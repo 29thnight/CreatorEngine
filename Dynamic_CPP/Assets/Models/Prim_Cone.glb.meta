@@ -1,4 +1,4 @@
-guid: 0f3c27d6-fd56-503f-9fea-ea2ea537ea90
+guid: 1cc56957-c0eb-4924-8439-f5f74e78df27
 importSettings:
   extension: .glb
   timestamp: 134300494792471617
@@ -6,3 +6,13 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: gltf/material/0
+      name: Cone_Mat
+      guid: 8d850a53-54f4-4ced-a7a4-5ce5aa7ea46b
+  embeddedTextures:
+    - key: gltf/image/0
+      name: Cone_Mat_BaseColor
+      guid: 6955879d-8fe7-48d2-b6b9-cba2276f52cb

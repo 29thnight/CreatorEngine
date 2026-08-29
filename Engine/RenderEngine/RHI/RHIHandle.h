@@ -103,8 +103,8 @@ struct RHIBufferHandle
 //   커맨드 버퍼가 참조하는 동안 파괴하면 미정의다. 표가 세대를 들면 "이미
 //   놓인 핸들"이 남의 파이프라인으로 풀리지 않고, 놓는 시점을 늦출 수 있다.
 //
-//   ★ 지금 놓는 호출자는 **0** 이다(캐시가 앱 수명이라 놓을 일이 없다).
-//     세어 둔다 — 적어 두지 않으면 다음 사람이 "쓰이는 것"으로 읽는다.
+//   ★ M5-C3b1부터 cache invalidation이 놓는 호출자다. 표의 handle은 즉시
+//     무효화하되 backend 객체는 in-flight 제출을 위해 별도 retired 보관한다.
 
 struct RHIPipelineHandle
 {

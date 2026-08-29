@@ -1,0 +1,31 @@
+guid: 7238a117-e923-4e2f-add6-324ec8682a61
+importSettings:
+  extension: .fbx
+  timestamp: 134297531275866512
+ModelImporter:
+  OptimizeMeshes: true
+  ImproveCacheLocality: true
+  CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: fbx/material/0
+      name: face.002
+      guid: 54371c67-a6df-4377-96d6-5e28ffad6fa6
+    - key: fbx/material/1
+      name: skin.002
+      guid: fea7358c-e43f-4dc9-a3bd-afffc757962f
+    - key: fbx/material/2
+      name: 팔찌.002
+      guid: 1a5214c9-8958-41e4-a415-97c6ab35c1e3
+    - key: fbx/material/3
+      name: 옷.002
+      guid: 7f3e0c49-a163-49dc-8104-9e098310db4b
+    - key: fbx/material/4
+      name: eye.002
+      guid: 40215ecd-32b9-45b7-9ebc-824969fac840
+    - key: fbx/material/5
+      name: 뿔.002
+      guid: 23052c61-9f09-4b4a-b7c6-f5c25732ff69
+  embeddedTextures:
+    []

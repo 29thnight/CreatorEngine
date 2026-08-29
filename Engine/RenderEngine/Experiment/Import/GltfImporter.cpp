@@ -342,6 +342,7 @@ namespace experiment::importer
 
             const fastgltf::Image& image = asset.images[*texture.imageIndex];
             ImportedTexture out;
+            out.sourceKey = "gltf/image/" + std::to_string(*texture.imageIndex);
             out.name = ToStdString(image.name);
             out.colorSpace = colorSpace;
 
@@ -633,9 +634,12 @@ namespace experiment::importer
         // ── 머테리얼 ────────────────────────────────────────────────────
         std::unordered_map<std::size_t, std::uint32_t> textureCache;
         scene.materials.reserve(asset.materials.size());
-        for (const fastgltf::Material& source : asset.materials)
+        for (std::size_t materialIndex = 0;
+            materialIndex < asset.materials.size(); ++materialIndex)
         {
+            const fastgltf::Material& source = asset.materials[materialIndex];
             ImportedMaterial material;
+            material.sourceKey = "gltf/material/" + std::to_string(materialIndex);
             material.name = ToStdString(source.name);
             material.baseColorFactor = {
                 source.pbrData.baseColorFactor.x(),

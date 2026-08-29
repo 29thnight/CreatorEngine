@@ -453,6 +453,8 @@ namespace experiment::importer
             const ufbx_material* material = loaded->materials.data[i];
             if (!material) continue;
             ImportedMaterial imported;
+            imported.sourceKey = "fbx/material/" +
+                std::to_string(material->typed_id);
             BuildFbxMaterial(*material, imported);
             materialIndex.emplace(material,
                 static_cast<std::uint32_t>(scene.materials.size()));

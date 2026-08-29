@@ -4,6 +4,7 @@
 #include "../ModelData.h"
 #include "../../StandardMaterialProperty.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -54,7 +55,19 @@ namespace experiment::importer
         // 모델 정체성은 .meta 소유이므로 변환기가 만들지 않고 받는다.
         AssetId modelAssetId{};
         std::string modelName{};
+        // source preview용 단일 fallback. 제품 Cook은 아래 resolver로 PBR
+        // alpha 정책에 맞는 실제 ShaderMeta identity를 재질마다 공급한다.
         AssetId shaderAssetId{};
+
+        std::function<AssetId(const ImportedMaterial&, std::size_t)>
+            resolveShaderAsset{};
+
+        // material은 모델 내부 순번만으로 영속 ID를 만들지 않는다. D2 catalog/
+        // authoring transaction이 발급한 identity를 D5 cook producer가 이 훅으로
+        // 공급한다. 비어 있거나 nil을 반환하면 source preview draft에는 nil이
+        // 남을 수 있지만 checked cooked writer는 publication을 거부한다.
+        std::function<AssetId(const ImportedMaterial&, std::size_t)>
+            resolveMaterialAsset{};
 
         MaterialPropertyNames propertyNames{};
 

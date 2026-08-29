@@ -8,6 +8,7 @@
 #include "GpuDiagnostics.h"
 #include "InputManager.h"
 #include "LogSystem.h"
+#include "Material.h"
 #include "PakHelper.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
@@ -278,10 +279,14 @@ void Player::App::Run()
 				EnhancedLiveDisplayTarget::Game,
 				EnhancedLiveViewFlags::ScreenSpaceUI };
 		}
+		const std::vector<std::shared_ptr<Material>> requiredMaterials =
+			SceneManagers->CaptureRequiredRenderMaterials();
+		const EnhancedRequiredAssetPacket requiredAssets =
+			EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
 		EnhancedLiveFramePacket renderFrame =
 			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(m_main->GetFrameDeltaTime()),
-			views, viewCount, SceneManagers->IsSceneLoading());
+			views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
 		const uint64_t publishedFrameId = renderFrame.frameId;
 		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
 		{

@@ -136,6 +136,38 @@ namespace
 		if (file::is_regular_file(requested, error) && !error) return requested;
 		return PathFinder::Relative(std::string(fallbackDirectory)) / requested.filename();
 	}
+
+	bool RegisterAssetMeta(AssetMetaRegistry& registry, const FileGuid& guid,
+		const file::path& path)
+	{
+		const AssetMetaRegistrationResult result = registry.Register(guid, path);
+		if (AssetMetaRegistrationResult::Registered == result
+			|| AssetMetaRegistrationResult::AlreadyRegistered == result)
+		{
+			return true;
+		}
+
+		std::string reason;
+		switch (result)
+		{
+		case AssetMetaRegistrationResult::Invalid:
+			reason = "invalid GUID/path";
+			break;
+		case AssetMetaRegistrationResult::GuidConflict:
+			reason = "GUID already maps to " + registry.GetPath(guid).string();
+			break;
+		case AssetMetaRegistrationResult::PathConflict:
+			reason = "path already maps to " + registry.GetGuid(path).ToString();
+			break;
+		default:
+			reason = "unknown registration result";
+			break;
+		}
+
+		Debug->LogError("Asset catalog rejected meta registration: guid="
+			+ guid.ToString() + " path=" + path.string() + " reason=" + reason);
+		return false;
+	}
 }
 
 DataSystem::~DataSystem()
@@ -158,14 +190,18 @@ void DataSystem::Finalize()
 	SpriteSheets.clear();
 	m_retainedAssets.clear();
 	{
-		std::lock_guard lock(m_retiredAssetMutex);
-		m_retiredAssetGenerations.clear();
+		std::lock_guard lock(m_retiredTextureMutex);
+		m_retiredTextureGenerations.clear();
 	}
 	{
 		std::lock_guard lock(m_shaderMetaMutex);
 		m_shaderMetaSlotByGuid.clear();
 		m_shaderMetaSlots.clear();
 		m_shaderMetaFreeSlots.clear();
+	}
+	{
+		std::lock_guard lock(m_pendingAssetChangeMutex);
+		m_pendingAssetChanges.clear();
 	}
 
 	m_assetMetaRegistry.reset();
@@ -203,7 +239,7 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 					{
 						const FileGuid guid(node["guid"].as<std::string>());
 						if (guid != FileGuid{})
-							m_assetMetaRegistry->Register(guid, targetPath);
+							RegisterAssetMeta(*m_assetMetaRegistry, guid, targetPath);
 					}
 				}
 				catch (const std::exception& exception)
@@ -278,7 +314,7 @@ void DataSystem::LoadModel(std::string_view filePath)
 	}
 }
 
-Model* DataSystem::LoadCashedModel(std::string_view filePath)
+std::shared_ptr<Model> DataSystem::LoadCachedModelShared(std::string_view filePath)
 {
 	const file::path assetPath = ResolveRuntimeAssetPath(filePath, "Models\\");
 	std::string name = assetPath.stem().string();
@@ -287,7 +323,7 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 		if (Models.find(name) != Models.end() && Models[name].get() != nullptr)
 		{
 			Debug->Log("ModelLoader::LoadModel : Model already loaded");
-			return Models[name].get();
+			return Models[name];
 		}
 	}
 
@@ -300,7 +336,7 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
     catch (const std::exception& e)
     {
         Debug->LogError(e.what());
-        return nullptr;
+        return {};
     }
 
 	if (model)
@@ -309,10 +345,15 @@ Model* DataSystem::LoadCashedModel(std::string_view filePath)
 			std::unique_lock lock(m_modelMutex);
 			Models[name] = model;
 		}
-		return model.get();
+		return model;
 	}
 
-	return nullptr;
+	return {};
+}
+
+Model* DataSystem::LoadCashedModel(std::string_view filePath)
+{
+	return LoadCachedModelShared(filePath).get();
 }
 
 void DataSystem::InsertMaterial(std::shared_ptr<Material> material)
@@ -452,15 +493,15 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 	};
 
 	synchronize(standard_material::property::BaseColorMap,
-		material.m_baseColorTexName, material.m_pBaseColor);
+		material.m_baseColorTexName, material.GetBaseColorMapShared().get());
 	synchronize(standard_material::property::NormalMap,
-		material.m_normalTexName, material.m_pNormal);
+		material.m_normalTexName, material.GetNormalMapShared().get());
 	synchronize(standard_material::property::OrmMap,
-		material.m_ORM_TexName, material.m_pOccRoughMetal);
+		material.m_ORM_TexName, material.GetOccRoughMetalMapShared().get());
 	synchronize(standard_material::property::AoMap,
-		material.m_AO_TexName, material.m_AOMap);
+		material.m_AO_TexName, material.GetAOMapShared().get());
 	synchronize(standard_material::property::EmissiveMap,
-		material.m_EmissiveTexName, material.m_pEmissive);
+		material.m_EmissiveTexName, material.GetEmissiveMapShared().get());
 }
 
 YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
@@ -609,17 +650,15 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 	if (0.04f > material.m_materialInfo.m_IOR || 4.f < material.m_materialInfo.m_IOR)
 		material.m_materialInfo.m_IOR = 1.5f;
 
-	// property GUID가 저장 정본이다. decode 대상에 남아 있을 수 있는 runtime raw
-	// pointer를 먼저 버려, 낡은 포인터 이름이 새 GUID를 역으로 덮지 못하게 한다.
-	material.m_pBaseColor = nullptr;
-	material.m_pNormal = nullptr;
-	material.m_pOccRoughMetal = nullptr;
-	material.m_AOMap = nullptr;
-	material.m_pEmissive = nullptr;
+	// property GUID가 저장 정본이다. decode 대상에 남아 있을 수 있는 generic/
+	// Standard runtime owner를 함께 버려 낡은 generation과 이름이 새 GUID를
+	// 역으로 덮지 못하게 한다.
+	material.ResetTextureRuntime();
 	SynchronizeLegacyMaterialProperties(material);
 	auto loadTexture = [this, &material](std::string_view property,
-		const std::string& name, Texture*& destination, bool compress)
+		const std::string& name, bool compress)
 	{
+		std::shared_ptr<Texture> texture;
 		const auto value = std::find_if(material.m_propertyValues.begin(),
 			material.m_propertyValues.end(), [property](const MaterialPropertyValue& candidate)
 			{
@@ -629,31 +668,49 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 			&& value->m_textureGuid != FileGuid{})
 		{
 			const file::path path = GetFilePath(value->m_textureGuid);
-			if (!path.empty()) destination = LoadMaterialTexture(path.string(), compress);
+			if (!path.empty()) texture = LoadSharedMaterialTexture(path.string(), compress);
 		}
-		if (!destination && !name.empty())
-			destination = LoadMaterialTexture(name, compress);
+		if (!texture && !name.empty())
+			texture = LoadSharedMaterialTexture(name, compress);
+		return texture;
 	};
 
-	loadTexture(standard_material::property::BaseColorMap,
-		material.m_baseColorTexName, material.m_pBaseColor, true);
-	loadTexture(standard_material::property::NormalMap,
-		material.m_normalTexName, material.m_pNormal, false);
-	loadTexture(standard_material::property::OrmMap,
-		material.m_ORM_TexName, material.m_pOccRoughMetal, false);
-	loadTexture(standard_material::property::AoMap,
-		material.m_AO_TexName, material.m_AOMap, false);
-	loadTexture(standard_material::property::EmissiveMap,
-		material.m_EmissiveTexName, material.m_pEmissive, false);
+	material.UseBaseColorMap(loadTexture(standard_material::property::BaseColorMap,
+		material.m_baseColorTexName, true));
+	material.UseNormalMap(loadTexture(standard_material::property::NormalMap,
+		material.m_normalTexName, false));
+	material.UseOccRoughMetalMap(loadTexture(standard_material::property::OrmMap,
+		material.m_ORM_TexName, false));
+	material.UseAOMap(loadTexture(standard_material::property::AoMap,
+		material.m_AO_TexName, false));
+	material.UseEmissiveMap(loadTexture(standard_material::property::EmissiveMap,
+		material.m_EmissiveTexName, false));
 
-	material.m_materialInfo.m_useBaseColor = nullptr != material.m_pBaseColor;
-	material.m_materialInfo.m_useOccRoughMetal = nullptr != material.m_pOccRoughMetal;
-	material.m_materialInfo.m_useAOMap = nullptr != material.m_AOMap;
-	material.m_materialInfo.m_useEmissive = nullptr != material.m_pEmissive;
-	if (!material.m_pNormal)
-		material.m_materialInfo.m_useNormalMap = 0;
-	else if (0 == material.m_materialInfo.m_useNormalMap)
-		material.m_materialInfo.m_useNormalMap = USE_NORMAL_MAP;
+	// P2d-c: Standard 다섯 이름 밖의 texture property도 같은 GUID 경로로 owner를
+	// 복원한다. MaterialPropertyValue는 type tag를 중복 저장하지 않으므로 nil이
+	// 아닌 texture GUID만 후보로 삼고, 실제 ShaderMeta type/register 대조는 frame
+	// sealing과 reflection gate가 담당한다.
+	const auto isLegacyTextureProperty = [](std::string_view property)
+	{
+		return property == standard_material::property::BaseColorMap
+			|| property == standard_material::property::NormalMap
+			|| property == standard_material::property::OrmMap
+			|| property == standard_material::property::AoMap
+			|| property == standard_material::property::EmissiveMap;
+	};
+	for (const MaterialPropertyValue& value : material.m_propertyValues)
+	{
+		if (value.m_name.empty() || value.m_textureGuid == FileGuid{}
+			|| isLegacyTextureProperty(value.m_name))
+		{
+			continue;
+		}
+
+		const file::path path = GetFilePath(value.m_textureGuid);
+		if (path.empty()) continue;
+		material.UseTextureMap(value.m_name,
+			LoadSharedMaterialTexture(path.string(), false));
+	}
 }
 
 Material* DataSystem::LoadMaterial(std::string_view name)
@@ -880,7 +937,7 @@ Material* DataSystem::CreateMaterial()
 			name = "NewMaterial" + std::to_string(index++);
 		}
 		material->m_name = name;
-		material->m_fileGuid = make_file_guid(name);
+		material->m_fileGuid = FileGuid::CreateRandomV4();
 		
 		Materials[name] = material;
 		
@@ -1002,6 +1059,41 @@ bool DataSystem::LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
 	return true;
 }
 
+void DataSystem::QueueAssetChange(RuntimeAssetChange change)
+{
+	if (change.path.empty()) return;
+	change.path = change.path.lexically_normal();
+
+	std::lock_guard lock(m_pendingAssetChangeMutex);
+	// Windows는 한 번의 저장에도 Modified를 여러 번 보낼 수 있다. 같은 종류와
+	// 경로의 미처리 이벤트는 마지막 게시값 하나로 합쳐 프레임 경계 generation이
+	// watcher 알림 조각 수만큼 뛰지 않게 한다.
+	const auto duplicate = std::find_if(m_pendingAssetChanges.rbegin(),
+		m_pendingAssetChanges.rend(), [&](const RuntimeAssetChange& queued)
+		{
+			return queued.kind == change.kind && queued.path == change.path;
+		});
+	if (duplicate != m_pendingAssetChanges.rend())
+	{
+		*duplicate = std::move(change);
+		return;
+	}
+
+	m_pendingAssetChanges.emplace_back(std::move(change));
+}
+
+std::size_t DataSystem::DrainQueuedAssetChanges()
+{
+	std::vector<RuntimeAssetChange> pending;
+	{
+		std::lock_guard lock(m_pendingAssetChangeMutex);
+		pending.swap(m_pendingAssetChanges);
+	}
+
+	for (const RuntimeAssetChange& change : pending) ApplyAssetChange(change);
+	return pending.size();
+}
+
 void DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 {
 	if (!m_assetMetaRegistry || change.path.empty()) return;
@@ -1014,14 +1106,14 @@ void DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 	{
 	case RuntimeAssetChangeKind::CatalogUpsert:
 		if (change.guid != FileGuid{})
-			m_assetMetaRegistry->Register(change.guid, change.path);
+			RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
 		break;
 	case RuntimeAssetChangeKind::ContentReload:
 		// 파일 게시는 이미 끝났다. 먼저 이전 generation을 cache lookup에서
 		// 분리한 뒤 catalog를 갱신해, 이 호출 이후의 load가 새 파일을 읽게 한다.
 		RetireCachedAsset(assetType, change.path, change.guid, false);
 		if (change.guid != FileGuid{})
-			m_assetMetaRegistry->Register(change.guid, change.path);
+			RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
 		break;
 	case RuntimeAssetChangeKind::Removed:
 		RetireCachedAsset(assetType, change.path, change.guid, true);
@@ -1045,40 +1137,43 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 	}
 
 	const std::string key = path.stem().string();
-	auto retire = [this, &key](auto& cache, std::mutex& cacheMutex)
+	auto detach = [&key](auto& cache, std::mutex& cacheMutex)
 	{
 		typename std::decay_t<decltype(cache)>::mapped_type generation;
 		{
 			std::lock_guard lock(cacheMutex);
 			const auto iterator = cache.find(key);
-			if (iterator == cache.end()) return;
+			if (iterator == cache.end()) return generation;
 			generation = std::move(iterator->second);
 			cache.erase(iterator);
 		}
-
-		if (generation)
-		{
-			std::lock_guard lock(m_retiredAssetMutex);
-			m_retiredAssetGenerations.emplace_back(std::move(generation));
-		}
+		return generation;
+	};
+	const auto detachForType = [this, &detach](RuntimeAssetType type,
+		auto& cache, std::mutex& cacheMutex)
+	{
+		auto generation = detach(cache, cacheMutex);
+		if (!generation || !RequiresLegacyRetiredGeneration(type)) return;
+		std::lock_guard lock(m_retiredTextureMutex);
+		m_retiredTextureGenerations.emplace_back(std::move(generation));
 	};
 
 	switch (assetType)
 	{
 	case RuntimeAssetType::Model:
-		retire(Models, m_modelMutex);
+		detachForType(assetType, Models, m_modelMutex);
 		break;
 	case RuntimeAssetType::Material:
-		retire(Materials, m_materialMutex);
+		detachForType(assetType, Materials, m_materialMutex);
 		break;
 	case RuntimeAssetType::Texture:
-		retire(Textures, m_textureMutex);
+		detachForType(assetType, Textures, m_textureMutex);
 		break;
 	case RuntimeAssetType::UITexture:
-		retire(UITextures, m_textureMutex);
+		detachForType(assetType, UITextures, m_textureMutex);
 		break;
 	case RuntimeAssetType::SpriteSheet:
-		retire(SpriteSheets, m_textureMutex);
+		detachForType(assetType, SpriteSheets, m_textureMutex);
 		break;
 	default:
 		break;

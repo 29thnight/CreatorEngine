@@ -328,8 +328,139 @@ PHASE 17은 socket, packet, RPC, replication을 구현하지 않는다. 대신 P
 랜덤 UUIDv4 채번 + `.meta` git 추적 전환(3.4) + 일괄 재채번·참조 재작성
 스크립트 + 레지스트리 충돌 경고. 죽은 프리팹 재연결 코드(Y-8)는 살리거나
 지우거나 이 슬라이스에서 결정한다(트랙 P 진행 상황에 따름 — §7).
+★ 대규모 리팩터링의 정책은 **기존 GUID 호환 없음**이다. 기존 UUIDv4도 보존하지
+않고 sidecar 226개를 전부 재발급하며, old→new 표는 현재 저작 자산을 같은
+transaction에서 고치기 위한 일회성 ledger일 뿐 runtime compatibility table이 아니다.
 판정: 동명 파일 2개가 서로 다른 GUID · 파일 리네임 후 씬 로드 시 참조 유지 ·
-전체 씬 12종 로드 왕복 diff 0(재채번 직후 1회 재저장 기준).
+전체 씬 14종 로드 왕복 diff 0(재채번 직후 1회 재저장 기준).
+
+**D2-a — sidecar 전수 감사 + catalog 충돌 fail-closed — ✅ 구현·표적 검증 완료
+(2026-08-29).** 실제 재채번에 앞서
+`Tools/regression/verify-asset-guid-contract.ps1`을 추가했다. 생성/빌드/임시 출력
+디렉터리를 제외한 sidecar 226개를 읽어 GUID 문법·UUID version·중복·대상 파일·Git
+추적 여부를 한 줄로 출력하며, 기본 audit는 현황을 기록하고 `-Strict`는 D2 최종
+계약을 만족하지 않으면 실패한다. 현재 기준선은 parsed 226, invalid 0,
+missing-target 0, duplicate GUID 0, UUIDv4 14, non-v4 212, tracked 29,
+policy-untracked 197, `d2Ready=false`다. 따라서 이 절편은 자산을 재작성하거나
+현재 deterministic v5 GUID를 완료로 승격하지 않는다.
+
+`AssetMetaRegistry::Register`는 이제 `Registered`·`AlreadyRegistered`·`Invalid`·
+`GuidConflict`·`PathConflict`를 반환한다. 같은 GUID가 다른 path를 가리키거나 같은
+path가 다른 GUID를 받으면 기존 양방향 매핑을 지우지 않고 거부하며 DataSystem이
+guid/path/기존 매핑을 오류로 남긴다. idempotent 재등록은 허용한다. selftest는 두
+충돌 방향과 invalid 입력을 넣어 거부 뒤 첫 매핑 보존을 단정한다.
+
+VS18 MSBuild/v145 Debug x64에서 RenderTests·CreatorEditor·Player가 성공했고
+`dx12.selftest`는 새 catalog 계약을 포함해 통과, stderr 0이었다.
+
+**D2-b1 — UUIDv4 발급 계약 + migration transaction manifest — ✅ 구현·표적 검증
+완료 (2026-08-29).** `FileGuid::CreateRandomV4()`는 경로나 이름을 받지 않고
+`CoCreateGuid` 결과를 RFC byte order로 옮긴 뒤 version 4·variant bit를 명시한다.
+selftest는 nil 아님·연속 발급 충돌 없음·version/variant·문자열 왕복을 단정하며
+D2-a의 catalog 충돌 검사와 함께 실행된다.
+
+`Tools/migration/New-AssetGuidMigrationManifest.ps1`은 자산 트리를 쓰지 않는 준비
+단계다. sidecar·대상 파일·GUID 유일성을 다시 검사하고 현재
+`metaPath/oldGuid` 인벤토리 SHA-256을 봉인한 뒤 기존 version과 무관하게 전부 새
+UUIDv4로 매핑한다. 알려진 참조는 `.creator/.asset/.prefab/.meta`에서만 세어
+entry별 occurrence/file 목록으로 남기며 source file이나 임의 UUID 문자열은
+재작성 대상에 넣지 않는다. 참조 path/GUID occurrence도 별도 SHA-256으로 봉인한다.
+manifest는 `Dynamic_CPP/Assets` 밖에만 만들고 기존 파일을 덮어쓰지 않으며
+`-ValidateExisting`은 meta·reference 인벤토리 drift, entry별 source mapping,
+mapping 중복과 UUIDv4 계약을 재검증한다.
+
+호환 제거 정책과 binary cache 감사를 반영해 manifest schema는 v3로 올렸고 이전
+schema reader를 남기지 않았다. CEMA v2 모델 `.asset` 14개 안에는 YAML ASCII GUID
+165건뿐 아니라 raw `Uuid16` 3건도 있었으므로 둘을 서로 다른 reference kind로
+봉인한다. 현재 dry-run은 assets 226, regenerate 226, preserve 0, known reference
+occurrence 431,
+inventory SHA-256
+`cdb2210ebf359630fd35a4c2763ed65c434a64d322734590cdb464478ec4cd12`, asset write
+0이었다. reference inventory SHA-256은
+`5abac0111533a9bd226cd16bcec8afdbd56ac894bb8625ba1d6b96199f3d3c8f`다. 생성 직후
+validate exit 0, 새 GUID 226개 유일, old==new 0, asset size/timestamp drift 0을
+확인했다.
+
+Editor의 GUID 없는 신규 sidecar fallback도 파일명 UUIDv5에서 random UUIDv4로
+전환했다. 기존 sidecar가 있으면 `.meta`만 identity 정본이고 payload의 `m_fileGuid`는
+mirror다. sidecar가 없는 최초 저작 publication에 한해서만 prefab/material payload의
+UUIDv4를 생성 힌트로 받으며, 구형 prefab 첫 엔티티의 `m_prefabFileGuid`를 복구하는
+호환 분기는 제거했다. 현재 prefab 9개는 모두 루트 `m_fileGuid`를 가져 제거된 분기의
+소비자가 0이다.
+VS18/v145 CreatorEditor·Player 빌드와 `dx12.selftest`(stderr 0)도 통과했다.
+
+**D2-b2 — 전수 재발급 transaction apply + Git pair 정책 — ✅ 구현·적용·표적 검증
+완료 (2026-08-29).** `Tools/migration/Invoke-AssetGuidMigration.ps1`은 먼저 기존
+manifest validator를 통과시킨 뒤 254개 영향 파일을 외부 backup/staged 트리에
+복사한다. UTF-8 문서는 문자열로, binary `.asset` 14개는 ASCII 36-byte와 raw
+16-byte 패턴으로 나눠 동일 길이 치환하며, entry별/전체 치환 수·old GUID 잔존 0·
+source hash drift·post-copy hash를 모두 검사한다. stage-only에서 254 files,
+14 binary, 431 replacements, asset writes 0을 확인한 뒤 같은 계약으로 실제 적용했고
+28,538,243-byte 원본 254개를 저장소 밖 backup에 남겼다.
+
+적용 후 live sidecar는 UUIDv4 226, non-v4 0, invalid/missing/duplicate 0이다.
+2026-08-29 프로젝트 분리 전 Git 경계를 다시 좁혔다. `*.meta`는 기본 ignore이고,
+저장소가 소유하는 clean-checkout 폐포(Prim/추적 FBX model, 대표 BaseColor,
+Forward material, ShaderMeta, 기존 IBL)의 target+meta만 `.gitignore`에 명시적으로 예외한다.
+자동 생성된 일반 HLSL/Volume/HDR 등 sidecar 70개는 `git add -f`로 강제 추가하지
+않고 로컬에만 보존한다. `verify-asset-guid-contract.ps1 -Strict`는 Git이 추적하는
+`.meta`가 현재 ignore 정책 밖의 명시적 예외인지 확인하며, `git add -f` 우회를
+`tracked-meta-policy-violation`으로 거부한다. 예외 target에만 sidecar를 필수로 하고
+orphan tracked meta를 거부하며 `d2Ready=true`를 유지한다.
+현재 index/live corpus 판정은 tracked meta 38, policy violation/required-meta-untracked/
+orphan 0, ignored-meta-with-tracked-target 70, local target/meta pair 118이다.
+
+VS18/v145 CreatorEditor·Player 빌드, `dx12.selftest`, `experiment.gltf
+Prim_Cube.glb`, `experiment.cooked Prim_Cube.glb` 실자산 왕복이 stderr 0으로
+통과했다. 당시 `dx12.scene` draw 0은 보관 원본 254개를 잠시 복원한 A/B에서도
+동일했고 이행본 재복원 hash drift가 0이라 GUID 이행 회귀에서는 분리했다. 후속
+D2-c에서 fixture 자체가 아니라 검증 시점의 RenderThread 진행도 차이로 확정했다.
+
+**D2-c — sidecar authority + atomic authoring/rename + 실제 draw gate — ✅ 구현·표적
+검증 완료 (2026-08-29).** 영속 asset ID의 경로/이름 기반 생성 API
+(`CreateFromName`, `MakeFileGUID`, `make_file_guid`, filesystem namespace UUID)를
+제거했고 legacy bridge의 `.meta` 누락 path-v5 fallback도 fail-closed로 바꿨다.
+Material/Prefab 저장은 payload를 먼저 노출하지 않고 Editor authoring lock 안에서
+temporary file publication과 UUIDv4 sidecar 생성을 한 transaction으로 수행한다.
+
+rename은 sidecar를 먼저 옮긴 뒤 target을 옮기며 target 이동 실패 시 sidecar를
+rollback한다. `asset.guid.rename.probe`는 material 저장→target/meta rename→catalog
+역조회→material YAML 재직렬화→cleanup을 수행해 같은 UUIDv4와 구조 dump를 단정한다.
+`verify-asset-guid-rename.ps1`와 prefab 저장·재로드 왕복은 각각 통과했다.
+
+`FT_Primitives`의 draw 0은 headless `wait 120`이 frame 124개를 빠르게 발행하는 동안
+RenderThread가 6개만 소비하고 118개를 latest-wins로 합친 상태에서 검증이 새 씬의
+create delta 적용 전에 `RenderScene`을 읽은 오진이었다. 일반 프레임은 그대로
+비동기이며, 오프라인 검증 진입에만 bounded queue drain API를 두었다.
+`verify-experiment-ft-primitives.ps1`은 같은 wait 120 경로에서 draw candidate 8,
+light 1, draw 8, mesh upload 8을 단정해 통과한다. strict 계약은 UUIDv4 226,
+required/orphan 0, `d2Ready=true`이고 VS18/v145 Debug x64 CreatorEditor도 통과했다.
+
+**D2-d — 전체 authoring corpus gate — ✅ 구현·전수 검증 완료
+(2026-08-29).** 현재 코퍼스는 scene 14, prefab 9, standalone material asset 2다.
+`verify-scene-authoring-corpus.ps1`은 원본을 입력으로만 열고 외부 temporary tree의
+동명 경로에 1차 저장→재로드→2차 저장한다. 14개 전수에서 load 28/28, save 28/28,
+1차/2차 SHA-256 불일치 0, 누락 0, 원본 hash 변경 0, 예상 밖 stderr 0으로 통과했고
+전체 회귀 세트에 편입했다. temporary 산출물은 실패 진단을 위해 보존한다.
+
+`verify-prefab-authoring-corpus.ps1`은 9개 전부를 외부 임시 씬에 소환해 13개 prefab
+entity, override 1건, 등록 root 11건의 identity/override multiset을 저장 전·재로드 후
+같은 digest로 확인했다. 소환 9/9, 원본 target/meta hash 변경 0, 예상 밖 stderr 0이다.
+
+`verify-material-authoring-corpus.ps1`은 standalone material 2개를 메모리에서 두 번
+왕복해 sidecar 정본과 payload mirror identity, ShaderMeta catalog 해석, texture reference,
+canonical payload를 확인했다. 착수 감사에서 두 payload의 `m_fileGuid`가 sidecar와 다른
+실제 위반을 발견해 sidecar 값으로 정규화했고, 이후 2/2 통과·원본 실행 중 변경 0·예상
+밖 stderr 0이다. 현재 두 재질의 non-nil texture reference는 0개이며 ShaderMeta reference
+2개는 모두 catalog target으로 해석된다. UUID version 판정은 중복하지 않고 전역 strict
+게이트가 맡는다.
+
+세 corpus gate와 전역 strict 계약을 `run-all.ps1`에 편입했다. live corpus 결과는 UUIDv4
+226/non-v4 0/invalid·missing·duplicate 0이고, Git 정책 gate는 명시적 target/meta
+폐포만 추적하며 강제 추가 violation 0, `d2Ready=true`다. GUID rename,
+FT_Primitives 실제 DX12 draw와 세 corpus gate가 모두
+통과했고 VS18/v145 Debug x64 CreatorEditor·Player 빌드도 성공했다. 이로써 D2는 완료다.
+old→new ledger와 외부 backup은 제품/runtime compatibility 경로에 남기지 않는다.
 
 **D3-a — format-neutral Document/Archive 경계 (Y-6, 3일)**
 장기 보관 4곳 + SceneManager 시그니처 + ComponentFactory 수기 접근을 3.3의
@@ -360,6 +491,110 @@ Player 로드 경로를 매니페스트+바이너리로 전환하고 `.meta`를 
 바이너리 로드 결과, 리플렉션 프로퍼티 전수 비교)를 먼저 세우고 배선한다.
 판정: 왕복 검사 전 씬·전 프리팹 통과 · Player 씬 전환 시간 D0 대비 수치
 개선(목표치는 D0 결과를 보고 이 문서에 추가) · 게임 빌드 실플레이 확인.
+
+**D5-a — Experiment model cooked identity publication gate — ✅ 구현·표적 검증 완료
+(2026-08-29).** 기존 cooked V3가 model/material/ShaderMeta/texture `AssetId` 필드를
+직렬화하면서도 producer가 material ID를 채우지 않고 texture path fallback을 그대로
+구울 수 있던 단절부터 닫았다. `ConversionOptions`는 catalog/authoring 쪽에서 발급한
+material identity를 받는 `resolveMaterialAsset`을 제공하고, 기존 texture resolver와 함께
+변환 결과에 싣는다. resolver가 비었거나 nil을 반환한 source preview draft 자체는 허용하지만
+`CookedModelCodec::Write`가 publication gate가 되어 nil model/material/ShaderMeta/texture ID와
+payload 내부 model/material owned-ID 충돌을 `Error` issue로 남기고 빈 bytes로 거부한다.
+fallback path는 cooked texture identity를 대신하지 못한다.
+
+호출부는 실패 가능한 `CookedWriteResult`를 소비하도록 전환했다. 합성 게이트는 nil model,
+nil material, nil ShaderMeta, fallback path만 있는 texture, 중복 material ID 5종을 모두
+거부하고 정상 V3 왕복·결정성을 포함해 310/310을 통과했다. `Prim_Cube.glb` 실자산은
+fixture 전용 resolver로 model/material/shader/texture identity를 각각 1/1 채워 24 vertices,
+2,480 B, 52/52 왕복을 통과했다. 이는 **제품 catalog 배선 증거가 아니라 codec 경계
+증거**다. `verify-experiment-cooked-identities.ps1`은 두 CLI pass, 음성 게이트 2회,
+원본 target/meta hash 변경 0, 예상 밖 stderr 0을 확인하며 `run-all.ps1`에 편입됐다.
+VS18/v145 Debug x64 CreatorEditor·Player 빌드도 성공했다.
+
+**D5-b1 — model subasset identity + GUID-addressed binary manifest contract — ✅ 구현·표적
+검증 완료 (2026-08-29).** 모델 sidecar에 `subAssets.schemaVersion: 1`과
+`materials[]`/`embeddedTextures[]`의 `sourceKey → UUIDv4` 매핑을 두었다. glTF는
+`gltf/material/<index>`·`gltf/image/<index>`, FBX는 `fbx/material/<typed_id>`를 게시하지만
+이 키 자체를 ID로 해시하지 않는다. 이름은 진단용일 뿐 identity가 아니며, 누락·중복·stale
+key와 nil/non-v4/비정규 UUID 표기는 fail-closed다. UUID 판정은 별도 전수 게이트를 만들지 않고
+기존 `verify-asset-guid-contract.ps1`에 nested subasset 2개와 최상위 226개의 전역 충돌 검사를
+합쳤다(`invalidSubasset=0`, duplicate 0, `d2Ready=true`).
+
+`CookedAssetManifest` CEMF v1은 UUID 순으로 정규화한 binary writer/reader와
+`GUID → kind/formatVersion/Derived path/byteSize/SHA-256/dependency GUID` 계약을 제공한다.
+model path는 `Derived/Models/<앞2자리>/<guid>.cemc`이고 절대 경로·역슬래시·dot segment,
+nil/중복/non-v4 ID, 빈 digest, self/duplicate/missing dependency, stale size/hash를 거부한다.
+`ConversionOptions::resolveShaderAsset`도 추가해 opaque/mask→GBuffer, blend→Forward의 실제
+ShaderMeta sidecar ID를 재질별로 공급한다. `Prim_Cube.glb`는 fixture ID 없이 실제 sidecar의
+model/material/embedded texture와 GBuffer ShaderMeta ID를 사용해 24 vertices, 2,480 B,
+64/64 왕복을 통과했고 model+material 2-entry manifest lookup/SHA-256도 왕복했다. 합성은
+331/331, subasset 음성 4/4와 manifest 음성 6/6을 두 CLI pass에서 모두 통과했으며 원본
+변경/stderr는 0이다. VS18/v145 Debug x64 CreatorEditor·Player도 성공했다(기존 PhysX PDB와
+Vulkan delay-load linker warning만 유지).
+
+**D5-b2a — 별도 AssetCooker + 단일 실제 model 원자 게시 — ✅ 구현·표적 검증 완료
+(2026-08-29).** `AssetPacker`에 import/RenderEngine 책임을 얹지 않고 별도 VS18/v145
+`Tools/AssetCooker`를 추가했다. `ModelCookProducer`는 source/.meta와 GBuffer/Forward ShaderMeta
+sidecar를 읽어 model/material/embedded texture identity를 해석하고 checked CEMC와 model+material
+CEMF entry를 완전 소유 값으로 만든다. 도구는 하나 이상의 `--model` product를 새 staging tree에
+모아 artifact와 `Derived/asset-manifest.cemf`를 다시 읽고 GUID/크기/SHA-256/subasset lookup을
+검증한 뒤 디렉터리 rename 한 번으로 게시한다. 기존 output, `Assets` 내부 output, invalid UUID
+sidecar는 partial output 없이 거부한다. 이 링크 경계를 위해 experiment import/cooked TU를
+RenderEngine unity object에서 분리했으며 렌더러 전체를 도구에 끌어오지 않는다.
+
+`verify-experiment-asset-cooker.ps1`는 `Prim_Cube.glb`를 외부 임시 tree에 두 번 cook해 두 결과
+hash가 같고 CEMC 2,432 B·CEMF 318 B·2 entry인지 확인했다. 같은 Assets tree를
+다른 물리 경로에 복제해도 CEMC/CEMF hash가 같다. 기존 output/Assets 내부 output/
+손상 sidecar 음성도 모두 통과했고 partial output 0, 원본 model/meta/ShaderMeta 변경 0,
+성공 stderr 0이다. VS18/v145 Debug x64 AssetCooker·CreatorEditor·Player 빌드도 성공했다
+(기존 ScriptCore trim/analyzer, PhysX PDB, Vulkan delay-load warning만 유지).
+
+**D5-b2b1 — 모델 전수 sidecar 재발급 + 전수 Cook — ✅ 구현·전수 검증 완료
+(2026-08-29).** 제품 Cook은 source sidecar를 수정하지 않는다. 별도 authoring 경계인
+`AssetCooker --refresh-model-identities`가 asset root의 최상위/기존 subasset UUIDv4를 먼저 전부 예약하고,
+현재 import 결과에서 실제로 소비되는 material/embedded texture source key에만 충돌 없는 새 random UUIDv4를
+발급한다. 전체 import/YAML 자기 검증이 끝난 뒤 sibling temporary를 준비하고 일괄 replace하며,
+게시 중 실패하면 이미 바꾼 sidecar를 원문으로 rollback한다. legacy subasset ID 보존/fallback은 없다.
+
+현재 checkout의 tracked 11 + local 3, model 14개 sidecar를 이 경계로 전수 재발급했다.
+material 52·embedded texture 96,
+model을 포함한 corpus ID 162개는 전부 canonical UUIDv4이고 중복 0이다. 전체 저장소 gate도
+`meta=226`, `subassetGuids=148`, invalid/missing/duplicate 0, `d2Ready=true`를 유지한다.
+`verify-experiment-model-cook-all.ps1`는 14개를 두 번 cook해 각각 CEMC 14개 + CEMF 1개,
+manifest entry 66개, CEMC 합계 17,752,200 B, CEMF 10,030 B를 만들고 tree hash 동등,
+원본 model/meta 변경 0, 성공 stderr 0을 확인한다. 복제 `Prim_Cube`에서는 명시적 refresh가
+상위 GUID를 유지하고 하위 GUID 2개만 새 UUIDv4로 바꾸는 것도 검증한다. VS18/v145 Debug x64
+AssetCooker 빌드와 기존 단일 model gate도 통과했다.
+
+**D5-b2b2 — build/AssetPacker/pak 통합 — ✅ 구현·실제 패키지 검증 완료 (2026-08-29).**
+`Tools/build.ps1`은 `InputMode` 규약으로 먼저 외부 `package-input/Base`를 만들고, live project가
+아닌 그 snapshot의 `Assets`를 `AssetCooker`에 넘겨 `Generated/Assets/Derived`를 만든다.
+저작 입력의 기존 `Assets/Derived`는 stale 산출물로 거부하고, Cook 결과만 `Merged`에
+overlay한다. `-BuildNative`는 Player·AssetPacker·AssetCooker를 VS18/v145로 함께 빌드하며,
+세 바이너리 모두를 필수 입력으로 판정한다.
+
+Cook 전·merge 후에 GUID-addressed CEMC 수가 model 수와 같고 CEMF가 딱 하나인지 재검증한다.
+`package-manifest.json` 안의 `cook` 섹션은 producer/source/artifact root/model·artifact·byte 수와
+CEMF SHA-256을 기록한다. `ModelCookProducer`는 CEMC provenance를 asset-relative 논리 경로로
+고정하고 물리 cooked path와 mtime을 직렬화 경계에서 제거해 staging 위치 불변을 보장한다.
+
+Debug/Project/SkipVerify 실제 패키징은 model 14, CEMC 14 + CEMF 1, entry 66,
+CEMC 17,752,200 B, CEMF 10,030 B를 전수 gate와 동일하게 만들었다. 분배 pak은
+529 sorted entries/510,108,259 B였고 `AssetPacker`의 reopen/index exact path·size 검증을 통과했다.
+`SkipVerify`이므로 candidate는 publish하지 않았고 Player runtime 소비 증거로 계산하지 않는다.
+build는 identity-refresh를 호출하지 않으며 sidecar 불일치는 fail-closed다.
+
+**D5-b2c — texture/ShaderMeta/scene/prefab producer — ⏳ 잔여.** 이 종류의 Derived artifact와
+material의 shader/texture dependency entry를 완성해야 D5-b 전체가 닫힌다. legacy cooked cache
+호환은 두지 않고 전수 재쿠킹한다. 따라서 제품 Cook/pak 배선은 아직 완료가 아니다.
+
+**D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.** Player가 `.meta`나 source
+path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,
+그 뒤에만 `.meta`를 pak에서 제외한다. missing/duplicate/stale manifest entry는 fail-closed다.
+
+**D5-d — 전수 cook parity + D0 성능·실플레이 — ⏳ 잔여.** scene 14·prefab 9·standalone
+material 2의 authoring 결과와 cooked load 결과를 전수 비교하고, Player 씬 전환을 D0과
+대조한 뒤 실제 게임 빌드 플레이로 D5 전체를 닫는다.
 
 **D6 — Player 텍스트 경로 은퇴 (1일)**
 EngineSettings·TagManager 등 부팅 YAML도 쿠킹 대상에 편입. 판정:

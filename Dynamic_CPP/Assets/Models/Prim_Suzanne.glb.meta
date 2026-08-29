@@ -1,4 +1,4 @@
-guid: 7a8b3051-26f2-5ea1-bfd9-9e9353b3e26d
+guid: dfd9b94f-cbf4-4712-9a41-01ee8453c7fa
 importSettings:
   extension: .glb
   timestamp: 134308765289434717
@@ -6,3 +6,13 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: gltf/material/0
+      name: Suzanne_Mat
+      guid: f1c84356-2cc4-4a8c-8549-42f6eca563b0
+  embeddedTextures:
+    - key: gltf/image/0
+      name: Suzanne_Mat_BaseColor
+      guid: d0c631bd-4cbb-4e02-93d7-690f2312ceb0

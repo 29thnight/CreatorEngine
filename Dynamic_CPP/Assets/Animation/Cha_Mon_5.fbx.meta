@@ -1,0 +1,14 @@
+guid: 2a91b60b-8923-49af-bcdf-9e39e1600e67
+importSettings:
+  extension: .fbx
+  timestamp: 134297531275931671
+ModelImporter:
+  OptimizeMeshes: true
+  ImproveCacheLocality: true
+  CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    []
+  embeddedTextures:
+    []

@@ -457,9 +457,9 @@ namespace RenderTest
         AppendNotes(im::ValidateImportedScene(scene), "ir", outLog, errors);
 
         // 3. 변환 경계
-        im::ConversionOptions options;
-        options.modelAssetId.value =
-            Uuid::FromName(FileGuid::ns_filesystem(), sourcePath.string());
+		im::ConversionOptions options;
+		options.modelAssetId.value =
+			FileGuid::CreateRandomV4().m_guid;
         options.modelName = sourcePath.stem().string();
         options.ticksPerSecond = 30.0;
         const im::ConversionResult converted =

@@ -165,14 +165,86 @@ namespace experiment::cooked
         {
             return static_cast<std::uint64_t>(begin) + count <= size;
         }
+
+        void RejectWrite(std::vector<ModelLoadIssue>& issues,
+            ModelLoadIssueCode code, std::string context, std::string message)
+        {
+            issues.push_back(ModelLoadIssue{ ModelLoadIssueSeverity::Error,
+                code, std::move(context), std::move(message) });
+        }
+
+        [[nodiscard]] bool ValidateCookedAssetReferences(const ModelDraft& draft,
+            std::vector<ModelLoadIssue>& issues)
+        {
+            std::vector<AssetId> ownedIdentities;
+            if (!draft.metadata.assetId.IsValid())
+            {
+                RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity,
+                    "metadata.assetId", "nil model AssetId는 cooked payload로 게시할 수 없다.");
+            }
+            else
+            {
+                ownedIdentities.push_back(draft.metadata.assetId);
+            }
+
+            for (std::size_t materialIndex = 0;
+                materialIndex < draft.materials.size(); ++materialIndex)
+            {
+                const Material& material = draft.materials[materialIndex];
+                const std::string context =
+                    "materials[" + std::to_string(materialIndex) + "]";
+                if (!material.assetId.IsValid())
+                {
+                    RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity,
+                        context + ".assetId",
+                        "nil material AssetId는 cooked payload로 게시할 수 없다.");
+                }
+                else if (std::ranges::find(ownedIdentities, material.assetId)
+                    != ownedIdentities.end())
+                {
+                    RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity,
+                        context + ".assetId",
+                        "model/material owned AssetId가 payload 안에서 충돌한다.");
+                }
+                else
+                {
+                    ownedIdentities.push_back(material.assetId);
+                }
+
+                if (!material.shaderAssetId.IsValid())
+                {
+                    RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity,
+                        context + ".shaderAssetId",
+                        "nil ShaderMeta AssetId는 cooked payload로 게시할 수 없다.");
+                }
+
+                for (std::size_t propertyIndex = 0;
+                    propertyIndex < material.properties.size(); ++propertyIndex)
+                {
+                    const auto* texture = std::get_if<TextureReference>(
+                        &material.properties[propertyIndex].value);
+                    if (texture && !texture->assetId.IsValid())
+                    {
+                        RejectWrite(issues, ModelLoadIssueCode::InvalidTextureReference,
+                            context + ".properties[" + std::to_string(propertyIndex)
+                                + "].textureAssetId",
+                            "cooked texture reference는 fallback path가 아니라 AssetId가 필요하다.");
+                    }
+                }
+            }
+            return issues.empty();
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════
     // 쓰기
     // ════════════════════════════════════════════════════════════════════
 
-    std::vector<std::byte> Write(const ModelDraft& draft)
+    CookedWriteResult Write(const ModelDraft& draft)
     {
+        CookedWriteResult result;
+        if (!ValidateCookedAssetReferences(draft, result.issues)) return result;
+
         StringTable strings;
 
         // ── 노드 ────────────────────────────────────────────────────────
@@ -444,7 +516,8 @@ namespace experiment::cooked
             std::memcpy(file.data() + table[i].offset, pending[i].data,
                 static_cast<std::size_t>(pending[i].bytes));
         }
-        return file;
+        result.bytes = std::move(file);
+        return result;
     }
 
     // ════════════════════════════════════════════════════════════════════

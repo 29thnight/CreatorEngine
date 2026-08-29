@@ -1,6 +1,7 @@
 // 렌더 측 프록시 로직만 남는다 — 컴포넌트를 읽는 생성자들은
 // ScriptBinder/PrimitiveProxyBridge.cpp에 있다 (PHASE 4-2 C1).
 #include "PrimitiveRenderProxy.h"
+#include "Mesh.h"
 
 // ── DX11 드로우 경로를 걷었다 (PHASE 3-1 재정의, T5) ──
 //
@@ -27,7 +28,45 @@ void FoliageRenderProxy::RebuildInstanceMap()
 	// 부르는 규약이고, 그래서 이 함수가 벡터를 건드리지 않는다.
 	for (auto& instance : m_foliageInstances)
 	{
-		if (instance.m_isCulled) continue;
+		if (instance.m_foliageTypeID >= m_foliageTypes.size()) continue;
 		instanceMap[instance.m_foliageTypeID].push_back(&instance);
 	}
+}
+
+std::vector<FoliageRenderProxy::DrawSource>
+FoliageRenderProxy::CaptureDrawSources() const
+{
+	std::vector<DrawSource> draws;
+	draws.reserve(m_foliageInstances.size());
+
+	// 타입 순서로 내보내 같은 mesh/material 인스턴스가 인접하게 남도록 한다.
+	// Forward 투명 정렬은 이후 view 단계가 다시 back-to-front로 수행한다.
+	for (std::size_t typeIndex = 0; typeIndex < m_foliageTypes.size(); ++typeIndex)
+	{
+		const FoliageType& type = m_foliageTypes[typeIndex];
+		if (!type.m_mesh) continue;
+
+		const auto found = instanceMap.find(static_cast<uint32>(typeIndex));
+		if (found == instanceMap.end()) continue;
+
+		for (const FoliageInstance* instance : found->second)
+		{
+			if (nullptr == instance
+				|| instance->m_foliageTypeID != static_cast<uint32>(typeIndex))
+			{
+				continue;
+			}
+
+			DrawSource draw{};
+			draw.mesh = type.m_mesh;
+			draw.material = type.m_material;
+			draw.worldMatrix = instance->m_worldMatrix;
+			draw.worldBounds = math::transform(
+				type.m_mesh->GetBoundingBox(), instance->m_worldMatrix);
+			draw.foliageTypeID = static_cast<uint32>(typeIndex);
+			draws.push_back(std::move(draw));
+		}
+	}
+
+	return draws;
 }

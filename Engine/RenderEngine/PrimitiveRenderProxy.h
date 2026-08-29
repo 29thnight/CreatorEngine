@@ -172,10 +172,22 @@ public:
 	FoliageRenderProxy() : PrimitiveRenderProxy(kProxyType) {}
 	explicit FoliageRenderProxy(FoliageComponent* component);
 
+	struct DrawSource
+	{
+		std::shared_ptr<Mesh> mesh{};
+		std::shared_ptr<Material> material{};
+		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
+		math::aabb worldBounds{};
+		uint32 foliageTypeID{};
+	};
+
 	// 인스턴스 목록이 바뀔 때마다 타입별 색인을 다시 만든다.
 	// 색인이 원소 주소를 들므로 m_foliageInstances를 갈아 끼운 뒤에는
 	// 반드시 불러야 한다 — 아니면 옛 벡터의 주소를 가리킨다.
+	// m_isCulled는 한 카메라에서 파생된 값이라 색인에서 제거 기준으로 쓰지
+	// 않는다. 실제 view별 절두체 판정은 DrawSource의 worldBounds로 수행한다.
 	void RebuildInstanceMap();
+	std::vector<DrawSource> CaptureDrawSources() const;
 
 public:
 	std::vector<FoliageInstance>	m_foliageInstances{};

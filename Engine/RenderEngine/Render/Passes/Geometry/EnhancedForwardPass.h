@@ -1,10 +1,22 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <map>
+#include <memory>
+#include <span>
+#include <string>
+#include <vector>
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../../RHI/RHIGraphicsPipelineRequest.h"
+
+struct ShaderMeta;
+struct ShaderMetaBindingLayout;
+struct ShaderRenderState;
+class RHIShaderBlob;
 
 // Forward+ 패스 (PHASE 3-6, 신규 작성).
 //
@@ -99,6 +111,27 @@ public:
     const char* GetName() const override { return "Forward+"; }
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
+    /// frame packet의 primary Forward ShaderMeta generation을 일반/Reference
+    /// graphics request 쌍으로 전환한다. 두 후보가 모두 준비된 뒤에만 현재
+    /// generation을 바꾸므로 한쪽 compile 실패가 기존 대조 쌍을 끊지 않는다.
+    bool ApplyShaderMeta(const EnhancedFrameContext& context,
+        ShaderMetaHandle handle, const ShaderMeta& meta,
+        RHICompletionPoint retireAfter, std::string& outError);
+    /// frame packet이 소유한 material generation/keyword 조합의 일반/Reference
+    /// PSO 쌍을 candidate-first로 준비한다. 모든 Forward material PSO는 primary와
+    /// 같은 pipeline layout을 써야 프레임/광원/타일/IBL binding을 보존할 수 있다.
+    bool EnsureShaderMetaVariant(const EnhancedFrameContext& context,
+        ShaderMetaHandle handle, const ShaderMeta& meta,
+        std::span<const std::uint16_t> keywordSelections,
+        RHIShaderPermutationKey& outPermutationKey,
+        std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
+        std::string& outError);
+    /// 성공적으로 밀봉된 이번 frame packet의 generation만 남긴다. 일반/Reference
+    /// 어느 쪽이든 다른 논리 key가 같은 cache handle을 공유하면 마지막 holder가
+    /// 사라질 때만 targeted invalidation한다.
+    std::uint32_t CommitShaderMetaFrame(const EnhancedFrameContext& context,
+        std::span<const ShaderMetaHandle> activeHandles,
+        RHICompletionPoint retireAfter);
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
@@ -120,6 +153,9 @@ public:
     /// SSGI의 누적 카운터와 같은 역할이다. 늘 0이면 컬링이 죽은 것이다.
     uint32_t GetLastCulledLightCount() const { return m_lastCulledLights; }
     uint32_t GetLastOverflowTileCount() const { return m_lastOverflowTiles; }
+    uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
+    uint32_t GetLastMaterialCount() const { return m_lastMaterialCount; }
+    uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
     /// 타일 버퍼. 소유는 패스이고(프레임을 넘겨 산다), 상태는 그래프가
     /// 관리한다 — Declare가 매 프레임 Import하고 writeback으로 끝 상태를
@@ -140,8 +176,28 @@ public:
     /// ★ 루트 시그니처 게터가 없어졌다(A-1). 핸들이 짝을 들므로 호출부가
     ///   그것을 따로 받을 이유가 사라졌다 — 자가 검증도 파이프라인 핸들
     ///   하나만 받아 SetPipeline 에 그대로 넘긴다.
-    RHIPipelineHandle GetShadePSO() const { return m_shadePSO; }
-    RHIPipelineHandle GetReferencePSO() const { return m_referencePSO; }
+    RHIPipelineHandle GetShadePSO() const
+    {
+        return m_shadePipelineRequest.GetHandle();
+    }
+    RHIPipelineHandle GetReferencePSO() const
+    {
+        return m_referencePipelineRequest.GetHandle();
+    }
+    std::uint32_t GetShaderVariantCount() const
+    {
+        return static_cast<std::uint32_t>(m_shaderVariants.size())
+            + (m_shaderMetaHandle.IsValid() ? 1u : 0u);
+    }
+    RHIPipelineHandle GetShaderVariantPipeline(ShaderMetaHandle handle,
+        RHIShaderPermutationKey permutationKey,
+        std::span<const std::uint16_t> keywordSelections,
+        bool referencePath) const;
+    ShaderMetaHandle GetShaderMetaHandle() const { return m_shaderMetaHandle; }
+    std::shared_ptr<const ShaderMetaBindingLayout> GetShaderBindingLayout() const
+    {
+        return m_shaderBindingLayout;
+    }
 
     /// IBL 앰비언트. Deferred가 받는 것과 같은 자원을 넘겨야 한다 —
     /// 한쪽만 앰비언트를 받으면 같은 재질이 투명일 때만 어둡게 보인다.
@@ -173,7 +229,22 @@ private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
+    bool BuildShadePipelineDesc(const EnhancedFrameContext& context,
+        const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
+        const ShaderRenderState* renderState,
+        const RHIShaderPermutation& permutation,
+        RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
+        RHIShaderBlob& outPs, std::string& outError);
+    bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
+        const ShaderMeta& meta,
+        std::span<const std::uint16_t> keywordSelections,
+        bool referencePath, RHIGraphicsPipelineDesc& outDesc,
+        RHIShaderBlob& outVs, RHIShaderBlob& outPs,
+        RHIShaderPermutationKey& outPermutationKey,
+        std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
+        std::string& outError);
     bool EnsureTileBuffers(const EnhancedFrameContext& context, std::string& outError);
+    void BuildAdjacentBatches(const EnhancedFrameContext& context);
 
     /// 드로우 기록. 컬링 경로와 참조 경로가 이 함수를 공유한다 — 대조가
     /// 뜻을 가지려면 PSO 말고는 아무것도 달라선 안 된다.
@@ -184,7 +255,7 @@ private:
     /// 바인딩 하나에만 쓰였고, R4-1c가 그것을 인코더의 지연 바인딩으로
     /// 옮기면서 마지막 쓰임이 사라졌다.
     bool RecordShading(class RHIEncoder& encoder,
-        const EnhancedFrameContext& context, RHIPipelineHandle pso, uint32_t lightCount,
+        const EnhancedFrameContext& context, uint32_t lightCount,
         RHITextureHandle shadowResource);
 
     Inputs   m_inputs{};
@@ -226,15 +297,51 @@ private:
 
     uint32_t m_lastCulledLights{ 0 };
     uint32_t m_lastOverflowTiles{ 0 };
+    uint32_t m_lastDrawCount{ 0 };
+    uint32_t m_lastMaterialCount{ 0 };
+    uint32_t m_lastBatchCount{ 0 };
     bool     m_useReferencePath{ false };
 
     RHIPipelineHandle m_cullPSO;
-    RHIPipelineHandle m_shadePSO;
+    // 일반/Reference는 같은 material permutation의 대조 쌍이다. desc가 빌린
+    // bytecode/input semantic 수명을 request가 함께 소유하고, 두 후보가 모두
+    // 성공한 뒤 한 경계에서 교체한다.
+    RHIGraphicsPipelineRequest m_shadePipelineRequest;
+    RHIGraphicsPipelineRequest m_referencePipelineRequest;
+    ShaderMetaHandle m_shaderMetaHandle{};
+    RHIShaderPermutationKey m_defaultPermutationKey{};
+    std::vector<std::uint16_t> m_defaultKeywordSelections{};
+    std::shared_ptr<const ShaderMetaBindingLayout> m_shaderBindingLayout{};
 
-    // 참조 경로(전 광원 루프) PSO. 대조의 정답지이자 성능 비교의 기준선이다.
-    // 셰이더는 같고 매크로 하나만 다르다 — 조명 계산이 달라지면 무엇 때문에
-    // 결과가 다른지 알 수 없게 된다.
-    RHIPipelineHandle m_referencePSO;
+    struct ShaderVariantKey
+    {
+        ShaderMetaHandle meta{};
+        RHIShaderPermutationKey permutation{};
+        // 128-bit digest 충돌이 다른 material 변형을 재사용하지 않게 하는
+        // collision guard. authored ShaderMeta 축 순서를 그대로 보존한다.
+        std::vector<std::uint16_t> keywordSelections{};
+
+        bool operator<(const ShaderVariantKey& other) const
+        {
+            if (meta.slot != other.meta.slot) return meta.slot < other.meta.slot;
+            if (meta.generation != other.meta.generation)
+                return meta.generation < other.meta.generation;
+            if (permutation.hi != other.permutation.hi)
+                return permutation.hi < other.permutation.hi;
+            if (permutation.lo != other.permutation.lo)
+                return permutation.lo < other.permutation.lo;
+            return keywordSelections < other.keywordSelections;
+        }
+    };
+
+    struct ShaderVariant
+    {
+        RHIGraphicsPipelineRequest shade;
+        RHIGraphicsPipelineRequest reference;
+        std::shared_ptr<const ShaderMetaBindingLayout> layout{};
+    };
+
+    std::map<ShaderVariantKey, ShaderVariant> m_shaderVariants;
 
 
     // 재질 텍스처 샘플러. 샘플러 힙이 중복을 걸러 주므로 GBuffer와 같은
@@ -251,16 +358,12 @@ private:
     // 두 번 그릴 때 두 번째가 첫 번째의 텍스처로 그려지지 않는다.
     struct MaterialKey
     {
-        Texture* textures[4]{};   // baseColor · normal · ORM · emissive
-        Texture* operator[](size_t i) const { return textures[i]; }
-        bool operator<(const MaterialKey& other) const
-        {
-            for (size_t i = 0; i < 4; ++i)
-            {
-                if (textures[i] != other.textures[i]) return textures[i] < other.textures[i];
-            }
-            return false;
-        }
+        std::array<Texture*, 4> textures{}; // baseColor · normal · ORM · emissive
+        std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> snapshot{};
+
+        Texture* operator[](std::size_t i) const { return textures[i]; }
+        bool operator==(const MaterialKey& other) const;
+        bool operator<(const MaterialKey& other) const;
     };
 
     struct MaterialTextures
@@ -269,6 +372,42 @@ private:
         RHIFormat       formats[4]{};
         uint32_t        mipLevels[4]{};
     };
+
+    // P2a 제품 draw는 owning snapshot에서만 값을 푼다. snapshot이 없는 기존
+    // selftest는 legacy EnhancedDrawItem field를 계속 쓸 수 있지만 두 경로를
+    // 섞지는 않는다.
+    struct MaterialView
+    {
+        Texture* textures[4]{};
+        math::color baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
+        float metallic{ 0.f };
+        float roughness{ 1.f };
+        uint32_t useNormalMap{ 0 };
+        std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> snapshot{};
+    };
+
+    static bool ResolveMaterialView(const EnhancedDrawItem& draw,
+        MaterialView& outView, std::string& outError);
+    MaterialKey MakeMaterialKey(const EnhancedDrawItem& draw) const;
+
+    bool ResolveShaderVariant(const EnhancedForwardMaterialDrawSnapshot& snapshot,
+        RHIPipelineHandle& outShadePipeline,
+        RHIPipelineHandle& outReferencePipeline,
+        std::shared_ptr<const ShaderMetaBindingLayout>& outLayout) const;
+
+    // CaptureFromView가 만든 back-to-front 순서는 절대 바꾸지 않는다. 같은
+    // mesh/material/PSO가 연속한 구간만 한 instanced draw로 합친다.
+    struct DrawBatch
+    {
+        std::size_t firstDraw{};
+        std::uint32_t drawCount{};
+        Mesh* mesh{};
+        MaterialKey material{};
+        RHIPipelineHandle shadePipeline{};
+        RHIPipelineHandle referencePipeline{};
+    };
+
+    std::vector<DrawBatch> m_batches;
 
     // 해시맵 대신 정렬 맵. 재질 종류는 프레임당 많아야 수십이고, 배열 키에
     // 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다(GBuffer와 같은 판단).

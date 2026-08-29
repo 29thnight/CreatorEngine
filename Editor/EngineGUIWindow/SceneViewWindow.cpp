@@ -753,7 +753,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 					Meta::UndoManager::GetInstance()->Execute(
 						std::make_unique<Meta::LoadModelToSceneObjCommand>(
 							scene,
-							DataSystems->LoadCashedModel(previewModelPath.string()),
+							DataSystems->LoadCachedModelShared(previewModelPath.string()),
 							&createdObj));
 					dragPreviewObject = createdObj;
 				}

@@ -383,26 +383,26 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
         Texture* bump = GenerateTexture(mat, aiTextureType_HEIGHT);
         if (normal)
         {
-            material->UseNormalMap(normal);
+            material->UseNormalMap(FindTextureOwner(normal));
             material->m_normalTexName = normal->m_name;
         }
         else if (bump)
         {
-            material->UseBumpMap(bump);
+            material->UseBumpMap(FindTextureOwner(bump));
             material->m_normalTexName = bump->m_name;
         }
 
         Texture* ao = GenerateTexture(mat, aiTextureType_LIGHTMAP);
         if (ao)
         {
-            material->UseAOMap(ao);
+            material->UseAOMap(FindTextureOwner(ao));
             material->m_AO_TexName = ao->m_name;
         }
 
         Texture* emissive = GenerateTexture(mat, aiTextureType_EMISSIVE);
         if (emissive)
         {
-            material->UseEmissiveMap(emissive);
+            material->UseEmissiveMap(FindTextureOwner(emissive));
             material->m_EmissiveTexName = emissive->m_name;
         }
 
@@ -418,7 +418,7 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
                 { aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE }, "baseColor");
             if (albedo)
             {
-                material->UseBaseColorMap(albedo);
+                material->UseBaseColorMap(FindTextureOwner(albedo));
                 material->m_baseColorTexName = albedo->m_name;
             }
 
@@ -429,7 +429,7 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
                   aiTextureType_UNKNOWN }, "metallicRoughness");
             if (occlusionMetalRough)
             {
-                material->UseOccRoughMetalMap(occlusionMetalRough);
+                material->UseOccRoughMetalMap(FindTextureOwner(occlusionMetalRough));
                 material->m_ORM_TexName = occlusionMetalRough->m_name;
             }
 
@@ -466,7 +466,7 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
             Texture* albedo = GenerateTexture(mat, aiTextureType_DIFFUSE);
             if (albedo)
             {
-                material->UseBaseColorMap(albedo);
+                material->UseBaseColorMap(FindTextureOwner(albedo));
                 material->m_baseColorTexName = albedo->m_name;
                 if (albedo->IsTextureAlpha())
                 {
@@ -903,26 +903,44 @@ void ModelLoader::LoadMaterial(std::ifstream& infile, uint32_t size)
 
 void ModelLoader::RetainMaterialTextures(Material& material)
 {
-	auto retain = [this](const std::string& name, Texture*& destination, bool compress)
+	auto retain = [this](const std::string& name,
+		const std::shared_ptr<Texture>& existing, bool compress)
 	{
-		if (name.empty()) return;
-		std::shared_ptr<Texture> texture =
-			DataSystems->LoadSharedMaterialTexture(name, compress);
-		if (!texture) return;
-		destination = texture.get();
+		std::shared_ptr<Texture> texture = existing;
+		if (!texture && !name.empty())
+			texture = DataSystems->LoadSharedMaterialTexture(name, compress);
+		if (!texture) return std::shared_ptr<Texture>{};
 		const bool alreadyRetained = std::ranges::any_of(m_model->m_Textures,
 			[&texture](const std::shared_ptr<Texture>& candidate)
 			{
 				return candidate.get() == texture.get();
 			});
-		if (!alreadyRetained) m_model->m_Textures.push_back(std::move(texture));
+		if (!alreadyRetained) m_model->m_Textures.push_back(texture);
+		return texture;
 	};
 
-	retain(material.m_baseColorTexName, material.m_pBaseColor, true);
-	retain(material.m_normalTexName, material.m_pNormal, false);
-	retain(material.m_ORM_TexName, material.m_pOccRoughMetal, false);
-	retain(material.m_AO_TexName, material.m_AOMap, false);
-	retain(material.m_EmissiveTexName, material.m_pEmissive, false);
+	material.UseBaseColorMap(retain(material.m_baseColorTexName,
+		material.GetBaseColorMapShared(), true));
+	material.UseNormalMap(retain(material.m_normalTexName,
+		material.GetNormalMapShared(), false));
+	material.UseOccRoughMetalMap(retain(material.m_ORM_TexName,
+		material.GetOccRoughMetalMapShared(), false));
+	material.UseAOMap(retain(material.m_AO_TexName,
+		material.GetAOMapShared(), false));
+	material.UseEmissiveMap(retain(material.m_EmissiveTexName,
+		material.GetEmissiveMapShared(), false));
+}
+
+std::shared_ptr<Texture> ModelLoader::FindTextureOwner(Texture* texture)
+{
+	if (!texture || !m_model) return {};
+	std::unique_lock lock(m_modelMutex);
+	const auto found = std::ranges::find_if(m_model->m_Textures,
+		[texture](const std::shared_ptr<Texture>& candidate)
+		{
+			return candidate.get() == texture;
+		});
+	return found == m_model->m_Textures.end() ? std::shared_ptr<Texture>{} : *found;
 }
 
 void ModelLoader::LoadSkeleton(std::ifstream& infile)

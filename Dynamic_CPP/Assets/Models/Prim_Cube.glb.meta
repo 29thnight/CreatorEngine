@@ -1,4 +1,4 @@
-guid: 3349d215-b026-59a7-bb01-1b173330c4f2
+guid: 68b21a01-958e-44ed-8820-a2b9aa289587
 importSettings:
   extension: .glb
   timestamp: 134300494787924110
@@ -6,3 +6,13 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: gltf/material/0
+      name: Cube_Mat
+      guid: 5700422c-13af-4bc0-b08e-1bc5d6a4e1ac
+  embeddedTextures:
+    - key: gltf/image/0
+      name: Cube_Mat_BaseColor
+      guid: d84d3983-7ca4-4fd2-9da7-2a33ac8c1001

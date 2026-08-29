@@ -246,9 +246,9 @@ public:
     ///
     /// ★ **디바이스가 소유하지 않는다.** DX12 는 PSO 관리자가 디바이스 곁에
     ///   사는데, 여기서는 캐시가 셰이더 모듈·셋 레이아웃까지 들어서 수명이
-    ///   더 크고 지금 소유자가 자가 검증이다. 소유를 옮기는 것은 슬라이스 8
-    ///   (러너 배선)의 몫이라, 그때까지 **가리키기만** 한다.
-    void SetPipelineCache(const VulkanPipelineCache* cache) { m_pipelineCache = cache; }
+    ///   더 크고 live pipeline/자가 검증이 직접 소유한다. 인코더 resolve와
+    ///   BeginFrame completion retirement를 위해 **가리키기만** 한다.
+    void SetPipelineCache(VulkanPipelineCache* cache) { m_pipelineCache = cache; }
 
     // ── 자가 검증이 쓰는 원시 표면 (인터페이스 밖) ──
     //
@@ -427,7 +427,7 @@ public:
 private:
 
     /// 소유하지 않는다 (위 `SetPipelineCache` ★).
-    const VulkanPipelineCache* m_pipelineCache{ nullptr };
+    VulkanPipelineCache* m_pipelineCache{ nullptr };
 
     std::atomic<uint32_t> m_unimplemented{ 0 };
     std::atomic<const char*> m_lastUnimplemented{ nullptr };

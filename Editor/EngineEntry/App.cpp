@@ -10,6 +10,7 @@
 #include "DumpHandler.h"
 #include "CoreWindow.h"
 #include "DataSystem.h"
+#include "Material.h"
 #include "DebugStreamBuf.h"
 #include "EditorSettingsStore.h"
 #include "EditorSessionState.h"
@@ -249,6 +250,10 @@ void Core::App::Run()
 	})
 	.Then([&]
 	{
+		// Watcher I/O thread가 게시한 asset 변경은 GT 프레임 경계에서만 적용한다.
+		// 이 뒤 Update와 frame packet 밀봉은 같은 ShaderMeta generation을 본다.
+		DataSystems->DrainQueuedAssetChanges();
+
 		// 메인 루프
 		m_main->Update();
 
@@ -293,10 +298,18 @@ void Core::App::Run()
 				EnhancedLiveDisplayTarget::Game,
 				EnhancedLiveViewFlags::ScreenSpaceUI };
 		}
+		// M6-P2d-d: 실제 Scene component가 소유한 Material에서 pass별
+		// ShaderMeta GUID를 선언한다. DataSystem cache에 없는 복제/런타임
+		// Material도 이 owner snapshot에 포함되며 RenderEngine은 Water/Wind
+		// 같은 대표 파일 이름을 알 필요가 없다.
+		const std::vector<std::shared_ptr<Material>> requiredMaterials =
+			SceneManagers->CaptureRequiredRenderMaterials();
+		const EnhancedRequiredAssetPacket requiredAssets =
+			EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
 		EnhancedLiveFramePacket renderFrame =
 			EnhancedSceneRenderer::BuildLiveFramePacket(
 			static_cast<float>(m_main->GetFrameDeltaTime()),
-			views, viewCount, SceneManagers->IsSceneLoading());
+			views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
 		const uint64_t publishedFrameId = renderFrame.frameId;
 		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
 		{

@@ -39,7 +39,13 @@ public:
 	void Shutdown() noexcept;
 	bool IsInitialized() const noexcept;
 
-	FileGuid CreateMeta(const file::path& filepath);
+	FileGuid CreateMeta(const file::path& filepath,
+		const FileGuid& preferredGuid = {});
+	FileGuid WriteTextAssetWithMeta(const file::path& destination,
+		std::string_view payload, const FileGuid& preferredGuid);
+	// target과 sidecar를 같은 transaction으로 옮긴다. 성공 시 기존 GUID를
+	// 반환하며, 새 GUID를 발급하는 fallback은 두지 않는다.
+	FileGuid RenameAsset(const file::path& source, const file::path& destination);
 	bool WriteModelCache(const file::path& destination,
 		std::span<const std::byte> bytes);
 	bool WriteEmbeddedTexture(const file::path& destination,

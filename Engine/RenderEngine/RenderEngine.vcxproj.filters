@@ -318,6 +318,15 @@
     <ClCompile Include="Experiment\Cooked\CookedModelCodec.cpp">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedAssetManifest.cpp">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\ModelCookIdentity.cpp">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\ModelCookProducer.cpp">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\NormalGeneration.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -686,6 +695,18 @@
     <ClInclude Include="Experiment\Cooked\CookedModelCodec.h">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
+    <ClInclude Include="Experiment\AssetIdentity.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\ModelCookIdentity.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\ModelCookProducer.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
     <ClInclude Include="Experiment\Import\FbxImporter.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
@@ -856,6 +877,9 @@
     </ClInclude>
     <ClInclude Include="RHI\IRenderPipelineCache.h">
       <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIGraphicsPipelineRequest.h">
+      <Filter>RHI\Core</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IRHIDeviceResources.h">
       <Filter>RHI\Interfaces</Filter>

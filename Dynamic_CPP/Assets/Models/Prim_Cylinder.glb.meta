@@ -1,4 +1,4 @@
-guid: b7e8d212-6209-5b7d-b358-e2e1bfa2e72c
+guid: 6723b433-dc6c-4b55-88b7-5abd646b59d5
 importSettings:
   extension: .glb
   timestamp: 134300494791293268
@@ -6,3 +6,13 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: gltf/material/0
+      name: Cylinder_Mat
+      guid: 401291fb-9ed5-4e77-8a96-51613371769e
+  embeddedTextures:
+    - key: gltf/image/0
+      name: Cylinder_Mat_BaseColor
+      guid: ded70f64-4957-41ce-8834-d0db6c6bdde4

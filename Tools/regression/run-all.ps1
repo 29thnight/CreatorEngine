@@ -185,6 +185,73 @@ Run-Step "Editor asset-authoring 소유권" {
         (Join-Path $PSScriptRoot "verify-asset-authoring-ownership.ps1") -EditorExe $Exe
 }
 
+# D2-c: material payload와 sidecar의 UUIDv4가 같고, target+meta rename 뒤에도
+# catalog 참조가 같은 GUID로 새 경로를 해석하는지 실제 Editor authoring host로 잰다.
+Run-Step "Asset GUID 전역 strict 계약" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-asset-guid-contract.ps1") -Strict
+}
+
+Run-Step "Asset GUID rename 불변식" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-asset-guid-rename.ps1") -Exe $Exe -Work $Work
+}
+
+# D2-c: 실제 experiment 이행 fixture가 catalog GUID로 모델/재질을 되찾고,
+# RenderThread의 새 씬 proxy delta를 적용한 뒤 DX12 draw까지 만드는지 확인한다.
+Run-Step "Experiment FT_Primitives 실제 draw" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-experiment-ft-primitives.ps1") -Exe $Exe -Work $Work
+}
+
+# D2-d: 저장소의 저작 씬 14개를 원본에 쓰지 않고 외부 임시 트리로 두 번
+# 저장한다. 첫 저장 결과를 다시 열어 같은 이름으로 재저장했을 때 byte hash가
+# 같아야 하고, 실행 전후 원본 hash도 같아야 한다.
+Run-Step "Scene authoring 전수 왕복" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-scene-authoring-corpus.ps1") -Exe $Exe -Work $Work
+}
+
+# D2-d: 현재 Prefabs 디렉터리의 9개를 모두 소환하고 외부 임시 씬 저장·재로드
+# 전후 identity/override/등록 multiset을 비교한다. prefab 원본은 읽기 전용이다.
+Run-Step "Prefab authoring 전수 왕복" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-prefab-authoring-corpus.ps1") -Exe $Exe -Work $Work
+}
+
+# D2-d: standalone material 2개의 sidecar identity, ShaderMeta/texture GUID와
+# canonical payload가 메모리 왕복에서 보존되는지 확인한다. UUID version 검사는
+# 위의 전역 strict 계약이 맡고 이 항목에서는 중복 판정하지 않는다.
+Run-Step "Material authoring 전수 왕복" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-material-authoring-corpus.ps1") -Exe $Exe -Work $Work
+}
+
+# D5-a: source preview의 nil identity/fallback path가 cooked artifact로 조용히
+# 게시되지 않는지, 그리고 명시적인 model/material/ShaderMeta/texture resolver가
+# 실자산 import → checked writer → reader 왕복에서 모두 보존되는지 확인한다.
+Run-Step "Experiment cooked identity 게시 계약" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-experiment-cooked-identities.ps1") -Exe $Exe -Work $Work
+}
+
+# D5-b2a: in-memory 계약을 별도 production tool까지 잇는다. 실제 model/.meta와
+# ShaderMeta sidecar를 읽어 새 staging tree에 CEMC/CEMF를 쓰고 재검증한 뒤 한 번에
+# 게시해야 한다. 두 번의 출력 hash가 같고 실패 요청은 partial tree를 남기지 않는다.
+Run-Step "Experiment AssetCooker 실제 산출물 게시" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-experiment-asset-cooker.ps1") -Work $Work
+}
+
+# D5-b2b1: tracked model 전부와 현재 checkout의 선택적 local model이 strict
+# subasset UUIDv4 sidecar를 가지며,
+# 두 번의 전수 Cook이 같은 14 CEMC + CEMF를 만들고 source를 수정하지 않아야 한다.
+# UUID 재발급은 복제 fixture에서 명시적 migration 모드로만 검증한다.
+Run-Step "Experiment model 전수 identity/cook" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-experiment-model-cook-all.ps1") -Work $Work
+}
+
 # E2: Editor import 완료 결과는 하나의 RuntimeAssetChange 계약으로만 Core에
 # 전달하고, reload는 이전 generation의 raw 참조 수명을 보존해야 한다.
 Run-Step "Runtime asset-change 경계" {

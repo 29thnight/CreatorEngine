@@ -142,7 +142,7 @@
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
     설계 문서 34종: <a href="#doc-index">아래 색인</a> ·
-수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-27</span>
+수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-08-29</span>
   </div>
 
   <div class="overall">
@@ -310,14 +310,18 @@
       실측 결론 ①: <b>생산 소비자가 0이다</b> — experiment:: 참조가 전부 검사 하네스이고 화면에 나오는 것은 여전히 legacy(Assimp)다. source(<code>ImporterModelDecoder</code>)와 cooked 디코더/코덱은 내부에 섰지만 <code>CookedThenSource</code> 정책 resolver와 제품 진입점 배선은 없다.
       실측 결론 ②(정점 233,910개 전수): legacy 96B는 여전히 GPU로 올라간다. 소비자 0인 experiment 경로는 V2 68B와 V3 mesh별 packed mask/stride까지 완료했다. 정적 실자산은 실제 48B(0.10MB→0.05MB), 컬러 자산은 COLOR_0 보존과 cooked v3 왕복을 통과했다. 11.17MB/47.8%는 전수 감사 기반 전망이다.
       게이트가 거짓 초록을 낸 사례 4건에서 얻은 규칙(보존과 계산을 갈라 재기 · 0건의 내역 찍기 · 불일치는 실값과 함께 · 새 검사는 변이로 이빨 증명)을 §3.3에 남겼다.</div></div>
-    <div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5 · M5-D</span>
-      <div class="why">머테리얼 → ShaderMeta → 퍼뮤테이션 → Slang → DXIL/SPIR-V 단일 파이프라인. M0·M1A/B·M2A/B·M3·M4·M7, M5-C2와 모델 교차 property 이름 정본(M5-D)은 완료됐다. 다음은 M5-C3 watcher·PSO generation, 이어 C4 raw 소비자 정리다.</div></div>
+<div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5 · 완료</span>
+<div class="why">머테리얼 → ShaderMeta → 퍼뮤테이션 → Slang → DXIL/SPIR-V 단일 파이프라인. M0~M7이 완료됐다. M5는 generation/소유 수명과 직렬화 정본을 닫았고, M6-P0~P2d-d는 GBuffer/Forward property·texture·ShaderMeta/PSO·Water/Wind·Foliage/flow·required assets를 제품 경로에 연결했다. P2d-e는 material-cache frame scan 2곳, Material raw texture alias/setter와 제품 draw pool legacy writer를 은퇴했다. 이 완료는 기존 <code>::Material</code> 렌더 계약의 완결이며 타입 퇴역은 아니다. D2/D5-a·D5-b1·D5-b2a·D5-b2b1·D5-b2b2로 model 전수 Cook/pak 게시까지 완료됐다. D5-b2c 나머지 ID가 공급된 뒤 ModelImport I5-M이 <code>experiment::Material</code>을 정본으로 승격하고 I6가 legacy Model/Material과 Assimp를 함께 제거한다.</div></div>
     <div class="doc is-done"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4 · 4-1</span>
-      <div class="why">Pipeline Asset Inspector가 Pass 순서·슬롯·리소스 schema·조건·폴백을 소유하고, 일반 Pass는 네이티브 Template와 재편집 가능한 Visual Shader Graph/직접 Slang으로 작성한다. Standard PBR은 native Slang 공용 모듈로 출력 동등 이관한 뒤 glTF 의미·에너지/IBL·그림자·display/post·확장 lobe를 단계적으로 연다. C#은 선택적 Game-thread 값 제어만 담당하며, 고급 Pass는 소스 수준 C++, 외부 Native DLL ABI는 제외한다.</div></div>
+      <div class="why">Pipeline Asset Inspector가 Pass 저작 순서·슬롯·리소스 schema·조건·폴백을 소유하고, 일반 Pass는 네이티브 Template와 재편집 가능한 Visual Shader Graph/직접 Slang으로 작성한다. 실행 순서는 versioned resource edge로 컴파일하며 독립 Pass만 저작 순서를 tie-break로 쓴다. Standard PBR은 native Slang 공용 모듈로 출력 동등 이관한 뒤 glTF 의미·에너지/IBL·그림자·display/post·확장 lobe를 단계적으로 연다. C#은 선택적 Game-thread 값 제어만 담당하며, 고급 Pass는 소스 수준 C++, 외부 Native DLL ABI는 제외한다.</div></div>
+    <div class="doc"><a href="plans/RenderGraphDependencySchedulingPlan.md">RenderGraphDependencySchedulingPlan.md</a><span class="tie">PHASE 4 · 트랙 RG</span>
+      <div class="why"><b>2026-08-28 신설.</b> 현재 <code>EnhancedRenderGraph</code>의 declaration-order 실행을 교체하지 않고 확장한다. 명시적 Read/Write/Modify와 resource version → stable single-queue DAG → culling/lifetime/barrier·병렬 기록 재계산 → 기본 19 node와 제품 Pass 이관 → DX12/Vulkan live cutover를 먼저 닫는다(RG0~RG6 57일). 그 뒤에만 transient buffer/aliasing → multi-queue async compute → subresource/split barrier·Resource Inspector를 연다(RG7~RG9 60일). 총 117일, 구현 미착수.</div></div>
     <div class="doc"><a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
       <div class="why">애니메이션 평가 엔진 3세대 전환 + 스케줄러 · LOD · CPU 버짓. 8-19 개정: 언리얼·유니티·Lumina 대조로 <b>평가 엔진이 한 세대 뒤</b>임이 드러나 두 겹이 됐다 — 아래층(포즈=값 · 태스크 레시피 · 도달성 실행 · 관측 본 물질화)과 위층(레시피 강등 L0~L7 · 태스크 EMA 기반 계산형 버짓). 실측 결론: 본 계산이 문자열 map 탐색 위에서, 공유 애셋(curKey·Bone)에 8스레드 쓰기 경합을 내며, 화면 밖 캐릭터까지 풀틱으로 돈다. 뼈=GameObject와 512행렬 프록시라는 <b>하이브리드 청구서를 동시에</b> 내는 중(744 뼈 노드 × 3순회 + 본 30개짜리도 32KB 복사).</div></div>
     <div class="doc"><a href="plans/ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14</span>
       <div class="why">표시 중심 프로파일러를 프레임 단위 녹화·정지 후 구간 분석 도구로 승격. 수집 코어(CaptureSession, EngineFrameId·SubmissionId)가 먼저고 ImGui는 불변 캡처의 reader일 뿐이다. 정적 점검 결론: collector가 producer TLS를 직접 리셋하고, GPU query record가 frame ring과 분리돼 2-in-flight·멀티카메라에서 프레임 매핑을 보장 못 하며, profiler가 에디터 모듈에 있어 Player 녹화 불가.</div></div>
+    <div class="doc"><a href="plans/EditorAutomationCLIPlan.md">EditorAutomationCLIPlan.md</a><span class="tie">PHASE 6 · CLI0~CLI7</span>
+      <div class="why">별칭 포함 176개 명령과 40개 자동화 소비 파일을 가진 기존 Editor CLI를 정식 command subsystem으로 승격한다. Result → Arguments → Descriptor → Module → JSONL 순으로 실패·인자·발견성·모듈·기계 판독 계약을 닫고, 기존 dotted ID와 frame-boundary Pump는 유지한다. <b>MCP는 보류하며 이 트랙의 범위와 작업에 포함하지 않는다.</b></div></div>
     <div class="doc is-done"><a href="plans/RhiBoundaryPlan.md">RhiBoundaryPlan.md</a><span class="tie">3-1 완료</span>
       <div class="why">RHI 경계 재설계 완료. 경계 인터페이스 7/7, 공용 패스 17/17, 양 backend 픽셀 대조 18개, Slice 7·8·R6와 최종 Debug/별도 프로세스/TickLive 통합 회귀까지 통과했다.</div></div>
     <div class="doc"><a href="plans/LivePipelineDescPlan.md">LivePipelineDescPlan.md</a><span class="tie">3-13</span>
@@ -486,57 +490,63 @@
 <!-- ===== PHASE 3.5 ===== -->
 <section class="phase" id="phase-3.5">
   <h2 class="sec"><span class="no">PHASE 3.5</span>머테리얼 · 셰이더 파이프라인 재설계 <span class="phase-pct" data-phase-pct="3.5"></span></h2>
-  <div class="phase-meta">예상 공수: 23일 · 신설(2026-08-11) · 최신화(2026-08-27) · 완료 공수 16일, 잔여 추정 7일 · M5-C2 + M5-D까지 진행 · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="plans/MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
+        <div class="phase-meta">예상 공수: 23일 · 신설(2026-08-11) · 완료(2026-08-29) · 완료 공수 23일, 잔여 추정 0일 · M0~M7 완료 · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="plans/MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
   <div class="phase-goal"><b>목표:</b> Material → ShaderMeta → (키워드 · Pass · RenderStates) → 퍼뮤테이션 → HLSL 소스 → Slang → DXIL | SPIR-V의 <b>단일 파이프라인</b>을 세운다.
   현재 컴파일러·캐시·퍼뮤테이션·중립 PSO 상태·ShaderMeta·양 타깃 reflection은 완료됐다. Material도 소유 프로퍼티 블록, typed YAML/CEMT v1 단일 codec, legacy texture GUID 이행, DataSystem 소유 ShaderMeta slot/generation handle까지 도달했다.
-  남은 임계 경로는 M5-C3의 watcher <code>Modified</code>→CPU invalidation queue→render-thread next-use 재요청과 DX12/Vulkan PSO generation 완결, M5-C4의 <code>FoliageType</code> raw Mesh/Material 제거다. 그 뒤 M6에서만 Material 값·PSO를 실제 draw item에 배선한다.</div>
+          C3a의 watcher <code>Modified</code>→GT CPU generation invalidation, C3b1의 DX12/Vulkan PSO handle generation, C3b2a의 completion 기반 bounded retirement, C3b2b1의 deep-owned graphics request/targeted invalidation과 C3b2b2의 ShaderMeta packet→GBuffer 대표 next-use를 완료했다. C4는 <code>FoliageType</code>과 Editor Undo의 장기 Model/Mesh/Material raw 소비를 소유 참조로 바꾸고 Model/Material 전역 retired generation 의존을 제거했다. M6-P0~P2d-d는 GBuffer/Forward의 property·texture generation·ShaderMeta/PSO·Water/Wind custom block·Foliage/flow·required-asset packet을 양 backend 제품 경로로 닫았다. P2d-e는 frame material-cache scan과 Material raw texture alias/setter, 제품 draw pool의 legacy writer를 은퇴했다. 빈 required packet의 primary-only 1/1과 명시 packet의 Forward primary+Water+Wind 3개를 판정했다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="3.5"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
       <li class="done-item">✔ 컴파일 진입점 하나 — Slang 2026.14 고정 번들, 엔진 직접 <code>dxcapi</code>/Vulkan SDK·PATH fallback 0건 · 손 퍼뮤테이션 0건</li>
-      <li>머테리얼 커스텀 셰이더가 화면에 나온다 — 검증 씬 픽셀 판정 통과, Material 프로퍼티 변경이 다음 프레임에 반영</li>
+      <li class="done-item">✔ 대표 머테리얼 커스텀 셰이더가 화면에 나온다 — Water/Wind 실제 GUID·양 backend 픽셀 판정 통과, <code>windTint</code> 변경이 다음 프레임에 반영</li>
+      <li class="done-item">✔ <code>FoliageRenderProxy</code> type/instance owning draw source와 view별 transformed AABB culling 입력</li>
+        <li class="done-item">✔ dynamic time/flow·<code>m_flowInfo</code>를 immutable snapshot/Forward instance로 이전 — 양 backend 픽셀·NaN fail-closed 통과</li>
+        <li class="done-item">✔ generic texture schema/owner vector와 <code>windMap@t4</code> 양 backend owner 수명·픽셀</li>
+              <li class="done-item">✔ 전체 legacy 호출자 재측정 — frame cache scan·Material raw alias/setter·제품 draw pool legacy writer 은퇴</li>
       <li class="done-item">✔ 같은 메타·같은 소스에서 Slang DXIL/SPIR-V 생성 · 양 타깃 reflection의 logical binding/cbuffer layout 일치 · DX12/Vulkan selftest 통과</li>
       <li class="done-item">✔ 두 번째 실행 컴파일 0건 + <code>.hlsli</code> 수정 시 의존 엔트리만 재컴파일 · 머테리얼 typed YAML/CEMT v1 codec 단일화</li>
-      <li>ShaderMeta watcher·render-thread 재요청과 PSO generation 완결 + raw Mesh/Material 소비자 제거 뒤 retired generation 축소</li>
-      <li>자가 검증 스윕 판정 착수 전과 동일 + <code>dx12.live status</code> 패스 목록 문자 일치 + 회귀 세트 통과</li>
+      <li class="done-item">✔ ShaderMeta watcher→render-thread owning request 재요청 완결 + raw Mesh/Material 소비자 제거 뒤 Model/Material retired generation 축소</li>
+      <li class="done-item">✔ 자가 검증 35종 판정 착수 전과 동일(통과 28 · 완료 4 · 실패 2 · 무판정 1, stderr 0) + <code>pipeline.nodes</code> 구성/상태 일치 + 회귀 세트 통과</li>
     </ul>
   </div>
   <div class="risknote">
     <div class="vt">리스크</div>
     Slang·downstream DXC DLL과 라이선스는 <code>ThirdParty/Slang</code> 및 package에 고정됐고 Workspace 격리 stage는 양 backend Player smoke를 통과했다. 커밋 스냅샷 기반 Tracked clean-checkout 재현은 아직 실행하지 않았다.
-    M6 배선이 최대 위험 — "배선만 이으면 그림이 더 나빠진다"(Forward+ 전례), 검증 씬·셰이더 프로브 선행.
-    CPU ShaderMeta stale handle 거부는 M5-C2에서 닫혔지만 watcher·PSO handle은 C3, <code>FoliageType</code> raw 포인터와 Model/Material/Texture retired generation 축소는 C4까지 남는다.
+            M6 배선의 최대 위험은 양 backend 픽셀·수명 게이트로 닫았다. P2d-e는 cache에 Water/Wind가 있어도 빈 required packet이 primary-only 1/1임을 단정하고 raw Material texture alias/setter와 제품 legacy writer를 제거했다.
+    CPU ShaderMeta stale handle·watcher queue, backend PSO handle generation/completion retirement, deep-owned graphics request·targeted invalidation, 제품 GBuffer 대표 next-use와 장기 Model/Mesh/Material 소유 수명은 C4까지 닫혔다. <code>TerrainLayer</code>·UITexture·SpriteSheet 등 Material 밖 raw texture alias 때문에 제한된 texture retired 보존은 남는다.
   </div>
 </section>
 
 <!-- ===== PHASE 4 ===== -->
 <section class="phase" id="phase-4">
   <h2 class="sec"><span class="no">PHASE 4</span>차세대 GPU 렌더링 기능 구상 <span class="phase-pct" data-phase-pct="4"></span></h2>
-  <div class="phase-meta">예상 공수: 구상 10일 + 트랙 I·V · 선행 조건: Phase 3 기반 완료 + Phase 3.5 셰이더 계약 확정 · 설계 문서: <a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a> · <a href="plans/ModelImportPipelinePlan.md" style="color:var(--accent)">ModelImportPipelinePlan.md</a> · <b>2026-08-25 모델 임포트 파이프라인(구 PHASE 24) 편입</b></div>
+  <div class="phase-meta">예상 공수: 구상 10일 + 트랙 RG 117일 + 트랙 I·V·L · 선행 조건: Phase 3 기반 완료 + Phase 3.5 셰이더 계약 확정 · 설계 문서: <a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a> · <a href="plans/RenderGraphDependencySchedulingPlan.md" style="color:var(--accent)">RenderGraphDependencySchedulingPlan.md</a> · <a href="plans/ModelImportPipelinePlan.md" style="color:var(--accent)">ModelImportPipelinePlan.md</a> · <b>2026-08-28 리소스 의존성 RenderGraph 트랙 편입</b></div>
   <div class="phase-goal"><b>목표:</b> 일반 개발자가 Pipeline Asset Inspector와 Shader Graph/직접 Slang으로 파이프라인과 신규 Pass를 작성하되 Game→Render 비동기와 네이티브 RenderGraph/RHI 실행을 보존하는 <b>Scriptable Render Pipeline</b> 계약을 먼저 세운다.
   그 위에서 <b>GPU-driven rendering</b>, <b>Stochastic Tile-Based Lighting</b>, <b>DXR</b>, <b>DLSS</b>를 서로 떨어진 기능 목록으로 두지 않고 공통 가시성·모션 벡터·깊이·조명·히스토리 데이터와 하나의 차세대 렌더링 로드맵으로 구상한다.
   Standard PBR은 glTF metallic-roughness와 M5-D property를 정본으로 삼아 Deferred/Forward/향후 ray path의 재질 평가를 native Slang module로 합친다. 현행 출력 동등 이관 뒤에만 의미 교정·에너지/IBL·그림자·display/post·확장 lobe를 연다.
-  이 페이즈는 구현이 아니라 기술 선택, 지원 범위, 폴백, 성능 기준선, 의존 순서와 수직 슬라이스를 확정하는 설계 게이트다.</div>
-  <div class="phase-goal"><b>트랙 구성 (2026-08-25 편입):</b> 네 GPU 기능이 전부 <b>정점 파이프라인의 출력을 입력으로 요구</b>하므로 모델 임포트 계획을 이 페이즈로 편입했다 — GPU-driven은 정점 레이아웃이 PSO 분류의 축이 되고, DXR은 BLAS 빌드가 정점 포맷과 stride를 직접 받는다. <code>buildMeshlets</code>가 "mesh shader 소비자가 생길 때까지 보류"였는데 그 소비자가 바로 4-2다.
-  <br><b>4-0 ~ 4-6</b> 설계 게이트 · <b>트랙 I(I0~I8)</b> 임포트 경로를 생산으로 승격하고 Assimp 은퇴 · <b>트랙 V(V0~V6)</b> 정점 레이아웃 정본화 · <b>트랙 L(L0~L7)</b> 라이트맵 베이커 재작성.
+  <b>4-0~4-6은</b> 기술 선택, 지원 범위, 폴백, 성능 기준선, 의존 순서와 수직 슬라이스를 확정하는 설계 게이트다. 트랙 RG·I·V·L은 별도 acceptance gate를 가진 구현 트랙이다.</div>
+  <div class="phase-goal"><b>트랙 구성 (2026-08-28 개정):</b> 네 GPU 기능이 전부 <b>정점 파이프라인의 출력과 공통 실행 그래프를 입력으로 요구</b>하므로 모델 임포트 계획과 RenderGraph 의존성 스케줄링을 이 페이즈에 둔다 — GPU-driven은 정점 레이아웃이 PSO 분류의 축이 되고, DXR은 BLAS 빌드가 정점 포맷과 stride를 직접 받는다. <code>buildMeshlets</code>가 "mesh shader 소비자가 생길 때까지 보류"였는데 그 소비자가 바로 4-2다.
+  <br><b>4-0 ~ 4-6</b> 설계 게이트 · <b>트랙 RG(RG0~RG9)</b> versioned resource 기반 stable DAG·제품 cutover·aliasing·async compute · <b>트랙 I(I0~I8)</b> 임포트 경로를 생산으로 승격하고 Assimp 은퇴 · <b>트랙 V(V0~V6)</b> 정점 레이아웃 정본화 · <b>트랙 L(L0~L7)</b> 라이트맵 베이커 재작성.
+  <br><b>트랙 RG 순서:</b> 기준선 → 명시적 접근·리소스 버전 → single-queue DAG → culling/lifetime/barrier·병렬 기록 → 제품 19 node·Pass 이관 → DX12/Vulkan live cutover를 먼저 닫고, 그 뒤에만 aliasing → async compute → subresource/Inspector를 연다. RG0~RG6은 57일, RG7~RG9은 60일이다.
   <br><b>트랙 L 편입 근거:</b> 현재 GI가 전부 스크린스페이스(SSAO·SSGI·SSR·SSS + IBL)라 <b>화면 밖 간접광을 아는 경로가 하나도 없다</b> — 프로브도 볼륨도 없다. 실시간 GI가 있어도 상용 엔진이 라이트맵을 유지하는 이유가 이것이고, 둘은 대체재가 아니라 보완재다. 라이트맵이 그 공백을 메우는 가장 싼 길이며 저작 표면(<code>LightMapping</code>)이 이미 살아 있다.
-  <br>트랙 L의 <b>UV1은 트랙 V3 옵셔널 스트림의 확정된 첫 소비자</b>다(삭제된 베이커가 <code>vertices[].uv1</code>의 원래 소비자였다). 트랙 L의 별도 COMPUTE 큐는 <b>4-1의 async compute와 같은 기반</b>이므로 먼저 세우는 쪽이 소유한다.
+  <br>트랙 L의 <b>UV1은 트랙 V3 옵셔널 스트림의 확정된 첫 소비자</b>다(삭제된 베이커가 <code>vertices[].uv1</code>의 원래 소비자였다). 트랙 L의 별도 COMPUTE 큐는 <b>트랙 RG8의 async compute와 같은 기반</b>이므로 먼저 세우는 쪽이 공통 RHI 계약을 소유한다.
   <br>경계: 트랙 V는 정점 데이터가 <b>어떤 모양으로</b> GPU까지 가는가(속성 기술표·메시별 마스크·캐시 버전·스트림 분리), 4-1은 Pass가 그 모양을 <b>어떻게 소비</b>하는가. V4가 4-1의 Asset-first Pass 계약의 전제다 — 현재 정점 오프셋이 C++ 5곳에 손으로 박혀 있어 Raster Pass를 Asset으로 기술할 수 없다.
   <br>실측(2026-08-25, 정점 233,910개 전수) + 구현(2026-08-27): legacy 96B는 여전히 GPU로 올라가지만 experiment는 V2 <b>68B</b>와 V3 mesh별 packed storage를 완료했다. 정적 Suzanne은 실제 <b>48B, 0.10MB→0.05MB</b>, SU_Mythic은 color mesh 1·layout 위반 0과 cooked 6,217/6,217을 확인했다. 11.17MB·47.8%는 기존 전수 감사에 현재 레이아웃을 적용한 전망이다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
-      <li>Pipeline Asset의 ordered Pass Stack·slot·resource schema·condition·fallback → 불변 native pipeline → <code>EnhancedRenderGraph</code> 실행 계약을 확정 — C#은 선택적 Game-thread 값 제어만 허용하고 Render/CommandBuild/RHI 스레드 managed callback 0</li>
+      <li>Pipeline Asset의 authored Pass Stack·slot·resource schema·condition·fallback → 불변 native pipeline → <code>EnhancedRenderGraph</code> 계약을 확정 — 명시적 resource version edge가 실행 순서를 만들고 독립 Pass만 authored index를 stable tie-break로 사용하며, C#은 선택적 Game-thread 값 제어만 허용</li>
       <li>일반 Pass는 Fullscreen·Compute·RendererList·Copy/Resolve 네이티브 Template + 논리 Shader Asset으로 완결하고, 특수 Pass는 소스 수준 C++ <code>EnhancedRenderPass</code>로 확장하며 외부 Native DLL ABI는 만들지 않는 경계를 확정</li>
       <li>Visual 모드는 Graph Editor ⇄ 재편집 가능한 <code>.shadergraph</code> → read-only generated <code>.slang</code>, Code 모드는 authored <code>.slang</code>을 정본으로 사용하고 공통 <code>.shadermeta</code>를 공유 — Slang→Graph 자동 역변환과 ShaderLab 호환 단일 파일 DSL은 제외</li>
       <li>Inspector의 <code>write</code>가 프로젝트 전용 slot과 <code>ResourceSchema</code>를 만들 수 있고, 새 engine-owned producer·RHI 기능·외부 SDK만 C++ 수정이 필요한 경계를 확정</li>
       <li>네 기능의 지원 GPU·백엔드·품질 모드·래스터 폴백을 기능 행렬로 확정</li>
       <li>RenderScene/RenderView → GPU 가시성 → 타일 조명 → DXR → 업스케일·프레젠트의 데이터 흐름과 프레임 히스토리 소유권을 문서화</li>
       <li>같은 밀봉 frame packet·카메라·해상도·tuning을 backend별 새 프로세스에서 재생해 final PNG·차영상·허용 오차·CPU record·pass별 GPU timing·RenderGraph stats를 남기는 전체 live scene DX12/Vulkan A/B 게이트를 확정</li>
-      <li>Standard PBR 재작성은 <code>PBR-S0~S8</code>로 분할 — DX12 현재 설정을 정본으로 한 양 backend 출력 기준선 → native Slang 기반 → 공용 모듈 동등 이관 → glTF 의미 → 에너지/IBL → 그림자 → display/post → 확장 lobe → Shader Graph 순이며, 제품 전환은 <code>M5-C3 → M5-C4 → M6</code> 뒤에 시작</li>
-      <li>RenderGraph read/write/producer/consumer·state·barrier·transient lifetime·중간 texture를 기존 graph/snapshot의 읽기 전용 소비자로 표시하는 Resource Inspector 범위를 확정</li>
+      <li>Standard PBR 재작성은 <code>PBR-S0~S8</code>로 분할 — PBR-S0는 SRP-G0의 동일 하네스/artifact를 공유하고, native Slang 기반 → 공용 모듈 동등 이관 → glTF 의미 → 에너지/IBL → 그림자 → display/post → 확장 lobe → Shader Graph 순이다. PBR-S3의 import→GPU 판정은 <code>D2/D5-b → I5/V4</code> 뒤이며 제품 전환은 완료된 <code>M5</code> 다음 <code>M6</code> 뒤에 시작</li>
+      <li><b>트랙 RG0~RG6</b> — 명시적 Read/Write/Modify와 versioned texture/buffer handle, stable DAG, edge 기반 culling/lifetime/barrier/record wave, 기본 19 node·제품 Pass 이관을 닫고 같은 밀봉 입력의 DX12/Vulkan live 픽셀·validation을 통과</li>
+      <li><b>트랙 RG7~RG9</b> — RG6 뒤 aliasing off/on 픽셀 동일·peak memory 감소, single/multi queue 픽셀 동일·GPU 이득 실측을 거쳐 subresource/split barrier와 producer/consumer/version/compiled order/lifetime/alias/queue Resource Inspector를 완결</li>
       <li>기능 간 의존 그래프와 최소 수직 슬라이스, 구현 페이즈 분할 및 공수 산정 완료</li>
       <li><b>트랙 I</b> — 생산 경로가 <code>IAssetImporter</code>를 타고 legacy 로더 호출 지점 0, 게이트가 실물 디코더를 타며, <code>ImportOptions</code> 중 소비자 0인 것이 <code>buildMeshlets</code>뿐(그 소비자는 4-2가 된다)</li>
       <li><b>트랙 V</b> — 정점 레이아웃 오프셋이 코드에 손으로 박힌 곳 0(전부 기술표에서 유도), 구버전 캐시가 <b>거부</b>되어 조용한 오독 0, 생산되고 소비되지 않는 스트림 0건, 정적 메시가 스킨 바이트를 내지 않음</li>
@@ -545,7 +555,7 @@
   </div>
   <div class="risknote">
     <div class="vt">범위 원칙</div>
-    이 단계에서 SDK 연동이나 렌더 패스를 먼저 만들지 않는다. 공통 입력과 폴백 계약 없이 개별 기능부터 붙이면 모션 벡터·깊이·노출·히스토리와 가시성 결과가 기능마다 중복되므로, 4-6 설계 게이트를 통과한 뒤 구현 순서를 확정한다.
+    4-0~4-6에서는 SDK 연동이나 개별 기능 렌더 패스를 먼저 만들지 않는다. 트랙 RG는 확정한 RG0→RG9 순서와 각 acceptance gate 안에서만 구현한다. RG6 제품 cutover 전에 aliasing·async compute를 배선하거나 declaration-order와 새 제품 실행 경로를 장기 병행하지 않는다.
   </div>
 </section>
 
@@ -575,9 +585,9 @@
 <!-- ===== PHASE 6 ===== -->
 <section class="phase" id="phase-6">
   <h2 class="sec"><span class="no">PHASE 6</span>코드 정리 및 품질 상시화 <span class="phase-pct" data-phase-pct="6"></span></h2>
-  <div class="phase-meta">예상 공수: 10일 · 선행 조건: 각 페이즈 종료 시 부분 수행, 최종 총정리는 Phase 3·5 완료 후</div>
+  <div class="phase-meta">기존 품질 항목 10일 + CLI 정식화 18일 · CLI 선행: 현재 PHASE 0의 0-8 자동화 레이어 · 실행 계획: <a href="plans/EditorAutomationCLIPlan.md">EditorAutomationCLIPlan.md</a></div>
   <div class="phase-goal"><b>목표:</b> 리팩토링 과정에서 확정된 데드 코드를 제거하고, 재발 방지 장치(정적 분석, include 게이트, 리소스 카운터 회귀 테스트)를
-  CI에 상시화한다. "한 번 청소"가 아니라 "더러워지지 않는 구조"가 목표.</div>
+  CI에 상시화한다. 기존 Editor 자동화 CLI는 구조화된 결과·인자·명령 descriptor·기계 판독 출력 계약을 갖춘 품질 기반으로 정식화한다. "한 번 청소"가 아니라 "더러워지지 않는 구조"가 목표.</div>
   <div class="task-wrap"><table class="tasks" data-phase="6"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
@@ -585,6 +595,8 @@
       <li>미사용 심볼·주석 처리 블록·비활성 Mono 경로가 저장소에서 제거되고 빌드 통과</li>
       <li>CI에 컴파일 + include 경계 검사 + (선택) clang-tidy 핵심 체크가 게이트로 동작</li>
       <li>씬 전환 메모리 평탄성 벤치마크가 자동화되어 회귀 시 CI 실패</li>
+      <li>모든 CLI 명령이 terminal <code>CommandResult</code>를 내고 session 결과가 process exit code로 집계</li>
+      <li>자동화 소비자가 C++ 로그 문안 대신 versioned JSONL 결과를 판정하며 help·argument 문서가 descriptor에서 생성</li>
     </ul>
   </div>
 </section>
@@ -1306,13 +1318,13 @@ const TASKS = [
     refs: "MaterialPipelinePlan.md §3.2 · §4 M4", priority: "P0", days: 2, status: "done",
     note: "완료(2026-08-24). 패스 24곳 인라인 HLSL 45블록을 파일화하고 .shadermeta v1 strict loader, GUID catalog, 상태 적용, unknown/duplicate/type/path/count/size fail-closed 검증을 추가했다. 별도 process-global shader registry는 없다." },
   { phase: 3.5, id: "M5", title: "Material 재설계 — 프로퍼티 블록·직렬화 단일화",
-    detail: "GUID+이름 기반 property/keyword 정본, typed YAML/CEMT v1 codec, legacy texture GUID 이행, DataSystem ShaderMeta slot/generation handle을 세웠다. ModelImport와 표준 PBR property 이름도 공유한다. watcher·PSO generation과 raw 소비자 정리는 남았다.",
-    refs: "MaterialPipelinePlan.md §3.6-3.7 · §4 M5", priority: "P0", days: 3, status: "progress", earnedDays: 0,
-    note: "M5-A·B1·B2·C1·C2 완료(2026-08-24). M5-D 완료(2026-08-27): StandardMaterialProperty.h를 정본으로 DataSystem legacy GUID 이행과 experiment SceneToModelDraft 기본 키를 통합했다. Debug x64 RenderEngine·RenderTests·CreatorEditor 빌드, glTF 재질 2개·FBX 재질 6개의 표준 숫자 property/underscore 별칭 게이트가 위반 0으로 통과했다. 다음은 C3 watcher Modified→CPU invalidation queue→render-thread next-use 재요청 및 DX12/Vulkan PSO handle 완결, 이어 C4 FoliageType raw Mesh/Material 제거와 retired generation 축소. 전체 M5 공수는 세부 추정이 없어 완료 일수에는 아직 합산하지 않는다." },
+    detail: "GUID+이름 기반 property/keyword 정본, typed YAML/CEMT v1 codec, legacy texture GUID 이행, DataSystem ShaderMeta slot/generation handle을 세웠다. ModelImport와 표준 PBR property 이름도 공유한다. C3는 watcher→양 backend PSO generation/completion retirement와 ShaderMeta packet→GBuffer representative next-use를 닫았고, C4는 장기 Model/Mesh/Material raw 소비를 소유 참조로 바꿔 전역 retired generation 의존을 제거했다.",
+    refs: "MaterialPipelinePlan.md §3.6-3.7 · §4 M5", priority: "P0", days: 3, status: "done",
+    note: "M5-A·B1·B2·C1·C2 완료(2026-08-24), M5-D 완료(2026-08-27), C3·C4 및 전체 게이트 완료(2026-08-28). C3는 watcher queue, DX12/Vulkan PSO handle generation, completion 기반 native retirement, deep-owned graphics request/targeted invalidation과 immutable ShaderMeta packet→GBuffer candidate-first next-use를 닫았다. C4는 FoliageType의 Mesh/Material과 Editor Undo의 Model을 shared owner로 바꾸고 LoadCachedModelShared를 소유 경계로 세웠다. Model/Material cache reload는 실제 shared consumer만 이전 세대를 살리며 전역 retired 목록에 넣지 않는다. raw texture alias가 남은 Texture·UITexture·SpriteSheet 보존은 의도적으로 유지한다. VS18/v145 Debug x64 RenderEngine·SceneRuntime·RenderTests·CreatorEditor·Player가 통과했다. dx12/vk selftest·dx12.psocache·vk.gbuffer는 exit 0·stderr 0, DX12 35종은 기준선 통과 28·완료 4·실패 2·무판정 1과 전 항목 stderr 0을 유지했다. pipeline nodes 19, reflection 77종/diff 0, asset authoring의 model/material/runtime reload 및 terrain/foliage/blackboard/collision/tag/input/animator gate도 모두 통과했다. item별 Material property/texture/CB/PSO 소비는 M6에 남는다." },
   { phase: 3.5, id: "M6", title: "소비 배선 — 머테리얼이 고른 셰이더로 실제 드로우",
-    detail: "copyQueue의 축약 복사를 PSO handle+binding+property CB 전달로 확장하고 GBuffer/Forward가 item별 PSO로 그린다. 폐기된 .shader를 복구하지 않고 물·바람 대표 재질을 새 .shadermeta+HLSL로 작성한다.",
-    refs: "MaterialPipelinePlan.md §4 M6", priority: "P0", days: 4, status: "todo",
-    note: "★ 최대 위험 슬라이스 — M5-C3→C4 뒤 착수한다. 먼저 표준 PBR .shadermeta + 단색 프로브로 Material→layout→CB/texture→PSO 한 재질을 수직 관통시키고 GBuffer/Forward 전체로 넓힌다. 픽셀 판정 없이 완료로 치지 않는다." },
+      detail: "P0~P2d-d가 GBuffer/Forward property·texture generation·ShaderMeta/PSO·Water/Wind·Foliage/flow·required assets를 제품 경로에 연결했다. P2d-e는 material-cache frame scan 2곳, Material raw texture alias/setter, m_dirtyCBs와 제품 draw pool legacy writer를 은퇴했다.",
+    refs: "MaterialPipelinePlan.md §4 M6", priority: "P0", days: 4, status: "done",
+      note: "M6 완료(2026-08-29). P2d-e 재측정에서 실행 코드 ApplyShaderParams·Material raw texture alias/setter·m_dirtyCBs·제품 draw pool legacy writer는 0건, SnapshotMaterials의 frame 소비는 2→0이 됐다. 남은 SnapshotMaterials 호출 2곳은 Editor asset 표시 전용이고 TrySetValue는 C# API 실제 호출자라 유지했다. cache에 Water/Wind가 들어온 뒤 빈 required packet은 GBuffer/Forward primary 1/1, 명시 packet은 Forward primary+Water+Wind 3개였다. vk.forward draw/batch/meta 7/4/3, overlap RGB 0.125/0.25/0.5, Wind G 0→0.2598, coverage 1134/1134, backend·기대식 최대 편차 0, custom 0.00023, Vulkan validation/미구현 0을 유지했다. VS18/v145 Debug x64 RenderEngine·SceneRuntime·RenderTests·CreatorEditor·Player가 빌드됐고 vk.gbuffer·vk.selftest와 DX12 forward·forwardshade가 같은 실행에서 통과했다." },
   { phase: 3.5, id: "M7", title: "Slang reflection·DXIL/SPIR-V 동등성",
     detail: "같은 Slang linked program에서 양 target layout을 읽어 논리 register/space, resource, cbuffer field offset/size를 중립 소유값으로 보존하고 ShaderMeta property schema와 fail-closed 대조한다.",
     refs: "MaterialPipelinePlan.md §4 M7", priority: "P1", days: 2, status: "done",
@@ -1322,11 +1334,11 @@ const TASKS = [
   // 구현 항목이 아니라 Scriptable Pipeline 계약과 네 기능의 공통 데이터·폴백·검증·순서를 확정하는 설계 게이트다.
   { phase: 4, id: "4-0", title: "기능 범위·기준선·지원 행렬 확정",
     detail: "GPU/드라이버·DX12/Vulkan 지원 범위, 대표 씬, GPU frame time·VRAM 기준선, 기능별 품질 모드와 미지원 환경의 래스터 폴백을 먼저 고정한다. backend는 부팅 고정이므로 같은 밀봉 frame packet·카메라·해상도·tuning을 별도 DX12/Vulkan 프로세스에 재생하고 final PNG·선형 색공간 오차·차영상·CPU record·pass별 GPU timing·RenderGraph stats를 한 artifact로 남긴다. 기존 pass fixture와 전체 live frame은 별도 gate로 판정한다.",
-    refs: "신규 기능 구상 공통 게이트 · ScriptableRenderPipelinePlan SRP-G0", priority: "P0", days: 1.5, status: "todo", note: "구상 단계. RenderGraph resource Inspector는 기존 graph/snapshot의 읽기 전용 소비자로 한정하고, 구현 공수는 4-6에서 별도 확정한다." },
+    refs: "신규 기능 구상 공통 게이트 · ScriptableRenderPipelinePlan SRP-G0/PBR-S0", priority: "P0", days: 1.5, status: "todo", note: "구상 단계. PBR-S0는 이 항목의 실행 하네스/artifact를 공유해 중복 기준선을 만들지 않는다. RenderGraph resource Inspector는 기존 graph/snapshot의 읽기 전용 소비자로 한정하고, 구현 공수는 4-6에서 별도 확정한다." },
   { phase: 4, id: "4-1", title: "Scriptable Render Pipeline·Custom Pass 확장 계약",
-    detail: "Pipeline Asset Inspector가 ordered Pass Stack, read/write/modify slot, ResourceSchema, condition, fallback과 property override를 기술한다. 일반 Pass는 Fullscreen·Compute·RendererList·Copy/Resolve 네이티브 Template와 논리 Shader Asset을 조합한다. Visual 모드는 node/pin/connection/layout/Blackboard/subgraph/version을 .shadergraph에 저장해 다시 열고 편집하며 generated .slang은 읽기 전용이다. Code 모드는 authored .slang을 정본으로 사용한다. Standard PBR은 glTF MR·M5-D property를 정본으로 MaterialInputs→StandardSurface와 GGX/IBL/light/shadow/display 공용 Slang module을 구성하고, GBuffer·Deferred·Forward가 같은 구현을 소비한다. C#은 stable handle을 통한 Game-thread 값·variant 제어만 선택적으로 허용한다. LivePipelineDesc는 첫 컴파일 타깃, EnhancedRenderGraph/RHIEncoder는 유일한 실행 경로로 유지하며, 고급 기능은 소스 수준 C++ EnhancedRenderPass로 확장하고 외부 Native DLL ABI는 만들지 않는다.",
+    detail: "Pipeline Asset Inspector가 authored Pass Stack, read/write/modify slot, ResourceSchema, condition, fallback과 property override를 기술한다. 리소스 version edge가 compiled 실행 순서를 만들고 독립 Pass만 authored index를 tie-break로 쓴다. 일반 Pass는 Fullscreen·Compute·RendererList·Copy/Resolve 네이티브 Template와 논리 Shader Asset을 조합한다. Visual 모드는 node/pin/connection/layout/Blackboard/subgraph/version을 .shadergraph에 저장해 다시 열고 편집하며 generated .slang은 읽기 전용이다. Code 모드는 authored .slang을 정본으로 사용한다. Standard PBR은 glTF MR·M5-D property를 정본으로 MaterialInputs→StandardSurface와 GGX/IBL/light/shadow/display 공용 Slang module을 구성하고, GBuffer·Deferred·Forward가 같은 구현을 소비한다. C#은 stable handle을 통한 Game-thread 값·variant 제어만 선택적으로 허용한다. LivePipelineDesc는 첫 컴파일 타깃, EnhancedRenderGraph/RHIEncoder는 유일한 실행 경로로 유지하며, 고급 기능은 소스 수준 C++ EnhancedRenderPass로 확장하고 외부 Native DLL ABI는 만들지 않는다.",
     refs: "ScriptableRenderPipelinePlan.md · LivePipelineDescPlan.md · MaterialPipelinePlan.md", priority: "P0", days: 2, status: "done",
-    note: "설계 기준선 개정 — Inspector Pass 데이터와 Shader Graph GPU 수식을 분리하고 일반 Pass별 C# 작성 요구를 제거했다. Graph Editor⇄.shadergraph 저장·재개방은 필수이며 node 의미와 편집 상태, schema migration/unknown-node recovery를 보존한다. Visual graph와 Code 모드 authored Slang은 상호 배타적 정본이고 .shadermeta를 공유하며 generated Slang은 읽기 전용 캐시다. Slang→Graph 자동 역변환, ShaderLab 호환 DSL, Native DLL ABI는 비목표다. 새 프로젝트 slot은 Inspector write+ResourceSchema로 만들며 Core LiveSlots 수정은 불필요하다. 2026-08-27 PBR-S0~S8 레인을 추가했다: current parity를 먼저 닫고 glTF 의미·energy/IBL·shadow·display/post·extension을 분리한다. native Slang 기반 fixture는 병렬 선행 가능하지만 제품 PBR 전환과 auto-binding은 M5-C3→C4→M6 뒤다." },
+    note: "설계 기준선 개정 — Inspector Pass 데이터와 Shader Graph GPU 수식을 분리하고 일반 Pass별 C# 작성 요구를 제거했다. Graph Editor⇄.shadergraph 저장·재개방은 필수이며 node 의미와 편집 상태, schema migration/unknown-node recovery를 보존한다. Visual graph와 Code 모드 authored Slang은 상호 배타적 정본이고 .shadermeta를 공유하며 generated Slang은 읽기 전용 캐시다. Slang→Graph 자동 역변환, ShaderLab 호환 DSL, Native DLL ABI는 비목표다. 새 프로젝트 slot은 Inspector write+ResourceSchema로 만들며 Core LiveSlots 수정은 불필요하다. PBR-S0~S8은 구현 완료가 아니라 설계 완료 상태다. PBR-S0는 SRP-G0 artifact를 공유하고 PBR-S3는 D2/D5→I5/V4 뒤 doubleSided·emissiveStrength·texture UV set/transform/wrap까지 닫는다. M5는 대표 next-use와 장기 Model/Mesh/Material 소유 수명까지 완료됐고, native Slang 기반 fixture는 병렬 선행 가능하지만 제품 PBR 전환과 auto-binding은 남은 M6 뒤다." },
   { phase: 4, id: "4-2", title: "GPU-driven rendering 아키텍처 구상",
     detail: "RenderScene/RenderView의 프록시를 GPU 가시성 입력으로 만드는 경계, 인스턴스·메시/메시렛 데이터 배치, Hi-Z 컬링, indirect command 생성·실행, material/PSO 분류와 CPU fallback을 설계한다. 기존 RenderGraph와 RHI에 필요한 버퍼·동기화 확장도 함께 식별한다.",
     refs: "RenderSceneViewPlan · EnhancedRenderGraph", priority: "P1", days: 2, status: "todo", note: "" },
@@ -1342,6 +1354,48 @@ const TASKS = [
   { phase: 4, id: "4-6", title: "통합 의존 그래프·수직 슬라이스·구현 페이즈 확정",
     detail: "Scriptable Pipeline 계약과 네 기능, PBR-S0~S8의 공통 자원·선후 관계를 하나의 의존 그래프로 합치고, 위험을 가장 빨리 드러내는 최소 슬라이스·회귀 기준·실행 순서를 정한다. PBR은 현행 출력 동등 이관과 glTF 의미·energy/IBL·shadow·display/post·extension 개선을 서로 다른 gate로 유지한다. 여기서만 구현 페이즈와 공수를 확정하며, 중복 입력·히스토리·가시성·재질 평가 경로와 기능별 별도 Pass 실행 체계를 허용하지 않는다.",
     refs: "4-0~4-5 설계 게이트 · ScriptableRenderPipelinePlan §12", priority: "P0", days: 0.5, status: "todo", note: "" },
+
+  // ---------- PHASE 4 트랙 RG: 리소스 의존성 RenderGraph (2026-08-28 신설) ----------
+  { phase: 4, id: "RG0", title: "현행 graph·픽셀 기준선과 변이 fixture",
+    detail: "현재 declaration-order BuildOrder, read-before-write, culling, barrier, lifetime, sequential/parallel recording의 정답지를 먼저 고정한다. 독립 Pass·RAW 연쇄·두 writer·read-modify-write·culled branch·imported history를 DX12/Vulkan 공용 fixture로 만들고 잘못된 producer/version/order 변이가 실제로 실패하는지 증명한다.",
+    refs: "RenderGraphDependencySchedulingPlan RG0", priority: "P0", days: 4, status: "todo",
+    note: "구현 미착수. 문서·정적 감사만 완료했으며 빌드·픽셀 기준선은 아직 캡처하지 않았다." },
+  { phase: 4, id: "RG1", title: "명시적 접근 모드·versioned resource API",
+    detail: "RGPassUsage의 state 기반 쓰기 추론을 Read/Write/ReadWrite와 요구 RHI state의 분리로 바꾼다. RGHandle을 resourceId/version/kind로 확장하고 Write·Modify가 새 버전을 반환하게 하며 transient buffer 생성도 texture와 대칭으로 닫는다. import v0, missing producer, stale handle, forked write를 fail-closed로 검증한다.",
+    refs: "RenderGraphDependencySchedulingPlan RG1", priority: "P0", days: 8, status: "todo",
+    note: "선행: RG0. 기존 {handle,state} aggregate는 마이그레이션 adapter에서만 임시 허용한다." },
+  { phase: 4, id: "RG2", title: "stable single-queue DAG compiler",
+    detail: "resource version에서 RAW/WAR/WAW producer-consumer edge와 indegree를 만들고 authored index를 ready queue tie-break로 쓰는 stable Kahn sort를 구현한다. cycle은 Pass→ResourceVersion→Pass 사슬을 출력하고 side effect는 명시적 root/ordering token으로 모델링한다.",
+    refs: "RenderGraphDependencySchedulingPlan RG2", priority: "P0", days: 10, status: "todo",
+    note: "선행: RG1. 의존 Pass 선언 배열을 섞어도 compiled order가 같고 독립 Pass만 authored order를 따르는 fixture로 판정한다." },
+  { phase: 4, id: "RG3", title: "DAG 기준 culling·lifetime·barrier 재계산",
+    detail: "culling을 version producer edge 역추적으로 바꾸고 lifetime·transient 회수·Transition/UAV 계획을 declaration index가 아니라 compiled index에서 다시 계산한다. access mode와 required state 불일치도 GPU 실행 전에 거부한다.",
+    refs: "RenderGraphDependencySchedulingPlan RG3", priority: "P0", days: 8, status: "todo",
+    note: "선행: RG2. 죽은 producer 제거, 마지막 소비 수명, sorted order barrier golden을 각각 독립 판정한다." },
+  { phase: 4, id: "RG4", title: "dependency wave 병렬 기록·진단",
+    detail: "DAG ready wave와 기존 recordCost/split-pass 휴리스틱을 결합한다. GPU submit은 compiled order를 보존하고 graph dump에 authored/compiled index, edge 원인, wave, critical path를 남긴다.",
+    refs: "RenderGraphDependencySchedulingPlan RG4", priority: "P1", days: 7, status: "todo",
+    note: "선행: RG3. sequential/parallel compiled order와 픽셀 동일을 함께 통과해야 한다." },
+  { phase: 4, id: "RG5", title: "제품 Pass·Pipeline compiler 이관",
+    detail: "기본 live pipeline 15 node + Editor 기여 4 node를 작은 묶음으로 version API에 이관한다. 2026-08-28 정적 기준 AddPass/AddSplitPass 108곳(제품 28, test/fixture 80)의 접근 선언을 옮기고 임시 adapter 잔여를 0으로 만든다.",
+    refs: "RenderGraphDependencySchedulingPlan RG5 · ScriptableRenderPipelinePlan SRP-1", priority: "P0", days: 12, status: "todo",
+    note: "선행: RG4 + 트랙 V4. 호출 수는 착수 직전 다시 세며 숫자 감소만으로 완료 판정하지 않는다." },
+  { phase: 4, id: "RG6", title: "DX12/Vulkan 제품 cutover",
+    detail: "같은 밀봉 frame packet·카메라·해상도·tuning을 backend별 새 프로세스에서 실행해 final PNG·차영상·linear RMSE/max/changed pixels, CPU record·pass GPU·graph stats를 한 artifact로 남긴다. pass fixture와 전체 live frame은 별도 gate이고 양 backend compiled dependency hash도 일치해야 한다.",
+    refs: "RenderGraphDependencySchedulingPlan RG6 · ScriptableRenderPipelinePlan SRP-G0", priority: "P0", days: 8, status: "todo",
+    note: "선행: RG5 + SRP-G0. validation error 0과 migration adapter 0에서 단일 큐 제품 전환을 닫는다. 이것이 리소스 의존성 RenderGraph의 첫 완료선이다." },
+  { phase: 4, id: "RG7", title: "transient buffer·in-frame aliasing",
+    detail: "buffer를 texture와 같은 transient lifetime에 넣고 compiled lifetime이 겹치지 않는 자원만 heap 영역을 공유한다. alias barrier·alignment·format/usage compatibility와 imported/history 제외 규칙을 명시한다.",
+    refs: "RenderGraphDependencySchedulingPlan RG7", priority: "P1", days: 20, status: "todo",
+    note: "선행: RG6. alias off/on 픽셀 동일, poison/강제 lifetime 변이 오류 0, peak committed/resident byte 감소를 모두 만족해야 한다." },
+  { phase: 4, id: "RG8", title: "multi-queue·async compute",
+    detail: "RHI에 graphics/compute capability, queue-neutral encoder pool, signal/wait fence와 ownership transfer를 추가한다. 후보 Pass는 비용·capability가 허용할 때만 compute queue로 보내고 미지원 환경은 같은 DAG의 single-queue fallback을 사용한다.",
+    refs: "RenderGraphDependencySchedulingPlan RG8 · LightmapBakerPlan L4", priority: "P1", days: 25, status: "todo",
+    note: "선행: RG7. single/multi queue 픽셀 동일과 DX12/Vulkan validation 0 뒤 GPU critical-path 이득을 실측한다. L4가 같은 기반을 소비하며 별도 큐 계층을 만들지 않는다." },
+  { phase: 4, id: "RG9", title: "subresource·split barrier·Resource Inspector",
+    detail: "texture mip/array slice와 buffer byte range를 view/range로 추적하고 split barrier와 단일 barrier fallback을 같은 중립 계획에 둔다. Inspector는 producer/consumer/version, authored/compiled order, state/barrier, lifetime/alias/queue를 compiled graph에서 읽기만 한다.",
+    refs: "RenderGraphDependencySchedulingPlan RG9", priority: "P1", days: 15, status: "todo",
+    note: "선행: RG8. debug UI가 별도 실행 그래프나 GPU resource ownership을 만들지 않는 것이 완료 조건이다." },
 
   // ---------- PHASE 5: 구조적 커플링 제거 ----------
   { phase: 5, id: "5-1", title: "렌더-게임플레이 인터페이스 계층 설계",
@@ -1388,6 +1442,31 @@ const TASKS = [
     detail: "구조 분석 보고서를 리팩토링 후 상태로 갱신, 소유권 모델·모듈 경계·락 규약을 docs/에 공식 문서화.",
     refs: "5장 · docs/README.md", priority: "P3", days: 2, status: "stopped",
     note: "중단(2026-08-27) — analysis 문서는 측정 시점의 스냅샷으로 보존하고 사후 덮어쓰지 않는 문서 규약이 정착했다. 현재 구조는 루트 README, 대시보드, docs/design과 각 실행 계획이 담당한다. 최종 구조 총람이 필요하면 기존 분석 갱신이 아니라 새 날짜의 analysis 문서로 작성한다." },
+  { phase: 6, id: "CLI0", title: "CLI 기준선·canary 고정",
+    detail: "등록 명령·alias·help 누락·raw line 재해석·exit code 쓰기·자동화 소비자를 inventory로 고정하고, 이후 슬라이스가 기존 --exec/--script/--console과 frame-boundary Pump 계약을 깨지 않는 canary를 만든다.",
+    refs: "EditorAutomationCLIPlan.md §12 CLI0", priority: "P0", days: 1.5, status: "todo",
+    note: "계획 작성 완료; 구현·빌드·런타임 미착수." },
+  { phase: 6, id: "CLI1", title: "CommandResult·session·exit code 정식화",
+    detail: "모든 명령 경로가 terminal CommandResult를 반환하게 하고 session summary가 syntax·precondition·logical failure·infrastructure failure를 process exit code로 결정한다.",
+    refs: "EditorAutomationCLIPlan.md §12 CLI1", priority: "P0", days: 2.5, status: "todo", note: "" },
+  { phase: 6, id: "CLI2", title: "소유형 argument parser·raw 재파싱 제거",
+    detail: "CommandInvocation이 owned token과 원문 메타데이터를 소유하고, quote/backslash 규칙을 고정한 뒤 object.parent·duplicate·prefab.create 등 핸들러의 raw line 재해석을 제거한다.",
+    refs: "EditorAutomationCLIPlan.md §12 CLI2", priority: "P0", days: 2, status: "todo", note: "" },
+  { phase: 6, id: "CLI3", title: "CommandDescriptor·help·discovery 단일 정본",
+    detail: "canonical ID·alias·argument schema·precondition·affinity·help를 descriptor로 모으고 help, help &lt;command&gt;, commands.list, commands.describe를 같은 정본에서 생성한다.",
+    refs: "EditorAutomationCLIPlan.md §12 CLI3", priority: "P1", days: 2.5, status: "todo", note: "" },
+  { phase: 6, id: "CLI4", title: "도메인 모듈 분리·Editor operation 의미 통일",
+    detail: "6,756줄 facade를 Scene·Object·Prefab·Asset·Play·Build·RenderTest 등 buildable 도메인으로 분리하고 GUI와 CLI가 공유해야 할 Undo·selection·play-state 의미를 operation 계층에서 맞춘다.",
+    refs: "EditorAutomationCLIPlan.md §12 CLI4", priority: "P1", days: 4, status: "todo", note: "" },
+  { phase: 6, id: "CLI5", title: "JSONL 결과 출력·자동화 소비자 이관",
+    detail: "기본 human 출력을 유지하면서 --result-format jsonl을 추가하고, 로그 문안/C++ 리터럴을 긁는 DX12 suite부터 40개 추적 소비자를 versioned 결과 schema로 단계 이관한다.",
+    refs: "EditorAutomationCLIPlan.md §12 CLI5", priority: "P1", days: 3, status: "todo", note: "" },
+  { phase: 6, id: "CLI6", title: "unattended 실행·thread affinity 강화",
+    detail: "interactive UI 요구 명령을 명시적으로 거부하고 Game Thread affinity·timeout·cancel·shutdown drain 정책을 고정해 무인 Editor 자동화가 결정적으로 종료되게 한다.",
+    refs: "EditorAutomationCLIPlan.md §12 CLI6", priority: "P1", days: 1.5, status: "todo", note: "" },
+  { phase: 6, id: "CLI7", title: "호환 shim 정리·회귀 ratchet",
+    detail: "모든 소비자 이관과 양성·음성·변이 게이트 통과 뒤 raw command API와 수동 help/exit shim을 제거하고 신규 명령이 descriptor·result 계약을 우회하지 못하게 한다.",
+    refs: "EditorAutomationCLIPlan.md §12 CLI7", priority: "P2", days: 1, status: "todo", note: "" },
 
   // ---------- PHASE 7: UI 서브시스템 재설계 ----------
   //
@@ -1806,12 +1885,12 @@ const TASKS = [
   { phase: 17, id: "D1", title: "런타임 위생 (Y-3·Y-4)",
     detail: ".meta를 pak에서 빼면 안 되는 이유가 여기 있다 — 계획 §3.4.", refs: "SerializationPlan §4 D1", priority: "P1", days: 1, status: "todo", note: "" },
   { phase: 17, id: "D2", title: "GUID 정체성 수술 (Y-1·Y-2)",
-    detail: "순서 제약: SceneGraph E1 이후.", refs: "SerializationPlan §4 D2", priority: "P0", days: 2, status: "todo", note: "" },
+    detail: "D2-a catalog fail-closed, D2-b1 UUIDv4/manifest, D2-b2 전수 재발급, D2-c sidecar authority·atomic publication/rename·실제 draw, D2-d scene 14/prefab 9/material 2 전수 authoring corpus를 모두 닫았다. 기존 GUID 호환과 path-v5 fallback은 없다.", refs: "SerializationPlan §4 D2", priority: "P0", days: 2, status: "done", note: "완료(2026-08-29): manifest v3 assets/regenerate 226, references 431, 254 files/14 binary 적용. live corpus UUIDv4 226/non-v4 0/invalid·missing·duplicate 0이다. 프로젝트 분리 전 Git은 Prim/추적 FBX·BaseColor·Forward material·ShaderMeta·IBL의 명시적 clean-checkout target/meta 폐포 38개만 추적하고, 일반 sidecar 70개와 local target/meta 118쌍은 ignore한다. Strict gate는 `git add -f`로 ignore된 meta를 강제 추가하면 tracked-meta-policy-violation으로 거부하며 violation/required/orphan 0, d2Ready=true다. sidecar가 정본이고 payload GUID는 최초 publication hint 이후 mirror다. GUID rename과 FT_Primitives 실제 DX12 draw(candidate 8/light 1/draw 8/upload 8) 통과. scene 14는 load/save 28/28·2회 hash 불일치 0, prefab 9는 entity 13/override 1/등록 11 digest 보존, material 2는 sidecar identity·ShaderMeta 2·texture ref 0·canonical payload 보존을 통과했다. 세 corpus gate와 strict 계약은 run-all에 편입했다. VS18/v145 Debug x64 CreatorEditor·Player 성공." },
   { phase: 17, id: "D3", title: "Node 추상화 격리 (Y-6)",
     detail: "포맷 전환의 이음새이자 독립 가치.", refs: "SerializationPlan §3.3·D3", priority: "P1", days: 3, status: "todo", note: "" },
   { phase: 17, id: "D4", title: "JSON 트랙 정리 (Y-5·Y-7)", detail: "", refs: "SerializationPlan §3.5·D4", priority: "P2", days: 2, status: "todo", note: "" },
   { phase: 17, id: "D5", title: "쿠킹 바이너리 + pak 매니페스트",
-    detail: "PHASE 18의 typed 순회 위에서 시작. 순서 제약: SceneGraph P2 이후.", refs: "SerializationPlan §3.2·§3.6·D5", priority: "P1", days: 4, status: "todo", note: "" },
+    detail: "D5-a checked writer, D5-b1 model subasset UUIDv4/CEMF, D5-b2a 단일 model 원자 게시, D5-b2b1 model 14개 전수 identity/Cook과 D5-b2b2 build/AssetPacker/pak까지 완료됐다. 다음은 D5-b2c 나머지 producer → D5-c Player manifest load → D5-d 전수 parity·성능·실플레이다.", refs: "SerializationPlan §3.2·§3.6·D5", priority: "P1", days: 4, status: "progress", note: "진행(2026-08-29): model 14/material 52/embedded texture 96의 canonical UUIDv4 identity와 CEMC 14 + CEMF 1/entry 66 전수 Cook을 닫았다. CEMC는 asset-relative provenance만 직렬화해 서로 다른 staging 위치에서도 같은 tree hash를 만든다. build.ps1은 InputMode base snapshot을 AssetCooker에 넘겨 Generated/Assets/Derived를 만들고 Merged에 overlay한 뒤 pak에 넣는다. Debug/Project/SkipVerify 실제 패키지는 CEMC 17,752,200B/CEMF 10,030B, generated 16, pak 529 entries/510,108,259B였고 AssetPacker reopen/index 검증을 통과했다. VS18/v145 Debug x64 AssetCooker·AssetPacker·Player는 경고/오류 0이다. texture/ShaderMeta/scene/prefab producer와 Player manifest 소비는 미배선이라 D5 전체 완료가 아니다." },
   { phase: 17, id: "D6", title: "Player 텍스트 경로 은퇴", detail: "", refs: "SerializationPlan §4 D6", priority: "P1", days: 1, status: "todo", note: "" },
   { phase: 17, id: "D7", title: "에디터 웜 캐시 (선택)",
     detail: "에디터 열기 비용에서 authoring parse가 실제 병목일 때만 도입한다.", refs: "SerializationPlan §4 D7", priority: "P3", days: 1, status: "stopped",
@@ -2098,16 +2177,16 @@ const TASKS = [
     detail: "weldVertices → optimizeVertexCache → lodLevels 순. buildMeshlets 는 mesh shader 소비자가 생길 때까지 보류. ★ 탄젠트 생성과의 순서가 중요하다 — 용접이 탄젠트 이음매를 다시 붙이면 mikktspace 규약이 깨지므로 탄젠트를 정점 정체성의 일부로 다뤄야 한다.",
     refs: "ModelImportPipelinePlan I4", priority: "P1", days: 4, status: "todo", note: "" },
   { phase: 4, id: "I5", title: "런타임 직접 소비 — B(치환) 구현",
-    detail: "B(렌더 경로가 experiment::Model을 직접 소비)로 결정됐다. legacy Model 소비 파일은 10개로 측정됐다. 모델 V2/V3는 완료됐고, 머테리얼 M5-C3→C4→M6·Serialization D2/D5 재질 식별자 정책을 각각 닫은 뒤 여기서 합류한다.",
+      detail: "B(렌더 경로가 experiment::Model을 직접 소비)로 결정됐다. legacy Model 소비 파일은 10개로 측정됐다. 모델 V2/V3와 기존 머테리얼 M5·M6 렌더 계약, Serialization D2/D5-a·D5-b1·D5-b2a·D5-b2b1·D5-b2b2 model 전수 Cook/pak 게시는 완료됐다. D5-b2c가 나머지 producer를 공급한 뒤 I5-M에서 experiment::Material을 영속 정본으로 승격하고 MaterialInstance/Resolver를 연결하며 Editor·Scene·CLR·standalone asset까지 새 경계로 옮긴다.",
     refs: "ModelImportPipelinePlan I5", priority: "P0", days: 5, status: "todo",
-    note: "★ 결정은 완료, 직접 소비 구현은 미착수. 2026-08-27 StandardMaterialProperty 이름 정본, V2 68B, V3 mesh별 packed mask/stride를 생산 소비자 0 상태에서 완료했다. 다음은 M5-C3/C4/M6와 재질/shader GUID 정책이며, 그 뒤 I5/V4를 함께 잇는다." },
+      note: "★ 결정은 완료, 직접 소비 구현은 미착수. P2d-e의 legacy writer 은퇴는 ::Material 타입 퇴역이 아니다. I5-M 완료에는 experiment::Material/MaterialInstance에서 M6 snapshot 생성, runtime instance와 asset duplicate 분리, 제품 external consumer 비0, legacy ::Material 제품 소비 0, 양 backend parity가 필요하다. 다음 선행은 D5-b2c 나머지 producer·manifest 게시이며, 그 뒤 I5/V4를 함께 잇는다." },
   { phase: 4, id: "I6", title: "전환 — Assimp 은퇴",
-    detail: "I5 결정 후. 두 경로 병행 기간을 두고 픽셀·성능 대조를 거친 뒤 legacy 로더를 제거한다. 성능 판정은 Release 로만 한다 — Debug 는 같은 조건에서 25배 느리고 규모별 개선 방향까지 뒤집는다.",
+    detail: "I5-M 뒤 두 경로 병행 기간의 픽셀·Release 성능 대조를 통과하면 Assimp와 함께 ExperimentLegacyBridge, legacy ::Model/::Material, DataSystem::Materials, InstantiateShared, legacy runtime codec·프로젝트 등록을 제거한다. 과거 자산 지원은 필요할 때 오프라인 migration reader로만 남긴다.",
     refs: "ModelImportPipelinePlan I6", priority: "P0", days: 5, status: "todo", note: "" },
   { phase: 4, id: "I7", title: "cooked 포맷·속도 (경로 규약 제외)",
-    detail: "CookedModelDecoder와 포맷/코덱은 섰지만 ModelLoader가 디코더 하나만 받아 CookedThenSource 거부 뒤 source fallback을 수행할 제품 resolver가 없다. PHASE 17의 GUID/런타임 쿠킹 결정을 기다리며, 이 항목은 포맷과 속도만 소유하고 산출물 경로는 정하지 않는다.",
+    detail: "CookedModelDecoder와 포맷/코덱, D5-a checked publication, D5-b1 GUID-addressed Derived/CEMF 계약, D5-b2a 단일 producer, D5-b2b1 model 14개 전수 Cook과 D5-b2b2 제품 pak 게시는 섰지만 ModelLoader가 디코더 하나만 받아 CookedThenSource 거부 뒤 source fallback을 수행할 제품 resolver가 없다. D5-b2c 나머지 producer를 기다리며, 이 항목은 포맷과 속도만 소유한다.",
     refs: "ModelImportPipelinePlan I7 · SerializationPlan §3.6.1", priority: "P2", days: 4, status: "progress",
-    note: "[포맷·코덱 완료 2026-08-25, V3 개정 2026-08-27] 매직 0x434D4543, kFormatVersion=3, 전체 VertexLayout 표 hash, header mask union/max stride, mesh별 packed byte range/count/mask/stride를 기록·교차 검증한다. 손상 거부는 임시 draft에서 수행해 부분 결과를 노출하지 않는다. 합성 280/280, 컬러 실자산 SU_Mythic 6,217/6,217 왕복 통과. 기존 Release 성능은 Gunner 1.708ms·SU 1.849ms·Suzanne 0.113ms이며 mmap은 실측에서 졌으므로 쓰지 않는다. 잔여는 PHASE 17 GUID 경로 뒤 ModelSourcePreference resolver와 CookedThenSource 신선도/fallback 배선이다." },
+    note: "[포맷·코덱 완료 2026-08-25, V3 개정 2026-08-27, D5-a/D5-b1/D5-b2a/D5-b2b1/D5-b2b2 2026-08-29] CEMC v3는 전체 VertexLayout 표 hash, header mask union/max stride, mesh별 packed byte range/count/mask/stride를 기록·교차 검증한다. D5-b1 합성 331/331·Prim_Cube 64/64에 이어 D5-b2a는 단일 CEMC/CEMF를, D5-b2b1은 model 14개 CEMC + 66-entry CEMF를 결정적으로 게시하고 D5-b2b2는 이를 pak에 넣는다. 컬러 SU_Mythic 6,217/6,217은 이전 V3 증거로 남고, 기존 Release 성능은 Gunner 1.708ms·SU 1.849ms·Suzanne 0.113ms다. 잔여는 D5-b2c 뒤 ModelSourcePreference resolver와 CookedThenSource 신선도/fallback 배선이다." },
   { phase: 4, id: "I8", title: "검사 자산·게이트 보강",
     detail: "값이 변하는 Step 트랙 자산 확보(실자산 455트랙이 전부 상수라 그 경로가 미검증). 실자산 게이트에 코너 탄젠트 대 삼각형 UV 기울기 부호 검사 추가 — 정상 코드에서 기준값을 먼저 재고 임계를 정한다(평활화된 이음매에서 거짓 실패 가능). 기준선 없는 자산(Cha_Mon_5.fbx)의 판정 방식 확정.",
     refs: "ModelImportPipelinePlan I8", priority: "P1", days: 3, status: "todo",
@@ -2162,8 +2241,8 @@ const TASKS = [
     note: "기대 6.4배 — 병렬화가 아니라 낭비 제거다. DX11 API 직접 호출이라 한 줄도 그대로 오지 않는다. 게이트: 삭제분과 같은 씬에서 픽셀 대조 + 디스패치 스레드 활용률 계측. 의존: L1(UV1)·L2(BVH)." },
   { phase: 4, id: "L4", title: "백그라운드 베이킹 — 에디터를 막지 않는다",
     detail: "L4-a 별도 COMPUTE 큐 + 큐 간 펜스(현재 CreateCommandQueue 는 TYPE_DIRECT 하나뿐이고 AsyncCompute 코드 0건 — 같은 DIRECT 큐에 베이크를 넣으면 에디터 프레임과 직렬화된다). L4-b GPU 타임슬라이스(디스패치를 렉트·샘플 단위로 쪼개 프레임당 예산 안에). L4-c 씬 밀봉 스냅샷 + 편집 시 무효화. 진행률·취소·재개를 명시적 체크포인트로 — 코루틴 프레임에 상태를 숨기지 않는다.",
-    refs: "LightmapBakerPlan L4 · ScriptableRenderPipelinePlan 4-⑦", priority: "P0", days: 7, status: "todo",
-    note: "★ 목표는 '영향 없음'이 아니라 non-blocking 이다 — 상용 엔진(Unity Progressive Lightmapper · UE5 GPU Lightmass)도 베이크 중 뷰포트가 느려진다. 같은 GPU 를 나눠 쓰기 때문이다. 달성 목표: 씬 편집·저장이 계속 되고, 뷰포트가 느려지되 멈추지 않고, 진행률·취소가 되고, 편집하면 무효화·재시작. ★ L4-b 는 성능이 아니라 안전 요구다 — 단일 디스패치가 Windows TDR(기본 2초)을 넘으면 디바이스가 리셋된다. ★ L4-a 는 SRP 의 async compute 와 같은 기반이므로 먼저 세우는 쪽이 소유하고 다른 쪽이 소비한다(두 번 만들지 않는다). RHIParallelCommandPool 의 기록 인프라는 빌리되 RunParallel 은 join 까지 대기하는 fork-join 이라 프레임을 넘나드는 수명에는 그대로 못 쓴다." },
+    refs: "LightmapBakerPlan L4 · RenderGraphDependencySchedulingPlan RG8", priority: "P0", days: 7, status: "todo",
+    note: "★ 목표는 '영향 없음'이 아니라 non-blocking 이다 — 상용 엔진(Unity Progressive Lightmapper · UE5 GPU Lightmass)도 베이크 중 뷰포트가 느려진다. 같은 GPU 를 나눠 쓰기 때문이다. 달성 목표: 씬 편집·저장이 계속 되고, 뷰포트가 느려지되 멈추지 않고, 진행률·취소가 되고, 편집하면 무효화·재시작. ★ L4-b 는 성능이 아니라 안전 요구다 — 단일 디스패치가 Windows TDR(기본 2초)을 넘으면 디바이스가 리셋된다. ★ L4-a 는 트랙 RG8의 async compute와 같은 기반이므로 먼저 세우는 쪽이 공통 RHI 계약을 소유하고 다른 쪽이 소비한다(두 번 만들지 않는다). RHIParallelCommandPool 의 기록 인프라는 빌리되 RunParallel 은 join 까지 대기하는 fork-join 이라 프레임을 넘나드는 수명에는 그대로 못 쓴다." },
   { phase: 4, id: "L5", title: "간접광 — progressive 누적",
     detail: "샘플을 분할 디스패치로 쪼개 누적한다(indirectSampleCount 512 · indirectCount 2). numthreads occupancy 측정 후 조정 — 현재 32×32 = 1024 스레드/그룹으로 API 한계치인데 스레드마다 uint stack[64] BVH 스택을 들어 레지스터·스크래치 압박이 크다. 바운스마다 CreateTexture2D 로 텍스처 배열을 재생성하는 것도 제거(누수 의심).",
     refs: "LightmapBakerPlan L5", priority: "P1", days: 5, status: "todo",

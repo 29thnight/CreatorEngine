@@ -1,4 +1,4 @@
-guid: 4547b6c7-5659-51bf-a0f2-8487020daefd
+guid: eef1dfaa-cf3a-4ce7-899b-d3e496f59d17
 importSettings:
   extension: .glb
   timestamp: 134300494793780860
@@ -6,3 +6,13 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: gltf/material/0
+      name: Plane_Mat
+      guid: 32b0e7db-18fb-4451-9bf8-d8379c38ea51
+  embeddedTextures:
+    - key: gltf/image/0
+      name: Plane_Mat_BaseColor
+      guid: 6c097b84-2860-4484-9f61-a354c7e80b9d

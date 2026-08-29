@@ -1,0 +1,29 @@
+schema: 1
+name: EnhancedGBuffer
+source: GBuffer.hlsl
+properties:
+  - { name: baseColor, label: Base Color, type: float4, default: [1.0, 1.0, 1.0, 1.0] }
+  - { name: metallic, label: Metallic, type: float, default: 0.0 }
+  - { name: roughness, label: Roughness, type: float, default: 1.0 }
+  - { name: normalScale, label: Normal Scale, type: float, default: 1.0 }
+  - { name: occlusionStrength, label: Occlusion Strength, type: float, default: 1.0 }
+  - { name: emissive, label: Emissive, type: float3, default: [1.0, 1.0, 1.0] }
+  - { name: alphaCutoff, label: Alpha Cutoff, type: float, default: 0.5 }
+  - { name: baseColorMap, label: Base Color Map, type: texture2d }
+  - { name: normalMap, label: Normal Map, type: texture2d }
+  - { name: ormMap, label: ORM Map, type: texture2d }
+  - { name: emissiveMap, label: Emissive Map, type: texture2d }
+keywords:
+  - { axis: SHADING_QUALITY, values: [full, reduced] }
+passes:
+  - name: GBuffer
+    vs: { entry: VSMain }
+    ps: { entry: PSMain }
+    state:
+      fill: solid
+      cull: none
+      blend: off
+      depthWrite: true
+      depthTest: less
+      topology: triangle
+    queue: opaque

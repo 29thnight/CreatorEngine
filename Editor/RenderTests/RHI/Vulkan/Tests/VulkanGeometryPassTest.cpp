@@ -12,12 +12,21 @@
 #include "Render/Passes/Geometry/EnhancedForwardPass.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "Render/Passes/Lighting/EnhancedSSAOPass.h"
 #include "Render/Passes/Lighting/EnhancedSSGIPass.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 #include "FrameCameraSnapshot.h"
+#include "DataSystem.h"
+#include "Material.h"
 #include "Mesh.h"
+#include "PrimitiveRenderProxy.h"
 #include "Texture.h"
+#include "ShaderMeta.h"
+#include "ShaderMetaReflection.h"
+#include "ShaderPermutationDomain.h"
+#include "StandardMaterialProperty.h"
+#include "RHI/RHIShaderSource.h"
 #include <mathematics/transform.hpp>
 
 #include <algorithm>
@@ -25,9 +34,11 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <limits>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -230,6 +241,9 @@ namespace
     struct GBufferCapture
     {
         float center[4][4]{};
+        float second[4][4]{};
+        float third[4][4]{};
+        float fourth[4][4]{};
         float outside[4][4]{};
         float bitmask{ 0.f };
         float outsideBitmask{ 0.f };
@@ -241,6 +255,25 @@ namespace
         uint32_t materials{ 0 };
         uint32_t batches{ 0 };
         EnhancedRenderGraph::Stats graph;
+        RHIPipelineHandle previousPipeline{};
+        RHIPipelineHandle activePipeline{};
+        RHIPipelineHandle alternatePipeline{};
+        RHIPipelineHandle secondaryMetaPipeline{};
+        RHIPipelineHandle retiredSecondaryMetaPipeline{};
+        RHIPipelineHandle retiredVariantPipeline{};
+        ShaderMetaHandle shaderMetaHandle{};
+        ShaderMetaHandle secondaryMetaHandle{};
+        uint32_t shaderVariants{};
+        bool previousPipelineStale{ false };
+        bool retiredVariantStale{ false };
+        bool rejectedReloadPreserved{ false };
+        bool rejectedMaterialPreserved{ false };
+        bool rejectedTextureBindingPreserved{ false };
+        bool rejectedPermutationPreserved{ false };
+        bool rejectedSecondaryMetaPreserved{ false };
+        bool secondaryMetaSurvivedPrimaryReload{ false };
+        bool secondaryMetaGenerationRetired{ false };
+        bool secondaryMetaFrameRetired{ false };
     };
 
     struct GBufferFixture
@@ -253,8 +286,8 @@ namespace
         GBufferFixture()
         {
         const math::vector3 positions[] = {
-                { -0.75f, -0.75f, 0.5f }, { -0.75f, 0.75f, 0.5f },
-                { 0.75f, 0.75f, 0.5f }, { 0.75f, -0.75f, 0.5f } };
+                { -0.25f, -0.75f, 0.5f }, { -0.25f, 0.75f, 0.5f },
+                { 0.25f, 0.75f, 0.5f }, { 0.25f, -0.75f, 0.5f } };
         const math::vector2 uvs[] = {
                 { 0.f, 1.f }, { 0.f, 0.f }, { 1.f, 0.f }, { 1.f, 1.f } };
             for (uint32_t i = 0; i < 4; ++i)
@@ -277,15 +310,162 @@ namespace
             draw.baseColorFactor = math::color(0.25f, 0.5f, 0.75f, 1.f);
             draw.metallic = 0.2f;
             draw.roughness = 0.6f;
+            draw.useNormalMap = 1;
             draws.push_back(draw);
         }
     };
+
+    bool PrepareStandardMaterialProbe(ShaderMetaHandle& outHandle,
+        ShaderMeta& outMeta, Material& outMaterial, std::string& outError)
+    {
+        const std::filesystem::path metaPath = RHIShaderSource::Resolve(
+            "GBuffer.shadermeta");
+        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
+        if (FileGuid{} == guid)
+        {
+            outError = "제품 GBuffer catalog GUID를 찾지 못했다";
+            return false;
+        }
+
+        outHandle = DataSystems->LoadShaderMetaHandle(guid, outError);
+        const std::shared_ptr<const ShaderMeta> snapshot =
+            DataSystems->ResolveShaderMeta(outHandle);
+        if (!outHandle.IsValid() || !snapshot)
+        {
+            if (outError.empty()) outError = "제품 GBuffer generation resolve 실패";
+            return false;
+        }
+        outMeta = *snapshot;
+
+        ShaderMetaPermutation permutation;
+        constexpr std::array<std::uint16_t, 1> fullQuality{ 0 };
+        if (!ShaderPermutationDomain::Resolve(outMeta, 0,
+                fullQuality, permutation, outError))
+            return false;
+
+        if (1 != outMeta.keywords.size()
+            || outMeta.keywords[0].name != "SHADING_QUALITY"
+            || outMeta.keywords[0].values
+                != std::vector<std::string>{ "full", "reduced" })
+        {
+            outError = "제품 GBuffer SHADING_QUALITY permutation 축 불일치";
+            return false;
+        }
+
+        std::error_code pathError;
+        const std::filesystem::path sourcePath = outMeta.ResolveSource(metaPath);
+        const std::filesystem::path relativeSource = std::filesystem::relative(
+            sourcePath, RHIShaderSource::Resolve(""), pathError);
+        if (pathError || relativeSource.empty())
+        {
+            outError = "제품 GBuffer source 상대 경로 계산 실패";
+            return false;
+        }
+
+        std::vector<RHIShaderReflection> dxilStages;
+        std::vector<RHIShaderReflection> spirvStages;
+        const ShaderPassDesc& pass = outMeta.passes[0];
+        const std::pair<const ShaderStageEntry*, const char*> stages[] = {
+            { pass.vertex ? &*pass.vertex : nullptr, "vs_5_0" },
+            { pass.pixel ? &*pass.pixel : nullptr, "ps_5_0" },
+        };
+        for (const auto& [stage, profile] : stages)
+        {
+            if (nullptr == stage)
+            {
+                outError = "제품 GBuffer는 VS+PS여야 한다";
+                return false;
+            }
+
+            RHIShaderReflection dxil;
+            RHIShaderReflection spirv;
+            const std::string sourceName = relativeSource.generic_string();
+            if (!RHIShaderCompiler::ReflectFile(sourceName, stage->entry, profile,
+                    RHIShaderBinary::Dxil, permutation.defines, dxil, outError)
+                || !RHIShaderCompiler::ReflectFile(sourceName, stage->entry, profile,
+                    RHIShaderBinary::SpirV, permutation.defines, spirv, outError)
+                || !AreShaderReflectionsEquivalent(dxil, spirv, outError))
+                return false;
+            dxilStages.push_back(std::move(dxil));
+            spirvStages.push_back(std::move(spirv));
+        }
+
+        ShaderMetaBindingLayout layout;
+        if (!ShaderMetaReflection::Resolve(outMeta, dxilStages, layout, outError))
+            return false;
+
+        constexpr std::size_t kNumericPropertyCount = 7;
+        const std::string_view expectedNames[kNumericPropertyCount] = {
+            standard_material::property::BaseColor,
+            standard_material::property::Metallic,
+            standard_material::property::Roughness,
+            standard_material::property::NormalScale,
+            standard_material::property::OcclusionStrength,
+            standard_material::property::Emissive,
+            standard_material::property::AlphaCutoff,
+        };
+        constexpr std::uint32_t expectedOffsets[kNumericPropertyCount] = {
+            0, 16, 20, 24, 28, 32, 44,
+        };
+        constexpr std::array<std::string_view, 4> expectedTextures{
+            standard_material::property::BaseColorMap,
+            standard_material::property::NormalMap,
+            standard_material::property::OrmMap,
+            standard_material::property::EmissiveMap,
+        };
+        bool layoutMatches = "MaterialProperties" == layout.constantBufferName
+            && 2 == layout.constantBufferRegister
+            && 0 == layout.constantBufferSpace
+            && 48 == layout.constantBufferByteSize
+            && kNumericPropertyCount + expectedTextures.size()
+                == layout.properties.size();
+        for (std::size_t i = 0; layoutMatches && i < kNumericPropertyCount; ++i)
+        {
+            layoutMatches = expectedNames[i] == layout.properties[i].name
+                && expectedOffsets[i] == layout.properties[i].byteOffset
+                && RHIShaderResourceKind::ConstantBuffer ==
+                    layout.properties[i].resourceKind;
+        }
+        for (std::size_t i = 0; layoutMatches && i < expectedTextures.size(); ++i)
+        {
+            const ShaderMetaPropertyBinding& binding =
+                layout.properties[kNumericPropertyCount + i];
+            layoutMatches = expectedTextures[i] == binding.name
+                && ShaderPropertyType::Texture2D == binding.propertyType
+                && RHIShaderResourceKind::Texture == binding.resourceKind
+                && i == binding.registerIndex && 0 == binding.registerSpace;
+        }
+        if (!layoutMatches)
+        {
+            outError = "제품 GBuffer b2/texture reflection layout 불일치";
+            return false;
+        }
+
+        if (!outMaterial.ConfigureShaderProperties(outMeta, layout, outError, outHandle)
+            || !outMaterial.TrySetVector("MaterialProperties", "baseColor",
+                math::vector4{ 0.125f, 0.25f, 0.5f, 1.0f })
+            || !outMaterial.TrySetFloat("MaterialProperties", "metallic", 0.75f)
+            || !outMaterial.TrySetFloat("MaterialProperties", "roughness", 0.625f)
+            || !outMaterial.TrySetFloat("MaterialProperties", "normalScale", 0.5f)
+            || !outMaterial.TrySetFloat("MaterialProperties", "occlusionStrength", 0.375f)
+            || !outMaterial.TrySetVector("MaterialProperties", "emissive",
+                math::vector3{ 0.0625f, 0.125f, 0.25f })
+            || !outMaterial.TrySetFloat("MaterialProperties", "alphaCutoff", 0.875f)
+            || 48 != outMaterial.GetConstantBufferData().size())
+        {
+            if (outError.empty()) outError = "제품 GBuffer Standard property pack 실패";
+            return false;
+        }
+        return true;
+    }
 
     template <typename TResources>
     bool CaptureGBufferBackend(TResources& resources,
         IRenderPipelineCache& pipelines, IRenderRootSignatureCache& roots,
         IRenderMeshCache& meshCache, IRenderTextureCache& textureCache,
         const std::function<void()>& beginCaches, GBufferFixture& fixture,
+        const ShaderMeta& materialProbeMeta, ShaderMetaHandle materialProbeHandle,
+        const ShaderMeta& secondaryMeta, ShaderMetaHandle secondaryMetaHandle,
         GBufferCapture& outCapture, std::string& outError)
     {
         EnhancedFrameContext context{};
@@ -313,6 +493,116 @@ namespace
         };
 
         if (!gbuffer.Initialize(context, outError)) return fail(outError);
+
+        // C3b2b2 대표 pass 전환. bootstrap은 lessEqual, catalog 제품 meta는
+        // less라 PSO key가 반드시 갈린다. 현재 depth=0.5, clear=1이라 픽셀은
+        // 동일하고 다음 draw가 새 handle로 같은 MRT를 내야 한다.
+        ShaderMeta shaderMeta{};
+        shaderMeta.guid = FileGuid{ "30000000-0000-4000-8000-000000000003" };
+        shaderMeta.name = "GBufferReloadProbe";
+        shaderMeta.source = "GBuffer.hlsl";
+        ShaderPassDesc shaderPass{};
+        shaderPass.name = "GBuffer";
+        shaderPass.vertex = ShaderStageEntry{ "VSMain" };
+        shaderPass.pixel = ShaderStageEntry{ "PSMain" };
+        shaderPass.state.cullMode = RHICullMode::None;
+        shaderPass.state.depthTest = RHICompareOp::LessEqual;
+        shaderPass.queue = ShaderPassQueue::Opaque;
+        shaderMeta.passes.push_back(shaderPass);
+
+        constexpr ShaderMetaHandle bootstrapHandle{ 0xFFFFFFFEu, 1u };
+        if (!gbuffer.ApplyShaderMeta(context, bootstrapHandle, shaderMeta,
+                {}, outError)) return fail(outError);
+        outCapture.previousPipeline = gbuffer.GetPipelineHandle();
+
+        if (!gbuffer.ApplyShaderMeta(context, materialProbeHandle, materialProbeMeta,
+                RHICompletionPoint{ resources.GetLastSignaledFenceValue() }, outError))
+            return fail(outError);
+        outCapture.activePipeline = gbuffer.GetPipelineHandle();
+        outCapture.shaderMetaHandle = gbuffer.GetShaderMetaHandle();
+
+        for (const EnhancedDrawItem& draw : fixture.draws)
+        {
+            if (!draw.materialSnapshot) continue;
+            const bool usesSecondaryMeta =
+                draw.materialSnapshot->shaderMetaHandle == secondaryMetaHandle;
+            const ShaderMeta& drawMeta = usesSecondaryMeta
+                ? secondaryMeta : materialProbeMeta;
+            const ShaderMetaHandle drawMetaHandle = usesSecondaryMeta
+                ? secondaryMetaHandle : materialProbeHandle;
+            RHIShaderPermutationKey resolvedKey{};
+            std::shared_ptr<const ShaderMetaBindingLayout> resolvedLayout;
+            if (!gbuffer.EnsureShaderMetaVariant(context, drawMetaHandle,
+                    drawMeta, draw.materialSnapshot->keywordSelections,
+                    resolvedKey, resolvedLayout, outError))
+            {
+                return fail(outError);
+            }
+            if (resolvedKey != draw.materialSnapshot->permutationKey
+                || !resolvedLayout
+                || *resolvedLayout != draw.materialSnapshot->bindingLayout)
+            {
+                return fail("material keyword variant identity/layout 불일치");
+            }
+        }
+        outCapture.shaderVariants = gbuffer.GetShaderVariantCount();
+        if (fixture.draws.size() >= 3 && fixture.draws[2].materialSnapshot)
+        {
+            outCapture.alternatePipeline = gbuffer.GetShaderVariantPipeline(
+                materialProbeHandle,
+                fixture.draws[2].materialSnapshot->permutationKey);
+        }
+        if (fixture.draws.size() >= 4 && fixture.draws[3].materialSnapshot)
+        {
+            outCapture.secondaryMetaHandle = secondaryMetaHandle;
+            outCapture.secondaryMetaPipeline = gbuffer.GetShaderVariantPipeline(
+                secondaryMetaHandle,
+                fixture.draws[3].materialSnapshot->permutationKey);
+        }
+        const std::array<ShaderMetaHandle, 2> activeMetaHandles{
+            materialProbeHandle, secondaryMetaHandle };
+        if (0 != gbuffer.CommitShaderMetaFrame(context, activeMetaHandles,
+                RHICompletionPoint{ resources.GetLastSignaledFenceValue() }))
+        {
+            return fail("active multi ShaderMeta frame이 variant를 조기 retire했다");
+        }
+
+        ShaderMeta invalidMeta = materialProbeMeta;
+        invalidMeta.passes[0].name = "NotGBuffer";
+        std::string rejectedError;
+        const ShaderMetaHandle invalidHandle{
+            materialProbeHandle.slot, materialProbeHandle.generation + 1u };
+        const bool rejected = !gbuffer.ApplyShaderMeta(context,
+            invalidHandle, invalidMeta,
+            RHICompletionPoint{ resources.GetLastSignaledFenceValue() }, rejectedError);
+        outCapture.rejectedReloadPreserved = rejected && !rejectedError.empty() &&
+            outCapture.activePipeline == gbuffer.GetPipelineHandle() &&
+            outCapture.shaderMetaHandle == gbuffer.GetShaderMetaHandle() &&
+            outCapture.alternatePipeline == gbuffer.GetShaderVariantPipeline(
+                materialProbeHandle,
+                fixture.draws[2].materialSnapshot->permutationKey) &&
+            outCapture.secondaryMetaPipeline == gbuffer.GetShaderVariantPipeline(
+                secondaryMetaHandle,
+                fixture.draws[3].materialSnapshot->permutationKey);
+
+        ShaderMeta invalidSecondaryMeta = secondaryMeta;
+        invalidSecondaryMeta.passes[0].name = "NotGBuffer";
+        const ShaderMetaHandle invalidSecondaryHandle{
+            secondaryMetaHandle.slot, secondaryMetaHandle.generation + 1u };
+        RHIShaderPermutationKey rejectedSecondaryKey{};
+        std::shared_ptr<const ShaderMetaBindingLayout> rejectedSecondaryLayout;
+        std::string rejectedSecondaryError;
+        const bool secondaryRejected = !gbuffer.EnsureShaderMetaVariant(context,
+            invalidSecondaryHandle, invalidSecondaryMeta,
+            fixture.draws[3].materialSnapshot->keywordSelections,
+            rejectedSecondaryKey, rejectedSecondaryLayout,
+            rejectedSecondaryError);
+        outCapture.rejectedSecondaryMetaPreserved = secondaryRejected
+            && !rejectedSecondaryError.empty()
+            && outCapture.secondaryMetaPipeline == gbuffer.GetShaderVariantPipeline(
+                secondaryMetaHandle,
+                fixture.draws[3].materialSnapshot->permutationKey)
+            && 3 == gbuffer.GetShaderVariantCount();
         const RHIFormat formats[] = {
             RHIFormat::RGBA16Float, RHIFormat::RGBA16Float,
             RHIFormat::RGBA16Float, RHIFormat::RGBA16Float,
@@ -327,6 +617,53 @@ namespace
         if (!resources.BeginFrame(outError)) return fail(outError);
         frameOpen = true;
         if (beginCaches) beginCaches();
+
+        const std::shared_ptr<const EnhancedMaterialDrawSnapshot> validMaterial =
+            fixture.draws[0].materialSnapshot;
+        auto invalidMaterial = std::make_shared<EnhancedMaterialDrawSnapshot>(
+            *validMaterial);
+        ++invalidMaterial->shaderMetaHandle.generation;
+        fixture.draws[0].materialSnapshot = invalidMaterial;
+        std::string materialError;
+        const bool materialRejected = !gbuffer.PrepareFrame(context, materialError);
+        fixture.draws[0].materialSnapshot = validMaterial;
+        outCapture.rejectedMaterialPreserved = materialRejected
+            && !materialError.empty()
+            && outCapture.activePipeline == gbuffer.GetPipelineHandle()
+            && outCapture.shaderMetaHandle == gbuffer.GetShaderMetaHandle();
+        if (!outCapture.rejectedMaterialPreserved)
+            return fail("invalid material snapshot이 fail-closed되지 않았다");
+
+        auto invalidTextureBinding =
+            std::make_shared<EnhancedMaterialDrawSnapshot>(*validMaterial);
+        invalidTextureBinding->textureBindings[0].registerIndex = 1;
+        fixture.draws[0].materialSnapshot = invalidTextureBinding;
+        std::string textureBindingError;
+        const bool textureBindingRejected =
+            !gbuffer.PrepareFrame(context, textureBindingError);
+        fixture.draws[0].materialSnapshot = validMaterial;
+        outCapture.rejectedTextureBindingPreserved = textureBindingRejected
+            && !textureBindingError.empty()
+            && outCapture.activePipeline == gbuffer.GetPipelineHandle()
+            && outCapture.shaderMetaHandle == gbuffer.GetShaderMetaHandle();
+        if (!outCapture.rejectedTextureBindingPreserved)
+            return fail("invalid texture register snapshot이 fail-closed되지 않았다");
+
+        auto invalidPermutation =
+            std::make_shared<EnhancedMaterialDrawSnapshot>(*validMaterial);
+        ++invalidPermutation->permutationKey.lo;
+        fixture.draws[0].materialSnapshot = invalidPermutation;
+        std::string permutationError;
+        const bool permutationRejected =
+            !gbuffer.PrepareFrame(context, permutationError);
+        fixture.draws[0].materialSnapshot = validMaterial;
+        outCapture.rejectedPermutationPreserved = permutationRejected
+            && !permutationError.empty()
+            && outCapture.activePipeline == gbuffer.GetPipelineHandle()
+            && 3 == gbuffer.GetShaderVariantCount();
+        if (!outCapture.rejectedPermutationPreserved)
+            return fail("invalid permutation snapshot이 fail-closed되지 않았다");
+
         if (!gbuffer.PrepareFrame(context, outError)) return fail(outError);
 
         EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
@@ -368,7 +705,10 @@ namespace
             if (!resources.MapReadback(readbacks[i], images[i], outError))
                 return fail(outError);
 
-        constexpr uint32_t center = kGeometryTestWindow / 2;
+        constexpr uint32_t center = kGeometryTestWindow / 8;
+        constexpr uint32_t second = kGeometryTestWindow * 3 / 8;
+        constexpr uint32_t third = kGeometryTestWindow * 5 / 8;
+        constexpr uint32_t fourth = kGeometryTestWindow * 7 / 8;
         constexpr uint32_t outside = 2;
         for (uint32_t target = 0; target < 4; ++target)
         {
@@ -376,6 +716,12 @@ namespace
             {
                 outCapture.center[target][channel] =
                     images[target].At(center, center, channel);
+                outCapture.second[target][channel] =
+                    images[target].At(second, center, channel);
+                outCapture.third[target][channel] =
+                    images[target].At(third, center, channel);
+                outCapture.fourth[target][channel] =
+                    images[target].At(fourth, center, channel);
                 outCapture.outside[target][channel] =
                     images[target].At(outside, outside, channel);
             }
@@ -388,6 +734,59 @@ namespace
             for (uint32_t x = 0; x < kGeometryTestWindow; ++x)
                 if (images[0].At(x, y, 3) > 0.5f) ++outCapture.writtenPixels;
 
+        outCapture.retiredVariantPipeline = outCapture.alternatePipeline;
+        const ShaderMetaHandle nextGeneration{
+            materialProbeHandle.slot, materialProbeHandle.generation + 2u };
+        if (!gbuffer.ApplyShaderMeta(context, nextGeneration, materialProbeMeta,
+                RHICompletionPoint{ resources.GetLastSignaledFenceValue() }, outError))
+        {
+            return fail(outError);
+        }
+        outCapture.retiredVariantStale = outCapture.retiredVariantPipeline.IsValid()
+            && !gbuffer.GetShaderVariantPipeline(materialProbeHandle,
+                fixture.draws[2].materialSnapshot->permutationKey).IsValid()
+            && 2 == gbuffer.GetShaderVariantCount();
+        outCapture.secondaryMetaSurvivedPrimaryReload =
+            outCapture.secondaryMetaPipeline == gbuffer.GetShaderVariantPipeline(
+                secondaryMetaHandle,
+                fixture.draws[3].materialSnapshot->permutationKey);
+
+        const ShaderMetaHandle nextSecondaryGeneration{
+            secondaryMetaHandle.slot, secondaryMetaHandle.generation + 2u };
+        RHIShaderPermutationKey nextSecondaryKey{};
+        std::shared_ptr<const ShaderMetaBindingLayout> nextSecondaryLayout;
+        if (!gbuffer.EnsureShaderMetaVariant(context, nextSecondaryGeneration,
+                secondaryMeta,
+                fixture.draws[3].materialSnapshot->keywordSelections,
+                nextSecondaryKey, nextSecondaryLayout, outError))
+        {
+            return fail(outError);
+        }
+        const std::array<ShaderMetaHandle, 2> nextActiveMetaHandles{
+            nextGeneration, nextSecondaryGeneration };
+        const std::uint32_t generationRetired = gbuffer.CommitShaderMetaFrame(
+            context, nextActiveMetaHandles,
+            RHICompletionPoint{ resources.GetLastSignaledFenceValue() });
+        outCapture.secondaryMetaGenerationRetired = 1 == generationRetired
+            && !gbuffer.GetShaderVariantPipeline(secondaryMetaHandle,
+                fixture.draws[3].materialSnapshot->permutationKey).IsValid()
+            && outCapture.secondaryMetaPipeline
+                == gbuffer.GetShaderVariantPipeline(nextSecondaryGeneration,
+                    nextSecondaryKey)
+            && 2 == gbuffer.GetShaderVariantCount();
+
+        const std::array<ShaderMetaHandle, 1> primaryOnly{ nextGeneration };
+        outCapture.retiredSecondaryMetaPipeline =
+            gbuffer.GetShaderVariantPipeline(nextSecondaryGeneration,
+                nextSecondaryKey);
+        const std::uint32_t frameRetired = gbuffer.CommitShaderMetaFrame(
+            context, primaryOnly,
+            RHICompletionPoint{ resources.GetLastSignaledFenceValue() });
+        outCapture.secondaryMetaFrameRetired = 1 == frameRetired
+            && !gbuffer.GetShaderVariantPipeline(nextSecondaryGeneration,
+                nextSecondaryKey).IsValid()
+            && 1 == gbuffer.GetShaderVariantCount();
+
         gbuffer.Shutdown();
         for (RHIReadback& readback : readbacks) resources.ReleaseReadback(readback);
         return true;
@@ -395,13 +794,28 @@ namespace
 
     struct ForwardCapture
     {
-        float center[4]{};
+        float swatches[3][4]{};
+        float overlap[4]{};
+        float customBefore[4]{};
+        float customAfter[4]{};
         float outside[4]{};
         uint32_t writtenPixels{ 0 };
         uint32_t centerTileLights{ 0 };
         uint32_t cornerTileLights{ 0 };
         uint32_t minTileLights{ UINT32_MAX };
         uint32_t maxTileLights{ 0 };
+        uint32_t draws{ 0 };
+        uint32_t batches{ 0 };
+        uint32_t shaderVariants{ 0 };
+        RHIPipelineHandle shadePipeline{};
+        RHIPipelineHandle referencePipeline{};
+        RHIPipelineHandle secondaryShadePipeline{};
+        RHIPipelineHandle secondaryReferencePipeline{};
+        RHIPipelineHandle tertiaryShadePipeline{};
+        RHIPipelineHandle tertiaryReferencePipeline{};
+        bool invalidMetaRejected{ false };
+        bool invalidMaterialRejected{ false };
+        bool invalidPacketRejected{ false };
         EnhancedRenderGraph::Stats graph;
     };
 
@@ -435,13 +849,19 @@ namespace
             mesh = std::make_unique<Mesh>("rhi_forward_quad", vertices, indices);
             mesh->RecalculateBounds();
 
-            EnhancedDrawItem draw{};
-            draw.mesh = mesh.get();
-            draw.worldMatrix = math::matrix4x4::identity();
-            draw.baseColorFactor = math::color(0.8f, 0.4f, 0.2f, 0.5f);
-            draw.metallic = 0.f;
-            draw.roughness = 0.7f;
-            draws.push_back(draw);
+            for (float x : { -0.75f, 0.75f })
+            {
+                EnhancedDrawItem draw{};
+                draw.mesh = mesh.get();
+                draw.worldMatrix = math::translation_matrix(
+                    math::vector3{ x, 0.f, 0.f });
+                // P2a gate에서는 두 draw의 legacy 값은 일부러 같다. 실제 색이
+                // 갈리려면 Forward가 owning packet의 값/texture를 읽어야 한다.
+                draw.baseColorFactor = math::color(0.25f, 0.25f, 0.25f, 0.5f);
+                draw.metallic = 0.f;
+                draw.roughness = 0.7f;
+                draws.push_back(draw);
+            }
 
             EnhancedLight sun{};
             sun.position = math::vector4(0.f, 0.f, 0.f, 0.f);
@@ -462,20 +882,261 @@ namespace
         }
     };
 
+    bool PrepareForwardMaterialProbe(std::string_view metaFile,
+        std::span<const std::string_view> tailProperties,
+        std::uint32_t expectedConstantBytes, ShaderMetaHandle& outHandle,
+        ShaderMeta& outMeta, Material& outMaterial, std::uint32_t& outPassIndex,
+        std::string& outError)
+    {
+        const std::filesystem::path metaPath = RHIShaderSource::Resolve(
+            std::string(metaFile));
+        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
+        if (FileGuid{} == guid)
+        {
+            outError = "제품 Forward catalog GUID를 찾지 못했다";
+            return false;
+        }
+
+        outHandle = DataSystems->LoadShaderMetaHandle(guid, outError);
+        const std::shared_ptr<const ShaderMeta> snapshot =
+            DataSystems->ResolveShaderMeta(outHandle);
+        if (!outHandle.IsValid() || !snapshot)
+        {
+            if (outError.empty()) outError = "제품 Forward generation resolve 실패";
+            return false;
+        }
+        outMeta = *snapshot;
+
+        const auto passIt = std::find_if(outMeta.passes.begin(), outMeta.passes.end(),
+            [](const ShaderPassDesc& pass) { return pass.name == "Forward"; });
+        if (passIt == outMeta.passes.end() || !passIt->vertex || !passIt->pixel
+            || passIt->compute || ShaderPassQueue::Transparent != passIt->queue)
+        {
+            outError = "제품 Forward는 transparent VS+PS pass여야 한다";
+            return false;
+        }
+        outPassIndex = static_cast<std::uint32_t>(
+            std::distance(outMeta.passes.begin(), passIt));
+
+        RHIGraphicsPipelineDesc stateProbe{};
+        passIt->state.ApplyTo(stateProbe);
+        if (!stateProbe.blendEnable || stateProbe.independentBlend
+            || RHIDepthWrite::Zero != stateProbe.depthWriteMask)
+        {
+            outError = "제품 Forward alpha blend/depth-write state가 다르다";
+            return false;
+        }
+
+        const std::vector<std::uint16_t> defaultSelections(outMeta.keywords.size(), 0);
+        ShaderMetaPermutation permutation;
+        if (!ShaderPermutationDomain::Resolve(outMeta, outPassIndex,
+                defaultSelections, permutation, outError))
+        {
+            return false;
+        }
+        RHIShaderPermutation reflectionDefines = permutation.defines;
+        if (!reflectionDefines.Set("TILE_SIZE",
+                std::to_string(EnhancedForwardPass::kTileSize), outError)
+            || !reflectionDefines.Set("MAX_LIGHTS_PER_TILE",
+                std::to_string(EnhancedForwardPass::kMaxLightsPerTile), outError))
+        {
+            return false;
+        }
+
+        std::error_code pathError;
+        const std::filesystem::path sourcePath = outMeta.ResolveSource(metaPath);
+        const std::filesystem::path relativeSource = std::filesystem::relative(
+            sourcePath, RHIShaderSource::Resolve(""), pathError);
+        if (pathError || relativeSource.empty())
+        {
+            outError = "제품 Forward source 상대 경로 계산 실패";
+            return false;
+        }
+
+        std::vector<RHIShaderReflection> dxilStages;
+        std::vector<RHIShaderReflection> spirvStages;
+        const std::pair<const ShaderStageEntry*, const char*> stages[] = {
+            { &*passIt->vertex, "vs_5_0" },
+            { &*passIt->pixel, "ps_5_0" },
+        };
+        for (const auto& [stage, profile] : stages)
+        {
+            RHIShaderReflection dxil;
+            RHIShaderReflection spirv;
+            const std::string sourceName = relativeSource.generic_string();
+            if (!RHIShaderCompiler::ReflectFile(sourceName, stage->entry, profile,
+                    RHIShaderBinary::Dxil, reflectionDefines, dxil, outError)
+                || !RHIShaderCompiler::ReflectFile(sourceName, stage->entry, profile,
+                    RHIShaderBinary::SpirV, reflectionDefines, spirv, outError)
+                || !AreShaderReflectionsEquivalent(dxil, spirv, outError))
+            {
+                return false;
+            }
+            dxilStages.push_back(std::move(dxil));
+            spirvStages.push_back(std::move(spirv));
+        }
+
+        ShaderMetaBindingLayout layout;
+        if (!ShaderMetaReflection::Resolve(outMeta, dxilStages, layout, outError))
+            return false;
+
+        constexpr std::size_t kStandardNumericPropertyCount = 7;
+        constexpr std::array<std::string_view,
+            kStandardNumericPropertyCount> expectedNames{
+            standard_material::property::BaseColor,
+            standard_material::property::Metallic,
+            standard_material::property::Roughness,
+            standard_material::property::NormalScale,
+            standard_material::property::OcclusionStrength,
+            standard_material::property::Emissive,
+            standard_material::property::AlphaCutoff,
+        };
+        constexpr std::array<std::uint32_t,
+            kStandardNumericPropertyCount> expectedOffsets{
+            0, 16, 20, 24, 28, 32, 44,
+        };
+        constexpr std::size_t kMaterialTextureSlotCount = 4;
+        bool layoutMatches = "MaterialProperties" == layout.constantBufferName
+            && 2 == layout.constantBufferRegister
+            && 0 == layout.constantBufferSpace
+            && expectedConstantBytes == layout.constantBufferByteSize
+            && kStandardNumericPropertyCount + tailProperties.size()
+                + kMaterialTextureSlotCount
+                == layout.properties.size();
+        for (std::size_t index = 0;
+            layoutMatches && index < expectedNames.size(); ++index)
+        {
+            const ShaderMetaPropertyBinding& binding = layout.properties[index];
+            layoutMatches = expectedNames[index] == binding.name
+                && expectedOffsets[index] == binding.byteOffset
+                && RHIShaderResourceKind::ConstantBuffer == binding.resourceKind;
+        }
+        for (std::size_t index = 0;
+            layoutMatches && index < tailProperties.size(); ++index)
+        {
+            const ShaderMetaPropertyBinding& binding =
+                layout.properties[kStandardNumericPropertyCount + index];
+            layoutMatches = tailProperties[index] == binding.name
+                && 48u + static_cast<std::uint32_t>(index) * 4u
+                    == binding.byteOffset
+                && ShaderPropertyType::Float == binding.propertyType
+                && RHIShaderResourceKind::ConstantBuffer == binding.resourceKind;
+        }
+        const std::size_t texturePropertyOffset =
+            kStandardNumericPropertyCount + tailProperties.size();
+        std::array<bool, kMaterialTextureSlotCount> occupied{};
+        std::vector<std::string_view> textureNames;
+        for (std::size_t index = 0;
+            layoutMatches && index < kMaterialTextureSlotCount; ++index)
+        {
+            const ShaderMetaPropertyBinding& binding =
+                layout.properties[texturePropertyOffset + index];
+            layoutMatches = !binding.name.empty()
+                && ShaderPropertyType::Texture2D == binding.propertyType
+                && RHIShaderResourceKind::Texture == binding.resourceKind
+                && binding.registerIndex >= 4u && binding.registerIndex < 8u
+                && 0 == binding.registerSpace;
+            if (layoutMatches)
+            {
+                const std::size_t slot = binding.registerIndex - 4u;
+                layoutMatches = !occupied[slot]
+                    && std::find(textureNames.begin(), textureNames.end(), binding.name)
+                        == textureNames.end();
+                occupied[slot] = true;
+                textureNames.push_back(binding.name);
+            }
+        }
+        if (!layoutMatches)
+        {
+            outError = "제품 Forward b2/t4..t7 reflection layout 불일치";
+            return false;
+        }
+
+        if (!outMaterial.ConfigureShaderProperties(outMeta, layout, outError, outHandle)
+            || !outMaterial.TrySetVector("MaterialProperties", "baseColor",
+                math::vector4{ 0.f, 0.f, 0.f, 0.5f })
+            || !outMaterial.TrySetFloat("MaterialProperties", "metallic", 0.f)
+            || !outMaterial.TrySetFloat("MaterialProperties", "roughness", 1.f)
+            || !outMaterial.TrySetFloat("MaterialProperties", "normalScale", 1.f)
+            || !outMaterial.TrySetFloat("MaterialProperties", "occlusionStrength", 1.f)
+            || !outMaterial.TrySetVector("MaterialProperties", "emissive",
+                math::vector3{ 1.f, 1.f, 1.f })
+            // 음수도 합법 authored 값이다. legacy 판별 sentinel로 재사용하면
+            // product snapshot이 ShadeInstance default로 잘못 전환된다.
+            || !outMaterial.TrySetFloat("MaterialProperties", "alphaCutoff", -1.f)
+            || expectedConstantBytes != outMaterial.GetConstantBufferData().size())
+        {
+            if (outError.empty()) outError = "제품 Forward Standard property pack 실패";
+            return false;
+        }
+        return true;
+    }
+
+    bool ValidateForwardRepresentativeAsset(const Material& material,
+        const ShaderMeta& meta, std::span<const std::string_view> tailProperties,
+        std::span<const float> expectedDefaults, std::string& outError)
+    {
+        if (tailProperties.size() != expectedDefaults.size()
+            || material.m_shaderMetaGuid != meta.guid
+            || FileGuid{} == material.m_fileGuid
+            || MaterialRenderingMode::Transparent != material.m_renderingMode)
+        {
+            outError = "대표 Forward material의 GUID/mode 계약이 다르다";
+            return false;
+        }
+        for (std::size_t index = 0; index < tailProperties.size(); ++index)
+        {
+            const std::string_view property = tailProperties[index];
+            const auto found = std::find_if(material.m_propertyValues.begin(),
+                material.m_propertyValues.end(),
+                [property](const MaterialPropertyValue& value)
+                {
+                    return value.m_name == property;
+                });
+            if (found == material.m_propertyValues.end()
+                || 1u != found->m_numericValue.size()
+                || std::fabs(found->m_numericValue[0] - expectedDefaults[index])
+                    > 1e-6f)
+            {
+                outError = "대표 Forward material custom float 불일치: ";
+                outError += property;
+                return false;
+            }
+        }
+        return true;
+    }
+
     template <typename TResources>
     bool CaptureForwardBackend(TResources& resources,
         IRenderPipelineCache& pipelines, IRenderRootSignatureCache& roots,
         IRenderMeshCache& meshCache, IRenderTextureCache& textureCache,
         const std::function<void()>& beginCaches, ForwardFixture& fixture,
+        const std::array<const ShaderMeta*, 3>& shaderMetas,
+        const std::array<ShaderMetaHandle, 3>& shaderMetaHandles,
+        std::size_t mutationDrawIndex,
+        std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> nextFramePacket,
         ForwardCapture& outCapture, std::string& outError)
     {
+        if (std::any_of(shaderMetas.begin(), shaderMetas.end(),
+                [](const ShaderMeta* meta) { return nullptr == meta; })
+            || std::any_of(shaderMetaHandles.begin(), shaderMetaHandles.end(),
+                [](ShaderMetaHandle handle) { return !handle.IsValid(); }))
+        {
+            outError = "Forward representative ShaderMeta 입력이 invalid다";
+            return false;
+        }
+        const ShaderMeta& primaryMeta = *shaderMetas[0];
+        const ShaderMetaHandle primaryHandle = shaderMetaHandles[0];
+        const ShaderMetaHandle secondaryHandle = shaderMetaHandles[1];
+        const ShaderMetaHandle tertiaryHandle = shaderMetaHandles[2];
+        std::vector<EnhancedDrawItem> frameDraws = fixture.draws;
         EnhancedFrameContext context{};
         context.resources = &resources;
         context.psoManager = &pipelines;
         context.rootSignatures = &roots;
         context.meshCache = &meshCache;
         context.textureCache = &textureCache;
-        context.forwardDraws = &fixture.draws;
+        context.forwardDraws = &frameDraws;
         context.lights = &fixture.lights;
         context.camera = &fixture.camera;
         context.width = kGeometryTestWindow;
@@ -496,6 +1157,227 @@ namespace
         };
 
         if (!forward.Initialize(context, outError)) return fail(outError);
+        if (!forward.ApplyShaderMeta(context, primaryHandle, primaryMeta,
+                RHICompletionPoint{ resources.GetLastSignaledFenceValue() }, outError))
+        {
+            return fail(outError);
+        }
+        for (const EnhancedDrawItem& draw : frameDraws)
+        {
+            if (!draw.forwardMaterialSnapshot) continue;
+            const EnhancedForwardMaterialDrawSnapshot& material =
+                *draw.forwardMaterialSnapshot;
+            const auto handleIt = std::find(shaderMetaHandles.begin(),
+                shaderMetaHandles.end(), material.shaderMetaHandle);
+            if (handleIt == shaderMetaHandles.end())
+                return fail("Forward draw가 frame catalog 밖 ShaderMeta를 참조한다");
+            const std::size_t metaIndex = static_cast<std::size_t>(
+                std::distance(shaderMetaHandles.begin(), handleIt));
+            const ShaderMeta& meta = *shaderMetas[metaIndex];
+            const ShaderMetaHandle handle = shaderMetaHandles[metaIndex];
+            RHIShaderPermutationKey resolvedKey{};
+            std::shared_ptr<const ShaderMetaBindingLayout> resolvedLayout;
+            if (!forward.EnsureShaderMetaVariant(context, handle, meta,
+                    material.keywordSelections, resolvedKey, resolvedLayout, outError))
+            {
+                return fail(outError);
+            }
+            if (resolvedKey != material.permutationKey || !resolvedLayout
+                || *resolvedLayout != material.bindingLayout)
+            {
+                return fail("Forward material meta/permutation/layout identity 불일치");
+            }
+        }
+        outCapture.shadePipeline = forward.GetShadePSO();
+        outCapture.referencePipeline = forward.GetReferencePSO();
+        outCapture.shaderVariants = forward.GetShaderVariantCount();
+        const auto secondaryDraw = std::find_if(frameDraws.begin(),
+            frameDraws.end(), [secondaryHandle](const EnhancedDrawItem& draw)
+            {
+                return draw.forwardMaterialSnapshot
+                    && draw.forwardMaterialSnapshot->shaderMetaHandle
+                        == secondaryHandle;
+            });
+        if (secondaryDraw != frameDraws.end())
+        {
+            const EnhancedForwardMaterialDrawSnapshot& material =
+                *secondaryDraw->forwardMaterialSnapshot;
+            outCapture.secondaryShadePipeline = forward.GetShaderVariantPipeline(
+                secondaryHandle, material.permutationKey,
+                material.keywordSelections, false);
+            outCapture.secondaryReferencePipeline = forward.GetShaderVariantPipeline(
+                secondaryHandle, material.permutationKey,
+                material.keywordSelections, true);
+        }
+        const auto tertiaryDraw = std::find_if(frameDraws.begin(),
+            frameDraws.end(), [tertiaryHandle](const EnhancedDrawItem& draw)
+            {
+                return draw.forwardMaterialSnapshot
+                    && draw.forwardMaterialSnapshot->shaderMetaHandle
+                        == tertiaryHandle;
+            });
+        if (tertiaryDraw != frameDraws.end())
+        {
+            const EnhancedForwardMaterialDrawSnapshot& material =
+                *tertiaryDraw->forwardMaterialSnapshot;
+            outCapture.tertiaryShadePipeline = forward.GetShaderVariantPipeline(
+                tertiaryHandle, material.permutationKey,
+                material.keywordSelections, false);
+            outCapture.tertiaryReferencePipeline = forward.GetShaderVariantPipeline(
+                tertiaryHandle, material.permutationKey,
+                material.keywordSelections, true);
+        }
+        if (!outCapture.shadePipeline.IsValid()
+            || !outCapture.referencePipeline.IsValid()
+            || !outCapture.secondaryShadePipeline.IsValid()
+            || !outCapture.secondaryReferencePipeline.IsValid()
+            || !outCapture.tertiaryShadePipeline.IsValid()
+            || !outCapture.tertiaryReferencePipeline.IsValid()
+            || outCapture.shadePipeline == outCapture.secondaryShadePipeline
+            || outCapture.shadePipeline == outCapture.tertiaryShadePipeline
+            || outCapture.secondaryShadePipeline == outCapture.tertiaryShadePipeline
+            || outCapture.referencePipeline == outCapture.secondaryReferencePipeline
+            || outCapture.referencePipeline == outCapture.tertiaryReferencePipeline
+            || outCapture.secondaryReferencePipeline
+                == outCapture.tertiaryReferencePipeline
+            || 3 != outCapture.shaderVariants)
+        {
+            return fail("Forward primary/water/wind ShaderMeta PSO 준비가 불완전하다");
+        }
+
+        class FailSecondGraphicsPipelineCache final : public IRenderPipelineCache
+        {
+        public:
+            explicit FailSecondGraphicsPipelineCache(IRenderPipelineCache& inner)
+                : m_inner(inner)
+            {
+            }
+
+            RHIPipelineHandle GetOrCreate(const RHIGraphicsPipelineDesc& desc,
+                std::string& error) override
+            {
+                ++graphicsRequests;
+                if (2u == graphicsRequests)
+                {
+                    error = "Forward unpublished pair reference failure injection";
+                    return {};
+                }
+                return m_inner.GetOrCreate(desc, error);
+            }
+
+            RHIPipelineHandle GetOrCreateCompute(const RHIComputePipelineDesc& desc,
+                std::string& error) override
+            {
+                return m_inner.GetOrCreateCompute(desc, error);
+            }
+
+            bool InvalidatePipeline(RHIPipelineHandle handle,
+                RHICompletionPoint retireAfter) override
+            {
+                const bool invalidated = m_inner.InvalidatePipeline(handle, retireAfter);
+                if (invalidated) invalidatedHandles.push_back(handle);
+                return invalidated;
+            }
+
+            std::uint32_t InvalidatePipelines(
+                RHICompletionPoint retireAfter) override
+            {
+                return m_inner.InvalidatePipelines(retireAfter);
+            }
+
+            std::uint32_t CollectRetiredPipelines(
+                RHICompletionPoint completed) override
+            {
+                return m_inner.CollectRetiredPipelines(completed);
+            }
+
+            std::uint32_t graphicsRequests{};
+            std::vector<RHIPipelineHandle> invalidatedHandles;
+
+        private:
+            IRenderPipelineCache& m_inner;
+        };
+
+        ShaderMeta cleanupProbeMeta = primaryMeta;
+        const auto cleanupProbePass = std::find_if(cleanupProbeMeta.passes.begin(),
+            cleanupProbeMeta.passes.end(),
+            [](const ShaderPassDesc& pass) { return pass.name == "Forward"; });
+        if (cleanupProbePass == cleanupProbeMeta.passes.end())
+            return fail("Forward unpublished pair cleanup probe pass가 없다");
+        cleanupProbePass->state.cullMode = RHICullMode::None;
+        const ShaderMetaHandle cleanupProbeHandle{
+            tertiaryHandle.slot + 1u, tertiaryHandle.generation + 1u };
+        const std::vector<std::uint16_t> cleanupSelections(
+            cleanupProbeMeta.keywords.size(), 0u);
+        FailSecondGraphicsPipelineCache failingPipelines(pipelines);
+        EnhancedFrameContext failingContext = context;
+        failingContext.psoManager = &failingPipelines;
+        RHIShaderPermutationKey cleanupKey{};
+        std::shared_ptr<const ShaderMetaBindingLayout> cleanupLayout;
+        std::string cleanupError;
+        if (forward.EnsureShaderMetaVariant(failingContext, cleanupProbeHandle,
+                cleanupProbeMeta, cleanupSelections, cleanupKey, cleanupLayout,
+                cleanupError)
+            || cleanupError.empty()
+            || !failingPipelines.invalidatedHandles.empty()
+            || outCapture.shaderVariants != forward.GetShaderVariantCount())
+        {
+            return fail("Forward unpublished half-pair가 shared cache handle을 invalidation했다");
+        }
+        cleanupError.clear();
+        if (!forward.EnsureShaderMetaVariant(context, cleanupProbeHandle,
+                cleanupProbeMeta, cleanupSelections, cleanupKey, cleanupLayout,
+                cleanupError)
+            || !cleanupLayout)
+        {
+            return fail(cleanupError.empty()
+                ? "Forward half-pair 실패 뒤 cache reuse retry가 실패했다" : cleanupError);
+        }
+        const std::array<ShaderMetaHandle, 3> fixtureHandles{
+            primaryHandle, secondaryHandle, tertiaryHandle };
+        if (1u != forward.CommitShaderMetaFrame(context, fixtureHandles, {})
+            || outCapture.shaderVariants != forward.GetShaderVariantCount())
+        {
+            return fail("Forward cleanup probe variant retirement가 불완전하다");
+        }
+
+        ShaderMeta invalidMeta = primaryMeta;
+        const auto invalidPass = std::find_if(invalidMeta.passes.begin(),
+            invalidMeta.passes.end(),
+            [](const ShaderPassDesc& pass) { return pass.name == "Forward"; });
+        if (invalidPass == invalidMeta.passes.end())
+            return fail("Forward invalid-meta probe pass가 없다");
+        invalidPass->name = "NotForward";
+        const ShaderMetaHandle invalidHandle{
+            primaryHandle.slot, primaryHandle.generation + 1u };
+        std::string rejectedMetaError;
+        const bool metaRejected = !forward.ApplyShaderMeta(context,
+            invalidHandle, invalidMeta,
+            RHICompletionPoint{ resources.GetLastSignaledFenceValue() },
+            rejectedMetaError);
+        outCapture.invalidMetaRejected = metaRejected && !rejectedMetaError.empty()
+            && outCapture.shadePipeline == forward.GetShadePSO()
+            && outCapture.referencePipeline == forward.GetReferencePSO()
+            && outCapture.secondaryShadePipeline == forward.GetShaderVariantPipeline(
+                secondaryHandle,
+                secondaryDraw->forwardMaterialSnapshot->permutationKey,
+                secondaryDraw->forwardMaterialSnapshot->keywordSelections, false)
+            && outCapture.secondaryReferencePipeline == forward.GetShaderVariantPipeline(
+                secondaryHandle,
+                secondaryDraw->forwardMaterialSnapshot->permutationKey,
+                secondaryDraw->forwardMaterialSnapshot->keywordSelections, true)
+            && outCapture.tertiaryShadePipeline == forward.GetShaderVariantPipeline(
+                tertiaryHandle,
+                tertiaryDraw->forwardMaterialSnapshot->permutationKey,
+                tertiaryDraw->forwardMaterialSnapshot->keywordSelections, false)
+            && outCapture.tertiaryReferencePipeline == forward.GetShaderVariantPipeline(
+                tertiaryHandle,
+                tertiaryDraw->forwardMaterialSnapshot->permutationKey,
+                tertiaryDraw->forwardMaterialSnapshot->keywordSelections, true)
+            && outCapture.shaderVariants == forward.GetShaderVariantCount();
+        if (!outCapture.invalidMetaRejected)
+            return fail("Forward invalid ShaderMeta candidate가 current PSO를 보존하지 않았다");
+
         const uint32_t tileX = (kGeometryTestWindow + EnhancedForwardPass::kTileSize - 1)
             / EnhancedForwardPass::kTileSize;
         const uint32_t tileY = tileX;
@@ -512,7 +1394,41 @@ namespace
         if (!resources.BeginFrame(outError)) return fail(outError);
         frameOpen = true;
         if (beginCaches) beginCaches();
+        if (frameDraws.empty() || !frameDraws[0].forwardMaterialSnapshot)
+            return fail("Forward P2b owning material packet이 없다");
+        {
+            const auto valid = frameDraws[0].forwardMaterialSnapshot;
+            auto invalidMaterial =
+                std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*valid);
+            ++invalidMaterial->shaderMetaHandle.generation;
+            frameDraws[0].forwardMaterialSnapshot = invalidMaterial;
+            std::string rejectedMaterialError;
+            outCapture.invalidMaterialRejected =
+                !forward.PrepareFrame(context, rejectedMaterialError)
+                && !rejectedMaterialError.empty()
+                && outCapture.shadePipeline == forward.GetShadePSO()
+                && outCapture.referencePipeline == forward.GetReferencePSO()
+                && outCapture.shaderVariants == forward.GetShaderVariantCount();
+            frameDraws[0].forwardMaterialSnapshot = valid;
+            if (!outCapture.invalidMaterialRejected)
+                return fail("Forward invalid material generation이 fail-closed되지 않았다");
+
+            auto invalid =
+                std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*valid);
+            invalid->textureBindings[0].registerIndex = 5;
+            frameDraws[0].forwardMaterialSnapshot = invalid;
+            std::string rejectedError;
+            outCapture.invalidPacketRejected =
+                !forward.PrepareFrame(context, rejectedError)
+                && !rejectedError.empty();
+            frameDraws[0].forwardMaterialSnapshot = valid;
+            if (!outCapture.invalidPacketRejected)
+                return fail("Forward invalid material packet이 fail-closed되지 않았다");
+            outError.clear();
+        }
         if (!forward.PrepareFrame(context, outError)) return fail(outError);
+        outCapture.draws = forward.GetLastDrawCount();
+        outCapture.batches = forward.GetLastBatchCount();
 
         EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
         RGTextureDesc depthDesc{};
@@ -571,11 +1487,29 @@ namespace
             return fail(outError);
         }
 
-        constexpr uint32_t center = kGeometryTestWindow / 2;
+        constexpr std::array<uint32_t, 3> swatchX{
+            kGeometryTestWindow * 7 / 40,
+            kGeometryTestWindow / 2,
+            kGeometryTestWindow * 33 / 40,
+        };
+        constexpr uint32_t swatchY = kGeometryTestWindow / 4;
+        constexpr uint32_t overlapX = kGeometryTestWindow / 2;
+        constexpr uint32_t overlapY = kGeometryTestWindow * 3 / 4;
+        constexpr uint32_t customX = kGeometryTestWindow * 33 / 40;
+        constexpr uint32_t customY = kGeometryTestWindow * 3 / 4;
         constexpr uint32_t outside = 2;
+        for (std::size_t material = 0; material < swatchX.size(); ++material)
+        {
+            for (uint32_t channel = 0; channel < 4; ++channel)
+            {
+                outCapture.swatches[material][channel] =
+                    color.At(swatchX[material], swatchY, channel);
+            }
+        }
         for (uint32_t channel = 0; channel < 4; ++channel)
         {
-            outCapture.center[channel] = color.At(center, center, channel);
+            outCapture.overlap[channel] = color.At(overlapX, overlapY, channel);
+            outCapture.customBefore[channel] = color.At(customX, customY, channel);
             outCapture.outside[channel] = color.At(outside, outside, channel);
         }
         for (uint32_t y = 0; y < kGeometryTestWindow; ++y)
@@ -593,6 +1527,79 @@ namespace
             outCapture.minTileLights = (std::min)(outCapture.minTileLights, tileCounts[i]);
             outCapture.maxTileLights = (std::max)(outCapture.maxTileLights, tileCounts[i]);
         }
+
+        // P2c: 같은 pass/variant를 유지한 채 immutable wind packet만 다음 프레임
+        // 값으로 바꾼다. 새 pass를 만들면 property 갱신이 아니라 초기화 차이도
+        // 섞이므로, 반드시 같은 EnhancedForwardPass의 연속 두 프레임으로 본다.
+        if (mutationDrawIndex >= frameDraws.size() || !nextFramePacket
+            || !nextFramePacket->IsValid())
+        {
+            return fail("Forward custom-float 다음-frame packet이 invalid다");
+        }
+        frameDraws[mutationDrawIndex].forwardMaterialSnapshot =
+            std::move(nextFramePacket);
+
+        if (!resources.BeginFrame(outError)) return fail(outError);
+        frameOpen = true;
+        if (beginCaches) beginCaches();
+        if (!forward.PrepareFrame(context, outError)) return fail(outError);
+        if (outCapture.draws != forward.GetLastDrawCount()
+            || outCapture.batches != forward.GetLastBatchCount()
+            || outCapture.shaderVariants != forward.GetShaderVariantCount())
+        {
+            return fail("Forward custom-float 갱신이 draw/batch/variant identity를 바꿨다");
+        }
+
+        EnhancedRenderGraph nextGraph(
+            static_cast<IRenderDeviceServices&>(resources));
+        RGTextureDesc nextDepthDesc{};
+        nextDepthDesc.width = kGeometryTestWindow;
+        nextDepthDesc.height = kGeometryTestWindow;
+        nextDepthDesc.format = EnhancedForwardPass::kDepthFormat;
+        nextDepthDesc.allowDepthStencil = true;
+        nextDepthDesc.name = "ForwardRHI.NextDepth";
+        const RGHandle nextDepth = nextGraph.CreateTexture(nextDepthDesc);
+        nextGraph.AddPass("ForwardRHI.NextDepthClear",
+            { { nextDepth, RHIResourceState::DepthWrite } },
+            [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+            {
+                const auto depthTarget = RHIDepthTargetDesc::Depth(
+                    executeContext.ResolveHandle(nextDepth),
+                    EnhancedForwardPass::kDepthFormat);
+                const RHIRenderTargetBinding targets =
+                    context.resources->CreateRenderTargets(
+                        std::span<const RHITextureHandle>{}, &depthTarget);
+                if (!targets.IsValid()) return;
+                executeContext.encoder->BindRenderTargets(targets);
+                executeContext.encoder->ClearDepthTarget(targets, 1.f);
+            });
+
+        EnhancedForwardPass::Inputs nextInputs{};
+        nextInputs.depth = nextDepth;
+        forward.SetInputs(nextInputs);
+        forward.Declare(nextGraph, context);
+        const RGHandle nextOutput = forward.GetOutput();
+        if (!nextOutput.IsValid())
+            return fail("Forward custom-float 다음-frame 출력이 없다");
+        nextGraph.AddPass("ForwardRHI.NextReadback",
+            { { nextOutput, RHIResourceState::CopySource } },
+            [&](const EnhancedRenderGraph::ExecuteContext& executeContext)
+            {
+                executeContext.encoder->CopyToReadback(
+                    colorReadback, executeContext.ResolveHandle(nextOutput));
+            }, true);
+        if (!nextGraph.Compile(outError) || !nextGraph.Execute(outError))
+            return fail(outError);
+        if (!resources.EndFrame(outError)) return fail(outError);
+        frameOpen = false;
+        resources.WaitForGpu();
+
+        RHIReadbackImage nextColor;
+        if (!resources.MapReadback(colorReadback, nextColor, outError))
+            return fail(outError);
+        for (uint32_t channel = 0; channel < 4; ++channel)
+            outCapture.customAfter[channel] =
+                nextColor.At(customX, customY, channel);
 
         forward.Shutdown();
         resources.ReleaseReadback(colorReadback);
@@ -871,11 +1878,271 @@ bool RunVulkanShadowTest(std::string& outLog)
 
 bool RunVulkanGBufferTest(std::string& outLog)
 {
-    outLog += "── GBuffer 패스 — DX12/Vulkan MRT·texture·sampler·mesh 대조 ──\n";
+    outLog += "── 제품 GBuffer — DX12/Vulkan Standard Material batch b2·MRT 대조 ──\n";
     GBufferFixture fixture;
     GBufferCapture dx12Capture{};
     GBufferCapture vkCapture{};
     std::string error;
+    ShaderMetaHandle materialProbeHandle{};
+    ShaderMeta materialProbeMeta{};
+    Material materialProbe{};
+    if (!PrepareStandardMaterialProbe(materialProbeHandle, materialProbeMeta,
+            materialProbe, error))
+    {
+        outLog += "[1/4] Standard Material probe 준비 실패: " + error + "\n";
+        return false;
+    }
+    const ShaderMetaBindingLayout* materialLayout =
+        materialProbe.GetShaderBindingLayout();
+    if (!materialLayout)
+    {
+        outLog += "[1/4] Standard Material snapshot layout이 없다\n";
+        return false;
+    }
+    ShaderMeta secondaryMeta = materialProbeMeta;
+    secondaryMeta.guid = FileGuid{ "50000000-0000-4000-8000-000000000005" };
+    secondaryMeta.name = "GBufferSecondaryMetaProbe";
+    secondaryMeta.passes[0].state.depthTest = RHICompareOp::LessEqual;
+    constexpr ShaderMetaHandle secondaryMetaHandle{ 0xFFFFFFFDu, 1u };
+    EnhancedLiveFramePacket shaderMetaFrame{};
+    auto primaryFrameOwner = std::make_shared<const ShaderMeta>(materialProbeMeta);
+    auto secondaryFrameOwner = std::make_shared<const ShaderMeta>(secondaryMeta);
+    std::weak_ptr<const ShaderMeta> primaryFrameLifetime = primaryFrameOwner;
+    std::weak_ptr<const ShaderMeta> secondaryFrameLifetime = secondaryFrameOwner;
+    EnhancedShaderMetaFrameSnapshot primaryFrameSnapshot{};
+    primaryFrameSnapshot.guid = materialProbeMeta.guid;
+    primaryFrameSnapshot.handle = materialProbeHandle;
+    primaryFrameSnapshot.value = primaryFrameOwner;
+    EnhancedShaderMetaFrameSnapshot secondaryFrameSnapshot{};
+    secondaryFrameSnapshot.guid = secondaryMeta.guid;
+    secondaryFrameSnapshot.handle = secondaryMetaHandle;
+    secondaryFrameSnapshot.value = secondaryFrameOwner;
+    shaderMetaFrame.gbufferShaderMetas.push_back(std::move(primaryFrameSnapshot));
+    shaderMetaFrame.gbufferShaderMetas.push_back(std::move(secondaryFrameSnapshot));
+    primaryFrameOwner.reset();
+    secondaryFrameOwner.reset();
+    const bool shaderMetaOwnedByFrame = !primaryFrameLifetime.expired()
+        && !secondaryFrameLifetime.expired()
+        && shaderMetaFrame.FindGBufferShaderMeta(materialProbeMeta.guid)
+        && shaderMetaFrame.FindGBufferShaderMeta(secondaryMeta.guid);
+    const std::array<std::uint8_t, 4> firstBaseColorPixel{
+        128u, 255u, 64u, 255u };
+    const std::array<std::uint8_t, 4> secondBaseColorPixel{
+        64u, 128u, 255u, 255u };
+    const std::array<std::uint8_t, 4> sharedNormalPixel{
+        255u, 128u, 128u, 255u };
+    std::shared_ptr<Texture> firstBaseColorOwner{ Texture::CreateFromPixels(
+        1, 1, "m6_p1b2a_first_base_color", DXGI_FORMAT_R8G8B8A8_UNORM,
+        firstBaseColorPixel.data(), firstBaseColorPixel.size()) };
+    std::shared_ptr<Texture> secondBaseColorOwner{ Texture::CreateFromPixels(
+        1, 1, "m6_p1b2a_second_base_color", DXGI_FORMAT_R8G8B8A8_UNORM,
+        secondBaseColorPixel.data(), secondBaseColorPixel.size()) };
+    std::shared_ptr<Texture> sharedNormalOwner{ Texture::CreateFromPixels(
+        1, 1, "m6_p1b2b1_shared_normal", DXGI_FORMAT_R8G8B8A8_UNORM,
+        sharedNormalPixel.data(), sharedNormalPixel.size()) };
+    if (!firstBaseColorOwner || !secondBaseColorOwner || !sharedNormalOwner)
+    {
+        outLog += "[1/4] GUID/register probe texture 생성 실패\n";
+        return false;
+    }
+    const FileGuid firstBaseColorGuid{
+        "10000000-0000-4000-8000-000000000001" };
+    const FileGuid secondBaseColorGuid{
+        "20000000-0000-4000-8000-000000000002" };
+    const FileGuid sharedNormalGuid{
+        "40000000-0000-4000-8000-000000000004" };
+    std::weak_ptr<Texture> firstBaseColorLifetime = firstBaseColorOwner;
+    std::weak_ptr<Texture> secondBaseColorLifetime = secondBaseColorOwner;
+    std::weak_ptr<Texture> sharedNormalLifetime = sharedNormalOwner;
+    materialProbe.UseBaseColorMap(firstBaseColorOwner);
+    if (!materialProbe.TrySetTextureGuid(
+            standard_material::property::BaseColorMap, firstBaseColorGuid))
+    {
+        outLog += "[1/4] 첫 baseColorMap GUID 설정 실패\n";
+        return false;
+    }
+
+    const auto makeSnapshot = [&](const Material& material,
+        const ShaderMeta& shaderMeta, ShaderMetaHandle shaderMetaHandle)
+    {
+        auto snapshot = std::make_shared<EnhancedMaterialDrawSnapshot>();
+        snapshot->shaderMetaHandle = shaderMetaHandle;
+        snapshot->bindingLayout = *materialLayout;
+        const std::span<const std::uint16_t> keywords =
+            material.GetKeywordSelections();
+        snapshot->keywordSelections.assign(keywords.begin(), keywords.end());
+        ShaderMetaPermutation permutation;
+        if (!ShaderPermutationDomain::Resolve(shaderMeta, 0,
+                snapshot->keywordSelections, permutation, error))
+        {
+            return snapshot;
+        }
+        snapshot->permutationKey = permutation.key;
+        if (!material.BuildShaderPropertyBlock(shaderMeta, *materialLayout,
+                snapshot->propertyBytes, error))
+        {
+            return snapshot;
+        }
+        constexpr std::array<std::string_view, 4> textureProperties{
+            standard_material::property::BaseColorMap,
+            standard_material::property::NormalMap,
+            standard_material::property::OrmMap,
+            standard_material::property::EmissiveMap,
+        };
+        const std::array<std::shared_ptr<Texture>, 4> textureOwners{
+            material.GetBaseColorMapShared(), material.GetNormalMapShared(),
+            material.GetOccRoughMetalMapShared(), material.GetEmissiveMapShared(),
+        };
+        snapshot->textureBindings.resize(textureProperties.size());
+        for (std::size_t index = 0; index < textureProperties.size(); ++index)
+        {
+            const std::string_view property = textureProperties[index];
+            const auto reflected = std::find_if(materialLayout->properties.begin(),
+                materialLayout->properties.end(),
+                [property](const ShaderMetaPropertyBinding& binding)
+                {
+                    return binding.name == property;
+                });
+            const auto logical = std::find_if(material.m_propertyValues.begin(),
+                material.m_propertyValues.end(),
+                [property](const MaterialPropertyValue& value)
+                {
+                    return value.m_name == property;
+                });
+            if (reflected == materialLayout->properties.end()
+                || logical == material.m_propertyValues.end())
+            {
+                error = "Standard Material texture GUID/register snapshot 실패: ";
+                error += property;
+                return snapshot;
+            }
+            EnhancedMaterialTextureBinding& texture =
+                snapshot->textureBindings[index];
+            texture.propertyName = std::string(property);
+            texture.textureGuid = logical->m_textureGuid;
+            texture.registerIndex = reflected->registerIndex;
+            texture.registerSpace = reflected->registerSpace;
+            texture.textureOwner = textureOwners[index];
+        }
+        return snapshot;
+    };
+
+    fixture.draws[0].worldMatrix = math::translation_matrix(
+        math::vector3{ -0.75f, 0.f, 0.f });
+    fixture.draws[0].materialSnapshot = makeSnapshot(
+        materialProbe, materialProbeMeta, materialProbeHandle);
+
+    Material secondMaterial = materialProbe;
+    if (!secondMaterial.TrySetVector("MaterialProperties", "baseColor",
+            math::vector4{ 0.75f, 0.125f, 0.25f, 1.0f })
+        || !secondMaterial.TrySetFloat("MaterialProperties", "metallic", 0.125f)
+        || !secondMaterial.TrySetFloat("MaterialProperties", "roughness", 0.25f)
+        || !secondMaterial.TrySetTextureGuid(
+            standard_material::property::BaseColorMap, secondBaseColorGuid)
+        || !secondMaterial.TrySetTextureGuid(
+            standard_material::property::NormalMap, sharedNormalGuid))
+    {
+        outLog += "[1/4] 두 번째 Standard Material property/GUID 설정 실패\n";
+        return false;
+    }
+    secondMaterial.UseBaseColorMap(secondBaseColorOwner);
+    secondMaterial.UseNormalMap(sharedNormalOwner);
+    EnhancedDrawItem secondDraw = fixture.draws[0];
+    secondDraw.worldMatrix = math::translation_matrix(
+        math::vector3{ -0.25f, 0.f, 0.f });
+    secondDraw.materialSnapshot = makeSnapshot(
+        secondMaterial, materialProbeMeta, materialProbeHandle);
+    fixture.draws.push_back(std::move(secondDraw));
+
+    Material reducedMaterial = secondMaterial;
+    if (!reducedMaterial.TrySetKeywordSelection("SHADING_QUALITY", "reduced"))
+    {
+        outLog += "[1/4] reduced SHADING_QUALITY 선택 실패\n";
+        return false;
+    }
+    EnhancedDrawItem thirdDraw = fixture.draws[1];
+    thirdDraw.worldMatrix = math::translation_matrix(
+        math::vector3{ 0.25f, 0.f, 0.f });
+    thirdDraw.materialSnapshot = makeSnapshot(
+        reducedMaterial, materialProbeMeta, materialProbeHandle);
+    fixture.draws.push_back(std::move(thirdDraw));
+
+    EnhancedDrawItem fourthDraw = fixture.draws[1];
+    fourthDraw.worldMatrix = math::translation_matrix(
+        math::vector3{ 0.75f, 0.f, 0.f });
+    fourthDraw.materialSnapshot = makeSnapshot(
+        secondMaterial, secondaryMeta, secondaryMetaHandle);
+    fixture.draws.push_back(std::move(fourthDraw));
+    if (!fixture.draws[0].materialSnapshot->IsValid()
+        || !fixture.draws[1].materialSnapshot->IsValid()
+        || !fixture.draws[2].materialSnapshot->IsValid()
+        || !fixture.draws[3].materialSnapshot->IsValid()
+        || fixture.draws[1].materialSnapshot->permutationKey
+            == fixture.draws[2].materialSnapshot->permutationKey
+        || fixture.draws[1].materialSnapshot->shaderMetaHandle
+            == fixture.draws[3].materialSnapshot->shaderMetaHandle)
+    {
+        outLog += "[1/4] Standard Material draw snapshot이 invalid다: "
+            + error + "\n";
+        return false;
+    }
+    materialProbe.UseBaseColorMap(std::shared_ptr<Texture>{});
+    secondMaterial.UseBaseColorMap(std::shared_ptr<Texture>{});
+    secondMaterial.UseNormalMap(std::shared_ptr<Texture>{});
+    reducedMaterial.UseBaseColorMap(std::shared_ptr<Texture>{});
+    reducedMaterial.UseNormalMap(std::shared_ptr<Texture>{});
+    firstBaseColorOwner.reset();
+    secondBaseColorOwner.reset();
+    sharedNormalOwner.reset();
+    const EnhancedMaterialTextureBinding& firstTexture =
+        fixture.draws[0].materialSnapshot->textureBindings[0];
+    const EnhancedMaterialTextureBinding& secondTexture =
+        fixture.draws[1].materialSnapshot->textureBindings[0];
+    const EnhancedMaterialTextureBinding& thirdTexture =
+        fixture.draws[2].materialSnapshot->textureBindings[0];
+    const EnhancedMaterialTextureBinding& fourthTexture =
+        fixture.draws[3].materialSnapshot->textureBindings[0];
+    const EnhancedMaterialTextureBinding& secondNormal =
+        fixture.draws[1].materialSnapshot->textureBindings[1];
+    const EnhancedMaterialTextureBinding& thirdNormal =
+        fixture.draws[2].materialSnapshot->textureBindings[1];
+    const EnhancedMaterialTextureBinding& fourthNormal =
+        fixture.draws[3].materialSnapshot->textureBindings[1];
+    const bool textureOwnedByPacket = !firstBaseColorLifetime.expired()
+        && !secondBaseColorLifetime.expired() && !sharedNormalLifetime.expired()
+        && firstTexture.textureOwner && secondTexture.textureOwner
+        && thirdTexture.textureOwner && fourthTexture.textureOwner
+        && secondNormal.textureOwner && thirdNormal.textureOwner
+        && fourthNormal.textureOwner
+        && firstTexture.textureOwner.get() != secondTexture.textureOwner.get()
+        && secondTexture.textureOwner.get() == thirdTexture.textureOwner.get()
+        && thirdTexture.textureOwner.get() == fourthTexture.textureOwner.get()
+        && secondNormal.textureOwner.get() == thirdNormal.textureOwner.get()
+        && thirdNormal.textureOwner.get() == fourthNormal.textureOwner.get()
+        && firstTexture.textureGuid == firstBaseColorGuid
+        && secondTexture.textureGuid == secondBaseColorGuid
+        && thirdTexture.textureGuid == secondBaseColorGuid
+        && fourthTexture.textureGuid == secondBaseColorGuid
+        && secondNormal.textureGuid == sharedNormalGuid
+        && thirdNormal.textureGuid == sharedNormalGuid
+        && fourthNormal.textureGuid == sharedNormalGuid
+        && firstTexture.propertyName == standard_material::property::BaseColorMap
+        && secondTexture.propertyName == standard_material::property::BaseColorMap
+        && 0 == firstTexture.registerIndex && 0 == firstTexture.registerSpace
+        && 0 == secondTexture.registerIndex && 0 == secondTexture.registerSpace
+        && fixture.draws[1].materialSnapshot->keywordSelections
+            == std::vector<std::uint16_t>{ 0 }
+        && fixture.draws[2].materialSnapshot->keywordSelections
+            == std::vector<std::uint16_t>{ 1 }
+        && fixture.draws[3].materialSnapshot->keywordSelections
+            == std::vector<std::uint16_t>{ 0 }
+        && fixture.draws[3].materialSnapshot->shaderMetaHandle
+            == secondaryMetaHandle;
+    if (!textureOwnedByPacket)
+    {
+        outLog += "[1/4] texture GUID→t0 binding/packet owner 계약 불일치\n";
+        return false;
+    }
 
     {
         DX12DeviceResources resources;
@@ -896,7 +2163,17 @@ bool RunVulkanGBufferTest(std::string& outLog)
         const bool captured = CaptureGBufferBackend(resources, pipelines, roots,
             meshes, textures,
             [&] { meshes.BeginFrame(0); textures.BeginFrame(0); },
-            fixture, dx12Capture, error);
+            fixture, materialProbeMeta, materialProbeHandle,
+            secondaryMeta, secondaryMetaHandle,
+            dx12Capture, error);
+        dx12Capture.previousPipelineStale =
+            !resources.Resolve(dx12Capture.previousPipeline).IsValid();
+        dx12Capture.retiredVariantStale = dx12Capture.retiredVariantStale
+            && !resources.Resolve(dx12Capture.retiredVariantPipeline).IsValid();
+        dx12Capture.secondaryMetaFrameRetired =
+            dx12Capture.secondaryMetaFrameRetired
+            && !resources.Resolve(
+                dx12Capture.retiredSecondaryMetaPipeline).IsValid();
         std::string validation;
         const uint32_t problems = resources.DrainDebugMessages(validation);
         resources.WaitForGpu();
@@ -912,7 +2189,8 @@ bool RunVulkanGBufferTest(std::string& outLog)
         }
     }
 
-    outLog += "[1/4] DX12 기준 5 MRT·depth·fallback texture·dynamic sampler 통과\n";
+    outLog += "[1/4] DX12 기준 Material property→reflection b2→PSO→5 MRT"
+        " · targeted next-use 통과\n";
 
     if (!VulkanApi::LoadLoader(error))
     {
@@ -946,8 +2224,17 @@ bool RunVulkanGBufferTest(std::string& outLog)
         ShadowSpirvScope spirv;
         captured = CaptureGBufferBackend(resources, pipelines, pipelines,
             meshes, textures, [&] { meshes.BeginFrame(0); },
-            fixture, vkCapture, error);
+            fixture, materialProbeMeta, materialProbeHandle,
+            secondaryMeta, secondaryMetaHandle,
+            vkCapture, error);
     }
+    vkCapture.previousPipelineStale =
+        !pipelines.Resolve(vkCapture.previousPipeline).IsValid();
+    vkCapture.retiredVariantStale = vkCapture.retiredVariantStale
+        && !pipelines.Resolve(vkCapture.retiredVariantPipeline).IsValid();
+    vkCapture.secondaryMetaFrameRetired =
+        vkCapture.secondaryMetaFrameRetired
+        && !pipelines.Resolve(vkCapture.retiredSecondaryMetaPipeline).IsValid();
 
     const VulkanMeshCache::Stats meshStats = meshes.GetStats();
     const VulkanTextureCache::Stats textureStats = textures.GetStats();
@@ -970,15 +2257,57 @@ bool RunVulkanGBufferTest(std::string& outLog)
         outLog += line;
     }
 
-    bool passed = captured && 0 == stubs && 0 == problems &&
+    bool passed = captured && textureOwnedByPacket && shaderMetaOwnedByFrame
+        && 0 == stubs && 0 == problems &&
         2 == vkCapture.graph.passesExecuted && 0 == vkCapture.graph.passesCulled &&
         6 == vkCapture.graph.transientCreated &&
-        1 == vkCapture.draws && 1 == vkCapture.meshes &&
-        1 == vkCapture.materials && 1 == vkCapture.batches &&
+        4 == dx12Capture.draws && 1 == dx12Capture.meshes &&
+        4 == dx12Capture.materials && 4 == dx12Capture.batches &&
+        4 == vkCapture.draws && 1 == vkCapture.meshes &&
+        4 == vkCapture.materials && 4 == vkCapture.batches &&
+        dx12Capture.previousPipeline.IsValid() && dx12Capture.activePipeline.IsValid() &&
+        dx12Capture.previousPipeline != dx12Capture.activePipeline &&
+        dx12Capture.alternatePipeline.IsValid() &&
+        dx12Capture.alternatePipeline != dx12Capture.activePipeline &&
+        dx12Capture.secondaryMetaPipeline.IsValid() &&
+        dx12Capture.secondaryMetaPipeline != dx12Capture.activePipeline &&
+        3 == dx12Capture.shaderVariants && dx12Capture.retiredVariantStale &&
+        dx12Capture.previousPipelineStale &&
+        dx12Capture.rejectedReloadPreserved &&
+        dx12Capture.rejectedMaterialPreserved &&
+        dx12Capture.rejectedTextureBindingPreserved &&
+        dx12Capture.rejectedPermutationPreserved &&
+        dx12Capture.rejectedSecondaryMetaPreserved &&
+        dx12Capture.secondaryMetaSurvivedPrimaryReload &&
+        dx12Capture.secondaryMetaGenerationRetired &&
+        dx12Capture.secondaryMetaFrameRetired &&
+        materialProbeHandle == dx12Capture.shaderMetaHandle &&
+        secondaryMetaHandle == dx12Capture.secondaryMetaHandle &&
+        vkCapture.previousPipeline.IsValid() && vkCapture.activePipeline.IsValid() &&
+        vkCapture.previousPipeline != vkCapture.activePipeline &&
+        vkCapture.alternatePipeline.IsValid() &&
+        vkCapture.alternatePipeline != vkCapture.activePipeline &&
+        vkCapture.secondaryMetaPipeline.IsValid() &&
+        vkCapture.secondaryMetaPipeline != vkCapture.activePipeline &&
+        3 == vkCapture.shaderVariants && vkCapture.retiredVariantStale &&
+        vkCapture.previousPipelineStale &&
+        vkCapture.rejectedReloadPreserved &&
+        vkCapture.rejectedMaterialPreserved &&
+        vkCapture.rejectedTextureBindingPreserved &&
+        vkCapture.rejectedPermutationPreserved &&
+        vkCapture.rejectedSecondaryMetaPreserved &&
+        vkCapture.secondaryMetaSurvivedPrimaryReload &&
+        vkCapture.secondaryMetaGenerationRetired &&
+        vkCapture.secondaryMetaFrameRetired &&
+        materialProbeHandle == vkCapture.shaderMetaHandle &&
+        secondaryMetaHandle == vkCapture.secondaryMetaHandle &&
         1 == meshStats.uploads && 0 == meshStats.failures &&
         0 == textureStats.failures;
 
     float maxCenterDelta = 0.f;
+    float maxSecondDelta = 0.f;
+    float maxThirdDelta = 0.f;
+    float maxFourthDelta = 0.f;
     float maxOutside = 0.f;
     for (uint32_t target = 0; target < 4; ++target)
     {
@@ -987,6 +2316,15 @@ bool RunVulkanGBufferTest(std::string& outLog)
             maxCenterDelta = (std::max)(maxCenterDelta, std::fabs(
                 vkCapture.center[target][channel] -
                 dx12Capture.center[target][channel]));
+            maxSecondDelta = (std::max)(maxSecondDelta, std::fabs(
+                vkCapture.second[target][channel] -
+                dx12Capture.second[target][channel]));
+            maxThirdDelta = (std::max)(maxThirdDelta, std::fabs(
+                vkCapture.third[target][channel] -
+                dx12Capture.third[target][channel]));
+            maxFourthDelta = (std::max)(maxFourthDelta, std::fabs(
+                vkCapture.fourth[target][channel] -
+                dx12Capture.fourth[target][channel]));
             maxOutside = (std::max)(maxOutside, std::fabs(
                 vkCapture.outside[target][channel]));
         }
@@ -1004,7 +2342,7 @@ bool RunVulkanGBufferTest(std::string& outLog)
     std::snprintf(compare, sizeof(compare),
         "[3/4] center — diffuse %.3f/%.3f,%.3f/%.3f,%.3f/%.3f · "
         "normal z %.3f/%.3f · bitmask %.0f/%.0f · depth %.3f/%.3f · "
-        "coverage %u/%u(편차 %.2f%%) · 최대 채널 편차 %.5f\n",
+        "coverage %u/%u(편차 %.2f%%) · 첫/둘째/셋째/넷째 최대 편차 %.5f/%.5f/%.5f/%.5f\n",
         dx12Capture.center[0][0], vkCapture.center[0][0],
         dx12Capture.center[0][1], vkCapture.center[0][1],
         dx12Capture.center[0][2], vkCapture.center[0][2],
@@ -1012,23 +2350,73 @@ bool RunVulkanGBufferTest(std::string& outLog)
         dx12Capture.bitmask, vkCapture.bitmask,
         dx12Capture.depth, vkCapture.depth,
         dx12Capture.writtenPixels, vkCapture.writtenPixels,
-        writtenDelta * 100.f, maxCenterDelta);
+        writtenDelta * 100.f, maxCenterDelta, maxSecondDelta, maxThirdDelta,
+        maxFourthDelta);
     outLog += compare;
 
     const float expected[][4] = {
-        { 0.25f, 0.5f, 0.75f, 1.f },
-        { 1.f, 0.6f, 0.2f, 1.f },
+        { 0.0627451f, 0.25f, 0.12549f, 1.f },
+        { 0.375f, 0.625f, 0.75f, 1.f },
         { 0.5f, 0.5f, 1.f, 1.f },
         { 0.f, 0.f, 0.f, 1.f } };
     float dxExpectedDelta = 0.f;
+    const float secondExpected[][4] = {
+        { 0.188235f, 0.0627451f, 0.25f, 1.f },
+        { 0.375f, 0.25f, 0.125f, 1.f },
+        { 0.5f, 0.5f, 1.f, 1.f },
+        { 0.f, 0.f, 0.f, 1.f } };
     for (uint32_t target = 0; target < 4; ++target)
+    {
+        if (2 == target) continue;
         for (uint32_t channel = 0; channel < 4; ++channel)
             dxExpectedDelta = (std::max)(dxExpectedDelta, std::fabs(
                 dx12Capture.center[target][channel] - expected[target][channel]));
+    }
+    float secondExpectedDelta = 0.f;
+    float thirdExpectedDelta = 0.f;
+    float fourthExpectedDelta = 0.f;
+    const float thirdExpected[][4] = {
+        { 0.188235f, 0.0627451f, 0.25f, 1.f },
+        { 0.375f, 0.25f, 0.125f, 1.f },
+        { 0.f, 0.f, 0.f, 0.f },
+        { 0.f, 0.f, 0.f, 1.f } };
+    for (uint32_t target = 0; target < 4; ++target)
+    {
+        if (2 == target) continue;
+        for (uint32_t channel = 0; channel < 4; ++channel)
+        {
+            secondExpectedDelta = (std::max)(secondExpectedDelta, std::fabs(
+                dx12Capture.second[target][channel] -
+                secondExpected[target][channel]));
+            thirdExpectedDelta = (std::max)(thirdExpectedDelta, std::fabs(
+                dx12Capture.third[target][channel] -
+                thirdExpected[target][channel]));
+            fourthExpectedDelta = (std::max)(fourthExpectedDelta, std::fabs(
+                dx12Capture.fourth[target][channel] -
+                secondExpected[target][channel]));
+        }
+    }
+
+    float dxPermutationNormalDelta = 0.f;
+    float vkPermutationNormalDelta = 0.f;
+    for (uint32_t channel = 0; channel < 3; ++channel)
+    {
+        dxPermutationNormalDelta = (std::max)(dxPermutationNormalDelta,
+            std::fabs(dx12Capture.second[2][channel]
+                - dx12Capture.third[2][channel]));
+        vkPermutationNormalDelta = (std::max)(vkPermutationNormalDelta,
+            std::fabs(vkCapture.second[2][channel]
+                - vkCapture.third[2][channel]));
+    }
 
     if (0 == dx12Capture.writtenPixels || 0 == vkCapture.writtenPixels ||
         writtenDelta > 0.02f || maxCenterDelta > 0.015f ||
-        dxExpectedDelta > 0.015f || bitmaskDelta > 0.5f ||
+        maxSecondDelta > 0.015f || maxThirdDelta > 0.015f ||
+        maxFourthDelta > 0.015f ||
+        dxExpectedDelta > 0.015f || secondExpectedDelta > 0.015f ||
+        thirdExpectedDelta > 0.015f || fourthExpectedDelta > 0.015f ||
+        dxPermutationNormalDelta < 0.1f ||
+        vkPermutationNormalDelta < 0.1f || bitmaskDelta > 0.5f ||
         std::fabs(dx12Capture.bitmask - 43981.f) > 0.5f ||
         depthDelta > 0.001f || std::fabs(vkCapture.depth - 0.5f) > 0.001f ||
         maxOutside > 0.001f || 0.f != vkCapture.outsideBitmask ||
@@ -1038,7 +2426,16 @@ bool RunVulkanGBufferTest(std::string& outLog)
         outLog += "MRT·depth 픽셀 대조 허용 범위를 벗어났다\n";
     }
 
-    outLog += "[4/4] 5 MRT·2D SRV×4·dynamic sampler·root SRV×2·indexed mesh · "
+    outLog += "[4/4] Standard numeric 7+texture 4·b2 48B"
+        " · baseColorMap GUID 2개→reflection t0/space0·서로 다른 owned texture 2 batch"
+        " · 같은 texture/property+SHADING_QUALITY full/reduced→PSO 2개·normal 픽셀 분리"
+        " · secondary ShaderMeta generation 동시 draw·candidate-first 교체·frame retirement"
+        " · GT frame packet primary/secondary generation owner 유지"
+        " · variant generation reload targeted retire"
+        " · old handle stale · new handle next draw"
+        " · invalid primary/secondary ShaderMeta·material generation·texture register/permutation rejected/current preserved"
+        " · Material 해제 뒤 packet texture owner 유지"
+        " · 5 MRT·CBV b2·2D SRV×4·dynamic sampler·root SRV×2·indexed mesh · "
         "미구현 " + std::to_string(stubs) + " · Vulkan validation " +
         std::to_string(problems) + "건\n";
     if (!captured && !error.empty()) outLog += error + "\n";
@@ -1049,6 +2446,15 @@ bool RunVulkanGBufferTest(std::string& outLog)
     meshes.Shutdown();
     pipelines.Shutdown();
     resources.Shutdown();
+    fixture.draws.clear();
+    shaderMetaFrame.gbufferShaderMetas.clear();
+    if (!firstBaseColorLifetime.expired() || !secondBaseColorLifetime.expired()
+        || !sharedNormalLifetime.expired() || !primaryFrameLifetime.expired()
+        || !secondaryFrameLifetime.expired())
+    {
+        passed = false;
+        outLog += "draw packet 해제 뒤 texture owner가 반환되지 않았다\n";
+    }
 
     outLog += passed
         ? "GBuffer 공용 패스 DX12/Vulkan 픽셀 대조 통과\n"
@@ -1058,11 +2464,512 @@ bool RunVulkanGBufferTest(std::string& outLog)
 
 bool RunVulkanForwardTest(std::string& outLog)
 {
-    outLog += "── Forward+ 패스 — DX12/Vulkan compute·buffer·blend·mesh 대조 ──\n";
+    outLog += "── Forward+ 패스 — DX12/Vulkan P2d-e legacy retirement + required assets 대조 ──\n";
     ForwardFixture fixture;
     ForwardCapture dx12Capture{};
     ForwardCapture vkCapture{};
     std::string error;
+
+    ShaderMetaHandle primaryHandle{};
+    ShaderMeta primaryMeta{};
+    Material primaryMaterial{};
+    std::uint32_t forwardPassIndex = 0;
+    if (!PrepareForwardMaterialProbe("Forward.shadermeta", {}, 48u,
+            primaryHandle, primaryMeta, primaryMaterial, forwardPassIndex, error))
+    {
+        outLog += "[1/4] 제품 Forward ShaderMeta 준비 실패: " + error + "\n";
+        return false;
+    }
+    constexpr std::array<std::string_view, 4> waterTail{
+        "waveSpeed", "waveAmplitude", "waveFrequency", "waterTint" };
+    constexpr std::array<float, 4> waterDefaults{ 0.35f, 0.08f, 2.0f, 0.8f };
+    constexpr std::array<std::string_view, 4> windTail{
+        "windSpeed", "windStrength", "windFrequency", "windTint" };
+    constexpr std::array<float, 4> windDefaults{ 1.2f, 0.35f, 2.5f, 0.7f };
+
+    // 제품 GT sealing 자체를 material cache 로드보다 먼저 태운다. Scene/proxy가
+    // 소유한 Material은 cache와 별개일 수 있으므로 Host required-asset packet의
+    // 임의 GUID가 generation owner로 frame에 들어오는지를 고정한다.
+    const FileGuid waterCatalogGuid = DataSystems->GetFileGuid(
+        RHIShaderSource::Resolve("ForwardWater.shadermeta"));
+    const FileGuid windCatalogGuid = DataSystems->GetFileGuid(
+        RHIShaderSource::Resolve("ForwardWind.shadermeta"));
+    auto waterRequiredMaterial = std::make_shared<Material>();
+    waterRequiredMaterial->m_shaderMetaGuid = waterCatalogGuid;
+    waterRequiredMaterial->m_renderingMode = MaterialRenderingMode::Transparent;
+    auto windRequiredMaterial = std::make_shared<Material>();
+    windRequiredMaterial->m_shaderMetaGuid = windCatalogGuid;
+    windRequiredMaterial->m_renderingMode = MaterialRenderingMode::Transparent;
+    const std::weak_ptr<Material> waterRequiredLifetime = waterRequiredMaterial;
+    const std::weak_ptr<Material> windRequiredLifetime = windRequiredMaterial;
+    std::vector<std::shared_ptr<Material>> requiredMaterials{
+        windRequiredMaterial, waterRequiredMaterial, windRequiredMaterial, nullptr };
+    EnhancedRequiredAssetPacket requiredAssets =
+        EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
+    requiredMaterials.clear();
+    waterRequiredMaterial.reset();
+    windRequiredMaterial.reset();
+    const bool requiredMaterialOwnersReleased =
+        waterRequiredLifetime.expired() && windRequiredLifetime.expired();
+    // 명시 API도 중복/빈 GUID를 허용하되 canonical set에는 남기지 않는다.
+    requiredAssets.RequireShaderMeta(
+        EnhancedShaderMetaDomain::Forward, windCatalogGuid);
+    requiredAssets.RequireShaderMeta(
+        EnhancedShaderMetaDomain::Forward, FileGuid{});
+    const EnhancedLiveFramePacket productFrame =
+        EnhancedSceneRenderer::BuildLiveFramePacket(
+            0.125f, nullptr, 0, false, requiredAssets);
+    const EnhancedLiveFramePacket productNextFrame =
+        EnhancedSceneRenderer::BuildLiveFramePacket(
+            0.25f, nullptr, 0, false, requiredAssets);
+    const bool productFrameTimeSealed =
+        std::fabs(productFrame.deltaSeconds - 0.125f) <= 1e-6f
+        && std::fabs(productNextFrame.deltaSeconds - 0.25f) <= 1e-6f
+        && std::fabs(productNextFrame.totalSeconds
+            - productFrame.totalSeconds - 0.25f) <= 1e-5f;
+    const FileGuid primaryCatalogGuid = DataSystems->GetFileGuid(
+        RHIShaderSource::Resolve("Forward.shadermeta"));
+    const EnhancedShaderMetaFrameSnapshot* productWater =
+        productFrame.FindForwardShaderMeta(waterCatalogGuid);
+    const EnhancedShaderMetaFrameSnapshot* productWind =
+        productFrame.FindForwardShaderMeta(windCatalogGuid);
+    const bool productSecondariesSortedUnique = std::adjacent_find(
+        productFrame.forwardShaderMetas.begin() +
+            (productFrame.forwardShaderMetas.empty() ? 0 : 1),
+        productFrame.forwardShaderMetas.end(),
+        [](const EnhancedShaderMetaFrameSnapshot& left,
+            const EnhancedShaderMetaFrameSnapshot& right)
+        {
+            return !(left.guid < right.guid);
+        }) == productFrame.forwardShaderMetas.end();
+    const bool productFrameOwnsRequiredMetas =
+        FileGuid{} != primaryCatalogGuid
+        && FileGuid{} != waterCatalogGuid && FileGuid{} != windCatalogGuid
+        && requiredMaterialOwnersReleased
+        && productFrame.requiredAssets.shaderMetas.size() == 2u
+        && productFrame.requiredAssets.ContainsShaderMeta(
+            EnhancedShaderMetaDomain::Forward, waterCatalogGuid)
+        && productFrame.requiredAssets.ContainsShaderMeta(
+            EnhancedShaderMetaDomain::Forward, windCatalogGuid)
+        && productFrame.gbufferShaderMetas.size() == 1u
+        && productFrame.forwardShaderMetas.size() == 3u
+        && productFrame.forwardShaderMetas[0].guid == primaryCatalogGuid
+        && productFrame.forwardShaderMetas[0].IsValid()
+        && productFrameTimeSealed
+        && productSecondariesSortedUnique
+        && nullptr != productWater && productWater->IsValid()
+        && nullptr != productWind && productWind->IsValid();
+    if (!productFrameOwnsRequiredMetas)
+    {
+        outLog += "[1/4] 제품 required-asset packet의 임의 GUID owner sealing 실패\n";
+        return false;
+    }
+
+    const std::shared_ptr<Material> waterAsset =
+        DataSystems->LoadMaterialShared("ForwardWater");
+    const std::shared_ptr<Material> windAsset =
+        DataSystems->LoadMaterialShared("ForwardWind");
+    if (!waterAsset || !windAsset
+        || waterAsset->m_shaderMetaGuid != waterCatalogGuid
+        || windAsset->m_shaderMetaGuid != windCatalogGuid)
+    {
+        outLog += "[1/4] ForwardWater/ForwardWind material asset GUID 로드 실패\n";
+        return false;
+    }
+    const EnhancedLiveFramePacket cacheIsolationFrame =
+        EnhancedSceneRenderer::BuildLiveFramePacket(
+            0.f, nullptr, 0, false, EnhancedRequiredAssetPacket{});
+    if (cacheIsolationFrame.gbufferShaderMetas.size() != 1u
+        || cacheIsolationFrame.forwardShaderMetas.size() != 1u
+        || nullptr != cacheIsolationFrame.FindForwardShaderMeta(waterCatalogGuid)
+        || nullptr != cacheIsolationFrame.FindForwardShaderMeta(windCatalogGuid))
+    {
+        outLog += "[1/4] 빈 required-asset packet에 material cache ShaderMeta가 누출됐다\n";
+        return false;
+    }
+    Material waterMaterial(*waterAsset);
+    Material windMaterial(*windAsset);
+
+    // P2d-a: 실제 FoliageRenderProxy가 타입별 인스턴스를 owning draw source로
+    // 펼친다. m_isCulled는 한 카메라의 파생값이므로 여기서 버리지 않고,
+    // worldBounds를 제품 CaptureFromView의 카메라별 절두체 판정으로 넘긴다.
+    bool foliageDrawSourceValid = false;
+    {
+        auto foliageMeshOwner = std::shared_ptr<Mesh>(
+            fixture.mesh.get(), [](Mesh*) noexcept {});
+        auto foliageMaterialOwner = std::make_shared<Material>(windMaterial);
+        const std::weak_ptr<Material> foliageMaterialLifetime =
+            foliageMaterialOwner;
+
+        FoliageRenderProxy foliage;
+        foliage.m_foliageTypes.emplace_back(
+            foliageMeshOwner, foliageMaterialOwner, true, "P2dWind");
+
+        FoliageInstance first{};
+        first.m_position = { -0.4f, 0.f, 0.f };
+        first.m_foliageTypeID = 0;
+        first.RebuildWorldMatrix();
+        FoliageInstance second{};
+        second.m_position = { 0.4f, 0.f, 0.f };
+        second.m_foliageTypeID = 0;
+        second.m_isCulled = true;
+        second.RebuildWorldMatrix();
+        FoliageInstance invalid{};
+        invalid.m_foliageTypeID = 7;
+        invalid.RebuildWorldMatrix();
+        foliage.m_foliageInstances = { first, second, invalid };
+        foliage.RebuildInstanceMap();
+
+        std::vector<FoliageRenderProxy::DrawSource> sources =
+            foliage.CaptureDrawSources();
+        foliageDrawSourceValid = 2u == sources.size()
+            && std::all_of(sources.begin(), sources.end(),
+                [&](const FoliageRenderProxy::DrawSource& source)
+                {
+                    return source.mesh.get() == fixture.mesh.get()
+                        && source.material == foliageMaterialOwner
+                        && 0u == source.foliageTypeID
+                        && !source.worldBounds.is_empty();
+                })
+            && math::near_equal(sources[0].worldMatrix, first.m_worldMatrix)
+            && math::near_equal(sources[1].worldMatrix, second.m_worldMatrix);
+
+        // 프록시 원본을 놓아도 frame draw source가 owner를 유지하고, source를
+        // 놓은 뒤에는 반환되는지까지 같이 고정한다.
+        foliage.m_foliageTypes.clear();
+        foliageMaterialOwner.reset();
+        foliageDrawSourceValid = foliageDrawSourceValid
+            && !foliageMaterialLifetime.expired();
+        sources.clear();
+        foliageDrawSourceValid = foliageDrawSourceValid
+            && foliageMaterialLifetime.expired();
+    }
+    if (!foliageDrawSourceValid)
+    {
+        outLog += "[1/4] FoliageRenderProxy owning draw source/culling 경계 실패\n";
+        return false;
+    }
+
+    ShaderMetaHandle waterHandle{};
+    ShaderMeta waterMeta{};
+    std::uint32_t waterPassIndex = 0;
+    ShaderMetaHandle windHandle{};
+    ShaderMeta windMeta{};
+    std::uint32_t windPassIndex = 0;
+    if (!PrepareForwardMaterialProbe("ForwardWater.shadermeta", waterTail, 64u,
+            waterHandle, waterMeta, waterMaterial, waterPassIndex, error)
+        || !PrepareForwardMaterialProbe("ForwardWind.shadermeta", windTail, 64u,
+            windHandle, windMeta, windMaterial, windPassIndex, error)
+        || waterPassIndex != forwardPassIndex || windPassIndex != forwardPassIndex)
+    {
+        outLog += "[1/4] 대표 Water/Wind ShaderMeta 준비 실패: " + error + "\n";
+        return false;
+    }
+    // ConfigureShaderProperties는 runtime schema를 붙이면서 authored logical
+    // 값을 보존한다. asset 원본으로 먼저 검사해 GUID 선택과 default가 실제
+    // catalog 파일에서 왔음을 고정한다(.meta GUID 하드코딩 금지).
+    if (!ValidateForwardRepresentativeAsset(*waterAsset, waterMeta,
+            waterTail, waterDefaults, error)
+        || !ValidateForwardRepresentativeAsset(*windAsset, windMeta,
+            windTail, windDefaults, error))
+    {
+        outLog += "[1/4] 대표 Water/Wind material 계약 실패: " + error + "\n";
+        return false;
+    }
+
+    const std::array<const ShaderMeta*, 3> shaderMetas{
+        &primaryMeta, &waterMeta, &windMeta };
+    const std::array<ShaderMetaHandle, 3> shaderMetaHandles{
+        primaryHandle, waterHandle, windHandle };
+
+    EnhancedLiveFramePacket shaderMetaFrame{};
+    std::array<std::shared_ptr<const ShaderMeta>, 3> frameOwners{
+        std::make_shared<const ShaderMeta>(primaryMeta),
+        std::make_shared<const ShaderMeta>(waterMeta),
+        std::make_shared<const ShaderMeta>(windMeta),
+    };
+    std::array<std::weak_ptr<const ShaderMeta>, 3> frameLifetimes{
+        frameOwners[0], frameOwners[1], frameOwners[2] };
+    for (std::size_t index = 0; index < frameOwners.size(); ++index)
+    {
+        EnhancedShaderMetaFrameSnapshot snapshot{};
+        snapshot.guid = shaderMetas[index]->guid;
+        snapshot.handle = shaderMetaHandles[index];
+        snapshot.value = frameOwners[index];
+        shaderMetaFrame.forwardShaderMetas.push_back(std::move(snapshot));
+    }
+    frameOwners = {};
+    const bool shaderMetaOwnedByFrame = 3 == shaderMetaFrame.forwardShaderMetas.size()
+        && std::all_of(frameLifetimes.begin(), frameLifetimes.end(),
+            [](const std::weak_ptr<const ShaderMeta>& owner)
+            {
+                return !owner.expired();
+            })
+        && std::all_of(shaderMetaFrame.forwardShaderMetas.begin(),
+            shaderMetaFrame.forwardShaderMetas.end(),
+            [](const EnhancedShaderMetaFrameSnapshot& snapshot)
+            {
+                return snapshot.IsValid();
+            })
+        && shaderMetaFrame.FindForwardShaderMeta(primaryMeta.guid)
+        && shaderMetaFrame.FindForwardShaderMeta(waterMeta.guid)
+        && shaderMetaFrame.FindForwardShaderMeta(windMeta.guid);
+
+    constexpr std::array<std::array<std::uint8_t, 4>, 3> emissionPixels{
+        std::array<std::uint8_t, 4>{ 255u, 0u, 0u, 255u },
+        std::array<std::uint8_t, 4>{ 0u, 255u, 0u, 255u },
+        std::array<std::uint8_t, 4>{ 0u, 0u, 255u, 255u },
+    };
+    constexpr std::array<const char*, 3> textureNames{
+        "m6_p2b_forward_far", "m6_p2b_forward_middle",
+        "m6_p2b_forward_near",
+    };
+    const std::array<FileGuid, 3> emissionGuids{
+        FileGuid{ "81000000-0000-4000-8000-000000000001" },
+        FileGuid{ "82000000-0000-4000-8000-000000000002" },
+        FileGuid{ "83000000-0000-4000-8000-000000000003" },
+    };
+    std::array<std::shared_ptr<Texture>, 3> emissionOwners{};
+    std::array<std::weak_ptr<Texture>, 3> emissionLifetimes{};
+    for (std::size_t index = 0; index < emissionOwners.size(); ++index)
+    {
+        emissionOwners[index].reset(Texture::CreateFromPixels(1, 1,
+            textureNames[index], DXGI_FORMAT_R8G8B8A8_UNORM,
+            emissionPixels[index].data(), emissionPixels[index].size()));
+        if (!emissionOwners[index])
+        {
+            outLog += "[1/4] Forward P2b emission texture 생성 실패\n";
+            return false;
+        }
+        emissionLifetimes[index] = emissionOwners[index];
+    }
+    constexpr std::array<std::uint8_t, 4> genericWindPixel{
+        255u, 255u, 255u, 255u };
+    std::shared_ptr<Texture> genericWindOwner(Texture::CreateFromPixels(1, 1,
+        "m6_p2d_c_wind_map", DXGI_FORMAT_R8G8B8A8_UNORM,
+        genericWindPixel.data(), genericWindPixel.size()));
+    if (!genericWindOwner)
+    {
+        outLog += "[1/4] P2d-c generic windMap texture 생성 실패\n";
+        return false;
+    }
+    std::weak_ptr<Texture> genericWindLifetime = genericWindOwner;
+    const FileGuid genericWindGuid{
+        "84000000-0000-4000-8000-000000000004" };
+
+    Material primaryNearMaterial(primaryMaterial);
+    const auto configureMaterial = [&](Material& material,
+        const std::shared_ptr<Texture>& emission, const FileGuid& emissionGuid)
+    {
+        material.m_renderingMode = MaterialRenderingMode::Transparent;
+        const bool configured = material.TrySetVector("MaterialProperties", "baseColor",
+                math::vector4{ 0.f, 0.f, 0.f, 0.5f })
+            && material.TrySetFloat("MaterialProperties", "metallic", 0.f)
+            && material.TrySetFloat("MaterialProperties", "roughness", 1.f)
+            && material.TrySetFloat("MaterialProperties", "normalScale", 1.f)
+            && material.TrySetFloat("MaterialProperties", "occlusionStrength", 1.f)
+            && material.TrySetVector("MaterialProperties", "emissive",
+                math::vector3{ 1.f, 1.f, 1.f })
+            && material.TrySetFloat("MaterialProperties", "alphaCutoff", 0.f)
+            && material.TrySetTextureGuid(
+                standard_material::property::EmissiveMap, emissionGuid);
+        if (configured) material.UseEmissiveMap(emission);
+        return configured;
+    };
+    if (!configureMaterial(primaryMaterial, emissionOwners[0], emissionGuids[0])
+        || !configureMaterial(waterMaterial, emissionOwners[1], emissionGuids[1])
+        || !configureMaterial(primaryNearMaterial,
+            emissionOwners[2], emissionGuids[2])
+        || !configureMaterial(windMaterial, {}, {})
+        // A/B/A 순서 probe에서는 Water tail의 고정 emission을 끄고 기존
+        // red/green/blue alpha 식을 그대로 지킨다. Wind tail은 별도 swatch의
+        // 연속 두 프레임에서 0→1로 바꿔 실제 64B b2 소비를 판정한다.
+        || !waterMaterial.TrySetFloat("MaterialProperties", "waveAmplitude", 0.f)
+        || !waterMaterial.TrySetFloat("MaterialProperties", "waterTint", 0.f)
+        || !windMaterial.TrySetFloat("MaterialProperties", "windStrength", 0.f)
+        || !windMaterial.TrySetFloat("MaterialProperties", "windTint", 0.f)
+        || !windMaterial.TrySetTextureGuid("windMap", genericWindGuid))
+    {
+        outLog += "[1/4] Forward P2c material property 구성 실패: " + error + "\n";
+        return false;
+    }
+    windMaterial.UseTextureMap("windMap", genericWindOwner);
+    // P2d-b는 legacy m_flowInfo를 Material 주소가 아닌 값 snapshot으로 넘긴다.
+    // Water는 구조 보존을, Wind mutation swatch는 실제 time/flow 픽셀 소비를 본다.
+    waterMaterial.SetWindVector(math::vector4{ 0.15f, -0.10f, 0.05f, 0.20f })
+        .SetUVScroll(math::vector2{ 0.03f, -0.02f });
+    windMaterial.SetWindVector(math::vector4{ -0.25f, 0.35f, 0.10f, 0.40f })
+        .SetUVScroll(math::vector2{ 0.05f, 0.025f });
+    Material mutatedWindMaterial(windMaterial);
+    constexpr float kPi = 3.14159265358979323846f;
+    if (!mutatedWindMaterial.TrySetFloat(
+            "MaterialProperties", "windSpeed", -0.5f * kPi)
+        || !mutatedWindMaterial.TrySetFloat(
+            "MaterialProperties", "windStrength", 0.7f)
+        || !mutatedWindMaterial.TrySetFloat(
+            "MaterialProperties", "windFrequency", 0.f)
+        || !mutatedWindMaterial.TrySetFloat(
+            "MaterialProperties", "windTint", 0.1f))
+    {
+        outLog += "[1/4] Forward Wind custom float mutation 실패\n";
+        return false;
+    }
+    mutatedWindMaterial.SetWindVector(
+            math::vector4{ 0.f, 0.f, 0.f, 1.5f * kPi })
+        .SetUVScroll(math::vector2{ 0.25f, -0.125f });
+
+    const auto makePacket = [&](const Material& material,
+        const ShaderMeta& meta, ShaderMetaHandle handle)
+    {
+        auto packet = std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
+        const ShaderMetaBindingLayout* materialLayout =
+            material.GetShaderBindingLayout();
+        if (nullptr == materialLayout)
+        {
+            error = "Forward material runtime binding layout이 없다";
+            return packet;
+        }
+        // P2b shader는 b2의 alpha=0.5를 써야 한다. 이 P2a 값(0.125)을 읽으면
+        // swatch/overlap의 정확한 blend 판정이 즉시 달라진다.
+        packet->baseColorFactor = math::color(0.f, 0.f, 0.f, 0.125f);
+        packet->metallic = 0.f;
+        packet->roughness = 1.f;
+        packet->shaderMetaHandle = handle;
+        packet->bindingLayout = *materialLayout;
+        const std::span<const std::uint16_t> keywords =
+            material.GetKeywordSelections();
+        packet->keywordSelections.assign(keywords.begin(), keywords.end());
+        ShaderMetaPermutation permutation;
+        if (!ShaderPermutationDomain::Resolve(meta, forwardPassIndex,
+                packet->keywordSelections, permutation, error))
+        {
+            return packet;
+        }
+        packet->permutationKey = permutation.key;
+        packet->flow.windVector = material.m_flowInfo.m_windVector;
+        packet->flow.uvScroll = material.m_flowInfo.m_uvScroll;
+        if (!material.BuildShaderPropertyBlock(meta, *materialLayout,
+                packet->propertyBytes, error))
+        {
+            return packet;
+        }
+
+        for (const ShaderPropertyDesc& desc : meta.properties)
+        {
+            if (ShaderPropertyType::Texture2D != desc.type) continue;
+            const auto reflected = std::find_if(materialLayout->properties.begin(),
+                materialLayout->properties.end(),
+                [&desc](const ShaderMetaPropertyBinding& binding)
+                {
+                    return binding.name == desc.name;
+                });
+            const auto logical = std::find_if(material.m_propertyValues.begin(),
+                material.m_propertyValues.end(),
+                [&desc](const MaterialPropertyValue& value)
+                {
+                    return value.m_name == desc.name;
+                });
+            if (reflected == materialLayout->properties.end()
+                || logical == material.m_propertyValues.end())
+            {
+                error = "Forward texture GUID/register snapshot 실패: ";
+                error += desc.name;
+                return packet;
+            }
+            EnhancedMaterialTextureBinding binding{};
+            binding.propertyName = desc.name;
+            binding.textureGuid = logical->m_textureGuid;
+            binding.registerIndex = reflected->registerIndex;
+            binding.registerSpace = reflected->registerSpace;
+            binding.textureOwner = material.GetTextureMapShared(desc.name);
+            packet->textureBindings.push_back(std::move(binding));
+        }
+        return packet;
+    };
+
+    std::array<std::shared_ptr<EnhancedForwardMaterialDrawSnapshot>, 4> packets{
+        makePacket(primaryMaterial, primaryMeta, primaryHandle),
+        makePacket(waterMaterial, waterMeta, waterHandle),
+        makePacket(primaryNearMaterial, primaryMeta, primaryHandle),
+        makePacket(windMaterial, windMeta, windHandle),
+    };
+    std::shared_ptr<EnhancedForwardMaterialDrawSnapshot> mutatedWindPacket =
+        makePacket(mutatedWindMaterial, windMeta, windHandle);
+    mutatedWindPacket->flow.totalSeconds = 1.f;
+    mutatedWindPacket->flow.deltaSeconds = 0.25f;
+    auto invalidFlowPacket =
+        std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*mutatedWindPacket);
+    invalidFlowPacket->flow.totalSeconds =
+        std::numeric_limits<float>::quiet_NaN();
+    const bool invalidFlowRejected = !invalidFlowPacket->IsValid();
+    if (std::any_of(packets.begin(), packets.end(),
+            [](const auto& packet) { return !packet || !packet->IsValid(); })
+        || !mutatedWindPacket || !mutatedWindPacket->IsValid()
+        || !invalidFlowRejected
+        || 48u != packets[0]->propertyBytes.size()
+        || 64u != packets[1]->propertyBytes.size()
+        || 64u != packets[3]->propertyBytes.size()
+        || 4u != packets[3]->textureBindings.size()
+        || "windMap" != packets[3]->textureBindings.front().propertyName
+        || 4u != packets[3]->textureBindings.front().registerIndex
+        || packets[3]->shaderMetaHandle != mutatedWindPacket->shaderMetaHandle
+        || packets[3]->permutationKey != mutatedWindPacket->permutationKey
+        || packets[3]->bindingLayout != mutatedWindPacket->bindingLayout
+        || packets[3]->propertyBytes == mutatedWindPacket->propertyBytes
+        || mutatedWindPacket->flow.windVector.w != 1.5f * kPi
+        || mutatedWindPacket->flow.uvScroll.x != 0.25f
+        || mutatedWindPacket->flow.uvScroll.y != -0.125f
+        || mutatedWindPacket->flow.totalSeconds != 1.f
+        || mutatedWindPacket->flow.deltaSeconds != 0.25f)
+    {
+        outLog += "[1/4] Forward P2c 48/64B draw packet이 invalid다: " + error + "\n";
+        return false;
+    }
+
+    EnhancedDrawItem drawTemplate = fixture.draws.front();
+    drawTemplate.baseColorFactor = math::color(1.f, 1.f, 1.f, 0.125f);
+    fixture.draws.clear();
+    const auto appendDraw = [&](std::size_t material, float scale,
+        float x, float y, float z)
+    {
+        EnhancedDrawItem draw = drawTemplate;
+        draw.worldMatrix = math::scaling_matrix(
+            math::vector3{ scale, scale, 1.f }) *
+            math::translation_matrix(math::vector3{ x, y, z });
+        draw.forwardMaterialSnapshot = packets[material];
+        fixture.draws.push_back(std::move(draw));
+    };
+    // 이미 back-to-front로 정렬된 A/B/A/C PSO 순서다. 앞의 6개는 기존 P2b
+    // order gate를 그대로 보존하고, 마지막 C는 겹치지 않는 Wind mutation
+    // swatch다. A를 전역 그룹화하면 overlap의 alpha 식이 달라진다.
+    appendDraw(0, 0.25f, -0.65f, 0.55f, 0.20f);
+    appendDraw(0, 0.55f,  0.00f, -0.45f, 0.20f);
+    appendDraw(1, 0.25f,  0.00f, 0.55f, 0.00f);
+    appendDraw(1, 0.55f,  0.00f, -0.45f, 0.00f);
+    appendDraw(2, 0.25f,  0.65f, 0.55f, -0.20f);
+    appendDraw(2, 0.55f,  0.00f, -0.45f, -0.20f);
+    constexpr std::size_t windMutationDrawIndex = 6;
+    appendDraw(3, 0.25f, 0.65f, -0.55f, -0.30f);
+    // 타일 컬링은 계속 광원 1개를 검증하되 픽셀은 emission만 남겨 blend 식을
+    // 정확히 판정한다.
+    fixture.lights[0].color = math::color(0.f, 0.f, 0.f, 0.f);
+
+    for (Material* material : { &primaryMaterial, &waterMaterial,
+            &primaryNearMaterial, &windMaterial, &mutatedWindMaterial })
+    {
+        material->UseEmissiveMap(std::shared_ptr<Texture>{});
+    }
+    windMaterial.UseTextureMap("windMap", {});
+    mutatedWindMaterial.UseTextureMap("windMap", {});
+    genericWindOwner.reset();
+    for (std::shared_ptr<Texture>& owner : emissionOwners) owner.reset();
+    const bool packetOwnsTextures = std::all_of(emissionLifetimes.begin(),
+        emissionLifetimes.end(), [](const std::weak_ptr<Texture>& owner)
+        {
+            return !owner.expired();
+        }) && !genericWindLifetime.expired()
+        && packets[3]->textureBindings.front().textureOwner
+        && packets[3]->textureBindings.front().textureGuid == genericWindGuid;
 
     {
         DX12DeviceResources resources;
@@ -1083,7 +2990,9 @@ bool RunVulkanForwardTest(std::string& outLog)
         const bool captured = CaptureForwardBackend(resources, pipelines, roots,
             meshes, textures,
             [&] { meshes.BeginFrame(0); textures.BeginFrame(0); },
-            fixture, dx12Capture, error);
+            fixture, shaderMetas, shaderMetaHandles, windMutationDrawIndex,
+            mutatedWindPacket,
+            dx12Capture, error);
         std::string validation;
         const uint32_t problems = resources.DrainDebugMessages(validation);
         resources.WaitForGpu();
@@ -1098,7 +3007,7 @@ bool RunVulkanForwardTest(std::string& outLog)
             return false;
         }
     }
-    outLog += "[1/4] DX12 기준 compute cull·structured UAV/SRV·alpha blend 통과\n";
+    outLog += "[1/4] DX12 기준 Forward ShaderMeta·material PSO/b2/t4..t7·blend order 통과\n";
 
     if (!VulkanApi::LoadLoader(error))
     {
@@ -1132,7 +3041,9 @@ bool RunVulkanForwardTest(std::string& outLog)
         ShadowSpirvScope spirv;
         captured = CaptureForwardBackend(resources, pipelines, pipelines,
             meshes, textures, [&] { meshes.BeginFrame(0); },
-            fixture, vkCapture, error);
+            fixture, shaderMetas, shaderMetaHandles, windMutationDrawIndex,
+            mutatedWindPacket,
+            vkCapture, error);
     }
 
     const VulkanMeshCache::Stats meshStats = meshes.GetStats();
@@ -1147,10 +3058,11 @@ bool RunVulkanForwardTest(std::string& outLog)
         char line[384]{};
         std::snprintf(line, sizeof(line),
             "[2/4] Vulkan — 실행 %u·컬링 %u·transient %u · "
-            "tile(center/corner/min/max) %u/%u/%u/%u · "
+            "draw/batch/meta %u/%u/%u · tile(center/corner/min/max) %u/%u/%u/%u · "
             "mesh upload %u/실패 %u · texture 실패 %u\n",
             vkCapture.graph.passesExecuted, vkCapture.graph.passesCulled,
-            vkCapture.graph.transientCreated, vkCapture.centerTileLights,
+            vkCapture.graph.transientCreated, vkCapture.draws, vkCapture.batches,
+            vkCapture.shaderVariants, vkCapture.centerTileLights,
             vkCapture.cornerTileLights, vkCapture.minTileLights,
             vkCapture.maxTileLights, meshStats.uploads, meshStats.failures,
             textureStats.failures);
@@ -1162,18 +3074,116 @@ bool RunVulkanForwardTest(std::string& outLog)
         2 == vkCapture.graph.transientCreated &&
         1 == meshStats.uploads && 0 == meshStats.failures &&
         0 == textureStats.failures &&
+        packetOwnsTextures && shaderMetaOwnedByFrame
+        && dx12Capture.invalidMetaRejected
+        && dx12Capture.invalidMaterialRejected
+        && dx12Capture.invalidPacketRejected
+        && vkCapture.invalidMetaRejected
+        && vkCapture.invalidMaterialRejected
+        && vkCapture.invalidPacketRejected
+        && 7 == dx12Capture.draws && 4 == dx12Capture.batches
+        && 3 == dx12Capture.shaderVariants
+        && 7 == vkCapture.draws && 4 == vkCapture.batches
+        && 3 == vkCapture.shaderVariants
+        && dx12Capture.shadePipeline.IsValid()
+        && dx12Capture.referencePipeline.IsValid()
+        && dx12Capture.secondaryShadePipeline.IsValid()
+        && dx12Capture.secondaryReferencePipeline.IsValid()
+        && dx12Capture.tertiaryShadePipeline.IsValid()
+        && dx12Capture.tertiaryReferencePipeline.IsValid()
+        && dx12Capture.shadePipeline != dx12Capture.secondaryShadePipeline
+        && dx12Capture.shadePipeline != dx12Capture.tertiaryShadePipeline
+        && dx12Capture.secondaryShadePipeline != dx12Capture.tertiaryShadePipeline
+        && dx12Capture.referencePipeline != dx12Capture.secondaryReferencePipeline
+        && dx12Capture.referencePipeline != dx12Capture.tertiaryReferencePipeline
+        && dx12Capture.secondaryReferencePipeline
+            != dx12Capture.tertiaryReferencePipeline
+        && vkCapture.shadePipeline.IsValid()
+        && vkCapture.referencePipeline.IsValid() &&
+        vkCapture.secondaryShadePipeline.IsValid()
+        && vkCapture.secondaryReferencePipeline.IsValid()
+        && vkCapture.tertiaryShadePipeline.IsValid()
+        && vkCapture.tertiaryReferencePipeline.IsValid()
+        && vkCapture.shadePipeline != vkCapture.secondaryShadePipeline
+        && vkCapture.shadePipeline != vkCapture.tertiaryShadePipeline
+        && vkCapture.secondaryShadePipeline != vkCapture.tertiaryShadePipeline
+        && vkCapture.referencePipeline != vkCapture.secondaryReferencePipeline
+        && vkCapture.referencePipeline != vkCapture.tertiaryReferencePipeline
+        && vkCapture.secondaryReferencePipeline
+            != vkCapture.tertiaryReferencePipeline &&
         1 == dx12Capture.centerTileLights && 1 == dx12Capture.cornerTileLights &&
         1 == dx12Capture.minTileLights && 1 == dx12Capture.maxTileLights &&
         1 == vkCapture.centerTileLights && 1 == vkCapture.cornerTileLights &&
         1 == vkCapture.minTileLights && 1 == vkCapture.maxTileLights;
 
-    float maxCenterDelta = 0.f;
+    float maxRegionDelta = 0.f;
+    float maxExpectedDelta = 0.f;
     float maxOutside = 0.f;
+    constexpr float expectedSwatches[3][3] = {
+        { 0.5f, 0.f, 0.f },
+        { 0.f, 0.5f, 0.f },
+        { 0.f, 0.f, 0.5f },
+    };
+    constexpr float expectedOverlap[3] = { 0.125f, 0.25f, 0.5f };
+    // windSpeed=-pi/2, total=1, flow phase=3pi/2 => phase=pi/2,
+    // response=0.1+0.7*1=0.8. alpha 0.5 합성까지 포함한 정확한 기대값이다.
+    constexpr float expectedWindAfter[3] = { 0.032f, 0.26f, 0.056f };
+    float maxCustomBackendDelta = 0.f;
+    float maxCustomExpectedDelta = 0.f;
+    float maxCustomBefore = 0.f;
+    float customMutationMagnitude = 0.f;
+    for (std::size_t material = 0; material < 3; ++material)
+    {
+        for (uint32_t channel = 0; channel < 4; ++channel)
+        {
+            maxRegionDelta = (std::max)(maxRegionDelta, std::fabs(
+                vkCapture.swatches[material][channel]
+                    - dx12Capture.swatches[material][channel]));
+            if (channel < 3)
+            {
+                maxExpectedDelta = (std::max)(maxExpectedDelta, std::fabs(
+                    dx12Capture.swatches[material][channel]
+                        - expectedSwatches[material][channel]));
+                maxExpectedDelta = (std::max)(maxExpectedDelta, std::fabs(
+                    vkCapture.swatches[material][channel]
+                        - expectedSwatches[material][channel]));
+            }
+        }
+    }
     for (uint32_t channel = 0; channel < 4; ++channel)
     {
-        maxCenterDelta = (std::max)(maxCenterDelta, std::fabs(
-            vkCapture.center[channel] - dx12Capture.center[channel]));
+        maxRegionDelta = (std::max)(maxRegionDelta, std::fabs(
+            vkCapture.overlap[channel] - dx12Capture.overlap[channel]));
         maxOutside = (std::max)(maxOutside, std::fabs(vkCapture.outside[channel]));
+        if (channel < 3)
+        {
+            maxExpectedDelta = (std::max)(maxExpectedDelta, std::fabs(
+                dx12Capture.overlap[channel] - expectedOverlap[channel]));
+            maxExpectedDelta = (std::max)(maxExpectedDelta, std::fabs(
+                vkCapture.overlap[channel] - expectedOverlap[channel]));
+            maxCustomBackendDelta = (std::max)(maxCustomBackendDelta,
+                std::fabs(dx12Capture.customBefore[channel]
+                    - vkCapture.customBefore[channel]));
+            maxCustomBackendDelta = (std::max)(maxCustomBackendDelta,
+                std::fabs(dx12Capture.customAfter[channel]
+                    - vkCapture.customAfter[channel]));
+            maxCustomBefore = (std::max)(maxCustomBefore,
+                std::fabs(dx12Capture.customBefore[channel]));
+            maxCustomBefore = (std::max)(maxCustomBefore,
+                std::fabs(vkCapture.customBefore[channel]));
+            maxCustomExpectedDelta = (std::max)(maxCustomExpectedDelta,
+                std::fabs(dx12Capture.customAfter[channel]
+                    - expectedWindAfter[channel]));
+            maxCustomExpectedDelta = (std::max)(maxCustomExpectedDelta,
+                std::fabs(vkCapture.customAfter[channel]
+                    - expectedWindAfter[channel]));
+            customMutationMagnitude = (std::max)(customMutationMagnitude,
+                std::fabs(dx12Capture.customAfter[channel]
+                    - dx12Capture.customBefore[channel]));
+            customMutationMagnitude = (std::max)(customMutationMagnitude,
+                std::fabs(vkCapture.customAfter[channel]
+                    - vkCapture.customBefore[channel]));
+        }
     }
     const float writtenDelta = (0 != dx12Capture.writtenPixels)
         ? std::fabs(static_cast<float>(vkCapture.writtenPixels) -
@@ -1181,28 +3191,41 @@ bool RunVulkanForwardTest(std::string& outLog)
             static_cast<float>(dx12Capture.writtenPixels)
         : 1.f;
 
-    char compare[512]{};
+    char compare[1024]{};
     std::snprintf(compare, sizeof(compare),
-        "[3/4] center RGBA %.4f/%.4f,%.4f/%.4f,%.4f/%.4f,%.4f/%.4f · "
-        "coverage %u/%u(편차 %.2f%%) · 최대 채널 편차 %.5f · outside %.5f\n",
-        dx12Capture.center[0], vkCapture.center[0],
-        dx12Capture.center[1], vkCapture.center[1],
-        dx12Capture.center[2], vkCapture.center[2],
-        dx12Capture.center[3], vkCapture.center[3],
+        "[3/4] overlap RGB %.4f/%.4f,%.4f/%.4f,%.4f/%.4f · "
+        "wind flow/time before→after G %.4f→%.4f/%.4f→%.4f · "
+        "coverage %u/%u(편차 %.2f%%) · backend 최대 편차 %.5f · "
+        "기대식 편차 %.5f/custom %.5f · outside %.5f\n",
+        dx12Capture.overlap[0], vkCapture.overlap[0],
+        dx12Capture.overlap[1], vkCapture.overlap[1],
+        dx12Capture.overlap[2], vkCapture.overlap[2],
+        dx12Capture.customBefore[1], dx12Capture.customAfter[1],
+        vkCapture.customBefore[1], vkCapture.customAfter[1],
         dx12Capture.writtenPixels, vkCapture.writtenPixels,
-        writtenDelta * 100.f, maxCenterDelta, maxOutside);
+        writtenDelta * 100.f, (std::max)(maxRegionDelta, maxCustomBackendDelta),
+        maxExpectedDelta, maxCustomExpectedDelta, maxOutside);
     outLog += compare;
 
     if (0 == dx12Capture.writtenPixels || 0 == vkCapture.writtenPixels ||
-        dx12Capture.center[0] <= 0.01f || vkCapture.center[0] <= 0.01f ||
-        writtenDelta > 0.02f || maxCenterDelta > 0.02f || maxOutside > 0.001f)
+        writtenDelta > 0.02f || maxRegionDelta > 0.02f ||
+        maxCustomBackendDelta > 0.02f || maxExpectedDelta > 0.025f ||
+        maxCustomBefore > 0.001f || maxCustomExpectedDelta > 0.025f ||
+        customMutationMagnitude < 0.20f || maxOutside > 0.001f)
     {
         passed = false;
         outLog += "Forward+ 픽셀·coverage 대조 허용 범위를 벗어났다\n";
     }
 
-    outLog += "[4/4] compute PSO·depth SRV·structured UAV table·UAV→SRV/Copy "
-        "buffer barrier·root buffer·dynamic sampler×3·indexed mesh · 미구현 " +
+    outLog += "[4/4] P2d-e material-cache ShaderMeta scan 0·빈 packet primary-only 1/1·raw Material texture alias/setter 0·"
+        "required-asset GUID packet 2개·non-cache Material owner 해제 뒤 유지·cache 로드 전 Water/Wind generation owner·canonical seed 0·"
+        "P2d-c windMap@t4 generic schema/owner vector·P2d-b m_flowInfo 32B+frame total/delta immutable snapshot·NaN fail-closed·"
+        "Foliage type 1개·view-culling draw source 2개·owner 반환·"
+        "Forward frame ShaderMeta owner 3개·48/64B material packet 5개·"
+        "primary/water/wind PSO A/B/A/C·인접 7 draw→4 batch·"
+        "wind property+flow/time 다음-frame 픽셀·invalid meta/generation/register fail-closed·"
+        "owner 원본 해제 뒤 양 backend 유지 · compute PSO·depth SRV·structured UAV table·"
+        "UAV→SRV/Copy buffer barrier·root buffer·dynamic sampler×3·indexed mesh · 미구현 " +
         std::to_string(stubs) + " · Vulkan validation " +
         std::to_string(problems) + "건\n";
     if (!captured && !error.empty()) outLog += error + "\n";
@@ -1213,6 +3236,29 @@ bool RunVulkanForwardTest(std::string& outLog)
     meshes.Shutdown();
     pipelines.Shutdown();
     resources.Shutdown();
+
+    for (EnhancedDrawItem& draw : fixture.draws)
+        draw.forwardMaterialSnapshot.reset();
+    packets = {};
+    mutatedWindPacket.reset();
+    invalidFlowPacket.reset();
+    shaderMetaFrame.forwardShaderMetas.clear();
+    const bool packetReleasedTextures = std::all_of(emissionLifetimes.begin(),
+        emissionLifetimes.end(), [](const std::weak_ptr<Texture>& owner)
+        {
+            return owner.expired();
+        }) && genericWindLifetime.expired();
+    const bool frameReleasedShaderMetas = std::all_of(
+        frameLifetimes.begin(), frameLifetimes.end(),
+        [](const std::weak_ptr<const ShaderMeta>& owner)
+        {
+            return owner.expired();
+        });
+    if (!packetReleasedTextures || !frameReleasedShaderMetas)
+    {
+        passed = false;
+        outLog += "Forward packet 해제 뒤 texture/ShaderMeta owner가 반환되지 않았다\n";
+    }
 
     outLog += passed
         ? "Forward+ 공용 패스 DX12/Vulkan 픽셀·타일 버퍼 대조 통과\n"

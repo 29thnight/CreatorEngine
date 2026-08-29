@@ -443,6 +443,7 @@ void EnhancedSceneRendererLiveDX12Adapter::MaintainAssetCaches(uint64_t frameInd
     impl.meshCache.RetireUnused(lastFence, &evictionPass);
     impl.textureCache.SweepGraveyard(completedFence);
     impl.meshCache.SweepGraveyard(completedFence);
+    impl.pipelines.CollectRetiredPipelines(RHICompletionPoint{ completedFence });
 }
 
 uint32_t EnhancedSceneRendererLiveDX12Adapter::DrainDebugMessages(

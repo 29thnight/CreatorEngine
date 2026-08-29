@@ -4,7 +4,7 @@
 
     Bin\<플랫폼>-<구성>\Editor\              CreatorEditor 실행 번들
     Bin\<플랫폼>-<구성>\Player\              Player 실행 번들
-    Bin\<플랫폼>-<구성>\Tools\AssetPacker\   도구 실행 번들
+    Bin\<플랫폼>-<구성>\Tools\<도구 이름>\    AssetCooker/AssetPacker 실행 번들
     Bin\<플랫폼>-<구성>\Managed\             공통 관리 어셈블리
     Bin\<플랫폼>-<구성>\Resources\           엔진 리소스
 

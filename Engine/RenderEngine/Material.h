@@ -15,7 +15,6 @@
 #include <memory>
 #include <span>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include <cstdint>
 
@@ -51,6 +50,15 @@ struct MaterialPropertyValue
     std::int32_t m_integerValue{};
     bool m_boolValue{};
     FileGuid m_textureGuid{};
+};
+
+// M6-P2d-c runtime-only texture generation owner. 디스크 정본은
+// MaterialPropertyValue의 (name, FileGuid)이고, 이 벡터는 임의 ShaderMeta texture
+// property 이름을 실제 Texture generation 수명과 결합한다.
+struct MaterialTextureOwner
+{
+	std::string propertyName{};
+	std::shared_ptr<Texture> textureOwner{};
 };
 
 class Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
@@ -101,12 +109,28 @@ public:
 	Material& SetRoughness(float roughness);
 
 public:
-	Material& UseBaseColorMap(Texture* texture);
-	Material& UseNormalMap(Texture* texture);
-	Material& UseBumpMap(Texture* texture);
-	Material& UseOccRoughMetalMap(Texture* texture);
-	Material& UseAOMap(Texture* texture);
-	Material& UseEmissiveMap(Texture* texture);
+	// Material이 Texture generation을 직접 소유한다. 호출자는 raw alias를 저장하지
+	// 않고 아래 shared getter에서 필요한 순간 view만 얻는다.
+	Material& UseBaseColorMap(std::shared_ptr<Texture> texture);
+	Material& UseNormalMap(std::shared_ptr<Texture> texture);
+	Material& UseBumpMap(std::shared_ptr<Texture> texture);
+	Material& UseOccRoughMetalMap(std::shared_ptr<Texture> texture);
+	Material& UseAOMap(std::shared_ptr<Texture> texture);
+	Material& UseEmissiveMap(std::shared_ptr<Texture> texture);
+	Material& UseTextureMap(std::string_view property, std::shared_ptr<Texture> texture);
+
+	const std::shared_ptr<Texture>& GetTextureMapShared(
+		std::string_view property) const noexcept;
+	std::span<const MaterialTextureOwner> GetTextureOwners() const noexcept
+	{
+		return m_textureOwners;
+	}
+	const std::shared_ptr<Texture>& GetBaseColorMapShared() const noexcept;
+	const std::shared_ptr<Texture>& GetNormalMapShared() const noexcept;
+	const std::shared_ptr<Texture>& GetOccRoughMetalMapShared() const noexcept;
+	const std::shared_ptr<Texture>& GetAOMapShared() const noexcept;
+	const std::shared_ptr<Texture>& GetEmissiveMapShared() const noexcept;
+
 	Material& ConvertToLinearSpace(bool32 convert);
 	Material& SetWindVector(const math::vector4& windVector);
 	Material& SetUVScroll(const math::vector2& uvScroll);
@@ -119,6 +143,12 @@ public:
 	ShaderMetaHandle GetShaderMetaHandle() const { return m_shaderMetaHandle; }
 	const ShaderMetaBindingLayout* GetShaderBindingLayout() const;
 	std::span<const std::uint8_t> GetConstantBufferData() const;
+	// runtime schema를 Material에 설치하지 않고도 현재 논리 property를 reflection
+	// layout에 맞춰 소유 byte block으로 만든다. RT frame sealing은 이 const API만
+	// 사용하므로 Material*가 draw packet으로 새지 않는다.
+	bool BuildShaderPropertyBlock(const ShaderMeta& meta,
+		const ShaderMetaBindingLayout& layout,
+		std::vector<std::uint8_t>& outBytes, std::string& outError) const;
 	bool TrySetTextureGuid(std::string_view property, const FileGuid& guid);
 	bool TryGetTextureGuid(std::string_view property, FileGuid& outGuid) const;
 	bool TrySetKeywordSelection(std::string_view axis, std::string_view value);
@@ -180,15 +210,10 @@ private:
 public:
 	std::string m_name{};
 	std::string m_baseColorTexName{};
-	Texture* m_pBaseColor{ nullptr };
 	std::string m_normalTexName{};
-	Texture* m_pNormal{ nullptr };
 	std::string m_ORM_TexName{};
-	Texture* m_pOccRoughMetal{ nullptr };
 	std::string m_AO_TexName{};
-	Texture* m_AOMap{ nullptr };
 	std::string m_EmissiveTexName{};
-	Texture* m_pEmissive{ nullptr };
 	MaterialInfomation m_materialInfo;
 	MaterialFlowInformation m_flowInfo;
 	FileGuid m_shaderMetaGuid{};
@@ -197,16 +222,17 @@ public:
 	FileGuid m_fileGuid{};
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
 	HashedGuid m_materialGuid{ make_guid() };
-	// M6 전환까지 유지하는 업로드 호환 표면. 값의 저장 정본은 위
-	// m_propertyValues이고, 이 byte view는 소유한 runtime schema에서 재생성된다.
+	// typed setter/getter와 legacy payload 왕복을 위한 CPU byte view. 값의 저장
+	// 정본은 위 m_propertyValues이고 제품 draw packet은 그 정본에서 다시 pack한다.
     std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
-	std::unordered_set<std::string> m_dirtyCBs;
 
 private:
 	friend class DataSystem;
 	void ResetShaderRuntime();
+	void ResetTextureRuntime();
 	std::shared_ptr<const RuntimeSchema> m_runtimeSchema{};
 	// runtime-only. GUID는 디스크 정본이고 이 값은 적용한 cache generation이다.
 	ShaderMetaHandle m_shaderMetaHandle{};
+	std::vector<MaterialTextureOwner> m_textureOwners{};
 };
 

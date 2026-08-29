@@ -1,15 +1,19 @@
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
 
+#include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedModelCodec.h"
+#include "Experiment/Cooked/ModelCookIdentity.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace RenderTest
@@ -375,6 +379,8 @@ namespace RenderTest
 
             ex::Material bare{};                      // ★ property·keyword 전부 0개
             bare.name = "재질1";
+            bare.assetId.value = Uuid::Parse("77777777-7777-4777-8777-777777777777");
+            bare.shaderAssetId = material.shaderAssetId;
             draft.materials.push_back(bare);
 
             // 스켈레톤 — 채널마다 보간이 다르고 트랙 개수도 다르다.
@@ -473,6 +479,268 @@ namespace RenderTest
             }
         }
 
+        // source preview에서는 아직 catalog identity가 비어 있을 수 있지만, 그
+        // 상태를 cooked artifact로 게시하는 것은 실패해야 한다. fallback path가
+        // 있더라도 texture AssetId를 대신하지 못한다.
+        void ExpectWriteRejected(const ex::ModelDraft& draft,
+            ex::ModelLoadIssueCode expectedCode, const std::string& expectedContext,
+            const std::string& what, Checker& check)
+        {
+            const ck::CookedWriteResult result = ck::Write(draft);
+            check.Check(!result.Succeeded(), "쿠킹 게시가 거부되어야 한다: " + what);
+            check.Check(result.bytes.empty(), "거부된 쿠킹 바이트가 비어야 한다: " + what);
+            check.Check(!result.issues.empty(), "쿠킹 거부 사유가 남아야 한다: " + what);
+            check.Check(std::ranges::any_of(result.issues,
+                [&](const ex::ModelLoadIssue& issue)
+                {
+                    return issue.code == expectedCode
+                        && issue.context == expectedContext;
+                }), "쿠킹 거부 code/context가 정확해야 한다: " + what);
+            for (const ex::ModelLoadIssue& issue : result.issues)
+            {
+                check.Check(issue.severity == ex::ModelLoadIssueSeverity::Error,
+                    "쿠킹 게시 거부는 Error여야 한다: " + what);
+            }
+        }
+
+        // 실제 catalog 배선 전의 codec fixture 전용 identity다. source path나
+        // material 이름으로 ID를 만들지 않고, v4 shape의 분리된 domain/index를
+        // 사용해 한 번의 decode 안에서만 결정적으로 유일하게 만든다.
+        [[nodiscard]] ex::AssetId MakeFixtureAssetId(
+            std::uint8_t domain, std::size_t index = 0) noexcept
+        {
+            ex::AssetId id{};
+            id.value.data[0] = domain;
+            for (std::size_t byte = 0; byte < sizeof(index); ++byte)
+            {
+                id.value.data[15 - byte] = static_cast<std::uint8_t>(
+                    (index >> (byte * 8u)) & std::size_t{ 0xffu });
+            }
+            id.value.data[6] = 0x40u;
+            id.value.data[8] = static_cast<std::uint8_t>(
+                (id.value.data[8] & 0x3fu) | 0x80u);
+            return id;
+        }
+
+        [[nodiscard]] bool ReadTextFile(const std::filesystem::path& path,
+            std::string& out)
+        {
+            std::ifstream stream(path, std::ios::binary);
+            if (!stream) return false;
+            stream.seekg(0, std::ios::end);
+            const std::streamoff bytes = stream.tellg();
+            if (bytes < 0) return false;
+            stream.seekg(0, std::ios::beg);
+            out.resize(static_cast<std::size_t>(bytes));
+            if (!out.empty())
+                stream.read(out.data(), static_cast<std::streamsize>(out.size()));
+            return stream.good() || stream.eof();
+        }
+
+        [[nodiscard]] ex::AssetId ReadMetaAssetId(
+            const std::filesystem::path& metaPath, std::string& outFailure)
+        {
+            std::string text;
+            if (!ReadTextFile(metaPath, text))
+            {
+                outFailure = "meta를 읽을 수 없다: " + metaPath.string();
+                return {};
+            }
+            ex::AssetId id{};
+            std::vector<ck::ModelIdentityIssue> issues;
+            if (!ck::ReadAssetIdFromMeta(text, id, issues))
+            {
+                outFailure = "meta GUID를 읽을 수 없다: " + metaPath.string();
+                if (!issues.empty()) outFailure += " (" + issues.front().message + ")";
+                return {};
+            }
+            return id;
+        }
+
+        void RunIdentityAndManifestContractSelfTest(
+            std::span<const std::byte> baked, Checker& check,
+            std::string& outLog)
+        {
+            const std::string validSidecar =
+                "guid: 10101010-1010-4010-8010-101010101010\n"
+                "subAssets:\n"
+                "  schemaVersion: 1\n"
+                "  materials:\n"
+                "    - key: gltf/material/0\n"
+                "      name: Fixture\n"
+                "      guid: 30303030-3030-4030-8030-303030303030\n"
+                "  embeddedTextures:\n"
+                "    - key: gltf/image/0\n"
+                "      guid: 40404040-4040-4040-8040-404040404040\n";
+
+            ck::ModelCookIdentity identity;
+            std::vector<ck::ModelIdentityIssue> identityIssues;
+            check.Check(ck::ReadModelCookIdentity(validSidecar,
+                identity, identityIssues), "model subasset sidecar v1을 읽는다");
+            check.Equal(identity.FindMaterial("gltf/material/0"),
+                ex::AssetId{ Uuid::Parse("30303030-3030-4030-8030-303030303030") },
+                "material source key가 저장된 UUIDv4로 해석된다");
+            check.Equal(identity.FindEmbeddedTexture("gltf/image/0"),
+                ex::AssetId{ Uuid::Parse("40404040-4040-4040-8040-404040404040") },
+                "embedded texture source key가 저장된 UUIDv4로 해석된다");
+
+            im::ImportedScene matchingScene;
+            matchingScene.materials.emplace_back().sourceKey = "gltf/material/0";
+            matchingScene.textures.emplace_back().sourceKey = "gltf/image/0";
+            matchingScene.textures.back().embeddedBytes.push_back(std::byte{ 1u });
+            identityIssues.clear();
+            check.Check(ck::ValidateModelCookIdentity(matchingScene,
+                identity, identityIssues),
+                "sidecar subasset key가 현재 import 결과와 정확히 맞는다");
+
+            const std::size_t identityFailedBefore = check.failed;
+            {
+                ck::ModelCookIdentity parsed;
+                std::vector<ck::ModelIdentityIssue> issues;
+                std::string invalid = validSidecar;
+                invalid.replace(invalid.find("1010-4010"), 9u, "1010-5010");
+                check.Check(!ck::ReadModelCookIdentity(invalid, parsed, issues),
+                    "UUIDv5 model sidecar를 거부한다");
+            }
+            {
+                ck::ModelCookIdentity parsed;
+                std::vector<ck::ModelIdentityIssue> issues;
+                std::string duplicate = validSidecar;
+                const std::string textureGuid =
+                    "40404040-4040-4040-8040-404040404040";
+                duplicate.replace(duplicate.find(textureGuid), textureGuid.size(),
+                    "30303030-3030-4030-8030-303030303030");
+                check.Check(!ck::ReadModelCookIdentity(duplicate, parsed, issues),
+                    "중복 model subasset UUIDv4를 거부한다");
+            }
+            {
+                im::ImportedScene missing = matchingScene;
+                missing.materials[0].sourceKey = "gltf/material/1";
+                std::vector<ck::ModelIdentityIssue> issues;
+                check.Check(!ck::ValidateModelCookIdentity(missing,
+                    identity, issues), "누락/stale material source key를 거부한다");
+            }
+            {
+                im::ImportedScene duplicate = matchingScene;
+                duplicate.materials.push_back(duplicate.materials[0]);
+                std::vector<ck::ModelIdentityIssue> issues;
+                check.Check(!ck::ValidateModelCookIdentity(duplicate,
+                    identity, issues), "중복 importer source key를 거부한다");
+            }
+            outLog += check.failed == identityFailedBefore
+                ? "  model subasset identity 거부: 4/4\n"
+                : "  model subasset identity 거부: 실패\n";
+
+            ck::Sha256Digest digest{};
+            std::string hashError;
+            check.Check(ck::ComputeSha256(baked, digest, hashError),
+                "cooked bytes의 SHA-256을 계산한다");
+
+            const ex::AssetId modelId = MakeFixtureAssetId(0x10u);
+            const ex::AssetId materialId = MakeFixtureAssetId(0x30u);
+            const ex::AssetId shaderId = MakeFixtureAssetId(0x20u);
+            const ex::AssetId textureId = MakeFixtureAssetId(0x40u);
+            const std::string modelPath = ck::MakeDerivedModelArtifactPath(modelId);
+            check.Check(modelPath ==
+                "Derived/Models/10/10000000-0000-4000-8000-000000000000.cemc",
+                "model GUID가 shard된 canonical Derived path를 만든다");
+
+            const auto entry = [&](ex::AssetId id, ck::CookedAssetKind kind,
+                std::string path, std::vector<ex::AssetId> dependencies)
+            {
+                ck::CookedAssetManifestEntry value;
+                value.assetId = id;
+                value.kind = kind;
+                value.formatVersion = kind == ck::CookedAssetKind::Model
+                    || kind == ck::CookedAssetKind::Material
+                    ? ck::kFormatVersion : 1u;
+                value.byteSize = baked.size();
+                value.contentSha256 = digest;
+                value.artifactPath = std::move(path);
+                value.dependencies = std::move(dependencies);
+                return value;
+            };
+
+            ck::CookedAssetManifest manifest;
+            // 일부러 역순으로 넣어 writer의 canonical ordering을 검증한다.
+            manifest.entries.push_back(entry(textureId, ck::CookedAssetKind::Texture,
+                "Derived/Textures/40/texture.cetex", {}));
+            manifest.entries.push_back(entry(shaderId, ck::CookedAssetKind::ShaderMeta,
+                "Derived/Shaders/20/shader.ceshader", {}));
+            manifest.entries.push_back(entry(materialId, ck::CookedAssetKind::Material,
+                modelPath, { shaderId, textureId }));
+            manifest.entries.push_back(entry(modelId, ck::CookedAssetKind::Model,
+                modelPath, { materialId }));
+
+            const ck::AssetManifestWriteResult write =
+                ck::WriteAssetManifest(manifest);
+            check.Check(write.Succeeded(), "GUID-addressed manifest를 쓴다");
+            ck::CookedAssetManifest reversed = manifest;
+            std::ranges::reverse(reversed.entries);
+            const ck::AssetManifestWriteResult deterministic =
+                ck::WriteAssetManifest(reversed);
+            check.Check(deterministic.Succeeded()
+                && deterministic.bytes == write.bytes,
+                "manifest bytes가 입력 순서와 무관하게 결정적이다");
+
+            ck::CookedAssetManifest restoredManifest;
+            std::vector<ck::AssetManifestIssue> manifestIssues;
+            check.Check(ck::ReadAssetManifest(write.bytes,
+                restoredManifest, manifestIssues), "manifest를 엄격히 읽는다");
+            const ck::CookedAssetManifestEntry* restoredModel =
+                restoredManifest.Find(modelId);
+            check.Check(restoredModel && restoredModel->artifactPath == modelPath,
+                "model GUID lookup이 Derived artifact를 찾는다");
+            manifestIssues.clear();
+            check.Check(restoredModel && ck::VerifyArtifact(*restoredModel,
+                baked.size(), digest, manifestIssues),
+                "manifest size/SHA-256이 cooked artifact와 맞는다");
+
+            const std::size_t manifestFailedBefore = check.failed;
+            {
+                ck::CookedAssetManifest invalid = manifest;
+                invalid.entries[0].assetId = invalid.entries[1].assetId;
+                check.Check(!ck::WriteAssetManifest(invalid).Succeeded(),
+                    "중복 manifest GUID를 거부한다");
+            }
+            {
+                ck::CookedAssetManifest invalid = manifest;
+                invalid.entries[0].assetId = {};
+                check.Check(!ck::WriteAssetManifest(invalid).Succeeded(),
+                    "nil manifest GUID를 거부한다");
+            }
+            {
+                ck::CookedAssetManifest invalid = manifest;
+                invalid.entries[0].artifactPath = "Derived/../source.glb";
+                check.Check(!ck::WriteAssetManifest(invalid).Succeeded(),
+                    "path escape manifest를 거부한다");
+            }
+            {
+                ck::CookedAssetManifest invalid = manifest;
+                invalid.entries[2].dependencies.push_back(
+                    MakeFixtureAssetId(0x70u));
+                check.Check(!ck::WriteAssetManifest(invalid).Succeeded(),
+                    "해석되지 않는 dependency GUID를 거부한다");
+            }
+            {
+                ck::CookedAssetManifest invalid = manifest;
+                invalid.entries[0].contentSha256 = {};
+                check.Check(!ck::WriteAssetManifest(invalid).Succeeded(),
+                    "빈 SHA-256 manifest entry를 거부한다");
+            }
+            {
+                ck::Sha256Digest stale = digest;
+                stale[0] ^= 1u;
+                std::vector<ck::AssetManifestIssue> issues;
+                check.Check(restoredModel && !ck::VerifyArtifact(*restoredModel,
+                    baked.size(), stale, issues),
+                    "stale artifact SHA-256을 거부한다");
+            }
+            outLog += check.failed == manifestFailedBefore
+                ? "  cooked asset manifest 거부: 6/6\n"
+                : "  cooked asset manifest 거부: 실패\n";
+        }
+
 		[[nodiscard]] std::optional<std::size_t> FirstMeshRecordOffset(
 			std::span<const std::byte> bytes)
 		{
@@ -519,7 +787,15 @@ namespace RenderTest
                 original.meshes[1].vertices.size() * std::size_t{ 48 },
                 "static mesh가 skin byte를 내지 않는다");
         }
-        const std::vector<std::byte> baked = ck::Write(original);
+        const ck::CookedWriteResult bakedResult = ck::Write(original);
+        check.Check(bakedResult.Succeeded(), "유효한 identity의 굽기가 성공한다");
+        if (!bakedResult.Succeeded())
+        {
+            for (const ex::ModelLoadIssue& issue : bakedResult.issues)
+                outLog += "    " + issue.context + ": " + issue.message + "\n";
+            return false;
+        }
+        const std::vector<std::byte>& baked = bakedResult.bytes;
         check.Check(!baked.empty(), "굽기 산출물이 비어 있지 않다");
 
         {
@@ -534,11 +810,53 @@ namespace RenderTest
         // ── 2. 결정성 — 같은 입력은 같은 바이트 ─────────────────────────
         // 굽기가 비결정적이면 캐시가 매번 더러워지고 diff 가 무의미해진다.
         {
-            const std::vector<std::byte> again = ck::Write(original);
-            check.Check(again == baked, "같은 draft 는 같은 바이트로 구워진다");
+            const ck::CookedWriteResult again = ck::Write(original);
+            check.Check(again.Succeeded(), "결정성 재굽기가 성공한다");
+            check.Check(again.bytes == baked, "같은 draft 는 같은 바이트로 구워진다");
         }
 
-        // ── 3. 거부 ─────────────────────────────────────────────────────
+        // ── 3. 게시 전 identity 거부 ────────────────────────────────────
+        const std::size_t publicationFailedBefore = check.failed;
+        {
+            ex::ModelDraft invalid = original;
+            invalid.metadata.assetId = {};
+            ExpectWriteRejected(invalid, ex::ModelLoadIssueCode::InvalidAssetIdentity,
+                "metadata.assetId", "nil model AssetId", check);
+        }
+        {
+            ex::ModelDraft invalid = original;
+            invalid.materials[0].assetId = {};
+            ExpectWriteRejected(invalid, ex::ModelLoadIssueCode::InvalidAssetIdentity,
+                "materials[0].assetId", "nil material AssetId", check);
+        }
+        {
+            ex::ModelDraft invalid = original;
+            invalid.materials[0].shaderAssetId = {};
+            ExpectWriteRejected(invalid, ex::ModelLoadIssueCode::InvalidAssetIdentity,
+                "materials[0].shaderAssetId", "nil ShaderMeta AssetId", check);
+        }
+        {
+            ex::ModelDraft invalid = original;
+            auto& texture = std::get<ex::TextureReference>(
+                invalid.materials[0].properties.back().value);
+            texture.assetId = {};
+            check.Check(!texture.fallbackPath.empty(),
+                "음성 fixture에 fallback path가 실제로 있다");
+            ExpectWriteRejected(invalid, ex::ModelLoadIssueCode::InvalidTextureReference,
+                "materials[0].properties[8].textureAssetId",
+                "fallback path만 있는 texture", check);
+        }
+        {
+            ex::ModelDraft invalid = original;
+            invalid.materials[1].assetId = invalid.materials[0].assetId;
+            ExpectWriteRejected(invalid, ex::ModelLoadIssueCode::InvalidAssetIdentity,
+                "materials[1].assetId", "중복 material AssetId", check);
+        }
+        outLog += check.failed == publicationFailedBefore
+            ? "  cooked identity 게시 거부: 5/5\n"
+            : "  cooked identity 게시 거부: 실패\n";
+
+        // ── 4. 읽기 거부 ────────────────────────────────────────────────
         {
             auto corrupt = baked;
             corrupt[0] = static_cast<std::byte>(0xFF);
@@ -622,16 +940,17 @@ namespace RenderTest
                 "헤더보다 짧은 파일", check);
         }
 
-        // ── 4. 스켈레톤 없는 모델 ───────────────────────────────────────
+        // ── 5. 스켈레톤 없는 모델 ───────────────────────────────────────
         {
             ex::ModelDraft skinless = MakeSyntheticDraft();
             skinless.skeleton.reset();
             skinless.animator.reset();
-            const std::vector<std::byte> bytes = ck::Write(skinless);
+            const ck::CookedWriteResult write = ck::Write(skinless);
+            check.Check(write.Succeeded(), "스켈레톤 없는 모델 굽기");
 
             ex::ModelDraft restored{};
             std::vector<ex::ModelLoadIssue> issues;
-            const bool ok = ck::Read(bytes, restored, issues);
+            const bool ok = ck::Read(write.bytes, restored, issues);
             check.Check(ok, "스켈레톤 없는 모델을 읽는다");
             if (ok)
             {
@@ -641,18 +960,23 @@ namespace RenderTest
             }
         }
 
-        // ── 5. 최소 모델 ────────────────────────────────────────────────
+        // ── 6. 최소 모델 ────────────────────────────────────────────────
         // 0개짜리를 성공으로 읽어 넘기는 것이 이 저장소의 거짓 통과 양식이었다.
         // 최소 draft 도 왕복해야 하지만, **그 자체가 통과의 근거는 아니다.**
         {
             ex::ModelDraft minimal{};
             minimal.metadata.name = "minimal";
-            const std::vector<std::byte> bytes = ck::Write(minimal);
+            minimal.metadata.assetId = MakeFixtureAssetId(0x50u);
+            const ck::CookedWriteResult write = ck::Write(minimal);
+            check.Check(write.Succeeded(), "identity가 있는 최소 draft 굽기");
             ex::ModelDraft restored{};
             std::vector<ex::ModelLoadIssue> issues;
-            check.Check(ck::Read(bytes, restored, issues), "최소 draft 왕복");
+            check.Check(ck::Read(write.bytes, restored, issues), "최소 draft 왕복");
             check.Equal(restored.metadata.name, minimal.metadata.name, "최소 draft name");
         }
+
+        // ── 7. D5-b1 sidecar identity + GUID manifest 계약 ──────────────
+        RunIdentityAndManifestContractSelfTest(baked, check, outLog);
 
         char summary[160];
         std::snprintf(summary, sizeof(summary),
@@ -668,9 +992,90 @@ namespace RenderTest
 
         const std::filesystem::path source(modelPath);
 
-        // 기본 생성이 glTF·FBX 를 모두 등록한다 — 확장자 분기를 여기서 다시
-        // 쓰면 그 규칙이 두 곳이 되고 반드시 어긋난다.
-        im::ImporterModelDecoder decoder{};
+        std::filesystem::path modelMetaPath = source;
+        modelMetaPath += ".meta";
+        std::string modelMetaText;
+        if (!ReadTextFile(modelMetaPath, modelMetaText))
+        {
+            outLog += "  결과: 실패 (model sidecar를 읽을 수 없음)\n";
+            return false;
+        }
+        ck::ModelCookIdentity modelIdentity;
+        std::vector<ck::ModelIdentityIssue> modelIdentityIssues;
+        if (!ck::ReadModelCookIdentity(modelMetaText,
+            modelIdentity, modelIdentityIssues))
+        {
+            outLog += "  결과: 실패 (model subasset identity 불일치)\n";
+            for (const ck::ModelIdentityIssue& issue : modelIdentityIssues)
+                outLog += "    " + issue.context + ": " + issue.message + "\n";
+            return false;
+        }
+
+        const std::filesystem::path assetsRoot = source.parent_path().parent_path();
+        std::string identityFailure;
+        const ex::AssetId gbufferShaderId = ReadMetaAssetId(
+            assetsRoot / "Shaders/DefaultPassShader/GBuffer.shadermeta.meta",
+            identityFailure);
+        if (!gbufferShaderId.IsValid())
+        {
+            outLog += "  결과: 실패 (" + identityFailure + ")\n";
+            return false;
+        }
+        const ex::AssetId forwardShaderId = ReadMetaAssetId(
+            assetsRoot / "Shaders/DefaultPassShader/Forward.shadermeta.meta",
+            identityFailure);
+        if (!forwardShaderId.IsValid())
+        {
+            outLog += "  결과: 실패 (" + identityFailure + ")\n";
+            return false;
+        }
+
+        // D5-b1은 fixture ID를 쓰지 않는다. 모델/내부 재질은 model sidecar,
+        // 외부 texture와 ShaderMeta는 각자의 sidecar UUIDv4를 읽는다. Blend만
+        // Forward, Opaque/Mask는 GBuffer라는 PBR shader 정책도 resolver 경계에서
+        // 명시한다.
+        std::vector<std::string> materialSourceKeys;
+        std::vector<std::string> embeddedTextureSourceKeys;
+        std::vector<std::string> resolutionFailures;
+        im::ImporterDecoderOptions decoderOptions{};
+        decoderOptions.conversion.modelAssetId = modelIdentity.modelAssetId;
+        decoderOptions.conversion.resolveMaterialAsset =
+            [&](const im::ImportedMaterial& material, std::size_t)
+            {
+                if (std::ranges::find(materialSourceKeys, material.sourceKey)
+                    == materialSourceKeys.end())
+                {
+                    materialSourceKeys.push_back(material.sourceKey);
+                }
+                return modelIdentity.FindMaterial(material.sourceKey);
+            };
+        decoderOptions.conversion.resolveShaderAsset =
+            [&](const im::ImportedMaterial& material, std::size_t)
+            {
+                return material.alphaMode == im::AlphaMode::Blend
+                    ? forwardShaderId : gbufferShaderId;
+            };
+        decoderOptions.conversion.resolveTextureAsset =
+            [&](const im::ImportedTexture& texture)
+            {
+                if (texture.IsEmbedded())
+                {
+                    if (std::ranges::find(embeddedTextureSourceKeys,
+                        texture.sourceKey) == embeddedTextureSourceKeys.end())
+                    {
+                        embeddedTextureSourceKeys.push_back(texture.sourceKey);
+                    }
+                    return modelIdentity.FindEmbeddedTexture(texture.sourceKey);
+                }
+
+                std::filesystem::path textureMetaPath = texture.sourcePath;
+                textureMetaPath += ".meta";
+                std::string failure;
+                const ex::AssetId id = ReadMetaAssetId(textureMetaPath, failure);
+                if (!id.IsValid()) resolutionFailures.push_back(std::move(failure));
+                return id;
+            };
+        im::ImporterModelDecoder decoder(std::move(decoderOptions));
 
         ex::ModelLoadRequest request{};
         request.sourcePath = source;
@@ -687,7 +1092,150 @@ namespace RenderTest
 
         Checker check{ outLog };
         const ex::ModelDraft& original = *decoded.draft;
-        const std::vector<std::byte> baked = ck::Write(original);
+        check.Equal(original.metadata.assetId, modelIdentity.modelAssetId,
+            "실자산 model AssetId가 sidecar UUIDv4와 같다");
+        check.Check(resolutionFailures.empty(),
+            "외부 texture sidecar identity가 모두 해석된다");
+        check.Equal(materialSourceKeys.size(), modelIdentity.materials.size(),
+            "import material source key와 sidecar identity 수가 같다");
+        check.Equal(embeddedTextureSourceKeys.size(),
+            modelIdentity.embeddedTextures.size(),
+            "import embedded texture source key와 sidecar identity 수가 같다");
+        for (const ck::ModelSubAssetIdentity& identity : modelIdentity.materials)
+        {
+            check.Check(std::ranges::find(materialSourceKeys, identity.sourceKey)
+                != materialSourceKeys.end(),
+                "stale model material subasset identity가 없다");
+        }
+        for (const ck::ModelSubAssetIdentity& identity : modelIdentity.embeddedTextures)
+        {
+            check.Check(std::ranges::find(embeddedTextureSourceKeys, identity.sourceKey)
+                != embeddedTextureSourceKeys.end(),
+                "stale embedded texture subasset identity가 없다");
+        }
+        std::size_t materialIdentities = 0;
+        std::size_t shaderIdentities = 0;
+        std::size_t textureReferences = 0;
+        std::size_t textureIdentities = 0;
+        for (std::size_t materialIndex = 0;
+            materialIndex < original.materials.size(); ++materialIndex)
+        {
+            const ex::Material& material = original.materials[materialIndex];
+            if (material.assetId.IsValid()) ++materialIdentities;
+            if (material.shaderAssetId.IsValid()) ++shaderIdentities;
+            check.Check(material.assetId.IsValid(),
+                "실자산 material[" + std::to_string(materialIndex) + "] AssetId가 채워진다");
+            check.Check(material.shaderAssetId.IsValid(),
+                "실자산 material[" + std::to_string(materialIndex) + "] ShaderMeta ID가 채워진다");
+            for (std::size_t propertyIndex = 0;
+                propertyIndex < material.properties.size(); ++propertyIndex)
+            {
+                if (const auto* texture = std::get_if<ex::TextureReference>(
+                    &material.properties[propertyIndex].value))
+                {
+                    ++textureReferences;
+                    if (texture->assetId.IsValid()) ++textureIdentities;
+                    check.Check(texture->assetId.IsValid(),
+                        "실자산 texture reference AssetId가 채워진다");
+                }
+            }
+        }
+        char identityScale[240];
+        std::snprintf(identityScale, sizeof(identityScale),
+            "  cooked identity: model=%s materials=%zu/%zu shaders=%zu/%zu textures=%zu/%zu\n",
+            original.metadata.assetId.IsValid() ? "yes" : "no",
+            materialIdentities, original.materials.size(),
+            shaderIdentities, original.materials.size(),
+            textureIdentities, textureReferences);
+        outLog += identityScale;
+        char sidecarScale[200];
+        std::snprintf(sidecarScale, sizeof(sidecarScale),
+            "  sidecar identity: model=yes materials=%zu/%zu embedded=%zu/%zu\n",
+            materialSourceKeys.size(), modelIdentity.materials.size(),
+            embeddedTextureSourceKeys.size(), modelIdentity.embeddedTextures.size());
+        outLog += sidecarScale;
+
+        const ck::CookedWriteResult write = ck::Write(original);
+        check.Check(write.Succeeded(), "실자산 checked cook가 성공한다");
+        if (!write.Succeeded())
+        {
+            for (const ex::ModelLoadIssue& issue : write.issues)
+                outLog += "    " + issue.context + ": " + issue.message + "\n";
+            return false;
+        }
+        const std::vector<std::byte>& baked = write.bytes;
+
+        ck::Sha256Digest cookedDigest{};
+        std::string hashError;
+        check.Check(ck::ComputeSha256(baked, cookedDigest, hashError),
+            "실자산 cooked artifact SHA-256을 계산한다");
+        const std::string derivedPath =
+            ck::MakeDerivedModelArtifactPath(original.metadata.assetId);
+        check.Check(!derivedPath.empty(),
+            "실자산 model GUID가 Derived .cemc path를 만든다");
+
+        ck::CookedAssetManifest manifest;
+        ck::CookedAssetManifestEntry modelEntry;
+        modelEntry.assetId = original.metadata.assetId;
+        modelEntry.kind = ck::CookedAssetKind::Model;
+        modelEntry.formatVersion = ck::kFormatVersion;
+        modelEntry.byteSize = baked.size();
+        modelEntry.contentSha256 = cookedDigest;
+        modelEntry.artifactPath = derivedPath;
+        for (const ex::Material& material : original.materials)
+            modelEntry.dependencies.push_back(material.assetId);
+        manifest.entries.push_back(std::move(modelEntry));
+
+        for (const ex::Material& material : original.materials)
+        {
+            ck::CookedAssetManifestEntry materialEntry;
+            materialEntry.assetId = material.assetId;
+            materialEntry.kind = ck::CookedAssetKind::Material;
+            materialEntry.formatVersion = ck::kFormatVersion;
+            materialEntry.byteSize = baked.size();
+            materialEntry.contentSha256 = cookedDigest;
+            // material은 이 단계에서 model .cemc container 안의 subasset이다.
+            materialEntry.artifactPath = derivedPath;
+            manifest.entries.push_back(std::move(materialEntry));
+        }
+
+        const ck::AssetManifestWriteResult manifestWrite =
+            ck::WriteAssetManifest(manifest);
+        check.Check(manifestWrite.Succeeded(),
+            "실자산 model/material GUID manifest를 쓴다");
+        ck::CookedAssetManifest restoredManifest;
+        std::vector<ck::AssetManifestIssue> manifestIssues;
+        const bool manifestRead = ck::ReadAssetManifest(manifestWrite.bytes,
+            restoredManifest, manifestIssues);
+        check.Check(manifestRead, "실자산 GUID manifest를 다시 읽는다");
+        const ck::CookedAssetManifestEntry* resolvedModel =
+            restoredManifest.Find(original.metadata.assetId);
+        check.Check(resolvedModel && resolvedModel->artifactPath == derivedPath,
+            "실제 model GUID lookup이 canonical Derived path를 찾는다");
+        std::size_t resolvedMaterials = 0u;
+        for (const ex::Material& material : original.materials)
+        {
+            const ck::CookedAssetManifestEntry* resolved =
+                restoredManifest.Find(material.assetId);
+            if (resolved && resolved->artifactPath == derivedPath
+                && resolved->kind == ck::CookedAssetKind::Material)
+            {
+                ++resolvedMaterials;
+            }
+        }
+        check.Equal(resolvedMaterials, original.materials.size(),
+            "실제 material subasset GUID가 model container로 해석된다");
+        manifestIssues.clear();
+        check.Check(resolvedModel && ck::VerifyArtifact(*resolvedModel,
+            baked.size(), cookedDigest, manifestIssues),
+            "실자산 manifest SHA-256/크기가 cooked bytes와 같다");
+        char manifestScale[220];
+        std::snprintf(manifestScale, sizeof(manifestScale),
+            "  manifest identity: entries=%zu model=%s materials=%zu/%zu sha256=%s\n",
+            restoredManifest.entries.size(), resolvedModel ? "yes" : "no",
+            resolvedMaterials, original.materials.size(),
+            resolvedModel ? "yes" : "no");
+        outLog += manifestScale;
 
         ex::ModelDraft restored{};
         std::vector<ex::ModelLoadIssue> issues;

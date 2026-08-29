@@ -1,4 +1,5 @@
 #include "VulkanDeviceResources.h"
+#include "VulkanPipelineCache.h"
 
 #include <Windows.h>
 #include <algorithm>
@@ -624,6 +625,7 @@ void VulkanDeviceResources::Shutdown()
     m_nullDescriptorSupported = false;
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
+    m_pipelineCache = nullptr;
     m_frameOpen = false;
     m_nextFenceValue = 1;
 }
@@ -676,6 +678,9 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     const uint64_t completedFence = GetCompletedFenceValue();
     m_uploadAllocator.Collect(completedFence);
     m_descriptorRecycler.Collect(RHICompletionPoint{ completedFence });
+    if (nullptr != m_pipelineCache)
+        m_pipelineCache->CollectRetiredPipelines(
+            RHICompletionPoint{ completedFence });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(completedFence);
     m_currentRecordingId = m_nextRecordingId++;

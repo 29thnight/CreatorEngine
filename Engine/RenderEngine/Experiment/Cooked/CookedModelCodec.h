@@ -21,9 +21,21 @@
 
 namespace experiment::cooked
 {
-    // ModelDraft → 바이트. 실패하지 않는다(메모리 부족 제외) — 쓰기는 우리가
-    // 가진 값을 그대로 내려놓는 일이고, 검증은 굽기 전에 이미 끝나 있다.
-    [[nodiscard]] std::vector<std::byte> Write(const ModelDraft& draft);
+    struct CookedWriteResult final
+    {
+        std::vector<std::byte> bytes{};
+        std::vector<ModelLoadIssue> issues{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return !bytes.empty() && issues.empty();
+        }
+    };
+
+    // ModelDraft → 바이트. D5부터 writer가 publication gate다. source preview에서
+    // 허용되던 fallback path나 nil material/shader identity를 그대로 굽지 않는다.
+    // 실패 시 bytes는 비어 있고 issues가 정확한 context를 가진다.
+    [[nodiscard]] CookedWriteResult Write(const ModelDraft& draft);
 
     // 바이트 → ModelDraft.
     //

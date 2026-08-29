@@ -8,6 +8,7 @@
 #include "LifecycleTrace.h"
 #include "ReflectionYml.h"
 #include <cstring>
+#include <sstream>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -605,44 +606,21 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
 {
     if (!prefab || path.empty())
         return false;
-    std::ofstream out(path);
-    if (!out.is_open())
-        return false;
 
-    // ── 프리팹 정체성 발급 (P-write S0.5) ──
-    //
-    // CreatePrefab은 이름과 데이터만 채우고 FileGuid를 매기지 않는다
-    // (Prefab::CreateFromGameObject — 그냥 new Prefab(name, source)다).
-    // 그 상태로 저장하면 인스턴스가 프리팹을 가리키지 못한다. 실측 사슬:
-    //
-    //   1. object.create로 만든 소스는 m_prefabFileGuid가 널이다
-    //   2. CreateFromGameObject가 그 널을 그대로 프리팹 데이터에 실어 온다
-    //   3. EditorAssetDatabase가 .prefab의 PrefabNode[i].m_prefabFileGuid를 읽어
-    //      .meta의 guid로 쓴다 -> guid: 00000000-...
-    //   4. LoadPrefab이 DataSystems->GetFileGuid로 그 널을 읽고(:493)
-    //   5. InstantiatePrefab이 널을 인스턴스의 m_prefabFileGuid에 넣는다(:311)
-    //
-    // 결과: prefab.status가 "씬 인스턴스 0개 · 등록 1개"를 찍는다 — 그 자리 주석이
-    // 말하는 "저장은 됐는데 연결은 복원되지 않았다"가 저작 시점부터 성립한다.
-    // 저작 자산(BTProbe)이 멀쩡한 것은 그 파일의 루트 노드가 이미 진짜 GUID를
-    // 들고 있어서지, 이 경로가 그것을 만들어 줘서가 아니다.
-    //
-    // 경로 기반 결정적 해시를 쓴다 — LoadPrefabFullPath(:467)가 이미 같은 방식이라
-    // 두 로드 경로가 같은 값에 수렴한다. (파일명만 해싱하는 .meta 쪽의 결함은
-    // 별건이고 SerializationPlan D1이 다룬다 — 여기서 그 규약을 바꾸지 않는다.)
-    static const FileGuid nullGuid{};
-    FileGuid identity = prefab->GetFileGuid();
-    if (identity == nullGuid)
-    {
-        identity = make_file_guid(path);
-        const_cast<Prefab*>(prefab)->SetFileGuid(identity);
-    }
+	// 이미 sidecar가 있으면 catalog GUID가 정본이다. 새 prefab만 호출자가 들고
+	// 있던 UUIDv4를 승계하거나 여기서 발급하고, CreateMeta에 같은 값을 요청한다.
+	// 경로/이름 해시는 영속 자산 정체성에 다시 들어오지 않는다.
+	static const FileGuid nullGuid{};
+	FileGuid identity = DataSystems->GetFileGuid(path);
+	if (identity == nullGuid) identity = prefab->GetFileGuid();
+	if (identity == nullGuid) identity = FileGuid::CreateRandomV4();
+	const_cast<Prefab*>(prefab)->SetFileGuid(identity);
 
     auto node = Meta::Serialize(const_cast<Prefab*>(prefab));
 
-    // 각인 지점은 **루트 엔티티 노드**다. .meta 생성기가 읽는 곳이 거기이고
-    // (Prefab::m_fileGuid는 저작 자산에서도 널로 저장돼 있어 읽히지 않는다),
-    // Prefab::InstantiateRecursive도 이 필드로 인스턴스 정체성을 세운다.
+	// Prefab::m_fileGuid는 sidecar 정체성의 payload mirror이고, 각 엔티티의
+	// m_prefabFileGuid는 인스턴스 재연결용 참조다. 둘 다 같은 catalog GUID를
+	// 기록하지만 정본은 sidecar 하나뿐이다.
     // 형상이 둘 다 나온다: SerializeRecursive는 루트 Map 하나를 돌려주고(자식은
     // 그 안에 중첩), 다른 경로에서 온 데이터는 Sequence다. 둘 다 각인한다 —
     // 한쪽만 처리하면 조용히 널로 남는다(실측으로 한 번 걸렸다).
@@ -660,21 +638,30 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
     }
 
 	node["PrefabNode"].push_back(data);
-    out << node;
-	out.flush();
-	if (!out.good())
-		return false;
-    out.close();
+	std::ostringstream payload;
+	payload << node;
 
-	// 파일 쓰기 완료와 meta 생성 사이에 watcher 스케줄링을 끼우지 않는다.
-	// Host가 설치한 authoring port가 같은 호출 안에서 meta를 확정하고 GUID catalog도
-	// 갱신한다. Player에는 handler가 없으므로 source meta를 만들지 않는다.
+	// Editor Host는 staging publish와 meta 확정을 같은 authoring lock 안에서 끝낸다.
+	// Player에는 handler가 없으므로 source meta를 만들지 않고 기존 파일 쓰기만
+	// 유지한다(실제 제품에서는 이 경로를 호출하지 않는다).
 	const bool hasAuthoringHost = AssetAuthoringPort::IsInstalled();
-	const FileGuid authoredIdentity = AssetAuthoringPort::CreateMeta(path);
-	if (hasAuthoringHost && authoredIdentity != identity)
+	if (hasAuthoringHost)
 	{
-		Debug->LogError("Prefab/meta GUID mismatch after authoring: " + path);
-		return false;
+		const FileGuid authoredIdentity = AssetAuthoringPort::WriteTextAssetWithMeta(
+			path, payload.str(), identity);
+		if (authoredIdentity != identity)
+		{
+			Debug->LogError("Prefab/meta GUID mismatch after authoring: " + path);
+			return false;
+		}
+	}
+	else
+	{
+		std::ofstream out(path);
+		if (!out.is_open()) return false;
+		out << payload.str();
+		out.flush();
+		if (!out.good()) return false;
 	}
 
 	// Host authoring port가 감시자를 기다리지 않고 같은 transaction 안에서
@@ -728,7 +715,13 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
     auto prefab = std::make_unique<Prefab>();
     Meta::Deserialize(prefab.get(), node);
 	prefab->SetPrefabData(node["PrefabNode"]);
-    prefab->SetFileGuid(make_file_guid(path));
+	const FileGuid identity = DataSystems->GetFileGuid(path);
+	if (identity == FileGuid{})
+	{
+		Debug->LogError("Prefab load rejected missing catalog identity: " + path);
+		return nullptr;
+	}
+	prefab->SetFileGuid(identity);
 
     Prefab* raw = prefab.get();
     m_prefabCache.emplace(key, std::move(prefab));

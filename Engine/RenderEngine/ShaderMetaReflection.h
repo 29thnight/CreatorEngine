@@ -30,6 +30,8 @@ struct ShaderMetaBindingLayout
     std::uint32_t constantBufferSpace{};
     std::uint32_t constantBufferByteSize{};
     std::vector<ShaderMetaPropertyBinding> properties;
+
+    bool operator==(const ShaderMetaBindingLayout&) const = default;
 };
 
 namespace ShaderMetaReflection

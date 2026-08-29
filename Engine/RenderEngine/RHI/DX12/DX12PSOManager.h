@@ -1,4 +1,5 @@
 #pragma once
+#include "../RHICompletionRetireQueue.h"
 #include "../RHIPipelineState.h"
 #include "RenderFrameServices.h"
 #include <cstdint>
@@ -47,6 +48,9 @@ public:
         uint32_t failures{ 0 };
         uint32_t fallbackDraws{ 0 };  // 폴백으로 그린 드로우 — 지속적으로 늘면 캐시가 놀고 있다
         uint32_t skippedDraws{ 0 };   // 폴백조차 없어 건너뛴 드로우
+        uint32_t invalidations{ 0 };
+        uint32_t retiredPipelines{ 0 };
+        uint32_t retiredCollections{ 0 };
 
         // 스키마 도장이 달라 통째로 버린 캐시 파일. 매 실행 1이면 도장이
         // 실행마다 달라지고 있다는 뜻이고, 그러면 디스크 캐시가 늘 논다.
@@ -69,6 +73,10 @@ public:
 
     // 컴퓨트 PSO. 같은 캐시 2층을 공유한다.
     RHIPipelineHandle GetOrCreateCompute(const RHIComputePipelineDesc& desc, std::string& outError) override;
+    bool InvalidatePipeline(RHIPipelineHandle handle,
+        RHICompletionPoint retireAfter = {}) override;
+    std::uint32_t InvalidatePipelines(RHICompletionPoint retireAfter = {}) override;
+    std::uint32_t CollectRetiredPipelines(RHICompletionPoint completed) override;
 
     // 비동기 요청 — 준비됐으면 Ready + 포인터, 아니면 Pending(컴파일은 백그라운드로).
     //
@@ -132,6 +140,7 @@ private:
     /// 캐시에 넣고 핸들을 발급한다. **락을 쥔 채로** 부른다.
     RHIPipelineHandle Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
         RHIPipelineLayoutHandle layout, std::string& outError);
+    std::uint32_t RetireCachedPipelinesLocked(RHICompletionPoint retireAfter);
 
     class DX12DeviceResources*     m_resources{ nullptr };
     ComPtr<ID3D12Device1>          m_device;
@@ -148,10 +157,12 @@ private:
         ComPtr<ID3D12PipelineState> pso;
         RHIPipelineHandle           handle;
     };
+    void RetireCacheEntryLocked(CacheEntry& entry, RHICompletionPoint retireAfter);
 
     mutable std::mutex m_mutex;
     std::unordered_map<uint64_t, CacheEntry> m_cache;
     std::unordered_map<uint64_t, std::shared_future<ComPtr<ID3D12PipelineState>>> m_pending;
+    RHICompletionRetireQueue<ComPtr<ID3D12PipelineState>> m_retiredPipelines;
     ComPtr<ID3D12PipelineState> m_fallback;
     Stats m_stats;
 };

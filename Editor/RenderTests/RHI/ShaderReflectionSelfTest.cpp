@@ -1,6 +1,8 @@
 #include "ShaderReflectionSelfTest.h"
 
 #include "DataSystem.h"
+#include "FoliageType.h"
+#include "Mesh.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/RHIShaderSource.h"
 #include "Material.h"
@@ -25,6 +27,47 @@ namespace
 
 bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 {
+	const FileGuid randomAssetGuidA = FileGuid::CreateRandomV4();
+	const FileGuid randomAssetGuidB = FileGuid::CreateRandomV4();
+	const bool randomAssetGuidContract = FileGuid{} != randomAssetGuidA
+		&& FileGuid{} != randomAssetGuidB
+		&& randomAssetGuidA != randomAssetGuidB
+		&& randomAssetGuidA.IsRandomV4()
+		&& FileGuid(randomAssetGuidA.ToString()) == randomAssetGuidA;
+	if (!randomAssetGuidContract)
+	{
+		outLog += "[shader reflection] D2 random asset UUIDv4 계약 불일치\n";
+		return false;
+	}
+
+	AssetMetaRegistry catalogProbe;
+	const FileGuid firstCatalogGuid = FileGuid::CreateRandomV4();
+	const FileGuid secondCatalogGuid = FileGuid::CreateRandomV4();
+	const std::filesystem::path firstCatalogPath = "D2/First.asset";
+	const std::filesystem::path secondCatalogPath = "D2/Second.asset";
+	const bool catalogRegistrationClosed =
+		AssetMetaRegistrationResult::Invalid ==
+			catalogProbe.Register({}, firstCatalogPath)
+		&& AssetMetaRegistrationResult::Invalid ==
+			catalogProbe.Register(firstCatalogGuid, {})
+		&& AssetMetaRegistrationResult::Registered ==
+			catalogProbe.Register(firstCatalogGuid, firstCatalogPath)
+		&& AssetMetaRegistrationResult::AlreadyRegistered ==
+			catalogProbe.Register(firstCatalogGuid, firstCatalogPath)
+		&& AssetMetaRegistrationResult::GuidConflict ==
+			catalogProbe.Register(firstCatalogGuid, secondCatalogPath)
+		&& AssetMetaRegistrationResult::PathConflict ==
+			catalogProbe.Register(secondCatalogGuid, firstCatalogPath)
+		&& firstCatalogPath == catalogProbe.GetPath(firstCatalogGuid)
+		&& firstCatalogGuid == catalogProbe.GetGuid(firstCatalogPath)
+		&& !catalogProbe.Contains(secondCatalogGuid)
+		&& !catalogProbe.Contains(secondCatalogPath);
+	if (!catalogRegistrationClosed)
+	{
+		outLog += "[shader reflection] D2 asset meta collision fail-closed 계약 불일치\n";
+		return false;
+	}
+
     const std::filesystem::path metaPath = RHIShaderSource::Resolve(
         "SelfTest/ShaderMetaFixture.shadermeta");
     const FileGuid guid = DataSystems->GetFileGuid(metaPath);
@@ -270,9 +313,13 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 	legacyTextures.m_ORM_TexName = "Cube_Mat_BaseColor.png";
 	legacyTextures.m_AO_TexName = "Cube_Mat_BaseColor.png";
 	legacyTextures.m_EmissiveTexName = "Cube_Mat_BaseColor.png";
-	DataSystems->FinalizeMaterialRuntime(legacyTextures);
 	const FileGuid legacyTextureGuid =
 		DataSystems->GetFilenameToGuid("Cube_Mat_BaseColor.png");
+	MaterialPropertyValue genericTexture;
+	genericTexture.m_name = "baseMap";
+	genericTexture.m_textureGuid = legacyTextureGuid;
+	legacyTextures.m_propertyValues.push_back(std::move(genericTexture));
+	DataSystems->FinalizeMaterialRuntime(legacyTextures);
 	auto hasMappedTexture = [&legacyTextures, &legacyTextureGuid](std::string_view name)
 	{
 		return std::ranges::any_of(legacyTextures.m_propertyValues,
@@ -283,13 +330,35 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 			});
 	};
 	const bool legacyTexturesMapped = legacyTextureGuid != FileGuid{}
-		&& 5 == legacyTextures.m_propertyValues.size()
+		&& 6 == legacyTextures.m_propertyValues.size()
 		&& hasMappedTexture("baseColorMap") && hasMappedTexture("normalMap")
 		&& hasMappedTexture("ormMap") && hasMappedTexture("aoMap")
-		&& hasMappedTexture("emissiveMap")
-		&& legacyTextures.m_pBaseColor && legacyTextures.m_pNormal
-		&& legacyTextures.m_pOccRoughMetal && legacyTextures.m_AOMap
-		&& legacyTextures.m_pEmissive;
+		&& hasMappedTexture("emissiveMap") && hasMappedTexture("baseMap")
+		&& legacyTextures.GetBaseColorMapShared()
+		&& legacyTextures.GetNormalMapShared()
+		&& legacyTextures.GetOccRoughMetalMapShared()
+		&& legacyTextures.GetAOMapShared()
+		&& legacyTextures.GetEmissiveMapShared();
+	const Material legacyTextureCopy = legacyTextures;
+	const bool legacyTextureOwners = legacyTextures.GetBaseColorMapShared()
+		&& legacyTextures.GetNormalMapShared()
+		&& legacyTextures.GetOccRoughMetalMapShared()
+		&& legacyTextures.GetAOMapShared()
+		&& legacyTextures.GetEmissiveMapShared()
+		&& legacyTextures.GetTextureMapShared("baseMap")
+		&& 6u == legacyTextures.GetTextureOwners().size()
+		&& legacyTextureCopy.GetBaseColorMapShared()
+			== legacyTextures.GetBaseColorMapShared()
+		&& legacyTextureCopy.GetNormalMapShared()
+			== legacyTextures.GetNormalMapShared()
+		&& legacyTextureCopy.GetOccRoughMetalMapShared()
+			== legacyTextures.GetOccRoughMetalMapShared()
+		&& legacyTextureCopy.GetAOMapShared() == legacyTextures.GetAOMapShared()
+		&& legacyTextureCopy.GetEmissiveMapShared()
+			== legacyTextures.GetEmissiveMapShared()
+		&& legacyTextureCopy.GetTextureMapShared("baseMap")
+			== legacyTextures.GetTextureMapShared("baseMap")
+		&& 6u == legacyTextureCopy.GetTextureOwners().size();
 
     if (!legacyBufferRestored || !restoredValues
         || firstYaml.str() != secondYaml.str() || !copyIsIndependent)
@@ -299,15 +368,15 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     }
 	if (!binaryWritten || !binaryHeaderDetected || !binaryValues
 		|| !unsupportedVersionRejected || !truncatedRejected
-		|| !legacyTexturesMapped)
+		|| !legacyTexturesMapped || !legacyTextureOwners)
 	{
-		outLog += "[material schema] binary v1/legacy texture GUID 이행 계약 불일치\n";
+		outLog += "[material schema] binary v1/legacy texture GUID·owner 이행 계약 불일치\n";
 		return false;
 	}
 
-    outLog += "[material schema] GUID + property 3 + keyword 1 · 32B repack · "
-        "type 거부 · DataSystem YAML diff 0 · binary v1 · legacy texture GUID 5 · "
-		"copy 독립 통과\n";
+	outLog += "[material schema] GUID + property 3 + keyword 1 · 32B repack · "
+		"type 거부 · DataSystem YAML diff 0 · binary v1 · legacy texture GUID 5 · "
+		"generic baseMap owner vector 6/raw alias 0·copy 공동 소유 · property copy 독립 통과\n";
 
     ShaderMeta mismatchedMeta = meta;
     mismatchedMeta.properties[1].type = ShaderPropertyType::Float4;
@@ -333,10 +402,16 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
-    // M5-C2: 게시된 content reload는 기존 slot의 generation을 올리고, 이전
-    // snapshot의 소유 수명과 무관하게 stale handle resolve를 거부해야 한다.
-    DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+    // M5-C3a: watcher thread의 게시만으로는 cache를 바꾸지 않는다. 같은 저장의
+    // 중복 Modified는 하나로 합쳐지고 GT 프레임 경계 drain 뒤에만 generation을
+    // 올려 이전 handle resolve를 거부해야 한다.
+    DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
         RuntimeAssetType::ShaderMeta, guid, metaPath });
+    DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+        RuntimeAssetType::ShaderMeta, guid, metaPath });
+    const bool queuedHandleStillValid =
+        DataSystems->ResolveShaderMeta(metaHandle).get() == metaSnapshot.get();
+    const std::size_t drainedAssetChanges = DataSystems->DrainQueuedAssetChanges();
     const bool staleHandleRejected =
         !DataSystems->ResolveShaderMeta(metaHandle) && metaSnapshot;
     const ShaderMetaHandle reloadedHandle =
@@ -351,7 +426,9 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     const bool reconfigured = reloadedMeta
         && reloadedMaterial.ConfigureShaderProperties(
             *reloadedMeta, layout, error, reloadedHandle);
-    const bool generationAdvanced = staleHandleRejected
+    const bool generationAdvanced = queuedHandleStillValid
+        && drainedAssetChanges == 1
+        && staleHandleRejected
         && reloadedHandle.IsValid()
         && reloadedHandle.slot == metaHandle.slot
         && reloadedHandle.generation != metaHandle.generation
@@ -366,9 +443,94 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
+    // M5-C4a: FoliageType이 Model 내부 raw 주소만 보관하면 cache generation이
+    // 바뀐 뒤 조용한 UAF가 된다. 원 Model과 FoliageType 복사본이 사라지는 각
+    // 경계에서 Mesh/Material의 실제 공동 소유가 유지·해제되는지 단정한다.
+    std::weak_ptr<Mesh> foliageMeshLifetime;
+    std::weak_ptr<Material> foliageMaterialLifetime;
+    {
+        auto mesh = std::make_shared<Mesh>();
+        auto material = std::make_shared<Material>();
+        foliageMeshLifetime = mesh;
+        foliageMaterialLifetime = material;
+
+        FoliageType foliage(mesh, material, true, "C4LifetimeProbe");
+        mesh.reset();
+        material.reset();
+        if (foliageMeshLifetime.expired() || foliageMaterialLifetime.expired())
+        {
+            outLog += "[shader reflection] FoliageType owning reference 적용 실패\n";
+            return false;
+        }
+
+        const MetaYml::Node foliagePayload = Meta::Serialize(&foliage);
+        FoliageType restoredFoliage;
+        Meta::Deserialize(&restoredFoliage, foliagePayload);
+        if (restoredFoliage.m_modelName != foliage.m_modelName
+            || restoredFoliage.m_castShadow != foliage.m_castShadow
+            || restoredFoliage.m_isShadowRecive != foliage.m_isShadowRecive
+            || restoredFoliage.m_mesh || restoredFoliage.m_material)
+        {
+            outLog += "[shader reflection] FoliageType asset/runtime owner 분리 실패\n";
+            return false;
+        }
+
+        FoliageType packetCopy = foliage;
+        foliage = {};
+        if (foliageMeshLifetime.expired() || foliageMaterialLifetime.expired())
+        {
+            outLog += "[shader reflection] FoliageType packet copy 수명 보존 실패\n";
+            return false;
+        }
+    }
+    if (!foliageMeshLifetime.expired() || !foliageMaterialLifetime.expired())
+    {
+        outLog += "[shader reflection] FoliageType 마지막 owner 해제 실패\n";
+        return false;
+    }
+
+    const bool retiredPolicyClosed =
+        !DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::Model)
+        && !DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::Material)
+        && DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::Texture)
+        && DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::UITexture)
+        && DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::SpriteSheet);
+    if (!retiredPolicyClosed)
+    {
+        outLog += "[shader reflection] C4 retired generation 축소 정책 불일치\n";
+        return false;
+    }
+
+    // Material cache에서 이전 generation을 분리해도 Foliage owner가 있는 동안만
+    // 생존하고, 마지막 실제 consumer가 사라지면 전역 retired 목록 없이 파괴된다.
+    constexpr std::string_view lifetimeProbeName = "M5_C4_FoliageMaterialProbe";
+    auto cacheMaterial = std::make_shared<Material>();
+    cacheMaterial->m_name = lifetimeProbeName;
+    std::weak_ptr<Material> cacheMaterialLifetime = cacheMaterial;
+    FoliageType cacheConsumer({}, cacheMaterial, true, "C4CacheProbe");
+    DataSystems->InsertMaterial(cacheMaterial);
+    const bool inserted = DataSystems->FindCachedMaterial(lifetimeProbeName).get()
+        == cacheMaterial.get();
+    cacheMaterial.reset();
+    DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+        RuntimeAssetType::Material, {}, std::filesystem::path(lifetimeProbeName)
+            .replace_extension(".material") });
+    const std::size_t retiredDrainCount = DataSystems->DrainQueuedAssetChanges();
+    const bool detached = !DataSystems->FindCachedMaterial(lifetimeProbeName);
+    const bool consumerPreserved = !cacheMaterialLifetime.expired();
+    cacheConsumer = {};
+    const bool releasedWithLastConsumer = cacheMaterialLifetime.expired();
+    if (!inserted || retiredDrainCount != 1 || !detached || !consumerPreserved
+        || !releasedWithLastConsumer)
+    {
+        outLog += "[shader reflection] C4 Material cache/shared consumer 수명 계약 불일치\n";
+        return false;
+    }
+
     outLog += "[shader reflection] Slang DXIL/SPIR-V "
         + std::to_string(requests.size())
         + " stages 동등 · b2/32B · tint@0 · roughness@16 · albedoMap@t3 · "
-        "ShaderMeta stale handle 거부 통과\n";
+        "ShaderMeta queued reload/stale handle 거부 · Foliage owning copy/asset 왕복 · "
+		"D2 UUIDv4/collision fail-closed · Model/Material retired 축소 통과\n";
     return true;
 }

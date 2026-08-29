@@ -5,6 +5,7 @@
 #include "RHI/Vulkan/VulkanPipelineCache.h"
 #include "RHI/Vulkan/VulkanPersistentHeap.h"
 #include "RHI/Vulkan/Shaders/VkMeshSpv.h"
+#include "RHI/RHIGraphicsPipelineRequest.h"
 #include "RHI/RHIShaderBlob.h"
 #include "RHI/IRenderDeviceServices.h"
 #include "Model.h"
@@ -472,9 +473,21 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         //   선언해야 한다. "포맷은 묶음이 아니라 파이프라인이 든다"의 실물.
         pipelineDesc.dsvFormat = RHIFormat::D32Float;
 
-        const RHIPipelineHandle pipeline = pipelineCache.GetOrCreate(pipelineDesc, error);
-        if (!pipeline.IsValid())
+        RHIGraphicsPipelineRequest pipelineRequest;
+        if (!pipelineRequest.Create(pipelineCache, pipelineDesc, error))
             return fail("[3/4] 파이프라인 생성 실패: " + error + "\n");
+        const RHIPipelineHandle pipeline = pipelineRequest.GetHandle();
+        const RHIGraphicsPipelineDesc& ownedPipelineDesc = pipelineRequest.GetDesc();
+        const bool requestOwnsSource =
+            ownedPipelineDesc.vsBytecode != pipelineDesc.vsBytecode &&
+            ownedPipelineDesc.psBytecode != pipelineDesc.psBytecode &&
+            ownedPipelineDesc.inputElements != pipelineDesc.inputElements &&
+            ownedPipelineDesc.inputElementCount == pipelineDesc.inputElementCount &&
+            nullptr != ownedPipelineDesc.inputElements[0].semantic &&
+            ownedPipelineDesc.inputElements[0].semantic != meshInput[0].semantic &&
+            std::string(ownedPipelineDesc.inputElements[0].semantic) == "POSITION";
+        if (!requestOwnsSource)
+            return fail("[3/4] owning PSO 요청이 bytecode/input semantic을 깊은 복사하지 않았다\n");
 
         // 실제 mesh bounds에서 가장 넓은 두 축을 골라 clip 공간 [-0.7, 0.7]에
         // 맞춘다. 특정 모델 좌표계나 카메라에 fixture가 의존하지 않게 한다.
@@ -561,6 +574,40 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         encoder.CopyToReadback(readback, color);
 
         if (!resources.EndFrame(error)) return fail("[3/4] EndFrame 실패: " + error + "\n");
+
+        // M5-C3b2b1: 새 PSO를 먼저 만들고 방금 제출된 command buffer가 참조한
+        // 옛 VkPipeline handle 하나만 무효화한다. 객체는 completion까지 보관한다.
+        const RHICompletionPoint pipelineRetireAfter{
+            resources.GetLastSignaledFenceValue() };
+        RHIGraphicsPipelineDesc replacementDesc = pipelineDesc;
+        replacementDesc.cullMode = RHICullMode::Back;
+        if (!pipelineRequest.Replace(pipelineCache, replacementDesc,
+            pipelineRetireAfter, error))
+        {
+            return fail("[3/4] Vulkan owning PSO 교체 실패: " + error + "\n");
+        }
+        const RHIPipelineHandle replacementPipeline = pipelineRequest.GetHandle();
+        const bool stalePipelineRejected = !pipelineCache.Resolve(pipeline).IsValid();
+        const bool replacementPublished = replacementPipeline.IsValid()
+            && replacementPipeline != pipeline
+            && pipelineCache.Resolve(replacementPipeline).IsValid();
+
+        // 옛 desc의 next-use는 방금 비운 slot의 새 generation을 받아야 한다.
+        const RHIPipelineHandle reloadedPipeline =
+            pipelineCache.GetOrCreate(pipelineDesc, error);
+        const auto reloadStats = pipelineCache.GetStats();
+        const bool pipelineGenerationAdvanced = reloadedPipeline.IsValid()
+            && RHIHandleBits::SlotOf(reloadedPipeline.id) == RHIHandleBits::SlotOf(pipeline.id)
+            && RHIHandleBits::GenerationOf(reloadedPipeline.id) !=
+                RHIHandleBits::GenerationOf(pipeline.id)
+            && pipelineCache.Resolve(reloadedPipeline).IsValid();
+        if (!stalePipelineRejected || !replacementPublished
+            || !pipelineGenerationAdvanced || reloadStats.invalidations != 1
+            || reloadStats.retiredPipelines != 1)
+        {
+            return fail("[3/4] Vulkan PSO generation invalidation/next-use 재요청 실패: "
+                + error + "\n");
+        }
         const VulkanDescriptorRecyclerStats descriptorPending =
             resources.GetDescriptorRecyclerStats();
         const bool descriptorVersionsPassed =
@@ -579,6 +626,35 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
                 + " · 실패 " + std::to_string(descriptorPending.allocationFailures) + ")\n");
         }
         resources.WaitForGpu();
+        const std::uint32_t collectedPipelines =
+            pipelineCache.CollectRetiredPipelines(
+                RHICompletionPoint{ resources.GetCompletedFenceValue() });
+        const auto collectedPipelineStats = pipelineCache.GetStats();
+        if (1 != collectedPipelines || 0 != collectedPipelineStats.retiredPipelines ||
+            1 != collectedPipelineStats.retiredCollections)
+        {
+            return fail("[3/4] Vulkan PSO completion retirement 회수 실패\n");
+        }
+
+        // targeted 경로가 전체 invalidation 계약을 약화시키지 않았는지도 backend에서
+        // 함께 확인한다. GPU는 이미 idle이고 두 live handle은 즉시 회수 가능하다.
+        const RHICompletionPoint completedPipelinePoint{
+            resources.GetCompletedFenceValue() };
+        const std::uint32_t globallyInvalidated =
+            pipelineCache.InvalidatePipelines(completedPipelinePoint);
+        const bool globalHandlesRejected =
+            !pipelineCache.Resolve(replacementPipeline).IsValid() &&
+            !pipelineCache.Resolve(reloadedPipeline).IsValid();
+        const std::uint32_t globallyCollected =
+            pipelineCache.CollectRetiredPipelines(completedPipelinePoint);
+        const auto globalPipelineStats = pipelineCache.GetStats();
+        if (2 != globallyInvalidated || !globalHandlesRejected || 2 != globallyCollected ||
+            2 != globalPipelineStats.invalidations ||
+            0 != globalPipelineStats.retiredPipelines ||
+            3 != globalPipelineStats.retiredCollections)
+        {
+            return fail("[3/4] Vulkan PSO global invalidation 회귀 실패\n");
+        }
         const VulkanDescriptorRecyclerStats descriptorCollected =
             resources.GetDescriptorRecyclerStats();
         if (0 != descriptorCollected.versions.pending ||
@@ -687,13 +763,13 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         std::snprintf(line, sizeof(line),
             "[3/4] scene.glb 중립 mesh 경로 통과 — mesh %zu개 · 누적 %lluB"
             " · draw 정점 %lluB · 인덱스 %lluB"
-            " · indexed %u · green %u · blue %u · PSO %u · segment 사용 %uB"
+            " · indexed %u · green %u · blue %u · PSO %u · reload collected %u · segment 사용 %uB"
             " · persistent %u장/%lluB 사용 · pooled %u"
             " · 표 잔량 %u장 · 미구현 0\n",
             sceneMeshes.size(), static_cast<unsigned long long>(sceneUploadBytes),
             static_cast<unsigned long long>(sceneVertexBytes),
             static_cast<unsigned long long>(sceneIndexBytes), sceneBinding.indexCount,
-            greenPixels, bluePixels, stats.compiles,
+            greenPixels, bluePixels, stats.compiles, stats.retiredCollections,
             static_cast<uint32_t>(resources.GetUploadUsedBytes()),
             meshHeap.activeSegments,
             static_cast<unsigned long long>(meshHeap.allocatedBytes),

@@ -2,7 +2,9 @@
 #include "../../../RHI/RHIFormat.h"
 #include <array>
 #include <map>
+#include <memory>
 #include <mathematics/color.hpp>
+#include <span>
 #include <vector>
 #include <unordered_map>
 #include <wrl/client.h>
@@ -12,6 +14,13 @@
 //   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
 //   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
 #include "../../../RHI/RHIParallelCommandPool.h"
+#include "../../../RHI/RHIGraphicsPipelineRequest.h"
+#include "../../../ShaderMetaHandle.h"
+
+struct ShaderMeta;
+struct ShaderMetaBindingLayout;
+struct ShaderRenderState;
+class RHIShaderBlob;
 
 // GBuffer 패스 (PHASE 3-6, 첫 패스).
 //
@@ -49,6 +58,25 @@ public:
     const char* GetName() const override { return "GBuffer"; }
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
+    /// frame packet의 primary ShaderMeta generation을 이 패스의 default request로
+    /// 전환한다. 후보 compile/PSO 생성이 끝난 뒤에만 같은 catalog slot을 retire한다.
+    bool ApplyShaderMeta(const EnhancedFrameContext& context,
+        ShaderMetaHandle handle, const ShaderMeta& meta,
+        RHICompletionPoint retireAfter, std::string& outError);
+    /// frame packet이 소유한 ShaderMeta generation의 material keyword 변형을
+    /// candidate-first로 준비한다. primary와 다른 meta도 같은 pipeline layout을
+    /// 만족하면 게시하며, 실패해도 default/기존 variant는 유지한다.
+    bool EnsureShaderMetaVariant(const EnhancedFrameContext& context,
+        ShaderMetaHandle handle, const ShaderMeta& meta,
+        std::span<const std::uint16_t> keywordSelections,
+        RHIShaderPermutationKey& outPermutationKey,
+        std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
+        std::string& outError);
+    /// 이번 frame packet에서 성공적으로 준비한 generation만 남긴다. 제거할 키가
+    /// 다른 키와 같은 cache handle을 공유하면 마지막 holder가 사라질 때만 retire한다.
+    std::uint32_t CommitShaderMetaFrame(const EnhancedFrameContext& context,
+        std::span<const ShaderMetaHandle> activeHandles,
+        RHICompletionPoint retireAfter);
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
@@ -88,10 +116,35 @@ public:
 
     static RHIFormat GetRenderTargetFormat(uint32_t index);
     static constexpr RHIFormat kDepthFormat = RHIFormat::D32Float;
+    RHIPipelineHandle GetPipelineHandle() const { return m_pipelineRequest.GetHandle(); }
+    std::uint32_t GetShaderVariantCount() const
+    {
+        return static_cast<std::uint32_t>(m_shaderVariants.size()) +
+            (m_shaderMetaHandle.IsValid() ? 1u : 0u);
+    }
+    RHIPipelineHandle GetShaderVariantPipeline(ShaderMetaHandle handle,
+        RHIShaderPermutationKey permutationKey) const;
+    ShaderMetaHandle GetShaderMetaHandle() const { return m_shaderMetaHandle; }
+    std::shared_ptr<const ShaderMetaBindingLayout> GetShaderBindingLayout() const
+    {
+        return m_shaderBindingLayout;
+    }
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+    bool BuildPipelineDesc(const EnhancedFrameContext& context,
+        const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
+        const ShaderRenderState* renderState,
+        const RHIShaderPermutation& permutation, RHIGraphicsPipelineDesc& outDesc,
+        RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError);
+    bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
+        const ShaderMeta& meta,
+        std::span<const std::uint16_t> keywordSelections,
+        RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
+        RHIShaderBlob& outPs, RHIShaderPermutationKey& outPermutationKey,
+        std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
+        std::string& outError);
     bool CreatePipeline(const EnhancedFrameContext& context, std::string& outError);
 
     /// 이번 프레임의 드로우 수로 조각 수를 정한다.
@@ -103,7 +156,17 @@ private:
     /// 같은 (메시, 재질)을 묶어 배치를 만든다. PrepareFrame이 부른다.
     void BuildBatches(const EnhancedFrameContext& context);
 
-    using MaterialKey = std::array<Texture*, 4>;
+    // 같은 texture를 쓰더라도 ShaderMeta generation, keyword 또는 property bytes가
+    // 다르면 b2/PSO 상태가 다르므로 한 draw로 합치지 않는다.
+    struct MaterialKey
+    {
+        std::array<Texture*, 4> textures{};
+        std::shared_ptr<const EnhancedMaterialDrawSnapshot> snapshot{};
+
+        bool operator==(const MaterialKey& other) const;
+        bool operator<(const MaterialKey& other) const;
+    };
+    MaterialKey MakeMaterialKey(const EnhancedDrawItem& draw) const;
 
     // 인스턴스 하나. HLSL의 StructuredBuffer 원소와 배치가 같아야 한다 —
     // 어긋나면 값이 조용히 밀려서 '재질이 이상하다'로만 드러난다.
@@ -136,9 +199,36 @@ private:
     {
         Mesh*        mesh{ nullptr };
         MaterialKey  material{};
+        RHIPipelineHandle pipeline{};
         uint32_t     firstInstance{ 0 };   // m_instances 안에서의 시작
         uint32_t     instanceCount{ 0 };
     };
+
+    struct ShaderVariantKey
+    {
+        ShaderMetaHandle meta{};
+        RHIShaderPermutationKey permutation{};
+
+        bool operator<(const ShaderVariantKey& other) const
+        {
+            if (meta.slot != other.meta.slot) return meta.slot < other.meta.slot;
+            if (meta.generation != other.meta.generation)
+                return meta.generation < other.meta.generation;
+            if (permutation.hi != other.permutation.hi)
+                return permutation.hi < other.permutation.hi;
+            return permutation.lo < other.permutation.lo;
+        }
+    };
+
+    struct ShaderVariant
+    {
+        RHIGraphicsPipelineRequest request;
+        std::shared_ptr<const ShaderMetaBindingLayout> layout{};
+    };
+
+    bool ResolveShaderVariant(const EnhancedMaterialDrawSnapshot& snapshot,
+        RHIPipelineHandle& outPipeline,
+        std::shared_ptr<const ShaderMetaBindingLayout>& outLayout) const;
 
     // 드로우가 쓸 텍스처. PrepareFrame이 채우고 Record가 읽는다.
     struct DrawTextures
@@ -182,7 +272,6 @@ private:
 
     // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
     math::matrix4x4 m_frameViewProjection{ math::matrix4x4::identity() };
-
     uint32_t m_lastDrawCount{ 0 };
     uint32_t m_lastMeshCount{ 0 };
     uint32_t m_lastMaterialCount{ 0 };
@@ -193,6 +282,14 @@ private:
     // 타깃별 RTV와 깊이 DSV. 그래프가 만든 transient에 매 프레임 뷰를 만든다 —
     // 리소스가 프레임마다 바뀔 수 있으므로 뷰를 캐시하지 않는다.
 
-    RHIPipelineHandle m_pso;
+    // LivePipeline 하나에 GBuffer pass도 하나뿐이다. default request/layout은 frame
+    // 상수의 root layout 정본이며, primary의 material keyword와 같은 layout을 쓰는
+    // secondary ShaderMeta 조합은 아래 variant map에서 별도 PSO로 보관한다. 새 primary
+    // generation은 같은 slot만, frame commit은 빠진 secondary key만 retire한다.
+    RHIGraphicsPipelineRequest m_pipelineRequest;
+    ShaderMetaHandle           m_shaderMetaHandle{};
+    RHIShaderPermutationKey     m_defaultPermutationKey{};
+    std::shared_ptr<const ShaderMetaBindingLayout> m_shaderBindingLayout{};
+    std::map<ShaderVariantKey, ShaderVariant> m_shaderVariants;
 };
 

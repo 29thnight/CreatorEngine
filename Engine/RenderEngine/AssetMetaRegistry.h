@@ -3,24 +3,40 @@
 #include <mutex>
 #include <shared_mutex>
 
+enum class AssetMetaRegistrationResult
+{
+	Registered,
+	AlreadyRegistered,
+	Invalid,
+	GuidConflict,
+	PathConflict,
+};
+
 class AssetMetaRegistry
 {
 public:
-    void Register(const FileGuid& guid, const file::path& path)
+    [[nodiscard]] AssetMetaRegistrationResult Register(
+		const FileGuid& guid, const file::path& path)
     {
+		if (FileGuid{} == guid || path.empty())
+			return AssetMetaRegistrationResult::Invalid;
+
 		std::unique_lock lock(m_mutex);
-		if (const auto pathIt = m_pathToGuid.find(path);
-			pathIt != m_pathToGuid.end() && pathIt->second != guid)
-		{
-			m_guidToPath.erase(pathIt->second);
-		}
 		if (const auto guidIt = m_guidToPath.find(guid);
-			guidIt != m_guidToPath.end() && guidIt->second != path)
+			guidIt != m_guidToPath.end())
 		{
-			m_pathToGuid.erase(guidIt->second);
+			return guidIt->second == path
+				? AssetMetaRegistrationResult::AlreadyRegistered
+				: AssetMetaRegistrationResult::GuidConflict;
 		}
-        m_guidToPath[guid] = path;
-        m_pathToGuid[path] = guid;
+		if (m_pathToGuid.contains(path))
+		{
+			return AssetMetaRegistrationResult::PathConflict;
+		}
+
+		m_guidToPath.emplace(guid, path);
+		m_pathToGuid.emplace(path, guid);
+		return AssetMetaRegistrationResult::Registered;
     }
 
     void Unregister(const FileGuid& guid)

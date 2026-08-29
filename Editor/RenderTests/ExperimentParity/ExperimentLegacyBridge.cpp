@@ -255,15 +255,15 @@ namespace RenderTest::bridge
     {
         ex::ModelDraft draft;
 
-        draft.metadata.assetId.value = legacy.guid.m_guid;
-        if (!draft.metadata.assetId.IsValid())
-        {
-            // .meta 없는 자산. 정체성 자체가 배선 차이는 아니므로 경로에서
-            // 결정론적으로 합성하고 기록만 남긴다.
-            draft.metadata.assetId.value = Uuid::FromName(
-                FileGuid::ns_filesystem(), legacy.path.string());
-            report.notes.push_back("legacy guid 가 nil — 경로 기반 v5 UUID 합성");
-        }
+		draft.metadata.assetId.value = legacy.guid.m_guid;
+		if (!draft.metadata.assetId.IsValid())
+		{
+			// D2는 .meta 없는 자산을 경로 해시로 복구하지 않는다. 브리지는
+			// 제품 이행 경계의 검사이므로 catalog 정체성이 없으면 그대로 실패한다.
+			report.failures.push_back(
+				"legacy guid 가 nil — catalog(.meta) identity 필요");
+			return draft;
+		}
         draft.metadata.name = legacy.name;
         if (draft.metadata.name.empty())
         {

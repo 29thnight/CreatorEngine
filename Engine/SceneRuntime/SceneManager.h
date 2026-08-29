@@ -13,6 +13,7 @@
 class Scene;
 class Entity;
 class MeshRenderer;
+class Material;
 class RenderScene;
 class InputActionManager;
 class SceneManager : public Singleton<SceneManager>
@@ -118,6 +119,9 @@ public:
     void SetInputActionManager(InputActionManager* inputActionManager) { m_inputActionManager = inputActionManager;}
 
     std::vector<MeshRenderer*> GetAllMeshRenderers() const;
+    // GT frame sealing용. 활성 Scene의 mesh/foliage가 실제 소유한 Material을
+    // cache 소속 여부와 무관하게 owner snapshot으로 돌려준다.
+    std::vector<std::shared_ptr<Material>> CaptureRequiredRenderMaterials() const;
 
 	void VolumeProfileApply();
 	bool IsVolumeProfileApply() const { return m_volumeProfileApply; }

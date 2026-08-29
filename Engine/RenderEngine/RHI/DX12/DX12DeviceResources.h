@@ -425,6 +425,10 @@ public:
     {
         return m_resourceTable.Resolve(handle);
     }
+    void ReleasePipeline(RHIPipelineHandle handle)
+    {
+        m_resourceTable.Release(handle);
+    }
 
     // ── 패스 소유 리소스(R2c) — 구현은 .cpp에 ──
     bool CreateBuffer(const RHIBufferDesc& desc,

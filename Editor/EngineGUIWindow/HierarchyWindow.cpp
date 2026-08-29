@@ -208,7 +208,7 @@ HierarchyWindow::HierarchyWindow()
 						Meta::UndoManager::GetInstance()->Execute(
 							std::make_unique<Meta::LoadModelToSceneObjCommand>(
 								scene,
-								DataSystems->LoadCashedModel(filepath.string())));
+								DataSystems->LoadCachedModelShared(filepath.string())));
 					}
 				}
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))

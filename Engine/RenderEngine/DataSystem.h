@@ -6,8 +6,11 @@
 #include "ClassProperty.h"
 #include "AssetBundle.h"
 #include "ShaderMetaHandle.h"
+#include <cstddef>
 #include <iosfwd>
+#include <mutex>
 #include <unordered_set>
+#include <vector>
 
 template <typename T>
 using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;
@@ -74,6 +77,17 @@ private:
 	DataSystem() = default;
 	~DataSystem();
 public:
+	// C4 이후 Model/Material의 장기 소비자는 shared_ptr를 보유한다. Texture 계열은
+	// TerrainLayer와 legacy Material raw 별칭이 남아 있어 별도 이행 전까지 이전
+	// cache generation을 runtime 종료까지 보존한다.
+	static constexpr bool RequiresLegacyRetiredGeneration(
+		RuntimeAssetType assetType) noexcept
+	{
+		return assetType == RuntimeAssetType::Texture
+			|| assetType == RuntimeAssetType::UITexture
+			|| assetType == RuntimeAssetType::SpriteSheet;
+	}
+
 	void Initialize();
     void Finalize();
 	// Asset bundle operations
@@ -84,6 +98,8 @@ public:
 	//Resource Model
 	Model* LoadModelGUID(FileGuid guid);
 	void LoadModel(std::string_view filePath);
+	std::shared_ptr<Model> LoadCachedModelShared(std::string_view filePath);
+	// 즉시 사용 legacy 호출부 호환. 참조를 보관하는 쪽은 위 shared API를 쓴다.
 	Model* LoadCashedModel(std::string_view filePath);
 	std::shared_ptr<Model> FindCachedModel(std::string_view name);
 	std::vector<std::pair<std::string, std::shared_ptr<Model>>> SnapshotModels();
@@ -128,6 +144,11 @@ public:
 	// Authoring Host가 파일/meta 게시를 끝낸 뒤 전달하는 유일한 변경 경계다.
 	// Player는 생산자를 설치하지 않고 startup catalog만 읽는다.
 	void ApplyAssetChange(const RuntimeAssetChange& change);
+	// Watcher I/O thread는 cache/catalog를 직접 바꾸지 않고 이 큐에 게시한다.
+	// Editor game thread가 프레임 경계에서 DrainQueuedAssetChanges를 호출해
+	// generation 변경과 이후 load의 관측 순서를 직렬화한다.
+	void QueueAssetChange(RuntimeAssetChange change);
+	std::size_t DrainQueuedAssetChanges();
 	FileGuid GetFilenameToGuid(const std::string& filename) const;
 	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;
@@ -171,11 +192,10 @@ private:
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
 	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
-	// 일부 legacy 소비자가 Texture/Model 내부 자료를 raw pointer로 보관한다.
-	// reload에서 이전 cache generation을 즉시 파괴하지 않고 runtime 종료까지
-	// 붙들어, 새 로드는 새 세대를 받되 기존 frame/component는 안전하게 마친다.
-	std::mutex m_retiredAssetMutex;
-	std::vector<std::shared_ptr<void>> m_retiredAssetGenerations;
+	// Texture 계열의 legacy raw 별칭만을 위한 한시적 보존 목록. Model/Material은
+	// cache 분리 뒤 실제 shared consumer가 없으면 즉시 파괴된다.
+	std::mutex m_retiredTextureMutex;
+	std::vector<std::shared_ptr<void>> m_retiredTextureGenerations;
 
 	struct ShaderMetaCacheSlot
 	{
@@ -188,6 +208,8 @@ private:
 	std::unordered_map<FileGuid, std::uint32_t> m_shaderMetaSlotByGuid;
 	std::vector<ShaderMetaCacheSlot> m_shaderMetaSlots;
 	std::vector<std::uint32_t> m_shaderMetaFreeSlots;
+	std::mutex m_pendingAssetChangeMutex;
+	std::vector<RuntimeAssetChange> m_pendingAssetChanges;
 
 };
 

@@ -1,4 +1,4 @@
-guid: 119b3e16-b7e7-532a-8f02-55f5208f4126
+guid: 61079d31-7d1d-48fb-91ad-df8feff43723
 importSettings:
   extension: .glb
   timestamp: 134300494793275063
@@ -6,3 +6,13 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: gltf/material/0
+      name: Torus_Mat
+      guid: be164345-5d14-41ee-990a-82b3a0377742
+  embeddedTextures:
+    - key: gltf/image/0
+      name: Torus_Mat_BaseColor
+      guid: 3ab3df66-f233-4886-937d-3eb7cb47f9ab

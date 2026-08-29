@@ -12,8 +12,6 @@
 #include "Experiment/Import/FbxImporter.h"
 #include "Experiment/Import/NormalGeneration.h"
 #include "Experiment/Import/TangentGeneration.h"
-#include "Uuid.h"
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -35,6 +33,25 @@ namespace RenderTest
     {
         namespace ex = experiment;
         namespace im = experiment::importer;
+
+        // 성능 측정 안에서 OS UUID 발급 비용을 섞지 않는 benchmark fixture ID다.
+        // path/name 기반 영속 identity가 아니며 각 decode 내부에서만 유일하다.
+        [[nodiscard]] ex::AssetId MakeBenchmarkAssetId(
+            std::uint8_t domain, std::size_t index = 0) noexcept
+        {
+            ex::AssetId id{};
+            id.value.data[0] = domain;
+            for (std::size_t byte = 0; byte < sizeof(index); ++byte)
+            {
+                id.value.data[15 - byte] = static_cast<std::uint8_t>(
+                    (index >> (byte * 8u)) & std::size_t{ 0xffu });
+            }
+            id.value.data[6] = 0x40u;
+            id.value.data[8] = static_cast<std::uint8_t>(
+                (id.value.data[8] & 0x3fu) | 0x80u);
+            return id;
+        }
+
         double KeyTime(const NodeAnimation::PositionKey& key) { return key.m_time; }
         double KeyTime(const NodeAnimation::RotationKey& key) { return key.m_time; }
         double KeyTime(const NodeAnimation::ScaleKey& key) { return key.m_time; }
@@ -413,9 +430,19 @@ namespace RenderTest
         }
 
         // ── 3. experiment (실물 디코더 전체) ────────────────────────────
-        im::ImporterDecoderOptions decoderOptions;
-        decoderOptions.conversion.modelAssetId.value =
-            Uuid::FromName(FileGuid::ns_filesystem(), sourcePath.string());
+		im::ImporterDecoderOptions decoderOptions;
+        decoderOptions.conversion.modelAssetId = MakeBenchmarkAssetId(0x10u);
+        decoderOptions.conversion.shaderAssetId = MakeBenchmarkAssetId(0x20u);
+        decoderOptions.conversion.resolveMaterialAsset =
+            [](const im::ImportedMaterial&, std::size_t index)
+            {
+                return MakeBenchmarkAssetId(0x30u, index);
+            };
+        decoderOptions.conversion.resolveTextureAsset =
+            [nextTexture = std::size_t{ 0 }](const im::ImportedTexture&) mutable
+            {
+                return MakeBenchmarkAssetId(0x40u, nextTexture++);
+            };
         decoderOptions.conversion.modelName = sourcePath.stem().string();
         decoderOptions.conversion.ticksPerSecond = 30.0;
 
@@ -456,8 +483,19 @@ namespace RenderTest
             ex::ModelDecodeResult decoded = draftDecoder.Decode(loadRequest);
             if (decoded.draft.has_value())
             {
-                const std::vector<std::byte> baked =
+                const experiment::cooked::CookedWriteResult write =
                     experiment::cooked::Write(*decoded.draft);
+                if (!write.Succeeded())
+                {
+                    outLog += "  experiment 쿠킹        : 실패 — asset identity 게시 계약 위반\n";
+                    for (const ex::ModelLoadIssue& issue : write.issues)
+                    {
+                        outLog += "    " + issue.context + ": " + issue.message + "\n";
+                    }
+                }
+                else
+                {
+                const std::vector<std::byte>& baked = write.bytes;
                 cookedBytes = baked.size();
 
                 std::filesystem::path bakedPath = sourcePath;
@@ -537,6 +575,7 @@ namespace RenderTest
                     outLog += stages;
                 }
                 std::filesystem::remove(bakedPath, errorCode);
+                }
             }
         }
         if (cookedMeasured)

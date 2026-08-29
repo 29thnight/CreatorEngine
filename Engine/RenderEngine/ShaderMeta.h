@@ -103,6 +103,10 @@ struct ShaderMeta
     std::uint32_t schemaVersion{ kSchemaVersion };
     std::string name;
     std::filesystem::path source;
+    // runtime-only loader context. authored source는 meta 파일 기준 상대 경로이므로
+    // immutable snapshot이 RenderThread로 넘어간 뒤에도 정식 경로를 재구성하려면
+    // origin이 함께 있어야 한다. 디스크 schema field는 아니다.
+    std::filesystem::path originPath;
     std::vector<ShaderPropertyDesc> properties;
     std::vector<ShaderKeywordAxis> keywords;
     std::vector<ShaderPassDesc> passes;

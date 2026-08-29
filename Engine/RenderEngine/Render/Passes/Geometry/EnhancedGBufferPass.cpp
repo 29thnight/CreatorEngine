@@ -1,5 +1,10 @@
 #include "EnhancedGBufferPass.h"
 #include "../../../RHI/RHIShaderCompiler.h"
+#include "../../../RHI/RHIShaderSource.h"
+#include "../../../ShaderMeta.h"
+#include "../../../ShaderMetaReflection.h"
+#include "../../../ShaderPermutationDomain.h"
+#include "../../../StandardMaterialProperty.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
@@ -10,6 +15,7 @@
 #include "../../../RHI/RHIEncoder.h"
 
 #include <algorithm>
+#include <functional>
 #include <sstream>
 
 namespace
@@ -31,12 +37,219 @@ namespace
 
     constexpr const char* kGBufferShaderFile = "GBuffer.hlsl";
 
-    bool CompileGBufferShader(const char* entry, const char* target,
+    // M6-P1a 전환 중 snapshot이 없는 격리 selftest/legacy draw가 제품 HLSL의
+    // b2를 비워 두지 않게 하는 sentinel이다. alphaCutoff < 0이면 shader가
+    // InstanceData의 기존 factor를 사용한다. 제품 BuildDrawPool은 이 경로를
+    // 쓰지 않고 항상 reflection-packed snapshot을 만든다.
+    struct LegacyMaterialConstants
+    {
+        float baseColor[4]{ 1.f, 1.f, 1.f, 1.f };
+        float metallic{ 0.f };
+        float roughness{ 1.f };
+        float normalScale{ 1.f };
+        float occlusionStrength{ 1.f };
+        float emissive[3]{ 1.f, 1.f, 1.f };
+        float alphaCutoff{ -1.f };
+    };
+    static_assert(sizeof(LegacyMaterialConstants) == 48u);
+    static_assert(offsetof(LegacyMaterialConstants, alphaCutoff) == 44u);
+    constexpr LegacyMaterialConstants kLegacyMaterialConstants{};
+
+    constexpr std::uint32_t kGBufferMaterialTextureFirstRegister = 0u;
+    constexpr std::uint32_t kGBufferMaterialTextureSlotCount = 4u;
+
+    bool ValidateGBufferTextureLayout(const ShaderMetaBindingLayout& layout,
+        std::string& outError)
+    {
+        std::array<bool, kGBufferMaterialTextureSlotCount> occupied{};
+        std::vector<std::string_view> names;
+        for (const ShaderMetaPropertyBinding& binding : layout.properties)
+        {
+            if (ShaderPropertyType::Texture2D != binding.propertyType) continue;
+            if (binding.name.empty()
+                || RHIShaderResourceKind::Texture != binding.resourceKind
+                || 0u != binding.registerSpace
+                || binding.registerIndex >= kGBufferMaterialTextureFirstRegister
+                    + kGBufferMaterialTextureSlotCount)
+            {
+                outError = "GBuffer texture property가 t0..t3/space0 범위 밖이다: "
+                    + binding.name;
+                return false;
+            }
+            const std::size_t slot = binding.registerIndex
+                - kGBufferMaterialTextureFirstRegister;
+            if (occupied[slot]
+                || std::find(names.begin(), names.end(), binding.name) != names.end())
+            {
+                outError = "GBuffer texture property 이름/register가 중복이다: "
+                    + binding.name;
+                return false;
+            }
+            occupied[slot] = true;
+            names.push_back(binding.name);
+        }
+        return true;
+    }
+
+    bool ValidateGBufferTextureSnapshot(const EnhancedMaterialDrawSnapshot& snapshot,
+        std::string& outError)
+    {
+        const std::size_t reflectedTextureCount = static_cast<std::size_t>(std::count_if(
+            snapshot.bindingLayout.properties.begin(), snapshot.bindingLayout.properties.end(),
+            [](const ShaderMetaPropertyBinding& binding)
+            {
+                return ShaderPropertyType::Texture2D == binding.propertyType;
+            }));
+        if (reflectedTextureCount != snapshot.textureBindings.size())
+        {
+            outError = "GBuffer draw texture owner 수가 reflection schema와 다르다";
+            return false;
+        }
+
+        std::array<bool, kGBufferMaterialTextureSlotCount> occupied{};
+        std::vector<std::string_view> names;
+        for (const EnhancedMaterialTextureBinding& texture : snapshot.textureBindings)
+        {
+            const auto reflected = std::find_if(snapshot.bindingLayout.properties.begin(),
+                snapshot.bindingLayout.properties.end(), [&texture](const auto& binding)
+                {
+                    return binding.name == texture.propertyName;
+                });
+            if (texture.propertyName.empty()
+                || reflected == snapshot.bindingLayout.properties.end()
+                || ShaderPropertyType::Texture2D != reflected->propertyType
+                || RHIShaderResourceKind::Texture != reflected->resourceKind
+                || reflected->registerIndex != texture.registerIndex
+                || reflected->registerSpace != texture.registerSpace
+                || 0u != texture.registerSpace
+                || texture.registerIndex >= kGBufferMaterialTextureFirstRegister
+                    + kGBufferMaterialTextureSlotCount)
+            {
+                outError = "GBuffer draw texture binding이 reflection register와 다르다: ";
+                outError += texture.propertyName;
+                return false;
+            }
+            const std::size_t slot = texture.registerIndex
+                - kGBufferMaterialTextureFirstRegister;
+            if (occupied[slot]
+                || std::find(names.begin(), names.end(), texture.propertyName) != names.end())
+            {
+                outError = "GBuffer draw texture 이름/register가 중복이다: "
+                    + texture.propertyName;
+                return false;
+            }
+            occupied[slot] = true;
+            names.push_back(texture.propertyName);
+        }
+        return true;
+    }
+
+    bool CompileGBufferShader(const char* shaderFile, const char* entry, const char* target,
+        const RHIShaderPermutation& permutation,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        return RHIShaderCompiler::CompileFile(kGBufferShaderFile, entry, target,
+        return RHIShaderCompiler::CompileFile(shaderFile, entry, target, permutation,
             outBlob, outError);
     }
+}
+
+bool EnhancedGBufferPass::MaterialKey::operator==(const MaterialKey& other) const
+{
+    if (textures != other.textures
+        || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
+    {
+        return false;
+    }
+    if (!snapshot) return true;
+    return snapshot->shaderMetaHandle == other.snapshot->shaderMetaHandle
+        && snapshot->permutationKey == other.snapshot->permutationKey
+        && snapshot->keywordSelections == other.snapshot->keywordSelections
+        && snapshot->propertyBytes == other.snapshot->propertyBytes;
+}
+
+bool EnhancedGBufferPass::MaterialKey::operator<(const MaterialKey& other) const
+{
+    const ShaderMetaHandle leftHandle = snapshot
+        ? snapshot->shaderMetaHandle : ShaderMetaHandle{};
+    const ShaderMetaHandle rightHandle = other.snapshot
+        ? other.snapshot->shaderMetaHandle : ShaderMetaHandle{};
+    if (leftHandle.slot != rightHandle.slot)
+        return leftHandle.slot < rightHandle.slot;
+    if (leftHandle.generation != rightHandle.generation)
+        return leftHandle.generation < rightHandle.generation;
+    if (snapshot && other.snapshot)
+    {
+        if (snapshot->keywordSelections != other.snapshot->keywordSelections)
+            return snapshot->keywordSelections < other.snapshot->keywordSelections;
+        if (snapshot->permutationKey.hi != other.snapshot->permutationKey.hi)
+            return snapshot->permutationKey.hi < other.snapshot->permutationKey.hi;
+        if (snapshot->permutationKey.lo != other.snapshot->permutationKey.lo)
+            return snapshot->permutationKey.lo < other.snapshot->permutationKey.lo;
+        if (snapshot->propertyBytes != other.snapshot->propertyBytes)
+            return snapshot->propertyBytes < other.snapshot->propertyBytes;
+    }
+    return std::lexicographical_compare(textures.begin(), textures.end(),
+        other.textures.begin(), other.textures.end(), std::less<Texture*>{});
+}
+
+EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
+    const EnhancedDrawItem& draw) const
+{
+    MaterialKey key{};
+    if (draw.materialSnapshot && draw.materialSnapshot->IsValid())
+    {
+        for (const EnhancedMaterialTextureBinding& binding :
+            draw.materialSnapshot->textureBindings)
+        {
+            if (binding.registerSpace != 0u
+                || binding.registerIndex >= kGBufferMaterialTextureFirstRegister
+                    + kGBufferMaterialTextureSlotCount)
+            {
+                continue;
+            }
+            key.textures[binding.registerIndex
+                - kGBufferMaterialTextureFirstRegister] = binding.textureOwner.get();
+        }
+        key.snapshot = draw.materialSnapshot;
+    }
+    else
+    {
+        key.textures = {
+            draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+    }
+    return key;
+}
+
+bool EnhancedGBufferPass::ResolveShaderVariant(
+    const EnhancedMaterialDrawSnapshot& snapshot,
+    RHIPipelineHandle& outPipeline,
+    std::shared_ptr<const ShaderMetaBindingLayout>& outLayout) const
+{
+    if (snapshot.shaderMetaHandle == m_shaderMetaHandle
+        && snapshot.permutationKey == m_defaultPermutationKey)
+    {
+        outPipeline = m_pipelineRequest.GetHandle();
+        outLayout = m_shaderBindingLayout;
+        return outPipeline.IsValid() && nullptr != outLayout;
+    }
+
+    const ShaderVariantKey key{ snapshot.shaderMetaHandle,
+        snapshot.permutationKey };
+    const auto found = m_shaderVariants.find(key);
+    if (found == m_shaderVariants.end()) return false;
+    outPipeline = found->second.request.GetHandle();
+    outLayout = found->second.layout;
+    return outPipeline.IsValid() && nullptr != outLayout;
+}
+
+RHIPipelineHandle EnhancedGBufferPass::GetShaderVariantPipeline(
+    ShaderMetaHandle handle, RHIShaderPermutationKey permutationKey) const
+{
+    if (handle == m_shaderMetaHandle && permutationKey == m_defaultPermutationKey)
+        return m_pipelineRequest.GetHandle();
+    const auto found = m_shaderVariants.find({ handle, permutationKey });
+    return found == m_shaderVariants.end()
+        ? RHIPipelineHandle{} : found->second.request.GetHandle();
 }
 
 RHIFormat EnhancedGBufferPass::GetRenderTargetFormat(uint32_t index)
@@ -79,6 +292,27 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     {
         if (nullptr == draw.mesh) continue;
 
+        if (draw.materialSnapshot)
+        {
+            const EnhancedMaterialDrawSnapshot& material = *draw.materialSnapshot;
+            if (!material.IsValid()
+                || material.bindingLayout.constantBufferRegister != 2
+                || material.bindingLayout.constantBufferSpace != 0)
+            {
+                outError = "GBuffer draw material snapshot의 b2/ShaderMeta 계약이 invalid다";
+                return false;
+            }
+            RHIPipelineHandle materialPipeline{};
+            std::shared_ptr<const ShaderMetaBindingLayout> materialLayout;
+            if (!ResolveShaderVariant(material, materialPipeline, materialLayout)
+                || material.bindingLayout != *materialLayout)
+            {
+                outError = "GBuffer draw material permutation/layout이 준비된 variant와 다르다";
+                return false;
+            }
+            if (!ValidateGBufferTextureSnapshot(material, outError)) return false;
+        }
+
         if (m_drawGeometry.find(draw.mesh) == m_drawGeometry.end())
         {
             std::string uploadError;
@@ -106,8 +340,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
         //   IBL 소비 검증의 '끔=검정' 대조군이 실측으로 잡았다.
         if (nullptr != context.textureCache)
         {
-            const MaterialKey key{
-                draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+            const MaterialKey key = MakeMaterialKey(draw);
 
             if (m_drawTextures.find(key) == m_drawTextures.end())
             {
@@ -116,17 +349,18 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 {
                     std::string textureError;
                     DX12TextureCache::Entry uploaded{};
-                    if (nullptr == key[i] && 2 == i)
+                    if (nullptr == key.textures[i] && 2 == i)
                     {
                         uploaded = context.textureCache->GetOrmNeutralTexture(textureError);
                     }
-                    else if (nullptr == key[i] && 3 == i)
+                    else if (nullptr == key.textures[i] && 3 == i)
                     {
                         uploaded = context.textureCache->GetBlackTexture(textureError);
                     }
                     else
                     {
-                        uploaded = context.textureCache->GetOrUpload(key[i], textureError);
+                        uploaded = context.textureCache->GetOrUpload(
+                            key.textures[i], textureError);
                     }
                     textures.resources[i] = uploaded.handle;
             textures.formats[i] = uploaded.format;
@@ -213,12 +447,12 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
     }
 
     std::stable_sort(sorted.begin(), sorted.end(),
-        [](const EnhancedDrawItem* a, const EnhancedDrawItem* b)
+        [this](const EnhancedDrawItem* a, const EnhancedDrawItem* b)
         {
             if (a->mesh != b->mesh) return a->mesh < b->mesh;
 
-            const MaterialKey keyA{ a->baseColor, a->normalMap, a->occRoughMetal, a->emissive };
-            const MaterialKey keyB{ b->baseColor, b->normalMap, b->occRoughMetal, b->emissive };
+            const MaterialKey keyA = MakeMaterialKey(*a);
+            const MaterialKey keyB = MakeMaterialKey(*b);
             return keyA < keyB;
         });
 
@@ -226,8 +460,7 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
     {
         const auto& draw = *drawPtr;
 
-        const MaterialKey key{
-            draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+        const MaterialKey key = MakeMaterialKey(draw);
 
         if (m_batches.empty() || m_batches.back().mesh != draw.mesh
             || m_batches.back().material != key)
@@ -235,6 +468,15 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
             DrawBatch batch{};
             batch.mesh = draw.mesh;
             batch.material = key;
+            if (key.snapshot)
+            {
+                std::shared_ptr<const ShaderMetaBindingLayout> ignoredLayout;
+                ResolveShaderVariant(*key.snapshot, batch.pipeline, ignoredLayout);
+            }
+            else
+            {
+                batch.pipeline = m_pipelineRequest.GetHandle();
+            }
             batch.firstInstance = static_cast<uint32_t>(m_instances.size());
             batch.instanceCount = 0;
             m_batches.push_back(batch);
@@ -263,12 +505,18 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
     m_lastBatchCount = static_cast<uint32_t>(m_batches.size());
 }
 
-bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
+    const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
+    const ShaderRenderState* renderState,
+    const RHIShaderPermutation& permutation, RHIGraphicsPipelineDesc& outDesc,
+    RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError)
 {
-    RHIShaderBlob vsBlob;
-    RHIShaderBlob psBlob;
-    if (!CompileGBufferShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
-    if (!CompileGBufferShader("PSMain", "ps_5_0", psBlob, outError)) return false;
+    if (!CompileGBufferShader(shaderFile, vertexEntry, "vs_5_0", permutation,
+            outVs, outError))
+        return false;
+    if (!CompileGBufferShader(shaderFile, pixelEntry, "ps_5_0", permutation,
+            outPs, outError))
+        return false;
 
     // 루트 시그니처는 캐시가 식별자를 준다 — 손번호를 붙이지 않는 것이 3-4의 계약이다.
     //
@@ -285,6 +533,7 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
         RHILayout::SrvTable(4, 0, RHIShaderVisibility::Pixel),   // baseColor · normal · occRoughMetal · emissive
         RHILayout::SamplerTable(1, 0, RHIShaderVisibility::Pixel),
         RHILayout::Srv(5, RHIShaderVisibility::Vertex),          // t5 — 본 팔레트
+        RHILayout::Cbv(2, RHIShaderVisibility::Pixel),           // b2 — M6 Material property block
     };
 
     RHIPipelineLayoutDesc rootDesc{};
@@ -320,25 +569,339 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     static_assert(offsetof(Vertex, boneIndices) == 64, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
-    RHIGraphicsPipelineDesc desc{};
-    desc.inputElements = kInputElements;
-    desc.inputElementCount = _countof(kInputElements);
-    desc.vsBytecode = vsBlob.Data();
-    desc.vsSize = vsBlob.Size();
-    desc.psBytecode = psBlob.Data();
-    desc.psSize = psBlob.Size();
-    desc.layout = root;
-    desc.depthEnable = true;
-    desc.cullMode = RHICullMode::None;
-    desc.numRenderTargets = kRenderTargetCount;
+    outDesc = {};
+    outDesc.inputElements = kInputElements;
+    outDesc.inputElementCount = _countof(kInputElements);
+    outDesc.vsBytecode = outVs.Data();
+    outDesc.vsSize = outVs.Size();
+    outDesc.psBytecode = outPs.Data();
+    outDesc.psSize = outPs.Size();
+    outDesc.layout = root;
+    outDesc.depthEnable = true;
+    outDesc.cullMode = RHICullMode::None;
+    outDesc.numRenderTargets = kRenderTargetCount;
     for (uint32_t i = 0; i < kRenderTargetCount; ++i)
     {
-        desc.rtvFormats[i] = GetRenderTargetFormat(i);
+        outDesc.rtvFormats[i] = GetRenderTargetFormat(i);
     }
-    desc.dsvFormat = kDepthFormat;
+    outDesc.dsvFormat = kDepthFormat;
 
-    m_pso = context.psoManager->GetOrCreate(desc, outError);
-    return m_pso.IsValid();
+    if (nullptr != renderState) renderState->ApplyTo(outDesc);
+    return true;
+}
+
+bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, std::string& outError)
+{
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob psBlob;
+    RHIGraphicsPipelineDesc desc{};
+    const RHIShaderPermutation emptyPermutation;
+    if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain", nullptr,
+            emptyPermutation, desc, vsBlob, psBlob, outError)) return false;
+
+    return m_pipelineRequest.Create(*context.psoManager, desc, outError);
+}
+
+bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
+    const EnhancedFrameContext& context, const ShaderMeta& meta,
+    std::span<const std::uint16_t> keywordSelections,
+    RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
+    RHIShaderBlob& outPs, RHIShaderPermutationKey& outPermutationKey,
+    std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
+    std::string& outError)
+{
+    const auto passIt = std::find_if(meta.passes.begin(), meta.passes.end(),
+        [](const ShaderPassDesc& pass) { return pass.name == "GBuffer"; });
+    if (passIt == meta.passes.end())
+    {
+        outError = "GBuffer ShaderMeta에 GBuffer pass가 없다";
+        return false;
+    }
+
+    const ShaderPassDesc& pass = *passIt;
+    if (pass.IsCompute() || !pass.vertex || !pass.pixel
+        || ShaderPassQueue::Opaque != pass.queue)
+    {
+        outError = "GBuffer ShaderMeta pass는 opaque VS+PS graphics여야 한다";
+        return false;
+    }
+
+    const std::uint32_t passIndex = static_cast<std::uint32_t>(
+        std::distance(meta.passes.begin(), passIt));
+    ShaderMetaPermutation permutation;
+    if (!ShaderPermutationDomain::Resolve(meta, passIndex, keywordSelections,
+            permutation, outError))
+    {
+        return false;
+    }
+
+    std::filesystem::path shaderPath = meta.source;
+    if (!meta.originPath.empty())
+    {
+        std::error_code pathError;
+        shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
+            RHIShaderSource::Resolve(""), pathError);
+        const auto first = shaderPath.begin();
+        if (pathError || shaderPath.empty() || shaderPath.is_absolute()
+            || (first != shaderPath.end() && *first == ".."))
+        {
+            outError = "GBuffer ShaderMeta source가 shader root 밖이다";
+            return false;
+        }
+    }
+
+    const std::string shaderFile = shaderPath.generic_string();
+    if (shaderFile.empty() || pass.vertex->entry.empty() || pass.pixel->entry.empty())
+    {
+        outError = "GBuffer ShaderMeta source/entry가 비었다";
+        return false;
+    }
+
+    if (!BuildPipelineDesc(context, shaderFile.c_str(), pass.vertex->entry.c_str(),
+            pass.pixel->entry.c_str(), &pass.state, permutation.defines,
+            outDesc, outVs, outPs, outError))
+    {
+        return false;
+    }
+
+    std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
+    if (!meta.properties.empty())
+    {
+        std::vector<RHIShaderReflection> reflections(2);
+        if (!RHIShaderCompiler::ReflectFile(shaderFile, pass.vertex->entry, "vs_5_0",
+                RHIShaderCompiler::GetOutput(), permutation.defines,
+                reflections[0], outError)
+            || !RHIShaderCompiler::ReflectFile(shaderFile, pass.pixel->entry, "ps_5_0",
+                RHIShaderCompiler::GetOutput(), permutation.defines,
+                reflections[1], outError))
+        {
+            return false;
+        }
+
+        ShaderMetaBindingLayout layout;
+        if (!ShaderMetaReflection::Resolve(meta, reflections, layout, outError))
+            return false;
+        if (layout.constantBufferName.empty()
+            || 2 != layout.constantBufferRegister
+            || 0 != layout.constantBufferSpace
+            || 0 == layout.constantBufferByteSize)
+        {
+            outError = "GBuffer Material property layout은 b2/space0이어야 한다";
+            return false;
+        }
+        if (!ValidateGBufferTextureLayout(layout, outError)) return false;
+        candidateLayout = std::make_shared<ShaderMetaBindingLayout>(std::move(layout));
+    }
+
+    outPermutationKey = permutation.key;
+    outLayout = std::move(candidateLayout);
+    return true;
+}
+
+bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
+    ShaderMetaHandle handle, const ShaderMeta& meta,
+    RHICompletionPoint retireAfter, std::string& outError)
+{
+    if (!handle.IsValid())
+    {
+        outError = "GBuffer ShaderMeta generation handle이 비었다";
+        return false;
+    }
+    if (handle == m_shaderMetaHandle) return true;
+
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob psBlob;
+    RHIGraphicsPipelineDesc desc{};
+    RHIShaderPermutationKey defaultPermutationKey{};
+    std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
+    const std::vector<std::uint16_t> defaultSelections(meta.keywords.size(), 0);
+    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections,
+            desc, vsBlob, psBlob, defaultPermutationKey, candidateLayout, outError))
+        return false;
+
+    const RHIPipelineHandle previousPipeline = m_pipelineRequest.GetHandle();
+    const bool previousShared = std::any_of(m_shaderVariants.begin(),
+        m_shaderVariants.end(), [previousPipeline](const auto& entry)
+        {
+            return entry.second.request.GetHandle() == previousPipeline;
+        });
+    // 후보가 완성된 뒤에만 기존 handle을 targeted retire한다. 실패하면 현재
+    // request와 m_shaderMetaHandle은 그대로라 다음 draw가 끊기지 않는다. 다른
+    // meta key가 같은 cache handle을 공유하면 그 holder가 사라질 때까지 보존한다.
+    if (!m_pipelineRequest.Replace(*context.psoManager, desc, retireAfter,
+            outError, !previousShared))
+        return false;
+
+    // primary generation 교체는 같은 catalog slot의 옛 permutation만 지운다.
+    // 다른 material ShaderMeta slot은 현재 frame sealing이 성공한 뒤 Commit에서
+    // 판단한다. 같은 cache handle을 공유하는 holder가 남아 있으면 무효화하지 않는다.
+    std::vector<RHIPipelineHandle> removedPipelines;
+    const std::uint32_t previousSlot = m_shaderMetaHandle.slot;
+    for (auto it = m_shaderVariants.begin(); it != m_shaderVariants.end();)
+    {
+        if (0 != previousSlot && it->first.meta.slot == previousSlot)
+        {
+            removedPipelines.push_back(it->second.request.GetHandle());
+            it = m_shaderVariants.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+    m_shaderMetaHandle = handle;
+    m_defaultPermutationKey = defaultPermutationKey;
+    m_shaderBindingLayout = std::move(candidateLayout);
+
+    std::vector<std::uint32_t> invalidated;
+    for (const RHIPipelineHandle pipeline : removedPipelines)
+    {
+        if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
+            || std::find(invalidated.begin(), invalidated.end(), pipeline.id)
+                != invalidated.end()
+            || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
+                [pipeline](const auto& entry)
+                {
+                    return entry.second.request.GetHandle() == pipeline;
+                }))
+        {
+            continue;
+        }
+        context.psoManager->InvalidatePipeline(pipeline, retireAfter);
+        invalidated.push_back(pipeline.id);
+    }
+    return true;
+}
+
+bool EnhancedGBufferPass::EnsureShaderMetaVariant(
+    const EnhancedFrameContext& context, ShaderMetaHandle handle,
+    const ShaderMeta& meta,
+    std::span<const std::uint16_t> keywordSelections,
+    RHIShaderPermutationKey& outPermutationKey,
+    std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
+    std::string& outError)
+{
+    if (!handle.IsValid())
+    {
+        outError = "GBuffer material variant의 ShaderMeta generation이 비었다";
+        return false;
+    }
+
+    const auto passIt = std::find_if(meta.passes.begin(), meta.passes.end(),
+        [](const ShaderPassDesc& pass) { return pass.name == "GBuffer"; });
+    if (passIt == meta.passes.end())
+    {
+        outError = "GBuffer material variant에 GBuffer pass가 없다";
+        return false;
+    }
+    const std::uint32_t passIndex = static_cast<std::uint32_t>(
+        std::distance(meta.passes.begin(), passIt));
+    ShaderMetaPermutation resolved;
+    if (!ShaderPermutationDomain::Resolve(meta, passIndex, keywordSelections,
+            resolved, outError))
+    {
+        return false;
+    }
+
+    outPermutationKey = resolved.key;
+    if (handle == m_shaderMetaHandle && resolved.key == m_defaultPermutationKey)
+    {
+        outLayout = m_shaderBindingLayout;
+        return nullptr != outLayout && m_pipelineRequest.IsValid();
+    }
+
+    const ShaderVariantKey key{ handle, resolved.key };
+    const auto existing = m_shaderVariants.find(key);
+    if (existing != m_shaderVariants.end())
+    {
+        outLayout = existing->second.layout;
+        return existing->second.request.IsValid() && nullptr != outLayout;
+    }
+
+    RHIShaderBlob vsBlob;
+    RHIShaderBlob psBlob;
+    RHIGraphicsPipelineDesc desc{};
+    RHIShaderPermutationKey candidateKey{};
+    std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
+    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections,
+            desc, vsBlob, psBlob, candidateKey, candidateLayout, outError))
+    {
+        return false;
+    }
+    if (candidateKey != resolved.key || !candidateLayout)
+    {
+        outError = "GBuffer material variant의 permutation/layout identity가 불완전하다";
+        return false;
+    }
+    if (!m_pipelineRequest.IsValid()
+        || desc.layout != m_pipelineRequest.GetDesc().layout)
+    {
+        outError = "GBuffer material ShaderMeta pipeline layout이 primary pass와 다르다";
+        return false;
+    }
+
+    ShaderVariant candidate;
+    candidate.layout = candidateLayout;
+    if (!candidate.request.Create(*context.psoManager, desc, outError)) return false;
+
+    auto [inserted, accepted] = m_shaderVariants.emplace(key, std::move(candidate));
+    if (!accepted)
+    {
+        outError = "GBuffer material variant cache insert가 충돌했다";
+        return false;
+    }
+    outLayout = inserted->second.layout;
+    outPermutationKey = candidateKey;
+    outError.clear();
+    return true;
+}
+
+std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
+    const EnhancedFrameContext& context,
+    std::span<const ShaderMetaHandle> activeHandles,
+    RHICompletionPoint retireAfter)
+{
+    if (nullptr == context.psoManager) return 0;
+    const auto isActive = [activeHandles](ShaderMetaHandle handle)
+    {
+        return std::find(activeHandles.begin(), activeHandles.end(), handle)
+            != activeHandles.end();
+    };
+
+    std::vector<RHIPipelineHandle> removedPipelines;
+    std::uint32_t removedKeys = 0;
+    for (auto it = m_shaderVariants.begin(); it != m_shaderVariants.end();)
+    {
+        if (!isActive(it->first.meta))
+        {
+            removedPipelines.push_back(it->second.request.GetHandle());
+            it = m_shaderVariants.erase(it);
+            ++removedKeys;
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    std::vector<std::uint32_t> invalidated;
+    for (const RHIPipelineHandle pipeline : removedPipelines)
+    {
+        if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
+            || std::find(invalidated.begin(), invalidated.end(), pipeline.id)
+                != invalidated.end()
+            || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
+                [pipeline](const auto& entry)
+                {
+                    return entry.second.request.GetHandle() == pipeline;
+                }))
+        {
+            continue;
+        }
+        context.psoManager->InvalidatePipeline(pipeline, retireAfter);
+        invalidated.push_back(pipeline.id);
+    }
+    return removedKeys;
 }
 
 bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
@@ -457,7 +1020,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 encoder.ClearDepthTarget(boundTargets, 1.f);
             }
 
-            encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
+            // 프레임/팔레트 상수를 걸기 전에 공용 root layout을 설치한다.
+            // batch loop는 같은 layout의 permutation PSO만 바꾸므로 DX12Encoder와
+            // VulkanEncoder 모두 이미 건 root/descriptor 상태를 보존한다.
+            encoder.SetPipeline(RHIBindPoint::Graphics, m_pipelineRequest.GetHandle());
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
             // 프레임 상수는 한 번만 올린다. 드로우마다 올리면 같은 값을 수백 번
@@ -546,10 +1112,33 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             for (size_t batchIndex = sliceBegin; batchIndex < sliceEnd; ++batchIndex)
             {
                 const DrawBatch& batch = m_batches[batchIndex];
-                if (0 == batch.instanceCount) continue;
+                if (0 == batch.instanceCount || !batch.pipeline.IsValid()) continue;
 
                 const auto mesh = m_drawGeometry.find(batch.mesh);
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
+
+                // M6-P1b2b1: PSO는 pass 전역 한 번이 아니라 material batch 직전에
+                // 고른다. 같은 texture/property라도 keyword permutation이 다르면
+                // 서로 다른 pipeline handle로 기록된다.
+                encoder.SetPipeline(RHIBindPoint::Graphics, batch.pipeline);
+
+                // M6-P1a: property bytes는 batch key의 일부다. 같은 texture/mesh라도
+                // 값이 다르면 batch가 갈리고, 그 batch를 기록하기 직전에 b2를
+                // 바꾼다. active ShaderMeta와 다른 handle은 PrepareFrame에서 이미
+                // fail-closed되어 이 지점에 도달하지 않는다.
+                const bool hasSnapshot = batch.material.snapshot
+                    && !batch.material.snapshot->propertyBytes.empty();
+                const void* materialData = !hasSnapshot
+                    ? static_cast<const void*>(&kLegacyMaterialConstants)
+                    : static_cast<const void*>(
+                        batch.material.snapshot->propertyBytes.data());
+                const std::size_t materialSize = !hasSnapshot
+                    ? sizeof(kLegacyMaterialConstants)
+                    : batch.material.snapshot->propertyBytes.size();
+                const auto materialConstants = context.resources->UploadConstants(
+                    materialData, materialSize);
+                if (!materialConstants.IsValid()) continue;
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 5, materialConstants);
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
                     instanceBlock.SubRange(
@@ -633,6 +1222,10 @@ void EnhancedGBufferPass::Shutdown()
     m_drawTextures.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
-    m_pso = {};
+    m_shaderVariants.clear();
+    m_pipelineRequest = {};
+    m_shaderMetaHandle = {};
+    m_defaultPermutationKey = {};
+    m_shaderBindingLayout.reset();
 }
 

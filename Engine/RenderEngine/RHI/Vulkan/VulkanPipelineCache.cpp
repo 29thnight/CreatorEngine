@@ -2,6 +2,7 @@
 #include "VulkanFormat.h"
 #include "VulkanBindingModel.h"
 
+#include <algorithm>
 #include <cstring>
 
 using namespace VulkanApi;
@@ -232,12 +233,20 @@ void VulkanPipelineCache::Shutdown()
 {
     if (VK_NULL_HANDLE == m_device) return;
 
-    for (const VulkanPipelineEntry& entry : m_pipelines)
+    for (const PipelineSlot& slot : m_pipelines)
     {
-        if (VK_NULL_HANDLE != entry.pipeline) vkDestroyPipeline(m_device, entry.pipeline, nullptr);
+        if (slot.alive && VK_NULL_HANDLE != slot.entry.pipeline)
+            vkDestroyPipeline(m_device, slot.entry.pipeline, nullptr);
     }
     m_pipelines.clear();
+    m_pipelineFree.clear();
     m_pipelineByHash.clear();
+
+    m_retiredPipelines.Drain([this](VkPipeline& pipeline)
+    {
+        if (VK_NULL_HANDLE != pipeline) vkDestroyPipeline(m_device, pipeline, nullptr);
+        pipeline = VK_NULL_HANDLE;
+    });
 
     for (const VulkanPipelineLayoutEntry& entry : m_layouts)
     {
@@ -503,7 +512,109 @@ VulkanPipelineEntry VulkanPipelineCache::Resolve(RHIPipelineHandle handle) const
 {
     if (!handle.IsValid()) return {};
     const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
-    return (slot < m_pipelines.size()) ? m_pipelines[slot] : VulkanPipelineEntry{};
+    if (slot >= m_pipelines.size()) return {};
+    const PipelineSlot& target = m_pipelines[slot];
+    if (!target.alive || target.generation != RHIHandleBits::GenerationOf(handle.id))
+        return {};
+    return target.entry;
+}
+
+bool VulkanPipelineCache::InvalidatePipeline(RHIPipelineHandle handle,
+    RHICompletionPoint retireAfter)
+{
+    if (!RetirePipeline(handle, retireAfter)) return false;
+
+    ++m_stats.invalidations;
+    m_stats.retiredPipelines = static_cast<std::uint32_t>(
+        m_retiredPipelines.GetPendingCount());
+    return true;
+}
+
+bool VulkanPipelineCache::RetirePipeline(RHIPipelineHandle handle,
+    RHICompletionPoint retireAfter)
+{
+    if (!handle.IsValid()) return false;
+
+    const auto found = std::find_if(m_pipelineByHash.begin(), m_pipelineByHash.end(),
+        [handle](const auto& pair) { return pair.second == handle; });
+    if (m_pipelineByHash.end() == found) return false;
+
+    const std::uint32_t slotIndex = RHIHandleBits::SlotOf(handle.id);
+    if (slotIndex >= m_pipelines.size()) return false;
+    PipelineSlot& slot = m_pipelines[slotIndex];
+    if (!slot.alive || slot.generation != RHIHandleBits::GenerationOf(handle.id))
+        return false;
+
+    if (VK_NULL_HANDLE != slot.entry.pipeline)
+        m_retiredPipelines.Enqueue(retireAfter, slot.entry.pipeline);
+    slot.entry = {};
+    slot.alive = false;
+    slot.generation = (slot.generation + 1u) & RHIHandleBits::kIndexMask;
+    m_pipelineFree.push_back(slotIndex);
+    m_pipelineByHash.erase(found);
+    return true;
+}
+
+std::uint32_t VulkanPipelineCache::InvalidatePipelines(RHICompletionPoint retireAfter)
+{
+    std::uint32_t invalidated = 0;
+    for (std::uint32_t slotIndex = 0;
+        slotIndex < static_cast<std::uint32_t>(m_pipelines.size()); ++slotIndex)
+    {
+        PipelineSlot& slot = m_pipelines[slotIndex];
+        if (!slot.alive) continue;
+
+        if (VK_NULL_HANDLE != slot.entry.pipeline)
+            m_retiredPipelines.Enqueue(retireAfter, slot.entry.pipeline);
+        slot.entry = {};
+        slot.alive = false;
+        slot.generation = (slot.generation + 1u) & RHIHandleBits::kIndexMask;
+        m_pipelineFree.push_back(slotIndex);
+        ++invalidated;
+    }
+
+    m_pipelineByHash.clear();
+    if (0 != invalidated) ++m_stats.invalidations;
+    m_stats.retiredPipelines = static_cast<std::uint32_t>(
+        m_retiredPipelines.GetPendingCount());
+    return invalidated;
+}
+
+std::uint32_t VulkanPipelineCache::CollectRetiredPipelines(
+    RHICompletionPoint completed)
+{
+    const RHIRetireCollection collected = m_retiredPipelines.Collect(
+        completed, [this](VkPipeline& pipeline)
+        {
+            if (VK_NULL_HANDLE != pipeline)
+                vkDestroyPipeline(m_device, pipeline, nullptr);
+            pipeline = VK_NULL_HANDLE;
+        });
+    m_stats.retiredCollections += static_cast<std::uint32_t>(collected.count);
+    m_stats.retiredPipelines = static_cast<std::uint32_t>(
+        m_retiredPipelines.GetPendingCount());
+    return static_cast<std::uint32_t>(collected.count);
+}
+
+RHIPipelineHandle VulkanPipelineCache::PublishPipeline(VulkanPipelineEntry entry)
+{
+    std::uint32_t slotIndex{};
+    if (!m_pipelineFree.empty())
+    {
+        slotIndex = m_pipelineFree.back();
+        m_pipelineFree.pop_back();
+    }
+    else
+    {
+        if (m_pipelines.size() >= RHIHandleBits::kMaxSlots) return {};
+        slotIndex = static_cast<std::uint32_t>(m_pipelines.size());
+        m_pipelines.emplace_back();
+    }
+
+    PipelineSlot& slot = m_pipelines[slotIndex];
+    slot.entry = entry;
+    slot.alive = true;
+    return { RHIHandleBits::Encode(slotIndex, slot.generation) };
 }
 
 VulkanLayoutSlot VulkanPipelineCache::ResolveParam(RHIPipelineLayoutHandle handle,
@@ -576,9 +687,15 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreateCompute(const RHIComputePipeli
     }
 
     ++m_stats.compiles;
-    m_pipelines.push_back({ pipeline, layout.layout, layout.setLayout, desc.layout });
-    const RHIPipelineHandle handle{
-        RHIHandleBits::Encode(static_cast<uint32_t>(m_pipelines.size() - 1), 0) };
+    const RHIPipelineHandle handle = PublishPipeline(
+        { pipeline, layout.layout, layout.setLayout, desc.layout });
+    if (!handle.IsValid())
+    {
+        vkDestroyPipeline(m_device, pipeline, nullptr);
+        ++m_stats.failures;
+        outError = "컴퓨트 파이프라인 핸들 발급 실패 — 표가 가득 찼다";
+        return {};
+    }
     m_pipelineByHash.emplace(hash, handle);
     return handle;
 }
@@ -613,9 +730,15 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreate(const RHIGraphicsPipelineDesc
     }
 
     ++m_stats.compiles;
-    m_pipelines.push_back({ pipeline, layout.layout, layout.setLayout, desc.layout });
-    const RHIPipelineHandle handle{
-        RHIHandleBits::Encode(static_cast<uint32_t>(m_pipelines.size() - 1), 0) };
+    const RHIPipelineHandle handle = PublishPipeline(
+        { pipeline, layout.layout, layout.setLayout, desc.layout });
+    if (!handle.IsValid())
+    {
+        vkDestroyPipeline(m_device, pipeline, nullptr);
+        ++m_stats.failures;
+        outError = "파이프라인 핸들 발급 실패 — 표가 가득 찼다";
+        return {};
+    }
     m_pipelineByHash.emplace(hash, handle);
     return handle;
 }

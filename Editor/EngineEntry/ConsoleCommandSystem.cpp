@@ -2787,6 +2787,207 @@ namespace ConsoleCmd
 			reloaded.GetValues().size(), roundTrip);
 	}
 
+	static void Cmd_asset_guid_rename_probe(const ConsoleCommandContext&)
+	{
+		// D2-c: 새 material payload와 sidecar가 같은 UUIDv4를 갖고, target+meta
+		// rename 뒤에도 catalog의 GUID->path 참조가 그대로 새 경로를 가리키는지
+		// 한 transaction으로 확인한다. 고정 이름을 쓰지 않아 이전 실패 잔재나
+		// 병렬 실행과 충돌하지 않는다.
+		const FileGuid requestedGuid = FileGuid::CreateRandomV4();
+		std::string suffix = requestedGuid.ToString();
+		std::erase(suffix, '-');
+		const std::string sourceName = "D2GuidRenameProbe_" + suffix;
+		const std::string destinationName = sourceName + "_Renamed";
+		const file::path sourcePath = PathFinder::Relative("Materials\\") /
+			(sourceName + ".asset");
+		const file::path destinationPath = PathFinder::Relative("Materials\\") /
+			(destinationName + ".asset");
+		const file::path sourceMeta = sourcePath.string() + ".meta";
+		const file::path destinationMeta = destinationPath.string() + ".meta";
+
+		auto cleanup = [](const file::path& assetPath)
+		{
+			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+				RuntimeAssetType::Material, {}, assetPath });
+			std::error_code ignored;
+			file::remove(assetPath, ignored);
+			ignored.clear();
+			file::remove(assetPath.string() + ".meta", ignored);
+		};
+
+		Material authored;
+		authored.m_name = sourceName;
+		authored.m_fileGuid = requestedGuid;
+		authored.m_materialInfo.m_roughness = 0.375f;
+
+		bool saved = false;
+		bool renamed = false;
+		bool identityPreserved = false;
+		bool materialRoundTrip = false;
+		FileGuid canonicalGuid{};
+		try
+		{
+			saved = EditorAssetDatabase::Get().SaveMaterial(&authored);
+			canonicalGuid = DataSystems->GetFileGuid(sourcePath);
+			if (saved && canonicalGuid == requestedGuid)
+			{
+				const FileGuid movedGuid = EditorAssetDatabase::Get().RenameAsset(
+					sourcePath, destinationPath);
+				renamed = movedGuid == canonicalGuid;
+				identityPreserved = renamed
+					&& !file::exists(sourcePath) && !file::exists(sourceMeta)
+					&& file::is_regular_file(destinationPath)
+					&& file::is_regular_file(destinationMeta)
+					&& DataSystems->GetFileGuid(sourcePath) == FileGuid{}
+					&& DataSystems->GetFileGuid(destinationPath) == canonicalGuid
+					&& DataSystems->GetFilePath(canonicalGuid).lexically_normal()
+						== destinationPath.lexically_normal();
+
+				if (identityPreserved)
+				{
+					const YAML::Node persisted = YAML::LoadFile(destinationPath.string());
+					Material decoded;
+					materialRoundTrip = DataSystems->DeserializeMaterialPayload(
+						decoded, persisted)
+						&& decoded.m_fileGuid == canonicalGuid
+						&& decoded.m_materialInfo.m_roughness
+							== authored.m_materialInfo.m_roughness
+						&& YAML::Dump(persisted) == YAML::Dump(
+							DataSystems->SerializeMaterialPayload(decoded));
+				}
+			}
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("[asset.guid.rename] probe exception: "
+				+ std::string(exception.what()));
+		}
+
+		cleanup(sourcePath);
+		cleanup(destinationPath);
+		const bool passed = saved && renamed && identityPreserved
+			&& materialRoundTrip
+			&& canonicalGuid.IsRandomV4();
+		std::printf("[asset.guid.rename] %s guid=%s save=%s move=%s "
+			"identity=%s material-roundtrip=%s cleanup=%s\n",
+			passed ? "pass" : "fail", canonicalGuid.ToString().c_str(),
+			saved ? "yes" : "no", renamed ? "yes" : "no",
+			identityPreserved ? "yes" : "no",
+			materialRoundTrip ? "yes" : "no",
+			(!file::exists(sourcePath) && !file::exists(sourceMeta)
+				&& !file::exists(destinationPath) && !file::exists(destinationMeta))
+				? "yes" : "no");
+		if (!passed) EngineBootstrap::SetExitCode(6);
+	}
+
+	static void Cmd_material_corpus_probe(const ConsoleCommandContext& ctx)
+	{
+		// D2-d: 실제 standalone material corpus를 파일 수정 없이 메모리에서 두 번
+		// 왕복한다. UUID version은 전역 strict gate의 책임이고, 여기서는 sidecar
+		// 정본과 payload mirror가 같은 identity인지 및 asset reference가 보존되는지만
+		// 판정한다.
+		if (ctx.parts.size() < 2)
+		{
+			std::printf("[CLI] 사용법: material.corpus.probe <머티리얼 이름>...\n");
+			EngineBootstrap::SetExitCode(6);
+			return;
+		}
+
+		auto captureReferences = [](const Material& material)
+		{
+			std::vector<std::string> rows;
+			rows.push_back("shader|" + material.m_shaderMetaGuid.ToString());
+			for (const MaterialPropertyValue& property : material.m_propertyValues)
+			{
+				if (property.m_textureGuid == FileGuid{}) continue;
+				rows.push_back("texture|" + property.m_name + "|"
+					+ property.m_textureGuid.ToString());
+			}
+			std::ranges::sort(rows);
+			return rows;
+		};
+
+		size_t passedCount = 0;
+		size_t textureReferenceCount = 0;
+		for (size_t index = 1; index < ctx.parts.size(); ++index)
+		{
+			const std::string& name = ctx.parts[index];
+			const file::path assetPath = PathFinder::Relative("Materials\\") /
+				(name + ".asset");
+			bool decoded = false;
+			bool identity = false;
+			bool shader = false;
+			bool textures = false;
+			bool stable = false;
+			size_t materialTextureReferences = 0;
+			try
+			{
+				const FileGuid catalogGuid = DataSystems->GetFileGuid(assetPath);
+				const YAML::Node source = YAML::LoadFile(assetPath.string());
+				Material first;
+				decoded = DataSystems->DeserializeMaterialPayload(first, source);
+				identity = decoded && catalogGuid != FileGuid{}
+					&& first.m_fileGuid == catalogGuid;
+
+				const file::path shaderPath = decoded
+					? DataSystems->GetFilePath(first.m_shaderMetaGuid) : file::path{};
+				shader = decoded && first.m_shaderMetaGuid != FileGuid{}
+					&& !shaderPath.empty() && file::is_regular_file(shaderPath)
+					&& shaderPath.extension() == ".shadermeta";
+
+				textures = decoded;
+				if (decoded)
+				{
+					for (const MaterialPropertyValue& property : first.m_propertyValues)
+					{
+						if (property.m_textureGuid == FileGuid{}) continue;
+						++materialTextureReferences;
+						const file::path texturePath = DataSystems->GetFilePath(
+							property.m_textureGuid);
+						if (texturePath.empty() || !file::is_regular_file(texturePath))
+							textures = false;
+					}
+				}
+
+				if (decoded)
+				{
+					const YAML::Node firstCanonical =
+						DataSystems->SerializeMaterialPayload(first);
+					Material second;
+					const bool decodedAgain = DataSystems->DeserializeMaterialPayload(
+						second, firstCanonical);
+					const YAML::Node secondCanonical = decodedAgain
+						? DataSystems->SerializeMaterialPayload(second) : YAML::Node{};
+					stable = decodedAgain
+						&& second.m_fileGuid == first.m_fileGuid
+						&& captureReferences(second) == captureReferences(first)
+						&& YAML::Dump(secondCanonical) == YAML::Dump(firstCanonical);
+				}
+			}
+			catch (const std::exception& exception)
+			{
+				Debug->LogError("[material.corpus] " + name + ": "
+					+ exception.what());
+			}
+
+			const bool passed = decoded && identity && shader && textures && stable;
+			if (passed) ++passedCount;
+			textureReferenceCount += materialTextureReferences;
+			std::printf("[material.corpus] %s %s identity=%s shader=%s "
+				"textures=%zu/%s stable=%s\n",
+				name.c_str(), passed ? "pass" : "fail",
+				identity ? "yes" : "no", shader ? "yes" : "no",
+				materialTextureReferences, textures ? "valid" : "invalid",
+				stable ? "yes" : "no");
+		}
+
+		const size_t total = ctx.parts.size() - 1;
+		const bool passed = passedCount == total;
+		std::printf("[material.corpus] %s materials=%zu/%zu textureRefs=%zu\n",
+			passed ? "pass" : "fail", passedCount, total, textureReferenceCount);
+		if (!passed) EngineBootstrap::SetExitCode(6);
+	}
+
     static void Cmd_model_place(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -3340,6 +3541,89 @@ namespace ConsoleCmd
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
     }
+
+	static void Cmd_prefab_corpus_digest(const ConsoleCommandContext& ctx)
+	{
+		// D2-d: 호출자가 지정한 9개 프리팹의 인스턴스 루트 identity와 활성 씬의
+		// 전체 prefab identity/override multiset을 저장 전후 비교 가능한 digest로
+		// 출력한다. instanceID나 scene index처럼 재로드에서 바뀔 수 있는 값은 섞지
+		// 않는다.
+		if (ctx.parts.size() < 3)
+		{
+			std::printf("[CLI] 사용법: prefab.corpus.digest <라벨> <프리팹 이름>...\n");
+			EngineBootstrap::SetExitCode(6);
+			return;
+		}
+
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (!scene)
+		{
+			std::printf("[CLI] 활성 씬 없음\n");
+			EngineBootstrap::SetExitCode(6);
+			return;
+		}
+
+		const std::string& label = ctx.parts[1];
+		const size_t expectedRoots = ctx.parts.size() - 2;
+		size_t validRoots = 0;
+		for (size_t index = 2; index < ctx.parts.size(); ++index)
+		{
+			const std::string& prefabName = ctx.parts[index];
+			Prefab* prefab = PrefabUtilitys->LoadPrefab(prefabName);
+			Entity* root = scene->GetEntity("D2Corpus_" + prefabName);
+			if (prefab && root && prefab->GetFileGuid() != FileGuid{}
+				&& root->m_prefabFileGuid == prefab->GetFileGuid())
+			{
+				++validRoots;
+			}
+		}
+
+		std::vector<std::string> rows;
+		size_t entityCount = 0;
+		size_t overrideCount = 0;
+		for (const auto& owner : scene->m_Entities)
+		{
+			Entity* entity = owner.get();
+			if (!entity || entity->m_prefabFileGuid == FileGuid{}) continue;
+			++entityCount;
+			Entity* parent = scene->TryGetEntity(entity->GetParentIndex());
+			const std::string parentName = parent
+				? parent->m_name.ToString() : std::string("<none>");
+			const std::string prefix = entity->m_name.ToString() + "|" + parentName
+				+ "|" + entity->m_prefabFileGuid.ToString();
+			rows.push_back("entity|" + prefix);
+			for (const PrefabOverride& item : entity->m_prefabOverrides)
+			{
+				++overrideCount;
+				rows.push_back("override|" + prefix + "|" + item.m_componentType
+					+ "|" + std::to_string(item.m_componentSlot) + "|"
+					+ item.m_propertyName + "|" + item.m_valueYaml);
+			}
+		}
+		std::ranges::sort(rows);
+
+		uint64_t digest = 1469598103934665603ull;
+		for (const std::string& row : rows)
+		{
+			for (const unsigned char byte : row)
+			{
+				digest ^= byte;
+				digest *= 1099511628211ull;
+			}
+			digest ^= static_cast<unsigned char>('\n');
+			digest *= 1099511628211ull;
+		}
+
+		const size_t registered = PrefabUtilitys->RegisteredInstanceCount();
+		const bool passed = validRoots == expectedRoots
+			&& entityCount >= expectedRoots && registered >= expectedRoots;
+		std::printf("[prefab.corpus:%s] %s roots=%zu/%zu entities=%zu "
+			"overrides=%zu registered=%zu digest=%016llx\n",
+			label.c_str(), passed ? "pass" : "fail", validRoots, expectedRoots,
+			entityCount, overrideCount, registered,
+			static_cast<unsigned long long>(digest));
+		if (!passed) EngineBootstrap::SetExitCode(6);
+	}
 
     static void Cmd_window_resize(const ConsoleCommandContext& ctx)
     {
@@ -4243,6 +4527,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanForwardTest(result);
+        std::printf("%s", result.c_str());
         Debug->LogWarning(std::string("[vk.forward] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.forward %s\n", passed ? "통과" : "실패");
@@ -6390,6 +6675,8 @@ namespace ConsoleCmd
 			reg({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
 			reg({ "foliage.authoring.probe" }, &Cmd_foliage_authoring_probe);
 			reg({ "blackboard.authoring.probe" }, &Cmd_blackboard_authoring_probe);
+			reg({ "asset.guid.rename.probe" }, &Cmd_asset_guid_rename_probe);
+			reg({ "material.corpus.probe" }, &Cmd_material_corpus_probe);
 			reg({ "collisionmatrix.authoring.probe" },
 				&Cmd_collisionmatrix_authoring_probe);
 			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
@@ -6403,6 +6690,7 @@ namespace ConsoleCmd
             reg({ "component.add" }, &Cmd_component_add);
             reg({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
             reg({ "prefab.status" }, &Cmd_prefab_status);
+			reg({ "prefab.corpus.digest" }, &Cmd_prefab_corpus_digest);
             reg({ "prefab.overrides" }, &Cmd_prefab_overrides);
             reg({ "prefab.update" }, &Cmd_prefab_update);
             reg({ "window.resize" }, &Cmd_window_resize);
@@ -6606,12 +6894,14 @@ void ConsoleCommandSystem::PrintHelp() const
         "  game.pak             Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
 		"  model.cache.build <원본>  원본을 복사하지 않고 .asset 캐시를 재생성·재로드 검증한다\n"
+		"  material.corpus.probe <이름>...  standalone material identity/reference 왕복\n"
 		"  terrain.authoring.probe <이름> <텍스처|->  Terrain writer 트랜잭션 회귀 검사\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
         "  object.create <이름> [타입]  빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)\n"
         "  object.rename <이전> <새>  오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)\n"
         "  object.transform <이름> <px py pz> [rx ry rz] [sx sy sz]  변환을 지정한다(회전은 도)\n"
-        "  object.rootref <오브젝트> [루트|-]  Bone형 same-scene root 참조를 설정/조회한다\n"
+		"  object.rootref <오브젝트> [루트|-]  Bone형 same-scene root 참조를 설정/조회한다\n"
+		"  prefab.corpus.digest <라벨> <이름>...  prefab identity/override 왕복 digest\n"
         "  object.property <오브젝트> <컴포넌트> <필드> <값>  리플렉션으로 프로퍼티를 설정한다\n"
         "  play / stop          에디터의 재생·정지와 같은 동작\n"
         "  lifecycle.trace on [틱프레임]|off|clear|status  생명주기 호출 순서를 받아 적는다\n"

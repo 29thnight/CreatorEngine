@@ -462,14 +462,23 @@ FodyWeavers.xsd
 /imgui.ini
 *.creator
 *.meta
-# ShaderMeta는 Material이 GUID로 참조하는 저작 정본이다. 일반 importer 부산물
-# .meta는 계속 무시하되 이 sidecar만 clean checkout/Tracked package에 남긴다.
+# 프로젝트 분리 전에는 로컬 게임 콘텐츠의 sidecar를 추적하지 않는다.
+# `git add -f`로 이 규약을 우회하지 않는다. 아래의 명시적 예외는 저장소가
+# 소유하는 clean-checkout 검증/패키지 폐포뿐이며 target과 .meta를 같이 추적한다.
+# verify-asset-guid-contract.ps1 -Strict는 ignore된 .meta의 강제 추가를 거부한다.
+# 현재 전수 model Cook이 소비하는 추적 FBX 두 개도 정확한 파일로만 예외다.
+!Dynamic_CPP/Assets/Animation/Ani_Mon_3_die.fbx.meta
+!Dynamic_CPP/Assets/Animation/Cha_Mon_5.fbx.meta
+# ShaderMeta는 Material이 GUID로 참조하는 저작 정본이므로 패턴으로 예외 처리한다.
 !Dynamic_CPP/Assets/Shaders/**/*.shadermeta.meta
 /TestScene.yml
 /NodeEditor/
 /Dynamic_CPP/Assets/ColorGrading/
 /Dynamic_CPP/Assets/Font/
-/Dynamic_CPP/Assets/HDR/
+/Dynamic_CPP/Assets/HDR/*
+# 기존 clean-checkout IBL 폐포. 새 HDR 프로젝트 자산은 예외에 자동 포함되지 않는다.
+!/Dynamic_CPP/Assets/HDR/autumn_field_puresky_1k.hdr
+!/Dynamic_CPP/Assets/HDR/autumn_field_puresky_1k.hdr.meta
 # 게임 콘텐츠는 저장소에 두지 않는다. 다만 기능 테스트 자산은 예외다 —
 # dx12.scene 같은 자가 검증은 '메시가 있는 씬'을 전제로 하는데, 자산이
 # 전부 무시되면 이 기계 밖에서는 그 검사를 돌릴 방법이 없다.
@@ -479,6 +488,12 @@ FodyWeavers.xsd
 /Dynamic_CPP/Assets/Materials/*
 !/Dynamic_CPP/Assets/Materials/*_Mat_BaseColor.png
 !/Dynamic_CPP/Assets/Materials/*_Mat_BaseColor.png.meta
+# M6-P2c의 제품 Forward material-GUID 회귀 정본. 일반 게임 콘텐츠는 계속
+# 무시하고 Water/Wind 대표 두 자산과 GUID sidecar만 clean checkout에 남긴다.
+!/Dynamic_CPP/Assets/Materials/ForwardWater.asset
+!/Dynamic_CPP/Assets/Materials/ForwardWater.asset.meta
+!/Dynamic_CPP/Assets/Materials/ForwardWind.asset
+!/Dynamic_CPP/Assets/Materials/ForwardWind.asset.meta
 /Dynamic_CPP/Assets/Models/*
 !/Dynamic_CPP/Assets/Models/Prim_*.glb
 !/Dynamic_CPP/Assets/Models/Prim_*.glb.meta

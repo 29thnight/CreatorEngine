@@ -116,7 +116,7 @@ SolutionGuid가 동일하다(복제 생성의 흔적).
 래퍼다** — 기능 무해, 그러나 모든 헤더 첫 줄에서 "이 가드는 왜 있지"를
 묻게 만드는 순수 부채.
 
-### 1.3 에셋 흐름 — B2 기능 경로는 닫혔고 셰이더 쿡은 아직 비어 있다
+### 1.3 에셋 흐름 — B2 model Cook/pak은 닫혔고 셰이더 쿡은 아직 비어 있다
 
 2026-08-24 현재 셰이더 컴파일 정본은 옛 `ShaderSystem/HLSLCompiler/.cso`나
 직접 DXC 경로가 아니라 `RHIShaderCompiler`와 고정 Slang 2026.14다. 요청의
@@ -128,7 +128,9 @@ DXIL/SPIR-V, strict-math
 허용하지 않는다. DXC는 Slang의 DXIL downstream 구현으로만 번들 안에 남으며
 엔진이 직접 적재하거나 선택하지 않는다.
 
-B2의 Cook 단계는 의도적으로 no-op이다. 현재 패키지는 HLSL source와
+B2의 Cook 단계는 더 이상 전체 no-op이 아니다. Serialization D5-b2b2가 package-base
+snapshot의 model 전수를 별도 `AssetCooker`로 CEMC/CEMF에 cook하고 `Assets/Derived`를
+`AssetPacker` 입력에 overlay한다. 다만 **shader precompile**은 의도적으로 no-op이다. 현재 패키지는 HLSL source와
 `slang-compiler.dll`·`dxcompiler.dll`·`dxil.dll`을 싣고 Player가 Slang으로
 런타임 컴파일한다. 따라서
 "cso를 복사하면 된다"는 과거 계획은 폐기한다. 현 캐시는 compiler 세 DLL의
@@ -295,9 +297,9 @@ C#(GameScripts.dll)뿐이고 ClrHost가 실행 시 로드한다 — 게임마다
 Tools/build.ps1 -Config Release -InputMode <Project|Workspace|Tracked>
                 [-Project <경로>] [-BuildNative]
                 [-StartupScene <name.creator>] [-RenderBackend <dx12|vulkan>]
-  1 BuildNative    선택적으로 Player·AssetPacker를 현재 solution에서 빌드
+  1 BuildNative    선택적으로 Player·AssetPacker·AssetCooker를 현재 solution에서 빌드
   2 BuildManaged   dotnet build ScriptCore → GameScripts
-  3 Cook           B3 전까지 no-op; HLSL source를 pak 입력에 유지
+  3 Cook           package-base model→CEMC/CEMF; shader는 B3 전까지 source를 유지
   4 Stage          미게시 candidate에 Player.exe·명시 DLL·Managed 배치
   5 Pak            정본 입력 + runtime settings overlay → GameAssets.pak/manifest
   6 Verify         격리 TEMP에서 Player --smoke N, unpack hash와 runtime hash 검증
@@ -418,7 +420,7 @@ OutDir 규약)를 Directory.Build.props로 승격 · EngineOutput.props 흡수
 링크로 디버거 아래서 뜬다.
 
 **B2 — 오케스트레이터 ◐ Workspace·Editor Project gate 통과, Tracked/CI/운영성
-잔여 (2026-08-21).** `Tools/build.ps1`이 BuildNative→BuildManaged→Cook(no-op)→
+잔여 (2026-08-21, model Cook 개정 2026-08-29).** `Tools/build.ps1`이 BuildNative→BuildManaged→Cook→
 Stage→Pak→Verify와 원자적 publish를 소유한다. `Project`, `Workspace`, `Tracked`
 입력은 live `EngineSettings.asset`을 제외하고 runtime settings overlay를 사용한다.
 Verify는 startup scene, 렌더 진행, exact unpack hash, C#
@@ -433,6 +435,13 @@ legacy Test Pack/Unpack UI도 제거했다. 현재 `-BuildNative`의 구성은 �
 패키징은 `BuildSettings`의 선택을 runtime overlay `render.backend`로 투영하고 Player는
 `build.render.backend`를 직접 읽지 않는다. E1 설정 재배선 뒤 Core/Editor 비유니티 build,
 Editor 즉시 종료 6회, packaging boundary와 Workspace/Product Player smoke를 다시 통과했다.
+Serialization D5-b2b2에서 Cook은 선택된 `InputMode`의 base snapshot을 입력으로 쓰고,
+AssetCooker가 만든 model `Derived` tree만 merge한 후 pak에 넣는다. Debug/Project/
+SkipVerify 실행은 model 14, CEMC 14 + CEMF 1, 529 pak entries를 생성했고
+AssetPacker reopen/index 검증을 통과했다. 이 실행은 publish/runtime smoke는 의도적으로
+생략했다. `DirectXTK12.dll`은 Player PE import가 아닌 낡은 runtime copy list 항목이었으며
+그 목록에서 제거했다. `verify-mathematics-contract.ps1`은 manifest/헤더와 더불어
+패키징 copy list의 `DirectXTK12.dll` 재유입도 거부한다.
 `Release|x64`의 host compiler/linker도 `PreferredToolArchitecture=x64`로 고정한다. 이전에는
 x86·x64 MSBuild 진입점이 같은 `IntDir`의 LTCG `.ipdb/.iobj`를 교대로 갱신해, x86 host로
 전환할 때 7만여 함수 중 90% 이상을 재생성했다. `build.ps1`은 PATH의 x86 MSBuild를 같은

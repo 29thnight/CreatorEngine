@@ -25,10 +25,14 @@
 #include "../../RHI/Vulkan/VulkanCommandBufferPool.h"
 #include "../../RHI/Vulkan/VulkanPipelineCache.h"
 #include "../../RHI/RHIShaderCompiler.h"
+#include "../../RHI/RHIShaderSource.h"
 #include "../../RHI/Vulkan/VulkanLoader.h"
 #include "../../RHI/ScreenSizedResource.h"
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
+#include "../../DataSystem.h"
+#include "../../ShaderMeta.h"
+#include "../../StandardMaterialProperty.h"
 
 #include "../../Camera.h"
 #include "../../Material.h"
@@ -59,6 +63,7 @@
 #include <deque>
 #include <condition_variable>
 #include <chrono>
+#include <string_view>
 #include <unordered_map>
 
 // EnhancedSceneRenderer의 단독 메인 런타임 구현.
@@ -110,6 +115,84 @@ namespace
         if (value == "1" || value == "true" || value == "on") return true;
         if (value == "0" || value == "false" || value == "off") return false;
         return fallback;
+    }
+
+    // P2d-c: ShaderMeta authoring 순서와 reflection register, logical GUID,
+    // Material의 runtime generation owner를 한 가변 벡터에 밀봉한다. pass의
+    // t-range 제한은 variant 생성 시 검증하고, 여기서는 임의 property 이름을
+    // Standard 의미로 재해석하지 않는다.
+    bool SealMaterialTextureBindings(const Material& material,
+        const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
+        std::vector<EnhancedMaterialTextureBinding>& outBindings,
+        std::string& outError)
+    {
+        std::vector<EnhancedMaterialTextureBinding> bindings;
+        bindings.reserve(static_cast<std::size_t>(std::count_if(
+            meta.properties.begin(), meta.properties.end(),
+            [](const ShaderPropertyDesc& property)
+            {
+                return ShaderPropertyType::Texture2D == property.type;
+            })));
+
+        for (const ShaderPropertyDesc& property : meta.properties)
+        {
+            if (ShaderPropertyType::Texture2D != property.type) continue;
+            const auto reflected = std::find_if(layout.properties.begin(),
+                layout.properties.end(), [&property](const ShaderMetaPropertyBinding& binding)
+                {
+                    return binding.name == property.name;
+                });
+            if (reflected == layout.properties.end()
+                || ShaderPropertyType::Texture2D != reflected->propertyType
+                || RHIShaderResourceKind::Texture != reflected->resourceKind)
+            {
+                outError = "ShaderMeta texture reflection binding이 없다: "
+                    + property.name;
+                return false;
+            }
+            const bool duplicateName = std::any_of(bindings.begin(), bindings.end(),
+                [&property](const EnhancedMaterialTextureBinding& binding)
+                {
+                    return binding.propertyName == property.name;
+                });
+            const bool duplicateRegister = std::any_of(bindings.begin(), bindings.end(),
+                [&reflected](const EnhancedMaterialTextureBinding& binding)
+                {
+                    return binding.registerIndex == reflected->registerIndex
+                        && binding.registerSpace == reflected->registerSpace;
+                });
+            if (duplicateName || duplicateRegister)
+            {
+                outError = "ShaderMeta texture property 이름/register가 중복이다: "
+                    + property.name;
+                return false;
+            }
+
+            EnhancedMaterialTextureBinding binding{};
+            binding.propertyName = property.name;
+            binding.registerIndex = reflected->registerIndex;
+            binding.registerSpace = reflected->registerSpace;
+            binding.textureOwner = material.GetTextureMapShared(property.name);
+            const auto logical = std::find_if(material.m_propertyValues.begin(),
+                material.m_propertyValues.end(), [&property](const MaterialPropertyValue& value)
+                {
+                    return value.m_name == property.name;
+                });
+            if (logical != material.m_propertyValues.end())
+            {
+                binding.textureGuid = logical->m_textureGuid;
+            }
+            else if (const auto* defaultGuid =
+                std::get_if<FileGuid>(&property.defaultValue))
+            {
+                binding.textureGuid = *defaultGuid;
+            }
+
+            bindings.push_back(std::move(binding));
+        }
+
+        outBindings = std::move(bindings);
+        return true;
     }
 
     float ReadLivePostFloat(const char* name, float fallback)
@@ -783,6 +866,7 @@ namespace
         bool PublishFrame(FrameSubmission submission);
         void StopRenderThread();
         EnhancedRenderThreadStats GetRenderThreadStats() const;
+        bool WaitForRenderThreadIdle(uint32_t timeoutMilliseconds);
 
         // 원본 HDR는 기존 자산 로더가 만든 DX11 Texture지만 소유자는 이쪽이다.
         // DX12TextureCache가 프레임 시작에 같은 어댑터의 리소스로 올린 뒤 IBL
@@ -948,6 +1032,13 @@ namespace
         struct PooledDraw
         {
             EnhancedDrawItem     item{};
+            // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
+            // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
+            std::shared_ptr<Mesh> meshSource{};
+            // BuildDrawPool의 안정된 프록시 읽기 동안만 Material owner를 유지한다.
+            // SealForwardMaterials/SealGBufferMaterials가 값 snapshot을 만든 뒤
+            // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
+            std::shared_ptr<const Material> materialSource{};
             math::aabb           worldBounds{};
             bool                 hasBounds{ false };
             bool                 isTransparent{ false };
@@ -1030,6 +1121,35 @@ namespace
         uint64_t nativeRecordSamples{ 0 };
         std::string lastError;
 
+        // GBuffer는 현재 제품에서 ShaderMeta→PSO를 잇는 첫 representative pass다.
+        // 이 값들은 RT만 쓰며 status가 renderStateMutex 아래 읽는다.
+        ShaderMetaHandle gbufferShaderMetaHandle{};
+        ShaderMetaHandle rejectedGBufferShaderMetaHandle{};
+        RHIPipelineHandle gbufferPipelineHandle{};
+        uint64_t gbufferShaderMetaApplies{ 0 };
+        uint64_t gbufferShaderMetaTargetedReplaces{ 0 };
+        uint64_t gbufferShaderMetaFailures{ 0 };
+        std::string gbufferShaderMetaError;
+
+        // M6-P2b: Forward도 GBuffer와 독립된 primary generation과 normal/reference
+        // PSO pair를 가진다. 한쪽만 교체된 상태는 pass가 게시하지 않는다.
+        ShaderMetaHandle forwardShaderMetaHandle{};
+        ShaderMetaHandle rejectedForwardShaderMetaHandle{};
+        RHIPipelineHandle forwardShadePipelineHandle{};
+        RHIPipelineHandle forwardReferencePipelineHandle{};
+        // Apply가 새 generation을 거부해도 기존 pass가 material property block을
+        // 계속 밀봉할 수 있도록 마지막으로 게시한 immutable Meta owner를 잡는다.
+        // incoming candidate와 섞지 않고 active pass handle과 같은 owner만 쓴다.
+        EnhancedShaderMetaFrameSnapshot activeForwardShaderMeta{};
+        // P2c: material별 Forward generation도 pass variant만 남겨 두고 Meta value를
+        // 놓으면 다음 reload 실패 때 직전 accepted variant를 다시 밀봉할 수 없다.
+        // 이번 frame에서 실제 사용한 secondary owner만 Commit 뒤 이 배열에 남긴다.
+        std::vector<EnhancedShaderMetaFrameSnapshot> activeForwardMaterialShaderMetas;
+        uint64_t forwardShaderMetaApplies{ 0 };
+        uint64_t forwardShaderMetaTargetedReplaces{ 0 };
+        uint64_t forwardShaderMetaFailures{ 0 };
+        std::string forwardShaderMetaError;
+
         void AddNativeRecordSample(double milliseconds)
         {
             lastNativeRecordMs = milliseconds;
@@ -1043,6 +1163,175 @@ namespace
             return 0 != nativeRecordSamples
                 ? totalNativeRecordMs / static_cast<double>(nativeRecordSamples)
                 : 0.0;
+        }
+
+        bool ApplyGBufferShaderMeta(
+            const std::vector<EnhancedShaderMetaFrameSnapshot>& snapshots,
+            EnhancedGBufferPass& pass, const EnhancedFrameContext& context,
+            RHICompletionPoint retireAfter, RHIShaderBinary output,
+            std::string& outError)
+        {
+            const auto recordFailure = [this](const std::string& error)
+            {
+                if (gbufferShaderMetaError != error)
+                {
+                    ++gbufferShaderMetaFailures;
+                    Debug->LogError("[EnhancedRenderer] GBuffer ShaderMeta 적용 실패: " + error);
+                }
+                gbufferShaderMetaError = error;
+            };
+
+            if (snapshots.empty())
+            {
+                outError = "GBuffer ShaderMeta frame snapshot 집합이 비었다";
+                recordFailure(outError);
+                return pass.GetShaderMetaHandle().IsValid();
+            }
+            const EnhancedShaderMetaFrameSnapshot& snapshot = snapshots.front();
+
+            if (!snapshot.IsValid())
+            {
+                outError = snapshot.error.empty()
+                    ? "GBuffer ShaderMeta frame snapshot이 비었다" : snapshot.error;
+                recordFailure(outError);
+                // reload 중 잘못 게시된 파일은 현재 request를 끊지 않는다. 다만
+                // 최초 제품 generation조차 적용되지 않았다면 static bootstrap PSO로
+                // 조용히 그리지 않고 fail-closed한다.
+                return pass.GetShaderMetaHandle().IsValid();
+            }
+
+            if (snapshot.handle == pass.GetShaderMetaHandle())
+            {
+                gbufferShaderMetaError.clear();
+                return true;
+            }
+            if (snapshot.handle == rejectedGBufferShaderMetaHandle)
+            {
+                outError = gbufferShaderMetaError;
+                return pass.GetShaderMetaHandle().IsValid();
+            }
+
+            const RHIPipelineHandle previousPipeline = pass.GetPipelineHandle();
+            const bool hadProductGeneration = pass.GetShaderMetaHandle().IsValid();
+            RHIShaderCompiler::ScopedOutput outputScope(output);
+            std::string applyError;
+            if (!pass.ApplyShaderMeta(context, snapshot.handle, *snapshot.value,
+                    retireAfter, applyError))
+            {
+                rejectedGBufferShaderMetaHandle = snapshot.handle;
+                outError = applyError;
+                recordFailure(applyError);
+                return hadProductGeneration;
+            }
+
+            const RHIPipelineHandle currentPipeline = pass.GetPipelineHandle();
+            gbufferShaderMetaHandle = snapshot.handle;
+            gbufferPipelineHandle = currentPipeline;
+            rejectedGBufferShaderMetaHandle = {};
+            gbufferShaderMetaError.clear();
+            ++gbufferShaderMetaApplies;
+            if (hadProductGeneration && previousPipeline != currentPipeline)
+                ++gbufferShaderMetaTargetedReplaces;
+            return true;
+        }
+
+        void AppendGBufferShaderMetaStatus(std::string& status) const
+        {
+            status += "\n  GBuffer ShaderMeta — handle " +
+                std::to_string(gbufferShaderMetaHandle.slot) + ":" +
+                std::to_string(gbufferShaderMetaHandle.generation) +
+                " · apply " + std::to_string(gbufferShaderMetaApplies) +
+                " · targeted replace " +
+                std::to_string(gbufferShaderMetaTargetedReplaces) +
+                " · failure " + std::to_string(gbufferShaderMetaFailures);
+            if (!gbufferShaderMetaError.empty())
+                status += " · last " + gbufferShaderMetaError;
+        }
+
+        bool ApplyForwardShaderMeta(
+            const std::vector<EnhancedShaderMetaFrameSnapshot>& snapshots,
+            EnhancedForwardPass& pass, const EnhancedFrameContext& context,
+            RHICompletionPoint retireAfter, RHIShaderBinary output,
+            std::string& outError)
+        {
+            const auto recordFailure = [this](const std::string& error)
+            {
+                if (forwardShaderMetaError != error)
+                {
+                    ++forwardShaderMetaFailures;
+                    Debug->LogError("[EnhancedRenderer] Forward ShaderMeta 적용 실패: " + error);
+                }
+                forwardShaderMetaError = error;
+            };
+
+            if (snapshots.empty())
+            {
+                outError = "Forward ShaderMeta frame snapshot 집합이 비었다";
+                recordFailure(outError);
+                return pass.GetShaderMetaHandle().IsValid();
+            }
+            const EnhancedShaderMetaFrameSnapshot& snapshot = snapshots.front();
+            if (!snapshot.IsValid())
+            {
+                outError = snapshot.error.empty()
+                    ? "Forward ShaderMeta frame snapshot이 비었다" : snapshot.error;
+                recordFailure(outError);
+                return pass.GetShaderMetaHandle().IsValid();
+            }
+            if (snapshot.handle == pass.GetShaderMetaHandle())
+            {
+                activeForwardShaderMeta = snapshot;
+                forwardShaderMetaError.clear();
+                return true;
+            }
+            if (snapshot.handle == rejectedForwardShaderMetaHandle
+                && pass.GetShaderMetaHandle().IsValid())
+            {
+                outError = forwardShaderMetaError;
+                return pass.GetShaderMetaHandle().IsValid();
+            }
+
+            const RHIPipelineHandle previousShade = pass.GetShadePSO();
+            const RHIPipelineHandle previousReference = pass.GetReferencePSO();
+            const bool hadProductGeneration = pass.GetShaderMetaHandle().IsValid();
+            RHIShaderCompiler::ScopedOutput outputScope(output);
+            std::string applyError;
+            if (!pass.ApplyShaderMeta(context, snapshot.handle, *snapshot.value,
+                    retireAfter, applyError))
+            {
+                rejectedForwardShaderMetaHandle = snapshot.handle;
+                outError = applyError;
+                recordFailure(applyError);
+                return hadProductGeneration;
+            }
+
+            forwardShaderMetaHandle = snapshot.handle;
+            forwardShadePipelineHandle = pass.GetShadePSO();
+            forwardReferencePipelineHandle = pass.GetReferencePSO();
+            activeForwardShaderMeta = snapshot;
+            rejectedForwardShaderMetaHandle = {};
+            forwardShaderMetaError.clear();
+            ++forwardShaderMetaApplies;
+            if (hadProductGeneration &&
+                (previousShade != forwardShadePipelineHandle
+                    || previousReference != forwardReferencePipelineHandle))
+            {
+                ++forwardShaderMetaTargetedReplaces;
+            }
+            return true;
+        }
+
+        void AppendForwardShaderMetaStatus(std::string& status) const
+        {
+            status += "\n  Forward ShaderMeta — handle " +
+                std::to_string(forwardShaderMetaHandle.slot) + ":" +
+                std::to_string(forwardShaderMetaHandle.generation) +
+                " · apply " + std::to_string(forwardShaderMetaApplies) +
+                " · targeted replace " +
+                std::to_string(forwardShaderMetaTargetedReplaces) +
+                " · failure " + std::to_string(forwardShaderMetaFailures);
+            if (!forwardShaderMetaError.empty())
+                status += " · last " + forwardShaderMetaError;
         }
 
         // 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 수집은 매
@@ -1310,13 +1599,30 @@ namespace
             return true;
         }
 
+        void ReleaseForwardShaderMetaOwnerIfUnused()
+        {
+            if (pipeline || vulkanPipeline) return;
+            activeForwardShaderMeta = {};
+            activeForwardMaterialShaderMetas.clear();
+            forwardShaderMetaHandle = {};
+            rejectedForwardShaderMetaHandle = {};
+            forwardShadePipelineHandle = {};
+            forwardReferencePipelineHandle = {};
+            forwardShaderMetaError.clear();
+        }
+
         void TeardownVulkanPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
-            if (!vulkanPipeline) return;
+            if (!vulkanPipeline)
+            {
+                ReleaseForwardShaderMetaOwnerIfUnused();
+                return;
+            }
             InvalidateDisplayResultsLocked();
             vulkanPipeline->Shutdown();
             vulkanPipeline.reset();
+            ReleaseForwardShaderMetaOwnerIfUnused();
         }
 
         /// 파이프라인 해체. DX11에 보이는 것은 묘지로 보낸다(수명 규약).
@@ -1324,7 +1630,11 @@ namespace
             bool gpuAlreadyDrained = false)
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
-            if (nullptr == pipeline) return;
+            if (nullptr == pipeline)
+            {
+                ReleaseForwardShaderMetaOwnerIfUnused();
+                return;
+            }
             InvalidateDisplayResultsLocked();
             LivePipeline& p = *pipeline;
 
@@ -1411,6 +1721,7 @@ namespace
             if (!preserveBackend) dx12.ShutdownPipeline();
 
             pipeline.reset();
+            ReleaseForwardShaderMetaOwnerIfUnused();
         }
 
         /// 포그가 처음 켜질 때 부른다. 프레임이 열려 있어야 한다(업로드 링과
@@ -2398,6 +2709,7 @@ namespace
                 if (nullptr == proxy->m_Mesh) return;
 
                 PooledDraw pooled{};
+                pooled.meshSource = proxy->m_Mesh;
                 pooled.item.mesh = proxy->m_Mesh.get();
                 pooled.item.worldMatrix = proxy->m_worldMatrix;
 
@@ -2412,17 +2724,7 @@ namespace
 
                 if (const auto* material = proxy->m_Material.get())
                 {
-                    pooled.item.baseColor = material->m_pBaseColor;
-                    pooled.item.normalMap = material->m_pNormal;
-                    pooled.item.occRoughMetal = material->m_pOccRoughMetal;
-                    pooled.item.emissive = material->m_pEmissive;
-
-                    pooled.item.baseColorFactor = material->m_materialInfo.m_baseColor;
-                    pooled.item.metallic = material->m_materialInfo.m_metallic;
-                    pooled.item.roughness = material->m_materialInfo.m_roughness;
-                    pooled.item.useNormalMap =
-                        (0 != material->m_materialInfo.m_useNormalMap) ? 1u : 0u;
-
+                    pooled.materialSource = proxy->m_Material;
                     pooled.isTransparent =
                         (MaterialRenderingMode::Transparent == material->m_renderingMode);
                 }
@@ -2431,6 +2733,34 @@ namespace
                 pooled.hasBounds = proxy->m_hasWorldBounds;
 
                 drawPool.push_back(pooled);
+            };
+
+            const auto poolFoliage = [this](const FoliageRenderProxy* proxy)
+            {
+                if (!proxy->m_isEnabled || proxy->m_isCulled) return;
+
+                for (FoliageRenderProxy::DrawSource source :
+                    proxy->CaptureDrawSources())
+                {
+                    if (!source.mesh) continue;
+
+                    PooledDraw pooled{};
+                    pooled.meshSource = std::move(source.mesh);
+                    pooled.item.mesh = pooled.meshSource.get();
+                    pooled.item.worldMatrix = source.worldMatrix;
+                    pooled.worldBounds = source.worldBounds;
+                    pooled.hasBounds = !source.worldBounds.is_empty();
+
+                    if (source.material)
+                    {
+                        pooled.materialSource = std::move(source.material);
+                        const Material* material = pooled.materialSource.get();
+                        pooled.isTransparent =
+                            MaterialRenderingMode::Transparent == material->m_renderingMode;
+                    }
+
+                    drawPool.push_back(std::move(pooled));
+                }
             };
 
             const auto poolSprite = [this](const SpriteRenderProxy* proxy)
@@ -2470,6 +2800,13 @@ namespace
                     continue;
                 }
 
+                if (const FoliageRenderProxy* foliage =
+                    proxy->As<FoliageRenderProxy>())
+                {
+                    poolFoliage(foliage);
+                    continue;
+                }
+
                 if (const SpriteRenderProxy* sprite = proxy->As<SpriteRenderProxy>())
                 {
                     poolSprite(sprite);
@@ -2482,6 +2819,346 @@ namespace
             {
                 if (proxy) uiProxyPointers.push_back(proxy.get());
             }
+        }
+
+        bool SealForwardMaterials(
+            const std::vector<EnhancedShaderMetaFrameSnapshot>& shaders,
+            float frameTotalSeconds, float frameDeltaSeconds,
+            EnhancedForwardPass& pass, const EnhancedFrameContext& context,
+            RHICompletionPoint retireAfter, RHIShaderBinary output,
+            std::string& outError)
+        {
+            const EnhancedShaderMetaFrameSnapshot* effective = nullptr;
+            if (activeForwardShaderMeta.IsValid()
+                && activeForwardShaderMeta.handle == pass.GetShaderMetaHandle())
+            {
+                effective = &activeForwardShaderMeta;
+            }
+            else if (!shaders.empty() && shaders.front().IsValid()
+                && shaders.front().handle == pass.GetShaderMetaHandle())
+            {
+                effective = &shaders.front();
+            }
+            if (nullptr == effective)
+            {
+                outError = "Forward material sealing의 ShaderMeta generation이 active pass와 다르다";
+                return false;
+            }
+            const EnhancedShaderMetaFrameSnapshot& primary = *effective;
+            std::vector<ShaderMetaHandle> activeHandles{ primary.handle };
+            // Commit 전까지 직전 accepted owner를 유지한다. 새 candidate가 실패하면
+            // pass 안에 남은 variant와 immutable Meta value로 다시 밀봉하고,
+            // Commit 뒤 이번 frame에서 안 쓴 secondary owner만 놓는다.
+            std::vector<EnhancedShaderMetaFrameSnapshot> nextActiveMaterialOwners;
+            std::unordered_map<const Material*,
+                std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>> sealed;
+            sealed.reserve(drawPool.size());
+            RHIShaderCompiler::ScopedOutput outputScope(output);
+
+            for (PooledDraw& pooled : drawPool)
+            {
+                if (!pooled.isTransparent) continue;
+                if (!pooled.materialSource)
+                {
+                    outError = "Forward transparent draw에 owning Material source가 없다";
+                    return false;
+                }
+
+                const Material* source = pooled.materialSource.get();
+                const auto found = sealed.find(source);
+                if (found != sealed.end())
+                {
+                    pooled.item.forwardMaterialSnapshot = found->second;
+                    pooled.materialSource.reset();
+                    continue;
+                }
+
+                const FileGuid materialShaderGuid =
+                    FileGuid{} == source->m_shaderMetaGuid
+                    ? primary.guid : source->m_shaderMetaGuid;
+                const EnhancedShaderMetaFrameSnapshot* incoming = nullptr;
+                if (materialShaderGuid == primary.guid)
+                {
+                    incoming = &primary;
+                }
+                else
+                {
+                    const auto shaderIt = std::find_if(shaders.begin(), shaders.end(),
+                        [&materialShaderGuid](const auto& candidate)
+                        {
+                            return candidate.guid == materialShaderGuid;
+                        });
+                    if (shaderIt != shaders.end()) incoming = &*shaderIt;
+                }
+
+                std::vector<const EnhancedShaderMetaFrameSnapshot*> candidates;
+                if (nullptr != incoming) candidates.push_back(incoming);
+                if (materialShaderGuid != primary.guid)
+                {
+                    for (const EnhancedShaderMetaFrameSnapshot& accepted :
+                        activeForwardMaterialShaderMetas)
+                    {
+                        if (accepted.guid != materialShaderGuid) continue;
+                        const bool duplicate = std::any_of(candidates.begin(),
+                            candidates.end(), [&accepted](const auto* candidate)
+                            {
+                                // resolve가 실패한 incoming은 같은 handle처럼 보여도
+                                // accepted immutable owner를 가리면 안 된다.
+                                return candidate->IsValid()
+                                    && candidate->handle == accepted.handle;
+                            });
+                        if (!duplicate) candidates.push_back(&accepted);
+                    }
+                }
+
+                const auto trySeal = [&](const EnhancedShaderMetaFrameSnapshot& materialShader,
+                    std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>& outSnapshot,
+                    std::string& error)
+                {
+                    if (!materialShader.IsValid())
+                    {
+                        error = materialShader.error.empty()
+                            ? "Forward material ShaderMeta generation이 invalid다: "
+                                + materialShaderGuid.ToString()
+                            : materialShader.error;
+                        return false;
+                    }
+
+                    auto snapshot =
+                        std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
+                    snapshot->shaderMetaHandle = materialShader.handle;
+                    snapshot->keywordSelections.assign(
+                        materialShader.value->keywords.size(), 0);
+                    const auto authoredSelections = source->GetKeywordSelections();
+                    for (std::size_t keywordIndex = 0;
+                        keywordIndex < authoredSelections.size(); ++keywordIndex)
+                    {
+                        if (keywordIndex >= materialShader.value->keywords.size()
+                            || authoredSelections[keywordIndex]
+                                >= materialShader.value->keywords[keywordIndex].values.size())
+                        {
+                            error = "Forward material keyword 선택이 ShaderMeta 축과 다르다";
+                            return false;
+                        }
+                        snapshot->keywordSelections[keywordIndex] =
+                            authoredSelections[keywordIndex];
+                    }
+
+                    std::shared_ptr<const ShaderMetaBindingLayout> layout;
+                    if (!pass.EnsureShaderMetaVariant(context, materialShader.handle,
+                            *materialShader.value, snapshot->keywordSelections,
+                            snapshot->permutationKey, layout, error)
+                        || !layout)
+                    {
+                        return false;
+                    }
+                    snapshot->bindingLayout = *layout;
+                    snapshot->flow.windVector = source->m_flowInfo.m_windVector;
+                    snapshot->flow.uvScroll = source->m_flowInfo.m_uvScroll;
+                    snapshot->flow.totalSeconds = frameTotalSeconds;
+                    snapshot->flow.deltaSeconds = frameDeltaSeconds;
+                    snapshot->baseColorFactor = source->m_materialInfo.m_baseColor;
+                    snapshot->metallic = source->m_materialInfo.m_metallic;
+                    snapshot->roughness = source->m_materialInfo.m_roughness;
+                    snapshot->useNormalMap =
+                        (0 != source->m_materialInfo.m_useNormalMap) ? 1u : 0u;
+
+                    if (!SealMaterialTextureBindings(*source, *materialShader.value,
+                            *layout, snapshot->textureBindings, error))
+                    {
+                        if (!source->m_name.empty())
+                            error += " (material " + source->m_name + ")";
+                        return false;
+                    }
+
+                    if (!source->BuildShaderPropertyBlock(*materialShader.value, *layout,
+                            snapshot->propertyBytes, error))
+                    {
+                        return false;
+                    }
+
+                    if (!snapshot->IsValid())
+                    {
+                        error = "Forward material snapshot sealing 결과가 invalid다";
+                        return false;
+                    }
+
+                    outSnapshot = std::move(snapshot);
+                    return true;
+                };
+
+                const EnhancedShaderMetaFrameSnapshot* selectedShader = nullptr;
+                std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> immutable;
+                std::string firstCandidateError;
+                for (const EnhancedShaderMetaFrameSnapshot* candidate : candidates)
+                {
+                    std::string candidateError;
+                    if (trySeal(*candidate, immutable, candidateError))
+                    {
+                        selectedShader = candidate;
+                        break;
+                    }
+                    if (firstCandidateError.empty())
+                        firstCandidateError = std::move(candidateError);
+                }
+
+                if (nullptr == selectedShader || !immutable)
+                {
+                    outError = firstCandidateError.empty()
+                        ? "Forward material ShaderMeta generation이 frame packet에 없고 accepted fallback도 없다: "
+                            + materialShaderGuid.ToString()
+                        : std::move(firstCandidateError);
+                    if (!source->m_name.empty())
+                        outError += " (material " + source->m_name + ")";
+                    return false;
+                }
+
+                if (std::find(activeHandles.begin(), activeHandles.end(),
+                        selectedShader->handle) == activeHandles.end())
+                    activeHandles.push_back(selectedShader->handle);
+                if (selectedShader->guid != primary.guid)
+                {
+                    const bool alreadyOwned = std::any_of(
+                        nextActiveMaterialOwners.begin(), nextActiveMaterialOwners.end(),
+                        [selectedShader](const auto& owner)
+                        {
+                            return owner.handle == selectedShader->handle;
+                        });
+                    if (!alreadyOwned)
+                        nextActiveMaterialOwners.push_back(*selectedShader);
+                }
+
+                sealed.emplace(source, immutable);
+                pooled.item.forwardMaterialSnapshot = std::move(immutable);
+                pooled.materialSource.reset();
+            }
+            pass.CommitShaderMetaFrame(context, activeHandles, retireAfter);
+            activeForwardMaterialShaderMetas = std::move(nextActiveMaterialOwners);
+            return true;
+        }
+
+        bool SealGBufferMaterials(
+            const std::vector<EnhancedShaderMetaFrameSnapshot>& shaders,
+            EnhancedGBufferPass& pass, const EnhancedFrameContext& context,
+            RHICompletionPoint retireAfter, RHIShaderBinary output,
+            std::string& outError)
+        {
+            if (shaders.empty() || !shaders.front().IsValid()
+                || shaders.front().handle != pass.GetShaderMetaHandle())
+            {
+                outError = "GBuffer material sealing의 ShaderMeta generation이 active pass와 다르다";
+                return false;
+            }
+            const EnhancedShaderMetaFrameSnapshot& primary = shaders.front();
+            std::vector<ShaderMetaHandle> activeHandles{ primary.handle };
+            Material defaultMaterial;
+            std::unordered_map<const Material*,
+                std::shared_ptr<const EnhancedMaterialDrawSnapshot>> sealed;
+            sealed.reserve(drawPool.size());
+            RHIShaderCompiler::ScopedOutput outputScope(output);
+
+            for (PooledDraw& pooled : drawPool)
+            {
+                // P2a Forward snapshot은 앞의 SealForwardMaterials가 별도로
+                // 밀봉했다. GBuffer ShaderMeta 계약을 투명 draw에 섞지 않는다.
+                if (pooled.isTransparent)
+                {
+                    continue;
+                }
+
+                const Material* source = pooled.materialSource
+                    ? pooled.materialSource.get() : &defaultMaterial;
+                const FileGuid materialShaderGuid =
+                    FileGuid{} == source->m_shaderMetaGuid
+                    ? primary.guid : source->m_shaderMetaGuid;
+                const auto shaderIt = std::find_if(shaders.begin(), shaders.end(),
+                    [&materialShaderGuid](const auto& candidate)
+                    {
+                        return candidate.guid == materialShaderGuid;
+                    });
+                if (shaderIt == shaders.end() || !shaderIt->IsValid())
+                {
+                    outError = "GBuffer material ShaderMeta generation이 frame packet에 없거나 invalid다: "
+                        + materialShaderGuid.ToString();
+                    if (shaderIt != shaders.end() && !shaderIt->error.empty())
+                        outError += " (" + shaderIt->error + ")";
+                    if (!source->m_name.empty()) outError += " (material "
+                        + source->m_name + ")";
+                    return false;
+                }
+                const EnhancedShaderMetaFrameSnapshot& materialShader = *shaderIt;
+                if (std::find(activeHandles.begin(), activeHandles.end(),
+                        materialShader.handle) == activeHandles.end())
+                    activeHandles.push_back(materialShader.handle);
+
+                const auto found = sealed.find(source);
+                if (found != sealed.end())
+                {
+                    pooled.item.materialSnapshot = found->second;
+                    pooled.materialSource.reset();
+                    continue;
+                }
+
+                auto snapshot = std::make_shared<EnhancedMaterialDrawSnapshot>();
+                snapshot->shaderMetaHandle = materialShader.handle;
+                snapshot->keywordSelections.assign(
+                    materialShader.value->keywords.size(), 0);
+                const auto authoredSelections = source->GetKeywordSelections();
+                for (std::size_t keywordIndex = 0;
+                    keywordIndex < authoredSelections.size(); ++keywordIndex)
+                {
+                    if (keywordIndex >= materialShader.value->keywords.size()
+                        || authoredSelections[keywordIndex]
+                            >= materialShader.value->keywords[keywordIndex].values.size())
+                    {
+                        outError = "GBuffer material keyword 선택이 ShaderMeta 축과 다르다";
+                        if (!source->m_name.empty())
+                            outError += ": " + source->m_name;
+                        return false;
+                    }
+                    snapshot->keywordSelections[keywordIndex] =
+                        authoredSelections[keywordIndex];
+                }
+
+                std::shared_ptr<const ShaderMetaBindingLayout> layout;
+                if (!pass.EnsureShaderMetaVariant(context, materialShader.handle,
+                        *materialShader.value,
+                        snapshot->keywordSelections, snapshot->permutationKey,
+                        layout, outError))
+                {
+                    if (!source->m_name.empty())
+                        outError += " (material " + source->m_name + ")";
+                    return false;
+                }
+                snapshot->bindingLayout = *layout;
+                if (!SealMaterialTextureBindings(*source, *materialShader.value,
+                        *layout, snapshot->textureBindings, outError))
+                {
+                    if (!source->m_name.empty())
+                        outError += " (material " + source->m_name + ")";
+                    return false;
+                }
+                if (!source->BuildShaderPropertyBlock(*materialShader.value, *layout,
+                        snapshot->propertyBytes, outError))
+                {
+                    if (!source->m_name.empty())
+                        outError += " (material " + source->m_name + ")";
+                    return false;
+                }
+                if (!snapshot->IsValid())
+                {
+                    outError = "GBuffer material snapshot sealing 결과가 invalid다";
+                    return false;
+                }
+
+                std::shared_ptr<const EnhancedMaterialDrawSnapshot> immutable = snapshot;
+                sealed.emplace(source, immutable);
+                pooled.item.materialSnapshot = std::move(immutable);
+                pooled.materialSource.reset();
+            }
+
+            pass.CommitShaderMetaFrame(context, activeHandles, retireAfter);
+            return true;
         }
 
         // ── 렌더 입력 소비: 이 뷰의 몫 ──
@@ -3398,6 +4075,18 @@ namespace
         return stats;
     }
 
+    bool LiveState::WaitForRenderThreadIdle(uint32_t timeoutMilliseconds)
+    {
+        std::unique_lock<std::mutex> lock(renderQueueMutex);
+        if (!renderThreadRunning) return false;
+
+        return renderQueueWake.wait_for(lock,
+            std::chrono::milliseconds(timeoutMilliseconds), [this]
+            {
+                return renderQueue.empty() && 0 == renderInProgress;
+            });
+    }
+
     LiveState& GetLiveState()
     {
         static LiveState state;
@@ -3575,9 +4264,26 @@ void EnhancedSceneRenderer::WaitForLiveGpu()
     }
 }
 
+EnhancedRequiredAssetPacket EnhancedSceneRenderer::BuildRequiredAssetPacket(
+    std::span<const std::shared_ptr<Material>> materials)
+{
+    EnhancedRequiredAssetPacket packet{};
+    for (const std::shared_ptr<Material>& material : materials)
+    {
+        if (!material) continue;
+        const EnhancedShaderMetaDomain domain =
+            MaterialRenderingMode::Transparent == material->m_renderingMode
+            ? EnhancedShaderMetaDomain::Forward
+            : EnhancedShaderMetaDomain::GBuffer;
+        packet.RequireShaderMeta(domain, material->m_shaderMetaGuid);
+    }
+    packet.Canonicalize();
+    return packet;
+}
+
 EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     float deltaSeconds, const EnhancedLiveViewRequest* views, uint32_t viewCount,
-    bool sceneLoading)
+    bool sceneLoading, const EnhancedRequiredAssetPacket& requiredAssets)
 {
     LiveState& state = GetLiveState();
     const std::thread::id currentThread = std::this_thread::get_id();
@@ -3600,6 +4306,118 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     frame.sceneLoading = sceneLoading;
     frame.width = ScreenResizeBus::Get().GetWidth();
     frame.height = ScreenResizeBus::Get().GetHeight();
+    frame.requiredAssets = requiredAssets;
+    frame.requiredAssets.Canonicalize();
+
+    // M6-P2d-d/e: watcher 변경은 App 프레임 시작의
+    // DrainQueuedAssetChanges에서 이미 DataSystem generation을 전진시켰다. GT가
+    // primary GBuffer와 Host가 required-asset packet에 선언한 ShaderMeta의 현재
+    // generation/value만 밀봉한다. cache 전체 스캔은 활성 Scene과 무관한 재질까지
+    // frame 수명에 붙들었으므로 P2d-e에서 은퇴했고, RT는 catalog/file/DataSystem을
+    // 다시 읽지 않는다.
+    {
+        const std::filesystem::path metaPath =
+            RHIShaderSource::Resolve("GBuffer.shadermeta");
+        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
+        std::vector<FileGuid> guids;
+        guids.push_back(guid);
+
+        for (const EnhancedRequiredShaderMetaAsset& required :
+            frame.requiredAssets.shaderMetas)
+        {
+            if (EnhancedShaderMetaDomain::GBuffer != required.domain
+                || std::find(guids.begin(), guids.end(), required.guid)
+                    != guids.end())
+            {
+                continue;
+            }
+            guids.push_back(required.guid);
+        }
+
+        if (guids.size() > 1)
+            std::sort(guids.begin() + 1, guids.end());
+
+        frame.gbufferShaderMetas.reserve(guids.size());
+        for (std::size_t index = 0; index < guids.size(); ++index)
+        {
+            EnhancedShaderMetaFrameSnapshot snapshot{};
+            snapshot.guid = guids[index];
+            if (FileGuid{} == snapshot.guid)
+            {
+                snapshot.error = "GBuffer.shadermeta catalog GUID를 찾지 못했다: "
+                    + metaPath.string();
+                frame.gbufferShaderMetas.push_back(std::move(snapshot));
+                continue;
+            }
+            std::string loadError;
+            snapshot.handle = DataSystems->LoadShaderMetaHandle(
+                snapshot.guid, loadError);
+            snapshot.value = DataSystems->ResolveShaderMeta(snapshot.handle);
+            if (!snapshot.IsValid())
+            {
+                snapshot.error = loadError.empty()
+                    ? "GBuffer ShaderMeta generation을 resolve하지 못했다: "
+                        + snapshot.guid.ToString()
+                    : loadError;
+            }
+            frame.gbufferShaderMetas.push_back(std::move(snapshot));
+        }
+    }
+
+    // M6-P2d-d: Forward는 GBuffer와 다른 primary catalog slot을 소유한다. 첫
+    // 항목은 항상 Standard primary이고, 뒤에는 Host required-asset packet이
+    // 선택한 ShaderMeta generation/value를 GUID 순서로 함께 밀봉한다. RT는
+    // catalog나 DataSystem을 다시 읽지 않는다.
+    {
+        const std::filesystem::path metaPath =
+            RHIShaderSource::Resolve("Forward.shadermeta");
+        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
+        std::vector<FileGuid> guids;
+        guids.push_back(guid);
+
+        for (const EnhancedRequiredShaderMetaAsset& required :
+            frame.requiredAssets.shaderMetas)
+        {
+            if (EnhancedShaderMetaDomain::Forward != required.domain
+                || std::find(guids.begin(), guids.end(), required.guid)
+                    != guids.end())
+            {
+                continue;
+            }
+            guids.push_back(required.guid);
+        }
+        if (guids.size() > 1)
+            std::sort(guids.begin() + 1, guids.end());
+
+        frame.forwardShaderMetas.reserve(guids.size());
+        for (std::size_t index = 0; index < guids.size(); ++index)
+        {
+            EnhancedShaderMetaFrameSnapshot snapshot{};
+            snapshot.guid = guids[index];
+            if (FileGuid{} == snapshot.guid)
+            {
+                snapshot.error = 0 == index
+                    ? "Forward.shadermeta catalog GUID를 찾지 못했다: "
+                        + metaPath.string()
+                    : "Forward material ShaderMeta GUID가 비었다";
+                frame.forwardShaderMetas.push_back(std::move(snapshot));
+                continue;
+            }
+            std::string loadError;
+            snapshot.handle = DataSystems->LoadShaderMetaHandle(
+                snapshot.guid, loadError);
+            snapshot.value = DataSystems->ResolveShaderMeta(snapshot.handle);
+            if (!snapshot.IsValid())
+            {
+                snapshot.error = loadError.empty()
+                    ? "Forward ShaderMeta generation을 resolve하지 못했다: "
+                        + snapshot.guid.ToString()
+                    : loadError;
+            }
+            frame.forwardShaderMetas.push_back(std::move(snapshot));
+        }
+    }
+
     if (frame.width != state.publishedWidth ||
         frame.height != state.publishedHeight)
     {
@@ -3648,6 +4466,11 @@ void EnhancedSceneRenderer::StopLiveRenderThread()
 EnhancedRenderThreadStats EnhancedSceneRenderer::GetLiveRenderThreadStats()
 {
     return GetLiveState().GetRenderThreadStats();
+}
+
+bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMilliseconds)
+{
+    return GetLiveState().WaitForRenderThreadIdle(timeoutMilliseconds);
 }
 
 void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
@@ -3714,11 +4537,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
         // 이번 프레임에 갱신하지 않았다면 풀을 비운다.
         //
-        // ★ 풀은 Mesh*·Texture* 원시 포인터를 든다. 프록시 스냅샷이
-        //   shared_ptr로 수명을 붙드는 것은 BuildDrawPool이 도는 동안뿐이라,
-        //   갱신을 건너뛴 채 남겨 두면 씬이 언로드된 뒤에도 그 주소를 든
-        //   목록이 살아 있다. "이번 프레임에 모은 것만 그린다"로 두면
-        //   그 부류가 성립하지 않는다.
+        // ★ 풀은 값 snapshot과 shared owner를 함께 들지만, 갱신을 건너뛴
+        //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
+        //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
         state.drawPool.clear();
         state.decals.clear();
     }
@@ -3797,6 +4618,49 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         }
 
         VulkanLivePipeline& p = *state.vulkanPipeline;
+        {
+            std::string shaderError;
+            if (!state.ApplyGBufferShaderMeta(frame.gbufferShaderMetas, p.gbuffer,
+                    p.frameContext,
+                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
+                    RHIShaderBinary::SpirV, shaderError))
+            {
+                state.lastError = "Vulkan GBuffer ShaderMeta 초기 적용 실패: " + shaderError;
+                state.TeardownVulkanPipeline();
+                state.enabled = false;
+                return;
+            }
+            if (!state.ApplyForwardShaderMeta(frame.forwardShaderMetas, p.forward,
+                    p.frameContext,
+                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
+                    RHIShaderBinary::SpirV, shaderError))
+            {
+                state.lastError = "Vulkan Forward ShaderMeta 초기 적용 실패: " + shaderError;
+                state.TeardownVulkanPipeline();
+                state.enabled = false;
+                return;
+            }
+            if (!state.SealForwardMaterials(frame.forwardShaderMetas,
+                    frame.totalSeconds, frame.deltaSeconds,
+                    p.forward, p.frameContext,
+                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
+                    RHIShaderBinary::SpirV, shaderError))
+            {
+                state.lastError = "Vulkan Forward Material snapshot 실패: " + shaderError;
+                ++state.frameFailures;
+                return;
+            }
+            if (!state.SealGBufferMaterials(frame.gbufferShaderMetas,
+                    p.gbuffer, p.frameContext,
+                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
+                    RHIShaderBinary::SpirV,
+                    shaderError))
+            {
+                state.lastError = "Vulkan GBuffer Material snapshot 실패: " + shaderError;
+                ++state.frameFailures;
+                return;
+            }
+        }
         uint32_t totalPending = p.PendingCount();
         LiveStopwatch watch;
         watch.Start();
@@ -4028,6 +4892,49 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
     }
 
     LivePipeline& p = *state.pipeline;
+    {
+        std::string shaderError;
+        if (!state.ApplyGBufferShaderMeta(frame.gbufferShaderMetas, p.gbuffer,
+                p.frameContext,
+                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
+                RHIShaderBinary::Dxil, shaderError))
+        {
+            state.lastError = "DX12 GBuffer ShaderMeta 초기 적용 실패: " + shaderError;
+            state.TeardownPipeline();
+            state.enabled = false;
+            return;
+        }
+        if (!state.ApplyForwardShaderMeta(frame.forwardShaderMetas, p.forward,
+                p.frameContext,
+                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
+                RHIShaderBinary::Dxil, shaderError))
+        {
+            state.lastError = "DX12 Forward ShaderMeta 초기 적용 실패: " + shaderError;
+            state.TeardownPipeline();
+            state.enabled = false;
+            return;
+        }
+        if (!state.SealForwardMaterials(frame.forwardShaderMetas,
+                frame.totalSeconds, frame.deltaSeconds,
+                p.forward, p.frameContext,
+                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
+                RHIShaderBinary::Dxil, shaderError))
+        {
+            state.lastError = "DX12 Forward Material snapshot 실패: " + shaderError;
+            ++state.frameFailures;
+            return;
+        }
+        if (!state.SealGBufferMaterials(frame.gbufferShaderMetas,
+                p.gbuffer, p.frameContext,
+                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
+                RHIShaderBinary::Dxil,
+                shaderError))
+        {
+            state.lastError = "DX12 GBuffer Material snapshot 실패: " + shaderError;
+            ++state.frameFailures;
+            return;
+        }
+    }
 
     // 뷰 합산 인플라이트. '인플라이트 2 = 링(kFrameCount=3)의 안전 거리'는
     // 제출 총량 기준의 실측이다 — 뷰당 2씩 총 4를 들면 BeginFrame이
@@ -4578,6 +5485,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             static_cast<double>(rhiStats.producerWaitNanoseconds) / 1.0e6,
             static_cast<double>(rhiStats.maxProducerWaitNanoseconds) / 1.0e6);
         status += producerWaitLine;
+        state.AppendGBufferShaderMetaStatus(status);
+        state.AppendForwardShaderMetaStatus(status);
         if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
         return status;
     }
@@ -4826,6 +5735,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         static_cast<double>(rhiStats.maxProducerWaitNanoseconds) / 1.0e6);
     status += producerWaitLine;
     if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
+        state.AppendGBufferShaderMetaStatus(status);
+        state.AppendForwardShaderMetaStatus(status);
     return status;
 }
 

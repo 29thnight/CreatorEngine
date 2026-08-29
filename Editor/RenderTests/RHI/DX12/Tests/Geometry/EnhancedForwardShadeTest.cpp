@@ -6,11 +6,22 @@
 #include "../DX12TestTextureRegistration.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/RHIShaderSource.h"
+#include "DataSystem.h"
+#include "Material.h"
 #include "Mesh.h"
+#include "ShaderMeta.h"
+#include "ShaderPermutationDomain.h"
+#include "StandardMaterialProperty.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
+#include <memory>
+#include <span>
+#include <string_view>
 #include <vector>
 
 // Forward+ 셰이딩 검증 (PHASE 3-6, 3·4·5단계).
@@ -167,6 +178,11 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
     std::vector<EnhancedDrawItem> draws(1);
     draws[0].mesh = quad.get();
     draws[0].worldMatrix = math::matrix4x4::identity();
+    // Snapshot 없는 legacy draw도 P2b의 b2 도입 뒤 ShadeInstance 값을 잃지
+    // 않아야 한다. 흰색 default로 회귀하면 아래 RGB 순서 단정이 실패한다.
+    draws[0].baseColorFactor = math::color(0.05f, 0.35f, 0.9f, 1.f);
+    draws[0].metallic = 0.f;
+    draws[0].roughness = 1.f;
 
     EnhancedFrameContext frameContext{};
     frameContext.resources = &resources;
@@ -186,7 +202,363 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         resources.Shutdown();
         return false;
     }
-    outLog += "[1/4] 셰이딩 VS/PS·참조 경로 PSO 생성 통과\n";
+
+    const auto failRepresentative = [&](const std::string& message)
+    {
+        outLog += "[1/4] Forward P2d-d required 재질 실패: " + message + "\n";
+        forward.Shutdown();
+        meshCache.Shutdown();
+        rootSignatures.Shutdown();
+        psoManager.Shutdown();
+        resources.Shutdown();
+        return false;
+    };
+
+    ShaderMetaHandle primaryHandle{}, waterHandle{}, windHandle{};
+    std::shared_ptr<const ShaderMeta> primaryMetaOwner;
+    std::shared_ptr<const ShaderMeta> waterMetaOwner;
+    std::shared_ptr<const ShaderMeta> windMetaOwner;
+    const auto loadCatalog = [&](std::string_view fileName,
+        ShaderMetaHandle& handle, std::shared_ptr<const ShaderMeta>& owner)
+    {
+        const FileGuid guid = DataSystems->GetFileGuid(
+            RHIShaderSource::Resolve(std::string(fileName)));
+        if (FileGuid{} == guid) return false;
+        handle = DataSystems->LoadShaderMetaHandle(guid, error);
+        owner = DataSystems->ResolveShaderMeta(handle);
+        return handle.IsValid() && nullptr != owner && owner->guid == guid;
+    };
+    if (!loadCatalog("Forward.shadermeta", primaryHandle, primaryMetaOwner)
+        || !loadCatalog("ForwardWater.shadermeta", waterHandle, waterMetaOwner)
+        || !loadCatalog("ForwardWind.shadermeta", windHandle, windMetaOwner))
+    {
+        return failRepresentative(error.empty()
+            ? "catalog GUID/generation resolve 실패" : error);
+    }
+
+    const std::shared_ptr<Material> waterAsset =
+        DataSystems->LoadMaterialShared("ForwardWater");
+    const std::shared_ptr<Material> windAsset =
+        DataSystems->LoadMaterialShared("ForwardWind");
+    if (!waterAsset || !windAsset
+        || waterAsset->m_shaderMetaGuid != waterMetaOwner->guid
+        || windAsset->m_shaderMetaGuid != windMetaOwner->guid
+        || MaterialRenderingMode::Transparent != waterAsset->m_renderingMode
+        || MaterialRenderingMode::Transparent != windAsset->m_renderingMode)
+    {
+        return failRepresentative("actual material GUID/mode 선택 불일치");
+    }
+
+    const std::vector<std::shared_ptr<Material>> requiredMaterials{
+        windAsset, waterAsset, windAsset };
+    const EnhancedRequiredAssetPacket requiredAssets =
+        EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
+    const EnhancedLiveFramePacket cacheIsolationFrame =
+        EnhancedSceneRenderer::BuildLiveFramePacket(
+            0.f, nullptr, 0, false, EnhancedRequiredAssetPacket{});
+    const EnhancedLiveFramePacket productFrame =
+        EnhancedSceneRenderer::BuildLiveFramePacket(
+            0.f, nullptr, 0, false, requiredAssets);
+    const EnhancedShaderMetaFrameSnapshot* productWater =
+        productFrame.FindForwardShaderMeta(waterMetaOwner->guid);
+    const EnhancedShaderMetaFrameSnapshot* productWind =
+        productFrame.FindForwardShaderMeta(windMetaOwner->guid);
+    const bool productSecondariesSortedUnique = std::adjacent_find(
+        productFrame.forwardShaderMetas.begin() +
+            (productFrame.forwardShaderMetas.empty() ? 0 : 1),
+        productFrame.forwardShaderMetas.end(),
+        [](const EnhancedShaderMetaFrameSnapshot& left,
+            const EnhancedShaderMetaFrameSnapshot& right)
+        {
+            return !(left.guid < right.guid);
+        }) == productFrame.forwardShaderMetas.end();
+    if (productFrame.requiredAssets.shaderMetas.size() != 2u
+        || !productFrame.requiredAssets.ContainsShaderMeta(
+            EnhancedShaderMetaDomain::Forward, waterMetaOwner->guid)
+        || !productFrame.requiredAssets.ContainsShaderMeta(
+            EnhancedShaderMetaDomain::Forward, windMetaOwner->guid)
+        || cacheIsolationFrame.gbufferShaderMetas.size() != 1u
+        || cacheIsolationFrame.forwardShaderMetas.size() != 1u
+        || nullptr != cacheIsolationFrame.FindForwardShaderMeta(waterMetaOwner->guid)
+        || nullptr != cacheIsolationFrame.FindForwardShaderMeta(windMetaOwner->guid)
+        || productFrame.gbufferShaderMetas.size() != 1u
+        || productFrame.forwardShaderMetas.size() != 3u
+        || productFrame.forwardShaderMetas[0].guid != primaryMetaOwner->guid
+        || !productFrame.forwardShaderMetas[0].IsValid()
+        || !productSecondariesSortedUnique
+        || nullptr == productWater || !productWater->IsValid()
+        || nullptr == productWind || !productWind->IsValid())
+    {
+        return failRepresentative(
+            "제품 required-asset packet 또는 cache 격리의 primary+Water/Wind owner sealing 실패");
+    }
+
+    if (!forward.ApplyShaderMeta(frameContext, primaryHandle, *primaryMetaOwner,
+            RHICompletionPoint{ resources.GetLastSignaledFenceValue() }, error))
+    {
+        return failRepresentative(error);
+    }
+
+    const auto selectionsOf = [](const Material& material)
+    {
+        const std::span<const std::uint16_t> values =
+            material.GetKeywordSelections();
+        return std::vector<std::uint16_t>(values.begin(), values.end());
+    };
+    const std::vector<std::uint16_t> primarySelections(
+        primaryMetaOwner->keywords.size(), 0u);
+    const std::vector<std::uint16_t> waterSelections = selectionsOf(*waterAsset);
+    const std::vector<std::uint16_t> windSelections = selectionsOf(*windAsset);
+    RHIShaderPermutationKey primaryKey{}, waterKey{}, windKey{};
+    std::shared_ptr<const ShaderMetaBindingLayout> primaryLayout;
+    std::shared_ptr<const ShaderMetaBindingLayout> waterLayout;
+    std::shared_ptr<const ShaderMetaBindingLayout> windLayout;
+    if (!forward.EnsureShaderMetaVariant(frameContext, primaryHandle,
+            *primaryMetaOwner, primarySelections, primaryKey, primaryLayout, error)
+        || !forward.EnsureShaderMetaVariant(frameContext, waterHandle,
+            *waterMetaOwner, waterSelections, waterKey, waterLayout, error)
+        || !forward.EnsureShaderMetaVariant(frameContext, windHandle,
+            *windMetaOwner, windSelections, windKey, windLayout, error))
+    {
+        return failRepresentative(error);
+    }
+
+    constexpr std::array<std::string_view, 4> waterTail{
+        "waveSpeed", "waveAmplitude", "waveFrequency", "waterTint" };
+    constexpr std::array<std::string_view, 4> windTail{
+        "windSpeed", "windStrength", "windFrequency", "windTint" };
+    constexpr std::array<std::string_view, 4> textureProperties{
+        standard_material::property::BaseColorMap,
+        standard_material::property::NormalMap,
+        standard_material::property::OrmMap,
+        standard_material::property::EmissiveMap,
+    };
+    const auto valid64ByteLayout = [&](const ShaderMetaBindingLayout& layout,
+        const std::array<std::string_view, 4>& tail,
+        std::string_view firstTextureProperty)
+    {
+        if ("MaterialProperties" != layout.constantBufferName
+            || 2u != layout.constantBufferRegister
+            || 0u != layout.constantBufferSpace
+            || 64u != layout.constantBufferByteSize)
+        {
+            return false;
+        }
+        for (std::size_t index = 0; index < tail.size(); ++index)
+        {
+            const auto found = std::find_if(layout.properties.begin(),
+                layout.properties.end(), [&](const ShaderMetaPropertyBinding& binding)
+                {
+                    return binding.name == tail[index];
+                });
+            if (found == layout.properties.end()
+                || ShaderPropertyType::Float != found->propertyType
+                || 48u + static_cast<std::uint32_t>(index) * 4u
+                    != found->byteOffset)
+            {
+                return false;
+            }
+        }
+        for (std::size_t index = 0; index < textureProperties.size(); ++index)
+        {
+            const std::string_view expected = (0u == index)
+                ? firstTextureProperty : textureProperties[index];
+            const auto found = std::find_if(layout.properties.begin(),
+                layout.properties.end(), [&](const ShaderMetaPropertyBinding& binding)
+                {
+                    return binding.name == expected;
+                });
+            if (found == layout.properties.end()
+                || ShaderPropertyType::Texture2D != found->propertyType
+                || RHIShaderResourceKind::Texture != found->resourceKind
+                || 4u + index != found->registerIndex
+                || 0u != found->registerSpace)
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+    if (!primaryLayout || 48u != primaryLayout->constantBufferByteSize
+        || !waterLayout || !windLayout
+        || !valid64ByteLayout(*waterLayout, waterTail,
+            standard_material::property::BaseColorMap)
+        || !valid64ByteLayout(*windLayout, windTail, "windMap")
+        || 3u != forward.GetShaderVariantCount())
+    {
+        return failRepresentative("48B primary/64B Water·Wind reflection 계약 불일치");
+    }
+
+    const RHIPipelineHandle primaryShade = forward.GetShadePSO();
+    const RHIPipelineHandle primaryReference = forward.GetReferencePSO();
+    const RHIPipelineHandle waterShade = forward.GetShaderVariantPipeline(
+        waterHandle, waterKey, waterSelections, false);
+    const RHIPipelineHandle waterReference = forward.GetShaderVariantPipeline(
+        waterHandle, waterKey, waterSelections, true);
+    const RHIPipelineHandle windShade = forward.GetShaderVariantPipeline(
+        windHandle, windKey, windSelections, false);
+    const RHIPipelineHandle windReference = forward.GetShaderVariantPipeline(
+        windHandle, windKey, windSelections, true);
+    if (!primaryShade.IsValid() || !primaryReference.IsValid()
+        || !waterShade.IsValid() || !waterReference.IsValid()
+        || !windShade.IsValid() || !windReference.IsValid()
+        || primaryShade == waterShade || primaryShade == windShade
+        || waterShade == windShade || primaryReference == waterReference
+        || primaryReference == windReference || waterReference == windReference)
+    {
+        return failRepresentative("primary+2 variant PSO pair identity 불일치");
+    }
+
+    Material waterMaterial(*waterAsset);
+    Material windMaterial(*windAsset);
+    const auto configureRepresentative = [&](Material& material,
+        const ShaderMeta& meta, ShaderMetaHandle handle,
+        const ShaderMetaBindingLayout& layout)
+    {
+        return material.ConfigureShaderProperties(meta, layout, error, handle)
+            && material.TrySetVector("MaterialProperties", "baseColor",
+                math::vector4{ 0.f, 0.f, 0.f, 0.5f })
+            && material.TrySetFloat("MaterialProperties", "metallic", 0.f)
+            && material.TrySetFloat("MaterialProperties", "roughness", 1.f)
+            && material.TrySetFloat("MaterialProperties", "normalScale", 1.f)
+            && material.TrySetFloat("MaterialProperties", "occlusionStrength", 1.f)
+            && material.TrySetVector("MaterialProperties", "emissive",
+                math::vector3{ 1.f, 1.f, 1.f })
+            && material.TrySetFloat("MaterialProperties", "alphaCutoff", 0.f);
+    };
+    if (!configureRepresentative(waterMaterial, *waterMetaOwner,
+            waterHandle, *waterLayout)
+        || !configureRepresentative(windMaterial, *windMetaOwner,
+            windHandle, *windLayout)
+        || !windMaterial.TrySetFloat("MaterialProperties", "windStrength", 0.f)
+        || !windMaterial.TrySetFloat("MaterialProperties", "windTint", 0.f))
+    {
+        return failRepresentative(error.empty() ? "64B property pack 실패" : error);
+    }
+    Material mutatedWindMaterial(windMaterial);
+    if (!mutatedWindMaterial.TrySetFloat(
+            "MaterialProperties", "windTint", 1.f))
+    {
+        return failRepresentative("windTint mutation 실패");
+    }
+
+    const auto makeWindPacket = [&](const Material& material)
+    {
+        auto packet = std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
+        packet->shaderMetaHandle = windHandle;
+        packet->permutationKey = windKey;
+        packet->bindingLayout = *windLayout;
+        packet->keywordSelections = windSelections;
+        packet->baseColorFactor = math::color(1.f, 1.f, 1.f, 0.125f);
+        if (!material.BuildShaderPropertyBlock(*windMetaOwner, *windLayout,
+                packet->propertyBytes, error))
+        {
+            return packet;
+        }
+        for (const ShaderPropertyDesc& desc : windMetaOwner->properties)
+        {
+            if (ShaderPropertyType::Texture2D != desc.type) continue;
+            const auto reflected = std::find_if(windLayout->properties.begin(),
+                windLayout->properties.end(), [&desc](const ShaderMetaPropertyBinding& binding)
+                {
+                    return binding.name == desc.name;
+                });
+            if (reflected == windLayout->properties.end())
+            {
+                error = "Wind generic texture reflection binding 실패: " + desc.name;
+                return packet;
+            }
+            EnhancedMaterialTextureBinding binding{};
+            binding.propertyName = desc.name;
+            binding.registerIndex = reflected->registerIndex;
+            binding.registerSpace = reflected->registerSpace;
+            binding.textureOwner = material.GetTextureMapShared(desc.name);
+            packet->textureBindings.push_back(std::move(binding));
+        }
+        return packet;
+    };
+    std::shared_ptr<EnhancedForwardMaterialDrawSnapshot> windPacket =
+        makeWindPacket(windMaterial);
+    std::shared_ptr<EnhancedForwardMaterialDrawSnapshot> mutatedWindPacket =
+        makeWindPacket(mutatedWindMaterial);
+    if (!windPacket || !mutatedWindPacket || !windPacket->IsValid()
+        || !mutatedWindPacket->IsValid()
+        || 64u != windPacket->propertyBytes.size()
+        || 4u != windPacket->textureBindings.size()
+        || "windMap" != windPacket->textureBindings.front().propertyName
+        || 4u != windPacket->textureBindings.front().registerIndex
+        || windPacket->propertyBytes == mutatedWindPacket->propertyBytes)
+    {
+        return failRepresentative(error.empty() ? "Wind draw packet 불일치" : error);
+    }
+    std::weak_ptr<const EnhancedForwardMaterialDrawSnapshot> windPacketLifetime =
+        windPacket;
+    std::weak_ptr<const EnhancedForwardMaterialDrawSnapshot> mutatedPacketLifetime =
+        mutatedWindPacket;
+
+    EnhancedLiveFramePacket ownerFrame{};
+    std::array<std::shared_ptr<const ShaderMeta>, 3> copiedMetaOwners{
+        std::make_shared<const ShaderMeta>(*primaryMetaOwner),
+        std::make_shared<const ShaderMeta>(*waterMetaOwner),
+        std::make_shared<const ShaderMeta>(*windMetaOwner),
+    };
+    std::array<std::weak_ptr<const ShaderMeta>, 3> copiedMetaLifetimes{
+        copiedMetaOwners[0], copiedMetaOwners[1], copiedMetaOwners[2] };
+    const std::array<ShaderMetaHandle, 3> catalogHandles{
+        primaryHandle, waterHandle, windHandle };
+    for (std::size_t index = 0; index < copiedMetaOwners.size(); ++index)
+    {
+        EnhancedShaderMetaFrameSnapshot snapshot{};
+        snapshot.guid = copiedMetaOwners[index]->guid;
+        snapshot.handle = catalogHandles[index];
+        snapshot.value = copiedMetaOwners[index];
+        ownerFrame.forwardShaderMetas.push_back(std::move(snapshot));
+    }
+    copiedMetaOwners = {};
+    const bool frameOwnsMetaCopies = std::all_of(
+        copiedMetaLifetimes.begin(), copiedMetaLifetimes.end(),
+        [](const std::weak_ptr<const ShaderMeta>& owner)
+        {
+            return !owner.expired();
+        });
+
+    ShaderMeta invalidMeta = *primaryMetaOwner;
+    invalidMeta.passes.front().name = "NotForward";
+    const ShaderMetaHandle invalidMetaHandle{
+        primaryHandle.slot, primaryHandle.generation + 1u };
+    std::string rejectedError;
+    const bool invalidMetaRejected = !forward.ApplyShaderMeta(frameContext,
+        invalidMetaHandle, invalidMeta,
+        RHICompletionPoint{ resources.GetLastSignaledFenceValue() }, rejectedError)
+        && !rejectedError.empty() && primaryShade == forward.GetShadePSO()
+        && primaryReference == forward.GetReferencePSO()
+        && 3u == forward.GetShaderVariantCount();
+
+    auto invalidGeneration =
+        std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*windPacket);
+    ++invalidGeneration->shaderMetaHandle.generation;
+    draws[0].forwardMaterialSnapshot = invalidGeneration;
+    rejectedError.clear();
+    const bool invalidGenerationRejected = !forward.PrepareFrame(
+        frameContext, rejectedError) && !rejectedError.empty()
+        && windShade == forward.GetShaderVariantPipeline(
+            windHandle, windKey, windSelections, false);
+    auto invalidRegister =
+        std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*windPacket);
+    invalidRegister->textureBindings[0].registerIndex = 5u;
+    draws[0].forwardMaterialSnapshot = invalidRegister;
+    rejectedError.clear();
+    const bool invalidRegisterRejected = !forward.PrepareFrame(
+        frameContext, rejectedError) && !rejectedError.empty()
+        && 3u == forward.GetShaderVariantCount();
+    draws[0].forwardMaterialSnapshot.reset();
+    if (!frameOwnsMetaCopies || !invalidMetaRejected
+        || !invalidGenerationRejected || !invalidRegisterRejected)
+    {
+        return failRepresentative("owner/fail-closed 계약 불일치");
+    }
+
+    outLog += "[1/4] required-asset GUID packet 2개 + 실제 Water/Wind 64B b2·windMap@t4 generic texture·primary+2 variant·fail-closed 통과\n";
 
     // ── 깊이 평면 ──
     //
@@ -263,13 +635,20 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
     // ── 두 경로를 한 번씩 그려 픽셀을 모은다 ──
     constexpr uint32_t kPixelCount = kShadeWidth * kShadeHeight;
 
-    std::vector<float> pixels[2];
+    std::vector<float> pixels[4];
     std::vector<uint32_t> tileCounts;
+    std::array<float, 3> legacyTintMax{};
     bool passed = true;
 
-    for (uint32_t pass = 0; pass < 2 && passed; ++pass)
+    for (uint32_t pass = 0; pass < 4 && passed; ++pass)
     {
         const bool reference = (1 == pass);
+        if (2u == pass)
+            draws[0].forwardMaterialSnapshot = windPacket;
+        else if (3u == pass)
+            draws[0].forwardMaterialSnapshot = mutatedWindPacket;
+        else
+            draws[0].forwardMaterialSnapshot.reset();
         forward.SetUseReferencePath(reference);
 
         if (!resources.BeginFrame(error))
@@ -387,8 +766,19 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
                 for (uint32_t y = 0; y < kShadeHeight; ++y)
                     for (uint32_t x = 0; x < kShadeWidth; ++x)
                     {
-                        // R 채널만 본다. 광원이 흰색이라 RGB가 같다.
+                        // 경로 동등성은 R 채널로 대조하고, 첫 경로의 RGB 최대값은
+                        // legacy ShadeInstance tint 보존을 별도로 판정한다.
                         pixels[pass][y * kShadeWidth + x] = captured.At(x, y, 0);
+                        if (0 == pass)
+                        {
+                            for (std::size_t channel = 0;
+                                channel < legacyTintMax.size(); ++channel)
+                            {
+                                legacyTintMax[channel] = (std::max)(
+                                    legacyTintMax[channel],
+                                    captured.At(x, y, static_cast<uint32_t>(channel)));
+                            }
+                        }
                     }
             }
         }
@@ -434,6 +824,16 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
             outLog += "화면 전체가 밝다 — 감쇠·반경이 죽었다\n";
             passed = false;
         }
+        else if (!(legacyTintMax[2] > legacyTintMax[1] + 0.005f
+                && legacyTintMax[1] > legacyTintMax[0] + 0.005f))
+        {
+            char tintLine[192]{};
+            std::snprintf(tintLine, sizeof(tintLine),
+                "legacy ShadeInstance tint가 b2 default로 덮였다 — RGB 최대 %.4f/%.4f/%.4f\n",
+                legacyTintMax[0], legacyTintMax[1], legacyTintMax[2]);
+            outLog += tintLine;
+            passed = false;
+        }
     }
 
     if (passed)
@@ -466,6 +866,33 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         {
             outLog += "타일 목록으로 그린 그림이 전 광원 루프와 다르다 — "
                       "컬링이 닿는 광원을 떨어뜨렸다\n";
+            passed = false;
+        }
+    }
+
+    // pass 2/3은 같은 EnhancedForwardPass와 같은 Wind PSO/layout을 유지한
+    // 연속 프레임이다. 바뀐 것은 64B b2의 windTint float 하나뿐이다.
+    if (passed)
+    {
+        uint32_t changedPixels = 0;
+        float maxMutationDelta = 0.f;
+        for (uint32_t i = 0; i < kPixelCount; ++i)
+        {
+            const float delta = std::fabs(pixels[3][i] - pixels[2][i]);
+            if (delta > 0.01f) ++changedPixels;
+            maxMutationDelta = (std::max)(maxMutationDelta, delta);
+        }
+        char line[256]{};
+        std::snprintf(line, sizeof(line),
+            "[3/4] Wind windTint 0→1 다음-frame — 변경 픽셀 %u · 최대 차 %.5f\n",
+            changedPixels, maxMutationDelta);
+        outLog += line;
+        if (0u == changedPixels || maxMutationDelta < 0.02f
+            || 3u != forward.GetShaderVariantCount()
+            || windShade != forward.GetShaderVariantPipeline(
+                windHandle, windKey, windSelections, false))
+        {
+            outLog += "Wind custom float가 같은 PSO의 다음 프레임 픽셀을 바꾸지 못했다\n";
             passed = false;
         }
     }
@@ -524,6 +951,11 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
                   "     잰다 — 128x128에서는 두 경로 다 측정 잡음에 묻힌다\n";
     }
 
+    draws[0].forwardMaterialSnapshot.reset();
+    windPacket.reset();
+    mutatedWindPacket.reset();
+    ownerFrame.forwardShaderMetas.clear();
+
     std::string validation;
     const uint32_t problems = resources.DrainDebugMessages(validation);
     if (0 != problems)
@@ -533,6 +965,19 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
     }
 
     forward.Shutdown();
+    const bool packetOwnersReleased = windPacketLifetime.expired()
+        && mutatedPacketLifetime.expired();
+    const bool metaCopiesReleased = std::all_of(
+        copiedMetaLifetimes.begin(), copiedMetaLifetimes.end(),
+        [](const std::weak_ptr<const ShaderMeta>& owner)
+        {
+            return owner.expired();
+        });
+    if (!packetOwnersReleased || !metaCopiesReleased)
+    {
+        passed = false;
+        outLog += "Forward packet/frame 해제 뒤 owner가 반환되지 않았다\n";
+    }
     meshCache.Shutdown();
     rootSignatures.Shutdown();
     psoManager.Shutdown();

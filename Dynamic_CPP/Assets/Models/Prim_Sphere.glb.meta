@@ -1,4 +1,4 @@
-guid: 37ad009e-e895-5599-aa57-84f2278b23f9
+guid: 79d6d261-1ba9-46c2-939e-82add54ba500
 importSettings:
   extension: .glb
   timestamp: 134300494788790560
@@ -6,3 +6,13 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: gltf/material/0
+      name: Sphere_Mat
+      guid: a663bd25-0721-4af4-b0be-4a24a4299c60
+  embeddedTextures:
+    - key: gltf/image/0
+      name: Sphere_Mat_BaseColor
+      guid: aa9dcf80-e2cd-4dfa-8a66-8ea2d1094df1

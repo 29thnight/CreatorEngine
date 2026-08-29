@@ -64,6 +64,7 @@ $provenance = Join-Path $repoRoot 'ThirdParty\Mathematics\PROVENANCE.md'
 $props = Join-Path $repoRoot 'Directory.Build.props'
 $targets = Join-Path $repoRoot 'Directory.Build.targets'
 $manifest = Join-Path $repoRoot 'vcpkg.json'
+$buildScript = Join-Path $repoRoot 'Tools\build.ps1'
 $expectedSha = '1f43e080f180db1afbf6e18cb3849b758858a496'
 
 foreach ($required in @(
@@ -83,7 +84,8 @@ foreach ($required in @(
     $provenance,
     $props,
     $manifest,
-    $targets
+    $targets,
+    $buildScript
 )) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "Mathematics contract input is missing: $required"
@@ -226,6 +228,9 @@ if ($manifestText -match '"(?:directxmath|directxtk12)"') {
 }
 if ((Get-Content -LiteralPath $props -Raw) -match 'DIRECTX_TOOLKIT') {
     throw 'Retired DirectXTK import configuration was reintroduced.'
+}
+if ((Get-Content -LiteralPath $buildScript -Raw) -match '(?i)DirectXTK12\.dll') {
+    throw 'Retired DirectXTK12 runtime copy entry was reintroduced in Tools/build.ps1.'
 }
 
 $manifestIncludeCandidates = @(

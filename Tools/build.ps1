@@ -60,6 +60,7 @@ $solutionPath = Join-Path $repoRoot 'CreatorEngine.sln'
 $engineBinaryRoot = Join-Path $repoRoot "Bin\x64-$Config"
 $playerOutput = Join-Path $engineBinaryRoot 'Player'
 $packerOutput = Join-Path $engineBinaryRoot 'Tools\AssetPacker'
+$cookerOutput = Join-Path $engineBinaryRoot 'Tools\AssetCooker'
 $managedOutput = Join-Path $engineBinaryRoot 'Managed'
 
 if (-not ('CreatorEnginePathIdentity' -as [type])) {
@@ -440,7 +441,7 @@ function Sort-EntriesOrdinal {
 function Get-RuntimeDllNames {
     if ($Config -eq 'Debug') {
         return @(
-            'assimp-vc145-mtd.dll', 'DirectXTex.dll', 'DirectXTK12.dll',
+            'assimp-vc145-mtd.dll', 'DirectXTex.dll',
             'fmodL.dll', 'fmtd.dll', 'kubazip.dll', 'meshoptimizer.dll',
             'minizipd.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
             'PhysXDevice64.dll',
@@ -449,7 +450,7 @@ function Get-RuntimeDllNames {
         )
     }
     return @(
-        'assimp-vc145-mt.dll', 'DirectXTex.dll', 'DirectXTK12.dll',
+        'assimp-vc145-mt.dll', 'DirectXTex.dll',
         'fmod.dll', 'fmt.dll', 'kubazip.dll', 'meshoptimizer.dll',
         'minizip.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
         'PhysXDevice64.dll',
@@ -559,6 +560,85 @@ function Get-PackageEntries {
             }
         })
     return @(Sort-EntriesOrdinal -Entries $entries)
+}
+
+function Get-ModelCookSources {
+    param([Parameter(Mandatory)][string]$AssetsRoot)
+
+    $models = @(Get-ChildItem -LiteralPath $AssetsRoot -File -Recurse |
+        Where-Object {
+            $_.Extension.ToLowerInvariant() -in @('.fbx', '.glb', '.gltf')
+        } |
+        Sort-Object FullName)
+    if ($models.Count -eq 0) {
+        throw "package Assets에 cook할 model source가 없다: $AssetsRoot"
+    }
+    return $models
+}
+
+function Assert-ModelCookOutput {
+    param(
+        [Parameter(Mandatory)][string]$OutputRoot,
+        [Parameter(Mandatory)][int]$ExpectedModelCount
+    )
+
+    $derivedRoot = Join-Path $OutputRoot 'Derived'
+    $manifestPath = Join-Path $derivedRoot 'asset-manifest.cemf'
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        throw "model cook manifest가 없다: $manifestPath"
+    }
+    $artifacts = @(Get-ChildItem -LiteralPath (Join-Path $derivedRoot 'Models') `
+        -File -Filter '*.cemc' -Recurse | Sort-Object FullName)
+    if ($artifacts.Count -ne $ExpectedModelCount) {
+        throw "model cook artifact 수가 다르다: $($artifacts.Count) != $ExpectedModelCount"
+    }
+    foreach ($artifact in $artifacts) {
+        $relative = [IO.Path]::GetRelativePath($derivedRoot, $artifact.FullName).Replace('\', '/')
+        if ($relative -notmatch '^Models/([0-9a-f]{2})/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.cemc$' -or
+            $Matches[1] -ne $Matches[2].Substring(0, 2)) {
+            throw "model cook artifact 경로가 GUID-addressed 규약과 다르다: $relative"
+        }
+    }
+    $derivedFiles = @(Get-ChildItem -LiteralPath $derivedRoot -File -Recurse)
+    if ($derivedFiles.Count -ne ($ExpectedModelCount + 1)) {
+        throw "D5-b2b2 model-only Derived tree에 예상 밖 파일이 있다: $($derivedFiles.Count)"
+    }
+
+    return [pscustomobject][ordered]@{
+        ModelCount = $ExpectedModelCount
+        ArtifactCount = $artifacts.Count
+        ArtifactBytes = ($artifacts | Measure-Object Length -Sum).Sum
+        ManifestBytes = (Get-Item -LiteralPath $manifestPath).Length
+        ManifestSha256 = Get-Sha256 -Path $manifestPath
+        DerivedFileCount = $derivedFiles.Count
+    }
+}
+
+function Invoke-ModelCook {
+    param(
+        [Parameter(Mandatory)][string]$AssetCooker,
+        [Parameter(Mandatory)][string]$AssetsRoot,
+        [Parameter(Mandatory)][string]$OutputRoot
+    )
+
+    if (Test-Path -LiteralPath $OutputRoot) {
+        throw "model cook output은 존재하지 않는 새 디렉터리여야 한다: $OutputRoot"
+    }
+    $models = @(Get-ModelCookSources -AssetsRoot $AssetsRoot)
+    $arguments = [Collections.Generic.List[string]]::new()
+    $arguments.Add('--asset-root')
+    $arguments.Add($AssetsRoot)
+    $arguments.Add('--output')
+    $arguments.Add($OutputRoot)
+    foreach ($model in $models) {
+        $arguments.Add('--model')
+        $arguments.Add($model.FullName)
+    }
+    $cookLog = @(Invoke-NativeChecked -FilePath $AssetCooker `
+        -Label 'AssetCooker model corpus' -Arguments $arguments.ToArray())
+    foreach ($line in $cookLog) { Write-Host $line }
+    return Assert-ModelCookOutput -OutputRoot $OutputRoot `
+        -ExpectedModelCount $models.Count
 }
 
 function Copy-WorkspaceInputs {
@@ -1174,7 +1254,7 @@ try {
     if ($BuildNative) {
         $msbuild = Find-MSBuild
         Invoke-NativeChecked -FilePath $msbuild -Label 'native Player/tool build' -Arguments @(
-            $solutionPath, '/m', '/t:Tools\AssetPacker;Player', "/p:Configuration=$Config", '/p:Platform=x64',
+            $solutionPath, '/m', '/t:Tools\AssetPacker;Tools\AssetCooker;Player', "/p:Configuration=$Config", '/p:Platform=x64',
             '/nologo', '/verbosity:minimal')
     } else {
         Write-Host '  skipped (use -BuildNative for a clean/CI native build)'
@@ -1182,7 +1262,8 @@ try {
 
     $playerSource = Join-Path $playerOutput 'Player.exe'
     $packerSource = Join-Path $packerOutput 'AssetPacker.exe'
-    foreach ($requiredBinary in @($playerSource, $packerSource)) {
+    $cookerSource = Join-Path $cookerOutput 'AssetCooker.exe'
+    foreach ($requiredBinary in @($playerSource, $packerSource, $cookerSource)) {
         if (-not (Test-Path -LiteralPath $requiredBinary -PathType Leaf)) {
             throw "required native output is missing: $requiredBinary (run with -BuildNative)"
         }
@@ -1196,7 +1277,39 @@ try {
         'build', (Join-Path $repoRoot 'GameScripts\GameScripts.csproj'), '-c', $Config, '--nologo')
 
     Write-Host '[3/6 Cook]' -ForegroundColor Cyan
-    Write-Host '  B3 전까지 사전 컴파일 셰이더 cook은 비어 있으며, HLSL source를 pak에 포함한다.'
+    $packageWorkRoot = Join-Path $candidateStage '.package-input'
+    $baseRoot = Join-Path $packageWorkRoot 'Base'
+    $generatedRoot = Join-Path $packageWorkRoot 'Generated'
+    $mergedRoot = Join-Path $packageWorkRoot 'Merged'
+    New-Item -ItemType Directory -Force -Path $baseRoot, $generatedRoot, $mergedRoot | Out-Null
+
+    # Cook은 live project가 아니라 실제 package base snapshot을 입력으로 쓴다.
+    # 따라서 Tracked/Workspace/Project 모드의 byte closure와 cooked 결과가 어긋나지 않는다.
+    $runtimeTemplateSource = $templatePath
+    $packageInputRevision = 'WORKTREE'
+    $baseCount = if ($InputMode -eq 'Tracked') {
+        $snapshotRoot = New-TrackedSnapshot `
+            -DestinationRoot (Join-Path $packageWorkRoot 'TrackedSnapshot') `
+            -GitCommit $gitCommit
+        $snapshotProject = Join-Path $snapshotRoot 'Dynamic_CPP'
+        $runtimeTemplateSource = Join-Path $snapshotRoot `
+            'Tools\packaging\templates\EngineSettings.runtime.yml'
+        $packageInputRevision = $gitCommit
+        Copy-ProjectInputs -BaseRoot $baseRoot -ProjectRoot $snapshotProject
+    } elseif ($InputMode -eq 'Workspace') {
+        Copy-WorkspaceInputs -BaseRoot $baseRoot -ProjectRoot $projectRoot
+    } else {
+        Copy-ProjectInputs -BaseRoot $baseRoot -ProjectRoot $projectRoot
+    }
+    $packageAssets = Join-Path $baseRoot 'Assets'
+    $authoredDerived = Join-Path $packageAssets 'Derived'
+    if (Test-Path -LiteralPath $authoredDerived) {
+        throw "package source에 stale/authored Derived tree를 둘 수 없다: $authoredDerived"
+    }
+    $modelCook = Invoke-ModelCook -AssetCooker $cookerSource `
+        -AssetsRoot $packageAssets -OutputRoot (Join-Path $generatedRoot 'Assets')
+    Write-Host "  models=$($modelCook.ModelCount), CEMC bytes=$($modelCook.ArtifactBytes), CEMF bytes=$($modelCook.ManifestBytes)"
+    Write-Host '  B3 전까지 shader는 source HLSL을 pak에 포함하며 precompiled shader cook은 아직 없다.'
 
     Write-Host '[4/6 Stage]' -ForegroundColor Cyan
     $runtimeRootFiles = [Collections.Generic.List[string]]::new()
@@ -1233,33 +1346,18 @@ try {
     $runtimeDigest = Get-ContentDigest -Entries $runtimeEntries
 
     Write-Host '[5/6 Pak]' -ForegroundColor Cyan
-    $packageWorkRoot = Join-Path $candidateStage '.package-input'
-    $baseRoot = Join-Path $packageWorkRoot 'Base'
-    $generatedRoot = Join-Path $packageWorkRoot 'Generated'
-    $mergedRoot = Join-Path $packageWorkRoot 'Merged'
-    New-Item -ItemType Directory -Force -Path $baseRoot, $generatedRoot, $mergedRoot | Out-Null
-
-    $runtimeTemplateSource = $templatePath
-    $packageInputRevision = 'WORKTREE'
-    $baseCount = if ($InputMode -eq 'Tracked') {
-        $snapshotRoot = New-TrackedSnapshot `
-            -DestinationRoot (Join-Path $packageWorkRoot 'TrackedSnapshot') `
-            -GitCommit $gitCommit
-        $snapshotProject = Join-Path $snapshotRoot 'Dynamic_CPP'
-        $runtimeTemplateSource = Join-Path $snapshotRoot `
-            'Tools\packaging\templates\EngineSettings.runtime.yml'
-        $packageInputRevision = $gitCommit
-        Copy-ProjectInputs -BaseRoot $baseRoot -ProjectRoot $snapshotProject
-    } elseif ($InputMode -eq 'Workspace') {
-        Copy-WorkspaceInputs -BaseRoot $baseRoot -ProjectRoot $projectRoot
-    } else {
-        Copy-ProjectInputs -BaseRoot $baseRoot -ProjectRoot $projectRoot
-    }
     $materializedSettings = Join-Path $generatedRoot 'ProjectSetting\EngineSettings.asset'
     Write-MaterializedRuntimeSettings -Template $runtimeTemplateSource `
         -Destination $materializedSettings -RequestedStartupScene $StartupScene `
         -RequestedRenderBackend $RenderBackend
     Merge-PackageInput -BaseRoot $baseRoot -GeneratedRoot $generatedRoot -MergedRoot $mergedRoot
+
+    $mergedCook = Assert-ModelCookOutput -OutputRoot (Join-Path $mergedRoot 'Assets') `
+        -ExpectedModelCount $modelCook.ModelCount
+    if ($mergedCook.ManifestSha256 -ne $modelCook.ManifestSha256 -or
+        $mergedCook.ArtifactBytes -ne $modelCook.ArtifactBytes) {
+        throw 'merged package의 model Derived tree가 Cook 게시 결과와 다르다.'
+    }
 
     $mergedSettings = Join-Path $mergedRoot 'ProjectSetting\EngineSettings.asset'
     $preflight = Assert-PackagePreflight -MergedRoot $mergedRoot -SettingsPath $mergedSettings
@@ -1284,7 +1382,7 @@ try {
         config = $Config
         inputMode = $InputMode
         baseFileCount = $baseCount
-        generatedFileCount = 1
+        generatedFileCount = 1 + $modelCook.DerivedFileCount
         entryCount = $entries.Count
         contentDigest = $contentDigest
         settingsTemplateSha256 = Get-Sha256 -Path $runtimeTemplateSource
@@ -1314,6 +1412,18 @@ try {
         runtimeDigest = $runtimeDigest
         distributionDigest = $distributionDigest
         runtimeEntries = $runtimeEntries
+        cook = [ordered]@{
+            schemaVersion = 1
+            producer = 'AssetCooker'
+            source = 'package-base/Assets'
+            artifactRoot = 'Assets/Derived'
+            modelCount = $modelCook.ModelCount
+            artifactCount = $modelCook.ArtifactCount
+            artifactBytes = $modelCook.ArtifactBytes
+            manifestBytes = $modelCook.ManifestBytes
+            manifestSha256 = $modelCook.ManifestSha256
+            derivedFileCount = $modelCook.DerivedFileCount
+        }
         verification = 'pending'
         entries = $entries
     }

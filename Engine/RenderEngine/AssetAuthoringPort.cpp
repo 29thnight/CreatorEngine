@@ -5,6 +5,8 @@
 namespace
 {
 	std::atomic<AssetAuthoringPort::CreateMetaHandler> g_createMetaHandler{};
+	std::atomic<AssetAuthoringPort::WriteTextAssetWithMetaHandler>
+		g_writeTextAssetWithMetaHandler{};
 	std::atomic<AssetAuthoringPort::WriteModelCacheHandler> g_writeModelCacheHandler{};
 	std::atomic<AssetAuthoringPort::WriteEmbeddedTextureHandler>
 		g_writeEmbeddedTextureHandler{};
@@ -33,11 +35,42 @@ void AssetAuthoringPort::Uninstall(CreateMetaHandler handler) noexcept
 		handler, nullptr, std::memory_order_acq_rel);
 }
 
-FileGuid AssetAuthoringPort::CreateMeta(const file::path& filepath) noexcept
+FileGuid AssetAuthoringPort::CreateMeta(const file::path& filepath,
+	const FileGuid& preferredGuid) noexcept
 {
 	const CreateMetaHandler handler =
 		g_createMetaHandler.load(std::memory_order_acquire);
-	return handler ? handler(filepath) : FileGuid{};
+	return handler ? handler(filepath, preferredGuid) : FileGuid{};
+}
+
+void AssetAuthoringPort::InstallTextAssetWriter(
+	WriteTextAssetWithMetaHandler handler) noexcept
+{
+	g_writeTextAssetWithMetaHandler.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallTextAssetWriter(
+	WriteTextAssetWithMetaHandler handler) noexcept
+{
+	g_writeTextAssetWithMetaHandler.compare_exchange_strong(
+		handler, nullptr, std::memory_order_acq_rel);
+}
+
+FileGuid AssetAuthoringPort::WriteTextAssetWithMeta(
+	const file::path& destination, std::string_view payload,
+	const FileGuid& preferredGuid) noexcept
+{
+	const WriteTextAssetWithMetaHandler handler =
+		g_writeTextAssetWithMetaHandler.load(std::memory_order_acquire);
+	if (!handler) return {};
+	try
+	{
+		return handler(destination, payload, preferredGuid);
+	}
+	catch (...)
+	{
+		return {};
+	}
 }
 
 void AssetAuthoringPort::InstallModelCacheWriter(

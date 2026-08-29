@@ -1,6 +1,7 @@
 #pragma once
 #include "VulkanLoader.h"
 
+#include "../RHICompletionRetireQueue.h"
 #include "../RHIFormat.h"
 #include "../RHIPipelineLayout.h"
 #include "../RHIPipelineState.h"
@@ -143,6 +144,10 @@ public:
     ///   주지 않고 실패로 멈춘다.
     RHIPipelineHandle GetOrCreateCompute(const RHIComputePipelineDesc& desc,
         std::string& outError) override;
+    bool InvalidatePipeline(RHIPipelineHandle handle,
+        RHICompletionPoint retireAfter = {}) override;
+    std::uint32_t InvalidatePipelines(RHICompletionPoint retireAfter = {}) override;
+    std::uint32_t CollectRetiredPipelines(RHICompletionPoint completed) override;
 
     /// 핸들 → 짝. 인코더가 부른다.
     VulkanPipelineEntry       Resolve(RHIPipelineHandle handle) const;
@@ -157,6 +162,9 @@ public:
         uint32_t memoryHits{ 0 };
         uint32_t compiles{ 0 };
         uint32_t failures{ 0 };
+        uint32_t invalidations{ 0 };
+        uint32_t retiredPipelines{ 0 };
+        uint32_t retiredCollections{ 0 };
     };
     Stats GetStats() const { return m_stats; }
 
@@ -168,19 +176,25 @@ private:
     /// 넣어도 된다 — 디스크 캐시가 없어 실행을 넘어 안정할 이유가 없다.
     uint64_t ComputeHash(const RHIGraphicsPipelineDesc& desc) const;
     uint64_t ComputeHash(const RHIComputePipelineDesc& desc) const;
+    RHIPipelineHandle PublishPipeline(VulkanPipelineEntry entry);
+    bool RetirePipeline(RHIPipelineHandle handle, RHICompletionPoint retireAfter);
 
     VkDevice m_device{ VK_NULL_HANDLE };
 
     std::unordered_map<uint64_t, RHIPipelineLayoutHandle> m_layoutByHash;
     std::unordered_map<uint64_t, RHIPipelineHandle>       m_pipelineByHash;
 
-    // 핸들의 슬롯이 곧 이 배열의 인덱스다. 놓는 호출자가 0 이라 세대는 아직
-    // 안 든다 — 표가 자라지 않고(같은 desc 는 같은 핸들) 캐시가 앱 수명이다.
-    //
-    // ★ 세대가 필요해지는 조건은 적어 둔다: 파이프라인을 실제로 놓기
-    //   시작하면(셰이더 리로드가 Vulkan 에도 생기면) 그때 DX12ResourceTable
-    //   과 같은 모양이 필요하다.
-    std::vector<VulkanPipelineEntry>       m_pipelines;
+    struct PipelineSlot
+    {
+        VulkanPipelineEntry entry{};
+        std::uint32_t generation{ 0 };
+        bool alive{ false };
+    };
+    // M5-C3b1: lookup에서 제거한 slot은 generation을 올려 재사용한다. VkPipeline은
+    // 제출 완료를 이 cache가 직접 알기 전까지 retired 목록에 보존한다.
+    std::vector<PipelineSlot>              m_pipelines;
+    std::vector<std::uint32_t>             m_pipelineFree;
+    RHICompletionRetireQueue<VkPipeline>   m_retiredPipelines;
     std::vector<VulkanPipelineLayoutEntry> m_layouts;
 
     // 셰이더 모듈은 파이프라인이 다 구워지면 지워도 되지만, 캐시가 같은

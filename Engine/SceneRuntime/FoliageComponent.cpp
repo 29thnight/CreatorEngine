@@ -272,7 +272,7 @@ void FoliageComponent::UpdateFoliageCullingData(
             foliage.RebuildWorldMatrix();
 
             const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
-            Mesh* mesh = foliageType.m_mesh;
+            Mesh* mesh = foliageType.m_mesh.get();
             if (!mesh)
             {
                 foliage.m_isCulled = true; // ���� �⺻��
@@ -330,14 +330,14 @@ void FoliageComponent::OnDeserialized()
 		if (type.m_modelName.empty())
 			continue;
 
-		Model* model = nullptr;
+		std::shared_ptr<Model> model;
 		std::array<std::string, 5> exts{ ".fbx", ".gltf", ".glb", ".obj", ".asset" };
 		for (const auto& ext : exts)
 		{
 			auto path = PathFinder::Relative("Models\\" + type.m_modelName + ext);
 			if (std::filesystem::exists(path))
 			{
-				model = DataSystems->LoadCashedModel(path.string());
+				model = DataSystems->LoadCachedModelShared(path.string());
 				break;
 			}
 		}
@@ -346,8 +346,8 @@ void FoliageComponent::OnDeserialized()
 			Debug->LogError("Failed to load model for FoliageType: " + type.m_modelName);
 			continue;
 		}
-		type.m_mesh = model->GetMesh(0);
-		type.m_material = model->GetMaterial(0);
+		type.m_mesh = model->GetMeshShared(0);
+		type.m_material = model->GetMaterialShared(0);
 	}
 
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존

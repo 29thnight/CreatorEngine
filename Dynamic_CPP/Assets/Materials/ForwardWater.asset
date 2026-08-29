@@ -1,0 +1,74 @@
+m_name: ForwardWater
+m_baseColorTexName: ""
+m_normalTexName: ""
+m_ORM_TexName: ""
+m_AO_TexName: ""
+m_EmissiveTexName: ""
+m_materialInfo:
+  m_baseColor: {r: 0.08, g: 0.32, b: 0.55, a: 0.65}
+  m_metallic: 0.0
+  m_roughness: 0.15
+  m_IOR: 1.5
+m_flowInfo:
+  m_windVector: {x: 0, y: 0, z: 0, w: 0}
+  m_uvScroll: {x: 0, y: 0}
+m_shaderMetaGuid: 759d0c45-0d43-46f4-b419-3b681d5db8d2
+m_propertyValues:
+  - m_name: baseColor
+    m_numericValue: [0.08, 0.32, 0.55, 0.65]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: metallic
+    m_numericValue: [0.0]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: roughness
+    m_numericValue: [0.15]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: normalScale
+    m_numericValue: [1.0]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: occlusionStrength
+    m_numericValue: [1.0]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: emissive
+    m_numericValue: [0.05, 0.15, 0.30]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: alphaCutoff
+    m_numericValue: [0.5]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: waveSpeed
+    m_numericValue: [0.35]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: waveAmplitude
+    m_numericValue: [0.08]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: waveFrequency
+    m_numericValue: [2.0]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+  - m_name: waterTint
+    m_numericValue: [0.8]
+    m_integerValue: 0
+    m_boolValue: false
+    m_textureGuid: 00000000-0000-0000-0000-000000000000
+m_keywordSelections: [0]
+m_fileGuid: bbb12414-7991-4de2-8d15-36f8ec299312
+m_renderingMode: 1

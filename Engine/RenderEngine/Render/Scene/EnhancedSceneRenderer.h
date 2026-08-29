@@ -1,20 +1,26 @@
 #pragma once
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
 #include "../../FrameCameraSnapshot.h"
+#include "../../ShaderMetaHandle.h"
+#include "../../../Utility_Framework/TypeTrait.h"
 
 // ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
 // GetLiveDisplaySrv가 D4에서 사라진 뒤로 쓰는 선언이 없다.
 class RenderScene;
 class Scene;
+class Material;
 struct EnhancedGizmoSceneData;
 struct EnhancedGizmoIconTextures;
 struct IRenderFeatureContributor;
 struct IDisplayPresentationSink;
+struct ShaderMeta;
 
 inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 2; // scene + game view
 
@@ -97,6 +103,83 @@ struct EnhancedLiveViewRequest
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
 };
 
+/// GT가 DataSystem generation handle과 immutable 값을 한 쌍으로 밀봉한 셰이더 입력.
+/// RenderThread는 DataSystem이나 authoring 파일을 다시 읽지 않는다. error가 있으면
+/// 최초 부팅은 fail-closed하고, 이미 적용한 render request가 있으면 그 PSO를 유지한다.
+struct EnhancedShaderMetaFrameSnapshot
+{
+    FileGuid guid{};
+    ShaderMetaHandle handle{};
+    std::shared_ptr<const ShaderMeta> value;
+    std::string error;
+
+    bool IsValid() const
+    {
+        return FileGuid{} != guid && handle.IsValid() && nullptr != value;
+    }
+};
+
+/// Host가 현재 Scene의 실제 draw material에서 수집한 ShaderMeta 의존성.
+/// 파일 이름이나 catalog의 대표 목록을 렌더러 안에 박아 넣지 않고, GT가
+/// pass domain과 GUID만 선언한다. BuildLiveFramePacket은 이를 generation/value
+/// owner로 해석하므로 RT는 DataSystem이나 authoring 파일을 다시 읽지 않는다.
+enum class EnhancedShaderMetaDomain : uint8_t
+{
+    GBuffer,
+    Forward,
+};
+
+struct EnhancedRequiredShaderMetaAsset
+{
+    EnhancedShaderMetaDomain domain{ EnhancedShaderMetaDomain::GBuffer };
+    FileGuid guid{};
+
+    bool operator==(const EnhancedRequiredShaderMetaAsset&) const = default;
+};
+
+struct EnhancedRequiredAssetPacket
+{
+    std::vector<EnhancedRequiredShaderMetaAsset> shaderMetas;
+
+    void RequireShaderMeta(EnhancedShaderMetaDomain domain, const FileGuid& guid)
+    {
+        if (FileGuid{} == guid) return;
+        const EnhancedRequiredShaderMetaAsset request{ domain, guid };
+        if (std::find(shaderMetas.begin(), shaderMetas.end(), request)
+            == shaderMetas.end())
+        {
+            shaderMetas.push_back(request);
+        }
+    }
+
+    void Canonicalize()
+    {
+        std::erase_if(shaderMetas, [](const auto& request)
+        {
+            return FileGuid{} == request.guid;
+        });
+        std::sort(shaderMetas.begin(), shaderMetas.end(),
+            [](const auto& left, const auto& right)
+            {
+                if (left.domain != right.domain)
+                {
+                    return static_cast<uint8_t>(left.domain)
+                        < static_cast<uint8_t>(right.domain);
+                }
+                return left.guid < right.guid;
+            });
+        shaderMetas.erase(std::unique(shaderMetas.begin(), shaderMetas.end()),
+            shaderMetas.end());
+    }
+
+    bool ContainsShaderMeta(EnhancedShaderMetaDomain domain,
+        const FileGuid& guid) const
+    {
+        return std::find(shaderMetas.begin(), shaderMetas.end(),
+            EnhancedRequiredShaderMetaAsset{ domain, guid }) != shaderMetas.end();
+    }
+};
+
 /// Immutable per-frame message from the game thread to the renderer.
 ///
 /// 3-2B first feeds this synchronously to TickLive. 3-2E can therefore insert
@@ -111,8 +194,39 @@ struct EnhancedLiveFramePacket
     uint32_t width{ 0 };
     uint32_t height{ 0 };
     bool     sceneLoading{ false };
+    // M6-P2d-d: Host가 실제 Scene material에서 수집해 넘긴 추가 의존성.
+    // 아래 ShaderMeta owner 배열은 이 선언과 primary/cache 입력을 resolve한 결과다.
+    EnhancedRequiredAssetPacket requiredAssets;
+    // 첫 항목은 제품 GBuffer primary meta다. 뒤에는 GT가 DataSystem의 material
+    // generation 집합에서 함께 밀봉한 material별 meta가 GUID 순서로 붙는다.
+    std::vector<EnhancedShaderMetaFrameSnapshot> gbufferShaderMetas;
+    // M6-P2b: 첫 항목은 제품 Forward primary meta다. P2c가 water/wind 등
+    // material별 Forward pass를 연결할 때 같은 owner 배열을 확장한다.
+    std::vector<EnhancedShaderMetaFrameSnapshot> forwardShaderMetas;
     uint32_t viewCount{ 0 };
     std::array<EnhancedLiveViewPacket, kEnhancedMaxLiveCameraViews> views{};
+
+    const EnhancedShaderMetaFrameSnapshot* FindGBufferShaderMeta(
+        const FileGuid& guid) const
+    {
+        const auto found = std::find_if(gbufferShaderMetas.begin(),
+            gbufferShaderMetas.end(), [&guid](const auto& snapshot)
+            {
+                return snapshot.guid == guid;
+            });
+        return found == gbufferShaderMetas.end() ? nullptr : &*found;
+    }
+
+    const EnhancedShaderMetaFrameSnapshot* FindForwardShaderMeta(
+        const FileGuid& guid) const
+    {
+        const auto found = std::find_if(forwardShaderMetas.begin(),
+            forwardShaderMetas.end(), [&guid](const auto& snapshot)
+            {
+                return snapshot.guid == guid;
+            });
+        return found == forwardShaderMetas.end() ? nullptr : &*found;
+    }
 };
 
 struct EnhancedRenderThreadStats
@@ -429,9 +543,12 @@ namespace EnhancedSceneRenderer
     /// 표시 우선순위가 아니라 제출 순서일 뿐이고, RenderThread가 Editor/Game
     /// 논리 대상으로 결과를 발행한다(MultiCameraRenderPlan.md).
     inline constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
+    EnhancedRequiredAssetPacket BuildRequiredAssetPacket(
+        std::span<const std::shared_ptr<Material>> materials);
+
     EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
         const EnhancedLiveViewRequest* views, uint32_t viewCount,
-        bool sceneLoading);
+        bool sceneLoading, const EnhancedRequiredAssetPacket& requiredAssets);
 
     /// 게임 스레드가 packet과 그 시점까지의 proxy delta를 하나의 제출 단위로
     /// 발행한다. queue가 찼으면 가장 최신 pending frame을 교체하되 lifecycle
@@ -446,6 +563,10 @@ namespace EnhancedSceneRenderer
     /// SceneManager가 RenderScene을 Finalize하기 전에 호출해야 한다.
     void StopLiveRenderThread();
     EnhancedRenderThreadStats GetLiveRenderThreadStats();
+
+    /// 진단/오프라인 검증 전용. 호출 시점까지 발행된 frame packet과 proxy delta를
+    /// RenderThread가 모두 소비할 때까지 기다린다. 일반 프레임 경로에서는 호출하지 않는다.
+    bool WaitForLiveRenderThreadIdle(uint32_t timeoutMilliseconds);
 
     /// RenderThread가 마지막으로 발행한 backend 중립 표시 스냅샷을 복사한다.
     /// Camera 객체나 backend 파이프라인을 CE/UI가 다시 조회하지 않는다.

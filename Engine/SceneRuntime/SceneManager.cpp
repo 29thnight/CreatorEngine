@@ -1,6 +1,9 @@
 ﻿#include "SceneManager.h"
 #include "RenderScene.h"
 #include "Scene.h"
+#include "MeshRenderer.h"
+#include "FoliageComponent.h"
+#include "Material.h"
 #include "Object.h"
 #include "Transform.h" // 레인 2: Entity::GetComponent<Transform>() 직접 참조
 #include "BoneComponent.h" // E7-b: 뼈 구파일 승격(Entity::AddComponent<BoneComponent>())
@@ -1208,6 +1211,33 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
 std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
 {
 	return m_activeScene.load()->m_allMeshRenderers;
+}
+
+std::vector<std::shared_ptr<Material>>
+SceneManager::CaptureRequiredRenderMaterials() const
+{
+    std::vector<std::shared_ptr<Material>> materials;
+    std::unordered_set<const Material*> seen;
+    Scene* scene = m_activeScene.load();
+    if (nullptr == scene) return materials;
+
+    const auto add = [&materials, &seen](const std::shared_ptr<Material>& material)
+    {
+        if (!material || !seen.insert(material.get()).second) return;
+        materials.push_back(material);
+    };
+
+    for (const MeshRenderer* renderer : scene->m_allMeshRenderers)
+    {
+        if (nullptr != renderer) add(renderer->m_Material);
+    }
+    for (const FoliageComponent* foliage : scene->m_foliageComponents)
+    {
+        if (nullptr == foliage) continue;
+        for (const FoliageType& type : foliage->GetFoliageTypes())
+            add(type.m_material);
+    }
+    return materials;
 }
 
 void SceneManager::VolumeProfileApply()

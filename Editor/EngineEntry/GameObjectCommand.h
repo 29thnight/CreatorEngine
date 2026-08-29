@@ -222,8 +222,9 @@ namespace Meta
     class LoadModelToSceneObjCommand : public IUndoableCommand
     {
     public:
-        LoadModelToSceneObjCommand(Scene* scene, Model* model, Entity** outObj = nullptr)
-            : m_scene(scene), m_model(model), m_outObj(outObj) {
+        LoadModelToSceneObjCommand(Scene* scene, std::shared_ptr<Model> model,
+            Entity** outObj = nullptr)
+            : m_scene(scene), m_model(std::move(model)), m_outObj(outObj) {
         }
 
         void Undo() override
@@ -237,7 +238,8 @@ namespace Meta
 
         void Redo() override
         {
-            Entity* obj = Model::LoadModelToSceneObj(m_model, *m_scene);
+            Entity* obj = (m_model && m_scene)
+                ? Model::LoadModelToSceneObj(m_model.get(), *m_scene) : nullptr;
             m_rootIndex = obj ? obj->m_index : Entity::INVALID_INDEX;
             if (m_outObj)
                 *m_outObj = obj;
@@ -245,7 +247,7 @@ namespace Meta
 
     private:
         Scene* m_scene{};
-        Model* m_model{};
+        std::shared_ptr<Model> m_model{};
         Entity::Index m_rootIndex{ Entity::INVALID_INDEX };
         Entity** m_outObj{};
     };

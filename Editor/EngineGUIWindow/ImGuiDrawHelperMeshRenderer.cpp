@@ -336,17 +336,17 @@ void TextureDropTarget(Material* mat)
 	ImVec2 maxRect;
 	ImGui::PushID(mat);
 	{
-		if (mat->m_pBaseColor) {
-			ImGui::Image((ImTextureID)EditorImGuiTexture::From(mat->m_pBaseColor), ImVec2(30, 30));
+		Texture* baseColor = mat->GetBaseColorMapShared().get();
+		if (baseColor) {
+			ImGui::Image((ImTextureID)EditorImGuiTexture::From(baseColor), ImVec2(30, 30));
 			minRect = ImGui::GetItemRectMin();
 			maxRect = ImGui::GetItemRectMax();
 
 			ImGui::SameLine();
-			ImGui::PushID(mat->m_pBaseColor);
+			ImGui::PushID(baseColor);
 			if (ImGui::Button("delete")) {
 				mat->m_baseColorTexName = "";
-				mat->m_pBaseColor = nullptr;
-				mat->m_materialInfo.m_useBaseColor = false;
+				mat->UseBaseColorMap(std::shared_ptr<Texture>{});
 			}
 			ImGui::PopID();
 		}
@@ -366,7 +366,7 @@ void TextureDropTarget(Material* mat)
 				HashingString path = filepath.string();
 				if (!filename.filename().empty()) {
 					//SetColorGradingTexture(filepath.string());
-					mat->UseBaseColorMap(Texture::LoadFormPath(filepath.string()));
+					mat->UseBaseColorMap(Texture::LoadSharedFromPath(filepath.string()));
 					mat->m_baseColorTexName = filepath.string();
 				}
 				else {
@@ -378,18 +378,18 @@ void TextureDropTarget(Material* mat)
 	}
 
 	{
-		if (mat->m_pNormal) {
-			ImGui::Image((ImTextureID)EditorImGuiTexture::From(mat->m_pNormal), ImVec2(30, 30));
+		Texture* normal = mat->GetNormalMapShared().get();
+		if (normal) {
+			ImGui::Image((ImTextureID)EditorImGuiTexture::From(normal), ImVec2(30, 30));
 
 			minRect = ImGui::GetItemRectMin();
 			maxRect = ImGui::GetItemRectMax();
 
 			ImGui::SameLine();
-			ImGui::PushID(mat->m_pNormal);
+			ImGui::PushID(normal);
 			if (ImGui::Button("delete")) {
 				mat->m_normalTexName = "";
-				mat->m_pNormal = nullptr;
-				mat->m_materialInfo.m_useNormalMap = false;
+				mat->UseNormalMap(std::shared_ptr<Texture>{});
 			}
 			ImGui::PopID();
 		}
@@ -409,7 +409,7 @@ void TextureDropTarget(Material* mat)
 				HashingString path = filepath.string();
 				if (!filename.filename().empty()) {
 					//SetColorGradingTexture(filepath.string());
-					mat->UseNormalMap(Texture::LoadFormPath(filepath.string()));
+					mat->UseNormalMap(Texture::LoadSharedFromPath(filepath.string()));
 					mat->m_normalTexName = filepath.string();
 				}
 				else {
@@ -420,18 +420,18 @@ void TextureDropTarget(Material* mat)
 		}
 	}
 	{
-		if (mat->m_pOccRoughMetal) {
-			ImGui::Image((ImTextureID)EditorImGuiTexture::From(mat->m_pOccRoughMetal), ImVec2(30, 30));
+		Texture* orm = mat->GetOccRoughMetalMapShared().get();
+		if (orm) {
+			ImGui::Image((ImTextureID)EditorImGuiTexture::From(orm), ImVec2(30, 30));
 
 			minRect = ImGui::GetItemRectMin();
 			maxRect = ImGui::GetItemRectMax();
 
 			ImGui::SameLine();
-			ImGui::PushID(mat->m_pOccRoughMetal);
+			ImGui::PushID(orm);
 			if (ImGui::Button("delete")) {
 				mat->m_ORM_TexName = "";
-				mat->m_pOccRoughMetal = nullptr;
-				mat->m_materialInfo.m_useOccRoughMetal = false;
+				mat->UseOccRoughMetalMap(std::shared_ptr<Texture>{});
 			}
 			ImGui::PopID();
 		}
@@ -451,7 +451,7 @@ void TextureDropTarget(Material* mat)
 				HashingString path = filepath.string();
 				if (!filename.filename().empty()) {
 					//SetColorGradingTexture(filepath.string());
-					mat->UseOccRoughMetalMap(Texture::LoadFormPath(filepath.string()));
+					mat->UseOccRoughMetalMap(Texture::LoadSharedFromPath(filepath.string()));
 					mat->m_ORM_TexName = filepath.string();
 				}
 				else {

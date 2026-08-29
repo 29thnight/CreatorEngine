@@ -2,6 +2,8 @@
 #include "DataSystem.h"
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
+#include "StandardMaterialProperty.h"
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <type_traits>
@@ -141,15 +143,10 @@ Material::Material()
 Material::Material(const Material& material) :
     m_name(material.m_name),
     m_baseColorTexName(material.m_baseColorTexName),
-    m_pBaseColor(material.m_pBaseColor),
     m_normalTexName(material.m_normalTexName),
-    m_pNormal(material.m_pNormal),
     m_ORM_TexName(material.m_ORM_TexName),
-    m_pOccRoughMetal(material.m_pOccRoughMetal),
     m_AO_TexName(material.m_AO_TexName),
-    m_AOMap(material.m_AOMap),
     m_EmissiveTexName(material.m_EmissiveTexName),
-    m_pEmissive(material.m_pEmissive),
     m_materialInfo(material.m_materialInfo),
     m_flowInfo(material.m_flowInfo),
     m_shaderMetaGuid(material.m_shaderMetaGuid),
@@ -158,20 +155,16 @@ Material::Material(const Material& material) :
     m_fileGuid(material.m_fileGuid),
     m_renderingMode(material.m_renderingMode),
     m_cbufferValues(material.m_cbufferValues),
-	m_dirtyCBs(material.m_dirtyCBs),
     m_runtimeSchema(material.m_runtimeSchema),
-	m_shaderMetaHandle(material.m_shaderMetaHandle)
+	m_shaderMetaHandle(material.m_shaderMetaHandle),
+	m_textureOwners(material.m_textureOwners)
 {
 }
 
 Material::Material(Material&& material) noexcept
 {
     std::exchange(m_name, material.m_name);
-    std::exchange(m_pBaseColor, material.m_pBaseColor);
-    std::exchange(m_pNormal, material.m_pNormal);
-    std::exchange(m_pOccRoughMetal, material.m_pOccRoughMetal);
-    std::exchange(m_AOMap, material.m_AOMap);
-    std::exchange(m_pEmissive, material.m_pEmissive);
+	m_textureOwners = std::move(material.m_textureOwners);
     std::exchange(m_fileGuid, material.m_fileGuid);
     std::exchange(m_baseColorTexName, material.m_baseColorTexName);
     std::exchange(m_normalTexName, material.m_normalTexName);
@@ -188,7 +181,6 @@ Material::Material(Material&& material) noexcept
     m_keywordSelections = std::move(material.m_keywordSelections);
     m_runtimeSchema = std::move(material.m_runtimeSchema);
     m_cbufferValues = std::move(material.m_cbufferValues);
-	m_dirtyCBs = std::move(material.m_dirtyCBs);
 }
 
 Material::~Material()
@@ -284,57 +276,10 @@ Material& Material::SetRoughness(float roughness)
 	return *this;
 }
 
-Material& Material::UseBaseColorMap(Texture* texture)
-{
-	m_pBaseColor = texture;
-	m_materialInfo.m_useBaseColor = true;
-
-	return *this;
-}
-
-Material& Material::UseNormalMap(Texture* texture)
-{
-	m_pNormal = texture;
-	m_materialInfo.m_useNormalMap = USE_NORMAL_MAP;
-
-	return *this;
-}
-
-Material& Material::UseBumpMap(Texture* texture)
-{
-	m_pNormal = texture;
-	m_materialInfo.m_useNormalMap = USE_BUMP_MAP;
-	return *this;
-}
-
-Material& Material::UseOccRoughMetalMap(Texture* texture)
-{
-	m_pOccRoughMetal = texture;
-	m_materialInfo.m_useOccRoughMetal = true;
-
-	return *this;
-}
-
-Material& Material::UseAOMap(Texture* texture)
-{
-	m_AOMap = texture;
-	m_materialInfo.m_useAOMap = true;
-
-	return *this;
-}
-
-Material& Material::UseEmissiveMap(Texture* texture)
-{
-	m_pEmissive = texture;
-	m_materialInfo.m_useEmissive = true;
-	
-	return *this;
-}
-
 Material& Material::ConvertToLinearSpace(bool32 convert)
 {
 	m_materialInfo.m_convertToLinearSpace = convert;
-	
+
 	return *this;
 }
 
@@ -350,6 +295,144 @@ Material& Material::SetUVScroll(const math::vector2& uvScroll)
 	m_flowInfo.m_uvScroll = uvScroll;
 
 	return *this;
+}
+
+Material& Material::UseBaseColorMap(std::shared_ptr<Texture> texture)
+{
+	return UseTextureMap(standard_material::property::BaseColorMap,
+		std::move(texture));
+}
+
+Material& Material::UseNormalMap(std::shared_ptr<Texture> texture)
+{
+	return UseTextureMap(standard_material::property::NormalMap,
+		std::move(texture));
+}
+
+Material& Material::UseBumpMap(std::shared_ptr<Texture> texture)
+{
+	UseTextureMap(standard_material::property::NormalMap, std::move(texture));
+	m_materialInfo.m_useNormalMap = GetNormalMapShared() ? USE_BUMP_MAP : 0;
+	return *this;
+}
+
+Material& Material::UseOccRoughMetalMap(std::shared_ptr<Texture> texture)
+{
+	return UseTextureMap(standard_material::property::OrmMap,
+		std::move(texture));
+}
+
+Material& Material::UseAOMap(std::shared_ptr<Texture> texture)
+{
+	return UseTextureMap(standard_material::property::AoMap,
+		std::move(texture));
+}
+
+Material& Material::UseEmissiveMap(std::shared_ptr<Texture> texture)
+{
+	return UseTextureMap(standard_material::property::EmissiveMap,
+		std::move(texture));
+}
+
+Material& Material::UseTextureMap(
+	std::string_view property, std::shared_ptr<Texture> texture)
+{
+	if (property.empty()) return *this;
+
+	auto found = std::find_if(m_textureOwners.begin(), m_textureOwners.end(),
+		[property](const MaterialTextureOwner& candidate)
+		{
+			return candidate.propertyName == property;
+		});
+	if (texture)
+	{
+		if (found == m_textureOwners.end())
+		{
+			MaterialTextureOwner owner{};
+			owner.propertyName = std::string(property);
+			owner.textureOwner = std::move(texture);
+			m_textureOwners.push_back(std::move(owner));
+		}
+		else
+		{
+			found->textureOwner = std::move(texture);
+		}
+	}
+	else if (found != m_textureOwners.end())
+	{
+		m_textureOwners.erase(found);
+	}
+
+	const bool hasTexture = static_cast<bool>(GetTextureMapShared(property));
+	if (property == standard_material::property::BaseColorMap)
+	{
+		m_materialInfo.m_useBaseColor = hasTexture;
+	}
+	else if (property == standard_material::property::NormalMap)
+	{
+		m_materialInfo.m_useNormalMap = hasTexture ? USE_NORMAL_MAP : 0;
+	}
+	else if (property == standard_material::property::OrmMap)
+	{
+		m_materialInfo.m_useOccRoughMetal = hasTexture;
+	}
+	else if (property == standard_material::property::AoMap)
+	{
+		m_materialInfo.m_useAOMap = hasTexture;
+	}
+	else if (property == standard_material::property::EmissiveMap)
+	{
+		m_materialInfo.m_useEmissive = hasTexture;
+	}
+	return *this;
+}
+
+const std::shared_ptr<Texture>& Material::GetTextureMapShared(
+	std::string_view property) const noexcept
+{
+	const auto found = std::find_if(m_textureOwners.begin(), m_textureOwners.end(),
+		[property](const MaterialTextureOwner& candidate)
+		{
+			return candidate.propertyName == property;
+		});
+	if (found != m_textureOwners.end()) return found->textureOwner;
+	static const std::shared_ptr<Texture> empty{};
+	return empty;
+}
+
+const std::shared_ptr<Texture>& Material::GetBaseColorMapShared() const noexcept
+{
+	return GetTextureMapShared(standard_material::property::BaseColorMap);
+}
+
+const std::shared_ptr<Texture>& Material::GetNormalMapShared() const noexcept
+{
+	return GetTextureMapShared(standard_material::property::NormalMap);
+}
+
+const std::shared_ptr<Texture>& Material::GetOccRoughMetalMapShared() const noexcept
+{
+	return GetTextureMapShared(standard_material::property::OrmMap);
+}
+
+const std::shared_ptr<Texture>& Material::GetAOMapShared() const noexcept
+{
+	return GetTextureMapShared(standard_material::property::AoMap);
+}
+
+const std::shared_ptr<Texture>& Material::GetEmissiveMapShared() const noexcept
+{
+	return GetTextureMapShared(standard_material::property::EmissiveMap);
+}
+
+void Material::ResetTextureRuntime()
+{
+	m_textureOwners.clear();
+	m_materialInfo.m_useBaseColor = false;
+	m_materialInfo.m_useNormalMap = 0;
+	m_materialInfo.m_useOccRoughMetal = false;
+	m_materialInfo.m_useAOMap = false;
+	m_materialInfo.m_useEmissive = false;
 }
 
 bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
@@ -422,11 +505,9 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
     m_runtimeSchema = std::move(runtimeSchema);
 	m_shaderMetaHandle = shaderMetaHandle;
     m_cbufferValues.clear();
-    m_dirtyCBs.clear();
     if (!layout.constantBufferName.empty())
     {
         m_cbufferValues.emplace(layout.constantBufferName, std::move(constantBuffer));
-        m_dirtyCBs.insert(layout.constantBufferName);
     }
     outError.clear();
     return true;
@@ -436,7 +517,6 @@ void Material::ResetShaderRuntime()
 {
 	m_runtimeSchema.reset();
 	m_shaderMetaHandle = {};
-	m_dirtyCBs.clear();
 }
 
 const ShaderMetaBindingLayout* Material::GetShaderBindingLayout() const
@@ -451,6 +531,82 @@ std::span<const std::uint8_t> Material::GetConstantBufferData() const
     return found == m_cbufferValues.end()
         ? std::span<const std::uint8_t>{}
         : std::span<const std::uint8_t>{ found->second };
+}
+
+bool Material::BuildShaderPropertyBlock(const ShaderMeta& meta,
+    const ShaderMetaBindingLayout& layout,
+    std::vector<std::uint8_t>& outBytes, std::string& outError) const
+{
+    if (layout.properties.size() != meta.properties.size()
+        || layout.constantBufferName.empty()
+        || 0 == layout.constantBufferByteSize)
+    {
+        outError = "Material draw snapshot의 ShaderMeta layout이 불완전하다";
+        return false;
+    }
+
+    std::vector<std::uint8_t> bytes(layout.constantBufferByteSize, 0);
+    for (const ShaderPropertyDesc& desc : meta.properties)
+    {
+        const ShaderMetaPropertyBinding* binding = FindBinding(layout, desc.name);
+        if (!binding || binding->propertyType != desc.type)
+        {
+            outError = "Material draw snapshot property binding이 없거나 type이 다르다: "
+                + desc.name;
+            return false;
+        }
+
+        MaterialPropertyValue value;
+        const auto existing = std::find_if(m_propertyValues.begin(),
+            m_propertyValues.end(), [&](const MaterialPropertyValue& candidate)
+            {
+                return candidate.m_name == desc.name;
+            });
+        if (existing != m_propertyValues.end())
+        {
+            value = *existing;
+        }
+        else if (!ApplyDefault(desc, value, outError))
+        {
+            return false;
+        }
+
+        // legacy Material은 숫자 property가 없고 MaterialInfo만 가진다. 이름 기반
+        // 값이 실제로 없을 때만 세 필드를 호환 입력으로 사용한다. experiment
+        // importer가 게시한 논리 property는 언제나 이 fallback보다 우선한다.
+        if (existing == m_propertyValues.end())
+        {
+            if (desc.name == standard_material::property::BaseColor)
+            {
+                value.m_numericValue = {
+                    m_materialInfo.m_baseColor.r,
+                    m_materialInfo.m_baseColor.g,
+                    m_materialInfo.m_baseColor.b,
+                    m_materialInfo.m_baseColor.a,
+                };
+            }
+            else if (desc.name == standard_material::property::Metallic)
+            {
+                value.m_numericValue = { m_materialInfo.m_metallic };
+            }
+            else if (desc.name == standard_material::property::Roughness)
+            {
+                value.m_numericValue = { m_materialInfo.m_roughness };
+            }
+        }
+
+        if (!ValidateLogicalValue(desc, value, outError)
+            || !PackProperty(desc, *binding, value, bytes, outError))
+        {
+            if (outError.empty())
+                outError = "Material draw snapshot property pack 실패: " + desc.name;
+            return false;
+        }
+    }
+
+    outBytes = std::move(bytes);
+    outError.clear();
+    return true;
 }
 
 bool Material::TrySetTextureGuid(std::string_view property, const FileGuid& guid)
@@ -544,7 +700,6 @@ bool Material::WriteBytes(const VarView& v, const void* src, size_t size)
         value.m_boolValue = 0 != encoded;
     }
 
-    m_dirtyCBs.insert(v.binding->resourceName);
     return true;
 }
 

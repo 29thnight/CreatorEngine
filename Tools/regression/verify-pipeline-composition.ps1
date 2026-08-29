@@ -161,8 +161,15 @@ try {
 
     # 워밍업이 필요하다. 파이프라인은 첫 리사이즈·첫 뷰 확정 뒤에 서므로 바로 물으면
     # 러너가 아직 비활성이거나 desc가 비어 있다(dx12 스위트가 240프레임을 쓰는 이유와 같다).
+    #
+    # wait는 게임 스레드 프레임만 전진시키므로, 초기 파이프라인 구축이 비동기
+    # RenderThread에서 아직 진행 중이면 오래된 debug snapshot을 읽을 수 있다.
+    # dx12.live 상태 조회는 renderStateMutex를 통해 구축 완료를 관측하고, 뒤의
+    # 짧은 wait가 그 상태를 debug snapshot에 게시할 기회를 준다.
     [IO.File]::WriteAllLines($commandFile, @(
         "wait 240"
+        "dx12.live"
+        "wait 10"
         "pipeline.nodes"
         "quit"
     ))

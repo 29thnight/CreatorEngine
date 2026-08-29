@@ -92,10 +92,8 @@ private:
     // 이 경로를 계속 부르기 때문에(적이 죽을 때마다 LoadPrefab("EnemyDeathEffect"))
     // 한 번의 실수가 아니라 계속 새는 구조였다. 이제 여기서 소유하고 재사용한다.
     //
-    // 키가 FileGuid가 아니라 경로인 이유: LoadPrefabFullPath는 make_file_guid(path)로,
-    // LoadPrefab은 DataSystem이 매긴 GUID로 서로 다르게 매긴다. 같은 파일이 호출
-    // 경로에 따라 다른 GUID를 갖는 셈이라 캐시 키로 쓸 수 없다. (그 불일치 자체는
-    // 이 트랙의 범위 밖이다 — DataSystem 소관)
+	// 캐시는 같은 파일을 상대/절대 경로로 중복 로드하지 않기 위해 경로를 쓴다.
+	// 자산 정체성은 호출 경로와 무관하게 catalog(.meta) GUID 하나만 사용한다.
     std::unordered_map<std::string, std::unique_ptr<Prefab>> m_prefabCache{};
 
     // 새로 만든 프리팹의 소유자.

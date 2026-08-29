@@ -3,6 +3,19 @@ cbuffer PerFrame : register(b0)
     float4x4 gViewProjection;
 };
 
+// M6-P1a 제품 Standard Material 숫자 property 정본. ShaderMeta reflection이
+// 이 b2의 byte layout을 검증하고 BuildDrawPool이 batch별 소유 bytes를 만든다.
+cbuffer MaterialProperties : register(b2)
+{
+    float4 baseColor;
+    float  metallic;
+    float  roughness;
+    float  normalScale;
+    float  occlusionStrength;
+    float3 emissive;
+    float  alphaCutoff;
+};
+
 // 드로우별 상수를 cbuffer가 아니라 구조화 버퍼로 넘긴다.
 //
 // 같은 메시·재질을 쓰는 드로우가 여럿이면 인스턴스로 묶어 한 번에 그린다.
@@ -34,11 +47,20 @@ StructuredBuffer<float4x4> gBones : register(t5);
 
 #define NO_SKINNING 0xFFFFFFFFu
 
-Texture2D    gBaseColor     : register(t0);
-Texture2D    gNormalMap     : register(t1);
-Texture2D    gOccRoughMetal : register(t2);
-Texture2D    gEmissive      : register(t3);
+// M6-P1b2a: 이름은 StandardMaterialProperty의 논리 property 정본과 같다.
+// .shadermeta reflection이 이 이름을 t0..t3에 결합하며 C++ 배열 순서로 추측하지 않는다.
+Texture2D    baseColorMap : register(t0);
+Texture2D    normalMap    : register(t1);
+Texture2D    ormMap       : register(t2);
+Texture2D    emissiveMap  : register(t3);
 SamplerState gSampler       : register(s0);
+
+// M6-P1b2b1 제품 permutation 축. 0(full)이 기존 출력 정본이고 1(reduced)은
+// normal-map 결과를 vertex normal 쪽으로 절반 완화한다. 두 변형 모두 같은
+// resource/layout을 소비하므로 material별 PSO 전환만 독립적으로 검증할 수 있다.
+#ifndef SHADING_QUALITY
+#define SHADING_QUALITY 0
+#endif
 
 struct VSIn
 {
@@ -126,14 +148,29 @@ struct PSOut
 
 PSOut PSMain(VSOut input)
 {
+    // alphaCutoff < 0은 snapshot이 없는 기존 격리 fixture의 호환 sentinel이다.
+    // 제품 BuildDrawPool은 항상 0 이상인 reflection-packed property를 싣는다.
+    const bool usePropertyBlock = alphaCutoff >= 0.0f;
+    const float4 materialBaseColor = usePropertyBlock
+        ? baseColor : input.baseColorFactor;
+    const float materialMetallic = usePropertyBlock
+        ? metallic : input.material.x;
+    const float materialRoughness = usePropertyBlock
+        ? roughness : input.material.y;
+    const float materialNormalScale = usePropertyBlock ? normalScale : 1.0f;
+    const float materialOcclusionStrength = usePropertyBlock
+        ? occlusionStrength : 1.0f;
+    const float3 materialEmissive = usePropertyBlock
+        ? emissive : float3(1.0f, 1.0f, 1.0f);
+
     // 텍스처가 없는 슬롯에는 슬롯 의미에 맞는 1x1 폴백이 묶여 있다(베이스는
     // 흰색, ORM은 중립 (1,1,0), emissive는 검정 — PrepareFrame 참조). 그래서
     // "텍스처가 있으면" 분기가 필요 없다 — 분기 없는 쪽이 셰이더에서 빠르고,
     // 재질마다 다른 셰이더 변형을 만들지 않아도 된다.
-    const float4 albedo = gBaseColor.Sample(gSampler, input.uv) * input.baseColorFactor;
+    const float4 albedo = baseColorMap.Sample(gSampler, input.uv) * materialBaseColor;
 
     // occlusion/roughness/metallic은 glTF 규약대로 G에 거칠기, B에 금속성이다.
-    const float3 orm = gOccRoughMetal.Sample(gSampler, input.uv).rgb;
+    const float3 orm = ormMap.Sample(gSampler, input.uv).rgb;
 
     float3 normal = normalize(input.normal);
     if (input.material.z != 0.0f)
@@ -148,15 +185,24 @@ PSOut PSMain(VSOut input)
         const float  handedness = (dot(cross(n, t), input.bitangent) < 0.0f) ? -1.0f : 1.0f;
         const float3 b = cross(n, t) * handedness;
 
-        const float3 sampled = gNormalMap.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f;
+        float3 sampled = normalMap.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f;
+        sampled.xy *= materialNormalScale;
         normal = normalize(sampled.x * t + sampled.y * b + sampled.z * n);
     }
+#if SHADING_QUALITY == 1
+    normal = normalize(normal + normalize(input.normal));
+#endif
 
     PSOut output;
     output.diffuse    = albedo;
-    output.metalRough = float4(orm.r, orm.g * input.material.y, orm.b + input.material.x, 1.0f);
+    output.metalRough = float4(
+        orm.r * materialOcclusionStrength,
+        orm.g * materialRoughness,
+        orm.b + materialMetallic,
+        1.0f);
     output.normal     = float4(normal * 0.5f + 0.5f, 1.0f);
-    output.emissive   = gEmissive.Sample(gSampler, input.uv);
+    output.emissive   = float4(
+        emissiveMap.Sample(gSampler, input.uv).rgb * materialEmissive, 1.0f);
     output.bitmask    = 0xABCDu;
     return output;
 }

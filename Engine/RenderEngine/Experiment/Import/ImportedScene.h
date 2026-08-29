@@ -269,6 +269,10 @@ namespace experiment::importer
     // 변환 경계에서 결정한다(M-phase 정본과 만나는 지점).
     struct ImportedMaterial final
     {
+        // 원본 포맷 내부에서 이 재질을 다시 찾는 키다. AssetId가 아니며,
+        // 모델 sidecar의 subAssets.materials가 이 키를 임의 UUIDv4에 매핑한다.
+        // 이름은 중복/변경될 수 있으므로 identity key로 쓰지 않는다.
+        std::string sourceKey{};
         std::string name{};
 
         math::vector4 baseColorFactor{ 1.0f, 1.0f, 1.0f, 1.0f };
@@ -294,6 +298,10 @@ namespace experiment::importer
     // 시점·위치는 임포트 정책이므로 IR 이 결정하지 않는다.
     struct ImportedTexture final
     {
+        // glTF image 등 원본 컨테이너 내부의 위치를 나타내는 키다. 외부
+        // texture는 자신의 .meta GUID를 쓰고, embedded texture만 모델 sidecar의
+        // subAssets.embeddedTextures에서 이 키를 UUIDv4로 해석한다.
+        std::string sourceKey{};
         std::string name{};
         std::filesystem::path sourcePath{};
         std::vector<std::byte> embeddedBytes{};

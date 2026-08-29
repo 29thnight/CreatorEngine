@@ -3,6 +3,7 @@
 #include "DX12DeviceResources.h"
 #include "PathFinder.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
@@ -287,7 +288,11 @@ void DX12PSOManager::Shutdown()
     }
 
     std::lock_guard<std::mutex> guard(m_mutex);
-    m_cache.clear();
+    RetireCachedPipelinesLocked({});
+    m_retiredPipelines.Drain([](ComPtr<ID3D12PipelineState>& pipeline)
+    {
+        pipeline.Reset();
+    });
     m_library.Reset();
     m_libraryBlob.clear();
     m_device.Reset();
@@ -545,6 +550,29 @@ DX12PSOManager::DrawDecision DX12PSOManager::Resolve(const RHIGraphicsPipelineDe
 
 void DX12PSOManager::OnShaderReloaded()
 {
+    InvalidatePipelines();
+}
+
+bool DX12PSOManager::InvalidatePipeline(RHIPipelineHandle handle,
+    RHICompletionPoint retireAfter)
+{
+    if (!handle.IsValid()) return false;
+
+    std::lock_guard<std::mutex> guard(m_mutex);
+    const auto found = std::find_if(m_cache.begin(), m_cache.end(),
+        [handle](const auto& pair) { return pair.second.handle == handle; });
+    if (m_cache.end() == found) return false;
+
+    RetireCacheEntryLocked(found->second, retireAfter);
+    m_cache.erase(found);
+    ++m_stats.invalidations;
+    m_stats.retiredPipelines = static_cast<uint32_t>(
+        m_retiredPipelines.GetPendingCount());
+    return true;
+}
+
+std::uint32_t DX12PSOManager::InvalidatePipelines(RHICompletionPoint retireAfter)
+{
     // 진행 중인 컴파일은 회수한다 — 옛 바이트코드를 참조하는 작업이 남으면
     // 리로드로 해제된 블롭을 읽을 수 있다.
     std::vector<std::shared_future<ComPtr<ID3D12PipelineState>>> inFlight;
@@ -559,8 +587,25 @@ void DX12PSOManager::OnShaderReloaded()
     }
 
     std::lock_guard<std::mutex> guard(m_mutex);
-    m_cache.clear();
-    m_fallback.Reset();
+    const std::uint32_t invalidated = RetireCachedPipelinesLocked(retireAfter);
+    if (0 != invalidated) ++m_stats.invalidations;
+    m_stats.retiredPipelines = static_cast<uint32_t>(
+        m_retiredPipelines.GetPendingCount());
+    return invalidated;
+}
+
+std::uint32_t DX12PSOManager::CollectRetiredPipelines(RHICompletionPoint completed)
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+    const RHIRetireCollection collected = m_retiredPipelines.Collect(
+        completed, [](ComPtr<ID3D12PipelineState>& pipeline)
+        {
+            pipeline.Reset();
+        });
+    m_stats.retiredCollections += static_cast<std::uint32_t>(collected.count);
+    m_stats.retiredPipelines = static_cast<std::uint32_t>(
+        m_retiredPipelines.GetPendingCount());
+    return static_cast<std::uint32_t>(collected.count);
 }
 
 RHIPipelineHandle DX12PSOManager::GetOrCreate(const RHIGraphicsPipelineDesc& desc,
@@ -611,6 +656,26 @@ RHIPipelineHandle DX12PSOManager::Publish(uint64_t hash, ComPtr<ID3D12PipelineSt
 
     m_cache.emplace(hash, entry);
     return entry.handle;
+}
+
+std::uint32_t DX12PSOManager::RetireCachedPipelinesLocked(
+    RHICompletionPoint retireAfter)
+{
+    const std::uint32_t retired = static_cast<std::uint32_t>(m_cache.size());
+    for (auto& [hash, entry] : m_cache)
+        RetireCacheEntryLocked(entry, retireAfter);
+    m_cache.clear();
+    m_fallback.Reset();
+    return retired;
+}
+
+void DX12PSOManager::RetireCacheEntryLocked(CacheEntry& entry,
+    RHICompletionPoint retireAfter)
+{
+    if (nullptr != m_resources) m_resources->ReleasePipeline(entry.handle);
+    if (m_fallback.Get() == entry.pso.Get()) m_fallback.Reset();
+    if (entry.pso)
+        m_retiredPipelines.Enqueue(retireAfter, std::move(entry.pso));
 }
 
 DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDesc& desc,

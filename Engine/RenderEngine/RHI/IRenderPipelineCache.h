@@ -1,8 +1,10 @@
 #pragma once
+#include <cstdint>
 #include <string>
 
 #include "RHIHandle.h"
 #include "RHIPipelineLayout.h"
+#include "RHIResourceTypes.h"
 #include "RHIPipelineState.h"
 
 // 파이프라인·레이아웃 캐시 인터페이스 — 백엔드 중립 (A-1b).
@@ -38,6 +40,24 @@ public:
         const RHIGraphicsPipelineDesc& desc, std::string& outError) = 0;
     virtual RHIPipelineHandle GetOrCreateCompute(
         const RHIComputePipelineDesc& desc, std::string& outError) = 0;
+
+    /// 지정한 live handle 하나만 lookup에서 제거하고 native pipeline을 retire한다.
+    /// false면 이미 stale이거나 이 cache가 발급한 handle이 아니다. 다른 pipeline은
+    /// 유지한다. 단, 같은 handle을 공유하는 CPU holder는 모두 stale이 되므로 render
+    /// owner가 그 holder들을 한 경계에서 함께 교체한다고 증명한 뒤에만 호출한다.
+    virtual bool InvalidatePipeline(RHIPipelineHandle handle,
+        RHICompletionPoint retireAfter = {}) = 0;
+
+    /// 현재 cache lookup과 발급 handle을 무효화한다. 이 호출은 render/record
+    /// owner가 제출 경계에서 수행하며, 이미 제출된 GPU 작업이 참조할 backend
+    /// 객체는 retireAfter가 완료될 때까지 파괴하지 않는다. completion을 증명할
+    /// 수 없으면 0을 주며, 그 객체는 shutdown drain에서만 회수한다. 같은 desc의
+    /// 다음 GetOrCreate가 새 generation handle을 발급해야 한다.
+    virtual std::uint32_t InvalidatePipelines(
+        RHICompletionPoint retireAfter = {}) = 0;
+
+    /// 완료된 native pipeline을 논블로킹 회수한다. 반환값은 이번에 회수한 수다.
+    virtual std::uint32_t CollectRetiredPipelines(RHICompletionPoint completed) = 0;
 };
 
 /// 레이아웃 캐시. 같은 레이아웃이면 같은 객체와 같은 핸들을 돌려준다.

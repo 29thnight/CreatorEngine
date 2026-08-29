@@ -22,6 +22,7 @@
 #include <limits>
 #include <mutex>
 #include <regex>
+#include <sstream>
 #include <unordered_set>
 
 namespace
@@ -33,11 +34,12 @@ namespace
 		return target;
 	}
 
-	FileGuid CreateMetaThroughEditor(const file::path& filepath) noexcept
+	FileGuid CreateMetaThroughEditor(const file::path& filepath,
+		const FileGuid& preferredGuid) noexcept
 	{
 		try
 		{
-			return EditorAssetDatabase::Get().CreateMeta(filepath);
+			return EditorAssetDatabase::Get().CreateMeta(filepath, preferredGuid);
 		}
 		catch (const std::exception& exception)
 		{
@@ -48,6 +50,28 @@ namespace
 		catch (...)
 		{
 			Debug->LogError("Editor asset meta creation failed with an unknown error");
+			return {};
+		}
+	}
+
+	FileGuid WriteTextAssetWithMetaThroughEditor(const file::path& destination,
+		std::string_view payload, const FileGuid& preferredGuid) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteTextAssetWithMeta(
+				destination, payload, preferredGuid);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug->LogError("Editor text asset publication failed: "
+				+ std::string(exception.what()));
+			return {};
+		}
+		catch (...)
+		{
+			Debug->LogError(
+				"Editor text asset publication failed with an unknown error");
 			return {};
 		}
 	}
@@ -406,10 +430,113 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		return m_registeredFiles.contains(ToLower(std::string(extension)));
 	}
 
-	FileGuid CreateMeta(const file::path& targetFile)
+	FileGuid CreateMeta(const file::path& targetFile,
+		const FileGuid& preferredGuid = {})
 	{
 		std::lock_guard lock(m_authoringMutex);
-		return CreateMetaLocked(targetFile);
+		return CreateMetaLocked(targetFile, preferredGuid);
+	}
+
+	FileGuid WriteTextAssetWithMeta(const file::path& requestedDestination,
+		std::string_view payload, const FileGuid& preferredGuid)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const file::path destination =
+			file::absolute(requestedDestination, error).lexically_normal();
+		if (error) return {};
+		error.clear();
+		const file::path root = file::absolute(m_root, error).lexically_normal();
+		if (error || payload.empty() || !preferredGuid.IsRandomV4()
+			|| !IsPathInside(destination, root) || !IsTargetFile(destination)
+			|| !IsSafeAssetName(destination.filename().wstring()))
+		{
+			Debug->LogError("Editor cataloged text publication rejected: "
+				+ requestedDestination.string());
+			return {};
+		}
+
+		const std::span<const std::byte> bytes{
+			reinterpret_cast<const std::byte*>(payload.data()), payload.size() };
+		if (!WriteBinaryFileLocked(destination, bytes, PublishEncoding::Text))
+			return {};
+		return CreateMetaLocked(destination, preferredGuid);
+	}
+
+	FileGuid RenameAsset(const file::path& source, const file::path& destination)
+	{
+		std::lock_guard lock(m_authoringMutex);
+
+		std::error_code error;
+		const file::path sourcePath = file::absolute(source, error).lexically_normal();
+		if (error) return {};
+		error.clear();
+		const file::path destinationPath =
+			file::absolute(destination, error).lexically_normal();
+		if (error) return {};
+		error.clear();
+		const file::path rootPath = file::absolute(m_root, error).lexically_normal();
+		if (error || !IsPathInside(sourcePath, rootPath)
+			|| !IsPathInside(destinationPath, rootPath)
+			|| sourcePath == destinationPath
+			|| !file::is_regular_file(sourcePath, error) || error
+			|| file::exists(destinationPath)
+			|| !IsTargetFile(sourcePath) || !IsTargetFile(destinationPath)
+			|| ToLower(sourcePath.extension().string())
+				!= ToLower(destinationPath.extension().string())
+			|| !file::is_directory(destinationPath.parent_path()))
+		{
+			Debug->LogError("Editor asset rename rejected: " + source.string()
+				+ " -> " + destination.string());
+			return {};
+		}
+
+		const file::path sourceMeta = sourcePath.string() + ".meta";
+		const file::path destinationMeta = destinationPath.string() + ".meta";
+		if (!file::is_regular_file(sourceMeta, error) || error
+			|| file::exists(destinationMeta))
+		{
+			Debug->LogError("Editor asset rename requires exactly one source sidecar: "
+				+ sourceMeta.string());
+			return {};
+		}
+
+		const FileGuid guid = LoadGuidFromMeta(sourceMeta);
+		if (guid == FileGuid{})
+		{
+			Debug->LogError("Editor asset rename rejected invalid source sidecar: "
+				+ sourceMeta.string());
+			return {};
+		}
+
+		// sidecar를 먼저 옮긴다. target을 먼저 옮기면 watcher가 그 짧은 틈에
+		// missing meta로 판단해 새 UUID를 발급할 수 있다.
+		error.clear();
+		file::rename(sourceMeta, destinationMeta, error);
+		if (error)
+		{
+			Debug->LogError("Editor asset sidecar rename failed: " + error.message());
+			return {};
+		}
+
+		error.clear();
+		file::rename(sourcePath, destinationPath, error);
+		if (error)
+		{
+			const std::string moveError = error.message();
+			std::error_code rollbackError;
+			file::rename(destinationMeta, sourceMeta, rollbackError);
+			Debug->LogError("Editor asset rename failed: " + moveError
+				+ (rollbackError ? " (sidecar rollback failed: "
+					+ rollbackError.message() + ")" : ""));
+			return {};
+		}
+
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+			RuntimeAssetType::Auto, guid, sourcePath });
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+			RuntimeAssetType::Auto, guid, destinationPath });
+		return guid;
 	}
 
 	bool WriteModelCache(const file::path& destination,
@@ -886,6 +1013,9 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			case efsw::Actions::Delete:
 				HandleDeleted(filepath);
 				break;
+			case efsw::Actions::Modified:
+				HandleModified(filepath);
+				break;
 			default:
 				break;
 			}
@@ -1153,55 +1283,54 @@ private:
 		return false;
 	}
 
-	FileGuid ResolveOrCreateGuid(const file::path& targetFile, YAML::Node& root) const
+	FileGuid LoadInitialIdentityHint(const file::path& targetFile) const
 	{
-		if (targetFile.extension() == ".prefab")
-		{
-			const YAML::Node prefabRoot = YAML::LoadFile(targetFile.string());
-			// SavePrefab가 발급하는 prefab 자체의 정체성이 정본이다. PrefabNode는
-			// Map 또는 중첩 Sequence일 수 있으므로 루트 값을 먼저 사용한다.
-			const YAML::Node prefabFileGuid = prefabRoot["m_fileGuid"];
-			if (prefabFileGuid && prefabFileGuid.IsScalar())
-			{
-				const FileGuid prefabGuid(prefabFileGuid.as<std::string>());
-				if (prefabGuid != FileGuid{})
-				{
-					root["guid"] = prefabGuid.ToString();
-					return prefabGuid;
-				}
-			}
+		const std::string extension = ToLower(targetFile.extension().string());
+		const bool prefab = extension == ".prefab";
+		const bool material = extension == ".asset"
+			&& ToLower(targetFile.parent_path().filename().string()) == "materials";
+		if (!prefab && !material) return {};
 
-			// 구형 prefab은 루트 GUID가 없을 수 있으므로 첫 엔티티 각인을
-			// 호환 경로로 남긴다.
-			const YAML::Node prefabNodes = prefabRoot["PrefabNode"];
-			if (prefabNodes && prefabNodes.IsSequence())
-			{
-				for (const YAML::Node& element : prefabNodes)
-				{
-					const YAML::Node guidNode = element["m_prefabFileGuid"];
-					if (guidNode && guidNode.IsScalar())
-					{
-						const FileGuid prefabGuid(guidNode.as<std::string>());
-						if (prefabGuid != FileGuid{})
-						{
-							root["guid"] = prefabGuid.ToString();
-							return prefabGuid;
-						}
-					}
-				}
-			}
+		try
+		{
+			const YAML::Node payload = YAML::LoadFile(targetFile.string());
+			const YAML::Node identity = payload["m_fileGuid"];
+			if (!identity || !identity.IsScalar()) return {};
+			const FileGuid hint(identity.as<std::string>());
+			return hint.IsRandomV4() ? hint : FileGuid{};
+		}
+		catch (const std::exception&)
+		{
+			return {};
+		}
+	}
+
+	FileGuid ResolveOrCreateGuid(const file::path& targetFile, YAML::Node& root,
+		const FileGuid& preferredGuid) const
+	{
+		// sidecar가 생긴 뒤에는 이 값만 정본이다. payload의 m_fileGuid를
+		// 다시 읽어 sidecar를 덮는 경로는 두지 않는다.
+		if (root["guid"] && root["guid"].IsScalar())
+		{
+			const FileGuid existing(root["guid"].as<std::string>());
+			return existing;
 		}
 
-		if (root["guid"] && root["guid"].IsScalar())
-			return FileGuid(root["guid"].as<std::string>());
+		if (preferredGuid != FileGuid{} && !preferredGuid.IsRandomV4()) return {};
 
-		const FileGuid generated =
-			GUIDCreator::MakeFileGUID(targetFile.filename().string());
+		// 새 sidecar의 첫 생성만 예외다. SavePrefab/SaveMaterial이 본문에 먼저
+		// 기록한 UUIDv4 mirror를 watcher도 같은 authoring handshake로 채택한다.
+		// 이 분기가 없으면 본문 close와 명시 CreateMeta 사이에서 watcher가 이겨
+		// 서로 다른 UUIDv4 두 개가 생긴다. sidecar가 생긴 뒤에는 위 분기만 탄다.
+		const FileGuid payloadHint = LoadInitialIdentityHint(targetFile);
+		const FileGuid generated = preferredGuid != FileGuid{} ? preferredGuid
+			: payloadHint != FileGuid{} ? payloadHint : FileGuid::CreateRandomV4();
 		root["guid"] = generated.ToString();
 		return generated;
 	}
 
-	FileGuid CreateMetaLocked(const file::path& targetFile)
+	FileGuid CreateMetaLocked(const file::path& targetFile,
+		const FileGuid& preferredGuid = {})
 	{
 		if (targetFile.empty() || !file::exists(targetFile)) return {};
 
@@ -1209,7 +1338,15 @@ private:
 		YAML::Node root;
 		if (file::exists(metaPath)) root = YAML::LoadFile(metaPath.string());
 
-		const FileGuid guid = ResolveOrCreateGuid(targetFile, root);
+		const FileGuid guid = ResolveOrCreateGuid(targetFile, root, preferredGuid);
+		if (guid == FileGuid{}) return {};
+		if (preferredGuid != FileGuid{} && guid != preferredGuid)
+		{
+			Debug->LogError("Editor asset identity disagrees with canonical sidecar: "
+				+ targetFile.string() + " requested=" + preferredGuid.ToString()
+				+ " canonical=" + guid.ToString());
+			return guid;
+		}
 		root["importSettings"]["extension"] = targetFile.extension().string();
 		std::error_code timestampError;
 		const auto timestamp = file::last_write_time(targetFile, timestampError);
@@ -1309,6 +1446,25 @@ private:
 				error.message());
 	}
 
+	void HandleModified(const file::path& filepath)
+	{
+		// M5-C3a는 generation 계약이 이미 있는 ShaderMeta만 연다. HLSL include
+		// dependency와 다른 asset cache의 reload 정책은 같은 이벤트라는 이유로
+		// 추측해 넓히지 않는다.
+		if (ToLower(filepath.extension().string()) != ".shadermeta") return;
+
+		FileGuid guid = DataSystems->GetFileGuid(filepath);
+		if (guid == FileGuid{})
+		{
+			const file::path metaPath = filepath.string() + ".meta";
+			if (file::exists(metaPath)) guid = LoadGuidFromMeta(metaPath);
+		}
+		if (guid == FileGuid{}) return;
+
+		DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			RuntimeAssetType::ShaderMeta, guid, filepath });
+	}
+
 	file::path m_root;
 	std::mutex m_authoringMutex;
 	std::unique_ptr<efsw::FileWatcher> m_watcher;
@@ -1342,6 +1498,8 @@ bool EditorAssetDatabase::Initialize()
 	if (!implementation->Start()) return false;
 	m_impl = std::move(implementation);
 	AssetAuthoringPort::Install(&CreateMetaThroughEditor);
+	AssetAuthoringPort::InstallTextAssetWriter(
+		&WriteTextAssetWithMetaThroughEditor);
 	AssetAuthoringPort::InstallModelCacheWriter(&WriteModelCacheThroughEditor);
 	AssetAuthoringPort::InstallEmbeddedTextureWriter(
 		&WriteEmbeddedTextureThroughEditor);
@@ -1373,6 +1531,8 @@ void EditorAssetDatabase::Shutdown() noexcept
 	AssetAuthoringPort::UninstallEmbeddedTextureWriter(
 		&WriteEmbeddedTextureThroughEditor);
 	AssetAuthoringPort::UninstallModelCacheWriter(&WriteModelCacheThroughEditor);
+	AssetAuthoringPort::UninstallTextAssetWriter(
+		&WriteTextAssetWithMetaThroughEditor);
 	AssetAuthoringPort::Uninstall(&CreateMetaThroughEditor);
 	if (m_impl) m_impl->Stop();
 	m_impl.reset();
@@ -1383,9 +1543,25 @@ bool EditorAssetDatabase::IsInitialized() const noexcept
 	return nullptr != m_impl;
 }
 
-FileGuid EditorAssetDatabase::CreateMeta(const file::path& filepath)
+FileGuid EditorAssetDatabase::CreateMeta(const file::path& filepath,
+	const FileGuid& preferredGuid)
 {
-	return m_impl ? m_impl->CreateMeta(filepath) : FileGuid{};
+	return m_impl ? m_impl->CreateMeta(filepath, preferredGuid) : FileGuid{};
+}
+
+FileGuid EditorAssetDatabase::WriteTextAssetWithMeta(
+	const file::path& destination, std::string_view payload,
+	const FileGuid& preferredGuid)
+{
+	return m_impl
+		? m_impl->WriteTextAssetWithMeta(destination, payload, preferredGuid)
+		: FileGuid{};
+}
+
+FileGuid EditorAssetDatabase::RenameAsset(const file::path& source,
+	const file::path& destination)
+{
+	return m_impl ? m_impl->RenameAsset(source, destination) : FileGuid{};
 }
 
 bool EditorAssetDatabase::WriteModelCache(const file::path& destination,
@@ -1473,15 +1649,15 @@ bool EditorAssetDatabase::SaveMaterial(Material* material)
 	if (!m_impl || !material) return false;
 	const file::path savePath = PathFinder::Relative("Materials\\") /
 		(material->m_name + ".asset");
-	std::ofstream output(savePath);
-	if (!output.is_open()) return false;
-
+	const FileGuid catalogGuid = DataSystems->GetFileGuid(savePath);
+	if (catalogGuid != FileGuid{}) material->m_fileGuid = catalogGuid;
+	else if (material->m_fileGuid == FileGuid{})
+		material->m_fileGuid = FileGuid::CreateRandomV4();
 	YAML::Node node = DataSystems->SerializeMaterialPayload(*material);
-	output << node;
-	output.flush();
-	if (!output.good()) return false;
-	output.close();
-	return CreateMeta(savePath) != FileGuid{};
+	std::ostringstream payload;
+	payload << node;
+	return WriteTextAssetWithMeta(savePath, payload.str(), material->m_fileGuid)
+		== material->m_fileGuid;
 }
 
 bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory)

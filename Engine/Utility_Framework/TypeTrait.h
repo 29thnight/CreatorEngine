@@ -8,6 +8,7 @@
 #include <vector>
 #include <utility>
 #include <cassert>
+#include <stdexcept>
 #include <type_traits>
 // FileGuid의 실체가 여기 있다. boost/uuid를 걷어낸 자리다 — 왜 걷었고
 // 무엇으로 동일성을 확인했는지는 Uuid.h 머리에 적었다.
@@ -124,20 +125,43 @@ struct FileGuid
 {
 	Uuid::Uuid16 m_guid;
 
-	// 자산 GUID의 네임스페이스. 이 값이 바뀌면 디스크의 .meta 전부가
-	// 무효가 되므로 건드리지 않는다.
-	static inline Uuid::Uuid16 ns_filesystem() noexcept
-	{
-		return Uuid::Uuid16{ { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
-							   0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0 } };
-	}
-
 	FileGuid() = default;
 	FileGuid(const std::string& str)
 	{
 		FromString(str);
 	}
 	FileGuid(const Uuid::Uuid16& guid) : m_guid(guid) {}
+
+	// D2: 영속 자산 정체성은 경로나 파일명에서 유도하지 않는다. Windows의
+	// CoCreateGuid가 만든 UUID를 RFC 4122 byte order로 옮기고 version/variant
+	// bit를 명시해, ToString() 결과가 표준 UUIDv4가 되게 한다.
+	static FileGuid CreateRandomV4()
+	{
+		GUID native{};
+		const HRESULT result = ::CoCreateGuid(&native);
+		if (FAILED(result))
+		{
+			throw std::runtime_error("CoCreateGuid failed while creating asset UUIDv4");
+		}
+
+		Uuid::Uuid16 value;
+		value.data[0] = static_cast<std::uint8_t>(native.Data1 >> 24u);
+		value.data[1] = static_cast<std::uint8_t>(native.Data1 >> 16u);
+		value.data[2] = static_cast<std::uint8_t>(native.Data1 >> 8u);
+		value.data[3] = static_cast<std::uint8_t>(native.Data1);
+		value.data[4] = static_cast<std::uint8_t>(native.Data2 >> 8u);
+		value.data[5] = static_cast<std::uint8_t>(native.Data2);
+		value.data[6] = static_cast<std::uint8_t>(native.Data3 >> 8u);
+		value.data[7] = static_cast<std::uint8_t>(native.Data3);
+		for (std::size_t index = 0; index < 8; ++index)
+			value.data[8 + index] = native.Data4[index];
+
+		value.data[6] = static_cast<std::uint8_t>(
+			(value.data[6] & 0x0fu) | 0x40u);
+		value.data[8] = static_cast<std::uint8_t>(
+			(value.data[8] & 0x3fu) | 0x80u);
+		return FileGuid(value);
+	}
 
 	FileGuid(const FileGuid&) = default;
 	FileGuid(FileGuid&&) = default;
@@ -172,6 +196,13 @@ struct FileGuid
 		return Uuid::ToString(m_guid);
 	}
 
+	[[nodiscard]] bool IsRandomV4() const noexcept
+	{
+		return *this != FileGuid{}
+			&& 0x40u == (m_guid.data[6] & 0xf0u)
+			&& 0x80u == (m_guid.data[8] & 0xc0u);
+	}
+
 	// 못 읽으면 던진다 — boost::uuids::string_generator와 같은 거동이다.
 	// 호출부 여섯 자리 어디도 잡지 않으므로 바꾸지 않았다.
 	void FromString(const std::string& str)
@@ -179,10 +210,6 @@ struct FileGuid
 		m_guid = Uuid::Parse(str);
 	}
 
-	void CreateFromName(const std::string& name)
-	{
-		m_guid = Uuid::FromName(ns_filesystem(), name);
-	}
 };
 
 static inline FileGuid nullFileGuid{ Uuid::Nil() };
@@ -288,24 +315,6 @@ namespace TypeTrait
 			return hash;
 		}
 
-		//static inline FileGuid MakeFileGUID()
-		//{
-		//	FileGuid guid();
-		//	while (g_fileGuids.find(guid) != g_fileGuids.end())
-		//	{
-		//		guid = GenerateGUID();
-		//	}
-		//	g_fileGuids.insert(guid);
-
-		//	return guid;
-		//}
-
-		static inline FileGuid MakeFileGUID(const std::string& filePath)
-		{
-			FileGuid guid;
-			guid.CreateFromName(filePath);
-			return guid;
-		}
 	};
 
 	// 컴포넌트 타입의 런타임 순차 인덱스 + uint64 비트마스크 (SceneGraphRedesignPlan
@@ -406,4 +415,3 @@ namespace TypeTrait
 
 #define type_guid(T) TypeTrait::GUIDCreator::GetTypeID<T>()
 #define make_guid() TypeTrait::GUIDCreator::MakeGUID()
-#define make_file_guid(filePath) TypeTrait::GUIDCreator::MakeFileGUID(filePath)

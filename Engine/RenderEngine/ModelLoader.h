@@ -112,6 +112,7 @@ private:
     // 파일로 뽑아낸 뒤 일반 텍스처 경로에 태운다(이유는 구현부 주석 참고).
     Texture* GenerateEmbeddedTexture(const aiTexture* embedded, std::string_view reference, bool isCompress = false);
     std::string MakeEmbeddedTextureFileName(const aiTexture* embedded, std::string_view reference) const;
+	std::shared_ptr<Texture> FindTextureOwner(Texture* texture);
 
 	const aiScene* m_AIScene;
 	LoadType m_loadType{ LoadType::UNKNOWN };

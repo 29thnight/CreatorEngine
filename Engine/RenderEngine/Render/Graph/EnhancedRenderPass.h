@@ -1,6 +1,10 @@
 #pragma once
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <array>
+#include <cmath>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -8,16 +12,121 @@
 #include <mathematics/color.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/transform.hpp>
+#include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
 
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/IRenderPipelineCache.h"
 #include "../../RHI/IRenderTextureCache.h"
+#include "../../RHI/RHIShaderPermutation.h"
 #include "../../FrameCameraSnapshot.h"
+#include "../../ShaderMetaHandle.h"
+#include "../../ShaderMetaReflection.h"
 
 class Mesh;
 class Texture;
+
+// M6-P1b2a: Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
+// ShaderMeta reflection이 해석한 논리 property/GUID/register와 CPU generation owner를
+// 한 레코드로 밀봉한다. 실제 backend binding은 register를 검증한 뒤 owner의 view를 쓴다.
+struct EnhancedMaterialTextureBinding
+{
+    std::string propertyName{};
+    FileGuid textureGuid{};
+    std::uint32_t registerIndex{};
+    std::uint32_t registerSpace{};
+    std::shared_ptr<Texture> textureOwner{};
+};
+
+// M6-P2d-b: Material::m_flowInfo와 producer frame time을 같은 immutable
+// draw 경계에 밀봉한다. ShaderMeta property b2는 authored 숫자 정본이므로
+// dynamic 값을 그 byte block에 덮어쓰지 않는다. Forward instance upload가
+// 이 32B를 그대로 소비해 Foliage를 포함한 각 draw의 flow를 보존한다.
+struct EnhancedForwardMaterialFlowSnapshot
+{
+    math::vector4 windVector{ 0.f, 0.f, 0.f, 0.f };
+    math::vector2 uvScroll{ 0.f, 0.f };
+    float totalSeconds{ 0.f };
+    float deltaSeconds{ 0.f };
+
+    std::array<float, 8> Values() const noexcept
+    {
+        return { windVector.x, windVector.y, windVector.z, windVector.w,
+            uvScroll.x, uvScroll.y, totalSeconds, deltaSeconds };
+    }
+
+    bool IsFinite() const noexcept
+    {
+        const auto values = Values();
+        return std::all_of(values.begin(), values.end(),
+            [](float value) { return std::isfinite(value); });
+    }
+};
+
+static_assert(sizeof(EnhancedForwardMaterialFlowSnapshot) == 32u);
+static_assert(offsetof(EnhancedForwardMaterialFlowSnapshot, windVector) == 0u);
+static_assert(offsetof(EnhancedForwardMaterialFlowSnapshot, uvScroll) == 16u);
+static_assert(offsetof(EnhancedForwardMaterialFlowSnapshot, totalSeconds) == 24u);
+static_assert(offsetof(EnhancedForwardMaterialFlowSnapshot, deltaSeconds) == 28u);
+static_assert(std::is_standard_layout_v<EnhancedForwardMaterialFlowSnapshot>);
+static_assert(std::is_trivially_copyable_v<EnhancedForwardMaterialFlowSnapshot>);
+
+// M6-P2a/P2b: 제품 Forward draw의 값/texture generation/ShaderMeta permutation을
+// 한 immutable packet으로 닫는다. P2d-c부터 texture schema는 ShaderMeta에 선언된
+// 임의 이름/개수를 owner vector로 보존하고, pass가 reflection register를 자기 물리
+// 슬롯에 투영한다. 기존 scalar는 legacy ShadeInstance 호환용이며 제품 material 값의
+// 정본은 propertyBytes(b2)다.
+struct EnhancedForwardMaterialDrawSnapshot
+{
+    ShaderMetaHandle shaderMetaHandle{};
+    RHIShaderPermutationKey permutationKey{};
+    ShaderMetaBindingLayout bindingLayout{};
+    std::vector<std::uint16_t> keywordSelections{};
+    std::vector<std::uint8_t> propertyBytes{};
+    EnhancedForwardMaterialFlowSnapshot flow{};
+    math::color baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
+    float metallic{ 0.f };
+    float roughness{ 1.f };
+    std::uint32_t useNormalMap{ 0 };
+    std::vector<EnhancedMaterialTextureBinding> textureBindings{};
+
+    bool IsValid() const noexcept
+    {
+        return useNormalMap <= 1u
+            && flow.IsFinite()
+            && shaderMetaHandle.IsValid()
+            && !bindingLayout.constantBufferName.empty()
+            && 2u == bindingLayout.constantBufferRegister
+            && 0u == bindingLayout.constantBufferSpace
+            && bindingLayout.constantBufferByteSize == propertyBytes.size();
+    }
+};
+
+// M6-P1a: Material의 게임 객체 주소를 RT draw packet까지 운반하지 않는다.
+// BuildDrawPool이 안정된 프레임 경계에서 generation/layout/property 값을 복사해
+// 이 소유 snapshot을 만들고, GBuffer는 이것만으로 batch key와 b2를 결정한다.
+// M6-P1b1부터 texture 넷도 shared owner를 복사한다. M6-P1b2a부터는 그 owner가
+// 어느 논리 property/GUID/register의 generation인지 함께 고정한다.
+struct EnhancedMaterialDrawSnapshot
+{
+    ShaderMetaHandle shaderMetaHandle{};
+    // M6-P1b2b1: 같은 ShaderMeta generation 안에서도 keyword 선택이 다르면
+    // 다른 compile/PSO identity다. authored index 배열과 함께 정규화된 key를
+    // 밀봉해 RT가 문자열/축 순서를 다시 추측하지 않게 한다.
+    RHIShaderPermutationKey permutationKey{};
+    ShaderMetaBindingLayout bindingLayout{};
+    std::vector<std::uint16_t> keywordSelections{};
+    std::vector<std::uint8_t> propertyBytes{};
+    std::vector<EnhancedMaterialTextureBinding> textureBindings{};
+
+    bool IsValid() const noexcept
+    {
+        return shaderMetaHandle.IsValid()
+            && !bindingLayout.constantBufferName.empty()
+            && bindingLayout.constantBufferByteSize == propertyBytes.size();
+    }
+};
 
 // 백엔드 서비스는 인터페이스로 받는다(PHASE 3-1 재정의, R1).
 //
@@ -71,6 +180,17 @@ struct EnhancedDrawItem
     float          metallic{ 0.f };
     float          roughness{ 1.f };
     uint32_t       useNormalMap{ 0 };
+
+    // M6-P1a 제품 GBuffer 경로는 이 immutable 값만 본다. 위 legacy
+    // factor/texture 필드는 아직 snapshot을 만들지 않는 격리 selftest의 호환
+    // 경계다.
+    std::shared_ptr<const EnhancedMaterialDrawSnapshot> materialSnapshot{};
+
+    // M6-P2a 제품 Forward 경로의 immutable 값/texture generation owner.
+    // Forward pass는 이 값이 있으면 위 legacy field를 읽지 않는다. P2b에서
+    // ShaderMeta generation/permutation/property block을 같은 경계에 합친다.
+    std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>
+        forwardMaterialSnapshot{};
 
     // ── 스키닝 ──
     //

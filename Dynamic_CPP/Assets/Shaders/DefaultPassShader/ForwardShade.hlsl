@@ -20,6 +20,8 @@ struct VSOut
     nointerpolation float4 baseColor : TEXCOORD3;
     // x 금속성 · y 거칠기 · z 노멀맵 · w 재질 텍스처가 묶였는가
     nointerpolation float4 material  : TEXCOORD4;
+    nointerpolation float4 flowWind  : TEXCOORD7;
+    nointerpolation float4 flowUvTime : TEXCOORD8;
 };
 
 struct ShadeInstance
@@ -29,7 +31,40 @@ struct ShadeInstance
     float    metallic;
     float    roughness;
     uint     useNormalMap;
-    uint     hasMaterialTextures;
+    // bit0: material texture table, bit1: owning ShaderMeta snapshot.
+    uint     materialFlags;
+    // P2d-b immutable Material::m_flowInfo + producer frame time.
+    float4   flowWindVector;
+    float2   flowUvScroll;
+    float    flowTotalSeconds;
+    float    flowDeltaSeconds;
+};
+
+// M6-P2b Standard Forward material numeric contract. ShaderMeta reflection owns
+// this b2/space0 layout. Snapshot 없는 legacy/self-test draw는 ShadeInstance의
+// 명시적 flag로 per-instance 값을 계속 소비해 기존 ABI를 보존한다.
+// The prefix matches the 48-byte Standard Material block used by GBuffer;
+// representative Forward materials may append a reflected 16-byte numeric tail.
+cbuffer MaterialProperties : register(b2)
+{
+    float4 baseColor;
+    float  metallic;
+    float  roughness;
+    float  normalScale;
+    float  occlusionStrength;
+    float3 emissive;
+    float  alphaCutoff;
+#if defined(FORWARD_WATER_MATERIAL)
+    float  waveSpeed;
+    float  waveAmplitude;
+    float  waveFrequency;
+    float  waterTint;
+#elif defined(FORWARD_WIND_MATERIAL)
+    float  windSpeed;
+    float  windStrength;
+    float  windFrequency;
+    float  windTint;
+#endif
 };
 
 StructuredBuffer<ShadeInstance> gInstances : register(t0);
@@ -37,12 +72,23 @@ StructuredBuffer<float4>        gLights    : register(t1);
 StructuredBuffer<uint>          gTileCount : register(t2);
 StructuredBuffer<uint>          gTileList  : register(t3);
 
-// 재질 텍스처 넷. 슬롯 의미와 채널 규약은 GBuffer와 같아야 한다 —
-// 다르면 같은 재질이 불투명과 투명에서 갈린다.
-Texture2D gBaseColorMap    : register(t4);
-Texture2D gNormalMap       : register(t5);
-Texture2D gOccRoughMetal   : register(t6);
-Texture2D gEmissiveMap     : register(t7);
+// M6-P2d-c: 물리 슬롯은 t4..t7/space0으로 유지하되 texture property 이름은
+// ShaderMeta/HLSL reflection 정본이다. Wind fixture가 t4를 windMap으로 바꿔
+// Standard 이름을 C++에서 하드코딩하지 않는 제품 경로를 판정한다.
+#ifndef FORWARD_BASE_COLOR_TEXTURE
+#define FORWARD_BASE_COLOR_TEXTURE baseColorMap
+#endif
+Texture2D FORWARD_BASE_COLOR_TEXTURE : register(t4);
+Texture2D normalMap    : register(t5);
+Texture2D ormMap       : register(t6);
+Texture2D emissiveMap  : register(t7);
+
+// Material-authored axis only. TILE_SIZE/MAX_LIGHTS_PER_TILE and
+// REFERENCE_PATH are Forward pass system defines and intentionally stay out of
+// Forward.shadermeta, so the host can compose them without duplicate axes.
+#ifndef SHADING_QUALITY
+#define SHADING_QUALITY 0
+#endif
 
 // IBL 셋(Deferred와 같은 split-sum). 없으면 앰비언트가 0이다.
 TextureCube gIrradiance  : register(t8);
@@ -148,7 +194,10 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     output.uv        = input.uv;
     output.baseColor = instance.baseColor;
     output.material  = float4(instance.metallic, instance.roughness,
-        (float)instance.useNormalMap, (float)instance.hasMaterialTextures);
+        (float)instance.useNormalMap, (float)instance.materialFlags);
+    output.flowWind = instance.flowWindVector;
+    output.flowUvTime = float4(instance.flowUvScroll,
+        instance.flowTotalSeconds, instance.flowDeltaSeconds);
 
     // 법선·탄젠트는 회전만 적용한다(GBuffer와 같은 처리). 비균등 스케일에는
     // 역전치가 필요한데, 그건 GBuffer가 아직 안 하므로 여기서만 하면 두
@@ -292,24 +341,60 @@ float4 PSMain(VSOut input) : SV_TARGET
     // ★ 텍스처는 묶였을 때만 읽는다. 없는 슬롯에 폴백을 물리는 방법도
     //   있지만(GBuffer가 그렇게 한다), 이 패스는 텍스처 캐시가 없는 자가
     //   검증에서도 돌아야 한다 — 그때는 만들 폴백조차 없다.
-    const bool hasTextures = (0.0f != input.material.w);
+    const uint materialFlags = (uint)input.material.w;
+    const bool hasTextures = (0u != (materialFlags & 1u));
+    const bool useLegacyInstanceMaterial = (0u == (materialFlags & 2u));
+    const float4 resolvedBaseColor = useLegacyInstanceMaterial
+        ? input.baseColor : baseColor;
+    const float resolvedRoughness = useLegacyInstanceMaterial
+        ? input.material.y : roughness;
+    const float resolvedMetallic = useLegacyInstanceMaterial
+        ? input.material.x : metallic;
+    const float resolvedNormalScale = useLegacyInstanceMaterial
+        ? 1.0f : normalScale;
+    const float2 resolvedUv = input.uv
+        + input.flowUvTime.xy * input.flowUvTime.z;
 
-    float4 albedo = input.baseColor;
-    float3 emissive = 0.0f;
-    float  rough = input.material.y;
-    float  metallic = input.material.x;
+    float4 albedo = resolvedBaseColor;
+    float3 materialEmissive = 0.0f;
+    float3 representativeEmission = 0.0f;
+    float  rough = resolvedRoughness;
+    float  materialMetallic = resolvedMetallic;
 
     if (hasTextures)
     {
-        albedo *= gBaseColorMap.Sample(gSampler, input.uv);
-        emissive = gEmissiveMap.Sample(gSampler, input.uv).rgb;
+        albedo *= FORWARD_BASE_COLOR_TEXTURE.Sample(gSampler, resolvedUv);
+        const float3 sampledEmissive = emissiveMap.Sample(gSampler, resolvedUv).rgb;
+        materialEmissive = useLegacyInstanceMaterial
+            ? sampledEmissive : sampledEmissive * emissive;
 
-        const float3 orm = gOccRoughMetal.Sample(gSampler, input.uv).rgb;
-        rough = orm.g * input.material.y;
-        metallic = orm.b + input.material.x;
+        const float3 orm = ormMap.Sample(gSampler, resolvedUv).rgb;
+        rough = orm.g * resolvedRoughness;
+        materialMetallic = orm.b + resolvedMetallic;
     }
+    // P2d-b: authored speed/frequency와 immutable frame time·m_flowInfo를 함께
+    // 사용한다. total=0, flow=0이면 P2c의 기존 authored phase와 정확히 같다.
+    const float flowPhase = dot(input.flowWind.xy, resolvedUv)
+        + input.flowWind.z * input.flowUvTime.z + input.flowWind.w;
+#if defined(FORWARD_WATER_MATERIAL)
+    const float waterWave = 0.5f + 0.5f * sin(
+        (resolvedUv.x + resolvedUv.y) * waveFrequency
+        + waveSpeed * (1.0f + input.flowUvTime.z) + flowPhase);
+    const float waterResponse = saturate(
+        waterTint + waveAmplitude * waterWave);
+    representativeEmission = emissive
+        * float3(0.04f, 0.20f, 0.70f) * waterResponse;
+#elif defined(FORWARD_WIND_MATERIAL)
+    const float windWave = 0.5f + 0.5f * sin(
+        (resolvedUv.x - resolvedUv.y) * windFrequency
+        + windSpeed * (1.0f + input.flowUvTime.z) + flowPhase);
+    const float windResponse = saturate(
+        windTint + windStrength * windWave);
+    representativeEmission = emissive
+        * float3(0.08f, 0.65f, 0.14f) * windResponse;
+#endif
     rough = saturate(rough);
-    metallic = saturate(metallic);
+    materialMetallic = saturate(materialMetallic);
 
     // ── 법선 ──
     float3 normal = normalize(input.normal);
@@ -323,9 +408,15 @@ float4 PSMain(VSOut input) : SV_TARGET
         const float  handedness = (dot(cross(n, t), input.bitangent) < 0.0f) ? -1.0f : 1.0f;
         const float3 b = cross(n, t) * handedness;
 
-        const float3 sampled = gNormalMap.Sample(gSampler, input.uv).rgb * 2.0f - 1.0f;
+        float3 sampled = normalMap.Sample(gSampler, resolvedUv).rgb * 2.0f - 1.0f;
+        sampled.xy *= resolvedNormalScale;
         normal = normalize(sampled.x * t + sampled.y * b + sampled.z * n);
     }
+#if SHADING_QUALITY == 1
+    // GBuffer의 reduced 축과 같은 의미: texture normal을 vertex normal 쪽으로
+    // 완화한다. 0(full)은 P2b 이전 출력 정본이다.
+    normal = normalize(normal + normalize(input.normal));
+#endif
 
     // ── 표면 항 (Deferred와 같은 구성) ──
     Surface surface;
@@ -334,9 +425,9 @@ float4 PSMain(VSOut input) : SV_TARGET
     surface.viewDirection = normalize(gEyePosition.xyz - input.worldPos);
     surface.ndotv = saturate(dot(normal, surface.viewDirection)) + 1e-5f;
     // 유전체의 기본 반사율 0.04는 관행값이고, 금속은 알베도가 곧 반사색이다.
-    surface.f0 = lerp(0.04f, albedo.rgb, metallic);
+    surface.f0 = lerp(0.04f, albedo.rgb, materialMetallic);
     surface.diffuseAlbedo = albedo.rgb / 3.14159265f;
-    surface.metallic = metallic;
+    surface.metallic = materialMetallic;
     // 거칠기를 그대로 쓰면 0에서 정반사가 점 하나가 되어 사라진다. 제곱해
     // 쓰는 것이 관행이고 하한을 두어 완전 거울을 피한다.
     surface.alpha = max(rough * rough, 1e-3f);
@@ -378,12 +469,12 @@ float4 PSMain(VSOut input) : SV_TARGET
             float2(surface.ndotv, rough), 0.0f).rg;
 
         const float3 fresnelAmbient = FresnelSchlick(surface.f0, surface.ndotv);
-        const float3 kdAmbient = (1.0f - fresnelAmbient) * (1.0f - metallic);
+        const float3 kdAmbient = (1.0f - fresnelAmbient) * (1.0f - materialMetallic);
 
         ambient = kdAmbient * irradiance * albedo.rgb
             + prefiltered * (surface.f0 * environmentBrdf.x + environmentBrdf.y);
     }
 
     // 알파는 베이스 컬러에서 온다 — 이것이 블렌드를 성립시킨다.
-    return float4(lit + ambient + emissive, albedo.a);
+    return float4(lit + ambient + materialEmissive + representativeEmission, albedo.a);
 }

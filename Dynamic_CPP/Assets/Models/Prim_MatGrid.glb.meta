@@ -1,4 +1,4 @@
-guid: d0340f4e-3546-50ab-a467-ca6d5ad1ab59
+guid: 0ecb57e2-cc63-47bc-85fd-ad00544c84ba
 importSettings:
   extension: .glb
   timestamp: 134300494798307662
@@ -6,3 +6,67 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
+subAssets:
+  schemaVersion: 1
+  materials:
+    - key: gltf/material/0
+      name: MatGrid_R0_C0_Mat
+      guid: e488f8fa-35ff-4529-80fc-3fec29cf461a
+    - key: gltf/material/1
+      name: MatGrid_R0_C1_Mat
+      guid: 371aff9f-e35b-43c4-b12b-e32bec26ecd4
+    - key: gltf/material/2
+      name: MatGrid_R0_C2_Mat
+      guid: 1915ed56-6e48-45e4-acb8-e57bcafd1a20
+    - key: gltf/material/3
+      name: MatGrid_R0_C3_Mat
+      guid: a4357ce2-1c5d-466f-82ac-9c1053ca3df3
+    - key: gltf/material/4
+      name: MatGrid_R0_C4_Mat
+      guid: c9ebb6bd-fd7d-4221-97ff-75facb8af02d
+    - key: gltf/material/5
+      name: MatGrid_R1_C0_Mat
+      guid: 9d887ba6-d914-4a98-bd81-d8686bb54ebb
+    - key: gltf/material/6
+      name: MatGrid_R1_C1_Mat
+      guid: 5a6af51d-e938-4a98-996d-3b2a26190bd3
+    - key: gltf/material/7
+      name: MatGrid_R1_C2_Mat
+      guid: 95b50e03-64cc-4678-a410-1d54e66d94ce
+    - key: gltf/material/8
+      name: MatGrid_R1_C3_Mat
+      guid: e404a906-6ffe-4351-8d2d-4262f95c5aad
+    - key: gltf/material/9
+      name: MatGrid_R1_C4_Mat
+      guid: 7f3b5e80-48ae-4162-ab85-87f1de8d5b51
+  embeddedTextures:
+    - key: gltf/image/0
+      name: MatGrid_R0_C0_Mat_BaseColor
+      guid: 0f8335bd-e843-4764-808b-c4972bdfa2cd
+    - key: gltf/image/1
+      name: MatGrid_R0_C1_Mat_BaseColor
+      guid: 278ed08f-0f7d-40d9-95ee-b6de80faa452
+    - key: gltf/image/2
+      name: MatGrid_R0_C2_Mat_BaseColor
+      guid: 591815de-19a1-43f8-9720-6a9235586a73
+    - key: gltf/image/3
+      name: MatGrid_R0_C3_Mat_BaseColor
+      guid: 623c7ad8-9e23-4ed2-b8c2-e4aced2fba28
+    - key: gltf/image/4
+      name: MatGrid_R0_C4_Mat_BaseColor
+      guid: 8ed7f9b7-1b9b-424e-af10-687eae063c11
+    - key: gltf/image/5
+      name: MatGrid_R1_C0_Mat_BaseColor
+      guid: 7ab141f6-a2f0-40d9-9077-dd417181c229
+    - key: gltf/image/6
+      name: MatGrid_R1_C1_Mat_BaseColor
+      guid: e3f09795-66aa-46f7-ac0d-af207899587d
+    - key: gltf/image/7
+      name: MatGrid_R1_C2_Mat_BaseColor
+      guid: 370888c9-0b99-4fe4-922f-994580a4aa34
+    - key: gltf/image/8
+      name: MatGrid_R1_C3_Mat_BaseColor
+      guid: 09f367cb-f302-4d2f-8cb4-277de0a7860b
+    - key: gltf/image/9
+      name: MatGrid_R1_C4_Mat_BaseColor
+      guid: 1a927d0a-9a7f-40c6-972f-6eedb3b37c58

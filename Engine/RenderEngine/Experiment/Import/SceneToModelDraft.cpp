@@ -555,7 +555,13 @@ namespace experiment::importer
                 Material material;
                 material.name = source.name.empty()
                     ? "material_" + std::to_string(i) : source.name;
-                material.shaderAssetId = options.shaderAssetId;
+                if (options.resolveMaterialAsset)
+                {
+                    material.assetId = options.resolveMaterialAsset(source, i);
+                }
+                material.shaderAssetId = options.resolveShaderAsset
+                    ? options.resolveShaderAsset(source, i)
+                    : options.shaderAssetId;
                 material.blendMode = source.alphaMode == AlphaMode::Blend
                     ? MaterialBlendMode::Transparent : MaterialBlendMode::Opaque;
 

@@ -280,9 +280,10 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						const char* droppedFilePath = static_cast<const char*>(payload->Data);
 						file::path filename = file::path(droppedFilePath).filename();
 						file::path filepath = PathFinder::Relative("Models\\") / filename;
-						if (Model* model = DataSystems->LoadCashedModel(filepath.string().c_str()))
+						if (auto model = DataSystems->LoadCachedModelShared(filepath.string()))
 						{
-							FoliageType type(model->GetMesh(0), model->GetMaterial(0), true, model->name);
+							FoliageType type(model->GetMeshShared(0),
+								model->GetMaterialShared(0), true, model->name);
 							foliage->AddFoliageType(type);
 							g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(foliage->GetFoliageTypes().size() - 1);
 						}

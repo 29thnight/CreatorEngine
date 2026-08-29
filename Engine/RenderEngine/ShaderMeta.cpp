@@ -535,6 +535,7 @@ bool ShaderMetaLoader::Parse(std::string_view text,
         ShaderMeta meta;
         meta.guid = guid;
         meta.schemaVersion = schema;
+        meta.originPath = originPath.lexically_normal();
         if (!ReadIdentifier(root, "name", originPath.string(), meta.name, outError))
             return false;
 

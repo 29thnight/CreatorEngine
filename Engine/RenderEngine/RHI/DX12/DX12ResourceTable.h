@@ -133,12 +133,9 @@ public:
         return ResolveEntry(m_layouts, handle.id);
     }
 
-    /// ★ 호출자 0 (2026-08-11). 캐시가 앱 수명이라 놓을 일이 없다. 세어 둔다 —
-    ///   이 저장소는 호출자 없는 인터페이스에 두 번 데였고(`RHIEncoder` 의 ★),
-    ///   적어 두지 않으면 다음 사람이 "쓰이는 것"으로 읽는다.
-    ///
-    ///   지우지 않는 이유: Vulkan 백엔드가 들어오면 반드시 필요해진다.
-    ///   그때도 호출자가 0 이면 그때는 지우는 것이 맞다.
+    /// M5-C3b1부터 DX12PSOManager invalidation이 호출한다. cache의 ComPtr는
+    /// in-flight 안전을 위해 retired 보관하고, 표는 이 자리에서 generation을
+    /// 올려 stale handle이 raw PSO로 풀리지 않게 한다.
     void Release(RHIPipelineHandle handle) { ReleaseEntry(m_pipelines, m_pipelineFree, handle.id); }
     void Release(RHIPipelineLayoutHandle handle) { ReleaseEntry(m_layouts, m_layoutFree, handle.id); }
 
@@ -397,7 +394,7 @@ private:
 
         target.entry = T{};
         target.alive = false;
-        ++target.generation;
+        target.generation = (target.generation + 1u) & RHIHandleBits::kIndexMask;
         freeList.push_back(slot);
     }
 

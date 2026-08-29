@@ -71,7 +71,11 @@ struct UncatalogedAuthoringRequest
 class AssetAuthoringPort final
 {
 public:
-	using CreateMetaHandler = FileGuid (*)(const file::path& filepath);
+	using CreateMetaHandler = FileGuid (*)(const file::path& filepath,
+		const FileGuid& preferredGuid);
+	using WriteTextAssetWithMetaHandler = FileGuid (*)(
+		const file::path& destination, std::string_view payload,
+		const FileGuid& preferredGuid);
 	using WriteModelCacheHandler = bool (*)(const file::path& destination,
 		std::span<const std::byte> bytes);
 	using WriteEmbeddedTextureHandler = bool (*)(const file::path& destination,
@@ -94,7 +98,16 @@ public:
 
 	static void Install(CreateMetaHandler handler) noexcept;
 	static void Uninstall(CreateMetaHandler handler) noexcept;
-	static FileGuid CreateMeta(const file::path& filepath) noexcept;
+	// preferredGuid는 새 sidecar를 처음 만들 때만 사용한다. 이미 존재하는
+	// sidecar의 GUID는 언제나 정본이며 handler가 그 값을 반환한다.
+	static FileGuid CreateMeta(const file::path& filepath,
+		const FileGuid& preferredGuid = {}) noexcept;
+	static void InstallTextAssetWriter(
+		WriteTextAssetWithMetaHandler handler) noexcept;
+	static void UninstallTextAssetWriter(
+		WriteTextAssetWithMetaHandler handler) noexcept;
+	static FileGuid WriteTextAssetWithMeta(const file::path& destination,
+		std::string_view payload, const FileGuid& preferredGuid) noexcept;
 
 	static void InstallModelCacheWriter(WriteModelCacheHandler handler) noexcept;
 	static void UninstallModelCacheWriter(WriteModelCacheHandler handler) noexcept;

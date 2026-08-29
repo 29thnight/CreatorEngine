@@ -275,8 +275,23 @@ t.lightmapUV0 = (vertices[i0].uv1 * litmaping.lightmapTiling) + litmaping.lightm
 - 변환기는 모든 재질에 `shaderAssetId` 하나를 복사하지만 `material.assetId`는 채우지
   않는다. validator도 두 nil ID를 거부하지 않아 렌더 불가능한 재질이 초록으로 게시될
   수 있다.
-- `EnhancedDrawItem`은 아직 legacy 고정 텍스처 4개와 factor만 복사한다. PSO handle,
-  ShaderMeta binding, property CB 소비는 M6 잔여다.
+- M6-P1a가 `EnhancedDrawItem`의 immutable property snapshot을 연결한 뒤 P1b1은 texture owner,
+  P1b2a는 texture GUID/register, P1b2b1은 keyword permutation, P1b2b2는 frame packet의 복수
+  ShaderMeta generation과 material별 PSO까지 닫았다. M6-P2a는 Forward의 immutable
+  value/texture-owner packet을, P2b는 별도 frame ShaderMeta owner·reflection b2/t4..t7·
+  material별 일반/Reference PSO pair와 인접-only transparent batch를 닫았다. P2c는 실제
+  Water/Wind Material의 `m_shaderMetaGuid`, Standard 48B prefix+custom float 4개의 64B `b2`,
+  다음-frame property 변경을 양 backend에서 닫았다. 당시 canonical seed는 Scene/proxy 소유
+  non-cache 대표 Material을 위한 고정 bridge였고 P2d-d의 Host required-asset packet으로 제거됐다.
+  P2d-a는 `FoliageRenderProxy`의 type별
+  mesh/material owner·instance world matrix·view별 AABB culling 입력을 실제 제품 draw pool에
+  연결했다. P2d-b는 `m_flowInfo` wind/UV와 frame total/delta를 immutable flow snapshot·Forward
+  instance로 연결해 양 backend 픽셀을 닫았다. P2d-c는 Material/DataSystem/draw snapshot의 texture
+  owner를 임의 property 이름 vector로 일반화하고 `windMap@t4`를 양 backend에서 닫았다. P2d-d는
+  활성 Scene의 Mesh/Foliage Material owner에서 pass별 GUID required packet을 만들고 고정 Water/Wind
+  seed를 제거했다. P2d-e는 material-cache frame scan·raw texture alias/setter·제품 draw pool의
+  legacy writer를 은퇴해 M6 전체를 닫았다. 이 legacy Material GUID 선택은 `experiment::Material`의 실제 asset/shader ID
+  보존 증거가 아니다.
 
 첫 틈은 `StandardMaterialProperty.h`를 이름 정본으로 세워 2026-08-27 닫았다.
 `DataSystem`의 legacy texture GUID 이행과 `SceneToModelDraft` 기본 매핑이 같은 상수를
@@ -377,7 +392,7 @@ IR 이후의 어떤 코드도 포맷별 관례를 알 필요가 없다. 원본 �
 ★ **탄젠트 생성과의 순서가 중요하다.** 용접이 탄젠트 이음매를 다시 붙이면
 mikktspace 규약이 깨진다 — 탄젠트를 정점 정체성의 일부로 다뤄야 한다.
 
-### I5-0. Material/ShaderMeta 교차 계약 — **이름 정본 완료, ID·소비 배선 잔여**
+### I5-0. Material/ShaderMeta 교차 계약 — **이름·쿠킹 게시 계약 완료, 제품 ID·소비 배선 잔여**
 
 I5에서 `experiment::Model`을 직접 소비하기 전에 재질이 M5/M6 계약으로 손실 없이
 건너갈 수 있어야 한다. 2026-08-27 첫 안전 슬라이스로 표준 PBR property 이름을
@@ -385,18 +400,79 @@ I5에서 `experiment::Model`을 직접 소비하기 전에 재질이 M5/M6 계�
 `SceneToModelDraft`가 함께 소비하게 했다. glTF/FBX 게이트에는 게시 property 검사를
 추가했다.
 
-남은 게이트는 둘이다.
+2026-08-29 현재 머테리얼 레인은 M5-C4까지 완료돼 M5를 닫았고, M6-P0의 격리된
+Standard Material 숫자 `b2` 프로브, M6-P1a의 제품 GBuffer 숫자 property batch,
+M6-P1b1의 Material/draw packet texture generation owner, M6-P1b2a의 texture property
+GUID→ShaderMeta reflection register binding, M6-P1b2b1의 material keyword permutation PSO,
+M6-P1b2b2의 multi ShaderMeta generation PSO도 양 backend에서 관통했다. 양 backend의
+deep-owned graphics request, targeted invalidation/completion retirement와 대표 GBuffer
+generation 전환에 이어 `FoliageType`과 Editor Undo의 장기 Model/Mesh/Material raw 소비를
+소유 참조로 바꿨다. Model/Material은 전역 retired generation 없이 실제 consumer 수명만
+따르며, Terrain/UI/Sprite 등 raw alias가 남은 texture 계열 보존은 제한적으로 유지한다. P1a는 `BuildDrawPool`의
+최종 item에서 `Material*`를 제거하고 generation/layout/keyword/property/texture snapshot을
+밀봉해 같은 mesh/texture의 다른 property를 GBuffer 2 batch로 나눴다. P1b1은 Material의
+texture owner 5개와 GBuffer packet owner 4개를 연결해 Material 해제 뒤 packet 수명과 packet
+해제 뒤 반환까지 닫았다. P1b2a는 제품 meta의 숫자 7개+texture 4개와 `t0..t3/space0`를
+reflection으로 고정하고 packet에 property/GUID/register/owner를 함께 밀봉했다. P1b2b1은
+같은 active meta 안의 keyword PSO를 닫았고 P1b2b2는 GT frame packet의 복수 meta owner와
+  material별 meta+permutation PSO·targeted retirement를 닫았다. P2a는 Forward value/texture owner
+  packet을, P2b는 제품 `Forward.shadermeta` generation, Standard `b2/48B`, `t4..t7`, material
+  permutation별 일반/Reference PSO pair와 A/B/A 인접-only 순서 게이트를 닫았다. P2c는 실제
+  `ForwardWater`·`ForwardWind` Material GUID가 별도 Meta와 64B custom numeric block을 고르고,
+  7 draw/4 batch/3 meta, 양 backend overlap `0.125/0.25/0.5`, wind G `0→0.325`, backend 편차
+  `0`과 다음-frame 변경을 닫았다. 그러나 이는 일반 transparent 경로의 대표 bridge다.
+  P2d-a는 `FoliageRenderProxy`를 owning type/instance draw source로 제품 `BuildDrawPool`에
+  연결하고 한 카메라의 `m_isCulled` 대신 view별 transformed AABB culling을 쓰게 했다.
+  P2d-b는 dynamic time/flow·`m_flowInfo`를 immutable draw/instance 입력으로 옮기고 DX12/Vulkan
+  동일 픽셀과 invalid time fail-closed를 닫았다. P2d-c는 generic texture schema/owner vector와
+  `windMap@t4` owner 수명·픽셀을 닫았다. P2d-d는 cache 밖 Scene Material까지 pass별 required GUID
+  packet으로 밀봉하고 canonical Water/Wind seed를 제거했다. P2d-e는 전체 legacy 호출자를 재측정해
+  제품 frame cache scan·Material raw alias/setter·draw pool 중복 writer를 은퇴했다. M6와 D2
+  authoring identity 수술에 이어 D5-a는 material resolver 입력과 nil/중복
+  model·material·ShaderMeta·texture ID의 cooked 게시 거부를 닫았다. D5-b1은 glTF/FBX
+  `sourceKey`와 model sidecar의 저장된 UUIDv4 subasset, 재질별 ShaderMeta resolver,
+  CEMF v1 GUID→Derived `.cemc` manifest 계약을 닫았다. D5-b2a는 별도 `AssetCooker`와
+  `ModelCookProducer`로 `Prim_Cube`의 실제 sidecar를 CEMC/CEMF에 원자 게시하는 첫 production
+  slice를 닫았다. D5-b2b1은 explicit authoring migration으로 현재 checkout의 tracked 11 + local 3
+  model에 있는 material 52·embedded
+  texture 96 UUIDv4를 전수 재발급하고, CEMC 14 + CEMF 1/entry 66의 결정적 전수 Cook까지 닫았다.
+  D5-b2b2는 같은 전수 Cook을 package-base snapshot→Generated/Derived→Merged/Assets→pak으로
+  연결하고 `AssetPacker` reopen/index 검증을 닫았다. I5 제품 배선에는 D5-b2c 나머지
+  asset producer가 여전히 필요하다.
 
-- [ ] SerializationPlan D2/D5의 GUID 정책을 받아 재질별 `assetId`와 실제 PBR
-      `shaderAssetId` resolver를 변환 옵션에 넣고, nil ID 게시를 거부한다.
-- [ ] MaterialPipelinePlan M6가 PSO handle·binding·property CB를 실제 draw item에
-      전달한다. 그 전에는 `experiment::Material` 구조가 맞아도 화면 소비 증거가 아니다.
+남은 제품 합류 게이트는 D5-b2c 나머지 식별자 게시와 I5 resolver 배선이다. 아래 M6 항목은 완료
+증거로 남긴다.
+
+- [x] SerializationPlan D2가 sidecar 정본, UUIDv4 전수 재발급, atomic authoring/rename과
+      scene 14/prefab 9/material 2 authoring corpus를 닫았다.
+- [x] SerializationPlan D5-a가 material/texture resolver 입력과 nil/중복
+      model·material·ShaderMeta·texture ID의 fail-closed cooked 게시 계약을 닫았다.
+- [x] SerializationPlan D5-b1이 모델 sidecar의 실제 material/embedded texture UUIDv4,
+      PBR `shaderAssetId` resolver와 GUID-addressed CEMF v1 writer/reader 계약을 닫았다.
+- [x] SerializationPlan D5-b2a가 별도 AssetCooker에서 `Prim_Cube` 실제 sidecar identity를
+      deterministic CEMC/CEMF로 만들고 새 staging tree를 원자 게시한다.
+- [x] SerializationPlan D5-b2b1이 모델 14개 subasset identity 148개를 전수 재발급하고
+      두 번 같은 CEMC 14 + CEMF 1/entry 66을 source 변경 없이 게시한다.
+- [x] SerializationPlan D5-b2b2가 전수 Cook을 build/AssetPacker/pak에 연결해 Derived tree와
+      CEMF를 제품 package에 게시한다.
+- [ ] SerializationPlan D5-b2c가 texture/ShaderMeta/scene/prefab Derived producer와 material
+      dependency entry를 완성한다.
+- [x] MaterialPipelinePlan M6-P2d-c가 generic texture schema/owner vector를 닫았다.
+- [x] MaterialPipelinePlan M6-P2d-d가 arbitrary required-asset packet과 canonical seed 제거를 닫았다.
+- [x] MaterialPipelinePlan M6-P2d-e가 전체 재질/legacy 전환을 닫았다. P2c의
+      실제 legacy Material GUID 선택도 `experiment::Material`의 texture·shader 식별자가
+      import→화면까지 보존된 증거는 아니다.
 
 **공동 안전 순서:** 서로 독립인 두 선행 레인을 먼저 닫는다. 모델 레인은
-`V2(완료) → V3(완료)`, 머테리얼 레인은 `M5-C3 → M5-C4 → M6`다. D2/D5 식별자 정책까지 닫힌 뒤
+`V2(완료) → V3(완료)`, 머테리얼 레인은 `M5(완료) → M6-P0~P2d-e(완료)`다. D2·D5-a·D5-b1·D5-b2a·D5-b2b1·D5-b2b2는 완료됐고 D5-b2c 나머지 제품 Cook 게시까지 닫힌 뒤
 세 레인이 `I5(B 직접 소비)`에서 합류하고, 그 다음에만 V4 입력 레이아웃 유도와 I6
 Assimp 은퇴를 수행한다. V2/V3가 생산 소비자 0인 동안 데이터 구조를 바꾸는 것이
 하류 렌더 경로를 붙인 뒤 바꾸는 것보다 안전하다.
+
+PHASE 4 `PBR-S3`는 importer 단독 완료 항목이 아니다. `D2/D5-b → I5/V4`가 생산 소비를
+연 뒤 metallic-roughness와 함께 현재 `ModelDraft`에서 빠지는 `doubleSided`·
+`emissiveStrength`, `TextureSlot`→`TextureReference` 경계에서 빠지는 UV set/offset/tiling/
+wrap까지 Material과 Deferred/Forward 양 경로에 도달해야 닫힌다.
 
 ### I5. 런타임 어댑터 — **B(치환) 로 확정**
 
@@ -423,11 +499,62 @@ packed storage가 섰다. 21.42MB → 11.17MB(47.8%)는 기존 233,910정점 감
 
 SceneGraphRedesignPlan(PHASE 16 계열) 과 충돌 여부를 먼저 확인해야 한다.
 
+#### I5-M. `experiment::Material` 정본 승격과 legacy `::Material` 퇴역
+
+I5의 B(치환)는 Model 컨테이너만 새 타입으로 바꾸는 작업이 아니다.
+`experiment::Model::materials`의 `experiment::Material`을 영속 저작 정본으로 승격하고,
+기존 전역 `::Material`은 전환 기간의 단방향 migration 입력으로만 남긴 뒤 I6에서
+제거한다. M6 완료는 기존 렌더 경로의 property·texture·ShaderMeta/PSO 소비 계약을
+검증했다는 뜻이지 `::Material` 타입을 장기 존치한다는 뜻이 아니다.
+
+새 기능을 legacy `::Material`에 추가하거나 그 타입을 `MaterialAsset`과
+`MaterialRuntimeState`로 다시 분해하지 않는다. 새 경로가 다음 책임을 직접 소유한다.
+
+- `experiment::Material`: D2/D5-b `AssetId`와 ShaderMeta asset ID, 이름 기반 논리
+  property, keyword 선택, blend mode의 불변 저작 정본.
+- `MaterialInstance`: base material owner와 인스턴스별 override/revision만 소유한다.
+  runtime 인스턴스는 asset cache에 등록하거나 독립 `.asset`으로 저장하지 않는다.
+- `MaterialResolver`/`MaterialPropertyPacker`: ShaderMeta generation과 reflection layout을
+  검증하고 논리 값을 permutation·CB bytes·texture binding으로 해석한다.
+- `ResolvedMaterial`: 해석한 ShaderMeta/texture generation owner를 보존한다.
+- 기존 M6 `EnhancedMaterialDrawSnapshot`: 위 결과를 frame 불변 입력으로 밀봉하며
+  Render Thread는 DataSystem이나 mutable material을 다시 읽지 않는다.
+
+asset 복제와 runtime 인스턴스 생성도 분리한다. `DuplicateMaterialAsset`은 catalog가
+새 AssetId/.meta를 발급한 새 저작 자산이고, `CreateMaterialInstance`는 MeshRenderer가
+소유하는 비영속 override다. 기존 `InstantiateShared`처럼 runtime clone을
+`DataSystem::Materials`에 등록하고 원본 `m_fileGuid`를 복사하는 계약은 승계하지 않는다.
+
+**I5-M 완료 게이트:**
+
+- [ ] D5/I5 resolver가 D2 identity를 받아 모든 `experiment::Material.assetId`·`shaderAssetId`와
+      `TextureReference.assetId`를 채우고 nil/충돌을 게시 전에 거부한다.
+- [ ] GBuffer/Forward/Water/Wind/Foliage 제품 sealing이 `experiment::Material` 또는
+      `MaterialInstance`에서 기존 M6 snapshot을 만들며 `::Material`을 읽지 않는다.
+- [ ] MeshRenderer·Foliage·Scene serialization·standalone material asset·Editor
+      picker/Inspector·CLR property API가 새 definition/instance 경계를 소비한다.
+- [ ] CLR의 인스턴스 변경은 논리 property override를 갱신하며 runtime CB 이름이나
+      `Material::RuntimeSchema` 설치 여부에 기대지 않는다.
+- [ ] legacy `.asset`은 별도 migration DTO/codec이 `experiment::Material`로 한 번
+      정규화하고, 제품 writer는 새 정본만 기록한다.
+- [ ] 양 backend에서 Standard/transparent/Water/Wind/Foliage와 ShaderMeta/texture
+      generation reload, instance 독립 override, save-load-resave parity를 통과한다.
+- [ ] 제품 `experiment::Model`/`experiment::Material` 외부 소비자가 0이 아니며,
+      legacy `::Material` 제품 소비자는 migration/parity 경계를 제외하고 0이다.
+
 ### I6. 전환 — Assimp 은퇴
 
 I5 결정 후. 두 경로 병행 기간을 두고 픽셀·성능 대조를 거친 뒤 legacy 로더를
 제거한다. **Release 로만 성능을 판정한다**(Debug 는 같은 조건에서 25배 느리고
 규모별 개선 방향까지 뒤집는다).
+
+I6는 Assimp만 떼는 단계가 아니다. I5-M parity가 닫히면 `ExperimentLegacyBridge`,
+legacy `::Model`/`::Material`, `DataSystem::Materials`, `Material::InstantiateShared`,
+legacy model/material runtime codec과 프로젝트 등록을 함께 제거한다. 과거 자산 지원이
+필요하면 제품 타입을 존치하지 않고 오프라인 migration reader만 별도 도구 경계에 둔다.
+완료 판정은 legacy Model/Material/Assimp 제품 호출 0, 대표 자산 픽셀 동등, Release
+성능 비퇴행, VS18/v145의 RenderEngine→SceneRuntime→RenderTests→CreatorEditor→Player
+빌드와 DX12/Vulkan 회귀 통과다.
 
 ### I7. cooked 경로 — **포맷·코덱 완료** (2026-08-25 · `c8e06ffa`)
 
@@ -874,7 +1001,7 @@ I5(치환)와 V4에서 입력 레이아웃 5곳·셰이더 4개를 함께 전환
 | **PHASE 4 DXR** | BLAS 가 정점 포맷·stride 를 직접 받는다 — V2/V3 의 절감이 가속 구조에 그대로 간다 |
 | SerializationPlan (PHASE 17) | I2·I7 이 `.meta`/AssetId 발급과 쿠킹 결정을 공유. **V0 의 캐시 버전 규약도 그쪽 형식 결정을 따른다** |
 | SceneGraphRedesignPlan | I5 안 B 가 노드/엔티티 표현과 충돌하는지 확인 필요 |
-| MaterialPipelinePlan (PHASE 3.5) | I5-0에서 표준 PBR property 이름을 공유했다. M5-C3/C4로 handle·raw 수명을 닫고 M6가 실제 draw 소비를 세운 뒤 I5가 `experiment::Material`을 그 계약에 직접 연결한다. **V4의 퍼뮤테이션 축도 그쪽 키 체계를 쓴다** |
+| MaterialPipelinePlan (PHASE 3.5) | I5-0에서 표준 PBR property 이름을 공유했다. M5가 generation/소유 경계를, M6-P0~P2d-e가 GBuffer/Forward의 property·texture·ShaderMeta/PSO·Foliage/flow·required-asset와 legacy 은퇴까지 닫아 PHASE 3.5는 완료됐다. D5-b2a 단일 model producer, D5-b2b1 model 전수 Cook, D5-b2b2 제품 pak 게시는 섰다. I5는 D2/D5-a/D5-b1 계약 위에 D5-b2c 나머지 ID가 공급된 뒤 `experiment::Material`을 그 계약에 직접 연결한다. **V4의 퍼뮤테이션 축도 그쪽 키 체계를 쓴다** |
 | **`LightmapBakerPlan` (같은 PHASE 4 · 트랙 L)** | **V3 옵셔널 스트림의 첫 소비자.** V6 는 그쪽으로 이관됐다. 삭제된 베이커가 uv1 의 원래 소비자였다(§1.8) |
 | AnimationSchedulerPlan (PHASE 13) | 게시된 clip 의 소비자가 그쪽 평가 엔진이다 |
 | `RhiBoundaryPlan` (PHASE 3) | V5(멀티 슬롯)가 `RHIEncoder`·`RHIMeshBinding` 확장을 요구 — 보류 중 |

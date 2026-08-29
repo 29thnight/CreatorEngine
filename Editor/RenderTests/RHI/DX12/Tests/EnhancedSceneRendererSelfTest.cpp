@@ -3,8 +3,10 @@
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
+#include "RHI/RHIGraphicsPipelineRequest.h"
 #include "DX12TestTextureRegistration.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "Render/Core/EnhancedLivePipelineDesc.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
 #include "Render/Passes/Geometry/EnhancedDeferredPass.h"
@@ -1183,10 +1185,23 @@ bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& ou
             return false;
         }
 
+        RHIGraphicsPipelineRequest request;
         RHIPipelineHandle handles[3]{};
         for (size_t i = 0; i < 3; ++i)
         {
-            handles[i] = manager.GetOrCreate(variants[i], error);
+            if (0 == i)
+            {
+                if (!request.Create(manager, variants[i], error))
+                {
+                    outLog += "1회차 owning PSO 요청 생성 실패: " + error + "\n";
+                    return false;
+                }
+                handles[i] = request.GetHandle();
+            }
+            else
+            {
+                handles[i] = manager.GetOrCreate(variants[i], error);
+            }
             if (!handles[i].IsValid())
             {
                 outLog += "1회차 PSO 생성 실패: " + error + "\n";
@@ -1211,13 +1226,104 @@ bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& ou
             return false;
         }
 
+        const RHIGraphicsPipelineDesc& ownedBase = request.GetDesc();
+        if (ownedBase.vsBytecode == variants[0].vsBytecode ||
+            ownedBase.psBytecode == variants[0].psBytecode ||
+            ownedBase.vsSize != variants[0].vsSize || ownedBase.psSize != variants[0].psSize)
+        {
+            outLog += "owning PSO 요청이 shader bytecode를 깊은 복사하지 않았다\n";
+            return false;
+        }
+
+        // M5-C3b2b1: 후보 PSO를 먼저 준비한 뒤 옛 handle 하나만 stale로 만든다.
+        // 이미 캐시에 있는 variant[1]로 교체해도 variant[2] lookup은 보존되어야 한다.
+        constexpr RHICompletionPoint kTargetRetireAfter{ 7 };
+        if (!request.Replace(manager, variants[1], kTargetRetireAfter, error))
+        {
+            outLog += "owning PSO 요청 교체 실패: " + error + "\n";
+            return false;
+        }
+        const bool oldHandleRejected = !resources.Resolve(handles[0]).IsValid();
+        const bool replacementPublished = request.GetHandle() == handles[1]
+            && resources.Resolve(request.GetHandle()).IsValid();
+        const bool unrelatedPreserved = resources.Resolve(handles[2]).IsValid();
+        const auto targetedStats = manager.GetStats();
+        if (!oldHandleRejected || !replacementPublished || !unrelatedPreserved
+            || targetedStats.invalidations != 1 || targetedStats.retiredPipelines != 1)
+        {
+            outLog += "PSO targeted invalidation/보존 계약 불일치\n";
+            return false;
+        }
+
+        const std::uint32_t targetedCollectedEarly =
+            manager.CollectRetiredPipelines(RHICompletionPoint{ 6 });
+        const std::uint32_t targetedCollectedReady =
+            manager.CollectRetiredPipelines(kTargetRetireAfter);
+        if (0 != targetedCollectedEarly || 1 != targetedCollectedReady)
+        {
+            outLog += "targeted PSO completion retirement 경계 불일치\n";
+            return false;
+        }
+
+        // M5-C3b1의 전체 무효화와 generation 재발급 계약도 그대로 보존한다.
+        const RHIPipelineHandle reloaded = manager.GetOrCreate(variants[0], error);
+        const bool generationAdvanced = reloaded.IsValid()
+            && reloaded != handles[0]
+            && RHIHandleBits::GenerationOf(reloaded.id) !=
+                RHIHandleBits::GenerationOf(handles[0].id)
+            && resources.Resolve(reloaded).IsValid();
+        constexpr RHICompletionPoint kGlobalRetireAfter{ 9 };
+        const std::uint32_t invalidated = manager.InvalidatePipelines(kGlobalRetireAfter);
+        const auto reloadStats = manager.GetStats();
+        if (invalidated != 3 || !generationAdvanced
+            || reloadStats.invalidations != 2 || reloadStats.retiredPipelines != 3)
+        {
+            outLog += "PSO generation invalidation/next-use 재요청 계약 불일치: "
+                + error + "\n";
+            return false;
+        }
+
+        const std::uint32_t collectedEarly =
+            manager.CollectRetiredPipelines(RHICompletionPoint{ 8 });
+        const std::uint32_t collectedReady =
+            manager.CollectRetiredPipelines(kGlobalRetireAfter);
+        const auto collectedStats = manager.GetStats();
+        if (0 != collectedEarly || 3 != collectedReady ||
+            0 != collectedStats.retiredPipelines ||
+            4 != collectedStats.retiredCollections)
+        {
+            outLog += "PSO completion retirement 경계 불일치\n";
+            return false;
+        }
+
+        const RHIPipelineHandle quarantineHandle =
+            manager.GetOrCreate(variants[0], error);
+        if (!quarantineHandle.IsValid())
+        {
+            outLog += "PSO quarantine 준비 실패: " + error + "\n";
+            return false;
+        }
+        const std::uint32_t quarantined = manager.InvalidatePipelines();
+        const std::uint32_t quarantineCollected = manager.CollectRetiredPipelines(
+            RHICompletionPoint{ ~std::uint64_t{ 0 } });
+        const auto quarantineStats = manager.GetStats();
+        if (1 != quarantined || 0 != quarantineCollected ||
+            1 != quarantineStats.retiredPipelines)
+        {
+            outLog += "PSO completion 0 quarantine 계약 불일치\n";
+            return false;
+        }
+
         if (!manager.SaveCache(error))
         {
             outLog += "1회차 캐시 저장 실패: " + error + "\n";
             return false;
         }
         manager.Shutdown();
-        outLog += "1회차: 컴파일 3 · 캐시 저장 완료\n";
+        outLog += "1회차: 컴파일 3 · owning bytecode · targeted stale 1/나머지 보존"
+            " · completion 6 보존/7 회수 1 · global stale 3/generation 재발급"
+            " · completion 8 보존/9 회수 3 · completion 0 shutdown quarantine 1"
+            " · 캐시 저장 완료\n";
     }
 
     // ── 2회차: 캐시 복원 → 컴파일 0 ──
@@ -2958,6 +3064,23 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         return false;
     }
 
+    // 이 검증은 GT에서 RenderScene snapshot을 직접 읽는다. headless script가
+    // wait N으로 프레임을 빠르게 생산하면 bounded RenderThread queue가 아직 새 씬의
+    // create delta를 적용하기 전일 수 있다. 그 상태의 0개는 씬/모델 실패가 아니라
+    // producer-consumer 진행도 차이이므로, 호출 시점까지 발행된 packet만 drain한다.
+    // 일반 프레임 경로에는 동기 대기를 넣지 않는다.
+    constexpr uint32_t kRenderThreadDrainTimeoutMs = 10000;
+    if (!EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(
+            kRenderThreadDrainTimeoutMs))
+    {
+        const EnhancedRenderThreadStats stats =
+            EnhancedSceneRenderer::GetLiveRenderThreadStats();
+        outLog += "[1/4] RenderThread drain 시간 초과 — pending " +
+            std::to_string(stats.pending) + " · active " +
+            std::to_string(stats.inProgress) + "\n";
+        return false;
+    }
+
     const FrameCameraSnapshot cameraSnapshot = sceneCamera->CaptureFrameSnapshot();
 
     // 커맨드 빌드 스레드가 채워 둔 deferred 큐를 그대로 읽는다. 프록시를 넘기지
@@ -3001,10 +3124,10 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
             bool isTransparent = false;
             if (auto* material = proxy->m_Material.get())
             {
-                item.baseColor = material->m_pBaseColor;
-                item.normalMap = material->m_pNormal;
-                item.occRoughMetal = material->m_pOccRoughMetal;
-                item.emissive = material->m_pEmissive;
+		item.baseColor = material->GetBaseColorMapShared().get();
+		item.normalMap = material->GetNormalMapShared().get();
+		item.occRoughMetal = material->GetOccRoughMetalMapShared().get();
+		item.emissive = material->GetEmissiveMapShared().get();
 
                 item.baseColorFactor = material->m_materialInfo.m_baseColor;
                 item.metallic = material->m_materialInfo.m_metallic;
