@@ -6,6 +6,7 @@
 // Texture.h는 본문 전체가 #ifndef DYNAMICCPP_EXPORTS로 막혀 있어
 // 스크립트 DLL 빌드에서는 Diagnostics가 선언되지 않는다.
 #include "EngineResourceCensus.h"
+#include "MaterialPropertyValue.h"
 #include "ShaderMetaHandle.h"
 #include "Texture.h"
 #include <mathematics/matrix4x4.hpp>
@@ -28,29 +29,8 @@ enum class MaterialRenderingMode
 	Transparent,
 };
 
-// Material의 디스크 정본은 ShaderMeta GUID와 이름 기반 논리 값이다. GPU byte
-// offset은 Slang reflection 결과이므로 저장하지 않고 ConfigureShaderProperties에서
-// 매 세대 다시 만든다. 한 타입만 유효하지만 variant를 YAML 정본에 끌어들이지
-// 않도록 고정된 필드로 둔다.
-struct MaterialPropertyValue
-{
-    static consteval auto reflect()
-    {
-        using Self = MaterialPropertyValue;
-        return meta::schema<Self>(
-            meta::field<&Self::m_name>,
-            meta::field<&Self::m_numericValue>,
-            meta::field<&Self::m_integerValue>,
-            meta::field<&Self::m_boolValue>,
-            meta::field<&Self::m_textureGuid>);
-    }
-
-    std::string m_name{};
-    std::vector<float> m_numericValue{};
-    std::int32_t m_integerValue{};
-    bool m_boolValue{};
-    FileGuid m_textureGuid{};
-};
+// MaterialPropertyValue(디스크 정본 논리 값)는 MaterialPropertyValue.h로 이전됐다 —
+// packing 정본(MaterialPropertyPacker)이 Material.h 없이 그 타입을 받기 위해서다.
 
 // M6-P2d-c runtime-only texture generation owner. 디스크 정본은
 // MaterialPropertyValue의 (name, FileGuid)이고, 이 벡터는 임의 ShaderMeta texture

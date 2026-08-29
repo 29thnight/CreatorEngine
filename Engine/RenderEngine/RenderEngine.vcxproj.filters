@@ -270,6 +270,9 @@
     <ClCompile Include="ShaderMeta.cpp">
       <Filter>Resources\Material</Filter>
     </ClCompile>
+    <ClCompile Include="MaterialPropertyPacker.cpp">
+      <Filter>Resources\Material</Filter>
+    </ClCompile>
     <ClCompile Include="ShaderMetaReflection.cpp">
       <Filter>Resources\Material</Filter>
     </ClCompile>
@@ -666,6 +669,12 @@
       <Filter>Resources\Material</Filter>
     </ClInclude>
     <ClInclude Include="ShaderMeta.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialPropertyPacker.h">
+      <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialPropertyValue.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
     <ClInclude Include="ShaderMetaReflection.h">

@@ -214,6 +214,7 @@
     <ClCompile Include="DataSystem.cpp" />
     <ClCompile Include="GpuDiagnostics.cpp" />
     <ClCompile Include="Material.cpp" />
+    <ClCompile Include="MaterialPropertyPacker.cpp" />
     <ClCompile Include="ShaderMeta.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ShaderMetaCanonical_%(Filename).obj</ObjectFileName>
@@ -466,6 +467,8 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="ShaderMetaHandle.h" />
     <ClInclude Include="ShaderMeta.h" />
+    <ClInclude Include="MaterialPropertyPacker.h" />
+    <ClInclude Include="MaterialPropertyValue.h" />
     <ClInclude Include="ShaderMetaReflection.h" />
     <ClInclude Include="ShaderPermutationDomain.h" />
     <ClInclude Include="StandardMaterialProperty.h" />

@@ -624,6 +624,19 @@ Debug x64 RenderEngine·RenderTests·CreatorEditor·Player 빌드가 성공했�
 리플렉션 골든은 새 기본 키 3개만 기준선에 반영한 뒤 타입 77·직렬화 77·실패 0·
 diff 0으로 통과했다.
 
+★ **M5-A 잔여 부채 — packing 정본의 배치 오류 (2026-08-29 확인).** 이 절편이 만든
+`ApplyDefault`·`ValidateLogicalValue`·`PackProperty`(+ `NumericElementCount`·`LogicalByteSize`·
+`FindBinding`)는 `Material` 상태를 한 글자도 읽지 않는다 — **Material 클래스의 알고리즘이 아니라
+ShaderMeta 계약의 알고리즘**이다. 그런데 `Material.cpp` 익명 namespace(internal linkage)에 두어
+다른 TU 에서 이름조차 보이지 않는다. 결과로 (1) legacy 안에 같은 루프가 두 벌이 됐고
+(`ConfigureShaderProperties` / `adc026b4`가 더한 `BuildShaderPropertyBlock`), (2) 두 번째 소비자인
+`experiment::Material`이 이 정본에 붙을 방법이 없다.
+
+이 정본은 I6에서 `Material.cpp`가 삭제된 뒤에도 살아남아야 하므로, 분리는 experiment 와 무관하게
+필요하다. **선행 작업 `MaterialPropertyPacker` 분리**로 상환한다 — 자유 함수 6종을 ShaderMeta
+계약 쪽으로 이동하고 legacy 두 호출부가 정본을 부른다(`MaterialInfo` 폴백은 legacy 호환 입력이므로
+`Material.cpp`에 존치). 상세는 ModelImportPipelinePlan §I5-M "선행 작업".
+
 **M5-B1 — standalone YAML codec + scene-owned runtime 복원 — ✅ 구현·표적 검증
 완료 (2026-08-24).** `DataSystem::SerializeMaterialPayload` /
 `DeserializeMaterialPayload`가 Editor 저장과 standalone `.asset` 로드의 typed YAML,
