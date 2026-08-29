@@ -121,7 +121,12 @@ namespace RenderTest
                   "    m_components:\n"
                   "      - MeshRenderer: 2\n"
                   "        m_Material:\n"
+                  // ★ legacy 이름 참조의 세 형태를 한 재질에 모은다.
+                  //   baseColor: 이름 + GUID  → 이주 완료, 세지 않는다
+                  //   ORM      : 이름 + nil   → 미이주, 센다
+                  //   normal   : 빈 이름      → 참조가 아니다
                   "          m_baseColorTexName: Probe_BaseColor.png\n"
+                  "          m_ORM_TexName: Probe_ORM.png\n"
                   "          m_normalTexName: \"\"\n"
                   "          m_fileGuid: " + kModelGuid + "\n"     // 모델 간선
                   "          m_propertyValues:\n"
@@ -246,8 +251,11 @@ namespace RenderTest
                 check.Check(product.textureEdges == 2u,
                     "텍스처 참조 2건(중복 포함)을 센다");
                 // ★ 그리지 못한 것들을 실제로 세는가.
+                // ★ **GUID 가 없는 것만** 센다. 이름 필드 존재만으로 세면
+                //   이주해도 숫자가 줄지 않는다 — `Synchronize~` 가 GUID 에서
+                //   이름을 되채우기 때문이다. 여기 셋 중 ORM 하나만 해당한다.
                 check.Check(product.legacyTextureNameReferences == 1u,
-                    "빈 문자열을 뺀 legacy 이름 참조 1건");
+                    "GUID 없는 legacy 이름 참조 1건(ORM만)");
                 check.Check(product.unproducedGuidReferences == 1u,
                     "producer 없는 GUID 참조 1건(BT)");
 

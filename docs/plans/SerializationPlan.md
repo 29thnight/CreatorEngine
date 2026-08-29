@@ -831,10 +831,42 @@ artifact 를 공유하는 재질 subasset 이다.
 material 열거에서 제외하고 세어서 보고만 한다. 둘 다 `package-manifest.json` 의 `cook` 섹션에
 기록된다.
 
+**D5-b2c 후속 — 씬 텍스처 GUID 이주 — ✅ 완료 (2026-08-29). `legacyTextureNameRefs=17 → 0`.**
+
+★ **먼저 계수 기준이 틀렸다는 것이 드러났다.** b2c-4는 "legacy 이름 필드가 비어 있지 않으면"
+셌는데, `DataSystem::SynchronizeLegacyMaterialProperties`가 **두 방향을 모두 채운다** — 이름에서
+GUID를 해석해 `m_propertyValues` 항목을 만들고, **GUID에서 이름도 되채운다.** 그래서 이주가
+끝난 재질도 이름 필드를 계속 갖고, 옛 기준으로는 **이주해도 숫자가 줄지 않는다.** 위험한 것은
+이름 필드의 존재가 아니라 *GUID가 없어서 이름에 의존하는 것*이므로, 같은 인라인 재질에 대응
+`m_textureGuid`가 있으면 세지 않도록 고쳤다. 변이(GUID 유무를 무시)가 정확히 1건을 빨갛게 한다.
+
+★ **새 변환기를 만들지 않았다.** 이주 로직은 이미 위 함수에 있으므로 정본 경로를 태운다 —
+`Tools/migration/Invoke-SceneTextureGuidMigration.ps1`이 에디터 CLI(`scene.switch` → `scene.save`)를
+돌리고 결과를 검증할 뿐이다. 대상 3개(FT_Primitives 8 · Test1 6 · Test2 3 = 17)를 사전에 셌고,
+17건 전부 파일명이 **유일하게** 해소됨을 먼저 확인했다(모호 0).
+
+★ **부수 효과가 컸다. 예고 없이 일어났다.** 로드-저장 왕복이 Test1/Test2를 **구형 씬 스키마에서
+신형으로 재작성했다**(`m_SceneObjects`→`m_Entities`, `- GameObject:`→`- Entity:`, `m_transform:`→
+Transform 컴포넌트). 부채를 줄이는 방향이지만 텍스처 GUID만 넣으려던 범위를 넘는다. 검증:
+`scene.dump` 오브젝트 수가 이주 전후 동일(Test1 68·Test2 63·FT_Primitives 11)하고, 구조 비교에서
+손실 항목이 없다(FT_Primitives는 `m_cameraIndex`→`m_isPrimary` 스키마 이주 1건뿐).
+
+★ **내가 한 번 잘못 단정했다.** diff의 줄 이동을 삭제로 오독해 "이주가 `PackageSmokeProbe`
+ScriptComponent를 지웠다"고 말했다. 패키지 입력 스냅샷의 이주 전 원본과 대조하니 ScriptComponent
+수가 전후 동일했다(2/1). 손실은 없었다.
+
+★ **에디터의 `.creator` sidecar 자동 발급이 실증됐다.** 검증용 임시 씬 3개를 Scenes 폴더에 두자
+에디터가 `.meta`를 발급했고, guid 게이트가 `missingTarget=3`으로 잡았다. 정리 후 `d2Ready=true`
+복귀. 등록이 실제로 동작한다는 증거이자, 임시 파일도 받는다는 함정이다.
+
+실측: 전수 cook `legacyTextureNameRefs=0`, 씬 게이트 실자산이 `간선 16(model 8·texture 8)·
+legacy이름 0`을 뽑는다(이주 전 `간선 8(model 8)·legacy이름 8`). experiment 게이트 17회 전수
+통과, 실제 패키지 빌드 성공(entry 789, Derived 261). **씬 파일은 gitignore 대상이라 커밋되지
+않는다** — 다른 워크스페이스는 위 스크립트를 각자 돌려야 한다.
+
 **D5-c — Player manifest/catalog scene+cooked load — ⏳ 잔여.**
-★ **선행 조건 하나가 남았다**: 씬 텍스처 참조 **17건의 GUID 이주**. `.creator` identity
-편입은 아래 정리 묶음(2026-08-29)에서 닫혔다. 도구가 `legacyTextureNameRefs`로 찍으므로
-그 수가 0이 되는 시점을 기계적으로 판정할 수 있다. Player가 `.meta`나 source
+★ **선행 조건이 모두 닫혔다.** `.creator` identity 편입과 씬 텍스처 GUID 이주가 끝났고
+`legacyTextureNameRefs=0`이다. Player가 `.meta`나 source
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,
 그 뒤에만 `.meta`를 pak에서 제외한다. missing/duplicate/stale manifest entry는 fail-closed다.
 

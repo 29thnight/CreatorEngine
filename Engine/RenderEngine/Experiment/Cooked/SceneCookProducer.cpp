@@ -24,12 +24,52 @@ namespace experiment::cooked
             return text == "00000000-0000-0000-0000-000000000000";
         }
 
-        // legacy 이름 참조 필드. 값이 비어 있지 않으면 "GUID 없이 이름으로
-        // 가리키는 텍스처"가 하나 있다는 뜻이다.
-        inline constexpr std::array<std::string_view, 5> kLegacyTextureNameKeys{
-            "m_baseColorTexName", "m_normalTexName", "m_ORM_TexName",
-            "m_AO_TexName", "m_EmissiveTexName",
+        // legacy 이름 참조 필드 ↔ 대응하는 property 이름.
+        //
+        // ★ **"이름 필드가 있다"가 위험한 게 아니다.** 위험한 것은 *GUID 가
+        //   없어서 이름에 의존하는* 경우다.
+        //
+        //   `DataSystem::FinalizeMaterialRuntime` 은 GUID 우선·이름 폴백이고,
+        //   `SynchronizeLegacyMaterialProperties` 는 **두 방향을 모두 채운다** —
+        //   이름에서 GUID 를 만들어 property 를 넣고, GUID 에서 이름도 되채운다.
+        //   그래서 이주가 끝난 재질도 이름 필드를 계속 갖는다. 처음에는 이름
+        //   필드 존재만으로 셌는데, 그 기준으로는 **이주해도 숫자가 안 줄어든다.**
+        //
+        //   그래서 같은 인라인 재질 안에 대응 `m_textureGuid` 가 있으면 세지
+        //   않는다. 남는 수가 곧 "GUID 로 못 가리키는 텍스처"이고, 그것이
+        //   D5-c 의 "source path 탐색 없이"가 요구하는 값이다.
+        struct LegacyTextureKey final
+        {
+            std::string_view nameField;
+            std::string_view propertyName;
         };
+        inline constexpr std::array<LegacyTextureKey, 5> kLegacyTextureNameKeys{{
+            { "m_baseColorTexName", "baseColorMap" },
+            { "m_normalTexName",    "normalMap" },
+            { "m_ORM_TexName",      "ormMap" },
+            { "m_AO_TexName",       "aoMap" },
+            { "m_EmissiveTexName",  "emissiveMap" },
+        }};
+
+        // 인라인 재질 매핑에서 해당 property 가 nil 아닌 texture GUID 를 갖는가.
+        [[nodiscard]] bool HasTextureGuidFor(const YAML::Node& materialNode,
+            std::string_view propertyName)
+        {
+            if (!materialNode.IsMap()) return false;
+            const YAML::Node properties = materialNode["m_propertyValues"];
+            if (!properties || !properties.IsSequence()) return false;
+            for (const YAML::Node& property : properties)
+            {
+                if (!property.IsMap()) continue;
+                const YAML::Node name = property["m_name"];
+                if (!name || !name.IsScalar()) continue;
+                if (name.Scalar() != propertyName) continue;
+                const YAML::Node guid = property["m_textureGuid"];
+                if (!guid || !guid.IsScalar()) return false;
+                return guid.Scalar() != "00000000-0000-0000-0000-000000000000";
+            }
+            return false;
+        }
 
         // producer 가 없어서 간선을 그릴 수 없는 GUID 참조.
         inline constexpr std::array<std::string_view, 2> kUnproducedGuidKeys{
@@ -119,11 +159,16 @@ namespace experiment::cooked
                         if (!pair.first.IsScalar()) { Visit(pair.second); continue; }
                         const std::string key = pair.first.Scalar();
 
-                        if (std::ranges::find(kLegacyTextureNameKeys, key)
-                            != kLegacyTextureNameKeys.end())
+                        const auto legacy = std::ranges::find(
+                            kLegacyTextureNameKeys, key,
+                            &LegacyTextureKey::nameField);
+                        if (legacy != kLegacyTextureNameKeys.end())
                         {
+                            // 이름이 비었으면 참조가 아니다. 이름이 있어도
+                            // 같은 재질에 GUID 가 있으면 폴백에 의존하지 않는다.
                             if (pair.second.IsScalar()
-                                && !pair.second.Scalar().empty())
+                                && !pair.second.Scalar().empty()
+                                && !HasTextureGuidFor(node, legacy->propertyName))
                             {
                                 ++product.legacyTextureNameReferences;
                             }
