@@ -1,4 +1,5 @@
 #include "ClrHost.h"
+#include "MaterialScriptBinding.h"
 #include "PathFinder.h"
 #include "Entity.h"
 #include "Transform.h"
@@ -1176,7 +1177,10 @@ namespace
 		MeshRenderer* mesh = ResolveMesh(handle);
 		if (nullptr == mesh || !mesh->m_Material) return;
 
-		mesh->m_Material = Material::InstantiateShared(mesh->m_Material.get(),
+		// I5-M5 S3 — InstantiateShared 계약 비승계: 클론을 asset cache에 등록하지
+		// 않고 수명은 이 컴포넌트의 shared_ptr가 진다.
+		mesh->m_Material = MaterialScriptBinding::InstantiateOwned(
+			*mesh->m_Material,
 			(nullptr != newName) ? std::string_view{ newName } : std::string_view{});
 	}
 
@@ -1194,8 +1198,10 @@ namespace
 		return length;
 	}
 
-	// 셰이더 상수 버퍼에 값을 넣는다. 이름이 틀리면 엔진이 조용히 실패하므로
-	// 결과를 그대로 돌려준다 — 오타를 삼키지 않으려면 호출부가 봐야 한다.
+	// I5-M5 S3 — 논리 property를 이름으로 갱신한다. legacy TrySetValue와 달리
+	// RuntimeSchema 설치나 CB 이름에 기대지 않는다(buffer 인자는 ABI 유지용으로
+	// 받고 검증하지 않는다 — 라우팅은 ShaderMeta 선언이 한다). 이름/타입이
+	// 틀리면 0을 돌려준다 — 오타를 삼키지 않으려면 호출부가 봐야 한다.
 	int __stdcall Api_Mesh_SetMaterialFloat(ScriptObjectHandle handle, const char* buffer, const char* name, float value)
 	{
 		if (nullptr == buffer || nullptr == name) return 0;
@@ -1203,7 +1209,7 @@ namespace
 		Material* material = ResolveMaterial(handle);
 		if (nullptr == material) return 0;
 
-		return material->TrySetValue(buffer, name, &value, sizeof(value)) ? 1 : 0;
+		return MaterialScriptBinding::SetFloat(*material, name, value) ? 1 : 0;
 	}
 
 	int __stdcall Api_Mesh_SetMaterialInt(ScriptObjectHandle handle, const char* buffer, const char* name, int value)
@@ -1213,7 +1219,7 @@ namespace
 		Material* material = ResolveMaterial(handle);
 		if (nullptr == material) return 0;
 
-		return material->TrySetValue(buffer, name, &value, sizeof(value)) ? 1 : 0;
+		return MaterialScriptBinding::SetInt(*material, name, value) ? 1 : 0;
 	}
 
 	Float4 __stdcall Api_Mesh_GetBaseColor(ScriptObjectHandle handle)
@@ -1221,7 +1227,7 @@ namespace
 		Material* material = ResolveMaterial(handle);
 		if (nullptr == material) return { 1.f, 1.f, 1.f, 1.f };
 
-		const auto& c = material->m_materialInfo.m_baseColor;
+		const math::color c = MaterialScriptBinding::GetBaseColor(*material);
 		return { c.r, c.g, c.b, c.a };
 	}
 
@@ -1229,7 +1235,8 @@ namespace
 	{
 		if (Material* material = ResolveMaterial(handle))
 		{
-			material->m_materialInfo.m_baseColor = { color.x, color.y, color.z, color.w };
+			MaterialScriptBinding::SetBaseColor(*material,
+				{ color.x, color.y, color.z, color.w });
 		}
 	}
 

@@ -203,6 +203,7 @@
     <ClCompile Include="InputAction.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="KeyState.cpp" />
+    <ClCompile Include="MaterialScriptBinding.cpp" />
     <ClCompile Include="MeshRenderer.cpp" />
     <ClCompile Include="ActionMap.cpp" />
     <ClCompile Include="InputActionManager.cpp" />
@@ -315,6 +316,7 @@
     <ClInclude Include="LightSystem.h" />
     <ClInclude Include="LinkData.h" />
     <ClInclude Include="MeshCollider.h" />
+    <ClInclude Include="MaterialScriptBinding.h" />
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PrefabUtility.h" />

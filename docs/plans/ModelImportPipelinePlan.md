@@ -639,7 +639,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
 | ↳ M5-S2b | 씬 writer 전환 — **선결: flow·useNormalMap·IOR의 정본 표현**(아래 ★) | 씬 저장 | 없음 |
 | ↳ M5-S2c | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
-| ↳ M5-S3 | CLR API 재구현 — override 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
+| ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 | Editor picker/Inspector — ShaderMeta 기반 동적 property 편집기·드롭타겟 재작성 | Editor 8파일 | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -801,6 +801,21 @@ S2c(reflect 스키마 이주)까지 이 제약이 유지된다.
 (Water/Wind shadermeta가 windVector·uvScroll을 선언하면 특수 필드가 사라진다 — PBR-S3와 같은
 결)이고, 그 전에 writer를 새 정본으로 바꾸면 저장할 때마다 flow 저작이 조용히 사라진다.
 S2b는 그 표현이 선 뒤에만 연다.
+
+**M5-S3 완료 실측 (2026-08-30).** `SceneRuntime/MaterialScriptBinding.h/.cpp` 신설 — CLR
+property API의 논리 값 경로. legacy `TrySetValue`의 두 족쇄(RuntimeSchema 설치·CB 이름
+일치)를 걷었다: 검증 기준은 ShaderMeta 선언(desc.type)이고 갱신 대상은 이름 기반 논리 값이다.
+M4 이후 sealing이 매 프레임 논리 값에서 재pack하므로 논리 값 갱신이 곧 화면 갱신이다 —
+완료 게이트의 "runtime CB 이름/RuntimeSchema에 기대지 않는다" 충족. `GetBaseColor/SetBaseColor`
+의 `m_materialInfo` 직접 접근을 논리 값 우선·사본 동기화로 치환. `InstantiateOwned`가 CLR의
+`InstantiateShared` 호출을 대체 — 클론을 asset cache에 등록하지 않고(비승계) 수명은
+MeshRenderer shared_ptr가 진다. ★ **m_fileGuid는 아직 승계한다** — MeshRenderer가 mesh 해석에
+material fileGuid를 재사용하는 족쇄(S2c에서 분리) 때문에 지금 지우면 씬 재저장 후 재로드에서
+메시가 사라진다. C# ABI(P/Invoke)는 무변경 — ClrHost 구현만 교체(buffer 인자는 ABI 유지용,
+검증하지 않음을 명시). `InstantiateShared` 잔여 호출부는 Inspector 1곳(S4)뿐이다. 게이트
+`experiment.matscript`(합성 25 · 실사 4): schema 없는 갱신·오타/타입 fail-closed·스칼라
+동기화·비등록 클론·원본 불변. 변이(타입 검증 제거)가 정확히 2건을 붉혔고, BT 스모크로 CLR
+부팅 경로 무회귀 확인.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

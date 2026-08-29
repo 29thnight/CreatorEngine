@@ -63,6 +63,7 @@
 #include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -4564,6 +4565,26 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matmigrate %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_experiment_matscript(const ConsoleCommandContext& ctx)
+    {
+        // I5-M5 S3 — CLR property API의 논리 값 경로.
+        (void)ctx;
+        std::string log;
+        bool passed = RenderTest::RunExperimentMaterialScriptSelfTest(log);
+        passed = RenderTest::RunExperimentMaterialScriptReal(log) && passed;
+
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.matscript] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.matscript] 실패\n") + log);
+        }
+        std::printf("[CLI] experiment.matscript %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
     {
         std::string log;
@@ -7020,6 +7041,7 @@ namespace ConsoleCmd
             reg({ "experiment.matseal" }, &Cmd_experiment_matseal);
             reg({ "experiment.matcodec" }, &Cmd_experiment_matcodec);
             reg({ "experiment.matmigrate" }, &Cmd_experiment_matmigrate);
+            reg({ "experiment.matscript" }, &Cmd_experiment_matscript);
             reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
             reg({ "experiment.catalog" }, &Cmd_experiment_catalog);
