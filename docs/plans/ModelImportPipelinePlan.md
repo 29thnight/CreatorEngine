@@ -639,7 +639,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
 | ↳ M5-S2b ✅ | 씬 writer 전환 — ShaderMeta를 아는 재질은 새 정본으로 저장(legacy 폴백 이중화) | 씬 저장 | 없음 |
 | ↳ M5-S2c-1 ✅ | 모델 GUID 자립 — `MeshRenderer::m_modelGuid` 신설, m_fileGuid 편법 이주, InstantiateOwned 비승계 | 씬 스키마·cook 폐포 | 없음 |
-| ↳ M5-S2c-2a | 저작 소유 분리 — base 자산 참조+override 저작, m_Material reflect 퇴출(훅 전담) | 씬 스키마·피커 | 없음 |
+| ↳ M5-S2c-2a ✅ | 저작 소유 분리 — base 참조(ref)+diff 저작, 피커 링크·소유 사본 (reflect 퇴출은 2b로) | 씬 스키마·피커 | 없음 |
 | ↳ M5-S2c-2b | 런타임 소유 분리 — base(experiment)+`MaterialInstance`, 프록시·sealing 타입 전환 | 프록시 사슬·CLR/Inspector | **소비자** 참조 감소 |
 | ↳ M5-S2c-2c | Foliage — `FoliageType.m_material` experiment 전환(비직렬화·저위험) | Foliage·required packet | 없음 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
@@ -922,6 +922,29 @@ MeshRenderer에 들이고 프록시에 effective 스냅샷을 흘려 sealing의 
 큰 수술 — I5-D(experiment::Model 직접 소비)와 결이 같아 그 옆에서 함께 판정하는 것이
 맞다. 주의: 훅(OnDeserialized/OnAfterSerialize)은 PHASE 17 D3-a가 시그니처를 이행 중인
 표면이라 2a 착수 시 조율이 필요하다.
+
+**M5-S2c-2a 완료 실측 (2026-08-30).** 저작 소유 분리 — base 자산에 링크된 재질은 인라인
+embed 대신 **base 참조+인스턴스 diff**를 적는다(`m_Material: {ref, blendMode?,
+keywordSelections?, overrides?}` — override 값은 S0 코덱의 타입 키 표기를 공개 창구
+`Serialize/DeserializeMaterialPropertyValue`로 재사용, 두 번째 표기 금지). 쓰기 diff는 현
+재질과 base를 같은 meta로 experiment 변환해 항목별 인코딩 텍스트로 비교한다(수학 타입에
+operator==가 없다). base에만 있는 저작은 참조 표기가 "되돌림"을 표현할 수 없어 인라인
+폴백(fail-open, 로그). 읽기는 base 소유 사본에 `ApplyPropertyToLegacy`(ConvertToLegacy와 값
+변환 정본 공유 — `ConvertPropertyToLegacyValue`·`SynchronizeLegacyScalarMirrors` 추출)로
+override를 겹친다. 피커는 자산 링크의 생산자다 — 공유 캐시 객체를 그대로 물던 결함(인스턴스
+편집의 전파 + 저장 시 자산 연결 소실)을 소유 사본+`m_materialBaseGuid`로 교정했고, 링크는
+GUID가 실제 standalone 재질 자산으로 해석될 때만 건다(모델 내장 재질의 m_fileGuid는 모델
+GUID다). Instantiate(Inspector·CLR)는 링크 해제. S2c-1의 모델 폴백은 base 링크 재질에서
+차단했다(재질 자산 GUID를 모델 GUID로 오인 금지).
+
+★ **m_Material의 reflect 퇴출은 2b로 미뤘다** — 프리팹 패치 경로(PrefabUtility의
+`Meta::Deserialize`)는 postLoad 없이 typed 읽기만 하므로, 지금 빼면 프리팹 재질 오버라이드가
+조용히 소실된다. typed는 ref 노드에서 기본값 재질을 만들고 postLoad가 교체한다(프리팹
+오버라이드에 ref 표기가 실리는 경우는 아직 없다 — 2b에서 패치 경로와 함께 판정).
+검증: matmigrate 실사 26(+7: ref 저장·diff 최소성·로드 실체화·링크 복원·재저장 고정점·
+무편집 diff 0·base 로드), override 적용 변이가 정확히 2건(로드 실체화·고정점)만 붉힘 —
+예측 일치. matseal 20(변환기 refactor 무변화 증명)·matparity·matscript·matcodec, 씬 코퍼스
+28/28·프리팹 3종·리플렉션 골든 diff 0·ft-primitives·dx12/vk 픽셀 초록.
 
 **M5-S2c-1 완료 실측 (2026-08-30).** 모델 GUID 자립 — S2c(소유 분리)의 선행 절단.
 `MeshRenderer::m_modelGuid`(reflect 말미 추가)가 메시 출처 모델의 정본 주소가 된다. 예전에는

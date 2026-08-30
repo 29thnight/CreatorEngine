@@ -439,4 +439,17 @@ namespace experiment
         outError.clear();
         return true;
     }
+
+    bool SerializeMaterialPropertyValue(const MaterialProperty& property,
+        YAML::Node& outEntry, std::string& outError)
+    {
+        return SerializeValue(property, outEntry, outError);
+    }
+
+    bool DeserializeMaterialPropertyValue(const YAML::Node& entry,
+        const std::string& name, MaterialPropertyValue& outValue,
+        std::string& outError)
+    {
+        return DeserializeValue(entry, name, outValue, outError);
+    }
 }

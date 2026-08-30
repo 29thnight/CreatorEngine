@@ -609,6 +609,94 @@ namespace RenderTest
                 "저장이 m_modelGuid를 자기 키로 적는다");
         }
 
+        // ── S2c-2a: base 참조+diff — 자산 링크가 저장을 살아넘는다 ────────
+        {
+            const std::shared_ptr<Material> base =
+                DataSystems->LoadMaterialShared("ForwardWater");
+            check.Check(nullptr != base && FileGuid{} != base->m_fileGuid,
+                "base 재질 자산 로드");
+            if (base)
+            {
+                MeshRenderer linked;
+                linked.m_Material = std::make_shared<Material>(*base);
+                linked.m_materialBaseGuid = base->m_fileGuid;
+                experiment::MaterialProperty edit;
+                edit.name = "roughness";
+                edit.value = 0.25f;
+                std::string error;
+                check.Check(ExperimentMaterialMigration::ApplyPropertyToLegacy(
+                    *linked.m_Material, edit, error),
+                    "인스턴스 편집 적용 (" + error + ")");
+
+                YAML::Node saved = Meta::Serialize(&linked);
+                const YAML::Node materialNode = saved["m_Material"];
+                check.Check(materialNode && materialNode["ref"]
+                    && materialNode["ref"].as<std::string>()
+                        == base->m_fileGuid.ToString(),
+                    "저장이 base 참조를 적는다");
+                std::size_t overrideCount = 0;
+                bool roughnessOverride = false;
+                if (materialNode && materialNode["overrides"]
+                    && materialNode["overrides"].IsSequence())
+                {
+                    for (const YAML::Node& entry : materialNode["overrides"])
+                    {
+                        ++overrideCount;
+                        if (entry["name"]
+                            && entry["name"].as<std::string>() == "roughness")
+                        {
+                            roughnessOverride = true;
+                        }
+                    }
+                }
+                check.Check(1u == overrideCount && roughnessOverride,
+                    "diff가 최소다 — 편집 1건만 override");
+
+                // 로드 왕복 — 실제 씬 로드처럼 typed + postLoad(TypeOps)로.
+                const Meta::Typed::TypeOps* ops = Meta::Typed::FindTypeOps(
+                    TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>()
+                        .m_ID_Data);
+                MeshRenderer reloaded;
+                Meta::Deserialize(&reloaded, saved);
+                if (ops && ops->postLoad)
+                {
+                    ops->postLoad(&reloaded, saved);
+                }
+                bool roughnessApplied = false;
+                if (reloaded.m_Material)
+                {
+                    const auto found = std::find_if(
+                        reloaded.m_Material->m_propertyValues.begin(),
+                        reloaded.m_Material->m_propertyValues.end(),
+                        [](const MaterialPropertyValue& value)
+                        {
+                            return value.m_name == "roughness";
+                        });
+                    roughnessApplied = found
+                        != reloaded.m_Material->m_propertyValues.end()
+                        && found->m_numericValue == std::vector<float>{ 0.25f };
+                }
+                check.Check(nullptr != reloaded.m_Material && roughnessApplied
+                    && reloaded.m_materialBaseGuid == base->m_fileGuid,
+                    "로드가 base+override를 실체화하고 링크를 복원한다");
+
+                YAML::Node resaved = Meta::Serialize(&reloaded);
+                check.Check(resaved["m_Material"]
+                    && YAML::Dump(resaved["m_Material"])
+                        == YAML::Dump(materialNode),
+                    "참조 표기 재저장 고정점");
+
+                MeshRenderer clean;
+                clean.m_Material = std::make_shared<Material>(*base);
+                clean.m_materialBaseGuid = base->m_fileGuid;
+                YAML::Node cleanSaved = Meta::Serialize(&clean);
+                check.Check(cleanSaved["m_Material"]
+                    && cleanSaved["m_Material"]["ref"]
+                    && !cleanSaved["m_Material"]["overrides"],
+                    "무편집 링크는 diff 0");
+            }
+        }
+
         char summary[160]{};
         std::snprintf(summary, sizeof(summary),
             "  실사 단정 %zu/%zu\n", check.passed,

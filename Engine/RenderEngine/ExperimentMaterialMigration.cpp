@@ -79,6 +79,73 @@ namespace ExperimentMaterialMigration
                 + value.m_name;
             return false;
         }
+
+        // experiment 값 → legacy MaterialPropertyValue. ConvertToLegacyMaterial
+        // 루프와 ApplyPropertyToLegacy가 공유하는 값 변환 정본이다.
+        [[nodiscard]] bool ConvertPropertyToLegacyValue(
+            const experiment::MaterialProperty& property,
+            MaterialPropertyValue& outValue, std::string& outError)
+        {
+            MaterialPropertyValue value;
+            value.m_name = property.name;
+            if (const auto* boolean = std::get_if<bool>(&property.value))
+            {
+                value.m_boolValue = *boolean;
+            }
+            else if (const auto* integer =
+                std::get_if<std::int32_t>(&property.value))
+            {
+                value.m_integerValue = *integer;
+            }
+            else if (const auto* unsignedInteger =
+                std::get_if<std::uint32_t>(&property.value))
+            {
+                if (*unsignedInteger > static_cast<std::uint32_t>(
+                    std::numeric_limits<std::int32_t>::max()))
+                {
+                    outError = "uint property가 legacy int32 범위를 넘는다: "
+                        + property.name;
+                    return false;
+                }
+                value.m_integerValue =
+                    static_cast<std::int32_t>(*unsignedInteger);
+            }
+            else if (const auto* scalar = std::get_if<float>(&property.value))
+            {
+                value.m_numericValue = { *scalar };
+            }
+            else if (const auto* vector2 =
+                std::get_if<math::vector2>(&property.value))
+            {
+                value.m_numericValue = { vector2->x, vector2->y };
+            }
+            else if (const auto* vector3 =
+                std::get_if<math::vector3>(&property.value))
+            {
+                value.m_numericValue = { vector3->x, vector3->y, vector3->z };
+            }
+            else if (const auto* vector4 =
+                std::get_if<math::vector4>(&property.value))
+            {
+                value.m_numericValue = { vector4->x, vector4->y, vector4->z,
+                    vector4->w };
+            }
+            else if (const auto* reference =
+                std::get_if<experiment::TextureReference>(&property.value))
+            {
+                value.m_textureGuid.m_guid = reference->assetId.value;
+            }
+            else
+            {
+                // string 등 legacy에 표현이 없는 값 — 조용히 떨구면 저작이
+                // 사라진다.
+                outError = "legacy 재질에 표현이 없는 property 값이다: "
+                    + property.name;
+                return false;
+            }
+            outValue = std::move(value);
+            return true;
+        }
     }
 
     bool ConvertLegacyMaterial(const Material& legacy, const ShaderMeta& meta,
@@ -197,60 +264,8 @@ namespace ExperimentMaterialMigration
                 return false;
             }
             MaterialPropertyValue value;
-            value.m_name = property.name;
-            if (const auto* boolean = std::get_if<bool>(&property.value))
+            if (!ConvertPropertyToLegacyValue(property, value, outError))
             {
-                value.m_boolValue = *boolean;
-            }
-            else if (const auto* integer =
-                std::get_if<std::int32_t>(&property.value))
-            {
-                value.m_integerValue = *integer;
-            }
-            else if (const auto* unsignedInteger =
-                std::get_if<std::uint32_t>(&property.value))
-            {
-                if (*unsignedInteger > static_cast<std::uint32_t>(
-                    std::numeric_limits<std::int32_t>::max()))
-                {
-                    outError = "uint property가 legacy int32 범위를 넘는다: "
-                        + property.name;
-                    return false;
-                }
-                value.m_integerValue =
-                    static_cast<std::int32_t>(*unsignedInteger);
-            }
-            else if (const auto* scalar = std::get_if<float>(&property.value))
-            {
-                value.m_numericValue = { *scalar };
-            }
-            else if (const auto* vector2 =
-                std::get_if<math::vector2>(&property.value))
-            {
-                value.m_numericValue = { vector2->x, vector2->y };
-            }
-            else if (const auto* vector3 =
-                std::get_if<math::vector3>(&property.value))
-            {
-                value.m_numericValue = { vector3->x, vector3->y, vector3->z };
-            }
-            else if (const auto* vector4 =
-                std::get_if<math::vector4>(&property.value))
-            {
-                value.m_numericValue = { vector4->x, vector4->y, vector4->z,
-                    vector4->w };
-            }
-            else if (const auto* reference =
-                std::get_if<experiment::TextureReference>(&property.value))
-            {
-                value.m_textureGuid.m_guid = reference->assetId.value;
-            }
-            else
-            {
-                // string 등 legacy에 표현이 없는 값 — 조용히 떨구면 저작이
-                // 사라진다.
-                outError = "legacy 재질에 표현이 없는 property 값이다: "
-                    + property.name;
                 return false;
             }
             propertyValues.push_back(std::move(value));
@@ -269,42 +284,79 @@ namespace ExperimentMaterialMigration
 
         // legacy 스칼라 소비자(Forward snapshot 호환 필드) 동기화 —
         // 논리 값이 정본이고 m_materialInfo는 그 사본이다.
-        if (const MaterialPropertyValue* baseColor = FindLegacyValue(outLegacy,
+        SynchronizeLegacyScalarMirrors(outLegacy);
+
+        outError.clear();
+        return true;
+    }
+
+    void SynchronizeLegacyScalarMirrors(Material& legacy)
+    {
+        if (const MaterialPropertyValue* baseColor = FindLegacyValue(legacy,
             standard_material::property::BaseColor);
             baseColor && baseColor->m_numericValue.size() == 4u)
         {
-            outLegacy.m_materialInfo.m_baseColor = {
+            legacy.m_materialInfo.m_baseColor = {
                 baseColor->m_numericValue[0], baseColor->m_numericValue[1],
                 baseColor->m_numericValue[2], baseColor->m_numericValue[3] };
         }
-        if (const MaterialPropertyValue* metallic = FindLegacyValue(outLegacy,
+        if (const MaterialPropertyValue* metallic = FindLegacyValue(legacy,
             standard_material::property::Metallic);
             metallic && metallic->m_numericValue.size() == 1u)
         {
-            outLegacy.m_materialInfo.m_metallic = metallic->m_numericValue[0];
+            legacy.m_materialInfo.m_metallic = metallic->m_numericValue[0];
         }
-        if (const MaterialPropertyValue* roughness = FindLegacyValue(outLegacy,
+        if (const MaterialPropertyValue* roughness = FindLegacyValue(legacy,
             standard_material::property::Roughness);
             roughness && roughness->m_numericValue.size() == 1u)
         {
-            outLegacy.m_materialInfo.m_roughness = roughness->m_numericValue[0];
+            legacy.m_materialInfo.m_roughness = roughness->m_numericValue[0];
         }
-        if (const MaterialPropertyValue* flowWind = FindLegacyValue(outLegacy,
+        if (const MaterialPropertyValue* flowWind = FindLegacyValue(legacy,
             standard_material::property::FlowWindVector);
             flowWind && flowWind->m_numericValue.size() == 4u)
         {
-            outLegacy.m_flowInfo.m_windVector = {
+            legacy.m_flowInfo.m_windVector = {
                 flowWind->m_numericValue[0], flowWind->m_numericValue[1],
                 flowWind->m_numericValue[2], flowWind->m_numericValue[3] };
         }
-        if (const MaterialPropertyValue* flowUv = FindLegacyValue(outLegacy,
+        if (const MaterialPropertyValue* flowUv = FindLegacyValue(legacy,
             standard_material::property::FlowUvScroll);
             flowUv && flowUv->m_numericValue.size() == 2u)
         {
-            outLegacy.m_flowInfo.m_uvScroll = {
+            legacy.m_flowInfo.m_uvScroll = {
                 flowUv->m_numericValue[0], flowUv->m_numericValue[1] };
         }
+    }
 
+    bool ApplyPropertyToLegacy(Material& legacy,
+        const experiment::MaterialProperty& property, std::string& outError)
+    {
+        if (property.name.empty())
+        {
+            outError = "빈 property 이름은 적용할 수 없다";
+            return false;
+        }
+        MaterialPropertyValue value;
+        if (!ConvertPropertyToLegacyValue(property, value, outError))
+        {
+            return false;
+        }
+        const auto found = std::find_if(legacy.m_propertyValues.begin(),
+            legacy.m_propertyValues.end(),
+            [&](const MaterialPropertyValue& candidate)
+            {
+                return candidate.m_name == property.name;
+            });
+        if (found == legacy.m_propertyValues.end())
+        {
+            legacy.m_propertyValues.push_back(std::move(value));
+        }
+        else
+        {
+            *found = std::move(value);
+        }
+        SynchronizeLegacyScalarMirrors(legacy);
         outError.clear();
         return true;
     }

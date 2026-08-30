@@ -39,4 +39,15 @@ namespace experiment
 
     [[nodiscard]] bool DeserializeMaterialAuthoring(const YAML::Node& node,
         Material& outMaterial, std::string& outError);
+
+    // S2c-2a — 씬 embed의 인스턴스 override 표기가 property 값 표기(타입 키
+    // 단일 키)를 재사용한다. 두 번째 표기를 만들지 않는다 — 이 둘은 문서
+    // 코덱이 쓰는 내부 정본의 공개 창구다.
+    [[nodiscard]] bool SerializeMaterialPropertyValue(
+        const MaterialProperty& property, YAML::Node& outEntry,
+        std::string& outError);
+
+    [[nodiscard]] bool DeserializeMaterialPropertyValue(const YAML::Node& entry,
+        const std::string& name, MaterialPropertyValue& outValue,
+        std::string& outError);
 }

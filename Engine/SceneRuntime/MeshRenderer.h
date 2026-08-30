@@ -18,6 +18,11 @@ class MeshRenderer : public meta::identity<MeshRenderer, Component>
    public:
    // CT4 파일럿 — P2996 유사 빌더 표기(매크로 0). shared_ptr·중첩 구조체·
    // 비트플래그 혼합 케이스의 대표. 멤버 순서 = 구 generated.h(골든 전제).
+   // I5-M5 S2c-2a: m_Material의 reflect 퇴출은 2b로 미룬다 — 프리팹 패치
+   // 경로(Meta::Deserialize, postLoad 없음)가 typed 읽기에 의존해서, 지금
+   // 빼면 프리팹 재질 오버라이드가 조용히 소실된다. base 참조(ref) 표기의
+   // 읽기/쓰기는 훅이 전담한다(typed는 ref 노드에서 기본값 재질을 만들고
+   // postLoad가 교체).
    static consteval auto reflect()
    {
        return meta::schema<Self>(
@@ -83,4 +88,10 @@ public:
     // 모델 주소다 — SceneCookProducer 실측). nil이면 OnDeserialized가 legacy
     // 편법으로 폴백하고 읽는 즉시 여기로 이주한다.
     FileGuid m_modelGuid{};
+
+    // I5-M5 S2c-2a: base 재질 자산 링크. 피커가 자산 재질을 고르면 여기에
+    // 자산 GUID가 남고, 저장은 인라인 embed 대신 base 참조+인스턴스 diff를
+    // 적는다(ref 표기). nil이면 인라인 소유(기존 S2b writer). reflect에는
+    // 없다 — 영속은 m_Material 노드의 ref 키가 진다(훅 전담).
+    FileGuid m_materialBaseGuid{};
 };

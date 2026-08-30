@@ -59,6 +59,9 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
                 // (DuplicateMaterialAsset)의 몫이다.
                 meshRenderer->m_Material = MaterialScriptBinding::InstantiateOwned(
                     *meshRenderer->m_Material, {});
+                // S2c-2a — 인스턴스화는 base 링크 해제다(Unity 의미론): 이후
+                // 편집은 자산 diff가 아니라 인라인 소유 저작이다.
+                meshRenderer->m_materialBaseGuid = FileGuid{};
             }
             ImGui::EndPopup();
         }
@@ -460,18 +463,44 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		// I5-M5 S4 — undo가 이름 재조회(FindCachedMaterial)에 기대면 캐시에
 		// 없는 runtime 인스턴스로는 되돌릴 수 없다. 이전 소유를 그대로
 		// 캡처한다 — shared_ptr가 수명을 보장한다.
+		//
+		// I5-M5 S2c-2a — 자산 재질 선택은 base 링크다: 공유 캐시 객체를 그대로
+		// 물면 인스턴스 편집이 다른 renderer까지 바꾸고, 저장이 자산 연결을
+		// 인라인 embed로 소실시켰다. 소유 사본 + m_materialBaseGuid로 바꾼다.
+		// 링크는 GUID가 실제 standalone 재질 자산으로 해석될 때만 건다 —
+		// 모델 내장 재질의 m_fileGuid는 모델 GUID라 base가 될 수 없다.
+		FileGuid baseGuid{};
+		if (FileGuid{} != selectedMaterial->m_fileGuid)
+		{
+			const file::path assetPath =
+				DataSystems->GetFilePath(selectedMaterial->m_fileGuid);
+			if (!assetPath.empty())
+			{
+				const std::shared_ptr<Material> asset =
+					DataSystems->LoadMaterialShared(assetPath.stem().string());
+				if (asset && asset->m_fileGuid == selectedMaterial->m_fileGuid)
+				{
+					baseGuid = selectedMaterial->m_fileGuid;
+				}
+			}
+		}
 		const std::shared_ptr<Material> previous = meshRenderer->m_Material;
+		const FileGuid previousBase = meshRenderer->m_materialBaseGuid;
+		auto ownedCopy = std::make_shared<Material>(*selectedMaterial);
 		Meta::MakeCustomChangeCommand(
 		[=]
 		{
 			meshRenderer->m_Material = previous;
+			meshRenderer->m_materialBaseGuid = previousBase;
 		},
 		[=]
 		{
-			meshRenderer->m_Material = selectedMaterial;
+			meshRenderer->m_Material = ownedCopy;
+			meshRenderer->m_materialBaseGuid = baseGuid;
 		});
 
-		meshRenderer->m_Material = std::move(selectedMaterial);
+		meshRenderer->m_Material = std::move(ownedCopy);
+		meshRenderer->m_materialBaseGuid = baseGuid;
 	}
 }
 

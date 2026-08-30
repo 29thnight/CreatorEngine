@@ -35,4 +35,14 @@ namespace ExperimentMaterialMigration
     [[nodiscard]] bool ConvertToLegacyMaterial(
         const experiment::Material& material, const ShaderMeta* meta,
         Material& outLegacy, std::string& outError);
+
+    // S2c-2a — 값 하나를 legacy 재질에 적용한다(이름 upsert + 스칼라 사본
+    // 동기화). ConvertToLegacyMaterial과 같은 값 변환 정본을 공유한다 —
+    // 씬 embed의 base+override 로드가 이 창구로 override를 겹친다.
+    [[nodiscard]] bool ApplyPropertyToLegacy(Material& legacy,
+        const experiment::MaterialProperty& property, std::string& outError);
+
+    // 논리 값 → legacy 호환 스칼라 사본(m_materialInfo·m_flowInfo) 동기화.
+    // ConvertToLegacyMaterial 말미와 ApplyPropertyToLegacy가 공유한다.
+    void SynchronizeLegacyScalarMirrors(Material& legacy);
 }

@@ -1182,6 +1182,9 @@ namespace
 		mesh->m_Material = MaterialScriptBinding::InstantiateOwned(
 			*mesh->m_Material,
 			(nullptr != newName) ? std::string_view{ newName } : std::string_view{});
+		// S2c-2a — 인스턴스화는 base 링크 해제다: 이후 편집은 자산 diff가
+		// 아니라 인라인 소유 저작이다.
+		mesh->m_materialBaseGuid = FileGuid{};
 	}
 
 	int __stdcall Api_Mesh_GetMaterialName(ScriptObjectHandle handle, char* buffer, int capacity)
