@@ -93,7 +93,6 @@ public:
 	// 않고 아래 shared getter에서 필요한 순간 view만 얻는다.
 	Material& UseBaseColorMap(std::shared_ptr<Texture> texture);
 	Material& UseNormalMap(std::shared_ptr<Texture> texture);
-	Material& UseBumpMap(std::shared_ptr<Texture> texture);
 	Material& UseOccRoughMetalMap(std::shared_ptr<Texture> texture);
 	Material& UseAOMap(std::shared_ptr<Texture> texture);
 	Material& UseEmissiveMap(std::shared_ptr<Texture> texture);
@@ -170,8 +169,6 @@ public:
 	bool TryGetVector(std::string_view qualified, math::vector4& out) const;
 	bool TrySetMatrix(std::string_view qualified, const math::matrix4x4& m);
 	bool TryGetMatrix(std::string_view qualified, math::matrix4x4& out) const;
-
-	void TrySetMaterialInfo();
 
 private:
 	struct VarView {

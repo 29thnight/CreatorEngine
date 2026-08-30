@@ -3,8 +3,10 @@
 #include "Core.Minimal.h"
 #include <mathematics/color.hpp>
 
+// 범프맵(높이맵 유사 노멀) 상태값 2는 은퇴했다 — 셰이더 소비자가 0이었고
+// enhanced 경로는 스냅샷 빌드에서 0/1로 정규화한다. m_useNormalMap은 이제
+// normalMap 텍스처 존재에서 유도되는 순수 0/1 상태다(저작·직렬화 없음).
 constexpr bool32 USE_NORMAL_MAP = 1;
-constexpr bool32 USE_BUMP_MAP = 2;
 
 cbuffer MaterialInfomation
 {

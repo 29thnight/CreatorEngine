@@ -379,17 +379,13 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)
 	{
 		aiMaterial* mat = m_AIScene->mMaterials[index];
 
+        // 범프맵(aiTextureType_HEIGHT) 폴백은 은퇴 — 높이맵을 노멀맵 슬롯에
+        // 꽂는 기법은 셰이더 소비자가 없었다.
         Texture* normal = GenerateTexture(mat, aiTextureType_NORMALS);
-        Texture* bump = GenerateTexture(mat, aiTextureType_HEIGHT);
         if (normal)
         {
             material->UseNormalMap(FindTextureOwner(normal));
             material->m_normalTexName = normal->m_name;
-        }
-        else if (bump)
-        {
-            material->UseBumpMap(FindTextureOwner(bump));
-            material->m_normalTexName = bump->m_name;
         }
 
         Texture* ao = GenerateTexture(mat, aiTextureType_LIGHTMAP);

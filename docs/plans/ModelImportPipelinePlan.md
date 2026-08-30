@@ -637,7 +637,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S0 ✅ | experiment 저작 YAML 코덱(정본 스키마) — 호출부 무변경 | 게이트 | 없음 |
 | ↳ M5-S1 ✅ | 변환 정본 + DataSystem 읽기 이중화 — legacy↔experiment 단일 변환기, 새 정본 문서 로드 | DataSystem·sealing 브리지 | 없음 |
 | ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
-| ↳ M5-S2b | 씬 writer 전환 — 선결 중 **flow는 해소**(아래 승격 실측), 잔여: useNormalMap·IOR | 씬 저장 | 없음 |
+| ↳ M5-S2b | 씬 writer 전환 — **선결 전부 해소**(flow 승격 · useNormalMap 유도 증명 · IOR/범프 은퇴, 아래 실측) | 씬 저장 | 없음 |
 | ↳ M5-S2c | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
@@ -853,6 +853,25 @@ dx12.forward/forwardshade·vk.forward/gbuffer/grid(테스트 계약을 80/96B·f
 갱신), matmigrate 합성 22(flow 승계·역동기화 — 변이가 정확히 2건을 붉힘), ft-primitives·
 material/scene 코퍼스 전수. Inspector 동적 편집기에는 flow가 자동으로 나타난다(meta 선언
 기반). 인스턴스 flow 채널의 wind/uvScroll 은퇴는 legacy 경로와 함께 I6의 몫이다.
+
+**S2b 잔여 선결 해소 실측 (2026-08-30) — useNormalMap·IOR은 표현할 것이 없었다.**
+정찰이 두 필드 모두 "새 정본이 표현해야 할 저작"이 아님을 증명했다:
+- **useNormalMap은 유도 상태다.** `MaterialInfomation::reflect()`에 없어 **애초에 직렬화된
+  적이 없고**, `UseTextureMap`이 normalMap 텍스처 존재에서 매번 재구축한다. 범프맵 상태값
+  `USE_BUMP_MAP(2)`은 소비자 0이었다 — 셰이더 어디에도 gNormalState/bump 분기가 없고,
+  enhanced 경로는 스냅샷 빌드·sealing에서 `!= 0 → 1`로 눌러버리며, draw 검증은 이미
+  `useNormalMap <= 1`을 강제한다(EnhancedRenderPass.h). 생산자는 legacy Assimp 로더의
+  `aiTextureType_HEIGHT` 폴백 1곳뿐 — **범프맵 경로를 은퇴**시켰다(사용자 지시:
+  UseBumpMap·USE_BUMP_MAP·HEIGHT 폴백 제거). 이제 useNormalMap은 순수 0/1 유도값이다.
+- **IOR은 소비 0인 죽은 저작이었다.** 유일 소비자 `TrySetMaterialInfo`(gIOR→"PBRMaterial"
+  CB)는 **호출자 0인 죽은 함수**였고, PBRMaterial CB는 현존 셰이더 어디에도 없다.
+  Inspector 슬라이더는 아무도 읽지 않는 값을 저작하고 있었다 — 슬라이더와 죽은 함수를
+  걷었다. 실측 방증: 씬·재질 코퍼스의 m_IOR 저작값이 전부 기본값 1.5로, 잃는 데이터가
+  0이다. `m_IOR` 필드·reflect 항목·DataSystem clamp는 씬 포맷 안정을 위해 S2c/I6까지
+  유지한다(로드 호환 — 값은 이제 어디에도 흐르지 않는다).
+
+이로써 ★ "S2b 보류 이유"의 세 표현(flow·useNormalMap·IOR)이 전부 해소됐다 — flow는
+논리 property 승격으로, 나머지 둘은 유도/은퇴 판정으로. S2b(writer 전환)는 열려 있다.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

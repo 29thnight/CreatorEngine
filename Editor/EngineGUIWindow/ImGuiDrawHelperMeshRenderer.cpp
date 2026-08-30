@@ -103,9 +103,9 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 				mat_info.m_roughness = roughness;
 			}
 
-			// IOR은 ShaderMeta 논리 property가 아니다 — legacy 전용 표면이라
-			// S2c/I6까지 직접 편집을 유지한다.
-			ImGui::SliderFloat("IOR", &mat_info.m_IOR, 0.01f, 4.f);
+			// IOR 슬라이더는 은퇴 — 유일 소비자였던 TrySetMaterialInfo가 호출자
+			// 0인 죽은 함수였고 PBRMaterial CB는 어떤 셰이더에도 없다. 소비 0인
+			// 저작 표면은 데이터만 쌓는다. m_IOR 필드 자체는 S2c/I6에서 제거한다.
 		}
 		else
 		{

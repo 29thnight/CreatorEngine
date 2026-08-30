@@ -210,13 +210,6 @@ Material& Material::UseNormalMap(std::shared_ptr<Texture> texture)
 		std::move(texture));
 }
 
-Material& Material::UseBumpMap(std::shared_ptr<Texture> texture)
-{
-	UseTextureMap(standard_material::property::NormalMap, std::move(texture));
-	m_materialInfo.m_useNormalMap = GetNormalMapShared() ? USE_BUMP_MAP : 0;
-	return *this;
-}
-
 Material& Material::UseOccRoughMetalMap(std::shared_ptr<Texture> texture)
 {
 	return UseTextureMap(standard_material::property::OrmMap,
@@ -759,21 +752,5 @@ bool Material::TrySetMatrix(std::string_view q, const math::matrix4x4& m) {
 bool Material::TryGetMatrix(std::string_view q, math::matrix4x4& out) const {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TryGetMatrix(cb, var, out);
-}
-
-void Material::TrySetMaterialInfo()
-{
-    TrySetVector("PBRMaterial", "gAlbedo", m_materialInfo.m_baseColor.rgba());
-	TrySetFloat("PBRMaterial", "gMetallic", m_materialInfo.m_metallic);
-	TrySetFloat("PBRMaterial", "gRoughness", m_materialInfo.m_roughness);
-
-	TrySetInt("PBRMaterial", "gUseAlbedoMap", m_materialInfo.m_useBaseColor);
-    TrySetInt("PBRMaterial", "gUseOccMetalRough", m_materialInfo.m_useOccRoughMetal);
-    TrySetInt("PBRMaterial", "gUseAoMap", m_materialInfo.m_useAOMap);
-    TrySetInt("PBRMaterial", "gUseEmmisive", m_materialInfo.m_useEmissive);
-    TrySetInt("PBRMaterial", "gNormalState", m_materialInfo.m_useNormalMap);
-    TrySetInt("PBRMaterial", "gConvertToLinear", m_materialInfo.m_convertToLinearSpace);
-
-	TrySetFloat("PBRMaterial", "gIOR", m_materialInfo.m_IOR);
 }
 
