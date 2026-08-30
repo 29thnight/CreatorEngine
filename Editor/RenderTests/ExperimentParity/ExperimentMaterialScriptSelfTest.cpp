@@ -208,9 +208,10 @@ namespace RenderTest
                 "클론이 별개 인스턴스다");
             check.Check(clone && clone->m_name == "ScriptOrigin_Instance",
                 "기본 이름 규칙");
-            // S2c 족쇄 — m_fileGuid는 아직 승계한다(헤더 주석 참조).
-            check.Check(clone && clone->m_fileGuid == origin.m_fileGuid,
-                "m_fileGuid 승계(전환기 계약)");
+            // S2c-1 — 족쇄 해제: 모델 해석은 renderer의 m_modelGuid가 지므로
+            // 클론은 자산 GUID를 승계하지 않는다(사칭 방지).
+            check.Check(clone && FileGuid{} == clone->m_fileGuid,
+                "m_fileGuid 비승계(S2c-1)");
 
             const auto named =
                 MaterialScriptBinding::InstantiateOwned(origin, "Custom");

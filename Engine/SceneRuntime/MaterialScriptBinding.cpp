@@ -183,6 +183,11 @@ namespace MaterialScriptBinding
         auto clone = std::make_shared<Material>(origin);
         clone->m_name = newName.empty()
             ? origin.m_name + "_Instance" : std::string(newName);
+        // S2c-1: m_fileGuid 비승계 — 클론은 자산이 아니라 씬 소유 인스턴스다.
+        // 예전에는 MeshRenderer가 mesh 해석에 재질 fileGuid를 재사용하는
+        // 편법 때문에 승계가 강제였는데, 이제 모델 출처는 renderer의
+        // m_modelGuid가 진다.
+        clone->m_fileGuid = FileGuid{};
         return clone;
     }
 }

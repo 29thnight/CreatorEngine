@@ -95,10 +95,21 @@ void MeshRenderer::OnDeserialized(const YAML::Node& node)
 		DataSystems->FinalizeMaterialRuntime(*m_Material);
 	}
 
+	// I5-M5 S2c-1 — 모델 해석의 정본은 자기 m_modelGuid다. legacy 씬은 인라인
+	// 재질의 m_fileGuid가 모델 GUID를 나르는 편법이라 폴백으로 읽고, 읽는 즉시
+	// 자기 필드로 이주해 다음 저장부터 정본이 된다(로드 실패여도 정보는 동일).
 	Model* model = nullptr;
-	if (m_Material)
+	if (FileGuid{} != m_modelGuid)
+	{
+		model = DataSystems->LoadModelGUID(m_modelGuid);
+	}
+	if (nullptr == model && m_Material)
 	{
 		model = DataSystems->LoadModelGUID(m_Material->m_fileGuid);
+		if (FileGuid{} == m_modelGuid)
+		{
+			m_modelGuid = m_Material->m_fileGuid;
+		}
 	}
 
 	MetaYml::Node getMeshNode = node["m_Mesh"];

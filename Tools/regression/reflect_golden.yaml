@@ -426,6 +426,7 @@ MeshRenderer:
   m_shadowRecive: true
   m_shadowCast: true
   m_isEnableLOD: false
+  m_modelGuid: 00000000-0000-0000-0000-000000000000
 Navigation:
   mode: 0
   parentHops: 4294967295

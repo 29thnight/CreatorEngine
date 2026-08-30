@@ -61,9 +61,9 @@ namespace MaterialScriptBinding
     // 등록하지 않는다 — 인스턴스는 자산 캐시의 시민이 아니고, 수명은
     // MeshRenderer의 shared_ptr가 진다. 이름 유니킹도 없다(캐시 키가 아니다).
     //
-    // ★ m_fileGuid는 아직 승계한다 — MeshRenderer::OnDeserialized가 mesh 해석에
-    //   material의 m_fileGuid를 재사용하는 족쇄(S2c에서 분리) 때문에, 지금
-    //   지우면 씬 재저장 후 재로드에서 메시가 사라진다.
+    // S2c-1: m_fileGuid도 비승계다 — 모델 해석은 MeshRenderer::m_modelGuid가
+    // 자립했고(legacy 씬은 읽기 시점 이주), 클론에 자산 GUID가 남으면
+    // 씬 embed의 assetId가 원본 자산을 사칭한다.
     [[nodiscard]] std::shared_ptr<Material> InstantiateOwned(
         const Material& origin, std::string_view newName);
 }

@@ -638,7 +638,8 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S1 ✅ | 변환 정본 + DataSystem 읽기 이중화 — legacy↔experiment 단일 변환기, 새 정본 문서 로드 | DataSystem·sealing 브리지 | 없음 |
 | ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
 | ↳ M5-S2b ✅ | 씬 writer 전환 — ShaderMeta를 아는 재질은 새 정본으로 저장(legacy 폴백 이중화) | 씬 저장 | 없음 |
-| ↳ M5-S2c | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
+| ↳ M5-S2c-1 ✅ | 모델 GUID 자립 — `MeshRenderer::m_modelGuid` 신설, m_fileGuid 편법 이주, InstantiateOwned 비승계 | 씬 스키마·cook 폐포 | 없음 |
+| ↳ M5-S2c-2 | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
@@ -896,6 +897,23 @@ diff 0(골든 재질은 nil meta → legacy 폴백이라 형상 무변경)·ft-p
 matseal/matparity/matscript·dx12/vk 픽셀 게이트 전부 초록. 잔여: 현 씬 코퍼스에는
 shadermeta 재질 embed가 0이라 전환의 실효는 앞으로의 저작부터다. 피커 열거
 (SnapshotMaterials)는 legacy 유지(S2c/I6).
+
+**M5-S2c-1 완료 실측 (2026-08-30).** 모델 GUID 자립 — S2c(소유 분리)의 선행 절단.
+`MeshRenderer::m_modelGuid`(reflect 말미 추가)가 메시 출처 모델의 정본 주소가 된다. 예전에는
+인라인 재질의 `m_fileGuid`가 모델 GUID를 나르는 편법이었다(재질 것처럼 보이지만 모델
+주소 — SceneCookProducer 실측 주석). 배선 전수: ① OnDeserialized가 m_modelGuid 우선 해석,
+legacy 씬은 편법 폴백 후 **읽는 즉시 이주**(로드 실패여도 정보 보존 — 다음 저장부터 정본).
+② 생성 경로 ModelSceneBridge 4곳이 model->guid를 직접 배선. ③ SceneCookProducer가
+m_modelGuid를 model edge로 계수(이주기 씬은 카운터 중복 가능하나 dependencies는 dedupe라
+폐포 정확). ④ **InstantiateOwned m_fileGuid 비승계** — S3의 족쇄가 풀렸다. 클론에 자산
+GUID가 남으면 씬 embed의 assetId가 원본을 사칭한다. 검증: matmigrate 실사 19(TypeOps
+postLoad 창구로 이주 검증 — 훅 시그니처가 D3-a 이행 중이라 안정 디스패치를 씀), 이주 줄
+변이가 정확히 1건 붉음, matscript 비승계 단정 전환(구 승계 단정이 곧 RED 증거), 리플렉션
+골든 diff 정확히 1줄(m_modelGuid) 검산 후 -Baseline 재생성, 씬 코퍼스 28/28 + **저장본
+실물 검증**(FT_Primitives pass1의 renderer 8개 전부 non-nil m_modelGuid 이주 확인 — 눈먼
+초록 방지), experiment.scenecook·ft-primitives·프리팹 코퍼스 초록. 잔여: 신규 canonical
+embed(assetId ≠ 모델)가 늘면 legacy 편법 키는 자연 소멸 — cook 폐포의 m_fileGuid 계수는
+I6에서 은퇴.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

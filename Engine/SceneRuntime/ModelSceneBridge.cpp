@@ -101,10 +101,11 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 
             meshRenderer->m_Mesh = m_model->m_Meshes[meshId];
             meshRenderer->m_Material = m_model->m_Materials[mesh->m_materialIndex];
+			meshRenderer->m_modelGuid = m_model->guid; // S2c-1: 모델 출처 자립
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->Transform_().SetLocalMatrix(node->m_transform);
 			nextIndex = rootObject->m_index;
-			
+
 			return;
 		}
 	}
@@ -145,6 +146,7 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 
 		meshRenderer->m_Mesh = mesh;
 		meshRenderer->m_Material = material;
+		meshRenderer->m_modelGuid = m_model->guid; // S2c-1: 모델 출처 자립
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 		object->Transform_().SetLocalMatrix(transform);
 
@@ -260,6 +262,7 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 
 			meshRenderer->m_Mesh = mesh;
 			meshRenderer->m_Material = material;
+			meshRenderer->m_modelGuid = m_model->guid; // S2c-1: 모델 출처 자립
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 			rootObject->Transform_().SetLocalMatrix(node->m_transform);
 
@@ -294,6 +297,7 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 
 		meshRenderer->m_Mesh = mesh;
 		meshRenderer->m_Material = material;
+		meshRenderer->m_modelGuid = m_model->guid; // S2c-1: 모델 출처 자립
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 		object->Transform_().SetLocalMatrix(transform);
 

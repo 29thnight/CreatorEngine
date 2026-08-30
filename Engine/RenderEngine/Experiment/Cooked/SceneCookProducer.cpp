@@ -103,7 +103,12 @@ namespace experiment::cooked
                 const YAML::Node& value)
             {
                 std::size_t* counter = nullptr;
-                if (key == "m_fileGuid") counter = &product.modelEdges;
+                // S2c-1: MeshRenderer가 모델 출처를 자기 m_modelGuid로 갖는다.
+                // legacy 씬은 인라인 재질의 m_fileGuid가 모델 GUID를 나른다 —
+                // 이주기 씬은 둘 다 실려 카운터는 중복될 수 있지만 dependencies
+                // 는 AddEdge가 dedupe하므로 폐포는 정확하다.
+                if (key == "m_fileGuid" || key == "m_modelGuid")
+                    counter = &product.modelEdges;
                 else if (key == "m_prefabFileGuid") counter = &product.prefabEdges;
                 else if (key == "m_textureGuid") counter = &product.textureEdges;
                 else if (std::ranges::find(kUnproducedGuidKeys, key)

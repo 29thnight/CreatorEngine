@@ -27,7 +27,8 @@ class MeshRenderer : public meta::identity<MeshRenderer, Component>
            meta::field<&Self::m_isSkinnedMesh>,
            meta::field<&Self::m_shadowRecive>,
            meta::field<&Self::m_shadowCast>,
-           meta::field<&Self::m_isEnableLOD>);
+           meta::field<&Self::m_isEnableLOD>,
+           meta::field<&Self::m_modelGuid>);
    }
 public:
 
@@ -75,4 +76,10 @@ public:
     bool m_shadowRecive = true;
     bool m_shadowCast = true;
     bool m_isEnableLOD{ false };
+
+    // I5-M5 S2c-1: 메시의 출처 모델을 자기 필드로 갖는다. 예전에는 인라인
+    // 재질의 m_fileGuid가 모델 GUID를 나르는 편법이었다(재질 것처럼 보이지만
+    // 모델 주소다 — SceneCookProducer 실측). nil이면 OnDeserialized가 legacy
+    // 편법으로 폴백하고 읽는 즉시 여기로 이주한다.
+    FileGuid m_modelGuid{};
 };

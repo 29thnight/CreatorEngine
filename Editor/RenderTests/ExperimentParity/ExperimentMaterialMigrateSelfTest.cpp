@@ -567,6 +567,41 @@ namespace RenderTest
                 "실자산(ForwardWater) 저장이 새 정본으로 나간다");
         }
 
+        // ── S2c-1: 모델 GUID 자립 — legacy 편법 이주와 저장 정본 ──────────
+        {
+            // postLoad는 TypeOps 창구로 부른다 — 훅 자체 시그니처(D3-a 이행
+            // 중)에 묶이지 않는 안정 디스패치이고, 실제 씬 로드가 타는 그
+            // 경로다.
+            const Meta::Typed::TypeOps* ops = Meta::Typed::FindTypeOps(
+                TypeTrait::GUIDCreator::GetTypeID<MeshRenderer>().m_ID_Data);
+            check.Check(nullptr != ops && nullptr != ops->postLoad,
+                "MeshRenderer TypeOps postLoad 등록");
+
+            // 카탈로그에 없는 GUID — LoadModelGUID는 조용히 실패하고, 이주는
+            // 로드 성공 여부와 무관하게 일어나야 한다(정보 보존).
+            const FileGuid modelProbe = FileGuid::CreateRandomV4();
+            MeshRenderer migrating;
+            const YAML::Node carrier = YAML::Load(
+                "m_Material:\n"
+                "  m_name: ModelCarrier\n"
+                "  m_fileGuid: " + modelProbe.ToString() + "\n");
+            Meta::Deserialize(&migrating, carrier);
+            if (ops && ops->postLoad)
+            {
+                ops->postLoad(&migrating, carrier);
+            }
+            check.Check(migrating.m_modelGuid == modelProbe,
+                "legacy 편법(재질 fileGuid)이 m_modelGuid로 이주한다");
+
+            MeshRenderer owning;
+            owning.m_modelGuid = modelProbe;
+            YAML::Node saved = Meta::Serialize(&owning);
+            check.Check(saved["m_modelGuid"]
+                && saved["m_modelGuid"].as<std::string>()
+                    == modelProbe.ToString(),
+                "저장이 m_modelGuid를 자기 키로 적는다");
+        }
+
         char summary[160]{};
         std::snprintf(summary, sizeof(summary),
             "  실사 단정 %zu/%zu\n", check.passed,
