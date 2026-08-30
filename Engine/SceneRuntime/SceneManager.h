@@ -2,6 +2,8 @@
 #include "Object.h"
 #include "AssetBundle.h"
 #include "ReflectionYml.h"
+#include "AuthoringDocument.h"
+#include "AuthoringNodeView.h" // D3-a-5
 #include "ClassProperty.h"
 #include "WorkerPool.h"
 // Index만 필요한데 Entity.h 전체를 물지 않으려고 경량 헤더를 쓴다
@@ -199,9 +201,9 @@ private:
     };
     using LoadIndexBatch = std::vector<LoadIndexEntry>;
 
-    void DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch = nullptr);
-    void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch = nullptr);
-	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch = nullptr);
+    void DesirealizeGameObject(const Meta::Type* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
+    void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
+	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
 
     // 배치가 끝난 직후 한 번 호출. targetScene이 null이거나 batch가 비어 있으면
     // 아무것도 하지 않는다(로더별 타깃 씬이 갈리는 경우 배치도 나눠 호출한다 —
@@ -213,7 +215,10 @@ private:
 
     // 재생 시작 직전의 에디터 씬 스냅샷. 정지하면 이 노드로 같은 Scene 객체를
     // 되채운다(EnterPlayMode/ExitPlayMode 주석 참조).
-    MetaYml::Node                       m_editorSceneBackup{};
+    // D3-a-3: backend 노드를 값으로 들지 않고 문서 소유 타입이 감싼다(§3.3).
+    // 이 헤더는 이 멤버 때문에 포맷 타입을 알 필요가 없다 — 실제 노드
+    // 접근은 SceneManager.cpp가 `AuthoringDocumentAccess.h`로 얻는다.
+    Authoring::Document                 m_editorSceneBackup{};
     // 소유는 활성 Scene(또는 이송 중 아래 transfer vector)에만 있다.
     std::vector<Object*>                m_dontDestroyOnLoadObjects{};
     std::vector<DetachedEntityTransfer> m_detachedDontDestroyOnLoadObjects{};

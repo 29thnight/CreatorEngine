@@ -46,6 +46,10 @@
     { "name": "physx", "$why": "물리" },
     { "name": "spdlog", "$why": "로그 — LogSystem·LogSink" },
     { "name": "stb", "$why": "이미지 로드/기록 — Terrain" },
-    { "name": "yaml-cpp", "$why": "씬·프리팹·.meta 직렬화" }
+    {
+      "name": "ryml",
+      "$why": "SerializationPlan D3-b — 저작 YAML 파서. PHASE 4-6이 \"흔적 0\"으로 걷어냈던 그 포트를 되살린다(전이 의존 c4core는 적지 않는다). yaml-cpp와 병행하는 기간이 있으며, 전환이 끝나면 yaml-cpp를 뺀다. 근거: D0 실측에서 씬 로드의 60%가 텍스트 파싱이다"
+    },
+    { "name": "yaml-cpp", "$why": "씬·프리팹·.meta 직렬화 — D3-b가 ryml로 대체 중" }
   ]
 }

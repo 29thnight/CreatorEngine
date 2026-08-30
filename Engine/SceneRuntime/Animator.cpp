@@ -1,4 +1,5 @@
 #include "Animator.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "Interfaces/AssetAuthoringPort.h"
 #include "AnimatorSystem.h"
 #include "Model.h"
@@ -506,11 +507,12 @@ void Animator::DeserializeControllers(std::string _filename)
 	}
 }
 
-void Animator::OnDeserialized(const YAML::Node& node)
+void Animator::OnDeserialized(const Authoring::NodeView& view)
 {
-	// CT6-d: �?ComponentFactory Animator 분기 ?�동(?�작·?�서 보존).
-	// Parameters·m_animationControllers???�인???�소 벡터??typed ??��?�화가
-	// 건드리�? ?�는?????�기???�동 복원???�채?�?�다.
+	const YAML::Node& node = Authoring::NodeViewAccess::Node(view);
+	// CT6-d: 구 ComponentFactory Animator 분기 이동(동작·순서 보존).
+	// Parameters·m_animationControllers는 포인터 원소 벡터라 typed 역직렬화가
+	// 건드리지 않는다 — 여기의 수동 복원이 실채움이다.
 	Model* model = nullptr;
 	std::vector<bool> animationBools;
 	std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;

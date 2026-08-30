@@ -17,8 +17,11 @@
 #include "PrefabUtility.h"
 #include "DataSystem.h"
 #include "ComponentFactory.h"
+#include "AuthoringDocumentAccess.h"
+#include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
 #include "RegisterReflectManual.h" // CT4: 명시 메타 이전 타입의 등록 (def 스캔 밖)
 #include "Profiler.h"
+#include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
 #include "InputActionManager.h"
 #include "TagManager.h"
 #include "ReflectionRegister.h"
@@ -555,7 +558,9 @@ Scene* SceneManager::SaveScene(std::string_view name)
 	//std::string fileExtension = ".creator";
     file::path saveSceneFileName = fileStem /*+ fileExtension*/;
 
-	std::ofstream sceneFileOut(saveSceneFileName);
+	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾸는데,
+	// 그러면 같은 내용을 저장할 때마다 개행이 뒤집혀 git 작업 트리가 흔들린다.
+	std::ofstream sceneFileOut(saveSceneFileName, std::ios::binary | std::ios::trunc);
     MetaYml::Node sceneNode{};
 	MetaYml::Node assetsBundleNode{};
 
@@ -595,11 +600,19 @@ Scene* SceneManager::SaveScene(std::string_view name)
 
 Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 {
+	// D0(SerializationPlan): 이 함수 전체가 "씬 전환 1회"를 재는 자다. 하위 단계
+	// 합과 이 값의 차이가 곧 미귀속분이고, 그 차이를 숨기지 않는 것이 이 계측의 요점이다.
+	SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneLoadTotal);
 	std::string loadSceneName = name.data();
 
 	try
 	{
-        MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
+        MetaYml::Node sceneNode;
+        {
+            // D0: 텍스트 → Node 트리 구축 구간만 따로 뗀다.
+            SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneParse);
+            sceneNode = MetaYml::LoadFile(loadSceneName);
+        }
         Scene* swapScene{};
         if (m_activeScene)
         {
@@ -693,7 +706,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                     continue;
                 }
 
-                DesirealizeGameObject(type, objNode, &loadBatch);
+                DesirealizeGameObject(type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
             }
             catch (const std::exception& e)
             {
@@ -712,7 +725,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                     Debug->LogError("Failed to extract type from YAML node.");
                     continue;
                 }
-                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode, &loadBatch);
+                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
             }
             catch (const std::exception& e)
             {
@@ -758,7 +771,12 @@ Scene* SceneManager::LoadScene(std::string_view name)
 
     try
     {
-        MetaYml::Node sceneNode = MetaYml::LoadFile(loadSceneName);
+        MetaYml::Node sceneNode;
+        {
+            // D0: 텍스트 → Node 트리 구축 구간만 따로 뗀다.
+            SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneParse);
+            sceneNode = MetaYml::LoadFile(loadSceneName);
+        }
         file::path sceneName = name.data();
         scene = Scene::LoadScene(sceneName.stem().string());
 
@@ -791,7 +809,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
                 continue;
             }
 
-            DesirealizeGameObject(scene, type, objNode, &sceneBatch);
+            DesirealizeGameObject(scene, type, Authoring::NodeViewAccess::Make(objNode), &sceneBatch);
         }
 
         for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
@@ -802,7 +820,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
                 Debug->LogError("Failed to extract type from YAML node.");
                 continue;
             }
-            DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode, &ddolBatch);
+            DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, Authoring::NodeViewAccess::Make(objNode), &ddolBatch);
         }
 
         RemapLoadBatchIndices(scene, sceneBatch);
@@ -892,7 +910,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                         continue;
                     }
 
-                    DesirealizeGameObject(newScene, type, objNode, &loadBatch);
+                    DesirealizeGameObject(newScene, type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
                 }
                 catch (const std::exception& e)
                 {
@@ -911,7 +929,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                         Debug->LogError("Failed to extract type from YAML node.");
                         continue;
                     }
-                    DesirealizeDontDestroyOnLoadObjects(newScene, type, objNode, &loadBatch);
+                    DesirealizeDontDestroyOnLoadObjects(newScene, type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
                 }
                 catch (const std::exception& e)
                 {
@@ -989,7 +1007,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                     Debug->LogError("Failed to extract type from YAML node.");
                     continue;
                 }
-                DesirealizeGameObject(newScene, type, objNode, &sceneBatch);
+                DesirealizeGameObject(newScene, type, Authoring::NodeViewAccess::Make(objNode), &sceneBatch);
             }
 
             for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
@@ -1000,7 +1018,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                     Debug->LogError("Failed to extract type from YAML node.");
                     continue;
                 }
-                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, objNode, &ddolBatch);
+                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, Authoring::NodeViewAccess::Make(objNode), &ddolBatch);
             }
 
             RemapLoadBatchIndices(newScene, sceneBatch);
@@ -1252,13 +1270,15 @@ void SceneManager::VolumeProfileApply()
 
 bool SceneManager::HasSceneSnapshot() const
 {
-    return static_cast<bool>(m_editorSceneBackup) &&
-        static_cast<bool>(SerializedEntities(m_editorSceneBackup));
+    // D3-a-3: 문서 자체의 빈 상태는 타입이 답하고, 그 안의 엔티티 목록만 노드로 본다.
+    if (m_editorSceneBackup.IsEmpty()) return false;
+    return static_cast<bool>(
+        SerializedEntities(Authoring::DocumentAccess::Node(m_editorSceneBackup)));
 }
 
 void SceneManager::DiscardSceneSnapshot()
 {
-    m_editorSceneBackup = MetaYml::Node{};
+    m_editorSceneBackup.Clear();
 }
 
 bool SceneManager::CaptureSceneSnapshot()
@@ -1275,7 +1295,7 @@ bool SceneManager::CaptureSceneSnapshot()
         // 편집 중이던 최신 값이 담기도록 직렬화한다. 스크립트를 재우지 않는
         // 이유는 사본이 없어 두 벌이 생기지 않기 때문이다 — 지금 씬의 인스턴스가
         // 그대로 플레이 인스턴스가 된다.
-        m_editorSceneBackup = Meta::Serialize(scene);
+        m_editorSceneBackup = Authoring::DocumentAccess::Adopt(Meta::Serialize(scene));
         PROFILE_CPU_END();
     }
     catch (const std::exception& e)
@@ -1333,7 +1353,8 @@ bool SceneManager::RestoreSceneSnapshot()
     {
         PROFILE_CPU_BEGIN("RestoreEditorScene");
         LoadIndexBatch loadBatch;
-        for (const auto& objNode : SerializedEntities(m_editorSceneBackup))
+        for (const auto& objNode :
+            SerializedEntities(Authoring::DocumentAccess::Node(m_editorSceneBackup)))
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
@@ -1348,7 +1369,7 @@ bool SceneManager::RestoreSceneSnapshot()
                 continue;
             }
 
-            DesirealizeGameObject(type, objNode, &loadBatch);
+            DesirealizeGameObject(type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
         }
         RemapLoadBatchIndices(scene, loadBatch);
 
@@ -1483,8 +1504,9 @@ void SceneManager::EndPlayTransaction()
 	m_isEditorSceneLoaded = false;
 }
 
-void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
+void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
+	const MetaYml::Node& itNode = Authoring::NodeViewAccess::Node(view);
     if (type->typeID == type_guid(Entity))
     {
         // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이 배치가
@@ -1493,11 +1515,11 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
         // (ReconnectPrefabInstance, SceneGraphRedesignPlan P2).
 
 		Entity::SerializedHierarchy serializedHierarchy =
-			Entity::ReadSerializedHierarchy(itNode);
+			EntityAuthoring::ReadSerializedHierarchy(itNode);
 		auto obj = m_activeScene.load()->LoadEntity(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
-			Entity::InferCreationType(itNode),
+			EntityAuthoring::InferCreationType(itNode),
 			Entity::INVALID_INDEX
 		);
 
@@ -1515,7 +1537,11 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
             // 고치게 한다.
             const Entity::Index actualSlotIndex = obj->m_index;
 
-            Meta::Deserialize(obj, itNode);
+            {
+                // D0: 엔티티 리플렉션 순회 구간(컴포넌트 특례는 아래 ComponentLoad).
+                SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::EntityDeserialize);
+                Meta::Deserialize(obj, itNode);
+            }
 
             const Entity::Index fileIndex = obj->m_index;
             if (fileIndex != actualSlotIndex)
@@ -1551,7 +1577,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
             {
                 try
                 {
-                    ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
+                    ComponentFactorys->LoadComponent(obj, Authoring::NodeViewAccess::Make(componentNode), m_isGameStart);
                 }
                 catch (const std::exception& e)
                 {
@@ -1563,19 +1589,20 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const MetaYml::
     }
 }
 
-void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
+void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
+	const MetaYml::Node& itNode = Authoring::NodeViewAccess::Node(view);
     if (type->typeID == type_guid(Entity))
     {
         // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이유는
         // 위 오버로드 주석 참고(ReconnectPrefabInstance, SceneGraphRedesignPlan P2).
 
 		Entity::SerializedHierarchy serializedHierarchy =
-			Entity::ReadSerializedHierarchy(itNode);
+			EntityAuthoring::ReadSerializedHierarchy(itNode);
 		auto obj = targetScene->LoadEntity(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
-			Entity::InferCreationType(itNode),
+			EntityAuthoring::InferCreationType(itNode),
 			Entity::INVALID_INDEX
 		);
 
@@ -1586,7 +1613,11 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             // 버퍼에 파일 인덱스를 남기는 이유는 위 오버로드 주석 참고.
             const Entity::Index actualSlotIndex = obj->m_index;
 
-            Meta::Deserialize(obj, itNode);
+            {
+                // D0: 엔티티 리플렉션 순회 구간(컴포넌트 특례는 아래 ComponentLoad).
+                SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::EntityDeserialize);
+                Meta::Deserialize(obj, itNode);
+            }
 
             const Entity::Index fileIndex = obj->m_index;
             if (fileIndex != actualSlotIndex)
@@ -1622,7 +1653,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             {
                 try
                 {
-                    ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
+                    ComponentFactorys->LoadComponent(obj, Authoring::NodeViewAccess::Make(componentNode), m_isGameStart);
                 }
                 catch (const std::exception& e)
                 {
@@ -1634,8 +1665,9 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
     }
 }
 
-void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const MetaYml::detail::iterator_value& itNode, LoadIndexBatch* batch)
+void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
+	const MetaYml::Node& itNode = Authoring::NodeViewAccess::Node(view);
     if (type->typeID == type_guid(Entity))
     {
         auto it = std::find_if(m_dontDestroyOnLoadObjects.begin(), m_dontDestroyOnLoadObjects.end(),
@@ -1647,11 +1679,11 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
 		}
 
 		Entity::SerializedHierarchy serializedHierarchy =
-			Entity::ReadSerializedHierarchy(itNode);
+			EntityAuthoring::ReadSerializedHierarchy(itNode);
 		auto obj = targetScene->LoadEntity(
             itNode["m_instanceID"].as<size_t>(),
             itNode["m_name"].as<std::string>(),
-			Entity::InferCreationType(itNode),
+			EntityAuthoring::InferCreationType(itNode),
 			Entity::INVALID_INDEX
 		);
         if (obj)
@@ -1661,7 +1693,11 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
             // DesirealizeGameObject 오버로드 주석 참고.
             const Entity::Index actualSlotIndex = obj->m_index;
 
-            Meta::Deserialize(obj, itNode);
+            {
+                // D0: 엔티티 리플렉션 순회 구간(컴포넌트 특례는 아래 ComponentLoad).
+                SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::EntityDeserialize);
+                Meta::Deserialize(obj, itNode);
+            }
 
             const Entity::Index fileIndex = obj->m_index;
             if (fileIndex != actualSlotIndex)
@@ -1695,7 +1731,7 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
             {
                 try
                 {
-                    ComponentFactorys->LoadComponent(obj, componentNode, m_isGameStart);
+                    ComponentFactorys->LoadComponent(obj, Authoring::NodeViewAccess::Make(componentNode), m_isGameStart);
                 }
                 catch (const std::exception& e)
                 {

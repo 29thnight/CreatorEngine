@@ -1,4 +1,5 @@
 #pragma once
+#include "AuthoringNodeView.h"
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "Entity.h"
@@ -35,7 +36,7 @@ public:
    MeshRenderer();
 
    // CT6-d: 머티리얼·메시 GUID 해석과 텍스처 로드(구 팩토리 분기 이동)
-   void OnDeserialized(const YAML::Node& node);
+   void OnDeserialized(const Authoring::NodeView& node); // D3-a-4
 
    // I5-M5 S2b: typed 리플렉션이 legacy 형상으로 적은 m_Material 서브트리를
    // 정본 writer(SerializeMaterialPayload)로 교체한다 — 씬·프리팹 embed 공용.

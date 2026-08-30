@@ -1,4 +1,6 @@
 #include "Object.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-5
+#include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
 #include "Entity.h"
 #include "ComponentFactory.h"
 #include "PrefabUtility.h"
@@ -136,7 +138,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 				: source->m_name.ToString() + "_Clone";
 
 			Entity* clone = scene->CreateEntity(
-				cloneName, Entity::InferCreationType(sourceNode));
+				cloneName, EntityAuthoring::InferCreationType(sourceNode));
 			if (!clone) return nullptr;
 
 			const HashedGuid newInstanceID = clone->m_instanceID;
@@ -163,7 +165,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			{
 				for (const auto& componentNode : sourceNode["m_components"])
 				{
-					try { ComponentFactorys->LoadComponent(clone, componentNode, true); }
+					try { ComponentFactorys->LoadComponent(clone, Authoring::NodeViewAccess::Make(componentNode), true); }
 					catch (const std::exception& e) { Debug->LogError(e.what()); }
 				}
 			}

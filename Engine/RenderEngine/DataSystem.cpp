@@ -12,6 +12,8 @@
 // Meta::Serialize / Deserialize. SceneManager.h가 ReflectionYml.h를 대신
 // 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
 #include "ReflectionYml.h"
+#include "SerializationProfiler.h" // D0: 부팅 catalog 파싱 기준선
+#include "AuthoringNodeViewAccess.h" // D3-a-5b
 #include "ShaderMeta.h"
 #include "ShaderPermutationDomain.h"
 #include "StandardMaterialProperty.h"
@@ -21,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <chrono>
 #include <istream>
 #include <limits>
 #include <ostream>
@@ -213,6 +216,12 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 {
 	if (!file::exists(root)) return;
 
+	// D0(SerializationPlan §1.7 ②): 부팅 시 `.meta` 전수 파싱 비용. CLI가 프로파일러를
+	// 켜기 전에 이미 끝나는 구간이라 Scope가 아니라 부팅 슬롯에 직접 적재한다.
+	// D5-c가 이 함수를 cooked catalog로 대체할 때 대조할 기준선이다.
+	const auto catalogStart = std::chrono::steady_clock::now();
+	uint64_t parsedMetaCount = 0;
+
 	std::error_code error;
 	file::recursive_directory_iterator iterator(
 		root, file::directory_options::skip_permission_denied, error);
@@ -237,6 +246,7 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 				try
 				{
 					const YAML::Node node = YAML::LoadFile(entry.path().string());
+					++parsedMetaCount;
 					if (node["guid"] && node["guid"].IsScalar())
 					{
 						const FileGuid guid(node["guid"].as<std::string>());
@@ -255,6 +265,15 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 		error.clear();
 		iterator.increment(error);
 	}
+
+	// calls는 호출 횟수가 아니라 실제로 파싱한 `.meta` 개수다 — 이 단계는 부팅 1회이므로
+	// 그 값을 세는 편이 판정에 쓸모 있다(회귀 게이트가 "0개를 성공으로 읽는" 것을 막는다).
+	const auto catalogElapsed = std::chrono::steady_clock::now() - catalogStart;
+	SerializationProfile::RecordBootStage(
+		SerializationProfile::Stage::AssetCatalog,
+		static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+			catalogElapsed).count()),
+		parsedMetaCount);
 }
 
 Model* DataSystem::LoadModelGUID(FileGuid guid)
@@ -564,8 +583,9 @@ YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
 	return node;
 }
 
-bool DataSystem::DeserializeMaterialPayload(Material& material, const YAML::Node& node)
+bool DataSystem::DeserializeMaterialPayload(Material& material, const Authoring::NodeView& view)
 {
+	const YAML::Node& node = Authoring::NodeViewAccess::Node(view);
 	if (!node || !node.IsMap()) return false;
 
 	// I5-M5 S1 — 읽기 이중화. 새 정본(schema + shaderAssetId)을 만나면
@@ -701,7 +721,10 @@ bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 
 	try
 	{
-		return DeserializeMaterialPayload(material, YAML::Load(payload));
+		// D3-a-5b: 임시 노드로 뷰를 만들 수 없다(Make(Node&&) = delete).
+		// 뷰는 소유하지 않으므로 대상 노드에 이름을 준다.
+		const YAML::Node payloadNode = YAML::Load(payload);
+		return DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(payloadNode));
 	}
 	catch (const std::exception& exception)
 	{
@@ -806,7 +829,7 @@ Material* DataSystem::LoadMaterial(std::string_view name)
 
     MetaYml::Node node = MetaYml::LoadFile(loadPath.string());
     auto material = std::make_shared<Material>();
-    if (!DeserializeMaterialPayload(*material, node)) return nullptr;
+    if (!DeserializeMaterialPayload(*material, Authoring::NodeViewAccess::Make(node))) return nullptr;
     // 파일 stem이 cache key의 정본이다. 내부 m_name이 낡았거나 비어 있어도
     // LoadMaterialShared(name)가 같은 세대를 찾도록 게시 직전에 맞춘다.
     material->m_name = materialName;

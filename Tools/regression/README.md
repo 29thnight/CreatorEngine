@@ -13,7 +13,7 @@ pwsh Tools/regression/run-all.ps1
 
 ## 개별 검사
 
-전체 런타임 스위트는 `run-all.ps1`의 Run-Step 목록이 정본이다(현재 27종). 아래 표는
+전체 런타임 스위트는 `run-all.ps1`의 Run-Step 목록이 정본이다(현재 34종). 아래 표는
 그 항목과 단계 전용 standalone gate 중 "왜 이렇게 재는가"를 기록해 둘 가치가 있는
 검사만 담는다. 표의 standalone gate는 해당 단계에서 명시적으로 실행한다.
 
@@ -86,6 +86,79 @@ copy "%VCToolsInstallDir%bin\Hostx64\x64\clang_rt.asan_dynamic-x86_64.dll" Bin\x
 set ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:abort_on_error=1
 ```
 
+## pak 배포 위생 (SerializationPlan D1)
+
+```powershell
+pwsh Tools/regression/verify-pak-source-exclusion.ps1
+pwsh Tools/regression/verify-player-runtime-hygiene.ps1
+```
+
+`verify-pak-source-exclusion.ps1`은 **합성 트리로만** 판정한다. 실제 pak 입력 루트에는
+`.cpp/.h/.hpp`가 0개라서, 실자산으로 재면 필터가 있든 없든 "0개를 걸렀다"가 나온다.
+그래서 오염된 트리를 일부러 만들어 필터를 밟는다. 그리고 **배제와 보존을 함께** 단정한다 —
+`.hlsl`/`.hlsli`는 pak에 실려야 한다(Player가 런타임에 컴파일한다). 과잉 필터는 누락보다
+위험하다.
+
+pak은 결정적이지 않아(같은 입력 2회의 SHA-256이 다르다) 바이트 비교로는 내용을 단정할 수
+없다. AssetPacker의 `--list-entries`가 내보내는 reopen된 목록을 대조한다.
+
+`verify-player-runtime-hygiene.ps1`은 바이너리 검사에 **대조군**을 둔다. "Player.exe에
+efsw 문자열 0"만 보면 빈 파일을 읽어도 통과하므로, 같은 방법으로 CreatorEditor.exe를 재서
+거기서는 반드시 검출되어야 한다고 함께 단정한다.
+
+## 직렬화 기준선 (SerializationPlan D0) — 이 검사만 Release를 쓴다
+
+```powershell
+pwsh Tools/regression/verify-serialization-baseline.ps1 -Baseline
+```
+
+`verify-serialization-baseline.ps1`은 세트에서 **유일하게 Release exe를 요구**한다.
+Debug는 같은 워크로드에서 단계별로 4~16배 느린 데다 **비중까지 뒤집는다** — 실측
+배율이 SceneParse 15.9배, ComponentLoad 5.5배라 Debug로 보면 파싱의 몫을 67%로,
+Release로 보면 58%로 읽게 된다. 그래서 Release가 없을 때 Debug로 **대체하지 않고**
+실패하며, `run-all.ps1`은 Release 부재 시 이 항목만 건너뛰고 그 사실을 출력한다.
+
+측정은 벤치가 재현한 모형이 아니라 제품 로드 경로 안에서 이뤄진다
+(`Engine/Utility_Framework/SerializationProfiler.h`의 Scope가 `SceneManager`·
+`ComponentFactory`·`PrefabUtility`·`DataSystem` 본체에 들어 있다). 계측 플래그는
+기본 꺼짐이고 `serialize.bench`가 켰다가 되돌린다.
+
+`-Baseline`을 주면 계획서에 옮길 표 형식으로 전체 수치를 찍는다.
+
+## ryml 에러 정책 (SerializationPlan D3-b-1)
+
+`verify-ryml-error-policy.ps1` — ryml의 기본 에러 처리는 예외도 반환값도 아니라
+**프로세스 abort**다. 파서를 제품 경로에 넣기 전에 그 abort를 예외로 바꾸는 정책이
+설치돼 있어야 한다.
+
+**이 검사의 이빨은 종료 코드가 아니라 크래시다.** ryml 0.16은 에러 콜백을
+`m_error_basic`/`m_error_parse`/`m_error_visit` 셋으로 나눈다. 하나만 빠져도 이
+명령은 "fail"을 찍는 것이 아니라 프로세스가 그 자리에서 죽는다 — 변이 2회로
+확인했다(basic 제거 → exit 3, parse 제거 → exit 3, 둘 다 게이트가 잡음).
+그래서 검사는 요약 라인의 **존재**와 종료 코드를 함께 본다.
+
+트리거는 지어내지 말고 재야 한다. 처음 쓴 재현("CRLF", "멀티라인 스칼라 키")을
+**ryml이 둘 다 조용히 받아들였다** — 게이트가 초록인데 아무것도 증명하지 않는
+상태였다. 14종을 태워 확인한 실제 트리거는 **홀로 선 CR**(basic)과
+**탭 들여쓰기**(parse)다. **CRLF는 정상 파싱되므로 오히려 통과해야 하는 대조군**이고,
+이것이 깨지면 파싱 전 정규화 사본이 다시 필요해져 D3-b의 성능 계산이 바뀐다.
+
+## 스칼라 변환 파리티 (SerializationPlan D3-b-2)
+
+`verify-scalar-conversion-parity.ps1` — 파서 동등성이 증명하지 못하는 축이다.
+두 파서가 만든 트리가 구조적으로 같아도 `as<bool>`이 `"yes"`를 다르게 읽으면
+**값의 의미만 조용히 달라진다.** 로드는 성공하고 값만 틀린다.
+
+**이 게이트는 "차이 0"을 단정하지 않는다.** 실측상 44케이스 중 11건이 실제로
+갈린다(`.inf`/`.nan`, YAML 1.1 불리언, 그리고 방향이 뒤집힌 `1`/`0`). 차이를
+없애는 것은 구현의 일이고, 검사의 일은 **알려진 목록을 고정**해 새 차이만
+빨개지게 하는 것이다. **목록보다 적어도 실패다** — 차이가 사라졌다면 누가 변환을
+바꾼 것이고, 조용히 넘기면 표가 낡는다.
+
+갈리는 것과 위험한 것은 다르다. 차이가 손상이 되려면 코퍼스에 그 표기가 있어야
+하므로, 같은 게이트가 자산 278개를 스캔해 `.inf`/`.nan` 0건과 YAML 1.1 불리언
+기준선 2건을 함께 단정한다.
+
 ## 검사가 조용히 건너뛰지 않게 하기
 
 `verify-resolution-sweep.ps1`은 히트박스 단정이 **한 건도 실행되지 않으면 실패**로 끝난다.
@@ -103,6 +176,13 @@ pwsh Tools/regression/verify-resolution-sweep.ps1 -RefWidth 1280 -RefHeight 720
 
 기준 해상도를 거짓으로 주었으므로 배율 단정이 전부 실패하고 종료 코드 1이 나온다.
 이게 나오지 않으면 검사가 아무것도 보고 있지 않다는 뜻이다.
+
+직렬화 기준선은 소스 변이로 증명한다. `ComponentFactory::LoadComponent`의
+`SERIALIZATION_PROFILE_SCOPE` 한 줄을 주석 처리하고 빌드하면
+`selfcheck=fail reason=child-stage-zero-calls`(scene)와
+`component-load-zero-calls`(prefab)가 나와야 한다. 실제로 이 변이를 처음 돌렸을 때
+scene만 빨개지고 prefab은 통과했고, 그래서 prefab 쪽 분기가 추가됐다 — 변이를
+안 돌렸으면 그 구멍은 초록 뒤에 남아 있었을 것이다.
 
 ## 아직 없는 것
 

@@ -1,4 +1,7 @@
 #include "Prefab.h"
+#include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
+#include "AuthoringDocumentAccess.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-5b
 #include "Entity.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
@@ -188,7 +191,8 @@ Prefab::Prefab(std::string_view name, const Entity* source)
         //
         // 이 프리팹 자신의 FileGuid를 쓰지 않는 이유: 생성자 시점에는 아직
         // 발급 전이다(SavePrefab이 매긴다 — P-write S0.5).
-        m_prefabData = SerializeRecursive(source, source->m_prefabFileGuid);
+        m_prefabData = Authoring::DocumentAccess::Adopt(
+            SerializeRecursive(source, source->m_prefabFileGuid));
     }
 }
 
@@ -201,19 +205,34 @@ Prefab* Prefab::CreateFromGameObject(const Entity* source, std::string_view name
     return new Prefab(prefabName, source);
 }
 
+const MetaYml::Node& Prefab::GetPrefabData() const
+{
+    return Authoring::DocumentAccess::Node(m_prefabData);
+}
+
+void Prefab::SetPrefabData(const Authoring::NodeView& view)
+{
+    m_prefabData = Authoring::DocumentAccess::Adopt(
+        Authoring::NodeViewAccess::Node(view));
+}
+
 Entity* Prefab::Instantiate(std::string_view newName) const
 {
-    if (!m_prefabData)
+    // D3-a-3c: 문서의 빈 상태는 타입이 답한다.
+    if (m_prefabData.IsEmpty())
         return nullptr;
 
     Scene* scene = SceneManagers->GetActiveScene();
     if (!scene)
         return nullptr;
 
-    if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
+    const MetaYml::Node& definition = Authoring::DocumentAccess::Node(m_prefabData);
+    if (!definition || !definition.IsSequence() || definition.size() == 0)
         return nullptr;
 
-	MetaYml::Node prefabData = MetaYml::Clone(m_prefabData);
+	// 소환은 정의를 그대로 쓰지 않고 사본 위에서 진행한다 — UpgradeLegacyNavigation이
+	// 노드를 고쳐 쓰므로, 사본이 아니면 프리팹 정의 자체가 오염된다.
+	MetaYml::Node prefabData = MetaYml::Clone(definition);
 	UpgradeLegacyNavigation(prefabData);
 
     Entity* rootObject = nullptr;
@@ -238,17 +257,21 @@ Entity* Prefab::Instantiate(std::string_view newName) const
 
 Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
 {
-    if (!m_prefabData)
+    // D3-a-3c: 문서의 빈 상태는 타입이 답한다.
+    if (m_prefabData.IsEmpty())
         return nullptr;
 
     Scene* scene = targetScene;
     if (!scene)
         return nullptr;
 
-    if (!m_prefabData || !m_prefabData.IsSequence() || m_prefabData.size() == 0)
+    const MetaYml::Node& definition = Authoring::DocumentAccess::Node(m_prefabData);
+    if (!definition || !definition.IsSequence() || definition.size() == 0)
         return nullptr;
 
-	MetaYml::Node prefabData = MetaYml::Clone(m_prefabData);
+	// 소환은 정의를 그대로 쓰지 않고 사본 위에서 진행한다 — UpgradeLegacyNavigation이
+	// 노드를 고쳐 쓰므로, 사본이 아니면 프리팹 정의 자체가 오염된다.
+	MetaYml::Node prefabData = MetaYml::Clone(definition);
 	UpgradeLegacyNavigation(prefabData);
 
     Entity* rootObject = nullptr;
@@ -363,7 +386,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     if (!scene || !node)
         return nullptr;
 
-	const GameObjectType type = Entity::InferCreationType(node);
+	const GameObjectType type = EntityAuthoring::InferCreationType(node);
     std::string objName = overrideName.empty() ? node["m_name"].as<std::string>() : std::string(overrideName);
 	Entity* obj = scene->LoadEntity(make_guid(), objName, type, parent);
     if (!obj)
@@ -446,7 +469,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         {
             try
             {
-                ComponentFactorys->LoadComponent(obj, componentNode ,true);
+                ComponentFactorys->LoadComponent(obj, Authoring::NodeViewAccess::Make(componentNode), true);
             }
             catch (const std::exception& e)
             {
@@ -498,7 +521,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     // 오기록**하고, 그 오버라이드가 갱신을 배제한다. 즉 인스턴스가 N개면
     // 프리팹 갱신이 **첫 하나에만** 먹고 나머지는 옛 값에 영구히 고정된다.
     // 실측: 인스턴스 2개로 재현 — I1 shadowCast=false(적용) · I2 true(고정).
-    obj->m_prefabOriginal = MetaYml::Clone(node);
+    obj->m_prefabOriginal = Authoring::DocumentAccess::Adopt(MetaYml::Clone(node));
 
     if (node["children"])
     {

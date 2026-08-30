@@ -1,4 +1,6 @@
 #pragma once
+#include "AuthoringDocument.h"
+#include "AuthoringNodeView.h" // D3-a-5b
 #include "Object.h"
 #include "Entity.h"
 #include "ReflectionYml.h"
@@ -25,8 +27,11 @@ public:
     Entity* Instantiate(std::string_view newName = "") const;
     Entity* Instantiate(Scene* targetScene, std::string_view newName = "") const;
 
-    const MetaYml::Node& GetPrefabData() const { return m_prefabData; }
-    void SetPrefabData(const MetaYml::Node& node) { m_prefabData = node; }
+    // D3-a-3c: 정의는 Prefab.cpp에 있다. 문서 소유 타입을 헤더에서 풀지 않기
+    // 위해서다 — 인라인으로 두면 이 헤더가 `AuthoringDocumentAccess.h`를
+    // include해야 하고, 그러면 소유자 헤더가 다시 포맷을 알게 된다.
+    const MetaYml::Node& GetPrefabData() const;
+    void SetPrefabData(const Authoring::NodeView& node);
     FileGuid GetFileGuid() const { return m_fileGuid; }
     void SetFileGuid(const FileGuid& guid) { m_fileGuid = guid; }
 
@@ -70,7 +75,9 @@ private:
                                      std::string_view overrideName = "",
                                      FileGuid inheritedPrefabGuid = nullFileGuid) const;
 
-    MetaYml::Node m_prefabData{};
+    // D3-a-3c: 장기 보관 root의 마지막 하나. backend 노드를 값으로 들지 않으므로
+    // D3-b가 backend를 바꿀 때 이 클래스는 손대지 않는다(§3.3).
+    Authoring::Document m_prefabData{};
 
 	FileGuid m_fileGuid{};
 };

@@ -1,4 +1,5 @@
 #include "Entity.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "Scene.h"
 #include "SceneManager.h"
 #include "RenderableComponents.h"
@@ -73,70 +74,13 @@ void Entity::AttachSpatialComponent(GameObjectType type, Entity::Index parentInd
 	m_pTransformComponent->SetParentID(parentIndex);
 }
 
-GameObjectType Entity::InferCreationType(const MetaYml::Node& node)
-{
-	// E7-c 읽기 호환: 옛 씬/프리팹은 필드를 갖는다. 이 값은 객체 상태로
-	// 저장하지 않고 생성 순간 공간 컴포넌트를 고르는 데 한 번만 쓴다.
-	if (const MetaYml::Node legacyType = node["m_gameObjectType"])
-	{
-		return static_cast<GameObjectType>(legacyType.as<int>());
-	}
-
-	bool hasTransform = false;
-	bool hasRectTransform = false;
-	if (const MetaYml::Node components = node["m_components"];
-		components && components.IsSequence())
-	{
-		for (const auto& componentNode : components)
-		{
-			const Meta::Type* componentType = nullptr;
-			try { componentType = Meta::ExtractTypeFromYAML(componentNode); }
-			catch (const std::exception&) { continue; }
-			if (!componentType) continue;
-
-			hasTransform |= componentType->typeID == type_guid(Transform);
-			hasRectTransform |= componentType->typeID == type_guid(RectTransformComponent);
-		}
-	}
-
-	// UI는 Rect만, Canvas는 Rect+Transform, 나머지는 Transform이라는 S3의
-	// 공간 구성 규칙을 역으로 읽는다. Light/Camera/Mesh/Bone 등은 나머지
-	// 컴포넌트가 정체성을 말하므로 생성 아키타입은 Empty면 충분하다.
-	if (hasRectTransform)
-		return hasTransform ? GameObjectType::Canvas : GameObjectType::UI;
-	return GameObjectType::Empty;
-}
-
-Entity::SerializedHierarchy Entity::ReadSerializedHierarchy(const YAML::Node& node)
-{
-	SerializedHierarchy result{};
-	YAML::Node parentNode;
-	YAML::Node rootNode;
-	YAML::Node childrenNode;
-
-	// 키 이름은 구 자산/도구 호환을 위해 유지한다. H3에서 달라진 경계는 이 값이
-	// Entity 멤버로 역직렬화되지 않고 로드 배치 DTO로만 들어간다는 점이다.
-	parentNode = node["m_parentIndex"];
-	rootNode = node["m_rootIndex"];
-	childrenNode = node["m_childrenIndices"];
-
-	if (parentNode) result.parentIndex = parentNode.as<Index>(INVALID_INDEX);
-	if (rootNode) result.rootIndex = rootNode.as<Index>(kSceneRootIndex);
-	if (childrenNode && childrenNode.IsSequence())
-	{
-		result.childrenIndices.reserve(childrenNode.size());
-		for (const YAML::Node& child : childrenNode)
-			result.childrenIndices.push_back(child.as<Index>());
-	}
-	return result;
-}
-
-void Entity::OnAfterSerialize(YAML::Node& node) const
+void Entity::OnAfterSerialize(const Authoring::MutableNodeView& view) const
 {
 	// 기본 팩토리/리플렉션 골든처럼 Scene 밖에 있는 Entity에는 계층이 없다.
 	// 가짜 기본값 블록을 만들지 않아 "attached Store만 직렬화한다"는 경계를 지킨다.
 	if (!m_ownerScene) return;
-	m_ownerScene->SerializeEntityHierarchy(*this, node);
+	// D3-a-5: 뷰를 그대로 넘긴다 — 이 함수는 노드를 열어 볼 이유가 없다.
+	m_ownerScene->SerializeEntityHierarchy(*this, view);
 }
 
 const std::string& Entity::RemoveSuffixNumberTag() const

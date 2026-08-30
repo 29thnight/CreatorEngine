@@ -408,6 +408,77 @@ if (Test-Path (Join-Path $PSScriptRoot "lifecycle_baseline.tsv")) {
     ""
 }
 
+# D3-b(SerializationPlan): 저작 텍스트 자산의 개행이 LF로 고정돼 있는지. 결과(자산의 CRLF 0)와 원인(writer가 텍스트 모드를 쓰지 않음, .gitattributes의 eol=lf)을 함께 본다 — 결과만 재면 "지금은 깨끗하지만 다음 저장에서 되돌아오는" 상태를 통과시킨다.
+Run-Step "저작 개행 LF 고정(D3-b)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-authoring-line-endings.ps1")
+}
+
+# D3-b-1(SerializationPlan): ryml 에러가 프로세스 abort가 아니라 예외로 오는가.
+# ★ 이 검사의 이빨은 종료 코드가 아니라 크래시다 — 채널 하나만 빼도 실패가 아니라
+#   프로세스가 죽는다(변이 2회로 확인: 둘 다 exit 3). ryml을 제품 경로에 넣기 전에
+#   반드시 초록이어야 하는 선결 조건이다.
+Run-Step "ryml 에러 정책(D3-b-1)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-ryml-error-policy.ps1") -Exe $Exe -Work $Work
+}
+
+# D3-b-2(SerializationPlan): 스칼라 **변환** 파리티. 구조 파리티가 증명하지 못하는
+# 축이다 — 트리가 같아도 `as<bool>`이 "yes"를 다르게 읽으면 값의 의미만 조용히
+# 달라진다. 실측 11건의 알려진 차이 목록을 고정하고, 코퍼스에 위험 표기(.inf/.nan/
+# YAML 1.1 불리언)가 늘지 않았는지도 함께 본다.
+Run-Step "스칼라 변환 파리티(D3-b-2)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-scalar-conversion-parity.ps1") -Exe $Exe -Work $Work
+}
+
+# D3-a-1(SerializationPlan Y-6): 오버라이드 시딩의 값 동등 판정이 Dump 문자열 비교에서
+# 구조 비교로 바뀌었다. 판정 규칙 14종과 "Dump와 갈리는 지점이 예상한 3건뿐"임을 본다.
+Run-Step "저작 노드 구조 비교(D3-a-1)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-authoring-node-equality.ps1") -Exe $Exe -Work $Work
+}
+
+# D1(SerializationPlan Y-3): Player가 파일 워처·`.meta` 생성 스캔을 끌고 들어가지
+# 않는지. 정적 검사 + 산출 바이너리 대조라 빠르고, exe가 없으면 스스로 실패한다.
+Run-Step "Player 런타임 위생(D1)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-player-runtime-hygiene.ps1")
+}
+
+# D1(SerializationPlan Y-4): 네이티브 스크립트 소스가 pak에 실리지 않고, 셰이더
+# 소스/sidecar는 그대로 실리는지. 실자산에는 `.cpp/.h/.hpp`가 0개라 합성 트리로
+# 판정한다 — 실자산으로 재면 필터가 있든 없든 "0개를 걸렀다"가 나온다.
+$assetPackerExe = Join-Path $PSScriptRoot "..\..\Bin\x64-Release\Tools\AssetPacker\AssetPacker.exe"
+if (Test-Path -LiteralPath $assetPackerExe -PathType Leaf) {
+    Run-Step "pak 소스 배제(D1)" {
+        & pwsh -NoProfile -File `
+            (Join-Path $PSScriptRoot "verify-pak-source-exclusion.ps1")
+    }
+} else {
+    "=== pak 소스 배제(D1) === 건너뜀 (AssetPacker Release 미빌드)"
+    ""
+}
+
+# D0(SerializationPlan): 직렬화 기준선. 이 항목만 Release exe를 요구한다 —
+# Debug는 단계별로 4~16배 느리고 **단계 간 비중까지 뒤집어**(SceneParse 15.9배 vs
+# ComponentLoad 5.5배) 성능 기준선으로 쓸 수 없다. 그래서 $Exe를 넘기지 않고
+# 스크립트 기본값(Release)을 그대로 쓴다.
+#
+# Release가 없으면 건너뛴다. 위 리플렉션 골든·생명주기 기준선과 같은 이유다 —
+# 아직 Release를 빌드하지 않은 사람에게 세트가 통째로 빨갛게 보이면 세트 전체가
+# 무시되기 시작한다. 대신 건너뛴 사실을 조용히 넘기지 않고 한 줄로 남긴다.
+$releaseExe = Join-Path $PSScriptRoot "..\..\Bin\x64-Release\Editor\CreatorEditor.exe"
+if (Test-Path -LiteralPath $releaseExe -PathType Leaf) {
+    Run-Step "직렬화 기준선(D0, Release)" {
+        & pwsh -NoProfile -File `
+            (Join-Path $PSScriptRoot "verify-serialization-baseline.ps1") -Work $Work
+    }
+} else {
+    "=== 직렬화 기준선(D0, Release) === 건너뜀 (Release 미빌드 — Debug로 대체하지 않는다)"
+    ""
+}
+
 if ($failed.Count -gt 0) {
     "실패한 검사: " + ($failed -join ', ')
     exit 1

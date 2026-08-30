@@ -1,4 +1,5 @@
 #pragma once
+#include "AuthoringNodeView.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include "Component.h"
@@ -47,7 +48,7 @@ public:
 	void OnBeforeSerialize();
 	// 구 Navigation.navObject(instanceID) 파일의 읽기 전용 승격. 새 파일에는
 	// navObject를 쓰지 않고, 한 번 해석되면 OnBeforeSerialize가 새 경로로 치유한다.
-	void LoadLegacyNavigation(const YAML::Node& componentNode);
+	void LoadLegacyNavigation(const Authoring::NodeView& componentNode); // D3-a-4
 	void DeserializeNavi();
 	std::vector<Navigation> GetNavigations() const { return navigations; }
 	Entity* GetNextNavi(Direction dir);

@@ -40,6 +40,12 @@
 #include "LogSystem.h"
 #include "PathFinder.h"
 #include "RuntimeSettings.h"
+#include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
+#include "AuthoringNodeViewAccess.h" // D3-a-5b
+#include "AuthoringParserProbe.h" // D3-b-0
+#include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
+#include "AuthoringScalarParityProbe.h" // D3-b-2: 스칼라 변환 파리티
+#include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
 #include "CoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
@@ -940,6 +946,525 @@ namespace
     //
     // 이 명령 혼자서는 "얼마나 빨라졌는지"를 말하지 않는다 — 최적화 전후로 같은
     // 인자로 두 번 돌려 비교하는 것이 사용법이다(미측정으로 보고할 것).
+    // ── D3-b-0(SerializationPlan): 파서 동등성·속도 프로브 ─────────────────────
+    //
+    // yaml-cpp 소비 53파일·408매치를 옮기기 **전에** "ryml이 이 저장소의 저작 문서를
+    // 같게 읽는가"를 먼저 증명한다. 옮긴 뒤에 어긋나면 파서 차이와 이행 실수를 가를 수
+    // 없다. 함께 재는 파싱 시간이 D3-b 이득의 실측 상한이다(D0는 씬 로드의 60%가
+    // 파싱이라고 말했다).
+    //
+    // 읽기 전용이라 저작 코퍼스를 오염시키지 않는다.
+    void HandleSerializeParserCompare(const std::vector<std::string>& parts)
+    {
+        std::vector<std::string> targets;
+
+        // 인자가 파일이면 그 하나만, `.`으로 시작하면 **확장자 필터**다. 확장자별로
+        // 갈라 재야 어느 자산 종류가 파싱 비용을 쓰는지 알 수 있다 — 전체 합계만으로는
+        // "부팅 catalog의 53.5 ms 중 파싱 몫이 얼마인가" 같은 질문에 답하지 못한다.
+        std::string extensionFilter;
+        if (parts.size() >= 2 && !parts[1].empty() && parts[1][0] == '.'
+            && parts[1].find_first_of("/" "\\") == std::string::npos)
+        {
+            extensionFilter = parts[1];
+        }
+
+        if (parts.size() >= 2 && extensionFilter.empty())
+        {
+            targets.push_back(parts[1]);
+        }
+        else
+        {
+            // 저작 코퍼스 전수. 확장자는 이 저장소가 실제로 저작하는 것들이다.
+            const file::path root = PathFinder::Relative();
+            std::error_code error;
+            file::recursive_directory_iterator it(
+                root, file::directory_options::skip_permission_denied, error);
+            const file::recursive_directory_iterator end;
+            while (!error && it != end)
+            {
+                const file::directory_entry& entry = *it;
+                if (entry.is_regular_file(error) && !error)
+                {
+                    const std::string ext = entry.path().extension().string();
+                    const bool matched = extensionFilter.empty()
+                        ? (ext == ".creator" || ext == ".prefab" || ext == ".asset"
+                            || ext == ".meta" || ext == ".shadermeta" || ext == ".volume")
+                        : (ext == extensionFilter);
+                    if (matched)
+                    {
+                        targets.push_back(entry.path().string());
+                    }
+                }
+                error.clear();
+                it.increment(error);
+            }
+        }
+
+        if (targets.empty())
+        {
+            std::printf("[serialize.parsercompare] selfcheck=fail reason=no-targets\n");
+            return;
+        }
+
+        int equalCount = 0;
+        int diffCount = 0;
+        int parseFailCount = 0;
+        int crlfCount = 0;
+        int skippedBinary = 0;
+        unsigned long long totalNodes = 0;
+        double totalYamlUs = 0.0;
+        double totalRymlUs = 0.0;
+
+        for (const std::string& target : targets)
+        {
+            const Authoring::ParserProbeResult probe = Authoring::ProbeParsers(target);
+            totalYamlUs += static_cast<double>(probe.yamlCppNanoseconds) / 1000.0;
+            totalRymlUs += static_cast<double>(probe.rymlNanoseconds) / 1000.0;
+            totalNodes += probe.comparedNodes;
+            if (probe.skippedBinaryAsset) { ++skippedBinary; continue; }
+            if (probe.normalizedCrLf) ++crlfCount;
+
+            if (!probe.parsedByYamlCpp || !probe.parsedByRyml)
+            {
+                ++parseFailCount;
+                std::printf("[serialize.parsercompare] PARSE-FAIL yamlcpp=%d ryml=%d file=%s reason=%s\n",
+                    probe.parsedByYamlCpp ? 1 : 0, probe.parsedByRyml ? 1 : 0,
+                    target.c_str(), probe.rymlError.c_str());
+                continue;
+            }
+            if (probe.structurallyEqual)
+            {
+                ++equalCount;
+            }
+            else
+            {
+                ++diffCount;
+                std::printf("[serialize.parsercompare] DIFF file=%s at=%s\n",
+                    target.c_str(), probe.firstDifference.c_str());
+            }
+        }
+
+        std::printf("[serialize.parsercompare] files=%zu equal=%d diff=%d parseFail=%d nodes=%llu\n",
+            targets.size(), equalCount, diffCount, parseFailCount, totalNodes);
+        // ryml 몫에는 CRLF 정규화 비용이 포함돼 있다 — 그것이 전제이기 때문이다.
+        // 건너뛴 바이너리는 "문제없음"이 아니라 "확인하지 않음"이다.
+        std::printf("[serialize.parsercompare] crlfNormalized=%d/%zu skippedBinary=%d\n",
+            crlfCount, targets.size(), skippedBinary);
+        std::printf("[serialize.parsercompare] yamlCppUs=%.1f rymlUs=%.1f speedup=%.2fx\n",
+            totalYamlUs, totalRymlUs,
+            (totalRymlUs > 0.0) ? (totalYamlUs / totalRymlUs) : 0.0);
+
+        // 0개를 비교하고 "차이 0"을 통과로 읽지 않는다.
+        const char* fail = nullptr;
+        if (0 == targets.size())      fail = "no-targets";
+        else if (0 == totalNodes)     fail = "compared-zero-nodes";
+        else if (parseFailCount > 0)  fail = "parse-failed";
+        else if (diffCount > 0)       fail = "structural-diff";
+        std::printf("[serialize.parsercompare] selfcheck=%s%s%s\n",
+            (nullptr == fail) ? "pass" : "fail",
+            (nullptr == fail) ? "" : " reason=",
+            (nullptr == fail) ? "" : fail);
+    }
+
+    // -- D3-b-1(SerializationPlan): ryml 에러 정책이 실제로 abort를 막는가 --
+    //
+    // ★ 이 검사는 "실패하면 빨개진다"가 아니라 **"정책이 없으면 크래시한다"**로
+    //   이빨을 갖는다. ryml은 잘못된 문서를 만나면 예외가 아니라 프로세스를
+    //   abort하므로, 콜백이 빠지거나 채널 하나를 놓치면 이 명령은 종료 코드가
+    //   아니라 프로세스 사망으로 끝난다. 게이트는 그것도 실패로 읽는다.
+    void HandleSerializeRymlError(const std::vector<std::string>& parts)
+    {
+        // 인자가 있으면 그 파일을 **있는 그대로** ryml에 넣는다. 무엇이 실제로
+        // abort를 일으키는지는 지어내지 말고 재야 한다 — 처음 만든 합성 재현
+        // 둘을 ryml이 조용히 받아들였다. 프로세스가 죽으면 그것이 답이다.
+        if (parts.size() >= 2)
+        {
+            std::ifstream input(parts[1], std::ios::binary);
+            if (!input)
+            {
+                std::printf("[serialize.rymlerror] probe=fail reason=open-failed path=%s\n",
+                    parts[1].c_str());
+                return;
+            }
+            const std::string text((std::istreambuf_iterator<char>(input)),
+                std::istreambuf_iterator<char>());
+            const Authoring::RymlParseAttempt attempt = Authoring::TryParseWithPolicy(text);
+            std::printf("[serialize.rymlerror] probe bytes=%zu parsed=%d threw=%d nodes=%llu\n",
+                text.size(), attempt.parsed ? 1 : 0, attempt.threw ? 1 : 0,
+                static_cast<unsigned long long>(attempt.nodeCount));
+            std::printf("[serialize.rymlerror] probeMessage=%s\n",
+                attempt.message.empty() ? "(none)" : attempt.message.c_str());
+            return;
+        }
+
+        const Authoring::RymlErrorPolicyProbe probe = Authoring::ProbeRymlErrorPolicy();
+
+        std::printf("[serialize.rymlerror] loneCr=%d tabIndent=%d distinctChannels=%d\n",
+            probe.threwOnLoneCr ? 1 : 0,
+            probe.threwOnTabIndent ? 1 : 0,
+            probe.coveredDistinctChannels ? 1 : 0);
+        std::printf("[serialize.rymlerror] validParsed=%d crlfParsed=%d\n",
+            probe.parsedValidDocument ? 1 : 0,
+            probe.parsedCrLfDocument ? 1 : 0);
+        std::printf("[serialize.rymlerror] firstMessage=%s\n",
+            probe.firstMessage.empty() ? "(none)" : probe.firstMessage.c_str());
+
+        const char* fail = nullptr;
+        if (!probe.threwOnLoneCr)          fail = "lone-cr-did-not-throw";
+        else if (!probe.threwOnTabIndent)  fail = "tab-indent-did-not-throw";
+        // 두 실패가 같은 채널을 탔다면 나머지 채널은 여전히 abort할 수 있다.
+        else if (!probe.coveredDistinctChannels) fail = "single-channel-only";
+        // 대조군: 정책이 모든 파싱을 막아 버린 상태를 통과로 읽지 않는다.
+        else if (!probe.parsedValidDocument) fail = "valid-document-rejected";
+        // CRLF가 거부되면 정규화 사본이 다시 필요하다 — 성능 전제가 바뀐다.
+        else if (!probe.parsedCrLfDocument)  fail = "crlf-document-rejected";
+        // 예외는 왔는데 메시지가 비면 실제 실패에서 원인을 못 읽는다.
+        else if (probe.firstMessage.empty()) fail = "empty-error-message";
+
+        std::printf("[serialize.rymlerror] selfcheck=%s%s%s\n",
+            (nullptr == fail) ? "pass" : "fail",
+            (nullptr == fail) ? "" : " reason=",
+            (nullptr == fail) ? "" : fail);
+    }
+
+    // -- D3-b-2(SerializationPlan): 스칼라 **변환** 파리티 --
+    //
+    // 구조 파리티(D3-b-0)는 스칼라를 문자열로만 비교했다. 그것으로는 `as<bool>`이
+    // "yes"를 어떻게 읽는지가 증명되지 않는다 — 두 파서가 다르게 읽으면 트리는
+    // 같은데 **값의 의미만 조용히 달라진다.** 로드는 성공하고 값만 틀린다.
+    void HandleSerializeScalarParity(const std::vector<std::string>&)
+    {
+        const Authoring::ScalarParityResult result = Authoring::ProbeScalarConversions();
+
+        for (const Authoring::ScalarParityCase& entry : result.cases)
+        {
+            if (entry.agrees) continue;
+            std::printf("[serialize.scalarparity] DIVERGE %-14s type=%-6s yamlcpp=%s(%s) ryml=%s(%s)\n",
+                entry.name.c_str(), entry.type.c_str(),
+                entry.yamlCppOk ? "ok" : "fail", entry.yamlCppValue.c_str(),
+                entry.rymlOk ? "ok" : "fail", entry.rymlValue.c_str());
+        }
+
+        std::printf("[serialize.scalarparity] cases=%zu agree=%u diverge=%u\n",
+            result.cases.size(), result.agreeCount, result.divergeCount);
+
+        const char* fail = nullptr;
+        if (result.cases.empty()) fail = "no-cases";
+        std::printf("[serialize.scalarparity] selfcheck=%s%s%s\n",
+            (nullptr == fail) ? "pass" : "fail",
+            (nullptr == fail) ? "" : " reason=",
+            (nullptr == fail) ? "" : fail);
+    }
+
+    // ── D3-a-1(SerializationPlan): 저작 노드 구조 비교 계약 ────────────────────
+    //
+    // 이 검사가 재는 것은 성능이 아니라 **판정 규칙**이다. 구조 비교는 Dump 비교의
+    // 동작을 그대로 옮기지 않는다 — 맵 키 순서를 무시하는 것이 의도된 차이이므로,
+    // 그 차이를 검사가 직접 단정해 "실수로 바뀐 것"과 구분한다.
+    void HandleSerializeNodeEqual(const std::vector<std::string>&)
+    {
+        struct Case
+        {
+            const char* name;
+            const char* lhs;
+            const char* rhs;
+            bool expectedEqual;
+            bool dumpAgrees;   // Dump 비교도 같은 답을 내는가
+        };
+
+        // dumpAgrees=false인 항목이 이 슬라이스가 바꾼 동작이다. 그런 항목이 0개면
+        // 구조 비교를 넣을 이유가 없었다는 뜻이므로, 아래에서 그 수도 단정한다.
+        static const Case kCases[] = {
+            { "scalar-same",        "a: 1",                  "a: 1",                  true,  true  },
+            { "scalar-diff",        "a: 1",                  "a: 2",                  false, true  },
+            { "scalar-notation",    "a: 1",                  "a: 1.0",                false, true  },
+            { "seq-same",           "a: [1, 2]",             "a: [1, 2]",             true,  true  },
+            { "seq-order-matters",  "a: [1, 2]",             "a: [2, 1]",             false, true  },
+            { "seq-length",         "a: [1, 2]",             "a: [1, 2, 3]",          false, true  },
+            { "map-key-order",      "a: {x: 1, y: 2}",       "a: {y: 2, x: 1}",       true,  false },
+            { "map-style",          "a: {x: 1}",             "a:\n  x: 1",            true,  false },
+            { "map-missing-key",    "a: {x: 1, y: 2}",       "a: {x: 1}",             false, true  },
+            { "map-value-diff",     "a: {x: 1}",             "a: {x: 2}",             false, true  },
+            { "nested-key-order",   "a: {p: {m: 1, n: 2}}",  "a: {p: {n: 2, m: 1}}",  true,  false },
+            { "null-vs-null",       "a: ~",                  "a: null",               true,  true  },
+            { "null-vs-scalar",     "a: ~",                  "a: 0",                  false, true  },
+            { "type-mismatch",      "a: [1]",                "a: {x: 1}",             false, true  },
+        };
+
+        int passed = 0;
+        int failed = 0;
+        int divergedFromDump = 0;
+        for (const Case& testCase : kCases)
+        {
+            bool actual = false;
+            bool dumpResult = false;
+            try
+            {
+                const MetaYml::Node lhsDoc = MetaYml::Load(testCase.lhs);
+                const MetaYml::Node rhsDoc = MetaYml::Load(testCase.rhs);
+                actual = Authoring::NodesEqual(lhsDoc["a"], rhsDoc["a"]);
+                dumpResult = (MetaYml::Dump(lhsDoc["a"]) == MetaYml::Dump(rhsDoc["a"]));
+            }
+            catch (const std::exception& exception)
+            {
+                std::printf("[serialize.nodeequal] case=%s FAIL(parse) %s\n",
+                    testCase.name, exception.what());
+                ++failed;
+                continue;
+            }
+
+            const bool caseOk = (actual == testCase.expectedEqual);
+            // 예상한 곳에서 예상한 만큼만 Dump와 갈리는지 함께 본다.
+            const bool divergenceOk =
+                ((dumpResult == testCase.expectedEqual) == testCase.dumpAgrees);
+            if (!testCase.dumpAgrees) ++divergedFromDump;
+
+            if (caseOk && divergenceOk)
+            {
+                ++passed;
+            }
+            else
+            {
+                ++failed;
+                std::printf("[serialize.nodeequal] case=%s FAIL structural=%d expected=%d dump=%d dumpAgreesExpected=%d\n",
+                    testCase.name, actual ? 1 : 0, testCase.expectedEqual ? 1 : 0,
+                    dumpResult ? 1 : 0, testCase.dumpAgrees ? 1 : 0);
+            }
+        }
+
+        std::printf("[serialize.nodeequal] cases=%d passed=%d failed=%d divergedFromDump=%d\n",
+            static_cast<int>(std::size(kCases)), passed, failed, divergedFromDump);
+
+        if (0 == divergedFromDump)
+        {
+            // 전부 Dump와 같은 답이면 이 슬라이스는 아무것도 바꾸지 않은 것이다.
+            std::printf("[serialize.nodeequal] selfcheck=fail reason=no-divergence-covered\n");
+            return;
+        }
+        std::printf("[serialize.nodeequal] selfcheck=%s\n", (0 == failed) ? "pass" : "fail");
+    }
+
+    // ── D0(SerializationPlan): 직렬화 기준선 ───────────────────────────────────
+    //
+    // 이 명령이 재는 것은 벤치가 재현한 모형이 아니라 제품 로드 경로 그 자체다
+    // (SerializationProfiler의 Scope가 SceneManager/ComponentFactory/PrefabUtility
+    // 본체에 들어 있다). dx12.encoderbench가 모형만 재고 있던 전례를 반복하지 않기
+    // 위한 선택이고, 대가로 계측 플래그가 켜져 있는 동안 로드 경로에 시계 읽기가
+    // 얹힌다 — 그래서 기본값은 꺼짐이고 이 명령이 켰다가 반드시 되돌린다.
+    //
+    // 출력은 회귀 스크립트가 파싱한다. key=value 형식을 바꾸면 게이트가 눈을 감는다.
+    void PrintSerializationStage(const char* mode,
+        SerializationProfile::Stage stage,
+        const SerializationProfile::Snapshot& snapshot,
+        int iterations)
+    {
+        const auto& sample = snapshot[stage];
+        const double totalUs = static_cast<double>(sample.nanoseconds) / 1000.0;
+        // perIterUs는 "반복 1회분"이지 "호출 1회분"이 아니다. calls는 그 회차 안에서
+        // 몇 번 불렸는지를 따로 말한다(예: 씬 하나에 EntityDeserialize 68회).
+        // 두 값을 같은 것으로 읽으면 단계별 비중을 통째로 오해한다.
+        std::printf("[serialize.bench] mode=%s stage=%s totalUs=%.3f perIterUs=%.3f calls=%llu\n",
+            mode,
+            std::string(SerializationProfile::StageName(stage)).c_str(),
+            totalUs,
+            totalUs / static_cast<double>((std::max)(1, iterations)),
+            static_cast<unsigned long long>(sample.calls));
+    }
+
+    // 부팅 구간은 CLI가 켜기 전에 끝난다 — 별도 슬롯에서 읽는다.
+    void PrintSerializationBoot()
+    {
+        const auto boot = SerializationProfile::TakeBoot();
+        const auto& catalog = boot[SerializationProfile::Stage::AssetCatalog];
+        const double ms = static_cast<double>(catalog.nanoseconds) / 1'000'000.0;
+        std::printf("[serialize.bench] mode=boot stage=AssetCatalog totalMs=%.3f parsedMeta=%llu\n",
+            ms, static_cast<unsigned long long>(catalog.calls));
+        if (0 == catalog.calls)
+        {
+            // 0개를 재고 "빠르다"고 보고하는 사고를 막는다.
+            std::printf("[serialize.bench] mode=boot selfcheck=fail reason=parsed-meta-zero\n");
+            return;
+        }
+        // ★ selfcheck는 언제나 독립 라인이다. 처음에는 perMetaUs와 같은 줄에 붙였는데,
+        //   게이트의 `mode=X selfcheck=Y` 정규식이 이 한 줄만 놓쳐 "selfcheck 3개"로
+        //   세었다 — 검사가 계약을 못 읽고 스스로 빨개진 형태다. 형식은 계약이다.
+        std::printf("[serialize.bench] mode=boot perMetaUs=%.3f\n",
+            (ms * 1000.0) / static_cast<double>(catalog.calls));
+        std::printf("[serialize.bench] mode=boot selfcheck=pass\n");
+    }
+
+    // ★ 구성 표기는 장식이 아니다. Debug는 같은 조건에서 배 단위로 느리고 단계 간
+    //   비중까지 뒤집는다 — 어떤 exe로 잰 값인지 출력이 스스로 말하게 해서, Debug
+    //   수치가 기준선처럼 굳는 사고를 막는다.
+    constexpr const char* kSerializeBenchConfig =
+#if defined(NDEBUG)
+        "Release";
+#else
+        "Debug";
+#endif
+
+    void HandleSerializeBench(const std::vector<std::string>& parts)
+    {
+        std::printf("[serialize.bench] config=%s\n", kSerializeBenchConfig);
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: serialize.bench boot\n");
+            std::printf("[CLI]         serialize.bench scene <절대경로> [반복=3]\n");
+            std::printf("[CLI]         serialize.bench prefab <이름|경로> [반복=3]\n");
+            return;
+        }
+
+        const std::string mode = parts[1];
+
+        if ("boot" == mode)
+        {
+            PrintSerializationBoot();
+            return;
+        }
+
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] serialize.bench %s: 대상이 없다\n", mode.c_str());
+            return;
+        }
+
+        const std::string target = parts[2];
+        const int iterations = (parts.size() >= 4)
+            ? (std::max)(1, std::atoi(parts[3].c_str()))
+            : 3;
+
+        if ("scene" == mode)
+        {
+            // 워밍업 1회는 계측을 끈 채로 돈다 — 첫 로드의 지연 초기화(프리팹 캐시,
+            // 애셋 상주화)를 평균에 섞지 않기 위해서다. 워밍업을 빼면 1회차만
+            // 유별나게 큰 값이 평균을 지배한다.
+            SerializationProfile::SetEnabled(false);
+            if (nullptr == SceneManagers->LoadSceneImmediate(target))
+            {
+                std::printf("[serialize.bench] mode=scene selfcheck=fail reason=warmup-load-failed target=%s\n",
+                    target.c_str());
+                return;
+            }
+
+            SerializationProfile::Reset();
+            SerializationProfile::SetEnabled(true);
+            int loaded = 0;
+            for (int i = 0; i < iterations; ++i)
+            {
+                if (nullptr != SceneManagers->LoadSceneImmediate(target))
+                    ++loaded;
+            }
+            SerializationProfile::SetEnabled(false);
+
+            const auto snapshot = SerializationProfile::Take();
+            std::printf("[serialize.bench] mode=scene target=%s iterations=%d loaded=%d warmup=1\n",
+                target.c_str(), iterations, loaded);
+
+            using Stage = SerializationProfile::Stage;
+            for (uint32_t i = 0; i < SerializationProfile::kStageCount; ++i)
+            {
+                const Stage stage = static_cast<Stage>(i);
+                if (Stage::AssetCatalog == stage) continue; // 부팅 전용 슬롯
+                PrintSerializationStage("scene", stage, snapshot, iterations);
+            }
+
+            // ★ 자를 먼저 검증한다. 분해 합이 루트를 넘으면 계측 자체가 틀린 것이고,
+            //   그 경우 아래 수치는 어떤 판정에도 쓸 수 없다.
+            const double rootUs =
+                static_cast<double>(snapshot[Stage::SceneLoadTotal].nanoseconds) / 1000.0;
+            double childUs = 0.0;
+            bool everyChildRan = true;
+            for (uint32_t i = 0; i < SerializationProfile::kStageCount; ++i)
+            {
+                const Stage stage = static_cast<Stage>(i);
+                if (!SerializationProfile::IsSceneLoadChild(stage)) continue;
+                childUs += static_cast<double>(snapshot[stage].nanoseconds) / 1000.0;
+                if (0 == snapshot[stage].calls) everyChildRan = false;
+            }
+
+            const double unattributedUs = rootUs - childUs;
+            std::printf("[serialize.bench] mode=scene rootUs=%.3f childSumUs=%.3f unattributedUs=%.3f childRatio=%.4f\n",
+                rootUs, childUs, unattributedUs,
+                (rootUs > 0.0) ? (childUs / rootUs) : 0.0);
+
+            const char* failReason = nullptr;
+            if (loaded != iterations)                             failReason = "load-count-mismatch";
+            else if (snapshot[Stage::SceneLoadTotal].calls !=
+                     static_cast<uint64_t>(iterations))           failReason = "root-call-mismatch";
+            else if (!everyChildRan)                              failReason = "child-stage-zero-calls";
+            else if (childUs > rootUs)                            failReason = "child-sum-exceeds-root";
+            else if (rootUs <= 0.0)                               failReason = "root-zero-time";
+
+            if (nullptr != failReason)
+                std::printf("[serialize.bench] mode=scene selfcheck=fail reason=%s\n", failReason);
+            else
+                std::printf("[serialize.bench] mode=scene selfcheck=pass\n");
+            return;
+        }
+
+        if ("prefab" == mode)
+        {
+            SerializationProfile::Reset();
+            SerializationProfile::SetEnabled(true);
+
+            // 캐시 미스는 최초 1회뿐이다 — 그 사실을 숨기지 않고 cacheMiss로 보고한다.
+            Prefab* prefab = PrefabUtilitys->LoadPrefab(target);
+            const auto afterLoad = SerializationProfile::Take();
+            if (nullptr == prefab)
+            {
+                SerializationProfile::SetEnabled(false);
+                std::printf("[serialize.bench] mode=prefab selfcheck=fail reason=load-failed target=%s\n",
+                    target.c_str());
+                return;
+            }
+
+            int instantiated = 0;
+            for (int i = 0; i < iterations; ++i)
+            {
+                if (nullptr != PrefabUtilitys->InstantiatePrefab(
+                        prefab, target + "_d0bench" + std::to_string(i)))
+                    ++instantiated;
+            }
+            SerializationProfile::SetEnabled(false);
+
+            const auto snapshot = SerializationProfile::Take();
+            using Stage = SerializationProfile::Stage;
+            // parseOnLoad는 LoadPrefab이 문서를 실제로 읽은 횟수(캐시 미스), nestedParse는
+            // 소환 도중 중첩 프리팹 정의를 추가로 읽은 횟수다. 둘을 합쳐 cacheMiss 하나로
+            // 보고했더니 "1이라고 했는데 2가 찍힌" 모순으로 보였다 — 계측이 틀린 게 아니라
+            // 소환이 leaf 정의를 더 읽은 것이었고, 그 사실이 보이는 편이 옳다.
+            const unsigned long long parseOnLoad =
+                static_cast<unsigned long long>(afterLoad[Stage::PrefabParse].calls);
+            const unsigned long long totalParse =
+                static_cast<unsigned long long>(snapshot[Stage::PrefabParse].calls);
+            std::printf("[serialize.bench] mode=prefab target=%s iterations=%d instantiated=%d parseOnLoad=%llu nestedParse=%llu\n",
+                target.c_str(), iterations, instantiated,
+                parseOnLoad,
+                (totalParse >= parseOnLoad) ? (totalParse - parseOnLoad) : 0ull);
+            PrintSerializationStage("prefab", Stage::PrefabParse, snapshot, 1);
+            PrintSerializationStage("prefab", Stage::PrefabInstantiate, snapshot, iterations);
+            PrintSerializationStage("prefab", Stage::ComponentLoad, snapshot, iterations);
+
+            const char* failReason = nullptr;
+            if (instantiated != iterations)                              failReason = "instantiate-count-mismatch";
+            else if (snapshot[Stage::PrefabInstantiate].calls !=
+                     static_cast<uint64_t>(iterations))                  failReason = "instantiate-call-mismatch";
+            else if (0 == snapshot[Stage::PrefabInstantiate].nanoseconds) failReason = "instantiate-zero-time";
+            // ★ 이 분기는 변이 실험이 열었다. ComponentLoad 계측을 제거한 변이본에서
+            //   scene 모드는 fail을 냈는데 prefab 모드는 그대로 통과했다 — 소환은
+            //   반드시 컴포넌트를 붙이므로 0 calls는 계측이 끊어졌다는 뜻이다.
+            else if (0 == snapshot[Stage::ComponentLoad].calls)          failReason = "component-load-zero-calls";
+
+            if (nullptr != failReason)
+                std::printf("[serialize.bench] mode=prefab selfcheck=fail reason=%s\n", failReason);
+            else
+                std::printf("[serialize.bench] mode=prefab selfcheck=pass\n");
+            return;
+        }
+
+        std::printf("[CLI] serialize.bench: 알 수 없는 모드 '%s'\n", mode.c_str());
+    }
+
     void HandleSceneProxyBench(const std::vector<std::string>& parts)
     {
         if (parts.size() < 2)
@@ -2861,7 +3386,7 @@ namespace ConsoleCmd
 					const YAML::Node persisted = YAML::LoadFile(destinationPath.string());
 					Material decoded;
 					materialRoundTrip = DataSystems->DeserializeMaterialPayload(
-						decoded, persisted)
+						decoded, Authoring::NodeViewAccess::Make(persisted))
 						&& decoded.m_fileGuid == canonicalGuid
 						&& decoded.m_materialInfo.m_roughness
 							== authored.m_materialInfo.m_roughness
@@ -2938,7 +3463,8 @@ namespace ConsoleCmd
 				const FileGuid catalogGuid = DataSystems->GetFileGuid(assetPath);
 				const YAML::Node source = YAML::LoadFile(assetPath.string());
 				Material first;
-				decoded = DataSystems->DeserializeMaterialPayload(first, source);
+				decoded = DataSystems->DeserializeMaterialPayload(
+					first, Authoring::NodeViewAccess::Make(source));
 				identity = decoded && catalogGuid != FileGuid{}
 					&& first.m_fileGuid == catalogGuid;
 
@@ -2968,7 +3494,7 @@ namespace ConsoleCmd
 						DataSystems->SerializeMaterialPayload(first);
 					Material second;
 					const bool decodedAgain = DataSystems->DeserializeMaterialPayload(
-						second, firstCanonical);
+						second, Authoring::NodeViewAccess::Make(firstCanonical));
 					const YAML::Node secondCanonical = decodedAgain
 						? DataSystems->SerializeMaterialPayload(second) : YAML::Node{};
 					stable = decodedAgain
@@ -3938,7 +4464,7 @@ namespace ConsoleCmd
 			const MetaYml::Node& authored = prefab->GetPrefabData();
 			if (authored.IsSequence()) data = MetaYml::Clone(authored);
 			else data.push_back(MetaYml::Clone(authored));
-			prefab->SetPrefabData(data);
+			prefab->SetPrefabData(Authoring::NodeViewAccess::Make(data));
 		};
 
 		Prefab* prefab = PrefabUtilitys->CreatePrefab(authorRoot, "__NavProbePrefab");
@@ -4008,7 +4534,7 @@ namespace ConsoleCmd
 		}
 
 		Prefab* legacyPrefab = PrefabUtilitys->CreatePrefab(authorRoot, "__NavLegacyProbePrefab");
-		if (legacyPrefab) legacyPrefab->SetPrefabData(legacyData);
+		if (legacyPrefab) legacyPrefab->SetPrefabData(Authoring::NodeViewAccess::Make(legacyData));
 		Entity* legacyInstance = legacyPrefab ? legacyPrefab->Instantiate(scene, "__NavLegacyInstance") : nullptr;
 		Entity* legacySource = nullptr; Entity* legacyTarget = nullptr; ImageComponent* legacyImage = nullptr;
 		const bool legacyOk = legacyFixtureBuilt
@@ -7130,6 +7656,11 @@ namespace ConsoleCmd
             reg({ "scene.traversalbench" }, [](const ConsoleCommandContext& c) { HandleSceneTraversalBench(c.parts); });
             reg({ "scene.bonedump" }, [](const ConsoleCommandContext& c) { HandleSceneBoneDump(c.parts); });
             reg({ "scene.transformdigest" }, [](const ConsoleCommandContext& c) { HandleSceneTransformDigest(c.parts); });
+            reg({ "serialize.bench" }, [](const ConsoleCommandContext& c) { HandleSerializeBench(c.parts); });
+            reg({ "serialize.nodeequal" }, [](const ConsoleCommandContext& c) { HandleSerializeNodeEqual(c.parts); });
+            reg({ "serialize.parsercompare" }, [](const ConsoleCommandContext& c) { HandleSerializeParserCompare(c.parts); });
+            reg({ "serialize.rymlerror" }, [](const ConsoleCommandContext& c) { HandleSerializeRymlError(c.parts); });
+            reg({ "serialize.scalarparity" }, [](const ConsoleCommandContext& c) { HandleSerializeScalarParity(c.parts); });
             reg({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { HandleSceneProxyBench(c.parts); });
 
             return t;

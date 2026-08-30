@@ -976,7 +976,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 // Save the graph to a file
                 auto node = Meta::Serialize(&graph);
 
-                std::ofstream outFile(BTSavePath.string());
+                std::ofstream outFile(BTSavePath.string(), std::ios::binary | std::ios::trunc);
 
                 if (outFile.is_open())
                 {
@@ -1068,7 +1068,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             // Save the graph to a file
             auto node = Meta::Serialize(&graph);
 
-            std::ofstream outFile(BTPath.string());
+            std::ofstream outFile(BTPath.string(), std::ios::binary | std::ios::trunc);
 
             if (outFile.is_open())
             {
@@ -1720,7 +1720,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             // Save the graph to a file
             auto node = Meta::Serialize(&graph);
 
-            std::ofstream outFile(BTPath.string());
+            std::ofstream outFile(BTPath.string(), std::ios::binary | std::ios::trunc);
 
             if (outFile.is_open())
             {

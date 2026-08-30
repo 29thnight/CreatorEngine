@@ -1,4 +1,5 @@
 #pragma once
+#include "AuthoringNodeView.h"
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
@@ -83,8 +84,8 @@ public:
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, Entity* object);
     Socket* FindSocket(std::string_view socketName);
 
-    // CT6-d: ?�켈?�톤·?�라미터·컨트롤러 그래??복원(�??�토�?분기 ?�동)
-    void OnDeserialized(const YAML::Node& node);
+    // CT6-d: 스켈레톤·파라미터·컨트롤러 그래프 복원(구 팩토리 분기 이동)
+    void OnDeserialized(const Authoring::NodeView& node); // D3-a-4
 
     bool HasSocket() { return !socketvec.empty(); };
     void ClearControllersAndParams();

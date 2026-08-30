@@ -26,6 +26,7 @@
 // 절단을 as<size_t>로 — typeID가 FNV64(CT4-b)가 된 뒤로 32비트 초과 값을
 // 읽으면 BadConversion이 나는 잠재 로드 버그였다.
 #include "ReflectionYml.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "ReflectionMeta.h"
 #include <mathematics/color.hpp>
 #include <mathematics/rect.hpp>
@@ -322,7 +323,13 @@ namespace Meta::Typed
     void PostLoadThunk(void* instance, const MetaYml::Node& node)
     {
         T& obj = *static_cast<T*>(instance);
-        if constexpr (requires { obj.OnDeserialized(node); })
+        // D3-a-4: 뷰를 받는 훅을 먼저 본다. 컴포넌트 헤더가 backend 노드 타입을
+        // 알지 않아도 되게 하는 것이 이 오버로드의 목적이다(§5 완료 기준 9).
+        if constexpr (requires { obj.OnDeserialized(Authoring::NodeViewAccess::Make(node)); })
+        {
+            obj.OnDeserialized(Authoring::NodeViewAccess::Make(node));
+        }
+        else if constexpr (requires { obj.OnDeserialized(node); })
         {
             obj.OnDeserialized(node);
         }
@@ -335,7 +342,9 @@ namespace Meta::Typed
     template<class T>
     consteval bool HasPostLoad()
     {
-        return requires(T& t, const MetaYml::Node& n) { t.OnDeserialized(n); }
+        return requires(T& t, const MetaYml::Node& n)
+                   { t.OnDeserialized(Authoring::NodeViewAccess::Make(n)); }
+            || requires(T& t, const MetaYml::Node& n) { t.OnDeserialized(n); }
             || requires(T& t) { t.OnDeserialized(); };
     }
 
@@ -516,6 +525,11 @@ namespace Meta::Typed
 		// 선택 훅. Entity는 Scene-owned HierarchyStore의 계층을 기존 YAML 키로
 		// 내보낸다. 훅이 없는 타입의 직렬화 형상은 바뀌지 않는다.
 		if constexpr (requires(T& value, MetaYml::Node& serializedNode)
+			{ value.OnAfterSerialize(Authoring::MutableNodeViewAccess::Make(serializedNode)); })
+		{
+			obj.OnAfterSerialize(Authoring::MutableNodeViewAccess::Make(node));
+		}
+		else if constexpr (requires(T& value, MetaYml::Node& serializedNode)
 			{ value.OnAfterSerialize(serializedNode); })
 		{
 			obj.OnAfterSerialize(node);

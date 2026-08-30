@@ -1,4 +1,5 @@
 #include "ShaderReflectionSelfTest.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-5b
 
 #include "DataSystem.h"
 #include "FoliageType.h"
@@ -216,7 +217,8 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     MetaYml::Node serialized = DataSystems->SerializeMaterialPayload(material);
     Material restored;
     if (!restored.ConfigureShaderProperties(meta, layout, error, metaHandle)
-        || !DataSystems->DeserializeMaterialPayload(restored, serialized))
+        || !DataSystems->DeserializeMaterialPayload(restored,
+            Authoring::NodeViewAccess::Make(serialized)))
     {
         outLog += "[material schema] DataSystem YAML decode 실패\n";
         return false;

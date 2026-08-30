@@ -1,4 +1,5 @@
 ﻿#include "Scene.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-5
 #include <cstdio> // FireReentrancyStress가 stdout에도 낸다(회귀가 발화를 본다)
 #include "LifecycleRegistry.h"
 #include "VolumeComponent.h"
@@ -193,8 +194,9 @@ std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
 	return released;
 }
 
-void Scene::SerializeEntityHierarchy(const Entity& entity, YAML::Node& node) const
+void Scene::SerializeEntityHierarchy(const Entity& entity, const Authoring::MutableNodeView& view) const
 {
+	YAML::Node& node = Authoring::MutableNodeViewAccess::Node(view);
 	if (!Entity::IsValidIndex(entity.m_index)) return;
 	const size_t index = static_cast<size_t>(entity.m_index);
 	if (index >= m_Entities.size() || m_Entities[index].get() != &entity) return;

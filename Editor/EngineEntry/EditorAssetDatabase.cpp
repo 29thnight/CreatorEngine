@@ -1144,8 +1144,11 @@ private:
 		// The watcher ignores .tmp paths. Publish only after the complete payload
 		// is flushed so runtime readers never observe a partial cache/image.
 		const file::path temporary = destination.string() + ".tmp";
-		const std::ios::openmode mode = PublishEncoding::Binary == encoding
-			? (std::ios::binary | std::ios::trunc) : std::ios::trunc;
+		// D3-b: 두 인코딩 모두 binary 모드로 연다. 여기서 텍스트 모드를 쓰면
+		// Windows가 개행을 CRLF로 바꿔, 같은 내용을 저장할 때마다 개행이 뒤집힌다.
+		// 인코딩 구분은 **무엇을 쓰는가**이지 **개행을 어떻게 쓰는가**가 아니다.
+		const std::ios::openmode mode = std::ios::binary | std::ios::trunc;
+		(void)encoding;
 		std::ofstream output(temporary, mode);
 		if (!output.is_open())
 		{
@@ -1373,7 +1376,8 @@ private:
 			root["ModelImporter"]["CreateMeshCollider"] = false;
 		}
 
-		std::ofstream output(metaPath);
+		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+		std::ofstream output(metaPath, std::ios::binary | std::ios::trunc);
 		if (!output.is_open()) return {};
 		output << root;
 		output.flush();
@@ -1685,7 +1689,8 @@ bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory)
 	while (file::exists(fullPath))
 		fullPath = directory / (baseName + std::to_string(suffix++) + ".volume");
 
-	std::ofstream output(fullPath);
+	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+	std::ofstream output(fullPath, std::ios::binary | std::ios::trunc);
 	if (!output.is_open()) return false;
 	output << Meta::Serialize(&profile);
 	output.flush();
@@ -1706,7 +1711,8 @@ bool EditorAssetDatabase::SaveExistingVolumeProfile(
 		return false;
 	}
 
-	std::ofstream output(savePath);
+	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+	std::ofstream output(savePath, std::ios::binary | std::ios::trunc);
 	if (!output.is_open()) return false;
 	output << Meta::Serialize(volume);
 	output.flush();

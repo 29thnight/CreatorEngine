@@ -1,5 +1,7 @@
 #pragma once
 #include "Object.h"
+#include "AuthoringDocument.h"
+#include "AuthoringNodeView.h"
 #include "Component.h"
 #include "Transform.h"
 #include "GameObjectType.h"
@@ -85,12 +87,19 @@ public:
 	// E7-c: GameObjectType은 생성 요청의 일회성 파라미터로만 남는다. 디스크에
 	// 필드가 없는 신형 노드는 공간 컴포넌트 조합으로 생성 아키타입을 복원하고,
 	// 구형 노드는 m_gameObjectType을 읽기 호환 입력으로만 받아들인다.
-	static GameObjectType InferCreationType(const YAML::Node& node);
+	// D3-a-2: 이 정적 진입은 `EntityAuthoringRead.h`의 `EntityAuthoring` 네임스페이스로
+	// 옮겼다 — Entity의 상태가 아니라 디스크 표현의 해석이기 때문이다.
+	// 반환 타입 `GameObjectType`은 포맷과 무관한 DTO라 여기 그대로 남는다.
 
 	// H3 YAML 호환 어댑터. 디스크의 top-level 계층 키는 유지하지만 더 이상
 	// Entity 리플렉션 필드가 아니다. 읽기 DTO와 쓰기 값은 Scene Store를 경유한다.
-	static SerializedHierarchy ReadSerializedHierarchy(const YAML::Node& node);
-	void OnAfterSerialize(YAML::Node& node) const;
+	// D3-a-2: 읽기 진입도 `EntityAuthoring::ReadSerializedHierarchy`로 옮겼다.
+	// `SerializedHierarchy` DTO 자체는 포맷 무관이라 여기 남는다.
+
+	// ★ 이 훅은 옮기지 않았다. 리플렉션이 SFINAE로 **멤버의 존재를 탐지해** 부르므로
+	//   (`ReflectionTypedYml.h:519`) 자유 함수로 빼면 컴파일은 되고 계층 직렬화만
+	//   조용히 사라진다. 리플렉션 계약과 함께 D3-a-4에서 바뀐다.
+	void OnAfterSerialize(const Authoring::MutableNodeView& node) const; // D3-a-4, D3-b-2 쓰기 분리
 
 	// K2 스테이지 A: 반환이 shared_ptr<Component> → Component*로 바뀌었다.
 	// m_components 자체가 고유 소유라 shared_ptr을 새로 만들 근거가 없다 —
@@ -378,7 +387,9 @@ public:
 	// m_prefabOverrides가 비어 있는 인스턴스를 만났을 때만 이 스냅샷과 현재 값을 1회
 	// 비교해 목록을 시딩하는 마이그레이션 편의로만 쓴다. 비직렬화라 씬을 재로드하면
 	// 비고, 그러면 시딩할 근거가 없어 "오버라이드 없음"으로 취급한다(예외 1과 같은 결과).
-	YAML::Node m_prefabOriginal{};
+	// D3-a-3: 문서 소유 타입이 감싼다(§3.3). 이 멤버는 여전히 비직렬화이고
+	// reflect()에 없다 — 바뀐 것은 소유 표현뿐이며 시딩 의미는 그대로다.
+	Authoring::Document m_prefabOriginal{};
 	std::string m_removedSuffixNumberTag{};
 
 	bool m_isStatic{ false };

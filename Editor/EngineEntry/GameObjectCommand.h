@@ -5,6 +5,8 @@
 #include "Model.h"
 #include "SceneManager.h"
 #include "Entity.h"
+#include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
+#include "AuthoringNodeViewAccess.h" // D3-a-5
 #include "ReflectionYml.h"
 #include "ComponentFactory.h"
 
@@ -56,7 +58,7 @@ namespace Meta
                 m_parentIndex = obj->GetParentIndex();
 				m_sourceRootIndex = obj->GetRootIndex();
 				m_serializedNode = Meta::Serialize(obj);
-				m_type = Entity::InferCreationType(m_serializedNode);
+				m_type = EntityAuthoring::InferCreationType(m_serializedNode);
             }
         }
 
@@ -75,7 +77,7 @@ namespace Meta
                     {
                         try
                         {
-							ComponentFactorys->LoadComponent(objPtr, componentNode);
+							ComponentFactorys->LoadComponent(objPtr, Authoring::NodeViewAccess::Make(componentNode));
                         }
                         catch (const std::exception& e)
                         {

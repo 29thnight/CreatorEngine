@@ -1,4 +1,5 @@
 #include "MeshRenderer.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "Model.h"
 #include "ReflectionYml.h"
 #include "DataSystem.h"
@@ -62,8 +63,9 @@ math::aabb MeshRenderer::GetBoundingBox() const
     return math::aabb{};
 }
 
-void MeshRenderer::OnDeserialized(const YAML::Node& node)
+void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 {
+	const YAML::Node& node = Authoring::NodeViewAccess::Node(view);
 	// typed 역직렬화가 m_Material의 소유 인스턴스를 이미 만들었다. 예전 경로는
 	// 이름으로 cache material을 꺼낸 뒤 scene snapshot을 그 공유 객체에 다시
 	// Deserialize해 다른 renderer까지 바꿨다. snapshot 소유권은 유지하고 runtime
@@ -79,7 +81,8 @@ void MeshRenderer::OnDeserialized(const YAML::Node& node)
 		&& materialNode["schema"] && materialNode["shaderAssetId"])
 	{
 		auto decoded = std::make_shared<Material>();
-		if (DataSystems->DeserializeMaterialPayload(*decoded, materialNode))
+		if (DataSystems->DeserializeMaterialPayload(*decoded,
+			Authoring::NodeViewAccess::Make(materialNode)))
 		{
 			// FinalizeMaterialRuntime은 이중화 경로 안에서 이미 수행됐다.
 			m_Material = std::move(decoded);

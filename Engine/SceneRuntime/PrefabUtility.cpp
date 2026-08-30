@@ -6,7 +6,10 @@
 #include "Scene.h"
 #include "Object.h"
 #include "LifecycleTrace.h"
+#include "AuthoringNodeEquality.h" // D3-a-1: 구조 비교
+#include "AuthoringDocumentAccess.h"
 #include "ReflectionYml.h"
+#include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
 #include <cstring>
 #include <sstream>
 #include <unordered_set>
@@ -52,7 +55,11 @@ namespace
 			const auto& snapProp = snapshotNode[prop.name];
 			if (!currProp || !snapProp)
 				continue;
-			if (YAML::Dump(currProp) == YAML::Dump(snapProp))
+			// D3-a-1: 문자열 덤프 비교 → 구조 비교(§3.3, Y-6). 비교하려고 문자열을
+			// 만들지 않고, 맵 키 순서 같은 표기 차이를 오버라이드로 오인하지 않는다.
+			// 아래 `ov.m_valueYaml`은 **저장 표현**이라 그대로 둔다 — 그것을 바꾸면
+			// 파일 포맷이 바뀐다(§1.7 ⑧).
+			if (Authoring::NodesEqual(currProp, snapProp))
 				continue;
 
 			PrefabOverride ov;
@@ -75,15 +82,19 @@ namespace
 	// 않는다 — 그 결과는 "오버라이드 없음"으로, 예외 1의 읽기 호환과 같다.
 	void SeedOverridesFromSnapshot(Entity& obj)
 	{
-		if (!obj.m_prefabOriginal || !obj.m_prefabOriginal.IsMap())
+		if (obj.m_prefabOriginal.IsEmpty())
+			return;
+		const MetaYml::Node& snapshotNode =
+			Authoring::DocumentAccess::Node(obj.m_prefabOriginal);
+		if (!snapshotNode.IsMap())
 			return;
 
 		MetaYml::Node currentNode = Meta::Serialize(&obj, Meta::TypeOf<Entity>());
 
-		SeedTypeOverrides(Meta::TypeOf<Entity>(), "", currentNode, obj.m_prefabOriginal, obj.m_prefabOverrides);
+		SeedTypeOverrides(Meta::TypeOf<Entity>(), "", currentNode, snapshotNode, obj.m_prefabOverrides);
 
 		const auto& currComponents = currentNode["m_components"];
-		const auto& snapComponents = obj.m_prefabOriginal["m_components"];
+		const auto& snapComponents = snapshotNode["m_components"];
 		if (currComponents && snapComponents && currComponents.IsSequence() && snapComponents.IsSequence())
 		{
 			// 순번은 **타입별 누적**이다 — 절대 인덱스가 아니다.
@@ -198,7 +209,7 @@ namespace
 				++ordinal;
 				try
 				{
-					ComponentFactorys->LoadComponent(&obj, node);
+					ComponentFactorys->LoadComponent(&obj, Authoring::NodeViewAccess::Make(node));
 				}
 				catch (const std::exception& e)
 				{
@@ -474,6 +485,8 @@ size_t PrefabUtility::OwnedPrefabCount() const
 
 Entity* PrefabUtility::InstantiatePrefab(const Prefab* prefab, std::string_view name)
 {
+    // D0(SerializationPlan): 소환은 자기 자신이 루트다 — 씬 로드 분해 합에 포함하지 않는다.
+    SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::PrefabInstantiate);
     if (!prefab)
         return nullptr;
     Entity* obj = prefab->Instantiate(name);
@@ -488,6 +501,8 @@ Entity* PrefabUtility::InstantiatePrefab(const Prefab* prefab, std::string_view 
 
 Entity* PrefabUtility::InstantiatePrefab(const Prefab* prefab, Scene* targetScene, std::string_view name)
 {
+    // D0: 위 오버로드와 서로 부르지 않으므로 이중 계수가 아니다.
+    SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::PrefabInstantiate);
     if (!prefab || !targetScene)
         return nullptr;
     Entity* obj = prefab->Instantiate(targetScene, name);
@@ -596,7 +611,7 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
         // (yaml-cpp 참조 의미) 그냥 대입하면 이 인스턴스의 스냅샷이 프리팹의 살아
         // 있는 데이터를 계속 가리킨다 — 프리팹이 다음에 바뀌면 스냅샷이 소리 없이
         // 따라 바뀌어 "무엇과 비교하는지"가 무너진다. 사유는 Prefab.cpp의 같은 자리.
-        obj->m_prefabOriginal = MetaYml::Clone(newData);
+        obj->m_prefabOriginal = Authoring::DocumentAccess::Adopt(MetaYml::Clone(newData));
 
         prefabInstanceUpdated.Broadcast(*obj);
     }
@@ -657,7 +672,8 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
 	}
 	else
 	{
-		std::ofstream out(path);
+		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+		std::ofstream out(path, std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) return false;
 		out << payload.str();
 		out.flush();
@@ -693,7 +709,9 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
     if (auto it = m_prefabCache.find(key);
         it != m_prefabCache.end() && it->second.get() != prefab)
     {
-        it->second->SetPrefabData(node["PrefabNode"]);
+        // D3-a-5b: 뷰는 소유하지 않으므로 대상 노드에 이름을 준다.
+        const MetaYml::Node cachedPrefabNode = node["PrefabNode"];
+        it->second->SetPrefabData(Authoring::NodeViewAccess::Make(cachedPrefabNode));
         it->second->SetFileGuid(identity);
     }
 
@@ -711,10 +729,15 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
         return it->second.get();
     }
 
+    // D0(SerializationPlan): 캐시 미스 구간 전체(파싱 + 정의 역직렬화 + identity 해석).
+    // LoadFile만 재면 정의 역직렬화 몫이 빠져 "프리팹 로드 비용"을 과소 보고한다.
+    SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::PrefabParse);
+
     auto node = MetaYml::LoadFile(path);
     auto prefab = std::make_unique<Prefab>();
     Meta::Deserialize(prefab.get(), node);
-	prefab->SetPrefabData(node["PrefabNode"]);
+	const MetaYml::Node loadedPrefabNode = node["PrefabNode"];
+	prefab->SetPrefabData(Authoring::NodeViewAccess::Make(loadedPrefabNode));
 	const FileGuid identity = DataSystems->GetFileGuid(path);
 	if (identity == FileGuid{})
 	{
@@ -750,8 +773,7 @@ Prefab* PrefabUtility::LoadPrefab(const std::string& path)
         prefab->SetFileGuid(DataSystems->GetFileGuid(filepath.string()));
         return prefab;
     }
-
-	return nullptr;
+    return prefab;
 }
 
 Prefab* PrefabUtility::LoadPrefabGuid(const FileGuid& guid)

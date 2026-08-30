@@ -498,7 +498,7 @@ InspectorWindow::InspectorWindow()
 						YAML::Emitter emitter;
 						emitter << *selectedNode;
 
-						std::ofstream fout(selectedMetaFilePath);
+						std::ofstream fout(selectedMetaFilePath, std::ios::binary | std::ios::trunc);
 						if (fout.is_open())
 						{
 							fout << emitter.c_str();

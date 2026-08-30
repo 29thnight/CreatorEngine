@@ -1,4 +1,6 @@
 #include "ComponentFactory.h"
+#include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
+#include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "LifecycleRegistry.h"
 #include "Entity.h"
 #include "Transform.h"
@@ -106,8 +108,12 @@ void ComponentFactory::Initialize()
    }
 }
 
-void ComponentFactory::LoadComponent(Entity* obj, const MetaYml::detail::iterator_value& itNode, bool isEditorToGame)
+void ComponentFactory::LoadComponent(Entity* obj, const Authoring::NodeView& view, bool isEditorToGame)
 {
+	const MetaYml::Node& itNode = Authoring::NodeViewAccess::Node(view);
+	// D0(SerializationPlan): 컴포넌트 적재 구간. 호출부(씬·프리팹·복제)가 여럿이므로
+	// 함수 본체에 둬야 전 경로가 한 자로 잡힌다.
+	SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::ComponentLoad);
 	if (itNode["ModuleBehavior"])
 	{
 		// C++ 스크립트 은퇴(9-4): 구 포맷의 ModuleBehavior 노드는 더는 복원할 수 없다.
@@ -179,7 +185,7 @@ void ComponentFactory::LoadComponent(Entity* obj, const MetaYml::detail::iterato
 		// UIManager의 지연 연결에서 새 경로로 치유한다.
 		if (auto* ui = dynamic_cast<UIComponent*>(component))
 		{
-			ui->LoadLegacyNavigation(itNode);
+			ui->LoadLegacyNavigation(Authoring::NodeViewAccess::Make(itNode));
 		}
 
 		if (const Meta::Typed::TypeOps* ops = Meta::Typed::FindTypeOps(componentType->typeID.m_ID_Data))

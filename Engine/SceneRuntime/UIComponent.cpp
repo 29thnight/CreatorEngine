@@ -1,4 +1,5 @@
 #include "UIComponent.h"
+#include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "Entity.h"
 #include "Canvas.h"
 #include "UIManager.h"
@@ -234,8 +235,9 @@ void UIComponent::OnBeforeSerialize()
 	}
 }
 
-void UIComponent::LoadLegacyNavigation(const YAML::Node& componentNode)
+void UIComponent::LoadLegacyNavigation(const Authoring::NodeView& view)
 {
+	const YAML::Node& componentNode = Authoring::NodeViewAccess::Node(view);
 	m_legacyNavigationIds.fill(HashedGuid{});
 	const YAML::Node legacyNavigations = componentNode["navigations"];
 	if (!legacyNavigations || !legacyNavigations.IsSequence())

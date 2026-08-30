@@ -248,6 +248,9 @@
     <ClCompile Include="EnhancedGizmoSceneBinding.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
+    <ClCompile Include="EntityAuthoringRead.cpp">
+      <Filter>Classes\GameObject</Filter>
+    </ClCompile>
     <ClCompile Include="Entity.cpp">
       <Filter>Classes\GameObject</Filter>
     </ClCompile>
@@ -525,6 +528,9 @@
     </ClInclude>
     <ClInclude Include="EForceMode.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="EntityAuthoringRead.h">
+      <Filter>Classes\GameObject</Filter>
     </ClInclude>
     <ClInclude Include="Entity.h">
       <Filter>Classes\GameObject</Filter>

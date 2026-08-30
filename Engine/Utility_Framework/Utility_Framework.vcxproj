@@ -25,6 +25,15 @@
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="MetaPolymorphic.h" />
     <ClInclude Include="PakHelper.h" />
+    <ClInclude Include="AuthoringParserProbe.h" />
+    <ClInclude Include="AuthoringRymlErrorPolicy.h" />
+    <ClInclude Include="AuthoringScalarParityProbe.h" />
+    <ClInclude Include="AuthoringNodeView.h" />
+    <ClInclude Include="AuthoringNodeViewAccess.h" />
+    <ClInclude Include="AuthoringDocument.h" />
+    <ClInclude Include="AuthoringDocumentAccess.h" />
+    <ClInclude Include="AuthoringNodeEquality.h" />
+    <ClInclude Include="SerializationProfiler.h" />
     <ClInclude Include="plf_colony.h" />
     <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.CountingSemaphore.h" />
@@ -77,6 +86,12 @@
       <ClInclude Include="EngineResourceCensus.h" />
 </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AuthoringParserProbe.cpp" />
+    <ClCompile Include="AuthoringRymlErrorPolicy.cpp" />
+    <ClCompile Include="AuthoringScalarParityProbe.cpp" />
+    <ClCompile Include="AuthoringDocument.cpp" />
+    <ClCompile Include="AuthoringNodeEquality.cpp" />
+    <ClCompile Include="SerializationProfiler.cpp" />
     <ClCompile Include="Core.Coroutine.cpp" />
     <ClCompile Include="CoreWindow.cpp" />
     <ClCompile Include="RuntimeSettings.cpp" />

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Texture.h"
+#include "AuthoringNodeView.h" // D3-a-5b
 #include "AssetMetaRegistry.h"
 #include "AssetJob.h"
 #include "ClassProperty.h"
@@ -117,7 +118,7 @@ public:
 	// M5-B1: standalone Material YAML의 단일 codec. scene embedded material은
 	// typed reflection이 값을 복원한 뒤 같은 runtime finalize 규약을 공유한다.
 	YAML::Node SerializeMaterialPayload(Material& material) const;
-	bool DeserializeMaterialPayload(Material& material, const YAML::Node& node);
+	bool DeserializeMaterialPayload(Material& material, const Authoring::NodeView& node);
 	// Model cache는 이 versioned envelope 안에 위 YAML payload를 넣는다. 기존
 	// 무버전 binary record 판별은 probe 뒤 ModelLoader의 read-only 호환 경로가 맡는다.
 	bool HasVersionedMaterialBinaryPayload(std::istream& input) const;

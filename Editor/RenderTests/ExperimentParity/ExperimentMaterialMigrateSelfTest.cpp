@@ -1,5 +1,6 @@
 #include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
 
+#include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "DataSystem.h"
 #include "MeshRenderer.h"
 #include "Experiment/AssetIdentity.h"
@@ -364,8 +365,9 @@ namespace RenderTest
             "keywordSelections: []\n";
 
         Material material;
+        const YAML::Node authoredNode = YAML::Load(yaml);
         const bool decoded = DataSystems->DeserializeMaterialPayload(material,
-            YAML::Load(yaml));
+            Authoring::NodeViewAccess::Make(authoredNode));
         check.Check(decoded, "새 정본 문서 decode");
         if (decoded)
         {
@@ -403,7 +405,9 @@ namespace RenderTest
                 "  keywords: []\n"
                 "  keywordSelections: []\n";
             MeshRenderer renderer;
-            renderer.OnDeserialized(YAML::Load(componentYaml));
+            // D3-a-4: 훅 인자가 뷰가 됐다. 자가 검사도 같은 창구로 부른다.
+            const YAML::Node componentNode = YAML::Load(componentYaml);
+            renderer.OnDeserialized(Authoring::NodeViewAccess::Make(componentNode));
             check.Check(nullptr != renderer.m_Material,
                 "postLoad가 새 정본 material을 만든다");
             if (renderer.m_Material)
@@ -429,7 +433,8 @@ namespace RenderTest
             legacyRenderer.m_Material = std::make_shared<Material>();
             legacyRenderer.m_Material->m_name = "TypedFilled";
             const std::shared_ptr<Material> before = legacyRenderer.m_Material;
-            legacyRenderer.OnDeserialized(YAML::Load("m_Material:\n  m_name: TypedFilled\n"));
+            const YAML::Node legacyNode = YAML::Load("m_Material:\n  m_name: TypedFilled\n");
+            legacyRenderer.OnDeserialized(Authoring::NodeViewAccess::Make(legacyNode));
             check.Check(legacyRenderer.m_Material == before
                 && legacyRenderer.m_Material->m_name == "TypedFilled",
                 "legacy 노드는 typed 인스턴스를 보존한다");
@@ -438,13 +443,15 @@ namespace RenderTest
         // legacy 문서는 기존 경로 그대로다 — 이중화가 legacy를 깨지 않는다.
         {
             Material legacyDocument;
-            const bool legacyDecoded = DataSystems->DeserializeMaterialPayload(
-                legacyDocument, YAML::Load(
+            // D3-a-5b: 임시 노드로 뷰를 만들 수 없다(Make(Node&&) = delete) — 이름을 준다.
+            const YAML::Node legacyDocumentNode = YAML::Load(
                     "m_name: LegacyProbe\n"
                     "m_shaderMetaGuid: " + fixtureGuid.ToString() + "\n"
                     "m_propertyValues:\n"
                     "  - m_name: roughness\n"
-                    "    m_numericValue: [0.5]\n"));
+                    "    m_numericValue: [0.5]\n");
+            const bool legacyDecoded = DataSystems->DeserializeMaterialPayload(
+                legacyDocument, Authoring::NodeViewAccess::Make(legacyDocumentNode));
             check.Check(legacyDecoded
                 && legacyDocument.m_name == "LegacyProbe",
                 "legacy 문서 경로 무변경");

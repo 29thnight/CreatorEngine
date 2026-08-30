@@ -66,6 +66,24 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AuthoringParserProbe.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="AuthoringRymlErrorPolicy.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="AuthoringScalarParityProbe.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="AuthoringDocument.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="AuthoringNodeEquality.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="SerializationProfiler.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
     <ClCompile Include="Core.Coroutine.cpp">
       <Filter>Core.Coroutine</Filter>
     </ClCompile>
@@ -186,6 +204,33 @@
       <Filter>Core.Reflection</Filter>
     </ClInclude>
     <ClInclude Include="MetaStateCommand.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringParserProbe.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringRymlErrorPolicy.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringScalarParityProbe.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringNodeView.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringNodeViewAccess.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringDocument.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringDocumentAccess.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringNodeEquality.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="SerializationProfiler.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
     <ClInclude Include="PakHelper.h">

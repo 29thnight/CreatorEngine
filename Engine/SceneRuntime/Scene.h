@@ -3,6 +3,7 @@
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
 #include "EntityHandle.h"
+#include "AuthoringNodeView.h" // D3-a-5
 #include "SystemSchedule.h"
 #include "CameraSystem.h"
 #include "PhysicsManager.h"
@@ -207,7 +208,7 @@ private:
     std::unique_ptr<Entity> ReleaseSlot(Entity::Index index);
 	// H3 저장 어댑터: Entity node에 Store 정본을 기존 계층 키로 쓴다.
 	// Entity::OnAfterSerialize만 호출하며 detached/비점유 Entity에는 쓰지 않는다.
-	void SerializeEntityHierarchy(const Entity& entity, YAML::Node& node) const;
+	void SerializeEntityHierarchy(const Entity& entity, const Authoring::MutableNodeView& node) const;
 	// 비소유 AI registry/component snapshot이 Entity를 읽는 동안 파괴·이송하지
 	// 않도록 Scene의 구조 변경 경계에서 future를 회수한다.
 	void DrainAIUpdate();

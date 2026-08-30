@@ -235,6 +235,33 @@ namespace
         return PathHasPrefix(fs::absolute(candidate), fs::absolute(root));
     }
 
+    // SerializationPlan D1(Y-4): 네이티브 스크립트 소스는 배포물에 실리지 않는다.
+    //
+    // ★ `.hlsl`/`.hlsli`는 여기 없고, 앞으로도 넣으면 안 된다. 현재 패키지는 셰이더
+    //   **소스**와 Slang/DXC DLL을 싣고 Player가 런타임에 컴파일한다
+    //   (BuildPipelinePlan B3). 셰이더를 "소스 파일"로 묶어 빼면 게임이 아무것도
+    //   그리지 못한다 — 필터의 과잉이 누락보다 위험한 자리다.
+    //
+    // ★ `.meta`도 없다. D5 매니페스트가 Player의 GUID 해석을 대체하기 전까지
+    //   sidecar가 필요하다(계획서 D1 본문의 별표).
+    bool IsExcludedSourceExtension(const fs::path& path)
+    {
+        static const std::wstring_view kExcluded[] = { L".cpp", L".h", L".hpp" };
+
+        std::wstring extension = path.extension().native();
+        // 대소문자 무시 — `.CPP`로 저장된 파일이 필터를 지나가면 안 된다.
+        for (wchar_t& c : extension)
+        {
+            if (c >= L'A' && c <= L'Z') c = static_cast<wchar_t>(c - L'A' + L'a');
+        }
+
+        for (const std::wstring_view candidate : kExcluded)
+        {
+            if (extension == candidate) return true;
+        }
+        return false;
+    }
+
     void CollectFiles(const fs::path& root, const char* mountName,
         std::vector<InputFile>& files)
     {
@@ -268,6 +295,10 @@ namespace
             }
             if (!fs::is_regular_file(status)) continue;
 
+            // D1: 제외는 reparse/symlink 거부 **뒤**에 온다. 순서를 바꾸면 악성 심볼릭
+            // 링크가 `.cpp` 확장자를 달고 검사를 건너뛴다.
+            if (IsExcludedSourceExtension(entry.path())) continue;
+
             const fs::path relative = fs::relative(entry.path(), normalizedRoot, error);
             if (error || relative.empty() || *relative.begin() == "..")
             {
@@ -285,6 +316,11 @@ namespace
         fs::path assets;
         fs::path settings;
         fs::path output;
+        // D1 게이트용. pak은 결정적이지 않다 — 같은 입력을 두 번 패킹해도 SHA-256이
+        // 다르다. 그래서 바이트 비교로는 "무엇이 실렸는지"를 단정할 수 없고, 목록을
+        // 내보내는 창구가 필요하다. entry 수만 세면 "빠져야 할 것이 들어가고 실려야
+        // 할 것이 빠진" 같은 수의 pak을 통과시킨다.
+        bool listEntries = false;
     };
 
     Arguments ParseArguments(int argc, wchar_t* argv[])
@@ -302,6 +338,7 @@ namespace
             if (arg == L"--assets") result.assets = argv[++i];
             else if (arg == L"--settings") result.settings = argv[++i];
             else if (arg == L"--output") result.output = argv[++i];
+            else if (arg == L"--list-entries") result.listEntries = true;
             else if (arg == L"--help" || arg == L"-h")
             {
                 std::wcout << L"AssetPacker --assets <dir> --settings <dir> --output <pak>\n";
@@ -435,6 +472,15 @@ int wmain(int argc, wchar_t* argv[])
         }
 
         PromoteCandidate(candidate, output);
+        if (args.listEntries)
+        {
+            // reopen 검증을 통과한 archivedFiles를 찍는다 — 빌더에 넣은 목록이 아니라
+            // **실제로 pak에서 다시 읽힌** 목록이라야 게이트가 산출물을 본 것이 된다.
+            for (const auto& archived : archivedFiles)
+            {
+                std::cout << "[PAK-ENTRY] " << archived.path << '\n';
+            }
+        }
         std::cout << "[PAK] packaged " << files.size() << " sorted entries: "
             << ToUtf8(output) << '\n';
         return 0;
