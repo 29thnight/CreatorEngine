@@ -637,7 +637,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S0 ✅ | experiment 저작 YAML 코덱(정본 스키마) — 호출부 무변경 | 게이트 | 없음 |
 | ↳ M5-S1 ✅ | 변환 정본 + DataSystem 읽기 이중화 — legacy↔experiment 단일 변환기, 새 정본 문서 로드 | DataSystem·sealing 브리지 | 없음 |
 | ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
-| ↳ M5-S2b | 씬 writer 전환 — **선결: flow·useNormalMap·IOR의 정본 표현**(아래 ★) | 씬 저장 | 없음 |
+| ↳ M5-S2b | 씬 writer 전환 — 선결 중 **flow는 해소**(아래 승격 실측), 잔여: useNormalMap·IOR | 씬 저장 | 없음 |
 | ↳ M5-S2c | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
@@ -833,6 +833,26 @@ SaveMaterial 즉시 저장 제거). **`InstantiateShared` 제품 호출부는 �
 I6과 함께), AssetBundle/ResourceCounter/Terrain 경량 표면은 시그니처 무변경. 검증: 빌드,
 matscript 35+4·matmigrate, material corpus 2/2, 씬 코퍼스 28/28. Inspector 시각 동작은 CLI
 게이트 밖이다 — 에디터 실사용 확인이 남는다.
+
+**flow 승격 완료 실측 (2026-08-30).** `m_flowInfo`(windVector/uvScroll)를 ShaderMeta 논리
+property(`flowUvScroll`·`flowWindVector`)로 승격했다 — S2b의 최대 선결 해소. Forward/Water/
+Wind shadermeta 3종과 ForwardShade.hlsl의 b2 CB에 공통 선언을 더했고, snapshot draw는 CB
+저작값을, legacy/self-test draw는 기존 인스턴스 채널을 쓴다(materialFlags bit1 분기 —
+baseColor와 같은 규약). 시간(total/delta)은 프레임 값이라 계속 인스턴스로 온다. 브리지
+(`ConvertLegacyMaterial`)가 m_flowInfo→논리 값 폴백을 승계하고 역변환이 m_flowInfo를
+동기화한다 — 제품 sealing 경로의 픽셀은 그대로다.
+
+실측이 가른 함정 셋: ① **VS가 b2를 읽으면 root signature CBV 스테이지 가시성이 어긋난다**
+(PSO 생성 E_INVALIDARG) — 선택은 PS에서 한다(PS는 이미 b2 소비자). ② **reflection이 CB
+크기를 패딩 없이 보고한다** — float4를 마지막에 둬야 총합이 16B 정렬로 끝나 pass 검증(%16)을
+지난다. 그래서 선언 순서는 float2(uvScroll)→float4(windVector)가 계약이다(48B 표준 프리픽스
+뒤, b2 = 무tail 80B / tail 96B). ③ **vk.forward의 수동 packet 경로는 브리지를 우회한다** —
+테스트가 flow를 m_flowInfo로만 저작해 기대식이 0.11376 어긋났고, 논리 값 저작을 더해
+기대식과 정확히 일치(0.2598≈0.26)로 복귀했다. 검증: dx12 스윕 기준선 일치(28·4·2·1),
+dx12.forward/forwardshade·vk.forward/gbuffer/grid(테스트 계약을 80/96B·flow 항목 포함으로
+갱신), matmigrate 합성 22(flow 승계·역동기화 — 변이가 정확히 2건을 붉힘), ft-primitives·
+material/scene 코퍼스 전수. Inspector 동적 편집기에는 flow가 자동으로 나타난다(meta 선언
+기반). 인스턴스 flow 채널의 wind/uvScroll 은퇴는 legacy 경로와 함께 I6의 몫이다.
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

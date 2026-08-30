@@ -221,6 +221,65 @@ namespace RenderTest
                 "역변환의 m_materialInfo 스칼라 동기화");
         }
 
+        // ── 2b. flow 승격 — m_flowInfo 폴백 승계·역동기화 ─────────────────
+        // 주의: legacy BuildShaderPropertyBlock에는 flow 폴백이 없다(의도 —
+        // 제품 sealing은 브리지만 탄다). 그래서 여기서는 bytes 패리티가 아니라
+        // 변환 자체를 단정한다.
+        {
+            MigrateContract flowContract = MakeContract();
+            flowContract.meta.properties.push_back(
+                { "flowUvScroll", "Flow UV Scroll", ShaderPropertyType::Float2,
+                  std::array<float, 2>{ 0.0f, 0.0f } });
+            flowContract.meta.properties.push_back(
+                { "flowWindVector", "Flow Wind Vector",
+                  ShaderPropertyType::Float4,
+                  std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 0.0f } });
+
+            Material legacy;
+            legacy.m_name = "MigrateFlow";
+            legacy.m_shaderMetaGuid = shaderGuid;
+            legacy.m_flowInfo.m_windVector = { 0.15f, -0.10f, 0.05f, 0.20f };
+            legacy.m_flowInfo.m_uvScroll = { 0.03f, -0.02f };
+
+            experiment::Material converted;
+            std::string error;
+            check.Check(ExperimentMaterialMigration::ConvertLegacyMaterial(
+                legacy, flowContract.meta, converted, error),
+                "flow 변환 (" + error + ")");
+            const auto findProperty = [&](std::string_view name)
+                -> const experiment::MaterialProperty*
+            {
+                for (const experiment::MaterialProperty& property
+                    : converted.properties)
+                {
+                    if (property.name == name) return &property;
+                }
+                return nullptr;
+            };
+            const experiment::MaterialProperty* flowWind =
+                findProperty("flowWindVector");
+            const auto* windValue = flowWind
+                ? std::get_if<math::vector4>(&flowWind->value) : nullptr;
+            check.Check(nullptr != windValue && windValue->x == 0.15f
+                && windValue->w == 0.20f,
+                "m_flowInfo windVector가 논리 값으로 승계된다");
+            const experiment::MaterialProperty* flowUv =
+                findProperty("flowUvScroll");
+            const auto* uvValue = flowUv
+                ? std::get_if<math::vector2>(&flowUv->value) : nullptr;
+            check.Check(nullptr != uvValue && uvValue->x == 0.03f
+                && uvValue->y == -0.02f,
+                "m_flowInfo uvScroll이 논리 값으로 승계된다");
+
+            Material restored;
+            check.Check(ExperimentMaterialMigration::ConvertToLegacyMaterial(
+                converted, &flowContract.meta, restored, error),
+                "flow 역변환 (" + error + ")");
+            check.Check(restored.m_flowInfo.m_windVector.w == 0.20f
+                && restored.m_flowInfo.m_uvScroll.y == -0.02f,
+                "역변환의 m_flowInfo 동기화");
+        }
+
         // ── 3. 이름 기반 keywords — meta 정규화·부재 시 fail-closed ───────
         {
             experiment::Material material;

@@ -132,6 +132,24 @@ namespace ExperimentMaterialMigration
             {
                 property.value = legacy.m_materialInfo.m_roughness;
             }
+            // flow 승격(I5-M5) — 저작 정본은 논리 값이고 m_flowInfo는 legacy
+            // 사본이다. 승계하지 않으면 meta 기본값 0이 저작된 바람을 지운다.
+            else if (desc.name == standard_material::property::FlowWindVector
+                && ShaderPropertyType::Float4 == desc.type)
+            {
+                property.value = math::vector4{
+                    legacy.m_flowInfo.m_windVector.x,
+                    legacy.m_flowInfo.m_windVector.y,
+                    legacy.m_flowInfo.m_windVector.z,
+                    legacy.m_flowInfo.m_windVector.w };
+            }
+            else if (desc.name == standard_material::property::FlowUvScroll
+                && ShaderPropertyType::Float2 == desc.type)
+            {
+                property.value = math::vector2{
+                    legacy.m_flowInfo.m_uvScroll.x,
+                    legacy.m_flowInfo.m_uvScroll.y };
+            }
             else
             {
                 continue; // 저작값 없음 — packer가 ShaderMeta 기본값을 쓴다.
@@ -270,6 +288,21 @@ namespace ExperimentMaterialMigration
             roughness && roughness->m_numericValue.size() == 1u)
         {
             outLegacy.m_materialInfo.m_roughness = roughness->m_numericValue[0];
+        }
+        if (const MaterialPropertyValue* flowWind = FindLegacyValue(outLegacy,
+            standard_material::property::FlowWindVector);
+            flowWind && flowWind->m_numericValue.size() == 4u)
+        {
+            outLegacy.m_flowInfo.m_windVector = {
+                flowWind->m_numericValue[0], flowWind->m_numericValue[1],
+                flowWind->m_numericValue[2], flowWind->m_numericValue[3] };
+        }
+        if (const MaterialPropertyValue* flowUv = FindLegacyValue(outLegacy,
+            standard_material::property::FlowUvScroll);
+            flowUv && flowUv->m_numericValue.size() == 2u)
+        {
+            outLegacy.m_flowInfo.m_uvScroll = {
+                flowUv->m_numericValue[0], flowUv->m_numericValue[1] };
         }
 
         outError.clear();

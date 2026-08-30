@@ -19,6 +19,10 @@ namespace standard_material::property
     inline constexpr std::string_view NormalScale{ "normalScale" };
     inline constexpr std::string_view OcclusionStrength{ "occlusionStrength" };
     inline constexpr std::string_view AlphaCutoff{ "alphaCutoff" };
+    // I5-M5 flow 승격 — legacy Material::m_flowInfo의 저작이 이 논리 이름으로
+    // material CB(b2)에 실린다. 시간은 프레임 값이라 property가 아니다.
+    inline constexpr std::string_view FlowWindVector{ "flowWindVector" };
+    inline constexpr std::string_view FlowUvScroll{ "flowUvScroll" };
 
     inline constexpr std::string_view BaseColorMap{ "baseColorMap" };
     inline constexpr std::string_view OrmMap{ "ormMap" };
@@ -34,6 +38,8 @@ namespace standard_material::property
         NormalScale,
         OcclusionStrength,
         AlphaCutoff,
+        FlowWindVector,
+        FlowUvScroll,
         BaseColorMap,
         OrmMap,
         NormalMap,

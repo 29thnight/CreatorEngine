@@ -1000,7 +1000,8 @@ namespace
             && 2 == layout.constantBufferRegister
             && 0 == layout.constantBufferSpace
             && expectedConstantBytes == layout.constantBufferByteSize
-            && kStandardNumericPropertyCount + tailProperties.size()
+            // I5-M5 flow 승격 — 표준 7 + variant tail + flow 2 + texture 4.
+            && kStandardNumericPropertyCount + tailProperties.size() + 2u
                 + kMaterialTextureSlotCount
                 == layout.properties.size();
         for (std::size_t index = 0;
@@ -1022,8 +1023,29 @@ namespace
                 && ShaderPropertyType::Float == binding.propertyType
                 && RHIShaderResourceKind::ConstantBuffer == binding.resourceKind;
         }
+        // flow 두 항목 — tail 뒤, texture 앞. float2(uvScroll)가 먼저고
+        // float4(windVector)는 다음 16B 레지스터로 정렬된다 — 총합이 16B로
+        // 끝나야 pass 검증(%16)을 지나므로 이 순서가 계약이다.
+        if (layoutMatches)
+        {
+            const std::size_t flowIndex =
+                kStandardNumericPropertyCount + tailProperties.size();
+            const std::uint32_t flowBase = 48u
+                + static_cast<std::uint32_t>(tailProperties.size()) * 4u;
+            const ShaderMetaPropertyBinding& flowUv =
+                layout.properties[flowIndex];
+            const ShaderMetaPropertyBinding& flowWind =
+                layout.properties[flowIndex + 1];
+            layoutMatches =
+                standard_material::property::FlowUvScroll == flowUv.name
+                && ShaderPropertyType::Float2 == flowUv.propertyType
+                && flowBase == flowUv.byteOffset
+                && standard_material::property::FlowWindVector == flowWind.name
+                && ShaderPropertyType::Float4 == flowWind.propertyType
+                && flowBase + 16u == flowWind.byteOffset;
+        }
         const std::size_t texturePropertyOffset =
-            kStandardNumericPropertyCount + tailProperties.size();
+            kStandardNumericPropertyCount + tailProperties.size() + 2u;
         std::array<bool, kMaterialTextureSlotCount> occupied{};
         std::vector<std::string_view> textureNames;
         for (std::size_t index = 0;
@@ -2474,7 +2496,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     ShaderMeta primaryMeta{};
     Material primaryMaterial{};
     std::uint32_t forwardPassIndex = 0;
-    if (!PrepareForwardMaterialProbe("Forward.shadermeta", {}, 48u,
+    if (!PrepareForwardMaterialProbe("Forward.shadermeta", {}, 80u,
             primaryHandle, primaryMeta, primaryMaterial, forwardPassIndex, error))
     {
         outLog += "[1/4] 제품 Forward ShaderMeta 준비 실패: " + error + "\n";
@@ -2656,9 +2678,9 @@ bool RunVulkanForwardTest(std::string& outLog)
     ShaderMetaHandle windHandle{};
     ShaderMeta windMeta{};
     std::uint32_t windPassIndex = 0;
-    if (!PrepareForwardMaterialProbe("ForwardWater.shadermeta", waterTail, 64u,
+    if (!PrepareForwardMaterialProbe("ForwardWater.shadermeta", waterTail, 96u,
             waterHandle, waterMeta, waterMaterial, waterPassIndex, error)
-        || !PrepareForwardMaterialProbe("ForwardWind.shadermeta", windTail, 64u,
+        || !PrepareForwardMaterialProbe("ForwardWind.shadermeta", windTail, 96u,
             windHandle, windMeta, windMaterial, windPassIndex, error)
         || waterPassIndex != forwardPassIndex || windPassIndex != forwardPassIndex)
     {
@@ -2796,10 +2818,27 @@ bool RunVulkanForwardTest(std::string& outLog)
     windMaterial.UseTextureMap("windMap", genericWindOwner);
     // P2d-b는 legacy m_flowInfo를 Material 주소가 아닌 값 snapshot으로 넘긴다.
     // Water는 구조 보존을, Wind mutation swatch는 실제 time/flow 픽셀 소비를 본다.
+    //
+    // I5-M5 flow 승격 — snapshot draw의 wind/uvScroll 정본은 b2 논리 값이다.
+    // 이 테스트는 sealing 브리지(m_flowInfo 폴백 합성)를 거치지 않고 수동으로
+    // packet을 만들므로, 논리 값을 직접 저작한다. m_flowInfo는 인스턴스 채널
+    // (legacy 폴백) 보존 검증용으로 함께 남긴다.
     waterMaterial.SetWindVector(math::vector4{ 0.15f, -0.10f, 0.05f, 0.20f })
         .SetUVScroll(math::vector2{ 0.03f, -0.02f });
     windMaterial.SetWindVector(math::vector4{ -0.25f, 0.35f, 0.10f, 0.40f })
         .SetUVScroll(math::vector2{ 0.05f, 0.025f });
+    if (!waterMaterial.TrySetVector("MaterialProperties", "flowWindVector",
+            math::vector4{ 0.15f, -0.10f, 0.05f, 0.20f })
+        || !waterMaterial.TrySetVector("MaterialProperties", "flowUvScroll",
+            math::vector2{ 0.03f, -0.02f })
+        || !windMaterial.TrySetVector("MaterialProperties", "flowWindVector",
+            math::vector4{ -0.25f, 0.35f, 0.10f, 0.40f })
+        || !windMaterial.TrySetVector("MaterialProperties", "flowUvScroll",
+            math::vector2{ 0.05f, 0.025f }))
+    {
+        outLog += "[1/4] Forward flow 논리 값 저작 실패\n";
+        return false;
+    }
     Material mutatedWindMaterial(windMaterial);
     constexpr float kPi = 3.14159265358979323846f;
     if (!mutatedWindMaterial.TrySetFloat(
@@ -2817,6 +2856,14 @@ bool RunVulkanForwardTest(std::string& outLog)
     mutatedWindMaterial.SetWindVector(
             math::vector4{ 0.f, 0.f, 0.f, 1.5f * kPi })
         .SetUVScroll(math::vector2{ 0.25f, -0.125f });
+    if (!mutatedWindMaterial.TrySetVector("MaterialProperties", "flowWindVector",
+            math::vector4{ 0.f, 0.f, 0.f, 1.5f * kPi })
+        || !mutatedWindMaterial.TrySetVector("MaterialProperties", "flowUvScroll",
+            math::vector2{ 0.25f, -0.125f }))
+    {
+        outLog += "[1/4] Forward Wind flow mutation 논리 값 저작 실패\n";
+        return false;
+    }
 
     const auto makePacket = [&](const Material& material,
         const ShaderMeta& meta, ShaderMetaHandle handle)
@@ -2906,9 +2953,9 @@ bool RunVulkanForwardTest(std::string& outLog)
             [](const auto& packet) { return !packet || !packet->IsValid(); })
         || !mutatedWindPacket || !mutatedWindPacket->IsValid()
         || !invalidFlowRejected
-        || 48u != packets[0]->propertyBytes.size()
-        || 64u != packets[1]->propertyBytes.size()
-        || 64u != packets[3]->propertyBytes.size()
+        || 80u != packets[0]->propertyBytes.size()
+        || 96u != packets[1]->propertyBytes.size()
+        || 96u != packets[3]->propertyBytes.size()
         || 4u != packets[3]->textureBindings.size()
         || "windMap" != packets[3]->textureBindings.front().propertyName
         || 4u != packets[3]->textureBindings.front().registerIndex

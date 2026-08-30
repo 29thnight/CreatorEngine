@@ -13,6 +13,8 @@ properties:
   - { name: waveAmplitude, label: Wave Amplitude, type: float, default: 0.08 }
   - { name: waveFrequency, label: Wave Frequency, type: float, default: 2.0 }
   - { name: waterTint, label: Water Tint, type: float, default: 0.8 }
+  - { name: flowUvScroll, label: Flow UV Scroll, type: float2, default: [0.0, 0.0] }
+  - { name: flowWindVector, label: Flow Wind Vector, type: float4, default: [0.0, 0.0, 0.0, 0.0] }
   - { name: baseColorMap, label: Base Color Map, type: texture2d }
   - { name: normalMap, label: Normal Map, type: texture2d }
   - { name: ormMap, label: ORM Map, type: texture2d }

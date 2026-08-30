@@ -65,6 +65,13 @@ cbuffer MaterialProperties : register(b2)
     float  windFrequency;
     float  windTint;
 #endif
+    // I5-M5 flow 승격 — wind/uvScroll 저작의 정본은 material CB(b2)다. 인스턴스
+    // 채널(ShadeInstance)의 사본은 snapshot 없는 legacy/self-test draw 폴백으로만
+    // 남는다. 시간(flowTotalSeconds/DeltaSeconds)은 프레임 값이라 계속 인스턴스로
+    // 온다. float2를 앞에 두는 이유: reflection이 CB 크기를 패딩 없이 보고하므로
+    // float4가 마지막이어야 총합이 16B 정렬로 끝난다(pass 검증 조건).
+    float2 flowUvScroll;
+    float4 flowWindVector;
 };
 
 StructuredBuffer<ShadeInstance> gInstances : register(t0);
@@ -195,6 +202,9 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     output.baseColor = instance.baseColor;
     output.material  = float4(instance.metallic, instance.roughness,
         (float)instance.useNormalMap, (float)instance.materialFlags);
+    // flow 승격의 CB 선택은 PS에서 한다 — VS가 b2를 읽으면 root signature의
+    // CBV 스테이지 가시성이 어긋난다(실측: PSO 생성 E_INVALIDARG). 인스턴스
+    // 채널은 그대로 나르고 PS가 materialFlags로 고른다.
     output.flowWind = instance.flowWindVector;
     output.flowUvTime = float4(instance.flowUvScroll,
         instance.flowTotalSeconds, instance.flowDeltaSeconds);
@@ -352,8 +362,15 @@ float4 PSMain(VSOut input) : SV_TARGET
         ? input.material.x : metallic;
     const float resolvedNormalScale = useLegacyInstanceMaterial
         ? 1.0f : normalScale;
+    // I5-M5 flow 승격 — snapshot draw의 wind/uvScroll 정본은 material CB(b2)다.
+    // 인스턴스 채널은 legacy/self-test 폴백이고, 시간(z/w)은 항상 인스턴스에서
+    // 온다.
+    const float4 resolvedFlowWind = useLegacyInstanceMaterial
+        ? input.flowWind : flowWindVector;
+    const float2 resolvedFlowUv = useLegacyInstanceMaterial
+        ? input.flowUvTime.xy : flowUvScroll;
     const float2 resolvedUv = input.uv
-        + input.flowUvTime.xy * input.flowUvTime.z;
+        + resolvedFlowUv * input.flowUvTime.z;
 
     float4 albedo = resolvedBaseColor;
     float3 materialEmissive = 0.0f;
@@ -374,8 +391,8 @@ float4 PSMain(VSOut input) : SV_TARGET
     }
     // P2d-b: authored speed/frequency와 immutable frame time·m_flowInfo를 함께
     // 사용한다. total=0, flow=0이면 P2c의 기존 authored phase와 정확히 같다.
-    const float flowPhase = dot(input.flowWind.xy, resolvedUv)
-        + input.flowWind.z * input.flowUvTime.z + input.flowWind.w;
+    const float flowPhase = dot(resolvedFlowWind.xy, resolvedUv)
+        + resolvedFlowWind.z * input.flowUvTime.z + resolvedFlowWind.w;
 #if defined(FORWARD_WATER_MATERIAL)
     const float waterWave = 0.5f + 0.5f * sin(
         (resolvedUv.x + resolvedUv.y) * waveFrequency

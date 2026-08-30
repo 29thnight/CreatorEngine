@@ -340,7 +340,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         if ("MaterialProperties" != layout.constantBufferName
             || 2u != layout.constantBufferRegister
             || 0u != layout.constantBufferSpace
-            || 64u != layout.constantBufferByteSize)
+            || 96u != layout.constantBufferByteSize)
         {
             return false;
         }
@@ -379,14 +379,14 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         }
         return true;
     };
-    if (!primaryLayout || 48u != primaryLayout->constantBufferByteSize
+    if (!primaryLayout || 80u != primaryLayout->constantBufferByteSize
         || !waterLayout || !windLayout
         || !valid64ByteLayout(*waterLayout, waterTail,
             standard_material::property::BaseColorMap)
         || !valid64ByteLayout(*windLayout, windTail, "windMap")
         || 3u != forward.GetShaderVariantCount())
     {
-        return failRepresentative("48B primary/64B Water·Wind reflection 계약 불일치");
+        return failRepresentative("80B primary/96B Water·Wind reflection 계약 불일치");
     }
 
     const RHIPipelineHandle primaryShade = forward.GetShadePSO();
@@ -483,7 +483,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         makeWindPacket(mutatedWindMaterial);
     if (!windPacket || !mutatedWindPacket || !windPacket->IsValid()
         || !mutatedWindPacket->IsValid()
-        || 64u != windPacket->propertyBytes.size()
+        || 96u != windPacket->propertyBytes.size()
         || 4u != windPacket->textureBindings.size()
         || "windMap" != windPacket->textureBindings.front().propertyName
         || 4u != windPacket->textureBindings.front().registerIndex

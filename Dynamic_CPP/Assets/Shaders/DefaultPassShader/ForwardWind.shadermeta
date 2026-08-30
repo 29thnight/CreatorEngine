@@ -13,6 +13,8 @@ properties:
   - { name: windStrength, label: Wind Strength, type: float, default: 0.35 }
   - { name: windFrequency, label: Wind Frequency, type: float, default: 2.5 }
   - { name: windTint, label: Wind Tint, type: float, default: 0.7 }
+  - { name: flowUvScroll, label: Flow UV Scroll, type: float2, default: [0.0, 0.0] }
+  - { name: flowWindVector, label: Flow Wind Vector, type: float4, default: [0.0, 0.0, 0.0, 0.0] }
   - { name: windMap, label: Wind Map, type: texture2d }
   - { name: normalMap, label: Normal Map, type: texture2d }
   - { name: ormMap, label: ORM Map, type: texture2d }

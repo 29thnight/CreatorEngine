@@ -9,6 +9,8 @@ properties:
   - { name: occlusionStrength, label: Occlusion Strength, type: float, default: 1.0 }
   - { name: emissive, label: Emissive, type: float3, default: [1.0, 1.0, 1.0] }
   - { name: alphaCutoff, label: Alpha Cutoff, type: float, default: 0.5 }
+  - { name: flowUvScroll, label: Flow UV Scroll, type: float2, default: [0.0, 0.0] }
+  - { name: flowWindVector, label: Flow Wind Vector, type: float4, default: [0.0, 0.0, 0.0, 0.0] }
   - { name: baseColorMap, label: Base Color Map, type: texture2d }
   - { name: normalMap, label: Normal Map, type: texture2d }
   - { name: ormMap, label: ORM Map, type: texture2d }
