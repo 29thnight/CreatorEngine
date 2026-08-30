@@ -644,8 +644,47 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S2c-2c | Foliage — `FoliageType.m_material` experiment 전환(비직렬화·저위험) | Foliage·required packet | 없음 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
-| **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
+| **I5-D** | `experiment::Model` 직접 소비 **+ V4 레이아웃 유도** — 아래 슬라이스로 분해(착수 정찰 2026-08-31) | 제품 렌더 | **소비자** 참조 감소 |
+| ↳ I5-D0a | 선결 갭 ① — 애니메이션 이벤트: `AddEvent`/`m_isLoop`의 experiment 대응 판정·구현(clip 표현 vs Animator 소유 이관) | Animator | 없음 |
+| ↳ I5-D0b | 선결 갭 ② — LOD: `GenerateLODs`/`m_LODThresholds`의 experiment 대응 판정(Mesh 표현 vs 렌더 파생) | Mesh·Inspector | 없음 |
+| ↳ I5-D1 | 로더 이중화 — catalog 기동 인스턴스+ResolvingModelDecoder 실조립, `LoadModelGUID`가 experiment 로드→legacy 브리지 소비(Assimp 폴백), **픽셀 diff 0 판정** | DataSystem·Player/Editor 기동 | 없음(브리지는 I6 은퇴) |
+| ↳ I5-D2 | V4 정적 경로 — mask→`RHIInputElement` 유도 함수, ForwardShade(무스킨) 전환, 짝 검사 게이트 | Forward 패스 | 없음 |
+| ↳ I5-D3 | V4 스킨 경로 — GBuffer/Shadow/WireFrame, BoneIndices RGBA8Uint·tangent w=handedness 셰이더 재현 | 스킨 3패스 | 없음 |
+| ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
+| ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
+
+**I5-D 착수 정찰 (2026-08-31) — 파급면 3방향 전수.**
+① **소비자 분류**: `#include "Model.h"` 24파일 중 오탐 2(Experiment 자체 include 동명 충돌 —
+[[substring-match-false-results]]의 재발 유형), 생산자/정의부 2를 제외하면 제품 소비자의
+위험도는 극도로 편중돼 있다. **GPU 업로드 초크포인트는 DX12MeshCache::GetOrUpload 하나**
+(호출부는 GBuffer/Forward/Shadow 3패스뿐, 96B `sizeof(Vertex)` 고정 가정 + `m_hashingMesh`
+캐시 키). 최대 재작성 대상은 ModelSceneBridge(m_nodes 자식 인덱스 순회·이름 조회 —
+experiment는 parent만 저장). 저위험 패스스루 6파일(DataSystem 팩토리·GameObjectCommand·
+Hierarchy·AssetBundle·ComponentFactory·EditorMain)은 타입 치환만. `GetMeshShared` 개별
+shared_ptr 장기 보유 패턴은 experiment 값 타입 모델과 불일치 — `Model::Shared+MeshIndex`
+페어 어댑터가 필요하다. Foliage와 TerrainComponent는 같은 패턴의 중복이라 함께 고친다.
+② **기능 손실형 갭 둘**(경계 전 필수 판정): 애니메이션 이벤트(`Skeleton::m_animations`의
+`AddEvent`/`m_isLoop` — experiment `AnimationClip`에 표현 없음)와 LOD(`GenerateLODs`/
+`m_LODThresholds` — experiment Mesh에 없음). D0a/D0b로 분리.
+③ **V4 실체**: 입력 레이아웃 5곳은 4파일 5배열(GBuffer 1·Forward 2·Shadow 1·WireFrame 1,
+GizmoLine은 자체 정점이라 제외), VSIn 4곳 확정. **마스크 계약은 이미 완성** —
+`Experiment/VertexLayout.h`의 `kVertexAttributeTable`이 시맨틱·포맷·permutation 축까지
+명시하고 cooked(`vertexLayoutTableHash`·mesh별 mask)로 왕복 중이라 V4는 설계가 아니라
+연결이다(mask→`RHIInputElement` 유도 함수 하나, RHI 계층에 — VertexLayout.h는 RHI 타입
+금지). 함정 둘: tangent가 RGBA32Float(w=handedness, BINORMAL 없음)라 셰이더가
+`bitangent = cross(N,T.xyz)*T.w` 재현으로 바뀌어야 하고, BoneIndices가 RGBA8Uint(legacy는
+RGBA32Float — "UINT4로 읽으면 팔레트 밖" 주석의 그 자리)라 스킨 3패스의 형식 변경이
+동반된다. 그래서 정적(D2)→스킨(D3) 순서로 격리한다.
+④ **Player 배선 현황**: `CookedAssetCatalog`은 완결 구현이나 **제품 인스턴스화 0건**
+(self-test만), `ResolvingModelDecoder`는 실디코더지만 실 cooked/source 디코더를 물려 제품에
+꽂는 조립이 0, `LoadModelGUID`는 AssetMetaRegistry→Assimp 그대로, Player pak은 cooked가
+아니라 소스 트리 사본이다. D1이 이 넷을 잇되 — "생산만 있고 소비 0"을 피하려고 배선과
+동시에 `LoadModelGUID`를 이중화한다: experiment 로드 성공 시 legacy 브리지(전환기,
+RenderTests의 ExperimentLegacyBridge 승격)로 기존 파이프에 소비시키고 실패는 Assimp 폴백.
+화면은 legacy 96B 그대로, 데이터 출처만 experiment — **V2 무손실 픽셀 diff 0 판정을 V4
+이전에, 렌더 경로를 열지 않고** 얻는 절단이다(I5-M S1 읽기 이중화와 같은 결). 브리지는
+D4에서 걷혀 I6에서 은퇴한다.
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그
