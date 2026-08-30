@@ -647,7 +647,8 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | **I5-D** | `experiment::Model` 직접 소비 **+ V4 레이아웃 유도** — 아래 슬라이스로 분해(착수 정찰 2026-08-31) | 제품 렌더 | **소비자** 참조 감소 |
 | ↳ I5-D0a | 선결 갭 ① — 애니메이션 이벤트: `AddEvent`/`m_isLoop`의 experiment 대응 판정·구현(clip 표현 vs Animator 소유 이관) | Animator | 없음 |
 | ↳ I5-D0b | 선결 갭 ② — LOD: `GenerateLODs`/`m_LODThresholds`의 experiment 대응 판정(Mesh 표현 vs 렌더 파생) | Mesh·Inspector | 없음 |
-| ↳ I5-D1 | 로더 이중화 — catalog 기동 인스턴스+ResolvingModelDecoder 실조립, `LoadModelGUID`가 experiment 로드→legacy 브리지 소비(Assimp 폴백), **픽셀 diff 0 판정** | DataSystem·Player/Editor 기동 | 없음(브리지는 I6 은퇴) |
+| ↳ I5-D1a ✅ | 역브리지 — `DataSystem::BuildLegacyModelFromExperiment`(experiment→legacy) + 왕복 게이트 | DataSystem | 없음(I6 은퇴) |
+| ↳ I5-D1b | 로더 이중화 — catalog 기동 인스턴스+ResolvingModelDecoder 실조립, `LoadModelGUID`가 experiment 로드→역브리지 소비(Assimp 폴백), **픽셀 diff 0 판정** | DataSystem·Player/Editor 기동 | 없음 |
 | ↳ I5-D2 | V4 정적 경로 — mask→`RHIInputElement` 유도 함수, ForwardShade(무스킨) 전환, 짝 검사 게이트 | Forward 패스 | 없음 |
 | ↳ I5-D3 | V4 스킨 경로 — GBuffer/Shadow/WireFrame, BoneIndices RGBA8Uint·tangent w=handedness 셰이더 재현 | 스킨 3패스 | 없음 |
 | ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
@@ -685,6 +686,28 @@ RenderTests의 ExperimentLegacyBridge 승격)로 기존 파이프에 소비시�
 화면은 legacy 96B 그대로, 데이터 출처만 experiment — **V2 무손실 픽셀 diff 0 판정을 V4
 이전에, 렌더 경로를 열지 않고** 얻는 절단이다(I5-M S1 읽기 이중화와 같은 결). 브리지는
 D4에서 걷혀 I6에서 은퇴한다.
+
+**I5-D1a 완료 실측 (2026-08-31).** `DataSystem::BuildLegacyModelFromExperiment` 신설 —
+experiment::Model → legacy ::Model **역브리지**(전환기, I6 은퇴). 착수 정정 하나: RenderTests의
+ExperimentLegacyBridge는 legacy→experiment **정브리지**(패리티용)라 D1이 가정한 역방향이
+없었다 — 신설이 D1의 실비용이었고, 정브리지와 합성하면 왕복 게이트가 즉시 성립하는 구조라
+D1a로 분리했다. 시공 견본은 legacy 모델 캐시 로드(LoadSkeleton — 평탄 본 목록+부모 인덱스
+트리 재구축). legacy Model/Mesh 컨테이너가 private+friend라 DataSystem 멤버로만 시공 가능해
+별도 TU(ExperimentModelMigration.cpp)에 정의했고, Mesh::m_materialIndex는 friend 목록을
+편집하는 대신 **reflect() 스키마의 멤버 공개를 순회로 사용**했다(legacy 본체 무편집).
+재질은 ConvertToLegacyMaterial 정본 위임. 루트 노드 자기 참조(parentIndex 0)를 자식으로
+넣지 않는다 — [[findbone-name-lookup-fails]] 함정의 대우.
+
+게이트 `experiment.modelbridge <경로>` — 정브리지→게시→역브리지 왕복을 원본과 대조(노드·
+메시·정점 필드·인덱스·본 remap 반영·클립/채널/키·채널 총량=왕복+dropped). 실측: 정적
+Suzanne 10/10(정점 1,066), 스킨 Gunner 21/21(정점 9,391 · dropped 채널 10 = 정브리지의
+본 없는 node-anim). 변이(uv1 폴백 파괴)가 양 모델에서 정점 단정 1건만 정확히 붉힘.
+실측이 가른 계약 하나: **bitangent 왕복은 handedness(부호) 보존이 계약**이다 — Gunner
+원본 bitangent의 74%(6,976/9,391)가 cross(n,t)와 비직교(스킨 가중 평균 산물)라 방향 정확
+일치는 원리적으로 불가하고, w 한 비트 재구성의 화면 영향은 D1b 픽셀 게이트가 최종
+판정한다(비직교 수는 게이트가 관측 계수로 남긴다). Step 보간은 legacy 표현 부재로 Linear
+강등(실측: 현 코퍼스 Step 트랙 전부 상수라 시각 손실 0). 애니메이션 이벤트는 브리지 무관 —
+런타임에 Animator가 단다(D0a의 실체는 직접 소비 시점의 표현 판정).
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그

@@ -26,6 +26,7 @@
     <ClInclude Include="ExperimentParity\ExperimentImportPathSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentLegacyBridge.h" />
     <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h" />
+    <ClInclude Include="ExperimentParity\ExperimentModelBridgeSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h" />
     <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h" />
@@ -62,6 +63,7 @@
     <ClCompile Include="ExperimentParity\ExperimentImportPathSelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentLegacyBridge.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentModelBridgeSelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentPoseSampler.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>

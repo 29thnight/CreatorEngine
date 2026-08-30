@@ -22,6 +22,7 @@ class Model;
 class Material;
 struct ShaderMeta;
 namespace YAML { class Node; }
+namespace experiment { class Model; } // I5-D1a 역브리지 입력
 
 enum class RuntimeAssetType
 {
@@ -98,6 +99,14 @@ public:
 	void UnloadUnusedAssets();
 	//Resource Model
 	Model* LoadModelGUID(FileGuid guid);
+	// I5-D1a — experiment::Model → legacy ::Model 역브리지(전환기, I6 은퇴).
+	// 렌더 소유가 아직 legacy인 동안 experiment 로드 결과를 기존 파이프에
+	// 소비시키는 어댑터다(I5-M의 ConvertToLegacyMaterial과 같은 지위).
+	// Model 컨테이너가 private+friend라 DataSystem 멤버로만 시공 가능하다 —
+	// 정의는 ExperimentModelMigration.cpp(별도 TU).
+	[[nodiscard]] bool BuildLegacyModelFromExperiment(
+		const experiment::Model& source, std::shared_ptr<Model>& outModel,
+		std::string& outError);
 	void LoadModel(std::string_view filePath);
 	std::shared_ptr<Model> LoadCachedModelShared(std::string_view filePath);
 	// 즉시 사용 legacy 호출부 호환. 참조를 보관하는 쪽은 위 shared API를 쓴다.

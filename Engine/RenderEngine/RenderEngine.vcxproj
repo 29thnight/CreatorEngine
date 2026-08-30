@@ -392,6 +392,7 @@
     </ClCompile>
     <ClCompile Include="ExperimentMaterialResolveBinding.cpp" />
     <ClCompile Include="ExperimentMaterialMigration.cpp" />
+    <ClCompile Include="ExperimentModelMigration.cpp" />
     <ClCompile Include="Experiment\ModelLoader.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
