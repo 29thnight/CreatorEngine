@@ -107,6 +107,11 @@ public:
 	[[nodiscard]] bool BuildLegacyModelFromExperiment(
 		const experiment::Model& source, std::shared_ptr<Model>& outModel,
 		std::string& outError);
+	// I5-D1b — 로더 이중화의 experiment 쪽 절반: cooked→source 해석 디코더로
+	// 로드해 역브리지로 내린다. 실패는 null(호출자가 Assimp 폴백). cookedPath는
+	// cooked 게시 규약(pak)이 서기 전까지 빈 경로다(resolver가 Info로 계수).
+	[[nodiscard]] std::shared_ptr<Model> LoadModelViaExperiment(
+		FileGuid guid, const file::path& sourcePath);
 	void LoadModel(std::string_view filePath);
 	std::shared_ptr<Model> LoadCachedModelShared(std::string_view filePath);
 	// 즉시 사용 legacy 호출부 호환. 참조를 보관하는 쪽은 위 shared API를 쓴다.

@@ -20,16 +20,21 @@
 //   - uv1 부재 시 uv0 복사 — legacy 임포터(ConvertToAiMesh)의 규약.
 #include "DataSystem.h"
 #include "Experiment/Model.h"
+#include "Experiment/Cooked/CookedModelCodec.h"
+#include "Experiment/Cooked/ResolvingModelDecoder.h"
+#include "Experiment/Import/ImporterModelDecoder.h"
 #include "ExperimentMaterialMigration.h"
 #include "Material.h"
 #include "Mesh.h"
 #include "Model.h"
 #include "ReflectionYml.h"
 #include "Skeleton.h"
+#include "StandardMaterialProperty.h"
 
 #include <mathematics/vector3.hpp>
 
 #include <cmath>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -252,6 +257,33 @@ bool DataSystem::BuildLegacyModelFromExperiment(
 				+ outError;
 			return false;
 		}
+		// 전환기 보강 — assetId를 못 푼 텍스처 참조(소스 임포트 산물)는
+		// fallbackPath 파일명을 legacy 이름 필드로 나른다. 변환 정본
+		// (ConvertToLegacyMaterial)은 이름 부활 금지 규약이라 나르지 않지만,
+		// legacy 파이프 소비가 목적인 이 브리지에서는 Finalize의 이름 폴백이
+		// 텍스처를 실제로 붙드는 유일한 길이다. I6에서 브리지와 함께 죽는다.
+		for (const experiment::MaterialProperty& property : material.properties)
+		{
+			const auto* reference =
+				std::get_if<experiment::TextureReference>(&property.value);
+			if (nullptr == reference || reference->assetId.IsValid()
+				|| reference->fallbackPath.empty())
+			{
+				continue;
+			}
+			const std::string textureName =
+				reference->fallbackPath.stem().string();
+			if (property.name == standard_material::property::BaseColorMap)
+				legacyMaterial->m_baseColorTexName = textureName;
+			else if (property.name == standard_material::property::NormalMap)
+				legacyMaterial->m_normalTexName = textureName;
+			else if (property.name == standard_material::property::OrmMap)
+				legacyMaterial->m_ORM_TexName = textureName;
+			else if (property.name == standard_material::property::AoMap)
+				legacyMaterial->m_AO_TexName = textureName;
+			else if (property.name == standard_material::property::EmissiveMap)
+				legacyMaterial->m_EmissiveTexName = textureName;
+		}
 		FinalizeMaterialRuntime(*legacyMaterial);
 		legacy->m_Materials.push_back(std::move(legacyMaterial));
 	}
@@ -272,4 +304,89 @@ bool DataSystem::BuildLegacyModelFromExperiment(
 	outModel = std::move(legacy);
 	outError.clear();
 	return true;
+}
+
+std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
+	FileGuid guid, const file::path& sourcePath)
+{
+	namespace exi = experiment::importer;
+
+	exi::ImporterDecoderOptions options;
+	// 모델 정체성은 .meta 소유 — 호출자가 이미 GUID로 왔으므로 그대로 준다.
+	options.resolveModelAsset =
+		[guid](const std::filesystem::path&) -> experiment::AssetId
+		{
+			experiment::AssetId id;
+			id.value = guid.m_guid;
+			return id;
+		};
+	// 텍스처 정체성도 .meta 정본이다 — 원본 경로를 카탈로그로 되물어 GUID를
+	// 준다(이름 부활 금지). 못 풀면 fallbackPath로 남고 브리지가 legacy 이름
+	// 폴백을 채운다.
+	options.conversion.resolveTextureAsset =
+		[this](const exi::ImportedTexture& texture) -> experiment::AssetId
+		{
+			experiment::AssetId id{};
+			if (!texture.sourcePath.empty())
+			{
+				id.value = GetFileGuid(texture.sourcePath).m_guid;
+			}
+			return id;
+		};
+
+	auto importerDecoder =
+		std::make_unique<exi::ImporterModelDecoder>(std::move(options));
+	if (!importerDecoder->CanDecode(sourcePath))
+	{
+		return nullptr; // 임포터 포맷 밖 — 조용히 legacy 경로로.
+	}
+
+	experiment::ModelLoader loader(
+		std::make_unique<experiment::cooked::ResolvingModelDecoder>(
+			std::make_unique<experiment::cooked::CookedModelDecoder>(),
+			std::move(importerDecoder)));
+	experiment::ModelLoadRequest request;
+	request.sourcePath = sourcePath;
+	// cookedPath는 cooked 게시 규약(pak)이 서기 전까지 빈 경로다 — resolver가
+	// Info로 계수하고 source로 간다. catalog 기동 배선은 그 규약과 함께 온다.
+	experiment::ModelLoadResult result = loader.Load(request);
+
+	// 관측 — Warning 이상만 요약한다(빈 cookedPath의 Info 계수는 기본 상태라
+	// 로그 스팸이 된다).
+	std::size_t warningCount = 0;
+	for (const experiment::ModelLoadIssue& issue : result.issues)
+	{
+		if (experiment::ModelLoadIssueSeverity::Warning == issue.severity
+			|| experiment::ModelLoadIssueSeverity::Error == issue.severity)
+		{
+			++warningCount;
+		}
+	}
+	if (!result.Succeeded())
+	{
+		Debug->LogWarning("[model.dual] experiment 로드 실패 — Assimp 폴백: "
+			+ sourcePath.string() + " (경고/오류 "
+			+ std::to_string(warningCount) + "건)");
+		return nullptr;
+	}
+
+	std::shared_ptr<Model> legacyModel;
+	std::string error;
+	if (!BuildLegacyModelFromExperiment(*result.model, legacyModel, error))
+	{
+		Debug->LogWarning("[model.dual] 역브리지 실패 — Assimp 폴백: "
+			+ sourcePath.string() + " (" + error + ")");
+		return nullptr;
+	}
+	if (warningCount > 0)
+	{
+		Debug->LogWarning("[model.dual] experiment 로드 경고 "
+			+ std::to_string(warningCount) + "건: " + sourcePath.string());
+	}
+	// 성공도 관측한다 — 폴백만 로그하면 "전부 폴백"과 "전부 experiment"가
+	// 같은 침묵이 된다(눈먼 초록). printf는 CLI 게이트 stdout에 잡히는
+	// 채널이라 게이트가 경로를 실증할 수 있다. 전환기와 함께 I6에서 죽는다.
+	std::printf("[model.dual] experiment 경로: %s\n",
+		sourcePath.filename().string().c_str());
+	return legacyModel;
 }

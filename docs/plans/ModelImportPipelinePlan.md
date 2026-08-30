@@ -648,7 +648,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D0a | 선결 갭 ① — 애니메이션 이벤트: `AddEvent`/`m_isLoop`의 experiment 대응 판정·구현(clip 표현 vs Animator 소유 이관) | Animator | 없음 |
 | ↳ I5-D0b | 선결 갭 ② — LOD: `GenerateLODs`/`m_LODThresholds`의 experiment 대응 판정(Mesh 표현 vs 렌더 파생) | Mesh·Inspector | 없음 |
 | ↳ I5-D1a ✅ | 역브리지 — `DataSystem::BuildLegacyModelFromExperiment`(experiment→legacy) + 왕복 게이트 | DataSystem | 없음(I6 은퇴) |
-| ↳ I5-D1b | 로더 이중화 — catalog 기동 인스턴스+ResolvingModelDecoder 실조립, `LoadModelGUID`가 experiment 로드→역브리지 소비(Assimp 폴백), **픽셀 diff 0 판정** | DataSystem·Player/Editor 기동 | 없음 |
+| ↳ I5-D1b ✅ | 로더 이중화 — `LoadModelGUID`가 experiment(cooked→source) 로드→역브리지 소비, Assimp 폴백·경로 관측 | DataSystem | 없음 |
 | ↳ I5-D2 | V4 정적 경로 — mask→`RHIInputElement` 유도 함수, ForwardShade(무스킨) 전환, 짝 검사 게이트 | Forward 패스 | 없음 |
 | ↳ I5-D3 | V4 스킨 경로 — GBuffer/Shadow/WireFrame, BoneIndices RGBA8Uint·tangent w=handedness 셰이더 재현 | 스킨 3패스 | 없음 |
 | ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
@@ -708,6 +708,27 @@ Suzanne 10/10(정점 1,066), 스킨 Gunner 21/21(정점 9,391 · dropped 채널 
 판정한다(비직교 수는 게이트가 관측 계수로 남긴다). Step 보간은 legacy 표현 부재로 Linear
 강등(실측: 현 코퍼스 Step 트랙 전부 상수라 시각 손실 0). 애니메이션 이벤트는 브리지 무관 —
 런타임에 Animator가 단다(D0a의 실체는 직접 소비 시점의 표현 판정).
+
+**I5-D1b 완료 실측 (2026-08-31).** 로더 이중화 — `DataSystem::LoadModelGUID`가
+`LoadModelViaExperiment`(ImporterModelDecoder+CookedModelDecoder를 ResolvingModelDecoder로
+조립 → ModelLoader → 역브리지)를 먼저 타고, 실패는 Assimp 폴백이다. **화면 데이터 출처가
+experiment로 바뀌었다**: 씬 코퍼스가 로드한 실모델 10종(스킨 Gunner·SU 포함) 전부
+experiment 경로·**폴백 0**, ft-primitives는 8종 experiment 경유로 실 DX12 draw 8건.
+정체성 배선: 모델 GUID는 호출자의 .meta GUID, 텍스처는 `resolveTextureAsset`이 원본
+경로→registry GUID로 해석(이름 부활 금지)하고, 못 푼 참조만 역브리지가 fallbackPath
+파일명을 legacy 이름 필드로 나른다(Finalize 이름 폴백 — 전환기 보강, I6 은퇴).
+
+★ **관측이 설계의 절반이었다.** 성공 무로그+폴백 로그 설계는 "전부 폴백"과 "전부
+experiment"가 같은 침묵이 된다(눈먼 초록) — 성공도 stdout 채널(printf)로 관측해 게이트가
+경로를 실증한다. 실측: dx12 스윕은 LoadModelGUID를 안 지나는 자가 로드라 이중화에 눈멀고
+(무회귀 증거로만 유효), 실증은 ft-primitives·씬 코퍼스 stdout의 [model.dual] 계수가 진다.
+**픽셀 판정**: FT 실드로우+스윕 기준선 정확 일치(28·4·2·1)+vk.forward/gbuffer로 정적 경로
+diff 0 성립. 스킨 모델은 경로 실증(코퍼스 10종)과 bt-smoke(Animator 실동작 — 역브리지
+스켈레톤/클립 위에서)까지 — 스킨 **픽셀** 게이트는 LoadModelGUID를 지나는 것이 없어
+한계로 남긴다(D2/D3 V4 게이트에서 함께 닫는 것이 자연스럽다). 잔여: catalog 기동
+인스턴스는 cooked 게시 규약(pak)이 서기 전에는 세울 수 없음이 실측 — cookedPath는 빈
+경로(resolver Info 계수)이고 배선은 그 규약과 함께 온다. LoadModel(이름 기반)·
+LoadCachedModelShared(에디터 배치)는 아직 Assimp — D4/D5에서 수렴.
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그

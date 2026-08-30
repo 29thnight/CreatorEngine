@@ -290,6 +290,19 @@ Model* DataSystem::LoadModelGUID(FileGuid guid)
 		}
 	}
 
+	// I5-D1b — 로더 이중화. experiment(cooked→source) 로드가 정본을 향한
+	// 경로이고, 성공하면 역브리지가 legacy 파이프에 소비시킨다. 실패는
+	// Assimp 폴백(관측 로그) — 화면이 조용히 비는 것보다 legacy가 낫다.
+	if (std::shared_ptr<Model> bridged = LoadModelViaExperiment(guid, modelPath))
+	{
+		Model* raw = bridged.get();
+		{
+			std::unique_lock lock(m_modelMutex);
+			Models[name] = std::move(bridged);
+		}
+		return raw;
+	}
+
 	Model* model = Model::LoadModel(modelPath.string());
 	if (model)
 	{
