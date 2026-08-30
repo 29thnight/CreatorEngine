@@ -6,6 +6,8 @@
 #include "Experiment/MaterialAuthoringCodec.h"
 #include "ExperimentMaterialMigration.h"
 #include "Material.h"
+#include "PathFinder.h" // S2b: 실자산 corpus 경로
+#include "ReflectionYml.h" // S2b: Meta::Serialize — 컴포넌트 embed 경로 실사
 #include "RHI/RHIShaderSource.h"
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
@@ -16,6 +18,7 @@
 #include <array>
 #include <cstdio>
 #include <filesystem>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -445,6 +448,123 @@ namespace RenderTest
             check.Check(legacyDecoded
                 && legacyDocument.m_name == "LegacyProbe",
                 "legacy 문서 경로 무변경");
+        }
+
+        // ── S2b: writer 전환 — 저장이 새 정본을 적고 왕복이 고정점이다 ────
+        {
+            // 위에서 decode한 material은 fixture meta를 아는 재질이다.
+            YAML::Node written = DataSystems->SerializeMaterialPayload(material);
+            check.Check(written["schema"] && written["shaderAssetId"],
+                "writer가 새 정본(schema+shaderAssetId)을 적는다");
+
+            bool tintSurvived = false;
+            if (written["properties"] && written["properties"].IsSequence())
+            {
+                for (const YAML::Node& property : written["properties"])
+                {
+                    if (property["name"]
+                        && property["name"].as<std::string>() == "tint"
+                        && property["float4"])
+                    {
+                        tintSurvived = true;
+                    }
+                }
+            }
+            check.Check(tintSurvived, "meta 선언 논리 값이 writer를 살아넘는다");
+
+            // 고정점: canonical → decode → re-encode 텍스트 동일. 이게 서야
+            // 씬 corpus의 save-load-resave diff 0이 새 형식에서도 성립한다.
+            // decode는 DataSystem 창구 대신 그 창구가 쓰는 정본 부품(코덱+
+            // 변환기+finalize)을 직접 부른다 — 같은 경로이고, 창구 시그니처가
+            // D3-a 이행 중이라 여기 묶지 않는다.
+            Material reloaded;
+            bool redecoded = false;
+            {
+                experiment::Material authoredAgain;
+                std::string error;
+                redecoded = experiment::DeserializeMaterialAuthoring(written,
+                        authoredAgain, error)
+                    && ExperimentMaterialMigration::ConvertToLegacyMaterial(
+                        authoredAgain, nullptr, reloaded, error);
+                if (redecoded)
+                {
+                    DataSystems->FinalizeMaterialRuntime(reloaded);
+                }
+            }
+            std::string firstText, secondText;
+            {
+                std::ostringstream stream; stream << written;
+                firstText = stream.str();
+            }
+            if (redecoded)
+            {
+                YAML::Node rewritten =
+                    DataSystems->SerializeMaterialPayload(reloaded);
+                std::ostringstream stream; stream << rewritten;
+                secondText = stream.str();
+            }
+            check.Check(redecoded && !firstText.empty()
+                && firstText == secondText,
+                "저장→로드→재저장이 고정점이다");
+
+            // meta를 모르는 재질은 legacy 표기로 폴백한다 — 조용한 소실 금지.
+            Material metaless;
+            metaless.m_name = "MetalessProbe";
+            YAML::Node fallback = DataSystems->SerializeMaterialPayload(metaless);
+            check.Check(!fallback["schema"] && fallback["m_name"],
+                "meta 없는 재질은 legacy 표기로 폴백한다");
+
+            // MeshRenderer embed — OnAfterSerialize가 m_Material 서브트리를
+            // 정본 writer 출력으로 교체한다(씬·프리팹 저장의 실제 경로).
+            MeshRenderer writerRenderer;
+            {
+                experiment::Material authoredForEmbed;
+                std::string error;
+                const ShaderMetaHandle handle =
+                    DataSystems->LoadShaderMetaHandle(fixtureGuid, error);
+                const std::shared_ptr<const ShaderMeta> fixtureMeta =
+                    DataSystems->ResolveShaderMeta(handle);
+                auto owned = std::make_shared<Material>();
+                if (fixtureMeta
+                    && experiment::DeserializeMaterialAuthoring(authoredNode,
+                        authoredForEmbed, error)
+                    && ExperimentMaterialMigration::ConvertToLegacyMaterial(
+                        authoredForEmbed, fixtureMeta.get(), *owned, error))
+                {
+                    DataSystems->FinalizeMaterialRuntime(*owned);
+                    writerRenderer.m_Material = std::move(owned);
+                }
+            }
+            check.Check(nullptr != writerRenderer.m_Material,
+                "writer 검사용 재질 준비");
+            YAML::Node componentNode = Meta::Serialize(&writerRenderer);
+            const YAML::Node embedded = componentNode["m_Material"];
+            check.Check(embedded && embedded.IsMap() && embedded["schema"]
+                && embedded["shaderAssetId"],
+                "컴포넌트 직렬화의 m_Material embed가 새 정본이다");
+
+            // 실자산 관측 — 씬 코퍼스는 shadermeta 재질 embed가 0이라 writer
+            // 전환을 원리적으로 못 본다(전부 legacy 폴백이어도 28/28 초록).
+            // corpus probe의 stable=yes도 형식을 안 본다. 실물 .asset이
+            // canonical로 적히는지는 여기서만 잰다.
+            const file::path corpusPath =
+                PathFinder::Relative("Materials\\") / "ForwardWater.asset";
+            Material corpusMaterial;
+            bool corpusCanonical = false;
+            if (std::filesystem::is_regular_file(corpusPath))
+            {
+                const YAML::Node corpusNode =
+                    YAML::LoadFile(corpusPath.string());
+                // legacy 문서 decode — typed reflection 직결(창구 시그니처 불변).
+                Meta::Deserialize(&corpusMaterial, corpusNode);
+                DataSystems->FinalizeMaterialRuntime(corpusMaterial);
+                const YAML::Node corpusWritten =
+                    DataSystems->SerializeMaterialPayload(corpusMaterial);
+                corpusCanonical = corpusWritten["schema"]
+                    && corpusWritten["shaderAssetId"];
+            }
+            check.Check(corpusCanonical,
+                "실자산(ForwardWater) 저장이 새 정본으로 나간다");
         }
 
         char summary[160]{};

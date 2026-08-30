@@ -637,7 +637,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S0 ✅ | experiment 저작 YAML 코덱(정본 스키마) — 호출부 무변경 | 게이트 | 없음 |
 | ↳ M5-S1 ✅ | 변환 정본 + DataSystem 읽기 이중화 — legacy↔experiment 단일 변환기, 새 정본 문서 로드 | DataSystem·sealing 브리지 | 없음 |
 | ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
-| ↳ M5-S2b | 씬 writer 전환 — **선결 전부 해소**(flow 승격 · useNormalMap 유도 증명 · IOR/범프 은퇴, 아래 실측) | 씬 저장 | 없음 |
+| ↳ M5-S2b ✅ | 씬 writer 전환 — ShaderMeta를 아는 재질은 새 정본으로 저장(legacy 폴백 이중화) | 씬 저장 | 없음 |
 | ↳ M5-S2c | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
@@ -872,6 +872,30 @@ material/scene 코퍼스 전수. Inspector 동적 편집기에는 flow가 자동
 
 이로써 ★ "S2b 보류 이유"의 세 표현(flow·useNormalMap·IOR)이 전부 해소됐다 — flow는
 논리 property 승격으로, 나머지 둘은 유도/은퇴 판정으로. S2b(writer 전환)는 열려 있다.
+
+**M5-S2b 완료 실측 (2026-08-30).** writer 이중화 — 읽기 이중화(S1)의 대칭이다.
+`SerializeMaterialPayload`가 ShaderMeta를 아는 재질(m_shaderMetaGuid 유효 + m_cbufferValues
+공백)을 `ConvertLegacyMaterial`+`SerializeMaterialAuthoring`으로 새 정본에 적고, meta 부재·
+변환/인코딩 실패는 legacy 표기로 폴백한다(폴백은 로그, nil shaderAssetId는 코덱이 fail-closed
+거부하므로 검사가 이중이다). 씬·프리팹 embed의 절단선은 `MeshRenderer::OnAfterSerialize` —
+reflection shared_ptr 멤버는 컴파일 타임 재귀라(S2a와 같은 제약) 쓰기 쪽도 소비자 훅이
+유일한 절단선이고, 기존 H3 훅(OnAfterSerialize)이 이미 emit 경로에 있어 리플렉션 무변경으로
+성립했다. standalone `.asset` writer(SaveMaterial/EditorAssetDatabase)도 같은 함수라 함께
+전환된다.
+
+★ **눈먼 초록을 하나 잡았다 — 씬 코퍼스는 writer 전환을 원리적으로 못 본다.** 14개 씬의
+재질 embed 전수가 m_shaderMetaGuid nil(기본 PBR)이라, canonical 분기가 통째로 죽어도
+28/28이 초록이다(실측: 첫 실행에서 canonical 0건·legacy 11건 전부 폴백으로도 안정 통과).
+corpus probe의 stable=yes도 형식을 관측하지 않는다. 그래서 matmigrate에 **실자산
+(ForwardWater.asset) canonical 관측 단정**을 신설해 이 사각을 게이트에 박았다. 검증:
+matmigrate 실사 9→16(writer 정본·meta 논리 값 생존·저장→로드→재저장 고정점·meta 부재
+legacy 폴백·컴포넌트 embed 정본·실자산 canonical), 변이(canonical 분기 차단)가 정확히
+writer 단정 3건만 붉힘(고정점·폴백은 legacy에서도 성립해야 하므로 초록 — 예측 일치).
+씬 코퍼스 28/28·재질 코퍼스 2/2·프리팹 3종(corpus/roundtrip/duplicate)·리플렉션 골든
+diff 0(골든 재질은 nil meta → legacy 폴백이라 형상 무변경)·ft-primitives 실드로우·
+matseal/matparity/matscript·dx12/vk 픽셀 게이트 전부 초록. 잔여: 현 씬 코퍼스에는
+shadermeta 재질 embed가 0이라 전환의 실효는 앞으로의 저작부터다. 피커 열거
+(SnapshotMaterials)는 legacy 유지(S2c/I6).
 
 ★ **I5-M1 이 첫 슬라이스인 이유는 소비자 때문이다.** 새 타입만 만들면 "생산만 있고 소비 0" 이
 된다 — 이 저장소가 반복해서 밟은 형태다. I5-M1 은 legacy 가 만드는 CB bytes 와 **비트 단위로

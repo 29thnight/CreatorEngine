@@ -509,6 +509,34 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
 {
 	SynchronizeLegacyMaterialProperties(material);
+
+	// I5-M5 S2b — writer 전환. ShaderMeta를 아는 재질은 새 정본(schema+
+	// shaderAssetId)으로 적는다. meta 부재 재질, legacy 전용 잔여
+	// (m_cbufferValues — 코퍼스 실저작 0), 변환·인코딩 실패는 legacy 표기로
+	// 폴백한다(조용한 소실 금지 — 폴백은 로그를 남긴다).
+	if (FileGuid{} != material.m_shaderMetaGuid && material.m_cbufferValues.empty())
+	{
+		std::string error;
+		// LoadShaderMetaHandle은 캐시 적재만 하는 논리적 const다 — 이 함수의
+		// const 계약(재질 형상 관찰)은 유지된다.
+		const ShaderMetaHandle handle = const_cast<DataSystem*>(this)
+			->LoadShaderMetaHandle(material.m_shaderMetaGuid, error);
+		if (const std::shared_ptr<const ShaderMeta> meta = ResolveShaderMeta(handle))
+		{
+			experiment::Material authored;
+			YAML::Node canonical;
+			if (ExperimentMaterialMigration::ConvertLegacyMaterial(material,
+					*meta, authored, error)
+				&& experiment::SerializeMaterialAuthoring(authored, canonical,
+					error))
+			{
+				return canonical;
+			}
+		}
+		Debug->LogWarning("Material 새 정본 writer 실패 — legacy 표기로 폴백"
+			" (" + material.m_name + "): " + error);
+	}
+
 	YAML::Node node = Meta::Serialize(&material);
 	if (material.m_cbufferValues.empty()) return node;
 

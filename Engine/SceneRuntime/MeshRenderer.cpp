@@ -123,3 +123,14 @@ void MeshRenderer::OnDeserialized(const YAML::Node& node)
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존
 }
 
+void MeshRenderer::OnAfterSerialize(YAML::Node& node)
+{
+	// I5-M5 S2b — 씬 embed writer 전환. typed 리플렉션이 legacy 형상으로 적은
+	// m_Material 서브트리를 정본 writer로 교체한다. reflection의 shared_ptr
+	// 멤버는 컴파일 타임 재귀라(OnDeserialized의 같은 제약) 쓰기 쪽 절단선도
+	// 소비자 훅이다. SerializeMaterialPayload는 ShaderMeta를 모르는 재질을
+	// legacy 표기로 폴백하므로, 그 경우 이 교체는 형상 무변경이다.
+	if (nullptr == m_Material) return;
+	node["m_Material"] = DataSystems->SerializeMaterialPayload(*m_Material);
+}
+
