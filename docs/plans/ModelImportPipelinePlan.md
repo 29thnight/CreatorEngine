@@ -639,7 +639,9 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
 | ↳ M5-S2b ✅ | 씬 writer 전환 — ShaderMeta를 아는 재질은 새 정본으로 저장(legacy 폴백 이중화) | 씬 저장 | 없음 |
 | ↳ M5-S2c-1 ✅ | 모델 GUID 자립 — `MeshRenderer::m_modelGuid` 신설, m_fileGuid 편법 이주, InstantiateOwned 비승계 | 씬 스키마·cook 폐포 | 없음 |
-| ↳ M5-S2c-2 | 소유 분리 — base+`MaterialInstance` 필드, reflect 스키마 이주 | SceneManager·Foliage·S3/S4 | **소비자** 참조 감소 |
+| ↳ M5-S2c-2a | 저작 소유 분리 — base 자산 참조+override 저작, m_Material reflect 퇴출(훅 전담) | 씬 스키마·피커 | 없음 |
+| ↳ M5-S2c-2b | 런타임 소유 분리 — base(experiment)+`MaterialInstance`, 프록시·sealing 타입 전환 | 프록시 사슬·CLR/Inspector | **소비자** 참조 감소 |
+| ↳ M5-S2c-2c | Foliage — `FoliageType.m_material` experiment 전환(비직렬화·저위험) | Foliage·required packet | 없음 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비(legacy `::Model` 13파일) **+ V4 레이아웃 유도**(입력 레이아웃 5곳·`VSIn` 4곳) | 제품 렌더 | **소비자** 참조 감소 |
@@ -897,6 +899,29 @@ diff 0(골든 재질은 nil meta → legacy 폴백이라 형상 무변경)·ft-p
 matseal/matparity/matscript·dx12/vk 픽셀 게이트 전부 초록. 잔여: 현 씬 코퍼스에는
 shadermeta 재질 embed가 0이라 전환의 실효는 앞으로의 저작부터다. 피커 열거
 (SnapshotMaterials)는 legacy 유지(S2c/I6).
+
+**S2c-2 착수 정찰 (2026-08-30) — 소유 분리는 저작과 런타임이 다른 수술이다.**
+`m_Material` 제품 소비자 전수(테스트 제외 8파일): ① **프록시 사슬** — MeshRenderer →
+ProxyCommand payload(ProxyCommand.h:62) → PrimitiveRenderProxy::m_Material(117) →
+EnhancedSceneRenderer pooled.materialSource → BuildSealSourceFromLegacy. legacy
+`shared_ptr<Material>` 핸들이 렌더 스레드 경계를 통째로 건넌다 — 런타임 소유 전환은 이
+사슬의 타입 전환과 동시일 수밖에 없다(빅뱅 위험). ② **required-asset packet** —
+SceneManager::CaptureRequiredRenderMaterials가 renderer·FoliageType에서 shared_ptr를 수집
+(App/PlayerApp 소비). ③ **Foliage** — FoliageType.m_material은 비직렬화(OnDeserialized가
+모델에서 재해석)라 분리 가능한 저위험 조각. ④ **Inspector/CLR** — S3/S4로 값 경로는 논리
+값이 됐고 남은 것은 핸들 노출(이름 버튼·renderingMode enum·피커 undo·CLR raw ptr).
+⑤ 캐시 표면(DataSystem::Materials/Snapshot/Insert/Duplicate)은 I6 은퇴 대상.
+
+경제적 절단: **저작 소유(2a)** 는 S2a/S2b 훅이 이미 m_Material 노드의 읽기/쓰기를 전담하므로
+reflect에서 m_Material을 빼고(스키마의 잉여 키는 무시되므로 old scene 호환) base 자산
+GUID+override 저작 표기를 훅에 더하는 점진 수술이 가능하다 — 지금 피커는 공유 자산 재질을
+고르면 저장 시 전체를 인라인 embed해 **자산 연결이 저장에서 소실**되는데, 2a가 이것을 참조
+의미론으로 고친다(experiment::MaterialInstance의 override 표현을 저작 스키마로 그대로 씀).
+**런타임 소유(2b)** 는 MaterialInstance(base가 experiment::Material인 비영속 타입)를
+MeshRenderer에 들이고 프록시에 effective 스냅샷을 흘려 sealing의 legacy 브리지를 우회하는
+큰 수술 — I5-D(experiment::Model 직접 소비)와 결이 같아 그 옆에서 함께 판정하는 것이
+맞다. 주의: 훅(OnDeserialized/OnAfterSerialize)은 PHASE 17 D3-a가 시그니처를 이행 중인
+표면이라 2a 착수 시 조율이 필요하다.
 
 **M5-S2c-1 완료 실측 (2026-08-30).** 모델 GUID 자립 — S2c(소유 분리)의 선행 절단.
 `MeshRenderer::m_modelGuid`(reflect 말미 추가)가 메시 출처 모델의 정본 주소가 된다. 예전에는
