@@ -650,7 +650,9 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D1a ✅ | 역브리지 — `DataSystem::BuildLegacyModelFromExperiment`(experiment→legacy) + 왕복 게이트 | DataSystem | 없음(I6 은퇴) |
 | ↳ I5-D1b ✅ | 로더 이중화 — `LoadModelGUID`가 experiment(cooked→source) 로드→역브리지 소비, Assimp 폴백·경로 관측 | DataSystem | 없음 |
 | ↳ I5-D2 ✅ | V4 유도 정본 — mask→`RHIInputElement` 유도, `RHIFormat::RGBA8Uint` 신설, 전환 계약 게이트 (패스 전환은 D4와 동시로 정정) | RHI | 없음 |
-| ↳ I5-D3 | V4 실전환(구 D2 잔여 포함) — 5곳 레이아웃·VSIn 4곳·BoneIndices uint·tangent 재구성, **D4 정점 버퍼와 동시** | 렌더 패스·셰이더 | 없음 |
+| ↳ I5-D34a | GBuffer 정적 수직 절단 — experiment mesh 병행 바인딩, 메시 캐시 이중화(DX12/Vulkan 대칭), VSIn 퍼뮤테이션+PSO 레이아웃 축, **FT 픽셀 판정** | 메시 캐시·GBuffer | 없음 |
+| ↳ I5-D34b | 스킨 전환 — GBuffer 스킨·Shadow·WireFrame, BLENDINDICES uint 읽기, **스킨 픽셀 게이트 신설** | 스킨 3패스 | 없음 |
+| ↳ I5-D34c | Forward 전환 — 기본 2-variant×레이아웃 축, ShaderMeta variant 축(SKIN keyword) | Forward | 없음 |
 | ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -746,6 +748,30 @@ vk.forward/gbuffer.
 사실을 숨기지 않는다(S0 코덱 선례). 5곳 레이아웃·VSIn 4곳의 실전환은 D3으로 옮기되 **D4
 (정점 버퍼 experiment 전환)와 동시**다 — mesh 단위 이중화(마스크 유도 레이아웃+새 VSIn
 퍼뮤테이션 vs legacy 96B 경로)로 좁게 여는 것이 다음 절단이다.
+
+**D3+D4 착수 정찰 (2026-08-31) — 잠금은 두 층뿐이고 소비 층은 이미 중립이다.**
+3방향 정찰(메시 캐시·PSO/퍼뮤테이션·픽셀 경로) 종합:
+① **소비 층(패스 4곳: GBuffer/Forward/Shadow/WireFrame)은 무변경** — stride는 전부
+`RHIMeshBinding::vertexStride` **데이터**로 흐르고(`sizeof(Vertex)` 리터럴 0), draw는
+`Mesh*` 키만 나른다. 96B의 실제 발생지는 **DX12MeshCache.cpp:214/287과
+VulkanRenderServices.cpp:703/810 — 대칭 4줄**이며 한쪽만 고치면 vk 대조 게이트가
+stride 불일치로 붉는다(동시 필수).
+② **draw별 레이아웃 스위칭 기구는 이미 있다** — PSO 캐시는 레이아웃 내용 해시
+(DX12PSOManager:88·VulkanPipelineCache:174), Forward의 `m_shaderVariants`가 draw별 PSO
+선택을 이미 하고(축이 keyword뿐 — 레이아웃 축만 추가), Shadow의 SHADOW_SKINNING이
+정적/스킨 듀얼 PSO+배치 정렬+그룹 경계 SetPipeline의 완전한 선례다. VSIn 퍼뮤테이션은
+`RHIShaderPermutation::Enable`+`#ifdef`(런타임 DXC, defines별 2단 캐시)로 신규 인프라 0.
+③ **첫 픽셀 판정 대상은 GBuffer다** — FT 프리미티브 8건은 전부 deferred(포워드 드로우 0).
+Forward-정적 우선안은 실픽셀 게이트가 없어 기각.
+④ **experiment 정점의 공급선**: D1b가 역브리지 후 experiment::Model을 버린다 — DataSystem
+병행 바인딩(`m_hashingMesh` → {Model::Shared, MeshIndex}, 캐시 키와 동일 축)을 D1b 로드
+지점에서 채우고, 메시 캐시가 조회 함수 주입(RHI가 DataSystem을 직접 알지 않게)으로 packed
+bytes+stride+마스크를 얻는다. legacy Mesh 본체는 무편집. `RHIMeshBinding`에 마스크 필드
+1개를 더해 패스의 PSO 선택 분기가 쓴다.
+⑤ 스코프 밖 명시: GizmoLine(자체 정점, 메시 캐시 우회)·MeshOptimizer/ModelLoader 쿡
+캐시/model.cache.build(legacy CPU 계층 — 폴백 경로와 함께 I6 판정). 재분해: D34a(GBuffer
+정적 수직 절단·FT 픽셀) → D34b(스킨 3패스+스킨 픽셀 게이트 신설) → D34c(Forward+
+ShaderMeta 축).
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그
