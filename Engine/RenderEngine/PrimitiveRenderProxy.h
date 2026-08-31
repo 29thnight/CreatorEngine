@@ -37,6 +37,7 @@ enum class PrimitiveProxyType
 class Material;
 class Mesh;
 class MeshRenderer;
+namespace experiment { class Model; } // I5-D4b 핸들 병행(shared_ptr 보관용)
 class TerrainMesh;
 class TerrainMaterial;
 class TerrainComponent;
@@ -116,6 +117,12 @@ public:
 	// 원본이 파괴되거나 언로드되어도 이 프록시가 그리는 중에는 안전하다.
 	std::shared_ptr<Material>		m_Material{};
 	std::shared_ptr<Mesh>			m_Mesh{};
+	// I5-D4b — experiment 핸들 병행. 프록시 생성이 legacy Mesh 신원으로
+	// (모델, 메시 인덱스)를 조회해 싣고, 렌더는 이것으로 캐시의 핸들 진입점을
+	// 부른다 — m_Mesh는 정렬·지오메트리 맵의 포인터 정체성과 폴백으로 남는다
+	// (은퇴는 D4f). null이면 핸들 경로 아님(A/B off·Assimp 폴백·절차 메시).
+	std::shared_ptr<const experiment::Model>	m_experimentModel{};
+	uint32							m_experimentMeshIndex{ 0 };
 	HashedGuid						m_animatorGuid{};
 	HashedGuid						m_materialGuid{};
 	// 본 팔레트 버퍼(소유권 공유).

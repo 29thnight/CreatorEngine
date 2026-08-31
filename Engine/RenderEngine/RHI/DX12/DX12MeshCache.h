@@ -58,6 +58,10 @@ public:
         // 없으면 "전부 legacy로 올라갔다"와 구분되지 않는다 — [model.dual]과
         // 같은 눈먼 초록 방지다.
         uint32_t experimentUploads{ 0 };
+        // I5-D4b: 그중 핸들 진입점(GetOrUploadExperiment)으로 올라간 수.
+        // lookup 폴백과 분리해야 "핸들이 안 실려도 lookup이 받쳐 초록"이라는
+        // 눈먼 통과를 게이트가 가른다.
+        uint32_t experimentHandleUploads{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
 
@@ -91,6 +95,10 @@ public:
     /// (BeginFrame과 EndFrame 사이). 패스 기록 중에 부르면 안 된다 —
     /// Record는 리소스를 만들지 않는다는 3-6의 규약을 어기는 것이다.
     Entry GetOrUpload(Mesh* mesh, std::string& outError) override;
+    /// I5-D4b 핸들 진입점 — 키·정점·인덱스가 뷰에 완비돼 legacy Mesh 객체
+    /// 없이 업로드가 완결된다. 본문은 GetOrUpload와 같은 UploadResolved 하나다.
+    Entry GetOrUploadExperiment(
+        const RHIExperimentVertexView& view, std::string& outError) override;
     void SetExperimentVertexLookup(RHIExperimentVertexLookup lookup) override
     {
         m_experimentLookup = std::move(lookup);
@@ -98,6 +106,10 @@ public:
     uint32_t GetExperimentUploadCount() const override
     {
         return m_stats.experimentUploads;
+    }
+    uint32_t GetExperimentHandleUploadCount() const override
+    {
+        return m_stats.experimentHandleUploads;
     }
     void OnUploadSubmitted(uint64_t recordingId,
         RHICompletionPoint completion) override;
@@ -146,6 +158,13 @@ private:
     bool RecordBufferUpload(const void* data, uint64_t bytes,
         const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
         DX12PersistentHeap::Allocation& destination, std::string& outError);
+
+    /// I5-D4b — 업로드 정본. 두 진입점(GetOrUpload/GetOrUploadExperiment)이
+    /// 키와 데이터 소스만 다르게 이 하나를 부른다. 키 조회(히트)도 여기서 한다.
+    Entry UploadResolved(HashedGuid key,
+        const void* vertexData, uint64_t vertexBytes, uint32_t vertexStride,
+        uint32_t attributeMask, const uint32_t* indexData, uint32_t indexCount,
+        bool viaExperimentHandle, std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };
     RHIExperimentVertexLookup m_experimentLookup;

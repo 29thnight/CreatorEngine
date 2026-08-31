@@ -1374,8 +1374,11 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
             if (nullptr == draw.mesh || m_drawGeometry.contains(draw.mesh)) continue;
 
             std::string uploadError;
-            const RHIMeshBinding entry =
-                context.meshCache->GetOrUpload(draw.mesh, uploadError);
+            // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선.
+            const RHIMeshBinding entry = (0 != draw.experimentView.stableKey)
+                ? context.meshCache->GetOrUploadExperiment(
+                    draw.experimentView, uploadError)
+                : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())
             {
                 if (!uploadError.empty()) outError = uploadError;

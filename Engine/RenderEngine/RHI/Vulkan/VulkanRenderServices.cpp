@@ -713,18 +713,65 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
     if (vertices.empty() || indices.empty()) return empty;
 
     // I5-D34a: DX12MeshCache::GetOrUpload와 대칭 — 한쪽만 고치면 vk 대조
-    // 게이트가 stride 불일치로 붉는다.
+    // 게이트가 stride 불일치로 붉는다. I5-D4b: 위임 구조도 대칭이다.
     RHIExperimentVertexView experimentView{};
     const bool useExperiment = m_impl->experimentLookup
         && m_impl->experimentLookup(*mesh, experimentView)
         && experimentView.IsValid();
 
-    const uint64_t vertexBytes = useExperiment
-        ? experimentView.bytes
-        : static_cast<uint64_t>(vertices.size()) * sizeof(Vertex);
-    const void* const vertexData = useExperiment
-        ? experimentView.data : static_cast<const void*>(vertices.data());
-    const uint64_t indexBytes = static_cast<uint64_t>(indices.size()) * sizeof(uint32);
+    if (useExperiment)
+    {
+        const bool viewHasIndices =
+            nullptr != experimentView.indexData && 0 != experimentView.indexCount;
+        return UploadResolved(mesh->m_hashingMesh.m_ID_Data,
+            experimentView.data, experimentView.bytes, experimentView.stride,
+            experimentView.attributeMask,
+            viewHasIndices ? experimentView.indexData : indices.data(),
+            viewHasIndices ? experimentView.indexCount
+                           : static_cast<uint32_t>(indices.size()),
+            false, outError);
+    }
+    return UploadResolved(mesh->m_hashingMesh.m_ID_Data, vertices.data(),
+        static_cast<uint64_t>(vertices.size()) * sizeof(Vertex),
+        sizeof(Vertex), 0, indices.data(),
+        static_cast<uint32_t>(indices.size()), false, outError);
+}
+
+RHIMeshBinding VulkanMeshCache::GetOrUploadExperiment(
+    const RHIExperimentVertexView& view, std::string& outError)
+{
+    RHIMeshBinding empty{};
+    if (!m_impl || nullptr == m_impl->resources || !view.IsHandleComplete())
+    {
+        outError = "Vulkan 메시 캐시: 핸들 뷰가 완비되지 않았다";
+        return empty;
+    }
+    return UploadResolved(view.stableKey, view.data, view.bytes, view.stride,
+        view.attributeMask, view.indexData, view.indexCount, true, outError);
+}
+
+RHIMeshBinding VulkanMeshCache::UploadResolved(size_t key,
+    const void* vertexData, uint64_t vertexBytes, uint32_t vertexStride,
+    uint32_t attributeMask, const uint32_t* indexData, uint32_t indexCount,
+    bool viaExperimentHandle, std::string& outError)
+{
+    RHIMeshBinding empty{};
+    const HashedGuid cacheKey{ key };
+    const auto found = m_impl->entries.find(cacheKey);
+    if (found != m_impl->entries.end())
+    {
+        ++m_impl->stats.hits;
+        found->second.lastUsedFrame = m_impl->frameIndex;
+        return found->second.binding;
+    }
+
+    if (nullptr == vertexData || 0 == vertexBytes || 0 == vertexStride ||
+        nullptr == indexData || 0 == indexCount)
+    {
+        return empty;
+    }
+
+    const uint64_t indexBytes = static_cast<uint64_t>(indexCount) * sizeof(uint32);
     const std::array<RHIUploadRequest, 2> requests = {{
         { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
         { indexBytes, RHIUploadUsage::IndexData, alignof(uint32) }
@@ -797,7 +844,7 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
     }
 
     std::memcpy(staging[0].cpuAddress, vertexData, static_cast<size_t>(vertexBytes));
-    std::memcpy(staging[1].cpuAddress, indices.data(), static_cast<size_t>(indexBytes));
+    std::memcpy(staging[1].cpuAddress, indexData, static_cast<size_t>(indexBytes));
 
     const VkBufferCopy vertexCopy{ staging[0].offset, 0, vertexBytes };
     const VkBufferCopy indexCopy{ staging[1].offset, 0, indexBytes };
@@ -830,26 +877,30 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
     vkCmdPipelineBarrier2(commandBuffer, &dependency);
 
     buffers.binding.vertices.size = vertexBytes;
-    buffers.binding.vertexStride = useExperiment
-        ? experimentView.stride : sizeof(Vertex);
-    buffers.binding.vertexAttributeMask = useExperiment
-        ? experimentView.attributeMask : 0;
+    buffers.binding.vertexStride = vertexStride;
+    buffers.binding.vertexAttributeMask = attributeMask;
     buffers.binding.indices.size = indexBytes;
     buffers.binding.indexFormat = RHIFormat::R32Uint;
-    buffers.binding.indexCount = static_cast<uint32_t>(indices.size());
+    buffers.binding.indexCount = indexCount;
     buffers.bytes = vertexBytes + indexBytes;
     buffers.lastUsedFrame = m_impl->frameIndex;
     buffers.recordingId = m_impl->resources->GetCurrentUploadRecordingId();
 
     ++m_impl->stats.uploads;
-    if (useExperiment) ++m_impl->stats.experimentUploads;
+    // DX12와 대칭 — experiment 여부는 마스크가 말하고, 핸들 경로는 별도 계수.
+    if (0 != attributeMask) ++m_impl->stats.experimentUploads;
+    if (viaExperimentHandle) ++m_impl->stats.experimentHandleUploads;
     m_impl->stats.bytesUploaded += buffers.bytes;
     ++m_impl->stats.residentCount;
     m_impl->stats.residentBytes += buffers.bytes;
 
-    const auto inserted = m_impl->entries.emplace(mesh->m_hashingMesh,
-        std::move(buffers));
+    const auto inserted = m_impl->entries.emplace(cacheKey, std::move(buffers));
     return inserted.first->second.binding;
+}
+
+uint32_t VulkanMeshCache::GetExperimentHandleUploadCount() const
+{
+    return m_impl ? m_impl->stats.experimentHandleUploads : 0;
 }
 
 void VulkanMeshCache::OnUploadSubmitted(uint64_t recordingId,

@@ -191,9 +191,9 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         return empty;
     }
 
-    // 키는 주소가 아니라 자산 신원이다(멤버 선언부 주석 참고).
+    // 키는 주소가 아니라 자산 신원이다(멤버 선언부 주석 참고). 히트를 여기서
+    // 먼저 조회해 lookup(뮤텍스+해시) 비용을 히트 경로에서 치르지 않는다.
     const HashedGuid assetId = mesh->m_hashingMesh;
-
     const auto found = m_entries.find(assetId);
     if (found != m_entries.end())
     {
@@ -212,18 +212,73 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
 
     // I5-D34a: experiment packed 정점이 있으면 그것을 올린다(마스크·stride를
     // 바인딩에 실어 패스가 레이아웃 PSO를 고른다). 없으면 legacy 96B 그대로 —
-    // Vulkan 쪽과 대칭 4줄이며, 한쪽만 고치면 vk 대조 게이트가 붉는다.
+    // Vulkan 쪽과 대칭이며, 한쪽만 고치면 vk 대조 게이트가 붉는다.
+    // I5-D4b: 이 lookup 경로는 핸들이 실리지 못한 소비자(Foliage·Terrain·
+    // A/B off)의 폴백이다 — 키는 legacy 신원 그대로 둔다.
     RHIExperimentVertexView experimentView{};
     const bool useExperiment = m_experimentLookup
         && m_experimentLookup(*mesh, experimentView) && experimentView.IsValid();
 
+    if (useExperiment)
+    {
+        // 인덱스도 뷰가 완비했으면 experiment에서 — legacy 배열과 값이 같은
+        // 것은 역브리지가 보장하고, D4f에서 legacy 배열이 사라져도 이 경로는
+        // 그대로 선다.
+        const bool viewHasIndices =
+            nullptr != experimentView.indexData && 0 != experimentView.indexCount;
+        return UploadResolved(assetId, experimentView.data,
+            experimentView.bytes, experimentView.stride,
+            experimentView.attributeMask,
+            viewHasIndices ? experimentView.indexData : indices.data(),
+            viewHasIndices ? experimentView.indexCount
+                           : static_cast<uint32_t>(indices.size()),
+            false, outError);
+    }
+    return UploadResolved(assetId, vertices.data(),
+        static_cast<uint64_t>(vertices.size()) * sizeof(Vertex),
+        sizeof(Vertex), 0, indices.data(),
+        static_cast<uint32_t>(indices.size()), false, outError);
+}
+
+DX12MeshCache::Entry DX12MeshCache::GetOrUploadExperiment(
+    const RHIExperimentVertexView& view, std::string& outError)
+{
+    Entry empty{};
+    if (nullptr == m_resources || !view.IsHandleComplete())
+    {
+        outError = "메시 캐시: 핸들 뷰가 완비되지 않았다";
+        return empty;
+    }
+    return UploadResolved(HashedGuid{ view.stableKey }, view.data, view.bytes,
+        view.stride, view.attributeMask, view.indexData, view.indexCount,
+        true, outError);
+}
+
+DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid key,
+    const void* vertexData, uint64_t vertexBytes, uint32_t vertexStride,
+    uint32_t attributeMask, const uint32_t* indexData, uint32_t indexCount,
+    bool viaExperimentHandle, std::string& outError)
+{
+    Entry empty{};
+    // 히트 조회 — 핸들 진입점은 여기가 첫 조회이고, mesh 진입점은 선조회
+    // miss 뒤라 중복 find 한 번이 업로드 경로에만 붙는다(업로드는 드물다).
+    const auto found = m_entries.find(key);
+    if (found != m_entries.end())
+    {
+        ++m_stats.hits;
+        found->second.lastUsedFrame = m_frameIndex;
+        return found->second.entry;
+    }
+
+    if (nullptr == vertexData || 0 == vertexBytes || 0 == vertexStride ||
+        nullptr == indexData || 0 == indexCount)
+    {
+        // 빈 메시는 실패가 아니라 '그릴 것이 없음'이다.
+        return empty;
+    }
+
     Buffers buffers{};
-    const uint64_t vertexBytes = useExperiment
-        ? experimentView.bytes
-        : static_cast<uint64_t>(vertices.size()) * sizeof(Vertex);
-    const void* const vertexData = useExperiment
-        ? experimentView.data : static_cast<const void*>(vertices.data());
-    const uint64_t indexBytes = static_cast<uint64_t>(indices.size()) * sizeof(uint32);
+    const uint64_t indexBytes = static_cast<uint64_t>(indexCount) * sizeof(uint32);
 
     const std::array<RHIUploadRequest, 2> requests = {{
         { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
@@ -277,7 +332,7 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     if (!RecordBufferUpload(vertexData, vertexBytes, staging[0],
         D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
         buffers.vertexBuffer, outError) ||
-        !RecordBufferUpload(indices.data(), indexBytes, staging[1],
+        !RecordBufferUpload(indexData, indexBytes, staging[1],
             D3D12_RESOURCE_STATE_INDEX_BUFFER, buffers.indexBuffer, outError))
     {
         m_persistentHeap.Release(buffers.vertexBuffer);
@@ -295,17 +350,15 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     buffers.entry.vertices = RHIBufferSlice::Whole(
         m_resources->RegisterExternalBuffer(buffers.vertexBuffer.resource.Get()));
     buffers.entry.vertices.size = vertexBytes;
-    buffers.entry.vertexStride = useExperiment
-        ? experimentView.stride : sizeof(Vertex);
-    buffers.entry.vertexAttributeMask = useExperiment
-        ? experimentView.attributeMask : 0;
+    buffers.entry.vertexStride = vertexStride;
+    buffers.entry.vertexAttributeMask = attributeMask;
 
     buffers.entry.indices = RHIBufferSlice::Whole(
         m_resources->RegisterExternalBuffer(buffers.indexBuffer.resource.Get()));
     buffers.entry.indices.size = indexBytes;
     buffers.entry.indexFormat = RHIFormat::R32Uint;
 
-    buffers.entry.indexCount = static_cast<uint32_t>(indices.size());
+    buffers.entry.indexCount = indexCount;
     if (!buffers.entry.vertices.buffer.IsValid() ||
         !buffers.entry.indices.buffer.IsValid())
     {
@@ -323,11 +376,14 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     buffers.uploadState = RHIUploadTransactionState::Recording;
 
     ++m_stats.uploads;
-    if (useExperiment) ++m_stats.experimentUploads;
+    // experiment 여부는 마스크가 말한다(0=legacy 96B) — lookup·핸들 두 경로의
+    // 공통 판정이고, 핸들 경로는 별도 계수로 관측을 가른다.
+    if (0 != attributeMask) ++m_stats.experimentUploads;
+    if (viaExperimentHandle) ++m_stats.experimentHandleUploads;
     ++m_stats.residentCount;
     m_stats.residentBytes += buffers.bytes;
 
-    const auto inserted = m_entries.emplace(assetId, std::move(buffers));
+    const auto inserted = m_entries.emplace(key, std::move(buffers));
     return inserted.first->second.entry;
 }
 

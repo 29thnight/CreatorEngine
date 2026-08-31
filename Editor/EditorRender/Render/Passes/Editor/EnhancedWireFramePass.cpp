@@ -128,6 +128,7 @@ void EnhancedWireFramePass::CollectDraws(const std::vector<EnhancedDrawItem>* dr
         {
             m_batches.push_back(Batch{ draw.mesh, 0, 0 });
             batch = &m_batches.back();
+            batch->experimentView = draw.experimentView; // I5-D4b 핸들 나름
         }
         ++batch->count;
 
@@ -230,7 +231,12 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
     for (const Batch& batch : m_batches)
     {
         std::string uploadError;
-        const auto entry = context.meshCache->GetOrUpload(batch.mesh, uploadError);
+        // I5-D4b: 3패스와 같은 분기 — 같은 stableKey라 GBuffer가 올린 것을
+        // 캐시 히트로 받는다.
+        const auto entry = (0 != batch.experimentView.stableKey)
+            ? context.meshCache->GetOrUploadExperiment(
+                batch.experimentView, uploadError)
+            : context.meshCache->GetOrUpload(batch.mesh, uploadError);
         if (!entry.IsValid())
         {
             if (!uploadError.empty())

@@ -518,6 +518,8 @@ public:
         // I5-D34a: DX12 쪽 Stats와 같은 계수 — 관측이 없으면 "전부 legacy"와
         // 구분되지 않는다.
         uint32_t experimentUploads{ 0 };
+        // I5-D4b: DX12와 대칭 — 핸들 진입점 계수.
+        uint32_t experimentHandleUploads{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
         uint32_t residentCount{ 0 };
@@ -544,8 +546,12 @@ public:
     void Shutdown();
 
     RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) override;
+    // I5-D4b: DX12MeshCache와 대칭 — 핸들 진입점(키·정점·인덱스가 뷰에 완비).
+    RHIMeshBinding GetOrUploadExperiment(
+        const RHIExperimentVertexView& view, std::string& outError) override;
     void SetExperimentVertexLookup(RHIExperimentVertexLookup lookup) override;
     uint32_t GetExperimentUploadCount() const override;
+    uint32_t GetExperimentHandleUploadCount() const override;
     void OnUploadSubmitted(uint64_t recordingId,
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
@@ -560,6 +566,13 @@ public:
     size_t GetCachedCount() const;
 
 private:
+    // I5-D4b — 업로드 정본(DX12 UploadResolved와 대칭). 두 진입점이 키와
+    // 데이터 소스만 다르게 이 하나를 부른다. 키는 HashedGuid의 원 값(size_t).
+    RHIMeshBinding UploadResolved(size_t key, const void* vertexData,
+        uint64_t vertexBytes, uint32_t vertexStride, uint32_t attributeMask,
+        const uint32_t* indexData, uint32_t indexCount,
+        bool viaExperimentHandle, std::string& outError);
+
     struct Impl;
     std::unique_ptr<Impl> m_impl;
 };

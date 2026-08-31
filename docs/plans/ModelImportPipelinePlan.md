@@ -655,7 +655,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D34c ✅ | Forward 전환 — shade/reference×experiment PSO 4벌, core 유도 하나로 마스크 불문, forward 배치 게이트(3c) — SKIN keyword 축은 불요 판정 | Forward | 없음 |
 | ↳ I5-D4 | 직접 소비 — 아래 하위 분해(착수 정찰 2026-08-31 둘째) | 렌더 초크포인트 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4a ✅ | 죽은 소비 청산 — postLoad GenerateLODs 절단(D0b 이행)·PhysicsManager 죽은 정점 줄 제거 | 씬 로드·물리 | 없음 |
-| &nbsp;&nbsp;↳ D4b | 메시 핸들 병행 — `Model::Shared+MeshIndex` 페어를 MeshRenderer·프록시·캐시 키에, 인덱스·바운드도 experiment에서 | 렌더 사슬 | 없음 |
+| &nbsp;&nbsp;↳ D4b ✅ | 메시 핸들 병행 — 프록시→아이템→4패스→캐시 핸들 진입점(experiment 신원 키·인덱스), 핸들 전량 게이트(2c)+off 대조(4g) — 바운드는 D4f로 | 렌더 사슬 | 없음 |
 | &nbsp;&nbsp;↳ D4c | 씬 경계 — m_Mesh 서브트리 read/write를 experiment 이름/인덱스 기반으로(스키마 유지), GetMeshShared 참조 제거 | 씬 직렬화 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4d | 인스턴스화 — ModelSceneBridge experiment 직행(parent 단일 순회 재작성) | 모델 배치 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4e | Animator experiment 직소비 + D0a 이관(이벤트·루프 Animator 소유) | 애니메이션 | **소비자** 참조 감소 |
@@ -926,6 +926,30 @@ m_Mesh 실소비자 전수(전환 대상): 바운드(GetBoundingBox — 컬링)�
 — D5). 최대 수술은 Animator/AnimationJob(legacy Skeleton·Animation 전면 순회)이라 D4e로
 고립하고, 역브리지 절단(D4f)은 에디터 패스스루(D5)까지 소비자 0이 된 뒤에만 가능하므로
 **D5 완료 선결**을 계약으로 박는다.
+
+**I5-D4b 완료 실측 (2026-08-31).** 메시 핸들 병행 — 렌더 사슬이 legacy Mesh **객체 없이
+업로드를 완결할 수 있는 능력**을 얻었다(실제 은퇴는 D4f). 절단선: ①
+`RHIExperimentVertexView`에 인덱스·안정 키(`stableKey` = assetId 16바이트 ⊕ meshIndex의
+FNV-1a 64, 0은 '핸들 아님' 표지) — 핸들 완비 뷰는 `IsHandleComplete` ②
+`IRenderMeshCache::GetOrUploadExperiment` **순수 가상**(D34a lookup과 같은 대칭 강제) +
+`GetExperimentHandleUploadCount` 관측 ③ 캐시 내부는 `UploadResolved` 정본 하나 — 두
+진입점이 키·데이터 소스만 다르게 위임(DX12·Vulkan 대칭), lookup 경로도 인덱스를 뷰에서
+가져간다 ④ 프록시(`m_experimentModel`+인덱스, 생성 시 1회 조회 — 갱신 커맨드는 메시를
+안 바꾼다)→`EnhancedDrawItem.experimentView`(3패스 공용 아이템이라 **한 곳**)→4패스
+분기(GBuffer/Shadow/Forward/**WireFrame** — 배치에 뷰를 나른다. 안 나르면 GBuffer의 핸들
+키와 mesh 키가 갈려 같은 메시를 두 번 올린다) ⑤ A/B 스위치는 바인딩 조회
+(`TryGetExperimentMeshBinding`)가 봐서 off면 핸들 자체가 안 실린다(4g 대조군).
+
+게이트 실측: **핸들 10/10 전량**(2c) · off 핸들 0(4g) · 커버리지 42411·드로우 9·포워드
+1 — D34c 기준선과 동수. 변이 2종이 각각 자기 계층에서 **2c만** 정확히 붉혔다: M1(프록시
+조회 생략) → "핸들 0/10, experiment 10 유지" — lookup 폴백이 받치는 상황을 계수 분리가
+정확히 가른다(계수를 합산만 했으면 눈먼 초록). M2(GBuffer 분기 훼손) → "핸들 10/19" —
+키 분열이 **이중 업로드 9건**으로 실증되며 붉었다(WireFrame에 뷰를 나른 이유가 이 해악).
+한계(정직): 제품 `poolMesh`의 아이템 채움은 헤드리스 관측 밖이다 — 라이브는 렌더
+0프레임이라 어떤 게이트도 그 코드를 실행하지 못하고, dx12.scene 하네스의 **대칭 아이템
+구성**(copyQueue)이 대신 선다. 변이 이빨은 공유 계층(프록시·패스·캐시)까지만 닿는다.
+Foliage/Terrain 아이템은 핸들을 싣지 않는다(lookup 폴백 — D5에서 합류). 바운드 전환은
+값이 동일(역브리지가 experiment bounds로 시공)해 참조 셈뿐이라 D4f로 미룬다.
 
 **I5-D4a 완료 실측 (2026-08-31).** 죽은 소비 청산 — 편집은 소비자 2파일뿐(legacy 본체
 무편집). ① MeshRenderer postLoad의 `m_LODThresholds`→`GenerateLODs` 재실행 절단(D0b

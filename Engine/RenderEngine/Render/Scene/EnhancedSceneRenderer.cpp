@@ -967,6 +967,9 @@ namespace
             // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
             // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
             std::shared_ptr<Mesh> meshSource{};
+            // I5-D4b — item.experimentView의 포인터(정점·인덱스)가 가리키는
+            // experiment 모델을 같은 이유로 붙든다.
+            std::shared_ptr<const experiment::Model> experimentSource{};
             // BuildDrawPool의 안정된 프록시 읽기 동안만 Material owner를 유지한다.
             // SealForwardMaterials/SealGBufferMaterials가 값 snapshot을 만든 뒤
             // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
@@ -2649,6 +2652,21 @@ namespace
                 pooled.meshSource = proxy->m_Mesh;
                 pooled.item.mesh = proxy->m_Mesh.get();
                 pooled.item.worldMatrix = proxy->m_worldMatrix;
+
+                // I5-D4b — 프록시에 experiment 핸들이 실려 있으면 뷰를 만들어
+                // 아이템에 싣는다. 실패는 핸들 없음(legacy 경로)과 같은 취급 —
+                // 캐시 lookup 폴백이 experiment 데이터는 여전히 보장한다.
+                if (proxy->m_experimentModel)
+                {
+                    RHIExperimentVertexView view{};
+                    if (DataSystem::BuildExperimentVertexView(
+                        *proxy->m_experimentModel,
+                        proxy->m_experimentMeshIndex, view))
+                    {
+                        pooled.item.experimentView = view;
+                        pooled.experimentSource = proxy->m_experimentModel;
+                    }
+                }
 
                 if (proxy->m_isAnimationEnabled
                     && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
@@ -5440,7 +5458,10 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
     // 어댑터가 중립 인터페이스만 노출하므로 계수도 인터페이스로 받는다.
     status += "\n  메시 캐시 — experiment 업로드 "
         + std::to_string(const_cast<LiveState&>(state)
-            .dx12.MeshCache().GetExperimentUploadCount());
+            .dx12.MeshCache().GetExperimentUploadCount())
+        + " (handle "
+        + std::to_string(const_cast<LiveState&>(state)
+            .dx12.MeshCache().GetExperimentHandleUploadCount()) + ")";
     char recordLine[192]{};
     std::snprintf(recordLine, sizeof(recordLine),
         "\n  Native record CPU — last %.3f ms · avg %.3f ms · max %.3f ms · samples %llu",

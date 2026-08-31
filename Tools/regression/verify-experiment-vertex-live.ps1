@@ -96,6 +96,13 @@ function Get-TotalUploads([string]$log) {
     if ($log -match '메시 업로드\s+(\d+)\(experiment') { return [int]$Matches[1] }
     return -1
 }
+function Get-HandleUploads([string]$log) {
+    # I5-D4b: 핸들 진입점 계수. lookup 폴백과 분리 — 핸들이 안 실려도 lookup이
+    # 받쳐 experiment 계수는 그대로이므로, 이 계수 없이는 핸들 경로 소실이
+    # 조용히 통과한다.
+    if ($log -match '메시 업로드\s+\d+\(experiment\s+\d+,\s+handle\s+(\d+)') { return [int]$Matches[1] }
+    return -1
+}
 function Get-DrawCount([string]$log) {
     if ($log -match '\[3/4\] 씬 카메라 렌더 — 드로우\s+(\d+)') { return [int]$Matches[1] }
     return -1
@@ -143,6 +150,13 @@ $totalOn = Get-TotalUploads $logOn
 if ($totalOn -lt 0 -or $totalOn -ne $uploadsOn) {
     $fail += "2b 업로드 전량이 experiment가 아니다 — 총 $totalOn vs experiment $uploadsOn"
 }
+# ★ 2c(I5-D4b) — 전량이 핸들 진입점이어야 한다. 이 씬의 메시는 전부 모델
+#   유래(바인딩 존재)라 핸들이 하나도 새면 프록시→아이템→패스 사슬 어딘가가
+#   핸들을 흘린 것이다. lookup 폴백이 받쳐 2·2b는 초록이므로 여기서만 갈린다.
+$handleOn = Get-HandleUploads $logOn
+if ($handleOn -lt 0 -or $handleOn -ne $totalOn) {
+    $fail += "2c 핸들 경로 업로드 $handleOn/$totalOn — 핸들이 새고 lookup 폴백이 받쳤다"
+}
 if (-not $scenePassOn) { $fail += "3 dx12.scene 실패(on) — experiment 버퍼로 그린 그림이 단정을 깼다" }
 # I5-D34c: forward 큐가 실제로 채워졌는가 — matmode 없이는 Forward 레이아웃
 # 축이 한 번도 돌지 않고, 이 단정 없이는 그 누락이 조용히 통과로 나온다.
@@ -156,7 +170,7 @@ if ($fwdBatchOn -le 0) {
     $fail += "3c 포워드 배치 $fwdBatchOn — 큐 $fwdOn 인데 배치가 비었다(드로우를 버렸다)"
 }
 
-"on  — model.dual $dualCount 건 · experiment 업로드 $uploadsOn/$totalOn · 드로우 $drawsOn(포워드 $fwdOn) · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
+"on  — model.dual $dualCount 건 · experiment 업로드 $uploadsOn/$totalOn(핸들 $handleOn) · 드로우 $drawsOn(포워드 $fwdOn) · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
 
 # ── B: 스위치 끔 ──
 $logOff = Invoke-Run "off" "0"
@@ -166,6 +180,10 @@ $coverOff = Get-Coverage $logOff
 $scenePassOff = $logOff -match '\[CLI\] dx12\.scene 통과'
 
 if ($uploadsOff -ne 0) { $fail += "4a 스위치를 껐는데 experiment 업로드 $uploadsOff" }
+# I5-D4b: 스위치가 핸들 경로도 막는가 — TryGetExperimentMeshBinding이 스위치를
+# 안 보면 off 대조군이 반쪽이 된다.
+$handleOff = Get-HandleUploads $logOff
+if ($handleOff -ne 0) { $fail += "4g 스위치를 껐는데 핸들 업로드 $handleOff" }
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"
 }

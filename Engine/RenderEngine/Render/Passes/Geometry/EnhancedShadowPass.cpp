@@ -347,7 +347,12 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         if (m_drawGeometry.find(draw.mesh) != m_drawGeometry.end()) continue;
 
         std::string uploadError;
-        const auto entry = context.meshCache->GetOrUpload(draw.mesh, uploadError);
+        // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선(같은 stableKey라
+        // GBuffer가 올린 것을 캐시 히트로 받는 계약도 그대로다).
+        const auto entry = (0 != draw.experimentView.stableKey)
+            ? context.meshCache->GetOrUploadExperiment(
+                draw.experimentView, uploadError)
+            : context.meshCache->GetOrUpload(draw.mesh, uploadError);
         if (!entry.IsValid())
         {
             if (!uploadError.empty()) outError = uploadError;

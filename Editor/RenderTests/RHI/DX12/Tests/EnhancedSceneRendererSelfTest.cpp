@@ -3104,6 +3104,21 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
             item.mesh = proxy->m_Mesh.get();
             item.worldMatrix = proxy->m_worldMatrix;
 
+            // I5-D4b — 제품 poolMesh와 같은 핸들 경로. 하네스가 다른 경로로
+            // 그리면 감시자가 제품이 안 타는 길을 재는 눈먼 초록이 된다(D34a
+            // 주입과 같은 이유). 뷰 포인터 수명은 프록시의 shared_ptr가 진다
+            // (이 프레임 동안 살아 있음 — 위 팔레트와 같은 계약).
+            if (proxy->m_experimentModel)
+            {
+                RHIExperimentVertexView view{};
+                if (DataSystem::BuildExperimentVertexView(
+                    *proxy->m_experimentModel,
+                    proxy->m_experimentMeshIndex, view))
+                {
+                    item.experimentView = view;
+                }
+            }
+
             // 본 팔레트. 포인터만 나르고 복사는 패스가 PrepareFrame에서 한다 —
             // 512행렬(32KB)을 여기서 복사하면 프록시마다 그만큼 든다.
             // 팔레트 버퍼는 프록시가 shared_ptr로 붙들고 있어 이 프레임 동안
@@ -3885,7 +3900,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         + " · 배치 " + std::to_string(gbuffer.GetLastBatchCount()) + "\n";
     outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
         + " · 메시 업로드 " + std::to_string(meshStats.uploads)
-        + "(experiment " + std::to_string(meshStats.experimentUploads) + ", "
+        + "(experiment " + std::to_string(meshStats.experimentUploads)
+        + ", handle " + std::to_string(meshStats.experimentHandleUploads) + ", "
         + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
         + " · 커버리지 " + std::to_string(coveredA) + "/" + std::to_string(kWidth * kHeight) + "\n";
 

@@ -331,7 +331,13 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
         if (m_drawGeometry.find(draw.mesh) == m_drawGeometry.end())
         {
             std::string uploadError;
-            const auto entry = context.meshCache->GetOrUpload(draw.mesh, uploadError);
+            // I5-D4b: 핸들이 실린 아이템은 legacy Mesh 없이 완결되는 핸들
+            // 진입점으로 올린다(키=experiment 자산 신원). mesh 포인터는 정렬·
+            // 지오메트리 맵 키로 남는다(은퇴는 D4f).
+            const auto entry = (0 != draw.experimentView.stableKey)
+                ? context.meshCache->GetOrUploadExperiment(
+                    draw.experimentView, uploadError)
+                : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())
             {
                 // 빈 메시는 그냥 건너뛴다. 업로드 실패는 알린다 — 조용히 안 그리면

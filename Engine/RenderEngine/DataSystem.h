@@ -119,6 +119,17 @@ public:
 	// RHI 메시 캐시에 함수로 주입되는 것이 소비자다 — 캐시는 이 클래스를 모른다.
 	[[nodiscard]] bool TryGetExperimentVertexView(
 		const Mesh& mesh, RHIExperimentVertexView& outView);
+	// I5-D4b — 핸들 병행: 프록시 생성이 legacy Mesh 신원으로 experiment
+	// (모델, 메시 인덱스) 페어를 얻어 렌더 사슬에 싣는다. A/B 스위치가 꺼져
+	// 있으면 false(핸들 자체가 실리지 않아 대조군이 성립한다).
+	[[nodiscard]] bool TryGetExperimentMeshBinding(const Mesh& mesh,
+		std::shared_ptr<const experiment::Model>& outModel,
+		std::uint32_t& outMeshIndex);
+	// I5-D4b — 핸들→뷰 변환(순수, 스위치 무관). 신원 키(stableKey)까지 채워
+	// 뷰가 IsHandleComplete가 되면 캐시의 핸들 진입점이 소비한다.
+	[[nodiscard]] static bool BuildExperimentVertexView(
+		const experiment::Model& model, std::uint32_t meshIndex,
+		RHIExperimentVertexView& outView);
 	void LoadModel(std::string_view filePath);
 	std::shared_ptr<Model> LoadCachedModelShared(std::string_view filePath);
 	// 즉시 사용 legacy 호출부 호환. 참조를 보관하는 쪽은 위 shared API를 쓴다.

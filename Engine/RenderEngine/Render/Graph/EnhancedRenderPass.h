@@ -167,6 +167,10 @@ struct EnhancedMaterialDrawSnapshot
 struct EnhancedDrawItem
 {
     Mesh*          mesh{ nullptr };
+    // I5-D4b — experiment 핸들 경로의 뷰. stableKey != 0이면 3패스가 캐시의
+    // GetOrUploadExperiment로 올린다(mesh는 정렬·지오메트리 맵 키로 존치).
+    // 뷰의 포인터 수명은 drawPool의 experimentSource(shared_ptr)가 진다.
+    RHIExperimentVertexView experimentView{};
     math::matrix4x4 worldMatrix{};
 
     // 재질에서 뽑아 온 것. Material* 자체를 들지 않는 이유는 메시와 같다 —

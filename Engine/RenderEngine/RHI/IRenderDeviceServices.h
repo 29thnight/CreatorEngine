@@ -322,10 +322,25 @@ struct RHIExperimentVertexView
     uint32_t    stride{ 0 };
     uint32_t    attributeMask{ 0 };
 
+    // I5-D4b: 인덱스와 안정 신원. 이 셋이 채워진 뷰는 legacy Mesh 객체 없이
+    // 업로드를 완결할 수 있다(핸들 경로 — GetOrUploadExperiment). stableKey는
+    // 자산 신원(experiment 모델 assetId ⊕ 메시 인덱스)에서 유도한 캐시 키로,
+    // 0이면 핸들 경로가 아니다. 포인터 비보관 계약은 indexData에도 같이 적용.
+    const uint32_t* indexData{ nullptr };
+    uint32_t        indexCount{ 0 };
+    size_t          stableKey{ 0 };
+
     bool IsValid() const
     {
         return nullptr != data && 0 != bytes && 0 != stride
             && 0 != attributeMask && 0 == bytes % stride;
+    }
+
+    /// 핸들 경로 요건 — 신원과 인덱스까지 완비.
+    bool IsHandleComplete() const
+    {
+        return IsValid() && 0 != stableKey
+            && nullptr != indexData && 0 != indexCount;
     }
 };
 
@@ -342,6 +357,12 @@ public:
 
     virtual RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) = 0;
 
+    /// I5-D4b 핸들 경로: 신원·정점·인덱스가 완비된 뷰(IsHandleComplete)로
+    /// 업로드한다 — legacy Mesh 객체가 키 운반체에서 빠지는 절단선이다.
+    /// D34a의 lookup 계약과 같은 이유로 순수 가상(두 backend 대칭 강제).
+    virtual RHIMeshBinding GetOrUploadExperiment(
+        const RHIExperimentVertexView& view, std::string& outError) = 0;
+
     /// I5-D34a: 순수 가상이다 — 구현(DX12/Vulkan)이 하나라도 빠뜨리면 컴파일이
     /// 막는다. 두 backend가 갈리면 vk 대조 게이트가 stride 불일치로 붉는 자리라
     /// 기본 구현(무시)을 주지 않는다.
@@ -350,5 +371,10 @@ public:
     /// I5-D34a 관측: 업로드 중 experiment packed 정점으로 올라간 수. CLI가
     /// "전부 legacy"와 구분하는 데 쓴다 — 전환기와 함께 I6에서 은퇴한다.
     virtual uint32_t GetExperimentUploadCount() const = 0;
+
+    /// I5-D4b 관측: 그중 핸들 경로(GetOrUploadExperiment)로 올라간 수.
+    /// lookup 폴백과 분리해야 "핸들이 실리지 않아도 lookup이 받쳐 초록"이라는
+    /// 눈먼 통과를 게이트가 가른다.
+    virtual uint32_t GetExperimentHandleUploadCount() const = 0;
 };
 

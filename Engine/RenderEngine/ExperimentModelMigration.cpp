@@ -432,37 +432,95 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 	return legacyModel;
 }
 
-bool DataSystem::TryGetExperimentVertexView(
-	const Mesh& mesh, RHIExperimentVertexView& outView)
+namespace
 {
 	// A/B 판정 스위치(부팅 고정): CREATOR_EXPERIMENT_VERTEX=0이면 전부 legacy
 	// 96B로 올린다. 같은 빌드에서 픽셀 diff 0을 재고 변이의 이빨을 증명하는
-	// 유일한 창구다 — 전환기와 함께 I6에서 은퇴한다.
-	static const bool enabled = []
+	// 유일한 창구다 — 전환기와 함께 I6에서 은퇴한다. D4b부터 lookup 경로와
+	// 핸들 경로(프록시 바인딩)가 같은 스위치를 본다 — 한쪽만 꺼지면 A/B
+	// 대조군이 반쪽이 된다.
+	bool IsExperimentVertexEnabled()
 	{
-		const char* value = std::getenv("CREATOR_EXPERIMENT_VERTEX");
-		return nullptr == value || '0' != value[0];
-	}();
-	if (!enabled) return false;
+		static const bool enabled = []
+		{
+			const char* value = std::getenv("CREATOR_EXPERIMENT_VERTEX");
+			return nullptr == value || '0' != value[0];
+		}();
+		return enabled;
+	}
+
+	// I5-D4b — 캐시 안정 키: 자산 신원(assetId 16바이트)과 메시 인덱스의
+	// FNV-1a 64. legacy m_hashingMesh(make_guid 랜덤)와 같은 64비트 키 공간을
+	// 공유하며 충돌 무시 가정도 같다. 0은 '핸들 아님' 표지라 회피한다.
+	size_t HashExperimentMeshKey(
+		const experiment::AssetId& assetId, std::uint32_t meshIndex)
+	{
+		std::uint64_t hash = 1469598103934665603ull;
+		const auto mix = [&hash](const void* data, size_t size)
+		{
+			const auto* bytes = static_cast<const unsigned char*>(data);
+			for (size_t i = 0; i < size; ++i)
+			{
+				hash ^= bytes[i];
+				hash *= 1099511628211ull;
+			}
+		};
+		mix(assetId.value.data.data(), assetId.value.data.size());
+		mix(&meshIndex, sizeof(meshIndex));
+		if (0 == hash) hash = 1;
+		return static_cast<size_t>(hash);
+	}
+}
+
+bool DataSystem::TryGetExperimentVertexView(
+	const Mesh& mesh, RHIExperimentVertexView& outView)
+{
+	if (!IsExperimentVertexEnabled()) return false;
 
 	std::lock_guard lock(m_experimentMeshMutex);
 	const auto found = m_experimentMeshBindings.find(mesh.m_hashingMesh);
 	if (found == m_experimentMeshBindings.end()) return false;
 
-	const experiment::Mesh* source = found->second.model->TryGetMesh(
-		experiment::MeshIndex{ found->second.meshIndex });
+	// D34b: 스킨 마스크 개방 — GBuffer/Shadow가 스킨 레이아웃 PSO 축(uint4
+	// BLENDINDICES)을 갖췄다. D4b: 뷰 시공은 핸들 경로와 같은 정본 함수 하나다
+	// — lookup 폴백과 핸들 경로의 데이터가 갈릴 여지를 없앤다.
+	return BuildExperimentVertexView(*found->second.model,
+		found->second.meshIndex, outView);
+}
+
+bool DataSystem::TryGetExperimentMeshBinding(const Mesh& mesh,
+	std::shared_ptr<const experiment::Model>& outModel,
+	std::uint32_t& outMeshIndex)
+{
+	if (!IsExperimentVertexEnabled()) return false;
+
+	std::lock_guard lock(m_experimentMeshMutex);
+	const auto found = m_experimentMeshBindings.find(mesh.m_hashingMesh);
+	if (found == m_experimentMeshBindings.end()) return false;
+	if (nullptr == found->second.model) return false;
+
+	outModel = found->second.model;
+	outMeshIndex = found->second.meshIndex;
+	return true;
+}
+
+bool DataSystem::BuildExperimentVertexView(
+	const experiment::Model& model, std::uint32_t meshIndex,
+	RHIExperimentVertexView& outView)
+{
+	const experiment::Mesh* source = model.TryGetMesh(
+		experiment::MeshIndex{ meshIndex });
 	if (nullptr == source) return false;
 
 	const experiment::VertexBuffer& vertices = source->vertices;
-	const experiment::VertexAttributeMask mask = vertices.AttributeMask();
-	// D34b: 스킨 마스크 개방 — GBuffer/Shadow가 스킨 레이아웃 PSO 축(uint4
-	// BLENDINDICES)을 갖췄다. Forward는 D34c까지 자체 fail-closed(마스크 != 0
-	// 전체 거부)라 여기서 가를 필요가 없다.
-
 	const std::span<const std::byte> bytes = vertices.Bytes();
 	outView.data = bytes.data();
 	outView.bytes = bytes.size();
 	outView.stride = vertices.Stride();
-	outView.attributeMask = mask;
-	return outView.IsValid();
+	outView.attributeMask = vertices.AttributeMask();
+	outView.indexData = source->indices.data();
+	outView.indexCount = static_cast<std::uint32_t>(source->indices.size());
+	outView.stableKey = HashExperimentMeshKey(
+		model.Metadata().assetId, meshIndex);
+	return outView.IsHandleComplete();
 }

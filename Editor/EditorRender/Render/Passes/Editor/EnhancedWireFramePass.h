@@ -103,6 +103,11 @@ private:
         Mesh*    mesh{ nullptr };
         uint32_t first{ 0 };
         uint32_t count{ 0 };
+        // I5-D4b — 아이템의 핸들 뷰를 배치로 나른다. 없으면(stableKey 0)
+        // legacy 진입점. 3패스와 키를 공유해야 캐시 히트가 성립한다 —
+        // 안 나르면 GBuffer(핸들 키)와 이 패스(mesh 키)가 같은 메시를
+        // 두 번 올린다.
+        RHIExperimentVertexView experimentView{};
     };
 
     static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;

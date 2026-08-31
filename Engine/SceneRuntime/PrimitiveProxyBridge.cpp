@@ -10,6 +10,7 @@
 #include "MeshRenderer.h"
 #include "Mesh.h"
 #include "Material.h"
+#include "DataSystem.h" // I5-D4b: experiment 핸들 조회
 #include "FoliageComponent.h"
 #include "Terrain.h"
 #include "DecalComponent.h"
@@ -35,6 +36,15 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
     m_isSkinnedMesh(component->m_isSkinnedMesh)
 {
     CopyWorldTransform(*this, component->GetOwner());
+
+    // I5-D4b — experiment 핸들 병행. 스냅샷 시점에 한 번 조회한다(프록시
+    // 갱신 커맨드는 메시를 바꾸지 않는다 — 메시 교체는 프록시 재생성 규약).
+    // 실패(false)는 핸들 없음이고 렌더는 legacy 경로로 그린다.
+    if (nullptr != m_Mesh)
+    {
+        DataSystems->TryGetExperimentMeshBinding(
+            *m_Mesh, m_experimentModel, m_experimentMeshIndex);
+    }
 
 	Entity* meshOwner = component->GetOwner();
 	Entity::Index animatorOwnerIndex = meshOwner
