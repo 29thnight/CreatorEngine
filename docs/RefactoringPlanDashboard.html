@@ -1003,7 +1003,7 @@
 <!-- ===== PHASE 21 ===== -->
 <section class="phase" id="phase-21">
   <h2 class="sec"><span class="no">PHASE 21</span>에디터 워크스페이스 · 도킹 · ViewportHost 재설계 <span class="phase-pct" data-phase-pct="21"></span></h2>
-  <div class="phase-meta">신설: 2026-08-24 · 설계 문서: <a href="plans/EditorWorkspaceRedesignPlan.md">EditorWorkspaceRedesignPlan.md</a> · Dear ImGui 유지 · 초기 추정 23일 · 구현 미착수</div>
+  <div class="phase-meta">신설: 2026-08-24 · 사전 정찰 2026-08-30 · 설계 문서: <a href="plans/EditorWorkspaceRedesignPlan.md">EditorWorkspaceRedesignPlan.md</a> · Dear ImGui 유지 · 추정 25일(정찰 뒤 23→25) · 구현 미착수</div>
   <div class="phase-goal"><b>목표:</b> S&amp;Box의 고정 좌표를 복제하는 대신 <b>고정 중앙 ViewportHost + 주변 자유 도킹 ToolPanel</b>의 제약 경계를 채택한다.
   공개 theme token을 CreatorEngine semantic token으로 옮기고, 소수 custom widget, stable workspace, Play 시 중앙 Game 전환, 선택적 Game Preview, 양 backend·DPI·시각·성능 회귀를 완결한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="21"><!-- JS 생성 --></table></div>
@@ -2061,11 +2061,11 @@ const TASKS = [
     refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo", note: "" },
 
   // ---------- PHASE 21: 에디터 워크스페이스·도킹·ViewportHost ----------
-  { phase: 21, id: "W0", title: "현 레이아웃·성능·시각 기준선과 실패 게이트",
-    detail: "현재 ini/title/flags/open state와 2해상도·2DPI screenshot, Editor UI CPU·ImGui geometry·target별 GPU ms를 기록하고 깨진 fixture가 실제 실패하는 canary를 만든다.",
-    refs: "EditorWorkspaceRedesignPlan W0", priority: "P0", days: 1, status: "todo", note: "" },
+  { phase: 21, id: "W0", title: "관측 표면·기준선·실패 게이트",
+    detail: "editor.layout/windows/dock/theme/viewport 관측 커맨드 5종을 먼저 신설하고 창 순회를 결정적 순서로 바꾼 뒤, 실물 ini 4벌·title/flags/open state와 해상도·user scale screenshot, Editor UI CPU·ImGui geometry·target별 GPU ms를 기록한다. canary는 변이로 이빨을 증명한다.",
+    refs: "EditorWorkspaceRedesignPlan W0", priority: "P0", days: 2, status: "todo", note: "정찰 1→2일: 에디터 chrome CLI 관측 표면이 0이라 canary 전제가 없었다" },
   { phase: 21, id: "W1", title: "S&Box식 theme token·font/icon·DPI 정본",
-    detail: "공개 색·geometry를 CreatorEngine semantic token으로 옮기고 Inter/fallback·Font Awesome atlas와 logical px × DPI × user scale 단일 경로를 만든다.",
+    detail: "공개 색·geometry를 semantic token으로 옮기고 PushStyleColor/Var 91건을 정리한다. DPI는 자체 구현이 아니라 ImGui 1.92의 FontScaleMain/FontScaleDpi로 이주하고 obsolete io.FontGlobalScale을 걷는다.",
     refs: "EditorWorkspaceRedesignPlan W1", priority: "P1", days: 2, status: "todo", note: "" },
   { phase: 21, id: "W2", title: "공통 styled primitive와 custom draw 4종",
     detail: "Inspector section/property row, XYZ field, toolbar/mode button만 custom draw하고 표준 Tree/Input/Menu/Docking interaction은 ImGui에 남긴다.",
@@ -2077,13 +2077,13 @@ const TASKS = [
     detail: "닫을 수 없는 central Host에서 Editor/Game target을 선택한다. Scene image/interaction/overlay/game input을 분리하고 optional Game Preview와 visible target demand를 연결한다.",
     refs: "EditorWorkspaceRedesignPlan W4", priority: "P0", days: 4, status: "todo", note: "" },
   { phase: 21, id: "W5", title: "Play/Pause/Eject 표시·입력 상태 머신",
-    detail: "Entering/PlayingPossessed/PlayingEjected/Exiting을 Editor에 두고 transaction commit, target-ready, gizmo/picking/game input/cursor/focus 복원을 명시한다.",
-    refs: "EditorWorkspaceRedesignPlan W5", priority: "P0", days: 3, status: "todo", note: "" },
+    detail: "선행으로 committed play 신호와 입력 소유권 신호를 만든다(지금은 둘 다 없다). 그 위에 Entering/PlayingPossessed/PlayingEjected/Exiting과 transaction commit·target-ready·cursor/focus 복원을 얹는다.",
+    refs: "EditorWorkspaceRedesignPlan W5", priority: "P0", days: 4, status: "todo", note: "정찰 3→4일: m_isGameStart가 스냅샷 실패에도 true로 남고, WantCapture*가 매 프레임 강제라 읽을 신호가 없다" },
   { phase: 21, id: "W6", title: "S&Box Compact·Level·UI·Render/Debug·Legacy preset",
     detail: "preset은 초기값/Reset일 뿐 lock이 아니며 Save As/Rename/Delete와 small-window/DPI reflow를 지원한다.",
     refs: "EditorWorkspaceRedesignPlan W6", priority: "P2", days: 2, status: "todo", note: "" },
   { phase: 21, id: "W7", title: "Hierarchy/Browser clipping과 presentation cache",
-    detail: "1k/10k/50k fixture에서 visible-row clipping과 파생 cache를 적용한다. SceneGraph HierarchyStore의 parent/children 정본은 복제하지 않는다.",
+    detail: "1k/10k/50k fixture에서 flatten 파생 cache를 먼저 만들고 그 위에 visible-row clipping을 얹는다(재귀 TreeNode에는 clipper를 바로 끼울 수 없다). HierarchyStore의 parent/children 정본은 복제하지 않는다.",
     refs: "EditorWorkspaceRedesignPlan W7", priority: "P1", days: 3, status: "todo", note: "" },
   { phase: 21, id: "W8", title: "양 backend·DPI·Play·layout·시각·성능 통합 회귀",
     detail: "DX12/Vulkan, damaged ini, restart, DPI, Game Preview, Play 왕복, chrome visual golden과 perf gate를 통과한 뒤 legacy 강제 배치를 은퇴한다.",
