@@ -1,0 +1,62 @@
+# 프리팹 identity 교란 게이트 (SceneGraphRedesignPlan 트랙 P)
+#
+# ── 이 검사가 메우는 구멍 ──
+#
+# prefab.update의 결과는 그 순간 asset catalog가 프리팹 경로의 GUID를 들고 있는지에
+# 달려 있다. 그런데 그 항목은 CLI 스레드가 아니라 **efsw 워처 스레드**가 바꾼다
+# (EditorAssetDatabase::HandleDeleted). 원자적 게시(.tmp -> replace)를 워처가 Delete로
+# 받으면, 본문이 멀쩡히 살아 있는데도 catalog 항목을 떨어뜨리고 sidecar까지 지운다.
+#
+# 그 창에 prefab.update가 걸리면 아무 에러 없이 다음이 연쇄한다.
+#   LoadPrefab이 살아 있는 identity를 널로 덮는다
+#     -> SavePrefab이 null을 보고 CreateRandomV4()로 **새 GUID를 발급**한다
+#       -> UpdateInstances가 그 새 키로 m_instanceMap을 조회해 **조용히 0건 적용**한다
+#
+# 겉으로는 전부 정상이다. prefab.status는 2·2 그대로고, 복제본도 인스턴스로 인식되고,
+# 로그는 "등록 인스턴스 2개에 적용"이라고 말한다. 인스턴스 값만 옛것으로 남는다.
+#
+# 음성 시험(2026-08-30, 고치기 전 실측 — 창을 열고 sidecar를 지운 결과):
+#   저장된 Orig/Copy.m_shadowCast = true (기대 false)
+#   저장된 인스턴스 guid c90d0b51… ≠ 최종 sidecar guid 496a9fac…  ← 새 GUID 발급의 지문
+#
+# ★ 이 게이트는 그 경합을 **일부러 재현한다.** verify-prefab-duplicate는 같은 결함을
+# 겨우 ~26ms 창에 우연히 걸릴 때만 잡는다(2026-08-30에 한 번 걸리고 재현되지 않았다).
+# 여기서는 창을 열어 놓고 밖에서 sidecar를 지워 교란을 확정적으로 넣고, 엔진이
+# identity를 지켜 내는지 본다.
+#
+# {{WINDOW}} 자리에 게이트가 주입 대기 프레임 수를 채운다.
+
+wait 45
+scene.new
+wait 40
+object.create Src Empty
+component.add Src MeshRenderer
+wait 20
+object.property Src MeshRenderer m_shadowCast true
+wait 10
+prefab.create Src DupProbe
+wait 45
+prefab.instantiate DupProbe Orig
+wait 45
+object.duplicate Orig Copy
+wait 30
+prefab.status
+prefab.overrides Copy
+prefab.objectguid Orig
+prefab.objectguid Copy
+
+# ── 주입 창 ──
+# 게이트가 위 prefab.overrides Copy 줄을 stdout에서 보고 sidecar를 지운다.
+wait {{WINDOW}}
+
+object.property Src MeshRenderer m_shadowCast false
+wait 15
+prefab.update Src DupProbe
+wait 60
+prefab.status
+prefab.objectguid Orig
+prefab.objectguid Copy
+scene.save {{SCENE_OUT}}
+wait 45
+log.flush
+quit

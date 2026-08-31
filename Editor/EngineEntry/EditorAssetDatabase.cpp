@@ -1431,16 +1431,48 @@ private:
 		else CreateMeta(newPath);
 	}
 
+	// 본문이 아직 살아 있으면 이 Delete 알림은 삭제가 아니라 **게시**다.
+	//
+	// PublishTextAssetLocked는 `.tmp` staging -> 원자적 교체로 끝나는데, 그 교체를
+	// 워처가 목적지 경로의 Delete로 받는다(2026-08-30 실측: 정상 실행 한 판에서
+	// DupProbe.prefab.meta가 스스로 두 번, 각각 ~26ms 사라졌다 — 본문은 내내
+	// 존재했다). 그때 catalog 항목을 떨어뜨리면 그 창에 GetFileGuid가 널을
+	// 돌려주고, 그 널이 다음으로 번진다.
+	//
+	//   LoadPrefab이 살아 있는 identity를 널로 덮는다
+	//     -> SavePrefab이 널을 보고 CreateRandomV4()로 새 GUID를 발급한다
+	//       -> UpdateInstances가 그 새 키로 조회해 **조용히 0건 적용**한다
+	//
+	// 에러도 로그도 없이 인스턴스 값만 옛것으로 남는다. verify-prefab-duplicate가
+	// 2026-08-30에 한 번 그 창에 걸렸고, 창이 좁아 재현되지 않았다.
+	// verify-prefab-identity-injection이 그 교란을 확정적으로 재현한다.
+	bool TargetStillExists(const file::path& targetPath) const
+	{
+		std::error_code error;
+		return file::exists(targetPath, error) && !error;
+	}
+
 	void HandleDeleted(const file::path& deletedPath)
 	{
 		if (deletedPath.extension() == ".meta")
 		{
-			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
-				RuntimeAssetType::Auto, {}, RemoveMetaExtension(deletedPath) });
+			// sidecar만 사라졌다면 본문의 identity를 버릴 이유가 없다. 다음
+			// 저작 게시가 sidecar를 같은 GUID로 다시 쓴다.
+			const file::path targetPath = RemoveMetaExtension(deletedPath);
+			if (TargetStillExists(targetPath)) return;
+
+			DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::Removed,
+				RuntimeAssetType::Auto, {}, targetPath });
 			return;
 		}
 
-		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+		if (TargetStillExists(deletedPath)) return;
+
+		// ★ ApplyAssetChange가 아니라 QueueAssetChange다. 이 함수는 efsw I/O
+		// 스레드에서 돈다 — DataSystem.h의 계약("Watcher I/O thread는 cache/catalog를
+		// 직접 바꾸지 않고 이 큐에 게시한다")대로 프레임 경계로 넘긴다.
+		// HandleModified는 이미 그렇게 하고 있었고 여기만 어긋나 있었다.
+		DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::Removed,
 			RuntimeAssetType::Auto, {}, deletedPath });
 		const file::path metaPath = deletedPath.string() + ".meta";
 		std::error_code error;

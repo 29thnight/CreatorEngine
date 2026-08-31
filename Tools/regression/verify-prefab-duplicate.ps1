@@ -9,9 +9,20 @@
 #   3  복제 후에도 씬 인스턴스 == 등록 — ★ 본 판정. 복제본이 등록부에 이어졌는가
 #   4  복제본이 인스턴스로 인식된다  — prefab.overrides가 인스턴스=예
 #   5  복제본이 프리팹 갱신을 받는다 — ★★ 저장된 Copy.m_shadowCast가 false
+#   6  프리팹 identity가 유지됐다   — 저장된 인스턴스 guid == 최종 sidecar guid
+#   7  적용 건수가 정직하다         — prefab.update가 "2개 중 2개에 적용"이라고 말한다
 #
 # 3과 5는 같은 결함의 앞뒤다. 3만 보면 "등록은 됐는데 갱신은 안 오는" 경우를 놓치고,
 # 5만 보면 왜 안 왔는지 못 가른다.
+#
+# 6·7은 2026-08-30에 이 게이트가 한 번 실패하고 재현되지 않은 뒤에 붙였다. 원인은
+# 초기 상태가 아니라 **워처 스레드와의 경합**이었다 — catalog가 프리팹 경로의 GUID를
+# 잠깐 잃는 ~26ms 창에 prefab.update가 걸리면, SavePrefab이 새 GUID를 발급하고
+# UpdateInstances가 그 키로 조회해 조용히 0건 적용한다. 그때 판정 1~4는 전부 통과하고
+# 5만 빨개지므로 "왜"를 가를 수 없었다. 6이 원인(identity 갈림)을, 7이 그 즉시 증상
+# (실제 적용 0건)을 잡는다. 그 경합을 확정적으로 재현하는 것은
+# verify-prefab-identity-injection.ps1 이고, 이 게이트는 우연히 걸렸을 때 원인을
+# 말할 수 있게만 한다.
 #
 # ★ 자가 틀렸을 때 어떻게 드러나는가 (이 저장소에서 파서 버그가 네 번 났다):
 #   · 개수를 못 읽으면 판정 1이 먼저 걸린다(측정 2회 단정)
@@ -34,13 +45,24 @@ $template = Join-Path $PSScriptRoot "prefab_duplicate.txt"
 if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 
 $sceneOut = Join-Path $Work "PrefabDuplicate.creator"
-if (Test-Path $sceneOut) { Remove-Item $sceneOut -Force }
+if (Test-Path $sceneOut) { Remove-Item $sceneOut -Force -ErrorAction SilentlyContinue }
+if (Test-Path $sceneOut) { "이전 실행의 저장 파일을 지우지 못했다: $sceneOut"; exit 1 }
 
 # 이전 실행이 남긴 프리팹을 지운다 — 남아 있으면 "레지스트리에 이미 있는" 상태를
 # 재게 되어, 세션 중 생성 경로(SavePrefab의 즉시 등록)를 검사하지 못한다.
-$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-Get-ChildItem (Join-Path $repoRoot "Dynamic_CPP\Assets\Prefabs") -Filter "DupProbe.prefab*" -ErrorAction SilentlyContinue |
-    Remove-Item -Force -ErrorAction SilentlyContinue
+#
+# ★ 지워졌는지 **확인한다**. 예전에는 -ErrorAction SilentlyContinue만 걸어 두어
+# 삭제 실패가 아무 흔적 없이 통과했다 — 초기 상태가 실행마다 달라지는데 그것을
+# 알 길이 없었다. (실측으로는 잔재가 있어도 결과가 갈리지 않았지만, 그 사실 자체를
+# 게이트가 증명해야 한다.)
+$repoRoot  = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$prefabDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Prefabs"
+$prefabAsset = Join-Path $prefabDir "DupProbe.prefab"
+$prefabMeta  = Join-Path $prefabDir "DupProbe.prefab.meta"
+foreach ($p in @($prefabAsset, $prefabMeta)) {
+    if (Test-Path $p) { Remove-Item $p -Force -ErrorAction SilentlyContinue }
+    if (Test-Path $p) { "이전 실행이 남긴 픽스처를 지우지 못했다: $p"; exit 1 }
+}
 
 $scenario = Join-Path $Work "prefab_duplicate_resolved.txt"
 (Get-Content $template -Raw) -replace '\{\{SCENE_OUT\}\}', ($sceneOut -replace '\\', '/') |
@@ -63,8 +85,9 @@ if (-not $proc.HasExited) {
 
 $text = Get-Content $outPath -Raw
 
-$status = [regex]::Matches($text, '\[prefab\.status\] 씬 인스턴스 (\d+)개 · 등록 (\d+)개')
-$inst   = [regex]::Matches($text, '\[prefab\.overrides\] (\S+) · 인스턴스=(\S+) · 기록 (\d+)건')
+$status  = [regex]::Matches($text, '\[prefab\.status\] 씬 인스턴스 (\d+)개 · 등록 (\d+)개')
+$inst    = [regex]::Matches($text, '\[prefab\.overrides\] (\S+) · 인스턴스=(\S+) · 기록 (\d+)건')
+$applied = [regex]::Match($text, '\[prefab\.update\] \S+ <- \S+ · 등록 인스턴스 (\d+)개 중 (\d+)개에 적용')
 
 $failed = @()
 
@@ -120,10 +143,27 @@ if (-not (Test-Path $sceneOut)) {
 
     $origShadow = Get-Field 'Orig' 'm_shadowCast'
     $copyShadow = Get-Field 'Copy' 'm_shadowCast'
+    $origGuid   = Get-Field 'Orig' 'm_prefabFileGuid'
+    $copyGuid   = Get-Field 'Copy' 'm_prefabFileGuid'
+
+    $sidecarGuid = $null
+    if (Test-Path $prefabMeta) {
+        $m = [regex]::Match((Get-Content $prefabMeta -Raw), '(?m)^guid:\s*(\S+)\s*$')
+        if ($m.Success) { $sidecarGuid = $m.Groups[1].Value }
+    }
 
     ""
     "저장된 값 — Orig.m_shadowCast = $origShadow (기대 false)"
     "           Copy.m_shadowCast = $copyShadow (기대 false) ← 판정 5"
+    "identity — sidecar $sidecarGuid · Orig $origGuid · Copy $copyGuid ← 판정 6"
+
+    # 판정 6 — 원인 쪽. 인스턴스가 든 guid가 sidecar와 갈리면 SavePrefab이 새
+    # GUID를 발급했다는 뜻이고, 그 순간 UpdateInstances는 아무것도 찾지 못한다.
+    if ($null -eq $sidecarGuid) {
+        $failed += "판정 6 실패: 최종 sidecar가 없거나 guid를 읽지 못했다: $prefabMeta"
+    } elseif ($origGuid -ne $sidecarGuid -or $copyGuid -ne $sidecarGuid) {
+        $failed += "판정 6 실패: 인스턴스 guid(Orig=$origGuid Copy=$copyGuid)가 sidecar guid($sidecarGuid)와 다르다 — 실행 중에 프리팹 identity를 잃고 새 GUID를 발급했다"
+    }
 
     if ($null -eq $origShadow -or $null -eq $copyShadow) {
         $failed += "저장된 씬에서 Orig/Copy 값을 읽지 못했다 — 블록 파싱 실패(형상이 바뀌었는지 확인)"
@@ -135,6 +175,19 @@ if (-not (Test-Path $sceneOut)) {
         if ($copyShadow -ne 'false') {
             $failed += "판정 5 실패: Copy.m_shadowCast가 '$copyShadow'다 — 복제본이 프리팹 갱신을 못 받았다. 등록부에 없어 UpdateInstances가 건너뛴 것이다"
         }
+    }
+}
+
+# 판정 7 — 로그가 정직한가. 예전 이 줄은 맞은 버킷이 아니라 등록부 전체를 세어,
+# 0건 적용된 실행에서도 "2개에 적용"이라고 말했다. 등록과 적용이 벌어지면 신호다.
+if (-not $applied.Success) {
+    $failed += "판정 7 실패: prefab.update의 적용 건수 줄을 읽지 못했다 (형식: '등록 인스턴스 N개 중 M개에 적용')"
+} else {
+    $registered = [int]$applied.Groups[1].Value
+    $applyCount = [int]$applied.Groups[2].Value
+    "prefab.update 적용 — 등록 $registered 개 중 $applyCount 개 (기대 2 중 2) ← 판정 7"
+    if ($applyCount -ne 2) {
+        $failed += "판정 7 실패: 실제 적용이 $applyCount 건이다 (기대 2) — UpdateInstances가 인스턴스를 찾지 못했다"
     }
 }
 
