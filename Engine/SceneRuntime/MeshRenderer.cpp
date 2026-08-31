@@ -444,9 +444,9 @@ void MeshRenderer::OnAfterSerialize(YAML::Node& node)
 
 void MeshRenderer::EnsureExperimentBinding()
 {
-	// I5-D4c — 핸들 확보의 정본. postLoad의 experiment 이름 해석이 이미
-	// 채웠으면 no-op이고, 그 밖의 경로(ModelSceneBridge 생성 — D4d 전까지
-	// legacy 대입)는 여기의 legacy 신원 조회가 잇는다. 프록시 생성이 부른다.
+	// I5-D4c — 핸들 확보의 정본. postLoad의 experiment 이름 해석과 D4d
+	// 인스턴스화 직심기가 이미 채웠으면 no-op이고, 남은 경로(legacy 인스턴스화
+	// 폴백·Assimp 모델)는 여기의 legacy 신원 조회가 잇는다. 프록시 생성이 부른다.
 	if (m_experimentModel || nullptr == m_Mesh) return;
 	DataSystems->TryGetExperimentMeshBinding(
 		*m_Mesh, m_experimentModel, m_experimentMeshIndex);

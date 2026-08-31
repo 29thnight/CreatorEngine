@@ -15,6 +15,41 @@
 #include "MeshCollider.h"
 #include "Skeleton.h"
 #include "BoneComponent.h"
+#include "DataSystem.h"          // I5-D4d: TryGetExperimentModel
+#include "Experiment/Model.h"    // I5-D4d: 인스턴스화의 experiment 정본
+
+#include <algorithm> // I5-D4d: 본 이름 대조 find_if
+#include <cstdio>    // I5-D4d: [model.instantiate] 경로 관측(stdout — CLI 게이트 채널)
+#include <span>
+#include <vector>
+
+namespace
+{
+	// I5-D4d — experiment 직행의 전제인 역브리지 1:1 순서 계약을 검증한다.
+	// 하나라도 어긋나면(Assimp 폴백 모델·낡은 등록) 전부 legacy 폴백이다 —
+	// 인덱스 대응이 깨진 채 절반만 experiment로 세우는 것이 최악이다.
+	[[nodiscard]] bool MatchesExperimentContract(
+		const Model& legacy, const experiment::Model& source)
+	{
+		return legacy.GetNodes().size() == source.Nodes().size()
+			&& legacy.GetMeshCount() == source.Meshes().size()
+			&& legacy.GetMaterialCount() == source.Materials().size();
+	}
+
+	// ModelLoader 멤버는 private(friend: Model)라 시공 호출은 Model:: 안에서
+	// 한다 — 여기서는 정본 조회와 계약 검증까지만.
+	[[nodiscard]] std::shared_ptr<const experiment::Model>
+		TryGetInstantiationSource(const Model& model)
+	{
+		std::shared_ptr<const experiment::Model> source =
+			DataSystems->TryGetExperimentModel(model.guid);
+		if (nullptr == source || !MatchesExperimentContract(model, *source))
+		{
+			return nullptr;
+		}
+		return source;
+	}
+}
 
 Model* Model::LoadModelToScene(Model* model, Scene& Scene)
 {
@@ -26,11 +61,24 @@ Model* Model::LoadModelToScene(Model* model, Scene& Scene)
     ModelLoader loader = ModelLoader(model, &Scene);
     file::path path_ = model->path;
 
-	loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
-	if (model->m_hasBones)
+	// I5-D4d — 인스턴스화 정본이 experiment다(parent 단일 순회). experiment
+	// 모델이 없으면(Assimp 폴백·A/B off·계약 불일치) legacy 재귀가 폴백이다.
+	// 경로는 stdout으로 계수한다([model.dual]·[mesh.resolve]와 같은 채널).
+	Entity* experimentRoot = nullptr;
+	if (const auto source = TryGetInstantiationSource(*model))
 	{
-		loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
+		experimentRoot = loader.GenerateSceneObjectHierarchyExperiment(source);
 	}
+	if (nullptr == experimentRoot)
+	{
+		loader.GenerateSceneObjectHierarchy(model->m_nodes[0], true, 0);
+		if (model->m_hasBones)
+		{
+			loader.GenerateSkeletonToSceneObjectHierarchy(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
+		}
+	}
+	std::printf("[model.instantiate] %s: %s\n",
+		experimentRoot ? "experiment" : "legacy", model->name.c_str());
 
 	WorkerPools->NotifyAllAndWait();
 
@@ -47,16 +95,185 @@ Entity* Model::LoadModelToSceneObj(Model* model, Scene& Scene)
     ModelLoader loader = ModelLoader(model, &Scene);
     file::path path_ = model->path;
 
-	auto rootObj = loader.GenerateSceneObjectHierarchyObj(model->m_nodes[0], true, 0);
-	if (model->m_hasBones)
+	// I5-D4d — Scene 변형과 같은 정본·같은 폴백. 구 Obj 변형의 본 조회는
+	// 씬 전역 이름 검색이라 같은 이름의 남의 오브젝트를 붙잡을 수 있었다 —
+	// experiment 순회는 이 모델이 만든 엔티티 안에서만 찾는다.
+	Entity* rootObj = nullptr;
+	if (const auto source = TryGetInstantiationSource(*model))
 	{
-		rootObj = loader.GenerateSkeletonToSceneObjectHierarchyObj(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
+		rootObj = loader.GenerateSceneObjectHierarchyExperiment(source);
 	}
+	const bool viaExperiment = nullptr != rootObj;
+	if (!viaExperiment)
+	{
+		rootObj = loader.GenerateSceneObjectHierarchyObj(model->m_nodes[0], true, 0);
+		if (model->m_hasBones)
+		{
+			rootObj = loader.GenerateSkeletonToSceneObjectHierarchyObj(model->m_nodes[0], model->m_Skeleton->m_rootBone, true, 0);
+		}
+	}
+	std::printf("[model.instantiate] %s: %s\n",
+		viaExperiment ? "experiment" : "legacy", model->name.c_str());
 
 	WorkerPools->NotifyAllAndWait();
 
 	return rootObj;
 }
+Entity* ModelLoader::GenerateSceneObjectHierarchyExperiment(
+	const std::shared_ptr<const experiment::Model>& source)
+{
+	// I5-D4d — parent-only 표현의 단일 순회. 로더 검증이 "parent는 항상 자기보다
+	// 앞선 인덱스"를 강제하므로(ModelLoader::Validate), 인덱스 순으로 돌면 부모
+	// 엔티티가 항상 먼저 서 있다 — legacy 재귀(children 목록 DFS)와 같은 구조를
+	// 재귀 없이 세운다. 만드는 계층·이름·트랜스폼은 legacy 규약 그대로다:
+	//   - 메시 N개 노드는 노드 자신 대신 메시 엔티티 N개를 사슬로 만든다
+	//     (i번째가 i-1번째의 자식). 자식 노드는 사슬 끝에 붙는다.
+	//   - 메시 0개 비루트 노드만 자기 엔티티를 만들고 본 이름 대조 목록에 든다.
+	//   - 루트 트랜스폼은 단일 노드·단일 메시 특례에서만 기록한다.
+	const std::span<const experiment::ModelNode> nodes = source->Nodes();
+	if (nodes.empty() || !source->RootNode().IsValid()
+		|| 0 != source->RootNode().Value())
+	{
+		return nullptr; // 역브리지가 노드 0을 루트로 시공한다 — 어긋나면 폴백.
+	}
+
+	m_isSkinnedMesh = m_model->m_hasBones;
+
+	// 메시 렌더러 시공 — legacy 컨테이너는 역브리지 1:1 순서 계약으로 같은
+	// 인덱스에서 꺼내고(D4f 은퇴 전까지의 병행), 핸들 정본은 여기서 직접
+	// 심는다. D4c의 EnsureExperimentBinding 신원 조회 폴백은 이 경로에서
+	// 더는 필요 없다(no-op이 된다).
+	const auto attachMeshRenderer = [&](Entity& object,
+		const experiment::Mesh& mesh, experiment::MeshIndex meshIndex)
+	{
+		MeshRenderer* meshRenderer = object.AddComponent<MeshRenderer>();
+
+		if (m_model->m_isMakeMeshCollider)
+		{
+			RigidBodyComponent* rigidbody = object.AddComponent<RigidBodyComponent>();
+			MeshColliderComponent* convexMesh = object.AddComponent<MeshColliderComponent>();
+			convexMesh->SetDensity(0);
+			convexMesh->SetDynamicFriction(0);
+			convexMesh->SetStaticFriction(0);
+			convexMesh->SetRestitution(0);
+		}
+
+		const uint32 materialIndex = mesh.material.IsValid()
+			? mesh.material.Value() : 0u;
+		meshRenderer->m_Mesh = m_model->m_Meshes[meshIndex.Value()];
+		meshRenderer->m_Material = m_model->m_Materials[materialIndex];
+		meshRenderer->m_modelGuid = m_model->guid;
+		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
+		meshRenderer->m_experimentModel = source;
+		meshRenderer->m_experimentMeshIndex = meshIndex.Value();
+	};
+
+	// 노드별 부착점 — 그 노드 몫으로 마지막에 선 엔티티의 인덱스. 자식 노드와
+	// (루트라면) 본 계층이 여기에 붙는다.
+	std::vector<int> attachPoint(nodes.size(), 0);
+	Entity* rootObject = nullptr;
+
+	for (std::size_t nodeIndex = 0; nodeIndex < nodes.size(); ++nodeIndex)
+	{
+		const experiment::ModelNode& node = nodes[nodeIndex];
+		const bool isRoot = 0 == nodeIndex;
+		int nextIndex = 0;
+
+		if (isRoot)
+		{
+			rootObject = m_scene->CreateEntity(m_model->name,
+				GameObjectType::Mesh, nextIndex);
+			m_gameObjects.push_back(rootObject);
+			nextIndex = rootObject->m_index;
+			m_modelRootIndex = rootObject->m_index;
+
+			if (m_model->m_hasBones)
+			{
+				m_animator = rootObject->AddComponent<Animator>();
+				m_animator->SetEnabled(true);
+				m_animator->m_Motion = m_model->m_animator->m_Motion;
+				m_animator->m_Skeleton = m_model->m_Skeleton;
+			}
+
+			// 단일 노드·단일 메시 특례 — 루트 자신이 메시 엔티티다.
+			if (1 == nodes.size() && 1 == node.meshes.size())
+			{
+				const experiment::MeshIndex meshIndex = node.meshes[0];
+				attachMeshRenderer(*rootObject,
+					*source->TryGetMesh(meshIndex), meshIndex);
+				rootObject->Transform_().SetLocalMatrix(node.localTransform);
+				attachPoint[nodeIndex] = rootObject->m_index;
+				continue;
+			}
+		}
+		else
+		{
+			nextIndex = attachPoint[node.parent.Value()];
+		}
+
+		for (const experiment::MeshIndex meshIndex : node.meshes)
+		{
+			Entity* object = m_scene->CreateEntity(node.name,
+				GameObjectType::Mesh, nextIndex);
+			attachMeshRenderer(*object, *source->TryGetMesh(meshIndex), meshIndex);
+			object->Transform_().SetLocalMatrix(node.localTransform);
+			nextIndex = object->m_index;
+		}
+
+		if (!isRoot && node.meshes.empty())
+		{
+			Entity* object = m_scene->CreateEntity(node.name,
+				GameObjectType::Mesh, nextIndex);
+			m_gameObjects.push_back(object);
+			object->Transform_().SetLocalMatrix(node.localTransform);
+			nextIndex = object->m_index;
+		}
+
+		attachPoint[nodeIndex] = nextIndex;
+	}
+
+	// ── 본 계층 — 같은 단일 순회 규약(본 검증도 parent가 항상 앞선다) ──────
+	//
+	// legacy와 같은 대조: 이 모델이 만든 이름 대조 목록(m_gameObjects) 안에서
+	// suffix 태그를 벗겨 찾는다. 구 Obj 변형의 씬 전역 GetEntity(name)는 같은
+	// 이름의 남의 오브젝트를 붙잡는 결함이라 승계하지 않는다. legacy 재귀가
+	// 대조 실패 시 end()를 역참조하던 잠재 결함도 여기서는 생성 폴백이다.
+	const experiment::Skeleton* skeleton = source->TryGetSkeleton();
+	if (m_model->m_hasBones && nullptr != skeleton
+		&& experiment::IsInRange(skeleton->rootBone, skeleton->bones.size()))
+	{
+		std::vector<int> boneAttach(skeleton->bones.size(), m_modelRootIndex);
+		for (std::size_t boneIndex = 0; boneIndex < skeleton->bones.size();
+			++boneIndex)
+		{
+			// 루트 본은 모델 루트 엔티티가 대신한다 — legacy 순회도 루트 본
+			// 자신은 세우지 않고 자식들을 루트 오브젝트 아래에 붙인다.
+			if (skeleton->rootBone.Value() == boneIndex) continue;
+
+			const experiment::Bone& bone = skeleton->bones[boneIndex];
+			const int parentAttach = bone.parent.IsValid()
+				? boneAttach[bone.parent.Value()] : m_modelRootIndex;
+
+			const auto found = std::find_if(m_gameObjects.begin(),
+				m_gameObjects.end(), [&bone](Entity* candidate)
+				{
+					return candidate->RemoveSuffixNumberTag() == bone.name;
+				});
+			Entity* boneObject = found != m_gameObjects.end() ? *found : nullptr;
+			if (nullptr == boneObject)
+			{
+				boneObject = m_scene->CreateEntity(bone.name,
+					GameObjectType::Bone, parentAttach);
+			}
+			boneObject->AddComponent<BoneComponent>();
+			boneObject->SetRootIndex(m_modelRootIndex);
+			boneAttach[boneIndex] = boneObject->m_index;
+		}
+	}
+
+	return rootObject;
+}
+
 void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex)
 {
 	static int modelSeparator = 0;

@@ -15,8 +15,12 @@
 #      스킨 전용 계수 없이도 여기서 갈린다) (D34b)
 #   3  하네스 단정 전체 통과          — dx12.scene 통과 (커버리지·밝기 포함:
 #      experiment 버퍼로 그린 그림이 통째로 틀리면 여기가 붉는다)
+#   1d 씬 배치 인스턴스화가 experiment 직행이다 (D4d)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
+#   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
+#   5  두 경로가 저장한 씬의 구조 동수 — 엔티티 이름 전수·본/렌더러 계수·
+#      (이름 ← 부모이름) 쌍 (D4d)
 #
 # ★ 자가 틀렸을 때 어떻게 드러나는가:
 #   · 2가 없으면 "로드만 experiment, 업로드는 legacy"가 통과로 나온다.
@@ -151,6 +155,15 @@ $resolveLegacyOn = ([regex]::Matches($logOn, '\[mesh\.resolve\] legacy:')).Count
 if ($resolveExpOn -lt 1 -or $resolveLegacyOn -ne 0) {
     $fail += "1c 메시 해석 experiment $resolveExpOn · legacy $resolveLegacyOn — 이름 해석이 legacy로 샜다"
 }
+# ★ 1d(I5-D4d) — model.place의 인스턴스화가 experiment 직행(parent 단일 순회)
+#   인가. legacy 계수가 하나라도 있으면 폴백(계약 불일치·조용한 실패)으로
+#   샌 것이다 — 폴백이 받치면 아래 계수·픽셀 단정은 전부 초록이라 여기서만
+#   갈린다.
+$instExpOn = ([regex]::Matches($logOn, '\[model\.instantiate\] experiment:')).Count
+$instLegacyOn = ([regex]::Matches($logOn, '\[model\.instantiate\] legacy:')).Count
+if ($instExpOn -lt 1 -or $instLegacyOn -ne 0) {
+    $fail += "1d 인스턴스화 experiment $instExpOn · legacy $instLegacyOn — 씬 배치가 legacy 재귀로 샜다"
+}
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
 # I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
 # legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
@@ -178,7 +191,7 @@ if ($fwdBatchOn -le 0) {
     $fail += "3c 포워드 배치 $fwdBatchOn — 큐 $fwdOn 인데 배치가 비었다(드로우를 버렸다)"
 }
 
-"on  — model.dual $dualCount 건 · 메시 해석 experiment $resolveExpOn/legacy $resolveLegacyOn · experiment 업로드 $uploadsOn/$totalOn(핸들 $handleOn) · 드로우 $drawsOn(포워드 $fwdOn) · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
+"on  — model.dual $dualCount 건 · 인스턴스화 experiment $instExpOn/legacy $instLegacyOn · 메시 해석 experiment $resolveExpOn/legacy $resolveLegacyOn · experiment 업로드 $uploadsOn/$totalOn(핸들 $handleOn) · 드로우 $drawsOn(포워드 $fwdOn) · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
 
 # ── B: 스위치 끔 ──
 $logOff = Invoke-Run "off" "0"
@@ -196,6 +209,13 @@ if ($handleOff -ne 0) { $fail += "4g 스위치를 껐는데 핸들 업로드 $ha
 # 해석이어야 한다(TryGetExperimentModel이 스위치를 본다).
 $resolveExpOff = ([regex]::Matches($logOff, '\[mesh\.resolve\] experiment:')).Count
 if ($resolveExpOff -ne 0) { $fail += "4h 스위치를 껐는데 experiment 해석 $resolveExpOff" }
+# I5-D4d: 스위치가 인스턴스화 정본 전환도 막는가 — off 대조군은 전량 legacy
+# 재귀여야 한다(TryGetExperimentModel이 스위치를 본다).
+$instExpOff = ([regex]::Matches($logOff, '\[model\.instantiate\] experiment:')).Count
+$instLegacyOff = ([regex]::Matches($logOff, '\[model\.instantiate\] legacy:')).Count
+if ($instExpOff -ne 0 -or $instLegacyOff -lt 1) {
+    $fail += "4i 스위치를 껐는데 인스턴스화 experiment $instExpOff · legacy $instLegacyOff"
+}
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"
 }
@@ -222,6 +242,76 @@ if ([string]::IsNullOrEmpty($lumOn) -or $lumOn -ne $lumOff) {
 }
 
 "off — experiment 업로드 $uploadsOff · 드로우 $drawsOff · 커버리지 $coverOff · dx12.scene $(if ($scenePassOff) {'통과'} else {'실패'}) (기대: 0 · $drawsOn · $coverOn · 통과)"
+
+# ★ 5(I5-D4d) — 두 경로가 저장한 씬의 구조 동수. experiment 단일 순회가
+#   legacy 재귀와 같은 계층을 세웠는가를 픽셀 밖에서 직접 잰다: 엔티티 이름
+#   전수(정렬)·BoneComponent·MeshRenderer 계수가 문자열까지 같아야 한다.
+#   (부모 관계·트랜스폼 차이는 4b/4d/4e의 렌더 동수가 가른다 — 이름 동수만으론
+#   못 잡는 축이라 겹으로 둔다.)
+$sceneOnPath = Join-Path $Work "experiment_vertex_live_on.creator"
+$sceneOffPath = Join-Path $Work "experiment_vertex_live_off.creator"
+if (-not (Test-Path $sceneOnPath) -or -not (Test-Path $sceneOffPath)) {
+    $fail += "5 저장 씬이 없다 — on $(Test-Path $sceneOnPath) / off $(Test-Path $sceneOffPath)"
+}
+else {
+    $sceneOnText = Get-Content $sceneOnPath
+    $sceneOffText = Get-Content $sceneOffPath
+    # 엔티티 수준 m_name은 4칸 들여쓰기(컴포넌트 수준은 8칸)라 여기서 갈린다.
+    # 씬 루트는 저장 파일명을 따라가므로(on/off 라벨 차이 — 하네스 산물)
+    # 정규화한다. 실측: 이것만 달랐고 나머지 75개는 동일했다.
+    $namesOn = ($sceneOnText | Where-Object { $_ -match '^    m_name: (.+)$' } |
+        ForEach-Object { $Matches[1] -replace '^experiment_vertex_live_on$', '<sceneroot>' }) | Sort-Object
+    $namesOff = ($sceneOffText | Where-Object { $_ -match '^    m_name: (.+)$' } |
+        ForEach-Object { $Matches[1] -replace '^experiment_vertex_live_off$', '<sceneroot>' }) | Sort-Object
+    if (($namesOn -join '|') -ne ($namesOff -join '|')) {
+        $fail += "5a 엔티티 이름 집합이 다르다 — on $($namesOn.Count)개 vs off $($namesOff.Count)개"
+    }
+    foreach ($componentName in @('BoneComponent', 'MeshRenderer')) {
+        $countOn = ($sceneOnText | Where-Object { $_ -match "- ${componentName}:" }).Count
+        $countOff = ($sceneOffText | Where-Object { $_ -match "- ${componentName}:" }).Count
+        if ($countOn -ne $countOff -or $countOn -lt 1) {
+            $fail += "5b $componentName 계수가 다르다 — on $countOn vs off $countOff"
+        }
+    }
+    # ★ 5c — (이름 ← 부모이름) 쌍 동수. 이름 집합(5a)·계수(5b)는 부착점 훼손
+    #   (평탄화)에 불변이고, 렌더 동수(4d/4e)도 스킨 메시에서는 노드 트랜스폼에
+    #   눈멀다(M2 변이 실측: 트랜스폼 생략이 전 단정 초록). 계층 구조 자체는
+    #   여기서만 갈린다. m_index/m_parentIndex의 절대값은 순회 순서에 따라
+    #   달라도 되므로 이름으로 조인해 비교한다.
+    function Get-HierarchyPairs([string[]]$sceneLines, [string]$rootLabel) {
+        $entities = @()
+        $current = $null
+        foreach ($line in $sceneLines) {
+            if ($line -match '^  - Entity:') {
+                if ($null -ne $current) { $entities += $current }
+                $current = @{ name = ''; index = -1; parent = -1 }
+            }
+            elseif ($null -ne $current) {
+                if ($line -match '^    m_name: (.+)$') {
+                    $current.name = $Matches[1] -replace ('^' + [regex]::Escape($rootLabel) + '$'), '<sceneroot>'
+                }
+                elseif ($line -match '^    m_index: (\d+)$') { $current.index = [int]$Matches[1] }
+                elseif ($line -match '^    m_parentIndex: (-?\d+)$') { $current.parent = [int]$Matches[1] }
+            }
+        }
+        if ($null -ne $current) { $entities += $current }
+        $nameByIndex = @{}
+        foreach ($entity in $entities) { $nameByIndex[$entity.index] = $entity.name }
+        return ($entities | ForEach-Object {
+            $parentName = if ($_.parent -lt 0) { '<none>' }
+                elseif ($nameByIndex.ContainsKey($_.parent)) { $nameByIndex[$_.parent] }
+                else { '<missing>' }
+            "$($_.name) <- $parentName"
+        }) | Sort-Object
+    }
+    $pairsOn = Get-HierarchyPairs $sceneOnText 'experiment_vertex_live_on'
+    $pairsOff = Get-HierarchyPairs $sceneOffText 'experiment_vertex_live_off'
+    if (($pairsOn -join '|') -ne ($pairsOff -join '|')) {
+        $diffCount = (Compare-Object $pairsOn $pairsOff | Measure-Object).Count
+        $fail += "5c 부모 관계가 다르다 — 어긋난 쌍 $diffCount 건 (계층 구조가 갈렸다)"
+    }
+    "구조 — 엔티티 $($namesOn.Count)/$($namesOff.Count) · 부모쌍 $($pairsOn.Count)/$($pairsOff.Count)"
+}
 
 if ($fail.Count -gt 0) {
     ""

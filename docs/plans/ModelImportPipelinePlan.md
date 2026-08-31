@@ -657,7 +657,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;↳ D4a ✅ | 죽은 소비 청산 — postLoad GenerateLODs 절단(D0b 이행)·PhysicsManager 죽은 정점 줄 제거 | 씬 로드·물리 | 없음 |
 | &nbsp;&nbsp;↳ D4b ✅ | 메시 핸들 병행 — 프록시→아이템→4패스→캐시 핸들 진입점(experiment 신원 키·인덱스), 핸들 전량 게이트(2c)+off 대조(4g) — 바운드는 D4f로 | 렌더 사슬 | 없음 |
 | &nbsp;&nbsp;↳ D4c ✅ | 씬 경계 — 이름 해석 experiment 정본화(GetMeshShared(name) 폴백 강등)·핸들 소유 MeshRenderer 이동·해석 계수 게이트(1c·4h) — writer 전환은 D4f와 동시 | 씬 직렬화 | **소비자** 참조 감소 |
-| &nbsp;&nbsp;↳ D4d | 인스턴스화 — ModelSceneBridge experiment 직행(parent 단일 순회 재작성) | 모델 배치 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4d ✅ | 인스턴스화 — ModelSceneBridge experiment 직행(parent 단일 순회)·핸들 생성 지점 직심기·인스턴스화 게이트(1d·4i)+구조 동수 게이트(5a/5b/5c) | 모델 배치 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4e | Animator experiment 직소비 + D0a 이관(이벤트·루프 Animator 소유) | 애니메이션 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
@@ -926,6 +926,38 @@ m_Mesh 실소비자 전수(전환 대상): 바운드(GetBoundingBox — 컬링)�
 — D5). 최대 수술은 Animator/AnimationJob(legacy Skeleton·Animation 전면 순회)이라 D4e로
 고립하고, 역브리지 절단(D4f)은 에디터 패스스루(D5)까지 소비자 0이 된 뒤에만 가능하므로
 **D5 완료 선결**을 계약으로 박는다.
+
+**I5-D4d 완료 실측 (2026-08-31).** 인스턴스화 — 씬 배치(`LoadModelToScene`/`Obj`,
+model.place·드래그드롭 공용)가 experiment 직행이 됐다. ① 절단선:
+`TryGetExperimentModel(guid)` + 계약 검증(노드·메시·재질 계수 동수 — 어긋나면 전부
+legacy 재귀 폴백, 반쪽 시공 금지) → `GenerateSceneObjectHierarchyExperiment`. parent-only
+표현의 **단일 순회** — 로더 검증이 "parent는 항상 자기보다 앞선 인덱스"를 강제하므로
+(노드·본 모두) 인덱스 순으로 돌면 부모 엔티티가 항상 먼저 서 있다. 계층 규약은 legacy
+재귀 그대로(메시 N개 노드는 메시 엔티티 사슬, 0-mesh 비루트만 본 이름 대조 목록, 루트
+트랜스폼은 단일 노드·단일 메시 특례에서만). ② 핸들 정본을 생성 지점에서 직접 심는다
+(`m_experimentModel`/인덱스) — D4c의 `EnsureExperimentBinding` 신원 조회 폴백은 이
+경로에서 no-op이 되고, legacy `m_Mesh`/`m_Material`은 역브리지 1:1 순서 계약으로 같은
+인덱스 병행 대입(D4f 은퇴 전까지). ③ 승계하지 않은 결함 둘: 구 Obj 변형의 본 조회는
+씬 전역 이름 검색이라 같은 이름의 남의 오브젝트를 붙잡을 수 있었고, legacy 재귀의
+본 대조 `find_if`는 실패 시 end()를 역참조하는 잠재 UB였다 — experiment 순회는 이 모델
+산 엔티티 안에서만 찾고 실패는 생성 폴백이다. ④ 관측 `[model.instantiate]
+experiment|legacy:` + 게이트 신설: 1d(배치가 experiment 직행 — 폴백이 받치면 나머지
+전 단정이 초록이라 여기서만 갈린다)·4i(off 대조군 전량 legacy)·5(두 경로 저장 씬의
+구조 동수: 5a 엔티티 이름 전수 — 씬 루트는 저장 파일명을 따라 on/off 라벨이 갈리는
+하네스 산물이라 정규화, 5b BoneComponent/MeshRenderer 계수, 5c (이름←부모이름) 쌍 —
+인덱스 절대값은 순회 순서 따라 달라도 되므로 이름 조인).
+
+게이트 실측: 인스턴스화 **experiment 1/legacy 0** · 구조 76/76 · 부모쌍 76/76 · 업로드
+10/10(핸들 10) · 커버리지 42411 A/B 동수 — D4c 기준선 유지. 변이 4종이 각자 자기
+단정만 붉혔다: **M1**(정본 조회 절단) → 1d만 — 핸들은 10/10 유지(EnsureExperimentBinding
+폴백이 받친다), 인스턴스화 소실은 1d 계수 없이는 눈먼 초록. **M2**(노드 트랜스폼 생략)
+→ **전 단정 초록(못 잡음)** — 스킨 메시는 본 팔레트로 그려져 노드 엔티티 트랜스폼에
+시각 불변이라는 실측이고, 이것이 5c 신설의 근거다. **M2'**(부착점 평탄화 — 전 노드를
+루트 직결) → 5c만(어긋난 쌍 122 — 렌더 동수·이름·계수 전부 눈멀다). **M3**(본 계층
+생략) → 5b만(BoneComponent 0 vs 62 — 본 전원이 이름 매칭이라 엔티티 수·부모쌍 불변).
+한계(정직): 정적 다중노드 모델의 인스턴스화는 이 게이트 시나리오에 없다(FT는 씬 로드
+경로, Gunner는 스킨) — 노드 트랜스폼 소실의 시각 판정은 열려 있고 5c가 구조 축에서
+부분 대체한다.
 
 **I5-D4c 완료 실측 (2026-08-31).** 씬 경계 — 이름→메시 해석의 정본이 experiment로
 바뀌고 핸들의 소유가 MeshRenderer로 이동했다. ① `DataSystem::TryGetExperimentModel`

@@ -96,11 +96,11 @@ public:
     // 없다 — 영속은 m_Material 노드의 ref 키가 진다(훅 전담).
     FileGuid m_materialBaseGuid{};
 
-    // I5-D4c — experiment 메시 핸들의 소유자. postLoad(씬 로드)가 experiment
-    // 이름 해석으로 채우고, 그 밖의 경로(ModelSceneBridge 생성 — D4d 전까지
-    // legacy)는 EnsureExperimentBinding의 신원 조회 폴백이 채운다. 프록시
-    // 생성은 이 필드를 정본으로 읽는다. 비직렬화 — 영속 신원은 m_modelGuid+
-    // 메시 이름이 진다.
+    // I5-D4c — experiment 메시 핸들의 소유자. postLoad(씬 로드)의 experiment
+    // 이름 해석과 ModelSceneBridge 인스턴스화(D4d — 생성 지점 직심기)가 채우고,
+    // 그 밖의 경로(legacy 인스턴스화 폴백·Assimp 모델)는 EnsureExperimentBinding
+    // 의 신원 조회 폴백이 채운다. 프록시 생성은 이 필드를 정본으로 읽는다.
+    // 비직렬화 — 영속 신원은 m_modelGuid+메시 이름이 진다.
     std::shared_ptr<const experiment::Model> m_experimentModel{};
     std::uint32_t m_experimentMeshIndex{ 0 };
     void EnsureExperimentBinding();

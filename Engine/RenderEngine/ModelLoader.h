@@ -9,8 +9,10 @@
 #include "Model.h"
 class Scene;
 class Entity;
+namespace experiment { class Model; } // I5-D4d: 인스턴스화의 experiment 정본
 #include "Skeleton.h"
 #include "SkeletonLoader.h"
+#include <memory>
 
 class ModelLoader
 {
@@ -93,6 +95,13 @@ private:
 	void RetainMaterialTextures(Material& material);
 
 	Model* LoadModel(bool isCreateMeshCollider = false);
+	// I5-D4d — experiment 직행 인스턴스화. parent-only 노드 표현을 단일 순회로
+	// 세우고, 핸들 정본(m_experimentModel/인덱스)을 생성 지점에서 직접 심는다.
+	// legacy m_Mesh/m_Material은 역브리지 1:1 순서 계약으로 같은 인덱스에서
+	// 꺼낸다(D4f 은퇴 전까지의 병행). 실패는 nullptr — 호출부가 legacy 재귀로
+	// 폴백한다(반쪽 시공 금지).
+	Entity* GenerateSceneObjectHierarchyExperiment(
+		const std::shared_ptr<const experiment::Model>& source);
 	void GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int parentIndex);
 	void GenerateSkeletonToSceneObjectHierarchy(ModelNode* node, Bone* bone, bool isRoot, int parentIndex);
 
