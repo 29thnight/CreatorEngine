@@ -32,6 +32,7 @@ inline DXGI_FORMAT ToDXGI(RHIFormat format)
     case RHIFormat::D24UnormS8Uint: return DXGI_FORMAT_D24_UNORM_S8_UINT;
     case RHIFormat::D32Float:       return DXGI_FORMAT_D32_FLOAT;
     case RHIFormat::D32FloatS8Uint: return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+    case RHIFormat::RGBA8Uint:      return DXGI_FORMAT_R8G8B8A8_UINT;
     default:                        return DXGI_FORMAT_UNKNOWN;
     }
 }
@@ -55,6 +56,7 @@ inline RHIFormat FromDXGI(DXGI_FORMAT format)
     case DXGI_FORMAT_D24_UNORM_S8_UINT:     return RHIFormat::D24UnormS8Uint;
     case DXGI_FORMAT_D32_FLOAT:             return RHIFormat::D32Float;
     case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:  return RHIFormat::D32FloatS8Uint;
+    case DXGI_FORMAT_R8G8B8A8_UINT:         return RHIFormat::RGBA8Uint;
     default:                                return RHIFormat::Unknown;
     }
 }

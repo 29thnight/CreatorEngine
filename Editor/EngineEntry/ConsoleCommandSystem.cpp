@@ -54,6 +54,7 @@
 #include "ProfilerSelfTest.h"
 #include "ExperimentParity/ExperimentModelParitySelfTest.h"
 #include "ExperimentParity/ExperimentModelBridgeSelfTest.h"
+#include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "ExperimentParity/ExperimentAnimationPlayback.h"
 #include "ExperimentParity/ExperimentImportPathSelfTest.h"
 #include "ExperimentParity/ExperimentGltfImportSelfTest.h"
@@ -4653,6 +4654,26 @@ namespace ConsoleCmd
             passed ? "통과" : "실패", modelPath.c_str());
     }
 
+    static void Cmd_experiment_vertexlayout(const ConsoleCommandContext&)
+    {
+        // I5-D2(V4) — 마스크→RHI 입력 레이아웃 유도 합성 검사. CPU 전용.
+        std::string log;
+        const bool passed = RenderTest::RunExperimentVertexLayoutSelfTest(log);
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[experiment.vertexlayout] 통과\n")
+                + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[experiment.vertexlayout] 실패\n")
+                + log);
+        }
+        std::printf("[CLI] experiment.vertexlayout %s\n",
+            passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_modelbridge(const ConsoleCommandContext& ctx)
     {
         // I5-D1a — 역브리지(experiment→legacy) 왕복 검사. CPU 전용.
@@ -7582,6 +7603,8 @@ namespace ConsoleCmd
             reg({ "vk.ssgi" }, &Cmd_vk_ssgi);
             reg({ "profile.selftest" }, &Cmd_profile_selftest);
             reg({ "experiment.model" }, &Cmd_experiment_model);
+            reg({ "experiment.modelbridge" }, &Cmd_experiment_modelbridge);
+            reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
             reg({ "experiment.import" }, &Cmd_experiment_import);
             reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
@@ -7695,7 +7718,6 @@ namespace ConsoleCmd
             reg({ "serialize.parsercompare" }, [](const ConsoleCommandContext& c) { HandleSerializeParserCompare(c.parts); });
             reg({ "serialize.rymlerror" }, [](const ConsoleCommandContext& c) { HandleSerializeRymlError(c.parts); });
             reg({ "serialize.scalarparity" }, [](const ConsoleCommandContext& c) { HandleSerializeScalarParity(c.parts); });
-            reg({ "serialize.adapterparity" }, [](const ConsoleCommandContext& c) { HandleSerializeAdapterParity(c.parts); });
             reg({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { HandleSceneProxyBench(c.parts); });
 
             return t;

@@ -32,6 +32,7 @@ inline VkFormat ToVulkan(RHIFormat format)
     case RHIFormat::D24UnormS8Uint: return VK_FORMAT_D24_UNORM_S8_UINT;
     case RHIFormat::D32Float:       return VK_FORMAT_D32_SFLOAT;
     case RHIFormat::D32FloatS8Uint: return VK_FORMAT_D32_SFLOAT_S8_UINT;
+    case RHIFormat::RGBA8Uint:      return VK_FORMAT_R8G8B8A8_UINT;
     default:                        return VK_FORMAT_UNDEFINED;
     }
 }

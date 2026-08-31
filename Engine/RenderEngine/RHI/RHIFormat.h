@@ -51,6 +51,12 @@ enum class RHIFormat : uint16_t
     D24UnormS8Uint,
     D32Float,
     D32FloatS8Uint,
+
+    // ── 정수 정점 속성 (V4/I5-D) ──
+    // experiment 정점의 BoneIndices(experiment::VertexFormat::RGBA8Uint) 대응.
+    // 끝에 두는 이유: enum 값이 캐시 키 등 런타임 밖에 스치더라도 기존 값을
+    // 밀지 않기 위해서다(중간 삽입 금지).
+    RGBA8Uint,
 };
 
 /// 픽셀 하나의 바이트 수. 0이면 이 포맷을 모르는 것이다.
@@ -70,6 +76,7 @@ constexpr uint32_t RHIFormatBytes(RHIFormat format)
     case RHIFormat::RGB32Float:     return 12;
     case RHIFormat::RGBA8Unorm:
     case RHIFormat::RGBA8UnormSrgb:
+    case RHIFormat::RGBA8Uint:
     case RHIFormat::RG16Float:
     case RHIFormat::R32Float:
     case RHIFormat::R32Uint:
@@ -103,6 +110,7 @@ constexpr uint32_t RHIFormatChannels(RHIFormat format)
     {
     case RHIFormat::RGBA8Unorm:
     case RHIFormat::RGBA8UnormSrgb:
+    case RHIFormat::RGBA8Uint:
     case RHIFormat::RGBA16Float:
     case RHIFormat::RGBA32Float:    return 4;
     case RHIFormat::RGB32Float:     return 3;

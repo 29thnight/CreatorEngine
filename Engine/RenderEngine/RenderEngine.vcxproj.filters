@@ -393,6 +393,9 @@
     <ClCompile Include="ExperimentModelMigration.cpp">
       <Filter>Resources\Model</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\ExperimentVertexInputLayout.cpp">
+      <Filter>RHI</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\ModelLoader.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>

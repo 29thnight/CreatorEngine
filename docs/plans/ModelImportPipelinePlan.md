@@ -649,8 +649,8 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D0b | 선결 갭 ② — LOD: `GenerateLODs`/`m_LODThresholds`의 experiment 대응 판정(Mesh 표현 vs 렌더 파생) | Mesh·Inspector | 없음 |
 | ↳ I5-D1a ✅ | 역브리지 — `DataSystem::BuildLegacyModelFromExperiment`(experiment→legacy) + 왕복 게이트 | DataSystem | 없음(I6 은퇴) |
 | ↳ I5-D1b ✅ | 로더 이중화 — `LoadModelGUID`가 experiment(cooked→source) 로드→역브리지 소비, Assimp 폴백·경로 관측 | DataSystem | 없음 |
-| ↳ I5-D2 | V4 정적 경로 — mask→`RHIInputElement` 유도 함수, ForwardShade(무스킨) 전환, 짝 검사 게이트 | Forward 패스 | 없음 |
-| ↳ I5-D3 | V4 스킨 경로 — GBuffer/Shadow/WireFrame, BoneIndices RGBA8Uint·tangent w=handedness 셰이더 재현 | 스킨 3패스 | 없음 |
+| ↳ I5-D2 ✅ | V4 유도 정본 — mask→`RHIInputElement` 유도, `RHIFormat::RGBA8Uint` 신설, 전환 계약 게이트 (패스 전환은 D4와 동시로 정정) | RHI | 없음 |
+| ↳ I5-D3 | V4 실전환(구 D2 잔여 포함) — 5곳 레이아웃·VSIn 4곳·BoneIndices uint·tangent 재구성, **D4 정점 버퍼와 동시** | 렌더 패스·셰이더 | 없음 |
 | ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -729,6 +729,23 @@ diff 0 성립. 스킨 모델은 경로 실증(코퍼스 10종)과 bt-smoke(Anima
 인스턴스는 cooked 게시 규약(pak)이 서기 전에는 세울 수 없음이 실측 — cookedPath는 빈
 경로(resolver Info 계수)이고 배선은 그 규약과 함께 온다. LoadModel(이름 기반)·
 LoadCachedModelShared(에디터 배치)는 아직 Assimp — D4/D5에서 수렴.
+
+**I5-D2 완료 실측 (2026-08-31).** V4 유도 정본 — `RHI/ExperimentVertexInputLayout`
+(`BuildInputElements`: kVertexAttributeTable에서 시맨틱·포맷·오프셋 전부 유도, 지원 규칙은
+`VertexBuffer::IsSupportedLayout` 위임 — 두 번째 정본 금지)과 **`RHIFormat::RGBA8Uint` 신설**
+(BoneIndices 대응이 RHI에 없었다 — enum 끝 추가로 기존 값 보존, DX12/Vulkan 매핑·크기·채널
+표 동반). 게이트 `experiment.vertexlayout`(합성 22): core 48B/스킨 68B/uv1 밀림의 명시 수치,
+fail-closed 3형, **legacy 전환표 단정**(BINORMAL 부재→cross(N,T)*w 재구성·TANGENT RGBA32@32·
+BLENDINDICES RGBA8Uint@48·stride 96→68 — D3/D4가 지킬 계약을 게이트에 박음). 변이(RG32→
+RGB32 유도 스왑)가 TEXCOORD 단정 2건만 정확히 붉힘. 무회귀: matseal·dx12.forwardshade·
+vk.forward/gbuffer.
+
+★ **D2 스코프 정정 — 레이아웃 전환은 정점 버퍼와 동시일 수밖에 없다.** 착수 시 D2에 뒀던
+"ForwardShade 전환"은 불가가 실측이다: DX12MeshCache가 96B legacy 정점을 올리는 동안 입력
+레이아웃만 유도(48B)로 바꾸면 버퍼와 어긋난다. 유도 정본의 호출부는 아직 게이트뿐이고 그
+사실을 숨기지 않는다(S0 코덱 선례). 5곳 레이아웃·VSIn 4곳의 실전환은 D3으로 옮기되 **D4
+(정점 버퍼 experiment 전환)와 동시**다 — mesh 단위 이중화(마스크 유도 레이아웃+새 VSIn
+퍼뮤테이션 vs legacy 96B 경로)로 좁게 여는 것이 다음 절단이다.
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그

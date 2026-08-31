@@ -132,6 +132,9 @@
     <ClCompile Include="ExperimentParity\ExperimentModelBridgeSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
@@ -258,6 +261,9 @@
       <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentModelBridgeSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h">
       <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h">
