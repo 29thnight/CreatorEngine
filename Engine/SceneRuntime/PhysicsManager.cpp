@@ -49,24 +49,24 @@ namespace
 class Scene;
 void PhysicsManager::Initialize()
 {
-	// PhysicsManager �ʱ�ȭ
+	// PhysicsManager 초기화
 	m_bIsInitialized = Physics->Initialize();
 	
-	// �� �ε�, ��ε�, ���� �̺�Ʈ �ڵ鷯 ���
+	// 씬 로드, 언로드, 변경 이벤트 핸들러 등록
 	m_OnSceneLoadHandle		= sceneLoadedEvent.AddRaw(this, &PhysicsManager::OnLoadScene);
 	m_OnSceneUnloadHandle	= sceneUnloadedEvent.AddRaw(this, &PhysicsManager::OnUnloadScene);
 	m_OnChangeSceneHandle	= SceneManagers->activeSceneChangedEvent.AddRaw(this, &PhysicsManager::ChangeScene);
 
-	// ���� ���� �ݹ� �Լ� ����
+	// 물리 엔진 콜백 함수 설정
 	Physics->SetCallBackCollisionFunction([this](const CollisionData& data, ECollisionEventType type) {
 		this->CallbackEvent(data, type);
 	});
 	
-	//�⺻ ��ü �浹 ��Ʈ���� ����
+	//기본 전체 충돌 매트릭스 설정
 	std::vector<std::vector<uint8_t>> collisionGrid;
 	collisionGrid.resize(32);
 	for (auto& row : collisionGrid) {
-		row.resize(32, 1); // �⺻������ ��� �浹ü�� �浹 �����ϵ��� ����
+		row.resize(32, 1); // 기본적으로 모든 충돌체가 충돌 가능하도록 설정
 	}
 	SetCollisionMatrix(collisionGrid);
 
@@ -76,41 +76,41 @@ void PhysicsManager::Update(float fixedDeltaTime)
 {
 	if (!m_bIsInitialized) return;
 	
-	// �ݹ� �̺�Ʈ �ʱ�ȭ
+	// 콜백 이벤트 초기화
 	m_callbacks.clear();
 	SetPhysicData();
-	// ���� ������ ���� ���� ����
+	// 물리 엔진에 변경 사항 적용
 	//Benchmark bm;
 	ApplyPendingChanges();
-	// ���� ���� ������Ʈ
+	// 물리 엔진 업데이트
 	Physics->Update(fixedDeltaTime);
 	//std::cout << " Physics->Update" << bm.GetElapsedTime() << std::endl;
 	
-	// 1����: GetPhysicData()
-	// ���� �ùķ��̼��� ����� ��� ���ӿ�����Ʈ�� Transform�� ���� ����ȭ�մϴ�.
-	// �̷��� �ؾ� ������ ��� ��ü�� ���������� �ùٸ� �ֽ� ��ġ�� �ְ� �˴ϴ�.
+	// 1순위: GetPhysicData()
+	// 물리 시뮬레이션의 결과를 모든 게임오브젝트의 Transform에 먼저 동기화합니다.
+	// 이렇게 해야 세상의 모든 객체가 물리적으로 올바른 최신 위치에 있게 됩니다.
 	GetPhysicData();
 
-	// 2����: ProcessCallback()
-	// ��� ��ü�� ��ġ�� �ֽ� ���·� ����ȭ�Ǿ����Ƿ�, ���� �� ��ġ�� ��������
-	// OnCollisionEnter, OnTriggerEnter ���� �̺�Ʈ ��ũ��Ʈ�� �����ϴ� ���� �����ϰ� ��Ȯ�մϴ�.
-	// ���� �� ������ �ݴ밡 �Ǹ�, ��ũ��Ʈ�� '���� �������� ��ġ'�� �������� ������ �����ϴ� ������ �߻��� �� �ֽ��ϴ�.
+	// 2순위: ProcessCallback()
+	// 모든 객체의 위치가 최신 상태로 동기화되었으므로, 이제 이 위치를 기준으로
+	// OnCollisionEnter, OnTriggerEnter 등의 이벤트 스크립트를 실행하는 것이 안전하고 정확합니다.
+	// 만약 이 순서가 반대가 되면, 스크립트는 '이전 프레임의 위치'를 기준으로 로직을 실행하는 오류가 발생할 수 있습니다.
 	ProcessCallback();
 
-	// 3����: ApplyPendingControllerPositionChanges()
-	// �ش� �������� ��� ������ ��ȣ�ۿ�� �̺�Ʈ ó���� ������ �������ϴ�.
-	// ���� ��� ������ ���� ���¿���, '���� ����'�� ���� Ư���� �����÷��� ȿ��(�����̵�)��
-	// �� �������� �����Ͽ� ���� �������� �غ��ŵ�ϴ�.
+	// 3순위: ApplyPendingControllerPositionChanges()
+	// 해당 프레임의 모든 물리적 상호작용과 이벤트 처리가 완전히 끝났습니다.
+	// 이제 모든 정산이 끝난 상태에서, '무한 복도'와 같은 특수한 게임플레이 효과(순간이동)를
+	// 맨 마지막에 적용하여 다음 프레임을 준비시킵니다.
 	ApplyPendingControllerPositionChanges();
 }
 void PhysicsManager::Shutdown()
 {
-	// ���� ���� �� ����
+	// 물리 엔진 씬 변경
 	Physics->ChangeScene();
-	//�����̳� ����
+	//컨테이너 제거
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
 	Container.clear();
-	// ���� ���� ����
+	// 물리 엔진 종료
 	Physics->UnInitialize();
 }
 void PhysicsManager::ChangeScene()
@@ -155,7 +155,7 @@ void PhysicsManager::ProcessCallback()
 
 		if (isSameID || lhs == iterEnd || rhs == iterEnd)
 		{
-			//�ڽ��� �ݶ��̴��� �浹 �̰ų� �浹ü�� ���� ���� ��� -> error
+			//자신의 콜라이더와 충돌 이거나 충돌체가 없어 졌을 경우 -> error
 			Debug->LogError("Collision Callback Error lfs :" + std::to_string(data.thisId) + " ,rhs : " + std::to_string(data.otherId));
 			continue;
 		}
@@ -316,7 +316,7 @@ int PhysicsManager::BoxSweep(const SweepInput& in, const math::vector3& boxExten
 			finalHit.gameObject = Container[hit.hitObjectID].gameObject;
 			finalHit.layer = hit.hitObjectLayer;
 
-			//// ��ǥ�� ��ȯ (�޼� -> ������)
+			//// 좌표계 변환 (왼손 -> 오른손)
 			finalHit.point = hit.hitPoint;
 			finalHit.normal = hit.hitNormal;
             finalHit.distance = hit.distance;
@@ -724,7 +724,7 @@ void PhysicsManager::SetPhysicData()
 		}
 
 		bool _isColliderEnabled = rigidbody->IsColliderEnabled();
-		//todo : CCT,Controller,ragdoll,capsule,?�중??deformeSuface
+		//todo : CCT,Controller,ragdoll,capsule,?섏쨷??deformeSuface
 		//sleeping
 		bool enable = colliderInfo.gameObject->IsEnabled();
 
@@ -792,16 +792,16 @@ void PhysicsManager::SetPhysicData()
 			math::decompose(transform.GetWorldMatrix_NoScale(), ignoredScale,
 				pureWorldRot, pureWorldPos);
 
-			// 2. �ݶ��̴��� ���� �������� �����ɴϴ�.  
+			// 2. 콜라이더의 로컬 오프셋을 가져옵니다.  
 			auto offset = colliderInfo.collider->GetPositionOffset();
 			auto rotOffset = colliderInfo.collider->GetRotationOffset();
 
 			auto type = colliderInfo.collider->GetColliderType();
 
-			// 3. �������� �����Ͽ� ���� ��ü�� '���� ���� Pose'�� ����մϴ�
+			// 3. 오프셋을 적용하여 물리 객체의 '최종 월드 Pose'를 계산합니다
 			data.rotation = rotOffset * pureWorldRot;
 			data.position = pureWorldPos + math::rotate(offset, pureWorldRot);
-			// 4. ���� ������ ���� ���� �����ɴϴ�.  
+			// 4. 월드 스케일 값을 따로 가져옵니다.  
 			data.scale = transform.GetWorldScale();
 			if(data.scale != rigidbody->GetScale())
 			{
@@ -915,11 +915,11 @@ void PhysicsManager::GetPhysicData()
 			auto posOffset = ColliderInfo.collider->GetPositionOffset();
 			auto rotOffset = ColliderInfo.collider->GetRotationOffset();
 
-			// 2. ȸ�� ������: ���� ���忡�� ���� ȸ����(data.rotation)���� �ݶ��̴��� ȸ�� �������� �����մϴ�.
+			// 2. 회전 역연산: 물리 월드에서 받은 회전값(data.rotation)에서 콜라이더의 회전 오프셋을 제거합니다.
 			const math::quaternion pureWorldRot =
 				math::inverse(rotOffset) * data.rotation;
 
-			// 3. ��ġ ������: ������ ����� '���� ���� ȸ��'�� ����Ͽ� ��ġ �������� ������ �����մϴ�.
+			// 3. 위치 역연산: 위에서 계산한 '순수 월드 회전'을 사용하여 위치 오프셋의 영향을 제거합니다.
 			const math::vector3 pureWorldPos =
 				data.position - math::rotate(posOffset, pureWorldRot);
 
@@ -932,29 +932,29 @@ void PhysicsManager::GetPhysicData()
 	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;
 }
 
-// ����� CCT ��ġ ���� ��û�� �ϰ� ó���ϴ� �Լ�
+// 펜딩된 CCT 위치 변경 요청을 일괄 처리하는 함수
 void PhysicsManager::ApplyPendingControllerPositionChanges()
 {
 	if (!Physics || m_pendingControllerPositions.empty()) return;
 
-	// ID�� ���� ���ӿ�����Ʈ�� ã�� ���� �ݶ��̴� �����̳ʿ� �����մϴ�.
+	// ID를 통해 게임오브젝트를 찾기 위해 콜라이더 컨테이너에 접근합니다.
 	auto& colliderContainer = SceneManagers->GetActiveScene()->m_colliderContainer;
 
 	for (const auto& change : m_pendingControllerPositions)
 	{
-		// 1. PhysX ���� ������ ��Ʈ�ѷ� ��ġ�� ������ �����մϴ�.
+		// 1. PhysX 엔진 내부의 컨트롤러 위치를 강제로 설정합니다.
 		Physics->SetControllerPosition(change.id, change.position);
 
-		// 2. �ش� ID�� ���� ���ӿ�����Ʈ�� ã���ϴ�.
+		// 2. 해당 ID를 가진 게임오브젝트를 찾습니다.
 		auto it = colliderContainer.find(change.id);
 		if (it != colliderContainer.end())
 		{
 			auto& colliderInfo = it->second;
 			if (colliderInfo.gameObject)
 			{
-				// 3. (�ٽ�) ���ӿ�����Ʈ�� Transform ������Ʈ ��ġ�� ��� ����ȭ�մϴ�.
-				// CCT�� ��� �Ϲ������� �������� ���ų�, �ִ��� �����̵��� �������� �������� �ϴ� ���� ��Ȯ�մϴ�.
-				// ���� �������� �����ؾ� �Ѵٸ�, change.position���� �������� ���� ���� SetWorldPosition�� �Ѱ��־�� �մϴ�.
+				// 3. (핵심) 게임오브젝트의 Transform 컴포넌트 위치도 즉시 동기화합니다.
+				// CCT의 경우 일반적으로 오프셋이 없거나, 있더라도 순간이동은 기준점을 기준으로 하는 것이 명확합니다.
+				// 만약 오프셋을 고려해야 한다면, change.position에서 오프셋을 빼준 값을 SetWorldPosition에 넘겨주어야 합니다.
 				colliderInfo.gameObject->Transform_().SetWorldPosition(change.position);
 			}
 		}
@@ -1018,7 +1018,7 @@ void PhysicsManager::LoadCollisionMatrix()
 			}
 			else
 			{
-				m_collisionMatrix[i][j] = true; // �⺻�� ����
+				m_collisionMatrix[i][j] = true; // 기본값 설정
 			}
 		}
 	}

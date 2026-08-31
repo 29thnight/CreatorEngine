@@ -42,6 +42,6 @@ private:
 private:
 	bool            m_openClipPicker{ false };
 	SoundComponent* m_clipPickerTarget{ nullptr };
-	std::string     m_clipSearch;                 // �˻���
-	std::vector<std::string> m_clipKeyCache;      // ĳ��
+	std::string     m_clipSearch;                 // 검색어
+	std::vector<std::string> m_clipKeyCache;      // 캐시
 };

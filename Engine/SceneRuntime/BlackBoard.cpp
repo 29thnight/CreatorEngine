@@ -1,3 +1,4 @@
+#include "AuthoringParsedDocument.h"
 #include "BlackBoard.h"
 #include "Entity.h"
 #include "Transform.h"
@@ -19,7 +20,7 @@ namespace
 
 BlackBoardValue& BlackBoard::GetOrCreate(const std::string& key)
 {
-	return m_values[key]; // default ����
+	return m_values[key]; // default 생성
 }
 
 const BlackBoardValue& BlackBoard::GetChecked(const std::string& key, BlackBoardType expected) const
@@ -289,10 +290,22 @@ void BlackBoard::Deserialize(std::string_view name)
 		throw std::runtime_error("Blackboard file not found: " + filePath.string());
 	}
 
-	MetaYml::Node node = MetaYml::LoadFile(filePath.string());
-	for (const auto& entry : node[m_name])
+	// D3-b-L: ryml로 읽는다. 이 파서는 자기 파일만 읽고 평범한 데이터를
+	// 내놓으므로 소비자가 backend에 묶여 있지 않다 — 씬 경로보다 먼저 옮길 수 있다.
+	//
+	// ★ 문서가 트리를 소유한다. 아래 노드들은 이 스코프를 벗어나면 안 된다.
+	std::string parseError;
+	const Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(filePath.string(), parseError);
+	if (!document)
 	{
-		std::string key = entry["key"].as<std::string>();
+		Debug->LogError("Blackboard parse failed: " + filePath.string() + " (" + parseError + ")");
+		throw std::runtime_error("Blackboard parse failed: " + filePath.string());
+	}
+	const Authoring::ReadNode entries = document.Root()[m_name.c_str()];
+	for (const auto entry : entries)
+	{
+		std::string key = entry["key"].AsString();
 		if (key.empty() || m_values.find(key) != m_values.end())
 			continue; // Skip empty keys
 

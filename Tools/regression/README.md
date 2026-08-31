@@ -13,7 +13,7 @@ pwsh Tools/regression/run-all.ps1
 
 ## 개별 검사
 
-전체 런타임 스위트는 `run-all.ps1`의 Run-Step 목록이 정본이다(현재 34종). 아래 표는
+전체 런타임 스위트는 `run-all.ps1`의 Run-Step 목록이 정본이다(현재 28종). 아래 표는
 그 항목과 단계 전용 standalone gate 중 "왜 이렇게 재는가"를 기록해 둘 가치가 있는
 검사만 담는다. 표의 standalone gate는 해당 단계에서 명시적으로 실행한다.
 
@@ -37,6 +37,7 @@ pwsh Tools/regression/run-all.ps1
 | `verify-asset-authoring-ownership.ps1` | E2의 asset writer 경계를 정적·동적으로 함께 고정한다. `ModelLoader`/`Terrain`에 filesystem writer가 재유입되지 않았는지 검사하고, 고유 GLB를 두 번 import해 Editor가 model cache와 embedded PNG를 처음 한 번만 게시하는지 확인한다. Terrain은 height/splat/texture를 임시 세대에 완성한 뒤 descriptor를 마지막에 게시하며, 실패 요청이 기존 descriptor·세대를 바꾸지 않는지도 검사한다. 같은 Editor 세션의 model reimport, Player writer 부재, `.tmp`·probe 잔여 검사도 함께 수행한다. |
 | `verify-asset-runtime-change-boundary.ps1` | E2의 Editor→Runtime asset 변경 계약을 고정한다. `DataSystem`의 public catalog mutation primitive 재노출을 막고 `CatalogUpsert`/`ContentReload`/`Removed` 단일 계약, 이전 cache generation pin, Editor 게시 완료 후 발행, Player 생산자 부재를 검사한다. |
 | `verify-asset-presentation-boundary.ps1` | E2의 picker/icon/font 경계를 고정한다. `DataSystem`에 ImGui·파일/gizmo 아이콘·폰트·material 전달 상태가 재유입되지 않는지, `EditorAssetPresentation`이 두 selector와 표시 리소스를 소유하는지, gizmo texture가 `ScriptBinder`의 Editor 역참조가 아니라 프레임 packet의 공유 수명 입력으로 전달되는지, Player가 presentation을 설치하지 않는지 검사한다. |
+| `verify-prefab-identity-injection.ps1` | 프리팹 identity가 **워처 스레드와의 경합**을 견디는지. `verify-prefab-duplicate`가 2026-08-30에 한 번 실패하고 재현되지 않았는데, 원인은 초기 상태가 아니라 efsw 워처였다 — 원자적 게시(`.tmp` → replace)를 목적지 경로의 Delete로 오독한 `HandleDeleted`가 본문이 멀쩡한데도 catalog 항목과 sidecar를 떨어뜨렸다(정상 실행 한 판에 두 번, 각 ~26ms 실측). 그 창에 `prefab.update`가 걸리면 `LoadPrefab`이 살아 있는 identity를 널로 덮고 → `SavePrefab`이 새 GUID를 발급하고 → `UpdateInstances`가 그 키로 조회해 **조용히 0건 적용**한다. 에러도 로그도 없고 판정 1~4는 전부 통과해서, 우연에 맡기면 원인을 못 가른다. 그래서 창을 열어 놓고 sidecar를 **밖에서 확정적으로** 떨어뜨린다. **교란이 실제로 먹었는지를 먼저 단정한다**(창 진입·삭제·삭제 직후 부재) — 그게 없으면 "교란을 넣지 못한 실행"이 통과로 나와 대조군을 검사로 착각한다. 판정은 원인(인스턴스 guid == sidecar guid)과 결과(`m_shadowCast`가 false)를 함께 본다. 고치기 전 RED, 고친 뒤 GREEN을 확인하고 편입했다. |
 
 ## 생명주기 기준선 뜨기 (PHASE 9-0)
 
@@ -149,15 +150,35 @@ Release로 보면 58%로 읽게 된다. 그래서 Release가 없을 때 Debug로
 두 파서가 만든 트리가 구조적으로 같아도 `as<bool>`이 `"yes"`를 다르게 읽으면
 **값의 의미만 조용히 달라진다.** 로드는 성공하고 값만 틀린다.
 
-**이 게이트는 "차이 0"을 단정하지 않는다.** 실측상 44케이스 중 11건이 실제로
-갈린다(`.inf`/`.nan`, YAML 1.1 불리언, 그리고 방향이 뒤집힌 `1`/`0`). 차이를
-없애는 것은 구현의 일이고, 검사의 일은 **알려진 목록을 고정**해 새 차이만
-빨개지게 하는 것이다. **목록보다 적어도 실패다** — 차이가 사라졌다면 누가 변환을
-바꾼 것이고, 조용히 넘기면 표가 낡는다.
+**두 축을 잰다.** 이식 변환기(`Authoring::Scalar`) 대 yaml-cpp는 **차이 0이어야
+한다** — 그것이 "backend가 바뀌어도 값의 의미가 그대로"의 정의다. 실제로 이 단정이
+이식 오류 3건을 잡았다(부호 없는 정수가 음수를 받아들임, 널 노드의 문자열 표현 2건).
+
+ryml 대 yaml-cpp는 다르다 — **"차이 0"을 단정하지 않는다.** 67케이스 중 21건이
+실제로 갈린다. 차이를 없애는 것은 구현의 일(D3-b-2b-1a가 변환을 문자열 위로 옮겼다)
+이고, 검사의 일은 **알려진 목록을 고정**해 새 차이만 빨개지게 하는 것이다.
+**목록보다 적어도 실패다** — 차이가 사라졌다면 누가 변환을 바꾼 것이고, 조용히
+넘기면 표가 낡는다.
+
+★ **가장 위험한 것은 실패가 아니라 "둘 다 성공하는데 값이 다른" 쪽이다.**
+`010`은 yaml-cpp에서 8(8진), ryml에서 10(10진)이다. `1.5x`는 yaml-cpp가 거부하고
+ryml이 1.5로 읽는다. 오버플로는 ryml이 쓰레기 값을 낸다. 그래서 ryml의
+`from_chars`를 직접 쓰면 안 된다.
 
 갈리는 것과 위험한 것은 다르다. 차이가 손상이 되려면 코퍼스에 그 표기가 있어야
-하므로, 같은 게이트가 자산 278개를 스캔해 `.inf`/`.nan` 0건과 YAML 1.1 불리언
+하므로, 같은 게이트가 자산 281개(`Assets` + `ProjectSetting`)를 스캔해 `.inf`/`.nan` 0건과 YAML 1.1 불리언
 기준선 2건을 함께 단정한다.
+
+## backend 경계 래칫 (SerializationPlan D3-b-2b-1b)
+
+`verify-authoring-backend-boundary.ps1` — 읽기 경로를 ryml로 옮기는 일은 한 번에
+못 한다. 그래서 아직 backend 노드를 만지는 자리마다 **이름이 흉한 탈출구**를 두었다
+(`BackendNodeDuringTransition`). 개수가 곧 진행률이다.
+
+**이 게이트가 막는 것은 실패가 아니라 역행이다.** 새 코드가 어댑터 대신 backend
+노드를 직접 잡으면 빌드도 다른 게이트도 전부 통과하므로 아무도 모른다. 기준선보다
+늘면 실패하고, 줄면 기준선을 갱신하라고 말하며(숫자가 낡으면 래칫이 풀린다),
+**0이 되면 이 게이트를 은퇴시키라고 말한다.**
 
 ## 검사가 조용히 건너뛰지 않게 하기
 

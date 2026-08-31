@@ -44,6 +44,15 @@ namespace Authoring
 
 		// 둘 다 성공했고 값이 같은가. 실패 여부가 갈리는 것도 불일치다.
 		bool agrees{ false };
+
+		// ── D3-b-2b-1a: 이식한 변환기(`Authoring::Scalar`) ───────────────────
+		//
+		// ryml과의 차이는 **허용된 목록**이지만, 이식 변환기와 yaml-cpp의 차이는
+		// **0이어야 한다.** 이 계층의 목적이 곧 "backend가 바뀌어도 값의 의미가
+		// 그대로"이기 때문이다. 차이가 하나라도 있으면 이식이 실패한 것이다.
+		bool converterOk{ false };
+		std::string converterValue{};
+		bool converterAgrees{ false };
 	};
 
 	struct ScalarParityResult
@@ -51,6 +60,9 @@ namespace Authoring
 		std::vector<ScalarParityCase> cases{};
 		std::uint32_t agreeCount{ 0 };
 		std::uint32_t divergeCount{ 0 };
+
+		// 이식 변환기 대 yaml-cpp. 0이어야 한다.
+		std::uint32_t converterDivergeCount{ 0 };
 	};
 
 	[[nodiscard]] ScalarParityResult ProbeScalarConversions();

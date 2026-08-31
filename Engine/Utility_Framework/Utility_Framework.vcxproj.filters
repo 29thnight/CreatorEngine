@@ -75,6 +75,15 @@
     <ClCompile Include="AuthoringScalarParityProbe.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>
+    <ClCompile Include="AuthoringScalarConvert.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="AuthoringAdapterParityProbe.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="AuthoringParsedDocument.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
     <ClCompile Include="AuthoringDocument.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>
@@ -213,6 +222,18 @@
       <Filter>Core.Reflection</Filter>
     </ClInclude>
     <ClInclude Include="AuthoringScalarParityProbe.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringScalarConvert.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringReadNode.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringAdapterParityProbe.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="AuthoringParsedDocument.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
     <ClInclude Include="AuthoringNodeView.h">

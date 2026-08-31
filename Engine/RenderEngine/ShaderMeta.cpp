@@ -1,6 +1,6 @@
 #include "ShaderMeta.h"
 
-#include <yaml-cpp/yaml.h>
+#include "AuthoringParsedDocument.h"
 
 #include <algorithm>
 #include <cmath>
@@ -47,16 +47,18 @@ namespace
         return true;
     }
 
-    bool ValidateMap(const YAML::Node& node,
+    bool ValidateMap(const Authoring::ReadNode& node,
         std::initializer_list<std::string_view> allowed,
         std::string_view context, std::string& outError)
     {
         if (!node || !node.IsMap()) return Fail(context, "map이어야 한다", outError);
-        for (const auto& field : node)
+        // ★ 키를 노드로 다루지 않는다. ryml에서 맵의 키는 **자식 노드의 속성**이지
+        //   별도 노드가 아니다 — 어댑터의 `MapEntry`가 그 비대칭을 흡수한다.
+        for (const Authoring::MapEntry entry : node.Map())
         {
-            if (!field.first.IsScalar())
+            if (!entry.key.IsScalar())
                 return Fail(context, "field 이름은 scalar여야 한다", outError);
-            const std::string key = field.first.Scalar();
+            const std::string key = entry.key.AsString();
             const bool known = std::any_of(allowed.begin(), allowed.end(),
                 [&key](std::string_view candidate) { return key == candidate; });
             if (!known) return Fail(context, "알 수 없는 field '" + key + "'", outError);
@@ -64,19 +66,19 @@ namespace
         return true;
     }
 
-    bool ReadRequiredScalar(const YAML::Node& node, const char* key,
+    bool ReadRequiredScalar(const Authoring::ReadNode& node, const char* key,
         std::string_view context, std::string& outValue, std::string& outError)
     {
-        const YAML::Node value = node[key];
+        const Authoring::ReadNode value = node[key];
         if (!value || !value.IsScalar())
             return Fail(context, std::string("필수 scalar '") + key + "'가 없다", outError);
-        outValue = value.Scalar();
+        outValue = value.AsString();
         if (outValue.empty())
             return Fail(context, std::string("'") + key + "'가 비었다", outError);
         return true;
     }
 
-    bool ReadIdentifier(const YAML::Node& node, const char* key,
+    bool ReadIdentifier(const Authoring::ReadNode& node, const char* key,
         std::string_view context, std::string& outValue, std::string& outError)
     {
         if (!ReadRequiredScalar(node, key, context, outValue, outError)) return false;
@@ -85,13 +87,13 @@ namespace
         return true;
     }
 
-    bool ReadStrictBool(const YAML::Node& node, const char* key,
+    bool ReadStrictBool(const Authoring::ReadNode& node, const char* key,
         std::string_view context, bool& outValue, std::string& outError)
     {
-        const YAML::Node value = node[key];
+        const Authoring::ReadNode value = node[key];
         if (!value || !value.IsScalar())
             return Fail(context, std::string("'") + key + "'는 bool scalar여야 한다", outError);
-        const std::string scalar = value.Scalar();
+        const std::string scalar = value.AsString();
         if ("true" == scalar) outValue = true;
         else if ("false" == scalar) outValue = false;
         else return Fail(context, std::string("'") + key + "'는 true|false여야 한다", outError);
@@ -99,16 +101,16 @@ namespace
     }
 
     template<std::size_t Size>
-    bool ParseFloatArray(const YAML::Node& node, std::string_view context,
+    bool ParseFloatArray(const Authoring::ReadNode& node, std::string_view context,
         std::array<float, Size>& outValue, std::string& outError)
     {
-        if (!node || !node.IsSequence() || node.size() != Size)
+        if (!node || !node.IsSequence() || node.Size() != Size)
             return Fail(context, std::to_string(Size) + "개 float sequence여야 한다", outError);
         for (std::size_t index = 0; index < Size; ++index)
         {
-            if (!node[index].IsScalar())
+            if (!node.At(index).IsScalar())
                 return Fail(context, "배열 원소는 float scalar여야 한다", outError);
-            const float value = node[index].as<float>();
+            const float value = node.At(index).As<float>();
             if (!std::isfinite(value))
                 return Fail(context, "NaN/Inf 기본값은 허용하지 않는다", outError);
             outValue[index] = value;
@@ -130,7 +132,7 @@ namespace
         return true;
     }
 
-    bool ParsePropertyDefault(const YAML::Node& node, ShaderPropertyType type,
+    bool ParsePropertyDefault(const Authoring::ReadNode& node, ShaderPropertyType type,
         std::string_view context, ShaderPropertyDefault& outValue,
         std::string& outError)
     {
@@ -149,7 +151,7 @@ namespace
         case ShaderPropertyType::Float:
         {
             if (!node.IsScalar()) return Fail(context, "float default가 아니다", outError);
-            const float value = node.as<float>();
+            const float value = node.As<float>();
             if (!std::isfinite(value)) return Fail(context, "NaN/Inf default", outError);
             outValue = value;
             return true;
@@ -177,12 +179,12 @@ namespace
         }
         case ShaderPropertyType::Int:
             if (!node.IsScalar()) return Fail(context, "int default가 아니다", outError);
-            outValue = node.as<std::int32_t>();
+            outValue = node.As<std::int32_t>();
             return true;
         case ShaderPropertyType::Bool:
         {
             if (!node.IsScalar()) return Fail(context, "bool default가 아니다", outError);
-            const std::string value = node.Scalar();
+            const std::string value = node.AsString();
             if ("true" == value) outValue = true;
             else if ("false" == value) outValue = false;
             else return Fail(context, "bool default는 true|false여야 한다", outError);
@@ -199,7 +201,7 @@ namespace
         {
             if (!node.IsScalar())
                 return Fail(context, "texture2d default는 asset GUID여야 한다", outError);
-            const FileGuid guid(node.Scalar());
+            const FileGuid guid{ node.AsString() };
             if (guid == FileGuid{})
                 return Fail(context, "texture2d default GUID가 nil이다", outError);
             outValue = guid;
@@ -209,19 +211,19 @@ namespace
         return Fail(context, "지원하지 않는 property type", outError);
     }
 
-    bool ParseProperties(const YAML::Node& node,
+    bool ParseProperties(const Authoring::ReadNode& node,
         std::vector<ShaderPropertyDesc>& outProperties, std::string& outError)
     {
         if (!node) return true;
         if (!node.IsSequence()) return Fail("properties", "sequence여야 한다", outError);
-        if (node.size() > kMaxProperties)
+        if (node.Size() > kMaxProperties)
             return Fail("properties", "상한 " + std::to_string(kMaxProperties) + "개 초과", outError);
 
         std::unordered_set<std::string> names;
-        outProperties.reserve(node.size());
-        for (std::size_t index = 0; index < node.size(); ++index)
+        outProperties.reserve(node.Size());
+        for (std::size_t index = 0; index < node.Size(); ++index)
         {
-            const YAML::Node propertyNode = node[index];
+            const Authoring::ReadNode propertyNode = node.At(index);
             const std::string context = "properties[" + std::to_string(index) + "]";
             if (!ValidateMap(propertyNode, { "name", "label", "type", "default" },
                 context, outError)) return false;
@@ -232,12 +234,12 @@ namespace
             if (!names.emplace(property.name).second)
                 return Fail(context, "property 이름이 중복됐다: " + property.name, outError);
 
-            if (const YAML::Node label = propertyNode["label"])
+            if (const Authoring::ReadNode label = propertyNode["label"])
             {
                 if (!label.IsScalar() || label.Scalar().empty()
                     || label.Scalar().size() > kMaxNameBytes)
                     return Fail(context, "label이 비었거나 너무 길다", outError);
-                property.label = label.Scalar();
+                property.label = label.AsString();
             }
             else property.label = property.name;
 
@@ -253,19 +255,19 @@ namespace
         return true;
     }
 
-    bool ParseKeywords(const YAML::Node& node,
+    bool ParseKeywords(const Authoring::ReadNode& node,
         std::vector<ShaderKeywordAxis>& outKeywords, std::string& outError)
     {
         if (!node) return true;
         if (!node.IsSequence()) return Fail("keywords", "sequence여야 한다", outError);
-        if (node.size() > kMaxKeywordAxes)
+        if (node.Size() > kMaxKeywordAxes)
             return Fail("keywords", "축 상한 " + std::to_string(kMaxKeywordAxes) + "개 초과", outError);
 
         std::unordered_set<std::string> axes;
-        outKeywords.reserve(node.size());
-        for (std::size_t index = 0; index < node.size(); ++index)
+        outKeywords.reserve(node.Size());
+        for (std::size_t index = 0; index < node.Size(); ++index)
         {
-            const YAML::Node keywordNode = node[index];
+            const Authoring::ReadNode keywordNode = node.At(index);
             const std::string context = "keywords[" + std::to_string(index) + "]";
             if (!ValidateMap(keywordNode, { "axis", "values" }, context, outError))
                 return false;
@@ -276,20 +278,20 @@ namespace
             if (!axes.emplace(axis.name).second)
                 return Fail(context, "keyword 축이 중복됐다: " + axis.name, outError);
 
-            const YAML::Node values = keywordNode["values"];
-            if (!values || !values.IsSequence() || values.size() < 2
-                || values.size() > kMaxKeywordValues)
+            const Authoring::ReadNode values = keywordNode["values"];
+            if (!values || !values.IsSequence() || values.Size() < 2
+                || values.Size() > kMaxKeywordValues)
             {
                 return Fail(context, "values는 2~" + std::to_string(kMaxKeywordValues)
                     + "개 sequence여야 한다", outError);
             }
             std::unordered_set<std::string> uniqueValues;
-            axis.values.reserve(values.size());
-            for (std::size_t valueIndex = 0; valueIndex < values.size(); ++valueIndex)
+            axis.values.reserve(values.Size());
+            for (std::size_t valueIndex = 0; valueIndex < values.Size(); ++valueIndex)
             {
-                if (!values[valueIndex].IsScalar())
+                if (!values.At(valueIndex).IsScalar())
                     return Fail(context, "keyword value는 scalar여야 한다", outError);
-                const std::string value = values[valueIndex].Scalar();
+                const std::string value = values.At(valueIndex).AsString();
                 if (!IsIdentifier(value))
                     return Fail(context, "keyword value가 식별자가 아니다: " + value, outError);
                 if (!uniqueValues.emplace(value).second)
@@ -301,7 +303,7 @@ namespace
         return true;
     }
 
-    bool ParseStage(const YAML::Node& node, std::string_view context,
+    bool ParseStage(const Authoring::ReadNode& node, std::string_view context,
         std::optional<ShaderStageEntry>& outStage, std::string& outError)
     {
         if (!node) return true;
@@ -312,7 +314,7 @@ namespace
         return true;
     }
 
-    bool ParseRenderState(const YAML::Node& node, std::string_view context,
+    bool ParseRenderState(const Authoring::ReadNode& node, std::string_view context,
         ShaderRenderState& outState, std::string& outError)
     {
         if (!node) return true;
@@ -320,14 +322,14 @@ namespace
             { "fill", "cull", "blend", "depthWrite", "depthTest", "topology" },
             context, outError)) return false;
 
-        if (const YAML::Node fill = node["fill"])
+        if (const Authoring::ReadNode fill = node["fill"])
         {
             if (!fill.IsScalar()) return Fail(context, "fill은 scalar여야 한다", outError);
             if ("solid" == fill.Scalar()) outState.fillMode = RHIFillMode::Solid;
             else if ("wireframe" == fill.Scalar()) outState.fillMode = RHIFillMode::Wireframe;
             else return Fail(context, "fill은 solid|wireframe이어야 한다", outError);
         }
-        if (const YAML::Node cull = node["cull"])
+        if (const Authoring::ReadNode cull = node["cull"])
         {
             if (!cull.IsScalar()) return Fail(context, "cull은 scalar여야 한다", outError);
             if ("none" == cull.Scalar()) outState.cullMode = RHICullMode::None;
@@ -335,7 +337,7 @@ namespace
             else if ("front" == cull.Scalar()) outState.cullMode = RHICullMode::Front;
             else return Fail(context, "cull은 none|back|front여야 한다", outError);
         }
-        if (const YAML::Node blend = node["blend"])
+        if (const Authoring::ReadNode blend = node["blend"])
         {
             if (!blend.IsScalar()) return Fail(context, "blend는 scalar여야 한다", outError);
             if ("off" == blend.Scalar()) outState.blendMode = ShaderBlendMode::Off;
@@ -345,7 +347,7 @@ namespace
         }
         if (node["depthWrite"] && !ReadStrictBool(node, "depthWrite", context,
             outState.depthWrite, outError)) return false;
-        if (const YAML::Node depthTest = node["depthTest"])
+        if (const Authoring::ReadNode depthTest = node["depthTest"])
         {
             if (!depthTest.IsScalar())
                 return Fail(context, "depthTest는 scalar여야 한다", outError);
@@ -355,7 +357,7 @@ namespace
                 outState.depthTest = RHICompareOp::LessEqual;
             else return Fail(context, "depthTest는 off|less|lessEqual이어야 한다", outError);
         }
-        if (const YAML::Node topology = node["topology"])
+        if (const Authoring::ReadNode topology = node["topology"])
         {
             if (!topology.IsScalar())
                 return Fail(context, "topology는 scalar여야 한다", outError);
@@ -382,19 +384,19 @@ namespace
         return true;
     }
 
-    bool ParsePasses(const YAML::Node& node,
+    bool ParsePasses(const Authoring::ReadNode& node,
         std::vector<ShaderPassDesc>& outPasses, std::string& outError)
     {
-        if (!node || !node.IsSequence() || node.size() == 0)
+        if (!node || !node.IsSequence() || node.Size() == 0)
             return Fail("passes", "비어 있지 않은 sequence여야 한다", outError);
-        if (node.size() > kMaxPasses)
+        if (node.Size() > kMaxPasses)
             return Fail("passes", "상한 " + std::to_string(kMaxPasses) + "개 초과", outError);
 
         std::unordered_set<std::string> names;
-        outPasses.reserve(node.size());
-        for (std::size_t index = 0; index < node.size(); ++index)
+        outPasses.reserve(node.Size());
+        for (std::size_t index = 0; index < node.Size(); ++index)
         {
-            const YAML::Node passNode = node[index];
+            const Authoring::ReadNode passNode = node.At(index);
             const std::string context = "passes[" + std::to_string(index) + "]";
             if (!ValidateMap(passNode,
                 { "name", "vs", "ps", "cs", "state", "queue" }, context, outError))
@@ -519,15 +521,24 @@ bool ShaderMetaLoader::Parse(std::string_view text,
         if (guid == FileGuid{})
             return Fail(originPath.string(), "asset GUID가 nil이다", outError);
 
-        const YAML::Node root = YAML::Load(std::string(text));
+        // ★ 트리를 소유하는 홀더를 통해 파싱한다. ryml의 노드 뷰는 트리를 소유하지
+        //   않으므로 `ParsedDocument`가 이 함수가 끝날 때까지 살아 있어야 한다.
+        //   yaml-cpp `Node`의 값 의미론과 다른 지점이라 타입으로 강제한다.
+        std::string parseError;
+        const Authoring::ParsedDocument document =
+            Authoring::ParsedDocument::ParseText(std::string(text), parseError);
+        if (!document)
+            return Fail(originPath.string(), "YAML 해석 실패: " + parseError, outError);
+
+        const Authoring::ReadNode root = document.Root();
         if (!ValidateMap(root,
             { "schema", "name", "source", "properties", "keywords", "passes" },
             originPath.string(), outError)) return false;
 
-        const YAML::Node schemaNode = root["schema"];
+        const Authoring::ReadNode schemaNode = root["schema"];
         if (!schemaNode || !schemaNode.IsScalar())
             return Fail(originPath.string(), "필수 schema scalar가 없다", outError);
-        const std::uint32_t schema = schemaNode.as<std::uint32_t>();
+        const std::uint32_t schema = schemaNode.As<std::uint32_t>();
         if (ShaderMeta::kSchemaVersion != schema)
             return Fail(originPath.string(), "지원하지 않는 schema version "
                 + std::to_string(schema), outError);
@@ -563,11 +574,10 @@ bool ShaderMetaLoader::Parse(std::string_view text,
         outError.clear();
         return true;
     }
-    catch (const YAML::Exception& exception)
-    {
-        return Fail(originPath.string(),
-            "YAML 해석 실패: " + std::string(exception.what()), outError);
-    }
+    // ★ `YAML::Exception` 전용 catch는 사라졌다. ryml은 예외가 아니라 **abort**가
+    //   기본값이라 잡을 것이 없고(D3-b-1의 에러 정책이 그것을 예외로 바꾼다),
+    //   파싱 실패는 위에서 `ParsedDocument`가 값으로 돌려준다. 아래 catch는
+    //   변환 실패(`As<T>()`)처럼 검증 도중 던지는 것들을 계속 받는다.
     catch (const std::exception& exception)
     {
         return Fail(originPath.string(),

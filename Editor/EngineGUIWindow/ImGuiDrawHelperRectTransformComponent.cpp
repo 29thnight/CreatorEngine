@@ -22,8 +22,8 @@ static int FindCurrentPresetIndex(RectTransformComponent* rt) {
 	return -1;
 }
 
-// -------------------- ������ �˾�: Unity ��ġ --------------------
-// 3x3 ����Ʈ ������ + ���ν�Ʈ��ġ 3 + ���ν�Ʈ��ġ 3 + ��ü��Ʈ��ġ 1
+// -------------------- 프리셋 팝업: Unity 배치 --------------------
+// 3x3 포인트 프리셋 + 가로스트레치 3 + 세로스트레치 3 + 전체스트레치 1
 static void DrawAnchorPresetPopup(RectTransformComponent* rt)
 {
 	const float pad = 4.f;
@@ -40,7 +40,7 @@ static void DrawAnchorPresetPopup(RectTransformComponent* rt)
 		return pressed;
 		};
 
-	// 3x3 ����Ʈ
+	// 3x3 포인트
 	{
 		// TL, TC, TR
 		drawBtn(AnchorPreset::TopLeft);   ImGui::SameLine(0, pad);
@@ -89,7 +89,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 		auto sizeDelta = rectTransformComponent->GetSizeDelta();
 		auto pivot = rectTransformComponent->GetPivot();
 
-		// ��: ������ �˾� ��ư (Unityó��)
+		// 좌: 프리셋 팝업 버튼 (Unity처럼)
 		ImGui::BeginGroup();
 		ImGui::TextUnformatted("Anchors");
 		{
@@ -99,14 +99,14 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 			ImGui::PushID("CurrentPresetButton");
 			bool pressed = ImGui::InvisibleButton("##currentPreset", btnSize);
 
-			// ��ư�� ���� �簢��
+			// 버튼의 실제 사각형
 			ImRect r(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 
-			// ���� �׸���: ��ħ ������ ������ ForegroundDrawList ���
-			// ImDrawList* dl = ImGui::GetForegroundDrawList(); // �׻� �ֻ���
+			// 위에 그리기: 겹침 문제가 있으면 ForegroundDrawList 사용
+			// ImDrawList* dl = ImGui::GetForegroundDrawList(); // 항상 최상위
 			ImDrawList* dl = ImGui::GetWindowDrawList();
 
-			// ���(ȣ��/��Ƽ�� ����)
+			// 배경(호버/액티브 반응)
 			ImU32 bgCol = ImGui::IsItemActive() ? IM_COL32(70, 70, 70, 255)
 				: ImGui::IsItemHovered() ? IM_COL32(80, 80, 80, 255)
 				: IM_COL32(60, 60, 60, 255);
@@ -121,7 +121,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 					pr.anchorMin, pr.anchorMax, /*selected=*/false);
 			}
 			else {
-				// Custom ����: ������ ����
+				// Custom 상태: 간단한 십자
 				dl->AddLine(ImVec2((r.Min.x + r.Max.x) * 0.5f, r.Min.y + 4), ImVec2((r.Min.x + r.Max.x) * 0.5f, r.Max.y - 4), IM_COL32(200, 200, 200, 255), 1.f);
 				dl->AddLine(ImVec2(r.Min.x + 4, (r.Min.y + r.Max.y) * 0.5f), ImVec2(r.Max.x - 4, (r.Min.y + r.Max.y) * 0.5f), IM_COL32(200, 200, 200, 255), 1.f);
 			}
@@ -131,7 +131,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 
 			if (ImGui::BeginPopup("AnchorPresetPopup"))
 			{
-				DrawAnchorPresetPopup(rectTransformComponent); // ���� ������ ���
+				DrawAnchorPresetPopup(rectTransformComponent); // 기존 프리셋 목록
 				ImGui::EndPopup();
 			}
 			ImGui::PopID();
@@ -148,7 +148,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 		ImGui::SameLine();
 
-		// ��: �� ���� ���̺� (�� | X | Y)
+		// 우: 값 편집 테이블 (라벨 | X | Y)
 		if (ImGui::BeginTable("RectTransformTable", 3,
 			ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit, ImVec2(-1, 0)))
 		{

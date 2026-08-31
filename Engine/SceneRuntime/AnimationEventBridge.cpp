@@ -85,7 +85,7 @@ void Animation::AddEvent()
 	std::string baseName = "newEvent";
 	std::string realName = baseName;
 	int index = 1;
-	// �ߺ� �̸��� �����ϸ� ���� ���̱�
+	// 중복 이름이 존재하면 숫자 붙이기
 	while (FindEventName(realName))
 	{
 		realName = baseName + "(" + std::to_string(index) + ")";

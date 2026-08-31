@@ -34,7 +34,7 @@ public:
    {
         m_Info.boxExtent = { 1.0f, 1.0f, 1.0f };
 		m_boxExtent = m_Info.boxExtent;
-        m_type = EColliderType::COLLISION; // �⺻�� ����
+        m_type = EColliderType::COLLISION; // 기본값 설정
    } 
    virtual ~BoxColliderComponent() = default;
 
@@ -67,10 +67,10 @@ public:
    math::vector3 m_posOffset{};
    math::quaternion m_rotOffset{};
 
-   float staticFriction = 0.5f;	//���� ��ü ���� ���
-   float dynamicFriction = 0.4f;	//���� ��ü ���� ���
-   float restitution = 0.3f;	//ź�� ���
-   float density = 10.0f;	//�е�
+   float staticFriction = 0.5f;	//정적 물체 마찰 계수
+   float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
+   float restitution = 0.3f;	//탄성 계수
+   float density = 10.0f;	//밀도
 
 
    math::vector3 GetExtents()
@@ -108,7 +108,7 @@ public:
            m_Info.boxExtent = { 0.001f, 0.001f ,0.001f };
        }
 
-       // �ӽ� �ݸ��� ���̾�
+       // 임시 콜리젼 레이어
        m_Info.colliderInfo.layerNumber = GetOwner()->m_collisionType;
 
        m_Info.colliderInfo.staticFriction = staticFriction;
@@ -168,7 +168,7 @@ public:
    
    //=========================================================
 
-    // ICollider��(��) ���� ��ӵ�
+    // ICollider을(를) 통해 상속됨
     void SetPositionOffset(math::vector3 pos) override;
 
     math::vector3 GetPositionOffset() override;

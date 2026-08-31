@@ -741,8 +741,16 @@ Runtime interface의 YAML Node 타입 0 + 회귀·왕복 검사 통과 + D0 대�
 | **D3-b-1** ✅ | ryml 에러를 abort→예외로. **제품 경로 투입의 선결 조건** — 변이 2회로 게이트 이빨 증명 | 소 | D3-b-0 |
 | **D3-b-2a** ✅ | 쓰기 뷰를 `MutableNodeView`로 분리(대상 3곳) — 읽기만 옮길 수 있게 한다. 변이로 훅 발화 증명 | 소 | D3-b-1 |
 | **D3-b-2b-0** ✅ | 스칼라 **변환** 파리티 — 44케이스 중 **11건 갈림**. 알려진 목록 + 코퍼스 위험 표기 고정 | 중 | D3-b-2a |
-| **D3-b-2b-1** ☐ | **읽기 경로**를 ryml로(`LoadFile`→`parse_in_arena` + typed 역직렬화 + 훅 본문). 측정된 이득이 전부 여기 있다 | 대 | D3-b-2b-0 |
-| **D3-b-3** ☐ | 쓰기 경로(`Meta::Serialize`·Emitter). 파싱 이득 없음 — 저작 왕복 정확성이 판정 | 중 | D3-b-2b-1 |
+| **D3-b-2b-1a** ✅ | 스칼라 변환을 문자열 위로 이식(`Authoring::Scalar`) — 67케이스 차이 0, 이식 오류 3건을 게이트가 잡음 | 중 | D3-b-2b-0 |
+| **D3-b-2b-1b-1** ✅ | 읽기 어댑터 `Authoring::ReadNode` 도입 + 타입 디시리얼라이저 이관. 행동 변화 0, 탈출구 6곳 | 중 | D3-b-2b-1a |
+| **D3-b-2b-1b-2a** ✅ | 맵 순회 추가 + `ExtractTypeFromYAML` 이관. 변이로 분기 생존 확인 | 중 | D3-b-2b-1b-1 |
+| **D3-b-2b-1b-2b** ✅ | 훅 인자를 어댑터로(`NodeViewAccess::Node` 반환형) + 래칫 게이트. 탈출구 15/14 기준선 | 중 | D3-b-2b-1b-2a |
+| **D3-b-2b-1b-2c** ◐ | 씬 읽기 경로 소비자 이관 — 래칫 15→12. 잔여는 backend 교체와 함께 사라진다 | 중 | D3-b-2b-1b-2b |
+| **D3-b-2b-1b-3a** ✅ | 어댑터를 이중 backend로 + 어댑터 파리티 게이트(278파일·15,339노드 차이 0) | 대 | D3-b-2b-1b-2c |
+| **D3-b-2b-1b-3b** ◐ | 훅 이관 + 뷰를 두 backend로(불투명 2워드+태그). 래칫 12→10 | 중 | D3-b-2b-1b-3a |
+| **D3-b-2b-1b-3c** ☐ | 씬 `LoadFile` → `parse_in_arena`. **선행: experiment 재질 코덱이 어댑터를 받아야 한다(I5)** | 중 | D3-b-2b-1b-3b |
+| **D3-b-L** ◐ | leaf 파서를 ryml로(BlackBoard·TagManager 완료, ~62곳 잔여). **계획서에 없던 슬라이스** | 중 | D3-b-1 |
+| **D3-b-3** ☐ | 쓰기 경로(`Meta::Serialize`·Emitter). 파싱 이득 없음 — 저작 왕복 정확성이 판정 | 중 | D3-b-2b-1b-3c |
 | **D3-b-4** ☐ | `Document::Impl` 교체 + Access 반환형. **첫 단계가 아니라 마지막이다**(아래 정정) | 중 | D3-b-3 |
 
 **D3-a-1 — 구조 비교 — ✅ 구현·표적 검증·게이트 편입 완료 (2026-08-30).**
@@ -1368,6 +1376,328 @@ yaml-cpp 의미를 유지한다. 부재 키(`if (!sub)`)도 ryml에서는 `has_c
   `NodeView` 훅 본문. `NodeView`의 **선언**은 이미 포맷을 모르므로 시그니처는 그대로다
   — D3-a가 만든 경계가 값을 하는지가 여기서 드러난다. 판정: D0과 같은 workload의
   Release A/B에서 `SceneParse` 감소 + 씬 전수 로드 통과.
+**D3-b-2b-1a — 스칼라 변환을 backend에서 분리 — ✅ 완료 (2026-08-30).**
+
+`Authoring::Scalar`(`AuthoringScalarConvert.h/.cpp`)가 정본이다. 값 변환은 **문자열
+위의 함수**가 하고 노드는 원문을 꺼내는 데만 쓴다. 그래서 D3-b-2b-1b가 backend를
+바꿔도 값의 의미가 바뀌지 않는다.
+
+**★ 재구현이 아니라 이식이고, 그 차이를 게이트가 강제한다.** 의미를 머리로 다시
+짜면 어긋난다 — 실제로 **이식 오류 3건을 게이트가 잡았다**:
+- `as<std::uint64_t>("-1")`: yaml-cpp는 **실패**하는데 내 `operator>>`는 래핑된
+  최대값으로 성공했다. 코드 주석에 "yaml-cpp도 같은 스트림을 쓰니 동작이 같을
+  것"이라 적어 두었는데 **그 추측이 틀렸다.**
+- `v: ~`와 `v: null`: yaml-cpp `as<std::string>`은 **"null"**을 준다. 널 노드는
+  `IsScalar()`가 거짓이라 원문 추출이 실패했다. 이것은 변환이 아니라 **노드→원문
+  추출**의 규칙이며, ryml 쪽에서 `val_is_null()`로 같은 규칙을 세워야 한다.
+
+**검증: 67케이스 전수에서 이식 변환기 대 yaml-cpp 차이 0(`convDiverge=0`).**
+케이스를 44 → 67로 넓혔다(진법 접두사·선행 0·부호·부분 파싱·오버플로·좁은 타입).
+
+**★ 그 확장이 ryml의 가장 위험한 차이를 드러냈다 — 실패가 아니라 "둘 다 성공하는데
+값이 다른" 쪽이다.**
+
+| 입력 | yaml-cpp | ryml |
+|---|---|---|
+| `010` | **8** (8진) | **10** (10진) |
+| `99999999999999999999999` | 실패 | **200376420520689663** (쓰레기) |
+| `1.5x` | 실패 | **1.5** (부분 파싱) |
+| `+42` · `+1.5` | 읽음 | 거부 |
+
+에러도 로그도 없이 값만 틀린다. **그러므로 D3-b-2b-1b는 ryml `from_chars`를 직접
+쓰면 안 된다.** ryml 차이는 11 → **21건**으로 늘었고, 게이트가 그 목록을 고정한다.
+
+**배선했다 — 죽은 코드로 두지 않았다.** `ReadScalar`의 산술 오버로드가 변환기를
+쓴다. 실패 경로는 `as<T>()`에 남겨 예외 타입·메시지를 그대로 유지한다(변환기와
+yaml-cpp의 성공 판정 일치를 게이트가 전수 단정하므로, 이 폴백은 **yaml-cpp도 실패할
+때만** 돈다). `char` 계열은 제외했다 — `as<char>`는 숫자가 아니라 문자 하나를 읽는다.
+
+**★ 변이로 배선이 살아 있음을 증명했다.** `TryParseFloat`에 `+1.0f`를 넣자
+`verify-scene-authoring-corpus`가 씬 4개에서 빨개졌다. **`verify-reflection-golden`은
+초록으로 남았다** — 골든은 직렬화 골든이라 역직렬화 변환을 지키지 못한다.
+`OnAfterSerialize` 때와 같은 사각이며, 여기서도 코퍼스 게이트가 실제 보호자다.
+
+★ 게이트 범위 누락 하나를 함께 닫았다. 개행 게이트가 `ProjectSetting/`을 안 봐서
+거짓 초록을 낸 전례가 있어, 이 게이트의 코퍼스 스캔도 두 루트를 보게 했다(278 → 281).
+
+**다음(D3-b-2b-1b):** 트리 순회를 ryml로. 변환은 이미 backend를 모르므로 남은 것은
+`LoadFile` → `parse_in_arena`, `NodeView`의 backing, `ReadMember`의 부재 키 판정
+(`has_child` 선행), 그리고 널 노드 규칙(`val_is_null()` → "null")이다.
+
+**D3-b-2b-1b-1 — 읽기 어댑터 도입 + 타입 디시리얼라이저 이관 — ✅ 완료 (2026-08-30).**
+
+`Authoring::ReadNode`(`AuthoringReadNode.h`)가 읽기 경로의 노드 창구다.
+
+**★ 왜 어댑터를 먼저 세우는가.** 파서를 바꾸려면 `LoadFile`부터 `ReadMember`까지
+타입이 한꺼번에 바뀌어야 한다 — 중간에 끊을 수 없어 수백 곳을 한 번에 고치게 되고,
+그러면 어긋났을 때 **"ryml이 다르게 읽은 것"과 "옮기다 틀린 것"을 가를 수 없다.**
+D3-b-0이 파서 프로브를 먼저 만든 것과 같은 이유다. 지금 단계의 판정은 성능이 아니라
+**"행동이 하나도 안 바뀌었다"** 이고, 기존 게이트가 그것을 그대로 잰다.
+
+**표면은 실측으로 정했다 — 아홉 가지뿐이다.** 타입 디시리얼라이저가 쓰는 것은
+유효성·널·스칼라·맵·시퀀스·크기·키 조회·시퀀스 순회·원문이다. **맵 순회는 없다**
+— 그것은 소비자(SceneManager·ComponentFactory)의 것이고 다음 조각이다.
+
+옮긴 것: `ReadMember` · `DeserializeObjectFrom` · `ReadScalar` 전 오버로드 ·
+`DeserializeThunk` · `PostLoadThunk` · `TypeOps::deserialize`/`postLoad` 시그니처.
+enum도 `as<int>` 직결 대신 변환기를 태운다 — 직결은 backend 의미에 묶인다.
+
+★ **순환 include를 하나 만들었다가 고쳤다.** 어댑터가 `ReflectionYml.h`를 물고
+그쪽이 어댑터를 물었다. 어댑터가 yaml-cpp를 직접 물게 해서 끊었다(네임스페이스
+별칭은 같은 대상이면 중복 선언이 허용된다).
+
+**★ 전환기 탈출구를 이름으로 드러냈다.** 아직 옮기지 않은 소비자가 backend 노드를
+필요로 하므로 `BackendNodeDuringTransition()`을 뒀다. **잔존은 한 파일 6곳뿐**이고
+(`ReflectionTypedYml.h`: 변환 폴백 3 · `char` 경로 1 · enum 폴백 1 · `NodeView`
+브리지 1), 전부 의도된 지점이다. 이름이 길고 흉한 것이 목적이다 — 남아 있으면
+전환이 덜 끝난 것이고, 개수가 진행률이다.
+
+**검증:** Debug x64 CreatorEditor·Player 빌드 exit 0, 게이트 9종 exit 0
+(골든 diff 0 · scene 전수 14 · prefab 9/9 · material 2/2 · play 왕복 · 중첩 프리팹 ·
+BT smoke · 스칼라 파리티 · 구조 비교). **행동 변화 0.**
+
+**다음(D3-b-2b-1b-2):** 소비자(`SceneManager`·`ComponentFactory`·훅 본문)를 어댑터로
+옮기고 **맵 순회**를 표면에 더한다. 그 뒤에 backend를 ryml로 바꾼다 —
+`LoadFile` → `parse_in_arena`, 없는 키는 `has_child` 선행(ryml은 `operator[]`로
+만지면 visit 채널로 죽는다), 널은 `val_is_null()` → `"null"`.
+
+**D3-b-2b-1b-2a — 맵 순회 + 타입 판별 이관 — ✅ 완료 (2026-08-30).**
+
+어댑터에 **맵 순회**(`MapRange`/`MapEntry`)와 `HasChild`를 더하고, 읽기 경로에서
+가장 미묘한 함수인 `Meta::ExtractTypeFromYAML`을 옮겼다(UUID → 이름+typeID →
+맵 폴백 → `typeID` 필드, 네 단계).
+
+★ **맵은 인덱스로 못 돈다.** yaml-cpp의 `operator[](size_t)`는 맵에서 **인덱스가
+아니라 키**로 해석되어 조용히 엉뚱한 값을 준다. 그래서 시퀀스와 달리 별도 반복자를
+뒀다. ryml은 인덱스 접근이 되지만 같은 인터페이스를 내주는 편이 옮길 때 안전하다.
+
+★ **`MapRange`는 노드를 값으로 소유한다.** 참조로 잡으면
+`for (auto e : node.Map())`에서 임시가 먼저 죽어 반복자가 dangling이 된다.
+
+★ **중첩 타입이 불완전 타입을 담을 수 없어 맵 타입을 클래스 밖으로 뺐다**
+(`MapEntry`가 `ReadNode`를 값으로 담는다).
+
+`as<T>(0)` 폴백 형태는 변환기 + 기본값으로 옮겼다 — 던지지 않는 것이 요점이다.
+숫자가 아니면 타입 헤더가 아니라 이름이 우연히 겹친 데이터 필드다.
+
+**★ 옮긴 분기가 실제로 도는지 변이로 확인했다.** UUID 경로(0단계)가 항상 이기면
+1단계 맵 순회는 **검증되지 않은 코드**가 된다. 1단계를 막자
+`verify-scene-authoring-corpus`(씬 4개 + `vector subscript out of range`)와
+`verify-prefab-authoring-corpus`(snapshots 1/2)가 빨개졌다 — 살아 있고 필수다.
+`verify-reflection-golden`은 여기서도 초록으로 남았다(직렬화 골든).
+
+**검증:** Debug x64 CreatorEditor·Player exit 0, 게이트 10종 exit 0. 행동 변화 0.
+
+**남은 전환기 표면:** `BackendNodeDuringTransition` 6곳(`ReflectionTypedYml.h`) +
+`ExtractTypeFromYAML`의 backend 오버로드 1개(호출부 15곳). 그 오버로드가 사라지는
+것이 소비자 이관 완료의 신호다.
+
+**다음(D3-b-2b-1b-2b):** `SceneManager::Desirealize*`·`ComponentFactory` 본문과 훅을
+어댑터로 옮긴다. 그 뒤 backend 교체 — `parse_in_arena`, `has_child` 선행,
+`val_is_null()` → `"null"`, 그리고 `NodeView`의 backing을 불투명 2워드로.
+
+**D3-b-2b-1b-2b — 훅 인자를 어댑터로 + backend 경계 래칫 — ✅ 완료 (2026-08-30).**
+
+`NodeViewAccess::Node()`가 **어댑터를 값으로 돌려준다.** 이전에는 backend 노드
+참조였는데, 그러면 backend를 바꾸는 순간 훅 본문 전부가 함께 깨진다. 어댑터를
+돌려주면 훅 본문은 `ReadNode` 연산만 쓰게 되고 **backend 교체가 이 함수 한 줄로
+좁혀진다.**
+
+변환 디스패치(`TryConvert`)를 `Authoring::Scalar`로 승격해 어댑터와 리플렉션이
+같은 것을 쓰게 했다. 어댑터에 `As<T>()`·`As<T>(fallback)`·`AsString()`을 더했다 —
+yaml-cpp `as<T>()`의 **드롭인 대체**이고, 실패하면 backend가 그대로 던진다(예외
+타입·메시지가 같아야 `LoadScene`의 catch 의미가 유지된다).
+
+**소비자 9곳은 계수 가능한 전환기 패턴으로 남겼다.** 본문이 아직 backend API에
+묶여 있고(특히 `DataSystem`은 experiment 코덱에 backend 노드를 넘긴다 — I5 소유),
+한 번에 옮기면 실패 원인을 못 가른다.
+
+**★ 그래서 래칫 게이트를 만들었다 — `verify-authoring-backend-boundary.ps1`.**
+탈출구 **15곳** / `ExtractTypeFromYAML` backend 호출부 **14곳**이 기준선이다.
+
+이 게이트가 막는 것은 실패가 아니라 **역행**이다. 새 코드가 어댑터 대신 backend
+노드를 직접 잡으면 **빌드도 다른 게이트도 전부 통과하므로 아무도 모른다.** 기준선을
+넘으면 실패하고, 줄면 기준선을 갱신하라고 말하며(숫자가 낡으면 래칫이 풀린다),
+**0이 되면 이 게이트를 은퇴시키라고 말한다.** 변이로 확인했다(가짜 탈출구 1개 추가
+→ 16/15 실패, 제거 → 통과). `run-all.ps1` 편입.
+
+이름이 흉한 것이 목적이다: `BackendNodeDuringTransition`. **개수가 곧 진행률이다.**
+
+**검증:** Debug x64 CreatorEditor·Player exit 0, 게이트 8종 exit 0. 행동 변화 0.
+
+**다음:** 소비자 본문을 하나씩 어댑터로 옮겨 래칫을 내린다(SceneManager 3 ·
+ComponentFactory 1 · 훅 4 · 리플렉션 6). 그 뒤 backend 교체 —
+`parse_in_arena` · `has_child` 선행 · `val_is_null()` → `"null"` ·
+`NodeView` backing을 불투명 2워드로.
+
+**D3-b-2b-1b-2c — 씬 읽기 경로 소비자 이관 — ✅ 부분 완료 (2026-08-30). 래칫 15 → 12.**
+
+`SceneManager`의 `DesirealizeGameObject` 3곳과 `ComponentFactory::LoadComponent`가
+어댑터만 쓴다. `EntityAuthoringRead.cpp`는 **backend 등장 0**이 됐다.
+`PromoteLegacyBone`·`PromoteLegacyTransform`도 옮겼다.
+
+이를 위해 어댑터 오버로드를 셋 더했다: `Meta::Deserialize`(void*/템플릿 2종) ·
+`NodeViewAccess::Make(const ReadNode&)` · `EntityAuthoring` 2함수.
+
+★ **뷰의 표현은 하나로 유지했다.** `Make(const ReadNode&)`를 더할 때 뷰가 backend
+노드와 어댑터 **둘 중 어느 것을 가리키는지 모르게** 될 뻔했다 — `Node()`가 그것을
+구분할 수 없으므로 타입 편칭으로 조용히 망가지는 결함이 된다. 새 오버로드가 어댑터
+안의 backend 노드를 가리키게 해서 표현을 하나로 두었다. 그 변환이 backend를 쓰는 것
+자체가 "전환이 안 끝났다"는 표시이고, 래칫이 그것을 센다.
+
+**★ Prefab 소환은 읽기 경로가 아니다 — 실측으로 갈렸다.**
+`Prefab::InstantiateRecursive`는 정의를 `Clone`한 뒤 **트리를 변형**하고
+(`UpgradeLegacyNavigation`이 `navigations`에 `parentHops`·자식 서수를 써 넣는다)
+읽는다. 읽기 전용 어댑터로는 표현할 수 없는 **read-write 경로**이므로 D3-b-3(쓰기
+경로)의 몫이다. 그때까지 `InferCreationType`·`PromoteLegacyTransform`에 backend를
+받는 전환기 오버로드를 두었다 — **그 둘이 사라지는 것이 그 경로 전환의 완료 신호다.**
+
+**남은 탈출구 12곳:** `ReflectionTypedYml.h` 6(변환 폴백 3 · `char` 1 · enum 1 ·
+`NodeView` 브리지 1) · `AuthoringNodeViewAccess.h` 1(뷰 표현) · 훅 4
+(`DataSystem`은 experiment 코덱이 backend 노드를 요구 — I5 소유) ·
+`Prefab.cpp` 1(read-write 경로). **이들 대부분은 backend 교체와 함께 사라진다** —
+지금 억지로 0으로 만들면 ryml에서 다시 써야 하는 코드를 두 번 쓰게 된다.
+
+**검증:** Debug x64 CreatorEditor·Player exit 0, 게이트 9종 exit 0. 행동 변화 0.
+
+**D3-b-2b-1b-3a — 어댑터를 이중 backend로 + 어댑터 파리티 게이트 — ✅ 완료
+(2026-08-30).**
+
+**★ 한 번에 다 못 바꾼다는 것이 실측으로 확정됐다.** 남은 탈출구 12곳 중 둘은
+구조적으로 막혀 있다 — `DataSystem`은 experiment 코덱(I5 소유)에 yaml-cpp 노드를
+넘기고, `Prefab` 소환은 트리를 변형하는 read-write 경로다. 그것들을 억지로 먼저
+옮기면 ryml에서 다시 써야 하는 코드를 두 번 쓰게 된다.
+
+그래서 `ReadNode`가 **두 backend를 모두 담는다.** 씬 로드처럼 준비된 원천부터
+ryml로 파싱하고 나머지는 yaml-cpp로 남는다. 소비자는 어느 쪽인지 모른다 —
+어댑터를 먼저 세운 값이 여기서 나온다. 분기 비용은 연산당 조건 하나이고, 파싱
+비용(씬 로드의 60%)에 비하면 무시할 수 있다.
+
+**★ 흡수해야 할 backend 비대칭이 셋이었다.**
+
+| 축 | yaml-cpp | ryml |
+|---|---|---|
+| 맵의 키 | **진짜 노드** | **자식의 속성**(`key(id)`) |
+| 널 | 노드 **타입** | "값이 있는데 `val_is_null`" |
+| 없는 키 | 정의되지 않은 노드 | `operator[]`는 **abort** → `find_child` 필수 |
+
+키 비대칭은 `Backend::RymlKey` 모드로 흡수했다(같은 id를 가리키되 `Scalar()`가
+키를 돌려준다). `BackendNodeDuringTransition()`은 ryml 노드에서 **던진다** — 조용히
+빈 노드를 주면 그 자리에서 데이터가 사라지고 아무도 모른다.
+
+**★ 게이트 `verify-adapter-parity.ps1` — 앞선 두 파리티가 못 재는 축이다.**
+파서 파리티는 **트리**를, 스칼라 파리티는 **값 변환**을 쟀다. 그러나 소비자가 실제로
+부르는 것은 어댑터 연산 아홉 가지다. 같은 문서를 양쪽 backend로 어댑터에 넣어
+전수 대조한다:
+
+**파일 278 · 노드 15,339 · 맵 항목 13,814 · 차이 0.**
+
+0을 세고 "차이 0"을 통과로 읽지 않도록 파일·노드·**맵 항목** 수를 함께 단정한다 —
+맵을 한 번도 안 돌았다면 키 비대칭을 검사하지 않은 것이다.
+
+**★ 변이가 정확히 390건을 붉혔다.** ryml의 `IsNull`을 `false`로 바꾸자
+`IsNull yamlcpp=1 ryml=0`이 **390건** 나왔다 — D3-b-2b-0에서 코퍼스를 스캔해 센
+`~` 개수와 **정확히 같다**. 검사의 이빨과 눈금이 함께 확인됐다.
+
+**검증:** Debug x64 CreatorEditor exit 0, 어댑터 파리티 통과. `run-all.ps1` 편입.
+
+**다음(D3-b-2b-1b-3b):** 씬 `LoadFile`을 `parse_in_arena`로 바꾸고 트리 수명을
+로드 스코프에 건다. 그 순간 D3-b의 이득이 처음으로 **제품 경로 `SceneParse` A/B**에
+나타난다 — 프로브 배율이 아니라 D0과 같은 profiler로 잰다.
+
+**D3-b-2b-1b-3b — 훅 이관 + 뷰를 두 backend로 — ◐ 부분 완료 (2026-08-31). 래칫 12 → 10.
+씬 전환은 I5 코덱 하나에 막혀 있다.**
+
+`UIComponent`·`Animator`·`MeshRenderer`의 훅 본문을 어댑터로 옮겼다. 앞의 둘은
+backend 등장 **0**이 됐다.
+
+**★ 뷰가 씬 전환의 블로커였다.** `NodeView`는 backend 노드 하나를 가리키는 포인터
+였는데, 두 backend의 표현이 다르다 — yaml-cpp는 노드 포인터로 족하지만 ryml은
+`{트리, id}` 쌍이라야 한다. 뷰가 한쪽만 담을 수 있으면 씬을 ryml로 파싱하는 순간
+`Make`가 ryml 어댑터에서 yaml-cpp 노드를 꺼내려다 던진다.
+
+**불투명 두 워드 + 태그**로 바꿨다. 필드는 `const void*`와 정수뿐이라 **헤더는 여전히
+포맷을 모르고**(§5 완료 기준 9), 의미 부여는 직렬화 계층만 한다. 태그가 핵심이다 —
+두 표현을 섞어 놓고 구분하지 않으면 타입 편칭으로 조용히 망가진다.
+
+★ 그 과정에서 표현을 하나로 강제하려다 `Make(const MetaYml::Node&)`를 지웠는데,
+호출부가 루프 변수·중간 노드라 이름 있는 어댑터를 만들 수 없는 자리가 많았다.
+**태그 방식이 옳았다** — 두 표현을 안전하게 공존시키면 호출부를 건드리지 않아도 된다.
+
+**★ 남은 씬 전환 블로커는 하나다:**
+`experiment::DeserializeMaterialPropertyValue(const YAML::Node&, ...)` —
+`MeshRenderer::OnDeserialized`가 재질 override를 읽을 때 부른다. **I5 소유 코덱**이라
+이 트랙이 옮길 수 없다. ryml 노드로 부르면 `BackendNodeDuringTransition()`이 던지므로,
+씬을 ryml로 파싱하면 MeshRenderer가 있는 모든 씬이 실패한다.
+
+★ 참고로 `DecodeMaterialReferenceNode`는 I5 소유가 아니라 `MeshRenderer.cpp`
+익명 네임스페이스의 지역 함수였다 — 그래서 옮겼다. **"I5 것"과 "I5 것처럼 보이는 것"을
+가르는 데 실측이 필요했다.**
+
+**권고:** experiment 재질 코덱이 `Authoring::ReadNode`를 받도록 I5 트랙에 요청하거나,
+D3-b-3(쓰기 경로)에서 그 코덱을 함께 옮긴다. 그 전에는 씬 ryml 파싱을 켤 수 없다.
+
+**남은 탈출구 10곳:** `ReflectionTypedYml.h` 6 · `MeshRenderer.cpp` 1(위 블로커) ·
+`DataSystem.cpp` 1(재질 경로) · `Prefab.cpp` 1(read-write 소환) ·
+`AuthoringNodeViewAccess.h` 1(yaml-cpp 표현 생성).
+
+**검증:** Debug x64 CreatorEditor·Player exit 0, 게이트 10종 exit 0. 행동 변화 0.
+
+**D3-b-L — leaf 파서 정리 (신설 슬라이스) — ◐ 착수 (2026-08-31).**
+
+★ **계획서에 구멍이 있었다.** D3-b의 판정은 "yaml-cpp consumer/include 0"인데,
+하위 슬라이스(씬 읽기·쓰기·Document)는 그 경로만 덮는다. 실측 424곳의 분포는:
+
+| 영역 | 등장 | 담당 |
+|---|---:|---|
+| experiment · cooked | **111** | **없음**(I5 소유) |
+| 어댑터 · 리플렉션 | 105 | D3-b-3 · D3-b-4 |
+| **독립 leaf 파서** | **~68** | **없었음 → 이 슬라이스** |
+| 씬 · 프리팹 · CLI · 에디터 | ~140 | D3-b-2b-1b-3c · D3-b-3 |
+
+**약 179곳(42%)에 담당 슬라이스가 없었다.** D3-b를 다 끝내도 yaml-cpp는 은퇴하지
+못하고, "2일" 추정이 이 몫을 세지 않았다.
+
+**leaf가 먼저인 이유:** 자기 파일만 읽고 평범한 데이터를 내놓아 **소비자가 backend에
+묶여 있지 않다.** 씬 경로는 I5 코덱에 막혀 있지만 leaf는 지금 옮길 수 있고, 그래서
+**제품 경로의 첫 ryml**이 된다 — 전환을 끝에서 검증하는 대신 여기서 먼저 밟는다.
+
+`Authoring::ParsedDocument` 신설 — 파싱 결과가 트리를 소유한다. ryml 뷰는 트리를
+소유하지 않으므로(§8) 홀더가 그 규칙을 타입으로 강제한다. `Authoring::Document`
+(저작 문서 장기 소유)와 이름이 비슷하니 용도를 헤더에 적어 뒀다.
+
+**옮긴 것:** `BlackBoard::LoadFromFile` · `TagManager::Load`. 두 파일의 잔존
+yaml-cpp는 전부 **쓰기 경로**(Save)이며 D3-b-3 몫이다.
+
+**★ 게이트가 여럿 초록이어도 그 경로가 지켜진다는 뜻이 아니다 — 변이로 확인했다.**
+- `BlackBoard` 변이 → `verify-bt-smoke`가 잡았다("시퀀스 완주 로그가 없다").
+- `TagManager` 변이 → **아무도 잡지 못했다.** scene 코퍼스·prefab·golden·play 왕복·
+  asset-authoring-ownership 전부 초록이었다. 기존 `tag.authoring.probe`는
+  Add/Has/Remove 즉 **메모리 조작만** 재고 디스크에서 읽은 결과를 보지 않았다.
+  그래서 `list` 동작과 `verify-tag-authoring-read.ps1`을 만들었다(태그 21·레이어 16
+  이름 집합 대조 — 개수만 세면 "다른 것을 같은 수만큼 읽은" 경우를 통과시킨다).
+
+**★★ 그 변이 실험이 저작 자산을 파괴했다 — 그리고 몇 번의 실행이 지난 뒤에야
+알아챘다.** 에디터는 종료 시 `Finalize()` → `Save()`를 무조건 부른다. 읽기가 깨지면
+메모리 상태가 비어 있고, 그 빈 상태가 디스크를 덮어 **태그 21개가 통째로 사라졌다.**
+`git checkout`으로 복구했다.
+
+**이것은 실험 사고가 아니라 제품 결함이고, ryml 전환이 그 위험을 키웠다** — 두 파서의
+수용 범위가 다르므로(21건) yaml-cpp가 읽던 파일을 ryml이 거부할 수 있고, 그 순간
+저장이 손실을 확정한다. 두 곳을 고쳤다:
+- `TagManager`에 `m_loadSucceeded`를 두고, **로드가 성공한 적 없고 파일이 존재하면
+  Save를 거부**한다. 빈 상태 저장은 사용자가 정말 전부 지운 경우에만 정당하다.
+- 게이트가 자산을 스냅샷 뜨고 **바이트 단위로 복원·대조**한다.
+
+가드는 변이로 검증했다 — 파싱을 실패시켜도 **자산이 보존됐고**(바이트 동일) 게이트는
+빨갛게 실패했다.
+
+**남은 leaf(~62곳):** `ShaderMeta` 26 · `EditorSettingsStore` 13 · `RuntimeSettings` 4 ·
+`FoliageComponent` 4 · `Model` 4 · `VolumeComponent`·`PhysicsManager`·
+`BehaviorTreeComponent` 각 2 · `Terrain`·`ModelLoader` 각 1.
+**착수 전에 각각 어떤 게이트가 지키는지 변이로 확인할 것** — TagManager가 그 필요를
+증명했다.
+
 - **D3-b-3:** 쓰기 경로(`Meta::Serialize`·`YAML::Emitter`). 파싱 이득은 없고 저작
   왕복 정확성이 판정이다.
 - **D3-b-4:** `Document::Impl` 교체 + `DocumentAccess`/`NodeViewAccess` 반환 타입.

@@ -1,5 +1,6 @@
 #pragma once
 #include "Entity.h"
+#include "AuthoringReadNode.h"
 #include "ReflectionYml.h"
 
 // SerializationPlan D3-a-2 — 저작 문서에서 Entity 생성 입력을 읽는 어댑터.
@@ -25,9 +26,18 @@ namespace EntityAuthoring
 	//
 	// 구형 노드는 `m_gameObjectType`을 읽기 호환 입력으로 받고, 신형 노드는 공간
 	// 컴포넌트 조합(Rect만=UI, Rect+Transform=Canvas, 그 외=Empty)에서 역으로 읽는다.
-	[[nodiscard]] GameObjectType InferCreationType(const MetaYml::Node& node);
+	[[nodiscard]] GameObjectType InferCreationType(const Authoring::ReadNode& node);
 
 	// top-level 계층 키를 로드 배치 DTO로 읽는다. 이 값들은 Entity 리플렉션 필드가
 	// 아니며 Scene Store를 경유해 확정된다(H3).
-	[[nodiscard]] Entity::SerializedHierarchy ReadSerializedHierarchy(const MetaYml::Node& node);
+	[[nodiscard]] Entity::SerializedHierarchy ReadSerializedHierarchy(const Authoring::ReadNode& node);
+
+	// ★ 전환기 오버로드. `Prefab::InstantiateRecursive`는 정의를 **복제한 뒤 트리를
+	//   변형**하고 읽는다 — 읽기 전용 어댑터로 표현할 수 없는 read-write 경로라
+	//   D3-b-3(쓰기 경로)의 몫이다. 그때까지 backend 노드를 받아 감싼다.
+	//   **이 오버로드가 사라지는 것이 그 경로 전환의 완료 신호다.**
+	[[nodiscard]] inline GameObjectType InferCreationType(const MetaYml::Node& node)
+	{
+		return InferCreationType(Authoring::ReadNode{ node });
+	}
 }

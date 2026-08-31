@@ -1,6 +1,7 @@
 #include "AuthoringScalarParityProbe.h"
 
 #include "AuthoringRymlErrorPolicy.h"
+#include "AuthoringScalarConvert.h"
 #include "ReflectionYml.h"
 
 #include <ryml/ryml.hpp>
@@ -112,10 +113,85 @@ namespace Authoring
 			return true;
 		}
 
+		// ── 이식 변환기 쪽 ───────────────────────────────────────────────────
+		//
+		// 파싱은 yaml-cpp로 하고 **변환만** 이식 함수로 한다. 이 축이 재려는 것은
+		// 파서가 아니라 변환이므로, 파서를 고정해야 차이의 원인이 하나로 좁혀진다.
+		bool RawScalar(const std::string& document, std::string& out)
+		{
+			try
+			{
+				const MetaYml::Node root = MetaYml::Load(document);
+				const MetaYml::Node value = root["v"];
+				if (!value) return false;
+				// ★ **널 노드는 문자열 "null"이다.** yaml-cpp `as<std::string>`의
+				//   실측 동작이고(`v: ~`·`v: null` 둘 다), 이것을 빠뜨리면 변환기가
+				//   yaml-cpp와 갈린다 — 게이트가 잡았다. 이 규칙은 변환이 아니라
+				//   **노드→원문 추출**의 규칙이므로, D3-b-2b-1b가 ryml 쪽에서도
+				//   같은 규칙을 세워야 한다(`val_is_null()`).
+				if (value.IsNull()) { out = "null"; return true; }
+				if (!value.IsScalar()) return false;
+				out = value.Scalar();
+				return true;
+			}
+			catch (const std::exception&)
+			{
+				return false;
+			}
+		}
+
+		bool ConvertString(const std::string& document, std::string& out)
+		{
+			// 문자열은 변환이 없다 — 스칼라 원문이 곧 값이다. 다만 yaml-cpp는
+			// `~`를 "null"로 정규화하므로 그 차이가 여기서 드러난다.
+			return RawScalar(document, out);
+		}
+
+		bool ConvertBool(const std::string& document, std::string& out)
+		{
+			std::string raw;
+			if (!RawScalar(document, raw)) return false;
+			bool value{};
+			if (!Authoring::Scalar::TryParseBool(raw, value)) return false;
+			out = Normalize(value);
+			return true;
+		}
+
+		bool ConvertFloat(const std::string& document, std::string& out)
+		{
+			std::string raw;
+			if (!RawScalar(document, raw)) return false;
+			float value{};
+			if (!Authoring::Scalar::TryParseFloat(raw, value)) return false;
+			out = Normalize(value);
+			return true;
+		}
+
+		bool ConvertU64(const std::string& document, std::string& out)
+		{
+			std::string raw;
+			if (!RawScalar(document, raw)) return false;
+			std::uint64_t value{};
+			if (!Authoring::Scalar::TryParseUInt64(raw, value)) return false;
+			out = Normalize(value);
+			return true;
+		}
+
+		bool ConvertI64(const std::string& document, std::string& out)
+		{
+			std::string raw;
+			if (!RawScalar(document, raw)) return false;
+			std::int64_t value{};
+			if (!Authoring::Scalar::TryParseInt64(raw, value)) return false;
+			out = Normalize(value);
+			return true;
+		}
+
 		void Add(ScalarParityResult& result, const char* name, const char* type,
 			const std::string& document,
 			bool (*yamlCpp)(const std::string&, std::string&),
-			bool (*ryml)(const std::string&, std::string&))
+			bool (*ryml)(const std::string&, std::string&),
+			bool (*converter)(const std::string&, std::string&))
 		{
 			ScalarParityCase entry;
 			entry.name = name;
@@ -123,9 +199,13 @@ namespace Authoring
 			entry.document = document;
 			entry.yamlCppOk = yamlCpp(document, entry.yamlCppValue);
 			entry.rymlOk = ryml(document, entry.rymlValue);
+			entry.converterOk = converter(document, entry.converterValue);
 			entry.agrees = (entry.yamlCppOk == entry.rymlOk)
 				&& (!entry.yamlCppOk || entry.yamlCppValue == entry.rymlValue);
+			entry.converterAgrees = (entry.yamlCppOk == entry.converterOk)
+				&& (!entry.yamlCppOk || entry.yamlCppValue == entry.converterValue);
 			if (entry.agrees) ++result.agreeCount; else ++result.divergeCount;
+			if (!entry.converterAgrees) ++result.converterDivergeCount;
 			result.cases.push_back(std::move(entry));
 		}
 	}
@@ -136,23 +216,23 @@ namespace Authoring
 
 		const auto addString = [&result](const char* name, const std::string& doc)
 		{
-			Add(result, name, "string", doc, &ReadYamlCpp<std::string>, &ReadRyml<std::string>);
+			Add(result, name, "string", doc, &ReadYamlCpp<std::string>, &ReadRyml<std::string>, &ConvertString);
 		};
 		const auto addFloat = [&result](const char* name, const std::string& doc)
 		{
-			Add(result, name, "float", doc, &ReadYamlCpp<float>, &ReadRyml<float>);
+			Add(result, name, "float", doc, &ReadYamlCpp<float>, &ReadRyml<float>, &ConvertFloat);
 		};
 		const auto addBool = [&result](const char* name, const std::string& doc)
 		{
-			Add(result, name, "bool", doc, &ReadYamlCpp<bool>, &ReadRyml<bool>);
+			Add(result, name, "bool", doc, &ReadYamlCpp<bool>, &ReadRyml<bool>, &ConvertBool);
 		};
 		const auto addU64 = [&result](const char* name, const std::string& doc)
 		{
-			Add(result, name, "u64", doc, &ReadYamlCpp<std::uint64_t>, &ReadRyml<std::uint64_t>);
+			Add(result, name, "u64", doc, &ReadYamlCpp<std::uint64_t>, &ReadRyml<std::uint64_t>, &ConvertU64);
 		};
 		const auto addI64 = [&result](const char* name, const std::string& doc)
 		{
-			Add(result, name, "i64", doc, &ReadYamlCpp<std::int64_t>, &ReadRyml<std::int64_t>);
+			Add(result, name, "i64", doc, &ReadYamlCpp<std::int64_t>, &ReadRyml<std::int64_t>, &ConvertI64);
 		};
 
 		// ── string ───────────────────────────────────────────────────────────
@@ -205,6 +285,35 @@ namespace Authoring
 		addI64("i-min",       "v: -9223372036854775808\n");
 		addU64("u-hex",       "v: 0x10\n");
 		addU64("u-octal",     "v: 0o10\n");
+
+		// ── 진법·부호·부분 파싱·오버플로 ─────────────────────────────────────
+		//
+		// 변환기를 **이식**했다고 말하려면 정상 표기뿐 아니라 이 경계들이 같아야
+		// 한다. 특히 부분 파싱("12abc")을 성공으로 읽으면 저작 오타가 조용히
+		// 숫자가 된다.
+		addU64("u-hex-upper",   "v: 0X1F\n");
+		addU64("u-octal-lead0", "v: 010\n");
+		addU64("u-plus",        "v: +42\n");
+		addU64("u-negative",    "v: -1\n");
+		addU64("u-partial",     "v: 12abc\n");
+		addU64("u-empty-quote", "v: \"\"\n");
+		addU64("u-space",       "v: \" 42 \"\n");
+		addU64("u-overflow",    "v: 99999999999999999999999\n");
+		addI64("i-hex",         "v: 0x1F\n");
+		addI64("i-plus",        "v: +7\n");
+		addI64("i-partial",     "v: 7x\n");
+		addFloat("f-plus",      "v: +1.5\n");
+		addFloat("f-partial",   "v: 1.5x\n");
+		addFloat("f-inf-caps",  "v: .Inf\n");
+		addFloat("f-nan-caps",  "v: .NaN\n");
+		addFloat("f-huge",      "v: 1e400\n");
+		addFloat("f-hex",       "v: 0x10\n");
+		addBool("b-yEs-mixed",  "v: yEs\n");
+		addBool("b-y",          "v: y\n");
+		addBool("b-n",          "v: n\n");
+		addBool("b-empty",      "v: \"\"\n");
+		addString("str-tilde-quoted", "v: \"~\"\n");
+		addString("str-null-word",    "v: null\n");
 
 		// ── 부재 키 ──────────────────────────────────────────────────────────
 		// yaml-cpp는 `if (!sub) return;`로 조용히 넘긴다(레거시 파리티). ryml에서

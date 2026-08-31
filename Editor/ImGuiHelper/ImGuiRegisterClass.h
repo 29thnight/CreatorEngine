@@ -40,7 +40,7 @@ public:
 
 		if (isPopup)
 		{
-			m_contexts[name.data()].m_opened = true; //������ �����ִ� ���·� �����ؼ� �׽�Ʈ �����ϰ� ���߿� �ݴ� ������� ����
+			m_contexts[name.data()].m_opened = true; //지금은 열려있는 상태로 설정해서 테스트 진행하고 나중에 닫는 방식으로 변경
 			m_contexts[name.data()].m_flags |= ImGuiWindowFlags_NoCollapse;
 		}
 	}
@@ -55,7 +55,7 @@ public:
 		m_contexts[name.data()].m_isPopup = isPopup;
 		if (isPopup)
 		{
-			m_contexts[name.data()].m_opened = true; //������ �����ִ� ���·� �����ؼ� �׽�Ʈ �����ϰ� ���߿� �ݴ� ������� ����
+			m_contexts[name.data()].m_opened = true; //지금은 열려있는 상태로 설정해서 테스트 진행하고 나중에 닫는 방식으로 변경
 			m_contexts[name.data()].m_flags |= ImGuiWindowFlags_NoCollapse;
 		}
 	}

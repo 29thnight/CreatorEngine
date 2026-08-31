@@ -22,7 +22,7 @@ void InputActionManager::AddActionMap()
 
 	int uniqueIndex = 0;
 
-	// �̹� �����ϴ� �̸��� �ִ� ���� �ݺ�
+	// 이미 존재하는 이름이 있는 동안 반복
 	while (FindActionMap(finalName) != nullptr)
 	{
 		finalName = baseName + std::to_string(uniqueIndex);
@@ -203,7 +203,7 @@ ActionMap* InputActionManager::DeSerializeMap(std::string _filepath)
 		action->funName = actionJson["funName"];
 		action->m_scriptName = actionJson["scpritName"];
 		action->key.resize(4);
-		// key0, key1, key2... ������ Ű���� �Ľ�
+		// key0, key1, key2... 식으로 키값들 파싱
 		for (int i = 0; ; ++i)
 		{
 			std::string keyName = "key" + std::to_string(i);

@@ -140,17 +140,17 @@ namespace LegacyTransformPromotion
 	//   - 없다(구파일) → 여기서 붙여야 한다. 안 그러면
     //     Scene::UpdateModelRecursive의 Bone 분기가 HasComponent<BoneComponent>()로
     //     판정하는 순간 이 오브젝트를 건너뛰어 애니메이션이 멈춘다.
-    void PromoteLegacyBone(Entity* obj, const MetaYml::Node& node)
+    void PromoteLegacyBone(Entity* obj, const Authoring::ReadNode& node)
     {
 		// E7-c: 저장 타입은 더 이상 Entity 상태가 아니다. 옛 파일에 남은 키를
 		// 이 승격 순간에만 읽고, 신형 파일은 BoneComponent 블록 자체가 정본이다.
 		if (!obj || !node["m_gameObjectType"]
-			|| GameObjectType::Bone != static_cast<GameObjectType>(node["m_gameObjectType"].as<int>()))
+			|| GameObjectType::Bone != static_cast<GameObjectType>(node["m_gameObjectType"].As<int>()))
             return;
 
-        if (const MetaYml::Node componentsNode = node["m_components"])
+        if (const Authoring::ReadNode componentsNode = node["m_components"])
         {
-            for (const auto& componentNode : componentsNode)
+            for (const auto componentNode : componentsNode)
             {
                 try
                 {
@@ -173,7 +173,7 @@ namespace LegacyTransformPromotion
 
     // obj->GetComponent<Transform>() 접근을 가정한다 — 레인 1의 최종
     // API가 다르면 통합 담당이 이 한 줄만 맞추면 된다.
-    void PromoteLegacyTransform(Entity* obj, const MetaYml::Node& node)
+    void PromoteLegacyTransform(Entity* obj, const Authoring::ReadNode& node)
     {
         if (!obj)
             return;
@@ -183,7 +183,7 @@ namespace LegacyTransformPromotion
         // 뼈 마커는 그 판정과 독립으로 붙어야 한다(위 PromoteLegacyBone 주석).
         PromoteLegacyBone(obj, node);
 
-        const MetaYml::Node legacyTransformNode = node["m_transform"];
+        const Authoring::ReadNode legacyTransformNode = node["m_transform"];
         if (!legacyTransformNode)
             return; // 신파일 — 이미 m_components 블록에서 읽혔다.
 
@@ -210,6 +210,12 @@ namespace LegacyTransformPromotion
             Meta::Typed::ReadScalar(rotationNode, transform->rotation);
         if (const auto scaleNode = legacyTransformNode["scale"])
             Meta::Typed::ReadScalar(scaleNode, transform->scale);
+    }
+
+    // ★ 전환기 오버로드 — Prefab의 read-write 소환 경로용(D3-b-3에서 사라진다).
+    void PromoteLegacyTransform(Entity* obj, const MetaYml::Node& node)
+    {
+        PromoteLegacyTransform(obj, Authoring::ReadNode{ node });
     }
 }
 
@@ -695,7 +701,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         // 넘나들며 서로를 참조해도(예: DDOL이 일반 오브젝트를 부모로) 안전하다.
         LoadIndexBatch loadBatch;
 
-        for (const auto& objNode : SerializedEntities(sceneNode))
+        for (const auto objNode : SerializedEntities(sceneNode))
         {
             try
             {
@@ -715,7 +721,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 			}
         }
 
-        for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
+        for (const auto objNode : sceneNode["DontDestroyOnLoadObjects"])
         {
             try
             {
@@ -800,7 +806,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
         LoadIndexBatch sceneBatch;
         LoadIndexBatch ddolBatch;
 
-        for (const auto& objNode : SerializedEntities(sceneNode))
+        for (const auto objNode : SerializedEntities(sceneNode))
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
@@ -812,7 +818,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
             DesirealizeGameObject(scene, type, Authoring::NodeViewAccess::Make(objNode), &sceneBatch);
         }
 
-        for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
+        for (const auto objNode : sceneNode["DontDestroyOnLoadObjects"])
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
@@ -899,7 +905,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
             // 두 루프 모두 newScene을 타깃으로 하므로 배치를 공유한다.
             LoadIndexBatch loadBatch;
 
-            for (const auto& objNode : SerializedEntities(sceneNode))
+            for (const auto objNode : SerializedEntities(sceneNode))
             {
                 try
                 {
@@ -919,7 +925,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                 }
             }
 
-            for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
+            for (const auto objNode : sceneNode["DontDestroyOnLoadObjects"])
             {
                 try
                 {
@@ -1000,7 +1006,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
             LoadIndexBatch sceneBatch;
             LoadIndexBatch ddolBatch;
 
-            for (const auto& objNode : SerializedEntities(sceneNode))
+            for (const auto objNode : SerializedEntities(sceneNode))
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type) {
@@ -1010,7 +1016,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                 DesirealizeGameObject(newScene, type, Authoring::NodeViewAccess::Make(objNode), &sceneBatch);
             }
 
-            for (const auto& objNode : sceneNode["DontDestroyOnLoadObjects"])
+            for (const auto objNode : sceneNode["DontDestroyOnLoadObjects"])
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type)
@@ -1506,7 +1512,7 @@ void SceneManager::EndPlayTransaction()
 
 void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
-	const MetaYml::Node& itNode = Authoring::NodeViewAccess::Node(view);
+	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (type->typeID == type_guid(Entity))
     {
         // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이 배치가
@@ -1517,8 +1523,8 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring
 		Entity::SerializedHierarchy serializedHierarchy =
 			EntityAuthoring::ReadSerializedHierarchy(itNode);
 		auto obj = m_activeScene.load()->LoadEntity(
-            itNode["m_instanceID"].as<size_t>(),
-            itNode["m_name"].as<std::string>(),
+            itNode["m_instanceID"].As<size_t>(),
+            itNode["m_name"].AsString(),
 			EntityAuthoring::InferCreationType(itNode),
 			Entity::INVALID_INDEX
 		);
@@ -1573,7 +1579,8 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring
 
         if (itNode["m_components"])
         {
-            for (const auto& componentNode : itNode["m_components"])
+            const Authoring::ReadNode componentsNode = itNode["m_components"];
+            for (const auto componentNode : componentsNode)
             {
                 try
                 {
@@ -1591,7 +1598,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring
 
 void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
-	const MetaYml::Node& itNode = Authoring::NodeViewAccess::Node(view);
+	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (type->typeID == type_guid(Entity))
     {
         // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이유는
@@ -1600,8 +1607,8 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
 		Entity::SerializedHierarchy serializedHierarchy =
 			EntityAuthoring::ReadSerializedHierarchy(itNode);
 		auto obj = targetScene->LoadEntity(
-            itNode["m_instanceID"].as<size_t>(),
-            itNode["m_name"].as<std::string>(),
+            itNode["m_instanceID"].As<size_t>(),
+            itNode["m_name"].AsString(),
 			EntityAuthoring::InferCreationType(itNode),
 			Entity::INVALID_INDEX
 		);
@@ -1649,7 +1656,8 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
 
         if (itNode["m_components"])
         {
-            for (const auto& componentNode : itNode["m_components"])
+            const Authoring::ReadNode componentsNode = itNode["m_components"];
+            for (const auto componentNode : componentsNode)
             {
                 try
                 {
@@ -1667,22 +1675,22 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
 
 void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
-	const MetaYml::Node& itNode = Authoring::NodeViewAccess::Node(view);
+	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (type->typeID == type_guid(Entity))
     {
         auto it = std::find_if(m_dontDestroyOnLoadObjects.begin(), m_dontDestroyOnLoadObjects.end(),
-			[&](const auto& obj) { return obj->GetInstanceID() == itNode["m_instanceID"].as<size_t>(); });
+			[&](const auto& obj) { return obj->GetInstanceID() == itNode["m_instanceID"].As<size_t>(); });
         if(it != m_dontDestroyOnLoadObjects.end())
         {
-            Debug->LogWarning("Object with instance ID " + std::to_string(itNode["m_instanceID"].as<size_t>()) + " already exists in DontDestroyOnLoad.");
+            Debug->LogWarning("Object with instance ID " + std::to_string(itNode["m_instanceID"].As<size_t>()) + " already exists in DontDestroyOnLoad.");
             return; // Object already exists, skip deserialization
 		}
 
 		Entity::SerializedHierarchy serializedHierarchy =
 			EntityAuthoring::ReadSerializedHierarchy(itNode);
 		auto obj = targetScene->LoadEntity(
-            itNode["m_instanceID"].as<size_t>(),
-            itNode["m_name"].as<std::string>(),
+            itNode["m_instanceID"].As<size_t>(),
+            itNode["m_name"].AsString(),
 			EntityAuthoring::InferCreationType(itNode),
 			Entity::INVALID_INDEX
 		);
@@ -1727,7 +1735,8 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
         }
         if (itNode["m_components"])
         {
-            for (const auto& componentNode : itNode["m_components"])
+            const Authoring::ReadNode componentsNode = itNode["m_components"];
+            for (const auto componentNode : componentsNode)
             {
                 try
                 {

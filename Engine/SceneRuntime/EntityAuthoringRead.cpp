@@ -5,21 +5,21 @@
 
 namespace EntityAuthoring
 {
-GameObjectType InferCreationType(const MetaYml::Node& node)
+GameObjectType InferCreationType(const Authoring::ReadNode& node)
 {
 	// E7-c 읽기 호환: 옛 씬/프리팹은 필드를 갖는다. 이 값은 객체 상태로
 	// 저장하지 않고 생성 순간 공간 컴포넌트를 고르는 데 한 번만 쓴다.
-	if (const MetaYml::Node legacyType = node["m_gameObjectType"])
+	if (const Authoring::ReadNode legacyType = node["m_gameObjectType"])
 	{
-		return static_cast<GameObjectType>(legacyType.as<int>());
+		return static_cast<GameObjectType>(legacyType.As<int>());
 	}
 
 	bool hasTransform = false;
 	bool hasRectTransform = false;
-	if (const MetaYml::Node components = node["m_components"];
+	if (const Authoring::ReadNode components = node["m_components"];
 		components && components.IsSequence())
 	{
-		for (const auto& componentNode : components)
+		for (const auto componentNode : components)
 		{
 			const Meta::Type* componentType = nullptr;
 			try { componentType = Meta::ExtractTypeFromYAML(componentNode); }
@@ -39,12 +39,12 @@ GameObjectType InferCreationType(const MetaYml::Node& node)
 	return GameObjectType::Empty;
 }
 
-Entity::SerializedHierarchy ReadSerializedHierarchy(const YAML::Node& node)
+Entity::SerializedHierarchy ReadSerializedHierarchy(const Authoring::ReadNode& node)
 {
 	Entity::SerializedHierarchy result{};
-	YAML::Node parentNode;
-	YAML::Node rootNode;
-	YAML::Node childrenNode;
+	Authoring::ReadNode parentNode;
+	Authoring::ReadNode rootNode;
+	Authoring::ReadNode childrenNode;
 
 	// 키 이름은 구 자산/도구 호환을 위해 유지한다. H3에서 달라진 경계는 이 값이
 	// Entity 멤버로 역직렬화되지 않고 로드 배치 DTO로만 들어간다는 점이다.
@@ -52,13 +52,13 @@ Entity::SerializedHierarchy ReadSerializedHierarchy(const YAML::Node& node)
 	rootNode = node["m_rootIndex"];
 	childrenNode = node["m_childrenIndices"];
 
-	if (parentNode) result.parentIndex = parentNode.as<Entity::Index>(Entity::INVALID_INDEX);
-	if (rootNode) result.rootIndex = rootNode.as<Entity::Index>(Entity::kSceneRootIndex);
+	if (parentNode) result.parentIndex = parentNode.As<Entity::Index>(Entity::INVALID_INDEX);
+	if (rootNode) result.rootIndex = rootNode.As<Entity::Index>(Entity::kSceneRootIndex);
 	if (childrenNode && childrenNode.IsSequence())
 	{
-		result.childrenIndices.reserve(childrenNode.size());
-		for (const YAML::Node& child : childrenNode)
-			result.childrenIndices.push_back(child.as<Entity::Index>());
+		result.childrenIndices.reserve(childrenNode.Size());
+		for (const auto child : childrenNode)
+			result.childrenIndices.push_back(child.As<Entity::Index>());
 	}
 	return result;
 }

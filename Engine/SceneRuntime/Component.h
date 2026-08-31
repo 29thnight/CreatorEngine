@@ -131,7 +131,7 @@ public:
 
 	template<typename T>
 	T* GetComponentDynamicCast();
-	//Transform�� ��쿡�� GetComponent<Transform>()�� ���
+	//Transform의 경우에는 GetComponent<Transform>()로 사용
 	Component& GetComponent(HashedGuid typeof);
 
 protected:

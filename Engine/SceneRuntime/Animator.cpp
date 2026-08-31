@@ -35,12 +35,12 @@ void Animator::OnUninitializing()
 	}
 }
 
-// ?�랙 C3 ??AnimatorSystem ?�록/?��?. Awake/OnDestroy(컴포?�트??1??게이??가
-// ?�니?????�입/?�탈 ?�을 ?�는 ?�유??AnimatorSystem.h ?�단 주석 참조 ??DDOL
-// ?�브?�트가 ?�을 건널 ?�도 매번 ?�시 불려???�기 ?�문?�다. ?�제 ?�괴 경로
+// 트랙 C3 — AnimatorSystem 등록/해지. Awake/OnDestroy(컴포넌트당 1회 게이트)가
+// 아니라 씬 편입/이탈 훅을 쓰는 이유는 AnimatorSystem.h 상단 주석 참조 — DDOL
+// 오브젝트가 씬을 건널 때도 매번 다시 불려야 하기 때문이다. 실제 파괴 경로
 // (Scene::FlushPendingDestroy)??OnUninitializing(??OnDestroy 브리지) 직전??
-// OnRemovingFromScene??먼�? 부르�?�? ???�스?�에??빠�????�점????�� ??
-// ?�괴보다 먼�???
+// OnRemovingFromScene을 먼저 부르므로, 이 시스템에서 빠지는 시점이 항상 실
+// 파괴보다 먼저다.
 void Animator::OnAddedToScene()
 {
 	AnimatorSystems->Register(this);
@@ -122,7 +122,7 @@ void Animator::DeleteController(std::string controllerName)
 
 AnimationController* Animator::GetController(std::string name)
 {
-    for (auto& Controller : m_animationControllers)
+    for (const auto Controller : m_animationControllers)
     {
             if (Controller->name == name)
                     return Controller.get();
@@ -152,7 +152,7 @@ Entity* Animator::FindBoneRecursive(Entity* parent, const std::string& boneName)
 		if (child->m_name == boneName)
 			return child;
 
-		// �ڽ��� �ڽĵ鵵 Ž��
+		// 자식의 자식들도 탐색
 		if (Entity* result = FindBoneRecursive(child, boneName))
 			return result;
 	}
@@ -165,11 +165,11 @@ Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneN
 	if (Socket* socket = FindSocket(socketName); socket)
 		return socket;
 
-	// ���� �ڽ� ���� ��ü���� boneName�� ã�´� (����� Ž��)
+	// 먼저 자식 구조 전체에서 boneName을 찾는다 (재귀적 탐색)
 	std::string realBoneName = boneName.data();
 	Entity* socketBone = FindBoneRecursive(object, realBoneName);
 
-	// ������ (1)~(100)���� �̸� �ٿ��� ã�´�
+	// 없으면 (1)~(100)까지 이름 붙여서 찾는다
 	int index = 1;
 	while (!socketBone && index <= 10)
 	{
@@ -177,18 +177,18 @@ Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneN
 		socketBone = FindBoneRecursive(object, indexedName);
 		if (socketBone)
 		{
-			realBoneName = indexedName;  // ���� �� �̸� ������Ʈ
+			realBoneName = indexedName;  // 실제 본 이름 업데이트
 			break;
 		}
 		++index;
 	}
 
-	// ã������ ���� ���� �� ��ȯ
+	// 찾았으면 소켓 생성 후 반환
 	if (socketBone)
 	{
 		Socket* newSocket = new Socket();
 		newSocket->m_name = socketName;
-		newSocket->GameObjectIndex = 9999 + index; // ������ �ε���
+		newSocket->GameObjectIndex = 9999 + index; // 임의의 인덱스
 		newSocket->m_ObjectName = boneName;
 		socketvec.push_back(newSocket);
 		return newSocket;
@@ -198,7 +198,7 @@ Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneN
 
 Socket* Animator::FindSocket(std::string_view socketName)
 {
-	for (auto& socket : socketvec)
+	for (const auto socket : socketvec)
 	{
 		if (socket->m_name == socketName)
 			return socket;
@@ -224,11 +224,11 @@ void Animator::DeleteParameter(int index)
 	std::unique_lock lock(m_paramMutex);
 	if (index >= 0 && index < Parameters.size())
 	{
-		for (auto& controller : m_animationControllers)
+		for (const auto controller : m_animationControllers)
 		{
-			for (auto& state : controller->StateVec)
+			for (const auto state : controller->StateVec)
 			{
-				for (auto& transition : state->Transitions)
+				for (const auto transition : state->Transitions)
 				{
 					for (auto& condition : transition->conditions)
 					{
@@ -272,7 +272,7 @@ ConditionParameter* Animator::AddDefaultParameter(ValueType vType)
 		while (isDuplicate)
 		{
 			isDuplicate = false;
-			for (auto& parm : Parameters)
+			for (const auto parm : Parameters)
 			{
 				if (parm->name == valueName)
 				{
@@ -294,7 +294,7 @@ ConditionParameter* Animator::AddDefaultParameter(ValueType vType)
 ConditionParameter* Animator::FindParameter(std::string valueName)
 {
 	std::unique_lock lock(m_paramMutex);
-	for (auto& parameter : Parameters)
+	for (const auto parameter : Parameters)
 	{
 		if (parameter->name == valueName)
 		{
@@ -317,7 +317,7 @@ bool Animator::SerializeControllers(std::string _jsonName)
 
 	nlohmann::json json;
 	nlohmann::json controllerArray = nlohmann::json::array();
-	for (auto& Controller : m_animationControllers)
+	for (const auto Controller : m_animationControllers)
 	{
 		controllerArray.push_back(Controller->Serialize());
 	}
@@ -326,7 +326,7 @@ bool Animator::SerializeControllers(std::string _jsonName)
 
 	{
 		std::unique_lock lock(m_paramMutex);
-		for (auto& param : Parameters)
+		for (const auto param : Parameters)
 		{
 			paramArray.push_back(param->Serialize());
 		}
@@ -352,7 +352,7 @@ bool Animator::SerializeControllers(std::string _jsonName)
 
 void Animator::DeserializeControllers(std::string _filename)
 {
-	//������� json ����
+	//폴더열어서 json 선택
 	/*namespace fs = std::filesystem;
 	fs::path dirPath = PathFinder::AnimatorjsonPath();
 	if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
@@ -389,7 +389,7 @@ void Animator::DeserializeControllers(std::string _filename)
 	}
 
 	ClearControllersAndParams();
-	for (auto& parameterJson : json["Parameters"])
+	for (const auto parameterJson : json["Parameters"])
 	{
 		int param_vType = parameterJson["param_vType"];
 		ValueType paramvType = ValueType::Float;
@@ -413,7 +413,7 @@ void Animator::DeserializeControllers(std::string _filename)
 		param->name = parameterJson["param_name"];
 	}
 
-	for (auto& contorllerJson : json["Controllers"])
+	for (const auto contorllerJson : json["Controllers"])
 	{
 
 		std::shared_ptr<AnimationController> curController = CreateController_UINoAni();
@@ -429,7 +429,7 @@ void Animator::DeserializeControllers(std::string _filename)
 			usemask = true;*/
 		//curController->useMask = usemask;
 
-		for (auto& stateJson : contorllerJson["StateVec"])
+		for (const auto stateJson : contorllerJson["StateVec"])
 		{
 			std::shared_ptr<AnimationState> curState = curController->CreateState_UI();
 			curState->AnimationIndex = stateJson["animationIndex"];
@@ -449,9 +449,9 @@ void Animator::DeserializeControllers(std::string _filename)
 
 		}
 
-		for (auto& stateJson : contorllerJson["StateVec"])
+		for (const auto stateJson : contorllerJson["StateVec"])
 		{
-			for (auto& transionJson : stateJson["transitions"])
+			for (const auto transionJson : stateJson["transitions"])
 			{
 				std::string curstateName = transionJson["curStateName"];
 				std::string nextStateName = transionJson["nextStateName"];
@@ -463,7 +463,7 @@ void Animator::DeserializeControllers(std::string _filename)
 				curtrans->exitTime = transionJson["exitTime"];
 				curtrans->blendTime = transionJson["blendTime"];
 
-				for (auto& condionJson : transionJson["conditions"])
+				for (const auto condionJson : transionJson["conditions"])
 				{
 					auto firstParam = Parameters[0];
 					TransCondition* curcodition = curtrans->AddConditionDefault(firstParam->name, ConditionType::None, firstParam->vType);
@@ -509,7 +509,7 @@ void Animator::DeserializeControllers(std::string _filename)
 
 void Animator::OnDeserialized(const Authoring::NodeView& view)
 {
-	const YAML::Node& node = Authoring::NodeViewAccess::Node(view);
+	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
 	// CT6-d: 구 ComponentFactory Animator 분기 이동(동작·순서 보존).
 	// Parameters·m_animationControllers는 포인터 원소 벡터라 typed 역직렬화가
 	// 건드리지 않는다 — 여기의 수동 복원이 실채움이다.
@@ -519,17 +519,17 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	int aniIndex = 0;
 	if (node["m_Skeleton"])
 	{
-		auto& skel = node["m_Skeleton"];
+		const auto skel = node["m_Skeleton"];
 		if (skel["m_animations"])
 		{
-			auto& animations = skel["m_animations"];
-			for (auto& animation : animations)
+			const auto animations = skel["m_animations"];
+			for (const auto animation : animations)
 			{
-				bool _aniBool = animation["m_isLoop"].as<bool>();
+				bool _aniBool = animation["m_isLoop"].As<bool>();
 				animationBools.push_back(_aniBool);
-				auto& keyFrameEvents = animation["m_keyFrameEvent"];
+				const auto keyFrameEvents = animation["m_keyFrameEvent"];
 				std::vector<KeyFrameEvent> KeyFrameEventVec;
-				for (auto& keyFrameEvent : keyFrameEvents)
+				for (const auto keyFrameEvent : keyFrameEvents)
 				{
 					KeyFrameEvent newEvent;
 					Meta::Deserialize(&newEvent, keyFrameEvent);
@@ -546,7 +546,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 	if (node["m_Motion"])
 	{
-		FileGuid guid = node["m_Motion"].as<std::string>();
+		FileGuid guid = node["m_Motion"].AsString();
 		if (guid != nullFileGuid)
 		{
 			m_Motion = guid;
@@ -562,7 +562,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 				m_Skeleton->m_animations[i].m_isLoop = animationBools[i];
 
-				for (auto& event : animationKeyFrameMap[i])
+				for (const auto event : animationKeyFrameMap[i])
 					m_Skeleton->m_animations[i].AddEvent(event);
 			}
 		}
@@ -570,9 +570,9 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 	if (node["Parameters"])
 	{
-		auto& paramNode = node["Parameters"];
+		const auto paramNode = node["Parameters"];
 
-		for (auto& param : paramNode)
+		for (const auto param : paramNode)
 		{
 			ConditionParameter* aniParam = new ConditionParameter();
 			Meta::Deserialize(aniParam, param);
@@ -582,9 +582,9 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 	if (node["m_animationControllers"])
 	{
-		auto& animationControllerNode = node["m_animationControllers"];
+		const auto animationControllerNode = node["m_animationControllers"];
 
-		for (auto& layer : animationControllerNode)
+		for (const auto layer : animationControllerNode)
 		{
 			std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
 			Meta::Deserialize(animationController.get(), layer);
@@ -593,16 +593,16 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 			{
 				if (layer["m_avatarMask"])
 				{
-					auto& MaskNode = layer["m_avatarMask"];
+					const auto MaskNode = layer["m_avatarMask"];
 					AvatarMask avatarMask;
 					Meta::Deserialize(&avatarMask, MaskNode);
 					avatarMask.RootMask = avatarMask.MakeBoneMask(animationController->m_owner->m_Skeleton->m_rootBone);
 					if (MaskNode["m_BoneMasks"])
 					{
-						auto& boneMaskNode = MaskNode["m_BoneMasks"];
+						const auto boneMaskNode = MaskNode["m_BoneMasks"];
 						int i = 0;
 
-						for (auto& boneMask : boneMaskNode)
+						for (const auto boneMask : boneMaskNode)
 						{
 							BoneMask* newboneMask = new BoneMask();
 							Meta::Deserialize(newboneMask, boneMask);
@@ -615,8 +615,8 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 			}
 			if (layer["StateVec"])
 			{
-				auto& StatesNode = layer["StateVec"];
-				for (auto& state : StatesNode)
+				const auto StatesNode = layer["StateVec"];
+				for (const auto state : StatesNode)
 				{
 					std::shared_ptr<AnimationState> sharedState = std::make_shared<AnimationState>();
 					Meta::Deserialize(sharedState.get(), state);
@@ -627,9 +627,9 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 					sharedState->SetBehaviour(sharedState->behaviourName);
 					if (state["Transitions"])
 					{
-						auto& transitionNode = state["Transitions"];
+						const auto transitionNode = state["Transitions"];
 
-						for (auto& transition : transitionNode)
+						for (const auto transition : transitionNode)
 						{
 							std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
 							Meta::Deserialize(sharedTransition.get(), transition);
@@ -638,8 +638,8 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 							if (transition["conditions"])
 							{
-								auto& conditionNode = transition["conditions"];
-								for (auto& condition : conditionNode)
+								const auto conditionNode = transition["conditions"];
+								for (const auto condition : conditionNode)
 								{
 									TransCondition newcondition;
 									Meta::Deserialize(&newcondition, condition);
@@ -655,17 +655,17 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 			}
 			if (layer["m_curState"])
 			{
-				auto& curNode = layer["m_curState"];
+				const auto curNode = layer["m_curState"];
 				if (curNode.IsNull() == false)
 				{
-					std::string name = curNode["m_name"].as<std::string>();
+					std::string name = curNode["m_name"].AsString();
 					animationController->SetCurState(name);
 				}
 			}
 
-			for (auto& state : animationController->StateVec)
+			for (const auto state : animationController->StateVec)
 			{
-				for (auto& transition : state->Transitions)
+				for (const auto transition : state->Transitions)
 				{
 					transition->SetCurState(transition->curStateName);
 					transition->SetNextState(transition->nextStateName);

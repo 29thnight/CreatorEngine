@@ -110,7 +110,7 @@ void ComponentFactory::Initialize()
 
 void ComponentFactory::LoadComponent(Entity* obj, const Authoring::NodeView& view, bool isEditorToGame)
 {
-	const MetaYml::Node& itNode = Authoring::NodeViewAccess::Node(view);
+	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
 	// D0(SerializationPlan): 컴포넌트 적재 구간. 호출부(씬·프리팹·복제)가 여럿이므로
 	// 함수 본체에 둬야 전 경로가 한 자로 잡힌다.
 	SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::ComponentLoad);
@@ -192,7 +192,7 @@ void ComponentFactory::LoadComponent(Entity* obj, const Authoring::NodeView& vie
 		{
 			if (nullptr != ops->postLoad)
 			{
-				ops->postLoad(component, itNode);
+				ops->postLoad(component, Authoring::ReadNode{ itNode });
 			}
 		}
 

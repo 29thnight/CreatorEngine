@@ -45,6 +45,7 @@
 #include "AuthoringParserProbe.h" // D3-b-0
 #include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
 #include "AuthoringScalarParityProbe.h" // D3-b-2: 스칼라 변환 파리티
+#include "AuthoringAdapterParityProbe.h" // D3-b-2b-1b-3a: 어댑터 파리티
 #include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
 #include "CoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
@@ -63,6 +64,7 @@
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
 #include "ExperimentParity/ExperimentCacheOptSelfTest.h"
 #include "ExperimentParity/ExperimentTextureCookSelfTest.h"
+#include "ShaderMeta.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
@@ -1140,19 +1142,97 @@ namespace
 
         for (const Authoring::ScalarParityCase& entry : result.cases)
         {
+            if (!entry.converterAgrees)
+            {
+                // 이식 변환기의 차이는 **허용되지 않는다.** 먼저 찍는다.
+                std::printf("[serialize.scalarparity] CONV-DIVERGE %-16s type=%-6s yamlcpp=%s(%s) conv=%s(%s)\n",
+                    entry.name.c_str(), entry.type.c_str(),
+                    entry.yamlCppOk ? "ok" : "fail", entry.yamlCppValue.c_str(),
+                    entry.converterOk ? "ok" : "fail", entry.converterValue.c_str());
+            }
+        }
+        for (const Authoring::ScalarParityCase& entry : result.cases)
+        {
             if (entry.agrees) continue;
-            std::printf("[serialize.scalarparity] DIVERGE %-14s type=%-6s yamlcpp=%s(%s) ryml=%s(%s)\n",
+            std::printf("[serialize.scalarparity] DIVERGE %-16s type=%-6s yamlcpp=%s(%s) ryml=%s(%s)\n",
                 entry.name.c_str(), entry.type.c_str(),
                 entry.yamlCppOk ? "ok" : "fail", entry.yamlCppValue.c_str(),
                 entry.rymlOk ? "ok" : "fail", entry.rymlValue.c_str());
         }
 
-        std::printf("[serialize.scalarparity] cases=%zu agree=%u diverge=%u\n",
-            result.cases.size(), result.agreeCount, result.divergeCount);
+        std::printf("[serialize.scalarparity] cases=%zu agree=%u diverge=%u convDiverge=%u\n",
+            result.cases.size(), result.agreeCount, result.divergeCount,
+            result.converterDivergeCount);
 
         const char* fail = nullptr;
         if (result.cases.empty()) fail = "no-cases";
+        // 이식 변환기가 yaml-cpp와 다르면 D3-b-2b-1a가 실패한 것이다.
+        else if (result.converterDivergeCount > 0) fail = "converter-diverges";
         std::printf("[serialize.scalarparity] selfcheck=%s%s%s\n",
+            (nullptr == fail) ? "pass" : "fail",
+            (nullptr == fail) ? "" : " reason=",
+            (nullptr == fail) ? "" : fail);
+    }
+
+    // -- D3-b-2b-1b-3a(SerializationPlan): 어댑터 수준 파리티 --
+    //
+    // 파서 파리티(트리)와 스칼라 파리티(값)가 증명하지 못하는 축이다. 소비자가
+    // 실제로 부르는 것은 어댑터 연산이고, 두 backend의 비대칭(맵 키가 노드인가
+    // 속성인가, 널이 타입인가 값 표기인가)을 어댑터가 옳게 흡수했는지는
+    // 같은 문서를 양쪽에 넣어 봐야만 알 수 있다.
+    void HandleSerializeAdapterParity(const std::vector<std::string>& parts)
+    {
+        std::vector<std::string> targets;
+        if (parts.size() >= 2)
+        {
+            targets.push_back(parts[1]);
+        }
+        else
+        {
+            const file::path root = PathFinder::Relative();
+            std::error_code error;
+            file::recursive_directory_iterator it(
+                root, file::directory_options::skip_permission_denied, error);
+            const file::recursive_directory_iterator end;
+            while (!error && it != end)
+            {
+                const file::directory_entry& entry = *it;
+                if (entry.is_regular_file(error) && !error)
+                {
+                    const std::string ext = entry.path().extension().string();
+                    if (ext == ".creator" || ext == ".prefab" || ext == ".asset"
+                        || ext == ".meta" || ext == ".shadermeta" || ext == ".volume")
+                    {
+                        targets.push_back(entry.path().string());
+                    }
+                }
+                error.clear();
+                it.increment(error);
+            }
+        }
+
+        const Authoring::AdapterParityResult result = Authoring::ProbeAdapterParity(targets);
+
+        std::printf("[serialize.adapterparity] files=%u nodes=%llu mapEntries=%llu diverge=%u\n",
+            result.files,
+            static_cast<unsigned long long>(result.comparedNodes),
+            static_cast<unsigned long long>(result.comparedMapEntries),
+            result.divergences);
+        std::printf("[serialize.adapterparity] skippedBinary=%u parseFailures=%u\n",
+            result.skippedBinary, result.parseFailures);
+        if (!result.firstDivergence.empty())
+        {
+            std::printf("[serialize.adapterparity] first=%s\n", result.firstDivergence.c_str());
+        }
+
+        const char* fail = nullptr;
+        if (0 == result.files)               fail = "no-files";
+        else if (0 == result.comparedNodes)  fail = "compared-zero-nodes";
+        // 맵 순회를 한 번도 안 했다면 키 비대칭을 검사하지 않은 것이다.
+        else if (0 == result.comparedMapEntries) fail = "compared-zero-map-entries";
+        else if (result.parseFailures > 0)   fail = "parse-mismatch";
+        else if (result.divergences > 0)     fail = "adapter-diverges";
+        std::printf("[serialize.adapterparity] selfcheck=%s%s%s\n",
             (nullptr == fail) ? "pass" : "fail",
             (nullptr == fail) ? "" : " reason=",
             (nullptr == fail) ? "" : fail);
@@ -3209,11 +3289,279 @@ namespace ConsoleCmd
 	// 태그 저작은 편집이 아니라 **종료 시 Finalize**가 디스크에 반영한다. 그 저장이
 	// authoring handler 수명 창 안에서 일어나는지는 "추가하고 정상 종료 → 다시 켜서
 	// 확인"으로만 증명된다 — 한 프로세스 안에서는 메모리 상태만 보게 된다.
+	// SerializationPlan D3-b-L — ShaderMeta **읽기 경로**를 관측 가능하게 만든다.
+	//
+	// ★ 왜 새로 만들었나. 이 파서의 계약은 `dx12.selftest` 안에만 있다. 그런데 그것은
+	//   회귀 세트(run-all)에 **없고**, 자기 하네스(`Invoke-DX12Validation.ps1`)는
+	//   vcpkg baseline preflight에 막혀 지금 이 기계에서 돌지 않는다.
+	//
+	//   변이로 확인했다 — `ValidateMap`의 unknown-field 거부를 무력화하면
+	//   `dx12.selftest`는 빨개지지만 `verify-experiment-asset-cooker`는 **초록이다.**
+	//   즉 정기적으로 도는 게이트 중 이 경로를 지키는 것이 하나도 없다. ryml 이식
+	//   **전에** 자를 먼저 세운다. TagManager에서 같은 순서를 놓쳐 저작 자산을 잃었다.
+	//
+	// ★ 두 방향을 함께 낸다. 실자산이 파싱되는지(수용)와 잘못된 문서가 거부되는지
+	//   (거절). 저작 코퍼스는 전부 유효하므로 수용만 재면 **느슨해지는 이식**을
+	//   원리적으로 못 잡는다 — 그리고 그것이 backend 교체에서 가장 흔한 실패다.
+	//
+	// ★ 거절 사례에는 ryml 고유 위험을 넣었다. `operator[]`는 없는 키에서 **abort**
+	//   하므로(어댑터가 `find_child`로 흡수한다) "필수 키 누락"이 조용한 실패가 아니라
+	//   프로세스 사망이 될 수 있다. 그 경계를 여기서 상시로 밟는다.
+	static void Cmd_shadermeta_probe(const ConsoleCommandContext& ctx)
+	{
+		(void)ctx;
+
+		auto propertyTypeName = [](ShaderPropertyType type) -> const char*
+		{
+			switch (type)
+			{
+			case ShaderPropertyType::Float:     return "float";
+			case ShaderPropertyType::Float2:    return "float2";
+			case ShaderPropertyType::Float3:    return "float3";
+			case ShaderPropertyType::Float4:    return "float4";
+			case ShaderPropertyType::Int:       return "int";
+			case ShaderPropertyType::Bool:      return "bool";
+			case ShaderPropertyType::Float4x4:  return "float4x4";
+			case ShaderPropertyType::Texture2D: return "texture2d";
+			}
+			return "?";
+		};
+		// 기본값은 **어떤 대안이 채워졌는지**를 찍는다. 값까지 찍으면 부동소수 표기가
+		// 게이트를 부서지게 만들고, 여기서 재려는 것은 "타입별 해석이 갈리지 않는가"다.
+		auto defaultKind = [](const ShaderPropertyDefault& value) -> const char*
+		{
+			switch (value.index())
+			{
+			case 0: return "none";
+			case 1: return "float";
+			case 2: return "float2";
+			case 3: return "float3";
+			case 4: return "float4";
+			case 5: return "int";
+			case 6: return "bool";
+			case 7: return "float4x4";
+			case 8: return "guid";
+			}
+			return "?";
+		};
+		auto queueName = [](ShaderPassQueue queue) -> const char*
+		{
+			switch (queue)
+			{
+			case ShaderPassQueue::Opaque:      return "opaque";
+			case ShaderPassQueue::Transparent: return "transparent";
+			case ShaderPassQueue::Shadow:      return "shadow";
+			case ShaderPassQueue::Compute:     return "compute";
+			}
+			return "?";
+		};
+		auto fillName = [](RHIFillMode mode) -> const char*
+		{
+			return RHIFillMode::Wireframe == mode ? "wireframe" : "solid";
+		};
+		auto cullName = [](RHICullMode mode) -> const char*
+		{
+			if (RHICullMode::None == mode) return "none";
+			if (RHICullMode::Front == mode) return "front";
+			return "back";
+		};
+		auto blendName = [](ShaderBlendMode mode) -> const char*
+		{
+			if (ShaderBlendMode::Alpha == mode) return "alpha";
+			if (ShaderBlendMode::Additive == mode) return "additive";
+			return "off";
+		};
+		auto depthName = [](RHICompareOp op) -> const char*
+		{
+			if (RHICompareOp::None == op) return "off";
+			if (RHICompareOp::LessEqual == op) return "lessEqual";
+			return "less";
+		};
+		auto topologyName = [](RHITopologyType type) -> const char*
+		{
+			if (RHITopologyType::Line == type) return "line";
+			if (RHITopologyType::Point == type) return "point";
+			return "triangle";
+		};
+		auto entryOf = [](const std::optional<ShaderStageEntry>& stage) -> std::string
+		{
+			return stage.has_value() ? stage->entry : std::string("-");
+		};
+
+		const file::path assetRoot = PathFinder::Relative();
+		std::vector<file::path> metaPaths;
+		std::error_code walkError;
+		for (file::recursive_directory_iterator it(assetRoot, walkError), end;
+			it != end && !walkError; it.increment(walkError))
+		{
+			if (!it->is_regular_file()) continue;
+			if (it->path().extension() != ".shadermeta") continue;
+			metaPaths.push_back(it->path());
+		}
+		// 순서를 고정한다. 디렉터리 순회 순서는 파일 시스템이 정하므로 그대로 두면
+		// 게이트가 재실행마다 다른 순서를 본다.
+		std::sort(metaPaths.begin(), metaPaths.end());
+
+		std::uint32_t parsed = 0;
+		for (const file::path& metaPath : metaPaths)
+		{
+			std::string relative = file::relative(metaPath, assetRoot).generic_string();
+
+			// GUID는 파싱 의미론의 일부가 아니지만 nil이면 로더가 거부한다. 카탈로그가
+			// 아는 것을 쓰되, 모르는 파일(자가 검증 fixture 등)은 sentinel로 대신한다 —
+			// 그 구분을 함께 찍어 "sidecar가 없어서 통과했다"를 감출 수 없게 한다.
+			FileGuid guid = DataSystems->GetFileGuid(metaPath);
+			const bool fromCatalog = (guid != FileGuid{});
+			if (!fromCatalog) guid = FileGuid::CreateRandomV4();
+
+			std::ifstream input(metaPath, std::ios::binary);
+			std::ostringstream buffer;
+			buffer << input.rdbuf();
+			const std::string text = buffer.str();
+
+			ShaderMeta meta;
+			std::string error;
+			const bool ok = ShaderMetaLoader::Parse(text, metaPath, guid, meta, error);
+			std::printf("[shadermeta.probe] file=%s ok=%d guidFromCatalog=%d"
+				" name=%s source=%s props=%zu keywords=%zu passes=%zu err=%s\n",
+				relative.c_str(), ok ? 1 : 0, fromCatalog ? 1 : 0,
+				ok ? meta.name.c_str() : "-",
+				ok ? meta.source.generic_string().c_str() : "-",
+				meta.properties.size(), meta.keywords.size(), meta.passes.size(),
+				ok ? "-" : error.c_str());
+			if (!ok) continue;
+			++parsed;
+
+			for (const ShaderPropertyDesc& property : meta.properties)
+			{
+				std::printf("[shadermeta.probe] prop=%s|%s|%s|%s|%s\n",
+					relative.c_str(), property.name.c_str(),
+					property.label.c_str(), propertyTypeName(property.type),
+					defaultKind(property.defaultValue));
+			}
+			for (const ShaderKeywordAxis& axis : meta.keywords)
+			{
+				std::string values;
+				for (const std::string& value : axis.values)
+				{
+					if (!values.empty()) values += ",";
+					values += value;
+				}
+				std::printf("[shadermeta.probe] axis=%s|%s|%s\n",
+					relative.c_str(), axis.name.c_str(), values.c_str());
+			}
+			for (const ShaderPassDesc& pass : meta.passes)
+			{
+				std::printf("[shadermeta.probe] pass=%s|%s|vs=%s|ps=%s|cs=%s|queue=%s"
+					"|fill=%s|cull=%s|blend=%s|depthWrite=%d|depthTest=%s|topology=%s\n",
+					relative.c_str(), pass.name.c_str(),
+					entryOf(pass.vertex).c_str(), entryOf(pass.pixel).c_str(),
+					entryOf(pass.compute).c_str(), queueName(pass.queue),
+					fillName(pass.state.fillMode), cullName(pass.state.cullMode),
+					blendName(pass.state.blendMode), pass.state.depthWrite ? 1 : 0,
+					depthName(pass.state.depthTest), topologyName(pass.state.topologyType));
+			}
+		}
+
+		// ── 거절 계약 ────────────────────────────────────────────────────────────
+		//
+		// 실자산 코퍼스는 전부 유효하다. 여기가 없으면 "무엇이든 통과시키는 파서"가
+		// 만점을 받는다. 사유 문자열까지 대조하는 이유는, 다른 이유로 실패한 것을
+		// "거부했다"로 읽으면 계약이 아니라 우연을 재기 때문이다.
+		struct RejectCase
+		{
+			const char* name;
+			const char* text;
+			const char* reason;
+		};
+		// 기준 경로는 실재하는 fixture 옆이어야 한다 — `source` 해소가 파일 존재를
+		// 확인하므로, 존재하지 않는 디렉터리를 쓰면 전부 "source 없음"으로 거부되어
+		// 정작 재려던 사유가 가려진다.
+		const file::path rejectOrigin = assetRoot
+			/ "Shaders" / "DefaultPassShader" / "SelfTest" / "RejectProbe.shadermeta";
+		static const RejectCase kRejects[] = {
+			{ "duplicate-property",
+			  "schema: 1\nname: RejectDuplicate\nsource: ShaderMetaFixture.hlsl\n"
+			  "properties:\n  - { name: v, type: float, default: 0.0 }\n"
+			  "  - { name: v, type: float, default: 1.0 }\n"
+			  "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
+			  " queue: opaque }\n",
+			  "중복" },
+			{ "unknown-field",
+			  "schema: 1\nname: RejectUnknown\nsource: ShaderMetaFixture.hlsl\n"
+			  "passes:\n  - name: Main\n    vs: { entry: VSMain }\n"
+			  "    ps: { entry: PSMain }\n    state: { depthWriet: false }\n"
+			  "    queue: opaque\n",
+			  "알 수 없는 field" },
+			{ "escaping-source",
+			  "schema: 1\nname: RejectPath\nsource: ../ShaderMetaFixture.hlsl\n"
+			  "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
+			  " queue: opaque }\n",
+			  "상위 이동 없는 상대" },
+			// ★ YAML 1.1 bool 표. `1`은 bool이 아니다 — 스칼라 파리티(D3-b-2b-0)가
+			//   두 backend에서 갈리는 것으로 실측한 부류라 상시로 밟는다.
+			{ "numeric-bool",
+			  "schema: 1\nname: RejectBool\nsource: ShaderMetaFixture.hlsl\n"
+			  "passes:\n  - name: Main\n    vs: { entry: VSMain }\n"
+			  "    ps: { entry: PSMain }\n    state: { depthWrite: 1 }\n"
+			  "    queue: opaque\n",
+			  "true|false" },
+			// ★ 없는 키. ryml `operator[]`는 여기서 **abort** 한다 — 어댑터가
+			//   `find_child`로 흡수하는 것이 맞는지 실제로 밟아 확인한다.
+			{ "missing-source",
+			  "schema: 1\nname: RejectMissing\n"
+			  "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
+			  " queue: opaque }\n",
+			  "필수 scalar 'source'" },
+			// ★ 루트가 map이 아닌 경우. 시퀀스 루트에 map 연산을 걸면 backend마다
+			//   반응이 다르다.
+			{ "sequence-root",
+			  "- schema: 1\n- name: RejectRoot\n",
+			  "map이어야 한다" },
+		};
+
+		std::uint32_t rejected = 0;
+		for (const RejectCase& item : kRejects)
+		{
+			ShaderMeta ignored;
+			std::string error;
+			const bool accepted = ShaderMetaLoader::Parse(
+				item.text, rejectOrigin, FileGuid::CreateRandomV4(), ignored, error);
+			const bool reasonMatched = !accepted
+				&& std::string::npos != error.find(item.reason);
+			if (reasonMatched) ++rejected;
+			std::printf("[shadermeta.probe] reject=%s accepted=%d reasonMatched=%d err=%s\n",
+				item.name, accepted ? 1 : 0, reasonMatched ? 1 : 0,
+				accepted ? "-" : error.c_str());
+		}
+
+		std::printf("[shadermeta.probe] files=%zu parsed=%u rejectCases=%zu rejected=%u\n",
+			metaPaths.size(), parsed,
+			sizeof(kRejects) / sizeof(kRejects[0]), rejected);
+	}
+
 	static void Cmd_tag_authoring_probe(const ConsoleCommandContext& ctx)
 	{
+		// D3-b-L: `list`는 **디스크에서 읽은 결과**를 찍는다. 나머지 동작은
+		// 메모리 조작이라 Load 경로를 전혀 재지 않았다 — 그래서 TagManager를
+		// ryml로 옮겼을 때 어떤 게이트도 그 변이를 잡지 못했다(실측).
+		if (ctx.parts.size() >= 2 && ctx.parts[1] == "list")
+		{
+			TagManagers->Load();
+			const auto& tags = TagManagers->GetTags();
+			const auto& layers = TagManagers->GetLayers();
+			std::printf("[tag.authoring.probe] loaded tags=%zu layers=%zu\n",
+				tags.size(), layers.size());
+			for (const std::string& tag : tags)
+				std::printf("[tag.authoring.probe] tag=%s\n", tag.c_str());
+			for (const std::string& layer : layers)
+				std::printf("[tag.authoring.probe] layer=%s\n", layer.c_str());
+			return;
+		}
+
 		if (ctx.parts.size() < 3)
 		{
-			std::printf("[tag.authoring.probe] usage: <add|has|remove> <name>\n");
+			std::printf("[tag.authoring.probe] usage: list | <add|has|remove> <name>\n");
 			return;
 		}
 
@@ -4015,6 +4363,26 @@ namespace ConsoleCmd
         }
         const FileGuid identity = existing->GetFileGuid();
 
+        // ★ 널 identity로는 진행하지 않는다 (2026-08-30).
+        //
+        // 그대로 두면 SavePrefab이 널을 보고 CreateRandomV4()로 **새 GUID를
+        // 발급**하고, 아래 UpdateInstances가 그 새 키로 m_instanceMap을 조회해
+        // 아무 인스턴스도 못 찾은 채 조용히 0건 적용한다 — 에러도 로그도 없이
+        // 인스턴스만 옛 값으로 남고, 게다가 sidecar가 새 GUID로 덮여 살아 있는
+        // 인스턴스 전부가 프리팹에서 영구히 떨어져 나간다. 되돌릴 수 없는 손상을
+        // 조용히 저지르느니 여기서 멈추는 편이 낫다.
+        //
+        // 여기 도달하는 유일한 길은 catalog가 그 순간 항목을 잃는 것이었고, 그
+        // 근본(워처의 게시 Delete 오독)과 LoadPrefab의 무조건 덮어쓰기를 함께
+        // 고쳤다. 이 가드는 세 번째 방어선이다 — 어느 경로로 널이 오든 막는다.
+        if (identity == nullFileGuid)
+        {
+            Debug->LogError("[CLI] 프리팹 identity를 확인할 수 없어 갱신을 중단한다: " + prefabName);
+            std::printf("[CLI] 프리팹 identity 없음(catalog 항목 부재) — 갱신 중단: %s\n",
+                prefabName.c_str());
+            return;
+        }
+
 		Prefab* prefab = PrefabUtilitys->CreatePrefab(source, prefabName);
         if (!prefab)
         {
@@ -4040,12 +4408,19 @@ namespace ConsoleCmd
             return;
         }
 
-        const size_t before = PrefabUtilitys->RegisteredInstanceCount();
-        PrefabUtilitys->UpdateInstances(prefab);
+        // ★ 등록 수와 **실제 적용 수**를 따로 찍는다 (2026-08-30).
+        //
+        // 예전에는 등록 수 하나만 찍었다 — 그런데 UpdateInstances는
+        // m_instanceMap[prefab->GetFileGuid()]로 대상을 찾으므로, identity가
+        // 어긋나면 등록부에 인스턴스가 멀쩡히 있어도 0건이 적용된다. 그때도
+        // 로그는 "등록 인스턴스 2개에 적용"이라고 말해, 게이트가 읽을 수 있는
+        // 유일한 창이 결함을 **정확히 가렸다**. 둘이 벌어지면 그게 신호다.
+        const size_t registered = PrefabUtilitys->RegisteredInstanceCount();
+        const size_t applied = PrefabUtilitys->UpdateInstances(prefab);
 
         Debug->LogWarning("[CLI] 프리팹 갱신 적용: " + prefabName + " <- " + objectName);
-        std::printf("[prefab.update] %s <- %s · 등록 인스턴스 %zu개에 적용\n",
-            prefabName.c_str(), objectName.c_str(), before);
+        std::printf("[prefab.update] %s <- %s · 등록 인스턴스 %zu개 중 %zu개에 적용\n",
+            prefabName.c_str(), objectName.c_str(), registered, applied);
     }
 
     static void Cmd_prefab_status(const ConsoleCommandContext& ctx)
@@ -7560,6 +7935,7 @@ namespace ConsoleCmd
 			reg({ "material.corpus.probe" }, &Cmd_material_corpus_probe);
 			reg({ "collisionmatrix.authoring.probe" },
 				&Cmd_collisionmatrix_authoring_probe);
+			reg({ "shadermeta.probe" }, &Cmd_shadermeta_probe);
 			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
 			reg({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
 			reg({ "animator.authoring.probe" }, &Cmd_animator_authoring_probe);
@@ -7718,6 +8094,7 @@ namespace ConsoleCmd
             reg({ "serialize.parsercompare" }, [](const ConsoleCommandContext& c) { HandleSerializeParserCompare(c.parts); });
             reg({ "serialize.rymlerror" }, [](const ConsoleCommandContext& c) { HandleSerializeRymlError(c.parts); });
             reg({ "serialize.scalarparity" }, [](const ConsoleCommandContext& c) { HandleSerializeScalarParity(c.parts); });
+            reg({ "serialize.adapterparity" }, [](const ConsoleCommandContext& c) { HandleSerializeAdapterParity(c.parts); });
             reg({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { HandleSceneProxyBench(c.parts); });
 
             return t;

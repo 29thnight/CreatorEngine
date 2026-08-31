@@ -560,11 +560,13 @@ void PrefabUtility::UnregisterInstance(Entity* instance)
     }
 }
 
-void PrefabUtility::UpdateInstances(const Prefab* prefab)
+size_t PrefabUtility::UpdateInstances(const Prefab* prefab)
 {
     auto it = m_instanceMap.find(prefab->GetFileGuid());
     if (it == m_instanceMap.end())
-        return;
+        return 0;
+
+    size_t applied = 0;
 
     // 세대 검사로 죽은 인스턴스를 자동 걸러낸다(P0의 수동 erase 방어를 대체 —
     // SceneGraphRedesignPlan P2). 훑는 김에 목록에서도 지운다.
@@ -614,7 +616,10 @@ void PrefabUtility::UpdateInstances(const Prefab* prefab)
         obj->m_prefabOriginal = Authoring::DocumentAccess::Adopt(MetaYml::Clone(newData));
 
         prefabInstanceUpdated.Broadcast(*obj);
+        ++applied;
     }
+
+    return applied;
 }
 
 bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
@@ -710,7 +715,7 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
         it != m_prefabCache.end() && it->second.get() != prefab)
     {
         // D3-a-5b: 뷰는 소유하지 않으므로 대상 노드에 이름을 준다.
-        const MetaYml::Node cachedPrefabNode = node["PrefabNode"];
+        const Authoring::ReadNode cachedPrefabNode{ node["PrefabNode"] };
         it->second->SetPrefabData(Authoring::NodeViewAccess::Make(cachedPrefabNode));
         it->second->SetFileGuid(identity);
     }
@@ -768,10 +773,26 @@ Prefab* PrefabUtility::LoadPrefab(const std::string& path)
 		return nullptr;
 
     auto prefab = LoadPrefabFullPath(filepath.string());
-    if (prefab)
+    if (!prefab)
+        return nullptr;
+
+    // ★ catalog가 널을 돌려줘도 **살아 있는 identity를 덮지 않는다** (2026-08-30).
+    //
+    // 예전에는 무조건 대입했다. 그런데 catalog 항목은 CLI/게임 스레드가 아니라
+    // efsw 워처 스레드가 바꾼다 — 원자적 게시(.tmp -> replace)를 Delete로 받은
+    // EditorAssetDatabase::HandleDeleted가 본문이 멀쩡한데도 항목을 떨어뜨렸다.
+    // 그 ~26ms 창에 여기가 걸리면 identity가 널이 되고, SavePrefab이 널을 보고
+    // CreateRandomV4()로 새 GUID를 발급하고, UpdateInstances가 그 새 키로
+    // m_instanceMap을 조회해 아무 인스턴스도 못 찾은 채 조용히 0건 적용한다.
+    //
+    // 워처 쪽도 함께 고쳤지만(그쪽이 근본), 여기도 막는다 — catalog는 여러
+    // 경로가 쓰는 공유 상태라 "그 순간 비었다"가 "정체성이 없다"를 뜻하지
+    // 않는다. LoadPrefabFullPath는 캐시 미스에서 이미 널 identity를 거부하므로,
+    // 여기 도달한 프리팹은 항상 한 번은 유효한 identity를 받았다.
+    if (const FileGuid catalogGuid = DataSystems->GetFileGuid(filepath.string());
+        catalogGuid != FileGuid{})
     {
-        prefab->SetFileGuid(DataSystems->GetFileGuid(filepath.string()));
-        return prefab;
+        prefab->SetFileGuid(catalogGuid);
     }
     return prefab;
 }

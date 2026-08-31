@@ -609,9 +609,9 @@ bool Material::ReadBytes(const VarView& v, void* dst, size_t size) const
     return true;
 }
 
-// ��������������������������������������������������������������
-// Ÿ�� ���� Setter / Getter
-// ��������������������������������������������������������������
+// ───────────────────────────────
+// 타입 안전 Setter / Getter
+// ───────────────────────────────
 bool Material::TrySetFloat(std::string_view cb, std::string_view var, float v)
 {
     const VarView view = FindVar(cb, var);
@@ -640,7 +640,7 @@ bool Material::TryGetInt(std::string_view cb, std::string_view var, int32_t& out
 
 bool Material::TrySetBool(std::string_view cb, std::string_view var, bool v)
 {
-    // HLSL cbuffer bool�� 4����Ʈ ������ �����Ƿ� int�� ����
+    // HLSL cbuffer bool은 4바이트 정렬을 따르므로 int로 저장
     int32_t iv = v ? 1 : 0;
     const VarView view = FindVar(cb, var);
     return view.binding && ShaderPropertyType::Bool == view.binding->propertyType
@@ -676,7 +676,7 @@ bool Material::TrySetVector(std::string_view cb, std::string_view var, const mat
 }
 bool Material::TryGetVector(std::string_view cb, std::string_view var, math::vector4& out) const
 {
-    // �ִ� 16����Ʈ�� float4�� �о ������ (var size�� 8/12�� �պκи� ��ȿ)
+    // 최대 16바이트의 float4를 읽어서 돌려줌 (var size가 8/12면 앞부분만 유효)
     auto v = FindVar(cb, var);
     if (!v.binding || (ShaderPropertyType::Float2 != v.binding->propertyType
         && ShaderPropertyType::Float3 != v.binding->propertyType
@@ -704,7 +704,7 @@ bool Material::TrySetValue(std::string_view cb, std::string_view var, const void
 	return WriteBytes(FindVar(cb, var), src, size);
 }
 
-// ���� Qualified name sugar ("CB.Var") ����
+// ── Qualified name sugar ("CB.Var") ──
 bool Material::TrySetFloat(std::string_view q, float v) {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TrySetFloat(cb, var, v);

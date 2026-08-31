@@ -141,8 +141,8 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 				)
 			);
 
-			metadata = compressedImage.GetMetadata(); // ��Ÿ������ ����
-			image = std::move(compressedImage); // ����� �̹����� ��ü
+			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
+			image = std::move(compressedImage); // 압축된 이미지로 교체
 		}
 	}
 
@@ -253,8 +253,8 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 				)
 			);
 
-			metadata = compressedImage.GetMetadata(); // ��Ÿ������ ����
-			image = std::move(compressedImage); // ����� �̹����� ��ü
+			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
+			image = std::move(compressedImage); // 압축된 이미지로 교체
 		}
 	}
 
@@ -362,8 +362,8 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 				)
 			);
 
-			metadata = compressedImage.GetMetadata(); // ��Ÿ������ ����
-			image = std::move(compressedImage); // ����� �̹����� ��ü
+			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
+			image = std::move(compressedImage); // 압축된 이미지로 교체
 		}
 	}
 

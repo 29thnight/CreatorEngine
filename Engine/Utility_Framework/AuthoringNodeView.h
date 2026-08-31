@@ -1,4 +1,6 @@
 #pragma once
+#include <cstddef>
+#include <cstdint>
 
 // SerializationPlan D3-a-4 — 저작 노드의 **읽기 전용 뷰**.
 //
@@ -25,13 +27,29 @@ namespace Authoring
 
 		// 훅이 "노드가 왔는가"를 물을 수 있게 한다. 유효하지 않은 뷰는 backend의
 		// "정의되지 않음"이 아니라 **뷰 자체가 비었음**을 뜻한다.
-		[[nodiscard]] bool IsValid() const noexcept { return nullptr != m_node; }
+		[[nodiscard]] bool IsValid() const noexcept { return 0 != m_kind; }
 
 	private:
 		friend struct NodeViewAccess;
-		explicit NodeView(const void* node) noexcept : m_node(node) {}
 
-		const void* m_node{ nullptr };
+		// ★ D3-b-2b-1b-3b: **불투명 두 워드 + 태그.**
+		//
+		//   두 backend의 노드 표현이 다르다 — yaml-cpp는 노드 하나를 가리키는
+		//   포인터로 족하지만, ryml은 `{트리, id}` 쌍이라야 한다. 뷰가 한쪽만
+		//   담을 수 있으면 그쪽 backend에 묶이고, 그것이 씬 전환을 막았다.
+		//
+		// ★ 그래도 **이 헤더는 포맷을 모른다.** 필드는 `const void*`와 정수뿐이고,
+		//   의미 부여는 `AuthoringNodeViewAccess.h`(직렬화 계층)만 한다 —
+		//   §5 완료 기준 9("Runtime interface에 Node 타입 0")를 지키는 방식이다.
+		//
+		// ★ 태그가 0이면 무효다. 두 표현을 섞어 놓고 구분하지 않으면 타입 편칭으로
+		//   조용히 망가진다 — 그래서 표현마다 태그를 다르게 준다.
+		NodeView(const void* first, std::size_t second, std::uint8_t kind) noexcept
+			: m_first(first), m_second(second), m_kind(kind) {}
+
+		const void* m_first{ nullptr };
+		std::size_t m_second{ 0 };
+		std::uint8_t m_kind{ 0 };
 	};
 
 	// ── 쓰기 훅용 뷰 ─────────────────────────────────────────────────────────

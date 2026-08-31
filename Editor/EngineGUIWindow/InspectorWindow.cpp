@@ -151,10 +151,10 @@ InspectorWindow::InspectorWindow()
 
 		bool metaNodeJustSelected = (isSelectedNode && !wasMetaSelectedLastFrame);
 
-		// 3. �켱���� ����
+		// 3. 우선순위 결정
 		if (sceneObjectJustSelected)
 		{
-			// ���� ������Ʈ ���� �� YAML ���� ����
+			// 게임 오브젝트 선택 시 YAML 선택 해제
 			selectedNode = std::nullopt;
 			isSelectedNode = false;
 			wasMetaSelectedLastFrame = false;
@@ -162,7 +162,7 @@ InspectorWindow::InspectorWindow()
 
 		if (metaNodeJustSelected)
 		{
-			// ��Ÿ ���� ���� �� ���� ������Ʈ ����
+			// 메타 파일 선택 시 게임 오브젝트 해제
 			selectedSceneObject = nullptr;
 			prevSelectedSceneObject = nullptr;
 			wasMetaSelectedLastFrame = true;
@@ -330,7 +330,7 @@ InspectorWindow::InspectorWindow()
 						SpriteRenderer* sprite = dynamic_cast<SpriteRenderer*>(component.get());
 						if (nullptr != sprite)
 						{
-							//�̰� �� ������?
+							//이건 뭔 버그죠?
 							ImGuiDrawHelperSpriteRenderer(sprite);
 						}
 					}
@@ -345,7 +345,7 @@ InspectorWindow::InspectorWindow()
 					else if (componentTypeID == type_guid(SoundComponent))
 					{
 						SoundComponent* snd = dynamic_cast<SoundComponent*>(component.get());
-						if (snd) ImGuiDrawHelperSoundComponent(snd);   // Ŀ���� �ν����� ȣ��
+						if (snd) ImGuiDrawHelperSoundComponent(snd);   // 커스텀 인스펙터 호출
 					}
 					else if (type)
 					{
@@ -366,23 +366,23 @@ InspectorWindow::InspectorWindow()
 			}
 			
 			ImGui::Separator();
-			ImVec2 windowSize = ImGui::GetWindowSize();      // ���� �������� ��ü ũ��
-			ImVec2 buttonSize = ImVec2(180, 0);              // ��ư ���� ũ�� (���δ� �ڵ� ����)
+			ImVec2 windowSize = ImGui::GetWindowSize();      // 현재 윈도우의 전체 크기
+			ImVec2 buttonSize = ImVec2(180, 0);              // 버튼 가로 크기 (세로는 자동 계산됨)
 
 			static ImGuiTextFilter searchFilter;
 
-			ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // ���� �߾� ����
+			ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // 수평 중앙 정렬
 
 			if (ImGui::Button("Add Component", buttonSize))
 			{
 				ImGui::OpenPopup("AddComponent");
 			}
 
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // ���ϴ� ������ ����
+			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
 			if (ImGui::BeginPopup("AddComponent"))
 			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // ����� �ؽ�Ʈ
-				ImGui::Separator(); // ���м�
+				ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // 노란색 텍스트
+				ImGui::Separator(); // 구분선
 
 				float availableWidth = ImGui::GetContentRegionAvail().x;
 				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
@@ -440,7 +440,7 @@ InspectorWindow::InspectorWindow()
 				ImGui::EndPopup();
 			}
 
-			// ���� �����ӿ��� ����
+			// 다음 프레임에서 열기
 
 
 
@@ -743,22 +743,22 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	selectedLayerIndex = TagManagers->GetLayerIndex(selectedLayer.ToString());
 	if (selectedTagIndex < 0 || selectedTagIndex >= tagCount)
 	{
-		selectedTagIndex = 0; // �⺻������ ù ��° �±� ����
+		selectedTagIndex = 0; // 기본값으로 첫 번째 태그 선택
 	}
-	// Tag �޺��ڽ�
+	// Tag 콤보박스
 	ImGui::Text("Tag");
 	ImGui::SameLine();
-	ImGui::SetNextItemWidth(90.0f); // �ȼ� ������ �ʺ� ����
+	ImGui::SetNextItemWidth(90.0f); // 픽셀 단위로 너비 설정
 	if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
 	{
 		for (int i = 0; i <= tagCount; ++i)
 		{
 			bool isSelected = false;
-			if (i == tagCount) // "Add Tag" �׸�
+			if (i == tagCount) // "Add Tag" 항목
 			{
 				if (ImGui::Selectable("Add Tag"))
 				{
-					m_openNewTagPopup = true; // �˾� ���� �÷��� ����
+					m_openNewTagPopup = true; // 팝업 열기 플래그 설정
 				}
 			}
 			else
@@ -769,7 +769,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 					TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
 					selectedTag = tagNames[i];
 					TagManagers->AddTagToObject(selectedTag.ToString(), gameObject);
-					selectedTagIndex = i; // ���õ� �ε��� ������Ʈ
+					selectedTagIndex = i; // 선택된 인덱스 업데이트
 				}
 			}
 
@@ -781,17 +781,17 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	ImGui::SameLine();
 	ImGui::Text("Layer");
 	ImGui::SameLine();
-	ImGui::SetNextItemWidth(90.0f); // �ȼ� ������ �ʺ� ����
+	ImGui::SetNextItemWidth(90.0f); // 픽셀 단위로 너비 설정
 	if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
 	{
 		for (int i = 0; i <= layerCount; ++i)
 		{
 			bool isSelected = false;
-			if (i == layerCount) // "Add Layer" �׸�
+			if (i == layerCount) // "Add Layer" 항목
 			{
 				if (ImGui::Selectable("Add Layer"))
 				{
-					m_openNewLayerPopup = true; // �˾� ���� �÷��� ����
+					m_openNewLayerPopup = true; // 팝업 열기 플래그 설정
 				}
 			}
 			else
@@ -801,9 +801,9 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 				{
 					TagManagers->RemoveObjectFromLayer(selectedLayer.ToString(), gameObject);
 					selectedLayer = layerNames[i];
-					gameObject->SetCollisionType(); // �浹 Ÿ�� ������Ʈ
+					gameObject->SetCollisionType(); // 충돌 타입 업데이트
 					TagManagers->AddObjectToLayer(selectedLayer.ToString(), gameObject);
-					selectedLayerIndex = i; // ���õ� �ε��� ������Ʈ
+					selectedLayerIndex = i; // 선택된 인덱스 업데이트
 				}
 			}
 
@@ -819,16 +819,16 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	if (m_openNewTagPopup)
 	{
 		ImGui::OpenPopup("New Tag");
-		m_openNewTagPopup = false; // �˾� ���� �÷��� �ʱ�ȭ
+		m_openNewTagPopup = false; // 팝업 열기 플래그 초기화
 	}
 
 	if (m_openNewLayerPopup)
 	{
 		ImGui::OpenPopup("New Layer");
-		m_openNewLayerPopup = false; // �˾� ���� �÷��� �ʱ�ȭ
+		m_openNewLayerPopup = false; // 팝업 열기 플래그 초기화
 	}
 
-	// New Tag �˾�
+	// New Tag 팝업
 	if (ImGui::BeginPopup("New Tag"))
 	{
 		static char newTagName[64] = "";
@@ -839,8 +839,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 			{
 				TagManagers->AddTag(newTagName);
 				selectedTag = newTagName;
-				selectedTagIndex = tagCount; // ���� �߰��� �±� �ε���
-				tagCount = TagManagers->GetTags().size(); // �±� ���� ������Ʈ
+				selectedTagIndex = tagCount; // 새로 추가된 태그 인덱스
+				tagCount = TagManagers->GetTags().size(); // 태그 개수 업데이트
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -852,7 +852,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 		ImGui::EndPopup();
 	}
 
-	// New Layer �˾�
+	// New Layer 팝업
 	if (ImGui::BeginPopup("New Layer"))
 	{
 		static char newLayerName[64] = "";
@@ -863,8 +863,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 			{
 				TagManagers->AddLayer(newLayerName);
 				selectedLayer = newLayerName;
-				selectedLayerIndex = layerCount; // ���� �߰��� ���̾� �ε���
-				layerCount = TagManagers->GetLayers().size(); // ���̾� ���� ������Ʈ
+				selectedLayerIndex = layerCount; // 새로 추가된 레이어 인덱스
+				layerCount = TagManagers->GetLayers().size(); // 레이어 개수 업데이트
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -879,7 +879,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 
 void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 {
-	// ���� Ʈ������ ��
+	// 현재 트랜스폼 값
 	math::vector4& position = gameObject->Transform_().position;
 	math::vector4& rotation = gameObject->Transform_().rotation;
 	math::vector4& scale = gameObject->Transform_().scale;
@@ -1131,13 +1131,13 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 		}
 	}
 
-	// Behavior Tree �̸� ǥ��
+	// Behavior Tree 이름 표시
 	if (!BTComponent->name.empty())
 	{
 		ImGui::Text("Behavior Tree: %s", BTComponent->name.c_str());
 	}
 
-	//BlackBoard �̸� ǥ��
+	//BlackBoard 이름 표시
 	if (!BTComponent->blackBoardName.empty())
 	{
 		ImGui::Text("BlackBoard: %s", BTComponent->blackBoardName.c_str());
@@ -1161,7 +1161,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			FileGuid guid = DataSystems->GetFileGuid(filepath);
 			if (guid != nullFileGuid)
 			{
-				// �̹� ���������� �����ϴ� ���
+				// 이미 프로파일이 존재하는 경우
 				if (volumeComponent->m_volumeProfileGuid != nullFileGuid)
 				{
 					Debug->LogWarning("Volume profile already exists. Replacing with new profile.");
@@ -1448,7 +1448,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 		ImGui::Text("Image");
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(150.0f); // �ȼ� ������ �ʺ� ����
+		ImGui::SetNextItemWidth(150.0f); // 픽셀 단위로 너비 설정
 		if (ImGui::BeginCombo("##TextureCombo", items[currentTextureIndex]))
 		{
 			for (int i = 0; i < count; ++i)
@@ -1630,9 +1630,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 {
 	using namespace ImGui;
 
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	//  Clip / Picker
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	TextUnformatted("Clip");
 	ImGui::SameLine();
 	SetNextItemWidth(240);
@@ -1646,9 +1646,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		m_openClipPicker = true;
 	}
 
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	//  Bus / Basic Params
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	SeparatorText("Bus / Params");
 
 	const char* busNames[] = { "BGM","SFX","PLAYER","MONSTER","UI" };
@@ -1669,7 +1669,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 	Checkbox("Loop", &sc->loop); ImGui::SameLine();
 	Checkbox("Play On Start", &sc->playOnStart);
 
-	// ���� ���� ���� ��� ä�ο� �ݿ�
+	// 루프 상태 변경 즉시 채널에 반영
 	if (loopBefore != sc->loop) {
 		auto applyLoop = [&](FMOD::Channel* ch) {
 			if (!ch) return;
@@ -1683,9 +1683,9 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		applyLoop(sc->Get3DChannel());
 	}
 
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	//  Spatial
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	SeparatorText("Spatial");
 	Checkbox("Spatial (Blend 2D+3D)", &sc->spatial);
 
@@ -1707,12 +1707,12 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		bool rollChanged = ImGui::Combo("Rolloff", &roll, rolloffNames, IM_ARRAYSIZE(rolloffNames));
 		sc->rolloff = (Rolloff)roll;
 
-		// �׷���: spatial�̸� �׻� ǥ��
+		// 그래프: spatial이면 항상 표시
 		ImGui::SeparatorText("Distance Rolloff Curve");
 
 		const bool isCustom = (sc->rolloff == Rolloff::Custom);
 
-		// Linear /Inverse ���� ��: �ڵ� ����� ����ȭ(�б�����)
+		// Linear /Inverse 선택 시: 자동 곡선으로 동기화(읽기전용)
 		if (!isCustom) {
 			if (rollChanged || minBefore != sc->minDistance || maxBefore != sc->maxDistance || sc->localRolloffCurve.size() < 2) {
 				if (sc->rolloff == Rolloff::Linear)  BuildLinearCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
@@ -1722,11 +1722,11 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 			ImGui::TextDisabled("Rolloff is %s - curve preview (read-only).", sc->rolloff == Rolloff::Linear ? "Linear" : "Inverse");
 		}
 		else {
-			// Custom: ����Ʈ ����
+			// Custom: 에디트 가능
 			if (sc->localRolloffCurve.size() < 2) {
 				sc->localRolloffCurve = { {0.f,1.f}, { std::max(0.1f, sc->maxDistance), 0.f } };
 			}
-			// maxDistance ���� �� ������ �� X�� ���� ���� ����(���� ������ ����)
+			// maxDistance 변경 시 마지막 점 X를 범위 내로 보정(편집 내용은 유지)
 			sc->localRolloffCurve.back().distance = std::clamp(sc->localRolloffCurve.back().distance, 0.1f, std::max(0.1f, sc->maxDistance));
 
 			if (ImGui::SmallButton("Reset to Default")) {
@@ -1736,7 +1736,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 			ImGui::TextDisabled("Custom mode - drag points, double-click to add, right-click/Delete to remove.");
 		}
 
-		// �ǽð� 3D ä�� �ݿ�(��ġ/�Ÿ�/�ѿ��� ��� ��)
+		// 실시간 3D 채널 반영(위치/거리/롤오프 모드 등)
 		if (auto* ch3 = sc->Get3DChannel()) {
 			FMOD_VECTOR p{ sc->position.x, sc->position.y, sc->position.z };
 			FMOD_VECTOR v{ sc->velocity.x, sc->velocity.y, sc->velocity.z };
@@ -1759,14 +1759,14 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		}
 	}
 
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	//  Reverb Send
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	SeparatorText("Reverb Send");
 	bool useRevBefore = sc->useReverbSend;
 	Checkbox("Enable Reverb Send", &sc->useReverbSend);
 
-	// dB �����̴�(-80~+10), ���δ� ����(0~1)�� ��ȯ�ؼ� FMOD�� ����
+	// dB 슬라이더(-80~+10), 내부는 선형(0~1)로 변환해서 FMOD에 적용
 	SetNextItemWidth(260);
 	DragFloat("Reverb Level (dB)", &sc->reverbLevel, 0.1f, -80.0f, 10.0f, "%.1f dB");
 	SetNextItemWidth(200);
@@ -1786,21 +1786,21 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		applyReverb(sc->Get2DChannel());
 		applyReverb(sc->Get3DChannel());
 	}
-	// ���� �ٲ�� �׻� ����
+	// 값이 바뀌면 항상 적용
 	if (IsItemEdited() || IsItemDeactivatedAfterEdit()) {
 		applyReverb(sc->Get2DChannel());
 		applyReverb(sc->Get3DChannel());
 	}
 
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	//  Preview Controls
-	// ��������������������������������������������������������������������������������������������������������������������������
+	// ─────────────────────────────────────────────────────────────
 	Separator();
 	if (Button("Play")) { sc->Play(); } ImGui::SameLine();
 	if (Button("Stop")) { sc->Stop(); } ImGui::SameLine();
 	if (Button("OneShot")) { sc->PlayOneShot(); }
 
-	// ����/��ġ/�����̾Ƽ ���� �ǽð� �ݿ�(ä�� ������� ��)
+	// 볼륨/피치/프라이어리티 변경 실시간 반영(채널 살아있을 때)
 	auto applyBasic = [&](FMOD::Channel* ch) {
 		if (!ch) return;
 		ch->setVolume(sc->volume);
@@ -1931,7 +1931,7 @@ bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& curve, flo
 		return changed;
 	}
 	else {
-		// readOnly ���: ��ȣ�ۿ� ����, �ȳ���
+		// readOnly 모드: 상호작용 없음, 안내만
 		if (hovered) SetTooltip("Graph is read-only (driven by Rolloff mode).");
 		Dummy(size);
 		if (outSelected) *outSelected = -1;
@@ -1944,14 +1944,14 @@ void InspectorWindow::DrawSoundClipPicker()
 	using namespace ImGui;
 	if (!m_openClipPicker) return;
 
-	// ���� ������(��� ����)
+	// 독립 윈도우(모달 느낌)
 	SetNextWindowSize(ImVec2(520, 480), ImGuiCond_Appearing);
 	if (Begin("Select Audio Clip", &m_openClipPicker,
 		ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
 	{
-		// ���: �˻�/��������
+		// 상단: 검색/리프레시
 		if (InputTextWithHint("##search", "Search clip key...", &m_clipSearch)) {
-			// �Է� �� ��� ���� �ݿ�
+			// 입력 시 즉시 필터 반영
 		}
 		SameLine();
 		if (Button("Refresh")) {
@@ -1959,11 +1959,11 @@ void InspectorWindow::DrawSoundClipPicker()
 		}
 		Separator();
 
-		// ���͸�
+		// 필터링
 		auto toLower = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), ::tolower); return s; };
 		std::string q = toLower(m_clipSearch);
 
-		// ����Ʈ ����
+		// 리스트 영역
 		BeginChild("##cliplist", ImVec2(0, -48), true);
 		static int selectedIndex = -1;
 		const int N = (int)m_clipKeyCache.size();
@@ -1976,10 +1976,10 @@ void InspectorWindow::DrawSoundClipPicker()
 				selectedIndex = i;
 			}
 
-			// ���� ������ ��ư
+			// 우측 프리뷰 버튼
 			if (IsItemHovered() && IsMouseDoubleClicked(0)) 
 			{
-				// ����Ŭ�� = ���� Ȯ��
+				// 더블클릭 = 선택 확정
 				if (m_clipPickerTarget && i >= 0) m_clipPickerTarget->clipKey = key;
 				m_openClipPicker = false;
 				selectedIndex = -1;
@@ -1990,7 +1990,7 @@ void InspectorWindow::DrawSoundClipPicker()
 			{
 				if (m_clipPickerTarget) 
 				{
-					// �̸����: ���� Ÿ�� ����/����/��ġ ���
+					// 미리듣기: 현재 타겟 버스/볼륨/피치 사용
 					FMOD_VECTOR pos{ m_clipPickerTarget->position.x,
 									 m_clipPickerTarget->position.y,
 									 m_clipPickerTarget->position.z };
@@ -2015,7 +2015,7 @@ void InspectorWindow::DrawSoundClipPicker()
 		}
 		EndChild();
 
-		// �ϴ� ��ư
+		// 하단 버튼
 		BeginDisabled(selectedIndex < 0);
 		if (Button("Use")) 
 		{

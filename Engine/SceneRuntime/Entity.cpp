@@ -85,7 +85,7 @@ void Entity::OnAfterSerialize(const Authoring::MutableNodeView& view) const
 
 const std::string& Entity::RemoveSuffixNumberTag() const
 {
-	// ����ǥ����: ���� ���� " (����)" �Ǵ� "(����)" ���� ����
+	// 정규표현식: 끝에 오는 " (숫자)" 또는 "(숫자)" 패턴 제거
 	return m_removedSuffixNumberTag;
 }
 

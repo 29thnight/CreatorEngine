@@ -229,7 +229,7 @@ std::vector<std::pair<size_t, size_t>> DivideRangeAuto(size_t count)
         return ranges;
 
     unsigned int hwThreads = std::thread::hardware_concurrency();
-    if (hwThreads == 0) hwThreads = 4; // ���� �⺻�� (�̰��� ��)
+    if (hwThreads == 0) hwThreads = 4; // 안전 기본값 (미검출 시)
 
     const size_t numSplits = hwThreads * 2 + 1;
     ranges.reserve(numSplits);
@@ -265,7 +265,7 @@ void FoliageComponent::UpdateFoliageCullingData(
 
             auto& foliage = m_foliageInstances[i];
 
-            // ��� üũ ����: >=
+            // 경계 체크 보정: >=
             if (static_cast<size_t>(foliage.m_foliageTypeID) >= m_foliageTypes.size())
                 continue;
 
@@ -275,7 +275,7 @@ void FoliageComponent::UpdateFoliageCullingData(
             Mesh* mesh = foliageType.m_mesh.get();
             if (!mesh)
             {
-                foliage.m_isCulled = true; // ���� �⺻��
+                foliage.m_isCulled = true; // 안전 기본값
                 continue;
             }
 
@@ -305,7 +305,7 @@ void FoliageComponent::UpdateFoliageCullingData(
         tasks.emplace_back(std::async(std::launch::async, process_range, begin, end));
     }
 
-    // �Ϸ� ���
+    // 완료 대기
     for (auto& f : tasks)
     {
         if (f.valid()) f.get();

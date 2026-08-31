@@ -67,7 +67,7 @@ bool RuntimeSettings::Load() noexcept
         if (root["renderPassSettings"])
         {
             Meta::Typed::DeserializeThunk<RenderPassSettings>(
-                &renderPassSettings, root["renderPassSettings"]);
+                &renderPassSettings, Authoring::ReadNode{ root["renderPassSettings"] });
         }
 
         RenderBackend renderBackend = RenderBackend::DX12;

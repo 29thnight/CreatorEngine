@@ -30,16 +30,16 @@ namespace
 	// base를 로드해 소유 사본을 만들고 override를 겹친다. 실패는 부분 결과를
 	// 내지 않는다 — 지어낸 재질로 조용히 그리는 것보다 빈 재질이 낫다.
 	[[nodiscard]] bool DecodeMaterialReferenceNode(
-		const YAML::Node& materialNode, std::shared_ptr<Material>& outMaterial,
+		const Authoring::ReadNode materialNode, std::shared_ptr<Material>& outMaterial,
 		FileGuid& outBaseGuid, std::string& outError)
 	{
-		const YAML::Node ref = materialNode["ref"];
+		const Authoring::ReadNode ref = materialNode["ref"];
 		if (!ref || !ref.IsScalar())
 		{
 			outError = "ref가 스칼라가 아니다";
 			return false;
 		}
-		const FileGuid baseGuid(ref.as<std::string>());
+		const FileGuid baseGuid(ref.AsString());
 		if (FileGuid{} == baseGuid)
 		{
 			outError = "ref가 nil GUID다";
@@ -48,7 +48,7 @@ namespace
 		const file::path basePath = DataSystems->GetFilePath(baseGuid);
 		if (basePath.empty())
 		{
-			outError = "base 자산 경로 미해석: " + ref.as<std::string>();
+			outError = "base 자산 경로 미해석: " + ref.AsString();
 			return false;
 		}
 		const std::shared_ptr<Material> base =
@@ -60,29 +60,29 @@ namespace
 		}
 
 		auto owned = std::make_shared<Material>(*base);
-		if (const YAML::Node blend = materialNode["blendMode"];
+		if (const Authoring::ReadNode blend = materialNode["blendMode"];
 			blend && blend.IsScalar())
 		{
-			owned->m_renderingMode = blend.as<std::string>() == "transparent"
+			owned->m_renderingMode = blend.AsString() == "transparent"
 				? MaterialRenderingMode::Transparent
 				: MaterialRenderingMode::Opaque;
 		}
-		if (const YAML::Node selections = materialNode["keywordSelections"];
+		if (const Authoring::ReadNode selections = materialNode["keywordSelections"];
 			selections && selections.IsSequence())
 		{
 			std::vector<std::uint16_t> values;
-			values.reserve(selections.size());
-			for (const YAML::Node& selection : selections)
+			values.reserve(selections.Size());
+			for (const Authoring::ReadNode selection : selections)
 			{
 				values.push_back(
-					static_cast<std::uint16_t>(selection.as<std::uint32_t>()));
+					static_cast<std::uint16_t>(selection.As<std::uint32_t>()));
 			}
 			owned->m_keywordSelections = std::move(values);
 		}
-		if (const YAML::Node overrides = materialNode["overrides"];
+		if (const Authoring::ReadNode overrides = materialNode["overrides"];
 			overrides && overrides.IsSequence())
 		{
-			for (const YAML::Node& entry : overrides)
+			for (const Authoring::ReadNode entry : overrides)
 			{
 				if (!entry.IsMap() || !entry["name"]
 					|| !entry["name"].IsScalar())
@@ -91,8 +91,12 @@ namespace
 					return false;
 				}
 				experiment::MaterialProperty property;
-				property.name = entry["name"].as<std::string>();
-				if (!experiment::DeserializeMaterialPropertyValue(entry,
+				property.name = entry["name"].AsString();
+				// ★ 전환기 탈출구 — I5 소유 코덱이 backend 노드를 받는다.
+				// **이것이 씬 ryml 전환을 막는 마지막 의존이다**(ryml 노드에
+				// 부르면 던진다). experiment 코덱이 어댑터를 받으면 사라진다.
+				if (!experiment::DeserializeMaterialPropertyValue(
+						entry.BackendNodeDuringTransition(),
 						property.name, property.value, outError)
 					|| !ExperimentMaterialMigration::ApplyPropertyToLegacy(
 						*owned, property, outError))
@@ -286,7 +290,7 @@ math::aabb MeshRenderer::GetBoundingBox() const
 
 void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 {
-	const YAML::Node& node = Authoring::NodeViewAccess::Node(view);
+	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
 	// typed 역직렬화가 m_Material의 소유 인스턴스를 이미 만들었다. 예전 경로는
 	// 이름으로 cache material을 꺼낸 뒤 scene snapshot을 그 공유 객체에 다시
 	// Deserialize해 다른 renderer까지 바꿨다. snapshot 소유권은 유지하고 runtime
@@ -297,7 +301,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	// 재해석한다. reflection의 shared_ptr 멤버는 컴파일 타임 재귀라
 	// (ReflectionTypedYml.h EmitMember/ReadMember의 meta::reflectable 분기)
 	// 타입 단위 후킹이 불가능하고, 그래서 소비자 postLoad가 절단선이다.
-	if (const YAML::Node materialNode = node["m_Material"];
+	if (const Authoring::ReadNode materialNode = node["m_Material"];
 		materialNode && materialNode.IsMap() && materialNode["ref"])
 	{
 		// I5-M5 S2c-2a — base 참조 표기. typed 역직렬화는 ref 노드에서 기본값
@@ -318,7 +322,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 			m_Material.reset();
 		}
 	}
-	else if (const YAML::Node materialNode = node["m_Material"];
+	else if (const Authoring::ReadNode materialNode = node["m_Material"];
 		materialNode && materialNode.IsMap()
 		&& materialNode["schema"] && materialNode["shaderAssetId"])
 	{
@@ -359,19 +363,19 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 		}
 	}
 
-	MetaYml::Node getMeshNode = node["m_Mesh"];
+	const Authoring::ReadNode getMeshNode = node["m_Mesh"];
 	if (model && getMeshNode)
 	{
-		m_Mesh = model->GetMeshShared(getMeshNode["m_name"].as<std::string>());
+		m_Mesh = model->GetMeshShared(getMeshNode["m_name"].AsString());
 		if (m_Mesh)
 		{
-			MetaYml::Node getLOD_Node = getMeshNode["m_LODThresholds"];
+			const Authoring::ReadNode getLOD_Node = getMeshNode["m_LODThresholds"];
 			if (getLOD_Node)
 			{
 				std::vector<float> lodThresholds;
-				for (const auto& threshold : getLOD_Node)
+				for (const auto threshold : getLOD_Node)
 				{
-					lodThresholds.push_back(threshold.as<float>());
+					lodThresholds.push_back(threshold.As<float>());
 				}
 				m_Mesh->GenerateLODs(lodThresholds);
 			}

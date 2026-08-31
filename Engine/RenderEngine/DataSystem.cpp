@@ -598,7 +598,10 @@ YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
 
 bool DataSystem::DeserializeMaterialPayload(Material& material, const Authoring::NodeView& view)
 {
-	const YAML::Node& node = Authoring::NodeViewAccess::Node(view);
+	// D3-b-2b-1b-2b 전환기: 본문이 experiment 코덱(I5 소유)에 backend 노드를
+	// 넘기므로 아직 못 옮긴다.
+	const Authoring::ReadNode readNode = Authoring::NodeViewAccess::Node(view);
+	const YAML::Node& node = readNode.BackendNodeDuringTransition();
 	if (!node || !node.IsMap()) return false;
 
 	// I5-M5 S1 — 읽기 이중화. 새 정본(schema + shaderAssetId)을 만나면
@@ -736,7 +739,7 @@ bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 	{
 		// D3-a-5b: 임시 노드로 뷰를 만들 수 없다(Make(Node&&) = delete).
 		// 뷰는 소유하지 않으므로 대상 노드에 이름을 준다.
-		const YAML::Node payloadNode = YAML::Load(payload);
+		const Authoring::ReadNode payloadNode{ YAML::Load(payload) };
 		return DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(payloadNode));
 	}
 	catch (const std::exception& exception)
@@ -840,7 +843,7 @@ Material* DataSystem::LoadMaterial(std::string_view name)
 		return nullptr;
     }
 
-    MetaYml::Node node = MetaYml::LoadFile(loadPath.string());
+    const Authoring::ReadNode node{ MetaYml::LoadFile(loadPath.string()) };
     auto material = std::make_shared<Material>();
     if (!DeserializeMaterialPayload(*material, Authoring::NodeViewAccess::Make(node))) return nullptr;
     // 파일 stem이 cache key의 정본이다. 내부 m_name이 낡았거나 비어 있어도

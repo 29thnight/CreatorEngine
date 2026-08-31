@@ -144,6 +144,16 @@ public:
     }
 
 private:
+    // ★ 로드가 실패한 상태를 저장하면 **자산이 지워진다.**
+    //
+    //   `Finalize()`가 종료 시 `Save()`를 무조건 부른다. 파싱이 실패하면
+    //   메모리 상태가 비어 있고, 그 빈 상태가 디스크를 덮어 **태그·레이어가
+    //   통째로 사라진다.** 실제로 이 경로로 자산을 한 번 잃었다(D3-b-L 실측).
+    //
+    //   백엔드를 ryml로 옮기면서 이 위험이 커졌다 — 두 파서의 수용 범위가
+    //   다르므로(D3-b-2b-0: 21건) yaml-cpp가 읽던 파일을 ryml이 거부할 수 있고,
+    //   그 순간 저장이 손실을 확정한다. 그래서 로드 성공 여부를 기억한다.
+    bool m_loadSucceeded{ false };
     std::unordered_map<std::string, size_t> m_tagMap{};
     std::vector<std::string> m_tags{};
     std::unordered_map<std::string, std::vector<Entity*>> m_taggedObjects{};

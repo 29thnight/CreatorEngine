@@ -173,7 +173,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 			static int ClickNodeIndex = -1;
 			static int targetNodeIndex = -1;
 			static int selectedTransitionIndex = -1;
-			static int preInspectorIndex = -1; //�ν����Ϳ��ٿ� �ε�����ȣ 
+			static int preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
 			static int AvatarControllerIndex = -1;
 			static bool showAvatarMaskWindow = false;
 			static bool isOpenAniBehaviorPopup = false;
@@ -194,7 +194,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					ClickNodeIndex = -1;
 					targetNodeIndex = -1;
 					selectedTransitionIndex = -1;
-					preInspectorIndex = -1; //�ν����Ϳ��ٿ� �ε�����ȣ 
+					preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
 					AvatarControllerIndex = -1;
 					showAvatarMaskWindow = false;
 				}
@@ -225,7 +225,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 							}
 							if (ImGui::BeginPopup("RightClickMenu"))
 							{
-								if (ImGui::MenuItem("Copy Contorller")) { /* ī�� ��Ʈ�ѷ� �Լ� */ }
+								if (ImGui::MenuItem("Copy Contorller")) { /* 카피 컨트롤러 함수 */ }
 								if (ImGui::MenuItem("Delete Controller"))
 								{
 									animator->DeleteController(selectedControllerIndex);
@@ -235,7 +235,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 									ClickNodeIndex = -1;
 									targetNodeIndex = -1;
 									selectedTransitionIndex = -1;
-									preInspectorIndex = -1; //�ν����Ϳ��ٿ� �ε�����ȣ 
+									preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
 									AvatarControllerIndex = -1;
 									showAvatarMaskWindow = false;
 								}
@@ -297,7 +297,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 							if (ImGui::Begin("AvatarMask", &showAvatarMaskWindow))
 							{
-								// ���빰 UI �ۼ�
+								// 내용물 UI 작성
 								ImGui::Text(controllers[AvatarControllerIndex]->name.c_str());
 								ImGui::Separator();
 								auto avatarMask = controllers[AvatarControllerIndex]->GetAvatarMask();
@@ -318,18 +318,18 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 									{
 										drawMaskTree = [&](BoneMask* mask)
 											{
-												// ���� ID �����
+												// 고유 ID 만들기
 												std::string label = mask->boneName + "##" + mask->boneName;
 
-												// TreeNode�� ��ĥ �� �ִ� ��Ӵٿ� ����
+												// TreeNode는 펼칠 수 있는 드롭다운 역할
 												if (ImGui::TreeNode(label.c_str()))
 												{
-													// Checkbox�� Ʈ�� ��� �ȿ� ǥ��
+													// Checkbox를 트리 노드 안에 표시
 													ImGui::Checkbox(("Enable##" + mask->boneName).c_str(), &mask->isEnabled);
 
 													for (auto& child : mask->m_children)
 													{
-														drawMaskTree(child); // ��� ȣ��
+														drawMaskTree(child); // 재귀 호출
 													}
 
 													ImGui::TreePop();
@@ -373,7 +373,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 							
 							ImGui::EndPopup();
 						}
-						if (ImGui::Button("Load Layers")) //&&&&load ���ϰ�� �����ؼ� ã��
+						if (ImGui::Button("Load Layers")) //&&&&load 파일경로 오픈해서 찾게
 						{
 
 							file::path fileName = ShowOpenFileDialog(
@@ -803,7 +803,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 							if (ImGui::IsItemDeactivatedAfterEdit())
 							{
-								// ���� ���� ������ �Է� �Ϸ� �������� ����
+								// 실제 변경 적용은 입력 완료 시점에만 수행
 								nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
 
 								for (auto& st : controller->StateVec)
@@ -1034,7 +1034,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 							}
 						}
 					}
-					const float buttonWidth = 210.0f; // ��ư�� ���� �ʺ� (���Ƿ� ���� �Ǵ� ����)
+					const float buttonWidth = 210.0f; // 버튼의 가로 너비 (임의로 지정 또는 측정)
 					const float windowWidth = ImGui::GetContentRegionAvail().x;
 					float offsetX = (windowWidth - buttonWidth) * 0.5f;
 					std::string stateName{};
@@ -1072,7 +1072,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 					{
 						state->ClearBehaviour();
 					}
-					// Ŀ�� ��ġ �̵�
+					// 커서 위치 이동
 					if (offsetX > 0.0f)
 						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
 
@@ -1094,7 +1094,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 				static ImGuiTextFilter searchFilter;
 
-				ImGui::SetNextWindowSize(ImVec2(350, 0)); // ���ϴ� ������ ����
+				ImGui::SetNextWindowSize(ImVec2(350, 0)); // 원하는 사이즈 지정
 				if(ImGui::BeginPopup("AniBehaviorSelect"))
 				{
 					ImGui::Text("Add AniBehavior");

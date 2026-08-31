@@ -27,6 +27,9 @@
 // 읽으면 BadConversion이 나는 잠재 로드 버그였다.
 #include "ReflectionYml.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
+#include "AuthoringScalarConvert.h" // D3-b-2b-1a
+#include "AuthoringReadNode.h" // D3-b-2b-1b
+#include <limits>
 #include "ReflectionMeta.h"
 #include <mathematics/color.hpp>
 #include <mathematics/rect.hpp>
@@ -143,61 +146,138 @@ namespace Meta::Typed
 
     // ── 스칼라 reader — FromYamlScalar 특수화의 typed 등가물 ───────────────
 
+    // -- D3-b-2b-1a: 산술 변환을 backend에서 뗀다 --
+    //
+    // 값 변환은 `Authoring::Scalar`(문자열 위의 함수)가 하고, 노드는 원문을
+    // 꺼내는 데만 쓴다. D3-b-2b-1b가 backend를 바꿔도 **값의 의미가 그대로**인
+    // 이유가 이것이다 — 파서만 바꾸면 `010`이 8에서 10이 되고 `1.5x`가 실패에서
+    // 1.5가 되는 식으로 조용히 갈린다(실측 21건).
+    //
+    // ★ **실패 경로는 yaml-cpp에 남겨 둔다.** 변환기가 실패하면 `as<T>()`를 불러
+    //   그대로 던지게 한다. 변환기와 yaml-cpp가 성공 판정에서 일치함은 게이트가
+    //   전수(67케이스) 단정하므로, 이 경로는 **yaml-cpp도 실패할 때만** 돈다 —
+    //   즉 예외 타입과 메시지가 이전과 완전히 같다. 1b가 실패 표현을 정하면 이
+    //   폴백이 사라진다.
+    namespace ScalarDetail
+    {
+        // ★ 널 노드는 문자열 "null"이다(yaml-cpp `as<std::string>` 실측).
+        //   이것은 변환이 아니라 **노드->원문 추출**의 규칙이고, ryml 쪽에서는
+        //   `val_is_null()`로 같은 규칙을 세워야 한다.
+        inline bool RawScalar(const Authoring::ReadNode& n, std::string& out)
+        {
+            if (!n) return false;
+            // 널 규칙과 스칼라 판정은 어댑터가 소유한다 — 두 backend가 같은
+            // 답을 내야 하는 지점이라 한 곳에 둔다.
+            const std::string_view raw = n.Scalar();
+            if (raw.empty() && !n.IsNull() && !n.IsScalar()) return false;
+            out.assign(raw);
+            return true;
+        }
+
+        // 변환 디스패치는 `Authoring::Scalar`가 소유한다 — 어댑터도 같은 것을
+        // 써야 두 경로가 갈리지 않는다.
+        template<class T>
+        inline bool TryConvert(std::string_view raw, T& out)
+        {
+            return Authoring::Scalar::TryConvert(raw, out);
+        }
+
+        // 변환기를 태우고, 실패하면 yaml-cpp가 그대로 던지게 한다.
+        // 두 backend가 같은 값을 내는 지점을 한 곳으로 모은다.
+        template<class T>
+        inline T ConvertOrThrow(const Authoring::ReadNode& n)
+        {
+            std::string raw;
+            T value{};
+            if (RawScalar(n, raw) && TryConvert(raw, value)) return value;
+            return n.BackendNodeDuringTransition().as<T>();
+        }
+
+        inline std::string StringOf(const Authoring::ReadNode& n)
+        {
+            std::string raw;
+            if (RawScalar(n, raw)) return raw;
+            return n.BackendNodeDuringTransition().as<std::string>();
+        }
+    }
+
+    // ★ `char` 계열은 변환기를 태우지 않는다. yaml-cpp `as<char>`는 숫자가 아니라
+    //   **문자 하나**를 읽으므로 의미가 다르다. 이 저장소에 그런 필드는 없지만,
+    //   생기면 조용히 달라지는 대신 기존 경로를 그대로 타게 둔다.
     template<class T>
-        requires (std::is_arithmetic_v<T> && !std::is_enum_v<T>)
-    inline void ReadScalar(const MetaYml::Node& n, T& out) { out = n.as<T>(); }
+        requires (std::is_arithmetic_v<T> && !std::is_enum_v<T>
+            && !std::is_same_v<std::remove_cv_t<T>, char>
+            && !std::is_same_v<std::remove_cv_t<T>, signed char>
+            && !std::is_same_v<std::remove_cv_t<T>, unsigned char>)
+    inline void ReadScalar(const Authoring::ReadNode& n, T& out)
+    {
+        std::string raw;
+        T value{};
+        if (ScalarDetail::RawScalar(n, raw) && ScalarDetail::TryConvert(raw, value))
+        {
+            out = value;
+            return;
+        }
+        out = n.BackendNodeDuringTransition().as<T>();
+    }
 
-    inline void ReadScalar(const MetaYml::Node& n, std::string& out) { out = n.as<std::string>(); }
-    inline void ReadScalar(const MetaYml::Node& n, HashingString& out) { out = HashingString(n.as<std::string>()); }
+    template<class T>
+        requires (std::is_same_v<std::remove_cv_t<T>, char>
+            || std::is_same_v<std::remove_cv_t<T>, signed char>
+            || std::is_same_v<std::remove_cv_t<T>, unsigned char>)
+    inline void ReadScalar(const Authoring::ReadNode& n, T& out) { out = n.BackendNodeDuringTransition().as<T>(); }
+
+    inline void ReadScalar(const Authoring::ReadNode& n, std::string& out) { out = ScalarDetail::StringOf(n); }
+    inline void ReadScalar(const Authoring::ReadNode& n, HashingString& out) { out = HashingString(ScalarDetail::StringOf(n)); }
     // 절단 수정: 레거시는 as<uint32_t>였다 — FNV64 값이 오면 BadConversion.
-    inline void ReadScalar(const MetaYml::Node& n, HashedGuid& out) { out = HashedGuid(n.as<size_t>()); }
-    inline void ReadScalar(const MetaYml::Node& n, file::path& out) { out = file::path(n.as<std::string>()); }
-    inline void ReadScalar(const MetaYml::Node& n, FileGuid& out) { out = FileGuid(n.as<std::string>()); }
+    inline void ReadScalar(const Authoring::ReadNode& n, HashedGuid& out) { out = HashedGuid(ScalarDetail::ConvertOrThrow<size_t>(n)); }
+    inline void ReadScalar(const Authoring::ReadNode& n, file::path& out) { out = file::path(ScalarDetail::StringOf(n)); }
+    inline void ReadScalar(const Authoring::ReadNode& n, FileGuid& out) { out = FileGuid(ScalarDetail::StringOf(n)); }
 
-    inline void ReadScalar(const MetaYml::Node& n, math::vector2& out)
+    inline void ReadScalar(const Authoring::ReadNode& n, math::vector2& out)
     {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
+        out.x = ScalarDetail::ConvertOrThrow<float>(n["x"]); out.y = ScalarDetail::ConvertOrThrow<float>(n["y"]);
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, math::vector3& out)
+    inline void ReadScalar(const Authoring::ReadNode& n, math::vector3& out)
     {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>(); out.z = n["z"].as<float>();
+        out.x = ScalarDetail::ConvertOrThrow<float>(n["x"]); out.y = ScalarDetail::ConvertOrThrow<float>(n["y"]); out.z = ScalarDetail::ConvertOrThrow<float>(n["z"]);
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, math::color& out)
+    inline void ReadScalar(const Authoring::ReadNode& n, math::color& out)
     {
-        out.r = n["r"].as<float>(); out.g = n["g"].as<float>();
-        out.b = n["b"].as<float>(); out.a = n["a"].as<float>();
+        out.r = ScalarDetail::ConvertOrThrow<float>(n["r"]); out.g = ScalarDetail::ConvertOrThrow<float>(n["g"]);
+        out.b = ScalarDetail::ConvertOrThrow<float>(n["b"]); out.a = ScalarDetail::ConvertOrThrow<float>(n["a"]);
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, math::vector4& out)
+    inline void ReadScalar(const Authoring::ReadNode& n, math::vector4& out)
     {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
-        out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
+        out.x = ScalarDetail::ConvertOrThrow<float>(n["x"]); out.y = ScalarDetail::ConvertOrThrow<float>(n["y"]);
+        out.z = ScalarDetail::ConvertOrThrow<float>(n["z"]); out.w = ScalarDetail::ConvertOrThrow<float>(n["w"]);
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, math::quaternion& out)
+    inline void ReadScalar(const Authoring::ReadNode& n, math::quaternion& out)
     {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
-        out.z = n["z"].as<float>(); out.w = n["w"].as<float>();
+        out.x = ScalarDetail::ConvertOrThrow<float>(n["x"]); out.y = ScalarDetail::ConvertOrThrow<float>(n["y"]);
+        out.z = ScalarDetail::ConvertOrThrow<float>(n["z"]); out.w = ScalarDetail::ConvertOrThrow<float>(n["w"]);
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, math::matrix4x4& out)
+    inline void ReadScalar(const Authoring::ReadNode& n, math::matrix4x4& out)
     {
-        if (!n.IsSequence() || 16 != n.size())
+        if (!n.IsSequence() || 16 != n.Size())
         {
             out = math::matrix4x4::identity();
             return;
         }
         for (int row = 0; row < 4; ++row)
             for (int column = 0; column < 4; ++column)
-                out.m[row][column] = n[row * 4 + column].as<float>();
+                out.m[row][column] = ScalarDetail::ConvertOrThrow<float>(n.At(static_cast<std::size_t>(row * 4 + column)));
     }
 
-    inline void ReadScalar(const MetaYml::Node& n, math::rect& out)
+    inline void ReadScalar(const Authoring::ReadNode& n, math::rect& out)
     {
-        out.x = n["x"].as<float>(); out.y = n["y"].as<float>();
-        out.width = n["width"].as<float>(); out.height = n["height"].as<float>();
+        out.x = ScalarDetail::ConvertOrThrow<float>(n["x"]); out.y = ScalarDetail::ConvertOrThrow<float>(n["y"]);
+        out.width = ScalarDetail::ConvertOrThrow<float>(n["width"]); out.height = ScalarDetail::ConvertOrThrow<float>(n["height"]);
     }
 
     // 미지원 타입을 "조용한 유실"이 아니라 컴파일 오류로 만들기 위한 의존 거짓
@@ -315,14 +395,17 @@ namespace Meta::Typed
     // 정의는 ReflectionYml.h 상단(OpsRegistry) — 여기서는 썽크만 만든다.
 
     template<class T> MetaYml::Node SerializeThunk(void* instance);
-    template<class T> void DeserializeThunk(void* instance, const MetaYml::Node& node);
+    template<class T> void DeserializeThunk(void* instance, const Authoring::ReadNode& node);
 
     // CT6-d: 역직렬화 후처리 — 컴포넌트가 OnDeserialized(node) 또는
     // OnDeserialized()를 선언하면 팩토리 공통 경로가 호출한다(분기 소멸).
     template<class T>
-    void PostLoadThunk(void* instance, const MetaYml::Node& node)
+    void PostLoadThunk(void* instance, const Authoring::ReadNode& readNode)
     {
         T& obj = *static_cast<T*>(instance);
+        // 훅 인자(NodeView)는 아직 backend 노드를 가리킨다. 1b-2가 뷰의
+        // backing을 옮길 때 이 한 줄이 사라진다.
+        const MetaYml::Node& node = readNode.BackendNodeDuringTransition();
         // D3-a-4: 뷰를 받는 훅을 먼저 본다. 컴포넌트 헤더가 backend 노드 타입을
         // 알지 않아도 되게 하는 것이 이 오버로드의 목적이다(§5 완료 기준 9).
         if constexpr (requires { obj.OnDeserialized(Authoring::NodeViewAccess::Make(node)); })
@@ -539,13 +622,13 @@ namespace Meta::Typed
     // ── Deserialize (typed) ────────────────────────────────────────────────
 
     template<meta::reflectable T>
-    void DeserializeObjectFrom(T& obj, const MetaYml::Node& node);
+    void DeserializeObjectFrom(T& obj, const Authoring::ReadNode& node);
 
     template<class V>
-    inline void ReadMember(const MetaYml::Node& node, const char* name, V& value)
+    inline void ReadMember(const Authoring::ReadNode& node, const char* name, V& value)
     {
         using T = std::remove_cv_t<V>;
-        const MetaYml::Node& sub = node[name];
+        const Authoring::ReadNode sub = node[name];
         if (!sub)
         {
             return; // 부재 키 스킵 (레거시 파리티)
@@ -602,7 +685,7 @@ namespace Meta::Typed
             {
                 if (!sub.IsSequence()) { return; }
                 value.clear();
-                value.reserve(sub.size());
+                value.reserve(sub.Size());
                 for (const auto& en : sub)
                 {
                     E item{};
@@ -614,7 +697,7 @@ namespace Meta::Typed
             {
                 if (!sub.IsSequence()) { return; }
                 value.clear();
-                value.reserve(sub.size());
+                value.reserve(sub.Size());
                 for (const auto& en : sub)
                 {
                     E item{};
@@ -629,7 +712,16 @@ namespace Meta::Typed
         }
         else if constexpr (std::is_enum_v<T>)
         {
-            value = static_cast<T>(sub.as<int>());
+            // enum도 변환기를 태운다 — `as<int>` 직결은 backend 의미에 묶인다.
+            int raw{};
+            if (ScalarDetail::TryConvert(std::string(sub.Scalar()), raw))
+            {
+                value = static_cast<T>(raw);
+            }
+            else
+            {
+                value = static_cast<T>(sub.BackendNodeDuringTransition().as<int>());
+            }
         }
         else if constexpr (meta::reflectable<T>)
         {
@@ -646,7 +738,7 @@ namespace Meta::Typed
     }
 
     template<meta::reflectable T>
-    void DeserializeObjectFrom(T& obj, const MetaYml::Node& node)
+    void DeserializeObjectFrom(T& obj, const Authoring::ReadNode& node)
     {
         meta::for_each_field(obj, [&](std::string_view memberName, auto& value)
         {
@@ -665,7 +757,7 @@ namespace Meta::Typed
     }
 
     template<class T>
-    void DeserializeThunk(void* instance, const MetaYml::Node& node)
+    void DeserializeThunk(void* instance, const Authoring::ReadNode& node)
     {
         DeserializeObjectFrom(*static_cast<T*>(instance), node);
     }

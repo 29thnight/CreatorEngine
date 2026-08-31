@@ -237,9 +237,9 @@ void UIComponent::OnBeforeSerialize()
 
 void UIComponent::LoadLegacyNavigation(const Authoring::NodeView& view)
 {
-	const YAML::Node& componentNode = Authoring::NodeViewAccess::Node(view);
+	const Authoring::ReadNode componentNode = Authoring::NodeViewAccess::Node(view);
 	m_legacyNavigationIds.fill(HashedGuid{});
-	const YAML::Node legacyNavigations = componentNode["navigations"];
+	const Authoring::ReadNode legacyNavigations = componentNode["navigations"];
 	if (!legacyNavigations || !legacyNavigations.IsSequence())
 		return;
 
@@ -247,10 +247,10 @@ void UIComponent::LoadLegacyNavigation(const Authoring::NodeView& view)
 	{
 		if (!legacy["mode"] || !legacy["navObject"])
 			continue;
-		const int mode = legacy["mode"].as<int>();
+		const int mode = legacy["mode"].As<int>();
 		if (mode < 0 || mode >= NavDirectionCount)
 			continue;
-		m_legacyNavigationIds[mode] = HashedGuid(legacy["navObject"].as<size_t>());
+		m_legacyNavigationIds[mode] = HashedGuid(legacy["navObject"].As<size_t>());
 	}
 }
 

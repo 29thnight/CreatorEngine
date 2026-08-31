@@ -8,7 +8,7 @@ void BehaviorTreeComponent::Initialize()
 {
 	if (m_BlackBoardGuid != nullFileGuid)
 	{
-		//TODO: �������� �ν��Ͻ� ���� �غ�
+		//TODO: 블랙보드 인스턴스 생성 준비
 		m_pBlackboard = new BlackBoard();
 
 		file::path blackBoardPath = DataSystems->GetFilePath(m_BlackBoardGuid);

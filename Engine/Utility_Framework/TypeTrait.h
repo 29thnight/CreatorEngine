@@ -15,7 +15,7 @@
 #include "Uuid.h"
 #include "combaseapi.h"
 
-// ������ FNV-1a 64��Ʈ constexpr �ؽ�
+// 간단한 FNV-1a 64비트 constexpr 해시
 constexpr uint64_t fnv1a_64(std::string_view s) {
 	uint64_t h = 14695981039346656037ull;
 	for (unsigned char c : s) {
@@ -37,7 +37,7 @@ inline size_t ConvertGUIDToHash(const GUID& guid)
 	return guid.Data1 + guid.Data2 + guid.Data3;
 }
 
-// �⺻: ���� �ƴ�
+// 기본: 벡터 아님
 template<typename T>
 struct VectorElementType { using Type = void; };
 

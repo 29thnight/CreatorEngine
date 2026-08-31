@@ -136,7 +136,7 @@ public:
 		return m_keywordSelections;
 	}
 
-	// ���� Typed setters/getters (explicit cb/var) ����
+	// ── Typed setters/getters (explicit cb/var) ──
 	bool TrySetFloat(std::string_view cb, std::string_view var, float v);
 	bool TryGetFloat(std::string_view cb, std::string_view var, float& out) const;
 
@@ -149,14 +149,14 @@ public:
 	bool TrySetVector(std::string_view cb, std::string_view var, const math::vector2& v);
 	bool TrySetVector(std::string_view cb, std::string_view var, const math::vector3& v);
 	bool TrySetVector(std::string_view cb, std::string_view var, const math::vector4& v);
-	bool TryGetVector(std::string_view cb, std::string_view var, math::vector4& out) const; // �ִ� 4���� ��ȯ
+	bool TryGetVector(std::string_view cb, std::string_view var, math::vector4& out) const; // 최대 4성분 반환
 
 	bool TrySetMatrix(std::string_view cb, std::string_view var, const math::matrix4x4& m);
 	bool TryGetMatrix(std::string_view cb, std::string_view var, math::matrix4x4& out) const;
 
 	bool TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size);
 
-	// ���� Qualified name sugar: "CB.Var" ����
+	// ── Qualified name sugar: "CB.Var" ──
 	bool TrySetFloat(std::string_view qualified, float v);
 	bool TryGetFloat(std::string_view qualified, float& out) const;
 	bool TrySetInt(std::string_view qualified, int32_t v);

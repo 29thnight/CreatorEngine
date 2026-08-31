@@ -5,6 +5,8 @@
 #include <yaml-cpp/yaml.h>
 // FindTypeByInstance가 IObject를 쓴다. IObject는 L1-2에서 코어로 내려왔다
 // (순수 인터페이스 + HashedGuid뿐이라 ScriptBinder 소속일 이유가 없었다).
+#include "AuthoringReadNode.h" // D3-b-2b-1b
+#include "AuthoringScalarConvert.h" // D3-b-2b-1a
 #include "IObject.h"
 // ComponentUUIDRegistry(K1-b) 조회 창구. IObject.h가 이미 물고 있어 사실상
 // 중복 include지만, 이 파일이 직접 쓰는 것을 명시한다.
@@ -29,6 +31,7 @@ namespace Meta
 }
 
 namespace MetaYml = YAML;
+
 using namespace TypeTrait;
 class Entity;
 
@@ -45,13 +48,13 @@ namespace Meta::Typed
 	struct TypeOps
 	{
 		MetaYml::Node (*serialize)(void* instance);
-		void (*deserialize)(void* instance, const MetaYml::Node& node);
+		void (*deserialize)(void* instance, const Authoring::ReadNode& node);
 
 		// CT6-d: 역직렬화 후처리 훅 — ComponentFactory의 타입별 하드코딩
 		// 분기(애셋 GUID 해석·리소스 로드)를 컴포넌트 소유의 OnDeserialized로
 		// 옮기고, 팩토리는 이 포인터 하나로 디스패치한다. 훅이 없는 타입은
 		// nullptr(썽크가 requires로 판별).
-		void (*postLoad)(void* instance, const MetaYml::Node& node);
+		void (*postLoad)(void* instance, const Authoring::ReadNode& node);
 	};
 
 	inline std::unordered_map<size_t, TypeOps>& OpsRegistry()
@@ -130,7 +133,7 @@ namespace Meta
 		return name;
 	}
 
-	inline const Type* ExtractTypeFromYAML(const MetaYml::Node& node)
+	inline const Type* ExtractTypeFromYAML(const Authoring::ReadNode& node)
 	{
 		if (!node || !node.IsMap())
 			return nullptr;
@@ -143,7 +146,7 @@ namespace Meta
 		if (const auto uuidNode = node[kComponentTypeUUIDKey])
 		{
 			Uuid::Uuid16 uuid;
-			if (Uuid::TryParse(uuidNode.as<std::string>(), uuid))
+			if (Uuid::TryParse(std::string(uuidNode.Scalar()), uuid))
 			{
 				if (const std::string* typeName = TypeTrait::ComponentUUIDRegistry::FindNameByUUID(uuid))
 				{
@@ -156,12 +159,12 @@ namespace Meta
 		}
 
 		// 1. key가 typeName이고, value가 typeID일 가능성 → 우선순위 높게
-		for (const auto& kv : node)
+		for (const auto kv : node.Map())
 		{
-			if (!kv.first.IsScalar() || !kv.second.IsScalar())
+			if (!kv.key.IsScalar() || !kv.value.IsScalar())
 				continue;
 
-			const std::string typeName = kv.first.as<std::string>();
+			const std::string typeName{ kv.key.Scalar() };
 
 			// K1-b가 얹은 m_typeUUID 필드는 값이 문자열이다 — 위 0번에서 이미 못
 			// 살렸을 때만 여기까지 내려오므로 그냥 건너뛴다. 쓸 때 항상 타입 헤더
@@ -183,7 +186,17 @@ namespace Meta
 
 			// 이름이 맞았을 때만 값을 typeID로 읽는다. 폴백 오버로드라 던지지 않는다 —
 			// 숫자가 아니면 타입 헤더가 아니라 이름이 우연히 겹친 데이터 필드다.
-			const std::size_t typeID = kv.second.as<std::size_t>(0);
+			// 폴백 형태(`as<T>(0)`)의 등가물: 변환기가 실패하면 0을 쓴다. 던지지
+			// 않는 것이 요점이다 — 숫자가 아니면 타입 헤더가 아니라 이름이 우연히
+			// 겹친 데이터 필드다.
+			std::size_t typeID = 0;
+			{
+				std::uint64_t parsed = 0;
+				if (Authoring::Scalar::TryParseUInt64(kv.value.Scalar(), parsed))
+				{
+					typeID = static_cast<std::size_t>(parsed);
+				}
+			}
 			if (0 == typeID)
 				continue;
 
@@ -204,24 +217,55 @@ namespace Meta
 		}
 
 		// 2. fallback: key가 typeName이고 value가 map인 경우 (Unreal 스타일)
-		for (const auto& kv : node)
+		for (const auto kv : node.Map())
 		{
-			if (kv.first.IsScalar() && kv.second.IsMap())
+			if (kv.key.IsScalar() && kv.value.IsMap())
 			{
-				const std::string typeName = kv.first.as<std::string>();
+				const std::string typeName{ kv.key.Scalar() };
 				bool renamed = false;
 				return MetaDataRegistry->Find(ResolveRenamedTypeName(typeName, renamed));
 			}
 		}
 
 		// 3. fallback: typeID 필드가 있는 경우
-		if (node["typeID"])
+		if (node.HasChild("typeID"))
 		{
-			std::size_t id = node["typeID"].as<std::size_t>();
-			return MetaDataRegistry->Find(id);
+			std::uint64_t id = 0;
+			if (Authoring::Scalar::TryParseUInt64(node["typeID"].Scalar(), id))
+			{
+				return MetaDataRegistry->Find(static_cast<std::size_t>(id));
+			}
 		}
 
 		return nullptr;
+	}
+
+	// ★ 전환기 오버로드. 아직 backend 노드를 들고 있는 호출부 15곳이 있고,
+	//   그들은 `LoadFile`이 옮겨질 때 자연히 `ReadNode`를 받게 된다.
+	//   **이 오버로드가 사라지는 것이 그 전환의 완료 신호다.**
+	inline const Type* ExtractTypeFromYAML(const MetaYml::Node& node)
+	{
+		return ExtractTypeFromYAML(Authoring::ReadNode{ node });
+	}
+
+	// D3-b-2b-1b-2c: 어댑터를 받는 진입점. 소비자는 이쪽을 쓰고, 아래 backend
+	// 오버로드는 아직 옮기지 않은 호출부를 위한 전환기다.
+	inline void Deserialize(void* instance, const Type& type, const Authoring::ReadNode& node)
+	{
+		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
+		{
+			ops->deserialize(instance, node);
+			return;
+		}
+
+		Debug->LogError(std::string("Deserialize: typed ops 미등록 타입 - ") + type.name
+			+ " (RegisterReflectManual.h 목록을 확인하라)");
+	}
+
+	template<class T>
+	inline void Deserialize(T* instance, const Authoring::ReadNode& node)
+	{
+		Deserialize(reinterpret_cast<void*>(instance), TypeOf<T>(), node);
 	}
 
 	inline void Deserialize(void* instance, const Type& type, const MetaYml::Node& node)
@@ -229,7 +273,9 @@ namespace Meta
 		// CT7: 레거시 워크 은퇴 (Serialize와 동일한 이유).
 		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
 		{
-			ops->deserialize(instance, node);
+			// D3-b-2b-1b: 썬크가 어댑터를 받는다. 이 경계가 아직 backend 노드를
+			// 받는 마지막 지점이고, 1b-2가 그것까지 옮긴다.
+			ops->deserialize(instance, Authoring::ReadNode{ node });
 			return;
 		}
 

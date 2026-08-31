@@ -595,7 +595,7 @@ namespace RenderTest
             Meta::Deserialize(&migrating, carrier);
             if (ops && ops->postLoad)
             {
-                ops->postLoad(&migrating, carrier);
+                ops->postLoad(&migrating, Authoring::ReadNode{ carrier });
             }
             check.Check(migrating.m_modelGuid == modelProbe,
                 "legacy 편법(재질 fileGuid)이 m_modelGuid로 이주한다");
@@ -660,7 +660,7 @@ namespace RenderTest
                 Meta::Deserialize(&reloaded, saved);
                 if (ops && ops->postLoad)
                 {
-                    ops->postLoad(&reloaded, saved);
+                    ops->postLoad(&reloaded, Authoring::ReadNode{ saved });
                 }
                 bool roughnessApplied = false;
                 if (reloaded.m_Material)

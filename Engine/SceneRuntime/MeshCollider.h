@@ -115,7 +115,7 @@ public:
 
 
 	//=========================================================
-	// ICollider��(��) ���� ��ӵ�
+	// ICollider을(를) 통해 상속됨
 	void SetPositionOffset(math::vector3 pos) override {
 		m_posOffset = pos;
 	}

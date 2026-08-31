@@ -335,6 +335,20 @@ Run-Step "프리팹 인스턴스 복제" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-duplicate.ps1") -Exe $Exe -Work $Work
 }
 
+# 프리팹 identity 교란(트랙 P). 위 "프리팹 인스턴스 복제"가 2026-08-30에 한 번
+# 실패하고 재현되지 않았다. 원인은 초기 상태가 아니라 **efsw 워처 스레드와의
+# 경합**이었다 — 원자적 게시(.tmp -> replace)를 워처가 Delete로 오독해 본문이
+# 멀쩡한데도 catalog 항목과 sidecar를 떨어뜨렸고(정상 실행 한 판에 두 번, 각
+# ~26ms 실측), 그 창에 prefab.update가 걸리면 새 GUID를 발급하고 인스턴스를
+# 하나도 못 찾은 채 조용히 0건 적용했다.
+#
+# 그 좁은 창을 우연에 맡기지 않고, sidecar를 실행 중에 확정적으로 떨어뜨려
+# 엔진이 identity를 지켜 내는지 본다. 고치기 전 RED(판정 4·5·6), 고친 뒤 GREEN을
+# 확인하고 편입했다.
+Run-Step "프리팹 identity 교란" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-prefab-identity-injection.ps1") -Exe $Exe -Work $Work
+}
+
 # 프리팹 오버라이드 기록(트랙 P — P-write). 인스턴스의 로컬 수정이 저작 시점에
 # 기록되고, 프리팹 갱신이 그것을 존중하는지 값 단위로 본다. 기존 프리팹 검사들이
 # 개수·정체성만 보고 값은 안 보던 사각지대다. object.property(리플렉션 경유)와
@@ -421,6 +435,44 @@ Run-Step "저작 개행 LF 고정(D3-b)" {
 Run-Step "ryml 에러 정책(D3-b-1)" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-ryml-error-policy.ps1") -Exe $Exe -Work $Work
+}
+
+# D3-b-L(SerializationPlan): TagManager 읽기 경로. `Load`를 ryml로 옮긴 뒤 변이를
+# 넣었더니 **어떤 게이트도 잡지 못했다** — 기존 tag 프로브는 메모리 조작만 쟀다.
+# ★ 이 검사는 자산을 스냅샷 뜨고 되돌린다. 에디터가 종료 시 TagManager를 저장하므로
+#   읽기가 깨진 빌드로 돌리면 빈 상태가 디스크를 덮는다(실제로 한 번 잃었다).
+Run-Step "TagManager 읽기(D3-b-L)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-tag-authoring-read.ps1") -Exe $Exe -Work $Work
+}
+
+# D3-b-L(SerializationPlan): ShaderMeta 읽기 경로. 이 파서의 계약은 `dx12.selftest`
+# 안에만 있었고 그것은 이 세트에 없다 — 게다가 자기 하네스는 vcpkg baseline
+# preflight에 막혀 돌지 않는다. 변이로 확인했다: unknown-field 거부를 지우면
+# `dx12.selftest`는 빨개지지만 `verify-experiment-asset-cooker`는 초록이었다.
+# ★ 수용(실자산 6개의 이름 집합)과 거절(사유별 6종)을 함께 잰다. 저작 코퍼스는
+#   전부 유효하므로 수용만 재면 느슨해지는 이식을 원리적으로 못 잡는다.
+Run-Step "ShaderMeta 읽기(D3-b-L)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-shadermeta-authoring-read.ps1") -Exe $Exe -Work $Work
+}
+
+# D3-b-2b-1b-3a(SerializationPlan): 어댑터 수준 파리티. 파서 파리티(트리)와 스칼라
+# 파리티(값)가 증명하지 못하는 축 — 소비자가 실제로 부르는 어댑터 연산 아홉 가지가
+# 두 backend에서 같은 답을 내는가. 맵 키가 노드인가 속성인가, 널이 타입인가 값
+# 표기인가 하는 비대칭을 어댑터가 옳게 흡수했는지는 여기서만 드러난다.
+Run-Step "어댑터 파리티(D3-b-2b-1b-3a)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-adapter-parity.ps1") -Exe $Exe -Work $Work
+}
+
+# D3-b-2b-1b(SerializationPlan): backend 경계 래칫. 읽기 경로를 ryml로 옮기는 일은
+# 한 번에 못 하므로, 아직 backend 노드를 만지는 자리마다 이름이 흉한 탈출구를 두었다.
+# 이 검사가 막는 것은 **역행**이다 — 새 코드가 어댑터 대신 backend 노드를 직접 잡으면
+# 빌드도 게이트도 통과하므로 아무도 모른다. 기준선보다 늘면 실패한다.
+Run-Step "backend 경계 래칫(D3-b-2b-1b)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-authoring-backend-boundary.ps1")
 }
 
 # D3-b-2(SerializationPlan): 스칼라 **변환** 파리티. 구조 파리티가 증명하지 못하는

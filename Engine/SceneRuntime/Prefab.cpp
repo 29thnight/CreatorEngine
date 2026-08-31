@@ -213,7 +213,7 @@ const MetaYml::Node& Prefab::GetPrefabData() const
 void Prefab::SetPrefabData(const Authoring::NodeView& view)
 {
     m_prefabData = Authoring::DocumentAccess::Adopt(
-        Authoring::NodeViewAccess::Node(view));
+        Authoring::NodeViewAccess::Node(view).BackendNodeDuringTransition());
 }
 
 Entity* Prefab::Instantiate(std::string_view newName) const
@@ -242,7 +242,7 @@ Entity* Prefab::Instantiate(std::string_view newName) const
     {
 		const MetaYml::Node& gameObjNode = prefabData[i];
 
-        // ù ��° GameObject���� overrideName ����
+        // 첫 번째 GameObject에만 overrideName 적용
         std::string_view nameOverride = (i == 0) ? newName : "";
 
         Entity* instantiated = InstantiateRecursive(gameObjNode, scene, 0, context, nameOverride);
@@ -281,7 +281,7 @@ Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
     {
 		const MetaYml::Node& gameObjNode = prefabData[i];
 
-        // ù ��° GameObject���� overrideName ����
+        // 첫 번째 GameObject에만 overrideName 적용
         std::string_view nameOverride = (i == 0) ? newName : "";
 
         Entity* instantiated = InstantiateRecursive(gameObjNode, scene, 0, context, nameOverride);
@@ -465,7 +465,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
     if (node["m_components"])
     {
-        for (const auto& componentNode : node["m_components"])
+        for (const auto componentNode : Authoring::ReadNode{ node }["m_components"])
         {
             try
             {

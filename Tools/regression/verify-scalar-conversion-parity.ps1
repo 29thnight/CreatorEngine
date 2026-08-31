@@ -31,16 +31,21 @@ if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
 $Exe = (Resolve-Path -LiteralPath $Exe).Path
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
-# 실측으로 확정한 알려진 차이(2026-08-30, ryml 0.16 / yaml-cpp).
-#   · yaml-cpp는 YAML 1.1 불리언(yes/no/on/off)과 .inf/.nan을 읽고 ryml은 거부한다.
-#   · 반대로 1/0은 **yaml-cpp가 거부하고** ryml이 읽는다(방향이 뒤집힌 차이).
-#   · 8진 0o10도 ryml만 읽는다.
-#   · `~`를 문자열로 읽으면 yaml-cpp는 "null", ryml은 "~"를 준다.
+# 실측으로 확정한 알려진 ryml 차이(2026-08-30, ryml 0.16 / yaml-cpp). 67케이스 중 21건.
+#
+# ★ **가장 위험한 것은 실패가 아니라 "둘 다 성공하는데 값이 다른" 쪽이다.**
+#     · `010` → yaml-cpp 8(8진), ryml 10(10진)
+#     · `99999999999999999999999` → yaml-cpp 실패, ryml 200376420520689663(쓰레기)
+#     · `1.5x` → yaml-cpp 실패, ryml 1.5(부분 파싱)
+#   에러도 로그도 없이 값만 틀린다. 그래서 D3-b-2b-1a가 변환을 문자열 위로 내렸고,
+#   D3-b-2b-1b는 ryml `from_chars`를 **직접 쓰면 안 된다** — 이 표가 그 근거다.
 $expected = @(
-    'f-inf', 'f-neg-inf', 'f-nan',
-    'b-yes', 'b-no', 'b-on', 'b-off',
+    'f-inf', 'f-neg-inf', 'f-nan', 'f-inf-caps', 'f-nan-caps',
+    'f-plus', 'f-partial',
+    'b-yes', 'b-no', 'b-on', 'b-off', 'b-y', 'b-n',
     'b-one', 'b-zero',
-    'u-octal',
+    'u-octal', 'u-octal-lead0', 'u-plus', 'u-overflow',
+    'i-plus',
     'null-tilde-s'
 )
 
@@ -64,13 +69,19 @@ if (-not $process.HasExited) {
 $text = if (Test-Path -LiteralPath $stdout) { Get-Content -LiteralPath $stdout -Raw } else { '' }
 $failures = New-Object System.Collections.Generic.List[string]
 
-$summary = [regex]::Match($text, '\[serialize\.scalarparity\] cases=(\d+) agree=(\d+) diverge=(\d+)')
+$summary = [regex]::Match($text, '\[serialize\.scalarparity\] cases=(\d+) agree=(\d+) diverge=(\d+) convDiverge=(\d+)')
 if (-not $summary.Success) {
     $failures.Add('요약 라인이 없다 — 명령 미등록이거나 낡은 exe다')
 } else {
     $cases = [int]$summary.Groups[1].Value
+    $convDiverge = [int]$summary.Groups[4].Value
     # 0건을 비교하고 "차이 0"을 통과로 읽지 않는다.
-    if ($cases -lt 40) { $failures.Add("케이스가 $cases 건뿐이다 — 표가 축소됐다") }
+    if ($cases -lt 60) { $failures.Add("케이스가 $cases 건뿐이다 — 표가 축소됐다") }
+    # ★ 이식 변환기(`Authoring::Scalar`)와 yaml-cpp의 차이는 **허용되지 않는다.**
+    #   ryml과의 차이는 목록으로 관리하지만, 이쪽은 0이어야 D3-b-2b-1a가 성립한다.
+    #   실제로 이 단정이 이식 오류 3건을 잡았다(부호 없는 정수의 음수 수용,
+    #   널 노드의 문자열 표현 2건).
+    if ($convDiverge -ne 0) { $failures.Add("이식 변환기가 yaml-cpp와 $convDiverge 건 갈린다 — CONV-DIVERGE 라인 참조") }
 }
 
 $actual = @([regex]::Matches($text, '\[serialize\.scalarparity\] DIVERGE (\S+)') |
@@ -91,11 +102,16 @@ if ($goneOnes.Count -gt 0) {
 #
 # ryml이 **거부**하는 표기(.inf/.nan/YAML 1.1 불리언)가 자산에 있으면, 파서를 옮긴
 # 뒤 그 필드는 예외 없이 기본값이 된다 — 조용한 데이터 손상이다.
-$assetRoot = Join-Path $root 'Dynamic_CPP\Assets'
+# 저작 자산은 `Assets/` 안에만 있지 않다 — 개행 게이트가 같은 구멍으로 한 번
+# 거짓 초록을 낸 적이 있다(ProjectSetting 미스캔). 두 루트를 모두 본다.
+$assetRoots = @(
+    (Join-Path $root 'Dynamic_CPP\Assets'),
+    (Join-Path $root 'Dynamic_CPP\ProjectSetting')
+)
 $riskyFloat = 0
 $riskyBool = 0
 $scanned = 0
-if (Test-Path -LiteralPath $assetRoot -PathType Container) {
+foreach ($assetRoot in ($assetRoots | Where-Object { Test-Path -LiteralPath $_ -PathType Container })) {
     $exts = @('.creator', '.prefab', '.meta', '.shadermeta', '.volume', '.asset')
     foreach ($file in Get-ChildItem -LiteralPath $assetRoot -Recurse -File) {
         if ($exts -notcontains $file.Extension.ToLowerInvariant()) { continue }
@@ -129,5 +145,5 @@ if ($failures.Count -gt 0) {
 }
 
 Remove-Item -LiteralPath $run -Recurse -Force -ErrorAction SilentlyContinue
-'전체 통과 — 알려진 변환 차이 11건과 일치하고, 위험 표기는 자산에 없다'
+'전체 통과 — 이식 변환기는 yaml-cpp와 차이 0, ryml 차이는 알려진 21건과 일치'
 exit 0

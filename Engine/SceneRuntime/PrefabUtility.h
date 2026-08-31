@@ -61,7 +61,11 @@ public:
     // 있는 것보다 싸므로 계속 부른다. GameObject::Destroy가 부른다.
     void UnregisterInstance(Entity* instance);
 
-    void UpdateInstances(const Prefab* prefab);
+    // 반환값은 **실제로 값을 덮은 인스턴스 수**다. 호출자가 이 수를 보고해야
+    // "0건 적용"이 성공처럼 보이는 것을 막는다 — prefab.update는 오래 등록부
+    // 전체(RegisteredInstanceCount)를 찍어, identity가 어긋나 아무것도 못 찾은
+    // 실행에서도 "2개에 적용"이라고 말했다(2026-08-30).
+    size_t UpdateInstances(const Prefab* prefab);
     bool SavePrefab(const Prefab* prefab, const std::string& path);
 
     // 아래 세 Load*는 모두 비소유 관찰 포인터를 반환한다 — 소유는 m_prefabCache가

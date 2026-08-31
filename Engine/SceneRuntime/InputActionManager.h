@@ -21,7 +21,7 @@ public:
 	bool SaveManager();
 	void LoadManager();
 
-	//�� �ϳ��� json �Ѱ�������
+	//맵 하나당 json 한개로저장
 	bool SerializeMap(ActionMap* _actionMap);
 	ActionMap* DeSerializeMap(std::string _filepath);
 	void ClearActionMaps() 

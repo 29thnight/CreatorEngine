@@ -70,12 +70,12 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 	}
 
 	g_CurrentBrush->m_isEditMode = false;
-	// ImGui UI ���� (������ �� �г� ����)
+	// ImGui UI 예시 (에디터 툴 패널 내부)
 	if (ImGui::CollapsingHeader("Terrain Editor", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		//inspector�� ȭ�鿡 �ߴ� ��� �귯�ð� Ȱ��ȭ�� ���·� ����
-		g_CurrentBrush->m_isEditMode = true; // �귯�ð� Ȱ��ȭ�� ���·� ����
-		// ��� ����
+		//inspector가 화면에 뜨는 경우 브러시가 활성화된 상태로 설정
+		g_CurrentBrush->m_isEditMode = true; // 브러시가 활성화된 상태로 설정
+		// 모드 선택
 		const char* modes[] = { "Raise", "Lower", "Flatten", "PaintLayer", "FoliageMode" };
 		int currentMode = static_cast<int>(g_CurrentBrush->m_mode);
 		if (ImGui::Combo("Edit Mode", &currentMode, modes, IM_ARRAYSIZE(modes)))
@@ -85,25 +85,25 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 		{
 			if (ImGui::CollapsingHeader("Paint Terrain", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				// ������ �����̴� (1 ~ 50 ���� ���� ����)
+				// 반지름 슬라이더 (1 ~ 50 등의 범위 예시)
 				ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
 
-				// ���� �����̴�
+				// 세기 슬라이더
 				ImGui::SliderFloat("Strength", &g_CurrentBrush->m_strength, 0.0f, 1.0f);
 
-				// Flatten �ɼ��� ���� ��ǥ ���� �Է�
+				// Flatten 옵션일 때만 목표 높이 입력
 				if (g_CurrentBrush->m_mode == TerrainBrush::Mode::Flatten)
 				{
 					//ImGui::InputFloat("Target Height", &g_CurrentBrush->m_flatTargetHeight);
 					ImGui::SliderFloat("FlatHeight", &g_CurrentBrush->m_flatTargetHeight, -100.0f, 500.0f);
 				}
 
-				// [MODIFIED] ���յ� ���̾� ���� UI
+				// [MODIFIED] 통합된 레이어 관리 UI
 				if (g_CurrentBrush->m_mode == TerrainBrush::Mode::PaintLayer)
 				{
 					ImGui::SeparatorText("Layers");
 
-					// --- �߰�/���� ��ư ---
+					// --- 추가/삭제 버튼 ---
 					if (ImGui::Button(ICON_FA_PLUS " Add"))
 					{
 						file::path diffuseFile = ShowOpenFileDialog(L"");
@@ -115,7 +115,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					}
 					ImGui::SameLine();
 
-					// ���õ� ���̾ ���� ��� ���� ��ư ��Ȱ��ȭ
+					// 선택된 레이어가 없을 경우 삭제 버튼 비활성화
 					bool isLayerSelected = terrainComponent->GetSelectedLayerId() != 0xFFFFFFFF;
 					if (!isLayerSelected)
 					{
@@ -126,9 +126,9 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						if (isLayerSelected)
 						{
 							uint32_t layerToDelete = terrainComponent->GetSelectedLayerId();
-							// ���� �� ���� ����
+							// 삭제 후 선택 해제
 							terrainComponent->SetSelectedLayerId(0xFFFFFFFF);
-							g_CurrentBrush->m_layerID = 0; // �귯�� Ÿ�� �ʱ�ȭ
+							g_CurrentBrush->m_layerID = 0; // 브러시 타겟 초기화
 							terrainComponent->RemoveLayer(layerToDelete);
 						}
 					}
@@ -137,7 +137,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						ImGui::EndDisabled();
 					}
 
-					// --- ���̾� ��� ����Ʈ �ڽ� ---
+					// --- 레이어 목록 리스트 박스 ---
 					std::vector<const char*> layerNames = terrainComponent->GetLayerNames();
 					int currentSelection = static_cast<int>(terrainComponent->GetSelectedLayerId());
 
@@ -145,13 +145,13 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					{
 						if (currentSelection >= 0 && currentSelection < layerNames.size())
 						{
-							// ������ ���ð� �귯�� ����Ʈ Ÿ���� ���� ������Ʈ
+							// 관리용 선택과 브러시 페인트 타겟을 동시 업데이트
 							terrainComponent->SetSelectedLayerId(static_cast<uint32>(currentSelection));
 							g_CurrentBrush->m_layerID = currentSelection;
 						}
 					}
 
-					// --- ���õ� ���̾� �Ӽ� ���� ---
+					// --- 선택된 레이어 속성 편집 ---
 					if (terrainComponent->GetSelectedLayerId() != 0xFFFFFFFF)
 					{
 						TerrainLayer* selectedLayer = terrainComponent->GetLayerDesc(terrainComponent->GetSelectedLayerId());
@@ -159,7 +159,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						{
 							ImGui::SeparatorText("Properties");
 
-							// �ؽ�ó ����� ǥ��
+							// 텍스처 썸네일 표시
 							// 백엔드를 묻지 않는다 — Texture::HasImage 주석 참고(T2).
 							if (selectedLayer->diffuseTexture && selectedLayer->diffuseTexture->HasImage())
 							{
@@ -169,7 +169,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							
 							ImGui::Text("Name: %s", selectedLayer->layerName.c_str());
 
-							// Ÿ�ϸ� ����
+							// 타일링 수정
 							float tiling = selectedLayer->tilling;
 							if (ImGui::DragFloat("Tiling", &tiling, 0.1f, 0.1f, 4096.0f))
 							{
@@ -184,7 +184,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					terrainComponent->RefreshTexture();
 				}
 
-				// �귯�� ��� ����
+				// 브러시 모양 선택
 				if (ImGui::Button("mask texture load"))
 				{
 					file::path maskTexture = ShowOpenFileDialog(L"");
@@ -210,12 +210,12 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							{
 								selectedMaskIndex = maskIndex;
 								uint32_t id = static_cast<uint32_t>(maskIndex);
-								g_CurrentBrush->SetMaskID(maskIndex); // ���õ� ����ũ ID ����
+								g_CurrentBrush->SetMaskID(maskIndex); // 선택된 마스크 ID 설정
 							}
 							else
 							{
-								selectedMaskIndex = -1; // �̹� ���õ� ����ũ�� �ٽ� Ŭ���ϸ� ���� ����
-								uint32_t id = 0xFFFFFFFF; // "None" ���� �� -1�� ����
+								selectedMaskIndex = -1; // 이미 선택된 마스크를 다시 클릭하면 선택 해제
+								uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
 								g_CurrentBrush->SetMaskID(id); // No mask selected
 							}
 						}
@@ -266,9 +266,9 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					ImGui::Combo("Type", &typeIndex, typeNames.data(), static_cast<int>(typeNames.size()));
 					g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(typeIndex);
 				}
-				// ������ �����̴� (1 ~ 50 ���� ���� ����)
+				// 반지름 슬라이더 (1 ~ 50 등의 범위 예시)
 				ImGui::SliderFloat("Radius", &g_CurrentBrush->m_radius, 1.0f, 50.0f);
-				// ���� �����̴�
+				// 세기 슬라이더
 				ImGui::InputInt("Density", &g_CurrentBrush->m_foliageDensity);
 
 				ImGui::SeparatorText("Foliage Mesh");
@@ -329,7 +329,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					}
 				}
 
-				// �귯�� ��� ����
+				// 브러시 모양 선택
 				if (ImGui::Button("mask texture load"))
 				{
 					file::path maskTexture = ShowOpenFileDialog(L"");
@@ -355,12 +355,12 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 							{
 								selectedMaskIndex = maskIndex;
 								uint32_t id = static_cast<uint32_t>(maskIndex);
-								g_CurrentBrush->SetMaskID(maskIndex); // ���õ� ����ũ ID ����
+								g_CurrentBrush->SetMaskID(maskIndex); // 선택된 마스크 ID 설정
 							}
 							else
 							{
-								selectedMaskIndex = -1; // �̹� ���õ� ����ũ�� �ٽ� Ŭ���ϸ� ���� ����
-								uint32_t id = 0xFFFFFFFF; // "None" ���� �� -1�� ����
+								selectedMaskIndex = -1; // 이미 선택된 마스크를 다시 클릭하면 선택 해제
+								uint32_t id = 0xFFFFFFFF; // "None" 선택 시 -1로 설정
 								g_CurrentBrush->SetMaskID(id); // No mask selected
 							}
 						}

@@ -14,7 +14,7 @@ struct Collision
 	const std::vector<math::vector3>& contactPoints;
 };
 
-//raycast event ���� �Լ���� ���� ���κο� ���� �Ұ�
+//raycast event 관련 함수등록 관련 메인부에 문의 할것
 struct RayEvent {
 	struct ResultData {
 		bool hasBlock;
@@ -47,12 +47,12 @@ struct RaycastHit {
 };
 
 struct HitResult {
-	// ��� �������� ���������� �����Ǵ� ����
+	// 모든 쿼리에서 공통적으로 제공되는 정보
 	Entity* gameObject = nullptr;
 	unsigned int layer = 0;
 
-	// Raycast�� Sweep ���������� ��ȿ�� �����Դϴ�.
-	// (Overlap�� ��� �⺻������ �����˴ϴ�.)
+	// Raycast와 Sweep 쿼리에서만 유효한 정보입니다.
+	// (Overlap의 경우 기본값으로 유지됩니다.)
 	math::vector3 point{};
 	math::vector3 normal{};
 	float distance = -1.0f;
@@ -73,12 +73,12 @@ private:
 	PhysicsManager() = default;
 	~PhysicsManager() = default;
 	//todo : 
-	// - �������� �ʱ�ȭ �� ������Ʈ
-	// - �������� ����
-	// - �������� �� ����
-	// - Object�� ��ȸ�ϸ� ����������Ʈ�� ã�� ���� �� ������Ʈ �� ����
-	// - �������� �ݸ��� �̺�Ʈ�� ã�Ƽ� �ݹ��Լ� ȣ��
-	// - �������� ������Ʈ�� �����͸� ������� ����� ���� ��ο�
+	// - 물리엔진 초기화 및 업데이트
+	// - 물리엔진 종료
+	// - 물리엔진 씬 변경
+	// - Object를 순회하며 물리컴포넌트를 찾아 생성 및 업데이트 및 삭제
+	// - 물리엔진 콜리전 이벤트를 찾아서 콜백함수 호출
+	// - 물리엔지 컴포넌트의 데이터를 기반으로 디버그 정보 드로우
 public:
 	friend class Scene;
 	using ColliderID = unsigned int;
@@ -96,7 +96,7 @@ public:
 		CollisionData data;
 		ECollisionEventType Type;
 	};
-	// RigidBodyComponent�� PhysicsManager�� ���� ������ ��û�� �� ����ϴ� ����ü
+	// RigidBodyComponent가 PhysicsManager로 상태 변경을 요청할 때 사용하는 구조체
 	struct RigidBodyState
 	{
 		unsigned int id;
@@ -108,48 +108,48 @@ public:
 		math::vector3 movePosition{};
 	};
 public:
-	// �������� �ʱ�ȭ �� ������Ʈ
+	// 물리엔진 초기화 및 업데이트
 	void Initialize();
 	void Update(float fixedDeltaTime);
 
-	// �������� ����
+	// 물리엔진 종료
 	void Shutdown();
 
-	// �������� �� ����
+	// 물리엔진 씬 변경
 	void ChangeScene();
 
-	//�� �ε� -> ���� ������ �� ������ü�� �����ϰ� ���� ���Ӿ��� ��ü�� ���� �������� ��ü�� ������ ���
+	//씬 로드 -> 남아 있을지 모를 물리객체를 삭제하고 현제 게임씬의 객체에 대한 물리엔진 객체를 생성및 등록
 	[[maybe_unused]] void OnLoadScene();
 
-	//�� ��ε�
+	//씬 언로드
 	void OnUnloadScene();
 
-	//��ϵ� �ݹ��Լ� ����
+	//등록된 콜백함수 실행
 	void ProcessCallback();
 
 	//============================
-	//raycast ���� �Լ���
+	//raycast 관련 함수들
 	void RayCast(RayEvent& rayEvent);
 	bool Raycast(RayEvent& rayEvent, RaycastHit& hit);
 	int Raycast(RayEvent& rayEvent, std::vector<RaycastHit>& hits);
 	//============================
-	//Shape Sweep ���� �Լ���
+	//Shape Sweep 관련 함수들
 	int BoxSweep(const SweepInput& in, const math::vector3& boxExtent, std::vector<HitResult>& out_hits);
 	int SphereSweep(const SweepInput& in, float radius, std::vector<HitResult>& out_hits);
 	int CapsuleSweep(const SweepInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits);
 	//============================
-	//Shape Overlap ���� �Լ���
+	//Shape Overlap 관련 함수들
 	int BoxOverlap(const OverlapInput& in, const math::vector3& boxExtent, std::vector<HitResult>& out_hits);
 	int SphereOverlap(const OverlapInput& in, float radius, std::vector<HitResult>& out_hits);
 	int CapsuleOverlap(const OverlapInput& in, float radius, float halfHeight, std::vector<HitResult>& out_hits);
 	//============================
 	
-	//�浹 ��Ʈ���� ����
+	//충돌 메트릭스 변경
 	void SetCollisionMatrix(std::vector<std::vector<uint8_t>> collisionGrid) {
 		m_collisionMatrix = std::move(collisionGrid);
 		unsigned int collisionMatrix[32] = { 0 };
 		for (int i = 0; i < 32; ++i) {
-			collisionMatrix[i] = 0; // �ʱ�ȭ
+			collisionMatrix[i] = 0; // 초기화
 			for (int j = 0; j < 32; ++j) {
 				if (m_collisionMatrix[i][j] != 0) {
 					collisionMatrix[i] |= (1 << j);
@@ -164,29 +164,29 @@ public:
 	bool SaveCollisionMatrix();
 	void LoadCollisionMatrix();
 
-	// RigidBody ���� ���� ��û (RigidBodyComponent���� ȣ��)
+	// RigidBody 상태 변경 요청 (RigidBodyComponent에서 호출)
 	void SetRigidBodyState(const RigidBodyState& state);
 
-	// Rigidbody ���� ��ȸ
+	// Rigidbody 상태 조회
 	bool IsRigidBodyKinematic(unsigned int id) const;
 	bool IsRigidBodyTrigger(unsigned int id) const;
 	bool IsRigidBodyColliderEnabled(unsigned int id) const;
 	bool IsRigidBodyUseGravity(unsigned int id) const;
 
 
-	// ������ CCT�� ���� �̵��� ���۽�ŵ�ϴ�.
+	// 지정된 CCT에 강제 이동을 시작시킵니다.
 	void ApplyForcedMoveToCCT(UINT controllerId, const math::vector3& initialVelocity);
 
-	// ������ CCT�� ���� �̵��� ������ŵ�ϴ�.
+	// 지정된 CCT의 강제 이동을 중지시킵니다.
 	void StopForcedMoveOnCCT(UINT controllerId);
 
-	// ������ CCT�� ���� ���� �̵� ������ Ȯ���մϴ�.
+	// 지정된 CCT가 현재 강제 이동 중인지 확인합니다.
 	bool IsInForcedMove(UINT controllerId) const;
 
-	// CharacterController�� ��ġ�� ������ �����ϴ� �������̽� (���� ť�� �۾��� �߰��մϴ�)
+	// CharacterController의 위치를 강제로 설정하는 인터페이스 (이제 큐에 작업을 추가합니다)
 	void SetControllerPosition(UINT id, const math::vector3& pos);
 
-	//geometry �˻�
+	//geometry 검사
 	//bool IsPenetrating();
 
 private:
@@ -196,16 +196,16 @@ private:
 	void ApplyPendingChanges();
 
 private:
-	// �ʱ�ȭ ����
+	// 초기화 여부
 	bool m_bIsInitialized{ false };
 
-	// �������� �ùķ���Ʈ ����
+	// 물리엔진 시뮬레이트 여부
 	bool m_bPlay{ false };
 
-	//����� ��ο� ����
+	//디버그 드로우 여부
 	bool m_bDebugDraw{ false };
 
-	//���ε� �Ϸ� ����
+	//씬로드 완료 여부
 	bool m_bIsLoaded{ false };
 
 	//================
@@ -245,21 +245,21 @@ private:
 
 
 
-	std::vector<std::vector<uint8_t>> m_collisionMatrix = std::vector<std::vector<uint8_t>>(32, std::vector<uint8_t>(32, true)); //�⺻ ���� ��� ���̾ �浹�ϴ� ������ ����
+	std::vector<std::vector<uint8_t>> m_collisionMatrix = std::vector<std::vector<uint8_t>>(32, std::vector<uint8_t>(32, true)); //기본 값은 모든 레이어가 충돌하는 것으로 설정
 	
-	// CCT ��ġ ������ ���� ��� ť
+	// CCT 위치 변경을 위한 펜딩 큐
 	struct PendingControllerPosition
 	{
 		UINT id;
 		math::vector3 position;
 	};
 	std::vector<PendingControllerPosition> m_pendingControllerPositions;
-	void ApplyPendingControllerPositionChanges(); // ����� CCT ��ġ ������ �����ϴ� �Լ�
+	void ApplyPendingControllerPositionChanges(); // 펜딩된 CCT 위치 변경을 적용하는 함수
 	
-	//�������� ��ü
+	//물리엔진 객체
 	//std::unordered_map<ColliderID, ColliderInfo> m_colliderContainer;
 
-	//�ݸ��� �ݹ� 
+	//콜리전 콜백 
 	std::vector<CollisionCallbackInfo> m_callbacks;
 };
 

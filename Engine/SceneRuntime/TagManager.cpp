@@ -1,3 +1,4 @@
+#include "AuthoringParsedDocument.h"
 #include "TagManager.h"
 #include "Core.Minimal.h"
 #include "ReflectionYml.h"
@@ -79,15 +80,27 @@ void TagManager::Load()
         return;
     }
 
-    YAML::Node root = YAML::LoadFile(path.string());
+    // D3-b-L: ryml로 읽는다(leaf 파서 — 소비자가 backend에 묶여 있지 않다).
+    // ★ 문서가 트리를 소유한다. root 이하 노드는 이 스코프 안에서만 유효하다.
+    std::string parseError;
+    const Authoring::ParsedDocument document =
+        Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+    if (!document)
+    {
+        Debug->LogError("TagManager parse failed: " + path.string() + " (" + parseError + ")");
+        // 플래그를 세우지 않고 나간다 — Save가 빈 상태로 덮어쓰지 못하게 한다.
+        return;
+    }
+    const Authoring::ReadNode root = document.Root();
+    m_loadSucceeded = true;
 
     if (root["tags"])
     {
         ClearTags();
         size_t index = 0;
-        for (const auto& t : root["tags"])
+        for (const auto t : root["tags"])
         {
-            std::string tag = t.as<std::string>();
+            std::string tag = t.AsString();
             m_tags.push_back(tag);
             m_tagMap[tag] = index++;
         }
@@ -97,9 +110,9 @@ void TagManager::Load()
     {
         ClearLayers();
         size_t index = 0;
-        for (const auto& l : root["layers"])
+        for (const auto l : root["layers"])
         {
-            std::string layer = l.as<std::string>();
+            std::string layer = l.AsString();
             m_layers.push_back(layer);
             m_layerMap[layer] = index++;
         }
@@ -108,6 +121,15 @@ void TagManager::Load()
 
 bool TagManager::Save()
 {
+    // ★ 로드가 실패한 상태로 기존 파일을 덮지 않는다. 빈 상태 저장은
+    //   사용자가 정말 전부 지운 경우에만 정당하고, 로드 실패 뒤에는 손실이다.
+    if (!m_loadSucceeded && file::exists(ResolveTagManagerPath()))
+    {
+        Debug->LogWarning("TagManager::Save 건너뜀 — 로드가 성공한 적이 없어 "
+            "기존 자산을 빈 상태로 덮을 수 없다");
+        return false;
+    }
+
     // 빈 시퀀스를 명시한다. 손대지 않은 Node를 흘리면 yaml-cpp가 0바이트를 내고,
     // 그렇게 저장된 자산은 Load가 tags/layers를 하나도 복원하지 못한다.
     YAML::Node tagsNode(YAML::NodeType::Sequence);
