@@ -10,10 +10,12 @@
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Experiment/MaterialAuthoringCodec.h" // S2c-2a: override 값 표기 정본
+#include "Experiment/Model.h" // I5-D4c: 이름→메시 해석의 experiment 정본
 #include "ExperimentMaterialMigration.h" // S2c-2a: diff 타이핑·override 적용
 #include <mathematics/transform.hpp>
 
 #include <algorithm>
+#include <cstdio> // I5-D4c: [mesh.resolve] 경로 관측(stdout — CLI 게이트 채널)
 
 namespace
 {
@@ -366,7 +368,42 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	const Authoring::ReadNode getMeshNode = node["m_Mesh"];
 	if (model && getMeshNode)
 	{
-		m_Mesh = model->GetMeshShared(getMeshNode["m_name"].AsString());
+		const std::string meshName = getMeshNode["m_name"].AsString();
+
+		// I5-D4c — 이름→메시 해석의 정본이 experiment다. experiment 모델에서
+		// 이름으로 인덱스를 찾고, legacy m_Mesh는 그 인덱스로 꺼낸다(역브리지
+		// 1:1 순서 계약 — 병행 바인딩 등록과 같은 전제). experiment 모델이
+		// 없으면(Assimp 폴백·A/B off) legacy 이름 조회가 폴백이다. 해석 경로는
+		// stdout으로 계수한다([model.dual]과 같은 채널 — 게이트가 실증).
+		bool resolvedViaExperiment = false;
+		m_experimentModel = DataSystems->TryGetExperimentModel(m_modelGuid);
+		if (m_experimentModel)
+		{
+			const auto meshes = m_experimentModel->Meshes();
+			for (std::size_t index = 0; index < meshes.size(); ++index)
+			{
+				if (meshes[index].name != meshName) continue;
+				m_experimentMeshIndex = static_cast<std::uint32_t>(index);
+				m_Mesh = model->GetMeshShared(static_cast<int>(index));
+				resolvedViaExperiment = (nullptr != m_Mesh);
+				break;
+			}
+			if (!resolvedViaExperiment) m_experimentModel.reset();
+		}
+		if (!resolvedViaExperiment)
+		{
+			m_Mesh = model->GetMeshShared(meshName);
+			// 신원 조회 폴백 — legacy로 해석해도 핸들은 최대한 잇는다
+			// (A/B off면 조회 자체가 거부돼 빈 채로 남는다 — 대조군 계약).
+			EnsureExperimentBinding();
+		}
+		if (m_Mesh)
+		{
+			std::printf("[mesh.resolve] %s: %s\n",
+				resolvedViaExperiment ? "experiment" : "legacy",
+				meshName.c_str());
+		}
+
 		// I5-D4a(D0b 이행): m_LODThresholds → GenerateLODs 재실행을 절단했다.
 		// GenerateLODs는 MeshOptimizer 결과를 버리고(indexCount만 보관) 그
 		// 계수의 유일한 독자 HasLODs는 전 리포 호출자 0이다 — 매 로드마다
@@ -403,5 +440,15 @@ void MeshRenderer::OnAfterSerialize(YAML::Node& node)
 			+ error);
 	}
 	node["m_Material"] = DataSystems->SerializeMaterialPayload(*m_Material);
+}
+
+void MeshRenderer::EnsureExperimentBinding()
+{
+	// I5-D4c — 핸들 확보의 정본. postLoad의 experiment 이름 해석이 이미
+	// 채웠으면 no-op이고, 그 밖의 경로(ModelSceneBridge 생성 — D4d 전까지
+	// legacy 대입)는 여기의 legacy 신원 조회가 잇는다. 프록시 생성이 부른다.
+	if (m_experimentModel || nullptr == m_Mesh) return;
+	DataSystems->TryGetExperimentMeshBinding(
+		*m_Mesh, m_experimentModel, m_experimentMeshIndex);
 }
 

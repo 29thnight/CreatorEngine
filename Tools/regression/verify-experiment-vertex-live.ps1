@@ -143,6 +143,14 @@ if ($dualCount -lt 1) { $fail += "1 [model.dual] experiment 경로 0건 — 로�
 if ($logOn -notmatch '\[model\.dual\] experiment 경로: Gunner_F_Mythic\.glb') {
     $fail += "1b 스킨 모델(Gunner)이 experiment 경로가 아니다"
 }
+# ★ 1c(I5-D4c) — 씬 postLoad의 이름→메시 해석이 experiment 정본을 탔는가.
+#   legacy 해석이 하나라도 남으면 GetMeshShared(name) 참조가 살아 있는 것이다
+#   (Assimp 폴백 모델이 없는 이 씬에서는 전량 experiment여야 한다).
+$resolveExpOn = ([regex]::Matches($logOn, '\[mesh\.resolve\] experiment:')).Count
+$resolveLegacyOn = ([regex]::Matches($logOn, '\[mesh\.resolve\] legacy:')).Count
+if ($resolveExpOn -lt 1 -or $resolveLegacyOn -ne 0) {
+    $fail += "1c 메시 해석 experiment $resolveExpOn · legacy $resolveLegacyOn — 이름 해석이 legacy로 샜다"
+}
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
 # I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
 # legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
@@ -170,7 +178,7 @@ if ($fwdBatchOn -le 0) {
     $fail += "3c 포워드 배치 $fwdBatchOn — 큐 $fwdOn 인데 배치가 비었다(드로우를 버렸다)"
 }
 
-"on  — model.dual $dualCount 건 · experiment 업로드 $uploadsOn/$totalOn(핸들 $handleOn) · 드로우 $drawsOn(포워드 $fwdOn) · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
+"on  — model.dual $dualCount 건 · 메시 해석 experiment $resolveExpOn/legacy $resolveLegacyOn · experiment 업로드 $uploadsOn/$totalOn(핸들 $handleOn) · 드로우 $drawsOn(포워드 $fwdOn) · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
 
 # ── B: 스위치 끔 ──
 $logOff = Invoke-Run "off" "0"
@@ -184,6 +192,10 @@ if ($uploadsOff -ne 0) { $fail += "4a 스위치를 껐는데 experiment 업로�
 # 안 보면 off 대조군이 반쪽이 된다.
 $handleOff = Get-HandleUploads $logOff
 if ($handleOff -ne 0) { $fail += "4g 스위치를 껐는데 핸들 업로드 $handleOff" }
+# I5-D4c: 스위치가 이름 해석 정본 전환도 막는가 — off 대조군은 전량 legacy
+# 해석이어야 한다(TryGetExperimentModel이 스위치를 본다).
+$resolveExpOff = ([regex]::Matches($logOff, '\[mesh\.resolve\] experiment:')).Count
+if ($resolveExpOff -ne 0) { $fail += "4h 스위치를 껐는데 experiment 해석 $resolveExpOff" }
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"
 }

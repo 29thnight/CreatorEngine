@@ -417,6 +417,9 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 				ExperimentMeshBinding{ result.model,
 					static_cast<std::uint32_t>(index) };
 		}
+		// I5-D4c — 모델 GUID로도 잇는다(씬 postLoad의 이름 해석 정본 창구).
+		// 계수 불일치면 메시 바인딩과 함께 생략된다 — 반쪽 등록 금지.
+		m_experimentModels[guid] = result.model;
 	}
 	else
 	{
@@ -486,6 +489,17 @@ bool DataSystem::TryGetExperimentVertexView(
 	// — lookup 폴백과 핸들 경로의 데이터가 갈릴 여지를 없앤다.
 	return BuildExperimentVertexView(*found->second.model,
 		found->second.meshIndex, outView);
+}
+
+std::shared_ptr<const experiment::Model> DataSystem::TryGetExperimentModel(
+	FileGuid modelGuid)
+{
+	if (!IsExperimentVertexEnabled()) return nullptr;
+	if (FileGuid{} == modelGuid) return nullptr;
+
+	std::lock_guard lock(m_experimentMeshMutex);
+	const auto found = m_experimentModels.find(modelGuid);
+	return found != m_experimentModels.end() ? found->second : nullptr;
 }
 
 bool DataSystem::TryGetExperimentMeshBinding(const Mesh& mesh,

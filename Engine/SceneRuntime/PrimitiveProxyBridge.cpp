@@ -37,13 +37,15 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
 {
     CopyWorldTransform(*this, component->GetOwner());
 
-    // I5-D4b — experiment 핸들 병행. 스냅샷 시점에 한 번 조회한다(프록시
-    // 갱신 커맨드는 메시를 바꾸지 않는다 — 메시 교체는 프록시 재생성 규약).
-    // 실패(false)는 핸들 없음이고 렌더는 legacy 경로로 그린다.
+    // I5-D4b/D4c — experiment 핸들. 정본은 컴포넌트 소유 필드다(postLoad의
+    // experiment 이름 해석이 채우고, 생성 경로는 EnsureExperimentBinding의
+    // 신원 조회가 잇는다). 프록시 갱신 커맨드는 메시를 바꾸지 않으므로
+    // 스냅샷 시점 한 번이면 된다. 빈 핸들이면 렌더는 legacy 경로로 그린다.
     if (nullptr != m_Mesh)
     {
-        DataSystems->TryGetExperimentMeshBinding(
-            *m_Mesh, m_experimentModel, m_experimentMeshIndex);
+        component->EnsureExperimentBinding();
+        m_experimentModel = component->m_experimentModel;
+        m_experimentMeshIndex = component->m_experimentMeshIndex;
     }
 
 	Entity* meshOwner = component->GetOwner();

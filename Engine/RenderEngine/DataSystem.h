@@ -130,6 +130,11 @@ public:
 	[[nodiscard]] static bool BuildExperimentVertexView(
 		const experiment::Model& model, std::uint32_t meshIndex,
 		RHIExperimentVertexView& outView);
+	// I5-D4c — 모델 GUID로 experiment 모델을 얻는다. MeshRenderer postLoad의
+	// 이름→메시 해석이 experiment를 정본으로 삼는 창구다. A/B 스위치가 꺼져
+	// 있거나 Assimp 폴백 모델이면 null(해석이 legacy로 간다).
+	[[nodiscard]] std::shared_ptr<const experiment::Model>
+		TryGetExperimentModel(FileGuid modelGuid);
 	void LoadModel(std::string_view filePath);
 	std::shared_ptr<Model> LoadCachedModelShared(std::string_view filePath);
 	// 즉시 사용 legacy 호출부 호환. 참조를 보관하는 쪽은 위 shared API를 쓴다.
@@ -218,6 +223,10 @@ public:
 		std::uint32_t meshIndex{ 0 };
 	};
 	std::unordered_map<HashedGuid, ExperimentMeshBinding> m_experimentMeshBindings;
+	// I5-D4c — 모델 GUID(.meta 정본)→experiment 모델. 병행 바인딩과 같은
+	// 지점에서 등록되고 같은 뮤텍스를 쓴다.
+	std::unordered_map<FileGuid,
+		std::shared_ptr<const experiment::Model>> m_experimentModels;
 	std::mutex m_experimentMeshMutex;
 
 private:

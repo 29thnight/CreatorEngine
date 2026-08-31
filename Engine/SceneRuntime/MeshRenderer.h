@@ -7,6 +7,7 @@
 #include <mathematics/bounds.hpp>
 
 class Mesh;
+namespace experiment { class Model; } // I5-D4c 핸들 소유(shared_ptr 보관용)
 namespace YAML { class Node; } // CT6-d: OnDeserialized(node) 전방 선언용
 
 class Material;
@@ -94,4 +95,13 @@ public:
     // 적는다(ref 표기). nil이면 인라인 소유(기존 S2b writer). reflect에는
     // 없다 — 영속은 m_Material 노드의 ref 키가 진다(훅 전담).
     FileGuid m_materialBaseGuid{};
+
+    // I5-D4c — experiment 메시 핸들의 소유자. postLoad(씬 로드)가 experiment
+    // 이름 해석으로 채우고, 그 밖의 경로(ModelSceneBridge 생성 — D4d 전까지
+    // legacy)는 EnsureExperimentBinding의 신원 조회 폴백이 채운다. 프록시
+    // 생성은 이 필드를 정본으로 읽는다. 비직렬화 — 영속 신원은 m_modelGuid+
+    // 메시 이름이 진다.
+    std::shared_ptr<const experiment::Model> m_experimentModel{};
+    std::uint32_t m_experimentMeshIndex{ 0 };
+    void EnsureExperimentBinding();
 };

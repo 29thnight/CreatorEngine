@@ -656,7 +656,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D4 | 직접 소비 — 아래 하위 분해(착수 정찰 2026-08-31 둘째) | 렌더 초크포인트 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4a ✅ | 죽은 소비 청산 — postLoad GenerateLODs 절단(D0b 이행)·PhysicsManager 죽은 정점 줄 제거 | 씬 로드·물리 | 없음 |
 | &nbsp;&nbsp;↳ D4b ✅ | 메시 핸들 병행 — 프록시→아이템→4패스→캐시 핸들 진입점(experiment 신원 키·인덱스), 핸들 전량 게이트(2c)+off 대조(4g) — 바운드는 D4f로 | 렌더 사슬 | 없음 |
-| &nbsp;&nbsp;↳ D4c | 씬 경계 — m_Mesh 서브트리 read/write를 experiment 이름/인덱스 기반으로(스키마 유지), GetMeshShared 참조 제거 | 씬 직렬화 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4c ✅ | 씬 경계 — 이름 해석 experiment 정본화(GetMeshShared(name) 폴백 강등)·핸들 소유 MeshRenderer 이동·해석 계수 게이트(1c·4h) — writer 전환은 D4f와 동시 | 씬 직렬화 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4d | 인스턴스화 — ModelSceneBridge experiment 직행(parent 단일 순회 재작성) | 모델 배치 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4e | Animator experiment 직소비 + D0a 이관(이벤트·루프 Animator 소유) | 애니메이션 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
@@ -926,6 +926,26 @@ m_Mesh 실소비자 전수(전환 대상): 바운드(GetBoundingBox — 컬링)�
 — D5). 최대 수술은 Animator/AnimationJob(legacy Skeleton·Animation 전면 순회)이라 D4e로
 고립하고, 역브리지 절단(D4f)은 에디터 패스스루(D5)까지 소비자 0이 된 뒤에만 가능하므로
 **D5 완료 선결**을 계약으로 박는다.
+
+**I5-D4c 완료 실측 (2026-08-31).** 씬 경계 — 이름→메시 해석의 정본이 experiment로
+바뀌고 핸들의 소유가 MeshRenderer로 이동했다. ① `DataSystem::TryGetExperimentModel`
+(modelGuid→`Model::Shared`) — 병행 바인딩과 같은 등록 지점·같은 뮤텍스, 계수 불일치면
+함께 생략(반쪽 등록 금지) ② postLoad: experiment 모델에서 이름으로 인덱스를 찾고 legacy
+`m_Mesh`는 그 인덱스로 꺼낸다(역브리지 1:1 순서 계약) — `GetMeshShared(name)` 이름
+조회는 Assimp 폴백·A/B off의 폴백으로 강등 ③ 핸들 소유가 컴포넌트로: `m_experimentModel/
+m_experimentMeshIndex` + `EnsureExperimentBinding`(생성 경로 폴백 — D4d 전까지
+ModelSceneBridge가 legacy 대입이라 신원 조회가 잇는다), 프록시 생성은 맵 조회 대신
+컴포넌트 필드를 정본으로 읽는다 ④ 해석 경로 관측 `[mesh.resolve] experiment|legacy:`
+(stdout — [model.dual]과 같은 채널).
+
+게이트 실측: **해석 experiment 18/legacy 0**(원본 FT 로드 9+저장·재로드 9 — 두 씬 로드
+전량 experiment 정본) · 핸들 10/10·커버리지 42411 유지 · off 대조군 experiment 해석
+0(4h — 스위치가 정본 전환도 막는다). 변이 M3(이름 비교 훼손 → 전량 legacy 폴백)가
+**1c만** 붉혔다: "해석 0/18"인데 핸들은 10/10 초록 — `EnsureExperimentBinding` 신원 조회
+폴백이 받치는 상황에서도 **정본 전환의 소실**을 해석 계수가 가른다(계수 축을 겹으로 두는
+이유 — 업로드 계수만 있으면 이 변이는 눈먼 초록이다). writer는 무변경 판정: m_Mesh
+서브트리는 리플렉션(Mesh::reflect)이 legacy 객체에서 적지만 필드 값(이름·materialIndex)이
+experiment와 동일해 스키마·바이트가 같다 — writer의 실전환은 m_Mesh 은퇴(D4f)와 동시다.
 
 **I5-D4b 완료 실측 (2026-08-31).** 메시 핸들 병행 — 렌더 사슬이 legacy Mesh **객체 없이
 업로드를 완결할 수 있는 능력**을 얻었다(실제 은퇴는 D4f). 절단선: ①
