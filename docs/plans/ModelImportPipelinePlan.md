@@ -645,15 +645,15 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비 **+ V4 레이아웃 유도** — 아래 슬라이스로 분해(착수 정찰 2026-08-31) | 제품 렌더 | **소비자** 참조 감소 |
-| ↳ I5-D0a | 선결 갭 ① — 애니메이션 이벤트: `AddEvent`/`m_isLoop`의 experiment 대응 판정·구현(clip 표현 vs Animator 소유 이관) | Animator | 없음 |
-| ↳ I5-D0b | 선결 갭 ② — LOD: `GenerateLODs`/`m_LODThresholds`의 experiment 대응 판정(Mesh 표현 vs 렌더 파생) | Mesh·Inspector | 없음 |
+| ↳ I5-D0a ✅ | 선결 갭 ① — 판정: **clip 표현 불요**. looping은 experiment에 이미 완결, 이벤트는 legacy조차 씬(Animator) 소유 — D4에서 Animator 소유 구조로 이관(코퍼스 저작분 0건) | Animator | 없음 |
+| ↳ I5-D0b ✅ | 선결 갭 ② — 판정: **표현 불요·기각**. LOD는 소비 0의 죽은 생산 전용 파이프라인(결과 버림+호출자 0+저작분 0건) — 미래 LOD는 렌더 파생 몫 | Mesh·Inspector | 없음 |
 | ↳ I5-D1a ✅ | 역브리지 — `DataSystem::BuildLegacyModelFromExperiment`(experiment→legacy) + 왕복 게이트 | DataSystem | 없음(I6 은퇴) |
 | ↳ I5-D1b ✅ | 로더 이중화 — `LoadModelGUID`가 experiment(cooked→source) 로드→역브리지 소비, Assimp 폴백·경로 관측 | DataSystem | 없음 |
 | ↳ I5-D2 ✅ | V4 유도 정본 — mask→`RHIInputElement` 유도, `RHIFormat::RGBA8Uint` 신설, 전환 계약 게이트 (패스 전환은 D4와 동시로 정정) | RHI | 없음 |
 | ↳ I5-D34a ✅ | GBuffer 정적 수직 절단 — 병행 바인딩·캐시 대칭 이중화·VSIn 퍼뮤테이션+PSO 레이아웃 축·A/B 동수 게이트(FT 8/8) | 메시 캐시·GBuffer | 없음 |
 | ↳ I5-D34b ✅ | 스킨 전환 — GBuffer·Shadow 스킨 PSO(BLENDINDICES uint4), 스킨 A/B 동수 게이트(10/10 전량·42411 동수), m_Motion 폴백 (WireFrame은 실존 안 함) | 스킨 2패스 | 없음 |
 | ↳ I5-D34c ✅ | Forward 전환 — shade/reference×experiment PSO 4벌, core 유도 하나로 마스크 불문, forward 배치 게이트(3c) — SKIN keyword 축은 불요 판정 | Forward | 없음 |
-| ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
+| ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) + D0a 이관(이벤트·루프를 Animator 소유로) + D0b 절단(postLoad GenerateLODs 재실행 제거) | 렌더 초크포인트 | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
@@ -866,6 +866,43 @@ forward는 `depthWrite=Zero`, 밝기는 **deferred 라이팅 리드백** — 두
 계수로 세우자 ③이 정확히 붉었다. 한계(정직): **forward 출력의 시각 판정(픽셀·밝기)은 현
 관측 표면에 없다** — forward 합성 결과 리드백 판정은 후속 몫이고, 그때까지 forward 시각
 축은 합성 검증(dx12.forwardshade — legacy 자가 지오메트리)만 쥔다.
+
+**I5-D0a·D0b 완료 판정 (2026-08-31).** 착수 정찰이 "기능 손실형 갭 둘"이라 적은 항목의
+전수 실측 — **둘 다 experiment 표현이 필요 없다**는 판정으로 닫힌다. 구현 0.
+
+**D0a(애니메이션 이벤트·루프): clip 표현 불요 — 소유는 씬(Animator)이고 legacy가 이미
+그렇다.** ① `looping`은 갭 자체가 아니었다: experiment `AnimationClip.looping`이 이미 있고
+(ModelData.h) cooked 왕복(CookedModelCodec)·역브리지 왕복(D1a 게이트 m_isLoop 대조)까지
+완결이다. ② `KeyFrameEvent`는 **legacy에서조차 모델 자산에 직렬화되지 않는다** — ModelLoader
+캐시 포맷은 `m_isLoop` 다음이 바로 nodeAnimCount(이벤트 없음). 유일한 영속은 씬 YAML:
+writer는 리플렉션 사슬(Animator→Skeleton::reflect(m_animations)→Animation::reflect(m_isLoop·
+m_keyFrameEvent))이 자동으로 쓰고, reader는 Animator postLoad 수동 복원(Animator.cpp:517-574)이
+**공유 자산 `m_Skeleton->m_animations`에 재주입**한다. 발화 소비는 살아 있다(`InvokeEvent
+(Animator*)` → CLR 스크립트 큐 — 무인자 오버로드는 주석 시체). ③ 따라서 D4 계약: experiment
+모델은 이벤트를 모르는 것이 옳고, **Animator가 이벤트·루프 오버라이드를 자기 소유 구조로
+이관**해 재생 시점에 결합한다 — 표현 추가가 아니라 소유 이동이며, 공유 자산 재주입(같은
+스켈레톤을 공유하는 Animator 간 이벤트 오염 — 마지막 로드 승자)이라는 기존 결함도 그때 함께
+청산된다. 에디터(ImGuiDrawHelperAnimator — 자산 Animation 직접 편집)의 편집 표면 전환은 D5.
+④ 데이터 이주 부담 **0**: 코퍼스 전수에서 `m_keyFrameEvent` non-nil 0건 · `m_isLoop: false`
+0건(전부 nil/기본값 — 씬 스키마에 필드만 나가고 저작된 적 없음).
+
+**D0b(LOD): 표현 불요·기각 — 갭이 아니라 이미 죽은 생산 전용 파이프라인이다**
+([[plan-target-may-be-already-dead]]·[[dead-produce-only-pipeline]]의 재현). ①
+`Mesh::GenerateLODs`는 MeshOptimizer 실계산을 돌리고 **결과 인덱스 버퍼를 버린다** —
+`LODResource`는 `{uint32 indexCount}` 하나뿐이고 단순화된 인덱스는 어디에도 저장되지 않는다.
+② 그 계수(`m_LODs`)의 유일한 독자 `HasLODs`는 전 리포 호출자 **0**. 소비 사슬(DrawLOD 계열
+8종·PrimitiveRenderProxy InitializeLODs/GetLODLevel)은 DX11 은퇴와 함께 이미 제거됐다(양쪽
+파일 주석이 자백). 살아 있는 것은 저작 껍데기뿐: 씬 `m_LODThresholds` 저장(Mesh::reflect) →
+MeshRenderer postLoad가 GenerateLODs 재실행(MeshRenderer.cpp:372-380 — 버려질 결과를 매
+로드마다 계산) → 에디터 버튼. ③ 판정: experiment Mesh/cooked에 LOD 표현을 **넣지 않는다**.
+미래 LOD는 cooked 자산이 아니라 렌더 파생(DX12 캐시 계층)의 몫. ④ 데이터 이주 부담 **0**:
+코퍼스 전수 `m_LODThresholds` non-nil 0건. D4에서 legacy Mesh가 걷힐 때 postLoad 재실행을
+끊고 thresholds는 스키마 호환만 유지(nil 통과)하면 된다.
+
+교훈: 착수 정찰의 "기능 손실형 갭" 분류는 **API 표면**(AddEvent·GenerateLODs가 존재한다)을
+보고 내린 것이었다 — 표면 뒤의 소비 사슬과 실저작 데이터를 전수하면 하나는 이미 닫힌 갭
+(looping)+소유 이동 명세(이벤트)였고, 하나는 시체였다. 판정 슬라이스의 실비용은 구현이
+아니라 "누가 소비하고 데이터가 실존하는가"의 전수다.
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그
