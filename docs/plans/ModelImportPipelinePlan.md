@@ -660,7 +660,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;↳ D4d ✅ | 인스턴스화 — ModelSceneBridge experiment 직행(parent 단일 순회)·핸들 생성 지점 직심기·인스턴스화 게이트(1d·4i)+구조 동수 게이트(5a/5b/5c) | 모델 배치 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4e | Animator experiment 직소비 + D0a 이관 — 아래 하위 분해(착수 정찰 2026-08-31 셋째) | 애니메이션 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-1 ✅ | 재생 이중화 — 샘플러 엔진 승격·Animator 재생 핸들·AnimationJob experiment 틱(단일 순회)·팔레트 패리티 게이트(6·1e·4j/4k, 오차 0) | 재생 틱 | 없음 |
-| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-2 | 이벤트·루프 Animator 소유 이관(D0a 명세) — 공유 자산 재주입 오염 청산, 발화 정본 이동 | Animator·CLR | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-2 ✅ | 이벤트·루프 Animator 소유 이관(D0a 명세) — 재주입 오염 청산·발화/편집/writer 정본 이동·합성 왕복 게이트(7·4l, 3축 변이 증명) | Animator·CLR | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-3 | 잔여 — Scene 본 전파(FindBone/m_serial)·AvatarMask 생성(Bone* 트리)·legacy 틱 은퇴 판정 | Scene·마스크 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
@@ -941,6 +941,32 @@ GBuffer/Shadow memcpy)은 `math::matrix4x4[512]` 값 배열이라 타입 무의�
 ⑤ AvatarMask 생성은 `m_Skeleton->m_rootBone`(Bone* 트리), humanoid 판정은
 `Bone::m_region`(이름 휴리스틱 파생). 분해: D4e-1(재생 이중화) → D4e-2(이벤트·루프 이관)
 → D4e-3(Scene 전파·마스크·은퇴 판정).
+
+**I5-D4e-2 완료 실측 (2026-09-01).** 이벤트·루프 오버라이드의 소유가 Animator로 옮겨졌다
+(D0a 명세 이행 — 공유 자산 재주입 오염 청산). ① `AnimatorClipOverride`(clipIndex·
+loopOverride·events)를 Animator가 소유하고, postLoad는 씬이 저장한 isLoop·이벤트를 공유
+자산에 재주입하는 대신 여기 보관한다 — 같은 스켈레톤을 공유하는 Animator 간 "마지막 로드
+승자" 오염이 구조적으로 소멸. ② 소비 정본 이동: 재생 루프 판정은 `IsClipLooping`
+(오버라이드→experiment 자산→legacy 자산 폴백 — legacy 재귀·experiment 틱이 같은 함수),
+발화는 `InvokeClipEvents`(구 `Animation::InvokeEvent` 로직 이주 + 매칭 판정과 CLR 큐잉
+분리 — 계수 리턴이 헤드리스 게이트의 창구), 에디터(ImGuiDrawHelperAnimator)의 루프
+체크박스·이벤트 CRUD도 오버라이드 편집으로 전환(순회 중 erase UB 교정 포함). ③ 씬 표기는
+기존 형상 유지: `OnAfterSerialize`가 리플렉션이 적은 m_Skeleton 서브트리의 m_isLoop/
+m_keyFrameEvent를 오버라이드 값으로 교체한다(reader 구세대 호환·스키마 무변경). ④ 구
+`Animation::` 이벤트 표면(InvokeEvent·CRUD 6종)은 제거 — 죽은 표면(SetEvent·문자열
+FindEvent — 호출자 0, return 누락 UB)은 이주하지 않았다. 필드·reflect는 표기 형상을 위해
+존치(자산 인스턴스의 이벤트 벡터는 이제 항상 빔).
+
+게이트 실측: 코퍼스 저작분 0(D0a ④)이라 실자산 게이트는 원리적으로 초록 — **합성**으로
+판정한다(`experiment.animevent` seed/verify): seed가 루프 false+이벤트 2를 주입하고
+저장·재로드 뒤 verify가 왕복(Animator 소유 보존)·비오염(공유 자산 불변 — 재주입 청산
+실증)·발화(구간 매칭 2종, loop=false 되감김 0, loop=true 되감김 1 — IsClipLooping 소비
+실증)을 잰다. 이관은 스위치 무관 무조건 경로라 on(7)·off(4l) 양쪽 단정. 전 단정
+초록(D4e-1 기준선 유지). 변이 3종이 verify의 **세 하위 축을 각각 정확히** 갈랐다:
+**M1**(writer 훅 절단) → 왕복 소실(+후속 발화 실패, 비오염은 초록 — 인과 사슬 그대로),
+**M2**(postLoad 오염 재도입) → 비오염만, **M3**(발화의 되감김 판정을 상수 true로) →
+"loop=false 되감김이 발화됨"만. 잔여: 에디터의 자산 직접 소비(m_animations 이름·
+m_totalKeyFrames 읽기)는 읽기 전용이라 존치 — 표면 전환의 나머지는 D5.
 
 **I5-D4e-1 완료 실측 (2026-08-31).** 재생 이중화 — 포즈 산술이 experiment 정본을 얻었다.
 ① 샘플러 승격: RenderTests 소유였던 `ExperimentPoseSampler`를 엔진

@@ -61,18 +61,12 @@ public:
 
 	int preKey = 0;
 	int curKey = 0; //&&&&& 실제 사용되는 값인지 확인필요
-	void InvokeEvent();
-	void InvokeEvent(Animator* _ownerAnimator,float _curAnimatonProgress, float _preAnimationProgress);
 
-	void AddEvent();
-	void AddEvent(KeyFrameEvent _event);
-	void DeleteEvent(KeyFrameEvent _event);
-	void DeleteEvent(int _index);
-	KeyFrameEvent* FindEvent(KeyFrameEvent _event);
-	KeyFrameEvent* FindEvent(const std::string& _eventName, const std::string& _scriptName, const std::string& _funName, float progressPercent);
-	bool FindEventName(std::string Name);
-	void SetEvent(const std::string& _eventName,const std::string& _scriptName, const std::string& _funName, float progressPercent);
-
+	// I5-D4e-2 — 이벤트 표면(InvokeEvent·CRUD)은 Animator 클립 오버라이드로
+	// 이주했다(AnimationEventBridge.cpp — 공유 자산 재주입 오염 청산). 이 필드는
+	// 씬 표기 형상(reflect)을 위해 남는다: reader 구세대 호환 + writer는
+	// Animator::OnAfterSerialize가 오버라이드 값으로 교체한다. 자산 인스턴스의
+	// 이 벡터는 이제 항상 비어 있다(임포터·캐시 어느 쪽도 채우지 않는다).
 	std::vector<KeyFrameEvent> m_keyFrameEvent;
 };
 

@@ -19,6 +19,8 @@
 #   1e 라이브 애니 틱이 legacy 경로로 새지 않는다 (D4e-1)
 #   6  재생 팔레트 패리티 — legacy 재귀 vs experiment 단일 순회, 제품 함수
 #      직접 대조 (D4e-1)
+#   7  이벤트·루프 오버라이드 이관 — 합성 seed→저장·재로드→왕복·비오염·발화
+#      (D4e-2, on/off 양쪽 — 이관은 스위치 무관)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -180,6 +182,12 @@ if ($animTickLegacyOn -ne 0) {
 if ($logOn -notmatch '\[CLI\] experiment\.animtick pass animators=([1-9]\d*)') {
     $fail += "6 재생 팔레트 패리티 실패 또는 대상 0 — animtick 출력을 확인하라"
 }
+# ★ 7(I5-D4e-2) — 이벤트·루프 오버라이드가 Animator 소유로 왕복하고 공유
+#   자산은 불변이며 발화 규칙이 오버라이드를 소비한다. 합성 seed가 전제 —
+#   코퍼스 저작분 0이라 실자산만으로는 이 이관이 영원히 초록이다.
+if ($logOn -notmatch '\[CLI\] experiment\.animevent verify pass') {
+    $fail += "7 이벤트·루프 이관 실패(on) — animevent 출력을 확인하라"
+}
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
 # I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
 # legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
@@ -240,6 +248,11 @@ if ($animTickExpOff -ne 0) {
 }
 if ($logOff -notmatch '\[CLI\] experiment\.animtick skip animators=0') {
     $fail += "4k 스위치를 껐는데 animtick 대상이 0이 아니다 — 재생 바인딩이 스위치를 무시한다"
+}
+# I5-D4e-2: 이관은 스위치와 무관한 무조건 경로 — off 대조군에서도 왕복·비오염·
+# 발화가 같이 통과해야 한다(legacy 틱도 같은 오버라이드를 소비한다).
+if ($logOff -notmatch '\[CLI\] experiment\.animevent verify pass') {
+    $fail += "4l 이벤트·루프 이관 실패(off) — 이관이 스위치 뒤로 샜다"
 }
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"

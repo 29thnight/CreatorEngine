@@ -3902,6 +3902,155 @@ namespace ConsoleCmd
         std::printf("[CLI] 씬에 배치: %s\n", parts[1].c_str());
     }
 
+    // I5-D4e-2 — 이벤트·루프 오버라이드의 소유 이관 게이트. 코퍼스에 저작분이
+    // 0이라 실자산 게이트는 원리적으로 초록이므로([[plan-target-may-be-already-
+    // dead]]의 그 함정) 합성으로 판정한다: seed가 합성 오버라이드(루프 false·
+    // 이벤트 2)를 주입하고, 저장·재로드 뒤 verify가 ①왕복(Animator 소유로
+    // 살아남았는가) ②비오염(공유 자산 m_animations가 불변인가 — 재주입 청산
+    // 실증) ③발화 매칭(구간·되감김 규칙이 오버라이드·IsClipLooping을 소비
+    // 하는가)을 잰다. 이관은 A/B 스위치와 무관한 무조건 경로라 on/off 대조군
+    // 양쪽에서 같은 판정이어야 한다.
+    static void Cmd_experiment_animevent(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene || ctx.parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: experiment.animevent seed|verify\n");
+            return;
+        }
+        const bool isSeed = "seed" == ctx.parts[1];
+
+        Animator* animator = nullptr;
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            Animator* candidate = object->GetComponent<Animator>();
+            if (nullptr == candidate || nullptr == candidate->m_Skeleton)
+                continue;
+            if (candidate->m_Skeleton->m_animations.empty()) continue;
+            animator = candidate;
+            break;
+        }
+        if (nullptr == animator)
+        {
+            std::printf("[CLI] experiment.animevent %s skip animators=0\n",
+                ctx.parts[1].c_str());
+            return;
+        }
+
+        if (isSeed)
+        {
+            animator->SetClipLooping(0, false);
+            AnimatorClipOverride& clipOverride = animator->EnsureClipOverride(0);
+            clipOverride.events.clear();
+            KeyFrameEvent early;
+            early.m_eventName = "gateEvent25";
+            early.m_scriptName = "GateScript";
+            early.m_funName = "GateFun25";
+            early.key = 0.25f;
+            early.frameKey = 25;
+            KeyFrameEvent late;
+            late.m_eventName = "gateEvent75";
+            late.m_scriptName = "GateScript";
+            late.m_funName = "GateFun75";
+            late.key = 0.75f;
+            late.frameKey = 75;
+            clipOverride.events.push_back(early);
+            clipOverride.events.push_back(late);
+            std::printf("[CLI] experiment.animevent seed done clip=0 "
+                "loop=false events=2\n");
+            return;
+        }
+
+        std::vector<std::string> failures;
+        // ① 왕복 — 저장·재로드가 Animator 소유 오버라이드를 보존했는가.
+        const AnimatorClipOverride* clipOverride = animator->FindClipOverride(0);
+        if (nullptr == clipOverride)
+        {
+            failures.push_back("왕복: 클립 0 오버라이드 부재");
+        }
+        else
+        {
+            if (!clipOverride->loopOverride.has_value()
+                || false != *clipOverride->loopOverride)
+            {
+                failures.push_back("왕복: loop 오버라이드 소실");
+            }
+            if (2 != clipOverride->events.size()
+                || "gateEvent25" != clipOverride->events[0].m_eventName
+                || "GateFun25" != clipOverride->events[0].m_funName
+                || std::abs(clipOverride->events[0].key - 0.25f) > 1e-6f
+                || "gateEvent75" != clipOverride->events[1].m_eventName)
+            {
+                failures.push_back("왕복: 이벤트 필드 소실("
+                    + std::to_string(clipOverride->events.size()) + "개)");
+            }
+        }
+        // ② 비오염 — 공유 자산이 불변인가(재주입 청산 실증). 자산 원본 루프는
+        // experiment 자산값과 동치여야 한다(둘 다 임포터 산물).
+        Skeleton* sharedSkeleton = animator->m_Skeleton;
+        if (!sharedSkeleton->m_animations[0].m_keyFrameEvent.empty())
+        {
+            failures.push_back("비오염: 공유 자산에 이벤트 "
+                + std::to_string(
+                    sharedSkeleton->m_animations[0].m_keyFrameEvent.size())
+                + "건 주입됨");
+        }
+        if (animator->m_experimentModel)
+        {
+            if (const experiment::Skeleton* experimentSkeleton =
+                animator->m_experimentModel->TryGetSkeleton())
+            {
+                if (!experimentSkeleton->clips.empty()
+                    && sharedSkeleton->m_animations[0].m_isLoop
+                        != experimentSkeleton->clips[0].looping)
+                {
+                    failures.push_back("비오염: 공유 자산 m_isLoop가 원본과 다름");
+                }
+            }
+        }
+        // ③ 발화 매칭 — 구간·되감김 규칙이 오버라이드와 IsClipLooping을 본다.
+        if (1 != animator->InvokeClipEvents(0, 0.3f, 0.2f))
+        {
+            failures.push_back("발화: 일반 구간(0.2→0.3) 매칭≠1");
+        }
+        if (1 != animator->InvokeClipEvents(0, 0.8f, 0.7f))
+        {
+            failures.push_back("발화: 일반 구간(0.7→0.8) 매칭≠1");
+        }
+        if (0 != animator->InvokeClipEvents(0, 0.1f, 0.7f))
+        {
+            failures.push_back("발화: loop=false 되감김이 발화됨");
+        }
+        animator->SetClipLooping(0, true);
+        if (1 != animator->InvokeClipEvents(0, 0.1f, 0.7f))
+        {
+            failures.push_back("발화: loop=true 되감김(0.75) 매칭≠1");
+        }
+        animator->SetClipLooping(0, false);
+        // ④ 루프 판정 폴백 — 오버라이드 없는 클립은 자산값.
+        if (false != animator->IsClipLooping(0))
+        {
+            failures.push_back("루프: 오버라이드가 정본이 아님");
+        }
+
+        if (failures.empty())
+        {
+            std::printf("[CLI] experiment.animevent verify pass "
+                "roundtrip=ok contamination=none firing=ok\n");
+        }
+        else
+        {
+            std::string joined;
+            for (const std::string& failure : failures)
+            {
+                joined += " [" + failure + "]";
+            }
+            std::printf("[CLI] experiment.animevent verify fail%s\n",
+                joined.c_str());
+        }
+    }
+
     // I5-D4e-1 — 재생 팔레트 패리티. 활성 씬의 experiment 핸들 보유 Animator
     // 전수에 대해, 같은 시각 입력으로 legacy 재귀(UpdateBone)와 experiment
     // 단일 순회를 제품 함수 그대로 돌려 m_FinalTransforms를 원소 단위 대조한다.
@@ -8134,6 +8283,7 @@ namespace ConsoleCmd
             reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
             reg({ "experiment.animtick" }, &Cmd_experiment_animtick);
+            reg({ "experiment.animevent" }, &Cmd_experiment_animevent);
             reg({ "experiment.import" }, &Cmd_experiment_import);
             reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
             reg({ "experiment.fbx" }, &Cmd_experiment_fbx);

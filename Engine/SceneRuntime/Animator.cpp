@@ -654,17 +654,21 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 						+ model->name);
 				}
 			}
-
-			for (int i = 0; i < m_Skeleton->m_animations.size(); ++i)
-			{
-				if (animationBools.empty()) break;
-
-				m_Skeleton->m_animations[i].m_isLoop = animationBools[i];
-
-				for (const auto event : animationKeyFrameMap[i])
-					m_Skeleton->m_animations[i].AddEvent(event);
-			}
 		}
+	}
+
+	// I5-D4e-2 — 씬이 저장한 클립별 isLoop·이벤트를 **자기 소유 오버라이드**로
+	// 보관한다. 구 코드는 공유 자산(m_Skeleton->m_animations)에 재주입해 같은
+	// 스켈레톤을 공유하는 Animator 간 오염(마지막 로드 승자)을 만들었다 — 이제
+	// 자산은 불변이고, 재생 루프 판정(IsClipLooping)·발화(InvokeClipEvents)·
+	// writer(OnAfterSerialize)가 이 오버라이드를 정본으로 본다.
+	for (int i = 0; i < static_cast<int>(animationBools.size()); ++i)
+	{
+		EnsureClipOverride(i).loopOverride = animationBools[i];
+	}
+	for (auto& [clipIndex, events] : animationKeyFrameMap)
+	{
+		EnsureClipOverride(clipIndex).events = std::move(events);
 	}
 
 	if (node["Parameters"])
@@ -778,5 +782,39 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	// I5-D4e-1 — 씬 로드 경계에서 experiment 재생 핸들을 잇는다(m_Motion·
 	// m_Skeleton이 위에서 복원된 뒤여야 계수 대조가 성립한다).
 	EnsureExperimentAnimationBinding();
+}
+
+void Animator::OnAfterSerialize(YAML::Node& node)
+{
+	// I5-D4e-2 — 씬 표기 형상 유지. 리플렉션이 m_Skeleton 포인터를 따라 적은
+	// m_animations[i].m_isLoop/m_keyFrameEvent는 **공유 자산의 값**(이벤트 항상
+	// 빈 벡터·원본 loop)이다 — 정본인 Animator 오버라이드로 교체해야 저장·
+	// 재로드 왕복에서 오버라이드가 살아남는다. 오버라이드가 없는 클립은 자산
+	// 값이 그대로 남는다(형상·의미 모두 구세대 reader와 호환).
+	if (m_clipOverrides.empty() || !node["m_Skeleton"]) return;
+	YAML::Node animations = node["m_Skeleton"]["m_animations"];
+	if (!animations || !animations.IsSequence()) return;
+
+	for (AnimatorClipOverride& clipOverride : m_clipOverrides)
+	{
+		if (clipOverride.clipIndex < 0
+			|| static_cast<std::size_t>(clipOverride.clipIndex)
+				>= animations.size())
+		{
+			continue;
+		}
+		YAML::Node animationNode =
+			animations[static_cast<std::size_t>(clipOverride.clipIndex)];
+		if (clipOverride.loopOverride.has_value())
+		{
+			animationNode["m_isLoop"] = *clipOverride.loopOverride;
+		}
+		YAML::Node eventsNode(YAML::NodeType::Sequence);
+		for (KeyFrameEvent& event : clipOverride.events)
+		{
+			eventsNode.push_back(Meta::Serialize(&event));
+		}
+		animationNode["m_keyFrameEvent"] = eventsNode;
+	}
 }
 

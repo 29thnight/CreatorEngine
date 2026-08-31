@@ -50,7 +50,15 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 				ImGui::Text(animation.m_name.c_str());
 				ImGui::Text("Loop");
 				ImGui::SameLine();
-				ImGui::Checkbox("", &animation.m_isLoop);
+				// I5-D4e-2 — 루프·이벤트 편집의 정본은 Animator 클립
+				// 오버라이드다. 구 코드는 공유 자산(m_Skeleton->m_animations)을
+				// 직접 편집해 같은 스켈레톤을 공유하는 다른 Animator까지
+				// 바뀌었다 — 발화·저장 정본과 편집 표면을 함께 옮긴다.
+				bool looping = animator->IsClipLooping(i);
+				if (ImGui::Checkbox("", &looping))
+				{
+					animator->SetClipLooping(i, looping);
+				}
 				ImGui::Text("KeyFrameEvent");
 				ImGui::SameLine();
 				if (ImGui::Button(ICON_FA_BOX))
@@ -74,14 +82,17 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 				ImGui::Text(animation.m_name.c_str());
 				if (ImGui::Button("Add Event"))
 				{
-					animation.AddEvent();
+					animator->AddClipEvent(animationIndex);
 				}
 				ImGui::Separator();
 				ImGui::Separator();
-				if (!animation.m_keyFrameEvent.empty())
+				AnimatorClipOverride* clipOverride =
+					animator->FindClipOverride(animationIndex);
+				if (clipOverride && !clipOverride->events.empty())
 				{
+					bool deletedThisFrame = false;
 					int eventIndex = 0;
-					for (auto& event : animation.m_keyFrameEvent)
+					for (auto& event : clipOverride->events)
 					{
 						ImGui::PushID(eventIndex);
 						ImGui::Dummy(ImVec2(10.0f, 0));
@@ -150,13 +161,17 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						ImGui::SameLine();
 						if(ImGui::Button("delete"))
 						{
-							animation.DeleteEvent(eventIndex);
+							// 순회 중 erase는 참조 무효화 — 프레임당 하나만
+							// 지우고 즉시 순회를 끝낸다(구 코드의 잠재 UB 교정).
+							animator->DeleteClipEvent(animationIndex, eventIndex);
+							deletedThisFrame = true;
 						}
 						ImGui::Separator();
 						eventIndex++;
 						ImGui::PopID();
+						if (deletedThisFrame) break;
 					}
-					
+
 				}
 				ImGui::End();
 			}

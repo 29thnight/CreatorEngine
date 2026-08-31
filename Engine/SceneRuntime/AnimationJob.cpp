@@ -196,7 +196,8 @@ void AnimationJob::Update(float deltaTime)
                     }
                     Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
                     animationcontroller->m_timeElapsed += deltaT * animation.m_ticksPerSecond * animationspeed;
-                    if (animation.m_isLoop == true)
+                    // I5-D4e-2: 루프 정본은 Animator 오버라이드(→자산 폴백)다.
+                    if (animator->IsClipLooping(animationcontroller->GetAnimationIndex()))
                     {
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
                         //animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
@@ -231,10 +232,12 @@ void AnimationJob::Update(float deltaTime)
                     }
 
                     if (deltaT <= 0.f) continue;
-                    skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator, animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
+                    // I5-D4e-2: 발화 정본은 Animator 클립 오버라이드다(공유
+                    // 자산 이벤트 참조 청산 — 자산의 m_keyFrameEvent는 항상 빔).
+                    animator->InvokeClipEvents(animationcontroller->GetAnimationIndex(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
                     if (animationcontroller->m_isBlend == true) //블렌딩중엔 다음애니메이션 프레임이벤트도
                     {
-                        skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator, animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
+                        animator->InvokeClipEvents(animationcontroller->GetNextAnimationIndex(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
                     }
                     
                 }
@@ -253,7 +256,8 @@ void AnimationJob::Update(float deltaTime)
                     Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
                     animator->m_TimeElapsed += deltaT * animation.m_ticksPerSecond;
 
-                    if (animation.m_isLoop == true)
+                    // I5-D4e-2: 루프 정본은 Animator 오버라이드(→자산 폴백)다.
+                    if (animator->IsClipLooping(static_cast<int>(animator->m_AnimIndexChosen)))
                     {
                         animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
                     }
@@ -302,7 +306,8 @@ void AnimationJob::Update(float deltaTime)
                     }
                     animationcontroller->m_timeElapsed += deltaT * animation.m_ticksPerSecond * animationspeed;
                     //animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    if (animation.m_isLoop == true)
+                    // I5-D4e-2: 루프 정본은 Animator 오버라이드(→자산 폴백)다.
+                    if (animator->IsClipLooping(animationcontroller->GetAnimationIndex()))
                     {
                         animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
                     }
@@ -355,10 +360,11 @@ void AnimationJob::Update(float deltaTime)
                     // skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator);
 
                     if (deltaT > 0.f) {
-                        skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator, animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
+                        // I5-D4e-2: 발화 정본은 Animator 클립 오버라이드다.
+                        animator->InvokeClipEvents(animationcontroller->GetAnimationIndex(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
                         if (animationcontroller->m_isBlend == true) //블렌딩중엔 다음애니메이션 프레임이벤트도
                         {
-                            skeleton->m_animations[animationcontroller->GetNextAnimationIndex()].InvokeEvent(animator, animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
+                            animator->InvokeClipEvents(animationcontroller->GetNextAnimationIndex(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
                         }
                     }
                 }
@@ -773,36 +779,19 @@ math::matrix4x4 AnimationJob::calculAni(NodeAnimation& nodeAnim, float time,
 // ─── I5-D4e-1 — experiment 재생 경로 ────────────────────────────────────────
 //
 // 시간축·이벤트·컨트롤러 분기는 legacy 경로(Update 람다)와 같은 구조이고,
-// clip 메타(durationTicks/ticksPerSecond/looping)만 experiment에서 읽는다.
-// looping은 자산 원본값이다 — legacy는 postLoad가 씬 오버라이드를 공유 자산에
-// 재주입한 값을 읽지만 코퍼스 전수 저작분 0(D0a 실측)이라 행동이 같다.
-// 오버라이드의 Animator 소유 이관은 D4e-2의 몫.
-//
-// 이벤트 발화는 아직 legacy 자산(m_animations[...].InvokeEvent)이다 — 이벤트
-// 데이터가 그쪽에 살고(같은 D0a), 클립 인덱스는 역브리지 1:1 계약으로 같다.
+// clip 메타(durationTicks/ticksPerSecond)만 experiment에서 읽는다. 루프 판정과
+// 이벤트 발화는 Animator 클립 오버라이드가 정본(I5-D4e-2 — 오버라이드 없으면
+// experiment 자산값 폴백)이라 legacy 경로와 같은 함수를 본다.
 
 void AnimationJob::TickExperiment(Animator& animator,
     const experiment::Skeleton& skeleton, float deltaT)
 {
     const std::vector<experiment::AnimationClip>& clips = skeleton.clips;
-    Skeleton* legacySkeleton = animator.m_Skeleton;
 
     const auto clipAt = [&clips](int index) -> const experiment::AnimationClip*
     {
         return index >= 0 && static_cast<std::size_t>(index) < clips.size()
             ? &clips[static_cast<std::size_t>(index)] : nullptr;
-    };
-    const auto invokeLegacyEvent =
-        [&](int index, float currentProgress, float previousProgress)
-    {
-        if (nullptr == legacySkeleton) return;
-        if (index < 0 || static_cast<std::size_t>(index)
-            >= legacySkeleton->m_animations.size())
-        {
-            return;
-        }
-        legacySkeleton->m_animations[static_cast<std::size_t>(index)]
-            .InvokeEvent(&animator, currentProgress, previousProgress);
     };
 
     if (animator.UsesMultipleControllers())
@@ -829,7 +818,7 @@ void AnimationJob::TickExperiment(Animator& animator,
             const float duration = static_cast<float>(clip->durationTicks);
             controller->m_timeElapsed += deltaT
                 * static_cast<float>(clip->ticksPerSecond) * animationSpeed;
-            if (clip->looping)
+            if (animator.IsClipLooping(controller->GetAnimationIndex()))
             {
                 controller->m_timeElapsed =
                     fmod(controller->m_timeElapsed, duration);
@@ -875,12 +864,12 @@ void AnimationJob::TickExperiment(Animator& animator,
             }
 
             if (deltaT <= 0.f) continue;
-            invokeLegacyEvent(controller->GetAnimationIndex(),
+            animator.InvokeClipEvents(controller->GetAnimationIndex(),
                 controller->curAnimationProgress,
                 controller->preCurAnimationProgress);
             if (controller->m_isBlend)
             {
-                invokeLegacyEvent(controller->GetNextAnimationIndex(),
+                animator.InvokeClipEvents(controller->GetNextAnimationIndex(),
                     controller->nextAnimationProgress,
                     controller->preNextAnimationProgress);
             }
@@ -896,7 +885,7 @@ void AnimationJob::TickExperiment(Animator& animator,
         const float duration = static_cast<float>(clip->durationTicks);
         animator.m_TimeElapsed += deltaT
             * static_cast<float>(clip->ticksPerSecond);
-        if (clip->looping)
+        if (animator.IsClipLooping(static_cast<int>(animator.m_AnimIndexChosen)))
         {
             animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, duration);
         }
@@ -948,7 +937,7 @@ void AnimationJob::TickExperiment(Animator& animator,
         }
         controller->m_timeElapsed += deltaT
             * static_cast<float>(clip->ticksPerSecond) * animationSpeed;
-        if (clip->looping)
+        if (animator.IsClipLooping(controller->GetAnimationIndex()))
         {
             controller->m_timeElapsed = fmod(controller->m_timeElapsed, duration);
         }
@@ -992,12 +981,12 @@ void AnimationJob::TickExperiment(Animator& animator,
 
         if (deltaT > 0.f)
         {
-            invokeLegacyEvent(controller->GetAnimationIndex(),
+            animator.InvokeClipEvents(controller->GetAnimationIndex(),
                 controller->curAnimationProgress,
                 controller->preCurAnimationProgress);
             if (controller->m_isBlend)
             {
-                invokeLegacyEvent(controller->GetNextAnimationIndex(),
+                animator.InvokeClipEvents(controller->GetNextAnimationIndex(),
                     controller->nextAnimationProgress,
                     controller->preNextAnimationProgress);
             }

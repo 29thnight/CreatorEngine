@@ -7,9 +7,24 @@
 //#include "IAwakable.h"
 //#include "IOnDestroy.h"
 #include "AnimationController.h"
+#include "KeyFrameEvent.h" // I5-D4e-2: 클립 오버라이드 소유
 #include <mathematics/matrix4x4.hpp>
+#include <optional>
 #include <type_traits>
 constexpr uint32 MAX_BONES{ 512 };
+
+// I5-D4e-2 — 클립별 이벤트·루프 오버라이드. 소유는 씬(Animator)이다(D0a 판정):
+// legacy조차 모델 자산에 직렬화한 적이 없고(.asset 캐시 포맷에 이벤트 없음) 씬
+// YAML이 유일한 영속이었는데, postLoad가 그것을 공유 자산
+// (m_Skeleton->m_animations)에 재주입해 같은 스켈레톤을 공유하는 Animator 간
+// 오염(마지막 로드 승자)을 만들었다. 이제 재생 루프 판정·발화·에디터 편집·
+// 직렬화가 전부 이 구조를 정본으로 본다 — 공유 자산은 불변이다.
+struct AnimatorClipOverride final
+{
+	int clipIndex{ -1 };
+	std::optional<bool> loopOverride{};
+	std::vector<KeyFrameEvent> events{};
+};
 
 class Skeleton;
 class AnimationController;
@@ -72,6 +87,26 @@ public:
     // CT6-d: 스켈레톤·파라미터·컨트롤러 그래프 복원(구 팩토리 분기 이동)
     void OnDeserialized(const Authoring::NodeView& node); // D3-a-4
 
+    // I5-D4e-2 — 씬 표기는 기존 형상(m_Skeleton.m_animations[i].m_isLoop/
+    // m_keyFrameEvent)을 유지하되, 리플렉션이 적은 공유 자산 값을 Animator
+    // 소유 오버라이드로 교체한다(reader 구세대 호환·스키마 무변경).
+    void OnAfterSerialize(YAML::Node& node);
+
+    // I5-D4e-2 — 클립 오버라이드 표면. 재생(AnimationJob)·발화·에디터가 쓴다.
+    // 구현은 AnimationEventBridge.cpp(CLR 경계 파일 — 구 Animation:: 이벤트
+    // 표면의 이주지).
+    AnimatorClipOverride* FindClipOverride(int clipIndex);
+    const AnimatorClipOverride* FindClipOverride(int clipIndex) const;
+    AnimatorClipOverride& EnsureClipOverride(int clipIndex);
+    bool IsClipLooping(int clipIndex) const; // 오버라이드 → 자산(experiment→legacy) 폴백
+    void SetClipLooping(int clipIndex, bool looping);
+    void AddClipEvent(int clipIndex);                 // 이름 유일화 신규(구 Animation::AddEvent())
+    void DeleteClipEvent(int clipIndex, int eventIndex);
+    // 발화 — 트리거 매칭 계수를 돌려준다(CLR 미준비여도 계수는 정확하다 —
+    // 게이트가 큐 없이 판정하는 창구).
+    std::size_t InvokeClipEvents(int clipIndex, float currentProgress,
+        float previousProgress);
+
     bool HasSocket() { return !socketvec.empty(); };
     void ClearControllersAndParams();
     template<typename T>
@@ -118,6 +153,10 @@ public:
     // [anim.tick] 경로 관측을 애니메이터당 1회로 줄이는 플래그.
     bool m_tickPathLogged{ false };
     void EnsureExperimentAnimationBinding();
+
+    // I5-D4e-2 — 클립별 이벤트·루프 오버라이드(위 구조 주석 참조). 영속은
+    // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.
+    std::vector<AnimatorClipOverride> m_clipOverrides{};
 
     float m_stopTimer = 0.f;
 	float m_stopDuration = 0.f;

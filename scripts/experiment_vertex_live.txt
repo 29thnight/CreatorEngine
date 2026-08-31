@@ -42,6 +42,11 @@ wait 30
 # 후에도 유지된다.
 render.matmode P_Torus transparent
 wait 30
+# I5-D4e-2: 합성 이벤트·루프 오버라이드 주입 — 코퍼스 저작분 0이라 합성 없이는
+# 이관(왕복·비오염·발화)이 원리적으로 판정 불가. 저장 직전에 심어 아래
+# 재로드에서 verify가 왕복을 잰다.
+experiment.animevent seed
+wait 10
 scene.save __SAVED_SCENE__
 wait 30
 scene.switch __SAVED_SCENE__
@@ -51,6 +56,9 @@ wait 120
 # 재생 바인딩(EnsureExperimentAnimationBinding)까지 함께 검증한다. 라이브
 # 틱은 실시간이라 비결정 — 이 명령이 결정적 표본으로 같은 제품 함수를 잰다.
 experiment.animtick
+wait 10
+# I5-D4e-2: 왕복·비오염·발화 판정(위 seed의 대구).
+experiment.animevent verify
 wait 10
 
 dx12.scene
