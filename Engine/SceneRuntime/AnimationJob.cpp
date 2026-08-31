@@ -7,6 +7,7 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "Socket.h"
+#include <atomic> // D34b: 루트 본 부재 1회 경고
 #include <mathematics/transform.hpp>
 
 inline float lerp(float a, float b, float f)
@@ -121,6 +122,21 @@ void AnimationJob::Update(float deltaTime)
         {
             Skeleton* skeleton = animator->m_Skeleton;
             if (!skeleton) return;
+            // 루트 없는 스켈레톤은 틱할 수 없다 — UpdateBone(nullptr)이
+            // 워커 스레드에서 0x80 널 역참조로 죽는다(D34b 게이트 실측 —
+            // 저장·재로드된 스킨 씬). 조용히 건너뛰지 않고 1회 알린다:
+            // 스켈레톤 재구성 경로(역브리지·postLoad)의 결함이 여기로 온다.
+            if (nullptr == skeleton->m_rootBone)
+            {
+                static std::atomic_flag warned = ATOMIC_FLAG_INIT;
+                if (!warned.test_and_set())
+                {
+                    Debug->LogError("[AnimationJob] 스켈레톤에 루트 본이 없다 — "
+                        "틱을 건너뛴다(본 "
+                        + std::to_string(skeleton->m_bones.size()) + "개)");
+                }
+                return;
+            }
 
             float deltaT = delta;
             if (animator->m_stopTimer > 0.f) {

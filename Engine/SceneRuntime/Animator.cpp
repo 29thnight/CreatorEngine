@@ -554,6 +554,13 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 			if (model)
 			{
 				m_Skeleton = model->m_Skeleton;
+				// D34b 진단: 복원된 스켈레톤의 루트 부재를 로드 시점에 알린다 —
+				// 이대로 틱에 나가면 AnimationJob이 건너뛰며 같은 메시지를 낸다.
+				if (m_Skeleton && nullptr == m_Skeleton->m_rootBone)
+				{
+					Debug->LogError("[Animator] 복원된 스켈레톤에 루트 본이 없다: "
+						+ model->name);
+				}
 			}
 
 			for (int i = 0; i < m_Skeleton->m_animations.size(); ++i)

@@ -26,7 +26,13 @@ struct VSIn
 {
     float3 position : POSITION;
 #ifdef SHADOW_SKINNING
+    // I5-D34b: experiment packed(68B)는 BLENDINDICES가 uint4다 — 본문의
+    // (uint) 캐스트가 항등이 되므로 선언만 갈리면 수식은 한 벌이다.
+#ifdef EXPERIMENT_SKINNED_VERTEX
+    uint4  boneIndices : BLENDINDICES;
+#else
     float4 boneIndices : BLENDINDICES;
+#endif
     float4 boneWeights : BLENDWEIGHT;
 #endif
 };

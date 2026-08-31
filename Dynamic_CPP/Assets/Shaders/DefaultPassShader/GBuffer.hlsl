@@ -62,17 +62,29 @@ SamplerState gSampler       : register(s0);
 #define SHADING_QUALITY 0
 #endif
 
-// I5-D34a: EXPERIMENT_STATIC_VERTEX는 experiment packed core 레이아웃(48B)이다.
-// BINORMAL이 없고 TANGENT.w가 handedness라 bitangent를 cross로 재구성한다.
-// 스킨 어트리뷰트도 없다 — 이 레이아웃 PSO에는 정적 메시만 온다(스킨 메시는
-// D34b 전까지 legacy 96B 경로로 남는다).
-#ifdef EXPERIMENT_STATIC_VERTEX
+// I5-D34a/b: experiment packed 레이아웃 2종. BINORMAL이 없고 TANGENT.w가
+// handedness라 bitangent를 cross로 재구성한다.
+//   EXPERIMENT_STATIC_VERTEX  — core 48B (정적 메시)
+//   EXPERIMENT_SKINNED_VERTEX — core+skin 68B, BLENDINDICES가 **uint4**다
+//                               (legacy는 float 비트를 실어 (uint) 캐스트로
+//                                읽었다 — packed는 정수를 정수로 싣는다)
+#if defined(EXPERIMENT_STATIC_VERTEX)
 struct VSIn
 {
     float3 position : POSITION;
     float3 normal   : NORMAL;
     float2 uv       : TEXCOORD0;
     float4 tangent  : TANGENT;
+};
+#elif defined(EXPERIMENT_SKINNED_VERTEX)
+struct VSIn
+{
+    float3 position    : POSITION;
+    float3 normal      : NORMAL;
+    float2 uv          : TEXCOORD0;
+    float4 tangent     : TANGENT;
+    uint4  boneIndices : BLENDINDICES;
+    float4 boneWeights : BLENDWEIGHT;
 };
 #else
 struct VSIn
@@ -106,10 +118,34 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     const InstanceData instance = gInstances[instanceId];
     const float4x4 gWorld = instance.world;
 
-#ifdef EXPERIMENT_STATIC_VERTEX
+#if defined(EXPERIMENT_STATIC_VERTEX)
     // packed 레이아웃의 bitangent 재구성. 부호(w)가 handedness의 정본이고,
     // 원본 bitangent의 방향 자체는 나르지 않는다(왕복 계약 — modelbridge
     // 게이트의 부호 보존 단정과 같은 계약).
+    const float3 localTangent   = input.tangent.xyz;
+    const float3 localBitangent =
+        cross(input.normal, input.tangent.xyz) * input.tangent.w;
+#elif defined(EXPERIMENT_SKINNED_VERTEX)
+    // legacy 스킨 경로와 같은 수식·같은 규약(아래 블록의 주석 참조). 다른 점
+    // 둘: boneIndices가 uint4라 (uint) 캐스트가 항등이고, bitangent는 스킨된
+    // normal/tangent에서 재구성한다 — 본 변환이 회전 근사이므로 legacy의
+    // "bitangent도 같은 변환" 결과와 방향이 같고, handedness(w)는 불변이다.
+    if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
+    {
+        float4x4 boneTransform = input.boneWeights[0]
+            * gBones[instance.boneOffset + (uint)input.boneIndices[0]];
+
+        [unroll]
+        for (int i = 1; i < 4; ++i)
+        {
+            boneTransform += input.boneWeights[i]
+                * gBones[instance.boneOffset + (uint)input.boneIndices[i]];
+        }
+
+        input.position    = mul(float4(input.position, 1.0f), boneTransform).xyz;
+        input.normal      = normalize(mul(float4(input.normal, 0.0f), boneTransform).xyz);
+        input.tangent.xyz = normalize(mul(float4(input.tangent.xyz, 0.0f), boneTransform).xyz);
+    }
     const float3 localTangent   = input.tangent.xyz;
     const float3 localBitangent =
         cross(input.normal, input.tangent.xyz) * input.tangent.w;

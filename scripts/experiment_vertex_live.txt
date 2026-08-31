@@ -1,8 +1,8 @@
-# experiment 정점 실증 시나리오 (I5-D34a)
+# experiment 정점 실증 시나리오 (I5-D34a/b)
 #
 # 사용법:
 #   pwsh Tools\regression\verify-experiment-vertex-live.ps1
-#   (씬 경로 치환과 CREATOR_EXPERIMENT_VERTEX A/B는 그 스크립트가 한다)
+#   (경로 치환과 CREATOR_EXPERIMENT_VERTEX A/B는 그 스크립트가 한다)
 #
 # 관측 지점이 dx12.live가 아니라 dx12.scene인 이유: --script 헤드리스에서
 # 라이브는 프레임을 완성하지 않는다(렌더 0프레임 실측 — present가 없다).
@@ -12,7 +12,33 @@
 
 scene.switch __SCENE__
 
-# 씬 프록시 게시가 하네스 스냅샷에 잡힐 시간.
+wait 60
+
+# I5-D34b: 스킨 메시(Gunner — 스킨 마스크 68B, BLENDINDICES uint)를 같은
+# 씬에 배치한다. FT 프리미티브는 전부 정적 core라 스킨 레이아웃 축이
+# 이 배치 없이는 단 한 번도 돌지 않는다.
+model.load __SKINNED_MODEL__
+wait 120
+model.place Gunner_F_Mythic
+wait 60
+# 원점 그대로 두면 캐릭터가 씬 카메라를 삼켜 커버리지가 전면(65536)이 되고
+# 하네스의 라이팅 단정("광원이 셰이더에 닿지 않는다")이 무너진다. CLI
+# transform은 라이브 프록시에 전파되지 않으므로(실측 — 스케일 0.01로도
+# 커버리지 불변), 저작값으로 기록한 뒤 저장·재로드로 반영한다 — 로드
+# 경로는 저작값으로 프록시를 새로 만든다.
+object.transform Gunner_F_Mythic 1.5 0 0 0 0 0 0.3 0.3 0.3
+wait 30
+# 애니메이션 틱은 실시간(deltaTime) 기반이라 포즈가 실행마다 다르다 — A/B
+# 커버리지·밝기 동수 단정과 양립하지 않는다. 저장 전에 Animator를 꺼서
+# 재로드 씬이 결정적 바인드 포즈로 그려지게 한다. 스킨 레이아웃 판정에는
+# 손실이 없다 — 정점 페치(BLENDINDICES uint 조립)는 스키닝 분기와 무관하게
+# PSO 레이아웃대로 일어난다. 스키닝 산술의 시각 판정은 비결정성 때문에 이
+# 게이트 밖이다(계획서 한계 기록).
+object.property Gunner_F_Mythic Animator m_isEnabled false
+wait 30
+scene.save __SAVED_SCENE__
+wait 30
+scene.switch __SAVED_SCENE__
 wait 120
 
 dx12.scene

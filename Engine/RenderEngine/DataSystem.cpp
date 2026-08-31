@@ -334,7 +334,20 @@ void DataSystem::LoadModel(std::string_view filePath)
 		}
 	}
 
-	std::shared_ptr<Model> model = Model::LoadModelShared(assetPath.string());
+	// I5-D34b — 이름 경로도 experiment 이중화(LoadModelGUID와 같은 결). 이게
+	// 없으면 CLI(model.load)·에디터의 이름 기반 로드가 legacy 경로로 남아
+	// 병행 바인딩이 비고, 스킨 게이트가 성립하지 않는다. D4의 로드 수렴을
+	// 이 절반만 앞당긴 것이다.
+	std::shared_ptr<Model> model;
+	const FileGuid guid = GetFileGuid(assetPath);
+	if (FileGuid{} != guid)
+	{
+		model = LoadModelViaExperiment(guid, assetPath);
+	}
+	if (!model)
+	{
+		model = Model::LoadModelShared(assetPath.string());
+	}
 	if (model)
 	{
 		{

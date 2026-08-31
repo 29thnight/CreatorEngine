@@ -651,7 +651,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D1b ✅ | 로더 이중화 — `LoadModelGUID`가 experiment(cooked→source) 로드→역브리지 소비, Assimp 폴백·경로 관측 | DataSystem | 없음 |
 | ↳ I5-D2 ✅ | V4 유도 정본 — mask→`RHIInputElement` 유도, `RHIFormat::RGBA8Uint` 신설, 전환 계약 게이트 (패스 전환은 D4와 동시로 정정) | RHI | 없음 |
 | ↳ I5-D34a ✅ | GBuffer 정적 수직 절단 — 병행 바인딩·캐시 대칭 이중화·VSIn 퍼뮤테이션+PSO 레이아웃 축·A/B 동수 게이트(FT 8/8) | 메시 캐시·GBuffer | 없음 |
-| ↳ I5-D34b | 스킨 전환 — GBuffer 스킨·Shadow·WireFrame, BLENDINDICES uint 읽기, **스킨 픽셀 게이트 신설** | 스킨 3패스 | 없음 |
+| ↳ I5-D34b ✅ | 스킨 전환 — GBuffer·Shadow 스킨 PSO(BLENDINDICES uint4), 스킨 A/B 동수 게이트(10/10 전량·42411 동수), m_Motion 폴백 (WireFrame은 실존 안 함) | 스킨 2패스 | 없음 |
 | ↳ I5-D34c | Forward 전환 — 기본 2-variant×레이아웃 축, ShaderMeta variant 축(SKIN keyword) | Forward | 없음 |
 | ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
@@ -812,6 +812,37 @@ PSO+experiment 버퍼)는 초록 — position/normal/uv 오프셋이 두 레이�
 게이트: `verify-experiment-vertex-live.ps1` 신설(run-all 편입) — [model.dual](로드)와
 experiment 업로드 계수(GPU)를 분리 관측 + A/B 동수. 남김: 정적 픽셀 diff·노멀맵 축은 D34b
 스킨 픽셀 게이트와 함께, Forward 전환은 D34c.
+
+**I5-D34b 완료 실측 (2026-08-31).** 스킨 전환 — 스킨 메시(Gunner, 68B packed,
+BLENDINDICES **RGBA8Uint@48**)가 GBuffer/Shadow의 experiment 스킨 PSO로 그려진다. 게이트
+실측: 업로드 10/10 전량 experiment(N==M 단정 — 스킨 전용 계수 없이 전량으로 가른다),
+A/B 커버리지 42411 동수(Gunner가 화면 기여 ~5,700픽셀), 변이(스킨 유도 레이아웃
+POSITION+12)가 4d·4e를 정확히 붉힘. 절단선: ① DataSystem lookup의 스킨 거부 해제 ②
+`LoadModel`(이름 경로)도 experiment 이중화 — **D4 로드 수렴의 절반 선취**(CLI model.load가
+legacy 직행이라 스킨 게이트가 성립하지 않던 갭) ③ 셰이더는 **VSIn 선언만 분기**
+(`EXPERIMENT_SKINNED_VERTEX` — uint4 boneIndices; 본문의 `(uint)` 캐스트가 양쪽에서
+항등이라 수식은 한 벌) ④ GBuffer 레이아웃 축 3종(legacy/expStatic/expSkinned — 기본
+request·variant 전부 짝 생성, 마스크→매크로·레이아웃을 BuildPipelineDesc가 유도) ⑤
+Shadow는 experiment 스킨 PSO 하나 추가(유도 6원소 전체 선언 — VS가 읽는 시맨틱만
+조립되므로 부분집합 재기재 금지), 분류는 "팔레트 && 버퍼가 스킨 어트리뷰트 보유"로 ⑥
+WireFrame은 **실존하지 않는다**(정찰 표기 정정 — RHIInputElement 발생지는 3패스뿐).
+
+★ **부수 결함 두 건을 게이트가 잡아 고쳤다.** ① 저장·재로드된 스킨 씬이
+`AnimationJob::UpdateBone` 널 역참조로 죽었다(0x80) — 원인은 역브리지의 `m_Motion`이
+nil이라 Animator postLoad가 스켈레톤을 복원하지 못하고 **reflect가 만든 빈 스켈레톤(본
+0)**이 틱에 나간 것. 3점 계측(역브리지 fail-closed / postLoad 관측 / 틱 가드 — "본
+0개" 로그가 원인을 갈랐다)으로 특정하고, 역브리지가 m_Motion을 모델 guid로 폴백하게
+고쳤다(Assimp 경로와 같은 의미론). 가드·계측은 존치 — 스켈레톤 재구성 경로의 상비
+진단이다. ② CLI `object.transform`은 라이브 프록시에 전파되지 않는다(실측 — 스케일
+0.01로도 화면 불변, [[proxy-update-fanout-and-dirty]]의 T4 미연결과 정합) — 게이트는
+저작값 기록 후 **저장·재로드**로 반영한다.
+
+★ **게이트의 결정성 한계(정직).** 애니메이션 틱은 실시간(deltaTime) 기반이라 포즈가
+실행마다 다르다 — A/B 동수 단정과 양립하지 않아 게이트는 저장 전에 Animator를 끄고
+**바인드 포즈**로 판정한다. 정점 페치(BLENDINDICES uint 조립)는 스키닝 분기와 무관하게
+PSO 레이아웃대로 일어나므로 레이아웃·업로드·PSO 선택 판정에는 손실이 없지만, **스키닝
+산술(팔레트 인덱싱)의 시각 판정은 이 게이트 밖이다** — 합성 검증(dx12.skinning)이
+그 축을 쥐고 있고, 결정적 포즈 고정(시간 주입) 없이는 실씬 판정이 서지 않는다.
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그

@@ -227,16 +227,18 @@ bool EnhancedGBufferPass::ResolveShaderVariant(
     uint32_t vertexAttributeMask, RHIPipelineHandle& outPipeline,
     std::shared_ptr<const ShaderMetaBindingLayout>& outLayout) const
 {
-    // I5-D34a: 마스크가 0이 아니면 experiment 레이아웃 짝을 준다. 짝이 없으면
-    // 실패다 — legacy PSO로 폴백하면 96B 레이아웃 PSO에 packed 버퍼가 물려
-    // 화면이 조용히 틀린다(fail-closed).
+    // I5-D34a/b: 마스크가 0이 아니면 experiment 레이아웃 짝(core/skin)을 준다.
+    // 짝이 없으면 실패다 — legacy PSO로 폴백하면 96B 레이아웃 PSO에 packed
+    // 버퍼가 물려 화면이 조용히 틀린다(fail-closed).
     const bool experiment = 0 != vertexAttributeMask;
+    const bool experimentSkinned =
+        0 != (vertexAttributeMask & experiment::kSkinVertexAttributes);
     if (snapshot.shaderMetaHandle == m_shaderMetaHandle
         && snapshot.permutationKey == m_defaultPermutationKey)
     {
-        outPipeline = experiment
-            ? m_experimentPipelineRequest.GetHandle()
-            : m_pipelineRequest.GetHandle();
+        outPipeline = !experiment ? m_pipelineRequest.GetHandle()
+            : experimentSkinned ? m_experimentSkinnedPipelineRequest.GetHandle()
+            : m_experimentPipelineRequest.GetHandle();
         outLayout = m_shaderBindingLayout;
         return outPipeline.IsValid() && nullptr != outLayout;
     }
@@ -245,9 +247,9 @@ bool EnhancedGBufferPass::ResolveShaderVariant(
         snapshot.permutationKey };
     const auto found = m_shaderVariants.find(key);
     if (found == m_shaderVariants.end()) return false;
-    outPipeline = experiment
-        ? found->second.experimentRequest.GetHandle()
-        : found->second.request.GetHandle();
+    outPipeline = !experiment ? found->second.request.GetHandle()
+        : experimentSkinned ? found->second.experimentSkinnedRequest.GetHandle()
+        : found->second.experimentRequest.GetHandle();
     outLayout = found->second.layout;
     return outPipeline.IsValid() && nullptr != outLayout;
 }
@@ -494,9 +496,11 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
             }
             else
             {
-                batch.pipeline = 0 != vertexMask
-                    ? m_experimentPipelineRequest.GetHandle()
-                    : m_pipelineRequest.GetHandle();
+                batch.pipeline = 0 == vertexMask
+                    ? m_pipelineRequest.GetHandle()
+                    : 0 != (vertexMask & experiment::kSkinVertexAttributes)
+                        ? m_experimentSkinnedPipelineRequest.GetHandle()
+                        : m_experimentPipelineRequest.GetHandle();
             }
             batch.firstInstance = static_cast<uint32_t>(m_instances.size());
             batch.instanceCount = 0;
@@ -529,19 +533,25 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
 bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
     const ShaderRenderState* renderState,
-    const RHIShaderPermutation& permutation, bool experimentLayout,
+    const RHIShaderPermutation& permutation, uint32_t experimentMask,
     RHIGraphicsPipelineDesc& outDesc,
     RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError)
 {
-    // I5-D34a: experiment 짝은 호출자의 퍼뮤테이션 위에 레이아웃 매크로를 얹는다.
-    // 키워드 축과 독립인 별도 축이라 여기서 합성한다 — 호출자마다 얹게 하면
-    // 하나가 빠뜨렸을 때 화면이 조용히 틀린다.
+    // I5-D34a/b: experiment 짝은 호출자의 퍼뮤테이션 위에 레이아웃 매크로를
+    // 얹는다. 키워드 축과 독립인 별도 축이라 여기서 합성한다 — 호출자마다
+    // 얹게 하면 하나가 빠뜨렸을 때 화면이 조용히 틀린다. 매크로는 마스크에서
+    // 유도한다(스킨 유무) — 마스크와 매크로가 갈리면 레이아웃과 VSIn이
+    // 어긋나 PSO 생성이 거부된다.
+    const bool experimentSkinned =
+        0 != (experimentMask & experiment::kSkinVertexAttributes);
     RHIShaderPermutation experimentPermutation;
     const RHIShaderPermutation* effectivePermutation = &permutation;
-    if (experimentLayout)
+    if (0 != experimentMask)
     {
         experimentPermutation = permutation;
-        if (!experimentPermutation.Enable("EXPERIMENT_STATIC_VERTEX", outError))
+        if (!experimentPermutation.Enable(experimentSkinned
+                ? "EXPERIMENT_SKINNED_VERTEX" : "EXPERIMENT_STATIC_VERTEX",
+                outError))
             return false;
         effectivePermutation = &experimentPermutation;
     }
@@ -605,28 +615,47 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
     outDesc = {};
-    if (experimentLayout)
+    if (0 != experimentMask)
     {
-        // I5-D34a: 마스크→레이아웃 유도 정본(D2)에서 온다 — 오프셋을 여기 다시
-        // 적으면 표와 어긋났을 때 화면이 조용히 틀린다. core 마스크 하나뿐이라
-        // 함수-지역 static으로 한 번만 유도한다(레이아웃 배열은 desc가 반환된
-        // 뒤 PSO 생성까지 살아야 하므로 지역 vector면 안 된다). D34b가 스킨
-        // 마스크를 열면 마스크별 캐시로 일반화한다.
-        static std::vector<RHIInputElement> experimentElements;
-        static std::string experimentElementsError;
-        static const bool experimentElementsBuilt =
+        // I5-D34a/b: 마스크→레이아웃 유도 정본(D2)에서 온다 — 오프셋을 여기
+        // 다시 적으면 표와 어긋났을 때 화면이 조용히 틀린다. 마스크가 두 종
+        // (core / core|skin)뿐이라 함수-지역 static으로 한 번씩만 유도한다
+        // (레이아웃 배열은 desc가 반환된 뒤 PSO 생성까지 살아야 하므로 지역
+        // vector면 안 된다).
+        static std::vector<RHIInputElement> coreElements;
+        static std::string coreElementsError;
+        static const bool coreElementsBuilt =
             ExperimentVertexInput::BuildInputElements(
-                experiment::kCoreVertexAttributes, experimentElements,
-                experimentElementsError);
-        if (!experimentElementsBuilt)
+                experiment::kCoreVertexAttributes, coreElements,
+                coreElementsError);
+        static std::vector<RHIInputElement> skinnedElements;
+        static std::string skinnedElementsError;
+        static const bool skinnedElementsBuilt =
+            ExperimentVertexInput::BuildInputElements(
+                experiment::kV2VertexAttributes, skinnedElements,
+                skinnedElementsError);
+
+        const bool built = experimentSkinned
+            ? skinnedElementsBuilt : coreElementsBuilt;
+        const std::vector<RHIInputElement>& elements = experimentSkinned
+            ? skinnedElements : coreElements;
+        if (!built)
         {
             outError = "GBuffer experiment 입력 레이아웃 유도 실패: "
-                + experimentElementsError;
+                + (experimentSkinned ? skinnedElementsError : coreElementsError);
             return false;
         }
-        outDesc.inputElements = experimentElements.data();
-        outDesc.inputElementCount =
-            static_cast<uint32_t>(experimentElements.size());
+        // 지원하는 마스크는 표의 두 값뿐이다 — 다른 마스크가 오면 그것은
+        // 상류(lookup)의 결함이므로 조용히 근사하지 않는다.
+        if (experimentMask != experiment::kCoreVertexAttributes
+            && experimentMask != experiment::kV2VertexAttributes)
+        {
+            outError = "GBuffer가 지원하지 않는 experiment 마스크다: "
+                + std::to_string(experimentMask);
+            return false;
+        }
+        outDesc.inputElements = elements.data();
+        outDesc.inputElementCount = static_cast<uint32_t>(elements.size());
     }
     else
     {
@@ -658,24 +687,35 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     RHIGraphicsPipelineDesc desc{};
     const RHIShaderPermutation emptyPermutation;
     if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain", nullptr,
-            emptyPermutation, false, desc, vsBlob, psBlob, outError)) return false;
+            emptyPermutation, 0, desc, vsBlob, psBlob, outError)) return false;
 
     if (!m_pipelineRequest.Create(*context.psoManager, desc, outError))
         return false;
 
-    // I5-D34a: experiment core 레이아웃 짝. 하나라도 없으면 초기화 실패다 —
-    // 배치가 마스크로 고르는 자리에서 폴백을 지어내지 않기 위해서다.
+    // I5-D34a/b: experiment 레이아웃 짝 둘(core / core+skin). 하나라도 없으면
+    // 초기화 실패다 — 배치가 마스크로 고르는 자리에서 폴백을 지어내지 않기
+    // 위해서다.
     RHIGraphicsPipelineDesc experimentDesc{};
     if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain", nullptr,
-            emptyPermutation, true, experimentDesc, vsBlob, psBlob, outError))
+            emptyPermutation, experiment::kCoreVertexAttributes,
+            experimentDesc, vsBlob, psBlob, outError))
         return false;
-    return m_experimentPipelineRequest.Create(*context.psoManager,
-        experimentDesc, outError);
+    if (!m_experimentPipelineRequest.Create(*context.psoManager,
+            experimentDesc, outError))
+        return false;
+
+    RHIGraphicsPipelineDesc experimentSkinnedDesc{};
+    if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain", nullptr,
+            emptyPermutation, experiment::kV2VertexAttributes,
+            experimentSkinnedDesc, vsBlob, psBlob, outError))
+        return false;
+    return m_experimentSkinnedPipelineRequest.Create(*context.psoManager,
+        experimentSkinnedDesc, outError);
 }
 
 bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
     const EnhancedFrameContext& context, const ShaderMeta& meta,
-    std::span<const std::uint16_t> keywordSelections, bool experimentLayout,
+    std::span<const std::uint16_t> keywordSelections, uint32_t experimentMask,
     RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
     RHIShaderBlob& outPs, RHIShaderPermutationKey& outPermutationKey,
     std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
@@ -730,7 +770,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
 
     if (!BuildPipelineDesc(context, shaderFile.c_str(), pass.vertex->entry.c_str(),
             pass.pixel->entry.c_str(), &pass.state, permutation.defines,
-            experimentLayout, outDesc, outVs, outPs, outError))
+            experimentMask, outDesc, outVs, outPs, outError))
     {
         return false;
     }
@@ -786,23 +826,34 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     RHIShaderPermutationKey defaultPermutationKey{};
     std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
     const std::vector<std::uint16_t> defaultSelections(meta.keywords.size(), 0);
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections, false,
+    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections, 0,
             desc, vsBlob, psBlob, defaultPermutationKey, candidateLayout, outError))
         return false;
 
-    // I5-D34a: experiment 짝 desc를 후보 단계에서 먼저 완성한다 — 둘 중 하나라도
+    // I5-D34a/b: experiment 짝 desc 둘을 후보 단계에서 먼저 완성한다 — 하나라도
     // 못 만들면 아무것도 교체하지 않는 것이 candidate-first 규약이다.
-    // ★ 블롭은 legacy 것과 분리한다. desc는 블롭 내부 버퍼를 빌려 가리키므로,
-    //   같은 변수를 재사용하면 위의 legacy desc가 experiment 바이트코드(또는
-    //   재할당으로 죽은 메모리)를 가리켜 PSO 생성이 E_INVALIDARG로 죽는다 —
-    //   실제로 FT 라이브 전멸(드로우 0)로 나타났던 결함이다.
+    // ★ 블롭은 desc마다 분리한다. desc는 블롭 내부 버퍼를 빌려 가리키므로,
+    //   같은 변수를 재사용하면 앞의 desc가 뒤의 바이트코드(또는 재할당으로
+    //   죽은 메모리)를 가리켜 PSO 생성이 E_INVALIDARG로 죽는다 — 실제로 FT
+    //   라이브 전멸(드로우 0)로 나타났던 결함이다.
     RHIShaderBlob experimentVsBlob;
     RHIShaderBlob experimentPsBlob;
     RHIGraphicsPipelineDesc experimentDesc{};
     RHIShaderPermutationKey experimentKeyIgnored{};
     std::shared_ptr<const ShaderMetaBindingLayout> experimentLayoutIgnored;
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections, true,
+    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections,
+            experiment::kCoreVertexAttributes,
             experimentDesc, experimentVsBlob, experimentPsBlob,
+            experimentKeyIgnored, experimentLayoutIgnored, outError))
+        return false;
+
+    RHIShaderBlob experimentSkinnedVsBlob;
+    RHIShaderBlob experimentSkinnedPsBlob;
+    RHIGraphicsPipelineDesc experimentSkinnedDesc{};
+    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections,
+            experiment::kV2VertexAttributes,
+            experimentSkinnedDesc, experimentSkinnedVsBlob,
+            experimentSkinnedPsBlob,
             experimentKeyIgnored, experimentLayoutIgnored, outError))
         return false;
 
@@ -819,9 +870,9 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
             outError, !previousShared))
         return false;
 
-    // I5-D34a: experiment 짝도 같은 규약으로 교체한다. desc는 위에서 이미
-    // 완성됐으므로 여기 실패는 PSO 생성 실패뿐이고, 그때 legacy 쪽만 새것인
-    // 반쪽 상태가 되지만 실패 반환으로 프레임이 이 meta를 쓰지 않는다.
+    // I5-D34a/b: experiment 짝 둘도 같은 규약으로 교체한다. desc는 위에서 이미
+    // 완성됐으므로 여기 실패는 PSO 생성 실패뿐이고, 그때 앞쪽만 새것인 반쪽
+    // 상태가 되지만 실패 반환으로 프레임이 이 meta를 쓰지 않는다.
     const RHIPipelineHandle previousExperiment =
         m_experimentPipelineRequest.GetHandle();
     const bool previousExperimentShared = std::any_of(m_shaderVariants.begin(),
@@ -832,6 +883,20 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
         });
     if (!m_experimentPipelineRequest.Replace(*context.psoManager, experimentDesc,
             retireAfter, outError, !previousExperimentShared))
+        return false;
+
+    const RHIPipelineHandle previousExperimentSkinned =
+        m_experimentSkinnedPipelineRequest.GetHandle();
+    const bool previousExperimentSkinnedShared = std::any_of(
+        m_shaderVariants.begin(), m_shaderVariants.end(),
+        [previousExperimentSkinned](const auto& entry)
+        {
+            return entry.second.experimentSkinnedRequest.GetHandle()
+                == previousExperimentSkinned;
+        });
+    if (!m_experimentSkinnedPipelineRequest.Replace(*context.psoManager,
+            experimentSkinnedDesc, retireAfter, outError,
+            !previousExperimentSkinnedShared))
         return false;
 
     // primary generation 교체는 같은 catalog slot의 옛 permutation만 지운다.
@@ -846,6 +911,8 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
             removedPipelines.push_back(it->second.request.GetHandle());
             removedPipelines.push_back(
                 it->second.experimentRequest.GetHandle());
+            removedPipelines.push_back(
+                it->second.experimentSkinnedRequest.GetHandle());
             it = m_shaderVariants.erase(it);
         }
         else
@@ -862,6 +929,7 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     {
         if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
             || pipeline == m_experimentPipelineRequest.GetHandle()
+            || pipeline == m_experimentSkinnedPipelineRequest.GetHandle()
             || std::find(invalidated.begin(), invalidated.end(), pipeline.id)
                 != invalidated.end()
             || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
@@ -869,6 +937,8 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
                 {
                     return entry.second.request.GetHandle() == pipeline
                         || entry.second.experimentRequest.GetHandle()
+                            == pipeline
+                        || entry.second.experimentSkinnedRequest.GetHandle()
                             == pipeline;
                 }))
         {
@@ -930,7 +1000,7 @@ bool EnhancedGBufferPass::EnsureShaderMetaVariant(
     RHIGraphicsPipelineDesc desc{};
     RHIShaderPermutationKey candidateKey{};
     std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections, false,
+    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections, 0,
             desc, vsBlob, psBlob, candidateKey, candidateLayout, outError))
     {
         return false;
@@ -947,17 +1017,29 @@ bool EnhancedGBufferPass::EnsureShaderMetaVariant(
         return false;
     }
 
-    // I5-D34a: experiment 짝 desc. variant 생성 시점에는 어떤 메시가 이 재질로
-    // 그려질지 모르므로 둘을 함께 만든다 — 배치가 메시 마스크로 고른다.
-    // ★ 블롭 분리 — ApplyShaderMeta와 같은 이유(위 참조). legacy desc가 빌려
+    // I5-D34a/b: experiment 짝 desc 둘. variant 생성 시점에는 어떤 메시가 이
+    // 재질로 그려질지 모르므로 셋을 함께 만든다 — 배치가 메시 마스크로 고른다.
+    // ★ 블롭 분리 — ApplyShaderMeta와 같은 이유(위 참조). 앞의 desc가 빌려
     //   가리키는 버퍼를 덮으면 안 된다.
     RHIShaderBlob experimentVsBlob;
     RHIShaderBlob experimentPsBlob;
     RHIGraphicsPipelineDesc experimentDesc{};
     RHIShaderPermutationKey experimentKeyIgnored{};
     std::shared_ptr<const ShaderMetaBindingLayout> experimentLayoutIgnored;
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections, true,
+    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections,
+            experiment::kCoreVertexAttributes,
             experimentDesc, experimentVsBlob, experimentPsBlob,
+            experimentKeyIgnored, experimentLayoutIgnored, outError))
+    {
+        return false;
+    }
+    RHIShaderBlob experimentSkinnedVsBlob;
+    RHIShaderBlob experimentSkinnedPsBlob;
+    RHIGraphicsPipelineDesc experimentSkinnedDesc{};
+    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections,
+            experiment::kV2VertexAttributes,
+            experimentSkinnedDesc, experimentSkinnedVsBlob,
+            experimentSkinnedPsBlob,
             experimentKeyIgnored, experimentLayoutIgnored, outError))
     {
         return false;
@@ -968,6 +1050,9 @@ bool EnhancedGBufferPass::EnsureShaderMetaVariant(
     if (!candidate.request.Create(*context.psoManager, desc, outError)) return false;
     if (!candidate.experimentRequest.Create(*context.psoManager, experimentDesc,
             outError))
+        return false;
+    if (!candidate.experimentSkinnedRequest.Create(*context.psoManager,
+            experimentSkinnedDesc, outError))
         return false;
 
     auto [inserted, accepted] = m_shaderVariants.emplace(key, std::move(candidate));
@@ -1003,6 +1088,8 @@ std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
             removedPipelines.push_back(it->second.request.GetHandle());
             removedPipelines.push_back(
                 it->second.experimentRequest.GetHandle());
+            removedPipelines.push_back(
+                it->second.experimentSkinnedRequest.GetHandle());
             it = m_shaderVariants.erase(it);
             ++removedKeys;
         }
@@ -1017,6 +1104,7 @@ std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
     {
         if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
             || pipeline == m_experimentPipelineRequest.GetHandle()
+            || pipeline == m_experimentSkinnedPipelineRequest.GetHandle()
             || std::find(invalidated.begin(), invalidated.end(), pipeline.id)
                 != invalidated.end()
             || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
@@ -1024,6 +1112,8 @@ std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
                 {
                     return entry.second.request.GetHandle() == pipeline
                         || entry.second.experimentRequest.GetHandle()
+                            == pipeline
+                        || entry.second.experimentSkinnedRequest.GetHandle()
                             == pipeline;
                 }))
         {
@@ -1356,6 +1446,7 @@ void EnhancedGBufferPass::Shutdown()
     m_shaderVariants.clear();
     m_pipelineRequest = {};
     m_experimentPipelineRequest = {};
+    m_experimentSkinnedPipelineRequest = {};
     m_shaderMetaHandle = {};
     m_defaultPermutationKey = {};
     m_shaderBindingLayout.reset();

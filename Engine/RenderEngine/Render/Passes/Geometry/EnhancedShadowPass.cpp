@@ -3,6 +3,8 @@
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../../RHI/RHIEncoder.h"
+#include "../../../Experiment/VertexLayout.h" // I5-D34b: 스킨 마스크
+#include "../../../RHI/ExperimentVertexInputLayout.h" // I5-D34b: 레이아웃 유도
 #include "../../../Mesh.h"
 
 #include <mathematics/frustum.hpp>
@@ -28,10 +30,14 @@ namespace
     constexpr const char* kShadowShaderFile = "Shadow.hlsl";
 
     bool CompileShadowShader(const char* entry, const char* target, bool skinning,
-        RHIShaderBlob& outBlob, std::string& outError)
+        bool experimentLayout, RHIShaderBlob& outBlob, std::string& outError)
     {
         RHIShaderPermutation permutation;
         if (skinning && !permutation.Enable("SHADOW_SKINNING", outError))
+            return false;
+        // I5-D34b: experiment packed 스킨 — BLENDINDICES를 uint4로 선언한다.
+        if (experimentLayout
+            && !permutation.Enable("EXPERIMENT_SKINNED_VERTEX", outError))
             return false;
 
         return RHIShaderCompiler::CompileFile(kShadowShaderFile, entry, target,
@@ -43,8 +49,12 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
 {
     RHIShaderBlob vsBlob;
     RHIShaderBlob skinnedVsBlob;
-    if (!CompileShadowShader("VSMain", "vs_5_0", false, vsBlob, outError)) return false;
-    if (!CompileShadowShader("VSMain", "vs_5_0", true, skinnedVsBlob, outError)) return false;
+    RHIShaderBlob experimentSkinnedVsBlob;
+    if (!CompileShadowShader("VSMain", "vs_5_0", false, false, vsBlob, outError)) return false;
+    if (!CompileShadowShader("VSMain", "vs_5_0", true, false, skinnedVsBlob, outError)) return false;
+    if (!CompileShadowShader("VSMain", "vs_5_0", true, true,
+            experimentSkinnedVsBlob, outError))
+        return false;
 
     // 인스턴스 배열은 루트 SRV로 넘긴다. 업로드 링에서 자른 조각의 GPU 주소를
     // 그대로 꽂으면 되므로 디스크립터를 만들 필요가 없다 — 배치마다 바뀌는
@@ -107,7 +117,31 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     desc.vsSize = skinnedVsBlob.Size();
 
     m_skinnedPso = context.psoManager->GetOrCreate(desc, outError);
-    return m_skinnedPso.IsValid();
+    if (!m_skinnedPso.IsValid()) return false;
+
+    // I5-D34b: experiment packed 스킨 변형. 레이아웃은 D2 유도 정본에서 —
+    // 6원소 전체를 선언해도 VS가 읽는 시맨틱만 조립되므로 부분집합을 다시
+    // 적지 않는다(오프셋 재기재 금지).
+    static std::vector<RHIInputElement> experimentSkinnedElements;
+    static std::string experimentSkinnedError;
+    static const bool experimentSkinnedBuilt =
+        ExperimentVertexInput::BuildInputElements(
+            experiment::kV2VertexAttributes, experimentSkinnedElements,
+            experimentSkinnedError);
+    if (!experimentSkinnedBuilt)
+    {
+        outError = "Shadow experiment 입력 레이아웃 유도 실패: "
+            + experimentSkinnedError;
+        return false;
+    }
+    desc.inputElements = experimentSkinnedElements.data();
+    desc.inputElementCount =
+        static_cast<uint32_t>(experimentSkinnedElements.size());
+    desc.vsBytecode = experimentSkinnedVsBlob.Data();
+    desc.vsSize = experimentSkinnedVsBlob.Size();
+
+    m_experimentSkinnedPso = context.psoManager->GetOrCreate(desc, outError);
+    return m_experimentSkinnedPso.IsValid();
 }
 
 bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
@@ -555,8 +589,20 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         {
                             // 스킨드 배치만 스킨드 PSO로 바꾼다. 정렬이 스킨드를
                             // 뭉쳐 두었으므로 전환은 그룹 경계에서 한 번뿐이다.
-                            RHIPipelineHandle wanted =
-                                batchSkinned ? m_skinnedPso : m_pso;
+                            // I5-D34b: 스킨드 안에서도 버퍼 레이아웃으로 갈린다 —
+                            // 배치는 메시 단위라 마스크가 배치 안에서 섞이지 않는다.
+                            uint32_t batchMask = 0;
+                            if (batchSkinned)
+                            {
+                                const auto geometry = m_drawGeometry.find(batchMesh);
+                                if (geometry != m_drawGeometry.end())
+                                    batchMask = geometry->second.entry
+                                        .vertexAttributeMask;
+                            }
+                            RHIPipelineHandle wanted = !batchSkinned ? m_pso
+                                : 0 != (batchMask
+                                    & experiment::kSkinVertexAttributes)
+                                    ? m_experimentSkinnedPso : m_skinnedPso;
                             if (wanted != boundPso)
                             {
                                 // 루트 시그니처는 위에서 이미 걸었다. 그대로 다시
@@ -617,14 +663,20 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         continue;
                     }
 
-                    // I5-D34a: experiment packed 버퍼(마스크 != 0)는 스킨
-                    // 어트리뷰트 오프셋(64/80)이 없다 — 스킨 PSO로 분류하면
-                    // 버퍼 밖을 읽는다. core 마스크 메시는 본 데이터가 없어
-                    // legacy에서도 바인드 포즈였으므로 정적 분류가 의미도 같다.
-                    // 정적 PSO는 POSITION@0 하나라 두 레이아웃에서 동일하다.
+                    // I5-D34a/b: 스킨 분류는 팔레트에 더해 버퍼가 스킨
+                    // 어트리뷰트를 실제로 실었는지도 본다. experiment core
+                    // (48B)는 스킨 오프셋이 없어 스킨 PSO로 분류하면 버퍼
+                    // 밖을 읽는다 — 그 메시는 본 데이터가 없어 legacy에서도
+                    // 바인드 포즈였으므로 정적 분류가 의미도 같다. experiment
+                    // 스킨(68B)은 아래 flushBatch가 uint4 레이아웃 PSO를 고른다.
+                    const uint32_t drawVertexMask =
+                        found->second.entry.vertexAttributeMask;
+                    const bool skinnableBuffer = 0 == drawVertexMask
+                        || 0 != (drawVertexMask
+                            & experiment::kSkinVertexAttributes);
                     const bool skinned =
                         (nullptr != draw.bonePalette) && (0 != draw.boneCount)
-                        && 0 == found->second.entry.vertexAttributeMask;
+                        && skinnableBuffer;
 
                     // 메시나 스킨드 여부가 바뀌면 지금까지 모은 것을 낸다.
                     // 정렬해 두었으므로 같은 것끼리는 이미 붙어 있다.
@@ -700,5 +752,6 @@ void EnhancedShadowPass::Shutdown()
     m_boneOffsets.clear();
     m_pso = {};
     m_skinnedPso = {};
+    m_experimentSkinnedPso = {};
 }
 

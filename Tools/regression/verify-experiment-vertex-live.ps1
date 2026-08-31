@@ -9,11 +9,14 @@
 # ── 판정 항목 ──
 #
 #   1  로드가 experiment 경로다      — [model.dual] experiment 경로 ≥ 1
+#   1b 스킨 모델(Gunner)도 experiment 경로다 (D34b)
 #   2  ★ GPU 업로드가 experiment다  — "메시 업로드 N(experiment M" M > 0
+#   2b ★ 업로드 전량이 experiment다 — N == M (스킨 메시가 legacy로 새면
+#      스킨 전용 계수 없이도 여기서 갈린다) (D34b)
 #   3  하네스 단정 전체 통과          — dx12.scene 통과 (커버리지·밝기 포함:
 #      experiment 버퍼로 그린 그림이 통째로 틀리면 여기가 붉는다)
-#   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우 수 동일, 하네스 여전히 통과
-#      (경로만 바뀌고 그리는 대상·그림 판정은 같다)
+#   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
+#      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #
 # ★ 자가 틀렸을 때 어떻게 드러나는가:
 #   · 2가 없으면 "로드만 experiment, 업로드는 legacy"가 통과로 나온다.
@@ -45,12 +48,22 @@ if ([string]::IsNullOrEmpty($Scene)) {
 if (-not (Test-Path $Scene)) { "씬이 없다: $Scene"; exit 1 }
 $Scene = (Resolve-Path -LiteralPath $Scene).Path
 
+# I5-D34b: 스킨 메시. FT 프리미티브는 전부 정적이라 이 모델 없이는 스킨
+# 레이아웃 축(BLENDINDICES uint4)이 한 번도 돌지 않는다.
+$SkinnedModel = Join-Path $repoRoot "Dynamic_CPP\Assets\Models\Gunner_F_Mythic.glb"
+if (-not (Test-Path $SkinnedModel)) { "스킨 모델이 없다: $SkinnedModel"; exit 1 }
+$SkinnedModel = (Resolve-Path -LiteralPath $SkinnedModel).Path
+
 $template = Join-Path $repoRoot "scripts\experiment_vertex_live.txt"
 if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 
 function Invoke-Run([string]$label, [string]$vertexSwitch) {
     $scenario = Join-Path $Work "experiment_vertex_live_$label.txt"
-    (Get-Content $template -Raw).Replace('__SCENE__', $Scene.Replace('\', '/')) |
+    $savedScene = Join-Path $Work "experiment_vertex_live_$label.creator"
+    Remove-Item -LiteralPath $savedScene -Force -ErrorAction SilentlyContinue
+    (Get-Content $template -Raw).Replace('__SCENE__', $Scene.Replace('\', '/')).
+        Replace('__SKINNED_MODEL__', $SkinnedModel.Replace('\', '/')).
+        Replace('__SAVED_SCENE__', $savedScene.Replace('\', '/')) |
         Set-Content -LiteralPath $scenario -Encoding UTF8
 
     $stdout = Join-Path $Work "experiment_vertex_live_$label.out.log"
@@ -79,6 +92,10 @@ function Get-ExperimentUploads([string]$log) {
     if ($log -match '메시 업로드\s+\d+\(experiment\s+(\d+)') { return [int]$Matches[1] }
     return -1
 }
+function Get-TotalUploads([string]$log) {
+    if ($log -match '메시 업로드\s+(\d+)\(experiment') { return [int]$Matches[1] }
+    return -1
+}
 function Get-DrawCount([string]$log) {
     if ($log -match '\[3/4\] 씬 카메라 렌더 — 드로우\s+(\d+)') { return [int]$Matches[1] }
     return -1
@@ -103,10 +120,21 @@ $coverOn = Get-Coverage $logOn
 $scenePassOn = $logOn -match '\[CLI\] dx12\.scene 통과'
 
 if ($dualCount -lt 1) { $fail += "1 [model.dual] experiment 경로 0건 — 로드가 legacy다" }
+# I5-D34b: 스킨 모델도 experiment 경로로 로드됐는가 — 이게 없으면 스킨
+# 레이아웃 축이 legacy로 새어도 아래 합산 단정이 못 가른다.
+if ($logOn -notmatch '\[model\.dual\] experiment 경로: Gunner_F_Mythic\.glb') {
+    $fail += "1b 스킨 모델(Gunner)이 experiment 경로가 아니다"
+}
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
+# I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
+# legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
+$totalOn = Get-TotalUploads $logOn
+if ($totalOn -lt 0 -or $totalOn -ne $uploadsOn) {
+    $fail += "2b 업로드 전량이 experiment가 아니다 — 총 $totalOn vs experiment $uploadsOn"
+}
 if (-not $scenePassOn) { $fail += "3 dx12.scene 실패(on) — experiment 버퍼로 그린 그림이 단정을 깼다" }
 
-"on  — model.dual $dualCount 건 · experiment 업로드 $uploadsOn · 드로우 $drawsOn · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
+"on  — model.dual $dualCount 건 · experiment 업로드 $uploadsOn/$totalOn · 드로우 $drawsOn · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
 
 # ── B: 스위치 끔 ──
 $logOff = Invoke-Run "off" "0"

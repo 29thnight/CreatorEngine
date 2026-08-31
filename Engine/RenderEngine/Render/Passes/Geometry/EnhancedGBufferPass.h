@@ -133,17 +133,19 @@ public:
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    // I5-D34a: experimentLayout이 true면 EXPERIMENT_STATIC_VERTEX 퍼뮤테이션 +
-    // experiment core 마스크에서 유도한 입력 레이아웃으로 desc를 만든다.
+    // I5-D34a/b: experimentMask가 0이 아니면 그 마스크에서 유도한 입력
+    // 레이아웃 + 대응 퍼뮤테이션(core→EXPERIMENT_STATIC_VERTEX,
+    // core|skin→EXPERIMENT_SKINNED_VERTEX)으로 desc를 만든다. 0이면 legacy 96B.
     bool BuildPipelineDesc(const EnhancedFrameContext& context,
         const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
         const ShaderRenderState* renderState,
-        const RHIShaderPermutation& permutation, bool experimentLayout,
+        const RHIShaderPermutation& permutation, uint32_t experimentMask,
         RHIGraphicsPipelineDesc& outDesc,
         RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError);
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
         const ShaderMeta& meta,
-        std::span<const std::uint16_t> keywordSelections, bool experimentLayout,
+        std::span<const std::uint16_t> keywordSelections,
+        uint32_t experimentMask,
         RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
         RHIShaderBlob& outPs, RHIShaderPermutationKey& outPermutationKey,
         std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
@@ -226,10 +228,11 @@ private:
     struct ShaderVariant
     {
         RHIGraphicsPipelineRequest request;
-        // I5-D34a: 같은 permutation의 experiment core 레이아웃 짝. variant 생성
-        // 시점에는 어떤 메시가 이 재질로 그려질지 모르므로 둘을 함께 만들고,
-        // 배치가 메시 바인딩의 마스크로 고른다.
+        // I5-D34a/b: 같은 permutation의 experiment 레이아웃 짝 둘(core / skin).
+        // variant 생성 시점에는 어떤 메시가 이 재질로 그려질지 모르므로 셋을
+        // 함께 만들고, 배치가 메시 바인딩의 마스크로 고른다.
         RHIGraphicsPipelineRequest experimentRequest;
+        RHIGraphicsPipelineRequest experimentSkinnedRequest;
         std::shared_ptr<const ShaderMetaBindingLayout> layout{};
     };
 
@@ -296,9 +299,10 @@ private:
     // secondary ShaderMeta 조합은 아래 variant map에서 별도 PSO로 보관한다. 새 primary
     // generation은 같은 slot만, frame commit은 빠진 secondary key만 retire한다.
     RHIGraphicsPipelineRequest m_pipelineRequest;
-    // I5-D34a: default request의 experiment core 레이아웃 짝(위 ShaderVariant의
-    // experimentRequest와 같은 지위).
+    // I5-D34a/b: default request의 experiment 레이아웃 짝 둘(위 ShaderVariant와
+    // 같은 지위).
     RHIGraphicsPipelineRequest m_experimentPipelineRequest;
+    RHIGraphicsPipelineRequest m_experimentSkinnedPipelineRequest;
     ShaderMetaHandle           m_shaderMetaHandle{};
     RHIShaderPermutationKey     m_defaultPermutationKey{};
     std::shared_ptr<const ShaderMetaBindingLayout> m_shaderBindingLayout{};

@@ -294,12 +294,30 @@ bool DataSystem::BuildLegacyModelFromExperiment(
 	if (const experiment::Skeleton* skeleton = source.TryGetSkeleton())
 	{
 		legacy->m_Skeleton = BuildLegacySkeleton(*skeleton);
+		// D34b 크래시 진단으로 넣은 fail-closed — 루트 없는 스켈레톤이 씬에
+		// 나가면 AnimationJob이 널 역참조로 죽는다(0x80). 여기서 막히면 로드가
+		// legacy 폴백으로 가고 [model.dual]에 그 모델이 빠지는 것이 관측이다.
+		if (nullptr == legacy->m_Skeleton->m_rootBone)
+		{
+			outError = "역브리지 스켈레톤에 루트 본이 없다(본 "
+				+ std::to_string(legacy->m_Skeleton->m_bones.size()) + "개)";
+			return false;
+		}
 		legacy->m_hasBones = true;
 		legacy->m_animator = new AnimatorData();
 		legacy->m_animator->m_Skeleton = legacy->m_Skeleton;
 		if (const experiment::AnimatorData* animator = source.TryGetAnimator())
 		{
 			legacy->m_animator->m_Motion.m_guid = animator->motionAssetId.value;
+		}
+		// D34b: m_Motion이 비면 씬 저장·재로드가 스켈레톤을 복원하지 못한다 —
+		// Animator postLoad가 m_Motion guid로 LoadModelGUID를 불러 m_Skeleton을
+		// 되찾는 구조라, nil이면 reflect가 만든 빈 스켈레톤(본 0)이 틱에 나가
+		// 널 역참조로 죽었다(게이트 실측). 임포터 경로는 별도 모션 자산이 없어
+		// 모델 자신이 모션의 출처다 — Assimp 경로와 같은 의미론으로 폴백한다.
+		if (FileGuid{} == legacy->m_animator->m_Motion)
+		{
+			legacy->m_animator->m_Motion = legacy->guid;
 		}
 	}
 
@@ -437,10 +455,9 @@ bool DataSystem::TryGetExperimentVertexView(
 
 	const experiment::VertexBuffer& vertices = source->vertices;
 	const experiment::VertexAttributeMask mask = vertices.AttributeMask();
-	// D34a는 정적 수직 절단이다 — 스킨 레이아웃(BLENDINDICES uint 읽기와 스킨
-	// 3패스 전환)은 D34b가 픽셀 게이트와 함께 연다. 그 전에 열면 스킨 메시가
-	// float4 BLENDINDICES 레이아웃 PSO로 그려져 팔레트 밖을 짚는다.
-	if (0 != (mask & experiment::kSkinVertexAttributes)) return false;
+	// D34b: 스킨 마스크 개방 — GBuffer/Shadow가 스킨 레이아웃 PSO 축(uint4
+	// BLENDINDICES)을 갖췄다. Forward는 D34c까지 자체 fail-closed(마스크 != 0
+	// 전체 거부)라 여기서 가를 필요가 없다.
 
 	const std::span<const std::byte> bytes = vertices.Bytes();
 	outView.data = bytes.data();
