@@ -7,7 +7,10 @@
 #include "AnimationController.h"
 #include "Animator.h"
 #include "Socket.h"
+#include "Experiment/Model.h"       // I5-D4e-1
+#include "Experiment/PoseSampler.h" // I5-D4e-1
 #include <atomic> // D34b: 루트 본 부재 1회 경고
+#include <cstdio> // I5-D4e-1: [anim.tick] 경로 관측
 #include <mathematics/transform.hpp>
 
 inline float lerp(float a, float b, float f)
@@ -122,11 +125,27 @@ void AnimationJob::Update(float deltaTime)
         {
             Skeleton* skeleton = animator->m_Skeleton;
             if (!skeleton) return;
+
+            // I5-D4e-1 — 재생 경로 선택. experiment 핸들이 있으면 포즈 산술을
+            // 단일 순회 경로가 맡고, 없으면(Assimp 폴백·A/B off·계수 불일치)
+            // legacy 재귀가 폴백이다. 경로는 stdout으로 애니메이터당 1회
+            // 계수한다([model.instantiate]와 같은 채널).
+            const experiment::Skeleton* experimentSkeleton =
+                animator->m_experimentModel
+                ? animator->m_experimentModel->TryGetSkeleton() : nullptr;
+            if (!animator->m_tickPathLogged)
+            {
+                animator->m_tickPathLogged = true;
+                std::printf("[anim.tick] %s\n",
+                    experimentSkeleton ? "experiment" : "legacy");
+            }
+
             // 루트 없는 스켈레톤은 틱할 수 없다 — UpdateBone(nullptr)이
             // 워커 스레드에서 0x80 널 역참조로 죽는다(D34b 게이트 실측 —
             // 저장·재로드된 스킨 씬). 조용히 건너뛰지 않고 1회 알린다:
             // 스켈레톤 재구성 경로(역브리지·postLoad)의 결함이 여기로 온다.
-            if (nullptr == skeleton->m_rootBone)
+            // (experiment 경로는 루트 본 재귀가 없으므로 legacy 폴백에만 적용.)
+            if (nullptr == experimentSkeleton && nullptr == skeleton->m_rootBone)
             {
                 static std::atomic_flag warned = ATOMIC_FLAG_INIT;
                 if (!warned.test_and_set())
@@ -149,8 +168,15 @@ void AnimationJob::Update(float deltaTime)
                 }
             }
 
+            // I5-D4e-1 — experiment 재생 경로(시간축·이벤트 구조는 legacy와
+            // 동일, 포즈만 단일 순회). 소켓 적용 블록(아래 공통부)은 두 경로가
+            // 공유한다.
+            if (experimentSkeleton)
+            {
+                TickExperiment(*animator, *experimentSkeleton, deltaT);
+            }
             //컨트롤러별로 상,하체 등등이 분리되있다면
-            if (animator->UsesMultipleControllers() == true)
+            else if (animator->UsesMultipleControllers() == true)
             {
                 for (auto& sharedanimationcontroller : animator->m_animationControllers)
                 {
@@ -742,4 +768,532 @@ math::matrix4x4 AnimationJob::calculAni(NodeAnimation& nodeAnim, float time,
     return math::compose(
         math::vector3{ interpScale, interpScale, interpScale }, interpQuat,
         math::vector3{ interpPos.x, interpPos.y, interpPos.z });
+}
+
+// ─── I5-D4e-1 — experiment 재생 경로 ────────────────────────────────────────
+//
+// 시간축·이벤트·컨트롤러 분기는 legacy 경로(Update 람다)와 같은 구조이고,
+// clip 메타(durationTicks/ticksPerSecond/looping)만 experiment에서 읽는다.
+// looping은 자산 원본값이다 — legacy는 postLoad가 씬 오버라이드를 공유 자산에
+// 재주입한 값을 읽지만 코퍼스 전수 저작분 0(D0a 실측)이라 행동이 같다.
+// 오버라이드의 Animator 소유 이관은 D4e-2의 몫.
+//
+// 이벤트 발화는 아직 legacy 자산(m_animations[...].InvokeEvent)이다 — 이벤트
+// 데이터가 그쪽에 살고(같은 D0a), 클립 인덱스는 역브리지 1:1 계약으로 같다.
+
+void AnimationJob::TickExperiment(Animator& animator,
+    const experiment::Skeleton& skeleton, float deltaT)
+{
+    const std::vector<experiment::AnimationClip>& clips = skeleton.clips;
+    Skeleton* legacySkeleton = animator.m_Skeleton;
+
+    const auto clipAt = [&clips](int index) -> const experiment::AnimationClip*
+    {
+        return index >= 0 && static_cast<std::size_t>(index) < clips.size()
+            ? &clips[static_cast<std::size_t>(index)] : nullptr;
+    };
+    const auto invokeLegacyEvent =
+        [&](int index, float currentProgress, float previousProgress)
+    {
+        if (nullptr == legacySkeleton) return;
+        if (index < 0 || static_cast<std::size_t>(index)
+            >= legacySkeleton->m_animations.size())
+        {
+            return;
+        }
+        legacySkeleton->m_animations[static_cast<std::size_t>(index)]
+            .InvokeEvent(&animator, currentProgress, previousProgress);
+    };
+
+    if (animator.UsesMultipleControllers())
+    {
+        for (auto& sharedController : animator.m_animationControllers)
+        {
+            AnimationController* controller = sharedController.get();
+            if (nullptr == controller || !controller->useController) continue;
+
+            float animationSpeed = 1;
+            AnimationState* curState = controller->m_curState;
+            if (curState)
+            {
+                animationSpeed = curState->animationSpeed;
+                if (curState->useMultipler)
+                {
+                    animationSpeed *= curState->multiplerAnimationSpeed;
+                }
+            }
+
+            const experiment::AnimationClip* clip =
+                clipAt(controller->GetAnimationIndex());
+            if (nullptr == clip) continue;
+            const float duration = static_cast<float>(clip->durationTicks);
+            controller->m_timeElapsed += deltaT
+                * static_cast<float>(clip->ticksPerSecond) * animationSpeed;
+            if (clip->looping)
+            {
+                controller->m_timeElapsed =
+                    fmod(controller->m_timeElapsed, duration);
+            }
+            else if (controller->m_timeElapsed >= duration)
+            {
+                controller->m_timeElapsed = duration;
+                if (controller->curAnimationProgress >= 0.95)
+                    controller->endAnimation = true;
+            }
+            controller->preCurAnimationProgress = controller->curAnimationProgress;
+            controller->curAnimationProgress =
+                controller->m_timeElapsed / duration;
+
+            if (controller->m_isBlend)
+            {
+                const experiment::AnimationClip* nextClip =
+                    clipAt(controller->GetNextAnimationIndex());
+                if (nextClip)
+                {
+                    const float nextDuration =
+                        static_cast<float>(nextClip->durationTicks);
+                    controller->m_nextTimeElapsed += deltaT
+                        * static_cast<float>(nextClip->ticksPerSecond);
+                    controller->m_nextTimeElapsed =
+                        fmod(controller->m_nextTimeElapsed, nextDuration);
+                    controller->preNextAnimationProgress =
+                        controller->nextAnimationProgress;
+                    controller->nextAnimationProgress =
+                        controller->m_nextTimeElapsed / nextDuration;
+                    UpdateExperimentPose(animator, skeleton, controller,
+                        controller->GetAnimationIndex(),
+                        controller->GetNextAnimationIndex(),
+                        controller->m_timeElapsed,
+                        controller->m_nextTimeElapsed);
+                }
+            }
+            else
+            {
+                UpdateExperimentPose(animator, skeleton, controller,
+                    controller->GetAnimationIndex(), -1,
+                    controller->m_timeElapsed, 0.f);
+            }
+
+            if (deltaT <= 0.f) continue;
+            invokeLegacyEvent(controller->GetAnimationIndex(),
+                controller->curAnimationProgress,
+                controller->preCurAnimationProgress);
+            if (controller->m_isBlend)
+            {
+                invokeLegacyEvent(controller->GetNextAnimationIndex(),
+                    controller->nextAnimationProgress,
+                    controller->preNextAnimationProgress);
+            }
+        }
+
+        UpdateExperimentLayer(animator, skeleton);
+    }
+    else if (animator.m_animationControllers.empty())
+    {
+        const experiment::AnimationClip* clip =
+            clipAt(static_cast<int>(animator.m_AnimIndexChosen));
+        if (nullptr == clip) return;
+        const float duration = static_cast<float>(clip->durationTicks);
+        animator.m_TimeElapsed += deltaT
+            * static_cast<float>(clip->ticksPerSecond);
+        if (clip->looping)
+        {
+            animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, duration);
+        }
+        else if (animator.m_TimeElapsed >= duration)
+        {
+            animator.m_TimeElapsed = duration;
+        }
+
+        if (animator.m_isBlend)
+        {
+            if (animator.nextAnimIndex == -1) return;
+            const experiment::AnimationClip* nextClip =
+                clipAt(animator.nextAnimIndex);
+            if (nullptr == nextClip) return;
+            const float nextDuration =
+                static_cast<float>(nextClip->durationTicks);
+            animator.m_nextTimeElapsed += deltaT
+                * static_cast<float>(nextClip->ticksPerSecond);
+            animator.m_nextTimeElapsed =
+                fmod(animator.m_nextTimeElapsed, nextDuration);
+            UpdateExperimentPose(animator, skeleton, nullptr,
+                static_cast<int>(animator.m_AnimIndexChosen),
+                animator.nextAnimIndex,
+                animator.m_TimeElapsed, animator.m_nextTimeElapsed);
+        }
+        else
+        {
+            UpdateExperimentPose(animator, skeleton, nullptr,
+                static_cast<int>(animator.m_AnimIndexChosen), -1,
+                animator.m_TimeElapsed, 0.f);
+        }
+    }
+    else // 컨트롤러 1개
+    {
+        AnimationController* controller = animator.m_animationControllers[0].get();
+        const experiment::AnimationClip* clip =
+            clipAt(controller->GetAnimationIndex());
+        if (nullptr == clip) return;
+        const float duration = static_cast<float>(clip->durationTicks);
+        AnimationState* curState = controller->m_curState;
+        float animationSpeed = 1;
+        if (curState)
+        {
+            animationSpeed = curState->animationSpeed;
+            if (curState->useMultipler)
+            {
+                animationSpeed *= curState->multiplerAnimationSpeed;
+            }
+        }
+        controller->m_timeElapsed += deltaT
+            * static_cast<float>(clip->ticksPerSecond) * animationSpeed;
+        if (clip->looping)
+        {
+            controller->m_timeElapsed = fmod(controller->m_timeElapsed, duration);
+        }
+        else if (controller->m_timeElapsed >= duration)
+        {
+            controller->m_timeElapsed = duration;
+            if (controller->curAnimationProgress >= 0.95)
+                controller->endAnimation = true;
+        }
+
+        controller->preCurAnimationProgress = controller->curAnimationProgress;
+        controller->curAnimationProgress = controller->m_timeElapsed / duration;
+
+        if (animator.m_isBlend)
+        {
+            if (animator.nextAnimIndex == -1) return;
+            const experiment::AnimationClip* nextClip =
+                clipAt(controller->GetNextAnimationIndex());
+            if (nullptr == nextClip) return;
+            const float nextDuration =
+                static_cast<float>(nextClip->durationTicks);
+            controller->m_nextTimeElapsed += deltaT
+                * static_cast<float>(nextClip->ticksPerSecond);
+            controller->m_nextTimeElapsed =
+                fmod(controller->m_nextTimeElapsed, nextDuration);
+            controller->preNextAnimationProgress =
+                controller->nextAnimationProgress;
+            controller->nextAnimationProgress =
+                controller->m_nextTimeElapsed / nextDuration;
+            UpdateExperimentPose(animator, skeleton, controller,
+                controller->GetAnimationIndex(),
+                controller->GetNextAnimationIndex(),
+                controller->m_timeElapsed, controller->m_nextTimeElapsed);
+        }
+        else
+        {
+            UpdateExperimentPose(animator, skeleton, controller,
+                controller->GetAnimationIndex(), -1,
+                controller->m_timeElapsed, 0.f);
+        }
+
+        if (deltaT > 0.f)
+        {
+            invokeLegacyEvent(controller->GetAnimationIndex(),
+                controller->curAnimationProgress,
+                controller->preCurAnimationProgress);
+            if (controller->m_isBlend)
+            {
+                invokeLegacyEvent(controller->GetNextAnimationIndex(),
+                    controller->nextAnimationProgress,
+                    controller->preNextAnimationProgress);
+            }
+        }
+    }
+}
+
+void AnimationJob::UpdateExperimentPose(Animator& animator,
+    const experiment::Skeleton& skeleton, AnimationController* controller,
+    int clipIndex, int nextClipIndex, float time, float nextTime)
+{
+    namespace sampler = experiment::sampler;
+    const std::vector<experiment::AnimationClip>& clips = skeleton.clips;
+    if (clipIndex < 0 || static_cast<std::size_t>(clipIndex) >= clips.size())
+        return;
+    const experiment::AnimationClip& clip =
+        clips[static_cast<std::size_t>(clipIndex)];
+    const experiment::AnimationClip* nextClip =
+        (nextClipIndex >= 0
+            && static_cast<std::size_t>(nextClipIndex) < clips.size())
+        ? &clips[static_cast<std::size_t>(nextClipIndex)] : nullptr;
+
+    const std::size_t boneCount = skeleton.bones.size();
+    std::vector<const experiment::AnimationChannel*> channelOf(boneCount, nullptr);
+    for (const experiment::AnimationChannel& channel : clip.channels)
+    {
+        if (experiment::IsInRange(channel.bone, boneCount))
+            channelOf[channel.bone.Value()] = &channel;
+    }
+    std::vector<const experiment::AnimationChannel*> nextChannelOf;
+    if (nextClip)
+    {
+        nextChannelOf.assign(boneCount, nullptr);
+        for (const experiment::AnimationChannel& channel : nextClip->channels)
+        {
+            if (experiment::IsInRange(channel.bone, boneCount))
+                nextChannelOf[channel.bone.Value()] = &channel;
+        }
+    }
+
+    const math::matrix4x4& rootTransform = skeleton.rootTransform;
+    const math::matrix4x4& globalInverse = skeleton.globalInverseTransform;
+    // legacy 재현: 소켓 행렬은 비블렌드 순회(UpdateBone)에서만 계산됐다.
+    const bool writeSockets = nullptr == nextClip && animator.HasSocket()
+        && SceneManagers->m_isGameStart && nullptr != animator.GetOwner();
+
+    // 게시 계약(parent < index) 덕에 단일 순회로 충분하다 — D4d와 같은 결.
+    std::vector<math::matrix4x4> globals(boneCount, rootTransform);
+    for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
+    {
+        const experiment::Bone& bone = skeleton.bones[boneIndex];
+        const math::matrix4x4 parentGlobal = bone.parent.IsValid()
+            ? globals[bone.parent.Value()] : rootTransform;
+        const experiment::AnimationChannel* channel = channelOf[boneIndex];
+        if (nullptr == channel)
+        {
+            // legacy 재현: 채널 없는 본은 부모 전역을 그대로 잇고 팔레트
+            // 슬롯을 건드리지 않는다(이전 값 유지).
+            globals[boneIndex] = parentGlobal;
+            continue;
+        }
+
+        math::matrix4x4 local = sampler::SampleLocal(*channel, time);
+        if (nextClip)
+        {
+            // legacy UpdateBlendBone은 다음 클립 맵에 operator[]로 접근해
+            // 채널이 없으면 빈 항목을 만들고 빈 키 배열을 읽었다(잠재 UB).
+            // 여기서는 다음 채널이 없으면 블렌드를 생략한다 — 실코퍼스는
+            // 클립 간 채널 집합이 같아 행동 차이가 없다.
+            if (const experiment::AnimationChannel* nextChannel =
+                nextChannelOf[boneIndex])
+            {
+                local = BlendAni(local,
+                    sampler::SampleLocal(*nextChannel, nextTime),
+                    animator.blendT);
+            }
+        }
+        const math::matrix4x4 global = local * parentGlobal;
+        globals[boneIndex] = global;
+
+        if (boneIndex < MAX_BONES)
+        {
+            animator.m_localTransforms[boneIndex] = local;
+            animator.m_FinalTransforms[boneIndex] =
+                bone.inverseBindMatrix * global * globalInverse;
+            if (controller)
+            {
+                controller->m_LocalTransforms[boneIndex] = local;
+            }
+        }
+
+        if (writeSockets)
+        {
+            for (auto& socket : animator.socketvec)
+            {
+                if (bone.name == socket->m_ObjectName)
+                {
+                    socket->m_boneMatrix = global * socket->m_offset;
+                    socket->m_boneMatrix = socket->m_boneMatrix
+                        * animator.GetOwner()->Transform_().GetWorldMatrix();
+                }
+            }
+        }
+    }
+}
+
+void AnimationJob::UpdateExperimentLayer(Animator& animator,
+    const experiment::Skeleton& skeleton)
+{
+    // legacy UpdateBoneLayer 재현(단일 순회). 컨트롤러들의 m_LocalTransforms
+    // (앞선 포즈 패스가 채움)를 마스크로 골라 합성한다. legacy의 알려진 결함도
+    // 그대로 승계한다: 채널이 있는 본에서 모든 컨트롤러가 마스크에 걸리면
+    // globalTransform이 기본 초기화(영행렬 — math 규약)로 남아 팔레트에 나간다.
+    const std::vector<experiment::AnimationClip>& clips = skeleton.clips;
+    const std::size_t boneCount = skeleton.bones.size();
+
+    // 컨트롤러별 "이 본에 채널이 있는가" 표 — legacy hasAnyAnimation 재현
+    // (useController 필터가 없는 것까지 동일).
+    std::vector<const experiment::AnimationClip*> controllerClips;
+    controllerClips.reserve(animator.m_animationControllers.size());
+    for (auto& sharedController : animator.m_animationControllers)
+    {
+        AnimationController* controller = sharedController.get();
+        const int index = controller ? controller->GetAnimationIndex() : -1;
+        controllerClips.push_back(
+            index >= 0 && static_cast<std::size_t>(index) < clips.size()
+            ? &clips[static_cast<std::size_t>(index)] : nullptr);
+    }
+    std::vector<std::vector<std::uint8_t>> controllerHasChannel(
+        controllerClips.size());
+    for (std::size_t slot = 0; slot < controllerClips.size(); ++slot)
+    {
+        controllerHasChannel[slot].assign(boneCount, 0);
+        if (nullptr == controllerClips[slot]) continue;
+        for (const experiment::AnimationChannel& channel
+            : controllerClips[slot]->channels)
+        {
+            if (experiment::IsInRange(channel.bone, boneCount))
+                controllerHasChannel[slot][channel.bone.Value()] = 1;
+        }
+    }
+
+    const math::matrix4x4& rootTransform = skeleton.rootTransform;
+    const math::matrix4x4& globalInverse = skeleton.globalInverseTransform;
+    const bool writeSockets = animator.HasSocket()
+        && SceneManagers->m_isGameStart && nullptr != animator.GetOwner();
+
+    std::vector<math::matrix4x4> globals(boneCount, rootTransform);
+    for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
+    {
+        const experiment::Bone& bone = skeleton.bones[boneIndex];
+        const math::matrix4x4 parentGlobal = bone.parent.IsValid()
+            ? globals[bone.parent.Value()] : rootTransform;
+
+        bool hasAnyAnimation = false;
+        for (const auto& table : controllerHasChannel)
+        {
+            if (boneIndex < table.size() && table[boneIndex])
+            {
+                hasAnyAnimation = true;
+                break;
+            }
+        }
+        if (!hasAnyAnimation || boneIndex >= MAX_BONES)
+        {
+            globals[boneIndex] = parentGlobal;
+            continue;
+        }
+
+        const BoneRegion region = boneIndex < animator.m_experimentBoneRegions.size()
+            ? static_cast<BoneRegion>(animator.m_experimentBoneRegions[boneIndex])
+            : BoneRegion::Root;
+
+        math::matrix4x4 globalTransform{};
+        for (auto& sharedController : animator.m_animationControllers)
+        {
+            AnimationController* controller = sharedController.get();
+            if (nullptr == controller) continue;
+            const math::matrix4x4 candidate =
+                controller->m_LocalTransforms[boneIndex] * parentGlobal;
+            if (controller->m_isBlend == false)
+            {
+                if (controller->IsUseLayer() == false) continue;
+                AvatarMask* mask = controller->GetAvatarMask();
+                if (mask != nullptr)
+                {
+                    if (mask->isHumanoid)
+                    {
+                        if (mask->IsBoneEnabled(region))
+                        {
+                            globalTransform = candidate;
+                        }
+                    }
+                    else if (mask->IsBoneEnabled(bone.name))
+                    {
+                        animator.m_localTransforms[boneIndex] =
+                            controller->m_LocalTransforms[boneIndex];
+                        globalTransform = candidate;
+                    }
+                }
+                else
+                {
+                    globalTransform = candidate;
+                }
+            }
+            else
+            {
+                AvatarMask* mask = controller->GetAvatarMask();
+                if (mask != nullptr)
+                {
+                    if (mask->isHumanoid)
+                    {
+                        if (mask->IsBoneEnabled(region))
+                        {
+                            globalTransform = candidate;
+                        }
+                    }
+                    else if (mask->IsBoneEnabled(bone.name))
+                    {
+                        animator.m_localTransforms[boneIndex] =
+                            controller->m_LocalTransforms[boneIndex];
+                        globalTransform = candidate;
+                    }
+                }
+                else
+                {
+                    globalTransform = candidate;
+                }
+            }
+        }
+
+        animator.m_FinalTransforms[boneIndex] =
+            bone.inverseBindMatrix * globalTransform * globalInverse;
+
+        if (writeSockets)
+        {
+            for (auto& socket : animator.socketvec)
+            {
+                if (bone.name == socket->m_ObjectName)
+                {
+                    socket->m_boneMatrix = globalTransform * socket->m_offset;
+                    socket->m_boneMatrix = socket->m_boneMatrix
+                        * animator.GetOwner()->Transform_().GetWorldMatrix();
+                }
+            }
+        }
+
+        globals[boneIndex] = globalTransform;
+    }
+}
+
+bool AnimationJob::EvaluateParityPose(Animator& animator,
+    const experiment::Skeleton& experimentSkeleton, int clipIndex,
+    float time, math::matrix4x4* outLegacy, math::matrix4x4* outExperiment)
+{
+    Skeleton* legacySkeleton = animator.m_Skeleton;
+    if (nullptr == legacySkeleton || nullptr == legacySkeleton->m_rootBone
+        || nullptr == outLegacy || nullptr == outExperiment)
+    {
+        return false;
+    }
+    if (clipIndex < 0
+        || static_cast<std::size_t>(clipIndex)
+            >= legacySkeleton->m_animations.size()
+        || static_cast<std::size_t>(clipIndex)
+            >= experimentSkeleton.clips.size())
+    {
+        return false;
+    }
+
+    // 살아 있는 컴포넌트를 빌려 쓰므로 팔레트·선택 인덱스를 원복한다.
+    std::vector<math::matrix4x4> savedLocal(
+        animator.m_localTransforms, animator.m_localTransforms + MAX_BONES);
+    std::vector<math::matrix4x4> savedFinal(
+        animator.m_FinalTransforms, animator.m_FinalTransforms + MAX_BONES);
+    const uint32_t savedChosen = animator.m_AnimIndexChosen;
+    animator.m_AnimIndexChosen = static_cast<uint32_t>(clipIndex);
+
+    // 두 경로 모두 같은 초기값(항등)에서 시작해야 "채널 없는 슬롯 미기록"
+    // 규약 아래에서도 대조가 성립한다.
+    std::fill(animator.m_FinalTransforms,
+        animator.m_FinalTransforms + MAX_BONES, math::matrix4x4::identity());
+    math::matrix4x4 rootTransform = legacySkeleton->m_rootTransform;
+    UpdateBone(legacySkeleton->m_rootBone, animator, nullptr, rootTransform, time);
+    std::copy(animator.m_FinalTransforms,
+        animator.m_FinalTransforms + MAX_BONES, outLegacy);
+
+    std::fill(animator.m_FinalTransforms,
+        animator.m_FinalTransforms + MAX_BONES, math::matrix4x4::identity());
+    UpdateExperimentPose(animator, experimentSkeleton, nullptr,
+        clipIndex, -1, time, 0.f);
+    std::copy(animator.m_FinalTransforms,
+        animator.m_FinalTransforms + MAX_BONES, outExperiment);
+
+    std::copy(savedLocal.begin(), savedLocal.end(), animator.m_localTransforms);
+    std::copy(savedFinal.begin(), savedFinal.end(), animator.m_FinalTransforms);
+    animator.m_AnimIndexChosen = savedChosen;
+    return true;
 }

@@ -15,7 +15,99 @@
 #include "../RenderEngine/Skeleton.h"
 #include "SceneManager.h"
 #include "Socket.h"
+#include "../RenderEngine/Experiment/Model.h" // I5-D4e-1
 #include <nlohmann/json.hpp>
+
+Animator::~Animator()
+{
+	m_animationControllers.clear();
+
+	{
+		std::unique_lock lock(m_paramMutex);
+		for (auto& param : Parameters)
+		{
+			delete param; // 하나씩 해제
+		}
+		Parameters.clear(); // 벡터 비우기
+	}
+
+	for (auto& socket : socketvec)
+	{
+		delete socket;
+	}
+	socketvec.clear();
+}
+
+namespace
+{
+	// I5-D4e-1 — legacy MarkRegionSkeleton 재현. 게시 계약(parent < index) 덕에
+	// "이름 매칭이면 자기 리전, 아니면 부모 리전 상속"의 단일 순회가 legacy의
+	// 서브트리 전파(+나중 매칭이 덮어씀)와 같은 결과를 낸다 — legacy m_bones
+	// 순서가 곧 인덱스 순서(역브리지 1:1)이기 때문이다.
+	[[nodiscard]] std::vector<std::uint8_t> DeriveExperimentBoneRegions(
+		const experiment::Skeleton& skeleton)
+	{
+		std::vector<std::uint8_t> regions(skeleton.bones.size(),
+			static_cast<std::uint8_t>(BoneRegion::Root));
+		for (std::size_t index = 0; index < skeleton.bones.size(); ++index)
+		{
+			const experiment::Bone& bone = skeleton.bones[index];
+			const std::string name = ToLower(bone.name);
+			bool matched = true;
+			BoneRegion region = BoneRegion::Root;
+			if (name.find("spine") != std::string::npos) region = BoneRegion::Spine;
+			else if (name.find("neck") != std::string::npos) region = BoneRegion::Neck;
+			else if (name.find("shoulder") != std::string::npos)
+			{
+				if (name.find("left") != std::string::npos) region = BoneRegion::LeftArm;
+				else if (name.find("right") != std::string::npos) region = BoneRegion::RightArm;
+				else matched = false;
+			}
+			else if (name.find("leg") != std::string::npos)
+			{
+				if (name.find("left") != std::string::npos) region = BoneRegion::LeftLeg;
+				else if (name.find("right") != std::string::npos) region = BoneRegion::RightLeg;
+				else matched = false;
+			}
+			else matched = false;
+
+			if (matched)
+			{
+				regions[index] = static_cast<std::uint8_t>(region);
+			}
+			else if (bone.parent.IsValid()
+				&& bone.parent.Value() < regions.size())
+			{
+				regions[index] = regions[bone.parent.Value()];
+			}
+		}
+		return regions;
+	}
+}
+
+void Animator::EnsureExperimentAnimationBinding()
+{
+	// I5-D4e-1 — 재생 데이터의 experiment 핸들. m_Motion(모델 GUID — 역브리지
+	// 폴백 규약)이 정본 창구다. legacy와 본·클립 계수가 어긋나면 핸들을 비워
+	// legacy 틱으로 폴백한다(반쪽 소비 금지 — 인덱스 1:1 계약이 전제라서다).
+	m_experimentModel.reset();
+	m_experimentBoneRegions.clear();
+	if (FileGuid{} == m_Motion || nullptr == m_Skeleton) return;
+
+	std::shared_ptr<const experiment::Model> source =
+		DataSystems->TryGetExperimentModel(m_Motion);
+	if (nullptr == source) return;
+	const experiment::Skeleton* skeleton = source->TryGetSkeleton();
+	if (nullptr == skeleton
+		|| skeleton->bones.size() != m_Skeleton->m_bones.size()
+		|| skeleton->clips.size() != m_Skeleton->m_animations.size())
+	{
+		return;
+	}
+	m_experimentBoneRegions = DeriveExperimentBoneRegions(*skeleton);
+	m_experimentModel = std::move(source);
+}
+
 void Animator::OnInitialized()
 {
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -682,5 +774,9 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 			m_animationControllers.push_back(animationController);
 		}
 	}
+
+	// I5-D4e-1 — 씬 로드 경계에서 experiment 재생 핸들을 잇는다(m_Motion·
+	// m_Skeleton이 위에서 복원된 뒤여야 계수 대조가 성립한다).
+	EnsureExperimentAnimationBinding();
 }
 

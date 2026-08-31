@@ -58,6 +58,10 @@ public:
 	void RegisterAnimator(Animator* animatorPtr);
 	void UnregisterAnimator(Animator* animatorPtr);
 
+	// I5-D4e-1: experiment.animtick 패리티 게이트 전용 — 제품 틱 함수
+	// (EvaluateParityPose)를 게이트가 직접 태우기 위한 접근.
+	AnimationJob& GetAnimationJob() { return m_animationJob; }
+
     void RegisterCommand(MeshRenderer* meshRendererPtr);
     void UpdateCommand(MeshRenderer* meshRendererPtr);
     void UnregisterCommand(MeshRenderer* meshRendererPtr);

@@ -47,6 +47,12 @@ wait 30
 scene.switch __SAVED_SCENE__
 wait 120
 
+# I5-D4e-1: 재생 팔레트 패리티 — 재로드 뒤에 돌려 postLoad의 experiment
+# 재생 바인딩(EnsureExperimentAnimationBinding)까지 함께 검증한다. 라이브
+# 틱은 실시간이라 비결정 — 이 명령이 결정적 표본으로 같은 제품 함수를 잰다.
+experiment.animtick
+wait 10
+
 dx12.scene
 
 quit

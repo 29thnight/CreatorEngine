@@ -16,6 +16,9 @@
 #   3  하네스 단정 전체 통과          — dx12.scene 통과 (커버리지·밝기 포함:
 #      experiment 버퍼로 그린 그림이 통째로 틀리면 여기가 붉는다)
 #   1d 씬 배치 인스턴스화가 experiment 직행이다 (D4d)
+#   1e 라이브 애니 틱이 legacy 경로로 새지 않는다 (D4e-1)
+#   6  재생 팔레트 패리티 — legacy 재귀 vs experiment 단일 순회, 제품 함수
+#      직접 대조 (D4e-1)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -164,6 +167,19 @@ $instLegacyOn = ([regex]::Matches($logOn, '\[model\.instantiate\] legacy:')).Cou
 if ($instExpOn -lt 1 -or $instLegacyOn -ne 0) {
     $fail += "1d 인스턴스화 experiment $instExpOn · legacy $instLegacyOn — 씬 배치가 legacy 재귀로 샜다"
 }
+# ★ 1e(I5-D4e-1) — 라이브 애니 틱 경로. Gunner 배치 직후 Animator가 꺼지기
+#   전까지의 틱은 experiment 경로여야 한다. legacy 계수가 있으면 재생 바인딩
+#   (EnsureExperimentAnimationBinding)이 조용히 실패한 것이다.
+$animTickLegacyOn = ([regex]::Matches($logOn, '\[anim\.tick\] legacy')).Count
+if ($animTickLegacyOn -ne 0) {
+    $fail += "1e 라이브 애니 틱 legacy $animTickLegacyOn 건 — 재생 바인딩이 새고 있다"
+}
+# ★ 6(I5-D4e-1) — 재생 팔레트 패리티. 같은 시각 입력으로 legacy 재귀와
+#   experiment 단일 순회(둘 다 제품 함수)를 대조한다. 라이브 틱의 A/B 렌더
+#   동수는 비결정 시간축 탓에 세울 수 없으므로 이 직접 대조가 그 축을 진다.
+if ($logOn -notmatch '\[CLI\] experiment\.animtick pass animators=([1-9]\d*)') {
+    $fail += "6 재생 팔레트 패리티 실패 또는 대상 0 — animtick 출력을 확인하라"
+}
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
 # I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
 # legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
@@ -215,6 +231,15 @@ $instExpOff = ([regex]::Matches($logOff, '\[model\.instantiate\] experiment:')).
 $instLegacyOff = ([regex]::Matches($logOff, '\[model\.instantiate\] legacy:')).Count
 if ($instExpOff -ne 0 -or $instLegacyOff -lt 1) {
     $fail += "4i 스위치를 껐는데 인스턴스화 experiment $instExpOff · legacy $instLegacyOff"
+}
+# I5-D4e-1: 스위치가 재생 경로도 막는가 — off 대조군의 애니 틱은 전량 legacy,
+# animtick은 대상 0(skip)이어야 한다(TryGetExperimentModel이 스위치를 본다).
+$animTickExpOff = ([regex]::Matches($logOff, '\[anim\.tick\] experiment')).Count
+if ($animTickExpOff -ne 0) {
+    $fail += "4j 스위치를 껐는데 experiment 애니 틱 $animTickExpOff 건"
+}
+if ($logOff -notmatch '\[CLI\] experiment\.animtick skip animators=0') {
+    $fail += "4k 스위치를 껐는데 animtick 대상이 0이 아니다 — 재생 바인딩이 스위치를 무시한다"
 }
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"

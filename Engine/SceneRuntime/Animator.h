@@ -15,6 +15,7 @@ class Skeleton;
 class AnimationController;
 class Socket;
 namespace YAML { class Node; } // CT6-d
+namespace experiment { class Model; } // I5-D4e-1: 재생 데이터 핸들(shared_ptr 보관용)
 
 // K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
 // 않고 this를 프레임-로컬 raw 포인터로만 관찰한다(Awake/OnDestroy 참조).
@@ -37,25 +38,9 @@ public:
     {
         socketvec.clear();
     }
-    virtual ~Animator()
-    {
-        m_animationControllers.clear();
-
-        {
-            std::unique_lock lock(m_paramMutex);
-            for (auto& param : Parameters)
-            {
-                delete param; // 하나씩 해제
-            }
-            Parameters.clear(); // 벡터 비우기
-        }
-
-        for (auto& socket : socketvec)
-        {
-            delete socket;
-        }
-        socketvec.clear();
-    }
+    // I5-D4e-1: 본문은 cpp로 — shared_ptr<const experiment::Model> 멤버가
+    // 전방선언 타입이라 헤더 inline 소멸이 불완전 타입을 인스턴스화한다.
+    virtual ~Animator();
 
     void OnInitialized() override;
     void OnUninitializing() override;
@@ -122,6 +107,18 @@ private:
     bool m_IsEnabled = false;
 
 public:
+    // I5-D4e-1 — 재생 데이터의 experiment 핸들. m_Motion(모델 GUID — 역브리지
+    // 폴백 규약)으로 EnsureExperimentAnimationBinding이 채우고, AnimationJob
+    // 틱이 이것이 있으면 experiment 경로(단일 순회)를, 없으면 legacy 경로를
+    // 탄다. 비직렬화 — 영속 신원은 m_Motion이 진다.
+    std::shared_ptr<const experiment::Model> m_experimentModel{};
+    // 본별 BoneRegion 파생 캐시(uint8 저장 — 헤더가 Skeleton.h의 enum을 열지
+    // 않기 위한 불투명 표현). AvatarMask humanoid 레이어 판정이 소비한다.
+    std::vector<std::uint8_t> m_experimentBoneRegions{};
+    // [anim.tick] 경로 관측을 애니메이터당 1회로 줄이는 플래그.
+    bool m_tickPathLogged{ false };
+    void EnsureExperimentAnimationBinding();
+
     float m_stopTimer = 0.f;
 	float m_stopDuration = 0.f;
     void StopAnimation(float duration)

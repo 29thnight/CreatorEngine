@@ -658,7 +658,10 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;↳ D4b ✅ | 메시 핸들 병행 — 프록시→아이템→4패스→캐시 핸들 진입점(experiment 신원 키·인덱스), 핸들 전량 게이트(2c)+off 대조(4g) — 바운드는 D4f로 | 렌더 사슬 | 없음 |
 | &nbsp;&nbsp;↳ D4c ✅ | 씬 경계 — 이름 해석 experiment 정본화(GetMeshShared(name) 폴백 강등)·핸들 소유 MeshRenderer 이동·해석 계수 게이트(1c·4h) — writer 전환은 D4f와 동시 | 씬 직렬화 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4d ✅ | 인스턴스화 — ModelSceneBridge experiment 직행(parent 단일 순회)·핸들 생성 지점 직심기·인스턴스화 게이트(1d·4i)+구조 동수 게이트(5a/5b/5c) | 모델 배치 | **소비자** 참조 감소 |
-| &nbsp;&nbsp;↳ D4e | Animator experiment 직소비 + D0a 이관(이벤트·루프 Animator 소유) | 애니메이션 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4e | Animator experiment 직소비 + D0a 이관 — 아래 하위 분해(착수 정찰 2026-08-31 셋째) | 애니메이션 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-1 ✅ | 재생 이중화 — 샘플러 엔진 승격·Animator 재생 핸들·AnimationJob experiment 틱(단일 순회)·팔레트 패리티 게이트(6·1e·4j/4k, 오차 0) | 재생 틱 | 없음 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-2 | 이벤트·루프 Animator 소유 이관(D0a 명세) — 공유 자산 재주입 오염 청산, 발화 정본 이동 | Animator·CLR | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-3 | 잔여 — Scene 본 전파(FindBone/m_serial)·AvatarMask 생성(Bone* 트리)·legacy 틱 은퇴 판정 | Scene·마스크 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -926,6 +929,55 @@ m_Mesh 실소비자 전수(전환 대상): 바운드(GetBoundingBox — 컬링)�
 — D5). 최대 수술은 Animator/AnimationJob(legacy Skeleton·Animation 전면 순회)이라 D4e로
 고립하고, 역브리지 절단(D4f)은 에디터 패스스루(D5)까지 소비자 0이 된 뒤에만 가능하므로
 **D5 완료 선결**을 계약으로 박는다.
+
+**I5-D4e 착수 정찰 셋째 (2026-08-31) — 분해 근거.** 전수(에이전트 정찰 + 직접 열람)가
+확정한 사실: ① 재생 산술 정본은 `AnimationJob.cpp` 단독이다 — AnimationController/
+AnimationState는 상태기계(정수 인덱스 제공)일 뿐 legacy `Animation` 재생 필드를 건드리지
+않는다. ② 씬 쪽 실소비처는 `Scene::UpdateModelRecursive`(m_localTransforms +
+FindBone/m_serial — 본 엔티티 트랜스폼 전파)다. ③ 팔레트 사슬(ProxyCommand 복제→프록시→
+GBuffer/Shadow memcpy)은 `math::matrix4x4[512]` 값 배열이라 타입 무의존 — 본 인덱스가
+1:1이면 무변경으로 동작한다. ④ KeyFrameEvent는 에디터 저작·씬 YAML 영속(.asset 캐시에
+없음)·postLoad가 **공유 자산에 재주입**(오염 — D0a)·AnimationJob 발화(InvokeEvent→CLR 큐).
+⑤ AvatarMask 생성은 `m_Skeleton->m_rootBone`(Bone* 트리), humanoid 판정은
+`Bone::m_region`(이름 휴리스틱 파생). 분해: D4e-1(재생 이중화) → D4e-2(이벤트·루프 이관)
+→ D4e-3(Scene 전파·마스크·은퇴 판정).
+
+**I5-D4e-1 완료 실측 (2026-08-31).** 재생 이중화 — 포즈 산술이 experiment 정본을 얻었다.
+① 샘플러 승격: RenderTests 소유였던 `ExperimentPoseSampler`를 엔진
+`Experiment/PoseSampler.h/.cpp`(`experiment::sampler`)로 이동, RenderTests 헤더는 네임스페이스
+alias 재-export("정의 하나" 규약 유지 — 제품과 검사가 같은 산술). ② Animator 재생 핸들:
+`m_experimentModel` + region 파생 캐시(`m_experimentBoneRegions` — legacy MarkRegionSkeleton의
+단일 순회 재현) + `EnsureExperimentAnimationBinding`(m_Motion 창구, 본·클립 계수 대조
+fail-closed) — postLoad와 D4d 인스턴스화 직심기 둘 다 이것을 지난다. ③ AnimationJob
+experiment 틱: 시간축·이벤트·컨트롤러 분기는 legacy 구조 그대로(clip 메타만 experiment),
+포즈는 `UpdateExperimentPose`(단일 순회 — 채널을 본 인덱스로 매핑, 이름 맵 조회 소멸)와
+`UpdateExperimentLayer`(레이어 합성 재현 — 영행렬 잔류 결함까지 승계 명시). 이벤트 발화는
+legacy 자산 참조 유지(데이터가 그쪽 — D4e-2 이관 전). 승계하지 않은 결함: legacy 블렌드의
+다음 클립 맵 operator[] 오염+빈 키 UB는 "다음 채널 없으면 블렌드 생략"으로 대체.
+
+★ **경계 규약 발견 — 참조 재구현끼리만 맞던 눈먼 초록.** 첫 패리티 실측이 maxErr
+0.0068(0.000488 linear 잔여)로 붉었다. 원인 둘: ⑴ Step 채널 369개 — legacy는 역브리지가
+보간 모드를 버려 **Linear 강등**을 재생하고 experiment는 Step을 집행한다(임포터가 보존한
+자산 의도 — 계획된 격차라 게이트를 두 축으로 분리: linear 강등 사본 대조=단정, step
+격차=관측 전용). ⑵ 키 구간 경계 — legacy `CurrentKeyIndex`는 time이 키 시각과 정확히
+일치하면 이전 구간(t=1)에 남는데 샘플러 `LinearIntervalIndex`(`<=`)는 다음 구간(t=0)으로
+넘어갔다. 값은 같지만 부동소수점 경로가 갈려 프레임 격자 키에서 4.88e-4 편차. 기존
+`experiment.anim`이 오차 0이었던 이유가 이것이다 — **참조 재구현과 정본 샘플러가 같은
+(틀린) 경계를 공유**해 실물과의 어긋남에 눈멀었고, 실물 함수(UpdateBone)를 태우는
+`experiment.animtick`이 드러냈다([[encoder-bench-must-measure-real-path]]의 재판). 정본과
+참조를 실물 규약(`<`)으로 정정하자 **linear 축 오차 0.000000000**(비트 동일 — 한계를 0으로
+조임), anim·sampler·gltf 셀프테스트 파급 없음.
+
+게이트 실측: `experiment.animtick`(신설 — RenderScene::GetAnimationJob 경유로 제품 틱 함수
+`EvaluateParityPose`를 직접 태움) pass — animators 1·clips 10·samples 50·maxErr 0(step
+격차 0.0068 관측) · 1e(라이브 틱 legacy 0 — 헤드리스 wait 프레임에서 틱이 실제로 돎) ·
+4j/4k(off 대조군: experiment 틱 0·animtick 대상 0 — 스위치가 재생 바인딩도 막는다) ·
+vertex-live 전 단정 초록(D4d 기준선 유지). 변이 2종이 각자 자기 단정만 붉혔다:
+**M1**(바인딩 절단) → 1e·6만 — legacy 폴백이 완전 패리티라 이 두 계수 없이는 눈먼 초록.
+**M2**(experiment 포즈 산술 time×1.001 왜곡) → 6만 — 오차 0 단정이 미세 산술 훼손의 유일한
+감시자. 한계(정직): 게이트 씬의 Gunner는 컨트롤러 0개라 다중 컨트롤러·블렌드·레이어
+경로는 이 시나리오가 원리적으로 못 잰다 — animtick도 컨트롤러 없는 경로만 잰다. 그 경로의
+검증은 컨트롤러 저작 씬이 게이트에 편입될 때의 몫으로 남긴다.
 
 **I5-D4d 완료 실측 (2026-08-31).** 인스턴스화 — 씬 배치(`LoadModelToScene`/`Obj`,
 model.place·드래그드롭 공용)가 experiment 직행이 됐다. ① 절단선:

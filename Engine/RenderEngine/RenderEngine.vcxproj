@@ -390,6 +390,10 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Experiment\PoseSampler.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="ExperimentMaterialResolveBinding.cpp" />
     <ClCompile Include="ExperimentMaterialMigration.cpp" />
     <ClCompile Include="ExperimentModelMigration.cpp" />
@@ -520,6 +524,7 @@
     <ClInclude Include="Experiment\MaterialAuthoringCodec.h" />
     <ClInclude Include="Experiment\MaterialInstance.h" />
     <ClInclude Include="Experiment\MaterialResolver.h" />
+    <ClInclude Include="Experiment\PoseSampler.h" />
     <ClInclude Include="ExperimentMaterialResolveBinding.h" />
     <ClInclude Include="ExperimentMaterialMigration.h" />
     <ClInclude Include="Experiment\ModelData.h" />

@@ -75,9 +75,6 @@
     <ClCompile Include="ExperimentParity\ExperimentLegacyBridge.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentPoseSampler.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>

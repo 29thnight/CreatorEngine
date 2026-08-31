@@ -57,12 +57,17 @@ namespace RenderTest
         double KeyTime(const NodeAnimation::ScaleKey& key) { return key.m_time; }
 
         // ── 공통 키 구간 선택 (legacy CurrentKeyIndex 와 같은 규칙) ─────────
+        // ★ 등호 제외 — 실물 legacy 는 time 이 키 시각과 정확히 일치하면 이전
+        //   구간(t=1)에 남는다. 구 규약 `<=` 는 이 참조 재구현과 정본 샘플러가
+        //   같은 (틀린) 경계를 공유해 experiment.anim 이 오차 0으로 통과하던
+        //   눈먼 초록이었다 — 실물 함수를 태우는 experiment.animtick(D4e-1)이
+        //   드러냈고, 정본(Experiment/PoseSampler)과 함께 정정했다.
         template <typename Key>
         std::size_t IntervalIndex(const std::vector<Key>& keys, double time)
         {
             std::size_t index = 0;
             while (index + 2 < keys.size()
-                && KeyTime(keys[index + 1]) <= time)
+                && KeyTime(keys[index + 1]) < time)
             {
                 ++index;
             }

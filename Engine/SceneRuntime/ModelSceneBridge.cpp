@@ -193,6 +193,8 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyExperiment(
 				m_animator->SetEnabled(true);
 				m_animator->m_Motion = m_model->m_animator->m_Motion;
 				m_animator->m_Skeleton = m_model->m_Skeleton;
+				// I5-D4e-1 — 재생 핸들 직심기(D4d 메시 핸들과 같은 결).
+				m_animator->EnsureExperimentAnimationBinding();
 			}
 
 			// 단일 노드·단일 메시 특례 — 루트 자신이 메시 엔티티다.
