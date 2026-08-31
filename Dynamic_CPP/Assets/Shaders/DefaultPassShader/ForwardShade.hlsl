@@ -1,3 +1,17 @@
+// I5-D34c: EXPERIMENT_STATIC_VERTEX는 experiment packed 레이아웃이다 —
+// BINORMAL이 없고 TANGENT.w(handedness)로 bitangent를 재구성한다(GBuffer와
+// 같은 계약). Forward는 본을 읽지 않으므로 스킨 마스크(68B) 메시도 이
+// 레이아웃으로 그려진다 — 48B 프리픽스(POSITION/NORMAL/TEXCOORD/TANGENT)가
+// 두 마스크에서 동일하고 stride는 바인딩이 나른다.
+#ifdef EXPERIMENT_STATIC_VERTEX
+struct VSIn
+{
+    float3 position : POSITION;
+    float3 normal   : NORMAL;
+    float2 uv       : TEXCOORD;
+    float4 tangent  : TANGENT;
+};
+#else
 struct VSIn
 {
     float3 position  : POSITION;
@@ -6,6 +20,7 @@ struct VSIn
     float3 tangent   : TANGENT;
     float3 bitangent : BINORMAL;
 };
+#endif
 
 struct VSOut
 {
@@ -212,9 +227,17 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     // 법선·탄젠트는 회전만 적용한다(GBuffer와 같은 처리). 비균등 스케일에는
     // 역전치가 필요한데, 그건 GBuffer가 아직 안 하므로 여기서만 하면 두
     // 경로가 갈린다.
+#ifdef EXPERIMENT_STATIC_VERTEX
+    const float3 localTangent   = input.tangent.xyz;
+    const float3 localBitangent =
+        cross(input.normal, input.tangent.xyz) * input.tangent.w;
+#else
+    const float3 localTangent   = input.tangent;
+    const float3 localBitangent = input.bitangent;
+#endif
     output.normal    = mul(input.normal,    (float3x3)instance.world);
-    output.tangent   = mul(input.tangent,   (float3x3)instance.world);
-    output.bitangent = mul(input.bitangent, (float3x3)instance.world);
+    output.tangent   = mul(localTangent,    (float3x3)instance.world);
+    output.bitangent = mul(localBitangent,  (float3x3)instance.world);
     return output;
 }
 

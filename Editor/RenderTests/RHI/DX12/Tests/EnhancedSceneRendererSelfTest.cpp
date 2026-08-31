@@ -3904,7 +3904,12 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
     outLog += "      포스트 체인 — 최종 " + std::string(
         postChain.GetOutput().IsValid() ? "선언됨" : "생략")
         + " · 블룸 " + std::to_string(postChain.GetBloomMipCount()) + "단\n";
+    // I5-D34c: 큐 크기와 별도로 패스의 실발행 계수(배치)를 남긴다 — 큐에는
+    // 있는데 배치 구성이 조용히 버리는 결함(PSO 부재·레이아웃 fail-closed)은
+    // 큐 크기만 봐서는 원리적으로 안 보인다.
     outLog += "      Forward+ — 포워드 드로우 " + std::to_string(forwardDraws.size())
+        + "(발행 " + std::to_string(forward.GetLastDrawCount())
+        + " · 배치 " + std::to_string(forward.GetLastBatchCount()) + ")"
         + " · 셰이딩 " + std::string(forward.GetOutput().IsValid()
             ? "선언됨" : "생략(포워드 큐 비어 있음)") + "\n";
 

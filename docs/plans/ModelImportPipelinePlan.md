@@ -652,7 +652,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D2 ✅ | V4 유도 정본 — mask→`RHIInputElement` 유도, `RHIFormat::RGBA8Uint` 신설, 전환 계약 게이트 (패스 전환은 D4와 동시로 정정) | RHI | 없음 |
 | ↳ I5-D34a ✅ | GBuffer 정적 수직 절단 — 병행 바인딩·캐시 대칭 이중화·VSIn 퍼뮤테이션+PSO 레이아웃 축·A/B 동수 게이트(FT 8/8) | 메시 캐시·GBuffer | 없음 |
 | ↳ I5-D34b ✅ | 스킨 전환 — GBuffer·Shadow 스킨 PSO(BLENDINDICES uint4), 스킨 A/B 동수 게이트(10/10 전량·42411 동수), m_Motion 폴백 (WireFrame은 실존 안 함) | 스킨 2패스 | 없음 |
-| ↳ I5-D34c | Forward 전환 — 기본 2-variant×레이아웃 축, ShaderMeta variant 축(SKIN keyword) | Forward | 없음 |
+| ↳ I5-D34c ✅ | Forward 전환 — shade/reference×experiment PSO 4벌, core 유도 하나로 마스크 불문, forward 배치 게이트(3c) — SKIN keyword 축은 불요 판정 | Forward | 없음 |
 | ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -843,6 +843,29 @@ nil이라 Animator postLoad가 스켈레톤을 복원하지 못하고 **reflect�
 PSO 레이아웃대로 일어나므로 레이아웃·업로드·PSO 선택 판정에는 손실이 없지만, **스키닝
 산술(팔레트 인덱싱)의 시각 판정은 이 게이트 밖이다** — 합성 검증(dx12.skinning)이
 그 축을 쥐고 있고, 결정적 포즈 고정(시간 주입) 없이는 실씬 판정이 서지 않는다.
+
+**I5-D34c 완료 실측 (2026-08-31).** Forward 전환 — D34a의 fail-closed를 걷고 forward 큐가
+experiment packed 버퍼로 그려진다. 게이트 실측: `render.matmode`로 P_Torus를 투명으로 바꿔
+forward 큐를 실제로 채우고(그 커맨드의 존재 이유 그대로 — "이 값 없이는 Forward+ 경로를
+실씬에서 실행해 볼 수 없다"), 포워드 큐 1·**배치 1** on/off 동수. 절단선: ① 레이아웃 축은
+**core 유도 하나로 마스크 불문**(Forward는 본을 안 읽고 48B 프리픽스가 core/skin 마스크에서
+동일 — stride는 바인딩) ② shade/reference 짝 × experiment = **PSO 4벌**(기본
+`CreatePipelines`와 ShaderMeta `Apply`/`Ensure` 전부 — Apply가 기본 PSO를 ShaderMeta
+경로로 **교체**하므로 두 생성 경로 다 짝이 필요하다) ③ ForwardShade.hlsl은
+`EXPERIMENT_STATIC_VERTEX` 분기(bitangent cross 재구성 — GBuffer와 같은 계약) ④ 계획의
+"ShaderMeta SKIN keyword 축"은 **불요로 판정** — GBuffer가 스킨을 인스턴스 분기+마스크
+PSO로 처리하고 Forward는 본을 안 읽어, keyword 축을 세울 소비자가 없다.
+
+★ **변이 3연속이 관측의 세 구멍을 차례로 드러냈다.** ① 기본 PSO 유도 훼손 → 초록:
+`ApplyShaderMeta`가 기본 PSO를 ShaderMeta 경로로 교체해 **죽은 경로를 훼손한 것**이었다.
+② 실경로(ShaderMeta) 유도 훼손 → 여전히 초록: 하네스의 커버리지는 **깊이 리드백**인데
+forward는 `depthWrite=Zero`, 밝기는 **deferred 라이팅 리드백** — 두 관측축 모두 forward
+출력에 **원리적으로 눈멀다**. ③ 배치 소실 변이 → "포워드 드로우 1(발행 1 · 배치 0)"이
+드러남 — 하네스에 실발행 계수를 추가하니 "발행"(GetLastDrawCount)조차 배치 이전의 큐 순회
+계수였고, **배치 계수만이 판별력**이 있었다. 게이트 3c(큐>0인데 배치 0이면 붉음)를 그
+계수로 세우자 ③이 정확히 붉었다. 한계(정직): **forward 출력의 시각 판정(픽셀·밝기)은 현
+관측 표면에 없다** — forward 합성 결과 리드백 판정은 후속 몫이고, 그때까지 forward 시각
+축은 합성 검증(dx12.forwardshade — legacy 자가 지오메트리)만 쥔다.
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그

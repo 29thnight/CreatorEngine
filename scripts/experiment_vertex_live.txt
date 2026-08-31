@@ -36,6 +36,12 @@ wait 30
 # 게이트 밖이다(계획서 한계 기록).
 object.property Gunner_F_Mythic Animator m_isEnabled false
 wait 30
+# I5-D34c: 오브젝트 하나를 투명으로 바꿔 forward 큐를 실제로 채운다 — FT는
+# 전부 불투명(deferred)이라 이 한 줄 없이는 Forward 레이아웃 축이 실씬에서
+# 단 한 번도 돌지 않는다. renderingMode는 재질 직렬화에 실리므로 저장·재로드
+# 후에도 유지된다.
+render.matmode P_Torus transparent
+wait 30
 scene.save __SAVED_SCENE__
 wait 30
 scene.switch __SAVED_SCENE__

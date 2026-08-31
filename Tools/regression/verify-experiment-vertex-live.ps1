@@ -108,6 +108,17 @@ function Get-Luminance([string]$log) {
     if ($log -match '라이팅 — 광원 \d+개 밝기 (\d+\.\d+)') { return $Matches[1] }
     return ""
 }
+function Get-ForwardDraws([string]$log) {
+    if ($log -match 'Forward\+ — 포워드 드로우 (\d+)') { return [int]$Matches[1] }
+    return -1
+}
+function Get-ForwardBatches([string]$log) {
+    # 큐 크기가 아니라 패스가 실제 구성한 배치 수 — 배치 구성이 조용히
+    # 버리는 결함(레이아웃 축 소실)은 이 계수로만 갈린다. "발행"(드로우
+    # 계수)은 배치 이전의 큐 순회 수라 판별력이 없다(변이 실측).
+    if ($log -match '포워드 드로우 \d+\(발행 \d+ · 배치 (\d+)') { return [int]$Matches[1] }
+    return -1
+}
 
 $fail = @()
 
@@ -133,8 +144,19 @@ if ($totalOn -lt 0 -or $totalOn -ne $uploadsOn) {
     $fail += "2b 업로드 전량이 experiment가 아니다 — 총 $totalOn vs experiment $uploadsOn"
 }
 if (-not $scenePassOn) { $fail += "3 dx12.scene 실패(on) — experiment 버퍼로 그린 그림이 단정을 깼다" }
+# I5-D34c: forward 큐가 실제로 채워졌는가 — matmode 없이는 Forward 레이아웃
+# 축이 한 번도 돌지 않고, 이 단정 없이는 그 누락이 조용히 통과로 나온다.
+$fwdOn = Get-ForwardDraws $logOn
+if ($fwdOn -le 0) { $fail += "3b 포워드 드로우 $fwdOn — Forward 레이아웃 축이 돌지 않았다" }
+# ★ 3c — 큐에 있는 드로우가 실제 배치로 구성됐는가. experiment 메시를
+#   배치가 조용히 버리면(레이아웃 축 소실) 큐 크기(3b)는 그대로라 여기서만
+#   갈린다(변이 실측: 배치 continue가 정확히 배치 0으로 드러남).
+$fwdBatchOn = Get-ForwardBatches $logOn
+if ($fwdBatchOn -le 0) {
+    $fail += "3c 포워드 배치 $fwdBatchOn — 큐 $fwdOn 인데 배치가 비었다(드로우를 버렸다)"
+}
 
-"on  — model.dual $dualCount 건 · experiment 업로드 $uploadsOn/$totalOn · 드로우 $drawsOn · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
+"on  — model.dual $dualCount 건 · experiment 업로드 $uploadsOn/$totalOn · 드로우 $drawsOn(포워드 $fwdOn) · 커버리지 $coverOn · dx12.scene $(if ($scenePassOn) {'통과'} else {'실패'})"
 
 # ── B: 스위치 끔 ──
 $logOff = Invoke-Run "off" "0"
@@ -148,6 +170,10 @@ if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"
 }
 if (-not $scenePassOff) { $fail += "4c dx12.scene 실패(off) — 대조군이 성립하지 않는다" }
+$fwdOff = Get-ForwardDraws $logOff
+if ($fwdOff -ne $fwdOn) {
+    $fail += "4f 포워드 드로우가 다르다 — on $fwdOn vs off $fwdOff (경로 전환이 forward 큐를 바꿨다)"
+}
 # ★ 4d — 이 게이트의 실질 이빨. 하네스 자체의 커버리지 단정은 "0이 아니다"
 #   수준이라 지오메트리 붕괴에 눈멀었다(변이 실측: POSITION 오프셋 +12로
 #   36706 → 2245가 됐는데 하네스는 초록). 같은 씬·같은 카메라를 두 경로로

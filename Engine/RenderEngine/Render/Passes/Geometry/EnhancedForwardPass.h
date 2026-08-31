@@ -232,13 +232,17 @@ private:
     bool BuildShadePipelineDesc(const EnhancedFrameContext& context,
         const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
         const ShaderRenderState* renderState,
-        const RHIShaderPermutation& permutation,
+        const RHIShaderPermutation& permutation, bool experimentLayout,
         RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
         RHIShaderBlob& outPs, std::string& outError);
+    // I5-D34c: experimentLayout이 true면 EXPERIMENT_STATIC_VERTEX 퍼뮤테이션 +
+    // experiment core 유도 레이아웃으로 desc를 만든다. Forward는 본을 읽지
+    // 않아 스킨 마스크 메시도 이 한 레이아웃으로 그려진다(48B 프리픽스 공통).
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
         const ShaderMeta& meta,
         std::span<const std::uint16_t> keywordSelections,
-        bool referencePath, RHIGraphicsPipelineDesc& outDesc,
+        bool referencePath, bool experimentLayout,
+        RHIGraphicsPipelineDesc& outDesc,
         RHIShaderBlob& outVs, RHIShaderBlob& outPs,
         RHIShaderPermutationKey& outPermutationKey,
         std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
@@ -308,6 +312,9 @@ private:
     // 성공한 뒤 한 경계에서 교체한다.
     RHIGraphicsPipelineRequest m_shadePipelineRequest;
     RHIGraphicsPipelineRequest m_referencePipelineRequest;
+    // I5-D34c: experiment 레이아웃 짝(위 ShaderVariant와 같은 지위).
+    RHIGraphicsPipelineRequest m_experimentShadePipelineRequest;
+    RHIGraphicsPipelineRequest m_experimentReferencePipelineRequest;
     ShaderMetaHandle m_shaderMetaHandle{};
     RHIShaderPermutationKey m_defaultPermutationKey{};
     std::vector<std::uint16_t> m_defaultKeywordSelections{};
@@ -338,6 +345,10 @@ private:
     {
         RHIGraphicsPipelineRequest shade;
         RHIGraphicsPipelineRequest reference;
+        // I5-D34c: experiment 레이아웃 짝. variant 생성 시점에는 어떤 메시가
+        // 올지 모르므로 넷을 함께 만들고, 배치가 메시 마스크로 고른다.
+        RHIGraphicsPipelineRequest experimentShade;
+        RHIGraphicsPipelineRequest experimentReference;
         std::shared_ptr<const ShaderMetaBindingLayout> layout{};
     };
 
@@ -390,7 +401,10 @@ private:
         MaterialView& outView, std::string& outError);
     MaterialKey MakeMaterialKey(const EnhancedDrawItem& draw) const;
 
+    // vertexAttributeMask는 RHIMeshBinding의 것 — 0이면 legacy 96B PSO,
+    // 0이 아니면 experiment 레이아웃 PSO를 돌려준다(fail-closed).
     bool ResolveShaderVariant(const EnhancedForwardMaterialDrawSnapshot& snapshot,
+        uint32_t vertexAttributeMask,
         RHIPipelineHandle& outShadePipeline,
         RHIPipelineHandle& outReferencePipeline,
         std::shared_ptr<const ShaderMetaBindingLayout>& outLayout) const;
