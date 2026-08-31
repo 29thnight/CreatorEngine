@@ -26,6 +26,7 @@
 #include "Skeleton.h" // E7-b: 벤치 진단이 m_bones 크기를 읽는다
 #include "Experiment/Model.h" // I5-D4e-1: experiment.animtick 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
+#include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
 #include "ConditionParameter.h"
 #include "UIManager.h"
 #include "Canvas.h"
@@ -4048,6 +4049,145 @@ namespace ConsoleCmd
             }
             std::printf("[CLI] experiment.animevent verify fail%s\n",
                 joined.c_str());
+        }
+    }
+
+    // I5-D4e-3 — 본 이름 해석 창구의 전수 A/B 대조. Scene 본 전파가 쓰는
+    // 실물 창구(Animator::ResolveBoneIndex)를 BoneComponent 전수에 태우고,
+    // legacy FindBone 직접 해석과 인덱스를 대조한다(1:1 계약 실증). 경로
+    // 계수(viaExperiment)는 창구 내부의 실분기 관측이다 — 조건 재현이 아니라서
+    // experiment 분기 소실이 legacy 폴백으로 조용히 덮여도 여기서 갈린다.
+    static void Cmd_experiment_boneresolve(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] experiment.boneresolve fail 활성 씬 없음\n");
+            return;
+        }
+        std::size_t boneCount = 0, viaExperimentCount = 0, viaLegacyCount = 0;
+        std::size_t mismatchCount = 0, unresolvedCount = 0;
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            if (nullptr == object->GetComponent<BoneComponent>()) continue;
+            const auto& rootObject = scene->TryGetEntity(object->GetRootIndex());
+            if (!rootObject) continue;
+            Animator* animator = rootObject->GetComponent<Animator>();
+            if (nullptr == animator || 0 == animator->GetSkeletonSerial())
+                continue;
+
+            const std::string boneName = object->RemoveSuffixNumberTag();
+            bool viaExperiment = false;
+            const int resolved =
+                animator->ResolveBoneIndex(boneName, &viaExperiment);
+            int legacyIndex = -1;
+            if (animator->m_Skeleton)
+            {
+                Bone* const bone = animator->m_Skeleton->FindBone(boneName);
+                legacyIndex = bone ? bone->m_index : -1;
+            }
+
+            ++boneCount;
+            if (viaExperiment) ++viaExperimentCount; else ++viaLegacyCount;
+            if (resolved != legacyIndex) ++mismatchCount;
+            if (resolved < 0) ++unresolvedCount;
+        }
+        const bool passed = boneCount > 0 && 0 == mismatchCount
+            && 0 == unresolvedCount;
+        std::printf("[CLI] experiment.boneresolve %s bones=%zu experiment=%zu "
+            "legacy=%zu mismatch=%zu unresolved=%zu\n",
+            passed ? "pass" : (boneCount == 0 ? "skip" : "fail"),
+            boneCount, viaExperimentCount, viaLegacyCount, mismatchCount,
+            unresolvedCount);
+    }
+
+    // I5-D4e-3 — AvatarMask 트리 생성의 A/B 대조. 실물 창구
+    // (BuildAvatarBoneMasks — experiment 단일 패스+스택 DFS)와 legacy
+    // MakeBoneMask 재귀를 같은 스켈레톤에 돌려 m_BoneMasks의 크기·순서
+    // (boneName 열)·자식 계수를 대조한다 — 순서가 저장분 인덱스 대응
+    // (ReCreateMask)이라 순서 재현이 곧 저작 호환이다.
+    static void Cmd_experiment_animmask(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] experiment.animmask fail 활성 씬 없음\n");
+            return;
+        }
+        Animator* animator = nullptr;
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            Animator* candidate = object->GetComponent<Animator>();
+            if (nullptr == candidate || nullptr == candidate->m_Skeleton
+                || nullptr == candidate->m_Skeleton->m_rootBone)
+            {
+                continue;
+            }
+            animator = candidate;
+            break;
+        }
+        if (nullptr == animator)
+        {
+            std::printf("[CLI] experiment.animmask skip animators=0\n");
+            return;
+        }
+
+        AvatarMask channelMask; // 실물 창구 산출
+        bool viaExperiment = false;
+        BoneMask* channelRoot =
+            animator->BuildAvatarBoneMasks(channelMask, &viaExperiment);
+        AvatarMask legacyMask;  // legacy 재귀 대조군
+        BoneMask* legacyRoot =
+            legacyMask.MakeBoneMask(animator->m_Skeleton->m_rootBone);
+
+        std::vector<std::string> failures;
+        if (nullptr == channelRoot || nullptr == legacyRoot)
+        {
+            failures.push_back("루트 마스크 생성 실패");
+        }
+        else
+        {
+            if (channelRoot->boneName != legacyRoot->boneName)
+                failures.push_back("루트 이름 불일치");
+            if (channelMask.m_BoneMasks.size() != legacyMask.m_BoneMasks.size())
+            {
+                failures.push_back("마스크 계수 불일치("
+                    + std::to_string(channelMask.m_BoneMasks.size()) + " vs "
+                    + std::to_string(legacyMask.m_BoneMasks.size()) + ")");
+            }
+            else
+            {
+                for (std::size_t index = 0;
+                    index < channelMask.m_BoneMasks.size(); ++index)
+                {
+                    if (channelMask.m_BoneMasks[index]->boneName
+                            != legacyMask.m_BoneMasks[index]->boneName
+                        || channelMask.m_BoneMasks[index]->m_children.size()
+                            != legacyMask.m_BoneMasks[index]->m_children.size())
+                    {
+                        failures.push_back("순서/자식 불일치 idx="
+                            + std::to_string(index));
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (failures.empty())
+        {
+            std::printf("[CLI] experiment.animmask pass masks=%zu "
+                "viaExperiment=%d\n",
+                channelMask.m_BoneMasks.size(), viaExperiment ? 1 : 0);
+        }
+        else
+        {
+            std::string joined;
+            for (const std::string& failure : failures)
+                joined += " [" + failure + "]";
+            std::printf("[CLI] experiment.animmask fail viaExperiment=%d%s\n",
+                viaExperiment ? 1 : 0, joined.c_str());
         }
     }
 
@@ -8284,6 +8424,8 @@ namespace ConsoleCmd
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
             reg({ "experiment.animtick" }, &Cmd_experiment_animtick);
             reg({ "experiment.animevent" }, &Cmd_experiment_animevent);
+            reg({ "experiment.boneresolve" }, &Cmd_experiment_boneresolve);
+            reg({ "experiment.animmask" }, &Cmd_experiment_animmask);
             reg({ "experiment.import" }, &Cmd_experiment_import);
             reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
             reg({ "experiment.fbx" }, &Cmd_experiment_fbx);

@@ -60,6 +60,11 @@ wait 10
 # I5-D4e-2: 왕복·비오염·발화 판정(위 seed의 대구).
 experiment.animevent verify
 wait 10
+# I5-D4e-3: 본 이름 해석 창구 전수 A/B + AvatarMask 트리 생성 A/B.
+experiment.boneresolve
+wait 10
+experiment.animmask
+wait 10
 
 dx12.scene
 

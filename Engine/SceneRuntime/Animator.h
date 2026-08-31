@@ -107,6 +107,23 @@ public:
     std::size_t InvokeClipEvents(int clipIndex, float currentProgress,
         float previousProgress);
 
+    // I5-D4e-3 — 본 해석·마스크 생성의 창구. Scene 본 전파와 AvatarMask
+    // 생성이 legacy Skeleton(FindBone·m_serial·Bone* 트리)을 직접 만지던
+    // 지점을 여기로 모은다 — experiment가 정본, legacy는 폴백(Assimp 모델).
+    // 세대 키는 m_serial 그대로다: experiment 모델은 항상 역브리지 legacy
+    // 스켈레톤과 짝으로 교체되므로 그 일련번호가 두 경로 공용 세대다.
+    [[nodiscard]] uint64 GetSkeletonSerial() const;
+    // 이름→본 인덱스(1:1 계약으로 두 경로 동일 값). 실패는 -1.
+    // outViaExperiment: 실제로 experiment 해석을 탔는가 — 게이트 관측 창구.
+    [[nodiscard]] int ResolveBoneIndex(const std::string& boneName,
+        bool* outViaExperiment = nullptr) const;
+    // AvatarMask의 BoneMask 트리 생성 — m_BoneMasks 순서가 저장분 인덱스
+    // 대응(ReCreateMask)이라 legacy MakeBoneMask와 같은 DFS 선순을 재현한다.
+    // legacy 폴백에서만 MarkRegionSkeleton(공유 자산 region 태깅 — 이름
+    // 파생이라 멱등)을 유지한다. outViaExperiment는 게이트 관측 창구.
+    BoneMask* BuildAvatarBoneMasks(AvatarMask& mask,
+        bool* outViaExperiment = nullptr);
+
     bool HasSocket() { return !socketvec.empty(); };
     void ClearControllersAndParams();
     template<typename T>

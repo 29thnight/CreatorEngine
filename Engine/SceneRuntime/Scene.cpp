@@ -2250,14 +2250,16 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
             return;
         }
         const auto& animator = rootObj->GetComponent<Animator>();
-        if (!animator || !animator->m_Skeleton || !animator->IsEnabled())
+        // I5-D4e-3 — 본 해석의 창구가 Animator다(GetSkeletonSerial 0 = 스켈레톤
+        // 없음). 이 순회는 더 이상 legacy Skeleton 타입을 직접 만지지 않는다.
+        if (!animator || 0 == animator->GetSkeletonSerial() || !animator->IsEnabled())
         {
             return;
         }
 
         // 캐시 갱신 — m_resolvedSerial이 지금 애니메이터의 스켈레톤 일련번호와
         // 다르거나(아직 못 풀었음·모델을 갈아 끼워 스켈레톤이 바뀜) m_boneIndex가
-        // 무효(-1, 이전 탐색 실패)면 그때만 FindBone(문자열 선형 탐색)을 다시
+        // 무효(-1, 이전 탐색 실패)면 그때만 이름 해석(문자열 선형 탐색)을 다시
         // 돈다. ★ 늦은 로드 허용 — 스켈레톤이 이번 프레임에 처음 붙었으면
         // m_resolvedSerial(이전 값, 0이거나 다른 번호)과 자동으로 어긋나므로
         // 여기서 다시 풀린다. 옛 코드가 매 프레임 FindBone을 공짜로 다시 돌던
@@ -2265,12 +2267,13 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
         //
         // 포인터가 아니라 일련번호로 비교하는 이유는 Skeleton::m_serial 주석
         // 참고(해제된 주소가 재할당되면 포인터 비교는 거짓 적중한다).
-        Skeleton* skeleton = animator->m_Skeleton;
-        if (!IsBoneCacheEnabled() || boneComp->m_resolvedSerial != skeleton->m_serial || boneComp->m_boneIndex < 0)
+        // 해석은 ResolveBoneIndex(experiment 정본·legacy 폴백 — 인덱스는 1:1
+        // 계약으로 동일)가 맡는다.
+        const uint64 skeletonSerial = animator->GetSkeletonSerial();
+        if (!IsBoneCacheEnabled() || boneComp->m_resolvedSerial != skeletonSerial || boneComp->m_boneIndex < 0)
         {
-            Bone* const bone = skeleton->FindBone(obj->RemoveSuffixNumberTag());
-            boneComp->m_boneIndex = bone ? bone->m_index : -1;
-            boneComp->m_resolvedSerial = skeleton->m_serial;
+            boneComp->m_boneIndex = animator->ResolveBoneIndex(obj->RemoveSuffixNumberTag());
+            boneComp->m_resolvedSerial = skeletonSerial;
         }
 
         // ★ 범위 검사 — m_localTransforms는 크기 고정 배열(MAX_BONES=512,

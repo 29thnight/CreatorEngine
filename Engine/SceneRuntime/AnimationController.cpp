@@ -20,7 +20,7 @@ bool AnimationController::BlendingAnimation(float tick)
 	blendingTime += tick;
 	float t = blendingTime / m_curTrans->GetBlendTime();
 	m_owner->blendT = std::clamp(t, 0.0f, 1.0f);
-	if (blendingTime >= m_curTrans->GetBlendTime()) //ºí·»µå Å¸ÀÓÀÌ ³¡³ª¸é ºí·»µåÁ¾·á -> ´ÙÀ½¾Ö´Ï¸ÞÀÌ¼Ç¸¸ °è»ê
+	if (blendingTime >= m_curTrans->GetBlendTime()) //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ -> ï¿½ï¿½ï¿½ï¿½ï¿½Ö´Ï¸ï¿½ï¿½Ì¼Ç¸ï¿½ ï¿½ï¿½ï¿½
 	{
 		m_curState = m_nextState;
 		m_nextState = nullptr;
@@ -56,7 +56,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 #pragma region OLD_CODE
 	if (!m_curState)
 	{
-		if (!StateVec.size() >= 2)   //0¹øÀº anystate¶ó¾øÀ½
+		if (!StateVec.size() >= 2)   //0ï¿½ï¿½ï¿½ï¿½ anystateï¿½ï¿½ï¿½ï¿½ï¿½
 		{
 			if (StateVec[1].get()->m_name != "Ani State")
 			{
@@ -139,7 +139,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	//	}
 	//}
 
-	//// 1) AnyState Ä³½Ã »ç¿ë
+	//// 1) AnyState Ä³ï¿½ï¿½ ï¿½ï¿½ï¿½
 	//if (auto aniState = GetAniState()) 
 	//{
 	//	for (auto& trans : aniState->Transitions) 
@@ -149,14 +149,14 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 
 	//		if (trans->CheckTransiton()) 
 	//		{
-	//			// BUG FIX: ¼¼¹ÌÄÝ·Ð Á¦°Å
+	//			// BUG FIX: ï¿½ï¿½ï¿½ï¿½ï¿½Ý·ï¿½ ï¿½ï¿½ï¿½ï¿½
 	//			if (trans->nextState != nullptr && m_curState != trans->nextState)
 	//				return trans;
 	//		}
 	//	}
 	//}
 
-	//// 2) ÇöÀç ÂüÁ¶ÇÒ »óÅÂÀÇ ÀüÀÌ ÁýÇÕÀ» 1¹ø¸¸ °áÁ¤
+	//// 2) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 1ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	//AnimationState* transState = m_isBlend ? m_nextState : m_curState;
 	//if (!transState || transState->Transitions.empty()) return nullptr;
 
@@ -180,7 +180,7 @@ void AnimationController::UpdateState()
 	{
 		trans = nullptr;
 	}*/
-	//ÀüÀÌ°¡ÀÖÀ¸¸é ¾Ö´Ï¸ÞÀÌ¼Ç ºí·»µù½ÃÀÛ //ºí·»µù¾ø´Â °­Á¦º¯È­ÀÖÀ»°æ¿ì Ãß°¡ÇÊ¿ä*****
+	//ï¿½ï¿½ï¿½Ì°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´Ï¸ï¿½ï¿½Ì¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ß°ï¿½ï¿½Ê¿ï¿½*****
 	if (nullptr != trans)
 	{
 		
@@ -409,9 +409,11 @@ void AnimationController::CreateMask()
 	if (!m_avatarMask)
 	{
 		useMask = true;
-		m_owner->m_Skeleton->MarkRegionSkeleton();
+		// I5-D4e-3 â€” ë§ˆìŠ¤í¬ ìƒì„± ì°½êµ¬ê°€ Animatorë‹¤(experiment ì •ë³¸Â·legacy
+		// í´ë°±). region íƒœê¹…(MarkRegionSkeleton)ì€ legacy í´ë°± ì•ˆìœ¼ë¡œ ë“¤ì–´ê°”ë‹¤
+		// â€” experiment ê²½ë¡œëŠ” Animator ì†Œìœ  region ìºì‹œë¥¼ ì“´ë‹¤.
 		m_avatarMask = new AvatarMask;
-		m_avatarMask->RootMask = m_avatarMask->MakeBoneMask(m_owner->m_Skeleton->m_rootBone);
+		m_avatarMask->RootMask = m_owner->BuildAvatarBoneMasks(*m_avatarMask);
 	}
 }
 
@@ -440,7 +442,7 @@ nlohmann::json AnimationController::Serialize()
 {
 	nlohmann::json j;
 	j["controller_name"] = name;
-	//stateµé ´ã±â
+	//stateï¿½ï¿½ ï¿½ï¿½ï¿½
 	j["useController"] = (int)useController; //bool 0 1
 	
 	nlohmann::json stateJson = nlohmann::json::array();

@@ -108,6 +108,106 @@ void Animator::EnsureExperimentAnimationBinding()
 	m_experimentModel = std::move(source);
 }
 
+uint64 Animator::GetSkeletonSerial() const
+{
+	// 0은 "스켈레톤 없음"(NextSerial은 1부터) — Scene 본 전파의 가드 값.
+	return m_Skeleton ? m_Skeleton->m_serial : 0;
+}
+
+int Animator::ResolveBoneIndex(const std::string& boneName,
+	bool* outViaExperiment) const
+{
+	if (outViaExperiment) *outViaExperiment = false;
+	if (m_experimentModel)
+	{
+		if (const experiment::Skeleton* skeleton =
+			m_experimentModel->TryGetSkeleton())
+		{
+			if (outViaExperiment) *outViaExperiment = true;
+			for (std::size_t index = 0; index < skeleton->bones.size(); ++index)
+			{
+				if (skeleton->bones[index].name == boneName)
+				{
+					return static_cast<int>(index);
+				}
+			}
+			return -1;
+		}
+	}
+	if (m_Skeleton)
+	{
+		Bone* const bone = m_Skeleton->FindBone(boneName);
+		return bone ? bone->m_index : -1;
+	}
+	return -1;
+}
+
+BoneMask* Animator::BuildAvatarBoneMasks(AvatarMask& mask,
+	bool* outViaExperiment)
+{
+	if (outViaExperiment) *outViaExperiment = false;
+	const experiment::Skeleton* skeleton = m_experimentModel
+		? m_experimentModel->TryGetSkeleton() : nullptr;
+	if (nullptr == skeleton)
+	{
+		// legacy 폴백(Assimp 모델) — 구 CreateMask 경로 그대로. region 태깅은
+		// 공유 자산(Bone::m_region) 쓰기지만 이름 파생이라 멱등이다.
+		if (nullptr == m_Skeleton || nullptr == m_Skeleton->m_rootBone)
+		{
+			return nullptr;
+		}
+		m_Skeleton->MarkRegionSkeleton();
+		return mask.MakeBoneMask(m_Skeleton->m_rootBone);
+	}
+
+	if (outViaExperiment) *outViaExperiment = true;
+	// experiment — parent-only 표현에서 children 목록을 만들고 legacy
+	// MakeBoneMask 재귀와 같은 DFS 선순(자기 → 자식 인덱스 순)으로 생성한다.
+	// ★ m_BoneMasks의 push 순서가 곧 저장분 인덱스 대응(postLoad의
+	//   ReCreateMask가 i번째끼리 잇는다)이라 순서 재현이 계약이다.
+	const std::size_t boneCount = skeleton->bones.size();
+	if (!experiment::IsInRange(skeleton->rootBone, boneCount)) return nullptr;
+
+	std::vector<std::vector<std::uint32_t>> children(boneCount);
+	for (std::size_t index = 0; index < boneCount; ++index)
+	{
+		const experiment::Bone& bone = skeleton->bones[index];
+		if (bone.parent.IsValid() && bone.parent.Value() < boneCount)
+		{
+			children[bone.parent.Value()].push_back(
+				static_cast<std::uint32_t>(index));
+		}
+	}
+
+	std::vector<BoneMask*> masks(boneCount, nullptr);
+	std::vector<std::uint32_t> stack{ skeleton->rootBone.Value() };
+	while (!stack.empty())
+	{
+		const std::uint32_t boneIndex = stack.back();
+		stack.pop_back();
+		const experiment::Bone& bone = skeleton->bones[boneIndex];
+
+		BoneMask* newMask = new BoneMask();
+		newMask->boneName = bone.name;
+		newMask->isEnabled = true;
+		mask.m_BoneMasks.push_back(newMask);
+		masks[boneIndex] = newMask;
+		if (bone.parent.IsValid() && masks[bone.parent.Value()])
+		{
+			masks[bone.parent.Value()]->m_children.push_back(newMask);
+		}
+
+		// 자식을 역순으로 쌓아야 pop이 인덱스 순으로 방문한다(legacy 재귀의
+		// children 순회 순서 재현).
+		for (auto childIt = children[boneIndex].rbegin();
+			childIt != children[boneIndex].rend(); ++childIt)
+		{
+			stack.push_back(*childIt);
+		}
+	}
+	return masks[skeleton->rootBone.Value()];
+}
+
 void Animator::OnInitialized()
 {
 	auto renderScene = SceneManagers->GetRenderScene();
@@ -671,6 +771,12 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 		EnsureClipOverride(clipIndex).events = std::move(events);
 	}
 
+	// I5-D4e-1/3 — experiment 재생 핸들. m_Motion·m_Skeleton 복원 직후,
+	// 아래 컨트롤러 복원 **이전**이어야 한다 — AvatarMask 재생성
+	// (BuildAvatarBoneMasks)이 이 핸들을 보고 경로를 고르기 때문이다(D4e-3
+	// 이동 전에는 함수 끝에 있어 마스크가 항상 legacy 폴백을 탔다).
+	EnsureExperimentAnimationBinding();
+
 	if (node["Parameters"])
 	{
 		const auto paramNode = node["Parameters"];
@@ -699,7 +805,9 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 					const auto MaskNode = layer["m_avatarMask"];
 					AvatarMask avatarMask;
 					Meta::Deserialize(&avatarMask, MaskNode);
-					avatarMask.RootMask = avatarMask.MakeBoneMask(animationController->m_owner->m_Skeleton->m_rootBone);
+					// I5-D4e-3 — 마스크 트리 생성 창구(experiment 정본·legacy 폴백,
+					// m_BoneMasks 순서는 legacy DFS 선순 재현 — 저장분 인덱스 대응).
+					avatarMask.RootMask = BuildAvatarBoneMasks(avatarMask);
 					if (MaskNode["m_BoneMasks"])
 					{
 						const auto boneMaskNode = MaskNode["m_BoneMasks"];
@@ -778,10 +886,6 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 			m_animationControllers.push_back(animationController);
 		}
 	}
-
-	// I5-D4e-1 — 씬 로드 경계에서 experiment 재생 핸들을 잇는다(m_Motion·
-	// m_Skeleton이 위에서 복원된 뒤여야 계수 대조가 성립한다).
-	EnsureExperimentAnimationBinding();
 }
 
 void Animator::OnAfterSerialize(YAML::Node& node)

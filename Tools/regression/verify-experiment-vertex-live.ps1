@@ -21,6 +21,10 @@
 #      직접 대조 (D4e-1)
 #   7  이벤트·루프 오버라이드 이관 — 합성 seed→저장·재로드→왕복·비오염·발화
 #      (D4e-2, on/off 양쪽 — 이관은 스위치 무관)
+#   8  본 이름 해석 창구 — 전수 A/B(실물 ResolveBoneIndex vs legacy FindBone),
+#      경로 실분기 관측 (D4e-3)
+#   9  AvatarMask 트리 생성 — experiment 단일 패스 vs legacy 재귀, 순서까지
+#      대조(저장분 인덱스 대응 계약) (D4e-3)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -188,6 +192,15 @@ if ($logOn -notmatch '\[CLI\] experiment\.animtick pass animators=([1-9]\d*)') {
 if ($logOn -notmatch '\[CLI\] experiment\.animevent verify pass') {
     $fail += "7 이벤트·루프 이관 실패(on) — animevent 출력을 확인하라"
 }
+# ★ 8(I5-D4e-3) — 본 해석 창구. 전수 인덱스 일치 + 전량 experiment 실분기
+#   (legacy 폴백이 인덱스를 1:1로 받쳐도 실분기 계수가 소실을 가른다).
+if ($logOn -notmatch '\[CLI\] experiment\.boneresolve pass bones=(\d+) experiment=\1 legacy=0') {
+    $fail += "8 본 해석 창구 실패(on) — boneresolve 출력을 확인하라"
+}
+# ★ 9(I5-D4e-3) — 마스크 트리 A/B. 순서 재현(저장분 인덱스 대응)까지 대조.
+if ($logOn -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperiment=1') {
+    $fail += "9 마스크 트리 대조 실패(on) — animmask 출력을 확인하라"
+}
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
 # I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
 # legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
@@ -253,6 +266,14 @@ if ($logOff -notmatch '\[CLI\] experiment\.animtick skip animators=0') {
 # 발화가 같이 통과해야 한다(legacy 틱도 같은 오버라이드를 소비한다).
 if ($logOff -notmatch '\[CLI\] experiment\.animevent verify pass') {
     $fail += "4l 이벤트·루프 이관 실패(off) — 이관이 스위치 뒤로 샜다"
+}
+# I5-D4e-3: off 대조군 — 창구는 전량 legacy 폴백이어야 하고(인덱스는 그래도
+# 전수 일치), 마스크 생성도 legacy 경로다.
+if ($logOff -notmatch '\[CLI\] experiment\.boneresolve pass bones=(\d+) experiment=0 legacy=\1') {
+    $fail += "4m 스위치를 껐는데 본 해석이 experiment로 샜다(또는 실패)"
+}
+if ($logOff -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperiment=0') {
+    $fail += "4n 스위치를 껐는데 마스크 생성이 experiment로 샜다(또는 실패)"
 }
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"

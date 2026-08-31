@@ -658,10 +658,10 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;↳ D4b ✅ | 메시 핸들 병행 — 프록시→아이템→4패스→캐시 핸들 진입점(experiment 신원 키·인덱스), 핸들 전량 게이트(2c)+off 대조(4g) — 바운드는 D4f로 | 렌더 사슬 | 없음 |
 | &nbsp;&nbsp;↳ D4c ✅ | 씬 경계 — 이름 해석 experiment 정본화(GetMeshShared(name) 폴백 강등)·핸들 소유 MeshRenderer 이동·해석 계수 게이트(1c·4h) — writer 전환은 D4f와 동시 | 씬 직렬화 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4d ✅ | 인스턴스화 — ModelSceneBridge experiment 직행(parent 단일 순회)·핸들 생성 지점 직심기·인스턴스화 게이트(1d·4i)+구조 동수 게이트(5a/5b/5c) | 모델 배치 | **소비자** 참조 감소 |
-| &nbsp;&nbsp;↳ D4e | Animator experiment 직소비 + D0a 이관 — 아래 하위 분해(착수 정찰 2026-08-31 셋째) | 애니메이션 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4e ✅ | Animator experiment 직소비 + D0a 이관 — 아래 하위 분해(착수 정찰 2026-08-31 셋째). legacy 틱·FindBone·MakeBoneMask는 Assimp 폴백으로 존치, 은퇴는 I6 | 애니메이션 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-1 ✅ | 재생 이중화 — 샘플러 엔진 승격·Animator 재생 핸들·AnimationJob experiment 틱(단일 순회)·팔레트 패리티 게이트(6·1e·4j/4k, 오차 0) | 재생 틱 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-2 ✅ | 이벤트·루프 Animator 소유 이관(D0a 명세) — 재주입 오염 청산·발화/편집/writer 정본 이동·합성 왕복 게이트(7·4l, 3축 변이 증명) | Animator·CLR | **소비자** 참조 감소 |
-| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-3 | 잔여 — Scene 본 전파(FindBone/m_serial)·AvatarMask 생성(Bone* 트리)·legacy 틱 은퇴 판정 | Scene·마스크 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-3 ✅ | 본 해석·마스크 생성 창구화 — Scene 본 전파의 legacy 접촉 0·마스크 DFS 순서 재현·전수 A/B 게이트(8·9·4m/4n, 3축 변이 증명) | Scene·마스크 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -941,6 +941,33 @@ GBuffer/Shadow memcpy)은 `math::matrix4x4[512]` 값 배열이라 타입 무의�
 ⑤ AvatarMask 생성은 `m_Skeleton->m_rootBone`(Bone* 트리), humanoid 판정은
 `Bone::m_region`(이름 휴리스틱 파생). 분해: D4e-1(재생 이중화) → D4e-2(이벤트·루프 이관)
 → D4e-3(Scene 전파·마스크·은퇴 판정).
+
+**I5-D4e-3 완료 실측 (2026-09-01).** 본 해석·마스크 생성 창구화 — D4e의 마지막 legacy
+직소비 두 갈래가 Animator 창구로 모였다. ① Scene 본 전파: `UpdateModelRecursive`의
+`FindBone`/`m_serial` 직접 소비를 `ResolveBoneIndex`(experiment 이름 해석 정본·legacy
+폴백 — 인덱스는 역브리지 1:1 계약으로 동일)와 `GetSkeletonSerial`(0 = 스켈레톤 없음
+가드)로 교체 — Scene.cpp의 legacy Skeleton 타입 접촉이 0이 됐다. 세대 키는 m_serial
+그대로다(experiment 모델은 항상 역브리지 legacy 스켈레톤과 짝으로 교체되므로 공용 세대).
+② AvatarMask 생성: `BuildAvatarBoneMasks` — experiment는 parent-only에서 children 목록을
+만들고 **스택 DFS로 legacy MakeBoneMask 재귀와 같은 선순**을 재현한다(m_BoneMasks push
+순서가 postLoad ReCreateMask의 인덱스 대응이라 순서 재현이 저작 호환 계약). legacy
+폴백에서만 MarkRegionSkeleton(공유 자산 Bone::m_region 쓰기 — 이름 파생이라 멱등) 유지,
+experiment 경로는 Animator 소유 region 캐시를 쓴다. 호출부 둘(AnimationController::
+CreateMask·postLoad 마스크 재생성) 전환. ③ 시점 결함 교정: postLoad의
+EnsureExperimentAnimationBinding이 함수 끝에 있어 마스크 재생성이 항상 legacy 폴백을
+타던 것을 m_Skeleton 복원 직후·컨트롤러 복원 이전으로 이동. ④ legacy 틱·FindBone·
+MakeBoneMask 은퇴 판정: Assimp 폴백 모델(experiment 미등록)이 사는 동안 폴백으로 존치
+— 은퇴는 I6(Assimp 은퇴)과 동시가 유일한 자리다.
+
+게이트 실측: `experiment.boneresolve`(BoneComponent 전수에 실물 창구를 태워 legacy
+FindBone과 A/B — **실분기 계수** 관측 포함) pass — bones 62·experiment 62·legacy 0·
+mismatch 0 · `experiment.animmask`(창구 vs legacy 재귀, 순서·자식 계수까지 대조) pass —
+masks 63·viaExperiment 1 · off 대조군(4m/4n): experiment 0·전수 일치(스위치가 창구도
+막는다) · 전 단정 초록(D4e-2 기준선 유지). 변이 3종이 각자 자기 단정만 붉혔다:
+**M1**(experiment 분기 절단) → 8만 — mismatch 0으로 폴백이 완전히 받치는 소실을
+실분기 계수만이 가른다(조건 재현이 아니라 창구 내부 관측이어야 하는 이유).
+**M2**(이름 비교 훼손) → 8만(mismatch·unresolved 62 전량). **M3**(DFS 자식 정순 push —
+역순 방문) → 9만(idx=4 첫 형제 분기에서 검출 — 순서 대조의 이빨).
 
 **I5-D4e-2 완료 실측 (2026-09-01).** 이벤트·루프 오버라이드의 소유가 Animator로 옮겨졌다
 (D0a 명세 이행 — 공유 자산 재주입 오염 청산). ① `AnimatorClipOverride`(clipIndex·
