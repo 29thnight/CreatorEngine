@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <span>
 #include <string>
 
@@ -312,6 +313,27 @@ public:
     /// 원본은 COPY_SOURCE 상태여야 한다(그래프가 선언으로 만들어 준다).
 };
 
+/// I5-D34a: experiment packed 정점의 빌린 뷰. 캐시가 업로드 memcpy 동안만
+/// 읽는다 — 포인터를 보관하지 않는 것이 계약이다(소유는 조회 제공자 몫).
+struct RHIExperimentVertexView
+{
+    const void* data{ nullptr };
+    uint64_t    bytes{ 0 };
+    uint32_t    stride{ 0 };
+    uint32_t    attributeMask{ 0 };
+
+    bool IsValid() const
+    {
+        return nullptr != data && 0 != bytes && 0 != stride
+            && 0 != attributeMask && 0 == bytes % stride;
+    }
+};
+
+/// 메시의 experiment 정점 조회. RHI 캐시가 자산 계층(DataSystem)을 직접
+/// 알지 않도록 함수로 주입한다 — 실패(false)는 legacy 96B 경로 그대로다.
+using RHIExperimentVertexLookup =
+    std::function<bool(const Mesh&, RHIExperimentVertexView&)>;
+
 /// 메시 업로드. 같은 메시를 여러 패스·여러 프레임이 공유한다.
 class IRenderMeshCache
 {
@@ -319,5 +341,14 @@ public:
     virtual ~IRenderMeshCache() = default;
 
     virtual RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) = 0;
+
+    /// I5-D34a: 순수 가상이다 — 구현(DX12/Vulkan)이 하나라도 빠뜨리면 컴파일이
+    /// 막는다. 두 backend가 갈리면 vk 대조 게이트가 stride 불일치로 붉는 자리라
+    /// 기본 구현(무시)을 주지 않는다.
+    virtual void SetExperimentVertexLookup(RHIExperimentVertexLookup lookup) = 0;
+
+    /// I5-D34a 관측: 업로드 중 experiment packed 정점으로 올라간 수. CLI가
+    /// "전부 legacy"와 구분하는 데 쓴다 — 전환기와 함께 I6에서 은퇴한다.
+    virtual uint32_t GetExperimentUploadCount() const = 0;
 };
 

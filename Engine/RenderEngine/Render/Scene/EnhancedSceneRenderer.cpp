@@ -422,6 +422,11 @@ namespace
                 !textureCache.Initialize(&resources, outError) ||
                 !commandPool.Initialize(resources, 4,
                     VulkanDeviceResources::kFrameCount, outError)) return false;
+            // I5-D34a: experiment 정점 조회 주입 — RHI 캐시가 자산 계층을 직접
+            // 알지 않게 하는 유일한 이음새다(DX12 쪽과 대칭).
+            meshCache.SetExperimentVertexLookup(
+                [](const Mesh& mesh, RHIExperimentVertexView& view)
+                { return DataSystems->TryGetExperimentVertexView(mesh, view); });
 
             width = newWidth;
             height = newHeight;
@@ -1407,6 +1412,11 @@ namespace
             p.frameContext.psoManager = &dx12.Pipelines();
             p.frameContext.rootSignatures = &dx12.RootSignatures();
             p.frameContext.meshCache = &dx12.MeshCache();
+            // I5-D34a: experiment 정점 조회 주입(Vulkan 쪽과 대칭). Resize로
+            // 다시 와도 같은 람다를 다시 거는 것뿐이라 무해하다.
+            dx12.MeshCache().SetExperimentVertexLookup(
+                [](const Mesh& mesh, RHIExperimentVertexView& view)
+                { return DataSystems->TryGetExperimentVertexView(mesh, view); });
             p.frameContext.textureCache = &dx12.TextureCache();
             p.frameContext.width = p.width;
             p.frameContext.height = p.height;
@@ -5224,7 +5234,7 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         std::snprintf(line, sizeof(line),
             "EnhancedRenderer(Vulkan) — %s · 공통 scene graph %s · %ux%u"
             " · 완성 %llu프레임(대기 %llu) · 인플라이트 %u · 드로우 %u(배치 %u)"
-            " · CPU %.2f ms · 메시 캐시 %u개/업로드 %u/실패 %u",
+            " · CPU %.2f ms · 메시 캐시 %u개/업로드 %u(experiment %u)/실패 %u",
             state.enabled ? "켜짐" : "꺼짐",
             pipeline ? "준비됨" : "없음",
             pipeline ? pipeline->width : 0u,
@@ -5233,7 +5243,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             static_cast<unsigned long long>(state.framesIdle),
             pipeline ? pipeline->PendingCount() : 0u,
             state.lastDrawCount, state.lastBatchCount, state.lastCpuMs,
-            meshStats.residentCount, meshStats.uploads, meshStats.failures);
+            meshStats.residentCount, meshStats.uploads,
+            meshStats.experimentUploads, meshStats.failures);
 
         std::string status = line;
         char recordLine[192]{};
@@ -5424,6 +5435,12 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         state.dx12.GetRetiredDisplayCount());
 
     std::string status = line;
+    // I5-D34a: 업로드 중 experiment packed 경로 계수. 이 관측이 없으면 CLI가
+    // "전부 legacy로 올라갔다"와 구분할 수 없다([model.dual]과 같은 결).
+    // 어댑터가 중립 인터페이스만 노출하므로 계수도 인터페이스로 받는다.
+    status += "\n  메시 캐시 — experiment 업로드 "
+        + std::to_string(const_cast<LiveState&>(state)
+            .dx12.MeshCache().GetExperimentUploadCount());
     char recordLine[192]{};
     std::snprintf(recordLine, sizeof(recordLine),
         "\n  Native record CPU — last %.3f ms · avg %.3f ms · max %.3f ms · samples %llu",

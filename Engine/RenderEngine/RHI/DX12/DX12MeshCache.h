@@ -54,6 +54,10 @@ public:
     {
         uint32_t hits{ 0 };
         uint32_t uploads{ 0 };
+        // I5-D34a: uploads 중 experiment packed 정점으로 올라간 수. 이 계수가
+        // 없으면 "전부 legacy로 올라갔다"와 구분되지 않는다 — [model.dual]과
+        // 같은 눈먼 초록 방지다.
+        uint32_t experimentUploads{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
 
@@ -87,6 +91,14 @@ public:
     /// (BeginFrame과 EndFrame 사이). 패스 기록 중에 부르면 안 된다 —
     /// Record는 리소스를 만들지 않는다는 3-6의 규약을 어기는 것이다.
     Entry GetOrUpload(Mesh* mesh, std::string& outError) override;
+    void SetExperimentVertexLookup(RHIExperimentVertexLookup lookup) override
+    {
+        m_experimentLookup = std::move(lookup);
+    }
+    uint32_t GetExperimentUploadCount() const override
+    {
+        return m_stats.experimentUploads;
+    }
     void OnUploadSubmitted(uint64_t recordingId,
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
@@ -136,6 +148,7 @@ private:
         DX12PersistentHeap::Allocation& destination, std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };
+    RHIExperimentVertexLookup m_experimentLookup;
     // ── 키가 주소가 아니라 자산 신원이다 (자산 상주 관리 ①) ──
     //
     // 텍스처 캐시와 같은 이유다. 자산 수명이 shared_ptr 공동 소유라 죽은 뒤

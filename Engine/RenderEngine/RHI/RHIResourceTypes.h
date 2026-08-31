@@ -827,6 +827,12 @@ struct RHIMeshBinding
     RHIBufferSlice vertices;
     uint32_t       vertexStride{ 0 };
 
+    // I5-D34a: 정점 버퍼의 experiment 어트리뷰트 마스크. 0이면 legacy 96B 고정
+    // 레이아웃이고, 0이 아니면 experiment packed 레이아웃이라 패스가 이 마스크의
+    // 입력 레이아웃 PSO를 골라야 한다. stride처럼 데이터로 나른다 — 소비자가
+    // 레이아웃을 추측하게 두면 화면이 조용히 틀린다.
+    uint32_t       vertexAttributeMask{ 0 };
+
     RHIBufferSlice indices;
     RHIFormat      indexFormat{ RHIFormat::R32Uint };
     uint32_t       indexCount{ 0 };

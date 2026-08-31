@@ -62,6 +62,19 @@ SamplerState gSampler       : register(s0);
 #define SHADING_QUALITY 0
 #endif
 
+// I5-D34a: EXPERIMENT_STATIC_VERTEX는 experiment packed core 레이아웃(48B)이다.
+// BINORMAL이 없고 TANGENT.w가 handedness라 bitangent를 cross로 재구성한다.
+// 스킨 어트리뷰트도 없다 — 이 레이아웃 PSO에는 정적 메시만 온다(스킨 메시는
+// D34b 전까지 legacy 96B 경로로 남는다).
+#ifdef EXPERIMENT_STATIC_VERTEX
+struct VSIn
+{
+    float3 position : POSITION;
+    float3 normal   : NORMAL;
+    float2 uv       : TEXCOORD0;
+    float4 tangent  : TANGENT;
+};
+#else
 struct VSIn
 {
     float3 position    : POSITION;
@@ -72,6 +85,7 @@ struct VSIn
     float4 boneIndices : BLENDINDICES;
     float4 boneWeights : BLENDWEIGHT;
 };
+#endif
 
 struct VSOut
 {
@@ -92,6 +106,14 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     const InstanceData instance = gInstances[instanceId];
     const float4x4 gWorld = instance.world;
 
+#ifdef EXPERIMENT_STATIC_VERTEX
+    // packed 레이아웃의 bitangent 재구성. 부호(w)가 handedness의 정본이고,
+    // 원본 bitangent의 방향 자체는 나르지 않는다(왕복 계약 — modelbridge
+    // 게이트의 부호 보존 단정과 같은 계약).
+    const float3 localTangent   = input.tangent.xyz;
+    const float3 localBitangent =
+        cross(input.normal, input.tangent.xyz) * input.tangent.w;
+#else
     // ── 스키닝 ──
     //
     // DX11 VertexShader.vs의 이식이다. 판정 조건(boneWeight[0] > 0)과 네 본의
@@ -118,6 +140,9 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
         input.tangent   = normalize(mul(float4(input.tangent, 0.0f), boneTransform).xyz);
         input.bitangent = normalize(mul(float4(input.bitangent, 0.0f), boneTransform).xyz);
     }
+    const float3 localTangent   = input.tangent;
+    const float3 localBitangent = input.bitangent;
+#endif
 
     VSOut output;
     const float4 worldPosition = mul(float4(input.position, 1.0f), gWorld);
@@ -131,8 +156,8 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     // 그건 스케일이 실제로 문제가 되는 씬이 나왔을 때 상수에 추가한다 —
     // 지금 넣으면 검증할 수 없는 값이 하나 더 늘어난다.
     output.normal    = mul(input.normal,    (float3x3)gWorld);
-    output.tangent   = mul(input.tangent,   (float3x3)gWorld);
-    output.bitangent = mul(input.bitangent, (float3x3)gWorld);
+    output.tangent   = mul(localTangent,    (float3x3)gWorld);
+    output.bitangent = mul(localBitangent,  (float3x3)gWorld);
     output.uv        = input.uv;
     return output;
 }

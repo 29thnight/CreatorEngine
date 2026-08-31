@@ -590,6 +590,8 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
 
 struct VulkanMeshCache::Impl
 {
+    RHIExperimentVertexLookup experimentLookup;
+
     struct Buffers
     {
         RHIMeshBinding binding;
@@ -679,6 +681,16 @@ void VulkanMeshCache::Shutdown()
     m_impl->resources = nullptr;
 }
 
+void VulkanMeshCache::SetExperimentVertexLookup(RHIExperimentVertexLookup lookup)
+{
+    if (m_impl) m_impl->experimentLookup = std::move(lookup);
+}
+
+uint32_t VulkanMeshCache::GetExperimentUploadCount() const
+{
+    return m_impl ? m_impl->stats.experimentUploads : 0u;
+}
+
 RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
 {
     RHIMeshBinding empty{};
@@ -700,7 +712,18 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
     const auto& indices = mesh->GetIndices();
     if (vertices.empty() || indices.empty()) return empty;
 
-    const uint64_t vertexBytes = static_cast<uint64_t>(vertices.size()) * sizeof(Vertex);
+    // I5-D34a: DX12MeshCache::GetOrUpload와 대칭 — 한쪽만 고치면 vk 대조
+    // 게이트가 stride 불일치로 붉는다.
+    RHIExperimentVertexView experimentView{};
+    const bool useExperiment = m_impl->experimentLookup
+        && m_impl->experimentLookup(*mesh, experimentView)
+        && experimentView.IsValid();
+
+    const uint64_t vertexBytes = useExperiment
+        ? experimentView.bytes
+        : static_cast<uint64_t>(vertices.size()) * sizeof(Vertex);
+    const void* const vertexData = useExperiment
+        ? experimentView.data : static_cast<const void*>(vertices.data());
     const uint64_t indexBytes = static_cast<uint64_t>(indices.size()) * sizeof(uint32);
     const std::array<RHIUploadRequest, 2> requests = {{
         { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
@@ -773,7 +796,7 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         return empty;
     }
 
-    std::memcpy(staging[0].cpuAddress, vertices.data(), static_cast<size_t>(vertexBytes));
+    std::memcpy(staging[0].cpuAddress, vertexData, static_cast<size_t>(vertexBytes));
     std::memcpy(staging[1].cpuAddress, indices.data(), static_cast<size_t>(indexBytes));
 
     const VkBufferCopy vertexCopy{ staging[0].offset, 0, vertexBytes };
@@ -807,7 +830,10 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
     vkCmdPipelineBarrier2(commandBuffer, &dependency);
 
     buffers.binding.vertices.size = vertexBytes;
-    buffers.binding.vertexStride = sizeof(Vertex);
+    buffers.binding.vertexStride = useExperiment
+        ? experimentView.stride : sizeof(Vertex);
+    buffers.binding.vertexAttributeMask = useExperiment
+        ? experimentView.attributeMask : 0;
     buffers.binding.indices.size = indexBytes;
     buffers.binding.indexFormat = RHIFormat::R32Uint;
     buffers.binding.indexCount = static_cast<uint32_t>(indices.size());
@@ -816,6 +842,7 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
     buffers.recordingId = m_impl->resources->GetCurrentUploadRecordingId();
 
     ++m_impl->stats.uploads;
+    if (useExperiment) ++m_impl->stats.experimentUploads;
     m_impl->stats.bytesUploaded += buffers.bytes;
     ++m_impl->stats.residentCount;
     m_impl->stats.residentBytes += buffers.bytes;

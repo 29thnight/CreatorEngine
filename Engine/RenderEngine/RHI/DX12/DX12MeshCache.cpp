@@ -210,8 +210,19 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         return empty;
     }
 
+    // I5-D34a: experiment packed 정점이 있으면 그것을 올린다(마스크·stride를
+    // 바인딩에 실어 패스가 레이아웃 PSO를 고른다). 없으면 legacy 96B 그대로 —
+    // Vulkan 쪽과 대칭 4줄이며, 한쪽만 고치면 vk 대조 게이트가 붉는다.
+    RHIExperimentVertexView experimentView{};
+    const bool useExperiment = m_experimentLookup
+        && m_experimentLookup(*mesh, experimentView) && experimentView.IsValid();
+
     Buffers buffers{};
-    const uint64_t vertexBytes = static_cast<uint64_t>(vertices.size()) * sizeof(Vertex);
+    const uint64_t vertexBytes = useExperiment
+        ? experimentView.bytes
+        : static_cast<uint64_t>(vertices.size()) * sizeof(Vertex);
+    const void* const vertexData = useExperiment
+        ? experimentView.data : static_cast<const void*>(vertices.data());
     const uint64_t indexBytes = static_cast<uint64_t>(indices.size()) * sizeof(uint32);
 
     const std::array<RHIUploadRequest, 2> requests = {{
@@ -263,7 +274,7 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         return empty;
     }
 
-    if (!RecordBufferUpload(vertices.data(), vertexBytes, staging[0],
+    if (!RecordBufferUpload(vertexData, vertexBytes, staging[0],
         D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
         buffers.vertexBuffer, outError) ||
         !RecordBufferUpload(indices.data(), indexBytes, staging[1],
@@ -284,7 +295,10 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     buffers.entry.vertices = RHIBufferSlice::Whole(
         m_resources->RegisterExternalBuffer(buffers.vertexBuffer.resource.Get()));
     buffers.entry.vertices.size = vertexBytes;
-    buffers.entry.vertexStride = sizeof(Vertex);
+    buffers.entry.vertexStride = useExperiment
+        ? experimentView.stride : sizeof(Vertex);
+    buffers.entry.vertexAttributeMask = useExperiment
+        ? experimentView.attributeMask : 0;
 
     buffers.entry.indices = RHIBufferSlice::Whole(
         m_resources->RegisterExternalBuffer(buffers.indexBuffer.resource.Get()));
@@ -309,6 +323,7 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     buffers.uploadState = RHIUploadTransactionState::Recording;
 
     ++m_stats.uploads;
+    if (useExperiment) ++m_stats.experimentUploads;
     ++m_stats.residentCount;
     m_stats.residentBytes += buffers.bytes;
 

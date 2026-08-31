@@ -617,8 +617,14 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         continue;
                     }
 
+                    // I5-D34a: experiment packed 버퍼(마스크 != 0)는 스킨
+                    // 어트리뷰트 오프셋(64/80)이 없다 — 스킨 PSO로 분류하면
+                    // 버퍼 밖을 읽는다. core 마스크 메시는 본 데이터가 없어
+                    // legacy에서도 바인드 포즈였으므로 정적 분류가 의미도 같다.
+                    // 정적 PSO는 POSITION@0 하나라 두 레이아웃에서 동일하다.
                     const bool skinned =
-                        (nullptr != draw.bonePalette) && (0 != draw.boneCount);
+                        (nullptr != draw.bonePalette) && (0 != draw.boneCount)
+                        && 0 == found->second.entry.vertexAttributeMask;
 
                     // 메시나 스킨드 여부가 바뀌면 지금까지 모은 것을 낸다.
                     // 정렬해 두었으므로 같은 것끼리는 이미 붙어 있다.

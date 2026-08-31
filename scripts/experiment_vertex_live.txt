@@ -1,0 +1,20 @@
+# experiment 정점 실증 시나리오 (I5-D34a)
+#
+# 사용법:
+#   pwsh Tools\regression\verify-experiment-vertex-live.ps1
+#   (씬 경로 치환과 CREATOR_EXPERIMENT_VERTEX A/B는 그 스크립트가 한다)
+#
+# 관측 지점이 dx12.live가 아니라 dx12.scene인 이유: --script 헤드리스에서
+# 라이브는 프레임을 완성하지 않는다(렌더 0프레임 실측 — present가 없다).
+# dx12.scene 오프라인 하네스는 같은 씬 프록시를 자체 캐시로 그리고 커버리지·
+# 밝기 단정까지 갖고 있어, experiment 버퍼로 그린 그림이 통째로 틀리면
+# 하네스가 붉는다 — 계수 관측에 부분적 픽셀 판정이 얹힌다.
+
+scene.switch __SCENE__
+
+# 씬 프록시 게시가 하네스 스냅샷에 잡힐 시간.
+wait 120
+
+dx12.scene
+
+quit

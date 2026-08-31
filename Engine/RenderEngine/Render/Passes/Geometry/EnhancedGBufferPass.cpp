@@ -1,4 +1,6 @@
 #include "EnhancedGBufferPass.h"
+#include "../../../Experiment/VertexLayout.h" // I5-D34a: core 마스크
+#include "../../../RHI/ExperimentVertexInputLayout.h" // I5-D34a: 레이아웃 유도
 #include "../../../RHI/RHIShaderCompiler.h"
 #include "../../../RHI/RHIShaderSource.h"
 #include "../../../ShaderMeta.h"
@@ -222,13 +224,19 @@ EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
 
 bool EnhancedGBufferPass::ResolveShaderVariant(
     const EnhancedMaterialDrawSnapshot& snapshot,
-    RHIPipelineHandle& outPipeline,
+    uint32_t vertexAttributeMask, RHIPipelineHandle& outPipeline,
     std::shared_ptr<const ShaderMetaBindingLayout>& outLayout) const
 {
+    // I5-D34a: 마스크가 0이 아니면 experiment 레이아웃 짝을 준다. 짝이 없으면
+    // 실패다 — legacy PSO로 폴백하면 96B 레이아웃 PSO에 packed 버퍼가 물려
+    // 화면이 조용히 틀린다(fail-closed).
+    const bool experiment = 0 != vertexAttributeMask;
     if (snapshot.shaderMetaHandle == m_shaderMetaHandle
         && snapshot.permutationKey == m_defaultPermutationKey)
     {
-        outPipeline = m_pipelineRequest.GetHandle();
+        outPipeline = experiment
+            ? m_experimentPipelineRequest.GetHandle()
+            : m_pipelineRequest.GetHandle();
         outLayout = m_shaderBindingLayout;
         return outPipeline.IsValid() && nullptr != outLayout;
     }
@@ -237,7 +245,9 @@ bool EnhancedGBufferPass::ResolveShaderVariant(
         snapshot.permutationKey };
     const auto found = m_shaderVariants.find(key);
     if (found == m_shaderVariants.end()) return false;
-    outPipeline = found->second.request.GetHandle();
+    outPipeline = experiment
+        ? found->second.experimentRequest.GetHandle()
+        : found->second.request.GetHandle();
     outLayout = found->second.layout;
     return outPipeline.IsValid() && nullptr != outLayout;
 }
@@ -304,7 +314,10 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
             }
             RHIPipelineHandle materialPipeline{};
             std::shared_ptr<const ShaderMetaBindingLayout> materialLayout;
-            if (!ResolveShaderVariant(material, materialPipeline, materialLayout)
+            // 이 지점은 메시 업로드 전이라 마스크를 모른다 — 여기의 목적은
+            // 재질 레이아웃 검증이므로 legacy 축(0)으로 확인한다. 마스크별
+            // PSO 선택은 BuildBatches가 한다.
+            if (!ResolveShaderVariant(material, 0, materialPipeline, materialLayout)
                 || material.bindingLayout != *materialLayout)
             {
                 outError = "GBuffer draw material permutation/layout이 준비된 variant와 다르다";
@@ -468,14 +481,22 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
             DrawBatch batch{};
             batch.mesh = draw.mesh;
             batch.material = key;
+            // I5-D34a: 메시 바인딩의 마스크가 레이아웃 축이다. 배치는 메시별로
+            // 갈리므로 마스크가 배치 안에서 섞일 수 없다.
+            const auto geometry = m_drawGeometry.find(draw.mesh);
+            const uint32_t vertexMask = geometry != m_drawGeometry.end()
+                ? geometry->second.vertexAttributeMask : 0;
             if (key.snapshot)
             {
                 std::shared_ptr<const ShaderMetaBindingLayout> ignoredLayout;
-                ResolveShaderVariant(*key.snapshot, batch.pipeline, ignoredLayout);
+                ResolveShaderVariant(*key.snapshot, vertexMask,
+                    batch.pipeline, ignoredLayout);
             }
             else
             {
-                batch.pipeline = m_pipelineRequest.GetHandle();
+                batch.pipeline = 0 != vertexMask
+                    ? m_experimentPipelineRequest.GetHandle()
+                    : m_pipelineRequest.GetHandle();
             }
             batch.firstInstance = static_cast<uint32_t>(m_instances.size());
             batch.instanceCount = 0;
@@ -508,14 +529,28 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
 bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
     const ShaderRenderState* renderState,
-    const RHIShaderPermutation& permutation, RHIGraphicsPipelineDesc& outDesc,
+    const RHIShaderPermutation& permutation, bool experimentLayout,
+    RHIGraphicsPipelineDesc& outDesc,
     RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError)
 {
-    if (!CompileGBufferShader(shaderFile, vertexEntry, "vs_5_0", permutation,
-            outVs, outError))
+    // I5-D34a: experiment 짝은 호출자의 퍼뮤테이션 위에 레이아웃 매크로를 얹는다.
+    // 키워드 축과 독립인 별도 축이라 여기서 합성한다 — 호출자마다 얹게 하면
+    // 하나가 빠뜨렸을 때 화면이 조용히 틀린다.
+    RHIShaderPermutation experimentPermutation;
+    const RHIShaderPermutation* effectivePermutation = &permutation;
+    if (experimentLayout)
+    {
+        experimentPermutation = permutation;
+        if (!experimentPermutation.Enable("EXPERIMENT_STATIC_VERTEX", outError))
+            return false;
+        effectivePermutation = &experimentPermutation;
+    }
+
+    if (!CompileGBufferShader(shaderFile, vertexEntry, "vs_5_0",
+            *effectivePermutation, outVs, outError))
         return false;
-    if (!CompileGBufferShader(shaderFile, pixelEntry, "ps_5_0", permutation,
-            outPs, outError))
+    if (!CompileGBufferShader(shaderFile, pixelEntry, "ps_5_0",
+            *effectivePermutation, outPs, outError))
         return false;
 
     // 루트 시그니처는 캐시가 식별자를 준다 — 손번호를 붙이지 않는 것이 3-4의 계약이다.
@@ -570,8 +605,34 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     static_assert(offsetof(Vertex, boneWeights) == 80, "Vertex 레이아웃이 바뀌었다");
 
     outDesc = {};
-    outDesc.inputElements = kInputElements;
-    outDesc.inputElementCount = _countof(kInputElements);
+    if (experimentLayout)
+    {
+        // I5-D34a: 마스크→레이아웃 유도 정본(D2)에서 온다 — 오프셋을 여기 다시
+        // 적으면 표와 어긋났을 때 화면이 조용히 틀린다. core 마스크 하나뿐이라
+        // 함수-지역 static으로 한 번만 유도한다(레이아웃 배열은 desc가 반환된
+        // 뒤 PSO 생성까지 살아야 하므로 지역 vector면 안 된다). D34b가 스킨
+        // 마스크를 열면 마스크별 캐시로 일반화한다.
+        static std::vector<RHIInputElement> experimentElements;
+        static std::string experimentElementsError;
+        static const bool experimentElementsBuilt =
+            ExperimentVertexInput::BuildInputElements(
+                experiment::kCoreVertexAttributes, experimentElements,
+                experimentElementsError);
+        if (!experimentElementsBuilt)
+        {
+            outError = "GBuffer experiment 입력 레이아웃 유도 실패: "
+                + experimentElementsError;
+            return false;
+        }
+        outDesc.inputElements = experimentElements.data();
+        outDesc.inputElementCount =
+            static_cast<uint32_t>(experimentElements.size());
+    }
+    else
+    {
+        outDesc.inputElements = kInputElements;
+        outDesc.inputElementCount = _countof(kInputElements);
+    }
     outDesc.vsBytecode = outVs.Data();
     outDesc.vsSize = outVs.Size();
     outDesc.psBytecode = outPs.Data();
@@ -597,14 +658,24 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     RHIGraphicsPipelineDesc desc{};
     const RHIShaderPermutation emptyPermutation;
     if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain", nullptr,
-            emptyPermutation, desc, vsBlob, psBlob, outError)) return false;
+            emptyPermutation, false, desc, vsBlob, psBlob, outError)) return false;
 
-    return m_pipelineRequest.Create(*context.psoManager, desc, outError);
+    if (!m_pipelineRequest.Create(*context.psoManager, desc, outError))
+        return false;
+
+    // I5-D34a: experiment core 레이아웃 짝. 하나라도 없으면 초기화 실패다 —
+    // 배치가 마스크로 고르는 자리에서 폴백을 지어내지 않기 위해서다.
+    RHIGraphicsPipelineDesc experimentDesc{};
+    if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain", nullptr,
+            emptyPermutation, true, experimentDesc, vsBlob, psBlob, outError))
+        return false;
+    return m_experimentPipelineRequest.Create(*context.psoManager,
+        experimentDesc, outError);
 }
 
 bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
     const EnhancedFrameContext& context, const ShaderMeta& meta,
-    std::span<const std::uint16_t> keywordSelections,
+    std::span<const std::uint16_t> keywordSelections, bool experimentLayout,
     RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
     RHIShaderBlob& outPs, RHIShaderPermutationKey& outPermutationKey,
     std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
@@ -659,7 +730,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
 
     if (!BuildPipelineDesc(context, shaderFile.c_str(), pass.vertex->entry.c_str(),
             pass.pixel->entry.c_str(), &pass.state, permutation.defines,
-            outDesc, outVs, outPs, outError))
+            experimentLayout, outDesc, outVs, outPs, outError))
     {
         return false;
     }
@@ -715,8 +786,24 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     RHIShaderPermutationKey defaultPermutationKey{};
     std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
     const std::vector<std::uint16_t> defaultSelections(meta.keywords.size(), 0);
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections,
+    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections, false,
             desc, vsBlob, psBlob, defaultPermutationKey, candidateLayout, outError))
+        return false;
+
+    // I5-D34a: experiment 짝 desc를 후보 단계에서 먼저 완성한다 — 둘 중 하나라도
+    // 못 만들면 아무것도 교체하지 않는 것이 candidate-first 규약이다.
+    // ★ 블롭은 legacy 것과 분리한다. desc는 블롭 내부 버퍼를 빌려 가리키므로,
+    //   같은 변수를 재사용하면 위의 legacy desc가 experiment 바이트코드(또는
+    //   재할당으로 죽은 메모리)를 가리켜 PSO 생성이 E_INVALIDARG로 죽는다 —
+    //   실제로 FT 라이브 전멸(드로우 0)로 나타났던 결함이다.
+    RHIShaderBlob experimentVsBlob;
+    RHIShaderBlob experimentPsBlob;
+    RHIGraphicsPipelineDesc experimentDesc{};
+    RHIShaderPermutationKey experimentKeyIgnored{};
+    std::shared_ptr<const ShaderMetaBindingLayout> experimentLayoutIgnored;
+    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections, true,
+            experimentDesc, experimentVsBlob, experimentPsBlob,
+            experimentKeyIgnored, experimentLayoutIgnored, outError))
         return false;
 
     const RHIPipelineHandle previousPipeline = m_pipelineRequest.GetHandle();
@@ -732,6 +819,21 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
             outError, !previousShared))
         return false;
 
+    // I5-D34a: experiment 짝도 같은 규약으로 교체한다. desc는 위에서 이미
+    // 완성됐으므로 여기 실패는 PSO 생성 실패뿐이고, 그때 legacy 쪽만 새것인
+    // 반쪽 상태가 되지만 실패 반환으로 프레임이 이 meta를 쓰지 않는다.
+    const RHIPipelineHandle previousExperiment =
+        m_experimentPipelineRequest.GetHandle();
+    const bool previousExperimentShared = std::any_of(m_shaderVariants.begin(),
+        m_shaderVariants.end(), [previousExperiment](const auto& entry)
+        {
+            return entry.second.experimentRequest.GetHandle()
+                == previousExperiment;
+        });
+    if (!m_experimentPipelineRequest.Replace(*context.psoManager, experimentDesc,
+            retireAfter, outError, !previousExperimentShared))
+        return false;
+
     // primary generation 교체는 같은 catalog slot의 옛 permutation만 지운다.
     // 다른 material ShaderMeta slot은 현재 frame sealing이 성공한 뒤 Commit에서
     // 판단한다. 같은 cache handle을 공유하는 holder가 남아 있으면 무효화하지 않는다.
@@ -742,6 +844,8 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
         if (0 != previousSlot && it->first.meta.slot == previousSlot)
         {
             removedPipelines.push_back(it->second.request.GetHandle());
+            removedPipelines.push_back(
+                it->second.experimentRequest.GetHandle());
             it = m_shaderVariants.erase(it);
         }
         else
@@ -757,12 +861,15 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     for (const RHIPipelineHandle pipeline : removedPipelines)
     {
         if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
+            || pipeline == m_experimentPipelineRequest.GetHandle()
             || std::find(invalidated.begin(), invalidated.end(), pipeline.id)
                 != invalidated.end()
             || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
                 [pipeline](const auto& entry)
                 {
-                    return entry.second.request.GetHandle() == pipeline;
+                    return entry.second.request.GetHandle() == pipeline
+                        || entry.second.experimentRequest.GetHandle()
+                            == pipeline;
                 }))
         {
             continue;
@@ -823,7 +930,7 @@ bool EnhancedGBufferPass::EnsureShaderMetaVariant(
     RHIGraphicsPipelineDesc desc{};
     RHIShaderPermutationKey candidateKey{};
     std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections,
+    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections, false,
             desc, vsBlob, psBlob, candidateKey, candidateLayout, outError))
     {
         return false;
@@ -840,9 +947,28 @@ bool EnhancedGBufferPass::EnsureShaderMetaVariant(
         return false;
     }
 
+    // I5-D34a: experiment 짝 desc. variant 생성 시점에는 어떤 메시가 이 재질로
+    // 그려질지 모르므로 둘을 함께 만든다 — 배치가 메시 마스크로 고른다.
+    // ★ 블롭 분리 — ApplyShaderMeta와 같은 이유(위 참조). legacy desc가 빌려
+    //   가리키는 버퍼를 덮으면 안 된다.
+    RHIShaderBlob experimentVsBlob;
+    RHIShaderBlob experimentPsBlob;
+    RHIGraphicsPipelineDesc experimentDesc{};
+    RHIShaderPermutationKey experimentKeyIgnored{};
+    std::shared_ptr<const ShaderMetaBindingLayout> experimentLayoutIgnored;
+    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections, true,
+            experimentDesc, experimentVsBlob, experimentPsBlob,
+            experimentKeyIgnored, experimentLayoutIgnored, outError))
+    {
+        return false;
+    }
+
     ShaderVariant candidate;
     candidate.layout = candidateLayout;
     if (!candidate.request.Create(*context.psoManager, desc, outError)) return false;
+    if (!candidate.experimentRequest.Create(*context.psoManager, experimentDesc,
+            outError))
+        return false;
 
     auto [inserted, accepted] = m_shaderVariants.emplace(key, std::move(candidate));
     if (!accepted)
@@ -875,6 +1001,8 @@ std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
         if (!isActive(it->first.meta))
         {
             removedPipelines.push_back(it->second.request.GetHandle());
+            removedPipelines.push_back(
+                it->second.experimentRequest.GetHandle());
             it = m_shaderVariants.erase(it);
             ++removedKeys;
         }
@@ -888,12 +1016,15 @@ std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
     for (const RHIPipelineHandle pipeline : removedPipelines)
     {
         if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
+            || pipeline == m_experimentPipelineRequest.GetHandle()
             || std::find(invalidated.begin(), invalidated.end(), pipeline.id)
                 != invalidated.end()
             || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
                 [pipeline](const auto& entry)
                 {
-                    return entry.second.request.GetHandle() == pipeline;
+                    return entry.second.request.GetHandle() == pipeline
+                        || entry.second.experimentRequest.GetHandle()
+                            == pipeline;
                 }))
         {
             continue;
@@ -1224,6 +1355,7 @@ void EnhancedGBufferPass::Shutdown()
     m_boneOffsets.clear();
     m_shaderVariants.clear();
     m_pipelineRequest = {};
+    m_experimentPipelineRequest = {};
     m_shaderMetaHandle = {};
     m_defaultPermutationKey = {};
     m_shaderBindingLayout.reset();

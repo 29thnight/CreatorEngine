@@ -1226,6 +1226,17 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 if (!uploadError.empty()) outError = uploadError;
                 continue;
             }
+            // I5-D34a: Forward의 레이아웃 축 전환은 D34c 몫이다. 그 전에
+            // experiment packed 버퍼(마스크 != 0)를 96B 레이아웃 PSO로 그리면
+            // TANGENT@40부터 어긋나 조용히 틀린다 — 안 그리고 알리는 쪽이
+            // 낫다(fail-closed). FT 실측으로 포워드 드로우는 0이라 제품 씬
+            // 파급도 0이다.
+            if (0 != entry.vertexAttributeMask)
+            {
+                outError = "Forward는 experiment 정점 레이아웃을 아직 못 그린다"
+                    "(D34c 전): " + draw.mesh->GetName();
+                continue;
+            }
             m_drawGeometry.emplace(draw.mesh, entry);
         }
     }

@@ -3235,6 +3235,13 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         outLog += "[2/4] 보조 시스템 초기화 실패: " + error + "\n";
         return false;
     }
+    // I5-D34a: 라이브와 같은 experiment 정점 조회를 이 하네스에도 건다. 이게
+    // 없으면 이 검증은 전부 legacy 96B로 그려 experiment 경로에 눈멀고,
+    // "라이브만 다른 그림"이 된다 — 라이브 배선의 회귀 감시자가 이 검증이므로
+    // 캐시 구성도 같아야 한다.
+    meshCache.SetExperimentVertexLookup(
+        [](const Mesh& mesh, RHIExperimentVertexView& view)
+        { return DataSystems->TryGetExperimentVertexView(mesh, view); });
 
     EnhancedFrameContext frameContext{};
     frameContext.resources = &resources;
@@ -3878,7 +3885,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         + " · 배치 " + std::to_string(gbuffer.GetLastBatchCount()) + "\n";
     outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
         + " · 메시 업로드 " + std::to_string(meshStats.uploads)
-        + "(" + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
+        + "(experiment " + std::to_string(meshStats.experimentUploads) + ", "
+        + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
         + " · 커버리지 " + std::to_string(coveredA) + "/" + std::to_string(kWidth * kHeight) + "\n";
 
     // 그래프가 GBuffer를 살렸는지. Deferred가 읽으므로 뿌리 표시 없이 살아남아야 한다.

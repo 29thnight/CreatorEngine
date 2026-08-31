@@ -23,6 +23,8 @@ class Material;
 struct ShaderMeta;
 namespace YAML { class Node; }
 namespace experiment { class Model; } // I5-D1a 역브리지 입력
+class Mesh; // I5-D34a 병행 바인딩 조회 입력
+struct RHIExperimentVertexView; // I5-D34a 병행 바인딩 조회 출력
 
 enum class RuntimeAssetType
 {
@@ -112,6 +114,11 @@ public:
 	// cooked 게시 규약(pak)이 서기 전까지 빈 경로다(resolver가 Info로 계수).
 	[[nodiscard]] std::shared_ptr<Model> LoadModelViaExperiment(
 		FileGuid guid, const file::path& sourcePath);
+	// I5-D34a — 병행 바인딩 조회: legacy Mesh 신원(m_hashingMesh)으로 experiment
+	// packed 정점 뷰를 돌려준다. 스킨 레이아웃은 D34b 전까지 닫혀 있다(false).
+	// RHI 메시 캐시에 함수로 주입되는 것이 소비자다 — 캐시는 이 클래스를 모른다.
+	[[nodiscard]] bool TryGetExperimentVertexView(
+		const Mesh& mesh, RHIExperimentVertexView& outView);
 	void LoadModel(std::string_view filePath);
 	std::shared_ptr<Model> LoadCachedModelShared(std::string_view filePath);
 	// 즉시 사용 legacy 호출부 호환. 참조를 보관하는 쪽은 위 shared API를 쓴다.
@@ -188,6 +195,19 @@ public:
 	std::mutex m_materialMutex;
 	std::mutex m_modelMutex;
 	std::mutex m_fontMutex;
+
+	// I5-D34a — 병행 바인딩: legacy Mesh 신원 → {experiment 모델, 메시 인덱스}.
+	// LoadModelViaExperiment 성공 시 채워지고, 조회는 렌더 캐시 주입 함수가
+	// 한다. shared_ptr이 experiment 모델의 수명을 여기서 잡아 준다 — 역브리지가
+	// legacy만 남기고 버리면 packed 정점의 출처가 사라지기 때문이다. 항목은
+	// Models 캐시와 같은 성격의 영구 캐시다(브리지와 함께 I6에서 은퇴).
+	struct ExperimentMeshBinding
+	{
+		std::shared_ptr<const experiment::Model> model;
+		std::uint32_t meshIndex{ 0 };
+	};
+	std::unordered_map<HashedGuid, ExperimentMeshBinding> m_experimentMeshBindings;
+	std::mutex m_experimentMeshMutex;
 
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);

@@ -515,6 +515,9 @@ public:
     {
         uint32_t hits{ 0 };
         uint32_t uploads{ 0 };
+        // I5-D34a: DX12 쪽 Stats와 같은 계수 — 관측이 없으면 "전부 legacy"와
+        // 구분되지 않는다.
+        uint32_t experimentUploads{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
         uint32_t residentCount{ 0 };
@@ -541,6 +544,8 @@ public:
     void Shutdown();
 
     RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) override;
+    void SetExperimentVertexLookup(RHIExperimentVertexLookup lookup) override;
+    uint32_t GetExperimentUploadCount() const override;
     void OnUploadSubmitted(uint64_t recordingId,
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;

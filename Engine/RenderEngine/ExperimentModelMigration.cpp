@@ -28,6 +28,7 @@
 #include "Mesh.h"
 #include "Model.h"
 #include "ReflectionYml.h"
+#include "RHI/IRenderDeviceServices.h" // I5-D34a: RHIExperimentVertexView
 #include "Skeleton.h"
 #include "StandardMaterialProperty.h"
 
@@ -35,6 +36,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib> // I5-D34a: A/B 스위치 getenv
 #include <string>
 #include <vector>
 
@@ -383,10 +385,67 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 		Debug->LogWarning("[model.dual] experiment 로드 경고 "
 			+ std::to_string(warningCount) + "건: " + sourcePath.string());
 	}
+	// I5-D34a — 병행 바인딩: 역브리지가 legacy만 남기면 packed 정점의 출처가
+	// 사라지므로, 렌더 캐시가 experiment 정점을 집을 수 있게 신원을 잇는다.
+	// 역브리지는 source.Meshes() 순서 그대로 legacy 메시를 만들므로 인덱스가
+	// 1:1이다 — 그 대응이 깨지면 아래 계수 불일치로 등록을 통째로 건너뛴다
+	// (일부만 잇는 것보다 전부 legacy 폴백이 낫다).
+	if (legacyModel->m_Meshes.size() == result.model->Meshes().size())
+	{
+		std::lock_guard lock(m_experimentMeshMutex);
+		for (std::size_t index = 0; index < legacyModel->m_Meshes.size(); ++index)
+		{
+			m_experimentMeshBindings[legacyModel->m_Meshes[index]->m_hashingMesh] =
+				ExperimentMeshBinding{ result.model,
+					static_cast<std::uint32_t>(index) };
+		}
+	}
+	else
+	{
+		Debug->LogWarning("[model.dual] 메시 계수 불일치 — 병행 바인딩 생략: "
+			+ sourcePath.string());
+	}
+
 	// 성공도 관측한다 — 폴백만 로그하면 "전부 폴백"과 "전부 experiment"가
 	// 같은 침묵이 된다(눈먼 초록). printf는 CLI 게이트 stdout에 잡히는
 	// 채널이라 게이트가 경로를 실증할 수 있다. 전환기와 함께 I6에서 죽는다.
 	std::printf("[model.dual] experiment 경로: %s\n",
 		sourcePath.filename().string().c_str());
 	return legacyModel;
+}
+
+bool DataSystem::TryGetExperimentVertexView(
+	const Mesh& mesh, RHIExperimentVertexView& outView)
+{
+	// A/B 판정 스위치(부팅 고정): CREATOR_EXPERIMENT_VERTEX=0이면 전부 legacy
+	// 96B로 올린다. 같은 빌드에서 픽셀 diff 0을 재고 변이의 이빨을 증명하는
+	// 유일한 창구다 — 전환기와 함께 I6에서 은퇴한다.
+	static const bool enabled = []
+	{
+		const char* value = std::getenv("CREATOR_EXPERIMENT_VERTEX");
+		return nullptr == value || '0' != value[0];
+	}();
+	if (!enabled) return false;
+
+	std::lock_guard lock(m_experimentMeshMutex);
+	const auto found = m_experimentMeshBindings.find(mesh.m_hashingMesh);
+	if (found == m_experimentMeshBindings.end()) return false;
+
+	const experiment::Mesh* source = found->second.model->TryGetMesh(
+		experiment::MeshIndex{ found->second.meshIndex });
+	if (nullptr == source) return false;
+
+	const experiment::VertexBuffer& vertices = source->vertices;
+	const experiment::VertexAttributeMask mask = vertices.AttributeMask();
+	// D34a는 정적 수직 절단이다 — 스킨 레이아웃(BLENDINDICES uint 읽기와 스킨
+	// 3패스 전환)은 D34b가 픽셀 게이트와 함께 연다. 그 전에 열면 스킨 메시가
+	// float4 BLENDINDICES 레이아웃 PSO로 그려져 팔레트 밖을 짚는다.
+	if (0 != (mask & experiment::kSkinVertexAttributes)) return false;
+
+	const std::span<const std::byte> bytes = vertices.Bytes();
+	outView.data = bytes.data();
+	outView.bytes = bytes.size();
+	outView.stride = vertices.Stride();
+	outView.attributeMask = mask;
+	return outView.IsValid();
 }

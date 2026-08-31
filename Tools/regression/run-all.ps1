@@ -204,6 +204,15 @@ Run-Step "Experiment FT_Primitives 실제 draw" {
         (Join-Path $PSScriptRoot "verify-experiment-ft-primitives.ps1") -Exe $Exe -Work $Work
 }
 
+# I5-D34a: 정적 메시의 GPU 정점 출처가 experiment packed(48B)인지 실증한다.
+# 위 draw 게이트는 "그려진다"를, 이것은 "experiment 버퍼로 그려진다"를 잰다 —
+# 로드 관측([model.dual])과 업로드 관측(experiment 업로드 계수)을 분리하고
+# CREATOR_EXPERIMENT_VERTEX=0 대조군으로 드로우 동수를 확인한다.
+Run-Step "Experiment 정점 라이브(D34a)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-experiment-vertex-live.ps1") -Exe $Exe -Work $Work
+}
+
 # D2-d: 저장소의 저작 씬 14개를 원본에 쓰지 않고 외부 임시 트리로 두 번
 # 저장한다. 첫 저장 결과를 다시 열어 같은 이름으로 재저장했을 때 byte hash가
 # 같아야 하고, 실행 전후 원본 hash도 같아야 한다.

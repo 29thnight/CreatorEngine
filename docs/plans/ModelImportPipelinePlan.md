@@ -650,7 +650,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D1a ✅ | 역브리지 — `DataSystem::BuildLegacyModelFromExperiment`(experiment→legacy) + 왕복 게이트 | DataSystem | 없음(I6 은퇴) |
 | ↳ I5-D1b ✅ | 로더 이중화 — `LoadModelGUID`가 experiment(cooked→source) 로드→역브리지 소비, Assimp 폴백·경로 관측 | DataSystem | 없음 |
 | ↳ I5-D2 ✅ | V4 유도 정본 — mask→`RHIInputElement` 유도, `RHIFormat::RGBA8Uint` 신설, 전환 계약 게이트 (패스 전환은 D4와 동시로 정정) | RHI | 없음 |
-| ↳ I5-D34a | GBuffer 정적 수직 절단 — experiment mesh 병행 바인딩, 메시 캐시 이중화(DX12/Vulkan 대칭), VSIn 퍼뮤테이션+PSO 레이아웃 축, **FT 픽셀 판정** | 메시 캐시·GBuffer | 없음 |
+| ↳ I5-D34a ✅ | GBuffer 정적 수직 절단 — 병행 바인딩·캐시 대칭 이중화·VSIn 퍼뮤테이션+PSO 레이아웃 축·A/B 동수 게이트(FT 8/8) | 메시 캐시·GBuffer | 없음 |
 | ↳ I5-D34b | 스킨 전환 — GBuffer 스킨·Shadow·WireFrame, BLENDINDICES uint 읽기, **스킨 픽셀 게이트 신설** | 스킨 3패스 | 없음 |
 | ↳ I5-D34c | Forward 전환 — 기본 2-variant×레이아웃 축, ShaderMeta variant 축(SKIN keyword) | Forward | 없음 |
 | ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) | 렌더 초크포인트 | **소비자** 참조 감소 |
@@ -772,6 +772,46 @@ bytes+stride+마스크를 얻는다. legacy Mesh 본체는 무편집. `RHIMeshBi
 캐시/model.cache.build(legacy CPU 계층 — 폴백 경로와 함께 I6 판정). 재분해: D34a(GBuffer
 정적 수직 절단·FT 픽셀) → D34b(스킨 3패스+스킨 픽셀 게이트 신설) → D34c(Forward+
 ShaderMeta 축).
+
+**I5-D34a 완료 실측 (2026-08-31).** GBuffer 정적 수직 절단 — FT 정적 메시 8종의 GPU 정점
+출처가 experiment packed(48B)로 바뀌었다(`CREATOR_EXPERIMENT_VERTEX` A/B로 켬 8/끔 0,
+커버리지·밝기 동수). 절단선은 정찰대로: ① `RHIMeshBinding::vertexAttributeMask`(stride처럼
+데이터로 나름, 0=legacy 96B) ② `IRenderMeshCache`에 조회 주입 계약(`RHIExperimentVertexView`,
+**순수 가상** — 두 backend가 갈리면 컴파일이 막음) ③ DX12/Vulkan 캐시 대칭 이중화 +
+`experimentUploads` 계수(관측 없으면 "전부 legacy"와 같은 침묵) ④ DataSystem 병행 바인딩
+(`m_hashingMesh`→{`Model::Shared`, meshIndex} — 역브리지의 1:1 순서가 키, 계수 불일치면 등록
+전체 생략) — **스킨 마스크는 D34b까지 fail-closed**(열면 float4 BLENDINDICES PSO가 팔레트
+밖을 짚는다) ⑤ GBuffer.hlsl `EXPERIMENT_STATIC_VERTEX` 퍼뮤테이션(`bitangent =
+cross(N,T.xyz)*T.w` — modelbridge의 부호 보존 계약과 같은 결) ⑥ PSO 레이아웃 축: 기본
+request와 ShaderMeta variant **전부에 experiment 짝을 함께 생성**(variant 생성 시점에는 어떤
+메시가 올지 모른다 — 배치가 메시 마스크로 고름), 레이아웃은 D2 유도 정본에서
+(`BuildInputElements(kCoreVertexAttributes)` — 오프셋 재기재 금지) ⑦ Shadow는 **무수술 호환**
+(정적 PSO가 POSITION@0 하나 — 두 레이아웃에서 동일)이되 스킨 분류에 마스크 가드, Forward는
+D34c까지 fail-closed(스킵+로그 — FT 실측 포워드 드로우 0이라 제품 파급 0).
+
+★ **사고 1 — 블롭 재사용 dangling이 세 층 밖에서 터졌다.** `ApplyShaderMeta`가 experiment
+desc를 legacy와 **같은 `vsBlob`으로** 빌드해, legacy desc의 bytecode 포인터가 재할당으로 죽은
+메모리를 가리켰고 PSO 생성이 `E_INVALIDARG`. 증상은 "FT 라이브 전멸(드로우 0·광원 0)"이라
+원인(GBuffer ShaderMeta 적용 실패)에서 세 층 떨어져 있었다 — 이력 로그의 ERROR 한 줄이
+갈랐다. 원인 특정은 **경로 지정 stash 이분**(HEAD 초록 / 작업 트리 빨강 — PHASE 17 동시
+커밋을 먼저 의심했으나 무죄). desc는 블롭 내부 버퍼를 빌려 가리킨다 — 같은 변수 재사용 금지.
+
+★ **사고 2 — 관측 지점 오선정.** 첫 게이트는 `dx12.live` status를 관측했는데 `--script`
+헤드리스에서 라이브는 **프레임을 완성하지 않는다**(렌더 0프레임 실측 — present 부재).
+`dx12.scene` 오프라인 하네스로 옮기고 **하네스 캐시에도 같은 주입**을 걸었다 — 안 걸면
+하네스가 전부 legacy로 그려 "라이브 배선의 회귀 감시자"가 experiment 경로에 눈먼다.
+
+★ **사고 3 — 변이 2연속 거짓 초록, 이빨은 A/B 동수 단정에 있었다.** ① 마스크 무시(legacy
+PSO+experiment 버퍼)는 초록 — position/normal/uv 오프셋이 두 레이아웃에서 **동일**(0/12/24)
+하고 FT 재질에 노멀맵이 없어 tangent 파손이 원리적으로 안 보인다(→ **D34b 픽셀 게이트가
+노멀맵 재질을 포함해야 하는 이유**). ② POSITION 오프셋 +12는 커버리지 36706→2245로 그림이
+붕괴했는데도 초록 — 하네스 커버리지 단정이 "0이 아니다" 수준이었다. 게이트에 **on/off
+커버리지 동수(4d)·밝기 동수(4e)** 단정을 신설하자 ②가 정확히 붉었다(같은 씬·같은 카메라를
+두 경로로 그리므로 동수가 정의상 성립 — 언팩이 float 비트 보존이라 밝기도 문자열까지 동일).
+
+게이트: `verify-experiment-vertex-live.ps1` 신설(run-all 편입) — [model.dual](로드)와
+experiment 업로드 계수(GPU)를 분리 관측 + A/B 동수. 남김: 정적 픽셀 diff·노멀맵 축은 D34b
+스킨 픽셀 게이트와 함께, Forward 전환은 D34c.
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그
