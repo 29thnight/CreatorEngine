@@ -653,7 +653,13 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D34a ✅ | GBuffer 정적 수직 절단 — 병행 바인딩·캐시 대칭 이중화·VSIn 퍼뮤테이션+PSO 레이아웃 축·A/B 동수 게이트(FT 8/8) | 메시 캐시·GBuffer | 없음 |
 | ↳ I5-D34b ✅ | 스킨 전환 — GBuffer·Shadow 스킨 PSO(BLENDINDICES uint4), 스킨 A/B 동수 게이트(10/10 전량·42411 동수), m_Motion 폴백 (WireFrame은 실존 안 함) | 스킨 2패스 | 없음 |
 | ↳ I5-D34c ✅ | Forward 전환 — shade/reference×experiment PSO 4벌, core 유도 하나로 마스크 불문, forward 배치 게이트(3c) — SKIN keyword 축은 불요 판정 | Forward | 없음 |
-| ↳ I5-D4 | 직접 소비 — DX12MeshCache experiment 정점 업로드, `Model::Shared+MeshIndex` 어댑터(프록시·MeshRenderer·ModelSceneBridge 재작성) + D0a 이관(이벤트·루프를 Animator 소유로) + D0b 절단(postLoad GenerateLODs 재실행 제거) | 렌더 초크포인트 | **소비자** 참조 감소 |
+| ↳ I5-D4 | 직접 소비 — 아래 하위 분해(착수 정찰 2026-08-31 둘째) | 렌더 초크포인트 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4a ✅ | 죽은 소비 청산 — postLoad GenerateLODs 절단(D0b 이행)·PhysicsManager 죽은 정점 줄 제거 | 씬 로드·물리 | 없음 |
+| &nbsp;&nbsp;↳ D4b | 메시 핸들 병행 — `Model::Shared+MeshIndex` 페어를 MeshRenderer·프록시·캐시 키에, 인덱스·바운드도 experiment에서 | 렌더 사슬 | 없음 |
+| &nbsp;&nbsp;↳ D4c | 씬 경계 — m_Mesh 서브트리 read/write를 experiment 이름/인덱스 기반으로(스키마 유지), GetMeshShared 참조 제거 | 씬 직렬화 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4d | 인스턴스화 — ModelSceneBridge experiment 직행(parent 단일 순회 재작성) | 모델 배치 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4e | Animator experiment 직소비 + D0a 이관(이벤트·루프 Animator 소유) | 애니메이션 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
@@ -903,6 +909,34 @@ MeshRenderer postLoad가 GenerateLODs 재실행(MeshRenderer.cpp:372-380 — 버
 보고 내린 것이었다 — 표면 뒤의 소비 사슬과 실저작 데이터를 전수하면 하나는 이미 닫힌 갭
 (looping)+소유 이동 명세(이벤트)였고, 하나는 시체였다. 판정 슬라이스의 실비용은 구현이
 아니라 "누가 소비하고 데이터가 실존하는가"의 전수다.
+
+**I5-D4 착수 정찰 둘째 (2026-08-31) — 분해 근거.** 정찰이 계획을 두 번 고쳤다. ①
+"스위치 정본화" 후보 슬라이스는 **불요**: `CREATOR_EXPERIMENT_VERTEX`는 D34a가 이미
+default-on으로 넣었다(미설정=experiment, `0`만 opt-out) — 지목 대상이 이미 처리된
+[[plan-target-may-be-already-dead]]의 셋째 사례를 착수 확인이 잡았다. 스위치 **은퇴**만
+I6에 남는다. ② 물리는 D4 전환 대상이 **아니다**: `ConvexMeshColliderInfo::vertices`를
+채우는 코드가 엔진 전체에 0(nullptr·0으로 convex cook — PHASE 19 소관의 별개 결함)이고,
+PhysicsManager::AddCollider(Mesh)의 `GetVertices()`는 정점 배열을 **값 복사한 뒤 버리는
+죽은 줄**이다. ③ LOD 사슬은 D0b 판정보다도 넓게 죽어 있다: `m_isEnableLOD`→프록시
+`m_EnableLOD`까지 흘러가나 렌더 소비 0(프록시 파일 주석이 자백).
+
+m_Mesh 실소비자 전수(전환 대상): 바운드(GetBoundingBox — 컬링)·프록시(hasWorldBounds+
+렌더 아이템 mesh 포인터)·캐시(GetOrUpload — m_hashingMesh 정체성 키)·씬 스키마(이름
+해석 GetMeshShared(name)+writer 서브트리)·에디터 3파일·Foliage/Terrain(GetMeshShared(0)
+— D5). 최대 수술은 Animator/AnimationJob(legacy Skeleton·Animation 전면 순회)이라 D4e로
+고립하고, 역브리지 절단(D4f)은 에디터 패스스루(D5)까지 소비자 0이 된 뒤에만 가능하므로
+**D5 완료 선결**을 계약으로 박는다.
+
+**I5-D4a 완료 실측 (2026-08-31).** 죽은 소비 청산 — 편집은 소비자 2파일뿐(legacy 본체
+무편집). ① MeshRenderer postLoad의 `m_LODThresholds`→`GenerateLODs` 재실행 절단(D0b
+이행): 버려질 단순화를 매 로드마다 계산하던 분기인데, 코퍼스 전수 nil이라 **실행된 적
+없는 분기의 제거 = 행동 무변경**이다. 스키마 무변경(writer는 Mesh::reflect가 계속 적음).
+② PhysicsManager::AddCollider(Mesh)의 정점 값 복사 후 미사용 줄 제거 — m_Mesh null이면
+크래시하던 잠재 결함도 함께 사라진다. 검증: vertex-live A/B 그린(D34c 기준선과 동일 —
+업로드 10/10·드로우 9·커버리지 42411, **이 게이트의 저장·재로드 시나리오가 절단된
+postLoad를 정확히 지난다**)·FT draw·dx12 스윕 기준선 일치. 변이 증명 대신 무회귀 증명인
+이유: 제거 슬라이스의 판정은 "새 검사가 잡는가"가 아니라 "기존 세트가 여전히 초록인가"다
+([[dependency-proven-by-removal]] — 끊어 봐야 확정된다).
 
 ★ **V4는 I5-D에 묶는다 (2026-08-29 정정).** 입력 레이아웃 5곳과 셰이더 `VSIn` 4곳은 legacy
 `::Vertex`를 전제하므로, 렌더 경로가 `experiment::Model`을 직접 소비하기 시작하는 I5-D가 그

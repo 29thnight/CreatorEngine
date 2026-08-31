@@ -367,19 +367,12 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	if (model && getMeshNode)
 	{
 		m_Mesh = model->GetMeshShared(getMeshNode["m_name"].AsString());
-		if (m_Mesh)
-		{
-			const Authoring::ReadNode getLOD_Node = getMeshNode["m_LODThresholds"];
-			if (getLOD_Node)
-			{
-				std::vector<float> lodThresholds;
-				for (const auto threshold : getLOD_Node)
-				{
-					lodThresholds.push_back(threshold.As<float>());
-				}
-				m_Mesh->GenerateLODs(lodThresholds);
-			}
-		}
+		// I5-D4a(D0b 이행): m_LODThresholds → GenerateLODs 재실행을 절단했다.
+		// GenerateLODs는 MeshOptimizer 결과를 버리고(indexCount만 보관) 그
+		// 계수의 유일한 독자 HasLODs는 전 리포 호출자 0이다 — 매 로드마다
+		// 버려질 단순화를 계산하던 낭비. 스키마는 무변경: writer(Mesh::reflect)가
+		// m_LODThresholds를 계속 적고(코퍼스 전수 nil — 실행된 적 없는 분기),
+		// 여기서 읽지 않을 뿐이다. 미래 LOD는 렌더 파생 몫(D0b 판정).
 	}
 
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존

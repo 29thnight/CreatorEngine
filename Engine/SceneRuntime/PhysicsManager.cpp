@@ -559,8 +559,9 @@ void PhysicsManager::AddCollider(MeshColliderComponent* mesh)
 	auto& collisionTransform = convexMeshInfo.colliderInfo.collsionTransform;
 	FillPhysicsTransform(collisionTransform, transform);
 	ApplyScaledColliderOffset(collisionTransform, posOffset);
-	auto model = obj->GetComponent<MeshRenderer>();
-	auto modelVertices = model->m_Mesh->GetVertices();
+	// I5-D4a: MeshRenderer 정점의 값 복사 후 미사용(죽은 줄) 제거. convex cook에
+	// 정점을 채우는 코드는 엔진 전체에 없고(ConvexMeshColliderInfo::vertices는
+	// nullptr로 cook — PHASE 19 소관) m_Mesh가 null이면 여기서 죽기까지 했다.
 
 	mesh->SetMeshInfoMation(convexMeshInfo);
 }
