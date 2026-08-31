@@ -11,15 +11,25 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $assets = (Resolve-Path (Join-Path $root 'Dynamic_CPP\Assets')).Path
 $model = (Resolve-Path (Join-Path $assets 'Models\Prim_Cube.glb')).Path
 $modelMeta = $model + '.meta'
-$gbufferMeta = Join-Path $assets 'Shaders\DefaultPassShader\GBuffer.shadermeta.meta'
+# D5-b2c-3 이후 재질 manifest entry가 shaderAssetId 의존을 갖는다. Prim_Cube
+# 재질은 GBuffer만 참조하므로 GBuffer.shadermeta 하나가 cook 폐포를 닫는다.
+$gbufferShaderMeta = Join-Path $assets 'Shaders\DefaultPassShader\GBuffer.shadermeta'
+$gbufferMeta = $gbufferShaderMeta + '.meta'
+# 재질 cook은 --shadermeta 인자와 별개로 asset root의 잘 알려진 경로에서
+# Forward sidecar도 읽고(shader.forward), shadermeta cook은 sourceGuid가
+# 가리키는 source 셰이더(.hlsl)와 그 sidecar까지 검증한다. fixture에 이들이
+# 없으면 cook이 거부된다.
 $forwardMeta = Join-Path $assets 'Shaders\DefaultPassShader\Forward.shadermeta.meta'
+$gbufferHlsl = Join-Path $assets 'Shaders\DefaultPassShader\GBuffer.hlsl'
+$gbufferHlslMeta = $gbufferHlsl + '.meta'
 
 if (-not (Test-Path -LiteralPath $AssetCooker -PathType Leaf)) {
     "AssetCooker가 없다: $AssetCooker"
     exit 1
 }
 
-$sourcePaths = @($model, $modelMeta, $gbufferMeta, $forwardMeta)
+$sourcePaths = @($model, $modelMeta, $gbufferShaderMeta, $gbufferMeta, $forwardMeta,
+    $gbufferHlsl, $gbufferHlslMeta)
 $sourceHashes = @{}
 foreach ($path in $sourcePaths) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -39,6 +49,15 @@ if (-not $guidMatch.Success) {
 $modelGuid = $guidMatch.Groups[1].Value
 $expectedArtifact = "Derived/Models/$($modelGuid.Substring(0, 2))/$modelGuid.cemc"
 
+$gbufferMetaText = Get-Content -LiteralPath $gbufferMeta -Raw
+$gbufferGuidMatch = [regex]::Match($gbufferMetaText,
+    '(?m)^guid:\s*([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\s*$')
+if (-not $gbufferGuidMatch.Success) {
+    'GBuffer shadermeta sidecar의 canonical UUIDv4를 읽지 못했다.'
+    exit 1
+}
+$gbufferGuid = $gbufferGuidMatch.Groups[1].Value
+
 $run = Join-Path $Work ("CE_D5AssetCooker_" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $run -Force | Out-Null
 
@@ -46,7 +65,8 @@ function Invoke-AssetCooker {
     param(
         [string]$AssetsRoot,
         [string]$OutputRoot,
-        [string]$ModelPath
+        [string]$ModelPath,
+        [string]$ShaderMetaPath
     )
 
     $start = [Diagnostics.ProcessStartInfo]::new()
@@ -59,7 +79,8 @@ function Invoke-AssetCooker {
     foreach ($argument in @(
         '--asset-root', $AssetsRoot,
         '--output', $OutputRoot,
-        '--model', $ModelPath)) {
+        '--model', $ModelPath,
+        '--shadermeta', $ShaderMetaPath)) {
         [void]$start.ArgumentList.Add($argument)
     }
 
@@ -112,8 +133,10 @@ function Test-SameSnapshot {
 
 $outputA = Join-Path $run 'output-a'
 $outputB = Join-Path $run 'output-b'
-$first = Invoke-AssetCooker -AssetsRoot $assets -OutputRoot $outputA -ModelPath $model
-$second = Invoke-AssetCooker -AssetsRoot $assets -OutputRoot $outputB -ModelPath $model
+$first = Invoke-AssetCooker -AssetsRoot $assets -OutputRoot $outputA -ModelPath $model `
+    -ShaderMetaPath $gbufferShaderMeta
+$second = Invoke-AssetCooker -AssetsRoot $assets -OutputRoot $outputB -ModelPath $model `
+    -ShaderMetaPath $gbufferShaderMeta
 
 $snapshotA = Get-TreeSnapshot -Path $outputA
 $snapshotB = Get-TreeSnapshot -Path $outputB
@@ -125,12 +148,16 @@ $manifestExists = Test-Path -LiteralPath $manifestPath -PathType Leaf
 $artifactBytes = if ($artifactExists) { (Get-Item -LiteralPath $artifactPath).Length } else { 0 }
 $manifestBytes = if ($manifestExists) { (Get-Item -LiteralPath $manifestPath).Length } else { 0 }
 
-$summaryPattern = 'asset-cooker models=1 materials=1 embeddedTextures=1 textureReferences=1 manifestEntries=2 artifactBytes=(\d+) manifest=Derived/asset-manifest\.cemf'
+# manifestEntries=4: model + material + embedded texture + shadermeta.
+# files=4: model CEMC + embedded texture + cooked shadermeta + manifest.
+$summaryPattern = 'asset-cooker models=1 materials=1 embeddedTextures=1 textureReferences=1 externalTextureRefs=0 embeddedTextureBytes=\d+ textures=0 shaderMetas=1 standaloneMaterials=0 standaloneMaterialBytes=0 scenes=0 prefabs=0 sceneBytes=0 legacyTextureNameRefs=0 unproducedGuidRefs=0 artifactPaths=3 files=4 manifestEntries=4 artifactBytes=(\d+) textureBytes=0 shaderMetaBytes=\d+ manifest=Derived/asset-manifest\.cemf'
 $modelPattern = "asset-cooker model=$([regex]::Escape($modelGuid)) artifact=$([regex]::Escape($expectedArtifact))"
+$shaderMetaPattern = "asset-cooker shadermeta=$([regex]::Escape($gbufferGuid)) "
 $successSummaries = @($first, $second | Where-Object {
     $_.ExitCode -eq 0 -and
     [regex]::IsMatch($_.Stdout, $summaryPattern) -and
-    [regex]::IsMatch($_.Stdout, $modelPattern)
+    [regex]::IsMatch($_.Stdout, $modelPattern) -and
+    [regex]::IsMatch($_.Stdout, $shaderMetaPattern)
 }).Count
 $unexpectedStderr = @($first, $second | Where-Object {
     -not [string]::IsNullOrWhiteSpace($_.Stderr)
@@ -143,15 +170,20 @@ $relocatedShaderDir = Join-Path $relocatedAssets 'Shaders\DefaultPassShader'
 New-Item -ItemType Directory -Path $relocatedModelDir -Force | Out-Null
 New-Item -ItemType Directory -Path $relocatedShaderDir -Force | Out-Null
 $relocatedModel = Join-Path $relocatedModelDir 'Prim_Cube.glb'
+$relocatedShaderMeta = Join-Path $relocatedShaderDir 'GBuffer.shadermeta'
 Copy-Item -LiteralPath $model -Destination $relocatedModel
 Copy-Item -LiteralPath $modelMeta -Destination ($relocatedModel + '.meta')
-Copy-Item -LiteralPath $gbufferMeta `
-    -Destination (Join-Path $relocatedShaderDir 'GBuffer.shadermeta.meta')
+Copy-Item -LiteralPath $gbufferShaderMeta -Destination $relocatedShaderMeta
+Copy-Item -LiteralPath $gbufferMeta -Destination ($relocatedShaderMeta + '.meta')
 Copy-Item -LiteralPath $forwardMeta `
     -Destination (Join-Path $relocatedShaderDir 'Forward.shadermeta.meta')
+Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $relocatedShaderDir 'GBuffer.hlsl')
+Copy-Item -LiteralPath $gbufferHlslMeta `
+    -Destination (Join-Path $relocatedShaderDir 'GBuffer.hlsl.meta')
 $relocatedOutput = Join-Path $run 'relocated-output'
 $relocated = Invoke-AssetCooker -AssetsRoot $relocatedAssets `
-    -OutputRoot $relocatedOutput -ModelPath $relocatedModel
+    -OutputRoot $relocatedOutput -ModelPath $relocatedModel `
+    -ShaderMetaPath $relocatedShaderMeta
 $relocatedSnapshot = Get-TreeSnapshot -Path $relocatedOutput
 $relocationDeterministic = $relocated.ExitCode -eq 0 -and
     (Test-SameSnapshot -Left $snapshotA -Right $relocatedSnapshot)
@@ -165,7 +197,7 @@ $longParent = $longParentBase + ('x' * [Math]::Max(1, 160 - $longParentBase.Leng
 New-Item -ItemType Directory -Path $longParent -Force | Out-Null
 $longOutput = Join-Path $longParent 'Assets'
 $longPathRun = Invoke-AssetCooker -AssetsRoot $assets `
-    -OutputRoot $longOutput -ModelPath $model
+    -OutputRoot $longOutput -ModelPath $model -ShaderMetaPath $gbufferShaderMeta
 $longPathSnapshot = Get-TreeSnapshot -Path $longOutput
 $longPathDeterministic = $longPathRun.ExitCode -eq 0 -and
     (Test-SameSnapshot -Left $snapshotA -Right $longPathSnapshot)
@@ -174,7 +206,8 @@ $longPathUnexpectedStderr =
 
 # 이미 게시된 디렉터리는 덮어쓰지 않고 원래 tree를 그대로 보존해야 한다.
 $beforeExistingReject = Get-TreeSnapshot -Path $outputA
-$existingReject = Invoke-AssetCooker -AssetsRoot $assets -OutputRoot $outputA -ModelPath $model
+$existingReject = Invoke-AssetCooker -AssetsRoot $assets -OutputRoot $outputA -ModelPath $model `
+    -ShaderMetaPath $gbufferShaderMeta
 $afterExistingReject = Get-TreeSnapshot -Path $outputA
 $existingOutputRejected = $existingReject.ExitCode -ne 0 -and
     (Test-SameSnapshot -Left $beforeExistingReject -Right $afterExistingReject)
@@ -182,7 +215,7 @@ $existingOutputRejected = $existingReject.ExitCode -ne 0 -and
 # Assets 아래로 cook output을 쓰려는 요청은 디렉터리조차 만들지 않는다.
 $insideAssetsOutput = Join-Path $assets ('.asset-cooker-reject-' + [guid]::NewGuid().ToString('N'))
 $insideAssetsReject = Invoke-AssetCooker -AssetsRoot $assets `
-    -OutputRoot $insideAssetsOutput -ModelPath $model
+    -OutputRoot $insideAssetsOutput -ModelPath $model -ShaderMetaPath $gbufferShaderMeta
 $insideAssetsRejected = $insideAssetsReject.ExitCode -ne 0 -and
     -not (Test-Path -LiteralPath $insideAssetsOutput)
 
@@ -193,16 +226,22 @@ $fixtureShaderDir = Join-Path $fixtureAssets 'Shaders\DefaultPassShader'
 New-Item -ItemType Directory -Path $fixtureModelDir -Force | Out-Null
 New-Item -ItemType Directory -Path $fixtureShaderDir -Force | Out-Null
 $fixtureModel = Join-Path $fixtureModelDir 'Prim_Cube.glb'
+$fixtureShaderMeta = Join-Path $fixtureShaderDir 'GBuffer.shadermeta'
 Copy-Item -LiteralPath $model -Destination $fixtureModel
-Copy-Item -LiteralPath $gbufferMeta -Destination (Join-Path $fixtureShaderDir 'GBuffer.shadermeta.meta')
+# shadermeta 입력은 온전하게 두어 이 검사의 유일한 결함이 손상 model sidecar가
+# 되도록 한다 — shadermeta 부재가 거부 원인을 가리면 안 된다.
+Copy-Item -LiteralPath $gbufferShaderMeta -Destination $fixtureShaderMeta
+Copy-Item -LiteralPath $gbufferMeta -Destination ($fixtureShaderMeta + '.meta')
 Copy-Item -LiteralPath $forwardMeta -Destination (Join-Path $fixtureShaderDir 'Forward.shadermeta.meta')
+Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $fixtureShaderDir 'GBuffer.hlsl')
+Copy-Item -LiteralPath $gbufferHlslMeta -Destination (Join-Path $fixtureShaderDir 'GBuffer.hlsl.meta')
 $invalidMeta = $modelMetaText -replace
     '(?m)^guid:\s*[0-9a-f-]+\s*$',
     'guid: 68b21a01-958e-14ed-8820-a2b9aa289587'
 Set-Content -LiteralPath ($fixtureModel + '.meta') -Value $invalidMeta -Encoding UTF8
 $invalidOutput = Join-Path $run 'invalid-output'
 $invalidReject = Invoke-AssetCooker -AssetsRoot $fixtureAssets `
-    -OutputRoot $invalidOutput -ModelPath $fixtureModel
+    -OutputRoot $invalidOutput -ModelPath $fixtureModel -ShaderMetaPath $fixtureShaderMeta
 $invalidSidecarRejected = $invalidReject.ExitCode -ne 0 -and
     -not (Test-Path -LiteralPath $invalidOutput)
 
@@ -227,7 +266,7 @@ $passed = $successSummaries -eq 2 -and
     $deterministic -and
     $relocationDeterministic -and
     $longPathDeterministic -and
-    $snapshotA.Count -eq 2 -and
+    $snapshotA.Count -eq 4 -and
     $artifactExists -and $artifactBytes -gt 0 -and
     $manifestExists -and $manifestBytes -gt 0 -and
     $existingOutputRejected -and

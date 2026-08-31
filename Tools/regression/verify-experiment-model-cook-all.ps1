@@ -30,6 +30,17 @@ if (-not (Test-Path -LiteralPath $AssetCooker -PathType Leaf)) {
     "AssetCooker가 없다: $AssetCooker"
     exit 1
 }
+
+# D5-b2c-3 이후 재질 manifest entry가 shaderAssetId 의존을 갖는다. 실측
+# (2026-08-30) 결과 14개 모델 재질 전부 GBuffer만 참조하므로 GBuffer.shadermeta
+# 하나가 전수 cook 폐포를 닫는다. 새 shader를 참조하는 모델이 늘면 여기 실패한다.
+$gbufferShaderMeta = Join-Path $assets 'Shaders\DefaultPassShader\GBuffer.shadermeta'
+foreach ($path in @($gbufferShaderMeta, ($gbufferShaderMeta + '.meta'))) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        "shadermeta producer 입력이 없다: $path"
+        exit 1
+    }
+}
 if ($trackedModels.Count -eq 0) {
     'tracked model corpus가 비어 있다.'
     exit 1
@@ -49,6 +60,9 @@ if ($missingTrackedModels.Count -gt 0) {
 $uuidV4Pattern = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 $allIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $sourceHashes = @{}
+foreach ($path in @($gbufferShaderMeta, ($gbufferShaderMeta + '.meta'))) {
+    $sourceHashes[$path] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+}
 $materialCount = 0
 $embeddedTextureCount = 0
 foreach ($model in $models) {
@@ -169,7 +183,8 @@ foreach ($model in $models) {
     $cookArguments.Add('--model')
     $cookArguments.Add($model.FullName)
 }
-
+$cookArguments.Add('--shadermeta')
+$cookArguments.Add($gbufferShaderMeta)
 $outputA = Join-Path $run 'output-a'
 $outputB = Join-Path $run 'output-b'
 $firstArguments = [Collections.Generic.List[string]]::new()
@@ -189,8 +204,11 @@ $deterministic = Test-SameSnapshot -Left $snapshotA -Right $snapshotB
 $artifacts = @(Get-ChildItem -LiteralPath (Join-Path $outputA 'Derived\Models') `
     -File -Filter '*.cemc' -Recurse)
 $manifest = Join-Path $outputA 'Derived\asset-manifest.cemf'
-$manifestEntries = $models.Count + $materialCount
-$summaryPattern = "asset-cooker models=$($models.Count) materials=$materialCount embeddedTextures=$embeddedTextureCount textureReferences=(\d+) manifestEntries=$manifestEntries artifactBytes=(\d+) manifest=Derived/asset-manifest\.cemf"
+# manifest entry = model + material + embedded texture + shadermeta(1).
+# 게시 파일 = model CEMC + embedded texture + cooked shadermeta(1) + manifest.
+$manifestEntries = $models.Count + $materialCount + $embeddedTextureCount + 1
+$expectedFiles = $models.Count + $embeddedTextureCount + 1 + 1
+$summaryPattern = "asset-cooker models=$($models.Count) materials=$materialCount embeddedTextures=$embeddedTextureCount textureReferences=(\d+) externalTextureRefs=0 embeddedTextureBytes=(\d+) textures=0 shaderMetas=1 standaloneMaterials=0 standaloneMaterialBytes=0 scenes=0 prefabs=0 sceneBytes=0 legacyTextureNameRefs=0 unproducedGuidRefs=0 artifactPaths=$($expectedFiles - 1) files=$expectedFiles manifestEntries=$manifestEntries artifactBytes=(\d+) textureBytes=0 shaderMetaBytes=(\d+) manifest=Derived/asset-manifest\.cemf"
 $successRuns = @($first, $second | Where-Object {
     $_.ExitCode -eq 0 -and [regex]::IsMatch($_.Stdout, $summaryPattern)
 }).Count
@@ -261,7 +279,7 @@ $manifestBytes = if (Test-Path -LiteralPath $manifest -PathType Leaf) {
 "models=$($models.Count) materials=$materialCount embeddedTextures=$embeddedTextureCount globalIds=$($allIds.Count) successRuns=$successRuns deterministic=$deterministic files=$($snapshotA.Count) artifacts=$($artifacts.Count) artifactBytes=$artifactBytes manifestBytes=$manifestBytes refreshValid=$refreshValid duplicateTransactionRejected=$duplicateTransactionRejected sourceMutations=$($sourceMutations.Count) unexpectedStderr=$unexpectedStderr"
 
 $passed = $successRuns -eq 2 -and $deterministic -and
-    $snapshotA.Count -eq ($models.Count + 1) -and
+    $snapshotA.Count -eq $expectedFiles -and
     $artifacts.Count -eq $models.Count -and
     $artifactBytes -gt 0 -and $manifestBytes -gt 0 -and
     $refreshValid -and $duplicateTransactionRejected -and
