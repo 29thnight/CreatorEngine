@@ -934,6 +934,65 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
 
 ---
 
+### §12-E — 슬라이스 공수 산정 (2026-09-01 · `4-6` 이행)
+
+`SRP-0`~`SRP-6`와 `PBR-S0`~`PBR-S8`은 이 계획서가 "공수는 4-6에서 확정한다"고 미뤄 둔
+채 대시보드에 **한 행도 없었다**. 산정했다. 순서·합계의 정본은
+[`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §8이고, 여기에는 **표면 실측**을 남긴다.
+
+#### 산정 전 실측 — 셋이 순진한 추정을 뒤집었다
+
+| 항목 | 실측 | 영향 |
+|---|---|---|
+| `SRP-3` Visual Shader Graph | `imgui-node-editor` 벤더링됨 · `Editor/ImGuiHelper/NodeEditor.cpp`(336) + `BlueprintBuilder.cpp`(300) 존재 · **BT 에디터가 그 위에서 이미 그래프를 저작**(`BTEditorBridge.h`·`InspectorWindow.cpp`) | **그린필드가 아니다.** 남는 본체는 `.shadergraph` 스키마와 codegen |
+| `SRP-2` Slang Code 모드 | `RHIShaderCompiler.cpp` 1,299줄에 Slang global session·reflection이 이미 붙어 있다(`slang::` 94회 · M1B/M7 산출) | **컴파일러 기반 존재.** 남는 것은 source/module/import 계약·cache identity·packaging 분류 |
+| `PBR-S2` 공용 모듈 이관 | `Deferred.hlsl`(272)·`ForwardShade.hlsl`(520)의 **공유 함수는 5개뿐** — `DistributionGGX`·`FresnelSchlick`·`VisibilitySmith`·`SampleShadow`·`SampleShadowCascade` | **수식 통합은 작다.** `MaterialInputs → StandardSurface` 구조 도입이 본체 |
+| `PBR-S7` 확장 lobe | lobe 여섯이 각각 property + 셰이더 + 골든을 따로 요구한다 | **한 슬라이스가 아니라 여섯이다**(아래 분해). 하나로 두면 `I5`·`I6`의 5배 과소산정 재발 |
+| `PBR-S5` 그림자 | `EnhancedShadowPass.cpp` 768줄 · cascade 접촉 43곳 존재, **point/spot atlas는 신설** | atlas가 슬라이스의 절반 |
+
+#### 산정
+
+| 슬라이스 | 공수 | 근거가 되는 표면 |
+|---|---:|---|
+| `SRP-0` | 4일 | `EnhancedLivePipelineDesc` 574줄이 nodes/reads/writes/modifies 보유 · 안정 ID는 Serialization D2/D5 재사용 · 렌더 없이 닫힌다 |
+| `SRP-1` | 8일 | `EnhancedSceneRenderer.cpp:1865~2368` ~500줄 · `AddNode` 15곳 · `pipeline.nodes` dump가 관측면 |
+| `SRP-2` | 7일 | 위 · packaging 분류가 `BuildPipelinePlan`과 물린다 |
+| `SRP-3` | 10일 | 위 · codegen이 본체 |
+| `SRP-4` | 5일 | Compute PSO 존재(3-4) · 뷰별 history는 `MultiCameraRenderPlan` 결정 완료 |
+| `SRP-5` | 6일 | 리로드·generation retirement는 M5-C가 닫음 · C# 값 경계는 `I6-D2`가 선행 |
+| `SRP-6` | 3일 | 정적 registry 하나 + 확장점 · 외부 ABI 비목표 |
+| **SRP 합** | **43일** | |
+| `PBR-S0` | **0** | `BASE-0`에 흡수 |
+| `PBR-S1` | 4일 | 진입점 3종 1,061줄 · **시각 변화 0이 조건**이라 골든이 자 |
+| `PBR-S2` | 5일 | 위 |
+| `PBR-S3` | 9일 | 항목 9종이 **importer부터 셰이더까지** 걸치고 각각 시각이 바뀐다 |
+| `PBR-S4` | 8일 | `IblBrdf`(108)·`IblPrefilter`(101) 존재 · **local reflection probe 신설**이 본체 |
+| `PBR-S5` | 10일 | 위 |
+| `PBR-S6` | 6일 | `PostChainUber.hlsl`(138)+`EnhancedPostChainPass.cpp`(457) · 세 기능 각각 독립 A/B |
+| `PBR-S7` | 15일 | **분해:** S7a specular/IOR 2 · S7b clearcoat 2 · S7c sheen 1.5 · S7d anisotropy 2 · S7e iridescence/dispersion 2.5 · **S7f transmission/volume 5**(refraction path) |
+| `PBR-S8` | 5일 | SRP-3이 codegen 기반 제공 · generated/authored parity |
+| **PBR-S 합** | **62일** | |
+
+#### ★ 산정 중 드러난 중복 — `SRP-1`과 트랙 `RG5`가 같은 500줄을 만진다
+
+`RG5`는 "**기본 19개 node**와 제품 28곳의 접근 선언 이관"(12일), `SRP-1`은 "현재 C++
+파이프라인 **19개 노드**를 authored Pass Stack으로 기술"(8일)이다. 대상이 같은
+`EnhancedSceneRenderer.cpp:1865~2368`이고, 따로 하면 같은 코드를 두 번 옮긴 뒤 그 사이
+기간 동안 두 표현이 병행한다 — `I5`→`I6`에서 **병행이 은퇴 대상을 늘린** 그 자리다.
+
+**제안: `RG5`+`SRP-1`을 한 슬라이스로 병합**(20일 → 15일). 결정 시점은 `RG5` 착수이며,
+위 합계에는 병합 전 값을 그대로 두었다.
+
+#### 산정하지 않은 것
+
+`4-2`~`4-5`의 **구현** 공수는 여전히 미산정이다. 세울 수 없어서가 아니라 **슬라이스가
+아직 없기 때문**이다 — 그 넷은 구상 게이트이고 **게이트의 산출물이 곧 분해**다.
+분해 없이 숫자를 붙이면 `I5`(5일 → 40슬라이스)와 `I6`(5일 → 24일)가 겪은 5배
+과소산정을 세 번째로 반복한다. 이 저장소에서 **미분해 산정은 두 번 다 5배 틀렸고,
+분해된 산정은 아직 반증되지 않았다.**
+
+---
+
 ## 13. 완료 기준
 
 1. **기본 파이프라인 무회귀** — Pipeline Asset이 현재 19개 노드의 이름·순서·슬롯을

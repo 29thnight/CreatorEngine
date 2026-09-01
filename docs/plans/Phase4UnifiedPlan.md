@@ -332,7 +332,9 @@ T7  4-2~4-6 설계 게이트 · RG9 · SRP-0~6 · PBR-S0~S8 (§8 미산정 백�
 | T4 `Q0` | **미산정** | RG8 25일에서 분리할 몫 |
 | T6 `L1~L7` | 33일 | |
 | T7 설계 게이트 `4-2~4-6` | 6.5일 | **구상만**이다 |
-| **잔여 합계** | **193.5일** | |
+| T7 `SRP-0~6` 레인 | **43일** | 2026-09-01 `4-6` 산정 (§8) |
+| T7 `PBR-S1~S8` 레인 | **62일** | 2026-09-01 `4-6` 산정 (§8) |
+| **잔여 합계** | **298.5일** | 대시보드 기준 292.5일 (차이 6일 = §5.2) |
 
 ### 5.2 대시보드의 235.5일과 어떻게 다른가
 
@@ -345,34 +347,37 @@ T7  4-2~4-6 설계 게이트 · RG9 · SRP-0~6 · PBR-S0~S8 (§8 미산정 백�
 
 | 축 | 값 |
 |---|---:|
-| 대시보드 활성 행 합계 (39행 · `stopped` 제외) | **235.5일** |
+| 대시보드 활성 행 합계 (**54행** · `stopped` 제외) | **340.5일** |
 | − 이미 완료된 13행 | −45일 |
 | − 진행 중 행의 기납입분 (`I6` 1 · `I7` 2) | −3일 |
-| **= 대시보드 기준 잔여** | **187.5일** |
+| **= 대시보드 기준 잔여** | **292.5일** |
 | + 대시보드에 행이 없는 마감 항목 (`I-fin` 2 · `V-fin` 2) | +4일 |
 | + `I7`을 잔여 4일 전량으로 보는 차이 | +2일 |
-| **= 이 문서 §4 기준 잔여** | **193.5일** |
+| **= 이 문서 §4·§8 기준 잔여** | **298.5일** |
 
-### 5.3 ★ 그런데 235.5도 193.5도 **페이즈 규모가 아니다**
+> **2026-09-01 `4-6` 산정 반영 전 값**: 39행 235.5일 · 잔여 187.5/193.5일. 백로그 15행
+> (SRP 43 + PBR-S 62 = 105일)이 세워지며 위 값으로 바뀌었다.
 
-둘 다 **분해가 끝난 트랙만** 센 수다. 안 세어진 것이 이렇게 남는다.
+### 5.3 안 세어진 몫 — **`4-6` 산정으로 대부분 닫혔다 (2026-09-01)**
+
+아래는 산정 전 목록이며, `SRP`·`PBR-S` 15슬라이스는 §8에서 **세웠다**. 남은 미산정은
+`Q0`과 `4-2~4-5` 구현 **둘뿐**이다.
 
 | 안 세어진 것 | 상태 |
 |---|---|
-| `SRP-0`~`SRP-6` (7슬라이스) | **미산정** — Pipeline Asset schema · 19 node authored 이관 · Slang Code 모드 · **Visual Shader Graph 에디터** · Compute/RendererList/history · variant/hot reload · 소스 Native Pass |
-| `PBR-S1`~`PBR-S8` (8슬라이스) | **미산정** — 공용 모듈 동등 이관 · glTF 의미 교정 · 에너지/IBL · 그림자 · display/post · 확장 lobe · Graph codegen |
-| `4-2`~`4-5`의 **구현** | **미산정** — GPU-driven · Stochastic Tile Lighting · DXR · DLSS. 위에서 센 6.5일은 **구상 게이트뿐**이다 |
-| `Q0` | **미산정** |
+| `SRP-0`~`SRP-6` (7슬라이스) | ✅ **산정 완료 43일** (§8.2) |
+| `PBR-S1`~`PBR-S8` (8슬라이스) | ✅ **산정 완료 62일** (§8.3 · `PBR-S7`은 여섯으로 분해) |
+| `4-2`~`4-5`의 **구현** | **미산정** — 슬라이스가 아직 없다. 그 넷은 구상 게이트이고 **게이트의 산출물이 곧 분해**다(§8.5) |
+| `Q0` | **미산정** — `RG8` 25일에서 분리할 몫 |
 | `BASE-0`의 SRP-G0 live 재생 배관 | 잠정 6일에 미포함 |
 
-**이 페이즈의 이름은 "차세대 GPU 렌더링 기능"인데, 그 네 기능의 구현 공수가 0일로
-들어 있다.** 비교할 유일한 실측 기준은 트랙 RG다 — 서브시스템 **하나**의 스케줄링
-재작업이 117일이었다. 미산정 15슬라이스 중에는 그와 같거나 더 큰 것이 여럿 있다
-(Visual Shader Graph 에디터 · PBR 재작성 레인 · GPU-driven). **세지 않은 몫이 세어진
-몫보다 클 가능성이 높다** — 이것은 판단이지 측정이 아니고, 확정하는 것이 `4-6`의 일이다.
+산정 전 나는 "세지 않은 몫이 세어진 몫보다 클 공산이 크다"고 적었다. **재고 나니
+절반쯤 맞았다** — 백로그는 105일로 세어진 193.5일보다 작았다. 표면 실측이 셋을
+내렸기 때문이다(§8.1). 다만 방향은 맞았다: 페이즈 규모가 235.5 → 340.5로 **45% 늘었다.**
 
-따라서 대시보드의 235.5일을 "PHASE 4의 크기"로 읽으면 안 된다. 지금 말할 수 있는 것은
-**"분해가 끝난 몫의 잔여가 193.5일이고, 페이즈 전체 규모는 아직 모른다"**뿐이다.
+남은 `4-2~4-5` 구현은 여전히 미지수이고, 비교 기준인 트랙 RG가 **서브시스템 하나에
+117일**이었음을 보면 네 GPU 기능의 구현이 이 페이즈에서 가장 큰 몫일 가능성이 높다.
+**지금 말할 수 있는 것은 "잔여 298.5일 + 네 GPU 기능의 구현(미지)"이다.**
 
 ---
 
@@ -433,33 +438,94 @@ T7  4-2~4-6 설계 게이트 · RG9 · SRP-0~6 · PBR-S0~S8 (§8 미산정 백�
 
 ---
 
-## 8. 미산정 백로그 — `4-6`에서 공수를 확정한다
+## 8. 백로그 공수 산정 — `4-6` 이행 (2026-09-01)
 
-대시보드에 **한 행도 없던** 16슬라이스다. 이것들이 서지 않으면 PHASE 4는 닫히지 않는다.
+대시보드에 **한 행도 없던** 16슬라이스를 산정했다. 정본 표면 실측은
+[`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) §12-E.
 
-| 레인 | 슬라이스 | 선행 |
-|---|---|---|
-| SRP | `SRP-0` Blueprint schema·순수 검증기 | BASE-0 |
-| | `SRP-1` 19 node authored Pass Stack·픽셀 동등 컴파일 | SRP-0, RG5 |
-| | `SRP-2` Slang Code 모드 + Fullscreen Custom Pass | SRP-1 |
-| | `SRP-3` 최소 Visual Shader Graph | SRP-2 |
-| | `SRP-4` Compute·RendererList·history | SRP-2 |
-| | `SRP-5` variant·hot reload·preview·선택적 C# 값 | SRP-4 |
-| | `SRP-6` 소스 Native Pass 연결 | SRP-5 |
-| PBR-S | `PBR-S0` 기준선 | **BASE-0에 흡수** |
-| | `PBR-S1` native Slang 기반 | SRP-2 |
-| | `PBR-S2` 공용 모듈 동등 이관 | PBR-S1, **M6 ✅** |
-| | `PBR-S3` glTF 의미 교정 | **`D2/D5-b` ✅ → `I5`/`V4` ✅** — 선행이 이미 닫혔다 |
-| | `PBR-S4` 에너지·IBL | PBR-S3 |
-| | `PBR-S5` 그림자 | PBR-S3 |
-| | `PBR-S6` display/post (AgX·auto exposure·bloom) | PBR-S3 |
-| | `PBR-S7` 확장 lobe | PBR-S4 |
-| | `PBR-S8` Shader Graph codegen | SRP-3, PBR-S7 |
-| GPU 기능 | `4-2`~`4-5`의 **구현** 공수 (구상만 산정돼 있다) | 4-6 |
+### 8.1 산정 전에 잰 것 — 표면 실측이 순진한 추정을 세 번 뒤집었다
 
-★ `PBR-S3`의 선행(`D2/D5-b → I5/V4`)은 **2026-09-01 기준 이미 전부 닫혔다**
-(`SerializationPlan` D5-b2c ✅ · `I5-D` ✅). 백로그 중 착수 가능 상태에 가장
-가까운 슬라이스다.
+| 실측 | 결과 |
+|---|---|
+| **`SRP-3` 최소 Visual Shader Graph** | **그린필드가 아니다.** `imgui-node-editor`가 벤더링돼 있고 `Editor/ImGuiHelper/NodeEditor.cpp`(336) + `BlueprintBuilder.cpp`(300)이 서 있으며, **BT 에디터가 이 위에서 이미 그래프를 저작한다**(`BTEditorBridge.h` · `InspectorWindow.cpp`). 남는 본체는 `.shadergraph` 스키마와 **codegen**이다 |
+| **`SRP-2` Slang Code 모드** | **컴파일러 기반이 이미 있다.** `RHIShaderCompiler.cpp` 1,299줄에 Slang global session·reflection이 M1B/M7로 붙어 있다(`slang::` 94회). 남는 것은 source/module/import 계약 · cache identity · packaging 분류다 |
+| **`PBR-S2` 공용 모듈 동등 이관** | **중복이 작다.** `Deferred.hlsl`(272)과 `ForwardShade.hlsl`(520)이 공유하는 함수는 실측 **5개**뿐이다 — `DistributionGGX` · `FresnelSchlick` · `VisibilitySmith` · `SampleShadow` · `SampleShadowCascade`. 수식 통합이 아니라 `MaterialInputs → StandardSurface` 구조 도입이 본체다 |
+
+반대로 **키운** 것도 있다.
+
+| 실측 | 결과 |
+|---|---|
+| **`PBR-S7` 확장 lobe** | 한 슬라이스가 아니라 **여섯**이다(specular/IOR · clearcoat · sheen · anisotropy · iridescence/dispersion · transmission/volume). 각각 material property + 셰이더 + 골든이 따로 붙는다. 하나로 두면 `I5`·`I6`가 겪은 **미분해 과소산정(5배)**을 반복한다 |
+| **`PBR-S5` 그림자** | `EnhancedShadowPass.cpp` 768줄에 cascade 접촉 43곳이 이미 있는데, **point/spot atlas는 신설**이다. 그 몫이 슬라이스의 절반이다 |
+
+### 8.2 산정 — SRP 레인 43일
+
+| 슬라이스 | 표면 | 공수 |
+|---|---|---:|
+| `SRP-0` Blueprint schema·순수 검증기 | `EnhancedLivePipelineDesc` 574줄이 nodes/reads/writes/modifies를 이미 든다. 안정 ID·직렬화는 SerializationPlan D2/D5 계약 재사용. **렌더 없이 닫힌다** | **4** |
+| `SRP-1` 19 node authored Pass Stack | `EnhancedSceneRenderer.cpp:1865~2368` ~500줄 · `AddNode` 15곳. `pipeline.nodes` dump가 이미 관측면 | **8** |
+| `SRP-2` Slang Code 모드 + Fullscreen Custom Pass | 컴파일러 기반 존재(위). packaging 분류가 BuildPipelinePlan과 물린다 | **7** |
+| `SRP-3` 최소 Visual Shader Graph | 노드 에디터·선례 존재(위). `.shadergraph` 스키마 + codegen + round-trip | **10** |
+| `SRP-4` Compute·RendererList·history | Compute PSO 존재(3-4). 뷰별 history는 MultiCameraRenderPlan이 결정 완료 | **5** |
+| `SRP-5` variant·hot reload·preview·C# 값 | 리로드·generation retirement는 M5-C가 닫음. C# 값 경계는 `I6-D2`가 먼저 갈아엎는다 | **6** |
+| `SRP-6` 소스 Native Pass 연결 | 정적 registry 하나 + `EnhancedRenderPass` 확장점. 외부 ABI는 비목표 | **3** |
+| **합** | | **43** |
+
+### 8.3 산정 — PBR-S 레인 62일
+
+| 슬라이스 | 표면 | 공수 |
+|---|---|---:|
+| `PBR-S0` 기준선 | **`BASE-0`에 흡수** | **0** |
+| `PBR-S1` native Slang 기반 | 제품 진입점 3종(`ForwardShade` 520 · `Deferred` 272 · `GBuffer` 269). **시각 변화 0이 조건**이라 골든이 자 | **4** |
+| `PBR-S2` 공용 모듈 동등 이관 | 공유 함수 5개(위). `MaterialInputs → StandardSurface` 구조가 본체 | **5** |
+| `PBR-S3` glTF 의미 교정 | 항목 9종(metallic 곱셈·ORM AO·normal scale·occlusion·emissive·alpha cutoff·doubleSided·emissiveStrength·UV set/transform/wrap). **importer부터 Deferred/Forward까지**이고 항목마다 시각이 바뀌어 각각 A/B가 붙는다 | **9** |
+| `PBR-S4` 에너지·IBL | `IblBrdf`(108)·`IblPrefilter`(101) 존재. **local reflection probe가 신설**이고 그것이 본체(프로브 자산·캡처·바인딩) | **8** |
+| `PBR-S5` 그림자 | `EnhancedShadowPass` 768줄·cascade 43곳 존재. **point/spot atlas 신설**이 절반 | **10** |
+| `PBR-S6` display/post | `PostChainUber.hlsl`(138) + `EnhancedPostChainPass.cpp`(457). AgX·auto exposure·bloom **각각 독립 A/B** | **6** |
+| `PBR-S7` 확장 lobe — **여섯으로 분해** | S7a specular/IOR 2 · S7b clearcoat 2 · S7c sheen 1.5 · S7d anisotropy 2 · S7e iridescence/dispersion 2.5 · **S7f transmission/volume 5**(refraction path가 크다) | **15** |
+| `PBR-S8` Shader Graph codegen | SRP-3이 codegen 기반을 이미 냄. 여기서는 검증된 Slang module API를 target으로 잇고 generated/authored parity | **5** |
+| **합** | | **62** |
+
+### 8.4 ★ `4-6`이 실제로 결정해야 할 것 — `SRP-1`과 `RG5`가 같은 500줄을 만진다
+
+산정 중에 드러난 **중복**이다. 둘의 대상이 문장 단위로 겹친다.
+
+| | 대상 |
+|---|---|
+| `RG5` (12일) | "**기본 19개 node**, 제품 호출 28곳과 test/fixture 80곳의 접근 선언 이관" |
+| `SRP-1` (8일) | "현재 C++ 기본 파이프라인 **19개 노드**를 authored Pass Stack Inspector로 기술" |
+
+같은 `EnhancedSceneRenderer.cpp:1865~2368`을 **RG5는 versioned access로, SRP-1은 authored
+Asset으로** 각각 옮긴다. 따로 하면 같은 500줄을 두 번 만지고, 그 사이 기간에는 두 표현이
+병행한다 — 이 저장소가 `I5`→`I6`에서 겪은 **병행이 은퇴 대상을 늘린다**(§4 T0 측정 ①)가
+그대로 재현될 자리다.
+
+**판정 제안: `RG5`와 `SRP-1`을 한 슬라이스로 병합**하고 합계 20일을 **15일**로 본다.
+단 이것은 `RG5` 착수 시점의 결정이므로, 위 §8.2 합계에는 **병합 전 8일을 그대로 두었다**.
+병합하면 페이즈 합계가 5일 줄어든다.
+
+### 8.5 여전히 산정하지 않은 것 — `4-2`~`4-5`의 구현
+
+GPU-driven · Stochastic Tile Lighting · DXR · DLSS의 **구현** 공수는 이번에도 산정하지
+않았다. 세울 수 없어서가 아니라 **아직 슬라이스가 없기 때문**이다 — `4-2`~`4-5`는
+구상 게이트이고, **그 게이트의 산출물이 곧 슬라이스 분해**다. 분해 없이 숫자를 붙이면
+`I5`(5일 → 40슬라이스)·`I6`(5일 → 24일)가 겪은 **5배 과소산정**을 세 번째로 반복한다.
+
+이 저장소에서 미분해 산정은 지금까지 **두 번 다 5배 틀렸고**, 분해된 산정(RG 트랙·이번
+백로그)은 아직 반증되지 않았다. 규칙으로 적는다 — **분해가 먼저이고 산정은 그 다음이다.**
+
+### 8.6 이 산정이 페이즈 합계에 미치는 영향
+
+| | 값 |
+|---|---:|
+| §5.1 잔여(분해가 끝난 트랙) | 193.5일 |
+| + SRP 레인 | +43일 |
+| + PBR-S 레인 | +62일 |
+| **= 잔여 합계** | **298.5일** |
+| (`RG5`+`SRP-1` 병합 시) | (293.5일) |
+| 대시보드 활성 행 합계(완료 45일 포함) | **340.5일** |
+
+**남은 미산정은 `Q0`과 `4-2`~`4-5` 구현 둘뿐이다.**
 
 ---
 
