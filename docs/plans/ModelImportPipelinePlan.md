@@ -94,7 +94,7 @@ I1의 내부 소스 사슬은 완료됐어도 §1.1의 "생산 소비자 0" 판�
 
 | 항목 | 실측 | 성격 |
 |---|---|---|
-| 임베디드 텍스처 | Gunner 재질당 ×3 property 생략 | `resolveTextureAsset` 정책 부재 |
+| ~~임베디드 텍스처~~ | ~~Gunner 재질당 ×3 property 생략~~ → **실측은 전량 생략(textureProps 0)**, I2-E에서 닫힘 | ~~`resolveTextureAsset` 정책 부재~~ |
 | `doubleSided` · `emissiveStrength` | 재질마다 1건 | ModelDraft 에 자리 없음 |
 | influence 5개 초과 | FBX 메시 3개에서 255·45·66건 | 설계상 클램프(상한 4) |
 | FBX 계단 키 | Linear 키 쌍으로 펴짐 | 값 보존, 표현만 다름 |
@@ -371,15 +371,31 @@ IR 이후의 어떤 코드도 포맷별 관례를 알 필요가 없다. 원본 �
 
 의존: 없음. **가장 먼저 할 것.**
 
-### I2. 텍스처 자산 해석 정책
+### I2. 텍스처 자산 해석 정책 — **완료** (2026-09-01 · I2-E)
 
 ~~`resolveTextureAsset` 이 비어 있어~~ **2026-09-01 재측정: 절반 닫혔다.**
 제품 로드(`LoadModelViaExperiment`)와 cook(`ModelCookProducer`) 둘 다
 `resolveTextureAsset` 을 채운다 — **외부 텍스처는 `.meta` GUID 로 해석된다.**
-**임베디드 텍스처만 남는다**: 소스 로드 경로에서는 `sourcePath` 가 비어 GUID 가
-nil 이고 property 가 생략된다(브리지가 `fallbackPath` 이름 폴백으로 받는다).
-cook 경로는 D5-b1/b2b1 이 모델 sidecar 의 `subAssets.embeddedTextures` UUIDv4 로
-이미 해결했다 — 남은 것은 **소스 경로에도 그 신원을 주는 것**이다.
+~~임베디드 텍스처만 남는다~~ — **I2-E에서 닫혔다(2026-09-01).** 소스 로드 경로가
+모델 sidecar의 `subAssets.embeddedTextures`를 cook과 **같은 정본 함수**
+(`ReadModelCookIdentity`)로 읽어 texture property에 UUIDv4를 싣는다.
+
+★ **실측이 §1.4의 크기를 정정했다.** 표는 "Gunner 재질당 ×3 property 생략"이라
+적었는데, 변이(신원 해석 절단)로 재니 **`textureProps=0` — 전량 생략**이었다.
+이 모델들의 텍스처가 전부 임베디드라 texture property가 하나도 서지 못했던
+것이다. 고친 뒤 Gunner 6/6 · Suzanne 1/1이 valid GUID를 갖는다.
+
+★ **생략은 값 대조로 안 보인다.** "없는 property"라 값을 비교할 대상 자체가 없다
+— 그래서 `experiment.embedded`가 **present(textureProps)와 valid를 함께** 센다.
+present만 세면 nil GUID가 통과하고, valid만 세면 생략이 통과한다(둘 다 0이면
+`skip`이라 초록이 아니다).
+
+★ **한계(정직).** GUID가 실려도 **legacy 재질에는 여전히 그 텍스처가 안 붙는다** —
+`FinalizeMaterialRuntime`은 `GetFilePath(guid)` 이름 경로를 쓰는데 registry는
+subasset GUID의 경로를 모른다. 실제 픽셀까지 닿는 길은 **cooked catalog 마운트**다
+(I7-C1의 `ResolveCookedArtifact`가 `Derived/Textures/..`를 준다). 그 조합
+(저작 재질이 임베디드 텍스처를 참조 → sealing이 cooked로 해석)은 코퍼스에 그런
+저작분이 없어 아직 게이트가 없다.
 
 - 임베디드 바이트를 디스크로 뽑는 시점·위치
 - AssetId 발급 — 새로 만들 것인가 기존 자산에 붙일 것인가

@@ -23,6 +23,7 @@
 #include "Experiment/Model.h"
 #include "Experiment/AnimationClipMetrics.h" // I5-D5b: totalKeyFrames 정본
 #include "Experiment/Cooked/CookedAssetCatalog.h" // I7-C1
+#include "Experiment/Cooked/ModelCookIdentity.h" // I2-E: 임베디드 신원
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/ResolvingModelDecoder.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
@@ -512,12 +513,44 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 			id.value = guid.m_guid;
 			return id;
 		};
-	// 텍스처 정체성도 .meta 정본이다 — 원본 경로를 카탈로그로 되물어 GUID를
-	// 준다(이름 부활 금지). 못 풀면 fallbackPath로 남고 브리지가 legacy 이름
-	// 폴백을 채운다.
-	options.conversion.resolveTextureAsset =
-		[this](const exi::ImportedTexture& texture) -> experiment::AssetId
+	// I2-E — 임베디드 텍스처의 신원은 **모델 sidecar가 정본**이다.
+	// 예전에는 `sourcePath`가 빈 임베디드 텍스처가 nil GUID로 떨어져 변환
+	// 경계가 property를 통째로 생략했다(§1.4의 "재질당 ×3 생략"). cook 경로는
+	// D5-b1이 `subAssets.embeddedTextures`의 UUIDv4로 이미 풀고 있었는데
+	// **소스 로드 경로만 그 표를 안 읽고 있었다** — 같은 정본 함수
+	// (ReadModelCookIdentity)를 여기서도 쓴다.
+	//
+	// sidecar가 없거나 표가 비면 예전대로 nil이고, 브리지의 fallbackPath 이름
+	// 폴백이 받는다(전환기 보강 — 그 경로를 없애지 않는다).
+	experiment::cooked::ModelCookIdentity identity;
+	{
+		file::path metaPath = sourcePath;
+		metaPath += ".meta";
+		std::ifstream metaInput(metaPath);
+		if (metaInput)
 		{
+			const std::string yaml{
+				std::istreambuf_iterator<char>(metaInput),
+				std::istreambuf_iterator<char>() };
+			std::vector<experiment::cooked::ModelIdentityIssue> identityIssues;
+			if (!experiment::cooked::ReadModelCookIdentity(yaml, identity,
+				identityIssues))
+			{
+				identity = {};
+			}
+		}
+	}
+
+	// 외부 텍스처 정체성도 .meta 정본이다 — 원본 경로를 카탈로그로 되물어
+	// GUID를 준다(이름 부활 금지).
+	options.conversion.resolveTextureAsset =
+		[this, identity](const exi::ImportedTexture& texture)
+			-> experiment::AssetId
+		{
+			if (texture.IsEmbedded())
+			{
+				return identity.FindEmbeddedTexture(texture.sourceKey);
+			}
 			experiment::AssetId id{};
 			if (!texture.sourcePath.empty())
 			{

@@ -78,6 +78,10 @@ wait 10
 # I5-D5b: 에디터 실소비 창구 전수 A/B(클립 열거·이름, 메시 존재 가드).
 experiment.editorsurface
 wait 10
+# I2-E: 임베디드 텍스처 신원 — 모델 sidecar의 subAssets가 소스 로드 경로에도
+# 실리는가(예전에는 property가 통째로 생략됐다 — 실측 textureProps 0).
+experiment.embedded __SKINNED_MODEL__
+wait 10
 # I5-D4f-1: 바운드 축 — 정점 시공 절단(legacyVertices)·바운드 생존
 # (degenerate)·두 유도의 값 동수(digest, ps1이 on/off 대조).
 experiment.meshbounds

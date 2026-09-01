@@ -39,6 +39,8 @@
 #   16 저작 단독 시공 — 제품 seal이 legacy Material을 읽지 않고 저작본만으로
 #      SealSource를 짓는다. 기존 2단계와 texture owner 전수 대조 + 인스턴스
 #      채널의 유일한 실소비(useNormalMap) 유도가 공허하지 않은가 (D5c5)
+#   17 임베디드 텍스처 신원 — 소스 로드 경로가 모델 sidecar의 subAssets를 읽어
+#      texture property에 GUID를 싣는가. 생략 결함은 present 계수로만 보인다 (I2-E)
 #   15 바운드 축 — 역브리지의 legacy 정점 시공 절단(legacyVertices on 0 ·
 #      off 전량)·바운드 생존(degenerate 0)·두 유도의 값 동수(digest를
 #      on/off로 대조 — on은 experiment 정본 주입, off는 정점→min/max
@@ -256,6 +258,14 @@ if ($logOn -notmatch '\[CLI\] experiment\.editorsurface pass animators=\d+ clipE
 if ($logOn -notmatch 'experiment\.editorsurface pass .*meshExperiment=[1-9]') {
     $fail += "11c 메시 가드가 experiment 분기를 한 번도 타지 않았다(on)"
 }
+# ★ 17(I2-E) — 임베디드 텍스처 신원. 모델 sidecar의 subAssets.embeddedTextures를
+#   소스 로드 경로가 읽어 texture property에 실제 GUID를 싣는가. 생략은 '없는
+#   property'라 값 대조로는 안 보인다 — present(textureProps)를 함께 센다.
+#   실측: 고치기 전 Gunner textureProps=0(전량 생략), 고친 뒤 6/6 valid.
+if ($logOn -notmatch 'experiment\.embedded pass .*textureProps=([1-9]\d*) validAssetId=([1-9]\d*) fallbackOnly=0') {
+    $fail += "17 임베디드 텍스처 신원이 실리지 않았다(on) — property가 생략됐거나 GUID가 nil이다"
+}
+
 # ★ 15(I5-D4f-1) — 바운드 축. 절단이 실제로 일어났고(legacyVertices=0),
 #   바운드가 기본값으로 남지 않았으며(degenerate=0), experiment 정본과
 #   대조된 메시가 실존하는가(expBound>0). 값 동수는 아래 4r이 진다.

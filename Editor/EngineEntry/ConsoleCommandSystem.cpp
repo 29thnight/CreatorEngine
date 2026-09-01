@@ -7061,6 +7061,71 @@ namespace ConsoleCmd
             firstAuthoredSeal.c_str());
     }
 
+    // I2-E — 임베디드 텍스처 신원. 소스 로드 경로가 모델 sidecar의
+    // subAssets.embeddedTextures를 읽어 texture property에 실제 GUID를 싣는가.
+    // 예전에는 sourcePath가 빈 임베디드 텍스처가 nil로 떨어져 변환 경계가
+    // property를 **통째로 생략**했다(§1.4). 생략은 '없는 property'라 값 대조로는
+    // 안 보인다 — 그래서 present/valid를 함께 센다.
+    static void Cmd_experiment_embedded(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 2)
+        {
+            std::printf("[CLI] experiment.embedded <모델경로>\n");
+            return;
+        }
+        const std::size_t head = ctx.line.find(ctx.parts[1]);
+        std::string pathText = ctx.line.substr(head);
+        while (!pathText.empty() && (pathText.back() == ' '
+            || pathText.back() == '\r' || pathText.back() == '\t'))
+        {
+            pathText.pop_back();
+        }
+        const file::path modelPath = std::filesystem::path(pathText);
+        const FileGuid guid = DataSystems->GetFileGuid(modelPath);
+        if (FileGuid{} == guid)
+        {
+            std::printf("[CLI] experiment.embedded fail GUID 미해석 %s\n",
+                modelPath.string().c_str());
+            return;
+        }
+        // 제품 경로로 로드한다 — 자체 로더를 새로 만들면 게이트가 제품을
+        // 재지 않는다.
+        DataSystems->LoadModelGUID(guid);
+        const std::shared_ptr<const experiment::Model> model =
+            DataSystems->TryGetExperimentModel(guid);
+        if (!model)
+        {
+            std::printf("[CLI] experiment.embedded fail experiment 모델 없음\n");
+            return;
+        }
+
+        std::size_t textureProps = 0, validAssetId = 0, fallbackOnly = 0;
+        std::string firstFallback;
+        for (const experiment::Material& material : model->Materials())
+        {
+            for (const experiment::MaterialProperty& property
+                : material.properties)
+            {
+                const auto* reference =
+                    std::get_if<experiment::TextureReference>(&property.value);
+                if (nullptr == reference) continue;
+                ++textureProps;
+                if (reference->assetId.IsValid()) { ++validAssetId; continue; }
+                ++fallbackOnly;
+                if (firstFallback.empty()) firstFallback = property.name;
+            }
+        }
+
+        const bool covered = textureProps > 0;
+        const bool passed = covered && 0 == fallbackOnly;
+        std::printf("[CLI] experiment.embedded %s model=%s materials=%zu "
+            "textureProps=%zu validAssetId=%zu fallbackOnly=%zu%s%s\n",
+            passed ? "pass" : (covered ? "fail" : "skip"),
+            modelPath.filename().string().c_str(), model->Materials().size(),
+            textureProps, validAssetId, fallbackOnly,
+            firstFallback.empty() ? "" : " first=", firstFallback.c_str());
+    }
+
     // I7-C1 — cooked catalog 관측·마운트. 굽는 쪽(AssetCooker → Derived/ +
     // CEMF → pak)은 D5-b2c에서 다 섰는데 읽는 쪽이 이어져 있지 않아 cooked
     // 경로가 제품에서 한 번도 돌지 않았다(실측 texCooked=0). 이 명령이
@@ -9779,6 +9844,7 @@ namespace ConsoleCmd
             reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
             reg({ "experiment.catalog" }, &Cmd_experiment_catalog);
+            reg({ "experiment.embedded" }, &Cmd_experiment_embedded);
             reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
