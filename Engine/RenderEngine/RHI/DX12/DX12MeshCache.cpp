@@ -202,14 +202,6 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         return found->second.entry;
     }
 
-    const auto& vertices = mesh->GetVertices();
-    const auto& indices = mesh->GetIndices();
-    if (vertices.empty() || indices.empty())
-    {
-        // 빈 메시는 실패가 아니라 '그릴 것이 없음'이다. 그리기 목록에서 빠진다.
-        return empty;
-    }
-
     // I5-D34a: experiment packed 정점이 있으면 그것을 올린다(마스크·stride를
     // 바인딩에 실어 패스가 레이아웃 PSO를 고른다). 없으면 legacy 96B 그대로 —
     // Vulkan 쪽과 대칭이며, 한쪽만 고치면 vk 대조 게이트가 붉는다.
@@ -219,19 +211,37 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
     const bool useExperiment = m_experimentLookup
         && m_experimentLookup(*mesh, experimentView) && experimentView.IsValid();
 
+    // I5-D4f-0 — **빈 메시 판정을 실제로 올릴 원본에 대해** 한다. 예전에는
+    // legacy 배열이 비면 experiment 뷰가 완비돼 있어도 그리기에서 빠졌다 —
+    // 역브리지가 정점 복사를 그만두는 순간(D4f) 화면이 통째로 사라지는
+    // 자리였다. 아래 주석이 "legacy 배열이 사라져도 이 경로는 그대로 선다"고
+    // 적어 둔 그 계약을 이 가드가 깨고 있었다.
+    const auto& vertices = mesh->GetVertices();
+    const auto& indices = mesh->GetIndices();
+    const bool viewHasVertices = useExperiment
+        && nullptr != experimentView.data && 0 != experimentView.bytes;
+    const bool viewHasIndexData =
+        useExperiment && nullptr != experimentView.indexData
+        && 0 != experimentView.indexCount;
+    const bool hasVertexSource = viewHasVertices || !vertices.empty();
+    const bool hasIndexSource = viewHasIndexData || !indices.empty();
+    if (!hasVertexSource || !hasIndexSource)
+    {
+        // 빈 메시는 실패가 아니라 '그릴 것이 없음'이다. 그리기 목록에서 빠진다.
+        return empty;
+    }
+
     if (useExperiment)
     {
         // 인덱스도 뷰가 완비했으면 experiment에서 — legacy 배열과 값이 같은
         // 것은 역브리지가 보장하고, D4f에서 legacy 배열이 사라져도 이 경로는
-        // 그대로 선다.
-        const bool viewHasIndices =
-            nullptr != experimentView.indexData && 0 != experimentView.indexCount;
+        // 그대로 선다(위 가드가 그 계약을 지킨다).
         return UploadResolved(assetId, experimentView.data,
             experimentView.bytes, experimentView.stride,
             experimentView.attributeMask,
-            viewHasIndices ? experimentView.indexData : indices.data(),
-            viewHasIndices ? experimentView.indexCount
-                           : static_cast<uint32_t>(indices.size()),
+            viewHasIndexData ? experimentView.indexData : indices.data(),
+            viewHasIndexData ? experimentView.indexCount
+                             : static_cast<uint32_t>(indices.size()),
             false, outError);
     }
     return UploadResolved(assetId, vertices.data(),

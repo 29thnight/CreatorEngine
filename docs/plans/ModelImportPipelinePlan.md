@@ -662,7 +662,9 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-1 ✅ | 재생 이중화 — 샘플러 엔진 승격·Animator 재생 핸들·AnimationJob experiment 틱(단일 순회)·팔레트 패리티 게이트(6·1e·4j/4k, 오차 0) | 재생 틱 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-2 ✅ | 이벤트·루프 Animator 소유 이관(D0a 명세) — 재주입 오염 청산·발화/편집/writer 정본 이동·합성 왕복 게이트(7·4l, 3축 변이 증명) | Animator·CLR | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-3 ✅ | 본 해석·마스크 생성 창구화 — Scene 본 전파의 legacy 접촉 0·마스크 DFS 순서 재현·전수 A/B 게이트(8·9·4m/4n, 3축 변이 증명) | Scene·마스크 | **소비자** 참조 감소 |
-| &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4f | 역브리지 시공 축소 — 아래 분해(착수 정찰 2026-09-01 셋째). **타입 은퇴는 I6로 정정**(Assimp 폴백이 legacy를 만드는 한 타입은 존재해야 한다) | DataSystem | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4f-0 ✅ | 선결 — 업로드 빈 메시 가드를 **실제로 올릴 원본** 기준으로 재배치. D4f 예행(역브리지 정점 복사 생략)으로 on 경로가 legacy 정점 없이 드로우 9·커버리지 42411 유지 실증 | 메시 캐시 | 없음 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4f-1 | 정점 시공 절단 — 역브리지 정점 복사 생략 + 바운드 직접 주입(**legacy Mesh 창구 추가 필요 — 정책 판단**) + `CREATOR_EXPERIMENT_VERTEX` off 대조군 재정의 | 역브리지·A/B 스위치 | legacy 창구 1 |
 | ↳ I5-D5 | 잔여 소비자 — 아래 하위 분해(착수 정찰 2026-09-01) | 에디터·Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-a ✅ | Foliage 메시 experiment 핸들 합류(컴포넌트→프록시→drawPool)·죽은 include 2건 청산·합성 게이트(10·4o, 2축 변이 증명) | Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-b ✅ | 에디터 실소비 정리 — LOD 편집 표면 제거(D0b 이행)·클립 열거/이름/키프레임 수 창구화·피킹 가드 창구화·**역브리지 totalKeyFrames 정의 결함 교정**·전수 A/B 게이트(11·4p, 변이 증명) / model.cache.build는 I6 존치 판정 | 에디터 | **소비자** 참조 감소 |
@@ -987,6 +989,52 @@ c3(소비자 전환) → c4(Foliage·reflect 퇴출).
 슬라이스에 **실자산 게이트는 판별력이 0이고 합성이 필수**다(D5-a Foliage와 같은
 결론). M5를 "완료"로 적어 둔 것은 코드 기준이지 저작분 기준이 아니다 —
 코퍼스 마이그레이션은 별도 트랙으로 남는다.
+
+**I5-D4f 착수 정찰 (2026-09-01 셋째) — 계획서 정의가 실측과 어긋난다.**
+
+표는 D4f를 "역브리지 절단 — legacy 시공 중단, `m_Mesh`/`m_Skeleton` **은퇴**"라
+적었지만, D4e 실측은 같은 대상을 "Assimp 폴백으로 존치, **은퇴는 I6**"이라 적었다.
+실측이 후자를 지지한다: **Assimp 폴백이 살아 있는 한 legacy `Model`/`Skeleton`
+타입은 존재해야 한다**(폴백이 그것을 만든다). 타입 은퇴는 I6(Assimp 은퇴)와 같은
+시점이고, D4f가 할 수 있는 것은 **역브리지 산물의 시공 축소**다. 표를 그렇게 고쳤다.
+
+소비 전수(제품, 게이트 대조군 제외): ① **legacy Mesh 정점·인덱스의 외부 소비가
+0건이다**(`GetVertices`/`GetIndices` 호출부 — Mesh.cpp 내부와 자체 정점을 쓰는
+Gizmo 제외). 내부 소비는 `RecalculateBounds`(바운드)와 `GenerateLODs`(D5-b가
+호출자를 0으로 만들었다)뿐이고, GPU 업로드는 D34가 experiment packed로 옮겼다.
+② `m_Skeleton`은 Animator.cpp 20·AnimationEventBridge 8·AnimationJob 5 — legacy
+재생 폴백 전체가 살아 있어 D4e가 I6로 미룬 그대로다. ③ `LoadModelGUID`의 제품
+호출자는 3곳뿐인데(`MeshRenderer` 2 — 메시 이름 해석, `Animator` 1 — 스켈레톤
+획득), **legacy 시공의 마지막 실요구자는 Animator의 스켈레톤**이다.
+
+**I5-D4f-0 완료 실측 (2026-09-01).** 선결 — 업로드의 빈 메시 가드를 **실제로 올릴
+원본** 기준으로 재배치했다. `DX12MeshCache::GetOrUpload`는 experiment 뷰를 우선
+소비하면서도 그 **앞에서** legacy 배열이 비면 즉시 빠지고 있었다:
+
+```
+const auto& vertices = mesh->GetVertices();
+if (vertices.empty() || indices.empty()) return empty;   // ← experiment 뷰가 있어도
+```
+
+그 아래 주석은 "D4f에서 legacy 배열이 사라져도 이 경로는 그대로 선다"고 적어 두었는데
+**이 가드가 바로 그 계약을 깨고 있었다** — 역브리지가 정점 복사를 그만두는 순간 화면이
+통째로 사라지는 자리다. 판정을 `viewHasVertices || !vertices.empty()`로 옮겼다.
+
+★ **증명은 D4f 예행으로 했다.** 이 변경은 현재 코퍼스에서 아무것도 바꾸지 않아
+(legacy 배열이 늘 차 있다) 게이트가 초록인 것만으로는 아무 의미가 없다. 그래서
+역브리지의 정점 복사를 임시로 끊고 돌렸다: **on 경로가 드로우 9·커버리지 42411을
+그대로 유지했다** — legacy 정점 없이 완전히 그린 것이다. 가드를 고치지 않았다면 여기서
+0이 나왔을 것이다.
+
+★ **예행이 D4f-1의 장애물 둘을 드러냈다.** ⓐ **A/B 스위치 off 대조군이 무너진다** —
+`CREATOR_EXPERIMENT_VERTEX=0`은 experiment 뷰를 끄는 장치라, 역브리지가 정점을 안
+채우면 off에서 그릴 것이 0이 된다(예행 실측: off 드로우 0·커버리지 0). 이 스위치는
+계획서가 "은퇴는 I6"으로 남긴 것인데, **정점 시공 절단과 함께 재정의되어야 한다**.
+ⓑ **바운드를 주입할 창구가 없다** — experiment는 `mesh.bounds`를 이미 갖고 있지만
+legacy `Mesh::m_boundingBox`는 private이고 reflect 스키마에도 없어(`m_name`·
+`m_materialIndex`·`m_LODThresholds`뿐) D1a가 쓴 "스키마 순회로 주입" 수법이 통하지
+않는다. `RecalculateBounds()`가 유일한 공개 창구이고 그것은 정점을 요구한다.
+**legacy Mesh 본체에 전환기 창구를 하나 더할지가 정책 판단**이라 D4f-1로 분리한다.
 
 **I5-D5c4 완료 실측 (2026-09-01).** Foliage 재질의 experiment 전환(S2c-2c 이행).
 D5-a가 깔아 둔 `m_experimentModel`에서 재질 정본도 얻는다 — **메시가 가리키는
