@@ -1,0 +1,42 @@
+# 라이브 스키닝 시각 축 시나리오 (I6-B4b 선행 ①)
+#
+# 살아 있는 애니메이터의 **그림**을 잰다. 헤드리스는 present 가 없어 라이브
+# 프레임을 못 보지만, dx12.scene 오프라인 하네스는 같은 씬 프록시(라이브
+# 팔레트 포함)를 자체적으로 그리고 커버리지·밝기 단정을 갖고 있다. 결정성은
+# 편집 모드(delta 0) + experiment.animpose 가 준다 — 애니메이터를 끄지 않는다.
+#
+# 이 시나리오가 세워진 사연: B4b(legacy 틱 폐기)가 두 번 되돌려졌는데 둘 다
+# 헤드리스 게이트 전부 초록인 채였다. 그 뒤 dx12.scene 포화의 원인이 glTF
+# inverseBind 전치 결함으로 밝혀져(2026-09-02) 이 축이 열렸다.
+#
+# 치환: __SCENE__ __MODEL__ __MODEL_NAME__ __SAVED_SCENE__
+#       __LOAD_CMD__   model.load(게이트가 늘 태우던 경로) | model.loadcached(에디터 드롭 경로)
+#       __ANIMATOR_PRE__   저장 **전**에 실행 — 바인드 팔은 여기서 Animator 를 끈다.
+#                          재로드 뒤에 끄면 프록시가 이미 t=0 팔레트를 들고 있어
+#                          바인드가 아니다(실측 49684 — 포즈 팔 49617 과 거의 같다).
+#       __ANIMATOR_POST__  재로드 **뒤**에 실행 — 포즈 팔은 여기서 animpose 0.5.
+
+scene.switch __SCENE__
+wait 60
+__LOAD_CMD__ __MODEL__
+wait 120
+model.place __MODEL_NAME__
+wait 60
+# 원점 그대로 두면 캐릭터가 씬 카메라를 삼켜 커버리지가 포화한다(vertex-live 와
+# 같은 배치). CLI transform 은 라이브 프록시에 전파되지 않으므로 저장·재로드로
+# 반영한다.
+object.transform __MODEL_NAME__ 1.5 0 0 0 0 0 0.3 0.3 0.3
+wait 30
+__ANIMATOR_PRE__
+wait 30
+scene.save __SAVED_SCENE__
+wait 30
+scene.switch __SAVED_SCENE__
+wait 120
+__ANIMATOR_POST__
+wait 30
+experiment.animlive
+experiment.skinbounds
+wait 10
+dx12.scene
+quit

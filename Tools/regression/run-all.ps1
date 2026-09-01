@@ -288,11 +288,17 @@ Run-Step "스킨 프록시 갱신" {
         (Join-Path $PSScriptRoot "verify-skinned-proxy-refresh.ps1") -Work $Work
 }
 
-# I6-B4-pre: 라이브 스키닝의 그림은 헤드리스로 못 잰다(dx12.scene이 포즈에서
-# 포화한다). 대신 그림의 입력을 잰다 — 유한성·본 인덱스 범위·포즈별 digest.
+# I6-B4-pre: 그림의 입력을 잰다 — 유한성·본 인덱스 범위·크기 상한·포즈별 digest.
 Run-Step "스킨 포즈 무결성" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-skin-pose-integrity.ps1") -Work $Work
+}
+
+# I6-B4b 선행: 살아 있는 애니메이터의 그림을 dx12.scene으로 잰다(bind·place·drop
+# 세 팔). B4b가 두 번 되돌려진 자리 — 이 축이 없으면 틱 폐기가 화면을 깨도 초록.
+Run-Step "라이브 스키닝 시각 축" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-skin-pose-visual.ps1") -Work $Work
 }
 
 Run-Step "Experiment cooked catalog 기동" {
