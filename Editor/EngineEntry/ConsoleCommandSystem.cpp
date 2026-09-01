@@ -6418,6 +6418,27 @@ namespace ConsoleCmd
             // 그 둘을 혼동할 뻔했다).
             const int clipIndex = static_cast<int>(animator->m_AnimIndexChosen);
             const double duration = animator->GetClipDuration(clipIndex);
+            // 팔레트가 갱신되는데 화면이 안 움직이면 그 다음 구간이다 —
+            // Scene::PublishAnimatorPose가 팔레트를 씬 packed storage와
+            // 부착 오브젝트 Transform으로 commit하는 자리. 실패 사유가
+            // 구조체에 이미 있는데 아무도 안 읽고 있었다.
+            const AnimatorPoseUploadMetrics publish =
+                scene->PublishAnimatorPose(*animator);
+            std::printf("[CLI] experiment.animlive publish %s uploaded=%d "
+                "packed=%d legacyFallback=%d rebound=%d disabled=%d "
+                "staleOwner=%d skeletonMissing=%d bindLookups=%llu "
+                "validBones=%llu invalidBones=%llu localWrites=%llu "
+                "queuedRoots=%llu\n",
+                object->GetHashedName().ToString().c_str(),
+                publish.uploaded ? 1 : 0, publish.packed ? 1 : 0,
+                publish.legacyFallback ? 1 : 0, publish.rebound ? 1 : 0,
+                publish.disabled ? 1 : 0, publish.staleOwner ? 1 : 0,
+                publish.skeletonMissing ? 1 : 0,
+                (unsigned long long)publish.bindLookups,
+                (unsigned long long)publish.validBones,
+                (unsigned long long)publish.invalidBones,
+                (unsigned long long)publish.localWrites,
+                (unsigned long long)publish.queuedRoots);
             std::printf("[CLI] experiment.animlive %s path=%s enabled=%d "
                 "clip=%u elapsed=%.4f duration=%.4f loop=%d clips=%zu "
                 "bones=%zu palette=%08X\n",
