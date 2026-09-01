@@ -2,6 +2,7 @@
 
 #include "../../Experiment/MaterialPropertyBlock.h"
 #include "../../ExperimentMaterialMigration.h"
+#include "../../ExperimentMaterialResolveBinding.h" // I5-D5c3-2
 #include "../../Material.h"
 #include "../../ShaderMeta.h"
 
@@ -51,6 +52,47 @@ namespace ExperimentMaterialSealing
         std::string debugName = std::move(source.debugName);
         source.material = authored;
         source.debugName = std::move(debugName);
+    }
+
+    bool ApplyAuthoredTextures(SealSource& source, const ShaderMeta& meta,
+        std::string& outError, std::size_t* outCooked,
+        std::size_t* outSourceFallback)
+    {
+        // catalog는 아직 제품 인스턴스가 없다(D1b 실측 — cooked 게시 규약이
+        // 서기 전에는 세울 수 없다). nullptr이면 resolver가 source만 쓴다:
+        // 지금 legacy가 하는 것과 같은 해석이고, catalog가 서면 이 자리가
+        // 그대로 cooked 우선이 된다.
+        const experiment::MaterialResolveServices services =
+            experiment::MakeDataSystemMaterialResolveServices(nullptr);
+        experiment::ResolvedMaterial resolved;
+        if (!experiment::ResolveMaterial(source.material, services, resolved,
+            outError))
+        {
+            return false;
+        }
+
+        // meta 선언 순서를 유지한다 — SealCore가 이 순서를 전제하지는 않지만
+        // (이름으로 찾는다) 진단 로그와 게이트 대조가 순서에 기댄다.
+        std::vector<SealTextureOwner> textures;
+        for (const ShaderPropertyDesc& desc : meta.properties)
+        {
+            if (ShaderPropertyType::Texture2D != desc.type) continue;
+            const auto found = std::find_if(resolved.textures.begin(),
+                resolved.textures.end(),
+                [&desc](const experiment::ResolvedMaterialTexture& candidate)
+                {
+                    return candidate.propertyName == desc.name;
+                });
+            textures.push_back({ desc.name,
+                found != resolved.textures.end() ? found->owner : nullptr });
+        }
+        source.textures = std::move(textures);
+        if (nullptr != outCooked) *outCooked = resolved.notes.cookedTextures;
+        if (nullptr != outSourceFallback)
+        {
+            *outSourceFallback = resolved.notes.sourceFallbackTextures;
+        }
+        return true;
     }
 
     bool SealCore(const SealSource& source, const ShaderMeta& meta,

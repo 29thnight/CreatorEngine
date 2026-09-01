@@ -67,6 +67,17 @@ namespace ExperimentMaterialSealing
     void ApplyAuthoredMaterial(SealSource& source,
         const experiment::Material& authored);
 
+    // I5-D5c3-2 — texture generation owner를 저작 GUID에서 해석한다(M2
+    // resolver의 첫 제품 소비자). 지금은 legacy 이름 맵(GetTextureMapShared)이
+    // 채우는데, 그 이름 폴백은 D5-c 이주가 죽인 표면이고 cooked 우선 해석도
+    // 못 탄다. 저작 정본이 있을 때만 부른다.
+    //
+    // fail-open이 아니다: 해석 실패는 false이고 호출부가 legacy로 내려간다 —
+    // 텍스처가 조용히 빠진 그림보다 전환기 경로가 낫다(관측은 notes가 진다).
+    [[nodiscard]] bool ApplyAuthoredTextures(SealSource& source,
+        const ShaderMeta& meta, std::string& outError,
+        std::size_t* outCooked = nullptr, std::size_t* outSourceFallback = nullptr);
+
     // layout 확보 후 호출 — propertyBytes(정본 packer)와 textureBindings
     // (reflection register 검증·중복 거부, legacy SealMaterialTextureBindings와
     // 같은 규칙)를 만든다. keyword 정규화는

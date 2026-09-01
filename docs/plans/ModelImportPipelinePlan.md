@@ -671,7 +671,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-1 ✅ | 전환 위험의 측정 — packing 직전 논리 값의 바이트 A/B(합성 layout). **실측 `sealByteMismatch=0`: 직행해도 바이트가 같다**(M2 변이로 이빨 증명) | 게이트 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-2 ✅ | sealing 직행 — `ApplyAuthoredMaterial`(properties·keywords·blendMode만, 부속은 전환기 legacy)·프록시 값 스냅샷·drawPool 반입·양 sealing 축·프록시 운반 게이트(12d, M3 변이 증명) | 프록시·sealing | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-1 ✅ | 편집 반영 — 편집 창구 6종에 인스턴스 경로·Inspector/CLR 호출부 전환·세대(Revision) 기반 프록시 재스냅샷·RED→GREEN 게이트(13) | 편집 창구·프록시 | **소비자** 참조 감소 |
-| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-2 | sealing 부속 정본화 — M2 resolver로 texture generation owner·flow·legacy 호환 스칼라(c2-2가 전환기로 남긴 것) | resolver·sealing | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-2 ✅ | texture owner 정본화 — `ApplyAuthoredTextures`(M2 resolver의 **첫 제품 소비자**)·양 sealing 축·owner A/B 게이트(14·14b, M4 변이 증명). flow·legacy 스칼라는 논리 property 승격 선행이라 존치 | resolver·sealing | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c4 | Foliage(S2c-2c) + `m_Material` reflect 퇴출·프리팹 패치 경로 판정(S2c-2a 이월) | Foliage·프리팹 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
@@ -987,6 +987,34 @@ c3(소비자 전환) → c4(Foliage·reflect 퇴출).
 슬라이스에 **실자산 게이트는 판별력이 0이고 합성이 필수**다(D5-a Foliage와 같은
 결론). M5를 "완료"로 적어 둔 것은 코드 기준이지 저작분 기준이 아니다 —
 코퍼스 마이그레이션은 별도 트랙으로 남는다.
+
+**I5-D5c3-2 완료 실측 (2026-09-01).** texture generation owner를 저작 GUID에서
+얻는다 — **M2 `MaterialResolver`의 첫 제품 소비자**다(c1의 `MaterialInstance`와 같은
+유형: `MakeDataSystemMaterialResolveServices`도 게이트만 쓰는 "생산만 있고 소비 0"
+상태였다). `ApplyAuthoredTextures`가 저작본의 texture property를 resolver로 해석해
+`SealSource.textures`를 채우고, 실패는 legacy 맵을 그대로 둔다(전환기 폴백 —
+텍스처가 조용히 빠진 그림보다 낫다).
+
+이 전환이 **그림을 바꾸지 않는가**의 판정은 두 경로가 같은 owner를 주는지다.
+실측 `texResolved=4 texResolvedOwners=1 texOwnerMismatch=0 texResolveFailed=0
+texCooked=0 texSourceFallback=1`. cooked가 0인 것은 정상이다 — catalog 제품
+인스턴스가 아직 0이라(D1b 실측) resolver가 source만 쓴다. **catalog가 서면 이 자리가
+그대로 cooked 우선이 된다** — 그것이 M2가 설계한 지점이다.
+
+★ **눈먼 초록을 또 하나 잡았다.** 처음 실측은 `texResolved=4 texOwnerMismatch=0`으로
+초록이었는데 `texCooked=0 texSourceFallback=0`이 이상했다 — seed 재질에 texture
+property가 없어서 **legacy 맵도 resolver도 nullptr을 주고 "동일"로 통과**한
+것이었다(nullptr끼리 비교하는 "0개를 비교해 차이 0"의 변형). seed에 실물 텍스처
+자산(`Cube_Mat_BaseColor.png`)을 싣고 `texResolvedOwners=[1-9]` 단정(14b)을 더해
+막았다. **변이 M4**(resolver owner를 nullptr로 절단)가 `texOwnerMismatch=1
+texResolvedOwners=0 firstTex=baseColorMap`으로 두 단정을 정확히 붉혔다.
+
+★ **범위 판정: flow와 legacy 호환 스칼라는 존치한다.** `SealSource.flow`
+(windVector/uvScroll)는 experiment 저작에 표현이 없다 — 헤더가 "PBR-S3/I5-M5에서
+논리 property 승격 후보"로 적어 둔 것이라 **승격이 선행**돼야 하고, 지어내면 화면이
+조용히 달라진다. `baseColorFactor`/`metallic`/`roughness`/`useNormalMap`은 Forward
+snapshot의 legacy 호환 스칼라 표면이라 그 소비자가 남아 있는 동안 필요하다. 둘 다
+I6에서 legacy와 함께 판정한다.
 
 **I5-D5c3-1 완료 실측 (2026-09-01) — c2-2가 만든 갭을 닫는다.**
 

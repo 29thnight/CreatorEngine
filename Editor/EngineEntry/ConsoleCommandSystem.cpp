@@ -36,6 +36,7 @@
 #include "PrimitiveRenderProxy.h"           // I5-D5c2-2: 프록시 축
 #include "MaterialScriptBinding.h"          // I5-D5c3: 실물 편집 창구
 #include "ProxyCommandQueue.h"             // I5-D5c3: 갱신 커맨드 소비
+#include "Render/Scene/ExperimentMaterialSealing.h" // I5-D5c3-2: texture 축
 #include "PrimitiveRenderProxy.h"  // I5-D5a: FoliageRenderProxy 실물 사슬
 #include "RHI/IRenderDeviceServices.h" // I5-D5a: RHIExperimentVertexView
 #include "ConditionParameter.h"
@@ -6265,6 +6266,29 @@ namespace ConsoleCmd
             return false;
         }
 
+        // ★ texture도 실어야 c3-2의 owner 축이 실제로 무언가를 비교한다.
+        //   싣지 않으면 legacy 맵도 resolver도 nullptr을 주고 "동일"로 통과한다
+        //   (nullptr끼리 비교하는 눈먼 초록 — 실제로 한 번 그렇게 나왔다).
+        const file::path texturePath =
+            PathFinder::Relative("Materials\\") / "Cube_Mat_BaseColor.png";
+        const FileGuid textureGuid = DataSystems->GetFileGuid(texturePath);
+        if (FileGuid{} == textureGuid)
+        {
+            outError = "seed 텍스처 GUID 미해석: " + texturePath.string();
+            return false;
+        }
+        for (const ShaderPropertyDesc& desc : meta->properties)
+        {
+            if (ShaderPropertyType::Texture2D != desc.type) continue;
+            experiment::MaterialProperty property;
+            property.name = desc.name;
+            experiment::TextureReference reference;
+            reference.assetId.value = textureGuid.m_guid;
+            property.value = std::move(reference);
+            authored.properties.push_back(std::move(property));
+            break; // 한 슬롯이면 축이 성립한다
+        }
+
         YAML::Node document;
         if (!experiment::SerializeMaterialAuthoring(authored, document, error))
         {
@@ -6502,6 +6526,10 @@ namespace ConsoleCmd
         std::size_t sealLayoutFailed = 0, sealBuildFailed = 0;
         std::string firstSealMismatch;
         std::size_t meshProxies = 0, proxyAuthored = 0, proxyValueMismatch = 0;
+        std::size_t texResolved = 0, texOwnerMismatch = 0, texResolveFailed = 0;
+        std::size_t texResolvedOwners = 0;
+        std::size_t texCooked = 0, texSourceFallback = 0;
+        std::string firstTexMismatch;
         std::string firstMismatch;
 
         for (const auto& object : scene->m_Entities)
@@ -6639,6 +6667,62 @@ namespace ConsoleCmd
                         + std::to_string(firstByte);
                 }
             }
+
+            // ── D5-c3-2: texture owner 축 ──
+            //
+            // sealing이 texture generation owner를 legacy 이름 맵 대신 저작
+            // GUID에서(M2 resolver) 얻도록 바꿨다. 이 전환이 **그림을 바꾸지
+            // 않는가**를 재는 유일한 방법은 두 경로가 같은 owner를 주는지
+            // 보는 것이다 — 다른 텍스처가 오면 화면이 조용히 달라진다.
+            ExperimentMaterialSealing::SealSource legacySeal;
+            if (ExperimentMaterialSealing::BuildSealSourceFromLegacy(
+                *renderer->m_Material, *meta, legacySeal, error))
+            {
+                ExperimentMaterialSealing::SealSource authoredSeal = legacySeal;
+                ExperimentMaterialSealing::ApplyAuthoredMaterial(authoredSeal,
+                    authoredEffective);
+                std::size_t cooked = 0, sourceFallback = 0;
+                if (!ExperimentMaterialSealing::ApplyAuthoredTextures(
+                    authoredSeal, *meta, error, &cooked, &sourceFallback))
+                {
+                    ++texResolveFailed;
+                    if (firstTexMismatch.empty())
+                    {
+                        firstTexMismatch = "resolve:" + error;
+                    }
+                }
+                else
+                {
+                    texCooked += cooked;
+                    texSourceFallback += sourceFallback;
+                    for (const auto& legacyTexture : legacySeal.textures)
+                    {
+                        const auto found = std::find_if(
+                            authoredSeal.textures.begin(),
+                            authoredSeal.textures.end(),
+                            [&](const auto& candidate)
+                            {
+                                return candidate.propertyName
+                                    == legacyTexture.propertyName;
+                            });
+                        ++texResolved;
+                        if (found != authoredSeal.textures.end()
+                            && nullptr != found->owner)
+                        {
+                            ++texResolvedOwners;
+                        }
+                        if (found == authoredSeal.textures.end()
+                            || found->owner != legacyTexture.owner)
+                        {
+                            ++texOwnerMismatch;
+                            if (firstTexMismatch.empty())
+                            {
+                                firstTexMismatch = legacyTexture.propertyName;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // ── D5-c2-2: 프록시 축 ──
@@ -6723,22 +6807,29 @@ namespace ConsoleCmd
         // 반면 layout/build 실패는 축이 돌지 않았다는 뜻이라 붉힌다.
         const bool passed = covered && 0 == valueMismatch && 0 == blendMismatch
             && 0 == buildFailed && 0 == sealLayoutFailed && 0 == sealBuildFailed
-            && sealCompared > 0 && 0 == proxyValueMismatch;
+            && sealCompared > 0 && 0 == proxyValueMismatch
+            && 0 == texOwnerMismatch && 0 == texResolveFailed;
         std::printf("[CLI] experiment.matruntime %s renderers=%zu "
             "withMaterial=%zu withInstance=%zu compared=%zu metaMissing=%zu "
             "buildFailed=%zu valueMismatch=%zu blendMismatch=%zu "
             "onlyAuthored=%zu onlyLegacy=%zu sealCompared=%zu "
             "sealByteMismatch=%zu sealLayoutFailed=%zu sealBuildFailed=%zu "
-            "meshProxies=%zu proxyAuthored=%zu proxyValueMismatch=%zu%s%s%s%s\n",
+            "meshProxies=%zu proxyAuthored=%zu proxyValueMismatch=%zu "
+            "texResolved=%zu texOwnerMismatch=%zu texResolveFailed=%zu "
+            "texResolvedOwners=%zu texCooked=%zu texSourceFallback=%zu%s%s%s%s%s%s\n",
             passed ? "pass" : (covered ? "fail" : "skip"),
             renderers, withMaterial, withInstance, compared, metaMissing,
             buildFailed, valueMismatch, blendMismatch, onlyAuthored, onlyLegacy,
             sealCompared, sealByteMismatch, sealLayoutFailed, sealBuildFailed,
             meshProxies, proxyAuthored, proxyValueMismatch,
+            texResolved, texOwnerMismatch, texResolveFailed, texResolvedOwners,
+            texCooked, texSourceFallback,
             firstMismatch.empty() ? "" : " first=",
             firstMismatch.c_str(),
             firstSealMismatch.empty() ? "" : " firstSeal=",
-            firstSealMismatch.c_str());
+            firstSealMismatch.c_str(),
+            firstTexMismatch.empty() ? "" : " firstTex=",
+            firstTexMismatch.c_str());
     }
 
     static void Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)

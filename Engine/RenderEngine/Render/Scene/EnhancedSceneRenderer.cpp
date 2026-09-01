@@ -2907,11 +2907,20 @@ namespace
                         return false;
                     }
                     // I5-D5c2-2 — 저작 정본이 있으면 properties·keywords·
-                    // blendMode가 그것으로 간다(왕복 절단). 부속은 legacy.
+                    // blendMode가 그것으로 간다(왕복 절단).
                     if (pooled.authoredMaterialSource)
                     {
                         ExperimentMaterialSealing::ApplyAuthoredMaterial(
                             sealSource, *pooled.authoredMaterialSource);
+                        // I5-D5c3-2 — texture owner도 저작 GUID에서 해석한다.
+                        // 실패는 legacy 맵을 그대로 둔다(전환기 폴백).
+                        std::string textureError;
+                        if (!ExperimentMaterialSealing::ApplyAuthoredTextures(
+                            sealSource, *materialShader.value, textureError))
+                        {
+                            Debug->LogWarning("Forward 저작 texture 해석 실패 —"
+                                " legacy 맵 유지: " + textureError);
+                        }
                     }
 
                     auto snapshot =
@@ -3088,6 +3097,13 @@ namespace
                 {
                     ExperimentMaterialSealing::ApplyAuthoredMaterial(
                         sealSource, *pooled.authoredMaterialSource);
+                    std::string textureError; // I5-D5c3-2
+                    if (!ExperimentMaterialSealing::ApplyAuthoredTextures(
+                        sealSource, *materialShader.value, textureError))
+                    {
+                        Debug->LogWarning("GBuffer 저작 texture 해석 실패 —"
+                            " legacy 맵 유지: " + textureError);
+                    }
                 }
 
                 auto snapshot = std::make_shared<EnhancedMaterialDrawSnapshot>();

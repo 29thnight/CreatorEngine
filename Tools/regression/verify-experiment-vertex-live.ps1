@@ -34,6 +34,8 @@
 #      + packing 바이트 A/B(c2-1)와 프록시 저작 정본 운반(c2-2)
 #   13 편집 반영 — 실물 편집 창구가 legacy→인스턴스→프록시까지 값을 나르는가
 #      (D5c3, c2-2가 만든 비대칭을 닫는다)
+#   14 texture owner — sealing이 저작 GUID(M2 resolver)로 얻은 owner가 legacy
+#      이름 맵과 같은가 (D5c3-2, M2의 첫 제품 소비자)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -266,6 +268,17 @@ if ($logOn -notmatch 'experiment\.matruntime pass .*proxyAuthored=[1-9]') {
 #   본다 — 프록시가 종착점이다(인스턴스만 따라오면 화면은 여전히 안 바뀐다).
 if ($logOn -notmatch '\[CLI\] experiment\.matruntime edit pass ') {
     $fail += "13 편집이 저작 정본에 반영되지 않는다(on) — edit 출력을 확인하라"
+}
+# ★ 14(I5-D5c3-2) — texture owner 전환. sealing이 texture generation owner를
+#   legacy 이름 맵 대신 저작 GUID(M2 resolver)에서 얻는다. 이 전환이 그림을
+#   바꾸지 않으려면 두 경로가 **같은 owner**를 줘야 한다.
+#   texResolvedOwners 단정이 없으면 seed에 텍스처가 없을 때 nullptr끼리 비교해
+#   통과한다 — 실제로 한 번 그렇게 나왔다(눈먼 초록).
+if ($logOn -notmatch 'experiment\.matruntime pass .*texOwnerMismatch=0 texResolveFailed=0') {
+    $fail += "14 저작 texture 해석이 legacy 맵과 갈렸다(on) — 그림이 바뀐다"
+}
+if ($logOn -notmatch 'experiment\.matruntime pass .*texResolvedOwners=[1-9]') {
+    $fail += "14b resolver가 실제 texture owner를 하나도 해석하지 않았다(on)"
 }
 # 왕복 손실은 **판정하지 않고 보고**한다 — 이 슬라이스의 목적은 손실을 없애는
 # 것이 아니라 크기를 아는 것이다(처방은 c2). 값을 아래 요약이 찍는다.
