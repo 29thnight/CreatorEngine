@@ -726,8 +726,40 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	std::vector<bool> animationBools;
 	std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;
 	int aniIndex = 0;
-	if (node["m_Skeleton"])
+	// I6-B1 — 클립 오버라이드 표기가 Animator 소유로 이주했다. 새 정본을
+	// 먼저 읽고, 없을 때만 구 씬의 legacy Skeleton 서브트리를 읽는다. 폴백은
+	// **읽기 전용**이다 — 저장은 아래 OnAfterSerialize가 새 표기로만 한다.
+	bool authoredOverrides = false;
+	if (node["m_clipOverrides"])
 	{
+		authoredOverrides = true;
+		for (const auto entry : node["m_clipOverrides"])
+		{
+			if (!entry["clipIndex"]) continue;
+			const int clipIndex = entry["clipIndex"].As<int>();
+			if (clipIndex < 0) continue;
+			AnimatorClipOverride& clipOverride = EnsureClipOverride(clipIndex);
+			if (entry["loopOverride"])
+			{
+				clipOverride.loopOverride = entry["loopOverride"].As<bool>();
+			}
+			if (entry["events"])
+			{
+				for (const auto keyFrameEvent : entry["events"])
+				{
+					KeyFrameEvent newEvent;
+					Meta::Deserialize(&newEvent, keyFrameEvent);
+					clipOverride.events.push_back(newEvent);
+				}
+			}
+		}
+	}
+
+	if (!authoredOverrides && node["m_Skeleton"])
+	{
+		// 구 씬 폴백 — 인덱스는 서브트리의 **순서**가 정한다(이름이 아니다).
+		// 그 규약은 저장 당시 자산 클립 순서와 1:1이라는 전제 위에 섰고,
+		// 새 표기는 clipIndex를 명시해 그 암묵 전제를 없앤다.
 		const auto skel = node["m_Skeleton"];
 		if (skel["m_animations"])
 		{
@@ -907,35 +939,47 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 void Animator::OnAfterSerialize(YAML::Node& node)
 {
-	// I5-D4e-2 — 씬 표기 형상 유지. 리플렉션이 m_Skeleton 포인터를 따라 적은
-	// m_animations[i].m_isLoop/m_keyFrameEvent는 **공유 자산의 값**(이벤트 항상
-	// 빈 벡터·원본 loop)이다 — 정본인 Animator 오버라이드로 교체해야 저장·
-	// 재로드 왕복에서 오버라이드가 살아남는다. 오버라이드가 없는 클립은 자산
-	// 값이 그대로 남는다(형상·의미 모두 구세대 reader와 호환).
-	if (m_clipOverrides.empty() || !node["m_Skeleton"]) return;
-	YAML::Node animations = node["m_Skeleton"]["m_animations"];
-	if (!animations || !animations.IsSequence()) return;
+	// I6-B1 — 오버라이드가 자기 표기를 갖는다. 구 코드는 리플렉션이 legacy
+	// Skeleton 포인터를 따라 적은 서브트리에 값을 **되입혔다** — 저장 형상이
+	// 은퇴 대상 타입의 형상이라, 그 타입이 죽는 순간 저작분이 갈 곳을 잃는다.
+	// 이제 소유(Animator)와 표기가 같은 곳을 가리킨다.
+	//
+	// ★ 인덱스를 명시한다. 구 표기는 서브트리 **순서**가 인덱스였고, 그것은
+	//   저장 당시 자산 클립 순서와 1:1이라는 암묵 전제 위에 섰다.
+	//
+	// 빈 오버라이드(값도 이벤트도 없는 것)는 적지 않는다 — 왕복 멱등이
+	// 이 게이트의 판정이라 쓰는 것과 읽는 것이 정확히 같아야 한다.
+	if (m_clipOverrides.empty()) return;
 
+	YAML::Node overridesNode(YAML::NodeType::Sequence);
 	for (AnimatorClipOverride& clipOverride : m_clipOverrides)
 	{
-		if (clipOverride.clipIndex < 0
-			|| static_cast<std::size_t>(clipOverride.clipIndex)
-				>= animations.size())
+		if (clipOverride.clipIndex < 0) continue;
+		if (!clipOverride.loopOverride.has_value()
+			&& clipOverride.events.empty())
 		{
 			continue;
 		}
-		YAML::Node animationNode =
-			animations[static_cast<std::size_t>(clipOverride.clipIndex)];
+
+		YAML::Node entry(YAML::NodeType::Map);
+		entry["clipIndex"] = clipOverride.clipIndex;
 		if (clipOverride.loopOverride.has_value())
 		{
-			animationNode["m_isLoop"] = *clipOverride.loopOverride;
+			entry["loopOverride"] = *clipOverride.loopOverride;
 		}
-		YAML::Node eventsNode(YAML::NodeType::Sequence);
-		for (KeyFrameEvent& event : clipOverride.events)
+		if (!clipOverride.events.empty())
 		{
-			eventsNode.push_back(Meta::Serialize(&event));
+			YAML::Node eventsNode(YAML::NodeType::Sequence);
+			for (KeyFrameEvent& event : clipOverride.events)
+			{
+				eventsNode.push_back(Meta::Serialize(&event));
+			}
+			entry["events"] = eventsNode;
 		}
-		animationNode["m_keyFrameEvent"] = eventsNode;
+		overridesNode.push_back(entry);
 	}
+
+	if (0 == overridesNode.size()) return;
+	node["m_clipOverrides"] = overridesNode;
 }
 

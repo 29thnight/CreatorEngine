@@ -39,8 +39,14 @@ class Animator : public meta::identity<Animator, Component>
     public:
     static consteval auto reflect()
     {
+        // I6-B1 — legacy Skeleton 서브트리는 더 이상 씬에 쓰지 않는다.
+        // 리플렉션이 포인터를 따라 적던 것은 클립 이름·m_isLoop·
+        // m_keyFrameEvent·m_rootTransform인데, **재로드가 실제로 읽는 것은
+        // 클립별 (isLoop, events) 뿐**이고 나머지는 자산에서 다시 유도되는
+        // 값이다. 그 둘은 D4e-2가 이미 Animator 소유(m_clipOverrides)로
+        // 옮겼으므로, 표기만 소유를 따라가면 된다 — 쓰기는 새 정본으로,
+        // 읽기는 구 씬 서브트리 폴백을 존치한다(OnDeserialized 참조).
         return meta::schema<Self>(
-            meta::field<&Self::m_Skeleton>,
             meta::field<&Self::m_AnimIndexChosen>,
             meta::field<&Self::m_AnimIndex>,
             meta::field<&Self::m_Motion>,

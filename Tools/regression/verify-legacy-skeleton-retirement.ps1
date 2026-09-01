@@ -55,9 +55,13 @@ if (-not (Test-Path -LiteralPath $animatorPath)) {
 }
 $animatorCode = Get-CodeText $animatorPath
 
+# I6-B1 — 쓰기 경로도 여기 든다. legacy 서브트리에 값을 되입히던 자리다.
+# 읽기(OnDeserialized)는 **구 씬 폴백이라 일부러 뺐다** — 폴백은 은퇴가
+# 아니라 호환이고, 그것까지 0으로 몰면 구 저작분이 갈 곳을 잃는다.
 $guarded = @(
     @{ Sig = 'void Animator::EnsureExperimentAnimationBinding()'; Why = 'experiment 바인딩' },
-    @{ Sig = 'void Animator::UpdateAnimation()'; Why = '클립 인덱스 클램프' })
+    @{ Sig = 'void Animator::UpdateAnimation()'; Why = '클립 인덱스 클램프' },
+    @{ Sig = 'void Animator::OnAfterSerialize(YAML::Node& node)'; Why = '씬 쓰기' })
 
 foreach ($entry in $guarded) {
     $body = Get-FunctionBody $animatorCode $entry.Sig
@@ -71,13 +75,36 @@ foreach ($entry in $guarded) {
     }
 }
 
-# ── 계약 2: 접촉 래칫 — 파일별 상한을 넘지 않는다 ───────────────────────────
+# ── 계약 2: 씬 표기가 legacy 타입을 지지 않는다 (I6-B1) ─────────────────────
 #
-# 값은 2026-09-01 I6-B0 직후 실측이다. I6-B/C/D가 내려갈 때마다 함께 낮춘다.
+# `Animator::reflect`에 `m_Skeleton`이 들어 있으면 리플렉션 writer가 포인터를
+# 따라 **legacy Skeleton 서브트리를 씬에 적는다**. 저장 형상이 은퇴 대상 타입의
+# 형상이면 그 타입이 죽는 순간 저작분이 갈 곳을 잃는다. 소유(Animator)와 표기가
+# 같은 곳을 가리켜야 한다 — 정본은 `m_clipOverrides`다.
+$headerPath = Join-Path $repoRoot "Engine\SceneRuntime\Animator.h"
+if (-not (Test-Path -LiteralPath $headerPath)) {
+    "Animator.h가 없다: $headerPath"; exit 1
+}
+$reflectBody = Get-FunctionBody (Get-CodeText $headerPath) 'static consteval auto reflect()'
+if ($null -eq $reflectBody) {
+    $fail += "Animator::reflect 본문을 못 찾았다(시그니처 변경?)"
+}
+elseif ($reflectBody -match 'm_Skeleton') {
+    $fail += "Animator::reflect가 아직 m_Skeleton을 적는다 — 씬에 legacy 서브트리가 실린다"
+}
+elseif ($reflectBody -notmatch 'm_Motion') {
+    # 표기 축이 통째로 비면 위 검사가 공짜로 통과한다. 살아 있는 필드 하나를
+    # 함께 물어 "본문을 실제로 읽었다"를 담보한다.
+    $fail += "Animator::reflect 본문 파싱이 수상하다 — m_Motion조차 없다"
+}
+
+# ── 계약 3: 접촉 래칫 — 파일별 상한을 넘지 않는다 ───────────────────────────
+#
+# 값은 2026-09-01 I6-B1 직후 실측이다. I6-B/C/D가 내려갈 때마다 함께 낮춘다.
 # 표에 없는 파일이 나타나면 **새 소비자**라 실패다 — 은퇴 중인 타입에 소비가
 # 늘어나는 것이 이 게이트가 막으려는 유일한 방향이다.
 $ratchet = @{
-    'Engine/SceneRuntime/Animator.cpp'                = 16
+    'Engine/SceneRuntime/Animator.cpp'                = 14
     'Editor/EngineEntry/ConsoleCommandSystem.cpp'     = 16
     'Engine/SceneRuntime/AnimationEventBridge.cpp'    = 11
     'Engine/SceneRuntime/ModelSceneBridge.cpp'        = 8
@@ -85,7 +112,7 @@ $ratchet = @{
     'Engine/RenderEngine/ExperimentModelMigration.cpp' = 5
     'Engine/SceneRuntime/AnimationJob.cpp'            = 5
     'Engine/RenderEngine/Model.cpp'                   = 2
-    'Engine/SceneRuntime/Animator.h'                  = 2
+    'Engine/SceneRuntime/Animator.h'                  = 1
     'Engine/RenderEngine/AnimatorData.h'              = 1
     'Engine/RenderEngine/Model.h'                     = 1
 }
@@ -126,5 +153,5 @@ if ($fail.Count -gt 0) {
     exit 1
 }
 
-"legacy Skeleton 은퇴 경계 통과 — 접촉 $total/$ceiling 건 · 파일 $($measured.Count)개 · 바인딩 자립 확인"
+"legacy Skeleton 은퇴 경계 통과 — 접촉 $total/$ceiling 건 · 파일 $($measured.Count)개 · 바인딩 자립·표기 이주 확인"
 exit 0

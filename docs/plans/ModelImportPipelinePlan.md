@@ -2262,7 +2262,7 @@ D4e-2가 소유는 옮겼지만 표기는 legacy 서브트리 그대로다.
 | 슬라이스 | 내용 | 선행 |
 |---|---|---|
 | **B0** ✅ | 바인딩 자립 — experiment 핸들이 `m_Motion` 단독으로 서고, 클립 클램프가 창구로. 은퇴 래칫 게이트 신설 | 없음 |
-| **B1** | 씬 표기 이주 — `m_Skeleton` 서브트리 표기를 Animator 소유 표기로(읽기 폴백 존치·쓰기 전환) | B0 |
+| **B1** ✅ | 씬 표기 이주 — `m_clipOverrides`가 자기 표기를 갖고, 리플렉션이 legacy 서브트리를 더 이상 적지 않는다(읽기 폴백 존치) | B0 |
 | **B2** | 배치 경로 — `ModelSceneBridge`의 `animator->m_Skeleton` 대입 3곳과 본 트리 계층 생성 2함수를 experiment parent 순회로 | B0 |
 | **B3** | 틱 단일화 — `UpdateBone`/`UpdateBlendBone`/`UpdateBoneLayer`·`EvaluateParityPose` 폐기, experiment 단일 틱 | B1·B2 |
 | **B4** | 진단 표면 — 콘솔 명령 4종(본 덤프·hierarchy 프로브·이벤트 패리티·본 해석)의 legacy 축 판정과 게이트 재배선 | B3 |
@@ -2300,6 +2300,57 @@ D4e-2가 소유는 옮겼지만 표기는 legacy 서브트리 그대로다.
 (on: model.dual 9 · 업로드 10/10 · 드로우 9 · 커버리지 42411 · 구조 77/77,
 off: 업로드 0 · 드로우 9 · 커버리지 42411) — 애니메이션 축 1e/6/7/8/9와 off 팔 4j/4k 포함.
 래칫 기준선 **73/73 · 11파일**.
+
+**I6-B1 완료 실측 (2026-09-01) — 소유는 옮겼는데 표기가 안 따라와 있었다.**
+
+`Animator::reflect`가 `m_Skeleton`을 들고 있어서 리플렉션 writer가 **포인터를 따라
+legacy Skeleton 서브트리를 씬에 적고 있었다.** D4e-2가 소유를 Animator로 옮긴 뒤에도
+`OnAfterSerialize`는 그 서브트리에 값을 **되입히는** 방식이었다 — 저장 형상이 은퇴 대상
+타입의 형상이라, 그 타입이 죽는 순간 저작분이 갈 곳을 잃는다.
+
+★ **표기가 실제로 나르던 것은 둘뿐이다.** 서브트리에 적히던 것은 클립 이름 ·
+`m_isLoop` · `m_keyFrameEvent` · `m_rootTransform`인데, **재로드가 읽는 것은 클립별
+(isLoop, events)뿐**이고 나머지는 자산에서 다시 유도된다. `m_bones`/`m_rootBone`은
+`Skeleton::reflect`에 없어 애초에 안 실렸다 — 페이로드는 유계였다.
+
+새 표기는 인덱스를 명시한다. 구 표기는 서브트리의 **순서**가 곧 클립 인덱스였고, 그것은
+저장 당시 자산 클립 순서와 1:1이라는 암묵 전제 위에 서 있었다.
+
+```yaml
+m_clipOverrides:
+  - clipIndex: 0
+    loopOverride: true
+```
+
+읽기는 이중화다 — 새 표기 우선, 없으면 구 서브트리. **폴백은 은퇴가 아니라 호환**이라
+게이트의 "접촉 0" 계약에서 일부러 뺐다(그것까지 0으로 몰면 구 저작분이 갈 곳을 잃는다).
+
+**코퍼스 실측.** `m_Skeleton` 표기를 가진 저작 씬은 **14개 중 2개**(`Test1`·`Test2`,
+각 Animator 하나에 클립 10개). 이주 후 pass1에 legacy 서브트리 **0건**, `m_clipOverrides`
+10항목, `loopOverride` 값 보존, pass1↔pass2 바이트 동일.
+
+★ **이벤트 축은 코퍼스가 못 잰다 — 저작분이 0이기 때문이다.** 두 씬의
+`m_keyFrameEvent`는 전부 `~`다. 실제로 이벤트 왕복을 태우는 것은 D4e-2가 세운 합성 축
+(`experiment.animevent` seed→save→reload→verify, 라이브 게이트 7·4l)뿐이다 —
+[[authored-assets-mask-defects]]의 그 자리다.
+
+**변이 3종:**
+
+| 변이 | 반응 |
+|---|---|
+| `reflect`에 `m_Skeleton` 복원 | **정적 2건 붉음** — 표기 계약과 `Animator.h` 래칫(1→2) |
+| writer가 `loopOverride`를 안 적음 | **라이브 7·4l 붉음** + **코퍼스 `unstable=2`** |
+| (B0에서) 바인딩 전제 복원 | 계약 ①·래칫 (앞 항목) |
+
+★ **둘째 변이가 두 게이트를 서로 다른 이유로 붉혔다.** 라이브 7은 **값**을 재고
+(seed한 loop=false가 왕복을 못 건넘), 코퍼스는 **멱등**을 잰다 — 쓰기가 값을 빠뜨리면
+in-memory 오버라이드는 남아 있어 pass1이 빈 `clipIndex` 항목을 적고, 그것을 다시 읽은
+pass2는 아무것도 안 적는다. 그래서 "쓰는 것과 읽는 것이 정확히 같다"가 코퍼스 게이트의
+실질 계약이고, 빈 오버라이드를 안 적는 규칙이 그 계약을 지킨다.
+
+무회귀: Debug x64 빌드 exit 0 · 리플렉션 골든 **정확히 1줄 감소**(`m_Skeleton: ~`,
+눈으로 검산 후 재생성) · 씬 코퍼스 14/14 `unstable=0`·`sourceMutations=0` · 프리팹 9/9 ·
+직렬화 기준선 4/4 · `verify-experiment-vertex-live` 전체 통과. 래칫 **73 → 70**.
 
 **I6-C 착수 실측 (2026-09-01) — 신원을 포인터에서 값으로.** 렌더 패스 셋이
 `Mesh*`를 지오메트리 맵 키·배치 키·정렬 기준으로 쓰고 있었다. 업로드는 D34/D4b가

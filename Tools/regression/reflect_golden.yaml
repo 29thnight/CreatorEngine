@@ -45,7 +45,6 @@ Animator:
   m_instanceID: <vol>
   m_isEnabled: true
   m_FileID: 00000000-0000-0000-0000-000000000000
-  m_Skeleton: ~
   m_AnimIndexChosen: 0
   m_AnimIndex: 0
   m_Motion: 00000000-0000-0000-0000-000000000000
