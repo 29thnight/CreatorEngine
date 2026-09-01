@@ -609,7 +609,14 @@ YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
 	return node;
 }
 
-bool DataSystem::DeserializeMaterialPayload(Material& material, const Authoring::NodeView& view)
+bool DataSystem::DeserializeMaterialPayload(Material& material,
+	const Authoring::NodeView& view)
+{
+	return DeserializeMaterialPayload(material, view, nullptr);
+}
+
+bool DataSystem::DeserializeMaterialPayload(Material& material,
+	const Authoring::NodeView& view, experiment::Material* outAuthored)
 {
 	// D3-b-2b-1b-2b 전환기: 본문이 experiment 코덱(I5 소유)에 backend 노드를
 	// 넘기므로 아직 못 옮긴다.
@@ -654,6 +661,10 @@ bool DataSystem::DeserializeMaterialPayload(Material& material, const Authoring:
 			return false;
 		}
 		FinalizeMaterialRuntime(material);
+		// I5-D5c1 — 저작 원본을 버리지 않는다. 여기서 놓치면 소비자는 legacy를
+		// 다시 experiment로 되돌리는 수밖에 없고, 그 왕복이 colorSpace·string
+		// property를 깎는다(변환기 헤더가 명시한 손실).
+		if (nullptr != outAuthored) *outAuthored = std::move(authored);
 		return true;
 	}
 
@@ -874,6 +885,42 @@ Material* DataSystem::LoadMaterial(std::string_view name)
         }
         return slot.get();
     }
+}
+
+// I5-D5c1 — base 재질 자산의 저작 원본. legacy 캐시(Materials)와 별개로
+// 자산 GUID로 캐시한다 — 씬 로드가 renderer마다 같은 base를 다시 파싱하지
+// 않게. 캐시 키는 GUID다(파일 stem이 아니라): ref 표기의 정본 주소가 GUID다.
+std::shared_ptr<const experiment::Material> DataSystem::LoadAuthoredMaterialShared(
+	FileGuid assetGuid)
+{
+	if (FileGuid{} == assetGuid) return nullptr;
+	{
+		std::lock_guard<std::mutex> guard(m_authoredMaterialMutex);
+		const auto it = m_authoredMaterials.find(assetGuid);
+		if (it != m_authoredMaterials.end()) return it->second;
+	}
+
+	const file::path path = GetFilePath(assetGuid);
+	if (path.empty()) return nullptr;
+
+	const Authoring::ReadNode node{ MetaYml::LoadFile(path.string()) };
+	const YAML::Node& backend = node.BackendNodeDuringTransition();
+	if (!backend || !backend.IsMap()) return nullptr;
+	// legacy 표기 자산에는 저작 원본이 없다 — 지어내지 않는다.
+	if (!backend["schema"] || !backend["shaderAssetId"]) return nullptr;
+
+	auto authored = std::make_shared<experiment::Material>();
+	std::string error;
+	if (!experiment::DeserializeMaterialAuthoring(backend, *authored, error))
+	{
+		Debug->LogError("base 재질 저작 원본 decode 실패: " + error);
+		return nullptr;
+	}
+
+	std::lock_guard<std::mutex> guard(m_authoredMaterialMutex);
+	auto& slot = m_authoredMaterials[assetGuid];
+	if (!slot) slot = std::move(authored);
+	return slot;
 }
 
 std::shared_ptr<Material> DataSystem::LoadMaterialShared(std::string_view name)

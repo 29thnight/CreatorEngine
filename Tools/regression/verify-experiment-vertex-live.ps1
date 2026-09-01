@@ -29,6 +29,8 @@
 #      (D5a, off 대조군 4o)
 #   11 에디터 실소비 창구 — 클립 열거·이름(인덱스별)과 메시 존재 가드를
 #      씬 전수로 legacy 직소비와 대조 (D5b, off 대조군 4p)
+#   12 재질 병행 표현 — 합성 새 정본 seed→저장(ref 표기)→재로드→저작 원본
+#      기반 합성이 legacy 왕복과 값 동등한가 + **왕복 손실 실측** (D5c1)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -83,10 +85,15 @@ function Invoke-Run([string]$label, [string]$vertexSwitch) {
     # 가드) — 게이트 산물(gate_foliage.*)은 아래 finally 정리가 걷는다.
     $foliageMode = if ("1" -eq $vertexSwitch) { "experiment" } else { "legacy" }
     $foliageDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Foliage"
+    # I5-D5c1: 합성 새 정본 재질 게시 위치. 코퍼스에 shaderAssetId/ref 표기가
+    # 0건이라(실측) 저작 경로가 실자산에서 돈 적이 없다 — 게이트 산물
+    # (GateAuthoredMat.*)은 아래 finally 정리가 걷는다.
+    $materialDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Materials"
     (Get-Content $template -Raw).Replace('__SCENE__', $Scene.Replace('\', '/')).
         Replace('__SKINNED_MODEL__', $SkinnedModel.Replace('\', '/')).
         Replace('__SAVED_SCENE__', $savedScene.Replace('\', '/')).
         Replace('__FOLIAGE_DIR__', $foliageDir.Replace('\', '/')).
+        Replace('__MATERIAL_DIR__', $materialDir.Replace('\', '/')).
         Replace('__FOLIAGE_MODE__', $foliageMode) |
         Set-Content -LiteralPath $scenario -Encoding UTF8
 
@@ -230,6 +237,21 @@ if ($logOn -notmatch '\[CLI\] experiment\.editorsurface pass animators=\d+ clipE
 if ($logOn -notmatch 'experiment\.editorsurface pass .*meshExperiment=[1-9]') {
     $fail += "11c 메시 가드가 experiment 분기를 한 번도 타지 않았다(on)"
 }
+# ★ 12(I5-D5c1) — 재질 병행 표현. seed가 저작 경로 그대로 새 정본 자산을
+#   게시하고 renderer를 base에 링크하므로, 저장·재로드가 ref 표기를 왕복해야
+#   병행 표현이 채워진다. withInstance=0이면 저작 경로 어딘가가 끊긴 것이다
+#   (skip으로 나오며, 이 단정이 그것을 통과로 읽지 않는다).
+if ($logOn -notmatch '\[CLI\] experiment\.matruntime pass ') {
+    $fail += "12 재질 병행 표현 실패(on) — matruntime 출력을 확인하라"
+}
+if ($logOn -notmatch 'experiment\.matruntime pass .*withInstance=[1-9]') {
+    $fail += "12b 병행 표현이 하나도 채워지지 않았다(on) — 저작 경로가 끊겼다"
+}
+if ($logOn -notmatch 'experiment\.matruntime pass .*compared=[1-9]') {
+    $fail += "12c 대조가 한 건도 성립하지 않았다(on)"
+}
+# 왕복 손실은 **판정하지 않고 보고**한다 — 이 슬라이스의 목적은 손실을 없애는
+# 것이 아니라 크기를 아는 것이다(처방은 c2). 값을 아래 요약이 찍는다.
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
 # I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
 # legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
@@ -416,10 +438,20 @@ else {
     "구조 — 엔티티 $($namesOn.Count)/$($namesOff.Count) · 부모쌍 $($pairsOn.Count)/$($pairsOff.Count)"
 }
 
+# I5-D5c1: 왕복 손실 실측 보고(판정 아님 — c2가 화면을 바꾸는지 가르는 기준선).
+if ($logOn -match 'experiment\.matruntime \w+ .*compared=(\d+) .*onlyAuthored=(\d+) onlyLegacy=(\d+)') {
+    "재질 — 대조 $($Matches[1]) · 저작에만 $($Matches[2]) · legacy에만 $($Matches[3]) (왕복 손실 실측)"
+}
+
 # I5-D5a: 게이트가 저작 루트에 게시한 합성 foliage 자산을 걷는다(성공·실패
 # 공통 — 코퍼스 오염 방지). 이름이 고정이라 재실행은 어차피 덮어쓴다.
 foreach ($gateAsset in @("gate_foliage.foliage", "gate_foliage.foliage.meta")) {
     $gateAssetPath = Join-Path $repoRoot "Dynamic_CPP\Assets\Foliage\$gateAsset"
+    if (Test-Path $gateAssetPath) { Remove-Item -LiteralPath $gateAssetPath -Force }
+}
+# I5-D5c1: 같은 이유로 합성 재질 자산도 걷는다.
+foreach ($gateAsset in @("GateAuthoredMat.asset", "GateAuthoredMat.asset.meta")) {
+    $gateAssetPath = Join-Path $repoRoot "Dynamic_CPP\Assets\Materials\$gateAsset"
     if (Test-Path $gateAssetPath) { Remove-Item -LiteralPath $gateAssetPath -Force }
 }
 

@@ -28,6 +28,9 @@
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
 #include "FoliageComponent.h"      // I5-D5a: experiment.foliage 게이트
+#include "Experiment/MaterialInstance.h"      // I5-D5c1: experiment.matruntime
+#include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
+#include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
 #include "PrimitiveRenderProxy.h"  // I5-D5a: FoliageRenderProxy 실물 사슬
 #include "RHI/IRenderDeviceServices.h" // I5-D5a: RHIExperimentVertexView
 #include "ConditionParameter.h"
@@ -6141,6 +6144,287 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matparity %s\n", passed ? "통과" : "실패");
     }
 
+    // I5-D5c1 — 재질 런타임 병행 표현의 전수 A/B, 그리고 **왕복 손실의 실측**.
+    //
+    // 지금 제품은 저작 문서를 experiment로 읽어 legacy 객체를 만들고, sealing이
+    // 매 프레임 그 legacy를 experiment로 되돌린다(experiment→legacy→experiment).
+    // D5-c1은 저작 원본을 버리지 않고 MeshRenderer에 병행 보관한다. 이 게이트가
+    // 재는 것은 두 가지다:
+    //
+    //   A/B 동등 — 저작 원본+override로 합성한 재질(B)이 legacy 왕복 결과(A)와
+    //     같은가. 값 비교는 코덱 인코딩 텍스트로 한다(수학 타입에 operator==가
+    //     없다 — S2c-2a의 diff writer와 같은 규약).
+    //   왕복 손실 — 같지 않다면 **어디서** 갈리는가. onlyAuthored는 저작 원본에만
+    //     있는 항목이다: 변환기 헤더가 예고한 손실(legacy에 표현이 없는 string
+    //     property·texture colorSpace)이 여기 숫자로 나온다. 이 계수가 0이 아니면
+    //     D5-c2의 sealing 직행이 **화면을 바꾼다**는 뜻이므로, 그 값을 모르고
+    //     넘어가면 c2의 픽셀 차이를 선재 손실과 구분할 수 없다.
+    //
+    // 이 슬라이스에서 병행 표현의 소비자는 이 게이트뿐이다(렌더는 아직 legacy).
+    // I5-D5c1 — 합성 seed. **코퍼스에 새 정본 저작분이 0이다**(실측: 씬·프리팹의
+    // shaderAssetId 0건, ref 표기 0건, standalone 재질 2개 전부 legacy 표기).
+    // S2b writer는 ShaderMeta를 아는 재질만 새 정본으로 쓰는데 코퍼스 재질의
+    // m_shaderMetaGuid가 전부 nil이라, S2c-2a가 만든 base 참조 저작 경로가
+    // 실자산에서 한 번도 돈 적이 없다 — 실자산 게이트는 이 슬라이스에 판별력이
+    // 0이고 합성이 필수다(D5-a Foliage와 같은 결론).
+    //
+    // seed는 저작 경로 그대로 간다: 새 정본 재질 자산을 게시하고(저작 루트
+    // 가드를 지나는 WriteTextAssetWithMeta — GUID 발급 포함), 씬 renderer를 그
+    // base에 링크한 뒤 override 하나를 얹는다. 저장이 ref 표기를 내고, 재로드가
+    // 병행 표현을 채운다.
+    static bool SeedAuthoredMaterial(Scene& scene, const file::path& directory,
+        std::string& outError)
+    {
+        // ShaderMeta는 실물을 쓴다 — 지어낸 GUID로는 keywords 정규화도 property
+        // 검증도 돌지 않아 seed가 검사 대상을 비껴간다.
+        const file::path metaPath = PathFinder::Relative("Shaders\\")
+            / "DefaultPassShader" / "GBuffer.shadermeta";
+        const FileGuid shaderGuid = DataSystems->GetFileGuid(metaPath);
+        if (FileGuid{} == shaderGuid)
+        {
+            outError = "GBuffer.shadermeta GUID 미해석: " + metaPath.string();
+            return false;
+        }
+        std::string error;
+        const ShaderMetaHandle handle =
+            DataSystems->LoadShaderMetaHandle(shaderGuid, error);
+        const std::shared_ptr<const ShaderMeta> meta =
+            DataSystems->ResolveShaderMeta(handle);
+        if (!meta) { outError = "ShaderMeta 로드 실패: " + error; return false; }
+
+        // base 저작본 — meta가 아는 숫자 property만 싣는다(모르는 이름은
+        // 변환기가 나르지 않아 대조가 무의미해진다).
+        // 게시 GUID를 먼저 만든다 — 저작 루트 가드가 preferredGuid의
+        // canonical UUIDv4를 요구하고(nil은 거부), 같은 값을 저작본 assetId에도
+        // 실어 자산 신원과 문서 신원을 일치시킨다.
+        const FileGuid preferredGuid = FileGuid::CreateRandomV4();
+        experiment::Material authored;
+        authored.name = "GateAuthoredMat";
+        authored.assetId.value = preferredGuid.m_guid;
+        authored.shaderAssetId.value = shaderGuid.m_guid;
+        authored.blendMode = experiment::MaterialBlendMode::Opaque;
+        for (const ShaderPropertyDesc& desc : meta->properties)
+        {
+            if (desc.type != ShaderPropertyType::Float) continue;
+            experiment::MaterialProperty property;
+            property.name = desc.name;
+            property.value = 0.25f;
+            authored.properties.push_back(std::move(property));
+            if (authored.properties.size() >= 2) break;
+        }
+        if (authored.properties.empty())
+        {
+            outError = "meta에 float property가 없다 — seed가 diff를 만들 수 없다";
+            return false;
+        }
+
+        YAML::Node document;
+        if (!experiment::SerializeMaterialAuthoring(authored, document, error))
+        {
+            outError = "저작 인코딩 실패: " + error;
+            return false;
+        }
+        YAML::Emitter emitter;
+        emitter << document;
+        const file::path destination =
+            directory / (authored.name + ".asset");
+        const FileGuid baseGuid = AssetAuthoringPort::WriteTextAssetWithMeta(
+            destination, std::string(emitter.c_str()), preferredGuid);
+        if (FileGuid{} == baseGuid)
+        {
+            outError = "자산 게시 거부(저작 루트 가드): " + destination.string();
+            return false;
+        }
+
+        // 링크 대상은 씬의 첫 MeshRenderer다. legacy 사본은 base를 변환해
+        // 만든다 — 저작 경계의 ref 읽기와 같은 규약(base 소유 사본+override).
+        MeshRenderer* target = nullptr;
+        for (const auto& object : scene.m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            if (MeshRenderer* candidate = object->GetComponent<MeshRenderer>())
+            {
+                target = candidate;
+                break;
+            }
+        }
+        if (nullptr == target) { outError = "씬에 MeshRenderer가 없다"; return false; }
+
+        auto owned = std::make_shared<Material>();
+        if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(authored,
+            meta.get(), *owned, error))
+        {
+            outError = "base legacy 변환 실패: " + error;
+            return false;
+        }
+        // override 하나 — 이것이 씬에 diff로 남아야 ref 표기가 성립한다.
+        experiment::MaterialProperty override;
+        override.name = authored.properties.front().name;
+        override.value = 0.75f;
+        if (!ExperimentMaterialMigration::ApplyPropertyToLegacy(*owned,
+            override, error))
+        {
+            outError = "override 적용 실패: " + error;
+            return false;
+        }
+        owned->m_name = authored.name;
+        DataSystems->FinalizeMaterialRuntime(*owned);
+        target->m_Material = std::move(owned);
+        target->m_materialBaseGuid = baseGuid;
+        std::printf("[CLI] experiment.matruntime seed done base=%s "
+            "property=%s owner=%s\n", authored.name.c_str(),
+            override.name.c_str(),
+            target->GetOwner() ? target->GetOwner()->m_name.ToString().c_str()
+                : "?");
+        return true;
+    }
+
+    static void Cmd_experiment_matruntime(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] experiment.matruntime fail 활성 씬 없음\n");
+            return;
+        }
+
+        if (ctx.parts.size() >= 2 && "seed" == ctx.parts[1])
+        {
+            if (ctx.parts.size() < 3)
+            {
+                std::printf("[CLI] experiment.matruntime seed <자산디렉터리>\n");
+                return;
+            }
+            std::string error;
+            if (!SeedAuthoredMaterial(*scene, file::path(ctx.parts[2]), error))
+            {
+                std::printf("[CLI] experiment.matruntime seed fail %s\n",
+                    error.c_str());
+            }
+            return;
+        }
+
+        const auto encodeValue = [](const std::string& name,
+            const experiment::MaterialPropertyValue& value) -> std::string
+        {
+            experiment::MaterialProperty property;
+            property.name = name;
+            property.value = value;
+            YAML::Node entry;
+            std::string error;
+            if (!experiment::SerializeMaterialPropertyValue(property, entry,
+                error))
+            {
+                return "<encode-fail:" + error + ">";
+            }
+            YAML::Emitter emitter;
+            emitter << entry;
+            return std::string(emitter.c_str());
+        };
+
+        std::size_t renderers = 0, withMaterial = 0, withInstance = 0;
+        std::size_t compared = 0, metaMissing = 0, buildFailed = 0;
+        std::size_t valueMismatch = 0, onlyAuthored = 0, onlyLegacy = 0;
+        std::size_t blendMismatch = 0;
+        std::string firstMismatch;
+
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            MeshRenderer* renderer = object->GetComponent<MeshRenderer>();
+            if (nullptr == renderer) continue;
+            ++renderers;
+            if (!renderer->m_Material) continue;
+            ++withMaterial;
+
+            experiment::MaterialInstance* instance =
+                renderer->GetMaterialInstance();
+            if (nullptr == instance) continue;
+            ++withInstance;
+
+            // legacy 축은 실물 변환 정본을 그대로 태운다 — 재구현하지 않는다.
+            std::string error;
+            const ShaderMetaHandle handle = DataSystems->LoadShaderMetaHandle(
+                renderer->m_Material->m_shaderMetaGuid, error);
+            const std::shared_ptr<const ShaderMeta> meta =
+                DataSystems->ResolveShaderMeta(handle);
+            if (!meta) { ++metaMissing; continue; }
+
+            experiment::Material legacyRoundTrip;
+            experiment::Material authoredEffective;
+            if (!ExperimentMaterialMigration::ConvertLegacyMaterial(
+                    *renderer->m_Material, *meta, legacyRoundTrip, error)
+                || !instance->BuildEffectiveMaterial(authoredEffective, error))
+            {
+                ++buildFailed;
+                if (firstMismatch.empty()) firstMismatch = "build:" + error;
+                continue;
+            }
+            ++compared;
+
+            if (legacyRoundTrip.blendMode != authoredEffective.blendMode)
+            {
+                ++blendMismatch;
+                if (firstMismatch.empty())
+                {
+                    firstMismatch = "blend " + object->m_name.ToString();
+                }
+            }
+
+            std::unordered_map<std::string, std::string> legacyValues;
+            for (const experiment::MaterialProperty& property
+                : legacyRoundTrip.properties)
+            {
+                legacyValues[property.name] =
+                    encodeValue(property.name, property.value);
+            }
+            for (const experiment::MaterialProperty& property
+                : authoredEffective.properties)
+            {
+                const auto it = legacyValues.find(property.name);
+                if (it == legacyValues.end())
+                {
+                    ++onlyAuthored;
+                    if (firstMismatch.empty())
+                    {
+                        firstMismatch = "onlyAuthored " + property.name;
+                    }
+                    continue;
+                }
+                if (it->second != encodeValue(property.name, property.value))
+                {
+                    ++valueMismatch;
+                    if (firstMismatch.empty())
+                    {
+                        firstMismatch = "value " + property.name;
+                    }
+                }
+                legacyValues.erase(it);
+            }
+            onlyLegacy += legacyValues.size();
+            if (!legacyValues.empty() && firstMismatch.empty())
+            {
+                firstMismatch = "onlyLegacy " + legacyValues.begin()->first;
+            }
+        }
+
+        // 판정은 **동등 축만** 한다. onlyAuthored/onlyLegacy는 왕복 손실의
+        // 실측이라 여기서 붉히지 않고 계수로 보고한다 — 이 슬라이스는 손실을
+        // 없애는 것이 아니라 크기를 아는 것이 목적이다(그 처방은 c2다).
+        const bool covered = withInstance > 0 && compared > 0;
+        const bool passed = covered && 0 == valueMismatch && 0 == blendMismatch
+            && 0 == buildFailed;
+        std::printf("[CLI] experiment.matruntime %s renderers=%zu "
+            "withMaterial=%zu withInstance=%zu compared=%zu metaMissing=%zu "
+            "buildFailed=%zu valueMismatch=%zu blendMismatch=%zu "
+            "onlyAuthored=%zu onlyLegacy=%zu%s%s\n",
+            passed ? "pass" : (covered ? "fail" : "skip"),
+            renderers, withMaterial, withInstance, compared, metaMissing,
+            buildFailed, valueMismatch, blendMismatch, onlyAuthored, onlyLegacy,
+            firstMismatch.empty() ? "" : " first=",
+            firstMismatch.c_str());
+    }
+
     static void Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)
     {
         // I5-M2 — MaterialResolver. 합성(가짜 서비스·호출 계수) + 실사(DataSystem
@@ -8722,6 +9006,7 @@ namespace ConsoleCmd
             reg({ "experiment.matcook" }, &Cmd_experiment_matcook);
             reg({ "experiment.matparity" }, &Cmd_experiment_matparity);
             reg({ "experiment.matresolve" }, &Cmd_experiment_matresolve);
+            reg({ "experiment.matruntime" }, &Cmd_experiment_matruntime);
             reg({ "experiment.matinstance" }, &Cmd_experiment_matinstance);
             reg({ "experiment.matseal" }, &Cmd_experiment_matseal);
             reg({ "experiment.matcodec" }, &Cmd_experiment_matcodec);

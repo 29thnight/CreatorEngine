@@ -666,7 +666,11 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D5 | 잔여 소비자 — 아래 하위 분해(착수 정찰 2026-09-01) | 에디터·Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-a ✅ | Foliage 메시 experiment 핸들 합류(컴포넌트→프록시→drawPool)·죽은 include 2건 청산·합성 게이트(10·4o, 2축 변이 증명) | Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-b ✅ | 에디터 실소비 정리 — LOD 편집 표면 제거(D0b 이행)·클립 열거/이름/키프레임 수 창구화·피킹 가드 창구화·**역브리지 totalKeyFrames 정의 결함 교정**·전수 A/B 게이트(11·4p, 변이 증명) / model.cache.build는 I6 존치 판정 | 에디터 | **소비자** 참조 감소 |
-| &nbsp;&nbsp;↳ D5-c | S2c-2b/2c 런타임 소유 분리 — base(experiment)+MaterialInstance, 5지점(프록시 33·sealing·CLR 1182/1187·Inspector·보존/커맨드) | 재질 사슬 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D5-c | S2c-2b/2c 런타임 소유 분리 — 아래 하위 분해(착수 정찰 2026-09-01 둘째). 계획의 "5지점"은 과소 계상 — 실소비 13파일 | 재질 사슬 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c1 ✅ | 저작 원본 보관 병행 — `DeserializeMaterialPayload` authored out·`LoadAuthoredMaterialShared`·MeshRenderer `MaterialInstance` 병행·**합성 seed**(코퍼스 새 정본 저작분 0 실측)·A/B 게이트(12, M2 변이 증명) | 저작 경계 | 없음 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2 | sealing 직행 — 프록시가 핸들을 나르고 `BuildSealSourceFromLegacy` 우회. **화면이 바뀐다**(c1 실측: 왕복이 baseColor를 주입) | 프록시·sealing | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3 | 소비자 전환 — CLR 4·Inspector 15·CLI 2를 창구로 | CLR·Inspector | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c4 | Foliage(S2c-2c) + `m_Material` reflect 퇴출·프리팹 패치 경로 판정(S2c-2a 이월) | Foliage·프리팹 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
 **I5-D 착수 정찰 (2026-08-31) — 파급면 3방향 전수.**
@@ -958,6 +962,66 @@ ImGuiDrawHelper 계열(재질 편집 + **D0b가 죽었다고 판정한 LOD 사�
 전환 지점 5개(프록시 브리지 33행·sealing BuildSealSourceFromLegacy·ClrHost 1182/1187·
 Inspector·SceneManager 보존/ProxyCommand payload)는 정찰이 목록화했다. 분해:
 D5-a(Foliage 메시 핸들) → D5-b(에디터 실소비 정리) → D5-c(S2c-2b/2c 소유 분리).
+
+**I5-D5c 착수 정찰 (2026-09-01 둘째) — 분해 근거, 그리고 전제 하나가 뒤집혔다.**
+① **`experiment::MaterialInstance`는 제품 소비자가 0이다** — 정의와
+`experiment.matinstance` selftest뿐이다. M3가 만든 타입이 이 계획서가 스스로
+경고한 "생산만 있고 소비 0" 상태로 남아 있었다. D5-c의 실체는 여기에 첫 제품
+소비자를 붙이는 것이다. ② **매 sealing마다 experiment→legacy→experiment 왕복이
+돈다**: S2c-2a 저작 경계가 experiment 코덱으로 읽어 legacy 객체를 만들고,
+`EnhancedSceneRenderer`(2900·3070)가 `BuildSealSourceFromLegacy`로 되돌린다.
+③ 소비 규모는 계획서의 "5지점"이 아니라 **13파일**이다(MeshRenderer.cpp 21 —
+전부 저작 경계·모델 GUID 폴백, Inspector 15, ModelSceneBridge 5, CLR 4, 프록시
+사슬 5, SceneManager 1, 그 외). 분해: c1(저작 원본 보관) → c2(sealing 직행) →
+c3(소비자 전환) → c4(Foliage·reflect 퇴출).
+
+★ **④ 코퍼스에 새 정본 저작분이 0이다 — 계획의 전제가 틀렸다.** 실측: 씬·프리팹의
+`shaderAssetId` **0건**, 씬의 `ref:` 표기 **0건**, standalone 재질 자산 2개
+(`ForwardWater`/`ForwardWind`) **전부 legacy 표기**. S2b writer는 ShaderMeta를 아는
+재질만 새 정본으로 쓰는데 코퍼스 재질의 `m_shaderMetaGuid`가 전부 nil이라,
+**S2b의 새 정본 writer와 S2c-2a의 base 참조 저작 경로가 실자산에서 한 번도 돈 적이
+없다**(라이브 게이트가 `scene.save`→재로드를 하는데도 저장본이 여전히 legacy 표기인
+것이 그 증거다). 그 경로들은 `matmigrate`의 합성 fixture에서만 산다. 따라서 이
+슬라이스에 **실자산 게이트는 판별력이 0이고 합성이 필수**다(D5-a Foliage와 같은
+결론). M5를 "완료"로 적어 둔 것은 코드 기준이지 저작분 기준이 아니다 —
+코퍼스 마이그레이션은 별도 트랙으로 남는다.
+
+**I5-D5c1 완료 실측 (2026-09-01).** 저작 원본 보관 — 왕복의 입구를 막았다.
+① `DataSystem::DeserializeMaterialPayload`에 `experiment::Material* outAuthored`
+오버로드를 더해 **새 정본 문서의 저작 원본을 버리지 않는다**(기존 무인자 호출부는
+그대로). ② `LoadAuthoredMaterialShared(FileGuid)` 신설 — base 재질 자산의 저작
+원본을 GUID 키로 캐시한다(legacy `Materials` 캐시는 변환 산물이고 이쪽이 원본이라
+별도 뮤텍스·별도 맵). ③ `MeshRenderer::m_materialInstance`(unique_ptr — 전방선언
+타입) 병행. 저작 경계 3분기가 각자 채운다: ref 표기는 base authored + 씬 diff를
+`SetPropertyOverride`로, 인라인 새 정본은 자기 문서가 곧 원본(override 없음),
+**legacy 표기는 비워 둔다** — 여기서 legacy를 변환해 채우면 "원본을 보관했다"는
+거짓 신호가 되고 왕복 손실이 병행 표현 안으로 들어온다. override 파싱은 legacy
+겹치기와 **같은 코덱·같은 순서**를 쓴다(두 번째 표기를 만들면 대조가 무의미해진다).
+
+★ **실측이 예상과 반대였다 — 왕복은 값을 깎는 게 아니라 만들어낸다.**
+`onlyLegacy=1 first=onlyLegacy baseColor`: 저작 원본에 없는 `baseColor`가 legacy
+왕복 결과에는 있다. `ConvertLegacyMaterial`이 승계하는 **MaterialInfo 3필드 폴백**
+(baseColor/metallic/roughness — legacy `BuildShaderPropertyBlock`과 같은 규칙)이
+없던 값을 주입하기 때문이다. 착수 전에 나는 변환기 헤더가 예고한 손실(string
+property·texture colorSpace)만 예상했는데, 실제로 잡힌 것은 **주입** 쪽이었다.
+이것이 c2의 기준선이다: sealing이 저작 원본을 직행하면 그 주입값이 사라져 **화면이
+바뀐다**. 이 숫자를 모르고 c2로 갔으면 픽셀 차이를 선재 손실과 구분할 수 없었다.
+
+게이트 `experiment.matruntime`(라이브 항목 12): seed가 **저작 경로 그대로** 새 정본
+재질 자산을 게시하고(실물 GBuffer ShaderMeta의 float property 2개 — 지어낸 meta로는
+keywords 정규화도 property 검증도 돌지 않는다) renderer를 base에 링크한 뒤 override
+하나를 얹는다. 저장이 ref 표기를 내고 재로드가 병행 표현을 채운다. verify는 저작
+원본+override 합성(B)과 legacy 왕복(A)을 **코덱 인코딩 텍스트**로 값 대조한다(수학
+타입에 operator==가 없다 — S2c-2a diff writer와 같은 규약). 실측:
+`withInstance=1 compared=1 valueMismatch=0 blendMismatch=0 onlyAuthored=0
+onlyLegacy=1`. **변이 M2**(인스턴스 override 생략)가 `valueMismatch=1
+first=value metallic`으로 정확히 그 property만 붉혔다 — 값 축의 이빨. 게시 GUID
+함정 하나: 저작 루트 가드는 `preferredGuid.IsRandomV4()`를 요구한다(nil 거부) —
+처음에 nil을 넘겨 seed가 막혔고, 게이트가 `skip`으로 정직하게 드러냈다.
+
+★ **왕복 손실/주입은 판정하지 않고 보고한다.** 이 슬라이스의 목적은 손실을 없애는
+것이 아니라 **크기를 아는 것**이다 — 처방은 c2다. 단정을 걸면 c2가 그것을 고칠 때
+게이트가 거꾸로 붉어진다([[gate-premise-flips-on-landing]]).
 
 **I5-D5b 완료 실측 (2026-09-01).** 에디터 실소비 정리 — 그리고 **정찰이 예상하지
 못한 실결함 하나**가 여기서 드러났다.

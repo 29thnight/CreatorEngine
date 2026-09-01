@@ -8,6 +8,7 @@
 
 class Mesh;
 namespace experiment { class Model; } // I5-D4c 핸들 소유(shared_ptr 보관용)
+namespace experiment { struct Material; class MaterialInstance; } // I5-D5c1
 namespace YAML { class Node; } // CT6-d: OnDeserialized(node) 전방 선언용
 
 class Material;
@@ -111,4 +112,21 @@ public:
     std::shared_ptr<const experiment::Model> m_experimentModel{};
     std::uint32_t m_experimentMeshIndex{ 0 };
     void EnsureExperimentBinding();
+
+    // I5-D5c1 — 재질의 experiment 병행 표현(base 저작 원본 + 인스턴스
+    // override). 저작 경계가 채운다: 새 정본 문서는 자기 authored 원본을,
+    // ref 표기는 base 자산의 authored를 base로 삼고 씬의 diff를 override로
+    // 얹는다. legacy 표기 문서에는 원본이 없어 비어 있다(게이트가 계수).
+    //
+    // 지금은 병행일 뿐 아무도 그리지 않는다 — 소비는 D5-c2(sealing 직행)의
+    // 몫이고, 이 슬라이스의 소비자는 legacy와 CB bytes를 비트 단위로 대조하는
+    // 게이트다(M1 패리티와 같은 축). unique_ptr인 이유: MaterialInstance가
+    // 전방선언 타입이라 값 멤버로 둘 수 없다.
+    std::unique_ptr<experiment::MaterialInstance> m_materialInstance{};
+    void SetExperimentMaterialBase(
+        std::shared_ptr<const experiment::Material> base);
+    [[nodiscard]] experiment::MaterialInstance* GetMaterialInstance() const
+    {
+        return m_materialInstance.get();
+    }
 };

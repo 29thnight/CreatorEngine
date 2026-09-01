@@ -23,6 +23,7 @@ class Material;
 struct ShaderMeta;
 namespace YAML { class Node; }
 namespace experiment { class Model; } // I5-D1a 역브리지 입력
+namespace experiment { struct Material; } // I5-D5c1 저작 원본 보관
 class Mesh; // I5-D34a 병행 바인딩 조회 입력
 struct RHIExperimentVertexView; // I5-D34a 병행 바인딩 조회 출력
 
@@ -156,6 +157,17 @@ public:
 	// typed reflection이 값을 복원한 뒤 같은 runtime finalize 규약을 공유한다.
 	YAML::Node SerializeMaterialPayload(Material& material) const;
 	bool DeserializeMaterialPayload(Material& material, const Authoring::NodeView& node);
+	// I5-D5c1 — 저작 원본 보관 창구. 새 정본(schema+shaderAssetId) 문서는
+	// experiment::Material로 읽힌 뒤 legacy로 변환되고 **원본이 버려져 왔다** —
+	// 그래서 sealing이 매 프레임 legacy를 experiment로 되돌린다(왕복). 이 창구는
+	// 그 원본을 함께 돌려준다. legacy 표기 문서에는 원본이 없으므로
+	// outAuthored는 채워지지 않는다(반환값은 그대로 성공).
+	bool DeserializeMaterialPayload(Material& material,
+		const Authoring::NodeView& node, experiment::Material* outAuthored);
+	// I5-D5c1 — base 재질 자산의 저작 원본. 씬의 ref 표기가 base를 legacy로만
+	// 로드해 왔다(LoadMaterialShared). 실패·legacy 표기 자산은 nullptr다.
+	std::shared_ptr<const experiment::Material> LoadAuthoredMaterialShared(
+		FileGuid assetGuid);
 	// Model cache는 이 versioned envelope 안에 위 YAML payload를 넣는다. 기존
 	// 무버전 binary record 판별은 probe 뒤 ModelLoader의 read-only 호환 경로가 맡는다.
 	bool HasVersionedMaterialBinaryPayload(std::istream& input) const;
@@ -211,6 +223,14 @@ public:
 	std::mutex m_materialMutex;
 	std::mutex m_modelMutex;
 	std::mutex m_fontMutex;
+
+	// I5-D5c1 — base 재질 자산의 저작 원본 캐시(GUID 키). legacy Materials
+	// 캐시와 별개다: 그쪽은 변환 산물이고 이쪽이 원본이다. 자체 뮤텍스를
+	// 쓴다 — LoadAuthoredMaterialShared는 파일 파싱 중 legacy 캐시를 건드리지
+	// 않으므로 m_materialMutex와 겹칠 이유가 없다.
+	std::mutex m_authoredMaterialMutex;
+	std::unordered_map<FileGuid,
+		std::shared_ptr<const experiment::Material>> m_authoredMaterials;
 
 	// I5-D34a — 병행 바인딩: legacy Mesh 신원 → {experiment 모델, 메시 인덱스}.
 	// LoadModelViaExperiment 성공 시 채워지고, 조회는 렌더 캐시 주입 함수가

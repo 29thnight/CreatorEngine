@@ -52,6 +52,11 @@ wait 10
 # 바인딩과 프록시 DrawSource 핸들을 잰다.
 experiment.foliage seed __FOLIAGE_DIR__
 wait 30
+# I5-D5c1: 합성 새 정본 재질 저작 — 코퍼스에 shaderAssetId/ref 표기가 0건이라
+# (실측) 저작 경로가 실자산에서 한 번도 돈 적이 없다. seed가 자산을 게시하고
+# renderer를 base에 링크해, 저장이 ref 표기를 내고 재로드가 병행 표현을 채운다.
+experiment.matruntime seed __MATERIAL_DIR__
+wait 30
 scene.save __SAVED_SCENE__
 wait 30
 scene.switch __SAVED_SCENE__
@@ -72,6 +77,9 @@ experiment.animmask
 wait 10
 # I5-D5b: 에디터 실소비 창구 전수 A/B(클립 열거·이름, 메시 존재 가드).
 experiment.editorsurface
+wait 10
+# I5-D5c1: 재질 병행 표현 A/B + 왕복 손실 실측.
+experiment.matruntime
 wait 10
 # I5-D5a: Foliage 핸들 왕복·프록시 DrawSource 판정(위 seed의 대구 — 스크립트가
 # 모드 인자를 치환한다).

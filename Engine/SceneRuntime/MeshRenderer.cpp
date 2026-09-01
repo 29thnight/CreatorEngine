@@ -12,6 +12,7 @@
 #include "Experiment/MaterialAuthoringCodec.h" // S2c-2a: override 값 표기 정본
 #include "Experiment/Model.h" // I5-D4c: 이름→메시 해석의 experiment 정본
 #include "ExperimentMaterialMigration.h" // S2c-2a: diff 타이핑·override 적용
+#include "Experiment/MaterialInstance.h" // I5-D5c1: 재질 병행 표현
 #include <mathematics/transform.hpp>
 
 #include <algorithm>
@@ -111,6 +112,46 @@ namespace
 		DataSystems->FinalizeMaterialRuntime(*owned);
 		outMaterial = std::move(owned);
 		outBaseGuid = baseGuid;
+		return true;
+	}
+
+	// I5-D5c1 — 같은 ref 노드의 override를 experiment 인스턴스에 얹는다.
+	// legacy 겹치기(DecodeMaterialReferenceNode)와 **같은 코덱·같은 순서**를
+	// 쓴다 — 두 번째 표기를 만들면 병행 대조가 무의미해진다.
+	[[nodiscard]] bool ApplyReferenceOverridesToInstance(
+		const Authoring::ReadNode materialNode,
+		experiment::MaterialInstance& instance, std::string& outError)
+	{
+		if (const Authoring::ReadNode selections = materialNode["keywordSelections"];
+			selections && selections.IsSequence())
+		{
+			// keywordSelections는 인덱스 표기(축 순서)라 이름 override로
+			// 옮길 수 없다 — base의 것을 그대로 두고 D5-c2의 resolver
+			// 배선에서 판정한다(지금 지어내면 화면이 조용히 달라진다).
+		}
+		const Authoring::ReadNode overrides = materialNode["overrides"];
+		if (!overrides || !overrides.IsSequence()) return true;
+
+		for (const Authoring::ReadNode entry : overrides)
+		{
+			if (!entry.IsMap() || !entry["name"] || !entry["name"].IsScalar())
+			{
+				outError = "override 항목에 name이 없다";
+				return false;
+			}
+			const std::string name = entry["name"].AsString();
+			experiment::MaterialPropertyValue value;
+			if (!experiment::DeserializeMaterialPropertyValue(
+					entry.BackendNodeDuringTransition(), name, value, outError))
+			{
+				return false;
+			}
+			if (!instance.SetPropertyOverride(name, std::move(value)))
+			{
+				outError = "override 설치 거부: " + name;
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -279,6 +320,20 @@ void MeshRenderer::OnUninitializing()
 
 }
 
+// I5-D5c1 — 재질 병행 표현의 base 설치. base가 없으면 인스턴스도 없다
+// (빈 인스턴스를 들고 있으면 "저작 원본이 있다"는 거짓 신호가 된다).
+void MeshRenderer::SetExperimentMaterialBase(
+    std::shared_ptr<const experiment::Material> base)
+{
+    if (!base)
+    {
+        m_materialInstance.reset();
+        return;
+    }
+    m_materialInstance =
+        std::make_unique<experiment::MaterialInstance>(std::move(base));
+}
+
 bool MeshRenderer::HasRenderableMesh(bool* outViaExperiment) const
 {
     if (outViaExperiment) *outViaExperiment = false;
@@ -327,6 +382,23 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 		{
 			m_Material = std::move(resolved);
 			m_materialBaseGuid = baseGuid;
+			// I5-D5c1 — 같은 base의 저작 원본을 experiment 쪽에도 세우고
+			// 씬의 diff를 override로 얹는다. legacy 겹치기(위)와 병행이며,
+			// 게이트가 두 결과를 CB bytes로 대조한다.
+			SetExperimentMaterialBase(
+				DataSystems->LoadAuthoredMaterialShared(baseGuid));
+			if (experiment::MaterialInstance* instance = GetMaterialInstance())
+			{
+				std::string overrideError;
+				if (!ApplyReferenceOverridesToInstance(materialNode, *instance,
+					overrideError))
+				{
+					// 병행 표현만 버린다 — legacy 경로는 이미 성립했다.
+					Debug->LogWarning("m_Material experiment override 적용 실패"
+						" — 병행 표현을 비운다: " + overrideError);
+					SetExperimentMaterialBase(nullptr);
+				}
+			}
 		}
 		else
 		{
@@ -340,11 +412,15 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 		&& materialNode["schema"] && materialNode["shaderAssetId"])
 	{
 		auto decoded = std::make_shared<Material>();
+		auto authored = std::make_shared<experiment::Material>();
 		if (DataSystems->DeserializeMaterialPayload(*decoded,
-			Authoring::NodeViewAccess::Make(materialNode)))
+			Authoring::NodeViewAccess::Make(materialNode), authored.get()))
 		{
 			// FinalizeMaterialRuntime은 이중화 경로 안에서 이미 수행됐다.
 			m_Material = std::move(decoded);
+			// I5-D5c1 — 인라인 새 정본은 자기 문서가 곧 저작 원본이다
+			// (override 없음 — 인라인은 전체 표기다).
+			SetExperimentMaterialBase(std::move(authored));
 		}
 		else
 		{
@@ -355,6 +431,10 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	else if (m_Material)
 	{
 		DataSystems->FinalizeMaterialRuntime(*m_Material);
+		// I5-D5c1 — legacy 표기 문서에는 저작 원본이 없다. 여기서 legacy를
+		// experiment로 변환해 채우면 "원본을 보관했다"는 거짓 신호가 되고
+		// 왕복 손실이 병행 표현 안으로 들어온다 — 비워 둔다(게이트가 계수).
+		SetExperimentMaterialBase(nullptr);
 	}
 
 	// I5-M5 S2c-1 — 모델 해석의 정본은 자기 m_modelGuid다. legacy 씬은 인라인
