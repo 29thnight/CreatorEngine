@@ -32,6 +32,8 @@
 #   12 재질 병행 표현 — 합성 새 정본 seed→저장(ref 표기)→재로드→저작 원본
 #      기반 합성이 legacy 왕복과 값 동등한가 + **왕복 손실 실측** (D5c1)
 #      + packing 바이트 A/B(c2-1)와 프록시 저작 정본 운반(c2-2)
+#   13 편집 반영 — 실물 편집 창구가 legacy→인스턴스→프록시까지 값을 나르는가
+#      (D5c3, c2-2가 만든 비대칭을 닫는다)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -256,6 +258,14 @@ if ($logOn -notmatch 'experiment\.matruntime pass .*compared=[1-9]') {
 #   "0개를 비교해 차이 0"의 전형이다.
 if ($logOn -notmatch 'experiment\.matruntime pass .*proxyAuthored=[1-9]') {
     $fail += "12d 프록시가 저작 정본을 하나도 나르지 않았다(on) — 스냅샷이 끊겼다"
+}
+# ★ 13(I5-D5c3) — 편집 반영. `MaterialScriptBinding.h`의 계약은 "논리 값 갱신이
+#   곧 화면 갱신"인데, c2-2가 sealing을 저작 정본 직행으로 바꾸면서 저작 재질에서
+#   그 계약이 깨져 있었다(편집은 legacy만 바꾸고 sealing은 인스턴스를 읽는다).
+#   이 축은 실물 편집 창구를 태워 legacy→인스턴스→**프록시**까지 값이 닿는지
+#   본다 — 프록시가 종착점이다(인스턴스만 따라오면 화면은 여전히 안 바뀐다).
+if ($logOn -notmatch '\[CLI\] experiment\.matruntime edit pass ') {
+    $fail += "13 편집이 저작 정본에 반영되지 않는다(on) — edit 출력을 확인하라"
 }
 # 왕복 손실은 **판정하지 않고 보고**한다 — 이 슬라이스의 목적은 손실을 없애는
 # 것이 아니라 크기를 아는 것이다(처방은 c2). 값을 아래 요약이 찍는다.

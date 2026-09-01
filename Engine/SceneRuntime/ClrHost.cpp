@@ -1209,20 +1209,26 @@ namespace
 	{
 		if (nullptr == buffer || nullptr == name) return 0;
 
-		Material* material = ResolveMaterial(handle);
+		MeshRenderer* mesh = ResolveMesh(handle);
+		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
 		if (nullptr == material) return 0;
 
-		return MaterialScriptBinding::SetFloat(*material, name, value) ? 1 : 0;
+		// I5-D5c3 — 저작 정본이 있으면 인스턴스도 함께 간다(c2-2 이후 sealing이
+		// 그쪽을 읽는다). 없으면 nullptr — legacy만 갱신하는 기존 경로다.
+		return MaterialScriptBinding::SetFloat(*material, name, value,
+			mesh->GetMaterialInstance()) ? 1 : 0;
 	}
 
 	int __stdcall Api_Mesh_SetMaterialInt(ScriptObjectHandle handle, const char* buffer, const char* name, int value)
 	{
 		if (nullptr == buffer || nullptr == name) return 0;
 
-		Material* material = ResolveMaterial(handle);
+		MeshRenderer* mesh = ResolveMesh(handle);
+		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
 		if (nullptr == material) return 0;
 
-		return MaterialScriptBinding::SetInt(*material, name, value) ? 1 : 0;
+		return MaterialScriptBinding::SetInt(*material, name, value,
+			mesh->GetMaterialInstance()) ? 1 : 0; // I5-D5c3
 	}
 
 	Float4 __stdcall Api_Mesh_GetBaseColor(ScriptObjectHandle handle)
@@ -1236,10 +1242,12 @@ namespace
 
 	void __stdcall Api_Mesh_SetBaseColor(ScriptObjectHandle handle, Float4 color)
 	{
-		if (Material* material = ResolveMaterial(handle))
+		MeshRenderer* mesh = ResolveMesh(handle);
+		if (nullptr != mesh && mesh->m_Material)
 		{
-			MaterialScriptBinding::SetBaseColor(*material,
-				{ color.x, color.y, color.z, color.w });
+			MaterialScriptBinding::SetBaseColor(*mesh->m_Material,
+				{ color.x, color.y, color.z, color.w },
+				mesh->GetMaterialInstance()); // I5-D5c3
 		}
 	}
 

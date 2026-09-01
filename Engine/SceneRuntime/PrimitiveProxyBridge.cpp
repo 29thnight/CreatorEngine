@@ -86,6 +86,7 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
         if (instance->BuildEffectiveMaterial(*effective, error))
         {
             m_authoredMaterial = std::move(effective);
+            m_authoredRevision = instance->Revision(); // I5-D5c3 세대 기준선
         }
         else
         {

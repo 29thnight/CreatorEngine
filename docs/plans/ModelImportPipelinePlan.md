@@ -670,7 +670,8 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c1 ✅ | 저작 원본 보관 병행 — `DeserializeMaterialPayload` authored out·`LoadAuthoredMaterialShared`·MeshRenderer `MaterialInstance` 병행·**합성 seed**(코퍼스 새 정본 저작분 0 실측)·A/B 게이트(12, M2 변이 증명) | 저작 경계 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-1 ✅ | 전환 위험의 측정 — packing 직전 논리 값의 바이트 A/B(합성 layout). **실측 `sealByteMismatch=0`: 직행해도 바이트가 같다**(M2 변이로 이빨 증명) | 게이트 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-2 ✅ | sealing 직행 — `ApplyAuthoredMaterial`(properties·keywords·blendMode만, 부속은 전환기 legacy)·프록시 값 스냅샷·drawPool 반입·양 sealing 축·프록시 운반 게이트(12d, M3 변이 증명) | 프록시·sealing | **소비자** 참조 감소 |
-| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3 | 소비자 전환 — CLR 4·Inspector 15·CLI 2를 창구로 | CLR·Inspector | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-1 ✅ | 편집 반영 — 편집 창구 6종에 인스턴스 경로·Inspector/CLR 호출부 전환·세대(Revision) 기반 프록시 재스냅샷·RED→GREEN 게이트(13) | 편집 창구·프록시 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-2 | sealing 부속 정본화 — M2 resolver로 texture generation owner·flow·legacy 호환 스칼라(c2-2가 전환기로 남긴 것) | resolver·sealing | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c4 | Foliage(S2c-2c) + `m_Material` reflect 퇴출·프리팹 패치 경로 판정(S2c-2a 이월) | Foliage·프리팹 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
@@ -986,6 +987,45 @@ c3(소비자 전환) → c4(Foliage·reflect 퇴출).
 슬라이스에 **실자산 게이트는 판별력이 0이고 합성이 필수**다(D5-a Foliage와 같은
 결론). M5를 "완료"로 적어 둔 것은 코드 기준이지 저작분 기준이 아니다 —
 코퍼스 마이그레이션은 별도 트랙으로 남는다.
+
+**I5-D5c3-1 완료 실측 (2026-09-01) — c2-2가 만든 갭을 닫는다.**
+
+★ **정찰이 c3의 정의를 바꿨다.** 계획서는 c3를 "CLR 4·Inspector 15·CLI 2를 창구로"라
+적었지만 **Inspector와 CLR은 이미 논리 값 경로다**(M5-S3·S4가 처리 —
+`MaterialScriptBinding::Get/SetFloat` 등, `m_Material`은 그 함수에 넘기는 핸들일
+뿐이다). [[plan-target-may-be-already-dead]]의 또 한 사례다.
+
+대신 **c2-2가 실제 갭을 만들었다**. `MaterialScriptBinding.h`의 계약은 "M4 이후
+sealing이 매 프레임 논리 값에서 CB bytes를 다시 pack하므로 **논리 값 갱신이 곧 화면
+갱신**"인데, c2-2가 sealing을 저작 정본 직행으로 바꾸면서 저작 재질에서 그 계약이
+깨졌다: legacy는 `shared_ptr` 공유라 편집이 프록시에 즉시 보이지만 저작 스냅샷은
+**값**이라 따라오지 않는다. 게이트 축(13)이 이것을 **RED로 재현**했다 —
+`applied=1 legacy=0.4242 instance=0.7500`.
+
+닫은 방법은 두 부분이다. ① 편집 창구 6종(`SetFloat`·`SetInt` 코어/제품 표면·
+`SetFloatVector`·`SetTexture`·`SetBaseColor`)에 선택적 인스턴스 인자를 더하고, 값
+생성은 **편집 인자에서 직접** 한다(legacy 값 모델을 되읽으면 타입 태그가 없어
+variant 대안을 정할 수 없다 — 변환기 헤더가 적은 그 제약). 호출부는 Inspector 6곳
+(`TextureDropTarget`→`DrawMaterialTextureSlot` 사슬 포함)과 CLR 3곳이 renderer의
+인스턴스를 넘긴다. ② **세대 기반 프록시 재스냅샷**: `MeshUpdate`가 저작 스냅샷과
+`MaterialInstance::Revision()`을 함께 나르고, 적용부가 세대 변화만 반영한다 —
+**재질 GUID가 그대로인 property 편집**이 여기서 화면까지 닿는다(기존 GUID 조건과
+별개 축). Revision은 M3가 "M4 sealing이 무변경 인스턴스의 재밀봉을 건너뛰도록"
+만들어 둔 필드다 — 설계가 이 자리를 예견하고 있었다.
+
+실측 `edit pass property=metallic applied=1 legacy=0.4242 instance=0.4242
+proxy=0.4242`. **RED→GREEN 전환이 곧 증명**이라 별도 변이를 두지 않았다(게이트가
+착수 전 상태에서 실제로 붉었고 고침 뒤 초록이다 — [[gate-premise-flips-on-landing]]의
+"핵심 판정" 케이스). 게이트는 프록시를 종착점으로 잰다: 인스턴스만 따라오고 프록시가
+옛 스냅샷을 들면 화면은 여전히 안 바뀐다. 큐 소비도 제품 창구
+(`ProxyCommandQueue->Execute`)를 그대로 태운다 — 헤드리스에는 렌더 틱이 없어서
+게이트가 직접 부르되, 다른 경로를 만들지 않는다.
+
+★ **한계(정직).** 호출부가 인스턴스를 넘기는지는 **정적으로 강제되지 않는다**
+(기본 인자가 nullptr이라 누락이 컴파일 에러가 아니다). 새 편집 호출부를 더할 때
+인스턴스를 빠뜨리면 그 property만 조용히 안 따라온다 — 게이트의 edit 축은 float
+하나만 태우므로 전수가 아니다. 정적 단정을 세우려면 호출 표현이 멀티라인이라
+파서가 필요해 이 슬라이스에서는 두지 않았다.
 
 **I5-D5c2-2 완료 실측 (2026-09-01).** sealing 직행 — 저작 정본이 있으면 왕복을
 타지 않는다. ① `ExperimentMaterialSealing::ApplyAuthoredMaterial` 신설:

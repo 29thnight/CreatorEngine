@@ -34,6 +34,8 @@
 #include "Experiment/MaterialPropertyBlock.h"  // I5-D5c2-1: packing 바이트 축
 #include "MaterialPropertyPacker.h"           // I5-D5c2-1: 합성 layout
 #include "PrimitiveRenderProxy.h"           // I5-D5c2-2: 프록시 축
+#include "MaterialScriptBinding.h"          // I5-D5c3: 실물 편집 창구
+#include "ProxyCommandQueue.h"             // I5-D5c3: 갱신 커맨드 소비
 #include "PrimitiveRenderProxy.h"  // I5-D5a: FoliageRenderProxy 실물 사슬
 #include "RHI/IRenderDeviceServices.h" // I5-D5a: RHIExperimentVertexView
 #include "ConditionParameter.h"
@@ -6330,6 +6332,131 @@ namespace ConsoleCmd
         if (nullptr == scene)
         {
             std::printf("[CLI] experiment.matruntime fail 활성 씬 없음\n");
+            return;
+        }
+
+        // I5-D5c3 — 편집 반영 축. `MaterialScriptBinding.h`의 계약은 "논리 값
+        // 갱신이 곧 화면 갱신"이다(M4 이후 sealing이 매 프레임 논리 값에서 CB
+        // bytes를 다시 pack하므로). c2-2가 저작 정본 직행을 넣으면서 그 계약이
+        // 저작 재질에서 깨졌다: 편집은 legacy를 바꾸는데 sealing은 인스턴스에서
+        // 합성한 값을 쓴다. 이 축이 그 간극을 잰다 — 실물 편집 창구를 태우고
+        // 인스턴스 합성 결과가 따라오는지 본다.
+        if (ctx.parts.size() >= 2 && "edit" == ctx.parts[1])
+        {
+            MeshRenderer* target = nullptr;
+            for (const auto& object : scene->m_Entities)
+            {
+                if (!object || object->IsDestroyMark()) continue;
+                MeshRenderer* candidate = object->GetComponent<MeshRenderer>();
+                if (nullptr != candidate && candidate->m_Material
+                    && nullptr != candidate->GetMaterialInstance())
+                {
+                    target = candidate;
+                    break;
+                }
+            }
+            if (nullptr == target)
+            {
+                std::printf("[CLI] experiment.matruntime edit skip "
+                    "저작 정본 보유 renderer 0\n");
+                return;
+            }
+
+            std::string error;
+            const ShaderMetaHandle handle = DataSystems->LoadShaderMetaHandle(
+                target->m_Material->m_shaderMetaGuid, error);
+            const std::shared_ptr<const ShaderMeta> meta =
+                DataSystems->ResolveShaderMeta(handle);
+            if (!meta)
+            {
+                std::printf("[CLI] experiment.matruntime edit fail meta=%s\n",
+                    error.c_str());
+                return;
+            }
+            std::string propertyName;
+            for (const ShaderPropertyDesc& desc : meta->properties)
+            {
+                if (ShaderPropertyType::Float != desc.type) continue;
+                propertyName = desc.name;
+                break;
+            }
+            if (propertyName.empty())
+            {
+                std::printf("[CLI] experiment.matruntime edit skip "
+                    "float property 0\n");
+                return;
+            }
+
+            // 실물 편집 창구를 그대로 태운다 — 재구현하면 게이트가 제품이
+            // 아니라 자기 사본을 재게 된다.
+            constexpr float kEdited = 0.4242f;
+            const bool applied = MaterialScriptBinding::SetFloat(
+                *target->m_Material, propertyName, kEdited,
+                target->GetMaterialInstance());
+            const float legacyAfter = MaterialScriptBinding::GetFloat(
+                *target->m_Material, propertyName, -1.0f);
+
+            experiment::Material effective;
+            float instanceAfter = -1.0f;
+            if (target->GetMaterialInstance()->BuildEffectiveMaterial(
+                effective, error))
+            {
+                for (const experiment::MaterialProperty& property
+                    : effective.properties)
+                {
+                    if (property.name != propertyName) continue;
+                    if (const float* value =
+                        std::get_if<float>(&property.value))
+                    {
+                        instanceAfter = *value;
+                    }
+                    break;
+                }
+            }
+
+            // 편집의 종착점은 프록시다 — 인스턴스만 따라오고 프록시가 옛
+            // 스냅샷을 들고 있으면 화면은 여전히 안 바뀐다(c2-2가 만든 그
+            // 비대칭). 갱신 커맨드를 실제로 태워 세대 기반 재스냅샷을 잰다.
+            RenderScene* renderScene = SceneManagers->GetRenderScene();
+            renderScene->UpdateCommand(target);
+            // 큐는 렌더 스레드가 비우지만 헤드리스에는 그 틱이 없다 — 게이트가
+            // 같은 소비 창구를 직접 태운다(제품과 다른 경로를 만들지 않는다).
+            ProxyCommandQueue->Execute(*renderScene,
+                renderScene->GetSceneEpoch());
+            float proxyAfter = -1.0f;
+            for (const auto& proxy :
+                SceneManagers->GetRenderScene()->GetPrimitiveProxySnapshot())
+            {
+                auto* meshProxy = dynamic_cast<MeshRenderProxy*>(proxy.get());
+                if (nullptr == meshProxy
+                    || meshProxy->m_instancedID != target->GetInstanceID()
+                    || !meshProxy->m_authoredMaterial)
+                {
+                    continue;
+                }
+                for (const experiment::MaterialProperty& property
+                    : meshProxy->m_authoredMaterial->properties)
+                {
+                    if (property.name != propertyName) continue;
+                    if (const float* value = std::get_if<float>(&property.value))
+                    {
+                        proxyAfter = *value;
+                    }
+                    break;
+                }
+                break;
+            }
+
+            const bool instanceFollowed =
+                std::abs(instanceAfter - kEdited) < 1e-5f;
+            const bool proxyFollowed =
+                std::abs(proxyAfter - kEdited) < 1e-5f;
+            std::printf("[CLI] experiment.matruntime edit %s property=%s "
+                "applied=%d legacy=%.4f instance=%.4f proxy=%.4f\n",
+                (applied && instanceFollowed && proxyFollowed)
+                    ? "pass" : "fail",
+                propertyName.c_str(), applied ? 1 : 0, legacyAfter,
+                instanceAfter, proxyAfter);
             return;
         }
 

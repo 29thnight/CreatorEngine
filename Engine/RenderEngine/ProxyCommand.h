@@ -60,6 +60,11 @@ public:
 		math::vector3 worldPosition{};
 		math::aabb worldBounds{};
 		std::shared_ptr<Material> material{};
+		// I5-D5c3 — 저작 정본의 값 스냅샷과 그 세대. 프록시의 authored는 값이라
+		// legacy(shared_ptr 공유)와 달리 편집이 저절로 보이지 않는다 — 갱신
+		// 커맨드가 세대 변화를 보고 새 스냅샷을 나른다.
+		std::shared_ptr<const experiment::Material> authoredMaterial{};
+		std::uint64_t authoredRevision{ 0 };
 		std::shared_ptr<math::matrix4x4[]> bonePalette{};
 		HashedGuid animatorGuid{};
 		HashedGuid materialGuid{};

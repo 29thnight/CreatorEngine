@@ -130,6 +130,9 @@ public:
 	// 저작 원본이 없다는 뜻이고(legacy 표기 문서·Assimp 모델) sealing은
 	// legacy 브리지를 그대로 탄다.
 	std::shared_ptr<const experiment::Material>	m_authoredMaterial{};
+	// I5-D5c3 — 그 스냅샷이 어느 세대의 것인가. 갱신 커맨드가 이 값을 보고
+	// 재스냅샷을 결정한다(재질 GUID가 그대로인 property 편집을 잡는 축).
+	std::uint64_t								m_authoredRevision{ 0 };
 	HashedGuid						m_animatorGuid{};
 	HashedGuid						m_materialGuid{};
 	// 본 팔레트 버퍼(소유권 공유).

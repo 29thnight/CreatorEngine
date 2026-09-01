@@ -77,7 +77,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		{
 			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
 			auto mat = meshRenderer->m_Material.get();
-			TextureDropTarget(mat);
+			TextureDropTarget(mat, meshRenderer->GetMaterialInstance());
 
 			// I5-M5 S4 — 편집 정본은 이름 기반 논리 값이다. m_materialInfo는
 			// legacy 스칼라 소비자용 사본이라 binding이 함께 동기화한다.
@@ -85,14 +85,16 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			math::color baseColor = MaterialScriptBinding::GetBaseColor(*mat);
 			if (ImGui::ColorEdit4("base color", &baseColor.r))
 			{
-				MaterialScriptBinding::SetBaseColor(*mat, baseColor);
+				MaterialScriptBinding::SetBaseColor(*mat, baseColor,
+					meshRenderer->GetMaterialInstance());
 			}
 
 			float metallic = MaterialScriptBinding::GetFloat(*mat,
 				standard_material::property::Metallic, mat_info.m_metallic);
 			if (ImGui::SliderFloat("metalic", &metallic, 0.f, 1.f)
 				&& !MaterialScriptBinding::SetFloat(*mat,
-					standard_material::property::Metallic, metallic))
+					standard_material::property::Metallic, metallic,
+					meshRenderer->GetMaterialInstance()))
 			{
 				mat_info.m_metallic = metallic;
 			}
@@ -101,7 +103,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 				standard_material::property::Roughness, mat_info.m_roughness);
 			if (ImGui::SliderFloat("roughness", &roughness, 0.f, 1.f)
 				&& !MaterialScriptBinding::SetFloat(*mat,
-					standard_material::property::Roughness, roughness))
+					standard_material::property::Roughness, roughness,
+					meshRenderer->GetMaterialInstance()))
 			{
 				mat_info.m_roughness = roughness;
 			}
@@ -209,7 +212,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 						{
 							(void)MaterialScriptBinding::SetFloatVector(*mat,
 								*meta, desc.name, std::span<const float>(
-									values, static_cast<std::size_t>(count)));
+									values, static_cast<std::size_t>(count)),
+								meshRenderer->GetMaterialInstance());
 						}
 						break;
 					}
@@ -219,7 +223,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 						if (ImGui::DragInt(desc.name.c_str(), &value))
 						{
 							(void)MaterialScriptBinding::SetInt(*mat, *meta,
-								desc.name, value);
+								desc.name, value,
+								meshRenderer->GetMaterialInstance());
 						}
 						break;
 					}
@@ -229,7 +234,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 						if (ImGui::Checkbox(desc.name.c_str(), &value))
 						{
 							(void)MaterialScriptBinding::SetInt(*mat, *meta,
-								desc.name, value ? 1 : 0);
+								desc.name, value ? 1 : 0,
+								meshRenderer->GetMaterialInstance());
 						}
 						break;
 					}
@@ -335,7 +341,8 @@ namespace
 	void DrawMaterialTextureSlot(Material& mat, const char* emptyLabel,
 		std::string_view propertyName, std::string& legacyNameField,
 		const std::shared_ptr<Texture>& current, bool compress,
-		const std::function<void(std::shared_ptr<Texture>)>& apply)
+		const std::function<void(std::shared_ptr<Texture>)>& apply,
+		experiment::MaterialInstance* instance) // I5-D5c3
 	{
 		ImGui::PushID(propertyName.data(),
 			propertyName.data() + propertyName.size());
@@ -353,7 +360,8 @@ namespace
 			if (ImGui::Button("delete"))
 			{
 				legacyNameField.clear();
-				MaterialScriptBinding::SetTexture(mat, propertyName, {});
+				MaterialScriptBinding::SetTexture(mat, propertyName, {},
+					instance);
 				apply({});
 			}
 		}
@@ -390,7 +398,8 @@ namespace
 				{
 					apply(DataSystems->LoadSharedMaterialTexture(
 						filepath.string(), compress));
-					MaterialScriptBinding::SetTexture(mat, propertyName, guid);
+					MaterialScriptBinding::SetTexture(mat, propertyName, guid,
+						instance);
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -400,7 +409,8 @@ namespace
 	}
 }
 
-void TextureDropTarget(Material* mat)
+void TextureDropTarget(Material* mat,
+	experiment::MaterialInstance* instance)
 {
 	ImGui::PushID(mat);
 	DrawMaterialTextureSlot(*mat, "No basemap texture",
@@ -409,20 +419,20 @@ void TextureDropTarget(Material* mat)
 		[mat](std::shared_ptr<Texture> texture)
 		{
 			mat->UseBaseColorMap(std::move(texture));
-		});
+		}, instance);
 	DrawMaterialTextureSlot(*mat, "No Normalmap texture",
 		standard_material::property::NormalMap, mat->m_normalTexName,
 		mat->GetNormalMapShared(), false,
 		[mat](std::shared_ptr<Texture> texture)
 		{
 			mat->UseNormalMap(std::move(texture));
-		});
+		}, instance);
 	DrawMaterialTextureSlot(*mat, "No ORMmap texture",
 		standard_material::property::OrmMap, mat->m_ORM_TexName,
 		mat->GetOccRoughMetalMapShared(), false,
 		[mat](std::shared_ptr<Texture> texture)
 		{
 			mat->UseOccRoughMetalMap(std::move(texture));
-		});
+		}, instance);
 	ImGui::PopID();
 }

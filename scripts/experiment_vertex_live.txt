@@ -81,6 +81,9 @@ wait 10
 # I5-D5c1: 재질 병행 표현 A/B + 왕복 손실 실측.
 experiment.matruntime
 wait 10
+# I5-D5c3: 편집 반영 축 — 실물 편집 창구를 태우고 저작 인스턴스가 따라오는가.
+experiment.matruntime edit
+wait 10
 # I5-D5a: Foliage 핸들 왕복·프록시 DrawSource 판정(위 seed의 대구 — 스크립트가
 # 모드 인자를 치환한다).
 experiment.foliage verify __FOLIAGE_MODE__

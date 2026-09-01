@@ -1,6 +1,7 @@
 #include "ProxyCommand.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
+#include "../RenderEngine/Experiment/MaterialInstance.h" // I5-D5c3
 #include "Terrain.h"
 #include "FoliageComponent.h"
 #include "ImageComponent.h"
@@ -61,6 +62,19 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 	}
 	update.material = std::move(material);
 	update.materialGuid = update.material->m_materialGuid;
+	// I5-D5c3 — 저작 정본은 값 스냅샷이라 legacy처럼 저절로 따라오지 않는다.
+	// 세대(Revision)를 함께 실어 적용부가 변화만 반영한다 — 매 갱신마다
+	// 합성하는 비용을 피하면서 편집이 화면에 닿게 한다.
+	if (experiment::MaterialInstance* instance = component->GetMaterialInstance())
+	{
+		auto effective = std::make_shared<experiment::Material>();
+		std::string error;
+		if (instance->BuildEffectiveMaterial(*effective, error))
+		{
+			update.authoredMaterial = std::move(effective);
+			update.authoredRevision = instance->Revision();
+		}
+	}
 	update.lightMapping = component->m_LightMapping;
 	update.updateLightMapping = -1 != update.lightMapping.lightmapIndex;
 	update.bitflag = component->m_bitflag;
@@ -423,6 +437,15 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 				{
 					proxy->m_Material = update->material;
 					proxy->m_materialGuid = update->materialGuid;
+				}
+				// I5-D5c3 — 저작 스냅샷은 **세대**로 갱신한다. 재질 GUID가
+				// 그대로여도 property 편집이면 세대가 오르므로, 같은 재질의
+				// 값 편집이 여기서 화면까지 닿는다(위 GUID 조건과 별개 축).
+				if (nullptr != update->authoredMaterial
+					&& proxy->m_authoredRevision != update->authoredRevision)
+				{
+					proxy->m_authoredMaterial = update->authoredMaterial;
+					proxy->m_authoredRevision = update->authoredRevision;
 				}
 
 				proxy->m_isAnimationEnabled = update->hasAnimator;
