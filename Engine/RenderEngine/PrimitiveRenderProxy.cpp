@@ -60,6 +60,8 @@ FoliageRenderProxy::CaptureDrawSources() const
 			DrawSource draw{};
 			draw.mesh = type.m_mesh;
 			draw.material = type.m_material;
+			draw.experimentModel = type.m_experimentModel;
+			draw.experimentMeshIndex = type.m_experimentMeshIndex;
 			draw.worldMatrix = instance->m_worldMatrix;
 			draw.worldBounds = math::transform(
 				type.m_mesh->GetBoundingBox(), instance->m_worldMatrix);

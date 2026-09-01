@@ -13,7 +13,7 @@
 #include "BoxColliderComponent.h"
 #include "CharacterControllerComponent.h"
 #include "Terrain.h"
-#include "Model.h"
+// I5-D5a: 죽은 include 청산 — Model 타입 사용 0건(착수 정찰 실측)
 #include "InvalidScriptComponent.h"
 #include "ScriptComponent.h"
 #include "FoliageComponent.h"

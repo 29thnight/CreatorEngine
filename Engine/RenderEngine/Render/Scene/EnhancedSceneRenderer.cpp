@@ -2706,6 +2706,20 @@ namespace
                     pooled.worldBounds = source.worldBounds;
                     pooled.hasBounds = !source.worldBounds.is_empty();
 
+                    // I5-D5a — Foliage도 experiment 핸들을 아이템에 싣는다
+                    // (poolMesh와 같은 규약 — 실패는 legacy lookup 폴백).
+                    if (source.experimentModel)
+                    {
+                        RHIExperimentVertexView view{};
+                        if (DataSystem::BuildExperimentVertexView(
+                            *source.experimentModel,
+                            source.experimentMeshIndex, view))
+                        {
+                            pooled.item.experimentView = view;
+                            pooled.experimentSource = source.experimentModel;
+                        }
+                    }
+
                     if (source.material)
                     {
                         pooled.materialSource = std::move(source.material);

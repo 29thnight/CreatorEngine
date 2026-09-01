@@ -25,6 +25,8 @@
 #      경로 실분기 관측 (D4e-3)
 #   9  AvatarMask 트리 생성 — experiment 단일 패스 vs legacy 재귀, 순서까지
 #      대조(저장분 인덱스 대응 계약) (D4e-3)
+#   10 Foliage 메시 핸들 합류 — 합성 seed→재로드→바인딩·DrawSource·뷰 완비
+#      (D5a, off 대조군 4o)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -74,9 +76,16 @@ function Invoke-Run([string]$label, [string]$vertexSwitch) {
     $scenario = Join-Path $Work "experiment_vertex_live_$label.txt"
     $savedScene = Join-Path $Work "experiment_vertex_live_$label.creator"
     Remove-Item -LiteralPath $savedScene -Force -ErrorAction SilentlyContinue
+    # I5-D5a: foliage 자산 게시 위치·verify 모드 치환(on=experiment, off=legacy).
+    # 게시는 저작 루트(Assets\Foliage) 안만 허용된다(AssetAuthoringPort 경로
+    # 가드) — 게이트 산물(gate_foliage.*)은 아래 finally 정리가 걷는다.
+    $foliageMode = if ("1" -eq $vertexSwitch) { "experiment" } else { "legacy" }
+    $foliageDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Foliage"
     (Get-Content $template -Raw).Replace('__SCENE__', $Scene.Replace('\', '/')).
         Replace('__SKINNED_MODEL__', $SkinnedModel.Replace('\', '/')).
-        Replace('__SAVED_SCENE__', $savedScene.Replace('\', '/')) |
+        Replace('__SAVED_SCENE__', $savedScene.Replace('\', '/')).
+        Replace('__FOLIAGE_DIR__', $foliageDir.Replace('\', '/')).
+        Replace('__FOLIAGE_MODE__', $foliageMode) |
         Set-Content -LiteralPath $scenario -Encoding UTF8
 
     $stdout = Join-Path $Work "experiment_vertex_live_$label.out.log"
@@ -201,6 +210,11 @@ if ($logOn -notmatch '\[CLI\] experiment\.boneresolve pass bones=(\d+) experimen
 if ($logOn -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperiment=1') {
     $fail += "9 마스크 트리 대조 실패(on) — animmask 출력을 확인하라"
 }
+# ★ 10(I5-D5a) — Foliage 핸들 합류: postLoad 재해석 바인딩·프록시 DrawSource·
+#   뷰 완비까지 실물 사슬로 판정(합성 seed 전제 — 코퍼스 Foliage 저작분 0).
+if ($logOn -notmatch '\[CLI\] experiment\.foliage verify pass mode=experiment') {
+    $fail += "10 Foliage 핸들 합류 실패(on) — foliage 출력을 확인하라"
+}
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
 # I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
 # legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
@@ -274,6 +288,10 @@ if ($logOff -notmatch '\[CLI\] experiment\.boneresolve pass bones=(\d+) experime
 }
 if ($logOff -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperiment=0') {
     $fail += "4n 스위치를 껐는데 마스크 생성이 experiment로 샜다(또는 실패)"
+}
+# I5-D5a: off 대조군 — Foliage 바인딩·뷰가 전량 legacy(핸들 0)여야 한다.
+if ($logOff -notmatch '\[CLI\] experiment\.foliage verify pass mode=legacy') {
+    $fail += "4o 스위치를 껐는데 Foliage 핸들이 experiment로 샜다(또는 실패)"
 }
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"
@@ -370,6 +388,13 @@ else {
         $fail += "5c 부모 관계가 다르다 — 어긋난 쌍 $diffCount 건 (계층 구조가 갈렸다)"
     }
     "구조 — 엔티티 $($namesOn.Count)/$($namesOff.Count) · 부모쌍 $($pairsOn.Count)/$($pairsOff.Count)"
+}
+
+# I5-D5a: 게이트가 저작 루트에 게시한 합성 foliage 자산을 걷는다(성공·실패
+# 공통 — 코퍼스 오염 방지). 이름이 고정이라 재실행은 어차피 덮어쓴다.
+foreach ($gateAsset in @("gate_foliage.foliage", "gate_foliage.foliage.meta")) {
+    $gateAssetPath = Join-Path $repoRoot "Dynamic_CPP\Assets\Foliage\$gateAsset"
+    if (Test-Path $gateAssetPath) { Remove-Item -LiteralPath $gateAssetPath -Force }
 }
 
 if ($fail.Count -gt 0) {

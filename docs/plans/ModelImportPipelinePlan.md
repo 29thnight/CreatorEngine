@@ -663,7 +663,10 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-2 ✅ | 이벤트·루프 Animator 소유 이관(D0a 명세) — 재주입 오염 청산·발화/편집/writer 정본 이동·합성 왕복 게이트(7·4l, 3축 변이 증명) | Animator·CLR | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-3 ✅ | 본 해석·마스크 생성 창구화 — Scene 본 전파의 legacy 접촉 0·마스크 DFS 순서 재현·전수 A/B 게이트(8·9·4m/4n, 3축 변이 증명) | Scene·마스크 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
-| ↳ I5-D5 | 잔여 소비자 — Foliage/Terrain(중복 패턴 동시)·에디터 패스스루 6파일·CLI, S2c-2b/2c 합류 | 에디터·Foliage | **소비자** 참조 감소 |
+| ↳ I5-D5 | 잔여 소비자 — 아래 하위 분해(착수 정찰 2026-09-01) | 에디터·Foliage | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D5-a ✅ | Foliage 메시 experiment 핸들 합류(컴포넌트→프록시→drawPool)·죽은 include 2건 청산·합성 게이트(10·4o, 2축 변이 증명) | Foliage | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D5-b | 에디터 실소비 정리 — LOD 편집 표면(D0b 죽은 사슬의 버튼)·model.cache.build 진단 판정·ImGuiDrawHelperAnimator 자산 편집 잔여 | 에디터 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D5-c | S2c-2b/2c 런타임 소유 분리 — base(experiment)+MaterialInstance, 5지점(프록시 33·sealing·CLR 1182/1187·Inspector·보존/커맨드) | 재질 사슬 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
 **I5-D 착수 정찰 (2026-08-31) — 파급면 3방향 전수.**
@@ -941,6 +944,39 @@ GBuffer/Shadow memcpy)은 `math::matrix4x4[512]` 값 배열이라 타입 무의�
 ⑤ AvatarMask 생성은 `m_Skeleton->m_rootBone`(Bone* 트리), humanoid 판정은
 `Bone::m_region`(이름 휴리스틱 파생). 분해: D4e-1(재생 이중화) → D4e-2(이벤트·루프 이관)
 → D4e-3(Scene 전파·마스크·은퇴 판정).
+
+**I5-D5 착수 정찰 (2026-09-01) — 분해 근거.** 잔여 소비자 전수(에이전트 정찰)가 계획을
+셋 고쳤다. ① **Terrain은 legacy 소비가 없다** — 자체 `TerrainMesh`/`TerrainMaterial`을
+heightmap에서 직접 생성(Model.h include 자체가 없음). "Foliage와 같은 중복 패턴"의 실체는
+Terrain 인스펙터(ImGuiDrawHelperTerrainComponent:283-286) 안의 **Foliage 저작 UI**(드롭 →
+`GetMeshShared(0)` — postLoad와 동일 패턴, AddFoliageType 경유)였다. ② 패스스루로 분류됐던
+6파일 중 **둘은 죽은 include**(EditorMain.h·ComponentFactory.cpp — Model 타입 사용 0건),
+셋은 실제 패스스루(GameObjectCommand·HierarchyWindow·AssetBundleWindow — 포인터 나르기/이름
+표시), 실소비는 ConsoleCommandSystem(model.cache.build 캐시 왕복 진단·renderingMode 토글)과
+ImGuiDrawHelper 계열(재질 편집 + **D0b가 죽었다고 판정한 LOD 사슬의 에디터 버튼**)이다.
+③ 코퍼스에 Foliage/Terrain 저작분 **0** — 실자산 게이트 판별력 없음, 합성 필수. S2c-2b의
+전환 지점 5개(프록시 브리지 33행·sealing BuildSealSourceFromLegacy·ClrHost 1182/1187·
+Inspector·SceneManager 보존/ProxyCommand payload)는 정찰이 목록화했다. 분해:
+D5-a(Foliage 메시 핸들) → D5-b(에디터 실소비 정리) → D5-c(S2c-2b/2c 소유 분리).
+
+**I5-D5a 완료 실측 (2026-09-01).** Foliage 메시의 experiment 핸들 합류 — D4b가 한계로
+남긴 "Foliage 아이템은 핸들을 싣지 않는다(lookup 폴백)"가 닫혔다. ① `FoliageType`에
+핸들 병행(m_experimentModel/인덱스 — m_mesh와 같은 비직렬화 지위), 바인딩은
+`FoliageComponent::BindExperimentMesh`(D4c 신원 조회) 하나로 — 호출 지점은
+AddFoliageType(에디터 드롭·CLI·자산 로드 공용)과 OnDeserialized의 m_mesh 재해석 직후.
+② 프록시 `DrawSource`에 핸들 필드 추가(CaptureDrawSources가 복사), 렌더러 poolFoliage가
+poolMesh와 같은 규약으로 `experimentView`를 아이템에 싣는다. ③ 죽은 include 2건 청산.
+게이트(`experiment.foliage` seed/verify — 합성): seed가 저작 경로 그대로 타입+인스턴스를
+심고 foliage 자산을 게시(저작 루트 가드 실측 — TEMP 게시는 AssetAuthoringPort가 거부,
+Assets\Foliage 안만 허용. 게이트가 산물을 걷는다), 재로드 verify가 바인딩·실물 프록시
+사슬(CaptureDrawSources)·뷰 완비(stableKey)를 잰다. 실측: on pass(types 1·bound 1·
+draws 1·views 1)·off 전량 legacy(4o)·전 단정 초록. 변이 2종이 각자 자기 축만 붉혔다:
+**M1**(바인딩 절단) → 바인딩+후속 뷰, **M2**(DrawSource 복사 생략) → **뷰 축만**(바인딩
+초록 — 컴포넌트 검사만으로는 눈먼 소실을 프록시 축이 가른다). 한계(정직): 렌더러
+poolFoliage 분기 자체는 헤드리스 관측 밖이다 — 라이브는 렌더 0프레임이고 dx12.scene
+하네스에 Foliage 대칭 구성이 없다(poolMesh는 D4b 때 하네스 대칭이 대신 섰지만 Foliage는
+그 대칭조차 없음). 코드가 poolMesh의 4줄 미러라는 사실과 DrawSource까지의 변이 증명이
+그 간극을 부분 보증한다.
 
 **I5-D4e-3 완료 실측 (2026-09-01).** 본 해석·마스크 생성 창구화 — D4e의 마지막 legacy
 직소비 두 갈래가 Animator 창구로 모였다. ① Scene 본 전파: `UpdateModelRecursive`의

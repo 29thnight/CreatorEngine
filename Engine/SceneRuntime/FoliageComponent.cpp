@@ -134,9 +134,24 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
 	std::cout << "Foliage asset loaded successfully: " << assetPath << std::endl;
 }
 
+void FoliageComponent::BindExperimentMesh(FoliageType& type)
+{
+    // I5-D5a — D4c 신원 조회(m_hashingMesh 키)로 experiment 핸들을 잇는다.
+    // 실패(미등록·스위치 off)는 핸들 없음 — 렌더가 legacy lookup 폴백을 탄다.
+    type.m_experimentModel.reset();
+    type.m_experimentMeshIndex = 0;
+    if (nullptr == type.m_mesh) return;
+    DataSystems->TryGetExperimentMeshBinding(
+        *type.m_mesh, type.m_experimentModel, type.m_experimentMeshIndex);
+}
+
 void FoliageComponent::AddFoliageType(const FoliageType& type)
 {
     m_foliageTypes.push_back(type);
+    // 저작 경로(에디터 드롭·CLI)는 m_mesh가 채워진 채 들어온다 — 여기서
+    // 바인딩한다. 자산 로드 경로(LoadFoliageAsset)는 m_mesh가 아직 비어
+    // no-op이고, OnDeserialized의 재해석 루프가 다시 바인딩한다.
+    BindExperimentMesh(m_foliageTypes.back());
 }
 
 void FoliageComponent::RemoveFoliageType(uint32 typeID)
@@ -348,6 +363,8 @@ void FoliageComponent::OnDeserialized()
 		}
 		type.m_mesh = model->GetMeshShared(0);
 		type.m_material = model->GetMaterialShared(0);
+		// I5-D5a — m_mesh 재해석 직후 experiment 핸들도 잇는다.
+		BindExperimentMesh(type);
 	}
 
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존

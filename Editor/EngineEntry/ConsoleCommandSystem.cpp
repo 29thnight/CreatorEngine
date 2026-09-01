@@ -27,6 +27,9 @@
 #include "Experiment/Model.h" // I5-D4e-1: experiment.animtick 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
+#include "FoliageComponent.h"      // I5-D5a: experiment.foliage 게이트
+#include "PrimitiveRenderProxy.h"  // I5-D5a: FoliageRenderProxy 실물 사슬
+#include "RHI/IRenderDeviceServices.h" // I5-D5a: RHIExperimentVertexView
 #include "ConditionParameter.h"
 #include "UIManager.h"
 #include "Canvas.h"
@@ -4049,6 +4052,145 @@ namespace ConsoleCmd
             }
             std::printf("[CLI] experiment.animevent verify fail%s\n",
                 joined.c_str());
+        }
+    }
+
+    // I5-D5a — Foliage 메시의 experiment 핸들 합류 게이트. 코퍼스에 Foliage
+    // 저작분이 0이라(착수 정찰 실측) 합성으로 판정한다: seed가 씬에
+    // FoliageComponent+타입(Gunner)+인스턴스를 저작 경로(AddFoliageType —
+    // 바인딩 지점) 그대로 심고 foliage 자산을 게시하며, 저장·재로드 뒤 verify가
+    // ①postLoad 재해석 경로의 바인딩 ②프록시 DrawSource의 핸들 반영
+    // (CaptureDrawSources — 실물 함수) ③뷰 완비(stableKey)를 잰다. 렌더러
+    // poolFoliage 분기는 헤드리스 관측 밖(라이브 렌더 0프레임 + dx12.scene
+    // 하네스에 Foliage 대칭 구성 없음) — 계획서 한계 기록.
+    static void Cmd_experiment_foliage(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene || ctx.parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: experiment.foliage seed <자산디렉터리>"
+                " | verify experiment|legacy\n");
+            return;
+        }
+
+        if ("seed" == ctx.parts[1])
+        {
+            if (ctx.parts.size() < 3)
+            {
+                std::printf("[CLI] experiment.foliage seed <자산디렉터리>\n");
+                return;
+            }
+            auto model = DataSystems->FindCachedModel("Gunner_F_Mythic");
+            if (!model)
+            {
+                std::printf("[CLI] experiment.foliage seed fail 모델 없음\n");
+                return;
+            }
+            Entity* entity = scene->CreateEntity("GateFoliage",
+                GameObjectType::Mesh, 0);
+            FoliageComponent* foliage = entity->AddComponent<FoliageComponent>();
+            FoliageType type(model->GetMeshShared(0),
+                model->GetMaterialShared(0), true, model->name);
+            foliage->AddFoliageType(type);
+            FoliageInstance instance;
+            instance.m_position = { 3.0f, 0.0f, 3.0f };
+            instance.m_scale = { 0.1f, 0.1f, 0.1f };
+            foliage->AddFoliageInstance(instance);
+            foliage->SaveFoliageAsset(file::path(ctx.parts[2]), L"gate_foliage");
+            const bool published = FileGuid{} != foliage->m_foliageAssetGuid;
+            std::printf("[CLI] experiment.foliage seed %s types=%zu "
+                "assetGuid=%s\n", published ? "done" : "fail",
+                foliage->GetFoliageTypes().size(),
+                published ? "ok" : "nil");
+            return;
+        }
+
+        const bool expectExperiment = ctx.parts.size() >= 3
+            && "experiment" == ctx.parts[2];
+        FoliageComponent* foliage = nullptr;
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            if (FoliageComponent* candidate =
+                object->GetComponent<FoliageComponent>())
+            {
+                foliage = candidate;
+                break;
+            }
+        }
+        if (nullptr == foliage)
+        {
+            std::printf("[CLI] experiment.foliage verify skip components=0\n");
+            return;
+        }
+
+        std::vector<std::string> failures;
+        const auto& types = foliage->GetFoliageTypes();
+        if (types.empty()) failures.push_back("왕복: 타입 0(자산 재로드 실패)");
+        std::size_t boundTypes = 0;
+        for (const FoliageType& type : types)
+        {
+            if (nullptr == type.m_mesh)
+            {
+                failures.push_back("왕복: m_mesh 재해석 실패");
+                continue;
+            }
+            if (type.m_experimentModel) ++boundTypes;
+        }
+        if (expectExperiment && boundTypes != types.size())
+        {
+            failures.push_back("바인딩: experiment 핸들 "
+                + std::to_string(boundTypes) + "/"
+                + std::to_string(types.size()));
+        }
+        if (!expectExperiment && 0 != boundTypes)
+        {
+            failures.push_back("바인딩: off인데 experiment 핸들 "
+                + std::to_string(boundTypes));
+        }
+
+        // 실물 프록시 사슬 — 생성자·색인·DrawSource 캡처를 제품 함수 그대로.
+        FoliageRenderProxy proxy(foliage);
+        proxy.RebuildInstanceMap();
+        const auto draws = proxy.CaptureDrawSources();
+        if (draws.empty()) failures.push_back("프록시: DrawSource 0");
+        std::size_t viewCompleteDraws = 0;
+        for (const auto& draw : draws)
+        {
+            if (nullptr == draw.experimentModel) continue;
+            RHIExperimentVertexView view{};
+            if (DataSystem::BuildExperimentVertexView(*draw.experimentModel,
+                draw.experimentMeshIndex, view) && 0 != view.stableKey)
+            {
+                ++viewCompleteDraws;
+            }
+        }
+        if (expectExperiment && viewCompleteDraws != draws.size())
+        {
+            failures.push_back("뷰: 완비 "
+                + std::to_string(viewCompleteDraws) + "/"
+                + std::to_string(draws.size()));
+        }
+        if (!expectExperiment && 0 != viewCompleteDraws)
+        {
+            failures.push_back("뷰: off인데 완비 "
+                + std::to_string(viewCompleteDraws));
+        }
+
+        if (failures.empty())
+        {
+            std::printf("[CLI] experiment.foliage verify pass mode=%s "
+                "types=%zu bound=%zu draws=%zu views=%zu\n",
+                expectExperiment ? "experiment" : "legacy",
+                types.size(), boundTypes, draws.size(), viewCompleteDraws);
+        }
+        else
+        {
+            std::string joined;
+            for (const std::string& failure : failures)
+                joined += " [" + failure + "]";
+            std::printf("[CLI] experiment.foliage verify fail mode=%s%s\n",
+                expectExperiment ? "experiment" : "legacy", joined.c_str());
         }
     }
 
@@ -8425,6 +8567,7 @@ namespace ConsoleCmd
             reg({ "experiment.animtick" }, &Cmd_experiment_animtick);
             reg({ "experiment.animevent" }, &Cmd_experiment_animevent);
             reg({ "experiment.boneresolve" }, &Cmd_experiment_boneresolve);
+            reg({ "experiment.foliage" }, &Cmd_experiment_foliage);
             reg({ "experiment.animmask" }, &Cmd_experiment_animmask);
             reg({ "experiment.import" }, &Cmd_experiment_import);
             reg({ "experiment.gltf" }, &Cmd_experiment_gltf);

@@ -47,6 +47,11 @@ wait 30
 # 재로드에서 verify가 왕복을 잰다.
 experiment.animevent seed
 wait 10
+# I5-D5a: 합성 Foliage 저작(같은 이유 — 코퍼스 Foliage 저작분 0). 타입 저작
+# 경로(AddFoliageType)와 자산 게시까지 심어, 재로드 verify가 postLoad 재해석
+# 바인딩과 프록시 DrawSource 핸들을 잰다.
+experiment.foliage seed __FOLIAGE_DIR__
+wait 30
 scene.save __SAVED_SCENE__
 wait 30
 scene.switch __SAVED_SCENE__
@@ -64,6 +69,10 @@ wait 10
 experiment.boneresolve
 wait 10
 experiment.animmask
+wait 10
+# I5-D5a: Foliage 핸들 왕복·프록시 DrawSource 판정(위 seed의 대구 — 스크립트가
+# 모드 인자를 치환한다).
+experiment.foliage verify __FOLIAGE_MODE__
 wait 10
 
 dx12.scene

@@ -183,6 +183,11 @@ public:
 	{
 		std::shared_ptr<Mesh> mesh{};
 		std::shared_ptr<Material> material{};
+		// I5-D5a — experiment 메시 핸들(FoliageType 병행 필드의 사본).
+		// drawPool이 이것으로 아이템 experimentView를 만들어 D4b 핸들 사슬에
+		// 합류한다 — 없으면 legacy lookup 폴백.
+		std::shared_ptr<const experiment::Model> experimentModel{};
+		uint32 experimentMeshIndex{ 0 };
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::aabb worldBounds{};
 		uint32 foliageTypeID{};

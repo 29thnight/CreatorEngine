@@ -6,7 +6,7 @@
 // 에디터 레이어(EngineGUIWindow, Academy_4Q Editor 필터). 구 ImGuiRenderer의
 // 후계다 — 백엔드는 IImGuiHost 경계 뒤로 갔다.
 #include "EditorRenderer.h"
-#include "Model.h"
+// I5-D5a: 죽은 include 청산 — Model 타입 사용 0건(착수 정찰 실측)
 #include "Delegate.h"
 
 #include "SceneViewWindow.h"
