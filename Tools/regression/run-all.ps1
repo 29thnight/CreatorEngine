@@ -288,6 +288,13 @@ Run-Step "스킨 프록시 갱신" {
         (Join-Path $PSScriptRoot "verify-skinned-proxy-refresh.ps1") -Work $Work
 }
 
+# I6-B4-pre: 라이브 스키닝의 그림은 헤드리스로 못 잰다(dx12.scene이 포즈에서
+# 포화한다). 대신 그림의 입력을 잰다 — 유한성·본 인덱스 범위·포즈별 digest.
+Run-Step "스킨 포즈 무결성" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-skin-pose-integrity.ps1") -Work $Work
+}
+
 Run-Step "Experiment cooked catalog 기동" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-experiment-cooked-catalog.ps1") -Exe $Exe -Work $Work

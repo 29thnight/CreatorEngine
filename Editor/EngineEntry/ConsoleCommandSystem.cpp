@@ -6366,6 +6366,175 @@ namespace ConsoleCmd
         }
     }
 
+    // 스킨 기하 축 — experiment.skinbounds
+    //
+    // ★ 왜 CPU에서 다시 푸는가: 라이브 팔레트로 그린 그림을 재는 자가 없다.
+    //   dx12.scene 하네스는 팔레트를 **옳게 받고도**(digest 일치 실측) 포즈가
+    //   실리면 커버리지가 포화한다 — 오프라인 하네스의 한계이고 에디터 화면은
+    //   정상이다(사용자 확인). 그래서 그림 대신 **그림의 입력**을 잰다:
+    //   팔레트 × 정점 스킨을 CPU에서 풀어 결과 기하가 성한지 본다.
+    //
+    // ★ 독립 유도다. 렌더 경로의 산술을 재구현하는 것이 아니라 스키닝 정의
+    //   자체(가중합)를 쓰고, 판정은 **바인드 포즈 대비 크기 비율**이다 —
+    //   팔레트 규약이 어긋나거나 인덱스가 밀리면 기하가 폭발하거나 접힌다.
+    //   B4b가 깨뜨릴 수 있는 것이 정확히 그것이다.
+    static void Cmd_experiment_skinbounds(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] experiment.skinbounds fail 활성 씬 없음\n");
+            return;
+        }
+
+        std::size_t meshes = 0, nonFinite = 0, emptyWeights = 0, outOfRange = 0;
+        // 왜 걸러졌는지 세지 않으면 meshes=0이 "대상 없음"인지 "조회 실패"인지
+        // 구별되지 않는다 — skip을 통과로 읽는 실수를 막는 계수다.
+        std::size_t renderers = 0, withModel = 0, withSkin = 0, withAnimator = 0;
+        double worstRatio = 0.0;
+        std::string worstMesh;
+        std::uint32_t digest = 2166136261u;
+
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            MeshRenderer* renderer = object->GetComponent<MeshRenderer>();
+            if (nullptr == renderer) continue;
+            ++renderers;
+            if (!renderer->m_experimentModel) continue;
+            ++withModel;
+            const experiment::Mesh* mesh = renderer->m_experimentModel
+                ->TryGetMesh(experiment::MeshIndex(renderer->m_experimentMeshIndex));
+            if (nullptr == mesh) continue;
+            if (!experiment::Has(mesh->vertices.AttributeMask(),
+                experiment::VertexAttribute::BoneIndices))
+            {
+                continue;
+            }
+            ++withSkin;
+
+            // ★ 메시 엔티티는 GetRootIndex를 안 채운다(SetRootIndex는 본
+            //   오브젝트에만 걸린다 — 실측: withSkin=2인데 withAnimator=0).
+            //   프록시가 쓰는 것과 같은 규칙으로 부모 사슬을 거슬러 찾는다
+            //   (ProxyCommand::FindEnabledAnimator).
+            Animator* animator = nullptr;
+            for (Entity::Index parent = object->GetParentIndex();
+                parent != Entity::INVALID_INDEX; )
+            {
+                Entity* owner = object->OwnerSceneFindIndex(parent);
+                if (nullptr == owner) break;
+                if (Animator* candidate = owner->GetComponent<Animator>())
+                {
+                    animator = candidate;
+                    break;
+                }
+                parent = owner->GetParentIndex();
+            }
+            if (nullptr == animator || 0 == animator->GetSkeletonSerial()) continue;
+            ++withAnimator;
+
+            ++meshes;
+            const std::size_t boneCount = animator->GetBoneCount();
+            float skinnedMin[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
+            float skinnedMax[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+            float bindMin[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
+            float bindMax[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
+            const std::size_t vertexCount = mesh->vertices.size();
+            for (std::size_t index = 0; index < vertexCount; ++index)
+            {
+                const experiment::Vertex vertex = mesh->vertices[index];
+                float weightSum = 0.f;
+                float skinned[3] = { 0.f, 0.f, 0.f };
+                for (std::size_t lane = 0;
+                    lane < experiment::MaxBoneInfluences; ++lane)
+                {
+                    const float weight = vertex.boneWeights[lane];
+                    if (weight <= 0.f) continue;
+                    const experiment::PackedBoneIndex packed =
+                        vertex.boneIndices[lane];
+                    if (experiment::InvalidPackedBoneIndex == packed) continue;
+                    const std::size_t bone = static_cast<std::size_t>(packed);
+                    if (bone >= boneCount || bone >= Skeleton::MAX_BONES)
+                    {
+                        ++outOfRange;
+                        continue;
+                    }
+                    weightSum += weight;
+                    const math::matrix4x4& m = animator->m_FinalTransforms[bone];
+                    const float px = vertex.position.x;
+                    const float py = vertex.position.y;
+                    const float pz = vertex.position.z;
+                    // ★ 절대 기하는 이 축의 판정 대상이 **아니다**. 두 곱
+                    //   순서를 다 시험했는데 바인드 대비 7,115배와 22,020배가
+                    //   나왔다 — 밖에서 팔레트 규약을 맞출 수 없다는 뜻이고,
+                    //   [[encoder-bench-must-measure-real-path]]가 적어 둔
+                    //   "재구현 대조군은 못 믿는다"의 그 자리다. 그래서 크기
+                    //   비율은 **관측값으로만** 내고 단정하지 않는다.
+                    //
+                    //   단정하는 것은 규약과 무관한 둘이다: 유한성(NaN/inf)과
+                    //   인덱스 범위. B4b가 깨뜨릴 수 있는 것(팔레트가 쓰레기가
+                    //   된다·인덱스가 밀린다)이 정확히 그 둘로 드러난다.
+                    skinned[0] += weight * (m.m[0][0] * px + m.m[1][0] * py
+                        + m.m[2][0] * pz + m.m[3][0]);
+                    skinned[1] += weight * (m.m[0][1] * px + m.m[1][1] * py
+                        + m.m[2][1] * pz + m.m[3][1]);
+                    skinned[2] += weight * (m.m[0][2] * px + m.m[1][2] * py
+                        + m.m[2][2] * pz + m.m[3][2]);
+                }
+                if (weightSum <= 0.f) { ++emptyWeights; continue; }
+                if (!std::isfinite(skinned[0]) || !std::isfinite(skinned[1])
+                    || !std::isfinite(skinned[2]))
+                {
+                    ++nonFinite;
+                    continue;
+                }
+                const float bind[3] = { vertex.position.x, vertex.position.y,
+                    vertex.position.z };
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    skinnedMin[axis] = (std::min)(skinnedMin[axis], skinned[axis]);
+                    skinnedMax[axis] = (std::max)(skinnedMax[axis], skinned[axis]);
+                    bindMin[axis] = (std::min)(bindMin[axis], bind[axis]);
+                    bindMax[axis] = (std::max)(bindMax[axis], bind[axis]);
+                    const std::int32_t q = static_cast<std::int32_t>(
+                        std::lround(static_cast<double>(skinned[axis]) * 256.0));
+                    std::uint32_t bits = static_cast<std::uint32_t>(q);
+                    for (int byte = 0; byte < 4; ++byte)
+                    {
+                        digest ^= (bits >> (byte * 8)) & 0xFFu;
+                        digest *= 16777619u;
+                    }
+                }
+            }
+
+            double skinnedExtent = 0.0, bindExtent = 0.0;
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                skinnedExtent = (std::max)(skinnedExtent,
+                    (double)(skinnedMax[axis] - skinnedMin[axis]));
+                bindExtent = (std::max)(bindExtent,
+                    (double)(bindMax[axis] - bindMin[axis]));
+            }
+            const double ratio = bindExtent > 0.0
+                ? skinnedExtent / bindExtent : 0.0;
+            if (ratio > worstRatio) { worstRatio = ratio; worstMesh = mesh->name; }
+        }
+
+        // 판정은 규약과 무관한 둘만 — 유한성과 인덱스 범위. worstRatio는
+        // 관측값이다(위 ★ 참조): 밖에서 팔레트 규약을 못 맞춰 절대 크기는
+        // 자로 쓸 수 없다. digest는 포즈별 골든으로 쓴다.
+        const bool passed = meshes > 0 && 0 == nonFinite && 0 == outOfRange;
+        std::printf("[CLI] experiment.skinbounds %s meshes=%zu nonFinite=%zu "
+            "outOfRange=%zu emptyWeights=%zu worstRatio=%.4f worst=%s "
+            "digest=%08X renderers=%zu withModel=%zu withSkin=%zu "
+            "withAnimator=%zu\n",
+            passed ? "pass" : (meshes == 0 ? "skip" : "fail"),
+            meshes, nonFinite, outOfRange, emptyWeights, worstRatio,
+            worstMesh.empty() ? "-" : worstMesh.c_str(), digest,
+            renderers, withModel, withSkin, withAnimator);
+    }
+
     // 결정적 포즈 고정 — experiment.animpose <fraction>
     //
     // ★ 왜 필요한가: 라이브 스키닝의 **그림**을 재려면 포즈가 결정적이어야
@@ -11631,6 +11800,7 @@ namespace ConsoleCmd
             reg({ "experiment.modelbridge" }, &Cmd_experiment_modelbridge);
             reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
+            reg({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
             reg({ "experiment.animpose" }, &Cmd_experiment_animpose);
             reg({ "experiment.animlive" }, &Cmd_experiment_animlive);
             reg({ "experiment.animtick" }, &Cmd_experiment_animtick);
