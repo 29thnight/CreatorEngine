@@ -4511,6 +4511,119 @@ namespace ConsoleCmd
             firstMismatch.c_str());
     }
 
+    // I5-D4f-1 — 바운드 축. 역브리지가 legacy 정점 시공을 그만두면
+    // RecalculateBounds()가 원본을 잃는다: 바운드는 기본값(빈 AABB·반지름 0)으로
+    // 남고 컬링·피킹·그림자 반경이 조용히 틀어진다. D4f-0 예행이 이 눈멂을
+    // 실증했다 — legacy 정점 없이도 드로우 9·커버리지 42411이 그대로였다.
+    // 지금 게이트의 어느 축도 바운드를 한 번도 읽지 않는다.
+    //
+    // 셋을 잰다:
+    //   ① 절단이 실제로 일어났는가 — legacyVertices (on 0 · off 전량)
+    //   ② 바운드가 살아 있는가   — degenerate 0
+    //   ③ 두 유도가 같은 값인가  — digest를 ps1이 on/off로 대조한다.
+    // ③이 실질 이빨이다. on은 experiment 정본 주입, off는 legacy 정점→min/max
+    // 유도라 서로 다른 산출 경로이고, digest가 갈리면 주입이 틀린 것이다.
+    // ①②는 각 실행 안에서만 성립한다 — ①이 없으면 절단이 안 일어나도 전부
+    // 초록이고(무변경 슬라이스), ②가 없으면 바운드 소실이 조용히 통과한다.
+    static void Cmd_experiment_meshbounds(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] experiment.meshbounds fail 활성 씬 없음\n");
+            return;
+        }
+
+        std::size_t meshes = 0, legacyVertices = 0, degenerate = 0;
+        std::size_t expBound = 0, boundMismatch = 0;
+        std::string firstIssue;
+        std::uint32_t digest = 2166136261u;
+
+        const auto account = [&](const std::string& label, Mesh& mesh,
+            const experiment::Model* model, std::uint32_t meshIndex)
+        {
+            ++meshes;
+            // 비-const 참조로 부른다 — const 오버로드는 배열을 값으로 복사한다.
+            if (!mesh.GetVertices().empty()) ++legacyVertices;
+
+            const math::aabb box = mesh.GetBoundingBox();
+            const math::sphere ball = mesh.GetBoundingSphere();
+            if (box.is_empty() || !(ball.radius > 0.0f))
+            {
+                ++degenerate;
+                if (firstIssue.empty()) firstIssue = "degenerate:" + label;
+            }
+
+            char line[320];
+            std::snprintf(line, sizeof(line),
+                "%s|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f",
+                label.c_str(), box.center.x, box.center.y, box.center.z,
+                box.extents.x, box.extents.y, box.extents.z, ball.radius);
+            for (const char* cursor = line; '\0' != *cursor; ++cursor)
+            {
+                digest ^= static_cast<unsigned char>(*cursor);
+                digest *= 16777619u;
+            }
+
+            if (nullptr == model) return;
+            const experiment::Mesh* source =
+                model->TryGetMesh(experiment::MeshIndex{ meshIndex });
+            if (nullptr == source) return;
+            ++expBound;
+            if (!math::near_equal(box, source->bounds))
+            {
+                ++boundMismatch;
+                if (firstIssue.empty()) firstIssue = "mismatch:" + label;
+            }
+        };
+
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+
+            MeshRenderer* renderer = object->GetComponent<MeshRenderer>();
+            if (nullptr != renderer && nullptr != renderer->m_Mesh)
+            {
+                account(object->m_name.ToString() + "/" +
+                    renderer->m_Mesh->GetName(), *renderer->m_Mesh,
+                    renderer->m_experimentModel.get(),
+                    renderer->m_experimentMeshIndex);
+            }
+
+            // Foliage 타입 메시도 같은 브리지 산물이다. 여기 바운드는 인스턴스
+            // 컬링(PrimitiveRenderProxy의 뷰별 transformed AABB)이 읽는데,
+            // 빈 AABB는 "컬링 안 함"으로 흘러 드로우 계수를 바꾸지 않는다 —
+            // 드로우 동수 축이 원리적으로 못 보는 자리라 여기서 잰다.
+            FoliageComponent* foliage = object->GetComponent<FoliageComponent>();
+            if (nullptr != foliage)
+            {
+                std::size_t typeIndex = 0;
+                for (const FoliageType& type : foliage->GetFoliageTypes())
+                {
+                    if (type.m_mesh)
+                    {
+                        account(object->m_name.ToString() + "/foliage" +
+                            std::to_string(typeIndex) + "/" +
+                            type.m_mesh->GetName(), *type.m_mesh,
+                            type.m_experimentModel.get(),
+                            type.m_experimentMeshIndex);
+                    }
+                    ++typeIndex;
+                }
+            }
+        }
+
+        const bool covered = meshes > 0;
+        const bool passed = covered && 0 == degenerate && 0 == boundMismatch;
+        std::printf("[CLI] experiment.meshbounds %s meshes=%zu "
+            "legacyVertices=%zu degenerate=%zu expBound=%zu mismatch=%zu "
+            "digest=%08X%s%s\n",
+            passed ? "pass" : (covered ? "fail" : "skip"),
+            meshes, legacyVertices, degenerate, expBound, boundMismatch,
+            digest,
+            firstIssue.empty() ? "" : " first=", firstIssue.c_str());
+    }
+
     // I5-D4e-1 — 재생 팔레트 패리티. 활성 씬의 experiment 핸들 보유 Animator
     // 전수에 대해, 같은 시각 입력으로 legacy 재귀(UpdateBone)와 experiment
     // 단일 순회를 제품 함수 그대로 돌려 m_FinalTransforms를 원소 단위 대조한다.
@@ -9430,6 +9543,7 @@ namespace ConsoleCmd
             reg({ "experiment.foliage" }, &Cmd_experiment_foliage);
             reg({ "experiment.animmask" }, &Cmd_experiment_animmask);
             reg({ "experiment.editorsurface" }, &Cmd_experiment_editorsurface);
+            reg({ "experiment.meshbounds" }, &Cmd_experiment_meshbounds);
             reg({ "experiment.import" }, &Cmd_experiment_import);
             reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
             reg({ "experiment.fbx" }, &Cmd_experiment_fbx);

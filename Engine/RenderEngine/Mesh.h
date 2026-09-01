@@ -184,6 +184,13 @@ public:
 private:
 	friend class ModelLoader;
 	friend class MeshOptimizer;
+	// I5-D4f-1 — 역브리지(DataSystem::BuildLegacyModelFromExperiment)가
+	// experiment 정본 bounds를 직접 주입한다. 정점 시공을 끊은 뒤에는
+	// RecalculateBounds()가 원본을 잃어(빈 배열이면 즉시 반환) 바운드가
+	// 기본값으로 남고, 컬링·피킹·그림자 반경이 조용히 틀어진다.
+	// Model.h가 같은 브리지를 위해 이미 든 선례고, 브리지와 함께 I6에서
+	// 죽는다. 값 계산은 experiment 임포터가 하므로 식이 갈리지 않는다.
+	friend class DataSystem;
 
 	std::string m_name;
 

@@ -662,9 +662,9 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-1 ✅ | 재생 이중화 — 샘플러 엔진 승격·Animator 재생 핸들·AnimationJob experiment 틱(단일 순회)·팔레트 패리티 게이트(6·1e·4j/4k, 오차 0) | 재생 틱 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-2 ✅ | 이벤트·루프 Animator 소유 이관(D0a 명세) — 재주입 오염 청산·발화/편집/writer 정본 이동·합성 왕복 게이트(7·4l, 3축 변이 증명) | Animator·CLR | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4e-3 ✅ | 본 해석·마스크 생성 창구화 — Scene 본 전파의 legacy 접촉 0·마스크 DFS 순서 재현·전수 A/B 게이트(8·9·4m/4n, 3축 변이 증명) | Scene·마스크 | **소비자** 참조 감소 |
-| &nbsp;&nbsp;↳ D4f | 역브리지 시공 축소 — 아래 분해(착수 정찰 2026-09-01 셋째). **타입 은퇴는 I6로 정정**(Assimp 폴백이 legacy를 만드는 한 타입은 존재해야 한다) | DataSystem | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D4f ✅ | 역브리지 시공 축소 — 아래 분해(착수 정찰 2026-09-01 셋째). **타입 은퇴는 I6로 정정**(Assimp 폴백이 legacy를 만드는 한 타입은 존재해야 한다). 정점은 절단, 스켈레톤·인덱스는 소비자가 살아 있어 존치 | DataSystem | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4f-0 ✅ | 선결 — 업로드 빈 메시 가드를 **실제로 올릴 원본** 기준으로 재배치. D4f 예행(역브리지 정점 복사 생략)으로 on 경로가 legacy 정점 없이 드로우 9·커버리지 42411 유지 실증 | 메시 캐시 | 없음 |
-| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4f-1 | 정점 시공 절단 — 역브리지 정점 복사 생략 + 바운드 직접 주입(**legacy Mesh 창구 추가 필요 — 정책 판단**) + `CREATOR_EXPERIMENT_VERTEX` off 대조군 재정의 | 역브리지·A/B 스위치 | legacy 창구 1 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D4f-1 ✅ | 정점 시공 절단 — 역브리지 정점 복사 생략(on)·바운드 experiment 정본 주입(`friend class DataSystem` — 정책 판단 아래)·스위치 뜻 확장(off가 시공)·**vk 가드 비대칭 선결**·바운드 축 신설(15·4q·4r, 변이 3종 증명) | 역브리지·A/B 스위치 | legacy 창구 1 |
 | ↳ I5-D5 | 잔여 소비자 — 아래 하위 분해(착수 정찰 2026-09-01) | 에디터·Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-a ✅ | Foliage 메시 experiment 핸들 합류(컴포넌트→프록시→drawPool)·죽은 include 2건 청산·합성 게이트(10·4o, 2축 변이 증명) | Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-b ✅ | 에디터 실소비 정리 — LOD 편집 표면 제거(D0b 이행)·클립 열거/이름/키프레임 수 창구화·피킹 가드 창구화·**역브리지 totalKeyFrames 정의 결함 교정**·전수 A/B 게이트(11·4p, 변이 증명) / model.cache.build는 I6 존치 판정 | 에디터 | **소비자** 참조 감소 |
@@ -1035,6 +1035,80 @@ legacy `Mesh::m_boundingBox`는 private이고 reflect 스키마에도 없어(`m_
 `m_materialIndex`·`m_LODThresholds`뿐) D1a가 쓴 "스키마 순회로 주입" 수법이 통하지
 않는다. `RecalculateBounds()`가 유일한 공개 창구이고 그것은 정점을 요구한다.
 **legacy Mesh 본체에 전환기 창구를 하나 더할지가 정책 판단**이라 D4f-1로 분리한다.
+
+**I5-D4f-1 완료 실측 (2026-09-01).** 정점 시공 절단 — 역브리지가 on 경로에서
+legacy 96B 배열을 더 이상 짓지 않는다. 실측: `legacyVertices=0`(메시 11개 전량),
+드로우 9·커버리지 42411·dx12.scene 통과는 그대로.
+
+★ **정책 판단: `friend class DataSystem` 한 줄을 들였다.** D4f-0이 남긴 물음
+("바운드 주입 창구를 legacy Mesh 본체에 더할 것인가")에 넷을 근거로 답했다.
+① **선례가 같은 브리지 안에 있다** — `Model.h:71`이 이미 `friend class DataSystem`
+이고, D1a의 헤더 주석은 Mesh도 그렇다고 적어 두었다(틀린 문장이었다 — 실제
+friend는 ModelLoader·MeshOptimizer뿐. 이번에 사실이 됐고 주석도 정정했다).
+② **한 줄이고 브리지와 함께 I6에서 죽는다** — 새 public 표면(setter)을 만들면
+legacy 타입의 계약이 넓어져 수명이 길어진다. ③ **대안은 지금 할 일이 아니다** —
+소비자 창구화(바운드를 experiment에서 읽게)는 `EnhancedShadowPass`의
+`GetBoundingSphere().radius`(핫 패스)·MeshRenderer·Foliage 2곳을 전환기 한복판에서
+건드리는데, 이 소비자들은 legacy Mesh와 함께 I6에서 죽는다. ④ 부수 효과로
+**D1a의 reflect 스키마 우회가 불필요해졌다** — friend가 생긴 이상 그 우회의 이유
+주석("friend 목록을 편집하지 않기 위해")이 거짓이 되므로 `m_materialIndex`도
+직접 쓰기로 바꿨다(값 동일 — digest가 증인).
+
+★ **선결로 vk 가드 비대칭을 닫았다.** D4f-0은 `DX12MeshCache::GetOrUpload`만
+고쳤는데 `VulkanMeshCache::GetOrUpload`에는 옛 가드가 그대로 있었다:
+
+```
+const auto& vertices = mesh->GetVertices();
+if (vertices.empty() || indices.empty()) return empty;   // ← vk만 남아 있었다
+```
+
+바로 그 아래 주석이 "DX12MeshCache::GetOrUpload와 대칭 — 한쪽만 고치면 vk 대조
+게이트가 붉는다"고 적어 둔 자리다. 이 슬라이스가 legacy 정점을 없애는 순간
+**vk 백엔드만 모든 메시를 떨군다**. DX12와 같은 형태(뷰/배열 중 실제 원본 기준)로
+옮겼다. 정직한 한계: `vk.*` 자가 검사는 격리된 합성 씬이고 **실씬 메시를 vk로
+올리는 게이트가 없다** — 이 대칭은 코드 대조로만 담보된다(I8 후보).
+
+★ **off 대조군은 스위치의 뜻을 넓혀 살렸다.** `CREATOR_EXPERIMENT_VERTEX`는
+"experiment 뷰를 끄는" 장치였는데, 역브리지가 정점을 안 채우면 off가 그릴 것을
+잃는다(D4f-0 예행 실측 — 드로우 0·커버리지 0). 그래서 스위치가 **역브리지의
+정점 시공까지** 가르게 했다: on은 짓지 않고 packed만 올리며, off는 예전처럼
+지어 legacy 96B로 그린다. 덕분에 A/B의 전제("두 경로가 같은 그림을 그린다")가
+유지된다 — 실측 off `legacyVertices=11`·드로우 9·커버리지 42411 동수.
+
+★ **바운드 축을 신설했다 — 기존 게이트는 여기에 원리적으로 눈멀다.** D4f-0
+예행이 그 눈멂을 이미 보여줬다(legacy 정점 없이도 드로우·커버리지 그대로).
+`experiment.meshbounds`가 씬 전수로 셋을 잰다: ① 절단이 실제로 일어났는가
+(`legacyVertices` — on 0·off 11) ② 바운드가 살아 있는가(`degenerate` 0)
+③ **두 유도가 같은 값인가**(`digest`를 ps1이 on/off로 대조 — on은 experiment
+정본 주입, off는 정점→min/max 유도라 산출 경로가 다르다). 실측 두 경로 모두
+`digest=1905CDAF`. Foliage 타입 메시도 센다 — 거기 빈 AABB는 "컬링 안 함"으로
+흘러 드로우 계수를 **바꾸지 않으므로** 동수 축이 원리적으로 못 보는 자리다.
+
+★ **변이 3종이 세 축의 독립을 증명했다.**
+
+| 변이 | 조작 | 붉은 단정 | 나머지 |
+|---|---|---|---|
+| M7-a | 바운드 주입 절단 | 15·15b·15c·4r (`degenerate=11 mismatch=11`) | 드로우·커버리지·밝기·구조 **전부 초록** |
+| M7-b | experiment `mesh.bounds` 자체를 오염(임포터에서 +0.25) | **4r만**(`on 6D7D9C15` vs `off 1905CDAF`) | `degenerate=0 mismatch=0` — 프로세스 내 축은 초록 |
+| M7-c | 절단 되돌림(`buildLegacyVertices=true`) | **15b만** | 나머지 전부 초록 |
+
+M7-b가 특히 중요하다: 프로세스 **안**의 대조(`mismatch`)는 주입과 비교가 같은
+출처를 읽으므로 동어반복이고, 정본 자체가 틀리면 잡지 못한다. off가 정점에서
+독립적으로 유도하는 **A/B digest만** 그것을 가른다 — 이 축이 없었다면 바운드가
+통째로 어긋난 채 전 게이트가 초록이었다.
+
+★ **회귀 세트 전체 통과 — 붉은 둘은 기준선이다.** `run-all`의 실패 둘
+(`verify-asset-authoring-ownership`의 "model-cache writer did not create the
+.asset artifact", `verify-hierarchy-read-boundary`의 H3 7건)은 **HEAD로 되돌려
+다시 빌드해 같은 실패를 확인했다** — 전자는 `DataSystem::LoadModel`이
+experiment 경로를 먼저 타면서 legacy `ModelLoader`의 `.asset` writer가 돌지
+않게 된 D34b/D1b의 결과이고, 후자가 지목한 7줄은 D1a의 bone/node parentIndex
+시공(내 편집분은 하나도 없다). 이 슬라이스가 만든 붉음은 0이다.
+
+★ **범위: 인덱스 배열은 절단하지 않았다.** 뷰가 인덱스도 나르지만(D4b), 절단의
+값어치는 96B 정점에 있고 인덱스는 legacy 폴백 경로(뷰 미완비)의 최후 원본으로
+남는다. `m_Skeleton`은 D4e가 적은 그대로 I6이다 — Animator 20·
+AnimationEventBridge 8·AnimationJob 5의 legacy 재생 폴백이 살아 있다.
 
 **I5-D5c4 완료 실측 (2026-09-01).** Foliage 재질의 experiment 전환(S2c-2c 이행).
 D5-a가 깔아 둔 `m_experimentModel`에서 재질 정본도 얻는다 — **메시가 가리키는

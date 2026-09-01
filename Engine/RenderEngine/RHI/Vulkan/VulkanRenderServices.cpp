@@ -708,10 +708,6 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         return found->second.binding;
     }
 
-    const auto& vertices = mesh->GetVertices();
-    const auto& indices = mesh->GetIndices();
-    if (vertices.empty() || indices.empty()) return empty;
-
     // I5-D34a: DX12MeshCache::GetOrUpload와 대칭 — 한쪽만 고치면 vk 대조
     // 게이트가 stride 불일치로 붉는다. I5-D4b: 위임 구조도 대칭이다.
     RHIExperimentVertexView experimentView{};
@@ -719,10 +715,24 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         && m_impl->experimentLookup(*mesh, experimentView)
         && experimentView.IsValid();
 
+    // I5-D4f-1 — 빈 메시 판정을 **실제로 올릴 원본**에 대해 한다. DX12는 D4f-0이
+    // 이미 고쳤고 여기만 남아 있었다 — 바로 위 주석이 "DX12와 대칭"이라
+    // 적어 둔 그 계약을 이 가드가 깨고 있었다. 역브리지가 정점 복사를
+    // 그만두는 순간(D4f-1) vk 경로만 모든 메시를 떨군다.
+    const auto& vertices = mesh->GetVertices();
+    const auto& indices = mesh->GetIndices();
+    const bool viewHasVertices = useExperiment
+        && nullptr != experimentView.data && 0 != experimentView.bytes;
+    const bool viewHasIndices = useExperiment
+        && nullptr != experimentView.indexData && 0 != experimentView.indexCount;
+    if ((!viewHasVertices && vertices.empty())
+        || (!viewHasIndices && indices.empty()))
+    {
+        return empty;
+    }
+
     if (useExperiment)
     {
-        const bool viewHasIndices =
-            nullptr != experimentView.indexData && 0 != experimentView.indexCount;
         return UploadResolved(mesh->m_hashingMesh.m_ID_Data,
             experimentView.data, experimentView.bytes, experimentView.stride,
             experimentView.attributeMask,

@@ -9,8 +9,9 @@
 // 시공 견본은 legacy 모델 캐시 로드(ModelLoader::LoadModelFromAsset 계열)다 —
 // 평탄 목록+부모 인덱스에서 트리를 재구축하는 그 규약을 그대로 따른다.
 // legacy Model/Mesh 컨테이너가 private+friend(ModelLoader·DataSystem)라 이
-// 함수는 DataSystem 멤버로만 시공 가능하고, 그래서 별도 TU에 정의한다
-// (legacy 본체의 friend 목록을 편집하지 않는다).
+// 함수는 DataSystem 멤버로만 시공 가능하고, 그래서 별도 TU에 정의한다.
+// (D1a 당시 이 줄은 Mesh에 대해 틀렸다 — friend는 ModelLoader·MeshOptimizer
+//  뿐이었고, D4f-1이 바운드 주입 창구로 DataSystem을 들이며 사실이 됐다.)
 //
 // 알려진 표현 격차(둘 다 관측 가능해야 한다 — outError가 아니라 시공 규약):
 //   - bitangent: legacy는 저장, experiment는 tangent.w(handedness)만 저장.
@@ -28,7 +29,6 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "Model.h"
-#include "ReflectionYml.h"
 #include "RHI/IRenderDeviceServices.h" // I5-D34a: RHIExperimentVertexView
 #include "Skeleton.h"
 #include "StandardMaterialProperty.h"
@@ -43,6 +43,26 @@
 
 namespace
 {
+	// A/B 판정 스위치(부팅 고정): CREATOR_EXPERIMENT_VERTEX=0이면 전부 legacy
+	// 96B로 올린다. 같은 빌드에서 픽셀 diff 0을 재고 변이의 이빨을 증명하는
+	// 유일한 창구다 — 전환기와 함께 I6에서 은퇴한다. D4b부터 lookup 경로와
+	// 핸들 경로(프록시 바인딩)가 같은 스위치를 본다 — 한쪽만 꺼지면 A/B
+	// 대조군이 반쪽이 된다.
+	//
+	// ★ I5-D4f-1에서 뜻이 하나 넓어졌다 — 이 스위치는 이제 **역브리지의 legacy
+	// 정점 시공**까지 가른다. on(기본)은 experiment packed만 올리므로 96B 배열을
+	// 짓지 않고, off는 대조군을 위해 예전처럼 짓는다. 넓히지 않으면 off가
+	// 그릴 것을 잃어(예행 실측: 드로우 0·커버리지 0) A/B 자체가 무너진다.
+	bool IsExperimentVertexEnabled()
+	{
+		static const bool enabled = []
+		{
+			const char* value = std::getenv("CREATOR_EXPERIMENT_VERTEX");
+			return nullptr == value || '0' != value[0];
+		}();
+		return enabled;
+	}
+
 	[[nodiscard]] float PackedBoneLane(experiment::PackedBoneIndex packed)
 	{
 		// 255(미사용 slot)는 legacy 규약의 "인덱스 0 + 가중치 0"으로 내린다 —
@@ -211,37 +231,48 @@ bool DataSystem::BuildLegacyModelFromExperiment(
 		node->m_numChildren = static_cast<uint32>(node->m_childrenIndex.size());
 	}
 
-	// ── 메시: packed 정점 언팩(96B) + 리플렉션 스키마로 materialIndex 주입 ──
+	// ── 메시: 인덱스·재질 인덱스·바운드 시공(정점은 D4f-1에서 절단) ──
 	legacy->m_Meshes.reserve(source.Meshes().size());
+	// I5-D4f-1 — 정점 시공 절단. on(기본)에서 GPU 업로드는 experiment packed를
+	// 직접 올리고(D34a lookup·D4b 핸들, 양 backend 가드는 D4f-0/D4f-1), legacy
+	// 96B 배열의 제품 소비자는 0이다(D4f 정찰 전수). 그래서 짓지 않는다 —
+	// 이 배열은 언팩 비용과 모델당 수 MB를 그대로 무는 사본이었다.
+	// off(A/B 대조군)에서는 그것이 유일한 그림의 출처이므로 예전처럼 짓는다.
+	const bool buildLegacyVertices = !IsExperimentVertexEnabled();
 	for (const experiment::Mesh& mesh : source.Meshes())
 	{
 		std::vector<Vertex> vertices;
-		vertices.reserve(mesh.vertices.size());
-		for (std::size_t index = 0; index < mesh.vertices.size(); ++index)
+		if (buildLegacyVertices)
 		{
-			vertices.push_back(UnpackVertex(mesh.vertices, index));
+			vertices.reserve(mesh.vertices.size());
+			for (std::size_t index = 0; index < mesh.vertices.size(); ++index)
+			{
+				vertices.push_back(UnpackVertex(mesh.vertices, index));
+			}
 		}
 		std::vector<uint32> indices(mesh.indices.begin(), mesh.indices.end());
 		auto legacyMesh = std::make_shared<Mesh>(mesh.name,
 			std::move(vertices), std::move(indices));
-		// m_materialIndex는 private(friend: ModelLoader·MeshOptimizer)이지만
-		// reflect() 스키마가 멤버를 공개한다 — legacy 본체의 friend 목록을
-		// 편집하지 않기 위해 스키마 순회로 쓴다. 브리지와 함께 I6에서 죽는다.
-		const uint32 materialIndex = mesh.material.IsValid()
+		// m_materialIndex·바운드는 private이다. D1a는 friend 목록을 안 건드리려고
+		// reflect() 스키마 순회로 썼지만, D4f-1이 바운드 주입 때문에 결국
+		// friend를 들였다(스키마에 바운드가 없어 그 수법이 통하지 않는다 —
+		// Mesh.h 주석). 우회로만 남기면 이유가 거짓이 되므로 직접 쓴다.
+		legacyMesh->m_materialIndex = mesh.material.IsValid()
 			? mesh.material.Value() : 0u;
-		meta::for_each_field(*legacyMesh,
-			[&](std::string_view fieldName, auto& value)
-			{
-				if constexpr (std::is_same_v<
-					std::remove_reference_t<decltype(value)>, uint32>)
-				{
-					if (fieldName == "m_materialIndex")
-					{
-						value = materialIndex;
-					}
-				}
-			});
-		legacyMesh->RecalculateBounds();
+		// 바운드는 **experiment 정본을 직접 주입**한다(친구 창구 — Mesh.h 주석).
+		// RecalculateBounds()는 정점을 요구하므로 절단 뒤에는 기본값(빈 AABB·
+		// 반지름 0)을 남기고, 컬링·피킹·그림자 반경이 조용히 틀어진다.
+		// off에서는 legacy 유도(정점→min/max)를 그대로 태워 A/B가 두 유도를
+		// 대조하게 둔다 — 같은 값이어야 한다(experiment.meshbounds 축).
+		if (buildLegacyVertices)
+		{
+			legacyMesh->RecalculateBounds();
+		}
+		else
+		{
+			legacyMesh->m_boundingBox = mesh.bounds;
+			legacyMesh->m_boundingSphere = math::bounding_sphere(mesh.bounds);
+		}
 		legacy->m_Meshes.push_back(std::move(legacyMesh));
 	}
 	legacy->m_numTotalMeshes = static_cast<int>(legacy->m_Meshes.size());
@@ -438,21 +469,6 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 
 namespace
 {
-	// A/B 판정 스위치(부팅 고정): CREATOR_EXPERIMENT_VERTEX=0이면 전부 legacy
-	// 96B로 올린다. 같은 빌드에서 픽셀 diff 0을 재고 변이의 이빨을 증명하는
-	// 유일한 창구다 — 전환기와 함께 I6에서 은퇴한다. D4b부터 lookup 경로와
-	// 핸들 경로(프록시 바인딩)가 같은 스위치를 본다 — 한쪽만 꺼지면 A/B
-	// 대조군이 반쪽이 된다.
-	bool IsExperimentVertexEnabled()
-	{
-		static const bool enabled = []
-		{
-			const char* value = std::getenv("CREATOR_EXPERIMENT_VERTEX");
-			return nullptr == value || '0' != value[0];
-		}();
-		return enabled;
-	}
-
 	// I5-D4b — 캐시 안정 키: 자산 신원(assetId 16바이트)과 메시 인덱스의
 	// FNV-1a 64. legacy m_hashingMesh(make_guid 랜덤)와 같은 64비트 키 공간을
 	// 공유하며 충돌 무시 가정도 같다. 0은 '핸들 아님' 표지라 회피한다.

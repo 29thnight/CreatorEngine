@@ -78,6 +78,10 @@ wait 10
 # I5-D5b: 에디터 실소비 창구 전수 A/B(클립 열거·이름, 메시 존재 가드).
 experiment.editorsurface
 wait 10
+# I5-D4f-1: 바운드 축 — 정점 시공 절단(legacyVertices)·바운드 생존
+# (degenerate)·두 유도의 값 동수(digest, ps1이 on/off 대조).
+experiment.meshbounds
+wait 10
 # I5-D5c1: 재질 병행 표현 A/B + 왕복 손실 실측.
 experiment.matruntime
 wait 10

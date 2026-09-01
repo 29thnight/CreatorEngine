@@ -36,6 +36,11 @@
 #      (D5c3, c2-2가 만든 비대칭을 닫는다)
 #   14 texture owner — sealing이 저작 GUID(M2 resolver)로 얻은 owner가 legacy
 #      이름 맵과 같은가 (D5c3-2, M2의 첫 제품 소비자)
+#   15 바운드 축 — 역브리지의 legacy 정점 시공 절단(legacyVertices on 0 ·
+#      off 전량)·바운드 생존(degenerate 0)·두 유도의 값 동수(digest를
+#      on/off로 대조 — on은 experiment 정본 주입, off는 정점→min/max
+#      유도다). 드로우·커버리지 축은 바운드에 눈멀다(D4f-0 예행 실측:
+#      legacy 정점 없이도 드로우 9·커버리지 42411) (D4f-1, off 4q)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -139,6 +144,12 @@ function Get-HandleUploads([string]$log) {
     if ($log -match '메시 업로드\s+\d+\(experiment\s+\d+,\s+handle\s+(\d+)') { return [int]$Matches[1] }
     return -1
 }
+function Get-BoundsDigest([string]$log) {
+    # I5-D4f-1: 두 경로가 산출한 바운드의 값 digest. on/off가 서로 다른
+    # 유도(주입 vs 정점 min/max)를 쓰므로 이 문자열이 같아야 한다.
+    if ($log -match 'experiment\.meshbounds pass .*digest=([0-9A-F]{8})') { return $Matches[1] }
+    return ""
+}
 function Get-DrawCount([string]$log) {
     if ($log -match '\[3/4\] 씬 카메라 렌더 — 드로우\s+(\d+)') { return [int]$Matches[1] }
     return -1
@@ -241,6 +252,21 @@ if ($logOn -notmatch '\[CLI\] experiment\.editorsurface pass animators=\d+ clipE
 }
 if ($logOn -notmatch 'experiment\.editorsurface pass .*meshExperiment=[1-9]') {
     $fail += "11c 메시 가드가 experiment 분기를 한 번도 타지 않았다(on)"
+}
+# ★ 15(I5-D4f-1) — 바운드 축. 절단이 실제로 일어났고(legacyVertices=0),
+#   바운드가 기본값으로 남지 않았으며(degenerate=0), experiment 정본과
+#   대조된 메시가 실존하는가(expBound>0). 값 동수는 아래 4r이 진다.
+if ($logOn -notmatch '\[CLI\] experiment\.meshbounds pass ') {
+    $fail += "15 바운드 축 실패(on) — meshbounds 출력을 확인하라"
+}
+# 이 씬의 메시는 전량 역브리지 산물이다(1·1b가 그것을 따로 잰다). Assimp
+# 폴백이나 절차 생성 메시가 섞이면 그쪽도 여기서 붉는데, 그것도 알아야 할
+# 사실이다 — on 경로에 legacy 정점 원본이 남았다는 뜻이므로.
+if ($logOn -notmatch 'experiment\.meshbounds pass .*legacyVertices=0 ') {
+    $fail += "15b legacy 정점 시공이 남아 있다(on) — 절단이 돌지 않았거나 legacy 원본 메시가 섞였다"
+}
+if ($logOn -notmatch 'experiment\.meshbounds pass .*expBound=[1-9]') {
+    $fail += "15c experiment 정본과 대조된 메시가 0이다(on) — 축이 비었다"
 }
 # ★ 12(I5-D5c1) — 재질 병행 표현. seed가 저작 경로 그대로 새 정본 자산을
 #   게시하고 renderer를 base에 링크하므로, 저장·재로드가 ref 표기를 왕복해야
@@ -371,6 +397,17 @@ if ($logOff -notmatch 'experiment\.editorsurface pass .*clipExperiment=0 ') {
 if ($logOff -notmatch 'experiment\.editorsurface pass .*meshExperiment=0 ') {
     $fail += "4p-2 스위치를 껐는데 메시 가드가 experiment로 샜다"
 }
+# ★ 4q(I5-D4f-1) — off 대조군은 legacy 정점을 **짓는다**. 이 슬라이스가
+#   스위치의 뜻을 넓힌 자리다: 넓히지 않으면 역브리지가 정점을 안 채워 off가
+#   그릴 것을 잃는다(D4f-0 예행 실측 — 드로우 0·커버리지 0). legacyVertices가
+#   0이면 그 확장이 끊긴 것이고, 아래 4b/4d 동수는 둘 다 빈 그림이라 통과할
+#   수 있다("0개를 비교해 차이 0").
+if ($logOff -notmatch '\[CLI\] experiment\.meshbounds pass ') {
+    $fail += "4q 바운드 축 실패(off) — 대조군이 성립하지 않는다"
+}
+if ($logOff -notmatch 'experiment\.meshbounds pass .*legacyVertices=[1-9]') {
+    $fail += "4q-1 스위치를 껐는데 legacy 정점을 짓지 않았다 — off 대조군이 빈 그림이다"
+}
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"
 }
@@ -390,6 +427,16 @@ if ($coverOn -lt 0 -or $coverOff -lt 0 -or $coverOn -ne $coverOff) {
 # ★ 4e — 커버리지가 못 잡는 축. NORMAL 오프셋이 틀리면 지오메트리(커버리지)는
 #   그대로인데 라이팅만 틀린다. 언팩 왕복이 float를 비트 보존하므로(modelbridge
 #   게이트의 필드 대조) 두 경로의 밝기는 문자열까지 같아야 한다.
+# ★ 4r(I5-D4f-1) — 바운드 값 동수. 이 축의 실질 이빨이다. on은 experiment
+#   정본을 주입하고 off는 legacy 정점에서 min/max를 유도하므로, 두 산출이
+#   같은 값을 내야 한다. 주입이 틀린 출처를 쓰면(다른 메시·다른 공간) 여기서만
+#   갈린다 — 드로우·커버리지·밝기는 바운드를 읽지 않고, degenerate=0은 "비지
+#   않았다"만 말한다.
+$boundsOn = Get-BoundsDigest $logOn
+$boundsOff = Get-BoundsDigest $logOff
+if ([string]::IsNullOrEmpty($boundsOn) -or $boundsOn -ne $boundsOff) {
+    $fail += "4r 바운드 digest가 다르다 — on '$boundsOn' vs off '$boundsOff' (주입이 legacy 유도와 갈렸다)"
+}
 $lumOn = Get-Luminance $logOn
 $lumOff = Get-Luminance $logOff
 if ([string]::IsNullOrEmpty($lumOn) -or $lumOn -ne $lumOff) {
