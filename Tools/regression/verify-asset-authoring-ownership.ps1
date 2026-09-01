@@ -323,49 +323,34 @@ try {
     if (-not (Test-Path -LiteralPath $destination)) {
         throw "Editor source intake did not create the model destination"
     }
-    if (-not (Test-Path -LiteralPath $cache)) {
-        throw "Editor model-cache writer did not create the .asset artifact"
+
+    # I6-A(폐기 결정, 2026-09-01): legacy `.asset` 모델 캐시와 임베디드 텍스처
+    # 디스크 추출은 **폐기됐다**. 제품 로드는 experiment importer를 타고
+    # (LoadModelViaExperiment), 임베디드 텍스처의 신원은 모델 sidecar의
+    # subAssets가 지며(I2-E), 바이트는 cooked artifact가 진다(D5-b1).
+    # 그래서 이 검사는 "캐시를 만들었는가"가 아니라 **"만들지 않는가"**를 잰다.
+    #
+    # ★ 이 뒤집기 전까지 이 검사는 HEAD부터 붉었다 — 실패 사유가 결함이 아니라
+    #   **결정되지 않은 정책**이었다. 결정이 났으므로 그 대우를 단정한다.
+    if (Test-Path -LiteralPath $cache) {
+        throw "legacy .asset 모델 캐시가 다시 생겼다(I6-A에서 폐기한 표면): $cache"
     }
-    $firstCache = Get-Item -LiteralPath $cache
-    if ($firstCache.Length -le 0) {
-        throw "Editor model-cache writer created an empty artifact"
-    }
-	$cacheBytes = [IO.File]::ReadAllBytes($cache)
-	if ($cacheBytes.Length -lt 8 -or
-		[Text.Encoding]::ASCII.GetString($cacheBytes, 0, 4) -ne "CEMA" -or
-		[BitConverter]::ToUInt32($cacheBytes, 4) -ne 2) {
-		throw "Editor model-cache writer did not emit the CEMA v2 envelope"
-	}
-    if (-not (Test-ByteSequence $cacheBytes `
-            ([Text.Encoding]::ASCII.GetBytes("CEMT")))) {
-        throw "Editor model-cache writer did not emit a versioned material payload"
-    }
-    if (-not (Test-Path -LiteralPath $embeddedTexture) -or
-        (Get-Item -LiteralPath $embeddedTexture).Length -le 0) {
-        throw "Editor embedded-texture writer did not create the PNG artifact"
+    if (Test-Path -LiteralPath $embeddedTexture) {
+        throw "임베디드 텍스처가 디스크로 추출됐다(I6-A에서 폐기한 표면): $embeddedTexture"
     }
     if ((Test-Path -LiteralPath ($cache + ".tmp")) -or
         (Test-Path -LiteralPath ($embeddedTexture + ".tmp"))) {
         throw "Editor asset writer left a temporary publication artifact"
     }
-    $firstHash = (Get-FileHash -LiteralPath $cache -Algorithm SHA256).Hash
-    $firstWrite = $firstCache.LastWriteTimeUtc
-    $firstTextureHash = (Get-FileHash -LiteralPath $embeddedTexture -Algorithm SHA256).Hash
-    $firstTextureWrite = (Get-Item -LiteralPath $embeddedTexture).LastWriteTimeUtc
 
-    # Reimport preserves the source timestamp. The existing cache must therefore
-    # be read, not rewritten through the authoring port.
+    # 재import는 여전히 원본 복사본을 그대로 두어야 한다(source intake는 살아
+    # 있는 표면이다 — 폐기한 것은 캐시 게시뿐이다).
+    $firstDestinationHash =
+        (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash
     $null = Invoke-Import "cached"
-    $secondCache = Get-Item -LiteralPath $cache
-    $secondHash = (Get-FileHash -LiteralPath $cache -Algorithm SHA256).Hash
-    if ($secondHash -ne $firstHash -or $secondCache.LastWriteTimeUtc -ne $firstWrite) {
-        throw "a usable model cache was unexpectedly rewritten"
-    }
-    if ((Get-FileHash -LiteralPath $embeddedTexture -Algorithm SHA256).Hash -ne
-            $firstTextureHash -or
-        (Get-Item -LiteralPath $embeddedTexture).LastWriteTimeUtc -ne
-            $firstTextureWrite) {
-        throw "a cached model unexpectedly rewrote its embedded texture"
+    if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne
+            $firstDestinationHash) {
+        throw "재import가 원본 복사본을 다시 썼다"
     }
 
     # 같은 Editor 세션에서 같은 source를 다시 import하면 기존 cache hit로
@@ -689,7 +674,7 @@ try {
         throw "rejected animator transaction wrote outside its authoring root"
     }
 
-    "asset authoring ownership: PASS (cache=$($firstCache.Length) bytes, model envelope v2=PASS, material payload v1=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator=PASS)"
+    "asset authoring ownership: PASS (legacy .asset 캐시 미생성=PASS, 임베디드 추출 미생성=PASS, source intake=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator=PASS)"
 }
 finally {
     $verifiedAssets = @()

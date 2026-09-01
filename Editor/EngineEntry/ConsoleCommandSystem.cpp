@@ -2961,148 +2961,6 @@ namespace ConsoleCmd
 			imported.string().c_str(), cacheResult);
     }
 
-	// 원본을 프로젝트 폴더로 복사하지 않고 실제 Assimp -> Editor writer 경로만
-	// 태운다. source가 기존 최신 cache로 해석되면 성공으로 위장하지 않고 거부한다.
-	// 저장 직후 캐시를 다시 열어 node/vertex/index/bounds raw 계약이 그대로
-	// 왕복했는지도 본다. 전체 모델 캐시 재생성 스크립트는 기존 cache를 먼저
-	// 백업한 뒤 이 명령을 한 Editor 프로세스에서 반복한다.
-	static void Cmd_model_cache_build(const ConsoleCommandContext& ctx)
-	{
-		if (ctx.parts.size() != 2)
-		{
-			std::printf("[model.cache.build] FAIL reason=usage: <source-path>\n");
-			return;
-		}
-
-		const file::path source = file::absolute(file::path(ctx.parts[1])).lexically_normal();
-		std::error_code errorCode;
-		if (!file::is_regular_file(source, errorCode))
-		{
-			std::printf("[model.cache.build] FAIL source=%s reason=source-missing\n",
-				source.string().c_str());
-			return;
-		}
-
-		std::string extension = source.extension().string();
-		std::transform(extension.begin(), extension.end(), extension.begin(),
-			[](unsigned char value) { return static_cast<char>(std::tolower(value)); });
-		if (extension != ".fbx" && extension != ".gltf" &&
-			extension != ".glb" && extension != ".obj")
-		{
-			std::printf("[model.cache.build] FAIL source=%s reason=unsupported-extension\n",
-				source.string().c_str());
-			return;
-		}
-
-		const std::shared_ptr<Model> imported = Model::LoadModelShared(source.string());
-		const file::path cache = PathFinder::Relative("Models\\") /
-			(source.stem().string() + ".asset");
-		const std::shared_ptr<Model> reloaded = Model::LoadModelShared(cache.string());
-		if (!imported || !reloaded)
-		{
-			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=load-failed\n",
-				source.string().c_str(), cache.string().c_str());
-			return;
-		}
-		if (imported->loadType != ModelLoadType::Form3DModel)
-		{
-			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=source-resolved-to-cache\n",
-				source.string().c_str(), cache.string().c_str());
-			return;
-		}
-		if (reloaded->loadType != ModelLoadType::FormAsset)
-		{
-			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=cache-reload-bypassed\n",
-				source.string().c_str(), cache.string().c_str());
-			return;
-		}
-
-		if (imported->GetMeshCount() != reloaded->GetMeshCount())
-		{
-			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=mesh-count-mismatch\n",
-				source.string().c_str(), cache.string().c_str());
-			return;
-		}
-
-		const std::vector<ModelNode*>& sourceNodes = imported->GetNodes();
-		const std::vector<ModelNode*>& cacheNodes = reloaded->GetNodes();
-		if (sourceNodes.size() != cacheNodes.size())
-		{
-			std::printf("[model.cache.build] FAIL source=%s cache=%s reason=node-count-mismatch\n",
-				source.string().c_str(), cache.string().c_str());
-			return;
-		}
-
-		for (size_t index = 0; index < sourceNodes.size(); ++index)
-		{
-			const ModelNode* sourceNode = sourceNodes[index];
-			const ModelNode* cacheNode = cacheNodes[index];
-			const bool metadataMatches = sourceNode && cacheNode &&
-				sourceNode->m_name == cacheNode->m_name &&
-				sourceNode->m_index == cacheNode->m_index &&
-				sourceNode->m_parentIndex == cacheNode->m_parentIndex &&
-				sourceNode->m_numChildren == cacheNode->m_numChildren &&
-				sourceNode->m_numMeshes == cacheNode->m_numMeshes &&
-				sourceNode->m_childrenIndex == cacheNode->m_childrenIndex &&
-				sourceNode->m_meshes == cacheNode->m_meshes;
-			const bool transformMatches = metadataMatches &&
-				std::memcmp(&sourceNode->m_transform, &cacheNode->m_transform,
-					sizeof(math::matrix4x4)) == 0;
-			if (!transformMatches)
-			{
-				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=node-roundtrip index=%zu\n",
-					source.string().c_str(), cache.string().c_str(), index);
-				return;
-			}
-		}
-
-		for (size_t index = 0; index < imported->GetMeshCount(); ++index)
-		{
-			const std::shared_ptr<Mesh> sourceMesh = imported->GetMeshShared(
-				static_cast<int>(index));
-			const std::shared_ptr<Mesh> cacheMesh = reloaded->GetMeshShared(
-				static_cast<int>(index));
-			if (!sourceMesh || !cacheMesh ||
-				sourceMesh->GetName() != cacheMesh->GetName() ||
-				sourceMesh->GetMaterialIndex() != cacheMesh->GetMaterialIndex())
-			{
-				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=mesh-metadata-roundtrip index=%zu\n",
-					source.string().c_str(), cache.string().c_str(), index);
-				return;
-			}
-
-			const std::vector<Vertex>& sourceVertices = sourceMesh->GetVertices();
-			const std::vector<Vertex>& cacheVertices = cacheMesh->GetVertices();
-			const bool verticesMatch = sourceVertices.size() == cacheVertices.size() &&
-				(sourceVertices.empty() || std::memcmp(sourceVertices.data(), cacheVertices.data(),
-					sourceVertices.size() * sizeof(Vertex)) == 0);
-			if (!verticesMatch)
-			{
-				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=vertex-roundtrip index=%zu\n",
-					source.string().c_str(), cache.string().c_str(), index);
-				return;
-			}
-
-			if (sourceMesh->GetIndices() != cacheMesh->GetIndices())
-			{
-				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=index-roundtrip index=%zu\n",
-					source.string().c_str(), cache.string().c_str(), index);
-				return;
-			}
-
-			if (!math::near_equal(sourceMesh->GetBoundingBox(), cacheMesh->GetBoundingBox()) ||
-				!math::near_equal(sourceMesh->GetBoundingSphere(), cacheMesh->GetBoundingSphere()))
-			{
-				std::printf("[model.cache.build] FAIL source=%s cache=%s reason=bounds-roundtrip index=%zu\n",
-					source.string().c_str(), cache.string().c_str(), index);
-				return;
-			}
-		}
-
-		std::printf("[model.cache.build] PASS source=%s cache=%s meshes=%zu\n",
-			source.string().c_str(), cache.string().c_str(), imported->GetMeshCount());
-	}
-
 	static void Cmd_terrain_authoring_probe(const ConsoleCommandContext& ctx)
 	{
 		if (ctx.parts.size() < 3)
@@ -9759,7 +9617,6 @@ namespace ConsoleCmd
             reg({ "render.matmode" }, &Cmd_render_matmode);
             reg({ "object.property" }, &Cmd_object_property);
             reg({ "model.load" }, &Cmd_model_load);
-			reg({ "model.cache.build" }, &Cmd_model_cache_build);
 			reg({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
 			reg({ "foliage.authoring.probe" }, &Cmd_foliage_authoring_probe);
 			reg({ "blackboard.authoring.probe" }, &Cmd_blackboard_authoring_probe);
@@ -10012,7 +9869,6 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
         "  game.pak             Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다\n"
         "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
-		"  model.cache.build <원본>  원본을 복사하지 않고 .asset 캐시를 재생성·재로드 검증한다\n"
 		"  material.corpus.probe <이름>...  standalone material identity/reference 왕복\n"
 		"  terrain.authoring.probe <이름> <텍스처|->  Terrain writer 트랜잭션 회귀 검사\n"
         "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"

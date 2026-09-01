@@ -1542,7 +1542,7 @@ legacy `m_Mesh`를 **존재 가드**로 쓰고 있었다(바운드는 이미 `Ge
 지난다) — D4f가 `m_Mesh`를 은퇴시키면 이 조건이 통째로 거짓이 되어 **피킹이 조용히
 죽는다**(선택 불가는 렌더 회귀로 안 잡힌다). `MeshRenderer::HasRenderableMesh`로 옮겼다.
 
-⑤ **`model.cache.build` 판정: I6 존치.** legacy Assimp→`.asset` 캐시 왕복 진단이고
+⑤ **`model.cache.build` 판정: I6 존치** → **I6-A에서 폐기로 뒤집혔다(2026-09-01).** legacy Assimp→`.asset` 캐시 왕복 진단이고
 제품 경로가 아니다(소비자는 run-all에 없는 `rebuild-model-assets.ps1` 하나). Assimp
 폴백이 살아 있는 동안 진단 가치가 있으므로 폴백과 함께 은퇴한다 — 계획서 §I5-D34 정찰
 ⑤의 스코프 밖 명시를 그대로 확정한다. 구현 0.
@@ -2185,11 +2185,38 @@ Assimp 삭제가 뒤**다. 이 절의 제목("전환 — Assimp 은퇴")이 반�
 
 | 슬라이스 | 내용 | 선행 |
 |---|---|---|
-| **I6-A** | 판정 — `.obj`·`.asset`(모델 캐시)·`model.cache.build`를 계승할 것인가 폐기할 것인가. 위 측정이 "폐기 비용 0"을 말하지만 제품 정책은 별개다 | 없음 |
+| **I6-A** ✅ | 판정 — **전부 폐기**(2026-09-01). `model.cache.build`·`rebuild-model-assets.ps1` 제거, asset-authoring 게이트를 폐기의 대우로 뒤집어 기준선 붉음 하나를 없앴다 | 없음 |
 | **I6-B** | `Skeleton` 은퇴 — D4e가 낸 창구(`ResolveBoneIndex`·마스크·재생 핸들)를 정본으로 승격하고 `m_Skeleton` 소비 44곳을 옮긴다 | A |
 | **I6-C** | `Mesh` 은퇴 — `EnhancedDrawItem::mesh` 신원 키를 stableKey로, 그다음 `m_Mesh`·`FoliageType::m_mesh`·바운드 소비 | A |
 | **I6-D** | `Material` 은퇴 — `MaterialInstance`가 정본. reflect `m_Material`·`m_IOR`·flow 인스턴스 채널·legacy 호환 스칼라 청산(D5-c5가 "제품 소비 0"을 이미 실측했다) | A |
 | **I6-E** | 삭제 — 역브리지·`ModelLoader`·`SkeletonLoader`·`AnimationLoader`·`Model.cpp`·`Material.cpp`·assimp 벤더링, 하네스(`ExperimentImportPathSelfTest`·`ExperimentLegacyBridge`)와 `CREATOR_EXPERIMENT_VERTEX`·`Mesh`의 `friend class DataSystem` | B·C·D |
+
+**I6-A 완료 실측 (2026-09-01) — 판정: 전부 폐기.** `.obj` 지원 · legacy `.asset`
+모델 캐시 · `model.cache.build` 진단을 **계승하지 않는다.** 근거는 정찰의 측정
+그대로다: `.obj`는 코퍼스 0건이고, 모델 캐시 14개는 전부 untracked 지역
+산출물이며(tracked `.asset` 둘은 확장자만 겹치는 재질 문서다), 그 캐시를 만드는
+경로는 experiment 로드가 이긴 뒤로 제품에서 돌지 않는다.
+
+이 슬라이스가 실제로 걷은 것:
+
+- `model.cache.build` 명령(142줄)과 그 유일한 소비자
+  `Tools/regression/rebuild-model-assets.ps1`(171줄). 둘 다 legacy Assimp→`.asset`
+  왕복 진단이라 폐기 결정과 함께 죽는다.
+- 캐시를 **쓰는** 코드(`ModelLoader.cpp`의 writer)는 남긴다 — 그 파일은 I6-E에서
+  통째로 지운다. 반쯤 지운 파일을 남기지 않는다.
+
+★ **결정이 붉은 게이트 하나를 초록으로 만들었다.**
+`verify-asset-authoring-ownership`이 HEAD부터 붉었는데
+("model-cache writer did not create the .asset artifact"), 그 실패는 **결함이
+아니라 결정되지 않은 정책**이었다 — D34b/D1b가 로드를 experiment로 옮기면서
+캐시 writer가 안 도는데, 검사는 예전 계약("만들어야 한다")을 그대로 들고
+있었다. 폐기가 결정됐으므로 **그 대우를 단정하도록 뒤집었다**: `.asset`이
+생기지 않는가, 임베디드 텍스처가 디스크로 추출되지 않는가. source intake와
+runtime reload는 살아 있는 표면이라 그대로 잰다.
+
+이로써 이 세션 내내 "기준선 붉음"으로 넘겨 온 둘 중 하나가 사라진다. 남은
+하나(`verify-hierarchy-read-boundary` H3 7건)는 D1a의 bone/node parentIndex
+시공이고, 그것도 I6-B/E에서 함께 죽는다.
 
 ★ **설계 문제 하나를 미리 적는다 — 은퇴는 자기 대조군을 없앤다.** D4f-1이
 `CREATOR_EXPERIMENT_VERTEX`의 뜻을 "off면 역브리지가 legacy 정점을 짓는다"로
