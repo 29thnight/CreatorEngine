@@ -668,7 +668,8 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;↳ D5-b ✅ | 에디터 실소비 정리 — LOD 편집 표면 제거(D0b 이행)·클립 열거/이름/키프레임 수 창구화·피킹 가드 창구화·**역브리지 totalKeyFrames 정의 결함 교정**·전수 A/B 게이트(11·4p, 변이 증명) / model.cache.build는 I6 존치 판정 | 에디터 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-c | S2c-2b/2c 런타임 소유 분리 — 아래 하위 분해(착수 정찰 2026-09-01 둘째). 계획의 "5지점"은 과소 계상 — 실소비 13파일 | 재질 사슬 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c1 ✅ | 저작 원본 보관 병행 — `DeserializeMaterialPayload` authored out·`LoadAuthoredMaterialShared`·MeshRenderer `MaterialInstance` 병행·**합성 seed**(코퍼스 새 정본 저작분 0 실측)·A/B 게이트(12, M2 변이 증명) | 저작 경계 | 없음 |
-| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2 | sealing 직행 — 프록시가 핸들을 나르고 `BuildSealSourceFromLegacy` 우회. **화면이 바뀐다**(c1 실측: 왕복이 baseColor를 주입) | 프록시·sealing | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-1 ✅ | 전환 위험의 측정 — packing 직전 논리 값의 바이트 A/B(합성 layout). **실측 `sealByteMismatch=0`: 직행해도 바이트가 같다**(M2 변이로 이빨 증명) | 게이트 | 없음 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-2 | sealing 직행 — 프록시가 저작 원본을 나르고 `BuildSealSourceFromLegacy` 우회 | 프록시·sealing | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3 | 소비자 전환 — CLR 4·Inspector 15·CLI 2를 창구로 | CLR·Inspector | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c4 | Foliage(S2c-2c) + `m_Material` reflect 퇴출·프리팹 패치 경로 판정(S2c-2a 이월) | Foliage·프리팹 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -985,6 +986,40 @@ c3(소비자 전환) → c4(Foliage·reflect 퇴출).
 슬라이스에 **실자산 게이트는 판별력이 0이고 합성이 필수**다(D5-a Foliage와 같은
 결론). M5를 "완료"로 적어 둔 것은 코드 기준이지 저작분 기준이 아니다 —
 코퍼스 마이그레이션은 별도 트랙으로 남는다.
+
+**I5-D5c2-1 완료 실측 (2026-09-01) — 그리고 c1 말미의 내 단정을 정정한다.**
+
+c1을 닫으며 나는 "sealing이 저작 원본을 직행하면 주입값이 사라져 **화면이 바뀐다**"고
+적었다. **틀렸다.** 그것은 property **이름 집합**의 차이(`onlyLegacy=1 baseColor`)만
+보고 값 차이를 추정한 것이고, packing 경로를 확인하지 않은 채였다.
+
+실제 경로: `BuildMaterialPropertyBlock`은 meta 선언을 순회하며 저작 값이 없으면
+**`MaterialPropertyPacker::ApplyDefault`(ShaderMeta 선언 기본값)**로 채운다. 즉
+"저작 원본에 baseColor가 없다"는 사실만으로는 아무것도 결정되지 않는다 — legacy
+왕복이 주입한 MaterialInfo 폴백값과 meta 기본값이 같으면 바이트는 동일하다.
+
+그래서 c2를 둘로 쪼개 **측정을 먼저** 했다. 실측:
+
+```
+sealCompared=1 sealByteMismatch=0
+```
+
+**packing 직전 논리 값이 바이트 단위로 동일하다** — 이 seed 재질에서 legacy 왕복의
+baseColor 주입값과 ShaderMeta 기본값이 같은 값이다. c2-2의 전환은 화면을 바꾸지
+않는다.
+
+축의 이빨은 변이로 증명했다: **M2**(인스턴스 override 생략)를 되살리자
+`sealByteMismatch=1 firstSeal=metallic@18` — 값이 갈리면 정확히 그 property와
+오프셋을 짚는다. `sealByteMismatch=0`은 눈먼 초록이 아니라 실측이다.
+
+★ **한계(정직).** ⓐ 합성 layout의 offset은 **제품 GPU 레이아웃이 아니다**(실제
+layout은 `EnsureShaderMetaVariant`의 셰이더 reflection 산물이라 헤드리스 CLI에서
+얻을 수 없다). 이 축이 재는 것은 "두 경로가 같은 논리 값을 packing하는가"이지
+"같은 자리에 올리는가"가 아니다 — 자리 판정은 D34 계열 픽셀 게이트의 몫이다.
+ⓑ 표본은 seed 재질 하나다(코퍼스 저작분 0 — c1 정찰 ④). 다른 저작 재질이
+meta 기본값과 다른 폴백을 타면 바이트가 갈릴 수 있고, 그때 이 축이 붉어 알려 준다.
+ⓒ `sealByteMismatch`는 **판정하지 않는다** — c2-2가 화면을 바꾸는 폭의 실측이지
+결함이 아니다. 반면 layout/build 실패는 축이 돌지 않았다는 뜻이라 붉힌다.
 
 **I5-D5c1 완료 실측 (2026-09-01).** 저작 원본 보관 — 왕복의 입구를 막았다.
 ① `DataSystem::DeserializeMaterialPayload`에 `experiment::Material* outAuthored`

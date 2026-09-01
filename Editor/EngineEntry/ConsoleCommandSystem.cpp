@@ -31,6 +31,8 @@
 #include "Experiment/MaterialInstance.h"      // I5-D5c1: experiment.matruntime
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
 #include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
+#include "Experiment/MaterialPropertyBlock.h"  // I5-D5c2-1: packing 바이트 축
+#include "MaterialPropertyPacker.h"           // I5-D5c2-1: 합성 layout
 #include "PrimitiveRenderProxy.h"  // I5-D5a: FoliageRenderProxy 실물 사슬
 #include "RHI/IRenderDeviceServices.h" // I5-D5a: RHIExperimentVertexView
 #include "ConditionParameter.h"
@@ -6161,6 +6163,48 @@ namespace ConsoleCmd
     //     넘어가면 c2의 픽셀 차이를 선재 손실과 구분할 수 없다.
     //
     // 이 슬라이스에서 병행 표현의 소비자는 이 게이트뿐이다(렌더는 아직 legacy).
+    // I5-D5c2-1 — packing 직전 논리 값의 A/B를 **바이트로** 재기 위한 합성
+    // layout. 실제 layout은 셰이더 reflection 산물이라(EnsureShaderMetaVariant —
+    // 렌더 패스 컨텍스트 필요) 헤드리스 CLI에서 얻을 수 없다. 그래서 meta 선언
+    // 순서대로 offset을 순차 배치한 layout을 만든다.
+    //
+    // ★ 한계(정직): 이 offset은 제품 GPU 레이아웃이 **아니다**. 이 축이 재는
+    //   것은 "두 경로가 같은 논리 값을 packing하는가"이지 "같은 자리에 올리는가"가
+    //   아니다. 자리 판정은 D34 계열 픽셀 게이트의 몫이다.
+    [[nodiscard]] static bool BuildSyntheticBindingLayout(const ShaderMeta& meta,
+        ShaderMetaBindingLayout& outLayout, std::string& outError)
+    {
+        outLayout = ShaderMetaBindingLayout{};
+        outLayout.constantBufferName = "SyntheticMaterialCB";
+        std::uint32_t offset = 0;
+        for (const ShaderPropertyDesc& desc : meta.properties)
+        {
+            ShaderMetaPropertyBinding binding;
+            binding.name = desc.name;
+            binding.propertyType = desc.type;
+            if (ShaderPropertyType::Texture2D == desc.type)
+            {
+                binding.resourceKind = RHIShaderResourceKind::Texture;
+                outLayout.properties.push_back(std::move(binding));
+                continue;
+            }
+            const std::size_t size =
+                MaterialPropertyPacker::LogicalByteSize(desc.type);
+            if (0 == size)
+            {
+                outError = "논리 크기 0인 property: " + desc.name;
+                return false;
+            }
+            binding.resourceKind = RHIShaderResourceKind::ConstantBuffer;
+            binding.byteOffset = offset;
+            binding.byteSize = static_cast<std::uint32_t>(size);
+            offset += static_cast<std::uint32_t>(size);
+            outLayout.properties.push_back(std::move(binding));
+        }
+        outLayout.constantBufferByteSize = offset;
+        return offset > 0;
+    }
+
     // I5-D5c1 — 합성 seed. **코퍼스에 새 정본 저작분이 0이다**(실측: 씬·프리팹의
     // shaderAssetId 0건, ref 표기 0건, standalone 재질 2개 전부 legacy 표기).
     // S2b writer는 ShaderMeta를 아는 재질만 새 정본으로 쓰는데 코퍼스 재질의
@@ -6326,6 +6370,9 @@ namespace ConsoleCmd
         std::size_t compared = 0, metaMissing = 0, buildFailed = 0;
         std::size_t valueMismatch = 0, onlyAuthored = 0, onlyLegacy = 0;
         std::size_t blendMismatch = 0;
+        std::size_t sealCompared = 0, sealByteMismatch = 0;
+        std::size_t sealLayoutFailed = 0, sealBuildFailed = 0;
+        std::string firstSealMismatch;
         std::string firstMismatch;
 
         for (const auto& object : scene->m_Entities)
@@ -6406,23 +6453,88 @@ namespace ConsoleCmd
             {
                 firstMismatch = "onlyLegacy " + legacyValues.begin()->first;
             }
+
+            // ── D5-c2-1: packing 직전 논리 값의 바이트 A/B ──
+            //
+            // 이름 집합 대조(위)는 "저작에만/legacy에만"을 세지만, 누락 property가
+            // ApplyDefault(ShaderMeta 기본값)로 채워지므로 **그것만으로는 c2가
+            // 화면을 바꾸는지 알 수 없다**. legacy 왕복이 주입한 값과 meta
+            // 기본값이 같다면 바이트는 동일하고 c2는 무해하다. 그 판정이 이
+            // 축이다.
+            ShaderMetaBindingLayout syntheticLayout;
+            std::string layoutError;
+            if (!BuildSyntheticBindingLayout(*meta, syntheticLayout, layoutError))
+            {
+                ++sealLayoutFailed;
+                continue;
+            }
+            std::vector<std::uint8_t> legacyBytes, authoredBytes;
+            if (!experiment::BuildMaterialPropertyBlock(legacyRoundTrip, *meta,
+                    syntheticLayout, legacyBytes, error)
+                || !experiment::BuildMaterialPropertyBlock(authoredEffective,
+                    *meta, syntheticLayout, authoredBytes, error))
+            {
+                ++sealBuildFailed;
+                if (firstMismatch.empty()) firstMismatch = "sealBuild:" + error;
+                continue;
+            }
+            ++sealCompared;
+            if (legacyBytes != authoredBytes)
+            {
+                ++sealByteMismatch;
+                std::size_t firstByte = 0;
+                while (firstByte < legacyBytes.size()
+                    && firstByte < authoredBytes.size()
+                    && legacyBytes[firstByte] == authoredBytes[firstByte])
+                {
+                    ++firstByte;
+                }
+                // 어느 property의 자리인지 되짚는다 — 숫자만으로는 c2의 위험
+                // 크기를 판단할 수 없다.
+                std::string culprit = "?";
+                for (const ShaderMetaPropertyBinding& binding
+                    : syntheticLayout.properties)
+                {
+                    if (RHIShaderResourceKind::ConstantBuffer
+                        != binding.resourceKind) continue;
+                    if (firstByte >= binding.byteOffset
+                        && firstByte < binding.byteOffset + binding.byteSize)
+                    {
+                        culprit = binding.name;
+                        break;
+                    }
+                }
+                if (firstSealMismatch.empty())
+                {
+                    firstSealMismatch = culprit + "@"
+                        + std::to_string(firstByte);
+                }
+            }
         }
 
         // 판정은 **동등 축만** 한다. onlyAuthored/onlyLegacy는 왕복 손실의
         // 실측이라 여기서 붉히지 않고 계수로 보고한다 — 이 슬라이스는 손실을
         // 없애는 것이 아니라 크기를 아는 것이 목적이다(그 처방은 c2다).
         const bool covered = withInstance > 0 && compared > 0;
+        // sealByteMismatch는 **판정하지 않는다** — c2가 화면을 바꾸는 폭의
+        // 실측이지 결함이 아니다(단정을 걸면 c2가 고칠 때 거꾸로 붉어진다).
+        // 반면 layout/build 실패는 축이 돌지 않았다는 뜻이라 붉힌다.
         const bool passed = covered && 0 == valueMismatch && 0 == blendMismatch
-            && 0 == buildFailed;
+            && 0 == buildFailed && 0 == sealLayoutFailed && 0 == sealBuildFailed
+            && sealCompared > 0;
         std::printf("[CLI] experiment.matruntime %s renderers=%zu "
             "withMaterial=%zu withInstance=%zu compared=%zu metaMissing=%zu "
             "buildFailed=%zu valueMismatch=%zu blendMismatch=%zu "
-            "onlyAuthored=%zu onlyLegacy=%zu%s%s\n",
+            "onlyAuthored=%zu onlyLegacy=%zu sealCompared=%zu "
+            "sealByteMismatch=%zu sealLayoutFailed=%zu sealBuildFailed=%zu%s%s%s%s\n",
             passed ? "pass" : (covered ? "fail" : "skip"),
             renderers, withMaterial, withInstance, compared, metaMissing,
             buildFailed, valueMismatch, blendMismatch, onlyAuthored, onlyLegacy,
+            sealCompared, sealByteMismatch, sealLayoutFailed, sealBuildFailed,
             firstMismatch.empty() ? "" : " first=",
-            firstMismatch.c_str());
+            firstMismatch.c_str(),
+            firstSealMismatch.empty() ? "" : " firstSeal=",
+            firstSealMismatch.c_str());
     }
 
     static void Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)
