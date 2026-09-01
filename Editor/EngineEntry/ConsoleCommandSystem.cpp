@@ -4151,6 +4151,7 @@ namespace ConsoleCmd
         // 축이다: 인덱스를 experiment로 풀면서 신원은 legacy 객체 수명에 묶여
         // 있으면 그 객체를 은퇴시킬 수 없다.
         std::size_t serialExperimentCount = 0, serialLegacyCount = 0;
+        std::size_t roundtripMismatch = 0;
         for (const auto& object : scene->m_Entities)
         {
             if (!object || object->IsDestroyMark()) continue;
@@ -4182,15 +4183,25 @@ namespace ConsoleCmd
             else ++serialLegacyCount;
             if (resolved != legacyIndex) ++mismatchCount;
             if (resolved < 0) ++unresolvedCount;
+            // I6-B4a — legacy를 안 쓰는 **독립 유도** 대조. 해석한 인덱스로
+            // 이름을 되받아 원래 tag와 같은가(name→index→name). legacy가
+            // 은퇴하면 위 mismatch 축은 잴 상대가 없어지므로, 그 전에 같은
+            // 결함(인덱스 어긋남)을 legacy 없이 잡는 축을 세워 겹치는 구간에서
+            // 함께 돌린다.
+            else if (animator->GetBoneName(resolved) != boneName)
+            {
+                ++roundtripMismatch;
+            }
         }
         const bool passed = boneCount > 0 && 0 == mismatchCount
-            && 0 == unresolvedCount;
+            && 0 == unresolvedCount && 0 == roundtripMismatch;
         std::printf("[CLI] experiment.boneresolve %s bones=%zu experiment=%zu "
             "legacy=%zu mismatch=%zu unresolved=%zu serialExperiment=%zu "
-            "serialLegacy=%zu\n",
+            "serialLegacy=%zu roundtrip=%zu\n",
             passed ? "pass" : (boneCount == 0 ? "skip" : "fail"),
             boneCount, viaExperimentCount, viaLegacyCount, mismatchCount,
-            unresolvedCount, serialExperimentCount, serialLegacyCount);
+            unresolvedCount, serialExperimentCount, serialLegacyCount,
+            roundtripMismatch);
     }
 
     // I5-D4e-3 — AvatarMask 트리 생성의 A/B 대조. 실물 창구
@@ -4266,11 +4277,83 @@ namespace ConsoleCmd
             }
         }
 
+        // I6-B4a — legacy를 안 쓰는 **독립 유도** 대조. 위 축은 legacy 재귀와
+        // 결과를 맞춰 보는 것이라 legacy가 은퇴하면 잴 상대가 없다. 이 축은
+        // 마스크 트리를 **스켈레톤 원자료(부모 인덱스)** 와 직접 맞춘다:
+        //   ① 마스크 하나당 뼈 하나 ② 마스크 트리의 부모 관계가 스켈레톤의
+        //   parent와 같다 ③ 부모가 자식보다 앞에 온다(저장분 인덱스 대응이
+        //   전제하는 preorder).
+        // ★ DFS를 다시 구현해 순서를 맞추지 않는다 — 같은 규약을 두 번 쓰면
+        //   둘이 함께 틀려도 초록이다. 이름→인덱스 사상 위의 **구조 불변식**만
+        //   본다.
+        const char* structureAxis = "n/a";
+        if (const experiment::Skeleton* skeleton =
+            animator->m_experimentModel ? animator->m_experimentModel->TryGetSkeleton() : nullptr)
+        {
+            std::unordered_map<std::string, std::size_t> boneIndexOf;
+            for (std::size_t index = 0; index < skeleton->bones.size(); ++index)
+            {
+                boneIndexOf.emplace(skeleton->bones[index].name, index);
+            }
+            std::unordered_map<const BoneMask*, std::size_t> position;
+            for (std::size_t index = 0;
+                index < channelMask.m_BoneMasks.size(); ++index)
+            {
+                position.emplace(channelMask.m_BoneMasks[index], index);
+            }
+
+            bool structureOk =
+                channelMask.m_BoneMasks.size() == skeleton->bones.size();
+            if (!structureOk)
+            {
+                failures.push_back("구조: 마스크 " +
+                    std::to_string(channelMask.m_BoneMasks.size()) + " vs 뼈 " +
+                    std::to_string(skeleton->bones.size()));
+            }
+            for (std::size_t index = 0;
+                structureOk && index < channelMask.m_BoneMasks.size(); ++index)
+            {
+                const BoneMask* mask = channelMask.m_BoneMasks[index];
+                const auto self = boneIndexOf.find(mask->boneName);
+                if (self == boneIndexOf.end())
+                {
+                    failures.push_back("구조: 스켈레톤에 없는 이름 "
+                        + mask->boneName);
+                    structureOk = false;
+                    break;
+                }
+                for (const BoneMask* child : mask->m_children)
+                {
+                    const auto childIndex = boneIndexOf.find(child->boneName);
+                    if (childIndex == boneIndexOf.end()
+                        || !skeleton->bones[childIndex->second].parent.IsValid()
+                        || skeleton->bones[childIndex->second].parent.Value()
+                            != self->second)
+                    {
+                        failures.push_back("구조: 부모 관계 어긋남 "
+                            + mask->boneName + " -> " + child->boneName);
+                        structureOk = false;
+                        break;
+                    }
+                    const auto childPos = position.find(child);
+                    if (childPos == position.end() || childPos->second <= index)
+                    {
+                        failures.push_back("구조: 자식이 부모보다 앞에 온다 "
+                            + child->boneName);
+                        structureOk = false;
+                        break;
+                    }
+                }
+            }
+            structureAxis = structureOk ? "ok" : "fail";
+        }
+
         if (failures.empty())
         {
             std::printf("[CLI] experiment.animmask pass masks=%zu "
-                "viaExperiment=%d\n",
-                channelMask.m_BoneMasks.size(), viaExperiment ? 1 : 0);
+                "viaExperiment=%d structure=%s\n",
+                channelMask.m_BoneMasks.size(), viaExperiment ? 1 : 0,
+                structureAxis);
         }
         else
         {
@@ -4555,6 +4638,16 @@ namespace ConsoleCmd
         std::size_t worstClip{}, worstBone{};
         float worstFraction{};
         std::string worstBoneName{};
+        // I6-B4a — experiment 팔레트만으로 접은 digest. legacy 대조가 은퇴하면
+        // 이 축이 재생 산술의 유일한 회귀 감시자가 된다(정확성이 아니라 안정성:
+        // 골든이 굳은 뒤 값이 달라지면 무언가 바뀐 것이다).
+        // ★ 1/4096로 양자화하되, 그것이 "말단 비트에 안 흔들린다"는 뜻은
+        //   **아니다**(실측). 512뼈×16원소×50표본이면 어떤 값 하나는 늘
+        //   반올림 경계 근처라, 0.0001 섭동(양자 1/4096보다 작다)에도 digest가
+        //   바뀐다. 즉 이것은 관대한 요약이 아니라 **엄격한 골든**이다 —
+        //   x64 Debug 이 툴체인에 고정이고, 구성이나 컴파일러가 바뀌면 값이
+        //   달라질 수 있다. 그때는 왜 바뀌었는지 확인하고 의도적으로 갱신한다.
+        std::uint32_t poseDigest{ 2166136261u };
     };
 
     static void MeasureAnimtickAxis(AnimationJob& job, Animator& animator,
@@ -4580,6 +4673,20 @@ namespace ConsoleCmd
                 ++result.sampleCount;
                 for (std::size_t bone = 0; bone < MAX_BONES; ++bone)
                 {
+                    for (int element = 0; element < 16; ++element)
+                    {
+                        const float value =
+                            (&experimentPose[bone].m[0][0])[element];
+                        const std::int32_t quantized = static_cast<std::int32_t>(
+                            std::lround(static_cast<double>(value) * 4096.0));
+                        std::uint32_t bits =
+                            static_cast<std::uint32_t>(quantized);
+                        for (int byte = 0; byte < 4; ++byte)
+                        {
+                            result.poseDigest ^= (bits >> (byte * 8)) & 0xFFu;
+                            result.poseDigest *= 16777619u;
+                        }
+                    }
                     const float* legacyValues = &legacyPose[bone].m[0][0];
                     const float* experimentValues =
                         &experimentPose[bone].m[0][0];
@@ -4676,10 +4783,11 @@ namespace ConsoleCmd
             "stepChannels=%zu worstBone=%s (의도된 격차 — 단정 없음)\n",
             stepAxis.maxError, stepChannels, stepAxis.worstBoneName.c_str());
         std::printf("[CLI] experiment.animtick %s animators=%zu clips=%zu "
-            "samples=%zu failedEval=%zu maxErr=%.9f\n",
+            "samples=%zu failedEval=%zu maxErr=%.9f poseDigest=%08X\n",
             passed ? "pass" : (animatorCount == 0 ? "skip" : "fail"),
             animatorCount, linearAxis.clipCount, linearAxis.sampleCount,
-            linearAxis.failedEvaluations, linearAxis.maxError);
+            linearAxis.failedEvaluations, linearAxis.maxError,
+            linearAxis.poseDigest);
     }
 
     static void Cmd_script_add(const ConsoleCommandContext& ctx)

@@ -242,6 +242,25 @@ if ($logOn -notmatch '\[CLI\] experiment\.boneresolve pass bones=(\d+) experimen
 if ($logOn -notmatch 'bones=(\d+) experiment=\1 legacy=0 mismatch=0 unresolved=0 serialExperiment=\1 serialLegacy=0') {
     $fail += "8b 본 캐시 신원이 experiment로 서지 않는다(on) — boneresolve serial* 을 확인하라"
 }
+# ★ 8c(I6-B4a) — **legacy를 안 쓰는** 해석 대조. 이름→인덱스→이름 왕복이다.
+#   축 8의 legacy 대조는 은퇴하면 잴 상대가 없어진다 — 그 전에 같은 결함을
+#   legacy 없이 잡는 축을 세워 겹치는 구간에서 함께 돌린다(대조군 인수인계).
+if ($logOn -notmatch 'boneresolve pass .* roundtrip=0') {
+    $fail += "8c 본 이름 왕복이 깨졌다(on) — boneresolve roundtrip 을 확인하라"
+}
+# ★ 9b(I6-B4a) — 마스크 트리를 **스켈레톤 원자료**와 직접 맞춘다(부모 관계·
+#   계수·preorder). 축 9의 legacy 재귀 대조를 대체할 축이다.
+if ($logOn -notmatch 'animmask pass masks=[1-9]\d* viaExperiment=1 structure=ok') {
+    $fail += "9b 마스크 구조 자기 대조 실패(on) — animmask structure 를 확인하라"
+}
+# ★ 6b(I6-B4a) — 재생 팔레트 골든. legacy 파리티(축 6)가 은퇴하면 이 digest가
+#   재생 산술의 유일한 회귀 감시자다. 정확성이 아니라 **안정성**을 잰다 —
+#   의도한 변경이면 값을 갱신하고 왜 바뀌었는지 커밋 메시지에 남긴다.
+#   ★ 양자화(1/4096)에도 **엄격하다** — 실측으로 0.0001 섭동에서 값이 바뀐다
+#     (표본이 많아 늘 어떤 값이 반올림 경계에 있다). x64 Debug 고정 골든이다.
+if ($logOn -notmatch 'animtick pass .* poseDigest=858071B5') {
+    $fail += "6b 재생 팔레트 골든이 달라졌다(on) — animtick poseDigest 를 확인하라"
+}
 # ★ 9(I5-D4e-3) — 마스크 트리 A/B. 순서 재현(저장분 인덱스 대응)까지 대조.
 if ($logOn -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperiment=1') {
     $fail += "9 마스크 트리 대조 실패(on) — animmask 출력을 확인하라"
@@ -417,6 +436,11 @@ if ($logOff -notmatch '\[CLI\] experiment\.boneresolve pass bones=(\d+) experime
 # "언제나 experiment라고 적는 계수기"가 8b를 공짜로 통과하지 못한다.
 if ($logOff -notmatch 'bones=(\d+) experiment=0 legacy=\1 mismatch=0 unresolved=0 serialExperiment=0 serialLegacy=\1') {
     $fail += "4m2 스위치를 껐는데 본 캐시 신원이 experiment로 샜다"
+}
+# I6-B4a: 왕복 축은 backend에 무관한 자기 검사라 off에서도 성립해야 한다 —
+# 여기서 갈리면 legacy 폴백의 이름 사상이 깨진 것이다.
+if ($logOff -notmatch 'boneresolve pass .* roundtrip=0') {
+    $fail += "4m3 스위치를 껐는데 본 이름 왕복이 깨졌다"
 }
 if ($logOff -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperiment=0') {
     $fail += "4n 스위치를 껐는데 마스크 생성이 experiment로 샜다(또는 실패)"
