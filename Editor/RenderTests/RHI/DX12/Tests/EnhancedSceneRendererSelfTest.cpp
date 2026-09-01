@@ -3133,6 +3133,49 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
                 item.bonePalette = proxy->m_finalTransforms.get();
                 item.boneCount = Skeleton::MAX_BONES;
                 item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
+
+                // I6-B4-pre 진단 — 하네스가 **실제로 받은** 팔레트의 digest.
+                // experiment.animlive가 Animator::m_FinalTransforms에서 뜬
+                // 값과 같은 방식(1/4096 양자화 FNV)으로 접는다. 두 값이
+                // 같으면 운반은 옳고 결함은 그 뒤(셰이더/CB), 다르면 운반
+                // 구간이다. 앞 64개만 접는 축도 함께 낸다 — animlive는
+                // 본 수(63)만큼만 접으므로 그쪽과 직접 대조하려면 필요하다.
+                {
+                    auto fold = [](const math::matrix4x4* palette,
+                        std::size_t count) -> std::uint32_t
+                    {
+                        std::uint32_t digest = 2166136261u;
+                        for (std::size_t bone = 0; bone < count; ++bone)
+                        {
+                            const float* values = &palette[bone].m[0][0];
+                            for (int element = 0; element < 16; ++element)
+                            {
+                                const std::int32_t quantized =
+                                    static_cast<std::int32_t>(std::lround(
+                                        static_cast<double>(values[element])
+                                        * 4096.0));
+                                std::uint32_t bits =
+                                    static_cast<std::uint32_t>(quantized);
+                                for (int byte = 0; byte < 4; ++byte)
+                                {
+                                    digest ^= (bits >> (byte * 8)) & 0xFFu;
+                                    digest *= 16777619u;
+                                }
+                            }
+                        }
+                        return digest;
+                    };
+                    static int reported = 0;
+                    if (reported < 4)
+                    {
+                        ++reported;
+                        std::printf("[dx12.scene] bonePalette 수신 — animator=%llu "
+                            "digest63=%08X digest512=%08X\n",
+                            (unsigned long long)item.animatorKey,
+                            fold(item.bonePalette, 63),
+                            fold(item.bonePalette, Skeleton::MAX_BONES));
+                    }
+                }
             }
 
             // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
