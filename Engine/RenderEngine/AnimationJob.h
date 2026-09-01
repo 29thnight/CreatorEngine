@@ -18,15 +18,15 @@ public:
 
     void Update(float deltaTime);
 
-	// I6-B4b — 결정적 표본 진입점(experiment.animtick 게이트 전용). 제품
-	// 포즈 함수를 그대로 태워 m_FinalTransforms 팔레트를 내놓는다.
-	// 애니메이터 상태(팔레트·시간축)는 복원한다.
-	//
-	// ★ D4e-1의 legacy 대조 팔은 B4b에서 죽었다 — 재귀 틱이 없어졌으므로
-	//   대조할 상대가 없다. 남은 축은 골든 digest(게이트 6b)다.
-	bool EvaluateExperimentPose(Animator& animator,
+	// I5-D4e-1 — 패리티 진입점(experiment.animtick 게이트 전용). 같은 시각
+	// 입력으로 legacy 재귀(UpdateBone)와 experiment 단일 순회를 각각 돌려
+	// m_FinalTransforms 팔레트를 내놓는다 — 제품 틱과 같은 함수를 태우므로
+	// 대조가 곧 제품 경로 검증이다. 애니메이터 상태(팔레트·시간축)는 복원한다.
+	// experimentSkeleton을 호출자가 준다 — 게이트가 Step→Linear 강등 사본을
+	// 먹여 "산술 재현" 축과 "Step 집행 격차(의도)" 축을 분리해 잴 수 있게.
+	bool EvaluateParityPose(Animator& animator,
 		const experiment::Skeleton& experimentSkeleton, int clipIndex,
-		float time, math::matrix4x4* outExperiment);
+		float time, math::matrix4x4* outLegacy, math::matrix4x4* outExperiment);
 	// K2: 공유 소유 해체 — Animator는 게임/컴포넌트 측이 소유하고, 여기서는
 	// 프레임 안에서만 유효한 관찰용 raw 포인터로 추적한다(등록/해제는 Awake/
 	// OnDestroy가 this로 직접 호출). 수명 불변식은 AnimationJob.cpp의
@@ -41,9 +41,12 @@ private:
 	std::vector<Animator*> SnapshotAnimators();
     void UpdateBones(Animator& animator);
 
-    // I6-B4b — legacy 재귀 틱 3종과 calculAni는 제거됐다(본문 373줄).
-    // BlendAni는 experiment 경로가 쓰므로 존치한다.
+    //현재 애니인덱스, 다음애니인덱스, 블렌드지속시간,
+    void UpdateBlendBone(Bone* bone, Animator& animator, AnimationController* controller, const math::matrix4x4& transform, float time ,float nextanitime);
+    void UpdateBone(Bone* bone, Animator& animator, AnimationController* controller, const math::matrix4x4& transform, float time);
+    void UpdateBoneLayer(Bone* bone, Animator& animator, const math::matrix4x4& transform);
     math::matrix4x4 BlendAni(const math::matrix4x4& curAni, const math::matrix4x4& nextAni, float t);
+    math::matrix4x4 calculAni(NodeAnimation& nodeAnim, float time, int* _key = nullptr);
 
 	// I5-D4e-1 — experiment 재생 경로. Animator::m_experimentModel이 있으면
 	// Update 워커가 legacy 재귀 대신 이것을 탄다. 시간축·이벤트 구조는 legacy와

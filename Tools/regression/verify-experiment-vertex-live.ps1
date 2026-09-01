@@ -215,13 +215,15 @@ if ($instExpOn -lt 1 -or $instLegacyOn -ne 0) {
 # ★ 1e(I5-D4e-1) — 라이브 애니 틱 경로. Gunner 배치 직후 Animator가 꺼지기
 #   전까지의 틱은 experiment 경로여야 한다. legacy 계수가 있으면 재생 바인딩
 #   (EnsureExperimentAnimationBinding)이 조용히 실패한 것이다.
-# I6-B4b: legacy 재귀 틱이 죽어 로그의 두 번째 값이 'legacy'에서 'none'으로
-# 바뀌었다. 뜻도 바뀐다 — 예전엔 "폴백으로 샜다"였고 이제는 "이 애니메이터는
-# **안 돈다**"다. 둘 다 on 팔에서 0이어야 한다(옛 토큰도 계속 막는다: 되살아나면
-# 그것도 실패다).
-$animTickLegacyOn = ([regex]::Matches($logOn, '\[anim\.tick\] (legacy|none)')).Count
+$animTickLegacyOn = ([regex]::Matches($logOn, '\[anim\.tick\] legacy')).Count
 if ($animTickLegacyOn -ne 0) {
-    $fail += "1e 라이브 애니 틱이 experiment가 아닌 경로 $animTickLegacyOn 건 — 재생 바인딩이 비었다"
+    $fail += "1e 라이브 애니 틱 legacy $animTickLegacyOn 건 — 재생 바인딩이 새고 있다"
+}
+# ★ 6(I5-D4e-1) — 재생 팔레트 패리티. 같은 시각 입력으로 legacy 재귀와
+#   experiment 단일 순회(둘 다 제품 함수)를 대조한다. 라이브 틱의 A/B 렌더
+#   동수는 비결정 시간축 탓에 세울 수 없으므로 이 직접 대조가 그 축을 진다.
+if ($logOn -notmatch '\[CLI\] experiment\.animtick pass animators=([1-9]\d*)') {
+    $fail += "6 재생 팔레트 패리티 실패 또는 대상 0 — animtick 출력을 확인하라"
 }
 # ★ 7(I5-D4e-2) — 이벤트·루프 오버라이드가 Animator 소유로 왕복하고 공유
 #   자산은 불변이며 발화 규칙이 오버라이드를 소비한다. 합성 seed가 전제 —
@@ -254,11 +256,9 @@ if ($logOn -notmatch 'animmask pass masks=[1-9]\d* viaExperiment=1 structure=ok'
 # ★ 6b(I6-B4a) — 재생 팔레트 골든. legacy 파리티(축 6)가 은퇴하면 이 digest가
 #   재생 산술의 유일한 회귀 감시자다. 정확성이 아니라 **안정성**을 잰다 —
 #   의도한 변경이면 값을 갱신하고 왜 바뀌었는지 커밋 메시지에 남긴다.
-#   ★ B4b에서 값이 858071B5 → 093A1FC2로 바뀌었다: 하네스가 legacy의
-#     Linear 강등 사본이 아니라 **실제 스켈레톤**(Step 보존)을 재게 됐다.
 #   ★ 양자화(1/4096)에도 **엄격하다** — 실측으로 0.0001 섭동에서 값이 바뀐다
 #     (표본이 많아 늘 어떤 값이 반올림 경계에 있다). x64 Debug 고정 골든이다.
-if ($logOn -notmatch 'animtick pass .* poseDigest=093A1FC2') {
+if ($logOn -notmatch 'animtick pass .* poseDigest=858071B5') {
     $fail += "6b 재생 팔레트 골든이 달라졌다(on) — animtick poseDigest 를 확인하라"
 }
 # ★ 9(I5-D4e-3) — 마스크 트리 A/B. 순서 재현(저장분 인덱스 대응)까지 대조.

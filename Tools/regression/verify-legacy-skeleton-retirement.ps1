@@ -100,23 +100,25 @@ elseif ($reflectBody -notmatch 'm_Motion') {
 
 # ── 계약 3: 접촉 래칫 — 파일별 상한을 넘지 않는다 ───────────────────────────
 #
-# 값은 2026-09-01 I6-B4b 직후 실측이다. I6-B/C/D가 내려갈 때마다 함께 낮춘다.
+# 값은 2026-09-01 **B4b 되돌림 직후** 실측이다(회귀 대응 — 아래 ★ 참조). I6-B/C/D가 내려갈 때마다 함께 낮춘다.
 # 표에 없는 파일이 나타나면 **새 소비자**라 실패다 — 은퇴 중인 타입에 소비가
 # 늘어나는 것이 이 게이트가 막으려는 유일한 방향이다.
 $ratchet = @{
     'Engine/SceneRuntime/Animator.cpp'                = 19
-    # ★ 2026-09-01 병합으로 10 → 13. Transform 트랙(X0~X8)이 들여온
-    # `scene.transformbulk` 하네스가 legacy Skeleton을 **합성해 주입한다**
-    # (makeSkeleton → animator->m_Skeleton = ...). 은퇴 대상에 새 소비가
-    # 붙은 것이라 이 게이트가 잡았고, 같은 병합이 Scene.cpp에 넣은 제품 접촉
-    # 둘은 창구로 돌렸다(B4b). 이 하네스는 B5 선행으로 이주해야 한다 —
-    # 상한을 올리는 것은 유예이지 승인이 아니다.
+    # 2026-09-01 병합(Transform 트랙 X0~X8)이 `scene.transformbulk` 하네스로
+    # legacy Skeleton을 합성 주입해 10 → 13이 됐다. B5 선행으로 이주해야 한다.
     'Editor/EngineEntry/ConsoleCommandSystem.cpp'     = 13
     'Engine/SceneRuntime/AnimationEventBridge.cpp'    = 11
     'Engine/SceneRuntime/ModelSceneBridge.cpp'        = 8
     'Engine/RenderEngine/ModelLoader.cpp'             = 6
     'Engine/RenderEngine/ExperimentModelMigration.cpp' = 5
+    'Engine/SceneRuntime/AnimationJob.cpp'            = 5
     'Engine/RenderEngine/Model.cpp'                   = 2
+    # ★ 아래 둘은 B4b 되돌림으로 **되살아난** 접촉이다(래칫 67 → 74).
+    # legacy 재귀 틱(AnimationJob 5)과 병합이 들여온 Scene.cpp 가드 2가
+    # 그대로 돌아왔다. B4b 재시도 때 다시 내려간다 — 지금 표에 적는 것은
+    # "여기까지 후퇴했다"는 사실의 기록이지 목표가 아니다.
+    'Engine/SceneRuntime/Scene.cpp'                   = 2
     'Engine/SceneRuntime/Animator.h'                  = 1
     'Engine/RenderEngine/AnimatorData.h'              = 1
     'Engine/RenderEngine/Model.h'                     = 1
@@ -158,7 +160,7 @@ $windowFiles = @(
     'Engine/SceneRuntime/Animator.cpp',
     'Engine/SceneRuntime/Animator.h',
     'Engine/SceneRuntime/AnimationEventBridge.cpp')
-$outsideCeiling = 36
+$outsideCeiling = 43
 $outside = 0
 foreach ($rel in $measured.Keys) {
     if ($windowFiles -notcontains $rel) { $outside += $measured[$rel] }

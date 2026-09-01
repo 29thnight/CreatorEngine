@@ -5408,23 +5408,6 @@ namespace ConsoleCmd
 		if (!passed) EngineBootstrap::SetExitCode(6);
 	}
 
-    // I6-B4b 후속 — **에디터 드롭 경로**를 CLI로 연다. 콘텐츠 브라우저에서
-    // 씬으로 끌어다 놓을 때 도는 것은 model.load(LoadModel)가 아니라
-    // DataSystems->LoadCachedModelShared다(HierarchyWindow·SceneViewWindow).
-    // 그 둘이 서로 다른 로더라는 것이 이 게이트 세트의 구멍이었다.
-    static void Cmd_model_loadcached(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-        if (parts.size() < 2)
-        {
-            std::printf("[CLI] 사용법: model.loadcached <모델 경로>\n");
-            return;
-        }
-        auto model = DataSystems->LoadCachedModelShared(parts[1]);
-        std::printf("[CLI] model.loadcached %s: %s\n",
-            model ? "ok" : "fail", parts[1].c_str());
-    }
-
     static void Cmd_model_place(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -6272,25 +6255,37 @@ namespace ConsoleCmd
             firstIssue.empty() ? "" : " first=", firstIssue.c_str());
     }
 
-    // I6-B4b — 재생 팔레트 골든. D4e-1은 legacy 재귀와 experiment 단일 순회를
-    // 같은 입력으로 돌려 원소 단위로 대조했는데, B4b가 legacy 재귀를 걷어
-    // **대조할 팔이 없어졌다**. 남은 것은 제품 포즈 함수를 결정적 표본으로
-    // 태워 접은 digest이고, 그것이 재는 것은 정확성이 아니라 **안정성**이다.
+    // I5-D4e-1 — 재생 팔레트 패리티. 활성 씬의 experiment 핸들 보유 Animator
+    // 전수에 대해, 같은 시각 입력으로 legacy 재귀(UpdateBone)와 experiment
+    // 단일 순회를 제품 함수 그대로 돌려 m_FinalTransforms를 원소 단위 대조한다.
+    // 라이브 틱은 실시간이라 비결정 — 이 명령이 결정적 표본(클립 구간 5점)으로
+    // 같은 산술을 잰다.
     //
-    // ★ 이 강등을 축소해 적지 않는다. "맞다"를 말하던 축이 "어제와 같다"로
-    //   내려온 것이고, 그 인수인계는 B4a가 legacy가 살아 있는 구간에서
-    //   변이로 증명해 두었다(8c·9b·6b).
-    //
-    // ★ 표본은 클립 구간 5점 × 전 클립이다. 라이브 틱은 실시간이라 비결정이라
-    //   골든이 성립하지 않는다 — 이 명령이 결정적 입력을 만든다.
+    // 두 축으로 잰다(실측 근거 — Gunner에서 Step 채널 369개, maxErr 0.0068):
+    //   linear 축(단정): Step→Linear 강등 사본으로 대조 — legacy는 역브리지가
+    //     보간 모드를 버려 항상 Linear를 재생하므로, 이 축이 "산술 재현"의
+    //     이빨이다.
+    //   step 축(관측): 원본(Step 집행)과의 격차 — 임포터가 보존한 자산 의도를
+    //     experiment 경로가 집행해서 생기는 **의도된 격차**라 단정하지 않고
+    //     크기만 보고한다(legacy Linear 강등이 알려진 손실이다).
     struct AnimtickAxisResult final
     {
         std::size_t clipCount{};
         std::size_t sampleCount{};
         std::size_t failedEvaluations{};
-        // 1/4096 양자화 FNV. 양자화에도 **엄격하다** — 512뼈×16원소×50표본이면
-        // 어떤 값 하나는 늘 반올림 경계 근처라, 양자 미만 섭동(0.0001)에도
-        // 값이 바뀐다(B4a 실측). x64 Debug 이 툴체인 고정 골든이다.
+        double maxError{};
+        std::size_t worstClip{}, worstBone{};
+        float worstFraction{};
+        std::string worstBoneName{};
+        // I6-B4a — experiment 팔레트만으로 접은 digest. legacy 대조가 은퇴하면
+        // 이 축이 재생 산술의 유일한 회귀 감시자가 된다(정확성이 아니라 안정성:
+        // 골든이 굳은 뒤 값이 달라지면 무언가 바뀐 것이다).
+        // ★ 1/4096로 양자화하되, 그것이 "말단 비트에 안 흔들린다"는 뜻은
+        //   **아니다**(실측). 512뼈×16원소×50표본이면 어떤 값 하나는 늘
+        //   반올림 경계 근처라, 0.0001 섭동(양자 1/4096보다 작다)에도 digest가
+        //   바뀐다. 즉 이것은 관대한 요약이 아니라 **엄격한 골든**이다 —
+        //   x64 Debug 이 툴체인에 고정이고, 구성이나 컴파일러가 바뀌면 값이
+        //   달라질 수 있다. 그때는 왜 바뀌었는지 확인하고 의도적으로 갱신한다.
         std::uint32_t poseDigest{ 2166136261u };
     };
 
@@ -6298,6 +6293,7 @@ namespace ConsoleCmd
         const experiment::Skeleton& skeleton, AnimtickAxisResult& result)
     {
         static constexpr float kSampleFractions[]{ 0.f, 0.25f, 0.5f, 0.75f, 0.95f };
+        std::vector<math::matrix4x4> legacyPose(MAX_BONES);
         std::vector<math::matrix4x4> experimentPose(MAX_BONES);
         for (std::size_t clip = 0; clip < skeleton.clips.size(); ++clip)
         {
@@ -6306,9 +6302,9 @@ namespace ConsoleCmd
                 static_cast<float>(skeleton.clips[clip].durationTicks);
             for (const float fraction : kSampleFractions)
             {
-                if (!job.EvaluateExperimentPose(animator, skeleton,
+                if (!job.EvaluateParityPose(animator, skeleton,
                     static_cast<int>(clip), duration * fraction,
-                    experimentPose.data()))
+                    legacyPose.data(), experimentPose.data()))
                 {
                     ++result.failedEvaluations;
                     continue;
@@ -6330,6 +6326,24 @@ namespace ConsoleCmd
                             result.poseDigest *= 16777619u;
                         }
                     }
+                    const float* legacyValues = &legacyPose[bone].m[0][0];
+                    const float* experimentValues =
+                        &experimentPose[bone].m[0][0];
+                    for (int element = 0; element < 16; ++element)
+                    {
+                        const double error = static_cast<double>(std::abs(
+                            legacyValues[element] - experimentValues[element]));
+                        if (error > result.maxError)
+                        {
+                            result.maxError = error;
+                            result.worstClip = clip;
+                            result.worstBone = bone;
+                            result.worstFraction = fraction;
+                            result.worstBoneName =
+                                bone < skeleton.bones.size()
+                                ? skeleton.bones[bone].name : "?";
+                        }
+                    }
                 }
             }
         }
@@ -6347,7 +6361,9 @@ namespace ConsoleCmd
         AnimationJob& job = renderScene->GetAnimationJob();
 
         std::size_t animatorCount = 0;
-        AnimtickAxisResult axis{};
+        std::size_t stepChannels = 0;
+        AnimtickAxisResult linearAxis{};
+        AnimtickAxisResult stepAxis{};
 
         for (const auto& object : scene->m_Entities)
         {
@@ -6360,18 +6376,58 @@ namespace ConsoleCmd
             if (nullptr == skeleton) continue;
 
             ++animatorCount;
-            MeasureAnimtickAxis(job, *animator, *skeleton, axis);
+
+            // linear 축 사본 — 제품 함수를 오염시키지 않고 legacy의 Linear
+            // 강등을 재현한다(게이트 전용 복사 비용).
+            experiment::Skeleton linearSkeleton = *skeleton;
+            for (experiment::AnimationClip& clip : linearSkeleton.clips)
+            {
+                for (experiment::AnimationChannel& channel : clip.channels)
+                {
+                    if (channel.translationInterpolation
+                            == experiment::InterpolationMode::Step
+                        || channel.rotationInterpolation
+                            == experiment::InterpolationMode::Step
+                        || channel.scaleInterpolation
+                            == experiment::InterpolationMode::Step)
+                    {
+                        ++stepChannels;
+                    }
+                    channel.translationInterpolation =
+                        experiment::InterpolationMode::Linear;
+                    channel.rotationInterpolation =
+                        experiment::InterpolationMode::Linear;
+                    channel.scaleInterpolation =
+                        experiment::InterpolationMode::Linear;
+                }
+            }
+
+            MeasureAnimtickAxis(job, *animator, linearSkeleton, linearAxis);
+            MeasureAnimtickAxis(job, *animator, *skeleton, stepAxis);
         }
 
-        const bool passed = animatorCount > 0 && axis.sampleCount > 0
-            && 0 == axis.failedEvaluations;
+        // 오차 한계 0 — 같은 산술의 재현이라 비트 동일이 실측이다(경계 규약
+        // 정정 후 Gunner 10클립 50표본에서 maxErr 0.000000000). 무손실 대조라
+        // 근사 허용이 없다(V2 픽셀 diff 0과 같은 결).
+        const bool passed = animatorCount > 0 && linearAxis.sampleCount > 0
+            && 0 == linearAxis.failedEvaluations && 0.0 == linearAxis.maxError;
+        if (linearAxis.maxError > 0.0)
+        {
+            std::printf("[CLI] experiment.animtick linear worst: clip=%zu "
+                "bone=%zu(%s) fraction=%.2f\n",
+                linearAxis.worstClip, linearAxis.worstBone,
+                linearAxis.worstBoneName.c_str(), linearAxis.worstFraction);
+        }
+        std::printf("[CLI] experiment.animtick step-divergence: maxErr=%.9f "
+            "stepChannels=%zu worstBone=%s (의도된 격차 — 단정 없음)\n",
+            stepAxis.maxError, stepChannels, stepAxis.worstBoneName.c_str());
         std::printf("[CLI] experiment.animtick %s animators=%zu clips=%zu "
-            "samples=%zu failedEval=%zu poseDigest=%08X\n",
+            "samples=%zu failedEval=%zu maxErr=%.9f poseDigest=%08X\n",
             passed ? "pass" : (animatorCount == 0 ? "skip" : "fail"),
-            animatorCount, axis.clipCount, axis.sampleCount,
-            axis.failedEvaluations, axis.poseDigest);
+            animatorCount, linearAxis.clipCount, linearAxis.sampleCount,
+            linearAxis.failedEvaluations, linearAxis.maxError,
+            linearAxis.poseDigest);
     }
-
 
     static void Cmd_script_add(const ConsoleCommandContext& ctx)
     {
@@ -11367,7 +11423,6 @@ namespace ConsoleCmd
 			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
 			reg({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
 			reg({ "animator.authoring.probe" }, &Cmd_animator_authoring_probe);
-            reg({ "model.loadcached" }, &Cmd_model_loadcached);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);
