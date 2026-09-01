@@ -358,10 +358,11 @@ IR 이후의 어떤 코드도 포맷별 관례를 알 필요가 없다. 원본 �
 
 이 문서 + 게이트 8종 + 벤더링 3종. 실측 기준선이 §1 에 있다.
 
-### I1. 실물 디코더 배선 — `ImporterModelDecoder`
+### I1. 실물 디코더 배선 — `ImporterModelDecoder` — **제품 배선 완료, 잔여 둘**
 
-임포터를 `ModelLoader` 에 꽂는 접착제. 지금은 검사가 손으로 잇고 생산 경로에는
-없다(§1.2).
+임포터를 `ModelLoader` 에 꽂는 접착제. **생산 경로에는 D1b가 이미 꽂았다**
+(`DataSystem::LoadModelViaExperiment` → `ResolvingModelDecoder(cooked, importer)`).
+아래 셋 중 첫 둘이 남는다(2026-09-01 재측정).
 
 - 확장자로 임포터를 고르고 → `Import` → `ConvertToModelDraft` → draft 반환
 - `ImportNote` 를 `ModelLoadIssue` 로 옮기는 규칙 확정(심각도 대응)
@@ -372,27 +373,37 @@ IR 이후의 어떤 코드도 포맷별 관례를 알 필요가 없다. 원본 �
 
 ### I2. 텍스처 자산 해석 정책
 
-`resolveTextureAsset` 이 비어 있어 임베디드 텍스처 property 가 생략된다(§1.4).
-`.meta`/AssetId 발급 주체를 정해야 하므로 SerializationPlan(PHASE 17) 과 맞물린다.
+~~`resolveTextureAsset` 이 비어 있어~~ **2026-09-01 재측정: 절반 닫혔다.**
+제품 로드(`LoadModelViaExperiment`)와 cook(`ModelCookProducer`) 둘 다
+`resolveTextureAsset` 을 채운다 — **외부 텍스처는 `.meta` GUID 로 해석된다.**
+**임베디드 텍스처만 남는다**: 소스 로드 경로에서는 `sourcePath` 가 비어 GUID 가
+nil 이고 property 가 생략된다(브리지가 `fallbackPath` 이름 폴백으로 받는다).
+cook 경로는 D5-b1/b2b1 이 모델 sidecar 의 `subAssets.embeddedTextures` UUIDv4 로
+이미 해결했다 — 남은 것은 **소스 경로에도 그 신원을 주는 것**이다.
 
 - 임베디드 바이트를 디스크로 뽑는 시점·위치
 - AssetId 발급 — 새로 만들 것인가 기존 자산에 붙일 것인가
 - 뽑지 않기로 한 경우의 표현(지금은 property 생략 + 계수)
 
-### I3. 노멀 생성 패스
+### I3. 노멀 생성 패스 — **완료**
 
-`generateMissingNormals` 는 ufbx 에만 전달되고 **glTF 경로에는 생성기가 없다.**
-법선이 없으면 탄젠트도 못 만든다(mikktspace 전제).
+~~`generateMissingNormals` 는 ufbx 에만 전달되고 glTF 경로에는 생성기가 없다.~~
+**2026-09-01 재측정: 아니다.** `Import/NormalGeneration.cpp` 가 서 있고
+`FbxImporter.cpp:606` · `GltfImporter.cpp:917` 둘 다 `GenerateMissingNormals` 를
+부른다. §1.3 의 "소비자 0" 표가 이 항목에 대해 낡아 있었다.
 
-### I4. meshoptimizer 연동
+### I4. meshoptimizer 연동 — **둘 완료, `lodLevels` 잔여**
 
-죽은 플래그 넷(§1.3)을 살린다. `weldVertices` → `optimizeVertexCache` →
-`lodLevels` 순. meshlet 은 mesh shader 소비자가 생길 때까지 보류.
+죽은 플래그 넷(§1.3)을 살린다. `weldVertices`(`Import/VertexWelding.cpp`) 와
+`optimizeVertexCache`(`Import/VertexCacheOptimization.cpp`) 는 섰다 —
+게이트도 `experiment.weld` · `experiment.cacheopt` 로 있다. **`lodLevels` 는
+여전히 소비자 0**(선언만 있다 — `ImportedScene.h:469`). meshlet 은 mesh shader
+소비자가 생길 때까지 보류.
 
 ★ **탄젠트 생성과의 순서가 중요하다.** 용접이 탄젠트 이음매를 다시 붙이면
 mikktspace 규약이 깨진다 — 탄젠트를 정점 정체성의 일부로 다뤄야 한다.
 
-### I5-0. Material/ShaderMeta 교차 계약 — **이름·쿠킹 게시 계약 완료, 제품 ID·소비 배선 잔여**
+### I5-0. Material/ShaderMeta 교차 계약 — **완료** (2026-09-01 · I7-C1에서 제품 합류)
 
 I5에서 `experiment::Model`을 직접 소비하기 전에 재질이 M5/M6 계약으로 손실 없이
 건너갈 수 있어야 한다. 2026-08-27 첫 안전 슬라이스로 표준 PBR property 이름을
