@@ -55,6 +55,18 @@ namespace ExperimentMaterialSealing
     [[nodiscard]] bool BuildSealSourceFromLegacy(const Material& legacy,
         const ShaderMeta& meta, SealSource& outSource, std::string& outError);
 
+    // I5-D5c2-2 — 저작 정본 직행. `BuildSealSourceFromLegacy`가 채운 SealSource의
+    // **material만** 저작 원본으로 교체한다(properties·keywords·blendMode).
+    // 나머지 부속(texture generation owner·flow·legacy 호환 스칼라)은 전환기
+    // 동안 legacy에서 온다 — 그쪽의 정본화는 M2 resolver 배선(c3)의 몫이다.
+    //
+    // ★ 왜 "교체"인가: 저작 원본이 있으면 legacy를 거쳐 온 properties는 MaterialInfo
+    //   3필드 폴백이 주입된 값이다(c1 실측). 저작본이 그 자리를 대신하면 누락
+    //   property는 packer의 ApplyDefault(ShaderMeta 선언 기본값)가 채운다 —
+    //   c2-1이 두 경로의 packing 바이트가 같음을 실측했다(sealByteMismatch=0).
+    void ApplyAuthoredMaterial(SealSource& source,
+        const experiment::Material& authored);
+
     // layout 확보 후 호출 — propertyBytes(정본 packer)와 textureBindings
     // (reflection register 검증·중복 거부, legacy SealMaterialTextureBindings와
     // 같은 규칙)를 만든다. keyword 정규화는

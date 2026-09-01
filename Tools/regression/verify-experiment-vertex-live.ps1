@@ -31,6 +31,7 @@
 #      씬 전수로 legacy 직소비와 대조 (D5b, off 대조군 4p)
 #   12 재질 병행 표현 — 합성 새 정본 seed→저장(ref 표기)→재로드→저작 원본
 #      기반 합성이 legacy 왕복과 값 동등한가 + **왕복 손실 실측** (D5c1)
+#      + packing 바이트 A/B(c2-1)와 프록시 저작 정본 운반(c2-2)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -249,6 +250,12 @@ if ($logOn -notmatch 'experiment\.matruntime pass .*withInstance=[1-9]') {
 }
 if ($logOn -notmatch 'experiment\.matruntime pass .*compared=[1-9]') {
     $fail += "12c 대조가 한 건도 성립하지 않았다(on)"
+}
+# ★ 12d(I5-D5c2-2) — 프록시가 저작 정본을 나르는가. 이 단정이 없으면 프록시
+#   배선이 끊겨도 proxyValueMismatch=0(비교할 것이 없으니)으로 통과한다 —
+#   "0개를 비교해 차이 0"의 전형이다.
+if ($logOn -notmatch 'experiment\.matruntime pass .*proxyAuthored=[1-9]') {
+    $fail += "12d 프록시가 저작 정본을 하나도 나르지 않았다(on) — 스냅샷이 끊겼다"
 }
 # 왕복 손실은 **판정하지 않고 보고**한다 — 이 슬라이스의 목적은 손실을 없애는
 # 것이 아니라 크기를 아는 것이다(처방은 c2). 값을 아래 요약이 찍는다.

@@ -33,6 +33,7 @@
 #include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
 #include "Experiment/MaterialPropertyBlock.h"  // I5-D5c2-1: packing 바이트 축
 #include "MaterialPropertyPacker.h"           // I5-D5c2-1: 합성 layout
+#include "PrimitiveRenderProxy.h"           // I5-D5c2-2: 프록시 축
 #include "PrimitiveRenderProxy.h"  // I5-D5a: FoliageRenderProxy 실물 사슬
 #include "RHI/IRenderDeviceServices.h" // I5-D5a: RHIExperimentVertexView
 #include "ConditionParameter.h"
@@ -6373,6 +6374,7 @@ namespace ConsoleCmd
         std::size_t sealCompared = 0, sealByteMismatch = 0;
         std::size_t sealLayoutFailed = 0, sealBuildFailed = 0;
         std::string firstSealMismatch;
+        std::size_t meshProxies = 0, proxyAuthored = 0, proxyValueMismatch = 0;
         std::string firstMismatch;
 
         for (const auto& object : scene->m_Entities)
@@ -6512,6 +6514,79 @@ namespace ConsoleCmd
             }
         }
 
+        // ── D5-c2-2: 프록시 축 ──
+        //
+        // sealing 직행 자체는 헤드리스 관측 밖이다: --script 라이브는 렌더
+        // 0프레임이고 dx12.scene 하네스는 sealing 경로를 타지 않는다(자체 그리기).
+        // 그래서 **프록시가 저작 정본을 나르는가**까지를 잰다 — 그 뒤 4줄
+        // (poolMesh 반입 → ApplyAuthoredMaterial)은 코드가 미러이고, 값의 동등은
+        // 위 바이트 축이 이미 증명했다. 남는 간극은 계획서에 한계로 적는다.
+        //
+        // 프록시가 나르는 것이 컴포넌트 인스턴스와 **같은 값**인지도 본다 —
+        // 프록시는 값 스냅샷이라 인스턴스를 가리키지 않는다(렌더 스레드 안전).
+        if (RenderScene* renderScene = SceneManagers->GetRenderScene())
+        {
+            for (const auto& proxy : renderScene->GetPrimitiveProxySnapshot())
+            {
+                auto* meshProxy = dynamic_cast<MeshRenderProxy*>(proxy.get());
+                if (nullptr == meshProxy) continue;
+                ++meshProxies;
+                if (!meshProxy->m_authoredMaterial) continue;
+                ++proxyAuthored;
+
+                // 같은 renderer의 인스턴스를 찾아 값 대조한다.
+                MeshRenderer* owner = nullptr;
+                for (const auto& object : scene->m_Entities)
+                {
+                    if (!object || object->IsDestroyMark()) continue;
+                    MeshRenderer* candidate = object->GetComponent<MeshRenderer>();
+                    if (nullptr != candidate
+                        && candidate->GetInstanceID() == meshProxy->m_instancedID)
+                    {
+                        owner = candidate;
+                        break;
+                    }
+                }
+                experiment::MaterialInstance* instance =
+                    (nullptr != owner) ? owner->GetMaterialInstance() : nullptr;
+                if (nullptr == instance) { ++proxyValueMismatch; continue; }
+
+                experiment::Material expected;
+                std::string error;
+                if (!instance->BuildEffectiveMaterial(expected, error))
+                {
+                    ++proxyValueMismatch;
+                    continue;
+                }
+                bool same = expected.properties.size()
+                    == meshProxy->m_authoredMaterial->properties.size()
+                    && expected.blendMode
+                        == meshProxy->m_authoredMaterial->blendMode;
+                if (same)
+                {
+                    for (const experiment::MaterialProperty& property
+                        : expected.properties)
+                    {
+                        const auto it = std::find_if(
+                            meshProxy->m_authoredMaterial->properties.begin(),
+                            meshProxy->m_authoredMaterial->properties.end(),
+                            [&](const experiment::MaterialProperty& candidate)
+                            {
+                                return candidate.name == property.name;
+                            });
+                        if (it == meshProxy->m_authoredMaterial->properties.end()
+                            || encodeValue(it->name, it->value)
+                                != encodeValue(property.name, property.value))
+                        {
+                            same = false;
+                            break;
+                        }
+                    }
+                }
+                if (!same) ++proxyValueMismatch;
+            }
+        }
+
         // 판정은 **동등 축만** 한다. onlyAuthored/onlyLegacy는 왕복 손실의
         // 실측이라 여기서 붉히지 않고 계수로 보고한다 — 이 슬라이스는 손실을
         // 없애는 것이 아니라 크기를 아는 것이 목적이다(그 처방은 c2다).
@@ -6521,16 +6596,18 @@ namespace ConsoleCmd
         // 반면 layout/build 실패는 축이 돌지 않았다는 뜻이라 붉힌다.
         const bool passed = covered && 0 == valueMismatch && 0 == blendMismatch
             && 0 == buildFailed && 0 == sealLayoutFailed && 0 == sealBuildFailed
-            && sealCompared > 0;
+            && sealCompared > 0 && 0 == proxyValueMismatch;
         std::printf("[CLI] experiment.matruntime %s renderers=%zu "
             "withMaterial=%zu withInstance=%zu compared=%zu metaMissing=%zu "
             "buildFailed=%zu valueMismatch=%zu blendMismatch=%zu "
             "onlyAuthored=%zu onlyLegacy=%zu sealCompared=%zu "
-            "sealByteMismatch=%zu sealLayoutFailed=%zu sealBuildFailed=%zu%s%s%s%s\n",
+            "sealByteMismatch=%zu sealLayoutFailed=%zu sealBuildFailed=%zu "
+            "meshProxies=%zu proxyAuthored=%zu proxyValueMismatch=%zu%s%s%s%s\n",
             passed ? "pass" : (covered ? "fail" : "skip"),
             renderers, withMaterial, withInstance, compared, metaMissing,
             buildFailed, valueMismatch, blendMismatch, onlyAuthored, onlyLegacy,
             sealCompared, sealByteMismatch, sealLayoutFailed, sealBuildFailed,
+            meshProxies, proxyAuthored, proxyValueMismatch,
             firstMismatch.empty() ? "" : " first=",
             firstMismatch.c_str(),
             firstSealMismatch.empty() ? "" : " firstSeal=",

@@ -38,6 +38,7 @@ class Material;
 class Mesh;
 class MeshRenderer;
 namespace experiment { class Model; } // I5-D4b 핸들 병행(shared_ptr 보관용)
+namespace experiment { struct Material; } // I5-D5c2-2 저작 정본 스냅샷
 class TerrainMesh;
 class TerrainMaterial;
 class TerrainComponent;
@@ -123,6 +124,12 @@ public:
 	// (은퇴는 D4f). null이면 핸들 경로 아님(A/B off·Assimp 폴백·절차 메시).
 	std::shared_ptr<const experiment::Model>	m_experimentModel{};
 	uint32							m_experimentMeshIndex{ 0 };
+	// I5-D5c2-2 — 재질 저작 정본의 **값 스냅샷**(base+override 합성 결과).
+	// MeshRenderer의 MaterialInstance에서 프록시 생성 시 한 번 만든다 —
+	// 프록시 갱신 커맨드가 재질을 바꾸면 그 경로가 다시 만든다. null이면
+	// 저작 원본이 없다는 뜻이고(legacy 표기 문서·Assimp 모델) sealing은
+	// legacy 브리지를 그대로 탄다.
+	std::shared_ptr<const experiment::Material>	m_authoredMaterial{};
 	HashedGuid						m_animatorGuid{};
 	HashedGuid						m_materialGuid{};
 	// 본 팔레트 버퍼(소유권 공유).

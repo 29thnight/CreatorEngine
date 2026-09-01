@@ -10,6 +10,7 @@
 #include "MeshRenderer.h"
 #include "Mesh.h"
 #include "Material.h"
+#include "Experiment/MaterialInstance.h" // I5-D5c2-2: 저작 정본 스냅샷
 #include "DataSystem.h" // I5-D4b: experiment 핸들 조회
 #include "FoliageComponent.h"
 #include "Terrain.h"
@@ -73,6 +74,26 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
     if (nullptr != m_Material)
     {
         m_materialGuid = m_Material->m_materialGuid;
+    }
+
+    // I5-D5c2-2 — 재질 저작 정본을 값으로 스냅샷한다(base+override 합성).
+    // 프록시는 렌더 스레드가 읽으므로 컴포넌트의 MaterialInstance를 가리키지
+    // 않는다 — 인스턴스 override 편집이 그리는 중에 값을 바꾸면 안 된다.
+    if (experiment::MaterialInstance* instance = component->GetMaterialInstance())
+    {
+        auto effective = std::make_shared<experiment::Material>();
+        std::string error;
+        if (instance->BuildEffectiveMaterial(*effective, error))
+        {
+            m_authoredMaterial = std::move(effective);
+        }
+        else
+        {
+            // 합성 실패는 legacy 경로로 조용히 내려간다 — 지어낸 재질로
+            // 그리는 것보다 전환기 브리지가 낫다(관측은 남긴다).
+            Debug->LogWarning("MeshRenderProxy 저작 재질 합성 실패 — legacy"
+                " sealing으로 내려간다: " + error);
+        }
     }
     m_instancedID = component->GetInstanceID();
 

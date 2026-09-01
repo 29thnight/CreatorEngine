@@ -974,6 +974,9 @@ namespace
             // SealForwardMaterials/SealGBufferMaterials가 값 snapshot을 만든 뒤
             // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
             std::shared_ptr<const Material> materialSource{};
+            // I5-D5c2-2 — 재질 저작 정본의 값 스냅샷. 있으면 sealing이
+            // properties·keywords·blendMode를 이것으로 덮는다(부속은 legacy).
+            std::shared_ptr<const experiment::Material> authoredMaterialSource{};
             math::aabb           worldBounds{};
             bool                 hasBounds{ false };
             bool                 isTransparent{ false };
@@ -2680,6 +2683,7 @@ namespace
                 if (const auto* material = proxy->m_Material.get())
                 {
                     pooled.materialSource = proxy->m_Material;
+                    pooled.authoredMaterialSource = proxy->m_authoredMaterial;
                     pooled.isTransparent =
                         (MaterialRenderingMode::Transparent == material->m_renderingMode);
                 }
@@ -2902,6 +2906,13 @@ namespace
                     {
                         return false;
                     }
+                    // I5-D5c2-2 — 저작 정본이 있으면 properties·keywords·
+                    // blendMode가 그것으로 간다(왕복 절단). 부속은 legacy.
+                    if (pooled.authoredMaterialSource)
+                    {
+                        ExperimentMaterialSealing::ApplyAuthoredMaterial(
+                            sealSource, *pooled.authoredMaterialSource);
+                    }
 
                     auto snapshot =
                         std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
@@ -3071,6 +3082,12 @@ namespace
                         *source, *materialShader.value, sealSource, outError))
                 {
                     return false;
+                }
+                // I5-D5c2-2 — 위와 같은 절단(GBuffer 축).
+                if (pooled.authoredMaterialSource)
+                {
+                    ExperimentMaterialSealing::ApplyAuthoredMaterial(
+                        sealSource, *pooled.authoredMaterialSource);
                 }
 
                 auto snapshot = std::make_shared<EnhancedMaterialDrawSnapshot>();

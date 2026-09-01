@@ -669,7 +669,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;↳ D5-c | S2c-2b/2c 런타임 소유 분리 — 아래 하위 분해(착수 정찰 2026-09-01 둘째). 계획의 "5지점"은 과소 계상 — 실소비 13파일 | 재질 사슬 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c1 ✅ | 저작 원본 보관 병행 — `DeserializeMaterialPayload` authored out·`LoadAuthoredMaterialShared`·MeshRenderer `MaterialInstance` 병행·**합성 seed**(코퍼스 새 정본 저작분 0 실측)·A/B 게이트(12, M2 변이 증명) | 저작 경계 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-1 ✅ | 전환 위험의 측정 — packing 직전 논리 값의 바이트 A/B(합성 layout). **실측 `sealByteMismatch=0`: 직행해도 바이트가 같다**(M2 변이로 이빨 증명) | 게이트 | 없음 |
-| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-2 | sealing 직행 — 프록시가 저작 원본을 나르고 `BuildSealSourceFromLegacy` 우회 | 프록시·sealing | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-2 ✅ | sealing 직행 — `ApplyAuthoredMaterial`(properties·keywords·blendMode만, 부속은 전환기 legacy)·프록시 값 스냅샷·drawPool 반입·양 sealing 축·프록시 운반 게이트(12d, M3 변이 증명) | 프록시·sealing | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3 | 소비자 전환 — CLR 4·Inspector 15·CLI 2를 창구로 | CLR·Inspector | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c4 | Foliage(S2c-2c) + `m_Material` reflect 퇴출·프리팹 패치 경로 판정(S2c-2a 이월) | Foliage·프리팹 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
@@ -986,6 +986,35 @@ c3(소비자 전환) → c4(Foliage·reflect 퇴출).
 슬라이스에 **실자산 게이트는 판별력이 0이고 합성이 필수**다(D5-a Foliage와 같은
 결론). M5를 "완료"로 적어 둔 것은 코드 기준이지 저작분 기준이 아니다 —
 코퍼스 마이그레이션은 별도 트랙으로 남는다.
+
+**I5-D5c2-2 완료 실측 (2026-09-01).** sealing 직행 — 저작 정본이 있으면 왕복을
+타지 않는다. ① `ExperimentMaterialSealing::ApplyAuthoredMaterial` 신설:
+`BuildSealSourceFromLegacy`가 채운 SealSource의 **material만** 저작 원본으로
+교체한다(properties·keywords·blendMode). 부속(texture generation owner·flow·legacy
+호환 스칼라)은 전환기 동안 legacy에서 온다 — 그쪽 정본화는 M2 resolver 배선(c3)의
+몫이다. `debugName`은 legacy 것을 유지한다: 진단 이름이 슬라이스 경계에서 바뀌면
+기존 게이트의 메시지 매칭이 조용히 깨진다. ② `MeshRenderProxy::m_authoredMaterial`
+— 프록시 생성 시 `BuildEffectiveMaterial`의 **값 스냅샷**을 만든다(인스턴스를
+가리키지 않는다: 렌더 스레드가 읽는 동안 override 편집이 값을 바꾸면 안 된다).
+합성 실패는 legacy 경로로 내려가되 관측은 남긴다. ③ `PooledDraw`에
+`authoredMaterialSource` 반입(D4b `experimentSource`와 같은 결), 양 sealing 축
+(Forward 2904·GBuffer 3074)에서 분기.
+
+실측 `meshProxies=10 proxyAuthored=1 proxyValueMismatch=0` — seed가 링크한 renderer
+하나가 저작 정본을 나르고 그 값이 컴포넌트 인스턴스와 동일하다.
+
+★ **눈먼 초록을 하나 막았다.** 프록시 축을 넣고 처음에는 `proxyValueMismatch == 0`만
+판정했는데, 그러면 **스냅샷 배선이 끊겨도 통과한다**(비교할 것이 없으니 차이 0 —
+[[gate-green-can-be-blind]]의 "0개를 비교해 차이 0"). `proxyAuthored=[1-9]` 단정
+(12d)을 더했고, **변이 M3**(스냅샷 절단)에서 명령 자체는 여전히 `pass`인 채
+**12d만 정확히 붉었다** — 단정이 없었다면 이 슬라이스는 배선 없이 초록이었다.
+
+★ **한계(정직) — sealing 분기 자체는 헤드리스 관측 밖이다.** `--script` 라이브는
+렌더 0프레임이고, `dx12.scene` 오프라인 하네스는 **sealing 경로를 타지 않는다**
+(자체 그리기 — D5-a poolFoliage와 같은 유형의 간극). 게이트가 재는 것은 프록시
+운반까지이고, 그 뒤 두 지점(poolMesh 반입 → `ApplyAuthoredMaterial`)은 코드가
+4줄 미러라는 사실과 c2-1의 바이트 동등 실측(`sealByteMismatch=0`)이 부분 보증한다.
+픽셀 판정은 코퍼스에 새 정본 저작분이 생긴 뒤에야 실물로 설 수 있다(c1 정찰 ④).
 
 **I5-D5c2-1 완료 실측 (2026-09-01) — 그리고 c1 말미의 내 단정을 정정한다.**
 

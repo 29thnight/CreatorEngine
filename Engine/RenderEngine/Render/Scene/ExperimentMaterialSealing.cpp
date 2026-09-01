@@ -43,6 +43,16 @@ namespace ExperimentMaterialSealing
         return true;
     }
 
+    void ApplyAuthoredMaterial(SealSource& source,
+        const experiment::Material& authored)
+    {
+        // debugName은 legacy 것을 유지한다 — 진단 로그의 이름이 슬라이스 경계에서
+        // 바뀌면 기존 게이트 메시지 매칭이 조용히 깨진다.
+        std::string debugName = std::move(source.debugName);
+        source.material = authored;
+        source.debugName = std::move(debugName);
+    }
+
     bool SealCore(const SealSource& source, const ShaderMeta& meta,
         const ShaderMetaBindingLayout& layout,
         std::vector<std::uint8_t>& outPropertyBytes,
