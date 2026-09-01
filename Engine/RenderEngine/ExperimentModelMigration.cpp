@@ -41,6 +41,7 @@
 #include <cstdlib> // I5-D34a: A/B 스위치 getenv
 #include <fstream> // I7-C1: manifest 읽기
 #include <string>
+#include <unordered_set> // I7-C2: stale 집합
 #include <vector>
 
 namespace
@@ -379,6 +380,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 		// 조용히 두면 resolver·모델 로드가 예전처럼 source로 간다.
 		std::lock_guard lock(m_cookedCatalogMutex);
 		m_cookedCatalog.reset();
+		m_cookedStaleAssets.clear();
 		return false;
 	}
 
@@ -418,16 +420,51 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 		}
 		std::lock_guard lock(m_cookedCatalogMutex);
 		m_cookedCatalog.reset();
+		m_cookedStaleAssets.clear();
 		return false;
 	}
 
+	// ── I7-C2: 신선도 판정 ──
+	//
+	// 소스가 아티팩트보다 새로우면 그 entry는 낡았다. 소스가 아예 없으면
+	// (게시된 배포) 비교 대상이 없으므로 신선한 것으로 둔다 — 그 경우 신선도는
+	// 빌드가 보증한다. registry가 GUID를 못 푸는 entry(모델 안의 subasset 등)도
+	// 같은 이유로 건너뛴다: 그 위험은 부모 모델 entry가 대신 진다(부모가 낡으면
+	// 모델이 source로 가고, 그러면 subasset artifact를 아무도 안 본다).
+	std::unordered_set<FileGuid> stale;
+	for (const experiment::cooked::CookedAssetManifestEntry& entry
+		: catalog->Entries())
+	{
+		FileGuid guid;
+		guid.m_guid = entry.assetId.value;
+		const file::path sourcePath = GetFilePath(guid);
+		if (sourcePath.empty()) continue;
+		std::error_code sourceError;
+		if (!file::is_regular_file(sourcePath, sourceError)) continue;
+		const file::path artifact = catalog->ResolveArtifactPath(entry.assetId);
+		std::error_code artifactError;
+		if (artifact.empty()
+			|| !file::is_regular_file(artifact, artifactError))
+		{
+			// 표에는 있는데 파일이 없다 — 낡음보다 나쁘다. 같이 끊는다.
+			stale.insert(guid);
+			continue;
+		}
+		const auto sourceTime = file::last_write_time(sourcePath, sourceError);
+		const auto artifactTime = file::last_write_time(artifact, artifactError);
+		if (sourceError || artifactError) continue;
+		if (artifactTime < sourceTime) stale.insert(guid);
+	}
+
 	const std::size_t entryCount = catalog->Size();
+	const std::size_t staleCount = stale.size();
 	{
 		std::lock_guard lock(m_cookedCatalogMutex);
 		m_cookedCatalog = std::move(catalog);
+		m_cookedStaleAssets = std::move(stale);
 	}
-	std::printf("[cooked.catalog] mount %s entries=%zu\n",
-		manifestPath.string().c_str(), entryCount);
+	std::printf("[cooked.catalog] mount %s entries=%zu stale=%zu\n",
+		manifestPath.string().c_str(), entryCount, staleCount);
 	return true;
 }
 
@@ -436,6 +473,23 @@ DataSystem::GetCookedCatalog() const
 {
 	std::lock_guard lock(m_cookedCatalogMutex);
 	return m_cookedCatalog;
+}
+
+file::path DataSystem::ResolveCookedArtifact(
+	const experiment::AssetId& assetId) const
+{
+	std::lock_guard lock(m_cookedCatalogMutex);
+	if (!m_cookedCatalog) return {};
+	FileGuid probe;
+	probe.m_guid = assetId.value;
+	if (m_cookedStaleAssets.contains(probe)) return {};
+	return m_cookedCatalog->ResolveArtifactPath(assetId);
+}
+
+std::size_t DataSystem::CookedCatalogStaleCount() const
+{
+	std::lock_guard lock(m_cookedCatalogMutex);
+	return m_cookedStaleAssets.size();
 }
 
 std::size_t DataSystem::CookedCatalogEntryCount() const
@@ -496,7 +550,7 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 	{
 		experiment::AssetId modelAsset;
 		modelAsset.value = guid.m_guid;
-		request.cookedPath = catalog->ResolveArtifactPath(modelAsset);
+		request.cookedPath = ResolveCookedArtifact(modelAsset);
 	}
 	experiment::ModelLoadResult result = loader.Load(request);
 

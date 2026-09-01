@@ -1039,6 +1039,56 @@ legacy `Mesh::m_boundingBox`는 private이고 reflect 스키마에도 없어(`m_
 않는다. `RecalculateBounds()`가 유일한 공개 창구이고 그것은 정점을 요구한다.
 **legacy Mesh 본체에 전환기 창구를 하나 더할지가 정책 판단**이라 D4f-1로 분리한다.
 
+**I7-C2 완료 실측 (2026-09-01) — 신선도 판정.** cooked artifact가 소스보다 낡았으면
+그 entry를 해석에서 뺀다. 끊는 자리는 하나(`DataSystem::ResolveCookedArtifact`)이고,
+그 아래 정책은 **이미 서 있었다** — 모델은 `ResolvingModelDecoder`가 빈 cookedPath를
+source로 흘려보내고, 텍스처는 resolver가 source 폴백을 한다. 그래서 이 슬라이스는
+새 폴백을 만들지 않고 경로만 끊는다.
+
+★ **기준을 mtime으로 정한 근거 — 아티팩트에 소스 시각을 넣는 길이 막혀 있다.**
+포맷에는 자리가 있다(`CookedMetadata::sourceWriteTimeTicks`, 왕복까지 완결).
+그런데 `ModelCookProducer`가 그 값을 **일부러 지운다**:
+
+```
+// 같은 Assets tree를 어느 staging 경로에 놓아도 동일한 CEMC가
+// 나와야 하므로 provenance는 asset-relative 논리 경로로만 보존한다.
+draft.metadata.sourceWriteTime = {};
+```
+
+결정적 cook 계약(cook-all이 두 실행의 바이트 동일을 단정한다)과 mtime은 양립하지
+않는다. 그러므로 **아티팩트 안**이 아니라 **파일 시스템**에서 시각을 읽는다:
+아티팩트 mtime < 소스 mtime이면 낡음. 소스가 없으면(게시된 배포) 비교 대상이
+없으므로 신선한 것으로 둔다 — 그 경우 신선도는 빌드가 보증한다. registry가 GUID를
+못 푸는 entry(모델 안의 subasset)도 건너뛴다: 그 위험은 **부모 모델 entry가 대신
+진다**(부모가 낡으면 모델이 source로 가고, 그러면 subasset artifact를 아무도 안
+본다).
+
+★ **판정은 마운트에서 한 번, entry 단위로.** 해석마다 stat을 두 번 하면 sealing이
+매 프레임 그 값을 문다. 그래서 마운트가 stale 집합을 만들고 해석은 집합 조회만
+한다.
+
+★ **게이트에 신선도 leg를 더했다**(같은 게이트, 세 실행 A/B/C):
+
+| leg | 모델 로드 | 뜻 |
+|---|---|---|
+| 마운트 | `cooked 8 · experiment 0` | cooked가 돈다 |
+| **낡음** | `cooked 7 · experiment 1` | 낡은 **하나만** source로 |
+| 비마운트 | `cooked 0 · experiment 8` | 대조군 |
+
+**소스를 건드리지 않고 아티팩트를 뒤로 돌린다** — 작업 트리의 mtime을 바꾸면 남의
+검사에 부작용을 남긴다. 첫 시도는 아무 artifact나 낡혔는데 계수가 그대로였다:
+코퍼스 14개 중 씬이 여는 것은 8개뿐이라 **씬이 쓰는 모델의 artifact를 GUID로 집어야**
+계수가 움직인다(경로 규약은 `MakeDerivedModelArtifactPath`와 같다).
+
+★ **변이 2종이 두 단정을 갈랐다.** M10-a(낡음 판정 절단) → 6·6c. M10-b(낡으면 표
+전체 무효) → **6d만** — "entry 단위인가"를 따로 물은 그 단정이다. 6d가 없으면
+표 전체를 끊는 과잉 보수가 초록으로 지나간다.
+
+★ **한계(정직).** ① 체크아웃이 소스 mtime을 새로 쓰면 신선한 아티팩트도 낡음으로
+읽힌다 — 그 방향의 오판은 source 폴백이라 **안전한 쪽**이다. ② 아티팩트를 복사하며
+mtime을 갱신하면 낡은 것이 신선해 보인다 — 그 방향은 위험하고, 내용 해시만이
+닫는다. ③ subasset entry는 부모에 기대 판정한다(위 근거).
+
 **I7-C1 완료 실측 (2026-09-01) — cooked가 제품에서 처음 돌았다.** 굽는 쪽은
 D5-b2c에서 다 서 있었는데(AssetCooker → `Derived/` + CEMF → pak) **읽는 쪽이
 이어져 있지 않았다**: resolver는 `nullptr` catalog로 불렸고
@@ -2228,10 +2278,13 @@ stride를 들고, 모두 V1 표에서 대조한다. V2의 단일 68B mask에서 
   `DataSystem::MountCookedCatalog`가 `<Assets>/Derived/asset-manifest.cemf`를
   읽어 catalog를 세우고, 그것이 모델 `cookedPath`와 M2 resolver의 cooked 우선
   해석을 동시에 먹인다. 선택 정책은 `ResolvingModelDecoder`가 이미 갖고 있었다.
-- **신선도 판정은 여전히 남는다** — cooked가 source보다 낡았는지 아무도 묻지
-  않는다. 지금은 "게시된 Derived가 있는 배포에서만 cooked를 탄다"가 그 자리를
-  대신한다(저작 트리에는 Derived가 없어 마운트가 무동작이다). 저작 중 굽고
-  다시 굽는 흐름을 열려면 이 판정이 선행이다.
+- ~~신선도 판정~~ — **I7-C2에서 닫혔다(2026-09-01, mtime 기준)**. 낡은 entry는
+  해석에서 빠지고 모델은 source로, 텍스처는 source 폴백으로 간다. 판정은 entry
+  단위다(낡은 하나가 표 전체를 끊지 않는다 — 변이로 증명).
+- **남는 것: 내용 해시 기반 신선도**. mtime은 체크아웃이 소스 시각을 새로 쓰면
+  신선한 아티팩트도 낡음으로 읽는다(그 방향은 source 폴백이라 안전하다). 내구적인
+  답은 소스 **내용 해시**를 CEMF entry에 싣는 것인데, 그것은 포맷 확장(v2 ·
+  `kEntryBytes` 80→112 · 전 producer)이라 별도 슬라이스다.
 - 검증 0.460ms 를 쿠킹 경로에서 줄일것인가. 굽는 시점에 이미 검증했으므로
   중복이긴 하나, **손상된 캠시를 신뢰하는 대가**가 얼마인지 먼저 재야 한다.
 

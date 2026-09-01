@@ -30,9 +30,14 @@ namespace experiment
             };
         if (catalog)
         {
-            services.resolveCookedArtifactPath = [catalog](const AssetId& id)
+            // I7-C2 — 해석은 catalog가 아니라 DataSystem 창구를 탄다. 신선도
+            // (stale 집합)는 마운트가 판정한 DataSystem 상태이지 표의 성질이
+            // 아니기 때문이다. catalog 인자는 여전히 "cooked 해석을 켤 것인가"의
+            // 정본이다 — nullptr이면 이 서비스가 아예 없다(M2 계약, 자가 검증이
+            // 그 대우를 단정한다).
+            services.resolveCookedArtifactPath = [](const AssetId& id)
                 {
-                    return catalog->ResolveArtifactPath(id);
+                    return DataSystems->ResolveCookedArtifact(id);
                 };
         }
         return services;

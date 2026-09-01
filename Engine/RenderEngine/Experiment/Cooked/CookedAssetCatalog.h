@@ -56,6 +56,14 @@ namespace experiment::cooked
         [[nodiscard]] std::filesystem::path ResolveArtifactPath(
             const AssetId& assetId) const;
 
+        // I7-C2 — 신선도 판정은 전 entry를 한 번 훑어야 한다(마운트 때 한 번).
+        // 표는 불변이라 span으로 내주는 것이 안전하다 — 수명은 catalog가 진다.
+        [[nodiscard]] std::span<const CookedAssetManifestEntry> Entries()
+            const noexcept
+        {
+            return entries_;
+        }
+
         // 이 종류의 entry 만 센다. 진단·게이트용.
         [[nodiscard]] std::size_t CountOfKind(CookedAssetKind kind) const noexcept;
 

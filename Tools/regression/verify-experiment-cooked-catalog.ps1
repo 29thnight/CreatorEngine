@@ -15,8 +15,16 @@
 #   4  대조군 — 마운트 없이 같은 씬을 로드하면 cooked 경로가 **0**이다.
 #      이것이 없으면 3이 마운트 덕인지 원래 그런지 갈리지 않는다.
 #
-# 한계(정직): 쿠킹 산출물의 **신선도**(cooked가 source보다 낡았는가)는 아직
-# 판정하지 않는다 — I7의 남은 항목이다. 이 게이트는 갓 구운 트리를 쓴다.
+#   6  ★ 신선도 — artifact 하나를 소스보다 낡게 만들면 그 모델만 source로
+#      간다(stale=1, cooked 하나 감소). 나머지는 그대로 cooked다 — 낡음 판정이
+#      entry 단위임을 여기서 본다. 대조군(4)이 "마운트 안 함"이라면 이 축은
+#      "마운트했지만 낡음"이라 서로 다른 실패를 가른다.
+#
+# 한계(정직): 신선도 기준은 **mtime**이다(아티팩트가 소스보다 오래되면 낡음).
+# 아티팩트에 소스 시각을 넣는 길은 결정적 cook 계약이 막고 있어(ModelCookProducer
+# 가 일부러 지운다) 내구적인 답은 소스 내용 해시를 CEMF에 싣는 것이고, 그것은
+# 포맷 확장이라 별도 슬라이스다. 체크아웃이 소스 mtime을 새로 쓰면 신선한
+# 아티팩트도 낡음으로 읽히는데, 그 방향의 오판은 source 폴백이라 안전하다.
 param(
     [string]$Exe = "",
     [string]$AssetCooker = "",
@@ -141,6 +149,39 @@ try {
         $fail += "3b resolver가 cooked texture를 고르지 않았다 — services 배선이 끊겼다"
     }
 
+    # ── 신선도 leg: artifact 하나를 소스보다 낡게 만든다 ──
+    #    소스를 건드리지 않는다 — 작업 트리의 mtime을 바꾸면 이 게이트가 남의
+    #    검사에 부작용을 남긴다. 임시 산출물만 뒤로 돌린다.
+    # 씬이 실제로 쓰는 모델을 골라야 [model.dual] 계수가 움직인다. 코퍼스 14개
+    # 중 씬이 여는 것은 8개뿐이라, 아무 artifact나 낡히면 계수가 그대로다
+    # (첫 시도에서 실제로 그랬다). .meta의 GUID로 artifact 경로를 만든다 —
+    # 경로 규약은 MakeDerivedModelArtifactPath와 같다.
+    $staleSource = Join-Path $assets 'Models\Prim_Cube.glb'
+    if (-not (Test-Path -LiteralPath $staleSource)) { "신선도 leg 대상이 없다: $staleSource"; exit 1 }
+    $metaText = Get-Content -LiteralPath ($staleSource + '.meta') -Raw
+    if ($metaText -notmatch 'guid:\s*([0-9a-fA-F-]{36})') { "meta에서 guid를 못 읽었다"; exit 1 }
+    $staleGuid = $Matches[1]
+    $victim = Join-Path $cookOutput ("Derived\Models\" + $staleGuid.Substring(0,2) + "\" + $staleGuid + ".cemc")
+    if (-not (Test-Path -LiteralPath $victim)) { "artifact가 없다: $victim"; exit 1 }
+    [IO.File]::SetLastWriteTime($victim, (Get-Date).AddDays(-30))
+    $logStale = Invoke-Editor 'stale' $true
+    $cookedStale = ([regex]::Matches($logStale, '\[model\.dual\] cooked 경로')).Count
+    $experimentStale = ([regex]::Matches($logStale, '\[model\.dual\] experiment 경로')).Count
+    if ($logStale -notmatch 'experiment\.catalog mount pass .*stale=([1-9]\d*)') {
+        $fail += "6 낡은 artifact를 만들었는데 stale 계수가 0이다 — 신선도 판정이 안 돈다"
+    }
+    if (($cookedStale + $experimentStale) -ne ($cookedOn + $experimentOn)) {
+        $fail += "6b 신선도 leg의 로드 수가 다르다 — $($cookedStale + $experimentStale) vs $($cookedOn + $experimentOn)"
+    }
+    # 낡은 것 하나가 source로 가고 나머지는 그대로여야 한다. 전부 source로 가면
+    # 판정이 entry 단위가 아니라 표 전체를 끊은 것이다.
+    if ($cookedStale -ge $cookedOn) {
+        $fail += "6c 낡음 판정이 로드 경로를 바꾸지 못했다 — cooked $cookedStale (신선 $cookedOn)"
+    }
+    elseif ($cookedStale -lt 1) {
+        $fail += "6d 낡은 하나 때문에 표 전체가 끊겼다 — cooked 0 (entry 단위가 아니다)"
+    }
+
     $logOff = Invoke-Editor 'unmounted' $false
     $cookedOff = ([regex]::Matches($logOff, '\[model\.dual\] cooked 경로')).Count
     $experimentOff = ([regex]::Matches($logOff, '\[model\.dual\] experiment 경로')).Count
@@ -171,6 +212,7 @@ try {
     "probe(mounted)   — $probeOn"
     "probe(unmounted) — $probeOff"
     "mounted   — cooked $cookedOn · experiment $experimentOn"
+    "stale     — cooked $cookedStale · experiment $experimentStale (artifact 하나 낡힘)"
     "unmounted — cooked $cookedOff · experiment $experimentOff (기대: 0 · $($cookedOn + $experimentOn))"
 }
 finally {
@@ -184,5 +226,5 @@ if ($fail.Count -gt 0) {
     exit 1
 }
 
-"전체 통과 — cooked catalog가 서고 제품 모델 로드가 cooked artifact를 탄다"
+"전체 통과 — cooked catalog가 서고, 제품이 cooked를 타며, 낡은 artifact는 entry 단위로 끊긴다"
 exit 0

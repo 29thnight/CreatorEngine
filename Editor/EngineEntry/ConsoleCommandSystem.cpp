@@ -7085,9 +7085,10 @@ namespace ConsoleCmd
             const file::path root = std::filesystem::path(rootText);
             std::string error;
             const bool mounted = DataSystems->MountCookedCatalog(root, error);
-            std::printf("[CLI] experiment.catalog mount %s root=%s entries=%zu%s%s\n",
+            std::printf("[CLI] experiment.catalog mount %s root=%s entries=%zu stale=%zu%s%s\n",
                 mounted ? "pass" : "fail", root.string().c_str(),
                 DataSystems->CookedCatalogEntryCount(),
+                DataSystems->CookedCatalogStaleCount(),
                 error.empty() ? "" : " error=", error.c_str());
             return;
         }
@@ -7199,7 +7200,7 @@ namespace ConsoleCmd
 
         std::printf("[CLI] experiment.catalog pass entries=%zu models=%zu "
             "materials=%zu textures=%zu shaderMetas=%zu scenes=%zu prefabs=%zu "
-            "modelsProbed=%zu modelsResolved=%zu root=%s\n",
+            "modelsProbed=%zu modelsResolved=%zu stale=%zu root=%s\n",
             catalog->Size(),
             catalog->CountOfKind(ck::CookedAssetKind::Model),
             catalog->CountOfKind(ck::CookedAssetKind::Material),
@@ -7207,7 +7208,7 @@ namespace ConsoleCmd
             catalog->CountOfKind(ck::CookedAssetKind::ShaderMeta),
             catalog->CountOfKind(ck::CookedAssetKind::Scene),
             catalog->CountOfKind(ck::CookedAssetKind::Prefab),
-            modelsProbed, modelsResolved,
+            modelsProbed, modelsResolved, DataSystems->CookedCatalogStaleCount(),
             catalog->DerivedRoot().string().c_str());
     }
 

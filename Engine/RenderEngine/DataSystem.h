@@ -26,6 +26,7 @@ namespace YAML { class Node; }
 namespace experiment { class Model; } // I5-D1a 역브리지 입력
 namespace experiment { struct Material; } // I5-D5c1 저작 원본 보관
 namespace experiment::cooked { class CookedAssetCatalog; } // I7-C1
+namespace experiment { struct AssetId; } // I7-C2
 class Mesh; // I5-D34a 병행 바인딩 조회 입력
 struct RHIExperimentVertexView; // I5-D34a 병행 바인딩 조회 출력
 
@@ -119,6 +120,18 @@ public:
 	[[nodiscard]] std::shared_ptr<const experiment::cooked::CookedAssetCatalog>
 		GetCookedCatalog() const;
 	[[nodiscard]] std::size_t CookedCatalogEntryCount() const;
+	// I7-C2 — 신선도 판정. cooked artifact가 소스보다 낡았으면 그 entry는 없는
+	// 것으로 친다(빈 경로) — 모델은 source 디코더로, 텍스처는 source 폴백으로
+	// 간다. 두 정책 모두 이미 서 있어서 여기서 경로만 끊으면 된다.
+	//
+	// 판정 기준은 **mtime**이다(아티팩트가 소스보다 오래되면 낡음). 아티팩트
+	// 안에 소스 시각을 넣는 길은 막혀 있다 — ModelCookProducer가 결정적 cook을
+	// 위해 일부러 지운다("같은 Assets tree를 어느 staging 경로에 놓아도 동일한
+	// CEMC"). 내구적인 답은 소스 **내용 해시**를 CEMF에 싣는 것이고 그것은
+	// 포맷 확장이라 별도 슬라이스다 — 그때까지 이 heuristic이 자리를 지킨다.
+	[[nodiscard]] file::path ResolveCookedArtifact(
+		const experiment::AssetId& assetId) const;
+	[[nodiscard]] std::size_t CookedCatalogStaleCount() const;
 
 	[[nodiscard]] bool BuildLegacyModelFromExperiment(
 		const experiment::Model& source, std::shared_ptr<Model>& outModel,
@@ -264,6 +277,9 @@ public:
 	// I7-C1 — cooked catalog. immutable 표라 교체는 포인터 하나 바꾸기다.
 	std::shared_ptr<const experiment::cooked::CookedAssetCatalog> m_cookedCatalog;
 	mutable std::mutex m_cookedCatalogMutex;
+	// I7-C2 — 마운트 때 한 번 판정한 stale 집합. 해석마다 stat을 두 번 하면
+	// sealing이 매 프레임 그 값을 문다.
+	std::unordered_set<FileGuid> m_cookedStaleAssets;
 
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);
