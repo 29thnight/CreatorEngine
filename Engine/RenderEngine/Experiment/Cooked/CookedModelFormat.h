@@ -60,7 +60,13 @@ namespace experiment::cooked
     // 3 (2026-08-27): V3가 mesh별 vertex mask/stride를 도입했다. Vertices 섹션은
     // 더 이상 고정 Vertex[]가 아니라 packed byte blob이고 CookedMesh가 자기
     // byte range·count·stride·mask를 가진다.
-    inline constexpr std::uint32_t kFormatVersion = 3u;
+    //
+    // 4 (2026-09-02): 레이아웃은 그대로인데 **값의 규약**이 바뀌었다. glTF
+    //   임포터가 inverseBindMatrix 를 전치된 채(열 벡터 규약) 게시하던 것을
+    //   엔진 행 벡터 규약으로 고쳤다. v3 캐시는 16 float 이 같은 자리에 있어
+    //   **바이트만 보면 구분이 안 되고**, 신선도 판정은 mtime 이라 소스가 안
+    //   바뀐 캐시를 신선하다고 읽는다 — 2 와 같은 이유로 버전이 갈라야 한다.
+    inline constexpr std::uint32_t kFormatVersion = 4u;
 
     // V3부터 헤더는 특정 mesh mask가 아니라 전체 기술표의 지문을 기록한다.
     // 각 mesh의 실제 배치는 CookedMesh의 mask에서 같은 표로 유도한다.

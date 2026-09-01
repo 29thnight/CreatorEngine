@@ -14,6 +14,8 @@
 #include "StandardMaterialProperty.h"
 #include "Uuid.h"
 
+#include <mathematics/transform.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -455,6 +457,80 @@ namespace RenderTest
 
         // 2. IR 자체 검증
         AppendNotes(im::ValidateImportedScene(scene), "ir", outLog, errors);
+
+        // 2b. 스킨 바인드 자기 대조 — inverseBind × 바인드 전역 ≈ 항등.
+        //
+        // ★ 왜 여기인가: 스켈레톤 패리티(experiment.model)는 legacy→experiment
+        //   **순브리지**를 대조군으로 쓴다 — 임포터를 태우지 않으므로 임포터의
+        //   행렬 규약 오류에 원리적으로 눈멀다. 실제로 glTF inverseBind 가
+        //   전치된 채 게시돼(2026-09-02 실측: 바인드 팔레트가 항등이 아니라
+        //   바인드 대비 9,612배) dx12.scene 커버리지 포화와 드롭 모델
+        //   "뒤죽박죽" 스킨으로 나타났는데 패리티는 0건이었다. 그래서 IR
+        //   자체(노드 TRS 사슬 × inverseBind)에서 독립 유도한다.
+        //
+        // ★ 한계: glTF 는 바인드 포즈 ≠ 레스트 포즈를 허용한다. 코퍼스의 스킨
+        //   자산 둘(Gunner·SU_Mythic)은 원본에서 1.2e-4 이내로 같고, 전치
+        //   오류는 O(100) 이라 임계 1e-2 가 둘을 가른다. 그런 자산이 들어오면
+        //   이 단정은 note 로 내려야 한다 — 그때 이 주석을 지우지 말고 이유를
+        //   남겨라.
+        {
+            std::vector<math::matrix4x4> bindGlobal(scene.nodes.size(),
+                math::matrix4x4::identity());
+            for (std::size_t n = 0; n < scene.nodes.size(); ++n)
+            {
+                const im::SceneNode& node = scene.nodes[n];
+                const math::matrix4x4 local = math::compose(
+                    node.local.scale, node.local.rotation,
+                    node.local.translation);
+                // IR 은 parent-before-child 정렬이 계약이다(ValidateImportedScene
+                // 이 검사한다). 어긋난 노드는 루트로 취급해 그 자리에서 셈이
+                // 멈추지 않게 한다 — 검증 오류는 위 AppendNotes 가 이미 셌다.
+                const bool hasParent = node.parent.IsValid()
+                    && node.parent.Value() < n;
+                bindGlobal[n] = hasParent
+                    ? local * bindGlobal[node.parent.Value()] : local;
+            }
+
+            float worst = 0.0f;
+            std::size_t audited = 0;
+            for (const im::ImportedSkin& skin : scene.skins)
+            {
+                const std::size_t count =
+                    (std::min)(skin.joints.size(), skin.inverseBind.size());
+                for (std::size_t j = 0; j < count; ++j)
+                {
+                    if (!ex::IsInRange(skin.joints[j], scene.nodes.size()))
+                        continue;
+                    const math::matrix4x4 palette = skin.inverseBind[j]
+                        * bindGlobal[skin.joints[j].Value()];
+                    for (int r = 0; r < 4; ++r)
+                    {
+                        for (int c = 0; c < 4; ++c)
+                        {
+                            const float expected = (r == c) ? 1.0f : 0.0f;
+                            worst = (std::max)(worst,
+                                std::abs(palette.m[r][c] - expected));
+                        }
+                    }
+                    ++audited;
+                }
+            }
+
+            char bindLine[160];
+            std::snprintf(bindLine, sizeof(bindLine),
+                "  바인드 자기 대조: joints %zu, max|inverseBind*bindGlobal - I|"
+                " = %.6f\n", audited, worst);
+            outLog += bindLine;
+
+            constexpr float kBindIdentityTolerance = 1e-2f;
+            if (audited > 0 && worst > kBindIdentityTolerance)
+            {
+                outLog += "  [diff] inverseBind × 바인드 전역이 항등이 아니다 — "
+                    "행렬 규약(행/열 벡터·전치)이 어긋났거나 바인드 ≠ 레스트 "
+                    "자산이다\n";
+                ++errors;
+            }
+        }
 
         // 3. 변환 경계
 		im::ConversionOptions options;

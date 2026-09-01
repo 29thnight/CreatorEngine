@@ -258,7 +258,11 @@ if ($logOn -notmatch 'animmask pass masks=[1-9]\d* viaExperiment=1 structure=ok'
 #   의도한 변경이면 값을 갱신하고 왜 바뀌었는지 커밋 메시지에 남긴다.
 #   ★ 양자화(1/4096)에도 **엄격하다** — 실측으로 0.0001 섭동에서 값이 바뀐다
 #     (표본이 많아 늘 어떤 값이 반올림 경계에 있다). x64 Debug 고정 골든이다.
-if ($logOn -notmatch 'animtick pass .* poseDigest=858071B5') {
+# 2026-09-02: glTF inverseBind 전치 수정으로 858071B5 → 1F6758FD. 옛 값은 전치된
+# inverseBind로 만든 폭발 팔레트의 digest였다(ModelImportPipelinePlan I6-B4-pre
+# 원인 규명 참조). legacy·experiment 두 팔이 같은 자산에서 유도되므로 오차 0은
+# 유지되고 골든만 옮긴다.
+if ($logOn -notmatch 'animtick pass .* poseDigest=1F6758FD') {
     $fail += "6b 재생 팔레트 골든이 달라졌다(on) — animtick poseDigest 를 확인하라"
 }
 # ★ 9(I5-D4e-3) — 마스크 트리 A/B. 순서 재현(저장분 인덱스 대응)까지 대조.

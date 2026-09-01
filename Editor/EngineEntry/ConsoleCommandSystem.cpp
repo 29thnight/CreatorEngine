@@ -6368,16 +6368,22 @@ namespace ConsoleCmd
 
     // 스킨 기하 축 — experiment.skinbounds
     //
-    // ★ 왜 CPU에서 다시 푸는가: 라이브 팔레트로 그린 그림을 재는 자가 없다.
-    //   dx12.scene 하네스는 팔레트를 **옳게 받고도**(digest 일치 실측) 포즈가
-    //   실리면 커버리지가 포화한다 — 오프라인 하네스의 한계이고 에디터 화면은
-    //   정상이다(사용자 확인). 그래서 그림 대신 **그림의 입력**을 잰다:
-    //   팔레트 × 정점 스킨을 CPU에서 풀어 결과 기하가 성한지 본다.
+    // ★ 왜 CPU에서 다시 푸는가: 헤드리스는 라이브 팔레트로 그린 그림을 픽셀로
+    //   못 잰다(--script 는 렌더 0프레임). 그래서 그림 대신 **그림의 입력**을
+    //   잰다: 팔레트 × 정점 스킨을 CPU에서 풀어 결과 기하가 성한지 본다.
     //
     // ★ 독립 유도다. 렌더 경로의 산술을 재구현하는 것이 아니라 스키닝 정의
     //   자체(가중합)를 쓰고, 판정은 **바인드 포즈 대비 크기 비율**이다 —
     //   팔레트 규약이 어긋나거나 인덱스가 밀리면 기하가 폭발하거나 접힌다.
     //   B4b가 깨뜨릴 수 있는 것이 정확히 그것이다.
+    //
+    // ★ 크기 비율은 자다(2026-09-02 정정). 처음엔 7,115배가 나와 "밖에서 팔레트
+    //   규약을 못 맞춘다"고 관측값으로만 남겼는데, 그것은 규약의 문제가 아니라
+    //   **팔레트가 실제로 폭발해 있던 것**이었다 — glTF 임포터가 inverseBind
+    //   를 전치된 채 게시했고(GltfImporter.cpp 참조), dx12.scene 이 포화한
+    //   것도 하네스 한계가 아니라 그 폭발을 옳게 그린 결과였다. 아래 식은
+    //   셰이더(mul(v, P) 행 벡터)와 같은 산술이라 비율이 곧 화면의 크기다.
+    //   그래서 유한성·인덱스 범위에 **크기 상한**을 더한다.
     static void Cmd_experiment_skinbounds(const ConsoleCommandContext& ctx)
     {
         Scene* scene = SceneManagers->GetActiveScene();
@@ -6465,16 +6471,9 @@ namespace ConsoleCmd
                     const float px = vertex.position.x;
                     const float py = vertex.position.y;
                     const float pz = vertex.position.z;
-                    // ★ 절대 기하는 이 축의 판정 대상이 **아니다**. 두 곱
-                    //   순서를 다 시험했는데 바인드 대비 7,115배와 22,020배가
-                    //   나왔다 — 밖에서 팔레트 규약을 맞출 수 없다는 뜻이고,
-                    //   [[encoder-bench-must-measure-real-path]]가 적어 둔
-                    //   "재구현 대조군은 못 믿는다"의 그 자리다. 그래서 크기
-                    //   비율은 **관측값으로만** 내고 단정하지 않는다.
-                    //
-                    //   단정하는 것은 규약과 무관한 둘이다: 유한성(NaN/inf)과
-                    //   인덱스 범위. B4b가 깨뜨릴 수 있는 것(팔레트가 쓰레기가
-                    //   된다·인덱스가 밀린다)이 정확히 그 둘로 드러난다.
+                    // 행 벡터 규약 v·M — GBuffer.hlsl 의 mul(v, gBones[i]) 과
+                    // 같은 산술이다(패스가 transpose 해 올리고 HLSL 이 열 우선
+                    // 으로 읽어 되돌린다). 이동 성분은 m[3][0..2].
                     skinned[0] += weight * (m.m[0][0] * px + m.m[1][0] * py
                         + m.m[2][0] * pz + m.m[3][0]);
                     skinned[1] += weight * (m.m[0][1] * px + m.m[1][1] * py
@@ -6521,10 +6520,14 @@ namespace ConsoleCmd
             if (ratio > worstRatio) { worstRatio = ratio; worstMesh = mesh->name; }
         }
 
-        // 판정은 규약과 무관한 둘만 — 유한성과 인덱스 범위. worstRatio는
-        // 관측값이다(위 ★ 참조): 밖에서 팔레트 규약을 못 맞춰 절대 크기는
-        // 자로 쓸 수 없다. digest는 포즈별 골든으로 쓴다.
-        const bool passed = meshes > 0 && 0 == nonFinite && 0 == outOfRange;
+        // 판정 셋 — 유한성·인덱스 범위·크기 상한. 상한은 "포즈가 바인드의
+        // 몇 배까지 커질 수 있나"의 넉넉한 값이다: 정상 포즈는 1배 근방이고
+        // (실측 Gunner 0.0/0.5/0.9 전부 1.0x 대), 규약이 어긋나면 수천 배다.
+        // 그 사이 어디에 둬도 같은 판정이라 4배로 잡는다. digest는 포즈별
+        // 골든으로 쓴다.
+        constexpr double kMaxSkinnedExtentRatio = 4.0;
+        const bool passed = meshes > 0 && 0 == nonFinite && 0 == outOfRange
+            && worstRatio <= kMaxSkinnedExtentRatio;
         std::printf("[CLI] experiment.skinbounds %s meshes=%zu nonFinite=%zu "
             "outOfRange=%zu emptyWeights=%zu worstRatio=%.4f worst=%s "
             "digest=%08X renderers=%zu withModel=%zu withSkin=%zu "

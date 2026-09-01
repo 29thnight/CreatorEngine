@@ -743,6 +743,24 @@ namespace experiment::importer
                     if (index >= skin.inverseBind.size()) return;
                     // 좌표계 변환: M' = S * M * S, S = diag(1,1,-1,1).
                     // 성분 기준으로는 3행/3열의 z 교차 항 부호가 뒤집힌다.
+                    //
+                    // ★ 규약 전환 — 전치해서 담는다. fastgltf 의 fmat4x4 는
+                    //   열 우선(value[column][row] = 수학 행렬의 (row, column))
+                    //   이고 열 벡터 규약(M·v)이다. 엔진 matrix4x4 는 행 우선
+                    //   저장에 **행 벡터 규약**(v·M, 이동 성분이 m[3][0..2])이라
+                    //   같은 변환은 전치다: out[r][c] = M(c, r) = value[r][c].
+                    //   FbxImporter::FbxMatrix 가 ufbx 행렬에 하는 것과 같은
+                    //   전환이고, legacy SkeletonLoaderMatrixFromAssimp 도 같다.
+                    //
+                    //   2026-09-02 이전에는 value[column][row] 를 그대로 담아
+                    //   inverseBind 가 전치된 채 게시됐다. 바인드 팔레트
+                    //   (inverseBind × 바인드 전역)가 항등이 아니라 바인드 대비
+                    //   ~9,600배로 폭발했고, dx12.scene 커버리지 포화·드롭 모델
+                    //   "뒤죽박죽" 스킨의 원인이었다. 패리티(experiment.model)는
+                    //   legacy→experiment 순브리지를 대조군으로 써 임포터를 안
+                    //   태우므로 이 오류에 눈멀었다 — 독립 유도는
+                    //   ExperimentGltfImportSelfTest 의 바인드 자기 대조가 한다.
+                    //   flip 판정은 (row, column) 대칭이라 전치와 무관하다.
                     math::matrix4x4 out;
                     for (std::size_t row = 0; row < 4; ++row)
                     {
@@ -750,8 +768,8 @@ namespace experiment::importer
                         {
                             const bool flip = (row == 2) != (column == 2);
                             const float element = value[
-                                static_cast<std::size_t>(column)][
-                                    static_cast<std::size_t>(row)];
+                                static_cast<std::size_t>(row)][
+                                    static_cast<std::size_t>(column)];
                             out.m[row][column] = flip ? -element : element;
                         }
                     }
