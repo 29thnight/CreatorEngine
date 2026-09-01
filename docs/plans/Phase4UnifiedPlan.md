@@ -220,7 +220,7 @@ T7  4-2~4-6 설계 게이트 · RG9 · SRP-0~6 · PBR-S0~S8 (§8 미산정 백�
 | `I6-B1` | 씬 표기 이주 — `m_clipOverrides` 자기 표기 | ✅ | B0 | — | ” |
 | `I6-B2` | 신원 자립 — 본 캐시 무효화 신원이 `experiment::Model::Generation()`으로 (계획한 "배치 경로"는 정찰이 뒤집었다) | ✅ | B0 | — | ” |
 | `I6-B3` | 진단·게이트 표면 — 콘솔 16 → 10. 은퇴 래칫에 **계약 4(창구 밖 접촉 ≤ 38)** 신설 | ✅ `e088a008` | B2 | 1.5일 (실적 ~0.5일) | ” |
-| `I6-B4` | 틱 단일화 + 배치 대입 절단 — legacy 틱 3함수·`calculAni`·`EvaluateParityPose` ~406줄 삭제, `Update()` 재작성 | · | B3 | **2.5일** | ” |
+| `I6-B4` | 틱 단일화(B4b ✅ 2026-09-02 재착지 — legacy 틱 3함수·`calculAni` 373줄 폐기, 드롭 경로 experiment 이중화, 시각 축 `verify-skin-pose-visual` 위에서) + 대입 절단(B4c ·) | ◐ | B3 | 잔여 **1.0일** | ” |
 | `I6-B5` | 필드 제거 — `Animator.cpp` 14 · `AnimationEventBridge` 11 · 헤더 2 | · | B4 | **2.5일** | ” |
 | `I6-C1` | 메시 소유 이전 — `MeshRenderer` 12 · `ModelSceneBridge` 5 · Foliage 8 · ProxyBridge 4 · ProxyCommand 1 | · | A | **2.5일** | ” |
 | `I6-C2` | 업로드 폴백 제거 — 세 패스의 `GetOrUpload(draw.mesh)` · 프록시 4 · 진단 9 | · | C1 | **1.5일** | ” |
