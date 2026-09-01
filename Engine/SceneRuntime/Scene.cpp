@@ -4312,8 +4312,12 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPose(Animator& animator)
 		return metrics;
 	}
 
+	// I6-B4b — serial 자체가 창구다(0이 "스켈레톤 없음"). 덧붙어 있던
+	// `nullptr == animator.m_Skeleton`은 같은 사실을 legacy 객체로 한 번 더
+	// 물은 것이라, 그 타입이 은퇴하면 **살아 있는 experiment 애니메이터를
+	// 통째로 거절한다**. 병합으로 들어온 이 줄을 은퇴 래칫이 잡았다.
 	metrics.skeletonSerial = animator.GetSkeletonSerial();
-	if (0 == metrics.skeletonSerial || nullptr == animator.m_Skeleton)
+	if (0 == metrics.skeletonSerial)
 	{
 		metrics.skeletonMissing = true;
 		return metrics;
@@ -4367,7 +4371,7 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPose(Animator& animator)
 		binding.skeletonSerial = metrics.skeletonSerial;
 		binding.topologyVersion = m_executionGraphs->compiledVersion;
 		const size_t poseCapacity = (std::min)(
-			animator.m_Skeleton->m_bones.size(), std::size(animator.m_localTransforms));
+			animator.GetBoneCount(), std::size(animator.m_localTransforms));
 		binding.boneExecByIndex.assign(poseCapacity, State::kInvalidExec);
 
 		const ExecIndex subtreeEnd = graph.subtreeEnd[ownerExec];

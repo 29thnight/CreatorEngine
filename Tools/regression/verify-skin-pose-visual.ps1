@@ -17,11 +17,10 @@
 #   2  place ≠ bind — 포즈가 실제로 그림을 움직인다(같으면 팔레트가 화면에 안 닿는다)
 #   3  place 커버리지·팔레트 digest 골든 — 포즈 산술이나 스키닝 규약이 바뀌면 붉는다
 #   4  place·drop 팔에 `[anim.tick] none` 0 · animlive enabled=1 — 틱이 실제로 돈다
-#   5  drop 팔이 experiment 경로면 place 와 **커버리지 동수** — 같은 로더면 같은 그림
-#      이어야 한다(B4b 의 A/B). legacy 경로면 이 단정은 보류하고 값을 기록한다 —
-#      legacy 틱이 살아 있는 마지막 구간이라 두 팔의 정점·스켈레톤 출처가 다르다
-#      (실측 2026-09-02: legacy 51297 vs experiment 49617). B4b 가 착지하면
-#      drop 도 experiment 가 되어 이 단정이 켜진다.
+#   5  drop 팔이 experiment 경로이고 place 와 **커버리지·팔레트 동수** — 같은
+#      로더면 같은 그림이어야 한다(B4b 의 A/B). legacy 틱이 살아 있던 마지막
+#      창(2026-09-02, B4b 직전)의 실측은 drop legacy 51297 vs place 49617 였고
+#      (정점·스켈레톤 출처가 달랐다), B4b 착지 뒤 drop 은 49617 로 동수가 됐다.
 param(
     [string]$Exe = "",
     [string]$Work = $env:TEMP,
@@ -142,18 +141,20 @@ foreach ($arm in @($place, $drop)) {
     }
 }
 
-# 5 — drop 팔 A/B. experiment 경로면 place 와 같은 그림이어야 한다.
+# 5 — drop 팔 A/B. B4b 착지(2026-09-02) 뒤로 드롭 경로도 experiment 로더를 타므로
+#     place 와 **같은 그림**이어야 한다. legacy 틱이 살아 있던 마지막 창에서 잰
+#     값(drop legacy 51297 vs place 49617)은 B4b 직전 상태의 기록이고, 착지 뒤
+#     drop 은 49617 로 place 와 동수가 됐다 — 틱 단일화가 그림을 안 바꿨다는 증거.
+#     legacy 로 새면(experiment 로더 실패 → Assimp 폴백) 틱이 없어 4 가 먼저 붉는다.
 $dropNote = ''
-if ($drop.path -eq 'experiment') {
-    if ($drop.coverage -ne $place.coverage) {
-        $fail += "5 드롭 경로 커버리지 $($drop.coverage) ≠ place $($place.coverage) — 같은 로더인데 그림이 다르다"
-    }
-    if ($drop.palette -ne $place.palette) {
-        $fail += "5b 드롭 경로 팔레트 digest $($drop.palette) ≠ place $($place.palette)"
-    }
+if ($drop.path -ne 'experiment') {
+    $fail += "5c 드롭 경로가 experiment 가 아니다('$($drop.path)') — LoadCachedModelShared 가 experiment 로더를 안 탄다"
 }
-else {
-    $dropNote = " (legacy 틱 팔 — 동수 단정 보류)"
+if ($drop.coverage -ne $place.coverage) {
+    $fail += "5 드롭 경로 커버리지 $($drop.coverage) ≠ place $($place.coverage) — 같은 로더인데 그림이 다르다"
+}
+if ($drop.palette -ne $place.palette) {
+    $fail += "5b 드롭 경로 팔레트 digest $($drop.palette) ≠ place $($place.palette)"
 }
 
 if ($fail.Count -gt 0) {

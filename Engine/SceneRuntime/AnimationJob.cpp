@@ -123,13 +123,16 @@ void AnimationJob::Update(float deltaTime)
             continue;
         m_UpdateThreadPool->Enqueue([this, animator, controllers, delta = deltaTime] ()
         {
-            Skeleton* skeleton = animator->m_Skeleton;
-            if (!skeleton) return;
-
-            // I5-D4e-1 — 재생 경로 선택. experiment 핸들이 있으면 포즈 산술을
-            // 단일 순회 경로가 맡고, 없으면(Assimp 폴백·A/B off·계수 불일치)
-            // legacy 재귀가 폴백이다. 경로는 stdout으로 애니메이터당 1회
-            // 계수한다([model.instantiate]와 같은 채널).
+            // I6-B4b — 재생 경로가 하나다. legacy 재귀 폴백(UsesMultipleControllers
+            // 분기 · UpdateBone/UpdateBlendBone/UpdateBoneLayer ~200줄)을 걷었다.
+            // 그 폴백이 살아 있으면 Animator가 legacy Skeleton을 들고 있어야 하고,
+            // 그것이 타입 은퇴를 막는 마지막 런타임 소비였다.
+            //
+            // ★ 폴백을 지운 값은 "폴백이 돌 상황"이 없어지는 것이 아니다 —
+            //   experiment 바인딩이 없으면 이제 **애니메이션이 안 돈다**.
+            //   코퍼스에서 그 상황은 0건이고(Assimp 폴백 발화 0 · 14모델 전부
+            //   importer가 덮는다), A/B 스위치 off가 그 상태다. 즉 스위치의
+            //   애니메이션 차원은 이 슬라이스로 은퇴한다(정점 차원은 남는다).
             const experiment::Skeleton* experimentSkeleton =
                 animator->m_experimentModel
                 ? animator->m_experimentModel->TryGetSkeleton() : nullptr;
@@ -137,25 +140,9 @@ void AnimationJob::Update(float deltaTime)
             {
                 animator->m_tickPathLogged = true;
                 std::printf("[anim.tick] %s\n",
-                    experimentSkeleton ? "experiment" : "legacy");
+                    experimentSkeleton ? "experiment" : "none");
             }
-
-            // 루트 없는 스켈레톤은 틱할 수 없다 — UpdateBone(nullptr)이
-            // 워커 스레드에서 0x80 널 역참조로 죽는다(D34b 게이트 실측 —
-            // 저장·재로드된 스킨 씬). 조용히 건너뛰지 않고 1회 알린다:
-            // 스켈레톤 재구성 경로(역브리지·postLoad)의 결함이 여기로 온다.
-            // (experiment 경로는 루트 본 재귀가 없으므로 legacy 폴백에만 적용.)
-            if (nullptr == experimentSkeleton && nullptr == skeleton->m_rootBone)
-            {
-                static std::atomic_flag warned = ATOMIC_FLAG_INIT;
-                if (!warned.test_and_set())
-                {
-                    Debug->LogError("[AnimationJob] 스켈레톤에 루트 본이 없다 — "
-                        "틱을 건너뛴다(본 "
-                        + std::to_string(skeleton->m_bones.size()) + "개)");
-                }
-                return;
-            }
+            if (nullptr == experimentSkeleton) return;
 
             float deltaT = delta;
             if (animator->m_stopTimer > 0.f) {
@@ -164,213 +151,11 @@ void AnimationJob::Update(float deltaTime)
                 deltaT = 0.f;
                 if (animator->m_stopTimer <= 0.f) {
                     deltaT = animator->m_stopDuration;
-					animator->m_stopDuration = 0.f;
+                    animator->m_stopDuration = 0.f;
                 }
             }
 
-            // I5-D4e-1 — experiment 재생 경로(시간축·이벤트 구조는 legacy와
-            // 동일, 포즈만 단일 순회). 소켓 적용 블록(아래 공통부)은 두 경로가
-            // 공유한다.
-            if (experimentSkeleton)
-            {
-                TickExperiment(*animator, *experimentSkeleton, deltaT);
-            }
-            //컨트롤러별로 상,하체 등등이 분리되있다면
-            else if (animator->UsesMultipleControllers() == true)
-            {
-                for (auto& sharedanimationcontroller : animator->m_animationControllers)
-                {
-                    float animationspeed = 1;
-                  
-                    AnimationController* animationcontroller = sharedanimationcontroller.get();
-                    if (animationcontroller == nullptr || !animationcontroller->useController) continue;
-
-                    AnimationState* curState = animationcontroller->m_curState;
-                    if (curState)
-                    {
-                        animationspeed = curState->animationSpeed;
-                        if (curState->useMultipler)
-                        {
-                            animationspeed *= curState->multiplerAnimationSpeed;
-                        }
-                    }
-                    Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
-                    animationcontroller->m_timeElapsed += deltaT * animation.m_ticksPerSecond * animationspeed;
-                    // I5-D4e-2: 루프 정본은 Animator 오버라이드(→자산 폴백)다.
-                    if (animator->IsClipLooping(animationcontroller->GetAnimationIndex()))
-                    {
-                        animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
-                        //animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    }
-                    else
-                    {
-                        if (animationcontroller->m_timeElapsed >= animation.m_duration)
-                        {
-                            animationcontroller->m_timeElapsed = animation.m_duration;
-                            if (animationcontroller->curAnimationProgress >= 0.95)
-                                animationcontroller->endAnimation = true;
-                        }
-                        
-                    }
-                    //animation.preAnimationProgress = animation.curAnimationProgress;
-                    //animation.curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    animationcontroller->preCurAnimationProgress = animationcontroller->curAnimationProgress;
-                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    math::matrix4x4 rootTransform = skeleton->m_rootTransform;
-                    if (animationcontroller->m_isBlend)
-                    {
-                        Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
-                        animationcontroller->m_nextTimeElapsed += deltaT * nextanimation.m_ticksPerSecond;
-                        animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
-                        animationcontroller->preNextAnimationProgress = animationcontroller->nextAnimationProgress;
-                        animationcontroller->nextAnimationProgress = animationcontroller->m_nextTimeElapsed / nextanimation.m_duration;
-                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);
-                    }
-                    else
-                    {
-                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
-                    }
-
-                    if (deltaT <= 0.f) continue;
-                    // I5-D4e-2: 발화 정본은 Animator 클립 오버라이드다(공유
-                    // 자산 이벤트 참조 청산 — 자산의 m_keyFrameEvent는 항상 빔).
-                    animator->InvokeClipEvents(animationcontroller->GetAnimationIndex(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
-                    if (animationcontroller->m_isBlend == true) //블렌딩중엔 다음애니메이션 프레임이벤트도
-                    {
-                        animator->InvokeClipEvents(animationcontroller->GetNextAnimationIndex(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
-                    }
-                    
-                }
-                
-                math::matrix4x4 rootTransform = skeleton->m_rootTransform;
-
-                UpdateBoneLayer(skeleton->m_rootBone, *animator , rootTransform);
-               
-            }
-            else
-            {
-                AnimationController* animationcontroller = nullptr;
-                if (animator->m_animationControllers.empty()) //아예없으면
-                {
-                    if (skeleton->m_animations.empty()) return;
-                    Animation& animation = skeleton->m_animations[animator->m_AnimIndexChosen];
-                    animator->m_TimeElapsed += deltaT * animation.m_ticksPerSecond;
-
-                    // I5-D4e-2: 루프 정본은 Animator 오버라이드(→자산 폴백)다.
-                    if (animator->IsClipLooping(static_cast<int>(animator->m_AnimIndexChosen)))
-                    {
-                        animator->m_TimeElapsed = fmod(animator->m_TimeElapsed, animation.m_duration);
-                    }
-                    else
-                    {
-                        if (animator->m_TimeElapsed >= animation.m_duration)
-                        {
-                            animator->m_TimeElapsed = animation.m_duration;
-                        }
-                    }
-                   // animation.preAnimationProgress = animation.curAnimationProgress;
-                   // animation.curAnimationProgress = animator->m_TimeElapsed / animation.m_duration;
-                    math::matrix4x4 rootTransform = skeleton->m_rootTransform;
-                    if (animator->m_isBlend)
-                    {
-                        if (animator->nextAnimIndex == -1)
-                        {
-                            //Debug->Log("다음애니메이션인덱스를확인해주세요");
-                            return;
-                        }
-                        Animation& nextanimation = skeleton->m_animations[animator->nextAnimIndex];
-                        animator->m_nextTimeElapsed += deltaT * nextanimation.m_ticksPerSecond;
-                        animator->m_nextTimeElapsed = fmod(animator->m_nextTimeElapsed, nextanimation.m_duration);
-                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animator).m_TimeElapsed, (*animator).m_nextTimeElapsed);
-                    }
-                    else
-                    {
-                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animator).m_TimeElapsed);
-                    }
-                    //animation.InvokeEvent(animator);
-                }
-                else //한개만 있으면
-                {
-                    animationcontroller = animator->m_animationControllers[0].get();
-                    if (skeleton->m_animations.empty()) return;
-                    Animation& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
-                    AnimationState* curState = animationcontroller->m_curState;
-                    float animationspeed = 1;
-                    if (curState)
-                    {
-                        animationspeed = curState->animationSpeed;
-                        if (curState->useMultipler)
-                        {
-                            animationspeed *= curState->multiplerAnimationSpeed;
-                        }
-                    }
-                    animationcontroller->m_timeElapsed += deltaT * animation.m_ticksPerSecond * animationspeed;
-                    //animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    // I5-D4e-2: 루프 정본은 Animator 오버라이드(→자산 폴백)다.
-                    if (animator->IsClipLooping(animationcontroller->GetAnimationIndex()))
-                    {
-                        animationcontroller->m_timeElapsed = fmod(animationcontroller->m_timeElapsed, animation.m_duration); //&&&&&
-                    }
-                    else
-                    {
-                        if (animationcontroller->m_timeElapsed >= animation.m_duration)
-                        {
-                            animationcontroller->m_timeElapsed = animation.m_duration;
-                            if (animationcontroller->curAnimationProgress >= 0.95)
-                                animationcontroller->endAnimation = true;
-                        }
-
-                    }
-
-                    //auto& animation = skeleton->m_animations[animationcontroller->GetAnimationIndex()];
-                    //animation.preAnimationProgress = animation.curAnimationProgress;
-                   // animation.curAnimationProgress = animationcontroller->curAnimationProgress;
-                    animationcontroller->preCurAnimationProgress = animationcontroller->curAnimationProgress;
-                    animationcontroller->curAnimationProgress = animationcontroller->m_timeElapsed / animation.m_duration;
-                    math::matrix4x4 rootTransform = skeleton->m_rootTransform;
-
-                    if (animator->m_isBlend)
-                    {
-                        if (animator->nextAnimIndex == -1)
-                        {
-                            //Debug->Log("다음애니메이션인덱스를확인해주세요");
-                            return;
-                        }
-                        /*Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
-                        animationcontroller->m_nextTimeElapsed += delta * nextanimation.m_ticksPerSecond;
-                        animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
-                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);*/
-
-
-                        Animation& nextanimation = skeleton->m_animations[animationcontroller->GetNextAnimationIndex()];
-                        animationcontroller->m_nextTimeElapsed += deltaT * nextanimation.m_ticksPerSecond;
-                        animationcontroller->m_nextTimeElapsed = fmod(animationcontroller->m_nextTimeElapsed, nextanimation.m_duration);
-                        animationcontroller->preNextAnimationProgress = animationcontroller->nextAnimationProgress;
-                        animationcontroller->nextAnimationProgress = animationcontroller->m_nextTimeElapsed / nextanimation.m_duration;
-                        UpdateBlendBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed, (*animationcontroller).m_nextTimeElapsed);
-
-
-
-
-                    }
-                    else
-                    {
-                        UpdateBone(skeleton->m_rootBone, *animator, animationcontroller, rootTransform, (*animationcontroller).m_timeElapsed);
-                    }
-                    // skeleton->m_animations[animationcontroller->GetAnimationIndex()].InvokeEvent(animator);
-
-                    if (deltaT > 0.f) {
-                        // I5-D4e-2: 발화 정본은 Animator 클립 오버라이드다.
-                        animator->InvokeClipEvents(animationcontroller->GetAnimationIndex(), animationcontroller->curAnimationProgress, animationcontroller->preCurAnimationProgress);
-                        if (animationcontroller->m_isBlend == true) //블렌딩중엔 다음애니메이션 프레임이벤트도
-                        {
-                            animator->InvokeClipEvents(animationcontroller->GetNextAnimationIndex(), animationcontroller->nextAnimationProgress, animationcontroller->preNextAnimationProgress);
-                        }
-                    }
-                }
-                
-            }
-
+            TickExperiment(*animator, *experimentSkeleton, deltaT);
         });
     }
 
@@ -415,302 +200,6 @@ void AnimationJob::CleanUp()
 	m_objectSize = 0;
 }
 
-void AnimationJob::UpdateBlendBone(Bone* bone, Animator& animator,
-    AnimationController* controller, const math::matrix4x4& parentTransform,
-    float time, float nextanitime)
-{
-    Skeleton* skeleton = animator.m_Skeleton;
-    Animation* animation;
-    Animation* nextanimation;
-    if (controller)
-    {
-        animation = &skeleton->m_animations[controller->GetAnimationIndex()];
-        nextanimation = &skeleton->m_animations[controller->GetNextAnimationIndex()];
-    }
-    else
-    {
-        animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
-        nextanimation = &skeleton->m_animations[animator.nextAnimIndex];
-    }
-
-    std::string& boneName = bone->m_name;
-
-
-    auto it = animation->m_nodeAnimations.find(boneName);
-    if (it == animation->m_nodeAnimations.end())
-    {
-        for (Bone* child : bone->m_children)
-        {
-            UpdateBlendBone(child, animator, controller,parentTransform, time, nextanitime);
-        }
-        return;
-    }
-
-    NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
-    NodeAnimation& nextnodeAnim = nextanimation->m_nodeAnimations[boneName];
-    
-    math::matrix4x4 nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
-    
-    math::matrix4x4 nextnodeTransform = calculAni(
-        nextnodeAnim, nextanitime, &nextanimation->curKey);
-    math::matrix4x4 blendTransform = BlendAni(
-        nodeTransform, nextnodeTransform, animator.blendT);
-    math::matrix4x4 globalTransform = blendTransform * parentTransform;
-
-    
-    animator.m_FinalTransforms[bone->m_index] =
-        bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-    animator.m_localTransforms[bone->m_index] = blendTransform;
-    // ??skeleton->m_sockets瑜??묒뼱 socket->m_boneMatrix瑜?怨꾩궛?섎뜕 釉붾줉??
-    //   ?ш린 ?덉뿀?? 洹?蹂닿??뚮뒗 ??鍮꾩뼱 ?덉뼱(Skeleton.h 李멸퀬) ??踰덈룄
-    //   ???곸씠 ?녿떎 ???댁븘 ?덈뒗 怨꾩궛? animator.socketvec瑜??꾨뒗 ?꾨옒履?
-    //   ???먮━?닿퀬, ?닿쾬? 洹?以묐났?댁뿀??
-    if (controller)
-    {
-        controller->m_LocalTransforms[bone->m_index] = blendTransform;
-    }
-    for (Bone* child : bone->m_children)
-    {
-        UpdateBlendBone(child, animator, controller,globalTransform, time, nextanitime);
-    }
-}
-
-void AnimationJob::UpdateBone(Bone* bone, Animator& animator,
-    AnimationController* controller, const math::matrix4x4& parentTransform,
-    float time)
-{
-    Skeleton* skeleton = animator.m_Skeleton;
-    std::string& boneName = bone->m_name;
-    Animation* animation;
-    if (controller)
-    {
-        animation = &skeleton->m_animations[controller->GetAnimationIndex()];
-        auto mask = controller->GetAvatarMask();
-    }
-    else
-    {
-        animation = &skeleton->m_animations[animator.m_AnimIndexChosen];
-    }
-    auto it = animation->m_nodeAnimations.find(boneName);
-    if (it == animation->m_nodeAnimations.end())
-    {
-        for (Bone* child : bone->m_children)
-        {
-            UpdateBone(child, animator, controller,parentTransform, time);
-        }
-        return;
-    }
-    NodeAnimation& nodeAnim = animation->m_nodeAnimations[boneName];
-    math::matrix4x4 nodeTransform = calculAni(nodeAnim, time, &animation->curKey);
-    math::matrix4x4 globalTransform = nodeTransform * parentTransform;
-    
-    animator.m_localTransforms[bone->m_index] = nodeTransform;
-    animator.m_FinalTransforms[bone->m_index] =
-        bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
- 
-
-    if (animator.HasSocket())
-    {
-        if (SceneManagers->m_isGameStart == false || animator.GetOwner() == nullptr)
-        {
-
-        }
-        else
-        {
-            for (auto& socket : animator.socketvec)
-            {
-                if (bone->m_name == socket->m_ObjectName)
-                {
-                    socket->m_boneMatrix = globalTransform * socket->m_offset;
-                    socket->m_boneMatrix = socket->m_boneMatrix
-                        * animator.GetOwner()->Transform_().GetWorldMatrix();
-                }
-            }
-        }
-    }
-
-
-    if (controller)
-    {
-        controller->m_LocalTransforms[bone->m_index] = nodeTransform;
-    }
-    for (Bone* child : bone->m_children)
-    {
-        UpdateBone(child, animator, controller,globalTransform, time);
-    }
-}
-
-
-void AnimationJob::UpdateBoneLayer(Bone* bone, Animator& animator,
-    const math::matrix4x4& parentTransform)
-{
-    Skeleton* skeleton = animator.m_Skeleton;
-    std::string& boneName = bone->m_name;
-    bool isCalculAnimate = true;
-    math::matrix4x4 globalTransform{};
-    
-    Animation* animation;
-
-    bool hasAnyAnimation = false;
-    for (auto& precontroller : animator.m_animationControllers)
-    {
-        animation = &skeleton->m_animations[precontroller->GetAnimationIndex()];
-        auto it = animation->m_nodeAnimations.find(boneName);
-        if (it != animation->m_nodeAnimations.end())
-        {
-            hasAnyAnimation = true;
-            break;
-        }
-    }
-
-    if (!hasAnyAnimation)
-    {
-        for (Bone* child : bone->m_children)
-            UpdateBoneLayer(child, animator, parentTransform);
-        return;
-    }
-
-    for (auto& controller : animator.m_animationControllers)
-    {
-        if (controller->m_isBlend == false)
-        {
-            if (controller->IsUseLayer() == true)
-            {
-                auto mask = controller->GetAvatarMask();
-
-
-                if (mask != nullptr) //마스크 있으면
-                {
-
-                    if (mask->isHumanoid)
-                    {
-                        if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
-                        {
-                            //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-                            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-                        }
-                        else
-                        {
-                            // globalTransform = parentTransform;
-                        }
-                    }
-                    else
-                    {
-                        if (mask->IsBoneEnabled(bone->m_name) == true)
-                        {
-                            animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-                            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-
-                        }
-                        else
-                        {
-                            //globalTransform = parentTransform;
-                        }
-                    }
-                }
-                else
-                {
-                    //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-                }
-            }
-        }
-        else
-        {
-            auto mask = controller->GetAvatarMask();
-            if (mask != nullptr) //마스크 있으면
-            {
-
-                if (mask->isHumanoid)
-                {
-                    if (mask->IsBoneEnabled(bone->m_region) == true) //&&&&& region이아니라  mask->IsBoneEnabled(); 로 수정할것
-                    {
-                        //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-                        globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-                    }
-                }
-                else
-                {
-                    if (mask->IsBoneEnabled(bone->m_name) == true)
-                    {
-                        animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-                        globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-
-                    }
-                }
-            }
-            else
-            {
-                //animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-                globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-            }
-        }
-    }
-
-    //int controllerSize = animator.m_animationControllers.size();
-    //for (int i = controllerSize - 1; i >= 0; --i)
-    //{
-    //    auto& controller = animator.m_animationControllers[i];
-
-    //    if (controller->IsUseLayer())
-    //    {
-    //        auto mask = controller->GetAvatarMask();
-
-    //        if (mask != nullptr) // 마스크 있으면
-    //        {
-    //            if (mask->isHumanoid)
-    //            {
-    //                if (mask->IsBoneEnabled(bone->m_region))
-    //                {
-    //                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-    //                }
-    //            }
-    //            else
-    //            {
-    //                if (mask->IsBoneEnabled(bone->m_name))
-    //                {
-    //                    animator.m_localTransforms[bone->m_index] = controller->m_LocalTransforms[bone->m_index];
-    //                    globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-    //                }
-    //            }
-    //        }
-    //        else
-    //        {
-    //            globalTransform = controller->m_LocalTransforms[bone->m_index] * parentTransform;
-    //        }
-    //    }
-    //}
-
-    animator.m_FinalTransforms[bone->m_index] =
-        bone->m_offset * globalTransform * skeleton->m_globalInverseTransform;
-    
-    if (animator.HasSocket())
-    {
-        if (SceneManagers->m_isGameStart == false || animator.GetOwner() == nullptr)
-        {
-
-        }
-        else
-        {
-            for (auto& socket : animator.socketvec)
-            {
-                if (bone->m_name == socket->m_ObjectName)
-                {
-                    socket->m_boneMatrix = globalTransform * socket->m_offset;
-                    socket->m_boneMatrix = socket->m_boneMatrix
-                        * animator.GetOwner()->Transform_().GetWorldMatrix();
-                }
-            }
-        }
-    }
-
-    for (Bone* child : bone->m_children)
-    {
-        UpdateBoneLayer(child, animator,globalTransform);
-    }
-    
-}
-
 math::matrix4x4 AnimationJob::BlendAni(const math::matrix4x4& curAni,
     const math::matrix4x4& nextAni, float t)
 {
@@ -726,67 +215,12 @@ math::matrix4x4 AnimationJob::BlendAni(const math::matrix4x4& curAni,
         math::lerp(current->translation, next->translation, t));
 }
 
-math::matrix4x4 AnimationJob::calculAni(NodeAnimation& nodeAnim, float time,
-    int* _key)
-{
-    float t = 0;
-    // Translation
-    math::vector4 interpPos = nodeAnim.m_positionKeys[0].m_position;
-    if (nodeAnim.m_positionKeys.size() > 1)
-    {
-        int posKeyIdx = CurrentKeyIndex<NodeAnimation::PositionKey>(nodeAnim.m_positionKeys, time);
-        int nPosKeyIdx = posKeyIdx + 1;
-
-        if (_key)
-            *_key = posKeyIdx;
-        NodeAnimation::PositionKey posKey = nodeAnim.m_positionKeys[posKeyIdx];
-        NodeAnimation::PositionKey nPosKey = nodeAnim.m_positionKeys[nPosKeyIdx];
-
-        t = (time - posKey.m_time) / (nPosKey.m_time - posKey.m_time);
-        interpPos = math::lerp(posKey.m_position, nPosKey.m_position, t);
-    }
-
-    // Rotation
-    math::quaternion interpQuat = nodeAnim.m_rotationKeys[0].m_rotation;
-    if (nodeAnim.m_rotationKeys.size() > 1)
-    {
-        int rotKeyIdx = CurrentKeyIndex<NodeAnimation::RotationKey>(nodeAnim.m_rotationKeys, time);
-        int nRotKeyIdx = rotKeyIdx + 1;
-
-        NodeAnimation::RotationKey rotKey = nodeAnim.m_rotationKeys[rotKeyIdx];
-        NodeAnimation::RotationKey nRotKey = nodeAnim.m_rotationKeys[nRotKeyIdx];
-
-        t = (time - rotKey.m_time) / (nRotKey.m_time - rotKey.m_time);
-        interpQuat = math::slerp(rotKey.m_rotation, nRotKey.m_rotation, t);
-
-    }
-
-    // Scaling
-    float interpScale = nodeAnim.m_scaleKeys[0].m_scale.x;
-
-    if (nodeAnim.m_scaleKeys.size() > 1)
-    {
-        int scalKeyIdx = CurrentKeyIndex<NodeAnimation::ScaleKey>(nodeAnim.m_scaleKeys, time);
-        int nScalKeyIdx = scalKeyIdx + 1;
-
-        NodeAnimation::ScaleKey scalKey = nodeAnim.m_scaleKeys[scalKeyIdx];
-        NodeAnimation::ScaleKey nScalKey = nodeAnim.m_scaleKeys[nScalKeyIdx];
-
-        t = (time - scalKey.m_time) / (nScalKey.m_time - scalKey.m_time);
-        interpScale = lerp(scalKey.m_scale.x, nScalKey.m_scale.x, t);
-    }
-
-    return math::compose(
-        math::vector3{ interpScale, interpScale, interpScale }, interpQuat,
-        math::vector3{ interpPos.x, interpPos.y, interpPos.z });
-}
-
-// ─── I5-D4e-1 — experiment 재생 경로 ────────────────────────────────────────
+// I6-B4b — legacy 재귀 틱(UpdateBlendBone/UpdateBone/UpdateBoneLayer/
+// calculAni)을 걷었다. 재생 경로는 TickExperiment 하나다.
 //
-// 시간축·이벤트·컨트롤러 분기는 legacy 경로(Update 람다)와 같은 구조이고,
-// clip 메타(durationTicks/ticksPerSecond)만 experiment에서 읽는다. 루프 판정과
-// 이벤트 발화는 Animator 클립 오버라이드가 정본(I5-D4e-2 — 오버라이드 없으면
-// experiment 자산값 폴백)이라 legacy 경로와 같은 함수를 본다.
+// ★ 이 함수들이 Animator의 legacy Skeleton 소비 중 유일한 **런타임**
+//   소비였다. 나머지는 진단·대조군이라, 이것이 죽어야 타입 은퇴가
+//   실제 코드 삭제로 이어진다.
 
 void AnimationJob::TickExperiment(Animator& animator,
     const experiment::Skeleton& skeleton, float deltaT)
@@ -1242,20 +676,19 @@ void AnimationJob::UpdateExperimentLayer(Animator& animator,
         globals[boneIndex] = globalTransform;
     }
 }
-
-bool AnimationJob::EvaluateParityPose(Animator& animator,
+// I6-B4b — 파리티 하네스를 experiment 단독 평가로 좁혔다. legacy 재귀가
+// 죽었으므로 대조할 팔이 없다 — 남은 쓸모는 **결정적 표본으로 제품
+// 포즈를 산출**해 주는 것이고, 게이트는 그것을 골든 digest로 잰다(6b).
+//
+// ★ 이것은 정확성 축의 강등이다. 축 6은 legacy와의 값 대조라 "맞다"를
+//   말할 수 있었지만, 이제 말할 수 있는 것은 "어제와 같다"뿐이다.
+//   B4a가 그 인수인계를 겹치는 구간에서 증명해 두었다.
+bool AnimationJob::EvaluateExperimentPose(Animator& animator,
     const experiment::Skeleton& experimentSkeleton, int clipIndex,
-    float time, math::matrix4x4* outLegacy, math::matrix4x4* outExperiment)
+    float time, math::matrix4x4* outExperiment)
 {
-    Skeleton* legacySkeleton = animator.m_Skeleton;
-    if (nullptr == legacySkeleton || nullptr == legacySkeleton->m_rootBone
-        || nullptr == outLegacy || nullptr == outExperiment)
-    {
-        return false;
-    }
+    if (nullptr == outExperiment) return false;
     if (clipIndex < 0
-        || static_cast<std::size_t>(clipIndex)
-            >= legacySkeleton->m_animations.size()
         || static_cast<std::size_t>(clipIndex)
             >= experimentSkeleton.clips.size())
     {
@@ -1270,15 +703,8 @@ bool AnimationJob::EvaluateParityPose(Animator& animator,
     const uint32_t savedChosen = animator.m_AnimIndexChosen;
     animator.m_AnimIndexChosen = static_cast<uint32_t>(clipIndex);
 
-    // 두 경로 모두 같은 초기값(항등)에서 시작해야 "채널 없는 슬롯 미기록"
-    // 규약 아래에서도 대조가 성립한다.
-    std::fill(animator.m_FinalTransforms,
-        animator.m_FinalTransforms + MAX_BONES, math::matrix4x4::identity());
-    math::matrix4x4 rootTransform = legacySkeleton->m_rootTransform;
-    UpdateBone(legacySkeleton->m_rootBone, animator, nullptr, rootTransform, time);
-    std::copy(animator.m_FinalTransforms,
-        animator.m_FinalTransforms + MAX_BONES, outLegacy);
-
+    // 항등에서 시작한다 — "채널 없는 슬롯 미기록" 규약 아래에서도 결과가
+    // 결정적이어야 골든이 성립한다.
     std::fill(animator.m_FinalTransforms,
         animator.m_FinalTransforms + MAX_BONES, math::matrix4x4::identity());
     UpdateExperimentPose(animator, experimentSkeleton, nullptr,

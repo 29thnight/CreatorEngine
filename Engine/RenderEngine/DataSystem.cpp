@@ -384,17 +384,35 @@ std::shared_ptr<Model> DataSystem::LoadCachedModelShared(std::string_view filePa
 		}
 	}
 
+	// ★ I6-B4b 후속 — 여기가 **에디터 드롭 경로**다(HierarchyWindow·
+	// SceneViewWindow의 콘텐츠 브라우저 드래그, TerrainComponent, Foliage).
+	// D34b가 `LoadModel`을 experiment로 이중화하면서 주석에 "에디터의 이름
+	// 기반 로드"를 적었는데, **정작 에디터가 부르는 것은 이 함수였다** —
+	// 그래서 드롭한 모델만 experiment 등록이 비고, 재생 바인딩이 서지 못했다.
+	//
+	// B4b가 legacy 재귀 틱을 걷기 전까지는 이 구멍이 폴백에 덮여 보이지
+	// 않았다(애니메이션이 legacy 경로로 돌았다). 틱이 하나가 되자 곧바로
+	// "드롭한 애니메이션 모델이 아무것도 안 그린다"로 드러났다 — 팔레트가
+	// 한 번도 안 쓰이면 스킨 정점이 원점으로 접힌다.
 	std::shared_ptr<Model> model{};
-    try
-    {
-		std::string modelPath = assetPath.string();
-        model = Model::LoadModelShared(modelPath);
-    }
-    catch (const std::exception& e)
-    {
-        Debug->LogError(e.what());
-        return {};
-    }
+	const FileGuid guid = GetFileGuid(assetPath);
+	if (FileGuid{} != guid)
+	{
+		model = LoadModelViaExperiment(guid, assetPath);
+	}
+	if (!model)
+	{
+		try
+		{
+			std::string modelPath = assetPath.string();
+			model = Model::LoadModelShared(modelPath);
+		}
+		catch (const std::exception& e)
+		{
+			Debug->LogError(e.what());
+			return {};
+		}
+	}
 
 	if (model)
 	{
