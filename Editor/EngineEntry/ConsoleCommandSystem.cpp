@@ -4110,6 +4110,10 @@ namespace ConsoleCmd
         }
         std::size_t boneCount = 0, viaExperimentCount = 0, viaLegacyCount = 0;
         std::size_t mismatchCount = 0, unresolvedCount = 0;
+        // I6-B2 — 본 캐시 무효화 신원의 출처. 해석 경로(viaExperiment)와 별개
+        // 축이다: 인덱스를 experiment로 풀면서 신원은 legacy 객체 수명에 묶여
+        // 있으면 그 객체를 은퇴시킬 수 없다.
+        std::size_t serialExperimentCount = 0, serialLegacyCount = 0;
         for (const auto& object : scene->m_Entities)
         {
             if (!object || object->IsDestroyMark()) continue;
@@ -4117,8 +4121,12 @@ namespace ConsoleCmd
             const auto& rootObject = scene->TryGetEntity(object->GetRootIndex());
             if (!rootObject) continue;
             Animator* animator = rootObject->GetComponent<Animator>();
-            if (nullptr == animator || 0 == animator->GetSkeletonSerial())
+            bool serialViaExperiment = false;
+            if (nullptr == animator
+                || 0 == animator->GetSkeletonSerial(&serialViaExperiment))
+            {
                 continue;
+            }
 
             const std::string boneName = object->RemoveSuffixNumberTag();
             bool viaExperiment = false;
@@ -4133,16 +4141,19 @@ namespace ConsoleCmd
 
             ++boneCount;
             if (viaExperiment) ++viaExperimentCount; else ++viaLegacyCount;
+            if (serialViaExperiment) ++serialExperimentCount;
+            else ++serialLegacyCount;
             if (resolved != legacyIndex) ++mismatchCount;
             if (resolved < 0) ++unresolvedCount;
         }
         const bool passed = boneCount > 0 && 0 == mismatchCount
             && 0 == unresolvedCount;
         std::printf("[CLI] experiment.boneresolve %s bones=%zu experiment=%zu "
-            "legacy=%zu mismatch=%zu unresolved=%zu\n",
+            "legacy=%zu mismatch=%zu unresolved=%zu serialExperiment=%zu "
+            "serialLegacy=%zu\n",
             passed ? "pass" : (boneCount == 0 ? "skip" : "fail"),
             boneCount, viaExperimentCount, viaLegacyCount, mismatchCount,
-            unresolvedCount);
+            unresolvedCount, serialExperimentCount, serialLegacyCount);
     }
 
     // I5-D4e-3 — AvatarMask 트리 생성의 A/B 대조. 실물 창구

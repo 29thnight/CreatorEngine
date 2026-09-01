@@ -2263,9 +2263,9 @@ D4e-2가 소유는 옮겼지만 표기는 legacy 서브트리 그대로다.
 |---|---|---|
 | **B0** ✅ | 바인딩 자립 — experiment 핸들이 `m_Motion` 단독으로 서고, 클립 클램프가 창구로. 은퇴 래칫 게이트 신설 | 없음 |
 | **B1** ✅ | 씬 표기 이주 — `m_clipOverrides`가 자기 표기를 갖고, 리플렉션이 legacy 서브트리를 더 이상 적지 않는다(읽기 폴백 존치) | B0 |
-| **B2** | 배치 경로 — `ModelSceneBridge`의 `animator->m_Skeleton` 대입 3곳과 본 트리 계층 생성 2함수를 experiment parent 순회로 | B0 |
-| **B3** | 틱 단일화 — `UpdateBone`/`UpdateBlendBone`/`UpdateBoneLayer`·`EvaluateParityPose` 폐기, experiment 단일 틱 | B1·B2 |
-| **B4** | 진단 표면 — 콘솔 명령 4종(본 덤프·hierarchy 프로브·이벤트 패리티·본 해석)의 legacy 축 판정과 게이트 재배선 | B3 |
+| **B2** ✅ | 신원 자립 — 본 캐시 무효화 신원이 `experiment::Model::Generation()`으로. **배치 경로는 정찰이 뒤집었다**(아래) | B0 |
+| **B3** | 진단·게이트 표면 — 콘솔 4종의 legacy 축 판정과 재배선. **틱보다 먼저다**(아래 순서 정정) | B2 |
+| **B4** | 틱 단일화 + 배치 대입 절단 — legacy 틱 3함수·`EvaluateParityPose` 폐기, `animator->m_Skeleton` 대입 제거. **자기 대조군을 없애는 슬라이스** | B3 |
 | **B5** | 필드 제거 — `Animator::m_Skeleton`·`GetSkeletonSerial` experiment 신원 전환·`Skeleton.h` include 청산 | B4 |
 
 **I6-B0 완료 실측 (2026-09-01) — 첫 자물쇠를 풀었다.**
@@ -2351,6 +2351,60 @@ pass2는 아무것도 안 적는다. 그래서 "쓰는 것과 읽는 것이 정�
 무회귀: Debug x64 빌드 exit 0 · 리플렉션 골든 **정확히 1줄 감소**(`m_Skeleton: ~`,
 눈으로 검산 후 재생성) · 씬 코퍼스 14/14 `unstable=0`·`sourceMutations=0` · 프리팹 9/9 ·
 직렬화 기준선 4/4 · `verify-experiment-vertex-live` 전체 통과. 래칫 **73 → 70**.
+
+**I6-B2 완료 실측 (2026-09-01) — 정찰이 B2의 내용을 통째로 바꿨다.**
+
+계획한 B2는 "`ModelSceneBridge`의 대입 3곳과 본 트리 계층 생성 2함수를 experiment
+순회로"였다. **전수하니 셋 다 이미 죽었거나 다른 슬라이스 몫이다**
+([[plan-target-may-be-already-dead]]의 재발).
+
+| 계획한 대상 | 실측 |
+|---|---|
+| 본 트리 계층 생성 2함수 | **D4d가 이미 대체**했다 — `GenerateSceneObjectHierarchyExperiment`가 정본이고 이 둘은 legacy 폴백 전용이다(I6-E 몫) |
+| 대입 3곳 중 2곳 | 같은 legacy 폴백 함수 안이다(I6-E 몫) |
+| 대입 1곳 | experiment 정본 경로 안에 있다 — **이것만 실대상** |
+
+★ **그런데 그 한 줄을 지우면 본 전파가 통째로 꺼진다.** `Scene.cpp`의 본 캐시 해석이
+`0 == animator->GetSkeletonSerial()`을 "스켈레톤 없음"으로 읽고 건너뛰는데,
+그 신원이 **legacy `Skeleton::m_serial` 하나**였다. 즉 은퇴를 막던 것은 배치 코드가
+아니라 **신원의 출처**다. B2를 그쪽으로 돌렸다.
+
+**신원을 experiment 축에 세웠다.** `experiment::Model`이 생성 시각에 단조 증가하는
+`Generation()`을 갖는다 — legacy `Skeleton::m_serial`이 하던 일과 같은 역할이고,
+같은 이유로 **포인터가 아니라 값**이다(해제된 주소를 재사용하면 캐시가 우연히 적중해
+다른 모델의 뼈 인덱스를 조용히 재사용한다 — `Skeleton.h`가 기록한 그 ABA다).
+
+★ **번호 공간을 겹치지 않게 띄웠다(`1<<32` 오프셋).** 둘 다 1부터 세면 legacy serial 3에
+대해 푼 캐시가 experiment generation 3을 만나 **거짓 적중**한다. 전환기에는 한 씬 안에
+두 축이 공존하므로 실재하는 위험이다. (충돌하려면 legacy가 40억 개의 스켈레톤을
+만들어야 한다.)
+
+★ **이 슬라이스는 래칫을 안 움직인다 — 그래서 자기 축이 필요했다.** legacy 폴백이
+남으므로 접촉 수는 70 그대로다. 정적 래칫만 있으면 이 전환은 **아무 게이트에도 안
+보인다.** 그래서 `experiment.boneresolve`에 신원 출처 계수를 더하고 라이브 A/B에 축
+둘을 세웠다:
+
+| 축 | on | off |
+|---|---|---|
+| **8b** | `serialExperiment=62 serialLegacy=0` | — |
+| **4m2** | — | `serialExperiment=0 serialLegacy=62` |
+
+off 팔이 없으면 "언제나 experiment라고 적는 계수기"가 8b를 공짜로 통과한다.
+해석 경로 축(8/4m)과 **별개 축**인 것도 중요하다 — 인덱스를 experiment로 풀면서
+신원만 legacy 객체 수명에 묶여 있는 상태가 정확히 은퇴를 막던 상태였다.
+
+**변이:** `GetSkeletonSerial`을 legacy 우선으로 되돌리자 **8b만 붉고 4m2는 초록**이다
+(예측 일치 — off 팔은 원래 legacy를 기대한다).
+
+무회귀: Debug x64 빌드 exit 0 · `verify-experiment-vertex-live` 전체 통과(on/off 양팔) ·
+리플렉션 골든 diff 0 · 은퇴 래칫 70/70.
+
+★ **순서를 정정한다 — 진단이 틱보다 먼저다.** 다음 슬라이스에서 `animator->m_Skeleton`
+대입을 끊으면 `experiment.animevent`(축 7)가 애니메이터를 못 고르고
+(`candidate->m_Skeleton` 널 검사로 후보를 거른다) `EvaluateParityPose`(축 6)가 대조군을
+잃어 **둘 다 붉는다**. 진단 표면을 experiment 축으로 먼저 옮긴 뒤에 틱과 대입을
+함께 끊어야 한다 — I6 정찰이 예고한 "은퇴 슬라이스는 자기 대조군을 없앤다"가
+구체적인 순서 제약으로 나타난 것이다.
 
 **I6-C 착수 실측 (2026-09-01) — 신원을 포인터에서 값으로.** 렌더 패스 셋이
 `Mesh*`를 지오메트리 맵 키·배치 키·정렬 기준으로 쓰고 있었다. 업로드는 D34/D4b가

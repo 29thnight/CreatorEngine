@@ -133,7 +133,10 @@ public:
     // 지점을 여기로 모은다 — experiment가 정본, legacy는 폴백(Assimp 모델).
     // 세대 키는 m_serial 그대로다: experiment 모델은 항상 역브리지 legacy
     // 스켈레톤과 짝으로 교체되므로 그 일련번호가 두 경로 공용 세대다.
-    [[nodiscard]] uint64 GetSkeletonSerial() const;
+    // I6-B2 — 본 캐시 무효화의 신원. experiment 핸들이 있으면 그 generation이
+    // 정본이고, 없을 때만 legacy Skeleton::m_serial로 떨어진다. 두 축은 번호
+    // 공간이 겹치지 않는다(experiment::Model::Generation 주석 참조).
+    [[nodiscard]] uint64 GetSkeletonSerial(bool* outViaExperiment = nullptr) const;
     // 이름→본 인덱스(1:1 계약으로 두 경로 동일 값). 실패는 -1.
     // outViaExperiment: 실제로 experiment 해석을 탔는가 — 게이트 관측 창구.
     [[nodiscard]] int ResolveBoneIndex(const std::string& boneName,

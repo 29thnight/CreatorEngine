@@ -236,6 +236,12 @@ if ($logOn -notmatch '\[CLI\] experiment\.animevent verify pass') {
 if ($logOn -notmatch '\[CLI\] experiment\.boneresolve pass bones=(\d+) experiment=\1 legacy=0') {
     $fail += "8 본 해석 창구 실패(on) — boneresolve 출력을 확인하라"
 }
+# ★ 8b(I6-B2) — 본 캐시 무효화 **신원**의 출처. 8과 별개 축이다: 인덱스를
+#   experiment로 풀면서 신원만 legacy 객체 수명에 묶여 있으면 그 객체를
+#   은퇴시킬 수 없다(신원이 0이 되면 Scene의 본 전파가 통째로 꺼진다).
+if ($logOn -notmatch 'bones=(\d+) experiment=\1 legacy=0 mismatch=0 unresolved=0 serialExperiment=\1 serialLegacy=0') {
+    $fail += "8b 본 캐시 신원이 experiment로 서지 않는다(on) — boneresolve serial* 을 확인하라"
+}
 # ★ 9(I5-D4e-3) — 마스크 트리 A/B. 순서 재현(저장분 인덱스 대응)까지 대조.
 if ($logOn -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperiment=1') {
     $fail += "9 마스크 트리 대조 실패(on) — animmask 출력을 확인하라"
@@ -406,6 +412,11 @@ if ($logOff -notmatch '\[CLI\] experiment\.animevent verify pass') {
 # 전수 일치), 마스크 생성도 legacy 경로다.
 if ($logOff -notmatch '\[CLI\] experiment\.boneresolve pass bones=(\d+) experiment=0 legacy=\1') {
     $fail += "4m 스위치를 껐는데 본 해석이 experiment로 샜다(또는 실패)"
+}
+# I6-B2: off 대조군 — 신원도 전량 legacy serial이어야 한다. 이 팔이 있어야
+# "언제나 experiment라고 적는 계수기"가 8b를 공짜로 통과하지 못한다.
+if ($logOff -notmatch 'bones=(\d+) experiment=0 legacy=\1 mismatch=0 unresolved=0 serialExperiment=0 serialLegacy=\1') {
+    $fail += "4m2 스위치를 껐는데 본 캐시 신원이 experiment로 샜다"
 }
 if ($logOff -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperiment=0') {
     $fail += "4n 스위치를 껐는데 마스크 생성이 experiment로 샜다(또는 실패)"

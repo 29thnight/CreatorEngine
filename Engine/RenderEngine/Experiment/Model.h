@@ -2,6 +2,7 @@
 
 #include "ModelData.h"
 
+#include <cstdint>
 #include <memory>
 #include <span>
 
@@ -33,6 +34,19 @@ namespace experiment
 		Model& operator=(Model&&) = delete;
 		~Model() = default;
 
+		// I6-B0/B2 — 이 generation의 런타임 신원. legacy Skeleton::m_serial이
+		// 하던 일을 experiment 축에서 대신한다: BoneComponent가 캐시한 뼈
+		// 인덱스가 "어느 스켈레톤에 대해 푼 값인가"를 이 값으로 판별한다.
+		//
+		// ★ 포인터가 아니라 값인 이유는 legacy 쪽 주석 그대로다 — 해제된 주소를
+		//   재사용하면 캐시가 우연히 적중해 **다른 모델의 뼈 인덱스를 조용히
+		//   재사용한다**. 생성마다 증가하는 값이면 주소 재사용이 못 속인다.
+		//
+		// ★ legacy serial과 **번호 공간을 겹치지 않게** 띄운다. 둘 다 1부터
+		//   세면 legacy 3에 대해 푼 캐시가 experiment 3을 만나 거짓 적중한다 —
+		//   전환기에는 한 씬 안에 두 축이 공존하므로 실재하는 위험이다.
+		[[nodiscard]] std::uint64_t Generation() const noexcept;
+
 		[[nodiscard]] const ModelMetadata& Metadata() const noexcept;
 		[[nodiscard]] NodeIndex RootNode() const noexcept;
 		[[nodiscard]] std::span<const ModelNode> Nodes() const noexcept;
@@ -46,6 +60,9 @@ namespace experiment
 		[[nodiscard]] const Material* TryGetMaterial(MaterialIndex index) const noexcept;
 
 	private:
+		static std::uint64_t NextGeneration() noexcept;
+
+		std::uint64_t generation_{ NextGeneration() };
 		ModelMetadata metadata_{};
 		NodeIndex rootNode_{};
 		std::vector<ModelNode> nodes_{};

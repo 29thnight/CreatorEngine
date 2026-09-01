@@ -1,9 +1,25 @@
 #include "Model.h"
 
+#include <atomic>
 #include <utility>
 
 namespace experiment
 {
+	namespace
+	{
+		// legacy Skeleton::m_serial은 1부터 센다. 겹치지 않게 experiment 축을
+		// 2^32 위로 띄운다 — 전환기에 두 축이 한 씬에 공존하기 때문이다.
+		constexpr std::uint64_t kGenerationBase = 1ull << 32;
+	}
+
+	std::uint64_t Model::NextGeneration() noexcept
+	{
+		static std::atomic<std::uint64_t> counter{ 0 };
+		return kGenerationBase + counter.fetch_add(1, std::memory_order_relaxed) + 1;
+	}
+
+	std::uint64_t Model::Generation() const noexcept { return generation_; }
+
 	Model::Model(ModelDraft&& draft, ConstructKey) noexcept
 		: metadata_(std::move(draft.metadata)),
 		  nodes_(std::move(draft.nodes)),

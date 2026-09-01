@@ -115,9 +115,21 @@ void Animator::EnsureExperimentAnimationBinding()
 	m_experimentModel = std::move(source);
 }
 
-uint64 Animator::GetSkeletonSerial() const
+uint64 Animator::GetSkeletonSerial(bool* outViaExperiment) const
 {
-	// 0은 "스켈레톤 없음"(NextSerial은 1부터) — Scene 본 전파의 가드 값.
+	// 0은 "스켈레톤 없음" — Scene 본 전파의 가드 값이다(두 축 모두 1 이상에서
+	// 센다). I6-B2: experiment 핸들이 있으면 그 generation이 신원이고, legacy
+	// serial은 폴백이다. 신원이 legacy 객체 수명에 묶여 있는 한 그 객체를
+	// 은퇴시킬 수 없다 — 본 전파가 통째로 꺼지기 때문이다.
+	if (outViaExperiment) *outViaExperiment = false;
+	if (m_experimentModel)
+	{
+		if (nullptr != m_experimentModel->TryGetSkeleton())
+		{
+			if (outViaExperiment) *outViaExperiment = true;
+			return m_experimentModel->Generation();
+		}
+	}
 	return m_Skeleton ? m_Skeleton->m_serial : 0;
 }
 
