@@ -440,8 +440,11 @@ reflection으로 고정하고 packet에 property/GUID/register/owner를 함께 �
   연결하고 `AssetPacker` reopen/index 검증을 닫았다. I5 제품 배선에는 D5-b2c 나머지
   asset producer가 여전히 필요하다.
 
-남은 제품 합류 게이트는 D5-b2c 나머지 식별자 게시와 I5 resolver 배선이다. 아래 M6 항목은 완료
-증거로 남긴다.
+남은 제품 합류 게이트는 **catalog 기동 배선** 하나다(2026-09-01 갱신). D5-b2c는 닫혔고
+resolver도 제품 소비자를 얻었지만(D5-c3-2), `MakeDataSystemMaterialResolveServices(nullptr)`와
+빈 `ModelLoadRequest::cookedPath`가 그대로라 **cooked 경로가 제품에서 한 번도 돌지 않는다**
+(D1b·c3-2 실측: `texCooked=0`). 그 배선은 I7의 "남은 것"(경로 규약·CookedThenSource
+신선도)과 같은 것이다. 아래 M6 항목은 완료 증거로 남긴다.
 
 - [x] SerializationPlan D2가 sidecar 정본, UUIDv4 전수 재발급, atomic authoring/rename과
       scene 14/prefab 9/material 2 authoring corpus를 닫았다.
@@ -455,8 +458,8 @@ reflection으로 고정하고 packet에 property/GUID/register/owner를 함께 �
       두 번 같은 CEMC 14 + CEMF 1/entry 66을 source 변경 없이 게시한다.
 - [x] SerializationPlan D5-b2b2가 전수 Cook을 build/AssetPacker/pak에 연결해 Derived tree와
       CEMF를 제품 package에 게시한다.
-- [ ] SerializationPlan D5-b2c가 texture/ShaderMeta/scene/prefab Derived producer와 material
-      dependency entry를 완성한다.
+- [x] SerializationPlan D5-b2c가 texture/ShaderMeta/scene/prefab Derived producer와 material
+      dependency entry를 완성했다(2026-08-29 — b2c-5에서 전체 폐포 fail-closed + pak 게시까지).
 - [x] MaterialPipelinePlan M6-P2d-c가 generic texture schema/owner vector를 닫았다.
 - [x] MaterialPipelinePlan M6-P2d-d가 arbitrary required-asset packet과 canonical seed 제거를 닫았다.
 - [x] MaterialPipelinePlan M6-P2d-e가 전체 재질/legacy 전환을 닫았다. P2c의
@@ -633,7 +636,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | **I5-M2** ✅ | `MaterialResolver`/`ResolvedMaterial` — `shaderAssetId`→ShaderMeta handle, texture GUID→generation owner | **catalog 의 첫 생산 소비자** | 없음 |
 | **I5-M3** ✅ | `MaterialInstance` — base + override. `InstantiateShared` 계약을 승계하지 않는다 | MeshRenderer | 없음 |
 | **I5-M4** ✅ | sealing 치환 — GBuffer/Forward 가 `experiment::Material` 에서 snapshot 을 만든다 | 제품 렌더 | **소비자** 참조 감소 |
-| **I5-M5** | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
+| **I5-M5** ✅ | 저작 경계 이전 — MeshRenderer·Scene 직렬화·CLR·Editor picker/Inspector | 제품 저작 | **소비자** 참조 감소 |
 | ↳ M5-S0 ✅ | experiment 저작 YAML 코덱(정본 스키마) — 호출부 무변경 | 게이트 | 없음 |
 | ↳ M5-S1 ✅ | 변환 정본 + DataSystem 읽기 이중화 — legacy↔experiment 단일 변환기, 새 정본 문서 로드 | DataSystem·sealing 브리지 | 없음 |
 | ↳ M5-S2a ✅ | 씬 읽기 경계 — MeshRenderer postLoad가 새 정본 m_Material을 재해석 | 씬/프리팹 로드 | 없음 |
@@ -644,7 +647,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S2c-2c ✅ | Foliage — `FoliageType.m_authoredMaterial` 병행(D5-c4에서 이행) | Foliage·required packet | 없음 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
-| **I5-D** | `experiment::Model` 직접 소비 **+ V4 레이아웃 유도** — 아래 슬라이스로 분해(착수 정찰 2026-08-31) | 제품 렌더 | **소비자** 참조 감소 |
+| **I5-D** ✅ | `experiment::Model` 직접 소비 **+ V4 레이아웃 유도** — 아래 슬라이스로 분해(착수 정찰 2026-08-31) | 제품 렌더 | **소비자** 참조 감소 |
 | ↳ I5-D0a ✅ | 선결 갭 ① — 판정: **clip 표현 불요**. looping은 experiment에 이미 완결, 이벤트는 legacy조차 씬(Animator) 소유 — D4에서 Animator 소유 구조로 이관(코퍼스 저작분 0건) | Animator | 없음 |
 | ↳ I5-D0b ✅ | 선결 갭 ② — 판정: **표현 불요·기각**. LOD는 소비 0의 죽은 생산 전용 파이프라인(결과 버림+호출자 0+저작분 0건) — 미래 LOD는 렌더 파생 몫 | Mesh·Inspector | 없음 |
 | ↳ I5-D1a ✅ | 역브리지 — `DataSystem::BuildLegacyModelFromExperiment`(experiment→legacy) + 왕복 게이트 | DataSystem | 없음(I6 은퇴) |
@@ -653,7 +656,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ I5-D34a ✅ | GBuffer 정적 수직 절단 — 병행 바인딩·캐시 대칭 이중화·VSIn 퍼뮤테이션+PSO 레이아웃 축·A/B 동수 게이트(FT 8/8) | 메시 캐시·GBuffer | 없음 |
 | ↳ I5-D34b ✅ | 스킨 전환 — GBuffer·Shadow 스킨 PSO(BLENDINDICES uint4), 스킨 A/B 동수 게이트(10/10 전량·42411 동수), m_Motion 폴백 (WireFrame은 실존 안 함) | 스킨 2패스 | 없음 |
 | ↳ I5-D34c ✅ | Forward 전환 — shade/reference×experiment PSO 4벌, core 유도 하나로 마스크 불문, forward 배치 게이트(3c) — SKIN keyword 축은 불요 판정 | Forward | 없음 |
-| ↳ I5-D4 | 직접 소비 — 아래 하위 분해(착수 정찰 2026-08-31 둘째) | 렌더 초크포인트 | **소비자** 참조 감소 |
+| ↳ I5-D4 ✅ | 직접 소비 — 아래 하위 분해(착수 정찰 2026-08-31 둘째) | 렌더 초크포인트 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D4a ✅ | 죽은 소비 청산 — postLoad GenerateLODs 절단(D0b 이행)·PhysicsManager 죽은 정점 줄 제거 | 씬 로드·물리 | 없음 |
 | &nbsp;&nbsp;↳ D4b ✅ | 메시 핸들 병행 — 프록시→아이템→4패스→캐시 핸들 진입점(experiment 신원 키·인덱스), 핸들 전량 게이트(2c)+off 대조(4g) — 바운드는 D4f로 | 렌더 사슬 | 없음 |
 | &nbsp;&nbsp;↳ D4c ✅ | 씬 경계 — 이름 해석 experiment 정본화(GetMeshShared(name) 폴백 강등)·핸들 소유 MeshRenderer 이동·해석 계수 게이트(1c·4h) — writer 전환은 D4f와 동시 | 씬 직렬화 | **소비자** 참조 감소 |
@@ -665,10 +668,10 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;↳ D4f ✅ | 역브리지 시공 축소 — 아래 분해(착수 정찰 2026-09-01 셋째). **타입 은퇴는 I6로 정정**(Assimp 폴백이 legacy를 만드는 한 타입은 존재해야 한다). 정점은 절단, 스켈레톤·인덱스는 소비자가 살아 있어 존치 | DataSystem | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4f-0 ✅ | 선결 — 업로드 빈 메시 가드를 **실제로 올릴 원본** 기준으로 재배치. D4f 예행(역브리지 정점 복사 생략)으로 on 경로가 legacy 정점 없이 드로우 9·커버리지 42411 유지 실증 | 메시 캐시 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D4f-1 ✅ | 정점 시공 절단 — 역브리지 정점 복사 생략(on)·바운드 experiment 정본 주입(`friend class DataSystem` — 정책 판단 아래)·스위치 뜻 확장(off가 시공)·**vk 가드 비대칭 선결**·바운드 축 신설(15·4q·4r, 변이 3종 증명) | 역브리지·A/B 스위치 | legacy 창구 1 |
-| ↳ I5-D5 | 잔여 소비자 — 아래 하위 분해(착수 정찰 2026-09-01) | 에디터·Foliage | **소비자** 참조 감소 |
+| ↳ I5-D5 ✅ | 잔여 소비자 — 아래 하위 분해(착수 정찰 2026-09-01) | 에디터·Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-a ✅ | Foliage 메시 experiment 핸들 합류(컴포넌트→프록시→drawPool)·죽은 include 2건 청산·합성 게이트(10·4o, 2축 변이 증명) | Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-b ✅ | 에디터 실소비 정리 — LOD 편집 표면 제거(D0b 이행)·클립 열거/이름/키프레임 수 창구화·피킹 가드 창구화·**역브리지 totalKeyFrames 정의 결함 교정**·전수 A/B 게이트(11·4p, 변이 증명) / model.cache.build는 I6 존치 판정 | 에디터 | **소비자** 참조 감소 |
-| &nbsp;&nbsp;↳ D5-c | S2c-2b/2c 런타임 소유 분리 — 아래 하위 분해(착수 정찰 2026-09-01 둘째). 계획의 "5지점"은 과소 계상 — 실소비 13파일 | 재질 사슬 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D5-c ✅ | S2c-2b/2c 런타임 소유 분리 — 아래 하위 분해(착수 정찰 2026-09-01 둘째). 계획의 "5지점"은 과소 계상 — 실소비 13파일 | 재질 사슬 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c1 ✅ | 저작 원본 보관 병행 — `DeserializeMaterialPayload` authored out·`LoadAuthoredMaterialShared`·MeshRenderer `MaterialInstance` 병행·**합성 seed**(코퍼스 새 정본 저작분 0 실측)·A/B 게이트(12, M2 변이 증명) | 저작 경계 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-1 ✅ | 전환 위험의 측정 — packing 직전 논리 값의 바이트 A/B(합성 layout). **실측 `sealByteMismatch=0`: 직행해도 바이트가 같다**(M2 변이로 이빨 증명) | 게이트 | 없음 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-2 ✅ | sealing 직행 — `ApplyAuthoredMaterial`(properties·keywords·blendMode만, 부속은 전환기 legacy)·프록시 값 스냅샷·drawPool 반입·양 sealing 축·프록시 운반 게이트(12d, M3 변이 증명) | 프록시·sealing | **소비자** 참조 감소 |
