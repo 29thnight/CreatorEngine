@@ -228,7 +228,7 @@ if ($logOn -notmatch '\[CLI\] experiment\.animtick pass animators=([1-9]\d*)') {
 # ★ 7(I5-D4e-2) — 이벤트·루프 오버라이드가 Animator 소유로 왕복하고 공유
 #   자산은 불변이며 발화 규칙이 오버라이드를 소비한다. 합성 seed가 전제 —
 #   코퍼스 저작분 0이라 실자산만으로는 이 이관이 영원히 초록이다.
-if ($logOn -notmatch '\[CLI\] experiment\.animevent verify pass') {
+if ($logOn -notmatch '\[CLI\] experiment\.animevent verify pass roundtrip=ok contamination=none firing=ok') {
     $fail += "7 이벤트·루프 이관 실패(on) — animevent 출력을 확인하라"
 }
 # ★ 8(I5-D4e-3) — 본 해석 창구. 전수 인덱스 일치 + 전량 experiment 실분기
@@ -405,7 +405,7 @@ if ($logOff -notmatch '\[CLI\] experiment\.animtick skip animators=0') {
 }
 # I5-D4e-2: 이관은 스위치와 무관한 무조건 경로 — off 대조군에서도 왕복·비오염·
 # 발화가 같이 통과해야 한다(legacy 틱도 같은 오버라이드를 소비한다).
-if ($logOff -notmatch '\[CLI\] experiment\.animevent verify pass') {
+if ($logOff -notmatch '\[CLI\] experiment\.animevent verify pass roundtrip=ok contamination=none firing=ok') {
     $fail += "4l 이벤트·루프 이관 실패(off) — 이관이 스위치 뒤로 샜다"
 }
 # I5-D4e-3: off 대조군 — 창구는 전량 legacy 폴백이어야 하고(인덱스는 그래도

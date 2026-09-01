@@ -133,6 +133,45 @@ uint64 Animator::GetSkeletonSerial(bool* outViaExperiment) const
 	return m_Skeleton ? m_Skeleton->m_serial : 0;
 }
 
+std::size_t Animator::GetBoneCount(bool* outViaExperiment) const
+{
+	if (outViaExperiment) *outViaExperiment = false;
+	if (m_experimentModel)
+	{
+		if (const experiment::Skeleton* skeleton =
+			m_experimentModel->TryGetSkeleton())
+		{
+			if (outViaExperiment) *outViaExperiment = true;
+			return skeleton->bones.size();
+		}
+	}
+	return m_Skeleton ? m_Skeleton->m_bones.size() : 0;
+}
+
+std::string Animator::GetBoneName(int boneIndex, bool* outViaExperiment) const
+{
+	if (outViaExperiment) *outViaExperiment = false;
+	if (boneIndex < 0) return std::string{};
+	const std::size_t index = static_cast<std::size_t>(boneIndex);
+	if (m_experimentModel)
+	{
+		if (const experiment::Skeleton* skeleton =
+			m_experimentModel->TryGetSkeleton())
+		{
+			if (outViaExperiment) *outViaExperiment = true;
+			if (index >= skeleton->bones.size()) return std::string{};
+			return skeleton->bones[index].name;
+		}
+	}
+	if (m_Skeleton && index < m_Skeleton->m_bones.size())
+	{
+		// legacy m_bones는 포인터 배열이라 구멍이 있을 수 있다(실측 전례).
+		const Bone* const bone = m_Skeleton->m_bones[index];
+		return bone ? bone->m_name : std::string{};
+	}
+	return std::string{};
+}
+
 int Animator::ResolveBoneIndex(const std::string& boneName,
 	bool* outViaExperiment) const
 {

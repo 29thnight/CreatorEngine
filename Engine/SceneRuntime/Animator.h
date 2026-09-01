@@ -139,6 +139,13 @@ public:
     [[nodiscard]] uint64 GetSkeletonSerial(bool* outViaExperiment = nullptr) const;
     // 이름→본 인덱스(1:1 계약으로 두 경로 동일 값). 실패는 -1.
     // outViaExperiment: 실제로 experiment 해석을 탔는가 — 게이트 관측 창구.
+    // I6-B3 — 진단 표면이 legacy 스켈레톤을 직접 훑지 않게 하는 창구 둘.
+    // 본 계수와 인덱스→이름은 지금까지 `m_Skeleton->m_bones`를 직접 읽는
+    // 것 말고는 길이 없었고, 그것이 진단을 은퇴의 인질로 잡고 있었다.
+    [[nodiscard]] std::size_t GetBoneCount(bool* outViaExperiment = nullptr) const;
+    [[nodiscard]] std::string GetBoneName(int boneIndex,
+        bool* outViaExperiment = nullptr) const;
+
     [[nodiscard]] int ResolveBoneIndex(const std::string& boneName,
         bool* outViaExperiment = nullptr) const;
     // AvatarMask의 BoneMask 트리 생성 — m_BoneMasks 순서가 저장분 인덱스

@@ -1733,7 +1733,11 @@ namespace
             return start;
         };
 
-        Skeleton* dumpedSkeleton = nullptr;
+        // I6-B3 — 덤프 대상을 legacy 스켈레톤이 아니라 Animator로 든다.
+        // 이 진단은 게이트 소비자가 0이지만 손으로 도달성을 볼 때 쓰는
+        // 살아 있는 표면이라 폐기가 아니라 이관이다(I6-A의 판정과 다르다 —
+        // 그쪽은 legacy 왕복 자체가 목적인 진단이었다).
+        Animator* dumpedAnimator = nullptr;
         size_t boneObjectCount = 0;
         size_t hitCount = 0;
         size_t emptyTagCount = 0;
@@ -1773,14 +1777,13 @@ namespace
             const auto& rootObj = scene->TryGetEntity(obj->GetRootIndex());
             if (!rootObj) continue;
             const auto& animator = rootObj->GetComponent<Animator>();
-            if (!animator || !animator->m_Skeleton) continue;
+            if (!animator || 0 == animator->GetSkeletonSerial()) continue;
 
-            Skeleton* skeleton = animator->m_Skeleton;
-            if (!dumpedSkeleton) dumpedSkeleton = skeleton;
+            if (!dumpedAnimator) dumpedAnimator = animator;
 
             const std::string& tag = obj->RemoveSuffixNumberTag();
             if (tag.empty()) ++emptyTagCount;
-            if (nullptr != skeleton->FindBone(tag))
+            if (animator->ResolveBoneIndex(tag) >= 0)
             {
                 ++hitCount;
             }
@@ -1799,20 +1802,31 @@ namespace
         std::printf("[scene.bonedump] Transform없음 %zu개 · 순회 미도달 %zu개 · 캐시된 인덱스 %zu개 (bonecache=%s)\n",
             noTransformCount, unreachableCount, cachedIndexCount, Scene::IsBoneCacheEnabled() ? "1" : "0");
 
-        if (dumpedSkeleton)
+        if (dumpedAnimator)
         {
-            std::printf("[scene.bonedump] 스켈레톤 serial=%llu · m_bones %zu개 · m_boneMap %zu개\n",
-                static_cast<unsigned long long>(dumpedSkeleton->m_serial),
-                dumpedSkeleton->m_bones.size(), dumpedSkeleton->m_boneMap.size());
+            // m_boneMap은 계수에서 뺐다 — FindBone이 정본이고 그 맵은 아무도
+            // 읽지 않는 죽은 필드다(실측). 신원 축은 experiment면 generation,
+            // 아니면 legacy serial이다(GetSkeletonSerial 주석 참조).
+            bool viaExperiment = false;
+            const size_t boneCount = dumpedAnimator->GetBoneCount(&viaExperiment);
+            std::printf("[scene.bonedump] 스켈레톤 serial=%llu · 뼈 %zu개 (출처=%s)\n",
+                static_cast<unsigned long long>(dumpedAnimator->GetSkeletonSerial()),
+                boneCount, viaExperiment ? "experiment" : "legacy");
 
             int printed = 0;
-            for (Bone* bone : dumpedSkeleton->m_bones)
+            for (size_t index = 0; index < boneCount; ++index)
             {
                 if (printed >= limit) break;
                 ++printed;
-                if (!bone) { std::printf("[scene.bonedump]   뼈[%d] = nullptr\n", printed - 1); continue; }
-                std::printf("[scene.bonedump]   뼈[%d] index=%d name=%s(len=%zu)\n",
-                    printed - 1, bone->m_index, quote(bone->m_name).c_str(), bone->m_name.size());
+                const std::string name =
+                    dumpedAnimator->GetBoneName(static_cast<int>(index));
+                if (name.empty())
+                {
+                    std::printf("[scene.bonedump]   뼈[%d] = 이름 없음\n", printed - 1);
+                    continue;
+                }
+                std::printf("[scene.bonedump]   뼈[%d] index=%zu name=%s(len=%zu)\n",
+                    printed - 1, index, quote(name).c_str(), name.size());
             }
         }
         else
@@ -2056,10 +2070,12 @@ namespace
                 if (!rootObj) { ++noRootCount; continue; }
                 const auto& animator = rootObj->GetComponent<Animator>();
                 if (!animator || !animator->IsEnabled()) { ++noAnimatorCount; continue; }
-                if (!animator->m_Skeleton) { ++noSkeletonCount; continue; }
+                // I6-B3 — 관문과 본 계수가 창구를 탄다. 벤치가 legacy 객체
+                // 존재를 관문으로 쓰면 그 객체를 은퇴시킬 수 없다.
+                if (0 == animator->GetSkeletonSerial()) { ++noSkeletonCount; continue; }
 
                 ++reachedCount;
-                skeletonBoneMax = (std::max)(skeletonBoneMax, animator->m_Skeleton->m_bones.size());
+                skeletonBoneMax = (std::max)(skeletonBoneMax, animator->GetBoneCount());
                 if (bc->GetResolvedBoneIndex() >= 0) ++resolvedCount;
             }
             // 512 — 한글이 UTF-8에서 글자당 3바이트라 이 문장은 값이 다 차면 300바이트를
@@ -3798,10 +3814,14 @@ namespace ConsoleCmd
         for (const auto& object : scene->m_Entities)
         {
             if (!object || object->IsDestroyMark()) continue;
+            // I6-B3 — 후보 선별이 창구를 탄다. legacy 객체 존재를 관문으로
+            // 쓰면 대입을 끊는 순간 이 게이트가 "animators=0 skip"으로 조용히
+            // 비어 버린다(초록인 채로). 값 대조 arm은 아래에 그대로 둔다 —
+            // 그것은 은퇴가 아니라 대조군이고, B4에서 함께 죽는다.
             Animator* candidate = object->GetComponent<Animator>();
-            if (nullptr == candidate || nullptr == candidate->m_Skeleton)
+            if (nullptr == candidate || 0 == candidate->GetSkeletonSerial())
                 continue;
-            if (candidate->m_Skeleton->m_animations.empty()) continue;
+            if (0 == candidate->GetClipCount()) continue;
             animator = candidate;
             break;
         }
@@ -3862,24 +3882,40 @@ namespace ConsoleCmd
         }
         // ② 비오염 — 공유 자산이 불변인가(재주입 청산 실증). 자산 원본 루프는
         // experiment 자산값과 동치여야 한다(둘 다 임포터 산물).
+        //
+        // ★ I6-B3 — 이 축은 **legacy 대조군**이라 legacy 자산이 없으면 잴 것이
+        //   없다. 예전에는 후보 선별이 m_Skeleton 널을 걸러 줘서 여기가
+        //   무방비로 역참조했고, B4 예행(대입 절단)에서 정확히 그 자리가
+        //   ACCESS_VIOLATION으로 죽었다 — 관문을 창구로 옮기면 그 암묵 보장이
+        //   사라진다. 이제 없으면 건너뛰되 **출력 토큰으로 드러낸다**(n/a).
+        //   조용히 건너뛰면 대조군이 사라진 채로 초록이 나온다.
+        const char* contaminationAxis = "none";
         Skeleton* sharedSkeleton = animator->m_Skeleton;
-        if (!sharedSkeleton->m_animations[0].m_keyFrameEvent.empty())
+        if (nullptr == sharedSkeleton || sharedSkeleton->m_animations.empty())
         {
-            failures.push_back("비오염: 공유 자산에 이벤트 "
-                + std::to_string(
-                    sharedSkeleton->m_animations[0].m_keyFrameEvent.size())
-                + "건 주입됨");
+            contaminationAxis = "n/a";
         }
-        if (animator->m_experimentModel)
+        else
         {
-            if (const experiment::Skeleton* experimentSkeleton =
-                animator->m_experimentModel->TryGetSkeleton())
+            if (!sharedSkeleton->m_animations[0].m_keyFrameEvent.empty())
             {
-                if (!experimentSkeleton->clips.empty()
-                    && sharedSkeleton->m_animations[0].m_isLoop
-                        != experimentSkeleton->clips[0].looping)
+                failures.push_back("비오염: 공유 자산에 이벤트 "
+                    + std::to_string(
+                        sharedSkeleton->m_animations[0].m_keyFrameEvent.size())
+                    + "건 주입됨");
+            }
+            if (animator->m_experimentModel)
+            {
+                if (const experiment::Skeleton* experimentSkeleton =
+                    animator->m_experimentModel->TryGetSkeleton())
                 {
-                    failures.push_back("비오염: 공유 자산 m_isLoop가 원본과 다름");
+                    if (!experimentSkeleton->clips.empty()
+                        && sharedSkeleton->m_animations[0].m_isLoop
+                            != experimentSkeleton->clips[0].looping)
+                    {
+                        failures.push_back(
+                            "비오염: 공유 자산 m_isLoop가 원본과 다름");
+                    }
                 }
             }
         }
@@ -3911,7 +3947,8 @@ namespace ConsoleCmd
         if (failures.empty())
         {
             std::printf("[CLI] experiment.animevent verify pass "
-                "roundtrip=ok contamination=none firing=ok\n");
+                "roundtrip=ok contamination=%s firing=ok\n",
+                contaminationAxis);
         }
         else
         {

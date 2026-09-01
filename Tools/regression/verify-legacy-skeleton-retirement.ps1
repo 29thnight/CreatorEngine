@@ -100,12 +100,12 @@ elseif ($reflectBody -notmatch 'm_Motion') {
 
 # ── 계약 3: 접촉 래칫 — 파일별 상한을 넘지 않는다 ───────────────────────────
 #
-# 값은 2026-09-01 I6-B1 직후 실측이다. I6-B/C/D가 내려갈 때마다 함께 낮춘다.
+# 값은 2026-09-01 I6-B3 직후 실측이다. I6-B/C/D가 내려갈 때마다 함께 낮춘다.
 # 표에 없는 파일이 나타나면 **새 소비자**라 실패다 — 은퇴 중인 타입에 소비가
 # 늘어나는 것이 이 게이트가 막으려는 유일한 방향이다.
 $ratchet = @{
-    'Engine/SceneRuntime/Animator.cpp'                = 14
-    'Editor/EngineEntry/ConsoleCommandSystem.cpp'     = 16
+    'Engine/SceneRuntime/Animator.cpp'                = 19
+    'Editor/EngineEntry/ConsoleCommandSystem.cpp'     = 10
     'Engine/SceneRuntime/AnimationEventBridge.cpp'    = 11
     'Engine/SceneRuntime/ModelSceneBridge.cpp'        = 8
     'Engine/RenderEngine/ModelLoader.cpp'             = 6
@@ -142,6 +142,26 @@ foreach ($rel in ($measured.Keys | Sort-Object)) {
     }
 }
 
+# ── 계약 4: 창구 **밖** 접촉이 줄어든다 (I6-B3) ─────────────────────────────
+#
+# 총계만 보면 창구 전환이 진척으로 안 보인다 — 진단에서 6건을 걷어도 창구의
+# legacy 폴백이 5건 늘어 총계는 1밖에 안 준다. 그런데 그 둘은 성질이 다르다:
+# 창구 밖 접촉은 **은퇴를 막는 것**이고(고칠 곳이 흩어져 있다), 창구 안 폴백은
+# B5에서 파일 하나를 지우면 한꺼번에 죽는다. 이 트랙의 실제 진척은 "흩어진
+# 접촉이 창구로 모이는 것"이라 그것을 따로 잰다.
+$windowFiles = @(
+    'Engine/SceneRuntime/Animator.cpp',
+    'Engine/SceneRuntime/Animator.h',
+    'Engine/SceneRuntime/AnimationEventBridge.cpp')
+$outsideCeiling = 38
+$outside = 0
+foreach ($rel in $measured.Keys) {
+    if ($windowFiles -notcontains $rel) { $outside += $measured[$rel] }
+}
+if ($outside -gt $outsideCeiling) {
+    $fail += "창구 밖 접촉 역주행 — 상한 $outsideCeiling 건, 실측 $outside 건"
+}
+
 $total = 0
 foreach ($v in $measured.Values) { $total += $v }
 $ceiling = 0
@@ -153,5 +173,5 @@ if ($fail.Count -gt 0) {
     exit 1
 }
 
-"legacy Skeleton 은퇴 경계 통과 — 접촉 $total/$ceiling 건 · 파일 $($measured.Count)개 · 바인딩 자립·표기 이주 확인"
+"legacy Skeleton 은퇴 경계 통과 — 접촉 $total/$ceiling 건(창구 밖 $outside/$outsideCeiling) · 파일 $($measured.Count)개 · 바인딩 자립·표기 이주 확인"
 exit 0
