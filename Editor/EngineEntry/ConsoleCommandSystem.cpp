@@ -6366,6 +6366,57 @@ namespace ConsoleCmd
         }
     }
 
+    // 결정적 포즈 고정 — experiment.animpose <fraction>
+    //
+    // ★ 왜 필요한가: 라이브 스키닝의 **그림**을 재려면 포즈가 결정적이어야
+    //   한다. 기존 라이브 게이트는 그 비결정성을 Animator를 **꺼서** 피했고,
+    //   그래서 재는 것이 바인드 포즈였다 — "스키닝 산술의 시각 판정은 이
+    //   게이트 밖"이라고 시나리오 주석이 스스로 적어 뒀다. 그 공백에서
+    //   B4b가 두 번 깨졌다.
+    //
+    // ★ 어떻게 고정하는가: 편집 모드는 GameLogic(0.0f) — delta 0이라 시간이
+    //   안 흐른다(EditorMain 주석). 그 상태에서 m_TimeElapsed를 한 번 박으면
+    //   틱이 매 프레임 **같은 시각의 포즈를 다시 계산**하므로 결과가 안정적이다.
+    //   애니메이터를 끄지 않으므로 프록시가 팔레트를 계속 나른다.
+    static void Cmd_experiment_animpose(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: experiment.animpose <0..1> [클립]\n");
+            return;
+        }
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] experiment.animpose fail 활성 씬 없음\n");
+            return;
+        }
+        const double fraction = std::atof(parts[1].c_str());
+        const int clip = parts.size() >= 3 ? std::atoi(parts[2].c_str()) : 0;
+
+        std::size_t posed = 0;
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            Animator* animator = object->GetComponent<Animator>();
+            if (nullptr == animator || 0 == animator->GetSkeletonSerial()) continue;
+            const double duration = animator->GetClipDuration(clip);
+            if (duration <= 0.0) continue;
+
+            animator->m_AnimIndexChosen = static_cast<uint32_t>(clip);
+            animator->m_TimeElapsed =
+                static_cast<float>(duration * fraction);
+            ++posed;
+            std::printf("[CLI] experiment.animpose %s clip=%d elapsed=%.4f "
+                "duration=%.4f\n",
+                object->GetHashedName().ToString().c_str(), clip,
+                animator->m_TimeElapsed, duration);
+        }
+        std::printf("[CLI] experiment.animpose done posed=%zu fraction=%.4f\n",
+            posed, fraction);
+    }
+
     // 라이브 재생 관측 — experiment.animlive
     //
     // ★ 이 저장소에는 **살아 있는 애니메이터가 실제로 도는가**를 재는 축이
@@ -11580,6 +11631,7 @@ namespace ConsoleCmd
             reg({ "experiment.modelbridge" }, &Cmd_experiment_modelbridge);
             reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
+            reg({ "experiment.animpose" }, &Cmd_experiment_animpose);
             reg({ "experiment.animlive" }, &Cmd_experiment_animlive);
             reg({ "experiment.animtick" }, &Cmd_experiment_animtick);
             reg({ "experiment.animevent" }, &Cmd_experiment_animevent);

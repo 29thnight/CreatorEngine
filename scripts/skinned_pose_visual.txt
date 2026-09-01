@@ -1,0 +1,45 @@
+# 라이브 스키닝 시각 축 (I6-B4-pre)
+#
+# ★ 기존 라이브 게이트가 못 재던 자리를 연다. 그쪽은 애니메이션의 비결정성을
+#   **Animator를 꺼서** 피했고(시나리오 주석에 "스키닝 산술의 시각 판정은 이
+#   게이트 밖"이라고 적혀 있다), 그 공백에서 B4b가 두 번 깨졌다.
+#
+# ★ 결정성은 편집 모드가 준다. GameLogic(0.0f) — delta 0이라 시간이 안 흐르고,
+#   m_TimeElapsed를 한 번 박으면 틱이 매 프레임 같은 시각의 포즈를 다시
+#   계산한다. 애니메이터를 끄지 않으므로 프록시가 팔레트를 계속 나른다.
+#
+# 같은 씬을 두 번 그린다: ①바인드 포즈(애니메이터 끔 — 기존 게이트가 재던 것)
+# ②고정 포즈(애니메이터 켬 + animpose). 둘이 **달라야** 팔레트가 그림에
+# 도달한 것이다. 같으면 포즈가 화면에 못 가고 있다(팔레트 굳음).
+
+scene.switch __SCENE__
+wait 60
+model.load __SKINNED_MODEL__
+wait 120
+model.place __MODEL_NAME__
+wait 60
+# CLI transform은 라이브 프록시에 전파되지 않는다(기존 게이트 실측) —
+# 저작값으로 기록한 뒤 저장·재로드로 반영한다.
+object.transform __MODEL_NAME__ 1.5 0 0 0 0 0 0.3 0.3 0.3
+wait 30
+scene.save __SAVED_SCENE__
+wait 30
+scene.switch __SAVED_SCENE__
+wait 120
+
+# ① 바인드 포즈 — 기존 게이트와 같은 조건(애니메이터 끔).
+object.property __MODEL_NAME__ Animator m_isEnabled false
+wait 60
+dx12.scene
+wait 30
+
+# ② 고정 포즈 — 애니메이터를 켜고 클립 중간에 박는다.
+object.property __MODEL_NAME__ Animator m_isEnabled true
+wait 30
+experiment.animpose 0.5
+wait 60
+experiment.animlive
+wait 10
+dx12.scene
+wait 30
+quit
