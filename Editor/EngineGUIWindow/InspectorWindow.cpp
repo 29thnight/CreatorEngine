@@ -880,9 +880,9 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 {
 	// 현재 트랜스폼 값
-	math::vector4& position = gameObject->Transform_().position;
-	math::vector4& rotation = gameObject->Transform_().rotation;
-	math::vector4& scale = gameObject->Transform_().scale;
+	math::vector4 position = gameObject->Transform_().GetPositionValue();
+	math::vector4 rotation = gameObject->Transform_().GetRotationValue();
+	math::vector4 scale = gameObject->Transform_().GetScaleValue();
 
 	// ===== POSITION =====
 	static bool editingPosition = false;
@@ -909,7 +909,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 				prevPosition = position;
 				editingPosition = true;
 			}
-			gameObject->Transform_().SetDirty();
+			gameObject->Transform_().SetPositionValue(
+				position, TransformWriteReason::Inspector);
 		}
 		if (editingPosition && ImGui::IsItemDeactivatedAfterEdit())
 		{
@@ -917,13 +918,13 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 			{
 				Meta::MakeCustomChangeCommand([=]
 				{
-					gameObject->Transform_().position = prevPosition;
-					gameObject->Transform_().SetDirty();
+					gameObject->Transform_().SetPositionValue(
+						prevPosition, TransformWriteReason::Inspector);
 				},
 				[=]
 				{
-					gameObject->Transform_().position = position;
-					gameObject->Transform_().SetDirty();
+					gameObject->Transform_().SetPositionValue(
+						position, TransformWriteReason::Inspector);
 				});
 			}
 			editingPosition = false;
@@ -969,7 +970,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 			const math::quaternion combined = delta * current;
 			rotation = math::vector4{
 				combined.x, combined.y, combined.z, combined.w };
-			gameObject->Transform_().SetDirty();
+			gameObject->Transform_().SetRotationValue(
+				rotation, TransformWriteReason::Inspector);
 		}
 		if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
 		{
@@ -984,13 +986,13 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 			{
 				Meta::MakeCustomChangeCommand([=]
 				{
-					gameObject->Transform_().rotation = prevRotation;
-					gameObject->Transform_().SetDirty();
+					gameObject->Transform_().SetRotationValue(
+						prevRotation, TransformWriteReason::Inspector);
 				},
 				[=]
 				{
-					gameObject->Transform_().rotation = rotation;
-					gameObject->Transform_().SetDirty();
+					gameObject->Transform_().SetRotationValue(
+						rotation, TransformWriteReason::Inspector);
 				});
 			}
 			editingRotation = false;
@@ -1008,7 +1010,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 				prevScale = scale;
 				editingScale = true;
 			}
-			gameObject->Transform_().SetDirty();
+			gameObject->Transform_().SetScaleValue(
+				scale, TransformWriteReason::Inspector);
 		}
 		if (editingScale && ImGui::IsItemDeactivatedAfterEdit())
 		{
@@ -1016,13 +1019,13 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 			{
 				Meta::MakeCustomChangeCommand([=]
 				{
-					gameObject->Transform_().scale = prevScale;
-					gameObject->Transform_().SetDirty();
+					gameObject->Transform_().SetScaleValue(
+						prevScale, TransformWriteReason::Inspector);
 				},
 				[=]
 				{
-					gameObject->Transform_().scale = scale;
-					gameObject->Transform_().SetDirty();
+					gameObject->Transform_().SetScaleValue(
+						scale, TransformWriteReason::Inspector);
 				});
 			}
 			editingScale = false;
@@ -1045,10 +1048,12 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 	{
 		if (ImGui::MenuItem("Reset Transform"))
 		{
-			gameObject->Transform_().position = { 0, 0, 0, 1 };
-			gameObject->Transform_().rotation = { 0.f, 0.f, 0.f, 1.f };
-			gameObject->Transform_().scale = { 1, 1, 1, 1 };
-			gameObject->Transform_().SetDirty();
+			gameObject->Transform_().SetPositionValue(
+				{ 0.f, 0.f, 0.f, 1.f }, TransformWriteReason::Inspector);
+			gameObject->Transform_().SetRotationValue(
+				{ 0.f, 0.f, 0.f, 1.f }, TransformWriteReason::Inspector);
+			gameObject->Transform_().SetScaleValue(
+				{ 1.f, 1.f, 1.f, 1.f }, TransformWriteReason::Inspector);
 			gameObject->Transform_().UpdateLocalMatrix();
 			ImGui::CloseCurrentPopup();
 		}

@@ -550,7 +550,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			const bool matrixChanged = !(oldLocalMatrix == newLocalMatrix);
 			if (!(deltaMat == math::matrix4x4::identity()))
 			{
-				obj->Transform_().SetLocalMatrix(newLocalMatrix);
+			obj->Transform_().SetLocalMatrix(
+				newLocalMatrix, TransformWriteReason::Gizmo);
 				const math::matrix4x4 newWorld =
 					obj->Transform_().GetWorldMatrix();
 				auto itSelf = startWorldMatrices.find(obj);
@@ -571,7 +572,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 								math::translation_matrix(offset);
 							const math::matrix4x4 targetLocal = targetWorld *
 								math::inverse(ResolveParentWorldMatrix(target));
-							target->Transform_().SetLocalMatrix(targetLocal);
+			target->Transform_().SetLocalMatrix(
+				targetLocal, TransformWriteReason::Gizmo);
 						}
 					}
 				}
@@ -582,11 +584,13 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				Meta::MakeCustomChangeCommand(
 					[=]
 					{
-						obj->Transform_().SetLocalMatrix(oldLocalMatrix);
+				obj->Transform_().SetLocalMatrix(
+					oldLocalMatrix, TransformWriteReason::Gizmo);
 					},
 					[=]
 					{
-						obj->Transform_().SetLocalMatrix(newLocalMatrix);
+				obj->Transform_().SetLocalMatrix(
+					newLocalMatrix, TransformWriteReason::Gizmo);
 				}
 				);
 			}
@@ -623,9 +627,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		auto selectedObjects = scene->m_selectedEntities;
 		for (auto* target : selectedObjects)
 		{
-			target->Transform_().SetWorldRotation(cam->rotate);
+		target->Transform_().SetWorldRotation(
+			cam->rotate, TransformWriteReason::Gizmo);
 
-			target->Transform_().SetWorldPosition(cam->m_eyePosition);
+		target->Transform_().SetWorldPosition(
+			cam->m_eyePosition, TransformWriteReason::Gizmo);
 		}
 	}
 	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
@@ -770,7 +776,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 					if (payload->IsPreview() && dragPreviewObject)
 					{
-						dragPreviewObject->Transform_().SetPosition(worldPos);
+		dragPreviewObject->Transform_().SetPosition(
+			worldPos, TransformWriteReason::Gizmo);
 					}
 				}
 

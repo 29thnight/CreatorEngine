@@ -857,7 +857,11 @@ void PhysicsManager::SetPhysicData()
 void PhysicsManager::GetPhysicData()
 {
 	//Benchmark bm;
-	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
+	Scene* scene = SceneManagers->GetActiveScene();
+	if (!scene) return;
+	auto& Container = scene->m_colliderContainer;
+	std::vector<TransformWorldWrite> worldWrites;
+	worldWrites.reserve(Container.size());
 	for (auto& [id, ColliderInfo] : Container) {
 
 		if (nullptr == ColliderInfo.gameObject)
@@ -877,7 +881,7 @@ void PhysicsManager::GetPhysicData()
 
 		auto rigidbody = ColliderInfo.gameObject->GetComponent<RigidBodyComponent>();
 		auto& transform = ColliderInfo.gameObject->Transform_();
-		auto offset = ColliderInfo.collider->GetPositionOffset();
+		if (!rigidbody) continue;
 
 
 		if (rigidbody->GetBodyType() != EBodyType::DYNAMIC)
@@ -897,7 +901,10 @@ void PhysicsManager::GetPhysicData()
 
 			controller->SetFalling(movement.isFall);
 			rigidbody->SetLinearVelocity(movement.velocity);
-			transform.SetPosition(position);
+		worldWrites.push_back(TransformWorldWrite{
+			scene->HandleOf(ColliderInfo.gameObject->m_index),
+			math::compose(transform.GetWorldScale(),
+				transform.GetWorldQuaternion(), position) });
 		}
 		else
 		{
@@ -927,9 +934,14 @@ void PhysicsManager::GetPhysicData()
 			const math::matrix4x4 matrix =
 				math::compose(data.scale, pureWorldRot, pureWorldPos);
 
-			transform.SetAndDecomposeMatrix(matrix, true);
+		worldWrites.push_back(TransformWorldWrite{
+			scene->HandleOf(ColliderInfo.gameObject->m_index), matrix });
 		}
 	}
+	// X7: PhysX 결과를 한 잠금/한 spatial epoch으로 publish한다. Scene이
+	// compiled parent order로 정렬해 parent+child 동시 write도 결정론적으로
+	// local을 역산하고 world cache를 즉시 맞춘다.
+	scene->ApplyWorldWriteBatch(worldWrites, TransformWriteReason::Physics);
 	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;
 }
 
@@ -939,7 +951,11 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 	if (!Physics || m_pendingControllerPositions.empty()) return;
 
 	// ID를 통해 게임오브젝트를 찾기 위해 콜라이더 컨테이너에 접근합니다.
-	auto& colliderContainer = SceneManagers->GetActiveScene()->m_colliderContainer;
+	Scene* scene = SceneManagers->GetActiveScene();
+	if (!scene) return;
+	auto& colliderContainer = scene->m_colliderContainer;
+	std::vector<TransformWorldWrite> worldWrites;
+	worldWrites.reserve(m_pendingControllerPositions.size());
 
 	for (const auto& change : m_pendingControllerPositions)
 	{
@@ -953,13 +969,15 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 			auto& colliderInfo = it->second;
 			if (colliderInfo.gameObject)
 			{
-				// 3. (핵심) 게임오브젝트의 Transform 컴포넌트 위치도 즉시 동기화합니다.
-				// CCT의 경우 일반적으로 오프셋이 없거나, 있더라도 순간이동은 기준점을 기준으로 하는 것이 명확합니다.
-				// 만약 오프셋을 고려해야 한다면, change.position에서 오프셋을 빼준 값을 SetWorldPosition에 넘겨주어야 합니다.
-				colliderInfo.gameObject->Transform_().SetWorldPosition(change.position);
+				Transform& transform = colliderInfo.gameObject->Transform_();
+				worldWrites.push_back(TransformWorldWrite{
+					scene->HandleOf(colliderInfo.gameObject->m_index),
+					math::compose(transform.GetWorldScale(),
+						transform.GetWorldQuaternion(), change.position) });
 			}
 		}
 	}
+	scene->ApplyWorldWriteBatch(worldWrites, TransformWriteReason::Physics);
 
 	m_pendingControllerPositions.clear();
 }

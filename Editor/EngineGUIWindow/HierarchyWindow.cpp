@@ -135,22 +135,23 @@ HierarchyWindow::HierarchyWindow()
 						{
 							auto obj = scene->CreateEntity("Directional Light", GameObjectType::Light);
 							auto comp = obj->AddComponent<LightComponent>();
-							comp->m_lightType = LightType::DirectionalLight;
+							comp->SetLightType(LightType::DirectionalLight);
 							comp->m_lightStatus = LightStatus::Enabled;
 						}
 						if (ImGui::MenuItem("		Point Light"))
 						{
 							auto obj = scene->CreateEntity("Point Light", GameObjectType::Light);
 							auto comp = obj->AddComponent<LightComponent>();
-							comp->m_lightType = LightType::PointLight;
+							comp->SetLightType(LightType::PointLight);
 							comp->m_lightStatus = LightStatus::Enabled;
 						}
 						if (ImGui::MenuItem("		Spot Light"))
 						{
 							auto obj = scene->CreateEntity("Spot Light", GameObjectType::Light);
-							obj->Transform_().SetRotation({ 0.7, 0, 0, 1 });
+	obj->Transform_().SetRotation(
+		{ 0.7, 0, 0, 1 }, TransformWriteReason::Inspector);
 							auto comp = obj->AddComponent<LightComponent>();
-							comp->m_lightType = LightType::SpotLight;
+							comp->SetLightType(LightType::SpotLight);
 							comp->m_lightStatus = LightStatus::Enabled;
 						}
 						ImGui::EndMenu();
@@ -343,17 +344,11 @@ HierarchyWindow::HierarchyWindow()
 						// 역참조 없이 포기한다.
 						if (sceneGameObject && draggedObj)
 						{
-							// 최상위 오브젝트도 부모로 씬 루트(0)를 가리킨다(E8).
-							auto oldParent = scene->GetEntity(draggedObj->GetParentIndex());
-							if (!oldParent) oldParent = scene->GetEntity(Entity::kSceneRootIndex);
-							if (oldParent)
+							const ReparentResult result = scene->Reparent(
+								scene->HandleOf(draggedObj->m_index),
+								scene->HandleOf(sceneGameObject->m_index));
+							if (ReparentResult::Success == result)
 							{
-								// 1. 기존 부모에서 제거
-								oldParent->DetachChildIndex(draggedIndex);
-
-								// 2. 새로운 부모에 추가
-								draggedObj->SetParentIndex(Entity::kSceneRootIndex);
-								sceneGameObject->AttachChildIndex(draggedIndex);
 								if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
 								{
 									rect->SetParentKeepWorldPosition(sceneGameObject);
@@ -556,18 +551,11 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
 				// 이미 파괴된 슬롯을 가리키면 draggedObj/oldParent가 nullptr일 수 있다.
 				if (draggedObj)
 				{
-					auto oldParent = scene->GetEntity(draggedObj->GetParentIndex());
-					if (!oldParent) oldParent = scene->GetEntity(Entity::kSceneRootIndex);
-					if (oldParent)
+					const ReparentResult result = scene->Reparent(
+						scene->HandleOf(draggedObj->m_index),
+						scene->HandleOf(obj->m_index));
+					if (ReparentResult::Success == result)
 					{
-						// 1. 기존 부모에서 제거
-						oldParent->DetachChildIndex(draggedIndex);
-
-						// 2. 새로운 부모에 추가
-						draggedObj->SetParentIndex(obj->m_index);
-
-						obj->AttachChildIndex(draggedIndex);
-
 						if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
 						{
 							rect->SetParentKeepWorldPosition(obj);

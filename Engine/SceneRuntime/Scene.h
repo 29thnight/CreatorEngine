@@ -11,6 +11,7 @@
 #include "TransformStore.h"
 #include "HierarchyStore.h"
 #include "DetachedEntityTransfer.h"
+#include "RenderProxyDirty.h"
 #include "EBodyType.h"
 #include <mathematics/rect.hpp>
 // Entity.h를 온전히 include한다 — ReflectScene의 meta_property(m_Entities)가
@@ -21,6 +22,11 @@
 // (EntityAt 우회 — Entity.inl 상단 주석 참고). 이 자급자족은
 // HeaderSelfSufficiency.cpp가 상시 검증한다.
 #include "Entity.h"
+#include <array>
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <span>
 #include <unordered_map>
 
 #pragma region forward_decl
@@ -40,12 +46,11 @@ class MeshRenderer;
 class RigidBodyComponent;
 class TerrainComponent;
 class FoliageComponent;
+class DecalComponent;
+class SpriteRenderer;
 class ImageComponent;
 class TextComponent;
-class DecalComponent;
-// S4의 스냅샷 버퍼가 포인터로만 쓴다 — 완전 정의는 필요 없다.
 class SpriteSheetComponent;
-class SpriteRenderer;
 class ReferenceAssets;
 class BoxColliderComponent;
 class SphereColliderComponent;
@@ -53,7 +58,218 @@ class CapsuleColliderComponent;
 class MeshColliderComponent;
 class CharacterControllerComponent;
 class TerrainColliderComponent;
+class Animator;
+struct TransformExecutionGraphState;
+struct SceneRenderRegistryState;
 #pragma endregion forward_decl
+
+enum class TransformSyncPoint : uint8_t
+{
+	Unspecified,
+	FixedUpdate,
+	PreUpdate,
+	LateUpdate,
+	SceneLoad,
+	Benchmark,
+	Count
+};
+
+struct TransformTopologyMutationCounters
+{
+	// Scene graph membership changes, not GameObject allocation lifetime. A
+	// cross-scene/DDOL transfer is therefore one removal plus one insertion.
+	uint64_t created = 0;
+	uint64_t destroyed = 0;
+	uint64_t reparented = 0;
+};
+
+enum class ReparentResult : uint8_t
+{
+	Success,
+	NoChange,
+	InvalidHandle,
+	StaleHandle,
+	CrossScene,
+	RootRejected,
+	SelfRejected,
+	CycleRejected,
+	CorruptHierarchy
+};
+
+const char* ReparentResultName(ReparentResult result);
+
+struct HierarchyIntegrityMetrics
+{
+	uint64_t parentChildMismatch = 0;
+	uint64_t orphan = 0;
+	uint64_t duplicateChild = 0;
+	uint64_t invalidReference = 0;
+
+	uint64_t Total() const
+	{
+		return parentChildMismatch + orphan + duplicateChild + invalidReference;
+	}
+};
+
+// TransformUpdatePlan X4의 compiled projection 진단 표면. ExecIndex와 packed
+// 배열 자체는 Scene.cpp의 비공개 상태에만 존재한다. 외부에는 stable EntityHandle과
+// 집계만 노출해 실행 위치가 저작 identity/직렬화 포맷으로 새지 않게 한다.
+struct ExecutionGraphCompileMetrics
+{
+	bool success = false;
+	uint64_t topologyVersion = 0;
+	uint64_t compiledVersion = 0;
+	uint64_t compileCount = 0;
+	double compileUs = 0.0;
+	uint64_t entitySlots = 0;
+	uint64_t occupiedEntities = 0;
+	uint64_t spatialNodes = 0;
+	uint64_t layoutNodes = 0;
+	uint64_t transformlessSpatial = 0;
+	uint64_t nonLayoutMember = 0;
+	uint64_t mappingViolations = 0;
+	uint64_t parentOrderViolations = 0;
+	uint64_t subtreeRangeViolations = 0;
+	uint64_t hierarchyViolations = 0;
+	uint64_t unreachableEntities = 0;
+	uint64_t cycleViolations = 0;
+
+	uint64_t TotalViolations() const
+	{
+		return transformlessSpatial + nonLayoutMember + mappingViolations
+			+ parentOrderViolations + subtreeRangeViolations
+			+ hierarchyViolations + unreachableEntities + cycleViolations;
+	}
+};
+
+struct ExecutionGraphRelationDiagnostics
+{
+	bool spatialMember = false;
+	bool layoutMember = false;
+	EntityHandle spatialParent{};
+	EntityHandle layoutParent{};
+	uint32_t spatialSubtreeSize = 0;
+	uint32_t layoutSubtreeSize = 0;
+};
+
+struct SpatialResolveMetrics
+{
+	bool resolved = false;
+	bool sparseRequested = false;
+	bool sparseExecuted = false;
+	bool legacyFallback = false;
+	bool fullResolve = false;
+	double resolveUs = 0.0;
+	uint64_t dirtyRequests = 0;
+	uint64_t staleRequests = 0;
+	uint64_t canonicalRanges = 0;
+	uint64_t mergedRequests = 0;
+	uint64_t resolvedNodes = 0;
+	uint64_t localComposes = 0;
+	uint64_t worldWrites = 0;
+};
+
+struct SpatialPullMetrics
+{
+	bool attempted = false;
+	bool resolved = false;
+	bool packed = false;
+	bool legacyFallback = false;
+	bool staleHandle = false;
+	bool queuePreserved = false;
+	bool propagationSignalPreserved = false;
+	uint64_t pathNodes = 0;
+	uint64_t recomputedNodes = 0;
+	uint64_t localComposes = 0;
+	uint64_t worldWrites = 0;
+	uint64_t pendingRequestsBefore = 0;
+	uint64_t pendingRequestsAfter = 0;
+	uint64_t dirtyEpochBefore = 0;
+	uint64_t dirtyEpochAfter = 0;
+};
+
+// TransformUpdatePlan X7: worker pose/physics 결과를 frame barrier 뒤 packed
+// transform storage에 합치는 계측이다. bindLookups는 skeleton serial 또는
+// topology가 바뀐 binding pass에서만 증가해야 하며 steady pose upload에서는 0이다.
+struct AnimatorPoseUploadMetrics
+{
+	bool attempted = false;
+	bool uploaded = false;
+	bool packed = false;
+	bool legacyFallback = false;
+	bool rebound = false;
+	bool disabled = false;
+	bool staleOwner = false;
+	bool skeletonMissing = false;
+	uint64_t skeletonSerial = 0;
+	uint64_t bindLookups = 0;
+	uint64_t validBones = 0;
+	uint64_t invalidBones = 0;
+	uint64_t localWrites = 0;
+	uint64_t queuedRoots = 0;
+};
+
+struct TransformWorldWrite
+{
+	EntityHandle target{};
+	math::matrix4x4 world{ math::matrix4x4::identity() };
+};
+
+struct TransformBulkWriteMetrics
+{
+	TransformWriteReason reason = TransformWriteReason::CppSetter;
+	bool packed = false;
+	bool legacyFallback = false;
+	uint64_t requested = 0;
+	uint64_t accepted = 0;
+	uint64_t stale = 0;
+	uint64_t localWrites = 0;
+	uint64_t worldWrites = 0;
+	uint64_t queuedRoots = 0;
+	uint64_t epochAdvances = 0;
+};
+
+// TransformUpdatePlan X0 진단 스냅샷. ui/spatial/dispatch는 한 번의 sync가 실제로
+// 걸린 wall time이고, visit/compose/multiply/decompose는 병렬 worker에서 합산한
+// CPU work다. 따라서 worker 합계를 wall time에 다시 더하면 안 된다.
+struct TransformUpdateMetrics
+{
+	TransformSyncPoint syncPoint = TransformSyncPoint::Unspecified;
+	bool uiDomainResolved = false;
+	bool spatialDomainResolved = false;
+	double totalUs = 0.0;
+	double uiUs = 0.0;
+	double spatialUs = 0.0;
+	double dispatchUs = 0.0;
+	double visitWorkerUs = 0.0;
+	double localComposeWorkerUs = 0.0;
+	double worldMultiplyWorkerUs = 0.0;
+	double decomposeWorkerUs = 0.0;
+
+	uint64_t spatialVisitCount = 0;
+	uint64_t localComposeCount = 0;
+	uint64_t worldMultiplyCount = 0;
+	uint64_t decomposeCount = 0;
+	uint64_t rootDispatchCount = 0;
+
+	uint64_t entityCount = 0;
+	uint64_t transformOnlyCount = 0;
+	uint64_t rectOnlyCount = 0;
+	uint64_t transformAndRectCount = 0;
+	uint64_t neitherCount = 0;
+	uint64_t transformDirtyCount = 0;
+	uint64_t rectDirtyCount = 0;
+};
+
+struct TransformWriteMetrics
+{
+	uint64_t publishEpoch = 0;
+	uint64_t windowStartEpoch = 0;
+	uint64_t total = 0;
+	uint64_t invalidHandle = 0;
+	std::array<uint64_t, kTransformWriteReasonCount> byReason{};
+};
+
 class Scene
 {
    public:
@@ -67,6 +283,22 @@ class Scene
            meta::field<&Self::m_requiredLoadAssetsBundle>);
    }
 public:
+	class HierarchyBulkBuildScope
+	{
+	public:
+		~HierarchyBulkBuildScope();
+		void Complete() noexcept;
+		HierarchyBulkBuildScope(const HierarchyBulkBuildScope&) = delete;
+		HierarchyBulkBuildScope& operator=(const HierarchyBulkBuildScope&) = delete;
+		HierarchyBulkBuildScope(HierarchyBulkBuildScope&& other) noexcept;
+		HierarchyBulkBuildScope& operator=(HierarchyBulkBuildScope&&) = delete;
+
+	private:
+		friend class Scene;
+		explicit HierarchyBulkBuildScope(Scene& scene);
+		Scene* m_scene = nullptr;
+	};
+
 	Scene();
 	~Scene();
 
@@ -91,6 +323,21 @@ public:
     // index가 가리키는 슬롯의 현재 EntityHandle. 슬롯이 비어 있으면(범위 밖·
     // tombstone) 무효 핸들을 돌려준다.
     EntityHandle HandleOf(Entity::Index index) const;
+	ReparentResult Reparent(EntityHandle child, EntityHandle newParent);
+	uint64_t GetTopologyVersion() const
+	{
+		return m_topologyVersion.load(std::memory_order_acquire);
+	}
+	HierarchyIntegrityMetrics GetHierarchyIntegrityMetrics() const;
+	const ExecutionGraphCompileMetrics& GetExecutionGraphCompileMetrics() const;
+	ExecutionGraphRelationDiagnostics GetExecutionGraphRelationDiagnostics(
+		EntityHandle entity) const;
+	// Engine component ownership paths call this when Transform/Rect/Canvas membership
+	// changes without a hierarchy edit. It only publishes derived topology dirtiness.
+	void RecordExecutionGraphMembershipChanged();
+	const SpatialResolveMetrics& GetLastSpatialResolveMetrics() const;
+	const SpatialPullMetrics& GetLastSpatialPullMetrics() const;
+	HierarchyBulkBuildScope BeginHierarchyBulkBuild();
     // 슬롯 점유자만 확인하는 raw 접근자
     // (SceneGraphRedesignPlan §4 트랙 S, S1). Transform::ResolveStore가 매
     // 접근마다 "이 슬롯의 진짜 점유자가 나 자신인가"를 확인하는 핫패스라
@@ -136,6 +383,10 @@ public:
 	void CommitRenderProxies();
 	// 커밋 대상 컴포넌트 총수 — 벤치가 "무엇을 얼마나 쟀는지" 함께 보고한다.
 	size_t RenderProxyComponentCount() const;
+	bool PublishRenderProxyDirty(Component* component, ProxyDirty dirty);
+	size_t PublishRenderProxyDirty(EntityHandle owner, ProxyDirty dirty);
+	RenderProxyCommitMetrics GetRenderProxyCommitMetrics() const;
+	void ResetRenderProxyCommitMetrics();
 	void InternalPauseUpdateForUI();
 
     // CreateEntities(일괄 생성)·InsertEntities(직삽입)는 호출자 0으로 확인돼
@@ -185,18 +436,13 @@ private:
     // SceneGraph 계층의 유일 정본. Entity는 슬롯/정체성과 컴포넌트만 보유하고,
     // 런타임 읽기·쓰기와 YAML 어댑터가 모두 이 Store를 사용한다(H3).
     HierarchyStore m_hierarchyStore;
-
-    // 렌더 프록시 커밋의 스냅샷 버퍼 (트랙 S · S4). CommitRenderProxies가 매
-    // 프레임 지역 벡터 8개를 새로 만들던 것을 멤버로 올려 capacity를 재사용한다
-    // — 실측 근거는 그쪽 주석. 직렬화 대상이 아니다(reflect()에 넣지 않는다).
-    std::vector<MeshRenderer*>        m_scratchMeshRenderers;
-    std::vector<TerrainComponent*>    m_scratchTerrains;
-    std::vector<FoliageComponent*>    m_scratchFoliages;
-    std::vector<ImageComponent*>      m_scratchImages;
-    std::vector<TextComponent*>       m_scratchTexts;
-    std::vector<SpriteRenderer*>      m_scratchSpriteRenderers;
-    std::vector<SpriteSheetComponent*> m_scratchSpriteSheets;
-    std::vector<DecalComponent*>      m_scratchDecals;
+	// X4 derived projection. PIMPL로 ExecIndex와 packed 배열을 이 헤더 밖에 가둔다.
+	// reflect()에 없으므로 Entity slot/generation 및 디스크 identity와 독립이다.
+	std::unique_ptr<TransformExecutionGraphState> m_executionGraphs;
+	// 렌더 컴포넌트 membership, light index 부기, 재사용 snapshot을 한 도메인으로
+	// 묶는다. Scene은 Entity와 phase orchestration만 드러내고 구체 컨테이너는
+	// Scene.cpp에 가둔다. 직렬화 대상이 아니다(reflect()에 넣지 않는다).
+	std::unique_ptr<SceneRenderRegistryState> m_renderRegistry;
 
     // 슬롯 할당 단일점. free 리스트가 있으면 재사용하고(세대는 해제 시 이미
     // 올라가 있다), 없으면 새로 늘린다. CreateEntity/AddEntity/
@@ -464,6 +710,12 @@ public:
 public:
 	void CollectDecalComponent(DecalComponent* ptr);
 	void UnCollectDecalComponent(DecalComponent* ptr);
+	void CollectImageComponent(ImageComponent* ptr);
+	void UnCollectImageComponent(ImageComponent* ptr);
+	void CollectTextComponent(TextComponent* ptr);
+	void UnCollectTextComponent(TextComponent* ptr);
+	void CollectSpriteSheetComponent(SpriteSheetComponent* ptr);
+	void UnCollectSpriteSheetComponent(SpriteSheetComponent* ptr);
 
 public:
 	void CollectRigidBodyComponent(RigidBodyComponent* ptr);
@@ -484,10 +736,10 @@ public:
 	void UnCollectColliderComponent(CharacterControllerComponent* ptr);
 	void UnCollectColliderComponent(TerrainColliderComponent* ptr);
 
-	std::vector<BoxColliderComponent*>& GetBoxColliderComponents() { return m_boxColliderComponents; }
-	std::vector<SphereColliderComponent*>& GetSphereColliderComponents() { return m_sphereColliderComponents; }
-	std::vector<CapsuleColliderComponent*>& GetCapsuleColliderComponents() { return m_capsuleColliderComponents; }
-	std::vector<CharacterControllerComponent*>& GetCharacterControllerComponents() { return m_characterControllerComponents; }
+	std::span<BoxColliderComponent* const> GetBoxColliderComponents() const;
+	std::span<SphereColliderComponent* const> GetSphereColliderComponents() const;
+	std::span<CapsuleColliderComponent* const> GetCapsuleColliderComponents() const;
+	std::span<CharacterControllerComponent* const> GetCharacterControllerComponents() const;
 
 public:
 	void AddCanvas(Entity* canvas);
@@ -502,14 +754,21 @@ public:
 private:
     void DestroyEntities();
 	void DestroyComponents();
+	std::span<MeshRenderer* const> MeshRendererComponents() const;
+	std::span<FoliageComponent* const> FoliageComponents() const;
+	bool EnsureExecutionGraphsCompiled();
+	bool CompileExecutionGraphs(uint64_t topologyVersion);
 	std::string GenerateUniqueEntityName(const std::string_view& name);
 	void RemoveEntityName(const std::string_view& name);
     // parentChanged: S2(dirty push / lazy pull) — 부모가 이번 순회에서 실제로
     // 바뀌었는지(재계산했는지) 자식에게 물려주는 신호. true면 이 노드는 dirty
     // 여부와 무관하게 재계산한다. 옛 이름은 recursive였고 실제로는 쓰이지 않는
     // 표지였다 — 지금은 진짜로 소비하는 값이라 이름을 바꿨다.
-    void UpdateModelRecursive(Entity::Index entityIndex, math::matrix4x4 model, bool parentChanged = false,
-        std::unordered_set<Entity::Index>* visited = nullptr, int depth = 0);
+	struct TransformUpdateAccumulator;
+	void UpdateModelRecursive(Entity::Index entityIndex, math::matrix4x4 model,
+		bool parentChanged = false,
+		std::unordered_set<Entity::Index>* visited = nullptr, int depth = 0,
+		TransformUpdateAccumulator* diagnostics = nullptr);
 
 	// UI 레이아웃 순회의 유일한 구현. 부모의 rect·배율·변경 여부를 받아 자신을
 	// 계산하고 자식으로 내려간다(PHASE 7-5).
@@ -549,8 +808,65 @@ private:
 	void SetInternalPhysicData();
 
 public:
-    void AllUpdateWorldMatrix();
+	void AllUpdateWorldMatrix(
+		TransformSyncPoint syncPoint = TransformSyncPoint::Unspecified);
 	void AllUIUpdateWorldMatrix();
+	void SyncDerivedState(
+		TransformSyncPoint syncPoint = TransformSyncPoint::Unspecified);
+	bool ResolveSpatialTransforms();
+	bool EnsureResolved(EntityHandle target);
+	AnimatorPoseUploadMetrics PublishAnimatorPose(Animator& animator);
+	TransformBulkWriteMetrics ApplyWorldWriteBatch(
+		std::span<const TransformWorldWrite> writes, TransformWriteReason reason);
+	void MarkUILayoutDirty();
+	void MarkSpatialTransformsDirty();
+	static void SetSparseSpatialResolverEnabled(bool enabled)
+	{
+		s_sparseSpatialResolverEnabled.store(enabled, std::memory_order_release);
+	}
+	static bool IsSparseSpatialResolverEnabled()
+	{
+		return s_sparseSpatialResolverEnabled.load(std::memory_order_acquire);
+	}
+
+	// X0 계측은 명시적으로 켠 동안에만 노드별 clock/atomic 비용을 낸다.
+	static void SetTransformDiagnosticsEnabled(bool enabled)
+	{
+		s_transformDiagnosticsEnabled.store(enabled, std::memory_order_relaxed);
+	}
+	static bool IsTransformDiagnosticsEnabled()
+	{
+		return s_transformDiagnosticsEnabled.load(std::memory_order_relaxed);
+	}
+	const TransformUpdateMetrics& GetLastTransformUpdateMetrics(
+		TransformSyncPoint syncPoint) const;
+	TransformTopologyMutationCounters GetTopologyMutationTotals() const;
+	TransformTopologyMutationCounters GetTransformDiagnosticTopologyMutations() const;
+	uint64_t GetTransformDiagnosticFrameCount() const
+	{
+		return m_transformDiagnosticFrameCount;
+	}
+	const TransformTopologyMutationCounters& GetLastFrameTopologyMutations() const
+	{
+		return m_lastFrameTopologyMutations;
+	}
+	void ResetTransformDiagnostics();
+
+	// X1 reason 계측 toggle. X2부터 publication 자체는 항상 spatial epoch를 올리고,
+	// 이 toggle은 reason/invalid-handle 진단 atomic만 켜고 끈다.
+	static void SetTransformWriteDiagnosticsEnabled(bool enabled)
+	{
+		s_transformWriteDiagnosticsEnabled.store(enabled, std::memory_order_relaxed);
+	}
+	static bool IsTransformWriteDiagnosticsEnabled()
+	{
+		return s_transformWriteDiagnosticsEnabled.load(std::memory_order_relaxed);
+	}
+	bool PublishLocalWrite(EntityHandle handle, TransformWriteReason reason);
+	uint64_t PublishLocalWriteBatch(
+		std::span<const EntityHandle> handles, TransformWriteReason reason);
+	TransformWriteMetrics GetTransformWriteMetrics() const;
+	void ResetTransformWriteDiagnostics();
 
     // A/B 토글(SceneGraphRedesignPlan §4 트랙 S, S2) — dirty 인지 순회(새 경로)와
     // 항상 재계산하던 옛 경로를 같은 바이너리에서 전환한다. 기본 켬(1). 콘솔
@@ -562,8 +878,9 @@ public:
     static void SetDirtyTraversalEnabled(bool enabled) { s_dirtyTraversalEnabled = enabled; }
     static bool IsDirtyTraversalEnabled() { return s_dirtyTraversalEnabled; }
 
-    // A/B 토글(트랙 E, E7-b) — 뼈 인덱스 캐시(새 경로)와 매 프레임
+    // A/B 토글(트랙 E, E7-b) — recursive fallback의 뼈 인덱스 캐시와 매 프레임
     // Skeleton::FindBone을 다시 도는 옛 경로를 같은 바이너리에서 전환한다.
+    // X7 packed resolver는 이 토글과 무관하게 binding pass에서만 해석한다.
     // 기본 켬(1). 콘솔 scene.bonecache 0|1이 유일한 쓰기 지점이다.
     //
     // 끄면 UpdateModelRecursive의 Bone 분기가 캐시 적중 여부를 묻지 않고 항상
@@ -583,32 +900,76 @@ public:
 	//
 	// 레이아웃은 부모→자식 의존 사슬이라 병렬화할 대상이 아니다. 여기서 직렬로
 	// 한 번 돌고, 트랜스폼 행렬 갱신(비-UI)만 예전처럼 병렬로 남긴다.
-	void UpdateUILayout();
+	bool UpdateUILayout();
 
 	// 한 서브트리만 즉시 레이아웃한다. 프레임 패스를 기다릴 수 없는 곳
 	// (에디터 드래그, UI 생성 직후)에서 쓴다. 순회 규칙은 프레임 패스와 공유한다.
 	void LayoutUISubtree(Entity* root);
 
 private:
+	static constexpr size_t kTransformSyncPointCount =
+		static_cast<size_t>(TransformSyncPoint::Count);
+	static constexpr size_t TransformSyncPointIndex(TransformSyncPoint syncPoint)
+	{
+		return static_cast<size_t>(syncPoint);
+	}
+	void CaptureTransformSceneCensus(TransformUpdateMetrics& metrics) const;
+	void RecordTopologyCreated();
+	void RecordTopologyDestroyed();
+	void RecordTopologyReparented();
+	void PublishTopologyMutation();
+	void EnterHierarchyBulkBuild();
+	void ExitHierarchyBulkBuild();
+	bool ResolveSpatialTransforms(
+		TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics);
+	bool ResolveSpatialTransformsLegacy(uint64_t dirtyEpoch,
+		TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics,
+		SpatialResolveMetrics& sparseMetrics);
+	bool ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
+		std::vector<EntityHandle> dirtyRoots, bool forceFull,
+		TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics,
+		SpatialResolveMetrics& sparseMetrics);
+	uint64_t TakeSpatialDirtySnapshot(
+		std::vector<EntityHandle>& dirtyRoots, bool& forceFull);
+
     // scene.dirtytraversal 콘솔 토글의 저장소 (위 IsDirtyTraversalEnabled 참고).
     // C++17 inline 정적 멤버 — 별도 .cpp 정의가 필요 없다.
     static inline bool s_dirtyTraversalEnabled = true;
 
     // scene.bonecache 콘솔 토글의 저장소 (위 IsBoneCacheEnabled 참고).
     static inline bool s_boneCacheEnabled = true;
+	static inline std::atomic_bool s_transformDiagnosticsEnabled = false;
+	static inline std::atomic_bool s_transformWriteDiagnosticsEnabled = false;
+	static inline std::atomic_bool s_sparseSpatialResolverEnabled = true;
+
+	std::array<TransformUpdateMetrics, kTransformSyncPointCount>
+		m_transformUpdateMetrics{};
+	std::atomic<uint64_t> m_topologyCreated{ 0 };
+	std::atomic<uint64_t> m_topologyDestroyed{ 0 };
+	std::atomic<uint64_t> m_topologyReparented{ 0 };
+	std::atomic<uint64_t> m_topologyVersion{ 0 };
+	uint32_t m_hierarchyBulkBuildDepth = 0;
+	bool m_hierarchyBulkBuildMutated = false;
+	TransformTopologyMutationCounters m_topologyFrameBaseline{};
+	TransformTopologyMutationCounters m_topologyObservationBaseline{};
+	TransformTopologyMutationCounters m_lastFrameTopologyMutations{};
+	uint64_t m_transformDiagnosticFrameCount = 0;
+	std::atomic<uint64_t> m_transformPublishEpoch{ 0 };
+	std::atomic<uint64_t> m_transformInvalidPublishCount{ 0 };
+	std::array<std::atomic<uint64_t>, kTransformWriteReasonCount>
+		m_transformWriteReasonCounts{};
+	uint64_t m_transformWriteEpochBaseline = 0;
+	uint64_t m_transformInvalidPublishBaseline = 0;
+	std::array<uint64_t, kTransformWriteReasonCount>
+		m_transformWriteReasonBaselines{};
+	std::atomic<uint64_t> m_uiDirtyEpoch{ 1 };
+	std::atomic<uint64_t> m_uiResolvedEpoch{ 0 };
+	std::atomic<uint64_t> m_spatialDirtyEpoch{ 1 };
+	std::atomic<uint64_t> m_spatialResolvedEpoch{ 0 };
+	math::rect m_lastUILayoutScreenRect{};
+	bool m_hasLastUILayoutScreenRect = false;
 
     std::unordered_set<std::string> m_entityNameSet{};
-	std::vector<LightComponent*>    m_lightComponents;
-	std::vector<MeshRenderer*>      m_allMeshRenderers;
-	std::vector<MeshRenderer*>      m_staticMeshRenderers;
-	std::vector<MeshRenderer*>      m_skinnedMeshRenderers;
-    // 직렬화된 m_lightIndex를 복원하고 파괴 때 인덱스를 압축하기 위한 점유표다.
-    // 렌더 값은 LightRenderProxy만 소유한다.
-    std::vector<uint8_t>            m_lightSlots;
-    std::vector<TerrainComponent*>  m_terrainComponents;
-    std::vector<FoliageComponent*>  m_foliageComponents;
-	std::vector<DecalComponent*>	m_decalComponents;
-	std::vector<SpriteRenderer*>	m_spriteRenderers;
 
 private:
 	friend class PhysicsManager;

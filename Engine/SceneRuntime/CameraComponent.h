@@ -46,7 +46,7 @@ public:
 
 	math::aabb GetEditorBoundingBox() const
 	{
-		const auto& position = m_pOwner->Transform_().position;
+		const auto& position = m_pOwner->Transform_().GetPositionValue();
 		return math::aabb{
 			math::vector3{ position.x, position.y, position.z },
 			m_editorBoundingBox.extents };

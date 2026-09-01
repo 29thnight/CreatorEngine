@@ -21,12 +21,12 @@
 // (Test1.creator 61 · 플레이어 프리팹마다 ~54)이고 Scene::UpdateModelRecursive
 // 순회가 프레임당 3회 도므로, 이 캐시가 곧 성능 축이다.
 //
-// 캐시 적중 조건은 이 컴포넌트가 스스로 판단하지 않는다 — Scene.cpp의 Bone
-// 분기가 m_resolvedSerial을 지금 애니메이터의 m_Skeleton->m_serial과 비교하고
-// m_boneIndex가 유효 범위인지 확인한 뒤에만 쓴다. 스켈레톤이 늦게 붙거나(늦은
-// 로드) 모델을 갈아 끼워 바뀌면 그 비교가 자동으로 깨져 다시 FindBone으로
-// 푼다 — 옛 코드가 매 프레임 재탐색으로 공짜로 얻던 그 관용을 그대로
-// 보존한다(Scene.cpp 주석 참고).
+// 캐시 적중 조건은 이 컴포넌트가 스스로 판단하지 않는다. X7 packed 경로는
+// Animator binding이 m_resolvedSerial을 skeleton serial과 비교하고 topology/owner까지
+// 함께 검증한다. 스켈레톤이 늦게 붙거나 갈아 끼워지면 binding pass에서 다시
+// FindBone으로 풀며, -1도 그 serial의 유효한 negative 결과로 캐시한다. 따라서
+// 존재하지 않는 본을 steady frame마다 재탐색하지 않는다. recursive A/B fallback만
+// Scene.cpp의 같은 serial 규약으로 이 필드를 직접 읽는다.
 class BoneComponent : public meta::identity<BoneComponent, Component>
 {
    public:
@@ -54,8 +54,8 @@ public:
     // 요구하는 최소 한 개의 서술 항목이다.
     int GetResolvedBoneIndex() { return m_boneIndex; }
 
-    // 마지막으로 FindBone이 성공한 결과. -1이면 아직 못 풀었다는 뜻이고,
-    // Scene.cpp는 이 값이 음수이거나 m_resolvedSerial이 어긋나면 무조건 다시 푼다.
+    // 마지막 binding의 FindBone 결과. -1은 아직 안 풀렸거나 그 skeleton에 없는
+    // 본이라는 뜻이다. m_resolvedSerial이 같으면 negative 결과도 다시 찾지 않는다.
     int m_boneIndex{ -1 };
 
     // m_boneIndex를 어느 스켈레톤에 대해 풀었는지 — Skeleton::m_serial 값이다.

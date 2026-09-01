@@ -83,8 +83,9 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     };
     markDdol(markDdol, go);
 
-    // Ensure root is detached from any parent (keep world)
-    go->SetParentIndex(Entity::INVALID_INDEX);
+    // 실제 parent/children 분리는 SceneManager의 DetachEntityHierarchy가 슬롯
+    // 이송과 한 transaction으로 수행한다. 여기서 parent만 먼저 지우면 그때까지
+    // 부모 children과 비대칭인 중간 상태가 노출된다.
     go->SetRootIndex(Entity::INVALID_INDEX);
 
     // Register to global DDOL bucket
@@ -112,6 +113,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 		Scene* scene = const_cast<Entity*>(originalEntity)->GetScene();
 		if (!scene) scene = SceneManagers->GetActiveScene();
 		if (!scene) return nullptr;
+		[[maybe_unused]] auto hierarchyTransaction = scene->BeginHierarchyBulkBuild();
 
 		// H3: 계층 필드가 Entity에서 사라졌으므로 Meta::Deserialize가 root 참조를
 		// 암묵 복사하지 않는다. 서브트리를 모두 만든 뒤 source slot→clone slot로
@@ -144,15 +146,12 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			const HashedGuid newInstanceID = clone->m_instanceID;
 			const HashingString newHashedName = clone->m_name;
 			const Entity::Index newIndex = clone->m_index;
-			const Entity::Index newParentIndex = clone->GetParentIndex();
 			const Entity::Index sourceRootIndex = source->GetRootIndex();
 
 			Meta::Deserialize(clone, sourceNode);
 			clone->m_instanceID = newInstanceID;
 			clone->m_name = newHashedName;
 			clone->m_index = newIndex;
-			clone->SetParentIndex(newParentIndex);
-			clone->ClearChildren();
 			sourceToClone[source->m_index] = newIndex;
 			rootFixups.push_back({ clone, sourceRootIndex });
 
@@ -186,10 +185,8 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 				Entity* childClone = self(self, child, child->m_name.ToString());
 				if (!childClone) continue;
 
-				if (Entity* sceneRoot = scene->GetRootEntity())
-					sceneRoot->DetachChildIndex(childClone->m_index);
-				childClone->SetParentIndex(clone->m_index);
-				clone->AttachChildIndex(childClone->m_index);
+				scene->Reparent(scene->HandleOf(childClone->m_index),
+					scene->HandleOf(clone->m_index));
 			}
 			return clone;
 		};

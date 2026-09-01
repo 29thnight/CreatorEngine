@@ -5,6 +5,8 @@
 #include "RenderableComponents.h"
 #include "TagManager.h"
 #include "RectTransformComponent.h"
+#include "Canvas.h"
+#include "BoneComponent.h"
 #include "PrefabUtility.h"
 #include "ScriptObjectRegistry.h"
 
@@ -182,6 +184,19 @@ void Entity::AttachComponentLifecycle(Component* component)
     // 소유자는 아직 안 붙었을 수 있지만(호출부마다 순서가 다르다) 등록은 typeID만
     // 보므로 무관하다 — 소유자는 Awake를 부를 때 확인한다.
     scene->RegisterComponent(component);
+
+	// X4 projection membership은 계층뿐 아니라 공간 컴포넌트 조합에도 달렸다.
+	// 생성자 안에서는 아직 Scene 슬롯 점유 전이라 create mutation 하나로 충분하고,
+	// 이미 점유된 Entity의 동적 부착만 별도 topology publication으로 올린다.
+	if ((dynamic_cast<Transform*>(component)
+		|| dynamic_cast<RectTransformComponent*>(component)
+		|| dynamic_cast<Canvas*>(component)
+		|| dynamic_cast<BoneComponent*>(component)
+		|| dynamic_cast<MeshRenderer*>(component))
+		&& scene->HandleOf(m_index).IsValid())
+	{
+		scene->RecordExecutionGraphMembershipChanged();
+	}
 }
 
 Component* Entity::AddComponent(const Meta::Type& type)
@@ -281,27 +296,10 @@ void Entity::RefreshComponentIdIndices()
 
 void Entity::AddChild(Entity* _objcet)
 {
-	auto scene = SceneManagers->GetActiveScene();
-	if (!scene || !_objcet) return;
-
-	// _objcet의 이전 부모가 없으면(최상위 오브젝트) 씬 루트의 children에서 자신을
-	// 뗀다 — CreateEntity 등 "부모 미지정 = 루트"인 관례를 여기서도 명시한다.
-	// Scene::GetEntity의 루트 폴백이 예전엔 이 자리에서도 암묵적으로 같은
-	// 일을 했다(N-13) — 폴백이 사라진 지금은 무효 핸들을 nullptr로 돌려주므로
-	// 직접 채워야 한다.
-	auto oldParent = scene->GetEntity(_objcet->GetParentIndex());
-	if (!oldParent)
-	{
-		oldParent = scene->GetRootEntity();
-	}
-
-	if (oldParent)
-	{
-		oldParent->DetachChildIndex(_objcet->m_index);
-	}
-
-	_objcet->SetParentIndex(m_index);
-	AttachChildIndex(_objcet->m_index);
+	if (!_objcet || !m_ownerScene || _objcet->GetScene() != m_ownerScene) return;
+	m_ownerScene->Reparent(
+		m_ownerScene->HandleOf(_objcet->m_index),
+		m_ownerScene->HandleOf(m_index));
 }
 
 // Transform 없는 오브젝트(S3의 UI)에서 Transform_()가 불렸을 때의 폴백.
@@ -370,7 +368,8 @@ void Entity::SetParentIndex(Entity::Index parentIndex)
 	if (m_ownerScene && Entity::IsValidIndex(m_index)
 		&& m_ownerScene->GetEntityRaw(m_index) == this)
 	{
-		m_ownerScene->m_hierarchyStore.SetParent(static_cast<size_t>(m_index), parentIndex);
+		const size_t slot = static_cast<size_t>(m_index);
+		m_ownerScene->m_hierarchyStore.SetParent(slot, parentIndex);
 	}
 }
 

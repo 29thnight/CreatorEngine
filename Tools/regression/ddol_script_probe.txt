@@ -56,7 +56,9 @@ wait 10
 script.add DdolScriptProbe LifecycleProbe
 wait 10
 play
-wait 90
+# Release headless는 90프레임이 Scope.Delay(0.2s)보다 먼저 끝날 수 있다.
+# 이송 순서 판정이 wall-time 운에 흔들리지 않도록 resume 여유를 둔다.
+wait 300
 scene.ddol DdolScriptProbe
 wait 10
 scene.switch {{DEST_SCENE}}

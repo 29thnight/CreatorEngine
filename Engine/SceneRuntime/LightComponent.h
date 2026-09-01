@@ -38,21 +38,25 @@ public:
     void OnDeserialized() { SetEnabled(true); }
 
 	LightComponent() = default;
+	void SetLightType(LightType type)
+	{
+		m_lightType = type;
+		PublishRenderProxyDirty(ProxyDirty::Payload);
+	}
 
     void OnInitialized() override;
     // 트랙 렌더: 가상 Update 오버라이드를 걷어내고 LightSystem(조밀 벡터,
     // 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,
-    // 근거는 AnimatorSystem.h 상단 주석 참고). 옛 Update 본문
-    // (renderScene->UpdateCommand(this) 한 줄)은 LightSystem::Update로 그대로
-    // 옮겨 갔다 — 전용 진입점을 새로 만들지 않은 이유는 LightSystem.h 상단
-    // 주석 참고.
+    // 근거는 AnimatorSystem.h 상단 주석 참고). 렌더 프록시 갱신은 X8부터
+    // LightSystem에서 직접 실행하지 않고 dirty 발행 뒤 Scene의 final commit이
+    // 담당한다.
     void OnAddedToScene() override;
     void OnRemovingFromScene() override;
     void OnUninitializing() override;
 
 	math::aabb GetEditorBoundingBox() const
 	{
-		const auto& position = m_pOwner->Transform_().position;
+		const auto& position = m_pOwner->Transform_().GetPositionValue();
 		return math::aabb{
 			math::vector3{ position.x, position.y, position.z },
 			m_editorBoundingBox.extents };

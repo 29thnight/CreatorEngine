@@ -41,6 +41,8 @@ public:
     void Resize(int newWidth, int newHeight);
 
     virtual void OnInitialized() override;
+    void OnAddedToScene() override;
+    void OnRemovingFromScene() override;
     virtual void OnUninitializing() override;
 
     //에디터 save/load

@@ -41,7 +41,7 @@ struct TransformStore
     // Scene::UpdateModelRecursive만 소비(ConsumeWorldChanged)해서 내린다.
     //
     // 왜 따로 두나 — SetAndDecomposeMatrix를 부르는 경로가 Scene 순회 하나가
-    // 아니다(ClrHost::EnsureWorldMatrix가 스크립트에서 즉시 읽기 위해 조상
+	// 아니다(Scene::EnsureResolved가 스크립트에서 즉시 읽기 위해 조상
     // 체인만 앞당겨 갱신하고, PhysicsManager도 물리 결과를 직접 반영한다).
     // 그런 순회 밖 갱신은 dirty를 이미 꺼버리므로, dirty만 보고 자식 전파 여부를
     // 정하면 그 자식(정확히는 갱신 안 된 형제 서브트리)이 갱신을 영영 놓친다 —

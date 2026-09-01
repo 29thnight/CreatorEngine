@@ -57,8 +57,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
                 // 등록하지 않고 독립 .asset으로 저장하지 않는다(InstantiateShared
                 // 계약 비승계). 새 저작 자산이 필요하면 그것은 자산 복제
                 // (DuplicateMaterialAsset)의 몫이다.
-                meshRenderer->m_Material = MaterialScriptBinding::InstantiateOwned(
-                    *meshRenderer->m_Material, {});
+                meshRenderer->SetMaterial(MaterialScriptBinding::InstantiateOwned(
+                    *meshRenderer->m_Material, {}));
                 // S2c-2a — 인스턴스화는 base 링크 해제다(Unity 의미론): 이후
                 // 편집은 자산 diff가 아니라 인라인 소유 저작이다.
                 meshRenderer->m_materialBaseGuid = FileGuid{};
@@ -317,16 +317,16 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		Meta::MakeCustomChangeCommand(
 		[=]
 		{
-			meshRenderer->m_Material = previous;
+			meshRenderer->SetMaterial(previous);
 			meshRenderer->m_materialBaseGuid = previousBase;
 		},
 		[=]
 		{
-			meshRenderer->m_Material = ownedCopy;
+			meshRenderer->SetMaterial(ownedCopy);
 			meshRenderer->m_materialBaseGuid = baseGuid;
 		});
 
-		meshRenderer->m_Material = std::move(ownedCopy);
+		meshRenderer->SetMaterial(std::move(ownedCopy));
 		meshRenderer->m_materialBaseGuid = baseGuid;
 	}
 }

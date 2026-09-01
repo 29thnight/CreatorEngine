@@ -14,6 +14,7 @@ void SpriteSheetComponent::LoadSpriteSheet(const file::path& path)
 	m_spriteSheetTexture = DataSystems->LoadSharedTexture(m_spriteSheetPath,
 		DataSystem::TextureFileType::SpriteSheet);
 	uiinfo.size = m_spriteSheetTexture->GetImageSize();
+	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 
 	//origin = { uiinfo.size.x / 2, uiinfo.size.y / 2 };
 }
@@ -24,7 +25,8 @@ void SpriteSheetComponent::OnInitialized()
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
-		renderScene->RegisterCommand(this);
+		scene->CollectSpriteSheetComponent(this);
+		if (renderScene) renderScene->RegisterCommand(this);
 	}
 
 	// 레지스트리 등록은 수명의 시작(Awake)에서 스스로 한다(6-1).
@@ -59,7 +61,8 @@ void SpriteSheetComponent::OnUninitializing()
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
-		renderScene->UnregisterCommand(this);
+		scene->UnCollectSpriteSheetComponent(this);
+		if (renderScene) renderScene->UnregisterCommand(this);
 	}
 
 	// 해제는 무조건 한다. 예전에는 씬이 널이면 건너뛰어 레지스트리에 dangling이 남았다.
@@ -82,11 +85,29 @@ void SpriteSheetComponent::OnAddedToScene()
 {
 	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterSpriteSheet(this);
+	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->CollectSpriteSheetComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->RegisterCommand(this);
+		}
+	}
 }
 
 void SpriteSheetComponent::OnRemovingFromScene()
 {
 	UITickSystems->UnregisterSpriteSheet(this);
+	if (GetOwner() && !GetOwner()->IsDestroyMark())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->UnCollectSpriteSheetComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->UnregisterCommand(this);
+		}
+	}
 	UIComponent::OnRemovingFromScene();
 }
 

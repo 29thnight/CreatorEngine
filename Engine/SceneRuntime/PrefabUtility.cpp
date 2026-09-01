@@ -4,6 +4,10 @@
 #include "Entity.h"
 #include "PrefabOverride.h"
 #include "Scene.h"
+#include "Canvas.h"
+#include "RectTransformComponent.h"
+#include "BoneComponent.h"
+#include "MeshRenderer.h"
 #include "Object.h"
 #include "LifecycleTrace.h"
 #include "AuthoringNodeEquality.h" // D3-a-1: 구조 비교
@@ -223,6 +227,7 @@ namespace
 		// 동일하게 유지한다 — UnregisterComponent를 먼저 하지 않으면 다음 프레임
 		// 디스패치가 죽은 포인터를 순회한다(K2 §6 함정, "제거가 비로소 성립").
 		Scene* scene = obj.GetScene();
+		bool executionGraphMembershipChanged = false;
 		for (size_t i = 0; i < originalCount; ++i)
 		{
 			if (kept[i])
@@ -245,6 +250,11 @@ namespace
 			// 이 함수가 아니라 호출부에 있다 — 여기서 타입으로 못 박아 둔다.
 			if (comp->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<Transform>())
 				continue;
+			executionGraphMembershipChanged = executionGraphMembershipChanged
+				|| nullptr != dynamic_cast<RectTransformComponent*>(comp.get())
+				|| nullptr != dynamic_cast<Canvas*>(comp.get())
+				|| nullptr != dynamic_cast<BoneComponent*>(comp.get())
+				|| nullptr != dynamic_cast<MeshRenderer*>(comp.get());
 
 			// 축소 통지를 Scene::FlushPendingDestroy와 같은 순서로 맞춘다(트랙 L1).
 			// 여기가 저장소에서 컴포넌트를 **즉시** 소멸시키는 유일한 경로다
@@ -275,6 +285,8 @@ namespace
 		// 기존 공개 API(내부에서 RebuildComponentTypeMask도 함께 부른다). 파괴분만큼
 		// 인덱스가 당겨졌으므로 부분 갱신보다 전체 재구축이 더 안전하다.
 		obj.RefreshComponentIdIndices();
+		if (scene && executionGraphMembershipChanged)
+			scene->RecordExecutionGraphMembershipChanged();
 	}
 }
 
@@ -364,7 +376,11 @@ void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
         }
 
         if (any)
+        {
+            Meta::ScopedPropertyChangeSource sourceScope(
+                Meta::PropertyChangeSource::Prefab);
             Meta::Deserialize(target, *type, patched);
+        }
     }
 }
 
@@ -589,18 +605,13 @@ size_t PrefabUtility::UpdateInstances(const Prefab* prefab)
 		// 경로 자체가 없다.
         Meta::DeserializePrefab(obj, newData, CollectGameObjectOverrideNames(*obj));
 
-        // 역직렬화는 리플렉션으로 position/rotation/scale을 **직접** 써 넣는다 —
-        // Transform의 세터를 거치지 않으므로 dirty가 서지 않는다. 새로 만든
-        // 오브젝트는 스토어 슬롯 기본값이 dirty=1이라 무해했지만, 여기는 이미
-        // 살아 있는 인스턴스를 덮어쓰는 자리다. S2의 dirty 게이트가 서기 전에는
-        // 순회가 어차피 전량 재계산이라 드러나지 않던 구멍이다.
-        obj->Transform_().SetDirty();
-
         // 컴포넌트: 통짜 Dump 비교로 갱신 여부를 정하던 것(P-e)을 걷어낸 자리에
         // Destroy 후 재생성(P-f)까지 걷어낸다(P3) — 차집합 적용으로 유지 타입은
         // 인스턴스를 보존한 채 패치하고, 사라진 타입만 파괴, 추가된 타입만 생성한다.
         if (newData["m_components"])
         {
+            // X1: Transform TRS도 typed reflection의 OnPropertyChanged 훅이
+            // dirty + Prefab publication을 함께 세운다. 별도 SetDirty 보정은 없다.
             ApplyComponentDiff(*obj, newData["m_components"]);
         }
         obj->m_prefab = const_cast<Prefab*>(prefab);

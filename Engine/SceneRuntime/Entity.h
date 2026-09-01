@@ -117,32 +117,12 @@ public:
 	void RefreshComponentIdIndices();
 	void AddChild(Entity* _objcet);
 
-	// 부모 인덱스와 Transform의 부모 ID를 함께 옮긴다.
-	//
-	// 둘은 항상 같아야 하는데 저장 위치가 갈라져 있어서, 한쪽만 갱신하는 실수가
-	// 컴파일을 통과했다. Instantiate는 Transform에 자기 인덱스를 넘겼고, Scene의
-	// 삭제·재매핑 경로 둘은 Transform을 아예 갱신하지 않아 부모 ID가 죽은 인덱스로
-	// 남았다. 쓰기를 한 점으로 모으고 Transform::SetParentID를 닫아서, 쌍을 깨는
-	// 코드가 애초에 컴파일되지 않게 한다.
-	void SetParentIndex(Index parentIndex);
 	// H3: 런타임/직렬화 계층 읽기의 단일 표면. 정상 부착된 Entity는 Scene의
 	// HierarchyStore만 읽는다. Scene 밖의 임시 Entity에는 계층 상태가 없다.
 	Index GetParentIndex() const;
 	Index GetRootIndex() const;
 	const std::vector<Index>& GetChildrenIndices() const;
 
-	// children/root 쓰기의 정본 지점 (SceneGraphRedesignPlan §3 트랙 E, E2).
-	// 최소 여섯 파일 스무 곳 가까이가 벡터를 직접 손으로 건드렸고,
-	// 중복 검사가 있는 자리와 없는 자리가 섞여 있어 같은 자식이 두 번 들어가는
-	// 경로가 있었다(Scene::AttachExistingEntity 계열만 방어했다). AttachChildIndex는
-	// 그 방어를 정본으로 삼아 항상 중복을 걸러낸다. H3 이후 실제 저장소는
-	// HierarchyStore 하나뿐이다.
-	void AttachChildIndex(Index childIndex);
-	void DetachChildIndex(Index childIndex);
-	void ClearChildren();
-	// 배치 재매핑(로더 후속 배선)처럼 목록 전체를 통째로 교체해야 하는 자리 전용 —
-	// 개별 부모-자식 연결에는 AttachChildIndex/DetachChildIndex를 쓴다.
-	void SetChildrenIndices(std::vector<Index> children);
 	void SetRootIndex(Index rootIndex);
 	template<typename T>
 	T* AddComponent();
@@ -202,6 +182,18 @@ public:
 	void SetStatic(bool isStatic) { m_isStatic = isStatic; }
 
 private:
+	friend class Scene;
+	friend class SceneManager;
+
+	// X3: 런타임 계층 변경은 Scene::Reparent만 사용한다. 아래 저수준 쓰기는
+	// Scene의 원자적 transaction과 SceneManager의 loader bulk-build 전용이다.
+	// SetParentIndex는 HierarchyStore와 Transform parent ID를 함께 동기화한다.
+	void SetParentIndex(Index parentIndex);
+	void AttachChildIndex(Index childIndex);
+	void DetachChildIndex(Index childIndex);
+	void ClearChildren();
+	void SetChildrenIndices(std::vector<Index> children);
+
 	// Transform 컴포넌트 캐시 (S1-b: m_transform 값 멤버 소멸, 저장소는
 	// m_components로 이동). 생성자에서 AddComponent<Transform>() 직후 채운다 —
 	// GetComponent<Transform>() 특수화(Entity.inl)와 공개 접근자 Transform_()가

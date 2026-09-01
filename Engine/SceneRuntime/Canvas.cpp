@@ -16,6 +16,22 @@ Canvas::Canvas()
 {
 }
 
+void Canvas::OnPropertyChanged(
+	std::string_view propertyName, Meta::PropertyChangeSource)
+{
+	if (propertyName != "ScaleMode" && propertyName != "ReferenceResolution"
+		&& propertyName != "MatchWidthOrHeight" && propertyName != "ScaleFactor"
+		&& propertyName != "RenderMode")
+	{
+		return;
+	}
+
+	if (Entity* owner = GetOwner())
+	{
+		if (Scene* scene = owner->GetScene()) scene->MarkUILayoutDirty();
+	}
+}
+
 float Canvas::ComputeScaleFactor(const math::rect& screenRect) const
 {
 	// 배율이 0이나 음수가 되면 레이아웃이 통째로 무너지므로(역산에서 0으로 나눔)
@@ -141,6 +157,7 @@ void Canvas::OnAddedToScene()
 		if (Scene* scene = owner->GetScene())
 		{
 			scene->AddCanvas(owner);
+			scene->MarkUILayoutDirty();
 		}
 	}
 }

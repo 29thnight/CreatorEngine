@@ -23,6 +23,7 @@
 #include "LifecycleTrace.h"
 #include "LifecycleRegistry.h"
 #include "Animator.h"
+#include "Socket.h" // X7 transform bulk probe
 #include "Skeleton.h" // E7-b: 벤치 진단이 m_bones 크기를 읽는다
 #include "Experiment/Model.h" // I5-D4e-1: experiment.animtick 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
@@ -46,6 +47,7 @@
 #include "UIManager.h"
 #include "Canvas.h"
 #include "ImageComponent.h"
+#include "MeshRenderer.h" // X8 render proxy dirty probe
 #include "RectTransformComponent.h"
 #include "BoneComponent.h" // E7-b: scene.traversalbench 0 모드의 마커 보유 수 진단
 #include "UIButton.h"
@@ -936,15 +938,18 @@ namespace
             }
 
             const auto& t = object->Transform_();
+			const auto& position = t.GetPositionValue();
+			const auto& rotation = t.GetRotationValue();
+			const auto& scale = t.GetScaleValue();
             char row[320]{};
             std::snprintf(row, sizeof(row),
                 "%u|%s|%d|%.4f,%.4f,%.4f|%.4f,%.4f,%.4f,%.4f|%.4f,%.4f,%.4f",
                 static_cast<unsigned>(object->m_index),
                 displayName.c_str(),
                 static_cast<int>(object->GetParentIndex()),
-                t.position.x, t.position.y, t.position.z,
-                t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w,
-                t.scale.x, t.scale.y, t.scale.z);
+				position.x, position.y, position.z,
+				rotation.x, rotation.y, rotation.z, rotation.w,
+				scale.x, scale.y, scale.z);
 
             mix(row);
             ++emitted;
@@ -1565,11 +1570,11 @@ namespace
         std::printf("[CLI] serialize.bench: 알 수 없는 모드 '%s'\n", mode.c_str());
     }
 
-    void HandleSceneProxyBench(const std::vector<std::string>& parts)
+	void HandleSceneProxyBench(const std::vector<std::string>& parts)
     {
         if (parts.size() < 2)
         {
-            std::printf("[CLI] 사용법: scene.proxybench <프레임수>\n");
+            std::printf("[CLI] 사용법: scene.proxybench <프레임수> [등록수]\n");
             return;
         }
 
@@ -1578,7 +1583,23 @@ namespace
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        const size_t componentCount = scene->RenderProxyComponentCount();
+		const size_t requestedCount = parts.size() > 2
+			? static_cast<size_t>((std::max)(0, std::atoi(parts[2].c_str()))) : 0u;
+		std::vector<Entity*> synthetic;
+		size_t componentCount = scene->RenderProxyComponentCount();
+		if (requestedCount > componentCount)
+		{
+			synthetic.reserve(requestedCount - componentCount);
+			for (size_t index = componentCount; index < requestedCount; ++index)
+			{
+				Entity* owner = scene->CreateEntity(
+					"__proxybench_x8_" + std::to_string(index), GameObjectType::Empty);
+				if (!owner || !owner->AddComponent<MeshRenderer>()) break;
+				synthetic.push_back(owner);
+			}
+			scene->DrainPendingLifecycle();
+			componentCount = scene->RenderProxyComponentCount();
+		}
         if (0 == componentCount)
         {
             // 0개를 재고 "빠르다"고 보고하는 사고를 막는다 — 하한 가드가 없으면
@@ -1589,6 +1610,7 @@ namespace
 
         using PerfClock = std::chrono::steady_clock;
         scene->CommitRenderProxies();   // 워밍업 1회(첫 호출의 지연 초기화를 평균에서 뺀다)
+		scene->ResetRenderProxyCommitMetrics();
 
         std::vector<double> samplesUs;
         samplesUs.reserve(static_cast<size_t>(frames));
@@ -1610,13 +1632,20 @@ namespace
             maxUs = (std::max)(maxUs, v);
         }
         const double avg = sum / static_cast<double>(samplesUs.size());
+		const RenderProxyCommitMetrics metrics = scene->GetRenderProxyCommitMetrics();
 
         char line[256]{};
         std::snprintf(line, sizeof(line),
-            "[scene.proxybench] 컴포넌트 %zu개 · 평균 %.2fus 최소 %.2fus 최대 %.2fus (프레임 %d) · 컴포넌트당 %.3fus",
-            componentCount, avg, minUs, maxUs, frames, avg / static_cast<double>(componentCount));
+			"[scene.proxybench] mode=stationary registered=%zu frames=%d avg=%.2fus min=%.2fus max=%.2fus committed=%llu selfcheck=%s",
+			componentCount, frames, avg, minUs, maxUs,
+			static_cast<unsigned long long>(metrics.committed),
+			0 == metrics.committed ? "PASS" : "FAIL");
         std::printf("%s\n", line);
         Debug->LogWarning(line);
+		for (Entity* owner : synthetic)
+		{
+			if (owner) owner->Destroy();
+		}
     }
 
     // S2 A/B 토글의 유일한 쓰기 지점(SceneGraphRedesignPlan §4 트랙 S, S2 —
@@ -1873,12 +1902,1517 @@ namespace
         std::printf("[CLI] [prefab.objectguid] %s guid=%s\n", parts[1].c_str(), guidStr.c_str());
         }
 
-    // S2 측정 게이트(SceneGraphRedesignPlan §4 트랙 S, S2). 폭 10 트리를
-    // objectCount개(+루트 1개) 합성 생성해 "전부 정지"·"10%만 매 프레임 이동" 두
-    // 시나리오로 AllUpdateWorldMatrix를 frames회씩 재고, 끝나면 만든 오브젝트를
-    // 전부 파괴 마크해 씬을 원상 복구한다. scene.dirtytraversal 0/1을 바꿔가며
-    // 같은 명령을 두 번 돌리는 것이 A/B 비교 방법이다 — 이 명령 혼자서는
-    // "옛 경로 대비 얼마나 빨라졌는지"를 말하지 않는다(미측정으로 보고할 것).
+    namespace
+    {
+        struct BenchPercentiles
+        {
+            double median = 0.0;
+            double p95 = 0.0;
+            double maximum = 0.0;
+        };
+
+        BenchPercentiles SummarizeBenchSamples(std::vector<double> samples)
+        {
+            if (samples.empty()) return {};
+            std::sort(samples.begin(), samples.end());
+            const size_t count = samples.size();
+            const double median = (0 != count % 2)
+                ? samples[count / 2]
+                : (samples[count / 2 - 1] + samples[count / 2]) * 0.5;
+            const size_t p95Index = (std::min)(count - 1,
+                (count * 95 + 99) / 100 - 1);
+            return BenchPercentiles{ median, samples[p95Index], samples.back() };
+        }
+
+        const char* TransformSyncPointName(TransformSyncPoint syncPoint)
+        {
+            switch (syncPoint)
+            {
+            case TransformSyncPoint::FixedUpdate: return "fixed";
+            case TransformSyncPoint::PreUpdate: return "pre-update";
+            case TransformSyncPoint::LateUpdate: return "late-update";
+            case TransformSyncPoint::SceneLoad: return "scene-load";
+            case TransformSyncPoint::Benchmark: return "benchmark";
+            default: return "unspecified";
+            }
+        }
+
+		const char* TransformBuildConfiguration()
+		{
+#if defined(_DEBUG)
+			return "Debug";
+#else
+			return "Release";
+#endif
+		}
+
+        void PrintTransformMetricSnapshot(const TransformUpdateMetrics& metrics)
+        {
+            const uint64_t transformCount = metrics.transformOnlyCount
+                + metrics.transformAndRectCount;
+            const uint64_t rectCount = metrics.rectOnlyCount
+                + metrics.transformAndRectCount;
+            const double transformDirtyPercent = 0 == transformCount ? 0.0
+                : 100.0 * static_cast<double>(metrics.transformDirtyCount)
+                    / static_cast<double>(transformCount);
+            const double rectDirtyPercent = 0 == rectCount ? 0.0
+                : 100.0 * static_cast<double>(metrics.rectDirtyCount)
+                    / static_cast<double>(rectCount);
+
+            std::printf(
+                "[scene.transformstats] sync=%s domains=UI+Spatial "
+                "gate ui=%s spatial=%s "
+                "wall-us total=%.2f ui=%.2f spatial=%.2f dispatch=%.2f\n",
+                TransformSyncPointName(metrics.syncPoint),
+                metrics.uiDomainResolved ? "run" : "empty",
+                metrics.spatialDomainResolved ? "run" : "empty",
+                metrics.totalUs, metrics.uiUs, metrics.spatialUs, metrics.dispatchUs);
+            std::printf(
+                "[scene.transformstats] spatial-worker-sum-us "
+                "visit=%.2f compose=%.2f multiply=%.2f decompose=%.2f "
+                "counts visit=%llu compose=%llu multiply=%llu decompose=%llu roots=%llu\n",
+                metrics.visitWorkerUs, metrics.localComposeWorkerUs,
+                metrics.worldMultiplyWorkerUs, metrics.decomposeWorkerUs,
+                static_cast<unsigned long long>(metrics.spatialVisitCount),
+                static_cast<unsigned long long>(metrics.localComposeCount),
+                static_cast<unsigned long long>(metrics.worldMultiplyCount),
+                static_cast<unsigned long long>(metrics.decomposeCount),
+                static_cast<unsigned long long>(metrics.rootDispatchCount));
+            std::printf(
+                "[scene.transformstats] census entities=%llu transform-only=%llu "
+                "rect-only=%llu both=%llu neither=%llu "
+                "transform-dirty=%llu(%.2f%%) rect-dirty=%llu(%.2f%%)\n",
+                static_cast<unsigned long long>(metrics.entityCount),
+                static_cast<unsigned long long>(metrics.transformOnlyCount),
+                static_cast<unsigned long long>(metrics.rectOnlyCount),
+                static_cast<unsigned long long>(metrics.transformAndRectCount),
+                static_cast<unsigned long long>(metrics.neitherCount),
+                static_cast<unsigned long long>(metrics.transformDirtyCount),
+                transformDirtyPercent,
+                static_cast<unsigned long long>(metrics.rectDirtyCount),
+                rectDirtyPercent);
+        }
+    }
+
+    void HandleSceneTransformStats(const std::vector<std::string>& parts)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+        if (parts.size() > 1 && ("0" == parts[1] || "1" == parts[1]))
+        {
+            const bool enabled = "1" == parts[1];
+            Scene::SetTransformDiagnosticsEnabled(enabled);
+            if (enabled) scene->ResetTransformDiagnostics();
+            std::printf("[scene.transformstats] enabled=%d build=%s; 노드별 clock/atomic 계측은 ON 동안만 발생\n",
+                enabled ? 1 : 0, TransformBuildConfiguration());
+            return;
+        }
+
+        std::printf("[scene.transformstats] enabled=%d build=%s; worker-sum은 병렬 CPU 합계라 wall에 더하지 말 것\n",
+            Scene::IsTransformDiagnosticsEnabled() ? 1 : 0,
+			TransformBuildConfiguration());
+        for (TransformSyncPoint point : {
+            TransformSyncPoint::FixedUpdate,
+            TransformSyncPoint::PreUpdate,
+            TransformSyncPoint::LateUpdate,
+            TransformSyncPoint::SceneLoad,
+            TransformSyncPoint::Benchmark })
+        {
+            const TransformUpdateMetrics& metrics =
+                scene->GetLastTransformUpdateMetrics(point);
+            if (metrics.totalUs > 0.0) PrintTransformMetricSnapshot(metrics);
+        }
+
+        const TransformTopologyMutationCounters frame =
+            scene->GetLastFrameTopologyMutations();
+		const TransformTopologyMutationCounters window =
+			scene->GetTransformDiagnosticTopologyMutations();
+		const uint64_t windowFrames = scene->GetTransformDiagnosticFrameCount();
+        const TransformTopologyMutationCounters total =
+            scene->GetTopologyMutationTotals();
+        std::printf(
+            "[scene.transformstats] topology last-frame create=%llu destroy=%llu reparent=%llu\n",
+            static_cast<unsigned long long>(frame.created),
+            static_cast<unsigned long long>(frame.destroyed),
+			static_cast<unsigned long long>(frame.reparented));
+		if (windowFrames > 0)
+		{
+			std::printf(
+				"[scene.transformstats] topology window frames=%llu total=%llu/%llu/%llu "
+				"per-frame=%.6f/%.6f/%.6f (create/destroy/reparent)\n",
+				static_cast<unsigned long long>(windowFrames),
+				static_cast<unsigned long long>(window.created),
+				static_cast<unsigned long long>(window.destroyed),
+				static_cast<unsigned long long>(window.reparented),
+				static_cast<double>(window.created) / windowFrames,
+				static_cast<double>(window.destroyed) / windowFrames,
+				static_cast<double>(window.reparented) / windowFrames);
+		}
+		else
+		{
+			std::printf("[scene.transformstats] topology window unavailable; 1로 reset 후 한 프레임 이상 관측할 것\n");
+		}
+		std::printf(
+			"[scene.transformstats] topology lifetime create=%llu destroy=%llu reparent=%llu\n",
+            static_cast<unsigned long long>(total.created),
+            static_cast<unsigned long long>(total.destroyed),
+			static_cast<unsigned long long>(total.reparented));
+    }
+
+	void PrintTransformWriteMetrics(const TransformWriteMetrics& metrics)
+	{
+		std::printf(
+			"[scene.transformwritestats] epoch=%llu window-start=%llu total=%llu invalid=%llu\n",
+			static_cast<unsigned long long>(metrics.publishEpoch),
+			static_cast<unsigned long long>(metrics.windowStartEpoch),
+			static_cast<unsigned long long>(metrics.total),
+			static_cast<unsigned long long>(metrics.invalidHandle));
+		for (size_t i = 0; i < kTransformWriteReasonCount; ++i)
+		{
+			const auto reason = static_cast<TransformWriteReason>(i);
+			std::printf("[scene.transformwritestats] reason=%s count=%llu\n",
+				TransformWriteReasonName(reason),
+				static_cast<unsigned long long>(metrics.byReason[i]));
+		}
+	}
+
+	void HandleSceneProxyDirty(const std::vector<std::string>& parts)
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (parts.size() < 2 || "probe" != parts[1])
+		{
+			std::printf("[CLI] 사용법: scene.proxydirty probe\n");
+			return;
+		}
+
+		Entity* owner = scene->CreateEntity("__proxy_dirty_probe", GameObjectType::Empty);
+		MeshRenderer* mesh = owner ? owner->AddComponent<MeshRenderer>() : nullptr;
+		if (!owner || !mesh)
+		{
+			if (owner) owner->Destroy();
+			std::printf("[scene.proxydirty] probe=FAIL create=0\n");
+			return;
+		}
+
+		scene->DrainPendingLifecycle();
+		scene->CommitRenderProxies(); // initial create/update tickets are outside the probe
+
+		// Five independent writers in one frame must collapse to one ticket while
+		// preserving every reason bit.
+		scene->ResetRenderProxyCommitMetrics();
+		scene->PublishRenderProxyDirty(mesh, ProxyDirty::Transform);
+		scene->PublishRenderProxyDirty(mesh, ProxyDirty::Material);
+		scene->PublishRenderProxyDirty(mesh, ProxyDirty::Visibility);
+		scene->PublishRenderProxyDirty(mesh, ProxyDirty::LOD);
+		scene->PublishRenderProxyDirty(mesh, ProxyDirty::Payload);
+		scene->CommitRenderProxies();
+		const RenderProxyCommitMetrics dedupe = scene->GetRenderProxyCommitMetrics();
+		const bool dedupePass = 5 == dedupe.publishCalls && 4 == dedupe.deduplicated
+			&& 1 == dedupe.lastDrained && 1 == dedupe.lastCommitted
+			&& 0 == dedupe.lastStale && ProxyDirty::All == dedupe.lastMask;
+
+		// Empty commits may take a lock, but must never scale with registered count.
+		scene->ResetRenderProxyCommitMetrics();
+		scene->CommitRenderProxies();
+		scene->CommitRenderProxies();
+		scene->CommitRenderProxies();
+		const RenderProxyCommitMetrics stationary = scene->GetRenderProxyCommitMetrics();
+		const bool stationaryPass = 3 == stationary.commitPasses
+			&& 0 == stationary.committed && 0 == stationary.lastDrained
+			&& 0 == stationary.pending;
+
+		// A write resolved before the first sync remains queued across later sync
+		// points and is still committed exactly once at the final stage.
+		scene->ResetRenderProxyCommitMetrics();
+		owner->Transform_().SetPosition({ 17.f, 3.f, -2.f });
+		scene->SyncDerivedState(TransformSyncPoint::FixedUpdate);
+		const RenderProxyCommitMetrics afterFixed = scene->GetRenderProxyCommitMetrics();
+		scene->SyncDerivedState(TransformSyncPoint::PreUpdate);
+		scene->SyncDerivedState(TransformSyncPoint::LateUpdate);
+		const RenderProxyCommitMetrics beforeFinal = scene->GetRenderProxyCommitMetrics();
+		scene->CommitRenderProxies();
+		const RenderProxyCommitMetrics phase = scene->GetRenderProxyCommitMetrics();
+		const bool phasePass = 1 == afterFixed.pending && 1 == beforeFinal.pending
+			&& 1 == phase.lastCommitted && ProxyDirty::Transform == phase.lastMask;
+
+		// Public setters cover material/enabled/LOD and OR into the next commit.
+		scene->ResetRenderProxyCommitMetrics();
+		mesh->SetMaterial(nullptr);
+		mesh->SetLODEnabled(true);
+		mesh->SetEnabled(false);
+		scene->CommitRenderProxies();
+		const RenderProxyCommitMetrics writers = scene->GetRenderProxyCommitMetrics();
+		const ProxyDirty writerMask = ProxyDirty::Material
+			| ProxyDirty::Visibility | ProxyDirty::LOD;
+		const bool writersPass = 3 == writers.publishCalls
+			&& 2 == writers.deduplicated && 1 == writers.lastCommitted
+			&& writerMask == writers.lastMask;
+
+		// Leave an old ticket alive, unregister, then register the same address.
+		// Only the new registration generation may dispatch.
+		scene->ResetRenderProxyCommitMetrics();
+		scene->PublishRenderProxyDirty(mesh, ProxyDirty::Payload);
+		scene->UnCollectMeshRenderer(mesh);
+		scene->CollectMeshRenderer(mesh);
+		scene->CommitRenderProxies();
+		const RenderProxyCommitMetrics lifetime = scene->GetRenderProxyCommitMetrics();
+		const bool lifetimePass = 2 == lifetime.lastDrained
+			&& 1 == lifetime.lastStale && 1 == lifetime.lastCommitted;
+
+		const bool pass = dedupePass && stationaryPass && phasePass
+			&& writersPass && lifetimePass;
+		std::printf(
+			"[scene.proxydirty] dedupe=%s publish=%llu folded=%llu drained=%llu mask=0x%02x\n",
+			dedupePass ? "PASS" : "FAIL",
+			static_cast<unsigned long long>(dedupe.publishCalls),
+			static_cast<unsigned long long>(dedupe.deduplicated),
+			static_cast<unsigned long long>(dedupe.lastDrained),
+			static_cast<unsigned>(dedupe.lastMask));
+		std::printf(
+			"[scene.proxydirty] stationary=%s passes=%llu committed=%llu phase=%s pending=%llu writers=%s\n",
+			stationaryPass ? "PASS" : "FAIL",
+			static_cast<unsigned long long>(stationary.commitPasses),
+			static_cast<unsigned long long>(stationary.committed),
+			phasePass ? "PASS" : "FAIL",
+			static_cast<unsigned long long>(beforeFinal.pending),
+			writersPass ? "PASS" : "FAIL");
+		std::printf(
+			"[scene.proxydirty] generation=%s drained=%llu stale=%llu committed=%llu probe=%s\n",
+			lifetimePass ? "PASS" : "FAIL",
+			static_cast<unsigned long long>(lifetime.lastDrained),
+			static_cast<unsigned long long>(lifetime.lastStale),
+			static_cast<unsigned long long>(lifetime.lastCommitted),
+			pass ? "PASS" : "FAIL");
+
+		owner->Destroy();
+	}
+
+	void HandleSceneTransformWriteStats(const std::vector<std::string>& parts)
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+
+		const std::string action = parts.size() > 1 ? parts[1] : "print";
+		if ("0" == action || "1" == action)
+		{
+			const bool enabled = "1" == action;
+			Scene::SetTransformWriteDiagnosticsEnabled(enabled);
+			if (enabled) scene->ResetTransformWriteDiagnostics();
+			std::printf("[scene.transformwritestats] enabled=%d build=%s\n",
+				enabled ? 1 : 0, TransformBuildConfiguration());
+			return;
+		}
+
+		if ("probe" == action)
+		{
+			const bool wasEnabled = Scene::IsTransformWriteDiagnosticsEnabled();
+			Scene::SetTransformWriteDiagnosticsEnabled(true);
+			Entity* probe = scene->CreateEntity(
+				"__transform_write_probe", GameObjectType::Empty);
+			Entity* child = scene->CreateEntity(
+				"__transform_write_probe_child", GameObjectType::Empty);
+			if (!probe || !child)
+			{
+				if (child) child->Destroy();
+				if (probe) probe->Destroy();
+				Scene::SetTransformWriteDiagnosticsEnabled(wasEnabled);
+				std::printf("[scene.transformwritestats] probe=FAIL create=0\n");
+				return;
+			}
+
+			const EntityHandle handle = scene->HandleOf(probe->m_index);
+			const bool resolverBefore = scene->Resolve(handle) == probe;
+			scene->ResetTransformWriteDiagnostics();
+
+			Transform& transform = probe->Transform_();
+			transform.SetPosition({ 1.f, 2.f, 3.f }, TransformWriteReason::CppSetter);
+			transform.SetPosition({ 2.f, 3.f, 4.f }, TransformWriteReason::Script);
+			transform.SetPositionValue(
+				{ 3.f, 4.f, 5.f, 0.f }, TransformWriteReason::Inspector);
+			transform.SetPosition({ 4.f, 5.f, 6.f }, TransformWriteReason::Physics);
+			transform.SetLocalMatrix(
+				transform.GetLocalMatrix(), TransformWriteReason::Socket);
+			transform.SetPosition({ 5.f, 6.f, 7.f }, TransformWriteReason::Gizmo);
+			transform.SetPosition({ 6.f, 7.f, 8.f }, TransformWriteReason::Animator);
+			transform.SetLocalMatrix(
+				transform.GetLocalMatrix(), TransformWriteReason::ModelImport);
+
+			MetaYml::Node reflected = Meta::Serialize(&transform);
+			reflected["position"]["x"] = 7.f;
+			Meta::Deserialize(&transform, reflected);
+
+			MetaYml::Node prefab = Meta::Serialize(&transform);
+			prefab["position"]["x"] = 8.f;
+			Meta::DeserializePrefab(
+				&transform, prefab, std::unordered_set<std::string>{});
+
+			scene->Reparent(scene->HandleOf(child->m_index),
+				scene->HandleOf(probe->m_index));
+			transform.TransformReset();
+
+			const bool resolverAfter = scene->Resolve(handle) == probe;
+			const TransformWriteMetrics metrics = scene->GetTransformWriteMetrics();
+			PrintTransformWriteMetrics(metrics);
+
+			size_t missing = 0;
+			for (uint64_t count : metrics.byReason)
+			{
+				if (0 == count) ++missing;
+			}
+			const bool pass = resolverBefore && resolverAfter
+				&& 0 == metrics.invalidHandle && 0 == missing;
+			std::printf(
+				"[scene.transformwritestats] probe=%s expected-reasons=%zu missing=%zu resolver=%s\n",
+				pass ? "PASS" : "FAIL", kTransformWriteReasonCount, missing,
+				(resolverBefore && resolverAfter) ? "stable" : "mismatch");
+			child->Destroy();
+			probe->Destroy();
+			Scene::SetTransformWriteDiagnosticsEnabled(wasEnabled);
+			return;
+		}
+
+		std::printf("[scene.transformwritestats] enabled=%d build=%s\n",
+			Scene::IsTransformWriteDiagnosticsEnabled() ? 1 : 0,
+			TransformBuildConfiguration());
+		PrintTransformWriteMetrics(scene->GetTransformWriteMetrics());
+	}
+
+	void HandleSceneTransformDomains(const std::vector<std::string>& parts)
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (parts.size() < 2 || "probe" != parts[1])
+		{
+			std::printf("[CLI] 사용법: scene.transformdomains probe\n");
+			return;
+		}
+
+		const bool wasDiagnosticsEnabled = Scene::IsTransformDiagnosticsEnabled();
+		Scene::SetTransformDiagnosticsEnabled(true);
+		Entity* ui = scene->CreateEntity(
+			"__transform_x2_ui_probe", GameObjectType::UI);
+		Entity* spatial = scene->CreateEntity(
+			"__transform_x2_spatial_probe", GameObjectType::Empty);
+		RectTransformComponent* rect = ui
+			? ui->GetComponent<RectTransformComponent>() : nullptr;
+		if (!ui || !spatial || !rect || !spatial->HasTransform())
+		{
+			if (ui) ui->Destroy();
+			if (spatial) spatial->Destroy();
+			Scene::SetTransformDiagnosticsEnabled(wasDiagnosticsEnabled);
+			std::printf("[scene.transformdomains] probe=FAIL create=0\n");
+			return;
+		}
+
+		auto snapshot = [&]() -> TransformUpdateMetrics
+		{
+			scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+			return scene->GetLastTransformUpdateMetrics(TransformSyncPoint::Benchmark);
+		};
+		auto isState = [](const TransformUpdateMetrics& metrics,
+			bool uiRun, bool spatialRun)
+		{
+			return metrics.uiDomainResolved == uiRun
+				&& metrics.spatialDomainResolved == spatialRun;
+		};
+
+		// 생성 dirty를 먼저 소비한 뒤 queue-empty 기준선을 잰다.
+		snapshot();
+		const TransformUpdateMetrics clean = snapshot();
+
+		rect->SetAnchoredPosition({ 13.f, 17.f });
+		const TransformUpdateMetrics uiOnly = snapshot();
+
+		spatial->Transform_().SetPosition({ 3.f, 5.f, 7.f });
+		const TransformUpdateMetrics spatialOnly = snapshot();
+
+		// 즉시 subtree는 그 자리에서 rect를 계산하되, global UI epoch는 다음
+		// full pass가 계속 소비하도록 남겨 둔다.
+		const math::rect subtreeBefore = rect->GetWorldRect();
+		rect->SetAnchoredPosition({ 29.f, 31.f });
+		scene->LayoutUISubtree(ui);
+		const math::rect subtreeAfter = rect->GetWorldRect();
+		const bool subtreeImmediate = !rect->IsDirty()
+			&& (subtreeBefore.x != subtreeAfter.x || subtreeBefore.y != subtreeAfter.y);
+		const TransformUpdateMetrics subtreeFollowup = snapshot();
+
+		// paused path는 UI만 소비해야 한다. 동시에 pending인 spatial write는
+		// 다음 full sync까지 남아야 한다.
+		snapshot();
+		rect->SetAnchoredPosition({ 37.f, 41.f });
+		spatial->Transform_().SetPosition({ 11.f, 13.f, 17.f });
+		scene->AllUIUpdateWorldMatrix();
+		const bool pausedConsumedUI = !rect->IsDirty();
+		const TransformUpdateMetrics afterPaused = snapshot();
+		const TransformUpdateMetrics finalClean = snapshot();
+
+		const bool pass = isState(clean, false, false)
+			&& isState(uiOnly, true, false)
+			&& isState(spatialOnly, false, true)
+			&& subtreeImmediate && isState(subtreeFollowup, true, false)
+			&& pausedConsumedUI && isState(afterPaused, false, true)
+			&& isState(finalClean, false, false);
+
+		std::printf(
+			"[scene.transformdomains] clean=%s/%s ui-write=%s/%s "
+			"spatial-write=%s/%s subtree=%s+%s/%s paused=%s+%s/%s final=%s/%s\n",
+			clean.uiDomainResolved ? "run" : "empty",
+			clean.spatialDomainResolved ? "run" : "empty",
+			uiOnly.uiDomainResolved ? "run" : "empty",
+			uiOnly.spatialDomainResolved ? "run" : "empty",
+			spatialOnly.uiDomainResolved ? "run" : "empty",
+			spatialOnly.spatialDomainResolved ? "run" : "empty",
+			subtreeImmediate ? "immediate" : "stale",
+			subtreeFollowup.uiDomainResolved ? "run" : "empty",
+			subtreeFollowup.spatialDomainResolved ? "run" : "empty",
+			pausedConsumedUI ? "ui-consumed" : "ui-dirty",
+			afterPaused.uiDomainResolved ? "run" : "empty",
+			afterPaused.spatialDomainResolved ? "run" : "empty",
+			finalClean.uiDomainResolved ? "run" : "empty",
+			finalClean.spatialDomainResolved ? "run" : "empty");
+		std::printf(
+			"[scene.transformdomains] probe=%s order=UI->Spatial build=%s\n",
+			pass ? "PASS" : "FAIL", TransformBuildConfiguration());
+
+		ui->Destroy();
+		spatial->Destroy();
+		Scene::SetTransformDiagnosticsEnabled(wasDiagnosticsEnabled);
+	}
+
+	void HandleSceneHierarchyMutation(const std::vector<std::string>& parts)
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (parts.size() < 2 || "probe" != parts[1])
+		{
+			std::printf("[CLI] 사용법: scene.hierarchymutation probe\n");
+			return;
+		}
+
+		Entity* ancestor = scene->CreateEntity(
+			"__hierarchy_x3_ancestor", GameObjectType::Empty);
+		Entity* parent = ancestor ? scene->CreateEntity(
+			"__hierarchy_x3_parent", GameObjectType::Empty, ancestor->m_index) : nullptr;
+		Entity* child = parent ? scene->CreateEntity(
+			"__hierarchy_x3_child", GameObjectType::Empty, parent->m_index) : nullptr;
+		if (!ancestor || !parent || !child)
+		{
+			if (child) child->Destroy();
+			if (parent) parent->Destroy();
+			if (ancestor) ancestor->Destroy();
+			std::printf("[scene.hierarchymutation] probe=FAIL create=0\n");
+			return;
+		}
+
+		const EntityHandle ancestorHandle = scene->HandleOf(ancestor->m_index);
+		const EntityHandle parentHandle = scene->HandleOf(parent->m_index);
+		const EntityHandle childHandle = scene->HandleOf(child->m_index);
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const uint64_t baseline = scene->GetTopologyVersion();
+
+		const ReparentResult noChange = scene->Reparent(parentHandle, ancestorHandle);
+		const ReparentResult self = scene->Reparent(ancestorHandle, ancestorHandle);
+		const ReparentResult ancestorCycle = scene->Reparent(ancestorHandle, childHandle);
+		EntityHandle staleParent = parentHandle;
+		++staleParent.generation;
+		if (0 == staleParent.generation) ++staleParent.generation;
+		const ReparentResult stale = scene->Reparent(childHandle, staleParent);
+
+		Scene foreignScene;
+		foreignScene.AddRootEntity("__hierarchy_x3_foreign_scene");
+		Entity* foreignParent = foreignScene.CreateEntity(
+			"__hierarchy_x3_foreign_parent", GameObjectType::Empty);
+		const ReparentResult cross = foreignParent
+			? scene->Reparent(childHandle,
+				foreignScene.HandleOf(foreignParent->m_index))
+			: ReparentResult::InvalidHandle;
+		const uint64_t rejectedDelta = scene->GetTopologyVersion() - baseline;
+
+		const uint64_t successBefore = scene->GetTopologyVersion();
+		const ReparentResult success = scene->Reparent(childHandle, ancestorHandle);
+		const uint64_t successDelta = scene->GetTopologyVersion() - successBefore;
+		const HierarchyIntegrityMetrics integrity =
+			scene->GetHierarchyIntegrityMetrics();
+
+		const uint64_t bulkBefore = scene->GetTopologyVersion();
+		Entity* bulkParent = nullptr;
+		Entity* bulkChild = nullptr;
+		{
+			[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
+			bulkParent = scene->CreateEntity(
+				"__hierarchy_x3_bulk_parent", GameObjectType::Empty);
+			bulkChild = bulkParent ? scene->CreateEntity(
+				"__hierarchy_x3_bulk_child", GameObjectType::Empty,
+				bulkParent->m_index) : nullptr;
+		}
+		const uint64_t bulkDelta = scene->GetTopologyVersion() - bulkBefore;
+
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const uint64_t cleanBefore = scene->GetTopologyVersion();
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const uint64_t cleanDelta = scene->GetTopologyVersion() - cleanBefore;
+
+		const bool pass = ReparentResult::NoChange == noChange
+			&& ReparentResult::SelfRejected == self
+			&& ReparentResult::CycleRejected == ancestorCycle
+			&& ReparentResult::StaleHandle == stale
+			&& ReparentResult::CrossScene == cross
+			&& 0 == rejectedDelta
+			&& ReparentResult::Success == success && 1 == successDelta
+			&& 0 == integrity.Total()
+			&& bulkParent && bulkChild && 1 == bulkDelta
+			&& 0 == cleanDelta;
+		std::printf(
+			"[scene.hierarchymutation] nochange=%s self=%s ancestor=%s "
+			"stale=%s cross=%s rejected-delta=%llu success=%s success-delta=%llu\n",
+			ReparentResultName(noChange), ReparentResultName(self),
+			ReparentResultName(ancestorCycle), ReparentResultName(stale),
+			ReparentResultName(cross),
+			static_cast<unsigned long long>(rejectedDelta),
+			ReparentResultName(success),
+			static_cast<unsigned long long>(successDelta));
+		std::printf(
+			"[scene.hierarchymutation] symmetry=%llu mismatch=%llu orphan=%llu "
+			"duplicate=%llu invalid=%llu bulk-delta=%llu clean-delta=%llu\n",
+			static_cast<unsigned long long>(integrity.Total()),
+			static_cast<unsigned long long>(integrity.parentChildMismatch),
+			static_cast<unsigned long long>(integrity.orphan),
+			static_cast<unsigned long long>(integrity.duplicateChild),
+			static_cast<unsigned long long>(integrity.invalidReference),
+			static_cast<unsigned long long>(bulkDelta),
+			static_cast<unsigned long long>(cleanDelta));
+		std::printf("[scene.hierarchymutation] probe=%s\n", pass ? "PASS" : "FAIL");
+
+		if (bulkChild) bulkChild->Destroy();
+		if (bulkParent) bulkParent->Destroy();
+		child->Destroy();
+		parent->Destroy();
+		ancestor->Destroy();
+	}
+
+	void HandleSceneExecutionGraph(const std::vector<std::string>& parts)
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (parts.size() < 2 || ("probe" != parts[1] && "bench" != parts[1]))
+		{
+			std::printf("[CLI] 사용법: scene.executiongraph probe | bench <N> [samples]\n");
+			return;
+		}
+
+		if ("bench" == parts[1])
+		{
+			const int objectCount = parts.size() > 2
+				? (std::max)(1, std::atoi(parts[2].c_str())) : 10000;
+			const int sampleCount = parts.size() > 3
+				? (std::max)(4, std::atoi(parts[3].c_str())) : 4;
+			Entity* parentA = nullptr;
+			Entity* parentB = nullptr;
+			Entity* mover = nullptr;
+			{
+				[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
+				parentA = scene->CreateEntity("__executiongraph_bench_a", GameObjectType::Empty);
+				parentB = scene->CreateEntity("__executiongraph_bench_b", GameObjectType::Empty);
+				for (int i = 0; parentA && i < objectCount; ++i)
+				{
+					Entity* node = scene->CreateEntity(
+						"__executiongraph_bench_node", GameObjectType::Empty, parentA->m_index);
+					if (0 == i) mover = node;
+				}
+			}
+
+			if (!parentA || !parentB || !mover)
+			{
+				if (parentA) parentA->Destroy();
+				if (parentB) parentB->Destroy();
+				std::printf("[scene.executiongraph] bench=FAIL create=0\n");
+				return;
+			}
+
+			const EntityHandle moverHandle = scene->HandleOf(mover->m_index);
+			const EntityHandle parentAHandle = scene->HandleOf(parentA->m_index);
+			const EntityHandle parentBHandle = scene->HandleOf(parentB->m_index);
+			std::vector<double> samples;
+			samples.reserve(sampleCount);
+			bool pass = true;
+			uint64_t previousCompileCount =
+				scene->GetExecutionGraphCompileMetrics().compileCount;
+			for (int sample = 0; sample < sampleCount; ++sample)
+			{
+				if (sample > 0)
+				{
+					const EntityHandle target = 0 == (sample & 1)
+						? parentAHandle : parentBHandle;
+					pass = pass && ReparentResult::Success == scene->Reparent(moverHandle, target);
+				}
+				scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+				const ExecutionGraphCompileMetrics metrics =
+					scene->GetExecutionGraphCompileMetrics();
+				pass = pass && metrics.success
+					&& metrics.compileCount == previousCompileCount + 1;
+				previousCompileCount = metrics.compileCount;
+				samples.push_back(metrics.compileUs);
+			}
+
+			std::ranges::sort(samples);
+			const double median = 0 == (samples.size() & 1)
+				? (samples[samples.size() / 2 - 1] + samples[samples.size() / 2]) * 0.5
+				: samples[samples.size() / 2];
+			const size_t p95Index = (samples.size() * 95 + 99) / 100 - 1;
+			const double p95 = samples[p95Index];
+			const double maximum = samples.back();
+			constexpr double frameBudgetUs = 1000000.0 / 60.0;
+			const bool inBudget = maximum <= frameBudgetUs;
+			pass = pass && inBudget;
+			const ExecutionGraphCompileMetrics finalMetrics =
+				scene->GetExecutionGraphCompileMetrics();
+			std::printf(
+				"[scene.executiongraph] bench nodes=%d samples=%d spatial=%llu "
+				"median-us=%.3f p95-us=%.3f max-us=%.3f budget-us=%.3f budget=%s\n",
+				objectCount, sampleCount,
+				static_cast<unsigned long long>(finalMetrics.spatialNodes),
+				median, p95, maximum, frameBudgetUs, inBudget ? "PASS" : "FAIL");
+			std::printf("[scene.executiongraph] bench=%s\n", pass ? "PASS" : "FAIL");
+			parentA->Destroy();
+			parentB->Destroy();
+			return;
+		}
+
+		Entity* spatialAncestor = nullptr;
+		Entity* spatialBridge = nullptr;
+		Entity* spatialChild = nullptr;
+		Entity* layoutAncestor = nullptr;
+		Entity* layoutBridge = nullptr;
+		Entity* layoutChild = nullptr;
+		Entity* canvasEntity = nullptr;
+		{
+			[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
+			spatialAncestor = scene->CreateEntity(
+				"__executiongraph_spatial_ancestor", GameObjectType::Empty);
+			spatialBridge = spatialAncestor ? scene->CreateEntity(
+				"__executiongraph_spatial_bridge", GameObjectType::UI,
+				spatialAncestor->m_index) : nullptr;
+			spatialChild = spatialBridge ? scene->CreateEntity(
+				"__executiongraph_spatial_child", GameObjectType::Empty,
+				spatialBridge->m_index) : nullptr;
+
+			layoutAncestor = scene->CreateEntity(
+				"__executiongraph_layout_ancestor", GameObjectType::UI);
+			layoutBridge = layoutAncestor ? scene->CreateEntity(
+				"__executiongraph_layout_bridge", GameObjectType::Empty,
+				layoutAncestor->m_index) : nullptr;
+			layoutChild = layoutBridge ? scene->CreateEntity(
+				"__executiongraph_layout_child", GameObjectType::UI,
+				layoutBridge->m_index) : nullptr;
+			canvasEntity = scene->CreateEntity(
+				"__executiongraph_canvas", GameObjectType::Canvas);
+			if (canvasEntity) canvasEntity->AddComponent<Canvas>();
+		}
+
+		const bool created = spatialAncestor && spatialBridge && spatialChild
+			&& layoutAncestor && layoutBridge && layoutChild && canvasEntity;
+		if (!created)
+		{
+			std::printf("[scene.executiongraph] probe=FAIL create=0\n");
+			return;
+		}
+
+		const EntityHandle spatialAncestorHandle = scene->HandleOf(spatialAncestor->m_index);
+		const EntityHandle spatialBridgeHandle = scene->HandleOf(spatialBridge->m_index);
+		const EntityHandle spatialChildHandle = scene->HandleOf(spatialChild->m_index);
+		const EntityHandle layoutAncestorHandle = scene->HandleOf(layoutAncestor->m_index);
+		const EntityHandle layoutBridgeHandle = scene->HandleOf(layoutBridge->m_index);
+		const EntityHandle layoutChildHandle = scene->HandleOf(layoutChild->m_index);
+		const EntityHandle canvasHandle = scene->HandleOf(canvasEntity->m_index);
+
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const ExecutionGraphCompileMetrics initial =
+			scene->GetExecutionGraphCompileMetrics();
+		const ExecutionGraphRelationDiagnostics spatialBridgeRelation =
+			scene->GetExecutionGraphRelationDiagnostics(spatialBridgeHandle);
+		const ExecutionGraphRelationDiagnostics spatialChildRelation =
+			scene->GetExecutionGraphRelationDiagnostics(spatialChildHandle);
+		const ExecutionGraphRelationDiagnostics layoutBridgeRelation =
+			scene->GetExecutionGraphRelationDiagnostics(layoutBridgeHandle);
+		const ExecutionGraphRelationDiagnostics layoutChildRelation =
+			scene->GetExecutionGraphRelationDiagnostics(layoutChildHandle);
+		const ExecutionGraphRelationDiagnostics canvasRelation =
+			scene->GetExecutionGraphRelationDiagnostics(canvasHandle);
+
+		const bool nearestSpatial = !spatialBridgeRelation.spatialMember
+			&& spatialChildRelation.spatialMember
+			&& spatialChildRelation.spatialParent == spatialAncestorHandle;
+		const bool nearestLayout = !layoutBridgeRelation.layoutMember
+			&& layoutChildRelation.layoutMember
+			&& layoutChildRelation.layoutParent == layoutAncestorHandle;
+		const bool canvasBoth = canvasRelation.spatialMember && canvasRelation.layoutMember;
+		const uint64_t compileBeforeMembership = initial.compileCount;
+		RectTransformComponent* dynamicRect =
+			layoutBridge->AddComponent<RectTransformComponent>();
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const ExecutionGraphCompileMetrics afterMembership =
+			scene->GetExecutionGraphCompileMetrics();
+		const ExecutionGraphRelationDiagnostics dynamicLayoutRelation =
+			scene->GetExecutionGraphRelationDiagnostics(layoutBridgeHandle);
+		const ExecutionGraphRelationDiagnostics dynamicChildRelation =
+			scene->GetExecutionGraphRelationDiagnostics(layoutChildHandle);
+		const bool dynamicMembership = dynamicRect && dynamicLayoutRelation.layoutMember
+			&& dynamicChildRelation.layoutParent == layoutBridgeHandle
+			&& afterMembership.compileCount == compileBeforeMembership + 1;
+
+		spatialAncestor->Transform_().SetPosition({ 3.f, 5.f, 7.f });
+		spatialChild->Transform_().SetPosition({ 11.f, 13.f, 17.f });
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const math::matrix4x4 localBefore = spatialChild->Transform_().GetLocalMatrix();
+		const math::matrix4x4 worldBefore = spatialChild->Transform_().GetWorldMatrix();
+		const uint64_t compileBeforeBulk =
+			scene->GetExecutionGraphCompileMetrics().compileCount;
+
+		Entity* bulkParent = nullptr;
+		Entity* bulkChild = nullptr;
+		{
+			[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
+			bulkParent = scene->CreateEntity(
+				"__executiongraph_bulk_parent", GameObjectType::Empty);
+			bulkChild = bulkParent ? scene->CreateEntity(
+				"__executiongraph_bulk_child", GameObjectType::Empty,
+				bulkParent->m_index) : nullptr;
+		}
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const ExecutionGraphCompileMetrics afterBulk =
+			scene->GetExecutionGraphCompileMetrics();
+		const math::matrix4x4 localAfter = spatialChild->Transform_().GetLocalMatrix();
+		const math::matrix4x4 worldAfter = spatialChild->Transform_().GetWorldMatrix();
+		const bool valuesExact = 0 == std::memcmp(&localBefore, &localAfter, sizeof(localBefore))
+			&& 0 == std::memcmp(&worldBefore, &worldAfter, sizeof(worldBefore));
+		const bool identityStable = scene->Resolve(spatialAncestorHandle) == spatialAncestor
+			&& scene->Resolve(spatialChildHandle) == spatialChild
+			&& scene->Resolve(layoutAncestorHandle) == layoutAncestor
+			&& scene->Resolve(layoutChildHandle) == layoutChild
+			&& scene->Resolve(canvasHandle) == canvasEntity;
+		const uint64_t bulkCompileDelta = afterBulk.compileCount - compileBeforeBulk;
+
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const ExecutionGraphCompileMetrics clean =
+			scene->GetExecutionGraphCompileMetrics();
+		const uint64_t cleanCompileDelta = clean.compileCount - afterBulk.compileCount;
+		constexpr double frameBudgetUs = 1000000.0 / 60.0;
+		const bool pass = initial.success && afterBulk.success
+			&& 0 == afterBulk.TotalViolations()
+			&& nearestSpatial && nearestLayout && canvasBoth && dynamicMembership
+			&& valuesExact && identityStable
+			&& bulkParent && bulkChild
+			&& 1 == bulkCompileDelta && 0 == cleanCompileDelta
+			&& afterBulk.compileUs <= frameBudgetUs;
+
+		std::printf(
+			"[scene.executiongraph] compile=%s topology=%llu compiled=%llu count=%llu "
+			"occupied=%llu spatial=%llu layout=%llu compile-us=%.3f budget-us=%.3f\n",
+			afterBulk.success ? "PASS" : "FAIL",
+			static_cast<unsigned long long>(afterBulk.topologyVersion),
+			static_cast<unsigned long long>(afterBulk.compiledVersion),
+			static_cast<unsigned long long>(afterBulk.compileCount),
+			static_cast<unsigned long long>(afterBulk.occupiedEntities),
+			static_cast<unsigned long long>(afterBulk.spatialNodes),
+			static_cast<unsigned long long>(afterBulk.layoutNodes),
+			afterBulk.compileUs, frameBudgetUs);
+		std::printf(
+			"[scene.executiongraph] transformless=%llu nonlayout=%llu mapping=%llu "
+			"parent-order=%llu range=%llu hierarchy=%llu unreachable=%llu cycle=%llu\n",
+			static_cast<unsigned long long>(afterBulk.transformlessSpatial),
+			static_cast<unsigned long long>(afterBulk.nonLayoutMember),
+			static_cast<unsigned long long>(afterBulk.mappingViolations),
+			static_cast<unsigned long long>(afterBulk.parentOrderViolations),
+			static_cast<unsigned long long>(afterBulk.subtreeRangeViolations),
+			static_cast<unsigned long long>(afterBulk.hierarchyViolations),
+			static_cast<unsigned long long>(afterBulk.unreachableEntities),
+			static_cast<unsigned long long>(afterBulk.cycleViolations));
+		std::printf(
+			"[scene.executiongraph] nearest-spatial=%s nearest-layout=%s canvas-both=%s dynamic-layout=%s "
+			"identity=%s values=%s bulk-compile-delta=%llu clean-compile-delta=%llu\n",
+			nearestSpatial ? "PASS" : "FAIL", nearestLayout ? "PASS" : "FAIL",
+			canvasBoth ? "PASS" : "FAIL", dynamicMembership ? "PASS" : "FAIL",
+			identityStable ? "stable" : "changed",
+			valuesExact ? "exact" : "changed",
+			static_cast<unsigned long long>(bulkCompileDelta),
+			static_cast<unsigned long long>(cleanCompileDelta));
+		std::printf("[scene.executiongraph] probe=%s\n", pass ? "PASS" : "FAIL");
+
+		if (bulkChild) bulkChild->Destroy();
+		if (bulkParent) bulkParent->Destroy();
+		spatialChild->Destroy();
+		spatialBridge->Destroy();
+		spatialAncestor->Destroy();
+		layoutChild->Destroy();
+		layoutBridge->Destroy();
+		layoutAncestor->Destroy();
+		canvasEntity->Destroy();
+	}
+
+	void HandleSceneSparseResolver(const std::vector<std::string>& parts)
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (parts.size() < 2)
+		{
+			std::printf("[CLI] 사용법: scene.sparseresolver 0|1|print|probe|bench <N> <frames>\n");
+			return;
+		}
+
+		if ("0" == parts[1] || "1" == parts[1])
+		{
+			const bool enabled = "1" == parts[1];
+			Scene::SetSparseSpatialResolverEnabled(enabled);
+			scene->MarkSpatialTransformsDirty();
+			std::printf("[scene.sparseresolver] enabled=%d\n", enabled ? 1 : 0);
+			return;
+		}
+
+		if ("print" == parts[1])
+		{
+			const SpatialResolveMetrics& m = scene->GetLastSpatialResolveMetrics();
+			std::printf(
+				"[scene.sparseresolver] enabled=%d resolved=%d sparse=%d fallback=%d full=%d "
+				"requests=%llu stale=%llu ranges=%llu merged=%llu nodes=%llu "
+				"compose=%llu writes=%llu resolve-us=%.3f\n",
+				Scene::IsSparseSpatialResolverEnabled() ? 1 : 0, m.resolved ? 1 : 0,
+				m.sparseExecuted ? 1 : 0, m.legacyFallback ? 1 : 0,
+				m.fullResolve ? 1 : 0,
+				static_cast<unsigned long long>(m.dirtyRequests),
+				static_cast<unsigned long long>(m.staleRequests),
+				static_cast<unsigned long long>(m.canonicalRanges),
+				static_cast<unsigned long long>(m.mergedRequests),
+				static_cast<unsigned long long>(m.resolvedNodes),
+				static_cast<unsigned long long>(m.localComposes),
+				static_cast<unsigned long long>(m.worldWrites), m.resolveUs);
+			return;
+		}
+
+		if ("bench" == parts[1])
+		{
+			if (parts.size() < 4)
+			{
+				std::printf("[CLI] 사용법: scene.sparseresolver bench <N> <frames>\n");
+				return;
+			}
+			const int objectCount = (std::max)(1, std::atoi(parts[2].c_str()));
+			const int frames = (std::max)(4, std::atoi(parts[3].c_str()));
+			const bool wasSparse = Scene::IsSparseSpatialResolverEnabled();
+			Entity* root = nullptr;
+			std::vector<Entity*> nodes;
+			nodes.reserve(objectCount);
+			{
+				[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
+				root = scene->CreateEntity("__sparse_bench_root", GameObjectType::Empty);
+				for (int i = 0; root && i < objectCount; ++i)
+				{
+					nodes.push_back(scene->CreateEntity(
+						"__sparse_bench_" + std::to_string(i),
+						GameObjectType::Empty, root->m_index));
+				}
+			}
+			if (!root || nodes.size() != static_cast<size_t>(objectCount)
+				|| std::ranges::find(nodes, nullptr) != nodes.end())
+			{
+				if (root) root->Destroy();
+				Scene::SetSparseSpatialResolverEnabled(wasSparse);
+				std::printf("[scene.sparseresolver] bench=FAIL create=0\n");
+				return;
+			}
+
+			scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+			enum class Scenario { Idle, Leaf, RandomOnePercent, Root, Full };
+			const auto scenarioName = [](Scenario scenario)
+			{
+				switch (scenario)
+				{
+				case Scenario::Idle: return "idle";
+				case Scenario::Leaf: return "leaf";
+				case Scenario::RandomOnePercent: return "random-1pct";
+				case Scenario::Root: return "root-subtree";
+				case Scenario::Full: return "full";
+				default: return "unknown";
+				}
+			};
+			struct BenchResult
+			{
+				double syncMedianUs = 0.0;
+				double resolveMedianUs = 0.0;
+				uint64_t nodes = 0;
+				uint64_t ranges = 0;
+			};
+
+			auto runScenario = [&](bool sparse, Scenario scenario)
+			{
+				Scene::SetSparseSpatialResolverEnabled(sparse);
+				scene->MarkSpatialTransformsDirty();
+				scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+				std::vector<double> syncSamples;
+				std::vector<double> resolveSamples;
+				syncSamples.reserve(frames);
+				resolveSamples.reserve(frames);
+				SpatialResolveMetrics last{};
+				const int movingOnePercent = (std::max)(1, objectCount / 100);
+				for (int frame = -2; frame < frames; ++frame)
+				{
+					const float x = 0 == (frame & 1) ? 1.f : 2.f;
+					switch (scenario)
+					{
+					case Scenario::Idle: break;
+					case Scenario::Leaf:
+						nodes.back()->Transform_().SetPosition({ x, 0.f, 0.f });
+						break;
+					case Scenario::RandomOnePercent:
+						for (int i = 0; i < movingOnePercent; ++i)
+							nodes[static_cast<size_t>(i)]->Transform_().SetPosition({ x, 0.f, 0.f });
+						break;
+					case Scenario::Root:
+						root->Transform_().SetPosition({ x, 0.f, 0.f });
+						break;
+					case Scenario::Full:
+						for (Entity* node : nodes)
+							node->Transform_().SetPosition({ x, 0.f, 0.f });
+						break;
+					}
+
+					const auto begin = std::chrono::steady_clock::now();
+					scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+					const auto end = std::chrono::steady_clock::now();
+					last = scene->GetLastSpatialResolveMetrics();
+					if (frame >= 0)
+					{
+						syncSamples.push_back(std::chrono::duration<double, std::micro>(end - begin).count());
+						resolveSamples.push_back(last.resolveUs);
+					}
+				}
+				std::ranges::sort(syncSamples);
+				std::ranges::sort(resolveSamples);
+				const auto medianOf = [](const std::vector<double>& values)
+				{
+					return 0 == (values.size() & 1)
+						? (values[values.size() / 2 - 1] + values[values.size() / 2]) * 0.5
+						: values[values.size() / 2];
+				};
+				return BenchResult{ medianOf(syncSamples), medianOf(resolveSamples),
+					last.resolvedNodes, last.canonicalRanges };
+			};
+
+			constexpr Scenario scenarios[] = {
+				Scenario::Idle, Scenario::Leaf, Scenario::RandomOnePercent,
+				Scenario::Root, Scenario::Full };
+			std::array<BenchResult, std::size(scenarios)> legacy{};
+			std::array<BenchResult, std::size(scenarios)> sparse{};
+			for (size_t i = 0; i < std::size(scenarios); ++i)
+				legacy[i] = runScenario(false, scenarios[i]);
+			for (size_t i = 0; i < std::size(scenarios); ++i)
+				sparse[i] = runScenario(true, scenarios[i]);
+
+			for (size_t i = 0; i < std::size(scenarios); ++i)
+			{
+				std::printf(
+					"[scene.sparseresolver] bench n=%d mode=legacy scenario=%s "
+					"sync-median-us=%.3f resolve-median-us=%.3f\n",
+					objectCount, scenarioName(scenarios[i]), legacy[i].syncMedianUs,
+					legacy[i].resolveMedianUs);
+				std::printf(
+					"[scene.sparseresolver] bench n=%d mode=sparse scenario=%s "
+					"sync-median-us=%.3f resolve-median-us=%.3f nodes=%llu ranges=%llu\n",
+					objectCount, scenarioName(scenarios[i]), sparse[i].syncMedianUs,
+					sparse[i].resolveMedianUs,
+					static_cast<unsigned long long>(sparse[i].nodes),
+					static_cast<unsigned long long>(sparse[i].ranges));
+			}
+			const bool pass = 1 == sparse[1].nodes && 1 == sparse[1].ranges
+				&& static_cast<uint64_t>((std::max)(1, objectCount / 100)) == sparse[2].nodes
+				&& sparse[3].nodes >= static_cast<uint64_t>(objectCount)
+				&& sparse[4].nodes >= static_cast<uint64_t>(objectCount)
+				&& sparse[4].resolveMedianUs <= legacy[4].resolveMedianUs * 1.10;
+			std::printf("[scene.sparseresolver] bench n=%d result=%s full-ratio=%.3f\n",
+				objectCount, pass ? "PASS" : "FAIL",
+				legacy[4].resolveMedianUs > 0.0
+					? sparse[4].resolveMedianUs / legacy[4].resolveMedianUs : 0.0);
+			root->Destroy();
+			Scene::SetSparseSpatialResolverEnabled(wasSparse);
+			return;
+		}
+
+		if ("probe" != parts[1])
+		{
+			std::printf("[CLI] 사용법: scene.sparseresolver 0|1|print|probe|bench <N> <frames>\n");
+			return;
+		}
+
+		const bool wasSparse = Scene::IsSparseSpatialResolverEnabled();
+		Scene::SetSparseSpatialResolverEnabled(true);
+		Entity* ancestor = nullptr;
+		Entity* bridge = nullptr;
+		Entity* leaf = nullptr;
+		Entity* sibling = nullptr;
+		{
+			[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
+			ancestor = scene->CreateEntity("__sparse_probe_ancestor", GameObjectType::Empty);
+			bridge = ancestor ? scene->CreateEntity(
+				"__sparse_probe_bridge", GameObjectType::UI, ancestor->m_index) : nullptr;
+			leaf = bridge ? scene->CreateEntity(
+				"__sparse_probe_leaf", GameObjectType::Empty, bridge->m_index) : nullptr;
+			sibling = ancestor ? scene->CreateEntity(
+				"__sparse_probe_sibling", GameObjectType::Empty, ancestor->m_index) : nullptr;
+		}
+		if (!ancestor || !bridge || !leaf || !sibling)
+		{
+			std::printf("[scene.sparseresolver] probe=FAIL create=0\n");
+			Scene::SetSparseSpatialResolverEnabled(wasSparse);
+			return;
+		}
+
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const SpatialResolveMetrics idle = scene->GetLastSpatialResolveMetrics();
+		leaf->Transform_().SetPosition({ 1.f, 2.f, 3.f });
+		leaf->Transform_().SetPosition({ 4.f, 5.f, 6.f });
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const SpatialResolveMetrics leafOnly = scene->GetLastSpatialResolveMetrics();
+
+		ancestor->Transform_().SetPosition({ 7.f, 0.f, 0.f });
+		leaf->Transform_().SetPosition({ 8.f, 0.f, 0.f });
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const SpatialResolveMetrics merged = scene->GetLastSpatialResolveMetrics();
+		const math::matrix4x4 sparseWorld = leaf->Transform_().GetWorldMatrix();
+
+		Scene::SetSparseSpatialResolverEnabled(false);
+		ancestor->Transform_().SetPosition({ 9.f, 0.f, 0.f });
+		leaf->Transform_().SetPosition({ 10.f, 0.f, 0.f });
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const SpatialResolveMetrics legacy = scene->GetLastSpatialResolveMetrics();
+		const math::matrix4x4 legacyWorld = leaf->Transform_().GetWorldMatrix();
+		Scene::SetSparseSpatialResolverEnabled(true);
+		scene->MarkSpatialTransformsDirty();
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const SpatialResolveMetrics returnedSparse = scene->GetLastSpatialResolveMetrics();
+		const math::matrix4x4 returnedWorld = leaf->Transform_().GetWorldMatrix();
+		const bool abExact = 0 == std::memcmp(
+			&legacyWorld, &returnedWorld, sizeof(legacyWorld));
+
+		const bool pass = !idle.resolved
+			&& leafOnly.sparseExecuted && 1 == leafOnly.dirtyRequests
+			&& 1 == leafOnly.canonicalRanges && 1 == leafOnly.resolvedNodes
+			&& merged.sparseExecuted && 2 == merged.dirtyRequests
+			&& 1 == merged.canonicalRanges && merged.mergedRequests >= 1
+			&& 3 == merged.resolvedNodes
+			&& legacy.resolved && !legacy.sparseExecuted
+			&& returnedSparse.sparseExecuted && returnedSparse.fullResolve
+			&& abExact && sparseWorld != legacyWorld;
+		std::printf(
+			"[scene.sparseresolver] idle=%s leaf=requests:%llu/ranges:%llu/nodes:%llu "
+			"merged=requests:%llu/ranges:%llu/merged:%llu/nodes:%llu\n",
+			idle.resolved ? "run" : "empty",
+			static_cast<unsigned long long>(leafOnly.dirtyRequests),
+			static_cast<unsigned long long>(leafOnly.canonicalRanges),
+			static_cast<unsigned long long>(leafOnly.resolvedNodes),
+			static_cast<unsigned long long>(merged.dirtyRequests),
+			static_cast<unsigned long long>(merged.canonicalRanges),
+			static_cast<unsigned long long>(merged.mergedRequests),
+			static_cast<unsigned long long>(merged.resolvedNodes));
+		std::printf(
+			"[scene.sparseresolver] legacy=%s return-sparse=%s/full:%s ab=%s\n",
+			legacy.sparseExecuted ? "sparse" : "recursive",
+			returnedSparse.sparseExecuted ? "packed" : "recursive",
+			returnedSparse.fullResolve ? "yes" : "no", abExact ? "exact" : "changed");
+		std::printf("[scene.sparseresolver] probe=%s\n", pass ? "PASS" : "FAIL");
+
+		ancestor->Destroy();
+		bridge->Destroy();
+		leaf->Destroy();
+		sibling->Destroy();
+		Scene::SetSparseSpatialResolverEnabled(wasSparse);
+	}
+
+	void HandleSceneTransformPull(const std::vector<std::string>& parts)
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (parts.size() < 2 || ("print" != parts[1] && "probe" != parts[1]))
+		{
+			std::printf("[CLI] 사용법: scene.transformpull print|probe\n");
+			return;
+		}
+
+		if ("print" == parts[1])
+		{
+			const SpatialPullMetrics& m = scene->GetLastSpatialPullMetrics();
+			std::printf(
+				"[scene.transformpull] attempted=%d resolved=%d packed=%d fallback=%d "
+				"stale=%d queue=%s signal=%s path=%llu recomputed=%llu compose=%llu "
+				"writes=%llu pending=%llu->%llu epoch=%llu->%llu\n",
+				m.attempted ? 1 : 0, m.resolved ? 1 : 0, m.packed ? 1 : 0,
+				m.legacyFallback ? 1 : 0, m.staleHandle ? 1 : 0,
+				m.queuePreserved ? "kept" : "changed",
+				m.propagationSignalPreserved ? "kept" : "changed",
+				static_cast<unsigned long long>(m.pathNodes),
+				static_cast<unsigned long long>(m.recomputedNodes),
+				static_cast<unsigned long long>(m.localComposes),
+				static_cast<unsigned long long>(m.worldWrites),
+				static_cast<unsigned long long>(m.pendingRequestsBefore),
+				static_cast<unsigned long long>(m.pendingRequestsAfter),
+				static_cast<unsigned long long>(m.dirtyEpochBefore),
+				static_cast<unsigned long long>(m.dirtyEpochAfter));
+			return;
+		}
+
+		const bool wasSparse = Scene::IsSparseSpatialResolverEnabled();
+		Scene::SetSparseSpatialResolverEnabled(true);
+		Entity* parent = nullptr;
+		Entity* childA = nullptr;
+		Entity* childB = nullptr;
+		{
+			[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
+			parent = scene->CreateEntity("__pull_probe_parent", GameObjectType::Empty);
+			childA = parent ? scene->CreateEntity(
+				"__pull_probe_a", GameObjectType::Empty, parent->m_index) : nullptr;
+			childB = parent ? scene->CreateEntity(
+				"__pull_probe_b", GameObjectType::Empty, parent->m_index) : nullptr;
+		}
+		if (!parent || !childA || !childB)
+		{
+			if (parent) parent->Destroy();
+			Scene::SetSparseSpatialResolverEnabled(wasSparse);
+			std::printf("[scene.transformpull] probe=FAIL create=0\n");
+			return;
+		}
+
+		childA->Transform_().SetPosition({ 1.f, 2.f, 3.f });
+		childB->Transform_().SetPosition({ 2.f, 0.f, 0.f });
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const EntityHandle childAHandle = scene->HandleOf(childA->m_index);
+
+		const auto nearScalar = [](float a, float b)
+		{
+			return std::abs(a - b) <= 1e-4f;
+		};
+		const auto nearVector = [&](const math::vector3& a, const math::vector3& b)
+		{
+			return nearScalar(a.x, b.x) && nearScalar(a.y, b.y) && nearScalar(a.z, b.z);
+		};
+		const auto nearQuaternion = [&](const math::quaternion& a, const math::quaternion& b)
+		{
+			const bool same = nearScalar(a.x, b.x) && nearScalar(a.y, b.y)
+				&& nearScalar(a.z, b.z) && nearScalar(a.w, b.w);
+			const bool negated = nearScalar(a.x, -b.x) && nearScalar(a.y, -b.y)
+				&& nearScalar(a.z, -b.z) && nearScalar(a.w, -b.w);
+			return same || negated;
+		};
+
+		Transform& transformA = childA->Transform_();
+		transformA.SetPosition({ 3.f, 4.f, 5.f }, TransformWriteReason::Script);
+		transformA.SetRotation(
+			{ 0.f, 0.38268343f, 0.f, 0.92387953f }, TransformWriteReason::Script);
+		transformA.SetScale({ 2.f, 3.f, 4.f }, TransformWriteReason::Script);
+		bool immediatePulls = scene->EnsureResolved(childAHandle);
+		SpatialPullMetrics immediate = scene->GetLastSpatialPullMetrics();
+		immediatePulls = immediatePulls && immediate.packed && immediate.queuePreserved
+			&& immediate.propagationSignalPreserved
+			&& 1 == immediate.pendingRequestsBefore
+			&& immediate.pendingRequestsBefore == immediate.pendingRequestsAfter;
+
+		// World setter들도 ClrHost와 같은 순서(먼저 Ensure, setter, 즉시 getter)를 탄다.
+		immediatePulls = immediatePulls && scene->EnsureResolved(childAHandle);
+		transformA.SetWorldPosition({ 6.f, 7.f, 8.f }, TransformWriteReason::Script);
+		immediatePulls = immediatePulls && scene->EnsureResolved(childAHandle)
+			&& nearVector(transformA.GetWorldPosition(), { 6.f, 7.f, 8.f });
+		immediatePulls = immediatePulls && scene->EnsureResolved(childAHandle);
+		const math::quaternion requestedWorldRotation{
+			0.25881905f, 0.f, 0.f, 0.96592583f };
+		transformA.SetWorldRotation(requestedWorldRotation, TransformWriteReason::Script);
+		immediatePulls = immediatePulls && scene->EnsureResolved(childAHandle)
+			&& nearQuaternion(transformA.GetWorldQuaternion(), requestedWorldRotation);
+		immediatePulls = immediatePulls && scene->EnsureResolved(childAHandle);
+		transformA.SetWorldScale({ 1.5f, 2.f, 2.5f }, TransformWriteReason::Script);
+		immediatePulls = immediatePulls && scene->EnsureResolved(childAHandle)
+			&& nearVector(transformA.GetWorldScale(), { 1.5f, 2.f, 2.5f });
+
+		const math::matrix4x4 immediateWorld = transformA.GetWorldMatrix();
+		math::vector3 expectedScale{};
+		math::quaternion expectedRotation{};
+		math::vector3 expectedPosition{};
+		const bool decomposed = math::decompose(
+			immediateWorld, expectedScale, expectedRotation, expectedPosition);
+		expectedRotation = math::normalize(expectedRotation);
+		const bool allGetters = decomposed
+			&& nearVector(transformA.GetWorldPosition(), expectedPosition)
+			&& nearVector(transformA.GetWorldScale(), expectedScale)
+			&& nearQuaternion(transformA.GetWorldQuaternion(), expectedRotation)
+			&& nearVector(transformA.GetForward(), math::normalize(math::transform_direction(
+				math::vector3::unit_z(), immediateWorld)))
+			&& nearVector(transformA.GetRight(), math::normalize(math::transform_direction(
+				math::vector3::unit_x(), immediateWorld)))
+			&& nearVector(transformA.GetUp(), math::normalize(math::transform_direction(
+				math::vector3::unit_y(), immediateWorld)));
+
+		// 첫 묶음의 queue를 비우고 parent-only write가 sibling에 전파되는 경계를 잰다.
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const math::vector3 childBeforeParent = transformA.GetWorldPosition();
+		const math::vector3 siblingBefore = childB->Transform_().GetWorldPosition();
+		parent->Transform_().SetPosition(
+			{ 10.f, 0.f, 0.f }, TransformWriteReason::Script);
+		const bool parentPulled = scene->EnsureResolved(childAHandle);
+		const SpatialPullMetrics parentPull = scene->GetLastSpatialPullMetrics();
+		const math::vector3 childAfterPull = transformA.GetWorldPosition();
+		const math::vector3 siblingBeforeGlobal = childB->Transform_().GetWorldPosition();
+		const bool targetedBoundary = parentPulled && parentPull.packed
+			&& parentPull.queuePreserved && parentPull.propagationSignalPreserved
+			&& 1 == parentPull.pendingRequestsBefore
+			&& nearScalar(childAfterPull.x, childBeforeParent.x + 10.f)
+			&& nearVector(siblingBeforeGlobal, siblingBefore);
+
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const SpatialResolveMetrics global = scene->GetLastSpatialResolveMetrics();
+		const math::vector3 siblingAfterGlobal = childB->Transform_().GetWorldPosition();
+		const bool siblingPropagated = nearScalar(
+			siblingAfterGlobal.x, siblingBefore.x + 10.f)
+			&& global.sparseExecuted && 1 == global.dirtyRequests
+			&& 1 == global.canonicalRanges && global.resolvedNodes >= 3;
+
+		const bool cleanResolved = scene->EnsureResolved(childAHandle);
+		const SpatialPullMetrics clean = scene->GetLastSpatialPullMetrics();
+		EntityHandle stale = childAHandle;
+		if (0 == ++stale.generation) ++stale.generation;
+		const bool staleRejected = !scene->EnsureResolved(stale);
+		const SpatialPullMetrics staleMetrics = scene->GetLastSpatialPullMetrics();
+		const bool failClose = staleRejected && staleMetrics.staleHandle
+			&& staleMetrics.queuePreserved;
+		const bool cleanEmpty = cleanResolved && clean.packed
+			&& 0 == clean.recomputedNodes && 0 == clean.worldWrites
+			&& clean.queuePreserved;
+
+		const math::vector3 fallbackBefore = transformA.GetWorldPosition();
+		Scene::SetSparseSpatialResolverEnabled(false);
+		transformA.SetPosition({ 7.f, 7.f, 8.f }, TransformWriteReason::Script);
+		const bool fallbackResolved = scene->EnsureResolved(childAHandle);
+		const SpatialPullMetrics fallback = scene->GetLastSpatialPullMetrics();
+		const bool fallbackPass = fallbackResolved && fallback.legacyFallback
+			&& fallback.queuePreserved && fallback.propagationSignalPreserved
+			&& nearScalar(transformA.GetWorldPosition().x, fallbackBefore.x + 1.f);
+		Scene::SetSparseSpatialResolverEnabled(true);
+		scene->MarkSpatialTransformsDirty();
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+
+		const bool pass = immediatePulls && allGetters && targetedBoundary
+			&& siblingPropagated && cleanEmpty && failClose && fallbackPass;
+		std::printf(
+			"[scene.transformpull] immediate=%s getters=%s queue=%llu->%llu signal=%s "
+			"path=%llu recomputed=%llu writes=%llu\n",
+			immediatePulls ? "PASS" : "FAIL", allGetters ? "PASS" : "FAIL",
+			static_cast<unsigned long long>(immediate.pendingRequestsBefore),
+			static_cast<unsigned long long>(immediate.pendingRequestsAfter),
+			immediate.propagationSignalPreserved ? "kept" : "changed",
+			static_cast<unsigned long long>(immediate.pathNodes),
+			static_cast<unsigned long long>(immediate.recomputedNodes),
+			static_cast<unsigned long long>(immediate.worldWrites));
+		std::printf(
+			"[scene.transformpull] parent-pull=%s sibling-before=%s sibling-global=%s "
+			"requests=%llu ranges=%llu nodes=%llu\n",
+			targetedBoundary ? "PASS" : "FAIL",
+			nearVector(siblingBeforeGlobal, siblingBefore) ? "stale" : "changed",
+			siblingPropagated ? "updated" : "stale",
+			static_cast<unsigned long long>(global.dirtyRequests),
+			static_cast<unsigned long long>(global.canonicalRanges),
+			static_cast<unsigned long long>(global.resolvedNodes));
+		std::printf("[scene.transformpull] clean=%s stale=%s fallback=%s probe=%s\n",
+			cleanEmpty ? "empty" : "work", failClose ? "fail-close" : "accepted",
+			fallbackPass ? "PASS" : "FAIL", pass ? "PASS" : "FAIL");
+
+		parent->Destroy();
+		Scene::SetSparseSpatialResolverEnabled(wasSparse);
+	}
+
+	void HandleSceneTransformBulk(const std::vector<std::string>& parts)
+	{
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (parts.size() < 2 || "probe" != parts[1])
+		{
+			std::printf("[CLI] 사용법: scene.transformbulk probe\n");
+			return;
+		}
+
+		const auto pose = [](const math::vector3& position)
+		{
+			return math::compose(math::vector3{ 1.f, 1.f, 1.f },
+				math::quaternion{ 0.f, 0.f, 0.f, 1.f }, position);
+		};
+		const auto nearVector = [](const math::vector3& lhs, const math::vector3& rhs)
+		{
+			return std::abs(lhs.x - rhs.x) <= 1e-4f
+				&& std::abs(lhs.y - rhs.y) <= 1e-4f
+				&& std::abs(lhs.z - rhs.z) <= 1e-4f;
+		};
+		const auto makeSkeleton = []()
+		{
+			auto skeleton = std::make_unique<Skeleton>();
+			Bone* boneA = new Bone("BoneA", 0, math::matrix4x4::identity());
+			Bone* boneB = new Bone("BoneB", 1, math::matrix4x4::identity());
+			boneA->m_parentIndex = -1;
+			boneB->m_parentIndex = 0;
+			boneA->m_children.push_back(boneB);
+			skeleton->m_rootBone = boneA;
+			skeleton->m_bones = { boneA, boneB };
+			skeleton->m_rootTransform = math::matrix4x4::identity();
+			skeleton->m_globalInverseTransform = math::matrix4x4::identity();
+			return skeleton;
+		};
+
+		Entity* animatorRoot = nullptr;
+		Entity* boneA = nullptr;
+		Entity* boneB = nullptr;
+		Entity* invalidBone = nullptr;
+		Entity* physicsParent = nullptr;
+		Entity* physicsChild = nullptr;
+		Entity* socketTarget = nullptr;
+		Animator* animator = nullptr;
+		{
+			[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
+			animatorRoot = scene->CreateEntity(
+				"__bulk_animator", GameObjectType::Empty);
+			animator = animatorRoot ? animatorRoot->AddComponent<Animator>() : nullptr;
+			boneA = animatorRoot ? scene->CreateEntity(
+				"BoneA", GameObjectType::Empty, animatorRoot->m_index) : nullptr;
+			boneB = boneA ? scene->CreateEntity(
+				"BoneB", GameObjectType::Empty, boneA->m_index) : nullptr;
+			invalidBone = animatorRoot ? scene->CreateEntity(
+				"Missing", GameObjectType::Empty, animatorRoot->m_index) : nullptr;
+			if (boneA) boneA->AddComponent<BoneComponent>();
+			if (boneB) boneB->AddComponent<BoneComponent>();
+			if (invalidBone) invalidBone->AddComponent<BoneComponent>();
+
+			physicsParent = scene->CreateEntity(
+				"__bulk_rigidbody", GameObjectType::Empty);
+			physicsChild = physicsParent ? scene->CreateEntity(
+				"__bulk_cct", GameObjectType::Empty, physicsParent->m_index) : nullptr;
+			socketTarget = scene->CreateEntity(
+				"__bulk_socket", GameObjectType::Empty);
+		}
+		if (!animatorRoot || !animator || !boneA || !boneB || !invalidBone
+			|| !physicsParent || !physicsChild || !socketTarget)
+		{
+			if (animatorRoot) animatorRoot->Destroy();
+			if (physicsParent) physicsParent->Destroy();
+			if (socketTarget) socketTarget->Destroy();
+			std::printf("[scene.transformbulk] probe=FAIL create=0\n");
+			return;
+		}
+
+		auto skeletonA = makeSkeleton();
+		auto skeletonB = makeSkeleton();
+		animator->m_Skeleton = skeletonA.get();
+		invalidBone->Transform_().SetPosition({ 0.f, 7.f, 0.f });
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+
+		animator->m_localTransforms[0] = pose({ 1.f, 0.f, 0.f });
+		animator->m_localTransforms[1] = pose({ 0.f, 2.f, 0.f });
+		const AnimatorPoseUploadMetrics first = scene->PublishAnimatorPose(*animator);
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const bool firstWorld = nearVector(
+			boneB->Transform_().GetWorldPosition(), { 1.f, 2.f, 0.f });
+		const bool invalidHeld = nearVector(
+			invalidBone->Transform_().GetWorldPosition(), { 0.f, 7.f, 0.f });
+
+		animator->m_localTransforms[0] = pose({ 3.f, 0.f, 0.f });
+		animator->m_localTransforms[1] = pose({ 0.f, 4.f, 0.f });
+		const AnimatorPoseUploadMetrics steady = scene->PublishAnimatorPose(*animator);
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const bool steadyWorld = nearVector(
+			boneB->Transform_().GetWorldPosition(), { 3.f, 4.f, 0.f });
+
+		animator->SetEnabled(false);
+		animator->m_localTransforms[0] = pose({ 9.f, 0.f, 0.f });
+		const AnimatorPoseUploadMetrics disabled = scene->PublishAnimatorPose(*animator);
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const bool disabledHeld = nearVector(
+			boneB->Transform_().GetWorldPosition(), { 3.f, 4.f, 0.f });
+		animator->SetEnabled(true);
+		const AnimatorPoseUploadMetrics reenabled = scene->PublishAnimatorPose(*animator);
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const bool reenabledWorld = nearVector(
+			boneB->Transform_().GetWorldPosition(), { 9.f, 4.f, 0.f });
+
+		animator->m_Skeleton = skeletonB.get();
+		const AnimatorPoseUploadMetrics reloaded = scene->PublishAnimatorPose(*animator);
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const bool animatorPass = first.packed && first.rebound
+			&& 3 == first.bindLookups && 2 == first.validBones
+			&& 1 == first.invalidBones && 1 == first.queuedRoots
+			&& firstWorld && invalidHeld
+			&& steady.packed && !steady.rebound && 0 == steady.bindLookups
+			&& steadyWorld && disabled.disabled && disabledHeld
+			&& reenabled.packed && !reenabled.rebound
+			&& 0 == reenabled.bindLookups && reenabledWorld
+			&& reloaded.rebound && 3 == reloaded.bindLookups;
+
+		const std::array<TransformWorldWrite, 2> physicsWrites{
+			TransformWorldWrite{ scene->HandleOf(physicsParent->m_index),
+				pose({ 10.f, 0.f, 0.f }) },
+			TransformWorldWrite{ scene->HandleOf(physicsChild->m_index),
+				pose({ 12.f, 3.f, 0.f }) }
+		};
+		const TransformBulkWriteMetrics physics = scene->ApplyWorldWriteBatch(
+			physicsWrites, TransformWriteReason::Physics);
+		const bool physicsImmediate = nearVector(
+			physicsParent->Transform_().GetWorldPosition(), { 10.f, 0.f, 0.f })
+			&& nearVector(physicsChild->Transform_().GetWorldPosition(), { 12.f, 3.f, 0.f });
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const bool physicsGlobal = nearVector(
+			physicsChild->Transform_().GetWorldPosition(), { 12.f, 3.f, 0.f });
+		const bool physicsPass = physics.packed && 2 == physics.requested
+			&& 2 == physics.accepted && 0 == physics.stale
+			&& 1 == physics.epochAdvances && physicsImmediate && physicsGlobal;
+
+		Socket socket;
+		socket.AttachObject(socketTarget);
+		socket.transform.SetLocalMatrix(
+			pose({ 4.f, 5.f, 6.f }), TransformWriteReason::Animator);
+		socket.Update();
+		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
+		const bool socketPass = nearVector(
+			socketTarget->Transform_().GetWorldPosition(), { 4.f, 5.f, 6.f });
+		socket.DetachAllObject();
+
+		const bool pass = animatorPass && physicsPass && socketPass;
+		std::printf(
+			"[scene.transformbulk] animator=%s first-lookups=%llu valid=%llu invalid=%llu "
+			"steady-lookups=%llu off=%s on-lookups=%llu reload-lookups=%llu\n",
+			animatorPass ? "PASS" : "FAIL",
+			static_cast<unsigned long long>(first.bindLookups),
+			static_cast<unsigned long long>(first.validBones),
+			static_cast<unsigned long long>(first.invalidBones),
+			static_cast<unsigned long long>(steady.bindLookups),
+			disabledHeld ? "held" : "changed",
+			static_cast<unsigned long long>(reenabled.bindLookups),
+			static_cast<unsigned long long>(reloaded.bindLookups));
+		std::printf(
+			"[scene.transformbulk] physics=%s requested=%llu accepted=%llu epoch=%llu "
+			"immediate=%s global=%s socket=%s\n",
+			physicsPass ? "PASS" : "FAIL",
+			static_cast<unsigned long long>(physics.requested),
+			static_cast<unsigned long long>(physics.accepted),
+			static_cast<unsigned long long>(physics.epochAdvances),
+			physicsImmediate ? "PASS" : "FAIL",
+			physicsGlobal ? "PASS" : "FAIL", socketPass ? "PASS" : "FAIL");
+		std::printf("[scene.transformbulk] barrier=main-thread invalid=%s probe=%s\n",
+			invalidHeld ? "held" : "changed", pass ? "PASS" : "FAIL");
+
+		animator->m_Skeleton = nullptr;
+		animatorRoot->Destroy();
+		physicsParent->Destroy();
+		socketTarget->Destroy();
+	}
+
+    // X0 측정 게이트(TransformUpdatePlan). flat fan-out, wide tree, deep chain,
+	// skeleton-like forest를 같은 objectCount로 합성해 "전부 정지"·"10% 이동"을
+	// 각각 잰다. UI/Spatial wall과 Spatial 내부 worker CPU 합계를 분리해 출력하고,
+	// 끝나면 만든 오브젝트를 전부 파괴 마크해 씬을 원상 복구한다. 이 명령 혼자서는
+	// 이후 X1~X6 변경의 성능을 말하지 않는다(아직 구현 전 기준선일 뿐이다).
     //
     // ★ 레인 2(트랙 E E7-b 측정 준비) — <오브젝트수> 0은 합성을 건너뛰고 "현재
     // 씬을 그대로" 잰다. Bone 판정(순회의 Scene::UpdateModelRecursive Bone
@@ -1890,17 +3424,41 @@ namespace
     {
         if (parts.size() < 3)
         {
-            std::printf("[CLI] 사용법: scene.traversalbench <오브젝트수> <프레임수> (0 = 합성 없이 현재 씬)\n");
+			std::printf("[CLI] 사용법: scene.traversalbench <오브젝트수> <프레임수> [flat|wide|deep|skeleton] (0 = 현재 씬)\n");
             return;
         }
 
         const int objectCount = (std::max)(0, std::atoi(parts[1].c_str()));
-        const int frames = (std::max)(1, std::atoi(parts[2].c_str()));
+		const int frames = (std::max)(4, std::atoi(parts[2].c_str()));
+		const std::string topology = 0 == objectCount ? "current"
+			: (parts.size() > 3 ? parts[3] : "wide");
+		if (0 != objectCount && "flat" != topology && "wide" != topology
+			&& "deep" != topology && "skeleton" != topology)
+		{
+			std::printf("[CLI] topology는 flat|wide|deep|skeleton 중 하나여야 한다\n");
+			return;
+		}
 
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        constexpr int kBenchWidth = 10;
+		const bool diagnosticsWasEnabled = Scene::IsTransformDiagnosticsEnabled();
+		struct DiagnosticsRestore
+		{
+			bool previous = false;
+			~DiagnosticsRestore()
+			{
+				Scene::SetTransformDiagnosticsEnabled(previous);
+			}
+		} diagnosticsRestore{ diagnosticsWasEnabled };
+		Scene::SetTransformDiagnosticsEnabled(true);
+		scene->ResetTransformDiagnostics();
+		const TransformTopologyMutationCounters topologyBeforeSetup =
+			scene->GetTopologyMutationTotals();
+
+		constexpr size_t kWideWidth = 64;
+		constexpr size_t kDeepChainLength = 64; // 현재 순환 방어 깊이와 같은 상한
+		constexpr size_t kSkeletonNodeCount = 64;
 
         // 0개 모드는 아무것도 만들지 않으므로 둘 다 빈 채로 남는다 — 정리 단계와
         // "10% 이동" 시나리오가 아래에서 이 빈 상태를 보고 스스로 건너뛴다.
@@ -1930,69 +3488,103 @@ namespace
 
             char header[192]{};
             std::snprintf(header, sizeof(header),
-				"[scene.traversalbench] 현재 씬 그대로 · 오브젝트 %zu개(뼈 마커 %zu개) · dirtytraversal=%s · bonecache=%s",
-				liveObjectCount, markedCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0",
-                Scene::IsBoneCacheEnabled() ? "1" : "0");
+				"[scene.traversalbench] build=%s topology=current domains=UI+Spatial objects=%zu bones=%zu dirtytraversal=%s bonecache=%s frames=%d warmup=2",
+				TransformBuildConfiguration(), liveObjectCount, markedCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0",
+				Scene::IsBoneCacheEnabled() ? "1" : "0", frames);
             std::printf("%s\n", header);
             Debug->LogWarning(header);
         }
         else
         {
-            auto benchRoot = scene->CreateEntity("__TraversalBenchRoot");
-            if (!benchRoot)
-            {
-                std::printf("[CLI] scene.traversalbench: 루트 생성 실패\n");
-                return;
-            }
+			const GameObjectIndex sceneRoot = Entity::kSceneRootIndex;
+			for (int madeCount = 0; madeCount < objectCount; ++madeCount)
+			{
+				GameObjectIndex parent = sceneRoot;
+				const size_t index = static_cast<size_t>(madeCount);
+				if ("wide" == topology && index > 0)
+				{
+					parent = created[(index - 1) / kWideWidth];
+				}
+				else if ("deep" == topology && 0 != index % kDeepChainLength)
+				{
+					parent = created.back();
+				}
+				else if ("skeleton" == topology)
+				{
+					const size_t local = index % kSkeletonNodeCount;
+					const size_t base = index - local;
+					if (local > 0 && local < 16)
+					{
+						parent = created.back(); // spine chain
+					}
+					else if (local >= 16)
+					{
+						const size_t branch = (local - 16) / 4;
+						const size_t branchOffset = (local - 16) % 4;
+						parent = 0 == branchOffset
+							? created[base + 2 + branch % 12]
+							: created.back();
+					}
+				}
 
-            // 폭 kBenchWidth로 BFS 합성 — 깊이는 objectCount에 따라 자연히 정해진다.
-            created.push_back(benchRoot->m_index);
+				Entity* child = scene->CreateEntity(
+					"__bench_" + std::to_string(madeCount),
+					GameObjectType::Empty, parent);
+				if (!child)
+				{
+					std::printf("[CLI] scene.traversalbench: 합성 생성 실패 index=%d\n",
+						madeCount);
+					break;
+				}
+				created.push_back(child->m_index);
+			}
 
-            std::vector<GameObjectIndex> currentLevel{ benchRoot->m_index };
-            int madeCount = 0;
-            while (madeCount < objectCount && !currentLevel.empty())
-            {
-                std::vector<GameObjectIndex> nextLevel;
-                for (GameObjectIndex parentIdx : currentLevel)
-                {
-                    for (int c = 0; c < kBenchWidth && madeCount < objectCount; ++c)
-                    {
-                        auto child = scene->CreateEntity(
-                            "__bench_" + std::to_string(madeCount), GameObjectType::Empty, parentIdx);
-                        if (!child) continue;
-                        created.push_back(child->m_index);
-                        nextLevel.push_back(child->m_index);
-                        ++madeCount;
-                    }
-                    if (madeCount >= objectCount) break;
-                }
-                currentLevel = std::move(nextLevel);
-            }
+			if (created.empty())
+			{
+				std::printf("[CLI] scene.traversalbench: 합성 오브젝트 생성 실패\n");
+				return;
+			}
 
-            // 10%만 매 프레임 이동시킬 대상 — 루트(created[0])를 뺀 생성분에서 10개마다 하나.
-            for (size_t i = 1; i < created.size(); i += 10)
+			// 10%만 매 프레임 이동시킬 대상.
+			for (size_t i = 9; i < created.size(); i += 10)
             {
                 movers.push_back(created[i]);
             }
 
-            char header[192]{};
+			char header[256]{};
             std::snprintf(header, sizeof(header),
-                "[scene.traversalbench] 오브젝트 %d개(+루트 1) · dirtytraversal=%s",
-                madeCount, Scene::IsDirtyTraversalEnabled() ? "1" : "0");
+				"[scene.traversalbench] build=%s topology=%s domains=UI+Spatial objects=%zu dirtytraversal=%s frames=%d warmup=2",
+				TransformBuildConfiguration(), topology.c_str(), created.size(),
+				Scene::IsDirtyTraversalEnabled() ? "1" : "0", frames);
             std::printf("%s\n", header);
             Debug->LogWarning(header);
         }
 
-        using PerfClock = std::chrono::steady_clock;
         const auto runScenario = [&](const char* label, bool moveEach)
         {
-            // 첫 패스는 새 슬롯이 전부 dirty=1이라 워밍업으로 버린다 — "이미
-            // 정착된 상태에서 정지/이동"을 재는 것이 목적이지, 스폰 직후 첫
-            // 패스의 전수 재계산 비용이 아니다.
-            scene->AllUpdateWorldMatrix();
+			// 첫 패스는 새 슬롯의 dirty를 소비하고 월드를 쓴다. 그 쓰기가 세운
+			// worldChanged를 둘째 패스가 소비해야 비로소 정지 steady-state다.
+			// 둘 다 버리고 난 뒤부터 측정한다.
+			scene->AllUpdateWorldMatrix(TransformSyncPoint::Benchmark);
+			scene->AllUpdateWorldMatrix(TransformSyncPoint::Benchmark);
 
-            std::vector<double> samplesUs;
-            samplesUs.reserve(static_cast<size_t>(frames));
+			std::vector<double> totalSamples;
+			std::vector<double> uiSamples;
+			std::vector<double> spatialSamples;
+			std::vector<double> dispatchSamples;
+			std::vector<double> visitSamples;
+			std::vector<double> composeSamples;
+			std::vector<double> multiplySamples;
+			std::vector<double> decomposeSamples;
+			for (auto* samples : { &totalSamples, &uiSamples, &spatialSamples,
+				&dispatchSamples, &visitSamples, &composeSamples,
+				&multiplySamples, &decomposeSamples })
+			{
+				samples->reserve(static_cast<size_t>(frames));
+			}
+			const TransformTopologyMutationCounters topologyBefore =
+				scene->GetTopologyMutationTotals();
+			TransformUpdateMetrics lastMetrics{};
             for (int f = 0; f < frames; ++f)
             {
                 if (moveEach)
@@ -2007,30 +3599,77 @@ namespace
                     }
                 }
 
-                const auto t0 = PerfClock::now();
-                scene->AllUpdateWorldMatrix();
-                const auto t1 = PerfClock::now();
-                samplesUs.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+				scene->AllUpdateWorldMatrix(TransformSyncPoint::Benchmark);
+				lastMetrics = scene->GetLastTransformUpdateMetrics(
+					TransformSyncPoint::Benchmark);
+				totalSamples.push_back(lastMetrics.totalUs);
+				uiSamples.push_back(lastMetrics.uiUs);
+				spatialSamples.push_back(lastMetrics.spatialUs);
+				dispatchSamples.push_back(lastMetrics.dispatchUs);
+				visitSamples.push_back(lastMetrics.visitWorkerUs);
+				composeSamples.push_back(lastMetrics.localComposeWorkerUs);
+				multiplySamples.push_back(lastMetrics.worldMultiplyWorkerUs);
+				decomposeSamples.push_back(lastMetrics.decomposeWorkerUs);
             }
 
-            double sum = 0.0;
-            double minUs = samplesUs.front();
-            double maxUs = samplesUs.front();
-            for (double v : samplesUs)
-            {
-                sum += v;
-                minUs = (std::min)(minUs, v);
-                maxUs = (std::max)(maxUs, v);
-            }
-            const double avg = sum / static_cast<double>(samplesUs.size());
+			const BenchPercentiles total = SummarizeBenchSamples(totalSamples);
+			const BenchPercentiles ui = SummarizeBenchSamples(uiSamples);
+			const BenchPercentiles spatial = SummarizeBenchSamples(spatialSamples);
+			const BenchPercentiles dispatch = SummarizeBenchSamples(dispatchSamples);
+			const BenchPercentiles visit = SummarizeBenchSamples(visitSamples);
+			const BenchPercentiles compose = SummarizeBenchSamples(composeSamples);
+			const BenchPercentiles multiply = SummarizeBenchSamples(multiplySamples);
+			const BenchPercentiles decompose = SummarizeBenchSamples(decomposeSamples);
 
-            char line[256]{};
+			char line[640]{};
             std::snprintf(line, sizeof(line),
-                "[scene.traversalbench] %s — 평균 %.2fus 최소 %.2fus 최대 %.2fus (프레임 %d)",
-                label, avg, minUs, maxUs, frames);
+				"[scene.traversalbench] %s wall-us median/p95/max "
+				"total=%.2f/%.2f/%.2f ui=%.2f/%.2f/%.2f "
+				"spatial=%.2f/%.2f/%.2f dispatch=%.2f/%.2f/%.2f frames=%d",
+				label,
+				total.median, total.p95, total.maximum,
+				ui.median, ui.p95, ui.maximum,
+				spatial.median, spatial.p95, spatial.maximum,
+				dispatch.median, dispatch.p95, dispatch.maximum, frames);
             std::printf("%s\n", line);
             Debug->LogWarning(line);
+
+			std::snprintf(line, sizeof(line),
+				"[scene.traversalbench] %s spatial-worker-sum-us median/p95/max "
+				"visit=%.2f/%.2f/%.2f compose=%.2f/%.2f/%.2f "
+				"multiply=%.2f/%.2f/%.2f decompose=%.2f/%.2f/%.2f",
+				label,
+				visit.median, visit.p95, visit.maximum,
+				compose.median, compose.p95, compose.maximum,
+				multiply.median, multiply.p95, multiply.maximum,
+				decompose.median, decompose.p95, decompose.maximum);
+			std::printf("%s\n", line);
+			Debug->LogWarning(line);
+
+			PrintTransformMetricSnapshot(lastMetrics);
+			const TransformTopologyMutationCounters topologyAfter =
+				scene->GetTopologyMutationTotals();
+			std::printf(
+				"[scene.traversalbench] %s topology measured-total create=%llu destroy=%llu reparent=%llu per-frame=%.3f/%.3f/%.3f\n",
+				label,
+				static_cast<unsigned long long>(topologyAfter.created - topologyBefore.created),
+				static_cast<unsigned long long>(topologyAfter.destroyed - topologyBefore.destroyed),
+				static_cast<unsigned long long>(topologyAfter.reparented - topologyBefore.reparented),
+				static_cast<double>(topologyAfter.created - topologyBefore.created) / frames,
+				static_cast<double>(topologyAfter.destroyed - topologyBefore.destroyed) / frames,
+				static_cast<double>(topologyAfter.reparented - topologyBefore.reparented) / frames);
         };
+
+		const TransformTopologyMutationCounters topologyAfterSetup =
+			scene->GetTopologyMutationTotals();
+		std::printf(
+			"[scene.traversalbench] topology setup create=%llu destroy=%llu reparent=%llu; runtime frequency는 scene.transformstats 1 후 print로 last-frame 확인\n",
+			static_cast<unsigned long long>(
+				topologyAfterSetup.created - topologyBeforeSetup.created),
+			static_cast<unsigned long long>(
+				topologyAfterSetup.destroyed - topologyBeforeSetup.destroyed),
+			static_cast<unsigned long long>(
+				topologyAfterSetup.reparented - topologyBeforeSetup.reparented));
 
         // 0개 모드(현재 씬)는 "전부 정지" 하나만 — 헤더 위에서 이미 적었다.
         // 합성 모드는 기존 그대로 둘 다 잰다.
@@ -6505,7 +8144,7 @@ namespace ConsoleCmd
         }
         owned->m_name = authored.name;
         DataSystems->FinalizeMaterialRuntime(*owned);
-        target->m_Material = std::move(owned);
+        target->SetMaterial(std::move(owned));
         target->m_materialBaseGuid = baseGuid;
         std::printf("[CLI] experiment.matruntime seed done base=%s "
             "property=%s owner=%s\n", authored.name.c_str(),
@@ -9177,7 +10816,7 @@ namespace ConsoleCmd
         for (const auto& object : scene->m_Entities)
         {
             if (!object) continue;
-            const auto& p = object->Transform_().position;
+		const auto& p = object->Transform_().GetPositionValue();
             char position[96]{};
             std::snprintf(position, sizeof(position), "(%.3f, %.3f, %.3f)", p.x, p.y, p.z);
 
@@ -9940,6 +11579,14 @@ namespace ConsoleCmd
             reg({ "scene.dirtytraversal" }, [](const ConsoleCommandContext& c) { HandleSceneDirtyTraversal(c.parts); });
             reg({ "scene.bonecache" }, [](const ConsoleCommandContext& c) { HandleSceneBoneCache(c.parts); });
             reg({ "prefab.objectguid" }, [](const ConsoleCommandContext& c) { HandlePrefabObjectGuid(c.parts); });
+			reg({ "scene.transformstats" }, [](const ConsoleCommandContext& c) { HandleSceneTransformStats(c.parts); });
+			reg({ "scene.transformwritestats" }, [](const ConsoleCommandContext& c) { HandleSceneTransformWriteStats(c.parts); });
+			reg({ "scene.transformdomains" }, [](const ConsoleCommandContext& c) { HandleSceneTransformDomains(c.parts); });
+			reg({ "scene.hierarchymutation" }, [](const ConsoleCommandContext& c) { HandleSceneHierarchyMutation(c.parts); });
+			reg({ "scene.executiongraph" }, [](const ConsoleCommandContext& c) { HandleSceneExecutionGraph(c.parts); });
+			reg({ "scene.sparseresolver" }, [](const ConsoleCommandContext& c) { HandleSceneSparseResolver(c.parts); });
+			reg({ "scene.transformpull" }, [](const ConsoleCommandContext& c) { HandleSceneTransformPull(c.parts); });
+			reg({ "scene.transformbulk" }, [](const ConsoleCommandContext& c) { HandleSceneTransformBulk(c.parts); });
             reg({ "scene.traversalbench" }, [](const ConsoleCommandContext& c) { HandleSceneTraversalBench(c.parts); });
             reg({ "scene.bonedump" }, [](const ConsoleCommandContext& c) { HandleSceneBoneDump(c.parts); });
             reg({ "scene.transformdigest" }, [](const ConsoleCommandContext& c) { HandleSceneTransformDigest(c.parts); });
@@ -9950,6 +11597,7 @@ namespace ConsoleCmd
             reg({ "serialize.scalarparity" }, [](const ConsoleCommandContext& c) { HandleSerializeScalarParity(c.parts); });
             reg({ "serialize.adapterparity" }, [](const ConsoleCommandContext& c) { HandleSerializeAdapterParity(c.parts); });
             reg({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { HandleSceneProxyBench(c.parts); });
+			reg({ "scene.proxydirty" }, [](const ConsoleCommandContext& c) { HandleSceneProxyDirty(c.parts); });
 
             return t;
         }();
@@ -10019,8 +11667,18 @@ void ConsoleCommandSystem::PrintHelp() const
         "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
         "  scene.dirtytraversal [0|1]  S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)\n"
         "  scene.bonecache [0|1]       E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)\n"
+		"  scene.transformstats [0|1|print]  X0 UI/Spatial·단계·구성·프레임 topology 계측\n"
+		"  scene.transformwritestats [0|1|print|probe]  X1 로컬 쓰기 publish 출처 계측\n"
+		"  scene.transformdomains probe  X2 UI/Spatial 독립 dirty gate·paused/subtree 검사\n"
+		"  scene.hierarchymutation probe  X3 reparent 검증·대칭성·topology version 검사\n"
+		"  scene.executiongraph probe|bench <N> [samples]  X4 packed projection 불변식·compile 비용 검사\n"
+		"  scene.sparseresolver 0|1|print|probe|bench <N> <frames>  X5 dirty-root sparse resolve·A/B 검사\n"
+		"  scene.transformpull print|probe  X6 C# 즉시 pull·sibling global 전파 검사\n"
+		"  scene.transformbulk probe  X7 Animator pose·Physics world batch·Socket barrier 검사\n"
+		"  scene.proxydirty probe  X8 frame-persistent render dirty mask·generation 검사\n"
         "  scene.ddol <이름>           오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용\n"
-        "  scene.traversalbench <오브젝트수> <프레임수>  AllUpdateWorldMatrix 시간 측정(정지/10%이동, 0=합성 없이 현재 씬·정지만)\n"
+		"  scene.traversalbench <오브젝트수> <프레임수> [flat|wide|deep|skeleton]  X0 Release 벤치(0=현재 씬)\n"
+		"  scene.proxybench <프레임수> [등록수]  X8 정지 dirty-queue 커밋 비용(선택: 합성 등록수)\n"
         "  scene.bonedump [개수]        대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)\n"
         "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
         "  game.pak             Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다\n"

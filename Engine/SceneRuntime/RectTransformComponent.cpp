@@ -1,6 +1,7 @@
 #include "RectTransformComponent.h"
 #include "RHI/ScreenSizedResource.h"
 #include "Entity.h"
+#include "Scene.h"
 #include <iterator>
 #include <unordered_set>
 
@@ -10,10 +11,17 @@ RectTransformComponent::RectTransformComponent()
     // 초기화가 필요한 경우 여기에 작성합니다.
 }
 
+void RectTransformComponent::MarkDirty(bool publishDomain)
+{
+    m_isDirty = true;
+    if (!publishDomain || nullptr == m_pOwner) return;
+    if (Scene* scene = m_pOwner->GetScene()) scene->MarkUILayoutDirty();
+}
+
 void RectTransformComponent::SetAnchoredPosition(const math::vector2& position)
 {
     m_anchoredPosition = position;
-    m_isDirty = true;
+    MarkDirty();
 }
 
 math::vector2 RectTransformComponent::GetWorldPivotPosition() const
@@ -28,7 +36,7 @@ void RectTransformComponent::SetWorldPivotPosition(const math::vector2& position
         m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
     m_anchoredPosition.y = FromWorldPivot(position.y, parentRect.y, parentRect.height,
         m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
-    m_isDirty = true;
+    MarkDirty();
 }
 
 math::vector2 RectTransformComponent::GetScreenPosition() const
@@ -49,7 +57,7 @@ void RectTransformComponent::SetAnchorMin(const math::vector2& anchorMin)
     const auto parentRect = ResolveParentRect();
     const auto worldPivot = CalculateWorldPivotPosition(parentRect);
     m_anchorMin = anchorMin;
-    m_isDirty = true;
+    MarkDirty();
     m_anchoredPosition.x = FromWorldPivot(worldPivot.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
     m_anchoredPosition.y = FromWorldPivot(worldPivot.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
 }
@@ -59,7 +67,7 @@ void RectTransformComponent::SetAnchorMax(const math::vector2& anchorMax)
     const auto parentRect = ResolveParentRect();
     const auto worldPivot = CalculateWorldPivotPosition(parentRect);
     m_anchorMax = anchorMax;
-    m_isDirty = true;
+    MarkDirty();
     m_anchoredPosition.x = FromWorldPivot(worldPivot.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
     m_anchoredPosition.y = FromWorldPivot(worldPivot.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
 }
@@ -67,7 +75,7 @@ void RectTransformComponent::SetAnchorMax(const math::vector2& anchorMax)
 void RectTransformComponent::SetSizeDelta(const math::vector2& size)
 {
     m_sizeDelta = size;
-    m_isDirty = true;
+    MarkDirty();
 }
 
 void RectTransformComponent::SetPivot(const math::vector2& pivot)
@@ -75,12 +83,12 @@ void RectTransformComponent::SetPivot(const math::vector2& pivot)
     const auto parentRect = ResolveParentRect();
     const auto worldPivot = CalculateWorldPivotPosition(parentRect);
     m_pivot = pivot;
-    m_isDirty = true;
+    MarkDirty();
     m_anchoredPosition.x = FromWorldPivot(worldPivot.x, parentRect.x, parentRect.width, m_anchorMin.x, m_anchorMax.x, m_pivot.x, m_layoutScale);
     m_anchoredPosition.y = FromWorldPivot(worldPivot.y, parentRect.y, parentRect.height, m_anchorMin.y, m_anchorMax.y, m_pivot.y, m_layoutScale);
 }
 
-void RectTransformComponent::SetLayoutScale(float scale)
+void RectTransformComponent::SetLayoutScale(float scale, bool publishDomain)
 {
     constexpr float kMinScale = 0.01f;
     const float clamped = scale > kMinScale ? scale : kMinScale;
@@ -88,7 +96,18 @@ void RectTransformComponent::SetLayoutScale(float scale)
     if (std::abs(m_layoutScale - clamped) < 1e-6f) return;
 
     m_layoutScale = clamped;
-    m_isDirty = true;
+    MarkDirty(publishDomain);
+}
+
+void RectTransformComponent::OnPropertyChanged(
+    std::string_view propertyName, Meta::PropertyChangeSource)
+{
+    if (propertyName == "m_anchorMin" || propertyName == "m_anchorMax"
+        || propertyName == "m_anchoredPosition" || propertyName == "m_sizeDelta"
+        || propertyName == "m_pivot")
+    {
+        MarkDirty();
+    }
 }
 
 float RectTransformComponent::ResolveParentScale() const
@@ -214,7 +233,7 @@ bool RectTransformComponent::DriveAsCanvasRoot(const math::rect& screenRootRect,
 {
     // 배율이 바뀌면 rect가 같아도 자식들은 다시 계산해야 한다. SetLayoutScale이
     // 그때 m_isDirty를 세워 주므로 아래 조기 반환에 자연히 반영된다.
-    SetLayoutScale(scale);
+    SetLayoutScale(scale, false);
 
     // 화면 크기가 그대로면 아무것도 하지 않는다. 매 프레임 도는 경로라
     // 변화가 없을 때의 비용이 0이어야 한다.
@@ -231,7 +250,7 @@ bool RectTransformComponent::DriveAsCanvasRoot(const math::rect& screenRootRect,
 
 bool RectTransformComponent::DriveAsWorldCanvasRoot()
 {
-    SetLayoutScale(1.f);
+    SetLayoutScale(1.f, false);
 
     math::rect localRect{};
     localRect.x = -m_sizeDelta.x * m_pivot.x;
@@ -347,7 +366,7 @@ void RectTransformComponent::SetAnchorPreset(AnchorPreset preset)
     const auto& entry = GetAnchorPresetEntry(preset);
     m_anchorMin = entry.anchorMin;
     m_anchorMax = entry.anchorMax;
-    m_isDirty = true;
+    MarkDirty();
 }
 
 // 역산도 UpdateLayout과 같은 식을 쓴다 — 배율은 오프셋에만 곱해져 있으므로
@@ -387,7 +406,7 @@ void RectTransformComponent::SetAnchorsPivotKeepWorld(const math::vector2& newAn
     m_anchoredPosition.y = SolveAnchored(desired.y, newParentRect.y, newParentRect.height,
         m_anchorMin.y, m_sizeDelta.y, m_pivot.y, m_layoutScale);
 
-    m_isDirty = true;
+    MarkDirty();
     UpdateLayout(newParentRect); // 부모 Rect로 다시 worldRect 갱신
 }
 

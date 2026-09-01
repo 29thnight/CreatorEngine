@@ -371,29 +371,34 @@ void AnimationJob::Update(float deltaTime)
                 
             }
 
-            if (animator->HasSocket())
-            {
-                if (SceneManagers->m_isGameStart == false || animator->GetOwner() == nullptr)
-                {
-
-
-                }
-                else
-                {
-
-                    for (auto& socket : animator->socketvec)
-                    {
-                        socket->transform.SetLocalMatrix(socket->m_boneMatrix);
-                        socket->Update();
-                    }
-                }
-            }
-
-
         });
     }
 
     m_UpdateThreadPool->NotifyAllAndWait();
+
+	// X7 — worker는 Animator 소유 pose/socket staging만 쓴다. Scene packed
+	// storage와 부착 오브젝트 Transform은 모든 job이 끝난 이 barrier 뒤에서
+	// 메인 스레드가 직렬 commit한다. 따라서 worker-local queue를 따로 만들지
+	// 않아도 resolver/파괴/다른 Animator와 Scene write가 겹치지 않는다.
+	for (Animator* animator : currentAnimators)
+	{
+		if (!animator || animator->IsDestroyMark() || !animator->IsEnabled()) continue;
+		Entity* owner = animator->GetOwner();
+		if (!owner || owner->IsDestroyMark()) continue;
+		if (Scene* scene = owner->GetScene())
+		{
+			scene->PublishAnimatorPose(*animator);
+		}
+
+		if (!animator->HasSocket() || !SceneManagers->m_isGameStart) continue;
+		for (Socket* socket : animator->socketvec)
+		{
+			if (!socket) continue;
+			socket->transform.SetLocalMatrix(
+				socket->m_boneMatrix, TransformWriteReason::Animator);
+			socket->Update();
+		}
+	}
 }
 
 void AnimationJob::PrepareAnimation()

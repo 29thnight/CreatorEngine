@@ -13,10 +13,46 @@
 #include "TypeTrait.h"
 // TypeOf<T>() 정의처 — 템플릿 래퍼 3곳이 T::Reflect() 대신 단일 창구를 쓴다(CT4-d).
 #include "ReflectionMeta.h"
+#include <cstdint>
 #include <unordered_set>
 
 namespace Meta
 {
+	enum class PropertyChangeSource : std::uint8_t
+	{
+		Reflection,
+		Prefab
+	};
+
+	inline thread_local PropertyChangeSource g_propertyChangeSource =
+		PropertyChangeSource::Reflection;
+
+	class ScopedPropertyChangeSource
+	{
+	public:
+		explicit ScopedPropertyChangeSource(PropertyChangeSource source)
+			: m_previous(g_propertyChangeSource)
+		{
+			g_propertyChangeSource = source;
+		}
+
+		~ScopedPropertyChangeSource()
+		{
+			g_propertyChangeSource = m_previous;
+		}
+
+		ScopedPropertyChangeSource(const ScopedPropertyChangeSource&) = delete;
+		ScopedPropertyChangeSource& operator=(const ScopedPropertyChangeSource&) = delete;
+
+	private:
+		PropertyChangeSource m_previous;
+	};
+
+	inline PropertyChangeSource CurrentPropertyChangeSource()
+	{
+		return g_propertyChangeSource;
+	}
+
 	//FindTypeByInstance base IObject
 	inline const Type* FindTypeByInstance(void* instance)
 	{
@@ -304,6 +340,7 @@ namespace Meta
 		const MetaYml::Node& newNode,
 		const std::unordered_set<std::string>& overriddenProperties)
 	{
+		ScopedPropertyChangeSource sourceScope(PropertyChangeSource::Prefab);
 		MetaYml::Node currentNode = Serialize(instance, type);
 		MetaYml::Node patchedNode = currentNode;
 

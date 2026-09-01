@@ -21,7 +21,8 @@ void TextComponent::OnInitialized()
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
-		renderScene->RegisterCommand(this);
+		scene->CollectTextComponent(this);
+		if (renderScene) renderScene->RegisterCommand(this);
 	}
 
 	// 레지스트리 등록은 수명의 시작(Awake)에서 스스로 한다(6-1).
@@ -87,7 +88,8 @@ void TextComponent::OnUninitializing()
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
-		renderScene->UnregisterCommand(this);
+		scene->UnCollectTextComponent(this);
+		if (renderScene) renderScene->UnregisterCommand(this);
 	}
 
 	// 해제는 무조건 한다. 예전에는 씬이 널이면 건너뛰어 레지스트리에 dangling이 남았다.
@@ -110,11 +112,29 @@ void TextComponent::OnAddedToScene()
 {
 	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterText(this);
+	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->CollectTextComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->RegisterCommand(this);
+		}
+	}
 }
 
 void TextComponent::OnRemovingFromScene()
 {
 	UITickSystems->UnregisterText(this);
+	if (GetOwner() && !GetOwner()->IsDestroyMark())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->UnCollectTextComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->UnregisterCommand(this);
+		}
+	}
 	UIComponent::OnRemovingFromScene();
 }
 
@@ -133,6 +153,7 @@ void TextComponent::SetFont(const file::path& path)
 	//   경로는 저작 데이터라 그대로 둔다 - 앞으로 세울 SDF 폰트 계통이
 	//   이 경로에서 아틀라스를 만든다.
 	fontPath = path.filename().string();
+	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 }
 
 

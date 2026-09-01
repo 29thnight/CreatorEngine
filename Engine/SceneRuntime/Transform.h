@@ -9,10 +9,38 @@
 #include <mathematics/vector4.hpp>
 #include <optional>
 #include <memory>
+#include <cstdint>
+#include <string_view>
 
 class RenderScene;
 class InspectorWindow;
 class Entity;
+class Scene;
+namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
+
+// TransformUpdatePlan X1: local/world authored write가 어느 길목에서 들어왔는지
+// 계측하는 분류다. X1에서는 카운터만 올렸고, X2부터 같은 publication이 Scene의
+// spatial domain epoch도 올린다.
+enum class TransformWriteReason : std::uint8_t
+{
+	CppSetter,
+	Script,
+	Inspector,
+	Reflection,
+	Prefab,
+	Physics,
+	Socket,
+	Gizmo,
+	Animator,
+	ModelImport,
+	Hierarchy,
+	Reset,
+	Count
+};
+
+inline constexpr size_t kTransformWriteReasonCount =
+	static_cast<size_t>(TransformWriteReason::Count);
+const char* TransformWriteReasonName(TransformWriteReason reason);
 
 // SceneGraphRedesignPlan.md §4 트랙 S, S1-b — Transform이 진짜 Component가 됐다.
 //
@@ -64,21 +92,36 @@ public:
 	Transform& operator=(const Transform&) = delete;
 	Transform& operator=(Transform&&) = delete;
 
-	// 디스크 스키마는 계속 x/y/z/w 네 필드다. vector3/quaternion으로 줄이는
-	// 것은 별도 asset schema migration에서 수행한다.
-	math::vector4 position{ 0.f, 0.f, 0.f, 1.f };
-	math::vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
-	math::vector4 scale{ 1.f, 1.f, 1.f, 1.f };
+	math::vector3 GetPosition() const;
+	math::quaternion GetRotation() const;
+	math::vector3 GetScale() const;
+	const math::vector4& GetPositionValue() const { return position; }
+	const math::vector4& GetRotationValue() const { return rotation; }
+	const math::vector4& GetScaleValue() const { return scale; }
 
-	Transform& SetScale(math::vector3 scale);
-	Transform& SetPosition(math::vector3 pos);
-	Transform& AddPosition(math::vector3 pos);
-	Transform& SetRotation(math::quaternion quaternion);
-	Transform& AddRotation(math::quaternion quaternion);
+	Transform& SetScale(math::vector3 scale,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& SetPosition(math::vector3 pos,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& AddPosition(math::vector3 pos,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& SetRotation(math::quaternion quaternion,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& AddRotation(math::quaternion quaternion,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& SetPositionValue(const math::vector4& value,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& SetRotationValue(const math::vector4& value,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& SetScaleValue(const math::vector4& value,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
 
-	Transform& SetWorldPosition(math::vector3 pos);
-	Transform& SetWorldRotation(math::quaternion quaternion);
-	Transform& SetWorldScale(math::vector3 scale);
+	Transform& SetWorldPosition(math::vector3 pos,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& SetWorldRotation(math::quaternion quaternion,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	Transform& SetWorldScale(math::vector3 scale,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
 
 	// Component::SetOwner가 이미 virtual이다(직전 커밋) — override로 두 경로
 	// (리플렉션 로드 vs 템플릿 AddComponent<T>())를 합류시킨다. GetOwner()는
@@ -92,8 +135,10 @@ public:
 
 	void UpdateLocalMatrix();
 	math::matrix4x4 UpdateWorldMatrix();
-	void SetLocalMatrix(const math::matrix4x4& matrix);
-	void SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLocal = false);
+	void SetLocalMatrix(const math::matrix4x4& matrix,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
+	void SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLocal = false,
+		TransformWriteReason reason = TransformWriteReason::CppSetter);
 
 	math::vector3 GetWorldPosition() const;
 	math::vector3 GetWorldScale() const;
@@ -112,18 +157,41 @@ public:
 	// 소비자가 먼저 불러 값을 가로채면 그 순회가 자식 전파를 놓친다.
 	bool ConsumeWorldChanged();
 
-	void TransformReset();
+	void TransformReset(
+		TransformWriteReason reason = TransformWriteReason::Reset);
+	// typed reflection이 실제 존재하는 필드를 쓴 직후 호출한다. detach 상태면
+	// reason 하나를 보류했다가 owner/scene 부착 뒤 publish한다.
+	void OnPropertyChanged(std::string_view propertyName,
+		Meta::PropertyChangeSource source);
+	void FlushPendingLocalWrite();
 	[[deprecated]]
 	void UpdateDirty();
 
 private:
 	friend class RenderScene;
 	friend class InspectorWindow;
+	friend class Scene;
 	// 부모 ID는 Entity::SetParentIndex를 통해서만 바뀐다. 여기를 열어두면
 	// m_parentIndex와 짝이 어긋난 채로 컴파일이 통과한다.
 	friend class Entity;
 
 	void SetParentID(uint32 id);
+	bool PublishLocalWrite(TransformWriteReason reason);
+	math::matrix4x4 ComposeAuthoredLocalMatrix() const
+	{
+		return math::compose(
+			math::vector3{ scale.x, scale.y, scale.z },
+			math::quaternion{ rotation.x, rotation.y, rotation.z, rotation.w },
+			math::vector3{ position.x, position.y, position.z });
+	}
+
+	// 디스크 스키마는 계속 x/y/z/w 네 필드다. reflect()는 클래스 내부에서
+	// private member pointer를 만들므로 공개 필드가 아니어도 기존 키가 유지된다.
+	math::vector4 position{ 0.f, 0.f, 0.f, 1.f };
+	math::vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
+	math::vector4 scale{ 1.f, 1.f, 1.f, 1.f };
+	bool m_hasPendingLocalWrite = false;
+	TransformWriteReason m_pendingLocalWriteReason = TransformWriteReason::Reflection;
 
 	// ── 스토어 슬롯 해석 (SceneGraphRedesignPlan §4 트랙 S, S1) ──
 	//

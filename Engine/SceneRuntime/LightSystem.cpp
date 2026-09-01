@@ -2,8 +2,6 @@
 #include "LifecycleTrace.h"
 #include "LightComponent.h"
 #include "Entity.h"
-#include "SceneManager.h"
-#include "RenderScene.h"
 #include <algorithm>
 
 void LightSystem::Register(LightComponent* light)
@@ -49,13 +47,7 @@ void LightSystem::Update(float tick)
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(light),
             owner->m_name.ToString().c_str(), light->GetInstanceID());
 
-        // ── 이하 옛 LightComponent::Update 본문 그대로(트랙 렌더 이관) ──
-        // 예전 주석: 여기서 씬 광원 슬롯을 매 프레임 덮어썼다. 이제 갱신은
-        // 프록시 커맨드 한 경로다 — 값이 흘러가는 자리를 하나로 두는 것이
-        // 이 전환의 요점이고, 세기가 두 번 곱해지던 부류도 거기서 닫혔다.
-        if (auto* renderScene = SceneManagers->GetRenderScene())
-        {
-            renderScene->UpdateCommand(light);
-        }
+		// X8: Light는 여기서 조기 커밋하지 않는다. Transform/property writer가
+		// dirty를 발행하고 Scene::CommitRenderProxies가 final resolve 뒤 한 번 싣는다.
     }
 }

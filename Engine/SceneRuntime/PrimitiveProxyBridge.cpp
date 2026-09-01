@@ -206,7 +206,8 @@ LightRenderProxy::Values LightRenderProxy::ReadFrom(LightComponent* component)
     values.spotLightAngle = component->m_spotLightAngle;
     values.range = component->m_range;
     values.lightType = static_cast<int>(component->m_lightType);
-    values.lightStatus = static_cast<int>(component->m_lightStatus);
+    values.lightStatus = static_cast<int>(component->IsEnabled() && owner
+		&& owner->IsEnabled() ? component->m_lightStatus : LightStatus::Disabled);
 
     return values;
 }

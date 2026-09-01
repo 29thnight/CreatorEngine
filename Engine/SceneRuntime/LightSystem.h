@@ -15,7 +15,8 @@ class LightComponent;
 // 이다 — LightComponent의 사유 멤버를 건드리지 않고 this 포인터만 필요하다.
 // 이 컴포넌트를 타입 포인터로 직접 틱하던 외부 호출부도 없다(전수 검색
 // 확인). Animator/Decal/Foliage와 같은 이유로 LightComponent에 새 메서드를
-// 추가하지 않고, 이 시스템의 Update가 옛 본문을 그대로 흡수한다.
+// 추가하지 않는다. X8부터 렌더 프록시는 writer가 dirty를 발행하고 Scene의
+// final commit이 일괄 반영하므로 이 시스템의 Update는 생명주기 틱만 맡는다.
 //
 // ★ RenderScene.h는 이 헤더가 include하지 않는다 — LightComponent.h 상단
 //   주석이 이미 밝힌 저장소 규약이 이 시스템에도 그대로 적용된다(광원이 렌더

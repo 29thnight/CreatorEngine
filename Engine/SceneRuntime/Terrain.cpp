@@ -587,8 +587,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		}
 	}
 	tmpLayerDescs.clear();
-	if (auto* renderScene = SceneManagers->GetRenderScene())
-		renderScene->UpdateCommand(this);
+	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 
 	file::path Path = filePath + L".meta";
 	if (file::exists(Path))
@@ -743,6 +742,28 @@ void TerrainComponent::OnInitialized()
 	{
 		scene->CollectTerrainComponent(this);
 		if (renderScene) renderScene->RegisterCommand(this);
+	}
+}
+
+void TerrainComponent::OnAddedToScene()
+{
+	if (!HasLifecycleState(State_AwakeCalled) || !GetOwner()) return;
+	if (Scene* scene = GetOwner()->GetScene())
+	{
+		scene->CollectTerrainComponent(this);
+		if (auto* renderScene = SceneManagers->GetRenderScene())
+			renderScene->RegisterCommand(this);
+	}
+}
+
+void TerrainComponent::OnRemovingFromScene()
+{
+	if (!GetOwner() || GetOwner()->IsDestroyMark()) return;
+	if (Scene* scene = GetOwner()->GetScene())
+	{
+		scene->UnCollectTerrainComponent(this);
+		if (auto* renderScene = SceneManagers->GetRenderScene())
+			renderScene->UnregisterCommand(this);
 	}
 }
 

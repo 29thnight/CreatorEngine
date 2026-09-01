@@ -235,8 +235,9 @@ Entity* Prefab::Instantiate(std::string_view newName) const
 	MetaYml::Node prefabData = MetaYml::Clone(definition);
 	UpgradeLegacyNavigation(prefabData);
 
-    Entity* rootObject = nullptr;
+	Entity* rootObject = nullptr;
 	InstantiateContext context;
+	[[maybe_unused]] auto hierarchyTransaction = scene->BeginHierarchyBulkBuild();
 
 	for (std::size_t i = 0; i < prefabData.size(); ++i)
     {
@@ -274,8 +275,9 @@ Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
 	MetaYml::Node prefabData = MetaYml::Clone(definition);
 	UpgradeLegacyNavigation(prefabData);
 
-    Entity* rootObject = nullptr;
+	Entity* rootObject = nullptr;
 	InstantiateContext context;
+	[[maybe_unused]] auto hierarchyTransaction = scene->BeginHierarchyBulkBuild();
 
 	for (std::size_t i = 0; i < prefabData.size(); ++i)
     {
@@ -423,11 +425,9 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 	// U7: Navigation은 소스 UI 기준 계층 로컬 경로로 해석한다. 따라서 UI도
 	// 다른 엔티티와 똑같이 매 인스턴스마다 새 ID를 받아야 하며, 같은 프리팹을
 	// 여러 번 배치해도 각 링크는 자기 계층 안에서만 풀린다.
-	obj->m_instanceID = newInstanceID;
-	obj->m_name = newHashedName;
+    obj->m_instanceID = newInstanceID;
+    obj->m_name = newHashedName;
     obj->m_index = newIndex;
-    obj->SetParentIndex(parent);
-    obj->ClearChildren();
 	// H3에서 Meta::Deserialize는 계층을 건드리지 않는다. 대상 Scene에서 갓 할당된
 	// 안전한 root를 유지하고, 전체 트리가 생기면 context가 source->target remap으로
 	// 최종 정정한다.
@@ -443,24 +443,6 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     if (!obj->m_layer.ToString().empty())
     {
         TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
-    }
-
-	Entity* parentObj = scene->TryGetEntity(parent);
-    if (parentObj && parentObj != obj)
-    {
-        // 계층 쓰기 정본 API(SceneGraphRedesignPlan 트랙 E2). AttachChildIndex 자체가
-        // 중복을 걸러내지만, 여기서는 먼저 find_if로 판정해 기존 경고 로그를 그대로
-        // 유지한다(로그를 남기지 않고 조용히 무시하는 쪽으로 동작을 바꾸지 않기 위해).
-		const auto& parentChildren = parentObj->GetChildrenIndices();
-        if(std::find(parentChildren.begin(), parentChildren.end(), newIndex) == parentChildren.end())
-        {
-            parentObj->AttachChildIndex(newIndex);
-        }
-        else
-        {
-            Debug->LogWarning("Entity with index " + std::to_string(newIndex) + " is already a child of " + std::to_string(parent));
-		}
-
     }
 
     if (node["m_components"])

@@ -140,9 +140,8 @@ namespace Meta
                 auto parentObj = m_scene->GetEntity(parentIndex);
                 if (parentObj)
                 {
-                    m_scene->m_Entities[0]->DetachChildIndex(cloned->m_index);
-                    cloned->SetParentIndex(parentIndex);
-                    parentObj->AttachChildIndex(cloned->m_index);
+					m_scene->Reparent(m_scene->HandleOf(cloned->m_index),
+						m_scene->HandleOf(parentObj->m_index));
                 }
             }
 
