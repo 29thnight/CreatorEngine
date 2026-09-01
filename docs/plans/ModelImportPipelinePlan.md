@@ -2366,7 +2366,8 @@ D4e-2가 소유는 옮겼지만 표기는 legacy 서브트리 그대로다.
 | **B2** ✅ | 신원 자립 — 본 캐시 무효화 신원이 `experiment::Model::Generation()`으로. **배치 경로는 정찰이 뒤집었다**(아래) | B0 |
 | **B3** ✅ | 진단·게이트 표면 — 관문을 창구로, 대조 arm에 널 가드. **B4 예행이 여기서 크래시를 찾았다** | B2 |
 | **B4a** ✅ | 대조군 인수인계 — legacy를 안 쓰는 독립 축 셋(이름 왕복 · 마스크 구조 · 팔레트 골든)을 **겹치는 구간에서 함께 돌린다** | B3 |
-| **B4b** | 절단 — legacy 틱 3함수·`EvaluateParityPose` 폐기, `animator->m_Skeleton` 대입 **둘** 제거, 죽은 축 정리 | B4a |
+| **B4b** ✅ | 틱 단일화 — legacy 재귀 틱 373줄 폐기, 파리티를 experiment 단독으로 축소. **대입은 남긴다**(대조 arm 보존) | B4a |
+| **B4c** | 대입 절단 — `animator->m_Skeleton` 쓰기 전부 제거, 그때 죽는 축(8·9·11 legacy arm · off 팔) 정리 | B4b |
 | **B5** | 필드 제거 — `Animator::m_Skeleton`·`GetSkeletonSerial` experiment 신원 전환·`Skeleton.h` include 청산 | B4 |
 
 **I6-B0 완료 실측 (2026-09-01) — 첫 자물쇠를 풀었다.**
@@ -2598,6 +2599,55 @@ x64 Debug 이 툴체인에 고정이다. 주석과 게이트 설명을 실측대
 무회귀: Debug x64 빌드 exit 0 · `verify-experiment-vertex-live` 전체 통과(양팔) ·
 은퇴 래칫 69/69(창구 밖 38/38). 실측값 — `roundtrip=0` · `structure=ok` ·
 `poseDigest=858071B5` · off 팔 `roundtrip=0`·`structure=n/a`.
+
+**I6-B4b 완료 실측 (2026-09-01) — 런타임 소비를 끊었다. 그리고 병합이 새 소비자를 들여왔다.**
+
+★ **B4를 또 쪼갰다.** 계획은 "틱 폐기 + 대입 절단"이었는데, 대입을 함께 끊으면 축
+8·9·11의 legacy arm과 off 팔이 **같은 커밋에서 통째로** 죽는다. 틱만 끊으면 대입이
+남아 대조 arm이 전부 살아 있다 — 파급면을 하나씩 보려면 이쪽이 맞다. 대입 절단은
+B4c로 뺐다.
+
+**걷어낸 것:** `UpdateBlendBone`·`UpdateBone`·`UpdateBoneLayer`·`calculAni`
+**373줄**과 `Update()`의 legacy 분기(`UsesMultipleControllers` 사슬). 재생 경로는
+`TickExperiment` 하나다. **이것이 Animator의 legacy Skeleton 소비 중 유일한 런타임
+소비였다** — 나머지는 진단·대조군이라, 이것이 죽어야 은퇴가 코드 삭제로 이어진다.
+`AnimationJob.cpp`의 접촉이 **5 → 0**이 됐다.
+
+★ **`BlendAni`를 실수로 함께 지웠고 링커가 잡았다.** 헤더 주석에 "experiment가 쓰므로
+존치"라고 적어 놓고 본문은 덩어리째 걷었다 — 삭제 범위를 줄 번호로 잡으면 그 안에
+섞인 생존자를 놓친다. `LNK2019` 하나로 드러났고, 이것이 은퇴 슬라이스에서
+"빌드가 막는다"가 게이트 축인 이유다.
+
+**파리티 하네스 강등.** `EvaluateParityPose`(legacy+experiment 두 팔) →
+`EvaluateExperimentPose`(experiment 단독). 대조할 상대가 없어졌으므로 남은 쓸모는
+결정적 표본으로 제품 포즈를 산출하는 것이고, 게이트는 그것을 골든으로 잰다.
+`experiment.animtick`도 linear/step 두 축(둘 다 legacy 상대 비교였다)을 버리고
+단일 축이 됐다.
+
+★ **골든이 858071B5 → 093A1FC2로 바뀌었고, 그 이유가 값보다 중요하다.** 예전 digest는
+**legacy의 Linear 강등 사본**에서 나온 값이었다(파리티 축의 입력이었으니까). 이제
+하네스가 실제 스켈레톤(Step 보존)을 재므로 값이 달라진다. 골든이 바뀔 때는 왜 바뀌었는지
+확인하고 적는다 — 안 그러면 골든은 "그때 우연히 나온 숫자"가 된다.
+
+★ **A/B 스위치의 애니메이션 차원이 은퇴했다.** off 팔은 이제 `[anim.tick] none`을
+찍는다 — 폴백이 없으므로 **애니메이션이 안 돈다**. 코퍼스에서 그 상황은 원래 0건이고
+(Assimp 폴백 발화 0), 정점 차원은 그대로다. 축 1e의 뜻도 따라 바뀌어(`legacy|none`
+둘 다 on 팔에서 0), off 팔이 실제로 `none`을 찍는 것이 그 축의 이빨을 그대로 보여 준다.
+
+★ **한계(정직).** 라이브 틱이 **실제로 도는지**는 이 하네스가 못 잰다(`--script`
+헤드리스는 렌더 0프레임). 검증되는 것은 포즈 함수(animtick)와 경로 로그이지 틱의
+집행이 아니다. 이 구멍은 B4b가 만든 것이 아니라 원래 있던 것이고, 여기서 명시한다.
+
+★ **병합이 은퇴 대상에 새 소비자를 붙였고 래칫이 잡았다.** Transform 트랙
+(`59d6eb4a` X0~X8)이 들여온 것 둘:
+
+| 지점 | 처분 |
+|---|---|
+| `Scene::PublishAnimatorPose`의 `nullptr == animator.m_Skeleton` 가드 · `m_Skeleton->m_bones.size()` | **창구로 전환**(제품 경로다). 그대로 뒀으면 B4c가 **살아 있는 experiment 애니메이터를 통째로 거절**한다 |
+| `scene.transformbulk` 하네스가 legacy Skeleton을 **합성해 주입** | 상한을 10→13으로 **유예**하고 근거를 표에 적었다. B5 선행으로 이주해야 한다 — 올린 것은 승인이 아니다 |
+
+무회귀: Debug x64 빌드 exit 0 · `verify-experiment-vertex-live` 전체 통과(양팔) ·
+씬 코퍼스 14/14 `unstable=0` · 래칫 **69 → 67**(창구 밖 38 → 36) · 순삭제 **630줄**.
 
 **I6-C 착수 실측 (2026-09-01) — 신원을 포인터에서 값으로.** 렌더 패스 셋이
 `Mesh*`를 지오메트리 맵 키·배치 키·정렬 기준으로 쓰고 있었다. 업로드는 D34/D4b가
