@@ -142,6 +142,10 @@ public:
     // I6-B3 — 진단 표면이 legacy 스켈레톤을 직접 훑지 않게 하는 창구 둘.
     // 본 계수와 인덱스→이름은 지금까지 `m_Skeleton->m_bones`를 직접 읽는
     // 것 말고는 길이 없었고, 그것이 진단을 은퇴의 인질로 잡고 있었다.
+    // 진단 창구 — 클립 길이. 두 축의 단위가 다르다(experiment durationTicks vs
+    // legacy m_duration)는 것 자체가 관측 대상이라 값 변환을 하지 않는다.
+    [[nodiscard]] double GetClipDuration(int clipIndex,
+        bool* outViaExperiment = nullptr) const;
     [[nodiscard]] std::size_t GetBoneCount(bool* outViaExperiment = nullptr) const;
     [[nodiscard]] std::string GetBoneName(int boneIndex,
         bool* outViaExperiment = nullptr) const;

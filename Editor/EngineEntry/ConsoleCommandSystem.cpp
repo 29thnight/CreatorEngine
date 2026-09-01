@@ -6417,22 +6417,7 @@ namespace ConsoleCmd
             // 멈춘 것"과 "긴 클립을 지나는 중"을 구별할 수 없다(실측으로
             // 그 둘을 혼동할 뻔했다).
             const int clipIndex = static_cast<int>(animator->m_AnimIndexChosen);
-            double duration = 0.0;
-            if (const experiment::Skeleton* expSkeleton = animator->m_experimentModel
-                ? animator->m_experimentModel->TryGetSkeleton() : nullptr)
-            {
-                if (clipIndex >= 0 && static_cast<std::size_t>(clipIndex)
-                    < expSkeleton->clips.size())
-                {
-                    duration = expSkeleton->clips[clipIndex].durationTicks;
-                }
-            }
-            else if (animator->m_Skeleton && clipIndex >= 0
-                && static_cast<std::size_t>(clipIndex)
-                    < animator->m_Skeleton->m_animations.size())
-            {
-                duration = animator->m_Skeleton->m_animations[clipIndex].m_duration;
-            }
+            const double duration = animator->GetClipDuration(clipIndex);
             std::printf("[CLI] experiment.animlive %s path=%s enabled=%d "
                 "clip=%u elapsed=%.4f duration=%.4f loop=%d clips=%zu "
                 "bones=%zu palette=%08X\n",

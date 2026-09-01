@@ -104,7 +104,9 @@ elseif ($reflectBody -notmatch 'm_Motion') {
 # 표에 없는 파일이 나타나면 **새 소비자**라 실패다 — 은퇴 중인 타입에 소비가
 # 늘어나는 것이 이 게이트가 막으려는 유일한 방향이다.
 $ratchet = @{
-    'Engine/SceneRuntime/Animator.cpp'                = 19
+    # 진단 창구(GetClipDuration) 추가로 19 → 22. 창구 안 폴백은 B5에서
+    # 한꺼번에 죽으므로 창구 밖 상한(43)은 그대로다.
+    'Engine/SceneRuntime/Animator.cpp'                = 22
     # 2026-09-01 병합(Transform 트랙 X0~X8)이 `scene.transformbulk` 하네스로
     # legacy Skeleton을 합성 주입해 10 → 13이 됐다. B5 선행으로 이주해야 한다.
     'Editor/EngineEntry/ConsoleCommandSystem.cpp'     = 13

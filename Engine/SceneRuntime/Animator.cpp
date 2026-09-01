@@ -133,6 +133,28 @@ uint64 Animator::GetSkeletonSerial(bool* outViaExperiment) const
 	return m_Skeleton ? m_Skeleton->m_serial : 0;
 }
 
+double Animator::GetClipDuration(int clipIndex, bool* outViaExperiment) const
+{
+	if (outViaExperiment) *outViaExperiment = false;
+	if (clipIndex < 0) return 0.0;
+	const std::size_t index = static_cast<std::size_t>(clipIndex);
+	if (m_experimentModel)
+	{
+		if (const experiment::Skeleton* skeleton =
+			m_experimentModel->TryGetSkeleton())
+		{
+			if (outViaExperiment) *outViaExperiment = true;
+			return index < skeleton->clips.size()
+				? static_cast<double>(skeleton->clips[index].durationTicks) : 0.0;
+		}
+	}
+	if (m_Skeleton && index < m_Skeleton->m_animations.size())
+	{
+		return static_cast<double>(m_Skeleton->m_animations[index].m_duration);
+	}
+	return 0.0;
+}
+
 std::size_t Animator::GetBoneCount(bool* outViaExperiment) const
 {
 	if (outViaExperiment) *outViaExperiment = false;
