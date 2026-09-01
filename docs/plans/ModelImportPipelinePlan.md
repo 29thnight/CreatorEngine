@@ -2133,7 +2133,7 @@ I6에서 은퇴.
 - [ ] legacy 본체의 experiment 명목 공개 표면이 더 늘지 않는다 — `Model.h` 패리티 getter
       3종(`72ed27ef`)이 마지막 사례이며 I6에서 legacy `::Model` 본체와 함께 은퇴한다.
 
-### I6. 전환 — Assimp 은퇴
+### I6. 전환 — legacy 타입 은퇴, 그다음 Assimp (2026-09-01 정찰로 순서 정정)
 
 I5 결정 후. 두 경로 병행 기간을 두고 픽셀·성능 대조를 거친 뒤 legacy 로더를
 제거한다. **Release 로만 성능을 판정한다**(Debug 는 같은 조건에서 25배 느리고
@@ -2146,6 +2146,58 @@ legacy model/material runtime codec과 프로젝트 등록을 함께 제거한�
 완료 판정은 legacy Model/Material/Assimp 제품 호출 0, 대표 자산 픽셀 동등, Release
 성능 비퇴행, VS18/v145의 RenderEngine→SceneRuntime→RenderTests→CreatorEditor→Player
 빌드와 DX12/Vulkan 회귀 통과다.
+
+**I6 착수 정찰 (2026-09-01) — 축이 둘이고, 계획서의 이름이 순서를 거꾸로 암시한다.**
+
+★ **"Assimp 은퇴"와 "legacy 타입 은퇴"는 다른 작업이다.** 역브리지가
+experiment에서 legacy 객체를 **만들기** 때문에, Assimp를 떼도 legacy 타입은
+그대로 산다(브리지가 계속 만든다). 반대로 legacy 소비자를 다 걷어내면 브리지가
+만들 것이 없어지고 그때 Assimp는 저절로 죽는다. 따라서 **타입 은퇴가 먼저이고
+Assimp 삭제가 뒤**다. 이 절의 제목("전환 — Assimp 은퇴")이 반대로 읽히게 하고
+있었다.
+
+**측정 ① — Assimp 표면은 생각보다 작다.** `#include <assimp/...>`는 5파일
+(`Model.cpp` · `ModelLoader.{h,cpp}` · `SkeletonLoader.{h,cpp}` ·
+`AnimationLoader`)이고 본체 합계 ~2,100줄이다. **코퍼스 14모델은 전부
+`.glb`/`.fbx`라 experiment importer가 100% 덮는다** — 제품에서 폴백이 발화한
+적이 0이다(라이브 게이트 `[model.dual]` 9/9, cooked 게이트 8/8 전량 experiment).
+
+**측정 ② — 은퇴가 함께 가져가는 두 표면.** legacy 로더는 importer가 안 받는
+`.obj`와 `.asset`(legacy CEMA 모델 캐시)을 더 받는다. 코퍼스의 `.asset` 16개 중
+**tracked는 2개뿐이고 그 둘은 모델 캐시가 아니라 standalone 재질 문서**다
+(`ForwardWater`/`ForwardWind`) — 확장자가 겹칠 뿐 다른 포맷이다. 모델 캐시
+14개는 전부 untracked 지역 산출물이라 **폐기 비용이 0**이다. `.obj`는 코퍼스에
+0건이고, 지원을 유지하려면 importer를 하나 더 쓰는 별개 작업이다.
+
+**측정 ③ — 소비자는 세 덩어리다**(제품, 게이트·하네스 제외).
+
+| 덩어리 | 규모 | 핵심 지점 |
+|---|---|---|
+| `Skeleton` | ~44 | `Animator.cpp` 20 · `Animator.h` 6 · `AnimationEventBridge` 8 · `AnimationJob` 5 · `ModelSceneBridge` 5 |
+| `Material` | 다수 | `MeshRenderer` · `ClrHost` · `MaterialScriptBinding` · 프록시 사슬 · `SceneManager` · Inspector · reflect의 `m_Material` |
+| `Mesh` | 소수지만 깊다 | `MeshRenderer::m_Mesh` · `FoliageType::m_mesh` · **`EnhancedDrawItem::mesh`(정렬·지오메트리 맵 키로 존치 중)** · 바운드 소비 4곳 |
+
+`EnhancedDrawItem::mesh`가 특히 중요하다 — 업로드는 D34/D4b가 experiment
+핸들로 옮겼는데 **신원 키만 legacy 포인터로 남아 있다**. 그 키를 experiment
+`stableKey`로 바꾸는 것이 Mesh 은퇴의 실질 착수점이다.
+
+**분해 제안** (순서는 의존이 정한다):
+
+| 슬라이스 | 내용 | 선행 |
+|---|---|---|
+| **I6-A** | 판정 — `.obj`·`.asset`(모델 캐시)·`model.cache.build`를 계승할 것인가 폐기할 것인가. 위 측정이 "폐기 비용 0"을 말하지만 제품 정책은 별개다 | 없음 |
+| **I6-B** | `Skeleton` 은퇴 — D4e가 낸 창구(`ResolveBoneIndex`·마스크·재생 핸들)를 정본으로 승격하고 `m_Skeleton` 소비 44곳을 옮긴다 | A |
+| **I6-C** | `Mesh` 은퇴 — `EnhancedDrawItem::mesh` 신원 키를 stableKey로, 그다음 `m_Mesh`·`FoliageType::m_mesh`·바운드 소비 | A |
+| **I6-D** | `Material` 은퇴 — `MaterialInstance`가 정본. reflect `m_Material`·`m_IOR`·flow 인스턴스 채널·legacy 호환 스칼라 청산(D5-c5가 "제품 소비 0"을 이미 실측했다) | A |
+| **I6-E** | 삭제 — 역브리지·`ModelLoader`·`SkeletonLoader`·`AnimationLoader`·`Model.cpp`·`Material.cpp`·assimp 벤더링, 하네스(`ExperimentImportPathSelfTest`·`ExperimentLegacyBridge`)와 `CREATOR_EXPERIMENT_VERTEX`·`Mesh`의 `friend class DataSystem` | B·C·D |
+
+★ **설계 문제 하나를 미리 적는다 — 은퇴는 자기 대조군을 없앤다.** D4f-1이
+`CREATOR_EXPERIMENT_VERTEX`의 뜻을 "off면 역브리지가 legacy 정점을 짓는다"로
+넓혀 A/B를 살렸는데, **타입이 죽으면 off가 지을 것이 없다**. 즉 I6의 각 은퇴
+슬라이스는 그 순간 자기 A/B 대조군을 잃는다. 그래서 은퇴 **전에** 값 동등을
+증명해 두고(지금까지의 A/B가 그 자산이다), 은퇴 슬라이스의 게이트는 "그림이
+같다"가 아니라 **"소비 0"과 "빌드가 막는다"**로 옮겨야 한다 —
+[[control-group-needs-independent-derivation]]가 기록한 그 함정의 마지막 형태다.
 
 ### I7. cooked 경로 — **포맷·코덱 완료** (2026-08-25 · `c8e06ffa`)
 
