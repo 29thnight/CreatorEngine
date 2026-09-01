@@ -2649,6 +2649,53 @@ B4c로 뺐다.
 무회귀: Debug x64 빌드 exit 0 · `verify-experiment-vertex-live` 전체 통과(양팔) ·
 씬 코퍼스 14/14 `unstable=0` · 래칫 **69 → 67**(창구 밖 38 → 36) · 순삭제 **630줄**.
 
+**I6-B4b 회귀와 수정 (2026-09-01) — 로더가 둘이었고 게이트는 한쪽만 태웠다.**
+
+사용자 보고: **씬에 애니메이션 모델을 올리면 아무것도 안 그려진다.** 내 B4b가
+원인이 맞다. 재현·원인·수정은 아래다.
+
+★ **에디터 드롭 경로는 `model.load`가 아니다.** 콘텐츠 브라우저에서 씬으로 끌어다
+놓을 때 도는 것은 `DataSystems->LoadCachedModelShared`(HierarchyWindow·
+SceneViewWindow·TerrainComponent·Foliage)이고, 그 함수는 **experiment 로더를 타지
+않고 Assimp로 직행**했다. 그래서 드롭한 모델만 `m_experimentModels` 등록이 비고
+`EnsureExperimentAnimationBinding`이 아무것도 못 찾는다.
+
+★ **D34b가 이 함수를 놓쳤다.** 그 슬라이스가 `LoadModel`을 이중화하며 주석에
+"에디터의 이름 기반 로드"라고 적었는데, **정작 에디터가 부르는 것은 옆 함수**였다.
+이름이 비슷한 로더가 둘이면 하나만 고치고 둘 다 고쳤다고 적기 쉽다.
+
+★ **B4b 전에는 폴백이 이 구멍을 덮고 있었다.** 바인딩이 비어도 legacy 재귀 틱이
+돌아 애니메이션이 나왔다. 틱이 하나가 되자 **팔레트가 한 번도 안 쓰이고**, 스킨
+정점이 원점으로 접혀 화면에서 사라진다. 즉 B4b가 결함을 만든 것이 아니라
+**덮개를 걷었다** — 그리고 그 덮개가 걷힌 자리를 게이트가 안 보고 있었다.
+
+**재현(실측).** `model.loadcached`를 CLI로 열고 같은 순서를 태웠다.
+
+| | `model.load`(게이트가 태우던 경로) | `model.loadcached`(에디터 드롭) |
+|---|---|---|
+| 로드 | `[model.dual] experiment 경로` | **없음**(Assimp 직행) |
+| 배치 | `[model.instantiate] experiment` | `[model.instantiate] legacy` |
+| 틱 | `[anim.tick] experiment` | **`[anim.tick] none`** |
+| 포즈 | `animtick pass animators=1 samples=50` | **`animtick skip animators=0`** |
+
+**수정.** `LoadCachedModelShared`가 `LoadModel`과 같은 결로 experiment를 먼저 타고
+실패 시 Assimp로 폴백한다. 수정 뒤 같은 시나리오가 네 줄 모두 experiment로 뒤집힌다
+(`poseDigest=093A1FC2` — `model.load` 경로와 같은 값).
+
+★ **게이트를 세웠다 — 이 구멍은 "왜 못 잡았나"가 분명하다.** 라이브 게이트는
+`model.load`만 태우고, 게다가 저장 전에 **Animator를 꺼 버린다**(비결정성 때문에).
+그래서 ①다른 로더 ②살아 있는 애니메이터, 둘 다 관측 밖이었다.
+`verify-editor-drop-animation`(신설·run-all 편입)이 드롭 경로를 그대로 태워
+로드·인스턴스화·`[anim.tick] none` 0건·포즈 표본을 잰다. 픽셀이 아니라 **바인딩**을
+재는 이유는 헤드리스가 프레임을 완성하지 않기 때문이고, 사라짐의 직접 원인이
+바인딩이라 그 자리를 막는 것으로 충분하다.
+
+RED→GREEN은 수정 전후 실행 로그 그대로다(위 표) — 변이를 따로 만들지 않았다.
+
+★ **남은 위험 하나를 적어 둔다.** `Foliage`와 `TerrainComponent`도 같은 함수를
+쓰므로 이번 수정으로 함께 experiment 경로에 올라탔다. 그 둘의 실자산 저작분은
+코퍼스에 0건이라(D5-a·D5-c1 실측) 이 게이트가 덮지 못한다.
+
 **I6-C 착수 실측 (2026-09-01) — 신원을 포인터에서 값으로.** 렌더 패스 셋이
 `Mesh*`를 지오메트리 맵 키·배치 키·정렬 기준으로 쓰고 있었다. 업로드는 D34/D4b가
 experiment 핸들로 옮겼는데 **신원만 게임 객체 주소로 남아 있던** 자리다.

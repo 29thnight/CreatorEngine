@@ -5408,6 +5408,23 @@ namespace ConsoleCmd
 		if (!passed) EngineBootstrap::SetExitCode(6);
 	}
 
+    // I6-B4b 후속 — **에디터 드롭 경로**를 CLI로 연다. 콘텐츠 브라우저에서
+    // 씬으로 끌어다 놓을 때 도는 것은 model.load(LoadModel)가 아니라
+    // DataSystems->LoadCachedModelShared다(HierarchyWindow·SceneViewWindow).
+    // 그 둘이 서로 다른 로더라는 것이 이 게이트 세트의 구멍이었다.
+    static void Cmd_model_loadcached(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: model.loadcached <모델 경로>\n");
+            return;
+        }
+        auto model = DataSystems->LoadCachedModelShared(parts[1]);
+        std::printf("[CLI] model.loadcached %s: %s\n",
+            model ? "ok" : "fail", parts[1].c_str());
+    }
+
     static void Cmd_model_place(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -11350,6 +11367,7 @@ namespace ConsoleCmd
 			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
 			reg({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
 			reg({ "animator.authoring.probe" }, &Cmd_animator_authoring_probe);
+            reg({ "model.loadcached" }, &Cmd_model_loadcached);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);

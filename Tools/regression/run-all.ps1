@@ -280,6 +280,14 @@ Run-Step "legacy Skeleton 은퇴 경계" {
         (Join-Path $PSScriptRoot "verify-legacy-skeleton-retirement.ps1")
 }
 
+# I6-B4b 후속: 콘텐츠 브라우저 드롭 경로(LoadCachedModelShared)의 재생
+# 바인딩. 라이브 게이트는 model.load 쪽만 태워서 이 경로가 구멍이었고,
+# legacy 재귀 틱을 걷자 "드롭한 애니메이션 모델이 안 그려진다"로 나왔다.
+Run-Step "에디터 드롭 재생 바인딩" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-editor-drop-animation.ps1") -Work $Work
+}
+
 Run-Step "Experiment cooked catalog 기동" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-experiment-cooked-catalog.ps1") -Exe $Exe -Work $Work
