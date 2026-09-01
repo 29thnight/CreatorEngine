@@ -202,7 +202,8 @@ private:
     // 정점 버퍼나 SRV 테이블을 바꿔야 하므로 같은 드로우로 묶을 수 없다.
     struct DrawBatch
     {
-        Mesh*        mesh{ nullptr };
+        // I6-C — 배치 키는 신원 값이다(포인터가 아니다).
+        std::size_t  geometryKey{ 0 };
         MaterialKey  material{};
         RHIPipelineHandle pipeline{};
         uint32_t     firstInstance{ 0 };   // m_instances 안에서의 시작
@@ -254,7 +255,8 @@ private:
 
     // 이번 프레임 드로우가 쓸 지오메트리. PrepareFrame에서 채우고 Record가 읽는다 —
     // Record가 메시 캐시를 직접 부르면 기록 중에 리소스를 만들게 되어 규약을 어긴다.
-    std::unordered_map<Mesh*, RHIMeshBinding> m_drawGeometry;
+    // I6-C — 지오메트리 맵의 키를 신원 값으로 옮겼다.
+    std::unordered_map<std::size_t, RHIMeshBinding> m_drawGeometry;
 
     // 재질은 메시가 아니라 재질로 키잉한다.
     //

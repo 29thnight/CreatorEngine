@@ -415,7 +415,8 @@ private:
     {
         std::size_t firstDraw{};
         std::uint32_t drawCount{};
-        Mesh* mesh{};
+        // I6-C — 배치 키는 신원 값이다.
+        std::size_t geometryKey{ 0 };
         MaterialKey material{};
         RHIPipelineHandle shadePipeline{};
         RHIPipelineHandle referencePipeline{};
@@ -430,7 +431,8 @@ private:
     // Vulkan에서는 vkCmdCopyBuffer를 dynamic rendering 안에서 기록할 수 없다.
     // 따라서 GBuffer와 같은 규칙으로 PrepareFrame에서 메시를 올려 두고,
     // 셰이딩 기록은 이미 완성된 중립 바인딩만 소비한다.
-    std::map<Mesh*, RHIMeshBinding> m_drawGeometry;
+    // I6-C — 키를 신원 값으로 옮겼다(정렬 순서도 자산 신원이 정한다).
+    std::map<std::size_t, RHIMeshBinding> m_drawGeometry;
 
     RGHandle           m_shadowMap;
     EnhancedShadowData m_shadowData{};

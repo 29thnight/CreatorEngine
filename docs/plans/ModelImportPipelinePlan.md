@@ -2187,7 +2187,7 @@ Assimp 삭제가 뒤**다. 이 절의 제목("전환 — Assimp 은퇴")이 반�
 |---|---|---|
 | **I6-A** ✅ | 판정 — **전부 폐기**(2026-09-01). `model.cache.build`·`rebuild-model-assets.ps1` 제거, asset-authoring 게이트를 폐기의 대우로 뒤집어 기준선 붉음 하나를 없앴다 | 없음 |
 | **I6-B** | `Skeleton` 은퇴 — D4e가 낸 창구(`ResolveBoneIndex`·마스크·재생 핸들)를 정본으로 승격하고 `m_Skeleton` 소비 44곳을 옮긴다 | A |
-| **I6-C** | `Mesh` 은퇴 — `EnhancedDrawItem::mesh` 신원 키를 stableKey로, 그다음 `m_Mesh`·`FoliageType::m_mesh`·바운드 소비 | A |
+| **I6-C** ◐ | `Mesh` 은퇴 — **신원 축은 닫혔다**(2026-09-01: 맵·배치·정렬 키가 값으로, Shadow 반경도 값으로, `draw.mesh`는 업로드 폴백 3줄만). 남은 것은 `m_Mesh`·`FoliageType::m_mesh` 소유와 업로드 폴백 자체 | A |
 | **I6-D** | `Material` 은퇴 — `MaterialInstance`가 정본. reflect `m_Material`·`m_IOR`·flow 인스턴스 채널·legacy 호환 스칼라 청산(D5-c5가 "제품 소비 0"을 이미 실측했다) | A |
 | **I6-E** | 삭제 — 역브리지·`ModelLoader`·`SkeletonLoader`·`AnimationLoader`·`Model.cpp`·`Material.cpp`·assimp 벤더링, 하네스(`ExperimentImportPathSelfTest`·`ExperimentLegacyBridge`)와 `CREATOR_EXPERIMENT_VERTEX`·`Mesh`의 `friend class DataSystem` | B·C·D |
 
@@ -2217,6 +2217,39 @@ runtime reload는 살아 있는 표면이라 그대로 잰다.
 이로써 이 세션 내내 "기준선 붉음"으로 넘겨 온 둘 중 하나가 사라진다. 남은
 하나(`verify-hierarchy-read-boundary` H3 7건)는 D1a의 bone/node parentIndex
 시공이고, 그것도 I6-B/E에서 함께 죽는다.
+
+**I6-C 착수 실측 (2026-09-01) — 신원을 포인터에서 값으로.** 렌더 패스 셋이
+`Mesh*`를 지오메트리 맵 키·배치 키·정렬 기준으로 쓰고 있었다. 업로드는 D34/D4b가
+experiment 핸들로 옮겼는데 **신원만 게임 객체 주소로 남아 있던** 자리다.
+`enhanced_draw::GeometryKey`(experiment `stableKey` 우선, 없으면 legacy
+`m_hashingMesh`)로 바꾸고 Shadow의 `boundRadius`도 값으로 옮겼다. 그 결과
+`draw.mesh`는 **세 패스에 각 한 줄, 업로드 폴백에만** 남는다.
+
+★ **첫 시도가 드로우를 통째로 지웠다 — 새 필드를 계약으로 걸었기 때문이다.**
+처음엔 `EnhancedDrawItem::geometryKey`를 필드로 두고 `BuildDrawPool`이 채우게
+했는데, 아이템을 짓는 곳이 제품 하나가 아니다(격리 하네스 여럿, `dx12.scene`도
+자기 것을 짓는다). 안 채운 곳이 조용히 0이 되어 패스의 null 가드에 전부
+걸렸다 — 실측 `experiment 업로드 0 · 포워드 배치 0 · dx12.scene 실패(양 arm)`.
+그래서 **필드가 아니라 창구**로 바꿨다: 값이 실려 있으면 그것이 정본이고,
+비어 있으면 legacy에서 유도한다. 계약 없이 성립하고, legacy 유도는 `mesh`와
+함께 I6-E에서 죽는다.
+
+★ **창구를 별도 헤더에 둔 이유.** `EnhancedRenderPass.h`는 `Mesh`를 전방선언만
+한다 — 렌더 그래프가 자산 타입을 알지 않는다는 경계다. legacy 유도는 역참조가
+필요하므로 `Render/Graph/EnhancedDrawIdentity.h`를 신설해 그 경계를 넘지 않게
+했다(멤버 함수로 넣으면 헤더가 `Mesh.h`를 끌어온다 — 컴파일이 그것을 막았다).
+
+★ **게이트는 정적이다 — 이 전환은 그림을 바꾸지 않기 때문이다.**
+`verify-render-geometry-identity`(신설·run-all 편입)가 셋을 잰다: ① `draw.mesh`가
+업로드 폴백 줄에만 나타나는가 ② 배치·지오메트리 맵이 포인터 키가 아닌가
+③ 세 패스가 실제로 신원 창구를 쓰는가. ③이 없으면 ①②를 만족하면서 아무도
+키를 안 쓰는 상태가 통과한다. 실측 `패스 3 · 신원 창구 사용 3 · 업로드 폴백
+전용 draw.mesh 3`. **변이 M12-a**(GBuffer만 포인터 신원으로 되돌림)가 그 패스의
+9줄을 정확히 붉혔다. 라이브 A/B는 전후가 같다(드로우 9·포워드 1·커버리지
+42411) — 그림이 안 바뀌는 것이 이 슬라이스의 성공 조건이고, 그래서 픽셀 축은
+되돌림을 못 잡는다. I6 정찰이 적어 둔 규칙("소비 0"·"빌드가 막는다")의 첫 적용이다.
+
+덤: 배치가 들던 `Mesh*`는 아무도 읽지 않게 되어 **죽은 필드로 확인되고 제거**됐다.
 
 ★ **설계 문제 하나를 미리 적는다 — 은퇴는 자기 대조군을 없앤다.** D4f-1이
 `CREATOR_EXPERIMENT_VERTEX`의 뜻을 "off면 역브리지가 legacy 정점을 짓는다"로

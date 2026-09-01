@@ -1,4 +1,5 @@
 #include "EnhancedGBufferPass.h"
+#include "../../Graph/EnhancedDrawIdentity.h" // I6-C
 #include "../../../Experiment/VertexLayout.h" // I5-D34a: core 마스크
 #include "../../../RHI/ExperimentVertexInputLayout.h" // I5-D34a: 레이아웃 유도
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -302,7 +303,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     // 단위가 둘이 다르다 — 지오메트리는 메시별로, 재질은 재질별로 한 번이다.
     for (const auto& draw : *context.draws)
     {
-        if (nullptr == draw.mesh) continue;
+        if (0 == enhanced_draw::GeometryKey(draw)) continue;
 
         if (draw.materialSnapshot)
         {
@@ -328,7 +329,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
             if (!ValidateGBufferTextureSnapshot(material, outError)) return false;
         }
 
-        if (m_drawGeometry.find(draw.mesh) == m_drawGeometry.end())
+        if (m_drawGeometry.find(enhanced_draw::GeometryKey(draw)) == m_drawGeometry.end())
         {
             std::string uploadError;
             // I5-D4b: 핸들이 실린 아이템은 legacy Mesh 없이 완결되는 핸들
@@ -346,9 +347,9 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 continue;
             }
 
-            m_drawGeometry.emplace(draw.mesh, entry);
+            m_drawGeometry.emplace(enhanced_draw::GeometryKey(draw), entry);
         }
-        else if (!m_drawGeometry[draw.mesh].IsValid())
+        else if (!m_drawGeometry[enhanced_draw::GeometryKey(draw)].IsValid())
         {
             continue;
         }
@@ -459,9 +460,9 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
     sorted.reserve(context.draws->size());
     for (const auto& draw : *context.draws)
     {
-        if (nullptr == draw.mesh) continue;
+        if (0 == enhanced_draw::GeometryKey(draw)) continue;
 
-        const auto geometry = m_drawGeometry.find(draw.mesh);
+        const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
         if (geometry == m_drawGeometry.end() || !geometry->second.IsValid()) continue;
 
         sorted.push_back(&draw);
@@ -470,7 +471,8 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
     std::stable_sort(sorted.begin(), sorted.end(),
         [this](const EnhancedDrawItem* a, const EnhancedDrawItem* b)
         {
-            if (a->mesh != b->mesh) return a->mesh < b->mesh;
+            if (enhanced_draw::GeometryKey(*a) != enhanced_draw::GeometryKey(*b))
+                return enhanced_draw::GeometryKey(*a) < enhanced_draw::GeometryKey(*b);
 
             const MaterialKey keyA = MakeMaterialKey(*a);
             const MaterialKey keyB = MakeMaterialKey(*b);
@@ -483,15 +485,16 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
 
         const MaterialKey key = MakeMaterialKey(draw);
 
-        if (m_batches.empty() || m_batches.back().mesh != draw.mesh
+        if (m_batches.empty()
+            || m_batches.back().geometryKey != enhanced_draw::GeometryKey(draw)
             || m_batches.back().material != key)
         {
             DrawBatch batch{};
-            batch.mesh = draw.mesh;
+            batch.geometryKey = enhanced_draw::GeometryKey(draw);
             batch.material = key;
             // I5-D34a: 메시 바인딩의 마스크가 레이아웃 축이다. 배치는 메시별로
             // 갈리므로 마스크가 배치 안에서 섞일 수 없다.
-            const auto geometry = m_drawGeometry.find(draw.mesh);
+            const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
             const uint32_t vertexMask = geometry != m_drawGeometry.end()
                 ? geometry->second.vertexAttributeMask : 0;
             if (key.snapshot)
@@ -1341,7 +1344,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 const DrawBatch& batch = m_batches[batchIndex];
                 if (0 == batch.instanceCount || !batch.pipeline.IsValid()) continue;
 
-                const auto mesh = m_drawGeometry.find(batch.mesh);
+                const auto mesh = m_drawGeometry.find(batch.geometryKey);
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
 
                 // M6-P1b2b1: PSO는 pass 전역 한 번이 아니라 material batch 직전에

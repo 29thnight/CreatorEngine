@@ -1,4 +1,5 @@
 #include "EnhancedForwardPass.h"
+#include "../../Graph/EnhancedDrawIdentity.h" // I6-C
 #include "../../../Experiment/VertexLayout.h" // I5-D34c: core 마스크
 #include "../../../RHI/ExperimentVertexInputLayout.h" // I5-D34c: 레이아웃 유도
 #include "../../../RHI/DX12/DX12DeviceResources.h"
@@ -1362,7 +1363,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                     return false;
                 }
             }
-            if (nullptr != draw.mesh) ++m_lastDrawCount;
+            if (0 != enhanced_draw::GeometryKey(draw)) ++m_lastDrawCount;
         }
     }
 
@@ -1371,7 +1372,8 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     {
         for (const EnhancedDrawItem& draw : *context.forwardDraws)
         {
-            if (nullptr == draw.mesh || m_drawGeometry.contains(draw.mesh)) continue;
+            if (0 == enhanced_draw::GeometryKey(draw)
+                || m_drawGeometry.contains(enhanced_draw::GeometryKey(draw))) continue;
 
             std::string uploadError;
             // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선.
@@ -1386,7 +1388,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
             }
             // I5-D34c: 레이아웃 축이 열렸다 — 마스크는 배치 구성이 PSO 선택에
             // 쓴다(D34a의 fail-closed는 여기서 걷혔다).
-            m_drawGeometry.emplace(draw.mesh, entry);
+            m_drawGeometry.emplace(enhanced_draw::GeometryKey(draw), entry);
         }
     }
 
@@ -1459,8 +1461,8 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
     for (std::size_t drawIndex = 0; drawIndex < context.forwardDraws->size(); ++drawIndex)
     {
         const EnhancedDrawItem& draw = (*context.forwardDraws)[drawIndex];
-        if (nullptr == draw.mesh) continue;
-        const auto geometry = m_drawGeometry.find(draw.mesh);
+        if (0 == enhanced_draw::GeometryKey(draw)) continue;
+        const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
         if (geometry == m_drawGeometry.end() || !geometry->second.IsValid()) continue;
 
         const MaterialKey key = MakeMaterialKey(draw);
@@ -1485,7 +1487,7 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
 
         const bool adjacentCompatible = !m_batches.empty()
             && drawIndex == m_batches.back().firstDraw + m_batches.back().drawCount
-            && m_batches.back().mesh == draw.mesh
+            && m_batches.back().geometryKey == enhanced_draw::GeometryKey(draw)
             && m_batches.back().material == key
             && m_batches.back().shadePipeline == shadePipeline
             && m_batches.back().referencePipeline == referencePipeline;
@@ -1498,7 +1500,7 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
         DrawBatch batch{};
         batch.firstDraw = drawIndex;
         batch.drawCount = 1;
-        batch.mesh = draw.mesh;
+        batch.geometryKey = enhanced_draw::GeometryKey(draw);
         batch.material = key;
         batch.shadePipeline = shadePipeline;
         batch.referencePipeline = referencePipeline;
@@ -1880,7 +1882,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         const RHIPipelineHandle pipeline = m_useReferencePath
             ? batch.referencePipeline : batch.shadePipeline;
         if (!pipeline.IsValid()) continue;
-        const auto geometry = m_drawGeometry.find(batch.mesh);
+        const auto geometry = m_drawGeometry.find(batch.geometryKey);
         if (geometry == m_drawGeometry.end() || !geometry->second.IsValid()) continue;
         const RHIMeshBinding& entry = geometry->second;
         encoder.SetPipeline(RHIBindPoint::Graphics, pipeline);

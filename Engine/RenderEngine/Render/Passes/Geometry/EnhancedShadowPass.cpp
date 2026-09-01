@@ -1,4 +1,5 @@
 #include "EnhancedShadowPass.h"
+#include "../../Graph/EnhancedDrawIdentity.h" // I6-C
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
@@ -343,8 +344,9 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     // 올리지 않는다는 것이 캐시의 요점이다.
     for (const auto& draw : *context.draws)
     {
-        if (nullptr == draw.mesh) continue;
-        if (m_drawGeometry.find(draw.mesh) != m_drawGeometry.end()) continue;
+        if (0 == enhanced_draw::GeometryKey(draw)) continue;
+        if (m_drawGeometry.find(enhanced_draw::GeometryKey(draw)) != m_drawGeometry.end())
+            continue;
 
         std::string uploadError;
         // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선(같은 stableKey라
@@ -361,8 +363,10 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
 
         Geometry geometry{};
         geometry.entry = entry;
-        geometry.boundRadius = draw.mesh->GetBoundingSphere().radius;
-        m_drawGeometry.emplace(draw.mesh, geometry);
+        // I6-C — 반경은 아이템이 값으로 나른다. 패스가 legacy Mesh를
+        //   역참조하던 마지막 데이터 소비 자리였다.
+        geometry.boundRadius = enhanced_draw::BoundRadius(draw);
+        m_drawGeometry.emplace(enhanced_draw::GeometryKey(draw), geometry);
     }
 
     // 본 팔레트를 애니메이터별로 한 번씩 모은다(GBuffer와 같은 규칙).
@@ -372,7 +376,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     // 팔레트 복사는 애니메이터당 한 번이라 실측으로도 문제가 안 된다.
     for (const auto& draw : *context.draws)
     {
-        if (nullptr == draw.mesh) continue;
+        if (0 == enhanced_draw::GeometryKey(draw)) continue;
         if (nullptr == draw.bonePalette || 0 == draw.boneCount) continue;
         if (m_boneOffsets.find(draw.animatorKey) != m_boneOffsets.end()) continue;
 
@@ -398,7 +402,8 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     m_sortedDraws.reserve(context.draws->size());
     for (size_t index = 0; index < context.draws->size(); ++index)
     {
-        if (nullptr != (*context.draws)[index].mesh) m_sortedDraws.push_back(index);
+        if (0 != enhanced_draw::GeometryKey((*context.draws)[index]))
+            m_sortedDraws.push_back(index);
     }
 
     // 스킨드 여부를 첫 키로 둔다. PSO가 둘이므로 섞여 있으면 배치마다
@@ -414,7 +419,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
             const bool skinnedB = (nullptr != drawB.bonePalette) && (0 != drawB.boneCount);
             if (skinnedA != skinnedB) return skinnedA < skinnedB;
 
-            return drawA.mesh < drawB.mesh;
+            return enhanced_draw::GeometryKey(drawA) < enhanced_draw::GeometryKey(drawB);
         });
 
     // 조각 수를 정하는 근거. 컬링 전 후보라 상한이지만, '몇 조각으로 나눌까'에는
@@ -562,7 +567,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 std::vector<ShadowInstance> instances;
                 instances.reserve(drawEnd - drawBegin);
 
-                Mesh* batchMesh = nullptr;
+                std::size_t batchGeometryKey = 0;
                 bool  batchSkinned = false;
 
                 // 지금 걸려 있는 PSO. 조각마다 상태를 새로 걸어야 하므로
@@ -572,9 +577,9 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 // 모아 둔 인스턴스를 드로우 하나로 낸다.
                 const auto flushBatch = [&]()
                 {
-                    if (instances.empty() || nullptr == batchMesh) return;
+                    if (instances.empty() || 0 == batchGeometryKey) return;
 
-                    const auto found = m_drawGeometry.find(batchMesh);
+                    const auto found = m_drawGeometry.find(batchGeometryKey);
                     if (found != m_drawGeometry.end() && found->second.entry.IsValid())
                     {
                         // 배치마다 링에서 자른다. dx12.bench11 실측으로 Allocate
@@ -599,7 +604,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                             uint32_t batchMask = 0;
                             if (batchSkinned)
                             {
-                                const auto geometry = m_drawGeometry.find(batchMesh);
+                                const auto geometry = m_drawGeometry.find(batchGeometryKey);
                                 if (geometry != m_drawGeometry.end())
                                     batchMask = geometry->second.entry
                                         .vertexAttributeMask;
@@ -650,7 +655,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 {
                     const auto& draw = (*context.draws)[m_sortedDraws[sortedIndex]];
 
-                    const auto found = m_drawGeometry.find(draw.mesh);
+                    const auto found = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
                     if (found == m_drawGeometry.end() || !found->second.entry.IsValid()) continue;
 
                     // 경계 구를 월드로 옮긴다. 비균등 배율에서는 최대 축으로
@@ -685,10 +690,11 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                     // 메시나 스킨드 여부가 바뀌면 지금까지 모은 것을 낸다.
                     // 정렬해 두었으므로 같은 것끼리는 이미 붙어 있다.
-                    if (draw.mesh != batchMesh || skinned != batchSkinned)
+                    if (enhanced_draw::GeometryKey(draw) != batchGeometryKey
+                        || skinned != batchSkinned)
                     {
                         flushBatch();
-                        batchMesh = draw.mesh;
+                        batchGeometryKey = enhanced_draw::GeometryKey(draw);
                         batchSkinned = skinned;
                     }
 

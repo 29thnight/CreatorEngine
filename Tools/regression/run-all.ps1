@@ -264,6 +264,14 @@ Run-Step "Experiment model 전수 identity/cook" {
 # cooked catalog 기동(I7-C1). 굽는 쪽은 D5-b2c가 닫았고, 이 검사는 **읽는 쪽**을
 # 잰다 — 마운트한 catalog로 모델이 cooked artifact를 타고 sealing이 cooked
 # texture를 고르는가. 대조군(마운트 없음)이 두 축 모두 0이어야 한다.
+# I6-C: 렌더 패스가 legacy Mesh 포인터를 신원으로 쓰지 않는가(정적). 이 전환은
+# 그림을 바꾸지 않으므로 픽셀 축이 되돌림을 못 잡는다 — 은퇴·전환 슬라이스의
+# 게이트는 "소비 0"과 "빌드가 막는다" 쪽이라는 I6 정찰의 규칙이다.
+Run-Step "렌더 지오메트리 신원 경계" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-render-geometry-identity.ps1")
+}
+
 Run-Step "Experiment cooked catalog 기동" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-experiment-cooked-catalog.ps1") -Exe $Exe -Work $Work

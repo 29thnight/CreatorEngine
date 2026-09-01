@@ -76,6 +76,24 @@
 // 명칭 체계가 흐려진다(실제로 그렇게 만들었다가 물렸다).
 namespace
 {
+    // I6-C — 신원 키 정본. experiment 핸들의 stableKey가 우선이고, 없으면
+    // legacy Mesh 신원(m_hashingMesh)이다. 두 키는 D4b가 적은 대로 같은
+    // 64비트 공간을 쓰므로 섞여도 충돌 가정이 같다.
+    //
+    // 포인터로 정렬하던 것을 값으로 바꾼다 — 주소는 할당 순서에 따라 달라지고,
+    // 무엇보다 렌더가 게임 객체 주소를 신원으로 쓰는 것 자체가 I6이 지우려는
+    // 결합이다.
+    [[nodiscard]] std::size_t MakeGeometryKey(const EnhancedDrawItem& item)
+    {
+        if (0 != item.experimentView.stableKey)
+        {
+            return item.experimentView.stableKey;
+        }
+        return nullptr != item.mesh
+            ? static_cast<std::size_t>(item.mesh->m_hashingMesh.m_ID_Data)
+            : std::size_t{ 0 };
+    }
+
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
 
     // 블랙보드 슬롯 이름(LiveSlots)은 EnhancedLivePipelineDesc.h로 갔다 —
@@ -2670,6 +2688,11 @@ namespace
                         pooled.experimentSource = proxy->m_experimentModel;
                     }
                 }
+                // I6-C — 신원 키와 반경을 값으로 싣는다. 패스는 이 뒤로
+                //   legacy Mesh를 역참조하지 않는다(업로드 폴백만 예외).
+                pooled.item.geometryKey = MakeGeometryKey(pooled.item);
+                pooled.item.boundRadius =
+                    proxy->m_Mesh->GetBoundingSphere().radius;
 
                 if (proxy->m_isAnimationEnabled
                     && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
@@ -2735,6 +2758,12 @@ namespace
                         pooled.isTransparent =
                             MaterialRenderingMode::Transparent == material->m_renderingMode;
                     }
+
+                    // I6-C — poolMesh와 같은 규약: 신원 키와 반경을 값으로
+                    //   싣는다(패스가 Mesh를 역참조하지 않게).
+                    pooled.item.geometryKey = MakeGeometryKey(pooled.item);
+                    pooled.item.boundRadius =
+                        pooled.meshSource->GetBoundingSphere().radius;
 
                     drawPool.push_back(std::move(pooled));
                 }

@@ -166,11 +166,27 @@ struct EnhancedMaterialDrawSnapshot
 // 프레임을 밀봉할 때 필요한 것만 복사해 온다.
 struct EnhancedDrawItem
 {
+    // I6-C — legacy 업로드 폴백의 **원본**으로만 남는다. 신원·정렬·지오메트리
+    // 맵 키는 아래 geometryKey가 진다. 폴백(Assimp 모델·A/B off)이 죽는 I6-E에서
+    // 이 필드도 사라진다.
     Mesh*          mesh{ nullptr };
+    // I6-C — 지오메트리 신원. experiment 핸들이 있으면 그 stableKey(자산
+    // 신원 ⊕ 메시 인덱스), 없으면 legacy Mesh의 m_hashingMesh다. 둘은 D4b가
+    // 적은 대로 **같은 64비트 키 공간**을 공유하고 충돌 무시 가정도 같다.
+    // 0이면 '그릴 지오메트리 없음'이다 — 패스의 null 가드가 이 값을 본다.
+    //
+    // 포인터로 정렬하면 실행마다 순서가 달라질 수 있고(주소는 할당 순서),
+    // 무엇보다 **렌더가 게임 객체 주소를 신원으로 쓰는 것** 자체가 I6에서
+    // 지우려는 결합이다. 키는 자산 신원에서 나온다.
+    std::size_t    geometryKey{ 0 };
+    // I6-C — 그림자 캐스터 반경. 예전에는 Shadow 패스가 draw.mesh를
+    // 역참조해 읽었다(legacy Mesh의 **데이터** 소비 마지막 자리).
+    float          boundRadius{ 0.f };
     // I5-D4b — experiment 핸들 경로의 뷰. stableKey != 0이면 3패스가 캐시의
-    // GetOrUploadExperiment로 올린다(mesh는 정렬·지오메트리 맵 키로 존치).
+    // GetOrUploadExperiment로 올린다.
     // 뷰의 포인터 수명은 drawPool의 experimentSource(shared_ptr)가 진다.
     RHIExperimentVertexView experimentView{};
+
     math::matrix4x4 worldMatrix{};
 
     // 재질에서 뽑아 온 것. Material* 자체를 들지 않는 이유는 메시와 같다 —

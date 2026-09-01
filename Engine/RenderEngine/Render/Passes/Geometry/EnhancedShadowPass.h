@@ -149,7 +149,8 @@ private:
 
     RGHandle m_shadowMap;
 
-    std::unordered_map<Mesh*, Geometry> m_drawGeometry;
+    // I6-C — 키를 신원 값으로.
+    std::unordered_map<std::size_t, Geometry> m_drawGeometry;
     std::array<Cascade, kCascadeCount>  m_cascades{};
 
     EnhancedShadowData m_shadowData{};
