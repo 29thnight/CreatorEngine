@@ -440,11 +440,10 @@ reflection으로 고정하고 packet에 property/GUID/register/owner를 함께 �
   연결하고 `AssetPacker` reopen/index 검증을 닫았다. I5 제품 배선에는 D5-b2c 나머지
   asset producer가 여전히 필요하다.
 
-남은 제품 합류 게이트는 **catalog 기동 배선** 하나다(2026-09-01 갱신). D5-b2c는 닫혔고
-resolver도 제품 소비자를 얻었지만(D5-c3-2), `MakeDataSystemMaterialResolveServices(nullptr)`와
-빈 `ModelLoadRequest::cookedPath`가 그대로라 **cooked 경로가 제품에서 한 번도 돌지 않는다**
-(D1b·c3-2 실측: `texCooked=0`). 그 배선은 I7의 "남은 것"(경로 규약·CookedThenSource
-신선도)과 같은 것이다. 아래 M6 항목은 완료 증거로 남긴다.
+제품 합류 게이트가 닫혔다(2026-09-01 — I7-C1). catalog가 기동에서 서고 모델
+`cookedPath`와 M2 resolver를 동시에 먹인다: 실측 모델 `cooked 8/8`, sealing texture
+`cooked=1 sourceFallback=0`(대조군은 각각 0). 남는 것은 **신선도 판정**뿐이고 그것은
+I7의 항목이다. 아래 M6 항목은 완료 증거로 남긴다.
 
 - [x] SerializationPlan D2가 sidecar 정본, UUIDv4 전수 재발급, atomic authoring/rename과
       scene 14/prefab 9/material 2 authoring corpus를 닫았다.
@@ -1039,6 +1038,54 @@ legacy `Mesh::m_boundingBox`는 private이고 reflect 스키마에도 없어(`m_
 `m_materialIndex`·`m_LODThresholds`뿐) D1a가 쓴 "스키마 순회로 주입" 수법이 통하지
 않는다. `RecalculateBounds()`가 유일한 공개 창구이고 그것은 정점을 요구한다.
 **legacy Mesh 본체에 전환기 창구를 하나 더할지가 정책 판단**이라 D4f-1로 분리한다.
+
+**I7-C1 완료 실측 (2026-09-01) — cooked가 제품에서 처음 돌았다.** 굽는 쪽은
+D5-b2c에서 다 서 있었는데(AssetCooker → `Derived/` + CEMF → pak) **읽는 쪽이
+이어져 있지 않았다**: resolver는 `nullptr` catalog로 불렸고
+`ModelLoadRequest::cookedPath`는 늘 비어 있었다. 그래서 `CookedAssetCatalog`는
+자가 검증 말고는 소비자가 0이었다 — 이 계획서가 스스로 경고한 "생산만 있고
+소비 0"([[dead-produce-only-pipeline]])의 또 한 사례다.
+
+배선은 셋이다. ① `DataSystem::MountCookedCatalog(derivedRoot)` —
+`<root>/Derived/asset-manifest.cemf`를 읽어 표를 세운다. **파일이 없으면
+무동작**이라 저작 트리의 동작은 그대로다(Derived가 없다). ② 기동 시
+`PathFinder::Relative()`로 한 번 시도한다 — 게시된 배포에는 있고 저작 트리에는
+없다. ③ `LoadModelViaExperiment`가 catalog에서 `cookedPath`를 채우고,
+`ApplyAuthoredTextures`가 `MakeDataSystemMaterialResolveServices(catalog)`로
+texture를 cooked 우선 해석한다.
+
+★ **실장애물은 resolver가 아니라 텍스처 로더의 한 줄이었다.** 배선을 잇고 처음
+잰 probe가 `error=texture 로드 실패: baseColorMap ← .../Derived/Textures/ee/
+<guid>.png`를 냈다. `DataSystem::LoadSharedMaterialTexture`가 **호출자가 준 경로를
+버리고 파일명만 떼어 `Assets/Materials/` 아래로 다시 뿌리내리고** 있었다 —
+resolver가 cooked artifact를 정확히 골라 줘도 그 자리에서 이름만 남아 존재하지
+않는 경로를 찾았다. 실재하는 절대 경로면 그대로 쓰도록 고쳤다(이름만 오는 legacy
+호출은 옛 규약 유지). **cooked 소비가 한 번도 안 돌았기 때문에 아무도 이 결함을
+못 만났다** — 배선을 잇는 일의 값어치가 여기 있다.
+
+★ **게이트 `verify-experiment-cooked-catalog`(신설, run-all 편입).** 코퍼스를
+임시로 굽고 → 마운트한 실행과 안 한 실행을 대조한다. 실측:
+
+| 축 | 마운트 | 대조군 |
+|---|---|---|
+| 모델 로드 경로 | `cooked 8 · experiment 0` | `cooked 0 · experiment 8` |
+| sealing texture 해석 | `catalog=1 cooked=1 sourceFallback=0` | `catalog=0 cooked=0 sourceFallback=1` |
+
+두 축은 **서로 다른 배관**이다(모델은 `cookedPath`, 텍스처는 services). 그래서
+변이도 따로 붉는다: **M9-a**(cookedPath 미충전) → 모델 축만, **M9-b**(sealing이
+catalog를 안 넘김) → 텍스처 축만, **M9-c**(로더 경로 규약 원복) → 텍스처 축만.
+대조군이 없으면 "마운트 덕인지 원래 그런지"를 못 가른다 — 그것이 4b/4d다.
+
+★ **texture 축은 제품 소비 지점을 그대로 탄다.** 처음엔 probe가
+`ResolveMaterial`을 직접 불렀는데, 그러면 "binding이 catalog를 쓴다"까지만
+증명되고 **sealing이 그것을 넘기는지**는 안 재진다. `ApplyAuthoredTextures`
+(매 프레임 sealing이 부르는 그 함수)로 바꾸자 M9-b가 제품 한 줄을 정확히
+붉혔다.
+
+★ **한계(정직).** ① **신선도 판정이 없다** — cooked가 source보다 낡아도 그대로
+탄다. 지금은 "저작 트리에 Derived가 없다"가 그 위험을 막고 있을 뿐이다.
+② 게이트는 갓 구운 트리를 쓴다 — 낡은 트리의 거동은 재지 않는다. ③ pak 마운트
+경로(Player)는 이 게이트 밖이다. 에디터에서 명시 마운트로 잰 것이 전부다.
 
 **I5-D5c5 완료 실측 (2026-09-01) — S2c-2b를 닫는다.** 제품 sealing이 저작 정본이
 있을 때 legacy `Material`을 **아예 읽지 않는다**. 그 전까지는 c2-2/c3-2가
@@ -2177,9 +2224,14 @@ stride를 들고, 모두 V1 표에서 대조한다. V2의 단일 68B mask에서 
 
 #### 남은 것
 
-- 경로 규약(SerializationPlan §3.4 → §3.6.1). 그것이 오기 전까지 쿠킹
-  산출물은 호출자가 `ModelLoadRequest::cookedPath` 로 들고 온다.
-- `CookedThenSource` 선택과 신선도 판정 — 그것도 경로 결정을 기다린다.
+- ~~경로 규약~~ / ~~`CookedThenSource` 선택~~ — **I7-C1에서 닫혔다(2026-09-01).**
+  `DataSystem::MountCookedCatalog`가 `<Assets>/Derived/asset-manifest.cemf`를
+  읽어 catalog를 세우고, 그것이 모델 `cookedPath`와 M2 resolver의 cooked 우선
+  해석을 동시에 먹인다. 선택 정책은 `ResolvingModelDecoder`가 이미 갖고 있었다.
+- **신선도 판정은 여전히 남는다** — cooked가 source보다 낡았는지 아무도 묻지
+  않는다. 지금은 "게시된 Derived가 있는 배포에서만 cooked를 탄다"가 그 자리를
+  대신한다(저작 트리에는 Derived가 없어 마운트가 무동작이다). 저작 중 굽고
+  다시 굽는 흐름을 열려면 이 판정이 선행이다.
 - 검증 0.460ms 를 쿠킹 경로에서 줄일것인가. 굽는 시점에 이미 검증했으므로
   중복이긴 하나, **손상된 캠시를 신뢰하는 대가**가 얼마인지 먼저 재야 한다.
 

@@ -31,6 +31,9 @@
 #include "Experiment/MaterialInstance.h"      // I5-D5c1: experiment.matruntime
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
 #include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
+#include "Experiment/Cooked/CookedAssetCatalog.h"  // I7-C1
+#include "ExperimentMaterialResolveBinding.h"       // I7-C1: 제품 resolver
+#include "StandardMaterialProperty.h"              // I7-C1: probe property
 #include "Experiment/MaterialPropertyBlock.h"  // I5-D5c2-1: packing 바이트 축
 #include "MaterialPropertyPacker.h"           // I5-D5c2-1: 합성 layout
 #include "PrimitiveRenderProxy.h"           // I5-D5c2-2: 프록시 축
@@ -7058,6 +7061,156 @@ namespace ConsoleCmd
             firstAuthoredSeal.c_str());
     }
 
+    // I7-C1 — cooked catalog 관측·마운트. 굽는 쪽(AssetCooker → Derived/ +
+    // CEMF → pak)은 D5-b2c에서 다 섰는데 읽는 쪽이 이어져 있지 않아 cooked
+    // 경로가 제품에서 한 번도 돌지 않았다(실측 texCooked=0). 이 명령이
+    //   ① 기동 마운트 상태를 보이고
+    //   ② 게이트가 임시 Derived 트리를 명시적으로 마운트할 창구가 된다.
+    // 저작 트리에는 Derived가 없으므로 인자 없는 실행은 미게시(skip)가 정상이다.
+    static void Cmd_experiment_catalog(const ConsoleCommandContext& ctx)
+    {
+        namespace ck = experiment::cooked;
+        // 경로에 공백이 있을 수 있어 토큰이 아니라 원문에서 잘라 쓴다.
+        if (ctx.parts.size() >= 3 && ctx.parts[1] == "mount")
+        {
+            const std::size_t head = ctx.line.find("mount");
+            std::string rootText = ctx.line.substr(head + 5);
+            while (!rootText.empty() && (rootText.front() == ' '
+                || rootText.front() == '	')) rootText.erase(0, 1);
+            while (!rootText.empty() && (rootText.back() == ' '
+                || rootText.back() == '' || rootText.back() == '	'))
+            {
+                rootText.pop_back();
+            }
+            const file::path root = std::filesystem::path(rootText);
+            std::string error;
+            const bool mounted = DataSystems->MountCookedCatalog(root, error);
+            std::printf("[CLI] experiment.catalog mount %s root=%s entries=%zu%s%s\n",
+                mounted ? "pass" : "fail", root.string().c_str(),
+                DataSystems->CookedCatalogEntryCount(),
+                error.empty() ? "" : " error=", error.c_str());
+            return;
+        }
+
+        // I7-C1 — 제품 바인딩 소비 프로브. "표가 섰다"와 "resolver가 cooked를
+        // 골랐다"는 다르다. 실제 texture 자산 경로를 받아 제품 서비스
+        // (MakeDataSystemMaterialResolveServices + 마운트된 catalog)로 해석하고
+        // cookedTextures 계수를 낸다 — sealing이 매 프레임 타는 그 경로다.
+        if (ctx.parts.size() >= 3 && ctx.parts[1] == "probe")
+        {
+            const auto mounted = DataSystems->GetCookedCatalog();
+            const std::size_t head = ctx.line.find("probe");
+            std::string pathText = ctx.line.substr(head + 5);
+            while (!pathText.empty() && (pathText.front() == ' '
+                || pathText.front() == '\t')) pathText.erase(0, 1);
+            while (!pathText.empty() && (pathText.back() == ' '
+                || pathText.back() == '\r' || pathText.back() == '\t'))
+            {
+                pathText.pop_back();
+            }
+            const FileGuid textureGuid =
+                DataSystems->GetFileGuid(std::filesystem::path(pathText));
+            const file::path metaPath = PathFinder::Relative("Shaders\\")
+                / "DefaultPassShader" / "GBuffer.shadermeta";
+            const FileGuid shaderGuid = DataSystems->GetFileGuid(metaPath);
+            if (FileGuid{} == textureGuid || FileGuid{} == shaderGuid)
+            {
+                std::printf("[CLI] experiment.catalog probe fail GUID 미해석 "
+                    "texture=%d shader=%d\n",
+                    FileGuid{} != textureGuid, FileGuid{} != shaderGuid);
+                return;
+            }
+
+            std::string metaError;
+            const ShaderMetaHandle metaHandle =
+                DataSystems->LoadShaderMetaHandle(shaderGuid, metaError);
+            const std::shared_ptr<const ShaderMeta> meta =
+                DataSystems->ResolveShaderMeta(metaHandle);
+            if (!meta)
+            {
+                std::printf("[CLI] experiment.catalog probe fail meta %s\n",
+                    metaError.c_str());
+                return;
+            }
+
+            experiment::Material material;
+            material.name = "CookedProbe";
+            material.shaderAssetId.value = shaderGuid.m_guid;
+            experiment::MaterialProperty property;
+            property.name = std::string(
+                standard_material::property::BaseColorMap);
+            experiment::TextureReference reference;
+            reference.assetId.value = textureGuid.m_guid;
+            property.value = std::move(reference);
+            material.properties.push_back(std::move(property));
+
+            // ★ 제품 sealing이 타는 **그 함수**를 부른다. resolver를 직접
+            //   부르면 "binding이 catalog를 쓴다"까지만 증명되고, sealing이
+            //   그것을 넘기는지는 안 재진다 — 여기가 실제 소비 지점이다.
+            ExperimentMaterialSealing::SealSource source;
+            source.material = std::move(material);
+            std::size_t cooked = 0, sourceFallback = 0;
+            std::string error;
+            const bool ok = ExperimentMaterialSealing::ApplyAuthoredTextures(
+                source, *meta, error, &cooked, &sourceFallback);
+            std::size_t owners = 0;
+            for (const auto& texture : source.textures)
+            {
+                if (nullptr != texture.owner) ++owners;
+            }
+            std::printf("[CLI] experiment.catalog probe %s catalog=%d "
+                "textures=%zu cooked=%zu sourceFallback=%zu%s%s\n",
+                (ok && owners > 0) ? "pass" : "fail",
+                nullptr != mounted, owners, cooked, sourceFallback,
+                error.empty() ? "" : " error=", error.c_str());
+            return;
+        }
+
+        const auto catalog = DataSystems->GetCookedCatalog();
+        if (!catalog)
+        {
+            // 미게시는 결함이 아니다 — 저작 트리의 정상 상태다.
+            std::printf("[CLI] experiment.catalog skip 미게시(Derived 없음)\n");
+            return;
+        }
+
+        // 씬의 모델 GUID가 실제로 cooked artifact로 해석되는가 — 표가 서 있어도
+        // 제품 신원과 맞물리지 않으면 cookedPath는 여전히 빈 경로다.
+        std::size_t modelsProbed = 0, modelsResolved = 0;
+        if (Scene* scene = SceneManagers->GetActiveScene())
+        {
+            std::unordered_set<std::uint64_t> seen;
+            for (const auto& object : scene->m_Entities)
+            {
+                if (!object || object->IsDestroyMark()) continue;
+                MeshRenderer* renderer = object->GetComponent<MeshRenderer>();
+                if (nullptr == renderer) continue;
+                if (FileGuid{} == renderer->m_modelGuid) continue;
+                if (!seen.insert(renderer->m_modelGuid.m_guid.data[0]).second)
+                {
+                    continue;
+                }
+                ++modelsProbed;
+                experiment::AssetId id;
+                id.value = renderer->m_modelGuid.m_guid;
+                if (!catalog->ResolveArtifactPath(id).empty()) ++modelsResolved;
+            }
+        }
+
+        std::printf("[CLI] experiment.catalog pass entries=%zu models=%zu "
+            "materials=%zu textures=%zu shaderMetas=%zu scenes=%zu prefabs=%zu "
+            "modelsProbed=%zu modelsResolved=%zu root=%s\n",
+            catalog->Size(),
+            catalog->CountOfKind(ck::CookedAssetKind::Model),
+            catalog->CountOfKind(ck::CookedAssetKind::Material),
+            catalog->CountOfKind(ck::CookedAssetKind::Texture),
+            catalog->CountOfKind(ck::CookedAssetKind::ShaderMeta),
+            catalog->CountOfKind(ck::CookedAssetKind::Scene),
+            catalog->CountOfKind(ck::CookedAssetKind::Prefab),
+            modelsProbed, modelsResolved,
+            catalog->DerivedRoot().string().c_str());
+    }
+
     static void Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)
     {
         // I5-M2 — MaterialResolver. 합성(가짜 서비스·호출 계수) + 실사(DataSystem
@@ -7217,30 +7370,6 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.resolver] 실패\n") + log);
         }
         std::printf("[CLI] experiment.resolver %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_catalog(const ConsoleCommandContext& ctx)
-    {
-        // 인자가 없으면 합성, <derivedRoot> 를 주면 전수 해석 증명까지.
-        std::string log;
-        bool passed = RenderTest::RunExperimentCatalogSelfTest(log);
-        if (ctx.parts.size() > 1)
-        {
-            const bool real =
-                RenderTest::RunExperimentCatalogReal(ctx.parts[1], log);
-            passed = passed && real;
-        }
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.catalog] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.catalog] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.catalog %s\n", passed ? "통과" : "실패");
     }
 
     static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)

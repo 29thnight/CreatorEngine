@@ -184,6 +184,16 @@ void DataSystem::Initialize()
 {
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
 	LoadAssetCatalog(PathFinder::Relative());
+	// I7-C1 — cooked catalog 기동. 게시된 배포(pak 마운트·스테이징)에는
+	// `<Assets>/Derived/asset-manifest.cemf`가 있고, 저작 트리에는 없다.
+	// 없으면 무동작이므로 에디터 동작은 그대로다.
+	std::string cookedCatalogError;
+	if (!MountCookedCatalog(PathFinder::Relative(), cookedCatalogError)
+		&& !cookedCatalogError.empty())
+	{
+		// 파일이 아예 없는 것(미게시)은 조용하다 — 손상만 시끄럽다.
+		Debug->LogWarning("[cooked.catalog] 마운트 실패: " + cookedCatalogError);
+	}
 }
 
 void DataSystem::Finalize()
@@ -1063,7 +1073,21 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
 
 std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view filePath, bool isCompress)
 {
-	file::path destination = PathFinder::Relative("Materials\\") / file::path(filePath).filename();
+	// I7-C1 — 호출자가 준 경로가 **실재하면 그대로 쓴다**. 예전에는 파일명만
+	// 떼어 `Assets/Materials/` 아래로 다시 뿌리내렸는데, 그 규약이 cooked
+	// artifact를 원리적으로 못 읽게 만들고 있었다: resolver가 catalog에서
+	// `Derived/Textures/<ab>/<guid>.png`를 골라 줘도 여기서 이름만 남아
+	// `Assets/Materials/<guid>.png`를 찾다 실패했다(실측 — cooked 소비의
+	// 실장애물이 resolver가 아니라 이 한 줄이었다). 이름만 오는 legacy
+	// 호출(재질의 텍스처 이름 필드)은 예전 규약 그대로 간다.
+	file::path destination = file::path(filePath);
+	std::error_code destinationError;
+	if (!destination.is_absolute()
+		|| !file::is_regular_file(destination, destinationError))
+	{
+		destination = PathFinder::Relative("Materials\\")
+			/ destination.filename();
+	}
 	std::string key = file::path(destination).stem().string();
 
 	// 1차 조회 (락 짧게)

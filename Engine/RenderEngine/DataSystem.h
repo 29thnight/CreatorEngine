@@ -9,6 +9,7 @@
 #include "ShaderMetaHandle.h"
 #include <cstddef>
 #include <iosfwd>
+#include <memory>
 #include <mutex>
 #include <unordered_set>
 #include <vector>
@@ -24,6 +25,7 @@ struct ShaderMeta;
 namespace YAML { class Node; }
 namespace experiment { class Model; } // I5-D1a 역브리지 입력
 namespace experiment { struct Material; } // I5-D5c1 저작 원본 보관
+namespace experiment::cooked { class CookedAssetCatalog; } // I7-C1
 class Mesh; // I5-D34a 병행 바인딩 조회 입력
 struct RHIExperimentVertexView; // I5-D34a 병행 바인딩 조회 출력
 
@@ -107,6 +109,17 @@ public:
 	// 소비시키는 어댑터다(I5-M의 ConvertToLegacyMaterial과 같은 지위).
 	// Model 컨테이너가 private+friend라 DataSystem 멤버로만 시공 가능하다 —
 	// 정의는 ExperimentModelMigration.cpp(별도 TU).
+	// I7-C1 — cooked catalog 기동. `<derivedRoot>/Derived/asset-manifest.cemf`를
+	// 읽어 자산 GUID→cooked artifact 표를 세운다. 파일이 없으면 **무동작**이다
+	// (에디터 작업 트리에는 Derived가 없다 — 마운트 실패가 아니라 미게시다).
+	// 이것이 M2 resolver의 cooked 우선 해석과 모델 cookedPath의 유일한 출처다.
+	bool MountCookedCatalog(const file::path& derivedRoot, std::string& outError);
+	// 수명 안전: 호출자가 shared_ptr을 잡은 동안만 raw 포인터를 쓴다
+	// (마운트가 렌더 중에 표를 갈아 끼워도 진행 중인 해석이 살아 있어야 한다).
+	[[nodiscard]] std::shared_ptr<const experiment::cooked::CookedAssetCatalog>
+		GetCookedCatalog() const;
+	[[nodiscard]] std::size_t CookedCatalogEntryCount() const;
+
 	[[nodiscard]] bool BuildLegacyModelFromExperiment(
 		const experiment::Model& source, std::shared_ptr<Model>& outModel,
 		std::string& outError);
@@ -248,6 +261,9 @@ public:
 	std::unordered_map<FileGuid,
 		std::shared_ptr<const experiment::Model>> m_experimentModels;
 	std::mutex m_experimentMeshMutex;
+	// I7-C1 — cooked catalog. immutable 표라 교체는 포인터 하나 바꾸기다.
+	std::shared_ptr<const experiment::cooked::CookedAssetCatalog> m_cookedCatalog;
+	mutable std::mutex m_cookedCatalogMutex;
 
 private:
 	void AddModel(const file::path& filepath, const file::path& dir);

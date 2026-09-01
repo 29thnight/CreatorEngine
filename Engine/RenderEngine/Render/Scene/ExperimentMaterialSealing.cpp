@@ -3,6 +3,7 @@
 #include "../../Experiment/MaterialPropertyBlock.h"
 #include "../../ExperimentMaterialMigration.h"
 #include "../../ExperimentMaterialResolveBinding.h" // I5-D5c3-2
+#include "../../DataSystem.h" // I7-C1: catalog 소유자
 #include "../../Material.h"
 #include "../../ShaderMeta.h"
 #include "../../StandardMaterialProperty.h" // I5-D5c5
@@ -122,12 +123,15 @@ namespace ExperimentMaterialSealing
         std::string& outError, std::size_t* outCooked,
         std::size_t* outSourceFallback)
     {
-        // catalog는 아직 제품 인스턴스가 없다(D1b 실측 — cooked 게시 규약이
-        // 서기 전에는 세울 수 없다). nullptr이면 resolver가 source만 쓴다:
-        // 지금 legacy가 하는 것과 같은 해석이고, catalog가 서면 이 자리가
-        // 그대로 cooked 우선이 된다.
+        // I7-C1 — catalog가 서면 texture artifact를 cooked 우선으로 해석한다.
+        // c3-2가 "catalog가 서면 이 자리가 그대로 cooked 우선이 된다"고 적어
+        // 둔 그 자리다. 미게시(저작 트리)에서는 nullptr이라 예전처럼 source.
+        //
+        // shared_ptr을 이 스코프에서 붙잡는다 — services는 raw 포인터를 나르고,
+        // 마운트가 렌더 중에 표를 갈아 끼울 수 있다.
+        const auto catalog = DataSystems->GetCookedCatalog();
         const experiment::MaterialResolveServices services =
-            experiment::MakeDataSystemMaterialResolveServices(nullptr);
+            experiment::MakeDataSystemMaterialResolveServices(catalog.get());
         experiment::ResolvedMaterial resolved;
         if (!experiment::ResolveMaterial(source.material, services, resolved,
             outError))

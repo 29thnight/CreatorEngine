@@ -261,6 +261,14 @@ Run-Step "Experiment model 전수 identity/cook" {
         (Join-Path $PSScriptRoot "verify-experiment-model-cook-all.ps1") -Work $Work
 }
 
+# cooked catalog 기동(I7-C1). 굽는 쪽은 D5-b2c가 닫았고, 이 검사는 **읽는 쪽**을
+# 잰다 — 마운트한 catalog로 모델이 cooked artifact를 타고 sealing이 cooked
+# texture를 고르는가. 대조군(마운트 없음)이 두 축 모두 0이어야 한다.
+Run-Step "Experiment cooked catalog 기동" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-experiment-cooked-catalog.ps1") -Exe $Exe -Work $Work
+}
+
 # E2: Editor import 완료 결과는 하나의 RuntimeAssetChange 계약으로만 Core에
 # 전달하고, reload는 이전 generation의 raw 참조 수명을 보존해야 한다.
 Run-Step "Runtime asset-change 경계" {

@@ -22,6 +22,7 @@
 #include "DataSystem.h"
 #include "Experiment/Model.h"
 #include "Experiment/AnimationClipMetrics.h" // I5-D5b: totalKeyFrames 정본
+#include "Experiment/Cooked/CookedAssetCatalog.h" // I7-C1
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/ResolvingModelDecoder.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
@@ -38,6 +39,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib> // I5-D34a: A/B 스위치 getenv
+#include <fstream> // I7-C1: manifest 읽기
 #include <string>
 #include <vector>
 
@@ -358,6 +360,90 @@ bool DataSystem::BuildLegacyModelFromExperiment(
 	return true;
 }
 
+// ── I7-C1: cooked catalog 기동 ──────────────────────────────────────────
+//
+// 굽는 쪽은 D5-b2c에서 다 섰는데(AssetCooker → Derived/ + CEMF → pak) **읽는
+// 쪽이 이어져 있지 않았다**: resolver는 `nullptr` catalog로 불렸고
+// `ModelLoadRequest::cookedPath`는 늘 비어 있었다(실측 texCooked=0). 그래서
+// cooked 경로가 제품에서 한 번도 돌지 않았다 — 이 함수가 그 입구다.
+bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
+	std::string& outError)
+{
+	outError.clear();
+	const file::path manifestPath =
+		derivedRoot / "Derived" / "asset-manifest.cemf";
+	std::error_code errorCode;
+	if (!file::is_regular_file(manifestPath, errorCode))
+	{
+		// 미게시는 실패가 아니다 — 에디터 작업 트리에는 Derived가 없다.
+		// 조용히 두면 resolver·모델 로드가 예전처럼 source로 간다.
+		std::lock_guard lock(m_cookedCatalogMutex);
+		m_cookedCatalog.reset();
+		return false;
+	}
+
+	std::vector<std::byte> bytes;
+	{
+		std::ifstream input(manifestPath, std::ios::binary);
+		if (!input)
+		{
+			outError = "manifest를 열 수 없다: " + manifestPath.string();
+			return false;
+		}
+		input.seekg(0, std::ios::end);
+		const std::streamoff size = input.tellg();
+		input.seekg(0, std::ios::beg);
+		bytes.resize(static_cast<std::size_t>(size));
+		if (size > 0)
+		{
+			input.read(reinterpret_cast<char*>(bytes.data()), size);
+			if (!input)
+			{
+				outError = "manifest 읽기가 끊겼다: " + manifestPath.string();
+				return false;
+			}
+		}
+	}
+
+	std::vector<experiment::cooked::AssetManifestIssue> issues;
+	// Load는 실패하면 **빈 catalog**를 준다(부분 표를 내놓지 않는 계약).
+	auto catalog = std::make_shared<experiment::cooked::CookedAssetCatalog>(
+		experiment::cooked::CookedAssetCatalog::Load(bytes, derivedRoot, issues));
+	if (catalog->IsEmpty())
+	{
+		outError = "catalog가 비었다(entry 0) — manifest 손상 또는 빈 게시";
+		for (const auto& issue : issues)
+		{
+			outError += " | " + issue.context + ": " + issue.message;
+		}
+		std::lock_guard lock(m_cookedCatalogMutex);
+		m_cookedCatalog.reset();
+		return false;
+	}
+
+	const std::size_t entryCount = catalog->Size();
+	{
+		std::lock_guard lock(m_cookedCatalogMutex);
+		m_cookedCatalog = std::move(catalog);
+	}
+	std::printf("[cooked.catalog] mount %s entries=%zu\n",
+		manifestPath.string().c_str(), entryCount);
+	return true;
+}
+
+std::shared_ptr<const experiment::cooked::CookedAssetCatalog>
+DataSystem::GetCookedCatalog() const
+{
+	std::lock_guard lock(m_cookedCatalogMutex);
+	return m_cookedCatalog;
+}
+
+std::size_t DataSystem::CookedCatalogEntryCount() const
+{
+	const auto catalog = GetCookedCatalog();
+	return catalog ? catalog->Size() : 0u;
+}
+
 std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 	FileGuid guid, const file::path& sourcePath)
 {
@@ -399,8 +485,19 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 			std::move(importerDecoder)));
 	experiment::ModelLoadRequest request;
 	request.sourcePath = sourcePath;
-	// cookedPath는 cooked 게시 규약(pak)이 서기 전까지 빈 경로다 — resolver가
-	// Info로 계수하고 source로 간다. catalog 기동 배선은 그 규약과 함께 온다.
+	// I7-C1 — catalog가 서 있으면 cooked artifact 경로를 채운다. 없으면 빈
+	// 경로 그대로이고 resolver가 Info로 계수한 뒤 source로 간다(그 정책은
+	// ResolvingModelDecoder가 이미 갖고 있었다 — 여기서 바꾸지 않는다).
+	//
+	// ★ 신선도(cooked가 source보다 낡았는가)는 **아직 판정하지 않는다**.
+	//   그래서 게시된 Derived가 있는 배포에서만 cooked를 탄다 — 저작 트리에는
+	//   Derived가 없어 이 줄이 무동작이다. 신선도 정책은 I7의 남은 항목이다.
+	if (const auto catalog = GetCookedCatalog())
+	{
+		experiment::AssetId modelAsset;
+		modelAsset.value = guid.m_guid;
+		request.cookedPath = catalog->ResolveArtifactPath(modelAsset);
+	}
 	experiment::ModelLoadResult result = loader.Load(request);
 
 	// 관측 — Warning 이상만 요약한다(빈 cookedPath의 Info 계수는 기본 상태라
@@ -462,7 +559,22 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 	// 성공도 관측한다 — 폴백만 로그하면 "전부 폴백"과 "전부 experiment"가
 	// 같은 침묵이 된다(눈먼 초록). printf는 CLI 게이트 stdout에 잡히는
 	// 채널이라 게이트가 경로를 실증할 수 있다. 전환기와 함께 I6에서 죽는다.
-	std::printf("[model.dual] experiment 경로: %s\n",
+	//
+	// I7-C1 — cooked를 **실제로 탔는가**까지 가른다. cookedPath가 채워진 것과
+	// cooked가 draft를 낸 것은 다르다: 디코더가 거부하면 조용히 source로
+	// 폴백하고(그 정책은 옳다) 계수만 보면 둘이 같아 보인다.
+	const bool cookedAttempted = !request.cookedPath.empty();
+	bool cookedFellBack = false;
+	for (const experiment::ModelLoadIssue& issue : result.issues)
+	{
+		if (experiment::ModelLoadIssueCode::CookedFallbackToSource == issue.code)
+		{
+			cookedFellBack = true;
+			break;
+		}
+	}
+	std::printf("[model.dual] %s 경로: %s\n",
+		(cookedAttempted && !cookedFellBack) ? "cooked" : "experiment",
 		sourcePath.filename().string().c_str());
 	return legacyModel;
 }
