@@ -2901,29 +2901,43 @@ namespace
                         return false;
                     }
 
+                    // I5-D5c5 — 저작 정본이 있으면 legacy Material을 **아예
+                    // 읽지 않는다**. c2-2/c3-2는 legacy로 시공한 뒤 덮어썼는데,
+                    // 그 시공(ConvertLegacyMaterial + 이름 맵 순회)은 결과가
+                    // 통째로 버려지는 왕복이었다. 실패만 legacy로 내려간다.
+                    ExperimentMaterialSealing::SealSource sealSource;
+                    bool sealBuilt = false;
+                    if (pooled.authoredMaterialSource)
+                    {
+                        std::string authoredError;
+                        sealBuilt = ExperimentMaterialSealing::
+                            BuildSealSourceFromAuthored(
+                                *pooled.authoredMaterialSource,
+                                *materialShader.value, sealSource,
+                                authoredError);
+                        if (!sealBuilt)
+                        {
+                            Debug->LogWarning("Forward 저작 seal 시공 실패 —"
+                                " legacy 폴백: " + authoredError);
+                        }
+                    }
                     // I5-M4: legacy Material은 seal source 변환에서 **한 번만**
                     // 읽는다. 이후 keyword 정규화·propertyBytes·textureBindings는
                     // experiment 정본(M1 packer·M2 정규화)을 탄다.
-                    ExperimentMaterialSealing::SealSource sealSource;
-                    if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
-                            *source, *materialShader.value, sealSource, error))
+                    if (!sealBuilt)
                     {
-                        return false;
-                    }
-                    // I5-D5c2-2 — 저작 정본이 있으면 properties·keywords·
-                    // blendMode가 그것으로 간다(왕복 절단).
-                    if (pooled.authoredMaterialSource)
-                    {
-                        ExperimentMaterialSealing::ApplyAuthoredMaterial(
-                            sealSource, *pooled.authoredMaterialSource);
-                        // I5-D5c3-2 — texture owner도 저작 GUID에서 해석한다.
-                        // 실패는 legacy 맵을 그대로 둔다(전환기 폴백).
-                        std::string textureError;
-                        if (!ExperimentMaterialSealing::ApplyAuthoredTextures(
-                            sealSource, *materialShader.value, textureError))
+                        if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
+                                *source, *materialShader.value, sealSource, error))
                         {
-                            Debug->LogWarning("Forward 저작 texture 해석 실패 —"
-                                " legacy 맵 유지: " + textureError);
+                            return false;
+                        }
+                        // 폴백이라도 저작 값은 지킨다 — c2-2의 의미론이다. 실패한 것은
+                        // texture 해석뿐이고 legacy 맵이 그 자리를 받는다. 여기서 저작
+                        // properties까지 버리면 폴백이 c2-2 이전으로 되돌아간다.
+                        if (pooled.authoredMaterialSource)
+                        {
+                            ExperimentMaterialSealing::ApplyAuthoredMaterial(
+                                sealSource, *pooled.authoredMaterialSource);
                         }
                     }
 
@@ -3088,25 +3102,38 @@ namespace
                     continue;
                 }
 
-                // I5-M4: Forward와 같은 처방 — legacy 읽기는 변환 한 번, 이후는
-                // experiment 정본이다.
+                // I5-D5c5 — Forward와 같은 처방: 저작 정본이 있으면 legacy를
+                // 읽지 않고 저작본만으로 시공한다. 실패만 legacy로 내려간다.
                 ExperimentMaterialSealing::SealSource sealSource;
-                if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
-                        *source, *materialShader.value, sealSource, outError))
-                {
-                    return false;
-                }
-                // I5-D5c2-2 — 위와 같은 절단(GBuffer 축).
+                bool sealBuilt = false;
                 if (pooled.authoredMaterialSource)
                 {
-                    ExperimentMaterialSealing::ApplyAuthoredMaterial(
-                        sealSource, *pooled.authoredMaterialSource);
-                    std::string textureError; // I5-D5c3-2
-                    if (!ExperimentMaterialSealing::ApplyAuthoredTextures(
-                        sealSource, *materialShader.value, textureError))
+                    std::string authoredError;
+                    sealBuilt = ExperimentMaterialSealing::
+                        BuildSealSourceFromAuthored(
+                            *pooled.authoredMaterialSource,
+                            *materialShader.value, sealSource, authoredError);
+                    if (!sealBuilt)
                     {
-                        Debug->LogWarning("GBuffer 저작 texture 해석 실패 —"
-                            " legacy 맵 유지: " + textureError);
+                        Debug->LogWarning("GBuffer 저작 seal 시공 실패 —"
+                            " legacy 폴백: " + authoredError);
+                    }
+                }
+                // I5-M4: legacy 읽기는 변환 한 번, 이후는 experiment 정본이다.
+                if (!sealBuilt)
+                {
+                    if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
+                            *source, *materialShader.value, sealSource, outError))
+                    {
+                        return false;
+                    }
+                    // 폴백이라도 저작 값은 지킨다 — c2-2의 의미론이다. 실패한 것은
+                    // texture 해석뿐이고 legacy 맵이 그 자리를 받는다. 여기서 저작
+                    // properties까지 버리면 폴백이 c2-2 이전으로 되돌아간다.
+                    if (pooled.authoredMaterialSource)
+                    {
+                        ExperimentMaterialSealing::ApplyAuthoredMaterial(
+                            sealSource, *pooled.authoredMaterialSource);
                     }
                 }
 

@@ -36,6 +36,9 @@
 #      (D5c3, c2-2가 만든 비대칭을 닫는다)
 #   14 texture owner — sealing이 저작 GUID(M2 resolver)로 얻은 owner가 legacy
 #      이름 맵과 같은가 (D5c3-2, M2의 첫 제품 소비자)
+#   16 저작 단독 시공 — 제품 seal이 legacy Material을 읽지 않고 저작본만으로
+#      SealSource를 짓는다. 기존 2단계와 texture owner 전수 대조 + 인스턴스
+#      채널의 유일한 실소비(useNormalMap) 유도가 공허하지 않은가 (D5c5)
 #   15 바운드 축 — 역브리지의 legacy 정점 시공 절단(legacyVertices on 0 ·
 #      off 전량)·바운드 생존(degenerate 0)·두 유도의 값 동수(digest를
 #      on/off로 대조 — on은 experiment 정본 주입, off는 정점→min/max
@@ -305,6 +308,21 @@ if ($logOn -notmatch 'experiment\.matruntime pass .*texOwnerMismatch=0 texResolv
 }
 if ($logOn -notmatch 'experiment\.matruntime pass .*texResolvedOwners=[1-9]') {
     $fail += "14b resolver가 실제 texture owner를 하나도 해석하지 않았다(on)"
+}
+# ★ 16(I5-D5c5) — 저작 단독 시공. 제품 seal은 이제 legacy Material을 읽지 않고
+#   저작본만으로 SealSource를 짓는다. 그것이 기존 2단계(legacy 시공→덮어쓰기)와
+#   같은 산출인지 in-process로 대조한다(texture owner 전수).
+if ($logOn -notmatch 'experiment\.matruntime pass .*sealAuthored=[1-9]') {
+    $fail += "16 저작 단독 시공이 한 번도 성립하지 않았다(on)"
+}
+if ($logOn -notmatch 'experiment\.matruntime pass .*sealAuthoredFail=0 sealAuthoredTexMismatch=0') {
+    $fail += "16b 저작 단독 시공이 기존 2단계와 갈렸다(on) — 그림이 바뀐다"
+}
+# 16c — useNormalMap은 인스턴스 채널의 유일한 실소비다(ForwardShade:441·
+#   GBuffer:237). 저작 유도가 1을 내지 못하면 그 축은 0과 0을 비교한 것이라
+#   판별력이 없다 — seed가 normalMap 슬롯을 싣는 이유가 여기 있다.
+if ($logOn -notmatch 'experiment\.matruntime pass .*normalMapDerived=[1-9]') {
+    $fail += "16c useNormalMap이 저작 정본에서 유도되지 않았다(on) — 축이 공허하다"
 }
 # 왕복 손실은 **판정하지 않고 보고**한다 — 이 슬라이스의 목적은 손실을 없애는
 # 것이 아니라 크기를 아는 것이다(처방은 c2). 값을 아래 요약이 찍는다.

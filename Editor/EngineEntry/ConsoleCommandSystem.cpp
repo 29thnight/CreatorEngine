@@ -6430,7 +6430,11 @@ namespace ConsoleCmd
             reference.assetId.value = textureGuid.m_guid;
             property.value = std::move(reference);
             authored.properties.push_back(std::move(property));
-            break; // 한 슬롯이면 축이 성립한다
+            // I5-D5c5 — 슬롯을 **전부** 싣는다. 한 슬롯(baseColorMap)만
+            // 실으면 normalMap이 비어 useNormalMap 유도가 늘 0이 되고, 그
+            // 축은 "0과 0을 비교해 통과"가 된다(c3-2가 owner에서 겪은 눈먼
+            // 초록의 같은 형태). legacy 사본은 이 저작본을 변환해 만들므로
+            // 두 경로가 같은 텍스처를 갖고, owner 대조는 그대로 성립한다.
         }
 
         YAML::Node document;
@@ -6674,6 +6678,12 @@ namespace ConsoleCmd
         std::size_t texResolvedOwners = 0;
         std::size_t texCooked = 0, texSourceFallback = 0;
         std::string firstTexMismatch;
+        // I5-D5c5 — 저작 단독 시공 축. 기존 2단계(legacy 시공 → 덮어쓰기)와
+        // 신규 1단계(BuildSealSourceFromAuthored)가 같은 산출을 내는가.
+        std::size_t sealAuthoredBuilt = 0, sealAuthoredFail = 0;
+        std::size_t sealAuthoredTexMismatch = 0, sealNormalMapDerived = 0;
+        std::size_t sealDeadChannelDelta = 0;
+        std::string firstAuthoredSeal;
         std::string firstMismatch;
 
         for (const auto& object : scene->m_Entities)
@@ -6866,6 +6876,70 @@ namespace ConsoleCmd
                         }
                     }
                 }
+
+                // ── D5-c5: 저작 단독 시공 ──
+                //
+                // 제품 경로는 이제 legacy를 읽지 않고 저작본만으로 seal을
+                // 짓는다. 그것이 **기존 2단계와 같은 산출**인지를 여기서
+                // 잰다 — 갈리면 화면이 조용히 달라진다.
+                ExperimentMaterialSealing::SealSource directSeal;
+                std::string directError;
+                if (!ExperimentMaterialSealing::BuildSealSourceFromAuthored(
+                    authoredEffective, *meta, directSeal, directError))
+                {
+                    ++sealAuthoredFail;
+                    if (firstAuthoredSeal.empty())
+                        firstAuthoredSeal = "build:" + directError;
+                }
+                else
+                {
+                    ++sealAuthoredBuilt;
+                    // texture owner는 두 경로가 **반드시** 같아야 한다 —
+                    // 같은 resolver를 부르므로 갈리면 시공 순서 결함이다.
+                    if (directSeal.textures.size() != authoredSeal.textures.size())
+                    {
+                        ++sealAuthoredTexMismatch;
+                        if (firstAuthoredSeal.empty())
+                            firstAuthoredSeal = "texCount";
+                    }
+                    else
+                    {
+                        for (std::size_t slot = 0;
+                            slot < directSeal.textures.size(); ++slot)
+                        {
+                            if (directSeal.textures[slot].propertyName
+                                    == authoredSeal.textures[slot].propertyName
+                                && directSeal.textures[slot].owner
+                                    == authoredSeal.textures[slot].owner)
+                            {
+                                continue;
+                            }
+                            ++sealAuthoredTexMismatch;
+                            if (firstAuthoredSeal.empty())
+                            {
+                                firstAuthoredSeal = "tex:" +
+                                    directSeal.textures[slot].propertyName;
+                            }
+                        }
+                    }
+                    // useNormalMap — 인스턴스 채널의 유일한 실소비다. 저작
+                    // 유도가 실제로 1을 내야 이 축이 공허하지 않다(seed가
+                    // normalMap을 싣는 이유).
+                    if (0 != directSeal.useNormalMap) ++sealNormalMapDerived;
+                    // 죽은 채널(baseColorFactor/metallic/roughness/flow)은
+                    // **판정하지 않고 보고한다** — 제품 셰이더가 CB를 우선하므로
+                    // (usePropertyBlock·useLegacyInstanceMaterial) legacy 값과
+                    // 갈려도 그림이 바뀌지 않는다. 이 계수는 "legacy 값을
+                    // 잃었다"는 사실의 크기다.
+                    if (directSeal.baseColorFactor != legacySeal.baseColorFactor
+                        || directSeal.metallic != legacySeal.metallic
+                        || directSeal.roughness != legacySeal.roughness
+                        || directSeal.flow.windVector != legacySeal.flow.windVector
+                        || directSeal.flow.uvScroll != legacySeal.flow.uvScroll)
+                    {
+                        ++sealDeadChannelDelta;
+                    }
+                }
             }
         }
 
@@ -6952,7 +7026,9 @@ namespace ConsoleCmd
         const bool passed = covered && 0 == valueMismatch && 0 == blendMismatch
             && 0 == buildFailed && 0 == sealLayoutFailed && 0 == sealBuildFailed
             && sealCompared > 0 && 0 == proxyValueMismatch
-            && 0 == texOwnerMismatch && 0 == texResolveFailed;
+            && 0 == texOwnerMismatch && 0 == texResolveFailed
+            // D5-c5: 저작 단독 시공이 기존 2단계와 갈리면 실패다.
+            && 0 == sealAuthoredFail && 0 == sealAuthoredTexMismatch;
         std::printf("[CLI] experiment.matruntime %s renderers=%zu "
             "withMaterial=%zu withInstance=%zu compared=%zu metaMissing=%zu "
             "buildFailed=%zu valueMismatch=%zu blendMismatch=%zu "
@@ -6960,7 +7036,9 @@ namespace ConsoleCmd
             "sealByteMismatch=%zu sealLayoutFailed=%zu sealBuildFailed=%zu "
             "meshProxies=%zu proxyAuthored=%zu proxyValueMismatch=%zu "
             "texResolved=%zu texOwnerMismatch=%zu texResolveFailed=%zu "
-            "texResolvedOwners=%zu texCooked=%zu texSourceFallback=%zu%s%s%s%s%s%s\n",
+            "texResolvedOwners=%zu texCooked=%zu texSourceFallback=%zu "
+            "sealAuthored=%zu sealAuthoredFail=%zu sealAuthoredTexMismatch=%zu "
+            "normalMapDerived=%zu deadChannelDelta=%zu%s%s%s%s%s%s%s%s\n",
             passed ? "pass" : (covered ? "fail" : "skip"),
             renderers, withMaterial, withInstance, compared, metaMissing,
             buildFailed, valueMismatch, blendMismatch, onlyAuthored, onlyLegacy,
@@ -6968,12 +7046,16 @@ namespace ConsoleCmd
             meshProxies, proxyAuthored, proxyValueMismatch,
             texResolved, texOwnerMismatch, texResolveFailed, texResolvedOwners,
             texCooked, texSourceFallback,
+            sealAuthoredBuilt, sealAuthoredFail, sealAuthoredTexMismatch,
+            sealNormalMapDerived, sealDeadChannelDelta,
             firstMismatch.empty() ? "" : " first=",
             firstMismatch.c_str(),
             firstSealMismatch.empty() ? "" : " firstSeal=",
             firstSealMismatch.c_str(),
             firstTexMismatch.empty() ? "" : " firstTex=",
-            firstTexMismatch.c_str());
+            firstTexMismatch.c_str(),
+            firstAuthoredSeal.empty() ? "" : " firstAuthoredSeal=",
+            firstAuthoredSeal.c_str());
     }
 
     static void Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)

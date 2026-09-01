@@ -640,7 +640,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S2b ✅ | 씬 writer 전환 — ShaderMeta를 아는 재질은 새 정본으로 저장(legacy 폴백 이중화) | 씬 저장 | 없음 |
 | ↳ M5-S2c-1 ✅ | 모델 GUID 자립 — `MeshRenderer::m_modelGuid` 신설, m_fileGuid 편법 이주, InstantiateOwned 비승계 | 씬 스키마·cook 폐포 | 없음 |
 | ↳ M5-S2c-2a ✅ | 저작 소유 분리 — base 참조(ref)+diff 저작, 피커 링크·소유 사본 (reflect 퇴출은 2b로) | 씬 스키마·피커 | 없음 |
-| ↳ M5-S2c-2b | 런타임 소유 분리 — base(experiment)+`MaterialInstance`, 프록시·sealing 타입 전환 | 프록시 사슬·CLR/Inspector | **소비자** 참조 감소 |
+| ↳ M5-S2c-2b ✅ | 런타임 소유 분리 — base(experiment)+`MaterialInstance`, 프록시·sealing 타입 전환. D5-c1~c5가 이행했고 **c5가 legacy Material을 seal 입력에서 뺐다** | 프록시 사슬·CLR/Inspector | **소비자** 참조 감소 |
 | ↳ M5-S2c-2c ✅ | Foliage — `FoliageType.m_authoredMaterial` 병행(D5-c4에서 이행) | Foliage·required packet | 없음 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
@@ -675,6 +675,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-1 ✅ | 편집 반영 — 편집 창구 6종에 인스턴스 경로·Inspector/CLR 호출부 전환·세대(Revision) 기반 프록시 재스냅샷·RED→GREEN 게이트(13) | 편집 창구·프록시 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-2 ✅ | texture owner 정본화 — `ApplyAuthoredTextures`(M2 resolver의 **첫 제품 소비자**)·양 sealing 축·owner A/B 게이트(14·14b, M4 변이 증명). flow·legacy 스칼라는 논리 property 승격 선행이라 존치 | resolver·sealing | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c4 ✅ | Foliage 재질 experiment 전환(S2c-2c) — 메시가 가리키는 MaterialIndex에서 정본 해석·DrawSource 운반·바인딩/운반 2축 게이트(M6 변이 증명). **reflect 퇴출은 I6로 재판정**(아래 근거) | Foliage | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c5 ✅ | 저작 단독 시공 — `BuildSealSourceFromAuthored`(legacy Material을 **읽지 않는** 유일한 입구)·`useNormalMap` 저작 유도·seed 텍스처 전 슬롯·저작/2단계 전수 대조 게이트(16, M8 변이 2종). **S2c-2b를 닫는다** | sealing 사슬 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
 **I5-D 착수 정찰 (2026-08-31) — 파급면 3방향 전수.**
@@ -1035,6 +1036,64 @@ legacy `Mesh::m_boundingBox`는 private이고 reflect 스키마에도 없어(`m_
 `m_materialIndex`·`m_LODThresholds`뿐) D1a가 쓴 "스키마 순회로 주입" 수법이 통하지
 않는다. `RecalculateBounds()`가 유일한 공개 창구이고 그것은 정점을 요구한다.
 **legacy Mesh 본체에 전환기 창구를 하나 더할지가 정책 판단**이라 D4f-1로 분리한다.
+
+**I5-D5c5 완료 실측 (2026-09-01) — S2c-2b를 닫는다.** 제품 sealing이 저작 정본이
+있을 때 legacy `Material`을 **아예 읽지 않는다**. 그 전까지는 c2-2/c3-2가
+`BuildSealSourceFromLegacy`로 시공한 뒤 `material`과 `textures`를 덮어썼다 —
+`ConvertLegacyMaterial`과 이름 맵 순회의 결과가 통째로 버려지는 왕복이었다.
+
+★ **착수 정찰이 남은 장애물을 하나로 줄였다.** c3-2가 "flow와 legacy 호환 스칼라는
+논리 property 승격이 선행이라 존치"라고 적어 둔 것을, `SealSource` 부속별로 소비자를
+전수해 다시 판정했다.
+
+| 부속 | 출처 | 제품 소비 | 판정 |
+|---|---|---|---|
+| `material`(properties·keywords·blendMode) | 저작(c2-2) | b2 CB | 이미 정본 |
+| `textures` | 저작 resolver(c3-2) | textureBindings | 이미 정본 |
+| `flow.windVector/uvScroll` | legacy `m_flowInfo` | **b2**(`flowWindVector`/`flowUvScroll`) | **승격은 이미 끝나 있었다** — `Forward.shadermeta`·`ForwardWind.shadermeta`가 둘을 property로 선언하고 `ForwardShade.hlsl:381~`이 snapshot draw에서 CB를 고른다("I5-M5 flow 승격" 주석). 인스턴스 채널은 legacy/self-test 폴백 |
+| `flow.totalSeconds/deltaSeconds` | 프레임 시각 | 항상 인스턴스 | 재질 값이 아니다 — 존치 |
+| `baseColorFactor`/`metallic`/`roughness` | legacy `m_materialInfo` | 두 패스 모두 CB 우선(`usePropertyBlock`·`useLegacyInstanceMaterial`) | 제품에서 **죽은 채널** |
+| `useNormalMap` | legacy `m_materialInfo` | `ForwardShade.hlsl:441`·`GBuffer.hlsl:237`이 **분기 밖에서 무조건** 읽는다 | **유일하게 살아 있다** |
+| `debugName` | legacy `m_name` | 진단 | authored.name으로 대체 |
+
+즉 legacy를 seal 입력에서 빼는 것을 막고 있던 실장애물은 `useNormalMap` 하나였다.
+그것의 의미는 "노멀맵이 붙어 있는가"이므로 **저작 정본에서 resolver가 normalMap
+owner를 실제로 준 것**으로 같은 뜻을 만든다(`ApplyAuthoredTextures` 안).
+[[plan-target-may-be-already-dead]]의 또 한 사례다 — 계획서가 "선행 필요"로 적어 둔
+승격이 이미 서 있었다.
+
+★ **게이트: 저작 단독 시공 vs 기존 2단계의 전수 대조.** `experiment.matruntime`에
+축을 더해 같은 재질을 두 방식으로 짓고 texture owner를 슬롯 단위로 맞춘다. 실측
+`sealAuthored=1 sealAuthoredFail=0 sealAuthoredTexMismatch=0 normalMapDerived=1
+deadChannelDelta=0`. **`deadChannelDelta=0`이 뜻밖의 소득이다** — 죽은 채널로 분류한
+셋조차 저작본이 같은 값을 낸다(저작 정본이 `baseColor`/`metallic`/`roughness`를
+property로 갖는다). 이 슬라이스는 legacy 값을 하나도 잃지 않았다.
+
+★ **seed가 텍스처 슬롯을 전부 싣도록 고쳤다.** 한 슬롯(baseColorMap)만 실으면
+`normalMap`이 비어 `useNormalMap` 유도가 늘 0이고, 그 축은 "0과 0을 비교해 통과"가
+된다 — c3-2가 owner에서 겪은 눈먼 초록과 같은 형태다. legacy 사본은 이 저작본을
+변환해 만들므로(`ConvertToLegacyMaterial`) owner 대조는 그대로 성립한다. 덤으로
+`texResolvedOwners`가 1→4가 됐다.
+
+★ **변이 2종.** M8-a(`useNormalMap` 유도를 0으로 절단)는 **16c만** 붉혔다 — 두 경로가
+같은 함수를 쓰므로 대조 축(16b)은 초록이고, "유도가 공허하지 않은가"를 따로 물은
+단정만 갈렸다. M8-b(저작 시공의 texture 해석 생략)는 `sealAuthoredTexMismatch=1`로
+16b를 붉혔다(그 줄이 fail이 되면서 `pass`에 걸린 12b~14b도 함께 붉었다 — 단정
+표현의 파급이지 별개 결함이 아니다).
+
+★ **자체 검토가 폴백 의미론 하나를 잡았다.** 저작 시공이 실패하면 legacy로
+내려가는데, 처음 배선은 그때 저작 properties까지 버렸다 — 실패한 것은 texture
+해석뿐인데 폴백이 c2-2 이전으로 되돌아가는 자리였다. 폴백에서도
+`ApplyAuthoredMaterial`을 태우도록 고쳤다(양 패스). 게이트는 이 경로를 태우지
+않는다(해석이 늘 성공한다) — 코드 대조로만 담보되는 자리라 여기 적어 둔다.
+
+★ **회귀 세트 전체 통과 — 붉은 둘은 D4f-1에서 확인한 그 기준선이다**
+(`verify-asset-authoring-ownership`·`verify-hierarchy-read-boundary`).
+
+★ **한계(정직).** sealing 자체는 여전히 헤드리스 관측 밖이다(`--script` 라이브는 렌더
+0프레임, `dx12.scene` 하네스는 자체 그리기라 sealing을 타지 않는다 — c2-2가 적은 그
+간극 그대로다). 이 축이 담보하는 것은 "두 시공이 같은 SealSource를 낸다"이지 "픽셀이
+같다"가 아니다. 코퍼스의 저작 재질이 여전히 seed 하나뿐이라는 것도 그대로다.
 
 **I5-D4f-1 완료 실측 (2026-09-01).** 정점 시공 절단 — 역브리지가 on 경로에서
 legacy 96B 배열을 더 이상 짓지 않는다. 실측: `legacyVertices=0`(메시 11개 전량),

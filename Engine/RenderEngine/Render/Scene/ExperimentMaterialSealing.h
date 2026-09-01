@@ -55,6 +55,22 @@ namespace ExperimentMaterialSealing
     [[nodiscard]] bool BuildSealSourceFromLegacy(const Material& legacy,
         const ShaderMeta& meta, SealSource& outSource, std::string& outError);
 
+    // I5-D5c5 — **저작 정본만으로** seal source를 시공한다. legacy Material을
+    // 아예 읽지 않는 유일한 입구다(S2c-2b의 목표). 부속의 출처 판정은 실측이다:
+    //   · flow.windVector/uvScroll — ShaderMeta에 이미 승격된 논리 property
+    //     (flowWindVector/flowUvScroll)에서 온다. 승격은 M5가 이미 했고 제품
+    //     snapshot draw는 b2를 읽는다 — 인스턴스 채널은 legacy 폴백이다.
+    //   · baseColorFactor/metallic/roughness — 같은 이름의 논리 property에서.
+    //     제품 셰이더는 CB를 우선하므로(usePropertyBlock/useLegacyInstance
+    //     Material) 이 값들은 legacy/self-test 채널 전용이다.
+    //   · useNormalMap — **유일하게 살아 있는 인스턴스 채널 소비**다
+    //     (ForwardShade:441·GBuffer:237이 무조건 읽는다). 저작 정본에서는
+    //     normalMap texture가 실제로 해석됐는지로 유도한다.
+    // 시각(totalSeconds/deltaSeconds)은 재질 값이 아니라 seal 호출부의 몫이다.
+    [[nodiscard]] bool BuildSealSourceFromAuthored(
+        const experiment::Material& authored, const ShaderMeta& meta,
+        SealSource& outSource, std::string& outError);
+
     // I5-D5c2-2 — 저작 정본 직행. `BuildSealSourceFromLegacy`가 채운 SealSource의
     // **material만** 저작 원본으로 교체한다(properties·keywords·blendMode).
     // 나머지 부속(texture generation owner·flow·legacy 호환 스칼라)은 전환기
