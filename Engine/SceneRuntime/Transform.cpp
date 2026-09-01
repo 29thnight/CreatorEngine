@@ -1,6 +1,27 @@
 #include "Transform.h"
 #include "Entity.h"
 #include "Scene.h"
+#include "ReflectionYml.h"
+
+const char* TransformWriteReasonName(TransformWriteReason reason)
+{
+	switch (reason)
+	{
+	case TransformWriteReason::CppSetter: return "CppSetter";
+	case TransformWriteReason::Script: return "Script";
+	case TransformWriteReason::Inspector: return "Inspector";
+	case TransformWriteReason::Reflection: return "Reflection";
+	case TransformWriteReason::Prefab: return "Prefab";
+	case TransformWriteReason::Physics: return "Physics";
+	case TransformWriteReason::Socket: return "Socket";
+	case TransformWriteReason::Gizmo: return "Gizmo";
+	case TransformWriteReason::Animator: return "Animator";
+	case TransformWriteReason::ModelImport: return "ModelImport";
+	case TransformWriteReason::Hierarchy: return "Hierarchy";
+	case TransformWriteReason::Reset: return "Reset";
+	default: return "Invalid";
+	}
+}
 
 // ── 스토어 슬롯 해석 (SceneGraphRedesignPlan §4 트랙 S, S1) ──
 std::optional<Transform::StoreSlot> Transform::ResolveStore() const
@@ -143,47 +164,125 @@ void Transform::SetStoredWorldPosition(const math::vector4& v)
 	else Fallback().worldPosition = v;
 }
 
-Transform& Transform::SetScale(math::vector3 scale)
+math::vector3 Transform::GetPosition() const
+{
+	return math::vector3{ position.x, position.y, position.z };
+}
+
+math::quaternion Transform::GetRotation() const
+{
+	return math::quaternion{ rotation.x, rotation.y, rotation.z, rotation.w };
+}
+
+math::vector3 Transform::GetScale() const
+{
+	return math::vector3{ scale.x, scale.y, scale.z };
+}
+
+bool Transform::PublishLocalWrite(TransformWriteReason reason)
+{
+	if (!m_pOwner || !m_pOwner->GetScene())
+	{
+		m_hasPendingLocalWrite = true;
+		m_pendingLocalWriteReason = reason;
+		return false;
+	}
+
+	Scene* scene = m_pOwner->GetScene();
+	const EntityHandle handle = scene->HandleOf(m_pOwner->m_index);
+	if (!handle.IsValid() || scene->Resolve(handle) != m_pOwner)
+	{
+		m_hasPendingLocalWrite = true;
+		m_pendingLocalWriteReason = reason;
+		return false;
+	}
+
+	if (scene->PublishLocalWrite(handle, reason)) return true;
+	m_hasPendingLocalWrite = true;
+	m_pendingLocalWriteReason = reason;
+	return false;
+}
+
+void Transform::FlushPendingLocalWrite()
+{
+	if (!m_hasPendingLocalWrite) return;
+	const TransformWriteReason reason = m_pendingLocalWriteReason;
+	if (PublishLocalWrite(reason)) m_hasPendingLocalWrite = false;
+}
+
+Transform& Transform::SetScale(math::vector3 scale, TransformWriteReason reason)
 {
 	SetDirty();
 	this->scale = math::vector4{ scale.x, scale.y, scale.z, 0.f };
+	PublishLocalWrite(reason);
 
 	return *this;
 }
 
-Transform& Transform::SetPosition(math::vector3 pos)
+Transform& Transform::SetPosition(math::vector3 pos, TransformWriteReason reason)
 {
 	SetDirty();
 	position = math::vector4{ pos.x, pos.y, pos.z, 0.f };
+	PublishLocalWrite(reason);
 
 	return *this;
 }
 
-Transform& Transform::AddPosition(math::vector3 pos)
+Transform& Transform::AddPosition(math::vector3 pos, TransformWriteReason reason)
 {
 	SetDirty();
 	position.x += pos.x;
 	position.y += pos.y;
 	position.z += pos.z;
+	PublishLocalWrite(reason);
 
 	return *this;
 }
 
-Transform& Transform::SetRotation(math::quaternion quaternion)
+Transform& Transform::SetRotation(math::quaternion quaternion, TransformWriteReason reason)
 {
 	SetDirty();
 	rotation = math::vector4{ quaternion.x, quaternion.y, quaternion.z, quaternion.w };
+	PublishLocalWrite(reason);
 
 	return *this;
 }
 
-Transform& Transform::AddRotation(math::quaternion quaternion)
+Transform& Transform::AddRotation(math::quaternion quaternion, TransformWriteReason reason)
 {
 	SetDirty();
 	const math::quaternion current{ rotation.x, rotation.y, rotation.z, rotation.w };
 	const math::quaternion combined = quaternion * current;
 	rotation = math::vector4{ combined.x, combined.y, combined.z, combined.w };
+	PublishLocalWrite(reason);
 
+	return *this;
+}
+
+Transform& Transform::SetPositionValue(
+	const math::vector4& value, TransformWriteReason reason)
+{
+	SetDirty();
+	position = value;
+	PublishLocalWrite(reason);
+	return *this;
+}
+
+Transform& Transform::SetRotationValue(
+	const math::vector4& value, TransformWriteReason reason)
+{
+	SetDirty();
+	rotation = value;
+	PublishLocalWrite(reason);
+	return *this;
+}
+
+Transform& Transform::SetScaleValue(
+	const math::vector4& value, TransformWriteReason reason)
+{
+	SetDirty();
+	scale = value;
+	PublishLocalWrite(reason);
 	return *this;
 }
 
@@ -202,20 +301,21 @@ static Entity* FindTransformParent(Entity* owner)
 	return owner->OwnerSceneFindIndex(parentIndex);
 }
 
-Transform& Transform::SetWorldPosition(math::vector3 pos)
+Transform& Transform::SetWorldPosition(math::vector3 pos, TransformWriteReason reason)
 {
 	Entity* parent = FindTransformParent(m_pOwner);
-	if (nullptr == parent) return SetPosition(pos);
+	if (nullptr == parent) return SetPosition(pos, reason);
 
 	const math::matrix4x4 parentWorldInverse = math::inverse(parent->Transform_().GetWorldMatrix());
 	const math::vector3 newLocalposition = math::transform_point(pos, parentWorldInverse);
-	return SetPosition(newLocalposition);
+	return SetPosition(newLocalposition, reason);
 }
 
-Transform& Transform::SetWorldRotation(math::quaternion quaternion)
+Transform& Transform::SetWorldRotation(
+	math::quaternion quaternion, TransformWriteReason reason)
 {
 	Entity* parent = FindTransformParent(m_pOwner);
-	if (nullptr == parent) return SetRotation(quaternion);
+	if (nullptr == parent) return SetRotation(quaternion, reason);
 
 	const math::quaternion parentWorldInverse = math::inverse(parent->Transform_().GetWorldQuaternion());
 
@@ -224,13 +324,13 @@ Transform& Transform::SetWorldRotation(math::quaternion quaternion)
 	// 인자 순서가 뒤집혀 있어서 부모가 회전해 있으면 엉뚱한 축으로 돌아갔다
 	// (부모가 회전한 뼈에 월드 회전을 걸어 실측 확인).
 	const math::quaternion newLocalrotation = quaternion * parentWorldInverse;
-	return SetRotation(newLocalrotation);
+	return SetRotation(newLocalrotation, reason);
 }
 
-Transform& Transform::SetWorldScale(math::vector3 scale)
+Transform& Transform::SetWorldScale(math::vector3 scale, TransformWriteReason reason)
 {
 	Entity* parent = FindTransformParent(m_pOwner);
-	if (nullptr == parent) return SetScale(scale);
+	if (nullptr == parent) return SetScale(scale, reason);
 
 	// 스케일은 행렬로 되돌리면 안 된다 — TransformCoord는 이동 성분까지 먹어서
 	// 부모가 원점에서 떨어져 있기만 해도 값이 망가진다. 부모 월드 스케일로 나눈다.
@@ -242,7 +342,7 @@ Transform& Transform::SetWorldScale(math::vector3 scale)
 		std::abs(parentWorldScale.y) > kMinScale ? scale.y / parentWorldScale.y : scale.y,
 		std::abs(parentWorldScale.z) > kMinScale ? scale.z / parentWorldScale.z : scale.z };
 
-	return SetScale(newLocalscale);
+	return SetScale(newLocalscale, reason);
 }
 
 math::matrix4x4 Transform::GetLocalMatrix()
@@ -374,9 +474,11 @@ void Transform::SetOwner(Entity* owner)
 		m_parentID = 0;
 	}
 	SetDirty();
+	FlushPendingLocalWrite();
 }
 
-void Transform::SetLocalMatrix(const math::matrix4x4& matrix)
+void Transform::SetLocalMatrix(
+	const math::matrix4x4& matrix, TransformWriteReason reason)
 {
 	math::vector3 decomposedScale{ scale.x, scale.y, scale.z };
 	math::quaternion decomposedRotation{ rotation.x, rotation.y, rotation.z, rotation.w };
@@ -406,15 +508,17 @@ void Transform::SetLocalMatrix(const math::matrix4x4& matrix)
 	// 드래그가 이 경로다. 호출부마다 SetDirty를 흩뿌리는 대신, 불변식을 아는
 	// 유일한 자리인 여기서 한 번 세운다.
 	SetStoredWorldChanged(true);
+	PublishLocalWrite(reason);
 }
 
-void Transform::SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLocal)
+void Transform::SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLocal,
+	TransformWriteReason reason)
 {
 	if (matrix == GetStoredWorldMatrix()) return;
 
 	SetStoredWorldMatrix(matrix);
 	// S2 — 값을 실제로 쓰는 이 자리에서만 세운다. 호출 경로가 Scene 순회든
-	// ClrHost::EnsureWorldMatrix든 PhysicsManager든 상관없이, "자식에게 아직
+	// Scene::EnsureResolved든 PhysicsManager든 상관없이, "자식에게 아직
 	// 못 알린 변경이 있다"는 사실은 여기서만 정확히 안다(TransformStore.h 참고).
 	SetStoredWorldChanged(true);
 
@@ -455,7 +559,7 @@ void Transform::SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLoc
 		{
 			// 최상위 오브젝트는 월드가 곧 로컬이다 — 역산할 부모 월드 행렬 자체가
 			// 없다. 예전에는 이 경우에도 부모를 역참조해서 죽었다.
-			SetLocalMatrix(matrix);
+			SetLocalMatrix(matrix, reason);
 		}
 		else
 		{
@@ -463,7 +567,7 @@ void Transform::SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLoc
 				math::inverse(parentObject->Transform_().GetWorldMatrix());
 			const math::matrix4x4 newLocalMatrix = matrix * parentWorldInverse;
 
-			SetLocalMatrix(newLocalMatrix);
+			SetLocalMatrix(newLocalMatrix, reason);
 		}
 	}
 }
@@ -538,14 +642,31 @@ void Transform::SetParentID(uint32 id)
 {
 	m_parentID = id;
 	SetDirty();
+	PublishLocalWrite(TransformWriteReason::Hierarchy);
 }
 
-void Transform::TransformReset()
+void Transform::TransformReset(TransformWriteReason reason)
 {
 	position = math::vector4{ 0.f, 0.f, 0.f, 0.f };
 	rotation = math::vector4{ 0.f, 0.f, 0.f, 0.f };
 	scale = math::vector4{ 1.f, 1.f, 1.f, 1.f };
 	SetDirty();
+	PublishLocalWrite(reason);
+}
+
+void Transform::OnPropertyChanged(
+	std::string_view propertyName, Meta::PropertyChangeSource source)
+{
+	if (propertyName != "position" && propertyName != "rotation"
+		&& propertyName != "scale")
+	{
+		return;
+	}
+
+	SetDirty();
+	PublishLocalWrite(source == Meta::PropertyChangeSource::Prefab
+		? TransformWriteReason::Prefab
+		: TransformWriteReason::Reflection);
 }
 
 void Transform::UpdateDirty()

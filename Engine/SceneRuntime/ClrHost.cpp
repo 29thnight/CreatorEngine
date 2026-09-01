@@ -373,41 +373,21 @@ namespace
 		}
 	}
 
-	/// 월드 값을 읽기 전에 캐시를 맞춰 둔다.
-	///
-	/// m_worldPosition·m_worldQuaternion·m_worldMatrix는 프레임당 한 번
-	/// Scene::AllUpdateWorldMatrix가 채우는 캐시다. 그런데 스크립트에서는
-	/// "방금 내 Transform을 고치고 바로 월드 값을 읽는" 흐름이 흔하고,
-	/// 그대로 두면 한 프레임 전 값을 보게 된다(실측으로 확인한 문제).
-	/// 조상까지 훑어 하나라도 더러우면 갱신한다 — 깨끗하면 bool 몇 번 읽고 끝난다.
-	void EnsureWorldMatrix(Entity* object)
+	/// C#의 setter 직후 GetWorld* 계약을 packed targeted pull에 연결한다.
+	/// Scene은 target의 parentExec chain만 정방향 계산하며 global dirty-root queue와
+	/// 자식 전파 신호를 소비하지 않는다.
+	void EnsureResolved(Entity* object)
 	{
 		if (nullptr == object) return;
-
-		// 계층이 꼬여 순환이 생기면 여기서 멈춘다(엔진 재귀도 같은 위험이 있다).
-		constexpr int kMaxDepth = 64;
-
-		bool dirty = false;
-		Entity* node = object;
-		for (int depth = 0; nullptr != node && depth < kMaxDepth; ++depth)
+		Scene* scene = object->GetScene();
+		if (scene)
 		{
-			if (node->Transform_().IsDirty())
-			{
-				dirty = true;
-				break;
-			}
-
-			const Entity::Index parentIndex = node->GetParentIndex();
-			if (Entity::INVALID_INDEX == parentIndex) break;
-
-			node = node->OwnerSceneFindIndex(parentIndex);
+			scene->EnsureResolved(scene->HandleOf(object->m_index));
+			return;
 		}
 
-		if (!dirty) return;
-
-		// UpdateWorldMatrix가 조상까지 거슬러 올라가며 갱신한다. 다만 부모가 없는
-		// 오브젝트는 월드 행렬만 세우고 분해는 하지 않으므로 여기서 마저 시킨다
-		// (행렬이 그대로면 SetAndDecomposeMatrix가 곧바로 빠져나간다).
+		// Scene 밖의 리플렉션 임시 객체는 packed identity가 없으므로 기존 로컬
+		// fallback을 유지한다.
 		Transform& transform = object->Transform_();
 		transform.SetAndDecomposeMatrix(transform.UpdateWorldMatrix());
 	}
@@ -467,7 +447,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
-		const auto& p = object->Transform_().position;
+		const auto& p = object->Transform_().GetPositionValue();
 		return { p.x, p.y, p.z };
 	}
 
@@ -476,7 +456,8 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->Transform_().SetPosition({ position.x, position.y, position.z });
+		object->Transform_().SetPosition(
+			{ position.x, position.y, position.z }, TransformWriteReason::Script);
 	}
 
 	Float3 __stdcall Api_Transform_GetWorldPosition(ScriptObjectHandle handle)
@@ -484,7 +465,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return {};
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
 		const math::vector3 world = object->Transform_().GetWorldPosition();
 		return { world.x, world.y, world.z };
@@ -499,7 +480,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 0.f, 0.f, 1.f };   // 단위 쿼터니언
 
-		const auto& r = object->Transform_().rotation;
+		const auto& r = object->Transform_().GetRotationValue();
 		return { r.x, r.y, r.z, r.w };
 	}
 
@@ -508,7 +489,9 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->Transform_().SetRotation({ rotation.x, rotation.y, rotation.z, rotation.w });
+		object->Transform_().SetRotation(
+			{ rotation.x, rotation.y, rotation.z, rotation.w },
+			TransformWriteReason::Script);
 	}
 
 	Float3 __stdcall Api_Transform_GetLocalScale(ScriptObjectHandle handle)
@@ -516,7 +499,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 1.f, 1.f, 1.f };
 
-		const auto& s = object->Transform_().scale;
+		const auto& s = object->Transform_().GetScaleValue();
 		return { s.x, s.y, s.z };
 	}
 
@@ -525,7 +508,8 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->Transform_().SetScale({ scale.x, scale.y, scale.z });
+		object->Transform_().SetScale(
+			{ scale.x, scale.y, scale.z }, TransformWriteReason::Script);
 	}
 
 	void __stdcall Api_Transform_AddLocalPosition(ScriptObjectHandle handle, Float3 delta)
@@ -533,7 +517,8 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->Transform_().AddPosition({ delta.x, delta.y, delta.z });
+		object->Transform_().AddPosition(
+			{ delta.x, delta.y, delta.z }, TransformWriteReason::Script);
 	}
 
 	void __stdcall Api_Transform_AddLocalRotation(ScriptObjectHandle handle, Float4 delta)
@@ -541,7 +526,8 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		object->Transform_().AddRotation({ delta.x, delta.y, delta.z, delta.w });
+		object->Transform_().AddRotation(
+			{ delta.x, delta.y, delta.z, delta.w }, TransformWriteReason::Script);
 	}
 
 	void __stdcall Api_Transform_SetWorldPosition(ScriptObjectHandle handle, Float3 position)
@@ -549,9 +535,10 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
-		object->Transform_().SetWorldPosition({ position.x, position.y, position.z });
+		object->Transform_().SetWorldPosition(
+			{ position.x, position.y, position.z }, TransformWriteReason::Script);
 	}
 
 	Float4 __stdcall Api_Transform_GetWorldRotation(ScriptObjectHandle handle)
@@ -559,7 +546,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 0.f, 0.f, 1.f };
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
 		const math::quaternion q = object->Transform_().GetWorldQuaternion();
 		return { q.x, q.y, q.z, q.w };
@@ -570,9 +557,11 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
-		object->Transform_().SetWorldRotation({ rotation.x, rotation.y, rotation.z, rotation.w });
+		object->Transform_().SetWorldRotation(
+			{ rotation.x, rotation.y, rotation.z, rotation.w },
+			TransformWriteReason::Script);
 	}
 
 	Float3 __stdcall Api_Transform_GetWorldScale(ScriptObjectHandle handle)
@@ -580,7 +569,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 1.f, 1.f, 1.f };
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
 		const math::vector3 s = object->Transform_().GetWorldScale();
 		return { s.x, s.y, s.z };
@@ -591,9 +580,10 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return;
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
-		object->Transform_().SetWorldScale({ scale.x, scale.y, scale.z });
+		object->Transform_().SetWorldScale(
+			{ scale.x, scale.y, scale.z }, TransformWriteReason::Script);
 	}
 
 	Float3 __stdcall Api_Transform_GetForward(ScriptObjectHandle handle)
@@ -601,7 +591,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 0.f, 1.f };
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
 		const math::vector3 v = object->Transform_().GetForward();
 		return { v.x, v.y, v.z };
@@ -612,7 +602,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 1.f, 0.f, 0.f };
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
 		const math::vector3 v = object->Transform_().GetRight();
 		return { v.x, v.y, v.z };
@@ -623,7 +613,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return { 0.f, 1.f, 0.f };
 
-		EnsureWorldMatrix(object);
+		EnsureResolved(object);
 
 		const math::vector3 v = object->Transform_().GetUp();
 		return { v.x, v.y, v.z };
@@ -1179,9 +1169,9 @@ namespace
 
 		// I5-M5 S3 — InstantiateShared 계약 비승계: 클론을 asset cache에 등록하지
 		// 않고 수명은 이 컴포넌트의 shared_ptr가 진다.
-		mesh->m_Material = MaterialScriptBinding::InstantiateOwned(
+		mesh->SetMaterial(MaterialScriptBinding::InstantiateOwned(
 			*mesh->m_Material,
-			(nullptr != newName) ? std::string_view{ newName } : std::string_view{});
+			(nullptr != newName) ? std::string_view{ newName } : std::string_view{}));
 		// S2c-2a — 인스턴스화는 base 링크 해제다: 이후 편집은 자산 diff가
 		// 아니라 인라인 소유 저작이다.
 		mesh->m_materialBaseGuid = FileGuid{};

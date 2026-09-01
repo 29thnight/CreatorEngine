@@ -36,21 +36,39 @@ void LightComponent::OnInitialized()
 void LightComponent::OnAddedToScene()
 {
     LightSystems->Register(this);
+	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->CollectLightComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->RegisterCommand(this);
+		}
+	}
 }
 
 void LightComponent::OnRemovingFromScene()
 {
     LightSystems->Unregister(this);
+	if (GetOwner() && !GetOwner()->IsDestroyMark())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->UnCollectLightComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->UnregisterCommand(this);
+		}
+	}
 }
 
 void LightComponent::OnUninitializing()
 {
     Scene* scene = GetOwner()->GetScene();
-    if (scene != nullptr && m_pOwner->IsDestroyMark())
-    {
-        scene->RemoveLight(m_lightIndex);
-        scene->UnCollectLightComponent(this);
-    }
+	if (scene != nullptr)
+	{
+		if (m_pOwner->IsDestroyMark()) scene->RemoveLight(m_lightIndex);
+		scene->UnCollectLightComponent(this);
+	}
 
     if (auto* renderScene = SceneManagers->GetRenderScene())
     {

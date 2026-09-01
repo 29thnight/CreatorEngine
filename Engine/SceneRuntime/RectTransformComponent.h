@@ -3,6 +3,8 @@
 #include <mathematics/rect.hpp>
 #include "Component.h"      // Component 클래스 포함
 #include "AnchorPreset.h"
+#include <cstdint>
+#include <string_view>
 
 // Unity의 RectTransform과 유사한 동작을 하는 UI용 트랜스폼 컴포넌트입니다.
 //
@@ -20,6 +22,7 @@
 // pivot도 마찬가지로 (0,0)이 좌상단이다.
 // ─────────────────────────────────────────────────────────────────────────
 class Entity;
+namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 
 // 앵커 프리셋 하나의 실제 값. 표는 아래 GetAnchorPresetTable() 한 곳에만 있다.
 struct AnchorPresetEntry
@@ -65,7 +68,7 @@ public:
     bool UpdateLayout(const math::rect& parentRect);
 
     // 다음 레이아웃 때 다시 계산하게 만든다. 드라이버가 부모 변경을 전파할 때 쓴다.
-    void MarkDirty() { m_isDirty = true; }
+    void MarkDirty(bool publishDomain = true);
 
     // 최상위 UI가 부모로 삼는 화면 rect. 렌더 레이아웃의 중심 원점 규약
     // (-width/2,-height/2,width,height)이 적용된 최종 값이다.
@@ -102,7 +105,10 @@ public:
     // 같은 결과를 낸다. worldRect는 중심 원점의 화면 픽셀을 유지하고, 입력은
     // UIButton 경계에서 좌상단 원점 좌표를 이 좌표계로 한 번 변환한다.
     float GetLayoutScale() const { return m_layoutScale; }
-    void SetLayoutScale(float scale);
+    void SetLayoutScale(float scale, bool publishDomain = true);
+
+    void OnPropertyChanged(std::string_view propertyName,
+        Meta::PropertyChangeSource source);
 
     // --- Getters & Setters ---
     const math::vector2& GetAnchorMin() const { return m_anchorMin; }

@@ -30,11 +30,29 @@ void DecalComponent::OnInitialized()
 void DecalComponent::OnAddedToScene()
 {
     DecalSystems->Register(this);
+	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->CollectDecalComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->RegisterCommand(this);
+		}
+	}
 }
 
 void DecalComponent::OnRemovingFromScene()
 {
     DecalSystems->Unregister(this);
+	if (GetOwner() && !GetOwner()->IsDestroyMark())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->UnCollectDecalComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->UnregisterCommand(this);
+		}
+	}
 }
 
 void DecalComponent::OnUninitializing()
@@ -56,6 +74,7 @@ void DecalComponent::SetDecalTexture(const std::string_view& fileName)
 	m_decalTextureOwner = Texture::LoadSharedFromPath(filepath.string());
 	m_decalTexture = m_decalTextureOwner.get();
     m_diffusefileName = fileName;
+	PublishRenderProxyDirty(ProxyDirty::Material);
 }
 
 void DecalComponent::SetDecalTexture(const FileGuid& fileGuid)
@@ -69,6 +88,7 @@ void DecalComponent::SetNormalTexture(const std::string_view& fileName)
 	m_normalTextureOwner = Texture::LoadSharedFromPath(filepath.string());
 	m_normalTexture = m_normalTextureOwner.get();
     m_normalFileName = fileName;
+	PublishRenderProxyDirty(ProxyDirty::Material);
 }
 
 void DecalComponent::SetNormalTexture(const FileGuid& fileGuid)
@@ -82,6 +102,7 @@ void DecalComponent::SetORMTexture(const std::string_view& fileName)
 	m_ormTextureOwner = Texture::LoadSharedFromPath(filepath.string());
 	m_occluroughmetalTexture = m_ormTextureOwner.get();
     m_ormFileName = fileName;
+	PublishRenderProxyDirty(ProxyDirty::Material);
 }
 
 void DecalComponent::SetORMTexture(const FileGuid& fileGuid)

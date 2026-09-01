@@ -66,7 +66,8 @@ void Socket::Update()
 	{
 		const math::matrix4x4 scaleMat =
 			math::scaling_matrix(obj->Transform_().GetWorldScale());
-		obj->Transform_().SetLocalMatrix(scaleMat * finalMat);
+		obj->Transform_().SetLocalMatrix(
+			scaleMat * finalMat, TransformWriteReason::Socket);
 	}
 
 
@@ -74,7 +75,7 @@ void Socket::Update()
 	{
 		auto mat = transform.GetLocalMatrix();
 		
-		obj->Transform_().SetLocalMatrix(mat);
+		obj->Transform_().SetLocalMatrix(mat, TransformWriteReason::Socket);
 	}*/
 
 

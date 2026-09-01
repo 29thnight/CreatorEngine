@@ -47,10 +47,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 	auto* owner = component->GetOwner();
 	if (nullptr == owner || owner->IsDestroyMark() || component->IsDestroyMark()) return;
 
-	// 재질이 없는 메시 갱신은 기존 계약처럼 no-op이다. 등록 프록시에 남아
-	// 있는 재질을 지우는 수명 전환은 3-2D에서 create/destroy와 함께 다룬다.
 	auto material = component->m_Material;
-	if (nullptr == material) return;
 
 	MeshUpdate update{};
 	update.worldMatrix = owner->Transform_().GetWorldMatrix();
@@ -61,7 +58,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 		update.worldBounds = component->GetBoundingBox();
 	}
 	update.material = std::move(material);
-	update.materialGuid = update.material->m_materialGuid;
+	if (update.material) update.materialGuid = update.material->m_materialGuid;
 	// I5-D5c3 — 저작 정본은 값 스냅샷이라 legacy처럼 저절로 따라오지 않는다.
 	// 세대(Revision)를 함께 실어 적용부가 변화만 반영한다 — 매 갱신마다
 	// 합성하는 비용을 피하면서 편집이 화면에 닿게 한다.
@@ -79,7 +76,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 	update.updateLightMapping = -1 != update.lightMapping.lightmapIndex;
 	update.bitflag = component->m_bitflag;
 	update.isStatic = owner->IsStatic();
-	update.isEnabled = owner->IsEnabled();
+	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 	update.isShadowCast = component->m_shadowCast;
 	update.isShadowReceive = component->m_shadowRecive;
 	update.enableLOD = component->m_isEnableLOD;
@@ -219,8 +216,9 @@ ProxyCommand::ProxyCommand(SpriteSheetComponent* component, uint64_t sceneEpoch)
 	update.data.isPreview = component->m_isPreview;
 	update.data.clipDirection = component->clipDirection;
 	update.data.clipPercent = component->clipPercent;
-	update.data.deltaTime = owner->IsEnabled() ? component->m_deltaTime : 0.f;
-	update.isEnabled = owner->IsEnabled();
+	update.data.deltaTime = component->IsEnabled() && owner->IsEnabled()
+		? component->m_deltaTime : 0.f;
+	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 	update.isLoop = component->m_isLoop;
 
 	m_proxyGUID = component->GetInstanceID();
@@ -290,7 +288,7 @@ ProxyCommand::ProxyCommand(TextComponent* component, uint64_t sceneEpoch) :
 	update.data.stretchX = component->isStretchX;
 	update.data.stretchY = component->isStretchY;
 	update.data.alignment = component->GetHorizontalAlignment();
-	update.isEnabled = owner->IsEnabled();
+	update.isEnabled = component->IsEnabled() && owner->IsEnabled();
 
 	// m_textMeasureSize는 현재 UIRenderProxy 어디에서도 0 이외의 값으로
 	// 발행되지 않는다. 명령 생산자가 프록시를 역조회해 그 0을 되복사하던
@@ -432,8 +430,8 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 					proxy->m_LightMapping = update->lightMapping;
 				}
 
-				if (nullptr != update->material &&
-					proxy->m_materialGuid != update->materialGuid)
+				if (proxy->m_Material != update->material
+					|| proxy->m_materialGuid != update->materialGuid)
 				{
 					proxy->m_Material = update->material;
 					proxy->m_materialGuid = update->materialGuid;
@@ -441,8 +439,8 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 				// I5-D5c3 — 저작 스냅샷은 **세대**로 갱신한다. 재질 GUID가
 				// 그대로여도 property 편집이면 세대가 오르므로, 같은 재질의
 				// 값 편집이 여기서 화면까지 닿는다(위 GUID 조건과 별개 축).
-				if (nullptr != update->authoredMaterial
-					&& proxy->m_authoredRevision != update->authoredRevision)
+				if (proxy->m_authoredMaterial != update->authoredMaterial
+					|| proxy->m_authoredRevision != update->authoredRevision)
 				{
 					proxy->m_authoredMaterial = update->authoredMaterial;
 					proxy->m_authoredRevision = update->authoredRevision;

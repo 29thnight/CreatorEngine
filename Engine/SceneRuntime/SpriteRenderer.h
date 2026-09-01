@@ -23,6 +23,8 @@ public:
     SpriteRenderer() = default;
 
    virtual void OnInitialized() override;
+   void OnAddedToScene() override;
+   void OnRemovingFromScene() override;
    virtual void OnUninitializing() override;
 
    void SetSprite(const std::shared_ptr<Texture>& ptr);
@@ -30,13 +32,13 @@ public:
 
 
    const std::shared_ptr<Texture>& GetSprite() const { return m_Sprite; }
-   void SetBillboardType(BillboardType type) { m_billboardType = type; }
+   void SetBillboardType(BillboardType type) { m_billboardType = type; PublishRenderProxyDirty(ProxyDirty::Payload); }
    BillboardType GetBillboardType() const noexcept { return m_billboardType; }
-   void SetBillboardAxis(const math::vector3& axis) { m_billboardAxis = axis; }
+   void SetBillboardAxis(const math::vector3& axis) { m_billboardAxis = axis; PublishRenderProxyDirty(ProxyDirty::Payload); }
    const math::vector3& GetBillboardAxis() const noexcept { return m_billboardAxis; }
 
    bool IsEnableDepth() const { return m_enableDepth; }
-   void SetEnableDepth(bool enable) { m_enableDepth = enable; }
+   void SetEnableDepth(bool enable) { m_enableDepth = enable; PublishRenderProxyDirty(ProxyDirty::Visibility); }
    int GetOrderInLayer() const { return m_orderInLayer; }
 
 private:

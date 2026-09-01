@@ -204,12 +204,24 @@ namespace LegacyTransformPromotion
         // 이 함수의 모든 호출부는 obj를 만들 때 이미 itNode/node의
         // m_parentIndex로 부모를 확정한 뒤다. 게다가 Transform::SetParentID는
         // private(friend GameObject만)라 여기서는 애초에 호출할 수 없다.
-        if (const auto positionNode = legacyTransformNode["position"])
-            Meta::Typed::ReadScalar(positionNode, transform->position);
-        if (const auto rotationNode = legacyTransformNode["rotation"])
-            Meta::Typed::ReadScalar(rotationNode, transform->rotation);
-        if (const auto scaleNode = legacyTransformNode["scale"])
-            Meta::Typed::ReadScalar(scaleNode, transform->scale);
+		if (const auto positionNode = legacyTransformNode["position"])
+		{
+			math::vector4 value = transform->GetPositionValue();
+			Meta::Typed::ReadScalar(positionNode, value);
+			transform->SetPositionValue(value, TransformWriteReason::Reflection);
+		}
+		if (const auto rotationNode = legacyTransformNode["rotation"])
+		{
+			math::vector4 value = transform->GetRotationValue();
+			Meta::Typed::ReadScalar(rotationNode, value);
+			transform->SetRotationValue(value, TransformWriteReason::Reflection);
+		}
+		if (const auto scaleNode = legacyTransformNode["scale"])
+		{
+			math::vector4 value = transform->GetScaleValue();
+			Meta::Typed::ReadScalar(scaleNode, value);
+			transform->SetScaleValue(value, TransformWriteReason::Reflection);
+		}
     }
 
     // ★ 전환기 오버로드 — Prefab의 read-write 소환 경로용(D3-b-3에서 사라진다).
@@ -699,7 +711,9 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         // m_Entities와 DontDestroyOnLoadObjects 루프 둘 다 같은 씬(m_activeScene)의
         // 슬롯을 할당하므로 배치 하나를 공유한다 — 파일 인덱스가 두 절 사이를
         // 넘나들며 서로를 참조해도(예: DDOL이 일반 오브젝트를 부모로) 안전하다.
-        LoadIndexBatch loadBatch;
+		LoadIndexBatch loadBatch;
+		[[maybe_unused]] auto hierarchyTransaction =
+			m_activeScene.load()->BeginHierarchyBulkBuild();
 
         for (const auto objNode : SerializedEntities(sceneNode))
         {
@@ -744,13 +758,14 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
         // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — 리매핑 직후, m_Entities·
         // DontDestroyOnLoadObjects 두 절이 공유하는 이 배치 전체를 한 번에 훑는다.
-        for (const auto& entry : loadBatch)
-        {
-            ReconnectPrefabInstance(m_activeScene.load(), entry.object);
-        }
+		for (const auto& entry : loadBatch)
+		{
+			ReconnectPrefabInstance(m_activeScene.load(), entry.object);
+		}
+		hierarchyTransaction.Complete();
 
-        RebindEventDontDestroyOnLoadObjects(m_activeScene.load());
-        m_activeScene.load()->AllUpdateWorldMatrix();
+		RebindEventDontDestroyOnLoadObjects(m_activeScene.load());
+		m_activeScene.load()->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
 
 		m_scenes.push_back(m_activeScene);
 		m_activeSceneIndex = m_scenes.size() - 1;
@@ -803,8 +818,12 @@ Scene* SceneManager::LoadScene(std::string_view name)
         // `scene`으로, DontDestroyOnLoadObjects는 (아직 활성화 전인) m_activeScene으로
         // 들어간다(이 함수의 기존 동작을 그대로 유지 — scene.load는 활성 씬을 바꾸지
         // 않는다). 슬롯 인덱스 공간이 서로 다르므로 배치도 둘로 나눈다.
-        LoadIndexBatch sceneBatch;
-        LoadIndexBatch ddolBatch;
+		LoadIndexBatch sceneBatch;
+		LoadIndexBatch ddolBatch;
+		[[maybe_unused]] auto sceneHierarchyTransaction =
+			scene->BeginHierarchyBulkBuild();
+		[[maybe_unused]] auto ddolHierarchyTransaction =
+			m_activeScene.load()->BeginHierarchyBulkBuild();
 
         for (const auto objNode : SerializedEntities(sceneNode))
         {
@@ -838,12 +857,14 @@ Scene* SceneManager::LoadScene(std::string_view name)
         {
             ReconnectPrefabInstance(scene, entry.object);
         }
-        for (const auto& entry : ddolBatch)
-        {
-            ReconnectPrefabInstance(m_activeScene.load(), entry.object);
-        }
+		for (const auto& entry : ddolBatch)
+		{
+			ReconnectPrefabInstance(m_activeScene.load(), entry.object);
+		}
+		sceneHierarchyTransaction.Complete();
+		ddolHierarchyTransaction.Complete();
 
-        scene->AllUpdateWorldMatrix();
+		scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
 
 
         m_scenes.push_back(scene);
@@ -903,7 +924,9 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
             }
 
             // 두 루프 모두 newScene을 타깃으로 하므로 배치를 공유한다.
-            LoadIndexBatch loadBatch;
+			LoadIndexBatch loadBatch;
+			[[maybe_unused]] auto hierarchyTransaction =
+				newScene->BeginHierarchyBulkBuild();
 
             for (const auto objNode : SerializedEntities(sceneNode))
             {
@@ -947,12 +970,13 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
             RemapLoadBatchIndices(newScene, loadBatch);
 
             // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2).
-            for (const auto& entry : loadBatch)
-            {
-                ReconnectPrefabInstance(newScene, entry.object);
-            }
+			for (const auto& entry : loadBatch)
+			{
+				ReconnectPrefabInstance(newScene, entry.object);
+			}
+			hierarchyTransaction.Complete();
 
-            RebindEventDontDestroyOnLoadObjects(newScene);
+			RebindEventDontDestroyOnLoadObjects(newScene);
             //newScene->AllUpdateWorldMatrix();
             return newScene;
         }
@@ -1003,8 +1027,12 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
             // ★ LoadScene(비-즉시 버전)과 같은 이유로 두 루프가 서로 다른 씬을
             // 타깃으로 한다 — m_Entities는 newScene, DontDestroyOnLoadObjects는
             // (아직 활성화 전인) m_activeScene. 기존 동작 그대로 유지하고 배치만 나눈다.
-            LoadIndexBatch sceneBatch;
-            LoadIndexBatch ddolBatch;
+			LoadIndexBatch sceneBatch;
+			LoadIndexBatch ddolBatch;
+			[[maybe_unused]] auto sceneHierarchyTransaction =
+				newScene->BeginHierarchyBulkBuild();
+			[[maybe_unused]] auto ddolHierarchyTransaction =
+				m_activeScene.load()->BeginHierarchyBulkBuild();
 
             for (const auto objNode : SerializedEntities(sceneNode))
             {
@@ -1036,14 +1064,16 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
             {
                 ReconnectPrefabInstance(newScene, entry.object);
             }
-            for (const auto& entry : ddolBatch)
-            {
-                ReconnectPrefabInstance(m_activeScene.load(), entry.object);
-            }
+			for (const auto& entry : ddolBatch)
+			{
+				ReconnectPrefabInstance(m_activeScene.load(), entry.object);
+			}
+			sceneHierarchyTransaction.Complete();
+			ddolHierarchyTransaction.Complete();
 
-            RebindEventDontDestroyOnLoadObjects(newScene);
+			RebindEventDontDestroyOnLoadObjects(newScene);
 
-            newScene->AllUpdateWorldMatrix();
+			newScene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
             return newScene;
         }
         catch (const std::exception& e)
@@ -1133,7 +1163,7 @@ void SceneManager::BeforeAwakeSceneLoad()
         Benchmark debugTimer1;
 
         RebindEventDontDestroyOnLoadObjects(m_sceneToActivate.load());
-        m_activeScene.load()->AllUpdateWorldMatrix();
+		m_activeScene.load()->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
 
         activeSceneChangedEvent.Broadcast();
         sceneLoadedEvent.Broadcast();
@@ -1234,7 +1264,10 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
 
 std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
 {
-	return m_activeScene.load()->m_allMeshRenderers;
+	Scene* scene = m_activeScene.load();
+	if (nullptr == scene) return {};
+	const auto renderers = scene->MeshRendererComponents();
+	return { renderers.begin(), renderers.end() };
 }
 
 std::vector<std::shared_ptr<Material>>
@@ -1251,11 +1284,11 @@ SceneManager::CaptureRequiredRenderMaterials() const
         materials.push_back(material);
     };
 
-    for (const MeshRenderer* renderer : scene->m_allMeshRenderers)
+    for (const MeshRenderer* renderer : scene->MeshRendererComponents())
     {
         if (nullptr != renderer) add(renderer->m_Material);
     }
-    for (const FoliageComponent* foliage : scene->m_foliageComponents)
+    for (const FoliageComponent* foliage : scene->FoliageComponents())
     {
         if (nullptr == foliage) continue;
         for (const FoliageType& type : foliage->GetFoliageTypes())
@@ -1357,8 +1390,10 @@ bool SceneManager::RestoreSceneSnapshot()
 
     try
     {
-        PROFILE_CPU_BEGIN("RestoreEditorScene");
-        LoadIndexBatch loadBatch;
+		PROFILE_CPU_BEGIN("RestoreEditorScene");
+		LoadIndexBatch loadBatch;
+		[[maybe_unused]] auto hierarchyTransaction =
+			scene->BeginHierarchyBulkBuild();
         for (const auto& objNode :
             SerializedEntities(Authoring::DocumentAccess::Node(m_editorSceneBackup)))
         {
@@ -1382,19 +1417,20 @@ bool SceneManager::RestoreSceneSnapshot()
         // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — DDOL로 살아남아
         // 되먹인 오브젝트(survivingIds로 걸러짐)는 이미 등록돼 있으니 중복 등록은
         // RegisterInstance의 existing-check가 걸러준다.
-        for (const auto& entry : loadBatch)
-        {
-            ReconnectPrefabInstance(scene, entry.object);
-        }
+		for (const auto& entry : loadBatch)
+		{
+			ReconnectPrefabInstance(scene, entry.object);
+		}
+		hierarchyTransaction.Complete();
 
-        PROFILE_CPU_END();
+		PROFILE_CPU_END();
 
         // InScene으로 되돌린다(트랙 L1) — 방금 복원한 오브젝트는 GameObject
         // 생성자의 기본값이 이미 InScene이지만, DDOL이라 파괴 없이 살아남은
         // 오브젝트는 Simulating에 머문 채라 여기서 함께 맞춘다.
         SetSimulationPhase(ScenePhase::InScene);
 
-        scene->AllUpdateWorldMatrix();
+		scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
     }
     catch (const std::exception& e)
     {

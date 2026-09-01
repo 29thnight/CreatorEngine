@@ -161,7 +161,7 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyExperiment(
 		const uint32 materialIndex = mesh.material.IsValid()
 			? mesh.material.Value() : 0u;
 		meshRenderer->m_Mesh = m_model->m_Meshes[meshIndex.Value()];
-		meshRenderer->m_Material = m_model->m_Materials[materialIndex];
+		meshRenderer->SetMaterial(m_model->m_Materials[materialIndex]);
 		meshRenderer->m_modelGuid = m_model->guid;
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
 		meshRenderer->m_experimentModel = source;
@@ -203,7 +203,8 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyExperiment(
 				const experiment::MeshIndex meshIndex = node.meshes[0];
 				attachMeshRenderer(*rootObject,
 					*source->TryGetMesh(meshIndex), meshIndex);
-				rootObject->Transform_().SetLocalMatrix(node.localTransform);
+	rootObject->Transform_().SetLocalMatrix(
+		node.localTransform, TransformWriteReason::ModelImport);
 				attachPoint[nodeIndex] = rootObject->m_index;
 				continue;
 			}
@@ -218,7 +219,8 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyExperiment(
 			Entity* object = m_scene->CreateEntity(node.name,
 				GameObjectType::Mesh, nextIndex);
 			attachMeshRenderer(*object, *source->TryGetMesh(meshIndex), meshIndex);
-			object->Transform_().SetLocalMatrix(node.localTransform);
+	object->Transform_().SetLocalMatrix(
+		node.localTransform, TransformWriteReason::ModelImport);
 			nextIndex = object->m_index;
 		}
 
@@ -227,7 +229,8 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyExperiment(
 			Entity* object = m_scene->CreateEntity(node.name,
 				GameObjectType::Mesh, nextIndex);
 			m_gameObjects.push_back(object);
-			object->Transform_().SetLocalMatrix(node.localTransform);
+		object->Transform_().SetLocalMatrix(
+			node.localTransform, TransformWriteReason::ModelImport);
 			nextIndex = object->m_index;
 		}
 
@@ -319,10 +322,11 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 			}
 
             meshRenderer->m_Mesh = m_model->m_Meshes[meshId];
-            meshRenderer->m_Material = m_model->m_Materials[mesh->m_materialIndex];
+            meshRenderer->SetMaterial(m_model->m_Materials[mesh->m_materialIndex]);
 			meshRenderer->m_modelGuid = m_model->guid; // S2c-1: 모델 출처 자립
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-			rootObject->Transform_().SetLocalMatrix(node->m_transform);
+	rootObject->Transform_().SetLocalMatrix(
+		node->m_transform, TransformWriteReason::ModelImport);
 			nextIndex = rootObject->m_index;
 
 			return;
@@ -364,10 +368,11 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 		}
 
 		meshRenderer->m_Mesh = mesh;
-		meshRenderer->m_Material = material;
+		meshRenderer->SetMaterial(material);
 		meshRenderer->m_modelGuid = m_model->guid; // S2c-1: 모델 출처 자립
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->Transform_().SetLocalMatrix(transform);
+	object->Transform_().SetLocalMatrix(
+		transform, TransformWriteReason::ModelImport);
 
 		nextIndex = object->m_index;
 		//m_gameObjects.push_back(object);
@@ -377,7 +382,8 @@ void ModelLoader::GenerateSceneObjectHierarchy(ModelNode* node, bool isRoot, int
 	{
 		Entity* object = m_scene->CreateEntity(node->m_name, GameObjectType::Mesh, nextIndex);
 		m_gameObjects.push_back(object);
-		object->Transform_().SetLocalMatrix(node->m_transform);
+		object->Transform_().SetLocalMatrix(
+			node->m_transform, TransformWriteReason::ModelImport);
 		nextIndex = object->m_index;
 	}
 
@@ -480,10 +486,11 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 			}
 
 			meshRenderer->m_Mesh = mesh;
-			meshRenderer->m_Material = material;
+			meshRenderer->SetMaterial(material);
 			meshRenderer->m_modelGuid = m_model->guid; // S2c-1: 모델 출처 자립
 			meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-			rootObject->Transform_().SetLocalMatrix(node->m_transform);
+	rootObject->Transform_().SetLocalMatrix(
+		node->m_transform, TransformWriteReason::ModelImport);
 
 			nextIndex = rootObject->m_index;
 			return rootObject;
@@ -515,10 +522,11 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 		}
 
 		meshRenderer->m_Mesh = mesh;
-		meshRenderer->m_Material = material;
+		meshRenderer->SetMaterial(material);
 		meshRenderer->m_modelGuid = m_model->guid; // S2c-1: 모델 출처 자립
 		meshRenderer->m_isSkinnedMesh = m_isSkinnedMesh;
-		object->Transform_().SetLocalMatrix(transform);
+	object->Transform_().SetLocalMatrix(
+		transform, TransformWriteReason::ModelImport);
 
 		nextIndex = object->m_index;
 		//m_gameObjects.push_back(object);
@@ -527,7 +535,8 @@ Entity* ModelLoader::GenerateSceneObjectHierarchyObj(ModelNode* node, bool isRoo
 	if (false == isRoot && 0 == node->m_numMeshes)
 	{
 		Entity* object = m_scene->CreateEntity(node->m_name, GameObjectType::Mesh, nextIndex);
-		object->Transform_().SetLocalMatrix(node->m_transform);
+		object->Transform_().SetLocalMatrix(
+			node->m_transform, TransformWriteReason::ModelImport);
 		nextIndex = object->m_index;
 	}
 

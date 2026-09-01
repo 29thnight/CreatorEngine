@@ -427,6 +427,57 @@ Run-Step "트랜스폼 값 왕복" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-roundtrip.ps1") -Exe $Exe -Work $Work
 }
 
+# TransformUpdatePlan X1 — C++/C#/reflection/prefab/Animator/Physics/Socket 등
+# known writer가 PublishLocalWrite로 합류하는지 정적 inventory와 runtime reason으로
+# 확인하고, 각 writer marker 제거 mutation이 실제 RED인지 고정한다.
+Run-Step "Transform 쓰기 publication 단일화" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-write-publication.ps1") -Exe $Exe -Work $Work
+}
+
+# TransformUpdatePlan X2 — 정지 queue-empty와 UI/Spatial 독립 publication,
+# paused UI-only 소비 및 LayoutUISubtree 즉시 의미를 한 probe에서 고정한다.
+Run-Step "트랜스폼 UI/Spatial 도메인 게이트" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-domain-gates.ps1") -Exe $Exe -Work $Work
+}
+
+# TransformUpdatePlan X3 — runtime 계층 변경을 handle 기반 Scene::Reparent로
+# 단일화하고, loader bulk-build의 topology version을 transaction당 한 번만 올린다.
+Run-Step "계층 mutation transaction" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hierarchy-mutation.ps1") -Exe $Exe -Work $Work
+}
+
+# TransformUpdatePlan X4 — stable Entity identity와 실행 위치를 분리한 두 packed
+# projection의 mapping/nearest-parent/preorder range를 검증하고, 10k topology
+# transaction compile이 60 Hz 프레임 예산 안인지 Release에서 4회 잰다.
+Run-Step "Transform sparse execution graph" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-execution-graphs.ps1") -Exe $Exe -Work $Work
+}
+
+# TransformUpdatePlan X5 — setter publish를 node epoch로 dedupe하고 canonical preorder
+# subtree range로 병합한 뒤 affected packed range만 resolve한다. recursive fallback과
+# 10k full-movement A/B 성능 상한도 같은 Release probe에서 고정한다.
+Run-Step "Transform dirty-root sparse resolver" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-sparse-resolver.ps1") -Exe $Exe -Work $Work
+}
+
+# TransformUpdatePlan X6 — C# world getter/setter 앞의 즉시 pull을 packed parent chain에
+# 연결하되 X5 global queue와 sibling propagation epoch를 소비하지 않는다.
+Run-Step "Transform targeted immediate pull" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-targeted-pull.ps1") -Exe $Exe -Work $Work
+}
+
+# TransformUpdatePlan X7 — skeleton binding 때 bone index를 한 번만 해석하고,
+# worker barrier 뒤 Animator pose·Socket 및 Physics world write를 bulk publish한다.
+Run-Step "Transform Animator/Physics bulk writers" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-bulk-writers.ps1") -Exe $Exe -Work $Work
+}
+
+# TransformUpdatePlan X8 — all render writers OR semantic bits into a frame-persistent
+# queue; the final render stage drains once and rejects stale registration generations.
+Run-Step "Render proxy dirty-mask final commit" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-render-proxy-dirty.ps1") -Exe $Exe -Work $Work
+}
+
 # 리플렉션 골든 대조(PHASE 18 CT0)는 골든 파일이 있을 때만 돈다.
 # 골든을 뜨려면 컴파일타임 전환 착수 전에 한 번:
 #   .\verify-reflection-golden.ps1 -Baseline

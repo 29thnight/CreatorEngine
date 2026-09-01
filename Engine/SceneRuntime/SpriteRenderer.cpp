@@ -16,6 +16,28 @@ void SpriteRenderer::OnInitialized()
 	}
 }
 
+void SpriteRenderer::OnAddedToScene()
+{
+	if (!HasLifecycleState(State_AwakeCalled) || !GetOwner()) return;
+	if (Scene* scene = GetOwner()->GetScene())
+	{
+		scene->CollectSpriteRenderer(this);
+		if (auto* renderScene = SceneManagers->GetRenderScene())
+			renderScene->RegisterCommand(this);
+	}
+}
+
+void SpriteRenderer::OnRemovingFromScene()
+{
+	if (!GetOwner() || GetOwner()->IsDestroyMark()) return;
+	if (Scene* scene = GetOwner()->GetScene())
+	{
+		scene->UnCollectSpriteRenderer(this);
+		if (auto* renderScene = SceneManagers->GetRenderScene())
+			renderScene->UnregisterCommand(this);
+	}
+}
+
 void SpriteRenderer::OnUninitializing()
 {
 	auto scene = GetOwner()->m_ownerScene;
@@ -38,6 +60,7 @@ void SpriteRenderer::SetSprite(const std::shared_ptr<Texture>& ptr)
 	{
 		m_SpritePath.clear();
 	}
+	PublishRenderProxyDirty(ProxyDirty::Material);
 }
 
 

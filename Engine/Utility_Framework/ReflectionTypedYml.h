@@ -742,7 +742,16 @@ namespace Meta::Typed
     {
         meta::for_each_field(obj, [&](std::string_view memberName, auto& value)
         {
+			const bool memberExists = static_cast<bool>(node[memberName.data()]);
             ReadMember(node, memberName.data(), value);
+			if (!memberExists) return;
+
+			if constexpr (requires(T& object, std::string_view name,
+				Meta::PropertyChangeSource source)
+				{ object.OnPropertyChanged(name, source); })
+			{
+				obj.OnPropertyChanged(memberName, Meta::CurrentPropertyChangeSource());
+			}
         });
     }
 

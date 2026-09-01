@@ -7,6 +7,9 @@
 #include "CanvasScaleMode.h"
 #include "CanvasRenderMode.h"
 #include "EntityHandle.h"
+#include <cstdint>
+
+namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 
 class Canvas : public meta::identity<Canvas, Component>
 {
@@ -52,6 +55,8 @@ public:
 
 	void SetCanvasName(std::string_view name) { CanvasName = name.data(); }
 	void OnDeserialized(); // CT6-d: UIManager 등록 + prevCanvasName 동기화(구 팩토리 분기)
+	void OnPropertyChanged(std::string_view propertyName,
+		Meta::PropertyChangeSource source);
 
 	std::string GetCanvasName() const { return CanvasName; }
 	Entity* GetFrontUIObject();

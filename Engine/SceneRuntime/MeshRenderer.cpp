@@ -283,6 +283,28 @@ void MeshRenderer::OnInitialized()
     }
 }
 
+void MeshRenderer::OnAddedToScene()
+{
+	if (!HasLifecycleState(State_AwakeCalled) || !GetOwner()) return;
+	if (Scene* scene = GetOwner()->GetScene())
+	{
+		scene->CollectMeshRenderer(this);
+		if (auto* renderScene = SceneManagers->GetRenderScene())
+			renderScene->RegisterCommand(this);
+	}
+}
+
+void MeshRenderer::OnRemovingFromScene()
+{
+	if (!GetOwner() || GetOwner()->IsDestroyMark()) return;
+	if (Scene* scene = GetOwner()->GetScene())
+	{
+		scene->UnCollectMeshRenderer(this);
+		if (auto* renderScene = SceneManagers->GetRenderScene())
+			renderScene->UnregisterCommand(this);
+	}
+}
+
 void MeshRenderer::OnUninitializing()
 {
     auto scene = GetOwner()->m_ownerScene;

@@ -12,9 +12,11 @@ X0~X9로 대체한다. 폐기 근거와 T→X 매핑은 **부록 A**에 남긴�
 관련: `AnimationSchedulerPlan.md`(X7) · `PhysicsRedesignPlan.md`(X7) ·
 `UISystemRedesignPlan.md`(X2의 UI resolver) · `EditorWorkspaceRedesignPlan.md` PHASE 21.
 
-상태: **소스 감사 기반 제안. 구현·빌드·런타임 검증 전이다.** 이 문서의 성능 수치는
-전부 `SceneGraphRedesignPlan` 트랙 S가 남긴 기록의 재해석이며, 이 계획을 위해 새로
-측정한 값은 하나도 없다. §3이 그 기록을 어떻게 잘못 읽었는지부터 정정한다.
+상태: **X0~X8 완료, X9 선택 확장 중단.** X7의 Windows 제품 바이너리 TSan은 target
+비지원으로 미확인이지만 WSL canary와 barrier 모델은 검증했다. X8은 Release 런타임·
+변이 게이트까지 완료했다. 이 문서의 옛 성능
+수치는 `SceneGraphRedesignPlan` 트랙 S 기록의 재해석이고, X0의 새 계측은 각 단계
+검증 결과에 따로 기록한다. §3은 옛 기록을 어떻게 잘못 읽었는지부터 정정한다.
 
 ---
 
@@ -130,12 +132,13 @@ Entity도 UI DFS에서 빠짐없이 방문된다.
 
 즉 이동 노드마다 무조건 내는 sqrt 대부분이 아무도 안 읽는 값을 위한 것이다.
 
-### 2.4 렌더 프록시 전량 무조건 갱신
+### 2.4 렌더 프록시 전량 무조건 갱신 — X8 이전 기준선
 
-`Scene::CommitRenderProxies`(`Scene.cpp:745`)가 메시·터레인·폴리지·데칼·스프라이트·
-이미지·텍스트를, `LightSystem::Update`(`LightSystem.cpp:58`)가 광원을 **매 프레임 전부**
-프록시 커맨드로 민다. 움직였는지 묻지 않는다. 커맨드마다 64바이트 월드 행렬 복사가
-실린다. 이것이 트랙 S의 S4가 겨냥했다가 보류한 자리다(§17).
+X8 이전에는 `Scene::CommitRenderProxies`가 메시·터레인·폴리지·데칼·스프라이트·
+이미지·텍스트를, `LightSystem::Update`가 광원을 **매 프레임 전부** 프록시 커맨드로
+밀었다. 움직였는지 묻지 않아 커맨드마다 64바이트 월드 행렬 복사가 실렸다. 이것이
+트랙 S의 S4가 겨냥했다가 보류한 자리이며, 현재는 X8의 dirty ticket 최종 커밋으로
+대체됐다(§9, §17).
 
 ### 2.5 순회 밖 갱신 경로 셋 — 설계 제약
 
@@ -144,7 +147,7 @@ Entity도 UI DFS에서 빠짐없이 방문된다.
 
 | 경로 | 소스 | 하는 일 |
 |---|---|---|
-| C# 스크립트 즉시 읽기 | `ClrHost.cpp:383` `EnsureWorldMatrix` | 조상 체인만 앞당겨 갱신 |
+| C# 스크립트 즉시 읽기 | `ClrHost.cpp:379` → `Scene::EnsureResolved` | packed parent chain만 앞당겨 갱신, global queue 보존 |
 | 물리 writeback | `PhysicsManager` | 시뮬레이션 결과를 직접 반영 |
 | 소켓 부착 | `Socket::Update`(매 프레임) | `SetLocalMatrix` 직접 호출 |
 
@@ -281,16 +284,16 @@ X9 선택지가 아니라 **X4의 전제**가 된다. **X0에서 반드시 잰�
 
 대상: `LuminaEngine-main`(로컬 사본) · `VanishingGround-main`(로컬 사본) · UE5 · Unity.
 
-|  | **CreatorEngine** | **VanishingGround** | **Unity** | **UE5** | **Lumina** |
-|---|---|---|---|---|---|
-| 저장 형태 | 컴포넌트 TRS + Scene SoA(파생) | 객체 AoS, 포인터 트리 | 네이티브 `TransformHierarchy` SoA, **부모가 배열상 항상 앞** | `USceneComponent` AoS + `ComponentToWorld` | EnTT dense pool, `CACHE_ALIGN` 128B |
-| 갱신 계기 | **프레임당 3회 전수 순회 ×2도메인** | 변경 감지 시 **루트 서브트리 전체 DFS** | 지연 평가 + 계층 dirty 비트 | setter가 즉시 `UpdateComponentToWorld` → 자식 push | **dirty 큐 드레인 O(변경분)** |
-| 정지 씬 비용 | O(N)×3 | O(0) — 단, 하나만 움직여도 O(서브트리) | O(0) | O(0) | **O(1)** (`bAnyDirty` 원자 load 1회) |
-| sparse 이동 | O(N) | O(서브트리) | O(조상 체인) | O(서브트리) | **O(변경분 + 영향 서브트리)** |
-| 순환 방어 | `unordered_set` ×2 + 깊이 제한 | 없음 | 구조상 불필요 | 없음 | 없음(64칸 고정 스택) |
-| 병렬 | `execution::par`, **루트 자식 단위** | 없음 | 잡 시스템 | 없음(게임 스레드) | `ParallelFor`(>1000), 평탄/계층 2단 분리 |
-| 월드 표현 | matrix4x4 + 분해 캐시 3종 | matrix + **역행렬** + basis 3종 | TRS | `FTransform`(SIMD TRS) | `FTransform`, **행렬은 요청 시 합성** |
-| 렌더 전달 | 매 프레임 전량 무조건 | — | — | `MarkRenderTransformDirty` → 움직인 것만 | `MovedTransforms` 채널 드레인 |
+| 비교 항목 | CreatorEngine | VanishingGround | Unity | UE5 | Lumina | 계획 완료 후 CreatorEngine |
+|:---|:---|:---|:---|:---|:---|:---|
+| 저장 형태 | 컴포넌트 TRS + Scene SoA(파생) | 객체 AoS, 포인터 트리 | 네이티브 `TransformHierarchy` SoA, **부모가 배열상 항상 앞** | `USceneComponent` AoS + `ComponentToWorld` | EnTT dense pool, `CACHE_ALIGN` 128B | 저작 TRS + packed `SpatialExecutionGraph`/`UILayoutExecutionGraph` projection |
+| 갱신 계기 | **프레임당 3회 전수 순회 ×2도메인** | 변경 감지 시 **루트 서브트리 전체 DFS** | 지연 평가 + 계층 dirty 비트 | setter가 즉시 `UpdateComponentToWorld` → 자식 push | **dirty 큐 드레인 O(변경분)** | 도메인별 O(1) gate → dirty-root queue 또는 targeted pull |
+| 정지 씬 비용 | O(N)×3 | O(0) — 단, 하나만 움직여도 O(서브트리) | O(0) | O(0) | **O(1)** (`bAnyDirty` 원자 load 1회) | **O(1)** UI/Spatial gate + 빈 proxy dirty queue |
+| sparse 이동 | O(N) | O(서브트리) | O(조상 체인) | O(서브트리) | **O(변경분 + 영향 서브트리)** | O(Q log Q + 병합된 영향 range), leaf는 O(1) |
+| 순환 방어 | `unordered_set` ×2 + 깊이 제한 | 없음 | 구조상 불필요 | 없음 | 없음(64칸 고정 스택) | `Reparent` transaction/graph compile 경계에서 1회 검증 |
+| 병렬 | `execution::par`, **루트 자식 단위** | 없음 | 잡 시스템 | 없음(게임 스레드) | `ParallelFor`(>1000), 평탄/계층 2단 분리 | packed range resolve, 비중첩 병렬은 X9 A/B 통과 시만 유지 |
+| 월드 표현 | matrix4x4 + 분해 캐시 3종 | matrix + **역행렬** + basis 3종 | TRS | `FTransform`(SIMD TRS) | `FTransform`, **행렬은 요청 시 합성** | packed local/world matrix + position 직접 읽기 + scale/quaternion 지연 분해 |
+| 렌더 전달 | 매 프레임 전량 무조건 | — | — | `MarkRenderTransformDirty` → 움직인 것만 | `MovedTransforms` 채널 드레인 | frame-persistent proxy dirty mask queue + Light 포함 단일 publish |
 
 ### 4.1 VanishingGround — 참고가 아니라 반례
 
@@ -523,7 +526,10 @@ EnsureResolved(target)
 
 ## 8. resolve 알고리즘
 
-### 8.1 프레임 플로우 — 지금
+### 8.1 프레임 플로우 — X0 착수 전 기준선
+
+아래 그림은 병목을 정한 과거 기준선이다. 완료된 X4~X8에서는 세 publish/resolve 결과를
+보존한 뒤 최종 `CommitRenderProxies`가 dirty ticket만 한 번 drain한다.
 
 ```mermaid
 %%{init:{'theme':'base','flowchart':{'useMaxWidth':false,'wrappingWidth':640,'padding':30,'nodeSpacing':45,'rankSpacing':55},'themeVariables':{'fontFamily':'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace','fontSize':'13px','background':'#FCFDFE','primaryColor':'#EEF2F7','primaryTextColor':'#121821','primaryBorderColor':'#8E9AAA','secondaryColor':'#E6ECF3','tertiaryColor':'#F4F7FA','mainBkg':'#EEF2F7','nodeBorder':'#8E9AAA','textColor':'#121821','lineColor':'#65717F','clusterBkg':'#F4F7FA','clusterBorder':'#B8C3D0','titleColor':'#3D4756','edgeLabelBackground':'#FCFDFE','labelBackgroundColor':'#FCFDFE'}}}%%
@@ -713,8 +719,8 @@ enum class ProxyDirty : uint8_t
 
 ### 9.2 단일 publish 지점
 
-`LightSystem::Update`의 매 프레임 `UpdateCommand(light)`와 `Scene::CommitRenderProxies`를
-같은 최종 publish 단계로 수렴시킨다.
+X8에서 `LightSystem::Update`의 매 프레임 `UpdateCommand(light)`와 옛 전량
+`Scene::CommitRenderProxies`를 같은 최종 dirty publish 단계로 수렴시켰다.
 
 ```
 BeforeRender spatial resolve
@@ -849,9 +855,45 @@ flowchart LR
 - 벤치 자체가 어느 도메인을 포함하는지 stdout에 명시
 - topology 변경 빈도 수치가 나오고, 그 값으로 X4의 O(N) compile 허용 여부를 판정
 
-⛔ **차단: X0 전에는 어떤 구현 슬라이스도 완료로 판정하지 않는다.**
+#### X0 완료 기록 — 2026-09-01
 
-### X1 — 쓰기 길목 단일화 (P0 · 1.5일)
+Release x64, Windows SDK host pack `10.0.11`, warm-up 2회 뒤 4회 표본의 중앙값이다.
+stdout은 `build=Release domains=UI+Spatial`을 명시하며, 아래 UI/Spatial은 서로
+독립인 wall time이다. Spatial의 visit/compose/multiply/decompose는 병렬 worker CPU
+합계로 별도 출력하므로 wall time에 다시 더하지 않는다.
+
+| topology / 10,000개 | 정지 total | UI | Spatial | 10% 이동 total | UI | Spatial |
+|---|---:|---:|---:|---:|---:|---:|
+| flat | 1,855.85µs | 1,216.20µs | 644.90µs | 1,736.60µs | 1,070.80µs | 665.70µs |
+| wide | 3,109.35µs | 1,262.70µs | 1,846.55µs | 3,919.00µs | 1,273.50µs | 2,645.40µs |
+| deep | 1,935.60µs | 1,306.55µs | 629.70µs | 2,854.40µs | 1,373.00µs | 1,486.80µs |
+| skeleton-like | 1,969.90µs | 1,351.25µs | 618.55µs | 2,759.90µs | 1,381.55µs | 1,338.50µs |
+
+정지 표본의 local compose/world multiply/decompose는 네 topology 모두 0이었다.
+과거 4,058.8µs는 타이머가 없던 바이너리의 합계라 소급 분할할 수 없고, 같은 10,000개
+규모를 현재 바이너리에서 재측정한 위 표가 교정 기준선이다.
+
+`scene.transformstats 1`로 post-load 기준선을 다시 잡고 두 저작 씬을 각각 602프레임
+관측했다.
+
+| 저작 씬 | census Entity | 관측 프레임 | create/frame | destroy/frame | reparent/frame |
+|---|---:|---:|---:|---:|---:|
+| `FT_Primitives.creator` | 10 | 602 | 0 | 0 | 0 |
+| `DX12Validation.creator` | 9 | 602 | 0 | 0 | 0 |
+
+로드 누적 스냅샷에서는 각각 create 11건, create 10건 + reparent 6건이 관측됐다. 따라서
+**X4의 O(N) compile은 topology transaction 종료 시 한 번만 허용**한다. 정지 프레임의
+polling compile과 loader의 노드별 compile은 금지하고, loader bulk-build 종료 시 한 번으로
+합친다. X4 구현 때 실제 compile 시간이 프레임 예산을 넘으면 이 허용을 철회하거나
+incremental compile로 내려간다.
+
+구현 진입점은 `scene.transformstats [0|1|print]`와
+`scene.traversalbench <N> <frames> [flat|wide|deep|skeleton]`이다. 전자는 reset 이후
+window frames, mutation total, per-frame 빈도까지 출력한다.
+
+✅ **X0 계측 기준선이 확보돼 후속 구현 슬라이스를 판정할 수 있다.**
+
+### X1 — 쓰기 길목 단일화 (P0 · 1.5일) ✅ 완료 (2026-09-01)
 
 변경: Transform 수동 쓰기를 setter로 수렴(**실측 12곳, 전부 에디터** — §3.8) ·
 reflection/prefab `OnPropertyChanged` 훅 · `PublishLocalWrite` **계측-only** 경로 추가 ·
@@ -863,7 +905,53 @@ Physics/Socket/gizmo/Animator writer inventory 작성.
 완료 기준: known writer 전부 publish 계수 증가 · **각 writer 한 곳의 publish를 제거하면
 해당 회귀가 RED가 되는 변이 시험** · 아직 resolver 동작은 변경하지 않음.
 
-### X2 — UI/Spatial resolver 분리 (P0 · 2일)
+#### X1 구현·검증 기록
+
+`Transform::position/rotation/scale`은 private로 닫고 기존 YAML 키는 클래스 내부
+`reflect()`의 private member pointer로 유지했다. 일반 setter와 값 보존 setter,
+`SetLocalMatrix`, hierarchy/reset 경로는 모두 계측-only `PublishLocalWrite`를 지난다.
+계측이 꺼져 있으면 atomic toggle 확인 뒤 기존 dirty/resolver 경로로 그대로 돌아가며,
+씬 슬롯이 아직 없는 reflection load는 reason 하나를 보류했다가 점유 후 flush한다.
+
+typed deserialize는 **노드에 실제로 존재한 필드**를 쓴 직후 `OnPropertyChanged`를
+호출한다. `Meta::ScopedPropertyChangeSource`가 일반 reflection과 prefab patch를 구분한다.
+프리팹 갱신 뒤 수동 `SetDirty()`에 의존하던 구멍은 이 훅으로 닫혔고 디스크 필드명과
+직렬화 형상은 바뀌지 않았다.
+
+| writer | 실제 진입점 | publish reason/처리 |
+|:---|:---|:---|
+| C++ API | `Transform` setter/value setter/local matrix | `CppSetter`(호출자가 더 구체적인 reason 지정 가능) |
+| C# | `ClrHost` local/world/add setter | `Script` |
+| Inspector/undo/reset | `InspectorWindow` 값 setter | `Inspector`; 직접 TRS 대입 0건 |
+| typed reflection | `DeserializeObjectFrom` → `OnPropertyChanged` | `Reflection` |
+| prefab update/override replay | scoped deserialize → 같은 훅 | `Prefab` |
+| Physics writeback | `PhysicsManager` | `Physics` |
+| CharacterController 자동 회전 | `CharacterControllerComponent::OnFixedUpdate` | 일반 setter(`CppSetter`); X7 bulk writer에서 Physics 묶음으로 합류 |
+| Socket attachment | `Socket::Update` | `Socket` |
+| SceneView gizmo/drag preview | `SceneViewWindow` | `Gizmo` |
+| Animator socket pose cache | `AnimationJob`의 detached cache | `Animator` 태그; Scene publish 대상은 아니며 실제 부착 객체는 `Socket` 경로가 publish |
+| model import/placement | `ModelSceneBridge` | `ModelImport` |
+| reparent | `Entity::SetParentIndex` → `Transform::SetParentID` | `Hierarchy` |
+| reset API | `TransformReset` | `Reset` |
+
+검증 결과:
+
+- Release `Editor.vcxproj` 컴파일 성공, `CreatorEditor.exe` 링크 성공. 전체 타깃의 마지막
+  종료 코드 1은 제품 코드가 아니라 기존 FMOD post-build 기대 경로
+  `ThirdParty/Fmod/bin/x64/fmod.dll` 부재다(`lib/x64`에는 존재).
+- `scene.transformwritestats probe`: epoch `4→20`, total `16`, invalid handle `0`.
+  12 reason 모두 1건 이상(`Reflection`/`Prefab`은 TRS 3필드라 각 3건), probe `PASS`,
+  resolver `stable`.
+- `verify-transform-write-publication.ps1`: writer inventory 13항목, 각 marker 한 곳을
+  메모리 표본에서 제거한 mutation 13/13 `RED`, runtime reason 12/12 `PASS`.
+- Release 회귀: transform 값 41개 저장·재로드 `PASS`, prefab 연결 왕복 `PASS`,
+  prefab override의 Transform position 보존 `PASS`.
+- reflection golden은 직렬화 77/77·실패 0이고 Transform 형상은 동일했으나,
+  기존 휘발 `m_instanceID` 정규화가 Release 출력에 적용되지 않고 초기화되지 않은
+  `BTBuildGraph.Policy`가 `-858993460→10`으로 달라 전체 diff만 `FAIL`했다. X1 회귀와
+  섞지 않고 별도 기존 게이트 부채로 남긴다.
+
+### X2 — UI/Spatial resolver 분리 (P0 · 2일) ✅ 완료 (2026-09-01)
 
 변경: `UpdateUILayout`와 `ResolveSpatialTransforms`를 별도 진입점으로 · `SyncDerivedState`가
 둘을 명시 순서로 호출 · **도메인별** O(1) dirty gate.
@@ -872,7 +960,47 @@ Physics/Socket/gizmo/Animator writer inventory 작성.
 paused UI 경로와 `LayoutUISubtree` 의미 보존 · 정지 sync에서 두 domain queue-empty
 경로 측정 · 해상도 스윕과 UI 레이아웃 골든 통과.
 
-### X3 — canonical hierarchy mutation (P0 · 2일)
+#### X2 구현·검증 기록
+
+`AllUpdateWorldMatrix`는 호환 wrapper가 됐고, 정본 `SyncDerivedState`가
+`UpdateUILayout → ResolveSpatialTransforms`를 명시 순서로 호출한다. Scene은 UI와
+Spatial에 독립적인 dirty/resolved epoch를 보유한다. 두 값이 같은 정지 sync는 계층에
+진입하지 않으며, X0 metrics의 `gate ui/spatial=run|empty`와 각 gate wall time으로
+그 경로를 관측한다.
+
+writer 연결은 다음처럼 분리했다.
+
+| 변경 | 올리는 domain | 비고 |
+|:---|:---|:---|
+| RectTransform setter / reflection·prefab | UI | resolver 내부 부모 dirty·layout scale 전파는 재-publish하지 않음 |
+| Canvas scaler / render mode reflection | UI | 화면 크기는 마지막 screen rect와 O(1) 비교해 UI만 dirty |
+| Transform setter / reflection·prefab | Spatial | X1 `PublishLocalWrite`가 X2부터 실제 spatial epoch를 올림; reason 계측은 toggle ON일 때만 |
+| 활성 AnimationController pose 갱신 | Spatial | bone buffer 직접 쓰기가 Transform setter를 우회하므로 animator당 1회 publish |
+| create/destroy/reparent | UI + Spatial | 어느 도메인 계층에 영향을 주는지 사전 단정하지 않고 둘 다 무효화 |
+
+epoch는 resolver **시작 시점 값만** 완료 처리한다. 순회 도중 더 큰 epoch가 publish되면
+다음 sync에 남아 동시 write를 잃지 않는다. `AllUIUpdateWorldMatrix`는 UI epoch만
+소비해 paused 상태의 Spatial dirty를 보존한다. `LayoutUISubtree`는 즉시 해당 서브트리를
+계산하지만 global UI epoch는 소비하지 않아 이후 full layout의 나머지 노드를 건너뛰지
+않는다.
+
+검증 결과:
+
+- Release `Editor.vcxproj` 컴파일 성공, `CreatorEditor.exe` 링크 성공. 전체 target의
+  종료 코드 1은 기존 FMOD post-build 기대 경로 `ThirdParty/Fmod/bin/x64/fmod.dll`
+  부재이며 실행 파일은 정상 생성됐다.
+- `verify-transform-domain-gates.ps1`: 정지 `empty/empty`, UI write `run/empty`,
+  Spatial write `empty/run`, subtree `immediate + run/empty`, paused UI 소비 뒤
+  `empty/run`, 최종 정지 `empty/empty` — 전부 `PASS`.
+- X1 재검증: writer inventory 13, mutation 13/13 `RED`, runtime reason 12/12,
+  resolver stable `PASS`.
+- Release UI 레이아웃 골든: rect 14 + hitbox 1, diff 0 `PASS`.
+- Release 해상도 스윕: 7개 해상도 전부 도달, 단정 43건(히트박스 7건) `PASS`.
+
+✅ **UI와 Spatial은 독립 gate로 분리됐고, 정지 sync의 두 queue-empty 경로가
+실행 바이너리에서 증명됐다.**
+
+### X3 — canonical hierarchy mutation (P0 · 2일) ✅ 완료 (2026-09-01)
 
 변경: `Reparent` transaction · cycle/same-scene/generation 검증 · `topologyVersion` ·
 loader bulk-build transaction.
@@ -881,7 +1009,43 @@ loader bulk-build transaction.
 DDOL detach/attach, prefab instantiate, undo/redo 회귀 통과 · mutation 시에만 topology
 version 증가(정지 프레임에 증가 0을 계측으로 확인).
 
-### X4 — sparse compiled projections (P0 · 4일)
+구현:
+
+- 런타임 부모 변경을 `Scene::Reparent(EntityHandle, EntityHandle)` 하나로 닫았다.
+  child/parent의 scene ID·slot generation·점유 상태를 먼저 검증하고, self·ancestor
+  cycle·scene root 이동을 거부한 뒤에만 `detach → parent 기록 → attach` 순서로 commit한다.
+- `Entity::SetParentIndex`·`AttachChildIndex`·`DetachChildIndex`·`ClearChildren`·
+  `SetChildrenIndices`는 private로 닫고 `Scene` transaction과 `SceneManager` loader만
+  저수준 복원을 할 수 있게 했다. 편집기 hierarchy drag, `Entity::AddChild`, 복제,
+  prefab instantiate는 전부 handle 기반 transaction을 탄다.
+- `topologyVersion`은 실제 create/destroy/reparent commit에서만 증가한다. loader,
+  prefab clone tree, DDOL subtree detach/attach는 중첩 가능한 `HierarchyBulkBuildScope`로
+  묶어 transaction 하나당 한 번만 증가시킨다.
+- DDOL 지정 시 parent 한쪽만 먼저 지우던 mutation을 제거했다. 실제 이탈 시점의
+  `DetachEntityHierarchy`가 parent/children 관계와 Scene slot을 한 transaction으로
+  분리하고, 목적 Scene의 attach transaction이 다시 대칭 관계를 만든다.
+
+검증 결과:
+
+- Release `Editor.vcxproj` 컴파일 성공, `CreatorEditor.exe` 링크 성공. 전체 target의
+  종료 코드 1은 기존 FMOD post-build 기대 경로 `ThirdParty/Fmod/bin/x64/fmod.dll`
+  부재이며 실행 파일은 정상 생성됐다.
+- `verify-hierarchy-mutation.ps1`: no-change/self/ancestor/stale/cross-scene 거부 뒤
+  version delta 0, 성공 reparent delta 1, parent/children mismatch·orphan·duplicate·
+  invalid reference 전부 0, bulk delta 1, 정지 sync delta 0 `PASS`.
+- 계층 규약 deep/wide 생성·왕복 4종에서 쌍불일치·고아·순회미도달·Store불일치
+  전부 0 `PASS`.
+- DDOL canvas detach/attach와 C# lifecycle 이탈→재부착 순서 `PASS`. Release headless의
+  90프레임이 `Scope.Delay(0.2s)`보다 먼저 끝나던 검사 레이스는 300프레임으로
+  안정화했다.
+- prefab 왕복, duplicate, nested instantiate와 play selection/undo `PASS`.
+- X1/X2, Transform 41개 왕복, UI rect 14+hitbox 1 골든 diff 0, 7개 해상도 43단정,
+  prefab override write를 모두 재검증해 `PASS`.
+
+✅ **계층 mutation은 한 transaction으로 수렴했고, X4 compiler가 신뢰할 수 있는
+mutation-only `topologyVersion`과 loader bulk-build 경계가 실행 바이너리에서 증명됐다.**
+
+### X4 — sparse compiled projections (P0 · 4일) ✅ 완료 (2026-09-01)
 
 변경: Transform-only packed `SpatialExecutionGraph` · Rect/Canvas-only
 `UILayoutExecutionGraph` · Entity↔Exec mapping · nearest spatial/layout ancestor compile ·
@@ -892,7 +1056,46 @@ preorder/subtree range 불변식 검사.
 diff 0** · Entity slot/generation/serialized identity diff 0 · X0의 topology 변경 빈도에서
 compile 비용이 프레임 예산을 넘지 않음.
 
-### X5 — dirty-root sparse resolver (P0 · 4일)
+#### X4 구현·검증 기록
+
+- `HierarchyStore`의 canonical preorder를 iterative compiler가 한 번 순회해
+  Transform-only spatial projection과 Rect/Canvas-only layout projection을 별도 packed
+  배열로 만든다. transformless/layoutless 중간 Entity는 배열에서 빠지되 그 아래 노드는
+  각각 가장 가까운 spatial/layout 조상을 `parentExec`로 받는다. Canvas는 두 projection에
+  모두 들어간다.
+- `ExecIndex`, Entity↔Exec mapping, `parentExec`, `subtreeEnd`, packed local/world matrix
+  snapshot은 `Scene.cpp`의 비공개 state에만 둔다. 공개 진단은 `EntityHandle`과 집계만
+  반환하며 `reflect()`에는 추가하지 않았다. 따라서 slot/generation/serialized identity는
+  바뀌지 않는다. X5 전에는 기존 recursive resolver가 갱신 정본이고 packed 행렬은 compile
+  시점 값 보존 검사용 snapshot이다.
+- compiler는 mapping 대칭성, membership, parent-before-self, preorder interval nesting,
+  canonical hierarchy 대칭성, orphan/unreachable, 고립 cycle을 O(N)에 검사한다. 실패한
+  version은 packed state로 publish하지 않는 fail-close이며, 같은 실패 version을 정지
+  프레임마다 재시도하지 않는다.
+- hierarchy mutation뿐 아니라 Transform/Rect/Canvas의 동적 attach/remove도 같은 topology
+  publication을 사용한다. X5가 hot loop에서 쓰는 Bone/MeshRenderer 보조 포인터 cache도
+  attach/remove 시 같은 compiler로 다시 잡는다. loader/prefab bulk scope 안에서는 기존 X3
+  transaction에 합쳐지고, `SyncDerivedState`가 transaction 종료 뒤 version당 한 번만 compile한다.
+- Release `scene.executiongraph probe`: occupied 12, spatial 9, layout 5(동적 Rect attach 포함),
+  transformless/nonlayout/mapping/parent-order/range/hierarchy/unreachable/cycle 모두 0.
+  nearest spatial/layout, Canvas 양쪽 편입, EntityHandle identity, local/world bit-exact,
+  bulk compile delta 1, clean sync delta 0 모두 `PASS`.
+- Release `scene.executiongraph bench 10000 4`: spatial 10,005개, 초기 회귀 compile 중앙값
+  **4,382.05us**, p95/max **4,955.50us**였다. 최종 현재 바이너리를 15표본×3세트로
+  재계측했다. 원격 7커밋 통합·재링크 뒤 최종 15표본×3세트의 중앙값은
+  **3,842.4 / 5,854.6 / 8,834.4us**(세트 중앙 **5,854.6us**), 전체 최악 표본은
+  **10,065.5us**로 편차가 컸지만 모두 60Hz 예산 **16,666.67us** 안이다.
+  X0에서 저작 프레임 topology mutation이 0이었고 load mutation은 transaction으로 합쳐지므로,
+  X4의 full O(N) compile 허용을 유지한다.
+- `verify-transform-execution-graphs.ps1`를 `run-all.ps1`에 연결했고 Release runtime/static
+  gate를 모두 통과했다. `Editor.vcxproj`는 성공했으며 `CreatorEditor.exe`도 링크 성공했다.
+  전체 target 종료 코드 1은 기존 FMOD post-build 기대 경로
+  `ThirdParty/Fmod/bin/x64/fmod.dll` 부재 때문이다.
+
+✅ **stable Entity identity와 packed 실행 위치가 분리됐고, X5가 방문집합 없는 sparse
+resolver를 올릴 수 있는 검증된 두 projection과 compile 비용 상한이 확보됐다.**
+
+### X5 — dirty-root sparse resolver (P0 · 4일) ✅ 완료 (2026-09-01)
 
 변경: node dedupe epoch와 dirty-root queue · range 정렬/포함 제거 · affected range만
 packed resolve · **기존 recursive path와 A/B 토글**.
@@ -906,7 +1109,47 @@ transform round-trip/골든 diff 0.
 `O(Q log Q)` 정렬이 지배하는데, 그것을 없애는 것이 X7의 bulk upload다. X5 시점의
 skeleton 수치가 나쁘게 나와도 그것을 설계 실패로 읽지 않는다.
 
-### X6 — 즉시 pull 통합 (P1 · 1.5일)
+#### X5 구현·검증 기록
+
+- `PublishLocalWrite`가 stable `EntityHandle`을 dirty-root queue에 넣고, slot generation과
+  enqueue epoch로 같은 resolve 구간의 중복 setter를 한 번만 남긴다. queue와 spatial dirty
+  epoch snapshot은 같은 mutex 경계에서 교환하므로 snapshot 뒤 write는 다음 epoch/queue에
+  남는다. topology/component membership·Animator 같은 무명시 invalidation은 full resolve로
+  승격하며, 대량 개별 write도 queue가 `max(256, spatial/8)`에 닿으면 정렬 대신 full range로
+  전환한다.
+- dirty handle은 `entityToExec`으로 실행 위치를 찾고 preorder start를 정렬한 뒤 이미 포함된
+  자손 range를 제거한다. 각 canonical `[begin, subtreeEnd)`만 순차 packed resolve하며 일반
+  Transform inner loop는 public getter나 component lookup 없이 private inline local compose와
+  `TransformStore`/packed local·world 배열을 사용한다. Bone은 X7 전까지 compile 시 캐시한
+  `BoneComponent*`와 기존 Animator binding 의미를 유지한다.
+- `scene.sparseresolver 0|1|print|probe|bench <N> <frames>`를 추가했다. probe에서 정지 queue는
+  empty, 같은 leaf setter 2회는 request/range/node `1/1/1`, ancestor+leaf는 `2/1/3`으로
+  병합됐다. recursive A/B 뒤 packed full resync의 world matrix는 byte-exact였다.
+- Release x64, warm-up 2회 뒤 4회 중앙값의 resolver 시간은 다음과 같다. 단위는 µs이며
+  `nodes`는 packed resolver가 실제 처리한 수다.
+
+| N | 정지 | leaf 1개 | random 1% | root subtree | sparse 100% | legacy 100% | full ratio |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1,000 | 0.000 | 0.200 (1) | 1.200 (10) | 73.200 (1,001) | 68.850 | 280.500 | **0.245** |
+| 10,000 | 0.000 | 0.250 (1) | 9.500 (100) | 512.800 (10,001) | 786.900 | 3,353.150 | **0.235** |
+| 100,000 | 0.000 | 0.200 (1) | 85.600 (1,000) | 8,869.650 (100,001) | 15,142.350 | 39,627.950 | **0.382** |
+
+  leaf는 세 규모 모두 1 node/1 range이고 0.2~0.3µs라 전체 Entity 수에 비례하지 않았다.
+  full movement도 세 규모 모두 기존 recursive path보다 빨라 퇴행 상한 1.10을 통과했다.
+- 최종 현재 바이너리 10,000개를 15표본×3세트로 재계측해 세트 중앙값들의 중앙을 취하면
+  leaf **0.3us**(legacy **2,105.9us**), random 1% **11.5us**(legacy **1,866.0us**),
+  root subtree **806.3us**(legacy **3,881.3us**), 100% 이동 **1,485.4us**(legacy
+  **3,923.8us**)이며 full ratio 세트 중앙은 **0.379**다.
+- `verify-transform-sparse-resolver.ps1`를 `run-all.ps1`에 연결했다. X1~X5 runtime/static gate,
+  deep/wide hierarchy 생성·왕복, Transform 41개 왕복(해시 `24ffce0d089dddc7`), UI rect
+  14+hitbox 1 골든, prefab override/round-trip/duplicate/nested를 모두 재검증해 `PASS`였다.
+  `Editor.vcxproj`는 성공했고 `CreatorEditor.exe`도 링크됐다. 전체 target 종료 코드 1은 기존
+  FMOD post-build 기대 경로 `ThirdParty/Fmod/bin/x64/fmod.dll` 부재 때문이다.
+
+✅ **정지 O(1), leaf N-독립, random sparse range, root/full 상한과 recursive A/B 정합성이
+실행 바이너리에서 닫혔다. skeleton batch 성능만 계획대로 X7 이후 재측정한다.**
+
+### X6 — 즉시 pull 통합 (P1 · 1.5일) ✅ 완료 (2026-09-01)
 
 변경: `ClrHost::EnsureWorldMatrix`를 `EnsureResolved(SpatialHandle)`로 대체 ·
 targeted pull과 global propagation epoch 분리 · stale handle fail-close.
@@ -914,7 +1157,41 @@ targeted pull과 global propagation epoch 분리 · stale handle fail-close.
 완료 기준: C# setter 직후 모든 `GetWorld*` 최신값 · **parent 즉시 pull 뒤 sibling
 subtree가 다음 global resolve에서 갱신됨** · targeted pull이 render dirty를 지우지 않음.
 
-### X7 — Animator/Physics bulk writer (P1 · 3일)
+#### X6 구현·검증 기록
+
+- `Scene::EnsureResolved(EntityHandle)`가 X4 spatial mapping으로 stale handle을 먼저
+  fail-close하고, target의 `parentExec` chain을 root→target 순서로 계산한다. authored local이
+  바뀐 노드만 private compose를 수행하며, packed local/world와 `TransformStore`의 행렬·분해
+  cache를 같은 자리에서 갱신한다. compiler/A/B fallback 중에는 기존 recursive pull을 유지하고
+  packed mirror를 unsynchronized로 표시해 다음 sparse global resolve가 full resync한다.
+- 각 exec에 `parentWorldEpoch`를 추가해 "내 world cache가 최신"과 "마지막으로 본 parent
+  world version"을 분리했다. parent를 먼저 targeted pull한 뒤 sibling을 pull하면 epoch mismatch로
+  갱신되며, sibling을 pull하지 않아도 원래 dirty-root queue가 남아 다음 global range에서 갱신된다.
+- targeted pull 전후의 dirty-root request 수, force-full 상태, global dirty epoch를 비교하는
+  `SpatialPullMetrics`를 추가했다. pull은 queue를 drain하지 않고, world를 쓴 노드의
+  `TransformStore::worldChanged`도 내리지 않는다. 당시에는 X8 이전이어서 render dirty 입력이 될
+  현재 전파 신호와 X5 queue를 모두 보존하는 경계만 고정했고, 완료된 X8이 이 신호를 최종
+  프록시 커밋에 연결한다.
+- `ClrHost`의 옛 `EnsureWorldMatrix` 조상 재귀를 제거하고 world position getter,
+  world rotation/scale setter·getter, world position setter, 방향축 3종의 9개 진입점을
+  `EnsureResolved`로 연결했다. local setter는 기존처럼 publish만 하고, 이어지는 world getter가
+  pull한다. 정적 gate는 배선 9개와 옛 helper 0개를 확인하고,
+  한 호출을 메모리 표본에서 제거하면 8개로 떨어지는 mutation `RED`를 증명한다.
+- Release `scene.transformpull probe`: Script reason의 local/world setter 직후 position/rotation/
+  scale/matrix/forward/right/up 모두 `PASS`, queue `1→1`, signal `kept`, path 3개 중 recompute 1,
+  world write 1. parent pull 직후 sibling은 의도대로 stale이고 다음 global resolve에서 requests 1,
+  range 1, nodes 3으로 갱신됐다. clean pull은 recompute/write 0, 세대가 틀린 handle은 fail-close,
+  recursive fallback과 sparse 복귀도 `PASS`였다.
+- `verify-transform-targeted-pull.ps1`를 `run-all.ps1`에 연결했다. X1~X6, X5 1k/10k/100k
+  성능 상한, deep/wide hierarchy, Transform 41개 왕복(해시 `24ffce0d089dddc7`), UI rect
+  14+hitbox 1, prefab override/round-trip/duplicate/nested를 모두 Release exe에서 `PASS`했다.
+  `Editor.vcxproj`는 성공했고 `CreatorEditor.exe`도 링크됐다. 전체 target 종료 코드 1은 기존
+  FMOD post-build 기대 경로 `ThirdParty/Fmod/bin/x64/fmod.dll` 부재 때문이다.
+
+✅ **C# 즉시 읽기는 packed targeted pull로 수렴했고, pull과 global propagation version이
+분리돼 형제 서브트리와 향후 render dirty 입력을 소비하지 않는다.**
+
+### X7 — Animator/Physics bulk writer (P1 · 3일) ✅ 구현·로컬 검증 완료 (2026-09-01)
 
 변경: bone name/index 해석을 skeleton binding 시점에 완료 · Animator pose를 packed local
 buffer에 bulk upload · Physics writeback을 같은 publish API에 합류 · 필요하면
@@ -924,7 +1201,52 @@ worker-local staging queue 추가.
 reload, invalid bone fallback 회귀 · rigidbody/character controller/socket world 골든 ·
 job race 검증(TSan).
 
-### X8 — render proxy dirty mask (P1 · 2.5일 · 트랙 S의 S4 승계)
+#### X7 구현·검증 기록
+
+- `Scene::PublishAnimatorPose`가 Animator instance, owner handle, skeleton serial, topology
+  version으로 binding을 캐시한다. 최초 bind/reload에서만 packed subtree의 Bone 이름을
+  해석하며 유효 인덱스뿐 아니라 `-1`도 캐시한다. steady upload와 off→on 재개는 lookup
+  0회이고 skeleton 교체 때만 3개를 다시 해석했다.
+- animation worker는 Animator 소유 local/final pose와 socket matrix만 staging한다.
+  `NotifyAllAndWait` 뒤 main thread가 Animator pose를 packed local/`TransformStore`에
+  일괄 복사하고 animator root를 한 번 publish한 다음 Socket을 반영한다. 기존 배열이
+  worker-local staging 역할을 하므로 별도 staging queue는 추가하지 않았다.
+- packed global/targeted resolver는 Animator·문자열·bone index를 다시 조회하지 않는다.
+  barrier upload가 유효 본의 dirty를 해소하고, 스켈레톤에 없는 본의 명시적 authored
+  local은 공통 dirty-compose 경로로 보존한다. `AnimatorSystem`의 pose 계산 전 full-dirty
+  호출도 제거했다.
+- Physics rigidbody/CCT writeback과 pending CCT teleport는 `ApplyWorldWriteBatch`로 합쳤다.
+  batch는 stable handle을 검증하고 parent-first로 local/world mirror를 갱신하며 한 번의
+  publish epoch으로 합친다.
+- Release `scene.transformbulk probe`에서 최초 `lookups=3/valid=2/invalid=1`, steady와
+  off→on `lookups=0`, reload `lookups=3`, invalid authored local 보존을 확인했다. Physics
+  parent/child world batch는 `requested=2/accepted=2/epoch=1`, 즉시/전역 결과와 실제
+  Socket world 골든이 모두 `PASS`였다. 정적 gate는 pose/Socket Scene write가 worker
+  barrier 뒤인지 확인하며 pose commit 한 줄 제거 변이가 `RED`가 되는 계약을 포함한다.
+- `verify-transform-bulk-writers.ps1`를 `run-all.ps1`에 연결했다. `SceneRuntime`·`Editor`
+  Release 빌드와 `CreatorEditor.exe` 링크는 성공했고, 전체 target 종료 코드 1은 기존
+  FMOD post-build 기대 경로 `ThirdParty/Fmod/bin/x64/fmod.dll` 부재 때문이다.
+
+#### X7 TSan 적용성 점검 — 2026-09-01
+
+- Visual Studio 18 Community에 포함된 Windows Clang 22.1.3을 확인하고
+  `VC/Tools/Llvm/x64/bin`을 사용자 PATH에 등록했다. 그러나 x64 MSVC target에서
+  `-fsanitize=thread` 컴파일은 `unsupported option '-fsanitize=thread' for target
+  'x86_64-pc-windows-msvc'`로 종료 코드 1이며 Windows compiler-rt 디렉터리의 TSan
+  runtime은 0개였다. [LLVM 공식 TSan 지원 플랫폼 목록](https://clang.llvm.org/docs/ThreadSanitizer.html#supported-platforms)에도
+  Windows는 없다.
+- WSL2 Ubuntu 24.04에 Clang 18.1.3과 compiler-rt를 설치했다. 의도적으로 공유 정수를
+  경쟁 쓰기한 canary는 `WARNING: ThreadSanitizer: data race`와 종료 코드 66을 냈다.
+  worker 8개가 각자 Animator staging 슬롯만 쓰고 전부 join한 뒤 main thread가 commit하는
+  X7 ownership/barrier 표본은 같은 `-fsanitize=thread`에서 종료 코드 0이었다.
+- CreatorEngine은 DX12·MSVC ABI의 Windows 전용 제품이라 WSL Linux TSan으로 실제
+  `AnimationJob`/`SceneRuntime` 바이너리를 계측할 수 없다. 따라서 **TSan 도구와 barrier
+  모델 검증은 완료했지만 제품 바이너리 TSan PASS를 주장하지 않는다.** 현재 제품 증거는
+  `NotifyAllAndWait` 뒤에만 Scene/Socket write가 존재하는 정적 gate, commit 제거 mutation
+  RED, Release Animator/Physics/Socket runtime golden이다. Windows TSan 지원 또는 Linux
+  가능 SceneRuntime core가 생기면 실제 제품 계측을 재개한다.
+
+### X8 — render proxy dirty mask (P1 · 2.5일 · 트랙 S의 S4 승계) ✅ 완료
 
 변경: frame-persistent proxy dirty queue · Transform/Material/Visibility/LOD/Payload bit ·
 **Light 포함 최종 publish 단일화** · proxy generation 검사.
@@ -934,6 +1256,32 @@ job race 검증(TSan).
 반영(각각 CLI 게이트) · 파괴 후 슬롯 재사용이 옛 proxy를 갱신하지 않음.
 
 A/B 자는 S4가 남긴 진입점 `Scene::CommitRenderProxies()`와 `scene.proxybench`가 그대로다.
+
+#### X8 완료 기록 — 2026-09-01
+
+- `ProxyDirty::{Transform,Material,Visibility,LOD,Payload}`를 두고 동일 프록시의 변경은
+  frame-persistent queue에서 mask OR로 합쳤다. `CommitRenderProxies()`는 더 이상 종류별
+  등록 벡터나 전역 UI 목록을 스냅샷/전수 순회하지 않고 dirty ticket만 drain한다.
+- legacy recursive, packed sparse, targeted pull, Physics world batch, UI layout resolve가
+  실제 world/layout 변경 시 소유 Entity의 렌더 프록시에 `Transform`을 발행한다. 첫째
+  resolve에서 올라온 ticket은 둘째·셋째 resolve에도 유지되고 최종 commit에서 한 번만
+  소비된다. `LightSystem::Update`의 조기 `UpdateCommand(light)`는 제거해 Light도 같은
+  최종 publish 지점을 탄다.
+- Mesh/Terrain/Foliage/Decal/Sprite/Image/Text/SpriteSheet/Light를 씬별 registry에 넣고,
+  reflection property·enabled·material·LOD 및 명시 setter가 해당 bit를 발행한다. 이미
+  초기화된 DDOL 컴포넌트는 scene 이송의 `OnRemovingFromScene`/`OnAddedToScene`에서 이전
+  registry를 떠나 새 registry와 RenderScene에 재등록된다.
+- ticket은 component 포인터뿐 아니라 단조 `registration generation`, owner
+  `EntityHandle`, component instance ID를 함께 검증한다. 동일 주소를 uncollect/collect해
+  옛 ticket과 새 ticket을 동시에 둔 probe에서 `drained=2, stale=1, committed=1`을 확인했다.
+- Release x64 `scene.proxybench 128 <등록수>` 최종 실측은 정지 평균이 등록 1개
+  **0.06µs**, 256개 **0.08µs**이고 실제 update command는 **0개**였다.
+  `scene.proxydirty probe`는 5개 bit 발행을
+  ticket 1개로 dedupe(`publish=5, folded=4, mask=0x1f`), 세 resolve 보존, material/enabled/LOD,
+  generation 수명을 모두 PASS했다. 핵심 계약 4종 제거 mutation은 4/4 RED였다.
+- `verify-render-proxy-dirty.ps1`를 `run-all.ps1`의 X7 다음에 연결했다. Release 에디터는
+  링크와 `CreatorEditor.exe` 산출까지 성공했으며 MSBuild 종료 코드 1은 기존과 같은
+  `ThirdParty/Fmod/bin/x64/fmod.dll` post-build 필수 파일 부재뿐이다.
 
 ### X9 — 선택 확장 (P2 · 4일 · X8 이후)
 
@@ -1055,7 +1403,7 @@ X5 골든과 성능 게이트가 닫힌 뒤에만 `UpdateModelRecursive`와 방�
 | 항목 | 트랙 S에서의 상태 | 이 계획에서 |
 |---|---|---|
 | S1 · S1-b+S3 · S2 | ✅ 완료 | **전제**. 이 계획은 그 위에서만 성립한다 |
-| **S4 — 프록시 커밋 dirty 게이트** | 🔶 트리거 명시 보류 | **X8이 승계.** 재개 근거가 "컴포넌트 수"에서 "sparse resolver가 dirty mask 입력을 만든다"로 바뀌었다 |
+| **S4 — 프록시 커밋 dirty 게이트** | 🔶 트리거 명시 보류 | **✅ X8에서 완료.** frame-persistent mask queue, final single commit, registration generation 검사를 구현했다 |
 | S2 잔여(방문집합) | ⛔ 하지 않음(재개 조건 2건) | **X0가 그 조건 둘, X4가 문제 자체를 소멸시킨다** |
 | sparse TransformStore | 별도 성능 슬라이스 | **X4가 이행한다**(§10.3) |
 | `Transform_()` 널 fallback 제거 | 조건부 정리 | 범위 밖 |

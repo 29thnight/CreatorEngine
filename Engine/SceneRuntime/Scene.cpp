@@ -1,5 +1,6 @@
 ﻿#include "Scene.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-5
+#include <chrono>
 #include <cstdio> // FireReentrancyStress가 stdout에도 낸다(회귀가 발화를 본다)
 #include "LifecycleRegistry.h"
 #include "VolumeComponent.h"
@@ -42,6 +43,7 @@
 #include "PlayerInput.h"
 #include "DecalComponent.h"
 #include "RectTransformComponent.h"
+#include "Canvas.h"
 #include "SpriteSheetComponent.h"
 #include "AIManager.h"
 #include <execution>
@@ -50,6 +52,140 @@
 #include <ranges>
 #include <iterator>
 #include <atomic> // TryEnterTraversal의 깊이초과 1회 보고 플래그(std::atomic<bool>)에 필요 — 전이 include에 기대지 않음
+#include <limits>
+#include <mutex>
+#include <utility>
+
+struct Scene::TransformUpdateAccumulator
+{
+	using Clock = std::chrono::steady_clock;
+	using TimePoint = Clock::time_point;
+
+	std::atomic<uint64_t> visitNs{ 0 };
+	std::atomic<uint64_t> localComposeNs{ 0 };
+	std::atomic<uint64_t> worldMultiplyNs{ 0 };
+	std::atomic<uint64_t> decomposeNs{ 0 };
+	std::atomic<uint64_t> visitCount{ 0 };
+	std::atomic<uint64_t> localComposeCount{ 0 };
+	std::atomic<uint64_t> worldMultiplyCount{ 0 };
+	std::atomic<uint64_t> decomposeCount{ 0 };
+
+	static uint64_t ElapsedNs(TimePoint begin, TimePoint end)
+	{
+		return static_cast<uint64_t>(
+			std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count());
+	}
+
+	static void AddElapsed(std::atomic<uint64_t>& destination,
+		TimePoint begin, TimePoint end)
+	{
+		destination.fetch_add(ElapsedNs(begin, end), std::memory_order_relaxed);
+	}
+
+	// 한 노드의 exclusive visit 비용만 모은다. 수학 단계 전에는 Pause/Resume,
+	// 자식 재귀 전에는 Stop을 호출하므로 worker 합계에 자손 시간이 중복되지 않는다.
+	class VisitTimer
+	{
+	public:
+		explicit VisitTimer(TransformUpdateAccumulator* owner)
+			: m_owner(owner)
+		{
+			if (m_owner)
+			{
+				m_begin = Clock::now();
+				m_owner->visitCount.fetch_add(1, std::memory_order_relaxed);
+			}
+		}
+
+		~VisitTimer() { Pause(); }
+
+		void Pause()
+		{
+			if (!m_owner || !m_running) return;
+			const TimePoint end = Clock::now();
+			AddElapsed(m_owner->visitNs, m_begin, end);
+			m_running = false;
+		}
+
+		void Resume()
+		{
+			if (!m_owner || m_running) return;
+			m_begin = Clock::now();
+			m_running = true;
+		}
+
+		void Stop() { Pause(); }
+
+	private:
+		TransformUpdateAccumulator* m_owner = nullptr;
+		TimePoint m_begin{};
+		bool m_running = true;
+	};
+};
+
+// X4 compiled projection의 전부. ExecIndex는 의도적으로 Scene.h에 선언하지 않는다.
+// 저작 정체성(Entity slot/generation)은 안정적으로 남고 이 배열만 canonical
+// HierarchyStore의 preorder로 매 topology transaction 뒤 다시 packed 된다.
+struct TransformExecutionGraphState
+{
+	using ExecIndex = uint32_t;
+	static constexpr ExecIndex kInvalidExec = std::numeric_limits<ExecIndex>::max();
+	static constexpr uint64_t kInvalidVersion = std::numeric_limits<uint64_t>::max();
+
+	struct Projection
+	{
+		std::vector<ExecIndex> entityToExec;
+		std::vector<EntityHandle> execToEntity;
+		std::vector<ExecIndex> parentExec;
+		std::vector<ExecIndex> subtreeEnd;
+	};
+
+	struct SpatialProjection : Projection
+	{
+		std::vector<math::matrix4x4> localMatrix;
+		std::vector<math::matrix4x4> worldMatrix;
+		std::vector<uint64_t> localEpoch;
+		std::vector<uint64_t> resolvedLocalEpoch;
+		std::vector<uint64_t> worldEpoch;
+		std::vector<uint64_t> parentWorldEpoch;
+		std::vector<uint8_t> scaleQuatDirty;
+		// X7의 bulk pose upload 전까지 Bone만 기존 binding을 읽는다. culling
+		// publication도 compile 시 포인터를 잡아 일반 노드 inner loop의 component
+		// lookup을 없앤다.
+		std::vector<BoneComponent*> boneComponents;
+		std::vector<MeshRenderer*> meshRenderers;
+	};
+
+	struct AnimatorPoseBinding
+	{
+		EntityHandle owner{};
+		uint64_t skeletonSerial = 0;
+		uint64_t topologyVersion = kInvalidVersion;
+		std::vector<ExecIndex> boneExecByIndex;
+		uint64_t validBones = 0;
+		uint64_t invalidBones = 0;
+	};
+
+	SpatialProjection spatial;
+	Projection layout;
+	ExecutionGraphCompileMetrics metrics{};
+	SpatialResolveMetrics resolveMetrics{};
+	SpatialPullMetrics pullMetrics{};
+	std::unordered_map<size_t, AnimatorPoseBinding> animatorPoseBindings;
+	uint64_t attemptedVersion = kInvalidVersion;
+	uint64_t compiledVersion = kInvalidVersion;
+	bool spatialDataSynchronized = false;
+
+	// PublishLocalWrite는 worker에서도 도달할 수 있어 queue와 epoch snapshot을
+	// 한 잠금으로 묶는다. write-before-snapshot은 이번 resolve, write-after는 다음
+	// resolve가 소비한다.
+	std::mutex dirtyMutex;
+	std::vector<EntityHandle> dirtyRoots;
+	std::vector<uint64_t> entityQueuedEpoch;
+	std::vector<uint32_t> entityQueuedGeneration;
+	uint64_t enqueueEpoch = 1;
+	bool forceFullResolve = false;
+};
 
 using namespace std::literals;
 
@@ -67,11 +203,131 @@ static bool push_unique(R& vec, const T& v)
     return false;
 }
 
+// Scene의 렌더 도메인 비소유 registry. Entity/component lifetime은 여전히
+// m_Entities가 단독 소유한다. X8부터 종류별 벡터는 편집기/기존 시스템 조회만
+// 맡고, 렌더 갱신은 generation ticket을 가진 frame-persistent dirty queue가 맡는다.
+struct SceneRenderRegistryState
+{
+	enum class Kind : uint8_t
+	{
+		Light, Mesh, Terrain, Foliage, Decal, Sprite, Image, Text, SpriteSheet
+	};
+
+	struct Registration
+	{
+		Kind kind{};
+		EntityHandle owner{};
+		size_t instanceId = 0;
+		uint64_t generation = 0;
+		ProxyDirty pending = ProxyDirty::None;
+		bool queued = false;
+	};
+
+	struct Ticket
+	{
+		Component* component = nullptr;
+		uint64_t generation = 0;
+	};
+
+	struct Dispatch
+	{
+		Component* component = nullptr;
+		Kind kind{};
+		EntityHandle owner{};
+		size_t instanceId = 0;
+		ProxyDirty mask = ProxyDirty::None;
+	};
+
+    std::vector<LightComponent*> lights;
+    std::vector<MeshRenderer*> meshes;
+    std::vector<TerrainComponent*> terrains;
+    std::vector<FoliageComponent*> foliages;
+    std::vector<DecalComponent*> decals;
+    std::vector<SpriteRenderer*> sprites;
+	std::vector<ImageComponent*> images;
+	std::vector<TextComponent*> texts;
+	std::vector<SpriteSheetComponent*> spriteSheets;
+
+    // 직렬화된 LightComponent::m_lightIndex 복원과 파괴 시 압축용 점유표다.
+    // 실제 렌더 값은 LightRenderProxy가 소유한다.
+    std::vector<uint8_t> lightSlots;
+
+	std::mutex dirtyMutex;
+	std::unordered_map<Component*, Registration> registrations;
+	std::vector<std::vector<Component*>> entityProxies;
+	std::vector<Ticket> dirtyQueue;
+	std::vector<Ticket> drainQueue;
+	std::vector<Dispatch> dispatchQueue;
+	uint64_t nextRegistrationGeneration = 1;
+	RenderProxyCommitMetrics metrics{};
+
+    void Clear()
+    {
+        lights.clear();
+        meshes.clear();
+        terrains.clear();
+        foliages.clear();
+        decals.clear();
+        sprites.clear();
+		images.clear();
+		texts.clear();
+		spriteSheets.clear();
+        lightSlots.clear();
+		registrations.clear();
+		entityProxies.clear();
+		dirtyQueue.clear();
+		drainQueue.clear();
+		dispatchQueue.clear();
+		metrics = {};
+    }
+};
+
+static void RegisterRenderProxy(SceneRenderRegistryState& state,
+	Component* component, SceneRenderRegistryState::Kind kind, EntityHandle owner)
+{
+	if (nullptr == component || !owner.IsValid()) return;
+	std::scoped_lock lock(state.dirtyMutex);
+	if (state.registrations.contains(component)) return;
+
+	if (owner.index >= state.entityProxies.size())
+		state.entityProxies.resize(static_cast<size_t>(owner.index) + 1u);
+
+	uint64_t generation = state.nextRegistrationGeneration++;
+	if (0 == generation) generation = state.nextRegistrationGeneration++;
+	SceneRenderRegistryState::Registration registration{
+		kind, owner, component->GetInstanceID(), generation, ProxyDirty::All, true };
+	state.registrations.emplace(component, registration);
+	state.entityProxies[owner.index].push_back(component);
+	state.dirtyQueue.push_back({ component, generation });
+	++state.metrics.publishCalls;
+}
+
+static void UnregisterRenderProxy(SceneRenderRegistryState& state,
+	Component* component)
+{
+	if (nullptr == component) return;
+	std::scoped_lock lock(state.dirtyMutex);
+	const auto found = state.registrations.find(component);
+	if (found == state.registrations.end()) return;
+
+	const EntityHandle owner = found->second.owner;
+	if (owner.index < state.entityProxies.size())
+	{
+		auto& proxies = state.entityProxies[owner.index];
+		std::erase(proxies, component);
+	}
+	// Outstanding tickets intentionally remain. Commit validates their captured
+	// registration generation before touching the pointer, closing pointer reuse ABA.
+	state.registrations.erase(found);
+}
+
 Scene::Scene()
     // 씬 식별자(트랙 W)는 생성자에서 딱 한 번 받는다 — Scene은 복사·이동이
     // 불가능한 타입이라(Scene.h의 m_sceneId 주석 참고) 이 값이 인스턴스 생애
     // 내내 유일하다는 전제가 깨지지 않는다.
-    : m_sceneId(NextSceneId())
+    : m_sceneId(NextSceneId()),
+	  m_executionGraphs(std::make_unique<TransformExecutionGraphState>()),
+	  m_renderRegistry(std::make_unique<SceneRenderRegistryState>())
 {
     resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedEntity);
     m_Entities.reserve(3000);
@@ -113,19 +369,373 @@ Scene::~Scene()
     m_schedule.Clear();
 
     m_entityNameSet.clear();
-    m_lightComponents.clear();
-    m_allMeshRenderers.clear();
-    m_staticMeshRenderers.clear();
-    m_skinnedMeshRenderers.clear();
-    m_lightSlots.clear();
-    m_terrainComponents.clear();
-    m_foliageComponents.clear();
-    m_decalComponents.clear();
-    m_spriteRenderers.clear();
+    m_renderRegistry->Clear();
     m_Entities.clear();
     m_generations.clear();
     m_freeSlots.clear();
     m_hierarchyStore.Clear();
+}
+
+const char* ReparentResultName(ReparentResult result)
+{
+	switch (result)
+	{
+	case ReparentResult::Success: return "success";
+	case ReparentResult::NoChange: return "no-change";
+	case ReparentResult::InvalidHandle: return "invalid-handle";
+	case ReparentResult::StaleHandle: return "stale-handle";
+	case ReparentResult::CrossScene: return "cross-scene";
+	case ReparentResult::RootRejected: return "root-rejected";
+	case ReparentResult::SelfRejected: return "self-rejected";
+	case ReparentResult::CycleRejected: return "cycle-rejected";
+	case ReparentResult::CorruptHierarchy: return "corrupt-hierarchy";
+	default: return "unknown";
+	}
+}
+
+Scene::HierarchyBulkBuildScope::HierarchyBulkBuildScope(Scene& scene)
+	: m_scene(&scene)
+{
+	m_scene->EnterHierarchyBulkBuild();
+}
+
+Scene::HierarchyBulkBuildScope::~HierarchyBulkBuildScope()
+{
+	Complete();
+}
+
+void Scene::HierarchyBulkBuildScope::Complete() noexcept
+{
+	Scene* scene = std::exchange(m_scene, nullptr);
+	if (scene) scene->ExitHierarchyBulkBuild();
+}
+
+Scene::HierarchyBulkBuildScope::HierarchyBulkBuildScope(
+	HierarchyBulkBuildScope&& other) noexcept
+	: m_scene(std::exchange(other.m_scene, nullptr))
+{
+}
+
+const TransformUpdateMetrics& Scene::GetLastTransformUpdateMetrics(
+	TransformSyncPoint syncPoint) const
+{
+	size_t index = TransformSyncPointIndex(syncPoint);
+	if (index >= m_transformUpdateMetrics.size())
+	{
+		index = TransformSyncPointIndex(TransformSyncPoint::Unspecified);
+	}
+	return m_transformUpdateMetrics[index];
+}
+
+TransformTopologyMutationCounters Scene::GetTopologyMutationTotals() const
+{
+	return TransformTopologyMutationCounters{
+		m_topologyCreated.load(std::memory_order_relaxed),
+		m_topologyDestroyed.load(std::memory_order_relaxed),
+		m_topologyReparented.load(std::memory_order_relaxed) };
+}
+
+TransformTopologyMutationCounters Scene::GetTransformDiagnosticTopologyMutations() const
+{
+	const TransformTopologyMutationCounters totals = GetTopologyMutationTotals();
+	return TransformTopologyMutationCounters{
+		totals.created - m_topologyObservationBaseline.created,
+		totals.destroyed - m_topologyObservationBaseline.destroyed,
+		totals.reparented - m_topologyObservationBaseline.reparented };
+}
+
+void Scene::ResetTransformDiagnostics()
+{
+	for (TransformUpdateMetrics& metrics : m_transformUpdateMetrics)
+	{
+		metrics = TransformUpdateMetrics{};
+	}
+	m_topologyFrameBaseline = GetTopologyMutationTotals();
+	m_topologyObservationBaseline = m_topologyFrameBaseline;
+	m_lastFrameTopologyMutations = {};
+	m_transformDiagnosticFrameCount = 0;
+}
+
+bool Scene::PublishLocalWrite(EntityHandle handle, TransformWriteReason reason)
+{
+	if (nullptr == Resolve(handle))
+	{
+		if (IsTransformWriteDiagnosticsEnabled())
+			m_transformInvalidPublishCount.fetch_add(1, std::memory_order_relaxed);
+		return false;
+	}
+
+	const size_t reasonIndex = static_cast<size_t>(reason);
+	if (reasonIndex >= m_transformWriteReasonCounts.size())
+	{
+		if (IsTransformWriteDiagnosticsEnabled())
+			m_transformInvalidPublishCount.fetch_add(1, std::memory_order_relaxed);
+		return false;
+	}
+
+	{
+		std::scoped_lock lock(m_executionGraphs->dirtyMutex);
+		if (IsSparseSpatialResolverEnabled() && !m_executionGraphs->forceFullResolve)
+		{
+			if (m_executionGraphs->entityQueuedEpoch.size() < m_Entities.size())
+			{
+				m_executionGraphs->entityQueuedEpoch.resize(m_Entities.size(), 0);
+				m_executionGraphs->entityQueuedGeneration.resize(m_Entities.size(), 0);
+			}
+			const size_t slot = handle.index;
+			if (m_executionGraphs->entityQueuedEpoch[slot] != m_executionGraphs->enqueueEpoch
+				|| m_executionGraphs->entityQueuedGeneration[slot] != handle.generation)
+			{
+				m_executionGraphs->entityQueuedEpoch[slot] = m_executionGraphs->enqueueEpoch;
+				m_executionGraphs->entityQueuedGeneration[slot] = handle.generation;
+				m_executionGraphs->dirtyRoots.push_back(handle);
+			}
+
+			// Dense writes stop growing/sorting Q and become one full-root range. 1%
+			// stays sparse at every X5 benchmark size; dense/full movement does not pay
+			// O(N log N) sorting before its unavoidable O(N) resolve.
+			const size_t spatialCount = m_executionGraphs->spatial.execToEntity.size();
+			const size_t saturation = (std::max)(size_t{ 256 }, spatialCount / 8);
+			if (spatialCount > 0 && m_executionGraphs->dirtyRoots.size() >= saturation)
+			{
+				m_executionGraphs->forceFullResolve = true;
+				m_executionGraphs->dirtyRoots.clear();
+			}
+		}
+		else if (!IsSparseSpatialResolverEnabled())
+		{
+			m_executionGraphs->forceFullResolve = true;
+		}
+
+		if (m_executionGraphs->compiledVersion == GetTopologyVersion()
+			&& handle.index < m_executionGraphs->spatial.entityToExec.size())
+		{
+			const auto exec = m_executionGraphs->spatial.entityToExec[handle.index];
+			if (TransformExecutionGraphState::kInvalidExec != exec
+				&& exec < m_executionGraphs->spatial.localEpoch.size())
+			{
+				uint64_t& epoch = m_executionGraphs->spatial.localEpoch[exec];
+				if (0 == ++epoch) ++epoch;
+			}
+		}
+		m_spatialDirtyEpoch.fetch_add(1, std::memory_order_release);
+	}
+	if (IsTransformWriteDiagnosticsEnabled())
+	{
+		m_transformPublishEpoch.fetch_add(1, std::memory_order_relaxed);
+		m_transformWriteReasonCounts[reasonIndex].fetch_add(1, std::memory_order_relaxed);
+	}
+	return true;
+}
+
+uint64_t Scene::PublishLocalWriteBatch(
+	std::span<const EntityHandle> handles, TransformWriteReason reason)
+{
+	if (handles.empty()) return 0;
+	const size_t reasonIndex = static_cast<size_t>(reason);
+	if (reasonIndex >= m_transformWriteReasonCounts.size())
+	{
+		if (IsTransformWriteDiagnosticsEnabled())
+			m_transformInvalidPublishCount.fetch_add(
+				handles.size(), std::memory_order_relaxed);
+		return 0;
+	}
+
+	uint64_t accepted = 0;
+	uint64_t rejected = 0;
+	for (const EntityHandle handle : handles)
+	{
+		if (nullptr != Resolve(handle)) ++accepted;
+		else ++rejected;
+	}
+	if (0 == accepted)
+	{
+		if (rejected && IsTransformWriteDiagnosticsEnabled())
+			m_transformInvalidPublishCount.fetch_add(rejected, std::memory_order_relaxed);
+		return 0;
+	}
+
+	{
+		std::scoped_lock lock(m_executionGraphs->dirtyMutex);
+		if (m_executionGraphs->entityQueuedEpoch.size() < m_Entities.size())
+		{
+			m_executionGraphs->entityQueuedEpoch.resize(m_Entities.size(), 0);
+			m_executionGraphs->entityQueuedGeneration.resize(m_Entities.size(), 0);
+		}
+
+		for (const EntityHandle handle : handles)
+		{
+			if (nullptr == Resolve(handle)) continue;
+			if (IsSparseSpatialResolverEnabled() && !m_executionGraphs->forceFullResolve)
+			{
+				const size_t slot = handle.index;
+				if (m_executionGraphs->entityQueuedEpoch[slot]
+						!= m_executionGraphs->enqueueEpoch
+					|| m_executionGraphs->entityQueuedGeneration[slot]
+						!= handle.generation)
+				{
+					m_executionGraphs->entityQueuedEpoch[slot]
+						= m_executionGraphs->enqueueEpoch;
+					m_executionGraphs->entityQueuedGeneration[slot]
+						= handle.generation;
+					m_executionGraphs->dirtyRoots.push_back(handle);
+				}
+			}
+			else if (!IsSparseSpatialResolverEnabled())
+			{
+				m_executionGraphs->forceFullResolve = true;
+			}
+
+			if (m_executionGraphs->compiledVersion == GetTopologyVersion()
+				&& handle.index < m_executionGraphs->spatial.entityToExec.size())
+			{
+				const auto exec =
+					m_executionGraphs->spatial.entityToExec[handle.index];
+				if (TransformExecutionGraphState::kInvalidExec != exec
+					&& exec < m_executionGraphs->spatial.localEpoch.size())
+				{
+					uint64_t& epoch = m_executionGraphs->spatial.localEpoch[exec];
+					if (0 == ++epoch) ++epoch;
+				}
+			}
+		}
+
+		const size_t spatialCount = m_executionGraphs->spatial.execToEntity.size();
+		const size_t saturation = (std::max)(size_t{ 256 }, spatialCount / 8);
+		if (spatialCount > 0 && m_executionGraphs->dirtyRoots.size() >= saturation)
+		{
+			m_executionGraphs->forceFullResolve = true;
+			m_executionGraphs->dirtyRoots.clear();
+		}
+		m_spatialDirtyEpoch.fetch_add(1, std::memory_order_release);
+	}
+
+	if (IsTransformWriteDiagnosticsEnabled())
+	{
+		m_transformPublishEpoch.fetch_add(accepted, std::memory_order_relaxed);
+		m_transformWriteReasonCounts[reasonIndex].fetch_add(
+			accepted, std::memory_order_relaxed);
+		if (rejected)
+			m_transformInvalidPublishCount.fetch_add(rejected, std::memory_order_relaxed);
+	}
+	return accepted;
+}
+
+void Scene::MarkUILayoutDirty()
+{
+	m_uiDirtyEpoch.fetch_add(1, std::memory_order_release);
+}
+
+void Scene::MarkSpatialTransformsDirty()
+{
+	std::scoped_lock lock(m_executionGraphs->dirtyMutex);
+	m_executionGraphs->forceFullResolve = true;
+	m_executionGraphs->dirtyRoots.clear();
+	m_spatialDirtyEpoch.fetch_add(1, std::memory_order_release);
+}
+
+TransformWriteMetrics Scene::GetTransformWriteMetrics() const
+{
+	TransformWriteMetrics metrics{};
+	metrics.publishEpoch = m_transformPublishEpoch.load(std::memory_order_relaxed);
+	metrics.windowStartEpoch = m_transformWriteEpochBaseline;
+	metrics.invalidHandle = m_transformInvalidPublishCount.load(std::memory_order_relaxed)
+		- m_transformInvalidPublishBaseline;
+	for (size_t i = 0; i < m_transformWriteReasonCounts.size(); ++i)
+	{
+		metrics.byReason[i] = m_transformWriteReasonCounts[i].load(
+			std::memory_order_relaxed) - m_transformWriteReasonBaselines[i];
+		metrics.total += metrics.byReason[i];
+	}
+	return metrics;
+}
+
+void Scene::ResetTransformWriteDiagnostics()
+{
+	m_transformWriteEpochBaseline =
+		m_transformPublishEpoch.load(std::memory_order_relaxed);
+	m_transformInvalidPublishBaseline =
+		m_transformInvalidPublishCount.load(std::memory_order_relaxed);
+	for (size_t i = 0; i < m_transformWriteReasonCounts.size(); ++i)
+	{
+		m_transformWriteReasonBaselines[i] =
+			m_transformWriteReasonCounts[i].load(std::memory_order_relaxed);
+	}
+}
+
+void Scene::CaptureTransformSceneCensus(TransformUpdateMetrics& metrics) const
+{
+	// 인위적인 Scene root(슬롯 0)는 저작 오브젝트 비율에서 제외한다.
+	for (size_t slot = 1; slot < m_Entities.size(); ++slot)
+	{
+		const auto& object = m_Entities[slot];
+		if (!object || object->IsDestroyMark()) continue;
+
+		++metrics.entityCount;
+		const bool hasTransform = object->HasTransform();
+		const RectTransformComponent* rect =
+			object->GetComponent<RectTransformComponent>();
+		const bool hasRect = nullptr != rect;
+
+		if (hasTransform && hasRect) ++metrics.transformAndRectCount;
+		else if (hasTransform) ++metrics.transformOnlyCount;
+		else if (hasRect) ++metrics.rectOnlyCount;
+		else ++metrics.neitherCount;
+
+		if (hasTransform && slot < m_transformStore.Size()
+			&& 0 != m_transformStore.dirty[slot])
+		{
+			++metrics.transformDirtyCount;
+		}
+		if (rect && rect->IsDirty()) ++metrics.rectDirtyCount;
+	}
+}
+
+void Scene::RecordTopologyCreated()
+{
+	m_topologyCreated.fetch_add(1, std::memory_order_relaxed);
+	PublishTopologyMutation();
+}
+
+void Scene::RecordTopologyDestroyed()
+{
+	m_topologyDestroyed.fetch_add(1, std::memory_order_relaxed);
+	PublishTopologyMutation();
+}
+
+void Scene::RecordTopologyReparented()
+{
+	m_topologyReparented.fetch_add(1, std::memory_order_relaxed);
+	PublishTopologyMutation();
+}
+
+void Scene::PublishTopologyMutation()
+{
+	if (m_hierarchyBulkBuildDepth > 0)
+	{
+		m_hierarchyBulkBuildMutated = true;
+		return;
+	}
+	m_topologyVersion.fetch_add(1, std::memory_order_release);
+	MarkUILayoutDirty();
+	MarkSpatialTransformsDirty();
+}
+
+void Scene::EnterHierarchyBulkBuild()
+{
+	++m_hierarchyBulkBuildDepth;
+}
+
+void Scene::ExitHierarchyBulkBuild()
+{
+	if (0 == m_hierarchyBulkBuildDepth) return;
+	--m_hierarchyBulkBuildDepth;
+	if (0 != m_hierarchyBulkBuildDepth || !m_hierarchyBulkBuildMutated) return;
+
+	m_hierarchyBulkBuildMutated = false;
+	m_topologyVersion.fetch_add(1, std::memory_order_release);
+	MarkUILayoutDirty();
+	MarkSpatialTransformsDirty();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,7 +785,9 @@ std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
     // 핸들을 무효화하면 살아있는 DDOL 스크립트가 씬 전환마다 고아로 오판되어
     // 뜯겨나간다. 스크립트 핸들 무효화의 정본 지점은 대신 GameObject::Destroy()다
     // (진짜 파괴만 지나가는, 재귀까지 포함하는 유일한 경로 — Entity.cpp 참고).
-    std::unique_ptr<Entity> released = std::move(m_Entities[index]);
+	const bool removedTopologyNode = nullptr != m_Entities[index]
+		&& m_hierarchyStore.IsOccupied(static_cast<size_t>(index));
+	std::unique_ptr<Entity> released = std::move(m_Entities[index]);
 
     // 트랜스폼 스토어 슬롯 리셋(트랙 S, S1) — Transform::ResolveStore의 점유자
     // 확인이 이 시점부터 실패하므로(m_Entities[index]가 비었다) 이 리셋을
@@ -191,6 +803,10 @@ std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
         m_generations[index] = 1;
     }
     m_freeSlots.push_back(static_cast<uint32_t>(index));
+	if (removedTopologyNode)
+	{
+		RecordTopologyDestroyed();
+	}
 	return released;
 }
 
@@ -284,6 +900,497 @@ EntityHandle Scene::HandleOf(Entity::Index index) const
     return EntityHandle{ m_sceneId, static_cast<uint32_t>(index), m_generations[index] };
 }
 
+ReparentResult Scene::Reparent(EntityHandle childHandle, EntityHandle newParentHandle)
+{
+	if (!childHandle.IsValid() || !newParentHandle.IsValid())
+		return ReparentResult::InvalidHandle;
+	if (childHandle.sceneId != m_sceneId || newParentHandle.sceneId != m_sceneId)
+		return ReparentResult::CrossScene;
+
+	Entity* child = Resolve(childHandle);
+	Entity* newParent = Resolve(newParentHandle);
+	if (!child || !newParent) return ReparentResult::StaleHandle;
+	if (child->m_index == Entity::kSceneRootIndex)
+		return ReparentResult::RootRejected;
+	if (child == newParent) return ReparentResult::SelfRejected;
+
+	const Entity::Index childIndex = child->m_index;
+	const Entity::Index newParentIndex = newParent->m_index;
+	if (!m_hierarchyStore.IsOccupied(static_cast<size_t>(childIndex))
+		|| !m_hierarchyStore.IsOccupied(static_cast<size_t>(newParentIndex)))
+	{
+		return ReparentResult::CorruptHierarchy;
+	}
+
+	std::unordered_set<Entity::Index> ancestors;
+	Entity::Index cursor = newParentIndex;
+	while (Entity::IsValidIndex(cursor))
+	{
+		if (cursor == childIndex) return ReparentResult::CycleRejected;
+		if (!ancestors.insert(cursor).second) return ReparentResult::CorruptHierarchy;
+		if (cursor < 0 || static_cast<size_t>(cursor) >= m_Entities.size()
+			|| !m_Entities[cursor]
+			|| !m_hierarchyStore.IsOccupied(static_cast<size_t>(cursor)))
+		{
+			return ReparentResult::CorruptHierarchy;
+		}
+		cursor = m_hierarchyStore.ParentOf(static_cast<size_t>(cursor));
+	}
+
+	const Entity::Index oldParentIndex =
+		m_hierarchyStore.ParentOf(static_cast<size_t>(childIndex));
+	const auto& newParentChildren =
+		m_hierarchyStore.ChildrenOf(static_cast<size_t>(newParentIndex));
+	const size_t newParentOccurrences = static_cast<size_t>(std::count(
+		newParentChildren.begin(), newParentChildren.end(), childIndex));
+	if (oldParentIndex == newParentIndex && 1 == newParentOccurrences)
+		return ReparentResult::NoChange;
+
+	if (Entity::IsValidIndex(oldParentIndex))
+	{
+		if (oldParentIndex < 0
+			|| static_cast<size_t>(oldParentIndex) >= m_Entities.size()
+			|| !m_Entities[oldParentIndex]
+			|| !m_hierarchyStore.IsOccupied(static_cast<size_t>(oldParentIndex)))
+		{
+			return ReparentResult::CorruptHierarchy;
+		}
+		m_hierarchyStore.DetachChild(static_cast<size_t>(oldParentIndex), childIndex);
+	}
+
+	// Commit order is deliberately detach -> parent -> attach. All validation has
+	// completed above, so no failure path can expose a half-written relationship.
+	child->SetParentIndex(newParentIndex);
+	m_hierarchyStore.AttachChild(static_cast<size_t>(newParentIndex), childIndex);
+
+	if (Entity::IsValidIndex(oldParentIndex) && oldParentIndex != newParentIndex)
+		RecordTopologyReparented();
+	else
+		PublishTopologyMutation();
+	return ReparentResult::Success;
+}
+
+HierarchyIntegrityMetrics Scene::GetHierarchyIntegrityMetrics() const
+{
+	HierarchyIntegrityMetrics metrics{};
+	std::vector<uint32_t> listedCount(m_Entities.size(), 0);
+
+	for (size_t parentIndex = 0; parentIndex < m_Entities.size(); ++parentIndex)
+	{
+		if (!m_Entities[parentIndex]) continue;
+		if (!m_hierarchyStore.IsOccupied(parentIndex))
+		{
+			++metrics.invalidReference;
+			continue;
+		}
+
+		std::unordered_set<Entity::Index> localChildren;
+		for (Entity::Index childIndex : m_hierarchyStore.ChildrenOf(parentIndex))
+		{
+			if (!localChildren.insert(childIndex).second)
+				++metrics.duplicateChild;
+			if (childIndex < 0 || static_cast<size_t>(childIndex) >= m_Entities.size()
+				|| !m_Entities[childIndex]
+				|| !m_hierarchyStore.IsOccupied(static_cast<size_t>(childIndex)))
+			{
+				++metrics.invalidReference;
+				continue;
+			}
+			++listedCount[static_cast<size_t>(childIndex)];
+			if (m_hierarchyStore.ParentOf(static_cast<size_t>(childIndex))
+				!= static_cast<Entity::Index>(parentIndex))
+			{
+				++metrics.parentChildMismatch;
+			}
+		}
+	}
+
+	for (size_t index = 0; index < m_Entities.size(); ++index)
+	{
+		if (!m_Entities[index] || !m_hierarchyStore.IsOccupied(index)) continue;
+		const Entity::Index parentIndex = m_hierarchyStore.ParentOf(index);
+		if (Entity::kSceneRootIndex == static_cast<Entity::Index>(index))
+		{
+			if (Entity::IsValidIndex(parentIndex)) ++metrics.parentChildMismatch;
+			continue;
+		}
+
+		if (!Entity::IsValidIndex(parentIndex)
+			|| parentIndex < 0 || static_cast<size_t>(parentIndex) >= m_Entities.size()
+			|| !m_Entities[parentIndex])
+		{
+			++metrics.invalidReference;
+		}
+		if (0 == listedCount[index]) ++metrics.orphan;
+		else if (listedCount[index] > 1)
+			metrics.duplicateChild += listedCount[index] - 1;
+	}
+	return metrics;
+}
+
+const ExecutionGraphCompileMetrics& Scene::GetExecutionGraphCompileMetrics() const
+{
+	return m_executionGraphs->metrics;
+}
+
+const SpatialResolveMetrics& Scene::GetLastSpatialResolveMetrics() const
+{
+	return m_executionGraphs->resolveMetrics;
+}
+
+const SpatialPullMetrics& Scene::GetLastSpatialPullMetrics() const
+{
+	return m_executionGraphs->pullMetrics;
+}
+
+ExecutionGraphRelationDiagnostics Scene::GetExecutionGraphRelationDiagnostics(
+	EntityHandle entity) const
+{
+	ExecutionGraphRelationDiagnostics result{};
+	if (!Resolve(entity)) return result;
+
+	const TransformExecutionGraphState& state = *m_executionGraphs;
+	if (!state.metrics.success || state.compiledVersion != GetTopologyVersion())
+		return result;
+
+	auto fill = [&](const TransformExecutionGraphState::Projection& graph,
+		bool& member, EntityHandle& parent, uint32_t& subtreeSize)
+	{
+		if (entity.index >= graph.entityToExec.size()) return;
+		const auto exec = graph.entityToExec[entity.index];
+		if (TransformExecutionGraphState::kInvalidExec == exec
+			|| exec >= graph.execToEntity.size())
+		{
+			return;
+		}
+
+		member = true;
+		const auto parentExec = graph.parentExec[exec];
+		if (TransformExecutionGraphState::kInvalidExec != parentExec
+			&& parentExec < graph.execToEntity.size())
+		{
+			parent = graph.execToEntity[parentExec];
+		}
+		if (exec < graph.subtreeEnd.size() && graph.subtreeEnd[exec] > exec)
+			subtreeSize = graph.subtreeEnd[exec] - exec;
+	};
+
+	fill(state.spatial, result.spatialMember, result.spatialParent,
+		result.spatialSubtreeSize);
+	fill(state.layout, result.layoutMember, result.layoutParent,
+		result.layoutSubtreeSize);
+	return result;
+}
+
+bool Scene::EnsureExecutionGraphsCompiled()
+{
+	const uint64_t topologyVersion = GetTopologyVersion();
+	if (m_executionGraphs->attemptedVersion == topologyVersion)
+	{
+		return m_executionGraphs->metrics.success
+			&& m_executionGraphs->compiledVersion == topologyVersion;
+	}
+	return CompileExecutionGraphs(topologyVersion);
+}
+
+bool Scene::CompileExecutionGraphs(uint64_t topologyVersion)
+{
+	using State = TransformExecutionGraphState;
+	using ExecIndex = State::ExecIndex;
+	using Clock = std::chrono::steady_clock;
+	const auto begin = Clock::now();
+
+	State::SpatialProjection spatial{};
+	State::Projection layout{};
+	ExecutionGraphCompileMetrics metrics{};
+	metrics.topologyVersion = topologyVersion;
+	metrics.compiledVersion = State::kInvalidVersion == m_executionGraphs->compiledVersion
+		? 0 : m_executionGraphs->compiledVersion;
+	metrics.compileCount = m_executionGraphs->metrics.compileCount + 1;
+	metrics.entitySlots = m_Entities.size();
+	spatial.entityToExec.assign(m_Entities.size(), State::kInvalidExec);
+	layout.entityToExec.assign(m_Entities.size(), State::kInvalidExec);
+
+	size_t spatialCapacity = 0;
+	size_t layoutCapacity = 0;
+	for (size_t slot = 0; slot < m_Entities.size(); ++slot)
+	{
+		Entity* entity = m_Entities[slot].get();
+		if (!entity) continue;
+		++metrics.occupiedEntities;
+		if (entity->HasTransform()) ++spatialCapacity;
+		if (entity->GetComponent<RectTransformComponent>()
+			|| entity->GetComponent<Canvas>())
+		{
+			++layoutCapacity;
+		}
+	}
+	spatial.execToEntity.reserve(spatialCapacity);
+	spatial.parentExec.reserve(spatialCapacity);
+	spatial.subtreeEnd.reserve(spatialCapacity);
+	spatial.localMatrix.reserve(spatialCapacity);
+	spatial.worldMatrix.reserve(spatialCapacity);
+	spatial.localEpoch.reserve(spatialCapacity);
+	spatial.resolvedLocalEpoch.reserve(spatialCapacity);
+	spatial.worldEpoch.reserve(spatialCapacity);
+	spatial.parentWorldEpoch.reserve(spatialCapacity);
+	spatial.scaleQuatDirty.reserve(spatialCapacity);
+	spatial.boneComponents.reserve(spatialCapacity);
+	spatial.meshRenderers.reserve(spatialCapacity);
+	layout.execToEntity.reserve(layoutCapacity);
+	layout.parentExec.reserve(layoutCapacity);
+	layout.subtreeEnd.reserve(layoutCapacity);
+
+	const HierarchyIntegrityMetrics hierarchy = GetHierarchyIntegrityMetrics();
+	metrics.hierarchyViolations = hierarchy.Total()
+		+ static_cast<uint64_t>(CountHierarchyStoreMismatches());
+
+	// Reparent가 정상 경로의 cycle을 막지만 compiler도 손상된 입력에 fail-close한다.
+	// parent chain 색칠은 루트에서 닿지 않는 고립 cycle까지 O(N)에 찾는다.
+	std::vector<uint8_t> parentColor(m_Entities.size(), 0);
+	for (size_t start = 0; start < m_Entities.size(); ++start)
+	{
+		if (!m_Entities[start] || !m_hierarchyStore.IsOccupied(start)
+			|| 0 != parentColor[start])
+		{
+			continue;
+		}
+
+		std::vector<size_t> path;
+		Entity::Index cursor = static_cast<Entity::Index>(start);
+		while (Entity::IsValidIndex(cursor)
+			&& cursor >= 0 && static_cast<size_t>(cursor) < m_Entities.size()
+			&& m_Entities[cursor] && m_hierarchyStore.IsOccupied(static_cast<size_t>(cursor)))
+		{
+			const size_t slot = static_cast<size_t>(cursor);
+			if (1 == parentColor[slot])
+			{
+				++metrics.cycleViolations;
+				break;
+			}
+			if (2 == parentColor[slot]) break;
+			parentColor[slot] = 1;
+			path.push_back(slot);
+			cursor = m_hierarchyStore.ParentOf(slot);
+		}
+		for (size_t slot : path) parentColor[slot] = 2;
+	}
+
+	struct CompileFrame
+	{
+		size_t slot = 0;
+		size_t nextChild = 0;
+		ExecIndex nearestSpatial = State::kInvalidExec;
+		ExecIndex nearestLayout = State::kInvalidExec;
+		ExecIndex selfSpatial = State::kInvalidExec;
+		ExecIndex selfLayout = State::kInvalidExec;
+		bool entered = false;
+	};
+
+	std::vector<uint8_t> visited(m_Entities.size(), 0);
+	uint64_t visitedCount = 0;
+	if (m_Entities.empty() || !m_Entities[Entity::kSceneRootIndex]
+		|| !m_hierarchyStore.IsOccupied(Entity::kSceneRootIndex))
+	{
+		++metrics.hierarchyViolations;
+	}
+	else
+	{
+		std::vector<CompileFrame> stack;
+		stack.push_back(CompileFrame{ static_cast<size_t>(Entity::kSceneRootIndex) });
+		while (!stack.empty())
+		{
+			CompileFrame& frame = stack.back();
+			if (!frame.entered)
+			{
+				frame.entered = true;
+				if (frame.slot >= m_Entities.size() || !m_Entities[frame.slot]
+					|| !m_hierarchyStore.IsOccupied(frame.slot))
+				{
+					++metrics.hierarchyViolations;
+					stack.pop_back();
+					continue;
+				}
+				if (visited[frame.slot])
+				{
+					++metrics.cycleViolations;
+					stack.pop_back();
+					continue;
+				}
+				visited[frame.slot] = 1;
+				++visitedCount;
+
+				Entity& entity = *m_Entities[frame.slot];
+				if (entity.HasTransform())
+				{
+					frame.selfSpatial = static_cast<ExecIndex>(spatial.execToEntity.size());
+					spatial.entityToExec[frame.slot] = frame.selfSpatial;
+					spatial.execToEntity.push_back(HandleOf(static_cast<Entity::Index>(frame.slot)));
+					spatial.parentExec.push_back(frame.nearestSpatial);
+					spatial.subtreeEnd.push_back(State::kInvalidExec);
+					if (frame.slot < m_transformStore.Size())
+					{
+						spatial.localMatrix.push_back(m_transformStore.localMatrix[frame.slot]);
+						spatial.worldMatrix.push_back(m_transformStore.worldMatrix[frame.slot]);
+					}
+					else
+					{
+						++metrics.mappingViolations;
+						spatial.localMatrix.push_back(math::matrix4x4::identity());
+						spatial.worldMatrix.push_back(math::matrix4x4::identity());
+					}
+					spatial.localEpoch.push_back(0);
+					spatial.resolvedLocalEpoch.push_back(0);
+					spatial.worldEpoch.push_back(0);
+					spatial.parentWorldEpoch.push_back(0);
+					spatial.scaleQuatDirty.push_back(1);
+					spatial.boneComponents.push_back(entity.GetComponent<BoneComponent>());
+					spatial.meshRenderers.push_back(entity.GetComponent<MeshRenderer>());
+				}
+
+				if (entity.GetComponent<RectTransformComponent>()
+					|| entity.GetComponent<Canvas>())
+				{
+					frame.selfLayout = static_cast<ExecIndex>(layout.execToEntity.size());
+					layout.entityToExec[frame.slot] = frame.selfLayout;
+					layout.execToEntity.push_back(HandleOf(static_cast<Entity::Index>(frame.slot)));
+					layout.parentExec.push_back(frame.nearestLayout);
+					layout.subtreeEnd.push_back(State::kInvalidExec);
+				}
+			}
+
+			const auto& children = m_hierarchyStore.ChildrenOf(frame.slot);
+			if (frame.nextChild < children.size())
+			{
+				const Entity::Index childIndex = children[frame.nextChild++];
+				if (childIndex < 0 || static_cast<size_t>(childIndex) >= m_Entities.size())
+				{
+					++metrics.hierarchyViolations;
+					continue;
+				}
+				stack.push_back(CompileFrame{
+					static_cast<size_t>(childIndex), 0,
+					State::kInvalidExec != frame.selfSpatial
+						? frame.selfSpatial : frame.nearestSpatial,
+					State::kInvalidExec != frame.selfLayout
+						? frame.selfLayout : frame.nearestLayout });
+				continue;
+			}
+
+			if (State::kInvalidExec != frame.selfSpatial)
+				spatial.subtreeEnd[frame.selfSpatial] =
+					static_cast<ExecIndex>(spatial.execToEntity.size());
+			if (State::kInvalidExec != frame.selfLayout)
+				layout.subtreeEnd[frame.selfLayout] =
+					static_cast<ExecIndex>(layout.execToEntity.size());
+			stack.pop_back();
+		}
+	}
+
+	metrics.unreachableEntities = metrics.occupiedEntities >= visitedCount
+		? metrics.occupiedEntities - visitedCount : 0;
+	metrics.spatialNodes = spatial.execToEntity.size();
+	metrics.layoutNodes = layout.execToEntity.size();
+
+	auto validateProjection = [&](const State::Projection& graph, bool spatialDomain)
+	{
+		std::vector<ExecIndex> intervalStack;
+		for (ExecIndex exec = 0; exec < graph.execToEntity.size(); ++exec)
+		{
+			const EntityHandle handle = graph.execToEntity[exec];
+			Entity* entity = Resolve(handle);
+			if (!entity || handle.index >= graph.entityToExec.size()
+				|| graph.entityToExec[handle.index] != exec)
+			{
+				++metrics.mappingViolations;
+			}
+
+			const bool member = entity && (spatialDomain
+				? entity->HasTransform()
+				: (nullptr != entity->GetComponent<RectTransformComponent>()
+					|| nullptr != entity->GetComponent<Canvas>()));
+			if (!member)
+			{
+				if (spatialDomain) ++metrics.transformlessSpatial;
+				else ++metrics.nonLayoutMember;
+			}
+
+			const ExecIndex parent = graph.parentExec[exec];
+			if (State::kInvalidExec != parent && parent >= exec)
+				++metrics.parentOrderViolations;
+			const ExecIndex end = graph.subtreeEnd[exec];
+			if (end <= exec || end > graph.execToEntity.size())
+				++metrics.subtreeRangeViolations;
+
+			while (!intervalStack.empty()
+				&& exec >= graph.subtreeEnd[intervalStack.back()])
+			{
+				intervalStack.pop_back();
+			}
+			const ExecIndex expectedParent = intervalStack.empty()
+				? State::kInvalidExec : intervalStack.back();
+			if (parent != expectedParent)
+				++metrics.subtreeRangeViolations;
+			if (!intervalStack.empty()
+				&& end > graph.subtreeEnd[intervalStack.back()])
+			{
+				++metrics.subtreeRangeViolations;
+			}
+			intervalStack.push_back(exec);
+		}
+
+		for (size_t slot = 0; slot < m_Entities.size(); ++slot)
+		{
+			Entity* entity = m_Entities[slot].get();
+			const bool member = entity && (spatialDomain
+				? entity->HasTransform()
+				: (nullptr != entity->GetComponent<RectTransformComponent>()
+					|| nullptr != entity->GetComponent<Canvas>()));
+			const ExecIndex exec = graph.entityToExec[slot];
+			if (member == (State::kInvalidExec == exec))
+				++metrics.mappingViolations;
+			else if (member && (exec >= graph.execToEntity.size()
+				|| graph.execToEntity[exec] != HandleOf(static_cast<Entity::Index>(slot))))
+			{
+				++metrics.mappingViolations;
+			}
+		}
+	};
+	validateProjection(spatial, true);
+	validateProjection(layout, false);
+
+	metrics.success = 0 == metrics.TotalViolations();
+	if (metrics.success)
+	{
+		std::scoped_lock lock(m_executionGraphs->dirtyMutex);
+		m_executionGraphs->spatial = std::move(spatial);
+		m_executionGraphs->layout = std::move(layout);
+		m_executionGraphs->compiledVersion = topologyVersion;
+		m_executionGraphs->spatialDataSynchronized = true;
+		m_executionGraphs->animatorPoseBindings.clear();
+		m_executionGraphs->entityQueuedEpoch.resize(m_Entities.size(), 0);
+		m_executionGraphs->entityQueuedGeneration.resize(m_Entities.size(), 0);
+		metrics.compiledVersion = topologyVersion;
+	}
+	m_executionGraphs->attemptedVersion = topologyVersion;
+	metrics.compileUs = std::chrono::duration<double, std::micro>(
+		Clock::now() - begin).count();
+	m_executionGraphs->metrics = metrics;
+	return metrics.success;
+}
+
+void Scene::RecordExecutionGraphMembershipChanged()
+{
+	// Rect/Canvas/Transform의 동적 attach/remove도 projection topology다. loader와
+	// prefab bulk scope 안에서는 hierarchy mutation과 같은 transaction으로 합쳐진다.
+	PublishTopologyMutation();
+}
+
+Scene::HierarchyBulkBuildScope Scene::BeginHierarchyBulkBuild()
+{
+	return HierarchyBulkBuildScope(*this);
+}
+
 Entity* Scene::AddEntity(std::unique_ptr<Entity> sceneObject)
 {
 	if (!sceneObject) return nullptr;
@@ -300,8 +1407,11 @@ Entity* Scene::AddEntity(std::unique_ptr<Entity> sceneObject)
     Entity* added = sceneObject.get();
 	m_Entities[index] = std::move(sceneObject);
 
-    added->m_index = index;
+	added->m_index = index;
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(index));
+	RecordTopologyCreated();
+	if (Transform* transform = added->GetComponent<Transform>())
+		transform->FlushPendingLocalWrite();
 
     if (Entity* root = GetRootEntity(); root && root != added)
     {
@@ -343,9 +1453,12 @@ void Scene::AddRootEntity(std::string_view name)
         return;
     }
 
-    m_Entities[index] = std::move(ptr);
+	m_Entities[index] = std::move(ptr);
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), Entity::INVALID_INDEX,
 		Entity::kSceneRootIndex);
+	RecordTopologyCreated();
+	if (Transform* transform = m_Entities[index]->GetComponent<Transform>())
+		transform->FlushPendingLocalWrite();
 }
 
 Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::Index parentIndex)
@@ -388,6 +1501,9 @@ Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::
 	m_Entities[index] = std::move(ptr);
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), parentIndex,
 		Entity::kSceneRootIndex);
+	RecordTopologyCreated();
+	if (Transform* transform = created->GetComponent<Transform>())
+		transform->FlushPendingLocalWrite();
 
     // parentIndex가 무효면(부모를 명시하지 않은 보통의 호출) 씬 루트를 부모로
     // 삼는다 — GetEntity의 루트 폴백이 암묵적으로 하던 일을 여기서 명시한다.
@@ -450,6 +1566,14 @@ Entity* Scene::LoadEntity(size_t instanceID, std::string_view name, GameObjectTy
 	m_Entities[index] = std::move(ptr);
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), parentIndex,
 		Entity::kSceneRootIndex);
+	RecordTopologyCreated();
+	if (Transform* transform = loaded->GetComponent<Transform>())
+		transform->FlushPendingLocalWrite();
+	if (Entity::IsValidIndex(parentIndex))
+	{
+		if (Entity* parent = TryGetEntity(parentIndex); parent && parent != loaded)
+			parent->AttachChildIndex(index);
+	}
 
     return loaded;
 }
@@ -487,8 +1611,9 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
     if (origin != this) return;
     // 씬 루트(0)는 이 경로로 오면 안 된다 — 아래에서 슬롯 해제 단일점을 타므로,
     // 다른 파괴 경로와 마찬가지로 여기서도 방어적으로 막는다.
-    if (0 == root->m_index) return;
+	if (0 == root->m_index) return;
 	DrainAIUpdate();
+	[[maybe_unused]] auto hierarchyTransaction = BeginHierarchyBulkBuild();
 
     // breadth-first (인덱스 재배열 없이 안전하게 순회)
     std::vector<Entity::Index> queue;
@@ -591,8 +1716,12 @@ Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::In
 	object->m_index = newIndex;
 	m_Entities[newIndex] = std::move(go);
 	m_hierarchyStore.OccupySlot(static_cast<size_t>(newIndex));
+	RecordTopologyCreated();
 	if (Transform* transform = object->GetComponent<Transform>())
+	{
 		transform->RestoreSceneTransferState();
+		transform->FlushPendingLocalWrite();
+	}
 
     // Tag/Layer 재등록
     if (!object->m_tag.ToString().empty())
@@ -659,6 +1788,7 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 {
     std::unordered_map<Entity::Index, Entity::Index> remap;
     if (objects.empty()) return remap;
+	[[maybe_unused]] auto hierarchyTransaction = BeginHierarchyBulkBuild();
 	struct PendingRootRemap
 	{
 		Entity::Index newIndex{ Entity::INVALID_INDEX };
@@ -750,70 +1880,165 @@ void Scene::DestroyEntity(Entity::Index index)
     }
 }
 
-// 렌더 프록시 커밋 (트랙 S · S4의 측정 대상).
-//
-// UpdateRenderData 안에 인라인으로 있던 것을 함수로 뽑았다 — 벤치가 이 단계만
-// 따로 재려면 진입점이 필요하고, S4가 손볼 자리도 여기 하나다.
-// 컴포넌트 목록은 값으로 복사한다(원본이 순회 중 바뀔 수 있다 — 기존 규약 유지).
+// X8 final single commit. Writers from any of the three transform resolves and
+// gameplay/property setters only OR a bit into the frame-persistent queue. This
+// stage is the sole component -> render proxy publication point.
 void Scene::CommitRenderProxies()
 {
     auto renderScene = SceneManagers->GetRenderScene();
     if (nullptr == renderScene) return;
 
-    // 스냅샷은 스크래치 버퍼에 담는다 — 매 프레임 새 벡터를 만들지 않는다.
-    //
-    // 값 복사를 하는 이유는 그대로다(UpdateCommand 도중 원본 목록이 바뀔 수 있다).
-    // 바뀐 것은 그 복사가 **어디에 담기는가**다. 예전에는 지역 벡터 8개를 매
-    // 프레임 새로 만들어 힙 할당 8회를 무조건 물었다 — 실측에서 이 단계의
-    // 고정 비용이 ~28µs였고, 저작 씬 대부분(렌더 컴포넌트 150개 미만)에서는
-    // 그 고정분이 컴포넌트당 가변분(~0.19µs)의 합보다 컸다. assign은 멤버
-    // 버퍼의 capacity를 재사용하므로 워밍업 이후 할당이 0이 된다.
-    const auto snapshot = [](auto& dst, const auto& src)
-    {
-        dst.assign(src.begin(), src.end());
-        return std::cref(dst);
-    };
+	using Kind = SceneRenderRegistryState::Kind;
+	auto& registry = *m_renderRegistry;
+	uint64_t stale = 0;
+	{
+		std::scoped_lock lock(registry.dirtyMutex);
+		++registry.metrics.commitPasses;
+		registry.metrics.lastDrained = registry.dirtyQueue.size();
+		registry.metrics.lastCommitted = 0;
+		registry.metrics.lastStale = 0;
+		registry.metrics.lastMask = ProxyDirty::None;
 
-    auto& allMeshes            = snapshot(m_scratchMeshRenderers, m_allMeshRenderers).get();
-    auto& terrainComponents    = snapshot(m_scratchTerrains, m_terrainComponents).get();
-    auto& foliageComponents    = snapshot(m_scratchFoliages, m_foliageComponents).get();
-    auto& imageComponents      = snapshot(m_scratchImages, UIManagers->Images).get();
-    auto& textComponents       = snapshot(m_scratchTexts, UIManagers->Texts).get();
-    auto& spriteRenderers      = snapshot(m_scratchSpriteRenderers, m_spriteRenderers).get();
-    auto& spriteSheetComponents= snapshot(m_scratchSpriteSheets, UIManagers->SpriteSheets).get();
-    auto& decalComponents      = snapshot(m_scratchDecals, m_decalComponents).get();
+		registry.drainQueue.clear();
+		registry.drainQueue.swap(registry.dirtyQueue);
+		registry.dispatchQueue.clear();
+		registry.dispatchQueue.reserve(registry.drainQueue.size());
+		for (const auto& ticket : registry.drainQueue)
+		{
+			const auto found = registry.registrations.find(ticket.component);
+			if (found == registry.registrations.end()
+				|| found->second.generation != ticket.generation)
+			{
+				++stale;
+				continue;
+			}
 
-    const auto updateProxies = [&](auto& components, const char* label)
-    {
-        for (auto* component : components)
-        {
-            if (nullptr == component) continue;
-            try
-            {
-                renderScene->UpdateCommand(component);
-            }
-            catch (const std::exception& e)
-            {
-                std::cerr << "Error updating " << label << " command: " << e.what() << '\n';
-            }
-        }
-    };
+			auto& registration = found->second;
+			registry.dispatchQueue.push_back({ ticket.component, registration.kind,
+				registration.owner, registration.instanceId, registration.pending });
+			registration.pending = ProxyDirty::None;
+			registration.queued = false;
+		}
+		registry.metrics.staleTickets += stale;
+		registry.metrics.lastStale = stale;
+	}
 
-    updateProxies(allMeshes, "mesh");
-    updateProxies(terrainComponents, "terrain");
-    updateProxies(foliageComponents, "foliage");
-    updateProxies(decalComponents, "decal");
-    updateProxies(spriteRenderers, "sprite");
-    updateProxies(imageComponents, "image");
-    updateProxies(textComponents, "text");
-    updateProxies(spriteSheetComponents, "spriteSheet");
+	uint64_t committed = 0;
+	ProxyDirty committedMask = ProxyDirty::None;
+	for (const auto& dispatch : registry.dispatchQueue)
+	{
+		Entity* owner = Resolve(dispatch.owner);
+		if (nullptr == owner || owner->IsDestroyMark()
+			|| nullptr == dispatch.component
+			|| dispatch.component->GetOwner() != owner
+			|| dispatch.component->GetInstanceID() != dispatch.instanceId)
+		{
+			++stale;
+			continue;
+		}
+
+		try
+		{
+			switch (dispatch.kind)
+			{
+			case Kind::Light:       renderScene->UpdateCommand(static_cast<LightComponent*>(dispatch.component)); break;
+			case Kind::Mesh:        renderScene->UpdateCommand(static_cast<MeshRenderer*>(dispatch.component)); break;
+			case Kind::Terrain:     renderScene->UpdateCommand(static_cast<TerrainComponent*>(dispatch.component)); break;
+			case Kind::Foliage:     renderScene->UpdateCommand(static_cast<FoliageComponent*>(dispatch.component)); break;
+			case Kind::Decal:       renderScene->UpdateCommand(static_cast<DecalComponent*>(dispatch.component)); break;
+			case Kind::Sprite:      renderScene->UpdateCommand(static_cast<SpriteRenderer*>(dispatch.component)); break;
+			case Kind::Image:       renderScene->UpdateCommand(static_cast<ImageComponent*>(dispatch.component)); break;
+			case Kind::Text:        renderScene->UpdateCommand(static_cast<TextComponent*>(dispatch.component)); break;
+			case Kind::SpriteSheet: renderScene->UpdateCommand(static_cast<SpriteSheetComponent*>(dispatch.component)); break;
+			}
+			++committed;
+			committedMask |= dispatch.mask;
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "Error committing render proxy command: " << e.what() << '\n';
+		}
+	}
+
+	{
+		std::scoped_lock lock(registry.dirtyMutex);
+		const uint64_t lateStale = stale - registry.metrics.lastStale;
+		registry.metrics.staleTickets += lateStale;
+		registry.metrics.lastStale += lateStale;
+		registry.metrics.committed += committed;
+		registry.metrics.lastCommitted = committed;
+		registry.metrics.lastMask = committedMask;
+	}
 }
 
 size_t Scene::RenderProxyComponentCount() const
 {
-    return m_allMeshRenderers.size() + m_terrainComponents.size() + m_foliageComponents.size()
-        + m_decalComponents.size() + m_spriteRenderers.size()
-        + UIManagers->Images.size() + UIManagers->Texts.size() + UIManagers->SpriteSheets.size();
+	std::scoped_lock lock(m_renderRegistry->dirtyMutex);
+	return m_renderRegistry->registrations.size();
+}
+
+bool Scene::PublishRenderProxyDirty(Component* component, ProxyDirty dirty)
+{
+	if (nullptr == component || !AnyProxyDirty(dirty)) return false;
+	auto& registry = *m_renderRegistry;
+	std::scoped_lock lock(registry.dirtyMutex);
+	const auto found = registry.registrations.find(component);
+	if (found == registry.registrations.end()) return false;
+
+	auto& registration = found->second;
+	registration.pending |= dirty;
+	++registry.metrics.publishCalls;
+	if (registration.queued)
+	{
+		++registry.metrics.deduplicated;
+		return true;
+	}
+
+	registration.queued = true;
+	registry.dirtyQueue.push_back({ component, registration.generation });
+	return true;
+}
+
+size_t Scene::PublishRenderProxyDirty(EntityHandle owner, ProxyDirty dirty)
+{
+	if (!owner.IsValid() || !AnyProxyDirty(dirty)) return 0;
+	auto& registry = *m_renderRegistry;
+	std::scoped_lock lock(registry.dirtyMutex);
+	if (owner.index >= registry.entityProxies.size()) return 0;
+
+	size_t published = 0;
+	for (Component* component : registry.entityProxies[owner.index])
+	{
+		const auto found = registry.registrations.find(component);
+		if (found == registry.registrations.end() || found->second.owner != owner) continue;
+		auto& registration = found->second;
+		registration.pending |= dirty;
+		++registry.metrics.publishCalls;
+		++published;
+		if (registration.queued)
+		{
+			++registry.metrics.deduplicated;
+			continue;
+		}
+		registration.queued = true;
+		registry.dirtyQueue.push_back({ component, registration.generation });
+	}
+	return published;
+}
+
+RenderProxyCommitMetrics Scene::GetRenderProxyCommitMetrics() const
+{
+	std::scoped_lock lock(m_renderRegistry->dirtyMutex);
+	RenderProxyCommitMetrics result = m_renderRegistry->metrics;
+	result.registered = m_renderRegistry->registrations.size();
+	result.pending = m_renderRegistry->dirtyQueue.size();
+	return result;
+}
+
+void Scene::ResetRenderProxyCommitMetrics()
+{
+	std::scoped_lock lock(m_renderRegistry->dirtyMutex);
+	m_renderRegistry->metrics = {};
 }
 
 void Scene::UpdateRenderData()
@@ -1274,7 +2499,7 @@ void Scene::FixedUpdate(float deltaSecond)
         m_AIFuture.get();
     }
     PROFILE_CPU_BEGIN("AllUpdateWorldMatrix");
-    AllUpdateWorldMatrix();
+	AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("SetInternalPhysicData");
@@ -1366,7 +2591,7 @@ void Scene::OnCollisionExit(const Collision& collider)
 void Scene::Update(float deltaSecond)
 {
     PROFILE_CPU_BEGIN("PreAllUpdateWorldMatrix");
-    AllUpdateWorldMatrix();
+	AllUpdateWorldMatrix(TransformSyncPoint::PreUpdate);
     PROFILE_CPU_END();
 
     // 트랙 C3 — Animator는 가상 Update 오버라이드(암묵 구독)를 버리고 전용
@@ -1434,7 +2659,7 @@ void Scene::Update(float deltaSecond)
     PROFILE_CPU_END();
 
     PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
-    AllUpdateWorldMatrix();
+	AllUpdateWorldMatrix(TransformSyncPoint::LateUpdate);
     PROFILE_CPU_END();
 }
 
@@ -1548,16 +2773,30 @@ void Scene::ClearSelectedEntities()
     m_selectedEntity = nullptr;
 }
 
+std::span<MeshRenderer* const> Scene::MeshRendererComponents() const
+{
+    return m_renderRegistry->meshes;
+}
+
+std::span<FoliageComponent* const> Scene::FoliageComponents() const
+{
+    return m_renderRegistry->foliages;
+}
+
 void Scene::CollectLightComponent(LightComponent* ptr)
 {
-    if (ptr) push_unique(m_lightComponents, ptr);
+	if (ptr && push_unique(m_renderRegistry->lights, ptr) && ptr->GetOwner())
+		RegisterRenderProxy(*m_renderRegistry, ptr,
+			SceneRenderRegistryState::Kind::Light, HandleOf(ptr->GetOwner()->m_index));
 }
 
 void Scene::UnCollectLightComponent(LightComponent* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_lightComponents, [ptr](const auto& light) { return light == ptr; });
+        std::erase_if(m_renderRegistry->lights,
+            [ptr](const auto& light) { return light == ptr; });
+		UnregisterRenderProxy(*m_renderRegistry, ptr);
     }
 }
 
@@ -1571,35 +2810,35 @@ void Scene::UnCollectLightComponent(LightComponent* ptr)
 
 size_t Scene::AddLight()
 {
-    m_lightSlots.push_back(1u);
-    return m_lightSlots.size() - 1u;
+    m_renderRegistry->lightSlots.push_back(1u);
+    return m_renderRegistry->lightSlots.size() - 1u;
 }
 
 void Scene::EnsureLightSlot(size_t index)
 {
     // 로드 경로가 여기로 온다. LightComponent::m_lightIndex는 직렬화되므로
     // 되살아난 컴포넌트는 AddLight()가 아니라 이 함수로 **이미 있어야 할 슬롯**을
-    // 집는데, 갓 로드된 Scene의 m_lightSlots는 비어 있다. 슬롯을 자라게 하는 책임이
+    // 집는데, 갓 로드된 Scene의 lightSlots는 비어 있다. 슬롯을 자라게 하는 책임이
     // 전부 여기에 있다.
     //
     // 조건이 `index > size()`였다. 라이트가 하나면 뒤에 붙어 있던
-    // `|| 0 == m_lightSlots.size()`가 우연히 구해 줘서(index 0 → resize(1)) 살아났고,
+    // `|| 0 == lightSlots.size()`가 우연히 구해 줘서(index 0 → resize(1)) 살아났고,
     // 둘째부터 `1 > 1` 거짓 · `0 == 1` 거짓으로 resize가 돌지 않아 두 번째 슬롯이
     // 범위 밖이 됐다 — vector 첨자 초과(0xC0000409). 그 뒤 조건이 off-by-one을
     // 가리는 역할을 해, 라이트 하나짜리 씬만 열어 보는 동안에는 보이지 않았다.
     // (verify-light-slot-restore.ps1이 라이트를 셋 두는 이유)
-    if (index >= m_lightSlots.size())
+    if (index >= m_renderRegistry->lightSlots.size())
     {
-        m_lightSlots.resize(index + 1u, 0u);
+        m_renderRegistry->lightSlots.resize(index + 1u, 0u);
     }
-    m_lightSlots[index] = 1u;
+    m_renderRegistry->lightSlots[index] = 1u;
 }
 
 void Scene::RemoveLight(size_t index)
 {
-    if (index < m_lightSlots.size())
+    if (index < m_renderRegistry->lightSlots.size())
     {
-        m_lightSlots[index] = 0u;
+        m_renderRegistry->lightSlots[index] = 0u;
     }
 }
 
@@ -1609,20 +2848,20 @@ void Scene::DestroyLight()
     std::vector<uint8_t> newLightSlots;
     bool isFirstDirectional = false;
 
-    newLightSlots.reserve(m_lightSlots.size());
+    newLightSlots.reserve(m_renderRegistry->lightSlots.size());
 
-    for (size_t i = 0; i < m_lightSlots.size(); ++i)
+    for (size_t i = 0; i < m_renderRegistry->lightSlots.size(); ++i)
     {
-        if (0u != m_lightSlots[i])
+        if (0u != m_renderRegistry->lightSlots[i])
         {
             indexRemap[i] = newLightSlots.size();
             newLightSlots.push_back(1u);
         }
     }
 
-    m_lightSlots = std::move(newLightSlots);
+    m_renderRegistry->lightSlots = std::move(newLightSlots);
 
-    for (auto& comp : m_lightComponents)
+    for (auto& comp : m_renderRegistry->lights)
     {
         if (!comp) continue;
 
@@ -1643,41 +2882,28 @@ void Scene::DestroyLight()
 
 void Scene::CollectMeshRenderer(MeshRenderer* ptr)
 {
-    if (ptr)
-    {
-        m_allMeshRenderers.push_back(ptr);
-        if (ptr->IsSkinnedMesh())
-        {
-            m_skinnedMeshRenderers.push_back(ptr);
-        }
-        else
-        {
-            m_staticMeshRenderers.push_back(ptr);
-        }
-    }
+	if (ptr && push_unique(m_renderRegistry->meshes, ptr) && ptr->GetOwner())
+		RegisterRenderProxy(*m_renderRegistry, ptr,
+			SceneRenderRegistryState::Kind::Mesh, HandleOf(ptr->GetOwner()->m_index));
 }
 
 void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
 {
     if (ptr)
-    {
-        if (ptr->IsSkinnedMesh())
-        {
-            std::erase_if(m_skinnedMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
-        }
-        else
-        {
-            std::erase_if(m_staticMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
-        }
-        std::erase_if(m_allMeshRenderers, [ptr](const auto& mesh) { return mesh == ptr; });
-    }
+	{
+        std::erase_if(m_renderRegistry->meshes,
+            [ptr](const auto& mesh) { return mesh == ptr; });
+		UnregisterRenderProxy(*m_renderRegistry, ptr);
+	}
 }
 
 void Scene::CollectSpriteRenderer(SpriteRenderer* ptr)
 {
     if (ptr)
     {
-        m_spriteRenderers.push_back(ptr);
+		if (push_unique(m_renderRegistry->sprites, ptr) && ptr->GetOwner())
+			RegisterRenderProxy(*m_renderRegistry, ptr,
+				SceneRenderRegistryState::Kind::Sprite, HandleOf(ptr->GetOwner()->m_index));
     }
 }
 
@@ -1685,7 +2911,9 @@ void Scene::UnCollectSpriteRenderer(SpriteRenderer* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_spriteRenderers, [ptr](const auto& sprite) { return sprite == ptr; });
+        std::erase_if(m_renderRegistry->sprites,
+            [ptr](const auto& sprite) { return sprite == ptr; });
+		UnregisterRenderProxy(*m_renderRegistry, ptr);
     }
 }
 
@@ -1693,7 +2921,9 @@ void Scene::CollectTerrainComponent(TerrainComponent* ptr)
 {
     if (ptr)
     {
-        m_terrainComponents.push_back(ptr);
+		if (push_unique(m_renderRegistry->terrains, ptr) && ptr->GetOwner())
+			RegisterRenderProxy(*m_renderRegistry, ptr,
+				SceneRenderRegistryState::Kind::Terrain, HandleOf(ptr->GetOwner()->m_index));
     }
 }
 
@@ -1701,7 +2931,9 @@ void Scene::UnCollectTerrainComponent(TerrainComponent* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_terrainComponents, [ptr](const auto& mesh) { return mesh == ptr; });
+        std::erase_if(m_renderRegistry->terrains,
+            [ptr](const auto& terrain) { return terrain == ptr; });
+		UnregisterRenderProxy(*m_renderRegistry, ptr);
     }
 }
 
@@ -1709,7 +2941,9 @@ void Scene::CollectFoliageComponent(FoliageComponent* ptr)
 {
     if (ptr)
     {
-        m_foliageComponents.push_back(ptr);
+		if (push_unique(m_renderRegistry->foliages, ptr) && ptr->GetOwner())
+			RegisterRenderProxy(*m_renderRegistry, ptr,
+				SceneRenderRegistryState::Kind::Foliage, HandleOf(ptr->GetOwner()->m_index));
     }
 }
 
@@ -1717,7 +2951,9 @@ void Scene::UnCollectFoliageComponent(FoliageComponent* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_foliageComponents, [ptr](const auto& comp) { return comp == ptr; });
+        std::erase_if(m_renderRegistry->foliages,
+            [ptr](const auto& comp) { return comp == ptr; });
+		UnregisterRenderProxy(*m_renderRegistry, ptr);
     }
 }
 
@@ -1725,7 +2961,9 @@ void Scene::CollectDecalComponent(DecalComponent* ptr)
 {
     if (ptr)
     {
-        m_decalComponents.push_back(ptr);
+		if (push_unique(m_renderRegistry->decals, ptr) && ptr->GetOwner())
+			RegisterRenderProxy(*m_renderRegistry, ptr,
+				SceneRenderRegistryState::Kind::Decal, HandleOf(ptr->GetOwner()->m_index));
     }
 }
 
@@ -1733,8 +2971,52 @@ void Scene::UnCollectDecalComponent(DecalComponent* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_decalComponents, [ptr](const auto& comp) { return comp == ptr; });
+        std::erase_if(m_renderRegistry->decals,
+            [ptr](const auto& comp) { return comp == ptr; });
+		UnregisterRenderProxy(*m_renderRegistry, ptr);
     }
+}
+
+void Scene::CollectImageComponent(ImageComponent* ptr)
+{
+	if (ptr && push_unique(m_renderRegistry->images, ptr) && ptr->GetOwner())
+		RegisterRenderProxy(*m_renderRegistry, ptr,
+			SceneRenderRegistryState::Kind::Image, HandleOf(ptr->GetOwner()->m_index));
+}
+
+void Scene::UnCollectImageComponent(ImageComponent* ptr)
+{
+	if (!ptr) return;
+	std::erase(m_renderRegistry->images, ptr);
+	UnregisterRenderProxy(*m_renderRegistry, ptr);
+}
+
+void Scene::CollectTextComponent(TextComponent* ptr)
+{
+	if (ptr && push_unique(m_renderRegistry->texts, ptr) && ptr->GetOwner())
+		RegisterRenderProxy(*m_renderRegistry, ptr,
+			SceneRenderRegistryState::Kind::Text, HandleOf(ptr->GetOwner()->m_index));
+}
+
+void Scene::UnCollectTextComponent(TextComponent* ptr)
+{
+	if (!ptr) return;
+	std::erase(m_renderRegistry->texts, ptr);
+	UnregisterRenderProxy(*m_renderRegistry, ptr);
+}
+
+void Scene::CollectSpriteSheetComponent(SpriteSheetComponent* ptr)
+{
+	if (ptr && push_unique(m_renderRegistry->spriteSheets, ptr) && ptr->GetOwner())
+		RegisterRenderProxy(*m_renderRegistry, ptr,
+			SceneRenderRegistryState::Kind::SpriteSheet, HandleOf(ptr->GetOwner()->m_index));
+}
+
+void Scene::UnCollectSpriteSheetComponent(SpriteSheetComponent* ptr)
+{
+	if (!ptr) return;
+	std::erase(m_renderRegistry->spriteSheets, ptr);
+	UnregisterRenderProxy(*m_renderRegistry, ptr);
 }
 
 void Scene::CollectRigidBodyComponent(RigidBodyComponent* ptr)
@@ -1748,6 +3030,27 @@ void Scene::UnCollectRigidBodyComponent(RigidBodyComponent* ptr)
     {
         std::erase_if(m_rigidBodyComponents, [ptr](const auto& body) { return body == ptr; });
     }
+}
+
+std::span<BoxColliderComponent* const> Scene::GetBoxColliderComponents() const
+{
+    return m_boxColliderComponents;
+}
+
+std::span<SphereColliderComponent* const> Scene::GetSphereColliderComponents() const
+{
+    return m_sphereColliderComponents;
+}
+
+std::span<CapsuleColliderComponent* const> Scene::GetCapsuleColliderComponents() const
+{
+    return m_capsuleColliderComponents;
+}
+
+std::span<CharacterControllerComponent* const>
+Scene::GetCharacterControllerComponents() const
+{
+    return m_characterControllerComponents;
 }
 
 void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
@@ -2084,6 +3387,7 @@ void Scene::DestroyComponents()
         if (obj)
         {
             bool isDirty = false;
+			bool executionGraphMembershipChanged = false;
             for (auto& component : obj->m_components)
             {
                 if (!component || !component->IsDestroyMark() || component->IsDontDestroyOnLoad())
@@ -2091,6 +3395,12 @@ void Scene::DestroyComponents()
                     continue;
                 }
                 isDirty = true;
+				executionGraphMembershipChanged = executionGraphMembershipChanged
+					|| nullptr != dynamic_cast<Transform*>(component.get())
+					|| nullptr != dynamic_cast<RectTransformComponent*>(component.get())
+					|| nullptr != dynamic_cast<Canvas*>(component.get())
+					|| nullptr != dynamic_cast<BoneComponent*>(component.get())
+					|| nullptr != dynamic_cast<MeshRenderer*>(component.get());
 
                 obj->RemoveComponentTypeID(component->GetTypeID());
 
@@ -2103,6 +3413,8 @@ void Scene::DestroyComponents()
                     return component == nullptr;
                 });
             obj->RefreshComponentIdIndices();
+			if (executionGraphMembershipChanged)
+				RecordExecutionGraphMembershipChanged();
         }
     }
 }
@@ -2187,7 +3499,8 @@ template bool Scene::TryEnterTraversal<Entity*>(
     std::unordered_set<Entity*>&, Entity* const&, int, const char*, std::string_view);
 
 void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, bool parentChanged,
-    std::unordered_set<Entity::Index>* visited, int depth)
+	std::unordered_set<Entity::Index>* visited, int depth,
+	TransformUpdateAccumulator* diagnostics)
 {
     if (objIndex == Entity::INVALID_INDEX || objIndex < 0 ||
         static_cast<size_t>(objIndex) >= m_Entities.size())
@@ -2202,6 +3515,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
     {
         return;
     }
+	TransformUpdateAccumulator::VisitTimer visitTimer(diagnostics);
 
     // AllUpdateWorldMatrix가 루트 자식 단위로 std::execution::par 병렬 실행하므로
     // 방문집합을 공유하면 레이스가 난다 — 최초 호출(visited==nullptr)에서만 이
@@ -2235,8 +3549,12 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
         for (auto childIndex : obj->GetChildrenIndices())
         {
             if (childIndex == obj->m_index) continue;
-            UpdateModelRecursive(childIndex, model, parentChanged, visited, depth + 1);
+			visitTimer.Pause();
+			UpdateModelRecursive(childIndex, model, parentChanged, visited,
+				depth + 1, diagnostics);
+			visitTimer.Resume();
         }
+		visitTimer.Stop();
         return;
     }
 
@@ -2257,10 +3575,9 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
             return;
         }
 
-        // 캐시 갱신 — m_resolvedSerial이 지금 애니메이터의 스켈레톤 일련번호와
-        // 다르거나(아직 못 풀었음·모델을 갈아 끼워 스켈레톤이 바뀜) m_boneIndex가
-        // 무효(-1, 이전 탐색 실패)면 그때만 이름 해석(문자열 선형 탐색)을 다시
-        // 돈다. ★ 늦은 로드 허용 — 스켈레톤이 이번 프레임에 처음 붙었으면
+		// 캐시 갱신 — m_resolvedSerial이 지금 애니메이터의 스켈레톤 일련번호와
+		// 다를 때만 이름 해석을 다시 돈다. -1도 같은 skeleton에 대한 유효한 음수
+		// 캐시다. ★ 늦은 로드 허용 — 스켈레톤이 이번 프레임에 처음 붙었으면
         // m_resolvedSerial(이전 값, 0이거나 다른 번호)과 자동으로 어긋나므로
         // 여기서 다시 풀린다. 옛 코드가 매 프레임 FindBone을 공짜로 다시 돌던
         // 것과 관측 가능한 차이가 없다 — 스켈레톤이 안 바뀐 프레임만 캐시를 쓴다.
@@ -2270,7 +3587,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
         // 해석은 ResolveBoneIndex(experiment 정본·legacy 폴백 — 인덱스는 1:1
         // 계약으로 동일)가 맡는다.
         const uint64 skeletonSerial = animator->GetSkeletonSerial();
-        if (!IsBoneCacheEnabled() || boneComp->m_resolvedSerial != skeletonSerial || boneComp->m_boneIndex < 0)
+		if (!IsBoneCacheEnabled() || boneComp->m_resolvedSerial != skeletonSerial)
         {
             boneComp->m_boneIndex = animator->ResolveBoneIndex(obj->RemoveSuffixNumberTag());
             boneComp->m_resolvedSerial = skeletonSerial;
@@ -2283,11 +3600,67 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
         // (BoneComponent.h 주석)로, 쓰는 자리에서 스스로를 방어한다.
         const bool hasValidIndex = boneComp->m_boneIndex >= 0
             && static_cast<size_t>(boneComp->m_boneIndex) < std::size(animator->m_localTransforms);
+		const size_t storeSlot = static_cast<size_t>(objIndex);
+		const bool localNeedsCompose = storeSlot >= m_transformStore.Size()
+			|| 0 != m_transformStore.dirty[storeSlot];
 
-        const math::matrix4x4 local = hasValidIndex
-            ? animator->m_localTransforms[boneComp->m_boneIndex]
-            : obj->Transform_().GetLocalMatrix();
-        obj->Transform_().SetAndDecomposeMatrix(local * model);
+		math::matrix4x4 local{};
+		if (hasValidIndex)
+		{
+			local = animator->m_localTransforms[boneComp->m_boneIndex];
+		}
+		else if (diagnostics && localNeedsCompose)
+		{
+			visitTimer.Pause();
+			const auto begin = TransformUpdateAccumulator::Clock::now();
+			local = obj->Transform_().GetLocalMatrix();
+			const auto end = TransformUpdateAccumulator::Clock::now();
+			TransformUpdateAccumulator::AddElapsed(
+				diagnostics->localComposeNs, begin, end);
+			diagnostics->localComposeCount.fetch_add(1, std::memory_order_relaxed);
+			visitTimer.Resume();
+		}
+		else
+		{
+			local = obj->Transform_().GetLocalMatrix();
+		}
+
+		math::matrix4x4 world{};
+		if (diagnostics)
+		{
+			visitTimer.Pause();
+			const auto begin = TransformUpdateAccumulator::Clock::now();
+			world = local * model;
+			const auto end = TransformUpdateAccumulator::Clock::now();
+			TransformUpdateAccumulator::AddElapsed(
+				diagnostics->worldMultiplyNs, begin, end);
+			diagnostics->worldMultiplyCount.fetch_add(1, std::memory_order_relaxed);
+			visitTimer.Resume();
+		}
+		else
+		{
+			world = local * model;
+		}
+
+		const bool willDecompose = storeSlot >= m_transformStore.Size()
+			|| world != m_transformStore.worldMatrix[storeSlot];
+		if (diagnostics && willDecompose)
+		{
+			visitTimer.Pause();
+			const auto begin = TransformUpdateAccumulator::Clock::now();
+			obj->Transform_().SetAndDecomposeMatrix(world);
+			const auto end = TransformUpdateAccumulator::Clock::now();
+			TransformUpdateAccumulator::AddElapsed(
+				diagnostics->decomposeNs, begin, end);
+			diagnostics->decomposeCount.fetch_add(1, std::memory_order_relaxed);
+			visitTimer.Resume();
+		}
+		else
+		{
+			obj->Transform_().SetAndDecomposeMatrix(world);
+		}
+		if (willDecompose)
+			PublishRenderProxyDirty(HandleOf(obj->m_index), ProxyDirty::Transform);
         // 애니메이션이 매 프레임 로컬 행렬을 갈아치우므로 dirty 플래그에 기대지
         // 않고 항상 재계산·전파한다(S2 범위 밖 — C3가 애니메이션 자체는 손댄다).
         childParentChanged = true;
@@ -2299,7 +3672,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
         // 수행한다 — 토글 꺼짐은 옛(항상 재계산) 동작과 바이트 단위로 같다.
         //
         // worldChangedExternally: dirty(로컬 포즈 재계산 플래그)와 독립인 신호 —
-        // ClrHost::EnsureWorldMatrix처럼 이 순회 밖에서 조상 체인만 앞당겨
+		// Scene::EnsureResolved처럼 이 순회 밖에서 조상 체인만 앞당겨
         // 갱신하는 호출이 dirty를 먼저 꺼버려도, SetAndDecomposeMatrix가 실제로
         // 값을 쓴 이 흔적은 남는다(TransformStore.h worldChanged 주석). 이걸 안
         // 보면 그런 호출 뒤에 이 노드의 "정상" 형제 서브트리가 갱신을 놓친다.
@@ -2357,8 +3730,58 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
 					renderer->SetNeedUpdateCulling(true);
 				}
 			}
-			model = obj->Transform_().GetLocalMatrix() * model;
-			obj->Transform_().SetAndDecomposeMatrix(model);
+			math::matrix4x4 local{};
+			if (diagnostics && localDirty)
+			{
+				visitTimer.Pause();
+				const auto begin = TransformUpdateAccumulator::Clock::now();
+				local = obj->Transform_().GetLocalMatrix();
+				const auto end = TransformUpdateAccumulator::Clock::now();
+				TransformUpdateAccumulator::AddElapsed(
+					diagnostics->localComposeNs, begin, end);
+				diagnostics->localComposeCount.fetch_add(1, std::memory_order_relaxed);
+				visitTimer.Resume();
+			}
+			else
+			{
+				local = obj->Transform_().GetLocalMatrix();
+			}
+
+			if (diagnostics)
+			{
+				visitTimer.Pause();
+				const auto begin = TransformUpdateAccumulator::Clock::now();
+				model = local * model;
+				const auto end = TransformUpdateAccumulator::Clock::now();
+				TransformUpdateAccumulator::AddElapsed(
+					diagnostics->worldMultiplyNs, begin, end);
+				diagnostics->worldMultiplyCount.fetch_add(1, std::memory_order_relaxed);
+				visitTimer.Resume();
+			}
+			else
+			{
+				model = local * model;
+			}
+
+			const bool willDecompose = !hasStoreSlot
+				|| model != m_transformStore.worldMatrix[storeSlot];
+			if (diagnostics && willDecompose)
+			{
+				visitTimer.Pause();
+				const auto begin = TransformUpdateAccumulator::Clock::now();
+				obj->Transform_().SetAndDecomposeMatrix(model);
+				const auto end = TransformUpdateAccumulator::Clock::now();
+				TransformUpdateAccumulator::AddElapsed(
+					diagnostics->decomposeNs, begin, end);
+				diagnostics->decomposeCount.fetch_add(1, std::memory_order_relaxed);
+				visitTimer.Resume();
+			}
+			else
+			{
+				obj->Transform_().SetAndDecomposeMatrix(model);
+			}
+			if (willDecompose)
+				PublishRenderProxyDirty(HandleOf(obj->m_index), ProxyDirty::Transform);
 			childParentChanged = true;
 		}
     }
@@ -2366,8 +3789,12 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
     for (auto childIndex : obj->GetChildrenIndices())
     {
         if (childIndex == obj->m_index) continue;
-        UpdateModelRecursive(childIndex, model, childParentChanged, visited, depth + 1);
+		visitTimer.Pause();
+		UpdateModelRecursive(childIndex, model, childParentChanged, visited,
+			depth + 1, diagnostics);
+		visitTimer.Resume();
     }
+	visitTimer.Stop();
 }
 
 void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
@@ -2420,8 +3847,10 @@ void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
         //  0,0,0,0으로 무너졌다. 그쪽이 평소 비활성인 계층이었다.)
         //
         // 부모 rect가 변했으면 자식도 다시 계산한다 — dirty 규칙은 여기 한 줄이다(F-10).
-        if (parentChanged) rect->MarkDirty();
-        rect->SetLayoutScale(parentScale);
+        // resolver 내부 전파는 Scene domain epoch를 다시 올리지 않는다. 외부 writer가
+        // 올린 epoch 하나를 이 pass가 소비하고, per-node dirty만 자식으로 전달한다.
+        if (parentChanged) rect->MarkDirty(false);
+        rect->SetLayoutScale(parentScale, false);
 
         childChanged = rect->UpdateLayout(parentRect);
         childRect = rect->GetWorldRect();
@@ -2436,6 +3865,9 @@ void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
         childIsTopLevel = true;
     }
 
+	if (childChanged)
+		PublishRenderProxyDirty(HandleOf(obj->m_index), ProxyDirty::Transform);
+
     for (auto childIndex : obj->GetChildrenIndices())
     {
         if (childIndex == obj->m_index) continue;
@@ -2444,11 +3876,27 @@ void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
     }
 }
 
-void Scene::UpdateUILayout()
+bool Scene::UpdateUILayout()
 {
-    if (m_Entities.empty()) return;
-
     const math::rect screenRect = RectTransformComponent::GetScreenRootRect();
+	if (!m_hasLastUILayoutScreenRect
+		|| screenRect.width != m_lastUILayoutScreenRect.width
+		|| screenRect.height != m_lastUILayoutScreenRect.height)
+	{
+		MarkUILayoutDirty();
+	}
+
+	const uint64_t dirtyEpoch = m_uiDirtyEpoch.load(std::memory_order_acquire);
+	if (dirtyEpoch == m_uiResolvedEpoch.load(std::memory_order_acquire)) return false;
+
+	if (m_Entities.empty())
+	{
+		m_lastUILayoutScreenRect = screenRect;
+		m_hasLastUILayoutScreenRect = true;
+		m_uiResolvedEpoch.store(dirtyEpoch, std::memory_order_release);
+		return true;
+	}
+
     std::unordered_set<Entity*> visited;
 
     // 씬 루트의 자식부터 한 번만 훑는다. 캔버스 구동도, 캔버스 밑에 없는 UI도
@@ -2472,6 +3920,11 @@ void Scene::UpdateUILayout()
 
         LayoutUINode(canvasObj, screenRect, 1.f, false, true, 0, visited);
     }
+
+	m_lastUILayoutScreenRect = screenRect;
+	m_hasLastUILayoutScreenRect = true;
+	m_uiResolvedEpoch.store(dirtyEpoch, std::memory_order_release);
+	return true;
 }
 
 void Scene::LayoutUISubtree(Entity* root)
@@ -2588,30 +4041,889 @@ void Scene::SetInternalPhysicData()
     }
 }
 
-void Scene::AllUpdateWorldMatrix()
+uint64_t Scene::TakeSpatialDirtySnapshot(
+	std::vector<EntityHandle>& dirtyRoots, bool& forceFull)
 {
-    // UI 레이아웃은 부모→자식 의존 사슬이라 직렬로 먼저 끝낸다. 아래 병렬 순회는
-    // 트랜스폼 행렬만 다루므로 UI rect를 건드리지 않는다(PHASE 7-5).
-    UpdateUILayout();
+	std::scoped_lock lock(m_executionGraphs->dirtyMutex);
+	const uint64_t dirtyEpoch = m_spatialDirtyEpoch.load(std::memory_order_acquire);
+	dirtyRoots.swap(m_executionGraphs->dirtyRoots);
+	forceFull = std::exchange(m_executionGraphs->forceFullResolve, false);
 
-    if (m_Entities.empty()) return;
+	if (0 == ++m_executionGraphs->enqueueEpoch)
+	{
+		m_executionGraphs->enqueueEpoch = 1;
+		std::ranges::fill(m_executionGraphs->entityQueuedEpoch, 0);
+	}
+	return dirtyEpoch;
+}
 
-    const auto& rootObjects = m_Entities[0]->GetChildrenIndices();
+bool Scene::ResolveSpatialTransformsLegacy(uint64_t,
+	TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics,
+	SpatialResolveMetrics& sparseMetrics)
+{
+	sparseMetrics.resolved = true;
+	sparseMetrics.fullResolve = true;
+	m_executionGraphs->spatialDataSynchronized = false;
+	if (sparseMetrics.sparseRequested) sparseMetrics.legacyFallback = true;
 
-    auto updateFunc = [this](Entity::Index index)
-    {
-		UpdateModelRecursive(index, math::matrix4x4::identity());
-    };
+	if (!m_Entities.empty())
+	{
+		const auto& rootObjects = m_Entities[0]->GetChildrenIndices();
+		if (metrics) metrics->rootDispatchCount = rootObjects.size();
+		auto updateFunc = [this, diagnostics](Entity::Index index)
+		{
+			UpdateModelRecursive(index, math::matrix4x4::identity(), false,
+				nullptr, 0, diagnostics);
+		};
 
-    if (!rootObjects.empty())
-    {
-        std::for_each(std::execution::par, rootObjects.begin(), rootObjects.end(), updateFunc);
-    }
+		TransformUpdateAccumulator::TimePoint dispatchBegin{};
+		if (metrics) dispatchBegin = TransformUpdateAccumulator::Clock::now();
+		if (!rootObjects.empty())
+		{
+			std::for_each(std::execution::par, rootObjects.begin(),
+				rootObjects.end(), updateFunc);
+		}
+		if (metrics)
+		{
+			const auto dispatchEnd = TransformUpdateAccumulator::Clock::now();
+			metrics->dispatchUs = static_cast<double>(
+				TransformUpdateAccumulator::ElapsedNs(dispatchBegin, dispatchEnd)) / 1000.0;
+		}
+	}
+	return true;
+}
+
+bool Scene::ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
+	std::vector<EntityHandle> dirtyRoots, bool forceFull,
+	TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics,
+	SpatialResolveMetrics& sparseMetrics)
+{
+	using State = TransformExecutionGraphState;
+	using ExecIndex = State::ExecIndex;
+	auto& graph = m_executionGraphs->spatial;
+	sparseMetrics.resolved = true;
+	sparseMetrics.sparseExecuted = true;
+	sparseMetrics.fullResolve = forceFull;
+	sparseMetrics.dirtyRequests = dirtyRoots.size();
+
+	// A/B로 legacy가 graph mirror를 우회한 뒤 sparse로 돌아온 첫 resolve만
+	// Entity identity를 통해 값을 다시 맞춘다. 정상 sparse 연속 프레임에는 없다.
+	if (!m_executionGraphs->spatialDataSynchronized)
+	{
+		for (ExecIndex exec = 0; exec < graph.execToEntity.size(); ++exec)
+		{
+			const EntityHandle handle = graph.execToEntity[exec];
+			if (handle.index >= m_transformStore.Size()
+				|| nullptr == Resolve(handle))
+			{
+				++sparseMetrics.staleRequests;
+				continue;
+			}
+			graph.localMatrix[exec] = m_transformStore.localMatrix[handle.index];
+			graph.worldMatrix[exec] = m_transformStore.worldMatrix[handle.index];
+		}
+		m_executionGraphs->spatialDataSynchronized = true;
+		forceFull = true;
+		sparseMetrics.fullResolve = true;
+	}
+
+	struct DirtyRange { ExecIndex begin = 0; ExecIndex end = 0; };
+	std::vector<DirtyRange> ranges;
+	if (forceFull || dirtyRoots.empty())
+	{
+		for (ExecIndex exec = 0; exec < graph.execToEntity.size(); ++exec)
+		{
+			if (State::kInvalidExec == graph.parentExec[exec])
+				ranges.push_back(DirtyRange{ exec, graph.subtreeEnd[exec] });
+		}
+	}
+	else
+	{
+		std::vector<ExecIndex> starts;
+		starts.reserve(dirtyRoots.size());
+		for (const EntityHandle handle : dirtyRoots)
+		{
+			if (!Resolve(handle) || handle.index >= graph.entityToExec.size())
+			{
+				++sparseMetrics.staleRequests;
+				continue;
+			}
+			const ExecIndex exec = graph.entityToExec[handle.index];
+			if (State::kInvalidExec == exec || exec >= graph.subtreeEnd.size())
+			{
+				++sparseMetrics.staleRequests;
+				continue;
+			}
+			starts.push_back(exec);
+		}
+
+		std::ranges::sort(starts);
+		for (ExecIndex exec : starts)
+		{
+			if (!ranges.empty() && exec < ranges.back().end)
+			{
+				++sparseMetrics.mergedRequests;
+				continue;
+			}
+			ranges.push_back(DirtyRange{ exec, graph.subtreeEnd[exec] });
+		}
+	}
+	sparseMetrics.canonicalRanges = ranges.size();
+	if (metrics) metrics->rootDispatchCount = ranges.size();
+
+	for (const DirtyRange range : ranges)
+	{
+		ExecIndex exec = range.begin;
+		while (exec < range.end)
+		{
+			const EntityHandle handle = graph.execToEntity[exec];
+			if (handle.index >= m_Entities.size()
+				|| handle.index >= m_transformStore.Size()
+				|| m_generations[handle.index] != handle.generation
+				|| !m_Entities[handle.index])
+			{
+				++sparseMetrics.staleRequests;
+				++exec;
+				continue;
+			}
+
+			Entity& entity = *m_Entities[handle.index];
+			if (entity.IsDestroyMark())
+			{
+				exec = (std::min)(range.end, graph.subtreeEnd[exec]);
+				continue;
+			}
+
+			const size_t slot = handle.index;
+			math::matrix4x4 local{};
+			if (Entity::kSceneRootIndex == static_cast<Entity::Index>(slot))
+			{
+				// 기존 resolver는 artificial scene root를 계산하지 않고 그 자식에
+				// identity를 넘긴다. packed parent로 포함해도 이 의미는 유지한다.
+				local = math::matrix4x4::identity();
+			}
+			else
+			{
+				// X7: 유효 본은 barrier commit이 packed local을 쓰고 dirty를
+				// 해소한다. invalid 본이나 명시적 authored write만 이 공통 dirty
+				// 경로에서 compose한다. Animator·문자열·bone index 조회는 없다.
+				const bool localDirty = 0 != m_transformStore.dirty[slot];
+				if (localDirty)
+				{
+					Transform* transform = entity.m_pTransformComponent;
+					if (!transform)
+					{
+						++sparseMetrics.staleRequests;
+						++exec;
+						continue;
+					}
+					local = transform->ComposeAuthoredLocalMatrix();
+					m_transformStore.localMatrix[slot] = local;
+					m_transformStore.dirty[slot] = 0;
+					++sparseMetrics.localComposes;
+					if (MeshRenderer* renderer = graph.meshRenderers[exec])
+						renderer->SetNeedUpdateCulling(true);
+				}
+				else
+				{
+					local = m_transformStore.localMatrix[slot];
+				}
+			}
+
+			graph.localMatrix[exec] = local;
+			// PublishLocalWrite may advance localEpoch after this resolver's queue
+			// snapshot. Record only the consumed global epoch here so the hot loop
+			// never races a worker publication on the per-node counter.
+			graph.resolvedLocalEpoch[exec] = dirtyEpoch;
+			const ExecIndex parent = graph.parentExec[exec];
+			const math::matrix4x4 parentWorld = State::kInvalidExec == parent
+				? math::matrix4x4::identity() : graph.worldMatrix[parent];
+			const uint64_t parentWorldEpoch = State::kInvalidExec == parent
+				? 0 : graph.worldEpoch[parent];
+			const math::matrix4x4 world = local * parentWorld;
+			if (world != graph.worldMatrix[exec])
+			{
+				graph.worldMatrix[exec] = world;
+				m_transformStore.worldMatrix[slot] = world;
+				uint64_t& worldEpoch = graph.worldEpoch[exec];
+				if (worldEpoch < dirtyEpoch) worldEpoch = dirtyEpoch;
+				else if (0 == ++worldEpoch) ++worldEpoch;
+				graph.scaleQuatDirty[exec] = 1;
+				++sparseMetrics.worldWrites;
+
+				math::vector3 worldScale{
+					m_transformStore.worldScale[slot].x,
+					m_transformStore.worldScale[slot].y,
+					m_transformStore.worldScale[slot].z };
+				math::quaternion worldRotation{
+					m_transformStore.worldQuaternion[slot].x,
+					m_transformStore.worldQuaternion[slot].y,
+					m_transformStore.worldQuaternion[slot].z,
+					m_transformStore.worldQuaternion[slot].w };
+				math::vector3 worldPosition{
+					m_transformStore.worldPosition[slot].x,
+					m_transformStore.worldPosition[slot].y,
+					m_transformStore.worldPosition[slot].z };
+				if (math::decompose(world, worldScale, worldRotation, worldPosition))
+				{
+					worldRotation = math::normalize(worldRotation);
+					m_transformStore.worldScale[slot] = math::vector4{
+						worldScale.x, worldScale.y, worldScale.z, 0.f };
+					m_transformStore.worldQuaternion[slot] = math::vector4{
+						worldRotation.x, worldRotation.y, worldRotation.z, worldRotation.w };
+					m_transformStore.worldPosition[slot] = math::vector4{
+						worldPosition.x, worldPosition.y, worldPosition.z, 0.f };
+				}
+				PublishRenderProxyDirty(handle, ProxyDirty::Transform);
+			}
+			graph.parentWorldEpoch[exec] = parentWorldEpoch;
+			m_transformStore.worldChanged[slot] = 0;
+			++sparseMetrics.resolvedNodes;
+			++exec;
+		}
+	}
+
+	if (diagnostics)
+	{
+		diagnostics->visitCount.fetch_add(sparseMetrics.resolvedNodes, std::memory_order_relaxed);
+		diagnostics->localComposeCount.fetch_add(sparseMetrics.localComposes, std::memory_order_relaxed);
+		diagnostics->worldMultiplyCount.fetch_add(sparseMetrics.resolvedNodes, std::memory_order_relaxed);
+		diagnostics->decomposeCount.fetch_add(sparseMetrics.worldWrites, std::memory_order_relaxed);
+	}
+	return true;
+}
+
+AnimatorPoseUploadMetrics Scene::PublishAnimatorPose(Animator& animator)
+{
+	using State = TransformExecutionGraphState;
+	using ExecIndex = State::ExecIndex;
+	AnimatorPoseUploadMetrics metrics{};
+	metrics.attempted = true;
+
+	Entity* owner = animator.GetOwner();
+	if (!owner || owner->GetScene() != this || owner->IsDestroyMark())
+	{
+		metrics.staleOwner = true;
+		return metrics;
+	}
+	if (!animator.IsEnabled())
+	{
+		metrics.disabled = true;
+		return metrics;
+	}
+
+	metrics.skeletonSerial = animator.GetSkeletonSerial();
+	if (0 == metrics.skeletonSerial || nullptr == animator.m_Skeleton)
+	{
+		metrics.skeletonMissing = true;
+		return metrics;
+	}
+
+	const EntityHandle ownerHandle = HandleOf(owner->m_index);
+	if (!ownerHandle.IsValid() || Resolve(ownerHandle) != owner)
+	{
+		metrics.staleOwner = true;
+		return metrics;
+	}
+
+	if (!EnsureExecutionGraphsCompiled()
+		|| !m_executionGraphs->metrics.success
+		|| m_executionGraphs->compiledVersion != GetTopologyVersion()
+		|| !m_executionGraphs->spatialDataSynchronized)
+	{
+		// Compiler/A-B fallback은 기존 recursive bone resolver가 Animator pose
+		// 배열을 직접 읽는다. 여기서는 전역 dirty만 남기고 packed mirror를
+		// 부분 갱신하지 않는다.
+		metrics.legacyFallback = true;
+		metrics.uploaded = true;
+		MarkSpatialTransformsDirty();
+		return metrics;
+	}
+
+	auto& graph = m_executionGraphs->spatial;
+	if (ownerHandle.index >= graph.entityToExec.size())
+	{
+		metrics.staleOwner = true;
+		return metrics;
+	}
+	const ExecIndex ownerExec = graph.entityToExec[ownerHandle.index];
+	if (State::kInvalidExec == ownerExec || ownerExec >= graph.execToEntity.size()
+		|| graph.execToEntity[ownerExec] != ownerHandle)
+	{
+		metrics.staleOwner = true;
+		return metrics;
+	}
+
+	const size_t bindingKey = animator.GetInstanceID();
+	auto bindingIt = m_executionGraphs->animatorPoseBindings.find(bindingKey);
+	const bool needsBinding = bindingIt == m_executionGraphs->animatorPoseBindings.end()
+		|| bindingIt->second.owner != ownerHandle
+		|| bindingIt->second.skeletonSerial != metrics.skeletonSerial
+		|| bindingIt->second.topologyVersion != m_executionGraphs->compiledVersion;
+	if (needsBinding)
+	{
+		State::AnimatorPoseBinding binding{};
+		binding.owner = ownerHandle;
+		binding.skeletonSerial = metrics.skeletonSerial;
+		binding.topologyVersion = m_executionGraphs->compiledVersion;
+		const size_t poseCapacity = (std::min)(
+			animator.m_Skeleton->m_bones.size(), std::size(animator.m_localTransforms));
+		binding.boneExecByIndex.assign(poseCapacity, State::kInvalidExec);
+
+		const ExecIndex subtreeEnd = graph.subtreeEnd[ownerExec];
+		for (ExecIndex exec = ownerExec; exec < subtreeEnd; ++exec)
+		{
+			BoneComponent* bone = graph.boneComponents[exec];
+			if (!bone) continue;
+			Entity* boneEntity = Resolve(graph.execToEntity[exec]);
+			if (!boneEntity)
+			{
+				++binding.invalidBones;
+				continue;
+			}
+
+			bone->m_boneIndex = animator.ResolveBoneIndex(
+				boneEntity->RemoveSuffixNumberTag());
+			bone->m_resolvedSerial = metrics.skeletonSerial;
+			++metrics.bindLookups;
+			const bool validIndex = bone->m_boneIndex >= 0
+				&& static_cast<size_t>(bone->m_boneIndex)
+					< binding.boneExecByIndex.size();
+			if (!validIndex
+				|| State::kInvalidExec
+					!= binding.boneExecByIndex[static_cast<size_t>(bone->m_boneIndex)])
+			{
+				++binding.invalidBones;
+				continue;
+			}
+			binding.boneExecByIndex[static_cast<size_t>(bone->m_boneIndex)] = exec;
+			++binding.validBones;
+		}
+		bindingIt = m_executionGraphs->animatorPoseBindings.insert_or_assign(
+			bindingKey, std::move(binding)).first;
+		metrics.rebound = true;
+	}
+
+	const State::AnimatorPoseBinding& binding = bindingIt->second;
+	metrics.validBones = binding.validBones;
+	metrics.invalidBones = binding.invalidBones;
+	for (size_t boneIndex = 0; boneIndex < binding.boneExecByIndex.size(); ++boneIndex)
+	{
+		const ExecIndex exec = binding.boneExecByIndex[boneIndex];
+		if (State::kInvalidExec == exec || exec >= graph.execToEntity.size()) continue;
+		const EntityHandle boneHandle = graph.execToEntity[exec];
+		if (!Resolve(boneHandle) || boneHandle.index >= m_transformStore.Size()) continue;
+
+		const math::matrix4x4& local = animator.m_localTransforms[boneIndex];
+		const size_t slot = boneHandle.index;
+		if (graph.localMatrix[exec] == local
+			&& m_transformStore.localMatrix[slot] == local)
+		{
+			continue;
+		}
+		graph.localMatrix[exec] = local;
+		m_transformStore.localMatrix[slot] = local;
+		m_transformStore.dirty[slot] = 0;
+		uint64_t& localEpoch = graph.localEpoch[exec];
+		if (0 == ++localEpoch) ++localEpoch;
+		++metrics.localWrites;
+	}
+
+	metrics.packed = true;
+	metrics.uploaded = true;
+	if (metrics.localWrites > 0
+		&& PublishLocalWrite(ownerHandle, TransformWriteReason::Animator))
+	{
+		metrics.queuedRoots = 1;
+	}
+	return metrics;
+}
+
+TransformBulkWriteMetrics Scene::ApplyWorldWriteBatch(
+	std::span<const TransformWorldWrite> writes, TransformWriteReason reason)
+{
+	using State = TransformExecutionGraphState;
+	using ExecIndex = State::ExecIndex;
+	TransformBulkWriteMetrics metrics{};
+	metrics.reason = reason;
+	metrics.requested = writes.size();
+	if (writes.empty()) return metrics;
+
+	const size_t reasonIndex = static_cast<size_t>(reason);
+	if (reasonIndex >= kTransformWriteReasonCount)
+	{
+		metrics.stale = writes.size();
+		return metrics;
+	}
+
+	if (!EnsureExecutionGraphsCompiled()
+		|| !m_executionGraphs->metrics.success
+		|| m_executionGraphs->compiledVersion != GetTopologyVersion()
+		|| !m_executionGraphs->spatialDataSynchronized)
+	{
+		metrics.legacyFallback = true;
+		for (const TransformWorldWrite& write : writes)
+		{
+			Entity* entity = Resolve(write.target);
+			if (!entity || !entity->HasTransform())
+			{
+				++metrics.stale;
+				continue;
+			}
+			entity->Transform_().SetAndDecomposeMatrix(write.world, true, reason);
+			++metrics.accepted;
+			++metrics.localWrites;
+			++metrics.worldWrites;
+		}
+		metrics.queuedRoots = metrics.accepted;
+		metrics.epochAdvances = metrics.accepted;
+		return metrics;
+	}
+
+	struct MappedWrite
+	{
+		ExecIndex exec = State::kInvalidExec;
+		size_t inputOrder = 0;
+		const TransformWorldWrite* write = nullptr;
+	};
+	std::vector<MappedWrite> mapped;
+	mapped.reserve(writes.size());
+	auto& graph = m_executionGraphs->spatial;
+	for (size_t index = 0; index < writes.size(); ++index)
+	{
+		const TransformWorldWrite& write = writes[index];
+		Entity* entity = Resolve(write.target);
+		if (!entity || !entity->HasTransform()
+			|| write.target.index >= graph.entityToExec.size())
+		{
+			++metrics.stale;
+			continue;
+		}
+		const ExecIndex exec = graph.entityToExec[write.target.index];
+		if (State::kInvalidExec == exec || exec >= graph.execToEntity.size()
+			|| graph.execToEntity[exec] != write.target)
+		{
+			++metrics.stale;
+			continue;
+		}
+		mapped.push_back(MappedWrite{ exec, index, &write });
+	}
+	std::stable_sort(mapped.begin(), mapped.end(),
+		[](const MappedWrite& lhs, const MappedWrite& rhs)
+		{
+			return lhs.exec < rhs.exec;
+		});
+
+	std::vector<EntityHandle> changedHandles;
+	changedHandles.reserve(mapped.size());
+	for (size_t begin = 0; begin < mapped.size();)
+	{
+		size_t end = begin + 1;
+		while (end < mapped.size() && mapped[end].exec == mapped[begin].exec) ++end;
+		const MappedWrite& mappedWrite = mapped[end - 1];
+		const ExecIndex exec = mappedWrite.exec;
+		const TransformWorldWrite& write = *mappedWrite.write;
+		Entity* entity = Resolve(write.target);
+		if (!entity || write.target.index >= m_transformStore.Size())
+		{
+			++metrics.stale;
+			begin = end;
+			continue;
+		}
+
+		const ExecIndex parent = graph.parentExec[exec];
+		const math::matrix4x4 parentWorld = State::kInvalidExec == parent
+			? math::matrix4x4::identity() : graph.worldMatrix[parent];
+		const math::matrix4x4 local = write.world * math::inverse(parentWorld);
+		math::vector3 localScale{};
+		math::quaternion localRotation{};
+		math::vector3 localPosition{};
+		math::vector3 worldScale{};
+		math::quaternion worldRotation{};
+		math::vector3 worldPosition{};
+		if (!math::decompose(local, localScale, localRotation, localPosition)
+			|| !math::decompose(write.world, worldScale, worldRotation, worldPosition))
+		{
+			++metrics.stale;
+			begin = end;
+			continue;
+		}
+		localRotation = math::normalize(localRotation);
+		worldRotation = math::normalize(worldRotation);
+		Transform& transform = entity->Transform_();
+		const size_t slot = write.target.index;
+		const bool localChanged = graph.localMatrix[exec] != local;
+		const bool worldChanged = graph.worldMatrix[exec] != write.world;
+		transform.position = math::vector4{
+			localPosition.x, localPosition.y, localPosition.z, 0.f };
+		transform.rotation = math::vector4{
+			localRotation.x, localRotation.y, localRotation.z, localRotation.w };
+		transform.scale = math::vector4{
+			localScale.x, localScale.y, localScale.z, 0.f };
+		graph.localMatrix[exec] = local;
+		m_transformStore.localMatrix[slot] = local;
+		m_transformStore.dirty[slot] = 0;
+		graph.worldMatrix[exec] = write.world;
+		m_transformStore.worldMatrix[slot] = write.world;
+		m_transformStore.worldScale[slot] = math::vector4{
+			worldScale.x, worldScale.y, worldScale.z, 0.f };
+		m_transformStore.worldQuaternion[slot] = math::vector4{
+			worldRotation.x, worldRotation.y, worldRotation.z, worldRotation.w };
+		m_transformStore.worldPosition[slot] = math::vector4{
+			worldPosition.x, worldPosition.y, worldPosition.z, 0.f };
+		graph.parentWorldEpoch[exec] = State::kInvalidExec == parent
+			? 0 : graph.worldEpoch[parent];
+		graph.scaleQuatDirty[exec] = 1;
+		if (worldChanged)
+		{
+			uint64_t& worldEpoch = graph.worldEpoch[exec];
+			if (0 == ++worldEpoch) ++worldEpoch;
+			m_transformStore.worldChanged[slot] = 1;
+			++metrics.worldWrites;
+			PublishRenderProxyDirty(write.target, ProxyDirty::Transform);
+		}
+		if (localChanged) ++metrics.localWrites;
+		++metrics.accepted;
+		if (localChanged || worldChanged) changedHandles.push_back(write.target);
+		begin = end;
+	}
+
+	metrics.packed = true;
+	metrics.queuedRoots = PublishLocalWriteBatch(changedHandles, reason);
+	metrics.epochAdvances = metrics.queuedRoots > 0 ? 1 : 0;
+	return metrics;
+}
+
+bool Scene::EnsureResolved(EntityHandle target)
+{
+	using State = TransformExecutionGraphState;
+	using ExecIndex = State::ExecIndex;
+	SpatialPullMetrics pull{};
+	pull.attempted = true;
+	pull.propagationSignalPreserved = true;
+
+	struct PendingSnapshot
+	{
+		uint64_t requests = 0;
+		uint64_t dirtyEpoch = 0;
+		bool forceFull = false;
+	};
+	const auto capturePending = [this]()
+	{
+		std::scoped_lock lock(m_executionGraphs->dirtyMutex);
+		return PendingSnapshot{
+			m_executionGraphs->dirtyRoots.size(),
+			m_spatialDirtyEpoch.load(std::memory_order_acquire),
+			m_executionGraphs->forceFullResolve };
+	};
+	const PendingSnapshot before = capturePending();
+	pull.pendingRequestsBefore = before.requests;
+	pull.dirtyEpochBefore = before.dirtyEpoch;
+
+	const auto finish = [this, &pull, &capturePending, before](bool result)
+	{
+		const PendingSnapshot after = capturePending();
+		pull.pendingRequestsAfter = after.requests;
+		pull.dirtyEpochAfter = after.dirtyEpoch;
+		pull.queuePreserved = before.requests == after.requests
+			&& before.dirtyEpoch == after.dirtyEpoch
+			&& before.forceFull == after.forceFull;
+		m_executionGraphs->pullMetrics = pull;
+		return result;
+	};
+
+	Entity* targetEntity = Resolve(target);
+	if (!targetEntity || !targetEntity->HasTransform())
+	{
+		pull.staleHandle = true;
+		return finish(false);
+	}
+
+	const bool graphCompiled = EnsureExecutionGraphsCompiled();
+	const bool graphReady = graphCompiled
+		&& m_executionGraphs->metrics.success
+		&& m_executionGraphs->compiledVersion == GetTopologyVersion()
+		&& m_executionGraphs->spatialDataSynchronized
+		&& IsSparseSpatialResolverEnabled();
+	if (!graphReady)
+	{
+		// A/B fallback 또는 compiler fail-close 중에도 C#의 즉시 읽기 계약은
+		// 유지한다. 이 경로는 global queue/worldChanged를 소비하지 않으며 packed
+		// mirror가 옛 값을 갖게 됐음을 표시해 다음 sparse global resolve가 full로
+		// 다시 맞추게 한다.
+		pull.legacyFallback = true;
+		const math::matrix4x4 oldWorld = targetEntity->Transform_().GetWorldMatrix();
+		Transform& transform = targetEntity->Transform_();
+		transform.SetAndDecomposeMatrix(transform.UpdateWorldMatrix());
+		pull.worldWrites = oldWorld != transform.GetWorldMatrix() ? 1 : 0;
+		if (pull.worldWrites)
+			PublishRenderProxyDirty(target, ProxyDirty::Transform);
+		pull.recomputedNodes = 1;
+		pull.resolved = true;
+		m_executionGraphs->spatialDataSynchronized = false;
+		if (pull.worldWrites && target.index < m_transformStore.Size())
+			pull.propagationSignalPreserved = 0 != m_transformStore.worldChanged[target.index];
+		return finish(true);
+	}
+
+	auto& graph = m_executionGraphs->spatial;
+	if (target.index >= graph.entityToExec.size())
+	{
+		pull.staleHandle = true;
+		return finish(false);
+	}
+	const ExecIndex targetExec = graph.entityToExec[target.index];
+	if (State::kInvalidExec == targetExec || targetExec >= graph.execToEntity.size()
+		|| graph.execToEntity[targetExec] != target)
+	{
+		pull.staleHandle = true;
+		return finish(false);
+	}
+
+	std::vector<ExecIndex> path;
+	for (ExecIndex exec = targetExec; State::kInvalidExec != exec;
+		exec = graph.parentExec[exec])
+	{
+		if (exec >= graph.execToEntity.size() || path.size() >= graph.execToEntity.size())
+		{
+			pull.staleHandle = true;
+			return finish(false);
+		}
+		path.push_back(exec);
+	}
+	std::ranges::reverse(path);
+	pull.pathNodes = path.size();
+	pull.packed = true;
+
+	for (const ExecIndex exec : path)
+	{
+		const EntityHandle handle = graph.execToEntity[exec];
+		Entity* entity = Resolve(handle);
+		if (!entity || entity->IsDestroyMark() || handle.index >= m_transformStore.Size())
+		{
+			pull.staleHandle = true;
+			return finish(false);
+		}
+
+		const size_t slot = handle.index;
+		const math::matrix4x4 previousLocal = graph.localMatrix[exec];
+		math::matrix4x4 local{};
+		bool localDirty = false;
+		if (Entity::kSceneRootIndex == static_cast<Entity::Index>(slot))
+		{
+			local = math::matrix4x4::identity();
+		}
+		else
+		{
+			// X7 barrier commit은 유효 본 pose와 dirty=0을 함께 publish한다.
+			// invalid 본의 authored write는 global resolver와 같은 공통 dirty
+			// 경로를 사용하므로 targeted pull도 binding lookup을 유발하지 않는다.
+			localDirty = 0 != m_transformStore.dirty[slot];
+			if (localDirty)
+			{
+				Transform* transform = entity->m_pTransformComponent;
+				if (!transform)
+				{
+					pull.staleHandle = true;
+					return finish(false);
+				}
+				local = transform->ComposeAuthoredLocalMatrix();
+				m_transformStore.localMatrix[slot] = local;
+				m_transformStore.dirty[slot] = 0;
+				++pull.localComposes;
+				if (MeshRenderer* renderer = graph.meshRenderers[exec])
+					renderer->SetNeedUpdateCulling(true);
+			}
+			else
+			{
+				local = m_transformStore.localMatrix[slot];
+			}
+		}
+
+		const bool localChanged = local != previousLocal;
+		graph.localMatrix[exec] = local;
+		graph.resolvedLocalEpoch[exec] = pull.dirtyEpochBefore;
+		const ExecIndex parent = graph.parentExec[exec];
+		const math::matrix4x4 parentWorld = State::kInvalidExec == parent
+			? math::matrix4x4::identity() : graph.worldMatrix[parent];
+		const uint64_t parentEpoch = State::kInvalidExec == parent
+			? 0 : graph.worldEpoch[parent];
+		const bool parentChanged = graph.parentWorldEpoch[exec] != parentEpoch;
+		const bool mirrorChanged = m_transformStore.worldMatrix[slot]
+			!= graph.worldMatrix[exec];
+		if (!localChanged && !parentChanged && !mirrorChanged)
+		{
+			graph.parentWorldEpoch[exec] = parentEpoch;
+			continue;
+		}
+
+		++pull.recomputedNodes;
+		const math::matrix4x4 world = local * parentWorld;
+		const bool worldChanged = world != graph.worldMatrix[exec];
+		graph.parentWorldEpoch[exec] = parentEpoch;
+		if (!worldChanged && !mirrorChanged) continue;
+
+		graph.worldMatrix[exec] = world;
+		m_transformStore.worldMatrix[slot] = world;
+		if (!worldChanged) continue;
+
+		uint64_t& worldEpoch = graph.worldEpoch[exec];
+		if (worldEpoch < pull.dirtyEpochBefore) worldEpoch = pull.dirtyEpochBefore;
+		else if (0 == ++worldEpoch) ++worldEpoch;
+		graph.scaleQuatDirty[exec] = 1;
+		m_transformStore.worldChanged[slot] = 1;
+		++pull.worldWrites;
+
+		math::vector3 worldScale{
+			m_transformStore.worldScale[slot].x,
+			m_transformStore.worldScale[slot].y,
+			m_transformStore.worldScale[slot].z };
+		math::quaternion worldRotation{
+			m_transformStore.worldQuaternion[slot].x,
+			m_transformStore.worldQuaternion[slot].y,
+			m_transformStore.worldQuaternion[slot].z,
+			m_transformStore.worldQuaternion[slot].w };
+		math::vector3 worldPosition{
+			m_transformStore.worldPosition[slot].x,
+			m_transformStore.worldPosition[slot].y,
+			m_transformStore.worldPosition[slot].z };
+		if (math::decompose(world, worldScale, worldRotation, worldPosition))
+		{
+			worldRotation = math::normalize(worldRotation);
+			m_transformStore.worldScale[slot] = math::vector4{
+				worldScale.x, worldScale.y, worldScale.z, 0.f };
+			m_transformStore.worldQuaternion[slot] = math::vector4{
+				worldRotation.x, worldRotation.y, worldRotation.z, worldRotation.w };
+			m_transformStore.worldPosition[slot] = math::vector4{
+				worldPosition.x, worldPosition.y, worldPosition.z, 0.f };
+		}
+		PublishRenderProxyDirty(HandleOf(static_cast<Entity::Index>(slot)),
+			ProxyDirty::Transform);
+		pull.propagationSignalPreserved = pull.propagationSignalPreserved
+			&& 0 != m_transformStore.worldChanged[slot];
+	}
+
+	pull.resolved = true;
+	return finish(true);
+}
+
+bool Scene::ResolveSpatialTransforms(
+	TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics)
+{
+	SpatialResolveMetrics sparseMetrics{};
+	sparseMetrics.sparseRequested = IsSparseSpatialResolverEnabled();
+	const uint64_t observedDirty = m_spatialDirtyEpoch.load(std::memory_order_acquire);
+	if (observedDirty == m_spatialResolvedEpoch.load(std::memory_order_acquire))
+	{
+		m_executionGraphs->resolveMetrics = sparseMetrics;
+		return false;
+	}
+
+	std::vector<EntityHandle> dirtyRoots;
+	bool forceFull = false;
+	const uint64_t dirtyEpoch = TakeSpatialDirtySnapshot(dirtyRoots, forceFull);
+	sparseMetrics.dirtyRequests = dirtyRoots.size();
+	sparseMetrics.fullResolve = forceFull;
+	const auto begin = std::chrono::steady_clock::now();
+	const bool graphReady = m_executionGraphs->metrics.success
+		&& m_executionGraphs->compiledVersion == GetTopologyVersion();
+	const bool resolved = sparseMetrics.sparseRequested && graphReady
+		? ResolveSpatialTransformsSparse(dirtyEpoch, std::move(dirtyRoots), forceFull,
+			diagnostics, metrics, sparseMetrics)
+		: ResolveSpatialTransformsLegacy(dirtyEpoch, diagnostics, metrics, sparseMetrics);
+	const auto end = std::chrono::steady_clock::now();
+	sparseMetrics.resolveUs = std::chrono::duration<double, std::micro>(end - begin).count();
+	if (metrics && sparseMetrics.sparseExecuted)
+		metrics->dispatchUs = sparseMetrics.resolveUs;
+	m_executionGraphs->resolveMetrics = sparseMetrics;
+
+	// snapshot 뒤의 write는 더 큰 epoch와 다음 queue에 남는다.
+	m_spatialResolvedEpoch.store(dirtyEpoch, std::memory_order_release);
+	return resolved;
+}
+
+bool Scene::ResolveSpatialTransforms()
+{
+	return ResolveSpatialTransforms(nullptr, nullptr);
+}
+
+void Scene::SyncDerivedState(TransformSyncPoint syncPoint)
+{
+	// X4 compiler는 topology transaction이 publish한 version만 소비한다. 같은
+	// version의 정지 sync는 O(1) 비교 한 번이고, 실패한 version도 매 프레임
+	// 재시도하지 않는다. 실패 시 아래 기존 recursive resolver가 안전망으로 남는다.
+	EnsureExecutionGraphsCompiled();
+	if (!IsTransformDiagnosticsEnabled())
+	{
+		// 명시 순서: UI layout이 먼저, spatial world transform이 다음이다.
+		UpdateUILayout();
+		ResolveSpatialTransforms();
+		return;
+	}
+
+	using Clock = TransformUpdateAccumulator::Clock;
+	TransformUpdateMetrics metrics{};
+	metrics.syncPoint = syncPoint;
+	CaptureTransformSceneCensus(metrics);
+	TransformUpdateAccumulator accumulator{};
+
+	const auto totalBegin = Clock::now();
+	const auto uiBegin = totalBegin;
+	metrics.uiDomainResolved = UpdateUILayout();
+	const auto uiEnd = Clock::now();
+	metrics.uiUs = static_cast<double>(
+		TransformUpdateAccumulator::ElapsedNs(uiBegin, uiEnd)) / 1000.0;
+
+	const auto spatialBegin = Clock::now();
+	metrics.spatialDomainResolved =
+		ResolveSpatialTransforms(&accumulator, &metrics);
+	const auto spatialEnd = Clock::now();
+	metrics.spatialUs = static_cast<double>(
+		TransformUpdateAccumulator::ElapsedNs(spatialBegin, spatialEnd)) / 1000.0;
+	metrics.totalUs = static_cast<double>(
+		TransformUpdateAccumulator::ElapsedNs(totalBegin, spatialEnd)) / 1000.0;
+
+	metrics.visitWorkerUs = static_cast<double>(
+		accumulator.visitNs.load(std::memory_order_relaxed)) / 1000.0;
+	metrics.localComposeWorkerUs = static_cast<double>(
+		accumulator.localComposeNs.load(std::memory_order_relaxed)) / 1000.0;
+	metrics.worldMultiplyWorkerUs = static_cast<double>(
+		accumulator.worldMultiplyNs.load(std::memory_order_relaxed)) / 1000.0;
+	metrics.decomposeWorkerUs = static_cast<double>(
+		accumulator.decomposeNs.load(std::memory_order_relaxed)) / 1000.0;
+	metrics.spatialVisitCount = accumulator.visitCount.load(std::memory_order_relaxed);
+	metrics.localComposeCount = accumulator.localComposeCount.load(std::memory_order_relaxed);
+	metrics.worldMultiplyCount = accumulator.worldMultiplyCount.load(std::memory_order_relaxed);
+	metrics.decomposeCount = accumulator.decomposeCount.load(std::memory_order_relaxed);
+
+	if (TransformSyncPoint::LateUpdate == syncPoint)
+	{
+		const TransformTopologyMutationCounters totals = GetTopologyMutationTotals();
+		m_lastFrameTopologyMutations.created =
+			totals.created - m_topologyFrameBaseline.created;
+		m_lastFrameTopologyMutations.destroyed =
+			totals.destroyed - m_topologyFrameBaseline.destroyed;
+		m_lastFrameTopologyMutations.reparented =
+			totals.reparented - m_topologyFrameBaseline.reparented;
+		m_topologyFrameBaseline = totals;
+		++m_transformDiagnosticFrameCount;
+	}
+
+	const size_t metricsIndex = TransformSyncPointIndex(syncPoint);
+	if (metricsIndex < m_transformUpdateMetrics.size())
+	{
+		m_transformUpdateMetrics[metricsIndex] = metrics;
+	}
+}
+
+void Scene::AllUpdateWorldMatrix(TransformSyncPoint syncPoint)
+{
+	SyncDerivedState(syncPoint);
 }
 
 void Scene::AllUIUpdateWorldMatrix()
 {
-    // 일시정지 중 UI만 갱신하는 경로. 이제 UpdateUILayout 하나면 된다(PHASE 7-5).
+    // 일시정지 중에는 UI domain만 소비하고 spatial dirty는 다음 full sync에 남긴다.
     UpdateUILayout();
 }
 

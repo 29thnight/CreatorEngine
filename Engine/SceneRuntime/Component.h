@@ -3,10 +3,12 @@
 #include "TypeTrait.h"
 #include "Reflection.hpp"
 #include "MetaPolymorphic.h"
+#include "RenderProxyDirty.h"
 
 
 class Entity;
 class Transform;
+namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 class Component : public meta::identity<Component, Object>
 {
    public:
@@ -113,15 +115,14 @@ public:
 	//
 	// 전이는 SetEnabled에서만 일어난다. 그 자리에서 직접 부르면 스캔이 통째로 사라지고,
 	// 호출 시점도 '다음 브로드캐스트'가 아니라 '바뀐 그 순간'으로 명확해진다.
-	void SetEnabled(bool able) override
-	{
-		const bool wasEnabled = IsEnabled();
-		Object::SetEnabled(able);
-		if (wasEnabled == able) return;
+	void SetEnabled(bool able) override;
 
-		if (able) OnEnable();
-		else      OnDisable();
-	}
+	// X8 writer boundary. Reflection-backed fields inherit this hook; explicit
+	// setters call PublishRenderProxyDirty directly. Non-render components are
+	// harmless because Scene rejects components absent from its proxy registry.
+	virtual void OnPropertyChanged(std::string_view propertyName,
+		Meta::PropertyChangeSource source);
+	void PublishRenderProxyDirty(ProxyDirty dirty) const;
 
 	//template<typename T>
 	//T& GetComponent();

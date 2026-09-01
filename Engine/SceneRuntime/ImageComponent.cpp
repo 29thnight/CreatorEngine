@@ -29,6 +29,7 @@ void ImageComponent::SetTexture(int index)
 	m_curtexture = textures[curindex];
     uiinfo.size = textures[curindex]->GetImageSize();
 	origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
+	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 }
 
 void ImageComponent::SetNativeSize()
@@ -46,6 +47,7 @@ void ImageComponent::SetNativeSize()
 	{
 		rect->SetSizeDelta({ uiinfo.size.x, uiinfo.size.y });
 	}
+	PublishRenderProxyDirty(ProxyDirty::Transform);
 }
 
 bool ImageComponent::isThisTextureExist(std::string_view path) const
@@ -91,7 +93,8 @@ void ImageComponent::OnInitialized()
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
-		renderScene->RegisterCommand(this);
+		scene->CollectImageComponent(this);
+		if (renderScene) renderScene->RegisterCommand(this);
 	}
 
 	// 레지스트리 등록은 수명의 시작(Awake)에서 스스로 한다(6-1).
@@ -123,11 +126,29 @@ void ImageComponent::OnAddedToScene()
 {
 	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterImage(this);
+	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->CollectImageComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->RegisterCommand(this);
+		}
+	}
 }
 
 void ImageComponent::OnRemovingFromScene()
 {
 	UITickSystems->UnregisterImage(this);
+	if (GetOwner() && !GetOwner()->IsDestroyMark())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->UnCollectImageComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->UnregisterCommand(this);
+		}
+	}
 	UIComponent::OnRemovingFromScene();
 }
 
@@ -167,7 +188,8 @@ void ImageComponent::OnUninitializing()
 	auto renderScene = SceneManagers->GetRenderScene();
 	if (scene)
 	{
-		renderScene->UnregisterCommand(this);
+		scene->UnCollectImageComponent(this);
+		if (renderScene) renderScene->UnregisterCommand(this);
 	}
 
 	// 해제는 무조건 한다. 예전에는 씬이 널이면 건너뛰어 레지스트리에 dangling이 남았다.

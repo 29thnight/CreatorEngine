@@ -38,11 +38,29 @@ void FoliageComponent::OnInitialized()
 void FoliageComponent::OnAddedToScene()
 {
     FoliageSystems->Register(this);
+	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->CollectFoliageComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->RegisterCommand(this);
+		}
+	}
 }
 
 void FoliageComponent::OnRemovingFromScene()
 {
     FoliageSystems->Unregister(this);
+	if (GetOwner() && !GetOwner()->IsDestroyMark())
+	{
+		if (Scene* scene = GetOwner()->GetScene())
+		{
+			scene->UnCollectFoliageComponent(this);
+			if (auto* renderScene = SceneManagers->GetRenderScene())
+				renderScene->UnregisterCommand(this);
+		}
+	}
 }
 
 void FoliageComponent::OnUninitializing()
@@ -170,12 +188,16 @@ void FoliageComponent::AddFoliageType(const FoliageType& type)
     // 바인딩한다. 자산 로드 경로(LoadFoliageAsset)는 m_mesh가 아직 비어
     // no-op이고, OnDeserialized의 재해석 루프가 다시 바인딩한다.
     BindExperimentMesh(m_foliageTypes.back());
+	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 }
 
 void FoliageComponent::RemoveFoliageType(uint32 typeID)
 {
     if (typeID < m_foliageTypes.size())
+	{
         m_foliageTypes.erase(m_foliageTypes.begin() + typeID);
+		PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+	}
 }
 
 void FoliageComponent::AddFoliageInstance(const FoliageInstance& instance)
@@ -191,13 +213,17 @@ void FoliageComponent::AddFoliageInstance(const FoliageInstance& instance)
         FoliageInstance sealed = instance;
         sealed.RebuildWorldMatrix();
         m_foliageInstances.push_back(std::move(sealed));
+		PublishRenderProxyDirty(ProxyDirty::Payload);
     }
 }
 
 void FoliageComponent::RemoveFoliageInstance(size_t index)
 {
     if(index < m_foliageInstances.size())
+	{
         m_foliageInstances.erase(m_foliageInstances.begin()+index);
+		PublishRenderProxyDirty(ProxyDirty::Payload);
+	}
 }
 
 void FoliageComponent::AddInstanceFromTerrain(TerrainComponent* terrain, const FoliageInstance& instance)
@@ -245,7 +271,8 @@ void FoliageComponent::AddRandomInstancesInBrush(TerrainComponent* terrain, cons
 
 void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const TerrainBrush& brush)
 {
-    (void)terrain;
+	(void)terrain;
+	const size_t previousSize = m_foliageInstances.size();
     m_foliageInstances.erase(std::remove_if(m_foliageInstances.begin(), m_foliageInstances.end(),
         [&](const FoliageInstance& inst)
         {
@@ -253,6 +280,8 @@ void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const T
             float dz = inst.m_position.z - brush.m_center.y;
             return dx * dx + dz * dz <= brush.m_radius * brush.m_radius;
         }), m_foliageInstances.end());
+	if (m_foliageInstances.size() != previousSize)
+		PublishRenderProxyDirty(ProxyDirty::Payload);
 }
 //helper
 std::vector<std::pair<size_t, size_t>> DivideRangeAuto(size_t count)

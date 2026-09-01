@@ -1,5 +1,6 @@
 #include "Component.h"
 #include "Entity.h"
+#include "Scene.h"
 
 void Component::SetOwner(Entity* owner)
 {
@@ -23,6 +24,51 @@ void Component::SetOwner(Entity* owner)
 	// 널 소유자 방어도 겸한다 — 예전 `&m_pOwner->m_transform`은 owner가 널이면
 	// 그 자리에서 널 역참조였다(호출부는 현재 0곳이지만 다음 사람이 시도할 모양).
 	m_pTransform = owner ? owner->GetComponentDynamicCast<Transform>() : nullptr;
+}
+
+void Component::SetEnabled(bool able)
+{
+	const bool wasEnabled = IsEnabled();
+	Object::SetEnabled(able);
+	if (wasEnabled == able) return;
+
+	if (able) OnEnable();
+	else      OnDisable();
+
+	PublishRenderProxyDirty(ProxyDirty::Visibility);
+}
+
+void Component::OnPropertyChanged(
+	std::string_view propertyName, Meta::PropertyChangeSource)
+{
+	ProxyDirty dirty = ProxyDirty::Payload;
+	if (propertyName.find("Material") != std::string_view::npos
+		|| propertyName.find("material") != std::string_view::npos)
+	{
+		dirty = ProxyDirty::Material;
+	}
+	else if (propertyName.find("LOD") != std::string_view::npos
+		|| propertyName.find("lod") != std::string_view::npos)
+	{
+		dirty = ProxyDirty::LOD;
+	}
+	else if (propertyName.find("Enabled") != std::string_view::npos
+		|| propertyName.find("enabled") != std::string_view::npos
+		|| propertyName.find("isActive") != std::string_view::npos)
+	{
+		dirty = ProxyDirty::Visibility;
+	}
+
+	PublishRenderProxyDirty(dirty);
+}
+
+void Component::PublishRenderProxyDirty(ProxyDirty dirty) const
+{
+	if (!AnyProxyDirty(dirty) || nullptr == m_pOwner) return;
+	if (Scene* scene = m_pOwner->GetScene())
+	{
+		scene->PublishRenderProxyDirty(const_cast<Component*>(this), dirty);
+	}
 }
 
 Component& Component::GetComponent(HashedGuid typeof)

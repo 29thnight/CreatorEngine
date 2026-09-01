@@ -55,10 +55,27 @@ public:
    void SetNeedUpdateCulling(bool able) { m_isNeedUpdateCulling = able; }
 
    virtual void OnInitialized() override;
+   void OnAddedToScene() override;
+   void OnRemovingFromScene() override;
    virtual void OnUninitializing() override;
 
-   void SetSkinnedMesh(bool isSkinned) { m_isSkinnedMesh = isSkinned; }
+   void SetSkinnedMesh(bool isSkinned)
+   {
+	   m_isSkinnedMesh = isSkinned;
+	   PublishRenderProxyDirty(ProxyDirty::Payload);
+   }
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
+
+	void SetMaterial(std::shared_ptr<Material> material)
+	{
+		m_Material = std::move(material);
+		PublishRenderProxyDirty(ProxyDirty::Material);
+	}
+	void SetLODEnabled(bool enabled)
+	{
+		m_isEnableLOD = enabled;
+		PublishRenderProxyDirty(ProxyDirty::LOD);
+	}
 
     [[nodiscard]] math::aabb GetBoundingBox() const;
 
