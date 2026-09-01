@@ -280,6 +280,14 @@ Run-Step "legacy Skeleton 은퇴 경계" {
         (Join-Path $PSScriptRoot "verify-legacy-skeleton-retirement.ps1")
 }
 
+# 본 팔레트가 렌더에 도달하는가. X8의 dirty 게이팅에 "팔레트가 바뀌었다"
+# 축이 없어 스킨 메시가 첫 포즈에서 굳었다 — 그림을 못 재는 헤드리스에서
+# 프록시 커밋 누계로 잰다.
+Run-Step "스킨 프록시 갱신" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-skinned-proxy-refresh.ps1") -Work $Work
+}
+
 Run-Step "Experiment cooked catalog 기동" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-experiment-cooked-catalog.ps1") -Exe $Exe -Work $Work

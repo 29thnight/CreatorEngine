@@ -207,6 +207,9 @@ struct AnimatorPoseUploadMetrics
 	uint64_t invalidBones = 0;
 	uint64_t localWrites = 0;
 	uint64_t queuedRoots = 0;
+	// 팔레트가 바뀐 프레임에 스킨 프록시를 몇 개 dirty로 올렸는가.
+	// 0인데 localWrites > 0이면 최신 팔레트가 렌더로 못 간다.
+	uint64_t paletteDirty = 0;
 };
 
 struct TransformWorldWrite

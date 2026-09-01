@@ -6428,7 +6428,7 @@ namespace ConsoleCmd
                 "packed=%d legacyFallback=%d rebound=%d disabled=%d "
                 "staleOwner=%d skeletonMissing=%d bindLookups=%llu "
                 "validBones=%llu invalidBones=%llu localWrites=%llu "
-                "queuedRoots=%llu\n",
+                "queuedRoots=%llu paletteDirty=%llu\n",
                 object->GetHashedName().ToString().c_str(),
                 publish.uploaded ? 1 : 0, publish.packed ? 1 : 0,
                 publish.legacyFallback ? 1 : 0, publish.rebound ? 1 : 0,
@@ -6438,7 +6438,8 @@ namespace ConsoleCmd
                 (unsigned long long)publish.validBones,
                 (unsigned long long)publish.invalidBones,
                 (unsigned long long)publish.localWrites,
-                (unsigned long long)publish.queuedRoots);
+                (unsigned long long)publish.queuedRoots,
+                (unsigned long long)publish.paletteDirty);
             std::printf("[CLI] experiment.animlive %s path=%s enabled=%d "
                 "clip=%u elapsed=%.4f duration=%.4f loop=%d clips=%zu "
                 "bones=%zu palette=%08X\n",
@@ -6449,8 +6450,16 @@ namespace ConsoleCmd
                 duration, animator->IsClipLooping(clipIndex) ? 1 : 0,
                 animator->GetClipCount(), bones, digest);
         }
-        std::printf("[CLI] experiment.animlive done animators=%zu\n",
-            animatorCount);
+        // 프록시 커밋 누계 — 팔레트가 렌더로 가려면 프록시가 다시 만들어져야
+        // 한다. 시간을 두고 두 번 부를 때 committed가 늘지 않으면 최신 팔레트가
+        // 렌더에 도달하지 않는다(그 상태가 "메시는 나오는데 안 움직인다"다).
+        const RenderProxyCommitMetrics proxy = scene->GetRenderProxyCommitMetrics();
+        std::printf("[CLI] experiment.animlive done animators=%zu "
+            "proxyCommitted=%llu proxyPending=%llu proxyPublishCalls=%llu\n",
+            animatorCount,
+            (unsigned long long)proxy.committed,
+            (unsigned long long)proxy.pending,
+            (unsigned long long)proxy.publishCalls);
     }
 
     static void Cmd_experiment_animtick(const ConsoleCommandContext& ctx)

@@ -4436,6 +4436,33 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPose(Animator& animator)
 	{
 		metrics.queuedRoots = 1;
 	}
+
+	// ★ 본 팔레트는 프록시가 **다시 만들어질 때만** 렌더로 간다
+	//   (ProxyCommand가 m_FinalTransforms를 immutable buffer로 복사한다).
+	//   X8이 프록시 발행을 dirty 게이팅으로 바꾸면서 그 마스크에 "팔레트가
+	//   바뀌었다"에 해당하는 축이 없었다 — 그래서 스킨 메시가 **정상적으로
+	//   그려지되 첫 포즈에서 굳었다**. 오브젝트를 움직이면 Transform dirty가
+	//   올라가 그때만 툭 갱신되는 것으로 확인됐다.
+	//
+	//   렌더러는 애니메이터 소유 엔티티가 아니라 그 **자식**에 붙으므로
+	//   (SK_*), 엔티티 하나가 아니라 서브트리를 훑는다. 프록시가 없는
+	//   엔티티는 빈 목록이라 비용이 사실상 인덱싱뿐이다.
+	//
+	//   ★ localWrites > 0으로 가둔다 — 로컬이 하나도 안 바뀌었으면 포즈가
+	//     그대로이므로(둘은 같은 틱에서 함께 쓰인다) 프레임마다 프록시를
+	//     새로 짓지 않는다. X8의 dedup을 스킨 메시에서만 통째로 버리지 않는다.
+	if (metrics.localWrites > 0)
+	{
+		const ExecIndex paletteSubtreeEnd = graph.subtreeEnd[ownerExec];
+		for (ExecIndex exec = ownerExec; exec < paletteSubtreeEnd; ++exec)
+		{
+			if (exec >= graph.execToEntity.size()) break;
+			const EntityHandle handle = graph.execToEntity[exec];
+			if (!handle.IsValid()) continue;
+			metrics.paletteDirty +=
+				PublishRenderProxyDirty(handle, ProxyDirty::Payload);
+		}
+	}
 	return metrics;
 }
 
