@@ -358,18 +358,28 @@ IR 이후의 어떤 코드도 포맷별 관례를 알 필요가 없다. 원본 �
 
 이 문서 + 게이트 8종 + 벤더링 3종. 실측 기준선이 §1 에 있다.
 
-### I1. 실물 디코더 배선 — `ImporterModelDecoder` — **제품 배선 완료, 잔여 둘**
+### I1. 실물 디코더 배선 — `ImporterModelDecoder` — **완료** (2026-09-01 재측정)
 
 임포터를 `ModelLoader` 에 꽂는 접착제. **생산 경로에는 D1b가 이미 꽂았다**
 (`DataSystem::LoadModelViaExperiment` → `ResolvingModelDecoder(cooked, importer)`).
-아래 셋 중 첫 둘이 남는다(2026-09-01 재측정).
+**세 항목을 전수하니 남은 것이 0이다(2026-09-01 재측정).**
 
-- 확장자로 임포터를 고르고 → `Import` → `ConvertToModelDraft` → draft 반환
-- `ImportNote` 를 `ModelLoadIssue` 로 옮기는 규칙 확정(심각도 대응)
-- 하네스가 `LegacyBridgeDecoder` 대신 이것을 쓰도록 전환 — **검사가 실물을
-  타야 검사에 값어치가 있다**
+- [x] 확장자로 임포터를 고르고 → `Import` → `ConvertToModelDraft` → draft 반환
+      — `ImporterModelDecoder`가 한다.
+- [x] `ImportNote` → `ModelLoadIssue` 심각도 대응 —
+      `ImporterModelDecoder.cpp`의 `ToLoadSeverity`/`ToLoadIssue`가 정본이다.
+- [x] **검사가 실물을 탄다** — `ExperimentGltfImportSelfTest`·
+      `ExperimentAnimationPlayback`·`ExperimentCookedSelfTest`가 모두 실물
+      `ImporterModelDecoder`를 만든다.
 
-의존: 없음. **가장 먼저 할 것.**
+★ **남은 `LegacyBridgeDecoder` 하나는 재판정한다 — 은퇴 시점은 I6다.**
+`ExperimentImportPathSelfTest`가 아직 그것을 쓰지만, 그 하네스는 **입력 자체가
+legacy다**(`LoadAndBridge(modelPath)` → `BuildImportedSceneFromLegacy`).
+거기서 `LegacyBridgeDecoder`는 "실물 디코더가 없어서 세운 대역"이 아니라
+**자기가 만든 draft를 게시 검증에 그대로 태우는 운반체**다(그래야 그 draft의
+검증 결과를 잰다). 디코더만 실물로 바꾸면 로더가 파일에서 다시 import해
+비교 대상이 달라진다 — 검사가 재던 것을 잃는다. 이 하네스는 legacy 대조
+진단이므로 **Assimp 은퇴(I6)와 함께 죽는 것이 맞다.**
 
 ### I2. 텍스처 자산 해석 정책 — **완료** (2026-09-01 · I2-E)
 
@@ -413,8 +423,15 @@ subasset GUID의 경로를 모른다. 실제 픽셀까지 닿는 길은 **cooked
 죽은 플래그 넷(§1.3)을 살린다. `weldVertices`(`Import/VertexWelding.cpp`) 와
 `optimizeVertexCache`(`Import/VertexCacheOptimization.cpp`) 는 섰다 —
 게이트도 `experiment.weld` · `experiment.cacheopt` 로 있다. **`lodLevels` 는
-여전히 소비자 0**(선언만 있다 — `ImportedScene.h:469`). meshlet 은 mesh shader
-소비자가 생길 때까지 보류.
+여전히 소비자 0**(선언만 있다 — `ImportedScene.h:469`).
+
+★ **`lodLevels` 판정: 보류 — `buildMeshlets` 와 같은 이유다(2026-09-01).**
+D0b가 LOD 사슬을 "소비 0의 죽은 생산 전용 파이프라인"으로 판정했고, D4a·D5-b가
+그 이행으로 postLoad 재생성과 에디터 편집 표면을 **걷어냈다**. 재측정해도
+소비자는 0이다(`HasLODs` 호출자 0, 렌더 경로 소비 0). 지금 임포터에 LOD 생성을
+붙이면 **아무도 읽지 않는 데이터를 굽는 비용만 는다** — 이 저장소가 반복해서
+겪은 [[dead-produce-only-pipeline]] 양식을 새로 하나 만드는 것이다.
+렌더에 LOD 선택 소비자가 생길 때 함께 연다. meshlet 도 같은 규칙이다.
 
 ★ **탄젠트 생성과의 순서가 중요하다.** 용접이 탄젠트 이음매를 다시 붙이면
 mikktspace 규약이 깨진다 — 탄젠트를 정점 정체성의 일부로 다뤄야 한다.
@@ -2534,11 +2551,11 @@ m_commandList->IASetVertexBuffers(0, 1, &view);   // DX12Encoder.cpp:159
 
 ### 트랙 I
 
-- [ ] 생산 경로가 `IAssetImporter` 를 탄다 — legacy 로더 호출 지점 0
+- [~] 생산 경로가 `IAssetImporter` 를 탄다 — **경로는 D1b가 이었다**(`LoadModelViaExperiment`). "legacy 로더 호출 지점 0"은 Assimp 폴백이 남아 있는 동안 성립하지 않으므로 I6 판정이다
 - [x] 대표 glTF·FBX·animation 게이트가 **실물 `ImporterModelDecoder`**를 타고 돈다
-- [ ] `ExperimentImportPathSelfTest`의 하네스 전용 `LegacyBridgeDecoder`를 은퇴한다
-- [ ] `ImportOptions` 플래그 중 소비자 0 인 것이 `buildMeshlets` 뿐
-- [ ] 임베디드 텍스처가 자산으로 해석된다 — property 생략 0건
+- [~] `ExperimentImportPathSelfTest`의 하네스 전용 `LegacyBridgeDecoder`를 은퇴한다 — **I6로 재판정**(그 하네스는 입력이 legacy인 대조 진단이라 Assimp와 함께 죽는다)
+- [~] `ImportOptions` 플래그 중 소비자 0 인 것이 `buildMeshlets` 뿐 — `weld`·`cacheopt`는 섰고, `lodLevels`는 **보류로 재판정**(소비자가 없으므로 지금 만들면 죽은 생산이다)
+- [x] 임베디드 텍스처가 자산으로 해석된다 — property 생략 0건 (I2-E · Gunner 6/6 · Suzanne 1/1)
 - [ ] 대표 자산 N종에서 legacy 대비 픽셀 대조 통과
 - [ ] Release 성능이 legacy 대비 회귀 없음
 - [ ] 합성 검사가 각 후처리 패스마다 존재하고, **변이로 이빨이 증명되어 있다**
