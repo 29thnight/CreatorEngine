@@ -32,9 +32,15 @@ namespace
 	//
 	// base를 로드해 소유 사본을 만들고 override를 겹친다. 실패는 부분 결과를
 	// 내지 않는다 — 지어낸 재질로 조용히 그리는 것보다 빈 재질이 낫다.
+	// I5-D5c1 — override를 legacy와 experiment 인스턴스에 **한 번의 파싱으로**
+	// 함께 얹는다. 두 번 파싱하면 backend 탈출구가 하나 더 생겨 D3-b 래칫이
+	// 역행한다 — 실제로 그렇게 짰다가 게이트가 잡았다(래칫은 raw 텍스트를
+	// 세므로 주석에 그 함수 이름을 적는 것만으로도 계수가 는다).
+	// outInstance는 선택이다(nullptr이면 legacy만).
 	[[nodiscard]] bool DecodeMaterialReferenceNode(
 		const Authoring::ReadNode materialNode, std::shared_ptr<Material>& outMaterial,
-		FileGuid& outBaseGuid, std::string& outError)
+		FileGuid& outBaseGuid, std::string& outError,
+		experiment::MaterialInstance* outInstance = nullptr)
 	{
 		const Authoring::ReadNode ref = materialNode["ref"];
 		if (!ref || !ref.IsScalar())
@@ -106,52 +112,21 @@ namespace
 				{
 					return false;
 				}
+				// 같은 값을 experiment 인스턴스에도 얹는다 — 두 표현이 같은
+				// 파싱 결과를 공유해야 병행 대조가 의미를 갖는다.
+				if (nullptr != outInstance
+					&& !outInstance->SetPropertyOverride(property.name,
+						property.value))
+				{
+					outError = "override 설치 거부: " + property.name;
+					return false;
+				}
 			}
 		}
 
 		DataSystems->FinalizeMaterialRuntime(*owned);
 		outMaterial = std::move(owned);
 		outBaseGuid = baseGuid;
-		return true;
-	}
-
-	// I5-D5c1 — 같은 ref 노드의 override를 experiment 인스턴스에 얹는다.
-	// legacy 겹치기(DecodeMaterialReferenceNode)와 **같은 코덱·같은 순서**를
-	// 쓴다 — 두 번째 표기를 만들면 병행 대조가 무의미해진다.
-	[[nodiscard]] bool ApplyReferenceOverridesToInstance(
-		const Authoring::ReadNode materialNode,
-		experiment::MaterialInstance& instance, std::string& outError)
-	{
-		if (const Authoring::ReadNode selections = materialNode["keywordSelections"];
-			selections && selections.IsSequence())
-		{
-			// keywordSelections는 인덱스 표기(축 순서)라 이름 override로
-			// 옮길 수 없다 — base의 것을 그대로 두고 D5-c2의 resolver
-			// 배선에서 판정한다(지금 지어내면 화면이 조용히 달라진다).
-		}
-		const Authoring::ReadNode overrides = materialNode["overrides"];
-		if (!overrides || !overrides.IsSequence()) return true;
-
-		for (const Authoring::ReadNode entry : overrides)
-		{
-			if (!entry.IsMap() || !entry["name"] || !entry["name"].IsScalar())
-			{
-				outError = "override 항목에 name이 없다";
-				return false;
-			}
-			const std::string name = entry["name"].AsString();
-			experiment::MaterialPropertyValue value;
-			if (!experiment::DeserializeMaterialPropertyValue(
-					entry.BackendNodeDuringTransition(), name, value, outError))
-			{
-				return false;
-			}
-			if (!instance.SetPropertyOverride(name, std::move(value)))
-			{
-				outError = "override 설치 거부: " + name;
-				return false;
-			}
-		}
 		return true;
 	}
 
@@ -377,34 +352,27 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 		std::shared_ptr<Material> resolved;
 		FileGuid baseGuid;
 		std::string error;
+		// I5-D5c1 — base 저작 원본을 먼저 세운다. 그래야 아래 한 번의 파싱이
+		// override를 legacy와 인스턴스 양쪽에 함께 얹는다(ref는 노드가 갖고
+		// 있으므로 base GUID를 미리 읽는다).
+		if (const Authoring::ReadNode ref = materialNode["ref"];
+			ref && ref.IsScalar())
+		{
+			SetExperimentMaterialBase(DataSystems->LoadAuthoredMaterialShared(
+				FileGuid(ref.AsString())));
+		}
 		if (DecodeMaterialReferenceNode(materialNode, resolved, baseGuid,
-			error))
+			error, GetMaterialInstance()))
 		{
 			m_Material = std::move(resolved);
 			m_materialBaseGuid = baseGuid;
-			// I5-D5c1 — 같은 base의 저작 원본을 experiment 쪽에도 세우고
-			// 씬의 diff를 override로 얹는다. legacy 겹치기(위)와 병행이며,
-			// 게이트가 두 결과를 CB bytes로 대조한다.
-			SetExperimentMaterialBase(
-				DataSystems->LoadAuthoredMaterialShared(baseGuid));
-			if (experiment::MaterialInstance* instance = GetMaterialInstance())
-			{
-				std::string overrideError;
-				if (!ApplyReferenceOverridesToInstance(materialNode, *instance,
-					overrideError))
-				{
-					// 병행 표현만 버린다 — legacy 경로는 이미 성립했다.
-					Debug->LogWarning("m_Material experiment override 적용 실패"
-						" — 병행 표현을 비운다: " + overrideError);
-					SetExperimentMaterialBase(nullptr);
-				}
-			}
 		}
 		else
 		{
 			Debug->LogError("MeshRenderer m_Material base 참조 해석 실패 — "
 				"재질을 비운다: " + error);
 			m_Material.reset();
+			SetExperimentMaterialBase(nullptr); // 부분 상태를 남기지 않는다
 		}
 	}
 	else if (const Authoring::ReadNode materialNode = node["m_Material"];

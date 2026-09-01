@@ -903,19 +903,21 @@ std::shared_ptr<const experiment::Material> DataSystem::LoadAuthoredMaterialShar
 	const file::path path = GetFilePath(assetGuid);
 	if (path.empty()) return nullptr;
 
+	// I5-D5c1 — 문서 파싱은 **기존 payload 디코더 하나**만 쓴다. 여기서 YAML
+	// backend 노드를 직접 열면 D3-b 래칫의 탈출구가 하나 더 생긴다(실제로
+	// 그렇게 짰다가 게이트가 잡았다). legacy 산물은 버린다 — 이 창구가 원하는
+	// 것은 authored 쪽이고, 캐시라 자산당 1회다.
 	const Authoring::ReadNode node{ MetaYml::LoadFile(path.string()) };
-	const YAML::Node& backend = node.BackendNodeDuringTransition();
-	if (!backend || !backend.IsMap()) return nullptr;
-	// legacy 표기 자산에는 저작 원본이 없다 — 지어내지 않는다.
-	if (!backend["schema"] || !backend["shaderAssetId"]) return nullptr;
-
+	Material discardedLegacy;
 	auto authored = std::make_shared<experiment::Material>();
-	std::string error;
-	if (!experiment::DeserializeMaterialAuthoring(backend, *authored, error))
+	if (!DeserializeMaterialPayload(discardedLegacy,
+		Authoring::NodeViewAccess::Make(node), authored.get()))
 	{
-		Debug->LogError("base 재질 저작 원본 decode 실패: " + error);
 		return nullptr;
 	}
+	// legacy 표기 자산에는 저작 원본이 없다 — 지어내지 않는다(디코더가
+	// outAuthored를 건드리지 않으므로 shaderAssetId가 nil로 남는다).
+	if (experiment::AssetId{} == authored->shaderAssetId) return nullptr;
 
 	std::lock_guard<std::mutex> guard(m_authoredMaterialMutex);
 	auto& slot = m_authoredMaterials[assetGuid];
