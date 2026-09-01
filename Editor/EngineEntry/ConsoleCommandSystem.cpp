@@ -6349,6 +6349,65 @@ namespace ConsoleCmd
         }
     }
 
+    // 라이브 재생 관측 — experiment.animlive
+    //
+    // ★ 이 저장소에는 **살아 있는 애니메이터가 실제로 도는가**를 재는 축이
+    //   없었다(헤드리스는 프레임을 완성하지 않고, 라이브 게이트는 저장 직전에
+    //   Animator를 꺼 버리며, animtick은 포즈를 다시 계산할 뿐 라이브 팔레트를
+    //   읽지 않는다). B4b 되돌림의 직접 사유가 그 공백이라, 그 자리를 메우는
+    //   가장 작은 관측부터 세운다.
+    //
+    // 재는 것: 애니메이터별 경로·선택 클립·경과 시간과 **라이브 팔레트
+    // (m_FinalTransforms)의 digest**. 시간을 두고 두 번 부르면 digest가
+    // 달라져야 "재생 중"이다 — 같으면 팔레트가 굳은 것이고, 그것이 화면에서
+    // 안 움직이는 것의 직접 원인이다.
+    static void Cmd_experiment_animlive(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] experiment.animlive fail 활성 씬 없음\n");
+            return;
+        }
+        std::size_t animatorCount = 0;
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            Animator* animator = object->GetComponent<Animator>();
+            if (nullptr == animator) continue;
+            if (0 == animator->GetSkeletonSerial()) continue;
+
+            ++animatorCount;
+            std::uint32_t digest = 2166136261u;
+            const std::size_t bones =
+                (std::min)(animator->GetBoneCount(), (std::size_t)MAX_BONES);
+            for (std::size_t bone = 0; bone < bones; ++bone)
+            {
+                const float* values = &animator->m_FinalTransforms[bone].m[0][0];
+                for (int element = 0; element < 16; ++element)
+                {
+                    const std::int32_t quantized = static_cast<std::int32_t>(
+                        std::lround(static_cast<double>(values[element]) * 4096.0));
+                    std::uint32_t bits = static_cast<std::uint32_t>(quantized);
+                    for (int byte = 0; byte < 4; ++byte)
+                    {
+                        digest ^= (bits >> (byte * 8)) & 0xFFu;
+                        digest *= 16777619u;
+                    }
+                }
+            }
+            std::printf("[CLI] experiment.animlive %s path=%s enabled=%d "
+                "clip=%u elapsed=%.4f bones=%zu palette=%08X\n",
+                object->GetHashedName().ToString().c_str(),
+                animator->m_experimentModel ? "experiment" : "legacy",
+                animator->IsEnabled() ? 1 : 0,
+                animator->m_AnimIndexChosen, animator->m_TimeElapsed,
+                bones, digest);
+        }
+        std::printf("[CLI] experiment.animlive done animators=%zu\n",
+            animatorCount);
+    }
+
     static void Cmd_experiment_animtick(const ConsoleCommandContext& ctx)
     {
         Scene* scene = SceneManagers->GetActiveScene();
@@ -11466,6 +11525,7 @@ namespace ConsoleCmd
             reg({ "experiment.modelbridge" }, &Cmd_experiment_modelbridge);
             reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
+            reg({ "experiment.animlive" }, &Cmd_experiment_animlive);
             reg({ "experiment.animtick" }, &Cmd_experiment_animtick);
             reg({ "experiment.animevent" }, &Cmd_experiment_animevent);
             reg({ "experiment.boneresolve" }, &Cmd_experiment_boneresolve);
