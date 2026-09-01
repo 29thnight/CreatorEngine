@@ -2727,6 +2727,10 @@ namespace
                     if (source.material)
                     {
                         pooled.materialSource = std::move(source.material);
+                        // I5-D5c4 — Foliage도 저작 정본을 나른다(poolMesh와 같은
+                        // 규약). sealing 직행·texture 해석에 그대로 합류한다.
+                        pooled.authoredMaterialSource =
+                            std::move(source.authoredMaterial);
                         const Material* material = pooled.materialSource.get();
                         pooled.isTransparent =
                             MaterialRenderingMode::Transparent == material->m_renderingMode;

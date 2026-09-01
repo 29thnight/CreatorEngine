@@ -198,6 +198,9 @@ public:
 		// 합류한다 — 없으면 legacy lookup 폴백.
 		std::shared_ptr<const experiment::Model> experimentModel{};
 		uint32 experimentMeshIndex{ 0 };
+		// I5-D5c4 — 재질 저작 정본(FoliageType 병행 필드의 사본). drawPool이
+		// pooled.authoredMaterialSource로 옮겨 sealing 직행에 합류시킨다.
+		std::shared_ptr<const experiment::Material> authoredMaterial{};
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::aabb worldBounds{};
 		uint32 foliageTypeID{};

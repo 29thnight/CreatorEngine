@@ -8,7 +8,8 @@
 // 보관할 수 있으므로 Mesh·Material 정의 없이도 소유권 계약을 표현할 수 있다.
 class Mesh;
 class Material;
-namespace experiment { class Model; } // I5-D5a: 메시 핸들 병행
+namespace experiment { class Model; }
+namespace experiment { struct Material; } // I5-D5c4 // I5-D5a: 메시 핸들 병행
 
 struct FoliageType
 {
@@ -29,6 +30,12 @@ struct FoliageType
     // 렌더 drawPool이 이것을 아이템 experimentView로 나른다(D4b 사슬 합류).
     std::shared_ptr<const experiment::Model> m_experimentModel{};
     std::uint32_t m_experimentMeshIndex{ 0 };
+    // I5-D5c4(S2c-2c) — 재질의 experiment 저작 정본. 메시 핸들과 같은 지위의
+    // 비직렬화 런타임 필드다. Foliage 자산은 재질을 따로 저작하지 않고 모델
+    // 것을 그대로 쓰므로, 정본도 같은 experiment 모델에서 온다(메시가 가리키는
+    // MaterialIndex) — MeshRenderer처럼 씬 diff를 얹을 표면이 없어 인스턴스가
+    // 아니라 base 값 그대로다.
+    std::shared_ptr<const experiment::Material> m_authoredMaterial{};
     bool m_castShadow{ true };
     bool m_isShadowRecive{ true };
 	std::string m_modelName{};

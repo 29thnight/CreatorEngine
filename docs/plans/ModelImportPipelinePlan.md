@@ -641,7 +641,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | ↳ M5-S2c-1 ✅ | 모델 GUID 자립 — `MeshRenderer::m_modelGuid` 신설, m_fileGuid 편법 이주, InstantiateOwned 비승계 | 씬 스키마·cook 폐포 | 없음 |
 | ↳ M5-S2c-2a ✅ | 저작 소유 분리 — base 참조(ref)+diff 저작, 피커 링크·소유 사본 (reflect 퇴출은 2b로) | 씬 스키마·피커 | 없음 |
 | ↳ M5-S2c-2b | 런타임 소유 분리 — base(experiment)+`MaterialInstance`, 프록시·sealing 타입 전환 | 프록시 사슬·CLR/Inspector | **소비자** 참조 감소 |
-| ↳ M5-S2c-2c | Foliage — `FoliageType.m_material` experiment 전환(비직렬화·저위험) | Foliage·required packet | 없음 |
+| ↳ M5-S2c-2c ✅ | Foliage — `FoliageType.m_authoredMaterial` 병행(D5-c4에서 이행) | Foliage·required packet | 없음 |
 | ↳ M5-S3 ✅ | CLR API 재구현 — 논리 값 경로, C# ABI 유지 | ClrHost | **소비자** 참조 감소 |
 | ↳ M5-S4 ✅ | Editor Inspector — 논리 값 편집·동적 property 편집기·드롭타겟 GUID 정본화 | Inspector | **소비자** 참조 감소 |
 | **I5-D** | `experiment::Model` 직접 소비 **+ V4 레이아웃 유도** — 아래 슬라이스로 분해(착수 정찰 2026-08-31) | 제품 렌더 | **소비자** 참조 감소 |
@@ -672,7 +672,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c2-2 ✅ | sealing 직행 — `ApplyAuthoredMaterial`(properties·keywords·blendMode만, 부속은 전환기 legacy)·프록시 값 스냅샷·drawPool 반입·양 sealing 축·프록시 운반 게이트(12d, M3 변이 증명) | 프록시·sealing | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-1 ✅ | 편집 반영 — 편집 창구 6종에 인스턴스 경로·Inspector/CLR 호출부 전환·세대(Revision) 기반 프록시 재스냅샷·RED→GREEN 게이트(13) | 편집 창구·프록시 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c3-2 ✅ | texture owner 정본화 — `ApplyAuthoredTextures`(M2 resolver의 **첫 제품 소비자**)·양 sealing 축·owner A/B 게이트(14·14b, M4 변이 증명). flow·legacy 스칼라는 논리 property 승격 선행이라 존치 | resolver·sealing | **소비자** 참조 감소 |
-| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c4 | Foliage(S2c-2c) + `m_Material` reflect 퇴출·프리팹 패치 경로 판정(S2c-2a 이월) | Foliage·프리팹 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;&nbsp;&nbsp;↳ D5-c4 ✅ | Foliage 재질 experiment 전환(S2c-2c) — 메시가 가리키는 MaterialIndex에서 정본 해석·DrawSource 운반·바인딩/운반 2축 게이트(M6 변이 증명). **reflect 퇴출은 I6로 재판정**(아래 근거) | Foliage | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
 **I5-D 착수 정찰 (2026-08-31) — 파급면 3방향 전수.**
@@ -987,6 +987,35 @@ c3(소비자 전환) → c4(Foliage·reflect 퇴출).
 슬라이스에 **실자산 게이트는 판별력이 0이고 합성이 필수**다(D5-a Foliage와 같은
 결론). M5를 "완료"로 적어 둔 것은 코드 기준이지 저작분 기준이 아니다 —
 코퍼스 마이그레이션은 별도 트랙으로 남는다.
+
+**I5-D5c4 완료 실측 (2026-09-01).** Foliage 재질의 experiment 전환(S2c-2c 이행).
+D5-a가 깔아 둔 `m_experimentModel`에서 재질 정본도 얻는다 — **메시가 가리키는
+MaterialIndex**가 출처다(`TryGetMesh`→`mesh->material`→`TryGetMaterial`). legacy
+저작 경로가 `GetMaterialShared(0)` 고정이었던 것은 메시-재질 대응을 무시하는
+편법인데, 여기서는 실제 대응을 쓴다. 값 복사 없이 **aliasing shared_ptr**로 모델
+generation 수명에 묶는다(모델은 immutable이라 안전하다). `DrawSource`가 그것을
+나르고 `poolFoliage`가 `pooled.authoredMaterialSource`로 옮겨 **c2-2 sealing 직행과
+c3-2 texture 해석에 그대로 합류**한다 — Foliage 전용 경로를 새로 만들지 않았다.
+
+게이트는 축을 둘로 나눈다: 바인딩(`authoredMat`)과 **운반**(`authoredMatDraws`).
+컴포넌트 바인딩만 세면 프록시 복사 누락에 눈멀기 때문이다 — D5-a의 M2가 가른 바로
+그 자리다. 실측 on(`types=1 bound=1 draws=1 views=1 authoredMat=1
+authoredMatDraws=1`)·off 대조군(전부 0). **변이 M6**(DrawSource 재질 복사 생략)이
+`[재질 운반: 0/1]`로 **운반 축만** 붉혔다(바인딩은 초록) — 두 축이 독립임을 증명한다.
+
+★ **`m_Material` reflect 퇴출은 하지 않고 I6로 재판정한다 — 지금 하면 손해다.**
+S2c-2a가 "2b에서 패치 경로와 함께 판정"으로 미룬 항목인데, 실측이 셋을 말한다.
+① **코퍼스 전체의 프리팹 오버라이드가 1건이고 그것은 `m_shadowCast`다**
+(`m_propertyName:` 전수) — `m_Material` 오버라이드는 0건이라 지금 빼도 회귀는 없다.
+② 그러나 **기능은 사라진다**: `PrefabUtility::ApplyRecordedOverrides`는
+`Meta::Serialize`→override 덮기→`Meta::Deserialize`로 **typed만** 돌고 postLoad가
+없다. reflect에서 빠지면 재질 오버라이드는 기록도 적용도 되지 않는다. ③ 패치 경로에
+postLoad를 붙이는 것은 **부작용이 크다** — `MeshRenderer::OnDeserialized`는 모델 GUID
+해석·메시 재해석·재질 재해석을 통째로 도는 훅이라, 오버라이드 하나 적용에 그 전부를
+다시 태우게 된다.
+반면 **남겨 둬도 해악이 없다**: 영속의 정본은 훅(`OnAfterSerialize`/`OnDeserialized`)이
+전담하고 typed가 적는 값은 postLoad가 덮는다. I6에서 legacy `Material` 자체가 죽을
+때 이 필드도 함께 사라지는 것이 가장 값싼 순서다.
 
 **I5-D5c3-2 완료 실측 (2026-09-01).** texture generation owner를 저작 GUID에서
 얻는다 — **M2 `MaterialResolver`의 첫 제품 소비자**다(c1의 `MaterialInstance`와 같은

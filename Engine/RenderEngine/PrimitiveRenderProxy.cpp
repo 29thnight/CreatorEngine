@@ -62,6 +62,7 @@ FoliageRenderProxy::CaptureDrawSources() const
 			draw.material = type.m_material;
 			draw.experimentModel = type.m_experimentModel;
 			draw.experimentMeshIndex = type.m_experimentMeshIndex;
+			draw.authoredMaterial = type.m_authoredMaterial; // I5-D5c4
 			draw.worldMatrix = instance->m_worldMatrix;
 			draw.worldBounds = math::transform(
 				type.m_mesh->GetBoundingBox(), instance->m_worldMatrix);

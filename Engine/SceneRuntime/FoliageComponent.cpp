@@ -2,6 +2,7 @@
 #include "FoliageSystem.h"
 #include "Model.h"
 #include "DataSystem.h"
+#include "Experiment/Model.h" // I5-D5c4: 재질 저작 정본 해석
 #include "Interfaces/AssetAuthoringPort.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
@@ -140,9 +141,26 @@ void FoliageComponent::BindExperimentMesh(FoliageType& type)
     // 실패(미등록·스위치 off)는 핸들 없음 — 렌더가 legacy lookup 폴백을 탄다.
     type.m_experimentModel.reset();
     type.m_experimentMeshIndex = 0;
+    type.m_authoredMaterial.reset();
     if (nullptr == type.m_mesh) return;
     DataSystems->TryGetExperimentMeshBinding(
         *type.m_mesh, type.m_experimentModel, type.m_experimentMeshIndex);
+
+    // I5-D5c4(S2c-2c) — 재질 저작 정본도 같은 모델에서 잇는다. 메시가 가리키는
+    // MaterialIndex가 정본이다(legacy는 GetMaterialShared(0) 고정이었는데 그것은
+    // 메시-재질 대응을 무시하는 편법이다 — 여기서는 실제 대응을 쓴다).
+    if (!type.m_experimentModel) return;
+    const experiment::Model& model = *type.m_experimentModel;
+    const experiment::Mesh* mesh = model.TryGetMesh(
+        experiment::MeshIndex{ type.m_experimentMeshIndex });
+    if (nullptr == mesh) return;
+    const experiment::Material* material = model.TryGetMaterial(mesh->material);
+    if (nullptr == material) return;
+    // 모델은 immutable generation이라 그 안의 재질을 값 복사 없이 가리킨다 —
+    // aliasing shared_ptr가 모델 수명에 묶어 준다.
+    type.m_authoredMaterial =
+        std::shared_ptr<const experiment::Material>(type.m_experimentModel,
+            material);
 }
 
 void FoliageComponent::AddFoliageType(const FoliageType& type)

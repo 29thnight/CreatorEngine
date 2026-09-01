@@ -4137,6 +4137,7 @@ namespace ConsoleCmd
         const auto& types = foliage->GetFoliageTypes();
         if (types.empty()) failures.push_back("왕복: 타입 0(자산 재로드 실패)");
         std::size_t boundTypes = 0;
+        std::size_t authoredMaterialTypes = 0, authoredMaterialDraws = 0;
         for (const FoliageType& type : types)
         {
             if (nullptr == type.m_mesh)
@@ -4145,6 +4146,9 @@ namespace ConsoleCmd
                 continue;
             }
             if (type.m_experimentModel) ++boundTypes;
+            // I5-D5c4(S2c-2c) — 재질 저작 정본도 같은 모델에서 잇는다. 메시
+            // 핸들만 세면 재질 배선이 끊겨도 초록이다(축이 하나 모자란다).
+            if (type.m_authoredMaterial) ++authoredMaterialTypes;
         }
         if (expectExperiment && boundTypes != types.size())
         {
@@ -4157,6 +4161,17 @@ namespace ConsoleCmd
             failures.push_back("바인딩: off인데 experiment 핸들 "
                 + std::to_string(boundTypes));
         }
+        if (expectExperiment && authoredMaterialTypes != types.size())
+        {
+            failures.push_back("재질: 저작 정본 "
+                + std::to_string(authoredMaterialTypes) + "/"
+                + std::to_string(types.size()));
+        }
+        if (!expectExperiment && 0 != authoredMaterialTypes)
+        {
+            failures.push_back("재질: off인데 저작 정본 "
+                + std::to_string(authoredMaterialTypes));
+        }
 
         // 실물 프록시 사슬 — 생성자·색인·DrawSource 캡처를 제품 함수 그대로.
         FoliageRenderProxy proxy(foliage);
@@ -4166,6 +4181,7 @@ namespace ConsoleCmd
         std::size_t viewCompleteDraws = 0;
         for (const auto& draw : draws)
         {
+            if (draw.authoredMaterial) ++authoredMaterialDraws;
             if (nullptr == draw.experimentModel) continue;
             RHIExperimentVertexView view{};
             if (DataSystem::BuildExperimentVertexView(*draw.experimentModel,
@@ -4185,13 +4201,28 @@ namespace ConsoleCmd
             failures.push_back("뷰: off인데 완비 "
                 + std::to_string(viewCompleteDraws));
         }
+        // DrawSource가 재질 정본을 나르는가 — 컴포넌트 바인딩만 보면 프록시
+        // 복사 누락에 눈멀다(D5-a의 M2 변이가 가른 그 축과 같은 자리).
+        if (expectExperiment && authoredMaterialDraws != draws.size())
+        {
+            failures.push_back("재질 운반: "
+                + std::to_string(authoredMaterialDraws) + "/"
+                + std::to_string(draws.size()));
+        }
+        if (!expectExperiment && 0 != authoredMaterialDraws)
+        {
+            failures.push_back("재질 운반: off인데 "
+                + std::to_string(authoredMaterialDraws));
+        }
 
         if (failures.empty())
         {
             std::printf("[CLI] experiment.foliage verify pass mode=%s "
-                "types=%zu bound=%zu draws=%zu views=%zu\n",
+                "types=%zu bound=%zu draws=%zu views=%zu "
+                "authoredMat=%zu authoredMatDraws=%zu\n",
                 expectExperiment ? "experiment" : "legacy",
-                types.size(), boundTypes, draws.size(), viewCompleteDraws);
+                types.size(), boundTypes, draws.size(), viewCompleteDraws,
+                authoredMaterialTypes, authoredMaterialDraws);
         }
         else
         {
