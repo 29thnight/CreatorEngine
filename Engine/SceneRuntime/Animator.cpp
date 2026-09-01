@@ -88,19 +88,26 @@ namespace
 void Animator::EnsureExperimentAnimationBinding()
 {
 	// I5-D4e-1 — 재생 데이터의 experiment 핸들. m_Motion(모델 GUID — 역브리지
-	// 폴백 규약)이 정본 창구다. legacy와 본·클립 계수가 어긋나면 핸들을 비워
-	// legacy 틱으로 폴백한다(반쪽 소비 금지 — 인덱스 1:1 계약이 전제라서다).
+	// 폴백 규약)이 정본 창구다.
+	//
+	// ★ I6-B0 — 바인딩이 legacy에서 자립한다. 예전엔 m_Skeleton이 없으면 즉시
+	//   돌아서고 본·클립 계수를 legacy와 대조해 불일치면 핸들을 비웠다 —
+	//   공유 자산이 없으면 experiment 경로가 **원리적으로 켜지지 않는** 구조라
+	//   legacy 은퇴의 첫 자물쇠였다. 그 대조가 지키던 것(인덱스 1:1)은 이미
+	//   상시 게이트가 코퍼스 전수에서 증명한다 — 팔레트 파리티(6)·본 해석(8)·
+	//   마스크(9) 오차 0. 런타임 대조는 그 위의 이중 잠금이었고, 은퇴하면
+	//   대조할 상대 자체가 사라진다. 대신 experiment 내부 불변식(본이 있다·
+	//   루트가 범위 안)을 직접 검사한다 — 독립 유도라야 대조군이 된다.
 	m_experimentModel.reset();
 	m_experimentBoneRegions.clear();
-	if (FileGuid{} == m_Motion || nullptr == m_Skeleton) return;
+	if (FileGuid{} == m_Motion) return;
 
 	std::shared_ptr<const experiment::Model> source =
 		DataSystems->TryGetExperimentModel(m_Motion);
 	if (nullptr == source) return;
 	const experiment::Skeleton* skeleton = source->TryGetSkeleton();
-	if (nullptr == skeleton
-		|| skeleton->bones.size() != m_Skeleton->m_bones.size()
-		|| skeleton->clips.size() != m_Skeleton->m_animations.size())
+	if (nullptr == skeleton || skeleton->bones.empty()
+		|| !experiment::IsInRange(skeleton->rootBone, skeleton->bones.size()))
 	{
 		return;
 	}
@@ -255,8 +262,18 @@ void Animator::UpdateAnimation()
 	if (m_AnimIndex <= 0)
 		m_AnimIndex = 0;
 
-	if (m_AnimIndex >= m_Skeleton->m_animations.size())
-		m_AnimIndex = m_Skeleton->m_animations.size() - 1;
+	// I6-B0 — 클립 계수는 창구가 정본이다(experiment 우선·legacy 폴백).
+	// 이전엔 m_Skeleton을 **가드 없이** 역참조했다 — 모델이 안 붙은 Animator에
+	// SetAnimation이 닿으면 그 자리에서 죽는다. 클립이 0이면 선택도 0이다.
+	const std::size_t clipCount = GetClipCount();
+	if (0 == clipCount)
+	{
+		m_AnimIndex = 0;
+	}
+	else if (static_cast<std::size_t>(m_AnimIndex) >= clipCount)
+	{
+		m_AnimIndex = static_cast<int>(clipCount) - 1;
+	}
 
 	m_AnimIndexChosen = m_AnimIndex;
 	m_TimeElapsed = 0;

@@ -2186,7 +2186,7 @@ Assimp 삭제가 뒤**다. 이 절의 제목("전환 — Assimp 은퇴")이 반�
 | 슬라이스 | 내용 | 선행 |
 |---|---|---|
 | **I6-A** ✅ | 판정 — **전부 폐기**(2026-09-01). `model.cache.build`·`rebuild-model-assets.ps1` 제거, asset-authoring 게이트를 폐기의 대우로 뒤집어 기준선 붉음 하나를 없앴다 | 없음 |
-| **I6-B** | `Skeleton` 은퇴 — D4e가 낸 창구(`ResolveBoneIndex`·마스크·재생 핸들)를 정본으로 승격하고 `m_Skeleton` 소비 44곳을 옮긴다 | A |
+| **I6-B** ◐ | `Skeleton` 은퇴 — D4e가 낸 창구를 정본으로 승격하고 잔여 접촉을 옮긴다. **아래 B0~B5로 분해**(착수 정찰 2026-09-01 둘째) | A |
 | **I6-C** ◐ | `Mesh` 은퇴 — **신원 축은 닫혔다**(2026-09-01: 맵·배치·정렬 키가 값으로, Shadow 반경도 값으로, `draw.mesh`는 업로드 폴백 3줄만). 남은 것은 `m_Mesh`·`FoliageType::m_mesh` 소유와 업로드 폴백 자체 | A |
 | **I6-D** | `Material` 은퇴 — `MaterialInstance`가 정본. reflect `m_Material`·`m_IOR`·flow 인스턴스 채널·legacy 호환 스칼라 청산(D5-c5가 "제품 소비 0"을 이미 실측했다) | A |
 | **I6-E** | 삭제 — 역브리지·`ModelLoader`·`SkeletonLoader`·`AnimationLoader`·`Model.cpp`·`Material.cpp`·assimp 벤더링, 하네스(`ExperimentImportPathSelfTest`·`ExperimentLegacyBridge`)와 `CREATOR_EXPERIMENT_VERTEX`·`Mesh`의 `friend class DataSystem` | B·C·D |
@@ -2217,6 +2217,89 @@ runtime reload는 살아 있는 표면이라 그대로 잰다.
 이로써 이 세션 내내 "기준선 붉음"으로 넘겨 온 둘 중 하나가 사라진다. 남은
 하나(`verify-hierarchy-read-boundary` H3 7건)는 D1a의 bone/node parentIndex
 시공이고, 그것도 I6-B/E에서 함께 죽는다.
+
+**I6-B 착수 정찰 (2026-09-01) — 자물쇠가 바인딩에 있었고, H3 붉음은 B 몫이 아니다.**
+
+**측정 ① — 계획서의 "44곳"은 줄 수였고, 실접촉은 다르다.** 주석을 걷어내고 센
+`m_Skeleton` **코드 접촉은 73건 · 11파일**이다(격리 하네스 `Editor/RenderTests` 제외).
+줄 기준으로는 76이고, 그 차이가 곧 **주석이 접촉을 부풀린다**는 실측이다 —
+은퇴를 설명하는 주석 한 줄이 래칫을 거꾸로 올린다.
+
+| 파일 | 접촉 | 성격 |
+|---|---|---|
+| `Animator.cpp` | 16 | 바인딩·직렬화·클램프 |
+| `ConsoleCommandSystem.cpp` | 16 | **에디터 진단·게이트 관측 표면** |
+| `AnimationEventBridge.cpp` | 11 | 창구 4종의 legacy 폴백 |
+| `ModelSceneBridge.cpp` | 8 | 배치 시 `animator->m_Skeleton` 대입·본 트리 계층 생성 |
+| `ModelLoader.cpp` · `Model.cpp` · `Model.h` · `AnimatorData.h` | 10 | **생산자·정의부(I6-E 몫)** |
+| `ExperimentModelMigration.cpp` | 5 | **역브리지(I6-E 몫)** |
+| `AnimationJob.cpp` | 5 | legacy 틱 3함수 + 파리티 게이트 |
+| `Animator.h` | 2 | 필드·reflect |
+
+**측정 ② — 자물쇠는 바인딩 조건문 하나였다.** `EnsureExperimentAnimationBinding`이
+`nullptr == m_Skeleton`이면 즉시 돌아서고, 본·클립 계수를 legacy와 대조해 불일치면
+핸들을 비웠다. 즉 **공유 legacy 자산이 없으면 experiment 재생 경로가 원리적으로 켜지지
+않는다.** 창구 5종(`ResolveBoneIndex`·`BuildAvatarBoneMasks`·이벤트 브리지 4함수)은
+이미 experiment 우선인데, 그 앞의 게이트가 legacy를 요구하고 있었다 — 은퇴의 첫 자물쇠다.
+
+**측정 ③ — H3 기준선 붉음은 B가 아니라 E 몫이다.** 계획서는 "I6-B/E에서 함께 죽는다"고
+적었는데, 재실행하니 **6건 전량이 `ExperimentModelMigration.cpp`**(역브리지의 bone/node
+`m_parentIndex` 시공)이다. B가 아무리 진행돼도 이 붉음은 안 사라진다 — 역브리지가
+죽는 I6-E까지 간다. (계획서의 "7건"도 6건으로 정정한다.)
+
+**측정 ④ — 씬 스키마가 legacy 타입을 지고 있다.** `Animator::reflect`에
+`m_Skeleton` 필드가 있고 `OnDeserialized`가 `node["m_Skeleton"]["m_animations"]`에서
+`m_isLoop`·`m_keyFrameEvent`를 읽어 D4e-2의 `m_clipOverrides`로 옮기며,
+`OnAfterSerialize`가 그 형상에 되입힌다. **타입 은퇴는 저장 표기 이주를 동반한다** —
+D4e-2가 소유는 옮겼지만 표기는 legacy 서브트리 그대로다.
+
+**측정 ⑤ — `BoneComponent.h`의 접촉은 주석뿐이다.** 코드 접촉 0. `m_serial` 캐시
+무효화는 이미 `GetSkeletonSerial()` 창구를 통과한다 — 다만 그 창구가 **legacy serial을
+반환**하므로 B5에서 experiment 신원으로 갈아야 한다.
+
+**분해:**
+
+| 슬라이스 | 내용 | 선행 |
+|---|---|---|
+| **B0** ✅ | 바인딩 자립 — experiment 핸들이 `m_Motion` 단독으로 서고, 클립 클램프가 창구로. 은퇴 래칫 게이트 신설 | 없음 |
+| **B1** | 씬 표기 이주 — `m_Skeleton` 서브트리 표기를 Animator 소유 표기로(읽기 폴백 존치·쓰기 전환) | B0 |
+| **B2** | 배치 경로 — `ModelSceneBridge`의 `animator->m_Skeleton` 대입 3곳과 본 트리 계층 생성 2함수를 experiment parent 순회로 | B0 |
+| **B3** | 틱 단일화 — `UpdateBone`/`UpdateBlendBone`/`UpdateBoneLayer`·`EvaluateParityPose` 폐기, experiment 단일 틱 | B1·B2 |
+| **B4** | 진단 표면 — 콘솔 명령 4종(본 덤프·hierarchy 프로브·이벤트 패리티·본 해석)의 legacy 축 판정과 게이트 재배선 | B3 |
+| **B5** | 필드 제거 — `Animator::m_Skeleton`·`GetSkeletonSerial` experiment 신원 전환·`Skeleton.h` include 청산 | B4 |
+
+**I6-B0 완료 실측 (2026-09-01) — 첫 자물쇠를 풀었다.**
+
+두 줄이 바뀌었다. ① 바인딩이 `m_Motion` 단독으로 서고 불변식을 **experiment 내부에서
+독립 유도**한다(본이 있다 · `rootBone`이 범위 안). ② `UpdateAnimation`의 클립 클램프가
+`GetClipCount()` 창구를 쓴다 — 덤으로 **가드 없는 역참조 하나가 사라졌다**(모델이 안
+붙은 Animator에 `SetAnimation`이 닿으면 그 자리에서 죽던 자리다).
+
+★ **런타임 대조를 지운 근거.** 그 조건이 지키던 것은 "experiment와 legacy의 본·클립
+인덱스가 1:1"이고, 그것은 이미 상시 게이트가 코퍼스 전수에서 증명한다 — 팔레트
+파리티(축 6) · 본 해석(8) · 마스크(9) 오차 0. 런타임 검사는 그 위의 이중 잠금이었고,
+**은퇴하면 대조할 상대 자체가 사라진다**. 남길 수 있는 것은 독립 유도뿐이다
+([[control-group-needs-independent-derivation]]).
+
+★ **게이트는 정적 래칫이다 — 라이브가 이 슬라이스를 못 잰다.** legacy 스켈레톤은
+지금 **항상 존재하므로**(역브리지가 만든다) 자물쇠를 되돌려도 화면도 로그도 안 바뀐다.
+그래서 `verify-legacy-skeleton-retirement`(신설·run-all 편입)가 셋을 잰다: ① 바인딩
+본문의 legacy 접촉 0 ② 클램프 본문의 legacy 접촉 0 ③ **파일별 접촉 래칫**(표에 없는
+파일이 나타나면 새 소비자라 실패). 주석은 걷어내고 센다 — 세면 은퇴를 설명하는 주석이
+래칫을 올린다(`verify-player-runtime-hygiene`이 같은 함정을 이미 밟았다).
+
+**변이 3종으로 이빨을 증명했다**(첫 실행부터 초록이었다):
+
+| 변이 | 반응 |
+|---|---|
+| 바인딩에 `nullptr == m_Skeleton` 전제 복원 | **2건 붉음** — 계약 ①과 Animator.cpp 래칫(16→17)을 정확히 지목 |
+| 래칫 표에 없는 파일(`BoneComponent.h`)에 코드 접촉 1건 추가 | **붉음** — "표에 없는 새 소비자" |
+| 같은 파일에 **주석으로만** 접촉 3건 추가 | **초록**(설계된 눈멂 — 이것이 주석을 안 세는 대가다) |
+
+무회귀: Debug x64 `CreatorEditor` 빌드 exit 0, `verify-experiment-vertex-live` 전체 통과
+(on: model.dual 9 · 업로드 10/10 · 드로우 9 · 커버리지 42411 · 구조 77/77,
+off: 업로드 0 · 드로우 9 · 커버리지 42411) — 애니메이션 축 1e/6/7/8/9와 off 팔 4j/4k 포함.
+래칫 기준선 **73/73 · 11파일**.
 
 **I6-C 착수 실측 (2026-09-01) — 신원을 포인터에서 값으로.** 렌더 패스 셋이
 `Mesh*`를 지오메트리 맵 키·배치 키·정렬 기준으로 쓰고 있었다. 업로드는 D34/D4b가

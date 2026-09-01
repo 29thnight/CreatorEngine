@@ -272,6 +272,14 @@ Run-Step "렌더 지오메트리 신원 경계" {
         (Join-Path $PSScriptRoot "verify-render-geometry-identity.ps1")
 }
 
+# I6-B: legacy Skeleton 은퇴 래칫(정적). 은퇴 슬라이스는 자기 A/B 대조군을
+# 없애므로(타입이 죽으면 off 팔이 지을 것이 없다) 축은 "소비 0"과 "빌드가
+# 막는다"다. 접촉 수가 늘어나는 방향만 막는다.
+Run-Step "legacy Skeleton 은퇴 경계" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-legacy-skeleton-retirement.ps1")
+}
+
 Run-Step "Experiment cooked catalog 기동" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-experiment-cooked-catalog.ps1") -Exe $Exe -Work $Work
