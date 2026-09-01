@@ -70,6 +70,9 @@ experiment.boneresolve
 wait 10
 experiment.animmask
 wait 10
+# I5-D5b: 에디터 실소비 창구 전수 A/B(클립 열거·이름, 메시 존재 가드).
+experiment.editorsurface
+wait 10
 # I5-D5a: Foliage 핸들 왕복·프록시 DrawSource 판정(위 seed의 대구 — 스크립트가
 # 모드 인자를 치환한다).
 experiment.foliage verify __FOLIAGE_MODE__

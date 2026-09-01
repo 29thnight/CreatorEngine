@@ -4333,6 +4333,144 @@ namespace ConsoleCmd
         }
     }
 
+    // I5-D5b — 에디터 실소비 창구의 전수 A/B. 에디터 UI 자체는 헤드리스
+    // 관측 밖이라(--script 라이브는 렌더 0프레임) UI를 재지 않고, UI가
+    // 지나게 된 **창구 두 개**를 씬 전수에 태워 legacy 직소비와 대조한다.
+    //
+    //   clip 축  — Animator::GetClipCount/GetClipName vs
+    //              m_Skeleton->m_animations(size·m_name). 개수만 재면 순서가
+    //              뒤집혀도 초록이라 **이름을 인덱스별로** 맞춘다: 편집
+    //              정본(D4e-2 오버라이드)이 인덱스 축이므로 순서가 어긋나면
+    //              다른 클립을 편집하게 된다.
+    //   mesh 축  — MeshRenderer::HasRenderableMesh vs (bool)m_Mesh. D4f
+    //              이전에는 둘이 동치여야 한다(역브리지가 항상 짝을 만든다).
+    //
+    // 경로 계수(viaExperiment)는 창구 내부의 실분기 관측이다 — 조건 재현이
+    // 아니라서 experiment 분기가 소실돼 legacy 폴백으로 조용히 덮여도 여기서
+    // 갈린다.
+    static void Cmd_experiment_editorsurface(const ConsoleCommandContext& ctx)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] experiment.editorsurface fail 활성 씬 없음\n");
+            return;
+        }
+
+        std::size_t animators = 0, clipViaExperiment = 0, clipViaLegacy = 0;
+        std::size_t clipsChecked = 0, clipCountMismatch = 0, clipNameMismatch = 0;
+        std::size_t clipFrameMismatch = 0;
+        std::size_t renderers = 0, meshViaExperiment = 0, meshViaLegacy = 0;
+        std::size_t meshGuardMismatch = 0, meshPresent = 0;
+        std::string firstMismatch;
+
+        for (const auto& object : scene->m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+
+            Animator* animator = object->GetComponent<Animator>();
+            if (nullptr != animator && nullptr != animator->m_Skeleton)
+            {
+                ++animators;
+                bool viaExperiment = false;
+                const std::size_t windowCount =
+                    animator->GetClipCount(&viaExperiment);
+                if (viaExperiment) ++clipViaExperiment; else ++clipViaLegacy;
+
+                const std::size_t legacyCount =
+                    animator->m_Skeleton->m_animations.size();
+                if (windowCount != legacyCount)
+                {
+                    ++clipCountMismatch;
+                    if (firstMismatch.empty())
+                    {
+                        firstMismatch = "clipCount " +
+                            std::to_string(windowCount) + "/" +
+                            std::to_string(legacyCount);
+                    }
+                }
+                const std::size_t common =
+                    windowCount < legacyCount ? windowCount : legacyCount;
+                for (std::size_t clip = 0; clip < common; ++clip)
+                {
+                    ++clipsChecked;
+                    const std::string windowName =
+                        animator->GetClipName(static_cast<int>(clip));
+                    const std::string& legacyName =
+                        animator->m_Skeleton->m_animations[clip].m_name;
+                    if (windowName != legacyName)
+                    {
+                        ++clipNameMismatch;
+                        if (firstMismatch.empty())
+                        {
+                            firstMismatch = "clipName[" +
+                                std::to_string(clip) + "] " + windowName +
+                                "/" + legacyName;
+                        }
+                    }
+                    // frame 축 — 키프레임 수(유니크 키 시각). D5b 실측이 여기서
+                    // 역브리지의 정의 어긋남(채널 키 합산)을 잡았다: 이벤트
+                    // 저작의 frameKey 상한과 key(0~1 진행률) 환산이 로드
+                    // 경로마다 달라져 같은 자산이 다른 시점에 발화했다.
+                    const std::size_t windowFrames =
+                        animator->GetClipFrameCount(static_cast<int>(clip));
+                    const std::size_t legacyFrames =
+                        animator->m_Skeleton->m_animations[clip].m_totalKeyFrames;
+                    if (windowFrames != legacyFrames)
+                    {
+                        ++clipFrameMismatch;
+                        if (firstMismatch.empty())
+                        {
+                            firstMismatch = "clipFrames[" +
+                                std::to_string(clip) + "] " +
+                                std::to_string(windowFrames) + "/" +
+                                std::to_string(legacyFrames);
+                        }
+                    }
+                }
+            }
+
+            MeshRenderer* renderer = object->GetComponent<MeshRenderer>();
+            if (nullptr != renderer)
+            {
+                ++renderers;
+                bool viaExperiment = false;
+                const bool windowHas =
+                    renderer->HasRenderableMesh(&viaExperiment);
+                const bool legacyHas = static_cast<bool>(renderer->m_Mesh);
+                if (viaExperiment) ++meshViaExperiment; else ++meshViaLegacy;
+                if (windowHas) ++meshPresent;
+                if (windowHas != legacyHas)
+                {
+                    ++meshGuardMismatch;
+                    if (firstMismatch.empty())
+                    {
+                        firstMismatch = std::string("meshGuard ") +
+                            (windowHas ? "1/0" : "0/1") + " " +
+                            object->m_name.ToString();
+                    }
+                }
+            }
+        }
+
+        const bool covered = animators > 0 && renderers > 0 && clipsChecked > 0;
+        const bool passed = covered && 0 == clipCountMismatch
+            && 0 == clipNameMismatch && 0 == clipFrameMismatch
+            && 0 == meshGuardMismatch;
+        std::printf("[CLI] experiment.editorsurface %s animators=%zu "
+            "clipExperiment=%zu clipLegacy=%zu clips=%zu countMismatch=%zu "
+            "nameMismatch=%zu frameMismatch=%zu renderers=%zu "
+            "meshExperiment=%zu meshLegacy=%zu "
+            "meshPresent=%zu guardMismatch=%zu%s%s\n",
+            passed ? "pass" : (covered ? "fail" : "skip"),
+            animators, clipViaExperiment, clipViaLegacy, clipsChecked,
+            clipCountMismatch, clipNameMismatch, clipFrameMismatch,
+            renderers, meshViaExperiment,
+            meshViaLegacy, meshPresent, meshGuardMismatch,
+            firstMismatch.empty() ? "" : " first=",
+            firstMismatch.c_str());
+    }
+
     // I5-D4e-1 — 재생 팔레트 패리티. 활성 씬의 experiment 핸들 보유 Animator
     // 전수에 대해, 같은 시각 입력으로 legacy 재귀(UpdateBone)와 experiment
     // 단일 순회를 제품 함수 그대로 돌려 m_FinalTransforms를 원소 단위 대조한다.
@@ -8569,6 +8707,7 @@ namespace ConsoleCmd
             reg({ "experiment.boneresolve" }, &Cmd_experiment_boneresolve);
             reg({ "experiment.foliage" }, &Cmd_experiment_foliage);
             reg({ "experiment.animmask" }, &Cmd_experiment_animmask);
+            reg({ "experiment.editorsurface" }, &Cmd_experiment_editorsurface);
             reg({ "experiment.import" }, &Cmd_experiment_import);
             reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
             reg({ "experiment.fbx" }, &Cmd_experiment_fbx);

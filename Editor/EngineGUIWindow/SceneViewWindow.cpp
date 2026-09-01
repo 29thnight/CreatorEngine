@@ -947,7 +947,10 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 	for (auto& obj : sceneObjects)
 	{
 		auto* meshComp = obj->GetComponent<MeshRenderer>();
-		if (!meshComp || !meshComp->m_Mesh)
+		// I5-D5b — "그릴 메시가 있는가"는 창구가 판정한다. legacy m_Mesh를
+		// 직접 가드로 쓰면 D4f의 은퇴가 이 조건을 통째로 거짓으로 만들어
+		// 피킹이 조용히 죽는다(선택 불가는 렌더 회귀로 안 잡힌다).
+		if (!meshComp || !meshComp->HasRenderableMesh())
 			continue;
 
 		const math::aabb worldAABB = meshComp->GetBoundingBox();
@@ -978,7 +981,7 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 		auto* meshComp = obj->GetComponent<MeshRenderer>();
 		auto* cameraComp = obj->GetComponent<CameraComponent>();
 		auto* lightComp = obj->GetComponent<LightComponent>();
-		if (meshComp && meshComp->m_Mesh)
+		if (meshComp && meshComp->HasRenderableMesh()) // I5-D5b — 위와 같은 창구
 		{
 			const math::aabb worldAABB = meshComp->GetBoundingBox();
 			if (worldAABB.is_empty()) continue;

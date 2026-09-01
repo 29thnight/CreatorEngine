@@ -279,6 +279,17 @@ void MeshRenderer::OnUninitializing()
 
 }
 
+bool MeshRenderer::HasRenderableMesh(bool* outViaExperiment) const
+{
+    if (outViaExperiment) *outViaExperiment = false;
+    if (m_experimentModel)
+    {
+        if (outViaExperiment) *outViaExperiment = true;
+        return true;
+    }
+    return static_cast<bool>(m_Mesh);
+}
+
 math::aabb MeshRenderer::GetBoundingBox() const
 {
     if (m_Mesh)

@@ -665,7 +665,7 @@ invalid fixture에 이들을 함께 복사해야 한다. 산출물 단정도 실
 | &nbsp;&nbsp;↳ D4f | 역브리지 절단 — legacy 시공 중단, m_Mesh/m_Skeleton 은퇴(**D5 완료 선결**) | DataSystem | **소비자** 참조 감소 |
 | ↳ I5-D5 | 잔여 소비자 — 아래 하위 분해(착수 정찰 2026-09-01) | 에디터·Foliage | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-a ✅ | Foliage 메시 experiment 핸들 합류(컴포넌트→프록시→drawPool)·죽은 include 2건 청산·합성 게이트(10·4o, 2축 변이 증명) | Foliage | **소비자** 참조 감소 |
-| &nbsp;&nbsp;↳ D5-b | 에디터 실소비 정리 — LOD 편집 표면(D0b 죽은 사슬의 버튼)·model.cache.build 진단 판정·ImGuiDrawHelperAnimator 자산 편집 잔여 | 에디터 | **소비자** 참조 감소 |
+| &nbsp;&nbsp;↳ D5-b ✅ | 에디터 실소비 정리 — LOD 편집 표면 제거(D0b 이행)·클립 열거/이름/키프레임 수 창구화·피킹 가드 창구화·**역브리지 totalKeyFrames 정의 결함 교정**·전수 A/B 게이트(11·4p, 변이 증명) / model.cache.build는 I6 존치 판정 | 에디터 | **소비자** 참조 감소 |
 | &nbsp;&nbsp;↳ D5-c | S2c-2b/2c 런타임 소유 분리 — base(experiment)+MaterialInstance, 5지점(프록시 33·sealing·CLR 1182/1187·Inspector·보존/커맨드) | 재질 사슬 | **소비자** 참조 감소 |
 | (I6) | `ExperimentLegacyBridge`·legacy runtime codec 은퇴 | — | **본체 삭제** |
 
@@ -958,6 +958,88 @@ ImGuiDrawHelper 계열(재질 편집 + **D0b가 죽었다고 판정한 LOD 사�
 전환 지점 5개(프록시 브리지 33행·sealing BuildSealSourceFromLegacy·ClrHost 1182/1187·
 Inspector·SceneManager 보존/ProxyCommand payload)는 정찰이 목록화했다. 분해:
 D5-a(Foliage 메시 핸들) → D5-b(에디터 실소비 정리) → D5-c(S2c-2b/2c 소유 분리).
+
+**I5-D5b 완료 실측 (2026-09-01).** 에디터 실소비 정리 — 그리고 **정찰이 예상하지
+못한 실결함 하나**가 여기서 드러났다.
+
+① **LOD 편집 표면 제거**(D0b 이행). `ImGuiDrawHelperMeshRenderer`의 LODGroupShared
+UI 190줄이 통째로 사라졌다 — 임계값 막대·드래그 핸들·Add/Remove·Apply. 이 UI의
+"Apply"는 `Mesh::GenerateLODs`를 불러 MeshOptimizer 산출을 버리고(indexCount만 보관)
+아무도 읽지 않는 `m_LODThresholds`를 적었다. **자산을 실제로 바꾸지 않으면서 바꾼
+것처럼 보이는 표면**이라 남겨 두는 쪽이 더 나쁘다. legacy `Mesh*` 직소비 3지점
+(`m_Mesh.get()`·`GetLODThresholds`·`GenerateLODs`)이 함께 사라져 **`Mesh::GenerateLODs`
+제품 호출자가 0**이 됐다. `m_isEnableLOD` 체크박스는 존치한다 — ProxyCommand→
+`PrimitiveRenderProxy::m_EnableLOD`로 흐르는 저작 값이고, 미래 LOD가 렌더 파생 몫이라는
+것이 D0b 판정이다.
+
+② **Animator 열거 창구화.** D4e-2가 편집(루프·이벤트)을 Animator 소유로 옮겼지만
+**열거·이름은 공유 자산을 직접 훑고 있었다** — 편집 정본과 표시 대상이 다른 출처를
+보는 상태다. `GetClipCount`/`GetClipName`/`GetClipFrameCount`(experiment 정본 → legacy
+폴백, `IsClipLooping`과 같은 3단 결)로 모았고, 헬퍼의 legacy Skeleton 타입 접촉이 0이 됐다.
+
+③ ★ **역브리지 `m_totalKeyFrames` 정의 결함 — 착수 정찰에 없던 발견.** legacy
+임포터(`AnimationLoader::CountUniqueKeyTimes`)는 이 필드를 **"eps 1e-6로 유니크한 키
+시각 개수"**로 정의하는데, D1a 역브리지는 같은 필드를 **"전 채널 키 개수의 합"**으로
+채우고 있었다. 이름이 같고 뜻이 다른 값이다. 실측 격차는 **22 vs 1332(60배)** —
+이벤트 저작이 `key = frameKey / totalKeyFrames`(0~1 진행률, 실제 발화 시점)를 이 값으로
+환산하므로, **같은 자산이 로드 경로(experiment vs Assimp 폴백)에 따라 다른 시점에
+발화**한다. 정본 정의를 `Experiment/AnimationClipMetrics.h`(헤더 전용, legacy 임포터
+규칙 재현)로 뽑아 역브리지와 창구가 함께 부르게 했다. 컴파일 에러가 이 결함을 물어다
+줬다 — UI가 `animation.m_totalKeyFrames`를 쓰고 있어서 창구 교체가 이 값을 마주쳤다.
+
+④ **피킹 가드 창구화**(정찰 기록에 없던 넷째 소비자). `SceneViewWindow`의 피킹 2지점이
+legacy `m_Mesh`를 **존재 가드**로 쓰고 있었다(바운드는 이미 `GetBoundingBox` 창구를
+지난다) — D4f가 `m_Mesh`를 은퇴시키면 이 조건이 통째로 거짓이 되어 **피킹이 조용히
+죽는다**(선택 불가는 렌더 회귀로 안 잡힌다). `MeshRenderer::HasRenderableMesh`로 옮겼다.
+
+⑤ **`model.cache.build` 판정: I6 존치.** legacy Assimp→`.asset` 캐시 왕복 진단이고
+제품 경로가 아니다(소비자는 run-all에 없는 `rebuild-model-assets.ps1` 하나). Assimp
+폴백이 살아 있는 동안 진단 가치가 있으므로 폴백과 함께 은퇴한다 — 계획서 §I5-D34 정찰
+⑤의 스코프 밖 명시를 그대로 확정한다. 구현 0.
+
+게이트 `experiment.editorsurface`(라이브 시나리오 항목 11 — 에디터 UI 자체는 헤드리스
+관측 밖이라 UI가 아니라 **UI가 지나게 된 창구**를 씬 전수에 태워 legacy 직소비와
+대조한다): clip 축(개수·**인덱스별 이름**·키프레임 수)과 mesh 축(존재 가드), 경로 계수.
+실측 on(`animators=1 clipExperiment=1 clips=10 renderers=10 meshExperiment=10`, 전
+mismatch 0)·off 대조군(`clipExperiment=0 meshExperiment=0`, 4p). **변이 M1**(역브리지를
+합산으로 되돌림)이 frame 축 10건을 정확히 붉혔다(`clipFrames[0] 22/1332`) — 이 축의
+이빨이자 ③ 결함이 실재했다는 증명이다.
+
+★ **한계(정직).** ⓐ off 대조군의 **값 축은 판별력이 없다** — 창구가 legacy를 읽어
+legacy와 비교하는 동어반복이라 M1 변이에서도 off는 초록이었다. off에서 유효한 것은
+경로 계수 축뿐이다. ⓑ **mesh 가드 축은 이 씬에서 약하다** — `renderers=10 meshPresent=10`
+으로 빈 렌더러가 0이라, `HasRenderableMesh`가 항상 참을 돌려주는 변이를 못 잡는다
+(가드가 실제로 갈리는 것은 D4f 이후다). ⓒ 클립 이름 축은 순서 뒤집힘을 잡지만, 두
+출처가 **같은 임포터 산물**이라 지금은 항상 일치한다 — 이 축은 D4f 회귀 감시용이다.
+
+★ **증명 중에 선재 게이트 결함이 드러났다 — 이 슬라이스와 무관하다.**
+`verify-hierarchy-read-boundary`(H3 계층 단일 정본 경계)가 **HEAD부터 빨갛다**:
+baseline 워크트리에서 같은 스크립트를 돌려 실패 7건이 동일함을 확인했다(라인 번호만
+D5-b의 include 한 줄 때문에 1씩 밀린다). 원인은 D1a가 역브리지
+(`ExperimentModelMigration.cpp`)를 만들면서 H3 allowlist에 등록하지 않은 것이다 —
+거기 걸린 `m_parentIndex`는 Entity 계층이 아니라 legacy `Bone`/`ModelNode`의 필드라
+**전부 오탐**이고, `model.cache.build`의 노드 왕복 대조 한 줄도 같은 이유다. H3는
+라인 번호가 아니라 정규식 allowlist를 쓰므로(그 파일 주석이 "허용 2건이 조용히
+위반으로 뒤집혔다"는 과거 사고를 적어 두었다) 처방은 역브리지·진단의 legacy 필드
+접근 패턴을 allowlist에 등록하는 별도 작업이다. run-all에 포함돼 있으므로 방치하면
+세트가 붉은 채 굳는다 — M5-C4 때 cook 게이트 2종이 그랬던 것과 같은 유형이다.
+
+둘째 선재 실패는 `verify-asset-authoring-ownership`("Editor model-cache writer did not
+create the .asset artifact")인데, **가르는 데 한 번 헛짚었다**. 처음에 스크립트를 단독
+실행해 통과하는 것을 보고 "run-all 안에서만 실패 = 순서 의존"으로 적었는데 틀렸다.
+스크립트의 `-EditorExe` 기본값은 **x64-Release**이고 run-all은 `-EditorExe $Exe`로
+**x64-Debug**를 넘긴다 — 단독 실행은 8/30자 Release exe를 재고 있었다
+([[gate-measures-stale-binary]]의 새 변종: 같은 스크립트가 호출 방식에 따라 다른
+바이너리를 잰다). Debug exe를 명시해 단독 실행하니 즉시 재현됐고, **내 변경만 stash한
+뒤 Debug를 다시 빌드해 돌리자 baseline에서도 동일하게 실패**했다 — 선재 확정이다.
+8/30 이후 구간(D0~D5a)의 어떤 커밋이 Debug에서 이 writer 경로를 붉혔고, run-all이
+Debug를 쓰므로 그때부터 굳어 있었다. 원인 규명은 별도 작업이다.
+
+★ **D5-b 이후 Editor 트리의 legacy 직소비 잔여는 1지점**이다 —
+`ImGuiDrawHelperTerrainComponent:285`(+ CLI 대구)의 `FoliageType(model->GetMeshShared(0), ...)`
+**생성 인자**. D5-a가 그 뒤에 `BindExperimentMesh`를 붙여 렌더 사슬은 experiment를 나르나,
+`FoliageType::m_mesh` 필드 자체가 legacy라 인자는 D4f에서 걷힌다. `ConsoleCommandSystem`의
+`m_Skeleton` 접촉 7건은 전부 게이트의 **legacy 대조군**이라 존치가 맞다.
 
 **I5-D5a 완료 실측 (2026-09-01).** Foliage 메시의 experiment 핸들 합류 — D4b가 한계로
 남긴 "Foliage 아이템은 핸들을 싣지 않는다(lookup 폴백)"가 닫혔다. ① `FoliageType`에

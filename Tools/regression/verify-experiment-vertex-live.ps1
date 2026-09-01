@@ -27,6 +27,8 @@
 #      대조(저장분 인덱스 대응 계약) (D4e-3)
 #   10 Foliage 메시 핸들 합류 — 합성 seed→재로드→바인딩·DrawSource·뷰 완비
 #      (D5a, off 대조군 4o)
+#   11 에디터 실소비 창구 — 클립 열거·이름(인덱스별)과 메시 존재 가드를
+#      씬 전수로 legacy 직소비와 대조 (D5b, off 대조군 4p)
 #   4  A/B 대조 — 스위치 끄면 experiment 0, 드로우·커버리지·밝기 동일,
 #      하네스 여전히 통과 (경로만 바뀌고 그리는 대상·그림 판정은 같다)
 #   4i off 대조군의 인스턴스화는 전량 legacy 재귀다 (D4d)
@@ -215,6 +217,19 @@ if ($logOn -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExperi
 if ($logOn -notmatch '\[CLI\] experiment\.foliage verify pass mode=experiment') {
     $fail += "10 Foliage 핸들 합류 실패(on) — foliage 출력을 확인하라"
 }
+# ★ 11(I5-D5b) — 에디터 실소비 창구. 에디터 UI는 헤드리스 관측 밖이라 UI가
+#   지나게 된 창구 둘을 씬 전수로 잰다: 클립 열거/이름(인덱스별 — 개수만
+#   재면 순서 뒤집힘에 눈멀다)과 메시 존재 가드. 경로 계수로 experiment
+#   실분기까지 실증한다(legacy 폴백이 같은 값을 받쳐도 계수가 갈린다).
+if ($logOn -notmatch '\[CLI\] experiment\.editorsurface pass ') {
+    $fail += "11 에디터 창구 A/B 실패(on) — editorsurface 출력을 확인하라"
+}
+if ($logOn -notmatch '\[CLI\] experiment\.editorsurface pass animators=\d+ clipExperiment=[1-9]') {
+    $fail += "11b 클립 열거가 experiment 분기를 한 번도 타지 않았다(on)"
+}
+if ($logOn -notmatch 'experiment\.editorsurface pass .*meshExperiment=[1-9]') {
+    $fail += "11c 메시 가드가 experiment 분기를 한 번도 타지 않았다(on)"
+}
 if ($uploadsOn -le 0) { $fail += "2 experiment 업로드 $uploadsOn — GPU 정점 출처가 legacy다" }
 # I5-D34b: 업로드 전량이 experiment여야 한다(N == M). 스킨 메시 하나라도
 # legacy로 새면 여기서 갈린다 — 스킨 전용 계수 없이 성립하는 전량 단정.
@@ -292,6 +307,17 @@ if ($logOff -notmatch '\[CLI\] experiment\.animmask pass masks=[1-9]\d* viaExper
 # I5-D5a: off 대조군 — Foliage 바인딩·뷰가 전량 legacy(핸들 0)여야 한다.
 if ($logOff -notmatch '\[CLI\] experiment\.foliage verify pass mode=legacy') {
     $fail += "4o 스위치를 껐는데 Foliage 핸들이 experiment로 샜다(또는 실패)"
+}
+# I5-D5b: off 대조군 — 창구는 전량 legacy 폴백이어야 하고(값은 그래도 전수
+# 일치: 역브리지가 두 출처를 1:1로 묶는다), 경로 계수가 0이어야 한다.
+if ($logOff -notmatch '\[CLI\] experiment\.editorsurface pass ') {
+    $fail += "4p 에디터 창구 A/B 실패(off) — 대조군이 성립하지 않는다"
+}
+if ($logOff -notmatch 'experiment\.editorsurface pass .*clipExperiment=0 ') {
+    $fail += "4p-1 스위치를 껐는데 클립 열거가 experiment로 샜다"
+}
+if ($logOff -notmatch 'experiment\.editorsurface pass .*meshExperiment=0 ') {
+    $fail += "4p-2 스위치를 껐는데 메시 가드가 experiment로 샜다"
 }
 if ($drawsOff -ne $drawsOn) {
     $fail += "4b 드로우 수가 다르다 — on $drawsOn vs off $drawsOff (경로 전환이 그리는 대상을 바꿨다)"

@@ -20,6 +20,7 @@
 //   - uv1 부재 시 uv0 복사 — legacy 임포터(ConvertToAiMesh)의 규약.
 #include "DataSystem.h"
 #include "Experiment/Model.h"
+#include "Experiment/AnimationClipMetrics.h" // I5-D5b: totalKeyFrames 정본
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/ResolvingModelDecoder.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
@@ -118,7 +119,6 @@ namespace
 			animation.m_ticksPerSecond = clip.ticksPerSecond;
 			animation.m_isLoop = clip.looping;
 
-			std::size_t totalKeys = 0;
 			for (const experiment::AnimationChannel& channel : clip.channels)
 			{
 				if (!experiment::IsInRange(channel.bone, source.bones.size()))
@@ -150,12 +150,13 @@ namespace
 					nodeAnimation.m_scaleKeys.push_back(
 						{ key.value, key.time });
 				}
-				totalKeys += channel.translations.size()
-					+ channel.rotations.size() + channel.scales.size();
 				animation.m_nodeAnimations.emplace(boneName,
 					std::move(nodeAnimation));
 			}
-			animation.m_totalKeyFrames = totalKeys;
+			// I5-D5b — 정본은 "유니크 키 시각 수"다(legacy 임포터 정의).
+			// 여기서 채널 키 개수를 합산하던 것이 같은 이름의 다른 값을
+			// 만들어, 로드 경로에 따라 이벤트 발화 시점이 갈렸다.
+			animation.m_totalKeyFrames = experiment::clip::CountUniqueKeyTimes(clip);
 			skeleton->m_animations.push_back(std::move(animation));
 		}
 		return skeleton;

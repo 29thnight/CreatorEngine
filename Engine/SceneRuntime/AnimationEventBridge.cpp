@@ -13,6 +13,7 @@
 #include "ClrHost.h"
 #include "Skeleton.h"
 #include "../RenderEngine/Experiment/Model.h"
+#include "../RenderEngine/Experiment/AnimationClipMetrics.h" // I5-D5b
 
 AnimatorClipOverride* Animator::FindClipOverride(int clipIndex)
 {
@@ -77,6 +78,67 @@ bool Animator::IsClipLooping(int clipIndex) const
 void Animator::SetClipLooping(int clipIndex, bool looping)
 {
 	EnsureClipOverride(clipIndex).loopOverride = looping;
+}
+
+std::size_t Animator::GetClipCount(bool* outViaExperiment) const
+{
+	if (outViaExperiment) *outViaExperiment = false;
+	if (m_experimentModel)
+	{
+		if (const experiment::Skeleton* skeleton =
+			m_experimentModel->TryGetSkeleton())
+		{
+			if (outViaExperiment) *outViaExperiment = true;
+			return skeleton->clips.size();
+		}
+	}
+	if (m_Skeleton) return m_Skeleton->m_animations.size();
+	return 0;
+}
+
+std::string Animator::GetClipName(int clipIndex, bool* outViaExperiment) const
+{
+	if (outViaExperiment) *outViaExperiment = false;
+	if (clipIndex < 0) return std::string{};
+	const std::size_t index = static_cast<std::size_t>(clipIndex);
+	if (m_experimentModel)
+	{
+		if (const experiment::Skeleton* skeleton =
+			m_experimentModel->TryGetSkeleton())
+		{
+			if (outViaExperiment) *outViaExperiment = true;
+			if (index >= skeleton->clips.size()) return std::string{};
+			return skeleton->clips[index].name;
+		}
+	}
+	if (m_Skeleton && index < m_Skeleton->m_animations.size())
+	{
+		return m_Skeleton->m_animations[index].m_name;
+	}
+	return std::string{};
+}
+
+std::size_t Animator::GetClipFrameCount(int clipIndex,
+	bool* outViaExperiment) const
+{
+	if (outViaExperiment) *outViaExperiment = false;
+	if (clipIndex < 0) return 0;
+	const std::size_t index = static_cast<std::size_t>(clipIndex);
+	if (m_experimentModel)
+	{
+		if (const experiment::Skeleton* skeleton =
+			m_experimentModel->TryGetSkeleton())
+		{
+			if (outViaExperiment) *outViaExperiment = true;
+			if (index >= skeleton->clips.size()) return 0;
+			return experiment::clip::CountUniqueKeyTimes(skeleton->clips[index]);
+		}
+	}
+	if (m_Skeleton && index < m_Skeleton->m_animations.size())
+	{
+		return m_Skeleton->m_animations[index].m_totalKeyFrames;
+	}
+	return 0;
 }
 
 void Animator::AddClipEvent(int clipIndex)

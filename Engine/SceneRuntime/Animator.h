@@ -100,6 +100,21 @@ public:
     AnimatorClipOverride& EnsureClipOverride(int clipIndex);
     bool IsClipLooping(int clipIndex) const; // 오버라이드 → 자산(experiment→legacy) 폴백
     void SetClipLooping(int clipIndex, bool looping);
+    // I5-D5b — 클립 목록의 열거 창구. D4e-2가 편집(루프·이벤트)을 Animator
+    // 소유로 옮겼지만 에디터의 **열거·이름**은 여전히 공유 자산
+    // (m_Skeleton->m_animations)을 직접 훑고 있었다 — 인덱스 축이 두 출처로
+    // 갈리면 편집 정본과 표시 대상이 어긋난다. experiment가 정본, legacy는
+    // 폴백(Assimp 모델). outViaExperiment는 게이트 관측 창구.
+    [[nodiscard]] std::size_t GetClipCount(bool* outViaExperiment = nullptr) const;
+    // 범위 밖이면 빈 문자열. 이름은 오버라이드 대상이 아니다(자산 값).
+    [[nodiscard]] std::string GetClipName(int clipIndex,
+        bool* outViaExperiment = nullptr) const;
+    // 클립의 키프레임 수 = **유니크 키 시각 개수**(legacy 임포터 정의가 정본 —
+    // experiment::clip::CountUniqueKeyTimes). 이벤트 저작이 frameKey 상한과
+    // key(0~1 진행률) 환산에 쓴다 — 두 로드 경로가 다른 값을 주면 같은 자산이
+    // 경로에 따라 다른 시점에 발화한다(D5b 실측).
+    [[nodiscard]] std::size_t GetClipFrameCount(int clipIndex,
+        bool* outViaExperiment = nullptr) const;
     void AddClipEvent(int clipIndex);                 // 이름 유일화 신규(구 Animation::AddEvent())
     void DeleteClipEvent(int clipIndex, int eventIndex);
     // 발화 — 트리거 매칭 계수를 돌려준다(CLR 미준비여도 계수는 정확하다 —

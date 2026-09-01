@@ -43,11 +43,15 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 		Meta::DrawMethods(animator, *aniType);
 		if (ImGui::CollapsingHeader("animations"))
 		{
-			for (int i = 0; i < animator->m_Skeleton->m_animations.size(); ++i)
+			// I5-D5b — 열거·이름도 창구를 지난다. D4e-2가 편집을 Animator
+			// 소유로 옮겼으나 목록은 공유 자산을 직접 훑고 있었다 — 인덱스
+			// 축이 두 출처로 갈리면 편집 정본과 표시 대상이 어긋난다.
+			const int clipCount = static_cast<int>(animator->GetClipCount());
+			for (int i = 0; i < clipCount; ++i)
 			{
-				Animation& animation = animator->m_Skeleton->m_animations[i];
-				ImGui::PushID(animation.m_name.c_str());
-				ImGui::Text(animation.m_name.c_str());
+				const std::string clipName = animator->GetClipName(i);
+				ImGui::PushID(clipName.c_str());
+				ImGui::Text("%s", clipName.c_str());
 				ImGui::Text("Loop");
 				ImGui::SameLine();
 				// I5-D4e-2 — 루프·이벤트 편집의 정본은 Animator 클립
@@ -78,8 +82,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 			{
 				ImGui::SetNextWindowSize(ImVec2(1100, 400), ImGuiCond_FirstUseEver);
 				bool open = ImGui::Begin("Event", &showKeyFrameWindow);
-				auto& animation = animator->m_Skeleton->m_animations[animationIndex];
-				ImGui::Text(animation.m_name.c_str());
+				ImGui::Text("%s", animator->GetClipName(animationIndex).c_str());
 				if (ImGui::Button("Add Event"))
 				{
 					animator->AddClipEvent(animationIndex);
@@ -149,11 +152,21 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 						if (ImGui::InputInt("##frame key", &event.frameKey, 0, 0))
 						{
+							// I5-D5b — 키프레임 수도 창구를 지난다. 역브리지가
+							// 이 값을 "채널 키 개수의 합"으로 채우고 있어
+							// legacy 임포터 정의(유니크 키 시각 수)와 한
+							// 자릿수씩 갈렸다 — 상한과 key(0~1 진행률) 환산이
+							// 로드 경로마다 달라지는 실결함이었다.
+							const int totalKeyFrames = static_cast<int>(
+								animator->GetClipFrameCount(animationIndex));
 							if (event.frameKey < 1) event.frameKey = 1;
-							if (event.frameKey > animation.m_totalKeyFrames)
-								event.frameKey = animation.m_totalKeyFrames;
-
-							event.key = float(event.frameKey) / float(animation.m_totalKeyFrames);
+							if (totalKeyFrames > 0)
+							{
+								if (event.frameKey > totalKeyFrames)
+									event.frameKey = totalKeyFrames;
+								event.key = float(event.frameKey)
+									/ float(totalKeyFrames);
+							}
 						}
 
 						//ImGui::DragFloat(("Key##" + event.m_eventName).c_str(), &event.key, 0.01f,0.0f, 1.0f);

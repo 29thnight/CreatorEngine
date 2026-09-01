@@ -524,6 +524,7 @@
     <ClInclude Include="Experiment\MaterialAuthoringCodec.h" />
     <ClInclude Include="Experiment\MaterialInstance.h" />
     <ClInclude Include="Experiment\MaterialResolver.h" />
+    <ClInclude Include="Experiment\AnimationClipMetrics.h" />
     <ClInclude Include="Experiment\PoseSampler.h" />
     <ClInclude Include="ExperimentMaterialResolveBinding.h" />
     <ClInclude Include="ExperimentMaterialMigration.h" />

@@ -61,6 +61,13 @@ public:
 
     [[nodiscard]] math::aabb GetBoundingBox() const;
 
+    // I5-D5b — "그릴 메시가 있는가"의 창구. 에디터 피킹이 legacy m_Mesh를
+    // 직접 존재 가드로 쓰고 있었다 — D4f가 m_Mesh를 은퇴시키면 그 가드가
+    // 통째로 거짓이 되어 피킹이 조용히 죽는다(선택이 안 되는 증상은 렌더
+    // 회귀로 안 잡힌다). experiment 핸들이 정본, legacy는 폴백.
+    // outViaExperiment는 게이트 관측 창구.
+    [[nodiscard]] bool HasRenderableMesh(bool* outViaExperiment = nullptr) const;
+
 public:
     // 에셋을 공동 소유한다.
     //
