@@ -288,6 +288,11 @@ UV1 스트림이 붙는다 — 스킨 캐릭터를 포함한 전 정점에 8B �
 
 ### L1. UV1 언랩 — xatlas 벤더링
 
+> **2026-09-01 — 구 트랙 V `V6` 를 흡수했다.** UV1 스트림의 **유일한 생산자**가 이 슬라이스다.
+> 흡수한 계약: ① UV1 은 라이트맵 대상 메시에만 붙는 옵셔널 스트림 ② 언랩이 정점을 쪼개므로
+> 스트림은 **언랩 단계에서 생성**되고 기존 `uv1` 슬롯을 재사용하지 않는다 ③ 완료 기준
+> "전 정점 부과 0". 근거: [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.4 C9.
+
 - `ThirdParty/xatlas` 원본 무수정 벤더링
 - 임포트 후처리 패스로 편입(`ImportedScene` 트랙) 또는 에디터 오프라인 도구
 - 정점 분할 계수 — 손실은 변환 경계에서 계수한다는 성질 유지
@@ -321,8 +326,12 @@ UV1 스트림이 붙는다 — 스킨 캐릭터를 포함한 전 정점에 8B �
 
 - **L4-a 별도 COMPUTE 큐 + 큐 간 펜스** — 지금 DIRECT 큐 하나뿐이다.
   큐를 넘나드는 리소스의 상태 전이(COMMON 경유) 규칙을 함께 정한다.
-  ★ `RenderGraphDependencySchedulingPlan` RG8의 async compute와 **같은 기반**이므로
-  어느 쪽이 먼저 세우든 공통 RHI 계약을 소유하고 다른 쪽이 소비한다 — 두 번 만들지 않는다.
+  ★ **2026-09-01 정정** — "어느 쪽이 먼저 세우든 소유"는 순서를 정하지 않는 문장이었고,
+  `RenderGraphDependencySchedulingPlan` §7은 반대로 "L4는 RG8을 기다린다"고 적어
+  P0인 L4를 P1 뒤 임계 경로 142일째에 묶고 있었다. 큐/펜스 RHI 계약을 `RG8`에서 떼어
+  **독립 슬라이스 `Q0`**으로 승격했다 — 소유는 RHI 계층이고 어느 트랙도 아니다.
+  L4-a는 `Q0`의 소비자이며, `Q0`은 `RG8`·`L4` 중 먼저 필요해지는 쪽의 착수 시점에 세운다.
+  근거와 판정: [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2.
 - **L4-b GPU 타임슬라이스** — 디스패치를 렉트·샘플 단위로 쪼개 프레임당 예산
   (예: 8ms) 안에 넣는다. 코루틴 페이싱 제거는 이 단계의 결과다.
   ★ **Windows TDR(기본 2초)** 이 상한이다. 단일 디스패치가 그것을 넘으면 디바이스가
@@ -383,7 +392,7 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 | 삭제분의 결함을 그대로 이식 | §1.4 다섯 종 | 슬라이스마다 해당 항목을 완료 기준에 명시 |
 | off-by-one 을 고치며 다른 것을 깬다 | 두 커널에 같은 패턴 | 현 동작 재현 검사를 **먼저** 세우고 변이로 이빨 증명 |
 | 병렬화를 낭비 위에 얹는다 | 디스패치 84% 낭비 | §2.2 순서 고정 — ①②③ 뒤에 판정 |
-| UV1 없이 착수 | 자산 전수 `TEXCOORD_1` 0건 | L1 이 L0 를 제외한 모든 슬라이스의 선행 |
+| UV1 없이 착수 | 자산 전수 `TEXCOORD_1` 0건 | L1 이 **L3 이후의** 모든 슬라이스의 선행. ★ 2026-09-01 정정 — "L0 를 제외한 모든"은 §4 L2 의 "의존: 없음. 가장 먼저 할 수 있다"와 모순이었다. BVH 재작성은 UV1 과 무관하고 합성 씬(구·평면 해석적 정답)으로 판정하므로 **L1 과 병렬로 연다**([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.5 C10) |
 | 베이크 중 씬 변경 | 결과 무의미 | 시작 시 지오메트리·조명 밀봉 + 무효화 정책(L4-c) |
 | 소비자 0 상태 재발 | 이 저장소의 전례 다수 | L3 에서 `LightMapPass` 를 라이브 그래프에 배선하고 화면으로 확인 |
 | **TDR 로 디바이스 리셋** | 큐가 DIRECT 하나뿐이라 긴 디스패치가 프레임을 통째로 민다. 기본 상한 2초 | L4-b 분할을 **성능이 아니라 안전 요구**로 다룬다. 단일 디스패치 시간을 계측해 상한을 못박는다 |
@@ -396,8 +405,8 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 
 | 계획 | 관계 |
 |---|---|
-| **`ModelImportPipelinePlan` (같은 PHASE 4)** | **L1 이 트랙 V3(옵셔널 스트림)의 첫 소비자다.** UV1 은 라이트맵 대상 메시에만 붙는다. V6 는 이 계획으로 대체된다 |
-| **`RenderGraphDependencySchedulingPlan` (같은 PHASE 4 · 트랙 RG)** | L4-a는 RG8의 queue-neutral multi-queue·cross-queue fence 기반을 공유한다. RG0~RG7 완료 전 L4가 먼저 필요하면 같은 RHI 계약만 선행하고 별도 큐 계층을 만들지 않는다 |
+| **`ModelImportPipelinePlan` (같은 PHASE 4)** | **L1 이 트랙 V3(옵셔널 스트림)의 첫 소비자다.** UV1 은 라이트맵 대상 메시에만 붙는다. **V6 는 2026-09-01 폐기됐고 `L1` 이 그 계약을 흡수했다** — UV1 스트림의 유일한 생산자는 `L1`(xatlas 언랩)이고, 트랙 V 완료 기준의 "UV1 이 라이트맵 대상 메시에만 붙는다 · 전 정점 부과 0"도 `L1` 완료 기준으로 옮겼다([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.4 C9) |
+| **`RenderGraphDependencySchedulingPlan` (같은 PHASE 4 · 트랙 RG)** | **2026-09-01 확정** — 이 행이 적어 둔 "같은 RHI 계약만 선행"에 이름을 줬다: **`Q0`**(queue-neutral 큐·cross-queue 펜스·COMMON 경유 상태 전이). L4-a와 RG8이 둘 다 `Q0`의 소비자이고 어느 트랙도 소유하지 않는다. `L4`는 `RG8`을 기다리지 않는다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2 |
 | **`ScriptableRenderPipelinePlan` (같은 PHASE 4)** | `LightMapPass` 를 Pipeline Asset 이 선택하는 Pass 로 둘지, 소스 Native Pass 로 둘지 결정 필요 |
 | PHASE 4 Stochastic Lighting | 정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다 |
 | PHASE 4 DXR | BLAS 가 서면 **베이크의 BVH 를 DXR 가속 구조로 대체**할 수 있다. L2 의 자체 BVH 는 그때까지의 다리다 |

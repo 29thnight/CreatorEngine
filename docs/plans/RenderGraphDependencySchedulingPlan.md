@@ -127,16 +127,19 @@ Compiler가 각 슬롯의 버전 핸들을 연결한 뒤에는 다음처럼 해�
 
 | ID | 슬라이스 | 선행 | 공수 | 종료 게이트 |
 |---|---|---:|---:|---|
-| **RG0** | 현행 declaration-order 기준선과 변이 fixture | 없음 | 4일 | DX12/Vulkan graph dump·픽셀·validation 기준선, 모호한 writer/read-before-write 변이 검사가 실제로 실패 |
+| ~~**RG0**~~ | **`BASE-0`에 흡수 (2026-09-01)** — 4-0·SRP-G0·PBR-S0와 같은 하네스·같은 artifact였다. graph dump와 변이 fixture는 `BASE-0`의 소비 항목으로 남는다 | 없음 | (BASE-0 6일에 포함) | [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.1 C1 |
 | **RG1** | 명시적 access mode + versioned texture/buffer handle | RG0 | 8일 | `Read/Write/Modify` 단위 검사, import/transient version dump, forked write와 stale handle fail-closed |
 | **RG2** | stable single-queue DAG compiler | RG1 | 10일 | RAW/WAR/WAW, 독립 Pass tie-break, cycle chain, 선언 배열 shuffle fixture가 결정적 compiled order를 생성 |
 | **RG3** | DAG 기준 culling·lifetime·barrier 재계산 | RG2 | 8일 | 죽은 producer 제거, 마지막 소비 수명, Transition/UAV 계획이 sorted order 기준으로 일치 |
 | **RG4** | dependency wave 기반 병렬 recording·진단 | RG3 | 7일 | sequential/parallel compiled order와 픽셀 동일, wave·critical path·edge 원인 dump 제공 |
 | **RG5** | 제품 Pass와 Pipeline Asset compiler 이관 | RG4 | 12일 | 기본 19개 node, 제품 호출 28곳과 test/fixture 80곳의 접근 선언 이관; 임시 adapter 잔여 0 |
-| **RG6** | DX12/Vulkan 제품 cutover | RG5, SRP-G0 | 8일 | 같은 밀봉 입력의 별도 프로세스 live frame, PNG/차영상/선형 오차, CPU record·pass GPU·graph stats, validation 0 |
+| **RG6** | DX12/Vulkan 제품 cutover | RG5, **BASE-0** | 8일 | 같은 밀봉 입력의 별도 프로세스 live frame, PNG/차영상/선형 오차, CPU record·pass GPU·graph stats, validation 0 |
 | **RG7** | transient buffer + in-frame aliasing | RG6 | 20일 | alias off/on 픽셀 동일, peak committed/resident byte 감소 실측, poison/overlap/lifetime 변이 통과 |
 | **RG8** | queue-neutral multi-queue + async compute | RG7 | 25일 | single-queue fallback, cross-queue fence/ownership, DX12/Vulkan validation, 겹침 GPU 이득 실측 |
 | **RG9** | subresource·split barrier·Resource Inspector 성숙 | RG8 | 15일 | mip/array/range 추적, split barrier parity, producer/consumer/version/order/lifetime/alias/queue 시각화 |
+
+> **2026-09-01 정정** — `RG0` 4일은 `BASE-0`으로, `RG8`의 큐/펜스 RHI 계약 몫은 `Q0`으로 빠져나갔다.
+> 아래 합계는 정정 전 수다. 통합 합계는 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §5가 정본이다.
 
 - **RG0~RG6: 57일, 약 11.4 엔지니어 주.** Unreal RDG형 단일 큐 리소스 의존성
   스케줄링과 제품 전환의 첫 완료선이다.
@@ -261,7 +264,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 | `LivePipelineDescPlan.md` | 현재 nodes/reads/writes/modifies를 RG5의 첫 native compiler 입력으로 사용한다 |
 | `RhiBoundaryPlan.md` | RG7 heap/alias 계약과 RG8 queue/fence 계약을 backend-neutral RHI에만 추가한다 |
 | 트랙 V4 | Raster Pass의 input layout 유도 계약. RG5의 Asset-first 제품 이관 전에 필요하다 |
-| 트랙 L4 | RG8 multi-queue 기반의 소비자다. 먼저 구현하는 트랙이 공통 RHI 계약을 소유하고 다른 쪽은 재사용한다 |
+| 트랙 L4 | **2026-09-01 정정** — `RG8`이 아니라 **`Q0`**(queue/fence RHI 계약)의 소비자다. "먼저 구현하는 트랙이 소유"는 순서를 정하지 않는 문장이었고, 아래 임계 경로의 "L4는 RG8을 기다린다"는 P0인 L4를 P1 뒤 142일째에 묶었다. 소유를 트랙에서 떼어 RHI 계층(`Q0`)에 두면 협상이 사라진다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2 |
 | GPU-driven/DXR/DLSS/Stochastic Lighting | RG6 단일 큐 제품 cutover 뒤 새 resource/pass를 추가하고, RG7~RG9 기능을 필요에 따라 소비한다 |
 
 권장 임계 경로는 다음으로 고정한다.
@@ -272,5 +275,8 @@ RG0 → RG1 → RG2 → RG3 → RG4 → RG5 → RG6
                                     RG7 → RG8 → RG9
 ```
 
-V4와 SRP-G0는 RG5/RG6 앞에서 합류한다. L4의 async compute는 RG8을 기다리며, 그 전의
-UV/BVH/직접광 준비는 독립적으로 진행할 수 있다.
+**2026-09-01 정정.** `V4`는 `I5-D2`/`I5-D34`로 이행 완료됐고(독립 슬라이스 아님), `SRP-G0`는
+`BASE-0`으로 흡수돼 이 트랙보다 앞에 선다. **L4의 async compute는 `RG8`이 아니라 `Q0`을
+기다린다** — `Q0`은 `RG8`·`L4` 중 먼저 필요해지는 쪽의 착수 시점에 세운다. 그 전의
+UV/BVH/직접광 준비는 독립적으로 진행할 수 있다. 통합 순서는
+[`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §3이 정본이다.

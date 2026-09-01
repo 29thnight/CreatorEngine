@@ -777,6 +777,10 @@ Material 소비와 PBR 출력 동등 이관이 끝나기 전에 도입하지 않
 
 ## 12. 구현 후보 슬라이스
 
+> **2026-09-01 — 이 절의 슬라이스 순서·공수는 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)가 정본이다.**
+> `SRP-0`~`SRP-6`와 `PBR-S1`~`PBR-S8`(16슬라이스)은 대시보드에 **한 행도 없어** PHASE 4 공수 합계에서
+> 통째로 빠져 있었다. 통합 계획서 §8이 이를 **미산정 백로그**로 명시하고 `4-6`에서 공수를 확정한다.
+
 4-0~4-6은 설계 게이트다. 다만 현재 `EnhancedRenderGraph`의 선언 순서 계약을
 Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 PHASE 4 구현
 트랙으로 확정**했다. 나머지 SRP 번호는 최종 4-6에서 네 GPU 기능의 공통 기반과 함께
@@ -797,7 +801,15 @@ Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 
 - 공수는 RG0~RG6 57일, RG7~RG9 60일, 총 117일이다. 각 단계는 직전 gate 통과 뒤
   진행하며 declaration-order 제품 경로와 새 제품 경로를 장기 병행하지 않는다.
 
-### SRP-G0 — 전체 live backend 동등성·관측 게이트
+### SRP-G0 — 전체 live backend 동등성·관측 게이트 — **`BASE-0`에 흡수 (2026-09-01)**
+
+> 이 슬라이스와 `4-0`(기능 범위·기준선), `RG0`(현행 graph·픽셀 기준선), `PBR-S0`(PBR 기준선)이
+> **같은 하네스·같은 artifact를 서로 다른 이름으로 네 번** 적고 있었다. 세 계획서가 이미
+> "별도 캡처 체계를 만들지 않는다"·"중복 기준선을 만들지 않는다"·"동일 하네스/artifact를 공유"라고
+> 서로에게 적어 두고도 넷 다 독립 슬라이스로 남아 있었다 — 합의는 있었고 통합만 없었다.
+> 통합 이름은 **`BASE-0`**이고 하네스는 한 벌만 만든다. 아래 항목은 `BASE-0`의 acceptance 내용으로
+> 그대로 승계되며, `RG6`의 하드 선행도 `BASE-0`이 진다.
+> 근거와 판정: [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.1 C1.
 
 - backend는 부팅 고정이므로 동일 scene/frame/tuning을 DX12·Vulkan 별도 프로세스에 재생
 - final PNG·차영상·허용 오차와 CPU record·pass별 GPU timing·graph stats artifact
@@ -898,7 +910,7 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
 `PBR-S0` 기준선과 소비자 없는 `PBR-S1/SRP-2` 기반은 병렬 준비할 수 있지만 제품 셰이더
 전환은 M6 전체 뒤에 시작한다.
 
-1. **PBR-S0 기준선** — `SRP-G0`의 동일 하네스/artifact에서 DX12 현재 설정을 정본으로
+1. **PBR-S0 기준선** — **`BASE-0`에 흡수(2026-09-01)**. `BASE-0`의 동일 하네스/artifact에서 DX12 현재 설정을 정본으로
    고정하고 Vulkan 기본값을 복원하지 않은 채 같은 밀봉 입력·tuning으로 pre-tone HDR,
    final LDR, 표준 material grid, pass timing과 RenderGraph stats를 캡처한다.
 2. **PBR-S1 native Slang 기반** — SRP-2의 source/module/import·asset/package·cache·reflection
@@ -962,8 +974,8 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
 | 계획 | 관계 |
 |---|---|
 | **`RenderGraphDependencySchedulingPlan.md` (같은 PHASE 4 · 트랙 RG)** | **이 계획의 실행 순서 정본** — Pipeline Asset의 `read/write/modify`를 versioned handle로 낮추고 stable DAG를 만든다. RG0~RG6 단일 큐 제품 전환 뒤 RG7 aliasing, RG8 async compute, RG9 subresource/관측 순으로 확장한다 |
-| **`ModelImportPipelinePlan.md` (같은 PHASE 4)** | **트랙 V4가 이 계약의 전제다** — Pass가 정점 입력 레이아웃 오프셋을 C++에 박고 있으면(현재 5곳) Raster Pass를 Asset으로 기술할 수 없다. 트랙 V의 퍼뮤테이션 축은 `.shadermeta` 키 체계를 공유한다. PBR-S3의 import→GPU 의미 완결도 D2/D5 재질 ID와 I5/V4 생산 소비 뒤에만 판정한다 |
-| **`LightmapBakerPlan.md` (같은 PHASE 4 · 트랙 L)** | **트랙 RG8의 async compute 기반을 쓴다** — 백그라운드 베이킹이 별도 COMPUTE 큐와 큐 간 펜스를 요구하는데 현재 큐는 `TYPE_DIRECT` 하나뿐이다. 먼저 세우는 쪽이 공통 RHI 계약을 소유하고 다른 쪽이 소비한다(두 번 만들지 않는다). `LightMapPass`를 Pipeline Asset이 선택하는 Pass로 둘지 소스 Native Pass로 둘지 결정 필요 |
+| **`ModelImportPipelinePlan.md` (같은 PHASE 4)** | **트랙 V4가 이 계약의 전제다.** ★ 2026-09-01 — V4는 독립 슬라이스가 아니라 `I5-D2`(마스크→`RHIInputElement` 유도)·`I5-D34a/b/c`(GBuffer 정적·스킨·Forward 전환)로 **이행 완료**됐다. 잔여는 "손으로 박힌 오프셋 0" 판정이며 `I6-E`로 legacy가 죽은 뒤 확정한다([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.3 C6). 트랙 V의 퍼뮤테이션 축은 `.shadermeta` 키 체계를 공유한다. PBR-S3의 import→GPU 의미 완결도 D2/D5 재질 ID와 I5/V4 생산 소비 뒤에만 판정한다 |
+| **`LightmapBakerPlan.md` (같은 PHASE 4 · 트랙 L)** | **2026-09-01 정정 — `RG8`이 아니라 독립 슬라이스 `Q0`(queue/fence RHI 계약)의 소비자다.** 백그라운드 베이킹이 별도 COMPUTE 큐와 큐 간 펜스를 요구하는데 현재 큐는 `TYPE_DIRECT` 하나뿐이다. "먼저 세우는 쪽이 소유"는 순서를 정하지 않는 문장이었고 RG 계획서는 반대로 "L4는 RG8을 기다린다"고 적어 P0를 임계 경로 142일째에 묶었다 — 소유를 RHI 계층(`Q0`)에 두어 협상을 없앴다([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2). `LightMapPass`를 Pipeline Asset이 선택하는 Pass로 둘지 소스 Native Pass로 둘지 결정 필요 |
 | `LivePipelineDescPlan.md` | 현재 C++ 조립 기술을 첫 native compiler target으로 사용. 공개 asset schema로 직접 노출하지 않음 |
 | `MaterialPipelinePlan.md` | `.shadermeta`, Slang, DXIL/SPIR-V, reflection, property override, PSO cache의 필수 선행. M5 generation/소유 경계와 M6-P0~P2d-e의 GBuffer/Forward 소비·required assets·legacy 은퇴가 완료됐다. native Slang source fixture는 격리 선행 가능하며 공용 Standard PBR 소비와 auto-binding은 PBR-S2부터 시작 |
 | `RhiBoundaryPlan.md` | RHIEncoder·texture/buffer handle·양 backend 계약을 그대로 소비. ScriptCore로 raw RHI를 올리지 않음 |
