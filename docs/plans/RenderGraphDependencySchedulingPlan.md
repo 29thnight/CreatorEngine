@@ -278,7 +278,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 | SRP-G0 | RG0 기준선과 RG6 전체 live backend artifact를 공유한다. 별도 캡처 체계를 만들지 않는다 |
 | `LivePipelineDescPlan.md` | 현재 nodes/reads/writes/modifies를 RG5의 첫 native compiler 입력으로 사용한다 |
 | `RhiBoundaryPlan.md` | RG7 heap/alias 계약과 RG8 queue/fence 계약을 backend-neutral RHI에만 추가한다 |
-| 트랙 V4 | Raster Pass의 input layout 유도 계약. RG5의 Asset-first 제품 이관 전에 필요하다 |
+| `ModelAssetBigBangCutoverPlan.md` PHASE 3.75 | MBC6의 vertex attribute mask→input layout/PSO/VSIn 계약과 model generation handle이 RG5의 Asset-first 제품 이관 전에 필요하다 |
 | 트랙 L4 | **2026-09-01 정정** — `RG8`이 아니라 **`Q0`**(queue/fence RHI 계약)의 소비자다. "먼저 구현하는 트랙이 소유"는 순서를 정하지 않는 문장이었고, 아래 임계 경로의 "L4는 RG8을 기다린다"는 P0인 L4를 P1 뒤 142일째에 묶었다. 소유를 트랙에서 떼어 RHI 계층(`Q0`)에 두면 협상이 사라진다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2 |
 | GPU-driven/DXR/DLSS/Stochastic Lighting | RG6 단일 큐 제품 cutover 뒤 새 resource/pass를 추가하고, RG7~RG9 기능을 필요에 따라 소비한다 |
 
@@ -290,7 +290,7 @@ RG0 → RG1 → RG2 → RG3 → RG4 → RG5 → RG6
                                     RG7 → RG8 → RG9
 ```
 
-**2026-09-01 정정.** `V4`는 `I5-D2`/`I5-D34`로 이행 완료됐고(독립 슬라이스 아님), `SRP-G0`는
+**2026-09-02 정정.** 모델/정점 입력 계약은 PHASE 3.75 완료를 하드 선행으로 받고, `SRP-G0`는
 `BASE-0`으로 흡수돼 이 트랙보다 앞에 선다. **L4의 async compute는 `RG8`이 아니라 `Q0`을
 기다린다** — `Q0`은 `RG8`·`L4` 중 먼저 필요해지는 쪽의 착수 시점에 세운다. 그 전의
 UV/BVH/직접광 준비는 독립적으로 진행할 수 있다. 통합 순서는

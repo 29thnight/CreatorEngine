@@ -749,7 +749,7 @@ Runtime interface의 YAML Node 타입 0 + 회귀·왕복 검사 통과 + D0 대�
 | **D3-b-2b-1b-3a** ✅ | 어댑터를 이중 backend로 + 어댑터 파리티 게이트(278파일·15,339노드 차이 0) | 대 | D3-b-2b-1b-2c |
 | **D3-b-2b-1b-3b** ◐ | 훅 이관 + 뷰를 두 backend로(불투명 2워드+태그). 래칫 12→10 | 중 | D3-b-2b-1b-3a |
 | **D3-b-2b-1b-3c** ☐ | 씬 `LoadFile` → `parse_in_arena`. **선행: experiment 재질 코덱이 어댑터를 받아야 한다(I5)** | 중 | D3-b-2b-1b-3b |
-| **D3-b-L** ◐ | leaf 파서를 ryml로(BlackBoard·TagManager 완료, ~62곳 잔여). **계획서에 없던 슬라이스** | 중 | D3-b-1 |
+| **D3-b-L** ◐ | leaf 파서를 ryml로(BlackBoard·TagManager·ShaderMeta 완료, ~35곳 잔여). **계획서에 없던 슬라이스** | 중 | D3-b-1 |
 | **D3-b-3** ☐ | 쓰기 경로(`Meta::Serialize`·Emitter). 파싱 이득 없음 — 저작 왕복 정확성이 판정 | 중 | D3-b-2b-1b-3c |
 | **D3-b-4** ☐ | `Document::Impl` 교체 + Access 반환형. **첫 단계가 아니라 마지막이다**(아래 정정) | 중 | D3-b-3 |
 
@@ -1692,11 +1692,80 @@ yaml-cpp는 전부 **쓰기 경로**(Save)이며 D3-b-3 몫이다.
 가드는 변이로 검증했다 — 파싱을 실패시켜도 **자산이 보존됐고**(바이트 동일) 게이트는
 빨갛게 실패했다.
 
-**남은 leaf(~62곳):** `ShaderMeta` 26 · `EditorSettingsStore` 13 · `RuntimeSettings` 4 ·
+---
+
+**ShaderMeta 27곳 이식 — 완료 (2026-08-31).** 전부 읽기 경로였다.
+
+**먼저 자를 세웠다.** 규칙대로 착수 전에 변이로 확인했더니, 이 파서의 계약은
+`dx12.selftest`(`EnhancedSceneRendererSelfTest::ValidateShaderMeta`) **안에만** 있었다.
+그리고 그것은 회귀 세트(run-all)에 없고, 자기 하네스인
+`Tools/dx12-validation/Invoke-DX12Validation.ps1`은 vcpkg baseline preflight에 막혀
+이 기계에서 돌지 않는다. 변이(`if (false && !known)` — unknown-field 거부 무력화)를
+넣고 다시 빌드한 결과:
+
+| 하네스 | 결과 |
+|---|---|
+| `dx12.selftest` | 실패(잡는다) — 하지만 세트에 없고 하네스는 preflight에 막힘 |
+| `verify-experiment-asset-cooker` | **통과(눈멀다)** |
+
+즉 **정기적으로 도는 게이트 중 이 경로를 지키는 것이 없었다.** TagManager에서 순서를
+놓쳐 저작 자산을 잃었으므로, 이번에는 이식 **전에** `shadermeta.probe`와
+`verify-shadermeta-authoring-read.ps1`을 만들고 run-all에 넣었다.
+
+**두 방향을 잰다.** 수용(실자산 6개의 property·axis·pass **이름 집합**을 자산 텍스트에서
+유도해 대조)과 거절(사유별 6종). 저작 코퍼스는 전부 유효하므로 수용만 재면 "무엇이든
+통과시키는 파서"가 만점을 받는다 — backend 교체에서 가장 흔한 실패가 그 방향이다.
+
+거절 사례에는 **ryml 고유 위험**을 넣었다:
+- `missing-source` — ryml `operator[]`는 없는 키에서 **abort**한다. 어댑터의
+  `find_child` 흡수가 맞는지 상시로 밟는다.
+- `numeric-bool`(`depthWrite: 1`) — YAML 1.1 bool 표. 스칼라 파리티(D3-b-2b-0)가 두
+  backend에서 갈리는 것으로 실측한 부류다.
+- `sequence-root` — 맵이 아닌 루트에 맵 연산.
+
+**변이로 이빨을 증명했다**(첫 실행부터 초록이었으므로 필수였다):
+
+| 변이 | 게이트 반응 |
+|---|---|
+| unknown-field 거부 무력화 | `rejected=5/6`, `unknown-field accepted=1`을 지목 |
+| 마지막 property 하나 흘림 | 6개 파일 각각에서 **빠진 이름을 지목**(`emissiveMap`·`albedoMap`·`alphaCutoff`) |
+
+**이식 결과.** `YAML::Load` → `Authoring::ParsedDocument::ParseText`,
+`ValidateMap`의 키 순회 → `MapEntry`(ryml에서 키는 자식의 **속성**이지 노드가 아니다),
+`node[index]` → `At()`, `as<T>()` → `As<T>()`, `Scalar()`가 `string_view`가 되어
+문자열 대입부는 `AsString()`. `catch (YAML::Exception)`은 사라졌다 — ryml은 예외가
+아니라 abort가 기본값이라 잡을 것이 없고, 파싱 실패는 `ParsedDocument`가 값으로
+돌려준다. **탈출구 0개**(래칫 10/10 불변).
+
+검증: 새 게이트 `files=6 parsed=6 rejectCases=6 rejected=6`, `dx12.selftest` 통과,
+`verify-experiment-asset-cooker`·`verify-material-authoring-corpus`·
+`verify-asset-guid-contract` 통과.
+
+---
+
+**부수 수정 — `verify-player-runtime-hygiene`(D1)이 주석을 참조로 세고 있었다.**
+`PrefabUtility.cpp`의 "efsw 워처가 이 필드를 바꾼다"라는 **설명 한 줄** 때문에 이
+검사가 빨갰다. 재는 것은 링크되는 참조인데 원문을 그대로 grep했다. 블록·줄 주석을
+걷어낸 뒤의 본문만 보도록 고쳤고, 변이(엔진 트리에 실제 `#include <efsw/efsw.hpp>`)로
+**여전히 실코드를 잡는 것**을 확인했다.
+
+---
+
+**★ 이 세트에는 내 트랙이 아닌 실패가 하나 남아 있다.** `HierarchyStore 읽기 경계`가
+7건으로 빨간데 전부 I5 트랙 소유다 — `ExperimentModelMigration.cpp` 6건(역브리지가
+`m_parentIndex`를 직접 쓴다)과 `ConsoleCommandSystem.cpp:3025` 1건. **HEAD에서 이미
+빨갛고**(해당 줄이 HEAD에 그대로 있고 `ExperimentModelMigration.cpp`는 워킹트리
+수정본이 아니다) 이 슬라이스와 무관하다. 계층 단일 정본 경계를 어떻게 지킬지는 I5의
+설계 결정이므로 여기서 코드를 고치거나 그쪽 게이트를 느슨하게 하지 않았다.
+
+---
+
+**남은 leaf(~35곳):** `EditorSettingsStore` 13 · `RuntimeSettings` 4 ·
 `FoliageComponent` 4 · `Model` 4 · `VolumeComponent`·`PhysicsManager`·
 `BehaviorTreeComponent` 각 2 · `Terrain`·`ModelLoader` 각 1.
 **착수 전에 각각 어떤 게이트가 지키는지 변이로 확인할 것** — TagManager가 그 필요를
-증명했다.
+증명했고, ShaderMeta는 "강한 계약이 있어도 도는 세트에 없으면 없는 것과 같다"를
+덧붙였다.
 
 - **D3-b-3:** 쓰기 경로(`Meta::Serialize`·`YAML::Emitter`). 파싱 이득은 없고 저작
   왕복 정확성이 판정이다.

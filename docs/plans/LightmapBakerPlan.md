@@ -65,8 +65,8 @@ BVH 레이트레이싱 기반 컴퓨트 베이커다. 살아남은 것은 저작
 t.lightmapUV0 = (vertices[i0].uv1 * litmaping.lightmapTiling) + litmaping.lightmapOffset;
 ```
 
-uv1 이 죽은 이유가 이걸로 설명된다 — 소비자가 렌더러 철거 때 함께 사라졌다
-(`ModelImportPipelinePlan` §1.7 의 "uv1 소비자 0" 실측의 배경).
+uv1 이 죽은 이유가 이걸로 설명된다 — 소비자가 렌더러 철거 때 함께 사라졌다. 구
+`ModelImportPipelinePlan`의 "uv1 소비자 0" 실측은 역사 근거로만 남는다.
 
 ### 1.2 구조 — 코루틴 프레임 페이싱
 
@@ -263,8 +263,9 @@ CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)   ← 유일
 
 ### 3.2 UV1 은 옵셔널 스트림이다
 
-`ModelImportPipelinePlan` 트랙 V3 의 첫 소비자가 이 계획이다. 라이트맵 대상 메시에만
-UV1 스트림이 붙는다 — 스킨 캐릭터를 포함한 전 정점에 8B 를 부과하지 않는다.
+PHASE 3.75가 게시한 vertex attribute schema의 UV1 optional slot을 이 계획이 처음
+생산·소비한다. 라이트맵 대상 메시에만 UV1 스트림이 붙는다 — 스킨 캐릭터를 포함한 전
+정점에 8B를 부과하지 않는다.
 
 ★ 언랩은 이음매에서 **정점을 쪼개므로 정점 수 자체가 바뀐다.** 즉 기존 uv1 슬롯을
 재사용하는 것이 아니라 언랩 단계에서 스트림을 새로 만든다.
@@ -288,17 +289,18 @@ UV1 스트림이 붙는다 — 스킨 캐릭터를 포함한 전 정점에 8B �
 
 ### L1. UV1 언랩 — xatlas 벤더링
 
-> **2026-09-01 — 구 트랙 V `V6` 를 흡수했다.** UV1 스트림의 **유일한 생산자**가 이 슬라이스다.
-> 흡수한 계약: ① UV1 은 라이트맵 대상 메시에만 붙는 옵셔널 스트림 ② 언랩이 정점을 쪼개므로
-> 스트림은 **언랩 단계에서 생성**되고 기존 `uv1` 슬롯을 재사용하지 않는다 ③ 완료 기준
-> "전 정점 부과 0". 근거: [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.4 C9.
+> **2026-09-02 — PHASE 3.75 선행 계약으로 개정.** UV1 스트림의 유일한 생산자는 이
+> 슬라이스다. 계약: ① UV1은 라이트맵 대상 메시에만 붙는 optional stream ② 언랩이 정점을
+> 쪼개므로 stream은 언랩 단계에서 생성되고 기존 slot을 재사용하지 않는다 ③ 완료 기준
+> "전 정점 부과 0". identity·generation·layout schema는 PHASE 3.75가 소유하고 L1은 그
+> authoring transaction을 통해 새 generation을 게시한다.
 
 - `ThirdParty/xatlas` 원본 무수정 벤더링
-- 임포트 후처리 패스로 편입(`ImportedScene` 트랙) 또는 에디터 오프라인 도구
+- PHASE 3.75 authoring transaction을 호출하는 에디터 오프라인 도구
 - 정점 분할 계수 — 손실은 변환 경계에서 계수한다는 성질 유지
 - 게이트: 차트 겹침 0 · UV 범위 [0,1] · seam 정점 수 계수
 
-의존: `ModelImportPipelinePlan` V1(속성 기술표)·V3(옵셔널 스트림).
+의존: `ModelAssetBigBangCutoverPlan` MBC3(authoring writer)·MBC6(vertex schema).
 
 ### L2. BVH 재작성 — SAH + `nth_element`
 
@@ -405,7 +407,7 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 
 | 계획 | 관계 |
 |---|---|
-| **`ModelImportPipelinePlan` (같은 PHASE 4)** | **L1 이 트랙 V3(옵셔널 스트림)의 첫 소비자다.** UV1 은 라이트맵 대상 메시에만 붙는다. **V6 는 2026-09-01 폐기됐고 `L1` 이 그 계약을 흡수했다** — UV1 스트림의 유일한 생산자는 `L1`(xatlas 언랩)이고, 트랙 V 완료 기준의 "UV1 이 라이트맵 대상 메시에만 붙는다 · 전 정점 부과 0"도 `L1` 완료 기준으로 옮겼다([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.4 C9) |
+| **`ModelAssetBigBangCutoverPlan` (PHASE 3.75)** | **하드 선행.** MBC3 authoring transaction과 MBC6 vertex schema를 소비한다. UV1은 라이트맵 대상 메시에만 붙고 L1이 새 model generation으로 원자 게시한다 |
 | **`RenderGraphDependencySchedulingPlan` (같은 PHASE 4 · 트랙 RG)** | **2026-09-01 확정** — 이 행이 적어 둔 "같은 RHI 계약만 선행"에 이름을 줬다: **`Q0`**(queue-neutral 큐·cross-queue 펜스·COMMON 경유 상태 전이). L4-a와 RG8이 둘 다 `Q0`의 소비자이고 어느 트랙도 소유하지 않는다. `L4`는 `RG8`을 기다리지 않는다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2 |
 | **`ScriptableRenderPipelinePlan` (같은 PHASE 4)** | `LightMapPass` 를 Pipeline Asset 이 선택하는 Pass 로 둘지, 소스 Native Pass 로 둘지 결정 필요 |
 | PHASE 4 Stochastic Lighting | 정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다 |

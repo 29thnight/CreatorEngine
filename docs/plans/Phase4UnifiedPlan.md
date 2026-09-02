@@ -1,591 +1,305 @@
-# PHASE 4 통합 계획 — 차세대 GPU 렌더링 (성능 우선 정렬)
+# PHASE 4 통합 계획 — 차세대 GPU 렌더링
 
-**신설 2026-09-01.** 계획서 5종(`ScriptableRenderPipelinePlan` · `RenderGraphDependencySchedulingPlan`
-· `ModelImportPipelinePlan` · `LightmapBakerPlan` · `MaterialPipelinePlan`)과
-`RefactoringPlanDashboard.html` PHASE 4 절을 전수 대조해 **충돌 13건**을 판정하고,
-PHASE 4의 실행 순서를 **성능 실현 ROI 기준**으로 하나로 합쳤다.
+**신설 2026-09-01 · 범위 개정 2026-09-02 · 활성 40행 267.5일 · 잔여 263.5일**
+
+2026-09-02 개정으로 구 `ModelImportPipelinePlan` I/V experiment 배선을 PHASE 4에서
+제거했다. 모델 자산 신원·sidecar·loader·renderer/scene/animation 소비·Assimp 은퇴는
+[`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md), **PHASE 3.75**의
+단방향 cutover가 소유한다.
+
+PHASE 4는 PHASE 3.75 완료 뒤 새 모델 자산 계약을 **읽기 전용 선행 입력**으로 받는다.
+기존 GUID, legacy 모델 객체, Assimp fallback, experiment on/off를 해석하거나 복구 경로로
+다시 만들지 않는다.
 
 ---
 
-## 0. 이 문서의 정본 경계
+## 0. 정본 경계
 
-이 문서가 5개 계획서를 대체하지 않는다. **경계를 명시한다.**
-
-| 무엇 | 정본 |
+| 범위 | 정본 |
 |---|---|
-| 트랙 간 **순서·선행·우선순위**, 페이즈 공수 합계, 슬라이스 존폐 | **이 문서** |
-| 슬라이스 **내부 설계·측정·게이트 문구** | 각 계획서 |
-| 대시보드 PHASE 4 절 | 이 문서의 파생 표시 — 이 문서가 바뀌면 따라간다 |
+| PHASE 4 트랙 간 순서·선행·우선순위·공수·완료 기준 | 이 문서 |
+| `4-0~4-6`, SRP·PBR-S 내부 설계 | `ScriptableRenderPipelinePlan.md` |
+| versioned resource·DAG·barrier·aliasing·async compute | `RenderGraphDependencySchedulingPlan.md` |
+| 라이트맵 UV1·BVH·직접/간접광·background bake | `LightmapBakerPlan.md` |
+| ShaderMeta·material snapshot·Slang compiler 기반 | `MaterialPipelinePlan.md` |
+| 모델 자산·vertex schema·typed model/material/texture handle | `ModelAssetBigBangCutoverPlan.md` |
+| 대시보드 PHASE 4 | 이 문서의 파생 표시 |
 
-원 계획서에서 이 문서와 어긋나는 서술은 §7의 정정 지시로 처리했다.
-**틀린 것으로 드러난 판단은 지우지 않고 정정 이력으로 남긴다**(저장소 관례).
+구 [`ModelImportPipelinePlan.md`](ModelImportPipelinePlan.md)는 과거 구현·측정·게이트 실패
+기록으로만 보존한다. 그 문서의 I/V 상태와 공수는 이 문서에 합산하지 않는다.
 
 ---
 
-## 1. 충돌 목록과 판정 (2026-09-01 전수)
+## 1. 2026-09-02 범위 개정
 
-### 1.1 같은 작업이 네 이름으로 적혀 있다 — 가장 큰 낭비
+### 1.1 제거한 활성 범위
 
-| # | 이름 | 출처 | 실제 내용 |
-|---|---|---|---|
-| **C1** | `4-0` 기능 범위·기준선·지원 행렬 | 대시보드 task `4-0` (P0 1.5일) | 밀봉 frame packet을 DX12/Vulkan 별도 프로세스에 재생 → final PNG·선형 오차·차영상·CPU record·pass GPU timing·RenderGraph stats를 **한 artifact로** |
-| | `SRP-G0` 전체 live backend 동등성·관측 게이트 | `ScriptableRenderPipelinePlan.md:800` | **위와 문장 단위로 같다** |
-| | `RG0` 현행 graph·픽셀 기준선 | `RenderGraphDependencySchedulingPlan.md:158` (4일) | 위 + graph dump·변이 fixture |
-| | `PBR-S0` 기준선 | `ScriptableRenderPipelinePlan.md:866` | "`SRP-G0`의 **동일 하네스/artifact**를 공유" — 스스로 중복임을 적고 있다 |
+대시보드에서 다음 구 task를 `archive-model-import`로 이동해 표시·진행률·공수 집계에서
+제외했다.
 
-**판정 — 하나로 합친다.** 통합 이름 **`BASE-0`**. 하네스·artifact·재생 경로는 한 벌만
-만들고, `4-0`의 지원 행렬 결정과 `RG0`의 graph dump·변이 fixture, `PBR-S0`의 pre-tone
-HDR 캡처는 그 하네스의 **소비 항목**으로 강등한다.
+- I 트랙: `I0~I8`, `I-fin`.
+- V 트랙: `V0~V6`, `V-fin`.
+- 활성 행 기준 제거량: **16행, 77일**.
+- stopped였던 `V5`, `V6`도 역사 레코드로 이동했다.
 
-근거: 세 계획서가 이미 서로에게 "별도 캡처 체계를 만들지 않는다"(RG §7)·"중복 기준선을
-만들지 않는다"(대시보드 4-0 note)·"동일 하네스/artifact를 공유"(SRP §12)라고 적어
-두고도, **넷 다 독립 슬라이스로 남아 있었다.** 합의는 있었고 통합만 없었다.
+이 개정은 77일을 끝낸 것으로 간주한 것이 아니다. PHASE 3.75의 12개 `MBC` 슬라이스,
+60일이 기존 진행률을 승계하지 않고 새 정본으로 시작한다.
 
-### 1.2 소유권이 미정인 채로 임계 경로에 걸려 있다
+### 1.2 남은 활성 범위
 
-| # | 충돌 | 세 계획서의 서로 다른 말 |
+| 트랙 | 범위 | 목적 |
 |---|---|---|
-| **C2** | COMPUTE 큐·큐 간 펜스 RHI 계약을 **누가 세우는가** | `LightmapBakerPlan.md:325` — "**어느 쪽이 먼저 세우든** 소유하고 다른 쪽이 소비" |
-| | | `ScriptableRenderPipelinePlan.md:966` — "**먼저 세우는 쪽이** 공통 RHI 계약을 소유" |
-| | | `RenderGraphDependencySchedulingPlan.md:275` — "**L4의 async compute는 RG8을 기다리며**" (임계 경로 도식에 고정) |
+| `BASE-0` | 공통 밀봉 frame 재생·PNG/HDR·CPU/GPU timing·graph stats | 모든 성능/품질 판정의 한 벌짜리 자 |
+| `4-0~4-6` | 지원 행렬·기능 계약·의존 그래프·구현 분해 | 네 GPU 기능의 설계 게이트 |
+| `RG0~RG9`, `Q0` | versioned resource, stable DAG, 제품 cutover, aliasing, multi-queue | 실행 그래프와 자원 수명 |
+| `L0~L7` | UV1, BVH, 직접/간접광, background bake | 화면 밖 간접광과 베이크 품질 |
+| `SRP-0~SRP-6` | Blueprint, authored Pass Stack, Slang, Shader Graph | Asset-first Scriptable Pipeline |
+| `PBR-S1~PBR-S8` | native Slang PBR, glTF 의미, IBL, shadow, display, lobe | 공용 재질 평가와 품질 |
 
-**판정 — 큐 계약을 RG8에서 떼어 독립 슬라이스 `Q0`으로 승격한다.**
+### 1.3 PHASE 3.75에서 받는 계약
 
-"먼저 세우는 쪽"은 순서를 정하지 않는 문장이고, "RG8을 기다린다"는 P0인 L4를
-**임계 경로 142일째**에 묶는다. 둘 다 틀렸다. `LightmapBakerPlan.md:400`이 이미 답을
-적어 뒀다 — "RG0~RG7 완료 전 L4가 먼저 필요하면 **같은 RHI 계약만 선행**하고 별도 큐
-계층을 만들지 않는다". 그 "같은 RHI 계약"에 이름을 준다.
+PHASE 4는 다음을 새로 만들지 않고 소비한다.
 
-- **`Q0`** — queue-neutral 큐/펜스·cross-queue 리소스 상태 전이(COMMON 경유) RHI 계약.
-  소유는 **RHI 계층**이고 트랙이 아니다.
-- 소비자: `RG8`(RenderGraph multi-queue 스케줄링)·`L4-a`(백그라운드 베이크 큐).
-- `Q0`은 **둘 중 먼저 필요해지는 쪽의 착수 시점에** 세운다. 어느 트랙도 소유하지 않으므로
-  "먼저 세우는 쪽" 협상이 사라진다.
+- `ModelAssetGeneration` typed handle과 generation lifetime.
+- UUIDv8 AssetId와 model/mesh/material/texture typed subasset identity.
+- vertex attribute mask에서 유도되는 backend-neutral layout schema.
+- immutable material/texture snapshot.
+- source/cooked 차이를 숨긴 검증 완료 model generation.
 
-### 1.3 완료된 것이 미착수로 남아 있다 — 대시보드 상태 낡음
-
-대시보드는 2026-08-30, `ModelImportPipelinePlan`은 2026-09-01이 최신이다. 그 사이에
-트랙 I·V의 절반이 닫혔다.
-
-| # | 항목 | 대시보드 | 계획서 실측 |
-|---|---|---|---|
-| **C3** | `I2` 텍스처 자산 해석 | `todo` P1 3일 | **완료** (`:384` — I2-E · Gunner 6/6 · Suzanne 1/1) |
-| **C4** | `I4` meshoptimizer | `todo` P1 4일 | **둘 완료**, `lodLevels`는 **보류 판정**(`:427` — D0b가 죽은 생산으로 판정) |
-| **C5** | `I5` 런타임 직접 소비 | `todo` P0 5일 | **완료** — I5-M1~M5 ✅ · I5-D(D0a~D4e-3) ✅ (`:678`~`:710`) |
-| **C6** | `V4` 패스 레이아웃 유도 | `todo` P0 **5일 독립 슬라이스** | **I5-D에 흡수돼 완료**. `:2748` — "수행 시점: I5-D에 묶는다 … **독립 슬라이스가 아니다**" |
-| **C7** | `I6` 전환 | `todo` P0 **5일 단일 항목** | **A✅ · B0✅ B1✅ B2~B5 · C◐ · D · E** 로 분해됨(`:2185`, `:2266`). 5일은 A~E를 담지 못한다 |
-| **C8** | `I6` 제목 | "전환 — **Assimp 은퇴**" | 계획서가 정정함(`:2136`) — "**legacy 타입 은퇴, 그다음 Assimp**". 역브리지가 legacy를 계속 만들므로 순서가 반대다 |
-
-**판정 — 대시보드를 계획서에 맞춘다.** C6은 행을 지우고 `I5-D`로 포인터만 남긴다.
-C7의 5일 산정은 **재산정 완료**했다 — 25일(잔여 24일), §4 T0 참조.
-
-### 1.4 이관됐다고 적힌 항목이 살아 있다
-
-| # | 충돌 |
-|---|---|
-| **C9** | `V6` UV1 스트림 — `ModelImportPipelinePlan.md:2781` "**이 항목은 `LightmapBakerPlan.md`(트랙 L)로 이관됐다**", `:2853` "V6는 그쪽으로 이관됐다", `LightmapBakerPlan.md:398` "**V6는 이 계획으로 대체된다**". 그런데 대시보드에 `V6` 행(P1 2일 todo)이 살아 있고, PHASE 4 목표 문단도 V6를 전제로 적혀 있다 |
-
-**판정 — `V6` 행을 폐기한다.** UV1 스트림의 유일한 생산자는 `L1`(xatlas 언랩)이다.
-스트림 쪽 계약(라이트맵 대상 메시에만 부착·언랩 단계에서 생성)은 트랙 L의 `L1` 완료
-기준으로 흡수한다. 트랙 V 완료 기준의 "UV1이 라이트맵 대상 메시에만 붙는다"는 **L1
-판정**으로 옮긴다.
-
-### 1.5 계획서 내부 모순
-
-| # | 충돌 |
-|---|---|
-| **C10** | `LightmapBakerPlan` §6 리스크 — "**L1이 L0를 제외한 모든 슬라이스의 선행**"(`:386`) vs §4 L2 — "**의존: 없음. 가장 먼저 할 수 있다.**"(`:307`) |
-
-**판정 — L2가 맞다.** BVH 재작성은 UV1과 무관하고, off-by-one 수정은 합성 씬(구·평면
-해석적 정답)으로 판정한다. 리스크 표의 문장은 "**L3 이후의 모든 슬라이스**"로 정정한다.
-성능 우선 정렬에서 이 정정은 실질적이다 — L2가 L1과 병렬로 열린다.
-
-### 1.6 우선순위와 일정이 어긋난다
-
-| # | 충돌 |
-|---|---|
-| **C11** | 트랙 L의 `L0~L4`가 전부 **P0**인데, `L4`가 `RG8`(P1 · 25일 · 임계 경로 142일째)에 걸려 있다. P0가 P1을 기다리는 구조다 |
-| **C12** | `RG6`의 선행이 "`RG5`, **`SRP-G0`**"(RG §3 표)인데 대시보드에 `SRP-G0` 행이 **없고 공수도 0**이다. 하드 게이트가 일정에서 사라져 있다 |
-| **C13** | `SRP-0`~`SRP-6`(7개)와 `PBR-S0`~`PBR-S8`(9개)가 **대시보드에 한 행도 없다.** 대시보드 PHASE 4 합계 226일은 이 16개를 세지 않은 수다. `ScriptableRenderPipelinePlan.md:781` — "나머지 SRP 번호는 최종 4-6에서 … 묶거나 분리한다", `:865` — "이 레인은 구현 공수를 **4-6에서 확정**한다" |
-
-**판정 —**
-- C11: `Q0` 분리로 해소된다(§1.2). `L4`는 `RG8`이 아니라 `Q0`을 기다린다.
-- C12: `SRP-G0`은 `BASE-0`에 흡수돼 **가장 앞**으로 온다(§1.1). 하드 게이트가 임계 경로 앞에 선다.
-- C13: 16개를 **미산정 백로그**로 명시적으로 세운다(§8). 대시보드 합계에 "미산정 16슬라이스"를 함께 적어 226일이 전체로 읽히지 않게 한다.
+PHASE 4 task가 이 계약을 확장해야 하면 먼저 PHASE 3.75 계약 변경으로 되돌려 반영한다.
+PHASE 4 내부 adapter로 legacy 객체나 GUID를 다시 들이지 않는다.
 
 ---
 
-## 2. 성능 우선 정렬의 판정 기준
+## 2. 공통 기반 판정
 
-### 2.1 PHASE 4의 "성능"은 세 축이 섞여 있다
+### 2.1 `BASE-0` — 기준선은 한 벌
 
-| 축 | 뜻 | 예 |
-|---|---|---|
-| **A. 런타임 프레임** | 매 프레임 CPU/GPU 시간 | RG4 병렬 기록 · RG8 async compute · GPU-driven |
-| **B. 메모리·대역폭** | 정점 바이트 · peak VRAM | V2/V3 47.8% · RG7 aliasing |
-| **C. 저작·도구 시간** | 임포트 · 베이크 · 빌드 | I7 cooked 로드 · L3 베이크 6.4배 |
+구 `4-0`, `SRP-G0`, `RG0`, `PBR-S0`가 요구하던 측정 하네스를 하나로 합친다.
 
-**A·B를 C보다 앞에 둔다.** 단 트랙 L은 성능만의 항목이 아니다 — 화면 밖 간접광은
-**품질** 축이고 현재 대체 경로가 0이므로, 성능 정렬에서 뒤로 가되 폐기 대상이 아니다.
+`BASE-0` 산출물:
 
-### 2.2 정렬 규칙 — 실현 ROI
+- 밀봉 frame packet·카메라·해상도·tuning.
+- DX12/Vulkan 별도 프로세스 재생.
+- final PNG, linear-space diff, pre-tone HDR.
+- CPU record time, pass별 GPU timing, RenderGraph stats.
+- graph dump, resource mutation fixture, validation output.
+- 지원 GPU·backend·quality mode·래스터 fallback 행렬.
 
-정렬은 "이득 크기"가 아니라 **이득 ÷ 실현까지 남은 공수**로 한다. 이 저장소가 반복해서
-겪은 양식 둘이 그 근거다.
+pass fixture 통과와 전체 live frame 통과는 서로 다른 판정이다. 하나로 다른 하나를 대체하지
+않는다. `RG0`은 stopped 포인터로만 남고 0일이다.
 
-- **완료됐는데 생산 배선이 없는 것이 최우선이다.** `ModelImportPipelinePlan.md:197` —
-  "V2 68B + V3 메시별 packed buffer 완료, **생산 GPU 배선은 아직 없음**". 측정된 47.8%가
-  실현율 0%로 앉아 있었다. 이 저장소의 [[dead-produce-only-pipeline]] 양식이다.
-- **자를 먼저 고치지 않으면 결론이 뒤집힌다.** `encoder-bench`가 모형만 재고 있었고,
-  실물 경로를 태우자 결론이 바뀌었다. **이득이 미측정인 항목은 측정 수단이 서기 전까지
-  순위를 매기지 않는다.**
+### 2.2 `Q0` — queue/fence RHI 계약은 한 벌
 
-### 2.3 실현 ROI 표 (2026-09-01)
+`Q0`은 queue-neutral queue/fence, cross-queue resource state transition, completion lifetime을
+RHI 계층에 둔다. 소비자는 `RG8` multi-queue scheduling과 `L4` background bake다.
 
-| 항목 | 축 | 측정된 이득 | 잔여 공수 | 현 실현율 |
-|---|---|---|---|---|
-| **V2·V3 packed 정점** | B | 21.42MB → 11.17MB (**47.8%**), 정적 실자산 0.10→0.05MB 실행 확인 | I6 잔여 | **부분** — I5-D로 제품이 experiment를 직접 소비. legacy 96B 병행 잔존 |
-| **I6 legacy 타입·Assimp 은퇴** | A·B | 이중 표현·역브리지 제거, 제품 접촉 **206**건 소거 + 삭제 **~5,300줄**, 로드 경로 단일화 | **24일** (2026-09-01 재산정 · 옛 5일의 5배) | **진행 중** — A✅ B0✅ B1✅ B2✅ C신원축✅ (자립 단계 종료, 소거 단계 착수 전) |
-| **I7 cooked 로드** | C | 포맷·코덱 완료. 스켈레톤이 로드의 80%, `fread` 채택(mmap은 2.9배 느려 기각) | ~4일 | 부분 |
-| **L3 렉트 디스패치** | C | 유효 스레드 15.6% → ~100%, **6.4배** | L1·L2 포함 15일 | 0 |
-| **RG3 edge culling** | A | **미측정** | RG0~RG3 30일 | 0 |
-| **RG4 dependency wave 병렬 기록** | A(CPU) | **미측정** | +7일 (누적 37일) | 0 |
-| **RG7 in-frame aliasing** | B(VRAM) | **미측정** — peak byte 감소가 게이트 | +20일 (누적 77일) | 0 |
-| **RG8 async compute** | A(GPU) | **미측정** — 두 큐가 같은 SM을 나눠 쓰면 이득 0 이하 | +25일 (누적 102일) | 0 |
-| **4-2 GPU-driven** | A | **미측정·미산정** | 미산정 | 0 |
-
-### 2.4 이 표에서 나오는 두 판정
-
-**① 트랙 I의 I6가 최우선이다.** PHASE 4에서 **측정도 끝나고 구현도 끝난 성능 이득은
-트랙 V의 47.8%가 유일하다.** 그것을 현금화하는 마지막 구간이 I6다. RG 트랙의 성능 항목
-셋(RG4·RG7·RG8)은 **전부 미측정**이고 실현까지 37~102일이 걸린다. 미측정 이득 셋을
-위해 측정 끝난 이득 하나를 미루는 순서는 성립하지 않는다.
-
-**② `BASE-0`을 I6와 병렬로 지금 세운다.** `BASE-0`은 이득이 0이지만 **RG4·RG7·RG8의
-이득을 잴 수 있게 만드는 유일한 자**다. 선행이 없으므로(RG0 선행 = 없음) I6와 병렬로
-열 수 있다. 자가 없는 상태에서 RG1~RG3 30일을 태우면, 이 저장소가 겪은 "벤치가 모형만
-재고 있었다" 양식을 30일 규모로 반복한다.
+- `RG8`과 `L4` 중 먼저 필요한 쪽의 착수 시점에 세운다.
+- 어느 트랙도 별도 queue 계층을 만들지 않는다.
+- 현재 0일은 완료가 아니라 **미산정**이다. `RG8` 25일에서 분리할 몫을 착수 정찰에서
+  재산정한다.
 
 ---
 
-## 3. 통합 실행 순서
+## 3. 실행 순서
 
 ```text
-T0  I6-B3 → B4 → B5 ─┐                    47.8% 실현 + legacy 은퇴 (24일)
-    I6-C1 → C2 ──────┼─→ I6-E1 → E2       B/C/D는 서로 독립(선행은 전부 I6-A)
-    I6-D1 → D2·D3·D4 ┘
-    BASE-0 (4-0+SRP-G0+RG0+PBR-S0)        이득을 잴 자 · 선행 없음 · 병렬
-                 │
-T1  I7 잔여 · I8 · 트랙 I/V 완료 기준 마감
-                 │
-T2  RG1 → RG2 → RG3 → RG4          첫 런타임 성능 델타(RG4)를 BASE-0 자로 판정
-                 │
-T3  RG5 → RG6                       제품 cutover · 성능 델타 0 · 되돌리지 않는 선
-                 │
-T4  RG7(VRAM 실측 게이트)
-                 │
-T5  Q0 → RG8(GPU 겹침 실측 게이트)   ──┐
-                 │                      │ Q0 공유
-T6  L2 ∥ L1 → L3 → L4 ─────────────────┘ → L5 → L6 → L7
-                 │
-T7  4-2~4-6 설계 게이트 · RG9 · SRP-0~6 · PBR-S0~S8 (§8 미산정 백로그)
+선행  PHASE 3.75 MBC0~MBC11 완료
+  │
+T0  BASE-0
+  │
+T1  RG1 → RG2 → RG3 → RG4
+  │
+T2  RG5 → RG6                         제품 graph cutover
+  │
+T3  RG7 → Q0 → RG8 → RG9             VRAM → multi-queue → inspector
+
+L   L1 ∥ L2 → L3 → Q0 → L4 → L5·L6 → L7
+    └──────── Q0 전까지 RG와 병렬 가능 ────────┘
+
+S   SRP-0 → SRP-1 → SRP-2·SRP-3 → SRP-4 → SRP-5 → SRP-6
+P   PBR-S1 → S2 → S3 → S4·S5 → S6 → S7 → S8
+
+G   4-2~4-5 설계 → 4-6 의존 그래프·최소 수직 슬라이스·구현 페이즈 확정
 ```
 
-**병렬 가능 지점 3곳** — 나머지는 의존이 순서를 정한다.
+순서 원칙:
 
-| 병렬 | 근거 |
-|---|---|
-| `I6-*` ∥ `BASE-0` | BASE-0 선행 없음. 다른 사람/다른 시점에 열 수 있다 |
-| `L1` ∥ `L2` | L2 의존 없음(§1.5 C10 정정). L1은 V3(완료)만 요구 |
-| `L1~L3` ∥ `RG*` | 트랙 L은 `Q0` 전까지 RG와 접점이 없다 |
-
-**T5/T6 순서 뒤집기 조건.** `Q0`이 `RG8`보다 `L4` 때문에 먼저 필요해지면 T5-T6을
-교환한다. `Q0`은 어느 트랙도 소유하지 않으므로 교환에 재설계가 없다(§1.2).
-
-**되돌리지 않는 선.** `RG6` 제품 cutover 통과 후 declaration-order로 되돌리지 않는다.
-`RG6` 이전에 aliasing·async compute를 배선하지 않는다(RG §6 금지선 승계).
+1. 측정 자 `BASE-0`을 구현보다 먼저 둔다.
+2. RenderGraph는 single-queue correctness와 제품 cutover를 닫은 뒤에만 aliasing과
+   multi-queue를 연다.
+3. 라이트맵은 `L1` UV1과 `L2` BVH를 병렬로 열 수 있다. `L4`만 `Q0`을 기다린다.
+4. SRP authored pipeline과 PBR 구현은 PHASE 3.75 typed asset 계약과 RG 제품 계약을
+   우회하지 않는다.
+5. `4-2~4-5`는 구상 task다. 구현 공수는 `4-6`이 분해한 후에만 추가한다.
 
 ---
 
-## 4. 통합 슬라이스 표 — 정정된 상태·선행·공수
+## 4. 활성 슬라이스
 
-`✅`완료 `◐`진행 `·`미착수 `⊘`폐기 · 공수는 1인 전담 개발일.
+`✅` 완료, `·` 미착수, `⊘` 흡수/stopped, `차단` 선행 대기. 공수는 1인 개발일이다.
 
-### T0 — 실현과 자 (지금)
+### 4.1 공통·설계 게이트 — 14일
 
-| ID | 내용 | 상태 | 선행 | 공수 | 정본 |
-|---|---|---|---|---:|---|
-| `I6-A` | 판정 — legacy `.asset` 캐시·`.obj`·`model.cache.build` **전부 폐기** | ✅ | — | — | ModelImport `:2185` |
-| `I6-B0` | 바인딩 자립 — experiment 핸들이 `m_Motion` 단독 | ✅ | — | — | ModelImport `:2266` |
-| `I6-B1` | 씬 표기 이주 — `m_clipOverrides` 자기 표기 | ✅ | B0 | — | ” |
-| `I6-B2` | 신원 자립 — 본 캐시 무효화 신원이 `experiment::Model::Generation()`으로 (계획한 "배치 경로"는 정찰이 뒤집었다) | ✅ | B0 | — | ” |
-| `I6-B3` | 진단·게이트 표면 — 콘솔 16 → 10. 은퇴 래칫에 **계약 4(창구 밖 접촉 ≤ 38)** 신설 | ✅ `e088a008` | B2 | 1.5일 (실적 ~0.5일) | ” |
-| `I6-B4` | 틱 단일화(B4b ✅ 2026-09-02 재착지 — legacy 틱 3함수·`calculAni` 373줄 폐기, 드롭 경로 experiment 이중화, 시각 축 `verify-skin-pose-visual` 위에서) + 대입 절단(B4c ·) | ◐ | B3 | 잔여 **1.0일** | ” |
-| `I6-B5` | 필드 제거 — `Animator.cpp` 14 · `AnimationEventBridge` 11 · 헤더 2 | · | B4 | **2.5일** | ” |
-| `I6-C1` | 메시 소유 이전 — `MeshRenderer` 12 · `ModelSceneBridge` 5 · Foliage 8 · ProxyBridge 4 · ProxyCommand 1 | · | A | **2.5일** | ” |
-| `I6-C2` | 업로드 폴백 제거 — 세 패스의 `GetOrUpload(draw.mesh)` · 프록시 4 · 진단 9 | · | C1 | **1.5일** | ” |
-| `I6-D1` | MeshRenderer·씬 재질 소유 — 31 접촉 | · | A | **2.0일** | ” |
-| `I6-D2` | CLR·스크립트 바인딩 — 31 접촉. **C# ABI 유지가 제약** | · | D1 | **2.5일** | ” |
-| `I6-D3` | Editor Inspector·진단 — 27 접촉 | · | D1 | **1.5일** | ” |
-| `I6-D4` | 프록시·DataSystem·잔재 — `DataSystem::Materials`·`InstantiateShared`·`m_IOR`·flow | · | D1 | **2.5일** | ” |
-| `I6-E1` | 제품 삭제 — `Model`·`Material`·`ModelLoader`·`SkeletonLoader`·`Skeleton`·`AnimationLoader`·역브리지 **~5,300줄** + `Mesh.h` assimp include + vcpkg 포트 | · | B·C·D | **3.0일** | ” |
-| `I6-E2` | 하네스·빌드 정리 — 하네스 53 접촉 · `CREATOR_EXPERIMENT_VERTEX` · `friend class DataSystem` 4곳 | · | E1 | **2.0일** | ” |
-| **`BASE-0`** | **통합 기준선 하네스** — 밀봉 packet 별도 프로세스 재생 · final PNG·차영상·선형 오차 · CPU record · pass GPU timing · graph stats · graph dump · 변이 fixture · pre-tone HDR · 지원 행렬 | · | **없음** | **잠정 6일** (4-0 1.5 + RG0 4 통합, SRP-G0 배관 미산정) | §1.1 · 이 문서 |
-
-> **`I6` 공수 재산정 — 완료 (2026-09-01, `9ef369d7` 기준). 5일이 아니라 25일(잔여 24일)이다.**
-> 정본은 [`ModelImportPipelinePlan.md`](ModelImportPipelinePlan.md) I6 §공수 재산정.
-> 자는 은퇴 래칫 게이트(`verify-legacy-skeleton-retirement.ps1`)와 같은 규칙을 썼다 —
-> 주석 제거 · 하네스 분리. 검산: `m_Skeleton` 제품 **70**건이 래칫 상한 합계 **70**과 일치한다.
->
-> **측정 ① 병행 단계가 은퇴 대상을 늘린다.** `I5-D4e` 하나가 `m_Skeleton`을 52 → 69(+33%)로
-> 늘렸고, 세 축 합계는 `I5-D4d` 166 → 정찰 시점 **213**이었다. 착수 정찰의 "`Skeleton` ~44곳"은
-> 소비자 파일만 센 낡은 수다 — 정의·생산자·역브리지를 넣으면 70이다.
->
-> **측정 ② 착지한 5슬라이스는 접촉을 거의 안 줄였다(213 → 206).** 지연이 아니라 **성격**이다 —
-> A·B0·B1·B2·C신원축은 전부 experiment를 홀로 세우는 **자립** 슬라이스이고, 소거는
-> B4·B5·C·D·E에서 덩어리로 일어난다. 그래서 남은 공수는 착지 실적으로 외삽할 수 없고
-> **남은 접촉 259건(제품 206 · 하네스 53)을 전수해 슬라이스별로 산정**했다.
->
-> **★ 첫 피드백 — `B3`(`e088a008`)이 축 하나를 정정했다.** 진단에서 6건을 걷었는데 창구
-> (`Animator.cpp`)의 legacy 폴백이 5건 늘어 총계는 70 → 69(−1)였다. **창구화 슬라이스는
-> 접촉을 걷지 않고 모은다** — 실제 소거는 창구가 죽는 `B5`·`E`에서 한 번에 일어난다.
-> 그래서 per-slice 축은 총 접촉이 아니라 **창구 밖 접촉**이며, B3이 은퇴 래칫에 **계약 4**
-> (창구 밖 합계 ≤ 38)로 이를 못박았다. **총 24일과 총 접촉 259는 유지**하되, 슬라이스별
-> 접촉 열은 소거량이 아니라 **관계량**으로 읽는다.
->
-> **한계:** 소거율은 아직 미관측이다. **첫 소거 슬라이스 `B4`가 착지하면 다시 잰다** —
-> 그때 재는 것은 총 접촉이 아니라 **창구 밖 접촉(현재 38)**의 감소다.
-> 단위는 RG 계획서와 같은 1인 전담 엔지니어 개발일이며, 이 저장소의 관측 속도
-> (`I5` 40슬라이스·17,004줄 / 약 3.5 달력일)로는 24 엔지니어일 ≈ **3~4 달력일**이다.
-
-> **`BASE-0`은 `SRP-G0`의 하드 게이트를 승계한다** — `RG6`의 선행이다(C12 해소).
-> pass fixture 통과와 전체 live frame 통과를 **별도 판정**하고 하나로 다른 하나를
-> 대체하지 않는다.
-
-### T1 — 트랙 I·V 마감
-
-| ID | 내용 | 상태 | 선행 | 공수 | 정본 |
-|---|---|---|---|---:|---|
-| `I7` | cooked 잔여 — 내용 해시 기반 신선도, 검증 0.460ms 쿠킹 시점 이동 판정 | ◐ | I6-E | 4일 | ModelImport `:2396` |
-| `I8` | 검사 자산·게이트 보강 — Step 트랙 자산·코너 탄젠트 부호 검사 | · | — | 3일 | ModelImport `:2581` |
-| `I-fin` | 트랙 I 완료 기준 마감 — 대표 자산 픽셀 대조 · **Release** 성능 비회귀 | · | I6-E | 2일 | ModelImport `:2798` |
-| `V-fin` | 트랙 V 완료 기준 마감 — 손으로 박힌 오프셋 0 · `VSIn` 짝 검사(변이 증명) · V2 픽셀 차이 0 | · | I6-E | 2일 | ModelImport `:2809` |
-| `V4` | ⊘ 독립 슬라이스 폐기 — `I5-D2`/`I5-D34`로 이행 완료 | ✅ | — | **0** | §1.3 C6 |
-| `V5` | 멀티 슬롯 정점 버퍼 — **보류**. 섀도 캐스케이드 대역폭이 병목으로 잡힌 뒤 | 보류 | — | 4일 | ModelImport `:2764` |
-| `V6` | ⊘ **폐기** — 트랙 L `L1`로 이관됨 | ⊘ | — | **0** | §1.4 C9 |
-
-### T2~T4 — RenderGraph
-
-| ID | 내용 | 상태 | 선행 | 공수 | 성능 축 |
-|---|---|---|---|---:|---|
-| `RG0` | ⊘ **`BASE-0`에 흡수** | — | — | (6일에 포함) | — |
-| `RG1` | 명시적 `Read/Write/Modify` + versioned handle | · | BASE-0 | 8일 | — |
-| `RG2` | stable single-queue DAG compiler | · | RG1 | 10일 | — |
-| `RG3` | DAG 기준 culling·lifetime·barrier 재계산 | · | RG2 | 8일 | **A** (미측정) |
-| `RG4` | dependency wave 병렬 기록·진단 | · | RG3 | 7일 | **A/CPU** (미측정) |
-| `RG5` | 제품 Pass·Pipeline compiler 이관 (19 node · 제품 28곳 · fixture 80곳) | · | RG4 | 12일 | — |
-| `RG6` | DX12/Vulkan 제품 cutover | · | RG5, **BASE-0** | 8일 | — |
-| `RG7` | transient buffer·in-frame aliasing | · | RG6 | 20일 | **B/VRAM** (미측정) |
-| `Q0` | **queue/fence RHI 계약** — queue-neutral 큐·cross-queue 펜스·COMMON 경유 상태 전이 | · | RG6 | **재산정** (RG8 25일에서 분리) | 기반 |
-| `RG8` | multi-queue·async compute 스케줄링 | · | RG7, **Q0** | 25일 − Q0 | **A/GPU** (미측정) |
-| `RG9` | subresource·split barrier·Resource Inspector | · | RG8 | 15일 | 관측 |
-
-### T6 — 라이트맵 (성능 축 C + 품질)
-
-| ID | 내용 | 상태 | 선행 | 공수 |
+| ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `L0` | 기준선 — 삭제분 실측·정답지 | ✅ | — | — |
-| `L1` | UV1 언랩 — xatlas 벤더링. **UV1 스트림의 유일한 생산자**(구 `V6` 흡수) | · | V3 ✅ | 5일 |
-| `L2` | BVH 재작성 — SAH + `nth_element` · 리프 off-by-one 양쪽 커널 | · | **없음** (C10 정정) | 4일 |
-| `L3` | 직접광 — 렉트 크기 디스패치(**6.4배**) · DX12 RHI 재작성 | · | L1·L2 | 6일 |
-| `L4-a` | 베이크 전용 큐 배선 — **`Q0` 소비자**. 별도 큐 계층을 만들지 않는다 | · | L3, **Q0** | (L4 7일에 포함) |
-| `L4-b` | GPU 타임슬라이스 — 프레임당 예산. **TDR 2초는 성능이 아니라 안전 요구** | · | L4-a | ” |
-| `L4-c` | 씬 밀봉 스냅샷 + 무효화 | · | L4-a | ” |
-| `L5` | 간접광 — progressive 누적 | · | L4 | 5일 |
-| `L6` | dilate·seam — padding 원인 수정 | · | L3 | 3일 |
-| `L7` | 병렬화 판정 — **§2.2 ①②③ 뒤에 비로소 잰다** | 차단 | L5·L6 | 3일 |
+| `BASE-0` | 통합 기준선 하네스 | · | PHASE 3.75 | 6 |
+| `4-1` | Scriptable Render Pipeline·Custom Pass 확장 계약 | ✅ | — | 2 |
+| `4-2` | GPU-driven rendering 아키텍처 구상 | · | BASE-0 | 2 |
+| `4-3` | Stochastic Tile-Based Lighting 구상 | · | BASE-0 | 1.5 |
+| `4-4` | DXR 구상 | · | BASE-0 | 1.5 |
+| `4-5` | DLSS 구상 | · | BASE-0 | 1 |
+| `4-6` | 통합 의존 그래프·수직 슬라이스·구현 페이즈 확정 | · | 4-2~4-5 | 0.5 |
 
-### T7 — 설계 게이트
+### 4.2 RenderGraph·queue — 113일 + `Q0` 미산정
 
-| ID | 내용 | 상태 | 공수 |
-|---|---|---|---:|
-| `4-0` | ⊘ **`BASE-0`에 흡수** | — | 0 |
-| `4-1` | Scriptable Render Pipeline·Custom Pass 확장 계약 | ✅ | — |
-| `4-2` | GPU-driven rendering 구상 — `buildMeshlets`의 확정된 소비자 | · | 2일 |
-| `4-3` | Stochastic Tile-Based Lighting 구상 | · | 1.5일 |
-| `4-4` | DXR 구상 — BLAS가 V2/V3 절감을 그대로 받는다 | · | 1.5일 |
-| `4-5` | DLSS 구상 | · | 1일 |
-| `4-6` | 통합 의존 그래프·수직 슬라이스·**§8 백로그 16슬라이스 공수 확정** | · | 0.5일 |
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
+| `RG0` | `BASE-0`에 흡수된 포인터 | ⊘ | — | 0 |
+| `RG1` | 명시적 Read/Write/Modify·versioned resource API | · | BASE-0 | 8 |
+| `RG2` | stable single-queue DAG compiler | · | RG1 | 10 |
+| `RG3` | DAG 기준 culling·lifetime·barrier 재계산 | · | RG2 | 8 |
+| `RG4` | dependency wave 병렬 기록·진단 | · | RG3 | 7 |
+| `RG5` | 제품 Pass·Pipeline compiler 이관 | · | RG4 | 12 |
+| `RG6` | DX12/Vulkan 제품 cutover | · | RG5, BASE-0 | 8 |
+| `RG7` | transient buffer·in-frame aliasing | · | RG6 | 20 |
+| `Q0` | queue/fence RHI 계약 | · | RG6 | 미산정 |
+| `RG8` | multi-queue·async compute | · | RG7, Q0 | 25 |
+| `RG9` | subresource·split barrier·Resource Inspector | · | RG8 | 15 |
 
----
+### 4.3 라이트맵 — 35일
 
-## 5. 공수 합계 — 무엇이 세어졌고 무엇이 안 세어졌나
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
+| `L0` | 삭제된 베이커 실측·정답지 | ✅ | — | 2 |
+| `L1` | xatlas UV1 언랩 | · | PHASE 3.75 vertex schema | 5 |
+| `L2` | SAH BVH·`nth_element`·leaf off-by-one 수정 | · | 없음 | 4 |
+| `L3` | 직접광·DX12 RHI·rect-size dispatch | · | L1, L2 | 6 |
+| `L4` | background bake·GPU time slice·snapshot/invalidation | · | L3, Q0 | 7 |
+| `L5` | progressive 간접광 | · | L4 | 5 |
+| `L6` | dilate·seam·padding 원인 수정 | · | L3 | 3 |
+| `L7` | 병렬화 실측 판정 | 차단 | L5, L6 | 3 |
 
-### 5.1 세어진 공수
+### 4.4 SRP — 43일
 
-| 구간 | 공수 | 비고 |
-|---|---:|---|
-| T0 `BASE-0` | 6일 (잠정) | SRP-G0 live 재생 배관 미산정 |
-| T0 `I6-B3~E2` | **24일** | 2026-09-01 재산정 · 옛 5일의 **5배** · 접촉 259건 전수 |
-| T1 `I7`·`I8`·`I-fin`·`V-fin` | **9일** | `I7` 잔여 2일(포맷·코덱은 완료라 절반 납입) · `I8` 3 · `I-fin` 2 · `V-fin` 2 |
-| T2~T4 `RG1~RG9` | 113일 | RG0 4일은 BASE-0으로 이동 |
-| T4 `Q0` | **미산정** | RG8 25일에서 분리할 몫 |
-| T6 `L1~L7` | 33일 | |
-| T7 설계 게이트 `4-2~4-6` | 6.5일 | **구상만**이다 |
-| T7 `SRP-0~6` 레인 | **43일** | 2026-09-01 `4-6` 산정 (§8) |
-| T7 `PBR-S1~S8` 레인 | **62일** | 2026-09-01 `4-6` 산정 (§8) |
-| **잔여 합계** | **296.5일** | **대시보드와 정확히 일치**(§5.2) |
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
+| `SRP-0` | Blueprint schema·순수 검증기 | · | BASE-0 | 4 |
+| `SRP-1` | 19 node authored Pass Stack·픽셀 동등 컴파일 | · | RG5, SRP-0 | 8 |
+| `SRP-2` | Slang Code 모드·Fullscreen Custom Pass | · | SRP-1 | 7 |
+| `SRP-3` | 최소 Visual Shader Graph | · | SRP-1 | 10 |
+| `SRP-4` | Compute·RendererList·history | · | SRP-2/3 | 5 |
+| `SRP-5` | variant·hot reload·preview·선택적 C# 값 | · | SRP-4, PHASE 3.75 typed CLR handle | 6 |
+| `SRP-6` | 소스 Native Pass 연결 | · | SRP-5 | 3 |
 
-### 5.2 대시보드의 235.5일과 어떻게 다른가
+### 4.5 PBR-S — 62일
 
-> **2026-09-01 정정** — 이 절은 앞서 **188.5일**로 적혀 있었다. 산술 오류다:
-> 정정 전 합계 169.5일에는 `I6`가 "재산정"으로 **0일**로 들어 있었는데, 재산정 결과를
-> 반영하며 5일→24일의 차이인 **+19**를 더했다. 더해야 할 값은 **+24**였다.
-
-두 수는 **다른 것을 센다.** 대시보드 카드의 235.5일은 페이즈 규모가 아니라
-"활성 행의 `days` 총합"이다.
-
-| 축 | 값 |
-|---|---:|
-| 대시보드 활성 행 합계 (**56행** · `stopped` 제외) | **344.5일** |
-| − 이미 완료된 13행 | −45일 |
-| − 진행 중 행의 기납입분 (`I6` 1 · `I7` 2) | −3일 |
-| **= 대시보드 기준 잔여 = 이 문서 §4·§8 기준 잔여** | **296.5일** |
-
-> **불일치 해소 (2026-09-01).** 직전까지 대시보드 292.5일 · 이 문서 298.5일로 **6일이
-> 어긋나 있었다.** 원인이 둘이었고 둘 다 닫았다.
-> ① `I-fin`·`V-fin`(각 2일)이 §4 T1에는 있는데 **대시보드에 행이 없어** 4일이 통째로
-> 빠져 있었다 → 두 행을 신설했다.
-> ② `I7`을 이 문서가 **잔여 4일 전량**으로 세고 있었다. 실제로는 포맷·코덱이 완료된
-> 진행 중 항목이라 잔여는 2일이다 → §5.1 T1을 11일 → 9일로 정정했다.
->
-> **산정 이력**: `4-6` 백로그 산정 전 39행 235.5일(잔여 187.5) → 백로그 15행
-> (SRP 43 + PBR-S 62 = 105일) 반영 후 54행 340.5일 → 마감 2행 신설 후 **56행 344.5일**.
-
-### 5.3 안 세어진 몫 — **`4-6` 산정으로 대부분 닫혔다 (2026-09-01)**
-
-아래는 산정 전 목록이며, `SRP`·`PBR-S` 15슬라이스는 §8에서 **세웠다**. 남은 미산정은
-`Q0`과 `4-2~4-5` 구현 **둘뿐**이다.
-
-| 안 세어진 것 | 상태 |
-|---|---|
-| `SRP-0`~`SRP-6` (7슬라이스) | ✅ **산정 완료 43일** (§8.2) |
-| `PBR-S1`~`PBR-S8` (8슬라이스) | ✅ **산정 완료 62일** (§8.3 · `PBR-S7`은 여섯으로 분해) |
-| `4-2`~`4-5`의 **구현** | **미산정** — 슬라이스가 아직 없다. 그 넷은 구상 게이트이고 **게이트의 산출물이 곧 분해**다(§8.5) |
-| `Q0` | **미산정** — `RG8` 25일에서 분리할 몫 |
-| `BASE-0`의 SRP-G0 live 재생 배관 | 잠정 6일에 미포함 |
-
-산정 전 나는 "세지 않은 몫이 세어진 몫보다 클 공산이 크다"고 적었다. **재고 나니
-절반쯤 맞았다** — 백로그는 105일로 세어진 193.5일보다 작았다. 표면 실측이 셋을
-내렸기 때문이다(§8.1). 다만 방향은 맞았다: 페이즈 규모가 235.5 → **344.5**로 **46% 늘었다.**
-
-남은 `4-2~4-5` 구현은 여전히 미지수이고, 비교 기준인 트랙 RG가 **서브시스템 하나에
-117일**이었음을 보면 네 GPU 기능의 구현이 이 페이즈에서 가장 큰 몫일 가능성이 높다.
-**지금 말할 수 있는 것은 "잔여 296.5일 + 네 GPU 기능의 구현(미지)"이다.**
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
+| `PBR-S1` | native Slang 기반·시각 변화 0 | · | BASE-0 | 4 |
+| `PBR-S2` | `MaterialInputs→StandardSurface` 공용 모듈 동등 이관 | · | S1 | 5 |
+| `PBR-S3` | glTF 의미 교정 9종 | · | S2, PHASE 3.75 typed assets | 9 |
+| `PBR-S4` | 에너지·IBL·local reflection probe | · | S3 | 8 |
+| `PBR-S5` | 그림자·point/spot atlas | · | S3 | 10 |
+| `PBR-S6` | AgX·auto exposure·bloom | · | S4/S5 | 6 |
+| `PBR-S7` | 확장 lobe 6종 | · | S6 | 15 |
+| `PBR-S8` | Shader Graph→authored Slang module codegen | · | S7, SRP-3 | 5 |
 
 ---
 
-## 6. 페이즈 완료 기준 (통합)
+## 5. 공수 합계
 
-원 계획서 5종의 완료 기준을 합치되 **중복을 제거하고 판정 주체를 하나로** 했다.
+대시보드 집계 규칙은 `status=stopped` 행을 활성 합계에서 제외하고, 완료 행의 `days`를
+완료 공수로 센다.
 
-### 6.1 성능 — 실현 판정
+| 묶음 | 활성 행 | 총일 | 완료 | 잔여 |
+|---|---:|---:|---:|---:|
+| 공통·설계 게이트 | 7 | 14.5 | 2 | 12.5 |
+| RenderGraph·Q0 | 10 | 113 | 0 | 113 |
+| 라이트맵 | 8 | 35 | 2 | 33 |
+| SRP | 7 | 43 | 0 | 43 |
+| PBR-S | 8 | 62 | 0 | 62 |
+| **합계** | **40** | **267.5** | **4** | **263.5** |
 
-- [ ] **정점 대역폭 47.8% 실현** — 제품 경로에 legacy 96B `::Vertex` 소비 0.
-      전수 재합산으로 확인(11.17MB는 전망치이지 실측 합이 아니다)
-- [ ] **legacy 로더·타입 제품 호출 0** — `::Model`/`::Material`/`Skeleton`/Assimp
-- [ ] **Release** 로드·프레임 성능이 legacy 대비 비회귀 (Debug 수치로 판정하지 않는다)
-- [ ] `RG4` 병렬 기록의 CPU 이득이 **`BASE-0` 자로** 실측됐다 — 이득이 없으면 기각을 기록한다
-- [ ] `RG7` alias off/on 픽셀 동일 + **peak committed/resident byte 감소 실측**
-- [ ] `RG8` single-queue fallback 동일 + **겹침 GPU 이득 실측** — 이득이 없으면 기각을 기록한다
-- [ ] 베이크 유효 스레드 활용률 ~100% · **Release** 베이크 시간이 기준선 대비 개선
+`Q0`은 0일로 표시돼 있지만 미산정이다. 또한 `4-2~4-5`의 task 일수는 구상만 포함하고
+실제 GPU 기능 구현은 포함하지 않는다. 따라서 현재 말할 수 있는 일정은
+**잔여 263.5일 + Q0 재산정 + 4-2~4-5 구현 미지수**다.
 
-### 6.2 구조 — 되돌리지 않는 선
+2026-09-01의 56행 344.5일 수치는 폐기한다. 차이는 구 I/V 활성 16행·77일이 PHASE 3.75로
+분리된 결과이며, 그 작업을 완료 처리하거나 77일을 60일로 단순 축소한 것이 아니다.
 
-- [ ] `BASE-0` 하네스가 **한 벌**이고 4-0/SRP-G0/RG0/PBR-S0가 그것을 소비한다 (§1.1)
-- [ ] `Q0` 큐/펜스 계약이 **한 벌**이고 `RG8`·`L4-a`가 그것을 소비한다 — 큐 계층 이중 구현 0 (§1.2)
-- [ ] `RG6` 통과 후 declaration-order 제품 경로 잔여 0 · 임시 adapter 0
-- [ ] 정점 레이아웃 오프셋이 코드에 손으로 박힌 곳 0 — 전부 기술표에서 유도
-- [ ] 입력 레이아웃과 셰이더 `VSIn`의 짝 어긋남을 검사가 잡고 **변이로 이빨이 증명**됐다
-- [ ] 구버전 캐시가 **거부**되어 조용한 오독 0
-- [ ] 생산되고 소비되지 않는 스트림 0건 · 소비자 0인 `ImportOptions`가 `buildMeshlets`·`lodLevels`뿐이며 **둘 다 보류로 명시**
-- [ ] UV1이 라이트맵 대상 메시에만 붙는다 — 전 정점 부과 0 (구 `V6` → `L1` 판정)
+---
 
-### 6.3 품질·검증
+## 6. 페이즈 완료 기준
 
-- [ ] 같은 밀봉 입력의 DX12/Vulkan live frame이 허용 오차·validation을 통과
-- [ ] 실내 씬에서 SSGI 단독 대비 간접광 개선이 스크린샷으로 확인
-- [ ] BVH 리프 순회 off-by-one이 **양쪽 커널에서** 닫혔고 변이로 증명
-- [ ] 단일 디스패치가 **TDR 상한 아래**임이 계측으로 확인
-- [ ] 베이크 중 씬 편집·이동·저장이 되고, 편집 시 무효화·재시작이 동작
+### 6.1 구조
+
+- [ ] PHASE 3.75의 UUIDv8/model generation/typed subasset handle만 모델 입력으로 사용한다.
+- [ ] PHASE 4에서 legacy GUID, Assimp, legacy `Model`/`Material`, experiment fallback을
+      참조하는 제품 호출이 0건이다.
+- [ ] `BASE-0` 하네스가 한 벌이고 `4-0`, `RG0`, `SRP-G0`, `PBR-S0` 요구를 소비한다.
+- [ ] `Q0` queue/fence 계약이 한 벌이고 `RG8`, `L4`가 소비한다.
+- [ ] `RG6` 뒤 declaration-order 제품 경로·임시 adapter 0.
+- [ ] `RG6` 전에 aliasing·multi-queue 제품 배선 0.
+
+### 6.2 품질·검증
+
+- [ ] 같은 밀봉 frame의 DX12/Vulkan final PNG·linear diff·validation이 허용 범위를 통과.
+- [ ] pass fixture와 전체 live frame을 별도 판정.
+- [ ] `RG7` aliasing off/on 픽셀 동일과 peak committed/resident byte 감소 실측.
+- [ ] `RG8` single/multi queue 픽셀 동일과 GPU overlap 이득 실측. 이득이 없으면 기각 기록.
+- [ ] BVH leaf off-by-one이 양쪽 kernel에서 닫히고 mutation으로 검증.
+- [ ] bake 중 scene 편집·저장·취소가 가능하고 편집 시 snapshot 무효화·재시작.
+- [ ] 단일 bake dispatch가 TDR 안전 예산 아래.
+
+### 6.3 SRP·PBR
+
+- [ ] Pipeline Asset authored Pass Stack과 versioned resource edge가 불변 native pipeline으로
+      컴파일되고 독립 Pass만 authored index를 stable tie-break로 사용.
+- [ ] Visual `.shadergraph` round-trip과 authored `.slang` code mode가 공통 `.shadermeta`를
+      소비하며 generated Slang은 read-only.
+- [ ] PBR native Slang 공용 평가를 Deferred·Forward가 공유하고 각 의미 변경에 독립 golden.
+- [ ] C#은 stable handle의 Game-thread 값 제어만 사용하며 render/RHI thread CLR 호출 0.
 
 ### 6.4 설계 게이트
 
-- [ ] 네 GPU 기능의 지원 GPU·백엔드·품질 모드·래스터 폴백 기능 행렬 확정
-- [ ] RenderScene/RenderView → GPU 가시성 → 타일 조명 → DXR → 업스케일 데이터 흐름과 히스토리 소유권 문서화
-- [ ] **§8 백로그 16슬라이스의 공수가 `4-6`에서 확정**됐다
+- [ ] GPU-driven, Stochastic Tile-Based Lighting, DXR, DLSS의 지원 GPU/backend/quality/fallback
+      행렬 확정.
+- [ ] RenderScene/View → GPU visibility → tiled lighting → DXR → upscale/present 데이터와
+      history ownership 문서화.
+- [ ] `4-6`이 네 기능의 최소 수직 슬라이스, 의존 그래프, 구현 페이즈, 공수를 확정.
 
 ---
 
-## 7. 원 계획서에 반영할 정정
+## 7. 범위 원칙
 
-기존 문장을 지우지 않고 **정정 이력으로 덧붙였다**(저장소 관례). 아래는 2026-09-01 반영 완료분이다.
-
-| 계획서 | 반영한 정정 | 상태 |
-|---|---|---|
-| `RenderGraphDependencySchedulingPlan.md` | ① §3 표 `RG0` → `BASE-0` 흡수 표기, `RG6` 선행 `SRP-G0` → **`BASE-0`**. ② §3 공수 합계에 정정 주석. ③ §7 `L4` 행과 임계 경로의 "L4는 RG8을 기다린다" → **`Q0`을 기다린다** | ✅ |
-| `LightmapBakerPlan.md` | ① §6 리스크 "L1이 L0를 제외한 모든 슬라이스의 선행" → "**L3 이후의**"(L2는 의존 없음, L1과 병렬). ② §4 `L4-a`·§7 "어느 쪽이 먼저 세우든" → **`Q0` 소비자**로 확정. ③ §4 `L1`에 구 `V6` 계약 흡수 명시, §7 관계표 갱신 | ✅ |
-| `ScriptableRenderPipelinePlan.md` | ① §12 `SRP-G0` → **`BASE-0` 흡수** 블록. ② §12 `PBR-S0` → `BASE-0` 소비 항목. ③ §14 LightmapBakerPlan 행 → **`Q0`**. ④ §14 ModelImport 행에 `V4` 이행 완료 명시. ⑤ §12 머리에 미산정 백로그 16슬라이스 경고 | ✅ |
-| `ModelImportPipelinePlan.md` | ① §4-V `V4` → "**I5-D로 이행 완료**"(이중 계상 해소·잔여 판정 명시). ② `V6` → "**⊘ 폐기 · L1이 승계**". ③ §4 `I6`에 공수 재산정 요구와 성능 우선 정렬상 최우선 근거. ④ §7 머리에 정본 경계 | ✅ |
-| `RefactoringPlanDashboard.html` | C1~C13 전량 반영 — task 15건 정정 + `Q0` 신설 + PHASE 4 절에 성능 우선 실행 순서 블록 + doc-grid 정본 카드. `MaterialPipelinePlan`·`ModelImportPipelinePlan` 카드의 낡은 실측 결론(D5-b2c 차단·"생산 소비자 0")도 갱신 | ✅ |
-| `MaterialPipelinePlan.md` | 정정 없음 — M0~M7·M6-P2d-e 표기가 대시보드와 일치한다(초안의 "P2d-d 표기 오류"는 오독이었다) | — |
+- `4-0~4-6`에서 SDK 연동이나 대규모 feature pass를 먼저 만들지 않는다.
+- 새로운 모델 importer/sidecar/GUID migration은 PHASE 4 범위가 아니다.
+- PHASE 3.75 계약의 빈 부분을 legacy adapter로 메우지 않는다. 필요한 계약은 3.75 계획에
+  반영한 뒤 선행 gate로 닫는다.
+- 성능 기능은 측정 자와 correctness gate 없이 켜지 않는다.
+- backend A/B는 같은 새 frame contract의 DX12/Vulkan 비교다. 모델 legacy/new live A/B와는
+  다르며 후자는 제품에 존재하지 않는다.
 
 ---
 
-## 8. 백로그 공수 산정 — `4-6` 이행 (2026-09-01)
-
-대시보드에 **한 행도 없던** 16슬라이스를 산정했다. 정본 표면 실측은
-[`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) §12-E.
-
-### 8.1 산정 전에 잰 것 — 표면 실측이 순진한 추정을 세 번 뒤집었다
-
-| 실측 | 결과 |
-|---|---|
-| **`SRP-3` 최소 Visual Shader Graph** | **그린필드가 아니다.** `imgui-node-editor`가 벤더링돼 있고 `Editor/ImGuiHelper/NodeEditor.cpp`(336) + `BlueprintBuilder.cpp`(300)이 서 있으며, **BT 에디터가 이 위에서 이미 그래프를 저작한다**(`BTEditorBridge.h` · `InspectorWindow.cpp`). 남는 본체는 `.shadergraph` 스키마와 **codegen**이다 |
-| **`SRP-2` Slang Code 모드** | **컴파일러 기반이 이미 있다.** `RHIShaderCompiler.cpp` 1,299줄에 Slang global session·reflection이 M1B/M7로 붙어 있다(`slang::` 94회). 남는 것은 source/module/import 계약 · cache identity · packaging 분류다 |
-| **`PBR-S2` 공용 모듈 동등 이관** | **중복이 작다.** `Deferred.hlsl`(272)과 `ForwardShade.hlsl`(520)이 공유하는 함수는 실측 **5개**뿐이다 — `DistributionGGX` · `FresnelSchlick` · `VisibilitySmith` · `SampleShadow` · `SampleShadowCascade`. 수식 통합이 아니라 `MaterialInputs → StandardSurface` 구조 도입이 본체다 |
-
-반대로 **키운** 것도 있다.
-
-| 실측 | 결과 |
-|---|---|
-| **`PBR-S7` 확장 lobe** | 한 슬라이스가 아니라 **여섯**이다(specular/IOR · clearcoat · sheen · anisotropy · iridescence/dispersion · transmission/volume). 각각 material property + 셰이더 + 골든이 따로 붙는다. 하나로 두면 `I5`·`I6`가 겪은 **미분해 과소산정(5배)**을 반복한다 |
-| **`PBR-S5` 그림자** | `EnhancedShadowPass.cpp` 768줄에 cascade 접촉 43곳이 이미 있는데, **point/spot atlas는 신설**이다. 그 몫이 슬라이스의 절반이다 |
-
-### 8.2 산정 — SRP 레인 43일
-
-| 슬라이스 | 표면 | 공수 |
-|---|---|---:|
-| `SRP-0` Blueprint schema·순수 검증기 | `EnhancedLivePipelineDesc` 574줄이 nodes/reads/writes/modifies를 이미 든다. 안정 ID·직렬화는 SerializationPlan D2/D5 계약 재사용. **렌더 없이 닫힌다** | **4** |
-| `SRP-1` 19 node authored Pass Stack | `EnhancedSceneRenderer.cpp:1865~2368` ~500줄 · `AddNode` 15곳. `pipeline.nodes` dump가 이미 관측면 | **8** |
-| `SRP-2` Slang Code 모드 + Fullscreen Custom Pass | 컴파일러 기반 존재(위). packaging 분류가 BuildPipelinePlan과 물린다 | **7** |
-| `SRP-3` 최소 Visual Shader Graph | 노드 에디터·선례 존재(위). `.shadergraph` 스키마 + codegen + round-trip | **10** |
-| `SRP-4` Compute·RendererList·history | Compute PSO 존재(3-4). 뷰별 history는 MultiCameraRenderPlan이 결정 완료 | **5** |
-| `SRP-5` variant·hot reload·preview·C# 값 | 리로드·generation retirement는 M5-C가 닫음. C# 값 경계는 `I6-D2`가 먼저 갈아엎는다 | **6** |
-| `SRP-6` 소스 Native Pass 연결 | 정적 registry 하나 + `EnhancedRenderPass` 확장점. 외부 ABI는 비목표 | **3** |
-| **합** | | **43** |
-
-### 8.3 산정 — PBR-S 레인 62일
-
-| 슬라이스 | 표면 | 공수 |
-|---|---|---:|
-| `PBR-S0` 기준선 | **`BASE-0`에 흡수** | **0** |
-| `PBR-S1` native Slang 기반 | 제품 진입점 3종(`ForwardShade` 520 · `Deferred` 272 · `GBuffer` 269). **시각 변화 0이 조건**이라 골든이 자 | **4** |
-| `PBR-S2` 공용 모듈 동등 이관 | 공유 함수 5개(위). `MaterialInputs → StandardSurface` 구조가 본체 | **5** |
-| `PBR-S3` glTF 의미 교정 | 항목 9종(metallic 곱셈·ORM AO·normal scale·occlusion·emissive·alpha cutoff·doubleSided·emissiveStrength·UV set/transform/wrap). **importer부터 Deferred/Forward까지**이고 항목마다 시각이 바뀌어 각각 A/B가 붙는다 | **9** |
-| `PBR-S4` 에너지·IBL | `IblBrdf`(108)·`IblPrefilter`(101) 존재. **local reflection probe가 신설**이고 그것이 본체(프로브 자산·캡처·바인딩) | **8** |
-| `PBR-S5` 그림자 | `EnhancedShadowPass` 768줄·cascade 43곳 존재. **point/spot atlas 신설**이 절반 | **10** |
-| `PBR-S6` display/post | `PostChainUber.hlsl`(138) + `EnhancedPostChainPass.cpp`(457). AgX·auto exposure·bloom **각각 독립 A/B** | **6** |
-| `PBR-S7` 확장 lobe — **여섯으로 분해** | S7a specular/IOR 2 · S7b clearcoat 2 · S7c sheen 1.5 · S7d anisotropy 2 · S7e iridescence/dispersion 2.5 · **S7f transmission/volume 5**(refraction path가 크다) | **15** |
-| `PBR-S8` Shader Graph codegen | SRP-3이 codegen 기반을 이미 냄. 여기서는 검증된 Slang module API를 target으로 잇고 generated/authored parity | **5** |
-| **합** | | **62** |
-
-### 8.4 `RG5`·`SRP-1` 병합 — **기각 확정 (2026-09-01)**
-
-> **★ 정정.** 이 절은 처음에 "둘이 같은 500줄을 만지므로 병합하면 20일 → 15일"이라는
-> **제안**으로 적혀 있었다. 확정에 앞서 코드를 전수하니 **그 근거가 오진이었다.**
-> 아래에 오진과 실측을 함께 남긴다.
-
-#### 오진 — 명사는 같고 동사가 달랐다
-
-두 계획서가 **같은 명사 "19개 노드"**를 쓴다.
-
-| | 계획서 문장 |
-|---|---|
-| `RG5` | "기본 **19개 node**, 제품 호출 28곳과 test/fixture 80곳의 **접근 선언** 이관" |
-| `SRP-1` | "현재 C++ 기본 파이프라인 **19개 노드**를 authored Pass Stack으로 **기술**" |
-
-나는 이것을 같은 대상으로 읽었다. **계획서 산문을 대조했고 코드를 재지 않았다** —
-이 저장소가 [[substring-match-false-results]]·[[plan-target-may-be-already-dead]]로
-기록해 둔 바로 그 양식이다.
-
-#### 실측 — 두 대상은 다른 심볼·다른 파일·다른 줄이다
-
-| | 심볼 | 총 | 제품 | 게이트 | 위치 |
-|---|---|---:|---:|---:|---|
-| `RG5` | `AddPass` · `AddSplitPass` | 120 | **38** | 82 | **Pass 구현 파일 전역에 흩어져 있다** — `EnhancedSSGIPass` 4 · `EnhancedVolumetricFogPass` 3 · `EnhancedSSAOPass`/`EnhancedForwardPass`/`EnhancedDecalPass` 각 2 · 나머지 Pass 각 1 · Editor Pass 4 · RHI/Graph 헤더 |
-| `SRP-1` | `AddNode` | 33 | **33** | 0 | **조립부 두 곳에 모여 있다** — `EnhancedSceneRenderer.cpp` 15 · `EnhancedLivePipelineDesc.cpp` 10 · Editor 조립 6 · 헤더 2 |
-
-**교집합 파일은 `EnhancedSceneRenderer.cpp` 하나뿐이고, 그 안에서도 다른 줄이다** —
-`AddPass`는 `live_present` 2곳(2343 · 2359), `AddNode`는 조립 15곳이다.
-
-#### 판정 — 병합하지 않는다
-
-1. **대상이 겹치지 않는다.** "같은 500줄"이라는 전제 자체가 성립하지 않는다.
-2. **축이 다르다.** `RG5`는 *각 Pass가 리소스 접근을 어떻게 선언하는가*, `SRP-1`은
-   *파이프라인이 노드를 어디서 조립하는가*다. 합치면 픽셀이 붉을 때 **어느 축인지
-   못 가린다** — 이 계획서 자신의 규칙("한 슬라이스의 이미지 차이를 다음 개선으로
-   덮지 않는다")과 [[control-group-needs-independent-derivation]]에 정면으로 어긋난다.
-3. **"병행이 대상을 늘린다"는 유비도 성립하지 않는다.** `I5`→`I6`의 그 패턴은 legacy
-   폴백을 **살려 둔 채** 새 경로를 세워서 생겼다. `RG5`는 폴백을 만들지 않는다 —
-   하나의 경로를 순차로 고쳐 갈 뿐이다.
-
-**유지되는 것:** `RG5 → SRP-1` **순서 의존은 그대로 둔다.** authored Pass Stack이
-표현해야 할 접근 선언을 `RG5`가 정하기 때문이다. 다만 이것은 "같은 코드를 두 번
-만진다"가 아니라 **정상적인 선행**이다. 공수는 `RG5` 12일 · `SRP-1` 8일을 각각 유지하며
-**페이즈 합계 변동은 없다**(병합 시 −5일 가정은 철회).
-
-#### 부수 발견 — `RG5`의 호출 수가 늘었다
-
-계획서의 "제품 28곳 · test/fixture 80곳(총 108)"이 2026-09-01 실측으로 **제품 38 ·
-게이트 82(총 120)**이다. 계획서가 "호출 수는 착수 직전 다시 세며 숫자 감소만으로
-완료 판정하지 않는다"고 적어 둔 그대로 늘었고, 제품만 **+36%**다. §4 T0 측정 ①
-(병행 단계가 대상을 늘린다)의 또 다른 사례다. `RG5` 12일의 재산정은 그 슬라이스
-착수 시점의 일로 남긴다.
-
-### 8.5 여전히 산정하지 않은 것 — `4-2`~`4-5`의 구현
-
-GPU-driven · Stochastic Tile Lighting · DXR · DLSS의 **구현** 공수는 이번에도 산정하지
-않았다. 세울 수 없어서가 아니라 **아직 슬라이스가 없기 때문**이다 — `4-2`~`4-5`는
-구상 게이트이고, **그 게이트의 산출물이 곧 슬라이스 분해**다. 분해 없이 숫자를 붙이면
-`I5`(5일 → 40슬라이스)·`I6`(5일 → 24일)가 겪은 **5배 과소산정**을 세 번째로 반복한다.
-
-이 저장소에서 미분해 산정은 지금까지 **두 번 다 5배 틀렸고**, 분해된 산정(RG 트랙·이번
-백로그)은 아직 반증되지 않았다. 규칙으로 적는다 — **분해가 먼저이고 산정은 그 다음이다.**
-
-### 8.6 이 산정이 페이즈 합계에 미치는 영향
-
-| | 값 |
-|---|---:|
-| §5.1 잔여(분해가 끝난 트랙 · `I7` 정정·마감 2행 반영) | 191.5일 |
-| + SRP 레인 | +43일 |
-| + PBR-S 레인 | +62일 |
-| **= 잔여 합계** | **296.5일** |
-| 대시보드 활성 행 합계(완료 45일 포함) | **344.5일** |
-
-★ `RG5`+`SRP-1` 병합은 **기각**됐으므로(§8.4) 위 합계에 변동은 없다.
-
-**남은 미산정은 `Q0`과 `4-2`~`4-5` 구현 둘뿐이다.**
-
----
-
-## 9. 다른 페이즈와의 관계
+## 8. 다른 계획과의 관계
 
 | 계획 | 관계 |
 |---|---|
-| `MaterialPipelinePlan` (PHASE 3.5) | **완료.** M0~M7 · M6-P2d-e까지 닫혔다. PBR-S 레인의 선행이 해소됨 |
-| `SerializationPlan` (PHASE 17) | `D5-b2c` 완료로 `I5-M` 차단 해제. `I7` 쿠킹 결정·`.meta` 발급을 공유. 라이트맵 텍스처 자산 형식도 그쪽 결정 |
-| `SceneGraphRedesignPlan` | `I5` B(치환)의 노드/엔티티 표현 충돌 확인 — I6-E에서 최종 판정 |
-| `AnimationSchedulerPlan` (PHASE 13) | 게시된 clip의 소비자. `I6-B3` 틱 단일화가 그쪽 평가 엔진 전환의 전제 |
-| `RhiBoundaryPlan` (PHASE 3) | `Q0`·`RG7` heap/alias 계약을 backend-neutral RHI에만 추가. `V5`(보류)가 `RHIEncoder` 확장 요구 |
-| `ProfilingCapturePlan` (PHASE 14) | `BASE-0`의 pass별 GPU timing·CPU record 소비자 |
-| `BuildPipelinePlan` (PHASE 12) | Pipeline/Shader Asset·permutation·native Pass 모듈의 Player 패키징 |
+| `ModelAssetBigBangCutoverPlan` | **하드 선행 PHASE 3.75.** model generation·vertex schema·typed material/texture handle 제공 |
+| `MaterialPipelinePlan` | ShaderMeta·Slang·snapshot 기반 제공. 모델 embedded material identity는 3.75 소유 |
+| `RenderGraphDependencySchedulingPlan` | RG1~RG9 내부 설계 정본 |
+| `LightmapBakerPlan` | L1~L7 내부 설계 정본. L1은 3.75 vertex schema, L4는 Q0 소비 |
+| `ScriptableRenderPipelinePlan` | 4-0~4-6, SRP, PBR-S 내부 설계 정본 |
+| `BuildPipelinePlan` | Slang/module·cooked shader·player package 재현성 |
+| `SerializationPlan` | 일반 authoring/cooked archive 계약. model identity epoch/writer는 3.75가 소유 |
 
 ---
 
-## 10. 정정 이력
+## 9. 변경 이력
 
-| 날짜 | 정정 |
+| 날짜 | 변경 |
 |---|---|
-| 2026-09-01 | **`I6` 공수 재산정 — 5일 → 25일(잔여 24일).** 은퇴 래칫과 같은 자로 접촉 259건 전수. 병행 단계가 은퇴 대상을 늘린다는 시계열(`I5-D4e`가 `m_Skeleton` +33%)과, 착지 5슬라이스가 소거가 아니라 **자립**이라 접촉을 안 줄였다는 성격 구분이 근거다. `assimp 벤더링`은 vcpkg 포트였고 `Mesh.h`가 include 목록에서 빠져 있었다 |
-| 2026-09-01 | 신설. 충돌 13건 판정. `BASE-0`(4-0+SRP-G0+RG0+PBR-S0 통합)·`Q0`(큐/펜스 계약 분리) 신설. `V4` 독립 슬라이스·`V6` 폐기. `L2` 선행 없음 확정. 성능 우선 정렬로 실행 순서 재배치 — 미측정 이득 셋(RG4·RG7·RG8)보다 측정 끝난 이득 하나(V2/V3 47.8%)의 실현(I6)을 앞에 둔다 |
+| 2026-09-02 | 구 ModelImport I/V experiment 배선을 PHASE 4에서 제거하고 PHASE 3.75로 분리. 활성 56행 344.5일 → 40행 267.5일, 잔여 263.5일. 실행 순서·완료 기준·교차 계획 의존을 RG/L/SRP/PBR 중심으로 재작성 |
+| 2026-09-01 | 최초 통합. `BASE-0`, `Q0`, RG/L/SRP/PBR 공수와 순서 정리 |

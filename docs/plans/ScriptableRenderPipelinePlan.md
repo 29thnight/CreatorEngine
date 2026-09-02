@@ -64,29 +64,29 @@ PHASE 4의 순서는 다음이다.
 ```text
 지원 행렬·기준선
     ↓
-Scriptable Pipeline·Custom Pass 계약   ─┐
-                                        ├─ 정점 레이아웃 정본 (ModelImportPipelinePlan 트랙 V)
-                                        ─┘
+PHASE 3.75 모델 자산·정점 schema 완료
+    ↓
+Scriptable Pipeline·Custom Pass 계약
     ↓
 GPU-driven / Stochastic Lighting / DXR / DLSS 구상
     ↓
 공통 의존 그래프·수직 슬라이스·구현 페이즈 확정
 ```
 
-**모델 임포트 파이프라인이 PHASE 4에 편입됐다**(2026-08-25, 구 PHASE 24).
-`ModelImportPipelinePlan.md` 를 보라. 네 GPU 기능이 전부 그 출력을 입력으로
-요구하기 때문이다 — GPU-driven은 정점 레이아웃이 PSO 분류의 축이 되고, DXR은
-BLAS 빌드가 정점 포맷과 stride를 직접 받는다.
+**2026-09-02 범위 개정:** 모델 자산 전환은 PHASE 3.75
+[`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md)로 분리됐다. 네 GPU
+기능은 그 페이즈가 게시한 model generation, typed subasset handle, vertex attribute schema를
+입력으로 받지만 PHASE 4에서 importer·GUID·legacy fallback을 다루지 않는다.
 
 이 계약과의 경계는 이렇다.
 
-- **`ModelImportPipelinePlan` 트랙 V** — 정점 데이터가 *어떤 모양으로* GPU까지
-  가는가(속성 기술표·메시별 마스크·캐시 버전·스트림 분리).
+- **PHASE 3.75 모델 자산 계약** — 정점 데이터가 *어떤 모양으로* GPU까지
+  가는가(속성 기술표·메시별 마스크·generation handle).
 - **이 문서** — Pass가 그 모양을 *어떻게 소비*하는가.
 
 ★ 이 계약에 직접 걸리는 지점이 하나 있다. **Pass를 Asset으로 기술하려면 Pass가
 정점 입력 레이아웃을 소유하면 안 된다.** 현재는 오프셋이 C++ 5곳에 손으로 박혀
-있다(Forward·GBuffer·Shadow×2·WireFrame). 트랙 V4가 이것을 "Pass는 요구 속성만
+있다(Forward·GBuffer·Shadow×2·WireFrame). PHASE 3.75 MBC6가 이것을 "Pass는 요구 속성만
 선언하고 레이아웃은 `(메시 마스크 ∩ Pass 요구)`에서 유도"로 바꾼다. 그 전까지는
 Pipeline Asset이 Raster Pass의 정점 계약을 완결할 수 없다.
 
@@ -917,7 +917,7 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
    fixture를 시각 변화 없이 통과시킨다.
 3. **PBR-S2 공용 모듈 동등 이관** — `MaterialInputs → StandardSurface`와 공용
    GGX/IBL/light/shadow를 도입하되 현행 출력 golden을 먼저 맞춘다.
-4. **PBR-S3 glTF 의미 교정** — `D2/D5 → I5/V4` 생산 소비가 선행한다. metallic factor
+4. **PBR-S3 glTF 의미 교정** — PHASE 3.75의 typed material/texture handle과 vertex schema가 선행한다. metallic factor
    곱셈, ORM AO, normal scale, occlusion strength, emissive, alpha cutoff뿐 아니라
    `doubleSided`, `emissiveStrength`, texture UV set/transform/wrap을 importer부터
    Deferred/Forward까지 닫는다.
@@ -947,7 +947,7 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
 | `SRP-3` Visual Shader Graph | `imgui-node-editor` 벤더링됨 · `Editor/ImGuiHelper/NodeEditor.cpp`(336) + `BlueprintBuilder.cpp`(300) 존재 · **BT 에디터가 그 위에서 이미 그래프를 저작**(`BTEditorBridge.h`·`InspectorWindow.cpp`) | **그린필드가 아니다.** 남는 본체는 `.shadergraph` 스키마와 codegen |
 | `SRP-2` Slang Code 모드 | `RHIShaderCompiler.cpp` 1,299줄에 Slang global session·reflection이 이미 붙어 있다(`slang::` 94회 · M1B/M7 산출) | **컴파일러 기반 존재.** 남는 것은 source/module/import 계약·cache identity·packaging 분류 |
 | `PBR-S2` 공용 모듈 이관 | `Deferred.hlsl`(272)·`ForwardShade.hlsl`(520)의 **공유 함수는 5개뿐** — `DistributionGGX`·`FresnelSchlick`·`VisibilitySmith`·`SampleShadow`·`SampleShadowCascade` | **수식 통합은 작다.** `MaterialInputs → StandardSurface` 구조 도입이 본체 |
-| `PBR-S7` 확장 lobe | lobe 여섯이 각각 property + 셰이더 + 골든을 따로 요구한다 | **한 슬라이스가 아니라 여섯이다**(아래 분해). 하나로 두면 `I5`·`I6`의 5배 과소산정 재발 |
+| `PBR-S7` 확장 lobe | lobe 여섯이 각각 property + 셰이더 + 골든을 따로 요구한다 | **한 슬라이스가 아니라 여섯이다**(아래 분해). 하나로 묶어 미분해 과소산정을 반복하지 않는다 |
 | `PBR-S5` 그림자 | `EnhancedShadowPass.cpp` 768줄 · cascade 접촉 43곳 존재, **point/spot atlas는 신설** | atlas가 슬라이스의 절반 |
 
 #### 산정
@@ -959,7 +959,7 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
 | `SRP-2` | 7일 | 위 · packaging 분류가 `BuildPipelinePlan`과 물린다 |
 | `SRP-3` | 10일 | 위 · codegen이 본체 |
 | `SRP-4` | 5일 | Compute PSO 존재(3-4) · 뷰별 history는 `MultiCameraRenderPlan` 결정 완료 |
-| `SRP-5` | 6일 | 리로드·generation retirement는 M5-C가 닫음 · C# 값 경계는 `I6-D2`가 선행 |
+| `SRP-5` | 6일 | 리로드·generation retirement는 M5-C가 닫음 · 모델 C# 값 경계는 PHASE 3.75 MBC8이 선행 |
 | `SRP-6` | 3일 | 정적 registry 하나 + 확장점 · 외부 ABI 비목표 |
 | **SRP 합** | **43일** | |
 | `PBR-S0` | **0** | `BASE-0`에 흡수 |
@@ -990,9 +990,9 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
 **판정:** ① 대상이 겹치지 않아 "같은 500줄" 전제가 성립하지 않는다. ② 축이 다르다 —
 `RG5`는 *Pass가 접근을 어떻게 선언하는가*, `SRP-1`은 *파이프라인이 노드를 어디서
 조립하는가*다. 합치면 픽셀이 붉을 때 어느 축인지 못 가려 이 계획서 §13-12의
-"한 슬라이스의 이미지 차이를 다음 개선으로 덮지 않는다"에 어긋난다. ③ "병행이 대상을
-늘린다"는 유비도 성립하지 않는다 — `I5`→`I6`의 그 패턴은 legacy 폴백을 살려 둔 채
-새 경로를 세워 생겼는데 `RG5`는 폴백을 만들지 않는다.
+"한 슬라이스의 이미지 차이를 다음 개선으로 덮지 않는다"에 어긋난다. ③ `RG5`는
+기존 접근 선언을 version API로 이관하는 작업이고 별도 제품 fallback을 만들지 않으므로,
+병행 경로가 대상을 늘린다는 유비도 성립하지 않는다.
 
 **유지:** `RG5 → SRP-1` 순서 의존은 그대로다(authored Pass Stack이 표현할 접근 선언을
 `RG5`가 정한다). 공수도 12일·8일 각각 유지하며 합계 변동 없다.
@@ -1005,9 +1005,8 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
 
 `4-2`~`4-5`의 **구현** 공수는 여전히 미산정이다. 세울 수 없어서가 아니라 **슬라이스가
 아직 없기 때문**이다 — 그 넷은 구상 게이트이고 **게이트의 산출물이 곧 분해**다.
-분해 없이 숫자를 붙이면 `I5`(5일 → 40슬라이스)와 `I6`(5일 → 24일)가 겪은 5배
-과소산정을 세 번째로 반복한다. 이 저장소에서 **미분해 산정은 두 번 다 5배 틀렸고,
-분해된 산정은 아직 반증되지 않았다.**
+분해 없이 숫자를 붙이면 과거 대형 이행에서 반복된 미분해 과소산정을 다시 만든다.
+구상 게이트가 표면과 수직 슬라이스를 낸 뒤에만 구현 공수를 확정한다.
 
 ---
 
@@ -1051,7 +1050,7 @@ time/flow·`m_flowInfo`를 32B immutable snapshot과 128B Forward instance에 �
 | 계획 | 관계 |
 |---|---|
 | **`RenderGraphDependencySchedulingPlan.md` (같은 PHASE 4 · 트랙 RG)** | **이 계획의 실행 순서 정본** — Pipeline Asset의 `read/write/modify`를 versioned handle로 낮추고 stable DAG를 만든다. RG0~RG6 단일 큐 제품 전환 뒤 RG7 aliasing, RG8 async compute, RG9 subresource/관측 순으로 확장한다 |
-| **`ModelImportPipelinePlan.md` (같은 PHASE 4)** | **트랙 V4가 이 계약의 전제다.** ★ 2026-09-01 — V4는 독립 슬라이스가 아니라 `I5-D2`(마스크→`RHIInputElement` 유도)·`I5-D34a/b/c`(GBuffer 정적·스킨·Forward 전환)로 **이행 완료**됐다. 잔여는 "손으로 박힌 오프셋 0" 판정이며 `I6-E`로 legacy가 죽은 뒤 확정한다([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.3 C6). 트랙 V의 퍼뮤테이션 축은 `.shadermeta` 키 체계를 공유한다. PBR-S3의 import→GPU 의미 완결도 D2/D5 재질 ID와 I5/V4 생산 소비 뒤에만 판정한다 |
+| **`ModelAssetBigBangCutoverPlan.md` (PHASE 3.75)** | **하드 선행.** MBC6가 vertex attribute mask→input layout/PSO/VSIn 계약을 닫고 MBC7·MBC8이 typed material/texture/CLR handle을 게시한다. 이 문서는 그 결과만 소비하며 legacy GUID·Assimp·experiment fallback을 재도입하지 않는다 |
 | **`LightmapBakerPlan.md` (같은 PHASE 4 · 트랙 L)** | **2026-09-01 정정 — `RG8`이 아니라 독립 슬라이스 `Q0`(queue/fence RHI 계약)의 소비자다.** 백그라운드 베이킹이 별도 COMPUTE 큐와 큐 간 펜스를 요구하는데 현재 큐는 `TYPE_DIRECT` 하나뿐이다. "먼저 세우는 쪽이 소유"는 순서를 정하지 않는 문장이었고 RG 계획서는 반대로 "L4는 RG8을 기다린다"고 적어 P0를 임계 경로 142일째에 묶었다 — 소유를 RHI 계층(`Q0`)에 두어 협상을 없앴다([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2). `LightMapPass`를 Pipeline Asset이 선택하는 Pass로 둘지 소스 Native Pass로 둘지 결정 필요 |
 | `LivePipelineDescPlan.md` | 현재 C++ 조립 기술을 첫 native compiler target으로 사용. 공개 asset schema로 직접 노출하지 않음 |
 | `MaterialPipelinePlan.md` | `.shadermeta`, Slang, DXIL/SPIR-V, reflection, property override, PSO cache의 필수 선행. M5 generation/소유 경계와 M6-P0~P2d-e의 GBuffer/Forward 소비·required assets·legacy 은퇴가 완료됐다. native Slang source fixture는 격리 선행 가능하며 공용 Standard PBR 소비와 auto-binding은 PBR-S2부터 시작 |
