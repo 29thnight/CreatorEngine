@@ -51,12 +51,23 @@ $failures = New-Object System.Collections.Generic.List[string]
 
 # ── 계약 1: 엔진 계층 소스에 파일 워처가 없다 ────────────────────────────────
 # efsw는 에디터 저작 도구다. Engine/ 아래에 참조가 생기면 Player가 링크하게 된다.
+#
+# ★ 주석은 세지 않는다. 재는 것은 **링크되는 참조**인데 원문 그대로 grep하면
+#   "efsw 워처가 이 필드를 바꾼다" 같은 설명 한 줄이 실패를 만든다. 실제로
+#   `PrefabUtility.cpp`의 주석 하나로 이 검사가 빨개져 있었고, 그것은 이 계약이
+#   말하려는 것과 아무 상관이 없다. 주석을 걷어낸 뒤의 본문만 본다.
 $engineEfsw = @(Get-ChildItem -Path (Join-Path $repoRoot 'Engine') -Recurse -File `
         -Include '*.h', '*.hpp', '*.cpp' -ErrorAction SilentlyContinue |
-    Select-String -Pattern 'efsw' -SimpleMatch -CaseSensitive:$false -List)
+    Where-Object {
+        $body = [IO.File]::ReadAllText($_.FullName)
+        # 블록 주석 먼저, 그 다음 줄 주석. 순서를 바꾸면 블록 안의 `//`가 남는다.
+        $body = [regex]::Replace($body, '(?s)/\*.*?\*/', ' ')
+        $body = [regex]::Replace($body, '(?m)//.*$', ' ')
+        $body -match 'efsw'
+    })
 if ($engineEfsw.Count -gt 0) {
     $failures.Add("Engine/ 트리에 efsw 참조 $($engineEfsw.Count)건: " +
-        (($engineEfsw | ForEach-Object { $_.Path.Substring($repoRoot.Length) }) -join ', '))
+        (($engineEfsw | ForEach-Object { $_.FullName.Substring($repoRoot.Length) }) -join ', '))
 }
 
 # ── 계약 2: Player가 에디터 진입 계층을 링크하지 않는다 ──────────────────────
