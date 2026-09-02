@@ -1,6 +1,6 @@
 # 모델 자산 빅뱅 전환 계획 (PHASE 3.75)
 
-**신설 2026-09-02 · 예상 공수 60 개발일 · 상태: 진행 중 — MBC0·MBC1 완료(5/60일, 2026-09-02)**
+**신설 2026-09-02 · 예상 공수 60 개발일 · 상태: 진행 중 — MBC0·MBC1·MBC2 완료(9/60일, 2026-09-02)**
 
 이 계획은 기존 `experiment` 배선을 완성하거나 legacy 경로와 대조 운용하는 계획이 아니다.
 모델 자산의 신원·저장·로딩·런타임 소비를 새 계약으로 한 번에 교체하고, 전환 완료 뒤
@@ -173,6 +173,29 @@ subAssets:
 단, `identityProfile`, `identityEpoch`, `authoringKey`, `assetId`, `generation`, 완전한
 `subAssets` closure는 반드시 재구성 가능해야 한다.
 
+**MBC2에서 확정(2026-09-02).**
+
+- epoch header는 `ProjectSetting/AssetIdentity.asset` 하나(schemaVersion 1, identityProfile,
+  identityEpoch, identityEpochSeed 64hex, createdAt). ProjectSetting은 pak에 들어가므로 Player가
+  §4 load 1단계를 같은 파일로 검증한다. sidecar는 seed를 복제하지 않고 `identityEpoch` 이름만
+  들어 header와 대조한다.
+- sidecar v2는 최상위 `schemaVersion: 2` 아래 `identityProfile`·`identityEpoch`·`authoringKey`·
+  `assetId`·`generation`·`sourceFingerprint(sha256:<64hex>)`·`subAssets[]{kind, stableKey,
+  assetId, binding, name, fingerprint}`. legacy 최상위 `guid:`는 없다(있으면 reader가 거부).
+  v1(`subAssets.schemaVersion: 1`)은 `LegacySchema`로 거부 — MBC4 offline migrator의 입력이다.
+  `importSettings`·`ModelImporter` 등 다른 최상위 키는 writer가 보존한다.
+- stable key 문법: `exporter:<id>` | `name:<NFC 이름>` | `authoring:<64hex>`. ordinal
+  (`gltf/material/0`)·빈 값·비NFC·대문자 접두는 파서가 거부한다. 모델 `authoringKey`는
+  `exporter:`·`authoring:`만(이름 없음).
+- authoring key 재결합 규칙: 요소의 콘텐츠 지문(SHA-256 — 재질=속성+슬롯 텍스처 지문,
+  텍스처=바이트, 메시=위치+인덱스, 스켈레톤=joint 이름+inverse bind, 애니메이션=타깃 이름+키)
+  으로 prior key를 되찾는다. 같은 지문이 여럿이면 binding 순으로 짝짓는다(바이트 동일 요소는
+  교환 불가시). prior에 없는 지문 → 새 key, 현재에 없는 prior → 은퇴(경고), **둘이 동시** →
+  `AuthoringRebindAmbiguous` 오류로 import 실패(§2.3 마지막 문장의 구현).
+- 실측: corpus 14 모델 309 subasset 중 scene.glb(무명 재질 25·텍스처 69·메시 103)만 authoring,
+  나머지 112건은 전부 semantic. exporter persistent ID는 0건이라 우선순위 1·2 경로는 필드만
+  열어 두고(`StableKeyElement::persistentId`) 임포터가 채우는 것은 MBC3에서 extras 콜백으로.
+
 ### 3.2 단일 authoring transaction
 
 `ModelAssetAuthoringTransaction` 하나가 다음 순서를 소유한다.
@@ -300,7 +323,7 @@ descriptor generation 전체를 함께 처리한다.
 |---|---|---|---:|---|
 | `MBC0` | cutover 계약·변경 동결·corpus/참조/성능 기준선 | — | 2 | **완료 2026-09-02** — `verify-mbc-cutover-freeze`(래칫 15 표면·하드 계약 3), `mbc0_corpus_baseline.json`, [기준선 문서](ModelAssetBigBangCutoverBaseline.md) |
 | `MBC1` | `ce.uuidv8.sha256.v1` 구현·test vector·collision registry | MBC0 | 3 | **완료 2026-09-02** — `Engine/RenderEngine/Assets/AssetIdentityProfile·Registry`, `Utility_Framework/Sha256.h`, `assets.identity`(단정 184), `verify-asset-identity`(C++·Python·.NET 3중 유도, 벡터 15) |
-| `MBC2` | schema v2·stable key·epoch header | MBC1 | 4 | 미착수 |
+| `MBC2` | schema v2·stable key·epoch header | MBC1 | 4 | **완료 2026-09-02** — `Assets/AssetIdentityEpoch`·`ModelStableKeys`·`ModelSidecarV2`, `assets.sidecar`(단정 83, corpus 14/14·subasset 309·충돌 0), `verify-asset-sidecar-v2` |
 | `MBC3` | 원자 authoring writer·watcher/AssetCooker 단일화 | MBC2 | 5 | 미착수 |
 | `MBC4` | 전 corpus 새 신원 발급·scene/prefab/material 참조 일회성 rewrite | MBC3 | 6 | 미착수 |
 | `MBC5` | `ModelAssetGeneration`·generation cache·원자 publish/retire | MBC2 | 7 | 미착수 |
@@ -386,4 +409,5 @@ on/off를 복구 경로로 사용하지 않는다. rollback은 이전 release �
 |---|---|
 | 2026-09-02 | 신설. 구 PHASE 4 I/V experiment 배선을 PHASE 3.75 단방향 cutover로 대체. 기존 GUID 비승계, UUIDv8+SHA-256 profile, schema v2 원자 writer, `ModelAssetGeneration`, SU/Gunner 폐쇄 조건, legacy/A-B/Assimp 제거, 60일 공수와 게이트를 확정 |
 | 2026-09-02 | **MBC0 완료.** 동결 래칫 게이트(표면 15·하드 계약 3), corpus 14/참조 28 분류(모델 참조 8·subasset 참조 **0**·고아 11), Prim sidecar 8개 손상의 원인 경로(워처 Delete 오독 → `CreateMetaLocked` 재발급) 실측, Release 기준선·예산 B1~B6 고정. 미커밋 폴백 덧대기(MeshRenderer 순서 해킹·`[material.finalize]`)와 손상 sidecar는 stash로 걷어냈다. **계측 공백**: 새 경로 cooked 읽기·frame CPU/GPU·peak VRAM은 CLI가 없어 MBC11 전에 세워야 한다 |
+| 2026-09-02 | **MBC2 완료.** epoch header(`ProjectSetting/AssetIdentity.asset`, CSPRNG 256-bit), stable key 문법·규칙 엔진(semantic/authoring, 지문 재결합, 모호성=고아 prior+새 지문 동시), sidecar v2 코덱(왕복·다른 키 보존·legacy guid 제거·v1/ordinal 거부)·폐포 검증(재유도·registry bijection). 실자산 14 모델 임포트→배정→v2→폐포 통과, 전 corpus registry 309 충돌 0, 같은 입력 재배정 동일 신원. 첫 규칙은 scene.glb의 동일 지오메트리 무명 메시에서 변경 없는 재임포트를 거부했다 — 지문 그룹 안 binding 순 짝짓기로 정련. 디스크 쓰기 없음(원본 해시 전후 동일 게이트). §3.1에 확정 사항 기록 |
 | 2026-09-02 | **MBC1 완료.** §2 바이트 계약을 `assets::DeriveIdentity`로 구현(헤더 온리 SHA-256, UTF-8 well-formed·NFC fail-closed, 길이 접두 U32BE, v8/variant bit), 계층 `DeriveModelId`/`DeriveSubAssetId`(legacy v4 namespace는 값에서 거부), `IdentityRegistry`(DuplicateTuple/UuidCollision/RecomputeMismatch, canonical tuple = 입력 바이트열). test vector 15건은 Python 독립 유도로 생성하고 .NET이 3차 검산. **변이 검증**: 길이 접두를 LE로 바꾼 제품 빌드에서 게이트 RED(단정 86 실패), 되돌리면 GREEN. §2.4의 pseudo v5-as-v4 0건은 MBC3가 writer를 교체할 때 래칫을 내린다(현재 접촉 2+1) |

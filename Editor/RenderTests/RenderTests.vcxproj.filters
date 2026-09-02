@@ -138,6 +138,9 @@
     <ClCompile Include="AssetIdentity\AssetIdentitySelfTest.cpp">
       <Filter>AssetIdentity</Filter>
     </ClCompile>
+    <ClCompile Include="AssetIdentity\AssetSidecarSchemaSelfTest.cpp">
+      <Filter>AssetIdentity</Filter>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
@@ -273,6 +276,9 @@
       <Filter>AssetIdentity</Filter>
     </ClInclude>
     <ClInclude Include="AssetIdentity\AssetIdentityTestVectors.inl">
+      <Filter>AssetIdentity</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetIdentity\AssetSidecarSchemaSelfTest.h">
       <Filter>AssetIdentity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h">

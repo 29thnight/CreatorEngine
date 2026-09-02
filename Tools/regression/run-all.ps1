@@ -296,6 +296,14 @@ Run-Step "자산 신원 프로필 UUIDv8" {
         (Join-Path $PSScriptRoot "verify-asset-identity.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 3.75 MBC2: epoch header·stable key 규칙 엔진·sidecar schema v2. 합성 단정 위에
+# 실자산 corpus 14를 임포트해 폐포를 재유도하고 전 모델을 한 registry에 넣는다.
+# 디스크에 쓰지 않는다(원본 해시 전후 동일) — 쓰기는 MBC3 transaction의 몫.
+Run-Step "model sidecar schema v2" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-asset-sidecar-v2.ps1") -Exe $Exe -Work $Work
+}
+
 # 본 팔레트가 렌더에 도달하는가. X8의 dirty 게이팅에 "팔레트가 바뀌었다"
 # 축이 없어 스킨 메시가 첫 포즈에서 굳었다 — 그림을 못 재는 헤드리스에서
 # 프록시 커밋 누계로 잰다.

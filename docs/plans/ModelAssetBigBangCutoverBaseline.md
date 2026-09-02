@@ -41,9 +41,10 @@ MBC9·MBC10 완료 조건은 이 표 전부 0이다.
 
 ### 1.2 하드 계약 (래칫 아님)
 
-- model sidecar writer는 허용목록 둘뿐: `EditorAssetDatabase.cpp`(`CreateMetaLocked`),
-  `ModelIdentityRefresher.cpp`. 셋째가 생기면 즉시 실패. MBC3가 둘을
-  `ModelAssetAuthoringTransaction` 하나로 합치면 허용목록을 그것 하나로 좁힌다.
+- model sidecar writer 허용목록: legacy 둘(`EditorAssetDatabase.cpp`의 `CreateMetaLocked`,
+  `ModelIdentityRefresher.cpp`)과 MBC2가 더한 v2 코덱(`Assets/ModelSidecarV2.cpp`). 넷째가
+  생기면 즉시 실패. MBC3가 legacy 둘을 제거하고 `ModelAssetAuthoringTransaction`이 v2 코덱을
+  통해서만 쓰게 되면 허용목록은 그 하나로 좁힌다.
 - 검사 전용 seam(`DeriveIdentityWithProfile`·`InsertUncheckedForTest`)은 `Engine/RenderEngine/Assets/`
   정의 밖 0건.
 - `Assets/` 계층 안에 legacy 신원 API(`Uuid::FromName`·`IsAssetIdV4`·`CreateRandomV4`) 0건 —

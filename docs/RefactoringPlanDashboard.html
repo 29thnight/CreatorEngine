@@ -527,7 +527,7 @@
 <!-- ===== PHASE 3.75 ===== -->
 <section class="phase" id="phase-3.75">
   <h2 class="sec"><span class="no">PHASE 3.75</span>모델 자산 빅뱅 전환 <span class="phase-pct" data-phase-pct="3.75"></span></h2>
-  <div class="phase-meta"><b>정본: <a href="plans/ModelAssetBigBangCutoverPlan.md" style="color:var(--accent)">ModelAssetBigBangCutoverPlan.md</a></b> · 신설 2026-09-02 · 예상 공수 60일 · 활성 12행 · 완료 5일(MBC0·MBC1, 2026-09-02) · 잔여 55일 · 선행: PHASE 3.5 완료 · 후행: PHASE 4 재개. 구 ModelImport I/V의 완료 표시는 승계하지 않는다. 구현은 빌드 가능한 내부 슬라이스로 나누되 제품 공개는 <code>MBC11</code>에서 한 번만 한다.</div>
+  <div class="phase-meta"><b>정본: <a href="plans/ModelAssetBigBangCutoverPlan.md" style="color:var(--accent)">ModelAssetBigBangCutoverPlan.md</a></b> · 신설 2026-09-02 · 예상 공수 60일 · 활성 12행 · 완료 9일(MBC0·MBC1·MBC2, 2026-09-02) · 잔여 51일 · 선행: PHASE 3.5 완료 · 후행: PHASE 4 재개. 구 ModelImport I/V의 완료 표시는 승계하지 않는다. 구현은 빌드 가능한 내부 슬라이스로 나누되 제품 공개는 <code>MBC11</code>에서 한 번만 한다.</div>
   <div class="phase-goal"><b>목표:</b> 기존 GUID·legacy 객체·Assimp fallback·experiment A/B를 보존한 채 배선을 연장하지 않는다. 전체 모델 corpus에 새 <code>ce.uuidv8.sha256.v1</code> identity epoch를 발급하고, schema v2 sidecar·cooked artifact·embedded texture/material closure를 단일 writer가 원자 게시한다. 런타임은 immutable <code>ModelAssetGeneration</code> 하나를 renderer·scene·animation·editor·serialization이 직접 소비한다.</div>
   <div class="phase-goal"><b>긴급 결함 폐쇄:</b> <code>SU_Mythic.glb</code>는 <code>core|color|skin</code> 전체 vertex attribute mask에서 input layout·PSO·<code>VSIn</code>을 함께 유도해 GBuffer/Shadow와 DX12/Vulkan을 통과시킨다. <code>Gunner_F_Mythic.glb</code>는 model 1·material 2·embedded texture 6의 새 UUIDv8 closure를 cold load/reimport에서 원자 게시하며 역직렬화 순서 해킹과 전역 registry 예열을 제거한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="3.75"><!-- JS 생성 --></table></div>
@@ -1365,8 +1365,8 @@ const TASKS = [
     note: "완료(2026-09-02). Engine/RenderEngine/Assets/AssetIdentityProfile(.h/.cpp)·AssetIdentityRegistry, Utility_Framework/Sha256.h(헤더 온리 FIPS 180-4). §2.2 바이트 계약(프로필‖0x00‖U32BE 길이 접두 4필드, UTF-8 well-formed·NFC fail-closed, digest[0..15]+v8/variant bit), 계층 DeriveModelId/DeriveSubAssetId(legacy v4 namespace는 NamespaceNotV8로 거부), registry Registered/DuplicateTuple/UuidCollision/RecomputeMismatch+VerifyBijection. 검증: assets.identity 단정 184(FIPS KAT 5·BCrypt 43/43·벡터 15·fail-closed·legacy 표기 거부·bit 256건·registry), verify-asset-identity가 Python 생성 벡터를 .NET SHA256으로 3차 검산. 변이: 길이 접두 LE 제품 빌드에서 RED(단정 86 실패)→되돌려 GREEN. pseudo-v5 구현 폐기(접촉 2+1)는 MBC3 writer 교체 시 래칫을 내린다." },
   { phase: 3.75, id: "MBC2", title: "sidecar schema v2·stable key·identity epoch",
     detail: "새 256-bit epoch seed, 불변 authoring key, profile/epoch/generation/source fingerprint와 typed subAssets closure를 정의한다. ordinal/name-only key는 거부한다.",
-    refs: "ModelAssetBigBangCutoverPlan §2.3 · §3.1", priority: "P0", days: 4, status: "todo",
-    note: "기존 GUID 보존·매핑·재활용은 제품 계약에 없다. 모델·메시·재질·텍스처·스켈레톤·애니메이션 모두 새 epoch에서 발급한다." },
+    refs: "ModelAssetBigBangCutoverPlan §2.3 · §3.1", priority: "P0", days: 4, status: "done",
+    note: "완료(2026-09-02). Engine/RenderEngine/Assets/AssetIdentityEpoch(ProjectSetting/AssetIdentity.asset, CSPRNG 256-bit seed, YAML 왕복·변조 거부)·ModelStableKeys(문법 exporter:|name:|authoring:, ordinal 거부; 규칙 semantic/authoring, 콘텐츠 지문 재결합, 지문 그룹 binding 순 짝짓기, 모호성=고아 prior+새 지문 동시 → 오류)·ModelSidecarV2(v2 코덱, 다른 최상위 키 보존, legacy guid 제거, v1 LegacySchema 거부, 폐포 재유도·registry bijection). assets.sidecar 단정 83: 합성 4절 + 실자산 corpus 14/14(subasset 309, 전 corpus registry 충돌 0, 같은 입력 재배정 동일 신원). Gunner 재질 2·임베디드 6 semantic, scene.glb 무명 재질 25·텍스처 69·메시 103 authoring. 디스크 쓰기 0(게이트가 원본 해시 전후 대조). 기존 GUID는 어디에도 입력되지 않는다." },
   { phase: 3.75, id: "MBC3", title: "원자 authoring writer·watcher/AssetCooker 단일화",
     detail: "decode→stable key→UUID closure→sidecar/cooked temp write→reparse→atomic rename→catalog publish를 ModelAssetAuthoringTransaction 하나가 소유한다.",
     refs: "ModelAssetBigBangCutoverPlan §3", priority: "P0", days: 5, status: "todo",

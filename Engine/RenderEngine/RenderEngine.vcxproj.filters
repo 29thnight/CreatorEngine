@@ -381,6 +381,15 @@
     <ClCompile Include="Assets\AssetIdentityRegistry.cpp">
       <Filter>Resources\Model\Assets</Filter>
     </ClCompile>
+    <ClCompile Include="Assets\AssetIdentityEpoch.cpp">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\ModelStableKeys.cpp">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\ModelSidecarV2.cpp">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\MaterialPropertyBlock.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>
@@ -768,6 +777,18 @@
       <Filter>Resources\Model\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Assets\AssetIdentityRegistry.h">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\AssetIdentityHex.h">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\AssetIdentityEpoch.h">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\ModelStableKeys.h">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\ModelSidecarV2.h">
       <Filter>Resources\Model\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h">

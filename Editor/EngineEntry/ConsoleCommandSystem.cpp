@@ -77,6 +77,7 @@
 #include "ExperimentParity/ExperimentModelBridgeSelfTest.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
+#include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
 #include "ExperimentParity/ExperimentAnimationPlayback.h"
 #include "ExperimentParity/ExperimentImportPathSelfTest.h"
 #include "ExperimentParity/ExperimentGltfImportSelfTest.h"
@@ -7840,6 +7841,25 @@ namespace ConsoleCmd
         std::printf("[CLI] assets.identity %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_assets_sidecar(const ConsoleCommandContext& ctx)
+    {
+        // MBC2 — epoch header·stable key·sidecar schema v2. 인자로 asset root를 주면
+        // 실자산 corpus를 임포트해 폐포를 검증한다(디스크에 쓰지 않는다 — 쓰기는 MBC3).
+        const std::string assetRoot = ctx.parts.size() > 1 ? ctx.parts[1] : std::string();
+        std::string log;
+        const bool passed = RenderTest::RunAssetSidecarSchemaSelfTest(assetRoot, log);
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[assets.sidecar] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[assets.sidecar] 실패\n") + log);
+        }
+        std::printf("[CLI] assets.sidecar %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_vertexlayout(const ConsoleCommandContext&)
     {
         // I5-D2(V4) — 마스크→RHI 입력 레이아웃 유도 합성 검사. CPU 전용.
@@ -11749,6 +11769,7 @@ namespace ConsoleCmd
             reg({ "experiment.modelbridge" }, &Cmd_experiment_modelbridge);
             reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
             reg({ "assets.identity" }, &Cmd_assets_identity);
+            reg({ "assets.sidecar" }, &Cmd_assets_sidecar);
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
             reg({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
             reg({ "experiment.animpose" }, &Cmd_experiment_animpose);

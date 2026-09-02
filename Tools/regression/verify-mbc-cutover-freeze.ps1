@@ -87,8 +87,9 @@ foreach ($name in $surfaces.Keys) { $counts[$name] = 0; $filesBySurface[$name] =
 #    하나로 합칠 때까지 현존 둘만 허용한다. 셋째가 생기면 즉시 실패.
 $sidecarWriterPattern = '\["(subAssets|ModelImporter)"\]\s*(\[|=)'
 $sidecarWriterAllow = @(
-    'Editor\EngineEntry\EditorAssetDatabase.cpp',
-    'Tools\AssetCooker\ModelIdentityRefresher.cpp'
+    'Editor\EngineEntry\EditorAssetDatabase.cpp',        # legacy — MBC3가 제거
+    'Tools\AssetCooker\ModelIdentityRefresher.cpp',      # legacy — MBC3가 제거
+    'Engine\RenderEngine\Assets\ModelSidecarV2.cpp'     # v2 코덱 — MBC3 transaction의 유일한 writer 후보
 )
 # ② 검사 전용 seam은 제품 코드에서 0건. 정의(Assets/)는 제외한다.
 $testSeamPattern = 'DeriveIdentityWithProfile|InsertUncheckedForTest'
