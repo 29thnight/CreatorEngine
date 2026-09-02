@@ -141,6 +141,16 @@ public:
 	// cooked 게시 규약(pak)이 서기 전까지 빈 경로다(resolver가 Info로 계수).
 	[[nodiscard]] std::shared_ptr<Model> LoadModelViaExperiment(
 		FileGuid guid, const file::path& sourcePath);
+	// I2-E 후속(2026-09-02) — 임베디드 텍스처 등록부. 키는 모델 sidecar의
+	// subasset UUIDv4(cook 과 같은 신원)이고 값은 임베디드 바이트에서 메모리로
+	// 만든 텍스처다. 소스 로드(LoadModelViaExperiment)가 채우고,
+	// FinalizeMaterialRuntime 이 registry 경로 해석에 실패한 GUID 를 여기서 푼다
+	// — registry 는 subasset GUID 의 경로를 원리적으로 모른다(파일이 없다).
+	// legacy Assimp 경로가 Materials\ 에 파일로 뽑아 이름으로 찾던 자리의
+	// experiment 판이다. B4b 로 에디터 드롭이 experiment 로더를 타면서
+	// "텍스처가 안 들어온다"로 드러났다.
+	void RegisterEmbeddedTexture(FileGuid guid, std::shared_ptr<Texture> texture);
+	[[nodiscard]] std::shared_ptr<Texture> FindEmbeddedTexture(FileGuid guid) const;
 	// I5-D34a — 병행 바인딩 조회: legacy Mesh 신원(m_hashingMesh)으로 experiment
 	// packed 정점 뷰를 돌려준다. 스킨 레이아웃은 D34b 전까지 닫혀 있다(false).
 	// RHI 메시 캐시에 함수로 주입되는 것이 소비자다 — 캐시는 이 클래스를 모른다.
@@ -257,6 +267,11 @@ public:
 	std::mutex m_authoredMaterialMutex;
 	std::unordered_map<FileGuid,
 		std::shared_ptr<const experiment::Material>> m_authoredMaterials;
+
+	// 임베디드 텍스처 등록부(위 RegisterEmbeddedTexture). Textures 캐시와
+	// 별개다 — 그쪽은 파일 stem 이름 키라 subasset GUID 와 충돌할 수 있다.
+	mutable std::mutex m_embeddedTextureMutex;
+	std::unordered_map<FileGuid, std::shared_ptr<Texture>> m_embeddedTextures;
 
 	// I5-D34a — 병행 바인딩: legacy Mesh 신원 → {experiment 모델, 메시 인덱스}.
 	// LoadModelViaExperiment 성공 시 채워지고, 조회는 렌더 캐시 주입 함수가

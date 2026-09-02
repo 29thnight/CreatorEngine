@@ -15,7 +15,9 @@
 #include <d3d11.h>
 #include <DirectXTex.h>
 #include <mathematics/vector2.hpp>
+#include <cstddef>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <functional>
 #include <type_traits>
@@ -70,6 +72,13 @@ public:
 
 	static std::shared_ptr<Texture> LoadSharedFromPath(
 		const file::path& path, bool isCompress = false);
+
+	// I2-E 후속 — 컨테이너 안에 묻힌 이미지(glb 임베디드 등)를 디스크에 뽑지
+	// 않고 바이트에서 바로 만든다. 포맷은 매직으로 가른다(DDS·HDR, 나머지는
+	// WIC → 실패 시 TGA). 실패는 nullptr — 예외를 밖으로 내지 않는다.
+	// LoadSharedFromPath 와 같은 결과물(압축 정책 포함)을 만든다.
+	static std::shared_ptr<Texture> LoadSharedFromMemory(
+		std::span<const std::byte> bytes, bool isCompress = false);
 
 	static std::unique_ptr<Texture> LoadManagedFromPath(
 		const file::path& path, bool isCompress = false);

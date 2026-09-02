@@ -273,6 +273,72 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 }
 
 
+std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
+	std::span<const std::byte> bytes, bool isCompress)
+{
+	if (bytes.empty()) return nullptr;
+
+	const auto startsWith = [&bytes](std::string_view magic)
+	{
+		if (bytes.size() < magic.size()) return false;
+		for (size_t index = 0; index < magic.size(); ++index)
+		{
+			if (static_cast<char>(bytes[index]) != magic[index]) return false;
+		}
+		return true;
+	};
+
+	ScratchImage image{};
+	TexMetadata metadata{};
+	HRESULT result = E_FAIL;
+	bool alreadyFinal = false; // DDS/HDR 는 LoadSharedFromPath 와 같이 재압축하지 않는다.
+	if (startsWith("DDS "))
+	{
+		result = LoadFromDDSMemory(bytes.data(), bytes.size(),
+			DDS_FLAGS_FORCE_RGB, &metadata, image);
+		alreadyFinal = true;
+	}
+	else if (startsWith("#?RADIANCE") || startsWith("#?RGBE"))
+	{
+		result = LoadFromHDRMemory(bytes.data(), bytes.size(), &metadata, image);
+		alreadyFinal = true;
+	}
+	else
+	{
+		// PNG·JPEG·BMP 등은 WIC 가 매직을 스스로 판별한다. TGA 는 매직이 없어
+		// WIC 가 거절한 뒤에만 시도한다.
+		result = LoadFromWICMemory(bytes.data(), bytes.size(),
+			WIC_FLAGS_IGNORE_SRGB, &metadata, image);
+		if (FAILED(result))
+		{
+			result = LoadFromTGAMemory(bytes.data(), bytes.size(),
+				TGA_FLAGS_NONE, &metadata, image);
+		}
+	}
+	if (FAILED(result) || 0 == image.GetImageCount()) return nullptr;
+
+	if (isCompress && !alreadyFinal && !IsCompressed(metadata.format))
+	{
+		ScratchImage compressedImage{};
+		// DXGI_FORMAT_BC1_UNORM (== DXT1) — LoadSharedFromPath 와 같은 정책.
+		if (SUCCEEDED(DirectX::Compress(image.GetImages(), image.GetImageCount(),
+			image.GetMetadata(), DXGI_FORMAT_BC1_UNORM,
+			TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM,
+			0.5f, compressedImage)))
+		{
+			metadata = compressedImage.GetMetadata();
+			image = std::move(compressedImage);
+		}
+	}
+
+	auto texture = std::make_shared<Texture>();
+	texture->m_textureType = TextureType::ImageTexture;
+	texture->m_size = { float(image.GetMetadata().width), float(image.GetMetadata().height) };
+	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+	texture->m_cpuPixels = std::make_shared<DirectX::ScratchImage>(std::move(image));
+	return texture;
+}
+
 std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());

@@ -830,6 +830,9 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 		{
 			const file::path path = GetFilePath(value->m_textureGuid);
 			if (!path.empty()) texture = LoadSharedMaterialTexture(path.string(), compress);
+			// I2-E 후속 — registry 가 모르는 GUID 는 임베디드 등록부다(모델
+			// sidecar subasset). 소스 로드가 바이트에서 만들어 둔 것.
+			if (!texture) texture = FindEmbeddedTexture(value->m_textureGuid);
 		}
 		if (!texture && !name.empty())
 			texture = LoadSharedMaterialTexture(name, compress);
@@ -868,10 +871,29 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 		}
 
 		const file::path path = GetFilePath(value.m_textureGuid);
-		if (path.empty()) continue;
-		material.UseTextureMap(value.m_name,
-			LoadSharedMaterialTexture(path.string(), false));
+		std::shared_ptr<Texture> texture = path.empty()
+			? FindEmbeddedTexture(value.m_textureGuid)
+			: LoadSharedMaterialTexture(path.string(), false);
+		if (!texture) continue;
+		material.UseTextureMap(value.m_name, std::move(texture));
 	}
+}
+
+void DataSystem::RegisterEmbeddedTexture(FileGuid guid, std::shared_ptr<Texture> texture)
+{
+	if (FileGuid{} == guid || !texture) return;
+	std::lock_guard<std::mutex> guard(m_embeddedTextureMutex);
+	// 먼저 넣은 쪽이 이긴다 — 같은 모델을 두 스레드가 로드해도 재질이
+	// 서로 다른 텍스처 객체를 붙들지 않게.
+	m_embeddedTextures.try_emplace(guid, std::move(texture));
+}
+
+std::shared_ptr<Texture> DataSystem::FindEmbeddedTexture(FileGuid guid) const
+{
+	if (FileGuid{} == guid) return nullptr;
+	std::lock_guard<std::mutex> guard(m_embeddedTextureMutex);
+	const auto found = m_embeddedTextures.find(guid);
+	return found != m_embeddedTextures.end() ? found->second : nullptr;
 }
 
 Material* DataSystem::LoadMaterial(std::string_view name)

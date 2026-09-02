@@ -34,6 +34,8 @@
 #include "RHI/IRenderDeviceServices.h" // I5-D34a: RHIExperimentVertexView
 #include "Skeleton.h"
 #include "StandardMaterialProperty.h"
+#include "Texture.h" // I2-E 후속: 임베디드 텍스처 메모리 디코드
+#include "LogSystem.h"
 
 #include <mathematics/vector3.hpp>
 
@@ -41,6 +43,7 @@
 #include <cstdio>
 #include <cstdlib> // I5-D34a: A/B 스위치 getenv
 #include <fstream> // I7-C1: manifest 읽기
+#include <span> // I2-E 후속: 임베디드 바이트 뷰
 #include <string>
 #include <unordered_set> // I7-C2: stale 집합
 #include <vector>
@@ -549,7 +552,35 @@ std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(
 		{
 			if (texture.IsEmbedded())
 			{
-				return identity.FindEmbeddedTexture(texture.sourceKey);
+				const experiment::AssetId id =
+					identity.FindEmbeddedTexture(texture.sourceKey);
+				// I2-E 후속(2026-09-02) — GUID 만 실으면 재질 마감이 registry
+				// 에서 그 경로를 못 찾아 텍스처가 빠진다(실측: legacy 드롭
+				// 10/10 · experiment 8/10 드로우). legacy 가 Materials\ 에
+				// 파일로 뽑던 자리를 메모리 등록부로 대신한다 — 바이트는 지금
+				// 이 손에 있고(IR), 다시 오지 않는다. 압축 정책은 legacy 와
+				// 같다(baseColor(sRGB) 만 BC1).
+				if (id.IsValid())
+				{
+					FileGuid textureGuid;
+					textureGuid.m_guid = id.value;
+					if (!FindEmbeddedTexture(textureGuid))
+					{
+						const bool compress =
+							experiment::TextureColorSpace::Srgb == texture.colorSpace;
+						if (auto loaded = Texture::LoadSharedFromMemory(
+							std::span<const std::byte>(texture.embeddedBytes), compress))
+						{
+							RegisterEmbeddedTexture(textureGuid, std::move(loaded));
+						}
+						else
+						{
+							Debug->LogWarning("임베디드 텍스처 디코드 실패: "
+								+ texture.name + " (" + texture.sourceKey + ")");
+						}
+					}
+				}
+				return id;
 			}
 			experiment::AssetId id{};
 			if (!texture.sourcePath.empty())

@@ -400,12 +400,26 @@ legacy다**(`LoadAndBridge(modelPath)` → `BuildImportedSceneFromLegacy`).
 present만 세면 nil GUID가 통과하고, valid만 세면 생략이 통과한다(둘 다 0이면
 `skip`이라 초록이 아니다).
 
-★ **한계(정직).** GUID가 실려도 **legacy 재질에는 여전히 그 텍스처가 안 붙는다** —
-`FinalizeMaterialRuntime`은 `GetFilePath(guid)` 이름 경로를 쓰는데 registry는
-subasset GUID의 경로를 모른다. 실제 픽셀까지 닿는 길은 **cooked catalog 마운트**다
-(I7-C1의 `ResolveCookedArtifact`가 `Derived/Textures/..`를 준다). 그 조합
-(저작 재질이 임베디드 텍스처를 참조 → sealing이 cooked로 해석)은 코퍼스에 그런
-저작분이 없어 아직 게이트가 없다.
+★ ~~**한계(정직).** GUID가 실려도 **legacy 재질에는 여전히 그 텍스처가 안 붙는다**~~
+— **2026-09-02 닫혔다(소스 로드 경로).** B4b가 에디터 드롭을 experiment 로더로
+옮기자 사용자 보고("머테리얼 텍스처가 안 들어온다")로 곧바로 드러났다 — legacy
+드롭은 텍스처 업로드 14·baseColor 드로우 10/10, experiment는 8·8/10(실측). 원인은
+위 문장 그대로다: `FinalizeMaterialRuntime`이 `GetFilePath(guid)`만 보는데 registry는
+subasset GUID의 경로를 모른다(파일이 없다).
+
+수정: legacy가 `Materials\`에 파일로 뽑아 이름으로 찾던 자리를 **메모리
+등록부**로 대신한다. `LoadModelViaExperiment`의 `resolveTextureAsset`이 임베디드
+바이트(IR에 이미 있다)를 `Texture::LoadSharedFromMemory`(DDS·HDR 매직, 나머지
+WIC→TGA)로 만들어 `DataSystem::RegisterEmbeddedTexture(subasset GUID)`에 두고,
+`FinalizeMaterialRuntime`은 registry 해석이 비면 `FindEmbeddedTexture(guid)`를
+본다. 압축 정책은 legacy와 같다(sRGB만 BC1). 게이트는 `verify-skin-pose-visual`
+단정 6(세 팔 전부 드로우 수 == baseColor 있는 드로우 수) — 수정 전 8/10, 후 10/10,
+텍스처 업로드 14(3744KB)로 legacy 드롭과 동수.
+
+남는 것: cooked 경로(CEMC 로드)는 IR이 없어 이 등록부가 비고, 그쪽은 여전히
+**cooked catalog 마운트**(I7-C1 `ResolveCookedArtifact` → `Derived/Textures/..`)가
+길이다 — `FinalizeMaterialRuntime`은 아직 catalog를 묻지 않는다. 그 조합의 게이트는
+그대로 없다.
 
 - 임베디드 바이트를 디스크로 뽑는 시점·위치
 - AssetId 발급 — 새로 만들 것인가 기존 자산에 붙일 것인가
@@ -2995,6 +3009,13 @@ animtick 골든이 바뀐 이유는 두 가지가 합쳐져서다: B4b가 하네
 ★ **되돌림 때 두 번 틀린 자리가 이번엔 어떻게 잡혔을까.** 첫 회귀("안 그려진다")는
 drop 팔의 `[anim.tick] none`·커버리지 0으로, 둘째("뒤죽박죽")는 drop 팔의 포화
 (1c)나 place 동수 불일치(5)로 붉는다 — 둘 다 이제 run-all 안에 있다.
+
+★ **착지 직후 사용자 보고 — "머테리얼 텍스처가 안 들어온다."** 의도가 아니다.
+드롭 경로가 experiment 로더를 타면서 I2-E가 "한계(정직)"로 적어 둔 자리(임베디드
+텍스처 GUID를 registry가 못 푼다)가 화면에 나온 것이다. B4b 직전의 시각 축 로그가
+이미 그 차이를 담고 있었는데(legacy 드롭 텍스처 14·10/10 vs experiment 8·8/10)
+단정이 없어 지나갔다 — 같은 게이트에 재질 축(단정 6)을 더했고, I2 절에 수정을
+적었다(메모리 등록부). 세 팔 전부 14·10/10으로 legacy와 동수.
 
 **남은 것:** B4c(대입 절단 — `animator->m_Skeleton` 쓰기 전부 제거) → B5(필드
 제거). 시각 축은 그 둘의 회귀도 같은 자리에서 잡는다.

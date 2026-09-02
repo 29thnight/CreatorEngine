@@ -87,6 +87,12 @@ function Invoke-Arm([string]$label, [string]$loadCmd, [string]$animatorPre, [str
         $arm.path = $Matches[1]; $arm.enabled = [int]$Matches[2]; $arm.palette = $Matches[3]
     }
     if ($log -match 'skinbounds \w+ .* worstRatio=([0-9.]+)') { $arm.ratio = [double]$Matches[1] }
+    # 재질 축 — 드로우 수와 baseColor 를 가진 드로우 수. 스킨 메시의 임베디드
+    # 텍스처가 experiment 경로에서 빠지면 여기서 갈린다(legacy 드롭 10/10 vs
+    # experiment 8/10 — 2026-09-02 사용자 보고 "텍스처가 안 들어온다").
+    $arm.draws = -1; $arm.texturedDraws = -1
+    if ($log -match '\[3/4\] 씬 카메라 렌더 — 드로우\s+(\d+)') { $arm.draws = [int]$Matches[1] }
+    if ($log -match 'baseColor 있는 드로우 (\d+)') { $arm.texturedDraws = [int]$Matches[1] }
     return $arm
 }
 
@@ -155,6 +161,16 @@ if ($drop.coverage -ne $place.coverage) {
 }
 if ($drop.palette -ne $place.palette) {
     $fail += "5b 드롭 경로 팔레트 digest $($drop.palette) ≠ place $($place.palette)"
+}
+
+# 6 — 재질이 스킨 메시까지 닿는다. legacy 드롭 경로는 임베디드 텍스처를
+#     Materials\ 에 뽑아 이름으로 붙였고, experiment 경로는 sidecar GUID 로
+#     참조만 하다가 마감(FinalizeMaterialRuntime)에서 잃었다(8/10). 세 팔 전부
+#     드로우 수 == baseColor 있는 드로우 수여야 한다.
+foreach ($arm in @($bind, $place, $drop)) {
+    if ($arm.draws -le 0 -or $arm.texturedDraws -ne $arm.draws) {
+        $fail += "6 $($arm.label) 팔 baseColor 있는 드로우 $($arm.texturedDraws)/$($arm.draws) — 스킨 메시의 임베디드 텍스처가 빠졌다"
+    }
 }
 
 if ($fail.Count -gt 0) {
