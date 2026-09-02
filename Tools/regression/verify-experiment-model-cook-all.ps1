@@ -217,7 +217,11 @@ $unexpectedStderr = @($first, $second | Where-Object {
 }).Count
 
 # 명시적 migration 모드는 복제 sidecar에서만 실행한다. 최상위 identity는
-# 유지되고 하위 identity는 모두 새 UUIDv4가 되어야 한다.
+# 유지되고, 하위 identity는 **결정적**이라 refresh를 다시 돌려도 그대로여야
+# 한다(2026-09-02 계약 전환). 예전에는 매 refresh마다 새 UUIDv4를 발급해
+# 그 모델을 참조하는 씬이 전부 고아가 됐다 — 지금은 최상위 GUID를 namespace로,
+# sourceKey를 name으로 하는 RFC 4122 v5 유도값(버전 nibble만 v4로 스탬프)이라
+# 안정하다. 그래서 이 검사는 하위 GUID가 **바뀌지 않음**을 단정한다.
 $fixtureAssets = Join-Path $run 'refresh-fixture\Assets'
 $fixtureModelDir = Join-Path $fixtureAssets 'Models'
 New-Item -ItemType Directory -Path $fixtureModelDir -Force | Out-Null
@@ -240,7 +244,7 @@ $refreshValid = $refresh.ExitCode -eq 0 -and
     [string]::IsNullOrWhiteSpace($refresh.Stderr) -and
     $refresh.Stdout -match 'identity-refresh models=1 materials=1 embeddedTextures=1' -and
     $beforeTop -eq $afterTop -and $afterNested.Count -eq 2 -and
-    @($afterNested | Where-Object { $_ -in $beforeNested }).Count -eq 0
+    @($afterNested | Where-Object { $_ -in $beforeNested }).Count -eq 2
 
 # batch 전체의 기존 상위 ID를 먼저 예약해야 한다. 같은 model GUID를 가진 두
 # sidecar를 주면 import/temporary write 전에 거부하고 첫 sidecar도 그대로 둔다.

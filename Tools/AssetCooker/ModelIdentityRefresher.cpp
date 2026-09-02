@@ -198,25 +198,33 @@ namespace asset_cooker
             return true;
         }
 
-        [[nodiscard]] experiment::AssetId CreateUniqueAssetId(
-            std::vector<experiment::AssetId>& usedIds)
+        // subasset GUID는 **결정적**이다 — 모델의 최상위 GUID를 namespace로,
+        // sourceKey("gltf/image/1"·"gltf/material/0")를 name으로 하는
+        // RFC 4122 v5(SHA-1) 유도값이다. 재임포트·refresh를 다시 돌려도 같은
+        // 모델·같은 sourceKey면 같은 GUID가 나온다.
+        //
+        // 왜 이렇게 바꿨나: 예전에는 CreateRandomV4()로 매번 새로 발급해, 모델을
+        // 다시 임포트할 때마다 subasset GUID가 바뀌었다. 그 GUID를 참조하던 씬
+        // (재질의 textureGuid)이 통째로 고아가 돼 "텍스처가 안 붙는다"로
+        // 나타났다(2026-09-02 Test1). 결정적 유도는 그 재발을 원천 차단한다.
+        //
+        // 왜 v5인데 v4로 스탬프하나: AssetId 검증(IsAssetIdV4)이 버전 nibble 4·
+        // RFC variant를 요구한다(무작위성은 검사하지 않는다). FromName은 variant는
+        // 맞게 두지만 버전을 5로 찍으므로, 버전 nibble만 4로 되돌려 포맷 계약을
+        // 만족시킨다. 값 자체는 여전히 SHA-1 유도라 결정적이다.
+        [[nodiscard]] experiment::AssetId DeterministicSubAssetId(
+            const experiment::AssetId& modelAssetId, std::string_view sourceKey)
         {
-            for (;;)
-            {
-                const FileGuid generated = FileGuid::CreateRandomV4();
-                const experiment::AssetId candidate{ generated.m_guid };
-                if (std::ranges::find(usedIds, candidate) == usedIds.end())
-                {
-                    usedIds.push_back(candidate);
-                    return candidate;
-                }
-            }
+            Uuid::Uuid16 derived = Uuid::FromName(modelAssetId.value, sourceKey);
+            derived.data[6] = static_cast<std::uint8_t>(
+                (derived.data[6] & 0x0Fu) | 0x40u); // v5 → v4 포맷
+            return experiment::AssetId{ derived };
         }
 
         [[nodiscard]] ck::ModelSubAssetIdentity& AddIdentity(
             std::vector<ck::ModelSubAssetIdentity>& target,
-            std::string_view sourceKey, std::string_view name,
-            std::vector<experiment::AssetId>& usedIds)
+            const experiment::AssetId& modelAssetId,
+            std::string_view sourceKey, std::string_view name)
         {
             const auto found = std::ranges::find(target, sourceKey,
                 &ck::ModelSubAssetIdentity::sourceKey);
@@ -225,14 +233,18 @@ namespace asset_cooker
             ck::ModelSubAssetIdentity identity;
             identity.sourceKey = sourceKey;
             identity.name = name;
-            identity.assetId = CreateUniqueAssetId(usedIds);
+            identity.assetId = DeterministicSubAssetId(modelAssetId, sourceKey);
+            // 유일성 예약·충돌 검사를 두지 않는다. 결정적 유도가 곧 유일성
+            // 보장이다: 한 모델 안에서는 sourceKey가 다르면 SHA-1이 다르고,
+            // 모델이 다르면 namespace(최상위 GUID)가 다르다. 그리고 재실행이
+            // 같은 값을 다시 내는 것이 이 변경의 목적이다 — 예전처럼 usedIds에
+            // 대조하면 두 번째 refresh가 자기 자신을 충돌로 오판한다(멱등성 파괴).
             target.push_back(std::move(identity));
             return target.back();
         }
 
         [[nodiscard]] bool DiscoverIdentity(const std::filesystem::path& source,
             const experiment::AssetId& modelAssetId,
-            std::vector<experiment::AssetId>& usedIds,
             ck::ModelCookIdentity& outIdentity, std::string& failure)
         {
             ck::ModelCookIdentity discovered;
@@ -248,15 +260,15 @@ namespace asset_cooker
             options.conversion.resolveMaterialAsset =
                 [&](const im::ImportedMaterial& material, std::size_t)
                 {
-                    return AddIdentity(discovered.materials,
-                        material.sourceKey, material.name, usedIds).assetId;
+                    return AddIdentity(discovered.materials, modelAssetId,
+                        material.sourceKey, material.name).assetId;
                 };
             options.conversion.resolveTextureAsset =
                 [&](const im::ImportedTexture& texture)
                 {
                     if (!texture.IsEmbedded()) return modelAssetId;
-                    return AddIdentity(discovered.embeddedTextures,
-                        texture.sourceKey, texture.name, usedIds).assetId;
+                    return AddIdentity(discovered.embeddedTextures, modelAssetId,
+                        texture.sourceKey, texture.name).assetId;
                 };
 
             im::ImporterModelDecoder decoder(std::move(options));
@@ -463,7 +475,7 @@ namespace asset_cooker
         {
             ck::ModelCookIdentity identity;
             if (!DiscoverIdentity(item.source, item.modelAssetId,
-                usedIds, identity, outFailure))
+                identity, outFailure))
                 return false;
             if (!BuildRefreshedSidecar(
                 item.original, identity, item.refreshed, outFailure))
