@@ -14,34 +14,36 @@
 // 위해(배정 파일 밖 편집 금지) 여기서 직접 forward-declare 한다.
 namespace LegacyTransformPromotion
 {
-    void PromoteLegacyTransform(Entity* obj, const MetaYml::Node& node);
+    void PromoteLegacyTransform(Entity* obj, const Authoring::ReadNode& node);
 }
 
 namespace
 {
 	struct PrefabNodeRecord
 	{
-		MetaYml::Node node;
+		Authoring::WriteNode node;
 		std::vector<uint32_t> path;
 	};
 
-	void CollectPrefabNodes(const MetaYml::Node& node, std::vector<uint32_t>& path,
+	void CollectPrefabNodes(Authoring::WriteNode node, std::vector<uint32_t>& path,
 		std::vector<PrefabNodeRecord>& records,
 		std::unordered_map<size_t, std::vector<uint32_t>>& pathByLegacyId)
 	{
 		if (!node) return;
 		records.push_back({ node, path });
-		if (node["m_instanceID"])
+		const Authoring::ReadNode readNode = node.Read();
+		if (readNode["m_instanceID"])
 		{
-			pathByLegacyId[node["m_instanceID"].as<size_t>()] = path;
+			pathByLegacyId[readNode["m_instanceID"].As<size_t>()] = path;
 		}
 
-		const MetaYml::Node children = node["children"];
-		if (!children || !children.IsSequence()) return;
-		for (uint32_t ordinal = 0; ordinal < children.size(); ++ordinal)
+		const Authoring::WriteNode children = node.Child("children");
+		if (!children.Read().IsSequence()) return;
+		for (uint32_t ordinal = 0;
+			ordinal < static_cast<uint32_t>(children.Size()); ++ordinal)
 		{
 			path.push_back(ordinal);
-			CollectPrefabNodes(children[ordinal], path, records, pathByLegacyId);
+			CollectPrefabNodes(children.At(ordinal), path, records, pathByLegacyId);
 			path.pop_back();
 		}
 	}
@@ -51,33 +53,45 @@ namespace
 	// 인스턴스화할 YAML 복사본에서 navObject(instanceID)를 source-relative route로
 	// 바꾼다. 원본 m_prefabData는 건드리지 않으며, 인스턴스를 다음에 저장하면
 	// UIComponent::OnBeforeSerialize가 새 형식만 쓴다.
-	void UpgradeLegacyNavigation(MetaYml::Node& prefabData)
+	void UpgradeLegacyNavigation(Authoring::WriteNode prefabData)
 	{
-		if (!prefabData || !prefabData.IsSequence()) return;
+		if (!prefabData || !prefabData.Read().IsSequence()) return;
 
-		for (uint32_t rootOrdinal = 0; rootOrdinal < prefabData.size(); ++rootOrdinal)
+		for (uint32_t rootOrdinal = 0;
+			rootOrdinal < static_cast<uint32_t>(prefabData.Size()); ++rootOrdinal)
 		{
 			std::vector<PrefabNodeRecord> records;
 			std::unordered_map<size_t, std::vector<uint32_t>> pathByLegacyId;
 			std::vector<uint32_t> path;
-			CollectPrefabNodes(prefabData[rootOrdinal], path, records, pathByLegacyId);
+			CollectPrefabNodes(prefabData.At(rootOrdinal), path, records, pathByLegacyId);
 
 			for (PrefabNodeRecord& record : records)
 			{
-				const MetaYml::Node components = record.node["m_components"];
-				if (!components || !components.IsSequence()) continue;
+				const Authoring::WriteNode components =
+					record.node.Child("m_components");
+				if (!components.Read().IsSequence()) continue;
 
-				for (auto componentNode : components)
+				for (std::size_t componentIndex = 0;
+					componentIndex < components.Size(); ++componentIndex)
 				{
-					MetaYml::Node navigations = componentNode["navigations"];
-					if (!navigations || !navigations.IsSequence()) continue;
+					const Authoring::WriteNode componentNode =
+						components.At(componentIndex);
+					const Authoring::WriteNode navigations =
+						componentNode.Child("navigations");
+					if (!navigations.Read().IsSequence()) continue;
 
-					for (auto navigationNode : navigations)
+					for (std::size_t navigationIndex = 0;
+						navigationIndex < navigations.Size(); ++navigationIndex)
 					{
-						if (!navigationNode["navObject"] || navigationNode["parentHops"])
+						const Authoring::WriteNode navigationNode =
+							navigations.At(navigationIndex);
+						const Authoring::ReadNode navigationRead = navigationNode.Read();
+						if (!navigationRead["navObject"]
+							|| navigationRead["parentHops"])
 							continue;
 
-						const size_t legacyTarget = navigationNode["navObject"].as<size_t>();
+						const size_t legacyTarget =
+							navigationRead["navObject"].As<size_t>();
 						const auto targetIt = pathByLegacyId.find(legacyTarget);
 						if (targetIt == pathByLegacyId.end())
 						{
@@ -94,13 +108,14 @@ namespace
 							++common;
 						}
 
-						navigationNode["parentHops"] = static_cast<uint32_t>(record.path.size() - common);
-						MetaYml::Node childOrdinals;
-						childOrdinals.SetStyle(MetaYml::EmitterStyle::Flow);
+						navigationNode.Child("parentHops").SetScalar(
+							static_cast<uint32_t>(record.path.size() - common));
+						const Authoring::WriteNode childOrdinals =
+							navigationNode.Child("childOrdinals");
+						childOrdinals.SetSequence(true);
 						for (size_t i = common; i < targetPath.size(); ++i)
-							childOrdinals.push_back(targetPath[i]);
-						navigationNode["childOrdinals"] = childOrdinals;
-						navigationNode.remove("navObject");
+							childOrdinals.Append().SetScalar(targetPath[i]);
+						navigationNode.RemoveChild("navObject");
 					}
 				}
 			}
@@ -189,10 +204,11 @@ Prefab::Prefab(std::string_view name, const Entity* source)
         // 프리팹의 인스턴스면 그 guid이고, 평범한 오브젝트면 널이다. 자식의
         // guid가 이 값과 다르고 유효하면 중첩 인스턴스 루트로 판정한다.
         //
-        // 이 프리팹 자신의 FileGuid를 쓰지 않는 이유: 생성자 시점에는 아직
-        // 발급 전이다(SavePrefab이 매긴다 — P-write S0.5).
-        m_prefabData = Authoring::DocumentAccess::Adopt(
-            SerializeRecursive(source, source->m_prefabFileGuid));
+		// 이 프리팹 자신의 FileGuid를 쓰지 않는 이유: 생성자 시점에는 아직
+		// 발급 전이다(SavePrefab이 매긴다 — P-write S0.5).
+		Authoring::WriteDocument document;
+		SerializeRecursive(source, source->m_prefabFileGuid, document.Root());
+		m_prefabData = Authoring::DocumentAccess::Adopt(std::move(document));
     }
 }
 
@@ -205,15 +221,17 @@ Prefab* Prefab::CreateFromGameObject(const Entity* source, std::string_view name
     return new Prefab(prefabName, source);
 }
 
-const MetaYml::Node& Prefab::GetPrefabData() const
+Authoring::ReadNode Prefab::GetPrefabData() const
 {
-    return Authoring::DocumentAccess::Node(m_prefabData);
+    return Authoring::DocumentAccess::Read(m_prefabData);
 }
 
 void Prefab::SetPrefabData(const Authoring::NodeView& view)
 {
-    m_prefabData = Authoring::DocumentAccess::Adopt(
-        Authoring::NodeViewAccess::Node(view).BackendNodeDuringTransition());
+	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
+	m_prefabData = node
+		? Authoring::DocumentAccess::Clone(node)
+		: Authoring::Document{};
 }
 
 Entity* Prefab::Instantiate(std::string_view newName) const
@@ -226,22 +244,24 @@ Entity* Prefab::Instantiate(std::string_view newName) const
     if (!scene)
         return nullptr;
 
-    const MetaYml::Node& definition = Authoring::DocumentAccess::Node(m_prefabData);
-    if (!definition || !definition.IsSequence() || definition.size() == 0)
+    const Authoring::ReadNode definition = Authoring::DocumentAccess::Read(m_prefabData);
+    if (!definition || !definition.IsSequence() || definition.Size() == 0)
         return nullptr;
 
 	// 소환은 정의를 그대로 쓰지 않고 사본 위에서 진행한다 — UpgradeLegacyNavigation이
 	// 노드를 고쳐 쓰므로, 사본이 아니면 프리팹 정의 자체가 오염된다.
-	MetaYml::Node prefabData = MetaYml::Clone(definition);
-	UpgradeLegacyNavigation(prefabData);
+	Authoring::WriteDocument prefabDocument;
+	prefabDocument.Root().Assign(definition);
+	UpgradeLegacyNavigation(prefabDocument.Root());
+	const Authoring::ReadNode prefabData = prefabDocument.Root().Read();
 
 	Entity* rootObject = nullptr;
 	InstantiateContext context;
 	[[maybe_unused]] auto hierarchyTransaction = scene->BeginHierarchyBulkBuild();
 
-	for (std::size_t i = 0; i < prefabData.size(); ++i)
+	for (std::size_t i = 0; i < prefabData.Size(); ++i)
     {
-		const MetaYml::Node& gameObjNode = prefabData[i];
+		const Authoring::ReadNode gameObjNode = prefabData.At(i);
 
         // 첫 번째 GameObject에만 overrideName 적용
         std::string_view nameOverride = (i == 0) ? newName : "";
@@ -266,22 +286,24 @@ Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
     if (!scene)
         return nullptr;
 
-    const MetaYml::Node& definition = Authoring::DocumentAccess::Node(m_prefabData);
-    if (!definition || !definition.IsSequence() || definition.size() == 0)
+    const Authoring::ReadNode definition = Authoring::DocumentAccess::Read(m_prefabData);
+    if (!definition || !definition.IsSequence() || definition.Size() == 0)
         return nullptr;
 
 	// 소환은 정의를 그대로 쓰지 않고 사본 위에서 진행한다 — UpgradeLegacyNavigation이
 	// 노드를 고쳐 쓰므로, 사본이 아니면 프리팹 정의 자체가 오염된다.
-	MetaYml::Node prefabData = MetaYml::Clone(definition);
-	UpgradeLegacyNavigation(prefabData);
+	Authoring::WriteDocument prefabDocument;
+	prefabDocument.Root().Assign(definition);
+	UpgradeLegacyNavigation(prefabDocument.Root());
+	const Authoring::ReadNode prefabData = prefabDocument.Root().Read();
 
 	Entity* rootObject = nullptr;
 	InstantiateContext context;
 	[[maybe_unused]] auto hierarchyTransaction = scene->BeginHierarchyBulkBuild();
 
-	for (std::size_t i = 0; i < prefabData.size(); ++i)
+	for (std::size_t i = 0; i < prefabData.Size(); ++i)
     {
-		const MetaYml::Node& gameObjNode = prefabData[i];
+		const Authoring::ReadNode gameObjNode = prefabData.At(i);
 
         // 첫 번째 GameObject에만 overrideName 적용
         std::string_view nameOverride = (i == 0) ? newName : "";
@@ -296,48 +318,46 @@ Entity* Prefab::Instantiate(Scene* targetScene, std::string_view newName) const
     return rootObject;
 }
 
-MetaYml::Node Prefab::SerializeNestedReference(const Entity* obj)
+void Prefab::SerializeNestedReference(const Entity* obj,
+	Authoring::WriteNode outNode)
 {
-    MetaYml::Node node;
-    if (!obj)
-        return node;
+	if (!obj)
+		return;
 
-    const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
-    if (type)
-    {
-        Entity* nonConst = const_cast<Entity*>(obj);
-        node = Meta::Serialize(nonConst, *type);
-    }
+	const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
+	if (type)
+	{
+		Entity* nonConst = const_cast<Entity*>(obj);
+		Meta::SerializeInto(nonConst, *type, outNode);
+	}
 
     // 컴포넌트는 담지 않는다 — 그것이 참조 노드의 요점이다. 담으면 그 순간의
     // 형상이 리터럴로 굳어 중첩 정의 변경이 영영 전달되지 않는다(P4-b가 고치는
     // 결함 그 자체). 로컬 수정은 m_prefabOverrides가 담고, 소환 때
     // PrefabUtility::ApplyRecordedOverrides가 되먹인다.
-    node.remove("m_components");
+	outNode.RemoveChild("m_components");
 
     // children도 담지 않는다. 중첩 프리팹의 하위 구조는 그 프리팹의 정의가
     // 소유한다 — 여기서 굽으면 같은 이유로 굳는다.
-    node.remove("children");
+	outNode.RemoveChild("children");
 
     // 계층 인덱스는 소환 시점에 새로 배정된다. 굽힌 값을 남기면 다른 씬에서
     // 되살아날 때 엉뚱한 슬롯을 가리키는 잡음이 된다.
-    node[kNestedRefKey] = true;
-
-    return node;
+	outNode.Child(kNestedRefKey).SetScalar(true);
 }
 
-MetaYml::Node Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefabGuid)
+void Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefabGuid,
+	Authoring::WriteNode outNode)
 {
-    MetaYml::Node node;
-    if (!obj)
-        return node;
+	if (!obj)
+		return;
 
-    const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
-    if (type)
-    {
-        Entity* nonConst = const_cast<Entity*>(obj);
-        node = Meta::Serialize(nonConst, *type);
-    }
+	const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
+	if (type)
+	{
+		Entity* nonConst = const_cast<Entity*>(obj);
+		Meta::SerializeInto(nonConst, *type, outNode);
+	}
 
 	const auto& childIndices = obj->GetChildrenIndices();
     if (!childIndices.empty())
@@ -347,7 +367,7 @@ MetaYml::Node Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefab
 		Scene* scene = obj->GetScene();
         if (scene)
         {
-            MetaYml::Node childrenNode;
+			Authoring::WriteNode childrenNode;
 			for (auto childIndex : childIndices)
             {
 				auto childObj = scene->TryGetEntity(childIndex);
@@ -366,19 +386,22 @@ MetaYml::Node Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefab
                 const bool isNestedInstanceRoot =
                     (childGuid != nullFileGuid) && (childGuid != ownerPrefabGuid);
 
-                childrenNode.push_back(isNestedInstanceRoot
-					? SerializeNestedReference(childObj)
-					: SerializeRecursive(childObj, ownerPrefabGuid));
-            }
-            if (childrenNode)
-                node["children"] = childrenNode;
-        }
-    }
-
-    return node;
+				if (!childrenNode)
+				{
+					childrenNode = outNode.Child("children");
+					childrenNode.SetSequence();
+				}
+				const Authoring::WriteNode childNode = childrenNode.Append();
+				if (isNestedInstanceRoot)
+					SerializeNestedReference(childObj, childNode);
+				else
+					SerializeRecursive(childObj, ownerPrefabGuid, childNode);
+			}
+		}
+	}
 }
 
-Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
+Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
     Scene* scene,
     Entity::Index parent,
 	InstantiateContext& context,
@@ -389,7 +412,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
         return nullptr;
 
 	const GameObjectType type = EntityAuthoring::InferCreationType(node);
-    std::string objName = overrideName.empty() ? node["m_name"].as<std::string>() : std::string(overrideName);
+    std::string objName = overrideName.empty() ? node["m_name"].AsStringChecked() : std::string(overrideName);
 	Entity* obj = scene->LoadEntity(make_guid(), objName, type, parent);
     if (!obj)
         return nullptr;
@@ -400,10 +423,10 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     Entity::Index newIndex = obj->m_index;
 	const Entity::Index targetRootIndex = obj->GetRootIndex();
 	const Entity::Index sourceIndex = node["m_index"]
-		? node["m_index"].as<Entity::Index>() : Entity::INVALID_INDEX;
+		? node["m_index"].As<Entity::Index>() : Entity::INVALID_INDEX;
 	const bool hasSourceRootIndex = static_cast<bool>(node["m_rootIndex"]);
 	const Entity::Index sourceRootIndex = hasSourceRootIndex
-		? node["m_rootIndex"].as<Entity::Index>() : targetRootIndex;
+		? node["m_rootIndex"].As<Entity::Index>() : targetRootIndex;
 	context.RecordIndex(sourceIndex, newIndex);
     if (meta)
     {
@@ -447,7 +470,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
     if (node["m_components"])
     {
-        for (const auto componentNode : Authoring::ReadNode{ node }["m_components"])
+        for (const Authoring::ReadNode componentNode : node["m_components"])
         {
             try
             {
@@ -492,8 +515,8 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
 
     obj->m_prefabFileGuid = effectivePrefabGuid;
     obj->m_prefab = const_cast<Prefab*>(this);
-    // ★ 깊은 복사로 준다. yaml-cpp Node는 참조 의미라, 그냥 대입하면 이 프리팹의
-    // **모든 인스턴스가 같은 노드 하나를 스냅샷으로 공유**한다. 그러면
+    // ★ 깊은 복사로 준다. 읽기 노드는 문서를 소유하지 않으므로, 그냥 보관하면
+    // **모든 인스턴스가 프리팹의 살아 있는 문서 하나를 스냅샷으로 공유**한다. 그러면
     // PrefabUtility::UpdateInstances가 첫 인스턴스를 처리하며 실행하는
     // obj->m_prefabOriginal = newData 한 줄이 그 공유 노드를 새 데이터로 덮어,
     // 아직 처리되지 않은 나머지 인스턴스의 스냅샷까지 바뀐다.
@@ -503,11 +526,11 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     // 오기록**하고, 그 오버라이드가 갱신을 배제한다. 즉 인스턴스가 N개면
     // 프리팹 갱신이 **첫 하나에만** 먹고 나머지는 옛 값에 영구히 고정된다.
     // 실측: 인스턴스 2개로 재현 — I1 shadowCast=false(적용) · I2 true(고정).
-    obj->m_prefabOriginal = Authoring::DocumentAccess::Adopt(MetaYml::Clone(node));
+    obj->m_prefabOriginal = Authoring::DocumentAccess::Clone(node);
 
     if (node["children"])
     {
-        for (const auto& childNode : node["children"])
+        for (const Authoring::ReadNode childNode : node["children"])
         {
             // ★ P4-b — 참조 노드는 그 프리팹의 **현재 정의**로 푼다.
             if (childNode[kNestedRefKey])
@@ -518,7 +541,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
                     // 사라진 채 아무 흔적도 남지 않는다 — 이 저장소가 반복해 겪은
                     // 조용한 유실 양식이다.
                     const std::string childName = childNode["m_name"]
-                        ? childNode["m_name"].as<std::string>() : std::string("(이름없음)");
+                        ? childNode["m_name"].AsStringChecked() : std::string("(이름없음)");
                     Debug->LogError("중첩 프리팹 참조를 풀지 못했다 — 자식 '" + childName
                         + "'이(가) 이 인스턴스에서 누락된다. 참조된 프리팹 자산을 찾을 수 없다");
                 }
@@ -556,7 +579,7 @@ Entity* Prefab::InstantiateRecursive(const MetaYml::Node& node,
     return obj;
 }
 
-Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
+Entity* Prefab::InstantiateNestedReference(const Authoring::ReadNode& node,
     Scene* scene,
     Entity::Index parent) const
 {
@@ -566,12 +589,11 @@ Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
     if (!node["m_prefabFileGuid"])
         return nullptr;
 
-    // FileGuid에는 yaml-cpp convert 특수화가 없다(리플렉션 경로로만 오간다).
     // 문자열로 읽어 생성자에 넘긴다 — FromString은 못 읽으면 던진다.
     FileGuid refGuid{};
     try
     {
-        refGuid = FileGuid(node["m_prefabFileGuid"].as<std::string>());
+        refGuid = FileGuid(node["m_prefabFileGuid"].AsStringChecked());
     }
     catch (const std::exception&)
     {
@@ -594,16 +616,18 @@ Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
     if (!nested)
         return nullptr;
 
-    const MetaYml::Node& nestedData = nested->GetPrefabData();
-    if (!nestedData || !nestedData.IsSequence() || nestedData.size() == 0)
+    const Authoring::ReadNode nestedData = nested->GetPrefabData();
+    if (!nestedData || !nestedData.IsSequence() || nestedData.Size() == 0)
         return nullptr;
-	MetaYml::Node upgradedNestedData = MetaYml::Clone(nestedData);
-	UpgradeLegacyNavigation(upgradedNestedData);
+	Authoring::WriteDocument upgradedNestedDocument;
+	upgradedNestedDocument.Root().Assign(nestedData);
+	UpgradeLegacyNavigation(upgradedNestedDocument.Root());
+	const Authoring::ReadNode upgradedNestedData = upgradedNestedDocument.Root().Read();
 
     // 굽힐 때의 이름을 그대로 쓴다 — 참조 노드가 Entity 필드를 싣고 있으므로
     // 저작자가 붙인 이름이 여기 있다(정의의 이름이 아니라).
     const std::string overrideName = node["m_name"]
-        ? node["m_name"].as<std::string>() : std::string();
+        ? node["m_name"].AsStringChecked() : std::string();
 
     // 중첩 프리팹의 **현재 정의**로 만든다. inheritedPrefabGuid에 그 프리팹의
     // guid를 넘기는 이유: 정의 루트 노드 자신의 m_prefabFileGuid는 보통 널이다
@@ -611,7 +635,7 @@ Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
     // effectivePrefabGuid 판정이 inheritedPrefabGuid로 떨어지고, 그 값이 정확히
     // 이 중첩 프리팹의 정체성이 된다(P4-a의 규칙 그대로).
 	InstantiateContext nestedContext;
-	Entity* child = nested->InstantiateRecursive(upgradedNestedData[0], scene, parent,
+	Entity* child = nested->InstantiateRecursive(upgradedNestedData.At(0), scene, parent,
 		nestedContext, overrideName, nested->GetFileGuid());
     if (!child)
         return nullptr;
@@ -637,7 +661,7 @@ Entity* Prefab::InstantiateNestedReference(const MetaYml::Node& node,
         // 항목 하나씩 리플렉션으로 읽는다 — 손으로 필드를 꺼내면 PrefabOverride의
         // 스키마가 바뀔 때 이 자리만 조용히 낡는다(m_componentSlot이 P4-c에서
         // 늘어난 것이 실례다).
-        for (const auto& ovNode : node["m_prefabOverrides"])
+        for (const Authoring::ReadNode ovNode : node["m_prefabOverrides"])
         {
             try
             {

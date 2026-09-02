@@ -1,5 +1,5 @@
 #pragma once
-#include "ReflectionYml.h"
+#include "AuthoringReadNode.h"
 
 // SerializationPlan D3-a-1 — 저작 노드의 **구조적 동등성** 판정.
 //
@@ -16,9 +16,8 @@
 //   비교하는 것이 의도된 차이이며, ①은 부수적 이득이고 ②가 본래 목적이다. 이 차이는
 //   `serialize.nodeequal` 자가 검사가 명시적으로 단정한다.
 //
-// 이 파일은 나중에 `AuthoringArchive`의 구조 비교로 흡수된다(§3.3). 지금은 backend가
-// 여전히 yaml-cpp이므로 노드 타입을 그대로 받는다 — D3-a-1은 동작 교체이지 타입
-// 경계 도입이 아니다(그건 D3-a-2 이후).
+// 이 파일은 나중에 `AuthoringArchive`의 구조 비교로 흡수된다(§3.3). 지금은 backend
+// 타입 대신 단일 ryml 읽기 경계인 `ReadNode`만 받는다.
 namespace Authoring
 {
 	// 두 노드가 같은 값을 나타내는가.
@@ -31,5 +30,5 @@ namespace Authoring
 	//
 	// 시퀀스는 순서가 값의 일부이므로 순서를 본다. 맵은 아니다 — 이 비대칭이 이
 	// 함수의 요점이다.
-	[[nodiscard]] bool NodesEqual(const MetaYml::Node& lhs, const MetaYml::Node& rhs);
+	[[nodiscard]] bool NodesEqual(const ReadNode& lhs, const ReadNode& rhs);
 }

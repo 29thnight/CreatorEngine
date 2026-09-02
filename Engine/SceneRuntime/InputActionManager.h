@@ -2,7 +2,6 @@
 #include "Core.Minimal.h"
 #include "ActionMap.h"
 #include "PlayerInput.h"
-#include <nlohmann/json.hpp>
 class InputActionManager //: public Singleton<InputActionManager>
 {
 	//friend class Singleton;
@@ -21,9 +20,9 @@ public:
 	bool SaveManager();
 	void LoadManager();
 
-	//맵 하나당 json 한개로저장
-	bool SerializeMap(ActionMap* _actionMap);
-	ActionMap* DeSerializeMap(std::string _filepath);
+	// 맵 하나당 YAML 1.2 `.inputmap` 하나로 저장한다.
+	bool SaveMap(ActionMap* actionMap);
+	ActionMap* LoadMap(const std::string& filepath);
 	void ClearActionMaps() 
 	{
 		for (auto& actionMap : m_actionMaps) 

@@ -21,6 +21,7 @@
 #include "TimeSystem.h"
 #include "UIManager.h"
 #include "RuntimeSettings.h"
+#include "AuthoringParseTelemetry.h"
 #include "imgui.h"
 
 #include <cstdio>
@@ -452,6 +453,12 @@ void Player::PlayerMain::Update()
 			+ std::to_string(Time->GetFrameCount()) + " GT frames, display frame "
 			+ std::to_string(gameDisplay.completedFrameId) + ", promotions "
 			+ std::to_string(gameDisplay.promotionCount) + ")");
+		const Authoring::TextParseTelemetrySnapshot parseTelemetry =
+			Authoring::GetTextParseTelemetry();
+		std::printf("[runtime.text-parser] calls=%llu\n",
+			static_cast<unsigned long long>(parseTelemetry.calls));
+		for (const std::string& context : parseTelemetry.contexts)
+			std::printf("[runtime.text-parser.call] source=%s\n", context.c_str());
 		PostMessage(handle, WM_CLOSE, 0, 0);
 		return;
 	}

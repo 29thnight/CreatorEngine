@@ -19,7 +19,10 @@
     "2026-08-24 재실측으로 2개를 더 걷었다: bshoshany-thread-pool(include 0·",
     "심볼 0 — Core.ThreadPool 소비 소멸), magic-enum(include 0 — PHASE 18",
     "CT9-b가 자급 표 meta::enum_entries로 대체, 남은 등장 8건은 전부 은퇴",
-    "이력 주석). include와 심볼을 각각 세어 이중 판정했다."
+    "이력 주석). include와 심볼을 각각 세어 이중 판정했다.",
+    "",
+    "ryml은 위 정리 당시 제거됐지만 PHASE 17 D3-b에서 authoring YAML 단일 backend로",
+    "명시 재도입했다. yaml-cpp는 D3-b-4에서 소스·manifest·runtime packaging에서 은퇴했다."
   ],
   "name": "creator-engine",
   "version-string": "0.1.0",
@@ -42,14 +45,12 @@
     { "name": "imguizmo", "$why": "씬 뷰 기즈모 — SceneViewWindow" },
     { "name": "lz4", "$why": "pak 압축 — Paklib" },
     { "name": "meshoptimizer", "$why": "LOD 생성 — MeshOptimizer" },
-    { "name": "nlohmann-json", "$why": "설정·메타 직렬화" },
     { "name": "physx", "$why": "물리" },
     { "name": "spdlog", "$why": "로그 — LogSystem·LogSink" },
     { "name": "stb", "$why": "이미지 로드/기록 — Terrain" },
     {
       "name": "ryml",
-      "$why": "SerializationPlan D3-b — 저작 YAML 파서. PHASE 4-6이 \"흔적 0\"으로 걷어냈던 그 포트를 되살린다(전이 의존 c4core는 적지 않는다). yaml-cpp와 병행하는 기간이 있으며, 전환이 끝나면 yaml-cpp를 뺀다. 근거: D0 실측에서 씬 로드의 60%가 텍스트 파싱이다"
-    },
-    { "name": "yaml-cpp", "$why": "씬·프리팹·.meta 직렬화 — D3-b가 ryml로 대체 중" }
+      "$why": "SerializationPlan D3-b — 저작 YAML parser/writer 단일 backend. 전이 의존 c4core는 직접 적지 않는다. 근거: D0 실측에서 scene load의 60%가 text parsing이었다"
+    }
   ]
 }

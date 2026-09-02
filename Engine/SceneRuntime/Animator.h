@@ -29,7 +29,6 @@ struct AnimatorClipOverride final
 class Skeleton;
 class AnimationController;
 class Socket;
-namespace YAML { class Node; } // CT6-d
 namespace experiment { class Model; } // I5-D4e-1: 재생 데이터 핸들(shared_ptr 보관용)
 
 // K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
@@ -81,10 +80,6 @@ public:
     void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
     bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
-    // 저작 게시는 Editor Host가 소유한다. 여기서는 JSON payload만 만들고 Player에는
-    // handler가 없어 정상적으로 실패한다.
-    bool SerializeControllers(std::string _jsonName);
-    void DeserializeControllers(std::string _filename);
     void SetUseLayer(int layerindex,bool _useLayer);
     Entity* FindBoneRecursive(Entity* parent, const std::string& boneName);
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, Entity* object);
@@ -96,7 +91,7 @@ public:
     // I5-D4e-2 — 씬 표기는 기존 형상(m_Skeleton.m_animations[i].m_isLoop/
     // m_keyFrameEvent)을 유지하되, 리플렉션이 적은 공유 자산 값을 Animator
     // 소유 오버라이드로 교체한다(reader 구세대 호환·스키마 무변경).
-    void OnAfterSerialize(YAML::Node& node);
+    void OnAfterSerialize(const Authoring::MutableNodeView& node);
 
     // I5-D4e-2 — 클립 오버라이드 표면. 재생(AnimationJob)·발화·에디터가 쓴다.
     // 구현은 AnimationEventBridge.cpp(CLR 경계 파일 — 구 Animation:: 이벤트

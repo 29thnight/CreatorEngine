@@ -19,19 +19,19 @@ AniTransition::~AniTransition()
 bool AniTransition::CheckTransiton(bool isBlend)
 {
 	auto Progress = m_ownerController->curAnimationProgress;
-	//¿¬¼ÓÀüÀÌÁß progress°¡ Á¦´ë·Î ÃÊ±âÈ­¾ÈµÇ¼­ ÀüÀÌ°¡ ÀÌ»óÇÏ°ÔµÊ
+	//ì—°ì†ì „ì´ì¤‘ progressê°€ ì œëŒ€ë¡œ ì´ˆê¸°í™”ì•ˆë˜ì„œ ì „ì´ê°€ ì´ìƒí•˜ê²Œë¨
 	if (isBlend)
 	{
 		Progress = m_ownerController->nextAnimationProgress;
 	}
-	if (hasExitTime) //ÃÖ¼Ò Å»Ãâ½Ã°£ ÀÖÀ»¶§
+	if (hasExitTime) //ìµœì†Œ íƒˆì¶œì‹œê°„ ìˆì„ë•Œ
 	{
-		if (conditions.empty()) //Å»Ãâ½Ã°£Àº ÀÖ´Â´ë Á¶°Ç¾øÀ¸¸é Å»Ãâ½Ã°£µÇ¸é Å»Ãâ
+		if (conditions.empty()) //íƒˆì¶œì‹œê°„ì€ ìˆëŠ”ëŒ€ ì¡°ê±´ì—†ìœ¼ë©´ íƒˆì¶œì‹œê°„ë˜ë©´ íƒˆì¶œ
 		{
 			if (GetExitTime() <= Progress)
 				return true;
 		}
-		else  //Å»Ãâ½Ã°£ + Á¶°ÇÀÖÀ¸¸é µÑ´Ù¸¸Á·ÇØ¾ß Å»Ãâ
+		else  //íƒˆì¶œì‹œê°„ + ì¡°ê±´ìˆìœ¼ë©´ ë‘˜ë‹¤ë§Œì¡±í•´ì•¼ íƒˆì¶œ
 		{
 			if (GetExitTime() <= Progress)
 			{
@@ -43,14 +43,14 @@ bool AniTransition::CheckTransiton(bool isBlend)
 			}
 		}
 	}
-	else   //¾øÀ»‹š
+	else   //ì—†ì„ë–„
 	{
-		if (conditions.empty()) //Å»Ãâ½Ã°£Àº ¾ø°í Á¶°Ç¾øÀ¸¸é ¾Ö´Ï¸ŞÀÌ¼Ç ³¡³ª¸éÅ»Ãâ loop¸é Å»ÃâºÒ°¡
+		if (conditions.empty()) //íƒˆì¶œì‹œê°„ì€ ì—†ê³  ì¡°ê±´ì—†ìœ¼ë©´ ì• ë‹ˆë©”ì´ì…˜ ëë‚˜ë©´íƒˆì¶œ loopë©´ íƒˆì¶œë¶ˆê°€
 		{
 			if (m_ownerController->endAnimation)
 				return true;
 		}
-		else  //Å»Ãâ ½Ã°£¾ø°í Á¶°ÇÀÖÀ¸¸é Á¶°Ç¸¸Á·½Ã Å»Ãâ
+		else  //íƒˆì¶œ ì‹œê°„ì—†ê³  ì¡°ê±´ìˆìœ¼ë©´ ì¡°ê±´ë§Œì¡±ì‹œ íƒˆì¶œ
 		{
 			for (auto& condition : conditions)
 			{
@@ -67,28 +67,7 @@ std::vector<TransCondition> AniTransition::GetConditions()
 	return conditions;
 }
 
-nlohmann::json AniTransition::Serialize()
-{
-	nlohmann::json j;
-	j["transName"] = m_name;
-	j["curStateName"] = curStateName;
-	j["nextStateName"] = nextStateName;
-	j["hasExitTime"] = (int)hasExitTime;
-	j["exitTime"] = exitTime;
-	j["blendTime"] = blendTime;
-	nlohmann::json conditionJson = nlohmann::json::array();
-	for (auto& condition : conditions)
-	{
-		conditionJson.push_back(condition.Serialize());
-	}
-	j["conditions"] = conditionJson;
-	return j;
-}
 
-AniTransition AniTransition::Deserialize()
-{
-	return AniTransition();
-}
 
 void AniTransition::DeleteCondition(int _index)
 {

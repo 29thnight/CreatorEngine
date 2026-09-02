@@ -34,8 +34,8 @@ public:
     Object(const Object&) = delete;
     Object& operator=(const Object&) = delete;
 
-    Object(std::string_view name) : m_name(name.data()) {}
-	Object(std::string_view name, size_t instanceID) : m_name(name.data()), m_instanceID(instanceID) 
+    Object(std::string_view name) : m_name(name) {}
+	Object(std::string_view name, size_t instanceID) : m_name(name), m_instanceID(instanceID)
     {
 		TypeTrait::GUIDCreator::InsertGUID(m_instanceID);
     }
@@ -45,7 +45,7 @@ public:
     void MakeInstanceID() { TypeTrait::GUIDCreator::EraseGUID(m_instanceID); m_instanceID = make_guid(); }
 	HashedGuid GetTypeID() const override final { return m_typeID; }
     std::string ToString() const override final { return m_name.ToString(); }
-    HashingString GetHashedName() const { return m_name; }
+    const HashingString& GetHashedName() const noexcept { return m_name; }
 
     virtual void Destroy();
     bool IsDestroyMark() const { return m_destroyMark; }

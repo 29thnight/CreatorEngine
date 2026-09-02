@@ -13,7 +13,7 @@
 namespace experiment::cooked
 {
     inline constexpr std::uint32_t kAssetManifestMagic = 0x464d4543u; // CEMF
-    inline constexpr std::uint16_t kAssetManifestVersion = 1u;
+    inline constexpr std::uint16_t kAssetManifestVersion = 2u;
 
     // pass-through texture artifact 의 버전이다. 트랜스코딩(BC7·밉)이
     // 들어오는 날 2 가 되고 구버전 artifact 는 자동으로 거부된다.
@@ -23,10 +23,10 @@ namespace experiment::cooked
     // 없다 — `Material::reflect()` 는 버전을 들지 않는다. 그래서 여기 손으로
     // 둔다. 저작 스키마가 바뀌면 **이 숫자를 함께 올려야 하고**, 안 올리면
     // 구형 artifact 가 새 리더에 조용히 들어간다.
-    inline constexpr std::uint32_t kMaterialArtifactVersion = 1u;
+    inline constexpr std::uint32_t kMaterialArtifactVersion = 2u;
 
     // scene/prefab artifact 의 버전. 저작 스키마가 바뀌면 함께 올려야 한다.
-    inline constexpr std::uint32_t kSceneArtifactVersion = 1u;
+    inline constexpr std::uint32_t kSceneArtifactVersion = 2u;
 
     enum class CookedAssetKind : std::uint8_t
     {
@@ -54,11 +54,24 @@ namespace experiment::cooked
         std::vector<AssetId> dependencies{};
     };
 
+    // D5 Player cutover identity table. Cooked entries describe artifacts; this
+    // table describes every packaged source asset that previously required a
+    // `.meta` sidecar scan. Paths are normalized UTF-8 paths relative to the
+    // package Assets root (for example `Models/Probe.glb`).
+    struct AssetSourceManifestEntry final
+    {
+        AssetId assetId{};
+        std::string sourcePath{};
+    };
+
     struct CookedAssetManifest final
     {
         std::vector<CookedAssetManifestEntry> entries{};
+        std::vector<AssetSourceManifestEntry> sourceAssets{};
 
         [[nodiscard]] const CookedAssetManifestEntry* Find(
+            const AssetId& assetId) const noexcept;
+        [[nodiscard]] const AssetSourceManifestEntry* FindSource(
             const AssetId& assetId) const noexcept;
     };
 
@@ -111,8 +124,8 @@ namespace experiment::cooked
     [[nodiscard]] bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept;
 
-    // 같은 논리 manifest는 입력 순서와 무관하게 같은 bytes를 낸다. entry와
-    // dependency를 UUID 순서로 정규화한 뒤 CEMF v1 binary를 기록한다.
+    // 같은 논리 manifest는 입력 순서와 무관하게 같은 bytes를 낸다. cooked entry,
+    // source identity와 dependency를 UUID 순서로 정규화한 뒤 CEMF v2 binary를 기록한다.
     [[nodiscard]] AssetManifestWriteResult WriteAssetManifest(
         const CookedAssetManifest& manifest);
 

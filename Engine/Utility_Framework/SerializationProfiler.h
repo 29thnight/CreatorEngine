@@ -19,8 +19,8 @@ namespace SerializationProfile
 	{
 		// 중첩 루트 — 분해 합과 대조하는 "자"다. 아래 단계들을 포함한다.
 		SceneLoadTotal = 0,
-		SceneParse,          // MetaYml::LoadFile — 텍스트 → Node 트리
-		EntityDeserialize,   // Meta::Deserialize(entity, node) — 리플렉션 순회
+		SceneParse,          // Authoring::ParsedDocument — 텍스트 → ryml Tree
+		EntityDeserialize,   // Meta::Deserialize(entity, ReadNode) — 리플렉션 순회
 		ComponentLoad,       // ComponentFactory::LoadComponent — 리플렉션 밖 특례 포함
 		AssetCatalog,        // DataSystem::LoadAssetCatalog — 부팅 .meta 전수 파싱
 		PrefabInstantiate,   // PrefabUtility::InstantiatePrefab — 소환(중첩 루트)

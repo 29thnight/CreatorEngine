@@ -7,7 +7,6 @@
 #include "Canvas.h"
 #include "Navigation.h"
 #include "EntityHandle.h"
-#include <yaml-cpp/yaml.h>
 
 extern float MaxOreder;
 

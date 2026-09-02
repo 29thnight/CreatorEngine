@@ -22,7 +22,7 @@ class ModelLoader;
 class Model;
 class Material;
 struct ShaderMeta;
-namespace YAML { class Node; }
+namespace Authoring { class WriteNode; }
 namespace experiment { class Model; } // I5-D1a 역브리지 입력
 namespace experiment { struct Material; } // I5-D5c1 저작 원본 보관
 namespace experiment::cooked { class CookedAssetCatalog; } // I7-C1
@@ -120,6 +120,7 @@ public:
 	[[nodiscard]] std::shared_ptr<const experiment::cooked::CookedAssetCatalog>
 		GetCookedCatalog() const;
 	[[nodiscard]] std::size_t CookedCatalogEntryCount() const;
+	[[nodiscard]] std::size_t CookedCatalogSourceAssetCount() const;
 	// I7-C2 — 신선도 판정. cooked artifact가 소스보다 낡았으면 그 entry는 없는
 	// 것으로 친다(빈 경로) — 모델은 source 디코더로, 텍스처는 source 폴백으로
 	// 간다. 두 정책 모두 이미 서 있어서 여기서 경로만 끊으면 된다.
@@ -131,6 +132,10 @@ public:
 	// 포맷 확장이라 별도 슬라이스다 — 그때까지 이 heuristic이 자리를 지킨다.
 	[[nodiscard]] file::path ResolveCookedArtifact(
 		const experiment::AssetId& assetId) const;
+	// D5-d document cutover. Produced runtime assets use a fresh cooked artifact
+	// when one exists. Editor may fall back to the authoring source; packaged
+	// Player fails closed instead of silently reopening source YAML/bytes.
+	[[nodiscard]] file::path ResolveCatalogAssetPath(FileGuid assetGuid) const;
 	[[nodiscard]] std::size_t CookedCatalogStaleCount() const;
 
 	[[nodiscard]] bool BuildLegacyModelFromExperiment(
@@ -181,7 +186,8 @@ public:
 		std::shared_ptr<Material> material, std::string_view baseName);
 	// M5-B1: standalone Material YAML의 단일 codec. scene embedded material은
 	// typed reflection이 값을 복원한 뒤 같은 runtime finalize 규약을 공유한다.
-	YAML::Node SerializeMaterialPayload(Material& material) const;
+	bool SerializeMaterialPayload(Material& material,
+		Authoring::WriteNode outNode) const;
 	bool DeserializeMaterialPayload(Material& material, const Authoring::NodeView& node);
 	// I5-D5c1 — 저작 원본 보관 창구. 새 정본(schema+shaderAssetId) 문서는
 	// experiment::Material로 읽힌 뒤 legacy로 변환되고 **원본이 버려져 왔다** —

@@ -4,6 +4,7 @@
 #include "DataSystem.h"
 #include "Experiment/Model.h" // I5-D5c4: 재질 저작 정본 해석
 #include "Interfaces/AssetAuthoringPort.h"
+#include "AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Terrain.h"
@@ -80,32 +81,29 @@ void FoliageComponent::OnUninitializing()
 void FoliageComponent::SaveFoliageAsset(const file::path& directory,
 	const std::wstring& name)
 {
-	// 빈 시퀀스를 명시적으로 만든다. 손대지 않은 Node를 그대로 흘리면 yaml-cpp가
+	// 빈 시퀀스를 명시적으로 만든다. 손대지 않은 노드를 그대로 흘리면
 	// 0바이트를 내보내는데, 그렇게 저장된 자산은 LoadFoliageAsset의
 	// assetNode["FoliageAsset"] 검사에서 다시 열리지 않는다.
-	MetaYml::Node typesNode(MetaYml::NodeType::Sequence);
+	Authoring::WriteDocument document;
+	const Authoring::WriteNode foliageNode = document.Root().Child("FoliageAsset");
+	const Authoring::WriteNode typesNode = foliageNode.Child("Types");
+	typesNode.SetSequence();
 	for (auto& type : m_foliageTypes)
 	{
-		typesNode.push_back(Meta::Serialize(&type));
+		Meta::SerializeInto(&type, typesNode.Append());
 	}
 
-	MetaYml::Node instancesNode(MetaYml::NodeType::Sequence);
+	const Authoring::WriteNode instancesNode = foliageNode.Child("Instances");
+	instancesNode.SetSequence();
 	for (auto& instance : m_foliageInstances)
 	{
-		instancesNode.push_back(Meta::Serialize(&instance));
+		Meta::SerializeInto(&instance, instancesNode.Append());
 	}
-
-	MetaYml::Node assetNode;
-	assetNode["FoliageAsset"]["Types"] = typesNode;
-	assetNode["FoliageAsset"]["Instances"] = instancesNode;
-
-	std::ostringstream payload;
-	payload << assetNode;
 
 	TextAssetAuthoringRequest request{};
 	request.destinationDirectory = directory;
 	request.name = name;
-	request.payload = payload.str();
+	request.payload = document.Dump();
 
 	TextAssetAuthoringResult result{};
 	if (!AssetAuthoringPort::WriteFoliage(request, result))
@@ -128,23 +126,29 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
         return;
     }
 
-    MetaYml::Node assetNode = MetaYml::LoadFile(assetPath.string());
-    if (assetNode.IsNull() || !assetNode["FoliageAsset"])
+    std::string parseError;
+    const Authoring::ParsedDocument document =
+        Authoring::ParsedDocument::ParseFile(assetPath.string(), parseError);
+    const Authoring::ReadNode assetNode = document.Root();
+    if (!document || assetNode.IsNull() || !assetNode["FoliageAsset"])
     {
-        std::cerr << "Invalid foliage asset file: " << assetPath << std::endl;
+        std::cerr << "Invalid foliage asset file: " << assetPath
+            << " (" << parseError << ")" << std::endl;
         return;
     }
 
     m_foliageTypes.clear();
     m_foliageInstances.clear();
-    for (const auto& typeNode : assetNode["FoliageAsset"]["Types"])
+    for (const Authoring::ReadNode typeNode :
+        assetNode["FoliageAsset"]["Types"])
     {
         FoliageType type;
         Meta::Deserialize(&type, typeNode);
         AddFoliageType(type);
     }
 
-    for (const auto& instanceNode : assetNode["FoliageAsset"]["Instances"])
+    for (const Authoring::ReadNode instanceNode :
+        assetNode["FoliageAsset"]["Instances"])
     {
         FoliageInstance instance;
         Meta::Deserialize(&instance, instanceNode);

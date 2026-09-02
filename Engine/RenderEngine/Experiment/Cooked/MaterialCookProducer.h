@@ -15,7 +15,7 @@ namespace experiment::cooked
     // 아니다 — 여기는 `Assets/Materials/*.asset` 처럼 **파일 하나가 곧 재질**인
     // 경우만 다룬다.
     //
-    // ★ artifact 는 원본 YAML 바이트 그대로다. texture/ShaderMeta 와 같은 자세.
+    // ★ artifact 는 D6 CEDO tree bytes다. Player는 YAML을 다시 파싱하지 않는다.
     //
     // ★ **이것은 material 파서가 아니다. 의존 GUID 추출기다.**
     //

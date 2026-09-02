@@ -16,6 +16,13 @@ namespace RenderTest
     bool RunExperimentAnimationPlaybackSelfTest(
         const std::string& modelPath, std::string& outLog);
 
+    // PHASE 17 local high-fidelity corpus acceptance.  Unlike experiment.anim,
+    // this exercises the experiment source importer and pose sampler directly;
+    // it does not require the retiring Assimp/legacy bridge to understand a
+    // Blender-authored glTF 2 file.
+    bool RunPhase17ModelCorpusSelfTest(
+        const std::string& modelPath, bool requireAnimation, std::string& outLog);
+
     // legacy 로드 대 Experiment 경계 비용 벤치마크.
     // legacy full load / 브리지 변환 / Validate / 게시(Load) / 포즈 샘플링을
     // 각각 반복 측정한다. Debug 빌드 수치는 방향 참고용 — 판정은 Release 로만.

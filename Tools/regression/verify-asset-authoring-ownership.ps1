@@ -48,10 +48,12 @@ Assert-DoesNotMatch "Engine\SceneRuntime\FoliageComponent.cpp" `
     'std::ofstream|create_directories\s*\(|copy_file\s*\(|AssetAuthoringPort::CreateMeta'
 Assert-Matches "Engine\SceneRuntime\FoliageComponent.cpp" `
     'AssetAuthoringPort::WriteFoliage'
-# 손대지 않은 Node를 흘리면 yaml-cpp가 0바이트를 낸다. 빈 시퀀스를 명시해야
+# 손대지 않은 writer 노드를 흘리면 0바이트를 낸다. 빈 시퀀스를 명시해야
 # 타입/인스턴스가 0개인 자산도 저장되고 다시 열린다.
 Assert-Matches "Engine\SceneRuntime\FoliageComponent.cpp" `
-    'MetaYml::NodeType::Sequence'
+    'typesNode\.SetSequence\(\)'
+Assert-Matches "Engine\SceneRuntime\FoliageComponent.cpp" `
+    'instancesNode\.SetSequence\(\)'
 # Foliage world matrix는 디스크 정본이 아니라 position/rotation/scale에서 다시 만드는
 # 런타임 캐시다. Mathematics 전환 뒤에도 reflection/YAML에 들어가면 asset schema가
 # 조용히 넓어지므로 타입과 비직렬화 규약을 함께 고정한다.
@@ -69,7 +71,7 @@ Assert-DoesNotMatch "Engine\SceneRuntime\BlackBoard.cpp" `
 Assert-Matches "Engine\SceneRuntime\BlackBoard.cpp" `
     'AssetAuthoringPort::WriteBlackBoard'
 Assert-Matches "Engine\SceneRuntime\BlackBoard.cpp" `
-    'MetaYml::NodeType::Sequence'
+    'entriesNode\.SetSequence\(\)'
 $blackBoardSource = Read-Source "Engine\SceneRuntime\BlackBoard.cpp"
 $blackBoardPathPolicy = ([regex]::Matches(
     $blackBoardSource, 'BehaviorTree\\\\')).Count
@@ -85,15 +87,12 @@ Assert-DoesNotMatch "Engine\SceneRuntime\PhysicsManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
 Assert-Matches "Engine\SceneRuntime\PhysicsManager.cpp" `
     'AssetAuthoringPort::WriteCollisionMatrix'
-# Animator: DeserializeControllers는 쓰기 쪽 AnimatorjsonPath 규약을 쓰지 않고 파일
-# 다이얼로그가 준 경로를 그대로 연다. 그래서 다른 도메인과 달리 '규약이 한 번만
-# 나타나는지' 단정을 붙이지 않는다 — 대상이 없어 항상 무의미하게 통과한다.
+# D4 Animator는 씬 reflection YAML만 쓴다. JSON reader/writer 또는 Editor
+# authoring handler가 다시 생기면 단일 정본 계약이 깨진다.
 Assert-DoesNotMatch "Engine\SceneRuntime\Animator.cpp" `
-    'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\SceneRuntime\Animator.cpp" `
-    'AssetAuthoringPort::WriteAnimatorController'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
-    'InstallAnimatorControllerWriter\(\s*&WriteAnimatorControllerThroughEditor\)'
+	'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta|AssetAuthoringPort::WriteAnimatorController|SerializeControllers|DeserializeControllers|ImportLegacyControllerJson|nlohmann'
+Assert-DoesNotMatch "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+	'AnimatorControllerWriter|WriteAnimatorControllerThroughEditor'
 
 Assert-DoesNotMatch "Engine\SceneRuntime\InputActionManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
@@ -107,7 +106,9 @@ Assert-DoesNotMatch "Engine\SceneRuntime\TagManager.cpp" `
 Assert-Matches "Engine\SceneRuntime\TagManager.cpp" `
     'AssetAuthoringPort::WriteTagManager'
 Assert-Matches "Engine\SceneRuntime\TagManager.cpp" `
-    'YAML::NodeType::Sequence'
+    'tagsNode\.SetSequence\(\)'
+Assert-Matches "Engine\SceneRuntime\TagManager.cpp" `
+    'layersNode\.SetSequence\(\)'
 $tagManagerSource = Read-Source "Engine\SceneRuntime\TagManager.cpp"
 $tagPathPolicy = ([regex]::Matches($tagManagerSource, 'TagManager\.asset')).Count
 if ($tagPathPolicy -ne 1) {
@@ -190,7 +191,7 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|TagManagerWriter|InputActionMapWriter|AnimatorControllerWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|TagManagerWriter|InputActionMapWriter)') {
     throw "Player installs an Editor asset-authoring writer"
 }
 
@@ -373,7 +374,7 @@ try {
         "quit"
     ))
     $terrainOutput = Invoke-Import "terrain-commit"
-    if ($terrainOutput -notmatch '\[terrain\.authoring\.probe\] committed') {
+    if ($terrainOutput -notmatch '\[terrain\.authoring\.probe\] committed .*roundtrip=PASS width=2 height=2 layers=1') {
         throw "Terrain authoring transaction did not commit"
     }
     if (-not (Test-Path -LiteralPath $terrainDescriptor) -or
@@ -381,10 +382,23 @@ try {
         throw "Terrain descriptor/meta publication is incomplete"
     }
 
-    $terrainJson = Get-Content -LiteralPath $terrainDescriptor -Raw | ConvertFrom-Json
-    $heightPath = Join-Path $terrainRoot $terrainJson.heightmap
-    $splatPath = Join-Path $terrainRoot $terrainJson.splatmaps[0]
-    $diffusePath = Join-Path $terrainRoot $terrainJson.layers[0].diffuseTexturePath
+    $terrainYaml = Get-Content -LiteralPath $terrainDescriptor -Raw
+    if ($terrainYaml -notmatch '(?m)^schemaVersion:\s*1\s*$' -or
+        $terrainYaml.TrimStart().StartsWith('{')) {
+        throw "Terrain descriptor is not canonical YAML"
+    }
+	function Read-TerrainScalar([string]$field) {
+		$match = [regex]::Match($terrainYaml,
+			"(?m)^[ \t]*$([regex]::Escape($field)):[ \t]*(.+?)[ \t]*$")
+        if (-not $match.Success) { throw "Terrain field is missing: $field" }
+        return $match.Groups[1].Value.Trim('"', "'")
+    }
+    $heightPath = Join-Path $terrainRoot (Read-TerrainScalar 'heightmap')
+	$splatMatch = [regex]::Match($terrainYaml,
+		'(?m)^splatmaps:[ \t]*\r?\n[ \t]*-[ \t]*(.+?)[ \t]*$')
+    if (-not $splatMatch.Success) { throw "Terrain splatmap is missing" }
+    $splatPath = Join-Path $terrainRoot $splatMatch.Groups[1].Value.Trim('"', "'")
+    $diffusePath = Join-Path $terrainRoot (Read-TerrainScalar 'diffuseTexturePath')
     foreach ($artifact in @($heightPath, $splatPath, $diffusePath)) {
         if (-not (Test-Path -LiteralPath $artifact) -or
             (Get-Item -LiteralPath $artifact).Length -le 0) {
@@ -615,7 +629,7 @@ try {
     # 스캔으로 다시 읽히는지를 함께 본다.
     $inputMapRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\InputMap"))
     $inputMapName = "CE_InputProbe_" + $probeName.Substring($probeName.Length - 12) + ".v2"
-    $inputMapAsset = Join-Path $inputMapRoot ($inputMapName + ".json")
+    $inputMapAsset = Join-Path $inputMapRoot ($inputMapName + ".inputmap")
 
     [IO.File]::WriteAllLines($commandFile, @(
         "inputmap.authoring.probe save $inputMapName"
@@ -637,44 +651,11 @@ try {
         "quit"
     ))
     $inputVerifyOutput = Invoke-Import "inputmap-verify"
-    if ($inputVerifyOutput -notmatch '\[inputmap\.authoring\.probe\] verify found=1') {
+    if ($inputVerifyOutput -notmatch '\[inputmap\.authoring\.probe\] verify found=1 actions=1 stable=1') {
         throw "restarted Editor did not load the persisted input action map"
     }
 
-    # 애니메이터 컨트롤러도 카탈로그에 없는 프리셋이다. 이름에 '.'이 든 경우가
-    # 잘리지 않는지, .meta가 생기지 않는지, 루트 밖 목적지가 거부되는지를 본다.
-    $animatorRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "Dynamic_CPP\Assets\AnimatorController"))
-    $animatorName = "CE_AnimProbe_" + $probeName.Substring($probeName.Length - 12) + ".v2"
-    $animatorAsset = Join-Path $animatorRoot ($animatorName + ".json")
-
-    [IO.File]::WriteAllLines($commandFile, @(
-        "animator.authoring.probe $animatorName"
-        "quit"
-    ))
-    $animatorOutput = Invoke-Import "animator-save"
-    if ($animatorOutput -notmatch '\[animator\.authoring\.probe\] save=ok') {
-        throw "animator controller did not save through the Editor authoring transaction"
-    }
-    if (-not (Test-Path -LiteralPath $animatorAsset)) {
-        throw "animator controller name with a dot was truncated — expected $animatorAsset"
-    }
-    if (Test-Path -LiteralPath ($animatorAsset + ".meta")) {
-        throw "animator controller publication created a .meta sidecar"
-    }
-
-    [IO.File]::WriteAllLines($commandFile, @(
-        "animator.authoring.probe $animatorName escape"
-        "quit"
-    ))
-    $animatorEscapeOutput = Invoke-Import "animator-escape"
-    if ($animatorEscapeOutput -notmatch '\[animator\.authoring\.probe\] rejected') {
-        throw "animator destination outside its authoring root was not rejected"
-    }
-    if (Test-Path -LiteralPath (Join-Path $inputMapRoot ($animatorName + ".json"))) {
-        throw "rejected animator transaction wrote outside its authoring root"
-    }
-
-    "asset authoring ownership: PASS (legacy .asset 캐시 미생성=PASS, 임베디드 추출 미생성=PASS, source intake=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator=PASS)"
+	"asset authoring ownership: PASS (legacy .asset 캐시 미생성=PASS, 임베디드 추출 미생성=PASS, source intake=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator single-truth=PASS)"
 }
 finally {
     $verifiedAssets = @()
@@ -752,16 +733,7 @@ finally {
         }
         Remove-Item -LiteralPath $absoluteTarget -Force -ErrorAction SilentlyContinue
     }
-    if ($null -ne $animatorAsset) {
-        $absoluteAnimator = [IO.Path]::GetFullPath($animatorAsset)
-        if (-not $absoluteAnimator.StartsWith($animatorRoot, [StringComparison]::OrdinalIgnoreCase) -or
-            -not (Split-Path $absoluteAnimator -Leaf).StartsWith(
-                "CE_AnimProbe_", [StringComparison]::OrdinalIgnoreCase)) {
-            throw "refusing to remove an unverified animator probe: $absoluteAnimator"
-        }
-        Remove-Item -LiteralPath $absoluteAnimator -Force -ErrorAction SilentlyContinue
-    }
-    if ($null -ne $inputMapAsset) {
+	if ($null -ne $inputMapAsset) {
         $absoluteInputMap = [IO.Path]::GetFullPath($inputMapAsset)
         if (-not $absoluteInputMap.StartsWith($inputMapRoot, [StringComparison]::OrdinalIgnoreCase) -or
             -not (Split-Path $absoluteInputMap -Leaf).StartsWith(

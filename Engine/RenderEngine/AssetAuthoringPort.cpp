@@ -20,8 +20,6 @@ namespace
 		g_writeTagManagerHandler{};
 	std::atomic<AssetAuthoringPort::WriteInputActionMapHandler>
 		g_writeInputActionMapHandler{};
-	std::atomic<AssetAuthoringPort::WriteAnimatorControllerHandler>
-		g_writeAnimatorControllerHandler{};
 }
 
 void AssetAuthoringPort::Install(CreateMetaHandler handler) noexcept
@@ -295,35 +293,6 @@ bool AssetAuthoringPort::WriteInputActionMap(
 {
 	const WriteInputActionMapHandler handler =
 		g_writeInputActionMapHandler.load(std::memory_order_acquire);
-	if (!handler) return false;
-	try
-	{
-		return handler(request);
-	}
-	catch (...)
-	{
-		return false;
-	}
-}
-
-void AssetAuthoringPort::InstallAnimatorControllerWriter(
-	WriteAnimatorControllerHandler handler) noexcept
-{
-	g_writeAnimatorControllerHandler.store(handler, std::memory_order_release);
-}
-
-void AssetAuthoringPort::UninstallAnimatorControllerWriter(
-	WriteAnimatorControllerHandler handler) noexcept
-{
-	g_writeAnimatorControllerHandler.compare_exchange_strong(
-		handler, nullptr, std::memory_order_acq_rel);
-}
-
-bool AssetAuthoringPort::WriteAnimatorController(
-	const UncatalogedAuthoringRequest& request) noexcept
-{
-	const WriteAnimatorControllerHandler handler =
-		g_writeAnimatorControllerHandler.load(std::memory_order_acquire);
 	if (!handler) return false;
 	try
 	{

@@ -4,7 +4,6 @@
 #include "ConditionParameter.h"
 #include "AnimationState.h"
 #include "AvatarMask.h"
-#include <nlohmann/json.hpp>
 #include <mathematics/matrix4x4.hpp>
 class AniTransition;
 class AvatarMask;
@@ -88,9 +87,6 @@ public:
 	void ReCreateMask(AvatarMask* mask);//팩토리에서 옮길때 쓸용
 	void DeleteAvatarMask(); 
 
-
-	nlohmann::json Serialize();
-	void Deserialize();
 
 	void SetUseLayer(bool _useLayer);
 	bool IsUseLayer() { return m_useLayer;}

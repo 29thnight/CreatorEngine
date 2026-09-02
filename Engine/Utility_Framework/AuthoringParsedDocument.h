@@ -1,7 +1,10 @@
 #pragma once
 #include "AuthoringReadNode.h"
 
+#include <cstddef>
+#include <span>
 #include <string>
+#include <string_view>
 
 // SerializationPlan D3-b-L — **파싱 결과를 소유하는** 홀더.
 //
@@ -45,6 +48,11 @@ namespace Authoring
 		[[nodiscard]] static ParsedDocument ParseText(const std::string& text,
 			std::string& error);
 
+		// CEDO만 받는 strict runtime 경계. 구버전 YAML payload를 여기서
+		// 호환하지 않는다; producer 변경 뒤의 artifact는 재쿠킹해야 한다.
+		[[nodiscard]] static ParsedDocument ParseCooked(
+			std::span<const std::byte> bytes, std::string& error);
+
 		[[nodiscard]] bool IsValid() const noexcept { return m_valid; }
 		explicit operator bool() const noexcept { return m_valid; }
 
@@ -52,6 +60,9 @@ namespace Authoring
 		[[nodiscard]] ReadNode Root() const;
 
 	private:
+		[[nodiscard]] static ParsedDocument ParseTextWithContext(
+			const std::string& text, std::string& error, std::string_view context);
+
 		bool m_valid{ false };
 		ryml::Tree m_tree{};
 	};

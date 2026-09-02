@@ -1,7 +1,9 @@
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
-    [int]$TimeoutSeconds = 300
+    [int]$TimeoutSeconds = 300,
+    [ValidateRange(1, 1000)]
+    [int]$ExpectedSceneCount = 14
 )
 
 Set-StrictMode -Version Latest
@@ -19,7 +21,7 @@ $scenes = @(Get-ChildItem -LiteralPath $sceneRoot -File -Filter '*.creator' |
 
 # D2-d의 전수 범위가 조용히 줄어드는 것을 막는 ratchet이다. 씬을 의도적으로
 # 추가하거나 제거했다면 숫자와 계획의 자산 목록을 함께 갱신해야 한다.
-$expectedSceneCount = 14
+$expectedSceneCount = $ExpectedSceneCount
 if ($scenes.Count -ne $expectedSceneCount) {
     "씬 코퍼스가 예상과 다르다: expected=$expectedSceneCount actual=$($scenes.Count)"
     $scenes.Name
@@ -137,5 +139,5 @@ if (-not $passed) {
     exit 1
 }
 
-'전체 통과 — 14개 저작 씬이 원본 불변 상태로 load→save→reload→save 바이트 안정성을 만족했다'
+"전체 통과 — $expectedSceneCount 개 저작 씬이 원본 불변 상태로 load→save→reload→save 바이트 안정성을 만족했다"
 exit 0

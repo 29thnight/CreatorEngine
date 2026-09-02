@@ -1,8 +1,10 @@
 #include "BehaviorTreeComponent.h"
 #include "DataSystem.h"
 #include "BTGraphFlatten.h"
+#include "BTBuildGraphAuthoring.h"
 #include "ClrHost.h"
 #include "SceneManager.h"
+#include "AuthoringParsedDocument.h"
 
 void BehaviorTreeComponent::Initialize()
 {
@@ -141,14 +143,22 @@ void BehaviorTreeComponent::GraphToBuild()
 		if (!BTpath.empty() && file::exists(BTpath))
 		{
 			std::shared_ptr<BTBuildGraph> graph = std::make_shared<BTBuildGraph>();
-			auto node = MetaYml::LoadFile(BTpath.string());
-			const MetaYml::Node& nodeList = node["NodeList"];
+			std::string parseError;
+			const Authoring::ParsedDocument document =
+				Authoring::ParsedDocument::ParseFile(BTpath.string(), parseError);
+			if (!document)
+			{
+				Debug->LogError("Behavior Tree parse failed: " + parseError);
+				return;
+			}
+			const Authoring::ReadNode node = document.Root();
+			const Authoring::ReadNode nodeList = node["NodeList"];
 			if (nodeList && nodeList.IsSequence())
 			{
 				graph->CleanUp();
-				for (const auto& node : nodeList)
+				for (const Authoring::ReadNode buildNode : nodeList)
 				{
-					graph->DeserializeSingleNode(node);
+					BTBuildGraphAuthoring::DeserializeSingleNode(*graph, buildNode);
 				}
 			}
 			AIManagers->SetBTBuildGraphCache(m_BehaviorTreeGuid, graph);

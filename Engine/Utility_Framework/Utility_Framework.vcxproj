@@ -25,13 +25,12 @@
     <ClInclude Include="ClassProperty.h" />
     <ClInclude Include="MetaPolymorphic.h" />
     <ClInclude Include="PakHelper.h" />
-    <ClInclude Include="AuthoringParserProbe.h" />
     <ClInclude Include="AuthoringRymlErrorPolicy.h" />
-    <ClInclude Include="AuthoringScalarParityProbe.h" />
+    <ClInclude Include="AuthoringParseTelemetry.h" />
     <ClInclude Include="AuthoringScalarConvert.h" />
     <ClInclude Include="AuthoringReadNode.h" />
-    <ClInclude Include="AuthoringAdapterParityProbe.h" />
     <ClInclude Include="AuthoringParsedDocument.h" />
+    <ClInclude Include="AuthoringCookedDocument.h" />
     <ClInclude Include="AuthoringNodeView.h" />
     <ClInclude Include="AuthoringNodeViewAccess.h" />
     <ClInclude Include="AuthoringDocument.h" />
@@ -90,12 +89,10 @@
       <ClInclude Include="EngineResourceCensus.h" />
 </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AuthoringParserProbe.cpp" />
     <ClCompile Include="AuthoringRymlErrorPolicy.cpp" />
-    <ClCompile Include="AuthoringScalarParityProbe.cpp" />
     <ClCompile Include="AuthoringScalarConvert.cpp" />
-    <ClCompile Include="AuthoringAdapterParityProbe.cpp" />
     <ClCompile Include="AuthoringParsedDocument.cpp" />
+    <ClCompile Include="AuthoringCookedDocument.cpp" />
     <ClCompile Include="AuthoringDocument.cpp" />
     <ClCompile Include="AuthoringNodeEquality.cpp" />
     <ClCompile Include="SerializationProfiler.cpp" />

@@ -130,31 +130,28 @@ bool TagManager::Save()
         return false;
     }
 
-    // 빈 시퀀스를 명시한다. 손대지 않은 Node를 흘리면 yaml-cpp가 0바이트를 내고,
+    // 빈 시퀀스를 명시한다. 손대지 않은 노드를 흘리면 0바이트를 내고,
     // 그렇게 저장된 자산은 Load가 tags/layers를 하나도 복원하지 못한다.
-    YAML::Node tagsNode(YAML::NodeType::Sequence);
+	Authoring::WriteDocument document;
+	const Authoring::WriteNode root = document.Root();
+	const Authoring::WriteNode tagsNode = root.Child("tags");
+	tagsNode.SetSequence();
     for (const auto& tag : m_tags)
     {
-        tagsNode.push_back(tag);
+		tagsNode.Append().SetScalar(tag);
     }
-    YAML::Node layersNode(YAML::NodeType::Sequence);
+	const Authoring::WriteNode layersNode = root.Child("layers");
+	layersNode.SetSequence();
     for (const auto& layer : m_layers)
     {
-        layersNode.push_back(layer);
+		layersNode.Append().SetScalar(layer);
     }
-
-    YAML::Node root;
-    root["tags"] = tagsNode;
-    root["layers"] = layersNode;
-
-    std::ostringstream payload;
-    payload << root;
 
     // 목적 경로는 Load와 같은 규약으로 만든다. 게시는 Editor Host가 소유하며
     // Player에는 handler가 없어 정상적으로 실패한다.
     UncatalogedAuthoringRequest request{};
     request.destinationPath = ResolveTagManagerPath();
-    request.payload = payload.str();
+	request.payload = document.Dump();
 
     if (!AssetAuthoringPort::WriteTagManager(request))
     {

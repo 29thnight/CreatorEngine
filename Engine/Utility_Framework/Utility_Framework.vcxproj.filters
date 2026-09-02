@@ -66,22 +66,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AuthoringParserProbe.cpp">
-      <Filter>Core.Reflection</Filter>
-    </ClCompile>
     <ClCompile Include="AuthoringRymlErrorPolicy.cpp">
-      <Filter>Core.Reflection</Filter>
-    </ClCompile>
-    <ClCompile Include="AuthoringScalarParityProbe.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>
     <ClCompile Include="AuthoringScalarConvert.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>
-    <ClCompile Include="AuthoringAdapterParityProbe.cpp">
+    <ClCompile Include="AuthoringParsedDocument.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>
-    <ClCompile Include="AuthoringParsedDocument.cpp">
+    <ClCompile Include="AuthoringCookedDocument.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>
     <ClCompile Include="AuthoringDocument.cpp">
@@ -215,13 +209,10 @@
     <ClInclude Include="MetaStateCommand.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringParserProbe.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="AuthoringRymlErrorPolicy.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringScalarParityProbe.h">
+    <ClInclude Include="AuthoringParseTelemetry.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
     <ClInclude Include="AuthoringScalarConvert.h">
@@ -230,10 +221,10 @@
     <ClInclude Include="AuthoringReadNode.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringAdapterParityProbe.h">
+    <ClInclude Include="AuthoringParsedDocument.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringParsedDocument.h">
+    <ClInclude Include="AuthoringCookedDocument.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
     <ClInclude Include="AuthoringNodeView.h">

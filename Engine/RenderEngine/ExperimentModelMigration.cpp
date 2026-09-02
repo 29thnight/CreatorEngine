@@ -31,6 +31,7 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "Model.h"
+#include "PathFinder.h"
 #include "RHI/IRenderDeviceServices.h" // I5-D34a: RHIExperimentVertexView
 #include "Skeleton.h"
 #include "StandardMaterialProperty.h"
@@ -425,47 +426,94 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 		return false;
 	}
 
+	// Packaged Player에는 `.meta`가 없다. CEMF v2의 source identity table로
+	// AssetMetaRegistry 전체를 새로 만든 뒤 한 번에 교체한다. Editor는 watcher가
+	// 갱신하는 source registry가 정본이므로 optional cooked mount가 건드리지 않는다.
+	const bool authoring = PathFinder::IsAssetAuthoringEnabled();
+	std::shared_ptr<AssetMetaRegistry> registryForFreshness = m_assetMetaRegistry;
+	std::shared_ptr<AssetMetaRegistry> packagedRegistry;
+	if (!authoring)
+	{
+		if (catalog->SourceAssetCount() == 0u)
+		{
+			outError = "CEMF source identity table이 비었다.";
+			return false;
+		}
+
+		packagedRegistry = std::make_shared<AssetMetaRegistry>();
+		for (const experiment::cooked::AssetSourceManifestEntry& source
+			: catalog->SourceAssets())
+		{
+			const file::path sourcePath = catalog->ResolveSourcePath(source.assetId);
+			std::error_code sourceError;
+			if (sourcePath.empty()
+				|| !file::is_regular_file(sourcePath, sourceError) || sourceError)
+			{
+				outError = "CEMF source asset이 package에 없다: "
+					+ source.sourcePath;
+				return false;
+			}
+
+			FileGuid guid;
+			guid.m_guid = source.assetId.value;
+			if (AssetMetaRegistrationResult::Registered
+				!= packagedRegistry->Register(guid, sourcePath))
+			{
+				outError = "CEMF source identity 등록 충돌: "
+					+ source.sourcePath;
+				return false;
+			}
+		}
+	}
+
 	// ── I7-C2: 신선도 판정 ──
 	//
-	// 소스가 아티팩트보다 새로우면 그 entry는 낡았다. 소스가 아예 없으면
-	// (게시된 배포) 비교 대상이 없으므로 신선한 것으로 둔다 — 그 경우 신선도는
-	// 빌드가 보증한다. registry가 GUID를 못 푸는 entry(모델 안의 subasset 등)도
-	// 같은 이유로 건너뛴다: 그 위험은 부모 모델 entry가 대신 진다(부모가 낡으면
-	// 모델이 source로 가고, 그러면 subasset artifact를 아무도 안 본다).
+	// Editor optional mount에서만 source mtime과 비교한다. Packaged Player는 pak
+	// 해제 시각이 source/Derived에 새로 찍혀 상대 순서가 원래 cook 순서를 뜻하지
+	// 않는다. Player의 신선도는 같은 package transaction과 CEMF size/hash 검증이
+	// 보증하며, 여기서 mtime을 비교하면 정상 패키지가 대량 stale로 오판된다.
+	// registry가 GUID를 못 푸는 entry(모델 안의 subasset 등)는 부모 모델 entry가
+	// 대신 책임진다.
 	std::unordered_set<FileGuid> stale;
-	for (const experiment::cooked::CookedAssetManifestEntry& entry
-		: catalog->Entries())
+	if (authoring)
 	{
-		FileGuid guid;
-		guid.m_guid = entry.assetId.value;
-		const file::path sourcePath = GetFilePath(guid);
-		if (sourcePath.empty()) continue;
-		std::error_code sourceError;
-		if (!file::is_regular_file(sourcePath, sourceError)) continue;
-		const file::path artifact = catalog->ResolveArtifactPath(entry.assetId);
-		std::error_code artifactError;
-		if (artifact.empty()
-			|| !file::is_regular_file(artifact, artifactError))
+		for (const experiment::cooked::CookedAssetManifestEntry& entry
+			: catalog->Entries())
 		{
-			// 표에는 있는데 파일이 없다 — 낡음보다 나쁘다. 같이 끊는다.
-			stale.insert(guid);
-			continue;
+			FileGuid guid;
+			guid.m_guid = entry.assetId.value;
+			const file::path sourcePath = registryForFreshness
+				? registryForFreshness->GetPath(guid) : file::path{};
+			if (sourcePath.empty()) continue;
+			std::error_code sourceError;
+			if (!file::is_regular_file(sourcePath, sourceError)) continue;
+			const file::path artifact = catalog->ResolveArtifactPath(entry.assetId);
+			std::error_code artifactError;
+			if (artifact.empty()
+				|| !file::is_regular_file(artifact, artifactError))
+			{
+				// 표에는 있는데 파일이 없다 — 낡음보다 나쁘다. 같이 끊는다.
+				stale.insert(guid);
+				continue;
+			}
+			const auto sourceTime = file::last_write_time(sourcePath, sourceError);
+			const auto artifactTime = file::last_write_time(artifact, artifactError);
+			if (sourceError || artifactError) continue;
+			if (artifactTime < sourceTime) stale.insert(guid);
 		}
-		const auto sourceTime = file::last_write_time(sourcePath, sourceError);
-		const auto artifactTime = file::last_write_time(artifact, artifactError);
-		if (sourceError || artifactError) continue;
-		if (artifactTime < sourceTime) stale.insert(guid);
 	}
 
 	const std::size_t entryCount = catalog->Size();
+	const std::size_t sourceAssetCount = catalog->SourceAssetCount();
 	const std::size_t staleCount = stale.size();
 	{
 		std::lock_guard lock(m_cookedCatalogMutex);
 		m_cookedCatalog = std::move(catalog);
 		m_cookedStaleAssets = std::move(stale);
 	}
-	std::printf("[cooked.catalog] mount %s entries=%zu stale=%zu\n",
-		manifestPath.string().c_str(), entryCount, staleCount);
+	if (packagedRegistry) m_assetMetaRegistry = std::move(packagedRegistry);
+	std::printf("[cooked.catalog] mount %s entries=%zu sources=%zu stale=%zu\n",
+		manifestPath.string().c_str(), entryCount, sourceAssetCount, staleCount);
 	return true;
 }
 
@@ -487,6 +535,20 @@ file::path DataSystem::ResolveCookedArtifact(
 	return m_cookedCatalog->ResolveArtifactPath(assetId);
 }
 
+file::path DataSystem::ResolveCatalogAssetPath(FileGuid assetGuid) const
+{
+	if (FileGuid{} == assetGuid) return {};
+	experiment::AssetId assetId{ assetGuid.m_guid };
+	if (file::path cooked = ResolveCookedArtifact(assetId); !cooked.empty())
+		return cooked;
+
+	// Editor owns authoring recovery and stale-source fallback. A packaged Player
+	// has no such authority: if a produced asset is absent/stale in CEMF, make the
+	// caller fail instead of making source files an accidental runtime contract.
+	return PathFinder::IsAssetAuthoringEnabled()
+		? GetFilePath(assetGuid) : file::path{};
+}
+
 std::size_t DataSystem::CookedCatalogStaleCount() const
 {
 	std::lock_guard lock(m_cookedCatalogMutex);
@@ -497,6 +559,12 @@ std::size_t DataSystem::CookedCatalogEntryCount() const
 {
 	const auto catalog = GetCookedCatalog();
 	return catalog ? catalog->Size() : 0u;
+}
+
+std::size_t DataSystem::CookedCatalogSourceAssetCount() const
+{
+	const auto catalog = GetCookedCatalog();
+	return catalog ? catalog->SourceAssetCount() : 0u;
 }
 
 std::shared_ptr<Model> DataSystem::LoadModelViaExperiment(

@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory)]
     [string]$ManifestPath,
 
-    [switch]$ValidateExisting
+    [switch]$ValidateExisting,
+
+    [switch]$RegenerateNonCanonicalOnly
 )
 
 Set-StrictMode -Version Latest
@@ -99,6 +101,7 @@ $head = (& git -C $resolvedRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'git rev-parse HEAD failed' }
 
 $uuidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-([0-9a-f])[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$'
+$canonicalV4Pattern = '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
 $uuidSearchPattern = '[{]?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[}]?'
 
 function ConvertTo-NormalizedGuid([string]$Value) {
@@ -224,17 +227,47 @@ foreach ($file in @(Get-ChildItem -LiteralPath $assetRoot -Recurse -File |
     }
 }
 $referenceInventoryHash = Get-Sha256 (@($referenceInventoryLines | Sort-Object) -join "`n")
-$currentRegenerateCount = $metaRecords.Count
-$currentKnownReferenceOccurrences = $referenceInventoryLines.Count
-$currentBinaryRawReferenceOccurrences = [int](($referenceKindCounts.GetEnumerator() |
-    Where-Object Key -Like '*|binary-raw' | Measure-Object Value -Sum).Sum)
 
+$manifest = $null
+$incrementalMode = $RegenerateNonCanonicalOnly.IsPresent
 if ($ValidateExisting) {
     if (-not (Test-Path -LiteralPath $manifestFullPath -PathType Leaf)) {
         throw "migration manifest does not exist: $manifestFullPath"
     }
     $manifest = Get-Content -LiteralPath $manifestFullPath -Raw | ConvertFrom-Json
-    if ($manifest.schemaVersion -ne 3) { throw 'unsupported manifest schemaVersion' }
+    if ($manifest.schemaVersion -eq 3) {
+        $incrementalMode = $false
+    } elseif ($manifest.schemaVersion -eq 4 -and
+        [string]$manifest.migrationMode -eq 'non-canonical-only') {
+        $incrementalMode = $true
+    } else {
+        throw 'unsupported migration manifest schema or mode'
+    }
+}
+
+$selectedRecords = if ($incrementalMode) {
+    @($metaRecords | Where-Object { $_.OldGuid -notmatch $canonicalV4Pattern })
+} else {
+    @($metaRecords)
+}
+$selectedGuidSet = [System.Collections.Generic.HashSet[string]]::new(
+    [string[]]@($selectedRecords | ForEach-Object OldGuid),
+    [StringComparer]::OrdinalIgnoreCase)
+$currentRegenerateCount = $selectedRecords.Count
+$currentPreserveCount = $metaRecords.Count - $currentRegenerateCount
+$currentKnownReferenceOccurrences = 0
+$currentBinaryRawReferenceOccurrences = 0
+foreach ($record in $selectedRecords) {
+    if ($referenceCounts.ContainsKey($record.OldGuid)) {
+        $currentKnownReferenceOccurrences += [int]$referenceCounts[$record.OldGuid]
+    }
+    $rawKindKey = $record.OldGuid + '|binary-raw'
+    if ($referenceKindCounts.ContainsKey($rawKindKey)) {
+        $currentBinaryRawReferenceOccurrences += [int]$referenceKindCounts[$rawKindKey]
+    }
+}
+
+if ($ValidateExisting) {
     if ($manifest.sourceHead -ne $head) {
         throw 'repository HEAD changed after manifest creation'
     }
@@ -245,8 +278,12 @@ if ($ValidateExisting) {
         throw 'asset reference inventory changed after manifest creation'
     }
     if ([int]$manifest.assetCount -ne $metaRecords.Count -or
-        @($manifest.entries).Count -ne $metaRecords.Count) {
+        @($manifest.entries).Count -ne $currentRegenerateCount) {
         throw 'manifest asset count does not match current inventory'
+    }
+    if ($incrementalMode -and
+        [int]$manifest.preserveCount -ne $currentPreserveCount) {
+        throw 'manifest preserve count does not match current inventory'
     }
     if ([int]$manifest.regenerateCount -ne $currentRegenerateCount -or
         [int]$manifest.knownReferenceOccurrences -ne
@@ -257,8 +294,10 @@ if ($ValidateExisting) {
     }
 
     $sourceByMeta = @{}
-    foreach ($record in $metaRecords) { $sourceByMeta[$record.MetaPath] = $record }
+    foreach ($record in $selectedRecords) { $sourceByMeta[$record.MetaPath] = $record }
     $newGuidSet = [System.Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    $entryMetaSet = [System.Collections.Generic.HashSet[string]]::new(
         [StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in @($manifest.entries)) {
         if (-not $sourceByMeta.ContainsKey([string]$entry.metaPath)) {
@@ -297,6 +336,9 @@ if ($ValidateExisting) {
         if (-not $newGuidSet.Add($newGuid)) {
             throw "manifest new guid is duplicated: $newGuid"
         }
+        if (-not $entryMetaSet.Add([string]$entry.metaPath)) {
+            throw "manifest meta path is duplicated: $($entry.metaPath)"
+        }
         if ($entry.action -ne 'regenerate') {
             throw "unknown migration action: $($entry.action)"
         }
@@ -305,8 +347,8 @@ if ($ValidateExisting) {
         }
     }
 
-    Write-Output ('asset-guid-migration validate assets={0} regenerate={1} references={2} raw={3} inventory={4} manifest={5}' -f
-        $manifest.assetCount, $manifest.regenerateCount,
+    Write-Output ('asset-guid-migration validate assets={0} regenerate={1} preserve={2} references={3} raw={4} inventory={5} manifest={6}' -f
+        $manifest.assetCount, $manifest.regenerateCount, $currentPreserveCount,
         $manifest.knownReferenceOccurrences, $manifest.binaryRawReferenceOccurrences,
         $inventoryHash, $manifestFullPath)
     exit 0
@@ -321,7 +363,7 @@ $reservedGuidSet = [System.Collections.Generic.HashSet[string]]::new(
 $entries = [System.Collections.Generic.List[object]]::new()
 $regenerateCount = 0
 $knownReferenceOccurrences = 0
-foreach ($record in $metaRecords) {
+foreach ($record in $selectedRecords) {
     do {
         $newGuid = [guid]::NewGuid().ToString('D').ToLowerInvariant()
     } while (-not $reservedGuidSet.Add($newGuid))
@@ -351,7 +393,7 @@ foreach ($record in $metaRecords) {
 }
 
 $manifest = [ordered]@{
-    schemaVersion = 3
+    schemaVersion = $(if ($incrementalMode) { 4 } else { 3 })
     createdUtc = [DateTime]::UtcNow.ToString('o')
     sourceHead = $head
     sourceInventorySha256 = $inventoryHash
@@ -362,6 +404,10 @@ $manifest = [ordered]@{
     binaryRawReferenceOccurrences = $currentBinaryRawReferenceOccurrences
     entries = $entries
 }
+if ($incrementalMode) {
+    $manifest['migrationMode'] = 'non-canonical-only'
+    $manifest['preserveCount'] = $currentPreserveCount
+}
 
 $parent = Split-Path -Parent $manifestFullPath
 if ([string]::IsNullOrWhiteSpace($parent)) { throw 'manifest parent is empty' }
@@ -371,8 +417,8 @@ if ([string]::IsNullOrWhiteSpace($parent)) { throw 'manifest parent is empty' }
     ($manifest | ConvertTo-Json -Depth 8),
     [Text.UTF8Encoding]::new($false))
 
-Write-Output ('asset-guid-migration create assets={0} regenerate={1} references={2} raw={3} inventory={4} manifest={5} assetWrites=0' -f
-    $metaRecords.Count, $regenerateCount,
+Write-Output ('asset-guid-migration create assets={0} regenerate={1} preserve={2} references={3} raw={4} inventory={5} manifest={6} assetWrites=0' -f
+    $metaRecords.Count, $regenerateCount, $currentPreserveCount,
     $knownReferenceOccurrences, $currentBinaryRawReferenceOccurrences,
     $inventoryHash, $manifestFullPath)
 exit 0

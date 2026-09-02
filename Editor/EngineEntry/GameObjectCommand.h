@@ -57,8 +57,9 @@ namespace Meta
                 m_name = obj->m_name.ToString();
                 m_parentIndex = obj->GetParentIndex();
 				m_sourceRootIndex = obj->GetRootIndex();
-				m_serializedNode = Meta::Serialize(obj);
-				m_type = EntityAuthoring::InferCreationType(m_serializedNode);
+				m_serializedDocument = Meta::SerializeDocument(obj);
+				m_type = EntityAuthoring::InferCreationType(
+					m_serializedDocument.Root().Read());
             }
         }
 
@@ -68,15 +69,18 @@ namespace Meta
             if (objPtr)
             {
 				const Entity::Index restoredIndex = objPtr->m_index;
-				Meta::Deserialize(objPtr, m_serializedNode);
+				const Authoring::ReadNode serialized =
+					m_serializedDocument.Root().Read();
+				Meta::Deserialize(objPtr, serialized);
 				objPtr->m_index = restoredIndex;
 				objPtr->SetRootIndex(m_sourceRootIndex);
-                if (m_serializedNode["m_components"])
-                {
-                    for (const auto& componentNode : m_serializedNode["m_components"])
-                    {
-                        try
-                        {
+				const Authoring::ReadNode components = serialized["m_components"];
+				if (components)
+				{
+					for (const Authoring::ReadNode componentNode : components)
+					{
+						try
+						{
 							ComponentFactorys->LoadComponent(objPtr, Authoring::NodeViewAccess::Make(componentNode));
                         }
                         catch (const std::exception& e)
@@ -105,7 +109,7 @@ namespace Meta
         Entity::Index m_parentIndex{ 0 };
 		Entity::Index m_sourceRootIndex{ Entity::INVALID_INDEX };
         Entity::Index m_index{ Entity::INVALID_INDEX };
-        MetaYml::Node m_serializedNode{};
+		Authoring::WriteDocument m_serializedDocument{};
     };
 
     class DuplicateGameObjectCommand : public IUndoableCommand

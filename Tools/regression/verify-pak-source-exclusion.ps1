@@ -9,9 +9,10 @@ param([string]$AssetPacker = '')
 #   필터가 있든 없든 참이라 아무것도 증명하지 않는다. 그래서 오염된 트리를
 #   일부러 만들어 필터를 밟는다.
 #
-# ★ 과잉 필터도 함께 잡는다. `.hlsl`/`.hlsli`는 pak에 **실려야** 한다 — 현재 패키지는
+# ★ 과잉 필터도 함께 잡는다. `.hlsl`/`.hlsli`와 CEMF는 pak에 **실려야** 한다 — 현재 패키지는
 #   셰이더 소스와 Slang/DXC DLL을 싣고 Player가 런타임에 컴파일한다
-#   (BuildPipelinePlan B3). `.meta`도 D5 매니페스트 전까지 실려야 한다.
+#   (BuildPipelinePlan B3). `.meta`는 D5 CEMF v2 source identity table이 대체한다.
+#   `.json`은 D4에서 consumer를 제거한 구 Animator/NodeEditor 잔재다.
 #   누락만 보고 과잉을 안 보면, 게임이 아무것도 못 그리는 pak이 초록으로 지나간다.
 
 Set-StrictMode -Version Latest
@@ -72,13 +73,13 @@ try {
     $dirtySettings = Join-Path $work 'dirty\ProjectSetting'
     foreach ($d in @($cleanAssets, $cleanSettings, $dirtyAssets, $dirtySettings)) { New-CleanTree $d }
 
-    # 실려야 하는 파일들. 셰이더 소스와 sidecar가 여기 있는 것이 요점이다.
+    # 실려야 하는 파일들. 셰이더 소스와 CEMF가 여기 있는 것이 요점이다.
     $keepAssets = @{
         'Scenes/Probe.creator'          = 'scene: probe'
-        'Scenes/Probe.creator.meta'     = 'guid: 00000000-0000-4000-8000-000000000001'
         'Shaders/Probe.hlsl'            = 'float4 main() : SV_Target { return 0; }'
         'Shaders/Probe.hlsli'           = '#define PROBE 1'
         'Textures/Probe.png'            = 'not-a-real-png'
+        'Derived/asset-manifest.cemf'   = 'synthetic-cemf'
     }
     $keepSettings = @{
         'EngineSettings.asset' = 'settings: probe'
@@ -89,6 +90,10 @@ try {
         'Scripts/Probe.h'     = '#pragma once'
         'Scripts/Probe.hpp'   = '#pragma once'
         'Scripts/UPPER.CPP'   = 'int upper() { return 0; }'
+        'Scenes/Probe.creator.meta' = 'guid: 00000000-0000-4000-8000-000000000001'
+        'Scenes/UPPER.META'   = 'guid: 00000000-0000-4000-8000-000000000002'
+        'Animator/Legacy.json' = '{"retired":true}'
+        'NodeEditor/UPPER.JSON' = '{"retired":true}'
     }
 
     function Write-TreeFiles {
@@ -138,7 +143,7 @@ try {
 
             # ① 실려야 할 것이 실제로 실렸는가. 이 단정이 없으면 "전부 걸러낸" pak도 통과한다.
             if ($cleanEntries -ne $expectedEntries) {
-                $failures.Add("clean entry 수가 $cleanEntries — $expectedEntries 를 기대했다 (hlsl/hlsli/meta가 빠졌을 수 있다)")
+                $failures.Add("clean entry 수가 $cleanEntries — $expectedEntries 를 기대했다 (hlsl/hlsli/CEMF가 빠졌을 수 있다)")
             }
             # ② 오염된 트리가 같은 수를 낸다 = 소스가 전부 걸러졌다.
             if ($dirtyEntries -ne $cleanEntries) {
@@ -166,13 +171,13 @@ try {
                 $failures.Add("clean/dirty 목록이 다르다: " + (($listDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join '; '))
             }
             # 목록 자체에 소스 확장자가 없어야 한다 — 위 두 단정과 독립적인 직접 확인이다.
-            $leakedSources = @($dirtyList | Where-Object { $_ -match '\.(cpp|h|hpp)$' })
+            $leakedSources = @($dirtyList | Where-Object { $_ -match '\.(cpp|h|hpp|meta|json)$' })
             if ($leakedSources.Count -gt 0) {
                 $failures.Add("소스가 pak에 실렸다: " + ($leakedSources -join ', '))
             }
-            # 셰이더 소스와 sidecar는 반드시 남아야 한다(과잉 필터 검출).
+            # 셰이더 소스와 CEMF는 반드시 남아야 한다(과잉 필터 검출).
             foreach ($required in @('Assets/Shaders/Probe.hlsl', 'Assets/Shaders/Probe.hlsli',
-                                    'Assets/Scenes/Probe.creator.meta')) {
+                                    'Assets/Derived/asset-manifest.cemf')) {
                 if ($dirtyList -notcontains $required) {
                     $failures.Add("실려야 할 파일이 빠졌다: $required")
                 }
@@ -194,5 +199,5 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-'전체 통과 — 네이티브 소스 8건이 두 루트 모두에서 배제되고, 셰이더 소스/sidecar는 그대로 실렸다'
+'전체 통과 — 네이티브 소스·.meta·은퇴 JSON이 두 루트 모두에서 배제되고, 셰이더 소스/CEMF는 그대로 실렸다'
 exit 0

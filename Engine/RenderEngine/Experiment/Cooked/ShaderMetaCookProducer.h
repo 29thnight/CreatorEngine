@@ -13,10 +13,8 @@ namespace experiment::cooked
     // `.shadermeta` 하나를 publication 직전의 완전 소유 산출물로 바꾼다.
     // `ModelCookProducer`·`TextureCookProducer` 와 같은 규약이다.
     //
-    // ★ artifact 는 원본 YAML 바이트 그대로다. texture 와 같은 이유이고,
-    //   같은 안전장치를 쓴다 — `formatVersion` 을 **`ShaderMeta::kSchemaVersion`
-    //   에서 가져온다.** 손으로 올리는 숫자가 아니라 schema 정본에서 유도되므로,
-    //   schema 가 2 가 되는 날 구버전 artifact 는 자동으로 거부된다.
+    // ★ artifact 는 D6 CEDO tree bytes다. `formatVersion`은 ShaderMeta schema와
+    //   CEDO version을 함께 담으므로 어느 한쪽이 바뀌어도 재쿠킹된다.
     //
     // ★ **검증은 `ShaderMetaLoader::Parse` 가 한다. 여기서 두 번째 파서를 만들지
     //   않는다.** 파서가 갈라지면 어떤 `.shadermeta` 는 에디터에서 통과하고

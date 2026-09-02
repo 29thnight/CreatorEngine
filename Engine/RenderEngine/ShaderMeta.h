@@ -12,6 +12,11 @@
 #include <variant>
 #include <vector>
 
+namespace Authoring
+{
+    class ReadNode;
+}
+
 enum class ShaderPropertyType : std::uint8_t
 {
     Float,
@@ -122,8 +127,21 @@ namespace ShaderMetaLoader
     bool LoadFile(const std::filesystem::path& path, const FileGuid& guid,
         ShaderMeta& outMeta, std::string& outError);
 
+    // Cooked D5 document는 GUID-addressed Derived 경로에 있지만 `source`는 여전히
+    // authoring .shadermeta 기준 상대 HLSL이다(B3 전 계약). documentPath에서
+    // payload를 읽되 sourceOriginPath를 상대 경로 기준과 runtime origin으로 쓴다.
+    bool LoadFile(const std::filesystem::path& documentPath,
+        const std::filesystem::path& sourceOriginPath, const FileGuid& guid,
+        ShaderMeta& outMeta, std::string& outError);
+
     // Editor importer와 자가 검증이 디스크 게시 전에 같은 검증기를 쓸 수 있는 경계.
     // originPath는 source 상대 경로의 기준이며 .shadermeta 파일명을 포함한다.
     bool Parse(std::string_view text, const std::filesystem::path& originPath,
         const FileGuid& guid, ShaderMeta& outMeta, std::string& outError);
+
+    // AssetCooker와 cooked runtime loader가 같은 schema 검증을 공유하는 경계.
+    // root의 소유자는 이 호출이 끝날 때까지 살아 있어야 한다.
+    bool ParseDocument(const Authoring::ReadNode& root,
+        const std::filesystem::path& originPath, const FileGuid& guid,
+        ShaderMeta& outMeta, std::string& outError);
 }

@@ -4,6 +4,7 @@
 #include "PathFinder.h"
 #include "ReflectionTypedYml.h"
 #include "RuntimeSettings.h"
+#include "AuthoringParsedDocument.h"
 
 #include <Windows.h>
 
@@ -14,26 +15,27 @@
 #include <fstream>
 #include <string>
 #include <utility>
-#include <yaml-cpp/yaml.h>
 
 namespace
 {
     std::atomic_uint64_t g_settingsCandidateId{ 0 };
 
-    void OverlayKnownMap(YAML::Node target, const YAML::Node& known)
+    void OverlayKnownMap(Authoring::WriteNode target,
+        const Authoring::ReadNode& known)
     {
-        for (const auto& field : known)
+        target.SetMap();
+        for (const auto field : known.Map())
         {
-            const std::string key = field.first.as<std::string>();
-            const YAML::Node knownValue = field.second;
-            YAML::Node existingValue = target[key];
-            if (knownValue.IsMap() && existingValue.IsMap())
+            const std::string key = field.key.AsStringChecked();
+            const Authoring::ReadNode knownValue = field.value;
+            const Authoring::WriteNode existingValue = target.Child(key);
+            if (knownValue.IsMap() && existingValue.Read().IsMap())
             {
                 OverlayKnownMap(existingValue, knownValue);
             }
             else
             {
-                target[key] = knownValue;
+                existingValue.Assign(knownValue);
             }
         }
     }
@@ -64,13 +66,20 @@ bool EditorSettingsStore::Initialize() noexcept
         PathFinder::ProjectSettingPath("EngineSettings.asset");
     try
     {
-        if (std::filesystem::exists(settingsPath))
-        {
-            const YAML::Node root = YAML::LoadFile(settingsPath.string());
+		if (std::filesystem::exists(settingsPath))
+		{
+			std::string parseError;
+			const Authoring::ParsedDocument document =
+				Authoring::ParsedDocument::ParseFile(
+					settingsPath.string(), parseError);
+			if (!document)
+				return ReportSettingsError(
+					"Unable to load Editor settings: " + parseError);
+			const Authoring::ReadNode root = document.Root();
 
-            if (root["m_contentsBrowserStyle"])
-            {
-                const int style = root["m_contentsBrowserStyle"].as<int>();
+			if (root["m_contentsBrowserStyle"])
+			{
+				const int style = root["m_contentsBrowserStyle"].As<int>();
                 if (style < static_cast<int>(ContentsBrowserStyle::Tile) ||
                     style > static_cast<int>(ContentsBrowserStyle::Tree))
                 {
@@ -81,7 +90,7 @@ bool EditorSettingsStore::Initialize() noexcept
 
             if (root["imguiScale"])
             {
-                const float scale = root["imguiScale"].as<float>();
+				const float scale = root["imguiScale"].As<float>();
                 if (!std::isfinite(scale) || scale <= 0.0f)
                     return ReportSettingsError("imguiScale must be a positive finite value.");
                 preferences.SetImGuiScale(scale);
@@ -89,31 +98,31 @@ bool EditorSettingsStore::Initialize() noexcept
 
             if (root["startupSceneName"])
             {
-                const std::filesystem::path startupScene =
-                    root["startupSceneName"].as<std::string>();
+				const std::filesystem::path startupScene =
+					root["startupSceneName"].AsString();
                 buildSettings.SetStartupSceneName(startupScene.wstring());
             }
 
-            const YAML::Node buildNode = root["build"];
+			const Authoring::ReadNode buildNode = root["build"];
             if (buildNode)
             {
                 if (!buildNode.IsMap())
                     return ReportSettingsError("build must be a map.");
 
-                const YAML::Node buildRenderNode = buildNode["render"];
+				const Authoring::ReadNode buildRenderNode = buildNode["render"];
                 if (buildRenderNode)
                 {
                     if (!buildRenderNode.IsMap())
                         return ReportSettingsError("build.render must be a map.");
 
-                    const YAML::Node buildBackendNode = buildRenderNode["backend"];
+					const Authoring::ReadNode buildBackendNode = buildRenderNode["backend"];
                     if (buildBackendNode)
                     {
                         if (!buildBackendNode.IsScalar())
                             return ReportSettingsError(
                                 "build.render.backend must be dx12 or vulkan.");
-                        const std::string backendName =
-                            buildBackendNode.as<std::string>();
+						const std::string backendName =
+							buildBackendNode.AsString();
                         RenderBackend backend{};
                         if (!TryParseRenderBackend(backendName, backend))
                         {
@@ -134,12 +143,7 @@ bool EditorSettingsStore::Initialize() noexcept
         if (!std::filesystem::exists(settingsPath)) return Save();
         return true;
     }
-    catch (const YAML::Exception& exception)
-    {
-        return ReportSettingsError("Unable to load Editor settings: " +
-            std::string(exception.what()));
-    }
-    catch (const std::exception& exception)
+	catch (const std::exception& exception)
     {
         return ReportSettingsError("Editor settings initialization failed: " +
             std::string(exception.what()));
@@ -172,35 +176,52 @@ bool EditorSettingsStore::Save() noexcept
 
     try
     {
-        YAML::Node root;
+        Authoring::WriteDocument rootDocument;
         if (std::filesystem::exists(settingsPath))
-            root = YAML::LoadFile(settingsPath.string());
-        if (!root || !root.IsMap()) root = YAML::Node(YAML::NodeType::Map);
+        {
+            std::string parseError;
+            auto parsed = Authoring::WriteDocument::ParseFile(
+                settingsPath, &parseError);
+            if (!parsed)
+                return ReportSettingsError(
+                    "Unable to load existing Editor settings for save: " +
+                    parseError);
+            rootDocument = std::move(*parsed);
+        }
+        const Authoring::WriteNode root = rootDocument.Root();
+        if (!root.Read().IsMap()) root.SetMap();
 
         RenderPassSettings renderPassSettings =
             RuntimeSettings::Get().GetRenderPassSettings();
-        const YAML::Node serializedRenderPassSettings =
-            Meta::Typed::SerializeThunk<RenderPassSettings>(&renderPassSettings);
-        YAML::Node storedRenderPassSettings = root["renderPassSettings"];
-        if (storedRenderPassSettings.IsMap() && serializedRenderPassSettings.IsMap())
+		Authoring::WriteDocument renderPassDocument;
+		Meta::Typed::SerializeThunk<RenderPassSettings>(
+			&renderPassSettings, renderPassDocument.Root());
+		const Authoring::ReadNode serializedRenderPassSettings =
+			renderPassDocument.Root().Read();
+        const Authoring::WriteNode storedRenderPassSettings =
+            root.Child("renderPassSettings");
+        if (storedRenderPassSettings.Read().IsMap()
+            && serializedRenderPassSettings.IsMap())
             OverlayKnownMap(storedRenderPassSettings, serializedRenderPassSettings);
         else
-            root["renderPassSettings"] = serializedRenderPassSettings;
-        root["m_contentsBrowserStyle"] =
-            static_cast<int>(m_preferences.GetContentsBrowserStyle());
-        root["startupSceneName"] =
-            std::filesystem::path(m_buildSettings.GetStartupSceneName()).string();
-        root["imguiScale"] = m_preferences.GetImGuiScale();
-        root["render"]["backend"] = RenderBackendName(m_preferences.GetRenderBackend());
-        root["build"]["render"]["backend"] =
-            RenderBackendName(m_buildSettings.GetRenderBackend());
-        root.remove("renderBackendDx12");
-        root.remove("imguiBackendDx12");
+            storedRenderPassSettings.Assign(serializedRenderPassSettings);
+        root.Child("m_contentsBrowserStyle").SetScalar(
+            static_cast<int>(m_preferences.GetContentsBrowserStyle()));
+        root.Child("startupSceneName").SetScalar(
+            std::filesystem::path(
+                m_buildSettings.GetStartupSceneName()).string());
+        root.Child("imguiScale").SetScalar(m_preferences.GetImGuiScale());
+        root.Child("render").Child("backend").SetScalar(
+            RenderBackendName(m_preferences.GetRenderBackend()));
+        root.Child("build").Child("render").Child("backend").SetScalar(
+            RenderBackendName(m_buildSettings.GetRenderBackend()));
+        root.RemoveChild("renderBackendDx12");
+        root.RemoveChild("imguiBackendDx12");
 
         std::ofstream output(candidatePath, std::ios::binary | std::ios::trunc);
         if (!output.is_open())
             return ReportSettingsError("Unable to open the Editor settings candidate file.");
-        output << root;
+        output << rootDocument.Dump();
         output.flush();
         if (!output.good())
         {

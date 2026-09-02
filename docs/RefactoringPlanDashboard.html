@@ -352,7 +352,7 @@
     <div class="doc"><a href="plans/UISystemRedesignPlan.md">UISystemRedesignPlan.md</a><span class="tie">PHASE 16</span>
       <div class="why">uGUI 저작 · Slate 런타임 하이브리드 UI 재설계(U0~U7). 별도 위젯 트리 금지 근거, 클릭 0-나누기 등 CRITICAL 4종, "배선 완료 ≠ 화면에 나옴" 함정 기록.</div></div>
     <div class="doc"><a href="plans/SerializationPlan.md">SerializationPlan.md</a><span class="tie">PHASE 17</span>
-      <div class="why">직렬화 이원화(D0~D7) — 저작은 YAML, 런타임은 쿠킹 바이너리. .meta 랜덤 GUID 재정의. D2·D5는 SceneGraph E1·P2 이후라는 순서 제약. 쿠킹(D2)은 PHASE 18의 typed 순회 위에서 시작한다.</div></div>
+      <div class="why">직렬화 이원화(D0~D7) — 저작은 YAML, 런타임은 쿠킹 바이너리. <b>2026-09-02 순차 구현:</b> D2 selective 재이주, D3-b-4 ryml 단일 backend, D4 canonical YAML/nlohmann 은퇴를 완료했다. D5는 CEMF v2 source identity 215개와 현존 corpus parity를 닫았고, D6은 CEDO1 문서 43개를 통해 Release Player text parser 호출 0을 달성했다. D3/D5 정본 성능 판정은 <code>Test1.creator</code> 복구 뒤 닫는다. D7 선택 중단.</div></div>
     <div class="doc"><a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a><span class="tie">PHASE 19</span>
       <div class="why">물리 계층 ~9,500줄 전면 재작성(트랙 Z·X·A·B·C·T·M). 실측 결론: <b>병렬화의 선결조건은 스레드가 아니라 자료구조다</b> — 맵 순회 + 원소마다 RTTI + 원소마다 GetComponent 위에는 어떤 스레딩 전략도 못 얹는다. PhysX 차별점(차량·클로스·조인트·디포머블)을 하나도 안 쓰고 있다는 실측이 Jolt 판정의 근거이고, 결정은 스파이크 벤치(X0)가 한다. AI 스레드 ↔ 물리 데이터 레이스가 보호 없이 열려 있어 트랙 Z는 순서 밖 최우선. 구조 설계는 아래 PhysicsComponentDesign.</div></div>
     <div class="doc"><a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a><span class="tie">PHASE 20</span>
@@ -971,9 +971,9 @@
 <!-- ===== PHASE 17 ===== -->
 <section class="phase" id="phase-17">
   <h2 class="sec"><span class="no">PHASE 17</span>직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리) <span class="phase-pct" data-phase-pct="17"></span></h2>
-  <div class="phase-meta">신설: 2026-08-16 · 설계 문서: <a href="plans/SerializationPlan.md">SerializationPlan.md</a> · 순서 제약: D2·D5는 <a href="plans/SceneGraphRedesignPlan.md">SceneGraph</a> E1·P2 이후 · D5 쿠킹은 PHASE 18의 typed 순회 위에서</div>
+  <div class="phase-meta">신설: 2026-08-16 · 최신 실측: 2026-09-02 · 설계 문서: <a href="plans/SerializationPlan.md">SerializationPlan.md</a> · D6까지 구현 완료 (D3/D5 Release A/B용 Test1·D1 정본 검증기·scene 14 입력은 별도 backlog, D7 선택 중단)</div>
   <div class="phase-goal"><b>목표:</b> 저작 포맷은 YAML 유지, 런타임(Player)은 리플렉션 기반 쿠킹 바이너리(캐시 산출물).
-  <code>.meta</code>는 존치하되 랜덤 GUID + git 추적으로 재정의. Node 추상화 격리가 포맷 전환의 이음새다.</div>
+          <code>.meta</code>는 Editor 저작 identity로 존치하되 Player pak에서는 제외한다. <b>현재:</b> host runtime·Blender 5.1 Infinian/Sponza 2/2·로컬 D0/D1·D2 Strict·AssetCooker가 초록이다. D3-b-4까지 ryml 단일 backend로 전환했고 D4에서 Animator/InputMap/Terrain canonical YAML과 nlohmann 은퇴를 닫았다. legacy JSON 호환 reader는 없으며 구 JSON 31개도 pak에서 제외한다. D5 현존 corpus는 scene 8·prefab 9·material 2 구조 parity를 통과했다. D6은 runtime document 18개와 Derived scene/prefab/material/ShaderMeta 25개를 CEDO1으로 게시하고 PrefabOverride 중첩 값도 <code>CEDO1:&lt;base64&gt;</code>로 cook한다. 최신 Release 스테이지 <code>Dynamic_CPP-bea30cea376f47799ec34d1413645b4a</code>는 pak 469 entry/제외 246, Player <code>catalog=cemf identities=215 metaParsed=0</code>, <code>runtime.text-parser calls=0</code>, direct ryml reference 0, <code>cooked scene docs=1</code>, 120프레임·promotion 2·managed type 25로 통과했다. 정본 D3/D5 Release A/B용 Test1과 scene 14 입력은 아직 복구 전이다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="17"><!-- JS 생성 --></table></div>
 </section>
 
@@ -1865,8 +1865,9 @@ const TASKS = [
     refs: "UtilityFrameworkModernizationPlan §1.2·트랙 U", priority: "P2", days: 2, status: "progress", earnedDays: 0.5,
     note: "부분 진행 — U0의 FileIO.h·Core.Fence.h 제거는 완료했고 DirectXHelper.h는 실제 소비자 15곳으로 생존 재분류했다. U1~U4의 껍데기 헤더·단일 소비자·plf_colony 배치 판정은 남아 있다." },
   { phase: 15, id: "15-H", title: "트랙 H — HashingString 재설계",
-    detail: "해시 문자열 타입의 소유·비교·저장 계약 정리.",
-    refs: "UtilityFrameworkModernizationPlan §1.8·트랙 H", priority: "P2", days: 2, status: "todo", note: "" },
+    detail: "해시 문자열 타입의 소유·비교·저장 계약 정리. mutable data 봉인, 부분 string_view 길이 보존, ==/<=> 일관성, const-ref 읽기, std::hash, 빈 문자열 합법 정책까지 구현.",
+    refs: "UtilityFrameworkModernizationPlan §1.8·트랙 H", priority: "P2", days: 2, status: "progress", earnedDays: 1.75,
+    note: "코드·자동 게이트 완료 — verify-hashing-string Debug/Release 통과, 관련 4개 native 프로젝트 Debug 빌드 통과. CanvasMap 키 전환은 이득 미측정·mutable map 노출 때문에 보류. 남은 수용 게이트는 인스펙터에서 긴 이름 편집→저장→재로드 수동 확인과 대표 충돌 경로 할당 프로파일링." },
   { phase: 15, id: "15-C", title: "트랙 C — 우산 헤더 해체",
     detail: "Core.Minimal 등 우산 헤더의 전이 include 축소. plf_colony 배치 정정 포함. Reflection.hpp 절단은 PHASE 18 CT3가 선행 이행했다.",
     refs: "UtilityFrameworkModernizationPlan §1.7·§1.9·트랙 C", priority: "P2", days: 3, status: "progress", earnedDays: 0.5,
@@ -1891,18 +1892,25 @@ const TASKS = [
   { phase: 16, id: "U6", title: "에디터 정합(누락 2건 포함)", detail: "", refs: "UISystemRedesignPlan U6", priority: "P2", days: 1.5, status: "todo", note: "" },
   { phase: 16, id: "U7", title: "구 시스템 은퇴 + 콘텐츠 이식", detail: "", refs: "UISystemRedesignPlan U7", priority: "P1", days: 2, status: "todo", note: "" },
   // ---------- PHASE 17: 직렬화 이원화 ----------
-  // 신설(2026-08-16). 설계: SerializationPlan.md. 공수는 문서 명기치.
-  { phase: 17, id: "D0", title: "계측 — 기준선 확정", detail: "", refs: "SerializationPlan §4 D0", priority: "P0", days: 0.5, status: "todo", note: "" },
+  // 신설(2026-08-16), 재감사(2026-09-02). D3-b-L 재산정 전이라 공수는 하한.
+  { phase: 17, id: "D0", title: "계측 — 기준선 확정",
+    detail: "Release 단계별 profiler·selfcheck·D0 기준선 수치를 상설 관문으로 두었다.", refs: "SerializationPlan §4 D0", priority: "P0", days: 0.5, status: "done",
+    note: "완료 유지. 정본 관문은 Test1.creator 누락으로 진입 전 실패한다. 별도 로컬 관문은 Release Editor에서 FT_Primitives/Lifecycle3D의 크기·SHA-256을 고정하고 boot 28.364ms, scene 51.261/13.261ms, prefab instantiate 1.323ms, selfcheck 4/4를 통과했다. 로컬 A/B에는 사용 가능하지만 정본 Test1 수치와 비교하지 않는다." },
   { phase: 17, id: "D1", title: "런타임 위생 (Y-3·Y-4)",
-    detail: ".meta를 pak에서 빼면 안 되는 이유가 여기 있다 — 계획 §3.4.", refs: "SerializationPlan §4 D1", priority: "P1", days: 1, status: "todo", note: "" },
+    detail: "Player의 watcher·meta 생성 스캔·Editor link 역행을 막는 계약. .meta 읽기 스캔 제거는 D5 cutover 소유.", refs: "SerializationPlan §4 D1", priority: "P1", days: 1, status: "done",
+    note: "제품 계약은 유지. 별도 로컬 관문은 PowerShell 7.6.4에서 scalar 결과를 배열화하고 C++ 주석을 제거해 code efsw 0/comment-only 1/scan symbol 0, Player 바이너리·DLL 0, Editor 양성 대조군 검출로 통과했다. 정본 verify-player-runtime-hygiene의 .Count/주석 위양성 보수는 별도다." },
   { phase: 17, id: "D2", title: "GUID 정체성 수술 (Y-1·Y-2)",
-    detail: "D2-a catalog fail-closed, D2-b1 UUIDv4/manifest, D2-b2 전수 재발급, D2-c sidecar authority·atomic publication/rename·실제 draw, D2-d scene 14/prefab 9/material 2 전수 authoring corpus를 모두 닫았다. 기존 GUID 호환과 path-v5 fallback은 없다.", refs: "SerializationPlan §4 D2", priority: "P0", days: 2, status: "done", note: "완료(2026-08-29): manifest v3 assets/regenerate 226, references 431, 254 files/14 binary 적용. live corpus UUIDv4 226/non-v4 0/invalid·missing·duplicate 0이다. 프로젝트 분리 전 Git은 Prim/추적 FBX·BaseColor·Forward material·ShaderMeta·IBL의 명시적 clean-checkout target/meta 폐포 38개만 추적하고, 일반 sidecar 70개와 local target/meta 118쌍은 ignore한다. Strict gate는 `git add -f`로 ignore된 meta를 강제 추가하면 tracked-meta-policy-violation으로 거부하며 violation/required/orphan 0, d2Ready=true다. sidecar가 정본이고 payload GUID는 최초 publication hint 이후 mirror다. GUID rename과 FT_Primitives 실제 DX12 draw(candidate 8/light 1/draw 8/upload 8) 통과. scene 14는 load/save 28/28·2회 hash 불일치 0, prefab 9는 entity 13/override 1/등록 11 digest 보존, material 2는 sidecar identity·ShaderMeta 2·texture ref 0·canonical payload 보존을 통과했다. 세 corpus gate와 strict 계약은 run-all에 편입했다. VS18/v145 Debug x64 CreatorEditor·Player 성공." },
-  { phase: 17, id: "D3", title: "Node 추상화 격리 (Y-6)",
-    detail: "포맷 전환의 이음새이자 독립 가치.", refs: "SerializationPlan §3.3·D3", priority: "P1", days: 3, status: "todo", note: "" },
-  { phase: 17, id: "D4", title: "JSON 트랙 정리 (Y-5·Y-7)", detail: "", refs: "SerializationPlan §3.5·D4", priority: "P2", days: 2, status: "todo", note: "" },
+    detail: "schema v4 selective transaction이 canonical v4는 보존하고 non-canonical sidecar만 재발급한다.", refs: "SerializationPlan §4 D2·§1.8", priority: "P0", days: 2, status: "progress", earnedDays: 2,
+    note: "로컬 재이주 완료: preserve 154/regenerate 61, 64파일·참조 76건 적용. Strict meta/parsed 215/215, UUIDv4 215, invalid/non-v4/missing/duplicate/policy violation 0, d2Ready=true. AssetCooker, prefab 9, material 2, 현존 scene 8 왕복 초록. 정본 완료 기준 scene 14 입력 복구는 별도라 done으로 올리지 않는다." },
+  { phase: 17, id: "D3", title: "Document/Archive 경계 + ryml backend (Y-6)",
+    detail: "D3-b-4까지 읽기·쓰기·장기 Document를 단일 ryml backend로 전환했다. 구현은 완료됐고 정본 D0 동일 workload Release A/B만 남았다.", refs: "SerializationPlan §3.3·D3", priority: "P1", days: 4, status: "progress", earnedDays: 4,
+    note: "Document::Impl 지연 WriteDocument 소유, DocumentAccess ReadNode/WriteNode, NodeView ryml {Tree,id} 2워드. migration probe/escape와 Reflection backend overload 삭제, strict RFC4648 Base64 도입. 은퇴 게이트: C++ 832파일 yaml-cpp include/symbol 0, manifest/runtime packaging 0, Editor PE import 0. Debug Editor build, Base64 Debug/Release, reflection 77/77, node equality 14/14, LF 259/259, material 2/2, scene 8개 16/16, prefab 9/9·중첩·roundtrip, BT·asset ownership 초록. Test1.creator 부재로 정본 Release A/B는 보류." },
+  { phase: 17, id: "D4", title: "JSON 트랙 정리 (Y-5·Y-7)", detail: "Animator scene YAML 단일 진실, InputMap/Terrain schemaVersion 1 YAML 직접 이주, ISerializable·nlohmann 완전 제거.", refs: "SerializationPlan §3.5·D4", priority: "P2", days: 2, status: "done",
+    note: "완료. legacy JSON reader/dual-write는 요구대로 만들지 않았다. Animator graph/링크 roundtrip, InputMap 6 maps·26 actions·104 keys, Terrain 2x2 height/layer transaction, asset ownership, nlohmann/yaml-cpp retirement, Debug Editor build 초록. nlohmann source·manifest·installed package 0." },
   { phase: 17, id: "D5", title: "쿠킹 바이너리 + pak 매니페스트",
-    detail: "D5-a checked writer, D5-b1 model subasset UUIDv4/CEMF, D5-b2a 단일 model 원자 게시, D5-b2b1 model 14개 전수 identity/Cook과 D5-b2b2 build/AssetPacker/pak까지 완료됐다. 다음은 D5-b2c 나머지 producer → D5-c Player manifest load → D5-d 전수 parity·성능·실플레이다.", refs: "SerializationPlan §3.2·§3.6·D5", priority: "P1", days: 4, status: "progress", note: "진행(2026-08-29): model 14/material 52/embedded texture 96의 canonical UUIDv4 identity와 CEMC 14 + CEMF 1/entry 66 전수 Cook을 닫았다. CEMC는 asset-relative provenance만 직렬화해 서로 다른 staging 위치에서도 같은 tree hash를 만든다. build.ps1은 InputMode base snapshot을 AssetCooker에 넘겨 Generated/Assets/Derived를 만들고 Merged에 overlay한 뒤 pak에 넣는다. Debug/Project/SkipVerify 실제 패키지는 CEMC 17,752,200B/CEMF 10,030B, generated 16, pak 529 entries/510,108,259B였고 AssetPacker reopen/index 검증을 통과했다. VS18/v145 Debug x64 AssetCooker·AssetPacker·Player는 경고/오류 0이다. texture/ShaderMeta/scene/prefab producer와 Player manifest 소비는 미배선이라 D5 전체 완료가 아니다." },
-  { phase: 17, id: "D6", title: "Player 텍스트 경로 은퇴", detail: "", refs: "SerializationPlan §4 D6", priority: "P1", days: 1, status: "todo", note: "" },
+    detail: "D5 현 로컬 corpus 완료: CEMF v2 source identity, model/texture/document cooked 소비, scene 8·prefab 9·material 2 구조 parity를 닫았다.", refs: "SerializationPlan §3.2·§3.6·D5", priority: "P1", days: 4, status: "progress",
+    note: "Release Project package 실측: source identities 215, Player catalog=cemf/metaParsed=0, cooked scene docs=1, 120프레임·promotion 2·managed type 25. document gate는 scene 8/prefab 9/material 2, CLI 19/19, source/meta mutation 0을 단정한다. catalog gate는 mounted model 8/8+texture 1/1 cooked, stale 1개만 fallback, unmounted 8/8 source다. 정본 Test1 성능 대조와 누락 scene 6개 확장만 backlog다." },
+          { phase: 17, id: "D6", title: "Player 텍스트 경로 은퇴", detail: "CEDO1으로 설정·InputMap·BT/BlackBoard·Volume와 scene/prefab/material/ShaderMeta runtime payload를 게시하고 Player text parser 호출 0을 계측한다.", refs: "SerializationPlan §4 D6", priority: "P1", days: 1, status: "done", note: "완료(2026-09-02). 최초 parser 12건(설정 3/InputMap 6/scene 1/memory 2)을 CEDO로 전환하고 PrefabOverride nested value도 CEDO envelope로 cook했다. 최신 stage bea30cea: runtime docs 18, Derived docs 25, pak 469/excluded 246, calls=0, direct ryml reference=0, legacy JSON=0, cooked scene docs=1. 구 YAML artifact/JSON 호환 reader는 두지 않는다." },
   { phase: 17, id: "D7", title: "에디터 웜 캐시 (선택)",
     detail: "에디터 열기 비용에서 authoring parse가 실제 병목일 때만 도입한다.", refs: "SerializationPlan §4 D7", priority: "P3", days: 1, status: "stopped",
     note: "중단 — 제품 정합성에 필요하지 않은 선택 최적화다. D0~D6 이후 프로젝트 open profile에서 텍스트 parse 비용이 목표 예산을 넘을 때만 캐시 무효화 계약과 함께 재개한다." },

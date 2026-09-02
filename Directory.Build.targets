@@ -97,8 +97,8 @@
           AfterTargets="Build"
           Condition="'$(MSBuildProjectName)' == 'CreatorEditor' or '$(MSBuildProjectName)' == 'Player'">
     <PropertyGroup>
-      <_EngineFmodRuntime Condition="'$(Configuration)' == 'Debug'">$(SolutionDir)ThirdParty\Fmod\bin\x64\fmodL.dll</_EngineFmodRuntime>
-      <_EngineFmodRuntime Condition="'$(Configuration)' != 'Debug'">$(SolutionDir)ThirdParty\Fmod\bin\x64\fmod.dll</_EngineFmodRuntime>
+      <_EngineFmodRuntime Condition="'$(Configuration)' == 'Debug'">$(SolutionDir)ThirdParty\Fmod\lib\x64\fmodL.dll</_EngineFmodRuntime>
+      <_EngineFmodRuntime Condition="'$(Configuration)' != 'Debug'">$(SolutionDir)ThirdParty\Fmod\lib\x64\fmod.dll</_EngineFmodRuntime>
       <_EnginePhysXGpuRuntime Condition="'$(Configuration)' == 'Debug'">$(_ZVcpkgCurrentInstalledDir)debug\bin\PhysXGpu_64.dll</_EnginePhysXGpuRuntime>
       <_EnginePhysXGpuRuntime Condition="'$(Configuration)' != 'Debug'">$(_ZVcpkgCurrentInstalledDir)bin\PhysXGpu_64.dll</_EnginePhysXGpuRuntime>
       <_EnginePhysXDeviceRuntime Condition="'$(Configuration)' == 'Debug'">$(_ZVcpkgCurrentInstalledDir)debug\bin\PhysXDevice64.dll</_EnginePhysXDeviceRuntime>

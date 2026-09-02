@@ -236,9 +236,6 @@
     <ClCompile Include="ComponentFactory.cpp">
       <Filter>Classes\Components\ComponentFactory</Filter>
     </ClCompile>
-    <ClCompile Include="ConditionParameter.cpp">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClCompile>
     <ClCompile Include="DecalComponent.cpp">
       <Filter>Classes\Components\DecalComponent</Filter>
     </ClCompile>
@@ -576,9 +573,6 @@
     </ClInclude>
     <ClInclude Include="IScriptedFSM.h">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
-    </ClInclude>
-    <ClInclude Include="ISerializable.h">
-      <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="KeyArray.h">
       <Filter>Managers\InputManager\Helper</Filter>

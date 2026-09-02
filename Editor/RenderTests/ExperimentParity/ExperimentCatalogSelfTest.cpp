@@ -102,6 +102,9 @@ namespace RenderTest
             { texture }));
         manifest.entries.push_back(MakeEntry(texture, ck::CookedAssetKind::Texture,
             "Derived/Textures/44/44444444-4444-4444-8444-444444444444.png"));
+        manifest.sourceAssets.push_back({ model, "Models/Probe.glb" });
+        manifest.sourceAssets.push_back({ scene, "Scenes/Probe.creator" });
+        manifest.sourceAssets.push_back({ texture, "Textures/Probe.png" });
 
         const ck::AssetManifestWriteResult written =
             ck::WriteAssetManifest(manifest);
@@ -115,12 +118,16 @@ namespace RenderTest
         check.Check(issues.empty(), "정상 CEMF 는 issue 가 없어야 한다");
         check.Check(!catalog.IsEmpty(), "catalog 가 비면 안 된다");
         check.Check(catalog.Size() == 4u, "entry 수");
+        check.Check(catalog.SourceAssetCount() == 3u, "source identity 수");
         check.Check(catalog.Find(scene) != nullptr, "scene 조회");
         check.Check(catalog.Find(absent) == nullptr, "없는 GUID 는 null");
         check.Check(catalog.CountOfKind(ck::CookedAssetKind::Texture) == 1u,
             "kind 별 계수");
         check.Check(catalog.CountOfKind(ck::CookedAssetKind::Prefab) == 0u,
             "없는 kind 는 0");
+        check.Check(catalog.ResolveSourcePath(scene) ==
+            std::filesystem::path("C:/probe/Assets/Scenes/Probe.creator"),
+            "source GUID가 package Assets 경로로 해석된다");
 
         // artifact 경로가 derivedRoot 아래로 붙는가.
         const std::filesystem::path resolved = catalog.ResolveArtifactPath(texture);
@@ -281,6 +288,8 @@ namespace RenderTest
         std::vector<ck::AssetManifestIssue> reread;
         check.Check(ck::ReadAssetManifest(bytes, manifest, reread),
             "GUID 열거를 위한 재판독");
+        check.Check(!manifest.sourceAssets.empty(),
+            "실 CEMF에 source identity table이 있어야 한다");
 
         std::size_t resolvedArtifacts = 0u;
         std::size_t verifiedBytes = 0u;

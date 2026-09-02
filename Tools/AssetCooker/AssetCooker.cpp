@@ -6,7 +6,11 @@
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
 #include "ModelIdentityRefresher.h"
+#include "AuthoringCookedDocument.h"
+#include "AuthoringNodeEquality.h"
+#include "AuthoringParsedDocument.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
@@ -21,6 +25,11 @@
 #include <utility>
 #include <vector>
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+
 namespace
 {
     namespace ck = experiment::cooked;
@@ -31,11 +40,13 @@ namespace
         {
             Cook,
             RefreshModelIdentities,
+            CompileRuntimeDocuments,
         };
 
         Mode mode{ Mode::Cook };
         std::filesystem::path assetRoot{};
         std::filesystem::path outputRoot{};
+        std::filesystem::path runtimeRoot{};
         std::vector<std::filesystem::path> models{};
         std::vector<std::filesystem::path> textures{};
         std::vector<std::filesystem::path> shaderMetas{};
@@ -49,7 +60,9 @@ namespace
             << "Usage: AssetCooker --asset-root <Assets> --output <new-dir> "
                "[--model <source> ...] [--texture <source> ...] [--shadermeta <source> ...] [--material <source> ...] [--scene <source> ...]\n"
             << "       AssetCooker --refresh-model-identities "
-               "--asset-root <Assets> --model <source> [--model <source> ...]\n";
+               "--asset-root <Assets> --model <source> [--model <source> ...]\n"
+            << "       AssetCooker --compile-runtime-documents "
+               "--runtime-root <package-input-root>\n";
     }
 
     [[nodiscard]] bool ParseArguments(int argc, wchar_t** argv,
@@ -65,12 +78,22 @@ namespace
             }
             if (option == L"--refresh-model-identities")
             {
-                if (out.mode == Arguments::Mode::RefreshModelIdentities)
+                if (out.mode != Arguments::Mode::Cook)
                 {
-                    failure = "--refresh-model-identities는 한 번만 지정할 수 있다.";
+                    failure = "AssetCooker mode는 하나만 지정할 수 있다.";
                     return false;
                 }
                 out.mode = Arguments::Mode::RefreshModelIdentities;
+                continue;
+            }
+            if (option == L"--compile-runtime-documents")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker mode는 하나만 지정할 수 있다.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::CompileRuntimeDocuments;
                 continue;
             }
             if (index + 1 >= argc)
@@ -97,6 +120,15 @@ namespace
                     return false;
                 }
                 out.outputRoot = value;
+            }
+            else if (option == L"--runtime-root")
+            {
+                if (!out.runtimeRoot.empty())
+                {
+                    failure = "--runtime-root는 한 번만 지정할 수 있다.";
+                    return false;
+                }
+                out.runtimeRoot = value;
             }
             else if (option == L"--model")
             {
@@ -127,9 +159,32 @@ namespace
             }
         }
 
+        if (out.mode == Arguments::Mode::CompileRuntimeDocuments)
+        {
+            if (out.runtimeRoot.empty())
+            {
+                failure = "runtime document compile에는 --runtime-root가 필요하다.";
+                return false;
+            }
+            if (!out.assetRoot.empty() || !out.outputRoot.empty()
+                || !out.models.empty() || !out.textures.empty()
+                || !out.shaderMetas.empty() || !out.materials.empty()
+                || !out.scenes.empty())
+            {
+                failure = "runtime document compile에는 cook/identity option을 섞을 수 없다.";
+                return false;
+            }
+            return true;
+        }
+
         if (out.assetRoot.empty())
         {
             failure = "--asset-root가 필요하다.";
+            return false;
+        }
+        if (!out.runtimeRoot.empty())
+        {
+            failure = "--runtime-root는 runtime document compile 전용이다.";
             return false;
         }
         // identity refresh는 model 전용 경계다. texture sidecar는 authoring
@@ -252,6 +307,219 @@ namespace
             failure = "검증할 파일을 완전히 읽지 못했다: " + path.string();
             return false;
         }
+        return true;
+    }
+
+    [[nodiscard]] bool IsRuntimeTextDocument(
+        const std::filesystem::path& root, const std::filesystem::path& path)
+    {
+        std::error_code error;
+        const std::filesystem::path relative =
+            std::filesystem::relative(path, root, error);
+        if (error || relative.empty() || relative.is_absolute()) return false;
+        const std::string virtualPath = relative.generic_string();
+        const std::string extension = path.extension().string();
+        if (virtualPath.starts_with("ProjectSetting/") && extension == ".asset")
+            return true;
+        if (!virtualPath.starts_with("Assets/")) return false;
+        return extension == ".inputmap" || extension == ".bt"
+            || extension == ".blackboard" || extension == ".volume"
+            || extension == ".terrain" || extension == ".foliage";
+    }
+
+    [[nodiscard]] int CompileRuntimeDocuments(const Arguments& arguments)
+    {
+        std::error_code error;
+        const std::filesystem::path root =
+            std::filesystem::weakly_canonical(arguments.runtimeRoot, error);
+        if (error || !std::filesystem::is_directory(root, error)
+            || !std::filesystem::is_directory(root / "Assets", error)
+            || !std::filesystem::is_directory(root / "ProjectSetting", error))
+        {
+            std::cerr << "asset-cooker error: runtime root가 package input tree가 아니다.\n";
+            return 2;
+        }
+
+        std::vector<std::filesystem::path> paths;
+        error.clear();
+        for (const std::filesystem::directory_entry& item :
+            std::filesystem::recursive_directory_iterator(root,
+                std::filesystem::directory_options::skip_permission_denied, error))
+        {
+            if (error) break;
+            if (item.is_regular_file(error) && !error
+                && IsRuntimeTextDocument(root, item.path()))
+            {
+                paths.push_back(item.path());
+            }
+            error.clear();
+        }
+        if (error || paths.empty())
+        {
+            std::cerr << "asset-cooker error: runtime document corpus를 열거하지 못했거나 0개다.\n";
+            return 3;
+        }
+        std::ranges::sort(paths);
+
+        struct Encoded final
+        {
+            std::filesystem::path path;
+            std::vector<std::byte> bytes;
+        };
+        std::vector<Encoded> encoded;
+        encoded.reserve(paths.size());
+        std::uint64_t totalBytes{};
+        for (const std::filesystem::path& path : paths)
+        {
+            std::string parseError;
+            const Authoring::ParsedDocument source =
+                Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+            if (!source)
+            {
+                std::cerr << "asset-cooker error: runtime document parse 실패: "
+                    << path << " (" << parseError << ")\n";
+                return 3;
+            }
+
+            Encoded item;
+            item.path = path;
+            std::string encodeError;
+            if (!Authoring::EncodeCookedDocument(
+                source.Root(), item.bytes, encodeError))
+            {
+                std::cerr << "asset-cooker error: runtime document encode 실패: "
+                    << path << " (" << encodeError << ")\n";
+                return 3;
+            }
+            std::string decodeError;
+            const auto restored = Authoring::DecodeCookedDocument(
+                item.bytes, decodeError);
+            if (!restored || !Authoring::NodesEqual(
+                source.Root(), restored->Root()))
+            {
+                std::cerr << "asset-cooker error: runtime document parity 실패: "
+                    << path << " (" << decodeError << ")\n";
+                return 3;
+            }
+            totalBytes += item.bytes.size();
+            encoded.push_back(std::move(item));
+        }
+
+        std::size_t index{};
+        for (const Encoded& item : encoded)
+        {
+            std::filesystem::path temporary = item.path;
+            temporary += ".cedo-tmp-" + std::to_string(_getpid())
+                + "-" + std::to_string(index++);
+            std::string writeError;
+            if (!WriteBinaryFile(temporary, item.bytes, writeError))
+            {
+                std::cerr << "asset-cooker error: " << writeError << '\n';
+                return 4;
+            }
+            if (!MoveFileExW(temporary.c_str(), item.path.c_str(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+            {
+                const DWORD moveError = GetLastError();
+                std::filesystem::remove(temporary, error);
+                std::cerr << "asset-cooker error: runtime document replace 실패: "
+                    << item.path << " (win32=" << moveError << ")\n";
+                return 4;
+            }
+        }
+
+        std::cout << "asset-cooker runtime-documents=" << encoded.size()
+            << " bytes=" << totalBytes
+            << " format=CEDO" << Authoring::kCookedDocumentVersion << '\n';
+        return 0;
+    }
+
+    [[nodiscard]] bool BuildSourceIdentityTable(
+        const std::filesystem::path& assetRoot,
+        std::vector<ck::AssetSourceManifestEntry>& outEntries,
+        std::string& failure)
+    {
+        std::vector<std::filesystem::path> sidecars;
+        std::error_code error;
+        std::filesystem::recursive_directory_iterator iterator(
+            assetRoot, std::filesystem::directory_options::skip_permission_denied,
+            error);
+        const std::filesystem::recursive_directory_iterator end;
+        if (error)
+        {
+            failure = "source identity sidecar를 열거할 수 없다: " + error.message();
+            return false;
+        }
+        for (; iterator != end; iterator.increment(error))
+        {
+            if (error)
+            {
+                failure = "source identity sidecar 열거가 끊겼다: " + error.message();
+                return false;
+            }
+            if (iterator->is_regular_file(error) && !error
+                && iterator->path().extension() == ".meta")
+            {
+                sidecars.push_back(iterator->path());
+            }
+            error.clear();
+        }
+        std::ranges::sort(sidecars);
+
+        std::vector<ck::AssetSourceManifestEntry> entries;
+        entries.reserve(sidecars.size());
+        for (const std::filesystem::path& sidecar : sidecars)
+        {
+            std::filesystem::path source = sidecar;
+            source.replace_extension();
+            if (!std::filesystem::is_regular_file(source, error) || error)
+            {
+                failure = "sidecar target source가 없다: " + source.string();
+                return false;
+            }
+
+            const std::filesystem::path relative =
+                std::filesystem::relative(source, assetRoot, error);
+            if (error || relative.empty() || relative.is_absolute())
+            {
+                failure = "source path를 Assets root에 상대화할 수 없다: "
+                    + source.string();
+                return false;
+            }
+            const std::u8string relativeU8 = relative.generic_u8string();
+            const std::string sourcePath(relativeU8.begin(), relativeU8.end());
+
+            std::string parseError;
+            const Authoring::ParsedDocument document =
+                Authoring::ParsedDocument::ParseFile(sidecar.string(), parseError);
+            if (!document)
+            {
+                failure = "source sidecar parse 실패: " + sidecar.string()
+                    + " (" + parseError + ")";
+                return false;
+            }
+            const Authoring::ReadNode guidNode = document.Root()["guid"];
+            experiment::AssetId assetId;
+            if (!guidNode || !guidNode.IsScalar()
+                || !experiment::TryParseCanonicalAssetId(
+                    guidNode.AsString(), assetId))
+            {
+                failure = "source sidecar GUID가 canonical UUIDv4가 아니다: "
+                    + sidecar.string();
+                return false;
+            }
+
+            entries.push_back(ck::AssetSourceManifestEntry{
+                assetId, sourcePath });
+        }
+        if (entries.empty())
+        {
+            failure = "source identity sidecar가 0개다.";
+            return false;
+        }
+
+        outEntries = std::move(entries);
+        failure.clear();
         return true;
     }
 
@@ -520,6 +788,14 @@ namespace
             sceneProducts.push_back(std::move(product));
         }
 
+        std::string sourceIdentityFailure;
+        if (!BuildSourceIdentityTable(assetRoot, manifest.sourceAssets,
+            sourceIdentityFailure))
+        {
+            std::cerr << "asset-cooker error: " << sourceIdentityFailure << '\n';
+            return 3;
+        }
+
         const ck::AssetManifestWriteResult manifestWrite =
             ck::WriteAssetManifest(manifest);
         if (!manifestWrite.Succeeded())
@@ -718,7 +994,8 @@ namespace
         std::vector<ck::AssetManifestIssue> manifestIssues;
         if (!ck::ReadAssetManifest(persistedManifest,
             restoredManifest, manifestIssues)
-            || restoredManifest.entries.size() != manifest.entries.size())
+            || restoredManifest.entries.size() != manifest.entries.size()
+            || restoredManifest.sourceAssets.size() != manifest.sourceAssets.size())
         {
             std::cerr << "asset-cooker error: 게시 전 CEMF 재검증이 실패했다.\n";
             return 5;
@@ -993,6 +1270,7 @@ namespace
             << " artifactPaths=" << closureArtifactPaths
             << " files=" << closureSweptFiles
             << " manifestEntries=" << manifest.entries.size()
+            << " sourceIdentities=" << manifest.sourceAssets.size()
             << " artifactBytes=" << totalArtifactBytes
             << " textureBytes=" << totalTextureBytes
             << " shaderMetaBytes=" << totalShaderMetaBytes
@@ -1045,5 +1323,7 @@ int wmain(int argc, wchar_t** argv)
             << " embeddedTextures=" << summary.embeddedTextures << '\n';
         return 0;
     }
+    if (arguments.mode == Arguments::Mode::CompileRuntimeDocuments)
+        return CompileRuntimeDocuments(arguments);
     return Run(arguments);
 }

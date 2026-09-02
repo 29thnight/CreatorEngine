@@ -30,7 +30,7 @@ public:
     // D3-a-3c: 정의는 Prefab.cpp에 있다. 문서 소유 타입을 헤더에서 풀지 않기
     // 위해서다 — 인라인으로 두면 이 헤더가 `AuthoringDocumentAccess.h`를
     // include해야 하고, 그러면 소유자 헤더가 다시 포맷을 알게 된다.
-    const MetaYml::Node& GetPrefabData() const;
+    Authoring::ReadNode GetPrefabData() const;
     void SetPrefabData(const Authoring::NodeView& node);
     FileGuid GetFileGuid() const { return m_fileGuid; }
     void SetFileGuid(const FileGuid& guid) { m_fileGuid = guid; }
@@ -51,16 +51,18 @@ private:
     // ownerPrefabGuid: 지금 굽고 있는 프리팹이 "자기 것"으로 보는 guid. 자식의
     // m_prefabFileGuid가 이 값과 다르고 유효하면 그 자식은 **다른 프리팹의
     // 인스턴스 루트**이므로 펼치지 않고 참조 노드로 굽는다(P4-b).
-    static MetaYml::Node SerializeRecursive(const Entity* obj, FileGuid ownerPrefabGuid);
+    static void SerializeRecursive(const Entity* obj, FileGuid ownerPrefabGuid,
+		Authoring::WriteNode outNode);
 
     // 중첩 인스턴스를 {정의 GUID + 오버라이드}로 굽는다 (P4-b). Entity 필드는
     // 그대로 싣고(m_name·m_tag·m_prefabOverrides 등) m_components와 children만
     // 뺀다 — 그 둘은 소환 시점에 정의에서 온다.
-    static MetaYml::Node SerializeNestedReference(const Entity* obj);
+    static void SerializeNestedReference(const Entity* obj,
+		Authoring::WriteNode outNode);
 
     // 참조 노드를 해석해 그 자리에 중첩 프리팹의 **현재 정의**를 인스턴스화한다.
     // 실패하면 nullptr을 돌려주고 호출자가 로그를 남긴다.
-    Entity* InstantiateNestedReference(const MetaYml::Node& node,
+    Entity* InstantiateNestedReference(const Authoring::ReadNode& node,
                                        Scene* scene,
                                        Entity::Index parent) const;
 
@@ -68,7 +70,7 @@ private:
     // 자식) 물려받을 값 — 호출자(부모 프레임)의 확정된 guid다. 최상위 호출
     // (parent==0, Instantiate()가 최초로 넘기는 자리)에서는 무시되고 항상
     // GetFileGuid()로 고정된다(P4-a, Prefab.cpp InstantiateRecursive 본문 주석 참고).
-    Entity* InstantiateRecursive(const MetaYml::Node& node,
+    Entity* InstantiateRecursive(const Authoring::ReadNode& node,
                                      Scene* scene,
                                      Entity::Index parent,
 	                                 InstantiateContext& context,

@@ -43,86 +43,93 @@ namespace Meta::Typed
 {
     // ── 스칼라 emitter — ToYamlScalar 특수화의 typed 등가물 ────────────────
 
-    inline MetaYml::Node MakeFlowMap2(const char* k0, float v0, const char* k1, float v1)
+    inline void EmitFlowMap2(Authoring::WriteNode node,
+        const char* k0, float v0, const char* k1, float v1)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n[k0] = v0;
-        n[k1] = v1;
-        return n;
+        node.SetMap(true);
+        node.Child(k0).SetScalar(v0);
+        node.Child(k1).SetScalar(v1);
     }
 
-    inline MetaYml::Node MakeFlowMap3(float x, float y, float z)
+    inline void EmitFlowMap3(Authoring::WriteNode node, float x, float y, float z)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n["x"] = x; n["y"] = y; n["z"] = z;
-        return n;
+        node.SetMap(true);
+        node.Child("x").SetScalar(x);
+        node.Child("y").SetScalar(y);
+        node.Child("z").SetScalar(z);
     }
 
-    inline MetaYml::Node MakeFlowMap4(float x, float y, float z, float w)
+    inline void EmitFlowMap4(Authoring::WriteNode node,
+        float x, float y, float z, float w)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n["x"] = x; n["y"] = y; n["z"] = z; n["w"] = w;
-        return n;
+        node.SetMap(true);
+        node.Child("x").SetScalar(x);
+        node.Child("y").SetScalar(y);
+        node.Child("z").SetScalar(z);
+        node.Child("w").SetScalar(w);
     }
 
-    // 기본 산술·문자열 — yaml-cpp convert 직결 (레거시 기본 템플릿과 동일 식)
+    // 기본 산술·문자열 — WriteNode의 canonical scalar writer.
     template<class T>
         requires (std::is_arithmetic_v<T> && !std::is_enum_v<T>)
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const T& v) { node[name] = v; }
-
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const std::string& v) { node[name] = v; }
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const HashingString& v) { node[name] = v.ToString(); }
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const HashedGuid& v) { node[name] = v.m_ID_Data; }
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const file::path& v) { node[name] = v.string(); }
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const FileGuid& v) { node[name] = v.ToString(); }
-
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector2& v)
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const T& v)
     {
-        node[name] = MakeFlowMap2("x", v.x, "y", v.y);
+        node.Child(name).SetScalar(v);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector3& v)
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const std::string& v) { node.Child(name).SetScalar(v); }
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const HashingString& v) { node.Child(name).SetScalar(v.ToString()); }
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const HashedGuid& v) { node.Child(name).SetScalar(v.m_ID_Data); }
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const file::path& v) { node.Child(name).SetScalar(v.string()); }
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const FileGuid& v) { node.Child(name).SetScalar(v.ToString()); }
+
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::vector2& v)
     {
-        node[name] = MakeFlowMap3(v.x, v.y, v.z);
+        EmitFlowMap2(node.Child(name), "x", v.x, "y", v.y);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::color& v)
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::vector3& v)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n["r"] = v.r; n["g"] = v.g; n["b"] = v.b; n["a"] = v.a;
-        node[name] = n;
+        EmitFlowMap3(node.Child(name), v.x, v.y, v.z);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::vector4& v)
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::color& v)
     {
-        node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
+        auto child = node.Child(name);
+        child.SetMap(true);
+        child.Child("r").SetScalar(v.r);
+        child.Child("g").SetScalar(v.g);
+        child.Child("b").SetScalar(v.b);
+        child.Child("a").SetScalar(v.a);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::quaternion& v)
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::vector4& v)
     {
-        node[name] = MakeFlowMap4(v.x, v.y, v.z, v.w);
+        EmitFlowMap4(node.Child(name), v.x, v.y, v.z, v.w);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::rect& v)
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::quaternion& v)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
-        n["x"] = v.x; n["y"] = v.y; n["width"] = v.width; n["height"] = v.height;
-        node[name] = n;
+        EmitFlowMap4(node.Child(name), v.x, v.y, v.z, v.w);
     }
 
-    inline void EmitScalar(MetaYml::Node& node, const char* name, const math::matrix4x4& v)
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::rect& v)
     {
-        MetaYml::Node n;
-        n.SetStyle(MetaYml::EmitterStyle::Flow);
+        auto child = node.Child(name);
+        child.SetMap(true);
+        child.Child("x").SetScalar(v.x);
+        child.Child("y").SetScalar(v.y);
+        child.Child("width").SetScalar(v.width);
+        child.Child("height").SetScalar(v.height);
+    }
+
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::matrix4x4& v)
+    {
+        auto child = node.Child(name);
+        child.SetSequence(true);
         for (int row = 0; row < 4; ++row)
             for (int column = 0; column < 4; ++column)
-                n.push_back(v.m[row][column]);
-        node[name] = n;
+                child.Append().SetScalar(v.m[row][column]);
     }
 
     // 정확 타입 목록 — 오버로드 가시성(requires{EmitScalar(...)})으로 정의하면
@@ -153,21 +160,16 @@ namespace Meta::Typed
     // 이유가 이것이다 — 파서만 바꾸면 `010`이 8에서 10이 되고 `1.5x`가 실패에서
     // 1.5가 되는 식으로 조용히 갈린다(실측 21건).
     //
-    // ★ **실패 경로는 yaml-cpp에 남겨 둔다.** 변환기가 실패하면 `as<T>()`를 불러
-    //   그대로 던지게 한다. 변환기와 yaml-cpp가 성공 판정에서 일치함은 게이트가
-    //   전수(67케이스) 단정하므로, 이 경로는 **yaml-cpp도 실패할 때만** 돈다 —
-    //   즉 예외 타입과 메시지가 이전과 완전히 같다. 1b가 실패 표현을 정하면 이
-    //   폴백이 사라진다.
+    // ★ 실패 경로도 `ReadNode::As<T>()`가 소유한다. 문자열 변환이 실패하면 backend
+    //   예외에 기대지 않고 저작 경계의 일정한 `runtime_error`로 보고한다.
     namespace ScalarDetail
     {
-        // ★ 널 노드는 문자열 "null"이다(yaml-cpp `as<std::string>` 실측).
-        //   이것은 변환이 아니라 **노드->원문 추출**의 규칙이고, ryml 쪽에서는
-        //   `val_is_null()`로 같은 규칙을 세워야 한다.
+        // ★ 널 노드는 문자열 "null"이다. 이것은 변환이 아니라
+        //   **노드->원문 추출**의 규칙이며 `ReadNode::Scalar()`가 소유한다.
         inline bool RawScalar(const Authoring::ReadNode& n, std::string& out)
         {
             if (!n) return false;
-            // 널 규칙과 스칼라 판정은 어댑터가 소유한다 — 두 backend가 같은
-            // 답을 내야 하는 지점이라 한 곳에 둔다.
+            // 널 규칙과 스칼라 판정은 단일 읽기 경계가 소유한다.
             const std::string_view raw = n.Scalar();
             if (raw.empty() && !n.IsNull() && !n.IsScalar()) return false;
             out.assign(raw);
@@ -182,28 +184,20 @@ namespace Meta::Typed
             return Authoring::Scalar::TryConvert(raw, out);
         }
 
-        // 변환기를 태우고, 실패하면 yaml-cpp가 그대로 던지게 한다.
-        // 두 backend가 같은 값을 내는 지점을 한 곳으로 모은다.
-        template<class T>
-        inline T ConvertOrThrow(const Authoring::ReadNode& n)
-        {
-            std::string raw;
-            T value{};
-            if (RawScalar(n, raw) && TryConvert(raw, value)) return value;
-            return n.BackendNodeDuringTransition().as<T>();
-        }
+		// 변환기를 태우고 실패 표현까지 ReadNode 경계에서 통일한다.
+		template<class T>
+		inline T ConvertOrThrow(const Authoring::ReadNode& n)
+		{
+			return n.As<T>();
+		}
 
         inline std::string StringOf(const Authoring::ReadNode& n)
         {
-            std::string raw;
-            if (RawScalar(n, raw)) return raw;
-            return n.BackendNodeDuringTransition().as<std::string>();
+			return n.AsStringChecked();
         }
     }
 
-    // ★ `char` 계열은 변환기를 태우지 않는다. yaml-cpp `as<char>`는 숫자가 아니라
-    //   **문자 하나**를 읽으므로 의미가 다르다. 이 저장소에 그런 필드는 없지만,
-    //   생기면 조용히 달라지는 대신 기존 경로를 그대로 타게 둔다.
+    // ★ `char` 계열은 일반 산술 변환기와 의미가 다르므로 별도 경로를 유지한다.
     template<class T>
         requires (std::is_arithmetic_v<T> && !std::is_enum_v<T>
             && !std::is_same_v<std::remove_cv_t<T>, char>
@@ -211,21 +205,14 @@ namespace Meta::Typed
             && !std::is_same_v<std::remove_cv_t<T>, unsigned char>)
     inline void ReadScalar(const Authoring::ReadNode& n, T& out)
     {
-        std::string raw;
-        T value{};
-        if (ScalarDetail::RawScalar(n, raw) && ScalarDetail::TryConvert(raw, value))
-        {
-            out = value;
-            return;
-        }
-        out = n.BackendNodeDuringTransition().as<T>();
+		out = n.As<T>();
     }
 
     template<class T>
         requires (std::is_same_v<std::remove_cv_t<T>, char>
             || std::is_same_v<std::remove_cv_t<T>, signed char>
             || std::is_same_v<std::remove_cv_t<T>, unsigned char>)
-    inline void ReadScalar(const Authoring::ReadNode& n, T& out) { out = n.BackendNodeDuringTransition().as<T>(); }
+	inline void ReadScalar(const Authoring::ReadNode& n, T& out) { out = n.As<T>(); }
 
     inline void ReadScalar(const Authoring::ReadNode& n, std::string& out) { out = ScalarDetail::StringOf(n); }
     inline void ReadScalar(const Authoring::ReadNode& n, HashingString& out) { out = HashingString(ScalarDetail::StringOf(n)); }
@@ -287,36 +274,35 @@ namespace Meta::Typed
 
     // 벡터의 스칼라 원소 emitter — VectorElementToYaml 파리티(Flow + 개별 push)
     template<YamlScalar T>
-    inline void EmitVectorElement(MetaYml::Node& arrayNode, const T& v)
+    inline void EmitVectorElement(Authoring::WriteNode arrayNode, const T& v)
     {
-        arrayNode.SetStyle(MetaYml::EmitterStyle::Flow);
-        if constexpr (std::is_same_v<T, HashingString>) { arrayNode.push_back(v.ToString()); }
-        else if constexpr (std::is_same_v<T, HashedGuid>) { arrayNode.push_back(v.m_ID_Data); }
-        else if constexpr (std::is_same_v<T, file::path>) { arrayNode.push_back(v.string()); }
-        else if constexpr (std::is_same_v<T, FileGuid>) { arrayNode.push_back(v.ToString()); }
+        arrayNode.SetFlow();
+        if constexpr (std::is_same_v<T, HashingString>) { arrayNode.Append().SetScalar(v.ToString()); }
+        else if constexpr (std::is_same_v<T, HashedGuid>) { arrayNode.Append().SetScalar(v.m_ID_Data); }
+        else if constexpr (std::is_same_v<T, file::path>) { arrayNode.Append().SetScalar(v.string()); }
+        else if constexpr (std::is_same_v<T, FileGuid>) { arrayNode.Append().SetScalar(v.ToString()); }
         else if constexpr (std::is_same_v<T, math::matrix4x4>)
         {
-            MetaYml::Node e;
-            e.SetStyle(MetaYml::EmitterStyle::Flow);
+            auto element = arrayNode.Append();
+            element.SetSequence(true);
             for (int row = 0; row < 4; ++row)
                 for (int column = 0; column < 4; ++column)
-                    e.push_back(v.m[row][column]);
-            arrayNode.push_back(e);
+                    element.Append().SetScalar(v.m[row][column]);
         }
         else if constexpr (std::is_same_v<T, math::vector2>)
         {
-            arrayNode.push_back(MakeFlowMap2("x", v.x, "y", v.y));
+            EmitFlowMap2(arrayNode.Append(), "x", v.x, "y", v.y);
         }
         else if constexpr (std::is_same_v<T, math::vector3>)
         {
-            arrayNode.push_back(MakeFlowMap3(v.x, v.y, v.z));
+            EmitFlowMap3(arrayNode.Append(), v.x, v.y, v.z);
         }
         else if constexpr (std::is_same_v<T, math::vector4>
             || std::is_same_v<T, math::quaternion>)
         {
-            arrayNode.push_back(MakeFlowMap4(v.x, v.y, v.z, v.w));
+            EmitFlowMap4(arrayNode.Append(), v.x, v.y, v.z, v.w);
         }
-        else { arrayNode.push_back(v); }
+        else { arrayNode.Append().SetScalar(v); }
     }
 
     // 포인터류의 피지시 타입 — conditional_t는 양팔을 모두 인스턴스화하므로
@@ -394,7 +380,7 @@ namespace Meta::Typed
     // ── 런타임 브리지 (타입이 런타임에 정해지는 소비자용) ──────────────────
     // 정의는 ReflectionYml.h 상단(OpsRegistry) — 여기서는 썽크만 만든다.
 
-    template<class T> MetaYml::Node SerializeThunk(void* instance);
+    template<class T> void SerializeThunk(void* instance, Authoring::WriteNode node);
     template<class T> void DeserializeThunk(void* instance, const Authoring::ReadNode& node);
 
     // CT6-d: 역직렬화 후처리 — 컴포넌트가 OnDeserialized(node) 또는
@@ -403,18 +389,9 @@ namespace Meta::Typed
     void PostLoadThunk(void* instance, const Authoring::ReadNode& readNode)
     {
         T& obj = *static_cast<T*>(instance);
-        // 훅 인자(NodeView)는 아직 backend 노드를 가리킨다. 1b-2가 뷰의
-        // backing을 옮길 때 이 한 줄이 사라진다.
-        const MetaYml::Node& node = readNode.BackendNodeDuringTransition();
-        // D3-a-4: 뷰를 받는 훅을 먼저 본다. 컴포넌트 헤더가 backend 노드 타입을
-        // 알지 않아도 되게 하는 것이 이 오버로드의 목적이다(§5 완료 기준 9).
-        if constexpr (requires { obj.OnDeserialized(Authoring::NodeViewAccess::Make(node)); })
-        {
-            obj.OnDeserialized(Authoring::NodeViewAccess::Make(node));
-        }
-        else if constexpr (requires { obj.OnDeserialized(node); })
-        {
-            obj.OnDeserialized(node);
+		if constexpr (requires { obj.OnDeserialized(Authoring::NodeViewAccess::Make(readNode)); })
+		{
+			obj.OnDeserialized(Authoring::NodeViewAccess::Make(readNode));
         }
         else if constexpr (requires { obj.OnDeserialized(); })
         {
@@ -425,10 +402,9 @@ namespace Meta::Typed
     template<class T>
     consteval bool HasPostLoad()
     {
-        return requires(T& t, const MetaYml::Node& n)
-                   { t.OnDeserialized(Authoring::NodeViewAccess::Make(n)); }
-            || requires(T& t, const MetaYml::Node& n) { t.OnDeserialized(n); }
-            || requires(T& t) { t.OnDeserialized(); };
+		return requires(T& t, const Authoring::ReadNode& n)
+				   { t.OnDeserialized(Authoring::NodeViewAccess::Make(n)); }
+			|| requires(T& t) { t.OnDeserialized(); };
     }
 
     template<class T>
@@ -442,18 +418,27 @@ namespace Meta::Typed
     // ── Serialize (typed) ──────────────────────────────────────────────────
 
     template<meta::reflectable T>
-    void SerializeObjectInto(T& obj, MetaYml::Node& node);
+    void SerializeObjectInto(T& obj, Authoring::WriteNode node);
 
     // 멤버 하나의 방출 — 레거시 분기 순서(벡터→포인터→스칼라→enum→구조체→마커) 보존
     template<class V>
-    inline void EmitMember(MetaYml::Node& node, const char* name, V& value)
+    inline void EmitMember(Authoring::WriteNode node, const char* name, V& value)
     {
         using T = std::remove_cv_t<V>;
 
         if constexpr (is_vector_v<T>)
         {
             using E = VectorElementTypeT<T>;
-            MetaYml::Node arrayNode;
+            const Authoring::WriteNode arrayNode = node.Child(name);
+			// yaml-cpp의 기본 Node에 아무 원소도 push하지 않은 뒤 맵에 넣으면
+			// `~`가 된다. 빈 시퀀스 `[]`로 바꾸면 골든과 구 reader의 널 의미가
+			// 달라지므로 legacy 표기를 명시 보존한다.
+			if (value.empty())
+			{
+				arrayNode.SetNull();
+				return;
+			}
+            arrayNode.SetSequence();
 
             for (auto& elem : value)
             {
@@ -469,7 +454,7 @@ namespace Meta::Typed
 
                     if (nullptr == p)
                     {
-                        arrayNode.push_back(MetaYml::Node());
+                        arrayNode.Append().SetNull();
                     }
                     else if constexpr (IsComponentExact<U>())
                     {
@@ -477,18 +462,16 @@ namespace Meta::Typed
                         // (레거시: elementTypeID==ComponentTypeID → FindTypeByInstance)
                         if (const TypeOps* ops = FindTypeOps(p->GetTypeID().m_ID_Data))
                         {
-                            arrayNode.push_back(ops->serialize(p));
+                            ops->serializeInto(p, arrayNode.Append());
                         }
                         else
                         {
-                            arrayNode.push_back(MetaYml::Node()); // unknown component
+                            arrayNode.Append().SetNull(); // unknown component
                         }
                     }
                     else if constexpr (meta::reflectable<U>)
                     {
-                        MetaYml::Node sub;
-                        SerializeObjectInto(*p, sub);
-                        arrayNode.push_back(sub);
+                        SerializeObjectInto(*p, arrayNode.Append());
                     }
                     else
                     {
@@ -497,9 +480,7 @@ namespace Meta::Typed
                 }
                 else if constexpr (meta::reflectable<E>)
                 {
-                    MetaYml::Node sub;
-                    SerializeObjectInto(elem, sub);
-                    arrayNode.push_back(sub);
+                    SerializeObjectInto(elem, arrayNode.Append());
                 }
                 else if constexpr (YamlScalar<E>)
                 {
@@ -511,7 +492,6 @@ namespace Meta::Typed
                 }
             }
 
-            node[name] = arrayNode;
         }
         else if constexpr (std::is_pointer_v<T> || is_shared_ptr_v<T> || is_unique_ptr_v<T>)
         {
@@ -522,18 +502,16 @@ namespace Meta::Typed
             {
                 if constexpr (meta::reflectable<U>)
                 {
-                    MetaYml::Node sub;
-                    SerializeObjectInto(*p, sub);
-                    node[name] = sub;
+                    SerializeObjectInto(*p, node.Child(name));
                 }
                 else
                 {
-                    node[name] = MetaYml::Node(); // unknown pointer (레거시 파리티)
+                    node.Child(name).SetNull(); // unknown pointer (레거시 파리티)
                 }
             }
             else
             {
-                node[name] = MetaYml::Node(); // nullptr
+                node.Child(name).SetNull(); // nullptr
             }
         }
         else if constexpr (YamlScalar<T>)
@@ -542,13 +520,12 @@ namespace Meta::Typed
         }
         else if constexpr (std::is_enum_v<T>)
         {
-            node[name] = static_cast<int>(static_cast<std::underlying_type_t<T>>(value));
+            node.Child(name).SetScalar(
+                static_cast<int>(static_cast<std::underlying_type_t<T>>(value)));
         }
         else if constexpr (meta::reflectable<T>)
         {
-            MetaYml::Node sub;
-            SerializeObjectInto(value, sub);
-            node[name] = sub;
+            SerializeObjectInto(value, node.Child(name));
         }
         else
         {
@@ -568,8 +545,10 @@ namespace Meta::Typed
     }
 
     template<meta::reflectable T>
-    void SerializeObjectInto(T& obj, MetaYml::Node& node)
+    void SerializeObjectInto(T& obj, Authoring::WriteNode node)
     {
+		node.SetMap();
+
 		// U7: 직렬화 직전 파생 참조를 최신 구조로 다시 계산할 수 있는 선택 훅.
 		// UIComponent의 Navigation은 런타임 약참조가 정본이고 디스크에는 계층
 		// 로컬 경로를 적는다. 에디터에서 링크를 만든 뒤 부모를 옮긴 경우에도
@@ -585,18 +564,19 @@ namespace Meta::Typed
         if constexpr (IsComponentFamily<T>())
         {
             using D = std::remove_cvref_t<decltype(::meta::reflect<T>())>;
-            node[std::string(D::identifier)] =
-                TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data;
+            node.Child(D::identifier).SetScalar(
+                TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data);
 
             if (const Uuid::Uuid16* uuid =
                 TypeTrait::ComponentUUIDRegistry::FindByName(std::string(D::identifier)))
             {
-                node[kComponentTypeUUIDKey] = Uuid::ToString(*uuid);
+                node.Child(kComponentTypeUUIDKey).SetScalar(Uuid::ToString(*uuid));
             }
         }
         else if constexpr (IsGameObjectType<T>())
         {
-            node[GAMEOBJECT_YAML_KEY] = TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data;
+            node.Child(GAMEOBJECT_YAML_KEY).SetScalar(
+                TypeTrait::GUIDCreator::GetTypeID<T>().m_ID_Data);
         }
 
         meta::for_each_field(obj, [&](std::string_view memberName, auto& value)
@@ -607,15 +587,10 @@ namespace Meta::Typed
 		// H3: 리플렉션 멤버가 아닌 호환/파생 데이터를 정본 저장소에서 보충하는
 		// 선택 훅. Entity는 Scene-owned HierarchyStore의 계층을 기존 YAML 키로
 		// 내보낸다. 훅이 없는 타입의 직렬화 형상은 바뀌지 않는다.
-		if constexpr (requires(T& value, MetaYml::Node& serializedNode)
+		if constexpr (requires(T& value, Authoring::WriteNode& serializedNode)
 			{ value.OnAfterSerialize(Authoring::MutableNodeViewAccess::Make(serializedNode)); })
 		{
 			obj.OnAfterSerialize(Authoring::MutableNodeViewAccess::Make(node));
-		}
-		else if constexpr (requires(T& value, MetaYml::Node& serializedNode)
-			{ value.OnAfterSerialize(serializedNode); })
-		{
-			obj.OnAfterSerialize(node);
 		}
     }
 
@@ -720,7 +695,7 @@ namespace Meta::Typed
             }
             else
             {
-                value = static_cast<T>(sub.BackendNodeDuringTransition().as<int>());
+				value = static_cast<T>(sub.As<int>());
             }
         }
         else if constexpr (meta::reflectable<T>)
@@ -758,11 +733,9 @@ namespace Meta::Typed
     // ── 썽크 (런타임 브리지 대상) ──────────────────────────────────────────
 
     template<class T>
-    MetaYml::Node SerializeThunk(void* instance)
+    void SerializeThunk(void* instance, Authoring::WriteNode node)
     {
-        MetaYml::Node node;
         SerializeObjectInto(*static_cast<T*>(instance), node);
-        return node;
     }
 
     template<class T>

@@ -20,6 +20,7 @@ $gbufferMeta = $gbufferShaderMeta + '.meta'
 # 가리키는 source 셰이더(.hlsl)와 그 sidecar까지 검증한다. fixture에 이들이
 # 없으면 cook이 거부된다.
 $forwardMeta = Join-Path $assets 'Shaders\DefaultPassShader\Forward.shadermeta.meta'
+$forwardShaderMeta = $forwardMeta.Substring(0, $forwardMeta.Length - '.meta'.Length)
 $gbufferHlsl = Join-Path $assets 'Shaders\DefaultPassShader\GBuffer.hlsl'
 $gbufferHlslMeta = $gbufferHlsl + '.meta'
 
@@ -28,7 +29,8 @@ if (-not (Test-Path -LiteralPath $AssetCooker -PathType Leaf)) {
     exit 1
 }
 
-$sourcePaths = @($model, $modelMeta, $gbufferShaderMeta, $gbufferMeta, $forwardMeta,
+$sourcePaths = @($model, $modelMeta, $gbufferShaderMeta, $gbufferMeta,
+    $forwardShaderMeta, $forwardMeta,
     $gbufferHlsl, $gbufferHlslMeta)
 $sourceHashes = @{}
 foreach ($path in $sourcePaths) {
@@ -149,8 +151,9 @@ $artifactBytes = if ($artifactExists) { (Get-Item -LiteralPath $artifactPath).Le
 $manifestBytes = if ($manifestExists) { (Get-Item -LiteralPath $manifestPath).Length } else { 0 }
 
 # manifestEntries=4: model + material + embedded texture + shadermeta.
+$sourceIdentityCount = @(Get-ChildItem -LiteralPath $assets -Recurse -File -Filter '*.meta').Count
 # files=4: model CEMC + embedded texture + cooked shadermeta + manifest.
-$summaryPattern = 'asset-cooker models=1 materials=1 embeddedTextures=1 textureReferences=1 externalTextureRefs=0 embeddedTextureBytes=\d+ textures=0 shaderMetas=1 standaloneMaterials=0 standaloneMaterialBytes=0 scenes=0 prefabs=0 sceneBytes=0 legacyTextureNameRefs=0 unproducedGuidRefs=0 artifactPaths=3 files=4 manifestEntries=4 artifactBytes=(\d+) textureBytes=0 shaderMetaBytes=\d+ manifest=Derived/asset-manifest\.cemf'
+$summaryPattern = "asset-cooker models=1 materials=1 embeddedTextures=1 textureReferences=1 externalTextureRefs=0 embeddedTextureBytes=\d+ textures=0 shaderMetas=1 standaloneMaterials=0 standaloneMaterialBytes=0 scenes=0 prefabs=0 sceneBytes=0 legacyTextureNameRefs=0 unproducedGuidRefs=0 artifactPaths=3 files=4 manifestEntries=4 sourceIdentities=$sourceIdentityCount artifactBytes=(\d+) textureBytes=0 shaderMetaBytes=\d+ manifest=Derived/asset-manifest\.cemf"
 $modelPattern = "asset-cooker model=$([regex]::Escape($modelGuid)) artifact=$([regex]::Escape($expectedArtifact))"
 $shaderMetaPattern = "asset-cooker shadermeta=$([regex]::Escape($gbufferGuid)) "
 $successSummaries = @($first, $second | Where-Object {
@@ -175,18 +178,31 @@ Copy-Item -LiteralPath $model -Destination $relocatedModel
 Copy-Item -LiteralPath $modelMeta -Destination ($relocatedModel + '.meta')
 Copy-Item -LiteralPath $gbufferShaderMeta -Destination $relocatedShaderMeta
 Copy-Item -LiteralPath $gbufferMeta -Destination ($relocatedShaderMeta + '.meta')
+Copy-Item -LiteralPath $forwardShaderMeta `
+    -Destination (Join-Path $relocatedShaderDir 'Forward.shadermeta')
 Copy-Item -LiteralPath $forwardMeta `
     -Destination (Join-Path $relocatedShaderDir 'Forward.shadermeta.meta')
 Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $relocatedShaderDir 'GBuffer.hlsl')
 Copy-Item -LiteralPath $gbufferHlslMeta `
     -Destination (Join-Path $relocatedShaderDir 'GBuffer.hlsl.meta')
-$relocatedOutput = Join-Path $run 'relocated-output'
-$relocated = Invoke-AssetCooker -AssetsRoot $relocatedAssets `
-    -OutputRoot $relocatedOutput -ModelPath $relocatedModel `
+$relocationBaselineOutput = Join-Path $run 'relocation-baseline-output'
+$relocationBaseline = Invoke-AssetCooker -AssetsRoot $relocatedAssets `
+    -OutputRoot $relocationBaselineOutput -ModelPath $relocatedModel `
     -ShaderMetaPath $relocatedShaderMeta
+$relocationCopyAssets = Join-Path $run 'relocated-copy\deeper\Assets'
+New-Item -ItemType Directory -Path (Split-Path -Parent $relocationCopyAssets) -Force | Out-Null
+Copy-Item -LiteralPath $relocatedAssets -Destination $relocationCopyAssets -Recurse
+$relocationCopyModel = Join-Path $relocationCopyAssets 'Models\Prim_Cube.glb'
+$relocationCopyShaderMeta = Join-Path $relocationCopyAssets 'Shaders\DefaultPassShader\GBuffer.shadermeta'
+$relocatedOutput = Join-Path $run 'relocated-output'
+$relocated = Invoke-AssetCooker -AssetsRoot $relocationCopyAssets `
+    -OutputRoot $relocatedOutput -ModelPath $relocationCopyModel `
+    -ShaderMetaPath $relocationCopyShaderMeta
+$relocationBaselineSnapshot = Get-TreeSnapshot -Path $relocationBaselineOutput
 $relocatedSnapshot = Get-TreeSnapshot -Path $relocatedOutput
-$relocationDeterministic = $relocated.ExitCode -eq 0 -and
-    (Test-SameSnapshot -Left $snapshotA -Right $relocatedSnapshot)
+$relocationDeterministic = $relocationBaseline.ExitCode -eq 0 -and `
+    $relocated.ExitCode -eq 0 -and
+    (Test-SameSnapshot -Left $relocationBaselineSnapshot -Right $relocatedSnapshot)
 $relocationUnexpectedStderr = -not [string]::IsNullOrWhiteSpace($relocated.Stderr)
 
 # Tracked package의 candidate/package-input 깊이에서도 atomic sibling staging이
@@ -232,6 +248,7 @@ Copy-Item -LiteralPath $model -Destination $fixtureModel
 # 되도록 한다 — shadermeta 부재가 거부 원인을 가리면 안 된다.
 Copy-Item -LiteralPath $gbufferShaderMeta -Destination $fixtureShaderMeta
 Copy-Item -LiteralPath $gbufferMeta -Destination ($fixtureShaderMeta + '.meta')
+Copy-Item -LiteralPath $forwardShaderMeta -Destination (Join-Path $fixtureShaderDir 'Forward.shadermeta')
 Copy-Item -LiteralPath $forwardMeta -Destination (Join-Path $fixtureShaderDir 'Forward.shadermeta.meta')
 Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $fixtureShaderDir 'GBuffer.hlsl')
 Copy-Item -LiteralPath $gbufferHlslMeta -Destination (Join-Path $fixtureShaderDir 'GBuffer.hlsl.meta')

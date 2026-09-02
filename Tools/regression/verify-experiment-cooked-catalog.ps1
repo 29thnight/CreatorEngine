@@ -1,9 +1,8 @@
-# cooked catalog 기동 게이트 (I7-C1)
+# cooked catalog 제품 소비 게이트 (D5-c/D5-d)
 #
-# 굽는 쪽은 D5-b2c에서 다 섰다(AssetCooker → Derived/ + asset-manifest.cemf →
-# pak). 그런데 **읽는 쪽이 이어져 있지 않아** cooked 경로가 제품에서 한 번도
-# 돌지 않았다: resolver는 nullptr catalog로 불렸고 ModelLoadRequest::cookedPath는
-# 늘 비어 있었다(c3-2 실측 texCooked=0). 이 게이트가 그 배선을 실증한다.
+# 실제 패키징과 같은 producer closure를 임시 Derived/CEMF에 굽고, catalog를
+# 마운트한 Editor와 마운트하지 않은 Editor를 대조한다. 모델/텍스처뿐 아니라
+# scene 문서 자체도 마운트 시 cooked artifact를 열어야 한다.
 #
 # ── 판정 항목 ──
 #   1  마운트 — catalog가 실제 CEMF에서 서고 entry가 0이 아니다
@@ -60,24 +59,55 @@ New-Item -ItemType Directory -Path $run -Force | Out-Null
 
 $fail = @()
 try {
-    # ── 굽기: 씬이 실제로 쓰는 모델만 구우면 신원 맞물림 판정이 좁아진다.
-    #    코퍼스 전량을 굽는다(cook-all과 같은 입력).
+    # ── 굽기: 실제 패키징과 같은 producer closure를 전부 넘긴다. 모델만 전량
+    #    넘기고 shader/texture를 일부만 넘기면 PBR 재질의 GUID 의존성이 CEMF에서
+    #    닫히지 않아 제품 소비 검증에 도달하기 전에 cook이 실패한다.
     $models = @(Get-ChildItem -LiteralPath $assets -File -Recurse | Where-Object {
         $_.Extension.ToLowerInvariant() -in @('.fbx', '.glb', '.gltf')
     } | Sort-Object FullName)
-    $gbuffer = Join-Path $assets 'Shaders\DefaultPassShader\GBuffer.shadermeta'
+    if ($models.Count -eq 0) { "catalog 제품 소비를 검증할 canonical model이 없다"; exit 1 }
+
+    # Assets/Models/*.asset은 standalone material이 아니라 legacy model cook cache다.
+    $legacyModelCaches = @(Get-ChildItem -LiteralPath $assets -File -Recurse -Filter '*.asset' |
+        Where-Object {
+            [IO.Path]::GetRelativePath($assets, $_.FullName).Replace('\', '/') -like 'Models/*'
+        })
+    $legacyModelCacheNames = [Collections.Generic.HashSet[string]]::new(
+        [string[]]@($legacyModelCaches | ForEach-Object { $_.FullName }),
+        [StringComparer]::OrdinalIgnoreCase)
+
+    $cookSourceRules = @(
+        [pscustomobject]@{ Option = '--model';      Extensions = @('.fbx', '.glb', '.gltf') }
+        [pscustomobject]@{ Option = '--texture';    Extensions = @('.png', '.hdr', '.dds') }
+        [pscustomobject]@{ Option = '--shadermeta'; Extensions = @('.shadermeta') }
+        [pscustomobject]@{ Option = '--material';   Extensions = @('.asset') }
+        [pscustomobject]@{ Option = '--scene';      Extensions = @('.creator', '.prefab') }
+    )
     $cookArgs = [Collections.Generic.List[string]]::new()
     $cookArgs.Add('--asset-root'); $cookArgs.Add($assets)
     $cookArgs.Add('--output');     $cookArgs.Add($cookOutput)
-    foreach ($model in $models) { $cookArgs.Add('--model'); $cookArgs.Add($model.FullName) }
-    $cookArgs.Add('--shadermeta'); $cookArgs.Add($gbuffer)
-    # ★ texture를 하나 굽는다 — 이것이 없으면 resolver의 cooked 소비 축이
-    #   "cooked 후보가 없어서 source로 갔다"와 "배선이 끊겼다"를 못 가른다.
+    $sourceCounts = [ordered]@{}
+    foreach ($rule in $cookSourceRules) {
+        $matches = @(Get-ChildItem -LiteralPath $assets -File -Recurse |
+            Where-Object { $rule.Extensions -contains $_.Extension.ToLowerInvariant() } |
+            Where-Object { -not $legacyModelCacheNames.Contains($_.FullName) } |
+            Sort-Object FullName)
+        $sourceCounts[$rule.Option] = $matches.Count
+        foreach ($source in $matches) {
+            $cookArgs.Add($rule.Option)
+            $cookArgs.Add($source.FullName)
+        }
+    }
+    if ($sourceCounts['--model'] -ne $models.Count) {
+        "model source 열거가 어긋난다: $($sourceCounts['--model']) != $($models.Count)"
+        exit 1
+    }
+
+    # resolver probe는 전체 texture closure 중 이 고정 자산을 사용한다.
     $probeTexture = Join-Path $assets 'Materials\Cube_Mat_BaseColor.png'
     if (-not (Test-Path -LiteralPath $probeTexture)) {
         "probe 텍스처가 없다: $probeTexture"; exit 1
     }
-    $cookArgs.Add('--texture'); $cookArgs.Add($probeTexture)
 
     $cookOut = Join-Path $run 'cook.out.log'
     $cookErr = Join-Path $run 'cook.err.log'
@@ -130,8 +160,8 @@ try {
     $cookedOn = ([regex]::Matches($logOn, '\[model\.dual\] cooked 경로')).Count
     $experimentOn = ([regex]::Matches($logOn, '\[model\.dual\] experiment 경로')).Count
 
-    if ($logOn -notmatch 'experiment\.catalog mount pass .*entries=([1-9]\d*)') {
-        $fail += "1 catalog 마운트 실패 — mount 출력을 확인하라"
+    if ($logOn -notmatch 'experiment\.catalog mount pass .*entries=([1-9]\d*) sources=([1-9]\d*)') {
+        $fail += "1 catalog/source identity 마운트 실패 — mount 출력을 확인하라"
     }
     if ($logOn -notmatch 'experiment\.catalog pass .*models=([1-9]\d*)') {
         $fail += "1b catalog에 model entry가 0이다"
@@ -147,6 +177,12 @@ try {
     #   catalog services로 간다.
     if ($logOn -notmatch 'experiment\.catalog probe pass .*cooked=([1-9]\d*)') {
         $fail += "3b resolver가 cooked texture를 고르지 않았다 — services 배선이 끊겼다"
+    }
+    if ($logOn -notmatch '\[scene\.document\] source=cooked guid=[0-9a-f-]{36}') {
+        $fail += "3c 마운트한 scene 문서가 cooked artifact를 열지 않았다"
+    }
+    if ($logOn -match '\[scene\.document\] source=authoring') {
+        $fail += "3d 마운트한 scene 문서가 authoring source로 폴백했다"
     }
 
     # ── 신선도 leg: artifact 하나를 소스보다 낡게 만든다 ──
@@ -197,6 +233,12 @@ try {
     if ($experimentOff -lt 1) {
         $fail += "4c 대조군에서 experiment 경로가 0건 — 로드 자체가 안 돌았다"
     }
+    if ($logOff -notmatch '\[scene\.document\] source=authoring guid=[0-9a-f-]{36}') {
+        $fail += "4e 대조군 scene 문서가 authoring source를 열지 않았다"
+    }
+    if ($logOff -match '\[scene\.document\] source=cooked') {
+        $fail += "4f 마운트하지 않은 대조군이 cooked scene 문서를 열었다"
+    }
     # 같은 씬이므로 로드한 모델 수는 두 실행이 같아야 한다. 마운트가 모델을
     # 통째로 떨구면(cooked 거부→폴백도 실패) 위 축들이 초록인 채 여기서 갈린다.
     if (($cookedOn + $experimentOn) -ne ($cookedOff + $experimentOff)) {
@@ -211,6 +253,7 @@ try {
 ]*')).Value
     "probe(mounted)   — $probeOn"
     "probe(unmounted) — $probeOff"
+    "producer closure — models $($sourceCounts['--model']) · textures $($sourceCounts['--texture']) · shader metas $($sourceCounts['--shadermeta']) · materials $($sourceCounts['--material']) · scenes/prefabs $($sourceCounts['--scene'])"
     "mounted   — cooked $cookedOn · experiment $experimentOn"
     "stale     — cooked $cookedStale · experiment $experimentStale (artifact 하나 낡힘)"
     "unmounted — cooked $cookedOff · experiment $experimentOff (기대: 0 · $($cookedOn + $experimentOn))"

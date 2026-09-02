@@ -3,6 +3,7 @@
 #include "Terrain.h"
 #include "DataSystem.h"
 #include "Interfaces/AssetAuthoringPort.h"
+#include "AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #define STB_IMAGE_IMPLEMENTATION
@@ -430,114 +431,150 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 }
 bool TerrainComponent::Load(const std::wstring& filePath)
 {
-	//debug용
 	Debug->LogDebug("Loading terrain from: " + Utf8Encode(filePath));
 
-	//세이브 역순으로 메타데이터 부터 읽어 오는대 filePath로 .meta 파일 읽어옴
-	//.meta
 	namespace fs = std::filesystem;
-	fs::path metaPath = filePath;
-
-	if (!fs::exists(metaPath)) {
-		Debug->LogError("Terrain meta file does not exist: " + Utf8Encode(metaPath.wstring()));
+	const fs::path descriptorPath = filePath;
+	if (!fs::is_regular_file(descriptorPath))
+	{
+		Debug->LogError("Terrain descriptor does not exist: "
+			+ Utf8Encode(descriptorPath.wstring()));
 		return false;
 	}
 
-	//metaPath가 예정된 경로가 아니면 풀패스로 사용 아니면 상대경로로 사용 //예정된 경로는 PathFinder::Relative("Terrain") 이다.
-	bool isRelative = false;
-	fs::path rel = PathFinder::Relative("Terrain");
-	if (metaPath.parent_path() != rel) {
-		//풀패스로 사용
-		isRelative = false;
-	}
-	else {
-		//상대경로로 사용
-		isRelative = true;
-	}
-
-	//.meta -> json 읽기
-
-	std::ifstream ifs(metaPath);
-	json metaData;
-	try {
-		ifs >> metaData;
-	}
-	catch (const json::parse_error& e) {
-		Debug->LogError("Failed to parse terrain meta file: " + Utf8Encode(metaPath.wstring()) + " Error: " + e.what());
+	std::string parseError;
+	const Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(descriptorPath.string(), parseError);
+	if (!document)
+	{
+		Debug->LogError("Terrain descriptor parse failed: "
+			+ Utf8Encode(descriptorPath.wstring()) + " / " + parseError);
 		return false;
 	}
 
-	int version = metaData.value("version", 1); // 버전 필드가 없으면 구버전(1)으로 간주
+	const Authoring::ReadNode root = document.Root();
+	const Authoring::ReadNode splatmaps = root["splatmaps"];
+	const Authoring::ReadNode layers = root["layers"];
+	if (!root.IsMap() || root["schemaVersion"].As<int>(0) != 1
+		|| !root["name"].IsScalar() || !root["terrainID"].IsScalar()
+		|| !root["width"].IsScalar() || !root["height"].IsScalar()
+		|| !root["minHeight"].IsScalar() || !root["maxHeight"].IsScalar()
+		|| !root["heightmap"].IsScalar() || !splatmaps.IsSequence()
+		|| !layers.IsSequence() || splatmaps.Size() != layers.Size()
+		|| layers.Size() > 4)
+	{
+		Debug->LogError("Terrain descriptor schema is invalid: "
+			+ descriptorPath.string());
+		return false;
+	}
 
-	//임시저장변수 선언
-	uint32_t tmpTerrainID = metaData["terrainID"].get<uint32_t>();
-	int tmpWidth = metaData["width"].get<int>();
-	int tmpHeight = metaData["height"].get<int>();
-	fs::path heightMapPath = fs::path(metaData["heightmap"].get<std::string>());
-	auto tmpHeightMap = std::vector<float>(tmpWidth * tmpHeight, 0.0f);
-	auto tmpLayerHeightMap = std::vector<std::vector<float>>(4, std::vector<float>(tmpWidth * tmpHeight, 0.0f)); //4개 레이어로 초기화
+	uint32_t tmpTerrainID = root["terrainID"].As<uint32_t>();
+	int tmpWidth = root["width"].As<int>();
+	int tmpHeight = root["height"].As<int>();
+	const float tmpMinHeight = root["minHeight"].As<float>();
+	const float tmpMaxHeight = root["maxHeight"].As<float>();
+	if (tmpWidth <= 0 || tmpHeight <= 0
+		|| !std::isfinite(tmpMinHeight) || !std::isfinite(tmpMaxHeight)
+		|| tmpMinHeight > tmpMaxHeight
+		|| static_cast<std::size_t>(tmpHeight)
+			> std::numeric_limits<std::size_t>::max()
+				/ static_cast<std::size_t>(tmpWidth))
+	{
+		Debug->LogError("Terrain descriptor dimensions are invalid: "
+			+ descriptorPath.string());
+		return false;
+	}
+
+	const fs::path terrainRoot = PathFinder::Relative("Terrain");
+	const bool usesRelativePaths =
+		descriptorPath.parent_path().lexically_normal()
+			== terrainRoot.lexically_normal();
+	const auto ResolvePath = [&](const Authoring::ReadNode& pathNode)
+	{
+		const fs::path stored = pathNode.AsString();
+		return usesRelativePaths
+			? PathFinder::TerrainSourcePath(stored.generic_string()) : stored;
+	};
+
+	fs::path heightMapPath = ResolvePath(root["heightmap"]);
+	auto tmpHeightMap = std::vector<float>(
+		static_cast<std::size_t>(tmpWidth) * static_cast<std::size_t>(tmpHeight),
+		0.0f);
+	if (!LoadEditorHeightMap(heightMapPath, static_cast<float>(tmpWidth),
+		static_cast<float>(tmpHeight), tmpMinHeight, tmpMaxHeight, tmpHeightMap))
+	{
+		Debug->LogError("Terrain height map load failed: "
+			+ heightMapPath.string());
+		return false;
+	}
+
+	auto tmpLayerHeightMap =
+		std::vector<std::vector<float>>(splatmaps.Size());
+	std::size_t splatIndex = 0;
+	for (const Authoring::ReadNode splatmap : splatmaps)
+	{
+		if (!splatmap.IsScalar()) return false;
+		fs::path splatPath = ResolvePath(splatmap);
+		if (!LoadEditorSplatMap(splatPath, tmpWidth, tmpHeight,
+			static_cast<int>(splatIndex), tmpLayerHeightMap))
+		{
+			Debug->LogError("Terrain splat map load failed: "
+				+ splatPath.string());
+			return false;
+		}
+		++splatIndex;
+	}
+
 	auto tmpLayerDescs = std::vector<TerrainLayer>();
-	heightMapPath = isRelative ? PathFinder::TerrainSourcePath(heightMapPath.string()) : heightMapPath; //상대경로로 변환
-	//헤이트맵 임시저장
-	LoadEditorHeightMap(heightMapPath, tmpWidth, tmpHeight, metaData["minHeight"].get<float>(), metaData["maxHeight"].get<float>(), tmpHeightMap);
-
-	// --- 스플랫맵 로드 (버전 분기) ---
-	if (version >= 2)
-	{
-		// 신규 포맷 로드
-		const auto& splatmapPaths = metaData["splatmaps"];
-		tmpLayerHeightMap.resize(splatmapPaths.size());
-		for (size_t i = 0; i < splatmapPaths.size(); ++i)
-		{
-			fs::path splatPath = fs::path(splatmapPaths[i].get<std::string>());
-			splatPath = isRelative ? PathFinder::TerrainSourcePath(splatPath.string()) : splatPath;
-			// 각 흑백 스플랫맵을 로드
-			LoadEditorSplatMap(splatPath, tmpWidth, tmpHeight, i, tmpLayerHeightMap);
-		}
-	}
-	else
-	{
-		// 구버전 포맷 로드 (호환성 코드)
-		fs::path splatPath = fs::path(metaData["splatmap"].get<std::string>());
-		splatPath = isRelative ? PathFinder::TerrainSourcePath(splatPath.string()) : splatPath;
-		// RGBA 스플랫맵을 로드하여 채널 분리
-		LoadEditorSplatMap_Compat(splatPath, tmpWidth, tmpHeight, tmpLayerHeightMap);
-	}
-	//fs::path splatMapPath = fs::path(metaData["splatmap"].get<std::string>());
-	//splatMapPath = isRelative ? PathFinder::TerrainSourcePath(splatMapPath.string()) : splatMapPath; //상대경로로 변환
-	////스플랫맵 임시저장
-	//LoadEditorSplatMap(splatMapPath, tmpWidth, tmpHeight, tmpLayerHeightMap);
-
+	tmpLayerDescs.reserve(layers.Size());
+	std::vector<std::unique_ptr<Texture>> tmpTextureOwners;
+	tmpTextureOwners.reserve(layers.Size());
 	float tmpNextLayerID = 0;
-	for (const auto& layerData : metaData["layers"]) {
-		TerrainLayer desc;
-		desc.m_layerID = layerData["layerID"].get<uint32_t>();
-		desc.layerName = layerData["layerName"].get<std::string>();
-		auto diffusePath = fs::path(layerData["diffuseTexturePath"].get<std::string>());
-		diffusePath = isRelative ? PathFinder::TerrainSourcePath(diffusePath.string()) : diffusePath; //상대경로로 변환
-		desc.diffuseTexturePath = diffusePath;
-		desc.tilling = layerData["tilling"].get<float>();
-
-		file::path path = file::path(desc.diffuseTexturePath);
-		if (file::exists(path))
+	for (const Authoring::ReadNode layerData : layers)
+	{
+		if (!layerData.IsMap() || !layerData["layerID"].IsScalar()
+			|| !layerData["layerName"].IsScalar()
+			|| !layerData["diffuseTexturePath"].IsScalar()
+			|| !layerData["tiling"].IsScalar())
 		{
-			desc.diffuseTexture = Texture::LoadFormPath(desc.diffuseTexturePath);
-		}
-		else {
-			Debug->LogError("Failed to load diffuse texture: " + desc.layerName);
-			continue; // 로드 실패시 해당 레이어는 무시
+			Debug->LogError("Terrain layer schema is invalid: "
+				+ descriptorPath.string());
+			return false;
 		}
 
-		//레이어 정보 저장
+		TerrainLayer desc;
+		desc.m_layerID = layerData["layerID"].As<uint32_t>();
+		desc.layerName = layerData["layerName"].AsString();
+		desc.diffuseTexturePath =
+			ResolvePath(layerData["diffuseTexturePath"]);
+		desc.tilling = layerData["tiling"].As<float>();
+		if (desc.layerName.empty() || !std::isfinite(desc.tilling)
+			|| !file::is_regular_file(desc.diffuseTexturePath))
+		{
+			Debug->LogError("Terrain layer value is invalid: " + desc.layerName);
+			return false;
+		}
+		std::unique_ptr<Texture> diffuseTexture{
+			Texture::LoadFormPath(desc.diffuseTexturePath) };
+		if (!diffuseTexture)
+		{
+			Debug->LogError("Failed to load diffuse texture: " + desc.layerName);
+			return false;
+		}
+		desc.diffuseTexture = diffuseTexture.get();
 		tmpLayerDescs.push_back(desc);
-		tmpNextLayerID++;
+		tmpTextureOwners.push_back(std::move(diffuseTexture));
+		++tmpNextLayerID;
 	}
+
 
 	//임시저장 변수 스왑 및
 	//바뀐 맴버 정보로 메쉬 및 버퍼,텍스쳐 업데이트
 	std::swap(m_terrainID, tmpTerrainID);
 	std::swap(m_width, tmpWidth);
 	std::swap(m_height, tmpHeight);
+	m_minHeight = tmpMinHeight;
+	m_maxHeight = tmpMaxHeight;
 	Resize(m_width, m_height); // 높이맵 크기 변경
 	std::swap(m_heightMap, tmpHeightMap);
 	RecalculateNormalsPatch(0, 0, m_width, m_height); // 높이맵 변경 후 노말 재계산
@@ -568,6 +605,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	//InitSplatMapTexture(m_width, m_height); // 스플랫맵 텍스처 초기화
 	std::swap(m_layerHeightMap, tmpLayerHeightMap);
 	//UpdateSplatMapPatch(0, 0, m_width, m_height); // 스플랫맵 패치 업데이트
+	for (auto& texture : tmpTextureOwners) texture.release();
 	std::swap(m_layers, tmpLayerDescs);
 	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap); // 레이어 정보 업데이트
 	m_nextLayerID = tmpNextLayerID;
@@ -592,19 +630,26 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	file::path Path = filePath + L".meta";
 	if (file::exists(Path))
 	{
-		auto node = MetaYml::LoadFile(Path.string());
+		std::string parseError;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseFile(Path.string(), parseError);
+		const Authoring::ReadNode node = document.Root();
 
-		if (node["guid"] && !node["guid"].IsNull())
+		if (!document)
 		{
-			FileGuid fileGuid = node["guid"].as<std::string>();
+			Debug->LogError("Terrain sidecar parse failed: " + parseError);
+		}
+		else if (node["guid"] && !node["guid"].IsNull())
+		{
+			FileGuid fileGuid = node["guid"].AsString();
 			if (fileGuid != nullFileGuid)
 			{
 				m_trrainAssetGuid = fileGuid;
 			}
 		}
 	}
-
-
+	m_terrainTargetPath = filePath;
+	return true;
 }
 
 bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out)
@@ -615,8 +660,12 @@ bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float
 
 	// comp=4 for RGBA8
 	uint8_t* data = stbi_load(pathUtf8.c_str(), &width, &height, &channels, 4);
-	if (!data)
+	if (!data || width != static_cast<int>(dataWidth)
+		|| height != static_cast<int>(dataHeight))
+	{
+		if (data) stbi_image_free(data);
 		return false;
+	}
 
 	size_t N = static_cast<size_t>(width) * height;
 	out.resize(N);
@@ -686,24 +735,6 @@ bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int da
 	out[layerIndex].resize(width * height);
 	for (int i = 0; i < width * height; ++i) {
 		out[layerIndex][i] = data[i] / 255.0f;
-	}
-	stbi_image_free(data);
-	return true;
-}
-
-// 신규: 구버전 RGBA 스플랫맵을 읽어 4개의 레이어 가중치 맵으로 분리
-bool TerrainComponent::LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out)
-{
-	int width, height, channels;
-	unsigned char* data = stbi_load(pngPath.string().c_str(), &width, &height, &channels, 4); // 4 = RGBA
-	if (!data || width != dataWidth || height != dataHeight) { /* ... 에러 처리 ... */ return false; }
-
-	out.assign(4, std::vector<float>(width * height));
-	for (int i = 0; i < width * height; ++i) {
-		out[0][i] = data[i * 4 + 0] / 255.0f; // R -> Layer 0
-		out[1][i] = data[i * 4 + 1] / 255.0f; // G -> Layer 1
-		out[2][i] = data[i * 4 + 2] / 255.0f; // B -> Layer 2
-		out[3][i] = data[i * 4 + 3] / 255.0f; // A -> Layer 3
 	}
 	stbi_image_free(data);
 	return true;

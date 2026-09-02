@@ -237,22 +237,18 @@ bool BlackBoard::Serialize(std::string_view name)
 		m_name = name;
 	}
 
-	// 빈 시퀀스를 명시한다. 손대지 않은 Node를 그대로 흘리면 yaml-cpp가 0바이트를
+	// 빈 시퀀스를 명시한다. 손대지 않은 노드를 그대로 흘리면 0바이트를
 	// 내보내고, 그렇게 저장된 자산은 Deserialize가 값 하나도 복원하지 못한다.
-	MetaYml::Node entriesNode(MetaYml::NodeType::Sequence);
+	Authoring::WriteDocument document;
+	const Authoring::WriteNode entriesNode = document.Root().Child(m_name);
+	entriesNode.SetSequence();
 	for (auto& [key, value] : m_values)
 	{
-		MetaYml::Node entryNode;
-		entryNode["key"] = key;
-		entryNode["value"] = Meta::Serialize(&value);
-		entriesNode.push_back(entryNode);
+		const Authoring::WriteNode entryNode = entriesNode.Append();
+		entryNode.SetMap();
+		entryNode.Child("key").SetScalar(key);
+		Meta::SerializeInto(&value, entryNode.Child("value"));
 	}
-
-	MetaYml::Node node;
-	node[m_name] = entriesNode;
-
-	std::ostringstream payload;
-	payload << node;
 
 	// 목적 경로는 런타임 읽기와 같은 규약에서 만든다. 확장자를 붙이고 파일을
 	// 게시하는 일은 Editor Host가 소유한다.
@@ -261,7 +257,7 @@ bool BlackBoard::Serialize(std::string_view name)
 	TextAssetAuthoringRequest request{};
 	request.destinationDirectory = assetPath.parent_path();
 	request.name = assetPath.stem().wstring();
-	request.payload = payload.str();
+	request.payload = document.Dump();
 
 	TextAssetAuthoringResult result{};
 	if (!AssetAuthoringPort::WriteBlackBoard(request, result))

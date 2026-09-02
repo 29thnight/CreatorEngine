@@ -9,12 +9,8 @@
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ExternUI.h"
-#include "FileDialog.h"
 // DataSystems가 여기 있다. 유니티 빌드에서는 앞선 파일이 공급했다.
 #include "DataSystem.h"
-#ifndef YAML_CPP_API
-#define YAML_CPP_API __declspec(dllimport)
-#endif /* YAML_CPP_STATIC_DEFINE */
 
 // 컨트롤러별 노드 편집기 세션 — 에디터가 소유한다(E3-5). Core의
 // AnimationController는 편집기 세션을 모른다. NodeEditor의 프레임 간 상태는
@@ -376,50 +372,6 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 							animator->CreateController_UI();
 						}
 
-						if (ImGui::Button("Save Layers")) //&&&&SaveLayer
-						{
-							ImGui::OpenPopup("savelayer");
-							
-						}
-
-						if (ImGui::BeginPopup("savelayer"))
-						{
-							float availableWidth = ImGui::GetContentRegionAvail().x;
-							static char fileName[64] = "NewControllers";
-							ImGui::InputText("Name", fileName, sizeof(fileName));
-
-							std::string fileNameStr(fileName);
-
-							if (ImGui::Button("Save"))
-							{
-								if (!animator->SerializeControllers(fileName))
-								{
-									Debug->LogError(
-										"Failed to save animator controllers: " + fileNameStr);
-								}
-							}
-							
-							ImGui::EndPopup();
-						}
-						if (ImGui::Button("Load Layers")) //&&&&load 파일경로 오픈해서 찾게
-						{
-
-							file::path fileName = ShowOpenFileDialog(
-								L"JSON Files (*.json)\0*.json\0",
-								L"Load JSON File",
-								PathFinder::Relative("AnimatorController").wstring()
-							);
-							if (!fileName.empty())
-							{
-								animator->DeserializeControllers(fileName.string());
-							}
-							else
-							{
-								Debug->LogError("Failed to load json.");
-							}
-
-							
-						}
 						ImGui::EndTabItem();
 					}
 					if (ImGui::BeginTabItem("Parameters"))

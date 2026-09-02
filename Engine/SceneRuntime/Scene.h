@@ -1012,7 +1012,7 @@ public:
 	// 쓰는 값과 같다 — 외부 소비자가 핸들을 직접 짜맞출 일이 생기면(현재는
 	// 없다) 여기서 얻는다.
 	uint32_t GetSceneId() const { return m_sceneId; }
-	HashingString GetSceneName() const { return m_sceneName; }
+	const HashingString& GetSceneName() const noexcept { return m_sceneName; }
     Entity*					m_selectedEntity = nullptr;
 	std::vector<Entity*>	m_selectedEntities;
     Core::DelegateHandle		resetObjHandle{};

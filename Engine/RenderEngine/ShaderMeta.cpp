@@ -492,45 +492,56 @@ std::filesystem::path ShaderMeta::ResolveSource(
 bool ShaderMetaLoader::LoadFile(const std::filesystem::path& path,
     const FileGuid& guid, ShaderMeta& outMeta, std::string& outError)
 {
-    if (".shadermeta" != path.extension().string())
-        return Fail(path.string(), "확장자가 .shadermeta가 아니다", outError);
+    return LoadFile(path, path, guid, outMeta, outError);
+}
+
+bool ShaderMetaLoader::LoadFile(const std::filesystem::path& documentPath,
+    const std::filesystem::path& sourceOriginPath, const FileGuid& guid,
+    ShaderMeta& outMeta, std::string& outError)
+{
+    if (".shadermeta" != documentPath.extension().string())
+        return Fail(documentPath.string(), "확장자가 .shadermeta가 아니다", outError);
+    if (".shadermeta" != sourceOriginPath.extension().string())
+        return Fail(sourceOriginPath.string(),
+            "source origin 확장자가 .shadermeta가 아니다", outError);
 
     std::error_code error;
-    const std::uintmax_t bytes = std::filesystem::file_size(path, error);
-    if (error) return Fail(path.string(), "파일 크기를 읽지 못했다", outError);
+    const std::uintmax_t bytes = std::filesystem::file_size(documentPath, error);
+    if (error) return Fail(documentPath.string(), "파일 크기를 읽지 못했다", outError);
     if (0 == bytes || bytes > kMaxMetaBytes)
-        return Fail(path.string(), "파일이 비었거나 1MiB 상한을 넘었다", outError);
+        return Fail(documentPath.string(), "파일이 비었거나 1MiB 상한을 넘었다", outError);
 
-    std::ifstream file(path, std::ios::binary);
-    if (!file) return Fail(path.string(), "파일을 열지 못했다", outError);
-    std::ostringstream text;
-    text << file.rdbuf();
-    if (!file.eof() && file.fail())
-        return Fail(path.string(), "파일을 끝까지 읽지 못했다", outError);
-    return Parse(text.str(), path, guid, outMeta, outError);
+    std::string documentError;
+    const Authoring::ParsedDocument document =
+        Authoring::ParsedDocument::ParseFile(documentPath.string(), documentError);
+    if (!document)
+        return Fail(documentPath.string(), "문서 해석 실패: " + documentError, outError);
+    return ParseDocument(document.Root(), sourceOriginPath, guid, outMeta, outError);
 }
 
 bool ShaderMetaLoader::Parse(std::string_view text,
     const std::filesystem::path& originPath, const FileGuid& guid,
     ShaderMeta& outMeta, std::string& outError)
 {
+    if (text.empty() || text.size() > kMaxMetaBytes)
+        return Fail(originPath.string(), "입력이 비었거나 1MiB 상한을 넘었다", outError);
+
+    std::string parseError;
+    const Authoring::ParsedDocument document =
+        Authoring::ParsedDocument::ParseText(std::string(text), parseError);
+    if (!document)
+        return Fail(originPath.string(), "YAML 해석 실패: " + parseError, outError);
+    return ParseDocument(document.Root(), originPath, guid, outMeta, outError);
+}
+
+bool ShaderMetaLoader::ParseDocument(const Authoring::ReadNode& root,
+    const std::filesystem::path& originPath, const FileGuid& guid,
+    ShaderMeta& outMeta, std::string& outError)
+{
     try
     {
-        if (text.empty() || text.size() > kMaxMetaBytes)
-            return Fail(originPath.string(), "입력이 비었거나 1MiB 상한을 넘었다", outError);
         if (guid == FileGuid{})
             return Fail(originPath.string(), "asset GUID가 nil이다", outError);
-
-        // ★ 트리를 소유하는 홀더를 통해 파싱한다. ryml의 노드 뷰는 트리를 소유하지
-        //   않으므로 `ParsedDocument`가 이 함수가 끝날 때까지 살아 있어야 한다.
-        //   yaml-cpp `Node`의 값 의미론과 다른 지점이라 타입으로 강제한다.
-        std::string parseError;
-        const Authoring::ParsedDocument document =
-            Authoring::ParsedDocument::ParseText(std::string(text), parseError);
-        if (!document)
-            return Fail(originPath.string(), "YAML 해석 실패: " + parseError, outError);
-
-        const Authoring::ReadNode root = document.Root();
         if (!ValidateMap(root,
             { "schema", "name", "source", "properties", "keywords", "passes" },
             originPath.string(), outError)) return false;

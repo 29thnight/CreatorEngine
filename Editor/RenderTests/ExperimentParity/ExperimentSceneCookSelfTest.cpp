@@ -3,6 +3,9 @@
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/SceneCookProducer.h"
+#include "AuthoringCookedDocument.h"
+#include "AuthoringNodeEquality.h"
+#include "AuthoringParsedDocument.h"
 
 #include <algorithm>
 #include <chrono>
@@ -77,14 +80,79 @@ namespace RenderTest
             return stream.good() || stream.eof();
         }
 
-        [[nodiscard]] std::string BytesToString(
-            const std::vector<std::byte>& bytes)
+        [[nodiscard]] bool RuntimeDocumentEquivalent(
+            const Authoring::ReadNode& source,
+            const Authoring::ReadNode& cooked)
         {
-            std::string text;
-            text.resize(bytes.size());
-            for (std::size_t index = 0u; index < bytes.size(); ++index)
-                text[index] = static_cast<char>(bytes[index]);
-            return text;
+            if (!source || !cooked) return !source && !cooked;
+            if (source.IsNull() || cooked.IsNull())
+                return source.IsNull() && cooked.IsNull();
+            if (source.IsScalar() || cooked.IsScalar())
+                return source.IsScalar() && cooked.IsScalar()
+                    && source.Scalar() == cooked.Scalar();
+            if (source.IsSequence() || cooked.IsSequence())
+            {
+                if (!source.IsSequence() || !cooked.IsSequence()
+                    || source.Size() != cooked.Size()) return false;
+                for (std::size_t index = 0u; index < source.Size(); ++index)
+                {
+                    if (!RuntimeDocumentEquivalent(
+                        source.At(index), cooked.At(index))) return false;
+                }
+                return true;
+            }
+            if (!source.IsMap() || !cooked.IsMap()
+                || source.Size() != cooked.Size()) return false;
+            for (const Authoring::MapEntry entry : source.Map())
+            {
+                const std::string key = entry.key.AsStringChecked();
+                const Authoring::ReadNode cookedValue = cooked[key.c_str()];
+                if (!cookedValue) return false;
+                if (key == "m_valueYaml" && entry.value.IsScalar()
+                    && !entry.value.Scalar().empty())
+                {
+                    if (!cookedValue.IsScalar()) return false;
+                    std::string sourceError;
+                    std::string cookedError;
+                    const Authoring::ParsedDocument embeddedSource =
+                        Authoring::ParsedDocument::ParseText(
+                            entry.value.AsString(), sourceError);
+                    const auto embeddedCooked =
+                        Authoring::DecodeCookedDocumentTextEnvelope(
+                            cookedValue.Scalar(), cookedError);
+                    if (!embeddedSource || !embeddedCooked
+                        || !Authoring::NodesEqual(
+                            embeddedSource.Root(), embeddedCooked->Root()))
+                        return false;
+                    continue;
+                }
+                if (!RuntimeDocumentEquivalent(entry.value, cookedValue))
+                    return false;
+            }
+            return true;
+        }
+
+        [[nodiscard]] std::size_t CountAuthoredOverrideValues(
+            const Authoring::ReadNode& node)
+        {
+            if (!node) return 0u;
+            std::size_t count{};
+            if (node.IsMap())
+            {
+                for (const Authoring::MapEntry entry : node.Map())
+                {
+                    const std::string key = entry.key.AsStringChecked();
+                    if (key == "m_valueYaml" && entry.value.IsScalar()
+                        && !entry.value.Scalar().empty()) ++count;
+                    count += CountAuthoredOverrideValues(entry.value);
+                }
+            }
+            else if (node.IsSequence())
+            {
+                for (const Authoring::ReadNode child : node)
+                    count += CountAuthoredOverrideValues(child);
+            }
+            return count;
         }
 
         inline constexpr const char* kNil =
@@ -220,8 +288,39 @@ namespace RenderTest
                 std::string original;
                 check.Check(ReadFileBytes(fixture.source, original),
                     "원본을 읽을 수 있어야 한다");
-                check.Check(BytesToString(product.artifactBytes) == original,
-                    "artifact 가 원본과 비트 단위로 같아야 한다");
+                check.Check(Authoring::IsCookedDocument(product.artifactBytes),
+                    "artifact 가 CEDO binary document여야 한다");
+                std::string sourceError;
+                std::string cookedError;
+                const Authoring::ParsedDocument sourceDocument =
+                    Authoring::ParsedDocument::ParseText(original, sourceError);
+                const Authoring::ParsedDocument cookedDocument =
+                    Authoring::ParsedDocument::ParseCooked(
+                        product.artifactBytes, cookedError);
+                check.Check(sourceDocument && cookedDocument
+                    && RuntimeDocumentEquivalent(
+                        sourceDocument.Root(), cookedDocument.Root()),
+                    "fixture authoring/CEDO 구조가 같아야 한다");
+                check.Check(sourceDocument
+                    && product.cookedOverrideValues
+                        == CountAuthoredOverrideValues(sourceDocument.Root()),
+                    "fixture nested override cook 수가 authoring 입력과 같아야 한다");
+                std::vector<std::byte> truncated = product.artifactBytes;
+                truncated.pop_back();
+                std::string corruptError;
+                check.Check(!Authoring::DecodeCookedDocument(
+                    truncated, corruptError).has_value(),
+                    "잘린 CEDO payload는 fail-closed여야 한다");
+                std::vector<std::byte> wrongVersion = product.artifactBytes;
+                wrongVersion[4] = std::byte{ 0xff };
+                check.Check(!Authoring::DecodeCookedDocument(
+                    wrongVersion, corruptError).has_value(),
+                    "지원하지 않는 CEDO version은 fail-closed여야 한다");
+                std::vector<std::byte> trailing = product.artifactBytes;
+                trailing.push_back(std::byte{});
+                check.Check(!Authoring::DecodeCookedDocument(
+                    trailing, corruptError).has_value(),
+                    "CEDO trailing byte는 fail-closed여야 한다");
                 check.Check(product.kind == ck::CookedAssetKind::Scene,
                     ".creator 는 Scene kind");
                 check.Check(product.artifactPath == std::string("Derived/Scenes/")
@@ -425,10 +524,28 @@ namespace RenderTest
         }
 
         const ck::SceneCookProduct& product = *result.product;
-        std::string original;
-        check.Check(ReadFileBytes(source, original), "원본을 읽을 수 있어야 한다");
-        check.Check(BytesToString(product.artifactBytes) == original,
-            "artifact 가 원본과 비트 단위로 같아야 한다");
+		check.Check(Authoring::IsCookedDocument(product.artifactBytes),
+			"artifact 가 CEDO binary document여야 한다");
+		std::string sourceParseError;
+		std::string cookedParseError;
+		const Authoring::ParsedDocument sourceDocument =
+			Authoring::ParsedDocument::ParseFile(source.string(), sourceParseError);
+		const Authoring::ParsedDocument cookedDocument =
+			Authoring::ParsedDocument::ParseCooked(
+				product.artifactBytes, cookedParseError);
+		check.Check(static_cast<bool>(sourceDocument),
+			"authoring scene/prefab 문서를 다시 로드할 수 있어야 한다");
+		check.Check(static_cast<bool>(cookedDocument),
+			"cooked scene/prefab payload를 로드할 수 있어야 한다");
+		if (sourceDocument && cookedDocument)
+		{
+			check.Check(RuntimeDocumentEquivalent(
+				sourceDocument.Root(), cookedDocument.Root()),
+				"authoring/cooked scene-payload 의미 구조가 같아야 한다");
+			check.Check(product.cookedOverrideValues
+				== CountAuthoredOverrideValues(sourceDocument.Root()),
+				"nested override CEDO 수가 authoring 입력과 같아야 한다");
+		}
         // 실자산 프리팹은 자기 GUID 를 자기 안에 적어 둔다. 그것이 간선으로
         // 새어 나가면 manifest 가 self-dependency 로 거부한다.
         check.Check(std::ranges::find(product.manifestEntry.dependencies,
@@ -437,13 +554,14 @@ namespace RenderTest
 
         char summary[380]{};
         std::snprintf(summary, sizeof(summary),
-            "  실자산 단정 %zu/%zu · 간선 %zu(model %zu·prefab %zu·texture %zu)"
-            " · legacy이름 %zu · producer없음 %zu\n",
+			"  실자산 parity 단정 %zu/%zu · 간선 %zu(model %zu·prefab %zu·texture %zu)"
+			" · legacy이름 %zu · producer없음 %zu · override CEDO %zu\n",
             check.passed, check.passed + check.failed,
             product.manifestEntry.dependencies.size(), product.modelEdges,
             product.prefabEdges, product.textureEdges,
             product.legacyTextureNameReferences,
-            product.unproducedGuidReferences);
+            product.unproducedGuidReferences,
+            product.cookedOverrideValues);
         outLog += summary;
         return check.failed == 0u;
     }

@@ -7,6 +7,7 @@
 #include "Material.h"
 #include "Texture.h"
 #include "ReflectionYml.h"
+#include "AuthoringParsedDocument.h"
 #include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
 #include <assimp/postprocess.h>
@@ -135,25 +136,30 @@ Model* Model::LoadModel(std::string_view filePath)
 			file::path metaPath = path_.string() + ".meta";
 			if (file::exists(metaPath))
 			{
-				auto node = MetaYml::LoadFile(metaPath.string());
+				std::string parseError;
+				const Authoring::ParsedDocument document =
+					Authoring::ParsedDocument::ParseFile(metaPath.string(), parseError);
+				if (!document)
+					throw std::runtime_error("Model meta parse failed: " + parseError);
+				const Authoring::ReadNode node = document.Root();
 				if (node["ModelImporter"])
 				{
-					const MetaYml::Node& modelImporterNode = node["ModelImporter"];
+					const Authoring::ReadNode modelImporterNode = node["ModelImporter"];
 					if (modelImporterNode)
 					{
-						if (modelImporterNode["OptimizeMeshes"] && modelImporterNode["OptimizeMeshes"].as<bool>())
+						if (modelImporterNode["OptimizeMeshes"] && modelImporterNode["OptimizeMeshes"].As<bool>())
 						{
 							settings |= aiProcess_OptimizeMeshes;
 						}
 
-						if (modelImporterNode["ImproveCacheLocality"] && modelImporterNode["ImproveCacheLocality"].as<bool>())
+						if (modelImporterNode["ImproveCacheLocality"] && modelImporterNode["ImproveCacheLocality"].As<bool>())
 						{
 							settings |= aiProcess_ImproveCacheLocality;
 						}
 
 						if (modelImporterNode["CreateMeshCollider"])
 						{
-							isCreateMeshCollider = modelImporterNode["CreateMeshCollider"].as<bool>();
+							isCreateMeshCollider = modelImporterNode["CreateMeshCollider"].As<bool>();
 						}
 					}
 				}
@@ -234,25 +240,30 @@ std::shared_ptr<Model> Model::LoadModelShared(std::string_view filePath)
 			file::path metaPath = path_.string() + ".meta";
 			if (file::exists(metaPath))
 			{
-				auto node = MetaYml::LoadFile(metaPath.string());
+				std::string parseError;
+				const Authoring::ParsedDocument document =
+					Authoring::ParsedDocument::ParseFile(metaPath.string(), parseError);
+				if (!document)
+					throw std::runtime_error("Model meta parse failed: " + parseError);
+				const Authoring::ReadNode node = document.Root();
 				if (node["ModelImporter"])
 				{
-					const MetaYml::Node& modelImporterNode = node["ModelImporter"];
+					const Authoring::ReadNode modelImporterNode = node["ModelImporter"];
 					if (modelImporterNode)
 					{
-						if (modelImporterNode["OptimizeMeshes"] && modelImporterNode["OptimizeMeshes"].as<bool>())
+						if (modelImporterNode["OptimizeMeshes"] && modelImporterNode["OptimizeMeshes"].As<bool>())
 						{
 							settings |= aiProcess_OptimizeMeshes;
 						}
 
-						if (modelImporterNode["ImproveCacheLocality"] && modelImporterNode["ImproveCacheLocality"].as<bool>())
+						if (modelImporterNode["ImproveCacheLocality"] && modelImporterNode["ImproveCacheLocality"].As<bool>())
 						{
 							settings |= aiProcess_ImproveCacheLocality;
 						}
 
 						if (modelImporterNode["CreateMeshCollider"])
 						{
-							isCreateMeshCollider = modelImporterNode["CreateMeshCollider"].as<bool>();
+							isCreateMeshCollider = modelImporterNode["CreateMeshCollider"].As<bool>();
 						}
 					}
 				}

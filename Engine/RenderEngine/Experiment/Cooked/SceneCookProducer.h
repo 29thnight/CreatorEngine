@@ -11,9 +11,8 @@
 namespace experiment::cooked
 {
     // `.creator`(scene) 와 `.prefab` 하나를 publication 직전의 완전 소유
-    // 산출물로 바꾼다. 둘은 같은 YAML 모양이고 kind 만 다르다.
-    //
-    // ★ artifact 는 원본 YAML 바이트 그대로다. 앞선 producer 들과 같은 자세.
+    // 산출물로 바꾼다. 둘은 같은 저작 YAML 모양이고 kind 만 다르다.
+    // artifact 는 D6 CEDO tree bytes이며 Player text parser를 호출하지 않는다.
     //
     // ★ **이것은 scene 파서가 아니다. 의존 GUID 추출기다.**
     //   scene 의 의미는 리플렉션 역직렬화가 소유한다. 여기서는 manifest 간선을
@@ -69,6 +68,7 @@ namespace experiment::cooked
         //   AssetCooker 가 요약에 찍고, 계획서가 D5-c 판정에 쓴다.
         std::size_t legacyTextureNameReferences{};
         std::size_t unproducedGuidReferences{};
+        std::size_t cookedOverrideValues{};
     };
 
     struct SceneCookProductIssue final

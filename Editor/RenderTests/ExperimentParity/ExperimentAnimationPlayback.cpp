@@ -24,6 +24,7 @@
 #include <mathematics/transform.hpp>
 #include <string>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -319,6 +320,210 @@ namespace RenderTest
             + " (clip " + std::to_string(skeleton->clips.size()) + "개)\n";
         return passed;
     }
+
+    bool RunPhase17ModelCorpusSelfTest(
+        const std::string& modelPath, bool requireAnimation, std::string& outLog)
+    {
+        outLog += "[experiment.phase17model] 대상: " + modelPath
+            + (requireAnimation ? " (animated)\n" : " (large-static)\n");
+
+        im::ImporterDecoderOptions decoderOptions{};
+        decoderOptions.conversion.modelAssetId = MakeBenchmarkAssetId(0x71u);
+        decoderOptions.conversion.shaderAssetId = MakeBenchmarkAssetId(0x72u);
+        decoderOptions.conversion.resolveMaterialAsset =
+            [](const im::ImportedMaterial&, std::size_t index)
+            {
+                return MakeBenchmarkAssetId(0x73u, index);
+            };
+        std::unordered_map<std::string, ex::AssetId> textureIds;
+        decoderOptions.conversion.resolveTextureAsset =
+            [&textureIds](const im::ImportedTexture& texture)
+            {
+                const auto [found, inserted] = textureIds.try_emplace(
+                    texture.sourceKey, MakeBenchmarkAssetId(0x74u, textureIds.size()));
+                (void)inserted;
+                return found->second;
+            };
+        im::ImporterModelDecoder decoder(std::move(decoderOptions));
+        ex::ModelLoadRequest request{};
+        request.sourcePath = std::filesystem::path(modelPath);
+        request.sourcePreference = ex::ModelSourcePreference::SourceOnly;
+        ex::ModelDecodeResult decoded = decoder.Decode(request);
+
+        std::size_t infos = 0, warnings = 0, errors = 0;
+        for (const ex::ModelLoadIssue& issue : decoded.issues)
+        {
+            switch (issue.severity)
+            {
+            case ex::ModelLoadIssueSeverity::Error:   ++errors; break;
+            case ex::ModelLoadIssueSeverity::Warning: ++warnings; break;
+            default:                                  ++infos; break;
+            }
+        }
+        if (!decoded.draft.has_value())
+        {
+            outLog += "  결과: 실패 (experiment source decoder가 draft를 만들지 못함)\n";
+            for (const ex::ModelLoadIssue& issue : decoded.issues)
+                outLog += "    " + issue.context + ": " + issue.message + "\n";
+            return false;
+        }
+
+        const ex::ModelDraft& draft = *decoded.draft;
+        std::size_t vertices = 0, indices = 0, invalidIndices = 0;
+        for (const ex::Mesh& mesh : draft.meshes)
+        {
+            vertices += mesh.vertices.size();
+            indices += mesh.indices.size();
+            for (std::uint32_t index : mesh.indices)
+                if (index >= mesh.vertices.size()) ++invalidIndices;
+        }
+        std::size_t textureProperties = 0, validTextureProperties = 0;
+        for (const ex::Material& material : draft.materials)
+        {
+            for (const ex::MaterialProperty& property : material.properties)
+            {
+                if (const auto* texture = std::get_if<ex::TextureReference>(
+                    &property.value))
+                {
+                    ++textureProperties;
+                    if (texture->assetId.IsValid()) ++validTextureProperties;
+                }
+            }
+        }
+
+        std::size_t failures = 0;
+        if (draft.nodes.empty() || draft.meshes.empty() || vertices == 0 || indices == 0)
+        {
+            ++failures;
+            outLog += "  [diff] node/mesh/vertex/index 중 빈 축이 있다\n";
+        }
+        if (invalidIndices != 0)
+        {
+            ++failures;
+            outLog += "  [diff] 범위를 벗어난 index "
+                + std::to_string(invalidIndices) + "개\n";
+        }
+        if (errors != 0)
+        {
+            ++failures;
+            outLog += "  [diff] decoder error issue " + std::to_string(errors) + "개\n";
+        }
+        const std::size_t requiredTextureProperties = requireAnimation ? 9u : 60u;
+        if (textureProperties < requiredTextureProperties
+            || validTextureProperties != textureProperties)
+        {
+            ++failures;
+            outLog += "  [diff] PBR texture property identity가 부족하다: "
+                + std::to_string(validTextureProperties) + "/"
+                + std::to_string(textureProperties) + "\n";
+        }
+
+        std::size_t bones = 0, clips = 0, channels = 0, sampledPoses = 0;
+        bool anyMovement = false;
+        if (draft.skeleton.has_value())
+        {
+            const ex::Skeleton& skeleton = *draft.skeleton;
+            bones = skeleton.bones.size();
+            clips = skeleton.clips.size();
+            for (const ex::AnimationClip& clip : skeleton.clips)
+                channels += clip.channels.size();
+        }
+
+        if (requireAnimation)
+        {
+            if (!draft.skeleton.has_value() || bones < 100 || clips == 0)
+            {
+                ++failures;
+                outLog += "  [diff] animated corpus의 skeleton/clip 축이 부족하다\n";
+            }
+            else
+            {
+                constexpr float MovementEpsilon = 1e-4f;
+                const ex::Skeleton& skeleton = *draft.skeleton;
+                for (const ex::AnimationClip& clip : skeleton.clips)
+                {
+                    if (clip.channels.empty() || !(clip.durationTicks > 0.0))
+                    {
+                        ++failures;
+                        outLog += "  [diff] 빈 채널 또는 duration 0 clip: "
+                            + clip.name + "\n";
+                        continue;
+                    }
+
+                    const double times[3] = {
+                        0.0, clip.durationTicks * 0.5,
+                        clip.durationTicks * 0.999 };
+                    ExperimentPose firstPose;
+                    for (std::size_t sample = 0; sample < 3; ++sample)
+                    {
+                        ExperimentPose pose;
+                        sampler::EvaluatePose(skeleton, clip, times[sample], pose);
+                        ++sampledPoses;
+                        if (pose.finals.size() != bones
+                            || pose.hasChannel.size() != bones)
+                        {
+                            ++failures;
+                            outLog += "  [diff] pose 크기가 bone 수와 다르다: "
+                                + clip.name + "\n";
+                            break;
+                        }
+                        bool finite = true;
+                        for (const math::matrix4x4& matrix : pose.finals)
+                            if (!AllFinite(matrix)) { finite = false; break; }
+                        if (!finite)
+                        {
+                            ++failures;
+                            outLog += "  [diff] 비유한 pose: " + clip.name + "\n";
+                            break;
+                        }
+                        if (sample == 0)
+                        {
+                            firstPose = std::move(pose);
+                        }
+                        else
+                        {
+                            for (std::size_t bone = 0; bone < pose.finals.size(); ++bone)
+                            {
+                                if (MaxAbsDiff(firstPose.finals[bone], pose.finals[bone])
+                                    > MovementEpsilon)
+                                {
+                                    anyMovement = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!anyMovement)
+                {
+                    ++failures;
+                    outLog += "  [diff] 어떤 clip도 시간에 따라 pose를 바꾸지 않았다\n";
+                }
+            }
+        }
+        else if (vertices < 1'000'000)
+        {
+            ++failures;
+            outLog += "  [diff] large-static corpus가 100만 게시 정점보다 작다\n";
+        }
+
+        char summary[480];
+        std::snprintf(summary, sizeof(summary),
+            "  source decode: nodes %zu, meshes %zu, vertices %zu, indices %zu,"
+            " materials %zu, textureProps %zu/%zu, bones %zu, clips %zu,"
+            " channels %zu, sampledPoses %zu"
+            " | issues info/warn/error %zu/%zu/%zu\n",
+            draft.nodes.size(), draft.meshes.size(), vertices, indices,
+            draft.materials.size(), validTextureProperties, textureProperties,
+            bones, clips, channels, sampledPoses,
+            infos, warnings, errors);
+        outLog += summary;
+
+        const bool passed = failures == 0;
+        outLog += std::string("  결과: ") + (passed ? "통과" : "실패") + "\n";
+        return passed;
+    }
+
     // ── 맞대결 벤치 ─────────────────────────────────────────────────────
     // ★ 이전 벤치는 성능 우열 비교가 아니었다. 실물 디코더가 없어
     //   `legacy 로드 → 브리지 → 검증 → 게시`를 재는 구조였고, 그건 legacy

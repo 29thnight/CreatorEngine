@@ -9,11 +9,11 @@
 #include "EditorAssetDatabase.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
-#include <yaml-cpp/yaml.h>
 
 std::string						ContentsBrowserWindow::selectedFileName{};
 std::string						ContentsBrowserWindow::selectedMetaFilePath{};
-std::optional<YAML::Node>		ContentsBrowserWindow::selectedFileMetaNode{};
+std::optional<Authoring::WriteDocument>
+	ContentsBrowserWindow::selectedFileMetaNode{};
 
 namespace
 {
@@ -478,14 +478,12 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& dire
 		selectedMetaFilePath = currentDirectory.string() + ".meta";
 		selectedFileName = currentDirectory.filename().string();
 		draggedFileType = FileTypeToString(selectedFileType);
-		try
+		std::string parseError;
+		selectedFileMetaNode = Authoring::WriteDocument::ParseFile(
+			selectedMetaFilePath, &parseError);
+		if (!selectedFileMetaNode)
 		{
-			selectedFileMetaNode = YAML::LoadFile(selectedMetaFilePath);
-		}
-		catch (const std::exception& e)
-		{
-			Debug->LogError(e.what());
-			selectedFileMetaNode = std::nullopt;
+			Debug->LogError(parseError);
 		}
 
 		isHoverAndClicked = false;
@@ -508,14 +506,12 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 
 		selectedFileName = fileName;
 
-		try
+		std::string parseError;
+		selectedFileMetaNode = Authoring::WriteDocument::ParseFile(
+			selectedMetaFilePath, &parseError);
+		if (!selectedFileMetaNode)
 		{
-			selectedFileMetaNode = YAML::LoadFile(selectedMetaFilePath);
-		}
-		catch (const std::exception& e)
-		{
-			Debug->LogError(e.what());
-			selectedFileMetaNode = std::nullopt;
+			Debug->LogError(parseError);
 		}
 	}
 

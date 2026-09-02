@@ -3,7 +3,7 @@
 #include <future>
 #include <ppltasks.h>
 #include <ppl.h>
-#include <yaml-cpp/yaml.h>
+#include "AuthoringBase64.h"
 #include "Benchmark.hpp"
 // SceneManager.h가 여기 있었다. LoadAssetBundle이 씬 매니저가 들고 있던
 // 스레드풀을 빌려 쓰느라 층 3이 층 4를 올려다봤다. 풀의 소유를 층 1로
@@ -12,6 +12,8 @@
 // Meta::Serialize / Deserialize. SceneManager.h가 ReflectionYml.h를 대신
 // 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
 #include "ReflectionYml.h"
+#include "AuthoringParsedDocument.h"
+#include "AuthoringCookedDocument.h"
 #include "SerializationProfiler.h" // D0: 부팅 catalog 파싱 기준선
 #include "AuthoringNodeViewAccess.h" // D3-a-5b
 #include "ShaderMeta.h"
@@ -28,6 +30,7 @@
 #include <limits>
 #include <ostream>
 #include <sstream>
+#include <stdexcept>
 
 // 검색 함수
 bool HasImageFile(const file::path& directory)
@@ -49,8 +52,8 @@ bool HasImageFile(const file::path& directory)
 namespace
 {
 	constexpr std::array<char, 4> kMaterialPayloadMagic{ 'C', 'E', 'M', 'T' };
-	constexpr std::uint16_t kMaterialPayloadVersion = 1;
-	constexpr std::uint16_t kMaterialPayloadYamlEncoding = 1;
+	constexpr std::uint16_t kMaterialPayloadVersion = 2;
+	constexpr std::uint16_t kMaterialPayloadCookedDocumentEncoding = 2;
 	constexpr std::uint32_t kMaxMaterialPayloadBytes = 4u * 1024u * 1024u;
 
 	void WriteU16(std::ostream& output, std::uint16_t value)
@@ -183,16 +186,46 @@ DataSystem::~DataSystem()
 void DataSystem::Initialize()
 {
 	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
-	LoadAssetCatalog(PathFinder::Relative());
-	// I7-C1 — cooked catalog 기동. 게시된 배포(pak 마운트·스테이징)에는
-	// `<Assets>/Derived/asset-manifest.cemf`가 있고, 저작 트리에는 없다.
-	// 없으면 무동작이므로 에디터 동작은 그대로다.
-	std::string cookedCatalogError;
-	if (!MountCookedCatalog(PathFinder::Relative(), cookedCatalogError)
-		&& !cookedCatalogError.empty())
+	const bool authoring = PathFinder::IsAssetAuthoringEnabled();
+	if (authoring)
 	{
-		// 파일이 아예 없는 것(미게시)은 조용하다 — 손상만 시끄럽다.
+		// Editor는 source catalog가 정본이다. efsw change publication도 이 표를
+		// 갱신하므로 부팅 때 sidecar를 읽는 기존 계약을 유지한다.
+		LoadAssetCatalog(PathFinder::Relative());
+	}
+
+	// D5 cutover — packaged Player는 CEMF source identity table을 정본으로 삼고
+	// `.meta` tree를 전혀 열거하지 않는다. Editor의 optional cooked cache mount는
+	// source registry를 건드리지 않는다.
+	const auto cookedCatalogStart = std::chrono::steady_clock::now();
+	std::string cookedCatalogError;
+	const bool mounted = MountCookedCatalog(
+		PathFinder::Relative(), cookedCatalogError);
+	if (!mounted && !cookedCatalogError.empty())
+	{
+		if (!authoring)
+			throw std::runtime_error("Packaged cooked catalog mount failed: "
+				+ cookedCatalogError);
 		Debug->LogWarning("[cooked.catalog] 마운트 실패: " + cookedCatalogError);
+	}
+	if (!authoring)
+	{
+		if (!mounted)
+			throw std::runtime_error(
+				"Packaged cooked catalog is missing: Assets/Derived/asset-manifest.cemf");
+		const std::size_t sourceAssets = CookedCatalogSourceAssetCount();
+		if (sourceAssets == 0u)
+			throw std::runtime_error(
+				"Packaged cooked catalog has no source identity table");
+
+		const auto elapsed = std::chrono::steady_clock::now() - cookedCatalogStart;
+		SerializationProfile::RecordBootStage(
+			SerializationProfile::Stage::AssetCatalog,
+			static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+				elapsed).count()),
+			static_cast<uint64_t>(sourceAssets));
+		std::printf("[asset.catalog] source=cemf identities=%zu metaParsed=0\n",
+			sourceAssets);
 	}
 }
 
@@ -253,21 +286,25 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 			targetPath.replace_extension();
 			if (file::exists(targetPath))
 			{
-				try
+				std::string parseError;
+				const Authoring::ParsedDocument document =
+					Authoring::ParsedDocument::ParseFile(
+						entry.path().string(), parseError);
+				if (!document)
 				{
-					const YAML::Node node = YAML::LoadFile(entry.path().string());
+					Debug->LogWarning("Asset catalog ignored invalid meta: " +
+						entry.path().string() + " (" + parseError + ")");
+				}
+				else
+				{
 					++parsedMetaCount;
+					const Authoring::ReadNode node = document.Root();
 					if (node["guid"] && node["guid"].IsScalar())
 					{
-						const FileGuid guid(node["guid"].as<std::string>());
+						const FileGuid guid(node["guid"].AsString());
 						if (guid != FileGuid{})
 							RegisterAssetMeta(*m_assetMetaRegistry, guid, targetPath);
 					}
-				}
-				catch (const std::exception& exception)
-				{
-					Debug->LogWarning("Asset catalog ignored invalid meta: " +
-						entry.path().string() + " (" + exception.what() + ")");
 				}
 			}
 		}
@@ -561,9 +598,12 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 		material.m_EmissiveTexName, material.GetEmissiveMapShared().get());
 }
 
-YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
+bool DataSystem::SerializeMaterialPayload(Material& material,
+	Authoring::WriteNode outNode) const
 {
 	SynchronizeLegacyMaterialProperties(material);
+	Authoring::WriteDocument staging;
+	const Authoring::WriteNode node = staging.Root();
 
 	// I5-M5 S2b — writer 전환. ShaderMeta를 아는 재질은 새 정본(schema+
 	// shaderAssetId)으로 적는다. meta 부재 재질, legacy 전용 잔여
@@ -579,21 +619,25 @@ YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
 		if (const std::shared_ptr<const ShaderMeta> meta = ResolveShaderMeta(handle))
 		{
 			experiment::Material authored;
-			YAML::Node canonical;
 			if (ExperimentMaterialMigration::ConvertLegacyMaterial(material,
 					*meta, authored, error)
-				&& experiment::SerializeMaterialAuthoring(authored, canonical,
+				&& experiment::SerializeMaterialAuthoring(authored, node,
 					error))
 			{
-				return canonical;
+				outNode.Assign(node);
+				return true;
 			}
 		}
 		Debug->LogWarning("Material 새 정본 writer 실패 — legacy 표기로 폴백"
 			" (" + material.m_name + "): " + error);
 	}
 
-	YAML::Node node = Meta::Serialize(&material);
-	if (material.m_cbufferValues.empty()) return node;
+	if (!Meta::SerializeInto(&material, node)) return false;
+	if (material.m_cbufferValues.empty())
+	{
+		outNode.Assign(node);
+		return true;
+	}
 
 	// unordered_map 순회 순서를 디스크 형상으로 새지 않는다. legacy CB payload도
 	// 이름순으로 고정해야 save-load-resave diff 0을 안정적으로 판정할 수 있다.
@@ -606,17 +650,19 @@ YAML::Node DataSystem::SerializeMaterialPayload(Material& material) const
 	}
 	std::ranges::sort(names);
 
-	YAML::Node buffers(YAML::NodeType::Sequence);
+	const Authoring::WriteNode buffers = node.Child("constant_buffers");
+	buffers.SetSequence();
 	for (const std::string_view name : names)
 	{
 		const auto& data = material.m_cbufferValues.at(std::string(name));
-		YAML::Node entry;
-		entry["name"] = std::string(name);
-		entry["data"] = YAML::Binary(data.data(), data.size());
-		buffers.push_back(entry);
+		const Authoring::WriteNode entry = buffers.Append();
+		entry.SetMap();
+		entry.Child("name").SetScalar(name);
+		entry.Child("data").SetScalar(
+			Authoring::Base64::Encode(data.data(), data.size()));
 	}
-	node["constant_buffers"] = buffers;
-	return node;
+	outNode.Assign(node);
+	return true;
 }
 
 bool DataSystem::DeserializeMaterialPayload(Material& material,
@@ -628,21 +674,18 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 bool DataSystem::DeserializeMaterialPayload(Material& material,
 	const Authoring::NodeView& view, experiment::Material* outAuthored)
 {
-	// D3-b-2b-1b-2b 전환기: 본문이 experiment 코덱(I5 소유)에 backend 노드를
-	// 넘기므로 아직 못 옮긴다.
 	const Authoring::ReadNode readNode = Authoring::NodeViewAccess::Node(view);
-	const YAML::Node& node = readNode.BackendNodeDuringTransition();
-	if (!node || !node.IsMap()) return false;
+	if (!readNode || !readNode.IsMap()) return false;
 
 	// I5-M5 S1 — 읽기 이중화. 새 정본(schema + shaderAssetId)을 만나면
 	// experiment 코덱으로 읽고 legacy 런타임 재질로 변환한다. 런타임 소유가
 	// 아직 legacy인 동안(S2 이전)의 전환기 경로이며, 이름 기반 keywords는
 	// 실제 ShaderMeta를 로드해 인덱스로 정규화한다 — 짐작하지 않는다.
-	if (node["schema"] && node["shaderAssetId"])
+	if (readNode["schema"] && readNode["shaderAssetId"])
 	{
 		experiment::Material authored;
 		std::string error;
-		if (!experiment::DeserializeMaterialAuthoring(node, authored, error))
+		if (!experiment::DeserializeMaterialAuthoring(readNode, authored, error))
 		{
 			Debug->LogError("Material 새 정본 decode 실패: " + error);
 			return false;
@@ -680,21 +723,22 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 
 	try
 	{
-		Meta::Deserialize(&material, node);
+		Meta::Deserialize(&material, readNode);
 		material.m_cbufferValues.clear();
-		if (const YAML::Node buffers = node["constant_buffers"])
+		if (const Authoring::ReadNode buffers = readNode["constant_buffers"])
 		{
 			if (!buffers.IsSequence()) return false;
-			for (const YAML::Node& entry : buffers)
+			for (const Authoring::ReadNode entry : buffers)
 			{
 				if (!entry.IsMap() || !entry["name"] || !entry["data"])
 					return false;
-				std::string name = entry["name"].as<std::string>();
+				std::string name = entry["name"].AsString();
 				if (name.empty() || material.m_cbufferValues.contains(name))
 					return false;
-				const YAML::Binary binary = entry["data"].as<YAML::Binary>();
-				material.m_cbufferValues.emplace(std::move(name),
-					std::vector<std::uint8_t>(binary.data(), binary.data() + binary.size()));
+				const std::string encoded = entry["data"].AsString();
+				std::vector<std::uint8_t> binary;
+				if (!Authoring::Base64::Decode(encoded, binary)) return false;
+				material.m_cbufferValues.emplace(std::move(name), std::move(binary));
 			}
 		}
 	}
@@ -726,9 +770,15 @@ bool DataSystem::HasVersionedMaterialBinaryPayload(std::istream& input) const
 bool DataSystem::SerializeMaterialBinaryPayload(Material& material,
 	std::ostream& output) const
 {
-	std::ostringstream yaml;
-	yaml << SerializeMaterialPayload(material);
-	const std::string payload = yaml.str();
+	Authoring::WriteDocument document;
+	if (!SerializeMaterialPayload(material, document.Root())) return false;
+	std::vector<std::byte> payload;
+	std::string encodeError;
+	if (!Authoring::EncodeCookedDocument(document.Root().Read(), payload, encodeError))
+	{
+		Debug->LogError("Material binary payload encode failed: " + encodeError);
+		return false;
+	}
 	if (payload.size() > kMaxMaterialPayloadBytes
 		|| payload.size() > std::numeric_limits<std::uint32_t>::max())
 	{
@@ -737,9 +787,10 @@ bool DataSystem::SerializeMaterialBinaryPayload(Material& material,
 
 	output.write(kMaterialPayloadMagic.data(), kMaterialPayloadMagic.size());
 	WriteU16(output, kMaterialPayloadVersion);
-	WriteU16(output, kMaterialPayloadYamlEncoding);
+	WriteU16(output, kMaterialPayloadCookedDocumentEncoding);
 	WriteU32(output, static_cast<std::uint32_t>(payload.size()));
-	output.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+	output.write(reinterpret_cast<const char*>(payload.data()),
+		static_cast<std::streamsize>(payload.size()));
 	return output.good();
 }
 
@@ -758,30 +809,29 @@ bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 		return false;
 	}
 	if (version != kMaterialPayloadVersion
-		|| encoding != kMaterialPayloadYamlEncoding
+		|| encoding != kMaterialPayloadCookedDocumentEncoding
 		|| payloadSize > kMaxMaterialPayloadBytes)
 	{
 		return false;
 	}
 
-	std::string payload(payloadSize, '\0');
+	std::vector<std::byte> payload(payloadSize);
 	if (payloadSize != 0)
-		input.read(payload.data(), static_cast<std::streamsize>(payload.size()));
+		input.read(reinterpret_cast<char*>(payload.data()),
+			static_cast<std::streamsize>(payload.size()));
 	if (!input) return false;
 
-	try
+	std::string parseError;
+	const Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseCooked(payload, parseError);
+	if (!document)
 	{
-		// D3-a-5b: 임시 노드로 뷰를 만들 수 없다(Make(Node&&) = delete).
-		// 뷰는 소유하지 않으므로 대상 노드에 이름을 준다.
-		const Authoring::ReadNode payloadNode{ YAML::Load(payload) };
-		return DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(payloadNode));
-	}
-	catch (const std::exception& exception)
-	{
-		Debug->LogError("Material binary payload decode failed: "
-			+ std::string(exception.what()));
+		Debug->LogError("Material binary payload decode failed: " + parseError);
 		return false;
 	}
+	const Authoring::ReadNode payloadNode = document.Root();
+	return DeserializeMaterialPayload(material,
+		Authoring::NodeViewAccess::Make(payloadNode));
 }
 
 void DataSystem::FinalizeMaterialRuntime(Material& material)
@@ -871,18 +921,38 @@ Material* DataSystem::LoadMaterial(std::string_view name)
             return Materials[materialName].get();
         }
     }
-    file::path loadPath = PathFinder::Relative("Materials\\") / (materialName + ".asset");
-    if (!file::exists(loadPath))
+    const file::path sourcePath =
+		PathFinder::Relative("Materials\\") / (materialName + ".asset");
+    if (!file::exists(sourcePath))
     {
 		return nullptr;
     }
+	file::path loadPath = sourcePath;
+	FileGuid assetGuid = GetFileGuid(sourcePath);
+	if (assetGuid != FileGuid{})
+	{
+		loadPath = ResolveCatalogAssetPath(assetGuid);
+		if (loadPath.empty()) return nullptr;
+	}
 
-    const Authoring::ReadNode node{ MetaYml::LoadFile(loadPath.string()) };
+	std::string parseError;
+	const Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(loadPath.string(), parseError);
+	if (!document)
+		throw std::runtime_error("Material parse failed: " + parseError);
+	const Authoring::ReadNode node = document.Root();
     auto material = std::make_shared<Material>();
     if (!DeserializeMaterialPayload(*material, Authoring::NodeViewAccess::Make(node))) return nullptr;
     // 파일 stem이 cache key의 정본이다. 내부 m_name이 낡았거나 비어 있어도
     // LoadMaterialShared(name)가 같은 세대를 찾도록 게시 직전에 맞춘다.
     material->m_name = materialName;
+	if (assetGuid != FileGuid{})
+	{
+		std::printf("[material.document] source=%s guid=%s\n",
+			loadPath.lexically_normal() != sourcePath.lexically_normal()
+				? "cooked" : "authoring",
+			assetGuid.ToString().c_str());
+	}
 
     {
         std::lock_guard<std::mutex> guard(m_materialMutex);
@@ -910,14 +980,20 @@ std::shared_ptr<const experiment::Material> DataSystem::LoadAuthoredMaterialShar
 		if (it != m_authoredMaterials.end()) return it->second;
 	}
 
-	const file::path path = GetFilePath(assetGuid);
+	const file::path sourcePath = GetFilePath(assetGuid);
+	const file::path path = ResolveCatalogAssetPath(assetGuid);
 	if (path.empty()) return nullptr;
 
 	// I5-D5c1 — 문서 파싱은 **기존 payload 디코더 하나**만 쓴다. 여기서 YAML
 	// backend 노드를 직접 열면 D3-b 래칫의 탈출구가 하나 더 생긴다(실제로
 	// 그렇게 짰다가 게이트가 잡았다). legacy 산물은 버린다 — 이 창구가 원하는
 	// 것은 authored 쪽이고, 캐시라 자산당 1회다.
-	const Authoring::ReadNode node{ MetaYml::LoadFile(path.string()) };
+	std::string parseError;
+	const Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+	if (!document)
+		throw std::runtime_error("Authored material parse failed: " + parseError);
+	const Authoring::ReadNode node = document.Root();
 	Material discardedLegacy;
 	auto authored = std::make_shared<experiment::Material>();
 	if (!DeserializeMaterialPayload(discardedLegacy,
@@ -928,6 +1004,10 @@ std::shared_ptr<const experiment::Material> DataSystem::LoadAuthoredMaterialShar
 	// legacy 표기 자산에는 저작 원본이 없다 — 지어내지 않는다(디코더가
 	// outAuthored를 건드리지 않으므로 shaderAssetId가 nil로 남는다).
 	if (experiment::AssetId{} == authored->shaderAssetId) return nullptr;
+	std::printf("[material.document] source=%s guid=%s\n",
+		path.lexically_normal() != sourcePath.lexically_normal()
+			? "cooked" : "authoring",
+		assetGuid.ToString().c_str());
 
 	std::lock_guard<std::mutex> guard(m_authoredMaterialMutex);
 	auto& slot = m_authoredMaterials[assetGuid];
@@ -953,7 +1033,7 @@ std::shared_ptr<Material> DataSystem::LoadMaterialShared(std::string_view name)
 Texture* DataSystem::LoadTextureGUID(FileGuid guid)
 {
 	if (!m_assetMetaRegistry) return nullptr;
-	const file::path texturePath = m_assetMetaRegistry->GetPath(guid);
+	const file::path texturePath = ResolveCatalogAssetPath(guid);
 	return texturePath.empty() ? nullptr : LoadTexture(texturePath.string());
 }
 
@@ -1177,15 +1257,25 @@ ShaderMetaHandle DataSystem::LoadShaderMetaHandle(FileGuid guid,
 		}
 	}
 
-	const file::path path = m_assetMetaRegistry->GetPath(guid);
+	const file::path sourcePath = GetFilePath(guid);
+	if (sourcePath.empty())
+	{
+		outError = "ShaderMeta source identity를 찾지 못했다: " + guid.ToString();
+		return {};
+	}
+	const file::path path = ResolveCatalogAssetPath(guid);
 	if (path.empty())
 	{
-		outError = "ShaderMeta catalog GUID 경로를 찾지 못했다: " + guid.ToString();
+		outError = "ShaderMeta runtime 경로를 찾지 못했다: " + guid.ToString();
 		return {};
 	}
 
 	ShaderMeta loaded;
-	if (!ShaderMetaLoader::LoadFile(path, guid, loaded, outError)) return {};
+	if (!ShaderMetaLoader::LoadFile(path, sourcePath, guid, loaded, outError)) return {};
+	std::printf("[shadermeta.document] source=%s guid=%s\n",
+		path.lexically_normal() != sourcePath.lexically_normal()
+			? "cooked" : "authoring",
+		guid.ToString().c_str());
 
 	ShaderMetaPermutationStats stats;
 	if (!ShaderPermutationDomain::Measure(loaded, stats, outError)) return {};

@@ -161,8 +161,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $manifest = Get-Content -LiteralPath $manifestFullPath -Raw | ConvertFrom-Json
-if ([int]$manifest.schemaVersion -ne 3) { throw 'apply requires manifest schemaVersion 3' }
+if ([int]$manifest.schemaVersion -ne 3 -and
+    [int]$manifest.schemaVersion -ne 4) {
+    throw 'apply requires manifest schemaVersion 3 or 4'
+}
 $entries = @($manifest.entries)
+if ($entries.Count -eq 0) { throw 'manifest has no regenerate entries' }
 $oldGuids = [string[]]@($entries | ForEach-Object { [string]$_.oldGuid })
 $newGuids = [string[]]@($entries | ForEach-Object { [string]$_.newGuid })
 

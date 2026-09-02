@@ -1,0 +1,17 @@
+schemaVersion: 1
+mapName: "PlayerPerchase"
+actions:
+  - actionName: "Buy"
+    inputType: "GamePad"
+    actionType: "Button"
+    keyState: "Pressed"
+    keys: [0, 0, 0, 0]
+    scriptName: "ItemUIPopup"
+    functionName: "PurshaseButton"
+  - actionName: "Cancel"
+    inputType: "GamePad"
+    actionType: "Button"
+    keyState: "Released"
+    keys: [0, 0, 0, 0]
+    scriptName: "ItemUIPopup"
+    functionName: "ReleaseKey"

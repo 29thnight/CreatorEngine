@@ -1,6 +1,5 @@
 #include "Animator.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
-#include "Interfaces/AssetAuthoringPort.h"
 #include "AnimatorSystem.h"
 #include "Model.h"
 #include "TransCondition.h"
@@ -16,7 +15,6 @@
 #include "SceneManager.h"
 #include "Socket.h"
 #include "../RenderEngine/Experiment/Model.h" // I5-D4e-1
-#include <nlohmann/json.hpp>
 
 Animator::~Animator()
 {
@@ -567,205 +565,6 @@ ConditionParameter* Animator::FindParameter(std::string valueName)
 
 
 
-bool Animator::SerializeControllers(std::string _jsonName)
-{
-	if (_jsonName.empty())
-	{
-		Debug->LogError("Animator controller save requires a non-empty name");
-		return false;
-	}
-
-	nlohmann::json json;
-	nlohmann::json controllerArray = nlohmann::json::array();
-	for (const auto Controller : m_animationControllers)
-	{
-		controllerArray.push_back(Controller->Serialize());
-	}
-	json["Controllers"] = controllerArray;
-	nlohmann::json paramArray = nlohmann::json::array();
-
-	{
-		std::unique_lock lock(m_paramMutex);
-		for (const auto param : Parameters)
-		{
-			paramArray.push_back(param->Serialize());
-		}
-	}
-	json["Parameters"] = paramArray;
-
-	// replace_extension은 이름에 '.'이 있으면 그 뒤를 통째로 잘라낸다("v1.2" →
-	// "v1.json"). 문자열로 붙여 이름을 보존한다.
-	UncatalogedAuthoringRequest request{};
-	request.destinationPath = PathFinder::AnimatorjsonPath(_jsonName + ".json");
-	request.payload = json.dump(4);
-
-	if (!AssetAuthoringPort::WriteAnimatorController(request))
-	{
-		Debug->LogError(
-			"Animator controller save requires a complete Editor authoring "
-			"transaction: " + _jsonName);
-		return false;
-	}
-
-	return true;
-}
-
-void Animator::DeserializeControllers(std::string _filename)
-{
-	//폴더열어서 json 선택
-	/*namespace fs = std::filesystem;
-	fs::path dirPath = PathFinder::AnimatorjsonPath();
-	if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
-	{
-		std::cerr << "Directory does not exist: " << dirPath << std::endl;
-		return;
-	}
-
-	for (const auto& entry : fs::directory_iterator(dirPath))
-	{
-		if (entry.is_regular_file() && entry.path().extension() == ".json")
-		{
-			std::string filePath = entry.path().string();
-
-
-			
-
-		}
-	}*/
-	std::ifstream file(_filename);
-	if (!file.is_open())
-	{
-		std::cerr << "Failed to open: " << _filename << std::endl;
-	}
-
-	nlohmann::json json;
-	try 
-	{
-		file >> json;
-	}
-	catch (std::exception& e) 
-	{
-		std::cerr << "JSON parsing error: " << e.what() << std::endl;
-	}
-
-	ClearControllersAndParams();
-	for (const auto parameterJson : json["Parameters"])
-	{
-		int param_vType = parameterJson["param_vType"];
-		ValueType paramvType = ValueType::Float;
-		switch (param_vType)
-		{
-		case 0:
-			paramvType = ValueType::Float;
-			break;
-		case 1:
-			paramvType = ValueType::Int;
-			break;
-		case 2:
-			paramvType = ValueType::Bool;
-			break;
-		case 3:
-			paramvType = ValueType::Trigger;
-			break;
-		}
-
-		ConditionParameter* param = AddDefaultParameter(paramvType);
-		param->name = parameterJson["param_name"];
-	}
-
-	for (const auto contorllerJson : json["Controllers"])
-	{
-
-		std::shared_ptr<AnimationController> curController = CreateController_UINoAni();
-
-		curController->name = contorllerJson["controller_name"];
-
-		bool usecontroller = false;
-		bool usemask = false;
-		if (contorllerJson["useController"] == 1)
-			usecontroller = true;
-		curController->useController = usecontroller;
-		/*if (contorllerJson["useMask"] == 1)
-			usemask = true;*/
-		//curController->useMask = usemask;
-
-		for (const auto stateJson : contorllerJson["StateVec"])
-		{
-			std::shared_ptr<AnimationState> curState = curController->CreateState_UI();
-			curState->AnimationIndex = stateJson["animationIndex"];
-			curState->animationSpeed = stateJson["animationSpeed"];
-			curState->animationSpeedParameterName = stateJson["animationSpeedParameterName"];
-			curState->behaviourName = stateJson["behaviourName"];
-			curState->SetBehaviour(curState->behaviourName);
-			curState->multiplerAnimationSpeed = stateJson["multiplerAnimationSpeed"];
-			curState->m_name = stateJson["state_name"];
-			curState->m_isAny = stateJson["m_isAny"];
-			bool usemultipler = false;
-			if (stateJson["useMultipler"] == 1)
-			{
-				usemultipler = true;
-			}
-			curState->useMultipler = usemultipler;
-
-		}
-
-		for (const auto stateJson : contorllerJson["StateVec"])
-		{
-			for (const auto transionJson : stateJson["transitions"])
-			{
-				std::string curstateName = transionJson["curStateName"];
-				std::string nextStateName = transionJson["nextStateName"];
-				AniTransition* curtrans = curController->CreateTransition(curstateName, nextStateName);
-				bool hasexitTime = false;
-				if (transionJson["hasExitTime"] == 1)
-					hasexitTime = true;
-				curtrans->hasExitTime = hasexitTime;
-				curtrans->exitTime = transionJson["exitTime"];
-				curtrans->blendTime = transionJson["blendTime"];
-
-				for (const auto condionJson : transionJson["conditions"])
-				{
-					auto firstParam = Parameters[0];
-					TransCondition* curcodition = curtrans->AddConditionDefault(firstParam->name, ConditionType::None, firstParam->vType);
-					curcodition->SetCondition(condionJson["valueName"]);
-					ConditionType ctype = ConditionType::Greater;
-
-					int type = condionJson["cType"].get<int>();
-
-					switch (type)
-					{
-					case 1:
-						ctype = ConditionType::Less;
-						break;
-					case 2:
-						ctype = ConditionType::Equal;
-						break;
-					case 3:
-						ctype = ConditionType::NotEqual;
-						break;
-					case 4:
-						ctype = ConditionType::True;
-						break;
-					case 5:
-						ctype = ConditionType::False;
-						break;
-					default:
-						ctype = ConditionType::Less;
-						break;
-					}
-					curcodition->cType = ctype;
-
-					curcodition->CompareParameter.fValue = condionJson["fValue"];
-					curcodition->CompareParameter.iValue = condionJson["iValue"];
-					curcodition->CompareParameter.bValue = condionJson["bValue"];
-					curcodition->CompareParameter.tValue = condionJson["tValue"];
-
-				}
-			}
-		}
-		curController->SetCurState(contorllerJson["m_curState"]);
-	}
-}
 
 void Animator::OnDeserialized(const Authoring::NodeView& view)
 {
@@ -936,6 +735,8 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 					animationController->m_nameToState.insert(std::make_pair(sharedState->m_name, sharedState));
 					sharedState->m_ownerController = animationController.get();
 					sharedState->SetBehaviour(sharedState->behaviourName);
+					if (sharedState->m_isAny)
+						animationController->m_anyState = sharedState;
 					if (state["Transitions"])
 					{
 						const auto transitionNode = state["Transitions"];
@@ -947,18 +748,12 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 							sharedState->Transitions.push_back(sharedTransition);
 							sharedTransition->m_ownerController = animationController.get();
 
-							if (transition["conditions"])
+							// TransCondition은 값 벡터라 typed deserializer가 이미 채운다.
+							// 여기서는 런타임 전용 owner/parameter 포인터만 다시 결합한다.
+							for (TransCondition& condition : sharedTransition->conditions)
 							{
-								const auto conditionNode = transition["conditions"];
-								for (const auto condition : conditionNode)
-								{
-									TransCondition newcondition;
-									Meta::Deserialize(&newcondition, condition);
-
-									newcondition.m_ownerController = animationController.get();
-									newcondition.SetValue(newcondition.valueName);
-									sharedTransition->conditions.push_back(newcondition);
-								}
+								condition.m_ownerController = animationController.get();
+								condition.SetValue(condition.valueName);
 							}
 						}
 					}
@@ -988,7 +783,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	}
 }
 
-void Animator::OnAfterSerialize(YAML::Node& node)
+void Animator::OnAfterSerialize(const Authoring::MutableNodeView& view)
 {
 	// I6-B1 — 오버라이드가 자기 표기를 갖는다. 구 코드는 리플렉션이 legacy
 	// Skeleton 포인터를 따라 적은 서브트리에 값을 **되입혔다** — 저장 형상이
@@ -1002,7 +797,8 @@ void Animator::OnAfterSerialize(YAML::Node& node)
 	// 이 게이트의 판정이라 쓰는 것과 읽는 것이 정확히 같아야 한다.
 	if (m_clipOverrides.empty()) return;
 
-	YAML::Node overridesNode(YAML::NodeType::Sequence);
+	const Authoring::WriteNode node = Authoring::MutableNodeViewAccess::Node(view);
+	Authoring::WriteNode overridesNode;
 	for (AnimatorClipOverride& clipOverride : m_clipOverrides)
 	{
 		if (clipOverride.clipIndex < 0) continue;
@@ -1012,25 +808,27 @@ void Animator::OnAfterSerialize(YAML::Node& node)
 			continue;
 		}
 
-		YAML::Node entry(YAML::NodeType::Map);
-		entry["clipIndex"] = clipOverride.clipIndex;
+		if (!overridesNode)
+		{
+			overridesNode = node.Child("m_clipOverrides");
+			overridesNode.SetSequence();
+		}
+		const Authoring::WriteNode entry = overridesNode.Append();
+		entry.SetMap();
+		entry.Child("clipIndex").SetScalar(clipOverride.clipIndex);
 		if (clipOverride.loopOverride.has_value())
 		{
-			entry["loopOverride"] = *clipOverride.loopOverride;
+			entry.Child("loopOverride").SetScalar(*clipOverride.loopOverride);
 		}
 		if (!clipOverride.events.empty())
 		{
-			YAML::Node eventsNode(YAML::NodeType::Sequence);
+			const Authoring::WriteNode eventsNode = entry.Child("events");
+			eventsNode.SetSequence();
 			for (KeyFrameEvent& event : clipOverride.events)
 			{
-				eventsNode.push_back(Meta::Serialize(&event));
+				Meta::SerializeInto(&event, eventsNode.Append());
 			}
-			entry["events"] = eventsNode;
 		}
-		overridesNode.push_back(entry);
 	}
-
-	if (0 == overridesNode.size()) return;
-	node["m_clipOverrides"] = overridesNode;
 }
 

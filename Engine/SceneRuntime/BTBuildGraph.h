@@ -19,18 +19,18 @@ struct BTBuildGraph
 
 	BTBuildGraph()
 	{
-	   NodeList.reserve(200); // ÃÊ±â ³ëµå ¸®½ºÆ® Å©±â ¿¹¾à
+	   NodeList.reserve(200); // ì´ˆê¸° ë…¸ë“œ ë¦¬ìŠ¤íŠ¸ í¬ê¸° ì˜ˆì•½
 
 		BTBuildNode rootNode;
 		rootNode.ID = make_guid();
-		rootNode.Type = BehaviorNodeType::Sequence; // ±âº»ÀûÀ¸·Î Sequence·Î ¼³Á¤
+		rootNode.Type = BehaviorNodeType::Sequence; // ê¸°ë³¸ì ìœ¼ë¡œ Sequenceë¡œ ì„¤ì •
 		rootNode.Name = "RootSequence";
-		rootNode.IsRoot = true; // ·çÆ® ³ëµå·Î ¼³Á¤
-		rootNode.Position = math::vector2(0, 0); // ÃÊ±â À§Ä¡ ¼³Á¤
+		rootNode.IsRoot = true; // ë£¨íŠ¸ ë…¸ë“œë¡œ ì„¤ì •
+		rootNode.Position = math::vector2(0, 0); // ì´ˆê¸° ìœ„ì¹˜ ì„¤ì •
 
 		NodeList.push_back(rootNode);
 		Nodes[rootNode.ID] = &NodeList.back();
-		SelectedNode = &NodeList.back(); // ·çÆ® ³ëµå¸¦ ¼±ÅÃµÈ ³ëµå·Î ¼³Á¤
+		SelectedNode = &NodeList.back(); // ë£¨íŠ¸ ë…¸ë“œë¥¼ ì„ íƒëœ ë…¸ë“œë¡œ ì„¤ì •
 	}
 
 	~BTBuildGraph()
@@ -45,8 +45,8 @@ struct BTBuildGraph
 		node.ID = make_guid();
 		node.Type = type;
 		node.Name = std::string(name);
-		node.IsRoot = false; // ±âº»ÀûÀ¸·Î ·çÆ®°¡ ¾Æ´Ô
-		node.Position = pos; // ÃÊ±â À§Ä¡ ¼³Á¤
+		node.IsRoot = false; // ê¸°ë³¸ì ìœ¼ë¡œ ë£¨íŠ¸ê°€ ì•„ë‹˜
+		node.Position = pos; // ì´ˆê¸° ìœ„ì¹˜ ì„¤ì •
 
 		NodeList.push_back(node);
 		Nodes[node.ID] = &NodeList.back();
@@ -64,12 +64,12 @@ struct BTBuildGraph
 		const auto& selectedNodeID = SelectedNode->ID;
 		auto& childNodeParentID = childNode->ParentID;
 
-		if (BT::IsDecoratorNode(selectedNodeType) && 0 < selectedNodeChildContainer.size()) return; // Decorator ³ëµå´Â ÀÚ½ÄÀÌ ÃÖ´ë 1°³¸¸ Çã¿ëµÊ
+		if (BT::IsDecoratorNode(selectedNodeType) && 0 < selectedNodeChildContainer.size()) return; // Decorator ë…¸ë“œëŠ” ìì‹ì´ ìµœëŒ€ 1ê°œë§Œ í—ˆìš©ë¨
 
 		selectedNodeChildContainer.push_back(childNodeID);
 
 		childNodeParentID = selectedNodeID;
-		SelectedNode = childNode; // »õ·Î Ãß°¡ÇÑ ³ëµå¸¦ ¼±ÅÃµÈ ³ëµå·Î ¼³Á¤
+		SelectedNode = childNode; // ìƒˆë¡œ ì¶”ê°€í•œ ë…¸ë“œë¥¼ ì„ íƒëœ ë…¸ë“œë¡œ ì„¤ì •
 	}
 
 	void PickNode(const HashedGuid& id)
@@ -86,23 +86,23 @@ struct BTBuildGraph
 		if (it != Nodes.end())
 		{
 			BTBuildNode* node = it->second;
-			if (node->IsRoot) return; // ·çÆ® ³ëµå´Â »èÁ¦ÇÒ ¼ö ¾øÀ½
+			if (node->IsRoot) return; // ë£¨íŠ¸ ë…¸ë“œëŠ” ì‚­ì œí•  ìˆ˜ ì—†ìŒ
 
-			// ¸ğµç ¸µÅ© Á¦°Å
+			// ëª¨ë“  ë§í¬ ì œê±°
 			for (auto& [otherId, otherNode] : Nodes)
 			{
 				if (otherNode->ParentID == id)
 				{
-					otherNode->ParentID = HashedGuid(); // ºÎ¸ğ ID ÃÊ±âÈ­
+					otherNode->ParentID = HashedGuid(); // ë¶€ëª¨ ID ì´ˆê¸°í™”
 				}
 				std::erase_if(otherNode->Children, 
-					[&id](const HashedGuid& childId) { return childId == id; }); // ÀÚ½Ä ID Á¦°Å
+					[&id](const HashedGuid& childId) { return childId == id; }); // ìì‹ ID ì œê±°
 			}
 
-			node->Children.clear(); // ÀÚ½Ä ³ëµå ¸ñ·Ï ÃÊ±âÈ­
+			node->Children.clear(); // ìì‹ ë…¸ë“œ ëª©ë¡ ì´ˆê¸°í™”
 
 
-			// ³ëµå »èÁ¦
+			// ë…¸ë“œ ì‚­ì œ
 			NodeList.erase(std::remove_if(NodeList.begin(), NodeList.end(),
 				[&id](const BTBuildNode& node) { return node.ID == id; }), NodeList.end());
 			Nodes.erase(it);
@@ -116,14 +116,14 @@ struct BTBuildGraph
 
 		BTBuildNode rootNode;
 		rootNode.ID = make_guid();
-		rootNode.Type = BehaviorNodeType::Sequence; // ±âº»ÀûÀ¸·Î Sequence·Î ¼³Á¤
+		rootNode.Type = BehaviorNodeType::Sequence; // ê¸°ë³¸ì ìœ¼ë¡œ Sequenceë¡œ ì„¤ì •
 		rootNode.Name = "RootSequence";
-		rootNode.IsRoot = true; // ·çÆ® ³ëµå·Î ¼³Á¤
-		rootNode.Position = math::vector2(0, 0); // ÃÊ±â À§Ä¡ ¼³Á¤
+		rootNode.IsRoot = true; // ë£¨íŠ¸ ë…¸ë“œë¡œ ì„¤ì •
+		rootNode.Position = math::vector2(0, 0); // ì´ˆê¸° ìœ„ì¹˜ ì„¤ì •
 
 		NodeList.push_back(rootNode);
 		Nodes[rootNode.ID] = &NodeList.back();
-		SelectedNode = &NodeList.back(); // ·çÆ® ³ëµå¸¦ ¼±ÅÃµÈ ³ëµå·Î ¼³Á¤
+		SelectedNode = &NodeList.back(); // ë£¨íŠ¸ ë…¸ë“œë¥¼ ì„ íƒëœ ë…¸ë“œë¡œ ì„¤ì •
 	}
 
 	void CleanUp()
@@ -131,22 +131,6 @@ struct BTBuildGraph
 		NodeList.clear();
 		Nodes.clear();
 		SelectedNode = nullptr;
-	}
-
-	void DeserializeSingleNode(const YAML::Node& node)
-	{
-		BTBuildNode out;
-
-		Meta::Deserialize(&out, node);
-
-
-		NodeList.push_back(out);
-		Nodes[out.ID] = &NodeList.back();
-
-		if (out.IsRoot)
-		{
-			SelectedNode = &NodeList.back(); // ·çÆ® ³ëµå¸¦ ¼±ÅÃµÈ ³ëµå·Î ¼³Á¤
-		}
 	}
 
 	HashedGuid GetRootID() const
@@ -161,8 +145,8 @@ struct BTBuildGraph
 
 	std::vector<std::string> GetRegisteredKey() const
 	{
-		// ºôµå ¸Ş´º¿¡¼­ »ç¿ëÇÒ ³ëµå Å¸ÀÔ ¸ñ·Ï ¹İÈ¯ : 
-		// ½ºÅ©¸³Æ®°¡ ÇÊ¿äÇÑ Action ³ëµå ¹× Condition ³ëµå´Â ¿ÜºÎ¿¡¼­ µû·Î Ã³¸®ÇÔ.
+		// ë¹Œë“œ ë©”ë‰´ì—ì„œ ì‚¬ìš©í•  ë…¸ë“œ íƒ€ì… ëª©ë¡ ë°˜í™˜:
+		// ìŠ¤í¬ë¦½íŠ¸ê°€ í•„ìš”í•œ Action ë…¸ë“œ ë° Condition ë…¸ë“œëŠ” ì™¸ë¶€ì—ì„œ ë”°ë¡œ ì²˜ë¦¬í•¨.
 		return {
 			"Sequence",
 			"Selector",

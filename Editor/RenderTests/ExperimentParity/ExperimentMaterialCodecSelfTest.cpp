@@ -2,8 +2,8 @@
 
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/MaterialAuthoringCodec.h"
-
-#include <yaml-cpp/yaml.h>
+#include "AuthoringParsedDocument.h"
+#include "AuthoringWriteNode.h"
 
 #include <cstdio>
 #include <string>
@@ -82,35 +82,33 @@ namespace RenderTest
             experiment::Material& outRestored, std::string& outDumped,
             std::string& outError)
         {
-            YAML::Node node;
-            if (!experiment::SerializeMaterialAuthoring(material, node, outError))
+            Authoring::WriteDocument document;
+            if (!experiment::SerializeMaterialAuthoring(
+                material, document.Root(), outError))
                 return false;
-            outDumped = YAML::Dump(node);
-            YAML::Node reloaded;
-            try { reloaded = YAML::Load(outDumped); }
-            catch (const std::exception& parse)
-            {
-                outError = std::string("YAML reload 실패: ") + parse.what();
-                return false;
-            }
-            return experiment::DeserializeMaterialAuthoring(reloaded,
-                outRestored, outError);
+            outDumped = document.Dump();
+            Authoring::ParsedDocument reloaded =
+                Authoring::ParsedDocument::ParseText(outDumped, outError);
+            if (!reloaded) return false;
+            return experiment::DeserializeMaterialAuthoring(
+                reloaded.Root(), outRestored, outError);
         }
 
         void CheckDeserializeRejected(Checker& check, const std::string& yaml,
             const std::string& what)
         {
-            YAML::Node node;
-            try { node = YAML::Load(yaml); }
-            catch (const std::exception&)
+            std::string parseError;
+            Authoring::ParsedDocument document =
+                Authoring::ParsedDocument::ParseText(yaml, parseError);
+            if (!document)
             {
                 check.Check(false, what + " — fixture YAML 자체가 깨졌다");
                 return;
             }
             experiment::Material restored;
             std::string error;
-            const bool ok = experiment::DeserializeMaterialAuthoring(node,
-                restored, error);
+            const bool ok = experiment::DeserializeMaterialAuthoring(
+                document.Root(), restored, error);
             check.Check(!ok, what + " — 거부해야 한다");
             check.Check(!error.empty(), what + " — 거부 사유가 있어야 한다");
         }
@@ -232,31 +230,71 @@ namespace RenderTest
         {
             experiment::Material material;   // shaderAssetId nil
             material.name = "NoShader";
-            YAML::Node node;
+            Authoring::WriteDocument document;
             std::string error;
-            check.Check(!experiment::SerializeMaterialAuthoring(material, node,
-                error) && !error.empty(), "nil shaderAssetId 직렬화 거부");
+            check.Check(!experiment::SerializeMaterialAuthoring(
+                material, document.Root(), error) && !error.empty(),
+                "nil shaderAssetId 직렬화 거부");
         }
         {
             experiment::Material material;
             material.shaderAssetId = shaderId;
             material.properties = { { "", 1.0f } };
-            YAML::Node node;
+            Authoring::WriteDocument document;
             std::string error;
-            check.Check(!experiment::SerializeMaterialAuthoring(material, node,
-                error), "빈 property 이름 직렬화 거부");
+            check.Check(!experiment::SerializeMaterialAuthoring(
+                material, document.Root(), error),
+                "빈 property 이름 직렬화 거부");
         }
         {
             experiment::Material material;
             material.shaderAssetId = shaderId;
             material.keywords = { "" };
-            YAML::Node node;
+            Authoring::WriteDocument document;
             std::string error;
-            check.Check(!experiment::SerializeMaterialAuthoring(material, node,
-                error), "빈 keyword 직렬화 거부");
+            check.Check(!experiment::SerializeMaterialAuthoring(
+                material, document.Root(), error),
+                "빈 keyword 직렬화 거부");
         }
 
-        // ── 4. Deserialize fail-closed ────────────────────────────────────
+        // ── 4. ryml-backed property 창구 ──────────────────────────────────
+        // Scene의 parse_in_arena 전환은 이 공개 창구가 backend 노드에 손대지
+        // 않는다는 사실에 의존한다. writer/reader 직접 왕복으로 그 축을 밟는다.
+        {
+            std::string error;
+            Authoring::ParsedDocument document =
+                Authoring::ParsedDocument::ParseText(
+                    "name: tint\nfloat4: [1, 0.5, 0.25, 1]\n", error);
+            experiment::MaterialPropertyValue value;
+            const bool ok = document
+                && experiment::DeserializeMaterialPropertyValue(
+                    document.Root(), "tint", value, error);
+            const math::vector4* vector = std::get_if<math::vector4>(&value);
+            check.Check(ok && nullptr != vector
+                && vector->x == 1.0f && vector->y == 0.5f
+                && vector->z == 0.25f && vector->w == 1.0f,
+                "ryml float4 property 역직렬화 (" + error + ")");
+        }
+        {
+            std::string error;
+            Authoring::ParsedDocument document =
+                Authoring::ParsedDocument::ParseText(
+                    "name: albedo\ntexture: {guid: "
+                    + std::string(kShaderGuid)
+                    + ", colorSpace: srgb}\n", error);
+            experiment::MaterialPropertyValue value;
+            const bool ok = document
+                && experiment::DeserializeMaterialPropertyValue(
+                    document.Root(), "albedo", value, error);
+            const experiment::TextureReference* texture =
+                std::get_if<experiment::TextureReference>(&value);
+            check.Check(ok && nullptr != texture
+                && texture->assetId == shaderId
+                && texture->colorSpace == experiment::TextureColorSpace::Srgb,
+                "ryml texture property 역직렬화 (" + error + ")");
+        }
+
+        // ── 5. Deserialize fail-closed ────────────────────────────────────
         CheckDeserializeRejected(check,
             "schema: 2\nshaderAssetId: " + std::string(kShaderGuid) + "\n",
             "schema 버전 불일치");

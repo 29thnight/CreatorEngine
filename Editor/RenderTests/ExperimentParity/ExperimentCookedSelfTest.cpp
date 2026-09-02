@@ -671,12 +671,17 @@ namespace RenderTest
                 modelPath, { shaderId, textureId }));
             manifest.entries.push_back(entry(modelId, ck::CookedAssetKind::Model,
                 modelPath, { materialId }));
+            manifest.sourceAssets.push_back({ textureId,
+                "Textures/fixture.png" });
+            manifest.sourceAssets.push_back({ modelId,
+                "Models/fixture.glb" });
 
             const ck::AssetManifestWriteResult write =
                 ck::WriteAssetManifest(manifest);
             check.Check(write.Succeeded(), "GUID-addressed manifest를 쓴다");
             ck::CookedAssetManifest reversed = manifest;
             std::ranges::reverse(reversed.entries);
+            std::ranges::reverse(reversed.sourceAssets);
             const ck::AssetManifestWriteResult deterministic =
                 ck::WriteAssetManifest(reversed);
             check.Check(deterministic.Succeeded()
@@ -691,6 +696,11 @@ namespace RenderTest
                 restoredManifest.Find(modelId);
             check.Check(restoredModel && restoredModel->artifactPath == modelPath,
                 "model GUID lookup이 Derived artifact를 찾는다");
+            const ck::AssetSourceManifestEntry* restoredModelSource =
+                restoredManifest.FindSource(modelId);
+            check.Check(restoredModelSource
+                && restoredModelSource->sourcePath == "Models/fixture.glb",
+                "model GUID lookup이 packaged source path를 찾는다");
             manifestIssues.clear();
             check.Check(restoredModel && ck::VerifyArtifact(*restoredModel,
                 baked.size(), digest, manifestIssues),
@@ -729,6 +739,25 @@ namespace RenderTest
                     "빈 SHA-256 manifest entry를 거부한다");
             }
             {
+                ck::CookedAssetManifest invalid = manifest;
+                invalid.sourceAssets[0].assetId = invalid.sourceAssets[1].assetId;
+                check.Check(!ck::WriteAssetManifest(invalid).Succeeded(),
+                    "중복 source identity GUID를 거부한다");
+            }
+            {
+                ck::CookedAssetManifest invalid = manifest;
+                invalid.sourceAssets[0].sourcePath =
+                    invalid.sourceAssets[1].sourcePath;
+                check.Check(!ck::WriteAssetManifest(invalid).Succeeded(),
+                    "중복 source identity path를 거부한다");
+            }
+            {
+                ck::CookedAssetManifest invalid = manifest;
+                invalid.sourceAssets[0].sourcePath = "../escape.png";
+                check.Check(!ck::WriteAssetManifest(invalid).Succeeded(),
+                    "source identity path escape를 거부한다");
+            }
+            {
                 ck::Sha256Digest stale = digest;
                 stale[0] ^= 1u;
                 std::vector<ck::AssetManifestIssue> issues;
@@ -737,7 +766,7 @@ namespace RenderTest
                     "stale artifact SHA-256을 거부한다");
             }
             outLog += check.failed == manifestFailedBefore
-                ? "  cooked asset manifest 거부: 6/6\n"
+                ? "  cooked asset manifest 거부: 9/9\n"
                 : "  cooked asset manifest 거부: 실패\n";
         }
 
