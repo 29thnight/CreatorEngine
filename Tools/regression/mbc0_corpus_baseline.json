@@ -1,0 +1,1105 @@
+{
+  "schema": "mbc0-corpus-baseline/1",
+  "generatedAt": "2026-09-02T13:07:11",
+  "gitHead": "1474c3c6",
+  "machine": "HEROP-PC-W5820",
+  "summary": {
+    "models": 14,
+    "modelsTracked": 11,
+    "sidecarsWithSubAssets": 13,
+    "materials": 27.0,
+    "embeddedTextures": 27.0,
+    "referenceFiles": 28,
+    "binaryCachesSkipped": [],
+    "modelReferences": 8.0,
+    "subassetReferences": 0.0,
+    "unresolvedReferences": 11.0,
+    "unresolved": [
+      "Dynamic_CPP\\Assets\\Scenes\\Test1.creator m_fileGuid=d3a16695-ac74-43e3-a797-eb5b28bce982",
+      "Dynamic_CPP\\Assets\\Scenes\\Test1.creator m_Motion=d3a16695-ac74-43e3-a797-eb5b28bce982",
+      "Dynamic_CPP\\Assets\\Scenes\\Test1.creator m_textureGuid=190a70bb-c5c9-4b36-88a0-f97659e70047",
+      "Dynamic_CPP\\Assets\\Scenes\\Test1.creator m_textureGuid=452fe2ce-0179-4eee-a467-4a33477e7e1c",
+      "Dynamic_CPP\\Assets\\Scenes\\Test1.creator m_textureGuid=759f9743-58b6-4c9b-96e7-9c05b6e1973f",
+      "Dynamic_CPP\\Assets\\Scenes\\Test1.creator m_textureGuid=b8accc52-1a59-4f51-8b7a-f91839ef91e3",
+      "Dynamic_CPP\\Assets\\Scenes\\Test1.creator m_textureGuid=e33297fe-ce85-4dec-b8f7-27e9e0e45d33",
+      "Dynamic_CPP\\Assets\\Scenes\\Test1.creator m_textureGuid=f0c8eade-7ea8-46b0-a3ae-6402ae82d1ad",
+      "Dynamic_CPP\\Assets\\Scenes\\Test2.creator m_fileGuid=5aab5ff1-4111-4376-a31e-531e0a08f158",
+      "Dynamic_CPP\\Assets\\Scenes\\Test2.creator m_Motion=5aab5ff1-4111-4376-a31e-531e0a08f158"
+    ]
+  },
+  "models": [
+    {
+      "source": "Dynamic_CPP\\Assets\\Animation\\Ani_Mon_3_die.fbx",
+      "tracked": true,
+      "sizeBytes": 978988,
+      "sha256": "85d75cb77fbfb876f0f95c75993c14d1022cfca6b07bff6200fd3a99fbccc2bb",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "7238a117-e923-4e2f-add6-324ec8682a61",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "fbx/material/0",
+          "name": "face.002",
+          "guid": "54371c67-a6df-4377-96d6-5e28ffad6fa6"
+        },
+        {
+          "key": "fbx/material/1",
+          "name": "skin.002",
+          "guid": "fea7358c-e43f-4dc9-a3bd-afffc757962f"
+        },
+        {
+          "key": "fbx/material/2",
+          "name": "팔찌.002",
+          "guid": "1a5214c9-8958-41e4-a415-97c6ab35c1e3"
+        },
+        {
+          "key": "fbx/material/3",
+          "name": "옷.002",
+          "guid": "7f3e0c49-a163-49dc-8104-9e098310db4b"
+        },
+        {
+          "key": "fbx/material/4",
+          "name": "eye.002",
+          "guid": "40215ecd-32b9-45b7-9ebc-824969fac840"
+        },
+        {
+          "key": "fbx/material/5",
+          "name": "뿔.002",
+          "guid": "23052c61-9f09-4b4a-b7c6-f5c25732ff69"
+        }
+      ],
+      "embeddedTextures": []
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Animation\\Cha_Mon_5.fbx",
+      "tracked": true,
+      "sizeBytes": 485340,
+      "sha256": "fef784c3ea36e32e3ee27e71a63ccf6de2f5bd196814be6c462d6c5a664b6235",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "2a91b60b-8923-49af-bcdf-9e39e1600e67",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [],
+      "embeddedTextures": []
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Gunner_F_Mythic.glb",
+      "tracked": false,
+      "sizeBytes": 2890480,
+      "sha256": "fb35aca73a34a7f6803cfb57ac4cf33c6421bc77e0d75fc779fd6476cf21f6dc",
+      "sidecar": true,
+      "sidecarTracked": false,
+      "guid": "935b883a-9d6d-44be-af0a-8ef7495f282a",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "MI_Wpn_Hero_GU_F_Mythic",
+          "guid": "9d7a8405-5150-4628-8f93-33f92fa7f20e"
+        },
+        {
+          "key": "gltf/material/1",
+          "name": "MI_Hero_GU_F_Mythic",
+          "guid": "2a3c5fcb-a8fc-4105-853d-964f710cd6de"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/1",
+          "name": "Wpn_Hero_GU_F_Mythic_D",
+          "guid": "8cc0ed02-ca5d-4ec4-b89d-6ad4ade2057a"
+        },
+        {
+          "key": "gltf/image/2",
+          "name": "Wpn_Hero_GU_F_Mythic_M",
+          "guid": "3d0cdf66-7f1a-466e-9335-544cf67c40ad"
+        },
+        {
+          "key": "gltf/image/0",
+          "name": "Wpn_Hero_GU_F_Mythic_N",
+          "guid": "53085c06-4f38-468a-a95b-6a968c7baef5"
+        },
+        {
+          "key": "gltf/image/4",
+          "name": "Hero_GU_F_Mythic_D",
+          "guid": "1b566d3f-0e17-4af7-803b-a06038e10d29"
+        },
+        {
+          "key": "gltf/image/5",
+          "name": "Hero_GU_F_Mythic_M",
+          "guid": "6f51a865-cd6f-495c-961f-fe2415127380"
+        },
+        {
+          "key": "gltf/image/3",
+          "name": "Hero_GU_F_Mythic_N",
+          "guid": "bb09db3f-43db-49a6-be6f-d5319af4cffe"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_Cone.glb",
+      "tracked": true,
+      "sizeBytes": 65532,
+      "sha256": "ff8bb90e14e887cc91b2ae86b4c54cb4c578231f3b3f1e780d8de0fd027c1677",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "1cc56957-c0eb-4924-8439-f5f74e78df27",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "Cone_Mat",
+          "guid": "02e94b04-c4a6-4bbf-8d45-fc9b9942ede5"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "Cone_Mat_BaseColor",
+          "guid": "15b20b46-09f9-4500-bb8f-1e2eb68a141b"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_Cube.glb",
+      "tracked": true,
+      "sizeBytes": 63056,
+      "sha256": "eed6b4e1846cc46cb574e6c2b99743e4352b41bc4d51ba32acc6d5dacf9d350e",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "68b21a01-958e-44ed-8820-a2b9aa289587",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "Cube_Mat",
+          "guid": "026ef3cb-32e3-4713-b80f-f1e719ad8188"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "Cube_Mat_BaseColor",
+          "guid": "527650a4-9a16-4fae-95ae-4a449f0d92fa"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_Cylinder.glb",
+      "tracked": true,
+      "sizeBytes": 69232,
+      "sha256": "04d186784b81f86f7dc57796f448788dba0a651aa2b14fb9d781628e3dc63723",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "6723b433-dc6c-4b55-88b7-5abd646b59d5",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "Cylinder_Mat",
+          "guid": "f19abca7-ab80-4578-b90e-0aeacf57e168"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "Cylinder_Mat_BaseColor",
+          "guid": "123a9a2e-c10b-49bd-bad6-1fae1bea80de"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_IcoSphere.glb",
+      "tracked": true,
+      "sizeBytes": 75164,
+      "sha256": "4c598783d932db61eaf5c98e9c41bfee62cd7a1d9948af4f33bd28188b462b2c",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "a177fa64-e7ba-401b-adf6-1972c14bb699",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "IcoSphere_Mat",
+          "guid": "e61c3b4c-725e-406c-9de2-ff17544747d2"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "IcoSphere_Mat_BaseColor",
+          "guid": "aaac82a7-d6be-4c5a-8247-fcaea2debe8e"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_MatGrid.glb",
+      "tracked": true,
+      "sizeBytes": 735192,
+      "sha256": "d63a6851b8aafc0cef16c206cf95890e157e74674531c6f494d7c3d38098f270",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "0ecb57e2-cc63-47bc-85fd-ad00544c84ba",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "MatGrid_R0_C0_Mat",
+          "guid": "96884377-7ac3-4603-ab1d-7d004b80a97f"
+        },
+        {
+          "key": "gltf/material/1",
+          "name": "MatGrid_R0_C1_Mat",
+          "guid": "36f082f4-e43d-48d1-a326-944708565ca2"
+        },
+        {
+          "key": "gltf/material/2",
+          "name": "MatGrid_R0_C2_Mat",
+          "guid": "170ca457-7730-4ad5-8a36-236b5a485558"
+        },
+        {
+          "key": "gltf/material/3",
+          "name": "MatGrid_R0_C3_Mat",
+          "guid": "65d8b5ed-0b82-4426-be7a-65fb05b1ab1c"
+        },
+        {
+          "key": "gltf/material/4",
+          "name": "MatGrid_R0_C4_Mat",
+          "guid": "310196b9-070e-4555-9942-c6d372cb1a0c"
+        },
+        {
+          "key": "gltf/material/5",
+          "name": "MatGrid_R1_C0_Mat",
+          "guid": "33b9041f-7c52-41fd-9e42-306c2a0f0d5f"
+        },
+        {
+          "key": "gltf/material/6",
+          "name": "MatGrid_R1_C1_Mat",
+          "guid": "b075587a-9e4e-42d2-bcca-eb266b38c9b9"
+        },
+        {
+          "key": "gltf/material/7",
+          "name": "MatGrid_R1_C2_Mat",
+          "guid": "f1c2ea19-c25b-4719-b692-f01ed363da16"
+        },
+        {
+          "key": "gltf/material/8",
+          "name": "MatGrid_R1_C3_Mat",
+          "guid": "3471216e-53c9-4775-82fc-481fdd5f2692"
+        },
+        {
+          "key": "gltf/material/9",
+          "name": "MatGrid_R1_C4_Mat",
+          "guid": "5de7d30e-a6d6-4af7-8726-77cab62d728b"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "MatGrid_R0_C0_Mat_BaseColor",
+          "guid": "f348d157-0cd9-4b02-ae4c-1ae4da58d12c"
+        },
+        {
+          "key": "gltf/image/1",
+          "name": "MatGrid_R0_C1_Mat_BaseColor",
+          "guid": "3226631a-afe5-4893-b183-e0e823c4998b"
+        },
+        {
+          "key": "gltf/image/2",
+          "name": "MatGrid_R0_C2_Mat_BaseColor",
+          "guid": "ac6e5045-a6f7-4931-9a82-0248c60a0e11"
+        },
+        {
+          "key": "gltf/image/3",
+          "name": "MatGrid_R0_C3_Mat_BaseColor",
+          "guid": "4e0e6959-8de6-4227-84e8-ffc3ea5925fb"
+        },
+        {
+          "key": "gltf/image/4",
+          "name": "MatGrid_R0_C4_Mat_BaseColor",
+          "guid": "22ea13cd-0f8e-4541-a154-4cbe6d398975"
+        },
+        {
+          "key": "gltf/image/5",
+          "name": "MatGrid_R1_C0_Mat_BaseColor",
+          "guid": "dafd1416-b785-491b-a37c-dd640abe04b7"
+        },
+        {
+          "key": "gltf/image/6",
+          "name": "MatGrid_R1_C1_Mat_BaseColor",
+          "guid": "ad81c967-2fb8-4a51-b166-3c2381ff4874"
+        },
+        {
+          "key": "gltf/image/7",
+          "name": "MatGrid_R1_C2_Mat_BaseColor",
+          "guid": "266769a6-b286-4564-ba5f-1379c0ed075e"
+        },
+        {
+          "key": "gltf/image/8",
+          "name": "MatGrid_R1_C3_Mat_BaseColor",
+          "guid": "e9692aa3-b1c9-4f98-9327-ebbb8ad80879"
+        },
+        {
+          "key": "gltf/image/9",
+          "name": "MatGrid_R1_C4_Mat_BaseColor",
+          "guid": "f981c2dc-09af-4ea3-a366-7ec78e027ba1"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_Plane.glb",
+      "tracked": true,
+      "sizeBytes": 62020,
+      "sha256": "8fad178c35795dcacdf7c4cc8cc9366a03c01c539fbdd4ae2d3902e7e04905d5",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "eef1dfaa-cf3a-4ce7-899b-d3e496f59d17",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "Plane_Mat",
+          "guid": "4cd17519-3c9f-4e87-8e24-99234fb7252c"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "Plane_Mat_BaseColor",
+          "guid": "4f6842aa-a4a9-4ce5-a06d-16adda89352e"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_Sphere.glb",
+      "tracked": true,
+      "sizeBytes": 135996,
+      "sha256": "91cc87c32fbd1d559582a38edbce177d8418f4f405b4993a1f66159ac0d44408",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "79d6d261-1ba9-46c2-939e-82add54ba500",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "Sphere_Mat",
+          "guid": "fa4a68ea-e2cb-471a-b946-2e933d806e3c"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "Sphere_Mat_BaseColor",
+          "guid": "cb18849b-4935-474e-9af5-3b7340cff5b5"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_Suzanne.glb",
+      "tracked": true,
+      "sizeBytes": 118892,
+      "sha256": "2c707817bd157e63623570d366a6f149e3001a3e5ddcf000cbfe43f1be907575",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "dfd9b94f-cbf4-4712-9a41-01ee8453c7fa",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "Suzanne_Mat",
+          "guid": "f800393c-c807-4974-955d-b07bfd82442c"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "Suzanne_Mat_BaseColor",
+          "guid": "678a6d30-7bc7-42a1-bfbb-2e1e7cce6195"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\Prim_Torus.glb",
+      "tracked": true,
+      "sizeBytes": 170040,
+      "sha256": "d5e77f53c4d840fbe7edf861d46479fa8777d818325875452bfabc113c6965b2",
+      "sidecar": true,
+      "sidecarTracked": true,
+      "guid": "61079d31-7d1d-48fb-91ad-df8feff43723",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "Torus_Mat",
+          "guid": "a8cb2b32-5d65-4faa-86fa-5384fb5e8ffb"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/0",
+          "name": "Torus_Mat_BaseColor",
+          "guid": "604d3b42-c9e8-4b0b-9553-7285e8792a6e"
+        }
+      ]
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\scene.glb",
+      "tracked": false,
+      "sizeBytes": 35052236,
+      "sha256": "e44c219d6cc17341bdc0ac8cdc98ae71aef72f127edccf4c22722d5d203d4863",
+      "sidecar": true,
+      "sidecarTracked": false,
+      "guid": "89f6382b-dc5d-4030-abf8-c5ba061f2b9c",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": null,
+      "materials": [],
+      "embeddedTextures": []
+    },
+    {
+      "source": "Dynamic_CPP\\Assets\\Models\\SU_Mythic.glb",
+      "tracked": false,
+      "sizeBytes": 2769640,
+      "sha256": "37c1cbc8ead0f7372fcc7836ee11ed75573005485d56c4ff13293d306eafe08f",
+      "sidecar": true,
+      "sidecarTracked": false,
+      "guid": "8998b0a9-34e8-4b37-8dd1-3b34a123d72c",
+      "guidCanonicalV4": true,
+      "subAssetsSchema": 1,
+      "materials": [
+        {
+          "key": "gltf/material/0",
+          "name": "MI_Skin_SU_Mythic",
+          "guid": "748cb282-4d05-4525-b84f-9b2168900c04"
+        }
+      ],
+      "embeddedTextures": [
+        {
+          "key": "gltf/image/1",
+          "name": "Skin_SU_Mythic_D",
+          "guid": "2262ddc4-379b-4378-9b04-6bea0d3ea3e0"
+        },
+        {
+          "key": "gltf/image/2",
+          "name": "Skin_SU_Mythic_M",
+          "guid": "70bd4d3f-7666-4859-a156-47f79c7411c9"
+        },
+        {
+          "key": "gltf/image/0",
+          "name": "Skin_SU_Mythic_N",
+          "guid": "3d1eea74-a152-4f5d-b377-bc03cfd64e82"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "file": "Dynamic_CPP\\Assets\\Materials\\ForwardWater.asset",
+      "tracked": true,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 2,
+        "type-or-instance": 0,
+        "nil": 11,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_shaderMetaGuid",
+        "m_textureGuid"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Materials\\ForwardWind.asset",
+      "tracked": true,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 2,
+        "type-or-instance": 0,
+        "nil": 11,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_shaderMetaGuid",
+        "m_textureGuid"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\BTSmokeProbe.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 4,
+        "type-or-instance": 4,
+        "nil": 0,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_BehaviorTreeGuid",
+        "m_BlackBoardGuid",
+        "m_fileGuid",
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\DupProbe.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 2,
+        "type-or-instance": 4,
+        "nil": 1,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_modelGuid",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\NestedProbeLeaf.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 2,
+        "type-or-instance": 2,
+        "nil": 0,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\NestedProbeParent.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 3,
+        "type-or-instance": 6,
+        "nil": 2,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\NestedUpdateLeaf.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 2,
+        "type-or-instance": 4,
+        "nil": 1,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_modelGuid",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\NestedUpdateParent.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 3,
+        "type-or-instance": 2,
+        "nil": 0,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\OvWriteProbe.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 2,
+        "type-or-instance": 4,
+        "nil": 1,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_modelGuid",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\ReflectGoldenProbe.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 2,
+        "type-or-instance": 4,
+        "nil": 1,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_modelGuid",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Prefabs\\RoundTripProbe.prefab",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 2,
+        "type-or-instance": 4,
+        "nil": 1,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_modelGuid",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\AsanLife3D.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 62,
+        "nil": 16,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\AsanLifeUI.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 20,
+        "nil": 5,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\DdolCanvasDest.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 4,
+        "nil": 2,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\E5AiRegistryDest.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 2,
+        "nil": 1,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\FT_Primitives.creator",
+      "tracked": true,
+      "counts": {
+        "model": 8,
+        "model-subasset": 0,
+        "other-meta": 8,
+        "type-or-instance": 44,
+        "nil": 19,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_shaderMetaGuid",
+        "m_textureGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [
+        "m_fileGuid=1cc56957-c0eb-4924-8439-f5f74e78df27",
+        "m_fileGuid=61079d31-7d1d-48fb-91ad-df8feff43723",
+        "m_fileGuid=6723b433-dc6c-4b55-88b7-5abd646b59d5",
+        "m_fileGuid=68b21a01-958e-44ed-8820-a2b9aa289587",
+        "m_fileGuid=79d6d261-1ba9-46c2-939e-82add54ba500",
+        "m_fileGuid=a177fa64-e7ba-401b-adf6-1972c14bb699",
+        "m_fileGuid=dfd9b94f-cbf4-4712-9a41-01ee8453c7fa",
+        "m_fileGuid=eef1dfaa-cf3a-4ce7-899b-d3e496f59d17"
+      ],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\L3DdolDest.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 2,
+        "nil": 1,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\Lifecycle3D.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 62,
+        "nil": 28,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_modelGuid",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\LifecycleUI.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 20,
+        "nil": 5,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\Light2Probe.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 14,
+        "nil": 4,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\LightProbe.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 10,
+        "nil": 3,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\LightSlotProbe.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 18,
+        "nil": 5,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\Test1.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 268,
+        "nil": 70,
+        "unresolved": 9
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_Motion",
+        "m_prefabFileGuid",
+        "m_shaderMetaGuid",
+        "m_textureGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": [
+        "m_fileGuid=d3a16695-ac74-43e3-a797-eb5b28bce982",
+        "m_Motion=d3a16695-ac74-43e3-a797-eb5b28bce982",
+        "m_textureGuid=190a70bb-c5c9-4b36-88a0-f97659e70047",
+        "m_textureGuid=452fe2ce-0179-4eee-a467-4a33477e7e1c",
+        "m_textureGuid=759f9743-58b6-4c9b-96e7-9c05b6e1973f",
+        "m_textureGuid=b8accc52-1a59-4f51-8b7a-f91839ef91e3",
+        "m_textureGuid=e33297fe-ce85-4dec-b8f7-27e9e0e45d33",
+        "m_textureGuid=f0c8eade-7ea8-46b0-a3ae-6402ae82d1ad"
+      ]
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\Test2.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 3,
+        "type-or-instance": 246,
+        "nil": 64,
+        "unresolved": 2
+      },
+      "keys": [
+        "m_fileGuid",
+        "m_FileID",
+        "m_Motion",
+        "m_prefabFileGuid",
+        "m_shaderMetaGuid",
+        "m_textureGuid",
+        "m_typeUUID"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": [
+        "m_fileGuid=5aab5ff1-4111-4376-a31e-531e0a08f158",
+        "m_Motion=5aab5ff1-4111-4376-a31e-531e0a08f158"
+      ]
+    },
+    {
+      "file": "Dynamic_CPP\\Assets\\Scenes\\UITestScene.creator",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 6,
+        "nil": 5,
+        "unresolved": 0
+      },
+      "keys": [
+        "m_FileID",
+        "m_prefabFileGuid"
+      ],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\ProjectSetting\\CollisionMatrix.asset",
+      "tracked": true,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 0,
+        "nil": 0,
+        "unresolved": 0
+      },
+      "keys": [],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\ProjectSetting\\EngineSettings.asset",
+      "tracked": false,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 0,
+        "nil": 0,
+        "unresolved": 0
+      },
+      "keys": [],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    },
+    {
+      "file": "Dynamic_CPP\\ProjectSetting\\TagManager.asset",
+      "tracked": true,
+      "counts": {
+        "model": 0,
+        "model-subasset": 0,
+        "other-meta": 0,
+        "type-or-instance": 0,
+        "nil": 0,
+        "unresolved": 0
+      },
+      "keys": [],
+      "modelGuids": [],
+      "subassetGuids": [],
+      "unresolvedGuids": []
+    }
+  ]
+}
