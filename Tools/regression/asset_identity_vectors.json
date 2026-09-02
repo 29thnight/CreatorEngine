@@ -1,0 +1,209 @@
+{
+  "profile": "ce.uuidv8.sha256.v1",
+  "generator": "Tools/regression/Generate-AssetIdentityVectors.py",
+  "profileVectors": [
+    {
+      "name": "model.alpha",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "model",
+      "namespaceHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "kind": "model",
+      "stableKey": "authoring/alpha",
+      "inputHex": "63652e7575696476382e7368613235362e763100000000056d6f64656c00000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f000000056d6f64656c0000000f617574686f72696e672f616c706861",
+      "sha256Hex": "58b92fba259a2578a9ff432aadf82f7c0a640e39dedba907349feefda99f9244",
+      "uuid": "58b92fba-259a-8578-a9ff-432aadf82f7c",
+      "note": "epoch 00..1f, 기본 모델 authoring key"
+    },
+    {
+      "name": "model.beta",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "model",
+      "namespaceHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "kind": "model",
+      "stableKey": "authoring/beta",
+      "inputHex": "63652e7575696476382e7368613235362e763100000000056d6f64656c00000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f000000056d6f64656c0000000e617574686f72696e672f62657461",
+      "sha256Hex": "ddd201d9a03df72a66fa1f9f9c645dac5b52901771d73c6cecf5dd3d7310d368",
+      "uuid": "ddd201d9-a03d-872a-a6fa-1f9f9c645dac",
+      "note": "같은 epoch, 다른 key"
+    },
+    {
+      "name": "model.alpha.alt-epoch",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "model",
+      "namespaceHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "kind": "model",
+      "stableKey": "authoring/alpha",
+      "inputHex": "63652e7575696476382e7368613235362e763100000000056d6f64656c00000020202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f000000056d6f64656c0000000f617574686f72696e672f616c706861",
+      "sha256Hex": "dc80dc880cd2aab170ea5f75a681bcacbe3dcb68fe5c1420abc27409d441c18f",
+      "uuid": "dc80dc88-0cd2-8ab1-b0ea-5f75a681bcac",
+      "note": "같은 key, 다른 epoch → 다른 ModelId여야 한다"
+    },
+    {
+      "name": "model.utf8-nfc",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "model",
+      "namespaceHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "kind": "model",
+      "stableKey": "저작/기본",
+      "inputHex": "63652e7575696476382e7368613235362e763100000000056d6f64656c00000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f000000056d6f64656c0000000deca080ec9e912feab8b0ebb3b8",
+      "sha256Hex": "b53922525a6bb06cbe241bb44c47de236ce276e12bfe08213b0ec228522a143e",
+      "uuid": "b5392252-5a6b-806c-be24-1bb44c47de23",
+      "note": "다바이트 UTF-8(NFC) key — 길이는 문자 수가 아니라 바이트 수"
+    },
+    {
+      "name": "subasset.material",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "material",
+      "stableKey": "material/MI_Hero_GU_F_Mythic",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c000000086d6174657269616c0000001c6d6174657269616c2f4d495f4865726f5f47555f465f4d7974686963",
+      "sha256Hex": "31737c31ebd5fa83ca433aec5e2e3b5a8d48089cff030fff9f431a140eae9655",
+      "uuid": "31737c31-ebd5-8a83-8a43-3aec5e2e3b5a",
+      "note": "namespace = model.alpha의 16바이트"
+    },
+    {
+      "name": "subasset.texture",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "texture",
+      "stableKey": "image/Hero_GU_F_Mythic_D",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c000000077465787475726500000018696d6167652f4865726f5f47555f465f4d79746869635f44",
+      "sha256Hex": "0dc824e2fa6378c449a372c4a9821f2034454931bc771f374e1c2c6b11aa3990",
+      "uuid": "0dc824e2-fa63-88c4-89a3-72c4a9821f20",
+      "note": ""
+    },
+    {
+      "name": "subasset.mesh",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "mesh",
+      "stableKey": "mesh/SK_Hero_GU_F_Mythic/0",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c000000046d6573680000001a6d6573682f534b5f4865726f5f47555f465f4d79746869632f30",
+      "sha256Hex": "628f335444553add5dd8400683159a49cedb2913670c21b8ac69e4d327a3bf2b",
+      "uuid": "628f3354-4455-8add-9dd8-400683159a49",
+      "note": ""
+    },
+    {
+      "name": "subasset.skeleton",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "skeleton",
+      "stableKey": "skeleton/root",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c00000008736b656c65746f6e0000000d736b656c65746f6e2f726f6f74",
+      "sha256Hex": "20db2427a0f25606db3c551d56573b32bd121b5a1cc5ea25c3e176d05f0ec65f",
+      "uuid": "20db2427-a0f2-8606-9b3c-551d56573b32",
+      "note": ""
+    },
+    {
+      "name": "subasset.animation",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "animation",
+      "stableKey": "animation/Idle",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c00000009616e696d6174696f6e0000000e616e696d6174696f6e2f49646c65",
+      "sha256Hex": "f3ba3b0cd0cb11d4e9851b948130270dd7eef017600495489125bddd5c937c8e",
+      "uuid": "f3ba3b0c-d0cb-81d4-a985-1b948130270d",
+      "note": ""
+    },
+    {
+      "name": "prefix.ab-c",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "ab",
+      "stableKey": "c",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c0000000261620000000163",
+      "sha256Hex": "025f0d6aabcf151f1a9a694284cda447436ae04895524afc56ae2d36840611a8",
+      "uuid": "025f0d6a-abcf-851f-9a9a-694284cda447",
+      "note": "prefix.a-bc와 연결 바이트열은 같고 길이 접두만 다르다"
+    },
+    {
+      "name": "prefix.a-bc",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "a",
+      "stableKey": "bc",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c0000000161000000026263",
+      "sha256Hex": "9b8b182b5b31a2163f7bbe8330afd69b666c46bf98a0aeebb9c8b4c045faf51c",
+      "uuid": "9b8b182b-5b31-8216-bf7b-be8330afd69b",
+      "note": ""
+    },
+    {
+      "name": "space.leading",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "material",
+      "stableKey": " x",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c000000086d6174657269616c000000022078",
+      "sha256Hex": "b503ffb4c4c0b38a62cc42cc005303c74c6b21e684f2078df21de75d2efc1f3b",
+      "uuid": "b503ffb4-c4c0-838a-a2cc-42cc005303c7",
+      "note": ""
+    },
+    {
+      "name": "space.trailing",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "subasset",
+      "namespaceHex": "58b92fba259a8578a9ff432aadf82f7c",
+      "kind": "material",
+      "stableKey": "x ",
+      "inputHex": "63652e7575696476382e7368613235362e7631000000000873756261737365740000001058b92fba259a8578a9ff432aadf82f7c000000086d6174657269616c000000027820",
+      "sha256Hex": "89a66ce1a330e3b872554643fa401136567a38b7bf20ddfe7e89a328f6242744",
+      "uuid": "89a66ce1-a330-83b8-b255-4643fa401136",
+      "note": ""
+    },
+    {
+      "name": "namespace.16",
+      "profile": "ce.uuidv8.sha256.v1",
+      "domain": "model",
+      "namespaceHex": "000102030405060708090a0b0c0d0e0f",
+      "kind": "model",
+      "stableKey": "authoring/alpha",
+      "inputHex": "63652e7575696476382e7368613235362e763100000000056d6f64656c00000010000102030405060708090a0b0c0d0e0f000000056d6f64656c0000000f617574686f72696e672f616c706861",
+      "sha256Hex": "41ce7f3f7a08b6eb6dd736a31371d9a893a278907c1f6e2fae3061323985c6e6",
+      "uuid": "41ce7f3f-7a08-86eb-add7-36a31371d9a8",
+      "note": "model.alpha와 namespace 앞 16바이트가 같다"
+    },
+    {
+      "name": "mutation.profile-v0",
+      "profile": "ce.uuidv8.sha256.v0",
+      "domain": "model",
+      "namespaceHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "kind": "model",
+      "stableKey": "authoring/alpha",
+      "inputHex": "63652e7575696476382e7368613235362e763000000000056d6f64656c00000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f000000056d6f64656c0000000f617574686f72696e672f616c706861",
+      "sha256Hex": "f9a6fa86da6e81c3bcbf9af989836a0fa4705ca155792abf77c96ab4feb0381a",
+      "uuid": "f9a6fa86-da6e-81c3-bcbf-9af989836a0f",
+      "note": "model.alpha와 입력이 같고 프로필 문자열만 다르다 → 다른 UUID"
+    }
+  ],
+  "shaVectors": [
+    {
+      "name": "empty",
+      "inputHex": "",
+      "sha256Hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "abc",
+      "inputHex": "616263",
+      "sha256Hex": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    },
+    {
+      "name": "two-block-56",
+      "inputHex": "6162636462636465636465666465666765666768666768696768696a68696a6b696a6b6c6a6b6c6d6b6c6d6e6c6d6e6f6d6e6f706e6f7071",
+      "sha256Hex": "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+    },
+    {
+      "name": "four-block-112",
+      "inputHex": "61626364656667686263646566676869636465666768696a6465666768696a6b65666768696a6b6c666768696a6b6c6d6768696a6b6c6d6e68696a6b6c6d6e6f696a6b6c6d6e6f706a6b6c6d6e6f70716b6c6d6e6f7071726c6d6e6f707172736d6e6f70717273746e6f707172737475",
+      "sha256Hex": "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1"
+    }
+  ],
+  "millionASha256": "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+}

@@ -28,6 +28,8 @@
     <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentModelBridgeSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
+    <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h" />
+    <ClInclude Include="AssetIdentity\AssetIdentityTestVectors.inl" />
     <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h" />
     <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h" />
@@ -66,6 +68,7 @@
     <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentModelBridgeSelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp" />
+    <ClCompile Include="AssetIdentity\AssetIdentitySelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>

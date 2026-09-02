@@ -4,6 +4,9 @@
     <Filter Include="ExperimentParity">
       <UniqueIdentifier>{7c2f1b4a-9d63-4e8f-b1a5-2f04c8de6a11}</UniqueIdentifier>
     </Filter>
+    <Filter Include="AssetIdentity">
+      <UniqueIdentifier>{4e8a1f27-6c3b-4d95-a0e2-9b7f3c5d1a86}</UniqueIdentifier>
+    </Filter>
     <Filter Include="RHI">
       <UniqueIdentifier>{d1c5d20e-36ec-568f-80b0-e388f485aa93}</UniqueIdentifier>
     </Filter>
@@ -131,6 +134,9 @@
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetIdentity\AssetIdentitySelfTest.cpp">
+      <Filter>AssetIdentity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp">
       <Filter>ExperimentParity</Filter>
@@ -262,6 +268,12 @@
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h">
       <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h">
+      <Filter>AssetIdentity</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetIdentity\AssetIdentityTestVectors.inl">
+      <Filter>AssetIdentity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h">
       <Filter>ExperimentParity</Filter>

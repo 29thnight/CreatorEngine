@@ -280,6 +280,22 @@ Run-Step "legacy Skeleton 은퇴 경계" {
         (Join-Path $PSScriptRoot "verify-legacy-skeleton-retirement.ps1")
 }
 
+# PHASE 3.75 MBC0: cutover 변경 동결 래칫(정적). §5.2가 제거 대상으로 적은
+# legacy·experiment 표면(역브리지·A/B 스위치·pseudo-v5·Assimp·무조건 진단)의 코드
+# 접촉이 늘지 않고, model sidecar writer가 허용목록(현존 둘) 밖에 생기지 않는다.
+Run-Step "MBC cutover 변경 동결" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-mbc-cutover-freeze.ps1")
+}
+
+# PHASE 3.75 MBC1: 자산 신원 프로필 ce.uuidv8.sha256.v1. C++(제품)·Python(생성기)·
+# .NET(이 게이트) 세 독립 유도가 벡터 15건에서 같고, selftest가 FIPS KAT·BCrypt
+# 대조·fail-closed·registry 네 판정을 통과한다.
+Run-Step "자산 신원 프로필 UUIDv8" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-asset-identity.ps1") -Exe $Exe -Work $Work
+}
+
 # 본 팔레트가 렌더에 도달하는가. X8의 dirty 게이팅에 "팔레트가 바뀌었다"
 # 축이 없어 스킨 메시가 첫 포즈에서 굳었다 — 그림을 못 재는 헤드리스에서
 # 프록시 커밋 누계로 잰다.

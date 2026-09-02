@@ -1,6 +1,6 @@
 # 모델 자산 빅뱅 전환 계획 (PHASE 3.75)
 
-**신설 2026-09-02 · 예상 공수 60 개발일 · 상태: 미착수**
+**신설 2026-09-02 · 예상 공수 60 개발일 · 상태: 진행 중 — MBC0·MBC1 완료(5/60일, 2026-09-02)**
 
 이 계획은 기존 `experiment` 배선을 완성하거나 legacy 경로와 대조 운용하는 계획이 아니다.
 모델 자산의 신원·저장·로딩·런타임 소비를 새 계약으로 한 번에 교체하고, 전환 완료 뒤
@@ -39,6 +39,7 @@ PHASE 4는 이 계획의 완료 산출물만 입력으로 받는다. 구
 | UUIDv8 byte-level identity profile | 이 문서 §2 |
 | sidecar schema v2·writer transaction | 이 문서 §3 |
 | 런타임 aggregate·소비자 cutover | 이 문서 §4~§6 |
+| MBC0 기준선(동결 표면·corpus/참조 분류·Release 성능·예산 B1~B6) | [`ModelAssetBigBangCutoverBaseline.md`](ModelAssetBigBangCutoverBaseline.md) — 다시 뜨지 않는 archive |
 | 대시보드 표시 | `RefactoringPlanDashboard.html` PHASE 3.75 — 이 문서의 파생 표시 |
 | 구 I/V 구현·측정 이력 | `ModelImportPipelinePlan.md` — **역사 자료이며 활성 계획이 아님** |
 
@@ -297,8 +298,8 @@ descriptor generation 전체를 함께 처리한다.
 
 | ID | 내용 | 선행 | 공수 | 상태 |
 |---|---|---|---:|---|
-| `MBC0` | cutover 계약·변경 동결·corpus/참조/성능 기준선 | — | 2 | 미착수 |
-| `MBC1` | `ce.uuidv8.sha256.v1` 구현·test vector·collision registry | MBC0 | 3 | 미착수 |
+| `MBC0` | cutover 계약·변경 동결·corpus/참조/성능 기준선 | — | 2 | **완료 2026-09-02** — `verify-mbc-cutover-freeze`(래칫 15 표면·하드 계약 3), `mbc0_corpus_baseline.json`, [기준선 문서](ModelAssetBigBangCutoverBaseline.md) |
+| `MBC1` | `ce.uuidv8.sha256.v1` 구현·test vector·collision registry | MBC0 | 3 | **완료 2026-09-02** — `Engine/RenderEngine/Assets/AssetIdentityProfile·Registry`, `Utility_Framework/Sha256.h`, `assets.identity`(단정 184), `verify-asset-identity`(C++·Python·.NET 3중 유도, 벡터 15) |
 | `MBC2` | schema v2·stable key·epoch header | MBC1 | 4 | 미착수 |
 | `MBC3` | 원자 authoring writer·watcher/AssetCooker 단일화 | MBC2 | 5 | 미착수 |
 | `MBC4` | 전 corpus 새 신원 발급·scene/prefab/material 참조 일회성 rewrite | MBC3 | 6 | 미착수 |
@@ -384,3 +385,5 @@ on/off를 복구 경로로 사용하지 않는다. rollback은 이전 release �
 | 날짜 | 변경 |
 |---|---|
 | 2026-09-02 | 신설. 구 PHASE 4 I/V experiment 배선을 PHASE 3.75 단방향 cutover로 대체. 기존 GUID 비승계, UUIDv8+SHA-256 profile, schema v2 원자 writer, `ModelAssetGeneration`, SU/Gunner 폐쇄 조건, legacy/A-B/Assimp 제거, 60일 공수와 게이트를 확정 |
+| 2026-09-02 | **MBC0 완료.** 동결 래칫 게이트(표면 15·하드 계약 3), corpus 14/참조 28 분류(모델 참조 8·subasset 참조 **0**·고아 11), Prim sidecar 8개 손상의 원인 경로(워처 Delete 오독 → `CreateMetaLocked` 재발급) 실측, Release 기준선·예산 B1~B6 고정. 미커밋 폴백 덧대기(MeshRenderer 순서 해킹·`[material.finalize]`)와 손상 sidecar는 stash로 걷어냈다. **계측 공백**: 새 경로 cooked 읽기·frame CPU/GPU·peak VRAM은 CLI가 없어 MBC11 전에 세워야 한다 |
+| 2026-09-02 | **MBC1 완료.** §2 바이트 계약을 `assets::DeriveIdentity`로 구현(헤더 온리 SHA-256, UTF-8 well-formed·NFC fail-closed, 길이 접두 U32BE, v8/variant bit), 계층 `DeriveModelId`/`DeriveSubAssetId`(legacy v4 namespace는 값에서 거부), `IdentityRegistry`(DuplicateTuple/UuidCollision/RecomputeMismatch, canonical tuple = 입력 바이트열). test vector 15건은 Python 독립 유도로 생성하고 .NET이 3차 검산. **변이 검증**: 길이 접두를 LE로 바꾼 제품 빌드에서 게이트 RED(단정 86 실패), 되돌리면 GREEN. §2.4의 pseudo v5-as-v4 0건은 MBC3가 writer를 교체할 때 래칫을 내린다(현재 접촉 2+1) |

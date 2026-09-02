@@ -151,6 +151,9 @@
     <Filter Include="Resources\Model\Experiment\Cooked">
       <UniqueIdentifier>{9f4c1ba8-6e73-4d55-8a2f-41c9e7052db3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resources\Model\Assets">
+      <UniqueIdentifier>{7c2d9e51-3b8a-4f06-9d1e-52a7c0b4e8f3}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ThirdParty\fastgltf">
       <UniqueIdentifier>{5e91a4d3-2c86-4f17-b0a9-16d8e3b7c452}</UniqueIdentifier>
     </Filter>
@@ -371,6 +374,12 @@
     </ClCompile>
     <ClCompile Include="Experiment\Model.cpp">
       <Filter>Resources\Model\Experiment</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\AssetIdentityProfile.cpp">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\AssetIdentityRegistry.cpp">
+      <Filter>Resources\Model\Assets</Filter>
     </ClCompile>
     <ClCompile Include="Experiment\MaterialPropertyBlock.cpp">
       <Filter>Resources\Model\Experiment</Filter>
@@ -754,6 +763,12 @@
     </ClInclude>
     <ClInclude Include="Experiment\AssetIdentity.h">
       <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\AssetIdentityProfile.h">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\AssetIdentityRegistry.h">
+      <Filter>Resources\Model\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h">
       <Filter>Resources\Model\Experiment\Cooked</Filter>

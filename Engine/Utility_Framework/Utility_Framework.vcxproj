@@ -87,6 +87,7 @@
     <ClInclude Include="ProgressSink.h" />
     <ClInclude Include="TypeDefinition.h" />
     <ClInclude Include="TypeTrait.h" />
+    <ClInclude Include="Sha256.h" />
       <ClInclude Include="EngineResourceCensus.h" />
 </ItemGroup>
   <ItemGroup>

@@ -374,6 +374,16 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <!-- PHASE 3.75 정식 자산 계층(Assets/). AssetCooker·RenderTests가 정적 lib에서
+         독립적으로 링크하므로 렌더러 TU와 unity로 합치지 않는다(Experiment와 같은 규칙). -->
+    <ClCompile Include="Assets\AssetIdentityProfile.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Assets\AssetIdentityRegistry.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Experiment\MaterialPropertyBlock.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
@@ -510,6 +520,8 @@
     <ClInclude Include="Experiment\Import\ImporterModelDecoder.h" />
     <ClInclude Include="Experiment\Import\GltfImporter.h" />
     <ClInclude Include="Experiment\AssetIdentity.h" />
+    <ClInclude Include="Assets\AssetIdentityProfile.h" />
+    <ClInclude Include="Assets\AssetIdentityRegistry.h" />
     <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h" />
     <ClInclude Include="Experiment\Cooked\ModelCookIdentity.h" />
     <ClInclude Include="Experiment\Cooked\ModelCookProducer.h" />

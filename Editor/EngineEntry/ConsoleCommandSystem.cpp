@@ -76,6 +76,7 @@
 #include "ExperimentParity/ExperimentModelParitySelfTest.h"
 #include "ExperimentParity/ExperimentModelBridgeSelfTest.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
+#include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "ExperimentParity/ExperimentAnimationPlayback.h"
 #include "ExperimentParity/ExperimentImportPathSelfTest.h"
 #include "ExperimentParity/ExperimentGltfImportSelfTest.h"
@@ -7821,6 +7822,24 @@ namespace ConsoleCmd
             passed ? "통과" : "실패", modelPath.c_str());
     }
 
+    static void Cmd_assets_identity(const ConsoleCommandContext&)
+    {
+        // MBC1 — ce.uuidv8.sha256.v1 신원 프로필·충돌 registry 합성 검사. CPU 전용.
+        // `assets.` 접두는 experiment가 아닌 정식 자산 계층(§5.1)의 명령이다.
+        std::string log;
+        const bool passed = RenderTest::RunAssetIdentitySelfTest(log);
+        std::printf("%s", log.c_str());
+        if (passed)
+        {
+            Debug->LogWarning(std::string("[assets.identity] 통과\n") + log);
+        }
+        else
+        {
+            Debug->LogError(std::string("[assets.identity] 실패\n") + log);
+        }
+        std::printf("[CLI] assets.identity %s\n", passed ? "통과" : "실패");
+    }
+
     static void Cmd_experiment_vertexlayout(const ConsoleCommandContext&)
     {
         // I5-D2(V4) — 마스크→RHI 입력 레이아웃 유도 합성 검사. CPU 전용.
@@ -11729,6 +11748,7 @@ namespace ConsoleCmd
             reg({ "experiment.model" }, &Cmd_experiment_model);
             reg({ "experiment.modelbridge" }, &Cmd_experiment_modelbridge);
             reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
+            reg({ "assets.identity" }, &Cmd_assets_identity);
             reg({ "experiment.anim" }, &Cmd_experiment_anim);
             reg({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
             reg({ "experiment.animpose" }, &Cmd_experiment_animpose);

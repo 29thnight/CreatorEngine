@@ -308,6 +308,9 @@
     <ClInclude Include="TypeTrait.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="Sha256.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
     <ClInclude Include="WindowDesc.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClInclude>
