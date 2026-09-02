@@ -11,8 +11,8 @@ subAssets:
   materials:
     - key: gltf/material/0
       name: IcoSphere_Mat
-      guid: a1159713-00b0-4505-96d6-0de2eb5f8fd3
+      guid: e61c3b4c-725e-406c-9de2-ff17544747d2
   embeddedTextures:
     - key: gltf/image/0
       name: IcoSphere_Mat_BaseColor
-      guid: 0b944d0f-a577-4d6d-aa79-a8862659a75a
+      guid: aaac82a7-d6be-4c5a-8247-fcaea2debe8e

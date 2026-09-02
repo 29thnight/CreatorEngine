@@ -11,8 +11,8 @@ subAssets:
   materials:
     - key: gltf/material/0
       name: Suzanne_Mat
-      guid: f1c84356-2cc4-4a8c-8549-42f6eca563b0
+      guid: f800393c-c807-4974-955d-b07bfd82442c
   embeddedTextures:
     - key: gltf/image/0
       name: Suzanne_Mat_BaseColor
-      guid: d0c631bd-4cbb-4e02-93d7-690f2312ceb0
+      guid: 678a6d30-7bc7-42a1-bfbb-2e1e7cce6195

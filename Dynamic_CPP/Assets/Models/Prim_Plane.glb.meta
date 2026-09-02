@@ -11,8 +11,8 @@ subAssets:
   materials:
     - key: gltf/material/0
       name: Plane_Mat
-      guid: 32b0e7db-18fb-4451-9bf8-d8379c38ea51
+      guid: 4cd17519-3c9f-4e87-8e24-99234fb7252c
   embeddedTextures:
     - key: gltf/image/0
       name: Plane_Mat_BaseColor
-      guid: 6c097b84-2860-4484-9f61-a354c7e80b9d
+      guid: 4f6842aa-a4a9-4ce5-a06d-16adda89352e

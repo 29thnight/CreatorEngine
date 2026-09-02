@@ -11,8 +11,8 @@ subAssets:
   materials:
     - key: gltf/material/0
       name: Cylinder_Mat
-      guid: 401291fb-9ed5-4e77-8a96-51613371769e
+      guid: f19abca7-ab80-4578-b90e-0aeacf57e168
   embeddedTextures:
     - key: gltf/image/0
       name: Cylinder_Mat_BaseColor
-      guid: ded70f64-4957-41ce-8834-d0db6c6bdde4
+      guid: 123a9a2e-c10b-49bd-bad6-1fae1bea80de

@@ -11,62 +11,62 @@ subAssets:
   materials:
     - key: gltf/material/0
       name: MatGrid_R0_C0_Mat
-      guid: e488f8fa-35ff-4529-80fc-3fec29cf461a
+      guid: 96884377-7ac3-4603-ab1d-7d004b80a97f
     - key: gltf/material/1
       name: MatGrid_R0_C1_Mat
-      guid: 371aff9f-e35b-43c4-b12b-e32bec26ecd4
+      guid: 36f082f4-e43d-48d1-a326-944708565ca2
     - key: gltf/material/2
       name: MatGrid_R0_C2_Mat
-      guid: 1915ed56-6e48-45e4-acb8-e57bcafd1a20
+      guid: 170ca457-7730-4ad5-8a36-236b5a485558
     - key: gltf/material/3
       name: MatGrid_R0_C3_Mat
-      guid: a4357ce2-1c5d-466f-82ac-9c1053ca3df3
+      guid: 65d8b5ed-0b82-4426-be7a-65fb05b1ab1c
     - key: gltf/material/4
       name: MatGrid_R0_C4_Mat
-      guid: c9ebb6bd-fd7d-4221-97ff-75facb8af02d
+      guid: 310196b9-070e-4555-9942-c6d372cb1a0c
     - key: gltf/material/5
       name: MatGrid_R1_C0_Mat
-      guid: 9d887ba6-d914-4a98-bd81-d8686bb54ebb
+      guid: 33b9041f-7c52-41fd-9e42-306c2a0f0d5f
     - key: gltf/material/6
       name: MatGrid_R1_C1_Mat
-      guid: 5a6af51d-e938-4a98-996d-3b2a26190bd3
+      guid: b075587a-9e4e-42d2-bcca-eb266b38c9b9
     - key: gltf/material/7
       name: MatGrid_R1_C2_Mat
-      guid: 95b50e03-64cc-4678-a410-1d54e66d94ce
+      guid: f1c2ea19-c25b-4719-b692-f01ed363da16
     - key: gltf/material/8
       name: MatGrid_R1_C3_Mat
-      guid: e404a906-6ffe-4351-8d2d-4262f95c5aad
+      guid: 3471216e-53c9-4775-82fc-481fdd5f2692
     - key: gltf/material/9
       name: MatGrid_R1_C4_Mat
-      guid: 7f3b5e80-48ae-4162-ab85-87f1de8d5b51
+      guid: 5de7d30e-a6d6-4af7-8726-77cab62d728b
   embeddedTextures:
     - key: gltf/image/0
       name: MatGrid_R0_C0_Mat_BaseColor
-      guid: 0f8335bd-e843-4764-808b-c4972bdfa2cd
+      guid: f348d157-0cd9-4b02-ae4c-1ae4da58d12c
     - key: gltf/image/1
       name: MatGrid_R0_C1_Mat_BaseColor
-      guid: 278ed08f-0f7d-40d9-95ee-b6de80faa452
+      guid: 3226631a-afe5-4893-b183-e0e823c4998b
     - key: gltf/image/2
       name: MatGrid_R0_C2_Mat_BaseColor
-      guid: 591815de-19a1-43f8-9720-6a9235586a73
+      guid: ac6e5045-a6f7-4931-9a82-0248c60a0e11
     - key: gltf/image/3
       name: MatGrid_R0_C3_Mat_BaseColor
-      guid: 623c7ad8-9e23-4ed2-b8c2-e4aced2fba28
+      guid: 4e0e6959-8de6-4227-84e8-ffc3ea5925fb
     - key: gltf/image/4
       name: MatGrid_R0_C4_Mat_BaseColor
-      guid: 8ed7f9b7-1b9b-424e-af10-687eae063c11
+      guid: 22ea13cd-0f8e-4541-a154-4cbe6d398975
     - key: gltf/image/5
       name: MatGrid_R1_C0_Mat_BaseColor
-      guid: 7ab141f6-a2f0-40d9-9077-dd417181c229
+      guid: dafd1416-b785-491b-a37c-dd640abe04b7
     - key: gltf/image/6
       name: MatGrid_R1_C1_Mat_BaseColor
-      guid: e3f09795-66aa-46f7-ac0d-af207899587d
+      guid: ad81c967-2fb8-4a51-b166-3c2381ff4874
     - key: gltf/image/7
       name: MatGrid_R1_C2_Mat_BaseColor
-      guid: 370888c9-0b99-4fe4-922f-994580a4aa34
+      guid: 266769a6-b286-4564-ba5f-1379c0ed075e
     - key: gltf/image/8
       name: MatGrid_R1_C3_Mat_BaseColor
-      guid: 09f367cb-f302-4d2f-8cb4-277de0a7860b
+      guid: e9692aa3-b1c9-4f98-9327-ebbb8ad80879
     - key: gltf/image/9
       name: MatGrid_R1_C4_Mat_BaseColor
-      guid: 1a927d0a-9a7f-40c6-972f-6eedb3b37c58
+      guid: f981c2dc-09af-4ea3-a366-7ec78e027ba1

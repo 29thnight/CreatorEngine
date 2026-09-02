@@ -11,8 +11,8 @@ subAssets:
   materials:
     - key: gltf/material/0
       name: Torus_Mat
-      guid: be164345-5d14-41ee-990a-82b3a0377742
+      guid: a8cb2b32-5d65-4faa-86fa-5384fb5e8ffb
   embeddedTextures:
     - key: gltf/image/0
       name: Torus_Mat_BaseColor
-      guid: 3ab3df66-f233-4886-937d-3eb7cb47f9ab
+      guid: 604d3b42-c9e8-4b0b-9553-7285e8792a6e

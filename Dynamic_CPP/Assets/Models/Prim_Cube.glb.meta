@@ -11,8 +11,8 @@ subAssets:
   materials:
     - key: gltf/material/0
       name: Cube_Mat
-      guid: 5700422c-13af-4bc0-b08e-1bc5d6a4e1ac
+      guid: 026ef3cb-32e3-4713-b80f-f1e719ad8188
   embeddedTextures:
     - key: gltf/image/0
       name: Cube_Mat_BaseColor
-      guid: d84d3983-7ca4-4fd2-9da7-2a33ac8c1001
+      guid: 527650a4-9a16-4fae-95ae-4a449f0d92fa

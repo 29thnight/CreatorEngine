@@ -11,8 +11,8 @@ subAssets:
   materials:
     - key: gltf/material/0
       name: Sphere_Mat
-      guid: a663bd25-0721-4af4-b0be-4a24a4299c60
+      guid: fa4a68ea-e2cb-471a-b946-2e933d806e3c
   embeddedTextures:
     - key: gltf/image/0
       name: Sphere_Mat_BaseColor
-      guid: aa9dcf80-e2cd-4dfa-8a66-8ea2d1094df1
+      guid: cb18849b-4935-474e-9af5-3b7340cff5b5
