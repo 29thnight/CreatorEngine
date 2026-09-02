@@ -1,7 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
-#include <nlohmann/json.hpp>
 
 enum class ConditionType
 {
@@ -128,9 +127,6 @@ public:
 			break;
 		}
 	}
-	nlohmann::json Serialize();
-	void Deserialize();
-
 public:
 	std::string name = "None";
 	float fValue{};

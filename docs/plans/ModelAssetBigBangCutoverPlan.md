@@ -196,6 +196,14 @@ subAssets:
   나머지 112건은 전부 semantic. exporter persistent ID는 0건이라 우선순위 1·2 경로는 필드만
   열어 두고(`StableKeyElement::persistentId`) 임포터가 채우는 것은 MBC3에서 extras 콜백으로.
 
+**PHASE 17 병합 재검증(2026-09-02).** PHASE 17은 yaml-cpp를 source·manifest·runtime에서
+0으로 만든다. 병합 전 MBC2의 `AssetIdentityEpoch`·`ModelSidecarV2`가 yaml-cpp를 직접
+사용해 의미 충돌이 있었으므로 둘을 `Authoring::ParsedDocument`·`WriteDocument`로 이식했다.
+UUIDv8 byte profile과 schema v2 출력 계약은 유지되고, `verify-yaml-cpp-retirement` 0건,
+`verify-asset-identity` 184/184, `verify-asset-sidecar-v2` 83/83·corpus 14/14·subasset
+309·registry 충돌 0으로 다시 닫았다. PHASE 17 D2의 UUIDv4 설계·수치는 전환 전 역사와
+MBC4 입력 기준선일 뿐 최종 identity authority가 아니다.
+
 ### 3.2 단일 authoring transaction
 
 `ModelAssetAuthoringTransaction` 하나가 다음 순서를 소유한다.
@@ -323,7 +331,7 @@ descriptor generation 전체를 함께 처리한다.
 |---|---|---|---:|---|
 | `MBC0` | cutover 계약·변경 동결·corpus/참조/성능 기준선 | — | 2 | **완료 2026-09-02** — `verify-mbc-cutover-freeze`(래칫 15 표면·하드 계약 3), `mbc0_corpus_baseline.json`, [기준선 문서](ModelAssetBigBangCutoverBaseline.md) |
 | `MBC1` | `ce.uuidv8.sha256.v1` 구현·test vector·collision registry | MBC0 | 3 | **완료 2026-09-02** — `Engine/RenderEngine/Assets/AssetIdentityProfile·Registry`, `Utility_Framework/Sha256.h`, `assets.identity`(단정 184), `verify-asset-identity`(C++·Python·.NET 3중 유도, 벡터 15) |
-| `MBC2` | schema v2·stable key·epoch header | MBC1 | 4 | **완료 2026-09-02** — `Assets/AssetIdentityEpoch`·`ModelStableKeys`·`ModelSidecarV2`, `assets.sidecar`(단정 83, corpus 14/14·subasset 309·충돌 0), `verify-asset-sidecar-v2` |
+| `MBC2` | schema v2·stable key·epoch header | MBC1 | 4 | **완료 2026-09-02, PHASE 17 병합 후 재검증** — `Assets/AssetIdentityEpoch`·`ModelStableKeys`·`ModelSidecarV2`를 ryml 저작 문서 경계에 접합, `assets.sidecar`(단정 83, corpus 14/14·subasset 309·충돌 0), `verify-asset-sidecar-v2`, yaml-cpp 은퇴 0건 |
 | `MBC3` | 원자 authoring writer·watcher/AssetCooker 단일화 | MBC2 | 5 | 미착수 |
 | `MBC4` | 전 corpus 새 신원 발급·scene/prefab/material 참조 일회성 rewrite | MBC3 | 6 | 미착수 |
 | `MBC5` | `ModelAssetGeneration`·generation cache·원자 publish/retire | MBC2 | 7 | 미착수 |
@@ -411,3 +419,4 @@ on/off를 복구 경로로 사용하지 않는다. rollback은 이전 release �
 | 2026-09-02 | **MBC0 완료.** 동결 래칫 게이트(표면 15·하드 계약 3), corpus 14/참조 28 분류(모델 참조 8·subasset 참조 **0**·고아 11), Prim sidecar 8개 손상의 원인 경로(워처 Delete 오독 → `CreateMetaLocked` 재발급) 실측, Release 기준선·예산 B1~B6 고정. 미커밋 폴백 덧대기(MeshRenderer 순서 해킹·`[material.finalize]`)와 손상 sidecar는 stash로 걷어냈다. **계측 공백**: 새 경로 cooked 읽기·frame CPU/GPU·peak VRAM은 CLI가 없어 MBC11 전에 세워야 한다 |
 | 2026-09-02 | **MBC2 완료.** epoch header(`ProjectSetting/AssetIdentity.asset`, CSPRNG 256-bit), stable key 문법·규칙 엔진(semantic/authoring, 지문 재결합, 모호성=고아 prior+새 지문 동시), sidecar v2 코덱(왕복·다른 키 보존·legacy guid 제거·v1/ordinal 거부)·폐포 검증(재유도·registry bijection). 실자산 14 모델 임포트→배정→v2→폐포 통과, 전 corpus registry 309 충돌 0, 같은 입력 재배정 동일 신원. 첫 규칙은 scene.glb의 동일 지오메트리 무명 메시에서 변경 없는 재임포트를 거부했다 — 지문 그룹 안 binding 순 짝짓기로 정련. 디스크 쓰기 없음(원본 해시 전후 동일 게이트). §3.1에 확정 사항 기록 |
 | 2026-09-02 | **MBC1 완료.** §2 바이트 계약을 `assets::DeriveIdentity`로 구현(헤더 온리 SHA-256, UTF-8 well-formed·NFC fail-closed, 길이 접두 U32BE, v8/variant bit), 계층 `DeriveModelId`/`DeriveSubAssetId`(legacy v4 namespace는 값에서 거부), `IdentityRegistry`(DuplicateTuple/UuidCollision/RecomputeMismatch, canonical tuple = 입력 바이트열). test vector 15건은 Python 독립 유도로 생성하고 .NET이 3차 검산. **변이 검증**: 길이 접두를 LE로 바꾼 제품 빌드에서 게이트 RED(단정 86 실패), 되돌리면 GREEN. §2.4의 pseudo v5-as-v4 0건은 MBC3가 writer를 교체할 때 래칫을 내린다(현재 접촉 2+1) |
+| 2026-09-02 | **PHASE 17 동기화 충돌 해소.** 코드 충돌 2곳(Console 명령 등록, SerializationPlan)을 병합하고, yaml-cpp 은퇴와 충돌한 MBC2 epoch/sidecar 코덱을 ryml 저작 문서 경계로 이식했다. PHASE 17 D2의 UUIDv4 방향은 역사·MBC4 입력 기준선으로 강등하고 최종 identity authority를 이 문서의 UUIDv8로 단일화했다. 현재 디스크 sidecar 226개는 여전히 UUIDv4이므로 실제 corpus cutover는 MBC3~MBC4 미완료로 유지 |

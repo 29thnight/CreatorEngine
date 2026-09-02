@@ -2,6 +2,8 @@
 
 #include "CookSupport.h"
 #include "../../ShaderMeta.h"
+#include "AuthoringCookedDocument.h"
+#include "AuthoringParsedDocument.h"
 
 #include <utility>
 
@@ -85,10 +87,19 @@ namespace experiment::cooked
             return result;
         }
 
+        std::string documentError;
+        const Authoring::ParsedDocument document =
+            Authoring::ParsedDocument::ParseText(text, documentError);
+        if (!document)
+        {
+            AddIssue(result, "shadermeta.yaml", std::move(documentError));
+            return result;
+        }
+
         // ★ 정본 검증기. 여기서 schema 를 다시 해석하지 않는다.
         ShaderMeta parsed;
         std::string parseError;
-        if (!ShaderMetaLoader::Parse(text, source,
+        if (!ShaderMetaLoader::ParseDocument(document.Root(), source,
             FileGuid{ shaderMetaAssetId.value }, parsed, parseError))
         {
             AddIssue(result, "shadermeta.schema", std::move(parseError));
@@ -136,9 +147,14 @@ namespace experiment::cooked
             return result;
         }
 
-        std::vector<std::byte> bytes(text.size());
-        for (std::size_t index = 0u; index < text.size(); ++index)
-            bytes[index] = static_cast<std::byte>(text[index]);
+        std::vector<std::byte> bytes;
+        std::string encodeError;
+        if (!Authoring::EncodeCookedDocument(
+            document.Root(), bytes, encodeError))
+        {
+            AddIssue(result, "shadermeta.cookedDocument", std::move(encodeError));
+            return result;
+        }
 
         Sha256Digest digest{};
         std::string hashError;
@@ -168,7 +184,8 @@ namespace experiment::cooked
         entry.assetId = shaderMetaAssetId;
         entry.kind = CookedAssetKind::ShaderMeta;
         // ★ schema 정본에서 유도한다. 손으로 올리는 숫자가 아니다.
-        entry.formatVersion = ShaderMeta::kSchemaVersion;
+        entry.formatVersion =
+            (ShaderMeta::kSchemaVersion << 16u) | Authoring::kCookedDocumentVersion;
         entry.byteSize = product.artifactBytes.size();
         entry.contentSha256 = digest;
         entry.artifactPath = artifactPath;

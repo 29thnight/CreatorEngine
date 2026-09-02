@@ -124,8 +124,6 @@ private:
     bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
 
     bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
-    bool LoadEditorSplatMap_Compat(std::filesystem::path& pngPath, int dataWidth, int dataHeight, std::vector<std::vector<float>>& out);
-
 public:
     FileGuid m_trrainAssetGuid{};// 에셋 가이드
     std::wstring m_terrainTargetPath{};

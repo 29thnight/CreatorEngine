@@ -242,11 +242,15 @@ namespace
     //   (BuildPipelinePlan B3). 셰이더를 "소스 파일"로 묶어 빼면 게임이 아무것도
     //   그리지 못한다 — 필터의 과잉이 누락보다 위험한 자리다.
     //
-    // ★ `.meta`도 없다. D5 매니페스트가 Player의 GUID 해석을 대체하기 전까지
-    //   sidecar가 필요하다(계획서 D1 본문의 별표).
+    // D5 cutover: `.meta`는 CEMF v2 source identity table이 대체한다. CEMF 자체는
+    // Derived/asset-manifest.cemf로 포함되며 이 필터를 통과해야 한다.
+    // D4 cutover 뒤 `.json` consumer는 0이다. 구 Animator/NodeEditor JSON은
+    // 호환 입력이 아니라 은퇴한 저작 잔재이므로 Player에 싣지 않는다.
     bool IsExcludedSourceExtension(const fs::path& path)
     {
-        static const std::wstring_view kExcluded[] = { L".cpp", L".h", L".hpp" };
+        static const std::wstring_view kExcluded[] = {
+            L".cpp", L".h", L".hpp", L".meta", L".json"
+        };
 
         std::wstring extension = path.extension().native();
         // 대소문자 무시 — `.CPP`로 저장된 파일이 필터를 지나가면 안 된다.

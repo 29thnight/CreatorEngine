@@ -1,6 +1,5 @@
 #include "ModelCookIdentity.h"
-
-#include <yaml-cpp/yaml.h>
+#include "AuthoringParsedDocument.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -18,11 +17,11 @@ namespace experiment::cooked
                 code, std::move(context), std::move(message) });
         }
 
-        [[nodiscard]] bool ReadScalar(const YAML::Node& parent,
+		[[nodiscard]] bool ReadScalar(const Authoring::ReadNode& parent,
             const char* key, const std::string& context, std::string& out,
             std::vector<ModelIdentityIssue>& issues, bool required = true)
         {
-            const YAML::Node node = parent[key];
+			const Authoring::ReadNode node = parent[key];
             if (!node)
             {
                 if (required)
@@ -39,20 +38,11 @@ namespace experiment::cooked
                 return false;
             }
 
-            try
-            {
-                out = node.as<std::string>();
-                return true;
-            }
-            catch (const YAML::Exception& exception)
-            {
-                AddIssue(issues, ModelIdentityIssueCode::InvalidDocument,
-                    context + "." + key, exception.what());
-                return false;
-            }
-        }
+			out = node.AsString();
+			return true;
+		}
 
-        [[nodiscard]] bool ReadGuid(const YAML::Node& parent,
+		[[nodiscard]] bool ReadGuid(const Authoring::ReadNode& parent,
             const char* key, const std::string& context, AssetId& out,
             std::vector<ModelIdentityIssue>& issues)
         {
@@ -74,7 +64,7 @@ namespace experiment::cooked
             return std::ranges::find(ids, id) != ids.end();
         }
 
-        [[nodiscard]] bool ReadSubAssets(const YAML::Node& sequence,
+		[[nodiscard]] bool ReadSubAssets(const Authoring::ReadNode& sequence,
             const std::string& context,
             std::vector<ModelSubAssetIdentity>& out,
             std::vector<AssetId>& usedIds,
@@ -91,10 +81,10 @@ namespace experiment::cooked
             }
 
             bool valid = true;
-            out.reserve(sequence.size());
-            for (std::size_t index = 0; index < sequence.size(); ++index)
-            {
-                const YAML::Node node = sequence[index];
+			out.reserve(sequence.Size());
+			for (std::size_t index = 0; index < sequence.Size(); ++index)
+			{
+				const Authoring::ReadNode node = sequence.At(index);
                 const std::string itemContext =
                     context + "[" + std::to_string(index) + "]";
                 if (!node.IsMap())
@@ -217,39 +207,48 @@ namespace experiment::cooked
         return found == embeddedTextures.end() ? AssetId{} : found->assetId;
     }
 
-    bool ReadAssetIdFromMeta(std::string_view yaml, AssetId& outAssetId,
-        std::vector<ModelIdentityIssue>& outIssues)
-    {
-        try
-        {
-            const YAML::Node root = YAML::Load(std::string(yaml));
-            if (!root.IsMap())
-            {
-                AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
-                    "meta", "sidecar root는 map이어야 한다.");
-                return false;
-            }
+	bool ReadAssetIdFromMeta(std::string_view yaml, AssetId& outAssetId,
+		std::vector<ModelIdentityIssue>& outIssues)
+	{
+		std::string parseError;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseText(std::string(yaml), parseError);
+		if (!document)
+		{
+			AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
+				"meta", parseError);
+			return false;
+		}
+		const Authoring::ReadNode root = document.Root();
+		if (!root.IsMap())
+		{
+			AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
+				"meta", "sidecar root는 map이어야 한다.");
+			return false;
+		}
 
-            AssetId parsed{};
-            if (!ReadGuid(root, "guid", "meta", parsed, outIssues)) return false;
-            outAssetId = parsed;
-            return true;
-        }
-        catch (const YAML::Exception& exception)
-        {
-            AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
-                "meta", exception.what());
-            return false;
-        }
-    }
+		AssetId parsed{};
+		if (!ReadGuid(root, "guid", "meta", parsed, outIssues)) return false;
+		outAssetId = parsed;
+		return true;
+	}
 
-    bool ReadModelCookIdentity(std::string_view yaml,
-        ModelCookIdentity& outIdentity,
-        std::vector<ModelIdentityIssue>& outIssues)
-    {
-        try
-        {
-            const YAML::Node root = YAML::Load(std::string(yaml));
+	bool ReadModelCookIdentity(std::string_view yaml,
+		ModelCookIdentity& outIdentity,
+		std::vector<ModelIdentityIssue>& outIssues)
+	{
+		std::string parseError;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseText(std::string(yaml), parseError);
+		if (!document)
+		{
+			AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
+				"meta", parseError);
+			return false;
+		}
+		try
+		{
+			const Authoring::ReadNode root = document.Root();
             if (!root.IsMap())
             {
                 AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
@@ -261,7 +260,7 @@ namespace experiment::cooked
             bool valid = ReadGuid(root, "guid", "meta",
                 parsed.modelAssetId, outIssues);
 
-            const YAML::Node subAssets = root["subAssets"];
+			const Authoring::ReadNode subAssets = root["subAssets"];
             if (!subAssets || !subAssets.IsMap())
             {
                 AddIssue(outIssues, subAssets
@@ -271,7 +270,7 @@ namespace experiment::cooked
                 return false;
             }
 
-            const YAML::Node schema = subAssets["schemaVersion"];
+			const Authoring::ReadNode schema = subAssets["schemaVersion"];
             if (!schema || !schema.IsScalar())
             {
                 AddIssue(outIssues, schema
@@ -282,22 +281,22 @@ namespace experiment::cooked
             }
             else
             {
-                try
-                {
-                    if (schema.as<std::uint32_t>() != 1u)
-                    {
-                        AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
-                            "meta.subAssets.schemaVersion",
-                            "지원하는 model subasset schemaVersion은 1이다.");
-                        valid = false;
-                    }
-                }
-                catch (const YAML::Exception& exception)
-                {
-                    AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
-                        "meta.subAssets.schemaVersion", exception.what());
-                    valid = false;
-                }
+				try
+				{
+					if (schema.As<std::uint32_t>() != 1u)
+					{
+						AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
+							"meta.subAssets.schemaVersion",
+							"지원하는 model subasset schemaVersion은 1이다.");
+						valid = false;
+					}
+				}
+				catch (const std::exception& exception)
+				{
+					AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
+						"meta.subAssets.schemaVersion", exception.what());
+					valid = false;
+				}
             }
 
             std::vector<AssetId> usedIds;
@@ -314,7 +313,7 @@ namespace experiment::cooked
             outIdentity = std::move(parsed);
             return true;
         }
-        catch (const YAML::Exception& exception)
+		catch (const std::exception& exception)
         {
             AddIssue(outIssues, ModelIdentityIssueCode::InvalidDocument,
                 "meta", exception.what());

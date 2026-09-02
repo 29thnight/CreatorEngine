@@ -100,7 +100,7 @@ void Entity::SetTag(std::string_view tag)
 
     if (TagManager::GetInstance()->HasTag(tag))
     {
-            m_tag = tag.data();
+			m_tag = tag;
     }
 }
 
@@ -114,7 +114,7 @@ void Entity::SetLayer(std::string_view layer)
     if (TagManager::GetInstance()->HasLayer(layer))
     {
 		size_t layerIndex = TagManager::GetInstance()->GetLayerIndex(layer); // Ensure layer is registered
-        m_layer = layer.data();
+		m_layer = layer;
 		m_collisionType = (uint32)layerIndex;
     }
 }

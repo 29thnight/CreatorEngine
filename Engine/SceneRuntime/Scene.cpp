@@ -812,7 +812,7 @@ std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
 
 void Scene::SerializeEntityHierarchy(const Entity& entity, const Authoring::MutableNodeView& view) const
 {
-	YAML::Node& node = Authoring::MutableNodeViewAccess::Node(view);
+	const Authoring::WriteNode node = Authoring::MutableNodeViewAccess::Node(view);
 	if (!Entity::IsValidIndex(entity.m_index)) return;
 	const size_t index = static_cast<size_t>(entity.m_index);
 	if (index >= m_Entities.size() || m_Entities[index].get() != &entity) return;
@@ -820,15 +820,14 @@ void Scene::SerializeEntityHierarchy(const Entity& entity, const Authoring::Muta
 
 	// 디스크 스키마는 H3 이전과 동일하게 유지한다. 달라진 것은 값의 출처다:
 	// Entity 멤버가 아니라 Scene-owned Store에서 세 키를 보충한다.
-	node["m_parentIndex"] = m_hierarchyStore.ParentOf(index);
-	node["m_rootIndex"] = m_hierarchyStore.RootOf(index);
-	YAML::Node children(YAML::NodeType::Sequence);
-	children.SetStyle(YAML::EmitterStyle::Flow);
+	node.Child("m_parentIndex").SetScalar(m_hierarchyStore.ParentOf(index));
+	node.Child("m_rootIndex").SetScalar(m_hierarchyStore.RootOf(index));
+	const Authoring::WriteNode children = node.Child("m_childrenIndices");
+	children.SetSequence(true);
 	for (Entity::Index child : m_hierarchyStore.ChildrenOf(index))
 	{
-		children.push_back(child);
+		children.Append().SetScalar(child);
 	}
-	node["m_childrenIndices"] = children;
 }
 
 size_t Scene::CountHierarchyStoreMismatches() const
@@ -1840,7 +1839,7 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 
 Entity* Scene::GetEntity(std::string_view name)
 {
-    HashingString hashedName(name.data());
+    HashingString hashedName(name);
     for (auto& obj : m_Entities)
     {
         if (obj && obj->GetHashedName() == hashedName)

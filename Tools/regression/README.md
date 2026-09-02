@@ -13,7 +13,7 @@ pwsh Tools/regression/run-all.ps1
 
 ## 개별 검사
 
-전체 런타임 스위트는 `run-all.ps1`의 Run-Step 목록이 정본이다(현재 28종). 아래 표는
+전체 런타임 스위트는 `run-all.ps1`의 Run-Step 목록이 정본이다. 아래 표는
 그 항목과 단계 전용 standalone gate 중 "왜 이렇게 재는가"를 기록해 둘 가치가 있는
 검사만 담는다. 표의 standalone gate는 해당 단계에서 명시적으로 실행한다.
 
@@ -42,6 +42,8 @@ pwsh Tools/regression/run-all.ps1
 | `verify-asset-sidecar-v2.ps1` | PHASE 3.75 MBC2 — identity epoch header(`ProjectSetting/AssetIdentity.asset`, CSPRNG 256-bit seed)·stable key 규칙 엔진·model sidecar schema v2. `assets.sidecar <assetRoot>`가 합성 단정([1] header 왕복·변조 거부, [2] key 문법 — `exporter:`/`name:`/`authoring:` 접두만, ordinal `gltf/material/0` 거부, [3] 규칙 — 이름 유일=semantic, 중복/무명=authoring, 재임포트는 콘텐츠 지문으로 재결합(순서 무관), 삭제=경고, 내용 변경+무명=**오류**(증명 불가), exporter id 중복=오류, [4] v2 코덱 — 왕복·다른 최상위 키 보존·legacy `guid` 제거·v1/ordinal/generation 0/대문자 id 거부·1비트 변조 RecomputeMismatch·epoch 불일치)을 돌린 뒤 실자산 corpus 전 모델을 임포트→배정→v2 생성→폐포 재유도하고 한 registry에서 충돌 0을 확인한다. 게이트가 더하는 실자산 단정: Gunner 재질 2·임베디드 6 전부 semantic, scene.glb 무명 재질 25 전부 authoring(authoring 경로가 실자산에서 실제로 돈다), 모델 ≥ 11, **원본·sidecar 해시 전후 동일**(이 슬라이스는 쓰지 않는다 — 쓰기는 MBC3). |
 | `Export-MbcCorpusBaseline.ps1` | (게이트가 아니라 **기준선 export**) PHASE 3.75 MBC0. 모델 corpus 14건의 source SHA-256·sidecar GUID·subasset closure와 `.creator/.prefab/.asset` 28건의 GUID 참조를 키별로 분류(model / model-subasset / other-meta / type-or-instance / nil / unresolved)해 `mbc0_corpus_baseline.json`에 굳힌다. MBC4의 참조 rewrite와 MBC11의 "old GUID 0건" 판정이 이 파일을 입력으로 쓴다. `Dynamic_CPP/Assets` 대부분이 gitignore라 이 파일은 로컬 상태의 archive다 — 한 번 떠서 커밋하고 다시 뜨지 않는다. |
 | `verify-prefab-identity-injection.ps1` | 프리팹 identity가 **워처 스레드와의 경합**을 견디는지. `verify-prefab-duplicate`가 2026-08-30에 한 번 실패하고 재현되지 않았는데, 원인은 초기 상태가 아니라 efsw 워처였다 — 원자적 게시(`.tmp` → replace)를 목적지 경로의 Delete로 오독한 `HandleDeleted`가 본문이 멀쩡한데도 catalog 항목과 sidecar를 떨어뜨렸다(정상 실행 한 판에 두 번, 각 ~26ms 실측). 그 창에 `prefab.update`가 걸리면 `LoadPrefab`이 살아 있는 identity를 널로 덮고 → `SavePrefab`이 새 GUID를 발급하고 → `UpdateInstances`가 그 키로 조회해 **조용히 0건 적용**한다. 에러도 로그도 없고 판정 1~4는 전부 통과해서, 우연에 맡기면 원인을 못 가른다. 그래서 창을 열어 놓고 sidecar를 **밖에서 확정적으로** 떨어뜨린다. **교란이 실제로 먹었는지를 먼저 단정한다**(창 진입·삭제·삭제 직후 부재) — 그게 없으면 "교란을 넣지 못한 실행"이 통과로 나와 대조군을 검사로 착각한다. 판정은 원인(인스턴스 guid == sidecar guid)과 결과(`m_shadowCast`가 false)를 함께 본다. 고치기 전 RED, 고친 뒤 GREEN을 확인하고 편입했다. |
+| `verify-experiment-document-cook-parity.ps1` | D5-d 현재 corpus의 scene 8·prefab 9·standalone material 2를 실제 producer로 굽고 authoring/cooked 문서를 구조 비교한다. CLI 성공만 보지 않고 parity 요약, source/meta 무변경, stderr 0을 함께 단정한다. |
+| `verify-experiment-cooked-catalog.ps1` | 실제 package와 같은 전체 producer closure를 임시 CEMF에 굽는다. mounted에서는 모델·texture·scene 문서가 cooked를 사용하고, stale leg는 모델 1개만 source fallback, unmounted 대조군은 cooked 0이어야 한다. |
 
 ## 생명주기 기준선 뜨기 (PHASE 9-0)
 
@@ -96,16 +98,24 @@ set ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:abort_on_error=1
 ```powershell
 pwsh Tools/regression/verify-pak-source-exclusion.ps1
 pwsh Tools/regression/verify-player-runtime-hygiene.ps1
+pwsh Tools/build.ps1 -Config Release -InputMode Project
 ```
 
-`verify-pak-source-exclusion.ps1`은 **합성 트리로만** 판정한다. 실제 pak 입력 루트에는
-`.cpp/.h/.hpp`가 0개라서, 실자산으로 재면 필터가 있든 없든 "0개를 걸렀다"가 나온다.
+`verify-pak-source-exclusion.ps1`은 **합성 트리로** `.cpp/.h/.hpp/.meta` 배제를 판정한다.
+실제 pak 입력 루트에는 C++ 소스가 0개라서, 실자산만 재면 해당 필터가 있든 없든
+"0개를 걸렀다"가 나온다.
 그래서 오염된 트리를 일부러 만들어 필터를 밟는다. 그리고 **배제와 보존을 함께** 단정한다 —
 `.hlsl`/`.hlsli`는 pak에 실려야 한다(Player가 런타임에 컴파일한다). 과잉 필터는 누락보다
 위험하다.
 
 pak은 결정적이지 않아(같은 입력 2회의 SHA-256이 다르다) 바이트 비교로는 내용을 단정할 수
 없다. AssetPacker의 `--list-entries`가 내보내는 reopen된 목록을 대조한다.
+
+`Tools/build.ps1` Release Project 검증은 그 정책을 실제 배포 경로에서 다시 닫는다.
+manifest 투영과 reopen된 pak 목록을 전수 대조하고, 격리 Player stdout의
+`source=cemf identities=N metaParsed=0`, cooked/source identity 수 일치, cooked scene 문서
+1건 이상, unpacked `.meta` 0개와 `Assets/Derived/asset-manifest.cemf` 존재를 확인한 뒤에만
+stage를 게시한다.
 
 `verify-player-runtime-hygiene.ps1`은 바이너리 검사에 **대조군**을 둔다. "Player.exe에
 efsw 문자열 0"만 보면 빈 파일을 읽어도 통과하므로, 같은 방법으로 CreatorEditor.exe를 재서
@@ -130,6 +140,40 @@ Release로 보면 58%로 읽게 된다. 그래서 Release가 없을 때 Debug로
 
 `-Baseline`을 주면 계획서에 옮길 표 형식으로 전체 수치를 찍는다.
 
+정본 `Test1.creator`가 없는 로컬 checkout에서는 역사 기준선을 덮어쓰지 말고
+`verify-phase17-local-d0-baseline.ps1`을 쓴다. 현재 가장 큰 scene 2개의 경로·크기·
+SHA-256을 출력하고 boot/scene 2/prefab Release selfcheck를 수행하므로 같은 해시의
+로컬 전후 비교에는 쓸 수 있지만 Test1 수치와 직접 비교할 수는 없다.
+
+## Cooked document parity와 제품 소비 (SerializationPlan D5-d)
+
+```powershell
+pwsh Tools/regression/verify-experiment-document-cook-parity.ps1
+pwsh Tools/regression/verify-experiment-cooked-catalog.ps1
+pwsh Tools/build.ps1 -Config Release -InputMode Project -BuildNative
+```
+
+첫 관문은 현존 scene 8·prefab 9·material 2의 authoring/cooked 구조 parity를 닫는다.
+둘째 관문은 모델만이 아니라 texture·ShaderMeta·material·scene/prefab producer closure를
+전부 넘겨 CEMF 의존성을 닫고 mounted/stale/unmounted 소비 경로를 대조한다. Release
+Project 검증은 pak에서 다시 열어 실제 Player가 CEMF identity만으로 부팅하고 cooked
+scene 문서를 여는지 확인한다. D6 이후 scene/prefab/material/ShaderMeta 산출물은
+CEDO 바이너리 tree payload이며, PrefabOverride 중첩 값도 `CEDO1:<base64>` envelope다.
+packaged Player에는 이 값의 YAML fallback과 구버전 YAML artifact 호환 reader가 없다.
+
+## Player text parser 은퇴 (SerializationPlan D6)
+
+```powershell
+pwsh Tools/regression/verify-player-runtime-text-parser.ps1
+```
+
+`Tools/build.ps1`은 EngineSettings를 YAML 상태에서 먼저 preflight한 뒤 ProjectSetting
+3개·InputMap 6개·BT/BlackBoard 2개·Volume 7개, 총 18개를 CEDO1으로 바꿔 pak에 넣는다.
+scene 8·prefab 9·material 2·ShaderMeta 6의 GUID-addressed artifact 25개도 같은 포맷이다.
+Player 스모크는 실제 text parser 진입 카운터가 정확히 0인지 강제하고, 위 독립 관문은
+runtime 모듈 direct ryml include/symbol 0, CEDO magic 43/43, legacy JSON 0을 다시 확인한다.
+구 Animator/NodeEditor JSON 31개는 reader를 되살리지 않고 pak 필터에서 제외한다.
+
 ## ryml 에러 정책 (SerializationPlan D3-b-1)
 
 `verify-ryml-error-policy.ps1` — ryml의 기본 에러 처리는 예외도 반환값도 아니라
@@ -148,41 +192,32 @@ Release로 보면 58%로 읽게 된다. 그래서 Release가 없을 때 Debug로
 **탭 들여쓰기**(parse)다. **CRLF는 정상 파싱되므로 오히려 통과해야 하는 대조군**이고,
 이것이 깨지면 파싱 전 정규화 사본이 다시 필요해져 D3-b의 성능 계산이 바뀐다.
 
-## 스칼라 변환 파리티 (SerializationPlan D3-b-2)
+## yaml-cpp 은퇴 + Base64 계약 (SerializationPlan D3-b-4)
 
-`verify-scalar-conversion-parity.ps1` — 파서 동등성이 증명하지 못하는 축이다.
-두 파서가 만든 트리가 구조적으로 같아도 `as<bool>`이 `"yes"`를 다르게 읽으면
-**값의 의미만 조용히 달라진다.** 로드는 성공하고 값만 틀린다.
+이행 중에만 필요했던 scalar/adapter/backend 대조 게이트는 yaml-cpp와 함께
+은퇴했다. 현재 정본은 두 개다.
 
-**두 축을 잰다.** 이식 변환기(`Authoring::Scalar`) 대 yaml-cpp는 **차이 0이어야
-한다** — 그것이 "backend가 바뀌어도 값의 의미가 그대로"의 정의다. 실제로 이 단정이
-이식 오류 3건을 잡았다(부호 없는 정수가 음수를 받아들임, 널 노드의 문자열 표현 2건).
+- `verify-yaml-cpp-retirement.ps1` — Engine/Editor/Tools C++의 yaml-cpp include,
+  backend symbol, namespace alias, transition escape가 0인지 검사하고 vcpkg manifest,
+  runtime 배치 목록, 빌드된 Editor PE import까지 확인한다.
+- `verify-authoring-base64.ps1` — DataSystem payload가 backend codec에 기대지 않는지
+  확인하고 strict RFC4648 known vector·0~255 roundtrip·잘못된 padding 거부를
+  Debug/Release에서 실행한다.
 
-ryml 대 yaml-cpp는 다르다 — **"차이 0"을 단정하지 않는다.** 67케이스 중 21건이
-실제로 갈린다. 차이를 없애는 것은 구현의 일(D3-b-2b-1a가 변환을 문자열 위로 옮겼다)
-이고, 검사의 일은 **알려진 목록을 고정**해 새 차이만 빨개지게 하는 것이다.
-**목록보다 적어도 실패다** — 차이가 사라졌다면 누가 변환을 바꾼 것이고, 조용히
-넘기면 표가 낡는다.
+## JSON 트랙 은퇴 (SerializationPlan D4)
 
-★ **가장 위험한 것은 실패가 아니라 "둘 다 성공하는데 값이 다른" 쪽이다.**
-`010`은 yaml-cpp에서 8(8진), ryml에서 10(10진)이다. `1.5x`는 yaml-cpp가 거부하고
-ryml이 1.5로 읽는다. 오버플로는 ryml이 쓰레기 값을 낸다. 그래서 ryml의
-`from_chars`를 직접 쓰면 안 된다.
+구버전 JSON 호환은 제품 계약이 아니다. 현재 자산을 canonical YAML로 직접 이주했고
+제품 loader에는 migration reader나 dual-read를 두지 않는다. 정본 관문은 세 개다.
 
-갈리는 것과 위험한 것은 다르다. 차이가 손상이 되려면 코퍼스에 그 표기가 있어야
-하므로, 같은 게이트가 자산 281개(`Assets` + `ProjectSetting`)를 스캔해 `.inf`/`.nan` 0건과 YAML 1.1 불리언
-기준선 2건을 함께 단정한다.
-
-## backend 경계 래칫 (SerializationPlan D3-b-2b-1b)
-
-`verify-authoring-backend-boundary.ps1` — 읽기 경로를 ryml로 옮기는 일은 한 번에
-못 한다. 그래서 아직 backend 노드를 만지는 자리마다 **이름이 흉한 탈출구**를 두었다
-(`BackendNodeDuringTransition`). 개수가 곧 진행률이다.
-
-**이 게이트가 막는 것은 실패가 아니라 역행이다.** 새 코드가 어댑터 대신 backend
-노드를 직접 잡으면 빌드도 다른 게이트도 전부 통과하므로 아무도 모른다. 기준선보다
-늘면 실패하고, 줄면 기준선을 갱신하라고 말하며(숫자가 낡으면 래칫이 풀린다),
-**0이 되면 이 게이트를 은퇴시키라고 말한다.**
+- `verify-animator-scene-single-truth.ps1` — 실제 controller/parameter/Any State/
+  transition/condition graph를 scene YAML로 왕복하고 구조 안정성과 owner/parameter
+  포인터 재연결을 확인한다.
+- `verify-inputmap-yaml-corpus.ps1` — `.inputmap` 6개를 strict schemaVersion 1 YAML로
+  전수 로드해 26 actions/104 keys와 키보드·게임패드 분류를 확인한다.
+- `verify-nlohmann-retirement.ps1` — Engine/Editor/Player source, vcpkg manifest와
+  설치 상태, `ISerializable`, Animator legacy JSON entry point, InputMap `.json`,
+  Terrain JSON/compat 경로가 모두 0인지 확인한다. Terrain 동적 왕복은
+  `verify-asset-authoring-ownership.ps1`이 함께 담당한다.
 
 ## 검사가 조용히 건너뛰지 않게 하기
 

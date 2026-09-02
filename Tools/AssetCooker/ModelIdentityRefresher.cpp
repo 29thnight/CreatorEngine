@@ -3,10 +3,11 @@
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/Cooked/ModelCookIdentity.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
+#include "AuthoringParsedDocument.h"
+#include "AuthoringWriteNode.h"
 #include "TypeTrait.h"
 
 #include <Windows.h>
-#include <yaml-cpp/yaml.h>
 
 #include <algorithm>
 #include <chrono>
@@ -152,16 +153,15 @@ namespace asset_cooker
                     return false;
                 }
 
-                try
-                {
-                    const YAML::Node root = YAML::Load(text);
-                    if (!root["subAssets"]) continue;
-                }
-                catch (const YAML::Exception& exception)
-                {
-                    failure = iterator->path().string() + ": " + exception.what();
-                    return false;
-                }
+				std::string parseError;
+				const Authoring::ParsedDocument document =
+					Authoring::ParsedDocument::ParseText(text, parseError);
+				if (!document)
+				{
+					failure = iterator->path().string() + ": " + parseError;
+					return false;
+				}
+				if (!document.Root()["subAssets"]) continue;
 
                 ck::ModelCookIdentity modelIdentity;
                 issues.clear();
@@ -291,57 +291,47 @@ namespace asset_cooker
             return true;
         }
 
-        [[nodiscard]] YAML::Node MakeSubAssetSequence(
-            const std::vector<ck::ModelSubAssetIdentity>& identities)
-        {
-            YAML::Node sequence(YAML::NodeType::Sequence);
-            for (const ck::ModelSubAssetIdentity& identity : identities)
-            {
-                YAML::Node entry(YAML::NodeType::Map);
-                entry["key"] = identity.sourceKey;
-                if (!identity.name.empty()) entry["name"] = identity.name;
-                entry["guid"] = Uuid::ToString(identity.assetId.value);
-                sequence.push_back(entry);
-            }
-            return sequence;
-        }
+		void WriteSubAssetSequence(Authoring::WriteNode sequence,
+			const std::vector<ck::ModelSubAssetIdentity>& identities)
+		{
+			sequence.SetSequence();
+			for (const ck::ModelSubAssetIdentity& identity : identities)
+			{
+				const Authoring::WriteNode entry = sequence.Append();
+				entry.SetMap();
+				entry.Child("key").SetScalar(identity.sourceKey);
+				if (!identity.name.empty())
+					entry.Child("name").SetScalar(identity.name);
+				entry.Child("guid").SetScalar(
+					Uuid::ToString(identity.assetId.value));
+			}
+		}
 
         [[nodiscard]] bool BuildRefreshedSidecar(std::string_view original,
             const ck::ModelCookIdentity& identity,
             std::string& out, std::string& failure)
         {
-            try
-            {
-                YAML::Node root = YAML::Load(std::string(original));
-                if (!root.IsMap())
-                {
-                    failure = "model sidecar root가 map이 아니다.";
-                    return false;
-                }
+			std::string parseError;
+			std::optional<Authoring::WriteDocument> document =
+				Authoring::WriteDocument::ParseText(original, &parseError);
+			if (!document || !document->Root().Read().IsMap())
+			{
+				failure = parseError.empty()
+					? "model sidecar root가 map이 아니다." : parseError;
+				return false;
+			}
 
-                YAML::Node subAssets(YAML::NodeType::Map);
-                subAssets["schemaVersion"] = 1u;
-                subAssets["materials"] = MakeSubAssetSequence(identity.materials);
-                subAssets["embeddedTextures"] =
-                    MakeSubAssetSequence(identity.embeddedTextures);
-                root["subAssets"] = subAssets;
+			const Authoring::WriteNode root = document->Root();
+			root.RemoveChild("subAssets");
+			const Authoring::WriteNode subAssets = root.Child("subAssets");
+			subAssets.SetMap();
+			subAssets.Child("schemaVersion").SetScalar(1u);
+			WriteSubAssetSequence(subAssets.Child("materials"), identity.materials);
+			WriteSubAssetSequence(subAssets.Child("embeddedTextures"),
+				identity.embeddedTextures);
 
-                YAML::Emitter emitter;
-                emitter.SetIndent(2);
-                emitter << root;
-                if (!emitter.good())
-                {
-                    failure = "model sidecar YAML emit이 실패했다.";
-                    return false;
-                }
-                out.assign(emitter.c_str(), emitter.size());
-                out.push_back('\n');
-            }
-            catch (const YAML::Exception& exception)
-            {
-                failure = exception.what();
-                return false;
-            }
+			out = document->Dump();
+			if (out.empty() || out.back() != '\n') out.push_back('\n');
 
             ck::ModelCookIdentity reparsed;
             std::vector<ck::ModelIdentityIssue> issues;

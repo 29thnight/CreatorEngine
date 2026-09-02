@@ -1,11 +1,11 @@
 #pragma once
 // ReflectionYamlTemplete.h(레거시 스칼라·벡터 특수화 테이블)는 CT10 감사에서
 // 파일째 삭제 — CT7 이후 자기참조만 남은 사강 코드였다. typed 직렬화기
-// (ReflectionTypedYml.h)가 파리티 재구현을 소유한다. yaml-cpp는 직접 문다.
-#include <yaml-cpp/yaml.h>
+// (ReflectionTypedYml.h)가 파리티 재구현을 소유한다.
 // FindTypeByInstance가 IObject를 쓴다. IObject는 L1-2에서 코어로 내려왔다
 // (순수 인터페이스 + HashedGuid뿐이라 ScriptBinder 소속일 이유가 없었다).
 #include "AuthoringReadNode.h" // D3-b-2b-1b
+#include "AuthoringWriteNode.h" // D3-b-3
 #include "AuthoringScalarConvert.h" // D3-b-2b-1a
 #include "IObject.h"
 // ComponentUUIDRegistry(K1-b) 조회 창구. IObject.h가 이미 물고 있어 사실상
@@ -66,8 +66,6 @@ namespace Meta
 	}
 }
 
-namespace MetaYml = YAML;
-
 using namespace TypeTrait;
 class Entity;
 
@@ -83,7 +81,7 @@ namespace Meta::Typed
 {
 	struct TypeOps
 	{
-		MetaYml::Node (*serialize)(void* instance);
+		void (*serializeInto)(void* instance, Authoring::WriteNode node);
 		void (*deserialize)(void* instance, const Authoring::ReadNode& node);
 
 		// CT6-d: 역직렬화 후처리 훅 — ComponentFactory의 타입별 하드코딩
@@ -117,27 +115,38 @@ namespace Meta
 	// PropertyToYamlNode/YamlNodeToProperty 헬퍼는 CT1 조회 순서 역전으로
 	// Serialize/Deserialize 본문에 흡수됐다 (호출처가 각 1곳뿐이었다).
 
-	inline MetaYml::Node Serialize(void* instance, const Type& type)
+	inline bool SerializeInto(void* instance, const Type& type,
+		Authoring::WriteNode node)
 	{
-		// CT7: 레거시 Property 워크(프로퍼티당 function/any/조회 폴백) 은퇴 —
-		// 등록 타입 전부가 typed 썽크(CT6-a)로 간다. 여기 도달하는 미등록
-		// 타입은 등록 정본(RegisterReflectManual) 누락이다.
 		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
 		{
-			return ops->serialize(instance);
+			ops->serializeInto(instance, node);
+			return true;
 		}
 
-		Debug->LogError(std::string("Serialize: typed ops 미등록 타입 - ") + type.name
+		Debug->LogError(std::string("SerializeInto: typed ops 미등록 타입 - ") + type.name
 			+ " (RegisterReflectManual.h 목록을 확인하라)");
-		return {};
+		return false;
 	}
 
+	template<typename T>
+	inline bool SerializeInto(T* instance, Authoring::WriteNode node)
+	{
+		return SerializeInto(reinterpret_cast<void*>(instance), TypeOf<T>(), node);
+	}
 
-    template<typename T>
-    inline MetaYml::Node Serialize(T* instance)
-    {
-        return Serialize(reinterpret_cast<void*>(instance), TypeOf<T>());
-    }
+	inline Authoring::WriteDocument SerializeDocument(void* instance, const Type& type)
+	{
+		Authoring::WriteDocument document;
+		SerializeInto(instance, type, document.Root());
+		return document;
+	}
+
+	template<typename T>
+	inline Authoring::WriteDocument SerializeDocument(T* instance)
+	{
+		return SerializeDocument(reinterpret_cast<void*>(instance), TypeOf<T>());
+	}
 
 	// 리네임된 타입의 **구 이름 → 현 이름** (§5 읽기 별칭).
 	//
@@ -276,16 +285,7 @@ namespace Meta
 		return nullptr;
 	}
 
-	// ★ 전환기 오버로드. 아직 backend 노드를 들고 있는 호출부 15곳이 있고,
-	//   그들은 `LoadFile`이 옮겨질 때 자연히 `ReadNode`를 받게 된다.
-	//   **이 오버로드가 사라지는 것이 그 전환의 완료 신호다.**
-	inline const Type* ExtractTypeFromYAML(const MetaYml::Node& node)
-	{
-		return ExtractTypeFromYAML(Authoring::ReadNode{ node });
-	}
-
-	// D3-b-2b-1b-2c: 어댑터를 받는 진입점. 소비자는 이쪽을 쓰고, 아래 backend
-	// 오버로드는 아직 옮기지 않은 호출부를 위한 전환기다.
+	// D3-b-2b-1b-2c: backend-neutral 어댑터를 받는 단일 진입점.
 	inline void Deserialize(void* instance, const Type& type, const Authoring::ReadNode& node)
 	{
 		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
@@ -303,28 +303,6 @@ namespace Meta
 	{
 		Deserialize(reinterpret_cast<void*>(instance), TypeOf<T>(), node);
 	}
-
-	inline void Deserialize(void* instance, const Type& type, const MetaYml::Node& node)
-	{
-		// CT7: 레거시 워크 은퇴 (Serialize와 동일한 이유).
-		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
-		{
-			// D3-b-2b-1b: 썬크가 어댑터를 받는다. 이 경계가 아직 backend 노드를
-			// 받는 마지막 지점이고, 1b-2가 그것까지 옮긴다.
-			ops->deserialize(instance, Authoring::ReadNode{ node });
-			return;
-		}
-
-		Debug->LogError(std::string("Deserialize: typed ops 미등록 타입 - ") + type.name
-			+ " (RegisterReflectManual.h 목록을 확인하라)");
-	}
-
-
-	template<typename T>
-	inline void Deserialize(T* instance, const MetaYml::Node& node)
-	{
-		Deserialize(reinterpret_cast<void*>(instance), TypeOf<T>(), node);
-	}
 }
 
 namespace Meta
@@ -337,12 +315,12 @@ namespace Meta
 	// 있는 프로퍼티 이름은 새 값 적용에서 제외하고(현재 값 그대로), 나머지만 newNode의
 	// 값으로 갱신한다.
 	inline void DeserializePrefab(void* instance, const Type& type,
-		const MetaYml::Node& newNode,
+		const Authoring::ReadNode& newNode,
 		const std::unordered_set<std::string>& overriddenProperties)
 	{
 		ScopedPropertyChangeSource sourceScope(PropertyChangeSource::Prefab);
-		MetaYml::Node currentNode = Serialize(instance, type);
-		MetaYml::Node patchedNode = currentNode;
+		Authoring::WriteDocument patchedDocument = SerializeDocument(instance, type);
+		const Authoring::WriteNode patchedNode = patchedDocument.Root();
 
 		if (type.parent)
 		{
@@ -351,20 +329,21 @@ namespace Meta
 
 		for (const auto& prop : type.properties)
 		{
-			if (!newNode[prop.name])
+			const Authoring::ReadNode incoming = newNode[prop.name];
+			if (!incoming)
 				continue;
 
 			if (overriddenProperties.contains(prop.name))
 				continue; // 오버라이드된 속성 — 현재 값을 그대로 둔다
 
-			patchedNode[prop.name] = newNode[prop.name];
+			patchedNode.Child(prop.name).Assign(incoming);
 		}
 
-		Deserialize(instance, type, patchedNode);
+		Deserialize(instance, type, patchedNode.Read());
 	}
 
 	template<typename T>
-	inline void DeserializePrefab(T* instance, const MetaYml::Node& newNode,
+	inline void DeserializePrefab(T* instance, const Authoring::ReadNode& newNode,
 		const std::unordered_set<std::string>& overriddenProperties)
 	{
 		DeserializePrefab(reinterpret_cast<void*>(instance), TypeOf<T>(), newNode, overriddenProperties);

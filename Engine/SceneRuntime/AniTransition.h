@@ -3,7 +3,6 @@
 #include "Core.Minimal.h"
 #include "TransCondition.h"
 #include "ConditionParameter.h"
-#include <nlohmann/json.hpp>
 class AnimationState;
 class AnimationController;
 class AniTransition
@@ -59,9 +58,6 @@ public:
 	bool CheckTransiton(bool isBlend = false);
 	float GetBlendTime() { return blendTime; }
 	float GetExitTime() { return exitTime; }
-	nlohmann::json Serialize();
-	AniTransition Deserialize();
-
 	std::vector<TransCondition> GetConditions();
 
 public:

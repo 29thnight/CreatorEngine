@@ -7,8 +7,8 @@ param(
 # SerializationPlan D3-a-1 — 저작 노드 구조 비교의 판정 규칙.
 #
 # ★ 이 게이트가 지키는 것은 성능이 아니라 **의미**다. 구조 비교는 이전의
-#   `YAML::Dump(a) == YAML::Dump(b)` 동작을 그대로 옮기지 않는다 — 맵 키 순서와
-#   emitter 스타일을 무시하는 것이 의도된 차이다. 그래서 검사는 "구조 비교가 옳은
+#   과거 Dump 문자열 비교 동작을 그대로 옮기지 않는다 — 맵 키 순서와 emitter
+#   스타일을 무시하고 null 표기를 정규화하는 것이 의도된 차이다. 그래서 검사는 "구조 비교가 옳은
 #   답을 내는가"와 "Dump와 갈리는 지점이 예상한 곳뿐인가"를 **함께** 단정한다.
 #
 # ★ `divergedFromDump=0`이면 실패다. 전부 Dump와 같은 답이면 이 슬라이스가 아무것도
@@ -57,7 +57,7 @@ if (-not $summary.Success) {
     if ($cases -le 0)        { $failures.Add('케이스가 0건이다 — 잴 것이 없다') }
     if ($failed -ne 0)       { $failures.Add("케이스 $failed 건 실패") }
     if ($passed -ne $cases)  { $failures.Add("통과 $passed / 전체 $cases — 일부가 실행되지 않았다") }
-    if ($diverged -le 0)     { $failures.Add('Dump와 갈리는 케이스가 0건 — 구조 비교가 아무것도 바꾸지 않았다') }
+    if ($diverged -ne 4)     { $failures.Add("Dump와 갈리는 케이스가 $diverged 건 — 정본은 4건이다") }
 
     "cases=$cases passed=$passed failed=$failed divergedFromDump=$diverged"
 }
@@ -84,5 +84,5 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-'전체 통과 — 구조 비교가 14개 판정 규칙을 만족하고, Dump와 갈리는 3건이 의도된 차이다'
+'전체 통과 — 구조 비교가 14개 판정 규칙을 만족하고, Dump와 갈리는 4건이 의도된 차이다'
 exit 0

@@ -3,6 +3,7 @@
 #include "PathFinder.h"
 #include "DataSystem.h"
 #include "Interfaces/AssetAuthoringPort.h"
+#include "AuthoringParsedDocument.h"
 #include "assimp/material.h"
 #include "assimp/Gltfmaterial.h"
 #include "ReflectionYml.h"
@@ -313,8 +314,13 @@ void ModelLoader::ProcessMaterials()
 
 void ModelLoader::ResolveFileGuidFromMeta()
 {
-	MetaYml::Node modelFileNode = MetaYml::LoadFile(m_metaDirectory);
-	m_fileGuid = modelFileNode["guid"].as<std::string>();
+	std::string parseError;
+	const Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(m_metaDirectory, parseError);
+	if (!document)
+		throw std::runtime_error("Model meta parse failed: " + parseError);
+	const Authoring::ReadNode modelFileNode = document.Root();
+	m_fileGuid = modelFileNode["guid"].AsString();
 }
 
 std::shared_ptr<Material> ModelLoader::GenerateMaterial(int index)

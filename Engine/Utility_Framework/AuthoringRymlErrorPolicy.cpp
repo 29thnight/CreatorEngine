@@ -10,8 +10,6 @@ namespace Authoring
 {
 	namespace
 	{
-		std::once_flag g_installOnce;
-
 		// 메시지 앞에 **채널 이름**을 붙인다. ryml은 에러를 basic/parse/visit
 		// 셋으로 나누고, 하나만 덮으면 나머지는 여전히 abort한다. 그런데
 		// what() 문자열만 보면 어느 채널을 타고 왔는지 알 수 없어서,
@@ -66,7 +64,13 @@ namespace Authoring
 
 	void EnsureRymlErrorPolicy()
 	{
-		std::call_once(g_installOnce, &Install);
+		// WriteDocument는 장기 보관 Document의 backend이므로 SceneManager 같은
+		// 전역 서비스가 정적 초기화 중 생성할 수 있다. namespace 전역 once_flag를
+		// 쓰면 다른 TU의 초기화 순서에 따라 아직 생성되지 않은 flag를 건드리는
+		// 정적 초기화 순서 결함이 된다. 함수 지역 정적은 첫 호출에 초기화되므로
+		// 그 순서와 무관하다.
+		static std::once_flag installOnce;
+		std::call_once(installOnce, &Install);
 	}
 
 	RymlErrorPolicyProbe ProbeRymlErrorPolicy()

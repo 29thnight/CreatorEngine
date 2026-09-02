@@ -23,6 +23,13 @@ function Run-Step([string]$name, [scriptblock]$body) {
     ""
 }
 
+# PHASE 15 트랙 H — 캐시 해시/문자열 불변식, 부분 string_view 길이,
+# 해시 컨테이너 키 계약을 Debug/Release 독립 프로브로 고정한다. 인스펙터 경로는
+# mutable data()를 다시 열지 않는지도 정적 래칫으로 함께 본다.
+Run-Step "HashingString 계약" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hashing-string.ps1")
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.
@@ -252,6 +259,14 @@ Run-Step "Experiment AssetCooker 실제 산출물 게시" {
         (Join-Path $PSScriptRoot "verify-experiment-asset-cooker.ps1") -Work $Work
 }
 
+# D5-d: 현재 source corpus의 scene/prefab/material을 전부 실제 producer로 굽고,
+# authoring과 cooked payload를 같은 ReadNode 구조로 파싱해 값 동등을 단정한다.
+# 파일 바이트만 비교하면 parser/decoder가 다른 값을 내도 놓치므로 구조 parity도 본다.
+Run-Step "Experiment document 전수 cook parity" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-experiment-document-cook-parity.ps1") -Exe $Exe -Work $Work
+}
+
 # D5-b2b1: tracked model 전부와 현재 checkout의 선택적 local model이 strict
 # subasset UUIDv4 sidecar를 가지며,
 # 두 번의 전수 Cook이 같은 14 CEMC + CEMF를 만들고 source를 수정하지 않아야 한다.
@@ -261,9 +276,9 @@ Run-Step "Experiment model 전수 identity/cook" {
         (Join-Path $PSScriptRoot "verify-experiment-model-cook-all.ps1") -Work $Work
 }
 
-# cooked catalog 기동(I7-C1). 굽는 쪽은 D5-b2c가 닫았고, 이 검사는 **읽는 쪽**을
-# 잰다 — 마운트한 catalog로 모델이 cooked artifact를 타고 sealing이 cooked
-# texture를 고르는가. 대조군(마운트 없음)이 두 축 모두 0이어야 한다.
+# cooked catalog 제품 소비(D5-c/D5-d). 실제 패키징과 같은 producer closure를
+# 굽고, 마운트한 catalog로 모델·texture·scene 문서가 cooked artifact를 타는지
+# 잰다. 대조군(마운트 없음)은 model/texture cooked 0, scene authoring이어야 한다.
 # I6-C: 렌더 패스가 legacy Mesh 포인터를 신원으로 쓰지 않는가(정적). 이 전환은
 # 그림을 바꾸지 않으므로 픽셀 축이 되돌림을 못 잡는다 — 은퇴·전환 슬라이스의
 # 게이트는 "소비 0"과 "빌드가 막는다" 쪽이라는 I6 정찰의 규칙이다.
@@ -337,6 +352,21 @@ Run-Step "에디터 드롭 재생 바인딩" {
 Run-Step "Experiment cooked catalog 기동" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-experiment-cooked-catalog.ps1") -Exe $Exe -Work $Work
+}
+
+# D6: package-time zero assertion과 별도로 현재 Release stage를 다시 실행해
+# parser counter 0, runtime module direct ryml reference 0, CEDO corpus와 retired
+# JSON 배제를 한 번에 확인한다. 패키지가 아직 없으면 다른 Release 전용 gate처럼
+# 명시적으로 건너뛴다.
+$currentStagePointer = Join-Path $PSScriptRoot "..\..\Build\Staging\Dynamic_CPP.current.json"
+if (Test-Path -LiteralPath $currentStagePointer -PathType Leaf) {
+    Run-Step "Player runtime text parser 은퇴(D6)" {
+        & pwsh -NoProfile -File `
+            (Join-Path $PSScriptRoot "verify-player-runtime-text-parser.ps1")
+    }
+} else {
+    "=== Player runtime text parser 은퇴(D6) === 건너뜀 (Release stage 없음)"
+    ""
 }
 
 # E2: Editor import 완료 결과는 하나의 RuntimeAssetChange 계약으로만 Core에
@@ -595,31 +625,39 @@ Run-Step "ShaderMeta 읽기(D3-b-L)" {
         (Join-Path $PSScriptRoot "verify-shadermeta-authoring-read.ps1") -Exe $Exe -Work $Work
 }
 
-# D3-b-2b-1b-3a(SerializationPlan): 어댑터 수준 파리티. 파서 파리티(트리)와 스칼라
-# 파리티(값)가 증명하지 못하는 축 — 소비자가 실제로 부르는 어댑터 연산 아홉 가지가
-# 두 backend에서 같은 답을 내는가. 맵 키가 노드인가 속성인가, 널이 타입인가 값
-# 표기인가 하는 비대칭을 어댑터가 옳게 흡수했는지는 여기서만 드러난다.
-Run-Step "어댑터 파리티(D3-b-2b-1b-3a)" {
+# D3-b-4(SerializationPlan): 이중 backend migration probe와 경계 래칫을 은퇴시키고
+# yaml-cpp include/symbol/manifest/runtime packaging이 다시 들어오지 못하게 0을 고정한다.
+Run-Step "yaml-cpp 은퇴(D3-b-4)" {
     & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-adapter-parity.ps1") -Exe $Exe -Work $Work
+        (Join-Path $PSScriptRoot "verify-yaml-cpp-retirement.ps1")
 }
 
-# D3-b-2b-1b(SerializationPlan): backend 경계 래칫. 읽기 경로를 ryml로 옮기는 일은
-# 한 번에 못 하므로, 아직 backend 노드를 만지는 자리마다 이름이 흉한 탈출구를 두었다.
-# 이 검사가 막는 것은 **역행**이다 — 새 코드가 어댑터 대신 backend 노드를 직접 잡으면
-# 빌드도 게이트도 통과하므로 아무도 모른다. 기준선보다 늘면 실패한다.
-Run-Step "backend 경계 래칫(D3-b-2b-1b)" {
+# Material constant buffer의 binary embedding이 parser 라이브러리에 다시 묶이지 않고
+# 표준 base64 known vector/전 byte round-trip/손상 입력 거부를 지키는지 본다.
+Run-Step "저작 base64 계약(D3-b-4)" {
     & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-authoring-backend-boundary.ps1")
+        (Join-Path $PSScriptRoot "verify-authoring-base64.ps1")
 }
 
-# D3-b-2(SerializationPlan): 스칼라 **변환** 파리티. 구조 파리티가 증명하지 못하는
-# 축이다 — 트리가 같아도 `as<bool>`이 "yes"를 다르게 읽으면 값의 의미만 조용히
-# 달라진다. 실측 11건의 알려진 차이 목록을 고정하고, 코퍼스에 위험 표기(.inf/.nan/
-# YAML 1.1 불리언)가 늘지 않았는지도 함께 본다.
-Run-Step "스칼라 변환 파리티(D3-b-2)" {
+# D4(SerializationPlan): Animator controller graph은 별도 JSON 없이 씬 reflection
+# YAML 하나로만 왕복하고 owner/current/Any/transition/condition 링크를 복원한다.
+Run-Step "Animator 씬 YAML 단일 정본(D4)" {
     & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-scalar-conversion-parity.ps1") -Exe $Exe -Work $Work
+        (Join-Path $PSScriptRoot "verify-animator-scene-single-truth.ps1") -Exe $Exe -Work $Work
+}
+
+# D4: 실제 InputMap 6개를 canonical `.inputmap` YAML로 읽어 의미 수치와
+# source 무변이를 고정한다.
+Run-Step "InputMap YAML 코퍼스(D4)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-inputmap-yaml-corpus.ps1") -Exe $Exe -Work $Work
+}
+
+# D4: header-only nlohmann은 PE import로 잡히지 않는다. source/manifest/installed
+# tree/status와 세 도메인의 legacy JSON 진입점을 모두 0으로 단정한다.
+Run-Step "nlohmann 은퇴(D4)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-nlohmann-retirement.ps1")
 }
 
 # D3-a-1(SerializationPlan Y-6): 오버라이드 시딩의 값 동등 판정이 Dump 문자열 비교에서

@@ -1,7 +1,14 @@
 #include "InputActionManager.h"
+#include "AuthoringParsedDocument.h"
+#include "AuthoringWriteNode.h"
 #include "SceneManager.h"
 #include "PathFinder.h"
 #include "Interfaces/AssetAuthoringPort.h"
+
+#include <algorithm>
+#include <limits>
+#include <memory>
+#include <unordered_set>
 InputActionManager* InputActionManagers = nullptr;
 void InputActionManager::Update(float tick)
 {
@@ -91,7 +98,7 @@ bool InputActionManager::SaveManager()
 	bool allSaved = true;
 	for (auto& actionMap : m_actionMaps)
 	{
-		if (!SerializeMap(actionMap)) allSaved = false;
+		if (!SaveMap(actionMap)) allSaved = false;
 	}
 	return allSaved;
 }
@@ -100,148 +107,180 @@ void InputActionManager::LoadManager()
 {
 	ClearActionMaps();
 	namespace fs = std::filesystem;
-	fs::path dirPath = PathFinder::InputMapPath();
-	if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
+	const fs::path directory = PathFinder::InputMapPath();
+	if (!fs::exists(directory) || !fs::is_directory(directory))
 	{
-		std::cerr << "Directory does not exist: " << dirPath << std::endl;
+		Debug->LogWarning("Input map directory does not exist: "
+			+ directory.string());
 		return;
 	}
 
-	for (const auto& entry : fs::directory_iterator(dirPath))
+	std::vector<fs::path> files;
+	for (const fs::directory_entry& entry : fs::directory_iterator(directory))
 	{
-		if (entry.is_regular_file() && entry.path().extension() == ".json")
+		if (entry.is_regular_file() && entry.path().extension() == ".inputmap")
+			files.push_back(entry.path());
+	}
+	std::sort(files.begin(), files.end(), [](const fs::path& lhs, const fs::path& rhs)
+	{
+		return lhs.generic_string() < rhs.generic_string();
+	});
+
+	for (const fs::path& path : files)
+	{
+		if (ActionMap* map = LoadMap(path.string()))
 		{
-			std::string filePath = entry.path().string();
-			m_actionMaps.push_back(DeSerializeMap(filePath));
+			m_actionMaps.push_back(map);
+		}
+		else
+		{
+			Debug->LogError("Input map rejected: " + path.string());
 		}
 	}
 }
 
-bool InputActionManager::SerializeMap(ActionMap* _actionMap)
+bool InputActionManager::SaveMap(ActionMap* actionMap)
 {
-	if (nullptr == _actionMap) return false;
+	if (nullptr == actionMap || actionMap->m_name.empty()) return false;
 
-	nlohmann::json json;
-	nlohmann::json actionArray = nlohmann::json::array();
-	json["mapName"] = _actionMap->m_name;
-	for (auto& action : _actionMap->m_actions)
+	Authoring::WriteDocument document;
+	const Authoring::WriteNode root = document.Root();
+	root.SetMap();
+	root.Child("schemaVersion").SetScalar(1);
+	root.Child("mapName").SetScalar(actionMap->m_name);
+	const Authoring::WriteNode actions = root.Child("actions");
+	actions.SetSequence();
+
+	for (const InputAction* action : actionMap->m_actions)
 	{
-		nlohmann::json actionJson;
-		actionJson["actionName"] = action->actionName;
-		actionJson["inputType"] = InputTypeString(action->inputType);
-		actionJson["actionType"] = ActionTypeString(action->actionType);
-		actionJson["keystate"] = KeyStateString(action->keystate);
-		int i = 0;
-		for (auto& key : action->key)
+		if (nullptr == action || action->actionName.empty()
+			|| action->key.empty() || action->key.size() > 4)
 		{
-			if (action->inputType == InputType::KeyBoard)
-			{
-				actionJson["key" + std::to_string(i)] = KeyBoardString(static_cast<KeyBoard>(key));
-			}
-			else if (action->inputType == InputType::GamePad)
-			{
-				actionJson["key" + std::to_string(i)] = ControllerButtonString(static_cast<ControllerButton>(key));
-			}
-			else
-			{
-
-			}
-
-			i++;
+			Debug->LogError("Input map contains an invalid action: "
+				+ actionMap->m_name);
+			return false;
 		}
-		actionJson["scpritName"] = action->m_scriptName;
-		actionJson["funName"] = action->funName;
-		actionArray.push_back(actionJson);
-	}
-	json["actions"] = actionArray;
 
-	// replace_extension은 이름에 '.'이 있으면 그 뒤를 통째로 잘라낸다("Player.v2" →
-	// "Player.json"). 문자열로 붙여 이름을 보존한다.
+		const Authoring::WriteNode output = actions.Append();
+		output.SetMap();
+		output.Child("actionName").SetScalar(action->actionName);
+		output.Child("inputType").SetScalar(InputTypeString(action->inputType));
+		output.Child("actionType").SetScalar(ActionTypeString(action->actionType));
+		output.Child("keyState").SetScalar(KeyStateString(action->keystate));
+		const Authoring::WriteNode keys = output.Child("keys");
+		keys.SetSequence(true);
+		for (const std::size_t key : action->key)
+			keys.Append().SetScalar(static_cast<unsigned long long>(key));
+		output.Child("scriptName").SetScalar(action->m_scriptName);
+		output.Child("functionName").SetScalar(action->funName);
+	}
+
 	UncatalogedAuthoringRequest request{};
-	request.destinationPath = PathFinder::InputMapPath(_actionMap->m_name + ".json");
-	request.payload = json.dump(4);
+	request.destinationPath =
+		PathFinder::InputMapPath(actionMap->m_name + ".inputmap");
+	request.payload = document.Dump();
+	if (request.payload.empty()) return false;
+	if (request.payload.back() != '\n') request.payload.push_back('\n');
 
 	if (!AssetAuthoringPort::WriteInputActionMap(request))
 	{
 		Debug->LogError(
 			"Input action map save requires a complete Editor authoring "
-			"transaction: " + _actionMap->m_name);
+			"transaction: " + actionMap->m_name);
 		return false;
 	}
-
 	return true;
 }
 
-ActionMap* InputActionManager::DeSerializeMap(std::string _filepath)
+ActionMap* InputActionManager::LoadMap(const std::string& filepath)
 {
-	std::ifstream file(_filepath);
-	if (!file.is_open())
+	std::string parseError;
+	Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(filepath, parseError);
+	if (!document)
 	{
-		std::cerr << "Failed to open: " << _filepath << std::endl;
+		Debug->LogError("Input map parse failed: " + filepath + " / " + parseError);
 		return nullptr;
 	}
 
-	nlohmann::json json;
-	try {
-		file >> json;
-	}
-	catch (std::exception& e) {
-		std::cerr << "JSON parsing error: " << e.what() << std::endl;
+	const Authoring::ReadNode root = document.Root();
+	const Authoring::ReadNode mapNameNode = root["mapName"];
+	const Authoring::ReadNode actionsNode = root["actions"];
+	if (!root.IsMap() || root["schemaVersion"].As<int>(0) != 1
+		|| !mapNameNode.IsScalar() || !actionsNode.IsSequence())
+	{
+		Debug->LogError("Input map schema is invalid: " + filepath);
 		return nullptr;
 	}
-	ActionMap* newMap = new ActionMap();
-	newMap->m_name = json["mapName"];
 
-	for (auto& actionJson : json["actions"])
+	const std::string mapName = mapNameNode.AsString();
+	if (mapName.empty()) return nullptr;
+
+	auto map = std::make_unique<ActionMap>();
+	map->m_name = mapName;
+	std::unordered_set<std::string> actionNames;
+	for (const Authoring::ReadNode actionNode : actionsNode)
 	{
-		auto action = newMap->AddAction();
-
-		action->actionName = actionJson["actionName"];
-		action->inputType = ParseInputType(actionJson["inputType"]);
-		action->actionType = ParseActionType(actionJson["actionType"]);
-		action->keystate = ParseKeyState(actionJson["keystate"]);
-		action->funName = actionJson["funName"];
-		action->m_scriptName = actionJson["scpritName"];
-		action->key.resize(4);
-		// key0, key1, key2... 식으로 키값들 파싱
-		for (int i = 0; ; ++i)
+		const Authoring::ReadNode actionNameNode = actionNode["actionName"];
+		const Authoring::ReadNode inputTypeNode = actionNode["inputType"];
+		const Authoring::ReadNode actionTypeNode = actionNode["actionType"];
+		const Authoring::ReadNode keyStateNode = actionNode["keyState"];
+		const Authoring::ReadNode keysNode = actionNode["keys"];
+		const Authoring::ReadNode scriptNameNode = actionNode["scriptName"];
+		const Authoring::ReadNode functionNameNode = actionNode["functionName"];
+		if (!actionNode.IsMap() || !actionNameNode.IsScalar()
+			|| !inputTypeNode.IsScalar() || !actionTypeNode.IsScalar()
+			|| !keyStateNode.IsScalar() || !keysNode.IsSequence()
+			|| !scriptNameNode.IsScalar() || !functionNameNode.IsScalar()
+			|| keysNode.Size() == 0 || keysNode.Size() > 4)
 		{
-			std::string keyName = "key" + std::to_string(i);
-			if (actionJson.contains(keyName))
-			{
-				std::string keyname = actionJson[keyName];
-				if (action->inputType == InputType::KeyBoard)
-				{
-					action->key[i] = static_cast<size_t>(ParseKeyBoard(keyname));
-				}
-				else if (action->inputType == InputType::GamePad)
-				{
-					if (ParseControllerButton(keyname) == ControllerButton::LEFT_THUMB ||
-						ParseControllerButton(keyname) == ControllerButton::RIGHT_THUMB
-						)
-					{
-						action->SetControllerButton(ParseControllerButton(keyname));
-					}
-					else
-					{
-						action->key[i] = static_cast<size_t>(ParseControllerButton(keyname));
-					}
-					
-				}
-				else
-				{
-
-				}
-
-
-			}
-			else
-				break;
+			Debug->LogError("Input map action schema is invalid: " + filepath);
+			return nullptr;
 		}
 
+		const std::string actionName = actionNameNode.AsString();
+		const std::string inputTypeName = inputTypeNode.AsString();
+		const std::string actionTypeName = actionTypeNode.AsString();
+		const std::string keyStateName = keyStateNode.AsString();
+		if (actionName.empty() || !actionNames.insert(actionName).second
+			|| (inputTypeName != "KeyBoard" && inputTypeName != "GamePad"
+				&& inputTypeName != "Mouse")
+			|| (actionTypeName != "Value" && actionTypeName != "Button")
+			|| (keyStateName != "Down" && keyStateName != "Pressed"
+				&& keyStateName != "Released"))
+		{
+			Debug->LogError("Input map action value is invalid: " + filepath);
+			return nullptr;
+		}
 
+		auto action = std::make_unique<InputAction>();
+		action->actionName = actionName;
+		action->inputType = ParseInputType(inputTypeName);
+		action->actionType = ParseActionType(actionTypeName);
+		action->keystate = ParseKeyState(keyStateName);
+		action->m_scriptName = scriptNameNode.AsString();
+		action->funName = functionNameNode.AsString();
+		action->key.clear();
+		for (const Authoring::ReadNode keyNode : keysNode)
+		{
+			const unsigned long long rawKey =
+				keyNode.As<unsigned long long>(
+					std::numeric_limits<unsigned long long>::max());
+			if (rawKey > static_cast<unsigned long long>(
+					std::numeric_limits<std::size_t>::max()))
+			{
+				Debug->LogError("Input map key is out of range: " + filepath);
+				return nullptr;
+			}
+			action->key.push_back(static_cast<std::size_t>(rawKey));
+		}
+		if (action->inputType == InputType::GamePad
+			&& action->actionType == ActionType::Value)
+		{
+			action->m_controllerButton =
+				static_cast<ControllerButton>(action->key.front());
+		}
+		map->m_actions.push_back(action.release());
 	}
-
-	return newMap;
-
+	return map.release();
 }

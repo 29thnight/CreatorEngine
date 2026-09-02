@@ -1,5 +1,6 @@
 #include "PhysicsManager.h"
 #include "Interfaces/AssetAuthoringPort.h"
+#include "AuthoringParsedDocument.h"
 
 #include <sstream>
 
@@ -985,26 +986,27 @@ void PhysicsManager::ApplyPendingControllerPositionChanges()
 
 bool PhysicsManager::SaveCollisionMatrix()
 {
-	MetaYml::Node matrixNode;
+	Authoring::WriteDocument document;
+	const Authoring::WriteNode matrixNode = document.Root();
+	matrixNode.SetSequence();
 	std::vector<std::string> layerNames = TagManagers->GetLayers();
 
 	for (int i = 0; i < layerNames.size(); ++i)
 	{
 		auto vec = m_collisionMatrix[i];
+		const Authoring::WriteNode row = matrixNode.Append();
+		row.SetSequence();
 		for (int j = 0; j < layerNames.size(); ++j)
 		{
-			matrixNode[i][j] = (bool)vec[j];
+			row.Append().SetScalar(static_cast<bool>(vec[j]));
 		}
 	}
-
-	std::ostringstream payload;
-	payload << matrixNode;
 
 	// 목적 경로는 LoadCollisionMatrix와 같은 규약으로 만든다. 게시는 Editor Host가
 	// 소유하며 Player에는 handler가 없어 정상적으로 실패한다.
 	UncatalogedAuthoringRequest request{};
 	request.destinationPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
-	request.payload = payload.str();
+	request.payload = document.Dump();
 
 	if (!AssetAuthoringPort::WriteCollisionMatrix(request))
 	{
@@ -1019,21 +1021,30 @@ bool PhysicsManager::SaveCollisionMatrix()
 void PhysicsManager::LoadCollisionMatrix()
 {
 	file::path matrixSettingsPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
-	std::ifstream settingsFile(matrixSettingsPath);
-	if (!settingsFile.is_open())
+	if (!file::exists(matrixSettingsPath))
 	{
 		Debug->LogWarning("No CollisionMatrix.asset file found. Using default collision matrix.");
 		return;
 	}
-	MetaYml::Node matrixNode = MetaYml::LoadFile(matrixSettingsPath.string());
+	std::string parseError;
+	const Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(matrixSettingsPath.string(), parseError);
+	if (!document)
+	{
+		Debug->LogError("CollisionMatrix.asset parse failed: " + parseError);
+		return;
+	}
+	const Authoring::ReadNode matrixNode = document.Root();
 	constexpr int MAX_LAYER_SIZE = 32;
 	for (int i = 0; i < MAX_LAYER_SIZE; ++i)
 	{
 		for (int j = 0; j < MAX_LAYER_SIZE; ++j)
 		{
-			if (matrixNode[i] && matrixNode[i][j])
+			const Authoring::ReadNode row = matrixNode.At(i);
+			const Authoring::ReadNode value = row.At(j);
+			if (row && value)
 			{
-				m_collisionMatrix[i][j] = matrixNode[i][j].as<bool>();
+				m_collisionMatrix[i][j] = value.As<bool>();
 			}
 			else
 			{
@@ -1042,7 +1053,6 @@ void PhysicsManager::LoadCollisionMatrix()
 		}
 	}
 	SetCollisionMatrix(m_collisionMatrix);
-	settingsFile.close();
 }
 
 void PhysicsManager::SetRigidBodyState(const RigidBodyState& state)

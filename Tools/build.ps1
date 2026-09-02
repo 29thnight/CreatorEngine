@@ -446,7 +446,7 @@ function Get-RuntimeDllNames {
             'minizipd.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
             'PhysXDevice64.dll',
             'PhysXCooking_64.dll', 'PhysXFoundation_64.dll', 'poly2tri.dll',
-            'pugixml.dll', 'vulkan-1.dll', 'yaml-cppd.dll', 'zd.dll'
+            'pugixml.dll', 'vulkan-1.dll', 'zd.dll'
         )
     }
     return @(
@@ -455,7 +455,7 @@ function Get-RuntimeDllNames {
         'minizip.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
         'PhysXDevice64.dll',
         'PhysXCooking_64.dll', 'PhysXFoundation_64.dll', 'poly2tri.dll',
-        'pugixml.dll', 'vulkan-1.dll', 'yaml-cpp.dll', 'z.dll'
+        'pugixml.dll', 'vulkan-1.dll', 'z.dll'
     )
 }
 
@@ -547,10 +547,22 @@ function Get-ContentDigest {
     return [Convert]::ToHexString($digest).ToLowerInvariant()
 }
 
+function Test-IsAssetPackerExcludedFile {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # Keep this projection explicit and verify it against AssetPacker's reopened
+    # pak listing below. CEMF v2 owns source identity, so .meta is authoring-only.
+    # D4 removed every JSON reader; those files are obsolete authoring remnants,
+    # not a compatibility surface, and must not leak back into Player content.
+    $extension = [IO.Path]::GetExtension($Path).ToLowerInvariant()
+    return $extension -in @('.cpp', '.h', '.hpp', '.meta', '.json')
+}
+
 function Get-PackageEntries {
     param([Parameter(Mandatory)][string]$MergedRoot)
 
     $entries = @(Get-ChildItem -LiteralPath $MergedRoot -File -Recurse |
+        Where-Object { -not (Test-IsAssetPackerExcludedFile -Path $_.FullName) } |
         ForEach-Object {
             $relative = [IO.Path]::GetRelativePath($MergedRoot, $_.FullName).Replace('\', '/')
             [pscustomobject][ordered]@{
@@ -731,6 +743,58 @@ function Invoke-AssetCook {
     Add-Member -InputObject $result -NotePropertyName LegacyModelCookCaches `
         -NotePropertyValue $staleCookCache.Count
     return $result
+}
+
+function Invoke-RuntimeDocumentCook {
+    param(
+        [Parameter(Mandatory)][string]$AssetCooker,
+        [Parameter(Mandatory)][string]$RuntimeRoot
+    )
+
+    $cookLog = @(Invoke-NativeChecked -FilePath $AssetCooker `
+        -Label 'AssetCooker runtime documents' -Arguments @(
+            '--compile-runtime-documents', '--runtime-root', $RuntimeRoot))
+    foreach ($line in $cookLog) { Write-Host $line }
+    $summary = $cookLog | Where-Object {
+        $_ -match '^asset-cooker runtime-documents=' } | Select-Object -First 1
+    if (-not $summary -or
+        $summary -notmatch '^asset-cooker runtime-documents=(\d+) bytes=(\d+) format=CEDO1$') {
+        throw 'AssetCooker runtime document 요약을 읽지 못했다.'
+    }
+    $documentCount = [int]$Matches[1]
+    $documentBytes = [uint64]$Matches[2]
+
+    $documents = [Collections.Generic.List[IO.FileInfo]]::new()
+    foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $RuntimeRoot 'ProjectSetting') `
+        -File -Recurse -Filter '*.asset')) {
+        $documents.Add($file)
+    }
+    $runtimeExtensions = @('.inputmap', '.bt', '.blackboard', '.volume', '.terrain', '.foliage')
+    foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $RuntimeRoot 'Assets') `
+        -File -Recurse | Where-Object { $runtimeExtensions -contains $_.Extension.ToLowerInvariant() })) {
+        $documents.Add($file)
+    }
+    if ($documents.Count -ne $documentCount) {
+        throw "runtime document 수가 tool 요약과 다르다: $($documents.Count) != $documentCount"
+    }
+    foreach ($document in $documents) {
+        $stream = [IO.File]::OpenRead($document.FullName)
+        try {
+            $magic = [byte[]]::new(4)
+            if ($stream.Read($magic, 0, 4) -ne 4 -or
+                [Text.Encoding]::ASCII.GetString($magic) -ne 'CEDO') {
+                throw "runtime document가 CEDO가 아니다: $($document.FullName)"
+            }
+        } finally {
+            $stream.Dispose()
+        }
+    }
+
+    return [pscustomobject]@{
+        DocumentCount = $documentCount
+        DocumentBytes = $documentBytes
+        Format = 'CEDO1'
+    }
 }
 
 function Copy-WorkspaceInputs {
@@ -1116,6 +1180,41 @@ function Invoke-PlayerSmoke {
     $combined = $logTexts -join "`n"
 
     if ($exitCode -ne 0) { throw "Player smoke failed with exit code $exitCode." }
+    $assetCatalogMarker = [regex]::Match($stdout,
+        '\[asset\.catalog\]\s*source=cemf\s+identities=([1-9]\d*)\s+metaParsed=0')
+    if (-not $assetCatalogMarker.Success) {
+        throw 'Player smoke lacks the CEMF-only source catalog marker (metaParsed=0).'
+    }
+    $cookedCatalogMarker = [regex]::Match($stdout,
+        '\[cooked\.catalog\]\s*mount\s+[^\r\n]*\s+entries=([1-9]\d*)\s+sources=([1-9]\d*)\s+stale=(\d+)')
+    if (-not $cookedCatalogMarker.Success) {
+        throw 'Player smoke lacks the mounted cooked catalog entry/source counts.'
+    }
+    $sourceIdentities = [int]$assetCatalogMarker.Groups[1].Value
+    $mountedEntries = [int]$cookedCatalogMarker.Groups[1].Value
+    $mountedSources = [int]$cookedCatalogMarker.Groups[2].Value
+    if ($sourceIdentities -ne $mountedSources) {
+        throw "Player catalog source count mismatch: identities=$sourceIdentities, mountedSources=$mountedSources"
+    }
+	$cookedSceneDocuments = ([regex]::Matches($stdout,
+		'\[scene\.document\]\s*source=cooked\s+guid=[0-9a-f-]{36}')).Count
+	$authoringSceneDocuments = ([regex]::Matches($stdout,
+		'\[scene\.document\]\s*source=authoring\s+guid=[0-9a-f-]{36}')).Count
+	if ($cookedSceneDocuments -lt 1 -or $authoringSceneDocuments -ne 0) {
+		throw "Player scene document route mismatch: cooked=$cookedSceneDocuments, authoring=$authoringSceneDocuments"
+	}
+    $textParserMarker = [regex]::Match($stdout,
+        '\[runtime\.text-parser\]\s*calls=(\d+)')
+    if (-not $textParserMarker.Success) {
+        throw 'Player smoke lacks the runtime text-parser counter.'
+    }
+    $textParserCalls = [int]$textParserMarker.Groups[1].Value
+    if ($textParserCalls -ne 0) {
+        $contexts = @([regex]::Matches($stdout,
+            '\[runtime\.text-parser\.call\]\s*source=([^\r\n]+)') |
+            ForEach-Object { $_.Groups[1].Value })
+        throw "Player runtime text parser was called $textParserCalls times: $($contexts -join ', ')"
+    }
     $sceneMarkerPattern = 'Scene loaded:[^\r\n]*' +
         [regex]::Escape([string]$Preflight.StartupScene)
     if ($combined -notmatch $sceneMarkerPattern) {
@@ -1185,6 +1284,22 @@ function Invoke-PlayerSmoke {
     if ($unpackedFiles.Count -ne $manifest.entries.Count) {
         throw "unpacked entry count mismatch: $($unpackedFiles.Count) != $($manifest.entries.Count)"
     }
+    $unpackedMeta = @($unpackedFiles | Where-Object {
+        $_.Extension.Equals('.meta', [StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($unpackedMeta.Count -ne 0) {
+        throw "Player runtime content leaked $($unpackedMeta.Count) authoring .meta files."
+    }
+    $unpackedLegacyJson = @($unpackedFiles | Where-Object {
+        $_.Extension.Equals('.json', [StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($unpackedLegacyJson.Count -ne 0) {
+        throw "Player runtime content leaked $($unpackedLegacyJson.Count) retired JSON files."
+    }
+    $unpackedCemf = Join-Path $unpackedRoot 'Assets\Derived\asset-manifest.cemf'
+    if (-not (Test-Path -LiteralPath $unpackedCemf -PathType Leaf)) {
+        throw 'Player runtime content lacks Assets/Derived/asset-manifest.cemf.'
+    }
     foreach ($entry in $manifest.entries) {
         $relativeNative = ([string]$entry.path).Replace('/', [IO.Path]::DirectorySeparatorChar)
         $unpackedPath = Join-Path $unpackedRoot $relativeNative
@@ -1205,6 +1320,12 @@ function Invoke-PlayerSmoke {
         Promotions = $promotions
         RegisteredScripts = [int]$scriptRegistration.Groups[1].Value
         ManagedLifecycle = $managedLifecycle
+        CatalogSource = 'cemf'
+        MetaParsed = 0
+        SourceIdentities = $sourceIdentities
+        CookedEntries = $mountedEntries
+		CookedSceneDocuments = $cookedSceneDocuments
+        TextParserCalls = $textParserCalls
     }
 }
 
@@ -1470,6 +1591,8 @@ try {
 
     $mergedSettings = Join-Path $mergedRoot 'ProjectSetting\EngineSettings.asset'
     $preflight = Assert-PackagePreflight -MergedRoot $mergedRoot -SettingsPath $mergedSettings
+    $runtimeDocumentCook = Invoke-RuntimeDocumentCook -AssetCooker $cookerSource `
+        -RuntimeRoot $mergedRoot
     $entries = Get-PackageEntries -MergedRoot $mergedRoot
     if ($entries.Count -eq 0) { throw 'merged package input is empty.' }
     $contentDigest = Get-ContentDigest -Entries $entries
@@ -1545,6 +1668,9 @@ try {
             sourceCounts = $modelCook.SourceCounts
             legacyTextureNameRefs = $modelCook.LegacyTextureNameRefs
             legacyModelCookCaches = $modelCook.LegacyModelCookCaches
+            runtimeDocumentCount = $runtimeDocumentCook.DocumentCount
+            runtimeDocumentBytes = $runtimeDocumentCook.DocumentBytes
+            runtimeDocumentFormat = $runtimeDocumentCook.Format
         }
         verification = 'pending'
         entries = $entries
@@ -1554,14 +1680,33 @@ try {
         [Text.UTF8Encoding]::new($false))
 
     $pakPath = Join-Path $candidateStage 'GameAssets.pak'
-    Invoke-NativeChecked -FilePath $packerSource -Label 'AssetPacker' -Arguments @(
+    $packLog = @(Invoke-NativeChecked -FilePath $packerSource -Label 'AssetPacker' -Arguments @(
         '--assets', (Join-Path $mergedRoot 'Assets'),
         '--settings', (Join-Path $mergedRoot 'ProjectSetting'),
-        '--output', $pakPath)
+        '--output', $pakPath,
+        '--list-entries'))
+    foreach ($line in $packLog | Where-Object { $_ -notmatch '^\[PAK-ENTRY\] ' }) {
+        Write-Host $line
+    }
     if (-not (Test-Path -LiteralPath $pakPath -PathType Leaf) -or
         (Get-Item -LiteralPath $pakPath).Length -le 0) {
         throw 'AssetPacker reported success without a non-empty GameAssets.pak.'
     }
+    $packedPaths = @($packLog | Where-Object { $_ -match '^\[PAK-ENTRY\] ' } |
+        ForEach-Object { $_.Substring('[PAK-ENTRY] '.Length) })
+    if ($packedPaths.Count -ne $entries.Count) {
+        throw "AssetPacker entry count mismatch: $($packedPaths.Count) != $($entries.Count)"
+    }
+    $expectedPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($entry in $entries) { [void]$expectedPaths.Add([string]$entry.path) }
+    $actualPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($path in $packedPaths) { [void]$actualPaths.Add([string]$path) }
+    if ($expectedPaths.Count -ne $entries.Count -or
+        $actualPaths.Count -ne $packedPaths.Count -or
+        -not $expectedPaths.SetEquals($actualPaths)) {
+        throw 'AssetPacker reopened entry list differs from the package manifest projection.'
+    }
+    Write-Host "  pak entries=$($packedPaths.Count), excluded authoring/source files=$((Get-ChildItem -LiteralPath $mergedRoot -File -Recurse).Count - $packedPaths.Count)"
     $manifest['pakFileSha256'] = Get-Sha256 -Path $pakPath
     [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 8),
         [Text.UTF8Encoding]::new($false))
@@ -1581,8 +1726,14 @@ try {
             promotions = $smoke.Promotions
             registeredScripts = $smoke.RegisteredScripts
             managedLifecycle = $smoke.ManagedLifecycle
+            catalogSource = $smoke.CatalogSource
+            metaParsed = $smoke.MetaParsed
+            sourceIdentities = $smoke.SourceIdentities
+            cookedEntries = $smoke.CookedEntries
+			cookedSceneDocuments = $smoke.CookedSceneDocuments
+            textParserCalls = $smoke.TextParserCalls
         }
-        Write-Host "  scene=$($preflight.StartupScene), promotions=$($smoke.Promotions), managed types=$($smoke.RegisteredScripts)"
+        Write-Host "  scene=$($preflight.StartupScene), cooked scene docs=$($smoke.CookedSceneDocuments), text parser calls=$($smoke.TextParserCalls), promotions=$($smoke.Promotions), managed types=$($smoke.RegisteredScripts), catalog=$($smoke.CatalogSource), identities=$($smoke.SourceIdentities), metaParsed=$($smoke.MetaParsed)"
     }
     [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 8),
         [Text.UTF8Encoding]::new($false))

@@ -9,7 +9,6 @@
 class Mesh;
 namespace experiment { class Model; } // I5-D4c 핸들 소유(shared_ptr 보관용)
 namespace experiment { struct Material; class MaterialInstance; } // I5-D5c1
-namespace YAML { class Node; } // CT6-d: OnDeserialized(node) 전방 선언용
 
 class Material;
 class Animator;
@@ -47,7 +46,7 @@ public:
 
    // I5-M5 S2b: typed 리플렉션이 legacy 형상으로 적은 m_Material 서브트리를
    // 정본 writer(SerializeMaterialPayload)로 교체한다 — 씬·프리팹 embed 공용.
-   void OnAfterSerialize(YAML::Node& node);
+   void OnAfterSerialize(const Authoring::MutableNodeView& node);
 
    virtual ~MeshRenderer() override;
 

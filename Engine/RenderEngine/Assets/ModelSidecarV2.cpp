@@ -2,12 +2,13 @@
 #include "AssetIdentityHex.h"
 #include "AssetIdentityRegistry.h"
 
+#include "AuthoringParsedDocument.h"
+#include "AuthoringWriteNode.h"
 #include "Sha256.h"
-
-#include <yaml-cpp/yaml.h>
 
 #include <algorithm>
 #include <charconv>
+#include <optional>
 #include <set>
 #include <utility>
 
@@ -20,17 +21,26 @@ namespace assets
             "assetId", "generation", "sourceFingerprint", "subAssets",
         };
 
+        [[nodiscard]] bool IsIdentityKey(std::string_view key) noexcept
+        {
+            for (const char* identityKey : kIdentityKeys)
+            {
+                if (key == identityKey) return true;
+            }
+            return key == "guid";
+        }
+
         void AddIssue(std::vector<SidecarIssue>& issues, SidecarIssueCode code,
             std::string context, std::string message)
         {
             issues.push_back({ code, std::move(context), std::move(message) });
         }
 
-        [[nodiscard]] bool ReadScalar(const YAML::Node& parent, const char* key,
+        [[nodiscard]] bool ReadScalar(const Authoring::ReadNode& parent, const char* key,
             const std::string& context, std::string& out, std::vector<SidecarIssue>& issues,
             bool required = true)
         {
-            const YAML::Node node = parent[key];
+            const Authoring::ReadNode node = parent[key];
             if (!node)
             {
                 if (required)
@@ -46,20 +56,11 @@ namespace assets
                     "scalar여야 한다.");
                 return false;
             }
-            try
-            {
-                out = node.as<std::string>();
-                return true;
-            }
-            catch (const YAML::Exception& exception)
-            {
-                AddIssue(issues, SidecarIssueCode::InvalidDocument, context + "." + key,
-                    exception.what());
-                return false;
-            }
+            out = node.AsString();
+            return true;
         }
 
-        [[nodiscard]] bool ReadV8(const YAML::Node& parent, const char* key,
+        [[nodiscard]] bool ReadV8(const Authoring::ReadNode& parent, const char* key,
             const std::string& context, Uuid::Uuid16& out, std::vector<SidecarIssue>& issues)
         {
             std::string text;
@@ -205,102 +206,102 @@ namespace assets
     {
         const std::size_t before = outIssues.size();
         ModelSidecarV2 doc;
-        try
+        std::string parseError;
+        const Authoring::ParsedDocument document =
+            Authoring::ParsedDocument::ParseText(std::string(yaml), parseError);
+        if (!document)
         {
-            const YAML::Node root = YAML::Load(std::string(yaml));
-            if (!root || !root.IsMap())
-            {
-                AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", "map document여야 한다.");
-                return false;
-            }
-            if (root["guid"])
-            {
-                AddIssue(outIssues, SidecarIssueCode::LegacyGuidField, "guid",
-                    "legacy 최상위 guid는 v2 sidecar에 없다(alias 금지 §8.1).");
-            }
+            AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", parseError);
+            return false;
+        }
+        const Authoring::ReadNode root = document.Root();
+        if (!root || !root.IsMap())
+        {
+            AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", "map document여야 한다.");
+            return false;
+        }
+        if (root["guid"])
+        {
+            AddIssue(outIssues, SidecarIssueCode::LegacyGuidField, "guid",
+                "legacy 최상위 guid는 v2 sidecar에 없다(alias 금지 §8.1).");
+        }
 
-            const YAML::Node schema = root["schemaVersion"];
-            if (!schema)
-            {
-                const YAML::Node legacy = root["subAssets"];
-                const bool isV1 = legacy && legacy.IsMap() && legacy["schemaVersion"];
-                AddIssue(outIssues, isV1 ? SidecarIssueCode::LegacySchema : SidecarIssueCode::MissingField,
-                    "schemaVersion", isV1
-                    ? "v1 sidecar(subAssets.schemaVersion)다 — MBC4 offline migrator의 입력이며 v2 reader는 거부한다."
-                    : "최상위 schemaVersion이 없다.");
-                return false;
-            }
-            std::string schemaText;
-            if (ReadScalar(root, "schemaVersion", "root", schemaText, outIssues)
-                && schemaText != std::to_string(kModelSidecarSchemaVersion))
-            {
-                AddIssue(outIssues, SidecarIssueCode::UnsupportedSchema, "schemaVersion",
-                    "지원하는 model sidecar schemaVersion은 2다: " + schemaText);
-                return false;
-            }
+        const Authoring::ReadNode schema = root["schemaVersion"];
+        if (!schema)
+        {
+            const Authoring::ReadNode legacy = root["subAssets"];
+            const bool isV1 = legacy && legacy.IsMap() && legacy["schemaVersion"];
+            AddIssue(outIssues, isV1 ? SidecarIssueCode::LegacySchema : SidecarIssueCode::MissingField,
+                "schemaVersion", isV1
+                ? "v1 sidecar(subAssets.schemaVersion)다 — MBC4 offline migrator의 입력이며 v2 reader는 거부한다."
+                : "최상위 schemaVersion이 없다.");
+            return false;
+        }
+        std::string schemaText;
+        if (ReadScalar(root, "schemaVersion", "root", schemaText, outIssues)
+            && schemaText != std::to_string(kModelSidecarSchemaVersion))
+        {
+            AddIssue(outIssues, SidecarIssueCode::UnsupportedSchema, "schemaVersion",
+                "지원하는 model sidecar schemaVersion은 2다: " + schemaText);
+            return false;
+        }
 
-            (void)ReadScalar(root, "identityProfile", "root", doc.identityProfile, outIssues);
-            (void)ReadScalar(root, "identityEpoch", "root", doc.identityEpoch, outIssues);
-            (void)ReadScalar(root, "authoringKey", "root", doc.authoringKey, outIssues);
-            (void)ReadV8(root, "assetId", "root", doc.assetId, outIssues);
-            (void)ReadScalar(root, "sourceFingerprint", "root", doc.sourceFingerprint, outIssues);
+        (void)ReadScalar(root, "identityProfile", "root", doc.identityProfile, outIssues);
+        (void)ReadScalar(root, "identityEpoch", "root", doc.identityEpoch, outIssues);
+        (void)ReadScalar(root, "authoringKey", "root", doc.authoringKey, outIssues);
+        (void)ReadV8(root, "assetId", "root", doc.assetId, outIssues);
+        (void)ReadScalar(root, "sourceFingerprint", "root", doc.sourceFingerprint, outIssues);
 
-            std::string generationText;
-            if (ReadScalar(root, "generation", "root", generationText, outIssues))
+        std::string generationText;
+        if (ReadScalar(root, "generation", "root", generationText, outIssues))
+        {
+            std::uint64_t value{};
+            const auto* first = generationText.data();
+            const auto* last = first + generationText.size();
+            const auto parsed = std::from_chars(first, last, value);
+            if (parsed.ec != std::errc{} || parsed.ptr != last)
             {
-                std::uint64_t value{};
-                const auto* first = generationText.data();
-                const auto* last = first + generationText.size();
-                const auto parsed = std::from_chars(first, last, value);
-                if (parsed.ec != std::errc{} || parsed.ptr != last)
-                {
-                    AddIssue(outIssues, SidecarIssueCode::InvalidGeneration, "generation",
-                        "부호 없는 정수여야 한다: " + generationText);
-                }
-                else
-                {
-                    doc.generation = value;
-                }
-            }
-
-            const YAML::Node subAssets = root["subAssets"];
-            if (!subAssets || !subAssets.IsSequence())
-            {
-                AddIssue(outIssues, subAssets ? SidecarIssueCode::InvalidDocument
-                    : SidecarIssueCode::MissingField, "subAssets", "subasset sequence가 필요하다(비어도 sequence).");
+                AddIssue(outIssues, SidecarIssueCode::InvalidGeneration, "generation",
+                    "부호 없는 정수여야 한다: " + generationText);
             }
             else
             {
-                for (std::size_t i = 0; i < subAssets.size(); ++i)
-                {
-                    const YAML::Node node = subAssets[i];
-                    const std::string ctx = "subAssets[" + std::to_string(i) + "]";
-                    if (!node.IsMap())
-                    {
-                        AddIssue(outIssues, SidecarIssueCode::InvalidDocument, ctx, "map이어야 한다.");
-                        continue;
-                    }
-                    ModelSubAssetRecord record;
-                    std::string kindText;
-                    if (ReadScalar(node, "kind", ctx, kindText, outIssues)
-                        && !TryParseKindName(kindText, record.kind))
-                    {
-                        AddIssue(outIssues, SidecarIssueCode::InvalidKind, ctx + ".kind",
-                            "kind는 mesh|material|texture|skeleton|animation이다: " + kindText);
-                    }
-                    (void)ReadScalar(node, "stableKey", ctx, record.stableKey, outIssues);
-                    (void)ReadV8(node, "assetId", ctx, record.assetId, outIssues);
-                    (void)ReadScalar(node, "binding", ctx, record.binding, outIssues, false);
-                    (void)ReadScalar(node, "name", ctx, record.name, outIssues, false);
-                    (void)ReadScalar(node, "fingerprint", ctx, record.fingerprint, outIssues, false);
-                    doc.subAssets.push_back(std::move(record));
-                }
+                doc.generation = value;
             }
         }
-        catch (const YAML::Exception& exception)
+
+        const Authoring::ReadNode subAssets = root["subAssets"];
+        if (!subAssets || !subAssets.IsSequence())
         {
-            AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", exception.what());
-            return false;
+            AddIssue(outIssues, subAssets ? SidecarIssueCode::InvalidDocument
+                : SidecarIssueCode::MissingField, "subAssets", "subasset sequence가 필요하다(비어도 sequence).");
+        }
+        else
+        {
+            for (std::size_t i = 0; i < subAssets.Size(); ++i)
+            {
+                const Authoring::ReadNode node = subAssets.At(i);
+                const std::string ctx = "subAssets[" + std::to_string(i) + "]";
+                if (!node.IsMap())
+                {
+                    AddIssue(outIssues, SidecarIssueCode::InvalidDocument, ctx, "map이어야 한다.");
+                    continue;
+                }
+                ModelSubAssetRecord record;
+                std::string kindText;
+                if (ReadScalar(node, "kind", ctx, kindText, outIssues)
+                    && !TryParseKindName(kindText, record.kind))
+                {
+                    AddIssue(outIssues, SidecarIssueCode::InvalidKind, ctx + ".kind",
+                        "kind는 mesh|material|texture|skeleton|animation이다: " + kindText);
+                }
+                (void)ReadScalar(node, "stableKey", ctx, record.stableKey, outIssues);
+                (void)ReadV8(node, "assetId", ctx, record.assetId, outIssues);
+                (void)ReadScalar(node, "binding", ctx, record.binding, outIssues, false);
+                (void)ReadScalar(node, "name", ctx, record.name, outIssues, false);
+                (void)ReadScalar(node, "fingerprint", ctx, record.fingerprint, outIssues, false);
+                doc.subAssets.push_back(std::move(record));
+            }
         }
 
         if (outIssues.size() != before) return false;
@@ -314,63 +315,64 @@ namespace assets
     {
         if (!CheckDocumentShape(document, outIssues)) return {};
 
-        try
+        std::optional<Authoring::WriteDocument> existingDocument;
+        Authoring::ReadNode existingRoot;
+        if (!existingYaml.empty())
         {
-            YAML::Node root;
-            if (!existingYaml.empty())
+            std::string parseError;
+            existingDocument = Authoring::WriteDocument::ParseText(existingYaml, &parseError);
+            if (!existingDocument)
             {
-                root = YAML::Load(std::string(existingYaml));
-                if (!root.IsMap()) root = YAML::Node(YAML::NodeType::Map);
-                // legacy 신원 키는 v2 문서에서 사라진다. 신원 키는 아래에서 전부 덮는다.
-                root.remove("guid");
-                for (const char* key : kIdentityKeys) root.remove(key);
-            }
-            else
-            {
-                root = YAML::Node(YAML::NodeType::Map);
-            }
-
-            // 신원 키를 문서 앞에 두려면 새 맵에 먼저 넣고 나머지를 뒤에 붙인다.
-            YAML::Node ordered(YAML::NodeType::Map);
-            ordered["schemaVersion"] = kModelSidecarSchemaVersion;
-            ordered["identityProfile"] = document.identityProfile;
-            ordered["identityEpoch"] = document.identityEpoch;
-            ordered["authoringKey"] = document.authoringKey;
-            ordered["assetId"] = Uuid::ToString(document.assetId);
-            ordered["generation"] = document.generation;
-            ordered["sourceFingerprint"] = document.sourceFingerprint;
-            YAML::Node subAssets(YAML::NodeType::Sequence);
-            for (const ModelSubAssetRecord& r : document.subAssets)
-            {
-                YAML::Node entry(YAML::NodeType::Map);
-                entry["kind"] = std::string(ToKindName(r.kind));
-                entry["stableKey"] = r.stableKey;
-                entry["assetId"] = Uuid::ToString(r.assetId);
-                if (!r.binding.empty()) entry["binding"] = r.binding;
-                if (!r.name.empty()) entry["name"] = r.name;
-                if (!r.fingerprint.empty()) entry["fingerprint"] = r.fingerprint;
-                subAssets.push_back(entry);
-            }
-            ordered["subAssets"] = subAssets;
-            for (const auto& kv : root) ordered[kv.first] = kv.second;
-
-            YAML::Emitter emitter;
-            emitter.SetIndent(2);
-            emitter << ordered;
-            if (!emitter.good())
-            {
-                AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", "YAML emit 실패.");
+                AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", parseError);
                 return {};
             }
-            std::string out(emitter.c_str(), emitter.size());
-            out.push_back('\n');
-            return out;
+            existingRoot = existingDocument->Root().Read();
         }
-        catch (const YAML::Exception& exception)
+
+        // 신원 키를 문서 앞에 두고 기존의 비신원 최상위 키만 뒤에 복제한다.
+        Authoring::WriteDocument outputDocument;
+        const Authoring::WriteNode root = outputDocument.Root();
+        root.SetMap();
+        root.Child("schemaVersion").SetScalar(kModelSidecarSchemaVersion);
+        root.Child("identityProfile").SetScalar(document.identityProfile);
+        root.Child("identityEpoch").SetScalar(document.identityEpoch);
+        root.Child("authoringKey").SetScalar(document.authoringKey);
+        root.Child("assetId").SetScalar(Uuid::ToString(document.assetId));
+        root.Child("generation").SetScalar(document.generation);
+        root.Child("sourceFingerprint").SetScalar(document.sourceFingerprint);
+
+        const Authoring::WriteNode subAssets = root.Child("subAssets");
+        subAssets.SetSequence();
+        for (const ModelSubAssetRecord& record : document.subAssets)
         {
-            AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", exception.what());
+            const Authoring::WriteNode entry = subAssets.Append();
+            entry.SetMap();
+            entry.Child("kind").SetScalar(std::string(ToKindName(record.kind)));
+            entry.Child("stableKey").SetScalar(record.stableKey);
+            entry.Child("assetId").SetScalar(Uuid::ToString(record.assetId));
+            if (!record.binding.empty()) entry.Child("binding").SetScalar(record.binding);
+            if (!record.name.empty()) entry.Child("name").SetScalar(record.name);
+            if (!record.fingerprint.empty())
+                entry.Child("fingerprint").SetScalar(record.fingerprint);
+        }
+
+        if (existingRoot.IsMap())
+        {
+            for (const auto existing : existingRoot.Map())
+            {
+                const std::string key = existing.key.AsStringChecked();
+                if (!IsIdentityKey(key)) root.Child(key).Assign(existing.value);
+            }
+        }
+
+        std::string out = outputDocument.Dump();
+        if (out.empty())
+        {
+            AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", "YAML emit 실패.");
             return {};
         }
+        if (out.back() != '\n') out.push_back('\n');
+        return out;
     }
 
     bool ValidateModelSidecarV2Closure(const ModelSidecarV2& document,

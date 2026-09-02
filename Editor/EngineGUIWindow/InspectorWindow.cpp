@@ -121,7 +121,8 @@ InspectorWindow::InspectorWindow()
 		Scene* scene = nullptr;
 		RenderScene* renderScene = nullptr;
 		Entity* selectedSceneObject = nullptr;
-		std::optional<MetaYml::Node>& selectedNode{ ContentsBrowserWindow::selectedFileMetaNode };
+		std::optional<Authoring::WriteDocument>& selectedNode{
+			ContentsBrowserWindow::selectedFileMetaNode };
 		bool isSelectedNode = selectedNode.has_value();
 		file::path selectedFileName{ ContentsBrowserWindow::selectedFileName };
 		file::path selectedMetaFilePath{ ContentsBrowserWindow::selectedMetaFilePath };
@@ -488,20 +489,17 @@ InspectorWindow::InspectorWindow()
 
 			if (ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				DrawYamlNodeEditor(*selectedNode);
+				DrawYamlNodeEditor(selectedNode->Root());
 
 				ImGui::Spacing();
 				if (ImGui::Button("Save"))
 				{
 					try
 					{
-						YAML::Emitter emitter;
-						emitter << *selectedNode;
-
 						std::ofstream fout(selectedMetaFilePath, std::ios::binary | std::ios::trunc);
 						if (fout.is_open())
 						{
-							fout << emitter.c_str();
+							fout << selectedNode->Dump();
 							fout.close();
 						}
 						else

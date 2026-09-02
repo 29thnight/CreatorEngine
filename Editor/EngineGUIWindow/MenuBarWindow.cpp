@@ -18,8 +18,9 @@
 #include "Prefab.h"
 #include "PrefabUtility.h"
 #include "AIManager.h"
-#include "BTBuildGraph.h"
+#include "BTBuildGraphAuthoring.h"
 #include "BTEditorBridge.h"
+#include "AuthoringParsedDocument.h"
 #include "ReflectionUndo.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
@@ -974,13 +975,13 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
                 }
 
                 // Save the graph to a file
-                auto node = Meta::Serialize(&graph);
+				Authoring::WriteDocument document = Meta::SerializeDocument(&graph);
 
                 std::ofstream outFile(BTSavePath.string(), std::ios::binary | std::ios::trunc);
 
                 if (outFile.is_open())
                 {
-                    outFile << node; // Pretty print with 4 spaces
+					outFile << document.Dump();
                     outFile.close();
                     outFile.flush();
                 }
@@ -1007,19 +1008,31 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             if (!fileName.empty())
             {
                 BTName = fileName.stem().string();
-                if (file::exists(fileName))
-                {
-                    graph.CleanUp();
-                    s_nodeScreenPos.clear();
-                    auto node = MetaYml::LoadFile(fileName.string());
-                    const YAML::Node& nodeList = node["NodeList"];
-                    if (nodeList && nodeList.IsSequence())
-                    {
-                        for (const auto& node : nodeList)
-                        {
-                            graph.DeserializeSingleNode(node);
-                        }
-                    }
+				if (file::exists(fileName))
+				{
+					graph.CleanUp();
+					s_nodeScreenPos.clear();
+					std::string parseError;
+					const Authoring::ParsedDocument document =
+						Authoring::ParsedDocument::ParseFile(
+							fileName.string(), parseError);
+					if (!document)
+					{
+						Debug->LogError("Behavior Tree parse failed: " + parseError);
+					}
+					else
+					{
+						const Authoring::ReadNode node = document.Root();
+						const Authoring::ReadNode nodeList = node["NodeList"];
+						if (nodeList && nodeList.IsSequence())
+						{
+							for (const Authoring::ReadNode buildNode : nodeList)
+							{
+								BTBuildGraphAuthoring::DeserializeSingleNode(
+									graph, buildNode);
+							}
+						}
+					}
                 }
                 else
                 {
@@ -1066,13 +1079,13 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             }
 
             // Save the graph to a file
-            auto node = Meta::Serialize(&graph);
+			Authoring::WriteDocument document = Meta::SerializeDocument(&graph);
 
             std::ofstream outFile(BTPath.string(), std::ios::binary | std::ios::trunc);
 
             if (outFile.is_open())
             {
-                outFile << node; // Pretty print with 4 spaces
+				outFile << document.Dump();
                 outFile.close();
             }
             else
@@ -1718,13 +1731,13 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             }
 
             // Save the graph to a file
-            auto node = Meta::Serialize(&graph);
+			Authoring::WriteDocument document = Meta::SerializeDocument(&graph);
 
             std::ofstream outFile(BTPath.string(), std::ios::binary | std::ios::trunc);
 
             if (outFile.is_open())
             {
-                outFile << node; // Pretty print with 4 spaces
+				outFile << document.Dump();
                 outFile.close();
             }
             else

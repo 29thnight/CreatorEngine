@@ -1,32 +1,31 @@
 #include "Core.Minimal.h"
-// Core.Minimal.h∞° Reflection ªÁΩΩ∑Œ ¥ÎΩ≈ ≤¯æÓøÕ ¡÷¥¯ ∞Õ¿ª ¡˜¡¢ µÁ¥Ÿ.
+// Core.Minimal.hÍ∞Ä Reflection ÏÇ¨Ïä¨Î°ú ÎåÄÏã† ÎÅåÏñ¥ÏôÄ Ï£ºÎçò Í≤ÉÏùÑ ÏßÅÏ†ë Îì†Îã§.
 #include <imgui.h>
-#include "yaml-cpp/yaml.h"
+#include "AuthoringWriteNode.h"
 #include "ExternUI.h"
 #include <unordered_set>
-#ifndef YAML_CPP_API
-#define YAML_CPP_API __declspec(dllimport)
-#endif /* YAML_CPP_STATIC_DEFINE */
 
 static const std::unordered_set<std::string> ignoredKeys = {
 	"guid",
 	"importSettings"
 };
 
-void DrawYamlNodeEditor(YAML::Node& node, const std::string& label)
+void DrawYamlNodeEditor(Authoring::WriteNode node, const std::string& label)
 {
-	if (node.IsNull()) return;
+	const Authoring::ReadNode read = node.Read();
+	if (!read || read.IsNull()) return;
 
-	if (node.IsMap())
+	if (read.IsMap())
 	{
-		for (auto it = node.begin(); it != node.end(); ++it)
+		for (const Authoring::MapEntry pair : read.Map())
 		{
-			std::string key = it->first.as<std::string>();
+			const std::string key = pair.key.AsString();
 			if (ignoredKeys.count(key)) continue;
 
-			YAML::Node& value = it->second;
+			const Authoring::ReadNode readValue = pair.value;
+			const Authoring::WriteNode value = node.Child(key);
 
-			if (value.IsMap() || value.IsSequence())
+			if (readValue.IsMap() || readValue.IsSequence())
 			{
 				if (ImGui::TreeNode(key.c_str()))
 				{
@@ -36,10 +35,10 @@ void DrawYamlNodeEditor(YAML::Node& node, const std::string& label)
 			}
 			else
 			{
-				// ¿⁄µø ∫–±‚ √≥∏Æ
-				if (value.IsScalar())
+				// ÏûêÎèô Î∂ÑÍ∏∞ Ï≤òÎ¶¨
+				if (readValue.IsScalar())
 				{
-					std::string val = value.as<std::string>();
+					const std::string val = readValue.AsString();
 					std::istringstream iss(val);
 					float f;
 					int i;
@@ -52,13 +51,13 @@ void DrawYamlNodeEditor(YAML::Node& node, const std::string& label)
 					{
 						b = (val == "true");
 						if (ImGui::Checkbox(uniqueID.c_str(), &b))
-							value = b ? "true" : "false";
+							value.SetScalar(b);
 					}
 					// int
 					else if ((iss >> i) && iss.eof())
 					{
 						if (ImGui::InputInt(uniqueID.c_str(), &i))
-							value = std::to_string(i);
+							value.SetScalar(i);
 					}
 					// float
 					else
@@ -67,7 +66,7 @@ void DrawYamlNodeEditor(YAML::Node& node, const std::string& label)
 						if ((iss2 >> f) && iss2.eof())
 						{
 							if (ImGui::InputFloat(uniqueID.c_str(), &f))
-								value = std::to_string(f);
+								value.SetScalar(f);
 						}
 						else
 						{
@@ -75,21 +74,22 @@ void DrawYamlNodeEditor(YAML::Node& node, const std::string& label)
 							char buffer[256];
 							strcpy_s(buffer, val.c_str());
 							if (ImGui::InputText(uniqueID.c_str(), buffer, sizeof(buffer)))
-								value = std::string(buffer);
+								value.SetScalar(std::string(buffer));
 						}
 					}
 				}
 			}
 		}
 	}
-	else if (node.IsSequence())
+	else if (read.IsSequence())
 	{
-		for (std::size_t i = 0; i < node.size(); ++i)
+		for (std::size_t i = 0; i < node.Size(); ++i)
 		{
-			YAML::Node element = node[i];
+			const Authoring::WriteNode element = node.At(i);
+			const Authoring::ReadNode readElement = element.Read();
 			std::string indexLabel = label + "[" + std::to_string(i) + "]";
 
-			if (element.IsMap() || element.IsSequence())
+			if (readElement.IsMap() || readElement.IsSequence())
 			{
 				if (ImGui::TreeNode(indexLabel.c_str()))
 				{
@@ -99,7 +99,7 @@ void DrawYamlNodeEditor(YAML::Node& node, const std::string& label)
 			}
 			else
 			{
-				std::string val = element.as<std::string>();
+				const std::string val = readElement.AsString();
 				std::istringstream iss(val);
 				float f;
 				int i;
@@ -112,13 +112,13 @@ void DrawYamlNodeEditor(YAML::Node& node, const std::string& label)
 				{
 					b = (val == "true");
 					if (ImGui::Checkbox(uniqueID.c_str(), &b))
-						element = b ? "true" : "false";
+						element.SetScalar(b);
 				}
 				// int
 				else if ((iss >> i) && iss.eof())
 				{
 					if (ImGui::InputInt(uniqueID.c_str(), &i))
-						element = std::to_string(i);
+						element.SetScalar(i);
 				}
 				// float
 				else
@@ -127,14 +127,14 @@ void DrawYamlNodeEditor(YAML::Node& node, const std::string& label)
 					if ((iss2 >> f) && iss2.eof())
 					{
 						if (ImGui::InputFloat(uniqueID.c_str(), &f))
-							element = std::to_string(f);
+							element.SetScalar(f);
 					}
 					else
 					{
 						char buffer[256];
 						strcpy_s(buffer, val.c_str());
 						if (ImGui::InputText(uniqueID.c_str(), buffer, sizeof(buffer)))
-							element = std::string(buffer);
+							element.SetScalar(std::string(buffer));
 					}
 				}
 			}

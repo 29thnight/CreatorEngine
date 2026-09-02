@@ -1,8 +1,8 @@
 #include "SceneCookProducer.h"
 
 #include "CookSupport.h"
-
-#include <yaml-cpp/yaml.h>
+#include "AuthoringCookedDocument.h"
+#include "AuthoringParsedDocument.h"
 
 #include <algorithm>
 #include <array>
@@ -52,19 +52,20 @@ namespace experiment::cooked
         }};
 
         // 인라인 재질 매핑에서 해당 property 가 nil 아닌 texture GUID 를 갖는가.
-        [[nodiscard]] bool HasTextureGuidFor(const YAML::Node& materialNode,
-            std::string_view propertyName)
-        {
-            if (!materialNode.IsMap()) return false;
-            const YAML::Node properties = materialNode["m_propertyValues"];
-            if (!properties || !properties.IsSequence()) return false;
-            for (const YAML::Node& property : properties)
-            {
-                if (!property.IsMap()) continue;
-                const YAML::Node name = property["m_name"];
-                if (!name || !name.IsScalar()) continue;
-                if (name.Scalar() != propertyName) continue;
-                const YAML::Node guid = property["m_textureGuid"];
+		[[nodiscard]] bool HasTextureGuidFor(
+			const Authoring::ReadNode& materialNode,
+			std::string_view propertyName)
+		{
+			if (!materialNode.IsMap()) return false;
+			const Authoring::ReadNode properties = materialNode["m_propertyValues"];
+			if (!properties || !properties.IsSequence()) return false;
+			for (const Authoring::ReadNode property : properties)
+			{
+				if (!property.IsMap()) continue;
+				const Authoring::ReadNode name = property["m_name"];
+				if (!name || !name.IsScalar()) continue;
+				if (name.Scalar() != propertyName) continue;
+				const Authoring::ReadNode guid = property["m_textureGuid"];
                 if (!guid || !guid.IsScalar()) return false;
                 return guid.Scalar() != "00000000-0000-0000-0000-000000000000";
             }
@@ -75,6 +76,81 @@ namespace experiment::cooked
         inline constexpr std::array<std::string_view, 2> kUnproducedGuidKeys{
             "m_BehaviorTreeGuid", "m_BlackBoardGuid",
         };
+
+        // PrefabOverride::m_valueYaml is an authoring file-format scalar that
+        // contains a second YAML document. Leaving it unchanged would make a
+        // later Player prefab instantiate re-enter the text parser even though
+        // the outer scene is CEDO. Cook that nested document into a strict
+        // CEDO1/base64 envelope while cloning the rest of the tree verbatim.
+        [[nodiscard]] bool BuildRuntimeTree(const Authoring::ReadNode& source,
+            const Authoring::WriteNode& destination,
+            std::size_t& cookedOverrideValues, std::string& error)
+        {
+            if (source.IsNull())
+            {
+                destination.SetNull();
+                return true;
+            }
+            if (source.IsScalar())
+            {
+                destination.SetScalar(source.Scalar());
+                return true;
+            }
+            if (source.IsSequence())
+            {
+                destination.SetSequence();
+                for (const Authoring::ReadNode child : source)
+                {
+                    if (!BuildRuntimeTree(child, destination.Append(),
+                        cookedOverrideValues, error))
+                        return false;
+                }
+                return true;
+            }
+            if (!source.IsMap())
+            {
+                error = "지원하지 않는 scene authoring node type이다";
+                return false;
+            }
+
+            destination.SetMap();
+            for (const Authoring::MapEntry entry : source.Map())
+            {
+                const std::string key = entry.key.AsStringChecked();
+                const Authoring::WriteNode child = destination.Child(key);
+                if (key == "m_valueYaml")
+                {
+                    if (!entry.value.IsScalar())
+                    {
+                        error = "PrefabOverride.m_valueYaml이 scalar가 아니다";
+                        return false;
+                    }
+                    if (entry.value.Scalar().empty())
+                    {
+                        child.SetScalar(std::string_view{});
+                        continue;
+                    }
+                    std::string parseError;
+                    const Authoring::ParsedDocument embedded =
+                        Authoring::ParsedDocument::ParseText(
+                            entry.value.AsString(), parseError);
+                    if (!embedded)
+                    {
+                        error = "PrefabOverride.m_valueYaml parse 실패: " + parseError;
+                        return false;
+                    }
+                    std::string envelope;
+                    if (!Authoring::EncodeCookedDocumentTextEnvelope(
+                        embedded.Root(), envelope, error)) return false;
+                    child.SetScalar(envelope);
+                    ++cookedOverrideValues;
+                    continue;
+                }
+                if (!BuildRuntimeTree(entry.value, child,
+                    cookedOverrideValues, error)) return false;
+            }
+            return true;
+        }
 
         struct Walk final
         {
@@ -98,9 +174,9 @@ namespace experiment::cooked
                     dependencies.push_back(id);
             }
 
-            // key 가 GUID 참조면 처리하고 true. 형식이 틀리면 failed 를 세운다.
-            [[nodiscard]] bool HandleGuidKey(const std::string& key,
-                const YAML::Node& value)
+			// key 가 GUID 참조면 처리하고 true. 형식이 틀리면 failed 를 세운다.
+			[[nodiscard]] bool HandleGuidKey(const std::string& key,
+				const Authoring::ReadNode& value)
             {
                 std::size_t* counter = nullptr;
                 // S2c-1: MeshRenderer가 모델 출처를 자기 m_modelGuid로 갖는다.
@@ -136,7 +212,7 @@ namespace experiment::cooked
                     failureContext = "scene.reference.kind";
                     return true;
                 }
-                const std::string& text = value.Scalar();
+				const std::string text = value.AsString();
                 if (IsNilGuidText(text)) return true;
 
                 AssetId id{};
@@ -152,17 +228,17 @@ namespace experiment::cooked
                 return true;
             }
 
-            void Visit(const YAML::Node& node)
+			void Visit(const Authoring::ReadNode& node)
             {
                 if (failed || !node) return;
 
                 if (node.IsMap())
                 {
-                    for (const auto& pair : node)
-                    {
-                        if (failed) return;
-                        if (!pair.first.IsScalar()) { Visit(pair.second); continue; }
-                        const std::string key = pair.first.Scalar();
+					for (const Authoring::MapEntry pair : node.Map())
+					{
+						if (failed) return;
+						if (!pair.key.IsScalar()) { Visit(pair.value); continue; }
+						const std::string key = pair.key.AsString();
 
                         const auto legacy = std::ranges::find(
                             kLegacyTextureNameKeys, key,
@@ -171,22 +247,22 @@ namespace experiment::cooked
                         {
                             // 이름이 비었으면 참조가 아니다. 이름이 있어도
                             // 같은 재질에 GUID 가 있으면 폴백에 의존하지 않는다.
-                            if (pair.second.IsScalar()
-                                && !pair.second.Scalar().empty()
-                                && !HasTextureGuidFor(node, legacy->propertyName))
+							if (pair.value.IsScalar()
+								&& !pair.value.Scalar().empty()
+								&& !HasTextureGuidFor(node, legacy->propertyName))
                             {
                                 ++product.legacyTextureNameReferences;
                             }
                             continue;
                         }
-                        if (HandleGuidKey(key, pair.second)) continue;
-                        Visit(pair.second);
+						if (HandleGuidKey(key, pair.value)) continue;
+						Visit(pair.value);
                     }
                     return;
                 }
                 if (node.IsSequence())
                 {
-                    for (const YAML::Node& element : node)
+					for (const Authoring::ReadNode element : node)
                     {
                         if (failed) return;
                         Visit(element);
@@ -270,17 +346,16 @@ namespace experiment::cooked
             return result;
         }
 
-        YAML::Node root;
-        try
-        {
-            root = YAML::Load(text);
-        }
-        catch (const YAML::Exception& exception)
-        {
-            AddIssue(result, "scene.yaml",
-                std::string("YAML을 파싱할 수 없다: ") + exception.what());
-            return result;
-        }
+		std::string parseError;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseText(text, parseError);
+		if (!document)
+		{
+			AddIssue(result, "scene.yaml",
+				"YAML을 파싱할 수 없다: " + parseError);
+			return result;
+		}
+		const Authoring::ReadNode root = document.Root();
         if (!root || !(root.IsMap() || root.IsSequence()))
         {
             AddIssue(result, "scene.yaml",
@@ -316,9 +391,20 @@ namespace experiment::cooked
             return result;
         }
 
-        product.artifactBytes.resize(text.size());
-        for (std::size_t index = 0u; index < text.size(); ++index)
-            product.artifactBytes[index] = static_cast<std::byte>(text[index]);
+        Authoring::WriteDocument runtimeDocument;
+        std::string encodeError;
+        if (!BuildRuntimeTree(root, runtimeDocument.Root(),
+            product.cookedOverrideValues, encodeError))
+        {
+            AddIssue(result, "scene.runtimeDocument", std::move(encodeError));
+            return result;
+        }
+        if (!Authoring::EncodeCookedDocument(
+            runtimeDocument.Root().Read(), product.artifactBytes, encodeError))
+        {
+            AddIssue(result, "scene.cookedDocument", std::move(encodeError));
+            return result;
+        }
 
         Sha256Digest digest{};
         std::string hashError;

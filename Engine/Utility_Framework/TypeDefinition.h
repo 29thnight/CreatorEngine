@@ -3,7 +3,6 @@
 #include <Unknwnbase.h>
 #include <combaseapi.h>
 #include <typeindex>
-#include <nlohmann/json.hpp>
 #include <filesystem>
 #include <execution>
 
@@ -12,8 +11,6 @@ namespace file = std::filesystem;
 
 typedef DECIMAL decimal;
 typedef FILE* File;
-
-using json = nlohmann::json;
 
 // Sizef가 namespace DirectX11에 있었다 (2026-08-10에 옮겼다).
 // float 둘을 든 평범한 값 타입이라 백엔드와 아무 상관이 없다.

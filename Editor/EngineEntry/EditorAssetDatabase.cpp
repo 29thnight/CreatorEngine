@@ -5,13 +5,13 @@
 #include "FileDialog.h"
 #include "Material.h"
 #include "PathFinder.h"
+#include "AuthoringParsedDocument.h"
 #include "ReflectionYml.h"
 #include "RuntimeSettings.h"
 #include "StringHelper.h"
 #include "VolumeProfile.h"
 
 #include <efsw/efsw.hpp>
-#include <yaml-cpp/yaml.h>
 #include <DirectXTex.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
@@ -22,7 +22,6 @@
 #include <limits>
 #include <mutex>
 #include <regex>
-#include <sstream>
 #include <unordered_set>
 
 namespace
@@ -171,26 +170,6 @@ namespace
 		catch (...)
 		{
 			Debug->LogError("Editor collision-matrix authoring failed with an "
-				"unknown error");
-		}
-		return false;
-	}
-
-	bool WriteAnimatorControllerThroughEditor(
-		const UncatalogedAuthoringRequest& request) noexcept
-	{
-		try
-		{
-			return EditorAssetDatabase::Get().WriteAnimatorController(request);
-		}
-		catch (const std::exception& exception)
-		{
-			Debug->LogError("Editor animator-controller authoring failed: " +
-				std::string(exception.what()));
-		}
-		catch (...)
-		{
-			Debug->LogError("Editor animator-controller authoring failed with an "
 				"unknown error");
 		}
 		return false;
@@ -617,7 +596,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			request.minHeight > request.maxHeight ||
 			request.width > static_cast<uint32>(
 				std::numeric_limits<int>::max() / 4) ||
-			request.height > static_cast<uint32>(std::numeric_limits<int>::max()))
+			request.height > static_cast<uint32>(std::numeric_limits<int>::max()) ||
+			request.layers.size() > 4)
 		{
 			Debug->LogError("Editor Terrain request header is invalid");
 			return false;
@@ -762,29 +742,35 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			return WstringToString(stored.generic_wstring());
 		};
 
-		json descriptor;
-		descriptor["version"] = 2;
-		descriptor["name"] = WstringToString(request.name);
-		descriptor["terrainID"] = request.terrainId;
-		descriptor["width"] = request.width;
-		descriptor["height"] = request.height;
-		descriptor["minHeight"] = request.minHeight;
-		descriptor["maxHeight"] = request.maxHeight;
-		descriptor["heightmap"] = DescriptorPath(PublishedPath(stagedHeight));
-		descriptor["splatmaps"] = json::array();
-		descriptor["layers"] = json::array();
+		Authoring::WriteDocument descriptor;
+		const Authoring::WriteNode descriptorRoot = descriptor.Root();
+		descriptorRoot.SetMap();
+		descriptorRoot.Child("schemaVersion").SetScalar(1);
+		descriptorRoot.Child("name").SetScalar(WstringToString(request.name));
+		descriptorRoot.Child("terrainID").SetScalar(request.terrainId);
+		descriptorRoot.Child("width").SetScalar(request.width);
+		descriptorRoot.Child("height").SetScalar(request.height);
+		descriptorRoot.Child("minHeight").SetScalar(request.minHeight);
+		descriptorRoot.Child("maxHeight").SetScalar(request.maxHeight);
+		descriptorRoot.Child("heightmap").SetScalar(
+			DescriptorPath(PublishedPath(stagedHeight)));
+		const Authoring::WriteNode splatmaps =
+			descriptorRoot.Child("splatmaps");
+		splatmaps.SetSequence();
+		const Authoring::WriteNode layers = descriptorRoot.Child("layers");
+		layers.SetSequence();
 		for (size_t index = 0; index < request.layers.size(); ++index)
 		{
-			descriptor["splatmaps"].push_back(
+			splatmaps.Append().SetScalar(
 				DescriptorPath(PublishedPath(stagedSplats[index])));
 			const TerrainAuthoringLayerSnapshot& layer = request.layers[index];
-			json layerDescriptor;
-			layerDescriptor["layerID"] = layer.layerId;
-			layerDescriptor["layerName"] = layer.name;
-			layerDescriptor["diffuseTexturePath"] =
-				DescriptorPath(PublishedPath(stagedTextures[index]));
-			layerDescriptor["tilling"] = layer.tiling;
-			descriptor["layers"].push_back(std::move(layerDescriptor));
+			const Authoring::WriteNode layerDescriptor = layers.Append();
+			layerDescriptor.SetMap();
+			layerDescriptor.Child("layerID").SetScalar(layer.layerId);
+			layerDescriptor.Child("layerName").SetScalar(layer.name);
+			layerDescriptor.Child("diffuseTexturePath").SetScalar(
+				DescriptorPath(PublishedPath(stagedTextures[index])));
+			layerDescriptor.Child("tiling").SetScalar(layer.tiling);
 		}
 
 		const file::path descriptorPath =
@@ -796,7 +782,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			std::ofstream output(descriptorTemporary,
 				std::ios::binary | std::ios::trunc);
 			if (!output.is_open()) return false;
-			output << descriptor.dump(4);
+			output << descriptor.Dump();
 			output.flush();
 			if (!output.good()) return false;
 		}
@@ -923,13 +909,6 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		std::lock_guard lock(m_authoringMutex);
 		return PublishUncatalogedLocked("InputActionMap",
 			PathFinder::InputMapPath(), request);
-	}
-
-	bool WriteAnimatorController(const UncatalogedAuthoringRequest& request)
-	{
-		std::lock_guard lock(m_authoringMutex);
-		return PublishUncatalogedLocked("AnimatorController",
-			PathFinder::AnimatorjsonPath(), request);
 	}
 
 	file::path ImportSourceAsset(const file::path& source,
@@ -1199,9 +1178,12 @@ private:
 
 	FileGuid LoadGuidFromMeta(const file::path& metaPath) const
 	{
-		const YAML::Node node = YAML::LoadFile(metaPath.string());
-		if (!node["guid"] || !node["guid"].IsScalar()) return {};
-		return FileGuid(node["guid"].as<std::string>());
+		std::string error;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseFile(metaPath.string(), error);
+		if (!document) return {};
+		const Authoring::ReadNode guid = document.Root()["guid"];
+		return guid && guid.IsScalar() ? FileGuid(guid.AsString()) : FileGuid{};
 	}
 
 	void RegisterMetaFile(const file::path& metaPath)
@@ -1294,28 +1276,26 @@ private:
 			&& ToLower(targetFile.parent_path().filename().string()) == "materials";
 		if (!prefab && !material) return {};
 
-		try
-		{
-			const YAML::Node payload = YAML::LoadFile(targetFile.string());
-			const YAML::Node identity = payload["m_fileGuid"];
-			if (!identity || !identity.IsScalar()) return {};
-			const FileGuid hint(identity.as<std::string>());
-			return hint.IsRandomV4() ? hint : FileGuid{};
-		}
-		catch (const std::exception&)
-		{
-			return {};
-		}
+		std::string error;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseFile(targetFile.string(), error);
+		if (!document) return {};
+		const Authoring::ReadNode identity = document.Root()["m_fileGuid"];
+		if (!identity || !identity.IsScalar()) return {};
+		const FileGuid hint(identity.AsString());
+		return hint.IsRandomV4() ? hint : FileGuid{};
 	}
 
-	FileGuid ResolveOrCreateGuid(const file::path& targetFile, YAML::Node& root,
+	FileGuid ResolveOrCreateGuid(const file::path& targetFile,
+		Authoring::WriteNode root,
 		const FileGuid& preferredGuid) const
 	{
 		// sidecar가 생긴 뒤에는 이 값만 정본이다. payload의 m_fileGuid를
 		// 다시 읽어 sidecar를 덮는 경로는 두지 않는다.
-		if (root["guid"] && root["guid"].IsScalar())
+		const Authoring::ReadNode existingGuid = root.Read()["guid"];
+		if (existingGuid && existingGuid.IsScalar())
 		{
-			const FileGuid existing(root["guid"].as<std::string>());
+			const FileGuid existing(existingGuid.AsString());
 			return existing;
 		}
 
@@ -1328,7 +1308,7 @@ private:
 		const FileGuid payloadHint = LoadInitialIdentityHint(targetFile);
 		const FileGuid generated = preferredGuid != FileGuid{} ? preferredGuid
 			: payloadHint != FileGuid{} ? payloadHint : FileGuid::CreateRandomV4();
-		root["guid"] = generated.ToString();
+		root.Child("guid").SetScalar(generated.ToString());
 		return generated;
 	}
 
@@ -1338,8 +1318,22 @@ private:
 		if (targetFile.empty() || !file::exists(targetFile)) return {};
 
 		const file::path metaPath = targetFile.string() + ".meta";
-		YAML::Node root;
-		if (file::exists(metaPath)) root = YAML::LoadFile(metaPath.string());
+		Authoring::WriteDocument document;
+		if (file::exists(metaPath))
+		{
+			std::string parseError;
+			std::optional<Authoring::WriteDocument> parsed =
+				Authoring::WriteDocument::ParseFile(metaPath, &parseError);
+			if (!parsed || !parsed->Root().Read().IsMap())
+			{
+				Debug->LogError("Editor meta parse failed: " + metaPath.string()
+					+ " — " + parseError);
+				return {};
+			}
+			document = std::move(*parsed);
+		}
+		const Authoring::WriteNode root = document.Root();
+		root.SetMap();
 
 		const FileGuid guid = ResolveOrCreateGuid(targetFile, root, preferredGuid);
 		if (guid == FileGuid{}) return {};
@@ -1350,36 +1344,47 @@ private:
 				+ " canonical=" + guid.ToString());
 			return guid;
 		}
-		root["importSettings"]["extension"] = targetFile.extension().string();
+		const Authoring::WriteNode importSettings = root.Child("importSettings");
+		importSettings.Child("extension").SetScalar(
+			targetFile.extension().string());
 		std::error_code timestampError;
 		const auto timestamp = file::last_write_time(targetFile, timestampError);
-		root["importSettings"]["timestamp"] = timestampError
-			? 0 : timestamp.time_since_epoch().count();
+		importSettings.Child("timestamp").SetScalar(timestampError
+			? 0 : timestamp.time_since_epoch().count());
 
 		const std::string extension = ToLower(targetFile.extension().string());
 		if (extension == ".cpp")
 		{
-			root.remove("reflectionFlag");
+			root.RemoveChild("reflectionFlag");
 			file::path header = targetFile;
 			header.replace_extension(".h");
-			root["reflectionFlag"] = file::exists(header) &&
-				HasScriptReflectionFieldAttribute(header);
-			root.remove("eventRegisterSetting");
+			root.Child("reflectionFlag").SetScalar(file::exists(header) &&
+				HasScriptReflectionFieldAttribute(header));
+			root.RemoveChild("eventRegisterSetting");
+			Authoring::WriteNode eventSettings;
 			for (const std::string& function : ExtractFunctionNames(targetFile))
-				root["eventRegisterSetting"].push_back(function);
+			{
+				if (!eventSettings)
+				{
+					eventSettings = root.Child("eventRegisterSetting");
+					eventSettings.SetSequence();
+				}
+				eventSettings.Append().SetScalar(function);
+			}
 		}
 		else if (extension == ".fbx" || extension == ".gltf" ||
 			extension == ".obj" || extension == ".glb")
 		{
-			root["ModelImporter"]["OptimizeMeshes"] = true;
-			root["ModelImporter"]["ImproveCacheLocality"] = true;
-			root["ModelImporter"]["CreateMeshCollider"] = false;
+			const Authoring::WriteNode importer = root.Child("ModelImporter");
+			importer.Child("OptimizeMeshes").SetScalar(true);
+			importer.Child("ImproveCacheLocality").SetScalar(true);
+			importer.Child("CreateMeshCollider").SetScalar(false);
 		}
 
 		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
 		std::ofstream output(metaPath, std::ios::binary | std::ios::trunc);
 		if (!output.is_open()) return {};
-		output << root;
+		output << document.Dump();
 		output.flush();
 		if (!output.good()) return {};
 		output.close();
@@ -1557,15 +1562,11 @@ bool EditorAssetDatabase::Initialize()
 	AssetAuthoringPort::InstallTagManagerWriter(&WriteTagManagerThroughEditor);
 	AssetAuthoringPort::InstallInputActionMapWriter(
 		&WriteInputActionMapThroughEditor);
-	AssetAuthoringPort::InstallAnimatorControllerWriter(
-		&WriteAnimatorControllerThroughEditor);
 	return true;
 }
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
-	AssetAuthoringPort::UninstallAnimatorControllerWriter(
-		&WriteAnimatorControllerThroughEditor);
 	AssetAuthoringPort::UninstallInputActionMapWriter(
 		&WriteInputActionMapThroughEditor);
 	AssetAuthoringPort::UninstallTagManagerWriter(&WriteTagManagerThroughEditor);
@@ -1658,12 +1659,6 @@ bool EditorAssetDatabase::WriteInputActionMap(
 	return m_impl && m_impl->WriteInputActionMap(request);
 }
 
-bool EditorAssetDatabase::WriteAnimatorController(
-	const UncatalogedAuthoringRequest& request)
-{
-	return m_impl && m_impl->WriteAnimatorController(request);
-}
-
 file::path EditorAssetDatabase::ImportSourceAsset(
 	const file::path& source, ImportKind kind)
 {
@@ -1699,10 +1694,10 @@ bool EditorAssetDatabase::SaveMaterial(Material* material)
 	if (catalogGuid != FileGuid{}) material->m_fileGuid = catalogGuid;
 	else if (material->m_fileGuid == FileGuid{})
 		material->m_fileGuid = FileGuid::CreateRandomV4();
-	YAML::Node node = DataSystems->SerializeMaterialPayload(*material);
-	std::ostringstream payload;
-	payload << node;
-	return WriteTextAssetWithMeta(savePath, payload.str(), material->m_fileGuid)
+	Authoring::WriteDocument document;
+	if (!DataSystems->SerializeMaterialPayload(*material, document.Root()))
+		return false;
+	return WriteTextAssetWithMeta(savePath, document.Dump(), material->m_fileGuid)
 		== material->m_fileGuid;
 }
 
@@ -1724,7 +1719,7 @@ bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory)
 	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
 	std::ofstream output(fullPath, std::ios::binary | std::ios::trunc);
 	if (!output.is_open()) return false;
-	output << Meta::Serialize(&profile);
+	output << Meta::SerializeDocument(&profile).Dump();
 	output.flush();
 	if (!output.good()) return false;
 	output.close();
@@ -1746,7 +1741,7 @@ bool EditorAssetDatabase::SaveExistingVolumeProfile(
 	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
 	std::ofstream output(savePath, std::ios::binary | std::ios::trunc);
 	if (!output.is_open()) return false;
-	output << Meta::Serialize(volume);
+	output << Meta::SerializeDocument(volume).Dump();
 	output.flush();
 	return output.good();
 }

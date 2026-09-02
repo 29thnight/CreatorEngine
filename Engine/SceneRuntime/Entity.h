@@ -9,7 +9,6 @@
 #include "PrefabOverride.h"
 #include "ScenePhase.h"
 #include <vector>
-#include <yaml-cpp/yaml.h>
 
 class Scene;
 class Bone;
@@ -60,10 +59,10 @@ public:
 	Entity& operator=(Entity&) = delete;
 	~Entity() override = default;
 
-	HashingString GetHashedName() const { return m_name; }
+	const HashingString& GetHashedName() const noexcept { return m_name; }
 	const std::string& RemoveSuffixNumberTag() const;
 
-    void SetName(std::string_view name) { m_name = name.data(); }
+	void SetName(std::string_view name) { m_name = name; }
     void SetTag(std::string_view tag);
     void SetLayer(std::string_view layer);
 

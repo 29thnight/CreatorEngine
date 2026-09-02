@@ -1,8 +1,8 @@
 #include "MaterialCookProducer.h"
 
 #include "CookSupport.h"
-
-#include <yaml-cpp/yaml.h>
+#include "AuthoringCookedDocument.h"
+#include "AuthoringParsedDocument.h"
 
 #include <algorithm>
 #include <utility>
@@ -93,17 +93,16 @@ namespace experiment::cooked
             return result;
         }
 
-        YAML::Node root;
-        try
-        {
-            root = YAML::Load(text);
-        }
-        catch (const YAML::Exception& exception)
-        {
-            AddIssue(result, "material.yaml",
-                std::string("YAML을 파싱할 수 없다: ") + exception.what());
-            return result;
-        }
+		std::string parseError;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseText(text, parseError);
+		if (!document)
+		{
+			AddIssue(result, "material.yaml",
+				"YAML을 파싱할 수 없다: " + parseError);
+			return result;
+		}
+		const Authoring::ReadNode root = document.Root();
         if (!root || !root.IsMap())
         {
             AddIssue(result, "material.yaml",
@@ -112,7 +111,7 @@ namespace experiment::cooked
         }
 
         // ── shader 의존 ────────────────────────────────────────────────
-        const YAML::Node shaderNode = root["m_shaderMetaGuid"];
+		const Authoring::ReadNode shaderNode = root["m_shaderMetaGuid"];
         if (!shaderNode || !shaderNode.IsScalar())
         {
             // ★ 없으면 실패다. 조용히 넘어가면 "간선이 없는 재질"과
@@ -122,11 +121,11 @@ namespace experiment::cooked
             return result;
         }
         AssetId shaderMetaAssetId{};
-        if (!TryParseCanonicalAssetId(shaderNode.Scalar(), shaderMetaAssetId))
-        {
-            AddIssue(result, "material.shaderMetaGuid",
-                "m_shaderMetaGuid가 canonical UUIDv4가 아니다: "
-                + shaderNode.Scalar());
+		if (!TryParseCanonicalAssetId(shaderNode.Scalar(), shaderMetaAssetId))
+		{
+			AddIssue(result, "material.shaderMetaGuid",
+				"m_shaderMetaGuid가 canonical UUIDv4가 아니다: "
+				+ shaderNode.AsString());
             return result;
         }
 
@@ -135,13 +134,13 @@ namespace experiment::cooked
 
         // ── texture 의존 ───────────────────────────────────────────────
         std::size_t texturePropertyCount = 0u;
-        const YAML::Node properties = root["m_propertyValues"];
+		const Authoring::ReadNode properties = root["m_propertyValues"];
         if (properties && properties.IsSequence())
         {
-            for (const YAML::Node& property : properties)
-            {
-                if (!property.IsMap()) continue;
-                const YAML::Node textureNode = property["m_textureGuid"];
+			for (const Authoring::ReadNode property : properties)
+			{
+				if (!property.IsMap()) continue;
+				const Authoring::ReadNode textureNode = property["m_textureGuid"];
                 // 키가 없으면 "텍스처 슬롯이 아니다" — 정상이다.
                 if (!textureNode) continue;
 
@@ -159,7 +158,7 @@ namespace experiment::cooked
                     return result;
                 }
 
-                const std::string& guidText = textureNode.Scalar();
+				const std::string guidText = textureNode.AsString();
                 if (IsNilGuidText(guidText)) continue;
 
                 ++texturePropertyCount;
@@ -187,9 +186,13 @@ namespace experiment::cooked
             return result;
         }
 
-        std::vector<std::byte> bytes(text.size());
-        for (std::size_t index = 0u; index < text.size(); ++index)
-            bytes[index] = static_cast<std::byte>(text[index]);
+        std::vector<std::byte> bytes;
+        std::string encodeError;
+        if (!Authoring::EncodeCookedDocument(root, bytes, encodeError))
+        {
+            AddIssue(result, "material.cookedDocument", std::move(encodeError));
+            return result;
+        }
 
         Sha256Digest digest{};
         std::string hashError;
@@ -207,10 +210,10 @@ namespace experiment::cooked
         product.texturePropertyCount = texturePropertyCount;
         // shader 하나를 뺀 나머지가 서로 다른 texture 수다.
         product.distinctTextureCount = dependencies.size() - 1u;
-        if (const YAML::Node nameNode = root["m_name"];
-            nameNode && nameNode.IsScalar())
-        {
-            product.name = nameNode.Scalar();
+		if (const Authoring::ReadNode nameNode = root["m_name"];
+			nameNode && nameNode.IsScalar())
+		{
+			product.name = nameNode.AsString();
         }
 
         CookedAssetManifestEntry entry;

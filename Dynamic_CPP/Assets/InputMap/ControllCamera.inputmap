@@ -1,0 +1,24 @@
+schemaVersion: 1
+mapName: "ControllCamera"
+actions:
+  - actionName: "OnCamera"
+    inputType: "GamePad"
+    actionType: "Button"
+    keyState: "Down"
+    keys: [8, 0, 0, 0]
+    scriptName: "CameraMove"
+    functionName: "OnCameraControll"
+  - actionName: "OffCamera"
+    inputType: "GamePad"
+    actionType: "Button"
+    keyState: "Down"
+    keys: [9, 0, 0, 0]
+    scriptName: "CameraMove"
+    functionName: "OffCameraCOntroll"
+  - actionName: "CameraMove"
+    inputType: "GamePad"
+    actionType: "Value"
+    keyState: "Down"
+    keys: [12, 0, 0, 0]
+    scriptName: "CameraMove"
+    functionName: "CameraMoveFun"

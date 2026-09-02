@@ -208,7 +208,8 @@ $manifest = Join-Path $outputA 'Derived\asset-manifest.cemf'
 # 게시 파일 = model CEMC + embedded texture + cooked shadermeta(1) + manifest.
 $manifestEntries = $models.Count + $materialCount + $embeddedTextureCount + 1
 $expectedFiles = $models.Count + $embeddedTextureCount + 1 + 1
-$summaryPattern = "asset-cooker models=$($models.Count) materials=$materialCount embeddedTextures=$embeddedTextureCount textureReferences=(\d+) externalTextureRefs=0 embeddedTextureBytes=(\d+) textures=0 shaderMetas=1 standaloneMaterials=0 standaloneMaterialBytes=0 scenes=0 prefabs=0 sceneBytes=0 legacyTextureNameRefs=0 unproducedGuidRefs=0 artifactPaths=$($expectedFiles - 1) files=$expectedFiles manifestEntries=$manifestEntries artifactBytes=(\d+) textureBytes=0 shaderMetaBytes=(\d+) manifest=Derived/asset-manifest\.cemf"
+$sourceIdentityCount = @(Get-ChildItem -LiteralPath $assets -Recurse -File -Filter '*.meta').Count
+$summaryPattern = "asset-cooker models=$($models.Count) materials=$materialCount embeddedTextures=$embeddedTextureCount textureReferences=(\d+) externalTextureRefs=0 embeddedTextureBytes=(\d+) textures=0 shaderMetas=1 standaloneMaterials=0 standaloneMaterialBytes=0 scenes=0 prefabs=0 sceneBytes=0 legacyTextureNameRefs=0 unproducedGuidRefs=0 artifactPaths=$($expectedFiles - 1) files=$expectedFiles manifestEntries=$manifestEntries sourceIdentities=$sourceIdentityCount artifactBytes=(\d+) textureBytes=0 shaderMetaBytes=(\d+) manifest=Derived/asset-manifest\.cemf"
 $successRuns = @($first, $second | Where-Object {
     $_.ExitCode -eq 0 -and [regex]::IsMatch($_.Stdout, $summaryPattern)
 }).Count

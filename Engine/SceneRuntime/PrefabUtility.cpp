@@ -11,11 +11,13 @@
 #include "Object.h"
 #include "LifecycleTrace.h"
 #include "AuthoringNodeEquality.h" // D3-a-1: 구조 비교
+#include "AuthoringCookedDocument.h"
 #include "AuthoringDocumentAccess.h"
+#include "AuthoringParsedDocument.h"
 #include "ReflectionYml.h"
 #include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
+#include "PathFinder.h"
 #include <cstring>
-#include <sstream>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -39,7 +41,8 @@ namespace
 	// type(및 type.parent 체인)의 프로퍼티를 스냅샷과 비교해 달라진 것만 오버라이드로
 	// 시딩한다. componentType이 비어 있으면 GameObject 자신의 프로퍼티를 뜻한다.
 	void SeedTypeOverrides(const Meta::Type& type, const std::string& componentType,
-		const MetaYml::Node& currentNode, const MetaYml::Node& snapshotNode,
+		const Authoring::ReadNode& currentNode,
+		const Authoring::ReadNode& snapshotNode,
 		std::vector<PrefabOverride>& out, int componentSlot = -1)
 	{
 		if (type.parent)
@@ -55,8 +58,8 @@ namespace
 					|| std::strcmp(prop.name, "m_index") == 0))
 				continue;
 
-			const auto& currProp = currentNode[prop.name];
-			const auto& snapProp = snapshotNode[prop.name];
+			const Authoring::ReadNode currProp = currentNode[prop.name];
+			const Authoring::ReadNode snapProp = snapshotNode[prop.name];
 			if (!currProp || !snapProp)
 				continue;
 			// D3-a-1: 문자열 덤프 비교 → 구조 비교(§3.3, Y-6). 비교하려고 문자열을
@@ -70,7 +73,7 @@ namespace
 			ov.m_componentType = componentType;
 			ov.m_componentSlot = componentSlot;
 			ov.m_propertyName = prop.name;
-			ov.m_valueYaml = YAML::Dump(currProp);
+			ov.m_valueYaml = currProp.Dump();
 			out.push_back(std::move(ov));
 		}
 	}
@@ -88,31 +91,35 @@ namespace
 	{
 		if (obj.m_prefabOriginal.IsEmpty())
 			return;
-		const MetaYml::Node& snapshotNode =
-			Authoring::DocumentAccess::Node(obj.m_prefabOriginal);
+		const Authoring::ReadNode snapshotNode =
+			Authoring::DocumentAccess::Read(obj.m_prefabOriginal);
 		if (!snapshotNode.IsMap())
 			return;
 
-		MetaYml::Node currentNode = Meta::Serialize(&obj, Meta::TypeOf<Entity>());
+		Authoring::WriteDocument currentDocument =
+			Meta::SerializeDocument(&obj, Meta::TypeOf<Entity>());
+		const Authoring::ReadNode currentNode = currentDocument.Root().Read();
+		SeedTypeOverrides(Meta::TypeOf<Entity>(), "", currentNode, snapshotNode,
+			obj.m_prefabOverrides);
 
-		SeedTypeOverrides(Meta::TypeOf<Entity>(), "", currentNode, snapshotNode, obj.m_prefabOverrides);
-
-		const auto& currComponents = currentNode["m_components"];
-		const auto& snapComponents = snapshotNode["m_components"];
+		const Authoring::ReadNode currComponents = currentNode["m_components"];
+		const Authoring::ReadNode snapComponents = snapshotNode["m_components"];
 		if (currComponents && snapComponents && currComponents.IsSequence() && snapComponents.IsSequence())
 		{
 			// 순번은 **타입별 누적**이다 — 절대 인덱스가 아니다.
 			// ApplyComponentDiff의 nextOrdinal과 같은 규칙이어야 하고, 그쪽도
 			// obj.m_components 순서로 센다(직렬화 순서가 곧 그 순서다).
 			std::unordered_map<std::string, int> slotByType;
-			const size_t count = std::min(currComponents.size(), snapComponents.size());
+			const size_t count = std::min(currComponents.Size(), snapComponents.Size());
 			for (size_t i = 0; i < count; ++i)
 			{
-				const Meta::Type* compType = Meta::ExtractTypeFromYAML(currComponents[i]);
+				const Meta::Type* compType = Meta::ExtractTypeFromYAML(
+					currComponents.At(i));
 				if (!compType)
 					continue;
 				const int slot = slotByType[compType->name]++;
-				SeedTypeOverrides(*compType, compType->name, currComponents[i], snapComponents[i],
+				SeedTypeOverrides(*compType, compType->name,
+					currComponents.At(i), snapComponents.At(i),
 					obj.m_prefabOverrides, slot);
 			}
 		}
@@ -157,7 +164,7 @@ namespace
 	// — 패치 대상 컴포넌트는 애초에 파괴되지 않으므로, 오버라이드된 프로퍼티는
 	// DeserializePrefab의 제외 목록에 걸려 새 값을 아예 받지 않고 지금 값 그대로
 	// 남는다. "재적용"이 아니라 "안 건드림"으로 같은 결과를 얻는다.
-	void ApplyComponentDiff(Entity& obj, const MetaYml::Node& newComponents)
+	void ApplyComponentDiff(Entity& obj, const Authoring::ReadNode& newComponents)
 	{
 		const size_t originalCount = obj.m_components.size();
 
@@ -179,7 +186,7 @@ namespace
 		std::vector<bool> kept(originalCount, false);
 		std::unordered_map<std::string, size_t> nextOrdinal;
 
-		for (const auto& node : newComponents)
+		for (const Authoring::ReadNode node : newComponents)
 		{
 			// K1-b UUID 우선, 이름 폴백 — Entity 레벨 갱신·ComponentFactory::
 			// LoadComponent와 같은 판정 창구를 재사용한다.
@@ -341,8 +348,8 @@ void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
         // 같은 함수를 부르므로 규칙이 갈릴 수 없다.
         const int slot = ComputeComponentSlot(obj, target);
 
-        MetaYml::Node patched;
-        bool any = false;
+		Authoring::WriteDocument patched;
+		bool any = false;
 
         for (const auto& ov : obj.m_prefabOverrides)
         {
@@ -358,28 +365,42 @@ void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
             {
                 // 현재 형상에서 출발해 오버라이드된 프로퍼티만 덮는다 —
                 // DeserializePrefab(배제 방식)의 정확한 거울상이다.
-                patched = Meta::Serialize(target, *type);
-                any = true;
-            }
+				patched = Meta::SerializeDocument(target, *type);
+				any = true;
+			}
 
-            try
-            {
-                patched[ov.m_propertyName] = MetaYml::Load(ov.m_valueYaml);
-            }
-            catch (const std::exception& e)
-            {
+			std::string parseError;
+			std::optional<Authoring::WriteDocument> value;
+			if (PathFinder::IsAssetAuthoringEnabled())
+			{
+				value = Authoring::WriteDocument::ParseText(
+					ov.m_valueYaml, &parseError);
+			}
+			else
+			{
+				// Packaged Player accepts only the D6 cooked envelope. There is no
+				// YAML fallback for pre-D6 artifacts; they must be recooked.
+				value = Authoring::DecodeCookedDocumentTextEnvelope(
+					ov.m_valueYaml, parseError);
+			}
+			if (value)
+			{
+				patched.Root().Child(ov.m_propertyName).Assign(value->Root());
+			}
+			else
+			{
                 // 조용히 넘기지 않는다 — 값 하나가 유실되면 그 필드는 이후
                 // 프리팹 갱신을 계속 받아 사용자 수정이 사라진 것처럼 보인다.
-                Debug->LogError("ApplyRecordedOverrides: 값 파싱 실패 "
-                    + type->name + "." + ov.m_propertyName + " — " + e.what());
-            }
+				Debug->LogError("ApplyRecordedOverrides: 값 파싱 실패 "
+					+ type->name + "." + ov.m_propertyName + " — " + parseError);
+			}
         }
 
         if (any)
         {
             Meta::ScopedPropertyChangeSource sourceScope(
                 Meta::PropertyChangeSource::Prefab);
-            Meta::Deserialize(target, *type, patched);
+			Meta::Deserialize(target, *type, patched.Root().Read());
         }
     }
 }
@@ -411,15 +432,17 @@ void PrefabUtility::RecordPropertyOverride(Entity& obj, const Component& compone
 
     // 값은 지금 형상에서 뽑는다 — 시딩(SeedTypeOverrides)과 같은 패턴이라
     // 두 경로가 같은 문자열 형태를 남긴다.
-    MetaYml::Node node = Meta::Serialize(const_cast<Component*>(&component), *type);
-    const auto& propNode = node[propertyName];
-    if (!propNode)
-        return;
+	Authoring::WriteDocument document = Meta::SerializeDocument(
+		const_cast<Component*>(&component), *type);
+	const Authoring::ReadNode propNode =
+		document.Root().Read()[propertyName.c_str()];
+	if (!propNode)
+		return;
 
     // 순번은 정본 헬퍼로만 센다(P4-c). 소비하는 쪽(ApplyComponentDiff)도 같은
     // 함수를 부르므로 규칙이 갈릴 수 없다.
     const int slot = ComputeComponentSlot(obj, &component);
-    const std::string valueYaml = YAML::Dump(propNode);
+	const std::string valueYaml = propNode.Dump();
 
     for (auto& ov : obj.m_prefabOverrides)
     {
@@ -620,11 +643,11 @@ size_t PrefabUtility::UpdateInstances(const Prefab* prefab)
         // 다음 시딩(과도기 한정)이 기준으로 삼을 스냅샷을 갱신한다. m_prefabOverrides가
         // 이미 정본이므로 이 값은 오버라이드 판정에 더 이상 쓰이지 않는다.
         //
-        // ★ 여기도 깊은 복사다. newData는 prefab->GetPrefabData()의 **별칭**이라
-        // (yaml-cpp 참조 의미) 그냥 대입하면 이 인스턴스의 스냅샷이 프리팹의 살아
-        // 있는 데이터를 계속 가리킨다 — 프리팹이 다음에 바뀌면 스냅샷이 소리 없이
+        // ★ 여기도 깊은 복사다. newData는 prefab->GetPrefabData()가 돌려준
+        // 비소유 읽기 뷰라 그냥 보관하면 이 인스턴스의 스냅샷이 프리팹의 살아
+        // 있는 문서를 계속 가리킨다 — 프리팹이 다음에 바뀌면 스냅샷이 소리 없이
         // 따라 바뀌어 "무엇과 비교하는지"가 무너진다. 사유는 Prefab.cpp의 같은 자리.
-        obj->m_prefabOriginal = Authoring::DocumentAccess::Adopt(MetaYml::Clone(newData));
+        obj->m_prefabOriginal = Authoring::DocumentAccess::Clone(newData);
 
         prefabInstanceUpdated.Broadcast(*obj);
         ++applied;
@@ -647,7 +670,9 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
 	if (identity == nullGuid) identity = FileGuid::CreateRandomV4();
 	const_cast<Prefab*>(prefab)->SetFileGuid(identity);
 
-    auto node = Meta::Serialize(const_cast<Prefab*>(prefab));
+	Authoring::WriteDocument document = Meta::SerializeDocument(
+		const_cast<Prefab*>(prefab));
+	const Authoring::WriteNode node = document.Root();
 
 	// Prefab::m_fileGuid는 sidecar 정체성의 payload mirror이고, 각 엔티티의
 	// m_prefabFileGuid는 인스턴스 재연결용 참조다. 둘 다 같은 catalog GUID를
@@ -655,22 +680,26 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
     // 형상이 둘 다 나온다: SerializeRecursive는 루트 Map 하나를 돌려주고(자식은
     // 그 안에 중첩), 다른 경로에서 온 데이터는 Sequence다. 둘 다 각인한다 —
     // 한쪽만 처리하면 조용히 널로 남는다(실측으로 한 번 걸렸다).
-    MetaYml::Node data = prefab->GetPrefabData();
+	Authoring::WriteDocument dataDocument;
+	dataDocument.Root().Assign(prefab->GetPrefabData());
+	const Authoring::ReadNode data = dataDocument.Root().Read();
     if (data.IsSequence())
     {
-        for (std::size_t i = 0; i < data.size(); ++i)
+        for (std::size_t i = 0; i < data.Size(); ++i)
         {
-            data[i]["m_prefabFileGuid"] = identity.ToString();
+			dataDocument.Root().At(i).Child("m_prefabFileGuid")
+				.SetScalar(identity.ToString());
         }
     }
     else if (data.IsMap())
     {
-        data["m_prefabFileGuid"] = identity.ToString();
+		dataDocument.Root().Child("m_prefabFileGuid").SetScalar(identity.ToString());
     }
 
-	node["PrefabNode"].push_back(data);
-	std::ostringstream payload;
-	payload << node;
+	const Authoring::WriteNode prefabNodes = node.Child("PrefabNode");
+	prefabNodes.SetSequence();
+	prefabNodes.Append().Assign(dataDocument.Root());
+	const std::string payload = document.Dump();
 
 	// Editor Host는 staging publish와 meta 확정을 같은 authoring lock 안에서 끝낸다.
 	// Player에는 handler가 없으므로 source meta를 만들지 않고 기존 파일 쓰기만
@@ -679,7 +708,7 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
 	if (hasAuthoringHost)
 	{
 		const FileGuid authoredIdentity = AssetAuthoringPort::WriteTextAssetWithMeta(
-			path, payload.str(), identity);
+			path, payload, identity);
 		if (authoredIdentity != identity)
 		{
 			Debug->LogError("Prefab/meta GUID mismatch after authoring: " + path);
@@ -691,7 +720,7 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
 		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
 		std::ofstream out(path, std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) return false;
-		out << payload.str();
+		out << payload;
 		out.flush();
 		if (!out.good()) return false;
 	}
@@ -726,7 +755,7 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
         it != m_prefabCache.end() && it->second.get() != prefab)
     {
         // D3-a-5b: 뷰는 소유하지 않으므로 대상 노드에 이름을 준다.
-        const Authoring::ReadNode cachedPrefabNode{ node["PrefabNode"] };
+		const Authoring::ReadNode cachedPrefabNode = node.Read()["PrefabNode"];
         it->second->SetPrefabData(Authoring::NodeViewAccess::Make(cachedPrefabNode));
         it->second->SetFileGuid(identity);
     }
@@ -738,6 +767,22 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 {
     if (path.empty() || !file::exists(path))
         return nullptr;
+	const FileGuid sourceIdentity = DataSystems->GetFileGuid(path);
+	file::path readPath(path);
+	if (sourceIdentity != FileGuid{})
+	{
+		readPath = DataSystems->ResolveCatalogAssetPath(sourceIdentity);
+		if (readPath.empty())
+		{
+			Debug->LogError("Prefab cooked runtime artifact 해석 실패: " + path);
+			return nullptr;
+		}
+	}
+	else if (!PathFinder::IsAssetAuthoringEnabled())
+	{
+		Debug->LogError("Player prefab source identity 해석 실패: " + path);
+		return nullptr;
+	}
 
     const std::string key = CacheKey(path);
     if (auto it = m_prefabCache.find(key); it != m_prefabCache.end())
@@ -749,18 +794,31 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
     // LoadFile만 재면 정의 역직렬화 몫이 빠져 "프리팹 로드 비용"을 과소 보고한다.
     SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::PrefabParse);
 
-    auto node = MetaYml::LoadFile(path);
-    auto prefab = std::make_unique<Prefab>();
-    Meta::Deserialize(prefab.get(), node);
-	const MetaYml::Node loadedPrefabNode = node["PrefabNode"];
+	std::string parseError;
+	Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(readPath.string(), parseError);
+	if (!document)
+	{
+		Debug->LogError("Prefab parse failed: " + readPath.string()
+			+ " — " + parseError);
+		return nullptr;
+	}
+	const Authoring::ReadNode node = document.Root();
+	auto prefab = std::make_unique<Prefab>();
+	Meta::Deserialize(prefab.get(), node);
+	const Authoring::ReadNode loadedPrefabNode = node["PrefabNode"];
 	prefab->SetPrefabData(Authoring::NodeViewAccess::Make(loadedPrefabNode));
-	const FileGuid identity = DataSystems->GetFileGuid(path);
+	const FileGuid identity = sourceIdentity;
 	if (identity == FileGuid{})
 	{
 		Debug->LogError("Prefab load rejected missing catalog identity: " + path);
 		return nullptr;
 	}
 	prefab->SetFileGuid(identity);
+	const bool cooked = readPath.lexically_normal()
+		!= file::path(path).lexically_normal();
+	std::printf("[prefab.document] source=%s guid=%s\n",
+		cooked ? "cooked" : "authoring", identity.ToString().c_str());
 
     Prefab* raw = prefab.get();
     m_prefabCache.emplace(key, std::move(prefab));

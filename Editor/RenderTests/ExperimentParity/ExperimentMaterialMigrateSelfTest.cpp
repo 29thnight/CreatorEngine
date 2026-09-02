@@ -1,6 +1,8 @@
 #include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
 
 #include "AuthoringNodeViewAccess.h" // D3-a-4
+#include "AuthoringParsedDocument.h"
+#include "AuthoringWriteNode.h"
 #include "DataSystem.h"
 #include "MeshRenderer.h"
 #include "Experiment/AssetIdentity.h"
@@ -13,13 +15,10 @@
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
 
-#include <yaml-cpp/yaml.h>
-
 #include <algorithm>
 #include <array>
 #include <cstdio>
 #include <filesystem>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -103,22 +102,19 @@ namespace RenderTest
             {
                 return false;
             }
-            YAML::Node node;
-            if (!experiment::SerializeMaterialAuthoring(converted, node,
-                outError))
+            Authoring::WriteDocument document;
+            if (!experiment::SerializeMaterialAuthoring(
+                converted, document.Root(), outError))
             {
                 return false;
             }
-            YAML::Node reloaded;
-            try { reloaded = YAML::Load(YAML::Dump(node)); }
-            catch (const std::exception& parse)
-            {
-                outError = std::string("YAML reload 실패: ") + parse.what();
-                return false;
-            }
+            Authoring::ParsedDocument reloaded =
+                Authoring::ParsedDocument::ParseText(
+                    document.Dump(), outError);
+            if (!reloaded) return false;
             experiment::Material restored;
-            if (!experiment::DeserializeMaterialAuthoring(reloaded, restored,
-                outError))
+            if (!experiment::DeserializeMaterialAuthoring(
+                reloaded.Root(), restored, outError))
             {
                 return false;
             }
@@ -365,9 +361,13 @@ namespace RenderTest
             "keywordSelections: []\n";
 
         Material material;
-        const YAML::Node authoredNode = YAML::Load(yaml);
-        const bool decoded = DataSystems->DeserializeMaterialPayload(material,
-            Authoring::NodeViewAccess::Make(authoredNode));
+        std::string authoredParseError;
+        Authoring::ParsedDocument authoredDocument =
+            Authoring::ParsedDocument::ParseText(yaml, authoredParseError);
+        const Authoring::ReadNode authoredNode = authoredDocument.Root();
+        const bool decoded = authoredDocument
+            && DataSystems->DeserializeMaterialPayload(material,
+                Authoring::NodeViewAccess::Make(authoredNode));
         check.Check(decoded, "새 정본 문서 decode");
         if (decoded)
         {
@@ -406,8 +406,13 @@ namespace RenderTest
                 "  keywordSelections: []\n";
             MeshRenderer renderer;
             // D3-a-4: 훅 인자가 뷰가 됐다. 자가 검사도 같은 창구로 부른다.
-            const YAML::Node componentNode = YAML::Load(componentYaml);
-            renderer.OnDeserialized(Authoring::NodeViewAccess::Make(componentNode));
+            std::string parseError;
+            Authoring::ParsedDocument componentDocument =
+                Authoring::ParsedDocument::ParseText(componentYaml, parseError);
+            const Authoring::ReadNode componentNode = componentDocument.Root();
+            if (componentDocument)
+                renderer.OnDeserialized(
+                    Authoring::NodeViewAccess::Make(componentNode));
             check.Check(nullptr != renderer.m_Material,
                 "postLoad가 새 정본 material을 만든다");
             if (renderer.m_Material)
@@ -433,8 +438,13 @@ namespace RenderTest
             legacyRenderer.m_Material = std::make_shared<Material>();
             legacyRenderer.m_Material->m_name = "TypedFilled";
             const std::shared_ptr<Material> before = legacyRenderer.m_Material;
-            const YAML::Node legacyNode = YAML::Load("m_Material:\n  m_name: TypedFilled\n");
-            legacyRenderer.OnDeserialized(Authoring::NodeViewAccess::Make(legacyNode));
+            Authoring::ParsedDocument legacyDocument =
+                Authoring::ParsedDocument::ParseText(
+                    "m_Material:\n  m_name: TypedFilled\n", parseError);
+            const Authoring::ReadNode legacyNode = legacyDocument.Root();
+            if (legacyDocument)
+                legacyRenderer.OnDeserialized(
+                    Authoring::NodeViewAccess::Make(legacyNode));
             check.Check(legacyRenderer.m_Material == before
                 && legacyRenderer.m_Material->m_name == "TypedFilled",
                 "legacy 노드는 typed 인스턴스를 보존한다");
@@ -444,14 +454,19 @@ namespace RenderTest
         {
             Material legacyDocument;
             // D3-a-5b: 임시 노드로 뷰를 만들 수 없다(Make(Node&&) = delete) — 이름을 준다.
-            const YAML::Node legacyDocumentNode = YAML::Load(
+            std::string parseError;
+            Authoring::ParsedDocument legacySource =
+                Authoring::ParsedDocument::ParseText(
                     "m_name: LegacyProbe\n"
                     "m_shaderMetaGuid: " + fixtureGuid.ToString() + "\n"
                     "m_propertyValues:\n"
                     "  - m_name: roughness\n"
-                    "    m_numericValue: [0.5]\n");
-            const bool legacyDecoded = DataSystems->DeserializeMaterialPayload(
-                legacyDocument, Authoring::NodeViewAccess::Make(legacyDocumentNode));
+                    "    m_numericValue: [0.5]\n", parseError);
+            const Authoring::ReadNode legacyDocumentNode = legacySource.Root();
+            const bool legacyDecoded = legacySource
+                && DataSystems->DeserializeMaterialPayload(
+                    legacyDocument,
+                    Authoring::NodeViewAccess::Make(legacyDocumentNode));
             check.Check(legacyDecoded
                 && legacyDocument.m_name == "LegacyProbe",
                 "legacy 문서 경로 무변경");
@@ -460,17 +475,21 @@ namespace RenderTest
         // ── S2b: writer 전환 — 저장이 새 정본을 적고 왕복이 고정점이다 ────
         {
             // 위에서 decode한 material은 fixture meta를 아는 재질이다.
-            YAML::Node written = DataSystems->SerializeMaterialPayload(material);
-            check.Check(written["schema"] && written["shaderAssetId"],
+            Authoring::WriteDocument writtenDocument;
+            const bool writtenOk = DataSystems->SerializeMaterialPayload(
+                material, writtenDocument.Root());
+            const Authoring::ReadNode written = writtenDocument.Root().Read();
+            check.Check(writtenOk && written["schema"]
+                && written["shaderAssetId"],
                 "writer가 새 정본(schema+shaderAssetId)을 적는다");
 
             bool tintSurvived = false;
             if (written["properties"] && written["properties"].IsSequence())
             {
-                for (const YAML::Node& property : written["properties"])
+                for (const Authoring::ReadNode property : written["properties"])
                 {
                     if (property["name"]
-                        && property["name"].as<std::string>() == "tint"
+                        && property["name"].AsStringChecked() == "tint"
                         && property["float4"])
                     {
                         tintSurvived = true;
@@ -489,8 +508,8 @@ namespace RenderTest
             {
                 experiment::Material authoredAgain;
                 std::string error;
-                redecoded = experiment::DeserializeMaterialAuthoring(written,
-                        authoredAgain, error)
+                redecoded = experiment::DeserializeMaterialAuthoring(
+                        written, authoredAgain, error)
                     && ExperimentMaterialMigration::ConvertToLegacyMaterial(
                         authoredAgain, nullptr, reloaded, error);
                 if (redecoded)
@@ -498,17 +517,14 @@ namespace RenderTest
                     DataSystems->FinalizeMaterialRuntime(reloaded);
                 }
             }
-            std::string firstText, secondText;
-            {
-                std::ostringstream stream; stream << written;
-                firstText = stream.str();
-            }
+            const std::string firstText = writtenDocument.Dump();
+            std::string secondText;
             if (redecoded)
             {
-                YAML::Node rewritten =
-                    DataSystems->SerializeMaterialPayload(reloaded);
-                std::ostringstream stream; stream << rewritten;
-                secondText = stream.str();
+                Authoring::WriteDocument rewrittenDocument;
+                if (DataSystems->SerializeMaterialPayload(
+                    reloaded, rewrittenDocument.Root()))
+                    secondText = rewrittenDocument.Dump();
             }
             check.Check(redecoded && !firstText.empty()
                 && firstText == secondText,
@@ -517,8 +533,13 @@ namespace RenderTest
             // meta를 모르는 재질은 legacy 표기로 폴백한다 — 조용한 소실 금지.
             Material metaless;
             metaless.m_name = "MetalessProbe";
-            YAML::Node fallback = DataSystems->SerializeMaterialPayload(metaless);
-            check.Check(!fallback["schema"] && fallback["m_name"],
+            Authoring::WriteDocument fallbackDocument;
+            const bool fallbackWritten = DataSystems->SerializeMaterialPayload(
+                metaless, fallbackDocument.Root());
+            const Authoring::ReadNode fallback =
+                fallbackDocument.Root().Read();
+            check.Check(fallbackWritten && !fallback["schema"]
+                && fallback["m_name"],
                 "meta 없는 재질은 legacy 표기로 폴백한다");
 
             // MeshRenderer embed — OnAfterSerialize가 m_Material 서브트리를
@@ -533,7 +554,8 @@ namespace RenderTest
                     DataSystems->ResolveShaderMeta(handle);
                 auto owned = std::make_shared<Material>();
                 if (fixtureMeta
-                    && experiment::DeserializeMaterialAuthoring(authoredNode,
+                    && experiment::DeserializeMaterialAuthoring(
+                        authoredNode,
                         authoredForEmbed, error)
                     && ExperimentMaterialMigration::ConvertToLegacyMaterial(
                         authoredForEmbed, fixtureMeta.get(), *owned, error))
@@ -544,8 +566,11 @@ namespace RenderTest
             }
             check.Check(nullptr != writerRenderer.m_Material,
                 "writer 검사용 재질 준비");
-            YAML::Node componentNode = Meta::Serialize(&writerRenderer);
-            const YAML::Node embedded = componentNode["m_Material"];
+            Authoring::WriteDocument componentDocument =
+                Meta::SerializeDocument(&writerRenderer);
+            const Authoring::ReadNode componentNode =
+                componentDocument.Root().Read();
+            const Authoring::ReadNode embedded = componentNode["m_Material"];
             check.Check(embedded && embedded.IsMap() && embedded["schema"]
                 && embedded["shaderAssetId"],
                 "컴포넌트 직렬화의 m_Material embed가 새 정본이다");
@@ -560,14 +585,22 @@ namespace RenderTest
             bool corpusCanonical = false;
             if (std::filesystem::is_regular_file(corpusPath))
             {
-                const YAML::Node corpusNode =
-                    YAML::LoadFile(corpusPath.string());
+                std::string parseError;
+                const Authoring::ParsedDocument corpusDocument =
+                    Authoring::ParsedDocument::ParseFile(
+                        corpusPath.string(), parseError);
                 // legacy 문서 decode — typed reflection 직결(창구 시그니처 불변).
-                Meta::Deserialize(&corpusMaterial, corpusNode);
+                if (corpusDocument)
+                    Meta::Deserialize(&corpusMaterial, corpusDocument.Root());
                 DataSystems->FinalizeMaterialRuntime(corpusMaterial);
-                const YAML::Node corpusWritten =
-                    DataSystems->SerializeMaterialPayload(corpusMaterial);
-                corpusCanonical = corpusWritten["schema"]
+                Authoring::WriteDocument corpusWrittenDocument;
+                const bool corpusWrittenOk =
+                    DataSystems->SerializeMaterialPayload(
+                        corpusMaterial, corpusWrittenDocument.Root());
+                const Authoring::ReadNode corpusWritten =
+                    corpusWrittenDocument.Root().Read();
+                corpusCanonical = corpusDocument && corpusWrittenOk
+                    && corpusWritten["schema"]
                     && corpusWritten["shaderAssetId"];
             }
             check.Check(corpusCanonical,
@@ -588,23 +621,29 @@ namespace RenderTest
             // 로드 성공 여부와 무관하게 일어나야 한다(정보 보존).
             const FileGuid modelProbe = FileGuid::CreateRandomV4();
             MeshRenderer migrating;
-            const YAML::Node carrier = YAML::Load(
-                "m_Material:\n"
-                "  m_name: ModelCarrier\n"
-                "  m_fileGuid: " + modelProbe.ToString() + "\n");
-            Meta::Deserialize(&migrating, carrier);
+            std::string parseError;
+            Authoring::ParsedDocument carrierDocument =
+                Authoring::ParsedDocument::ParseText(
+                    "m_Material:\n"
+                    "  m_name: ModelCarrier\n"
+                    "  m_fileGuid: " + modelProbe.ToString() + "\n",
+                    parseError);
+            const Authoring::ReadNode carrier = carrierDocument.Root();
+            if (carrierDocument) Meta::Deserialize(&migrating, carrier);
             if (ops && ops->postLoad)
             {
-                ops->postLoad(&migrating, Authoring::ReadNode{ carrier });
+                ops->postLoad(&migrating, carrier);
             }
             check.Check(migrating.m_modelGuid == modelProbe,
                 "legacy 편법(재질 fileGuid)이 m_modelGuid로 이주한다");
 
             MeshRenderer owning;
             owning.m_modelGuid = modelProbe;
-            YAML::Node saved = Meta::Serialize(&owning);
+            Authoring::WriteDocument savedDocument =
+                Meta::SerializeDocument(&owning);
+            const Authoring::ReadNode saved = savedDocument.Root().Read();
             check.Check(saved["m_modelGuid"]
-                && saved["m_modelGuid"].as<std::string>()
+                && saved["m_modelGuid"].AsStringChecked()
                     == modelProbe.ToString(),
                 "저장이 m_modelGuid를 자기 키로 적는다");
         }
@@ -628,10 +667,12 @@ namespace RenderTest
                     *linked.m_Material, edit, error),
                     "인스턴스 편집 적용 (" + error + ")");
 
-                YAML::Node saved = Meta::Serialize(&linked);
-                const YAML::Node materialNode = saved["m_Material"];
+                Authoring::WriteDocument savedDocument =
+                    Meta::SerializeDocument(&linked);
+                const Authoring::ReadNode saved = savedDocument.Root().Read();
+                const Authoring::ReadNode materialNode = saved["m_Material"];
                 check.Check(materialNode && materialNode["ref"]
-                    && materialNode["ref"].as<std::string>()
+                    && materialNode["ref"].AsStringChecked()
                         == base->m_fileGuid.ToString(),
                     "저장이 base 참조를 적는다");
                 std::size_t overrideCount = 0;
@@ -639,11 +680,11 @@ namespace RenderTest
                 if (materialNode && materialNode["overrides"]
                     && materialNode["overrides"].IsSequence())
                 {
-                    for (const YAML::Node& entry : materialNode["overrides"])
+                    for (const Authoring::ReadNode entry : materialNode["overrides"])
                     {
                         ++overrideCount;
                         if (entry["name"]
-                            && entry["name"].as<std::string>() == "roughness")
+                            && entry["name"].AsStringChecked() == "roughness")
                         {
                             roughnessOverride = true;
                         }
@@ -660,7 +701,7 @@ namespace RenderTest
                 Meta::Deserialize(&reloaded, saved);
                 if (ops && ops->postLoad)
                 {
-                    ops->postLoad(&reloaded, Authoring::ReadNode{ saved });
+                    ops->postLoad(&reloaded, saved);
                 }
                 bool roughnessApplied = false;
                 if (reloaded.m_Material)
@@ -680,16 +721,21 @@ namespace RenderTest
                     && reloaded.m_materialBaseGuid == base->m_fileGuid,
                     "로드가 base+override를 실체화하고 링크를 복원한다");
 
-                YAML::Node resaved = Meta::Serialize(&reloaded);
+                Authoring::WriteDocument resavedDocument =
+                    Meta::SerializeDocument(&reloaded);
+                const Authoring::ReadNode resaved =
+                    resavedDocument.Root().Read();
                 check.Check(resaved["m_Material"]
-                    && YAML::Dump(resaved["m_Material"])
-                        == YAML::Dump(materialNode),
+                    && resaved["m_Material"].Dump() == materialNode.Dump(),
                     "참조 표기 재저장 고정점");
 
                 MeshRenderer clean;
                 clean.m_Material = std::make_shared<Material>(*base);
                 clean.m_materialBaseGuid = base->m_fileGuid;
-                YAML::Node cleanSaved = Meta::Serialize(&clean);
+                Authoring::WriteDocument cleanDocument =
+                    Meta::SerializeDocument(&clean);
+                const Authoring::ReadNode cleanSaved =
+                    cleanDocument.Root().Read();
                 check.Check(cleanSaved["m_Material"]
                     && cleanSaved["m_Material"]["ref"]
                     && !cleanSaved["m_Material"]["overrides"],

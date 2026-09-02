@@ -1,6 +1,7 @@
 #pragma once
 #include "AuthoringNodeView.h"
 #include "AuthoringReadNode.h"
+#include "AuthoringWriteNode.h"
 
 // SerializationPlan D3-a-4 — `NodeView`의 생성·해제 창구.
 //
@@ -11,30 +12,12 @@ namespace Authoring
 {
 	struct NodeViewAccess
 	{
-		// 뷰 표현의 태그. 0은 무효, 1은 yaml-cpp 노드 포인터, 2는 ryml {트리,id}.
-		static constexpr std::uint8_t kYamlCpp = 1;
-		static constexpr std::uint8_t kRyml = 2;
-
-		// backend 노드에서 뷰를 만든다(아직 옮기지 않은 호출부용).
-		[[nodiscard]] static NodeView Make(const MetaYml::Node& node) noexcept
-		{
-			return NodeView{ static_cast<const void*>(&node), 0, kYamlCpp };
-		}
-		// 임시 노드로 뷰를 만드는 것을 **타입으로** 막는다 — 뷰는 소유하지 않으므로
-		// 임시를 가리키면 전달 한 번에 dangling이 된다(§8 ryml view 수명 오용).
-		static NodeView Make(MetaYml::Node&&) = delete;
-
-		// ★ 어댑터에서 뷰를 만든다. **두 backend를 모두 담는다** — 뷰가 한쪽에만
-		//   묶여 있던 것이 씬 전환을 막던 블로커였다.
+		// 어댑터에서 단일 ryml 뷰를 만든다. 뷰는 소유하지 않으므로 임시 노드를
+		// 타입으로 막는다.
 		[[nodiscard]] static NodeView Make(const ReadNode& node) noexcept
 		{
-			if (node.IsRymlBacked())
-			{
-				return NodeView{ node.RymlTreeDuringTransition(),
-					node.RymlIdDuringTransition(), kRyml };
-			}
-			return NodeView{ static_cast<const void*>(&node.BackendNodeDuringTransition()),
-				0, kYamlCpp };
+			if (!node) return {};
+			return NodeView{ node.TreeForView(), node.IdForView() };
 		}
 		static NodeView Make(ReadNode&&) = delete;
 
@@ -52,16 +35,9 @@ namespace Authoring
 		//   기존 코드의 if (!node) 형태가 그대로 유지된다.
 		[[nodiscard]] static ReadNode Node(const NodeView& view) noexcept
 		{
-			switch (view.m_kind)
-			{
-			case kYamlCpp:
-				return ReadNode{ *static_cast<const MetaYml::Node*>(view.m_first) };
-			case kRyml:
-				return ReadNode::FromRyml(
-					*static_cast<const ryml::Tree*>(view.m_first), view.m_second);
-			default:
-				return ReadNode{};
-			}
+			if (!view.IsValid()) return {};
+			return ReadNode::FromRyml(
+				*static_cast<const ryml::Tree*>(view.m_first), view.m_second);
 		}
 
 	private:
@@ -71,27 +47,21 @@ namespace Authoring
 	// 겸하면 읽기 backend를 옮기는 순간 쓰기 훅이 함께 끌려간다(D3-b-2 정정).
 	struct MutableNodeViewAccess
 	{
-		[[nodiscard]] static MutableNodeView Make(MetaYml::Node& node) noexcept
+		[[nodiscard]] static MutableNodeView Make(WriteNode& node) noexcept
 		{
 			return MutableNodeView{ static_cast<void*>(&node) };
 		}
 
 		// 읽기 쪽과 같은 이유로 임시 노드를 막는다(§8 "ryml view 수명 오용").
-		static MutableNodeView Make(MetaYml::Node&&) = delete;
+		static MutableNodeView Make(WriteNode&&) = delete;
 
-		// ★ 유효하지 않은 뷰에는 **버려지는 노드**를 돌려준다. 널 역참조로 죽지
-		//   않되, 훅이 쓴 값은 아무 데도 가지 않는다. 읽기 쪽의 `kUndefined`와
-		//   달리 `static`이 아닌 이유는 쓰기 대상이라 상태가 누적되면 안 되기
-		//   때문이다 — 대신 thread_local로 두어 스레드 간 오염도 막는다.
-		[[nodiscard]] static MetaYml::Node& Node(const MutableNodeView& view) noexcept
+		// 유효하지 않은 뷰에는 no-op `WriteNode`를 돌려준다. WriteNode의 모든 변이
+		// 연산은 invalid 상태에서 아무것도 하지 않으므로 널 역참조도, 버려지는
+		// thread_local 상태의 누적도 없다.
+		[[nodiscard]] static WriteNode Node(const MutableNodeView& view) noexcept
 		{
-			thread_local MetaYml::Node discarded{};
-			if (!view.IsValid())
-			{
-				discarded = MetaYml::Node{};
-				return discarded;
-			}
-			return *static_cast<MetaYml::Node*>(ViewPointer(view));
+			if (!view.IsValid()) return {};
+			return *static_cast<WriteNode*>(ViewPointer(view));
 		}
 
 	private:

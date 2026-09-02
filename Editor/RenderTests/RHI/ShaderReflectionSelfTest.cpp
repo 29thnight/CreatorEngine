@@ -214,9 +214,14 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
-    MetaYml::Node serialized = DataSystems->SerializeMaterialPayload(material);
+    Authoring::WriteDocument serializedDocument;
+    const bool serializedOk = DataSystems->SerializeMaterialPayload(
+        material, serializedDocument.Root());
+    const Authoring::ReadNode serialized =
+        serializedDocument.Root().Read();
     Material restored;
-    if (!restored.ConfigureShaderProperties(meta, layout, error, metaHandle)
+    if (!serializedOk
+        || !restored.ConfigureShaderProperties(meta, layout, error, metaHandle)
         || !DataSystems->DeserializeMaterialPayload(restored,
             Authoring::NodeViewAccess::Make(serialized)))
     {
@@ -248,11 +253,9 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         && 1 == restored.GetKeywordSelections().size()
         && 1 == restored.GetKeywordSelections()[0];
 
-    MetaYml::Node reserialized = DataSystems->SerializeMaterialPayload(restored);
-    std::ostringstream firstYaml;
-    std::ostringstream secondYaml;
-    firstYaml << serialized;
-    secondYaml << reserialized;
+    Authoring::WriteDocument reserializedDocument;
+    const bool reserializedOk = DataSystems->SerializeMaterialPayload(
+        restored, reserializedDocument.Root());
 
     Material copied(restored);
     float originalAfterCopyWrite{};
@@ -363,7 +366,9 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 		&& 6u == legacyTextureCopy.GetTextureOwners().size();
 
     if (!legacyBufferRestored || !restoredValues
-        || firstYaml.str() != secondYaml.str() || !copyIsIndependent)
+        || !reserializedOk
+        || serializedDocument.Dump() != reserializedDocument.Dump()
+        || !copyIsIndependent)
     {
         outLog += "[material schema] 저장-load-재저장/copy 소유권 계약 불일치\n";
         return false;
@@ -465,7 +470,10 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
             return false;
         }
 
-        const MetaYml::Node foliagePayload = Meta::Serialize(&foliage);
+        Authoring::WriteDocument foliageDocument =
+            Meta::SerializeDocument(&foliage);
+        const Authoring::ReadNode foliagePayload =
+            foliageDocument.Root().Read();
         FoliageType restoredFoliage;
         Meta::Deserialize(&restoredFoliage, foliagePayload);
         if (restoredFoliage.m_modelName != foliage.m_modelName

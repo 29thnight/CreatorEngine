@@ -56,6 +56,17 @@ namespace experiment::cooked
         return derivedRoot_ / std::filesystem::path(entry->artifactPath);
     }
 
+    std::filesystem::path CookedAssetCatalog::ResolveSourcePath(
+        const AssetId& assetId) const
+    {
+        const AssetSourceManifestEntry* entry = manifest_.FindSource(assetId);
+        if (!entry) return {};
+        const auto* first = reinterpret_cast<const char8_t*>(entry->sourcePath.data());
+        const std::u8string utf8Path(first, first + entry->sourcePath.size());
+        return (derivedRoot_ / std::filesystem::path(utf8Path))
+            .lexically_normal();
+    }
+
     std::size_t CookedAssetCatalog::CountOfKind(
         CookedAssetKind kind) const noexcept
     {

@@ -68,7 +68,7 @@ $identityRejectPasses = ([regex]::Matches($text,
 $subassetRejectPasses = ([regex]::Matches($text,
     'model subasset identity 거부: 4/4')).Count
 $manifestRejectPasses = ([regex]::Matches($text,
-    'cooked asset manifest 거부: 6/6')).Count
+    'cooked asset manifest 거부: 9/9')).Count
 $summaries = @([regex]::Matches($text,
     '단정 (\d+)건 중 통과 (\d+) · 실패 (\d+)'))
 $allAssertionsPassed = $summaries.Count -eq 3 -and

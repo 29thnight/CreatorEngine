@@ -29,6 +29,7 @@
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
 #include "FoliageComponent.h"      // I5-D5a: experiment.foliage 게이트
+#include "Terrain.h"               // D4 Terrain YAML authoring round-trip
 #include "Experiment/MaterialInstance.h"      // I5-D5c1: experiment.matruntime
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
 #include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
@@ -62,10 +63,8 @@
 #include "RuntimeSettings.h"
 #include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
 #include "AuthoringNodeViewAccess.h" // D3-a-5b
-#include "AuthoringParserProbe.h" // D3-b-0
+#include "AuthoringParsedDocument.h"
 #include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
-#include "AuthoringScalarParityProbe.h" // D3-b-2: 스칼라 변환 파리티
-#include "AuthoringAdapterParityProbe.h" // D3-b-2b-1b-3a: 어댑터 파리티
 #include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
 #include "CoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
@@ -120,6 +119,7 @@
 #include <cctype>
 #include <random>
 #include <unordered_map>
+#include <unordered_set>
 #include <DbgHelp.h>
 #pragma comment(lib, "dbghelp.lib")
 
@@ -758,7 +758,9 @@ namespace
         auto names = Meta::Registry::GetInstance()->GetAllTypeNames();
         std::sort(names.begin(), names.end()); // unordered_map 순회 순서를 고정한다
 
-        MetaYml::Node root;
+		Authoring::WriteDocument document;
+		const Authoring::WriteNode root = document.Root();
+		root.SetMap();
         int serialized = 0;
         int noFactory = 0;
         int failed = 0;
@@ -778,19 +780,21 @@ namespace
             {
                 // 팩토리 미등록(자동 등록 경로 밖에서 Reflect만 가진 중첩 구조체 등).
                 // 누락이 아니라 커버리지 한계다 — 목록으로 남겨 diff 대상에 포함한다.
-                root["__no_factory__"].push_back(key);
+				Authoring::WriteNode noFactoryNode = root.Child("__no_factory__");
+				if (!noFactoryNode.Read().IsSequence()) noFactoryNode.SetSequence();
+				noFactoryNode.Append().SetScalar(key);
                 ++noFactory;
                 continue;
             }
 
             try
             {
-                root[key] = Meta::Serialize(instance, *type);
+				Meta::SerializeInto(instance, *type, root.Child(key));
                 ++serialized;
             }
             catch (const std::exception& e)
             {
-                root["__failed__"][key] = e.what();
+				root.Child("__failed__").Child(key).SetScalar(e.what());
                 ++failed;
             }
             // instance는 의도적으로 해제하지 않는다 — Type::create에 void*
@@ -803,8 +807,8 @@ namespace
             std::printf("[CLI] reflect.golden: 출력 파일을 열 수 없음: %s\n", outPath.c_str());
             return;
         }
-        out << "# reflect.golden — 등록 전 타입 default-Serialize 덤프 (PHASE 18 CT0)\n"
-            << MetaYml::Dump(root) << "\n";
+		out << "# reflect.golden — 등록 전 타입 default-Serialize 덤프 (PHASE 18 CT0)\n"
+			<< document.Dump();
         out.close();
 
         char line[320]{};
@@ -841,7 +845,8 @@ namespace
             for (const auto& obj : scene->m_Entities)
             {
                 if (nullptr == obj) continue;
-                MetaYml::Node node = Meta::Serialize(obj.get(), Meta::TypeOf<Entity>());
+				[[maybe_unused]] Authoring::WriteDocument document =
+					Meta::SerializeDocument(obj.get(), Meta::TypeOf<Entity>());
                 ++objectCount;
             }
         }
@@ -975,125 +980,6 @@ namespace
     //
     // 이 명령 혼자서는 "얼마나 빨라졌는지"를 말하지 않는다 — 최적화 전후로 같은
     // 인자로 두 번 돌려 비교하는 것이 사용법이다(미측정으로 보고할 것).
-    // ── D3-b-0(SerializationPlan): 파서 동등성·속도 프로브 ─────────────────────
-    //
-    // yaml-cpp 소비 53파일·408매치를 옮기기 **전에** "ryml이 이 저장소의 저작 문서를
-    // 같게 읽는가"를 먼저 증명한다. 옮긴 뒤에 어긋나면 파서 차이와 이행 실수를 가를 수
-    // 없다. 함께 재는 파싱 시간이 D3-b 이득의 실측 상한이다(D0는 씬 로드의 60%가
-    // 파싱이라고 말했다).
-    //
-    // 읽기 전용이라 저작 코퍼스를 오염시키지 않는다.
-    void HandleSerializeParserCompare(const std::vector<std::string>& parts)
-    {
-        std::vector<std::string> targets;
-
-        // 인자가 파일이면 그 하나만, `.`으로 시작하면 **확장자 필터**다. 확장자별로
-        // 갈라 재야 어느 자산 종류가 파싱 비용을 쓰는지 알 수 있다 — 전체 합계만으로는
-        // "부팅 catalog의 53.5 ms 중 파싱 몫이 얼마인가" 같은 질문에 답하지 못한다.
-        std::string extensionFilter;
-        if (parts.size() >= 2 && !parts[1].empty() && parts[1][0] == '.'
-            && parts[1].find_first_of("/" "\\") == std::string::npos)
-        {
-            extensionFilter = parts[1];
-        }
-
-        if (parts.size() >= 2 && extensionFilter.empty())
-        {
-            targets.push_back(parts[1]);
-        }
-        else
-        {
-            // 저작 코퍼스 전수. 확장자는 이 저장소가 실제로 저작하는 것들이다.
-            const file::path root = PathFinder::Relative();
-            std::error_code error;
-            file::recursive_directory_iterator it(
-                root, file::directory_options::skip_permission_denied, error);
-            const file::recursive_directory_iterator end;
-            while (!error && it != end)
-            {
-                const file::directory_entry& entry = *it;
-                if (entry.is_regular_file(error) && !error)
-                {
-                    const std::string ext = entry.path().extension().string();
-                    const bool matched = extensionFilter.empty()
-                        ? (ext == ".creator" || ext == ".prefab" || ext == ".asset"
-                            || ext == ".meta" || ext == ".shadermeta" || ext == ".volume")
-                        : (ext == extensionFilter);
-                    if (matched)
-                    {
-                        targets.push_back(entry.path().string());
-                    }
-                }
-                error.clear();
-                it.increment(error);
-            }
-        }
-
-        if (targets.empty())
-        {
-            std::printf("[serialize.parsercompare] selfcheck=fail reason=no-targets\n");
-            return;
-        }
-
-        int equalCount = 0;
-        int diffCount = 0;
-        int parseFailCount = 0;
-        int crlfCount = 0;
-        int skippedBinary = 0;
-        unsigned long long totalNodes = 0;
-        double totalYamlUs = 0.0;
-        double totalRymlUs = 0.0;
-
-        for (const std::string& target : targets)
-        {
-            const Authoring::ParserProbeResult probe = Authoring::ProbeParsers(target);
-            totalYamlUs += static_cast<double>(probe.yamlCppNanoseconds) / 1000.0;
-            totalRymlUs += static_cast<double>(probe.rymlNanoseconds) / 1000.0;
-            totalNodes += probe.comparedNodes;
-            if (probe.skippedBinaryAsset) { ++skippedBinary; continue; }
-            if (probe.normalizedCrLf) ++crlfCount;
-
-            if (!probe.parsedByYamlCpp || !probe.parsedByRyml)
-            {
-                ++parseFailCount;
-                std::printf("[serialize.parsercompare] PARSE-FAIL yamlcpp=%d ryml=%d file=%s reason=%s\n",
-                    probe.parsedByYamlCpp ? 1 : 0, probe.parsedByRyml ? 1 : 0,
-                    target.c_str(), probe.rymlError.c_str());
-                continue;
-            }
-            if (probe.structurallyEqual)
-            {
-                ++equalCount;
-            }
-            else
-            {
-                ++diffCount;
-                std::printf("[serialize.parsercompare] DIFF file=%s at=%s\n",
-                    target.c_str(), probe.firstDifference.c_str());
-            }
-        }
-
-        std::printf("[serialize.parsercompare] files=%zu equal=%d diff=%d parseFail=%d nodes=%llu\n",
-            targets.size(), equalCount, diffCount, parseFailCount, totalNodes);
-        // ryml 몫에는 CRLF 정규화 비용이 포함돼 있다 — 그것이 전제이기 때문이다.
-        // 건너뛴 바이너리는 "문제없음"이 아니라 "확인하지 않음"이다.
-        std::printf("[serialize.parsercompare] crlfNormalized=%d/%zu skippedBinary=%d\n",
-            crlfCount, targets.size(), skippedBinary);
-        std::printf("[serialize.parsercompare] yamlCppUs=%.1f rymlUs=%.1f speedup=%.2fx\n",
-            totalYamlUs, totalRymlUs,
-            (totalRymlUs > 0.0) ? (totalYamlUs / totalRymlUs) : 0.0);
-
-        // 0개를 비교하고 "차이 0"을 통과로 읽지 않는다.
-        const char* fail = nullptr;
-        if (0 == targets.size())      fail = "no-targets";
-        else if (0 == totalNodes)     fail = "compared-zero-nodes";
-        else if (parseFailCount > 0)  fail = "parse-failed";
-        else if (diffCount > 0)       fail = "structural-diff";
-        std::printf("[serialize.parsercompare] selfcheck=%s%s%s\n",
-            (nullptr == fail) ? "pass" : "fail",
-            (nullptr == fail) ? "" : " reason=",
-            (nullptr == fail) ? "" : fail);
-    }
 
     // -- D3-b-1(SerializationPlan): ryml 에러 정책이 실제로 abort를 막는가 --
     //
@@ -1156,112 +1042,6 @@ namespace
             (nullptr == fail) ? "" : fail);
     }
 
-    // -- D3-b-2(SerializationPlan): 스칼라 **변환** 파리티 --
-    //
-    // 구조 파리티(D3-b-0)는 스칼라를 문자열로만 비교했다. 그것으로는 `as<bool>`이
-    // "yes"를 어떻게 읽는지가 증명되지 않는다 — 두 파서가 다르게 읽으면 트리는
-    // 같은데 **값의 의미만 조용히 달라진다.** 로드는 성공하고 값만 틀린다.
-    void HandleSerializeScalarParity(const std::vector<std::string>&)
-    {
-        const Authoring::ScalarParityResult result = Authoring::ProbeScalarConversions();
-
-        for (const Authoring::ScalarParityCase& entry : result.cases)
-        {
-            if (!entry.converterAgrees)
-            {
-                // 이식 변환기의 차이는 **허용되지 않는다.** 먼저 찍는다.
-                std::printf("[serialize.scalarparity] CONV-DIVERGE %-16s type=%-6s yamlcpp=%s(%s) conv=%s(%s)\n",
-                    entry.name.c_str(), entry.type.c_str(),
-                    entry.yamlCppOk ? "ok" : "fail", entry.yamlCppValue.c_str(),
-                    entry.converterOk ? "ok" : "fail", entry.converterValue.c_str());
-            }
-        }
-        for (const Authoring::ScalarParityCase& entry : result.cases)
-        {
-            if (entry.agrees) continue;
-            std::printf("[serialize.scalarparity] DIVERGE %-16s type=%-6s yamlcpp=%s(%s) ryml=%s(%s)\n",
-                entry.name.c_str(), entry.type.c_str(),
-                entry.yamlCppOk ? "ok" : "fail", entry.yamlCppValue.c_str(),
-                entry.rymlOk ? "ok" : "fail", entry.rymlValue.c_str());
-        }
-
-        std::printf("[serialize.scalarparity] cases=%zu agree=%u diverge=%u convDiverge=%u\n",
-            result.cases.size(), result.agreeCount, result.divergeCount,
-            result.converterDivergeCount);
-
-        const char* fail = nullptr;
-        if (result.cases.empty()) fail = "no-cases";
-        // 이식 변환기가 yaml-cpp와 다르면 D3-b-2b-1a가 실패한 것이다.
-        else if (result.converterDivergeCount > 0) fail = "converter-diverges";
-        std::printf("[serialize.scalarparity] selfcheck=%s%s%s\n",
-            (nullptr == fail) ? "pass" : "fail",
-            (nullptr == fail) ? "" : " reason=",
-            (nullptr == fail) ? "" : fail);
-    }
-
-    // -- D3-b-2b-1b-3a(SerializationPlan): 어댑터 수준 파리티 --
-    //
-    // 파서 파리티(트리)와 스칼라 파리티(값)가 증명하지 못하는 축이다. 소비자가
-    // 실제로 부르는 것은 어댑터 연산이고, 두 backend의 비대칭(맵 키가 노드인가
-    // 속성인가, 널이 타입인가 값 표기인가)을 어댑터가 옳게 흡수했는지는
-    // 같은 문서를 양쪽에 넣어 봐야만 알 수 있다.
-    void HandleSerializeAdapterParity(const std::vector<std::string>& parts)
-    {
-        std::vector<std::string> targets;
-        if (parts.size() >= 2)
-        {
-            targets.push_back(parts[1]);
-        }
-        else
-        {
-            const file::path root = PathFinder::Relative();
-            std::error_code error;
-            file::recursive_directory_iterator it(
-                root, file::directory_options::skip_permission_denied, error);
-            const file::recursive_directory_iterator end;
-            while (!error && it != end)
-            {
-                const file::directory_entry& entry = *it;
-                if (entry.is_regular_file(error) && !error)
-                {
-                    const std::string ext = entry.path().extension().string();
-                    if (ext == ".creator" || ext == ".prefab" || ext == ".asset"
-                        || ext == ".meta" || ext == ".shadermeta" || ext == ".volume")
-                    {
-                        targets.push_back(entry.path().string());
-                    }
-                }
-                error.clear();
-                it.increment(error);
-            }
-        }
-
-        const Authoring::AdapterParityResult result = Authoring::ProbeAdapterParity(targets);
-
-        std::printf("[serialize.adapterparity] files=%u nodes=%llu mapEntries=%llu diverge=%u\n",
-            result.files,
-            static_cast<unsigned long long>(result.comparedNodes),
-            static_cast<unsigned long long>(result.comparedMapEntries),
-            result.divergences);
-        std::printf("[serialize.adapterparity] skippedBinary=%u parseFailures=%u\n",
-            result.skippedBinary, result.parseFailures);
-        if (!result.firstDivergence.empty())
-        {
-            std::printf("[serialize.adapterparity] first=%s\n", result.firstDivergence.c_str());
-        }
-
-        const char* fail = nullptr;
-        if (0 == result.files)               fail = "no-files";
-        else if (0 == result.comparedNodes)  fail = "compared-zero-nodes";
-        // 맵 순회를 한 번도 안 했다면 키 비대칭을 검사하지 않은 것이다.
-        else if (0 == result.comparedMapEntries) fail = "compared-zero-map-entries";
-        else if (result.parseFailures > 0)   fail = "parse-mismatch";
-        else if (result.divergences > 0)     fail = "adapter-diverges";
-        std::printf("[serialize.adapterparity] selfcheck=%s%s%s\n",
-            (nullptr == fail) ? "pass" : "fail",
-            (nullptr == fail) ? "" : " reason=",
-            (nullptr == fail) ? "" : fail);
-    }
 
     // ── D3-a-1(SerializationPlan): 저작 노드 구조 비교 계약 ────────────────────
     //
@@ -1293,7 +1073,9 @@ namespace
             { "map-missing-key",    "a: {x: 1, y: 2}",       "a: {x: 1}",             false, true  },
             { "map-value-diff",     "a: {x: 1}",             "a: {x: 2}",             false, true  },
             { "nested-key-order",   "a: {p: {m: 1, n: 2}}",  "a: {p: {n: 2, m: 1}}",  true,  false },
-            { "null-vs-null",       "a: ~",                  "a: null",               true,  true  },
+            // 구조 비교는 두 null 표기를 같은 값으로 보지만 ryml emitter는 원래
+            // 표기를 보존한다. yaml-cpp 은퇴 뒤에는 이 차이도 의도된 Dump divergence다.
+            { "null-vs-null",       "a: ~",                  "a: null",               true,  false },
             { "null-vs-scalar",     "a: ~",                  "a: 0",                  false, true  },
             { "type-mismatch",      "a: [1]",                "a: {x: 1}",             false, true  },
         };
@@ -1307,10 +1089,18 @@ namespace
             bool dumpResult = false;
             try
             {
-                const MetaYml::Node lhsDoc = MetaYml::Load(testCase.lhs);
-                const MetaYml::Node rhsDoc = MetaYml::Load(testCase.rhs);
-                actual = Authoring::NodesEqual(lhsDoc["a"], rhsDoc["a"]);
-                dumpResult = (MetaYml::Dump(lhsDoc["a"]) == MetaYml::Dump(rhsDoc["a"]));
+				std::string lhsError;
+				std::string rhsError;
+				Authoring::ParsedDocument lhsDoc =
+					Authoring::ParsedDocument::ParseText(testCase.lhs, lhsError);
+				Authoring::ParsedDocument rhsDoc =
+					Authoring::ParsedDocument::ParseText(testCase.rhs, rhsError);
+				if (!lhsDoc || !rhsDoc)
+					throw std::runtime_error(lhsError.empty() ? rhsError : lhsError);
+				const Authoring::ReadNode lhs = lhsDoc.Root()["a"];
+				const Authoring::ReadNode rhs = rhsDoc.Root()["a"];
+				actual = Authoring::NodesEqual(lhs, rhs);
+                dumpResult = (lhs.Dump() == rhs.Dump());
             }
             catch (const std::exception& exception)
             {
@@ -2241,14 +2031,15 @@ namespace
 			transform.SetLocalMatrix(
 				transform.GetLocalMatrix(), TransformWriteReason::ModelImport);
 
-			MetaYml::Node reflected = Meta::Serialize(&transform);
-			reflected["position"]["x"] = 7.f;
-			Meta::Deserialize(&transform, reflected);
+			Authoring::WriteDocument reflected = Meta::SerializeDocument(&transform);
+			reflected.Root().Child("position").Child("x").SetScalar(7.f);
+			Meta::Deserialize(&transform, reflected.Root().Read());
 
-			MetaYml::Node prefab = Meta::Serialize(&transform);
-			prefab["position"]["x"] = 8.f;
+			Authoring::WriteDocument prefab = Meta::SerializeDocument(&transform);
+			prefab.Root().Child("position").Child("x").SetScalar(8.f);
 			Meta::DeserializePrefab(
-				&transform, prefab, std::unordered_set<std::string>{});
+				&transform, prefab.Root().Read(),
+				std::unordered_set<std::string>{});
 
 			scene->Reparent(scene->HandleOf(child->m_index),
 				scene->HandleOf(probe->m_index));
@@ -4648,10 +4439,27 @@ namespace ConsoleCmd
 
 		TerrainAuthoringResult result{};
 		const bool written = AssetAuthoringPort::WriteTerrain(request, result);
-		std::printf("[terrain.authoring.probe] %s path=%s guid=%s\n",
+		bool roundTrip = false;
+		std::size_t layers = 0;
+		if (written)
+		{
+			TerrainComponent restored;
+			roundTrip = restored.Load(result.descriptorPath.wstring());
+			layers = restored.GetLayerCount().size();
+			const float* heights = restored.GetHeightMap();
+			roundTrip = roundTrip && restored.GetWidth() == 2
+				&& restored.GetHeight() == 2 && layers == 1 && heights
+				&& heights[0] == -4.0f && heights[1] == 0.5f
+				&& heights[2] == 3.0f && heights[3] == 8.0f
+				&& restored.m_trrainAssetGuid == result.guid;
+		}
+		std::printf(
+			"[terrain.authoring.probe] %s path=%s guid=%s roundtrip=%s "
+			"width=2 height=2 layers=%zu\n",
 			written ? "committed" : "rejected",
 			result.descriptorPath.string().c_str(),
-			result.guid.ToString().c_str());
+			result.guid.ToString().c_str(), roundTrip ? "PASS" : "FAIL", layers);
+		if (written && !roundTrip) EngineBootstrap::SetExitCode(5);
 	}
 
 	// Foliage 저작 트랜잭션을 실행 중인 Editor에서 그대로 태운다. escape 인자는
@@ -4679,15 +4487,15 @@ namespace ConsoleCmd
 		source.m_isCulled = true;
 		source.RebuildWorldMatrix();
 
-		MetaYml::Node typesNode(MetaYml::NodeType::Sequence);
-		MetaYml::Node instancesNode(MetaYml::NodeType::Sequence);
-		instancesNode.push_back(Meta::Serialize(&source));
-		MetaYml::Node assetNode;
-		assetNode["FoliageAsset"]["Types"] = typesNode;
-		assetNode["FoliageAsset"]["Instances"] = instancesNode;
-		std::ostringstream payload;
-		payload << assetNode;
-		request.payload = payload.str();
+		Authoring::WriteDocument assetDocument;
+		const Authoring::WriteNode foliageAsset =
+			assetDocument.Root().Child("FoliageAsset");
+		foliageAsset.Child("Types").SetSequence();
+		const Authoring::WriteNode instances = foliageAsset.Child("Instances");
+		instances.SetSequence();
+		Meta::SerializeInto(&source, Meta::TypeOf<FoliageInstance>(),
+			instances.Append());
+		request.payload = assetDocument.Dump();
 
 		TextAssetAuthoringResult result{};
 		const bool written = AssetAuthoringPort::WriteFoliage(request, result);
@@ -4698,13 +4506,17 @@ namespace ConsoleCmd
 		{
 			try
 			{
-				const MetaYml::Node published = MetaYml::LoadFile(result.assetPath.string());
-				const MetaYml::Node publishedInstances =
-					published["FoliageAsset"]["Instances"];
-				if (publishedInstances.IsSequence() && 1 == publishedInstances.size())
+				std::string parseError;
+				Authoring::ParsedDocument published =
+					Authoring::ParsedDocument::ParseFile(result.assetPath.string(), parseError);
+				if (!published)
+					throw std::runtime_error(parseError);
+				const Authoring::ReadNode publishedInstances =
+					published.Root()["FoliageAsset"]["Instances"];
+				if (publishedInstances.IsSequence() && 1 == publishedInstances.Size())
 				{
-					const MetaYml::Node instanceNode = publishedInstances[0];
-					schemaStable = 4 == instanceNode.size() &&
+					const Authoring::ReadNode instanceNode = publishedInstances.At(0);
+					schemaStable = 4 == instanceNode.Size() &&
 						instanceNode["m_position"] && instanceNode["m_rotation"] &&
 						instanceNode["m_scale"] && instanceNode["m_foliageTypeID"] &&
 						!instanceNode["m_isCulled"] && !instanceNode["m_worldMatrix"];
@@ -4743,42 +4555,101 @@ namespace ConsoleCmd
 			EngineBootstrap::SetExitCode(5);
 	}
 
-	// 애니메이터 컨트롤러 json은 카탈로그에 없는 저작 프리셋이다. 이름에 '.'이 든
-	// 경우가 잘리지 않는지와 목적지가 AnimatorController 루트를 벗어나면 거부되는지를
-	// 본다. 값 왕복(DeserializeControllers)은 태우지 않는다 — 상태 0개 컨트롤러의
-	// m_curState 누락과 파싱 실패 시 기존 상태를 지우는 것은 이관 이전부터 있던
-	// 별개 결함이라, 여기서 태우면 게이트가 그 결함으로 붉어진다.
-	static void Cmd_animator_authoring_probe(const ConsoleCommandContext& ctx)
+
+	// D4: Animator controller graph의 유일한 영속 경로인 scene reflection YAML을
+	// 실물 그래프로 왕복한다. JSON 파일이나 별도 controller writer는 관여하지 않는다.
+	static void Cmd_animator_scene_probe(const ConsoleCommandContext&)
 	{
-		if (ctx.parts.size() < 2)
+		Animator source;
+		source.AddParameter<float>("Speed", 1.5f, ValueType::Float);
+		const auto controller = source.CreateController_UINoAni();
+		controller->name = "Base Layer";
+		AnimationState* anyState =
+			controller->CreateState("Any State", -1, true);
+		controller->CreateState("Idle", 0);
+		controller->CreateState("Run", 1);
+		controller->SetCurState("Idle");
+
+		AniTransition* transition =
+			controller->CreateTransition("Idle", "Run");
+		if (transition)
 		{
-			std::printf("[animator.authoring.probe] usage: <name> [escape]\n");
-			return;
+			transition->exitTime = 0.25f;
+			transition->blendTime = 0.15f;
+			transition->hasExitTime = true;
+			TransCondition condition{
+				0.5f, ConditionType::Greater, ValueType::Float };
+			condition.valueName = "Speed";
+			condition.valueParameter = source.Parameters.front();
+			condition.m_ownerController = controller.get();
+			transition->conditions.push_back(condition);
 		}
 
-		const bool escape = ctx.parts.size() >= 3 && ctx.parts[2] == "escape";
-		if (escape)
+		Authoring::WriteDocument first = Meta::SerializeDocument(&source);
+		const std::string yaml = first.Dump();
+		std::string parseError;
+		auto parsed = Authoring::WriteDocument::ParseText(yaml, &parseError);
+
+		bool stable = false;
+		bool links = false;
+		std::size_t states = 0;
+		std::size_t transitions = 0;
+		std::size_t conditions = 0;
+		if (parsed)
 		{
-			UncatalogedAuthoringRequest request{};
-			request.destinationPath =
-				PathFinder::InputMapPath(ctx.parts[1] + ".json");
-			request.payload = "{}\n";
-			const bool written =
-				AssetAuthoringPort::WriteAnimatorController(request);
-			std::printf("[animator.authoring.probe] %s\n",
-				written ? "committed" : "rejected");
-			return;
+			Animator roundTrip;
+			const Authoring::ReadNode roundTripNode = parsed->Root().Read();
+			Meta::Deserialize(&roundTrip, roundTripNode);
+			// ComponentFactory와 같은 순서: typed fields 뒤 component post-load.
+			roundTrip.OnDeserialized(
+				Authoring::NodeViewAccess::Make(roundTripNode));
+			Authoring::WriteDocument second = Meta::SerializeDocument(&roundTrip);
+			stable = Authoring::NodesEqual(
+				first.Root().Read(), second.Root().Read());
+
+			if (roundTrip.m_animationControllers.size() == 1
+				&& roundTrip.Parameters.size() == 1)
+			{
+				const auto& restored = roundTrip.m_animationControllers.front();
+				states = restored->StateVec.size();
+				for (const auto& state : restored->StateVec)
+				{
+					transitions += state->Transitions.size();
+					for (const auto& restoredTransition : state->Transitions)
+						conditions += restoredTransition->conditions.size();
+				}
+
+				AnimationState* idle = restored->FindState("Idle");
+				links = restored->m_owner == &roundTrip
+					&& restored->m_curState == idle
+					&& restored->m_anyState
+					&& restored->m_anyState->m_isAny
+					&& restored->m_anyState->m_name == "Any State"
+					&& idle && idle->Transitions.size() == 1
+					&& idle->Transitions.front()->curState == idle
+					&& idle->Transitions.front()->nextState == restored->FindState("Run")
+					&& idle->Transitions.front()->conditions.size() == 1
+					&& idle->Transitions.front()->conditions.front().valueParameter
+						== roundTrip.Parameters.front();
+			}
 		}
 
-		Animator probe;
-		const bool saved = probe.SerializeControllers(ctx.parts[1]);
-		std::printf("[animator.authoring.probe] save=%s\n",
-			saved ? "ok" : "failed");
+		const bool passed = parsed.has_value() && stable && links
+			&& nullptr != anyState && controller->m_anyState.get() == anyState
+			&& states == 3 && transitions == 1 && conditions == 1
+			&& !yaml.empty();
+		std::printf(
+			"[animator.scene.probe] controllers=%zu parameters=%zu states=%zu "
+			"transitions=%zu conditions=%zu yamlBytes=%zu stable=%d links=%d "
+			"selfcheck=%s\n",
+			source.m_animationControllers.size(), source.Parameters.size(), states,
+			transitions, conditions, yaml.size(), stable ? 1 : 0, links ? 1 : 0,
+			passed ? "pass" : "fail");
+		if (!passed) EngineBootstrap::SetExitCode(5);
 	}
 
-	// 입력 액션맵은 맵마다 파일 하나다. 이름에 '.'이 든 맵도 잘리지 않는지, 액션이
-	// 0개인 맵도 저장·재로드되는지, 그리고 저장한 것이 디렉터리 스캔으로 다시
-	// 읽히는지를 함께 본다.
+	// 입력 액션맵은 맵마다 YAML `.inputmap` 하나다. 이름에 '.'이 든 맵과 실제
+	// action/key payload가 저장·재기동 후 그대로 복원되는지를 함께 본다.
 	static void Cmd_inputmap_authoring_probe(const ConsoleCommandContext& ctx)
 	{
 		if (ctx.parts.size() < 2)
@@ -4798,7 +4669,19 @@ namespace ConsoleCmd
 				std::printf("[inputmap.authoring.probe] rejected no-map\n");
 				return;
 			}
-			const bool saved = InputActionManagers->SerializeMap(map);
+			InputAction* probeAction = map->AddAction();
+			probeAction->actionName = "ProbeMove";
+			probeAction->inputType = InputType::KeyBoard;
+			probeAction->actionType = ActionType::Value;
+			probeAction->keystate = KeyState::Released;
+			probeAction->key = {
+				static_cast<std::size_t>(KeyBoard::LeftArrow),
+				static_cast<std::size_t>(KeyBoard::RightArrow),
+				static_cast<std::size_t>(KeyBoard::DownArrow),
+				static_cast<std::size_t>(KeyBoard::UpArrow) };
+			probeAction->m_scriptName = "ProbeScript";
+			probeAction->funName = "ProbeFunction";
+			const bool saved = InputActionManagers->SaveMap(map);
 			std::printf("[inputmap.authoring.probe] save=%s\n",
 				saved ? "ok" : "failed");
 			return;
@@ -4808,15 +4691,85 @@ namespace ConsoleCmd
 		{
 			InputActionManagers->LoadManager();
 			size_t found = 0;
+			size_t actionCount = 0;
+			bool stable = false;
 			for (ActionMap* map : InputActionManagers->m_actionMaps)
 			{
-				if (map && map->m_name == name) ++found;
+				if (!map || map->m_name != name) continue;
+				++found;
+				actionCount = map->m_actions.size();
+				if (actionCount == 1 && map->m_actions.front())
+				{
+					const InputAction* restored = map->m_actions.front();
+					stable = restored->actionName == "ProbeMove"
+						&& restored->inputType == InputType::KeyBoard
+						&& restored->actionType == ActionType::Value
+						&& restored->keystate == KeyState::Released
+						&& restored->key == std::vector<std::size_t>{
+							static_cast<std::size_t>(KeyBoard::LeftArrow),
+							static_cast<std::size_t>(KeyBoard::RightArrow),
+							static_cast<std::size_t>(KeyBoard::DownArrow),
+							static_cast<std::size_t>(KeyBoard::UpArrow) }
+						&& restored->m_scriptName == "ProbeScript"
+						&& restored->funName == "ProbeFunction";
+				}
 			}
-			std::printf("[inputmap.authoring.probe] verify found=%zu\n", found);
+			std::printf(
+				"[inputmap.authoring.probe] verify found=%zu actions=%zu stable=%d\n",
+				found, actionCount, stable ? 1 : 0);
+			if (found != 1 || !stable) EngineBootstrap::SetExitCode(5);
 			return;
 		}
 
 		std::printf("[inputmap.authoring.probe] unknown action %s\n", action.c_str());
+	}
+
+	static void Cmd_inputmap_corpus_probe(const ConsoleCommandContext&)
+	{
+		InputActionManagers->LoadManager();
+		std::size_t maps = 0;
+		std::size_t actions = 0;
+		std::size_t keys = 0;
+		std::size_t keyboard = 0;
+		std::size_t gamepad = 0;
+		std::size_t buttons = 0;
+		std::size_t values = 0;
+		std::size_t invalid = 0;
+		std::unordered_set<std::string> names;
+		for (const ActionMap* map : InputActionManagers->m_actionMaps)
+		{
+			if (!map || map->m_name.empty() || !names.insert(map->m_name).second)
+			{
+				++invalid;
+				continue;
+			}
+			++maps;
+			for (const InputAction* action : map->m_actions)
+			{
+				if (!action || action->actionName.empty() || action->key.empty()
+					|| action->key.size() > 4)
+				{
+					++invalid;
+					continue;
+				}
+				++actions;
+				keys += action->key.size();
+				if (action->inputType == InputType::KeyBoard) ++keyboard;
+				else if (action->inputType == InputType::GamePad) ++gamepad;
+				else ++invalid;
+				if (action->actionType == ActionType::Button) ++buttons;
+				else if (action->actionType == ActionType::Value) ++values;
+				else ++invalid;
+			}
+		}
+
+		const bool passed = maps > 0 && actions > 0 && keys > 0 && invalid == 0;
+		std::printf(
+			"[inputmap.corpus.probe] maps=%zu actions=%zu keys=%zu keyboard=%zu "
+			"gamepad=%zu buttons=%zu values=%zu invalid=%zu selfcheck=%s\n",
+			maps, actions, keys, keyboard, gamepad, buttons, values, invalid,
+			passed ? "pass" : "fail");
+		if (!passed) EngineBootstrap::SetExitCode(5);
 	}
 
 	// 태그 저작은 편집이 아니라 **종료 시 Finalize**가 디스크에 반영한다. 그 저장이
@@ -5266,15 +5219,23 @@ namespace ConsoleCmd
 
 				if (identityPreserved)
 				{
-					const YAML::Node persisted = YAML::LoadFile(destinationPath.string());
+					std::string parseError;
+					const Authoring::ParsedDocument persistedDocument =
+						Authoring::ParsedDocument::ParseFile(
+							destinationPath.string(), parseError);
+					const Authoring::ReadNode persisted =
+						persistedDocument.Root();
 					Material decoded;
-					materialRoundTrip = DataSystems->DeserializeMaterialPayload(
+					Authoring::WriteDocument reserializedDocument;
+					materialRoundTrip = persistedDocument
+						&& DataSystems->DeserializeMaterialPayload(
 						decoded, Authoring::NodeViewAccess::Make(persisted))
 						&& decoded.m_fileGuid == canonicalGuid
 						&& decoded.m_materialInfo.m_roughness
 							== authored.m_materialInfo.m_roughness
-						&& YAML::Dump(persisted) == YAML::Dump(
-							DataSystems->SerializeMaterialPayload(decoded));
+						&& DataSystems->SerializeMaterialPayload(
+							decoded, reserializedDocument.Root())
+						&& persisted.Dump() == reserializedDocument.Dump();
 				}
 			}
 		}
@@ -5344,9 +5305,14 @@ namespace ConsoleCmd
 			try
 			{
 				const FileGuid catalogGuid = DataSystems->GetFileGuid(assetPath);
-				const YAML::Node source = YAML::LoadFile(assetPath.string());
+				std::string parseError;
+				const Authoring::ParsedDocument sourceDocument =
+					Authoring::ParsedDocument::ParseFile(
+						assetPath.string(), parseError);
+				const Authoring::ReadNode source = sourceDocument.Root();
 				Material first;
-				decoded = DataSystems->DeserializeMaterialPayload(
+				decoded = sourceDocument
+					&& DataSystems->DeserializeMaterialPayload(
 					first, Authoring::NodeViewAccess::Make(source));
 				identity = decoded && catalogGuid != FileGuid{}
 					&& first.m_fileGuid == catalogGuid;
@@ -5373,17 +5339,26 @@ namespace ConsoleCmd
 
 				if (decoded)
 				{
-					const YAML::Node firstCanonical =
-						DataSystems->SerializeMaterialPayload(first);
+					Authoring::WriteDocument firstCanonicalDocument;
+					const bool firstCanonicalWritten =
+						DataSystems->SerializeMaterialPayload(
+							first, firstCanonicalDocument.Root());
+					const Authoring::ReadNode firstCanonical =
+						firstCanonicalDocument.Root().Read();
 					Material second;
-					const bool decodedAgain = DataSystems->DeserializeMaterialPayload(
+					const bool decodedAgain = firstCanonicalWritten
+						&& DataSystems->DeserializeMaterialPayload(
 						second, Authoring::NodeViewAccess::Make(firstCanonical));
-					const YAML::Node secondCanonical = decodedAgain
-						? DataSystems->SerializeMaterialPayload(second) : YAML::Node{};
+					Authoring::WriteDocument secondCanonicalDocument;
+					const bool secondCanonicalWritten = decodedAgain
+						&& DataSystems->SerializeMaterialPayload(
+							second, secondCanonicalDocument.Root());
 					stable = decodedAgain
+						&& secondCanonicalWritten
 						&& second.m_fileGuid == first.m_fileGuid
 						&& captureReferences(second) == captureReferences(first)
-						&& YAML::Dump(secondCanonical) == YAML::Dump(firstCanonical);
+						&& secondCanonicalDocument.Dump()
+							== firstCanonicalDocument.Dump();
 				}
 			}
 			catch (const std::exception& exception)
@@ -7631,11 +7606,14 @@ namespace ConsoleCmd
 
 		auto makeSequenceData = [](Prefab* prefab)
 		{
-			MetaYml::Node data;
-			const MetaYml::Node& authored = prefab->GetPrefabData();
-			if (authored.IsSequence()) data = MetaYml::Clone(authored);
-			else data.push_back(MetaYml::Clone(authored));
-			prefab->SetPrefabData(Authoring::NodeViewAccess::Make(data));
+			Authoring::WriteDocument data;
+			const Authoring::ReadNode authored = prefab->GetPrefabData();
+			if (authored.IsSequence())
+				data.Root().Assign(authored);
+			else
+				data.Root().Append().Assign(authored);
+			const Authoring::ReadNode dataView = data.Root().Read();
+			prefab->SetPrefabData(Authoring::NodeViewAccess::Make(dataView));
 		};
 
 		Prefab* prefab = PrefabUtilitys->CreatePrefab(authorRoot, "__NavProbePrefab");
@@ -7646,7 +7624,7 @@ namespace ConsoleCmd
 		}
 		makeSequenceData(prefab);
 
-		const std::string serialized = MetaYml::Dump(prefab->GetPrefabData());
+		const std::string serialized = prefab->GetPrefabData().Dump();
 		const bool schemaOk = serialized.find("navObject") == std::string::npos
 			&& serialized.find("parentHops") != std::string::npos
 			&& serialized.find("childOrdinals") != std::string::npos
@@ -7690,22 +7668,29 @@ namespace ConsoleCmd
 			&& sourceA->GetComponent<RectTransformComponent>();
 
 		// 구 navObject 파일 승격: 새 경로 필드를 지우고 저작 대상의 옛 ID를 넣는다.
-		MetaYml::Node legacyData = MetaYml::Clone(prefab->GetPrefabData());
-		MetaYml::Node sourceComponents = legacyData[0]["children"][0]["m_components"];
+		Authoring::WriteDocument legacyDocument;
+		legacyDocument.Root().Assign(prefab->GetPrefabData());
+		const Authoring::WriteNode sourceComponents = legacyDocument.Root().At(0)
+			.Child("children").At(0).Child("m_components");
 		bool legacyFixtureBuilt = false;
-		for (auto componentNode : sourceComponents)
+		for (std::size_t componentIndex = 0;
+			componentIndex < sourceComponents.Size(); ++componentIndex)
 		{
-			MetaYml::Node navs = componentNode["navigations"];
-			if (!navs || !navs.IsSequence() || navs.size() == 0) continue;
-			navs[0]["navObject"] = target->GetInstanceID();
-			navs[0].remove("parentHops");
-			navs[0].remove("childOrdinals");
+			const Authoring::WriteNode navs =
+				sourceComponents.At(componentIndex).Child("navigations");
+			if (!navs.Read().IsSequence() || navs.Size() == 0) continue;
+			const Authoring::WriteNode navigation = navs.At(0);
+			navigation.Child("navObject").SetScalar(target->GetInstanceID());
+			navigation.RemoveChild("parentHops");
+			navigation.RemoveChild("childOrdinals");
 			legacyFixtureBuilt = true;
 			break;
 		}
 
 		Prefab* legacyPrefab = PrefabUtilitys->CreatePrefab(authorRoot, "__NavLegacyProbePrefab");
-		if (legacyPrefab) legacyPrefab->SetPrefabData(Authoring::NodeViewAccess::Make(legacyData));
+		const Authoring::ReadNode legacyView = legacyDocument.Root().Read();
+		if (legacyPrefab) legacyPrefab->SetPrefabData(
+			Authoring::NodeViewAccess::Make(legacyView));
 		Entity* legacyInstance = legacyPrefab ? legacyPrefab->Instantiate(scene, "__NavLegacyInstance") : nullptr;
 		Entity* legacySource = nullptr; Entity* legacyTarget = nullptr; ImageComponent* legacyImage = nullptr;
 		const bool legacyOk = legacyFixtureBuilt
@@ -7941,6 +7926,26 @@ namespace ConsoleCmd
         }
         std::printf("[CLI] experiment.anim %s → %s\n",
             passed ? "통과" : "실패", modelPath.c_str());
+    }
+
+    static void Cmd_experiment_phase17model(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        if (parts.size() < 3 || (parts[1] != "animated" && parts[1] != "large"))
+        {
+            std::printf("[CLI] experiment.phase17model 사용법: "
+                "experiment.phase17model <animated|large> <glTF/GLB 경로>\n");
+            return;
+        }
+
+        const bool requireAnimation = parts[1] == "animated";
+        const std::string& modelPath = parts[2];
+        std::string log;
+        const bool passed = RenderTest::RunPhase17ModelCorpusSelfTest(
+            modelPath, requireAnimation, log);
+        std::printf("%s", log.c_str());
+        std::printf("[CLI] experiment.phase17model %s mode=%s → %s\n",
+            passed ? "통과" : "실패", parts[1].c_str(), modelPath.c_str());
     }
 
     static void Cmd_experiment_import(const ConsoleCommandContext& ctx)
@@ -8395,18 +8400,17 @@ namespace ConsoleCmd
             // 두 경로가 같은 텍스처를 갖고, owner 대조는 그대로 성립한다.
         }
 
-        YAML::Node document;
-        if (!experiment::SerializeMaterialAuthoring(authored, document, error))
-        {
-            outError = "저작 인코딩 실패: " + error;
-            return false;
-        }
-        YAML::Emitter emitter;
-        emitter << document;
-        const file::path destination =
-            directory / (authored.name + ".asset");
-        const FileGuid baseGuid = AssetAuthoringPort::WriteTextAssetWithMeta(
-            destination, std::string(emitter.c_str()), preferredGuid);
+		Authoring::WriteDocument document;
+		if (!experiment::SerializeMaterialAuthoring(
+			authored, document.Root(), error))
+		{
+			outError = "저작 인코딩 실패: " + error;
+			return false;
+		}
+		const file::path destination =
+			directory / (authored.name + ".asset");
+		const FileGuid baseGuid = AssetAuthoringPort::WriteTextAssetWithMeta(
+			destination, document.Dump(), preferredGuid);
         if (FileGuid{} == baseGuid)
         {
             outError = "자산 게시 거부(저작 루트 가드): " + destination.string();
@@ -8612,17 +8616,15 @@ namespace ConsoleCmd
             experiment::MaterialProperty property;
             property.name = name;
             property.value = value;
-            YAML::Node entry;
-            std::string error;
-            if (!experiment::SerializeMaterialPropertyValue(property, entry,
-                error))
-            {
-                return "<encode-fail:" + error + ">";
-            }
-            YAML::Emitter emitter;
-            emitter << entry;
-            return std::string(emitter.c_str());
-        };
+			Authoring::WriteDocument document;
+			std::string error;
+			if (!experiment::SerializeMaterialPropertyValue(
+				property, document.Root(), error))
+			{
+				return "<encode-fail:" + error + ">";
+			}
+			return document.Dump();
+		};
 
         std::size_t renderers = 0, withMaterial = 0, withInstance = 0;
         std::size_t compared = 0, metaMissing = 0, buildFailed = 0;
@@ -9105,9 +9107,10 @@ namespace ConsoleCmd
             const file::path root = std::filesystem::path(rootText);
             std::string error;
             const bool mounted = DataSystems->MountCookedCatalog(root, error);
-            std::printf("[CLI] experiment.catalog mount %s root=%s entries=%zu stale=%zu%s%s\n",
+            std::printf("[CLI] experiment.catalog mount %s root=%s entries=%zu sources=%zu stale=%zu%s%s\n",
                 mounted ? "pass" : "fail", root.string().c_str(),
                 DataSystems->CookedCatalogEntryCount(),
+                DataSystems->CookedCatalogSourceAssetCount(),
                 DataSystems->CookedCatalogStaleCount(),
                 error.empty() ? "" : " error=", error.c_str());
             return;
@@ -9218,10 +9221,11 @@ namespace ConsoleCmd
             }
         }
 
-        std::printf("[CLI] experiment.catalog pass entries=%zu models=%zu "
+        std::printf("[CLI] experiment.catalog pass entries=%zu sources=%zu models=%zu "
             "materials=%zu textures=%zu shaderMetas=%zu scenes=%zu prefabs=%zu "
             "modelsProbed=%zu modelsResolved=%zu stale=%zu root=%s\n",
             catalog->Size(),
+            catalog->SourceAssetCount(),
             catalog->CountOfKind(ck::CookedAssetKind::Model),
             catalog->CountOfKind(ck::CookedAssetKind::Material),
             catalog->CountOfKind(ck::CookedAssetKind::Texture),
@@ -11724,7 +11728,8 @@ namespace ConsoleCmd
 			reg({ "shadermeta.probe" }, &Cmd_shadermeta_probe);
 			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
 			reg({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
-			reg({ "animator.authoring.probe" }, &Cmd_animator_authoring_probe);
+			reg({ "animator.scene.probe" }, &Cmd_animator_scene_probe);
+			reg({ "inputmap.corpus.probe" }, &Cmd_inputmap_corpus_probe);
             reg({ "model.loadcached" }, &Cmd_model_loadcached);
             reg({ "model.place" }, &Cmd_model_place);
             reg({ "script.add" }, &Cmd_script_add);
@@ -11774,6 +11779,7 @@ namespace ConsoleCmd
             reg({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
             reg({ "experiment.animpose" }, &Cmd_experiment_animpose);
             reg({ "experiment.animlive" }, &Cmd_experiment_animlive);
+            reg({ "experiment.phase17model" }, &Cmd_experiment_phase17model);
             reg({ "experiment.animtick" }, &Cmd_experiment_animtick);
             reg({ "experiment.animevent" }, &Cmd_experiment_animevent);
             reg({ "experiment.boneresolve" }, &Cmd_experiment_boneresolve);
@@ -11900,10 +11906,7 @@ namespace ConsoleCmd
             reg({ "scene.transformdigest" }, [](const ConsoleCommandContext& c) { HandleSceneTransformDigest(c.parts); });
             reg({ "serialize.bench" }, [](const ConsoleCommandContext& c) { HandleSerializeBench(c.parts); });
             reg({ "serialize.nodeequal" }, [](const ConsoleCommandContext& c) { HandleSerializeNodeEqual(c.parts); });
-            reg({ "serialize.parsercompare" }, [](const ConsoleCommandContext& c) { HandleSerializeParserCompare(c.parts); });
             reg({ "serialize.rymlerror" }, [](const ConsoleCommandContext& c) { HandleSerializeRymlError(c.parts); });
-            reg({ "serialize.scalarparity" }, [](const ConsoleCommandContext& c) { HandleSerializeScalarParity(c.parts); });
-            reg({ "serialize.adapterparity" }, [](const ConsoleCommandContext& c) { HandleSerializeAdapterParity(c.parts); });
             reg({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { HandleSceneProxyBench(c.parts); });
 			reg({ "scene.proxydirty" }, [](const ConsoleCommandContext& c) { HandleSceneProxyDirty(c.parts); });
 

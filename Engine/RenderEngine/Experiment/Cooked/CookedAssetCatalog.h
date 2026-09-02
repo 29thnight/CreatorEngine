@@ -21,10 +21,10 @@ namespace experiment::cooked
     //   렌더 경로가 `experiment::Model` 을 직접 소비할 때 붙는다. 그전까지 이
     //   표의 소비자는 게이트 하나이고, 그 사실을 숨기지 않는다.
     //
-    // ★ `AssetMetaRegistry` 를 대체하지 **않는다.** 그쪽은 GUID→**원본** 경로,
-    //   이쪽은 GUID→**artifact** 경로다. 둘은 다른 표이고, 하나로 합치는 것은
-    //   legacy 로더가 은퇴하는 I5/I6 의 일이다. 지금 합치면 어느 쪽이 정본인지
-    //   흐려진다.
+    // ★ CEMF v2는 두 표를 명시적으로 분리해 함께 싣는다. cooked entries는
+    //   GUID→artifact, sourceAssets는 GUID→package source path다. Player는 후자로
+    //   AssetMetaRegistry를 한 번 구성하고 `.meta`를 스캔하지 않는다. Editor는
+    //   watcher가 갱신하는 source registry를 계속 정본으로 쓴다.
     class CookedAssetCatalog final
     {
     public:
@@ -44,6 +44,10 @@ namespace experiment::cooked
 
         [[nodiscard]] bool IsEmpty() const noexcept { return entries_.empty(); }
         [[nodiscard]] std::size_t Size() const noexcept { return entries_.size(); }
+        [[nodiscard]] std::size_t SourceAssetCount() const noexcept
+        {
+            return manifest_.sourceAssets.size();
+        }
         [[nodiscard]] const std::filesystem::path& DerivedRoot() const noexcept
         {
             return derivedRoot_;
@@ -55,6 +59,16 @@ namespace experiment::cooked
         // artifact 의 실제 파일 경로. 모르는 GUID 면 빈 경로다.
         [[nodiscard]] std::filesystem::path ResolveArtifactPath(
             const AssetId& assetId) const;
+
+        // Package Assets root 아래의 source 경로. D5 cutover 동안 아직 source를
+        // 읽는 consumer와 AssetMetaRegistry를 `.meta` 스캔 없이 연결한다.
+        [[nodiscard]] std::filesystem::path ResolveSourcePath(
+            const AssetId& assetId) const;
+        [[nodiscard]] std::span<const AssetSourceManifestEntry> SourceAssets()
+            const noexcept
+        {
+            return manifest_.sourceAssets;
+        }
 
         // I7-C2 — 신선도 판정은 전 entry를 한 번 훑어야 한다(마운트 때 한 번).
         // 표는 불변이라 span으로 내주는 것이 안전하다 — 수명은 catalog가 진다.

@@ -133,8 +133,9 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			const Meta::Type* sourceMeta = Meta::MetaDataRegistry->Find(source->GetTypeID());
 			if (!sourceMeta) return nullptr;
 
-			MetaYml::Node sourceNode = Meta::Serialize(
+			Authoring::WriteDocument sourceDocument = Meta::SerializeDocument(
 				const_cast<Entity*>(source), *sourceMeta);
+			const Authoring::ReadNode sourceNode = sourceDocument.Root().Read();
 			const std::string cloneName = !requestedName.empty()
 				? std::string(requestedName)
 				: source->m_name.ToString() + "_Clone";

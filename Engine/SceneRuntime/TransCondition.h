@@ -2,7 +2,6 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include "ConditionParameter.h"
-#include <nlohmann/json.hpp>
 
 class AnimationController;
 class TransCondition
@@ -69,9 +68,7 @@ public:
 	void SetCondition(std::string _parameterName);
 
 	void SetConditionType(ConditionType _conditionType) { cType = _conditionType;}
-	nlohmann::json Serialize();
-	TransCondition Deserialize();
-	//Å¸ÀÔ ,°ª ,ÇÔ¼ö 
+	//íƒ€ìž… ,ê°’ ,í•¨ìˆ˜
 	std::string valueName = "None";
 	ConditionParameter* valueParameter;
 	ConditionParameter CompareParameter;

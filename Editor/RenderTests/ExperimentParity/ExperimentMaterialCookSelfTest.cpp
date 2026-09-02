@@ -3,6 +3,9 @@
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/MaterialCookProducer.h"
+#include "AuthoringCookedDocument.h"
+#include "AuthoringNodeEquality.h"
+#include "AuthoringParsedDocument.h"
 #include "Experiment/Cooked/ModelCookProducer.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
 
@@ -78,16 +81,6 @@ namespace RenderTest
             if (!out.empty())
                 stream.read(out.data(), static_cast<std::streamsize>(out.size()));
             return stream.good() || stream.eof();
-        }
-
-        [[nodiscard]] std::string BytesToString(
-            const std::vector<std::byte>& bytes)
-        {
-            std::string text;
-            text.resize(bytes.size());
-            for (std::size_t index = 0u; index < bytes.size(); ++index)
-                text[index] = static_cast<char>(bytes[index]);
-            return text;
         }
 
         inline constexpr const char* kNilGuid =
@@ -193,8 +186,19 @@ namespace RenderTest
                 std::string original;
                 check.Check(ReadFileBytes(fixture.source, original),
                     "원본을 읽을 수 있어야 한다");
-                check.Check(BytesToString(product.artifactBytes) == original,
-                    "artifact 가 원본과 비트 단위로 같아야 한다");
+                check.Check(Authoring::IsCookedDocument(product.artifactBytes),
+                    "artifact 가 CEDO binary document여야 한다");
+                std::string sourceError;
+                std::string cookedError;
+                const Authoring::ParsedDocument sourceDocument =
+                    Authoring::ParsedDocument::ParseText(original, sourceError);
+                const Authoring::ParsedDocument cookedDocument =
+                    Authoring::ParsedDocument::ParseCooked(
+                        product.artifactBytes, cookedError);
+                check.Check(sourceDocument && cookedDocument
+                    && Authoring::NodesEqual(
+                        sourceDocument.Root(), cookedDocument.Root()),
+                    "fixture authoring/CEDO 구조가 같아야 한다");
 
                 const std::string expectedPath = "Derived/Materials/"
                     + spec.metaGuid.substr(0u, 2u) + "/" + spec.metaGuid
@@ -403,10 +407,25 @@ namespace RenderTest
         }
 
         const ck::MaterialCookProduct& product = *result.product;
-        std::string original;
-        check.Check(ReadFileBytes(source, original), "원본을 읽을 수 있어야 한다");
-        check.Check(BytesToString(product.artifactBytes) == original,
-            "artifact 가 원본과 비트 단위로 같아야 한다");
+		check.Check(Authoring::IsCookedDocument(product.artifactBytes),
+			"artifact 가 CEDO binary document여야 한다");
+		std::string sourceParseError;
+		std::string cookedParseError;
+		const Authoring::ParsedDocument sourceDocument =
+			Authoring::ParsedDocument::ParseFile(source.string(), sourceParseError);
+		const Authoring::ParsedDocument cookedDocument =
+			Authoring::ParsedDocument::ParseCooked(
+				product.artifactBytes, cookedParseError);
+		check.Check(static_cast<bool>(sourceDocument),
+			"authoring material 문서를 다시 로드할 수 있어야 한다");
+		check.Check(static_cast<bool>(cookedDocument),
+			"cooked material payload를 로드할 수 있어야 한다");
+		if (sourceDocument && cookedDocument)
+		{
+			check.Check(Authoring::NodesEqual(
+				sourceDocument.Root(), cookedDocument.Root()),
+				"authoring/cooked material-payload 구조가 같아야 한다");
+		}
         check.Check(experiment::IsAssetIdV4(product.shaderMetaAssetId),
             "shaderMetaAssetId 가 canonical UUIDv4 여야 한다");
         check.Check(!product.manifestEntry.dependencies.empty(),
@@ -414,7 +433,7 @@ namespace RenderTest
 
         char summary[320]{};
         std::snprintf(summary, sizeof(summary),
-            "  material 단정 %zu/%zu · %s · 의존 %zu · %s\n",
+			"  material parity 단정 %zu/%zu · %s · 의존 %zu · %s\n",
             check.passed, check.passed + check.failed, product.name.c_str(),
             product.manifestEntry.dependencies.size(),
             product.artifactPath.c_str());

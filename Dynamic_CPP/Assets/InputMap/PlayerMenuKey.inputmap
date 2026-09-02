@@ -1,0 +1,10 @@
+schemaVersion: 1
+mapName: "PlayerMenuKey"
+actions:
+  - actionName: "Menu"
+    inputType: "GamePad"
+    actionType: "Button"
+    keyState: "Pressed"
+    keys: [8, 0, 0, 0]
+    scriptName: "MenuKeyObserver"
+    functionName: "OberveMenuKeyPress"

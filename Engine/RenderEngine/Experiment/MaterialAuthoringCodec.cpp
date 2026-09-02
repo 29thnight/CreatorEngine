@@ -1,8 +1,8 @@
 #include "MaterialAuthoringCodec.h"
 
 #include "AssetIdentity.h"
-
-#include <yaml-cpp/yaml.h>
+#include "AuthoringReadNode.h"
+#include "AuthoringWriteNode.h"
 
 #include <array>
 #include <cstdint>
@@ -20,7 +20,7 @@ namespace experiment
                 : std::string(kNilGuidText);
         }
 
-        [[nodiscard]] bool ParseGuid(const YAML::Node& node, bool allowNil,
+        [[nodiscard]] bool ParseGuid(const Authoring::ReadNode& node, bool allowNil,
             const char* context, AssetId& out, std::string& outError)
         {
             if (!node || !node.IsScalar())
@@ -28,7 +28,7 @@ namespace experiment
                 outError = std::string(context) + " GUID가 스칼라가 아니다";
                 return false;
             }
-            const std::string text = node.as<std::string>();
+            const std::string text = node.AsString();
             if (allowNil && text == kNilGuidText)
             {
                 out = {};
@@ -44,11 +44,11 @@ namespace experiment
         }
 
         template <std::size_t Count>
-        [[nodiscard]] bool ParseFloats(const YAML::Node& node,
+        [[nodiscard]] bool ParseFloats(const Authoring::ReadNode& node,
             const char* context, std::array<float, Count>& out,
             std::string& outError)
         {
-            if (!node.IsSequence() || node.size() != Count)
+            if (!node.IsSequence() || node.Size() != Count)
             {
                 outError = std::string(context) + " 값은 float "
                     + std::to_string(Count) + "개 시퀀스여야 한다";
@@ -56,75 +56,75 @@ namespace experiment
             }
             for (std::size_t index = 0; index < Count; ++index)
             {
-                if (!node[index].IsScalar())
+                const Authoring::ReadNode value = node.At(index);
+                if (!value.IsScalar())
                 {
                     outError = std::string(context) + " 값에 비스칼라가 있다";
                     return false;
                 }
-                out[index] = node[index].as<float>();
+                out[index] = value.As<float>();
             }
             return true;
         }
 
-        [[nodiscard]] YAML::Node MakeFloats(std::initializer_list<float> values)
+        void WriteFloats(Authoring::WriteNode node,
+			std::initializer_list<float> values)
         {
-            YAML::Node node(YAML::NodeType::Sequence);
-            node.SetStyle(YAML::EmitterStyle::Flow);
-            for (const float value : values) node.push_back(value);
-            return node;
+			node.SetSequence(true);
+			for (const float value : values) node.Append().SetScalar(value);
         }
 
         [[nodiscard]] bool SerializeValue(const MaterialProperty& property,
-            YAML::Node& outEntry, std::string& outError)
+			Authoring::WriteNode outEntry, std::string& outError)
         {
             if (const auto* value = std::get_if<bool>(&property.value))
             {
-                outEntry["bool"] = *value;
+				outEntry.Child("bool").SetScalar(*value);
             }
             else if (const auto* value = std::get_if<std::int32_t>(&property.value))
             {
-                outEntry["int"] = *value;
+				outEntry.Child("int").SetScalar(*value);
             }
             else if (const auto* value =
                 std::get_if<std::uint32_t>(&property.value))
             {
-                outEntry["uint"] = *value;
+				outEntry.Child("uint").SetScalar(*value);
             }
             else if (const auto* value = std::get_if<float>(&property.value))
             {
-                outEntry["float"] = *value;
+				outEntry.Child("float").SetScalar(*value);
             }
             else if (const auto* value =
                 std::get_if<math::vector2>(&property.value))
             {
-                outEntry["float2"] = MakeFloats({ value->x, value->y });
+				WriteFloats(outEntry.Child("float2"), { value->x, value->y });
             }
             else if (const auto* value =
                 std::get_if<math::vector3>(&property.value))
             {
-                outEntry["float3"] = MakeFloats({ value->x, value->y, value->z });
+				WriteFloats(outEntry.Child("float3"),
+					{ value->x, value->y, value->z });
             }
             else if (const auto* value =
                 std::get_if<math::vector4>(&property.value))
             {
-                outEntry["float4"] = MakeFloats(
-                    { value->x, value->y, value->z, value->w });
+				WriteFloats(outEntry.Child("float4"),
+					{ value->x, value->y, value->z, value->w });
             }
             else if (const auto* value =
                 std::get_if<std::string>(&property.value))
             {
-                outEntry["string"] = *value;
+				outEntry.Child("string").SetScalar(*value);
             }
             else if (const auto* value =
                 std::get_if<TextureReference>(&property.value))
             {
-                YAML::Node texture(YAML::NodeType::Map);
-                texture.SetStyle(YAML::EmitterStyle::Flow);
-                texture["guid"] = GuidText(value->assetId);
-                texture["colorSpace"] =
-                    TextureColorSpace::Srgb == value->colorSpace
-                    ? "srgb" : "linear";
-                outEntry["texture"] = texture;
+				const Authoring::WriteNode texture = outEntry.Child("texture");
+				texture.SetMap(true);
+				texture.Child("guid").SetScalar(GuidText(value->assetId));
+				texture.Child("colorSpace").SetScalar(
+					TextureColorSpace::Srgb == value->colorSpace
+					? "srgb" : "linear");
             }
             else
             {
@@ -134,17 +134,17 @@ namespace experiment
             return true;
         }
 
-        [[nodiscard]] bool DeserializeValue(const YAML::Node& entry,
+        [[nodiscard]] bool DeserializeValue(const Authoring::ReadNode& entry,
             const std::string& name, MaterialPropertyValue& outValue,
             std::string& outError)
         {
             std::size_t valueKeys = 0;
-            for (const auto& pair : entry)
+            for (const Authoring::MapEntry pair : entry.Map())
             {
-                const std::string key = pair.first.as<std::string>();
+                const std::string key = pair.key.AsString();
                 if (key == "name") continue;
                 ++valueKeys;
-                const YAML::Node& value = pair.second;
+                const Authoring::ReadNode value = pair.value;
                 if (key == "bool" || key == "int" || key == "uint"
                     || key == "float" || key == "string")
                 {
@@ -153,11 +153,11 @@ namespace experiment
                         outError = "property 값이 스칼라가 아니다: " + name;
                         return false;
                     }
-                    if (key == "bool") outValue = value.as<bool>();
-                    else if (key == "int") outValue = value.as<std::int32_t>();
-                    else if (key == "uint") outValue = value.as<std::uint32_t>();
-                    else if (key == "float") outValue = value.as<float>();
-                    else outValue = value.as<std::string>();
+                    if (key == "bool") outValue = value.As<bool>();
+                    else if (key == "int") outValue = value.As<std::int32_t>();
+                    else if (key == "uint") outValue = value.As<std::uint32_t>();
+                    else if (key == "float") outValue = value.As<float>();
+                    else outValue = value.AsString();
                 }
                 else if (key == "float2")
                 {
@@ -196,14 +196,13 @@ namespace experiment
                     {
                         return false;
                     }
-                    const YAML::Node colorSpace = value["colorSpace"];
+                    const Authoring::ReadNode colorSpace = value["colorSpace"];
                     if (!colorSpace || !colorSpace.IsScalar())
                     {
                         outError = "texture colorSpace가 없다: " + name;
                         return false;
                     }
-                    const std::string colorSpaceText =
-                        colorSpace.as<std::string>();
+                    const std::string colorSpaceText = colorSpace.AsString();
                     if (colorSpaceText == "srgb")
                         reference.colorSpace = TextureColorSpace::Srgb;
                     else if (colorSpaceText == "linear")
@@ -213,10 +212,10 @@ namespace experiment
                         outError = "미지의 colorSpace다: " + colorSpaceText;
                         return false;
                     }
-                    for (const auto& texturePair : value)
+                    for (const Authoring::MapEntry texturePair : value.Map())
                     {
                         const std::string textureKey =
-                            texturePair.first.as<std::string>();
+                            texturePair.key.AsString();
                         if (textureKey != "guid" && textureKey != "colorSpace")
                         {
                             outError = "texture의 미지 키다: " + textureKey;
@@ -245,8 +244,8 @@ namespace experiment
         }
     }
 
-    bool SerializeMaterialAuthoring(const Material& material, YAML::Node& outNode,
-        std::string& outError)
+    bool SerializeMaterialAuthoring(const Material& material,
+		Authoring::WriteNode outNode, std::string& outError)
     {
         if (!material.shaderAssetId.IsValid()
             || !IsAssetIdV4(material.shaderAssetId))
@@ -256,16 +255,21 @@ namespace experiment
             return false;
         }
 
-        YAML::Node node(YAML::NodeType::Map);
-        node["schema"] = kMaterialAuthoringSchemaVersion;
-        node["assetId"] = GuidText(material.assetId);
-        node["shaderAssetId"] = GuidText(material.shaderAssetId);
-        node["name"] = material.name;
-        node["blendMode"] =
-            MaterialBlendMode::Transparent == material.blendMode
-            ? "transparent" : "opaque";
+        // fail-closed: 출력 노드를 직접 채우다 중간 검증에서 실패하면 부분 문서가
+		// 남는다. 임시 Tree에서 완성한 뒤 성공할 때만 subtree를 교체한다.
+		Authoring::WriteDocument staging;
+		const Authoring::WriteNode node = staging.Root();
+		node.SetMap();
+		node.Child("schema").SetScalar(kMaterialAuthoringSchemaVersion);
+		node.Child("assetId").SetScalar(GuidText(material.assetId));
+		node.Child("shaderAssetId").SetScalar(GuidText(material.shaderAssetId));
+		node.Child("name").SetScalar(material.name);
+		node.Child("blendMode").SetScalar(
+			MaterialBlendMode::Transparent == material.blendMode
+			? "transparent" : "opaque");
 
-        YAML::Node properties(YAML::NodeType::Sequence);
+		const Authoring::WriteNode properties = node.Child("properties");
+		properties.SetSequence();
         for (const MaterialProperty& property : material.properties)
         {
             if (property.name.empty())
@@ -273,15 +277,14 @@ namespace experiment
                 outError = "빈 property 이름이 있다: " + material.name;
                 return false;
             }
-            YAML::Node entry(YAML::NodeType::Map);
-            entry["name"] = property.name;
+			const Authoring::WriteNode entry = properties.Append();
+			entry.SetMap();
+			entry.Child("name").SetScalar(property.name);
             if (!SerializeValue(property, entry, outError)) return false;
-            properties.push_back(entry);
         }
-        node["properties"] = properties;
 
-        YAML::Node keywords(YAML::NodeType::Sequence);
-        keywords.SetStyle(YAML::EmitterStyle::Flow);
+		const Authoring::WriteNode keywords = node.Child("keywords");
+		keywords.SetSequence(true);
         for (const std::string& keyword : material.keywords)
         {
             if (keyword.empty())
@@ -289,22 +292,25 @@ namespace experiment
                 outError = "빈 keyword 문자열이 있다: " + material.name;
                 return false;
             }
-            keywords.push_back(keyword);
+			keywords.Append().SetScalar(keyword);
         }
-        node["keywords"] = keywords;
 
-        YAML::Node selections(YAML::NodeType::Sequence);
-        selections.SetStyle(YAML::EmitterStyle::Flow);
+		const Authoring::WriteNode selections = node.Child("keywordSelections");
+		selections.SetSequence(true);
         for (const std::uint16_t selection : material.keywordSelections)
-            selections.push_back(static_cast<std::uint32_t>(selection));
-        node["keywordSelections"] = selections;
+			selections.Append().SetScalar(static_cast<std::uint32_t>(selection));
 
-        outNode = node;
+		outNode.Assign(node);
+		if (!outNode.Read()["schema"])
+		{
+			outError = "material writer staging commit failed: " + outNode.Dump();
+			return false;
+		}
         outError.clear();
         return true;
     }
 
-    bool DeserializeMaterialAuthoring(const YAML::Node& node,
+    bool DeserializeMaterialAuthoring(const Authoring::ReadNode& node,
         Material& outMaterial, std::string& outError)
     {
         if (!node || !node.IsMap())
@@ -312,40 +318,43 @@ namespace experiment
             outError = "material 저작 문서가 매핑이 아니다";
             return false;
         }
-        const YAML::Node schema = node["schema"];
+        const Authoring::ReadNode schema = node["schema"];
         if (!schema || !schema.IsScalar()
-            || schema.as<std::uint32_t>() != kMaterialAuthoringSchemaVersion)
+            || schema.As<std::uint32_t>() != kMaterialAuthoringSchemaVersion)
         {
-            outError = "material 저작 schema 버전이 다르다";
+			outError = "material 저작 schema 버전이 다르다(raw="
+				+ (schema ? schema.AsString() : std::string("<missing>")) + ")";
             return false;
         }
 
         Material material;
-        if (!ParseGuid(node["assetId"], true, "assetId", material.assetId,
+        if (!ParseGuid(node["assetId"], true,
+            "assetId", material.assetId,
             outError))
         {
             return false;
         }
-        if (!ParseGuid(node["shaderAssetId"], false, "shaderAssetId",
+        if (!ParseGuid(node["shaderAssetId"], false,
+            "shaderAssetId",
             material.shaderAssetId, outError))
         {
             return false;
         }
-        const YAML::Node name = node["name"];
+        const Authoring::ReadNode name = node["name"];
         if (!name || !name.IsScalar())
         {
             outError = "name이 없다";
             return false;
         }
-        material.name = name.as<std::string>();
+        material.name = name.AsString();
 
-        const YAML::Node blendMode = node["blendMode"];
+        const Authoring::ReadNode blendMode = node["blendMode"];
         if (!blendMode || !blendMode.IsScalar())
         {
             outError = "blendMode가 없다";
             return false;
         }
-        const std::string blendModeText = blendMode.as<std::string>();
+        const std::string blendModeText = blendMode.AsString();
         if (blendModeText == "opaque")
             material.blendMode = MaterialBlendMode::Opaque;
         else if (blendModeText == "transparent")
@@ -356,33 +365,34 @@ namespace experiment
             return false;
         }
 
-        const YAML::Node properties = node["properties"];
+        const Authoring::ReadNode properties = node["properties"];
         if (!properties || !properties.IsSequence())
         {
             outError = "properties가 시퀀스가 아니다";
             return false;
         }
-        for (const YAML::Node& entry : properties)
+        for (const Authoring::ReadNode entry : properties)
         {
             if (!entry.IsMap())
             {
                 outError = "property 항목이 매핑이 아니다";
                 return false;
             }
-            const YAML::Node entryName = entry["name"];
+            const Authoring::ReadNode entryName = entry["name"];
             if (!entryName || !entryName.IsScalar())
             {
                 outError = "property name이 없다";
                 return false;
             }
             MaterialProperty property;
-            property.name = entryName.as<std::string>();
+            property.name = entryName.AsString();
             if (property.name.empty())
             {
                 outError = "빈 property 이름이 있다";
                 return false;
             }
-            if (!DeserializeValue(entry, property.name, property.value,
+            if (!DeserializeValue(entry, property.name,
+                property.value,
                 outError))
             {
                 return false;
@@ -390,20 +400,20 @@ namespace experiment
             material.properties.push_back(std::move(property));
         }
 
-        const YAML::Node keywords = node["keywords"];
+        const Authoring::ReadNode keywords = node["keywords"];
         if (!keywords || !keywords.IsSequence())
         {
             outError = "keywords가 시퀀스가 아니다";
             return false;
         }
-        for (const YAML::Node& keyword : keywords)
+        for (const Authoring::ReadNode keyword : keywords)
         {
             if (!keyword.IsScalar())
             {
                 outError = "keyword가 스칼라가 아니다";
                 return false;
             }
-            const std::string keywordText = keyword.as<std::string>();
+            const std::string keywordText = keyword.AsString();
             if (keywordText.empty())
             {
                 outError = "빈 keyword 문자열이 있다";
@@ -412,20 +422,20 @@ namespace experiment
             material.keywords.push_back(keywordText);
         }
 
-        const YAML::Node selections = node["keywordSelections"];
+        const Authoring::ReadNode selections = node["keywordSelections"];
         if (!selections || !selections.IsSequence())
         {
             outError = "keywordSelections가 시퀀스가 아니다";
             return false;
         }
-        for (const YAML::Node& selection : selections)
+        for (const Authoring::ReadNode selection : selections)
         {
             if (!selection.IsScalar())
             {
                 outError = "keywordSelection이 스칼라가 아니다";
                 return false;
             }
-            const std::uint32_t value = selection.as<std::uint32_t>();
+            const std::uint32_t value = selection.As<std::uint32_t>();
             if (value > 0xFFFFu)
             {
                 outError = "keywordSelection이 uint16 범위를 넘는다";
@@ -441,12 +451,16 @@ namespace experiment
     }
 
     bool SerializeMaterialPropertyValue(const MaterialProperty& property,
-        YAML::Node& outEntry, std::string& outError)
+		Authoring::WriteNode outEntry, std::string& outError)
     {
-        return SerializeValue(property, outEntry, outError);
+		// 이 API의 계약은 완성 문서 교체가 아니라 기존 property entry에 값 키
+		// 하나를 추가하는 것이다. 호출자가 먼저 적은 `name`을 보존해야 한다.
+		if (!SerializeValue(property, outEntry, outError)) return false;
+		outError.clear();
+		return true;
     }
 
-    bool DeserializeMaterialPropertyValue(const YAML::Node& entry,
+    bool DeserializeMaterialPropertyValue(const Authoring::ReadNode& entry,
         const std::string& name, MaterialPropertyValue& outValue,
         std::string& outError)
     {

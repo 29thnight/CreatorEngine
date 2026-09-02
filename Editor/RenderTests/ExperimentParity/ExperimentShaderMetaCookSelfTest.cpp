@@ -4,6 +4,9 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "ShaderMeta.h"
+#include "AuthoringCookedDocument.h"
+#include "AuthoringNodeEquality.h"
+#include "AuthoringParsedDocument.h"
 
 #include <chrono>
 #include <cstdio>
@@ -81,16 +84,6 @@ namespace RenderTest
         [[nodiscard]] std::string MetaYaml(const std::string& guid)
         {
             return "guid: " + guid + "\n";
-        }
-
-        [[nodiscard]] std::string BytesToString(
-            const std::vector<std::byte>& bytes)
-        {
-            std::string text;
-            text.resize(bytes.size());
-            for (std::size_t index = 0u; index < bytes.size(); ++index)
-                text[index] = static_cast<char>(bytes[index]);
-            return text;
         }
 
         // 실자산과 같은 모양의 최소 문서. 정본 파서가 받는 형태여야 한다.
@@ -233,8 +226,19 @@ namespace RenderTest
                 std::string original;
                 check.Check(ReadFileBytes(fixture.shaderMeta, original),
                     "원본을 읽을 수 있어야 한다");
-                check.Check(BytesToString(product.artifactBytes) == original,
-                    "artifact 가 원본과 비트 단위로 같아야 한다");
+                check.Check(Authoring::IsCookedDocument(product.artifactBytes),
+                    "artifact 가 CEDO binary document여야 한다");
+                std::string sourceError;
+                std::string cookedError;
+                const Authoring::ParsedDocument sourceDocument =
+                    Authoring::ParsedDocument::ParseText(original, sourceError);
+                const Authoring::ParsedDocument cookedDocument =
+                    Authoring::ParsedDocument::ParseCooked(
+                        product.artifactBytes, cookedError);
+                check.Check(sourceDocument && cookedDocument
+                    && Authoring::NodesEqual(
+                        sourceDocument.Root(), cookedDocument.Root()),
+                    "fixture authoring/CEDO 구조가 같아야 한다");
 
                 const std::string expectedPath = "Derived/ShaderMeta/"
                     + spec.metaGuid.substr(0u, 2u) + "/" + spec.metaGuid
@@ -443,10 +447,23 @@ namespace RenderTest
         const ck::ShaderMetaCookProduct& product = *result.product;
         std::string original;
         check.Check(ReadFileBytes(source, original), "원본을 읽을 수 있어야 한다");
-        check.Check(BytesToString(product.artifactBytes) == original,
-            "artifact 가 원본과 비트 단위로 같아야 한다");
+        check.Check(Authoring::IsCookedDocument(product.artifactBytes),
+            "artifact 가 CEDO binary document여야 한다");
+        std::string sourceError;
+        std::string cookedError;
+        const Authoring::ParsedDocument sourceDocument =
+            Authoring::ParsedDocument::ParseText(original, sourceError);
+        const Authoring::ParsedDocument cookedDocument =
+            Authoring::ParsedDocument::ParseCooked(
+                product.artifactBytes, cookedError);
+        check.Check(sourceDocument && cookedDocument
+            && Authoring::NodesEqual(
+                sourceDocument.Root(), cookedDocument.Root()),
+            "실자산 authoring/CEDO 구조가 같아야 한다");
         check.Check(product.manifestEntry.formatVersion
-            == ShaderMeta::kSchemaVersion, "formatVersion 이 schema 정본과 같아야 한다");
+            == ((ShaderMeta::kSchemaVersion << 16u)
+                | Authoring::kCookedDocumentVersion),
+            "formatVersion 이 schema/CEDO 정본과 같아야 한다");
         check.Check(experiment::IsAssetIdV4(product.sourceShaderAssetId),
             "source 셰이더 GUID 가 canonical UUIDv4 여야 한다");
         check.Check(product.passCount > 0u, "pass 가 하나 이상이어야 한다");

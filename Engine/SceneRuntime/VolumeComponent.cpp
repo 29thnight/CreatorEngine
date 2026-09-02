@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "DataSystem.h"
 #include "RuntimeSettings.h"
+#include "AuthoringParsedDocument.h"
 
 void VolumeComponent::OnInitialized()
 {
@@ -15,8 +16,15 @@ void VolumeComponent::OnInitialized()
         file::path path = DataSystems->GetFilePath(m_volumeProfileGuid);
         if (!path.empty() && file::exists(path))
         {
-            MetaYml::Node node = MetaYml::LoadFile(path.string());
-            if (node["settings"])
+            std::string parseError;
+            const Authoring::ParsedDocument document =
+                Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+            const Authoring::ReadNode node = document.Root();
+            if (!document)
+            {
+                Debug->LogError("Volume profile parse failed: " + parseError);
+            }
+            else if (node["settings"])
             {
                 Meta::Deserialize(&m_profile.settings, node["settings"]);
                 RuntimeSettings::Get().SetRenderPassSettings(m_profile.settings);
@@ -47,8 +55,15 @@ void VolumeComponent::LoadProfile(FileGuid profileGuid)
     file::path path = DataSystems->GetFilePath(m_volumeProfileGuid);
     if (!path.empty() && file::exists(path))
     {
-        MetaYml::Node node = MetaYml::LoadFile(path.string());
-        if (node["settings"])
+        std::string parseError;
+        const Authoring::ParsedDocument document =
+            Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+        const Authoring::ReadNode node = document.Root();
+        if (!document)
+        {
+            Debug->LogError("Volume profile parse failed: " + parseError);
+        }
+        else if (node["settings"])
         {
             Meta::Deserialize(&m_profile.settings, node["settings"]);
 			m_prevSettings = RuntimeSettings::Get().GetRenderPassSettings();

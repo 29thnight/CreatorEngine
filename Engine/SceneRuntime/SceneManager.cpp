@@ -18,6 +18,7 @@
 #include "DataSystem.h"
 #include "ComponentFactory.h"
 #include "AuthoringDocumentAccess.h"
+#include "AuthoringParsedDocument.h"
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
 #include "RegisterReflectManual.h" // CT4: 명시 메타 이전 타입의 등록 (def 스캔 밖)
 #include "Profiler.h"
@@ -26,6 +27,7 @@
 #include "TagManager.h"
 #include "ReflectionRegister.h"
 #include <algorithm>
+#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
 #include "Component.h"
@@ -44,12 +46,55 @@ namespace
     // Scene 공개/리플렉션 API는 Entity 기준 이름(m_Entities)으로 저장한다.
     // 다만 기존 .creator 자산은 m_SceneObjects 키를 갖고 있으므로 읽을 때만
     // 구 키를 별칭으로 허용한다. 새 저장 결과는 항상 m_Entities 하나로 수렴한다.
-    MetaYml::Node SerializedEntities(const MetaYml::Node& sceneNode)
+    Authoring::ReadNode SerializedEntities(const Authoring::ReadNode& sceneNode)
     {
         if (!sceneNode) return {};
-        if (MetaYml::Node entities = sceneNode["m_Entities"])
+        if (Authoring::ReadNode entities = sceneNode["m_Entities"])
             return entities;
         return sceneNode["m_SceneObjects"];
+    }
+
+    Authoring::ParsedDocument ParseSceneDocument(const std::string& path)
+    {
+		const file::path sourcePath(path);
+		file::path readPath = sourcePath;
+		FileGuid assetGuid{};
+		if (DataSystems)
+		{
+			assetGuid = DataSystems->GetFileGuid(sourcePath);
+			if (assetGuid != FileGuid{})
+			{
+				readPath = DataSystems->ResolveCatalogAssetPath(assetGuid);
+				if (readPath.empty())
+				{
+					throw std::runtime_error(
+						"씬 cooked runtime artifact 해석 실패: " + path);
+				}
+			}
+			else if (!PathFinder::IsAssetAuthoringEnabled())
+			{
+				throw std::runtime_error(
+					"Player 씬 source identity 해석 실패: " + path);
+			}
+		}
+
+        std::string error;
+        Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseFile(readPath.string(), error);
+        if (!document)
+        {
+			throw std::runtime_error("씬 runtime 문서 파싱 실패: "
+				+ readPath.string()
+                + " (" + error + ")");
+        }
+		if (assetGuid != FileGuid{})
+		{
+			const bool cooked = readPath.lexically_normal()
+				!= sourcePath.lexically_normal();
+			std::printf("[scene.document] source=%s guid=%s\n",
+				cooked ? "cooked" : "authoring", assetGuid.ToString().c_str());
+		}
+        return document;
     }
 
     // 프리팹 인스턴스 재연결 (SceneGraphRedesignPlan §4 트랙 P, P2).
@@ -222,12 +267,6 @@ namespace LegacyTransformPromotion
 			Meta::Typed::ReadScalar(scaleNode, value);
 			transform->SetScaleValue(value, TransformWriteReason::Reflection);
 		}
-    }
-
-    // ★ 전환기 오버로드 — Prefab의 read-write 소환 경로용(D3-b-3에서 사라진다).
-    void PromoteLegacyTransform(Entity* obj, const MetaYml::Node& node)
-    {
-        PromoteLegacyTransform(obj, Authoring::ReadNode{ node });
     }
 }
 
@@ -579,13 +618,12 @@ Scene* SceneManager::SaveScene(std::string_view name)
 	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾸는데,
 	// 그러면 같은 내용을 저장할 때마다 개행이 뒤집혀 git 작업 트리가 흔들린다.
 	std::ofstream sceneFileOut(saveSceneFileName, std::ios::binary | std::ios::trunc);
-    MetaYml::Node sceneNode{};
-	MetaYml::Node assetsBundleNode{};
+	Authoring::WriteDocument sceneDocument;
 
     m_activeScene.load()->m_Entities[0]->m_name = saveSceneFileName.stem().string();
     try
     {
-        sceneNode = Meta::Serialize(m_activeScene.load());
+		sceneDocument = Meta::SerializeDocument(m_activeScene.load());
     }
 	catch (const std::exception& e)
 	{
@@ -595,21 +633,27 @@ Scene* SceneManager::SaveScene(std::string_view name)
 
     if (0 < m_dontDestroyOnLoadObjects.size())
     {
-        MetaYml::Node dontDestroyOnLoadNode;
-        for (auto obj : m_dontDestroyOnLoadObjects)
+		Authoring::WriteNode dontDestroyOnLoadNode;
+		for (auto obj : m_dontDestroyOnLoadObjects)
         {
 			if (!obj) continue;
 
 			auto* gameObject = dynamic_cast<Entity*>(obj);
-            if (gameObject)
-            {
-				dontDestroyOnLoadNode.push_back(Meta::Serialize(gameObject));
-            }
-        }
-		sceneNode["DontDestroyOnLoadObjects"] = dontDestroyOnLoadNode;
-    }
+			if (gameObject)
+			{
+				if (!dontDestroyOnLoadNode)
+				{
+					dontDestroyOnLoadNode = sceneDocument.Root().Child(
+						"DontDestroyOnLoadObjects");
+					dontDestroyOnLoadNode.SetSequence();
+				}
+				Meta::SerializeInto(gameObject, Meta::TypeOf<Entity>(),
+					dontDestroyOnLoadNode.Append());
+			}
+		}
+	}
 
-	sceneFileOut << sceneNode;
+	sceneFileOut << sceneDocument.Dump();
 
     sceneFileOut.close();
 
@@ -625,12 +669,13 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
 	try
 	{
-        MetaYml::Node sceneNode;
+        Authoring::ParsedDocument sceneDocument;
         {
             // D0: 텍스트 → Node 트리 구축 구간만 따로 뗀다.
             SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneParse);
-            sceneNode = MetaYml::LoadFile(loadSceneName);
+            sceneDocument = ParseSceneDocument(loadSceneName);
         }
+        const Authoring::ReadNode sceneNode = sceneDocument.Root();
         Scene* swapScene{};
         if (m_activeScene)
         {
@@ -667,7 +712,8 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         resourceTrimEvent.Broadcast();
 		m_activeScene = Scene::LoadScene(sceneName.stem().string());
 
-        if(auto assetsBundleNode = sceneNode["m_requiredLoadAssetsBundle"])
+        if (const Authoring::ReadNode assetsBundleNode =
+            sceneNode["m_requiredLoadAssetsBundle"])
         {
             try
             {
@@ -680,15 +726,15 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                     auto* assetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
                     Meta::Deserialize(assetBundle, assetsBundleNode);
                     //DataSystems->LoadAssetBundle(*assetBundle);
-                    if (auto assets = assetsBundleNode["assets"])
+                    if (const Authoring::ReadNode assets = assetsBundleNode["assets"])
                     {
-                        for (auto asset : assets)
+                        for (const Authoring::ReadNode asset : assets)
                         {
                             if(asset["assetTypeID"] && asset["assetName"])
                             {
                                 AssetEntry entry{};
-                                entry.assetTypeID = asset["assetTypeID"].as<int>();
-                                entry.assetName = asset["assetName"].as<std::string>();
+                                entry.assetTypeID = asset["assetTypeID"].As<int>();
+                                entry.assetName = asset["assetName"].AsString();
                                 if (!assetBundle->ContainsAsset(entry))
                                 {
                                     assetBundle->AddAsset(entry);
@@ -715,7 +761,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		[[maybe_unused]] auto hierarchyTransaction =
 			m_activeScene.load()->BeginHierarchyBulkBuild();
 
-        for (const auto objNode : SerializedEntities(sceneNode))
+        for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
         {
             try
             {
@@ -735,7 +781,8 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 			}
         }
 
-        for (const auto objNode : sceneNode["DontDestroyOnLoadObjects"])
+        for (const Authoring::ReadNode objNode :
+            sceneNode["DontDestroyOnLoadObjects"])
         {
             try
             {
@@ -792,16 +839,17 @@ Scene* SceneManager::LoadScene(std::string_view name)
 
     try
     {
-        MetaYml::Node sceneNode;
+        Authoring::ParsedDocument sceneDocument;
         {
             // D0: 텍스트 → Node 트리 구축 구간만 따로 뗀다.
             SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneParse);
-            sceneNode = MetaYml::LoadFile(loadSceneName);
+            sceneDocument = ParseSceneDocument(loadSceneName);
         }
+        const Authoring::ReadNode sceneNode = sceneDocument.Root();
         file::path sceneName = name.data();
         scene = Scene::LoadScene(sceneName.stem().string());
 
-        if (auto assetsBundleNode = sceneNode["AssetsBundle"])
+        if (const Authoring::ReadNode assetsBundleNode = sceneNode["AssetsBundle"])
         {
             if (assetsBundleNode.IsNull())
             {
@@ -825,7 +873,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
 		[[maybe_unused]] auto ddolHierarchyTransaction =
 			m_activeScene.load()->BeginHierarchyBulkBuild();
 
-        for (const auto objNode : SerializedEntities(sceneNode))
+        for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
@@ -837,7 +885,8 @@ Scene* SceneManager::LoadScene(std::string_view name)
             DesirealizeGameObject(scene, type, Authoring::NodeViewAccess::Make(objNode), &sceneBatch);
         }
 
-        for (const auto objNode : sceneNode["DontDestroyOnLoadObjects"])
+        for (const Authoring::ReadNode objNode :
+            sceneNode["DontDestroyOnLoadObjects"])
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
@@ -889,25 +938,27 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
         try
         {
             // This code runs in a background thread.
-            MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
+            Authoring::ParsedDocument sceneDocument = ParseSceneDocument(scenePath);
+            const Authoring::ReadNode sceneNode = sceneDocument.Root();
             Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
 
-            if (auto assetsBundleNode = sceneNode["m_requiredLoadAssetsBundle"])
+            if (const Authoring::ReadNode assetsBundleNode =
+                sceneNode["m_requiredLoadAssetsBundle"])
             {
                 try
                 {
                     if (!assetsBundleNode.IsNull())
                     {
                         auto* assetBundle = &newScene->m_requiredLoadAssetsBundle;
-                        if (auto assets = assetsBundleNode["assets"])
+                        if (const Authoring::ReadNode assets = assetsBundleNode["assets"])
                         {
-                            for (auto asset : assets)
+                            for (const Authoring::ReadNode asset : assets)
                             {
                                 if (asset["assetTypeID"] && asset["assetName"])
                                 {
                                     AssetEntry entry{};
-                                    entry.assetTypeID = asset["assetTypeID"].as<int>();
-                                    entry.assetName = asset["assetName"].as<std::string>();
+                                    entry.assetTypeID = asset["assetTypeID"].As<int>();
+                                    entry.assetName = asset["assetName"].AsString();
                                     if (!assetBundle->ContainsAsset(entry))
                                     {
                                         assetBundle->AddAsset(entry);
@@ -928,7 +979,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
 			[[maybe_unused]] auto hierarchyTransaction =
 				newScene->BeginHierarchyBulkBuild();
 
-            for (const auto objNode : SerializedEntities(sceneNode))
+            for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
             {
                 try
                 {
@@ -948,7 +999,8 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                 }
             }
 
-            for (const auto objNode : sceneNode["DontDestroyOnLoadObjects"])
+            for (const Authoring::ReadNode objNode :
+                sceneNode["DontDestroyOnLoadObjects"])
             {
                 try
                 {
@@ -996,23 +1048,25 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
         try
         {
             // This code runs in a background thread.
-            MetaYml::Node sceneNode = MetaYml::LoadFile(scenePath);
+            Authoring::ParsedDocument sceneDocument = ParseSceneDocument(scenePath);
+            const Authoring::ReadNode sceneNode = sceneDocument.Root();
             Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
 
-            if (auto assetsBundleNode = sceneNode["m_requiredLoadAssetsBundle"])
+            if (const Authoring::ReadNode assetsBundleNode =
+                sceneNode["m_requiredLoadAssetsBundle"])
             {
                 if (!assetsBundleNode.IsNull())
                 {
                     auto* assetBundle = &newScene->m_requiredLoadAssetsBundle;
-                    if (auto assets = assetsBundleNode["assets"])
+                    if (const Authoring::ReadNode assets = assetsBundleNode["assets"])
                     {
-                        for (auto asset : assets)
+                        for (const Authoring::ReadNode asset : assets)
                         {
                             if (asset["assetTypeID"] && asset["assetName"])
                             {
                                 AssetEntry entry{};
-                                entry.assetTypeID = asset["assetTypeID"].as<int>();
-                                entry.assetName = asset["assetName"].as<std::string>();
+                                entry.assetTypeID = asset["assetTypeID"].As<int>();
+                                entry.assetName = asset["assetName"].AsString();
                                 if (!assetBundle->ContainsAsset(entry))
                                 {
                                     assetBundle->AddAsset(entry);
@@ -1034,7 +1088,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
 			[[maybe_unused]] auto ddolHierarchyTransaction =
 				m_activeScene.load()->BeginHierarchyBulkBuild();
 
-            for (const auto objNode : SerializedEntities(sceneNode))
+            for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type) {
@@ -1044,7 +1098,8 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                 DesirealizeGameObject(newScene, type, Authoring::NodeViewAccess::Make(objNode), &sceneBatch);
             }
 
-            for (const auto objNode : sceneNode["DontDestroyOnLoadObjects"])
+            for (const Authoring::ReadNode objNode :
+                sceneNode["DontDestroyOnLoadObjects"])
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type)
@@ -1311,8 +1366,8 @@ bool SceneManager::HasSceneSnapshot() const
 {
     // D3-a-3: 문서 자체의 빈 상태는 타입이 답하고, 그 안의 엔티티 목록만 노드로 본다.
     if (m_editorSceneBackup.IsEmpty()) return false;
-    return static_cast<bool>(
-        SerializedEntities(Authoring::DocumentAccess::Node(m_editorSceneBackup)));
+    return static_cast<bool>(SerializedEntities(
+        Authoring::DocumentAccess::Read(m_editorSceneBackup)));
 }
 
 void SceneManager::DiscardSceneSnapshot()
@@ -1334,7 +1389,8 @@ bool SceneManager::CaptureSceneSnapshot()
         // 편집 중이던 최신 값이 담기도록 직렬화한다. 스크립트를 재우지 않는
         // 이유는 사본이 없어 두 벌이 생기지 않기 때문이다 — 지금 씬의 인스턴스가
         // 그대로 플레이 인스턴스가 된다.
-        m_editorSceneBackup = Authoring::DocumentAccess::Adopt(Meta::Serialize(scene));
+		m_editorSceneBackup = Authoring::DocumentAccess::Adopt(
+			Meta::SerializeDocument(scene));
         PROFILE_CPU_END();
     }
     catch (const std::exception& e)
@@ -1394,8 +1450,8 @@ bool SceneManager::RestoreSceneSnapshot()
 		LoadIndexBatch loadBatch;
 		[[maybe_unused]] auto hierarchyTransaction =
 			scene->BeginHierarchyBulkBuild();
-        for (const auto& objNode :
-            SerializedEntities(Authoring::DocumentAccess::Node(m_editorSceneBackup)))
+        for (const Authoring::ReadNode objNode : SerializedEntities(
+            Authoring::DocumentAccess::Read(m_editorSceneBackup)))
         {
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
@@ -1405,7 +1461,7 @@ bool SceneManager::RestoreSceneSnapshot()
             }
 
             if (objNode["m_instanceID"] &&
-                survivingIds.contains(objNode["m_instanceID"].as<size_t>()))
+                survivingIds.contains(objNode["m_instanceID"].As<size_t>()))
             {
                 continue;
             }

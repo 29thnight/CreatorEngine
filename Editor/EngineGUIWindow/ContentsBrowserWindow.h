@@ -3,7 +3,7 @@
 #include "ImGuiRegister.h"
 #include "EditorAssetPresentation.h"
 #include "EditorSettingsStore.h"
-#include <yaml-cpp/yaml.h>
+#include "AuthoringWriteNode.h"
 
 // ── 콘텐츠 브라우저 (PHASE 4-3 슬라이스 2) ──
 //
@@ -29,7 +29,7 @@ public:
 	// 사실상 전역이었으므로 수명 관계는 달라지지 않는다.
 	static std::string					selectedFileName;
 	static std::string					selectedMetaFilePath;
-	static std::optional<YAML::Node>		selectedFileMetaNode;
+	static std::optional<Authoring::WriteDocument> selectedFileMetaNode;
 
 private:
 	void ShowDirectoryTree(const file::path& directory);

@@ -295,7 +295,10 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 
 	auto state = std::make_shared<AnimationState>(this, stateName);
 	if (isAny == true)
+	{
 		state->m_isAny = true;
+		m_anyState = state;
+	}
 	state->AnimationIndex = animationIndex;
 	//state->SetBehaviour(stateName);
 	//States.insert(std::make_pair(stateName, StateVec.size()));
@@ -438,32 +441,7 @@ void AnimationController::DeleteAvatarMask()
     }
 }
 
-nlohmann::json AnimationController::Serialize()
-{
-	nlohmann::json j;
-	j["controller_name"] = name;
-	//state�� ���
-	j["useController"] = (int)useController; //bool 0 1
-	
-	nlohmann::json stateJson = nlohmann::json::array();
-	for (auto& state : StateVec)
-	{
-		stateJson.push_back(state->Serialize());
-	}
 
-	j["StateVec"] = stateJson;
-	if (m_curState)
-	{
-		j["m_curState"] = m_curState->m_name;
-	}
-
-	j["useMask"] = (int)useMask; //bool 0 1 /
-	return j;
-}
-
-void AnimationController::Deserialize()
-{
-}
 
 void AnimationController::SetUseLayer(bool _useLayer)
 {

@@ -3,7 +3,6 @@
 #include "../Utility_Framework/Core.Minimal.h"
 #include "AniTransition.h"
 #include "AniBehavior.h"
-#include <nlohmann/json.hpp>
 
 class AnimationController;
 class AnimationState
@@ -44,9 +43,6 @@ public:
 	}
 	void SetBehaviour(std::string name, bool isReload = false);
 	void UpdateAnimationSpeed();
-	nlohmann::json Serialize();
-	AnimationState Deserialize();
-
 public:
 	std::string m_name{};
 	std::string behaviourName{};
@@ -56,12 +52,12 @@ public:
 	int index =0; 
 	int AnimationIndex = 0;
 	
-	//±âº»¼Óµµ
+	//ê¸°ë³¸ì†ë„
 	float animationSpeed = 1;
-	//ÆÄ¶ó¹ÌÅÍ·Î ´õ °öÇØÁÙ ¼Óµµ ÀÌµ¿¼Óµµ ºñ·Ê,°ø°İ¼Óµµºñ·Ê
+	//íŒŒë¼ë¯¸í„°ë¡œ ë” ê³±í•´ì¤„ ì†ë„ ì´ë™ì†ë„ ë¹„ë¡€,ê³µê²©ì†ë„ë¹„ë¡€
 	float multiplerAnimationSpeed = 1;
 	std::string animationSpeedParameterName = "None";
-	//»óÅÂÀÇ ¾Ö´Ï¸ŞÀÌ¼Ç ½Ã°£ »óÇÏÃ¼ ºĞ¸®ÈÄ ÇÕÄ¥‹š¾µ¿ë
+	//ìƒíƒœì˜ ì• ë‹ˆë©”ì´ì…˜ ì‹œê°„ ìƒí•˜ì²´ ë¶„ë¦¬í›„ í•©ì¹ ë–„ì“¸ìš©
 	float m_animationTimeElapsed = 0;
 	bool m_isAny = false;
 	bool useMultipler = false;

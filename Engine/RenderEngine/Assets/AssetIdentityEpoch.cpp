@@ -1,10 +1,11 @@
 #include "AssetIdentityEpoch.h"
 #include "AssetIdentityHex.h"
 
+#include "AuthoringParsedDocument.h"
+#include "AuthoringWriteNode.h"
+
 #include <Windows.h>
 #include <bcrypt.h>
-
-#include <yaml-cpp/yaml.h>
 
 #include <algorithm>
 #include <utility>
@@ -21,10 +22,10 @@ namespace assets
             issues.push_back({ code, std::move(context), std::move(message) });
         }
 
-        [[nodiscard]] bool ReadScalar(const YAML::Node& parent, const char* key,
+        [[nodiscard]] bool ReadScalar(const Authoring::ReadNode& parent, const char* key,
             std::string& out, std::vector<EpochHeaderIssue>& issues, bool required = true)
         {
-            const YAML::Node node = parent[key];
+            const Authoring::ReadNode node = parent[key];
             if (!node)
             {
                 if (required)
@@ -40,17 +41,8 @@ namespace assets
                     "scalar여야 한다.");
                 return false;
             }
-            try
-            {
-                out = node.as<std::string>();
-                return true;
-            }
-            catch (const YAML::Exception& exception)
-            {
-                AddIssue(issues, EpochHeaderIssueCode::InvalidDocument, key,
-                    exception.what());
-                return false;
-            }
+            out = node.AsString();
+            return true;
         }
     }
 
@@ -117,19 +109,18 @@ namespace assets
         std::vector<EpochHeaderIssue> issues;
         if (!ValidateIdentityEpochHeader(header, issues)) return {};
 
-        YAML::Node root(YAML::NodeType::Map);
-        root["schemaVersion"] = kIdentityEpochHeaderSchemaVersion;
-        root["identityProfile"] = header.identityProfile;
-        root["identityEpoch"] = header.identityEpoch;
-        root["identityEpochSeed"] = ToLowerHex(header.identityEpochSeed);
-        if (!header.createdAt.empty()) root["createdAt"] = header.createdAt;
+        Authoring::WriteDocument document;
+        const Authoring::WriteNode root = document.Root();
+        root.SetMap();
+        root.Child("schemaVersion").SetScalar(kIdentityEpochHeaderSchemaVersion);
+        root.Child("identityProfile").SetScalar(header.identityProfile);
+        root.Child("identityEpoch").SetScalar(header.identityEpoch);
+        root.Child("identityEpochSeed").SetScalar(ToLowerHex(header.identityEpochSeed));
+        if (!header.createdAt.empty()) root.Child("createdAt").SetScalar(header.createdAt);
 
-        YAML::Emitter emitter;
-        emitter.SetIndent(2);
-        emitter << root;
-        if (!emitter.good()) return {};
-        std::string out(emitter.c_str(), emitter.size());
-        out.push_back('\n');
+        std::string out = document.Dump();
+        if (out.empty()) return {};
+        if (out.back() != '\n') out.push_back('\n');
         return out;
     }
 
@@ -138,49 +129,48 @@ namespace assets
     {
         const std::size_t before = outIssues.size();
         IdentityEpochHeader parsed;
-        try
+        std::string parseError;
+        const Authoring::ParsedDocument document =
+            Authoring::ParsedDocument::ParseText(std::string(yaml), parseError);
+        if (!document)
         {
-            const YAML::Node root = YAML::Load(std::string(yaml));
-            if (!root || !root.IsMap())
-            {
-                AddIssue(outIssues, EpochHeaderIssueCode::InvalidDocument, "root",
-                    "map document여야 한다.");
-                return false;
-            }
-
-            std::string schema;
-            if (ReadScalar(root, "schemaVersion", schema, outIssues)
-                && schema != std::to_string(kIdentityEpochHeaderSchemaVersion))
-            {
-                AddIssue(outIssues, EpochHeaderIssueCode::UnsupportedSchema, "schemaVersion",
-                    "지원하는 epoch header schemaVersion은 "
-                    + std::to_string(kIdentityEpochHeaderSchemaVersion) + "이다: " + schema);
-            }
-            (void)ReadScalar(root, "identityProfile", parsed.identityProfile, outIssues);
-            (void)ReadScalar(root, "identityEpoch", parsed.identityEpoch, outIssues);
-            (void)ReadScalar(root, "createdAt", parsed.createdAt, outIssues, false);
-
-            std::string seedHex;
-            if (ReadScalar(root, "identityEpochSeed", seedHex, outIssues))
-            {
-                std::vector<std::uint8_t> seedBytes;
-                if (!TryParseLowerHex(seedHex, seedBytes, kEpochSeedBytes))
-                {
-                    AddIssue(outIssues, EpochHeaderIssueCode::InvalidSeed, "identityEpochSeed",
-                        "64자 소문자 16진(32바이트)이어야 한다.");
-                }
-                else
-                {
-                    std::copy(seedBytes.begin(), seedBytes.end(),
-                        parsed.identityEpochSeed.begin());
-                }
-            }
+            AddIssue(outIssues, EpochHeaderIssueCode::InvalidDocument, "root", parseError);
+            return false;
         }
-        catch (const YAML::Exception& exception)
+        const Authoring::ReadNode root = document.Root();
+        if (!root || !root.IsMap())
         {
             AddIssue(outIssues, EpochHeaderIssueCode::InvalidDocument, "root",
-                exception.what());
+                "map document여야 한다.");
             return false;
+        }
+
+        std::string schema;
+        if (ReadScalar(root, "schemaVersion", schema, outIssues)
+            && schema != std::to_string(kIdentityEpochHeaderSchemaVersion))
+        {
+            AddIssue(outIssues, EpochHeaderIssueCode::UnsupportedSchema, "schemaVersion",
+                "지원하는 epoch header schemaVersion은 "
+                + std::to_string(kIdentityEpochHeaderSchemaVersion) + "이다: " + schema);
+        }
+        (void)ReadScalar(root, "identityProfile", parsed.identityProfile, outIssues);
+        (void)ReadScalar(root, "identityEpoch", parsed.identityEpoch, outIssues);
+        (void)ReadScalar(root, "createdAt", parsed.createdAt, outIssues, false);
+
+        std::string seedHex;
+        if (ReadScalar(root, "identityEpochSeed", seedHex, outIssues))
+        {
+            std::vector<std::uint8_t> seedBytes;
+            if (!TryParseLowerHex(seedHex, seedBytes, kEpochSeedBytes))
+            {
+                AddIssue(outIssues, EpochHeaderIssueCode::InvalidSeed, "identityEpochSeed",
+                    "64자 소문자 16진(32바이트)이어야 한다.");
+            }
+            else
+            {
+                std::copy(seedBytes.begin(), seedBytes.end(),
+                    parsed.identityEpochSeed.begin());
+            }
         }
 
         if (outIssues.size() != before) return false;

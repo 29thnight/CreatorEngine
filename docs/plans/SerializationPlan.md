@@ -21,6 +21,26 @@ meta::schema
 SceneGraphRedesignPlan §5("파일 포맷 불변·일괄 변환 금지")와 충돌하므로
 §7에서 순서로 조정한다.
 
+**신원 정본 재지정(2026-09-02, PHASE 3.75 병합):** 이 문서의 UUIDv4 설계와 D2
+실행 기록은 현재 디스크 코퍼스를 설명하는 **전환 전 역사**일 뿐, 최종 자산 신원
+계약이 아니다. 최종 모델 자산 신원은
+[`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md)의
+`ce.uuidv8.sha256.v1`·schema v2·새 identity epoch가 유일한 정본이다. PHASE 17은
+UUIDv4 발급/보존/확장을 더 진행하지 않으며, 실제 226개 sidecar와 저장 참조의 일회성
+UUIDv8 재발급은 MBC3 원자 writer 뒤 MBC4가 소유한다. MBC2 완료는 규약·코덱·폐포
+검증 완료이며 현재 코퍼스 cutover 완료를 뜻하지 않는다.
+
+**현재 판정(2026-09-02 순차 구현 갱신):** D0·D1 제품 코드는 완료 상태다.
+D2의 로컬 old-v5 sidecar 61개는 당시의 transitional UUIDv4 transaction으로 재이주해
+`d2Ready=true`를 복구했다. D3는 읽기·쓰기·장기 Document를 모두 단일 ryml
+backend로 전환했고 yaml-cpp 소스·매니페스트·패키징·PE import를 0으로 만들었다.
+정본 `Test1.creator`가 없어 D0 동일 workload Release A/B만 닫지 못했다. D4는
+Animator·InputMap·Terrain을 단일 YAML 저작 경로로 전환하고 nlohmann을 완전히
+은퇴시켰다. D5-d는 현존 scene 8·prefab 9·material 2 전수 구조 parity와 Release
+Player cooked scene 소비를 닫았고, 정본 Test1 성능 비교만 입력 복구 backlog로 남겼다.
+D6은 CEDO1 runtime document와 Player parser 계측으로 완료했고, D7은 재개 조건을 둔 선택 중단이다. 세부 증거와 다음 순서는
+§1.8이 정본이다.
+
 ---
 
 ## 1. 지금 무엇이 있는가 — 측정 (2026-08-16)
@@ -238,6 +258,92 @@ YAML을 덤프한 **문자열**이다(`PrefabUtility.cpp:63`). 되먹일 때는 
 기준 1(호출 0)은 여전히 달성 가능하지만, 물리 링크 판정을 맡는 E6/N9 시점에는 이 배치
 자체가 재검토 대상이다. D6 착수 시 위치 이동 여부를 결정한다.
 
+### 1.8 2026-09-02 현재 구현 재감사 — 코드 진척과 수용 관문을 분리한다
+
+최신 `master` 소스와 현 작업 트리의 실행 자산을 다시 잴다. 예전에 통과한
+슬라이스라도 **현재 수용 관문이 빨가면 완료로 숨기지 않는다.** 다만 코드
+계약과 로컬 자산 상태를 하나의 실패로 섞지 않고 따로 적었다.
+
+| 트랙 | 현재 소스/실행 증거 | 판정 |
+|---|---|---|
+| D0 | 정본 계측 코드와 Release 관문은 존재하지만 `Test1.creator`가 없어 `verify-serialization-baseline`은 진입 전 실패한다. 별도 로컬 관문 `verify-phase17-local-d0-baseline.ps1`은 현존 최대 두 scene의 파일 크기·SHA-256을 고정해 boot/scene/prefab Release 계측 **4/4 selfcheck**를 통과했다 | **코드 완료 유지 · 로컬 대체 기준선 초록 · 정본 수치 비교 불가** |
+| D1 | 제품 계약은 그대로 초록이다. 정본 스크립트는 PowerShell 7.6 scalar `.Count` 오류와 주석 `efsw` 1건 위양성이 남았다. 별도 로컬 관문 `verify-phase17-local-d1-runtime-hygiene.ps1`은 7.6.4에서 배열 정규화와 C++ 주석 제거를 적용해 코드 참조 0, 주석 전용 1, Player 바이너리/DLL 0, Editor 대조군 검출로 통과했다 | **제품 계약 완료 유지 · 로컬 7.6 관문 초록 · 정본 검증기 보수 별도** |
+| D2 | schema v4 `non-canonical-only` manifest가 canonical 154개를 보존하고 old-v5 61개만 재발급했다. apply는 64파일/참조 76건이며 backup은 `%TEMP%/CE_D2Apply_c88550be8d0845b4aa5fcd5210fc2c29`. 당시 Strict 결과는 meta/parsed 215/215, UUIDv4 215, invalid/non-v4/missing/duplicate/policy violation 0, `d2Ready=true`. 현재 strict는 sidecar 226/UUIDv4 226/subasset 54다. 이 수치는 MBC4 입력 기준선이며 최종 신원 완료 증거가 아니다 | **PHASE 17 역사 완료 · UUID authority는 PHASE 3.75 MBC3~MBC4로 이관** |
+| D3 | D3-b-4까지 구현 완료했다. 장기 `Document::Impl`은 지연 생성 `WriteDocument`를 소유하고 `DocumentAccess`는 `ReadNode`/`WriteNode`만 노출한다. `ReadNode`·`NodeView`는 ryml `{Tree,id}` 단일 표현이며 migration probe/escape는 은퇴했다. DataSystem base64도 자체 strict RFC4648 codec으로 교체했다. 은퇴 게이트는 C++ 832파일에서 yaml-cpp include/symbol 0, manifest/runtime packaging 0, Editor PE import 0을 확인했다. Debug Editor build, Base64 Debug/Release, reflection 77/77, node equality 14/14, material 2/2, scene 8개 16/16, prefab 9/9·중첩·roundtrip, BT, asset ownership, LF 259/259이 초록이다 | **D3-b-4 구현 완료 · 정본 D0 동일 workload Release A/B만 보류** |
+| D4 | Animator scene YAML을 유일한 상태 그래프 정본으로 확정하고 외부 JSON 저장/불러오기를 제거했다. InputMap 6개는 구버전 reader 없이 schemaVersion 1 `.inputmap` YAML로 직접 이주했으며 6 maps/26 actions/104 keys를 전수 재로드했다. Terrain `.terrain` 본문도 schemaVersion 1 YAML로 바꾸고 2×2 height/layer 왕복을 검증했다. `ISerializable`과 `ConditionParameter.cpp`를 삭제했고 nlohmann source/manifest/installed package는 모두 0이다. Animator graph/링크, InputMap corpus, Terrain transaction/roundtrip, asset ownership, nlohmann/yaml-cpp retirement, Debug Editor build가 초록이다 | **완료 · legacy JSON 호환 경로 없음** |
+| D5 | CEMF v2가 cooked entry와 별도로 GUID→source-path identity 215개를 결정적으로 게시한다. Editor는 기존 source catalog를 유지하고, packaged Player는 `LoadAssetCatalog`를 호출하지 않은 채 CEMF만으로 registry/catalog를 트랜잭션 구축하며 missing/corrupt/identity 0을 fail-closed한다. 현존 scene 8·prefab 9·material 2의 authoring↔cooked 구조 parity가 통과했고, Release Project package는 Player `catalog=cemf identities=215 metaParsed=0`, `cooked scene docs=1`, 120프레임·promotion 2·managed type 25로 통과했다 | **D5-d 현 로컬 corpus 완료 · 정본 Test1 성능 비교만 backlog** |
+| D6 | CEDO1이 authoring tree를 versioned/bounded deterministic binary로 기록한다. 패키징은 ProjectSetting 3·InputMap 6·BT/BlackBoard 2·Volume 7 등 runtime document 18개와 scene/prefab/material/ShaderMeta Derived document 25개를 CEDO로 게시한다. Release Player는 `runtime.text-parser calls=0`, runtime module direct ryml reference 0, legacy JSON 0으로 통과했다 | **완료 · 구 YAML artifact/JSON 호환 reader 없음** |
+| D7 | 제품 정합성에 필수가 아닌 선택 최적화. D0~D6 이후 Editor open profile이 예산을 넘을 때만 재개 | **중단 유지** |
+
+#### 로컬 수용 환경과 고부하 모델 코퍼스 복구 (2026-09-01~02)
+
+Debug Editor의 `0xC0000135`는 .NET host pack 부재가 아니었다.
+`DeployEngineHostRuntime`가 FMOD DLL을 실제 `ThirdParty/Fmod/lib/x64`가 아닌
+존재하지 않는 `bin/x64`에서 먼저 검사했고, 그 오류 때문에 같은 item group의
+`nethost.dll` 복사까지 전부 중단됐다. 경로를 정정한 뒤 Debug Editor 전체 빌드가
+host runtime 배치를 실행했고, 출력의 `nethost.dll` SHA-256
+`bd949498388e321576bce83fddb19842566095619dda4023310545a83de1bbc`는 로컬
+.NET 10.0.11 host pack 원본과 같다. PATH 우회 없이 `help → quit` 기동·정상 종료,
+stderr 0을 확인했다.
+
+검증 입력은 라이선스 문서가 동봉되지 않은 외부 대용량 자산이라 저장소에 넣지
+않고 ignored `artifacts/phase17/validation-assets`에만 생성한다.
+`prepare-phase17-validation-assets.ps1`이 로컬 Blender 5.1.0을 factory-startup으로
+실행해 PBR metallic-roughness 재질을 다시 연결한다. Draco·gltfpack·mesh
+quantization·decimation·weld·vertex-cache 최적화·sparse accessor·animation key
+reduction·`.blend` 압축은 모두 끈다. FBX tangent layer는 Infinian에서 법선과
+평행한 값이 대량 검출돼 싣지 않고, 위치/인덱스/skin/key를 바꾸지 않은 채 엔진의
+기존 MikkTSpace 생성 경로를 명시적으로 탄다.
+
+| 입력 | Blender 원본 계수 | GLB 구조 | experiment source 수용 |
+|---|---|---|---|
+| Infinian animated | vertex 37,685 · polygon 46,223 · bone 190 · action 14 · material 3 | 31,918,804B · vertex 37,731 · index 138,669 · skin 1/joint 190 · animation 14/channel 7,980 · PBR texture 9 | node 192 · mesh 3 · vertex 37,709 · bone 191 · clip 14/channel 2,660 · texture property **9/9** · pose sample **42** · error 0 |
+| Sponza large-static | vertex 1,932,514 · polygon 2,408,209 · material 28 | 653,397,136B · vertex 2,031,565 · index 11,241,912 · PBR texture 73 · 금지 압축 확장 0 | node 23 · mesh 120 · vertex 2,040,885 · index 11,241,912 · material 28 · texture property **73/73** · error 0 |
+
+`verify-phase17-local-model-corpus.ps1`은 원본/산출물 SHA-256, float32 POSITION,
+금지 glTF 확장 0, 위 구조 하한을 검사한 뒤 `experiment.phase17model` 두 모드를
+실행한다. 결과는 **2/2 통과, process exit 0, stderr 0**이다. 기존
+`experiment.anim`은 Assimp legacy 브리지까지 요구해 Blender 5.1 GLB 수용 판정에
+맞지 않으므로, 새 관문은 experiment decoder와 제품 pose sampler를 직접 쓴다.
+
+이 초록은 **source importer·재질·애니메이션·대형 정점 수용 환경**만 닫는다.
+생성 GLB에는 D2 canonical UUIDv4 sidecar/subAssets가 없으므로 D2 이주나 D5
+AssetCooker/CEMF/Player cutover 완료 증거로 세지 않는다. 따라서 아래 단계 상태와
+Phase 17 진척률은 바꾸지 않는다.
+
+2026-09-02에는 정본 관문을 수정하지 않고 로컬 전용 D0/D1 관문을 별도로 세웠다.
+`verify-phase17-local-d0-baseline.ps1`은 Release Editor와 현재 코퍼스의 가장 큰 두
+scene을 사용한다. 이번 입력은 `FT_Primitives.creator` 22,716B
+(`d80056d1…f63156`)와 `Lifecycle3D.creator` 22,160B (`c6e9af5d…e5a777`)였고,
+boot 28.364ms/215 meta, scene 51.261ms·13.261ms/회, `NestedProbeParent` prefab
+instantiate 1.323ms/회까지
+**selfcheck 4/4**로 통과했다. 이 수치는 입력 해시가 같은 로컬 A/B에만 쓰며 누락된
+`Test1.creator`의 2026-08-30 정본 수치와 비교하지 않는다.
+
+`verify-phase17-local-d1-runtime-hygiene.ps1`은 PowerShell 7.6.4의 단일 결과를 항상
+배열로 정규화하고 C++ 주석 제거 후 제품 심볼만 센다. 실행 결과는
+`engineEfswCodeRefs=0`, `commentOnlyEfswRefs=1`, `scanSymbolCodeRefs=0`,
+Player project reference 6, Player 출력 폴더 1, Player 바이너리/DLL `efsw` 0이며
+Editor 바이너리 양성 대조군도 검출했다. 두 로컬 관문은 현재 머신의 수용 환경을
+복구한 것이며 정본 스크립트의 입력/호환성 결함을 은폐하거나 완료 처리하지 않는다.
+
+**최신 실행 순서:**
+
+1. 로컬 수용 환경, 고부하 모델, 별도 D0/D1 관문과 D2 selective 재이주는 완료했다.
+   정본 `Test1.creator` 복원/코퍼스 재정의, 정본 D1 스크립트 PowerShell 7.6 보수,
+   삭제된 정본 scene 14 입력은 별도 backlog로 유지한다.
+2. D3-b-4까지 구현해 yaml-cpp를 은퇴시켰다. 정본 `Test1.creator`가 복구되면
+   D0과 동일 workload의 Release 수치를 다시 채워 D3 수용 판정을 닫는다.
+3. D4는 완료했다. Animator는 scene YAML만 쓰고, InputMap/Terrain은 구 JSON
+   호환 reader 없이 canonical YAML로 직접 이주했다. `ISerializable`과 nlohmann은
+   source·manifest·설치 패키지에서 모두 제거했다.
+4. D5-d 현 로컬 corpus는 완료했다. scene 8·prefab 9·material 2 구조 parity와 실제
+   Release game package의 CEMF-only catalog/cooked scene 소비가 초록이다. 정본 Test1
+   성능 비교와 누락 scene 6개 확장은 입력 복구 backlog로 남긴다.
+5. D6도 완료했다. 최초 계측 12건(설정 3·InputMap 6·scene 1·memory payload 2)을
+   CEDO로 전환했고 Release package와 독립 관문에서 Player text parser 호출 0을
+   단정했다. D7은 재개 조건이 실측될 때까지 실행 순서에 넣지 않는다.
+
 ---
 
 ## 2. 결함 목록
@@ -273,8 +379,9 @@ YAML을 덤프한 **문자열**이다(`PrefabUtility.cpp:63`). 되먹일 때는 
 4. 성능 문제의 최종 답은 여전히 **런타임에서 텍스트 parser를 치우는 것**(3.2)이다.
    ryml 전환은 Editor 저장·로드와 dependency/build 비용을 줄이는 별도 가치다.
 
-새 authoring 정본은 YAML 1.2다. 기존 JSON 파일은 D4 동안 ryml JSON parser로 읽고
-YAML로 재저장한다. 외부 교환 계약이 생긴 JSON만 명시 예외로 남긴다. `.asset` 확장자는
+새 authoring 정본은 YAML 1.2다. **구버전 호환은 제품 요구가 아니므로 D4에 JSON
+migration reader를 두지 않는다.** 현 코퍼스는 한 번 직접 변환하고 제품 코드는 canonical
+YAML만 읽는다. 외부 교환 계약이 생긴 JSON만 명시 예외로 남긴다. `.asset` 확장자는
 텍스트와 모델 binary cache가 혼재하므로 확장자 일괄 변환은 금지하고, 실제 text YAML
 문서만 변환한다. ryml의 amalgamated 구성은 별도 c4core package를 피할 수 있지만
 포함 코드와 라이선스/SBOM은 ryml+c4core로 기록한다.
@@ -318,13 +425,13 @@ ryml의 `NodeRef`는 `Tree`를 소유하지 않는다. 따라서 `MetaYml = ryml
 않고 명시적인 base64 scalar codec으로 만든다. 이 단계 뒤에는 Entity/ComponentFactory가
 YAML/JSON 타입을 알지 않는다.
 
-### 3.4 `.meta` — 존치하되 재정의: 랜덤 GUID + git 추적
+### 3.4 `.meta` — 역사적 UUIDv4 전환 기록; 최종 정본은 PHASE 3.75 UUIDv8
 
 - **폐지 + 중앙 DB안 기각**: 임포트 설정(모델 3종 옵션 · `.cpp`의
   reflectionFlag/이벤트)의 저장처가 필요하고, 중앙 단일 파일은 팀 머지
   충돌의 단일점이 된다.
-- **채택**: GUID를 **랜덤 UUIDv4 채번**으로 바꾸고 `.meta`를 **git 추적
-  대상**으로 전환한다. 이때 비로소 Y-1·Y-2가 동시에 해소된다 — 리네임/이동은
+- **당시 채택(현재 폐기 예정)**: GUID를 **랜덤 UUIDv4 채번**으로 바꾸고 `.meta`를 **git 추적
+  대상**으로 전환했다. 이때 Y-1·Y-2를 먼저 해소했다 — 리네임/이동은
   `.meta`가 따라가므로 참조 불변, 동명 파일은 서로 다른 GUID. 결정성을 잃는
   대신 `.meta` 커밋이 진실이 된다(Unity와 같은 규약: "애셋을 옮길 때 .meta를
   같이 옮겨라").
@@ -332,6 +439,9 @@ YAML/JSON 타입을 알지 않는다.
   1회**로 전환한다(씬 12 + 프리팹 206 + `.asset`류 — 참조 필드는 전부
   `m_fileGuid`·`m_prefabFileGuid`·`m_scriptGuid` 계열 문자열이라 기계 치환
   가능). 레지스트리에는 충돌 시 경고 로그를 넣는다(무경고 덮어쓰기 금지).
+- **최종 계약**: UUIDv4 보존·신규 발급·runtime alias는 PHASE 3.75 완료선에 없다.
+  MBC3가 writer를 schema v2/UUIDv8로 단일화하고 MBC4가 새 epoch에서 corpus와 저장
+  참조를 한 번에 재작성한다. 아래 D2 수치와 UUIDv4 설명은 그 이전 상태의 감사 기록이다.
 - **런타임에서 `.meta`는 퇴출한다**: 쿠킹이 GUID→경로(→pak 오프셋) 매핑을
   매니페스트로 굽는다(3.6). 그 전까지 Player는 `.meta`를 **등록 전용**으로만
   읽는다(생성·워처 없이).
@@ -340,11 +450,10 @@ YAML/JSON 타입을 알지 않는다.
 
 - **애니메이터(Y-5)**: 씬 YAML 리플렉션 경로를 단일 진실로 하고 에디터 `.json`
   별도 저장을 은퇴시킨다. 빈 `Deserialize()`(Y-7)도 함께 제거한다.
-- **`ISerializable`**: `nlohmann::json` 고정 virtual 계약을 Archive/typed value 계약으로
-  교체한다. Runtime interface에 generic text DOM을 두지 않는다.
-- **입력맵·터레인 본문**: ryml JSON parser로 기존 파일을 읽는 migration reader를
-  먼저 세운 뒤 YAML 1.2로 재저장한다. migration 종료 뒤 dual-write와 nlohmann
-  consumer를 제거한다.
+- **`ISerializable`**: 소비자 없는 `nlohmann::json` 고정 virtual 계약을 삭제한다.
+  Runtime interface에 generic text DOM을 두지 않는다.
+- **입력맵·터레인 본문**: 현 코퍼스를 schemaVersion 1 YAML로 직접 변환하고 제품
+  loader는 canonical YAML만 받는다. legacy JSON reader와 dual-write는 만들지 않는다.
 - 외부 서비스가 요구하는 JSON은 PHASE 20 control/backend adapter 소관이며 realtime
   replication format으로 승격하지 않는다.
 
@@ -566,10 +675,12 @@ EngineLayerSeparation E 트랙 소유다 — D1은 링크 그래프만 판정한
 `.meta` 보존 · engineEfswRefs 0 · scanSymbolRefs 0 · Player.exe efsw 0(대조군 Editor.exe는
 검출) · 기존 `verify-asset-packer-boundaries` 회귀 없음. AssetPacker Release 빌드 exit 0.
 
-**D2 — GUID 정체성 수술 (Y-1·Y-2, 2일)**
-랜덤 UUIDv4 채번 + `.meta` git 추적 전환(3.4) + 일괄 재채번·참조 재작성
+**D2 — GUID 정체성 수술 (Y-1·Y-2, 2일) — 역사 완료·PHASE 3.75로 이관
+(2026-09-02)**
+아래는 랜덤 UUIDv4 채번 + `.meta` git 추적 전환(3.4) + 일괄 재채번·참조 재작성
 스크립트 + 레지스트리 충돌 경고. 죽은 프리팹 재연결 코드(Y-8)는 살리거나
-지우거나 이 슬라이스에서 결정한다(트랙 P 진행 상황에 따름 — §7).
+지우거나 이 슬라이스에서 결정했던 실행 기록이다. 최종 신원 규약과 남은 작업은
+PHASE 3.75 MBC3~MBC4가 소유한다.
 ★ 대규모 리팩터링의 정책은 **기존 GUID 호환 없음**이다. 기존 UUIDv4도 보존하지
 않고 sidecar 226개를 전부 재발급하며, old→new 표는 현재 저작 자산을 같은
 transaction에서 고치기 위한 일회성 ledger일 뿐 runtime compatibility table이 아니다.
@@ -701,7 +812,8 @@ canonical payload를 확인했다. 착수 감사에서 두 payload의 `m_fileGui
 226/non-v4 0/invalid·missing·duplicate 0이고, Git 정책 gate는 명시적 target/meta
 폐포만 추적하며 강제 추가 violation 0, `d2Ready=true`다. GUID rename,
 FT_Primitives 실제 DX12 draw와 세 corpus gate가 모두
-통과했고 VS18/v145 Debug x64 CreatorEditor·Player 빌드도 성공했다. 이로써 D2는 완료다.
+통과했고 VS18/v145 Debug x64 CreatorEditor·Player 빌드도 성공했다. 이로써 당시 D2
+범위는 완료됐지만, UUIDv8 cutover는 완료되지 않았다.
 old→new ledger와 외부 backup은 제품/runtime compatibility 경로에 남기지 않는다.
 
 **D3-a — format-neutral Document/Archive 경계 (Y-6, ~~3일~~ → 2일)**
@@ -735,7 +847,7 @@ Runtime interface의 YAML Node 타입 0 + 회귀·왕복 검사 통과 + D0 대�
 | **D3-a-3c** ✅ | `Prefab::m_prefabData` 적용. 접근자를 `.cpp`로 내려 소비자 20여 곳은 수정 0 | 중 | D3-a-3b |
 | **D3-a-4** ✅ | 컴포넌트 훅의 노드 인자를 `Authoring::NodeView`로. **실제 대상 4곳**(아래 정정) | 중 | D3-a-3 |
 | **D3-a-5a** ✅ | `ComponentFactory.h`·`SceneManager.h`·`Scene.h` — 완료 기준 9가 **명시한 이름**을 닫는다 | 중 | D3-a-4 |
-| **D3-a-5b** ◐ | 인자형 완료(`DataSystem::DeserializeMaterialPayload`·`Prefab::SetPrefabData`). **반환형은 D3-b로**, `MaterialAuthoringCodec`은 I5-M5 소유, `BTBuildGraph.h`는 CP949 | 중 | D3-a-5a |
+| **D3-a-5b** ✅ | 인자·반환형을 `ReadNode`/`WriteDocument`로 닫고 `MaterialAuthoringCodec`·BT graph까지 backend 타입을 제거 | 중 | D3-a-5a |
 | **D3-b-CRLF** ✅ | 저작 개행 LF 고정 — 자산 243개 변환 + writer 11곳 binary + `.gitattributes` 명시 | 소 | — |
 | **D3-b-0** ✅ | ryml 도입 + 파서 동등성 프로브(Release 12.70×, 구조 diff 0) | 중 | — |
 | **D3-b-1** ✅ | ryml 에러를 abort→예외로. **제품 경로 투입의 선결 조건** — 변이 2회로 게이트 이빨 증명 | 소 | D3-b-0 |
@@ -745,13 +857,13 @@ Runtime interface의 YAML Node 타입 0 + 회귀·왕복 검사 통과 + D0 대�
 | **D3-b-2b-1b-1** ✅ | 읽기 어댑터 `Authoring::ReadNode` 도입 + 타입 디시리얼라이저 이관. 행동 변화 0, 탈출구 6곳 | 중 | D3-b-2b-1a |
 | **D3-b-2b-1b-2a** ✅ | 맵 순회 추가 + `ExtractTypeFromYAML` 이관. 변이로 분기 생존 확인 | 중 | D3-b-2b-1b-1 |
 | **D3-b-2b-1b-2b** ✅ | 훅 인자를 어댑터로(`NodeViewAccess::Node` 반환형) + 래칫 게이트. 탈출구 15/14 기준선 | 중 | D3-b-2b-1b-2a |
-| **D3-b-2b-1b-2c** ◐ | 씬 읽기 경로 소비자 이관 — 래칫 15→12. 잔여는 backend 교체와 함께 사라진다 | 중 | D3-b-2b-1b-2b |
+| **D3-b-2b-1b-2c** ✅ | 씬·컴포넌트 읽기 소비자를 `ReadNode`로 이관. backend 오버로드 제거는 writer/Document 단계가 소유 | 중 | D3-b-2b-1b-2b |
 | **D3-b-2b-1b-3a** ✅ | 어댑터를 이중 backend로 + 어댑터 파리티 게이트(278파일·15,339노드 차이 0) | 대 | D3-b-2b-1b-2c |
-| **D3-b-2b-1b-3b** ◐ | 훅 이관 + 뷰를 두 backend로(불투명 2워드+태그). 래칫 12→10 | 중 | D3-b-2b-1b-3a |
-| **D3-b-2b-1b-3c** ☐ | 씬 `LoadFile` → `parse_in_arena`. **선행: experiment 재질 코덱이 어댑터를 받아야 한다(I5)** | 중 | D3-b-2b-1b-3b |
-| **D3-b-L** ◐ | leaf 파서를 ryml로(BlackBoard·TagManager·ShaderMeta 완료, ~35곳 잔여). **계획서에 없던 슬라이스** | 중 | D3-b-1 |
-| **D3-b-3** ☐ | 쓰기 경로(`Meta::Serialize`·Emitter). 파싱 이득 없음 — 저작 왕복 정확성이 판정 | 중 | D3-b-2b-1b-3c |
-| **D3-b-4** ☐ | `Document::Impl` 교체 + Access 반환형. **첫 단계가 아니라 마지막이다**(아래 정정) | 중 | D3-b-3 |
+| **D3-b-2b-1b-3b** ✅ | 훅 이관 완료. 최종 `NodeView`는 태그 없는 ryml `{Tree,id}` 불투명 2워드 | 중 | D3-b-2b-1b-3a |
+| **D3-b-2b-1b-3c** ✅ | scene `LoadFile` → 소유형 `ParsedDocument`; material codec/DataSystem 전체 문서도 `ReadNode`. 현존 scene 8의 16/16 왕복 초록, 정본 14 입력은 별도 | 중 | D3-b-2b-1b-3b |
+| **D3-b-L** ✅ | runtime/leaf와 cooked producer 읽기 전환 완료. 제품 direct parse 잔여 9건은 전부 read-write라 D3-b-3 소유 | 중 | D3-b-1 |
+| **D3-b-3** ✅ | `WriteDocument`/`WriteNode`로 제품·테스트 writer 이관. `Meta::Serialize`·Emitter·텍스트 writer bridge·YAML 반환 material writer 0, reflection golden 77/77 diff 0 + 저작 corpus 초록 | 중 | D3-b-2b-1b-3c |
+| **D3-b-4** ✅ | `Document::Impl`→지연 생성 `WriteDocument`, Access→`ReadNode`/`WriteNode`; yaml-cpp dependency·probe·packaging·PE import 0 | 중 | D3-b-3 |
 
 **D3-a-1 — 구조 비교 — ✅ 구현·표적 검증·게이트 편입 완료 (2026-08-30).**
 `Engine/Utility_Framework/AuthoringNodeEquality.h/.cpp` 신설 — `Authoring::NodesEqual`이
@@ -1624,24 +1736,23 @@ backend 등장 **0**이 됐다.
 호출부가 루프 변수·중간 노드라 이름 있는 어댑터를 만들 수 없는 자리가 많았다.
 **태그 방식이 옳았다** — 두 표현을 안전하게 공존시키면 호출부를 건드리지 않아도 된다.
 
-**★ 남은 씬 전환 블로커는 하나다:**
-`experiment::DeserializeMaterialPropertyValue(const YAML::Node&, ...)` —
-`MeshRenderer::OnDeserialized`가 재질 override를 읽을 때 부른다. **I5 소유 코덱**이라
-이 트랙이 옮길 수 없다. ryml 노드로 부르면 `BackendNodeDuringTransition()`이 던지므로,
-씬을 ryml로 파싱하면 MeshRenderer가 있는 모든 씬이 실패한다.
+**2026-09-02 갱신 — 씬 전환 블로커 해소.**
+`DeserializeMaterialPropertyValue`와 전체 `DeserializeMaterialAuthoring` 계약을
+`Authoring::ReadNode`로 옮겼고, `DataSystem::DeserializeMaterialPayload`의 backend
+탈출구도 제거했다. legacy constant-buffer의 Base64는 스칼라를 명시 decode해 ryml에서도
+같은 bytes를 만든다. 이어 `SceneManager` 네 로드 경로를 소유형
+`ParsedDocument::ParseFile`로 바꿔 Tree 수명을 전체 역직렬화 동안 유지한다.
 
 ★ 참고로 `DecodeMaterialReferenceNode`는 I5 소유가 아니라 `MeshRenderer.cpp`
 익명 네임스페이스의 지역 함수였다 — 그래서 옮겼다. **"I5 것"과 "I5 것처럼 보이는 것"을
 가르는 데 실측이 필요했다.**
 
-**권고:** experiment 재질 코덱이 `Authoring::ReadNode`를 받도록 I5 트랙에 요청하거나,
-D3-b-3(쓰기 경로)에서 그 코덱을 함께 옮긴다. 그 전에는 씬 ryml 파싱을 켤 수 없다.
-
-**남은 탈출구 10곳:** `ReflectionTypedYml.h` 6 · `MeshRenderer.cpp` 1(위 블로커) ·
-`DataSystem.cpp` 1(재질 경로) · `Prefab.cpp` 1(read-write 소환) ·
-`AuthoringNodeViewAccess.h` 1(yaml-cpp 표현 생성).
-
-**검증:** Debug x64 CreatorEditor·Player exit 0, 게이트 10종 exit 0. 행동 변화 0.
+**현재 탈출구 2곳:** `Prefab.cpp` 1(read-write 소환) ·
+`AuthoringNodeViewAccess.h` 1(yaml-cpp writer 표현 생성). 리플렉션 reader의 변환 실패
+폴백과 post-load 훅도 backend 독립 API로 닫았다. `MaterialAuthoringCodec` 42/42,
+material migrate 합성 22/22·실사 26/26, standalone material 2/2, 현존 scene 8의
+load/save 16/16이 통과했다. 어댑터 게이트는 live corpus 247파일과 자급 fixture
+250파일을 별도로 요구해 코퍼스 축소를 빈 성공으로 통과시키지 않는다.
 
 **D3-b-L — leaf 파서 정리 (신설 슬라이스) — ◐ 착수 (2026-08-31).**
 
@@ -1666,8 +1777,12 @@ D3-b-3(쓰기 경로)에서 그 코덱을 함께 옮긴다. 그 전에는 씬 ry
 소유하지 않으므로(§8) 홀더가 그 규칙을 타입으로 강제한다. `Authoring::Document`
 (저작 문서 장기 소유)와 이름이 비슷하니 용도를 헤더에 적어 뒀다.
 
-**옮긴 것:** `BlackBoard::LoadFromFile` · `TagManager::Load`. 두 파일의 잔존
-yaml-cpp는 전부 **쓰기 경로**(Save)이며 D3-b-3 몫이다.
+**옮긴 것(2026-09-02 누적):** `BlackBoard`·`TagManager`·`ShaderMeta`·
+`RuntimeSettings`·`EditorSettingsStore::Initialize`·`FoliageComponent`·`PhysicsManager`·
+`Terrain`·`VolumeComponent`·`Model`·`ModelLoader`·`BehaviorTreeComponent`, 그리고
+cooked `MaterialCookProducer`·`SceneCookProducer`·`ModelCookIdentity`.
+`BTBuildGraph.h`는 CP949라 패치 도구가 읽지 못하므로 UTF-8
+`BTBuildGraphAuthoring.h` 브리지에서 runtime/editor가 같은 `ReadNode` 삽입 절차를 쓴다.
 
 **★ 게이트가 여럿 초록이어도 그 경로가 지켜진다는 뜻이 아니다 — 변이로 확인했다.**
 - `BlackBoard` 변이 → `verify-bt-smoke`가 잡았다("시퀀스 완주 로그가 없다").
@@ -1692,85 +1807,39 @@ yaml-cpp는 전부 **쓰기 경로**(Save)이며 D3-b-3 몫이다.
 가드는 변이로 검증했다 — 파싱을 실패시켜도 **자산이 보존됐고**(바이트 동일) 게이트는
 빨갛게 실패했다.
 
----
+**읽기 단계 종료 실측:** `ParsedDocument::ParseFile/ParseText` 제품 호출 28,
+runtime 직접 `YAML::Load*` 0. 전체 Engine/Editor/AssetCooker에는 yaml-cpp include 15파일,
+`YAML::`/`MetaYml::` 사용 47파일·321건이 남았다. 제품 직접 parse 9건은
+`PrefabUtility`·`EditorAssetDatabase`·`EditorSettingsStore::Save`·Inspector 선택 노드·
+`ModelIdentityRefresher`의 **read-write** 경로뿐이라 D3-b-3 소유다.
 
-**ShaderMeta 27곳 이식 — 완료 (2026-08-31).** 전부 읽기 경로였다.
+**검증:** Debug CreatorEditor 빌드, strict GUID, AssetCooker 결정성/원자성,
+material/scene/prefab corpus, BT 실제 실행, Phase 17 Infinian/Sponza 2/2가 통과했다.
+정본 scene 14 중 현재 Git에 남은 것은 8개라 14개 완료 주장은 하지 않는다.
 
-**먼저 자를 세웠다.** 규칙대로 착수 전에 변이로 확인했더니, 이 파서의 계약은
-`dx12.selftest`(`EnhancedSceneRendererSelfTest::ValidateShaderMeta`) **안에만** 있었다.
-그리고 그것은 회귀 세트(run-all)에 없고, 자기 하네스인
-`Tools/dx12-validation/Invoke-DX12Validation.ps1`은 vcpkg baseline preflight에 막혀
-이 기계에서 돌지 않는다. 변이(`if (false && !known)` — unknown-field 거부 무력화)를
-넣고 다시 빌드한 결과:
-
-| 하네스 | 결과 |
-|---|---|
-| `dx12.selftest` | 실패(잡는다) — 하지만 세트에 없고 하네스는 preflight에 막힘 |
-| `verify-experiment-asset-cooker` | **통과(눈멀다)** |
-
-즉 **정기적으로 도는 게이트 중 이 경로를 지키는 것이 없었다.** TagManager에서 순서를
-놓쳐 저작 자산을 잃었으므로, 이번에는 이식 **전에** `shadermeta.probe`와
-`verify-shadermeta-authoring-read.ps1`을 만들고 run-all에 넣었다.
-
-**두 방향을 잰다.** 수용(실자산 6개의 property·axis·pass **이름 집합**을 자산 텍스트에서
-유도해 대조)과 거절(사유별 6종). 저작 코퍼스는 전부 유효하므로 수용만 재면 "무엇이든
-통과시키는 파서"가 만점을 받는다 — backend 교체에서 가장 흔한 실패가 그 방향이다.
-
-거절 사례에는 **ryml 고유 위험**을 넣었다:
-- `missing-source` — ryml `operator[]`는 없는 키에서 **abort**한다. 어댑터의
-  `find_child` 흡수가 맞는지 상시로 밟는다.
-- `numeric-bool`(`depthWrite: 1`) — YAML 1.1 bool 표. 스칼라 파리티(D3-b-2b-0)가 두
-  backend에서 갈리는 것으로 실측한 부류다.
-- `sequence-root` — 맵이 아닌 루트에 맵 연산.
-
-**변이로 이빨을 증명했다**(첫 실행부터 초록이었으므로 필수였다):
-
-| 변이 | 게이트 반응 |
-|---|---|
-| unknown-field 거부 무력화 | `rejected=5/6`, `unknown-field accepted=1`을 지목 |
-| 마지막 property 하나 흘림 | 6개 파일 각각에서 **빠진 이름을 지목**(`emissiveMap`·`albedoMap`·`alphaCutoff`) |
-
-**이식 결과.** `YAML::Load` → `Authoring::ParsedDocument::ParseText`,
-`ValidateMap`의 키 순회 → `MapEntry`(ryml에서 키는 자식의 **속성**이지 노드가 아니다),
-`node[index]` → `At()`, `as<T>()` → `As<T>()`, `Scalar()`가 `string_view`가 되어
-문자열 대입부는 `AsString()`. `catch (YAML::Exception)`은 사라졌다 — ryml은 예외가
-아니라 abort가 기본값이라 잡을 것이 없고, 파싱 실패는 `ParsedDocument`가 값으로
-돌려준다. **탈출구 0개**(래칫 10/10 불변).
-
-검증: 새 게이트 `files=6 parsed=6 rejectCases=6 rejected=6`, `dx12.selftest` 통과,
-`verify-experiment-asset-cooker`·`verify-material-authoring-corpus`·
-`verify-asset-guid-contract` 통과.
-
----
-
-**부수 수정 — `verify-player-runtime-hygiene`(D1)이 주석을 참조로 세고 있었다.**
-`PrefabUtility.cpp`의 "efsw 워처가 이 필드를 바꾼다"라는 **설명 한 줄** 때문에 이
-검사가 빨갰다. 재는 것은 링크되는 참조인데 원문을 그대로 grep했다. 블록·줄 주석을
-걷어낸 뒤의 본문만 보도록 고쳤고, 변이(엔진 트리에 실제 `#include <efsw/efsw.hpp>`)로
-**여전히 실코드를 잡는 것**을 확인했다.
-
----
-
-**★ 이 세트에는 내 트랙이 아닌 실패가 하나 남아 있다.** `HierarchyStore 읽기 경계`가
-7건으로 빨간데 전부 I5 트랙 소유다 — `ExperimentModelMigration.cpp` 6건(역브리지가
-`m_parentIndex`를 직접 쓴다)과 `ConsoleCommandSystem.cpp:3025` 1건. **HEAD에서 이미
-빨갛고**(해당 줄이 HEAD에 그대로 있고 `ExperimentModelMigration.cpp`는 워킹트리
-수정본이 아니다) 이 슬라이스와 무관하다. 계층 단일 정본 경계를 어떻게 지킬지는 I5의
-설계 결정이므로 여기서 코드를 고치거나 그쪽 게이트를 느슨하게 하지 않았다.
-
----
-
-**남은 leaf(~35곳):** `EditorSettingsStore` 13 · `RuntimeSettings` 4 ·
-`FoliageComponent` 4 · `Model` 4 · `VolumeComponent`·`PhysicsManager`·
-`BehaviorTreeComponent` 각 2 · `Terrain`·`ModelLoader` 각 1.
-**착수 전에 각각 어떤 게이트가 지키는지 변이로 확인할 것** — TagManager가 그 필요를
-증명했고, ShaderMeta는 "강한 계약이 있어도 도는 세트에 없으면 없는 것과 같다"를
-덧붙였다.
-
-- **D3-b-3:** 쓰기 경로(`Meta::Serialize`·`YAML::Emitter`). 파싱 이득은 없고 저작
-  왕복 정확성이 판정이다.
-- **D3-b-4:** `Document::Impl` 교체 + `DocumentAccess`/`NodeViewAccess` 반환 타입.
-  위 둘이 끝나야 변환 없이 바뀐다.
+- **D3-b-3 완료(2026-09-02):** `Authoring::WriteDocument`/`WriteNode`를 도입해
+  reflection, Scene/Prefab, Inspector, AssetDatabase, AssetCooker refresher, material,
+  EditorSettings writer를 직접 ryml Tree에 쓰도록 옮겼다. `Meta::Serialize`,
+  `YAML::Emitter`, `ReplaceFromYamlText`, YAML 반환 material writer는 각각 0이다.
+  빈 문자열 `""`, null `~`, flow map/sequence의 inline·쉼표 공백을 기존 canonical
+  출력과 맞췄고, 다른 Tree/`ReadNode` subtree는 목적지 arena로 깊은 복제한다.
+  검증은 Debug Editor build, reflection 77/77 golden diff 0, material codec 42/42,
+  migration 22/22·26/26, material 2/2, scene 8개 load/save 16/16, prefab override,
+  BT 실제 실행, asset ownership 전체 통과다. yaml-cpp 표면은 include 15→5,
+  사용 47파일/321건→21파일/89건, backend escape 2→1로 줄었고 래칫도 1로 조였다.
+- **D3-b-4 완료(2026-09-02):** `Document::Impl`이 지연 생성 `WriteDocument`를
+  소유한다. 지연 생성은 전역 `SceneManager`의 정적 초기화 중 ryml callback 정책이
+  먼저 설치돼 발생하던 `0xC0000005`를 막는다. `DocumentAccess`는 adopt/clone/read/write를
+  `WriteDocument`·`ReadNode`·`WriteNode`로만 제공하고, `NodeView`는 backend 태그 없는
+  `{Tree,id}` 두 워드다. Prefab의 장기 원본·snapshot·중첩 instantiate와 Console/foliage/
+  navigation parse도 새 소유 경계를 쓴다.
+  Reflection의 backend 오버로드와 parser/scalar/adapter migration probe·게이트를 삭제했고,
+  DataSystem의 yaml-cpp Base64 호출은 strict RFC4648 codec으로 교체했다. vcpkg 의존성과
+  Debug/Release DLL 배치도 제거했다. `verify-yaml-cpp-retirement.ps1` 결과는
+  C++ 832파일 위반 0, PE import checked이고 Base64 계약은 Debug/Release 모두 통과했다.
+  전체 Debug Editor build와 reflection 77/77, node equality 14/14, LF 259/259,
+  material/scene/prefab/BT/asset ownership 회귀도 통과했다. 정본 scene 14 중 현존 8의
+  16/16 왕복은 초록이지만, `Test1.creator` 부재로 D0 동일 workload Release A/B는 보류다.
 
 **D3-b — rapidyaml backend 전환 (2일)**
 `AuthoringDocument`의 backend를 ryml `Tree`로 바꾸고 장기 문서는
@@ -1779,11 +1848,14 @@ yaml-cpp는 전부 **쓰기 경로**(Save)이며 D3-b-3 몫이다.
 판정: 전 authoring 문서 로드·재저장·Prefab/Undo/Editor generic node edit 통과 +
 yaml-cpp consumer/include 0 + D0과 동일 workload의 Release A/B 첨부.
 
-**D4 — structured text 통일과 nlohmann 제거 (Y-5·Y-7, 2일)**
-3.5. 애니메이터 단일 진실화, 입력맵·터레인 migration reader, `ISerializable` Archive
-전환이 본체다. 판정: 애니메이터 저장 경로 1개 · dual-write 0 · nlohmann consumer/
-include 0 · 기존 JSON fixture read 후 YAML canonical save · 상태 그래프/입력/터레인
-회귀 통과.
+**D4 — structured text 통일과 nlohmann 제거 (Y-5·Y-7, 2일) — ✅ 완료
+(2026-09-02)**
+3.5. 애니메이터 scene YAML 단일 진실화, 입력맵·터레인 canonical YAML 직접 이주,
+소비자 없는 `ISerializable` 삭제가 본체다. 구버전 호환 요구가 없으므로 JSON fixture
+reader나 dual-read를 만들지 않았다. 판정 결과: 애니메이터 저장 경로 1개 · dual-write 0 ·
+InputMap 6 maps/26 actions/104 keys · Terrain 2×2 height/layer 왕복 · nlohmann
+consumer/include/manifest/installed package 0 · 상태 그래프 포인터 링크 안정성 · 전체 Debug
+Editor build와 전용 D4/asset ownership/yaml-cpp retirement 관문 통과.
 
 **D5 — 쿠킹 바이너리 + pak 매니페스트 (4일)**
 리플렉션 순회 바이너리 라이터/리더(3.2) + Cook 단계 확장 + 매니페스트(3.6).
@@ -2225,7 +2297,28 @@ CEMF 하나를 읽어 **GUID로 묻는** 런타임 경계. 조회(`Find`)·artif
 부분 catalog 게시 34건. 게이트 `experiment.catalog`(합성 31 · 전수 11), experiment 게이트 19회
 호출 전수 통과.
 
-**D5-c 잔여 — Player 배선. ⏳ I5-M5 S1~S4 대기(08-30 확인).**
+**D5-c 완료 — 제품 mount·cooked 소비·stale 폴백 + Player CEMF cutover
+(2026-09-02).** I7-C1이 `DataSystem::MountCookedCatalog`/
+`ResolveCookedArtifact`를 기동·모델·texture sealing에 이었고, I7-C2가 낡은
+artifact 하나만 source로 폴백하는 entry 단위 신선도 판정을 닫았다.
+
+`DataSystem::Initialize`는 host capability로 갈라져 Editor에서만 source `.meta`
+catalog를 읽는다. packaged Player는 CEMF v2 source identity table로 새
+`AssetMetaRegistry`를 만든 뒤 완성된 registry/catalog만 게시하고, manifest가
+없거나 깨졌거나 source identity가 0이면 부팅을 실패시킨다. AssetPacker는
+`.meta`를 제외하고 CEMF는 보존한다. `Tools/build.ps1`은 manifest 투영과 reopen된
+pak 목록을 전수 대조하고, 격리 스모크에서 `source=cemf`, `metaParsed=0`, source
+identity 수 일치, unpacked `.meta` 0, CEMF 존재를 단정한다.
+
+Release Project 실측: model 14, manifest entry 297, source identity 215, pak entry
+500, authoring/source 제외 215. `FT_Primitives.creator` 120프레임은 promotion 2,
+managed type 25로 정상 종료했고 `catalog=cemf identities=215 metaParsed=0`,
+`cooked scene docs=1`을 남겼다. pak 해제 mtime은 source/Derived의 원래 cook 순서를
+보존하지 않으므로 Player는 package transaction과 CEMF hash/size를 신선도 정본으로
+쓰고, mtime stale fallback은 Editor optional mount에서만 적용한다.
+
+**08-30 기록(현 상태는 위 단락으로 대체):**
+
 ★ 위 catalog를 Player 기동 경로에 꽂아 `.meta` 재귀 스캔을 대체하는 일이 남았다.
 대체 대상은 `DataSystem::LoadAssetCatalog`(`DataSystem.cpp:210`)이고, 현재 Player는
 `PlayerMain.cpp:139`에서 이를 호출해 부팅마다 `.meta` 240개를 전수 파싱한다(§1.7 ②). 다만 그 순간
@@ -2236,9 +2329,16 @@ pak의 CEMF를 기동 시 읽어 GUID→artifact catalog를 세우고, 지금의
 path 탐색 없이 manifest와 cooked bytes만으로 scene/model/material 의존성을 해석하게 하고,
 그 뒤에만 `.meta`를 pak에서 제외한다. missing/duplicate/stale manifest entry는 fail-closed다.
 
-**D5-d — 전수 cook parity + D0 성능·실플레이 — ⏳ 잔여.** scene 14·prefab 9·standalone
-material 2의 authoring 결과와 cooked load 결과를 전수 비교하고, Player 씬 전환을 D0과
-대조한 뒤 실제 게임 빌드 플레이로 D5 전체를 닫는다.
+**D5-d — 전수 cook parity + D0 성능 — 현 로컬 corpus 완료, 정본 비교 backlog.**
+`verify-experiment-document-cook-parity.ps1`이 현존 scene 8·prefab 9·standalone
+material 2를 실제 producer로 굽고 authoring/cooked `ReadNode` 구조 동등, CLI
+19/19, source/meta 변경 0, stderr 0을 단정해 통과했다. catalog 제품 소비 게이트는
+실제 package와 같은 producer closure(model 14·texture 103·ShaderMeta 6·material 2·
+scene/prefab 17)를 굽고 mounted model 8/8 cooked, texture 1/1 cooked, stale 모델
+1개만 source fallback, unmounted model 8/8 source를 확인했다. Release Player는 cooked
+scene 문서 1건 이상을 열었다. 이 D5 구조 parity는 D6에서 CEDO payload로 다시 통과했다.
+원래 완료 기준의 scene 14 전수 판정과 Test1 동일 workload 성능 대조는 누락 입력이
+복구될 때 확장한다.
 
 **D6 — Player 텍스트 경로 은퇴 (1일)**
 EngineSettings·TagManager 등 부팅 YAML도 쿠킹 대상에 편입. 판정:
@@ -2247,15 +2347,36 @@ ryml include 0. yaml-cpp/nlohmann consumer 제거는 D3-b/D4에서 이미 끝나
 물리 링크·PE import를 Editor에만 가두는 최종 판정은 EngineLayerSeparation E6와
 PHASE 20 N9가 맡는다.
 
+**2026-09-02 완료 증거.** 최초 Release Player 계측은 12건이었다: EngineSettings·
+TagManager·CollisionMatrix 3, InputMap 6, 시작 scene 1, material/ShaderMeta memory payload
+2. `AuthoringCookedDocument`의 CEDO1은 node type/key/scalar/child count를 little-endian
+tree로 기록하고 version·크기·node 수·깊이·중복 key·trailing byte를 fail-closed한다.
+scene/prefab/material/ShaderMeta producer와 CEMT material payload를 CEDO로 바꿨고,
+PrefabOverride의 중첩 저작 값도 `CEDO1:<base64>` envelope로 cook해 packaged Player의
+YAML fallback을 없앴다(`overrideCedo=1/1`).
+AssetCooker package mode가 runtime document 18개를 YAML preflight 뒤 CEDO로 교체한다.
+구 YAML artifact는 버전 상승 후 재쿠킹하며 compatibility reader를 두지 않았다.
+
+최신 Release Project package `Dynamic_CPP-bea30cea376f47799ec34d1413645b4a`
+(content digest `aa4fdcacce9935597fafc460fe69966e9a66b8903fa2b5538b127280e5076cbd`)는 pak 469 entry,
+authoring sidecar/retired JSON 등 제외 246, CEMF identity 215, runtime document 18,
+Derived CEDO document 25, parser calls 0, direct ryml reference 0, legacy JSON 0,
+cooked scene docs 1, 120 frame, promotion 2, managed type 25로 통과했다. Debug/Release
+전체 빌드 뒤 최종 override 변경에 대해 Debug Editor와 Release AssetCooker/Player를
+재빌드했고, scene 8·prefab 9·material 2 구조 parity, mounted/stale/unmounted catalog와
+독립 `verify-player-runtime-text-parser.ps1`도 다시 초록이다.
+
 **D7 — 에디터 웜 캐시 (선택, 1일)**
 에디터도 쿠킹 캐시를 mtime 비교로 활용해 반복 로드를 가속. D5의 부산물이
 공짜로 생기는지 보고 결정 — 안 되면 하지 않는다(YAGNI).
 
-합계 **16.5일**(D7 제외 15.5일). 순서 제약: D0 → D1·D2 병행 가능 → D3-a →
+기존 명기치 재합계는 **15.5일**(D7 제외 **14.5일**)이다. 다만 D3-b-L의
+leaf ~62곳은 신설 범위인데 별도 공수를 아직 재지 않았으므로, 14.5일은
+**활성 공수의 하한**이지 현실적 총합이 아니다. 순서 제약: D0 → D1·D2 병행 가능 → D3-a →
 D3-b·D5 병행 가능(D5는 D2의 GUID 확정도 선행) → D4 → D6. D3-a가 전체의
 이음새이고, PHASE 20 N1은 D3-a/D3-b/D4 완료 뒤 시작한다.
 
-**08-30 잔여 재산정.** D2 전체와 D5-a~D5-c-2가 닫힌 현재, 남은 것은
+**08-30 잔여 재산정(역사 기록 — 현 순서는 아래 09-01 판정이 대체).** D2 전체와 D5-a~D5-c-2가 닫힌 당시, 남은 것은
 D0 · D1(축소) · D3-a(축소) · D3-b · D4 · D5-c 잔여 · D5-d · D6 · D7(선택)이다.
 D2·D5가 D0보다 먼저 진행된 탓에 지금 **실제 하드 블로커는 D0 하나**였다:
 
@@ -2276,6 +2397,12 @@ D2·D5가 D0보다 먼저 진행된 탓에 지금 **실제 하드 블로커는 D
 **08-30 진행 상황: D0·D1 완료.** 남은 것은 D3-a · D3-b · D4 · D5-c 잔여 · D5-d · D6 ·
 D7(선택)이다. 다음은 **D3-a**이고, 이 슬라이스가 전체의 이음새다(§1.7 표가 보여주듯
 저작 표면이 계속 자라므로 지연 비용이 단조 증가한다).
+
+**2026-09-02 현재 잔여 및 순서.** D2 selective 재이주, D3-b-4, D4, D5-c Player
+CEMF cutover, D5-d 현 로컬 corpus parity와 D6 Player text parser 호출 0까지 완료했다.
+D3의 정본 Release A/B와 D5 정본 성능
+판정을 위해 Test1 입력은 여전히 필요하다. D1 검증기/scene 14 입력 복구는 로컬
+대체 관문과 구분한 backlog다. D7은 재개 조건 실측 전까지 중단을 유지한다.
 
 ---
 

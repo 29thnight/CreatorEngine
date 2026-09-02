@@ -101,12 +101,8 @@ namespace
 				}
 				experiment::MaterialProperty property;
 				property.name = entry["name"].AsString();
-				// ★ 전환기 탈출구 — I5 소유 코덱이 backend 노드를 받는다.
-				// **이것이 씬 ryml 전환을 막는 마지막 의존이다**(ryml 노드에
-				// 부르면 던진다). experiment 코덱이 어댑터를 받으면 사라진다.
 				if (!experiment::DeserializeMaterialPropertyValue(
-						entry.BackendNodeDuringTransition(),
-						property.name, property.value, outError)
+						entry, property.name, property.value, outError)
 					|| !ExperimentMaterialMigration::ApplyPropertyToLegacy(
 						*owned, property, outError))
 				{
@@ -133,9 +129,9 @@ namespace
 	// I5-M5 S2c-2a — base 참조(ref) 표기의 쓰기. 현 재질과 base를 같은 meta로
 	// experiment 변환해 diff만 남긴다. base에만 있는 저작은 참조 표기로
 	// "되돌림"을 표현할 수 없으므로 실패(인라인 폴백)다. variant 값 비교는
-	// 코덱 인코딩 텍스트로 한다 — 수학 타입에 operator==가 없다.
+	// 정본 코덱의 ryml 인코딩 텍스트로 한다 — 수학 타입에 operator==가 없다.
 	[[nodiscard]] bool BuildMaterialReferenceNode(const Material& current,
-		FileGuid baseGuid, YAML::Node& outNode, std::string& outError)
+		FileGuid baseGuid, Authoring::WriteNode outNode, std::string& outError)
 	{
 		const file::path basePath = DataSystems->GetFilePath(baseGuid);
 		if (basePath.empty())
@@ -192,64 +188,80 @@ namespace
 			}
 		}
 
-		const auto encodeEntry = [&outError](
-			const experiment::MaterialProperty& property,
-			YAML::Node& outEntry)
+		const auto encodeValueText = [&outError](
+			const experiment::MaterialProperty& property, std::string& outText)
 		{
-			outEntry["name"] = property.name;
-			return experiment::SerializeMaterialPropertyValue(property,
-				outEntry, outError);
-		};
-		YAML::Node overrides(YAML::NodeType::Sequence);
-		for (const experiment::MaterialProperty& property :
-			currentConverted.properties)
-		{
-			YAML::Node entry;
-			if (!encodeEntry(property, entry))
+			Authoring::WriteDocument document;
+			const Authoring::WriteNode entry = document.Root();
+			entry.SetMap();
+			if (!experiment::SerializeMaterialPropertyValue(property,
+				entry, outError))
 			{
 				return false;
 			}
+			outText = document.Dump();
+			return true;
+		};
+
+		Authoring::WriteDocument staging;
+		const Authoring::WriteNode result = staging.Root();
+		result.SetMap();
+		result.Child("ref").SetScalar(baseGuid.ToString());
+		Authoring::WriteNode overrides;
+		for (const experiment::MaterialProperty& property :
+			currentConverted.properties)
+		{
 			if (const experiment::MaterialProperty* baseProperty =
 				findByName(baseConverted, property.name))
 			{
-				YAML::Node baseEntry;
-				if (!encodeEntry(*baseProperty, baseEntry))
+				std::string currentText;
+				std::string baseText;
+				if (!encodeValueText(property, currentText)
+					|| !encodeValueText(*baseProperty, baseText))
 				{
 					return false;
 				}
-				if (YAML::Dump(entry) == YAML::Dump(baseEntry))
+				if (currentText == baseText)
 				{
 					continue;
 				}
 			}
-			overrides.push_back(entry);
+
+			if (!overrides)
+			{
+				overrides = result.Child("overrides");
+				overrides.SetSequence();
+			}
+			const Authoring::WriteNode entry = overrides.Append();
+			entry.SetMap();
+			entry.Child("name").SetScalar(property.name);
+			if (!experiment::SerializeMaterialPropertyValue(property,
+				entry, outError))
+			{
+				return false;
+			}
 		}
 
-		YAML::Node result;
-		result["ref"] = baseGuid.ToString();
 		if (currentConverted.blendMode != baseConverted.blendMode)
 		{
-			result["blendMode"] =
+			result.Child("blendMode").SetScalar(
 				experiment::MaterialBlendMode::Transparent
 					== currentConverted.blendMode
-				? "transparent" : "opaque";
+				? "transparent" : "opaque");
 		}
 		if (currentConverted.keywordSelections
 			!= baseConverted.keywordSelections)
 		{
-			YAML::Node selections(YAML::NodeType::Sequence);
-			selections.SetStyle(YAML::EmitterStyle::Flow);
+			const Authoring::WriteNode selections =
+				result.Child("keywordSelections");
+			selections.SetSequence(true);
 			for (const std::uint16_t value : currentConverted.keywordSelections)
 			{
-				selections.push_back(static_cast<std::uint32_t>(value));
+				selections.Append().SetScalar(static_cast<std::uint32_t>(value));
 			}
-			result["keywordSelections"] = selections;
 		}
-		if (overrides.size() > 0)
-		{
-			result["overrides"] = overrides;
-		}
-		outNode = result;
+		outNode.Assign(result);
+		outError.clear();
 		return true;
 	}
 }
@@ -496,7 +508,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존
 }
 
-void MeshRenderer::OnAfterSerialize(YAML::Node& node)
+void MeshRenderer::OnAfterSerialize(const Authoring::MutableNodeView& view)
 {
 	// I5-M5 S2b — 씬 embed writer 전환. typed 리플렉션이 legacy 형상으로 적은
 	// m_Material 서브트리를 정본 writer로 교체한다. reflection의 shared_ptr
@@ -504,23 +516,26 @@ void MeshRenderer::OnAfterSerialize(YAML::Node& node)
 	// 소비자 훅이다. SerializeMaterialPayload는 ShaderMeta를 모르는 재질을
 	// legacy 표기로 폴백하므로, 그 경우 이 교체는 형상 무변경이다.
 	if (nullptr == m_Material) return;
+	const Authoring::WriteNode node = Authoring::MutableNodeViewAccess::Node(view);
 
 	// I5-M5 S2c-2a — base 자산에 링크된 재질은 인라인 embed 대신 참조+diff를
 	// 적는다(자산 연결이 저장에서 소실되던 결함의 교정). 실패는 인라인 폴백.
 	if (FileGuid{} != m_materialBaseGuid)
 	{
-		YAML::Node reference;
 		std::string error;
 		if (BuildMaterialReferenceNode(*m_Material, m_materialBaseGuid,
-			reference, error))
+			node.Child("m_Material"), error))
 		{
-			node["m_Material"] = reference;
 			return;
 		}
 		Debug->LogWarning("m_Material base 참조 저장 실패 — 인라인 폴백: "
 			+ error);
 	}
-	node["m_Material"] = DataSystems->SerializeMaterialPayload(*m_Material);
+	if (!DataSystems->SerializeMaterialPayload(
+		*m_Material, node.Child("m_Material")))
+	{
+		Debug->LogWarning("m_Material writer ryml 전환 실패");
+	}
 }
 
 void MeshRenderer::EnsureExperimentBinding()

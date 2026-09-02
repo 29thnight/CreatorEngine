@@ -3,6 +3,7 @@
 #include "LogSystem.h"
 #include "PathFinder.h"
 #include "ReflectionTypedYml.h"
+#include "AuthoringParsedDocument.h"
 
 #include <cstdio>
 #include <exception>
@@ -10,7 +11,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <yaml-cpp/yaml.h>
 
 namespace
 {
@@ -62,17 +62,25 @@ bool RuntimeSettings::Load() noexcept
             return true;
         }
 
-        const YAML::Node root = YAML::LoadFile(settingsPath.string());
+        std::string parseError;
+        const Authoring::ParsedDocument document =
+            Authoring::ParsedDocument::ParseFile(settingsPath.string(), parseError);
+        if (!document)
+        {
+            Debug->LogError("Unable to load EngineSettings.asset: " + parseError);
+            return false;
+        }
+        const Authoring::ReadNode root = document.Root();
         RenderPassSettings renderPassSettings = m_renderPassSettings;
         if (root["renderPassSettings"])
         {
             Meta::Typed::DeserializeThunk<RenderPassSettings>(
-                &renderPassSettings, Authoring::ReadNode{ root["renderPassSettings"] });
+                &renderPassSettings, root["renderPassSettings"]);
         }
 
         RenderBackend renderBackend = RenderBackend::DX12;
         bool hasCanonicalBackend = false;
-        const YAML::Node renderNode = root["render"];
+        const Authoring::ReadNode renderNode = root["render"];
         if (renderNode)
         {
             if (!renderNode.IsMap())
@@ -81,7 +89,7 @@ bool RuntimeSettings::Load() noexcept
                 return false;
             }
 
-            const YAML::Node backendNode = renderNode["backend"];
+            const Authoring::ReadNode backendNode = renderNode["backend"];
             if (backendNode)
             {
                 if (!backendNode.IsScalar())
@@ -90,7 +98,7 @@ bool RuntimeSettings::Load() noexcept
                     return false;
                 }
 
-                const std::string backendName = backendNode.as<std::string>();
+                const std::string backendName = backendNode.AsString();
                 if (!TryParseRenderBackend(backendName, renderBackend))
                 {
                     const std::string message = "Unsupported EngineSettings render.backend '" +
@@ -106,14 +114,15 @@ bool RuntimeSettings::Load() noexcept
         {
             bool legacyDx12 = true;
             if (root["renderBackendDx12"])
-                legacyDx12 = root["renderBackendDx12"].as<bool>();
+                legacyDx12 = root["renderBackendDx12"].As<bool>();
             if (root["imguiBackendDx12"])
-                legacyDx12 = legacyDx12 && root["imguiBackendDx12"].as<bool>();
+                legacyDx12 = legacyDx12 && root["imguiBackendDx12"].As<bool>();
             renderBackend = legacyDx12 ? RenderBackend::DX12 : RenderBackend::Vulkan;
         }
 
-        const std::filesystem::path startupScene = root["startupSceneName"].as<std::string>(
-            "SampleScene");
+        const Authoring::ReadNode startupSceneNode = root["startupSceneName"];
+        const std::filesystem::path startupScene = startupSceneNode
+            ? startupSceneNode.AsString() : "SampleScene";
 
         m_renderPassSettings = std::move(renderPassSettings);
         m_renderBackend = renderBackend;
@@ -122,14 +131,6 @@ bool RuntimeSettings::Load() noexcept
         Debug->LogDebug(std::string("[RenderBackend] runtime=") +
             RenderBackendName(m_renderBackend));
         return true;
-    }
-    catch (const YAML::Exception& exception)
-    {
-        const std::string message = "Unable to load EngineSettings.asset: " +
-            std::string(exception.what());
-        std::fprintf(stderr, "[RuntimeSettings] %s\n", message.c_str());
-        Debug->LogError(message);
-        return false;
     }
     catch (const std::exception& exception)
     {

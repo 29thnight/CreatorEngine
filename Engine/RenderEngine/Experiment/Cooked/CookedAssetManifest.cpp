@@ -15,8 +15,9 @@ namespace experiment::cooked
 {
     namespace
     {
-        inline constexpr std::size_t kHeaderBytes = 24u;
+        inline constexpr std::size_t kHeaderBytes = 32u;
         inline constexpr std::size_t kEntryBytes = 80u;
+        inline constexpr std::size_t kSourceEntryBytes = 24u;
 
         struct RawEntry final
         {
@@ -29,6 +30,13 @@ namespace experiment::cooked
             std::uint32_t pathBytes{};
             std::uint32_t dependencyBegin{};
             std::uint32_t dependencyCount{};
+        };
+
+        struct RawSourceEntry final
+        {
+            AssetId assetId{};
+            std::uint32_t pathOffset{};
+            std::uint32_t pathBytes{};
         };
 
         void AddIssue(std::vector<AssetManifestIssue>& issues,
@@ -64,6 +72,32 @@ namespace experiment::cooked
         {
             if (!path.starts_with("Derived/") || path.size() <= 8u
                 || path.back() == '/' || path.find('\\') != std::string_view::npos
+                || path.find(':') != std::string_view::npos)
+            {
+                return false;
+            }
+
+            std::size_t begin = 0u;
+            while (begin < path.size())
+            {
+                const std::size_t end = path.find('/', begin);
+                const std::string_view segment = path.substr(begin,
+                    end == std::string_view::npos ? path.size() - begin
+                                                  : end - begin);
+                if (segment.empty() || segment == "." || segment == "..")
+                    return false;
+                if (end == std::string_view::npos) break;
+                begin = end + 1u;
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool IsNormalizedSourcePath(
+            std::string_view path) noexcept
+        {
+            if (path.empty() || path.front() == '/' || path.back() == '/'
+                || path.starts_with("Derived/")
+                || path.find('\\') != std::string_view::npos
                 || path.find(':') != std::string_view::npos)
             {
                 return false;
@@ -314,6 +348,52 @@ namespace experiment::cooked
                     }
                 }
             }
+
+            std::vector<AssetId> sourceIds;
+            std::vector<std::string_view> sourcePaths;
+            sourceIds.reserve(manifest.sourceAssets.size());
+            sourcePaths.reserve(manifest.sourceAssets.size());
+            for (std::size_t index = 0u; index < manifest.sourceAssets.size(); ++index)
+            {
+                const AssetSourceManifestEntry& source = manifest.sourceAssets[index];
+                const std::string context =
+                    "sourceAssets[" + std::to_string(index) + "]";
+                if (!IsAssetIdV4(source.assetId))
+                {
+                    AddIssue(issues, context + ".assetId",
+                        "source catalog key는 UUIDv4 asset identity여야 한다.");
+                    valid = false;
+                }
+                else if (std::ranges::find(sourceIds, source.assetId)
+                    != sourceIds.end())
+                {
+                    AddIssue(issues, context + ".assetId",
+                        "source catalog에 중복 asset identity가 있다.");
+                    valid = false;
+                }
+                else
+                {
+                    sourceIds.push_back(source.assetId);
+                }
+
+                if (!IsNormalizedSourcePath(source.sourcePath))
+                {
+                    AddIssue(issues, context + ".sourcePath",
+                        "source path는 Assets root 상대 normalized path여야 한다.");
+                    valid = false;
+                }
+                else if (std::ranges::find(sourcePaths,
+                    std::string_view(source.sourcePath)) != sourcePaths.end())
+                {
+                    AddIssue(issues, context + ".sourcePath",
+                        "source catalog에 중복 path가 있다.");
+                    valid = false;
+                }
+                else
+                {
+                    sourcePaths.push_back(source.sourcePath);
+                }
+            }
             return valid;
         }
     }
@@ -324,6 +404,15 @@ namespace experiment::cooked
         const auto found = std::ranges::lower_bound(entries, assetId,
             {}, &CookedAssetManifestEntry::assetId);
         if (found == entries.end() || found->assetId != assetId) return nullptr;
+        return &*found;
+    }
+
+    const AssetSourceManifestEntry* CookedAssetManifest::FindSource(
+        const AssetId& assetId) const noexcept
+    {
+        const auto found = std::ranges::lower_bound(sourceAssets, assetId,
+            {}, &AssetSourceManifestEntry::assetId);
+        if (found == sourceAssets.end() || found->assetId != assetId) return nullptr;
         return &*found;
     }
 
@@ -474,29 +563,44 @@ namespace experiment::cooked
         CookedAssetManifest canonical = manifest;
         std::ranges::sort(canonical.entries, {},
             &CookedAssetManifestEntry::assetId);
+        std::ranges::sort(canonical.sourceAssets, {},
+            &AssetSourceManifestEntry::assetId);
         for (CookedAssetManifestEntry& entry : canonical.entries)
             std::ranges::sort(entry.dependencies, {}, &AssetId::value);
 
         std::size_t dependencyCount = 0u;
-        std::size_t stringBytes = 0u;
+        std::size_t artifactStringBytes = 0u;
+        std::size_t sourceStringBytes = 0u;
         for (const CookedAssetManifestEntry& entry : canonical.entries)
         {
             if (AddWouldOverflow(dependencyCount, entry.dependencies.size())
-                || AddWouldOverflow(stringBytes, entry.artifactPath.size()))
+                || AddWouldOverflow(artifactStringBytes, entry.artifactPath.size()))
             {
                 AddIssue(result.issues, "manifest",
                     "manifest count/문자열 크기가 size_t 범위를 넘는다.");
                 return result;
             }
             dependencyCount += entry.dependencies.size();
-            stringBytes += entry.artifactPath.size();
+            artifactStringBytes += entry.artifactPath.size();
+        }
+        for (const AssetSourceManifestEntry& source : canonical.sourceAssets)
+        {
+            if (AddWouldOverflow(sourceStringBytes, source.sourcePath.size()))
+            {
+                AddIssue(result.issues, "manifest.sourceAssets",
+                    "source path 문자열 크기가 size_t 범위를 넘는다.");
+                return result;
+            }
+            sourceStringBytes += source.sourcePath.size();
         }
         if (canonical.entries.size() > (std::numeric_limits<std::uint32_t>::max)()
+            || canonical.sourceAssets.size() > (std::numeric_limits<std::uint32_t>::max)()
             || dependencyCount > (std::numeric_limits<std::uint32_t>::max)()
-            || stringBytes > (std::numeric_limits<std::uint32_t>::max)())
+            || artifactStringBytes > (std::numeric_limits<std::uint32_t>::max)()
+            || sourceStringBytes > (std::numeric_limits<std::uint32_t>::max)())
         {
             AddIssue(result.issues, "manifest",
-                "CEMF v1의 32-bit count 범위를 넘는다.");
+                "CEMF v2의 32-bit count 범위를 넘는다.");
             return result;
         }
 
@@ -506,7 +610,9 @@ namespace experiment::cooked
         writer.U16(static_cast<std::uint16_t>(kHeaderBytes));
         writer.U32(static_cast<std::uint32_t>(canonical.entries.size()));
         writer.U32(static_cast<std::uint32_t>(dependencyCount));
-        writer.U32(static_cast<std::uint32_t>(stringBytes));
+        writer.U32(static_cast<std::uint32_t>(artifactStringBytes));
+        writer.U32(static_cast<std::uint32_t>(canonical.sourceAssets.size()));
+        writer.U32(static_cast<std::uint32_t>(sourceStringBytes));
         writer.U32(0u);
 
         std::uint32_t pathOffset = 0u;
@@ -529,6 +635,15 @@ namespace experiment::cooked
             dependencyBegin += static_cast<std::uint32_t>(entry.dependencies.size());
         }
 
+        std::uint32_t sourcePathOffset = 0u;
+        for (const AssetSourceManifestEntry& source : canonical.sourceAssets)
+        {
+            writer.Raw(source.assetId.value.data.data(), source.assetId.value.data.size());
+            writer.U32(sourcePathOffset);
+            writer.U32(static_cast<std::uint32_t>(source.sourcePath.size()));
+            sourcePathOffset += static_cast<std::uint32_t>(source.sourcePath.size());
+        }
+
         for (const CookedAssetManifestEntry& entry : canonical.entries)
         {
             for (const AssetId& dependency : entry.dependencies)
@@ -539,6 +654,8 @@ namespace experiment::cooked
         }
         for (const CookedAssetManifestEntry& entry : canonical.entries)
             writer.Raw(entry.artifactPath.data(), entry.artifactPath.size());
+        for (const AssetSourceManifestEntry& source : canonical.sourceAssets)
+            writer.Raw(source.sourcePath.data(), source.sourcePath.size());
 
         result.bytes = writer.Take();
         return result;
@@ -560,7 +677,9 @@ namespace experiment::cooked
         const std::uint16_t headerBytes = reader.U16();
         const std::uint32_t entryCount = reader.U32();
         const std::uint32_t dependencyCount = reader.U32();
-        const std::uint32_t stringBytes = reader.U32();
+        const std::uint32_t artifactStringBytes = reader.U32();
+        const std::uint32_t sourceEntryCount = reader.U32();
+        const std::uint32_t sourceStringBytes = reader.U32();
         const std::uint32_t reserved = reader.U32();
         if (!reader.Ok() || magic != kAssetManifestMagic
             || version != kAssetManifestVersion || headerBytes != kHeaderBytes
@@ -578,6 +697,7 @@ namespace experiment::cooked
 
         const std::size_t entries = entryCount;
         const std::size_t dependencies = dependencyCount;
+        const std::size_t sourceEntries = sourceEntryCount;
         std::size_t expected = kHeaderBytes;
         if (MultiplyWouldOverflow(entries, kEntryBytes)
             || AddWouldOverflow(expected, entries * kEntryBytes))
@@ -586,6 +706,14 @@ namespace experiment::cooked
             return false;
         }
         expected += entries * kEntryBytes;
+        if (MultiplyWouldOverflow(sourceEntries, kSourceEntryBytes)
+            || AddWouldOverflow(expected, sourceEntries * kSourceEntryBytes))
+        {
+            AddIssue(outIssues, "manifest.header",
+                "source identity table 크기가 overflow한다.");
+            return false;
+        }
+        expected += sourceEntries * kSourceEntryBytes;
         if (MultiplyWouldOverflow(dependencies, sizeof(Uuid::Uuid16))
             || AddWouldOverflow(expected, dependencies * sizeof(Uuid::Uuid16)))
         {
@@ -594,12 +722,14 @@ namespace experiment::cooked
             return false;
         }
         expected += dependencies * sizeof(Uuid::Uuid16);
-        if (AddWouldOverflow(expected, stringBytes))
+        if (AddWouldOverflow(expected, artifactStringBytes)
+            || AddWouldOverflow(expected + artifactStringBytes, sourceStringBytes))
         {
             AddIssue(outIssues, "manifest.header", "string table 크기가 overflow한다.");
             return false;
         }
-        expected += stringBytes;
+        expected += artifactStringBytes;
+        expected += sourceStringBytes;
         if (expected != bytes.size())
         {
             AddIssue(outIssues, "manifest.header",
@@ -633,6 +763,23 @@ namespace experiment::cooked
             rawEntries.push_back(raw);
         }
 
+        std::vector<RawSourceEntry> rawSourceEntries;
+        rawSourceEntries.reserve(sourceEntryCount);
+        for (std::uint32_t index = 0u; index < sourceEntryCount; ++index)
+        {
+            RawSourceEntry raw;
+            reader.Raw(raw.assetId.value.data.data(), raw.assetId.value.data.size());
+            raw.pathOffset = reader.U32();
+            raw.pathBytes = reader.U32();
+            if (!reader.Ok())
+            {
+                AddIssue(outIssues, "sourceAssets[" + std::to_string(index) + "]",
+                    "source identity entry가 잘렸다.");
+                return false;
+            }
+            rawSourceEntries.push_back(raw);
+        }
+
         std::vector<AssetId> dependencyIds(dependencyCount);
         for (AssetId& dependency : dependencyIds)
         {
@@ -643,14 +790,16 @@ namespace experiment::cooked
                 return false;
             }
         }
-        const std::size_t stringsBegin = reader.Offset();
+        const std::size_t artifactStringsBegin = reader.Offset();
+        const std::size_t sourceStringsBegin =
+            artifactStringsBegin + artifactStringBytes;
 
         CookedAssetManifest parsed;
         parsed.entries.reserve(entryCount);
         for (std::size_t index = 0u; index < rawEntries.size(); ++index)
         {
             const RawEntry& raw = rawEntries[index];
-            if (static_cast<std::uint64_t>(raw.pathOffset) + raw.pathBytes > stringBytes
+            if (static_cast<std::uint64_t>(raw.pathOffset) + raw.pathBytes > artifactStringBytes
                 || static_cast<std::uint64_t>(raw.dependencyBegin)
                     + raw.dependencyCount > dependencyIds.size())
             {
@@ -666,12 +815,32 @@ namespace experiment::cooked
             entry.byteSize = raw.byteSize;
             entry.contentSha256 = raw.contentSha256;
             const auto* path = reinterpret_cast<const char*>(
-                bytes.data() + stringsBegin + raw.pathOffset);
+                bytes.data() + artifactStringsBegin + raw.pathOffset);
             entry.artifactPath.assign(path, raw.pathBytes);
             entry.dependencies.assign(
                 dependencyIds.begin() + raw.dependencyBegin,
                 dependencyIds.begin() + raw.dependencyBegin + raw.dependencyCount);
             parsed.entries.push_back(std::move(entry));
+        }
+
+        parsed.sourceAssets.reserve(sourceEntryCount);
+        for (std::size_t index = 0u; index < rawSourceEntries.size(); ++index)
+        {
+            const RawSourceEntry& raw = rawSourceEntries[index];
+            if (static_cast<std::uint64_t>(raw.pathOffset) + raw.pathBytes
+                > sourceStringBytes)
+            {
+                AddIssue(outIssues, "sourceAssets[" + std::to_string(index) + "]",
+                    "source path range가 string table 밖을 가리킨다.");
+                return false;
+            }
+
+            AssetSourceManifestEntry source;
+            source.assetId = raw.assetId;
+            const auto* path = reinterpret_cast<const char*>(
+                bytes.data() + sourceStringsBegin + raw.pathOffset);
+            source.sourcePath.assign(path, raw.pathBytes);
+            parsed.sourceAssets.push_back(std::move(source));
         }
 
         std::vector<AssetManifestIssue> validationIssues;
@@ -687,6 +856,13 @@ namespace experiment::cooked
         {
             AddIssue(outIssues, "manifest.entries",
                 "entry table이 UUID 순서로 정렬되지 않았다.");
+            return false;
+        }
+        if (!std::ranges::is_sorted(parsed.sourceAssets, {},
+            &AssetSourceManifestEntry::assetId))
+        {
+            AddIssue(outIssues, "manifest.sourceAssets",
+                "source identity table이 UUID 순서로 정렬되지 않았다.");
             return false;
         }
         for (std::size_t index = 0; index < parsed.entries.size(); ++index)
