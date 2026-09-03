@@ -146,7 +146,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 		{
 			DirectX::TexMetadata tempMetadata = metadata;
 
-			// DXGI_FORMAT_BC1_UNORM (== DXT1)
+			// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨)
 			Win32::ThrowIfFailed(
 				DirectX::Compress(
 					image.GetImages(),
@@ -258,13 +258,20 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 		{
 			DirectX::TexMetadata tempMetadata = metadata;
 
-			// DXGI_FORMAT_BC1_UNORM (== DXT1)
+			// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨)
 			Win32::ThrowIfFailed(
+					// ★ _SRGB 라벨을 단다. isCompress 가 켜지는 자리는 baseColorMap
+					// 하나뿐이고(FinalizeMaterialRuntime · MaterialResolver 모두
+					// 그 property 에서만 true 를 넘긴다), 그 텍스처의 바이트는
+					// sRGB 로 인코딩돼 있다. 예전처럼 BC1_UNORM 으로 라벨하면
+					// 샘플러가 감마 디코드를 하지 않아 셰이더가 받는 알베도가
+					// sRGB 값 그대로였다 — 밝고 탈색된 그림의 legacy 경로판이다.
+					// 아래 TEX_COMPRESS_SRGB 도 같은 전제를 이미 깔고 있었다.
 				DirectX::Compress(
 					image.GetImages(),
 					image.GetImageCount(),
 					image.GetMetadata(),
-					DXGI_FORMAT_BC1_UNORM,
+					DXGI_FORMAT_BC1_UNORM_SRGB,
 					TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM,
 					0.5f,
 					compressedImage
@@ -338,9 +345,9 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 	if (isCompress && !alreadyFinal && !IsCompressed(metadata.format))
 	{
 		ScratchImage compressedImage{};
-		// DXGI_FORMAT_BC1_UNORM (== DXT1) — LoadSharedFromPath 와 같은 정책.
+		// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨) — LoadSharedFromPath 와 같은 정책.
 		if (SUCCEEDED(DirectX::Compress(image.GetImages(), image.GetImageCount(),
-			image.GetMetadata(), DXGI_FORMAT_BC1_UNORM,
+			image.GetMetadata(), DXGI_FORMAT_BC1_UNORM_SRGB,
 			TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM,
 			0.5f, compressedImage)))
 		{

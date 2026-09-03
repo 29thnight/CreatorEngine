@@ -277,23 +277,44 @@ namespace assets
                 return false;
             }
 
-            const DXGI_FORMAT target = colorSpace == ModelTextureColorSpace::Srgb
+            const DirectX::TexMetadata sourceMetadata = source->GetMetadata();
+
+            // ── 색공간은 라벨로만 정한다 ──────────────────────────────────
+            //
+            // ★ 여기 있던 코드는 target 을 semantic(_UNORM_SRGB)으로 잡고
+            //   Convert 를 불렀다. DirectXTex 는 **출력 포맷이 IsSRGB 면
+            //   SRGB_OUT 이 기본 on** 이라고 스스로 문서화한다
+            //   (DirectXTex.h "if the output format type is IsSRGB(), then
+            //   SRGB_OUT is on by default"). 입력은 _UNORM 이라 SRGB_IN 이
+            //   꺼진 채로, 이미 sRGB 로 인코딩된 PNG 바이트에 linear→sRGB
+            //   인코드가 한 번 더 먹었다.
+            //
+            //   런타임 SRV 는 out.format(= semantic) 을 쓰므로 하드웨어가
+            //   디코드를 한 번 한다. 두 연산이 정확히 상쇄돼 **셰이더가 받는
+            //   알베도가 sRGB 바이트값 그대로**였다 — Gunner 본체 텍스처
+            //   기준 밝기 2.1~3.7 배, 채도비 2.96 → 1.70 (43% 탈색).
+            //
+            //   고침은 "바이트를 건드리지 않는다"다. 레이아웃만 RGBA8 로
+            //   맞추되 목표 포맷의 sRGB 성질을 **소스와 같게** 두면
+            //   DirectXTex 가 전달 함수에 손대지 않는다. 최종 라벨은
+            //   아래 out.format 이 semantic 으로 따로 정한다.
+            const DXGI_FORMAT layoutTarget = DirectX::IsSRGB(sourceMetadata.format)
                 ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
                 : DXGI_FORMAT_R8G8B8A8_UNORM;
+
             DirectX::ScratchImage converted;
             const DirectX::ScratchImage* finalImage = source;
-            const DirectX::TexMetadata sourceMetadata = source->GetMetadata();
             HRESULT conversion = S_OK;
             if (DirectX::IsCompressed(sourceMetadata.format))
             {
                 conversion = DirectX::Decompress(source->GetImages(),
-                    source->GetImageCount(), sourceMetadata, target, converted);
+                    source->GetImageCount(), sourceMetadata, layoutTarget, converted);
                 finalImage = &converted;
             }
-            else if (sourceMetadata.format != target)
+            else if (sourceMetadata.format != layoutTarget)
             {
                 conversion = DirectX::Convert(source->GetImages(),
-                    source->GetImageCount(), sourceMetadata, target,
+                    source->GetImageCount(), sourceMetadata, layoutTarget,
                     DirectX::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT,
                     converted);
                 finalImage = &converted;
