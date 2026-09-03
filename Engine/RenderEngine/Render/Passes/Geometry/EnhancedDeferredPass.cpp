@@ -11,7 +11,7 @@
 namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    constexpr const char* kDeferredShaderFile = "Deferred.hlsl";
+    constexpr const char* kDeferredShaderFile = "Deferred.slang";
 
     bool CompileDeferredShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)

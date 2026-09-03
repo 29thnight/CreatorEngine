@@ -34,7 +34,8 @@ namespace RHIShaderSource
     ///   자동으로 따라온다. 실행 파일 옆에 두면 그 경로가 따로 필요해진다.
     inline constexpr const char* kFolder = "DefaultPassShader";
 
-    /// 이름을 실제 경로로. 확장자까지 포함한 이름을 준다("GBuffer.hlsl").
+    /// 이름을 실제 경로로. 확장자까지 포함한 이름을 준다("GBuffer.slang").
+    /// 확장자가 Slang front-end 선택도 정한다(RHIShaderCompiler::IsSlangSource).
     std::filesystem::path Resolve(std::string_view name);
 
     /// 소스를 읽는다. 실패하면 false 와 사람이 읽을 이유를 준다 —

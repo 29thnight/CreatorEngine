@@ -267,6 +267,7 @@ void EditorAssetPresentation::LoadPresentationResources()
 		{ ".obj", FileType::Model }, { ".glb", FileType::Model },
 		{ ".png", FileType::Texture }, { ".dds", FileType::Texture },
 		{ ".hdr", FileType::HDR }, { ".hlsl", FileType::Shader },
+		{ ".slang", FileType::Shader },
 		{ ".shadermeta", FileType::Shader }, { ".shader", FileType::Shader },
 		{ ".cpp", FileType::CppScript },
 		{ ".cs", FileType::CSharpScript }, { ".wav", FileType::Sound },

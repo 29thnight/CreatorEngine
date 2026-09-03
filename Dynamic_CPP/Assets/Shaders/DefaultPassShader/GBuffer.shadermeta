@@ -1,6 +1,6 @@
 schema: 1
 name: EnhancedGBuffer
-source: GBuffer.hlsl
+source: GBuffer.slang
 properties:
   - { name: baseColor, label: Base Color, type: float4, default: [1.0, 1.0, 1.0, 1.0] }
   - { name: metallic, label: Metallic, type: float, default: 0.0 }

@@ -525,7 +525,7 @@ namespace
         ShaderMeta shaderMeta{};
         shaderMeta.guid = FileGuid{ "30000000-0000-4000-8000-000000000003" };
         shaderMeta.name = "GBufferReloadProbe";
-        shaderMeta.source = "GBuffer.hlsl";
+        shaderMeta.source = "GBuffer.slang";
         ShaderPassDesc shaderPass{};
         shaderPass.name = "GBuffer";
         shaderPass.vertex = ShaderStageEntry{ "VSMain" };

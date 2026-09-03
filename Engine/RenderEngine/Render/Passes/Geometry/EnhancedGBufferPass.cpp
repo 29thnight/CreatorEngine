@@ -38,7 +38,7 @@ namespace
     // 각각 기록되는지 확인하려면 값이 구분되어야 한다. 한 타깃만 기록되고
     // 나머지가 비어 있어도 '그려지긴 한다'로 보이는 것을 막는다.
 
-    constexpr const char* kGBufferShaderFile = "GBuffer.hlsl";
+    constexpr const char* kGBufferShaderFile = "GBuffer.slang";
 
     // M6-P1a 전환 중 snapshot이 없는 격리 selftest/legacy draw가 제품 HLSL의
     // b2를 비워 두지 않게 하는 sentinel이다. alphaCutoff < 0이면 shader가

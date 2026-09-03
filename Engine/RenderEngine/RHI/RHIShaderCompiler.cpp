@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -176,6 +177,20 @@ namespace
     std::string PathUtf8(const std::filesystem::path& path)
     {
         return NarrowUtf8(path.generic_wstring());
+    }
+
+    // 확장자 하나가 front-end를 고른다. 대소문자를 접는 이유는 자산 트리의
+    // 이름이 손으로 적히기 때문이다 — ".Slang"이 조용히 hlsl로 컴파일되면
+    // `import` 한 줄에서 파스 에러가 나고 원인이 확장자로 보이지 않는다.
+    [[nodiscard]] bool IsSlangSource(const std::filesystem::path& path)
+    {
+        std::string extension = PathUtf8(path.extension());
+        std::ranges::transform(extension, extension.begin(),
+            [](unsigned char character)
+            {
+                return static_cast<char>(std::tolower(character));
+            });
+        return ".slang" == extension;
     }
 
     bool AddFileHash(const std::filesystem::path& path, Hash128& hash)
@@ -1026,8 +1041,13 @@ namespace
             addArgument(RHIShaderBinary::Dxil == request.output ? "dxil" : "spirv");
             addArgument("-profile");
             addArgument(RHIShaderBinary::Dxil == request.output ? "sm_6_0" : "spirv_1_3");
+            // 소스 언어는 확장자가 정한다. Slang은 HLSL의 상위집합이라 둘을
+            // 한 세션 설정으로 묶고 싶어지지만, front-end 규칙이 갈린다 —
+            // .slang은 `import`·`[shader(...)]`·모듈 가시성을 알고 .hlsl은
+            // 모르며, hlsl 모드로 .slang을 먹이면 그 문법이 파스 에러가 된다.
+            // 그래서 이관 중에는 두 언어가 공존하고, 판정은 파일 하나 단위다.
             addArgument("-lang");
-            addArgument("hlsl");
+            addArgument(IsSlangSource(sourcePath) ? "slang" : "hlsl");
             addArgument("-matrix-layout-column-major");
             addArgument("-O3");
             addArgument("-warnings-as-errors");

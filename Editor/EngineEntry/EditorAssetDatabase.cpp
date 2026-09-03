@@ -1540,7 +1540,7 @@ private:
 	const std::unordered_set<std::string> m_registeredFiles{
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
-		".hlsl", ".shadermeta", ".shader", ".cpp", ".cs",
+		".hlsl", ".slang", ".shadermeta", ".shader", ".cpp", ".cs",
 		".wav", ".mp3", ".ogg", ".spritefont",
 		".terrain", ".bt", ".blackboard", ".prefab", ".volume",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서

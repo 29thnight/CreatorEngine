@@ -53,17 +53,17 @@ namespace
     //     의도한 사전 블러가 무동작이다.
     //   · 휘도 상한 초과 샘플의 전량 폐기, 로그 공간 평균 — 톤 정책.
     // 그림의 기준선이 이 결과물이라 여기서 고치면 대조가 성립하지 않는다.
-    constexpr const char* kIblIrradiancePSFile = "IblIrradiance.hlsl";
+    constexpr const char* kIblIrradiancePSFile = "IblIrradiance.slang";
 
     // ── 프리필터 스페큘러 (DX11 SpecularPreFilter.ps의 이식) ──
     //
     // ★ Sample(자동 LOD)을 그대로 둔다 — 발산하는 중요도 샘플 방향에 화면
     //   미분 기반 LOD는 관행(SampleLevel 0)에서 벗어나지만 원본이 그렇다.
     //   휘도 폐기·로그 공간도 조도 맵과 같은 정책.
-    constexpr const char* kIblPrefilterPSFile = "IblPrefilter.hlsl";
+    constexpr const char* kIblPrefilterPSFile = "IblPrefilter.slang";
 
     // ── BRDF LUT (DX11 IntegrateBRDF.ps의 이식) ──
-    constexpr const char* kIblBrdfPSFile = "IblBrdf.hlsl";
+    constexpr const char* kIblBrdfPSFile = "IblBrdf.slang";
 
     bool CompileIblShader(const char* file, const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError, bool strictMath = false)
