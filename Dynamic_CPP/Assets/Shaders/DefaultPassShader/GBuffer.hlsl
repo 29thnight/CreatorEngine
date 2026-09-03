@@ -259,7 +259,7 @@ PSOut PSMain(VSOut input)
     output.metalRough = float4(
         orm.r * materialOcclusionStrength,
         orm.g * materialRoughness,
-        orm.b + materialMetallic,
+        orm.b * materialMetallic,
         1.0f);
     output.normal     = float4(normal * 0.5f + 0.5f, 1.0f);
     output.emissive   = float4(

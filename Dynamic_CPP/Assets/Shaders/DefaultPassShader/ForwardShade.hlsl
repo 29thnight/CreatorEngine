@@ -410,7 +410,7 @@ float4 PSMain(VSOut input) : SV_TARGET
 
         const float3 orm = ormMap.Sample(gSampler, resolvedUv).rgb;
         rough = orm.g * resolvedRoughness;
-        materialMetallic = orm.b + resolvedMetallic;
+        materialMetallic = orm.b * resolvedMetallic;
     }
     // P2d-b: authored speed/frequency와 immutable frame time·m_flowInfo를 함께
     // 사용한다. total=0, flow=0이면 P2c의 기존 authored phase와 정확히 같다.
