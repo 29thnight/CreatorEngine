@@ -317,6 +317,10 @@ Build 정책:
 - Shipping: `CE_PROFILE_ENABLED=0`이면 compile-out
 - 포함된 빌드에서도 runtime category mask로 비활성화 가능
 - `WITH_PROFILING`의 헤더 내 무조건 기본값 1은 제거하고 빌드 설정이 정한다.
+- ★ **Editor/Development/Shipping 구성 구분은 이 계획 혼자 쓰지 않는다**(2026-09-04 기입).
+  PHASE 14.5(`EditorAutomationCLIPlan.md` §11.1)의 Player 커맨드 서비스가 같은 구분을
+  compile-out 경계로 쓴다. 저장소에는 아직 그런 매크로가 0건이므로 **먼저 도착하는 쪽이
+  만들고 다른 쪽이 소비한다** — 두 벌을 만들면 Shipping 격리 게이트가 둘로 갈린다.
 
 ### 5.3 Event
 

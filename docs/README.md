@@ -30,6 +30,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [MaterialPipelinePlan.md](plans/MaterialPipelinePlan.md) | 머테리얼·셰이더 파이프라인 (PHASE 3.5) |
 | [ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md) | 스크립터블 렌더 파이프라인 |
 | [ProfilingCapturePlan.md](plans/ProfilingCapturePlan.md) | 프레임 프로파일러 수집·녹화 (PHASE 14) |
+| [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | 라이브 커맨드 서비스 — 로컬 HTTP·JSON으로 실행 중인 에디터·플레이어 제어 (PHASE 14.5). 2026-09-04에 PHASE 6 CLI 트랙에서 분리·재수립 |
 | [UISystemRedesignPlan.md](plans/UISystemRedesignPlan.md) | UI 시스템 재설계 (PHASE 16) |
 | [UtilityFrameworkModernizationPlan.md](plans/UtilityFrameworkModernizationPlan.md) | 유틸리티 프레임워크 현대화 (PHASE 15) |
 | [SerializationPlan.md](plans/SerializationPlan.md) | 직렬화 이원화 — 저작 텍스트·런타임 쿠킹 (PHASE 17) |

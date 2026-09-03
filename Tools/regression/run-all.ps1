@@ -30,6 +30,22 @@ Run-Step "HashingString 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hashing-string.ps1")
 }
 
+# PHASE 14.5 LC0 — CLI 계약의 래칫 둘.
+#
+# 둘 다 "계약을 지켰는가"가 아니라 "거동이 기록된 것과 같은가"를 본다. 오늘의
+# 거동은 계약 위반이고(실패를 출력하고 exit 0), 그것을 지금 붉게 만들면 세트가
+# 첫날부터 붉어 아무도 안 본다. 대신 관측을 baseline/golden에 적어 두고 **달라질
+# 때** 붉어지게 했다 — LC1이 exit spine을 세우거나 LC2가 tokenizer를 바꾸면
+# 여기가 먼저 알린다. 그때 -UpdateBaseline / -UpdateGolden 으로 한 번 갱신하고
+# 그 diff를 커밋에 남긴다.
+Run-Step "CLI exit 계약 canary(LC0)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-exit-contract.ps1") -Exe $Exe -Work $Work
+}
+
+Run-Step "CLI tokenizer 골든(LC0)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-parser-golden.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

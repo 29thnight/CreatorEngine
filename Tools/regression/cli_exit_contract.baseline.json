@@ -1,0 +1,39 @@
+{
+  "schema": "lc0-exit-contract/1",
+  "recorded": "2026-09-04",
+  "note": "observed = 오늘 실제로 관측된 프로세스 종료 코드. contract = EditorAutomationCLIPlan.md §5.4가 요구하는 값. 둘이 다른 항목이 곧 false-green이다. LC1이 exit spine을 세우면 observed를 contract 값으로 갱신하고, 그때 이 파일의 두 열은 같아진다.",
+  "cases": [
+    {
+      "name": "unknown-command",
+      "commands": ["this.command.does.not.exist"],
+      "expectStdout": "알 수 없는 명령",
+      "observed": 0,
+      "contract": 2,
+      "why": "오타 하나가 조용히 성공으로 끝난다. Execute()가 printf 뒤 그냥 return한다."
+    },
+    {
+      "name": "help-orphan-command",
+      "commands": ["experiment.model"],
+      "expectStdout": "알 수 없는 명령",
+      "observed": 0,
+      "contract": 2,
+      "why": "help가 안내하는 이름인데 등록돼 있지 않다(§3.4 drift). 사용자는 help를 보고 쳤는데 결과는 성공이다."
+    },
+    {
+      "name": "scene-load-missing",
+      "commands": ["scene.load Assets/Scenes/NoSuchScene.creator"],
+      "expectStdout": "씬 로드 실패",
+      "observed": 0,
+      "contract": 3,
+      "why": "precondition 불충족을 텍스트로만 알린다. 자동화는 성공으로 읽는다."
+    },
+    {
+      "name": "failure-then-quit",
+      "commands": ["scene.load Assets/Scenes/NoSuchScene.creator", "help"],
+      "expectStdout": "씬 로드 실패",
+      "observed": 0,
+      "contract": 3,
+      "why": "앞의 실패가 뒤의 성공/quit에 지워지지 않아야 한다는 §3.1의 session severity 규약. 지금은 session 자체가 없다."
+    }
+  ]
+}

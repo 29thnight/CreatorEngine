@@ -78,6 +78,9 @@
     <ClInclude Include="EngineEntry\BuildSettings.h">
       <Filter>EditorRuntime\Settings</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\CommandBaseline.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
@@ -247,6 +250,9 @@
     </ClCompile>
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp">
       <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\CommandBaseline.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp">
       <Filter>EditorRuntime\Runtime</Filter>

@@ -1,5 +1,7 @@
 #pragma once
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <deque>
 #include <future>
 #include <mutex>
@@ -82,6 +84,14 @@ public:
     /// help.
     void PrintHelp() const;
 
+    /// PrintHelp가 찍는 바로 그 문자열.
+    ///
+    /// LC0(PHASE 14.5)이 "등록된 명령 중 몇 개가 help에 실려 있는가"를 재려면
+    /// help가 stdout으로만 존재해서는 안 된다 — 출력을 되읽는 것은 계획이
+    /// 끊겠다고 한 바로 그 습관이다. 그래서 문자열을 정본으로 두고 PrintHelp는
+    /// 그것을 찍기만 한다. LC3이 descriptor를 세우면 이 상수는 사라진다.
+    static const char* HelpText() noexcept;
+
     /// 에디터 카메라를 게임 카메라와 같은 자세로 맞춘다(camera.editor match).
     /// 두 뷰의 시점을 통일해야 성립하는 대조 실험이 있어서 명령으로 뺐다 —
     /// 마우스로 맞추면 근사치라 "차이가 시점 탓인가 렌더 탓인가"를 못 가른다.
@@ -100,8 +110,25 @@ private:
     void LoadScriptFile(const std::string& path);
     void Execute(const std::string& line);
 
-    std::deque<std::string> m_pending;
+    // 큐에 든 명령 하나.
+    //
+    // 예전에는 그냥 std::string이었다. LC0이 "명령을 넣은 순간부터 실행될
+    // 때까지"를 재려면 넣은 시각이 명령과 함께 다녀야 한다 — 실행 시점에
+    // 되짚을 방법이 없기 때문이다. 이 두 필드가 §7.1 지연 예산의 바닥값이고,
+    // LC5가 서비스 응답의 timing.queuedMs / waitedFrames로 그대로 승계한다.
+    struct PendingCommand
+    {
+        std::string                           text;
+        std::chrono::steady_clock::time_point enqueuedAt{};
+        uint64_t                              enqueuedFrame{};
+    };
+
+    std::deque<PendingCommand> m_pending;
     std::mutex m_mutex;
+
+    // Pump가 도는 횟수. 프레임 경계에서 정확히 한 번이라 프레임 수와 같다.
+    // Enqueue가 게임 스레드 밖에서 읽으므로 원자적이어야 한다.
+    std::atomic<uint64_t> m_frameIndex{ 0 };
 
     // 표준 입력 읽기 스레드.
     //

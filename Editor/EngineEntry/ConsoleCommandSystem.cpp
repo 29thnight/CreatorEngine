@@ -1,4 +1,5 @@
 #include "ConsoleCommandSystem.h"
+#include "CommandBaseline.h"   // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
@@ -125,6 +126,7 @@
 #include <atomic>
 #include <cctype>
 #include <random>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <DbgHelp.h>
@@ -716,8 +718,13 @@ void ConsoleCommandSystem::LoadScriptFile(const std::string& path)
 
 void ConsoleCommandSystem::Enqueue(std::string command)
 {
+    PendingCommand pending;
+    pending.text          = std::move(command);
+    pending.enqueuedAt    = std::chrono::steady_clock::now();
+    pending.enqueuedFrame = m_frameIndex.load(std::memory_order_acquire);
+
     std::lock_guard<std::mutex> guard(m_mutex);
-    m_pending.push_back(std::move(command));
+    m_pending.push_back(std::move(pending));
 }
 
 void ConsoleCommandSystem::Pump()
@@ -730,6 +737,35 @@ void ConsoleCommandSystem::Pump()
     // 프레임이고, 그 사이에 일어난 Awake/OnDestroy가 어느 프레임 것인지 알아야 한다.
     Lifecycle::Trace::BeginFrame();
 
+    // LC0(PHASE 14.5) 프레임 계측.
+    //
+    // BeginFrame과 같은 이유로 조기 반환들보다 앞이다 — wait 중이거나 씬 로딩
+    // 중인 프레임도 프레임이고, §7.1의 예산은 "명령이 도는 프레임"이 아니라
+    // "에디터가 도는 프레임"을 분모로 삼아야 한다. 조기 반환 뒤에 두면 큐가
+    // 멈춘 구간이 통째로 표본에서 빠져, 가장 느린 구간만 못 보는 계측이 된다.
+    // ★ 계측이 꺼져 있으면 원자 변수 읽기 하나로 끝난다.
+    //
+    //   `GetForegroundWindow()`는 시스템 호출이다. 그것을 아무도 재지 않는
+    //   실행에도 매 프레임 물리면 ① 제품에 상시 비용이 붙고 ② 하필 재려는
+    //   대상인 프레임 시간을 흔든다. 관측이 관측 대상을 바꾸면 그 값은
+    //   §7.1의 분모로 못 쓴다. 기본은 off이고 `cli.probe.timing reset`이 켠다.
+    const uint64_t frameIndex = m_frameIndex.fetch_add(1, std::memory_order_acq_rel) + 1;
+    const bool sceneLoading = SceneManagers->IsSceneLoading();
+    if (CommandBaseline::IsCollecting())
+    {
+        CommandBaseline::FrameState frameState;
+        frameState.sceneLoading = sceneLoading;
+        frameState.playing      = SceneManagers->IsGameStart();
+        frameState.waiting      = (m_waitFrames > 0);
+
+        const CoreWindow* window = CoreWindow::GetForCurrentInstance();
+        const HWND handle = (nullptr != window) ? window->GetHandle() : nullptr;
+        frameState.windowKnown = (nullptr != handle);
+        frameState.focused     = frameState.windowKnown && (::GetForegroundWindow() == handle);
+
+        CommandBaseline::NoteFrame(frameState);
+    }
+
     // wait 명령으로 보류 중이면 프레임만 소모한다.
     if (m_waitFrames > 0)
     {
@@ -739,17 +775,34 @@ void ConsoleCommandSystem::Pump()
 
     // 씬 로딩이 끝나기 전에는 다음 명령을 실행하지 않는다.
     // (전환 중 측정하면 중간값이 섞인다)
-    if (SceneManagers->IsSceneLoading()) return;
+    if (sceneLoading) return;
 
-    std::string command;
+    PendingCommand pending;
     {
         std::lock_guard<std::mutex> guard(m_mutex);
         if (m_pending.empty()) return;
-        command = std::move(m_pending.front());
+        pending = std::move(m_pending.front());
         m_pending.pop_front();
     }
 
-    Execute(TrimLine(command));
+    const std::string line = TrimLine(pending.text);
+
+    const auto dequeuedAt = std::chrono::steady_clock::now();
+    Execute(line);
+    const auto finishedAt = std::chrono::steady_clock::now();
+
+    // 이름만 남긴다. 인자는 경로·오브젝트 이름이 섞여 있어 계측 artifact에
+    // 그대로 실으면 기계마다 다른 문자열이 들어간다.
+    const auto nameEnd = line.find_first_of(" \t");
+    const std::string_view name = std::string_view(line).substr(
+        0, (nameEnd == std::string::npos) ? line.size() : nameEnd);
+
+    const std::chrono::duration<double, std::milli> queued   = dequeuedAt - pending.enqueuedAt;
+    const std::chrono::duration<double, std::milli> executed = finishedAt - dequeuedAt;
+    const uint64_t waitedFrames = (frameIndex > pending.enqueuedFrame)
+        ? (frameIndex - pending.enqueuedFrame) : 0;
+
+    CommandBaseline::NoteCommand(name, queued.count(), waitedFrames, executed.count());
 }
 
 namespace
@@ -3604,6 +3657,104 @@ namespace ConsoleCmd
     {
         std::printf("[CLI] 종료 요청\n");
         ctx.system.RequestQuit();
+    }
+
+    // ── LC0 (PHASE 14.5) 기준선 계측 명령 ───────────────────────────────
+    //
+    // 셋 다 아무것도 바꾸지 않는다. 재고 찍기만 한다. 계획 §13 LC0의
+    // "거동 변경 0"이 이 셋에 걸린 제약이다.
+
+    /// commands.dump [경로]
+    ///
+    /// 런타임 등록 표를 TSV로 덤프한다. 소스를 긁지 않는다 — `Invoke-Dx12Suite`가
+    /// C++ 리터럴을 정규식으로 뽑다가 두 번 틀린(26/35만 실행, 그리고 0/35로 읽음)
+    /// 바로 그 방식을 여기서 끊는다. LC9가 그 소비자를 이 출력으로 옮긴다.
+    static void Cmd_commands_dump(const ConsoleCommandContext& ctx)
+    {
+        const std::string requested = (ctx.parts.size() > 1) ? ctx.parts[1]
+                                                             : std::string("lc0_command_inventory.tsv");
+        const std::string path = ResolveTestArtifactPath("lc0", requested);
+
+        if (!CommandBaseline::WriteInventory(path, ConsoleCommandSystem::HelpText()))
+        {
+            std::printf("[CLI] commands.dump 실패: %s 를 쓸 수 없다\n", path.c_str());
+            return;
+        }
+
+        const auto& registrations = CommandBaseline::Registrations();
+        std::size_t nameCount = 0;
+        for (const auto& registration : registrations)
+        {
+            nameCount += 1 + registration.aliases.size();
+        }
+
+        std::printf("[CLI] commands.dump 완료 그룹=%zu 이름=%zu 경로=%s\n",
+                    registrations.size(), nameCount, path.c_str());
+    }
+
+    /// cli.probe.timing [reset|off|경로]
+    ///
+    /// 프레임 시간 분포와 명령 왕복 지연의 **바닥값**을 낸다. §7.1의 예산표는
+    /// 분모가 없는 상태로 쓰여 있다 — 이 명령이 그 분모다.
+    ///
+    /// 계측은 기본이 off다. `reset`이 표본을 비우고 수집을 켜고, `off`가 끈다.
+    /// 상시 수집을 하지 않는 이유는 `Pump`의 주석에 있다 — 관측 비용이 관측
+    /// 대상(프레임 시간)에 섞이면 그 값을 예산의 분모로 못 쓴다.
+    static void Cmd_cli_probe_timing(const ConsoleCommandContext& ctx)
+    {
+        const std::string argument = (ctx.parts.size() > 1) ? ctx.parts[1] : std::string();
+
+        if ("reset" == argument)
+        {
+            CommandBaseline::SetCollecting(true);
+            std::printf("[CLI] cli.probe.timing 표본 초기화·수집 시작\n");
+            return;
+        }
+        if ("off" == argument)
+        {
+            CommandBaseline::SetCollecting(false);
+            std::printf("[CLI] cli.probe.timing 수집 중지\n");
+            return;
+        }
+
+        if (!CommandBaseline::IsCollecting())
+        {
+            // 표본 0개짜리 artifact를 조용히 내지 않는다. 전부 0인 표를 받은
+            // 사람은 그것을 "빠르다"로 읽는다 — 안 쟀다는 사실이 값처럼 보인다.
+            std::printf("[CLI] cli.probe.timing: 수집이 꺼져 있다. "
+                        "먼저 'cli.probe.timing reset' 으로 켜라\n");
+            return;
+        }
+
+        const std::string requested = argument.empty() ? std::string("lc0_timing.tsv") : argument;
+        const std::string path = ResolveTestArtifactPath("lc0", requested);
+
+        if (!CommandBaseline::WriteTiming(path))
+        {
+            std::printf("[CLI] cli.probe.timing 실패: %s 를 온전히 쓰지 못했다\n", path.c_str());
+            return;
+        }
+        std::printf("[CLI] cli.probe.timing 완료 경로=%s\n", path.c_str());
+    }
+
+    /// cli.echo.args <아무 인자>
+    ///
+    /// tokenizer가 실제로 무엇을 만들었는지 되비춘다. 길이를 함께 찍는 이유는
+    /// 따옴표·공백·빈 문자열이 눈으로 구분되지 않기 때문이다 — `<>`와 `<"">`는
+    /// 화면에서 같아 보여도 다른 토큰이다.
+    ///
+    /// LC2가 라인 문법과 JSON `args` 배열이 같은 invocation을 만드는지 단정할 때
+    /// 양쪽에서 이 명령을 부른다. 그때 비교 기준이 되려면 지금의 형상이 golden으로
+    /// 고정돼 있어야 한다.
+    static void Cmd_cli_echo_args(const ConsoleCommandContext& ctx)
+    {
+        std::printf("[CLI] cli.echo.args count=%zu line_len=%zu\n",
+                    ctx.parts.size(), ctx.line.size());
+        for (std::size_t i = 0; i < ctx.parts.size(); ++i)
+        {
+            std::printf("[CLI] cli.echo.args arg[%zu] len=%zu <<<%s>>>\n",
+                        i, ctx.parts[i].size(), ctx.parts[i].c_str());
+        }
     }
 
     static void Cmd_game_pak(const ConsoleCommandContext& ctx)
@@ -11509,16 +11660,42 @@ namespace ConsoleCmd
             auto reg = [&t](std::initializer_list<const char*> names,
                             ConsoleCommandHandler fn)
             {
+                // LC0: canonical↔alias 관계와 handler 그룹을 한 벌 더 남긴다.
+                //
+                // 아래 표는 이름마다 entry를 만들기 때문에 "quit과 exit이 같은
+                // 명령"이라는 사실을 잃는다. 조회에는 필요 없지만 inventory에는
+                // 필요하다 — 219개 이름이 몇 개의 명령인지가 계약의 크기다.
+                // 조회 표는 건드리지 않는다(거동 변경 0).
+                //
+                // ★ 등록을 **먼저 하고** 그 결과를 갈라 넘긴다. emplace는 같은
+                //   이름이 두 번 오면 나중 것을 조용히 버리는데, 시도한 이름을
+                //   그대로 inventory에 적으면 실제로는 죽어 있는 이름이 "이
+                //   handler로 간다"고 주장하게 된다. LC0이 없애려는 drift를
+                //   LC0이 만드는 셈이라, 살아남은 이름과 버려진 이름을 나눈다.
+                std::vector<const char*> accepted;
+                std::vector<const char*> rejected;
                 for (const char* n : names)
                 {
                     // 같은 이름을 두 번 등록하면 조용히 한쪽이 먹힌다.
                     const bool inserted = t.emplace(n, fn).second;
                     if (!inserted) { std::printf("[CLI] 명령 이름 중복 등록: %s\n", n); }
+                    (inserted ? accepted : rejected).push_back(n);
                 }
+
+                // 함수 포인터 → const void* 는 표준이 conditionally-supported로
+                // 두는 변환이다. MSVC/Win32에서는 성립하고 이 값은 **비교와
+                // 그룹핑에만** 쓴다(주소를 artifact에 싣지 않는다). LC4에서 이
+                // 파일이 Engine 공용 모듈로 옮겨 갈 때 다시 판정할 자리다.
+                CommandBaseline::RecordRegistration(
+                    accepted, rejected, reinterpret_cast<const void*>(fn));
             };
 
             reg({ "help" }, &Cmd_help);
             reg({ "quit", "exit" }, &Cmd_quit);
+            // LC0(PHASE 14.5) 기준선 계측. 거동 변경 0 — 재고 찍기만 한다.
+            reg({ "commands.dump" }, &Cmd_commands_dump);
+            reg({ "cli.probe.timing" }, &Cmd_cli_probe_timing);
+            reg({ "cli.echo.args" }, &Cmd_cli_echo_args);
             reg({ "game.pak" }, &Cmd_game_pak);
             reg({ "wait" }, &Cmd_wait);
             reg({ "scene.load", "scene.switch" }, &Cmd_scene_load);
@@ -11781,9 +11958,13 @@ bool ConsoleCommandSystem::MatchEditorCameraToGameCamera()
     return true;
 }
 
-void ConsoleCommandSystem::PrintHelp() const
+const char* ConsoleCommandSystem::HelpText() noexcept
 {
-    std::printf(
+    // 이 문자열이 help의 정본이다. 예전에는 printf의 인자로만 존재해서
+    // "무엇이 안내되고 있는가"를 프로그램이 스스로 알 수 없었다 — §3.4의
+    // help/registry drift가 아무에게도 안 보인 이유가 그것이다. 이제
+    // commands.dump가 이 문자열과 등록 표를 대조해 누락과 고아를 센다.
+    static constexpr const char* kHelpText =
         "\n[CLI] 사용 가능한 명령\n"
         "  scene.new [이름]     빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)\n"
         "  scene.load <경로>    씬을 로드한다(활성 씬은 그대로)\n"
@@ -11928,8 +12109,20 @@ void ConsoleCommandSystem::PrintHelp() const
         "  crash.status         크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다\n"
         "  crash.test <종류>    일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)\n"
         "  quit                 에디터 종료\n"
+        "  commands.dump [경로]  등록 명령 표를 TSV로 덤프한다(LC0 기준선, 소스 스크래핑 대체)\n"
+        "  cli.probe.timing [reset|off|경로]  프레임 시간 분포와 명령 왕복 지연(LC0, 기본 off)\n"
+        "  cli.echo.args <인자>  tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)\n"
         "\n실행 인자: --exec \"<명령>\"  |  --script <파일>  |  --console\n"
-        "           --heapcheck  CRT 디버그 힙 전수 검사(힙 손상을 손상 시점에서 잡는다, 매우 느림)\n\n");
+        "           --heapcheck  CRT 디버그 힙 전수 검사(힙 손상을 손상 시점에서 잡는다, 매우 느림)\n\n";
+
+    return kHelpText;
+}
+
+void ConsoleCommandSystem::PrintHelp() const
+{
+    // 서식 인자가 없으므로 printf가 아니라 fputs다. 출력 바이트는 같고,
+    // 사용자가 준 문자열이 서식 문자열 자리에 앉는 사고가 원천적으로 없다.
+    std::fputs(HelpText(), stdout);
 }
 
 void ConsoleCommandSystem::Shutdown()

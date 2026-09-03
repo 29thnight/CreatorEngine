@@ -341,8 +341,8 @@
       <div class="why">애니메이션 평가 엔진 3세대 전환 + 스케줄러 · LOD · CPU 버짓. 8-19 개정: 언리얼·유니티·Lumina 대조로 <b>평가 엔진이 한 세대 뒤</b>임이 드러나 두 겹이 됐다 — 아래층(포즈=값 · 태스크 레시피 · 도달성 실행 · 관측 본 물질화)과 위층(레시피 강등 L0~L7 · 태스크 EMA 기반 계산형 버짓). 실측 결론: 본 계산이 문자열 map 탐색 위에서, 공유 애셋(curKey·Bone)에 8스레드 쓰기 경합을 내며, 화면 밖 캐릭터까지 풀틱으로 돈다. 뼈=GameObject와 512행렬 프록시라는 <b>하이브리드 청구서를 동시에</b> 내는 중(744 뼈 노드 × 3순회 + 본 30개짜리도 32KB 복사).</div></div>
     <div class="doc"><a href="plans/ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14</span>
       <div class="why">표시 중심 프로파일러를 프레임 단위 녹화·정지 후 구간 분석 도구로 승격. 수집 코어(CaptureSession, EngineFrameId·SubmissionId)가 먼저고 ImGui는 불변 캡처의 reader일 뿐이다. 정적 점검 결론: collector가 producer TLS를 직접 리셋하고, GPU query record가 frame ring과 분리돼 2-in-flight·멀티카메라에서 프레임 매핑을 보장 못 하며, profiler가 에디터 모듈에 있어 Player 녹화 불가.</div></div>
-    <div class="doc"><a href="plans/EditorAutomationCLIPlan.md">EditorAutomationCLIPlan.md</a><span class="tie">PHASE 6 · CLI0~CLI7</span>
-      <div class="why">별칭 포함 176개 명령과 40개 자동화 소비 파일을 가진 기존 Editor CLI를 정식 command subsystem으로 승격한다. Result → Arguments → Descriptor → Module → JSONL 순으로 실패·인자·발견성·모듈·기계 판독 계약을 닫고, 기존 dotted ID와 frame-boundary Pump는 유지한다. <b>MCP는 보류하며 이 트랙의 범위와 작업에 포함하지 않는다.</b></div></div>
+    <div class="doc"><a href="plans/EditorAutomationCLIPlan.md">EditorAutomationCLIPlan.md</a><span class="tie">PHASE 14.5 · LC0~LC9</span>
+      <div class="why">배치 CLI를 <b>라이브 커맨드 서비스</b>로 재수립(2026-09-04 전면 개정, PHASE 6에서 분리). 켜져 있는 에디터에 로컬 HTTP/JSON으로 붙어 명령을 주입하고 같은 연결에서 결과를 받는다 — 프로세스 수명과 명령 수명을 분리해 에디터를 껐다 켜지 않는다. 실행 중 Development Player에도 같은 계약으로 접속한다. 파일 이름은 링크 안정성 때문에 유지. <b>MCP와 임의 스니펫 컴파일 실행은 여전히 범위 밖.</b></div></div>
     <div class="doc is-done"><a href="plans/RhiBoundaryPlan.md">RhiBoundaryPlan.md</a><span class="tie">3-1 완료</span>
       <div class="why">RHI 경계 재설계 완료. 경계 인터페이스 7/7, 공용 패스 17/17, 양 backend 픽셀 대조 18개, Slice 7·8·R6와 최종 Debug/별도 프로세스/TickLive 통합 회귀까지 통과했다.</div></div>
     <div class="doc"><a href="plans/LivePipelineDescPlan.md">LivePipelineDescPlan.md</a><span class="tie">3-13</span>
@@ -653,9 +653,9 @@
 <!-- ===== PHASE 6 ===== -->
 <section class="phase" id="phase-6">
   <h2 class="sec"><span class="no">PHASE 6</span>코드 정리 및 품질 상시화 <span class="phase-pct" data-phase-pct="6"></span></h2>
-  <div class="phase-meta">기존 품질 항목 10일 + CLI 정식화 18일 · CLI 선행: 현재 PHASE 0의 0-8 자동화 레이어 · 실행 계획: <a href="plans/EditorAutomationCLIPlan.md">EditorAutomationCLIPlan.md</a></div>
+  <div class="phase-meta">예상 공수: 10일 · <b>2026-09-04 개정 — CLI 트랙(CLI0~CLI7)을 이 페이즈에서 분리해 <a href="#phase-14.5">PHASE 14.5</a>(라이브 커맨드 서비스)로 옮겼다.</b> 성격이 다르기 때문이다: 이 페이즈는 "더러워지지 않는 구조"이고 CLI 트랙은 새 제품 표면(서비스·라이브 실행·Player 제어)이다. 나란히 두는 동안 미뤄진 쪽은 CLI였고, 그 사이 대상 파일이 일주일에 6,756 → 11,968줄(+77%)로 자랐다</div>
   <div class="phase-goal"><b>목표:</b> 리팩토링 과정에서 확정된 데드 코드를 제거하고, 재발 방지 장치(정적 분석, include 게이트, 리소스 카운터 회귀 테스트)를
-  CI에 상시화한다. 기존 Editor 자동화 CLI는 구조화된 결과·인자·명령 descriptor·기계 판독 출력 계약을 갖춘 품질 기반으로 정식화한다. "한 번 청소"가 아니라 "더러워지지 않는 구조"가 목표.</div>
+  CI에 상시화한다. "한 번 청소"가 아니라 "더러워지지 않는 구조"가 목표.</div>
   <div class="task-wrap"><table class="tasks" data-phase="6"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
@@ -663,8 +663,6 @@
       <li>미사용 심볼·주석 처리 블록·비활성 Mono 경로가 저장소에서 제거되고 빌드 통과</li>
       <li>CI에 컴파일 + include 경계 검사 + (선택) clang-tidy 핵심 체크가 게이트로 동작</li>
       <li>씬 전환 메모리 평탄성 벤치마크가 자동화되어 회귀 시 CI 실패</li>
-      <li>모든 CLI 명령이 terminal <code>CommandResult</code>를 내고 session 결과가 process exit code로 집계</li>
-      <li>자동화 소비자가 C++ 로그 문안 대신 versioned JSONL 결과를 판정하며 help·argument 문서가 descriptor에서 생성</li>
     </ul>
   </div>
 </section>
@@ -1008,6 +1006,43 @@
     UI보다 frame identity가 먼저다 — 잘못 매핑된 예쁜 그래프는 없는 것보다 위험하다. 원본 interval을 버리지 않는다(합계·병합은 reader의 일).
     producer를 collector가 직접 초기화하지 않는다(sealed ownership만 handoff). 멀티카메라를 기본 조건으로 본다.
     Resource Counter 창은 provider 전환 완료까지 비교 기준으로 유지. Deep Profiling은 1차 범위 밖(정적 marker ID 저오버헤드 계측이 기준).
+  </div>
+</section>
+
+<!-- ===== PHASE 14.5 ===== -->
+<section class="phase" id="phase-14.5">
+  <h2 class="sec"><span class="no">PHASE 14.5</span>라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어) <span class="phase-pct" data-phase-pct="14.5"></span></h2>
+  <div class="phase-meta">신설: 2026-09-04 · <b>PHASE 6의 CLI 트랙(CLI0~CLI7)을 분리·재수립한 것</b> · 예상 공수: 26일 · 설계 문서: <a href="plans/EditorAutomationCLIPlan.md">EditorAutomationCLIPlan.md</a> · 선행: PHASE 0의 0-8 자동화 레이어 · PHASE 14와 Development/Shipping 구성 구분·계측 카운터를 공유한다(먼저 도착하는 쪽이 만들고 다른 쪽이 소비) · 공수는 계획 추정치이며 구현·빌드·런타임 검증 전이다</div>
+  <div class="phase-goal"><b>목표:</b> 지금의 CLI는 <b>배치 모델</b>이다 — 프로세스를 켜고, 명령을 주고, 죽인다. 명령 하나를 더 보내려면 에디터를 다시 켜야 하고 그 비용이 부팅 시간 전부다.
+  이 페이즈는 그 위에 <b>서비스 프론트엔드</b>를 얹는다: 이미 켜져 있는 에디터에 <code>127.0.0.1</code> HTTP/JSON으로 붙어 명령을 주입하고 같은 연결에서 결과를 값으로 받는다.
+  실행 중인 Development Player에도 같은 계약으로 접속해 재시작 없이 런타임을 제어하고, C# 어셈블리는 collectible ALC 교체로 라이브 메모리에서 갈아 끼운다.
+  배치 <code>--exec</code>/<code>--script</code>/<code>--console</code>은 그대로 둔다 — 서비스는 대체가 아니라 추가다.
+  <br><br>
+  <b>★ 착수 근거(2026-09-04 정적 재실측):</b> ① <code>Enqueue()</code>는 이미 스레드 안전해 외부 주입은 오늘도 되지만 <b>결과를 돌려줄 값이 없다</b> — 출구가 <code>std::printf</code> 683곳뿐이다.
+  ② <code>Pump()</code>가 프레임당 정확히 한 명령이라 명령 N개가 N프레임이고, 그 앞의 <code>IsSceneLoading()</code>·<code>wait N</code>이 큐를 임의로 길게 멈춘다.
+  ③ 1st-party 소스에 소켓·HTTP·JSON이 <b>0건</b>이라 전송·codec은 전부 신설이다.
+  ④ Player에는 <code>--smoke</code> 하나뿐이고 Development/Shipping을 가르는 매크로가 없다.
+  ⑤ 그 사이 <code>ConsoleCommandSystem.cpp</code>는 6,756 → <b>11,968줄</b>(+77%), 소비 파일은 40 → <b>85개</b>로 자랐다 — 계약 없이 자라는 표면은 계약 비용도 같이 키운다. <b>(LC0 실측이 정적 추정을 정정했다: 명령 그룹은 184가 아니라 205, 소비 파일은 81이 아니라 85 — 집계 패턴의 <code>Academy_4Q.exe</code>가 0건이었다. 계획 §2.1.1.)</b>
+  <br>유리한 사실 하나: 메시지 루프가 <code>PeekMessage</code> 폴링이고 present가 <code>Present(0,0)</code>이라 <b>창이 비활성이어도 프레임이 계속 돈다</b> — 지연 예산의 바탕이 있다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="14.5"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준 (EditorAutomationCLIPlan.md §18)</div>
+    <ul>
+      <li>켜져 있는 에디터에 로컬 HTTP로 붙어 명령을 보내고 결과 JSON을 받는다 · 짧은 명령 왕복 p50 50ms / p95 150ms / p99 300ms를 <b>실측</b>으로 만족</li>
+      <li>명령 N개가 N프레임을 기다리지 않으며, 기존 프레임 기반 벤치마크 수치는 불변(배치 큐의 "프레임당 1개" 의미 보존)</li>
+      <li>멈춤(씬 로딩·긴 명령)이 지연이 아니라 상태로 응답 · 장시간 명령은 <code>operationId</code>로 승격</li>
+      <li>토큰 없는 요청이 어떤 경로로도 통과하지 않고 bind는 loopback뿐 · 서비스는 기본 off이며 off일 때 소켓 0</li>
+      <li>에디터 재시작 없이 C# 변경 → <code>script.reload</code> → <code>script.invoke</code> 왕복이 한 세션에서 닫힘 · 표식 없는 메서드 호출 0</li>
+      <li>실행 중 Development Player 제어 가능 · Shipping에 서비스·소켓 심볼 0 · <code>runtime.text-parser calls=0</code> 유지</li>
+      <li>모든 command가 terminal <code>CommandResult</code>와 descriptor(<code>cost</code>·<code>roles</code> 포함)를 갖고, 자동화 소비자가 로그 문안·C++ 리터럴을 파싱하지 않음</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">지켜야 할 결정 (§4·§8 발췌)</div>
+    서비스는 <b>실행 표면</b>이다 — loopback bind·요청마다 Bearer token·<code>Origin</code> 거부·기본 off·감사 로그가 기능이 아니라 전제다.
+    L0(결과·인자·descriptor)이 L1(전송)보다 먼저다 — 그것 없이는 HTTP 200에 담을 값이 없다.
+    실행 지점은 프레임 경계 <code>Pump()</code>를 유지한다(GT 규약). 지연은 스레드가 아니라 드레인 예산으로 줄인다.
+    "라이브 코드 실행"은 A(등록 명령)·B(표식된 메서드 호출)까지다 — <b>임의 스니펫 컴파일(Roslyn)은 범위 밖</b>이고 승인·격리 모델이 선다음 별도 판정한다. MCP도 마찬가지로 밖이되 보류 근거가 바뀐다(§16).
   </div>
 </section>
 
@@ -1565,31 +1600,8 @@ const TASKS = [
     detail: "구조 분석 보고서를 리팩토링 후 상태로 갱신, 소유권 모델·모듈 경계·락 규약을 docs/에 공식 문서화.",
     refs: "5장 · docs/README.md", priority: "P3", days: 2, status: "stopped",
     note: "중단(2026-08-27) — analysis 문서는 측정 시점의 스냅샷으로 보존하고 사후 덮어쓰지 않는 문서 규약이 정착했다. 현재 구조는 루트 README, 대시보드, docs/design과 각 실행 계획이 담당한다. 최종 구조 총람이 필요하면 기존 분석 갱신이 아니라 새 날짜의 analysis 문서로 작성한다." },
-  { phase: 6, id: "CLI0", title: "CLI 기준선·canary 고정",
-    detail: "등록 명령·alias·help 누락·raw line 재해석·exit code 쓰기·자동화 소비자를 inventory로 고정하고, 이후 슬라이스가 기존 --exec/--script/--console과 frame-boundary Pump 계약을 깨지 않는 canary를 만든다.",
-    refs: "EditorAutomationCLIPlan.md §12 CLI0", priority: "P0", days: 1.5, status: "todo",
-    note: "계획 작성 완료; 구현·빌드·런타임 미착수." },
-  { phase: 6, id: "CLI1", title: "CommandResult·session·exit code 정식화",
-    detail: "모든 명령 경로가 terminal CommandResult를 반환하게 하고 session summary가 syntax·precondition·logical failure·infrastructure failure를 process exit code로 결정한다.",
-    refs: "EditorAutomationCLIPlan.md §12 CLI1", priority: "P0", days: 2.5, status: "todo", note: "" },
-  { phase: 6, id: "CLI2", title: "소유형 argument parser·raw 재파싱 제거",
-    detail: "CommandInvocation이 owned token과 원문 메타데이터를 소유하고, quote/backslash 규칙을 고정한 뒤 object.parent·duplicate·prefab.create 등 핸들러의 raw line 재해석을 제거한다.",
-    refs: "EditorAutomationCLIPlan.md §12 CLI2", priority: "P0", days: 2, status: "todo", note: "" },
-  { phase: 6, id: "CLI3", title: "CommandDescriptor·help·discovery 단일 정본",
-    detail: "canonical ID·alias·argument schema·precondition·affinity·help를 descriptor로 모으고 help, help &lt;command&gt;, commands.list, commands.describe를 같은 정본에서 생성한다.",
-    refs: "EditorAutomationCLIPlan.md §12 CLI3", priority: "P1", days: 2.5, status: "todo", note: "" },
-  { phase: 6, id: "CLI4", title: "도메인 모듈 분리·Editor operation 의미 통일",
-    detail: "6,756줄 facade를 Scene·Object·Prefab·Asset·Play·Build·RenderTest 등 buildable 도메인으로 분리하고 GUI와 CLI가 공유해야 할 Undo·selection·play-state 의미를 operation 계층에서 맞춘다.",
-    refs: "EditorAutomationCLIPlan.md §12 CLI4", priority: "P1", days: 4, status: "todo", note: "" },
-  { phase: 6, id: "CLI5", title: "JSONL 결과 출력·자동화 소비자 이관",
-    detail: "기본 human 출력을 유지하면서 --result-format jsonl을 추가하고, 로그 문안/C++ 리터럴을 긁는 DX12 suite부터 40개 추적 소비자를 versioned 결과 schema로 단계 이관한다.",
-    refs: "EditorAutomationCLIPlan.md §12 CLI5", priority: "P1", days: 3, status: "todo", note: "" },
-  { phase: 6, id: "CLI6", title: "unattended 실행·thread affinity 강화",
-    detail: "interactive UI 요구 명령을 명시적으로 거부하고 Game Thread affinity·timeout·cancel·shutdown drain 정책을 고정해 무인 Editor 자동화가 결정적으로 종료되게 한다.",
-    refs: "EditorAutomationCLIPlan.md §12 CLI6", priority: "P1", days: 1.5, status: "todo", note: "" },
-  { phase: 6, id: "CLI7", title: "호환 shim 정리·회귀 ratchet",
-    detail: "모든 소비자 이관과 양성·음성·변이 게이트 통과 뒤 raw command API와 수동 help/exit shim을 제거하고 신규 명령이 descriptor·result 계약을 우회하지 못하게 한다.",
-    refs: "EditorAutomationCLIPlan.md §12 CLI7", priority: "P2", days: 1, status: "todo", note: "" },
+  // CLI0~CLI7은 2026-09-04에 PHASE 14.5(라이브 커맨드 서비스)로 이관하며 LC0~LC9로 재편했다.
+  // 분리 근거와 재수립 내용은 plans/EditorAutomationCLIPlan.md.
 
   // ---------- PHASE 7: UI 서브시스템 재설계 ----------
   //
@@ -1966,6 +1978,50 @@ const TASKS = [
   { phase: 14, id: "14-7", title: "P7 — 자동 trigger + PIX/ETW 연결",
     detail: "CPU/GPU/GC/marker 임계 trigger · pre/post-trigger 프레임 보존 · 기존 DX12 validation/PIX launch 흐름과 연결(과거 캡처 소급 변환이 아니라 다음 재현 프레임 캡처) · 선택적 ETW TraceLogging export · 외부 캡처와 .ceprof metadata 상호 참조. 판정: GPU frame > threshold 재현에서 내부 캡처 자동 freeze · PIX 불가 환경은 내부 캡처만 보존하고 사유 표시 · marker 추가가 PIX command stream 무손상.",
     refs: "ProfilingCapturePlan §9 · §10 P7", priority: "P2", days: 2, status: "todo", note: "" },
+  // ---------- PHASE 14.5: 라이브 커맨드 서비스 ----------
+  // 신설(2026-09-04). PHASE 6의 CLI0~CLI7을 분리·재수립한 트랙이다.
+  // 계획: plans/EditorAutomationCLIPlan.md. 공수는 계획 추정치이며 구현 착수 전이다.
+  { phase: 14.5, id: "LC0", title: "기준선 · 지연 실측 · false-green canary",
+    detail: "등록 명령/별칭/핸들러/help coverage를 registry 기준으로 다시 생성하고, raw line 재해석·직접 SetExitCode·verdict print 지점을 센다. ★ 에디터 프레임 시간 분포(포커스/비포커스/씬 로딩/재생 중)와 현행 왕복 지연 바닥값(stdin Enqueue → 실행 → printf)을 실측한다 — 지연 예산의 분모가 아직 없다. 씬 로딩·wait로 큐가 멈추는 시간 분포, 소비 파일 81개 목록 고정, 논리 실패가 exit 0으로 남는 canary, quote/escape parser golden.",
+    refs: "EditorAutomationCLIPlan.md §13 LC0 · §2.1.1 · §7.1.1", priority: "P0", days: 1.5, status: "done",
+    note: "완료(2026-09-04) — 빌드·런타임 검증까지. 거동 변경 0(기존 명령 205개 무수정, 계측 명령 3개 추가). ★ 실측이 계획 수치 셋을 정정했다: 명령 그룹은 184가 아니라 205(정적 'Cmd_ 정의 수'가 틀렸다 — 런타임 205와 reg( 205가 일치), 소비 파일은 81이 아니라 85(집계 패턴의 Academy_4Q.exe가 0건 — CreatorEditor.exe로 개명됐다), 직접 SetExitCode는 2곳이 아니라 12곳. ★★ 지연 분모 확보(4회 반복): 외부 왕복 p50 2.5~3.0ms/p95 3.4~4.0ms/p99 3.8~4.4ms, 프레임 p50 2.6ms(701프레임 중 666개가 2~4ms — 봉우리 하나), handler 실행 p50 0.29ms — 지연은 거의 전부 프레임 경계 대기다. 목표 50/150/300ms는 바닥값의 약 20배라 그대로 SLO로 쓰면 20배 퇴행이 초록으로 통과한다(LC5가 재조정). 첫 측정은 같은 기계에서 빌드가 돌던 중이라 p95가 13.6ms로 나왔다 — 반복하지 않았다면 예산이 기계 소음 위에 섰을 것이다. ★ 계측이 계측 대상을 흔든다는 것도 드러났다: 프레임 상태 수집을 상시로 켜 두면 매 프레임 GetForegroundWindow() 시스템 호출이 붙어 분포 자체가 달라진다 — 기본 off로 바꿨다. ★★★ help drift 실물: 등록 205개 중 help 게재 130개(63%)이고, help가 안내하는 experiment.anim/bench/fbx/gltf/import/model 6개는 등록돼 있지 않다 — 치면 '알 수 없는 명령'에 exit 0. 래칫 둘(verify-cli-exit-contract · verify-cli-parser-golden)이 run-all.ps1에 들어갔고 오늘 초록, LC1/LC2가 거동을 바꾸면 붉어진다. 못 잰 축: 포커스 상태 프레임 시간(하네스가 배경 프로세스라 창이 전경이 안 됨 — artifact가 focused_unmeasured로 자기 신고)." },
+  { phase: 14.5, id: "LC1", title: "CommandResult · session · exit spine",
+    detail: "모든 명령 경로가 terminal CommandResult를 반환하게 하고 session summary가 syntax·precondition·logical·infrastructure failure를 process exit code로 결정한다. legacy void handler는 LegacyUnreported adapter로만 남기고 신규 명령에는 금지.",
+    refs: "EditorAutomationCLIPlan.md §13 LC1", priority: "P0", days: 2.5, status: "todo",
+    note: "★ 이 슬라이스 없이는 HTTP 응답 본문이 존재하지 않는다 — 지금 결과의 유일한 출구는 printf 683곳이다. 전송 계층보다 먼저다." },
+  { phase: 14.5, id: "LC2", title: "소유형 invocation · raw 재파싱 제거",
+    detail: "CommandInvocation이 owned token과 원문 메타데이터를 소유하고, JSON args 배열이 라인 문자열을 거치지 않고 곧장 owned argument가 되는 경로를 연다. object.parent·duplicate·prefab.create의 parts+raw line 혼합 제거, Windows path·빈 문자열·quote/escape·UTF-8 golden 고정.",
+    refs: "EditorAutomationCLIPlan.md §13 LC2", priority: "P0", days: 2, status: "todo",
+    note: "JSON이 이미 갈라 온 인자를 라인 문법으로 다시 이어 붙였다 자르면 따옴표 손실이 서비스에서 재발한다. 같은 인자를 라인/JSON 두 경로로 넣어 동일 invocation을 단정한다." },
+  { phase: 14.5, id: "LC3", title: "CommandDescriptor · help · discovery 단일 정본",
+    detail: "canonical ID·alias·argument schema·capability·affinity·help에 더해 cost(Immediate/Frames/Long)와 roles(Editor/Player)를 descriptor로 모으고, help·commands.list·commands.describe·GET /commands를 같은 snapshot에서 생성한다.",
+    refs: "EditorAutomationCLIPlan.md §13 LC3", priority: "P0", days: 2.5, status: "todo",
+    note: "cost는 서비스가 동기/202를 추측하지 않고 결정하게 하고, roles는 Player registry가 에디터 저작 명령을 물려받지 않게 한다. Invoke-Dx12Suite의 C++ 소스 스크래핑을 여기서 끊는다." },
+  { phase: 14.5, id: "LC4", title: "로컬 HTTP/JSON 서비스 (Winsock loopback · 토큰 · 감사)",
+    detail: "Engine/CommandService 신설 — Winsock loopback listener, HTTP/1.1 최소 서브셋(Content-Length·keep-alive·헤더 한계), 자체 JSON codec, endpoint.json(포트+토큰) 발행·회수, GET /health · /commands · POST /command 동기 경로, 감사 로그. bind는 127.0.0.1/::1만, 요청마다 Bearer token, Origin 거부, 본문 1MiB 상한, 기본 off.",
+    refs: "EditorAutomationCLIPlan.md §13 LC4 · §5 · §8", priority: "P0", days: 3, status: "todo",
+    note: "★ 1st-party 소스에 소켓·HTTP·JSON이 0건이라 전부 신설이다. 라이브러리 도입 대신 자체 최소 서브셋을 택한 근거와 되돌릴 조건은 계획 §17. 크래시 후 유령 endpoint 회수까지 이 슬라이스 몫." },
+  { phase: 14.5, id: "LC5", title: "프레임 예산 드레인 · 세션 · operation · 스트리밍",
+    detail: "service 큐를 시간(기본 2ms)·개수(기본 8) 예산으로 드레인하되 배치 큐의 프레임당 1개 의미는 보존한다. 서비스 세션에서 wait 금지, cost=Long 명령의 operationId·폴링·취소·진행 스트림, blocked 상태 노출(state·blockedReason·queueDepth·oldestQueuedMs)과 429 상한, timing 필드와 지연 SLO 회귀 게이트.",
+    refs: "EditorAutomationCLIPlan.md §13 LC5 · §7", priority: "P0", days: 2.5, status: "todo",
+    note: "★ 배치 큐를 함께 바꾸면 프레임 수로 시간을 재는 기존 시나리오(scene_churn_benchmark 등) 측정값이 조용히 이동한다. 큐를 나누는 것은 구현 편의가 아니라 기존 측정 의미의 보존이다. ★★ LC0 실측이 두 가지를 바꿨다(계획 §7.1.1·§7.2): ① SLO는 50/150/300ms가 아니라 실측(p50 2.8ms/p95 3.8ms/p99 4.2ms, 4회 반복)에 여유를 얹은 값이어야 한다 — 목표를 바닥값의 20배로 두면 20배 퇴행이 초록으로 통과한다. ② blocked 상태 발행을 Pump()에 두면 안 된다. scene.load가 큐를 2.4초 막는 동안 IsSceneLoading()이 참인 프레임은 0개였다 — 핸들러 안에서 동기로 멈추므로 그 시간에 Pump가 아예 돌지 않는다. 상태는 명령 실행 전후 원자 변수에 찍고 수신 스레드가 읽어야 GT가 멈춰도 응답한다." },
+  { phase: 14.5, id: "LC6", title: "도메인 모듈 분리 · Editor operation 의미 통일",
+    detail: "11,968줄 facade를 Core·SceneObject·AssetAuthoring·ScriptUiAnimator·Diagnostics·RenderTest·Build 도메인으로 한 파일씩 이동·빌드하고, mutating command를 Shared Editor operation / Shared engine service / Test probe / Raw fixture 넷으로 전수 분류한다. GUI와 서비스가 공유해야 할 Undo·selection·play-state 의미를 operation 계층에서 맞춘다.",
+    refs: "EditorAutomationCLIPlan.md §13 LC6 · §9 · §12", priority: "P1", days: 4, status: "todo",
+    note: "LC3 이후 도메인 단위로 LC4/LC5와 병행 가능. 같은 handler를 한쪽이 옮기고 다른 쪽이 formatter까지 바꾸는 동시 작업만 금지. 한 번에 잘라 빌드를 마지막에 보는 방식 금지." },
+  { phase: 14.5, id: "LC7", title: "라이브 코드 실행 A/B — 어셈블리 교체와 표식된 호출",
+    detail: "script.reload를 결과 있는 명령으로 승격(복원 수·실패 목록·이전 컨텍스트 잔존을 data로), script.invoke로 로드된 어셈블리의 표식된 static 메서드만 GT에서 호출, 표식 attribute를 ScriptCore에 정의하고 표식 없는 메서드 호출을 거부로 판정, 리로드 실패 시 이전 상태 보존. 수정 → 빌드 → reload → invoke 왕복 시간 실측.",
+    refs: "EditorAutomationCLIPlan.md §13 LC7 · §10", priority: "P1", days: 2.5, status: "todo",
+    note: "기반은 이미 있다 — ScriptLoadContext는 isCollectible: true이고 Cmd_script_reload가 값 보존 후 교체·복원을 한다. ★ 임의 C# 스니펫 컴파일(Roslyn)은 범위 밖이다: capability·격리·ALC 수명·비용 실측 넷이 서기 전의 C는 되돌리기 어려운 표면이다." },
+  { phase: 14.5, id: "LC8", title: "Player Development 에이전트 · Shipping 격리",
+    detail: "Development/Shipping 구성 구분 도입(PHASE 14와 공유), roles 기반 Player registry(에디터 저작 명령 부재), --command-service 명시 플래그(기본 off), Player 전용 JSON codec(authoring 계측 경로 미사용), Shipping 링크 0과 runtime.text-parser calls=0 유지 증명.",
+    refs: "EditorAutomationCLIPlan.md §13 LC8 · §11", priority: "P1", days: 3, status: "todo",
+    note: "현재 Player에는 --smoke 하나뿐이고 Development/Shipping 매크로가 0건이다. 구분을 두 번 만들지 않는다 — PHASE 14 프로파일러도 같은 것을 필요로 하므로 먼저 도착하는 쪽이 만들고 다른 쪽이 소비한다. 재현이 어려운 런타임 상태 위에서 명령을 시험할 수 있게 되는 것이 이 계층의 실제 값어치." },
+  { phase: 14.5, id: "LC9", title: "소비자 이관 · legacy 제거 · 최종 ratchet",
+    detail: "배치 JSONL(--result-format jsonl)과 서비스 JSON이 schema v1을 공유하게 하고, 소비자를 Invoke-Dx12Suite → profiling-validation → featuretest → regression 개별 → run-all.ps1 → 루트 scripts 순으로 이관한다. LegacyUnreported·raw reconstruction·수동 verdict print를 사용량 0 확인 후 제거하고, 소스 스크래핑·비 loopback bind·무인증 라우트·Shipping 서비스 심볼을 정적 게이트로 막는다.",
+    refs: "EditorAutomationCLIPlan.md §13 LC9 · §14", priority: "P1", days: 2.5, status: "todo",
+    note: "이관한 소비자는 text fallback을 남기지 않는다 — 이중 parser는 새 drift를 만든다. 게이트가 처음부터 초록이면 변이로 이빨을 확인한다(토큰 비교 무력화·0.0.0.0 bind·드레인 예산 0·Shipping 심볼 잔존)." },
+
   // ---------- PHASE 15: 유틸리티 프레임워크 현대화 ----------
   // 신설(2026-08-14). 설계: UtilityFrameworkModernizationPlan.md. 공수는 계획 추정치.
   { phase: 15, id: "15-S", title: "트랙 S — 표준 회귀",
@@ -2514,7 +2570,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 14.5: "라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어)", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨", stopped: "중단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked", stopped: "st-stopped" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0, stopped: 0 };
