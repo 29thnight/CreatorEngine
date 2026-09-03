@@ -13,6 +13,7 @@
 #include "../IRenderDeviceServices.h"
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIAssetEvictionPolicy.h"
+#include "../../TextureImage.h"
 #include "DX12PersistentHeap.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
@@ -22,14 +23,12 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
-// DirectXTex를 이 헤더로 끌어오지 않는다.
+// ★ 여기 있던 DirectX::ScratchImage 전방 선언과 그 사연을 걷었다(축 A).
 //
-// 끌어오면 이 헤더를 먼저 include한 TU에서 DirectXTex.h가 d3d11.h보다 앞서게 되고,
-// DirectXTex의 DX11 헬퍼(CreateShaderResourceView 등)가 __d3d11_h__ 가드에 걸려
-// 통째로 사라진다. 뒤에 d3d11.h가 와도 #pragma once 때문에 되살아나지 않는다 —
-// 실제로 ImGuiDx12Shell.cpp가 그렇게 깨졌다(PHASE 9-9).
-// 선언에 필요한 것은 이름뿐이므로 전방 선언이면 충분하다.
-namespace DirectX { class ScratchImage; }
+//   그 주석이 적고 있던 문제는 "DirectXTex.h를 이 헤더로 끌어오면 d3d11.h와
+//   순서가 뒤집혀 DX11 헬퍼가 통째로 사라진다"였고, 그래서 이름만 전방
+//   선언해 두고 있었다. 업로드 창구의 인자가 중립 타입이 되면서 그 사연
+//   자체가 없어졌다 — 이 헤더는 이제 DirectXTex를 알지 않는다.
 
 class Texture;
 class DX12DeviceResources;
@@ -188,7 +187,7 @@ private:
     ///
     /// 로더가 압축까지 끝낸 이미지를 Texture에 남겨 두므로
     /// (Texture::m_cpuPixels) 그것을 그대로 업로드 링에 밀어 넣는다.
-    bool UploadFromCpuPixels(const DirectX::ScratchImage& image,
+    bool UploadFromCpuPixels(const TextureImage& image,
         const wchar_t* debugName, DX12PersistentHeap::Allocation& outAllocation,
         Entry& outEntry, std::string& outError);
 

@@ -6,18 +6,21 @@
 #include "Delegate.h"
 // m_assetId의 HashedGuid·make_guid()가 여기서 온다 — 전이 include에 기대지 않는다.
 #include "TypeTrait.h"
-// DirectXTex.h는 이 저장소에서 늘 __d3d11_h__가 켜진 채로 읽혀야 한다.
-// DirectXHelper.h가 쓰는 CreateShaderResourceView·CreateTextureEx가 그 가드
-// 안에 있는데, #pragma once 때문에 먼저 들어온 쪽의 순서가 그대로 굳는다.
-// Core.Definition.h는 d3d11.h를 먼저 넣어 그 규약을 지키지만 이 헤더만
-// 어긋나 있었고, 유니티 빌드에서는 앞선 파일이 순서를 맞춰 가려 왔다.
-// (근본 처방은 DirectXHelper.h의 DX11 TGA 로더를 걷는 것이다 — DX11 은퇴 몫)
-#include <d3d11.h>
-#include <DirectXTex.h>
+// ★ 여기 있던 <d3d11.h> + <DirectXTex.h> 를 걷었다(축 A).
+//
+//   그 둘은 m_cpuPixels 가 DirectX::ScratchImage 였기 때문에 있었고,
+//   DirectXTex.h 가 __d3d11_h__ 가 켜진 채로 읽혀야 한다는 규약 때문에
+//   d3d11.h 를 앞세워야 했다. 결과는 Texture.h 를 읽는 모든 TU 가 —
+//   Vulkan 백엔드 구현 파일까지 — DX11 헤더를 컴파일하는 것이었다.
+//
+//   지금 CPU 픽셀은 백엔드 중립 타입이 든다. 디코더와 BC 압축기는 여전히
+//   DirectXTex 이지만 Texture.cpp 안에만 있다.
+#include "TextureImage.h"
 #include <mathematics/vector2.hpp>
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
 #include <functional>
 #include <type_traits>
@@ -37,7 +40,8 @@
 //     '아무도 안 쓰는 것들이 서로를 부르는' 덩어리가 남아 있었다.
 //
 //   지금 이 타입이 하는 일은 하나다 — 파일에서 읽은 픽셀을 CPU에 들고,
-//   DX12TextureCache가 그것을 신원(m_assetId)으로 캐싱해 GPU에 올린다.
+//   텍스처 캐시(DX12·Vulkan)가 그것을 신원(m_assetId)으로 캐싱해 GPU에
+//   올린다.
 //-----------------------------------------------------------------------------
 
 enum class TextureType
@@ -63,7 +67,7 @@ public:
 		_In_ uint32 width,
 		_In_ uint32 height,
 		_In_ std::string_view name,
-		_In_ DXGI_FORMAT textureFormat,
+		_In_ RHIFormat textureFormat,
 		_In_reads_bytes_(rowPitch* height) const void* pixels,
 		_In_opt_ size_t rowPitch = 0
 	);
@@ -85,8 +89,20 @@ public:
 	// 디코드해 둔 RGBA8 픽셀이라 파일 로더를 다시 태울 이유가 없다 — 여기서
 	// 두 번째 디코드가 생기면 generation의 SHA-256 검증이 뜻을 잃는다. 이미지가
 	// 비었으면 nullptr.
-	static std::shared_ptr<Texture> CreateSharedFromScratchImage(
-		std::string_view name, std::shared_ptr<DirectX::ScratchImage> image);
+	static std::shared_ptr<Texture> CreateSharedFromCpuImage(
+		std::string_view name, std::shared_ptr<const TextureImage> image);
+
+	// ── 디코드 전용 창구 (축 A) ──
+	//
+	// 인코딩된 이미지 바이트를 RGBA8 중립 이미지로 푼다. 압축(BC)이면 풀고,
+	// 색공간 전달 함수는 건드리지 않는다 — 레이아웃만 RGBA8로 맞춘다.
+	//
+	// ★ 이 함수가 있는 이유는 ModelAssetGeneration 의 cook 경로다. 그쪽은
+	//   "바이트 → 중립 RGBA8"만 필요한데 그것 하나 때문에 DirectXTex 의
+	//   Convert·Decompress·IsSRGB 를 직접 불렀다. 디코더를 갈아 끼우려면
+	//   봐야 할 파일이 둘이 되는 자리였고, 지금은 Texture.cpp 하나다.
+	static bool DecodeToRgba8(std::span<const std::byte> bytes,
+		TextureImage& outImage, std::string& outFailure);
 
 	static std::unique_ptr<Texture> LoadManagedFromPath(
 		const file::path& path, bool isCompress = false);
@@ -115,11 +131,15 @@ public:
 	//
 	// shared_ptr인 이유: Texture가 이동되는 경로가 있어 소유권을 하나로
 	// 묶어야 하고, unique_ptr이면 그 경로들이 깨진다.
-	std::shared_ptr<DirectX::ScratchImage> m_cpuPixels;
+	//
+	// ★ const 인 이유(축 A): 만든 뒤로는 아무도 고치지 않는다. 캐시 둘이
+	//   같은 픽셀을 각자 읽어 가므로(DX12·Vulkan) 쓰기 창구를 열어 두면
+	//   그 공유가 곧 경합이 된다.
+	std::shared_ptr<const TextureImage> m_cpuPixels;
 
-	/// DX12 업로드용. 소유권을 넘기지 않는다 — 은퇴 후 재업로드가 같은
+	/// GPU 업로드용. 소유권을 넘기지 않는다 — 은퇴 후 재업로드가 같은
 	/// 픽셀을 다시 읽어야 한다.
-	const DirectX::ScratchImage* GetCpuPixels() const { return m_cpuPixels.get(); }
+	const TextureImage* GetCpuPixels() const { return m_cpuPixels.get(); }
 
 	// ── 자산 신원 (PHASE 3-1 재정의, 자산 상주 관리 ①) ──
 	//

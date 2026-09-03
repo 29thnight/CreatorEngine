@@ -414,18 +414,20 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(
 
 namespace
 {
-	// generation이 검증·디코드해 둔 RGBA8 subresource를 DirectXTex 이미지로
-	// 되돌려 DX12/Vulkan 텍스처 캐시가 읽는 형태(ScratchImage)로 만든다.
-	// 두 번째 디코드는 없다 — 바이트를 옮길 뿐이다.
-	[[nodiscard]] std::shared_ptr<DirectX::ScratchImage> BuildGenerationScratchImage(
+	// generation이 검증·디코드해 둔 RGBA8 subresource를 텍스처 캐시가 읽는
+	// 중립 CPU 이미지로 옮긴다. 두 번째 디코드는 없다 — 바이트를 옮길 뿐이다.
+	//
+	// ★ 예전에는 이 자리가 왕복이었다(축 A 전). generation 의 텍스처는 이미
+	//   RHIFormat + raw 픽셀로 백엔드 중립인데, 그것을 DXGI_FORMAT 으로
+	//   되돌려 DirectX::ScratchImage 를 세웠고, Vulkan 캐시가 그 DXGI_FORMAT
+	//   을 다시 RHIFormat 으로 환원했다. 포맷 왕복 두 번이 순수한 어댑터
+	//   비용이었다 — 지금은 양쪽 어휘가 처음부터 같아 옮기기만 한다.
+	[[nodiscard]] std::shared_ptr<const TextureImage> BuildGenerationCpuImage(
 		const assets::ModelTextureAsset& texture, std::string& outError)
 	{
-		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
-		switch (texture.format)
+		if (RHIFormat::RGBA8Unorm != texture.format
+			&& RHIFormat::RGBA8UnormSrgb != texture.format)
 		{
-		case RHIFormat::RGBA8Unorm: format = DXGI_FORMAT_R8G8B8A8_UNORM; break;
-		case RHIFormat::RGBA8UnormSrgb: format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; break;
-		default:
 			outError = "generation texture 포맷이 RGBA8 계열이 아니다";
 			return nullptr;
 		}
@@ -438,11 +440,11 @@ namespace
 			return nullptr;
 		}
 
-		auto image = std::make_shared<DirectX::ScratchImage>();
-		if (FAILED(image->Initialize2D(format, texture.width, texture.height,
-			texture.arraySize, texture.mipLevels)))
+		TextureImage image = TextureImage::Allocate(texture.format, texture.width,
+			texture.height, texture.arraySize, texture.mipLevels);
+		if (!image.IsValid())
 		{
-			outError = "ScratchImage 초기화 실패";
+			outError = "중립 CPU 이미지 초기화 실패";
 			return nullptr;
 		}
 		for (std::uint32_t item = 0; item < texture.arraySize; ++item)
@@ -450,11 +452,14 @@ namespace
 			for (std::uint32_t mip = 0; mip < texture.mipLevels; ++mip)
 			{
 				// CopyTexturePixels(ModelAssetGeneration.cpp)의 적재 순서와 같다:
-				// item 바깥, mip 안쪽.
+				// item 바깥, mip 안쪽. TextureImage 도 같은 규약이다.
 				const assets::ModelTextureSubresource& source =
 					texture.subresources[static_cast<std::size_t>(item) * texture.mipLevels + mip];
-				const DirectX::Image* destination = image->GetImage(mip, item, 0);
-				if (nullptr == destination || 0 == source.rowPitch
+				const TextureImage::Subresource* destination = image.Find(mip, item);
+				std::byte* destinationPixels = (nullptr != destination)
+					? image.MutablePixelsAt(*destination) : nullptr;
+				if (nullptr == destination || nullptr == destinationPixels
+					|| 0 == source.rowPitch
 					|| source.offset + source.slicePitch > texture.pixels.size()
 					|| destination->width != source.width
 					|| destination->height != source.height)
@@ -462,19 +467,16 @@ namespace
 					outError = "generation texture subresource가 이미지 기술과 어긋난다";
 					return nullptr;
 				}
-				const std::size_t rows = static_cast<std::size_t>(source.slicePitch / source.rowPitch);
-				const std::size_t copyBytes = (std::min)(
-					static_cast<std::size_t>(source.rowPitch), destination->rowPitch);
-				const auto* sourceBytes = reinterpret_cast<const std::uint8_t*>(
-					texture.pixels.data() + source.offset);
-				for (std::size_t y = 0; y < rows && y < destination->height; ++y)
-				{
-					std::memcpy(destination->pixels + y * destination->rowPitch,
-						sourceBytes + y * static_cast<std::size_t>(source.rowPitch), copyBytes);
-				}
+				const std::uint32_t sourceRows = static_cast<std::uint32_t>(
+					source.slicePitch / source.rowPitch);
+				CopyImageRows(destinationPixels, destination->rowPitch,
+					texture.pixels.data() + source.offset,
+					static_cast<std::size_t>(source.rowPitch),
+					(std::min)(sourceRows, destination->height),
+					destination->rowPitch);
 			}
 		}
-		return image;
+		return std::make_shared<const TextureImage>(std::move(image));
 	}
 }
 
@@ -494,10 +496,10 @@ std::shared_ptr<Texture> DataSystem::ResolveModelGenerationTexture(
 	}
 
 	std::string error;
-	std::shared_ptr<DirectX::ScratchImage> image =
-		BuildGenerationScratchImage(*texture, error);
+	std::shared_ptr<const TextureImage> image =
+		BuildGenerationCpuImage(*texture, error);
 	std::shared_ptr<Texture> owner = image
-		? Texture::CreateSharedFromScratchImage(texture->name, std::move(image))
+		? Texture::CreateSharedFromCpuImage(texture->name, std::move(image))
 		: nullptr;
 	if (!owner)
 	{

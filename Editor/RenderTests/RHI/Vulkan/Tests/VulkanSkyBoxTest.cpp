@@ -378,9 +378,9 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
         outLog += "[1/4] CameraGizmo.png 로드 실패: " + cameraIconPath.string() + "\n";
         return false;
     }
-    const DirectX::TexMetadata& metadata = cameraIcon->GetCpuPixels()->GetMetadata();
-    if (128 != metadata.width || 128 != metadata.height ||
-        cameraIcon->GetCpuPixels()->IsAlphaAllOpaque())
+    const TextureImage* iconPixels = cameraIcon->GetCpuPixels();
+    if (128 != iconPixels->Width() || 128 != iconPixels->Height() ||
+        !cameraIcon->IsTextureAlpha())
     {
         outLog += "[1/4] CameraGizmo.png가 기대한 128x128 RGBA 자산이 아니다\n";
         return false;
@@ -444,7 +444,40 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
         if (!gizmo.Initialize(frameContext, error))
             return fail("[1/4] 셰이더/파이프라인 초기화 실패: " + error + "\n");
     }
-    outLog += "[1/4] 실제 CameraGizmo.png 로드 · SPIR-V·파이프라인 생성 통과\n";
+
+    // ── 텍스처 코덱 경계 슬라이스 (축 A) ─────────────────────────────────
+    //
+    // ★ 이 슬라이스가 잡는 것은 "같은 자산을 DX12는 올리고 Vulkan은 흰색으로
+    //   돌려주던" 비대칭이다. 원인은 상위 어휘(RHIFormat)에 블록 압축과 BGRA가
+    //   없었던 것이다 — DX12는 DXGI_FORMAT을 컨테이너째 들고 다녀 우연히
+    //   통과했고, Vulkan은 포맷을 몰라 업로드를 통째로 거절했다.
+    //
+    //   셋 다 저작 경로가 실제로 만드는 것이다: baseColorMap은 compress=true로
+    //   BC1이 되고(FinalizeMaterialRuntime), blueNoise.dds는 DXT5(BC3)이며,
+    //   WIC PNG 디코더는 FORCE_RGB가 없으면 흔히 BGRA8을 남긴다.
+    //
+    // ★ 포맷을 먼저 단정하는 이유: 로더가 압축을 안 했거나 dds가 다른 포맷이면
+    //   아래 업로드 단정은 비압축 자산을 올려 놓고 초록을 내는 눈먼 검사가 된다.
+    std::shared_ptr<Texture> compressedIcon =
+        Texture::LoadSharedFromPath(cameraIconPath, /*isCompress*/ true);
+    std::shared_ptr<Texture> blockNoise = Texture::LoadSharedFromPath(
+        PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
+    const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
+    std::shared_ptr<Texture> bgraTexture(Texture::CreateFromPixels(
+        1, 1, "vk_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
+
+    if (!compressedIcon || nullptr == compressedIcon->GetCpuPixels() ||
+        RHIFormat::BC1UnormSrgb != compressedIcon->GetCpuPixels()->Format())
+        return fail("[1/4] baseColor 압축 경로가 BC1_SRGB를 만들지 않았다\n");
+    if (!blockNoise || nullptr == blockNoise->GetCpuPixels() ||
+        RHIFormat::BC3Unorm != blockNoise->GetCpuPixels()->Format())
+        return fail("[1/4] blueNoise.dds가 BC3로 로드되지 않았다\n");
+    if (!bgraTexture || nullptr == bgraTexture->GetCpuPixels() ||
+        RHIFormat::BGRA8Unorm != bgraTexture->GetCpuPixels()->Format())
+        return fail("[1/4] BGRA8 자산을 만들지 못했다\n");
+
+    outLog += "[1/4] 실제 CameraGizmo.png 로드 · SPIR-V·파이프라인 생성 · "
+        "코덱 자산 셋(BC1_SRGB·BC3·BGRA8) 준비 통과\n";
 
     if (!resources.CreateReadback(kVkIconWidth, kVkIconHeight,
         EnhancedGizmoIconPass::kOutputFormat, 1, readback, error))
@@ -460,6 +493,25 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
         return fail("[2/4] BeginFrame 실패: " + error + "\n");
     if (!gizmo.PrepareFrame(frameContext, error))
         return fail("[2/4] PrepareFrame/PNG 업로드 실패: " + error + "\n");
+
+    // 코덱 자산도 같은 프레임에서 올린다 — 캐시가 프레임 안을 요구한다.
+    //
+    // ★ handle 만 보면 눈먼다. 업로드가 거절되면 캐시는 흰색을 돌려주는데
+    //   그것도 유효한 handle 이다. 판별하는 것은 format 이다 — 흰색은
+    //   RGBA8Unorm 이라 BC1_SRGB · BC3 · BGRA8 어느 것과도 다르다.
+    std::string codecError;
+    const RHITextureEntry compressedEntry =
+        textureCache.GetOrUpload(compressedIcon.get(), codecError);
+    const RHITextureEntry noiseEntry =
+        textureCache.GetOrUpload(blockNoise.get(), codecError);
+    const RHITextureEntry bgraEntry =
+        textureCache.GetOrUpload(bgraTexture.get(), codecError);
+    if (!compressedEntry.IsValid() || !noiseEntry.IsValid() || !bgraEntry.IsValid() ||
+        RHIFormat::BC1UnormSrgb != compressedEntry.format ||
+        RHIFormat::BC3Unorm != noiseEntry.format ||
+        RHIFormat::BGRA8Unorm != bgraEntry.format)
+        return fail("[2/4] 코덱 자산이 Vulkan에 올라가지 않았다(흰색 폴백): "
+            + codecError + "\n");
 
     EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
     gizmo.Declare(graph, frameContext);
@@ -501,7 +553,9 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     outLog += graphLine;
     if (2 != graphStats.passesExecuted || 0 != graphStats.passesCulled ||
         1 != graphStats.transientCreated || 1 != gizmo.GetLastIconCount() ||
-        1 != gizmo.GetLastBatchCount() || 1 != textureStats.fromCpuPixels ||
+        1 != gizmo.GetLastBatchCount() ||
+        // 아이콘 1 + 코덱 자산 3. 예전에는 코덱 셋이 전부 failures 로 갔다.
+        4 != textureStats.fromCpuPixels ||
         0 != textureStats.failures ||
         0 == textureStats.persistentHeap.activeSegments ||
         0 == textureStats.persistentHeap.livePooledAllocations ||

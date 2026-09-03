@@ -1112,6 +1112,9 @@
     <ClInclude Include="Texture.h">
       <Filter>Resources\Texture</Filter>
     </ClInclude>
+    <ClInclude Include="TextureImage.h">
+      <Filter>Resources\Texture</Filter>
+    </ClInclude>
     <ClInclude Include="UIClipping.h">
       <Filter>Resources\UI</Filter>
     </ClInclude>

@@ -109,27 +109,16 @@ struct VulkanTextureCache::Impl
         return false;
     }
 
-    struct SourceFormat
-    {
-        RHIFormat format{ RHIFormat::Unknown };
-        bool bgra{ false };
-    };
-
-    static SourceFormat FormatOf(DXGI_FORMAT format)
-    {
-        switch (format)
-        {
-        case DXGI_FORMAT_R8G8B8A8_UNORM:      return { RHIFormat::RGBA8Unorm, false };
-        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return { RHIFormat::RGBA8UnormSrgb, false };
-        // WIC PNG 로더는 FORCE_RGB가 없으면 흔히 BGRA8을 남긴다. Vulkan RHI
-        // 어휘에는 BGRA 자산 포맷이 없으므로 업로드 때 채널을 RGBA로 바꾼다.
-        case DXGI_FORMAT_B8G8R8A8_UNORM:      return { RHIFormat::RGBA8Unorm, true };
-        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return { RHIFormat::RGBA8UnormSrgb, true };
-        default:                              return {};
-        }
-    }
-
-    bool UploadRgba8(const DirectX::ScratchImage* image, const uint8_t* solid,
+    // 여기 있던 FormatOf 와 BGRA 스위즐을 걷었다(축 A).
+    //
+    // 그 둘이 하던 일은 "DXGI_FORMAT 을 RHIFormat 으로 환원하고, 어휘에
+    // 없는 것은 어떻게든 때운다"였다. BGRA 는 픽셀마다 채널을 뒤집었고
+    // (Vulkan 은 B8G8R8A8 을 네이티브로 받는데도), 블록 압축은 아예
+    // 거절해 자산이 흰색으로 나왔다 — DX12 는 같은 자산을 통과시키던
+    // 비대칭이었다. 셋 다 원인이 하나다: 상위 어휘에 그 포맷이 없었다.
+    //
+    // 지금은 CPU 이미지가 이미 RHIFormat 을 들고 오므로 그대로 쓴다.
+    bool UploadImage(const TextureImage* image, const uint8_t* solid,
         const wchar_t* name, VulkanPersistentHeap::ImageAllocation& outAllocation,
         RHITextureEntry& outEntry, uint64_t& outBytes, std::string& outError)
     {
@@ -146,25 +135,22 @@ struct VulkanTextureCache::Impl
         uint32_t height = 1;
         uint32_t mipLevels = 1;
         RHIFormat format = RHIFormat::RGBA8Unorm;
-        bool sourceIsBgra = false;
-        const DirectX::TexMetadata* metadata = nullptr;
         if (nullptr != image)
         {
-            metadata = &image->GetMetadata();
-            const SourceFormat sourceFormat = FormatOf(metadata->format);
-            format = sourceFormat.format;
-            sourceIsBgra = sourceFormat.bgra;
-            if (RHIFormat::Unknown == format ||
-                DirectX::TEX_DIMENSION_TEXTURE2D != metadata->dimension ||
-                1 != metadata->arraySize || 0 == metadata->mipLevels ||
-                metadata->width > UINT32_MAX || metadata->height > UINT32_MAX)
+            if (!image->IsValid() || 1 != image->ArraySize())
             {
-                outError = "Vulkan GizmoIcon 슬라이스는 2D RGBA8 자산만 지원한다";
+                outError = "Vulkan 텍스처 캐시는 2D 단일 자산만 올린다";
                 return false;
             }
-            width = static_cast<uint32_t>(metadata->width);
-            height = static_cast<uint32_t>(metadata->height);
-            mipLevels = static_cast<uint32_t>(metadata->mipLevels);
+            format = image->Format();
+            width = image->Width();
+            height = image->Height();
+            mipLevels = image->MipLevels();
+        }
+        if (VK_FORMAT_UNDEFINED == ToVulkan(format))
+        {
+            outError = "Vulkan이 모르는 CPU 픽셀 포맷이다";
+            return false;
         }
 
         uint64_t totalBytes = 0;
@@ -172,11 +158,18 @@ struct VulkanTextureCache::Impl
         {
             const uint32_t mipWidth = (std::max)(1u, width >> mip);
             const uint32_t mipHeight = (std::max)(1u, height >> mip);
-            totalBytes += static_cast<uint64_t>(mipWidth) * mipHeight * 4u;
+            totalBytes += RHIFormatSlicePitch(format, mipWidth, mipHeight);
         }
 
+        // 복사 오프셋 정렬을 링에 요구한다. Vulkan 은 vkCmdCopyBufferToImage
+        // 의 bufferOffset 이 4의 배수이면서 텍셀 블록 크기의 배수일 것을
+        // 요구한다 — 비압축만 올리던 시절에는 4로 충분해 1을 넘겨도 우연히
+        // 맞았지만, 블록 압축(BC1 8바이트 · BC3 16바이트)이 들어오면
+        // 검증 레이어가 잡는다.
+        const uint64_t uploadAlignment =
+            (std::max)(4u, RHIFormatBlockBytes(format));
         const RHIBufferSlice upload = resources->AllocateUpload(
-            RHIUploadRequest{ totalBytes, RHIUploadUsage::TextureCopy, 1 });
+            RHIUploadRequest{ totalBytes, RHIUploadUsage::TextureCopy, uploadAlignment });
         if (!upload.IsWritable())
         {
             outError = "Vulkan 텍스처 업로드 링 공간이 부족하다";
@@ -190,37 +183,26 @@ struct VulkanTextureCache::Impl
         {
             const uint32_t mipWidth = (std::max)(1u, width >> mip);
             const uint32_t mipHeight = (std::max)(1u, height >> mip);
-            const size_t tightRow = static_cast<size_t>(mipWidth) * 4u;
-            uint8_t* destination = static_cast<uint8_t*>(upload.cpuAddress) + localOffset;
+            const size_t tightRow = static_cast<size_t>(
+                RHIFormatRowPitch(format, mipWidth));
+            std::byte* destination =
+                static_cast<std::byte*>(upload.cpuAddress) + localOffset;
 
             if (nullptr != image)
             {
-                const DirectX::Image* source = image->GetImage(mip, 0, 0);
-                if (nullptr == source || source->rowPitch < tightRow)
+                const TextureImage::Subresource* source = image->Find(mip, 0);
+                const std::byte* sourcePixels = (nullptr != source)
+                    ? image->PixelsAt(*source) : nullptr;
+                if (nullptr == source || nullptr == sourcePixels
+                    || source->rowPitch < tightRow)
                 {
                     outError = "Vulkan 텍스처 밉 픽셀을 찾지 못했다";
                     return false;
                 }
-                for (uint32_t row = 0; row < mipHeight; ++row)
-                {
-                    uint8_t* destinationRow = destination + static_cast<size_t>(row) * tightRow;
-                    const uint8_t* sourceRow = source->pixels +
-                        static_cast<size_t>(row) * source->rowPitch;
-                    if (!sourceIsBgra)
-                    {
-                        std::memcpy(destinationRow, sourceRow, tightRow);
-                    }
-                    else
-                    {
-                        for (uint32_t x = 0; x < mipWidth; ++x)
-                        {
-                            destinationRow[x * 4 + 0] = sourceRow[x * 4 + 2];
-                            destinationRow[x * 4 + 1] = sourceRow[x * 4 + 1];
-                            destinationRow[x * 4 + 2] = sourceRow[x * 4 + 0];
-                            destinationRow[x * 4 + 3] = sourceRow[x * 4 + 3];
-                        }
-                    }
-                }
+                // 압축이면 한 행이 블록 한 줄이다 — RHIFormatRowCount 가 그
+                // 차이를 흡수하므로 여기 루프는 두 경우에 같다.
+                CopyImageRows(destination, tightRow, sourcePixels, source->rowPitch,
+                    RHIFormatRowCount(format, mipHeight), tightRow);
             }
             else
             {
@@ -232,9 +214,10 @@ struct VulkanTextureCache::Impl
             copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             copy.imageSubresource.mipLevel = mip;
             copy.imageSubresource.layerCount = 1;
+            // imageExtent 는 블록이 아니라 텍셀 단위다(압축이어도 같다).
             copy.imageExtent = { mipWidth, mipHeight, 1 };
             copies.push_back(copy);
-            localOffset += static_cast<uint64_t>(tightRow) * mipHeight;
+            localOffset += RHIFormatSlicePitch(format, mipWidth, mipHeight);
         }
 
         RHITextureDesc desc{};
@@ -305,7 +288,7 @@ struct VulkanTextureCache::Impl
     {
         if (cache.IsValid()) return cache;
         uint64_t bytes = 0;
-        if (!UploadRgba8(nullptr, rgba, name, allocation, cache, bytes,
+        if (!UploadImage(nullptr, rgba, name, allocation, cache, bytes,
             outError)) ++stats.failures;
         return cache;
     }
@@ -382,7 +365,7 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
         return found->second.entry;
     }
 
-    const DirectX::ScratchImage* pixels = texture->GetCpuPixels();
+    const TextureImage* pixels = texture->GetCpuPixels();
     if (nullptr == pixels)
     {
         ++m_impl->stats.failures;
@@ -395,7 +378,7 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
     RHITextureEntry entry;
     VulkanPersistentHeap::ImageAllocation allocation;
     uint64_t bytes = 0;
-    if (!m_impl->UploadRgba8(pixels, nullptr, L"VulkanTexture.Asset",
+    if (!m_impl->UploadImage(pixels, nullptr, L"VulkanTexture.Asset",
         allocation, entry, bytes, outError))
     {
         ++m_impl->stats.failures;

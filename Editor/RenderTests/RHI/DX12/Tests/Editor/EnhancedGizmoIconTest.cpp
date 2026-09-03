@@ -119,9 +119,12 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
         return false;
     }
 
-    const DirectX::TexMetadata& cameraMetadata = cameraIcon->GetCpuPixels()->GetMetadata();
-    if (128 != cameraMetadata.width || 128 != cameraMetadata.height ||
-        cameraIcon->GetCpuPixels()->IsAlphaAllOpaque())
+    // 알파 판정은 Texture 가 로드 때 재어 둔 값을 본다. 예전에는 여기서
+    // ScratchImage::IsAlphaAllOpaque 를 직접 불렀는데, 그 물음의 답은
+    // m_isTextureAlpha 에 이미 들어 있다(로더가 같은 함수로 잰다).
+    const TextureImage* cameraPixels = cameraIcon->GetCpuPixels();
+    if (128 != cameraPixels->Width() || 128 != cameraPixels->Height() ||
+        !cameraIcon->IsTextureAlpha())
     {
         outLog += "[1/4] CameraGizmo.png가 기대한 128x128 RGBA 자산이 아니다\n";
         return false;
@@ -478,6 +481,79 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
             {
                 outLog += "등 뒤의 아이콘이 보인다 — 카메라 상수가 셰이더에 안 닿는다\n";
                 passed = false;
+            }
+        }
+    }
+
+    // ── 텍스처 코덱 경계 슬라이스 (축 A) ─────────────────────────────────
+    //
+    // vk.gizmoicon 의 같은 이름 슬라이스와 짝이다. 저쪽은 "Vulkan 이 이제
+    // 이 셋을 올린다"를 재고 여기는 "DX12 가 여전히 올린다"를 잰다 — 둘이
+    // 같은 자산·같은 단정을 쓰므로 두 백엔드가 같은 답을 내는지가 드러난다.
+    //
+    // ★ 축 A 전에는 이 대칭이 깨져 있었다. DX12 는 DXGI_FORMAT 을 컨테이너째
+    //   들고 다녀 BC1·BC3 를 통과시켰고, Vulkan 은 어휘에 없어 흰색을 냈다.
+    //   그때 이 파일 쪽만으로는 아무것도 드러나지 않았다는 것이 요점이다 —
+    //   비대칭은 한쪽만 재면 보이지 않는다.
+    {
+        std::shared_ptr<Texture> compressedIcon =
+            Texture::LoadSharedFromPath(cameraIconPath, /*isCompress*/ true);
+        std::shared_ptr<Texture> blockNoise = Texture::LoadSharedFromPath(
+            PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
+        const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
+        std::shared_ptr<Texture> bgraTexture(Texture::CreateFromPixels(
+            1, 1, "dx12_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
+
+        if (!compressedIcon || nullptr == compressedIcon->GetCpuPixels() ||
+            RHIFormat::BC1UnormSrgb != compressedIcon->GetCpuPixels()->Format() ||
+            !blockNoise || nullptr == blockNoise->GetCpuPixels() ||
+            RHIFormat::BC3Unorm != blockNoise->GetCpuPixels()->Format() ||
+            !bgraTexture || nullptr == bgraTexture->GetCpuPixels() ||
+            RHIFormat::BGRA8Unorm != bgraTexture->GetCpuPixels()->Format())
+        {
+            passed = false;
+            outLog += "[4/4] 코덱 자산 셋(BC1_SRGB·BC3·BGRA8)을 준비하지 못했다\n";
+        }
+        else if (!resources.BeginFrame(error))
+        {
+            passed = false;
+            outLog += "[4/4] 코덱 슬라이스 BeginFrame 실패: " + error + "\n";
+        }
+        else
+        {
+            // handle 만 보면 눈먼다 — 업로드가 거절되면 캐시는 흰색을 주는데
+            // 그것도 유효한 handle 이다. 판별하는 것은 format 이다.
+            std::string codecError;
+            const DX12TextureCache::Entry compressedEntry =
+                textureCache.GetOrUpload(compressedIcon.get(), codecError);
+            const DX12TextureCache::Entry noiseEntry =
+                textureCache.GetOrUpload(blockNoise.get(), codecError);
+            const DX12TextureCache::Entry bgraEntry =
+                textureCache.GetOrUpload(bgraTexture.get(), codecError);
+            const bool codecOk = compressedEntry.IsValid() && noiseEntry.IsValid() &&
+                bgraEntry.IsValid() &&
+                RHIFormat::BC1UnormSrgb == compressedEntry.format &&
+                RHIFormat::BC3Unorm == noiseEntry.format &&
+                RHIFormat::BGRA8Unorm == bgraEntry.format;
+
+            std::string frameError;
+            if (!resources.EndFrame(frameError))
+            {
+                passed = false;
+                outLog += "[4/4] 코덱 슬라이스 EndFrame 실패: " + frameError + "\n";
+            }
+            resources.WaitForGpu();
+
+            if (!codecOk)
+            {
+                passed = false;
+                outLog += "[4/4] 코덱 자산이 DX12에 올라가지 않았다(흰색 폴백): "
+                    + codecError + "\n";
+            }
+            else
+            {
+                outLog += "[4/4] 코덱 경계 — BC1_SRGB·BC3·BGRA8 세 자산이 "
+                    "포맷을 지킨 채 DX12로 업로드 (vk.gizmoicon 과 같은 단정)\n";
             }
         }
     }

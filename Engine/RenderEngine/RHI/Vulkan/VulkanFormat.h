@@ -33,6 +33,13 @@ inline VkFormat ToVulkan(RHIFormat format)
     case RHIFormat::D32Float:       return VK_FORMAT_D32_SFLOAT;
     case RHIFormat::D32FloatS8Uint: return VK_FORMAT_D32_SFLOAT_S8_UINT;
     case RHIFormat::RGBA8Uint:      return VK_FORMAT_R8G8B8A8_UINT;
+    // D3D의 BC1은 1비트 알파를 포함하므로 Vulkan 쪽 짝은 RGB가 아니라 RGBA다
+    // (VK_FORMAT_BC1_RGB_*는 알파 비트를 버려 마스크 컷아웃이 사라진다).
+    case RHIFormat::BC1Unorm:       return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    case RHIFormat::BC1UnormSrgb:   return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+    case RHIFormat::BC3Unorm:       return VK_FORMAT_BC3_UNORM_BLOCK;
+    case RHIFormat::BGRA8Unorm:     return VK_FORMAT_B8G8R8A8_UNORM;
+    case RHIFormat::BGRA8UnormSrgb: return VK_FORMAT_B8G8R8A8_SRGB;
     default:                        return VK_FORMAT_UNDEFINED;
     }
 }

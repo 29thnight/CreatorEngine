@@ -616,6 +616,7 @@
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
     <ClInclude Include="RHI\RHIRecordedBatch.h" />
     <ClInclude Include="RHI\RHISubmissionThread.h" />
+    <ClInclude Include="TextureImage.h" />
     <ClInclude Include="RHI\RHIResourceTypes.h" />
     <ClInclude Include="RHI\IRenderDeviceServices.h" />
     <ClInclude Include="RHI\DX12\RenderFrameServices.h" />
