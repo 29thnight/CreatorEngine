@@ -1,4 +1,4 @@
-# 라이트맵 베이커 재작성 (PHASE 4 · 트랙 L)
+# 라이트맵 베이커 재작성 (PHASE 4.75 · 트랙 L)
 
 2026-08-25 신설. 삭제된 DX11 베이커를 실측한 결과 **복원이 아니라 재작성**이 맞다는
 결론에서 출발한다. 고칠 지점이 성능만이 아니라 **정확성에도** 있어서 그대로 되살리면
@@ -333,7 +333,7 @@ PHASE 3.75가 게시한 vertex attribute schema의 UV1 optional slot을 이 계�
   P0인 L4를 P1 뒤 임계 경로 142일째에 묶고 있었다. 큐/펜스 RHI 계약을 `RG8`에서 떼어
   **독립 슬라이스 `Q0`**으로 승격했다 — 소유는 RHI 계층이고 어느 트랙도 아니다.
   L4-a는 `Q0`의 소비자이며, `Q0`은 `RG8`·`L4` 중 먼저 필요해지는 쪽의 착수 시점에 세운다.
-  근거와 판정: [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2.
+  근거와 판정: [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.2~§6.3.
 - **L4-b GPU 타임슬라이스** — 디스패치를 렉트·샘플 단위로 쪼개 프레임당 예산
   (예: 8ms) 안에 넣는다. 코루틴 페이싱 제거는 이 단계의 결과다.
   ★ **Windows TDR(기본 2초)** 이 상한이다. 단일 디스패치가 그것을 넘으면 디바이스가
@@ -394,7 +394,7 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 | 삭제분의 결함을 그대로 이식 | §1.4 다섯 종 | 슬라이스마다 해당 항목을 완료 기준에 명시 |
 | off-by-one 을 고치며 다른 것을 깬다 | 두 커널에 같은 패턴 | 현 동작 재현 검사를 **먼저** 세우고 변이로 이빨 증명 |
 | 병렬화를 낭비 위에 얹는다 | 디스패치 84% 낭비 | §2.2 순서 고정 — ①②③ 뒤에 판정 |
-| UV1 없이 착수 | 자산 전수 `TEXCOORD_1` 0건 | L1 이 **L3 이후의** 모든 슬라이스의 선행. ★ 2026-09-01 정정 — "L0 를 제외한 모든"은 §4 L2 의 "의존: 없음. 가장 먼저 할 수 있다"와 모순이었다. BVH 재작성은 UV1 과 무관하고 합성 씬(구·평면 해석적 정답)으로 판정하므로 **L1 과 병렬로 연다**([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.5 C10) |
+| UV1 없이 착수 | 자산 전수 `TEXCOORD_1` 0건 | L1 이 **L3 이후의** 모든 슬라이스의 선행. BVH 재작성은 UV1 과 무관하고 합성 씬(구·평면 해석적 정답)으로 판정하므로 **L1 과 병렬로 연다**([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.3) |
 | 베이크 중 씬 변경 | 결과 무의미 | 시작 시 지오메트리·조명 밀봉 + 무효화 정책(L4-c) |
 | 소비자 0 상태 재발 | 이 저장소의 전례 다수 | L3 에서 `LightMapPass` 를 라이브 그래프에 배선하고 화면으로 확인 |
 | **TDR 로 디바이스 리셋** | 큐가 DIRECT 하나뿐이라 긴 디스패치가 프레임을 통째로 민다. 기본 상한 2초 | L4-b 분할을 **성능이 아니라 안전 요구**로 다룬다. 단일 디스패치 시간을 계측해 상한을 못박는다 |
@@ -408,10 +408,10 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 | 계획 | 관계 |
 |---|---|
 | **`ModelAssetBigBangCutoverPlan` (PHASE 3.75)** | **하드 선행.** MBC3 authoring transaction과 MBC6 vertex schema를 소비한다. UV1은 라이트맵 대상 메시에만 붙고 L1이 새 model generation으로 원자 게시한다 |
-| **`RenderGraphDependencySchedulingPlan` (같은 PHASE 4 · 트랙 RG)** | **2026-09-01 확정** — 이 행이 적어 둔 "같은 RHI 계약만 선행"에 이름을 줬다: **`Q0`**(queue-neutral 큐·cross-queue 펜스·COMMON 경유 상태 전이). L4-a와 RG8이 둘 다 `Q0`의 소비자이고 어느 트랙도 소유하지 않는다. `L4`는 `RG8`을 기다리지 않는다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2 |
-| **`ScriptableRenderPipelinePlan` (같은 PHASE 4)** | `LightMapPass` 를 Pipeline Asset 이 선택하는 Pass 로 둘지, 소스 Native Pass 로 둘지 결정 필요 |
-| PHASE 4 Stochastic Lighting | 정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다 |
-| PHASE 4 DXR | BLAS 가 서면 **베이크의 BVH 를 DXR 가속 구조로 대체**할 수 있다. L2 의 자체 BVH 는 그때까지의 다리다 |
+| **`RenderGraphDependencySchedulingPlan` (같은 PHASE 4.75 · 트랙 RG)** | `Q0`(queue-neutral 큐·cross-queue 펜스·상태 전이)은 L4-a와 RG8의 공용 기반이다. `L4`는 `RG8`을 기다리지 않는다 |
+| **`ScriptableRenderPipelinePlan` (같은 PHASE 4.75)** | `LightMapPass` 를 Pipeline Asset 이 선택하는 Pass 로 둘지, 소스 Native Pass 로 둘지 결정 필요 |
+| PHASE 4.75 Stochastic Lighting | 정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다 |
+| PHASE 4.75 DXR | BLAS 가 서면 **베이크의 BVH 를 DXR 가속 구조로 대체**할 수 있다. L2 의 자체 BVH 는 그때까지의 다리다 |
 | `RhiBoundaryPlan` (PHASE 3) | L3 이 DX12 RHI 로 재작성. async compute 판정 기준을 그대로 적용 |
 | `MaterialPipelinePlan` (PHASE 3.5) | 베이크 커널의 셰이더 퍼뮤테이션이 `.shadermeta` 정본을 따른다 |
 | `SerializationPlan` (PHASE 17) | 구운 라이트맵 텍스처의 자산 형식·쿠킹 결정을 공유 |

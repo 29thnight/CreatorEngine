@@ -1185,40 +1185,21 @@ validation·미구현 `0`을 유지했다. `vk.gbuffer`·`vk.selftest`, DX12 `fo
 같은 실행에서 통과했고 VS18 MSBuild/v145 Debug x64 RenderEngine·SceneRuntime·RenderTests·
 CreatorEditor·Player가 빌드됐다.
 
-### M6 이후 PHASE 4 인계 — Standard PBR native Slang 재작성
+### M6 이후 PHASE 4 계열 인계
 
-PBR 수식 개선과 HLSL→Slang 전환을 M6의 첫 소비 배선에 섞지 않는다. M6는 현재 출력과
-수명 계약을 유지한 채 `Material → draw item → PSO/binding`을 실제 제품 경로에서 닫고,
-PHASE 4가 그 위에서 **출력 동등 전환 → 의미 교정 → 품질 확장** 순으로 셰이더를 바꾼다.
-단, 실제 Slang source/module/import를 읽는 컴파일러·에디터·패키징 기반은 소비자를 만들지
-않는 격리된 `SRP-2` fixture로 M6와 병렬 선행할 수 있다. 자동 바인딩·`ParameterBlock`과
-제품 PBR 진입점 전환은 M6 뒤다.
+이 문서는 M0~M7의 **기반과 완료 기록**만 소유한다. 이후 작업을 더 이상 단일 PBR 직선
+레인으로 정의하지 않는다. 2026-09-03 소스 재감사에서 배선 결함, Blender형 재질
+모델, renderer/post 기능이 서로 다른 실패 축임을 확인해 다음으로 분리했다.
 
-```text
-PBR-S0 현재 DX12/Vulkan 기준선
-    ├─ M5(완료) → M6 실제 Material 소비
-    └─ PBR-S1 / SRP-2 native Slang source 기반(시각 변화 0)
-                       ↓ 둘 모두 완료
-PBR-S2 공용 PBR 모듈로 동등 이관 → S3 glTF 의미 교정 → S4 에너지·IBL
-    → S5 그림자 → S6 display/post → S7 확장 lobe → S8 Shader Graph codegen
-```
-
-| 슬라이스 | 범위 | 완료 게이트 |
+| 후속 | 이 문서가 제공하는 입력 | 후속 정본 |
 |---|---|---|
-| PBR-S0 | DX12 현재 설정을 정본으로 고정하고 같은 scene/frame packet·카메라·해상도·tuning의 pre-tone 선형 HDR, final LDR, 표준 material grid와 pass별 timing을 DX12/Vulkan 별도 프로세스에서 캡처 | Vulkan 기본값 복원이 아니라 DX12 설정 재생. `SRP-G0`가 만든 이미지·차영상·RenderGraph stats artifact를 그대로 공유하고 별도 기준선 하네스를 만들지 않으며, pass fixture/live frame은 별도 판정 |
-| PBR-S1 | `RHIShaderCompileRequest`의 HLSL/Slang 언어를 명시하고 cache identity에 포함. stable module search root·import dependency와 `.slang` Editor/Asset/packaging 분류를 추가 | native `.slang` 한 fixture가 DXIL/SPIR-V·reflection 동등 통과. 기존 HLSL 전수 개명과 시각 변경 0 |
-| PBR-S2 | `MaterialInputs → StandardSurface` 평가와 GGX/IBL/light/shadow 공용 함수를 authored Slang module로 분리해 GBuffer·Deferred·Forward가 같은 구현을 소비 | 현행 출력을 의도적으로 보존한 DX12/Vulkan golden 통과. 중복 BRDF/재질 평가 제거 |
-| PBR-S3 | `D2/D5-b → I5/V4` 뒤 glTF metallic-roughness 의미와 M5-D property를 실제 GPU 소비까지 닫음 | metallic factor는 texture 값에 곱하고 ORM AO·`normalScale`·`occlusionStrength`·emissive·`alphaCutoff`뿐 아니라 `doubleSided`·`emissiveStrength`와 texture UV set/transform/wrap이 import→Material→양 경로에 손실 없이 도달 |
-| PBR-S4 | CreatorEngine의 height-correlated Smith·split-sum IBL을 유지하면서 multi-scatter energy compensation, specular AO, local reflection probe를 추가 | furnace/material-grid golden과 Deferred/Forward 허용 오차 통과 |
-| PBR-S5 | shadow sampling module 단일화, normal-offset bias, cascade blend/far fade, 3/4 cascade 설정, point/spot atlas와 Low/Medium/High 품질 단계 | Low는 현행 PCF 비용을 보존하고 PCSS는 High에서만 선택. Vulkan timing 회귀 상한 포함 |
-| PBR-S6 | `Linear HDR → Bloom → Exposure → Grading → Tone map → Display OETF → AA/UI` 계약과 `RGBA8Unorm` 출력 변환을 명시 | ACES 기준 golden의 backend 동등성 후 canonical AgX·auto exposure·bloom을 각각 독립 A/B |
-| PBR-S7 | specular/IOR → clearcoat → transmission/volume → sheen → anisotropy/iridescence/dispersion 순으로 수직 확장 | 기본 MR은 Deferred 유지. GBuffer를 즉시 늘리지 않고 추가 lobe는 우선 Forward+; RT의 VNDF·exact Fresnel·Beer attenuation은 DXR reference slice로 분리 |
-| PBR-S8 | 검증된 authored Slang module 계약을 Visual Shader Graph typed IR/codegen의 target으로 사용 | `.shadergraph` save→reload와 generated/authored Slang fixture가 같은 reflection·픽셀 게이트 통과 |
+| PHASE 4 | ShaderMeta, immutable material snapshot, Slang compiler/reflection, DXIL/SPIR-V | [`PBRWiringStabilizationPlan.md`](PBRWiringStabilizationPlan.md) |
+| PHASE 4.25 | property/texture override와 generation 수명 | [`BlenderMaterialGraphPlan.md`](BlenderMaterialGraphPlan.md) |
+| PHASE 4.75 | Pipeline/Shader Asset와 native pass 기반 | [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) |
 
-2026-08-27 정적 재감사 기준으로 먼저 닫을 의미 부채는 GBuffer/Forward의 metallic factor
-가산, GBuffer에 기록되지만 Deferred 조명에서 소비되지 않는 ORM AO, 표준 property 중
-실제 셰이더까지 도달하지 않는 normal/occlusion/emissive/alpha 값, PostChain의 명시적
-display OETF 계약이다. 구현 착수 때는 각 항목을 소스와 golden으로 다시 확인한다.
+현재 PBR 제품 결함의 목록과 완료 판정은 PHASE 4가 다시 실측한 소스를 정본으로 한다.
+이 완료 문서의 과거 HLSL 줄 수나 당시 selftest 초록을 현재 제품 동작의 증거로 재사용하지
+않는다. Blender Principled, Material Graph, shadow/probe/post도 M6/M7 완료 범위가 아니다.
 
 **M7 — Slang reflection과 DXIL/SPIR-V 타깃 동등성 (2일) — ✅ 구현·양 백엔드
 자가 검증 완료 (2026-08-24).**
@@ -1253,11 +1234,11 @@ reflection `b2/t4..t7`, material별 일반/Reference PSO pair와 인접-only tra
 
 합계 **23일**(M0 1 · M1A 2.5 · M1B 3 · M2A 1.5 · M2B 1 · M3 3 · M4 2 ·
 M5 3 · M6 4 · M7 2). M0·M1A·M1B·M2A·M2B·M3·M4·M5·M6·M7의 실행 코드 기준
-**23일 완료, 남은 추정 0일**이다. PBR-S0~S8은 PHASE 4의 후속 구현 후보라 이 23일 합계에
-넣지 않으며 공수는 4-6에서 확정한다.
+**23일 완료, 남은 추정 0일**이다. PHASE 4/4.25/4.75 후속 작업은 이 23일 합계에
+넣지 않는다.
 M2B·M3·M4·M5·M7 선행은 모두 닫혔다. native Slang source/module/import 기반만 격리된
-`SRP-2` fixture로 병렬 선행할 수 있고, 제품 PBR 모듈 전환·specialization·
-`ParameterBlock`은 M6 완료 후 별도 트랙이다.
+fixture로 확인할 수 있으나 제품 PBR 배선은 PHASE 4, material specialization은 PHASE 4.25,
+generic Custom Pass Slang Code mode는 PHASE 4.75의 서로 다른 완료선이다.
 
 ★ **판정 문구 정정**: "자가 검증 33종"은 낡았다 — 기준선이 35종으로 갱신됐고
 (`a253a22d`), 셰이더 작업 두 커밋은 **32종 통과**로 판정했다. 각 슬라이스는
@@ -1326,5 +1307,7 @@ M2B·M3·M4·M5·M7 선행은 모두 닫혔다. native Slang source/module/impor
 | PHASE 10 파티클 · PHASE 11 지형 | 이 시스템 위에 선다 — 그쪽에서 셰이더 경로를 따로 만들지 않는다 |
 | AssetResidencyPlan | 텍스처 상주는 그쪽 몫, 여기는 프로퍼티가 참조만 든다 |
 | SceneGraphRedesignPlan | 직렬화 단일화(M5)가 트랙 P의 프리팹 왕복 회귀를 그대로 판정에 쓴다 |
-| ModelImportPipelinePlan (PHASE 4) | I5-0에서 표준 PBR property 이름을 공유했고 모델 V2(68B)·V3(mesh별 packed layout), 머테리얼 M5와 M6의 기존 렌더 계약까지 완료됐다. Serialization D2/D5-a·D5-b1·D5-b2a·D5-b2b1·D5-b2b2로 model 전수 Cook과 AssetPacker/pak 게시까지 완료됐고, D5-b2c가 나머지 producer를 공급한 뒤 I5-M이 `experiment::Material` 정본·instance/resolver를 그 계약에 직접 연결한다. parity 뒤 I6가 legacy `::Model`/`::Material`과 Assimp를 함께 퇴역시킨다. V4의 레이아웃 퍼뮤테이션 축도 같은 ShaderMeta 키 체계를 쓴다 |
-| ScriptableRenderPipelinePlan (PHASE 4) | M6 뒤 PBR-S0~S8을 소유한다. native Slang 기반은 SRP-2가 격리 선행할 수 있지만, 공용 Standard PBR 소비·자동 바인딩·Shader Graph codegen은 M6 실제 소비 계약을 우회하지 않는다 |
+| ModelAssetBigBangCutoverPlan (PHASE 3.75) | UUIDv8 typed model/material/texture generation과 vertex schema를 제공한다. 이 문서는 그 identity를 재해석하거나 legacy 모델 bridge를 소유하지 않는다 |
+| PBRWiringStabilizationPlan (PHASE 4) | M6/M7 기반 위에서 현 제품 Slang/Material/Renderer 배선 결함과 runtime gate를 닫는다 |
+| BlenderMaterialGraphPlan (PHASE 4.25) | `PrincipledSurface`·Material Graph·artist 비용 tier를 소유한다. M6 완료를 Blender 호환 완료로 승계하지 않는다 |
+| ScriptableRenderPipelinePlan (PHASE 4.75) | Pipeline Asset, generic Pass Graph, Slang Code mode와 Custom Pass를 소유하며 Material Graph 의미는 재정의하지 않는다 |

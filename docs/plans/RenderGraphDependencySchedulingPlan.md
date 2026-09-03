@@ -1,4 +1,4 @@
-# RenderGraph 리소스 의존성 스케줄링 계획 (PHASE 4 · 트랙 RG)
+# RenderGraph 리소스 의존성 스케줄링 계획 (PHASE 4.75 · 트랙 RG)
 
 2026-08-28 작성. `EnhancedRenderGraph`를 교체하지 않고, 명시적 리소스 접근과
 버전 계보로 실행 순서를 컴파일하는 그래프로 단계적으로 확장하는 구현 계획이다.
@@ -127,7 +127,7 @@ Compiler가 각 슬롯의 버전 핸들을 연결한 뒤에는 다음처럼 해�
 
 | ID | 슬라이스 | 선행 | 공수 | 종료 게이트 |
 |---|---|---:|---:|---|
-| ~~**RG0**~~ | **`BASE-0`에 흡수 (2026-09-01)** — 4-0·SRP-G0·PBR-S0와 같은 하네스·같은 artifact였다. graph dump와 변이 fixture는 `BASE-0`의 소비 항목으로 남는다 | 없음 | (BASE-0 6일에 포함) | [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.1 C1 |
+| ~~**RG0**~~ | **`BASE-0`에 흡수** — 4-0·SRP-G0와 같은 하네스·같은 artifact였다. graph dump와 변이 fixture는 `BASE-0`의 소비 항목으로 남는다 | 없음 | (BASE-0 6일에 포함) | [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6 |
 | **RG1** | 명시적 access mode + versioned texture/buffer handle | RG0 | 8일 | `Read/Write/Modify` 단위 검사, import/transient version dump, forked write와 stale handle fail-closed |
 | **RG2** | stable single-queue DAG compiler | RG1 | 10일 | RAW/WAR/WAW, 독립 Pass tie-break, cycle chain, 선언 배열 shuffle fixture가 결정적 compiled order를 생성 |
 | **RG3** | DAG 기준 culling·lifetime·barrier 재계산 | RG2 | 8일 | 죽은 producer 제거, 마지막 소비 수명, Transition/UAV 계획이 sorted order 기준으로 일치 |
@@ -139,7 +139,7 @@ Compiler가 각 슬롯의 버전 핸들을 연결한 뒤에는 다음처럼 해�
 | **RG9** | subresource·split barrier·Resource Inspector 성숙 | RG8 | 15일 | mip/array/range 추적, split barrier parity, producer/consumer/version/order/lifetime/alias/queue 시각화 |
 
 > **2026-09-01 정정** — `RG0` 4일은 `BASE-0`으로, `RG8`의 큐/펜스 RHI 계약 몫은 `Q0`으로 빠져나갔다.
-> 아래 합계는 정정 전 수다. 통합 합계는 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §5가 정본이다.
+> 아래 합계는 정정 전 수다. 통합 합계는 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §7이 정본이다.
 
 - **RG0~RG6: 57일, 약 11.4 엔지니어 주.** Unreal RDG형 단일 큐 리소스 의존성
   스케줄링과 제품 전환의 첫 완료선이다.
@@ -198,7 +198,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 > 교집합 파일은 `EnhancedSceneRenderer.cpp` 하나뿐이고 그 안에서도 다른 줄이다.
 > 축도 다르다(접근 **선언** vs 노드 **조립**) — 합치면 픽셀이 붉을 때 어느 축인지
 > 못 가린다. `RG5 → SRP-1` **순서 의존만 유지**하고 공수는 12일·8일 각각 둔다.
-> 판정 전문: [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §8.4.
+> 판정 전문: [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) §12-E.
 >
 > **덤 — 호출 수가 늘었다.** §3 표와 아래 목록의 근거인 "제품 28곳 · test/fixture
 > 80곳(총 108)"이 2026-09-01 실측으로 **제품 38 · 게이트 82(총 120)**다. 제품만 **+36%**.
@@ -270,7 +270,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 
 ---
 
-## 7. 다른 PHASE 4 트랙과의 의존성
+## 7. 다른 PHASE 4.75 트랙과의 의존성
 
 | 계획/트랙 | 관계 |
 |---|---|
@@ -279,7 +279,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 | `LivePipelineDescPlan.md` | 현재 nodes/reads/writes/modifies를 RG5의 첫 native compiler 입력으로 사용한다 |
 | `RhiBoundaryPlan.md` | RG7 heap/alias 계약과 RG8 queue/fence 계약을 backend-neutral RHI에만 추가한다 |
 | `ModelAssetBigBangCutoverPlan.md` PHASE 3.75 | MBC6의 vertex attribute mask→input layout/PSO/VSIn 계약과 model generation handle이 RG5의 Asset-first 제품 이관 전에 필요하다 |
-| 트랙 L4 | **2026-09-01 정정** — `RG8`이 아니라 **`Q0`**(queue/fence RHI 계약)의 소비자다. "먼저 구현하는 트랙이 소유"는 순서를 정하지 않는 문장이었고, 아래 임계 경로의 "L4는 RG8을 기다린다"는 P0인 L4를 P1 뒤 142일째에 묶었다. 소유를 트랙에서 떼어 RHI 계층(`Q0`)에 두면 협상이 사라진다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.2 C2 |
+| 트랙 L4 | `RG8`이 아니라 **`Q0`**(queue/fence RHI 계약)의 소비자다. `Q0`은 RHI 계층 공용 기반이며 어느 트랙도 별도 queue 계층을 만들지 않는다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.2~§6.3 |
 | GPU-driven/DXR/DLSS/Stochastic Lighting | RG6 단일 큐 제품 cutover 뒤 새 resource/pass를 추가하고, RG7~RG9 기능을 필요에 따라 소비한다 |
 
 권장 임계 경로는 다음으로 고정한다.

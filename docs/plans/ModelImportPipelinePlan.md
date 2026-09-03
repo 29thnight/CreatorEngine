@@ -22,20 +22,20 @@
 
 ---
 
-## 0. PHASE 4 편입 — 왜 별도 페이즈가 아닌가
+## 0. 당시 PHASE 4 편입 기록 — 왜 별도 페이즈가 아니었는가
 
-이 계획은 독립 페이즈(PHASE 24)로 신설됐다가 PHASE 4(차세대 렌더러 기능)로
-편입됐다. 근거는 **PHASE 4 의 네 기능이 전부 이 파이프라인의 출력을 입력으로
+이 계획은 독립 페이즈(PHASE 24)로 신설됐다가 당시 PHASE 4(차세대 렌더러 기능)로
+편입됐다. 근거는 **당시 PHASE 4의 네 기능이 전부 이 파이프라인의 출력을 입력으로
 요구한다**는 것이다.
 
-| PHASE 4 기능 | 이 계획에 거는 것 |
+| 당시 PHASE 4 기능 | 이 계획에 거는 것 |
 |---|---|
 | GPU-driven rendering | 메시가 공통 버퍼에 들어가려면 정점 레이아웃이 **PSO 분류의 축**이 된다. meshlet 빌드(`buildMeshlets`)의 소비자가 바로 이것이다 |
 | Stochastic Tile-Based Lighting | 정적/동적 메시 구분이 히스토리 유효성의 입력 |
 | DXR | BLAS 빌드가 정점 버퍼의 **포맷과 stride 를 직접 받는다**. 96B stride 로 BLAS 를 만들면 그 낭비가 가속 구조 빌드 시간·메모리에 그대로 간다 |
 | DLSS | 모션 벡터가 이전 프레임 정점 변환을 요구 — 스킨/정적 구분이 그 경로를 가른다 |
 
-그리고 `ScriptableRenderPipelinePlan`(같은 PHASE 4 의 첫 계약)이 **Pass 를 Asset
+그리고 `ScriptableRenderPipelinePlan`(당시 같은 PHASE 4, 현재 PHASE 4.75)이 **Pass 를 Asset
 으로 기술**하기로 확정했는데, Pass 가 정점 레이아웃 오프셋을 C++ 에 손으로 박고
 있으면 그 계약이 성립하지 않는다. 현재 오프셋은 **5곳에 손으로 반복**돼 있다(§1.7).
 
@@ -47,7 +47,7 @@
   Pass 가 "요구 속성"만 선언하고 입력 레이아웃을 유도받는 계약.
 
 `buildMeshlets` 가 "mesh shader 소비자가 생길 때까지 보류"라고 적혀 있었는데
-(§1.3), **그 소비자가 PHASE 4 의 GPU-driven 이다.** 편입으로 그 보류 사유가
+(§1.3), **그 소비자가 당시 PHASE 4, 현재 PHASE 4.75의 GPU-driven이다.** 편입으로 그 보류 사유가
 해소된다.
 
 ---
@@ -259,7 +259,7 @@ t.lightmapUV0 = (vertices[i0].uv1 * litmaping.lightmapTiling) + litmaping.lightm
 ```
 
 즉 §1.7 의 "uv1 소비자 0" 은 처음부터 없었던 것이 아니라 **렌더러 철거 때 함께
-사라진 것**이다. 상세 분석과 재작성 계획은 `LightmapBakerPlan.md`(같은 PHASE 4 ·
+사라진 것**이다. 상세 분석과 재작성 계획은 `LightmapBakerPlan.md`(현재 PHASE 4.75 ·
 트랙 L)에 있다.
 
 **이것이 트랙 V 의 입력을 바꾼다.** 라이트맵은 폐기 대상이 아니다 — 현재 GI 가 전부
@@ -317,7 +317,7 @@ Gunner glTF(재질 2)·Ani_Mon FBX(재질 6) 실행에서 계약 위반 0건, �
 3. **"손실은 한 경계에서만, 반드시 계수된다" 성질을 유지한다.** 이것이
    `ImportedScene` 을 따로 둔 이유이고, 전환 과정에서 깨지면 안 된다.
 4. **정점 레이아웃의 정본을 세운다(트랙 V).** 지금은 정본이 없어 같은 사실이
-   11곳에 손으로 반복되고, 그중 셋은 빠뜨리면 조용히 틀린다(§1.7). PHASE 4 의
+   11곳에 손으로 반복되고, 그중 셋은 빠뜨리면 조용히 틀린다(§1.7). 당시 PHASE 4의
    GPU 기능들이 이 레이아웃을 입력으로 받으므로 **그 전에 서 있어야 한다.**
 
 ---
@@ -536,7 +536,7 @@ I7의 항목이다. 아래 M6 항목은 완료 증거로 남긴다.
 Assimp 은퇴를 수행한다. V2/V3가 생산 소비자 0인 동안 데이터 구조를 바꾸는 것이
 하류 렌더 경로를 붙인 뒤 바꾸는 것보다 안전하다.
 
-PHASE 4 `PBR-S3`는 importer 단독 완료 항목이 아니다. `D2/D5-b → I5/V4`가 생산 소비를
+PHASE 4 `PBR-W4~W7`은 importer 단독 완료 항목이 아니다. `D2/D5-b → I5/V4`가 생산 소비를
 연 뒤 metallic-roughness와 함께 현재 `ModelDraft`에서 빠지는 `doubleSided`·
 `emissiveStrength`, `TextureSlot`→`TextureReference` 경계에서 빠지는 UV set/offset/tiling/
 wrap까지 Material과 Deferred/Forward 양 경로에 도달해야 닫힌다.
@@ -896,7 +896,7 @@ PSO+experiment 버퍼)는 초록 — position/normal/uv 오프셋이 두 레이�
 커버리지 동수(4d)·밝기 동수(4e)** 단정을 신설하자 ②가 정확히 붉었다(같은 씬·같은 카메라를
 두 경로로 그리므로 동수가 정의상 성립 — 언팩이 float 비트 보존이라 밝기도 문자열까지 동일).
 
-게이트: `verify-experiment-vertex-live.ps1` 신설(run-all 편입) — [model.dual](로드)와
+게이트: `verify-experiment-vertex-live.ps1` 신설(run-all 편입) — `[model.dual]` 로드와
 experiment 업로드 계수(GPU)를 분리 관측 + A/B 동수. 남김: 정적 픽셀 diff·노멀맵 축은 D34b
 스킨 픽셀 게이트와 함께, Forward 전환은 D34c.
 
@@ -1384,7 +1384,7 @@ property가 없어서 **legacy 맵도 resolver도 nullptr을 주고 "동일"로 
 texResolvedOwners=0 firstTex=baseColorMap`으로 두 단정을 정확히 붉혔다.
 
 ★ **범위 판정: flow와 legacy 호환 스칼라는 존치한다.** `SealSource.flow`
-(windVector/uvScroll)는 experiment 저작에 표현이 없다 — 헤더가 "PBR-S3/I5-M5에서
+(windVector/uvScroll)는 experiment 저작에 표현이 없다 — 헤더가 "PHASE 4 PBR 배선/I5-M5에서
 논리 property 승격 후보"로 적어 둔 것이라 **승격이 선행**돼야 하고, 지어내면 화면이
 조용히 달라진다. `baseColorFactor`/`metallic`/`roughness`/`useNormalMap`은 Forward
 snapshot의 legacy 호환 스칼라 표면이라 그 소비자가 남아 있는 동안 필요하다. 둘 다
@@ -1895,7 +1895,7 @@ experiment 정본을 탄다. legacy `SealMaterialTextureBindings`는 소비자 0
 남는 legacy 읽기와 격차 기록: draw 분류(`m_renderingMode`)와 `BuildRequiredAssetPacket`의
 `m_shaderMetaGuid` 읽기는 packet 구축 표면이라 I5-M5/D의 몫. `m_flowInfo`·MaterialInfo
 스칼라 4종은 experiment 데이터 모델에 표현이 없어 `SealSource`의 부속 필드로 나른다 —
-PBR-S3/I5-M5의 논리 property 승격 후보. 구조적 비대칭 하나를 조사가 드러냈다: GBuffer
+PHASE 4 PBR 배선/I5-M5의 논리 property 승격 후보. 구조적 비대칭 하나를 조사가 드러냈다: GBuffer
 snapshot에는 flow 필드 자체가 없어 opaque로 그려지는 wind 재질은 wind 애니메이션을 원리적으로
 못 받는다(legacy 시절부터의 형태 — 이번 치환은 보존).
 
@@ -1961,7 +1961,7 @@ S2c(reflect 스키마 이주)까지 이 제약이 유지된다.
 ★ **S2b(writer 전환)를 보류한 이유 — 지금 뒤집으면 저작 데이터가 소실된다.** 새 정본은
 `m_flowInfo`(windVector/uvScroll — Water/Wind/Foliage의 정본 값), `m_useNormalMap`, `m_IOR`,
 고정 5슬롯 텍스처 이름을 표현하지 못한다. flow의 올바른 종착은 ShaderMeta 논리 property 승격
-(Water/Wind shadermeta가 windVector·uvScroll을 선언하면 특수 필드가 사라진다 — PBR-S3와 같은
+(Water/Wind shadermeta가 windVector·uvScroll을 선언하면 특수 필드가 사라진다 — PHASE 4 `PBR-W7`과 같은
 결)이고, 그 전에 writer를 새 정본으로 바꾸면 저장할 때마다 flow 저작이 조용히 사라진다.
 S2b는 그 표현이 선 뒤에만 연다.
 
@@ -3425,7 +3425,7 @@ byte blob으로 쓰고 mesh별 범위를 왕복한다. `COLOR_0` VEC3는 alpha 1
 > **2026-09-01 — 이행 완료.** `I5-D2`(마스크→`RHIInputElement` 유도 · `RHIFormat::RGBA8Uint` 신설 ·
 > 전환 계약 게이트)와 `I5-D34a/b/c`(GBuffer 정적 · 스킨 `BLENDINDICES uint4` · Forward)가 이것을 이행했다.
 > 대시보드는 이 항목을 여전히 **독립 P0 5일 슬라이스**로 들고 있어 이중 계상이었다 — 0일로 내리고
-> 완료 표기했다([`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.3 C6).
+> 완료 표기했다. 현재 활성 정본은 PHASE 3.75 `ModelAssetBigBangCutoverPlan`이다.
 > **잔여 판정**: 트랙 V 완료 기준의 "손으로 박힌 오프셋 0" · "`VSIn` 짝 어긋남을 검사가 잡는다" ·
 > "V2 픽셀 차이 0"은 `I6-E`로 legacy 경로가 죽은 뒤 확정한다.
 
@@ -3463,7 +3463,7 @@ m_commandList->IASetVertexBuffers(0, 1, &view);   // DX12Encoder.cpp:159
 > 대시보드에는 `V6` 행이 P1 2일 `todo`로 살아 있었고 PHASE 4 목표 문단도 V6를 전제로 적혀 있었다.
 > 행을 폐기하고, UV1 스트림 계약(라이트맵 대상 메시에만 부착 · 언랩 단계에서 생성 · 기존 `uv1` 슬롯
 > 재사용 없음)과 트랙 V 완료 기준의 "전 정점 부과 0" 판정을 `L1` 완료 기준으로 옮겼다.
-> [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.4 C9.
+> 현재 라이트맵 위치는 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.3이다.
 
 **이 항목은 `LightmapBakerPlan.md`(트랙 L)로 이관됐다.** 착수 시점에는 "라이트맵
 존치/폐기 결정"이었으나, 삭제된 베이커 구현이 발견되면서(§1.9) 폐기 선택지가
@@ -3529,17 +3529,19 @@ I5(치환)와 V4에서 입력 레이아웃 5곳·셰이더 4개를 함께 전환
 
 ## 7. 다른 계획과의 관계
 
-> **순서·우선순위·공수는 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)가 정본이다**(2026-09-01 신설).
-> 이 문서는 트랙 I·V의 슬라이스 내부 설계·측정을 소유한다.
+> **이 문서는 2026-09-02부터 역사 기록이다.** 모델 교체의 순서·우선순위·공수는
+> [`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md), PHASE 3.75가 정본이다.
+> [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)는 완료된 typed model/vertex 결과를 소비하는
+> PHASE 4/4.25/4.75 후속만 소유한다.
 
 | 계획 | 관계 |
 |---|---|
-| **`ScriptableRenderPipelinePlan` (같은 PHASE 4)** | **V4 가 그쪽 Asset-first Pass 계약의 전제다.** Pass 가 레이아웃 오프셋을 C++ 에 박고 있으면 Pass 를 Asset 으로 기술할 수 없다. 경계는 §0 |
-| **PHASE 4 GPU-driven** | 트랙 V 의 첫 대형 소비자. `buildMeshlets` 보류 사유가 여기서 해소된다 |
-| **PHASE 4 DXR** | BLAS 가 정점 포맷·stride 를 직접 받는다 — V2/V3 의 절감이 가속 구조에 그대로 간다 |
+| **`ScriptableRenderPipelinePlan` (PHASE 4.75)** | PHASE 3.75가 닫은 typed vertex schema를 Asset-first Pass 입력으로 소비한다. 이 역사 문서의 V4를 활성 선행 작업으로 재개하지 않는다 |
+| **PHASE 4.75 GPU-driven** | 트랙 V 의 첫 대형 소비자. `buildMeshlets` 보류 사유가 여기서 해소된다 |
+| **PHASE 4.75 DXR** | BLAS 가 정점 포맷·stride 를 직접 받는다 — V2/V3 의 절감이 가속 구조에 그대로 간다 |
 | SerializationPlan (PHASE 17) | I2·I7 이 `.meta`/AssetId 발급과 쿠킹 결정을 공유. **V0 의 캐시 버전 규약도 그쪽 형식 결정을 따른다** |
 | SceneGraphRedesignPlan | I5 안 B 가 노드/엔티티 표현과 충돌하는지 확인 필요 |
 | MaterialPipelinePlan (PHASE 3.5) | I5-0에서 표준 PBR property 이름을 공유했다. M5가 generation/소유 경계를, M6-P0~P2d-e가 GBuffer/Forward의 property·texture·ShaderMeta/PSO·Foliage/flow·required-asset와 legacy 은퇴까지 닫아 PHASE 3.5는 완료됐다. D5-b2a 단일 model producer, D5-b2b1 model 전수 Cook, D5-b2b2 제품 pak 게시는 섰다. I5는 D2/D5-a/D5-b1 계약 위에 D5-b2c 나머지 ID가 공급된 뒤 `experiment::Material`을 그 계약에 직접 연결한다. **V4의 퍼뮤테이션 축도 그쪽 키 체계를 쓴다** |
-| **`LightmapBakerPlan` (같은 PHASE 4 · 트랙 L)** | **V3 옵셔널 스트림의 첫 소비자.** V6 는 그쪽으로 이관됐다. 삭제된 베이커가 uv1 의 원래 소비자였다(§1.8) |
+| **`LightmapBakerPlan` (PHASE 4.75 · 트랙 L)** | **V3 옵셔널 스트림의 첫 소비자.** V6 는 그쪽으로 이관됐다. 삭제된 베이커가 uv1 의 원래 소비자였다(§1.8) |
 | AnimationSchedulerPlan (PHASE 13) | 게시된 clip 의 소비자가 그쪽 평가 엔진이다 |
 | `RhiBoundaryPlan` (PHASE 3) | V5(멀티 슬롯)가 `RHIEncoder`·`RHIMeshBinding` 확장을 요구 — 보류 중 |
