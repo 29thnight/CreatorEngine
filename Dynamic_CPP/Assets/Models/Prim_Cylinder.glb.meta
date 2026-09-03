@@ -1,4 +1,29 @@
-guid: 6723b433-dc6c-4b55-88b7-5abd646b59d5
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:02e9540b2bc5ffbee8375a67a0d0d99e2c701d9179d7b5cb327e261992863397
+assetId: cdf2f89b-32f4-85d5-adc6-c652c61a071c
+generation: 2
+sourceFingerprint: sha256:04d186784b81f86f7dc57796f448788dba0a651aa2b14fb9d781628e3dc63723
+subAssets:
+  - kind: material
+    stableKey: name:Cylinder_Mat
+    assetId: 44f1214b-dd15-8df0-b89e-64e760e8caee
+    binding: gltf/material/0
+    name: Cylinder_Mat
+    fingerprint: sha256:221934711d71b588b1abfa8a58e1a796cd379e4b254b366e98477298153124c4
+  - kind: texture
+    stableKey: name:Cylinder_Mat_BaseColor
+    assetId: c4261d3c-9839-8e82-9bd9-16549b76173d
+    binding: gltf/image/0
+    name: Cylinder_Mat_BaseColor
+    fingerprint: sha256:e20ba51ac8a2ebf7e5b098f412016ca3d13a9f41d24190ae8d3547e13f598abf
+  - kind: mesh
+    stableKey: name:Prim_Cylinder
+    assetId: fd816a99-62d5-8926-b72f-c582fd705ab1
+    binding: mesh/0
+    name: Prim_Cylinder
+    fingerprint: sha256:c1e690554ee5c5d17ac20154b2cffe82d0f0450f93a122d1c36f8468c867db1d
 importSettings:
   extension: .glb
   timestamp: 134300494791293268
@@ -6,13 +31,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: gltf/material/0
-      name: Cylinder_Mat
-      guid: f19abca7-ab80-4578-b90e-0aeacf57e168
-  embeddedTextures:
-    - key: gltf/image/0
-      name: Cylinder_Mat_BaseColor
-      guid: 123a9a2e-c10b-49bd-bad6-1fae1bea80de

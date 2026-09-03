@@ -1,22 +1,20 @@
 #include "MeshRenderer.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
-#include "Model.h"
 #include "ReflectionYml.h"
 #include "DataSystem.h"
 #include "Entity.h"
-#include "Mesh.h"
 #include "Material.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Experiment/MaterialAuthoringCodec.h" // S2c-2a: override 값 표기 정본
-#include "Experiment/Model.h" // I5-D4c: 이름→메시 해석의 experiment 정본
 #include "ExperimentMaterialMigration.h" // S2c-2a: diff 타이핑·override 적용
 #include "Experiment/MaterialInstance.h" // I5-D5c1: 재질 병행 표현
+#include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC7: typed 정본
 #include <mathematics/transform.hpp>
 
 #include <algorithm>
-#include <cstdio> // I5-D4c: [mesh.resolve] 경로 관측(stdout — CLI 게이트 채널)
+#include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 계수(무조건 stdout 출력 제거)
 
 namespace
 {
@@ -343,25 +341,17 @@ void MeshRenderer::SetExperimentMaterialBase(
         std::make_unique<experiment::MaterialInstance>(std::move(base));
 }
 
-bool MeshRenderer::HasRenderableMesh(bool* outViaExperiment) const
-{
-    if (outViaExperiment) *outViaExperiment = false;
-    if (m_experimentModel)
-    {
-        if (outViaExperiment) *outViaExperiment = true;
-        return true;
-    }
-    return static_cast<bool>(m_Mesh);
-}
-
 math::aabb MeshRenderer::GetBoundingBox() const
 {
-    if (m_Mesh)
+    // typed 정본의 바운드(immutable aggregate가 소유). MBC9: legacy Mesh 바운드 폴백은
+    // 은퇴했다 — generation이 없으면 빈 상자다.
+    if (m_modelGeneration
+        && m_modelMeshIndex < m_modelGeneration->Meshes().size())
     {
-		return math::transform(
-			m_Mesh->GetBoundingBox(), m_pOwner->Transform_().GetWorldMatrix());
+        return math::transform(
+            m_modelGeneration->Meshes()[m_modelMeshIndex].bounds,
+            m_pOwner->Transform_().GetWorldMatrix());
     }
-
     return math::aabb{};
 }
 
@@ -441,68 +431,81 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 
 	// I5-M5 S2c-1 — 모델 해석의 정본은 자기 m_modelGuid다. legacy 씬은 인라인
 	// 재질의 m_fileGuid가 모델 GUID를 나르는 편법이라 폴백으로 읽고, 읽는 즉시
-	// 자기 필드로 이주해 다음 저장부터 정본이 된다(로드 실패여도 정보는 동일).
+	// 자기 필드로 이주해 다음 저장부터 정본이 된다.
 	// S2c-2a: base 링크 재질의 m_fileGuid는 **재질 자산** GUID라 모델 폴백
-	// 대상이 아니다 — ref 표기는 S2c-1 이후의 것이라 m_modelGuid가 정본이다.
-	Model* model = nullptr;
-	if (FileGuid{} != m_modelGuid)
+	// 대상이 아니다.
+	//
+	// PHASE 3.75 MBC9 — 모델의 유일한 런타임 표현은 ModelAssetGeneration이다.
+	// legacy Model·experiment 병행 핸들·이름 폴백·전역 임베디드 등록부는 없다.
+	// embedded texture owner는 BindModelGeneration이 generation closure에서 묶는다.
+	if (FileGuid{} == m_modelGuid && m_Material && FileGuid{} == m_materialBaseGuid
+		&& assets::IsUuidV8(m_Material->m_fileGuid.m_guid))
 	{
-		model = DataSystems->LoadModelGUID(m_modelGuid);
+		m_modelGuid = m_Material->m_fileGuid;
 	}
-	if (nullptr == model && m_Material && FileGuid{} == m_materialBaseGuid)
+	const std::shared_ptr<const assets::ModelAssetGeneration> generation =
+		DataSystems->LoadModelAssetGeneration(m_modelGuid);
+
+	// 구 씬은 메시를 이름으로 적었다(m_Mesh.m_name) — 영속 MeshId가 없으면 이름으로
+	// 한 번 되찾아 m_meshAssetId로 이주한다. 새 씬은 MeshId만 적는다.
+	const Authoring::ReadNode legacyMeshNode = node["m_Mesh"];
+	const std::string meshName = (legacyMeshNode && legacyMeshNode["m_name"])
+		? legacyMeshNode["m_name"].AsString() : std::string{};
+	bool resolvedViaGeneration = false;
+	if (generation)
 	{
-		model = DataSystems->LoadModelGUID(m_Material->m_fileGuid);
-		if (FileGuid{} == m_modelGuid)
+		// ① 영속 MeshId(UUIDv8 subasset). ② 이름 — semantic stable key와 같은 축이라
+		// generation 안에서 유일할 때만 신원으로 인정한다(둘 이상이면 authoring key
+		// 자산이고, 그 씬은 MeshId를 적어야 한다 — 짐작하지 않는다).
+		const auto meshes = generation->Meshes();
+		std::uint32_t meshIndex = assets::kInvalidModelAssetIndex;
+		if (FileGuid{} != m_meshAssetId)
 		{
-			m_modelGuid = m_Material->m_fileGuid;
+			for (std::size_t index = 0; index < meshes.size(); ++index)
+			{
+				if (meshes[index].meshId != m_meshAssetId.m_guid) continue;
+				meshIndex = static_cast<std::uint32_t>(index);
+				break;
+			}
+			if (assets::kInvalidModelAssetIndex == meshIndex)
+			{
+				Debug->LogWarning("MeshRenderer m_meshAssetId가 모델 generation에 없다 — "
+					"이름으로 다시 찾는다: " + m_meshAssetId.ToString());
+			}
 		}
-	}
-
-	const Authoring::ReadNode getMeshNode = node["m_Mesh"];
-	if (model && getMeshNode)
-	{
-		const std::string meshName = getMeshNode["m_name"].AsString();
-
-		// I5-D4c — 이름→메시 해석의 정본이 experiment다. experiment 모델에서
-		// 이름으로 인덱스를 찾고, legacy m_Mesh는 그 인덱스로 꺼낸다(역브리지
-		// 1:1 순서 계약 — 병행 바인딩 등록과 같은 전제). experiment 모델이
-		// 없으면(Assimp 폴백·A/B off) legacy 이름 조회가 폴백이다. 해석 경로는
-		// stdout으로 계수한다([model.dual]과 같은 채널 — 게이트가 실증).
-		bool resolvedViaExperiment = false;
-		m_experimentModel = DataSystems->TryGetExperimentModel(m_modelGuid);
-		if (m_experimentModel)
+		if (assets::kInvalidModelAssetIndex == meshIndex && !meshName.empty())
 		{
-			const auto meshes = m_experimentModel->Meshes();
+			std::size_t matches = 0;
 			for (std::size_t index = 0; index < meshes.size(); ++index)
 			{
 				if (meshes[index].name != meshName) continue;
-				m_experimentMeshIndex = static_cast<std::uint32_t>(index);
-				m_Mesh = model->GetMeshShared(static_cast<int>(index));
-				resolvedViaExperiment = (nullptr != m_Mesh);
-				break;
+				++matches;
+				meshIndex = static_cast<std::uint32_t>(index);
 			}
-			if (!resolvedViaExperiment) m_experimentModel.reset();
+			if (1u != matches)
+			{
+				meshIndex = assets::kInvalidModelAssetIndex;
+				if (matches > 1u)
+				{
+					Debug->LogWarning("MeshRenderer 메시 이름이 generation 안에서 유일하지 "
+						"않다 — MeshId가 필요하다: " + meshName);
+				}
+			}
 		}
-		if (!resolvedViaExperiment)
-		{
-			m_Mesh = model->GetMeshShared(meshName);
-			// 신원 조회 폴백 — legacy로 해석해도 핸들은 최대한 잇는다
-			// (A/B off면 조회 자체가 거부돼 빈 채로 남는다 — 대조군 계약).
-			EnsureExperimentBinding();
-		}
-		if (m_Mesh)
-		{
-			std::printf("[mesh.resolve] %s: %s\n",
-				resolvedViaExperiment ? "experiment" : "legacy",
-				meshName.c_str());
-		}
-
-		// I5-D4a(D0b 이행): m_LODThresholds → GenerateLODs 재실행을 절단했다.
-		// GenerateLODs는 MeshOptimizer 결과를 버리고(indexCount만 보관) 그
-		// 계수의 유일한 독자 HasLODs는 전 리포 호출자 0이다 — 매 로드마다
-		// 버려질 단순화를 계산하던 낭비. 스키마는 무변경: writer(Mesh::reflect)가
-		// m_LODThresholds를 계속 적고(코퍼스 전수 nil — 실행된 적 없는 분기),
-		// 여기서 읽지 않을 뿐이다. 미래 LOD는 렌더 파생 몫(D0b 판정).
+		resolvedViaGeneration = assets::kInvalidModelAssetIndex != meshIndex
+			&& BindModelGeneration(generation, meshIndex);
+	}
+	if (resolvedViaGeneration)
+	{
+		// MBC10 — 해석 관측은 읽기 전용 계수다(`assets.modeldiag`가 읽는다).
+		ModelConsumptionDiagnostics::NoteMeshResolved();
+	}
+	else if (FileGuid{} != m_modelGuid)
+	{
+		ModelConsumptionDiagnostics::NoteMeshResolveFailed();
+		Debug->LogError("MeshRenderer 모델 generation 해석 실패 — 그리지 않는다: model="
+			+ m_modelGuid.ToString() + " mesh=" + (meshName.empty()
+				? m_meshAssetId.ToString() : meshName));
 	}
 
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존
@@ -538,13 +541,34 @@ void MeshRenderer::OnAfterSerialize(const Authoring::MutableNodeView& view)
 	}
 }
 
-void MeshRenderer::EnsureExperimentBinding()
+bool MeshRenderer::BindModelGeneration(
+	std::shared_ptr<const assets::ModelAssetGeneration> generation,
+	std::uint32_t meshIndex)
 {
-	// I5-D4c — 핸들 확보의 정본. postLoad의 experiment 이름 해석과 D4d
-	// 인스턴스화 직심기가 이미 채웠으면 no-op이고, 남은 경로(legacy 인스턴스화
-	// 폴백·Assimp 모델)는 여기의 legacy 신원 조회가 잇는다. 프록시 생성이 부른다.
-	if (m_experimentModel || nullptr == m_Mesh) return;
-	DataSystems->TryGetExperimentMeshBinding(
-		*m_Mesh, m_experimentModel, m_experimentMeshIndex);
+	if (!generation || meshIndex >= generation->Meshes().size()) return false;
+	m_modelGeneration = std::move(generation);
+	m_modelMeshIndex = meshIndex;
+	m_meshAssetId = FileGuid(m_modelGeneration->Meshes()[meshIndex].meshId);
+	m_modelGuid = FileGuid(m_modelGeneration->Identity().modelId);
+	// 재질의 embedded texture owner는 이 generation closure가 정본이다. 전역
+	// 임베디드 등록부(소스 로드 부산물)·이름 폴백·로드 순서에 기대지 않는다 —
+	// 콜드 로드 첫 렌더러에서 텍스처가 비던 결함(§6.2)의 실제 처방이다.
+	if (m_Material)
+	{
+		DataSystems->BindModelGenerationTextures(*m_Material, *m_modelGeneration);
+	}
+	return true;
+}
+
+assets::ModelMeshHandle MeshRenderer::GetModelMeshHandle() const
+{
+	if (!m_modelGeneration
+		|| m_modelMeshIndex >= m_modelGeneration->Meshes().size())
+	{
+		return {};
+	}
+	return { m_modelGeneration->Identity().modelId,
+		m_modelGeneration->Meshes()[m_modelMeshIndex].meshId,
+		m_modelGeneration->Identity().generation };
 }
 

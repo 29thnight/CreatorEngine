@@ -441,7 +441,7 @@ function Sort-EntriesOrdinal {
 function Get-RuntimeDllNames {
     if ($Config -eq 'Debug') {
         return @(
-            'assimp-vc145-mtd.dll', 'DirectXTex.dll',
+            'DirectXTex.dll',
             'fmodL.dll', 'fmtd.dll', 'kubazip.dll', 'meshoptimizer.dll',
             'minizipd.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
             'PhysXDevice64.dll',
@@ -450,7 +450,7 @@ function Get-RuntimeDllNames {
         )
     }
     return @(
-        'assimp-vc145-mt.dll', 'DirectXTex.dll',
+        'DirectXTex.dll',
         'fmod.dll', 'fmt.dll', 'kubazip.dll', 'meshoptimizer.dll',
         'minizip.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
         'PhysXDevice64.dll',
@@ -592,7 +592,9 @@ function Get-ModelCookSources {
 # 한 번 더 확인한다 — 경로를 만드는 지점(CookedAssetManifest.h)과 검사하는 지점이
 # 같은 코드면 규약이 바뀌어도 아무도 모른다.
 $script:derivedPathRules = @(
-    [pscustomobject]@{ Folder = 'Models';     Pattern = 'cemc' }
+    # MBC11 — 모델은 generation 디렉터리(<id>/<gen>/generation.asset·model.cemc·
+    # sidecar.meta·textures/<TextureId>.png)로 내보낸다. Directory=$true 규약.
+    [pscustomobject]@{ Folder = 'Models';     Pattern = 'asset|cemc|meta|png'; Directory = $true }
     [pscustomobject]@{ Folder = 'Textures';   Pattern = 'png|hdr|dds|jpg' }
     [pscustomobject]@{ Folder = 'ShaderMeta'; Pattern = 'shadermeta' }
     [pscustomobject]@{ Folder = 'Materials';  Pattern = 'asset' }
@@ -612,7 +614,7 @@ function Assert-CookOutput {
         throw "cook manifest가 없다: $manifestPath"
     }
 
-    $guid = '([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})'
+    $guid = '([0-9a-f]{8}-[0-9a-f]{4}-[48][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})'
     $derivedFiles = @(Get-ChildItem -LiteralPath $derivedRoot -File -Recurse)
     $artifacts = @($derivedFiles | Where-Object {
         $_.FullName -ne (Get-Item -LiteralPath $manifestPath).FullName
@@ -628,7 +630,12 @@ function Assert-CookOutput {
         }
         # ★ `-cnotmatch` 다. `-notmatch` 는 대소문자를 무시해서 대문자 GUID 가
         #   통과한다(guid 게이트가 같은 함정에 빠져 있었다).
-        $expected = ('^{0}/([0-9a-f]{{2}})/{1}\.({2})$' -f $folder, $guid, $rule.Pattern)
+        $isDirectoryRule = ($rule.PSObject.Properties.Name -contains 'Directory') -and $rule.Directory
+        $expected = if ($isDirectoryRule) {
+            ('^{0}/([0-9a-f]{{2}})/{1}/[0-9]+/(generation\.asset|model\.cemc|sidecar\.meta|textures/{1}\.png)$' -f $folder, $guid)
+        } else {
+            ('^{0}/([0-9a-f]{{2}})/{1}\.({2})$' -f $folder, $guid, $rule.Pattern)
+        }
         if ($relative -cnotmatch $expected -or
             $Matches[1] -ne $Matches[2].Substring(0, 2)) {
             throw "cook artifact 경로가 GUID-addressed 규약과 다르다: $relative"

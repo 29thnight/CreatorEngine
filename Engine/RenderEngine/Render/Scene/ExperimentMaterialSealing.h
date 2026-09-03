@@ -9,6 +9,7 @@
 
 class Material;
 struct ShaderMeta;
+namespace assets { class ModelAssetGeneration; } // MBC7 — closure texture 축
 
 // I5-M4 — M6 draw snapshot sealing의 experiment 치환.
 //
@@ -67,9 +68,13 @@ namespace ExperimentMaterialSealing
     //     (ForwardShade:441·GBuffer:237이 무조건 읽는다). 저작 정본에서는
     //     normalMap texture가 실제로 해석됐는지로 유도한다.
     // 시각(totalSeconds/deltaSeconds)은 재질 값이 아니라 seal 호출부의 몫이다.
+    // MBC7 — generation을 주면 texture 해석의 첫 축이 그 closure다(embedded
+    // texture는 파일이 없어 경로 해석이 원리적으로 실패한다). nullptr이면 예전과
+    // 같다(cooked → source).
     [[nodiscard]] bool BuildSealSourceFromAuthored(
         const experiment::Material& authored, const ShaderMeta& meta,
-        SealSource& outSource, std::string& outError);
+        SealSource& outSource, std::string& outError,
+        const assets::ModelAssetGeneration* generation = nullptr);
 
     // I5-D5c2-2 — 저작 정본 직행. `BuildSealSourceFromLegacy`가 채운 SealSource의
     // **material만** 저작 원본으로 교체한다(properties·keywords·blendMode).
@@ -92,7 +97,8 @@ namespace ExperimentMaterialSealing
     // 텍스처가 조용히 빠진 그림보다 전환기 경로가 낫다(관측은 notes가 진다).
     [[nodiscard]] bool ApplyAuthoredTextures(SealSource& source,
         const ShaderMeta& meta, std::string& outError,
-        std::size_t* outCooked = nullptr, std::size_t* outSourceFallback = nullptr);
+        std::size_t* outCooked = nullptr, std::size_t* outSourceFallback = nullptr,
+        const assets::ModelAssetGeneration* generation = nullptr);
 
     // layout 확보 후 호출 — propertyBytes(정본 packer)와 textureBindings
     // (reflection register 검증·중복 거부, legacy SealMaterialTextureBindings와

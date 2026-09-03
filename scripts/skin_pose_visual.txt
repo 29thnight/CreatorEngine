@@ -37,6 +37,7 @@ __ANIMATOR_POST__
 wait 30
 experiment.animlive
 experiment.skinbounds
+assets.modeldiag
 wait 10
 dx12.scene
 quit

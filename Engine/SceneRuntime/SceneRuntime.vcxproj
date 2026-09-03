@@ -161,7 +161,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ModelSceneBridge.cpp" />
+    <ClCompile Include="ModelConsumptionDiagnostics.cpp" />
+    <ClCompile Include="ModelSceneInstantiation.cpp" />
     <ClCompile Include="AnimationEventBridge.cpp" />
     <ClCompile Include="AnimationJob.cpp" />
     <ClCompile Include="EnhancedGizmoSceneBinding.cpp" />
@@ -318,6 +319,8 @@
     <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="MaterialScriptBinding.h" />
     <ClInclude Include="MeshRenderer.h" />
+    <ClInclude Include="ModelConsumptionDiagnostics.h" />
+    <ClInclude Include="ModelSceneInstantiation.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PrefabUtility.h" />
     <ClInclude Include="RagdollComponent.h" />

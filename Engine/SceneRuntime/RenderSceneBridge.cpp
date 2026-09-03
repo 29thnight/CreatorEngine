@@ -16,10 +16,7 @@
 #include "LightComponent.h"
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
-// Skeleton::MAX_BONES를 직접 쓴다. 예전에는 다른 헤더를 타고 딸려
-// 들어왔는데, include를 정리하면서 그 경로가 끊겼다 — AvatarMask.h의
-// 전방 선언만 남아 비유니티 빌드에서 드러났다.
-#include "Skeleton.h"
+#include "BoneRegion.h" // MAX_BONES
 
 namespace
 {

@@ -324,6 +324,46 @@ namespace RenderTest
             check.Check(!r.Succeeded() && HasIssue(r.issues, assets::StableKeyIssueCode::DuplicatePersistentId),
                 "exporter id 중복 → 오류");
 
+            im::ImportedScene importedWithExporterId;
+            im::ImportedMaterial importedMaterial;
+            importedMaterial.sourceKey = "gltf/material/0";
+            importedMaterial.name = "Mat";
+            importedMaterial.persistentId = "dcc-material-42";
+            importedWithExporterId.materials.push_back(std::move(importedMaterial));
+            const std::vector<assets::StableKeyElement> collected =
+                assets::CollectStableKeyElements(importedWithExporterId);
+            r = assets::DeriveModelStableKeys(collected, {}, &DeterministicFactory);
+            check.Check(r.Succeeded() && r.assignments.size() == 1u
+                && r.assignments[0].stableKey == "exporter:dcc-material-42",
+                "ImportedScene persistentId → exporter stable key");
+
+            // animation-only FBX는 변환 단계가 target node 폐포에서 skeleton을
+            // 유도하므로 identity inventory도 새 skeleton UUIDv8을 한 번 발급해야 한다.
+            im::ImportedScene animationOnly;
+            im::SceneNode rootNode;
+            rootNode.name = "Root";
+            animationOnly.nodes.push_back(std::move(rootNode));
+            im::SceneNode boneNode;
+            boneNode.name = "Bone";
+            boneNode.parent = im::SceneNodeIndex(0);
+            animationOnly.nodes.push_back(std::move(boneNode));
+            im::ImportedClip animationClip;
+            animationClip.name = "Walk";
+            im::ImportedChannel animationChannel;
+            animationChannel.target = im::SceneNodeIndex(1);
+            animationClip.channels.push_back(std::move(animationChannel));
+            animationOnly.clips.push_back(std::move(animationClip));
+            const std::vector<assets::StableKeyElement> animationElements =
+                assets::CollectStableKeyElements(animationOnly);
+            r = assets::DeriveModelStableKeys(
+                animationElements, {}, &DeterministicFactory);
+            check.Check(r.Succeeded() && r.assignments.size() == 2u
+                && r.CountOrigin(K::Skeleton,
+                    assets::StableKeyOrigin::Authoring) == 1u
+                && r.CountOrigin(K::Animation,
+                    assets::StableKeyOrigin::Semantic) == 1u,
+                "animation-only node 폐포 → derived skeleton 신규 UUIDv8 + clip");
+
             // 비NFC 이름 → authoring으로 강등(경고), 성공
             std::vector<assets::StableKeyElement> nfd = { Element(K::Material, 0, "e\xCC\x81", "d0") };
             r = assets::DeriveModelStableKeys(nfd, {}, &DeterministicFactory);

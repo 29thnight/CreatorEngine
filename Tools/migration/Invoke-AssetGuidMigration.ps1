@@ -183,6 +183,21 @@ foreach ($entry in $entries) {
 $affectedFiles = @($entriesByFile.Keys | Sort-Object)
 if ($affectedFiles.Count -eq 0) { throw 'manifest has no affected files' }
 
+# PHASE 3.75 MBC3: model identity는 UUIDv4 치환 manifest가 아니라 하나의
+# ModelAssetAuthoringTransaction에서만 게시한다. model 자체 또는 model sidecar를
+# 건드리는 legacy migration은 stage-only라도 허용하지 않는다.
+$modelExtensions = @('.fbx', '.gltf', '.obj', '.glb')
+$modelEntries = @($entries | Where-Object {
+    $modelExtensions -contains [IO.Path]::GetExtension([string]$_.assetPath).ToLowerInvariant()
+})
+$modelSidecarReferences = @($affectedFiles | Where-Object {
+    $lower = ([string]$_).ToLowerInvariant()
+    @($modelExtensions | Where-Object { $lower.EndsWith($_ + '.meta') }).Count -gt 0
+})
+if ($modelEntries.Count -gt 0 -or $modelSidecarReferences.Count -gt 0) {
+    throw 'legacy UUIDv4 migration cannot write model identity; use AssetCooker --author-model-asset'
+}
+
 $originalRoot = Join-Path $backupFullPath 'original'
 $stagedRoot = Join-Path $backupFullPath 'staged'
 [IO.Directory]::CreateDirectory($originalRoot) | Out-Null

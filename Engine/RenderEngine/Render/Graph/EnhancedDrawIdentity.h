@@ -27,9 +27,10 @@ namespace enhanced_draw
         const EnhancedDrawItem& draw) noexcept
     {
         if (0 != draw.geometryKey) return draw.geometryKey;
-        if (0 != draw.experimentView.stableKey)
+        // MBC7 — typed 뷰가 첫 축이다(자산 신원 {ModelId, MeshId, generation}).
+        if (draw.modelMeshView.handle.IsValid())
         {
-            return draw.experimentView.stableKey;
+            return HashModelMeshHandle(draw.modelMeshView.handle);
         }
         return nullptr != draw.mesh
             ? static_cast<std::size_t>(draw.mesh->m_hashingMesh.m_ID_Data)

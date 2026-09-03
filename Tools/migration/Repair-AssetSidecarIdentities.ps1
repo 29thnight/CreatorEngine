@@ -4,9 +4,9 @@
     `.meta` sidecar 표기를 정규화하고 누락된 sidecar 를 발급한다.
 
 .DESCRIPTION
-    저작 경계 도구다. `AssetCooker --refresh-model-identities` 와 같은 위치이며,
-    **Cook 은 절대 데이터를 고치지 않는다** — producer 가 조용히 표기를 고치면
-    저작본과 산출물이 갈라진다.
+    비모델 legacy 자산의 저작 경계 도구다. model은 PHASE 3.75 MBC3의
+    `AssetCooker --author-model-asset` transaction만 쓸 수 있으므로 이 도구가
+    정규화하거나 발급하지 않는다.
 
     두 가지 일을 한다.
 
@@ -58,6 +58,14 @@ $registeredExtensions = @(
 )
 $registered = [System.Collections.Generic.HashSet[string]]::new(
     [string[]]$registeredExtensions, [StringComparer]::OrdinalIgnoreCase)
+$modelExtensions = [System.Collections.Generic.HashSet[string]]::new(
+    [string[]]@('.fbx', '.gltf', '.obj', '.glb'),
+    [StringComparer]::OrdinalIgnoreCase)
+
+function Test-IsModelMeta([string]$Path) {
+    $assetPath = $Path.Substring(0, $Path.Length - '.meta'.Length)
+    return $modelExtensions.Contains([IO.Path]::GetExtension($assetPath))
+}
 
 $canonical = '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
 $anyUuid = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
@@ -85,6 +93,7 @@ $refused = [System.Collections.Generic.List[string]]::new()
 # ── 1. 표기 정규화 ───────────────────────────────────────────────────────
 if ($Normalize) {
     foreach ($meta in $metaFiles) {
+        if (Test-IsModelMeta $meta.FullName) { continue }
         $lines = [IO.File]::ReadAllLines($meta.FullName)
         $changed = $false
         for ($index = 0; $index -lt $lines.Length; ++$index) {
@@ -124,6 +133,7 @@ if ($Normalize) {
 if ($Issue) {
     $targets = @(Get-ChildItem -LiteralPath $assetsRoot -Recurse -File |
         Where-Object { $registered.Contains($_.Extension) } |
+        Where-Object { -not $modelExtensions.Contains($_.Extension) } |
         Where-Object { -not (Test-Path -LiteralPath ($_.FullName + '.meta') -PathType Leaf) })
 
     foreach ($target in $targets) {

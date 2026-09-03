@@ -450,21 +450,19 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
-    // M5-C4a: FoliageType이 Model 내부 raw 주소만 보관하면 cache generation이
-    // 바뀐 뒤 조용한 UAF가 된다. 원 Model과 FoliageType 복사본이 사라지는 각
-    // 경계에서 Mesh/Material의 실제 공동 소유가 유지·해제되는지 단정한다.
-    std::weak_ptr<Mesh> foliageMeshLifetime;
+    // M5-C4a(MBC9 재단): FoliageType의 runtime 재질은 공동 소유(shared_ptr)여야
+    // cache generation이 바뀐 뒤 UAF가 없다. 메시는 typed generation이 소유하므로
+    // 이 프로브는 재질 축만 잰다 — 원 소유자와 복사본이 사라지는 각 경계에서
+    // 소유가 유지·해제되는지 단정한다.
     std::weak_ptr<Material> foliageMaterialLifetime;
     {
-        auto mesh = std::make_shared<Mesh>();
         auto material = std::make_shared<Material>();
-        foliageMeshLifetime = mesh;
         foliageMaterialLifetime = material;
 
-        FoliageType foliage(mesh, material, true, "C4LifetimeProbe");
-        mesh.reset();
+        FoliageType foliage("C4LifetimeProbe", true);
+        foliage.m_material = material;
         material.reset();
-        if (foliageMeshLifetime.expired() || foliageMaterialLifetime.expired())
+        if (foliageMaterialLifetime.expired())
         {
             outLog += "[shader reflection] FoliageType owning reference 적용 실패\n";
             return false;
@@ -479,7 +477,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         if (restoredFoliage.m_modelName != foliage.m_modelName
             || restoredFoliage.m_castShadow != foliage.m_castShadow
             || restoredFoliage.m_isShadowRecive != foliage.m_isShadowRecive
-            || restoredFoliage.m_mesh || restoredFoliage.m_material)
+            || restoredFoliage.m_material || restoredFoliage.m_modelGeneration)
         {
             outLog += "[shader reflection] FoliageType asset/runtime owner 분리 실패\n";
             return false;
@@ -487,13 +485,13 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 
         FoliageType packetCopy = foliage;
         foliage = {};
-        if (foliageMeshLifetime.expired() || foliageMaterialLifetime.expired())
+        if (foliageMaterialLifetime.expired())
         {
             outLog += "[shader reflection] FoliageType packet copy 수명 보존 실패\n";
             return false;
         }
     }
-    if (!foliageMeshLifetime.expired() || !foliageMaterialLifetime.expired())
+    if (!foliageMaterialLifetime.expired())
     {
         outLog += "[shader reflection] FoliageType 마지막 owner 해제 실패\n";
         return false;
@@ -517,7 +515,8 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     auto cacheMaterial = std::make_shared<Material>();
     cacheMaterial->m_name = lifetimeProbeName;
     std::weak_ptr<Material> cacheMaterialLifetime = cacheMaterial;
-    FoliageType cacheConsumer({}, cacheMaterial, true, "C4CacheProbe");
+    FoliageType cacheConsumer("C4CacheProbe", true);
+    cacheConsumer.m_material = cacheMaterial;
     DataSystems->InsertMaterial(cacheMaterial);
     const bool inserted = DataSystems->FindCachedMaterial(lifetimeProbeName).get()
         == cacheMaterial.get();

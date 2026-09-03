@@ -1,4 +1,29 @@
-guid: 79d6d261-1ba9-46c2-939e-82add54ba500
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:3e123b4d6400e63838a523971d1400e855b92a2de5f9de5b01a6968e0dcd29d7
+assetId: df464176-385d-8563-98b9-5b1d266415bd
+generation: 2
+sourceFingerprint: sha256:91cc87c32fbd1d559582a38edbce177d8418f4f405b4993a1f66159ac0d44408
+subAssets:
+  - kind: material
+    stableKey: name:Sphere_Mat
+    assetId: 5ddef1b8-956e-8da3-8d7b-47282507d33b
+    binding: gltf/material/0
+    name: Sphere_Mat
+    fingerprint: sha256:cc6347766179be1b9019ec3185c34367eeb74b765bfb8264cf51561f2b29e124
+  - kind: texture
+    stableKey: name:Sphere_Mat_BaseColor
+    assetId: 845b7933-3d01-825e-9883-b28afd29736a
+    binding: gltf/image/0
+    name: Sphere_Mat_BaseColor
+    fingerprint: sha256:e20ba51ac8a2ebf7e5b098f412016ca3d13a9f41d24190ae8d3547e13f598abf
+  - kind: mesh
+    stableKey: name:Prim_Sphere
+    assetId: 10939add-54b9-87f3-bccf-775d715274ae
+    binding: mesh/0
+    name: Prim_Sphere
+    fingerprint: sha256:26e94877f598ab1e9d9fd8e59a52d2aecf6462efeb4614e7a5103136b00ff52a
 importSettings:
   extension: .glb
   timestamp: 134300494788790560
@@ -6,13 +31,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: gltf/material/0
-      name: Sphere_Mat
-      guid: fa4a68ea-e2cb-471a-b946-2e933d806e3c
-  embeddedTextures:
-    - key: gltf/image/0
-      name: Sphere_Mat_BaseColor
-      guid: cb18849b-4935-474e-9af5-3b7340cff5b5

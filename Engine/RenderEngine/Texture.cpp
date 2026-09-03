@@ -53,6 +53,24 @@ Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 	return texture;
 }
 
+std::shared_ptr<Texture> Texture::CreateSharedFromScratchImage(
+	std::string_view name, std::shared_ptr<DirectX::ScratchImage> image)
+{
+	if (!image || 0 == image->GetImageCount()) return nullptr;
+	const DirectX::TexMetadata metadata = image->GetMetadata();
+	if (0 == metadata.width || 0 == metadata.height) return nullptr;
+
+	auto texture = std::shared_ptr<Texture>(new Texture());
+	texture->m_name = std::string(name);
+	texture->m_textureType = metadata.IsCubemap()
+		? TextureType::TextureCube
+		: (metadata.arraySize > 1 ? TextureType::TextureArray : TextureType::ImageTexture);
+	texture->m_size = { float(metadata.width), float(metadata.height) };
+	texture->m_isTextureAlpha = DirectX::HasAlpha(metadata.format);
+	texture->m_cpuPixels = std::move(image);
+	return texture;
+}
+
 Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());

@@ -211,15 +211,6 @@ Run-Step "Experiment FT_Primitives 실제 draw" {
         (Join-Path $PSScriptRoot "verify-experiment-ft-primitives.ps1") -Exe $Exe -Work $Work
 }
 
-# I5-D34a: 정적 메시의 GPU 정점 출처가 experiment packed(48B)인지 실증한다.
-# 위 draw 게이트는 "그려진다"를, 이것은 "experiment 버퍼로 그려진다"를 잰다 —
-# 로드 관측([model.dual])과 업로드 관측(experiment 업로드 계수)을 분리하고
-# CREATOR_EXPERIMENT_VERTEX=0 대조군으로 드로우 동수를 확인한다.
-Run-Step "Experiment 정점 라이브(D34a)" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-experiment-vertex-live.ps1") -Exe $Exe -Work $Work
-}
-
 # D2-d: 저장소의 저작 씬 14개를 원본에 쓰지 않고 외부 임시 트리로 두 번
 # 저장한다. 첫 저장 결과를 다시 열어 같은 이름으로 재저장했을 때 byte hash가
 # 같아야 하고, 실행 전후 원본 hash도 같아야 한다.
@@ -317,6 +308,46 @@ Run-Step "자산 신원 프로필 UUIDv8" {
 Run-Step "model sidecar schema v2" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-asset-sidecar-v2.ps1") -Exe $Exe -Work $Work
+}
+
+# PHASE 3.75 MBC3~MBC5: 원자 authoring transaction(실패 주입 5단계·collision 거부),
+# 전 corpus UUIDv8 cutover(rollback·참조 rewrite·old 참조 0), runtime
+# ModelAssetGeneration closure/cache(변조 4종 게시 전 거부·generation 1→2 교체).
+# 이 넷은 2026-09-02 구현 뒤 세트에 배선되지 않은 채였다 — 도는 세트에 없으면
+# 없는 것과 같다.
+Run-Step "model authoring transaction(MBC3)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-authoring-transaction.ps1") -Work $Work
+}
+Run-Step "model corpus UUIDv8 closure(MBC4)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-corpus-v8.ps1")
+}
+Run-Step "model corpus cutover rollback/rewrite(MBC4)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-corpus-v8-cutover.ps1") -Work $Work
+}
+Run-Step "model asset generation cache(MBC5)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-asset-generation.ps1") -Work $Work
+}
+# PHASE 3.75 MBC6: RHI/GBuffer/Forward/Shadow의 typed generation 직접 소비와 SU 전체
+# mask 조합(실GPU DX12/Vulkan). MBC7: Scene/MeshRenderer가 그 typed 뷰를 실제로
+# 채우고 Gunner 콜드 로드가 등록부·순서 없이 closure에서 텍스처를 푼다.
+Run-Step "model render wiring(MBC6)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-render-wiring.ps1") -Work $Work
+}
+Run-Step "scene model consumption + Gunner cold-load(MBC7)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-scene-consumption.ps1") -Work $Work
+}
+# PHASE 3.75 MBC8: Animator·Foliage·Editor 창구가 typed generation을 스위치와 무관하게
+# 소비한다 — A/B 스위치를 끈 프로세스에서 typed 재생 골든·본 해석·마스크·클립 열거·
+# Foliage typed 뷰가 전량 generation 축이어야 한다.
+Run-Step "typed consumers Animator/Foliage/Editor(MBC8)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-typed-consumers.ps1") -Work $Work
 }
 
 # 본 팔레트가 렌더에 도달하는가. X8의 dirty 게이팅에 "팔레트가 바뀌었다"
@@ -704,6 +735,19 @@ if (Test-Path -LiteralPath $releaseExe -PathType Leaf) {
     }
 } else {
     "=== 직렬화 기준선(D0, Release) === 건너뜀 (Release 미빌드 — Debug로 대체하지 않는다)"
+    ""
+}
+
+# PHASE 3.75 MBC11 §8.4: 모델 cutover 성능 예산. 위와 같은 이유로 Release exe만 쓴다 —
+# B1/B2는 임시 프로젝트 사본에서 저작·재로드를 재고, B6는 archive가 있을 때만 비회귀를
+# 판정한다(archive는 `-Archive`로 사람이 뜬다 — 세트는 기록하지 않는다).
+if (Test-Path -LiteralPath $releaseExe -PathType Leaf) {
+    Run-Step "모델 cutover 성능 예산(MBC11 §8.4, Release)" {
+        & pwsh -NoProfile -File `
+            (Join-Path $PSScriptRoot "verify-model-cutover-budget.ps1") -Work $Work
+    }
+} else {
+    "=== 모델 cutover 성능 예산(MBC11 §8.4, Release) === 건너뜀 (Release 미빌드 — Debug로 대체하지 않는다)"
     ""
 }
 

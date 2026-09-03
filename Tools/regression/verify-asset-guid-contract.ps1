@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $resolvedRoot = (Resolve-Path -LiteralPath $Root).Path
 $excludedSegments = @(
-    '.git', 'Artifacts', 'Bin', 'Build', 'output', 'tmp',
+    '.git', 'Artifacts', 'Bin', 'Build', 'Library', 'output', 'tmp',
     'vcpkg_installed', 'x64'
 )
 
@@ -33,13 +33,33 @@ $invalidSubassets = [System.Collections.Generic.List[string]]::new()
 $missingTargets = [System.Collections.Generic.List[string]]::new()
 $uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-([0-9a-fA-F])[0-9a-fA-F]{3}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 $canonicalV4Pattern = '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+$canonicalV8Pattern = '^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+$modelExtensions = @('.fbx', '.gltf', '.obj', '.glb')
 
 foreach ($meta in $metaFiles) {
-    $guidLines = @(Select-String -LiteralPath $meta.FullName -Pattern '^guid:\s*(\S+)\s*$')
-    if ($guidLines.Count -ne 1) {
-        $invalid.Add($meta.FullName)
-        continue
-    }
+    $target = $meta.FullName.Substring(0, $meta.FullName.Length - '.meta'.Length)
+    $text = Get-Content -LiteralPath $meta.FullName -Raw
+    $isModelV2 = $modelExtensions -contains [IO.Path]::GetExtension($target).ToLowerInvariant() -and
+        $text -match '(?m)^schemaVersion:\s*2\s*$'
+    $identity = $null
+    $version = 0
+
+    if ($isModelV2) {
+        $assetIdLines = @(Select-String -LiteralPath $meta.FullName -Pattern '^assetId:\s*(\S+)\s*$')
+        if ($assetIdLines.Count -ne 1 -or
+            $assetIdLines[0].Matches[0].Groups[1].Value -cnotmatch $canonicalV8Pattern -or
+            $text -match '(?m)^guid:') {
+            $invalid.Add($meta.FullName)
+            continue
+        }
+        $identity = $assetIdLines[0].Matches[0].Groups[1].Value
+        $version = 8
+    } else {
+        $guidLines = @(Select-String -LiteralPath $meta.FullName -Pattern '^guid:\s*(\S+)\s*$')
+        if ($guidLines.Count -ne 1) {
+            $invalid.Add($meta.FullName)
+            continue
+        }
 
     # ★ 여기가 코드와 어긋나 있었다.
     #
@@ -58,23 +78,24 @@ foreach ($meta in $metaFiles) {
     #     무시**라 `[0-9a-f]` 로 써 놓아도 대문자가 통과한다. 강화 직후
     #     brace 변이는 잡혔지만 **대문자 변이가 그대로 통과해** 드러난
     #     것이다. 이름만 canonical 이었고 소문자를 강제한 적이 없다.
-    $guid = $guidLines[0].Matches[0].Groups[1].Value.Trim()
-    if ($guid -cnotmatch $canonicalV4Pattern) {
-        $invalid.Add($meta.FullName)
-        continue
+        $identity = $guidLines[0].Matches[0].Groups[1].Value.Trim()
+        if ($identity -cnotmatch $canonicalV4Pattern) {
+            $invalid.Add($meta.FullName)
+            continue
+        }
+        $uuidMatch = [regex]::Match($identity, $uuidPattern)
+        $version = [int]::Parse(
+            $uuidMatch.Groups[1].Value,
+            [Globalization.NumberStyles]::HexNumber)
     }
-    $uuidMatch = [regex]::Match($guid, $uuidPattern)
 
-    $target = $meta.FullName.Substring(0, $meta.FullName.Length - '.meta'.Length)
     if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
         $missingTargets.Add($meta.FullName)
     }
 
     $records.Add([pscustomobject]@{
-        Guid = $guid.ToLowerInvariant()
-        Version = [int]::Parse(
-            $uuidMatch.Groups[1].Value,
-            [Globalization.NumberStyles]::HexNumber)
+        Guid = $identity.ToLowerInvariant()
+        Version = $version
         Meta = $meta.FullName
         Target = $target
     })
@@ -93,20 +114,25 @@ foreach ($meta in $metaFiles) {
         if ($inSubAssets -and $line -match '^\S') {
             $inSubAssets = $false
         }
-        if (-not $inSubAssets -or
-            $line -notmatch '^\s+guid:\s*(\S+)\s*$') {
+        $subassetPattern = if ($isModelV2) {
+            '^\s+assetId:\s*(\S+)\s*$'
+        } else {
+            '^\s+guid:\s*(\S+)\s*$'
+        }
+        if (-not $inSubAssets -or $line -notmatch $subassetPattern) {
             continue
         }
 
         $subassetGuid = $Matches[1]
         # ★ 위와 같은 이유로 `-cnotmatch` 다.
-        if ($subassetGuid -cnotmatch $canonicalV4Pattern) {
+        $expectedPattern = if ($isModelV2) { $canonicalV8Pattern } else { $canonicalV4Pattern }
+        if ($subassetGuid -cnotmatch $expectedPattern) {
             $invalidSubassets.Add(('{0}:{1}' -f $meta.FullName, $lineNumber))
             continue
         }
         $subassetRecords.Add([pscustomobject]@{
             Guid = $subassetGuid
-            Version = 4
+            Version = $isModelV2 ? 8 : 4
             Meta = $meta.FullName
             Target = $target
             Line = $lineNumber
@@ -122,7 +148,8 @@ $duplicateGroups = @(
         Sort-Object @{ Expression = 'Count'; Descending = $true }, Name
 )
 $version4 = @($records | Where-Object Version -eq 4)
-$nonVersion4 = @($records | Where-Object Version -ne 4)
+$version8 = @($records | Where-Object Version -eq 8)
+$unsupportedVersion = @($records | Where-Object { $_.Version -ne 4 -and $_.Version -ne 8 })
 $trackedFiles = @(& git -C $resolvedRoot ls-files)
 if ($LASTEXITCODE -ne 0) { throw 'git ls-files failed' }
 $trackedSet = [System.Collections.Generic.HashSet[string]]::new(
@@ -205,15 +232,16 @@ $duplicateFileCount = 0
 foreach ($group in $duplicateGroups) { $duplicateFileCount += $group.Count }
 $ready = $invalid.Count -eq 0 -and $invalidSubassets.Count -eq 0 -and
     $missingTargets.Count -eq 0 -and
-    $duplicateGroups.Count -eq 0 -and $nonVersion4.Count -eq 0 -and
+    $duplicateGroups.Count -eq 0 -and $unsupportedVersion.Count -eq 0 -and
     $trackedMetaPolicyViolations.Count -eq 0 -and
     $requiredMetaUntracked.Count -eq 0 -and $orphanTrackedMeta.Count -eq 0
 
-Write-Output ('asset-guid-contract meta={0} parsed={1} invalid={2} subassetGuids={3} invalidSubasset={4} missingTarget={5} duplicateGroups={6} duplicateFiles={7} uuidV4={8} nonV4={9} trackedMeta={10} trackedMetaPolicyViolations={11} requiredMetaUntracked={12} orphanTrackedMeta={13} localUntrackedPairs={14} d2Ready={15}' -f
+Write-Output ('asset-guid-contract meta={0} parsed={1} invalid={2} subassetGuids={3} invalidSubasset={4} missingTarget={5} duplicateGroups={6} duplicateFiles={7} uuidV4={8} uuidV8={9} unsupportedVersion={10} trackedMeta={11} trackedMetaPolicyViolations={12} requiredMetaUntracked={13} orphanTrackedMeta={14} localUntrackedPairs={15} identityReady={16}' -f
     $metaFiles.Count, $records.Count, $invalid.Count,
     $subassetRecords.Count, $invalidSubassets.Count, $missingTargets.Count,
     $duplicateGroups.Count, $duplicateFileCount, $version4.Count,
-    $nonVersion4.Count, $trackedMeta.Count, $trackedMetaPolicyViolations.Count,
+    $version8.Count, $unsupportedVersion.Count, $trackedMeta.Count,
+    $trackedMetaPolicyViolations.Count,
     $requiredMetaUntracked.Count,
     $orphanTrackedMeta.Count, $localUntrackedPairs.Count,
     $ready.ToString().ToLowerInvariant())

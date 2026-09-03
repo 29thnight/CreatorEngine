@@ -10,6 +10,8 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "PrimitiveRenderProxy.h"
+#include "Assets/ModelAssetGeneration.h"
+#include "Render/Graph/EnhancedDrawIdentity.h"
 #include "RenderScene.h"
 #include "Scene.h"
 #include "SceneManager.h"
@@ -80,9 +82,12 @@ bool DX12Test::RunGizmoSceneTest(std::string& outLog)
             {
                 const MeshRenderProxy* mesh =
                     (nullptr != proxy) ? proxy->As<MeshRenderProxy>() : nullptr;
-                if (nullptr == mesh || nullptr == mesh->m_Mesh) continue;
+                if (nullptr == mesh || !mesh->m_modelGeneration) continue;
                 EnhancedDrawItem item{};
-                item.mesh = mesh->m_Mesh.get();
+                // MBC9 — typed 뷰 + 값 키(제품 poolMesh와 같은 규약).
+                if (!BuildRHIModelMeshView(*mesh->m_modelGeneration,
+                    mesh->m_modelMeshIndex, item.modelMeshView)) continue;
+                item.geometryKey = enhanced_draw::GeometryKey(item);
                 item.worldMatrix = mesh->m_worldMatrix;
                 draws.push_back(item);
             }

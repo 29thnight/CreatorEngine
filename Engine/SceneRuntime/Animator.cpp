@@ -1,7 +1,6 @@
 #include "Animator.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "AnimatorSystem.h"
-#include "Model.h"
 #include "TransCondition.h"
 #include "AniTransition.h"
 #include "AnimationState.h"
@@ -11,10 +10,10 @@
 #include "DataSystem.h"
 #include "AnimationController.h"
 #include "RenderScene.h"
-#include "../RenderEngine/Skeleton.h"
+#include "../RenderEngine/BoneRegion.h"
 #include "SceneManager.h"
 #include "Socket.h"
-#include "../RenderEngine/Experiment/Model.h" // I5-D4e-1
+#include "../RenderEngine/Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC8
 
 Animator::~Animator()
 {
@@ -42,15 +41,17 @@ namespace
 	// "이름 매칭이면 자기 리전, 아니면 부모 리전 상속"의 단일 순회가 legacy의
 	// 서브트리 전파(+나중 매칭이 덮어씀)와 같은 결과를 낸다 — legacy m_bones
 	// 순서가 곧 인덱스 순서(역브리지 1:1)이기 때문이다.
-	[[nodiscard]] std::vector<std::uint8_t> DeriveExperimentBoneRegions(
-		const experiment::Skeleton& skeleton)
+	// PHASE 3.75 MBC8 — typed·experiment 두 뼈 목록에 같은 규칙을 적용하는 일반형.
+	// nameOf(i)·parentOf(i)(부모 없음 = boneCount 이상)만 받는다.
+	template <typename NameOf, typename ParentOf>
+	[[nodiscard]] std::vector<std::uint8_t> DeriveBoneRegionsFrom(
+		std::size_t boneCount, NameOf nameOf, ParentOf parentOf)
 	{
-		std::vector<std::uint8_t> regions(skeleton.bones.size(),
+		std::vector<std::uint8_t> regions(boneCount,
 			static_cast<std::uint8_t>(BoneRegion::Root));
-		for (std::size_t index = 0; index < skeleton.bones.size(); ++index)
+		for (std::size_t index = 0; index < boneCount; ++index)
 		{
-			const experiment::Bone& bone = skeleton.bones[index];
-			const std::string name = ToLower(bone.name);
+			const std::string name = ToLower(nameOf(index));
 			bool matched = true;
 			BoneRegion region = BoneRegion::Root;
 			if (name.find("spine") != std::string::npos) region = BoneRegion::Spine;
@@ -73,217 +74,241 @@ namespace
 			{
 				regions[index] = static_cast<std::uint8_t>(region);
 			}
-			else if (bone.parent.IsValid()
-				&& bone.parent.Value() < regions.size())
+			else if (const std::size_t parent = parentOf(index); parent < index)
 			{
-				regions[index] = regions[bone.parent.Value()];
+				regions[index] = regions[parent];
 			}
 		}
 		return regions;
 	}
+
+	[[nodiscard]] std::vector<std::uint8_t> DeriveTypedBoneRegions(
+		const assets::ModelSkeletonAsset& skeleton)
+	{
+		return DeriveBoneRegionsFrom(skeleton.bones.size(),
+			[&skeleton](std::size_t index) -> const std::string&
+			{ return skeleton.bones[index].name; },
+			[&skeleton](std::size_t index) -> std::size_t
+			{
+				const std::uint32_t parent = skeleton.bones[index].parent;
+				return parent == assets::kInvalidModelAssetIndex
+					? skeleton.bones.size() : parent;
+			});
+	}
+
+	// 관측 축 보고 — viaExperiment는 experiment 핸들 축만 참(A/B 대조군 계약),
+	// outPath는 실제 출처 셋을 가른다.
+	// MBC9: experiment 축이 은퇴해 viaExperiment는 항상 false다(호환 인자).
+	void ReportPath(bool* outViaExperiment, AnimatorDataPath* outPath,
+		AnimatorDataPath path) noexcept
+	{
+		if (outViaExperiment) *outViaExperiment = false;
+		if (outPath) *outPath = path;
+	}
+
+	// typed skeleton 신원 — Scene 본 캐시 무효화 키. 0은 "스켈레톤 없음" 가드라
+	// 회피하고, legacy m_serial·experiment Generation 번호 공간과 겹치지 않게
+	// {ModelId, SkeletonId, generation} 전체를 FNV-1a 64로 접는다.
+	[[nodiscard]] uint64 TypedSkeletonSerial(
+		const assets::ModelAssetGeneration& generation,
+		const assets::ModelSkeletonAsset& skeleton) noexcept
+	{
+		std::uint64_t hash = 1469598103934665603ull;
+		const auto mix = [&hash](const void* data, std::size_t size)
+		{
+			const auto* bytes = static_cast<const unsigned char*>(data);
+			for (std::size_t i = 0; i < size; ++i)
+			{
+				hash ^= bytes[i];
+				hash *= 1099511628211ull;
+			}
+		};
+		const assets::ModelAssetGenerationIdentity& identity = generation.Identity();
+		mix(identity.modelId.data.data(), identity.modelId.data.size());
+		mix(skeleton.skeletonId.data.data(), skeleton.skeletonId.data.size());
+		mix(&identity.generation, sizeof(identity.generation));
+		if (0 == hash) hash = 1;
+		return static_cast<uint64>(hash);
+	}
 }
 
-void Animator::EnsureExperimentAnimationBinding()
+const assets::ModelSkeletonAsset* Animator::TypedSkeleton() const noexcept
 {
-	// I5-D4e-1 — 재생 데이터의 experiment 핸들. m_Motion(모델 GUID — 역브리지
-	// 폴백 규약)이 정본 창구다.
-	//
-	// ★ I6-B0 — 바인딩이 legacy에서 자립한다. 예전엔 m_Skeleton이 없으면 즉시
-	//   돌아서고 본·클립 계수를 legacy와 대조해 불일치면 핸들을 비웠다 —
-	//   공유 자산이 없으면 experiment 경로가 **원리적으로 켜지지 않는** 구조라
-	//   legacy 은퇴의 첫 자물쇠였다. 그 대조가 지키던 것(인덱스 1:1)은 이미
-	//   상시 게이트가 코퍼스 전수에서 증명한다 — 팔레트 파리티(6)·본 해석(8)·
-	//   마스크(9) 오차 0. 런타임 대조는 그 위의 이중 잠금이었고, 은퇴하면
-	//   대조할 상대 자체가 사라진다. 대신 experiment 내부 불변식(본이 있다·
-	//   루트가 범위 안)을 직접 검사한다 — 독립 유도라야 대조군이 된다.
-	m_experimentModel.reset();
-	m_experimentBoneRegions.clear();
+	return m_modelGeneration ? m_modelGeneration->Skeleton() : nullptr;
+}
+
+std::size_t Animator::TypedClipCount() const noexcept
+{
+	return m_modelGeneration ? m_modelGeneration->Animations().size() : 0u;
+}
+
+const assets::ModelAnimationAsset* Animator::TypedClip(int clipIndex) const noexcept
+{
+	if (!m_modelGeneration || clipIndex < 0) return nullptr;
+	const auto clips = m_modelGeneration->Animations();
+	const std::size_t index = static_cast<std::size_t>(clipIndex);
+	return index < clips.size() ? &clips[index] : nullptr;
+}
+
+AnimatorDataPath Animator::GetSkeletonPath() const noexcept
+{
+	return nullptr != TypedSkeleton() ? AnimatorDataPath::Generation : AnimatorDataPath::None;
+}
+
+void Animator::EnsureAnimationBinding()
+{
+	// PHASE 3.75 MBC9 — 재생 데이터의 유일한 출처는 typed generation이다. m_Motion은
+	// ModelId(UUIDv8)고, 여기서 직접 generation을 게시·해석한다. skeleton 불변식
+	// (본이 있다·루트가 범위 안)을 typed 쪽에서 검사한다.
+	m_modelGeneration.reset();
+	m_boneRegions.clear();
 	if (FileGuid{} == m_Motion) return;
 
-	std::shared_ptr<const experiment::Model> source =
-		DataSystems->TryGetExperimentModel(m_Motion);
-	if (nullptr == source) return;
-	const experiment::Skeleton* skeleton = source->TryGetSkeleton();
+	std::shared_ptr<const assets::ModelAssetGeneration> generation =
+		DataSystems->LoadModelAssetGeneration(m_Motion);
+	if (!generation) return;
+	const assets::ModelSkeletonAsset* skeleton = generation->Skeleton();
 	if (nullptr == skeleton || skeleton->bones.empty()
-		|| !experiment::IsInRange(skeleton->rootBone, skeleton->bones.size()))
+		|| skeleton->rootBone >= skeleton->bones.size())
 	{
 		return;
 	}
-	m_experimentBoneRegions = DeriveExperimentBoneRegions(*skeleton);
-	m_experimentModel = std::move(source);
+	m_boneRegions = DeriveTypedBoneRegions(*skeleton);
+	m_modelGeneration = std::move(generation);
 }
 
-uint64 Animator::GetSkeletonSerial(bool* outViaExperiment) const
+uint64 Animator::GetSkeletonSerial(bool* outViaExperiment,
+	AnimatorDataPath* outPath) const
 {
-	// 0은 "스켈레톤 없음" — Scene 본 전파의 가드 값이다(두 축 모두 1 이상에서
-	// 센다). I6-B2: experiment 핸들이 있으면 그 generation이 신원이고, legacy
-	// serial은 폴백이다. 신원이 legacy 객체 수명에 묶여 있는 한 그 객체를
-	// 은퇴시킬 수 없다 — 본 전파가 통째로 꺼지기 때문이다.
-	if (outViaExperiment) *outViaExperiment = false;
-	if (m_experimentModel)
+	// 0은 "스켈레톤 없음" — Scene 본 전파의 가드 값이다. 신원은
+	// {ModelId, SkeletonId, generation} 해시(MBC8) 하나다.
+	if (const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton())
 	{
-		if (nullptr != m_experimentModel->TryGetSkeleton())
-		{
-			if (outViaExperiment) *outViaExperiment = true;
-			return m_experimentModel->Generation();
-		}
+		ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+		return TypedSkeletonSerial(*m_modelGeneration, *typedSkeleton);
 	}
-	return m_Skeleton ? m_Skeleton->m_serial : 0;
+	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
+	return 0;
 }
 
-double Animator::GetClipDuration(int clipIndex, bool* outViaExperiment) const
+double Animator::GetClipDuration(int clipIndex, bool* outViaExperiment,
+	AnimatorDataPath* outPath) const
 {
-	if (outViaExperiment) *outViaExperiment = false;
-	if (clipIndex < 0) return 0.0;
-	const std::size_t index = static_cast<std::size_t>(clipIndex);
-	if (m_experimentModel)
-	{
-		if (const experiment::Skeleton* skeleton =
-			m_experimentModel->TryGetSkeleton())
-		{
-			if (outViaExperiment) *outViaExperiment = true;
-			return index < skeleton->clips.size()
-				? static_cast<double>(skeleton->clips[index].durationTicks) : 0.0;
-		}
-	}
-	if (m_Skeleton && index < m_Skeleton->m_animations.size())
-	{
-		return static_cast<double>(m_Skeleton->m_animations[index].m_duration);
-	}
-	return 0.0;
+	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
+	if (clipIndex < 0 || nullptr == TypedSkeleton()) return 0.0;
+	ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+	const assets::ModelAnimationAsset* clip = TypedClip(clipIndex);
+	return clip ? clip->durationTicks : 0.0;
 }
 
-std::size_t Animator::GetBoneCount(bool* outViaExperiment) const
+std::size_t Animator::GetBoneCount(bool* outViaExperiment,
+	AnimatorDataPath* outPath) const
 {
-	if (outViaExperiment) *outViaExperiment = false;
-	if (m_experimentModel)
+	if (const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton())
 	{
-		if (const experiment::Skeleton* skeleton =
-			m_experimentModel->TryGetSkeleton())
-		{
-			if (outViaExperiment) *outViaExperiment = true;
-			return skeleton->bones.size();
-		}
+		ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+		return typedSkeleton->bones.size();
 	}
-	return m_Skeleton ? m_Skeleton->m_bones.size() : 0;
+	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
+	return 0;
 }
 
-std::string Animator::GetBoneName(int boneIndex, bool* outViaExperiment) const
+std::string Animator::GetBoneName(int boneIndex, bool* outViaExperiment,
+	AnimatorDataPath* outPath) const
 {
-	if (outViaExperiment) *outViaExperiment = false;
+	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
 	if (boneIndex < 0) return std::string{};
 	const std::size_t index = static_cast<std::size_t>(boneIndex);
-	if (m_experimentModel)
+	if (const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton())
 	{
-		if (const experiment::Skeleton* skeleton =
-			m_experimentModel->TryGetSkeleton())
-		{
-			if (outViaExperiment) *outViaExperiment = true;
-			if (index >= skeleton->bones.size()) return std::string{};
-			return skeleton->bones[index].name;
-		}
-	}
-	if (m_Skeleton && index < m_Skeleton->m_bones.size())
-	{
-		// legacy m_bones는 포인터 배열이라 구멍이 있을 수 있다(실측 전례).
-		const Bone* const bone = m_Skeleton->m_bones[index];
-		return bone ? bone->m_name : std::string{};
+		ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+		if (index >= typedSkeleton->bones.size()) return std::string{};
+		return typedSkeleton->bones[index].name;
 	}
 	return std::string{};
 }
 
 int Animator::ResolveBoneIndex(const std::string& boneName,
-	bool* outViaExperiment) const
+	bool* outViaExperiment, AnimatorDataPath* outPath) const
 {
-	if (outViaExperiment) *outViaExperiment = false;
-	if (m_experimentModel)
+	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
+	if (const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton())
 	{
-		if (const experiment::Skeleton* skeleton =
-			m_experimentModel->TryGetSkeleton())
+		ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+		for (std::size_t index = 0; index < typedSkeleton->bones.size(); ++index)
 		{
-			if (outViaExperiment) *outViaExperiment = true;
-			for (std::size_t index = 0; index < skeleton->bones.size(); ++index)
-			{
-				if (skeleton->bones[index].name == boneName)
-				{
-					return static_cast<int>(index);
-				}
-			}
-			return -1;
+			if (typedSkeleton->bones[index].name == boneName)
+				return static_cast<int>(index);
 		}
-	}
-	if (m_Skeleton)
-	{
-		Bone* const bone = m_Skeleton->FindBone(boneName);
-		return bone ? bone->m_index : -1;
 	}
 	return -1;
 }
 
-BoneMask* Animator::BuildAvatarBoneMasks(AvatarMask& mask,
-	bool* outViaExperiment)
+namespace
 {
-	if (outViaExperiment) *outViaExperiment = false;
-	const experiment::Skeleton* skeleton = m_experimentModel
-		? m_experimentModel->TryGetSkeleton() : nullptr;
-	if (nullptr == skeleton)
+	// MBC8 — parent-only 표현에서 legacy MakeBoneMask 재귀와 같은 DFS 선순
+	// (자기 → 자식 인덱스 순)으로 BoneMask 트리를 만든다. m_BoneMasks의 push
+	// 순서가 곧 저장분 인덱스 대응(ReCreateMask)이라 순서 재현이 계약이다.
+	template <typename NameOf, typename ParentOf>
+	[[nodiscard]] BoneMask* BuildBoneMasksFrom(AvatarMask& mask,
+		std::size_t boneCount, std::size_t rootBone, NameOf nameOf, ParentOf parentOf)
 	{
-		// legacy 폴백(Assimp 모델) — 구 CreateMask 경로 그대로. region 태깅은
-		// 공유 자산(Bone::m_region) 쓰기지만 이름 파생이라 멱등이다.
-		if (nullptr == m_Skeleton || nullptr == m_Skeleton->m_rootBone)
+		if (rootBone >= boneCount) return nullptr;
+		std::vector<std::vector<std::uint32_t>> children(boneCount);
+		for (std::size_t index = 0; index < boneCount; ++index)
 		{
-			return nullptr;
+			const std::size_t parent = parentOf(index);
+			if (parent < boneCount)
+				children[parent].push_back(static_cast<std::uint32_t>(index));
 		}
-		m_Skeleton->MarkRegionSkeleton();
-		return mask.MakeBoneMask(m_Skeleton->m_rootBone);
+
+		std::vector<BoneMask*> masks(boneCount, nullptr);
+		std::vector<std::uint32_t> stack{ static_cast<std::uint32_t>(rootBone) };
+		while (!stack.empty())
+		{
+			const std::uint32_t boneIndex = stack.back();
+			stack.pop_back();
+
+			BoneMask* newMask = new BoneMask();
+			newMask->boneName = nameOf(boneIndex);
+			newMask->isEnabled = true;
+			mask.m_BoneMasks.push_back(newMask);
+			masks[boneIndex] = newMask;
+			const std::size_t parent = parentOf(boneIndex);
+			if (parent < boneCount && masks[parent])
+			{
+				masks[parent]->m_children.push_back(newMask);
+			}
+
+			// 자식을 역순으로 쌓아야 pop이 인덱스 순으로 방문한다(legacy 재귀의
+			// children 순회 순서 재현).
+			for (auto childIt = children[boneIndex].rbegin();
+				childIt != children[boneIndex].rend(); ++childIt)
+			{
+				stack.push_back(*childIt);
+			}
+		}
+		return masks[rootBone];
 	}
+}
 
-	if (outViaExperiment) *outViaExperiment = true;
-	// experiment — parent-only 표현에서 children 목록을 만들고 legacy
-	// MakeBoneMask 재귀와 같은 DFS 선순(자기 → 자식 인덱스 순)으로 생성한다.
-	// ★ m_BoneMasks의 push 순서가 곧 저장분 인덱스 대응(postLoad의
-	//   ReCreateMask가 i번째끼리 잇는다)이라 순서 재현이 계약이다.
-	const std::size_t boneCount = skeleton->bones.size();
-	if (!experiment::IsInRange(skeleton->rootBone, boneCount)) return nullptr;
-
-	std::vector<std::vector<std::uint32_t>> children(boneCount);
-	for (std::size_t index = 0; index < boneCount; ++index)
-	{
-		const experiment::Bone& bone = skeleton->bones[index];
-		if (bone.parent.IsValid() && bone.parent.Value() < boneCount)
+BoneMask* Animator::BuildAvatarBoneMasks(AvatarMask& mask,
+	bool* outViaExperiment, AnimatorDataPath* outPath)
+{
+	ReportPath(outViaExperiment, outPath, AnimatorDataPath::None);
+	const assets::ModelSkeletonAsset* typedSkeleton = TypedSkeleton();
+	if (nullptr == typedSkeleton) return nullptr;
+	ReportPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+	return BuildBoneMasksFrom(mask, typedSkeleton->bones.size(),
+		typedSkeleton->rootBone,
+		[typedSkeleton](std::size_t index) -> const std::string&
+		{ return typedSkeleton->bones[index].name; },
+		[typedSkeleton](std::size_t index) -> std::size_t
 		{
-			children[bone.parent.Value()].push_back(
-				static_cast<std::uint32_t>(index));
-		}
-	}
-
-	std::vector<BoneMask*> masks(boneCount, nullptr);
-	std::vector<std::uint32_t> stack{ skeleton->rootBone.Value() };
-	while (!stack.empty())
-	{
-		const std::uint32_t boneIndex = stack.back();
-		stack.pop_back();
-		const experiment::Bone& bone = skeleton->bones[boneIndex];
-
-		BoneMask* newMask = new BoneMask();
-		newMask->boneName = bone.name;
-		newMask->isEnabled = true;
-		mask.m_BoneMasks.push_back(newMask);
-		masks[boneIndex] = newMask;
-		if (bone.parent.IsValid() && masks[bone.parent.Value()])
-		{
-			masks[bone.parent.Value()]->m_children.push_back(newMask);
-		}
-
-		// 자식을 역순으로 쌓아야 pop이 인덱스 순으로 방문한다(legacy 재귀의
-		// children 순회 순서 재현).
-		for (auto childIt = children[boneIndex].rbegin();
-			childIt != children[boneIndex].rend(); ++childIt)
-		{
-			stack.push_back(*childIt);
-		}
-	}
-	return masks[skeleton->rootBone.Value()];
+			const std::uint32_t parent = typedSkeleton->bones[index].parent;
+			return parent == assets::kInvalidModelAssetIndex
+				? typedSkeleton->bones.size() : parent;
+		});
 }
 
 void Animator::OnInitialized()
@@ -660,22 +685,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	if (node["m_Motion"])
 	{
 		FileGuid guid = node["m_Motion"].AsString();
-		if (guid != nullFileGuid)
-		{
-			m_Motion = guid;
-			auto model = DataSystems->LoadModelGUID(guid);
-			if (model)
-			{
-				m_Skeleton = model->m_Skeleton;
-				// D34b 진단: 복원된 스켈레톤의 루트 부재를 로드 시점에 알린다 —
-				// 이대로 틱에 나가면 AnimationJob이 건너뛰며 같은 메시지를 낸다.
-				if (m_Skeleton && nullptr == m_Skeleton->m_rootBone)
-				{
-					Debug->LogError("[Animator] 복원된 스켈레톤에 루트 본이 없다: "
-						+ model->name);
-				}
-			}
-		}
+		if (guid != nullFileGuid) m_Motion = guid;
 	}
 
 	// I5-D4e-2 — 씬이 저장한 클립별 isLoop·이벤트를 **자기 소유 오버라이드**로
@@ -692,11 +702,14 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 		EnsureClipOverride(clipIndex).events = std::move(events);
 	}
 
-	// I5-D4e-1/3 — experiment 재생 핸들. m_Motion·m_Skeleton 복원 직후,
-	// 아래 컨트롤러 복원 **이전**이어야 한다 — AvatarMask 재생성
-	// (BuildAvatarBoneMasks)이 이 핸들을 보고 경로를 고르기 때문이다(D4e-3
-	// 이동 전에는 함수 끝에 있어 마스크가 항상 legacy 폴백을 탔다).
-	EnsureExperimentAnimationBinding();
+	// typed 재생 바인딩. m_Motion 복원 직후, 아래 컨트롤러 복원 **이전**이어야
+	// 한다 — AvatarMask 재생성(BuildAvatarBoneMasks)이 generation을 읽는다.
+	EnsureAnimationBinding();
+	if (FileGuid{} != m_Motion && nullptr == TypedSkeleton())
+	{
+		Debug->LogError("[Animator] 모델 generation의 스켈레톤을 붙들지 못했다: "
+			+ m_Motion.ToString());
+	}
 
 	if (node["Parameters"])
 	{

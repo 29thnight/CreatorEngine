@@ -16,5 +16,6 @@ wait 120
 model.place __MODEL_NAME__
 wait 90
 experiment.animtick
+assets.modeldiag
 wait 10
 quit

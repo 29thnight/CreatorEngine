@@ -1,4 +1,28 @@
-guid: 2a91b60b-8923-49af-bcdf-9e39e1600e67
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:9fde988363f4fabf04296ca590dee935b7382f2a59fd55290db8c1cb0122d4a4
+assetId: 926b7b0d-1c12-865a-b8b1-841cc4d8c1af
+generation: 4
+sourceFingerprint: sha256:fef784c3ea36e32e3ee27e71a63ccf6de2f5bd196814be6c462d6c5a664b6235
+subAssets:
+  - kind: skeleton
+    stableKey: authoring:96a8bf75aab3a00510d27144e1b5a1917bef9fcb7122cb58ed04e6ab911ba672
+    assetId: 69c89302-7aff-8ab6-9226-e12c02f025e6
+    binding: skeleton/animation-derived
+    fingerprint: sha256:eb3ce924b0f4af625d91bb5b4f68c733d89b7b423dda83dc707fc888463fa74a
+  - kind: animation
+    stableKey: name:walk|hit
+    assetId: 9ce6beac-9403-8c1b-bb0f-ac6d55977216
+    binding: animation/0
+    name: walk|hit
+    fingerprint: sha256:7b8a496f2569aea079250310217098c59b9c54c237bc64a323e7493c0ad1a282
+  - kind: animation
+    stableKey: name:walk|walk
+    assetId: 3b5ec5f7-a1ff-89d1-b539-3766c7552159
+    binding: animation/1
+    name: walk|walk
+    fingerprint: sha256:200eb915dde101de55b57287e247e4b2b2f7758eb43cdb2f650d4afc62d3b45e
 importSettings:
   extension: .fbx
   timestamp: 134297531275931671
@@ -6,9 +30,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    []
-  embeddedTextures:
-    []

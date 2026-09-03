@@ -21,6 +21,7 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "PrimitiveRenderProxy.h"
+#include "Assets/ModelAssetGeneration.h"
 #include "Texture.h"
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
@@ -254,6 +255,7 @@ namespace
         uint32_t meshes{ 0 };
         uint32_t materials{ 0 };
         uint32_t batches{ 0 };
+        uint32_t modelGenerationUploads{ 0 };
         EnhancedRenderGraph::Stats graph;
         RHIPipelineHandle previousPipeline{};
         RHIPipelineHandle activePipeline{};
@@ -279,6 +281,7 @@ namespace
     struct GBufferFixture
     {
         std::vector<Vertex> vertices;
+        std::vector<std::array<float, 12>> modelVertices;
         std::vector<uint32> indices{ 0, 1, 2, 0, 2, 3 };
         std::unique_ptr<Mesh> mesh;
         std::vector<EnhancedDrawItem> draws;
@@ -299,6 +302,11 @@ namespace
                 vertex.tangent = { 1.f, 0.f, 0.f };
                 vertex.bitangent = { 0.f, 1.f, 0.f };
                 vertices.push_back(vertex);
+                modelVertices.push_back({
+                    positions[i].x, positions[i].y, positions[i].z,
+                    0.f, 0.f, 1.f,
+                    uvs[i].x, uvs[i].y,
+                    1.f, 0.f, 0.f, 1.f });
             }
 
             mesh = std::make_unique<Mesh>("rhi_gbuffer_quad", vertices, indices);
@@ -306,6 +314,23 @@ namespace
 
             EnhancedDrawItem draw{};
             draw.mesh = mesh.get();
+            draw.geometryKey = 0x4d42433600000001ull;
+            draw.modelMeshView.handle.modelId = Uuid::Parse(
+                "10000000-0000-8000-8000-000000000001");
+            draw.modelMeshView.handle.meshId = Uuid::Parse(
+                "10000000-0000-8000-8000-000000000002");
+            draw.modelMeshView.handle.generation = 1;
+            draw.modelMeshView.vertexData = modelVertices.data();
+            draw.modelMeshView.vertexBytes =
+                modelVertices.size() * sizeof(modelVertices.front());
+            draw.modelMeshView.vertexStride =
+                assets::StrideOf(assets::kCoreVertexAttributes);
+            draw.modelMeshView.vertexAttributeMask =
+                assets::kCoreVertexAttributes;
+            draw.modelMeshView.vertexLayoutHash =
+                assets::VertexLayoutHash(assets::kCoreVertexAttributes);
+            draw.modelMeshView.indexData = indices.data();
+            draw.modelMeshView.indexCount = static_cast<uint32_t>(indices.size());
             draw.worldMatrix = math::matrix4x4::identity();
             draw.baseColorFactor = math::color(0.25f, 0.5f, 0.75f, 1.f);
             draw.metallic = 0.2f;
@@ -665,6 +690,8 @@ namespace
             return fail("invalid permutation snapshot이 fail-closed되지 않았다");
 
         if (!gbuffer.PrepareFrame(context, outError)) return fail(outError);
+        outCapture.modelGenerationUploads =
+            meshCache.GetModelGenerationUploadCount();
 
         EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
         gbuffer.Declare(graph, context);
@@ -2270,12 +2297,13 @@ bool RunVulkanGBufferTest(std::string& outLog)
         char line[384]{};
         std::snprintf(line, sizeof(line),
             "[2/4] Vulkan — 실행 %u·컬링 %u·transient %u · "
-            "draw/mesh/material/batch %u/%u/%u/%u · mesh upload %u/실패 %u · "
+            "draw/mesh/material/batch %u/%u/%u/%u · mesh upload %u/model generation %u/실패 %u · "
             "texture 실패 %u\n",
             vkCapture.graph.passesExecuted, vkCapture.graph.passesCulled,
             vkCapture.graph.transientCreated, vkCapture.draws, vkCapture.meshes,
             vkCapture.materials, vkCapture.batches, meshStats.uploads,
-            meshStats.failures, textureStats.failures);
+            vkCapture.modelGenerationUploads, meshStats.failures,
+            textureStats.failures);
         outLog += line;
     }
 
@@ -2285,8 +2313,10 @@ bool RunVulkanGBufferTest(std::string& outLog)
         6 == vkCapture.graph.transientCreated &&
         4 == dx12Capture.draws && 1 == dx12Capture.meshes &&
         4 == dx12Capture.materials && 4 == dx12Capture.batches &&
+        1 == dx12Capture.modelGenerationUploads &&
         4 == vkCapture.draws && 1 == vkCapture.meshes &&
         4 == vkCapture.materials && 4 == vkCapture.batches &&
+        1 == vkCapture.modelGenerationUploads &&
         dx12Capture.previousPipeline.IsValid() && dx12Capture.activePipeline.IsValid() &&
         dx12Capture.previousPipeline != dx12Capture.activePipeline &&
         dx12Capture.alternatePipeline.IsValid() &&
@@ -2453,6 +2483,7 @@ bool RunVulkanGBufferTest(std::string& outLog)
         " · 같은 texture/property+SHADING_QUALITY full/reduced→PSO 2개·normal 픽셀 분리"
         " · secondary ShaderMeta generation 동시 draw·candidate-first 교체·frame retirement"
         " · GT frame packet primary/secondary generation owner 유지"
+        " · DX12/Vulkan ModelAssetGeneration direct upload 1/1"
         " · variant generation reload targeted retire"
         " · old handle stale · new handle next draw"
         " · invalid primary/secondary ShaderMeta·material generation·texture register/permutation rejected/current preserved"
@@ -2616,16 +2647,31 @@ bool RunVulkanForwardTest(std::string& outLog)
     // 펼친다. m_isCulled는 한 카메라의 파생값이므로 여기서 버리지 않고,
     // worldBounds를 제품 CaptureFromView의 카메라별 절두체 판정으로 넘긴다.
     bool foliageDrawSourceValid = false;
+    std::string foliageFailureWhy;
     {
-        auto foliageMeshOwner = std::shared_ptr<Mesh>(
-            fixture.mesh.get(), [](Mesh*) noexcept {});
+        // MBC9 — Foliage 지오메트리는 typed generation이 유일한 출처다. 코퍼스의
+        // Prim_Cube generation을 붙든다(없으면 fixture 실패).
+        const std::shared_ptr<const assets::ModelAssetGeneration> foliageGeneration =
+            DataSystems->FindModelAssetGenerationByStem("Prim_Cube");
+        if (!foliageGeneration)
+        {
+            outLog += "[1/4] Foliage fixture용 Prim_Cube generation을 찾지 못했다\n";
+            return false;
+        }
         auto foliageMaterialOwner = std::make_shared<Material>(windMaterial);
         const std::weak_ptr<Material> foliageMaterialLifetime =
             foliageMaterialOwner;
 
         FoliageRenderProxy foliage;
-        foliage.m_foliageTypes.emplace_back(
-            foliageMeshOwner, foliageMaterialOwner, true, "P2dWind");
+        {
+            // 지역 사본이 재질을 붙들면 아래 "마지막 owner 해제" 단정이 거짓으로 붉는다.
+            // FoliageType은 사용자 선언 소멸자 때문에 move가 복사로 떨어지므로 블록으로
+            // 수명을 끊는다(MBC9 실측: ownerNotReleased).
+            FoliageType windType("P2dWind", true);
+            windType.m_material = foliageMaterialOwner;
+            windType.m_modelGeneration = foliageGeneration;
+            foliage.m_foliageTypes.push_back(windType);
+        }
 
         FoliageInstance first{};
         first.m_position = { -0.4f, 0.f, 0.f };
@@ -2644,31 +2690,41 @@ bool RunVulkanForwardTest(std::string& outLog)
 
         std::vector<FoliageRenderProxy::DrawSource> sources =
             foliage.CaptureDrawSources();
-        foliageDrawSourceValid = 2u == sources.size()
-            && std::all_of(sources.begin(), sources.end(),
-                [&](const FoliageRenderProxy::DrawSource& source)
-                {
-                    return source.mesh.get() == fixture.mesh.get()
-                        && source.material == foliageMaterialOwner
-                        && 0u == source.foliageTypeID
-                        && !source.worldBounds.is_empty();
-                })
-            && math::near_equal(sources[0].worldMatrix, first.m_worldMatrix)
-            && math::near_equal(sources[1].worldMatrix, second.m_worldMatrix);
+        // 실패 사유를 남긴다 — "경계 실패" 한 줄로는 어느 축인지 갈리지 않는다(MBC9 실측).
+        std::string foliageWhy;
+        if (2u != sources.size())
+            foliageWhy += " sources=" + std::to_string(sources.size());
+        for (std::size_t index = 0; index < sources.size(); ++index)
+        {
+            const FoliageRenderProxy::DrawSource& source = sources[index];
+            if (source.modelGeneration != foliageGeneration) foliageWhy += " generation";
+            if (0u != source.modelMeshIndex) foliageWhy += " meshIndex";
+            if (source.material != foliageMaterialOwner) foliageWhy += " material";
+            if (0u != source.foliageTypeID) foliageWhy += " typeID";
+            if (source.worldBounds.is_empty()) foliageWhy += " emptyBounds";
+        }
+        if (sources.size() >= 2
+            && (!math::near_equal(sources[0].worldMatrix, first.m_worldMatrix)
+                || !math::near_equal(sources[1].worldMatrix, second.m_worldMatrix)))
+        {
+            foliageWhy += " worldMatrix";
+        }
+        foliageDrawSourceValid = foliageWhy.empty();
 
         // 프록시 원본을 놓아도 frame draw source가 owner를 유지하고, source를
         // 놓은 뒤에는 반환되는지까지 같이 고정한다.
         foliage.m_foliageTypes.clear();
         foliageMaterialOwner.reset();
-        foliageDrawSourceValid = foliageDrawSourceValid
-            && !foliageMaterialLifetime.expired();
+        if (foliageMaterialLifetime.expired()) foliageWhy += " ownerLostEarly";
         sources.clear();
-        foliageDrawSourceValid = foliageDrawSourceValid
-            && foliageMaterialLifetime.expired();
+        if (!foliageMaterialLifetime.expired()) foliageWhy += " ownerNotReleased";
+        foliageDrawSourceValid = foliageWhy.empty();
+        foliageFailureWhy = foliageWhy;
     }
     if (!foliageDrawSourceValid)
     {
-        outLog += "[1/4] FoliageRenderProxy owning draw source/culling 경계 실패\n";
+        outLog += "[1/4] FoliageRenderProxy owning draw source/culling 경계 실패:"
+            + foliageFailureWhy + "\n";
         return false;
     }
 

@@ -1,16 +1,18 @@
 #include "AnimationJob.h"
 #include "RenderScene.h"
-#include "Skeleton.h"
+#include "BoneRegion.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Benchmark.hpp"
 #include "AnimationController.h"
 #include "Animator.h"
 #include "Socket.h"
-#include "Experiment/Model.h"       // I5-D4e-1
-#include "Experiment/PoseSampler.h" // I5-D4e-1
+#include "Assets/ModelAssetGeneration.h"   // PHASE 3.75 MBC8
+#include "Assets/ModelAnimationSampler.h"  // PHASE 3.75 MBC8
+#include <limits>
+#include <span>
 #include <atomic> // D34b: 루트 본 부재 1회 경고
-#include <cstdio> // I5-D4e-1: [anim.tick] 경로 관측
+#include "ModelConsumptionDiagnostics.h" // MBC10: 틱 경로 관측(읽기 전용 계수)
 #include <mathematics/transform.hpp>
 
 inline float lerp(float a, float b, float f)
@@ -133,16 +135,18 @@ void AnimationJob::Update(float deltaTime)
             //   코퍼스에서 그 상황은 0건이고(Assimp 폴백 발화 0 · 14모델 전부
             //   importer가 덮는다), A/B 스위치 off가 그 상태다. 즉 스위치의
             //   애니메이션 차원은 이 슬라이스로 은퇴한다(정점 차원은 남는다).
-            const experiment::Skeleton* experimentSkeleton =
-                animator->m_experimentModel
-                ? animator->m_experimentModel->TryGetSkeleton() : nullptr;
+            // PHASE 3.75 MBC8 — typed 정본이 첫 축이다(스위치 무관). generation
+            // shared_ptr을 이 잡 안에서 붙들어 바인딩 교체와 겹쳐도 데이터가 산다.
+            const std::shared_ptr<const assets::ModelAssetGeneration> generation =
+                animator->m_modelGeneration;
+            const assets::ModelSkeletonAsset* typedSkeleton =
+                generation ? generation->Skeleton() : nullptr;
             if (!animator->m_tickPathLogged)
             {
                 animator->m_tickPathLogged = true;
-                std::printf("[anim.tick] %s\n",
-                    experimentSkeleton ? "experiment" : "none");
+                ModelConsumptionDiagnostics::NoteTickPath(nullptr != typedSkeleton);
             }
-            if (nullptr == experimentSkeleton) return;
+            if (nullptr == typedSkeleton) return;
 
             float deltaT = delta;
             if (animator->m_stopTimer > 0.f) {
@@ -155,7 +159,7 @@ void AnimationJob::Update(float deltaTime)
                 }
             }
 
-            TickExperiment(*animator, *experimentSkeleton, deltaT);
+            TickGeneration(*animator, *generation, deltaT);
         });
     }
 
@@ -200,48 +204,391 @@ void AnimationJob::CleanUp()
 	m_objectSize = 0;
 }
 
-math::matrix4x4 AnimationJob::BlendAni(const math::matrix4x4& curAni,
-    const math::matrix4x4& nextAni, float t)
-{
-    const auto current = math::decompose(curAni);
-    const auto next = math::decompose(nextAni);
-    // 애니메이션 키에서 만든 TRS는 항상 분해 가능하다. 손상된 입력이면
-    // 초기화되지 않은 분해 결과를 쓰지 않고 현재 포즈를 유지한다.
-    if (!current || !next) return curAni;
-
-    return math::compose(
-        math::lerp(current->scale, next->scale, t),
-        math::slerp(current->rotation, next->rotation, t),
-        math::lerp(current->translation, next->translation, t));
-}
-
 // I6-B4b — legacy 재귀 틱(UpdateBlendBone/UpdateBone/UpdateBoneLayer/
-// calculAni)을 걷었다. 재생 경로는 TickExperiment 하나다.
+// calculAni)을 걷었다. 재생 경로는 하나다 — 데이터 출처만 둘(typed generation ·
+// experiment)이고, PHASE 3.75 MBC8은 그 둘을 아래 뷰 템플릿 하나에 태운다.
 //
-// ★ 이 함수들이 Animator의 legacy Skeleton 소비 중 유일한 **런타임**
-//   소비였다. 나머지는 진단·대조군이라, 이것이 죽어야 타입 은퇴가
-//   실제 코드 삭제로 이어진다.
-
-void AnimationJob::TickExperiment(Animator& animator,
-    const experiment::Skeleton& skeleton, float deltaT)
+// ★ 왜 템플릿 뷰인가: 틱 본문(컨트롤러·블렌드·레이어·소켓 ~400줄)을 데이터
+//   타입마다 복제하면 두 판이 갈리는 순간 "골든은 통과하는데 화면은 다른" 상태가
+//   된다. 본문은 하나, 뷰는 둘(experiment 뷰는 MBC9와 함께 죽는다). typed 뷰의
+//   포즈 산술은 experiment와 비트 동일해야 하고 animtick 골든(6b)이 그것을 잰다.
+namespace
 {
-    const std::vector<experiment::AnimationClip>& clips = skeleton.clips;
+    constexpr std::uint32_t kPoseNoParent = (std::numeric_limits<std::uint32_t>::max)();
 
-    const auto clipAt = [&clips](int index) -> const experiment::AnimationClip*
+    struct GenerationPoseSource final
     {
-        return index >= 0 && static_cast<std::size_t>(index) < clips.size()
-            ? &clips[static_cast<std::size_t>(index)] : nullptr;
+        using Clip = assets::ModelAnimationAsset;
+        using Track = assets::ModelAnimationTrack;
+        const assets::ModelSkeletonAsset& skeleton;
+        std::span<const assets::ModelAnimationAsset> clips;
+
+        std::size_t BoneCount() const noexcept { return skeleton.bones.size(); }
+        std::uint32_t Parent(std::size_t index) const noexcept
+        {
+            const std::uint32_t parent = skeleton.bones[index].parent;
+            // 게시 계약은 parent < index다 — 어긋난 값은 루트 취급(안전).
+            return (parent != assets::kInvalidModelAssetIndex && parent < index)
+                ? parent : kPoseNoParent;
+        }
+        const math::matrix4x4& InverseBind(std::size_t index) const noexcept
+        { return skeleton.bones[index].inverseBindMatrix; }
+        const std::string& BoneName(std::size_t index) const noexcept
+        { return skeleton.bones[index].name; }
+        const math::matrix4x4& RootTransform() const noexcept { return skeleton.rootTransform; }
+        const math::matrix4x4& GlobalInverse() const noexcept { return skeleton.globalInverseTransform; }
+        std::size_t ClipCount() const noexcept { return clips.size(); }
+        const Clip* ClipAt(int index) const noexcept
+        {
+            return index >= 0 && static_cast<std::size_t>(index) < clips.size()
+                ? &clips[static_cast<std::size_t>(index)] : nullptr;
+        }
+        static double Duration(const Clip& clip) noexcept { return clip.durationTicks; }
+        static double TicksPerSecond(const Clip& clip) noexcept { return clip.ticksPerSecond; }
+        static void BuildTrackTable(const Clip& clip, std::size_t boneCount,
+            std::vector<const Track*>& outTable)
+        { assets::animation::BuildTrackTable(clip, boneCount, outTable); }
+        static math::matrix4x4 SampleLocal(const Track& track, double time)
+        { return assets::animation::SampleLocal(track, time); }
     };
 
-    if (animator.UsesMultipleControllers())
+    math::matrix4x4 BlendPose(const math::matrix4x4& curAni,
+        const math::matrix4x4& nextAni, float t)
     {
-        for (auto& sharedController : animator.m_animationControllers)
-        {
-            AnimationController* controller = sharedController.get();
-            if (nullptr == controller || !controller->useController) continue;
+        const auto current = math::decompose(curAni);
+        const auto next = math::decompose(nextAni);
+        // 애니메이션 키에서 만든 TRS는 항상 분해 가능하다. 손상된 입력이면
+        // 초기화되지 않은 분해 결과를 쓰지 않고 현재 포즈를 유지한다.
+        if (!current || !next) return curAni;
 
-            float animationSpeed = 1;
+        return math::compose(
+            math::lerp(current->scale, next->scale, t),
+            math::slerp(current->rotation, next->rotation, t),
+            math::lerp(current->translation, next->translation, t));
+    }
+
+    template <class Source>
+    void UpdatePose(Animator& animator, const Source& source,
+        AnimationController* controller, int clipIndex, int nextClipIndex,
+        float time, float nextTime)
+    {
+        using Track = typename Source::Track;
+        const auto* clip = source.ClipAt(clipIndex);
+        if (nullptr == clip) return;
+        const auto* nextClip = source.ClipAt(nextClipIndex);
+
+        const std::size_t boneCount = source.BoneCount();
+        std::vector<const Track*> trackOf;
+        Source::BuildTrackTable(*clip, boneCount, trackOf);
+        std::vector<const Track*> nextTrackOf;
+        if (nextClip) Source::BuildTrackTable(*nextClip, boneCount, nextTrackOf);
+
+        const math::matrix4x4& rootTransform = source.RootTransform();
+        const math::matrix4x4& globalInverse = source.GlobalInverse();
+        // legacy 재현: 소켓 행렬은 비블렌드 순회(UpdateBone)에서만 계산됐다.
+        const bool writeSockets = nullptr == nextClip && animator.HasSocket()
+            && SceneManagers->m_isGameStart && nullptr != animator.GetOwner();
+
+        // 게시 계약(parent < index) 덕에 단일 순회로 충분하다 — D4d와 같은 결.
+        std::vector<math::matrix4x4> globals(boneCount, rootTransform);
+        for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
+        {
+            const std::uint32_t parent = source.Parent(boneIndex);
+            const math::matrix4x4 parentGlobal = parent != kPoseNoParent
+                ? globals[parent] : rootTransform;
+            const Track* track = trackOf[boneIndex];
+            if (nullptr == track)
+            {
+                // legacy 재현: 채널 없는 본은 부모 전역을 그대로 잇고 팔레트
+                // 슬롯을 건드리지 않는다(이전 값 유지).
+                globals[boneIndex] = parentGlobal;
+                continue;
+            }
+
+            math::matrix4x4 local = Source::SampleLocal(*track, time);
+            if (nextClip)
+            {
+                // legacy UpdateBlendBone은 다음 클립 맵에 operator[]로 접근해
+                // 채널이 없으면 빈 항목을 만들고 빈 키 배열을 읽었다(잠재 UB).
+                // 여기서는 다음 채널이 없으면 블렌드를 생략한다 — 실코퍼스는
+                // 클립 간 채널 집합이 같아 행동 차이가 없다.
+                if (const Track* nextTrack = nextTrackOf[boneIndex])
+                {
+                    local = BlendPose(local,
+                        Source::SampleLocal(*nextTrack, nextTime), animator.blendT);
+                }
+            }
+            const math::matrix4x4 global = local * parentGlobal;
+            globals[boneIndex] = global;
+
+            if (boneIndex < MAX_BONES)
+            {
+                animator.m_localTransforms[boneIndex] = local;
+                animator.m_FinalTransforms[boneIndex] =
+                    source.InverseBind(boneIndex) * global * globalInverse;
+                if (controller)
+                {
+                    controller->m_LocalTransforms[boneIndex] = local;
+                }
+            }
+
+            if (writeSockets)
+            {
+                const std::string& boneName = source.BoneName(boneIndex);
+                for (auto& socket : animator.socketvec)
+                {
+                    if (boneName == socket->m_ObjectName)
+                    {
+                        socket->m_boneMatrix = global * socket->m_offset;
+                        socket->m_boneMatrix = socket->m_boneMatrix
+                            * animator.GetOwner()->Transform_().GetWorldMatrix();
+                    }
+                }
+            }
+        }
+    }
+
+    template <class Source>
+    void UpdateLayer(Animator& animator, const Source& source)
+    {
+        using Track = typename Source::Track;
+        // legacy UpdateBoneLayer 재현(단일 순회). 컨트롤러들의 m_LocalTransforms
+        // (앞선 포즈 패스가 채움)를 마스크로 골라 합성한다. legacy의 알려진 결함도
+        // 그대로 승계한다: 채널이 있는 본에서 모든 컨트롤러가 마스크에 걸리면
+        // globalTransform이 기본 초기화(영행렬 — math 규약)로 남아 팔레트에 나간다.
+        const std::size_t boneCount = source.BoneCount();
+
+        // 컨트롤러별 "이 본에 채널이 있는가" 표 — legacy hasAnyAnimation 재현
+        // (useController 필터가 없는 것까지 동일).
+        std::vector<std::vector<std::uint8_t>> controllerHasChannel(
+            animator.m_animationControllers.size());
+        for (std::size_t slot = 0; slot < controllerHasChannel.size(); ++slot)
+        {
+            controllerHasChannel[slot].assign(boneCount, 0);
+            AnimationController* controller = animator.m_animationControllers[slot].get();
+            const auto* clip = source.ClipAt(controller ? controller->GetAnimationIndex() : -1);
+            if (nullptr == clip) continue;
+            std::vector<const Track*> trackOf;
+            Source::BuildTrackTable(*clip, boneCount, trackOf);
+            for (std::size_t bone = 0; bone < boneCount; ++bone)
+                controllerHasChannel[slot][bone] = trackOf[bone] ? 1 : 0;
+        }
+
+        const math::matrix4x4& rootTransform = source.RootTransform();
+        const math::matrix4x4& globalInverse = source.GlobalInverse();
+        const bool writeSockets = animator.HasSocket()
+            && SceneManagers->m_isGameStart && nullptr != animator.GetOwner();
+
+        std::vector<math::matrix4x4> globals(boneCount, rootTransform);
+        for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
+        {
+            const std::uint32_t parent = source.Parent(boneIndex);
+            const math::matrix4x4 parentGlobal = parent != kPoseNoParent
+                ? globals[parent] : rootTransform;
+
+            bool hasAnyAnimation = false;
+            for (const auto& table : controllerHasChannel)
+            {
+                if (boneIndex < table.size() && table[boneIndex])
+                {
+                    hasAnyAnimation = true;
+                    break;
+                }
+            }
+            if (!hasAnyAnimation || boneIndex >= MAX_BONES)
+            {
+                globals[boneIndex] = parentGlobal;
+                continue;
+            }
+
+            const BoneRegion region = boneIndex < animator.m_boneRegions.size()
+                ? static_cast<BoneRegion>(animator.m_boneRegions[boneIndex])
+                : BoneRegion::Root;
+            const std::string& boneName = source.BoneName(boneIndex);
+
+            math::matrix4x4 globalTransform{};
+            for (auto& sharedController : animator.m_animationControllers)
+            {
+                AnimationController* controller = sharedController.get();
+                if (nullptr == controller) continue;
+                const math::matrix4x4 candidate =
+                    controller->m_LocalTransforms[boneIndex] * parentGlobal;
+                if (controller->m_isBlend == false && controller->IsUseLayer() == false)
+                    continue;
+                AvatarMask* mask = controller->GetAvatarMask();
+                if (mask != nullptr)
+                {
+                    if (mask->isHumanoid)
+                    {
+                        if (mask->IsBoneEnabled(region))
+                        {
+                            globalTransform = candidate;
+                        }
+                    }
+                    else if (mask->IsBoneEnabled(boneName))
+                    {
+                        animator.m_localTransforms[boneIndex] =
+                            controller->m_LocalTransforms[boneIndex];
+                        globalTransform = candidate;
+                    }
+                }
+                else
+                {
+                    globalTransform = candidate;
+                }
+            }
+
+            animator.m_FinalTransforms[boneIndex] =
+                source.InverseBind(boneIndex) * globalTransform * globalInverse;
+
+            if (writeSockets)
+            {
+                for (auto& socket : animator.socketvec)
+                {
+                    if (boneName == socket->m_ObjectName)
+                    {
+                        socket->m_boneMatrix = globalTransform * socket->m_offset;
+                        socket->m_boneMatrix = socket->m_boneMatrix
+                            * animator.GetOwner()->Transform_().GetWorldMatrix();
+                    }
+                }
+            }
+
+            globals[boneIndex] = globalTransform;
+        }
+    }
+
+    template <class Source>
+    void TickPose(Animator& animator, const Source& source, float deltaT)
+    {
+        if (animator.UsesMultipleControllers())
+        {
+            for (auto& sharedController : animator.m_animationControllers)
+            {
+                AnimationController* controller = sharedController.get();
+                if (nullptr == controller || !controller->useController) continue;
+
+                float animationSpeed = 1;
+                AnimationState* curState = controller->m_curState;
+                if (curState)
+                {
+                    animationSpeed = curState->animationSpeed;
+                    if (curState->useMultipler)
+                    {
+                        animationSpeed *= curState->multiplerAnimationSpeed;
+                    }
+                }
+
+                const auto* clip = source.ClipAt(controller->GetAnimationIndex());
+                if (nullptr == clip) continue;
+                const float duration = static_cast<float>(Source::Duration(*clip));
+                controller->m_timeElapsed += deltaT
+                    * static_cast<float>(Source::TicksPerSecond(*clip)) * animationSpeed;
+                if (animator.IsClipLooping(controller->GetAnimationIndex()))
+                {
+                    controller->m_timeElapsed =
+                        fmod(controller->m_timeElapsed, duration);
+                }
+                else if (controller->m_timeElapsed >= duration)
+                {
+                    controller->m_timeElapsed = duration;
+                    if (controller->curAnimationProgress >= 0.95)
+                        controller->endAnimation = true;
+                }
+                controller->preCurAnimationProgress = controller->curAnimationProgress;
+                controller->curAnimationProgress =
+                    controller->m_timeElapsed / duration;
+
+                if (controller->m_isBlend)
+                {
+                    const auto* nextClip = source.ClipAt(controller->GetNextAnimationIndex());
+                    if (nextClip)
+                    {
+                        const float nextDuration =
+                            static_cast<float>(Source::Duration(*nextClip));
+                        controller->m_nextTimeElapsed += deltaT
+                            * static_cast<float>(Source::TicksPerSecond(*nextClip));
+                        controller->m_nextTimeElapsed =
+                            fmod(controller->m_nextTimeElapsed, nextDuration);
+                        controller->preNextAnimationProgress =
+                            controller->nextAnimationProgress;
+                        controller->nextAnimationProgress =
+                            controller->m_nextTimeElapsed / nextDuration;
+                        UpdatePose(animator, source, controller,
+                            controller->GetAnimationIndex(),
+                            controller->GetNextAnimationIndex(),
+                            controller->m_timeElapsed,
+                            controller->m_nextTimeElapsed);
+                    }
+                }
+                else
+                {
+                    UpdatePose(animator, source, controller,
+                        controller->GetAnimationIndex(), -1,
+                        controller->m_timeElapsed, 0.f);
+                }
+
+                if (deltaT <= 0.f) continue;
+                animator.InvokeClipEvents(controller->GetAnimationIndex(),
+                    controller->curAnimationProgress,
+                    controller->preCurAnimationProgress);
+                if (controller->m_isBlend)
+                {
+                    animator.InvokeClipEvents(controller->GetNextAnimationIndex(),
+                        controller->nextAnimationProgress,
+                        controller->preNextAnimationProgress);
+                }
+            }
+
+            UpdateLayer(animator, source);
+        }
+        else if (animator.m_animationControllers.empty())
+        {
+            const auto* clip = source.ClipAt(static_cast<int>(animator.m_AnimIndexChosen));
+            if (nullptr == clip) return;
+            const float duration = static_cast<float>(Source::Duration(*clip));
+            animator.m_TimeElapsed += deltaT
+                * static_cast<float>(Source::TicksPerSecond(*clip));
+            if (animator.IsClipLooping(static_cast<int>(animator.m_AnimIndexChosen)))
+            {
+                animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, duration);
+            }
+            else if (animator.m_TimeElapsed >= duration)
+            {
+                animator.m_TimeElapsed = duration;
+            }
+
+            if (animator.m_isBlend)
+            {
+                if (animator.nextAnimIndex == -1) return;
+                const auto* nextClip = source.ClipAt(animator.nextAnimIndex);
+                if (nullptr == nextClip) return;
+                const float nextDuration =
+                    static_cast<float>(Source::Duration(*nextClip));
+                animator.m_nextTimeElapsed += deltaT
+                    * static_cast<float>(Source::TicksPerSecond(*nextClip));
+                animator.m_nextTimeElapsed =
+                    fmod(animator.m_nextTimeElapsed, nextDuration);
+                UpdatePose(animator, source, nullptr,
+                    static_cast<int>(animator.m_AnimIndexChosen),
+                    animator.nextAnimIndex,
+                    animator.m_TimeElapsed, animator.m_nextTimeElapsed);
+            }
+            else
+            {
+                UpdatePose(animator, source, nullptr,
+                    static_cast<int>(animator.m_AnimIndexChosen), -1,
+                    animator.m_TimeElapsed, 0.f);
+            }
+        }
+        else // 컨트롤러 1개
+        {
+            AnimationController* controller = animator.m_animationControllers[0].get();
+            const auto* clip = source.ClipAt(controller->GetAnimationIndex());
+            if (nullptr == clip) return;
+            const float duration = static_cast<float>(Source::Duration(*clip));
             AnimationState* curState = controller->m_curState;
+            float animationSpeed = 1;
             if (curState)
             {
                 animationSpeed = curState->animationSpeed;
@@ -250,17 +597,11 @@ void AnimationJob::TickExperiment(Animator& animator,
                     animationSpeed *= curState->multiplerAnimationSpeed;
                 }
             }
-
-            const experiment::AnimationClip* clip =
-                clipAt(controller->GetAnimationIndex());
-            if (nullptr == clip) continue;
-            const float duration = static_cast<float>(clip->durationTicks);
             controller->m_timeElapsed += deltaT
-                * static_cast<float>(clip->ticksPerSecond) * animationSpeed;
+                * static_cast<float>(Source::TicksPerSecond(*clip)) * animationSpeed;
             if (animator.IsClipLooping(controller->GetAnimationIndex()))
             {
-                controller->m_timeElapsed =
-                    fmod(controller->m_timeElapsed, duration);
+                controller->m_timeElapsed = fmod(controller->m_timeElapsed, duration);
             }
             else if (controller->m_timeElapsed >= duration)
             {
@@ -268,452 +609,101 @@ void AnimationJob::TickExperiment(Animator& animator,
                 if (controller->curAnimationProgress >= 0.95)
                     controller->endAnimation = true;
             }
-            controller->preCurAnimationProgress = controller->curAnimationProgress;
-            controller->curAnimationProgress =
-                controller->m_timeElapsed / duration;
 
-            if (controller->m_isBlend)
+            controller->preCurAnimationProgress = controller->curAnimationProgress;
+            controller->curAnimationProgress = controller->m_timeElapsed / duration;
+
+            if (animator.m_isBlend)
             {
-                const experiment::AnimationClip* nextClip =
-                    clipAt(controller->GetNextAnimationIndex());
-                if (nextClip)
-                {
-                    const float nextDuration =
-                        static_cast<float>(nextClip->durationTicks);
-                    controller->m_nextTimeElapsed += deltaT
-                        * static_cast<float>(nextClip->ticksPerSecond);
-                    controller->m_nextTimeElapsed =
-                        fmod(controller->m_nextTimeElapsed, nextDuration);
-                    controller->preNextAnimationProgress =
-                        controller->nextAnimationProgress;
-                    controller->nextAnimationProgress =
-                        controller->m_nextTimeElapsed / nextDuration;
-                    UpdateExperimentPose(animator, skeleton, controller,
-                        controller->GetAnimationIndex(),
-                        controller->GetNextAnimationIndex(),
-                        controller->m_timeElapsed,
-                        controller->m_nextTimeElapsed);
-                }
+                if (animator.nextAnimIndex == -1) return;
+                const auto* nextClip = source.ClipAt(controller->GetNextAnimationIndex());
+                if (nullptr == nextClip) return;
+                const float nextDuration =
+                    static_cast<float>(Source::Duration(*nextClip));
+                controller->m_nextTimeElapsed += deltaT
+                    * static_cast<float>(Source::TicksPerSecond(*nextClip));
+                controller->m_nextTimeElapsed =
+                    fmod(controller->m_nextTimeElapsed, nextDuration);
+                controller->preNextAnimationProgress =
+                    controller->nextAnimationProgress;
+                controller->nextAnimationProgress =
+                    controller->m_nextTimeElapsed / nextDuration;
+                UpdatePose(animator, source, controller,
+                    controller->GetAnimationIndex(),
+                    controller->GetNextAnimationIndex(),
+                    controller->m_timeElapsed, controller->m_nextTimeElapsed);
             }
             else
             {
-                UpdateExperimentPose(animator, skeleton, controller,
+                UpdatePose(animator, source, controller,
                     controller->GetAnimationIndex(), -1,
                     controller->m_timeElapsed, 0.f);
             }
 
-            if (deltaT <= 0.f) continue;
-            animator.InvokeClipEvents(controller->GetAnimationIndex(),
-                controller->curAnimationProgress,
-                controller->preCurAnimationProgress);
-            if (controller->m_isBlend)
+            if (deltaT > 0.f)
             {
-                animator.InvokeClipEvents(controller->GetNextAnimationIndex(),
-                    controller->nextAnimationProgress,
-                    controller->preNextAnimationProgress);
+                animator.InvokeClipEvents(controller->GetAnimationIndex(),
+                    controller->curAnimationProgress,
+                    controller->preCurAnimationProgress);
+                if (controller->m_isBlend)
+                {
+                    animator.InvokeClipEvents(controller->GetNextAnimationIndex(),
+                        controller->nextAnimationProgress,
+                        controller->preNextAnimationProgress);
+                }
             }
-        }
-
-        UpdateExperimentLayer(animator, skeleton);
-    }
-    else if (animator.m_animationControllers.empty())
-    {
-        const experiment::AnimationClip* clip =
-            clipAt(static_cast<int>(animator.m_AnimIndexChosen));
-        if (nullptr == clip) return;
-        const float duration = static_cast<float>(clip->durationTicks);
-        animator.m_TimeElapsed += deltaT
-            * static_cast<float>(clip->ticksPerSecond);
-        if (animator.IsClipLooping(static_cast<int>(animator.m_AnimIndexChosen)))
-        {
-            animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, duration);
-        }
-        else if (animator.m_TimeElapsed >= duration)
-        {
-            animator.m_TimeElapsed = duration;
-        }
-
-        if (animator.m_isBlend)
-        {
-            if (animator.nextAnimIndex == -1) return;
-            const experiment::AnimationClip* nextClip =
-                clipAt(animator.nextAnimIndex);
-            if (nullptr == nextClip) return;
-            const float nextDuration =
-                static_cast<float>(nextClip->durationTicks);
-            animator.m_nextTimeElapsed += deltaT
-                * static_cast<float>(nextClip->ticksPerSecond);
-            animator.m_nextTimeElapsed =
-                fmod(animator.m_nextTimeElapsed, nextDuration);
-            UpdateExperimentPose(animator, skeleton, nullptr,
-                static_cast<int>(animator.m_AnimIndexChosen),
-                animator.nextAnimIndex,
-                animator.m_TimeElapsed, animator.m_nextTimeElapsed);
-        }
-        else
-        {
-            UpdateExperimentPose(animator, skeleton, nullptr,
-                static_cast<int>(animator.m_AnimIndexChosen), -1,
-                animator.m_TimeElapsed, 0.f);
         }
     }
-    else // 컨트롤러 1개
+
+    // 결정적 표본 진입점(animtick 게이트 전용) — 살아 있는 컴포넌트를 빌려 쓰므로
+    // 팔레트·선택 인덱스를 원복한다. 항등에서 시작한다 — "채널 없는 슬롯
+    // 미기록" 규약 아래에서도 결과가 결정적이어야 골든이 성립한다.
+    template <class Source>
+    bool EvaluatePoseSample(Animator& animator, const Source& source,
+        int clipIndex, float time, math::matrix4x4* outPose)
     {
-        AnimationController* controller = animator.m_animationControllers[0].get();
-        const experiment::AnimationClip* clip =
-            clipAt(controller->GetAnimationIndex());
-        if (nullptr == clip) return;
-        const float duration = static_cast<float>(clip->durationTicks);
-        AnimationState* curState = controller->m_curState;
-        float animationSpeed = 1;
-        if (curState)
-        {
-            animationSpeed = curState->animationSpeed;
-            if (curState->useMultipler)
-            {
-                animationSpeed *= curState->multiplerAnimationSpeed;
-            }
-        }
-        controller->m_timeElapsed += deltaT
-            * static_cast<float>(clip->ticksPerSecond) * animationSpeed;
-        if (animator.IsClipLooping(controller->GetAnimationIndex()))
-        {
-            controller->m_timeElapsed = fmod(controller->m_timeElapsed, duration);
-        }
-        else if (controller->m_timeElapsed >= duration)
-        {
-            controller->m_timeElapsed = duration;
-            if (controller->curAnimationProgress >= 0.95)
-                controller->endAnimation = true;
-        }
+        if (nullptr == outPose) return false;
+        if (nullptr == source.ClipAt(clipIndex)) return false;
 
-        controller->preCurAnimationProgress = controller->curAnimationProgress;
-        controller->curAnimationProgress = controller->m_timeElapsed / duration;
+        std::vector<math::matrix4x4> savedLocal(
+            animator.m_localTransforms, animator.m_localTransforms + MAX_BONES);
+        std::vector<math::matrix4x4> savedFinal(
+            animator.m_FinalTransforms, animator.m_FinalTransforms + MAX_BONES);
+        const uint32_t savedChosen = animator.m_AnimIndexChosen;
+        animator.m_AnimIndexChosen = static_cast<uint32_t>(clipIndex);
 
-        if (animator.m_isBlend)
-        {
-            if (animator.nextAnimIndex == -1) return;
-            const experiment::AnimationClip* nextClip =
-                clipAt(controller->GetNextAnimationIndex());
-            if (nullptr == nextClip) return;
-            const float nextDuration =
-                static_cast<float>(nextClip->durationTicks);
-            controller->m_nextTimeElapsed += deltaT
-                * static_cast<float>(nextClip->ticksPerSecond);
-            controller->m_nextTimeElapsed =
-                fmod(controller->m_nextTimeElapsed, nextDuration);
-            controller->preNextAnimationProgress =
-                controller->nextAnimationProgress;
-            controller->nextAnimationProgress =
-                controller->m_nextTimeElapsed / nextDuration;
-            UpdateExperimentPose(animator, skeleton, controller,
-                controller->GetAnimationIndex(),
-                controller->GetNextAnimationIndex(),
-                controller->m_timeElapsed, controller->m_nextTimeElapsed);
-        }
-        else
-        {
-            UpdateExperimentPose(animator, skeleton, controller,
-                controller->GetAnimationIndex(), -1,
-                controller->m_timeElapsed, 0.f);
-        }
+        std::fill(animator.m_FinalTransforms,
+            animator.m_FinalTransforms + MAX_BONES, math::matrix4x4::identity());
+        UpdatePose(animator, source, nullptr, clipIndex, -1, time, 0.f);
+        std::copy(animator.m_FinalTransforms,
+            animator.m_FinalTransforms + MAX_BONES, outPose);
 
-        if (deltaT > 0.f)
-        {
-            animator.InvokeClipEvents(controller->GetAnimationIndex(),
-                controller->curAnimationProgress,
-                controller->preCurAnimationProgress);
-            if (controller->m_isBlend)
-            {
-                animator.InvokeClipEvents(controller->GetNextAnimationIndex(),
-                    controller->nextAnimationProgress,
-                    controller->preNextAnimationProgress);
-            }
-        }
+        std::copy(savedLocal.begin(), savedLocal.end(), animator.m_localTransforms);
+        std::copy(savedFinal.begin(), savedFinal.end(), animator.m_FinalTransforms);
+        animator.m_AnimIndexChosen = savedChosen;
+        return true;
     }
 }
 
-void AnimationJob::UpdateExperimentPose(Animator& animator,
-    const experiment::Skeleton& skeleton, AnimationController* controller,
-    int clipIndex, int nextClipIndex, float time, float nextTime)
+void AnimationJob::TickGeneration(Animator& animator,
+    const assets::ModelAssetGeneration& generation, float deltaT)
 {
-    namespace sampler = experiment::sampler;
-    const std::vector<experiment::AnimationClip>& clips = skeleton.clips;
-    if (clipIndex < 0 || static_cast<std::size_t>(clipIndex) >= clips.size())
-        return;
-    const experiment::AnimationClip& clip =
-        clips[static_cast<std::size_t>(clipIndex)];
-    const experiment::AnimationClip* nextClip =
-        (nextClipIndex >= 0
-            && static_cast<std::size_t>(nextClipIndex) < clips.size())
-        ? &clips[static_cast<std::size_t>(nextClipIndex)] : nullptr;
-
-    const std::size_t boneCount = skeleton.bones.size();
-    std::vector<const experiment::AnimationChannel*> channelOf(boneCount, nullptr);
-    for (const experiment::AnimationChannel& channel : clip.channels)
-    {
-        if (experiment::IsInRange(channel.bone, boneCount))
-            channelOf[channel.bone.Value()] = &channel;
-    }
-    std::vector<const experiment::AnimationChannel*> nextChannelOf;
-    if (nextClip)
-    {
-        nextChannelOf.assign(boneCount, nullptr);
-        for (const experiment::AnimationChannel& channel : nextClip->channels)
-        {
-            if (experiment::IsInRange(channel.bone, boneCount))
-                nextChannelOf[channel.bone.Value()] = &channel;
-        }
-    }
-
-    const math::matrix4x4& rootTransform = skeleton.rootTransform;
-    const math::matrix4x4& globalInverse = skeleton.globalInverseTransform;
-    // legacy 재현: 소켓 행렬은 비블렌드 순회(UpdateBone)에서만 계산됐다.
-    const bool writeSockets = nullptr == nextClip && animator.HasSocket()
-        && SceneManagers->m_isGameStart && nullptr != animator.GetOwner();
-
-    // 게시 계약(parent < index) 덕에 단일 순회로 충분하다 — D4d와 같은 결.
-    std::vector<math::matrix4x4> globals(boneCount, rootTransform);
-    for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
-    {
-        const experiment::Bone& bone = skeleton.bones[boneIndex];
-        const math::matrix4x4 parentGlobal = bone.parent.IsValid()
-            ? globals[bone.parent.Value()] : rootTransform;
-        const experiment::AnimationChannel* channel = channelOf[boneIndex];
-        if (nullptr == channel)
-        {
-            // legacy 재현: 채널 없는 본은 부모 전역을 그대로 잇고 팔레트
-            // 슬롯을 건드리지 않는다(이전 값 유지).
-            globals[boneIndex] = parentGlobal;
-            continue;
-        }
-
-        math::matrix4x4 local = sampler::SampleLocal(*channel, time);
-        if (nextClip)
-        {
-            // legacy UpdateBlendBone은 다음 클립 맵에 operator[]로 접근해
-            // 채널이 없으면 빈 항목을 만들고 빈 키 배열을 읽었다(잠재 UB).
-            // 여기서는 다음 채널이 없으면 블렌드를 생략한다 — 실코퍼스는
-            // 클립 간 채널 집합이 같아 행동 차이가 없다.
-            if (const experiment::AnimationChannel* nextChannel =
-                nextChannelOf[boneIndex])
-            {
-                local = BlendAni(local,
-                    sampler::SampleLocal(*nextChannel, nextTime),
-                    animator.blendT);
-            }
-        }
-        const math::matrix4x4 global = local * parentGlobal;
-        globals[boneIndex] = global;
-
-        if (boneIndex < MAX_BONES)
-        {
-            animator.m_localTransforms[boneIndex] = local;
-            animator.m_FinalTransforms[boneIndex] =
-                bone.inverseBindMatrix * global * globalInverse;
-            if (controller)
-            {
-                controller->m_LocalTransforms[boneIndex] = local;
-            }
-        }
-
-        if (writeSockets)
-        {
-            for (auto& socket : animator.socketvec)
-            {
-                if (bone.name == socket->m_ObjectName)
-                {
-                    socket->m_boneMatrix = global * socket->m_offset;
-                    socket->m_boneMatrix = socket->m_boneMatrix
-                        * animator.GetOwner()->Transform_().GetWorldMatrix();
-                }
-            }
-        }
-    }
+    const assets::ModelSkeletonAsset* skeleton = generation.Skeleton();
+    if (nullptr == skeleton) return;
+    TickPose(animator, GenerationPoseSource{ *skeleton, generation.Animations() }, deltaT);
 }
 
-void AnimationJob::UpdateExperimentLayer(Animator& animator,
-    const experiment::Skeleton& skeleton)
-{
-    // legacy UpdateBoneLayer 재현(단일 순회). 컨트롤러들의 m_LocalTransforms
-    // (앞선 포즈 패스가 채움)를 마스크로 골라 합성한다. legacy의 알려진 결함도
-    // 그대로 승계한다: 채널이 있는 본에서 모든 컨트롤러가 마스크에 걸리면
-    // globalTransform이 기본 초기화(영행렬 — math 규약)로 남아 팔레트에 나간다.
-    const std::vector<experiment::AnimationClip>& clips = skeleton.clips;
-    const std::size_t boneCount = skeleton.bones.size();
-
-    // 컨트롤러별 "이 본에 채널이 있는가" 표 — legacy hasAnyAnimation 재현
-    // (useController 필터가 없는 것까지 동일).
-    std::vector<const experiment::AnimationClip*> controllerClips;
-    controllerClips.reserve(animator.m_animationControllers.size());
-    for (auto& sharedController : animator.m_animationControllers)
-    {
-        AnimationController* controller = sharedController.get();
-        const int index = controller ? controller->GetAnimationIndex() : -1;
-        controllerClips.push_back(
-            index >= 0 && static_cast<std::size_t>(index) < clips.size()
-            ? &clips[static_cast<std::size_t>(index)] : nullptr);
-    }
-    std::vector<std::vector<std::uint8_t>> controllerHasChannel(
-        controllerClips.size());
-    for (std::size_t slot = 0; slot < controllerClips.size(); ++slot)
-    {
-        controllerHasChannel[slot].assign(boneCount, 0);
-        if (nullptr == controllerClips[slot]) continue;
-        for (const experiment::AnimationChannel& channel
-            : controllerClips[slot]->channels)
-        {
-            if (experiment::IsInRange(channel.bone, boneCount))
-                controllerHasChannel[slot][channel.bone.Value()] = 1;
-        }
-    }
-
-    const math::matrix4x4& rootTransform = skeleton.rootTransform;
-    const math::matrix4x4& globalInverse = skeleton.globalInverseTransform;
-    const bool writeSockets = animator.HasSocket()
-        && SceneManagers->m_isGameStart && nullptr != animator.GetOwner();
-
-    std::vector<math::matrix4x4> globals(boneCount, rootTransform);
-    for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
-    {
-        const experiment::Bone& bone = skeleton.bones[boneIndex];
-        const math::matrix4x4 parentGlobal = bone.parent.IsValid()
-            ? globals[bone.parent.Value()] : rootTransform;
-
-        bool hasAnyAnimation = false;
-        for (const auto& table : controllerHasChannel)
-        {
-            if (boneIndex < table.size() && table[boneIndex])
-            {
-                hasAnyAnimation = true;
-                break;
-            }
-        }
-        if (!hasAnyAnimation || boneIndex >= MAX_BONES)
-        {
-            globals[boneIndex] = parentGlobal;
-            continue;
-        }
-
-        const BoneRegion region = boneIndex < animator.m_experimentBoneRegions.size()
-            ? static_cast<BoneRegion>(animator.m_experimentBoneRegions[boneIndex])
-            : BoneRegion::Root;
-
-        math::matrix4x4 globalTransform{};
-        for (auto& sharedController : animator.m_animationControllers)
-        {
-            AnimationController* controller = sharedController.get();
-            if (nullptr == controller) continue;
-            const math::matrix4x4 candidate =
-                controller->m_LocalTransforms[boneIndex] * parentGlobal;
-            if (controller->m_isBlend == false)
-            {
-                if (controller->IsUseLayer() == false) continue;
-                AvatarMask* mask = controller->GetAvatarMask();
-                if (mask != nullptr)
-                {
-                    if (mask->isHumanoid)
-                    {
-                        if (mask->IsBoneEnabled(region))
-                        {
-                            globalTransform = candidate;
-                        }
-                    }
-                    else if (mask->IsBoneEnabled(bone.name))
-                    {
-                        animator.m_localTransforms[boneIndex] =
-                            controller->m_LocalTransforms[boneIndex];
-                        globalTransform = candidate;
-                    }
-                }
-                else
-                {
-                    globalTransform = candidate;
-                }
-            }
-            else
-            {
-                AvatarMask* mask = controller->GetAvatarMask();
-                if (mask != nullptr)
-                {
-                    if (mask->isHumanoid)
-                    {
-                        if (mask->IsBoneEnabled(region))
-                        {
-                            globalTransform = candidate;
-                        }
-                    }
-                    else if (mask->IsBoneEnabled(bone.name))
-                    {
-                        animator.m_localTransforms[boneIndex] =
-                            controller->m_LocalTransforms[boneIndex];
-                        globalTransform = candidate;
-                    }
-                }
-                else
-                {
-                    globalTransform = candidate;
-                }
-            }
-        }
-
-        animator.m_FinalTransforms[boneIndex] =
-            bone.inverseBindMatrix * globalTransform * globalInverse;
-
-        if (writeSockets)
-        {
-            for (auto& socket : animator.socketvec)
-            {
-                if (bone.name == socket->m_ObjectName)
-                {
-                    socket->m_boneMatrix = globalTransform * socket->m_offset;
-                    socket->m_boneMatrix = socket->m_boneMatrix
-                        * animator.GetOwner()->Transform_().GetWorldMatrix();
-                }
-            }
-        }
-
-        globals[boneIndex] = globalTransform;
-    }
-}
 // I6-B4b — 파리티 하네스를 experiment 단독 평가로 좁혔다. legacy 재귀가
 // 죽었으므로 대조할 팔이 없다 — 남은 쓸모는 **결정적 표본으로 제품
 // 포즈를 산출**해 주는 것이고, 게이트는 그것을 골든 digest로 잰다(6b).
-//
-// ★ 이것은 정확성 축의 강등이다. 축 6은 legacy와의 값 대조라 "맞다"를
-//   말할 수 있었지만, 이제 말할 수 있는 것은 "어제와 같다"뿐이다.
-//   B4a가 그 인수인계를 겹치는 구간에서 증명해 두었다.
-bool AnimationJob::EvaluateExperimentPose(Animator& animator,
-    const experiment::Skeleton& experimentSkeleton, int clipIndex,
-    float time, math::matrix4x4* outExperiment)
+// MBC8: typed 판이 같은 골든을 내야 한다 — 그것이 typed 샘플러의 정확성 증명이다.
+bool AnimationJob::EvaluateGenerationPose(Animator& animator,
+    const assets::ModelAssetGeneration& generation, int clipIndex,
+    float time, math::matrix4x4* outPose)
 {
-    if (nullptr == outExperiment) return false;
-    if (clipIndex < 0
-        || static_cast<std::size_t>(clipIndex)
-            >= experimentSkeleton.clips.size())
-    {
-        return false;
-    }
-
-    // 살아 있는 컴포넌트를 빌려 쓰므로 팔레트·선택 인덱스를 원복한다.
-    std::vector<math::matrix4x4> savedLocal(
-        animator.m_localTransforms, animator.m_localTransforms + MAX_BONES);
-    std::vector<math::matrix4x4> savedFinal(
-        animator.m_FinalTransforms, animator.m_FinalTransforms + MAX_BONES);
-    const uint32_t savedChosen = animator.m_AnimIndexChosen;
-    animator.m_AnimIndexChosen = static_cast<uint32_t>(clipIndex);
-
-    // 항등에서 시작한다 — "채널 없는 슬롯 미기록" 규약 아래에서도 결과가
-    // 결정적이어야 골든이 성립한다.
-    std::fill(animator.m_FinalTransforms,
-        animator.m_FinalTransforms + MAX_BONES, math::matrix4x4::identity());
-    UpdateExperimentPose(animator, experimentSkeleton, nullptr,
-        clipIndex, -1, time, 0.f);
-    std::copy(animator.m_FinalTransforms,
-        animator.m_FinalTransforms + MAX_BONES, outExperiment);
-
-    std::copy(savedLocal.begin(), savedLocal.end(), animator.m_localTransforms);
-    std::copy(savedFinal.begin(), savedFinal.end(), animator.m_FinalTransforms);
-    animator.m_AnimIndexChosen = savedChosen;
-    return true;
+    const assets::ModelSkeletonAsset* skeleton = generation.Skeleton();
+    if (nullptr == skeleton) return false;
+    return EvaluatePoseSample(animator,
+        GenerationPoseSource{ *skeleton, generation.Animations() },
+        clipIndex, time, outPose);
 }

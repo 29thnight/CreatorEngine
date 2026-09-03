@@ -6,7 +6,11 @@
 #include "AuthoringCookedDocument.h"
 #include "AuthoringNodeEquality.h"
 #include "AuthoringParsedDocument.h"
-#include "Experiment/Cooked/ModelCookProducer.h"
+#include "Experiment/Cooked/ModelGenerationExportProducer.h" // MBC11
+#include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelSidecarV2.h"
+#include <set>
+#include <variant>
 #include "Experiment/Cooked/TextureCookProducer.h"
 
 #include <algorithm>
@@ -444,127 +448,85 @@ namespace RenderTest
     bool RunExperimentModelDependencyReal(const std::string& assetRootPath,
         const std::string& modelPath, std::string& outLog)
     {
+        // MBC11 — 모델 재질의 의존은 더 이상 cook이 그리는 manifest 간선이 아니라
+        // 게시된 generation의 closure다. 실자산 모델의 generation을 내보내 재질마다
+        // shader 신원이 있고, 재질의 texture property가 전부 같은 generation의
+        // embedded texture로 해소되는지를 잰다.
         Checker check{ outLog };
         outLog += "[experiment.matcook] 실자산 model: " + modelPath + "\n";
 
-        const ck::ModelCookProductResult result = ck::BuildModelCookProduct(
-            { std::filesystem::path(modelPath),
-              std::filesystem::path(assetRootPath) });
-        check.Check(result.Succeeded(), "실자산 model cook 이 통과해야 한다");
-        if (!result.Succeeded())
+        const std::filesystem::path source(modelPath);
+        const std::filesystem::path assetRoot(assetRootPath);
+        const std::filesystem::path projectRoot = assetRoot.parent_path();
+        ck::ModelGenerationExportRequest request;
+        request.sourcePath = source;
+        request.assetRoot = assetRoot;
+        request.generationRoot = projectRoot / "Library" / "ModelAssetGenerations";
+        request.identityHeaderPath = projectRoot / "ProjectSetting" / "AssetIdentity.asset";
+        const ck::ModelGenerationExportResult exported =
+            ck::BuildModelGenerationExportProduct(request);
+        check.Check(exported.Succeeded(), "실자산 model generation 내보내기가 통과해야 한다");
+        if (!exported.Succeeded())
         {
-            for (const ck::ModelCookProductIssue& issue : result.issues)
+            for (const ck::ModelGenerationExportIssue& issue : exported.issues)
                 outLog += "    " + issue.context + ": " + issue.message + "\n";
             return false;
         }
+        const ck::ModelGenerationExportProduct& product = *exported.product;
 
-        const ck::ModelCookProduct& product = *result.product;
+        std::filesystem::path sidecarPath = source;
+        sidecarPath += ".meta";
+        assets::ModelAssetGenerationLoadRequest load;
+        load.identityHeaderPath = request.identityHeaderPath;
+        load.generationRoot = request.generationRoot;
+        load.canonicalSidecarPath = sidecarPath;
+        const assets::ModelAssetGenerationLoadResult loaded =
+            assets::LoadModelAssetGeneration(load);
+        check.Check(loaded.Succeeded(), "generation을 런타임 리더로 읽는다");
+        if (!loaded.Succeeded()) return false;
+        const assets::ModelAssetGeneration& generation = *loaded.generation;
 
-        // 이 product 가 스스로 만든 노드 집합.
-        std::set<experiment::AssetId> produced;
-        std::set<std::string> paths;
-        std::size_t materialEntries = 0u;
-        std::size_t textureEntries = 0u;
-        bool duplicatePath = false;
-        for (const ck::CookedAssetManifestEntry& entry : product.manifestEntries)
-        {
-            produced.insert(entry.assetId);
-            if (entry.kind == ck::CookedAssetKind::Material) ++materialEntries;
-            if (entry.kind == ck::CookedAssetKind::Texture)
-            {
-                ++textureEntries;
-                // 재질 entry 는 model artifact 경로를 공유하므로 texture 만 본다.
-                if (!paths.insert(entry.artifactPath).second) duplicatePath = true;
-            }
-        }
-        check.Check(!duplicatePath, "임베디드 texture artifact 경로가 서로 달라야 한다");
-        check.Check(materialEntries == product.materialCount,
-            "material entry 수가 materialCount 와 같아야 한다");
-        check.Check(textureEntries == product.embeddedTextures.size(),
-            "texture entry 수가 임베디드 artifact 수와 같아야 한다");
-        check.Check(product.embeddedTextures.size()
-            == product.embeddedTextureCount,
-            "임베디드 artifact 수가 embeddedTextureCount 와 같아야 한다");
-
-        // ★ 핵심: 재질 의존이 전부 해소되는가.
-        //
-        //   ShaderMeta 는 이 product 밖(별도 producer)이므로 "GUID 가 유효한가"
-        //   까지만 본다. texture 는 이 product 가 직접 만들어야 하므로
-        //   **여기서 해소되지 않으면 실패**다.
-        std::size_t shaderEdges = 0u;
-        std::size_t textureEdges = 0u;
+        std::set<Uuid::Uuid16> embeddedIds;
+        for (const assets::ModelTextureAsset& texture : generation.Textures())
+            embeddedIds.insert(texture.textureId);
+        std::set<Uuid::Uuid16> referencedTextures;
+        std::size_t materials = 0, shaderEdges = 0, textureEdges = 0;
         bool unresolvedTexture = false;
-        bool invalidEdge = false;
-        for (const ck::CookedAssetManifestEntry& entry : product.manifestEntries)
+        for (const assets::ModelMaterialAsset& material : generation.Materials())
         {
-            if (entry.kind != ck::CookedAssetKind::Material) continue;
-            check.Check(!entry.dependencies.empty(),
-                "재질은 최소 shader 의존 하나를 가져야 한다");
-            for (std::size_t index = 0u; index < entry.dependencies.size(); ++index)
+            ++materials;
+            if (!material.shaderAssetId.IsNil()) ++shaderEdges;
+            for (const assets::ModelMaterialProperty& property : material.properties)
             {
-                const experiment::AssetId& dependency = entry.dependencies[index];
-                if (!experiment::IsAssetIdV4(dependency)) { invalidEdge = true; continue; }
-                if (0u == index) { ++shaderEdges; continue; }
+                const auto* handle = std::get_if<assets::ModelTextureHandle>(&property.value);
+                if (nullptr == handle || handle->textureId.IsNil()) continue;
                 ++textureEdges;
-                if (!produced.contains(dependency)) unresolvedTexture = true;
+                referencedTextures.insert(handle->textureId);
+                if (!embeddedIds.contains(handle->textureId)) unresolvedTexture = true;
             }
         }
-        check.Check(!invalidEdge, "모든 의존 GUID 가 canonical UUIDv4 여야 한다");
+        check.Check(materials == product.materialCount,
+            "내보낸 재질 수가 generation과 같아야 한다");
+        check.Check(embeddedIds.size() == product.embeddedTextureCount,
+            "내보낸 embedded texture 수가 generation과 같아야 한다");
+        check.Check(shaderEdges == materials, "재질마다 shader 신원이 정확히 하나여야 한다");
         check.Check(!unresolvedTexture,
-            "재질의 texture 의존이 이 product 안에서 해소돼야 한다");
-        check.Check(shaderEdges == materialEntries,
-            "재질마다 shader 간선이 정확히 하나여야 한다");
-
-        // ★ 반대 방향도 본다. 위의 단정들은 "그린 간선이 해소되는가"만 보므로
-        //   **간선을 하나도 안 그려도 전부 통과한다** — 변이로 확인했다.
-        //   b2c-3 의 본체가 바로 그 간선이므로, 뽑아 놓은 임베디드 texture 가
-        //   실제로 어떤 재질에서 참조되는지를 함께 단정한다.
-        std::set<experiment::AssetId> referencedTextures;
-        for (const ck::CookedAssetManifestEntry& entry : product.manifestEntries)
-        {
-            if (entry.kind != ck::CookedAssetKind::Material) continue;
-            for (std::size_t index = 1u; index < entry.dependencies.size(); ++index)
-                referencedTextures.insert(entry.dependencies[index]);
-        }
+            "재질의 texture 의존이 generation closure 안에서 해소돼야 한다");
+        // 반대 방향 — 뽑아 둔 embedded texture가 어떤 재질에서든 참조되는가.
         bool everyEmbeddedReferenced = true;
-        for (const ck::EmbeddedTextureArtifact& embedded : product.embeddedTextures)
-        {
-            if (!referencedTextures.contains(embedded.textureAssetId))
-                everyEmbeddedReferenced = false;
-        }
+        for (const Uuid::Uuid16& embedded : embeddedIds)
+            if (!referencedTextures.contains(embedded)) everyEmbeddedReferenced = false;
         check.Check(everyEmbeddedReferenced,
-            "뽑아낸 임베디드 texture 는 모두 어떤 재질의 의존이어야 한다");
-        check.Check(referencedTextures.size() == product.embeddedTextures.size(),
-            "참조된 texture 수와 뽑아낸 임베디드 수가 같아야 한다");
-        check.Check(textureEdges >= product.embeddedTextures.size(),
-            "texture 간선 수가 임베디드 수 이상이어야 한다");
-
-        // 임베디드 artifact 자체.
-        bool emptyBytes = false;
-        bool badExtension = false;
-        for (const ck::EmbeddedTextureArtifact& embedded : product.embeddedTextures)
-        {
-            if (embedded.artifactBytes.empty()) emptyBytes = true;
-            if (!ck::IsSupportedTextureExtension(embedded.extension))
-                badExtension = true;
-            // 판별 결과가 실제 바이트와 맞는가. 확장자를 상수로 박아 두면
-            // 여기서 걸린다.
-            if (ck::SniffTextureExtension(embedded.artifactBytes)
-                != embedded.extension)
-            {
-                badExtension = true;
-            }
-        }
-        check.Check(!emptyBytes, "임베디드 artifact 바이트가 비면 안 된다");
-        check.Check(!badExtension,
-            "임베디드 확장자가 allowlist 이고 바이트와 일치해야 한다");
+            "generation의 embedded texture는 모두 어떤 재질의 의존이어야 한다");
+        check.Check(!product.files.empty() && product.artifactBytes > 0u,
+            "내보낸 generation 파일이 0개가 아니어야 한다");
 
         char summary[400]{};
         std::snprintf(summary, sizeof(summary),
             "  model 단정 %zu/%zu · 재질 %zu · 임베디드 %zu · shader 간선 %zu"
             " · texture 간선 %zu\n",
-            check.passed, check.passed + check.failed, materialEntries,
-            product.embeddedTextures.size(), shaderEdges, textureEdges);
+            check.passed, check.passed + check.failed, materials,
+            embeddedIds.size(), shaderEdges, textureEdges);
         outLog += summary;
         return check.failed == 0u;
     }

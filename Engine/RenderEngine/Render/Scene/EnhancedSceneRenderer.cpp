@@ -43,7 +43,7 @@
 #include "../../PrimitiveRenderProxy.h"
 #include "../../UIRenderProxy.h"
 #include "../../UIClipping.h"
-#include "../../Skeleton.h"
+#include "../../BoneRegion.h" // MAX_BONES
 #include "../../Mesh.h"
 #include "../../RenderState.h"
 #include "../../../Utility_Framework/PathFinder.h"
@@ -85,9 +85,10 @@ namespace
     // 결합이다.
     [[nodiscard]] std::size_t MakeGeometryKey(const EnhancedDrawItem& item)
     {
-        if (0 != item.experimentView.stableKey)
+        // MBC7 — typed 뷰가 첫 축(EnhancedDrawIdentity::GeometryKey와 같은 순서).
+        if (item.modelMeshView.handle.IsValid())
         {
-            return item.experimentView.stableKey;
+            return HashModelMeshHandle(item.modelMeshView.handle);
         }
         return nullptr != item.mesh
             ? static_cast<std::size_t>(item.mesh->m_hashingMesh.m_ID_Data)
@@ -440,12 +441,6 @@ namespace
                 !textureCache.Initialize(&resources, outError) ||
                 !commandPool.Initialize(resources, 4,
                     VulkanDeviceResources::kFrameCount, outError)) return false;
-            // I5-D34a: experiment 정점 조회 주입 — RHI 캐시가 자산 계층을 직접
-            // 알지 않게 하는 유일한 이음새다(DX12 쪽과 대칭).
-            meshCache.SetExperimentVertexLookup(
-                [](const Mesh& mesh, RHIExperimentVertexView& view)
-                { return DataSystems->TryGetExperimentVertexView(mesh, view); });
-
             width = newWidth;
             height = newHeight;
             frameContext = {};
@@ -985,9 +980,9 @@ namespace
             // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
             // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
             std::shared_ptr<Mesh> meshSource{};
-            // I5-D4b — item.experimentView의 포인터(정점·인덱스)가 가리키는
-            // experiment 모델을 같은 이유로 붙든다.
-            std::shared_ptr<const experiment::Model> experimentSource{};
+            // MBC7 — item.modelMeshView의 정점·인덱스 저장소를 소유하는 immutable
+            // generation. sealing은 이것으로 재질의 embedded texture를 closure에서 푼다.
+            std::shared_ptr<const assets::ModelAssetGeneration> generationSource{};
             // BuildDrawPool의 안정된 프록시 읽기 동안만 Material owner를 유지한다.
             // SealForwardMaterials/SealGBufferMaterials가 값 snapshot을 만든 뒤
             // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
@@ -1436,11 +1431,6 @@ namespace
             p.frameContext.psoManager = &dx12.Pipelines();
             p.frameContext.rootSignatures = &dx12.RootSignatures();
             p.frameContext.meshCache = &dx12.MeshCache();
-            // I5-D34a: experiment 정점 조회 주입(Vulkan 쪽과 대칭). Resize로
-            // 다시 와도 같은 람다를 다시 거는 것뿐이라 무해하다.
-            dx12.MeshCache().SetExperimentVertexLookup(
-                [](const Mesh& mesh, RHIExperimentVertexView& view)
-                { return DataSystems->TryGetExperimentVertexView(mesh, view); });
             p.frameContext.textureCache = &dx12.TextureCache();
             p.frameContext.width = p.width;
             p.frameContext.height = p.height;
@@ -2667,39 +2657,36 @@ namespace
 
             const auto poolMesh = [this](const MeshRenderProxy* proxy)
             {
-                if (nullptr == proxy->m_Mesh) return;
+                // PHASE 3.75 MBC7 — typed generation 뷰가 정본이다. generation
+                // descriptor와 immutable 저장소를 대조해 뷰를 짓고(BuildRHIModelMeshView),
+                // 실패·부재면 experiment 핸들 → legacy Mesh 순으로 내려간다(MBC9 은퇴).
+                RHIModelMeshView modelView{};
+                if (!proxy->m_modelGeneration
+                    || !BuildRHIModelMeshView(*proxy->m_modelGeneration,
+                        proxy->m_modelMeshIndex, modelView))
+                {
+                    return;
+                }
 
                 PooledDraw pooled{};
-                pooled.meshSource = proxy->m_Mesh;
-                pooled.item.mesh = proxy->m_Mesh.get();
                 pooled.item.worldMatrix = proxy->m_worldMatrix;
-
-                // I5-D4b — 프록시에 experiment 핸들이 실려 있으면 뷰를 만들어
-                // 아이템에 싣는다. 실패는 핸들 없음(legacy 경로)과 같은 취급 —
-                // 캐시 lookup 폴백이 experiment 데이터는 여전히 보장한다.
-                if (proxy->m_experimentModel)
-                {
-                    RHIExperimentVertexView view{};
-                    if (DataSystem::BuildExperimentVertexView(
-                        *proxy->m_experimentModel,
-                        proxy->m_experimentMeshIndex, view))
-                    {
-                        pooled.item.experimentView = view;
-                        pooled.experimentSource = proxy->m_experimentModel;
-                    }
-                }
-                // I6-C — 신원 키와 반경을 값으로 싣는다. 패스는 이 뒤로
-                //   legacy Mesh를 역참조하지 않는다(업로드 폴백만 예외).
+                pooled.item.modelMeshView = modelView;
+                pooled.generationSource = proxy->m_modelGeneration;
+                // I6-C — 신원 키와 반경을 값으로 싣는다.
                 pooled.item.geometryKey = MakeGeometryKey(pooled.item);
-                pooled.item.boundRadius =
-                    proxy->m_Mesh->GetBoundingSphere().radius;
+                {
+                    const math::aabb& bounds = proxy->m_modelGeneration
+                        ->Meshes()[proxy->m_modelMeshIndex].bounds;
+                    pooled.item.boundRadius = bounds.is_empty()
+                        ? 0.f : math::length(bounds.extents);
+                }
 
                 if (proxy->m_isAnimationEnabled
                     && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
                     && proxy->m_finalTransforms)
                 {
                     pooled.item.bonePalette = proxy->m_finalTransforms.get();
-                    pooled.item.boneCount = Skeleton::MAX_BONES;
+                    pooled.item.boneCount = MAX_BONES;
                     pooled.item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
                 }
 
@@ -2724,28 +2711,21 @@ namespace
                 for (FoliageRenderProxy::DrawSource source :
                     proxy->CaptureDrawSources())
                 {
-                    if (!source.mesh) continue;
+                    // PHASE 3.75 MBC8 — poolMesh와 같은 typed 축이 첫째다.
+                    RHIModelMeshView modelView{};
+                    if (!source.modelGeneration
+                        || !BuildRHIModelMeshView(*source.modelGeneration,
+                            source.modelMeshIndex, modelView))
+                    {
+                        continue;
+                    }
 
                     PooledDraw pooled{};
-                    pooled.meshSource = std::move(source.mesh);
-                    pooled.item.mesh = pooled.meshSource.get();
                     pooled.item.worldMatrix = source.worldMatrix;
                     pooled.worldBounds = source.worldBounds;
                     pooled.hasBounds = !source.worldBounds.is_empty();
-
-                    // I5-D5a — Foliage도 experiment 핸들을 아이템에 싣는다
-                    // (poolMesh와 같은 규약 — 실패는 legacy lookup 폴백).
-                    if (source.experimentModel)
-                    {
-                        RHIExperimentVertexView view{};
-                        if (DataSystem::BuildExperimentVertexView(
-                            *source.experimentModel,
-                            source.experimentMeshIndex, view))
-                        {
-                            pooled.item.experimentView = view;
-                            pooled.experimentSource = source.experimentModel;
-                        }
-                    }
+                    pooled.item.modelMeshView = modelView;
+                    pooled.generationSource = source.modelGeneration;
 
                     if (source.material)
                     {
@@ -2762,8 +2742,12 @@ namespace
                     // I6-C — poolMesh와 같은 규약: 신원 키와 반경을 값으로
                     //   싣는다(패스가 Mesh를 역참조하지 않게).
                     pooled.item.geometryKey = MakeGeometryKey(pooled.item);
-                    pooled.item.boundRadius =
-                        pooled.meshSource->GetBoundingSphere().radius;
+                    {
+                        const math::aabb& bounds = source.modelGeneration
+                            ->Meshes()[source.modelMeshIndex].bounds;
+                        pooled.item.boundRadius = bounds.is_empty()
+                            ? 0.f : math::length(bounds.extents);
+                    }
 
                     drawPool.push_back(std::move(pooled));
                 }
@@ -2943,7 +2927,7 @@ namespace
                             BuildSealSourceFromAuthored(
                                 *pooled.authoredMaterialSource,
                                 *materialShader.value, sealSource,
-                                authoredError);
+                                authoredError, pooled.generationSource.get());
                         if (!sealBuilt)
                         {
                             Debug->LogWarning("Forward 저작 seal 시공 실패 —"
@@ -3141,7 +3125,8 @@ namespace
                     sealBuilt = ExperimentMaterialSealing::
                         BuildSealSourceFromAuthored(
                             *pooled.authoredMaterialSource,
-                            *materialShader.value, sealSource, authoredError);
+                            *materialShader.value, sealSource, authoredError,
+                            pooled.generationSource.get());
                     if (!sealBuilt)
                     {
                         Debug->LogWarning("GBuffer 저작 seal 시공 실패 —"
@@ -5359,7 +5344,7 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         std::snprintf(line, sizeof(line),
             "EnhancedRenderer(Vulkan) — %s · 공통 scene graph %s · %ux%u"
             " · 완성 %llu프레임(대기 %llu) · 인플라이트 %u · 드로우 %u(배치 %u)"
-            " · CPU %.2f ms · 메시 캐시 %u개/업로드 %u(experiment %u)/실패 %u",
+            " · CPU %.2f ms · 메시 캐시 %u개/업로드 %u(generation %u)/실패 %u",
             state.enabled ? "켜짐" : "꺼짐",
             pipeline ? "준비됨" : "없음",
             pipeline ? pipeline->width : 0u,
@@ -5369,7 +5354,7 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             pipeline ? pipeline->PendingCount() : 0u,
             state.lastDrawCount, state.lastBatchCount, state.lastCpuMs,
             meshStats.residentCount, meshStats.uploads,
-            meshStats.experimentUploads, meshStats.failures);
+            meshStats.modelGenerationUploads, meshStats.failures);
 
         std::string status = line;
         char recordLine[192]{};
@@ -5560,15 +5545,10 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         state.dx12.GetRetiredDisplayCount());
 
     std::string status = line;
-    // I5-D34a: 업로드 중 experiment packed 경로 계수. 이 관측이 없으면 CLI가
-    // "전부 legacy로 올라갔다"와 구분할 수 없다([model.dual]과 같은 결).
-    // 어댑터가 중립 인터페이스만 노출하므로 계수도 인터페이스로 받는다.
-    status += "\n  메시 캐시 — experiment 업로드 "
+    // MBC9: 모델 지오메트리 업로드는 typed generation 진입점 하나다.
+    status += "\n  메시 캐시 — generation 업로드 "
         + std::to_string(const_cast<LiveState&>(state)
-            .dx12.MeshCache().GetExperimentUploadCount())
-        + " (handle "
-        + std::to_string(const_cast<LiveState&>(state)
-            .dx12.MeshCache().GetExperimentHandleUploadCount()) + ")";
+            .dx12.MeshCache().GetModelGenerationUploadCount());
     char recordLine[192]{};
     std::snprintf(recordLine, sizeof(recordLine),
         "\n  Native record CPU — last %.3f ms · avg %.3f ms · max %.3f ms · samples %llu",

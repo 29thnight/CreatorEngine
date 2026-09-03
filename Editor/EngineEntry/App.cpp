@@ -446,7 +446,7 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 			{
 				const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
 					filePath, EditorAssetDatabase::ImportKind::Model);
-				if (!imported.empty()) DataSystems->LoadModel(imported.string());
+				if (!imported.empty()) DataSystems->LoadModelAssetGenerationByPath(imported.string());
 			}
 			else if (
 				".png" == filePath.extension() || 

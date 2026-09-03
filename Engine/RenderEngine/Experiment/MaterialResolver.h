@@ -48,6 +48,12 @@ namespace experiment
             resolveCookedArtifactPath{};
         // GUID → 원본 경로. 정본: AssetMetaRegistry(DataSystem::GetFilePath).
         std::function<std::filesystem::path(const FileGuid&)> resolveSourcePath{};
+        // PHASE 3.75 MBC7 — model generation closure의 embedded texture. 이 재질을
+        // 그리는 renderer가 붙든 ModelAssetGeneration 안의 TextureId면 여기서
+        // owner를 받는다 — 경로 해석이 없다(파일이 없는 subasset이다). nullptr이면
+        // 그 generation에 없는 것이고 cooked/source 경로로 내려간다. 비어 있으면
+        // (generation 없는 재질) 건너뛴다. 정본: DataSystem::ResolveModelGenerationTexture.
+        std::function<std::shared_ptr<Texture>(const AssetId&)> resolveEmbeddedTexture{};
     };
 
     struct ResolvedMaterialTexture final
@@ -56,6 +62,7 @@ namespace experiment
         AssetId assetId{};
         std::shared_ptr<Texture> owner{};
         bool fromCookedArtifact{};
+        bool fromGenerationClosure{}; // MBC7
     };
 
     // 폴백은 관측 가능해야 한다 — cooked가 늘 비고 조용히 source로 도는 상태는
@@ -64,6 +71,7 @@ namespace experiment
     {
         std::size_t cookedTextures{};
         std::size_t sourceFallbackTextures{};
+        std::size_t generationTextures{}; // MBC7 — closure에서 푼 수
     };
 
     struct ResolvedMaterial final

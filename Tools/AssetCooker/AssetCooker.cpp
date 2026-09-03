@@ -1,11 +1,13 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/MaterialCookProducer.h"
-#include "Experiment/Cooked/ModelCookProducer.h"
+#include "Experiment/Cooked/ModelGenerationExportProducer.h" // MBC11: generation 내보내기
+#include "Assets/AssetIdentityProfile.h"                       // MBC11: UUIDv8 source identity
 #include "Experiment/Cooked/SceneCookProducer.h"
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
-#include "ModelIdentityRefresher.h"
+#include "Assets/AssetIdentityEpoch.h"
+#include "Assets/ModelAssetAuthoringTransaction.h"
 #include "AuthoringCookedDocument.h"
 #include "AuthoringNodeEquality.h"
 #include "AuthoringParsedDocument.h"
@@ -17,6 +19,7 @@
 #include <fstream>
 #include <iostream>
 #include <process.h>
+#include <objbase.h> // MBC11: CoInitializeEx
 #include <set>
 #include <sstream>
 #include <span>
@@ -39,7 +42,8 @@ namespace
         enum class Mode
         {
             Cook,
-            RefreshModelIdentities,
+            AuthorModelAsset,
+            IssueModelIdentityEpoch,
             CompileRuntimeDocuments,
         };
 
@@ -47,20 +51,28 @@ namespace
         std::filesystem::path assetRoot{};
         std::filesystem::path outputRoot{};
         std::filesystem::path runtimeRoot{};
+        // MBC11 — 게시된 generation 루트. 비우면 <asset-root>/../Library/ModelAssetGenerations.
+        std::filesystem::path generationRoot{};
         std::vector<std::filesystem::path> models{};
         std::vector<std::filesystem::path> textures{};
         std::vector<std::filesystem::path> shaderMetas{};
         std::vector<std::filesystem::path> materials{};
         std::vector<std::filesystem::path> scenes{};
+        std::string identityEpoch{};
+        assets::ModelAuthoringFailurePoint modelAuthoringFailurePoint{};
     };
 
     void PrintUsage()
     {
         std::cout
             << "Usage: AssetCooker --asset-root <Assets> --output <new-dir> "
+               "[--generation-root <Library/ModelAssetGenerations>] "
                "[--model <source> ...] [--texture <source> ...] [--shadermeta <source> ...] [--material <source> ...] [--scene <source> ...]\n"
-            << "       AssetCooker --refresh-model-identities "
-               "--asset-root <Assets> --model <source> [--model <source> ...]\n"
+            << "       (--model은 게시된 generation을 내보낸다 — 먼저 --author-model-asset)\n"
+            << "       AssetCooker --author-model-asset "
+               "--asset-root <Assets> --output <generation-root> --model <source>\n"
+            << "       AssetCooker --issue-model-identity-epoch "
+               "--asset-root <Assets> --identity-epoch <name>\n"
             << "       AssetCooker --compile-runtime-documents "
                "--runtime-root <package-input-root>\n";
     }
@@ -76,14 +88,14 @@ namespace
                 PrintUsage();
                 return false;
             }
-            if (option == L"--refresh-model-identities")
+            if (option == L"--author-model-asset")
             {
                 if (out.mode != Arguments::Mode::Cook)
                 {
                     failure = "AssetCooker mode는 하나만 지정할 수 있다.";
                     return false;
                 }
-                out.mode = Arguments::Mode::RefreshModelIdentities;
+                out.mode = Arguments::Mode::AuthorModelAsset;
                 continue;
             }
             if (option == L"--compile-runtime-documents")
@@ -94,6 +106,16 @@ namespace
                     return false;
                 }
                 out.mode = Arguments::Mode::CompileRuntimeDocuments;
+                continue;
+            }
+            if (option == L"--issue-model-identity-epoch")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker mode는 하나만 지정할 수 있다.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::IssueModelIdentityEpoch;
                 continue;
             }
             if (index + 1 >= argc)
@@ -130,6 +152,15 @@ namespace
                 }
                 out.runtimeRoot = value;
             }
+            else if (option == L"--generation-root")
+            {
+                if (!out.generationRoot.empty())
+                {
+                    failure = "--generation-root는 한 번만 지정할 수 있다.";
+                    return false;
+                }
+                out.generationRoot = value;
+            }
             else if (option == L"--model")
             {
                 out.models.push_back(value);
@@ -151,6 +182,33 @@ namespace
                 // .creator 와 .prefab 을 함께 받는다. producer 가 확장자로
                 // kind 를 정한다.
                 out.scenes.push_back(value);
+            }
+            else if (option == L"--identity-epoch")
+            {
+                if (!out.identityEpoch.empty())
+                {
+                    failure = "--identity-epoch는 한 번만 지정할 수 있다.";
+                    return false;
+                }
+                out.identityEpoch = value.string();
+            }
+            else if (option == L"--model-authoring-fail")
+            {
+                if (value == L"after-decode")
+                    out.modelAuthoringFailurePoint = assets::ModelAuthoringFailurePoint::AfterDecode;
+                else if (value == L"after-identity")
+                    out.modelAuthoringFailurePoint = assets::ModelAuthoringFailurePoint::AfterIdentity;
+                else if (value == L"after-stage-write")
+                    out.modelAuthoringFailurePoint = assets::ModelAuthoringFailurePoint::AfterStageWrite;
+                else if (value == L"after-stage-validation")
+                    out.modelAuthoringFailurePoint = assets::ModelAuthoringFailurePoint::AfterStageValidation;
+                else if (value == L"after-generation-publish")
+                    out.modelAuthoringFailurePoint = assets::ModelAuthoringFailurePoint::AfterGenerationPublish;
+                else
+                {
+                    failure = "알 수 없는 model authoring failure point다.";
+                    return false;
+                }
             }
             else
             {
@@ -177,6 +235,24 @@ namespace
             return true;
         }
 
+        if (out.mode == Arguments::Mode::IssueModelIdentityEpoch)
+        {
+            if (out.assetRoot.empty() || out.identityEpoch.empty())
+            {
+                failure = "identity epoch 발급에는 --asset-root와 --identity-epoch가 필요하다.";
+                return false;
+            }
+            if (!out.outputRoot.empty() || !out.runtimeRoot.empty()
+                || !out.models.empty() || !out.textures.empty()
+                || !out.shaderMetas.empty() || !out.materials.empty()
+                || !out.scenes.empty())
+            {
+                failure = "identity epoch 발급에는 cook/model/runtime option을 섞을 수 없다.";
+                return false;
+            }
+            return true;
+        }
+
         if (out.assetRoot.empty())
         {
             failure = "--asset-root가 필요하다.";
@@ -187,19 +263,17 @@ namespace
             failure = "--runtime-root는 runtime document compile 전용이다.";
             return false;
         }
-        // identity refresh는 model 전용 경계다. texture sidecar는 authoring
-        // 쪽에서 이미 발급돼 있고, 이 도구가 손댈 대상이 아니다.
-        if (out.mode == Arguments::Mode::RefreshModelIdentities)
+        if (out.mode == Arguments::Mode::AuthorModelAsset)
         {
             if (!out.textures.empty() || !out.shaderMetas.empty()
                 || !out.materials.empty() || !out.scenes.empty())
             {
-                failure = "identity refresh에는 --texture/--shadermeta/--material을 지정할 수 없다.";
+                failure = "model authoring에는 --texture/--shadermeta/--material/--scene을 지정할 수 없다.";
                 return false;
             }
-            if (out.models.empty())
+            if (out.models.size() != 1u)
             {
-                failure = "identity refresh에는 하나 이상의 --model이 필요하다.";
+                failure = "model authoring에는 정확히 하나의 --model이 필요하다.";
                 return false;
             }
         }
@@ -210,15 +284,22 @@ namespace
             failure = "Cook에는 하나 이상의 --model/--texture/--shadermeta/--material이 필요하다.";
             return false;
         }
-        if (out.mode == Arguments::Mode::Cook && out.outputRoot.empty())
+        if ((out.mode == Arguments::Mode::Cook
+            || out.mode == Arguments::Mode::AuthorModelAsset)
+            && out.outputRoot.empty())
         {
-            failure = "Cook에는 --output이 필요하다.";
+            failure = "Cook/model authoring에는 --output이 필요하다.";
             return false;
         }
-        if (out.mode == Arguments::Mode::RefreshModelIdentities
-            && !out.outputRoot.empty())
+        if (!out.identityEpoch.empty())
         {
-            failure = "identity refresh에는 --output을 지정할 수 없다.";
+            failure = "--identity-epoch는 identity epoch 발급 전용이다.";
+            return false;
+        }
+        if (out.mode != Arguments::Mode::AuthorModelAsset
+            && out.modelAuthoringFailurePoint != assets::ModelAuthoringFailurePoint::None)
+        {
+            failure = "--model-authoring-fail은 model authoring 전용이다.";
             return false;
         }
         return true;
@@ -250,18 +331,34 @@ namespace
         return (parent / absolute.filename()).lexically_normal();
     }
 
+    // MBC11 — generation 디렉터리 내보내기로 artifact 경로가 깊어졌다
+    // (Derived/Models/xx/<id>/<gen>/textures/<id>.png). 패키지 부모가 길면 legacy 260자
+    // 경계를 넘으므로 절대 경로가 길 때 `\\?\` 접두로 연다. 상대·짧은 경로는 그대로.
+    [[nodiscard]] std::filesystem::path LongPath(const std::filesystem::path& path)
+    {
+        const std::wstring native = path.lexically_normal().native();
+        if (!path.is_absolute() || native.size() < 240u
+            || native.rfind(L"\\\\?\\", 0) == 0)
+        {
+            return path;
+        }
+        std::wstring prefixed = L"\\\\?\\" + native;
+        for (wchar_t& c : prefixed) if (c == L'/') c = L'\\';
+        return std::filesystem::path(prefixed);
+    }
+
     [[nodiscard]] bool WriteBinaryFile(const std::filesystem::path& path,
         std::span<const std::byte> bytes, std::string& failure)
     {
         std::error_code error;
-        std::filesystem::create_directories(path.parent_path(), error);
+        std::filesystem::create_directories(LongPath(path.parent_path()), error);
         if (error)
         {
             failure = "산출물 디렉터리를 만들 수 없다: " + error.message();
             return false;
         }
 
-        std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+        std::ofstream stream(LongPath(path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
             failure = "산출물 파일을 열 수 없다: " + path.string();
@@ -284,7 +381,7 @@ namespace
     [[nodiscard]] bool ReadBinaryFile(const std::filesystem::path& path,
         std::vector<std::byte>& out, std::string& failure)
     {
-        std::ifstream stream(path, std::ios::binary);
+        std::ifstream stream(LongPath(path), std::ios::binary);
         if (!stream)
         {
             failure = "검증할 파일을 열 수 없다: " + path.string();
@@ -498,13 +595,23 @@ namespace
                     + " (" + parseError + ")";
                 return false;
             }
+            // MBC11 — 모델 sidecar(schema v2)는 최상위 `guid`가 없고 `assetId`(UUIDv8)를
+            // 든다. 다른 자산은 여전히 최상위 `guid`(UUIDv4)다.
             const Authoring::ReadNode guidNode = document.Root()["guid"];
+            const Authoring::ReadNode assetIdNode = document.Root()["assetId"];
             experiment::AssetId assetId;
-            if (!guidNode || !guidNode.IsScalar()
-                || !experiment::TryParseCanonicalAssetId(
-                    guidNode.AsString(), assetId))
+            bool identified = false;
+            if (guidNode && guidNode.IsScalar())
             {
-                failure = "source sidecar GUID가 canonical UUIDv4가 아니다: "
+                identified = experiment::TryParseCanonicalAssetId(guidNode.AsString(), assetId);
+            }
+            else if (assetIdNode && assetIdNode.IsScalar())
+            {
+                identified = assets::TryParseCanonicalUuidV8(assetIdNode.AsString(), assetId.value);
+            }
+            if (!identified)
+            {
+                failure = "source sidecar 신원이 canonical UUIDv4(guid)/UUIDv8(assetId)가 아니다: "
                     + sidecar.string();
                 return false;
             }
@@ -589,8 +696,15 @@ namespace
             return 2;
         }
 
-        std::vector<ck::ModelCookProduct> products;
+        // MBC11 — 모델은 굽지 않고 게시된 generation을 검증해 내보낸다.
+        std::vector<ck::ModelGenerationExportProduct> products;
         products.reserve(arguments.models.size());
+        error.clear();
+        const std::filesystem::path generationRoot = arguments.generationRoot.empty()
+            ? (assetRoot.parent_path() / "Library" / "ModelAssetGenerations")
+            : std::filesystem::weakly_canonical(arguments.generationRoot, error);
+        const std::filesystem::path identityHeaderPath =
+            assetRoot.parent_path() / "ProjectSetting" / "AssetIdentity.asset";
         ck::CookedAssetManifest manifest;
         std::set<std::string> artifactPaths;
         std::size_t totalMaterials = 0u;
@@ -604,11 +718,13 @@ namespace
 
         for (const std::filesystem::path& model : arguments.models)
         {
-            ck::ModelCookProductResult result = ck::BuildModelCookProduct(
-                { model, assetRoot });
+            const std::filesystem::path modelSource = model.is_relative()
+                ? assetRoot / model : model;
+            ck::ModelGenerationExportResult result = ck::BuildModelGenerationExportProduct(
+                { modelSource, assetRoot, generationRoot, identityHeaderPath });
             if (!result.Succeeded())
             {
-                for (const ck::ModelCookProductIssue& issue : result.issues)
+                for (const ck::ModelGenerationExportIssue& issue : result.issues)
                 {
                     std::cerr << "asset-cooker error: " << issue.context
                         << ": " << issue.message << '\n';
@@ -616,43 +732,23 @@ namespace
                 return 3;
             }
 
-            ck::ModelCookProduct product = std::move(*result.product);
-            if (!artifactPaths.insert(product.artifactPath).second)
+            ck::ModelGenerationExportProduct product = std::move(*result.product);
+            for (const ck::ModelGenerationExportFile& file : product.files)
             {
-                std::cerr << "asset-cooker error: 중복 model artifact path다.\n";
-                return 3;
-            }
-            bool embeddedPathCollision = false;
-            for (const ck::EmbeddedTextureArtifact& embedded
-                : product.embeddedTextures)
-            {
-                if (!artifactPaths.insert(embedded.artifactPath).second)
+                if (!artifactPaths.insert(file.artifactPath).second)
                 {
-                    // 경로는 GUID 에서 나온다. 충돌은 곧 두 자산이 같은 GUID 를
-                    // 들고 있다는 뜻이고, 어느 파일인지 여기서만 보인다.
-                    std::cerr << "asset-cooker error: 중복 embedded texture "
-                        "artifact path다: " << embedded.artifactPath << '\n';
-                    embeddedPathCollision = true;
-                    break;
+                    std::cerr << "asset-cooker error: 중복 model artifact path다: "
+                        << file.artifactPath << '\n';
+                    return 3;
                 }
-                totalEmbeddedTextureBytes += embedded.artifactBytes.size();
             }
-            if (embeddedPathCollision) return 3;
-
             totalMaterials += product.materialCount;
             totalEmbeddedTextures += product.embeddedTextureCount;
-            totalTextureReferences += product.textureReferenceCount;
-            totalExternalTextureReferences +=
-                product.externalTextureReferenceCount;
-            totalArtifactBytes += product.artifactBytes.size();
-            // ★ 옮기지 않고 복사한다.
-            //
-            //   원래는 `std::move` 였다. 그때는 게시 전 검증이 `assetId` 하나만
-            //   읽었고 `AssetId` 는 옮겨도 값이 남아서 아무 일이 없었다. b2c-3
-            //   에서 kind·artifactPath·byteSize 까지 읽기 시작하자 곧바로
-            //   **빈 artifactPath** 로 터졌다 — 옮겨진 `std::string` 이 비어
-            //   있었기 때문이다. entry 는 작고 개수도 적으므로 복사가 맞다.
-            for (const ck::CookedAssetManifestEntry& entry : product.manifestEntries)
+            totalTextureReferences += product.embeddedTextureCount;
+            totalEmbeddedTextureBytes += product.embeddedTextureBytes;
+            totalArtifactBytes += product.artifactBytes;
+            manifest.entries.push_back(product.manifestEntry);
+            for (const ck::CookedAssetManifestEntry& entry : product.subAssetEntries)
                 manifest.entries.push_back(entry);
             products.push_back(std::move(product));
         }
@@ -817,7 +913,7 @@ namespace
                 << (error ? error.message() : "path collision") << '\n';
             return 5;
         }
-        std::filesystem::create_directories(stagingRoot, error);
+        std::filesystem::create_directories(LongPath(stagingRoot), error);
         if (error)
         {
             std::cerr << "asset-cooker error: staging 디렉터리를 만들 수 없다: "
@@ -827,51 +923,24 @@ namespace
         StagingCleanup cleanup(stagingRoot);
 
         std::string failure;
-        for (const ck::ModelCookProduct& product : products)
+        for (const ck::ModelGenerationExportProduct& product : products)
         {
-            const std::filesystem::path artifactFile =
-                stagingRoot / std::filesystem::path(product.artifactPath);
-            if (!WriteBinaryFile(artifactFile, product.artifactBytes, failure))
+            // generation 파일 전부를 바이트 동일하게 옮기고 다시 읽어 대조한다.
+            for (const ck::ModelGenerationExportFile& file : product.files)
             {
-                std::cerr << "asset-cooker error: " << failure << '\n';
-                return 5;
-            }
-
-            std::vector<std::byte> persisted;
-            if (!ReadBinaryFile(artifactFile, persisted, failure))
-            {
-                std::cerr << "asset-cooker error: " << failure << '\n';
-                return 5;
-            }
-            experiment::ModelDraft restored;
-            std::vector<experiment::ModelLoadIssue> readIssues;
-            if (!ck::Read(persisted, restored, readIssues)
-                || restored.metadata.assetId != product.modelAssetId)
-            {
-                std::cerr << "asset-cooker error: 게시 전 CEMC 재검증이 실패했다.\n";
-                return 5;
-            }
-
-            for (const ck::EmbeddedTextureArtifact& embedded
-                : product.embeddedTextures)
-            {
-                const std::filesystem::path embeddedFile =
-                    stagingRoot / std::filesystem::path(embedded.artifactPath);
-                if (!WriteBinaryFile(embeddedFile, embedded.artifactBytes, failure))
+                const std::filesystem::path artifactFile =
+                    stagingRoot / std::filesystem::path(file.artifactPath);
+                if (!WriteBinaryFile(artifactFile, file.bytes, failure))
                 {
                     std::cerr << "asset-cooker error: " << failure << '\n';
                     return 5;
                 }
-                std::vector<std::byte> embeddedPersisted;
-                if (!ReadBinaryFile(embeddedFile, embeddedPersisted, failure))
+                std::vector<std::byte> persisted;
+                if (!ReadBinaryFile(artifactFile, persisted, failure)
+                    || persisted != file.bytes)
                 {
-                    std::cerr << "asset-cooker error: " << failure << '\n';
-                    return 5;
-                }
-                if (embeddedPersisted != embedded.artifactBytes)
-                {
-                    std::cerr << "asset-cooker error: 게시 전 embedded texture "
-                        "재검증이 실패했다: " << embedded.artifactPath << '\n';
+                    std::cerr << "asset-cooker error: 게시 전 generation 파일 재검증이 "
+                        "실패했다: " << file.artifactPath << '\n';
                     return 5;
                 }
             }
@@ -1001,62 +1070,23 @@ namespace
             return 5;
         }
 
-        for (const ck::ModelCookProduct& product : products)
+        for (const ck::ModelGenerationExportProduct& product : products)
         {
             const ck::CookedAssetManifestEntry* modelEntry =
                 restoredManifest.Find(product.modelAssetId);
+            const auto record = std::ranges::find(product.files, product.recordArtifactPath,
+                &ck::ModelGenerationExportFile::artifactPath);
             ck::Sha256Digest digest{};
             std::string hashError;
             manifestIssues.clear();
-            if (!modelEntry
-                || !ck::ComputeSha256(product.artifactBytes, digest, hashError)
+            if (!modelEntry || record == product.files.end()
+                || modelEntry->artifactPath != product.recordArtifactPath
+                || !ck::ComputeSha256(record->bytes, digest, hashError)
                 || !ck::VerifyArtifact(*modelEntry,
-                    product.artifactBytes.size(), digest, manifestIssues))
+                    record->bytes.size(), digest, manifestIssues))
             {
                 std::cerr << "asset-cooker error: manifest artifact 검증이 실패했다.\n";
                 return 5;
-            }
-            // ★ index 로 종류를 가정하지 않는다. b2c-3 부터 이 목록에는
-            //   model·embedded texture·material 이 섞여 있고, "1번부터는 전부
-            //   material" 이라는 옛 전제는 임베디드 entry 를 material 로
-            //   오독한다. kind 로 갈라서 각자에게 맞는 검증을 건다.
-            for (std::size_t index = 1u;
-                index < product.manifestEntries.size(); ++index)
-            {
-                const ck::CookedAssetManifestEntry& expected =
-                    product.manifestEntries[index];
-                const ck::CookedAssetManifestEntry* found =
-                    restoredManifest.Find(expected.assetId);
-                if (!found || found->kind != expected.kind
-                    || found->artifactPath != expected.artifactPath)
-                {
-                    std::cerr << "asset-cooker error: subasset lookup 검증이 실패했다: "
-                        << expected.artifactPath << '\n';
-                    return 5;
-                }
-
-                manifestIssues.clear();
-                if (expected.kind == ck::CookedAssetKind::Material)
-                {
-                    // material 은 model CEMC 안의 subasset 이라 크기·해시가
-                    // model artifact 의 것이다.
-                    if (!ck::VerifyArtifact(*found,
-                        product.artifactBytes.size(), digest, manifestIssues))
-                    {
-                        std::cerr << "asset-cooker error: material subasset artifact 검증이 실패했다.\n";
-                        return 5;
-                    }
-                    continue;
-                }
-
-                // embedded texture 는 자기 artifact 를 가진다.
-                if (!ck::VerifyArtifact(*found, expected.byteSize,
-                    expected.contentSha256, manifestIssues))
-                {
-                    std::cerr << "asset-cooker error: embedded texture artifact 검증이 실패했다: "
-                        << expected.artifactPath << '\n';
-                    return 5;
-                }
             }
         }
 
@@ -1152,10 +1182,20 @@ namespace
         // staging tree 전체와 맞춘다. 이게 pak 에 실리기 직전의 마지막 문이다.
         {
             std::set<std::string> namedPaths;
+            // MBC11 — 모델 generation 레코드(kind Model, generation.asset)가 이름 붙인
+            // 디렉터리 안의 파일(model.cemc·sidecar.meta·textures/*)은 레코드의 폐포다.
+            // 레코드 리더가 파일 지문으로 검증하므로 manifest가 따로 이름 붙이지 않는다.
+            std::vector<std::string> closurePrefixes;
             for (const ck::CookedAssetManifestEntry& entry
                 : restoredManifest.entries)
             {
                 namedPaths.insert(entry.artifactPath);
+                if (entry.kind == ck::CookedAssetKind::Model
+                    && entry.artifactPath.ends_with("/generation.asset"))
+                {
+                    closurePrefixes.push_back(entry.artifactPath.substr(0,
+                        entry.artifactPath.size() - std::string("generation.asset").size()));
+                }
 
                 // dependency 는 writer 가 이미 해소를 강제하지만, 여기서는
                 // **읽어 온 manifest** 로 다시 본다 — 기록과 판독 사이에
@@ -1200,15 +1240,17 @@ namespace
 
             // 디스크에 있는 것 중 manifest 가 모르는 파일은 없어야 한다.
             std::size_t sweptFiles = 0u;
+            std::size_t closureFiles = 0u;
             error.clear();
+            const std::filesystem::path sweepRoot = LongPath(stagingRoot);
             for (const std::filesystem::directory_entry& item :
-                std::filesystem::recursive_directory_iterator(stagingRoot, error))
+                std::filesystem::recursive_directory_iterator(sweepRoot, error))
             {
                 if (!item.is_regular_file()) continue;
                 ++sweptFiles;
                 const std::filesystem::path relative =
-                    std::filesystem::relative(item.path(), stagingRoot, error);
-                if (error)
+                    item.path().lexically_relative(sweepRoot);
+                if (relative.empty())
                 {
                     std::cerr << "asset-cooker error: staging tree 를 훑지 못했다.\n";
                     return 5;
@@ -1216,6 +1258,12 @@ namespace
                 const std::string virtualPath = relative.generic_string();
                 if (virtualPath == "Derived/asset-manifest.cemf") continue;
                 if (namedPaths.contains(virtualPath)) continue;
+                bool inClosure = false;
+                for (const std::string& prefix : closurePrefixes)
+                {
+                    if (virtualPath.rfind(prefix, 0) == 0) { inClosure = true; break; }
+                }
+                if (inClosure) { ++closureFiles; continue; }
 
                 std::cerr << "asset-cooker error: manifest 가 모르는 artifact 가 "
                     "staging tree 에 있다: " << virtualPath << '\n';
@@ -1230,10 +1278,10 @@ namespace
             // 파일 수 = 서로 다른 artifact 경로 + manifest 하나.
             // material 처럼 model artifact 를 공유하는 subasset 이 있으므로
             // entry 수가 아니라 **경로 수**와 비교한다.
-            if (sweptFiles != namedPaths.size() + 1u)
+            if (sweptFiles != namedPaths.size() + closureFiles + 1u)
             {
                 std::cerr << "asset-cooker error: staging 파일 수가 맞지 않는다: "
-                    << sweptFiles << " != " << (namedPaths.size() + 1u) << '\n';
+                    << sweptFiles << " != " << (namedPaths.size() + closureFiles + 1u) << '\n';
                 return 5;
             }
             closureArtifactPaths = namedPaths.size();
@@ -1241,7 +1289,7 @@ namespace
         }
 
         error.clear();
-        std::filesystem::rename(stagingRoot, outputRoot, error);
+        std::filesystem::rename(LongPath(stagingRoot), LongPath(outputRoot), error);
         if (error)
         {
             std::cerr << "asset-cooker error: 최종 디렉터리를 게시할 수 없다: "
@@ -1288,11 +1336,13 @@ namespace
                 << " keywordAxes=" << product.keywordAxisCount
                 << " passes=" << product.passCount << '\n';
         }
-        for (const ck::ModelCookProduct& product : products)
+        for (const ck::ModelGenerationExportProduct& product : products)
         {
             std::cout << "asset-cooker model="
                 << Uuid::ToString(product.modelAssetId.value)
-                << " artifact=" << product.artifactPath << '\n';
+                << " generation=" << product.generation
+                << " files=" << product.files.size()
+                << " artifact=" << product.recordArtifactPath << '\n';
         }
         return 0;
     }
@@ -1300,6 +1350,10 @@ namespace
 
 int wmain(int argc, wchar_t** argv)
 {
+    // MBC11 — generation 검증(LoadModelAssetGeneration)이 embedded texture를 WIC로
+    // 디코드한다. 에디터는 부팅이 COM을 올리지만 cooker는 여기서 올린다.
+    const HRESULT comInit = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    struct ComScope { HRESULT hr; ~ComScope() { if (SUCCEEDED(hr)) CoUninitialize(); } } comScope{ comInit };
     Arguments arguments;
     std::string failure;
     if (!ParseArguments(argc, argv, arguments, failure))
@@ -1309,18 +1363,50 @@ int wmain(int argc, wchar_t** argv)
         PrintUsage();
         return 2;
     }
-    if (arguments.mode == Arguments::Mode::RefreshModelIdentities)
+    if (arguments.mode == Arguments::Mode::AuthorModelAsset)
     {
-        asset_cooker::ModelIdentityRefreshSummary summary;
-        if (!asset_cooker::RefreshModelIdentities(arguments.assetRoot,
-            arguments.models, summary, failure))
+        const std::filesystem::path source = arguments.models.front().is_relative()
+            ? arguments.assetRoot / arguments.models.front()
+            : arguments.models.front();
+        assets::ModelAssetAuthoringRequest request;
+        request.assetRoot = arguments.assetRoot;
+        request.sourcePath = source;
+        request.identityHeaderPath = arguments.assetRoot.parent_path()
+            / "ProjectSetting" / "AssetIdentity.asset";
+        request.generationRoot = arguments.outputRoot;
+        request.failurePoint = arguments.modelAuthoringFailurePoint;
+        const assets::ModelAssetAuthoringResult result =
+            assets::AuthorModelAsset(request);
+        if (!result.Succeeded())
         {
-            std::cerr << "asset-cooker error: " << failure << '\n';
+            for (const assets::ModelAssetAuthoringIssue& issue : result.issues)
+                std::cerr << "asset-cooker error [" << issue.stage << "]: "
+                    << issue.message << '\n';
             return 7;
         }
-        std::cout << "asset-cooker identity-refresh models=" << summary.models
-            << " materials=" << summary.materials
-            << " embeddedTextures=" << summary.embeddedTextures << '\n';
+        std::cout << "asset-cooker model-authoring model="
+            << Uuid::ToString(result.modelAssetId)
+            << " generation=" << result.generation
+            << " subAssets=" << result.subAssetCount
+            << " materials=" << result.materialCount
+            << " embeddedTextures=" << result.embeddedTextureCount
+            << " published=" << result.generationPath.generic_string()
+            << '\n';
+        return 0;
+    }
+    if (arguments.mode == Arguments::Mode::IssueModelIdentityEpoch)
+    {
+        const std::filesystem::path headerPath = arguments.assetRoot.parent_path()
+            / "ProjectSetting" / assets::kIdentityEpochHeaderFileName;
+        if (!assets::IssueIdentityEpochHeader(headerPath,
+            arguments.identityEpoch, failure))
+        {
+            std::cerr << "asset-cooker error: " << failure << '\n';
+            return 8;
+        }
+        std::cout << "asset-cooker identity-epoch issued="
+            << arguments.identityEpoch << " header="
+            << headerPath.generic_string() << '\n';
         return 0;
     }
     if (arguments.mode == Arguments::Mode::CompileRuntimeDocuments)

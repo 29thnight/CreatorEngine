@@ -156,7 +156,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AnimationLoader.cpp" />
     <ClCompile Include="AssetJob.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
@@ -222,9 +221,8 @@
     </ClCompile>
     <ClCompile Include="ShaderMetaReflection.cpp" />
     <ClCompile Include="ShaderPermutationDomain.cpp" />
+    <ClCompile Include="BoneRegion.cpp" />
     <ClCompile Include="Mesh.cpp" />
-    <ClCompile Include="Model.cpp" />
-    <ClCompile Include="ModelLoader.cpp" />
     <!-- 벤더링한 fastgltf/simdjson. per-file 설정 셋이 반드시 필요하다:
          PCH 미사용(외부 소스에 pch.h include 가 없다), 유니티 빌드 제외(매크로·
          익명 네임스페이스 충돌 — simdjson amalgamation 이 특히 위험), 경고 차단.
@@ -331,7 +329,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="Experiment\Cooked\ModelCookProducer.cpp">
+    <ClCompile Include="Experiment\Cooked\ModelGenerationExportProducer.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
@@ -396,6 +394,18 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Assets\ModelAssetAuthoringTransaction.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Assets\ModelAnimationSampler.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Assets\ModelAssetGeneration.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Experiment\MaterialPropertyBlock.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
@@ -418,16 +428,15 @@
     </ClCompile>
     <ClCompile Include="ExperimentMaterialResolveBinding.cpp" />
     <ClCompile Include="ExperimentMaterialMigration.cpp" />
-    <ClCompile Include="ExperimentModelMigration.cpp" />
-    <ClCompile Include="RHI\ExperimentVertexInputLayout.cpp" />
+    <ClCompile Include="RHI\ModelVertexInputLayout.cpp" />
     <ClCompile Include="Experiment\ModelLoader.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="EnhancedGizmoLineCollector.cpp" />
-    <ClCompile Include="RenderScene.cpp" />
-    <ClCompile Include="Skeleton.cpp" />
-    <ClCompile Include="SkeletonLoader.cpp" />
+    <ClCompile Include="RenderScene.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="UIRenderProxy.cpp" />
   </ItemGroup>
@@ -446,10 +455,7 @@
     <ClInclude Include="Interfaces\AAPassSetting.h" />
 	<ClInclude Include="Interfaces\AssetAuthoringPort.h" />
 	<ClInclude Include="Render\Core\RenderFeatureContributor.h" />
-    <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimationJob.h" />
-    <ClInclude Include="AnimationLoader.h" />
-    <ClInclude Include="AnimatorData.h" />
     <ClInclude Include="AssetBundle.h" />
     <ClInclude Include="AssetEntry.h" />
     <ClInclude Include="AssetJob.h" />
@@ -520,10 +526,8 @@
     <ClInclude Include="ShaderMetaReflection.h" />
     <ClInclude Include="ShaderPermutationDomain.h" />
     <ClInclude Include="StandardMaterialProperty.h" />
+    <ClInclude Include="BoneRegion.h" />
     <ClInclude Include="Mesh.h" />
-    <ClInclude Include="Model.h" />
-    <ClInclude Include="ModelAssetFormat.h" />
-    <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="Experiment\Import\ImportedScene.h" />
     <ClInclude Include="Experiment\Import\SceneToModelDraft.h" />
     <ClInclude Include="Experiment\Import\NormalGeneration.h" />
@@ -537,10 +541,14 @@
     <ClInclude Include="Assets\AssetIdentityHex.h" />
     <ClInclude Include="Assets\AssetIdentityEpoch.h" />
     <ClInclude Include="Assets\ModelStableKeys.h" />
+    <ClInclude Include="Assets\ModelAssetPhaseTiming.h" />
     <ClInclude Include="Assets\ModelSidecarV2.h" />
+    <ClInclude Include="Assets\ModelAssetAuthoringTransaction.h" />
+    <ClInclude Include="Assets\ModelAnimationSampler.h" />
+    <ClInclude Include="Assets\ModelAssetGeneration.h" />
     <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h" />
     <ClInclude Include="Experiment\Cooked\ModelCookIdentity.h" />
-    <ClInclude Include="Experiment\Cooked\ModelCookProducer.h" />
+    <ClInclude Include="Experiment\Cooked\ModelGenerationExportProducer.h" />
     <ClInclude Include="Experiment\Cooked\CookSupport.h" />
     <ClInclude Include="Experiment\Cooked\TextureCookProducer.h" />
     <ClInclude Include="Experiment\Cooked\ShaderMetaCookProducer.h" />
@@ -557,12 +565,12 @@
     <ClInclude Include="ExperimentMaterialResolveBinding.h" />
     <ClInclude Include="ExperimentMaterialMigration.h" />
     <ClInclude Include="Experiment\ModelData.h" />
+    <ClInclude Include="Assets\ModelVertexLayout.h" />
     <ClInclude Include="Experiment\VertexLayout.h" />
+    <ClInclude Include="RHI\ModelVertexInputLayout.h" />
     <ClInclude Include="Experiment\Model.h" />
     <ClInclude Include="Experiment\ModelLoader.h" />
     <ClInclude Include="RenderScene.h" />
-    <ClInclude Include="Skeleton.h" />
-    <ClInclude Include="SkeletonLoader.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="UIRenderProxy.h" />
     <ClInclude Include="Interfaces\VignettePassSetting.h" />

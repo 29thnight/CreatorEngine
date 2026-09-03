@@ -240,10 +240,7 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 	// 근사치로 읽는다. HUD 용도에서는 추세만 보이면 충분하다.
 	if (auto* dataSystem = DataSystem::GetInstance())
 	{
-		{
-			std::lock_guard<std::mutex> lock(dataSystem->m_modelMutex);
-			snapshot.models = dataSystem->Models.size();
-		}
+		snapshot.models = dataSystem->SnapshotModelAssetGenerations().currentAssets;
 		{
 			std::lock_guard<std::mutex> lock(dataSystem->m_materialMutex);
 			snapshot.materials = dataSystem->Materials.size();

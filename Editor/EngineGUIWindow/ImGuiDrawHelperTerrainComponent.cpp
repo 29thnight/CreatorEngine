@@ -1,7 +1,7 @@
 #include "ExternUI.h"
 #include "EditorSessionState.h"
 #include "DataSystem.h"
-#include "Model.h"
+#include "Assets/ModelAssetGeneration.h" // MBC9
 #include "EditorImGuiTexture.h"
 #include "Terrain.h"
 #include "TableAPIHelper.h"
@@ -280,10 +280,11 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 						const char* droppedFilePath = static_cast<const char*>(payload->Data);
 						file::path filename = file::path(droppedFilePath).filename();
 						file::path filepath = PathFinder::Relative("Models\\") / filename;
-						if (auto model = DataSystems->LoadCachedModelShared(filepath.string()))
+						if (auto generation = DataSystems->LoadModelAssetGenerationByPath(filepath.string()))
 						{
-							FoliageType type(model->GetMeshShared(0),
-								model->GetMaterialShared(0), true, model->name);
+							// MBC9 — Foliage 자산은 모델을 이름(stem)으로 적고, 런타임 바인딩은
+							// AddFoliageType(BindModelGeneration)이 잇는다.
+							FoliageType type(generation->SourcePath().stem().string(), true);
 							foliage->AddFoliageType(type);
 							g_CurrentBrush->m_foliageTypeID = static_cast<uint32_t>(foliage->GetFoliageTypes().size() - 1);
 						}

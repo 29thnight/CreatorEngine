@@ -1,4 +1,101 @@
-guid: 7238a117-e923-4e2f-add6-324ec8682a61
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:7bbfd0e359dce62c29bf2cf55364c01dc026bc53f1b871aa6b5a33d173a6b864
+assetId: 60054e98-6f4a-89d3-8d62-7df4454f93b8
+generation: 2
+sourceFingerprint: sha256:85d75cb77fbfb876f0f95c75993c14d1022cfca6b07bff6200fd3a99fbccc2bb
+subAssets:
+  - kind: material
+    stableKey: name:face.002
+    assetId: 68599950-bc5b-8f18-9d17-99b186c8b31e
+    binding: fbx/material/0
+    name: face.002
+    fingerprint: sha256:a8b1fcdd044e45cd40a6bae9fcaab7d8db1e1c01f720dfc75204d9e3bfe22653
+  - kind: material
+    stableKey: name:skin.002
+    assetId: 9cd3b36b-f277-8be3-9629-157590addf5e
+    binding: fbx/material/1
+    name: skin.002
+    fingerprint: sha256:e27dab918d158f9b1583d2976844cef91ce6db471a14b916bbb391e0c208f62c
+  - kind: material
+    stableKey: name:팔찌.002
+    assetId: e3339339-4717-8140-aae2-5ec4f66ce280
+    binding: fbx/material/2
+    name: 팔찌.002
+    fingerprint: sha256:60ff470ee92e23be26e325535e0928ee65ac9c10f6e33a2d52cf7e656c69083e
+  - kind: material
+    stableKey: name:옷.002
+    assetId: 37885901-37c0-85b0-9036-34696daabc0c
+    binding: fbx/material/3
+    name: 옷.002
+    fingerprint: sha256:84af10566c90b8955a2648d86d04c4fa6e37e18b31adca794681c75ada01b563
+  - kind: material
+    stableKey: name:eye.002
+    assetId: 985362be-2393-8014-9e97-1c2458ab4916
+    binding: fbx/material/4
+    name: eye.002
+    fingerprint: sha256:8b5f423b65baef5082b532ea14c9419df29d83e2f5ab64e799023c6b1fc188b0
+  - kind: material
+    stableKey: name:뿔.002
+    assetId: 96fb6241-a623-8c24-b44c-40d9c6884f59
+    binding: fbx/material/5
+    name: 뿔.002
+    fingerprint: sha256:45a8f319573076d765ce8f3cb95b372cac98a98c993427ed28ab0b53ec1e5ded
+  - kind: mesh
+    stableKey: name:Cha_Mon_L_0
+    assetId: 8bc5f46f-3a55-8756-836c-8eea7c523bcf
+    binding: mesh/0
+    name: Cha_Mon_L_0
+    fingerprint: sha256:d351f0e2c54607a16dd05c1a075320858b4e6f1a3a5b2c0b77d154a494e023f0
+  - kind: mesh
+    stableKey: name:Cha_Mon_L_1
+    assetId: 0b7f2ab0-2c2f-83ba-a583-cb6a1aa03376
+    binding: mesh/1
+    name: Cha_Mon_L_1
+    fingerprint: sha256:00582083d155e895774fb13bb63eed99c4f2b9a7a6831fda1ceaeb182d3ab1bc
+  - kind: mesh
+    stableKey: name:Cha_Mon_L_2
+    assetId: e351d1c6-60c1-8f40-bf73-01f0823a2dda
+    binding: mesh/2
+    name: Cha_Mon_L_2
+    fingerprint: sha256:55f2cf482052a3a0ece6423284819f0d24e9d9d114f7b2d060db3190eb92b94b
+  - kind: mesh
+    stableKey: name:Cha_Mon_L_3
+    assetId: a72bfe41-d1eb-85be-8329-950d6e7d6332
+    binding: mesh/3
+    name: Cha_Mon_L_3
+    fingerprint: sha256:094bdc3f8a316abd49fd1c463e3bc1f94b957462cc8097474047e4d0be31aeec
+  - kind: mesh
+    stableKey: name:Cha_Mon_L_4
+    assetId: f88b34ee-4d27-8431-a6a9-4f3263282604
+    binding: mesh/4
+    name: Cha_Mon_L_4
+    fingerprint: sha256:6530af4296e28c0d462d279e62fb03a721a8373b014b19d0ddecbdf7d99583ba
+  - kind: mesh
+    stableKey: name:Cha_Mon_L_5
+    assetId: 0dfaa341-105d-8470-95cc-faa7953beaac
+    binding: mesh/5
+    name: Cha_Mon_L_5
+    fingerprint: sha256:3d0fee92c14672aacaca527d7aa7b72692d6c942f073ba95c275b3d356bc8fe8
+  - kind: skeleton
+    stableKey: name:Ani_Mon_2_die
+    assetId: 27e716b1-7eaa-88ee-ad38-d6ac6e1477d2
+    binding: skin/0
+    name: Ani_Mon_2_die
+    fingerprint: sha256:aec10f19e9dcd397768de54d63f09f6053c2dd9a9ac80b5218c7b5f9b64bb4d2
+  - kind: animation
+    stableKey: name:Ani_Mon_2_die|Ani_Mon_2_die
+    assetId: 144c0420-a4dc-8eb3-8b2b-b9b6216ea59a
+    binding: animation/0
+    name: Ani_Mon_2_die|Ani_Mon_2_die
+    fingerprint: sha256:409abc95c793d2b72a8532d07fb0cef30f6f9a35f59694ece952e1cbe815ef01
+  - kind: animation
+    stableKey: name:Ani_Mon_2_die|Ani_Mon_2_hit
+    assetId: 8fb94c3d-8b2e-878f-a88f-9c49359b8e5b
+    binding: animation/1
+    name: Ani_Mon_2_die|Ani_Mon_2_hit
+    fingerprint: sha256:aae4b2bae47fb33f8184fbac4aff218e73c261f797dcf08a9165281404b93b67
 importSettings:
   extension: .fbx
   timestamp: 134297531275866512
@@ -6,26 +103,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: fbx/material/0
-      name: face.002
-      guid: 54371c67-a6df-4377-96d6-5e28ffad6fa6
-    - key: fbx/material/1
-      name: skin.002
-      guid: fea7358c-e43f-4dc9-a3bd-afffc757962f
-    - key: fbx/material/2
-      name: 팔찌.002
-      guid: 1a5214c9-8958-41e4-a415-97c6ab35c1e3
-    - key: fbx/material/3
-      name: 옷.002
-      guid: 7f3e0c49-a163-49dc-8104-9e098310db4b
-    - key: fbx/material/4
-      name: eye.002
-      guid: 40215ecd-32b9-45b7-9ebc-824969fac840
-    - key: fbx/material/5
-      name: 뿔.002
-      guid: 23052c61-9f09-4b4a-b7c6-f5c25732ff69
-  embeddedTextures:
-    []

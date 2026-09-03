@@ -7,6 +7,7 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
+#include <simdjson.h>
 
 #include <algorithm>
 #include <cctype>
@@ -22,7 +23,54 @@ namespace experiment::importer
 {
     namespace
     {
-        // ── 좌표 규약 변환 (legacy aiProcess_ConvertToLeftHanded 와 동일) ──
+        struct GltfPersistentIds final
+        {
+            std::vector<std::string> images{};
+            std::vector<std::string> materials{};
+            std::vector<std::string> meshes{};
+            std::vector<std::string> skins{};
+            std::vector<std::string> animations{};
+
+            void Put(fastgltf::Category category, std::size_t index,
+                std::string_view value)
+            {
+                std::vector<std::string>* target = nullptr;
+                switch (category)
+                {
+                case fastgltf::Category::Images: target = &images; break;
+                case fastgltf::Category::Materials: target = &materials; break;
+                case fastgltf::Category::Meshes: target = &meshes; break;
+                case fastgltf::Category::Skins: target = &skins; break;
+                case fastgltf::Category::Animations: target = &animations; break;
+                default: return;
+                }
+                if (target->size() <= index) target->resize(index + 1u);
+                (*target)[index] = value;
+            }
+
+            [[nodiscard]] static std::string Get(
+                const std::vector<std::string>& values, std::size_t index)
+            {
+                return index < values.size() ? values[index] : std::string{};
+            }
+        };
+
+        void CaptureCreatorEngineId(simdjson::dom::object* extras,
+            std::size_t objectIndex, fastgltf::Category objectType,
+            void* userPointer)
+        {
+            if (nullptr == extras || nullptr == userPointer) return;
+            std::string_view value;
+            if (extras->at_key("creatorEngineId").get_string().get(value)
+                != simdjson::SUCCESS || value.empty())
+            {
+                return;
+            }
+            static_cast<GltfPersistentIds*>(userPointer)->Put(
+                objectType, objectIndex, value);
+        }
+
+        // ── 공간 좌표 규약 변환 (MakeLeftHanded + FlipWindingOrder) ──────
         [[nodiscard]] math::vector3 ToEngine(const fastgltf::math::fvec3& v) noexcept
         {
             return { v.x(), v.y(), -v.z() };
@@ -38,11 +86,6 @@ namespace experiment::importer
         [[nodiscard]] math::quaternion ToEngine(const fastgltf::math::fquat& q) noexcept
         {
             return { -q.x(), -q.y(), q.z(), q.w() };
-        }
-
-        [[nodiscard]] math::vector2 FlipV(const fastgltf::math::fvec2& uv) noexcept
-        {
-            return { uv.x(), 1.0f - uv.y() };
         }
 
         [[nodiscard]] std::string ToStdString(std::string_view text)
@@ -188,7 +231,9 @@ namespace experiment::importer
             fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
                 asset, accessor, [&](fastgltf::math::fvec2 value, std::size_t index)
             {
-                out[index] = FlipV(value);
+                // glTF와 현재 texture upload/sampler가 같은 upper-left UV 원점을
+                // 사용한다. 좌표계 handedness 변환은 UV에 적용하지 않는다.
+                out[index] = { value.x(), value.y() };
             });
         }
 
@@ -317,7 +362,7 @@ namespace experiment::importer
             const fastgltf::Asset& asset, const fastgltf::TextureInfo& info,
             TextureColorSpace colorSpace, const std::filesystem::path& baseDirectory,
             ImportedScene& scene, std::unordered_map<std::size_t, std::uint32_t>& cache,
-            ImportNoteSink& notes)
+            const GltfPersistentIds& persistentIds, ImportNoteSink& notes)
         {
             if (info.textureIndex >= asset.textures.size()) return {};
             const fastgltf::Texture& texture = asset.textures[info.textureIndex];
@@ -342,6 +387,8 @@ namespace experiment::importer
 
             const fastgltf::Image& image = asset.images[*texture.imageIndex];
             ImportedTexture out;
+            out.persistentId = GltfPersistentIds::Get(
+                persistentIds.images, *texture.imageIndex);
             out.sourceKey = "gltf/image/" + std::to_string(*texture.imageIndex);
             out.name = ToStdString(image.name);
             out.colorSpace = colorSpace;
@@ -428,6 +475,9 @@ namespace experiment::importer
             | fastgltf::Options::GenerateMeshIndices;
 
         fastgltf::Parser parser;
+        GltfPersistentIds persistentIds;
+        parser.setUserPointer(&persistentIds);
+        parser.setExtrasParseCallback(&CaptureCreatorEngineId);
         const std::filesystem::path baseDirectory =
             request.sourcePath.parent_path();
         auto loaded = parser.loadGltf(data.get(), baseDirectory, options);
@@ -534,6 +584,15 @@ namespace experiment::importer
                 }
 
                 ImportedMesh mesh;
+                const std::string meshPersistentId = GltfPersistentIds::Get(
+                    persistentIds.meshes, meshIndex);
+                if (!meshPersistentId.empty())
+                {
+                    // glTF mesh 하나가 여러 primitive로 갈라질 수 있으므로
+                    // exporter ID만 복제하지 않고 primitive 좌표를 하위 key로 붙인다.
+                    mesh.persistentId = meshPersistentId + "/primitive/"
+                        + std::to_string(p);
+                }
                 mesh.name = ToStdString(sourceMesh.name);
                 if (sourceMesh.primitives.size() > 1)
                 {
@@ -639,6 +698,8 @@ namespace experiment::importer
         {
             const fastgltf::Material& source = asset.materials[materialIndex];
             ImportedMaterial material;
+            material.persistentId = GltfPersistentIds::Get(
+                persistentIds.materials, materialIndex);
             material.sourceKey = "gltf/material/" + std::to_string(materialIndex);
             material.name = ToStdString(source.name);
             material.baseColorFactor = {
@@ -667,7 +728,7 @@ namespace experiment::importer
             {
                 TextureSlot out;
                 out.texture = ResolveTexture(asset, info, colorSpace,
-                    baseDirectory, scene, textureCache, notes);
+                    baseDirectory, scene, textureCache, persistentIds, notes);
                 out.uvSet = static_cast<std::uint32_t>(info.texCoordIndex);
                 return out;
             };
@@ -705,9 +766,12 @@ namespace experiment::importer
 
         // ── skin ────────────────────────────────────────────────────────
         scene.skins.reserve(asset.skins.size());
-        for (const fastgltf::Skin& source : asset.skins)
+        for (std::size_t skinIndex = 0; skinIndex < asset.skins.size(); ++skinIndex)
         {
+            const fastgltf::Skin& source = asset.skins[skinIndex];
             ImportedSkin skin;
+            skin.persistentId = GltfPersistentIds::Get(
+                persistentIds.skins, skinIndex);
             skin.name = ToStdString(source.name);
             skin.joints.reserve(source.joints.size());
             for (std::size_t joint : source.joints)
@@ -786,9 +850,13 @@ namespace experiment::importer
 
         // ── 애니메이션 ──────────────────────────────────────────────────
         scene.clips.reserve(asset.animations.size());
-        for (const fastgltf::Animation& source : asset.animations)
+        for (std::size_t animationIndex = 0;
+            animationIndex < asset.animations.size(); ++animationIndex)
         {
+            const fastgltf::Animation& source = asset.animations[animationIndex];
             ImportedClip clip;
+            clip.persistentId = GltfPersistentIds::Get(
+                persistentIds.animations, animationIndex);
             clip.name = ToStdString(source.name);
 
             // glTF 는 (노드, 경로)마다 채널이 따로다. IR 은 노드마다 T/R/S 를

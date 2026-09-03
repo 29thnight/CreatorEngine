@@ -542,6 +542,10 @@ vcpkg_installed/
 vcpkg-response.txt
 vcpkg-install-log.txt
 
+# PHASE 3.75 MBC3 model authoring transaction이 게시하는 재생성 가능한 generation.
+/Dynamic_CPP/Library/
+!Dynamic_CPP/ProjectSetting/AssetIdentity.asset
+
 # 회귀 게이트가 매 실행마다 CLI로 다시 만드는 픽스처 — instanceID가 매번 달라져
 # 추적하면 트리가 상시 더러워진다(SceneGraphRedesignPlan 트랙 P · P-write S1).
 Dynamic_CPP/Assets/Prefabs/OvWriteProbe.prefab

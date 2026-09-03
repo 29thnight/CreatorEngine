@@ -1,0 +1,11 @@
+{
+  "meshUploads": 10,
+  "meshUploadKB": 1075,
+  "coverage": 49684,
+  "vramUsedMB": 1145,
+  "sceneTest1Ms": 15.15716,
+  "sceneFtMs": 11.76182,
+  "bootMs": 31.075,
+  "peakWorkingSetMB": 832.8,
+  "measuredAt": "2026-09-03 17:45"
+}

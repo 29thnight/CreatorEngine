@@ -11,9 +11,7 @@
 #include "Entity.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
-#include "Skeleton.h"
-#include "../RenderEngine/Experiment/Model.h"
-#include "../RenderEngine/Experiment/AnimationClipMetrics.h" // I5-D5b
+#include "Assets/ModelAnimationSampler.h" // PHASE 3.75 MBC8: typed 클립 계량
 
 AnimatorClipOverride* Animator::FindClipOverride(int clipIndex)
 {
@@ -56,22 +54,9 @@ bool Animator::IsClipLooping(int clipIndex) const
 			return *clipOverride->loopOverride;
 		}
 	}
-	if (m_experimentModel)
-	{
-		if (const experiment::Skeleton* skeleton = m_experimentModel->TryGetSkeleton())
-		{
-			if (clipIndex >= 0 && static_cast<std::size_t>(clipIndex)
-				< skeleton->clips.size())
-			{
-				return skeleton->clips[static_cast<std::size_t>(clipIndex)].looping;
-			}
-		}
-	}
-	if (m_Skeleton && clipIndex >= 0
-		&& static_cast<std::size_t>(clipIndex) < m_Skeleton->m_animations.size())
-	{
-		return m_Skeleton->m_animations[static_cast<std::size_t>(clipIndex)].m_isLoop;
-	}
+	// 오버라이드가 없으면 generation 자산값(MBC9: 유일한 출처).
+	if (const assets::ModelAnimationAsset* clip = TypedClip(clipIndex))
+		return clip->looping;
 	return true;
 }
 
@@ -80,65 +65,46 @@ void Animator::SetClipLooping(int clipIndex, bool looping)
 	EnsureClipOverride(clipIndex).loopOverride = looping;
 }
 
-std::size_t Animator::GetClipCount(bool* outViaExperiment) const
+namespace
 {
-	if (outViaExperiment) *outViaExperiment = false;
-	if (m_experimentModel)
+	void ReportClipPath(bool* outViaExperiment, AnimatorDataPath* outPath,
+		AnimatorDataPath path) noexcept
 	{
-		if (const experiment::Skeleton* skeleton =
-			m_experimentModel->TryGetSkeleton())
-		{
-			if (outViaExperiment) *outViaExperiment = true;
-			return skeleton->clips.size();
-		}
+		if (outViaExperiment) *outViaExperiment = false;
+		if (outPath) *outPath = path;
 	}
-	if (m_Skeleton) return m_Skeleton->m_animations.size();
+}
+
+std::size_t Animator::GetClipCount(bool* outViaExperiment,
+	AnimatorDataPath* outPath) const
+{
+	if (nullptr != TypedSkeleton())
+	{
+		ReportClipPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+		return TypedClipCount();
+	}
+	ReportClipPath(outViaExperiment, outPath, AnimatorDataPath::None);
 	return 0;
 }
 
-std::string Animator::GetClipName(int clipIndex, bool* outViaExperiment) const
+std::string Animator::GetClipName(int clipIndex, bool* outViaExperiment,
+	AnimatorDataPath* outPath) const
 {
-	if (outViaExperiment) *outViaExperiment = false;
-	if (clipIndex < 0) return std::string{};
-	const std::size_t index = static_cast<std::size_t>(clipIndex);
-	if (m_experimentModel)
-	{
-		if (const experiment::Skeleton* skeleton =
-			m_experimentModel->TryGetSkeleton())
-		{
-			if (outViaExperiment) *outViaExperiment = true;
-			if (index >= skeleton->clips.size()) return std::string{};
-			return skeleton->clips[index].name;
-		}
-	}
-	if (m_Skeleton && index < m_Skeleton->m_animations.size())
-	{
-		return m_Skeleton->m_animations[index].m_name;
-	}
-	return std::string{};
+	ReportClipPath(outViaExperiment, outPath, AnimatorDataPath::None);
+	if (clipIndex < 0 || nullptr == TypedSkeleton()) return std::string{};
+	ReportClipPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+	const assets::ModelAnimationAsset* clip = TypedClip(clipIndex);
+	return clip ? clip->name : std::string{};
 }
 
 std::size_t Animator::GetClipFrameCount(int clipIndex,
-	bool* outViaExperiment) const
+	bool* outViaExperiment, AnimatorDataPath* outPath) const
 {
-	if (outViaExperiment) *outViaExperiment = false;
-	if (clipIndex < 0) return 0;
-	const std::size_t index = static_cast<std::size_t>(clipIndex);
-	if (m_experimentModel)
-	{
-		if (const experiment::Skeleton* skeleton =
-			m_experimentModel->TryGetSkeleton())
-		{
-			if (outViaExperiment) *outViaExperiment = true;
-			if (index >= skeleton->clips.size()) return 0;
-			return experiment::clip::CountUniqueKeyTimes(skeleton->clips[index]);
-		}
-	}
-	if (m_Skeleton && index < m_Skeleton->m_animations.size())
-	{
-		return m_Skeleton->m_animations[index].m_totalKeyFrames;
-	}
-	return 0;
+	ReportClipPath(outViaExperiment, outPath, AnimatorDataPath::None);
+	if (clipIndex < 0 || nullptr == TypedSkeleton()) return 0;
+	ReportClipPath(outViaExperiment, outPath, AnimatorDataPath::Generation);
+	const assets::ModelAnimationAsset* clip = TypedClip(clipIndex);
+	return clip ? assets::animation::CountUniqueKeyTimes(*clip) : 0u;
 }
 
 void Animator::AddClipEvent(int clipIndex)

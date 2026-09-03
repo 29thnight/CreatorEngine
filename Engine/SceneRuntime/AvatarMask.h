@@ -3,8 +3,6 @@
 #include "Core.Minimal.h"
 #include "BoneMask.h"
 
-class Skeleton;
-class Bone;
 enum class BoneRegion;
 class AvatarMask
 {
@@ -32,7 +30,6 @@ public:
 	void ReCreateMask(AvatarMask* _otherMask);
 	BoneMask* RootMask{ nullptr };
 	bool IsBoneEnabled(const std::string& name);
-	BoneMask* MakeBoneMask(Bone* Bone);
 	std::vector<BoneMask*> m_BoneMasks;
 	bool isHumanoid = true; 
 	bool useAll = false;

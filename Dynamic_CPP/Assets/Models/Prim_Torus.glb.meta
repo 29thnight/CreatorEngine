@@ -1,4 +1,29 @@
-guid: 61079d31-7d1d-48fb-91ad-df8feff43723
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:8347a3019858cb6c07cbd659a7e20b34a1d55da7b5188fbb619014bc2d74bb56
+assetId: 17d1efaf-9c93-8adb-ab23-6f4a04810c46
+generation: 2
+sourceFingerprint: sha256:d5e77f53c4d840fbe7edf861d46479fa8777d818325875452bfabc113c6965b2
+subAssets:
+  - kind: material
+    stableKey: name:Torus_Mat
+    assetId: e7752eda-3ebb-800f-a34b-4a1692b27a79
+    binding: gltf/material/0
+    name: Torus_Mat
+    fingerprint: sha256:d740e36989bac1df59b310a0c2b1c799fae0dc97984069d0bbe13ab41de9b338
+  - kind: texture
+    stableKey: name:Torus_Mat_BaseColor
+    assetId: 76cad07c-b66d-8b44-8cff-69e630fc445d
+    binding: gltf/image/0
+    name: Torus_Mat_BaseColor
+    fingerprint: sha256:e20ba51ac8a2ebf7e5b098f412016ca3d13a9f41d24190ae8d3547e13f598abf
+  - kind: mesh
+    stableKey: name:Prim_Torus
+    assetId: 66033d4e-bc68-84d2-b140-553da730cc1e
+    binding: mesh/0
+    name: Prim_Torus
+    fingerprint: sha256:dbb43894bfda073bf5098620283a3854b20afc4b333725a1b79532ad609fb1c6
 importSettings:
   extension: .glb
   timestamp: 134300494793275063
@@ -6,13 +31,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: gltf/material/0
-      name: Torus_Mat
-      guid: a8cb2b32-5d65-4faa-86fa-5384fb5e8ffb
-  embeddedTextures:
-    - key: gltf/image/0
-      name: Torus_Mat_BaseColor
-      guid: 604d3b42-c9e8-4b0b-9553-7285e8792a6e

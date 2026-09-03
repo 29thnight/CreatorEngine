@@ -1,4 +1,5 @@
 #include "MeshRenderer.h"
+#include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC8: typed 정본 read-only 표시
 #include "MaterialScriptBinding.h"
 #include "MaterialPropertyPacker.h"
 #include "ShaderMeta.h"
@@ -9,7 +10,6 @@
 #include "DataSystem.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
-#include "Model.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "ExternUI.h"
@@ -24,6 +24,35 @@
 
 void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 {
+	// PHASE 3.75 MBC8 — typed 정본의 read-only snapshot. 인스펙터는 generation을
+	// 읽기만 하고, 변경은 authoring transaction(재임포트)이 새 generation으로
+	// 게시한다. legacy Mesh 필드는 여기서 보이지 않는다(MBC9 은퇴).
+	if (ImGui::CollapsingHeader("Model Generation"))
+	{
+		if (const auto& generation = meshRenderer->m_modelGeneration)
+		{
+			const assets::ModelAssetGenerationIdentity& identity = generation->Identity();
+			ImGui::Text("Model    %s", Uuid::ToString(identity.modelId).c_str());
+			ImGui::Text("Mesh     %s", meshRenderer->m_meshAssetId.ToString().c_str());
+			ImGui::Text("Generation %llu · epoch %s",
+				static_cast<unsigned long long>(identity.generation),
+				identity.identityEpoch.c_str());
+			if (meshRenderer->m_modelMeshIndex < generation->Meshes().size())
+			{
+				const assets::ModelMeshAsset& mesh =
+					generation->Meshes()[meshRenderer->m_modelMeshIndex];
+				ImGui::Text("Name     %s", mesh.name.c_str());
+				ImGui::Text("Vertices %zu · Indices %zu · mask 0x%X",
+					static_cast<std::size_t>(mesh.vertexStride ? mesh.vertexBytes.size() / mesh.vertexStride : 0u),
+					mesh.indices.size(), mesh.vertexAttributeMask);
+			}
+		}
+		else
+		{
+			ImGui::TextDisabled("typed generation 없음 (legacy/experiment 경로)");
+		}
+	}
+
 	if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		ImGui::Text("Element ");

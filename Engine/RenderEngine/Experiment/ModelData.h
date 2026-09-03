@@ -163,11 +163,7 @@ namespace experiment
 		[[nodiscard]] static constexpr bool IsSupportedLayout(
 			VertexAttributeMask attributes) noexcept
 		{
-			if ((attributes & ~kAllVertexAttributes) != 0) return false;
-			if ((attributes & kCoreVertexAttributes) != kCoreVertexAttributes)
-				return false;
-			const VertexAttributeMask skin = attributes & kSkinVertexAttributes;
-			return skin == 0 || skin == kSkinVertexAttributes;
+			return IsSupportedModelVertexLayout(attributes);
 		}
 
 		[[nodiscard]] bool SetLayout(VertexAttributeMask attributes) noexcept

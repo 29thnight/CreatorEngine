@@ -236,6 +236,10 @@ namespace experiment::importer
         ImportMaterialIndex material{};
         VertexStreams streams{};
         std::vector<std::uint32_t> indices{};
+        // Exporter/DCC가 재export에도 보존한다고 명시한 ID다. 비어 있으면
+        // ModelStableKeys가 이름 또는 authoring key로 내려간다. 배열 ordinal을
+        // 여기에 넣으면 안 된다.
+        std::string persistentId{};
     };
 
     enum class AlphaMode : std::uint8_t
@@ -270,7 +274,7 @@ namespace experiment::importer
     struct ImportedMaterial final
     {
         // 원본 포맷 내부에서 이 재질을 다시 찾는 키다. AssetId가 아니며,
-        // 모델 sidecar의 subAssets.materials가 이 키를 임의 UUIDv4에 매핑한다.
+        // 모델 sidecar의 typed subAssets가 이 binding을 UUIDv8에 매핑한다.
         // 이름은 중복/변경될 수 있으므로 identity key로 쓰지 않는다.
         std::string sourceKey{};
         std::string name{};
@@ -292,6 +296,7 @@ namespace experiment::importer
         TextureSlot normal{};
         TextureSlot occlusion{};
         TextureSlot emissive{};
+        std::string persistentId{};
     };
 
     // GLB/FBX 임베디드 텍스처는 바이트를 여기서 소유한다. 디스크로 뽑아내는
@@ -300,13 +305,14 @@ namespace experiment::importer
     {
         // glTF image 등 원본 컨테이너 내부의 위치를 나타내는 키다. 외부
         // texture는 자신의 .meta GUID를 쓰고, embedded texture만 모델 sidecar의
-        // subAssets.embeddedTextures에서 이 키를 UUIDv4로 해석한다.
+        // typed subAssets에서 이 binding을 UUIDv8로 해석한다.
         std::string sourceKey{};
         std::string name{};
         std::filesystem::path sourcePath{};
         std::vector<std::byte> embeddedBytes{};
         std::string mimeType{};
         TextureColorSpace colorSpace{ TextureColorSpace::Linear };
+        std::string persistentId{};
 
         [[nodiscard]] bool IsEmbedded() const noexcept
         {
@@ -323,6 +329,7 @@ namespace experiment::importer
         SceneNodeIndex skeletonRoot{};
         std::vector<SceneNodeIndex> joints{};
         std::vector<math::matrix4x4> inverseBind{};   // joints 와 같은 길이
+        std::string persistentId{};
     };
 
     enum class KeyInterpolation : std::uint8_t
@@ -355,6 +362,7 @@ namespace experiment::importer
         std::string name{};
         double durationSeconds{};
         std::vector<ImportedChannel> channels{};
+        std::string persistentId{};
     };
 
     enum class ImportNoteSeverity : std::uint8_t

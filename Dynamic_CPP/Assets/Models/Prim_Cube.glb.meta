@@ -1,4 +1,29 @@
-guid: 68b21a01-958e-44ed-8820-a2b9aa289587
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:a65883fc2f019dc05f198f571be23c7608390a86dbedaf09899a079802c0d8f6
+assetId: 8a69bd42-f950-8265-9c0e-0ff597095141
+generation: 2
+sourceFingerprint: sha256:eed6b4e1846cc46cb574e6c2b99743e4352b41bc4d51ba32acc6d5dacf9d350e
+subAssets:
+  - kind: material
+    stableKey: name:Cube_Mat
+    assetId: 98add748-9405-8297-8089-bd7b664ac47a
+    binding: gltf/material/0
+    name: Cube_Mat
+    fingerprint: sha256:cb1bb90a1df0fc2cc634e6963125ad45ab2e7407111d1d0aa0b8ec08d41c025c
+  - kind: texture
+    stableKey: name:Cube_Mat_BaseColor
+    assetId: b5a59f23-f1cd-8a13-8c71-31fcb6b7b6e6
+    binding: gltf/image/0
+    name: Cube_Mat_BaseColor
+    fingerprint: sha256:e20ba51ac8a2ebf7e5b098f412016ca3d13a9f41d24190ae8d3547e13f598abf
+  - kind: mesh
+    stableKey: name:Prim_Cube
+    assetId: a4aa6c26-0466-8374-b0d8-e63626e3fbc7
+    binding: mesh/0
+    name: Prim_Cube
+    fingerprint: sha256:5c45816f715573baa39953bb255c1e072368107d1b957ae858b633491b316aec
 importSettings:
   extension: .glb
   timestamp: 134300494787924110
@@ -6,13 +31,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: gltf/material/0
-      name: Cube_Mat
-      guid: 026ef3cb-32e3-4713-b80f-f1e719ad8188
-  embeddedTextures:
-    - key: gltf/image/0
-      name: Cube_Mat_BaseColor
-      guid: 527650a4-9a16-4fae-95ae-4a449f0d92fa

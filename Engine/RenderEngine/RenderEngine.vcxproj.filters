@@ -243,9 +243,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AnimationLoader.cpp">
-      <Filter>Asset\Loader</Filter>
-    </ClCompile>
     <ClCompile Include="AssetAuthoringPort.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
@@ -282,17 +279,14 @@
     <ClCompile Include="ShaderPermutationDomain.cpp">
       <Filter>Resources\Material</Filter>
     </ClCompile>
+    <ClCompile Include="BoneRegion.cpp">
+      <Filter>Resources\Mesh</Filter>
+    </ClCompile>
     <ClCompile Include="Mesh.cpp">
       <Filter>Resources\Mesh</Filter>
     </ClCompile>
     <ClCompile Include="MeshOptimizer.cpp">
       <Filter>Asset\MeshOptimizer</Filter>
-    </ClCompile>
-    <ClCompile Include="Model.cpp">
-      <Filter>Resources\Model</Filter>
-    </ClCompile>
-    <ClCompile Include="ModelLoader.cpp">
-      <Filter>Asset\Loader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\ThirdParty\fastgltf\src\base64.cpp">
       <Filter>ThirdParty\fastgltf</Filter>
@@ -330,7 +324,7 @@
     <ClCompile Include="Experiment\Cooked\ModelCookIdentity.cpp">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClCompile>
-    <ClCompile Include="Experiment\Cooked\ModelCookProducer.cpp">
+    <ClCompile Include="Experiment\Cooked\ModelGenerationExportProducer.cpp">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClCompile>
     <ClCompile Include="Experiment\Cooked\CookSupport.cpp">
@@ -390,6 +384,12 @@
     <ClCompile Include="Assets\ModelSidecarV2.cpp">
       <Filter>Resources\Model\Assets</Filter>
     </ClCompile>
+    <ClCompile Include="Assets\ModelAssetAuthoringTransaction.cpp">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\ModelAssetGeneration.cpp">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\MaterialPropertyBlock.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>
@@ -408,10 +408,7 @@
     <ClCompile Include="ExperimentMaterialMigration.cpp">
       <Filter>Resources\Material</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentModelMigration.cpp">
-      <Filter>Resources\Model</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\ExperimentVertexInputLayout.cpp">
+    <ClCompile Include="RHI\ModelVertexInputLayout.cpp">
       <Filter>RHI</Filter>
     </ClCompile>
     <ClCompile Include="Experiment\ModelLoader.cpp">
@@ -567,12 +564,6 @@
     <ClCompile Include="RHI\Vulkan\VulkanResourceTable.cpp">
       <Filter>RHI\Vulkan\Memory</Filter>
     </ClCompile>
-    <ClCompile Include="Skeleton.cpp">
-      <Filter>Resources\Skeleton</Filter>
-    </ClCompile>
-    <ClCompile Include="SkeletonLoader.cpp">
-      <Filter>Asset\Loader</Filter>
-    </ClCompile>
     <ClCompile Include="TerrainMaterial.cpp">
       <Filter>Resources\TerrainMaterial</Filter>
     </ClCompile>
@@ -584,17 +575,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Animation.h">
-      <Filter>Resources\Skeleton\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="AnimationJob.h">
       <Filter>Asset\JobSystem\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="AnimationLoader.h">
-      <Filter>Asset\Loader</Filter>
-    </ClInclude>
-    <ClInclude Include="AnimatorData.h">
-      <Filter>Resources</Filter>
     </ClInclude>
     <ClInclude Include="AssetBundle.h">
       <Filter>Resources\AssetBundle</Filter>
@@ -737,20 +719,14 @@
     <ClInclude Include="MaterialInfomation.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
+    <ClInclude Include="BoneRegion.h">
+      <Filter>Resources\Mesh</Filter>
+    </ClInclude>
     <ClInclude Include="Mesh.h">
       <Filter>Resources\Mesh</Filter>
     </ClInclude>
     <ClInclude Include="MeshOptimizer.h">
       <Filter>Asset\MeshOptimizer</Filter>
-    </ClInclude>
-    <ClInclude Include="Model.h">
-      <Filter>Resources\Model</Filter>
-    </ClInclude>
-    <ClInclude Include="ModelLoader.h">
-      <Filter>Asset\Loader</Filter>
-    </ClInclude>
-    <ClInclude Include="ModelAssetFormat.h">
-      <Filter>Asset\Loader</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\ImportedScene.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
@@ -788,7 +764,16 @@
     <ClInclude Include="Assets\ModelStableKeys.h">
       <Filter>Resources\Model\Assets</Filter>
     </ClInclude>
+    <ClInclude Include="Assets\ModelAssetPhaseTiming.h">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClInclude>
     <ClInclude Include="Assets\ModelSidecarV2.h">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\ModelAssetAuthoringTransaction.h">
+      <Filter>Resources\Model\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\ModelAssetGeneration.h">
       <Filter>Resources\Model\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h">
@@ -797,7 +782,7 @@
     <ClInclude Include="Experiment\Cooked\ModelCookIdentity.h">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
-    <ClInclude Include="Experiment\Cooked\ModelCookProducer.h">
+    <ClInclude Include="Experiment\Cooked\ModelGenerationExportProducer.h">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\CookSupport.h">
@@ -857,8 +842,14 @@
     <ClInclude Include="Experiment\ModelData.h">
       <Filter>Resources\Model\Experiment</Filter>
     </ClInclude>
+    <ClInclude Include="Assets\ModelVertexLayout.h">
+      <Filter>Header Files\RenderEngine\Assets</Filter>
+    </ClInclude>
     <ClInclude Include="Experiment\VertexLayout.h">
       <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\ModelVertexInputLayout.h">
+      <Filter>Header Files\RenderEngine\RHI</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Model.h">
       <Filter>Resources\Model\Experiment</Filter>
@@ -1108,12 +1099,6 @@
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\VulkanResourceTable.h">
       <Filter>RHI\Vulkan\Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="Skeleton.h">
-      <Filter>Resources\Skeleton</Filter>
-    </ClInclude>
-    <ClInclude Include="SkeletonLoader.h">
-      <Filter>Asset\Loader</Filter>
     </ClInclude>
     <ClInclude Include="SpriteSheet.h">
       <Filter>Resources\SpriteSheet</Filter>

@@ -4,12 +4,9 @@
 #include <mathematics/matrix4x4.hpp>
 
 class RenderScene;
-class Bone;
 class Animator;
-class Animation;
-class NodeAnimation;
 class AnimationController;
-namespace experiment { struct Skeleton; } // I5-D4e-1
+namespace assets { class ModelAssetGeneration; } // PHASE 3.75 MBC8
 class AnimationJob
 {
 public:
@@ -24,9 +21,11 @@ public:
 	//
 	// ★ D4e-1의 legacy 대조 팔은 B4b에서 죽었다 — 재귀 틱이 없어졌으므로
 	//   대조할 상대가 없다. 남은 축은 골든 digest(게이트 6b)다.
-	bool EvaluateExperimentPose(Animator& animator,
-		const experiment::Skeleton& experimentSkeleton, int clipIndex,
-		float time, math::matrix4x4* outExperiment);
+	// PHASE 3.75 MBC8/MBC9 — 결정적 표본 진입점(animtick 골든). experiment 판은
+	// MBC9에서 은퇴했다 — 골든 8042DC1C는 이 typed 판이 낸다.
+	bool EvaluateGenerationPose(Animator& animator,
+		const assets::ModelAssetGeneration& generation, int clipIndex,
+		float time, math::matrix4x4* outPose);
 	// K2: 공유 소유 해체 — Animator는 게임/컴포넌트 측이 소유하고, 여기서는
 	// 프레임 안에서만 유효한 관찰용 raw 포인터로 추적한다(등록/해제는 Awake/
 	// OnDestroy가 this로 직접 호출). 수명 불변식은 AnimationJob.cpp의
@@ -42,19 +41,11 @@ private:
     void UpdateBones(Animator& animator);
 
     // I6-B4b — legacy 재귀 틱 3종과 calculAni는 제거됐다(본문 373줄).
-    // BlendAni는 experiment 경로가 쓰므로 존치한다.
-    math::matrix4x4 BlendAni(const math::matrix4x4& curAni, const math::matrix4x4& nextAni, float t);
+    // MBC8 — BlendAni는 틱 뷰 템플릿의 자유 함수(BlendPose)가 됐다.
 
-	// I5-D4e-1 — experiment 재생 경로. Animator::m_experimentModel이 있으면
-	// Update 워커가 legacy 재귀 대신 이것을 탄다. 시간축·이벤트 구조는 legacy와
-	// 같고 포즈만 단일 순회다(구현부 주석 참조).
-	void TickExperiment(Animator& animator,
-		const experiment::Skeleton& skeleton, float deltaT);
-	void UpdateExperimentPose(Animator& animator,
-		const experiment::Skeleton& skeleton, AnimationController* controller,
-		int clipIndex, int nextClipIndex, float time, float nextTime);
-	void UpdateExperimentLayer(Animator& animator,
-		const experiment::Skeleton& skeleton);
+	// 재생 틱 — 데이터 출처는 typed generation 하나다(구현부 뷰 템플릿 참조).
+	void TickGeneration(Animator& animator,
+		const assets::ModelAssetGeneration& generation, float deltaT);
 	Core::DelegateHandle m_sceneLoadedHandle;
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;

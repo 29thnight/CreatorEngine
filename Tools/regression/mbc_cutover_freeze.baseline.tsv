@@ -1,16 +1,15 @@
 surface	count	files
-legacy-bridge.BuildLegacyModelFromExperiment	3	Engine\RenderEngine\DataSystem.h(1) Engine\RenderEngine\ExperimentModelMigration.cpp(2)
-ab-switch.CREATOR_EXPERIMENT_VERTEX	1	Engine\RenderEngine\ExperimentModelMigration.cpp(1)
-dual-state.m_experimentMeshBindings	6	Engine\RenderEngine\DataSystem.h(1) Engine\RenderEngine\ExperimentModelMigration.cpp(5)
-legacy-binding.m_hashingMesh	14	Engine\RenderEngine\ExperimentModelMigration.cpp(3) Engine\RenderEngine\Mesh.cpp(2) Engine\RenderEngine\Mesh.h(3) Engine\RenderEngine\Render\Graph\EnhancedDrawIdentity.h(1) Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.cpp(1) Engine\RenderEngine\RHI\DX12\DX12MeshCache.cpp(1) Engine\RenderEngine\RHI\Vulkan\VulkanRenderServices.cpp(3)
-assimp.include	10	Engine\RenderEngine\AnimationLoader.h(1) Engine\RenderEngine\Mesh.h(1) Engine\RenderEngine\Model.cpp(4) Engine\RenderEngine\ModelLoader.cpp(2) Engine\RenderEngine\ModelLoader.h(1) Engine\RenderEngine\SkeletonLoader.h(1)
-pseudo-v5.DeterministicSubAssetId	2	Tools\AssetCooker\ModelIdentityRefresher.cpp(2)
-pseudo-v5.Uuid::FromName-call	1	Tools\AssetCooker\ModelIdentityRefresher.cpp(1)
-legacy-bridge.ModelSceneBridge	0	
-legacy-fallback.LoadModelViaExperiment	5	Engine\RenderEngine\DataSystem.cpp(3) Engine\RenderEngine\DataSystem.h(1) Engine\RenderEngine\ExperimentModelMigration.cpp(1)
-diag.material.finalize	0	
-diag.mesh.resolve	1	Engine\SceneRuntime\MeshRenderer.cpp(1)
-diag.model.instantiate	2	Engine\SceneRuntime\ModelSceneBridge.cpp(2)
-diag.anim.tick	1	Engine\SceneRuntime\AnimationJob.cpp(1)
-diag.experiment.animlive	5	Editor\EngineEntry\ConsoleCommandSystem.cpp(5)
-assimp.vcpkg-port	1	vcpkg.json(1)
+legacy-bridge.BuildLegacyModelFromExperiment	0
+ab-switch.CREATOR_EXPERIMENT_VERTEX	0
+dual-state.m_experimentMeshBindings	0
+legacy-binding.m_hashingMesh	10	Engine\RenderEngine\Mesh.cpp(2) Engine\RenderEngine\Mesh.h(3) Engine\RenderEngine\Render\Graph\EnhancedDrawIdentity.h(1) Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.cpp(1) Engine\RenderEngine\RHI\DX12\DX12MeshCache.cpp(1) Engine\RenderEngine\RHI\Vulkan\VulkanRenderServices.cpp(2)
+assimp.include	0
+pseudo-v5.DeterministicSubAssetId	0
+pseudo-v5.Uuid::FromName-call	0
+legacy-bridge.ModelSceneBridge	0
+legacy-fallback.LoadModelViaExperiment	0
+diag.material.finalize	0
+diag.mesh.resolve	0
+diag.model.instantiate	0
+diag.anim.tick	0
+assimp.vcpkg-port	0	vcpkg.json(0)

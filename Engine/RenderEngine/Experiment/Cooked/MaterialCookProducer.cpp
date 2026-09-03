@@ -1,6 +1,7 @@
 #include "MaterialCookProducer.h"
 
 #include "CookSupport.h"
+#include "../../Assets/AssetIdentityProfile.h" // PHASE 3.75 MBC8: UUIDv8 embedded texture
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
 
@@ -163,10 +164,13 @@ namespace experiment::cooked
 
                 ++texturePropertyCount;
                 AssetId textureAssetId{};
-                if (!TryParseCanonicalAssetId(guidText, textureAssetId))
+                // PHASE 3.75 MBC8 — 모델 generation closure의 embedded texture는
+                // UUIDv8 subasset 신원이다. 외부 텍스처 자산은 v4 그대로.
+                if (!TryParseCanonicalAssetId(guidText, textureAssetId)
+                    && !assets::TryParseCanonicalUuidV8(guidText, textureAssetId.value))
                 {
                     AddIssue(result, "material.textureGuid",
-                        "m_textureGuid가 canonical UUIDv4가 아니다: " + guidText);
+                        "m_textureGuid가 canonical UUIDv4/UUIDv8가 아니다: " + guidText);
                     return result;
                 }
                 if (std::ranges::find(dependencies, textureAssetId)

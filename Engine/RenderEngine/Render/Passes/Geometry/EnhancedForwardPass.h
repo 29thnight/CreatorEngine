@@ -7,6 +7,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <wrl/client.h>
 
@@ -232,16 +233,15 @@ private:
     bool BuildShadePipelineDesc(const EnhancedFrameContext& context,
         const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
         const ShaderRenderState* renderState,
-        const RHIShaderPermutation& permutation, bool experimentLayout,
+        const RHIShaderPermutation& permutation, uint32_t modelVertexMask,
         RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
         RHIShaderBlob& outPs, std::string& outError);
-    // I5-D34c: experimentLayout이 true면 EXPERIMENT_STATIC_VERTEX 퍼뮤테이션 +
-    // experiment core 유도 레이아웃으로 desc를 만든다. Forward는 본을 읽지
-    // 않아 스킨 마스크 메시도 이 한 레이아웃으로 그려진다(48B 프리픽스 공통).
+    // modelVertexMask가 0이 아니면 동일 mask에서 입력 레이아웃과 shader 축을
+    // 유도한다. color/skin 조합을 bool로 축약하지 않는다.
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
         const ShaderMeta& meta,
         std::span<const std::uint16_t> keywordSelections,
-        bool referencePath, bool experimentLayout,
+        bool referencePath, uint32_t modelVertexMask,
         RHIGraphicsPipelineDesc& outDesc,
         RHIShaderBlob& outVs, RHIShaderBlob& outPs,
         RHIShaderPermutationKey& outPermutationKey,
@@ -312,9 +312,13 @@ private:
     // 성공한 뒤 한 경계에서 교체한다.
     RHIGraphicsPipelineRequest m_shadePipelineRequest;
     RHIGraphicsPipelineRequest m_referencePipelineRequest;
-    // I5-D34c: experiment 레이아웃 짝(위 ShaderVariant와 같은 지위).
-    RHIGraphicsPipelineRequest m_experimentShadePipelineRequest;
-    RHIGraphicsPipelineRequest m_experimentReferencePipelineRequest;
+    struct ModelPipelinePair
+    {
+        RHIGraphicsPipelineRequest shade;
+        RHIGraphicsPipelineRequest reference;
+    };
+    // MBC6: 전체 vertexAttributeMask가 map key다. skin/color bool로 축약하지 않는다.
+    std::map<uint32_t, ModelPipelinePair> m_modelPipelineRequests;
     ShaderMetaHandle m_shaderMetaHandle{};
     RHIShaderPermutationKey m_defaultPermutationKey{};
     std::vector<std::uint16_t> m_defaultKeywordSelections{};
@@ -345,10 +349,9 @@ private:
     {
         RHIGraphicsPipelineRequest shade;
         RHIGraphicsPipelineRequest reference;
-        // I5-D34c: experiment 레이아웃 짝. variant 생성 시점에는 어떤 메시가
+        // MBC6 model 레이아웃 짝. variant 생성 시점에는 어떤 메시가
         // 올지 모르므로 넷을 함께 만들고, 배치가 메시 마스크로 고른다.
-        RHIGraphicsPipelineRequest experimentShade;
-        RHIGraphicsPipelineRequest experimentReference;
+        std::map<uint32_t, ModelPipelinePair> modelRequests;
         std::shared_ptr<const ShaderMetaBindingLayout> layout{};
     };
 
@@ -402,7 +405,7 @@ private:
     MaterialKey MakeMaterialKey(const EnhancedDrawItem& draw) const;
 
     // vertexAttributeMask는 RHIMeshBinding의 것 — 0이면 legacy 96B PSO,
-    // 0이 아니면 experiment 레이아웃 PSO를 돌려준다(fail-closed).
+    // 0이 아니면 ModelAssetGeneration 레이아웃 PSO를 돌려준다(fail-closed).
     bool ResolveShaderVariant(const EnhancedForwardMaterialDrawSnapshot& snapshot,
         uint32_t vertexAttributeMask,
         RHIPipelineHandle& outShadePipeline,
@@ -434,6 +437,11 @@ private:
     // I6-C — 키를 신원 값으로 옮겼다(정렬 순서도 자산 신원이 정한다).
     std::map<std::size_t, RHIMeshBinding> m_drawGeometry;
 
+    // GBuffer와 같은 animator-keyed 팔레트 저장소. Forward의 투명 스킨 메시도
+    // 같은 pose를 읽고, 인접 instancing은 instance별 bone offset으로 유지한다.
+    std::vector<math::matrix4x4> m_bonePalettes;
+    std::unordered_map<uint64_t, uint32_t> m_boneOffsets;
+
     RGHandle           m_shadowMap;
     EnhancedShadowData m_shadowData{};
 
@@ -444,4 +452,3 @@ private:
     RHITextureHandle m_iblBrdfLut;
     uint32_t        m_iblPrefilterMips{ 1 };
 };
-

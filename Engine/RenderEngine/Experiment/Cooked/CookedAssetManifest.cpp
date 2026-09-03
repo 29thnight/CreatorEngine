@@ -1,4 +1,5 @@
 #include "CookedAssetManifest.h"
+#include "../../Assets/AssetIdentityProfile.h" // MBC11: IsUuidV8
 
 #include <Windows.h>
 #include <bcrypt.h>
@@ -10,6 +11,19 @@
 #include <utility>
 
 #pragma comment(lib, "bcrypt.lib")
+
+// PHASE 3.75 MBC11 — 모델·subasset 신원은 UUIDv8(ce.uuidv8.sha256.v1)이고 나머지 자산은
+// 아직 UUIDv4다. manifest는 둘 다 받는다(pseudo-v5 등 그 밖의 표기는 거부).
+namespace experiment::cooked
+{
+    namespace
+    {
+        [[nodiscard]] bool IsCookedAssetId(const AssetId& id) noexcept
+        {
+            return IsAssetIdV4(id) || assets::IsUuidV8(id.value);
+        }
+    }
+}
 
 namespace experiment::cooked
 {
@@ -252,10 +266,10 @@ namespace experiment::cooked
                 const CookedAssetManifestEntry& entry = manifest.entries[index];
                 const std::string context =
                     "entries[" + std::to_string(index) + "]";
-                if (!IsAssetIdV4(entry.assetId))
+                if (!IsCookedAssetId(entry.assetId))
                 {
                     AddIssue(issues, context + ".assetId",
-                        "manifest key는 UUIDv4 asset identity여야 한다.");
+                        "manifest key는 canonical UUIDv4/UUIDv8 asset identity여야 한다.");
                     valid = false;
                 }
                 else if (std::ranges::find(ids, entry.assetId) != ids.end())
@@ -302,7 +316,7 @@ namespace experiment::cooked
                     const AssetId dependency = entry.dependencies[dependencyIndex];
                     const std::string dependencyContext = context + ".dependencies["
                         + std::to_string(dependencyIndex) + "]";
-                    if (!IsAssetIdV4(dependency))
+                    if (!IsCookedAssetId(dependency))
                     {
                         AddIssue(issues, dependencyContext,
                             "dependency는 UUIDv4 asset identity여야 한다.");
@@ -343,7 +357,10 @@ namespace experiment::cooked
                         AddIssue(issues,
                             "entries[" + std::to_string(index) + "].dependencies["
                                 + std::to_string(dependencyIndex) + "]",
-                            "dependency GUID가 manifest entry로 해석되지 않는다.");
+                            "dependency GUID가 manifest entry로 해석되지 않는다: "
+                                + Uuid::ToString(dependency.value) + " (entry "
+                                + Uuid::ToString(manifest.entries[index].assetId.value)
+                                + " " + manifest.entries[index].artifactPath + ")");
                         valid = false;
                     }
                 }
@@ -358,7 +375,7 @@ namespace experiment::cooked
                 const AssetSourceManifestEntry& source = manifest.sourceAssets[index];
                 const std::string context =
                     "sourceAssets[" + std::to_string(index) + "]";
-                if (!IsAssetIdV4(source.assetId))
+                if (!IsCookedAssetId(source.assetId))
                 {
                     AddIssue(issues, context + ".assetId",
                         "source catalog key는 UUIDv4 asset identity여야 한다.");

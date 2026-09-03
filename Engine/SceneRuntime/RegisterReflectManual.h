@@ -13,7 +13,6 @@
 #include "ShadowMapPassSetting.h"
 #include "BlackBoardValue.h"
 #include "AssetEntry.h"
-#include "Animation.h"
 #include "DecalComponent.h"
 #include "TerrainCollider.h"
 #include "CameraComponent.h"
@@ -52,7 +51,6 @@
 #include "MaterialInfomation.h"
 #include "Mesh.h"
 #include "InvalidScriptComponent.h"
-#include "Skeleton.h"
 #include "ActionMap.h"
 #include "AnimationController.h"
 #include "AnimationState.h"
@@ -93,7 +91,6 @@
     X(AAPassSetting) \
     X(ActionMap) \
     X(AniTransition) \
-    X(Animation) \
     X(AnimationController) \
     X(AnimationState) \
     X(Animator) \
@@ -146,7 +143,6 @@
     X(SSGIPassSetting) \
     X(Scene) \
     X(ScriptComponent) \
-    X(Skeleton) \
     X(SoundComponent) \
     X(SphereColliderComponent) \
     X(SpriteRenderer) \

@@ -66,7 +66,11 @@ namespace experiment::cooked
     //   엔진 행 벡터 규약으로 고쳤다. v3 캐시는 16 float 이 같은 자리에 있어
     //   **바이트만 보면 구분이 안 되고**, 신선도 판정은 mtime 이라 소스가 안
     //   바뀐 캐시를 신선하다고 읽는다 — 2 와 같은 이유로 버전이 갈라야 한다.
-    inline constexpr std::uint32_t kFormatVersion = 4u;
+    //
+    // 5 (2026-09-03): glTF UV를 원문 그대로 보존한다. v4 GLB 캐시는 legacy
+    //   Assimp parity를 이유로 v = 1 - v를 저장해 텍스처가 수직으로 어긋난다.
+    //   레이아웃이 아니라 값의 규약 변경이므로 구버전 cache를 재임포트한다.
+    inline constexpr std::uint32_t kFormatVersion = 5u;
 
     // V3부터 헤더는 특정 mesh mask가 아니라 전체 기술표의 지문을 기록한다.
     // 각 mesh의 실제 배치는 CookedMesh의 mask에서 같은 표로 유도한다.

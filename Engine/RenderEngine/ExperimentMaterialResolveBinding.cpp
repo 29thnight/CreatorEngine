@@ -6,9 +6,20 @@
 namespace experiment
 {
     MaterialResolveServices MakeDataSystemMaterialResolveServices(
-        const cooked::CookedAssetCatalog* catalog)
+        const cooked::CookedAssetCatalog* catalog,
+        const assets::ModelAssetGeneration* generation)
     {
         MaterialResolveServices services;
+        if (nullptr != generation)
+        {
+            services.resolveEmbeddedTexture =
+                [generation](const AssetId& id) -> std::shared_ptr<Texture>
+                {
+                    if (nullptr == generation->FindTexture(id.value)) return nullptr;
+                    return DataSystems->ResolveModelGenerationTexture(
+                        *generation, id.value);
+                };
+        }
         services.loadShaderMetaHandle =
             [](const FileGuid& guid, std::string& outError)
             {

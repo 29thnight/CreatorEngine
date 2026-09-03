@@ -1,5 +1,7 @@
 #include "ExperimentMaterialMigration.h"
 
+#include "Assets/ModelAssetGeneration.h" // MBC7
+
 #include "Experiment/MaterialResolver.h"
 #include "Material.h"
 #include "ShaderMeta.h"
@@ -359,5 +361,51 @@ namespace ExperimentMaterialMigration
         SynchronizeLegacyScalarMirrors(legacy);
         outError.clear();
         return true;
+    }
+
+    void ConvertModelMaterialAsset(const assets::ModelMaterialAsset& source,
+        const assets::ModelAssetGeneration& generation,
+        experiment::Material& outMaterial)
+    {
+        experiment::Material result;
+        result.assetId.value = source.materialId;
+        result.shaderAssetId.value = source.shaderAssetId;
+        result.name = source.name;
+        result.blendMode = source.transparent
+            ? experiment::MaterialBlendMode::Transparent
+            : experiment::MaterialBlendMode::Opaque;
+        result.keywords = source.keywords;
+        result.keywordSelections = source.keywordSelections;
+        result.properties.reserve(source.properties.size());
+        for (const assets::ModelMaterialProperty& property : source.properties)
+        {
+            experiment::MaterialProperty target;
+            target.name = property.name;
+            std::visit([&](const auto& value)
+            {
+                using T = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<T, assets::ModelTextureHandle>)
+                {
+                    experiment::TextureReference reference;
+                    reference.assetId.value = value.textureId;
+                    reference.logicalName = property.name;
+                    if (const assets::ModelTextureAsset* texture =
+                        generation.FindTexture(value.textureId))
+                    {
+                        reference.colorSpace = texture->colorSpace
+                            == assets::ModelTextureColorSpace::Srgb
+                            ? experiment::TextureColorSpace::Srgb
+                            : experiment::TextureColorSpace::Linear;
+                    }
+                    target.value = std::move(reference);
+                }
+                else
+                {
+                    target.value = value;
+                }
+            }, property.value);
+            result.properties.push_back(std::move(target));
+        }
+        outMaterial = std::move(result);
     }
 }

@@ -59,9 +59,9 @@ $animatorCode = Get-CodeText $animatorPath
 # 읽기(OnDeserialized)는 **구 씬 폴백이라 일부러 뺐다** — 폴백은 은퇴가
 # 아니라 호환이고, 그것까지 0으로 몰면 구 저작분이 갈 곳을 잃는다.
 $guarded = @(
-    @{ Sig = 'void Animator::EnsureExperimentAnimationBinding()'; Why = 'experiment 바인딩' },
+    @{ Sig = 'void Animator::EnsureAnimationBinding()'; Why = 'typed 바인딩' },
     @{ Sig = 'void Animator::UpdateAnimation()'; Why = '클립 인덱스 클램프' },
-    @{ Sig = 'void Animator::OnAfterSerialize(YAML::Node& node)'; Why = '씬 쓰기' })
+    @{ Sig = 'void Animator::OnAfterSerialize(const Authoring::MutableNodeView& view)'; Why = '씬 쓰기' })
 
 foreach ($entry in $guarded) {
     $body = Get-FunctionBody $animatorCode $entry.Sig
@@ -103,25 +103,18 @@ elseif ($reflectBody -notmatch 'm_Motion') {
 # 값은 2026-09-01 I6-B4b 직후 실측이다. I6-B/C/D가 내려갈 때마다 함께 낮춘다.
 # 표에 없는 파일이 나타나면 **새 소비자**라 실패다 — 은퇴 중인 타입에 소비가
 # 늘어나는 것이 이 게이트가 막으려는 유일한 방향이다.
+# PHASE 3.75 MBC9 — legacy Skeleton 타입이 물리 삭제됐다(Skeleton.h·AnimatorData.h·
+# ModelLoader·ModelSceneBridge·ExperimentModelMigration 부재). 남은 접촉은 Animator.cpp
+# OnDeserialized의 **구 씬 YAML 키 문자열** `node["m_Skeleton"]`(호환 읽기)뿐이다.
+# 표에 없는 파일이 나타나면 새 소비자라 실패 — 이 게이트는 이제 0-래칫이다.
 $ratchet = @{
-    # 진단 창구(GetClipDuration) 추가로 19 → 22. 창구 안 폴백은 B5에서
-    # 한꺼번에 죽으므로 창구 밖 상한은 그대로다.
-    'Engine/SceneRuntime/Animator.cpp'                = 22
-    # ★ 2026-09-01 병합으로 10 → 13. Transform 트랙(X0~X8)이 들여온
-    # `scene.transformbulk` 하네스가 legacy Skeleton을 **합성해 주입한다**
-    # (makeSkeleton → animator->m_Skeleton = ...). 은퇴 대상에 새 소비가
-    # 붙은 것이라 이 게이트가 잡았고, 같은 병합이 Scene.cpp에 넣은 제품 접촉
-    # 둘은 창구로 돌렸다(B4b). 이 하네스는 B5 선행으로 이주해야 한다 —
-    # 상한을 올리는 것은 유예이지 승인이 아니다.
-    'Editor/EngineEntry/ConsoleCommandSystem.cpp'     = 13
-    'Engine/SceneRuntime/AnimationEventBridge.cpp'    = 11
-    'Engine/SceneRuntime/ModelSceneBridge.cpp'        = 8
-    'Engine/RenderEngine/ModelLoader.cpp'             = 6
-    'Engine/RenderEngine/ExperimentModelMigration.cpp' = 5
-    'Engine/RenderEngine/Model.cpp'                   = 2
-    'Engine/SceneRuntime/Animator.h'                  = 1
-    'Engine/RenderEngine/AnimatorData.h'              = 1
-    'Engine/RenderEngine/Model.h'                     = 1
+    'Engine/SceneRuntime/Animator.cpp' = 2
+}
+foreach ($deadHeader in @('Engine\RenderEngine\Skeleton.h', 'Engine\RenderEngine\AnimatorData.h',
+    'Engine\RenderEngine\ModelLoader.h', 'Engine\SceneRuntime\ModelSceneBridge.cpp')) {
+    if (Test-Path -LiteralPath (Join-Path $repoRoot $deadHeader)) {
+        $fail += "legacy Skeleton 정의/소비 파일이 되살아났다: $deadHeader"
+    }
 }
 
 $measured = @{}
@@ -160,7 +153,7 @@ $windowFiles = @(
     'Engine/SceneRuntime/Animator.cpp',
     'Engine/SceneRuntime/Animator.h',
     'Engine/SceneRuntime/AnimationEventBridge.cpp')
-$outsideCeiling = 36
+$outsideCeiling = 0
 $outside = 0
 foreach ($rel in $measured.Keys) {
     if ($windowFiles -notcontains $rel) { $outside += $measured[$rel] }

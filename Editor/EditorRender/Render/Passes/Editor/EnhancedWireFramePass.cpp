@@ -113,22 +113,26 @@ void EnhancedWireFramePass::CollectDraws(const std::vector<EnhancedDrawItem>* dr
 
     for (const EnhancedDrawItem& draw : *draws)
     {
-        if (nullptr == draw.mesh) continue;
+        if (nullptr == draw.mesh && !draw.modelMeshView.IsComplete()) continue;
 
         ++m_lastDrawItemCount;
 
-        // 배치는 (메시)로만 가른다 — 재질은 이 패스에 없다.
+        // 배치는 (지오메트리 키)로만 가른다 — 재질은 이 패스에 없다. 키가 0인
+        // 절차 메시(격리 하네스)는 포인터로 대신한다.
+        const std::size_t key = 0 != draw.geometryKey
+            ? draw.geometryKey : reinterpret_cast<std::size_t>(draw.mesh);
         Batch* batch = nullptr;
         for (Batch& existing : m_batches)
         {
-            if (existing.mesh == draw.mesh) { batch = &existing; break; }
+            if (existing.geometryKey == key) { batch = &existing; break; }
         }
 
         if (nullptr == batch)
         {
             m_batches.push_back(Batch{ draw.mesh, 0, 0 });
             batch = &m_batches.back();
-            batch->experimentView = draw.experimentView; // I5-D4b 핸들 나름
+            batch->geometryKey = key;
+            batch->modelMeshView = draw.modelMeshView; // MBC9 typed 뷰 나름
         }
         ++batch->count;
 
@@ -233,9 +237,8 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
         std::string uploadError;
         // I5-D4b: 3패스와 같은 분기 — 같은 stableKey라 GBuffer가 올린 것을
         // 캐시 히트로 받는다.
-        const auto entry = (0 != batch.experimentView.stableKey)
-            ? context.meshCache->GetOrUploadExperiment(
-                batch.experimentView, uploadError)
+        const auto entry = batch.modelMeshView.IsComplete()
+            ? context.meshCache->GetOrUploadModel(batch.modelMeshView, uploadError)
             : context.meshCache->GetOrUpload(batch.mesh, uploadError);
         if (!entry.IsValid())
         {
@@ -246,7 +249,7 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
             }
             continue;   // 빈 메시는 건너뛴다
         }
-        m_geometry[batch.mesh] = entry;
+        m_geometry[batch.geometryKey] = entry;
     }
 
     m_lastBatchCount = static_cast<uint32_t>(m_batches.size());
@@ -373,7 +376,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 
             for (const Batch& batch : m_batches)
             {
-                const auto geometry = m_geometry.find(batch.mesh);
+                const auto geometry = m_geometry.find(batch.geometryKey);
                 if (geometry == m_geometry.end()) continue;
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,

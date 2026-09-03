@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstring>
 #include <map>
+#include <optional>
 #include <set>
 #include <utility>
 
@@ -161,6 +162,76 @@ namespace assets
             for (const im::SceneNodeIndex joint : skin.joints) fp.Text(NodeName(scene, joint));
             fp.Pod(skin.inverseBind);
             return fp.Finish();
+        }
+
+        // 스킨이 없는 animation-only source도 ConvertToModelDraft에서 채널 target과
+        // 그 조상으로 skeleton 하나를 유도한다. sidecar inventory가 import 원본의
+        // skin 배열만 세면 CEMC에는 skeleton이 있는데 sidecar에는 없는 부분 게시가
+        // 된다. 같은 폐포를 여기서 지문화하되, 합성 skeleton의 신원은 이름을
+        // 지어내지 않고 one-time authoring key로 발급한다.
+        [[nodiscard]] std::optional<std::string> AnimationOnlySkeletonFingerprint(
+            const im::ImportedScene& scene)
+        {
+            if (!scene.skins.empty() || scene.clips.empty() || scene.nodes.empty())
+                return std::nullopt;
+
+            std::vector<std::uint8_t> member(scene.nodes.size(), 0u);
+            for (const im::ImportedClip& clip : scene.clips)
+            {
+                for (const im::ImportedChannel& channel : clip.channels)
+                {
+                    if (!channel.target.IsValid()
+                        || channel.target.Value() >= scene.nodes.size()) continue;
+                    std::uint32_t cursor = channel.target.Value();
+                    for (std::size_t steps = 0; steps <= scene.nodes.size(); ++steps)
+                    {
+                        if (member[cursor]) break;
+                        member[cursor] = 1u;
+                        const im::SceneNodeIndex parent = scene.nodes[cursor].parent;
+                        if (!parent.IsValid() || parent.Value() >= scene.nodes.size()) break;
+                        cursor = parent.Value();
+                    }
+                }
+            }
+            if (std::ranges::none_of(member, [](std::uint8_t value) { return value != 0u; }))
+                return std::nullopt;
+
+            // 노드 ordinal은 fingerprint에도 쓰지 않는다. root부터의 이름 경로와
+            // local TRS를 node별로 해시한 뒤 정렬해 importer 배열 재배치에 안정적이다.
+            std::vector<std::string> nodeFingerprints;
+            for (std::size_t nodeIndex = 0; nodeIndex < scene.nodes.size(); ++nodeIndex)
+            {
+                if (!member[nodeIndex]) continue;
+                std::vector<std::string_view> path;
+                std::uint32_t cursor = static_cast<std::uint32_t>(nodeIndex);
+                for (std::size_t steps = 0; steps <= scene.nodes.size(); ++steps)
+                {
+                    path.push_back(scene.nodes[cursor].name);
+                    const im::SceneNodeIndex parent = scene.nodes[cursor].parent;
+                    if (!parent.IsValid() || parent.Value() >= scene.nodes.size()
+                        || !member[parent.Value()]) break;
+                    cursor = parent.Value();
+                }
+                std::ranges::reverse(path);
+
+                FingerprintBuilder node;
+                node.Tag("animation-only-skeleton.node.v1");
+                node.U32(static_cast<std::uint32_t>(path.size()));
+                for (std::string_view component : path) node.Text(component);
+                const im::TrsTransform& local = scene.nodes[nodeIndex].local;
+                node.F32(local.translation.x); node.F32(local.translation.y);
+                node.F32(local.translation.z);
+                node.F32(local.rotation.x); node.F32(local.rotation.y);
+                node.F32(local.rotation.z); node.F32(local.rotation.w);
+                node.F32(local.scale.x); node.F32(local.scale.y); node.F32(local.scale.z);
+                nodeFingerprints.push_back(node.Finish());
+            }
+            std::ranges::sort(nodeFingerprints);
+            FingerprintBuilder aggregate;
+            aggregate.Tag("animation-only-skeleton.v1");
+            aggregate.U32(static_cast<std::uint32_t>(nodeFingerprints.size()));
+            for (const std::string& node : nodeFingerprints) aggregate.Text(node);
+            return aggregate.Finish();
         }
 
         [[nodiscard]] std::string ClipFingerprint(const im::ImportedClip& clip,
@@ -337,33 +408,39 @@ namespace assets
         for (std::size_t i = 0; i < scene.materials.size(); ++i)
         {
             const im::ImportedMaterial& m = scene.materials[i];
-            out.push_back({ SubAssetKind::Material, i, {}, m.name, m.sourceKey,
+            out.push_back({ SubAssetKind::Material, i, m.persistentId, m.name, m.sourceKey,
                 MaterialFingerprint(m, scene, textureFingerprints) });
         }
         for (std::size_t i = 0; i < scene.textures.size(); ++i)
         {
             const im::ImportedTexture& t = scene.textures[i];
             if (!t.IsEmbedded()) continue; // 외부 텍스처는 자기 .meta가 신원이다
-            out.push_back({ SubAssetKind::Texture, i, {}, t.name, t.sourceKey,
+            out.push_back({ SubAssetKind::Texture, i, t.persistentId, t.name, t.sourceKey,
                 textureFingerprints[i] });
         }
         for (std::size_t i = 0; i < scene.meshes.size(); ++i)
         {
             const im::ImportedMesh& mesh = scene.meshes[i];
-            out.push_back({ SubAssetKind::Mesh, i, {}, mesh.name,
+            out.push_back({ SubAssetKind::Mesh, i, mesh.persistentId, mesh.name,
                 "mesh/" + std::to_string(i), MeshFingerprint(mesh) });
         }
         for (std::size_t i = 0; i < scene.skins.size(); ++i)
         {
             const im::ImportedSkin& skin = scene.skins[i];
             std::string name = skin.name.empty() ? NodeName(scene, skin.skeletonRoot) : skin.name;
-            out.push_back({ SubAssetKind::Skeleton, i, {}, std::move(name),
+            out.push_back({ SubAssetKind::Skeleton, i, skin.persistentId, std::move(name),
                 "skin/" + std::to_string(i), SkinFingerprint(skin, scene) });
+        }
+        if (const std::optional<std::string> fingerprint =
+            AnimationOnlySkeletonFingerprint(scene))
+        {
+            out.push_back({ SubAssetKind::Skeleton, 0u, {}, {},
+                "skeleton/animation-derived", *fingerprint });
         }
         for (std::size_t i = 0; i < scene.clips.size(); ++i)
         {
             const im::ImportedClip& clip = scene.clips[i];
-            out.push_back({ SubAssetKind::Animation, i, {}, clip.name,
+            out.push_back({ SubAssetKind::Animation, i, clip.persistentId, clip.name,
                 "animation/" + std::to_string(i), ClipFingerprint(clip, scene) });
         }
         return out;

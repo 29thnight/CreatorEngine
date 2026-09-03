@@ -11,7 +11,7 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "Experiment/MaterialInstance.h" // I5-D5c2-2: 저작 정본 스냅샷
-#include "DataSystem.h" // I5-D4b: experiment 핸들 조회
+#include "DataSystem.h"
 #include "FoliageComponent.h"
 #include "Terrain.h"
 #include "DecalComponent.h"
@@ -32,22 +32,15 @@ static void CopyWorldTransform(RenderProxy& proxy, Entity* owner)
 MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
     PrimitiveRenderProxy(kProxyType),
     m_Material(component->m_Material),
-    m_Mesh(component->m_Mesh),
     m_LightMapping(component->m_LightMapping),
     m_isSkinnedMesh(component->m_isSkinnedMesh)
 {
     CopyWorldTransform(*this, component->GetOwner());
 
-    // I5-D4b/D4c — experiment 핸들. 정본은 컴포넌트 소유 필드다(postLoad의
-    // experiment 이름 해석·D4d 인스턴스화가 채우고, 잔여 경로는 EnsureExperimentBinding의
-    // 신원 조회가 잇는다). 프록시 갱신 커맨드는 메시를 바꾸지 않으므로
-    // 스냅샷 시점 한 번이면 된다. 빈 핸들이면 렌더는 legacy 경로로 그린다.
-    if (nullptr != m_Mesh)
-    {
-        component->EnsureExperimentBinding();
-        m_experimentModel = component->m_experimentModel;
-        m_experimentMeshIndex = component->m_experimentMeshIndex;
-    }
+    // PHASE 3.75 MBC7/MBC9 — typed 정본이 유일한 지오메트리 출처다. 프록시 갱신
+    // 커맨드는 메시를 바꾸지 않으므로 스냅샷 시점 한 번이면 된다.
+    m_modelGeneration = component->m_modelGeneration;
+    m_modelMeshIndex = component->m_modelMeshIndex;
 
 	Entity* meshOwner = component->GetOwner();
 	Entity::Index animatorOwnerIndex = meshOwner
@@ -105,7 +98,7 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
 
     // 컬링용 월드 AABB. 스키닝은 담지 않는다 — 메시의 상자가 바인드 포즈
     // 것이라 애니메이션이 그 밖으로 정점을 민다(헤더의 m_hasWorldBounds).
-    m_hasWorldBounds = (!m_isSkinnedMesh && nullptr != m_Mesh);
+    m_hasWorldBounds = (!m_isSkinnedMesh && component->HasRenderableMesh());
     if (m_hasWorldBounds)
     {
         m_worldBounds = component->GetBoundingBox();

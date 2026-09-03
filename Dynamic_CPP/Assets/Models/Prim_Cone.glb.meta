@@ -1,4 +1,29 @@
-guid: 1cc56957-c0eb-4924-8439-f5f74e78df27
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:674af912673287bab9aed7c17b0086355d0d820ac42ede031752b3190672b14d
+assetId: 9888e325-a6fb-8378-b297-aa1f10eca2dc
+generation: 2
+sourceFingerprint: sha256:ff8bb90e14e887cc91b2ae86b4c54cb4c578231f3b3f1e780d8de0fd027c1677
+subAssets:
+  - kind: material
+    stableKey: name:Cone_Mat
+    assetId: ba34f36c-f102-8981-a60d-1d1f5e9151f3
+    binding: gltf/material/0
+    name: Cone_Mat
+    fingerprint: sha256:9d7423b3d96bd0b1a7fe454a40b6a4084f1ede99af4f95b2052b3f26492542cc
+  - kind: texture
+    stableKey: name:Cone_Mat_BaseColor
+    assetId: 428b8cb0-1c49-8e2d-b214-68e2d9ac6a63
+    binding: gltf/image/0
+    name: Cone_Mat_BaseColor
+    fingerprint: sha256:e20ba51ac8a2ebf7e5b098f412016ca3d13a9f41d24190ae8d3547e13f598abf
+  - kind: mesh
+    stableKey: name:Prim_Cone
+    assetId: 0ad356ee-71ab-8104-a008-b5c4e31b91f3
+    binding: mesh/0
+    name: Prim_Cone
+    fingerprint: sha256:94c407de5468102150826c0f3914d4d2e115ea2bb20a7f199768237caafae7f5
 importSettings:
   extension: .glb
   timestamp: 134300494792471617
@@ -6,13 +31,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: gltf/material/0
-      name: Cone_Mat
-      guid: 02e94b04-c4a6-4bbf-8d45-fc9b9942ede5
-  embeddedTextures:
-    - key: gltf/image/0
-      name: Cone_Mat_BaseColor
-      guid: 15b20b46-09f9-4500-bb8f-1e2eb68a141b

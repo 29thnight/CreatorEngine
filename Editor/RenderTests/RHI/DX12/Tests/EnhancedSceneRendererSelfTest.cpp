@@ -42,8 +42,9 @@
 #include "Render/Core/EnhancedLightPacking.h"
 #include "Texture.h"
 #include "PrimitiveRenderProxy.h"
-#include "Skeleton.h"
-#include "Model.h"
+#include "BoneRegion.h" // MAX_BONES
+#include "DataSystem.h"
+#include "Assets/ModelAssetGeneration.h"
 #include <mathematics/transform.hpp>
 #include "PathFinder.h"
 // 자가 검증이 만드는 쿼드가 Vertex를 쓴다. 유니티 빌드에서는 같은 블롭의
@@ -1963,22 +1964,20 @@ bool DX12Test::RunUploadSegmentTest(std::string& outLog)
         else
         {
             const file::path scenePath = PathFinder::ModelSourcePath() / L"scene.glb";
-            const std::shared_ptr<Model> sceneModel = Model::LoadModelShared(scenePath.string());
-            std::vector<std::shared_ptr<Mesh>> sceneMeshes;
+            // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
+            const std::shared_ptr<const assets::ModelAssetGeneration> sceneModel =
+                DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
+            std::vector<RHIModelMeshView> sceneMeshes;
             uint64_t sceneUploadBytes = 0;
             if (sceneModel)
             {
-                for (int i = 0; i < sceneModel->m_numTotalMeshes; ++i)
+                for (std::uint32_t i = 0; i < sceneModel->Meshes().size(); ++i)
                 {
-                    std::shared_ptr<Mesh> mesh = sceneModel->GetMeshShared(i);
-                    if (!mesh) continue;
-                    const uint64_t vertexBytes =
-                        static_cast<uint64_t>(mesh->GetVertices().size()) * sizeof(Vertex);
-                    const uint64_t indexBytes =
-                        static_cast<uint64_t>(mesh->GetIndices().size()) * sizeof(uint32);
-                    if (0 == vertexBytes || 0 == indexBytes) continue;
-                    sceneUploadBytes += vertexBytes + indexBytes;
-                    sceneMeshes.push_back(std::move(mesh));
+                    RHIModelMeshView view{};
+                    if (!BuildRHIModelMeshView(*sceneModel, i, view) || !view.IsComplete()) continue;
+                    sceneUploadBytes += view.vertexBytes
+                        + static_cast<uint64_t>(view.indexCount) * sizeof(uint32);
+                    sceneMeshes.push_back(view);
                 }
             }
 
@@ -1998,10 +1997,10 @@ bool DX12Test::RunUploadSegmentTest(std::string& outLog)
             else
             {
                 meshCache.BeginFrame(1);
-                for (const std::shared_ptr<Mesh>& mesh : sceneMeshes)
+                for (const RHIModelMeshView& mesh : sceneMeshes)
                 {
                     std::string uploadError;
-                    const RHIMeshBinding binding = meshCache.GetOrUpload(mesh.get(), uploadError);
+                    const RHIMeshBinding binding = meshCache.GetOrUploadModel(mesh, uploadError);
                     if (!binding.vertices.IsValid() || !binding.indices.IsValid())
                     {
                         scenePassed = false;
@@ -3098,25 +3097,24 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         {
             const MeshRenderProxy* proxy =
                 (nullptr != basePtr) ? basePtr->As<MeshRenderProxy>() : nullptr;
-            if (nullptr == proxy || nullptr == proxy->m_Mesh) continue;
+            if (nullptr == proxy) continue;
+            // MBC7/MBC9 — 제품 poolMesh와 같은 typed 축. generation이 유일한
+            // 지오메트리 출처다.
+            RHIModelMeshView modelView{};
+            if (!proxy->m_modelGeneration
+                || !BuildRHIModelMeshView(*proxy->m_modelGeneration,
+                    proxy->m_modelMeshIndex, modelView))
+            {
+                continue;
+            }
 
             EnhancedDrawItem item{};
-            item.mesh = proxy->m_Mesh.get();
             item.worldMatrix = proxy->m_worldMatrix;
-
-            // I5-D4b — 제품 poolMesh와 같은 핸들 경로. 하네스가 다른 경로로
-            // 그리면 감시자가 제품이 안 타는 길을 재는 눈먼 초록이 된다(D34a
-            // 주입과 같은 이유). 뷰 포인터 수명은 프록시의 shared_ptr가 진다
-            // (이 프레임 동안 살아 있음 — 위 팔레트와 같은 계약).
-            if (proxy->m_experimentModel)
+            item.modelMeshView = modelView;
             {
-                RHIExperimentVertexView view{};
-                if (DataSystem::BuildExperimentVertexView(
-                    *proxy->m_experimentModel,
-                    proxy->m_experimentMeshIndex, view))
-                {
-                    item.experimentView = view;
-                }
+                const math::aabb& bounds = proxy->m_modelGeneration
+                    ->Meshes()[proxy->m_modelMeshIndex].bounds;
+                item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
             }
 
             // 본 팔레트. 포인터만 나르고 복사는 패스가 PrepareFrame에서 한다 —
@@ -3131,7 +3129,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
                 && proxy->m_finalTransforms)
             {
                 item.bonePalette = proxy->m_finalTransforms.get();
-                item.boneCount = Skeleton::MAX_BONES;
+                item.boneCount = MAX_BONES;
                 item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
 
                 // I6-B4-pre 진단 — 하네스가 **실제로 받은** 팔레트의 digest.
@@ -3173,7 +3171,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
                             "digest63=%08X digest512=%08X\n",
                             (unsigned long long)item.animatorKey,
                             fold(item.bonePalette, 63),
-                            fold(item.bonePalette, Skeleton::MAX_BONES));
+                            fold(item.bonePalette, MAX_BONES));
                     }
                 }
             }
@@ -3293,14 +3291,6 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         outLog += "[2/4] 보조 시스템 초기화 실패: " + error + "\n";
         return false;
     }
-    // I5-D34a: 라이브와 같은 experiment 정점 조회를 이 하네스에도 건다. 이게
-    // 없으면 이 검증은 전부 legacy 96B로 그려 experiment 경로에 눈멀고,
-    // "라이브만 다른 그림"이 된다 — 라이브 배선의 회귀 감시자가 이 검증이므로
-    // 캐시 구성도 같아야 한다.
-    meshCache.SetExperimentVertexLookup(
-        [](const Mesh& mesh, RHIExperimentVertexView& view)
-        { return DataSystems->TryGetExperimentVertexView(mesh, view); });
-
     EnhancedFrameContext frameContext{};
     frameContext.resources = &resources;
     frameContext.psoManager = &psoManager;
@@ -3943,8 +3933,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         + " · 배치 " + std::to_string(gbuffer.GetLastBatchCount()) + "\n";
     outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
         + " · 메시 업로드 " + std::to_string(meshStats.uploads)
-        + "(experiment " + std::to_string(meshStats.experimentUploads)
-        + ", handle " + std::to_string(meshStats.experimentHandleUploads) + ", "
+        + "(generation " + std::to_string(meshStats.modelGenerationUploads) + ", "
         + std::to_string(meshStats.bytesUploaded / 1024) + "KB)"
         + " · 커버리지 " + std::to_string(coveredA) + "/" + std::to_string(kWidth * kHeight) + "\n";
 

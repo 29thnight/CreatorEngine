@@ -2,7 +2,7 @@
 #include "AnimationState.h"
 #include "AniBehavior.h"
 #include "Animator.h"
-#include "Skeleton.h"
+#include "BoneRegion.h"
 #include "AvatarMask.h"
 void AnimationController::SetNextState(std::string stateName)
 {

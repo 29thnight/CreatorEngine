@@ -1,4 +1,29 @@
-guid: dfd9b94f-cbf4-4712-9a41-01ee8453c7fa
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:273fdd8f63e26e9ed83b111b8f906d6a0cd04a3910472ebf42c0efdd0584152d
+assetId: 987a8d42-3964-8d46-9024-7f280c92f986
+generation: 2
+sourceFingerprint: sha256:2c707817bd157e63623570d366a6f149e3001a3e5ddcf000cbfe43f1be907575
+subAssets:
+  - kind: material
+    stableKey: name:Suzanne_Mat
+    assetId: 1b148b33-0ca8-8bd0-972f-15d47193f001
+    binding: gltf/material/0
+    name: Suzanne_Mat
+    fingerprint: sha256:a31939b6addceb5103f5417eecd0d9e24484d7aec659c5033449308283bed734
+  - kind: texture
+    stableKey: name:Suzanne_Mat_BaseColor
+    assetId: ee5a1c8f-d3e5-841a-a0f4-5867cbae6ada
+    binding: gltf/image/0
+    name: Suzanne_Mat_BaseColor
+    fingerprint: sha256:e20ba51ac8a2ebf7e5b098f412016ca3d13a9f41d24190ae8d3547e13f598abf
+  - kind: mesh
+    stableKey: name:Prim_Suzanne
+    assetId: fd45a171-ae8b-8c74-b129-0ee00371b7ad
+    binding: mesh/0
+    name: Prim_Suzanne
+    fingerprint: sha256:ccef981c679d85fd09c70d15697d139e329cc2166f5486dc8f93e071f2f7af66
 importSettings:
   extension: .glb
   timestamp: 134308765289434717
@@ -6,13 +31,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: gltf/material/0
-      name: Suzanne_Mat
-      guid: f800393c-c807-4974-955d-b07bfd82442c
-  embeddedTextures:
-    - key: gltf/image/0
-      name: Suzanne_Mat_BaseColor
-      guid: 678a6d30-7bc7-42a1-bfbb-2e1e7cce6195

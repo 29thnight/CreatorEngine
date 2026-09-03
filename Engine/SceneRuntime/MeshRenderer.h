@@ -6,9 +6,8 @@
 #include "LightMapping.h"
 #include <mathematics/bounds.hpp>
 
-class Mesh;
-namespace experiment { class Model; } // I5-D4c 핸들 소유(shared_ptr 보관용)
 namespace experiment { struct Material; class MaterialInstance; } // I5-D5c1
+namespace assets { class ModelAssetGeneration; struct ModelMeshHandle; } // PHASE 3.75 MBC7
 
 class Material;
 class Animator;
@@ -28,14 +27,14 @@ class MeshRenderer : public meta::identity<MeshRenderer, Component>
    {
        return meta::schema<Self>(
            meta::field<&Self::m_Material>,
-           meta::field<&Self::m_Mesh>,
            meta::field<&Self::m_LightMapping>,
            meta::field<&Self::m_bitflag>,
            meta::field<&Self::m_isSkinnedMesh>,
            meta::field<&Self::m_shadowRecive>,
            meta::field<&Self::m_shadowCast>,
            meta::field<&Self::m_isEnableLOD>,
-           meta::field<&Self::m_modelGuid>);
+           meta::field<&Self::m_modelGuid>,
+           meta::field<&Self::m_meshAssetId>);
    }
 public:
 
@@ -78,12 +77,25 @@ public:
 
     [[nodiscard]] math::aabb GetBoundingBox() const;
 
-    // I5-D5b — "그릴 메시가 있는가"의 창구. 에디터 피킹이 legacy m_Mesh를
-    // 직접 존재 가드로 쓰고 있었다 — D4f가 m_Mesh를 은퇴시키면 그 가드가
-    // 통째로 거짓이 되어 피킹이 조용히 죽는다(선택이 안 되는 증상은 렌더
-    // 회귀로 안 잡힌다). experiment 핸들이 정본, legacy는 폴백.
-    // outViaExperiment는 게이트 관측 창구.
-    [[nodiscard]] bool HasRenderableMesh(bool* outViaExperiment = nullptr) const;
+    // I5-D5b — "그릴 메시가 있는가"의 창구(에디터 피킹·프록시 바운드). PHASE 3.75
+    // MBC9: typed generation이 유일한 정본이다.
+    [[nodiscard]] bool HasRenderableMesh() const noexcept
+    {
+        return static_cast<bool>(m_modelGeneration);
+    }
+
+    // PHASE 3.75 MBC7 — typed 정본 창구. generation과 그 안의 메시 인덱스를 붙들고
+    // {ModelId, MeshId, generation} 핸들·영속 MeshId·재질의 closure 텍스처를 한 번에
+    // 맞춘다. Scene bridge(모델 배치)와 OnDeserialized(씬 로드)가 부르는 유일한
+    // 진입점이다 — 두 경로가 다른 필드를 다르게 채우면 프록시가 갈린다.
+    [[nodiscard]] bool HasModelGeneration() const noexcept
+    {
+        return static_cast<bool>(m_modelGeneration);
+    }
+    bool BindModelGeneration(
+        std::shared_ptr<const assets::ModelAssetGeneration> generation,
+        std::uint32_t meshIndex);
+    [[nodiscard]] assets::ModelMeshHandle GetModelMeshHandle() const;
 
 public:
     // 에셋을 공동 소유한다.
@@ -95,7 +107,6 @@ public:
     // 리플렉션은 shared_ptr을 포인터와 동등하게 다루므로(ReflectionFunction.h)
     // 직렬화·인스펙터 경로는 그대로 동작한다.
     std::shared_ptr<Material> m_Material{};
-    std::shared_ptr<Mesh> m_Mesh{};
     LightMapping m_LightMapping;
     uint32 m_bitflag{ 0 };
 
@@ -120,14 +131,17 @@ public:
     // 없다 — 영속은 m_Material 노드의 ref 키가 진다(훅 전담).
     FileGuid m_materialBaseGuid{};
 
-    // I5-D4c — experiment 메시 핸들의 소유자. postLoad(씬 로드)의 experiment
-    // 이름 해석과 ModelSceneBridge 인스턴스화(D4d — 생성 지점 직심기)가 채우고,
-    // 그 밖의 경로(legacy 인스턴스화 폴백·Assimp 모델)는 EnsureExperimentBinding
-    // 의 신원 조회 폴백이 채운다. 프록시 생성은 이 필드를 정본으로 읽는다.
-    // 비직렬화 — 영속 신원은 m_modelGuid+메시 이름이 진다.
-    std::shared_ptr<const experiment::Model> m_experimentModel{};
-    std::uint32_t m_experimentMeshIndex{ 0 };
-    void EnsureExperimentBinding();
+    // PHASE 3.75 MBC7 — 메시의 영속 신원(UUIDv8 subasset MeshId). 이름은 semantic
+    // stable key와 같은 축이라 로드가 이름으로 한 번 되찾아 여기로 이주하고, 그
+    // 뒤로는 이 값이 정본이다(무명·중복 이름 메시는 이 값 없이는 해석하지 않는다).
+    FileGuid m_meshAssetId{};
+
+    // PHASE 3.75 MBC7 — 런타임 typed 정본. immutable ModelAssetGeneration과 그 안의
+    // 메시 인덱스. 프록시는 이것으로 RHIModelMeshView를 만들어 패스에 싣고, 재질의
+    // embedded texture는 이 generation closure에서 푼다. 비직렬화 — 영속 신원은
+    // m_modelGuid + m_meshAssetId가 진다. null이면 legacy(v4)·해석 실패 모델이다.
+    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+    std::uint32_t m_modelMeshIndex{ 0 };
 
     // I5-D5c1 — 재질의 experiment 병행 표현(base 저작 원본 + 인스턴스
     // override). 저작 경계가 채운다: 새 정본 문서는 자기 authored 원본을,

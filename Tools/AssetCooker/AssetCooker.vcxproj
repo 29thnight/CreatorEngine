@@ -86,14 +86,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AssetCooker.cpp" />
-    <ClCompile Include="ModelIdentityRefresher.cpp">
-      <!-- Windows UUID helper annotations originate in shared/third-party
-           headers; keep the tool's own Level4 diagnostics enabled. -->
-      <DisableSpecificWarnings>4189;4251;4275;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ModelIdentityRefresher.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Engine\RenderEngine\RenderEngine.vcxproj">

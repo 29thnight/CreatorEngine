@@ -1,5 +1,11 @@
 #include "DataSystem.h"
-#include "Model.h"	
+#include "Experiment/Cooked/CookedAssetCatalog.h" // I7-C1 (MBC9: ExperimentModelMigration.cpp에서 이주)
+#include "Assets/ModelAssetGeneration.h"
+#include "Material.h" // MBC9: Model.h 전이 include가 사라져 직접 든다
+#include "Mesh.h"
+#include "Texture.h"
+#include <fstream> // I7-C1: manifest 읽기
+#include <unordered_set>
 #include <future>
 #include <ppltasks.h>
 #include <ppl.h>
@@ -21,6 +27,8 @@
 #include "StandardMaterialProperty.h"
 #include "Experiment/MaterialAuthoringCodec.h"
 #include "ExperimentMaterialMigration.h"
+#include "Assets/ModelSidecarV2.h"
+#include "RHI/RHIFormat.h" // MBC7: generation embedded texture 포맷
 
 #include <algorithm>
 #include <array>
@@ -231,7 +239,13 @@ void DataSystem::Initialize()
 
 void DataSystem::Finalize()
 {
-    Models.clear();
+	m_modelAssetGenerations.Clear();
+	{
+		std::lock_guard lock(m_modelGenerationTextureMutex);
+		m_modelGenerationTextures.clear();
+		m_modelGenerationTextureOwners.clear();
+		m_modelGenerationTextureStats = {};
+	}
     Textures.clear();
     Materials.clear();
 	UITextures.clear();
@@ -299,9 +313,15 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 				{
 					++parsedMetaCount;
 					const Authoring::ReadNode node = document.Root();
-					if (node["guid"] && node["guid"].IsScalar())
+					// MBC5 — schema-v2 model sidecar에는 legacy `guid`가 없다.
+					// startup catalog가 `assetId`를 읽지 않으면 MBC4가 rewrite한 scene
+					// ModelId를 경로로 풀 수 없어 새 generation loader에 도달하지 못한다.
+					const Authoring::ReadNode identity =
+						(node["schemaVersion"].As(0u) == assets::kModelSidecarSchemaVersion)
+						? node["assetId"] : node["guid"];
+					if (identity && identity.IsScalar())
 					{
-						const FileGuid guid(node["guid"].AsString());
+						const FileGuid guid(identity.AsString());
 						if (guid != FileGuid{})
 							RegisterAssetMeta(*m_assetMetaRegistry, guid, targetPath);
 					}
@@ -323,167 +343,248 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 		parsedMetaCount);
 }
 
-Model* DataSystem::LoadModelGUID(FileGuid guid)
+assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(
+	FileGuid guid)
 {
-	file::path modelPath = m_assetMetaRegistry->GetPath(guid);
-	std::string name = modelPath.stem().string();
-	{
-		std::unique_lock lock(m_modelMutex);
-		if (Models.find(name) != Models.end())
-		{
-			Debug->Log("ModelLoader::LoadModel : Model already loaded");
-			auto model = Models[name].get();
-			return model;
-		}
-	}
+	if (FileGuid{} == guid || !assets::IsUuidV8(guid.m_guid)) return {};
+	if (auto current = m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
+		return current;
 
-	// I5-D1b — 로더 이중화. experiment(cooked→source) 로드가 정본을 향한
-	// 경로이고, 성공하면 역브리지가 legacy 파이프에 소비시킨다. 실패는
-	// Assimp 폴백(관측 로그) — 화면이 조용히 비는 것보다 legacy가 낫다.
-	if (std::shared_ptr<Model> bridged = LoadModelViaExperiment(guid, modelPath))
+	// MBC11 — cooked catalog가 마운트돼 있고 이 모델의 generation 레코드가 신선하면
+	// 그 레코드(Derived/Models/xx/<id>/<gen>/generation.asset)를 읽는다. Player는 이
+	// 경로뿐이고 Editor는 마운트 없이 Library(저작 정본)를 읽는다. 어느 쪽도 실패하면
+	// 다른 쪽으로 우회하지 않는다(§0.1-4 — silent fallback 0).
+	assets::ModelAssetGenerationLoadRequest request;
+	request.identityHeaderPath = PathFinder::ProjectSettingPath("AssetIdentity.asset");
+	request.expectedModelId = guid.m_guid;
+	const file::path cookedRecord = ResolveCookedArtifact(experiment::AssetId{ guid.m_guid });
+	const bool fromCatalog = !cookedRecord.empty()
+		&& cookedRecord.filename() == file::path("generation.asset");
+	std::string sourceLabel;
+	if (fromCatalog)
 	{
-		Model* raw = bridged.get();
-		{
-			std::unique_lock lock(m_modelMutex);
-			Models[name] = std::move(bridged);
-		}
-		return raw;
-	}
-
-	Model* model = Model::LoadModel(modelPath.string());
-	if (model)
-	{
-		{
-			std::unique_lock lock(m_modelMutex);
-			Models[name] = std::shared_ptr<Model>(model);
-		}
-		return model;
+		request.generationPath = cookedRecord.parent_path();
+		request.canonicalSidecarPath = request.generationPath / "sidecar.meta";
+		sourceLabel = cookedRecord.string();
 	}
 	else
 	{
-		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+		const file::path sourcePath = GetFilePath(guid);
+		if (sourcePath.empty()) return {};
+		file::path sidecarPath = sourcePath;
+		sidecarPath += ".meta";
+		request.generationRoot = PathFinder::DynamicSolutionPath(
+			"Library/ModelAssetGenerations");
+		request.canonicalSidecarPath = sidecarPath;
+		sourceLabel = sourcePath.string();
 	}
+	assets::ModelAssetGenerationLoadResult loaded =
+		assets::LoadModelAssetGeneration(request);
+	if (!loaded.Succeeded())
+	{
+		m_generationLoadFailed.fetch_add(1, std::memory_order_relaxed);
+		const std::string detail = loaded.issues.empty()
+			? "알 수 없는 generation load 실패"
+			: loaded.issues.front().context + ": "
+				+ loaded.issues.front().message;
+		Debug->LogError(std::string("[model.generation] 게시 전 검증 실패(")
+			+ (fromCatalog ? "catalog" : "library") + "): " + sourceLabel
+			+ " (" + detail + ")");
+		return {};
+	}
+	(fromCatalog ? m_generationFromCatalog : m_generationFromLibrary)
+		.fetch_add(1, std::memory_order_relaxed);
+	const std::string sourcePathString = sourceLabel;
 
-	return nullptr;
+	assets::ModelAssetPublishResult published =
+		m_modelAssetGenerations.Publish(std::move(loaded.generation));
+	if (!published.Succeeded())
+	{
+		Debug->LogError("[model.generation] cache publish 거부: "
+			+ sourcePathString + " (outcome "
+			+ std::to_string(static_cast<unsigned>(published.outcome)) + ")");
+		return {};
+	}
+	// MBC7 — 교체된 generation의 embedded texture owner는 새 generation과
+	// 섞이지 않는다(§6.2 "이전 texture generation 재사용 금지").
+	if (published.retired)
+		RetireModelGenerationTextures(published.retired->Handle());
+	return published.current;
 }
 
-void DataSystem::LoadModel(std::string_view filePath)
+namespace
 {
-	const file::path assetPath = ResolveRuntimeAssetPath(filePath, "Models\\");
-	std::string name = assetPath.stem().string();
+	// generation이 검증·디코드해 둔 RGBA8 subresource를 DirectXTex 이미지로
+	// 되돌려 DX12/Vulkan 텍스처 캐시가 읽는 형태(ScratchImage)로 만든다.
+	// 두 번째 디코드는 없다 — 바이트를 옮길 뿐이다.
+	[[nodiscard]] std::shared_ptr<DirectX::ScratchImage> BuildGenerationScratchImage(
+		const assets::ModelTextureAsset& texture, std::string& outError)
 	{
-		std::lock_guard<std::mutex> guard(m_modelMutex);
-		auto iter = Models.find(name);
-		if (iter != Models.end() && iter->second)
+		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+		switch (texture.format)
 		{
-			Debug->Log("ModelLoader::LoadModel : Model already loaded");
-			return;
+		case RHIFormat::RGBA8Unorm: format = DXGI_FORMAT_R8G8B8A8_UNORM; break;
+		case RHIFormat::RGBA8UnormSrgb: format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; break;
+		default:
+			outError = "generation texture 포맷이 RGBA8 계열이 아니다";
+			return nullptr;
 		}
-	}
+		if (texture.isCube || 0 == texture.width || 0 == texture.height
+			|| 0 == texture.mipLevels || 0 == texture.arraySize
+			|| texture.subresources.size()
+				!= static_cast<std::size_t>(texture.mipLevels) * texture.arraySize)
+		{
+			outError = "generation texture descriptor와 subresource 수가 맞지 않는다";
+			return nullptr;
+		}
 
-	// I5-D34b — 이름 경로도 experiment 이중화(LoadModelGUID와 같은 결). 이게
-	// 없으면 CLI(model.load)·에디터의 이름 기반 로드가 legacy 경로로 남아
-	// 병행 바인딩이 비고, 스킨 게이트가 성립하지 않는다. D4의 로드 수렴을
-	// 이 절반만 앞당긴 것이다.
-	std::shared_ptr<Model> model;
-	const FileGuid guid = GetFileGuid(assetPath);
-	if (FileGuid{} != guid)
-	{
-		model = LoadModelViaExperiment(guid, assetPath);
-	}
-	if (!model)
-	{
-		model = Model::LoadModelShared(assetPath.string());
-	}
-	if (model)
-	{
+		auto image = std::make_shared<DirectX::ScratchImage>();
+		if (FAILED(image->Initialize2D(format, texture.width, texture.height,
+			texture.arraySize, texture.mipLevels)))
 		{
-			std::unique_lock lock(m_modelMutex);
-			Models[name] = model;
+			outError = "ScratchImage 초기화 실패";
+			return nullptr;
 		}
-	}
-	else
-	{
-		Debug->LogError("ModelLoader::LoadModel : Model file not found");
+		for (std::uint32_t item = 0; item < texture.arraySize; ++item)
+		{
+			for (std::uint32_t mip = 0; mip < texture.mipLevels; ++mip)
+			{
+				// CopyTexturePixels(ModelAssetGeneration.cpp)의 적재 순서와 같다:
+				// item 바깥, mip 안쪽.
+				const assets::ModelTextureSubresource& source =
+					texture.subresources[static_cast<std::size_t>(item) * texture.mipLevels + mip];
+				const DirectX::Image* destination = image->GetImage(mip, item, 0);
+				if (nullptr == destination || 0 == source.rowPitch
+					|| source.offset + source.slicePitch > texture.pixels.size()
+					|| destination->width != source.width
+					|| destination->height != source.height)
+				{
+					outError = "generation texture subresource가 이미지 기술과 어긋난다";
+					return nullptr;
+				}
+				const std::size_t rows = static_cast<std::size_t>(source.slicePitch / source.rowPitch);
+				const std::size_t copyBytes = (std::min)(
+					static_cast<std::size_t>(source.rowPitch), destination->rowPitch);
+				const auto* sourceBytes = reinterpret_cast<const std::uint8_t*>(
+					texture.pixels.data() + source.offset);
+				for (std::size_t y = 0; y < rows && y < destination->height; ++y)
+				{
+					std::memcpy(destination->pixels + y * destination->rowPitch,
+						sourceBytes + y * static_cast<std::size_t>(source.rowPitch), copyBytes);
+				}
+			}
+		}
+		return image;
 	}
 }
 
-std::shared_ptr<Model> DataSystem::LoadCachedModelShared(std::string_view filePath)
+std::shared_ptr<Texture> DataSystem::ResolveModelGenerationTexture(
+	const assets::ModelAssetGeneration& generation, const Uuid::Uuid16& textureId)
 {
-	const file::path assetPath = ResolveRuntimeAssetPath(filePath, "Models\\");
-	std::string name = assetPath.stem().string();
+	const assets::ModelTextureAsset* texture = generation.FindTexture(textureId);
+	if (nullptr == texture) return nullptr;
+	const assets::ModelTextureHandle key{ textureId, generation.Identity().generation };
+
+	std::lock_guard lock(m_modelGenerationTextureMutex);
+	if (const auto found = m_modelGenerationTextures.find(key);
+		found != m_modelGenerationTextures.end())
 	{
-		std::unique_lock lock(m_modelMutex);
-		if (Models.find(name) != Models.end() && Models[name].get() != nullptr)
-		{
-			Debug->Log("ModelLoader::LoadModel : Model already loaded");
-			return Models[name];
-		}
+		++m_modelGenerationTextureStats.hits;
+		return found->second;
 	}
 
-	// ★ I6-B4b 후속 — 여기가 **에디터 드롭 경로**다(HierarchyWindow·
-	// SceneViewWindow의 콘텐츠 브라우저 드래그, TerrainComponent, Foliage).
-	// D34b가 `LoadModel`을 experiment로 이중화하면서 주석에 "에디터의 이름
-	// 기반 로드"를 적었는데, **정작 에디터가 부르는 것은 이 함수였다** —
-	// 그래서 드롭한 모델만 experiment 등록이 비고, 재생 바인딩이 서지 못했다.
-	//
-	// B4b가 legacy 재귀 틱을 걷기 전까지는 이 구멍이 폴백에 덮여 보이지
-	// 않았다(애니메이션이 legacy 경로로 돌았다). 틱이 하나가 되자 곧바로
-	// "드롭한 애니메이션 모델이 아무것도 안 그린다"로 드러났다 — 팔레트가
-	// 한 번도 안 쓰이면 스킨 정점이 원점으로 접힌다.
-	std::shared_ptr<Model> model{};
-	const FileGuid guid = GetFileGuid(assetPath);
-	if (FileGuid{} != guid)
+	std::string error;
+	std::shared_ptr<DirectX::ScratchImage> image =
+		BuildGenerationScratchImage(*texture, error);
+	std::shared_ptr<Texture> owner = image
+		? Texture::CreateSharedFromScratchImage(texture->name, std::move(image))
+		: nullptr;
+	if (!owner)
 	{
-		model = LoadModelViaExperiment(guid, assetPath);
+		++m_modelGenerationTextureStats.rejected;
+		Debug->LogError("[model.generation] embedded texture owner 생성 실패: "
+			+ texture->name + " (" + error + ")");
+		return nullptr;
 	}
-	if (!model)
-	{
-		try
-		{
-			std::string modelPath = assetPath.string();
-			model = Model::LoadModelShared(modelPath);
-		}
-		catch (const std::exception& e)
-		{
-			Debug->LogError(e.what());
-			return {};
-		}
-	}
-
-	if (model)
-	{
-		{
-			std::unique_lock lock(m_modelMutex);
-			Models[name] = model;
-		}
-		return model;
-	}
-
-	return {};
+	m_modelGenerationTextures.emplace(key, owner);
+	m_modelGenerationTextureOwners[generation.Handle()].push_back(key);
+	++m_modelGenerationTextureStats.created;
+	m_modelGenerationTextureStats.live = m_modelGenerationTextures.size();
+	return owner;
 }
 
-Model* DataSystem::LoadCashedModel(std::string_view filePath)
+DataSystem::ModelGenerationTextureCacheSnapshot
+DataSystem::SnapshotModelGenerationTextures() const
 {
-	return LoadCachedModelShared(filePath).get();
+	std::lock_guard lock(m_modelGenerationTextureMutex);
+	ModelGenerationTextureCacheSnapshot snapshot = m_modelGenerationTextureStats;
+	snapshot.live = m_modelGenerationTextures.size();
+	return snapshot;
+}
+
+void DataSystem::RetireModelGenerationTextures(
+	assets::ModelAssetGenerationHandle handle)
+{
+	std::lock_guard lock(m_modelGenerationTextureMutex);
+	const auto owners = m_modelGenerationTextureOwners.find(handle);
+	if (owners == m_modelGenerationTextureOwners.end()) return;
+	for (const assets::ModelTextureHandle& key : owners->second)
+	{
+		if (0 != m_modelGenerationTextures.erase(key))
+			++m_modelGenerationTextureStats.retired;
+	}
+	m_modelGenerationTextureOwners.erase(owners);
+	m_modelGenerationTextureStats.live = m_modelGenerationTextures.size();
+}
+
+std::size_t DataSystem::BindModelGenerationTextures(Material& material,
+	const assets::ModelAssetGeneration& generation)
+{
+	std::size_t bound = 0;
+	for (const MaterialPropertyValue& value : material.m_propertyValues)
+	{
+		if (value.m_name.empty() || FileGuid{} == value.m_textureGuid) continue;
+		if (nullptr == generation.FindTexture(value.m_textureGuid.m_guid)) continue;
+		std::shared_ptr<Texture> owner =
+			ResolveModelGenerationTexture(generation, value.m_textureGuid.m_guid);
+		if (!owner) continue;
+		material.UseTextureMap(value.m_name, std::move(owner));
+		++bound;
+	}
+	return bound;
+}
+
+assets::ModelAssetGeneration::Shared DataSystem::ResolveModelAssetGeneration(
+	assets::ModelAssetGenerationHandle handle) const
+{
+	return m_modelAssetGenerations.Resolve(handle);
+}
+
+assets::ModelAssetGenerationCacheSnapshot
+DataSystem::SnapshotModelAssetGenerations() const
+{
+	return m_modelAssetGenerations.Snapshot();
+}
+
+std::vector<assets::ModelAssetGeneration::Shared>
+DataSystem::SnapshotCurrentModelAssetGenerations() const
+{
+	return m_modelAssetGenerations.SnapshotCurrent();
+}
+
+DataSystem::ModelGenerationSourceSnapshot
+DataSystem::SnapshotModelGenerationSources() const noexcept
+{
+	ModelGenerationSourceSnapshot snapshot;
+	snapshot.fromCatalog = m_generationFromCatalog.load(std::memory_order_relaxed);
+	snapshot.fromLibrary = m_generationFromLibrary.load(std::memory_order_relaxed);
+	snapshot.failed = m_generationLoadFailed.load(std::memory_order_relaxed);
+	return snapshot;
 }
 
 void DataSystem::InsertMaterial(std::shared_ptr<Material> material)
 {
 	if (material) (void)RegisterImportedMaterial(material, material->m_name);
-}
-
-std::shared_ptr<Model> DataSystem::FindCachedModel(std::string_view name)
-{
-	std::lock_guard<std::mutex> guard(m_modelMutex);
-	auto iter = Models.find(std::string(name));
-	return iter == Models.end() ? nullptr : iter->second;
-}
-
-std::vector<std::pair<std::string, std::shared_ptr<Model>>> DataSystem::SnapshotModels()
-{
-	std::lock_guard<std::mutex> guard(m_modelMutex);
-	return { Models.begin(), Models.end() };
 }
 
 std::vector<std::pair<std::string, std::shared_ptr<Texture>>> DataSystem::SnapshotTextures()
@@ -563,6 +664,13 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 
 		FileGuid guid = value == material.m_propertyValues.end()
 			? FileGuid{} : value->m_textureGuid;
+		// PHASE 3.75 MBC7 — UUIDv8 texture GUID는 모델 generation closure의 subasset
+		// 신원이다. 파일이 없으니 아래 이름 역해석(Materials\<이름>.png)은 legacy
+		// Assimp 추출물의 **다른 자산** v4 GUID를 되살려 신원을 덮어쓰던 자리였다
+		// (실측: Gunner 저장 씬의 texture GUID가 v8 → v4로 바뀌어 콜드 로드가 closure
+		// 를 못 찾았다). closure 신원은 이름에 지지 않고, legacy 이름 필드도 채우지
+		// 않는다 — 이름 폴백 자체가 §6.2가 없애는 축이다.
+		if (assets::IsUuidV8(guid.m_guid)) return;
 		bool runtimeTextureSelected = false;
 		if (runtimeTexture && !runtimeTexture->m_name.empty())
 		{
@@ -880,9 +988,6 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 		{
 			const file::path path = GetFilePath(value->m_textureGuid);
 			if (!path.empty()) texture = LoadSharedMaterialTexture(path.string(), compress);
-			// I2-E 후속 — registry 가 모르는 GUID 는 임베디드 등록부다(모델
-			// sidecar subasset). 소스 로드가 바이트에서 만들어 둔 것.
-			if (!texture) texture = FindEmbeddedTexture(value->m_textureGuid);
 		}
 		if (!texture && !name.empty())
 			texture = LoadSharedMaterialTexture(name, compress);
@@ -920,30 +1025,14 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 			continue;
 		}
 
+		// MBC9 — 임베디드(subasset) GUID는 registry에 경로가 없다. 그 owner는
+		// MeshRenderer::BindModelGeneration이 generation closure에서 묶는다.
 		const file::path path = GetFilePath(value.m_textureGuid);
-		std::shared_ptr<Texture> texture = path.empty()
-			? FindEmbeddedTexture(value.m_textureGuid)
-			: LoadSharedMaterialTexture(path.string(), false);
+		if (path.empty()) continue;
+		std::shared_ptr<Texture> texture = LoadSharedMaterialTexture(path.string(), false);
 		if (!texture) continue;
 		material.UseTextureMap(value.m_name, std::move(texture));
 	}
-}
-
-void DataSystem::RegisterEmbeddedTexture(FileGuid guid, std::shared_ptr<Texture> texture)
-{
-	if (FileGuid{} == guid || !texture) return;
-	std::lock_guard<std::mutex> guard(m_embeddedTextureMutex);
-	// 먼저 넣은 쪽이 이긴다 — 같은 모델을 두 스레드가 로드해도 재질이
-	// 서로 다른 텍스처 객체를 붙들지 않게.
-	m_embeddedTextures.try_emplace(guid, std::move(texture));
-}
-
-std::shared_ptr<Texture> DataSystem::FindEmbeddedTexture(FileGuid guid) const
-{
-	if (FileGuid{} == guid) return nullptr;
-	std::lock_guard<std::mutex> guard(m_embeddedTextureMutex);
-	const auto found = m_embeddedTextures.find(guid);
-	return found != m_embeddedTextures.end() ? found->second : nullptr;
 }
 
 Material* DataSystem::LoadMaterial(std::string_view name)
@@ -1486,7 +1575,17 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 	switch (assetType)
 	{
 	case RuntimeAssetType::Model:
-		detachForType(assetType, Models, m_modelMutex);
+		if (FileGuid{} == guid && m_assetMetaRegistry)
+			guid = m_assetMetaRegistry->GetGuid(path);
+		if (FileGuid{} != guid)
+		{
+			// MBC7 — generation과 그 embedded texture owner는 한 단위로 은퇴한다.
+			if (const assets::ModelAssetGeneration::Shared retired =
+				m_modelAssetGenerations.Retire(guid.m_guid))
+			{
+				RetireModelGenerationTextures(retired->Handle());
+			}
+		}
 		break;
 	case RuntimeAssetType::Material:
 		detachForType(assetType, Materials, m_materialMutex);
@@ -1539,22 +1638,6 @@ file::path DataSystem::GetFilePath(FileGuid fileguid) const
 	return m_assetMetaRegistry ? m_assetMetaRegistry->GetPath(fileguid) : file::path{};
 }
 
-void DataSystem::AddModel(const file::path& filepath, const file::path& dir)
-{
-	std::string name = file::path(filepath.filename()).replace_extension().string();
-
-	if(Models[name])
-	{
-		return;
-	}
-
-	std::shared_ptr<Model> model;
-	if (model)
-	{
-		Models[model->name] = model;
-	}
-}
-
 void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 {
 	for (const auto& entry : bundle.assets)
@@ -1567,7 +1650,7 @@ void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 			switch (type)
 			{
 			case ManagedAssetType::Model:
-				LoadModel(name.string());
+				(void)LoadModelAssetGenerationByPath(name.string());
 				break;
 			case ManagedAssetType::Material:
 				LoadMaterial(name.string());
@@ -1640,10 +1723,254 @@ void DataSystem::UnloadUnusedAssets()
 		}
 	};
 
-	removeUnused(Models,       static_cast<int>(ManagedAssetType::Model),       m_modelMutex);
 	removeUnused(Materials,    static_cast<int>(ManagedAssetType::Material),    m_materialMutex);
 	removeUnused(Textures,     static_cast<int>(ManagedAssetType::Texture),     m_textureMutex);
 	// 예전에는 이 두 캐시가 ManagedAssetType에 없어 언로드 대상에서 아예 빠져 있었다(12.2-②).
 	removeUnused(UITextures,   static_cast<int>(ManagedAssetType::UITexture),   m_textureMutex);
 	removeUnused(SpriteSheets, static_cast<int>(ManagedAssetType::SpriteSheet), m_textureMutex);
+}
+
+// ── I7-C1/C2 cooked catalog (MBC9: ExperimentModelMigration.cpp에서 이주) ──
+// ── I7-C1: cooked catalog 기동 ──────────────────────────────────────────
+//
+// 굽는 쪽은 D5-b2c에서 다 섰는데(AssetCooker → Derived/ + CEMF → pak) **읽는
+// 쪽이 이어져 있지 않았다**: resolver는 `nullptr` catalog로 불렸고
+// `ModelLoadRequest::cookedPath`는 늘 비어 있었다(실측 texCooked=0). 그래서
+// cooked 경로가 제품에서 한 번도 돌지 않았다 — 이 함수가 그 입구다.
+bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
+	std::string& outError)
+{
+	outError.clear();
+	const file::path manifestPath =
+		derivedRoot / "Derived" / "asset-manifest.cemf";
+	std::error_code errorCode;
+	if (!file::is_regular_file(manifestPath, errorCode))
+	{
+		// 미게시는 실패가 아니다 — 에디터 작업 트리에는 Derived가 없다.
+		// 조용히 두면 resolver·모델 로드가 예전처럼 source로 간다.
+		std::lock_guard lock(m_cookedCatalogMutex);
+		m_cookedCatalog.reset();
+		m_cookedStaleAssets.clear();
+		return false;
+	}
+
+	std::vector<std::byte> bytes;
+	{
+		std::ifstream input(manifestPath, std::ios::binary);
+		if (!input)
+		{
+			outError = "manifest를 열 수 없다: " + manifestPath.string();
+			return false;
+		}
+		input.seekg(0, std::ios::end);
+		const std::streamoff size = input.tellg();
+		input.seekg(0, std::ios::beg);
+		bytes.resize(static_cast<std::size_t>(size));
+		if (size > 0)
+		{
+			input.read(reinterpret_cast<char*>(bytes.data()), size);
+			if (!input)
+			{
+				outError = "manifest 읽기가 끊겼다: " + manifestPath.string();
+				return false;
+			}
+		}
+	}
+
+	std::vector<experiment::cooked::AssetManifestIssue> issues;
+	// Load는 실패하면 **빈 catalog**를 준다(부분 표를 내놓지 않는 계약).
+	auto catalog = std::make_shared<experiment::cooked::CookedAssetCatalog>(
+		experiment::cooked::CookedAssetCatalog::Load(bytes, derivedRoot, issues));
+	if (catalog->IsEmpty())
+	{
+		outError = "catalog가 비었다(entry 0) — manifest 손상 또는 빈 게시";
+		for (const auto& issue : issues)
+		{
+			outError += " | " + issue.context + ": " + issue.message;
+		}
+		std::lock_guard lock(m_cookedCatalogMutex);
+		m_cookedCatalog.reset();
+		m_cookedStaleAssets.clear();
+		return false;
+	}
+
+	// Packaged Player에는 `.meta`가 없다. CEMF v2의 source identity table로
+	// AssetMetaRegistry 전체를 새로 만든 뒤 한 번에 교체한다. Editor는 watcher가
+	// 갱신하는 source registry가 정본이므로 optional cooked mount가 건드리지 않는다.
+	const bool authoring = PathFinder::IsAssetAuthoringEnabled();
+	std::shared_ptr<AssetMetaRegistry> registryForFreshness = m_assetMetaRegistry;
+	std::shared_ptr<AssetMetaRegistry> packagedRegistry;
+	if (!authoring)
+	{
+		if (catalog->SourceAssetCount() == 0u)
+		{
+			outError = "CEMF source identity table이 비었다.";
+			return false;
+		}
+
+		packagedRegistry = std::make_shared<AssetMetaRegistry>();
+		for (const experiment::cooked::AssetSourceManifestEntry& source
+			: catalog->SourceAssets())
+		{
+			const file::path sourcePath = catalog->ResolveSourcePath(source.assetId);
+			std::error_code sourceError;
+			if (sourcePath.empty()
+				|| !file::is_regular_file(sourcePath, sourceError) || sourceError)
+			{
+				outError = "CEMF source asset이 package에 없다: "
+					+ source.sourcePath;
+				return false;
+			}
+
+			FileGuid guid;
+			guid.m_guid = source.assetId.value;
+			if (AssetMetaRegistrationResult::Registered
+				!= packagedRegistry->Register(guid, sourcePath))
+			{
+				outError = "CEMF source identity 등록 충돌: "
+					+ source.sourcePath;
+				return false;
+			}
+		}
+	}
+
+	// ── I7-C2: 신선도 판정 ──
+	//
+	// Editor optional mount에서만 source mtime과 비교한다. Packaged Player는 pak
+	// 해제 시각이 source/Derived에 새로 찍혀 상대 순서가 원래 cook 순서를 뜻하지
+	// 않는다. Player의 신선도는 같은 package transaction과 CEMF size/hash 검증이
+	// 보증하며, 여기서 mtime을 비교하면 정상 패키지가 대량 stale로 오판된다.
+	// registry가 GUID를 못 푸는 entry(모델 안의 subasset 등)는 부모 모델 entry가
+	// 대신 책임진다.
+	std::unordered_set<FileGuid> stale;
+	if (authoring)
+	{
+		for (const experiment::cooked::CookedAssetManifestEntry& entry
+			: catalog->Entries())
+		{
+			FileGuid guid;
+			guid.m_guid = entry.assetId.value;
+			const file::path sourcePath = registryForFreshness
+				? registryForFreshness->GetPath(guid) : file::path{};
+			if (sourcePath.empty()) continue;
+			std::error_code sourceError;
+			if (!file::is_regular_file(sourcePath, sourceError)) continue;
+			const file::path artifact = catalog->ResolveArtifactPath(entry.assetId);
+			std::error_code artifactError;
+			if (artifact.empty()
+				|| !file::is_regular_file(artifact, artifactError))
+			{
+				// 표에는 있는데 파일이 없다 — 낡음보다 나쁘다. 같이 끊는다.
+				stale.insert(guid);
+				continue;
+			}
+			const auto sourceTime = file::last_write_time(sourcePath, sourceError);
+			const auto artifactTime = file::last_write_time(artifact, artifactError);
+			if (sourceError || artifactError) continue;
+			if (artifactTime < sourceTime) stale.insert(guid);
+		}
+	}
+
+	const std::size_t entryCount = catalog->Size();
+	const std::size_t sourceAssetCount = catalog->SourceAssetCount();
+	const std::size_t staleCount = stale.size();
+	{
+		std::lock_guard lock(m_cookedCatalogMutex);
+		m_cookedCatalog = std::move(catalog);
+		m_cookedStaleAssets = std::move(stale);
+	}
+	if (packagedRegistry) m_assetMetaRegistry = std::move(packagedRegistry);
+	std::printf("[cooked.catalog] mount %s entries=%zu sources=%zu stale=%zu\n",
+		manifestPath.string().c_str(), entryCount, sourceAssetCount, staleCount);
+	return true;
+}
+
+std::shared_ptr<const experiment::cooked::CookedAssetCatalog>
+DataSystem::GetCookedCatalog() const
+{
+	std::lock_guard lock(m_cookedCatalogMutex);
+	return m_cookedCatalog;
+}
+
+file::path DataSystem::ResolveCookedArtifact(
+	const experiment::AssetId& assetId) const
+{
+	std::lock_guard lock(m_cookedCatalogMutex);
+	if (!m_cookedCatalog) return {};
+	FileGuid probe;
+	probe.m_guid = assetId.value;
+	if (m_cookedStaleAssets.contains(probe)) return {};
+	return m_cookedCatalog->ResolveArtifactPath(assetId);
+}
+
+file::path DataSystem::ResolveCatalogAssetPath(FileGuid assetGuid) const
+{
+	if (FileGuid{} == assetGuid) return {};
+	experiment::AssetId assetId{ assetGuid.m_guid };
+	if (file::path cooked = ResolveCookedArtifact(assetId); !cooked.empty())
+		return cooked;
+
+	// Editor owns authoring recovery and stale-source fallback. A packaged Player
+	// has no such authority: if a produced asset is absent/stale in CEMF, make the
+	// caller fail instead of making source files an accidental runtime contract.
+	return PathFinder::IsAssetAuthoringEnabled()
+		? GetFilePath(assetGuid) : file::path{};
+}
+
+std::size_t DataSystem::CookedCatalogStaleCount() const
+{
+	std::lock_guard lock(m_cookedCatalogMutex);
+	return m_cookedStaleAssets.size();
+}
+
+std::size_t DataSystem::CookedCatalogEntryCount() const
+{
+	const auto catalog = GetCookedCatalog();
+	return catalog ? catalog->Size() : 0u;
+}
+
+std::size_t DataSystem::CookedCatalogSourceAssetCount() const
+{
+	const auto catalog = GetCookedCatalog();
+	return catalog ? catalog->SourceAssetCount() : 0u;
+}
+
+// ── PHASE 3.75 MBC9 — 모델 generation 창구(경로·stem·sidecar 옵션) ─────────────
+
+assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGenerationByPath(
+	std::string_view filePath)
+{
+	const file::path path = ResolveRuntimeAssetPath(filePath, "Models\\");
+	FileGuid guid;
+	if (m_assetMetaRegistry) guid = m_assetMetaRegistry->GetGuid(path);
+	if (FileGuid{} == guid) guid = GetFilenameToGuid(path.filename().string());
+	if (FileGuid{} == guid)
+	{
+		Debug->LogError("[model.generation] registry에 없는 모델 경로: " + path.string());
+		return {};
+	}
+	return LoadModelAssetGeneration(guid);
+}
+
+assets::ModelAssetGeneration::Shared DataSystem::FindModelAssetGenerationByStem(
+	std::string_view stem)
+{
+	const FileGuid guid = GetStemToGuid(std::string(stem));
+	if (FileGuid{} == guid) return {};
+	return LoadModelAssetGeneration(guid);
+}
+
+bool DataSystem::ReadModelCreateMeshCollider(FileGuid guid) const
+{
+	const file::path sourcePath = GetFilePath(guid);
+	if (sourcePath.empty()) return false;
+	file::path sidecarPath = sourcePath;
+	sidecarPath += ".meta";
+	std::string parseError;
+	const Authoring::ParsedDocument document =
+		Authoring::ParsedDocument::ParseFile(sidecarPath.string(), parseError);
+	if (!document) return false;
+	const Authoring::ReadNode importer = document.Root()["ModelImporter"];
+	if (!importer || !importer["CreateMeshCollider"]) return false;
+	return importer["CreateMeshCollider"].As<bool>();
 }

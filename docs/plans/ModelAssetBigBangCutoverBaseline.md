@@ -39,6 +39,18 @@ archived baseline"이 이 문서와 아래 두 기계 파일이다. MBC11은 새
 래칫 규칙: **증가만 실패**. 접촉을 내린 슬라이스가 자기 커밋에서 `-Baseline`으로 내려 고정한다.
 MBC9·MBC10 완료 조건은 이 표 전부 0이다.
 
+**2026-09-03 MBC9 재기준**: 제거 표면(역브리지·A/B 스위치·병행 바인딩·Assimp include·
+`ModelSceneBridge`·`LoadModelViaExperiment`·vcpkg port)은 전부 0이다. 남은 비영 항목은
+`m_hashingMesh` 10(모델이 아닌 절차 지오메트리 — 스프라이트 쿼드·지형·기즈모·격리 하네스의
+legacy `Mesh` 캐시 키. 모델 지오메트리는 `{ModelId,MeshId,generation}`만 탄다)과 진단 출력
+4건(`[mesh.resolve]`·`[model.instantiate]`·`[anim.tick]` 각 1, `experiment.animlive` 5 —
+MBC10의 read-only화 대상)이다.
+
+**2026-09-03 MBC10 재기준**: 진단 출력 표면 4종은 제품 경로에서 0이 됐고(계수 →
+`assets.modeldiag` 스냅샷), `experiment.animlive` 표면은 래칫에서 빠지고 "publish를 부르지
+않는다"는 하드 계약으로 바뀌었다. 제거 표면 12종은 하드 0이다. 남은 비영 항목은
+`m_hashingMesh` 10(허용목록 10파일 — 밖은 하드 실패)뿐이다.
+
 ### 1.2 하드 계약 (래칫 아님)
 
 - model sidecar writer 허용목록: legacy 둘(`EditorAssetDatabase.cpp`의 `CreateMetaLocked`,
@@ -214,8 +226,104 @@ bench가 만든 `.asset` 14개는 측정 뒤 지웠다(첫 export 뒤 나타난 
 
 ---
 
+### 4.5 MBC11 실측 (Release, 2026-09-03, `verify-model-cutover-budget`, 반복 5)
+
+★ 측정 방법. legacy 런타임이 제품에 없으므로 §4.4의 기준값을 게이트 상수로 박고 새 경로만
+잰다. B1/B2는 `Dynamic_CPP`의 Models·Animation·Shaders·Materials·ProjectSetting을 임시
+프로젝트 사본으로 복사한 뒤 `assets.modelbench <copy>/Assets/Models 5 author`가 in-process
+`assets::AuthorModelAsset`을 5회 돌리고(B1 = min), 방금 게시한 generation을
+`assets::LoadModelAssetGeneration`으로 5회 읽는다(B2 = min). 작업 트리 Library는 건드리지
+않는다. 단계 분해는 두 결과의 `phases`(MBC11이 닫은 §4.3 계측 공백)다. B3/B4는
+`verify-serialization-baseline`, B5는 저작 프로세스 peak working set, B6는 `dx12.scene`.
+corpus 재임포트(2026-09-03 17:40, CEMC v4→v5, 14/14 성공, 신원 324개 전부 보존, generation만 상승)
+뒤의 값이다.
+
+| 예산 | 실측 | 판정 |
+|---|--:|---|
+| B3 Test1 SceneLoadTotal / iter | 15.16 ms (기준 31.54 → ≤ 34.69) | 통과 |
+| B3 FT_Primitives SceneLoadTotal / iter | 11.76 ms (기준 48.18 → ≤ 53.00) | 통과 — component 41 ms가 모델 8개 typed 로드로 내려갔다 |
+| B4 부팅 AssetCatalog (meta 226) | 31.08 ms (≤ 47.58; 실행마다 29~52 ms로 흔들림) | 통과 |
+| B5 저작+로드 프로세스 peak working set | 832.8 MB (≤ 1,351) | 통과 |
+| B6 frame/GPU/VRAM (archive 기준선) | 메시 업로드 10개 / 1,075 KB · 커버리지 49,684 · VRAM 1,145 MB | 기록 — `mbc11_perf_archive.json` |
+| B2w 작업 트리 Library 재로드(참고) | 14/14 로드, 실패 0 | 통과 |
+| B1 cold source import | 아래 표 — **10/14 초과** | **미충족** |
+| B2 cooked generation load | 아래 표 — **12/14 초과** (텍스처 디코드 제외 시 4/14) | **미충족** |
+
+| 모델 | B1 저작 min | 기준 | 판정 | 그중 소스 디코드 | B2 cooked min | 기준(×1.25) | 판정 | 그중 텍스처 디코드 | 텍스처 제외 |
+|---|--:|--:|---|--:|--:|--:|---|--:|--:|
+| Ani_Mon_3_die | 71.6 | 190 | ok | 33.1 | 5.2 | 112.12 | ok | 0.0 | 5.2 ok |
+| Cha_Mon_5 | 33.8 | 34 | ok | 5.4 | 0.8 | 25.88 | ok | 0.0 | 0.8 ok |
+| Gunner_F_Mythic | 150.9 | 158 | ok | 51.9 | 54.1 | 11.88 | **초과** | 42.5 | 11.7 ok |
+| Prim_Cone | 25.9 | 25 | **초과** | 1.0 | 13.4 | 1.50 | **초과** | 12.8 | 0.7 ok |
+| Prim_Cube | 26.0 | 27 | ok | 0.7 | 13.2 | 1.38 | **초과** | 12.5 | 0.6 ok |
+| Prim_Cylinder | 27.0 | 27 | **초과** | 1.1 | 13.7 | 1.50 | **초과** | 12.9 | 0.8 ok |
+| Prim_IcoSphere | 26.6 | 19 | **초과** | 1.0 | 13.3 | 1.25 | **초과** | 12.5 | 0.8 ok |
+| Prim_MatGrid | 71.8 | 39 | **초과** | 19.1 | 7.7 | 6.00 | **초과** | 1.2 | 6.5 **초과** |
+| Prim_Plane | 27.2 | 21 | **초과** | 0.6 | 13.5 | 0.88 | **초과** | 12.7 | 0.7 ok |
+| Prim_Sphere | 32.2 | 24 | **초과** | 2.3 | 13.9 | 1.50 | **초과** | 12.5 | 1.4 ok |
+| Prim_Suzanne | 28.7 | 23 | **초과** | 2.3 | 13.8 | 1.12 | **초과** | 12.7 | 1.1 ok |
+| Prim_Torus | 31.6 | 20 | **초과** | 3.4 | 14.8 | 1.12 | **초과** | 13.2 | 1.6 **초과** |
+| SU_Mythic | 142.5 | 76 | **초과** | 50.9 | 45.4 | 7.25 | **초과** | 32.4 | 12.9 **초과** |
+| scene | 1,378.5 | 859 | **초과** | 461.8 | 765.4 | 67.88 | **초과** | 665.3 | 100.0 **초과** |
+
+**B2 초과의 실체.** cooked 로드의 `textures-read+sha+decode`가 embedded texture 1장(512² PNG)당
+≈12.8 ms, Gunner 6장 42.5 ms, scene 69장(22.5 MB) 663 ms로 로드의 93~98%다(WIC 디코드 +
+RGBA8 변환, ≈49 ns/픽셀). legacy `.asset` 읽기 기준값은 텍스처를 **포함하지 않았다**(legacy는
+재질 바인딩 때 텍스처 로더가 따로 읽었다) — 기준이 재는 축과 새 경로가 재는 축이 다르다. 텍스처를
+빼면 10/14가 예산 안이고, 남는 4개는 CEMC 읽기+SHA-256(scene 12.4 MB 70 ms,
+SU 1.8 MB 9.6 ms)과 Gunner·Torus·MatGrid의 소수점 초과다.
+
+**B1 초과의 실체.** 소스 디코드(`source-read+decode`)는 14/14 기준 안이다(Gunner 54.9 vs 158,
+scene 445 vs 859). 초과분은 저작 트랜잭션이 더한 고정·비례 비용이다 — Prim 한 개 기준
+`corpus-collision-scan` ≈ 6.6 ms(사본 345파일 재귀 순회·sidecar 14개 재파싱, 저작마다),
+`stage-write` ≈ 7.5 ms(파일 4~5개 생성), `stage-verify` ≈ 5.2 ms(staging 재판독·SHA·CEMC 재디코드),
+`publish` ≈ 2.5 ms(rename 2회 + **source 전체 재읽기·재해시**). scene(35 MB 소스)은 stable key
+127 ms, sidecar/draft 121 ms, stage-write 163 ms, stage-verify 222 ms, publish 197 ms가 디코드
+445 ms 위에 얹힌다.
+
+| 단계 | Prim_Cone | Gunner_F_Mythic | scene |
+|---|--:|--:|--:|
+| 저작 `lock+header+sidecar` | 0.8 | 1.1 | 3.4 |
+| 저작 `source-read+decode` | 1.0 | 51.9 | 461.8 |
+| 저작 `stable-keys+identity` | 0.3 | 12.7 | 132.1 |
+| 저작 `corpus-collision-scan` | 6.7 | 7.3 | 4.3 |
+| 저작 `sidecar+draft` | 0.7 | 8.6 | 118.6 |
+| 저작 `cook+textures+record` | 1.8 | 10.6 | 66.2 |
+| 저작 `stage-write` | 6.3 | 17.9 | 157.3 |
+| 저작 `stage-verify` | 5.3 | 20.3 | 216.9 |
+| 저작 `publish` | 2.9 | 18.8 | 201.2 |
+| cooked `identity+sidecar` | 0.50 | 0.91 | 5.53 |
+| cooked `cemc-read+sha` | 0.10 | 8.62 | 68.93 |
+| cooked `cemc-decode+validate` | 0.02 | 1.57 | 20.25 |
+| cooked `materials+meshes+skeleton` | 0.01 | 0.30 | 3.48 |
+| cooked `textures-read+sha+decode` | 12.79 | 42.47 | 665.34 |
+| cooked `assemble` | 0.01 | 0.01 | 0.02 |
+
+**corpus 재임포트(2026-09-03).** 같은 날 다른 세션이 glTF UV 보존을 위해 CEMC `kFormatVersion`을
+4→5로 올려 작업 트리 Library 14개가 "포맷 버전 4 != 5 — 재임포트 필요"로 거부되고 있었다(B6·B2w
+측정 불가, corpus 게이트 3종 RED). `AssetCooker --author-model-asset`로 14/14를 재임포트했다 —
+**assetId 324개(모델 14·subasset 310)가 전부 동일**하고 generation만 올랐다(Prim 1→2, Gunner 15→16,
+Cha_Mon_5 3→4). 저장 씬/프리팹 참조는 모델 assetId를 쓰므로 rewrite가 필요 없었다. 재임포트 뒤
+`verify-model-asset-generation`(corpus 14/14 loaded, mesh 130·material 52·texture 96·skeleton 4·
+animation 28·descriptor 356), `verify-experiment-cooked-catalog`, `verify-experiment-asset-cooker`가
+초록으로 돌아왔다. 이전 generation 디렉터리는 남아 있다(Library는 gitignore).
+
+**B6 기준선의 뜻.** archive는 "지금 값"을 정답으로 굳히는 것이라 비회귀 판정에만 쓴다 — 첫 기록이므로
+이 값 자체가 옳다는 증거는 아니다. FT_Primitives + Gunner 씬에서 메시 업로드 10개·1,075 KB가 전량
+generation 경로였고(`dx12.scene` 통과), 이후 실행은 ×1.10 안이어야 한다. 게이트는 B6가 붉은 실행을
+archive로 뜨지 않는다(0 값 기준선 방지).
+
+**cutover 판정.** §4.4 규칙("기준을 못 맞추면 cutover를 연기한다. legacy fallback을 되살리지
+않는다")에 따라 MBC11의 cutover는 보류다. 예산을 맞출 후보(계획 결정은 별도): ① cooked 텍스처를
+디코드 완료 형식(RGBA8/BC + mip)으로 게시해 로드가 memcpy가 되게 한다(B2 12/14의 원인),
+② corpus collision registry를 프로젝트 단위로 캐시해 저작마다 재스캔하지 않는다(B1 고정 6.6 ms),
+③ publish 단계의 source 재해시를 크기+mtime 지문으로 바꾸고 stage-verify의 CEMC 재디코드를 SHA만
+남긴다(B1 비례 비용), ④ CEMC 읽기의 SHA-256을 mmap/청크 해시로(scene 70 ms). ①~③이 닫히면
+B1/B2를 다시 잰다.
+
 ## 5. 변경 이력
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-09-03 | MBC11 실측 §4.5 추가(corpus 재임포트 뒤 재측정) — B3(14.6/20.0 ms)·B4(37.8 ms)·B5(832.9 MB) 통과, **B1 11/14·B2 12/14 초과**와 단계 분해(cooked 로드의 embedded texture PNG 디코드 93~98%, 저작 트랜잭션의 corpus 재스캔·stage 재판독·source 재해시), B6 기준선 기록(메시 업로드 10개/1,075 KB·VRAM 1,145 MB), corpus 재임포트 14/14(신원 324개 보존·generation만 상승)로 CEMC v5 전환 완료, cutover 보류와 후보 4종 |
 | 2026-09-02 | 신설(MBC0). 동결 표면 15종·하드 계약 3종·stash 처리 3종, corpus 14/참조 28 분류(모델 참조 8·subasset 참조 0·고아 11), Prim sidecar 손상 원인 경로, Release 성능 기준선과 예산 B1~B6 |

@@ -1,6 +1,7 @@
 #include "SceneCookProducer.h"
 
 #include "CookSupport.h"
+#include "../../Assets/AssetIdentityProfile.h" // PHASE 3.75 MBC8: UUIDv8 참조
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
 
@@ -216,7 +217,11 @@ namespace experiment::cooked
                 if (IsNilGuidText(text)) return true;
 
                 AssetId id{};
-                if (!TryParseCanonicalAssetId(text, id))
+                // PHASE 3.75 MBC8 — 씬·프리팹의 모델(m_modelGuid·m_Motion)·subasset
+                // (m_meshAssetId·embedded texture) 참조는 UUIDv8이다(MBC4 cutover).
+                // 비모델 자산은 v4 그대로. 두 canonical 표기 외는 예전처럼 거부한다.
+                if (!TryParseCanonicalAssetId(text, id)
+                    && !assets::TryParseCanonicalUuidV8(text, id.value))
                 {
                     failed = true;
                     failureKey = key;

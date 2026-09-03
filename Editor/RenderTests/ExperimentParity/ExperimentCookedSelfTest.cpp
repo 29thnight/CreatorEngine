@@ -3,6 +3,9 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/ModelCookIdentity.h"
+#include "Experiment/Cooked/ModelGenerationExportProducer.h" // MBC11
+#include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelSidecarV2.h"
 #include "Experiment/Import/ImporterModelDecoder.h"
 
 #include <algorithm>
@@ -561,72 +564,28 @@ namespace RenderTest
             std::span<const std::byte> baked, Checker& check,
             std::string& outLog)
         {
-            const std::string validSidecar =
+            // MBC11 — legacy v1 subasset sidecar 리더는 은퇴했다. 모델 신원은 schema
+            // v2(UUIDv8)뿐이고 그 문법·거부 계약은 assets.sidecar selftest가 전수 검증한다.
+            // 여기서는 cook 경계가 v1·v4·깨진 문서를 받지 않는다는 것만 4건으로 못 박는다.
+            const std::size_t identityFailedBefore = check.failed;
+            const auto rejects = [&](const std::string& yaml, const std::string& what)
+            {
+                assets::ModelSidecarV2 parsed;
+                std::vector<assets::SidecarIssue> issues;
+                check.Check(!assets::ReadModelSidecarV2(yaml, parsed, issues), what);
+            };
+            rejects(
                 "guid: 10101010-1010-4010-8010-101010101010\n"
                 "subAssets:\n"
                 "  schemaVersion: 1\n"
                 "  materials:\n"
                 "    - key: gltf/material/0\n"
-                "      name: Fixture\n"
-                "      guid: 30303030-3030-4030-8030-303030303030\n"
-                "  embeddedTextures:\n"
-                "    - key: gltf/image/0\n"
-                "      guid: 40404040-4040-4040-8040-404040404040\n";
-
-            ck::ModelCookIdentity identity;
-            std::vector<ck::ModelIdentityIssue> identityIssues;
-            check.Check(ck::ReadModelCookIdentity(validSidecar,
-                identity, identityIssues), "model subasset sidecar v1을 읽는다");
-            check.Equal(identity.FindMaterial("gltf/material/0"),
-                ex::AssetId{ Uuid::Parse("30303030-3030-4030-8030-303030303030") },
-                "material source key가 저장된 UUIDv4로 해석된다");
-            check.Equal(identity.FindEmbeddedTexture("gltf/image/0"),
-                ex::AssetId{ Uuid::Parse("40404040-4040-4040-8040-404040404040") },
-                "embedded texture source key가 저장된 UUIDv4로 해석된다");
-
-            im::ImportedScene matchingScene;
-            matchingScene.materials.emplace_back().sourceKey = "gltf/material/0";
-            matchingScene.textures.emplace_back().sourceKey = "gltf/image/0";
-            matchingScene.textures.back().embeddedBytes.push_back(std::byte{ 1u });
-            identityIssues.clear();
-            check.Check(ck::ValidateModelCookIdentity(matchingScene,
-                identity, identityIssues),
-                "sidecar subasset key가 현재 import 결과와 정확히 맞는다");
-
-            const std::size_t identityFailedBefore = check.failed;
-            {
-                ck::ModelCookIdentity parsed;
-                std::vector<ck::ModelIdentityIssue> issues;
-                std::string invalid = validSidecar;
-                invalid.replace(invalid.find("1010-4010"), 9u, "1010-5010");
-                check.Check(!ck::ReadModelCookIdentity(invalid, parsed, issues),
-                    "UUIDv5 model sidecar를 거부한다");
-            }
-            {
-                ck::ModelCookIdentity parsed;
-                std::vector<ck::ModelIdentityIssue> issues;
-                std::string duplicate = validSidecar;
-                const std::string textureGuid =
-                    "40404040-4040-4040-8040-404040404040";
-                duplicate.replace(duplicate.find(textureGuid), textureGuid.size(),
-                    "30303030-3030-4030-8030-303030303030");
-                check.Check(!ck::ReadModelCookIdentity(duplicate, parsed, issues),
-                    "중복 model subasset UUIDv4를 거부한다");
-            }
-            {
-                im::ImportedScene missing = matchingScene;
-                missing.materials[0].sourceKey = "gltf/material/1";
-                std::vector<ck::ModelIdentityIssue> issues;
-                check.Check(!ck::ValidateModelCookIdentity(missing,
-                    identity, issues), "누락/stale material source key를 거부한다");
-            }
-            {
-                im::ImportedScene duplicate = matchingScene;
-                duplicate.materials.push_back(duplicate.materials[0]);
-                std::vector<ck::ModelIdentityIssue> issues;
-                check.Check(!ck::ValidateModelCookIdentity(duplicate,
-                    identity, issues), "중복 importer source key를 거부한다");
-            }
+                "      guid: 30303030-3030-4030-8030-303030303030\n",
+                "v1 subasset sidecar를 거부한다");
+            rejects("{}\n", "신원 키가 없는 sidecar를 거부한다");
+            rejects("assetId: 10101010-1010-4010-8010-101010101010\n"
+                "generation: 1\n", "UUIDv4 assetId를 거부한다");
+            rejects("assetId: not-a-uuid\nsubAssets: 1\n", "형식이 깨진 sidecar를 거부한다");
             outLog += check.failed == identityFailedBefore
                 ? "  model subasset identity 거부: 4/4\n"
                 : "  model subasset identity 거부: 실패\n";
@@ -1017,10 +976,15 @@ namespace RenderTest
 
     bool RunExperimentCookedRoundTrip(const std::string& modelPath, std::string& outLog)
     {
+        // MBC11 — 실자산 왕복은 "다시 굽기"가 아니라 "게시된 generation을 검증해 내보내고,
+        // 런타임 리더로 다시 읽고, manifest로 되찾는다"다. 굽는 것은 authoring
+        // transaction 한 곳(MBC3)뿐이다.
         outLog += "[experiment.cooked] 실자산 왕복: " + modelPath + "\n";
+        Checker check{ outLog };
 
         const std::filesystem::path source(modelPath);
-
+        const std::filesystem::path assetsRoot = source.parent_path().parent_path();
+        const std::filesystem::path projectRoot = assetsRoot.parent_path();
         std::filesystem::path modelMetaPath = source;
         modelMetaPath += ".meta";
         std::string modelMetaText;
@@ -1029,275 +993,155 @@ namespace RenderTest
             outLog += "  결과: 실패 (model sidecar를 읽을 수 없음)\n";
             return false;
         }
-        ck::ModelCookIdentity modelIdentity;
-        std::vector<ck::ModelIdentityIssue> modelIdentityIssues;
-        if (!ck::ReadModelCookIdentity(modelMetaText,
-            modelIdentity, modelIdentityIssues))
+        assets::ModelSidecarV2 sidecar;
+        std::vector<assets::SidecarIssue> sidecarIssues;
+        if (!assets::ReadModelSidecarV2(modelMetaText, sidecar, sidecarIssues))
         {
-            outLog += "  결과: 실패 (model subasset identity 불일치)\n";
-            for (const ck::ModelIdentityIssue& issue : modelIdentityIssues)
+            outLog += "  결과: 실패 (schema v2 sidecar가 아님)\n";
+            for (const assets::SidecarIssue& issue : sidecarIssues)
                 outLog += "    " + issue.context + ": " + issue.message + "\n";
             return false;
         }
-
-        const std::filesystem::path assetsRoot = source.parent_path().parent_path();
-        std::string identityFailure;
-        const ex::AssetId gbufferShaderId = ReadMetaAssetId(
-            assetsRoot / "Shaders/DefaultPassShader/GBuffer.shadermeta.meta",
-            identityFailure);
-        if (!gbufferShaderId.IsValid())
+        std::size_t sidecarMaterials = 0, sidecarTextures = 0;
+        for (const assets::ModelSubAssetRecord& record : sidecar.subAssets)
         {
-            outLog += "  결과: 실패 (" + identityFailure + ")\n";
-            return false;
-        }
-        const ex::AssetId forwardShaderId = ReadMetaAssetId(
-            assetsRoot / "Shaders/DefaultPassShader/Forward.shadermeta.meta",
-            identityFailure);
-        if (!forwardShaderId.IsValid())
-        {
-            outLog += "  결과: 실패 (" + identityFailure + ")\n";
-            return false;
+            if (record.kind == assets::SubAssetKind::Material) ++sidecarMaterials;
+            if (record.kind == assets::SubAssetKind::Texture) ++sidecarTextures;
         }
 
-        // D5-b1은 fixture ID를 쓰지 않는다. 모델/내부 재질은 model sidecar,
-        // 외부 texture와 ShaderMeta는 각자의 sidecar UUIDv4를 읽는다. Blend만
-        // Forward, Opaque/Mask는 GBuffer라는 PBR shader 정책도 resolver 경계에서
-        // 명시한다.
-        std::vector<std::string> materialSourceKeys;
-        std::vector<std::string> embeddedTextureSourceKeys;
-        std::vector<std::string> resolutionFailures;
-        im::ImporterDecoderOptions decoderOptions{};
-        decoderOptions.conversion.modelAssetId = modelIdentity.modelAssetId;
-        decoderOptions.conversion.resolveMaterialAsset =
-            [&](const im::ImportedMaterial& material, std::size_t)
-            {
-                if (std::ranges::find(materialSourceKeys, material.sourceKey)
-                    == materialSourceKeys.end())
-                {
-                    materialSourceKeys.push_back(material.sourceKey);
-                }
-                return modelIdentity.FindMaterial(material.sourceKey);
-            };
-        decoderOptions.conversion.resolveShaderAsset =
-            [&](const im::ImportedMaterial& material, std::size_t)
-            {
-                return material.alphaMode == im::AlphaMode::Blend
-                    ? forwardShaderId : gbufferShaderId;
-            };
-        decoderOptions.conversion.resolveTextureAsset =
-            [&](const im::ImportedTexture& texture)
-            {
-                if (texture.IsEmbedded())
-                {
-                    if (std::ranges::find(embeddedTextureSourceKeys,
-                        texture.sourceKey) == embeddedTextureSourceKeys.end())
-                    {
-                        embeddedTextureSourceKeys.push_back(texture.sourceKey);
-                    }
-                    return modelIdentity.FindEmbeddedTexture(texture.sourceKey);
-                }
-
-                std::filesystem::path textureMetaPath = texture.sourcePath;
-                textureMetaPath += ".meta";
-                std::string failure;
-                const ex::AssetId id = ReadMetaAssetId(textureMetaPath, failure);
-                if (!id.IsValid()) resolutionFailures.push_back(std::move(failure));
-                return id;
-            };
-        im::ImporterModelDecoder decoder(std::move(decoderOptions));
-
-        ex::ModelLoadRequest request{};
+        ck::ModelGenerationExportRequest request;
         request.sourcePath = source;
-        request.sourcePreference = ex::ModelSourcePreference::SourceOnly;
-
-        ex::ModelDecodeResult decoded = decoder.Decode(request);
-        if (!decoded.draft.has_value())
+        request.assetRoot = assetsRoot;
+        request.generationRoot = projectRoot / "Library" / "ModelAssetGenerations";
+        request.identityHeaderPath = projectRoot / "ProjectSetting" / "AssetIdentity.asset";
+        const ck::ModelGenerationExportResult exported =
+            ck::BuildModelGenerationExportProduct(request);
+        check.Check(exported.Succeeded(), "게시된 generation을 검증해 내보낸다");
+        if (!exported.Succeeded())
         {
-            outLog += "  결과: 실패 (임포트 불가)\n";
-            for (const auto& issue : decoded.issues)
+            for (const ck::ModelGenerationExportIssue& issue : exported.issues)
                 outLog += "    " + issue.context + ": " + issue.message + "\n";
+            char failSummary[160];
+            std::snprintf(failSummary, sizeof(failSummary),
+                "  단정 %zu건 중 통과 %zu · 실패 %zu\n",
+                check.passed + check.failed, check.passed, check.failed);
+            outLog += failSummary;
             return false;
         }
+        const ck::ModelGenerationExportProduct& product = *exported.product;
 
-        Checker check{ outLog };
-        const ex::ModelDraft& original = *decoded.draft;
-        check.Equal(original.metadata.assetId, modelIdentity.modelAssetId,
-            "실자산 model AssetId가 sidecar UUIDv4와 같다");
-        check.Check(resolutionFailures.empty(),
-            "외부 texture sidecar identity가 모두 해석된다");
-        check.Equal(materialSourceKeys.size(), modelIdentity.materials.size(),
-            "import material source key와 sidecar identity 수가 같다");
-        check.Equal(embeddedTextureSourceKeys.size(),
-            modelIdentity.embeddedTextures.size(),
-            "import embedded texture source key와 sidecar identity 수가 같다");
-        for (const ck::ModelSubAssetIdentity& identity : modelIdentity.materials)
+        // 런타임과 같은 리더로 다시 읽어 재질/shader/texture 신원을 센다.
+        assets::ModelAssetGenerationLoadRequest load;
+        load.identityHeaderPath = request.identityHeaderPath;
+        load.generationRoot = request.generationRoot;
+        load.canonicalSidecarPath = modelMetaPath;
+        load.expectedModelId = sidecar.assetId;
+        load.expectedGeneration = sidecar.generation;
+        const assets::ModelAssetGenerationLoadResult loaded =
+            assets::LoadModelAssetGeneration(load);
+        check.Check(loaded.Succeeded(), "generation을 런타임 리더로 다시 읽는다");
+        std::size_t materials = 0, shaders = 0, textures = 0;
+        std::vector<Uuid::Uuid16> materialIds;
+        if (loaded.Succeeded())
         {
-            check.Check(std::ranges::find(materialSourceKeys, identity.sourceKey)
-                != materialSourceKeys.end(),
-                "stale model material subasset identity가 없다");
-        }
-        for (const ck::ModelSubAssetIdentity& identity : modelIdentity.embeddedTextures)
-        {
-            check.Check(std::ranges::find(embeddedTextureSourceKeys, identity.sourceKey)
-                != embeddedTextureSourceKeys.end(),
-                "stale embedded texture subasset identity가 없다");
-        }
-        std::size_t materialIdentities = 0;
-        std::size_t shaderIdentities = 0;
-        std::size_t textureReferences = 0;
-        std::size_t textureIdentities = 0;
-        for (std::size_t materialIndex = 0;
-            materialIndex < original.materials.size(); ++materialIndex)
-        {
-            const ex::Material& material = original.materials[materialIndex];
-            if (material.assetId.IsValid()) ++materialIdentities;
-            if (material.shaderAssetId.IsValid()) ++shaderIdentities;
-            check.Check(material.assetId.IsValid(),
-                "실자산 material[" + std::to_string(materialIndex) + "] AssetId가 채워진다");
-            check.Check(material.shaderAssetId.IsValid(),
-                "실자산 material[" + std::to_string(materialIndex) + "] ShaderMeta ID가 채워진다");
-            for (std::size_t propertyIndex = 0;
-                propertyIndex < material.properties.size(); ++propertyIndex)
+            for (const assets::ModelMaterialAsset& material : loaded.generation->Materials())
             {
-                if (const auto* texture = std::get_if<ex::TextureReference>(
-                    &material.properties[propertyIndex].value))
-                {
-                    ++textureReferences;
-                    if (texture->assetId.IsValid()) ++textureIdentities;
-                    check.Check(texture->assetId.IsValid(),
-                        "실자산 texture reference AssetId가 채워진다");
-                }
+                ++materials;
+                if (!material.shaderAssetId.IsNil()) ++shaders;
+                materialIds.push_back(material.materialId);
             }
+            textures = loaded.generation->Textures().size();
         }
+        check.Check(materials == product.materialCount,
+            "내보낸 재질 수가 generation과 같다");
+        check.Check(textures == product.embeddedTextureCount,
+            "내보낸 embedded texture 수가 generation과 같다");
+        check.Check(shaders == materials, "모든 재질이 shader 신원을 가진다");
+
         char identityScale[240];
         std::snprintf(identityScale, sizeof(identityScale),
             "  cooked identity: model=%s materials=%zu/%zu shaders=%zu/%zu textures=%zu/%zu\n",
-            original.metadata.assetId.IsValid() ? "yes" : "no",
-            materialIdentities, original.materials.size(),
-            shaderIdentities, original.materials.size(),
-            textureIdentities, textureReferences);
+            loaded.Succeeded() ? "yes" : "no", materials, materials, shaders, materials,
+            textures, textures);
         outLog += identityScale;
         char sidecarScale[200];
         std::snprintf(sidecarScale, sizeof(sidecarScale),
             "  sidecar identity: model=yes materials=%zu/%zu embedded=%zu/%zu\n",
-            materialSourceKeys.size(), modelIdentity.materials.size(),
-            embeddedTextureSourceKeys.size(), modelIdentity.embeddedTextures.size());
+            sidecarMaterials, materials, sidecarTextures, textures);
         outLog += sidecarScale;
+        check.Check(sidecarMaterials == materials && sidecarTextures == textures,
+            "sidecar subasset 수가 generation과 같다");
 
-        const ck::CookedWriteResult write = ck::Write(original);
-        check.Check(write.Succeeded(), "실자산 checked cook가 성공한다");
-        if (!write.Succeeded())
-        {
-            for (const ex::ModelLoadIssue& issue : write.issues)
-                outLog += "    " + issue.context + ": " + issue.message + "\n";
-            return false;
-        }
-        const std::vector<std::byte>& baked = write.bytes;
-
-        ck::Sha256Digest cookedDigest{};
+        // manifest — model entry + 모델 재질 subasset entry(같은 generation record를 가리킨다).
+        const auto record = std::ranges::find(product.files, product.recordArtifactPath,
+            &ck::ModelGenerationExportFile::artifactPath);
+        check.Check(record != product.files.end(), "generation record가 내보낸 파일에 있다");
+        ck::Sha256Digest digest{};
         std::string hashError;
-        check.Check(ck::ComputeSha256(baked, cookedDigest, hashError),
-            "실자산 cooked artifact SHA-256을 계산한다");
-        const std::string derivedPath =
-            ck::MakeDerivedModelArtifactPath(original.metadata.assetId);
-        check.Check(!derivedPath.empty(),
-            "실자산 model GUID가 Derived .cemc path를 만든다");
-
-        ck::CookedAssetManifest manifest;
-        ck::CookedAssetManifestEntry modelEntry;
-        modelEntry.assetId = original.metadata.assetId;
-        modelEntry.kind = ck::CookedAssetKind::Model;
-        modelEntry.formatVersion = ck::kFormatVersion;
-        modelEntry.byteSize = baked.size();
-        modelEntry.contentSha256 = cookedDigest;
-        modelEntry.artifactPath = derivedPath;
-        for (const ex::Material& material : original.materials)
-            modelEntry.dependencies.push_back(material.assetId);
-        manifest.entries.push_back(std::move(modelEntry));
-
-        for (const ex::Material& material : original.materials)
+        if (record != product.files.end())
         {
-            ck::CookedAssetManifestEntry materialEntry;
-            materialEntry.assetId = material.assetId;
+            check.Check(ck::ComputeSha256(record->bytes, digest, hashError),
+                "generation record SHA-256을 계산한다");
+        }
+        ck::CookedAssetManifest manifest;
+        manifest.entries.push_back(product.manifestEntry);
+        for (const Uuid::Uuid16& materialId : materialIds)
+        {
+            ck::CookedAssetManifestEntry materialEntry = product.manifestEntry;
+            materialEntry.assetId = ex::AssetId{ materialId };
             materialEntry.kind = ck::CookedAssetKind::Material;
-            materialEntry.formatVersion = ck::kFormatVersion;
-            materialEntry.byteSize = baked.size();
-            materialEntry.contentSha256 = cookedDigest;
-            // material은 이 단계에서 model .cemc container 안의 subasset이다.
-            materialEntry.artifactPath = derivedPath;
             manifest.entries.push_back(std::move(materialEntry));
         }
-
-        const ck::AssetManifestWriteResult manifestWrite =
-            ck::WriteAssetManifest(manifest);
-        check.Check(manifestWrite.Succeeded(),
-            "실자산 model/material GUID manifest를 쓴다");
+        const ck::AssetManifestWriteResult manifestWrite = ck::WriteAssetManifest(manifest);
+        check.Check(manifestWrite.Succeeded(), "실자산 model/material GUID manifest를 쓴다");
         ck::CookedAssetManifest restoredManifest;
         std::vector<ck::AssetManifestIssue> manifestIssues;
         const bool manifestRead = ck::ReadAssetManifest(manifestWrite.bytes,
             restoredManifest, manifestIssues);
         check.Check(manifestRead, "실자산 GUID manifest를 다시 읽는다");
         const ck::CookedAssetManifestEntry* resolvedModel =
-            restoredManifest.Find(original.metadata.assetId);
-        check.Check(resolvedModel && resolvedModel->artifactPath == derivedPath,
-            "실제 model GUID lookup이 canonical Derived path를 찾는다");
-        std::size_t resolvedMaterials = 0u;
-        for (const ex::Material& material : original.materials)
+            restoredManifest.Find(product.modelAssetId);
+        check.Check(resolvedModel && resolvedModel->artifactPath == product.recordArtifactPath,
+            "model GUID가 generation record artifact로 해석된다");
+        std::size_t resolvedMaterials = 0;
+        for (const Uuid::Uuid16& materialId : materialIds)
         {
             const ck::CookedAssetManifestEntry* resolved =
-                restoredManifest.Find(material.assetId);
-            if (resolved && resolved->artifactPath == derivedPath
+                restoredManifest.Find(ex::AssetId{ materialId });
+            if (resolved && resolved->artifactPath == product.recordArtifactPath
                 && resolved->kind == ck::CookedAssetKind::Material)
             {
                 ++resolvedMaterials;
             }
         }
-        check.Equal(resolvedMaterials, original.materials.size(),
-            "실제 material subasset GUID가 model container로 해석된다");
+        check.Check(resolvedMaterials == materials,
+            "모든 재질 GUID가 같은 generation record로 해석된다");
         manifestIssues.clear();
-        check.Check(resolvedModel && ck::VerifyArtifact(*resolvedModel,
-            baked.size(), cookedDigest, manifestIssues),
-            "실자산 manifest SHA-256/크기가 cooked bytes와 같다");
-        char manifestScale[220];
+        const bool artifactVerified = resolvedModel && record != product.files.end()
+            && ck::VerifyArtifact(*resolvedModel, record->bytes.size(), digest, manifestIssues);
+        check.Check(artifactVerified, "실자산 manifest SHA-256/크기가 generation record와 같다");
+
+        char manifestScale[200];
         std::snprintf(manifestScale, sizeof(manifestScale),
             "  manifest identity: entries=%zu model=%s materials=%zu/%zu sha256=%s\n",
             restoredManifest.entries.size(), resolvedModel ? "yes" : "no",
-            resolvedMaterials, original.materials.size(),
-            resolvedModel ? "yes" : "no");
+            resolvedMaterials, materials, artifactVerified ? "yes" : "no");
         outLog += manifestScale;
 
-        ex::ModelDraft restored{};
-        std::vector<ex::ModelLoadIssue> issues;
-        const bool ok = ck::Read(baked, restored, issues);
-        check.Check(ok, "실자산 페이로드를 읽는다");
-        if (ok) CompareDrafts(original, restored, check, "실자산");
-        else for (const auto& issue : issues) outLog += "    사유: " + issue.message + "\n";
-
-        // ★ 규모를 찍는다. 0건을 성공으로 읽는 것을 막는 유일한 방법은
-        //   무엇을 몇 개 비교했는지 눈에 보이게 하는 것이다.
-        std::size_t vertexCount = 0, keyCount = 0, channelCount = 0;
-        for (const ex::Mesh& mesh : original.meshes) vertexCount += mesh.vertices.size();
-        if (original.skeleton.has_value())
+        std::size_t vertexCount = 0;
+        if (loaded.Succeeded())
         {
-            for (const ex::AnimationClip& clip : original.skeleton->clips)
-            {
-                channelCount += clip.channels.size();
-                for (const ex::AnimationChannel& channel : clip.channels)
-                {
-                    keyCount += channel.translations.size()
-                        + channel.rotations.size() + channel.scales.size();
-                }
-            }
+            for (const assets::ModelMeshAsset& mesh : loaded.generation->Meshes())
+                if (mesh.vertexStride) vertexCount += mesh.vertexBytes.size() / mesh.vertexStride;
         }
         char scale[256];
         std::snprintf(scale, sizeof(scale),
-            "  비교 규모: 정점 %zu · 인덱스는 메시별 · 채널 %zu · 키 %zu · 재질 %zu · 뼈 %zu\n"
-            "  구운 크기: %zu B\n",
-            vertexCount, channelCount, keyCount, original.materials.size(),
-            original.skeleton.has_value() ? original.skeleton->bones.size() : 0u,
-            baked.size());
+            "  비교 규모: 정점 %zu · 메시 %zu · 재질 %zu · texture %zu · generation %llu\n"
+            "  내보낸 파일: %zu개 · %llu B\n",
+            vertexCount, product.meshCount, materials, textures,
+            (unsigned long long)product.generation, product.files.size(),
+            (unsigned long long)product.artifactBytes);
         outLog += scale;
-
         check.Check(vertexCount > 0, "비교한 정점이 0개가 아니다");
 
         char summary[160];

@@ -52,7 +52,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 	MeshUpdate update{};
 	update.worldMatrix = owner->Transform_().GetWorldMatrix();
 	update.worldPosition = owner->Transform_().GetWorldPosition();
-	update.hasWorldBounds = !component->IsSkinnedMesh() && nullptr != component->m_Mesh;
+	update.hasWorldBounds = !component->IsSkinnedMesh() && component->HasRenderableMesh();
 	if (update.hasWorldBounds)
 	{
 		update.worldBounds = component->GetBoundingBox();

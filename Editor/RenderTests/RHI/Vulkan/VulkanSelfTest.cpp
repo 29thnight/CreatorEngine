@@ -8,7 +8,9 @@
 #include "RHI/RHIGraphicsPipelineRequest.h"
 #include "RHI/RHIShaderBlob.h"
 #include "RHI/IRenderDeviceServices.h"
-#include "Model.h"
+#include "DataSystem.h"
+#include "Assets/ModelAssetGeneration.h"
+#include "Mesh.h" // Vertex(격리 쿼드)
 #include "PathFinder.h"
 
 #include <Windows.h>
@@ -178,36 +180,39 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     }
 
     const file::path scenePath = PathFinder::ModelSourcePath() / L"scene.glb";
-    auto sceneModel = Model::LoadModelShared(scenePath.string());
-    std::vector<std::shared_ptr<Mesh>> sceneMeshes;
-    std::shared_ptr<Mesh> sceneMesh;
+    // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
+    const std::shared_ptr<const assets::ModelAssetGeneration> sceneModel =
+        DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
+    std::vector<RHIModelMeshView> sceneMeshes;
+    RHIModelMeshView sceneMesh{};
+    math::aabb sceneMeshBounds{};
     uint64_t sceneVertexBytes = 0;
     uint64_t sceneIndexBytes = 0;
     uint64_t sceneUploadBytes = 0;
     if (sceneModel)
     {
-        for (int i = 0; i < sceneModel->m_numTotalMeshes; ++i)
+        for (std::uint32_t i = 0; i < sceneModel->Meshes().size(); ++i)
         {
-            std::shared_ptr<Mesh> candidate = sceneModel->GetMeshShared(i);
-            if (!candidate) continue;
-            const uint64_t candidateVertexBytes =
-                static_cast<uint64_t>(candidate->GetVertices().size()) * sizeof(Vertex);
+            RHIModelMeshView candidate{};
+            if (!BuildRHIModelMeshView(*sceneModel, i, candidate) || !candidate.IsComplete())
+                continue;
+            const uint64_t candidateVertexBytes = candidate.vertexBytes;
             const uint64_t candidateIndexBytes =
-                static_cast<uint64_t>(candidate->GetIndices().size()) * sizeof(uint32);
-            if (0 == candidateVertexBytes || 0 == candidateIndexBytes) continue;
+                static_cast<uint64_t>(candidate.indexCount) * sizeof(uint32);
 
             sceneMeshes.push_back(candidate);
             sceneUploadBytes += candidateVertexBytes + candidateIndexBytes;
-            if (!sceneMesh || candidateVertexBytes + candidateIndexBytes >
+            if (!sceneMesh.IsComplete() || candidateVertexBytes + candidateIndexBytes >
                 sceneVertexBytes + sceneIndexBytes)
             {
-                sceneMesh = std::move(candidate);
+                sceneMesh = candidate;
+                sceneMeshBounds = sceneModel->Meshes()[i].bounds;
                 sceneVertexBytes = candidateVertexBytes;
                 sceneIndexBytes = candidateIndexBytes;
             }
         }
     }
-    if (!sceneMesh || sceneUploadBytes <= 16ull * 1024 * 1024)
+    if (!sceneMesh.IsComplete() || sceneUploadBytes <= 16ull * 1024 * 1024)
     {
         meshCache.Shutdown();
         pipelineCache.Shutdown();
@@ -260,21 +265,20 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         // cache 계약으로 올린다. 개별 mesh가 아니라 모델 누적 업로드가 기존
         // 16MiB ring 경계를 넘는 실제 자산 구조를 그대로 재현한다.
         meshCache.BeginFrame(0);
-        for (const std::shared_ptr<Mesh>& mesh : sceneMeshes)
+        for (const RHIModelMeshView& mesh : sceneMeshes)
         {
             std::string meshError;
-            const RHIMeshBinding binding = meshCache.GetOrUpload(mesh.get(), meshError);
-            const uint64_t vertexBytes =
-                static_cast<uint64_t>(mesh->GetVertices().size()) * sizeof(Vertex);
+            const RHIMeshBinding binding = meshCache.GetOrUploadModel(mesh, meshError);
+            const uint64_t vertexBytes = mesh.vertexBytes;
             const uint64_t indexBytes =
-                static_cast<uint64_t>(mesh->GetIndices().size()) * sizeof(uint32);
+                static_cast<uint64_t>(mesh.indexCount) * sizeof(uint32);
             if (!binding.IsValid() || binding.vertices.size != vertexBytes ||
                 binding.indices.size != indexBytes)
             {
                 return fail("[2/4] scene.glb 실제 mesh 누적 cache upload가 실패했다: "
                     + meshError + "\n");
             }
-            if (mesh.get() == sceneMesh.get()) sceneBinding = binding;
+            if (mesh.handle == sceneMesh.handle) sceneBinding = binding;
         }
         const VulkanMeshCache::Stats firstMeshStats = meshCache.GetStats();
         if (!sceneBinding.IsValid() || !sceneBinding.vertices.IsValid() ||
@@ -491,14 +495,9 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         // 실제 mesh bounds에서 가장 넓은 두 축을 골라 clip 공간 [-0.7, 0.7]에
         // 맞춘다. 특정 모델 좌표계나 카메라에 fixture가 의존하지 않게 한다.
-        const auto& sceneVertices = sceneMesh->GetVertices();
-        math::vector3 meshMin = sceneVertices.front().position;
-        math::vector3 meshMax = sceneVertices.front().position;
-        for (const Vertex& vertex : sceneVertices)
-        {
-            meshMin = math::min(meshMin, vertex.position);
-            meshMax = math::max(meshMax, vertex.position);
-        }
+        // 바운드는 generation이 소유한 값(임포터가 계산)이다.
+        const math::vector3 meshMin = sceneMeshBounds.min();
+        const math::vector3 meshMax = sceneMeshBounds.max();
         const auto component = [](const math::vector3& value, uint32_t axis) {
             return 0 == axis ? value.x : (1 == axis ? value.y : value.z);
         };
@@ -798,8 +797,8 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         // 네이티브 buffer를 만들지 않고 기존 Resident binding을 돌려줘야 한다.
         meshCache.BeginFrame(1);
         std::string cacheHitError;
-        const RHIMeshBinding cacheHit = meshCache.GetOrUpload(
-            sceneMesh.get(), cacheHitError);
+        const RHIMeshBinding cacheHit = meshCache.GetOrUploadModel(
+            sceneMesh, cacheHitError);
         const VulkanMeshCache::Stats afterCacheHit = meshCache.GetStats();
         const bool cacheHitPassed = cacheHit.IsValid() &&
             cacheHit.vertices.buffer.id == sceneBinding.vertices.buffer.id &&

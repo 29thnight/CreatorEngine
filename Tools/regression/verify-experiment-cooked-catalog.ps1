@@ -8,8 +8,8 @@
 #   1  마운트 — catalog가 실제 CEMF에서 서고 entry가 0이 아니다
 #   2  신원 맞물림 — 씬의 모델 GUID가 cooked artifact로 해석된다
 #      (표만 서고 제품 신원과 안 맞으면 cookedPath는 여전히 빈 경로다)
-#   3  ★ 제품 소비 — 마운트 뒤 로드가 **cooked 경로로 그린다**
-#      ([model.dual] cooked 경로 ≥ 1). 1·2가 있어도 디코더가 거부하면 조용히
+#   3  ★ 제품 소비 — 마운트 뒤 로드가 **cooked generation 레코드로 읽는다**
+#      (assets.modeldiag generationFromCatalog ≥ 1, Library 폴백 0 — MBC11). 1·2가 있어도 디코더가 거부하면 조용히
 #      source로 폴백하므로, 이 축만이 "cooked가 실제로 돌았다"를 말한다.
 #   4  대조군 — 마운트 없이 같은 씬을 로드하면 cooked 경로가 **0**이다.
 #      이것이 없으면 3이 마운트 덕인지 원래 그런지 갈리지 않는다.
@@ -86,11 +86,22 @@ try {
     $cookArgs = [Collections.Generic.List[string]]::new()
     $cookArgs.Add('--asset-root'); $cookArgs.Add($assets)
     $cookArgs.Add('--output');     $cookArgs.Add($cookOutput)
+    # MBC11 — 씬/프리팹 문서는 **tracked** 파일만 굽는다. gitignore된 로컬 씬(Test1/Test2)은
+    # MBC0 기준선이 적어 둔 대로 존재하지 않는 모델/텍스처 GUID를 가리키는 고아라 cook이
+    # fail-closed로 거부한다(깨진 콘텐츠를 패키지에 싣지 않는 것이 맞다). 게이트는 그 로컬
+    # 상태에 흔들리지 않도록 저장소가 아는 문서만 입력으로 삼는다.
+    $trackedDocuments = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($line in @(& git -C $repoRoot ls-files -- 'Dynamic_CPP/Assets/Scenes' 'Dynamic_CPP/Assets/Prefabs')) {
+        if (-not [string]::IsNullOrWhiteSpace($line)) {
+            [void]$trackedDocuments.Add((Join-Path $repoRoot ($line.Replace('/', [IO.Path]::DirectorySeparatorChar))))
+        }
+    }
     $sourceCounts = [ordered]@{}
     foreach ($rule in $cookSourceRules) {
         $matches = @(Get-ChildItem -LiteralPath $assets -File -Recurse |
             Where-Object { $rule.Extensions -contains $_.Extension.ToLowerInvariant() } |
             Where-Object { -not $legacyModelCacheNames.Contains($_.FullName) } |
+            Where-Object { $rule.Option -ne '--scene' -or $trackedDocuments.Contains($_.FullName) } |
             Sort-Object FullName)
         $sourceCounts[$rule.Option] = $matches.Count
         foreach ($source in $matches) {
@@ -141,6 +152,7 @@ try {
         $lines.Add("wait 10")
         $lines.Add("experiment.catalog probe $probeTexture")
         $lines.Add("wait 10")
+        $lines.Add("assets.modeldiag")
         $lines.Add("quit")
         Set-Content -LiteralPath $scenario -Value $lines -Encoding UTF8
 
@@ -156,9 +168,19 @@ try {
         return Get-Content -LiteralPath $stdout -Raw
     }
 
+    # MBC11 — 모델은 cooked catalog의 generation 레코드(Derived/Models/xx/<id>/<gen>/
+    # generation.asset)로 읽고, 그 출처 계수는 읽기 전용 스냅샷 assets.modeldiag의
+    # generationFromCatalog / generationFromLibrary다([model.dual] 로더는 MBC9에서 은퇴).
+    function Read-GenerationSources([string]$text) {
+        $m = [regex]::Match($text, 'assets\.modeldiag .* generationFromCatalog=(\d+) generationFromLibrary=(\d+) generationLoadFailed=(\d+)')
+        if (-not $m.Success) { return $null }
+        return [pscustomobject]@{ Catalog = [int]$m.Groups[1].Value; Library = [int]$m.Groups[2].Value; Failed = [int]$m.Groups[3].Value }
+    }
     $logOn = Invoke-Editor 'mounted' $true
-    $cookedOn = ([regex]::Matches($logOn, '\[model\.dual\] cooked 경로')).Count
-    $experimentOn = ([regex]::Matches($logOn, '\[model\.dual\] experiment 경로')).Count
+    $sourcesOn = Read-GenerationSources $logOn
+    if ($null -eq $sourcesOn) { $fail += "3 mounted leg에 assets.modeldiag 스냅샷이 없다"; $sourcesOn = [pscustomobject]@{ Catalog = 0; Library = 0; Failed = 0 } }
+    $cookedOn = $sourcesOn.Catalog
+    $experimentOn = $sourcesOn.Library
 
     if ($logOn -notmatch 'experiment\.catalog mount pass .*entries=([1-9]\d*) sources=([1-9]\d*)') {
         $fail += "1 catalog/source identity 마운트 실패 — mount 출력을 확인하라"
@@ -170,7 +192,10 @@ try {
         $fail += "2 씬 모델 GUID가 cooked artifact로 해석되지 않았다 — 신원이 안 맞물린다"
     }
     if ($cookedOn -lt 1) {
-        $fail += "3 cooked 경로 로드가 0건 — 표는 섰는데 제품이 cooked를 타지 않았다"
+        $fail += "3 cooked 경로 로드가 0건 — 표는 섰는데 제품이 cooked generation을 타지 않았다"
+    }
+    if ($experimentOn -ne 0 -or $sourcesOn.Failed -ne 0) {
+        $fail += "3e mounted leg에서 Library 폴백($experimentOn) 또는 로드 실패($($sourcesOn.Failed))가 있다 — silent fallback 0 계약"
     }
     # ★ 3b — resolver(sealing이 매 프레임 타는 그 경로)가 cooked artifact를
     #   실제로 골랐는가. 모델 축(3)과 독립이다: 모델은 cookedPath로, 텍스처는
@@ -195,14 +220,18 @@ try {
     $staleSource = Join-Path $assets 'Models\Prim_Cube.glb'
     if (-not (Test-Path -LiteralPath $staleSource)) { "신선도 leg 대상이 없다: $staleSource"; exit 1 }
     $metaText = Get-Content -LiteralPath ($staleSource + '.meta') -Raw
-    if ($metaText -notmatch 'guid:\s*([0-9a-fA-F-]{36})') { "meta에서 guid를 못 읽었다"; exit 1 }
+    if ($metaText -notmatch '(?m)^assetId:\s*([0-9a-f-]{36})') { "meta(schema v2)에서 assetId를 못 읽었다"; exit 1 }
     $staleGuid = $Matches[1]
-    $victim = Join-Path $cookOutput ("Derived\Models\" + $staleGuid.Substring(0,2) + "\" + $staleGuid + ".cemc")
+    if ($metaText -notmatch '(?m)^generation:\s*(\d+)') { "meta에서 generation을 못 읽었다"; exit 1 }
+    $staleGeneration = $Matches[1]
+    $victim = Join-Path $cookOutput ("Derived\Models\" + $staleGuid.Substring(0,2) + "\" + $staleGuid + "\" + $staleGeneration + "\generation.asset")
     if (-not (Test-Path -LiteralPath $victim)) { "artifact가 없다: $victim"; exit 1 }
     [IO.File]::SetLastWriteTime($victim, (Get-Date).AddDays(-30))
     $logStale = Invoke-Editor 'stale' $true
-    $cookedStale = ([regex]::Matches($logStale, '\[model\.dual\] cooked 경로')).Count
-    $experimentStale = ([regex]::Matches($logStale, '\[model\.dual\] experiment 경로')).Count
+    $sourcesStale = Read-GenerationSources $logStale
+    if ($null -eq $sourcesStale) { $fail += "6 stale leg에 assets.modeldiag 스냅샷이 없다"; $sourcesStale = [pscustomobject]@{ Catalog = 0; Library = 0; Failed = 0 } }
+    $cookedStale = $sourcesStale.Catalog
+    $experimentStale = $sourcesStale.Library
     if ($logStale -notmatch 'experiment\.catalog mount pass .*stale=([1-9]\d*)') {
         $fail += "6 낡은 artifact를 만들었는데 stale 계수가 0이다 — 신선도 판정이 안 돈다"
     }
@@ -219,8 +248,10 @@ try {
     }
 
     $logOff = Invoke-Editor 'unmounted' $false
-    $cookedOff = ([regex]::Matches($logOff, '\[model\.dual\] cooked 경로')).Count
-    $experimentOff = ([regex]::Matches($logOff, '\[model\.dual\] experiment 경로')).Count
+    $sourcesOff = Read-GenerationSources $logOff
+    if ($null -eq $sourcesOff) { $fail += "4 unmounted leg에 assets.modeldiag 스냅샷이 없다"; $sourcesOff = [pscustomobject]@{ Catalog = 0; Library = 0; Failed = 0 } }
+    $cookedOff = $sourcesOff.Catalog
+    $experimentOff = $sourcesOff.Library
     if ($logOff -notmatch 'experiment\.catalog skip') {
         $fail += "4 대조군인데 catalog가 서 있다 — 저작 트리에 Derived가 생겼는가"
     }

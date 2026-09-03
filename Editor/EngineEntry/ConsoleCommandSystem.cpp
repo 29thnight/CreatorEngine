@@ -19,12 +19,20 @@
 #include "ScriptComponent.h"
 #include "PrefabUtility.h"
 #include "ComponentFactory.h"
-#include "Model.h"
+#include "ModelSceneInstantiation.h" // MBC9: generation 씬 인스턴스화
+#include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 소비 스냅샷
+#include "Material.h"
+#include "Mesh.h"
+#include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelVertexLayout.h"    // MBC9: skinbounds typed 정점 디코드
+#include "Assets/ModelAnimationSampler.h" // MBC9: editorsurface frame 축(CountUniqueKeyTimes)
+#include "Assets/ModelAssetAuthoringTransaction.h" // MBC11: assets.modelbench author 모드
+#include "RHI/IRHIDeviceResources.h"                // MBC11: VRAM 계측
 #include "LifecycleTrace.h"
 #include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "Socket.h" // X7 transform bulk probe
-#include "Skeleton.h" // E7-b: 벤치 진단이 m_bones 크기를 읽는다
+#include "BoneRegion.h" // MAX_BONES
 #include "Experiment/Model.h" // I5-D4e-1: experiment.animtick 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
@@ -43,7 +51,7 @@
 #include "ProxyCommandQueue.h"             // I5-D5c3: 갱신 커맨드 소비
 #include "Render/Scene/ExperimentMaterialSealing.h" // I5-D5c3-2: texture 축
 #include "PrimitiveRenderProxy.h"  // I5-D5a: FoliageRenderProxy 실물 사슬
-#include "RHI/IRenderDeviceServices.h" // I5-D5a: RHIExperimentVertexView
+#include "RHI/IRenderDeviceServices.h" // RHIModelMeshView·BuildRHIModelMeshView
 #include "ConditionParameter.h"
 #include "UIManager.h"
 #include "Canvas.h"
@@ -72,14 +80,11 @@
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
 #include "ProfilerSelfTest.h"
-#include "ExperimentParity/ExperimentModelParitySelfTest.h"
-#include "ExperimentParity/ExperimentModelBridgeSelfTest.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
-#include "ExperimentParity/ExperimentAnimationPlayback.h"
-#include "ExperimentParity/ExperimentImportPathSelfTest.h"
-#include "ExperimentParity/ExperimentGltfImportSelfTest.h"
+#include "AssetIdentity/ModelAssetGenerationSelfTest.h"
+#include "AssetIdentity/SceneModelGenerationSelfTest.h"
 #include "ExperimentParity/ExperimentSamplerSelfTest.h"
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
@@ -113,6 +118,8 @@
 #include "TagManager.h"
 
 #include <Windows.h>
+#include <psapi.h> // MBC11: assets.modelbench peak working set
+#pragma comment(lib, "Psapi.lib")
 #include <crtdbg.h>
 #include <algorithm>
 #include <atomic>
@@ -3041,19 +3048,25 @@ namespace
 				&& std::abs(lhs.y - rhs.y) <= 1e-4f
 				&& std::abs(lhs.z - rhs.z) <= 1e-4f;
 		};
-		const auto makeSkeleton = []()
+		// MBC9 — 합성 legacy Skeleton 대신 코퍼스의 typed generation 둘(Gunner·SU)을
+		// 쓴다. 본 엔티티 이름은 Gunner 스켈레톤의 첫 두 본에서 읽고(인덱스 0·1 →
+		// m_localTransforms[0..1]), 재로드 축은 SU로 rebind해 신원이 바뀌는 것을 잰다.
+		const auto gunner = DataSystems->FindModelAssetGenerationByStem("Gunner_F_Mythic");
+		const auto su = DataSystems->FindModelAssetGenerationByStem("SU_Mythic");
+		const assets::ModelSkeletonAsset* gunnerSkeleton =
+			gunner ? gunner->Skeleton() : nullptr;
+		if (nullptr == gunnerSkeleton || gunnerSkeleton->bones.size() < 2
+			|| !su || nullptr == su->Skeleton())
 		{
-			auto skeleton = std::make_unique<Skeleton>();
-			Bone* boneA = new Bone("BoneA", 0, math::matrix4x4::identity());
-			Bone* boneB = new Bone("BoneB", 1, math::matrix4x4::identity());
-			boneA->m_parentIndex = -1;
-			boneB->m_parentIndex = 0;
-			boneA->m_children.push_back(boneB);
-			skeleton->m_rootBone = boneA;
-			skeleton->m_bones = { boneA, boneB };
-			skeleton->m_rootTransform = math::matrix4x4::identity();
-			skeleton->m_globalInverseTransform = math::matrix4x4::identity();
-			return skeleton;
+			std::printf("[scene.transformbulk] probe=FAIL skeleton=0\n");
+			return;
+		}
+		const std::string boneAName = gunnerSkeleton->bones[0].name;
+		const std::string boneBName = gunnerSkeleton->bones[1].name;
+		const auto bindAnimator = [](Animator& target, const FileGuid& modelId)
+		{
+			target.m_Motion = modelId;
+			target.EnsureAnimationBinding();
 		};
 
 		Entity* animatorRoot = nullptr;
@@ -3070,9 +3083,9 @@ namespace
 				"__bulk_animator", GameObjectType::Empty);
 			animator = animatorRoot ? animatorRoot->AddComponent<Animator>() : nullptr;
 			boneA = animatorRoot ? scene->CreateEntity(
-				"BoneA", GameObjectType::Empty, animatorRoot->m_index) : nullptr;
+				boneAName, GameObjectType::Empty, animatorRoot->m_index) : nullptr;
 			boneB = boneA ? scene->CreateEntity(
-				"BoneB", GameObjectType::Empty, boneA->m_index) : nullptr;
+				boneBName, GameObjectType::Empty, boneA->m_index) : nullptr;
 			invalidBone = animatorRoot ? scene->CreateEntity(
 				"Missing", GameObjectType::Empty, animatorRoot->m_index) : nullptr;
 			if (boneA) boneA->AddComponent<BoneComponent>();
@@ -3096,9 +3109,7 @@ namespace
 			return;
 		}
 
-		auto skeletonA = makeSkeleton();
-		auto skeletonB = makeSkeleton();
-		animator->m_Skeleton = skeletonA.get();
+		bindAnimator(*animator, FileGuid(gunner->Identity().modelId));
 		invalidBone->Transform_().SetPosition({ 0.f, 7.f, 0.f });
 		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
 
@@ -3130,7 +3141,7 @@ namespace
 		const bool reenabledWorld = nearVector(
 			boneB->Transform_().GetWorldPosition(), { 9.f, 4.f, 0.f });
 
-		animator->m_Skeleton = skeletonB.get();
+		bindAnimator(*animator, FileGuid(su->Identity().modelId));
 		const AnimatorPoseUploadMetrics reloaded = scene->PublishAnimatorPose(*animator);
 		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
 		const bool animatorPass = first.packed && first.rebound
@@ -3195,7 +3206,7 @@ namespace
 		std::printf("[scene.transformbulk] barrier=main-thread invalid=%s probe=%s\n",
 			invalidHeld ? "held" : "changed", pass ? "PASS" : "FAIL");
 
-		animator->m_Skeleton = nullptr;
+		bindAnimator(*animator, FileGuid{});
 		animatorRoot->Destroy();
 		physicsParent->Destroy();
 		socketTarget->Destroy();
@@ -4391,8 +4402,8 @@ namespace ConsoleCmd
 		// 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
 		const std::string path = TrimLine(line.substr(cmd.size()));
 		const std::string modelName = file::path(path).stem().string();
-		const std::shared_ptr<Model> previousGeneration =
-			DataSystems->FindCachedModel(modelName);
+		const std::shared_ptr<const assets::ModelAssetGeneration> previousGeneration =
+			DataSystems->FindModelAssetGenerationByStem(modelName);
 		const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
 			path, EditorAssetDatabase::ImportKind::Model);
 		if (imported.empty())
@@ -4400,10 +4411,14 @@ namespace ConsoleCmd
 			std::printf("[CLI] 모델 임포트 실패: %s\n", path.c_str());
 			return;
 		}
-		DataSystems->LoadModel(imported.string());
-		const std::shared_ptr<Model> loadedGeneration =
-			DataSystems->FindCachedModel(imported.stem().string());
-		const char* cacheResult = previousGeneration && loadedGeneration &&
+		const std::shared_ptr<const assets::ModelAssetGeneration> loadedGeneration =
+			DataSystems->LoadModelAssetGenerationByPath(imported.string());
+		if (!loadedGeneration)
+		{
+			std::printf("[CLI] 모델 generation 로드 실패: %s\n", imported.string().c_str());
+			return;
+		}
+		const char* cacheResult = previousGeneration &&
 			previousGeneration != loadedGeneration ? "reloaded" : "loaded";
 		std::printf("[CLI] 모델 임포트 및 로드 요청: %s (runtime-cache=%s)\n",
 			imported.string().c_str(), cacheResult);
@@ -5397,9 +5412,9 @@ namespace ConsoleCmd
             std::printf("[CLI] 사용법: model.loadcached <모델 경로>\n");
             return;
         }
-        auto model = DataSystems->LoadCachedModelShared(parts[1]);
+        const auto generation = DataSystems->LoadModelAssetGenerationByPath(parts[1]);
         std::printf("[CLI] model.loadcached %s: %s\n",
-            model ? "ok" : "fail", parts[1].c_str());
+            generation ? "ok" : "fail", parts[1].c_str());
     }
 
     static void Cmd_model_place(const ConsoleCommandContext& ctx)
@@ -5414,15 +5429,18 @@ namespace ConsoleCmd
 
         // 콘텐츠 브라우저에서 씬으로 끌어다 놓는 것과 같은 경로.
         Scene* scene = SceneManagers->GetActiveScene();
-        auto model = DataSystems->FindCachedModel(parts[1]);
-        if (!scene || !model)
+        const auto generation = DataSystems->FindModelAssetGenerationByStem(parts[1]);
+        if (!scene || !generation)
         {
             std::printf("[CLI] 씬 또는 모델을 찾을 수 없음: %s\n", parts[1].c_str());
             return;
         }
 
-        Model::LoadModelToScene(model.get(), *scene);
-        std::printf("[CLI] 씬에 배치: %s\n", parts[1].c_str());
+        ModelSceneInstantiation::Options options{};
+        options.createMeshCollider = DataSystems->ReadModelCreateMeshCollider(
+            FileGuid(generation->Identity().modelId));
+        Entity* root = ModelSceneInstantiation::Instantiate(*scene, generation, options);
+        std::printf("[CLI] 씬에 배치: %s (%s)\n", parts[1].c_str(), root ? "ok" : "fail");
     }
 
     // I5-D4e-2 — 이벤트·루프 오버라이드의 소유 이관 게이트. 코퍼스에 저작분이
@@ -5522,35 +5540,24 @@ namespace ConsoleCmd
         //   ACCESS_VIOLATION으로 죽었다 — 관문을 창구로 옮기면 그 암묵 보장이
         //   사라진다. 이제 없으면 건너뛰되 **출력 토큰으로 드러낸다**(n/a).
         //   조용히 건너뛰면 대조군이 사라진 채로 초록이 나온다.
-        const char* contaminationAxis = "none";
-        Skeleton* sharedSkeleton = animator->m_Skeleton;
-        if (nullptr == sharedSkeleton || sharedSkeleton->m_animations.empty())
+        // MBC9 — 공유 자산은 immutable ModelAnimationAsset이고 이벤트 필드가 아예
+        // 없다(이벤트는 씬 소유). 오염은 구조적으로 불가능하므로 자산 루프값이 원본
+        // 그대로인지(오버라이드가 자산을 안 건드렸는지)만 확인한다.
+        const char* contaminationAxis = "immutable";
+        if (const assets::ModelAnimationAsset* clip = animator->TypedClip(0))
         {
-            contaminationAxis = "n/a";
+            const AnimatorClipOverride* probe = animator->FindClipOverride(0);
+            if (probe && probe->loopOverride.has_value()
+                && *probe->loopOverride == clip->looping)
+            {
+                // 오버라이드 값이 자산값과 같으면 "정본이 오버라이드"임을 가를 수 없다 —
+                // seed는 false를 심고 Gunner 자산은 loop=true라 같지 않아야 한다.
+                failures.push_back("비오염: 자산 loop가 오버라이드와 같아 판별 불가");
+            }
         }
         else
         {
-            if (!sharedSkeleton->m_animations[0].m_keyFrameEvent.empty())
-            {
-                failures.push_back("비오염: 공유 자산에 이벤트 "
-                    + std::to_string(
-                        sharedSkeleton->m_animations[0].m_keyFrameEvent.size())
-                    + "건 주입됨");
-            }
-            if (animator->m_experimentModel)
-            {
-                if (const experiment::Skeleton* experimentSkeleton =
-                    animator->m_experimentModel->TryGetSkeleton())
-                {
-                    if (!experimentSkeleton->clips.empty()
-                        && sharedSkeleton->m_animations[0].m_isLoop
-                            != experimentSkeleton->clips[0].looping)
-                    {
-                        failures.push_back(
-                            "비오염: 공유 자산 m_isLoop가 원본과 다름");
-                    }
-                }
-            }
+            contaminationAxis = "n/a";
         }
         // ③ 발화 매칭 — 구간·되감김 규칙이 오버라이드와 IsClipLooping을 본다.
         if (1 != animator->InvokeClipEvents(0, 0.3f, 0.2f))
@@ -5608,8 +5615,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene || ctx.parts.size() < 2)
         {
-            std::printf("[CLI] 사용법: experiment.foliage seed <자산디렉터리>"
-                " | verify experiment|legacy\n");
+            std::printf("[CLI] 사용법: experiment.foliage seed <자산디렉터리> | verify\n");
             return;
         }
 
@@ -5620,8 +5626,8 @@ namespace ConsoleCmd
                 std::printf("[CLI] experiment.foliage seed <자산디렉터리>\n");
                 return;
             }
-            auto model = DataSystems->FindCachedModel("Gunner_F_Mythic");
-            if (!model)
+            const auto generation = DataSystems->FindModelAssetGenerationByStem("Gunner_F_Mythic");
+            if (!generation)
             {
                 std::printf("[CLI] experiment.foliage seed fail 모델 없음\n");
                 return;
@@ -5629,8 +5635,9 @@ namespace ConsoleCmd
             Entity* entity = scene->CreateEntity("GateFoliage",
                 GameObjectType::Mesh, 0);
             FoliageComponent* foliage = entity->AddComponent<FoliageComponent>();
-            FoliageType type(model->GetMeshShared(0),
-                model->GetMaterialShared(0), true, model->name);
+            // MBC9 — Foliage 자산은 모델을 이름(stem)으로만 적는다. 바인딩은
+            // AddFoliageType(BindModelGeneration)이 이름 → generation으로 잇는다.
+            FoliageType type(generation->SourcePath().stem().string(), true);
             foliage->AddFoliageType(type);
             FoliageInstance instance;
             instance.m_position = { 3.0f, 0.0f, 3.0f };
@@ -5645,8 +5652,6 @@ namespace ConsoleCmd
             return;
         }
 
-        const bool expectExperiment = ctx.parts.size() >= 3
-            && "experiment" == ctx.parts[2];
         FoliageComponent* foliage = nullptr;
         for (const auto& object : scene->m_Entities)
         {
@@ -5667,41 +5672,30 @@ namespace ConsoleCmd
         std::vector<std::string> failures;
         const auto& types = foliage->GetFoliageTypes();
         if (types.empty()) failures.push_back("왕복: 타입 0(자산 재로드 실패)");
-        std::size_t boundTypes = 0;
         std::size_t authoredMaterialTypes = 0, authoredMaterialDraws = 0;
+        std::size_t generationTypes = 0, generationViews = 0, materialTypes = 0;
         for (const FoliageType& type : types)
         {
-            if (nullptr == type.m_mesh)
-            {
-                failures.push_back("왕복: m_mesh 재해석 실패");
-                continue;
-            }
-            if (type.m_experimentModel) ++boundTypes;
-            // I5-D5c4(S2c-2c) — 재질 저작 정본도 같은 모델에서 잇는다. 메시
-            // 핸들만 세면 재질 배선이 끊겨도 초록이다(축이 하나 모자란다).
+            if (type.m_modelGeneration) ++generationTypes;
+            if (type.m_material) ++materialTypes;
+            // I5-D5c4(S2c-2c) — 재질 저작 정본도 같은 generation에서 잇는다.
             if (type.m_authoredMaterial) ++authoredMaterialTypes;
         }
-        if (expectExperiment && boundTypes != types.size())
+        if (generationTypes != types.size())
         {
-            failures.push_back("바인딩: experiment 핸들 "
-                + std::to_string(boundTypes) + "/"
-                + std::to_string(types.size()));
+            failures.push_back("typed: generation 바인딩 "
+                + std::to_string(generationTypes) + "/" + std::to_string(types.size()));
         }
-        if (!expectExperiment && 0 != boundTypes)
+        if (materialTypes != types.size())
         {
-            failures.push_back("바인딩: off인데 experiment 핸들 "
-                + std::to_string(boundTypes));
+            failures.push_back("재질: runtime 재질 "
+                + std::to_string(materialTypes) + "/" + std::to_string(types.size()));
         }
-        if (expectExperiment && authoredMaterialTypes != types.size())
+        if (authoredMaterialTypes != types.size())
         {
             failures.push_back("재질: 저작 정본 "
                 + std::to_string(authoredMaterialTypes) + "/"
                 + std::to_string(types.size()));
-        }
-        if (!expectExperiment && 0 != authoredMaterialTypes)
-        {
-            failures.push_back("재질: off인데 저작 정본 "
-                + std::to_string(authoredMaterialTypes));
         }
 
         // 실물 프록시 사슬 — 생성자·색인·DrawSource 캡처를 제품 함수 그대로.
@@ -5709,59 +5703,46 @@ namespace ConsoleCmd
         proxy.RebuildInstanceMap();
         const auto draws = proxy.CaptureDrawSources();
         if (draws.empty()) failures.push_back("프록시: DrawSource 0");
-        std::size_t viewCompleteDraws = 0;
         for (const auto& draw : draws)
         {
             if (draw.authoredMaterial) ++authoredMaterialDraws;
-            if (nullptr == draw.experimentModel) continue;
-            RHIExperimentVertexView view{};
-            if (DataSystem::BuildExperimentVertexView(*draw.experimentModel,
-                draw.experimentMeshIndex, view) && 0 != view.stableKey)
+            if (draw.modelGeneration)
             {
-                ++viewCompleteDraws;
+                RHIModelMeshView typedView{};
+                if (BuildRHIModelMeshView(*draw.modelGeneration, draw.modelMeshIndex, typedView)
+                    && typedView.IsComplete())
+                {
+                    ++generationViews;
+                }
             }
         }
-        if (expectExperiment && viewCompleteDraws != draws.size())
-        {
-            failures.push_back("뷰: 완비 "
-                + std::to_string(viewCompleteDraws) + "/"
-                + std::to_string(draws.size()));
-        }
-        if (!expectExperiment && 0 != viewCompleteDraws)
-        {
-            failures.push_back("뷰: off인데 완비 "
-                + std::to_string(viewCompleteDraws));
-        }
         // DrawSource가 재질 정본을 나르는가 — 컴포넌트 바인딩만 보면 프록시
-        // 복사 누락에 눈멀다(D5-a의 M2 변이가 가른 그 축과 같은 자리).
-        if (expectExperiment && authoredMaterialDraws != draws.size())
+        // 복사 누락에 눈멀다.
+        if (authoredMaterialDraws != draws.size())
         {
             failures.push_back("재질 운반: "
                 + std::to_string(authoredMaterialDraws) + "/"
                 + std::to_string(draws.size()));
         }
-        if (!expectExperiment && 0 != authoredMaterialDraws)
+        if (generationViews != draws.size())
         {
-            failures.push_back("재질 운반: off인데 "
-                + std::to_string(authoredMaterialDraws));
+            failures.push_back("typed: RHIModelMeshView 완비 "
+                + std::to_string(generationViews) + "/" + std::to_string(draws.size()));
         }
-
         if (failures.empty())
         {
-            std::printf("[CLI] experiment.foliage verify pass mode=%s "
-                "types=%zu bound=%zu draws=%zu views=%zu "
-                "authoredMat=%zu authoredMatDraws=%zu\n",
-                expectExperiment ? "experiment" : "legacy",
-                types.size(), boundTypes, draws.size(), viewCompleteDraws,
-                authoredMaterialTypes, authoredMaterialDraws);
+            std::printf("[CLI] experiment.foliage verify pass "
+                "types=%zu draws=%zu authoredMat=%zu authoredMatDraws=%zu "
+                "generationTypes=%zu generationViews=%zu\n",
+                types.size(), draws.size(), authoredMaterialTypes, authoredMaterialDraws,
+                generationTypes, generationViews);
         }
         else
         {
             std::string joined;
             for (const std::string& failure : failures)
                 joined += " [" + failure + "]";
-            std::printf("[CLI] experiment.foliage verify fail mode=%s%s\n",
-                expectExperiment ? "experiment" : "legacy", joined.c_str());
+            std::printf("[CLI] experiment.foliage verify fail%s\n", joined.c_str());
         }
     }
 
@@ -5778,13 +5759,11 @@ namespace ConsoleCmd
             std::printf("[CLI] experiment.boneresolve fail 활성 씬 없음\n");
             return;
         }
-        std::size_t boneCount = 0, viaExperimentCount = 0, viaLegacyCount = 0;
-        std::size_t mismatchCount = 0, unresolvedCount = 0;
-        // I6-B2 — 본 캐시 무효화 신원의 출처. 해석 경로(viaExperiment)와 별개
-        // 축이다: 인덱스를 experiment로 풀면서 신원은 legacy 객체 수명에 묶여
-        // 있으면 그 객체를 은퇴시킬 수 없다.
-        std::size_t serialExperimentCount = 0, serialLegacyCount = 0;
-        std::size_t roundtripMismatch = 0;
+        // MBC9 — 본 이름 해석 창구(Animator::ResolveBoneIndex)를 BoneComponent 전수에
+        // 태운다. 독립 유도 대조는 name→index→name 왕복이고, 경로·신원 계수는 창구
+        // 내부의 실분기 관측이다(typed generation 하나여야 한다).
+        std::size_t boneCount = 0, viaGenerationCount = 0, serialGenerationCount = 0;
+        std::size_t unresolvedCount = 0, roundtripMismatch = 0;
         for (const auto& object : scene->m_Entities)
         {
             if (!object || object->IsDestroyMark()) continue;
@@ -5792,49 +5771,31 @@ namespace ConsoleCmd
             const auto& rootObject = scene->TryGetEntity(object->GetRootIndex());
             if (!rootObject) continue;
             Animator* animator = rootObject->GetComponent<Animator>();
-            bool serialViaExperiment = false;
+            AnimatorDataPath serialPath = AnimatorDataPath::None;
             if (nullptr == animator
-                || 0 == animator->GetSkeletonSerial(&serialViaExperiment))
+                || 0 == animator->GetSkeletonSerial(nullptr, &serialPath))
             {
                 continue;
             }
 
             const std::string boneName = object->RemoveSuffixNumberTag();
-            bool viaExperiment = false;
-            const int resolved =
-                animator->ResolveBoneIndex(boneName, &viaExperiment);
-            int legacyIndex = -1;
-            if (animator->m_Skeleton)
-            {
-                Bone* const bone = animator->m_Skeleton->FindBone(boneName);
-                legacyIndex = bone ? bone->m_index : -1;
-            }
+            AnimatorDataPath resolvePath = AnimatorDataPath::None;
+            const int resolved = animator->ResolveBoneIndex(boneName, nullptr, &resolvePath);
 
             ++boneCount;
-            if (viaExperiment) ++viaExperimentCount; else ++viaLegacyCount;
-            if (serialViaExperiment) ++serialExperimentCount;
-            else ++serialLegacyCount;
-            if (resolved != legacyIndex) ++mismatchCount;
+            if (AnimatorDataPath::Generation == resolvePath) ++viaGenerationCount;
+            if (AnimatorDataPath::Generation == serialPath) ++serialGenerationCount;
             if (resolved < 0) ++unresolvedCount;
-            // I6-B4a — legacy를 안 쓰는 **독립 유도** 대조. 해석한 인덱스로
-            // 이름을 되받아 원래 tag와 같은가(name→index→name). legacy가
-            // 은퇴하면 위 mismatch 축은 잴 상대가 없어지므로, 그 전에 같은
-            // 결함(인덱스 어긋남)을 legacy 없이 잡는 축을 세워 겹치는 구간에서
-            // 함께 돌린다.
-            else if (animator->GetBoneName(resolved) != boneName)
-            {
-                ++roundtripMismatch;
-            }
+            else if (animator->GetBoneName(resolved) != boneName) ++roundtripMismatch;
         }
-        const bool passed = boneCount > 0 && 0 == mismatchCount
-            && 0 == unresolvedCount && 0 == roundtripMismatch;
-        std::printf("[CLI] experiment.boneresolve %s bones=%zu experiment=%zu "
-            "legacy=%zu mismatch=%zu unresolved=%zu serialExperiment=%zu "
-            "serialLegacy=%zu roundtrip=%zu\n",
+        const bool passed = boneCount > 0 && 0 == unresolvedCount
+            && 0 == roundtripMismatch && viaGenerationCount == boneCount
+            && serialGenerationCount == boneCount;
+        std::printf("[CLI] experiment.boneresolve %s bones=%zu generation=%zu "
+            "unresolved=%zu serialGeneration=%zu roundtrip=%zu\n",
             passed ? "pass" : (boneCount == 0 ? "skip" : "fail"),
-            boneCount, viaExperimentCount, viaLegacyCount, mismatchCount,
-            unresolvedCount, serialExperimentCount, serialLegacyCount,
-            roundtripMismatch);
+            boneCount, viaGenerationCount, unresolvedCount,
+            serialGenerationCount, roundtripMismatch);
     }
 
     // I5-D4e-3 — AvatarMask 트리 생성의 A/B 대조. 실물 창구
@@ -5855,11 +5816,7 @@ namespace ConsoleCmd
         {
             if (!object || object->IsDestroyMark()) continue;
             Animator* candidate = object->GetComponent<Animator>();
-            if (nullptr == candidate || nullptr == candidate->m_Skeleton
-                || nullptr == candidate->m_Skeleton->m_rootBone)
-            {
-                continue;
-            }
+            if (nullptr == candidate || 0 == candidate->GetSkeletonSerial()) continue;
             animator = candidate;
             break;
         }
@@ -5870,63 +5827,36 @@ namespace ConsoleCmd
         }
 
         AvatarMask channelMask; // 실물 창구 산출
-        bool viaExperiment = false;
+        AnimatorDataPath maskPath = AnimatorDataPath::None;
         BoneMask* channelRoot =
-            animator->BuildAvatarBoneMasks(channelMask, &viaExperiment);
-        AvatarMask legacyMask;  // legacy 재귀 대조군
-        BoneMask* legacyRoot =
-            legacyMask.MakeBoneMask(animator->m_Skeleton->m_rootBone);
+            animator->BuildAvatarBoneMasks(channelMask, nullptr, &maskPath);
+        const bool viaGeneration = AnimatorDataPath::Generation == maskPath;
 
         std::vector<std::string> failures;
-        if (nullptr == channelRoot || nullptr == legacyRoot)
-        {
-            failures.push_back("루트 마스크 생성 실패");
-        }
-        else
-        {
-            if (channelRoot->boneName != legacyRoot->boneName)
-                failures.push_back("루트 이름 불일치");
-            if (channelMask.m_BoneMasks.size() != legacyMask.m_BoneMasks.size())
-            {
-                failures.push_back("마스크 계수 불일치("
-                    + std::to_string(channelMask.m_BoneMasks.size()) + " vs "
-                    + std::to_string(legacyMask.m_BoneMasks.size()) + ")");
-            }
-            else
-            {
-                for (std::size_t index = 0;
-                    index < channelMask.m_BoneMasks.size(); ++index)
-                {
-                    if (channelMask.m_BoneMasks[index]->boneName
-                            != legacyMask.m_BoneMasks[index]->boneName
-                        || channelMask.m_BoneMasks[index]->m_children.size()
-                            != legacyMask.m_BoneMasks[index]->m_children.size())
-                    {
-                        failures.push_back("순서/자식 불일치 idx="
-                            + std::to_string(index));
-                        break;
-                    }
-                }
-            }
-        }
+        if (nullptr == channelRoot) failures.push_back("루트 마스크 생성 실패");
 
-        // I6-B4a — legacy를 안 쓰는 **독립 유도** 대조. 위 축은 legacy 재귀와
-        // 결과를 맞춰 보는 것이라 legacy가 은퇴하면 잴 상대가 없다. 이 축은
-        // 마스크 트리를 **스켈레톤 원자료(부모 인덱스)** 와 직접 맞춘다:
-        //   ① 마스크 하나당 뼈 하나 ② 마스크 트리의 부모 관계가 스켈레톤의
-        //   parent와 같다 ③ 부모가 자식보다 앞에 온다(저장분 인덱스 대응이
-        //   전제하는 preorder).
-        // ★ DFS를 다시 구현해 순서를 맞추지 않는다 — 같은 규약을 두 번 쓰면
-        //   둘이 함께 틀려도 초록이다. 이름→인덱스 사상 위의 **구조 불변식**만
-        //   본다.
+        // I6-B4a — **독립 유도** 대조. 마스크 트리를 스켈레톤 원자료(부모 인덱스)와
+        // 직접 맞춘다: ① 마스크 하나당 뼈 하나 ② 마스크 트리의 부모 관계가
+        // 스켈레톤의 parent와 같다 ③ 부모가 자식보다 앞에 온다(저장분 인덱스
+        // 대응이 전제하는 preorder). DFS를 다시 구현해 순서를 맞추지 않는다 —
+        // 같은 규약을 두 번 쓰면 둘이 함께 틀려도 초록이다.
         const char* structureAxis = "n/a";
-        if (const experiment::Skeleton* skeleton =
-            animator->m_experimentModel ? animator->m_experimentModel->TryGetSkeleton() : nullptr)
+        std::vector<std::pair<std::string, std::size_t>> structureBones; // (name, parent or npos)
+        if (const assets::ModelSkeletonAsset* typedSkeleton = animator->TypedSkeleton())
+        {
+            for (const assets::ModelBoneAsset& bone : typedSkeleton->bones)
+            {
+                structureBones.emplace_back(bone.name,
+                    bone.parent == assets::kInvalidModelAssetIndex
+                    ? std::string::npos : static_cast<std::size_t>(bone.parent));
+            }
+        }
+        if (!structureBones.empty())
         {
             std::unordered_map<std::string, std::size_t> boneIndexOf;
-            for (std::size_t index = 0; index < skeleton->bones.size(); ++index)
+            for (std::size_t index = 0; index < structureBones.size(); ++index)
             {
-                boneIndexOf.emplace(skeleton->bones[index].name, index);
+                boneIndexOf.emplace(structureBones[index].first, index);
             }
             std::unordered_map<const BoneMask*, std::size_t> position;
             for (std::size_t index = 0;
@@ -5936,12 +5866,12 @@ namespace ConsoleCmd
             }
 
             bool structureOk =
-                channelMask.m_BoneMasks.size() == skeleton->bones.size();
+                channelMask.m_BoneMasks.size() == structureBones.size();
             if (!structureOk)
             {
                 failures.push_back("구조: 마스크 " +
                     std::to_string(channelMask.m_BoneMasks.size()) + " vs 뼈 " +
-                    std::to_string(skeleton->bones.size()));
+                    std::to_string(structureBones.size()));
             }
             for (std::size_t index = 0;
                 structureOk && index < channelMask.m_BoneMasks.size(); ++index)
@@ -5959,9 +5889,7 @@ namespace ConsoleCmd
                 {
                     const auto childIndex = boneIndexOf.find(child->boneName);
                     if (childIndex == boneIndexOf.end()
-                        || !skeleton->bones[childIndex->second].parent.IsValid()
-                        || skeleton->bones[childIndex->second].parent.Value()
-                            != self->second)
+                        || structureBones[childIndex->second].second != self->second)
                     {
                         failures.push_back("구조: 부모 관계 어긋남 "
                             + mask->boneName + " -> " + child->boneName);
@@ -5980,21 +5908,25 @@ namespace ConsoleCmd
             }
             structureAxis = structureOk ? "ok" : "fail";
         }
+        else
+        {
+            failures.push_back("구조: typed skeleton 원자료 없음");
+        }
+        if (!viaGeneration) failures.push_back("경로: generation 아님");
 
         if (failures.empty())
         {
             std::printf("[CLI] experiment.animmask pass masks=%zu "
-                "viaExperiment=%d structure=%s\n",
-                channelMask.m_BoneMasks.size(), viaExperiment ? 1 : 0,
-                structureAxis);
+                "viaGeneration=%d structure=%s\n",
+                channelMask.m_BoneMasks.size(), viaGeneration ? 1 : 0, structureAxis);
         }
         else
         {
             std::string joined;
             for (const std::string& failure : failures)
                 joined += " [" + failure + "]";
-            std::printf("[CLI] experiment.animmask fail viaExperiment=%d%s\n",
-                viaExperiment ? 1 : 0, joined.c_str());
+            std::printf("[CLI] experiment.animmask fail viaGeneration=%d%s\n",
+                viaGeneration ? 1 : 0, joined.c_str());
         }
     }
 
@@ -6022,11 +5954,12 @@ namespace ConsoleCmd
             return;
         }
 
-        std::size_t animators = 0, clipViaExperiment = 0, clipViaLegacy = 0;
+        // MBC9 — 창구(GetClipCount/GetClipName/GetClipFrameCount·HasRenderableMesh)가
+        // typed generation 원자료와 인덱스별로 맞는지 잰다. legacy 대조군은 은퇴했다.
+        std::size_t animators = 0, clipViaGeneration = 0;
         std::size_t clipsChecked = 0, clipCountMismatch = 0, clipNameMismatch = 0;
         std::size_t clipFrameMismatch = 0;
-        std::size_t renderers = 0, meshViaExperiment = 0, meshViaLegacy = 0;
-        std::size_t meshGuardMismatch = 0, meshPresent = 0;
+        std::size_t renderers = 0, meshPresent = 0, meshGuardMismatch = 0;
         std::string firstMismatch;
 
         for (const auto& object : scene->m_Entities)
@@ -6034,62 +5967,52 @@ namespace ConsoleCmd
             if (!object || object->IsDestroyMark()) continue;
 
             Animator* animator = object->GetComponent<Animator>();
-            if (nullptr != animator && nullptr != animator->m_Skeleton)
+            if (nullptr != animator && 0 != animator->GetSkeletonSerial())
             {
                 ++animators;
-                bool viaExperiment = false;
-                const std::size_t windowCount =
-                    animator->GetClipCount(&viaExperiment);
-                if (viaExperiment) ++clipViaExperiment; else ++clipViaLegacy;
+                AnimatorDataPath clipPath = AnimatorDataPath::None;
+                const std::size_t windowCount = animator->GetClipCount(nullptr, &clipPath);
+                if (AnimatorDataPath::Generation == clipPath) ++clipViaGeneration;
 
-                const std::size_t legacyCount =
-                    animator->m_Skeleton->m_animations.size();
-                if (windowCount != legacyCount)
+                const auto clips = animator->m_modelGeneration
+                    ? animator->m_modelGeneration->Animations()
+                    : std::span<const assets::ModelAnimationAsset>{};
+                if (windowCount != clips.size())
                 {
                     ++clipCountMismatch;
                     if (firstMismatch.empty())
                     {
-                        firstMismatch = "clipCount " +
-                            std::to_string(windowCount) + "/" +
-                            std::to_string(legacyCount);
+                        firstMismatch = "clipCount " + std::to_string(windowCount)
+                            + "/" + std::to_string(clips.size());
                     }
                 }
-                const std::size_t common =
-                    windowCount < legacyCount ? windowCount : legacyCount;
+                const std::size_t common = (std::min)(windowCount, clips.size());
                 for (std::size_t clip = 0; clip < common; ++clip)
                 {
                     ++clipsChecked;
-                    const std::string windowName =
-                        animator->GetClipName(static_cast<int>(clip));
-                    const std::string& legacyName =
-                        animator->m_Skeleton->m_animations[clip].m_name;
-                    if (windowName != legacyName)
+                    const std::string windowName = animator->GetClipName(static_cast<int>(clip));
+                    if (windowName != clips[clip].name)
                     {
                         ++clipNameMismatch;
                         if (firstMismatch.empty())
                         {
-                            firstMismatch = "clipName[" +
-                                std::to_string(clip) + "] " + windowName +
-                                "/" + legacyName;
+                            firstMismatch = "clipName[" + std::to_string(clip) + "] "
+                                + windowName + "/" + clips[clip].name;
                         }
                     }
-                    // frame 축 — 키프레임 수(유니크 키 시각). D5b 실측이 여기서
-                    // 역브리지의 정의 어긋남(채널 키 합산)을 잡았다: 이벤트
-                    // 저작의 frameKey 상한과 key(0~1 진행률) 환산이 로드
-                    // 경로마다 달라져 같은 자산이 다른 시점에 발화했다.
+                    // frame 축 — 유니크 키 시각 수(이벤트 저작의 frameKey 상한).
                     const std::size_t windowFrames =
                         animator->GetClipFrameCount(static_cast<int>(clip));
-                    const std::size_t legacyFrames =
-                        animator->m_Skeleton->m_animations[clip].m_totalKeyFrames;
-                    if (windowFrames != legacyFrames)
+                    const std::size_t assetFrames =
+                        assets::animation::CountUniqueKeyTimes(clips[clip]);
+                    if (windowFrames != assetFrames)
                     {
                         ++clipFrameMismatch;
                         if (firstMismatch.empty())
                         {
-                            firstMismatch = "clipFrames[" +
-                                std::to_string(clip) + "] " +
-                                std::to_string(windowFrames) + "/" +
-                                std::to_string(legacyFrames);
+                            firstMismatch = "clipFrames[" + std::to_string(clip) + "] "
+                                + std::to_string(windowFrames) + "/"
+                                + std::to_string(assetFrames);
                         }
                     }
                 }
@@ -6099,13 +6022,13 @@ namespace ConsoleCmd
             if (nullptr != renderer)
             {
                 ++renderers;
-                bool viaExperiment = false;
-                const bool windowHas =
-                    renderer->HasRenderableMesh(&viaExperiment);
-                const bool legacyHas = static_cast<bool>(renderer->m_Mesh);
-                if (viaExperiment) ++meshViaExperiment; else ++meshViaLegacy;
+                const bool windowHas = renderer->HasRenderableMesh();
+                RHIModelMeshView view{};
+                const bool typedHas = renderer->m_modelGeneration
+                    && BuildRHIModelMeshView(*renderer->m_modelGeneration,
+                        renderer->m_modelMeshIndex, view) && view.IsComplete();
                 if (windowHas) ++meshPresent;
-                if (windowHas != legacyHas)
+                if (windowHas != typedHas)
                 {
                     ++meshGuardMismatch;
                     if (firstMismatch.empty())
@@ -6121,132 +6044,17 @@ namespace ConsoleCmd
         const bool covered = animators > 0 && renderers > 0 && clipsChecked > 0;
         const bool passed = covered && 0 == clipCountMismatch
             && 0 == clipNameMismatch && 0 == clipFrameMismatch
-            && 0 == meshGuardMismatch;
+            && 0 == meshGuardMismatch && clipViaGeneration == animators;
         std::printf("[CLI] experiment.editorsurface %s animators=%zu "
-            "clipExperiment=%zu clipLegacy=%zu clips=%zu countMismatch=%zu "
+            "clipGeneration=%zu clips=%zu countMismatch=%zu "
             "nameMismatch=%zu frameMismatch=%zu renderers=%zu "
-            "meshExperiment=%zu meshLegacy=%zu "
             "meshPresent=%zu guardMismatch=%zu%s%s\n",
             passed ? "pass" : (covered ? "fail" : "skip"),
-            animators, clipViaExperiment, clipViaLegacy, clipsChecked,
+            animators, clipViaGeneration, clipsChecked,
             clipCountMismatch, clipNameMismatch, clipFrameMismatch,
-            renderers, meshViaExperiment,
-            meshViaLegacy, meshPresent, meshGuardMismatch,
+            renderers, meshPresent, meshGuardMismatch,
             firstMismatch.empty() ? "" : " first=",
             firstMismatch.c_str());
-    }
-
-    // I5-D4f-1 — 바운드 축. 역브리지가 legacy 정점 시공을 그만두면
-    // RecalculateBounds()가 원본을 잃는다: 바운드는 기본값(빈 AABB·반지름 0)으로
-    // 남고 컬링·피킹·그림자 반경이 조용히 틀어진다. D4f-0 예행이 이 눈멂을
-    // 실증했다 — legacy 정점 없이도 드로우 9·커버리지 42411이 그대로였다.
-    // 지금 게이트의 어느 축도 바운드를 한 번도 읽지 않는다.
-    //
-    // 셋을 잰다:
-    //   ① 절단이 실제로 일어났는가 — legacyVertices (on 0 · off 전량)
-    //   ② 바운드가 살아 있는가   — degenerate 0
-    //   ③ 두 유도가 같은 값인가  — digest를 ps1이 on/off로 대조한다.
-    // ③이 실질 이빨이다. on은 experiment 정본 주입, off는 legacy 정점→min/max
-    // 유도라 서로 다른 산출 경로이고, digest가 갈리면 주입이 틀린 것이다.
-    // ①②는 각 실행 안에서만 성립한다 — ①이 없으면 절단이 안 일어나도 전부
-    // 초록이고(무변경 슬라이스), ②가 없으면 바운드 소실이 조용히 통과한다.
-    static void Cmd_experiment_meshbounds(const ConsoleCommandContext& ctx)
-    {
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (nullptr == scene)
-        {
-            std::printf("[CLI] experiment.meshbounds fail 활성 씬 없음\n");
-            return;
-        }
-
-        std::size_t meshes = 0, legacyVertices = 0, degenerate = 0;
-        std::size_t expBound = 0, boundMismatch = 0;
-        std::string firstIssue;
-        std::uint32_t digest = 2166136261u;
-
-        const auto account = [&](const std::string& label, Mesh& mesh,
-            const experiment::Model* model, std::uint32_t meshIndex)
-        {
-            ++meshes;
-            // 비-const 참조로 부른다 — const 오버로드는 배열을 값으로 복사한다.
-            if (!mesh.GetVertices().empty()) ++legacyVertices;
-
-            const math::aabb box = mesh.GetBoundingBox();
-            const math::sphere ball = mesh.GetBoundingSphere();
-            if (box.is_empty() || !(ball.radius > 0.0f))
-            {
-                ++degenerate;
-                if (firstIssue.empty()) firstIssue = "degenerate:" + label;
-            }
-
-            char line[320];
-            std::snprintf(line, sizeof(line),
-                "%s|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f",
-                label.c_str(), box.center.x, box.center.y, box.center.z,
-                box.extents.x, box.extents.y, box.extents.z, ball.radius);
-            for (const char* cursor = line; '\0' != *cursor; ++cursor)
-            {
-                digest ^= static_cast<unsigned char>(*cursor);
-                digest *= 16777619u;
-            }
-
-            if (nullptr == model) return;
-            const experiment::Mesh* source =
-                model->TryGetMesh(experiment::MeshIndex{ meshIndex });
-            if (nullptr == source) return;
-            ++expBound;
-            if (!math::near_equal(box, source->bounds))
-            {
-                ++boundMismatch;
-                if (firstIssue.empty()) firstIssue = "mismatch:" + label;
-            }
-        };
-
-        for (const auto& object : scene->m_Entities)
-        {
-            if (!object || object->IsDestroyMark()) continue;
-
-            MeshRenderer* renderer = object->GetComponent<MeshRenderer>();
-            if (nullptr != renderer && nullptr != renderer->m_Mesh)
-            {
-                account(object->m_name.ToString() + "/" +
-                    renderer->m_Mesh->GetName(), *renderer->m_Mesh,
-                    renderer->m_experimentModel.get(),
-                    renderer->m_experimentMeshIndex);
-            }
-
-            // Foliage 타입 메시도 같은 브리지 산물이다. 여기 바운드는 인스턴스
-            // 컬링(PrimitiveRenderProxy의 뷰별 transformed AABB)이 읽는데,
-            // 빈 AABB는 "컬링 안 함"으로 흘러 드로우 계수를 바꾸지 않는다 —
-            // 드로우 동수 축이 원리적으로 못 보는 자리라 여기서 잰다.
-            FoliageComponent* foliage = object->GetComponent<FoliageComponent>();
-            if (nullptr != foliage)
-            {
-                std::size_t typeIndex = 0;
-                for (const FoliageType& type : foliage->GetFoliageTypes())
-                {
-                    if (type.m_mesh)
-                    {
-                        account(object->m_name.ToString() + "/foliage" +
-                            std::to_string(typeIndex) + "/" +
-                            type.m_mesh->GetName(), *type.m_mesh,
-                            type.m_experimentModel.get(),
-                            type.m_experimentMeshIndex);
-                    }
-                    ++typeIndex;
-                }
-            }
-        }
-
-        const bool covered = meshes > 0;
-        const bool passed = covered && 0 == degenerate && 0 == boundMismatch;
-        std::printf("[CLI] experiment.meshbounds %s meshes=%zu "
-            "legacyVertices=%zu degenerate=%zu expBound=%zu mismatch=%zu "
-            "digest=%08X%s%s\n",
-            passed ? "pass" : (covered ? "fail" : "skip"),
-            meshes, legacyVertices, degenerate, expBound, boundMismatch,
-            digest,
-            firstIssue.empty() ? "" : " first=", firstIssue.c_str());
     }
 
     // I6-B4b — 재생 팔레트 골든. D4e-1은 legacy 재귀와 experiment 단일 순회를
@@ -6271,43 +6079,48 @@ namespace ConsoleCmd
         std::uint32_t poseDigest{ 2166136261u };
     };
 
-    static void MeasureAnimtickAxis(AnimationJob& job, Animator& animator,
-        const experiment::Skeleton& skeleton, AnimtickAxisResult& result)
+    static void FoldPoseDigest(const std::vector<math::matrix4x4>& pose,
+        std::uint32_t& digest)
+    {
+        for (std::size_t bone = 0; bone < MAX_BONES; ++bone)
+        {
+            for (int element = 0; element < 16; ++element)
+            {
+                const float value = (&pose[bone].m[0][0])[element];
+                const std::int32_t quantized = static_cast<std::int32_t>(
+                    std::lround(static_cast<double>(value) * 4096.0));
+                std::uint32_t bits = static_cast<std::uint32_t>(quantized);
+                for (int byte = 0; byte < 4; ++byte)
+                {
+                    digest ^= (bits >> (byte * 8)) & 0xFFu;
+                    digest *= 16777619u;
+                }
+            }
+        }
+    }
+
+    // PHASE 3.75 MBC8 — typed 표본. 같은 자산이면 experiment 판과 같은 digest를
+    // 내야 한다 — 골든(6b)이 typed 샘플러의 정확성 게이트다.
+    static void MeasureAnimtickAxisTyped(AnimationJob& job, Animator& animator,
+        const assets::ModelAssetGeneration& generation, AnimtickAxisResult& result)
     {
         static constexpr float kSampleFractions[]{ 0.f, 0.25f, 0.5f, 0.75f, 0.95f };
-        std::vector<math::matrix4x4> experimentPose(MAX_BONES);
-        for (std::size_t clip = 0; clip < skeleton.clips.size(); ++clip)
+        std::vector<math::matrix4x4> pose(MAX_BONES);
+        const auto clips = generation.Animations();
+        for (std::size_t clip = 0; clip < clips.size(); ++clip)
         {
             ++result.clipCount;
-            const float duration =
-                static_cast<float>(skeleton.clips[clip].durationTicks);
+            const float duration = static_cast<float>(clips[clip].durationTicks);
             for (const float fraction : kSampleFractions)
             {
-                if (!job.EvaluateExperimentPose(animator, skeleton,
-                    static_cast<int>(clip), duration * fraction,
-                    experimentPose.data()))
+                if (!job.EvaluateGenerationPose(animator, generation,
+                    static_cast<int>(clip), duration * fraction, pose.data()))
                 {
                     ++result.failedEvaluations;
                     continue;
                 }
                 ++result.sampleCount;
-                for (std::size_t bone = 0; bone < MAX_BONES; ++bone)
-                {
-                    for (int element = 0; element < 16; ++element)
-                    {
-                        const float value =
-                            (&experimentPose[bone].m[0][0])[element];
-                        const std::int32_t quantized = static_cast<std::int32_t>(
-                            std::lround(static_cast<double>(value) * 4096.0));
-                        std::uint32_t bits =
-                            static_cast<std::uint32_t>(quantized);
-                        for (int byte = 0; byte < 4; ++byte)
-                        {
-                            result.poseDigest ^= (bits >> (byte * 8)) & 0xFFu;
-                            result.poseDigest *= 16777619u;
-                        }
-                    }
-                }
+                FoldPoseDigest(pose, result.poseDigest);
             }
         }
     }
@@ -6353,22 +6166,35 @@ namespace ConsoleCmd
             MeshRenderer* renderer = object->GetComponent<MeshRenderer>();
             if (nullptr == renderer) continue;
             ++renderers;
-            if (!renderer->m_experimentModel) continue;
+            if (!renderer->m_modelGeneration
+                || renderer->m_modelMeshIndex >= renderer->m_modelGeneration->Meshes().size())
+            {
+                continue;
+            }
             ++withModel;
-            const experiment::Mesh* mesh = renderer->m_experimentModel
-                ->TryGetMesh(experiment::MeshIndex(renderer->m_experimentMeshIndex));
-            if (nullptr == mesh) continue;
-            if (!experiment::Has(mesh->vertices.AttributeMask(),
-                experiment::VertexAttribute::BoneIndices))
+            // MBC9 — typed generation의 packed 정점을 레이아웃 표(ModelVertexLayout)로
+            // 디코드한다. 스킨 속성이 없으면 대상이 아니다.
+            const assets::ModelMeshAsset* mesh =
+                &renderer->m_modelGeneration->Meshes()[renderer->m_modelMeshIndex];
+            const assets::VertexAttributeMask layout = mesh->vertexAttributeMask;
+            if (!assets::Has(layout, assets::VertexAttribute::BoneIndices)
+                || !assets::Has(layout, assets::VertexAttribute::BoneWeights)
+                || !assets::Has(layout, assets::VertexAttribute::Position)
+                || 0 == mesh->vertexStride)
             {
                 continue;
             }
             ++withSkin;
+            const std::uint32_t positionOffset =
+                assets::OffsetOf(layout, assets::VertexAttribute::Position);
+            const std::uint32_t boneIndexOffset =
+                assets::OffsetOf(layout, assets::VertexAttribute::BoneIndices);
+            const std::uint32_t boneWeightOffset =
+                assets::OffsetOf(layout, assets::VertexAttribute::BoneWeights);
 
             // ★ 메시 엔티티는 GetRootIndex를 안 채운다(SetRootIndex는 본
-            //   오브젝트에만 걸린다 — 실측: withSkin=2인데 withAnimator=0).
-            //   프록시가 쓰는 것과 같은 규칙으로 부모 사슬을 거슬러 찾는다
-            //   (ProxyCommand::FindEnabledAnimator).
+            //   오브젝트에만 걸린다). 프록시가 쓰는 것과 같은 규칙으로 부모 사슬을
+            //   거슬러 찾는다(ProxyCommand::FindEnabledAnimator).
             Animator* animator = nullptr;
             for (Entity::Index parent = object->GetParentIndex();
                 parent != Entity::INVALID_INDEX; )
@@ -6392,31 +6218,34 @@ namespace ConsoleCmd
             float bindMin[3] = { FLT_MAX, FLT_MAX, FLT_MAX };
             float bindMax[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 
-            const std::size_t vertexCount = mesh->vertices.size();
+            const std::size_t vertexCount = mesh->vertexBytes.size() / mesh->vertexStride;
+            const std::byte* base = mesh->vertexBytes.data();
             for (std::size_t index = 0; index < vertexCount; ++index)
             {
-                const experiment::Vertex vertex = mesh->vertices[index];
+                const std::byte* vertex = base + index * mesh->vertexStride;
+                float position[3]{};
+                float boneWeights[4]{};
+                std::uint8_t boneIndices[4]{};
+                std::memcpy(position, vertex + positionOffset, sizeof(position));
+                std::memcpy(boneWeights, vertex + boneWeightOffset, sizeof(boneWeights));
+                std::memcpy(boneIndices, vertex + boneIndexOffset, sizeof(boneIndices));
                 float weightSum = 0.f;
                 float skinned[3] = { 0.f, 0.f, 0.f };
-                for (std::size_t lane = 0;
-                    lane < experiment::MaxBoneInfluences; ++lane)
+                for (std::size_t lane = 0; lane < 4; ++lane)
                 {
-                    const float weight = vertex.boneWeights[lane];
+                    const float weight = boneWeights[lane];
                     if (weight <= 0.f) continue;
-                    const experiment::PackedBoneIndex packed =
-                        vertex.boneIndices[lane];
-                    if (experiment::InvalidPackedBoneIndex == packed) continue;
-                    const std::size_t bone = static_cast<std::size_t>(packed);
-                    if (bone >= boneCount || bone >= Skeleton::MAX_BONES)
+                    const std::size_t bone = boneIndices[lane];
+                    if (bone >= boneCount || bone >= MAX_BONES)
                     {
                         ++outOfRange;
                         continue;
                     }
                     weightSum += weight;
                     const math::matrix4x4& m = animator->m_FinalTransforms[bone];
-                    const float px = vertex.position.x;
-                    const float py = vertex.position.y;
-                    const float pz = vertex.position.z;
+                    const float px = position[0];
+                    const float py = position[1];
+                    const float pz = position[2];
                     // 행 벡터 규약 v·M — GBuffer.hlsl 의 mul(v, gBones[i]) 과
                     // 같은 산술이다(패스가 transpose 해 올리고 HLSL 이 열 우선
                     // 으로 읽어 되돌린다). 이동 성분은 m[3][0..2].
@@ -6434,8 +6263,7 @@ namespace ConsoleCmd
                     ++nonFinite;
                     continue;
                 }
-                const float bind[3] = { vertex.position.x, vertex.position.y,
-                    vertex.position.z };
+                const float bind[3] = { position[0], position[1], position[2] };
                 for (int axis = 0; axis < 3; ++axis)
                 {
                     skinnedMin[axis] = (std::min)(skinnedMin[axis], skinned[axis]);
@@ -6589,16 +6417,20 @@ namespace ConsoleCmd
             const double duration = animator->GetClipDuration(clipIndex);
             // 팔레트가 갱신되는데 화면이 안 움직이면 그 다음 구간이다 —
             // Scene::PublishAnimatorPose가 팔레트를 씬 packed storage와
-            // 부착 오브젝트 Transform으로 commit하는 자리. 실패 사유가
-            // 구조체에 이미 있는데 아무도 안 읽고 있었다.
-            const AnimatorPoseUploadMetrics publish =
-                scene->PublishAnimatorPose(*animator);
-            std::printf("[CLI] experiment.animlive publish %s uploaded=%d "
+            // 부착 오브젝트 Transform으로 commit하는 자리. MBC10: 진단이 publish를
+            // **다시 부르지 않는다**(상태 변경) — 제품 barrier가 남긴 마지막 메트릭을
+            // 읽기 전용 스냅샷으로 읽는다. source=none이면 아직 barrier가 한 번도
+            // 안 돌았거나 애니메이터가 barrier 대상이 아니었던 것이다.
+            AnimatorPoseUploadMetrics publish{};
+            const bool hasPublish =
+                scene->TryGetLastAnimatorPoseMetrics(*animator, publish);
+            std::printf("[CLI] experiment.animlive publish %s source=%s uploaded=%d "
                 "packed=%d legacyFallback=%d rebound=%d disabled=%d "
                 "staleOwner=%d skeletonMissing=%d bindLookups=%llu "
                 "validBones=%llu invalidBones=%llu localWrites=%llu "
                 "queuedRoots=%llu paletteDirty=%llu\n",
                 object->GetHashedName().ToString().c_str(),
+                hasPublish ? "product" : "none",
                 publish.uploaded ? 1 : 0, publish.packed ? 1 : 0,
                 publish.legacyFallback ? 1 : 0, publish.rebound ? 1 : 0,
                 publish.disabled ? 1 : 0, publish.staleOwner ? 1 : 0,
@@ -6613,7 +6445,7 @@ namespace ConsoleCmd
                 "clip=%u elapsed=%.4f duration=%.4f loop=%d clips=%zu "
                 "bones=%zu palette=%08X\n",
                 object->GetHashedName().ToString().c_str(),
-                animator->m_experimentModel ? "experiment" : "legacy",
+                animator->TypedSkeleton() ? "generation" : "none",
                 animator->IsEnabled() ? 1 : 0,
                 animator->m_AnimIndexChosen, animator->m_TimeElapsed,
                 duration, animator->IsClipLooping(clipIndex) ? 1 : 0,
@@ -6643,29 +6475,30 @@ namespace ConsoleCmd
         AnimationJob& job = renderScene->GetAnimationJob();
 
         std::size_t animatorCount = 0;
+        std::size_t typedAnimators = 0;
         AnimtickAxisResult axis{};
 
         for (const auto& object : scene->m_Entities)
         {
             if (!object || object->IsDestroyMark()) continue;
             Animator* animator = object->GetComponent<Animator>();
-            if (nullptr == animator || nullptr == animator->m_experimentModel)
-                continue;
-            const experiment::Skeleton* skeleton =
-                animator->m_experimentModel->TryGetSkeleton();
-            if (nullptr == skeleton) continue;
-
+            if (nullptr == animator) continue;
+            // MBC9 — typed 정본 하나다.
+            if (!animator->m_modelGeneration || nullptr == animator->TypedSkeleton()) continue;
             ++animatorCount;
-            MeasureAnimtickAxis(job, *animator, *skeleton, axis);
+            ++typedAnimators;
+            MeasureAnimtickAxisTyped(job, *animator, *animator->m_modelGeneration, axis);
         }
 
         const bool passed = animatorCount > 0 && axis.sampleCount > 0
             && 0 == axis.failedEvaluations;
         std::printf("[CLI] experiment.animtick %s animators=%zu clips=%zu "
-            "samples=%zu failedEval=%zu poseDigest=%08X\n",
+            "samples=%zu failedEval=%zu poseDigest=%08X path=%s typed=%zu\n",
             passed ? "pass" : (animatorCount == 0 ? "skip" : "fail"),
             animatorCount, axis.clipCount, axis.sampleCount,
-            axis.failedEvaluations, axis.poseDigest);
+            axis.failedEvaluations, axis.poseDigest,
+            animatorCount > 0 ? "generation" : "none",
+            typedAnimators);
     }
 
 
@@ -7777,37 +7610,6 @@ namespace ConsoleCmd
         std::printf("[CLI] dx12.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
     }
 
-    static void Cmd_experiment_model(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // legacy 로딩과 Experiment 모델 경계를 같은 자산으로 비교하는 패리티 검증.
-        // CPU 전용이라 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
-        if (parts.size() < 2)
-        {
-            Debug->LogWarning("[experiment.model] 사용법: experiment.model <모델 경로(공백 없는)>");
-            std::printf("[CLI] experiment.model 사용법: experiment.model <모델 경로>\n");
-            return;
-        }
-        const std::string& modelPath = parts[1];
-
-        std::string log;
-        const bool passed =
-            RenderTest::RunExperimentModelParitySelfTest(modelPath, log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.model] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.model] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.model %s → %s\n",
-            passed ? "통과" : "실패", modelPath.c_str());
-    }
-
     static void Cmd_assets_identity(const ConsoleCommandContext&)
     {
         // MBC1 — ce.uuidv8.sha256.v1 신원 프로필·충돌 registry 합성 검사. CPU 전용.
@@ -7845,6 +7647,45 @@ namespace ConsoleCmd
         std::printf("[CLI] assets.sidecar %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_assets_generation(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 2)
+        {
+            Debug->LogWarning("[assets.generation] 사용법: assets.generation <fixture project root>");
+            std::printf("[CLI] assets.generation 사용법: assets.generation <project root>\n");
+            return;
+        }
+        std::string log;
+        const bool passed = RenderTest::RunModelAssetGenerationSelfTest(
+            ctx.parts[1], log);
+        std::printf("%s", log.c_str());
+        if (passed)
+            Debug->LogWarning(std::string("[assets.generation] 통과\n") + log);
+        else
+            Debug->LogError(std::string("[assets.generation] 실패\n") + log);
+        std::printf("[CLI] assets.generation %s\n", passed ? "PASS" : "FAIL");
+    }
+
+    static void Cmd_assets_generationcorpus(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 2)
+        {
+            Debug->LogWarning("[assets.generationcorpus] 사용법: assets.generationcorpus <runtime content root>");
+            std::printf("[CLI] assets.generationcorpus 사용법: assets.generationcorpus <content root>\n");
+            return;
+        }
+        std::string log;
+        const bool passed = RenderTest::RunModelAssetGenerationCorpusSelfTest(
+            ctx.parts[1], log);
+        std::printf("%s", log.c_str());
+        if (passed)
+            Debug->LogWarning(std::string("[assets.generationcorpus] 통과\n") + log);
+        else
+            Debug->LogError(std::string("[assets.generationcorpus] 실패\n") + log);
+        std::printf("[CLI] assets.generationcorpus %s\n",
+            passed ? "PASS" : "FAIL");
+    }
+
     static void Cmd_experiment_vertexlayout(const ConsoleCommandContext&)
     {
         // I5-D2(V4) — 마스크→RHI 입력 레이아웃 유도 합성 검사. CPU 전용.
@@ -7865,178 +7706,252 @@ namespace ConsoleCmd
             passed ? "통과" : "실패");
     }
 
-    static void Cmd_experiment_modelbridge(const ConsoleCommandContext& ctx)
+    static void Cmd_assets_modelrender(const ConsoleCommandContext&)
     {
-        // I5-D1a — 역브리지(experiment→legacy) 왕복 검사. CPU 전용.
-        const std::vector<std::string>& parts = ctx.parts;
-        if (parts.size() < 2)
-        {
-            Debug->LogWarning("[experiment.modelbridge] 사용법: "
-                "experiment.modelbridge <모델 경로(공백 없는)>");
-            std::printf("[CLI] experiment.modelbridge 사용법: "
-                "experiment.modelbridge <모델 경로>\n");
-            return;
-        }
-        const std::string& modelPath = parts[1];
-
         std::string log;
-        const bool passed =
-            RenderTest::RunExperimentModelBridgeSelfTest(modelPath, log);
-
+        const bool passed = RenderTest::RunModelRenderWiringSelfTest(log);
         std::printf("%s", log.c_str());
         if (passed)
+            Debug->LogWarning(std::string("[assets.modelrender] 통과\n") + log);
+        else
+            Debug->LogError(std::string("[assets.modelrender] 실패\n") + log);
+        std::printf("[CLI] assets.modelrender %s\n", passed ? "PASS" : "FAIL");
+    }
+
+    // PHASE 3.75 MBC7 — 활성 씬의 MeshRenderer가 typed generation handle·closure
+    // 텍스처로 서 있는가(씬 전수). `assets.scenemodel reload <모델 이름>`은 reimport
+    // 뒤 이전 texture generation이 재사용되지 않는가를 같은 프로세스에서 잰다.
+    // PHASE 3.75 MBC10 — 읽기 전용 모델 소비 스냅샷. 제품 경로(MeshRenderer 해석·씬
+    // 인스턴스화·Animator 틱)는 stdout 토큰 대신 계수만 올리고, 이 명령이 그것을 읽는다.
+    // 아무 상태도 바꾸지 않는다(리셋도 없다).
+    static void Cmd_assets_modeldiag(const ConsoleCommandContext&)
+    {
+        const ModelConsumptionSnapshot snapshot = ModelConsumptionDiagnostics::Snapshot();
+        const DataSystem::ModelGenerationSourceSnapshot sources =
+            DataSystems->SnapshotModelGenerationSources();
+        std::printf("[CLI] assets.modeldiag meshResolveGeneration=%llu meshResolveFailed=%llu "
+            "instantiateGeneration=%llu instantiateRejected=%llu tickGeneration=%llu "
+            "tickNone=%llu lastInstantiated=%s generationFromCatalog=%llu "
+            "generationFromLibrary=%llu generationLoadFailed=%llu\n",
+            (unsigned long long)snapshot.meshResolveGeneration,
+            (unsigned long long)snapshot.meshResolveFailed,
+            (unsigned long long)snapshot.instantiateGeneration,
+            (unsigned long long)snapshot.instantiateRejected,
+            (unsigned long long)snapshot.tickGeneration,
+            (unsigned long long)snapshot.tickNone,
+            snapshot.lastInstantiated.empty() ? "-" : snapshot.lastInstantiated.c_str(),
+            (unsigned long long)sources.fromCatalog,
+            (unsigned long long)sources.fromLibrary,
+            (unsigned long long)sources.failed);
+    }
+
+    // PHASE 3.75 MBC11 — §8.4 B1/B2/B5/B6 계측.
+    //   assets.modelbench <dir|-> <iterations> [cooked|author]
+    //   cooked: 모델마다 generation을 은퇴(ContentReload)시킨 뒤 cooked generation 로드를
+    //           N회 재고(min/avg ms) — 관측 밖의 상태 변경은 캐시 은퇴·재게시뿐이다.
+    //   author: <dir>이 <project>/Assets/<sub>인 **사본 프로젝트**에서 authoring transaction
+    //           (소스 디코드 → sidecar → generation 게시)을 N회 재고(min/avg ms). 작업
+    //           트리의 sidecar를 건드리지 않도록 사본에서만 부른다(게이트가 사본을 만든다).
+    //   끝에 프로세스 peak working set과 VRAM 사용량을 찍는다.
+    static void Cmd_assets_modelbench(const ConsoleCommandContext& ctx)
+    {
+        const int iterations = ctx.parts.size() > 2
+            ? (std::max)(1, std::atoi(ctx.parts[2].c_str())) : 5;
+        const bool authorMode = ctx.parts.size() > 3 && ctx.parts[3] == "author";
+        file::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
+            ? file::path(ctx.parts[1]) : file::path(PathFinder::ModelSourcePath());
+        std::error_code error;
+        if (!file::is_directory(root, error))
         {
-            Debug->LogWarning(std::string("[experiment.modelbridge] 통과\n")
-                + log);
+            std::printf("[CLI] assets.modelbench fail 디렉터리가 아니다: %s\n",
+                root.string().c_str());
+            return;
+        }
+        std::vector<file::path> models;
+        for (file::recursive_directory_iterator it(root, error), end; !error && it != end;
+            it.increment(error))
+        {
+            if (!it->is_regular_file(error)) continue;
+            std::string ext = it->path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (ext == ".glb" || ext == ".gltf" || ext == ".fbx") models.push_back(it->path());
+        }
+        std::sort(models.begin(), models.end());
+
+        std::size_t failed = 0, measured = 0;
+        if (authorMode)
+        {
+            // 사본 프로젝트 배치: <project>/Assets/<sub>/<model>.
+            const file::path assetRoot = root.parent_path();
+            const file::path projectRoot = assetRoot.parent_path();
+            const file::path generationRoot = projectRoot / "Library" / "ModelAssetGenerations";
+            const file::path identityHeader = projectRoot / "ProjectSetting" / "AssetIdentity.asset";
+            if (assetRoot.filename() != file::path("Assets") || !file::exists(identityHeader, error))
+            {
+                std::printf("[CLI] assets.modelbench fail author 모드는 <project>/Assets/<sub> 사본과 "
+                    "ProjectSetting/AssetIdentity.asset이 필요하다: %s\n", root.string().c_str());
+                return;
+            }
+            const auto formatPhases = [](const assets::ModelAssetPhaseTimeline& phases)
+                {
+                    std::string text;
+                    for (const assets::ModelAssetPhaseMs& phase : phases)
+                    {
+                        char value[32];
+                        std::snprintf(value, sizeof(value), "%.3f", phase.milliseconds);
+                        if (!text.empty()) text += ';';
+                        text += phase.phase; text += ':'; text += value;
+                    }
+                    return text.empty() ? std::string("-") : text;
+                };
+            for (const file::path& model : models)
+            {
+                double minMs = 1e30, sumMs = 0.0;
+                assets::ModelAssetPhaseTimeline minPhases;
+                bool ok = true;
+                std::size_t subAssets = 0;
+                for (int i = 0; i < iterations; ++i)
+                {
+                    assets::ModelAssetAuthoringRequest request;
+                    request.assetRoot = assetRoot;
+                    request.sourcePath = model;
+                    request.identityHeaderPath = identityHeader;
+                    request.generationRoot = generationRoot;
+                    const auto begin = std::chrono::steady_clock::now();
+                    const assets::ModelAssetAuthoringResult result = assets::AuthorModelAsset(request);
+                    const auto finish = std::chrono::steady_clock::now();
+                    if (!result.Succeeded()) { ok = false; break; }
+                    const double ms = std::chrono::duration<double, std::milli>(finish - begin).count();
+                    if (ms < minMs) { minMs = ms; minPhases = result.phases; }
+                    sumMs += ms;
+                    subAssets = result.subAssetCount;
+                }
+                if (!ok)
+                {
+                    ++failed;
+                    std::printf("[CLI] assets.modelbench model=%s fail reason=authoring\n",
+                        model.stem().string().c_str());
+                    continue;
+                }
+                // 같은 사본에서 방금 게시한 generation을 런타임 리더로 N회 읽는다 — B2
+                // (cooked generation load)를 작업 트리 Library 상태와 무관하게 잰다.
+                double loadMinMs = 1e30, loadSumMs = 0.0;
+                assets::ModelAssetPhaseTimeline loadPhases;
+                std::size_t meshes = 0; unsigned long long vertices = 0;
+                file::path sidecarPath = model; sidecarPath += ".meta";
+                for (int i = 0; i < iterations && ok; ++i)
+                {
+                    assets::ModelAssetGenerationLoadRequest load;
+                    load.identityHeaderPath = identityHeader;
+                    load.generationRoot = generationRoot;
+                    load.canonicalSidecarPath = sidecarPath;
+                    const auto begin = std::chrono::steady_clock::now();
+                    const assets::ModelAssetGenerationLoadResult loaded =
+                        assets::LoadModelAssetGeneration(load);
+                    const auto finish = std::chrono::steady_clock::now();
+                    if (!loaded.Succeeded()) { ok = false; break; }
+                    const double ms = std::chrono::duration<double, std::milli>(finish - begin).count();
+                    if (ms < loadMinMs) { loadMinMs = ms; loadPhases = loaded.phases; }
+                    loadSumMs += ms;
+                    meshes = loaded.generation->Meshes().size(); vertices = 0;
+                    for (const assets::ModelMeshAsset& mesh : loaded.generation->Meshes())
+                        if (mesh.vertexStride) vertices += mesh.vertexBytes.size() / mesh.vertexStride;
+                }
+                if (!ok)
+                {
+                    ++failed;
+                    std::printf("[CLI] assets.modelbench model=%s fail reason=generation-load\n",
+                        model.stem().string().c_str());
+                    continue;
+                }
+                ++measured;
+                std::printf("[CLI] assets.modelbench model=%s authorMinMs=%.3f authorAvgMs=%.3f "
+                    "subAssets=%zu cookedMinMs=%.3f cookedAvgMs=%.3f meshes=%zu vertices=%llu "
+                    "authorPhases=%s cookedPhases=%s\n",
+                    model.stem().string().c_str(), minMs, sumMs / iterations, subAssets,
+                    loadMinMs, loadSumMs / iterations, meshes, vertices,
+                    formatPhases(minPhases).c_str(), formatPhases(loadPhases).c_str());
+            }
+            models.clear(); // 아래 cooked 루프를 건너뛴다(done 줄은 공통).
+        }
+        for (const file::path& model : models)
+        {
+            const FileGuid guid = DataSystems->GetFilenameToGuid(model.filename().string());
+            if (FileGuid{} == guid || !assets::IsUuidV8(guid.m_guid))
+            {
+                std::printf("[CLI] assets.modelbench model=%s skip reason=no-v8-identity\n",
+                    model.stem().string().c_str());
+                continue;
+            }
+            double minMs = 1e30, sumMs = 0.0;
+            std::size_t meshes = 0; unsigned long long vertices = 0;
+            bool ok = true;
+            for (int i = 0; i < iterations; ++i)
+            {
+                RuntimeAssetChange change;
+                change.kind = RuntimeAssetChangeKind::ContentReload;
+                change.assetType = RuntimeAssetType::Model;
+                change.guid = guid;
+                change.path = model;
+                DataSystems->ApplyAssetChange(change);
+                const auto begin = std::chrono::steady_clock::now();
+                const auto generation = DataSystems->LoadModelAssetGeneration(guid);
+                const auto finish = std::chrono::steady_clock::now();
+                if (!generation) { ok = false; break; }
+                const double ms = std::chrono::duration<double, std::milli>(finish - begin).count();
+                minMs = (std::min)(minMs, ms); sumMs += ms;
+                meshes = generation->Meshes().size(); vertices = 0;
+                for (const assets::ModelMeshAsset& mesh : generation->Meshes())
+                {
+                    if (mesh.vertexStride) vertices += mesh.vertexBytes.size() / mesh.vertexStride;
+                }
+            }
+            if (!ok)
+            {
+                ++failed;
+                std::printf("[CLI] assets.modelbench model=%s fail reason=generation-load\n",
+                    model.stem().string().c_str());
+                continue;
+            }
+            ++measured;
+            std::printf("[CLI] assets.modelbench model=%s cookedMinMs=%.3f cookedAvgMs=%.3f "
+                "meshes=%zu vertices=%llu\n", model.stem().string().c_str(), minMs,
+                sumMs / iterations, meshes, vertices);
+        }
+        PROCESS_MEMORY_COUNTERS counters{};
+        counters.cb = sizeof(counters);
+        double peakMb = 0.0;
+        if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)))
+            peakMb = static_cast<double>(counters.PeakWorkingSetSize) / (1024.0 * 1024.0);
+        unsigned long long vramUsedMb = 0, vramBudgetMb = 0;
+        if (IRHIDeviceResources* device = GetDiagnosticsDeviceResources())
+        {
+            const RHIVideoMemoryInfo memory = device->QueryVideoMemory();
+            vramUsedMb = memory.usedMB; vramBudgetMb = memory.budgetMB;
+        }
+        std::printf("[CLI] assets.modelbench done mode=%s measured=%zu failed=%zu "
+            "iterations=%d peakWorkingSetMB=%.1f vramUsedMB=%llu vramBudgetMB=%llu\n",
+            authorMode ? "author" : "cooked", measured, failed,
+            iterations, peakMb, vramUsedMb, vramBudgetMb);
+    }
+
+    static void Cmd_assets_scenemodel(const ConsoleCommandContext& ctx)
+    {
+        std::string log;
+        bool passed = false;
+        if (ctx.parts.size() >= 3 && "reload" == ctx.parts[1])
+        {
+            passed = RenderTest::RunSceneModelGenerationReloadSelfTest(ctx.parts[2], log);
         }
         else
         {
-            Debug->LogError(std::string("[experiment.modelbridge] 실패\n")
-                + log);
+            passed = RenderTest::RunSceneModelGenerationSelfTest(log);
         }
-        std::printf("[CLI] experiment.modelbridge %s → %s\n",
-            passed ? "통과" : "실패", modelPath.c_str());
-    }
-
-    static void Cmd_experiment_anim(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // Experiment clip 재생 배선 검증. CPU 전용 — 게임 스레드에서 즉시 실행.
-        if (parts.size() < 2)
-        {
-            Debug->LogWarning("[experiment.anim] 사용법: experiment.anim <모델 경로(공백 없는)>");
-            std::printf("[CLI] experiment.anim 사용법: experiment.anim <모델 경로>\n");
-            return;
-        }
-        const std::string& modelPath = parts[1];
-
-        std::string log;
-        const bool passed =
-            RenderTest::RunExperimentAnimationPlaybackSelfTest(modelPath, log);
-
-        std::printf("%s", log.c_str());
         if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.anim] 통과\n") + log);
-        }
+            Debug->LogWarning(std::string("[assets.scenemodel] 통과\n") + log);
         else
-        {
-            Debug->LogError(std::string("[experiment.anim] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.anim %s → %s\n",
-            passed ? "통과" : "실패", modelPath.c_str());
-    }
-
-    static void Cmd_experiment_phase17model(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-        if (parts.size() < 3 || (parts[1] != "animated" && parts[1] != "large"))
-        {
-            std::printf("[CLI] experiment.phase17model 사용법: "
-                "experiment.phase17model <animated|large> <glTF/GLB 경로>\n");
-            return;
-        }
-
-        const bool requireAnimation = parts[1] == "animated";
-        const std::string& modelPath = parts[2];
-        std::string log;
-        const bool passed = RenderTest::RunPhase17ModelCorpusSelfTest(
-            modelPath, requireAnimation, log);
-        std::printf("%s", log.c_str());
-        std::printf("[CLI] experiment.phase17model %s mode=%s → %s\n",
-            passed ? "통과" : "실패", parts[1].c_str(), modelPath.c_str());
-    }
-
-    static void Cmd_experiment_import(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // legacy → ImportedScene → ModelDraft 임포트 경로 검증.
-        // CPU 전용 — 게임 스레드에서 즉시 실행.
-        if (parts.size() < 2)
-        {
-            Debug->LogWarning("[experiment.import] 사용법: experiment.import <모델 경로(공백 없는)>");
-            std::printf("[CLI] experiment.import 사용법: experiment.import <모델 경로>\n");
-            return;
-        }
-        const std::string& modelPath = parts[1];
-
-        std::string log;
-        const bool passed =
-            RenderTest::RunExperimentImportPathSelfTest(modelPath, log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.import] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.import] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.import %s → %s\n",
-            passed ? "통과" : "실패", modelPath.c_str());
-    }
-
-    static void Cmd_experiment_gltf(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // fastgltf 임포터 경로 검증(Assimp 기준선과 비교). CPU 전용.
-        if (parts.size() < 2)
-        {
-            Debug->LogWarning("[experiment.gltf] 사용법: experiment.gltf <glTF/GLB 경로(공백 없는)>");
-            std::printf("[CLI] experiment.gltf 사용법: experiment.gltf <경로>\n");
-            return;
-        }
-        const std::string& modelPath = parts[1];
-
-        std::string log;
-        const bool passed =
-            RenderTest::RunExperimentGltfImportSelfTest(modelPath, log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.gltf] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.gltf] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.gltf %s → %s\n",
-            passed ? "통과" : "실패", modelPath.c_str());
-    }
-
-    static void Cmd_experiment_fbx(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // ufbx 임포터 경로 검증(Assimp 기준선과 비교). CPU 전용.
-        if (parts.size() < 2)
-        {
-            Debug->LogWarning("[experiment.fbx] 사용법: experiment.fbx <FBX 경로(공백 없는)>");
-            std::printf("[CLI] experiment.fbx 사용법: experiment.fbx <경로>\n");
-            return;
-        }
-        const std::string& modelPath = parts[1];
-
-        std::string log;
-        const bool passed =
-            RenderTest::RunExperimentFbxImportSelfTest(modelPath, log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.fbx] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.fbx] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.fbx %s → %s\n",
-            passed ? "통과" : "실패", modelPath.c_str());
+            Debug->LogError(std::string("[assets.scenemodel] 실패\n") + log);
     }
 
     static void Cmd_experiment_sampler(const ConsoleCommandContext&)
@@ -8796,8 +8711,11 @@ namespace ConsoleCmd
                 ExperimentMaterialSealing::ApplyAuthoredMaterial(authoredSeal,
                     authoredEffective);
                 std::size_t cooked = 0, sourceFallback = 0;
+                // MBC7 — 제품 sealing과 같은 축: renderer가 붙든 모델 generation
+                // closure가 embedded texture의 첫 해석 축이다(경로 해석 없음).
                 if (!ExperimentMaterialSealing::ApplyAuthoredTextures(
-                    authoredSeal, *meta, error, &cooked, &sourceFallback))
+                    authoredSeal, *meta, error, &cooked, &sourceFallback,
+                    renderer->m_modelGeneration.get()))
                 {
                     ++texResolveFailed;
                     if (firstTexMismatch.empty())
@@ -8845,7 +8763,8 @@ namespace ConsoleCmd
                 ExperimentMaterialSealing::SealSource directSeal;
                 std::string directError;
                 if (!ExperimentMaterialSealing::BuildSealSourceFromAuthored(
-                    authoredEffective, *meta, directSeal, directError))
+                    authoredEffective, *meta, directSeal, directError,
+                    renderer->m_modelGeneration.get()))
                 {
                     ++sealAuthoredFail;
                     if (firstAuthoredSeal.empty())
@@ -9016,71 +8935,6 @@ namespace ConsoleCmd
             firstTexMismatch.c_str(),
             firstAuthoredSeal.empty() ? "" : " firstAuthoredSeal=",
             firstAuthoredSeal.c_str());
-    }
-
-    // I2-E — 임베디드 텍스처 신원. 소스 로드 경로가 모델 sidecar의
-    // subAssets.embeddedTextures를 읽어 texture property에 실제 GUID를 싣는가.
-    // 예전에는 sourcePath가 빈 임베디드 텍스처가 nil로 떨어져 변환 경계가
-    // property를 **통째로 생략**했다(§1.4). 생략은 '없는 property'라 값 대조로는
-    // 안 보인다 — 그래서 present/valid를 함께 센다.
-    static void Cmd_experiment_embedded(const ConsoleCommandContext& ctx)
-    {
-        if (ctx.parts.size() < 2)
-        {
-            std::printf("[CLI] experiment.embedded <모델경로>\n");
-            return;
-        }
-        const std::size_t head = ctx.line.find(ctx.parts[1]);
-        std::string pathText = ctx.line.substr(head);
-        while (!pathText.empty() && (pathText.back() == ' '
-            || pathText.back() == '\r' || pathText.back() == '\t'))
-        {
-            pathText.pop_back();
-        }
-        const file::path modelPath = std::filesystem::path(pathText);
-        const FileGuid guid = DataSystems->GetFileGuid(modelPath);
-        if (FileGuid{} == guid)
-        {
-            std::printf("[CLI] experiment.embedded fail GUID 미해석 %s\n",
-                modelPath.string().c_str());
-            return;
-        }
-        // 제품 경로로 로드한다 — 자체 로더를 새로 만들면 게이트가 제품을
-        // 재지 않는다.
-        DataSystems->LoadModelGUID(guid);
-        const std::shared_ptr<const experiment::Model> model =
-            DataSystems->TryGetExperimentModel(guid);
-        if (!model)
-        {
-            std::printf("[CLI] experiment.embedded fail experiment 모델 없음\n");
-            return;
-        }
-
-        std::size_t textureProps = 0, validAssetId = 0, fallbackOnly = 0;
-        std::string firstFallback;
-        for (const experiment::Material& material : model->Materials())
-        {
-            for (const experiment::MaterialProperty& property
-                : material.properties)
-            {
-                const auto* reference =
-                    std::get_if<experiment::TextureReference>(&property.value);
-                if (nullptr == reference) continue;
-                ++textureProps;
-                if (reference->assetId.IsValid()) { ++validAssetId; continue; }
-                ++fallbackOnly;
-                if (firstFallback.empty()) firstFallback = property.name;
-            }
-        }
-
-        const bool covered = textureProps > 0;
-        const bool passed = covered && 0 == fallbackOnly;
-        std::printf("[CLI] experiment.embedded %s model=%s materials=%zu "
-            "textureProps=%zu validAssetId=%zu fallbackOnly=%zu%s%s\n",
-            passed ? "pass" : (covered ? "fail" : "skip"),
-            modelPath.filename().string().c_str(), model->Materials().size(),
-            textureProps, validAssetId, fallbackOnly,
-            firstFallback.empty() ? "" : " first=", firstFallback.c_str());
     }
 
     // I7-C1 — cooked catalog 관측·마운트. 굽는 쪽(AssetCooker → Derived/ +
@@ -9395,42 +9249,6 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.resolver] 실패\n") + log);
         }
         std::printf("[CLI] experiment.resolver %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_bench(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // legacy 로드 대 Experiment 경계 비용 측정. CPU 전용 — 게임 스레드 실행.
-        if (parts.size() < 2)
-        {
-            Debug->LogWarning("[experiment.bench] 사용법: experiment.bench <모델 경로> [반복수]");
-            std::printf("[CLI] experiment.bench 사용법: experiment.bench <모델 경로> [반복수]\n");
-            return;
-        }
-        const std::string& modelPath = parts[1];
-        int iterations = 5;
-        if (parts.size() > 2)
-        {
-            iterations = std::atoi(parts[2].c_str());
-            if (iterations <= 0) iterations = 5;
-        }
-
-        std::string log;
-        const bool passed =
-            RenderTest::RunExperimentModelBenchmark(modelPath, iterations, log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.bench] 완료\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.bench] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.bench %s → %s\n",
-            passed ? "완료" : "실패", modelPath.c_str());
     }
 
     static void Cmd_vk_selftest(const ConsoleCommandContext& ctx)
@@ -11770,26 +11588,24 @@ namespace ConsoleCmd
             reg({ "vk.post" }, &Cmd_vk_post);
             reg({ "vk.ssgi" }, &Cmd_vk_ssgi);
             reg({ "profile.selftest" }, &Cmd_profile_selftest);
-            reg({ "experiment.model" }, &Cmd_experiment_model);
-            reg({ "experiment.modelbridge" }, &Cmd_experiment_modelbridge);
             reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
             reg({ "assets.identity" }, &Cmd_assets_identity);
             reg({ "assets.sidecar" }, &Cmd_assets_sidecar);
-            reg({ "experiment.anim" }, &Cmd_experiment_anim);
+            reg({ "assets.generation" }, &Cmd_assets_generation);
+            reg({ "assets.generationcorpus" }, &Cmd_assets_generationcorpus);
+            reg({ "assets.modelrender" }, &Cmd_assets_modelrender);
+            reg({ "assets.scenemodel" }, &Cmd_assets_scenemodel);
+            reg({ "assets.modeldiag" }, &Cmd_assets_modeldiag);
+            reg({ "assets.modelbench" }, &Cmd_assets_modelbench);
             reg({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
             reg({ "experiment.animpose" }, &Cmd_experiment_animpose);
             reg({ "experiment.animlive" }, &Cmd_experiment_animlive);
-            reg({ "experiment.phase17model" }, &Cmd_experiment_phase17model);
             reg({ "experiment.animtick" }, &Cmd_experiment_animtick);
             reg({ "experiment.animevent" }, &Cmd_experiment_animevent);
             reg({ "experiment.boneresolve" }, &Cmd_experiment_boneresolve);
             reg({ "experiment.foliage" }, &Cmd_experiment_foliage);
             reg({ "experiment.animmask" }, &Cmd_experiment_animmask);
             reg({ "experiment.editorsurface" }, &Cmd_experiment_editorsurface);
-            reg({ "experiment.meshbounds" }, &Cmd_experiment_meshbounds);
-            reg({ "experiment.import" }, &Cmd_experiment_import);
-            reg({ "experiment.gltf" }, &Cmd_experiment_gltf);
-            reg({ "experiment.fbx" }, &Cmd_experiment_fbx);
             reg({ "experiment.sampler" }, &Cmd_experiment_sampler);
             reg({ "experiment.tangent" }, &Cmd_experiment_tangent);
             reg({ "experiment.normal" }, &Cmd_experiment_normal);
@@ -11810,8 +11626,6 @@ namespace ConsoleCmd
             reg({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
             reg({ "experiment.catalog" }, &Cmd_experiment_catalog);
-            reg({ "experiment.embedded" }, &Cmd_experiment_embedded);
-            reg({ "experiment.bench" }, &Cmd_experiment_bench);
             reg({ "profile.stats" }, &Cmd_profile_stats);
             reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
             reg({ "rhi.uploadsegments" }, &Cmd_rhi_uploadsegments);
@@ -12023,6 +11837,8 @@ void ConsoleCommandSystem::PrintHelp() const
         "                       ★ 프레임 경계를 넘으므로 라이브 캡처를 교란한다\n"
         "  profile.stats        프로파일러 자체 비용과 용량 소진(교란 없음)\n"
         "  experiment.model <경로>  legacy↔Experiment 모델 로딩 패리티 검증(검증 이슈·구조 diff·설계 갭 실측)\n"
+        "  assets.generation <project root> UUIDv8 model generation closure·원자 cache publish/retire 검증\n"
+        "  assets.generationcorpus <content root> 현재 MBC4 model corpus generation cold-load 검증\n"
         "  experiment.anim <경로>   Experiment clip 재생 배선 검증(legacy 참조 팔레트 파리티·포즈 변화)\n"
         "  experiment.import <경로> 임포트 경로 검증(legacy→ImportedScene→ModelDraft, 손실 계수·경로 비교)\n"
         "  experiment.gltf <경로>   fastgltf 임포터 검증(Assimp 기준선 대비 삼각형·AABB·이름 집합)\n"

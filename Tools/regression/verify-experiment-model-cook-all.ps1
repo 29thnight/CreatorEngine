@@ -12,6 +12,37 @@ $assets = (Resolve-Path (Join-Path $root 'Dynamic_CPP\Assets')).Path
 $models = @(Get-ChildItem -LiteralPath $assets -File -Recurse | Where-Object {
     $_.Extension.ToLowerInvariant() -in @('.fbx', '.glb', '.gltf')
 } | Sort-Object FullName)
+$identityHeader = Join-Path $root 'Dynamic_CPP\ProjectSetting\AssetIdentity.asset'
+$modelV2 = @($models | Where-Object {
+    (Get-Content -LiteralPath ($_.FullName + '.meta') -Raw) -match
+        '(?m)^schemaVersion:\s*2\s*$'
+})
+if ((Test-Path -LiteralPath $identityHeader -PathType Leaf) -or $modelV2.Count -gt 0) {
+    if (-not (Test-Path -LiteralPath $identityHeader -PathType Leaf) -or
+        $modelV2.Count -ne $models.Count) {
+        "MBC4 partial corpus를 거부한다: header=$([int](Test-Path -LiteralPath $identityHeader)) modelV2=$($modelV2.Count)/$($models.Count)"
+        exit 1
+    }
+    if (-not (Test-Path -LiteralPath $AssetCooker -PathType Leaf)) {
+        "AssetCooker가 없다: $AssetCooker"
+        exit 1
+    }
+    $v8Gate = Join-Path $PSScriptRoot 'verify-model-corpus-v8.ps1'
+    $generationRoot = Join-Path $root 'Dynamic_CPP\Library\ModelAssetGenerations'
+    $v8Output = @(& pwsh -NoProfile -File $v8Gate -Root $root `
+        -GenerationRoot $generationRoot -ExpectedSubAssets 310 2>&1)
+    $v8Valid = $LASTEXITCODE -eq 0
+    $authoringGate = Join-Path $PSScriptRoot 'verify-model-authoring-transaction.ps1'
+    $authoringOutput = @(& pwsh -NoProfile -File $authoringGate `
+        -AssetCooker $AssetCooker -Work $Work 2>&1)
+    $authoringValid = $LASTEXITCODE -eq 0
+    $v8Output
+    $authoringOutput
+    "model-cook-all cutover=uuidv8 models=$($models.Count) generations=$($models.Count) v8Corpus=$v8Valid authoringTransaction=$authoringValid"
+    if (-not $v8Valid -or -not $authoringValid) { exit 1 }
+    '전체 통과 — legacy v1 cook 대신 MBC4 schema v2/cooked generation 전수 폐포와 MBC3 원자 authoring을 검증했다'
+    exit 0
+}
 $trackedPatterns = @(
     'Dynamic_CPP/Assets/Animation/*.fbx',
     'Dynamic_CPP/Assets/Models/*.fbx',
@@ -217,59 +248,14 @@ $unexpectedStderr = @($first, $second | Where-Object {
     -not [string]::IsNullOrWhiteSpace($_.Stderr)
 }).Count
 
-# 명시적 migration 모드는 복제 sidecar에서만 실행한다. 최상위 identity는
-# 유지되고, 하위 identity는 **결정적**이라 refresh를 다시 돌려도 그대로여야
-# 한다(2026-09-02 계약 전환). 예전에는 매 refresh마다 새 UUIDv4를 발급해
-# 그 모델을 참조하는 씬이 전부 고아가 됐다 — 지금은 최상위 GUID를 namespace로,
-# sourceKey를 name으로 하는 RFC 4122 v5 유도값(버전 nibble만 v4로 스탬프)이라
-# 안정하다. 그래서 이 검사는 하위 GUID가 **바뀌지 않음**을 단정한다.
-$fixtureAssets = Join-Path $run 'refresh-fixture\Assets'
-$fixtureModelDir = Join-Path $fixtureAssets 'Models'
-New-Item -ItemType Directory -Path $fixtureModelDir -Force | Out-Null
-$cube = (Resolve-Path (Join-Path $assets 'Models\Prim_Cube.glb')).Path
-$fixtureCube = Join-Path $fixtureModelDir 'Prim_Cube.glb'
-Copy-Item -LiteralPath $cube -Destination $fixtureCube
-Copy-Item -LiteralPath ($cube + '.meta') -Destination ($fixtureCube + '.meta')
-$beforeRefresh = Get-Content -LiteralPath ($fixtureCube + '.meta') -Raw
-$beforeTop = [regex]::Match($beforeRefresh, "(?m)^guid:\s*($uuidV4Pattern)\s*$").Groups[1].Value
-$beforeNested = @([regex]::Matches($beforeRefresh,
-    "(?m)^\s{6}guid:\s*($uuidV4Pattern)\s*$") | ForEach-Object { $_.Groups[1].Value })
-$refresh = Invoke-Cooker -Label 'identity-refresh' -Arguments @(
-    '--refresh-model-identities', '--asset-root', $fixtureAssets,
-    '--model', $fixtureCube)
-$afterRefresh = Get-Content -LiteralPath ($fixtureCube + '.meta') -Raw
-$afterTop = [regex]::Match($afterRefresh, "(?m)^guid:\s*($uuidV4Pattern)\s*$").Groups[1].Value
-$afterNested = @([regex]::Matches($afterRefresh,
-    "(?m)^\s{6}guid:\s*($uuidV4Pattern)\s*$") | ForEach-Object { $_.Groups[1].Value })
-$refreshValid = $refresh.ExitCode -eq 0 -and
-    [string]::IsNullOrWhiteSpace($refresh.Stderr) -and
-    $refresh.Stdout -match 'identity-refresh models=1 materials=1 embeddedTextures=1' -and
-    $beforeTop -eq $afterTop -and $afterNested.Count -eq 2 -and
-    @($afterNested | Where-Object { $_ -in $beforeNested }).Count -eq 2
-
-# batch 전체의 기존 상위 ID를 먼저 예약해야 한다. 같은 model GUID를 가진 두
-# sidecar를 주면 import/temporary write 전에 거부하고 첫 sidecar도 그대로 둔다.
-$duplicateAssets = Join-Path $run 'duplicate-fixture\Assets'
-$duplicateA = Join-Path $duplicateAssets 'A\Cube.glb'
-$duplicateB = Join-Path $duplicateAssets 'B\Cube.glb'
-New-Item -ItemType Directory -Path (Split-Path -Parent $duplicateA), `
-    (Split-Path -Parent $duplicateB) -Force | Out-Null
-foreach ($destination in @($duplicateA, $duplicateB)) {
-    Copy-Item -LiteralPath $cube -Destination $destination
-    Copy-Item -LiteralPath ($cube + '.meta') -Destination ($destination + '.meta')
-}
-$duplicateBeforeA = (Get-FileHash -LiteralPath ($duplicateA + '.meta') -Algorithm SHA256).Hash
-$duplicateBeforeB = (Get-FileHash -LiteralPath ($duplicateB + '.meta') -Algorithm SHA256).Hash
-$duplicateReject = Invoke-Cooker -Label 'duplicate-top-id' -Arguments @(
-    '--refresh-model-identities', '--asset-root', $duplicateAssets,
-    '--model', $duplicateA, '--model', $duplicateB)
-$duplicateTransactionRejected = $duplicateReject.ExitCode -ne 0 -and
-    $duplicateReject.Stderr -match 'asset root UUIDv4가 중복' -and
-    (Get-FileHash -LiteralPath ($duplicateA + '.meta') -Algorithm SHA256).Hash -eq $duplicateBeforeA -and
-    (Get-FileHash -LiteralPath ($duplicateB + '.meta') -Algorithm SHA256).Hash -eq $duplicateBeforeB -and
-    @(Get-ChildItem -LiteralPath $duplicateAssets -File -Recurse | Where-Object {
-        $_.Name -match '\.(?:identity-refresh|rollback)-'
-    }).Count -eq 0
+# MBC3부터 model identity authoring은 별도 UUIDv4 refresher가 아니라 schema v2,
+# UUIDv8, cooked generation을 함께 게시하는 단일 transaction이다. 이 전수 cook
+# 게이트는 제품 corpus의 legacy cook 결정성을 유지하고, 새 transaction의 원자성은
+# 전용 게이트 결과를 함께 요구한다.
+$authoringGate = Join-Path $PSScriptRoot 'verify-model-authoring-transaction.ps1'
+$authoringGateOutput = @(& pwsh -NoProfile -File $authoringGate `
+    -AssetCooker $AssetCooker -Work $Work 2>&1)
+$authoringGateValid = $LASTEXITCODE -eq 0
 
 $sourceMutations = @($sourceHashes.Keys | Where-Object {
     -not (Test-Path -LiteralPath $_ -PathType Leaf) -or
@@ -281,13 +267,13 @@ $manifestBytes = if (Test-Path -LiteralPath $manifest -PathType Leaf) {
 } else { 0 }
 
 "experiment-model-cook-all output=$run"
-"models=$($models.Count) materials=$materialCount embeddedTextures=$embeddedTextureCount globalIds=$($allIds.Count) successRuns=$successRuns deterministic=$deterministic files=$($snapshotA.Count) artifacts=$($artifacts.Count) artifactBytes=$artifactBytes manifestBytes=$manifestBytes refreshValid=$refreshValid duplicateTransactionRejected=$duplicateTransactionRejected sourceMutations=$($sourceMutations.Count) unexpectedStderr=$unexpectedStderr"
+"models=$($models.Count) materials=$materialCount embeddedTextures=$embeddedTextureCount globalIds=$($allIds.Count) successRuns=$successRuns deterministic=$deterministic files=$($snapshotA.Count) artifacts=$($artifacts.Count) artifactBytes=$artifactBytes manifestBytes=$manifestBytes authoringTransaction=$authoringGateValid sourceMutations=$($sourceMutations.Count) unexpectedStderr=$unexpectedStderr"
 
 $passed = $successRuns -eq 2 -and $deterministic -and
     $snapshotA.Count -eq $expectedFiles -and
     $artifacts.Count -eq $models.Count -and
     $artifactBytes -gt 0 -and $manifestBytes -gt 0 -and
-    $refreshValid -and $duplicateTransactionRejected -and
+    $authoringGateValid -and
     $sourceMutations.Count -eq 0 -and
     $unexpectedStderr -eq 0
 if (-not $passed) {
@@ -297,14 +283,10 @@ if (-not $passed) {
     if ($second.ExitCode -ne 0 -or -not [string]::IsNullOrWhiteSpace($second.Stderr)) {
         'second stderr:'; $second.Stderr
     }
-    if (-not $refreshValid) { 'refresh stdout:'; $refresh.Stdout; 'refresh stderr:'; $refresh.Stderr }
-    if (-not $duplicateTransactionRejected) {
-        'duplicate transaction stdout:'; $duplicateReject.Stdout
-        'duplicate transaction stderr:'; $duplicateReject.Stderr
-    }
+    if (-not $authoringGateValid) { 'model authoring transaction:'; $authoringGateOutput }
     if ($sourceMutations.Count -gt 0) { '원본 변경:'; $sourceMutations }
     exit 1
 }
 
-"전체 통과 — tracked $($trackedModels.Count) + local $($models.Count - $trackedModels.Count) model sidecar identity가 전수 UUIDv4이며 AssetCooker가 결정적 CEMC/CEMF를 만들고 명시적 refresh 외 source를 수정하지 않았다"
+"전체 통과 — tracked $($trackedModels.Count) + local $($models.Count - $trackedModels.Count) legacy corpus cook이 결정적이고 MBC3 UUIDv8 authoring transaction이 sidecar/cooked generation을 원자 게시했다"
 exit 0

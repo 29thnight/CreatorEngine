@@ -21,16 +21,12 @@
   <ItemGroup>
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
-    <ClInclude Include="ExperimentParity\ExperimentAnimationPlayback.h" />
-    <ClInclude Include="ExperimentParity\ExperimentGltfImportSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentImportPathSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentLegacyBridge.h" />
-    <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentModelBridgeSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
     <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h" />
     <ClInclude Include="AssetIdentity\AssetIdentityTestVectors.inl" />
     <ClInclude Include="AssetIdentity\AssetSidecarSchemaSelfTest.h" />
+    <ClInclude Include="AssetIdentity\ModelAssetGenerationSelfTest.h" />
+    <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h" />
     <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h" />
@@ -60,14 +56,6 @@
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoSceneTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp" />
-    <ClCompile Include="ExperimentParity\ExperimentAnimationPlayback.cpp" />
-    <ClCompile Include="ExperimentParity\ExperimentGltfImportSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentImportPathSelfTest.cpp" />
-    <ClCompile Include="ExperimentParity\ExperimentLegacyBridge.cpp" />
-    <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp" />
-    <ClCompile Include="ExperimentParity\ExperimentModelBridgeSelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp" />
     <!-- PHASE 3.75 selftest. unity 블롭이 COFF 섹션 한도(C1128)를 넘겼고, 익명
          네임스페이스 helper가 다른 selftest와 겹치므로 개별 TU로 컴파일한다. -->
@@ -75,6 +63,12 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="AssetIdentity\AssetSidecarSchemaSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="AssetIdentity\ModelAssetGenerationSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="AssetIdentity\SceneModelGenerationSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">

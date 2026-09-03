@@ -5,7 +5,6 @@
 #include "Scene.h"
 #include "Object.h"
 #include "Entity.h"
-#include "Model.h"
 #include "LightComponent.h"
 #include "ImageComponent.h"
 #include "TextComponent.h"
@@ -209,7 +208,7 @@ HierarchyWindow::HierarchyWindow()
 						Meta::UndoManager::GetInstance()->Execute(
 							std::make_unique<Meta::LoadModelToSceneObjCommand>(
 								scene,
-								DataSystems->LoadCachedModelShared(filepath.string())));
+								DataSystems->LoadModelAssetGenerationByPath(filepath.string())));
 					}
 				}
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))

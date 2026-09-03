@@ -1,6 +1,7 @@
 #include "EditorAssetDatabase.h"
 
 #include "Interfaces/AssetAuthoringPort.h"
+#include "Assets/ModelAssetAuthoringTransaction.h"
 #include "DataSystem.h"
 #include "FileDialog.h"
 #include "Material.h"
@@ -1182,7 +1183,8 @@ private:
 		const Authoring::ParsedDocument document =
 			Authoring::ParsedDocument::ParseFile(metaPath.string(), error);
 		if (!document) return {};
-		const Authoring::ReadNode guid = document.Root()["guid"];
+		Authoring::ReadNode guid = document.Root()["assetId"];
+		if (!guid || !guid.IsScalar()) guid = document.Root()["guid"];
 		return guid && guid.IsScalar() ? FileGuid(guid.AsString()) : FileGuid{};
 	}
 
@@ -1316,6 +1318,35 @@ private:
 		const FileGuid& preferredGuid = {})
 	{
 		if (targetFile.empty() || !file::exists(targetFile)) return {};
+		if (assets::IsModelAuthoringSource(targetFile))
+		{
+			if (preferredGuid != FileGuid{})
+			{
+				Debug->LogError("Model authoring rejects caller-supplied legacy identity: "
+					+ targetFile.string());
+				return {};
+			}
+			assets::ModelAssetAuthoringRequest request;
+			request.assetRoot = m_root;
+			request.sourcePath = targetFile;
+			request.identityHeaderPath = m_root.parent_path()
+				/ "ProjectSetting" / "AssetIdentity.asset";
+			request.generationRoot = m_root.parent_path()
+				/ "Library" / "ModelAssetGenerations";
+			const assets::ModelAssetAuthoringResult result =
+				assets::AuthorModelAsset(request);
+			if (!result.Succeeded())
+			{
+				for (const assets::ModelAssetAuthoringIssue& issue : result.issues)
+					Debug->LogError("Model authoring failed [" + issue.stage + "]: "
+						+ issue.message + " (" + targetFile.string() + ")");
+				return {};
+			}
+			const FileGuid guid(result.modelAssetId);
+			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+				RuntimeAssetType::Model, guid, targetFile });
+			return guid;
+		}
 
 		const file::path metaPath = targetFile.string() + ".meta";
 		Authoring::WriteDocument document;
@@ -1372,15 +1403,6 @@ private:
 				eventSettings.Append().SetScalar(function);
 			}
 		}
-		else if (extension == ".fbx" || extension == ".gltf" ||
-			extension == ".obj" || extension == ".glb")
-		{
-			const Authoring::WriteNode importer = root.Child("ModelImporter");
-			importer.Child("OptimizeMeshes").SetScalar(true);
-			importer.Child("ImproveCacheLocality").SetScalar(true);
-			importer.Child("CreateMeshCollider").SetScalar(false);
-		}
-
 		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
 		std::ofstream output(metaPath, std::ios::binary | std::ios::trunc);
 		if (!output.is_open()) return {};
@@ -1432,7 +1454,8 @@ private:
 				Debug->LogWarning("Failed to move asset meta: " + error.message());
 		}
 
-		if (file::exists(newMeta)) RegisterMetaFile(newMeta);
+		if (assets::IsModelAuthoringSource(newPath)) CreateMeta(newPath);
+		else if (file::exists(newMeta)) RegisterMetaFile(newMeta);
 		else CreateMeta(newPath);
 	}
 
@@ -1489,6 +1512,11 @@ private:
 
 	void HandleModified(const file::path& filepath)
 	{
+		if (assets::IsModelAuthoringSource(filepath))
+		{
+			CreateMeta(filepath);
+			return;
+		}
 		// M5-C3a는 generation 계약이 이미 있는 ShaderMeta만 연다. HLSL include
 		// dependency와 다른 asset cache의 reload 정책은 같은 이벤트라는 이유로
 		// 추측해 넓히지 않는다.

@@ -103,11 +103,12 @@ private:
         Mesh*    mesh{ nullptr };
         uint32_t first{ 0 };
         uint32_t count{ 0 };
-        // I5-D4b — 아이템의 핸들 뷰를 배치로 나른다. 없으면(stableKey 0)
-        // legacy 진입점. 3패스와 키를 공유해야 캐시 히트가 성립한다 —
-        // 안 나르면 GBuffer(핸들 키)와 이 패스(mesh 키)가 같은 메시를
-        // 두 번 올린다.
-        RHIExperimentVertexView experimentView{};
+        // MBC9 — 배치 키는 아이템의 지오메트리 값 키(EnhancedDrawIdentity)다. 모델은
+        // legacy Mesh 포인터를 싣지 않으므로 포인터로 가르면 전부 한 배치로 뭉친다.
+        std::size_t geometryKey{ 0 };
+        // typed 뷰를 배치로 나른다. 3패스와 키를 공유해야 캐시 히트가 성립한다
+        // (GBuffer가 올린 것을 그대로 받는다).
+        RHIModelMeshView modelMeshView{};
     };
 
     static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
@@ -140,7 +141,7 @@ private:
     std::vector<math::matrix4x4>            m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t>  m_boneOffsets;
 
-    std::unordered_map<Mesh*, RHIMeshBinding> m_geometry;
+    std::unordered_map<std::size_t, RHIMeshBinding> m_geometry;
 
     // 프레임 밀봉 값(3-2).
     math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };

@@ -8,6 +8,9 @@
 #include <bcrypt.h>
 
 #include <algorithm>
+#include <cstdio>
+#include <fstream>
+#include <limits>
 #include <utility>
 
 #pragma comment(lib, "bcrypt.lib")
@@ -177,5 +180,108 @@ namespace assets
         if (!ValidateIdentityEpochHeader(parsed, outIssues)) return false;
         out = std::move(parsed);
         return true;
+    }
+
+    bool IssueIdentityEpochHeader(const std::filesystem::path& path,
+        std::string_view identityEpoch, std::string& outError) noexcept
+    {
+        outError.clear();
+        try
+        {
+            if (path.empty() || path.filename().empty())
+            {
+                outError = "identity epoch header path가 비었다.";
+                return false;
+            }
+
+            std::error_code error;
+            if (std::filesystem::exists(path, error))
+            {
+                outError = error ? "identity epoch header 존재 여부를 읽지 못했다: "
+                    + error.message() : "identity epoch header가 이미 존재한다.";
+                return false;
+            }
+            error.clear();
+            std::filesystem::create_directories(path.parent_path(), error);
+            if (error)
+            {
+                outError = "identity epoch header 디렉터리를 만들지 못했다: "
+                    + error.message();
+                return false;
+            }
+
+            IdentityEpochHeader header;
+            header.identityEpoch.assign(identityEpoch);
+            if (!CreateIdentityEpochSeed(header.identityEpochSeed, outError)) return false;
+
+            SYSTEMTIME utc{};
+            ::GetSystemTime(&utc);
+            char timestamp[32]{};
+            std::snprintf(timestamp, sizeof(timestamp),
+                "%04u-%02u-%02uT%02u:%02u:%02uZ",
+                static_cast<unsigned>(utc.wYear), static_cast<unsigned>(utc.wMonth),
+                static_cast<unsigned>(utc.wDay), static_cast<unsigned>(utc.wHour),
+                static_cast<unsigned>(utc.wMinute), static_cast<unsigned>(utc.wSecond));
+            header.createdAt = timestamp;
+
+            const std::string text = WriteIdentityEpochHeader(header);
+            if (text.empty())
+            {
+                outError = "identity epoch header 값이 계약을 통과하지 못했다.";
+                return false;
+            }
+
+            std::filesystem::path temporary = path;
+            temporary += L".issue-" + std::to_wstring(::GetCurrentProcessId())
+                + L"-" + std::to_wstring(::GetTickCount64());
+            const HANDLE file = ::CreateFileW(temporary.c_str(), GENERIC_WRITE, 0,
+                nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+                nullptr);
+            if (file == INVALID_HANDLE_VALUE)
+            {
+                outError = "identity epoch 임시 파일을 만들지 못했다 (Win32 "
+                    + std::to_string(::GetLastError()) + ").";
+                return false;
+            }
+
+            DWORD written{};
+            const bool wrote = text.size() <= (std::numeric_limits<DWORD>::max)()
+                && 0 != ::WriteFile(file, text.data(), static_cast<DWORD>(text.size()),
+                    &written, nullptr)
+                && written == text.size()
+                && 0 != ::FlushFileBuffers(file);
+            const DWORD writeError = wrote ? ERROR_SUCCESS : ::GetLastError();
+            ::CloseHandle(file);
+            if (!wrote)
+            {
+                std::filesystem::remove(temporary, error);
+                outError = "identity epoch 임시 파일 쓰기가 실패했다 (Win32 "
+                    + std::to_string(writeError) + ").";
+                return false;
+            }
+
+            if (0 == ::MoveFileExW(temporary.c_str(), path.c_str(),
+                MOVEFILE_WRITE_THROUGH))
+            {
+                const DWORD moveError = ::GetLastError();
+                std::filesystem::remove(temporary, error);
+                outError = moveError == ERROR_ALREADY_EXISTS || moveError == ERROR_FILE_EXISTS
+                    ? "identity epoch header가 동시에 발급됐다; 기존 파일을 보존했다."
+                    : "identity epoch header를 게시하지 못했다 (Win32 "
+                        + std::to_string(moveError) + ").";
+                return false;
+            }
+            return true;
+        }
+        catch (const std::exception& exception)
+        {
+            outError = std::string("identity epoch 발급 예외: ") + exception.what();
+            return false;
+        }
+        catch (...)
+        {
+            outError = "identity epoch 발급 중 알 수 없는 예외가 발생했다.";
+            return false;
+        }
     }
 }

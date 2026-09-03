@@ -28,6 +28,7 @@
 #include <memory>
 #include <span>
 #include <unordered_map>
+#include <mutex> // MBC10: 마지막 animator publish 메트릭 스냅샷
 
 #pragma region forward_decl
 // LifecycleRegistry.h를 여기서 포함하지 않는 이유:
@@ -819,6 +820,16 @@ public:
 	bool ResolveSpatialTransforms();
 	bool EnsureResolved(EntityHandle target);
 	AnimatorPoseUploadMetrics PublishAnimatorPose(Animator& animator);
+	// PHASE 3.75 MBC10 — 제품 barrier(AnimationJob)가 남긴 마지막 publish 메트릭의
+	// 읽기 전용 스냅샷. 진단(`experiment.animlive`)이 publish를 **다시 부르지 않고**
+	// 이것을 읽는다 — 관측이 상태를 바꾸면 그 관측은 재현되지 않는다.
+	[[nodiscard]] bool TryGetLastAnimatorPoseMetrics(const Animator& animator,
+		AnimatorPoseUploadMetrics& outMetrics) const;
+	mutable std::mutex m_lastAnimatorPoseMetricsMutex;
+	std::unordered_map<const Animator*, AnimatorPoseUploadMetrics> m_lastAnimatorPoseMetrics;
+private:
+	AnimatorPoseUploadMetrics PublishAnimatorPoseImpl(Animator& animator);
+public:
 	TransformBulkWriteMetrics ApplyWorldWriteBatch(
 		std::span<const TransformWorldWrite> writes, TransformWriteReason reason);
 	void MarkUILayoutDirty();

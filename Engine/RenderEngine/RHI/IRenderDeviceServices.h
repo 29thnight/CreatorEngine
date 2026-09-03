@@ -8,6 +8,7 @@
 #include "RHIHandle.h"
 #include "RHIResourceState.h"
 #include "RHIPipelineLayout.h"
+#include "../Assets/ModelAssetGeneration.h"
 
 class Mesh;
 
@@ -313,43 +314,105 @@ public:
     /// 원본은 COPY_SOURCE 상태여야 한다(그래프가 선언으로 만들어 준다).
 };
 
-/// I5-D34a: experiment packed 정점의 빌린 뷰. 캐시가 업로드 memcpy 동안만
-/// 읽는다 — 포인터를 보관하지 않는 것이 계약이다(소유는 조회 제공자 몫).
-struct RHIExperimentVertexView
+/// MBC6 제품 upload view. 주소는 immutable ModelAssetGeneration이 소유하고 캐시는
+/// memcpy 동안만 읽는다. 신원은 축약 hash가 아니라 {ModelId, MeshId, generation}
+/// 전체이며 layoutHash까지 검산해 다른 mask/stride를 같은 PSO에 넣지 않는다.
+struct RHIModelMeshView
 {
-    const void* data{ nullptr };
-    uint64_t    bytes{ 0 };
-    uint32_t    stride{ 0 };
-    uint32_t    attributeMask{ 0 };
-
-    // I5-D4b: 인덱스와 안정 신원. 이 셋이 채워진 뷰는 legacy Mesh 객체 없이
-    // 업로드를 완결할 수 있다(핸들 경로 — GetOrUploadExperiment). stableKey는
-    // 자산 신원(experiment 모델 assetId ⊕ 메시 인덱스)에서 유도한 캐시 키로,
-    // 0이면 핸들 경로가 아니다. 포인터 비보관 계약은 indexData에도 같이 적용.
+    assets::ModelMeshHandle handle{};
+    const void* vertexData{ nullptr };
+    uint64_t vertexBytes{ 0 };
+    uint32_t vertexStride{ 0 };
+    uint32_t vertexAttributeMask{ 0 };
+    uint64_t vertexLayoutHash{ 0 };
     const uint32_t* indexData{ nullptr };
-    uint32_t        indexCount{ 0 };
-    size_t          stableKey{ 0 };
+    uint32_t indexCount{ 0 };
 
-    bool IsValid() const
+    [[nodiscard]] bool IsComplete() const noexcept
     {
-        return nullptr != data && 0 != bytes && 0 != stride
-            && 0 != attributeMask && 0 == bytes % stride;
-    }
-
-    /// 핸들 경로 요건 — 신원과 인덱스까지 완비.
-    bool IsHandleComplete() const
-    {
-        return IsValid() && 0 != stableKey
+        return handle.IsValid() && nullptr != vertexData && 0 != vertexBytes
+            && 0 != vertexStride && 0 == vertexBytes % vertexStride
+            && assets::IsSupportedModelVertexLayout(vertexAttributeMask)
+            && vertexLayoutHash == assets::VertexLayoutHash(vertexAttributeMask)
             && nullptr != indexData && 0 != indexCount;
     }
 };
 
-/// 메시의 experiment 정점 조회. RHI 캐시가 자산 계층(DataSystem)을 직접
-/// 알지 않도록 함수로 주입한다 — 실패(false)는 legacy 96B 경로 그대로다.
-using RHIExperimentVertexLookup =
-    std::function<bool(const Mesh&, RHIExperimentVertexView&)>;
+/// MBC7 — typed 뷰의 지오메트리 키. 패스의 지오메트리 맵·배치 키·정렬은 값 키를
+/// 쓰고(EnhancedDrawIdentity), 그 값은 자산 신원 {ModelId, MeshId, generation}
+/// 전체에서 유도한다(FNV-1a 64). legacy m_hashingMesh·experiment stableKey와
+/// 같은 64비트 키 공간을 공유하며 충돌 무시 가정도 같다. 0은 '키 없음' 표지라
+/// 회피한다. 신원이 무효면 0이다 — 호출부가 다른 축으로 내려간다.
+[[nodiscard]] inline size_t HashModelMeshHandle(
+    const assets::ModelMeshHandle& handle) noexcept
+{
+    if (!handle.IsValid()) return 0;
+    uint64_t hash = 1469598103934665603ull;
+    const auto mix = [&hash](const void* data, size_t size)
+    {
+        const auto* bytes = static_cast<const unsigned char*>(data);
+        for (size_t i = 0; i < size; ++i)
+        {
+            hash ^= bytes[i];
+            hash *= 1099511628211ull;
+        }
+    };
+    mix(handle.modelId.data.data(), handle.modelId.data.size());
+    mix(handle.meshId.data.data(), handle.meshId.data.size());
+    mix(&handle.generation, sizeof(handle.generation));
+    if (0 == hash) hash = 1;
+    return static_cast<size_t>(hash);
+}
+
+/// generation descriptor와 실제 immutable 저장소를 한 번 더 대조한 뒤 RHI 뷰를
+/// 만든다. descriptor를 건너뛴 임의 바이트 업로드는 제품 경로가 될 수 없다.
+[[nodiscard]] inline bool BuildRHIModelMeshView(
+    const assets::ModelAssetGeneration& generation, uint32_t meshIndex,
+    RHIModelMeshView& outView)
+{
+    outView = {};
+    const auto meshes = generation.Meshes();
+    if (meshIndex >= meshes.size()) return false;
+    const assets::ModelMeshAsset& mesh = meshes[meshIndex];
+    const assets::ModelGpuUploadDescriptor* vertexDescriptor = nullptr;
+    const assets::ModelGpuUploadDescriptor* indexDescriptor = nullptr;
+    for (const assets::ModelGpuUploadDescriptor& descriptor
+        : generation.GpuDescriptors())
+    {
+        if (descriptor.assetId != mesh.meshId || descriptor.sourceIndex != meshIndex)
+            continue;
+        if (descriptor.kind == assets::ModelGpuUploadKind::VertexBuffer)
+            vertexDescriptor = &descriptor;
+        else if (descriptor.kind == assets::ModelGpuUploadKind::IndexBuffer)
+            indexDescriptor = &descriptor;
+    }
+    if (nullptr == vertexDescriptor || nullptr == indexDescriptor
+        || vertexDescriptor->byteSize != mesh.vertexBytes.size()
+        || vertexDescriptor->stride != mesh.vertexStride
+        || indexDescriptor->byteSize
+            != mesh.indices.size() * static_cast<uint64_t>(sizeof(uint32_t))
+        || indexDescriptor->elementCount != mesh.indices.size())
+    {
+        return false;
+    }
+
+    outView.handle = { generation.Identity().modelId, mesh.meshId,
+        generation.Identity().generation };
+    outView.vertexData = mesh.vertexBytes.data();
+    outView.vertexBytes = mesh.vertexBytes.size();
+    outView.vertexStride = mesh.vertexStride;
+    outView.vertexAttributeMask = mesh.vertexAttributeMask;
+    outView.vertexLayoutHash = mesh.vertexLayoutHash;
+    outView.indexData = mesh.indices.data();
+    outView.indexCount = static_cast<uint32_t>(mesh.indices.size());
+    return outView.IsComplete();
+}
 
 /// 메시 업로드. 같은 메시를 여러 패스·여러 프레임이 공유한다.
+///
+/// PHASE 3.75 MBC9 — 모델 지오메트리의 유일한 진입점은 GetOrUploadModel(typed
+/// generation 뷰)이다. GetOrUpload(Mesh*)는 모델이 아닌 절차 지오메트리(스프라이트
+/// 쿼드·지형·기즈모)의 legacy 96B 경로로만 남는다.
 class IRenderMeshCache
 {
 public:
@@ -357,24 +420,10 @@ public:
 
     virtual RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) = 0;
 
-    /// I5-D4b 핸들 경로: 신원·정점·인덱스가 완비된 뷰(IsHandleComplete)로
-    /// 업로드한다 — legacy Mesh 객체가 키 운반체에서 빠지는 절단선이다.
-    /// D34a의 lookup 계약과 같은 이유로 순수 가상(두 backend 대칭 강제).
-    virtual RHIMeshBinding GetOrUploadExperiment(
-        const RHIExperimentVertexView& view, std::string& outError) = 0;
+    /// MBC6 제품 진입점. 신원은 {ModelId, MeshId, generation} 전체다.
+    virtual RHIMeshBinding GetOrUploadModel(
+        const RHIModelMeshView& view, std::string& outError) = 0;
 
-    /// I5-D34a: 순수 가상이다 — 구현(DX12/Vulkan)이 하나라도 빠뜨리면 컴파일이
-    /// 막는다. 두 backend가 갈리면 vk 대조 게이트가 stride 불일치로 붉는 자리라
-    /// 기본 구현(무시)을 주지 않는다.
-    virtual void SetExperimentVertexLookup(RHIExperimentVertexLookup lookup) = 0;
-
-    /// I5-D34a 관측: 업로드 중 experiment packed 정점으로 올라간 수. CLI가
-    /// "전부 legacy"와 구분하는 데 쓴다 — 전환기와 함께 I6에서 은퇴한다.
-    virtual uint32_t GetExperimentUploadCount() const = 0;
-
-    /// I5-D4b 관측: 그중 핸들 경로(GetOrUploadExperiment)로 올라간 수.
-    /// lookup 폴백과 분리해야 "핸들이 실리지 않아도 lookup이 받쳐 초록"이라는
-    /// 눈먼 통과를 게이트가 가른다.
-    virtual uint32_t GetExperimentHandleUploadCount() const = 0;
+    virtual uint32_t GetModelGenerationUploadCount() const = 0;
 };
 

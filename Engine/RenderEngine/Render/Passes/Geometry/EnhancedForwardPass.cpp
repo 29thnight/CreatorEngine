@@ -1,7 +1,7 @@
 #include "EnhancedForwardPass.h"
 #include "../../Graph/EnhancedDrawIdentity.h" // I6-C
-#include "../../../Experiment/VertexLayout.h" // I5-D34c: core 마스크
-#include "../../../RHI/ExperimentVertexInputLayout.h" // I5-D34c: 레이아웃 유도
+#include "../../../Assets/ModelVertexLayout.h"
+#include "../../../RHI/ModelVertexInputLayout.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
@@ -311,17 +311,20 @@ namespace
         math::vector2  flowUvScroll{};
         float          flowTotalSeconds{ 0.f };
         float          flowDeltaSeconds{ 0.f };
+        uint32_t       boneOffset{ 0xFFFFFFFFu };
+        uint32_t       bonePadding[3]{};
     };
     // ★ 보폭이 어긋나면 컴파일도 검증도 통과하고 GPU만 엉뚱한 필드를 읽는다.
     //   마지막 넷이 정확히 16바이트를 채우는 것이 핵심 — 그래야 구조화
     //   버퍼의 타이트 패킹과 16바이트 논스트래들 규칙이 같은 답을 낸다.
     //   필드를 더할 때 이 수를 함께 고칠 것.
-    static_assert(sizeof(ShadeInstance) == 128,
+    static_assert(sizeof(ShadeInstance) == 144,
         "HLSL ShadeInstance와 구조화 버퍼 보폭이 어긋났다");
     static_assert(offsetof(ShadeInstance, flowWindVector) == 96u);
     static_assert(offsetof(ShadeInstance, flowUvScroll) == 112u);
     static_assert(offsetof(ShadeInstance, flowTotalSeconds) == 120u);
     static_assert(offsetof(ShadeInstance, flowDeltaSeconds) == 124u);
+    static_assert(offsetof(ShadeInstance, boneOffset) == 128u);
     static_assert(std::is_trivially_copyable_v<ShadeInstance>);
 
     struct ShadeParams
@@ -511,12 +514,18 @@ bool EnhancedForwardPass::ResolveShaderVariant(
         && snapshot.permutationKey == m_defaultPermutationKey
         && snapshot.keywordSelections == m_defaultKeywordSelections)
     {
-        outShadePipeline = experiment
-            ? m_experimentShadePipelineRequest.GetHandle()
-            : m_shadePipelineRequest.GetHandle();
-        outReferencePipeline = experiment
-            ? m_experimentReferencePipelineRequest.GetHandle()
-            : m_referencePipelineRequest.GetHandle();
+        if (!experiment)
+        {
+            outShadePipeline = m_shadePipelineRequest.GetHandle();
+            outReferencePipeline = m_referencePipelineRequest.GetHandle();
+        }
+        else
+        {
+            const auto model = m_modelPipelineRequests.find(vertexAttributeMask);
+            if (model == m_modelPipelineRequests.end()) return false;
+            outShadePipeline = model->second.shade.GetHandle();
+            outReferencePipeline = model->second.reference.GetHandle();
+        }
         outLayout = m_shaderBindingLayout;
         return outShadePipeline.IsValid() && outReferencePipeline.IsValid()
             && nullptr != outLayout;
@@ -526,12 +535,18 @@ bool EnhancedForwardPass::ResolveShaderVariant(
         snapshot.permutationKey, snapshot.keywordSelections };
     const auto found = m_shaderVariants.find(key);
     if (found == m_shaderVariants.end()) return false;
-    outShadePipeline = experiment
-        ? found->second.experimentShade.GetHandle()
-        : found->second.shade.GetHandle();
-    outReferencePipeline = experiment
-        ? found->second.experimentReference.GetHandle()
-        : found->second.reference.GetHandle();
+    if (!experiment)
+    {
+        outShadePipeline = found->second.shade.GetHandle();
+        outReferencePipeline = found->second.reference.GetHandle();
+    }
+    else
+    {
+        const auto model = found->second.modelRequests.find(vertexAttributeMask);
+        if (model == found->second.modelRequests.end()) return false;
+        outShadePipeline = model->second.shade.GetHandle();
+        outReferencePipeline = model->second.reference.GetHandle();
+    }
     outLayout = found->second.layout;
     return outShadePipeline.IsValid() && outReferencePipeline.IsValid()
         && nullptr != outLayout;
@@ -606,7 +621,8 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     // ── 셰이딩 루트 시그니처 ──
     //
-    // b0 상수 · t0 인스턴스 · t1 광원 · t2 타일 카운트 · t3 타일 목록.
+    // b0 상수 · t0 인스턴스 · t1 광원 · t2 타일 카운트 · t3 타일 목록 ·
+    // t12 model bone palette.
     // 넷 다 구조화 버퍼라 루트 SRV로 꽂는다 — 디스크립터 테이블을 만들 이유가
     // 없고, 드로우마다 인스턴스 버퍼 주소만 바뀌므로 이쪽이 싸다.
     //
@@ -626,6 +642,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         RHILayout::SrvTable(4, 8, RHIShaderVisibility::Pixel),   // t8~t11 조도 · 프리필터 · BRDF LUT · 그림자
         RHILayout::SamplerTable(3, 0, RHIShaderVisibility::Pixel),  // 재질 · IBL · 그림자 비교
         RHILayout::Cbv(2, RHIShaderVisibility::Pixel),           // b2 — M6 Forward material property block
+        RHILayout::Srv(12, RHIShaderVisibility::Vertex),         // t12 — model bone palette
     };
 
     RHIPipelineLayoutDesc shadeRootDesc{};
@@ -675,36 +692,25 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     static_assert(offsetof(Vertex, tangent) == 40, "Vertex 레이아웃이 바뀌었다");
     static_assert(offsetof(Vertex, bitangent) == 52, "Vertex 레이아웃이 바뀌었다");
 
-    // I5-D34c: experiment core 유도 레이아웃(마스크 불문 — Forward는 본을 안
-    // 읽고 48B 프리픽스가 core/skin 마스크에서 동일하다). 오프셋 재기재 금지.
-    static std::vector<RHIInputElement> experimentElements;
-    static std::string experimentElementsError;
-    static const bool experimentElementsBuilt =
-        ExperimentVertexInput::BuildInputElements(
-            experiment::kCoreVertexAttributes, experimentElements,
-            experimentElementsError);
-    if (!experimentElementsBuilt)
-    {
-        outError = "Forward experiment 입력 레이아웃 유도 실패: "
-            + experimentElementsError;
-        return false;
-    }
-
-    // 컬링 경로와 참조 경로를 둘 다 만든다. 참조는 대조의 정답지다.
-    // I5-D34c: 각 경로에 experiment 레이아웃 짝을 곱한다 — 배치가 메시
-    // 마스크로 고르는 자리에서 폴백을 지어내지 않기 위해 넷 다 필수다.
+    // 컬링 경로와 참조 경로를 둘 다 만든다. model 경로는 전체 mask 네 종류를
+    // 각각 PSO key로 보존한다.
     struct ShadeVariant
     {
         bool                  reference;
-        bool                  experimentLayout;
+        uint32_t              modelVertexMask;
         RHIGraphicsPipelineRequest* target;
     };
-    const ShadeVariant variants[] = {
-        { false, false, &m_shadePipelineRequest },
-        { true,  false, &m_referencePipelineRequest },
-        { false, true,  &m_experimentShadePipelineRequest },
-        { true,  true,  &m_experimentReferencePipelineRequest },
+    std::vector<ShadeVariant> variants{
+        { false, 0, &m_shadePipelineRequest },
+        { true,  0, &m_referencePipelineRequest },
     };
+    m_modelPipelineRequests.clear();
+    for (uint32_t mask : assets::kModelVertexMasks)
+    {
+        ModelPipelinePair& pair = m_modelPipelineRequests[mask];
+        variants.push_back({ false, mask, &pair.shade });
+        variants.push_back({ true, mask, &pair.reference });
+    }
 
     for (const ShadeVariant& variant : variants)
     {
@@ -712,8 +718,9 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         if (variant.reference
             && !shadePermutation.Enable("REFERENCE_PATH", outError))
             return false;
-        if (variant.experimentLayout
-            && !shadePermutation.Enable("EXPERIMENT_STATIC_VERTEX", outError))
+        if (0 != variant.modelVertexMask
+            && !ModelVertexInput::ApplyShaderPermutation(
+                variant.modelVertexMask, shadePermutation, outError))
             return false;
 
         RHIShaderBlob vsBlob;
@@ -724,11 +731,13 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
                 "PSMain", "ps_5_0", psBlob, outError)) return false;
 
         RHIGraphicsPipelineDesc shadeDesc{};
-        if (variant.experimentLayout)
+        if (0 != variant.modelVertexMask)
         {
-            shadeDesc.inputElements = experimentElements.data();
-            shadeDesc.inputElementCount =
-                static_cast<uint32_t>(experimentElements.size());
+            const auto* elements = ModelVertexInput::ResolveInputElements(
+                variant.modelVertexMask, outError);
+            if (nullptr == elements) return false;
+            shadeDesc.inputElements = elements->data();
+            shadeDesc.inputElementCount = static_cast<uint32_t>(elements->size());
         }
         else
         {
@@ -779,7 +788,7 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     const EnhancedFrameContext& context, const char* shaderFile,
     const char* vertexEntry, const char* pixelEntry,
     const ShaderRenderState* renderState,
-    const RHIShaderPermutation& permutation, bool experimentLayout,
+    const RHIShaderPermutation& permutation, uint32_t modelVertexMask,
     RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
     RHIShaderBlob& outPs, std::string& outError)
 {
@@ -787,10 +796,11 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     // 호출자마다 얹게 하면 하나가 빠뜨렸을 때 화면이 조용히 틀린다.
     RHIShaderPermutation experimentPermutation;
     const RHIShaderPermutation* effectivePermutation = &permutation;
-    if (experimentLayout)
+    if (0 != modelVertexMask)
     {
         experimentPermutation = permutation;
-        if (!experimentPermutation.Enable("EXPERIMENT_STATIC_VERTEX", outError))
+        if (!ModelVertexInput::ApplyShaderPermutation(modelVertexMask,
+                experimentPermutation, outError))
             return false;
         effectivePermutation = &experimentPermutation;
     }
@@ -813,6 +823,7 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
         RHILayout::SrvTable(4, 8, RHIShaderVisibility::Pixel),
         RHILayout::SamplerTable(3, 0, RHIShaderVisibility::Pixel),
         RHILayout::Cbv(2, RHIShaderVisibility::Pixel),
+        RHILayout::Srv(12, RHIShaderVisibility::Vertex),
     };
     RHIPipelineLayoutDesc rootDesc{};
     rootDesc.params = params;
@@ -828,26 +839,14 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
         { "BINORMAL", 0, RHIFormat::RGB32Float, 0, 52, 0 },
     };
 
-    // I5-D34c: 마스크→레이아웃 유도 정본(D2)에서 온다 — 오프셋 재기재 금지.
-    static std::vector<RHIInputElement> experimentElements;
-    static std::string experimentElementsError;
-    static const bool experimentElementsBuilt =
-        ExperimentVertexInput::BuildInputElements(
-            experiment::kCoreVertexAttributes, experimentElements,
-            experimentElementsError);
-
     outDesc = {};
-    if (experimentLayout)
+    if (0 != modelVertexMask)
     {
-        if (!experimentElementsBuilt)
-        {
-            outError = "Forward experiment 입력 레이아웃 유도 실패: "
-                + experimentElementsError;
-            return false;
-        }
-        outDesc.inputElements = experimentElements.data();
-        outDesc.inputElementCount =
-            static_cast<uint32_t>(experimentElements.size());
+        const auto* elements = ModelVertexInput::ResolveInputElements(
+            modelVertexMask, outError);
+        if (nullptr == elements) return false;
+        outDesc.inputElements = elements->data();
+        outDesc.inputElementCount = static_cast<uint32_t>(elements->size());
     }
     else
     {
@@ -873,7 +872,7 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
 bool EnhancedForwardPass::BuildShaderMetaPipelineDesc(
     const EnhancedFrameContext& context, const ShaderMeta& meta,
     std::span<const std::uint16_t> keywordSelections,
-    bool referencePath, bool experimentLayout,
+    bool referencePath, uint32_t modelVertexMask,
     RHIGraphicsPipelineDesc& outDesc,
     RHIShaderBlob& outVs, RHIShaderBlob& outPs,
     RHIShaderPermutationKey& outPermutationKey,
@@ -937,7 +936,7 @@ bool EnhancedForwardPass::BuildShaderMetaPipelineDesc(
 
     if (!BuildShadePipelineDesc(context, shaderFile.c_str(),
             pass.vertex->entry.c_str(), pass.pixel->entry.c_str(), &pass.state,
-            compilePermutation, experimentLayout, outDesc, outVs, outPs,
+            compilePermutation, modelVertexMask, outDesc, outVs, outPs,
             outError))
     {
         return false;
@@ -997,22 +996,29 @@ bool EnhancedForwardPass::ApplyShaderMeta(const EnhancedFrameContext& context,
         return false;
     }
 
-    // I5-D34c: experiment 짝 desc 둘. ★ 블롭은 desc마다 분리한다 — desc는
-    // 블롭 내부 버퍼를 빌려 가리키므로 재사용하면 앞의 desc가 죽은 메모리를
-    // 가리켜 PSO 생성이 E_INVALIDARG로 죽는다(D34a에서 FT 라이브 전멸로 실측).
-    RHIGraphicsPipelineDesc experimentShadeDesc{};
-    RHIGraphicsPipelineDesc experimentReferenceDesc{};
-    RHIShaderBlob expShadeVs, expShadePs, expReferenceVs, expReferencePs;
-    RHIShaderPermutationKey expKeyIgnored{};
-    std::shared_ptr<const ShaderMetaBindingLayout> expLayoutIgnored;
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections, false,
-            true, experimentShadeDesc, expShadeVs, expShadePs,
-            expKeyIgnored, expLayoutIgnored, outError)
-        || !BuildShaderMetaPipelineDesc(context, meta, defaultSelections, true,
-            true, experimentReferenceDesc, expReferenceVs, expReferencePs,
-            expKeyIgnored, expLayoutIgnored, outError))
+    struct ModelCandidate
     {
-        return false;
+        uint32_t mask{};
+        RHIGraphicsPipelineDesc shadeDesc{};
+        RHIGraphicsPipelineDesc referenceDesc{};
+        RHIShaderBlob shadeVs, shadePs, referenceVs, referencePs;
+    };
+    std::array<ModelCandidate, assets::kModelVertexMasks.size()> modelCandidates{};
+    for (std::size_t i = 0; i < modelCandidates.size(); ++i)
+    {
+        ModelCandidate& model = modelCandidates[i];
+        model.mask = assets::kModelVertexMasks[i];
+        RHIShaderPermutationKey modelKeyIgnored{};
+        std::shared_ptr<const ShaderMetaBindingLayout> modelLayoutIgnored;
+        if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections, false,
+                model.mask, model.shadeDesc, model.shadeVs, model.shadePs,
+                modelKeyIgnored, modelLayoutIgnored, outError)
+            || !BuildShaderMetaPipelineDesc(context, meta, defaultSelections, true,
+                model.mask, model.referenceDesc, model.referenceVs,
+                model.referencePs, modelKeyIgnored, modelLayoutIgnored, outError))
+        {
+            return false;
+        }
     }
 
     ShaderVariant candidate;
@@ -1028,18 +1034,21 @@ bool EnhancedForwardPass::ApplyShaderMeta(const EnhancedFrameContext& context,
         // 재사용하며, 외부 holder도 stale되지 않는다.
         return false;
     }
-    if (!candidate.experimentShade.Create(*context.psoManager,
-            experimentShadeDesc, outError)
-        || !candidate.experimentReference.Create(*context.psoManager,
-            experimentReferenceDesc, outError))
+    for (const ModelCandidate& model : modelCandidates)
     {
-        return false;
+        ModelPipelinePair& pair = candidate.modelRequests[model.mask];
+        if (!pair.shade.Create(*context.psoManager, model.shadeDesc, outError)
+            || !pair.reference.Create(*context.psoManager,
+                model.referenceDesc, outError)) return false;
     }
 
     std::vector<RHIPipelineHandle> removedPipelines{
-        m_shadePipelineRequest.GetHandle(), m_referencePipelineRequest.GetHandle(),
-        m_experimentShadePipelineRequest.GetHandle(),
-        m_experimentReferencePipelineRequest.GetHandle() };
+        m_shadePipelineRequest.GetHandle(), m_referencePipelineRequest.GetHandle() };
+    for (const auto& [mask, pair] : m_modelPipelineRequests)
+    {
+        removedPipelines.push_back(pair.shade.GetHandle());
+        removedPipelines.push_back(pair.reference.GetHandle());
+    }
     const std::uint32_t previousSlot = m_shaderMetaHandle.slot;
     for (auto it = m_shaderVariants.begin(); it != m_shaderVariants.end();)
     {
@@ -1047,9 +1056,11 @@ bool EnhancedForwardPass::ApplyShaderMeta(const EnhancedFrameContext& context,
         {
             removedPipelines.push_back(it->second.shade.GetHandle());
             removedPipelines.push_back(it->second.reference.GetHandle());
-            removedPipelines.push_back(it->second.experimentShade.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentReference.GetHandle());
+            for (const auto& [mask, pair] : it->second.modelRequests)
+            {
+                removedPipelines.push_back(pair.shade.GetHandle());
+                removedPipelines.push_back(pair.reference.GetHandle());
+            }
             it = m_shaderVariants.erase(it);
         }
         else
@@ -1061,9 +1072,7 @@ bool EnhancedForwardPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     // candidate request를 모두 만든 뒤 한 경계에서 게시한다.
     m_shadePipelineRequest = std::move(candidate.shade);
     m_referencePipelineRequest = std::move(candidate.reference);
-    m_experimentShadePipelineRequest = std::move(candidate.experimentShade);
-    m_experimentReferencePipelineRequest =
-        std::move(candidate.experimentReference);
+    m_modelPipelineRequests = std::move(candidate.modelRequests);
     m_shaderMetaHandle = handle;
     m_defaultPermutationKey = shadeKey;
     m_defaultKeywordSelections = defaultSelections;
@@ -1072,17 +1081,24 @@ bool EnhancedForwardPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     const auto stillHeld = [this](RHIPipelineHandle pipeline)
     {
         if (pipeline == m_shadePipelineRequest.GetHandle()
-            || pipeline == m_referencePipelineRequest.GetHandle()
-            || pipeline == m_experimentShadePipelineRequest.GetHandle()
-            || pipeline == m_experimentReferencePipelineRequest.GetHandle())
+            || pipeline == m_referencePipelineRequest.GetHandle())
             return true;
+        for (const auto& [mask, pair] : m_modelPipelineRequests)
+        {
+            if (pipeline == pair.shade.GetHandle()
+                || pipeline == pair.reference.GetHandle()) return true;
+        }
         return std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
             [pipeline](const auto& entry)
             {
-                return pipeline == entry.second.shade.GetHandle()
-                    || pipeline == entry.second.reference.GetHandle()
-                    || pipeline == entry.second.experimentShade.GetHandle()
-                    || pipeline == entry.second.experimentReference.GetHandle();
+                if (pipeline == entry.second.shade.GetHandle()
+                    || pipeline == entry.second.reference.GetHandle()) return true;
+                return std::any_of(entry.second.modelRequests.begin(),
+                    entry.second.modelRequests.end(), [pipeline](const auto& model)
+                    {
+                        return pipeline == model.second.shade.GetHandle()
+                            || pipeline == model.second.reference.GetHandle();
+                    });
             });
     };
     std::vector<RHIPipelineHandle> invalidated;
@@ -1174,19 +1190,28 @@ bool EnhancedForwardPass::EnsureShaderMetaVariant(
         return false;
     }
 
-    // I5-D34c: experiment 짝 desc 둘 — 블롭 분리(ApplyShaderMeta와 같은 이유).
-    RHIGraphicsPipelineDesc experimentShadeDesc{}, experimentReferenceDesc{};
-    RHIShaderBlob expShadeVs, expShadePs, expReferenceVs, expReferencePs;
-    RHIShaderPermutationKey expKeyIgnored{};
-    std::shared_ptr<const ShaderMetaBindingLayout> expLayoutIgnored;
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections, false,
-            true, experimentShadeDesc, expShadeVs, expShadePs,
-            expKeyIgnored, expLayoutIgnored, outError)
-        || !BuildShaderMetaPipelineDesc(context, meta, keywordSelections, true,
-            true, experimentReferenceDesc, expReferenceVs, expReferencePs,
-            expKeyIgnored, expLayoutIgnored, outError))
+    struct ModelCandidate
     {
-        return false;
+        uint32_t mask{};
+        RHIGraphicsPipelineDesc shadeDesc{}, referenceDesc{};
+        RHIShaderBlob shadeVs, shadePs, referenceVs, referencePs;
+    };
+    std::array<ModelCandidate, assets::kModelVertexMasks.size()> modelCandidates{};
+    for (std::size_t i = 0; i < modelCandidates.size(); ++i)
+    {
+        ModelCandidate& model = modelCandidates[i];
+        model.mask = assets::kModelVertexMasks[i];
+        RHIShaderPermutationKey modelKeyIgnored{};
+        std::shared_ptr<const ShaderMetaBindingLayout> modelLayoutIgnored;
+        if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections, false,
+                model.mask, model.shadeDesc, model.shadeVs, model.shadePs,
+                modelKeyIgnored, modelLayoutIgnored, outError)
+            || !BuildShaderMetaPipelineDesc(context, meta, keywordSelections, true,
+                model.mask, model.referenceDesc, model.referenceVs,
+                model.referencePs, modelKeyIgnored, modelLayoutIgnored, outError))
+        {
+            return false;
+        }
     }
 
     ShaderVariant candidate;
@@ -1201,12 +1226,12 @@ bool EnhancedForwardPass::EnsureShaderMetaVariant(
         // invalidate하면 같은 desc를 공유한 다른 owner까지 끊어진다.
         return false;
     }
-    if (!candidate.experimentShade.Create(*context.psoManager,
-            experimentShadeDesc, outError)
-        || !candidate.experimentReference.Create(*context.psoManager,
-            experimentReferenceDesc, outError))
+    for (const ModelCandidate& model : modelCandidates)
     {
-        return false;
+        ModelPipelinePair& pair = candidate.modelRequests[model.mask];
+        if (!pair.shade.Create(*context.psoManager, model.shadeDesc, outError)
+            || !pair.reference.Create(*context.psoManager,
+                model.referenceDesc, outError)) return false;
     }
     auto [inserted, accepted] =
         m_shaderVariants.try_emplace(key, std::move(candidate));
@@ -1241,9 +1266,11 @@ std::uint32_t EnhancedForwardPass::CommitShaderMetaFrame(
         {
             removedPipelines.push_back(it->second.shade.GetHandle());
             removedPipelines.push_back(it->second.reference.GetHandle());
-            removedPipelines.push_back(it->second.experimentShade.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentReference.GetHandle());
+            for (const auto& [mask, pair] : it->second.modelRequests)
+            {
+                removedPipelines.push_back(pair.shade.GetHandle());
+                removedPipelines.push_back(pair.reference.GetHandle());
+            }
             it = m_shaderVariants.erase(it);
             ++removedKeys;
         }
@@ -1256,17 +1283,24 @@ std::uint32_t EnhancedForwardPass::CommitShaderMetaFrame(
     const auto stillHeld = [this](RHIPipelineHandle pipeline)
     {
         if (pipeline == m_shadePipelineRequest.GetHandle()
-            || pipeline == m_referencePipelineRequest.GetHandle()
-            || pipeline == m_experimentShadePipelineRequest.GetHandle()
-            || pipeline == m_experimentReferencePipelineRequest.GetHandle())
+            || pipeline == m_referencePipelineRequest.GetHandle())
             return true;
+        for (const auto& [mask, pair] : m_modelPipelineRequests)
+        {
+            if (pipeline == pair.shade.GetHandle()
+                || pipeline == pair.reference.GetHandle()) return true;
+        }
         return std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
             [pipeline](const auto& entry)
             {
-                return pipeline == entry.second.shade.GetHandle()
-                    || pipeline == entry.second.reference.GetHandle()
-                    || pipeline == entry.second.experimentShade.GetHandle()
-                    || pipeline == entry.second.experimentReference.GetHandle();
+                if (pipeline == entry.second.shade.GetHandle()
+                    || pipeline == entry.second.reference.GetHandle()) return true;
+                return std::any_of(entry.second.modelRequests.begin(),
+                    entry.second.modelRequests.end(), [pipeline](const auto& model)
+                    {
+                        return pipeline == model.second.shade.GetHandle()
+                            || pipeline == model.second.reference.GetHandle();
+                    });
             });
     };
     std::vector<RHIPipelineHandle> invalidated;
@@ -1340,6 +1374,8 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_lastMaterialCount = 0;
     m_lastBatchCount = 0;
     m_batches.clear();
+    m_bonePalettes.clear();
+    m_boneOffsets.clear();
 
     if (nullptr != context.forwardDraws)
     {
@@ -1363,6 +1399,17 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                     return false;
                 }
             }
+            if (nullptr != draw.bonePalette && 0 != draw.boneCount
+                && m_boneOffsets.find(draw.animatorKey) == m_boneOffsets.end())
+            {
+                const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
+                m_bonePalettes.resize(offset + draw.boneCount);
+                for (uint32_t i = 0; i < draw.boneCount; ++i)
+                {
+                    m_bonePalettes[offset + i] = math::transpose(draw.bonePalette[i]);
+                }
+                m_boneOffsets.emplace(draw.animatorKey, offset);
+            }
             if (0 != enhanced_draw::GeometryKey(draw)) ++m_lastDrawCount;
         }
     }
@@ -1377,9 +1424,8 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
 
             std::string uploadError;
             // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선.
-            const RHIMeshBinding entry = (0 != draw.experimentView.stableKey)
-                ? context.meshCache->GetOrUploadExperiment(
-                    draw.experimentView, uploadError)
+            const RHIMeshBinding entry = draw.modelMeshView.IsComplete()
+                ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
                 : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())
             {
@@ -1469,12 +1515,15 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
         // I5-D34c: 메시 바인딩의 마스크가 레이아웃 축이다 — 병합 조건에 PSO가
         // 이미 들어 있으므로 마스크가 다른 메시는 배치가 저절로 갈린다.
         const uint32_t vertexMask = geometry->second.vertexAttributeMask;
-        RHIPipelineHandle shadePipeline = 0 != vertexMask
-            ? m_experimentShadePipelineRequest.GetHandle()
-            : m_shadePipelineRequest.GetHandle();
-        RHIPipelineHandle referencePipeline = 0 != vertexMask
-            ? m_experimentReferencePipelineRequest.GetHandle()
-            : m_referencePipelineRequest.GetHandle();
+        RHIPipelineHandle shadePipeline = m_shadePipelineRequest.GetHandle();
+        RHIPipelineHandle referencePipeline = m_referencePipelineRequest.GetHandle();
+        if (0 != vertexMask)
+        {
+            const auto model = m_modelPipelineRequests.find(vertexMask);
+            if (model == m_modelPipelineRequests.end()) continue;
+            shadePipeline = model->second.shade.GetHandle();
+            referencePipeline = model->second.reference.GetHandle();
+        }
         if (key.snapshot)
         {
             std::shared_ptr<const ShaderMetaBindingLayout> ignoredLayout;
@@ -1763,6 +1812,12 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         instances[i].metallic = material.metallic;
         instances[i].roughness = material.roughness;
         instances[i].useNormalMap = material.useNormalMap;
+        instances[i].boneOffset = 0xFFFFFFFFu;
+        if (nullptr != draw.bonePalette && 0 != draw.boneCount)
+        {
+            const auto found = m_boneOffsets.find(draw.animatorKey);
+            if (found != m_boneOffsets.end()) instances[i].boneOffset = found->second;
+        }
 
         const MaterialKey key = MakeMaterialKey(draw);
         constexpr uint32_t kHasMaterialTextures = 1u << 0u;
@@ -1822,6 +1877,24 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     if (!cb.IsValid()) return false;
     memcpy(cb.cpuAddress, &params, sizeof(params));
 
+    const uint64_t paletteBytes = m_bonePalettes.empty()
+        ? sizeof(math::matrix4x4)
+        : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
+    const auto paletteBuffer = context.resources->AllocateUpload(
+        RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
+            sizeof(math::matrix4x4) });
+    if (!paletteBuffer.IsValid()) return false;
+    if (m_bonePalettes.empty())
+    {
+        constexpr math::matrix4x4 identity = math::matrix4x4::identity();
+        memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
+    }
+    else
+    {
+        memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
+            static_cast<size_t>(paletteBytes));
+    }
+
     // root CBV/table을 걸기 전에 첫 material PSO로 layout을 확정한다. 이후
     // batch별 PSO는 같은 layout이라 DX12 root arguments와 Vulkan descriptor
     // pending state를 보존한다.
@@ -1837,6 +1910,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         RHIBufferSlice::Whole(m_tileCountBuffer));
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
         RHIBufferSlice::Whole(m_tileListBuffer));
+    encoder.SetRootBuffer(RHIBindPoint::Graphics, 9, paletteBuffer);
 
     encoder.SetSamplers(RHIBindPoint::Graphics, 7, m_sampler);
 
@@ -1968,8 +2042,7 @@ void EnhancedForwardPass::Shutdown()
     m_cullPSO = {};
     m_shadePipelineRequest = {};
     m_referencePipelineRequest = {};
-    m_experimentShadePipelineRequest = {};
-    m_experimentReferencePipelineRequest = {};
+    m_modelPipelineRequests.clear();
     m_shaderMetaHandle = {};
     m_defaultPermutationKey = {};
     m_defaultKeywordSelections.clear();
@@ -1979,6 +2052,8 @@ void EnhancedForwardPass::Shutdown()
     m_materialTextures.clear();
     m_drawGeometry.clear();
     m_batches.clear();
+    m_bonePalettes.clear();
+    m_boneOffsets.clear();
     m_sampler = {};
 
     m_iblIrradiance = {};
@@ -1989,5 +2064,3 @@ void EnhancedForwardPass::Shutdown()
     m_shadowMap = RGHandle{};
     m_shadowData = {};
 }
-
-

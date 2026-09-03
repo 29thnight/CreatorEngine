@@ -1,6 +1,8 @@
 #include "FoliageComponent.h"
 #include "FoliageSystem.h"
-#include "Model.h"
+#include "ExperimentMaterialMigration.h" // MBC9: generation 재질 시공
+#include "Assets/ModelAssetGeneration.h"
+#include "Material.h"
 #include "DataSystem.h"
 #include "Experiment/Model.h" // I5-D5c4: 재질 저작 정본 해석
 #include "Interfaces/AssetAuthoringPort.h"
@@ -157,41 +159,63 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
 	std::cout << "Foliage asset loaded successfully: " << assetPath << std::endl;
 }
 
-void FoliageComponent::BindExperimentMesh(FoliageType& type)
+void FoliageComponent::BindModelGeneration(FoliageType& type)
 {
-    // I5-D5a — D4c 신원 조회(m_hashingMesh 키)로 experiment 핸들을 잇는다.
-    // 실패(미등록·스위치 off)는 핸들 없음 — 렌더가 legacy lookup 폴백을 탄다.
-    type.m_experimentModel.reset();
-    type.m_experimentMeshIndex = 0;
+    // PHASE 3.75 MBC9 — typed 정본만 있다. Foliage 자산은 모델을 **이름**으로만
+    // 적으므로(m_modelName) 이름 → ModelId → 현재 generation으로 잇는다. 메시는
+    // legacy 규약과 같은 0번(FoliageType이 메시를 고르지 않는다). 재질은 그 메시가
+    // 가리키는 generation 재질에서 시공하고 embedded texture는 같은 closure에서 푼다.
+    type.m_modelGeneration.reset();
+    type.m_modelMeshIndex = 0;
+    type.m_material.reset();
     type.m_authoredMaterial.reset();
-    if (nullptr == type.m_mesh) return;
-    DataSystems->TryGetExperimentMeshBinding(
-        *type.m_mesh, type.m_experimentModel, type.m_experimentMeshIndex);
+    if (type.m_modelName.empty()) return;
 
-    // I5-D5c4(S2c-2c) — 재질 저작 정본도 같은 모델에서 잇는다. 메시가 가리키는
-    // MaterialIndex가 정본이다(legacy는 GetMaterialShared(0) 고정이었는데 그것은
-    // 메시-재질 대응을 무시하는 편법이다 — 여기서는 실제 대응을 쓴다).
-    if (!type.m_experimentModel) return;
-    const experiment::Model& model = *type.m_experimentModel;
-    const experiment::Mesh* mesh = model.TryGetMesh(
-        experiment::MeshIndex{ type.m_experimentMeshIndex });
-    if (nullptr == mesh) return;
-    const experiment::Material* material = model.TryGetMaterial(mesh->material);
-    if (nullptr == material) return;
-    // 모델은 immutable generation이라 그 안의 재질을 값 복사 없이 가리킨다 —
-    // aliasing shared_ptr가 모델 수명에 묶어 준다.
-    type.m_authoredMaterial =
-        std::shared_ptr<const experiment::Material>(type.m_experimentModel,
-            material);
+    const FileGuid modelGuid = DataSystems->GetStemToGuid(type.m_modelName);
+    std::shared_ptr<const assets::ModelAssetGeneration> generation =
+        DataSystems->LoadModelAssetGeneration(modelGuid);
+    if (!generation || generation->Meshes().empty())
+    {
+        Debug->LogError("FoliageType 모델 generation 해석 실패: " + type.m_modelName);
+        return;
+    }
+    const assets::ModelMeshAsset& mesh = generation->Meshes().front();
+    const auto materials = generation->Materials();
+    for (std::size_t index = 0; index < materials.size(); ++index)
+    {
+        if (materials[index].materialId != mesh.materialId) continue;
+        experiment::Material converted;
+        ExperimentMaterialMigration::ConvertModelMaterialAsset(
+            materials[index], *generation, converted);
+        auto material = std::make_shared<Material>();
+        std::string error;
+        if (ExperimentMaterialMigration::ConvertToLegacyMaterial(
+            converted, nullptr, *material, error))
+        {
+            DataSystems->FinalizeMaterialRuntime(*material);
+            DataSystems->BindModelGenerationTextures(*material, *generation);
+            type.m_material = std::move(material);
+            if (!materials[index].shaderAssetId.IsNil())
+            {
+                auto authored = std::make_shared<experiment::Material>(std::move(converted));
+                type.m_authoredMaterial = std::move(authored);
+            }
+        }
+        else
+        {
+            Debug->LogWarning("FoliageType 재질 변환 실패 — 빈 재질: " + error);
+        }
+        break;
+    }
+    type.m_modelGeneration = std::move(generation);
 }
 
 void FoliageComponent::AddFoliageType(const FoliageType& type)
 {
     m_foliageTypes.push_back(type);
-    // 저작 경로(에디터 드롭·CLI)는 m_mesh가 채워진 채 들어온다 — 여기서
-    // 바인딩한다. 자산 로드 경로(LoadFoliageAsset)는 m_mesh가 아직 비어
-    // no-op이고, OnDeserialized의 재해석 루프가 다시 바인딩한다.
-    BindExperimentMesh(m_foliageTypes.back());
+    // 저작 경로(에디터 드롭·CLI)든 자산 로드 경로(LoadFoliageAsset)든 이름으로
+    // 같은 typed 바인딩을 한다.
+    BindModelGeneration(m_foliageTypes.back());
 	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 }
 
@@ -338,8 +362,9 @@ void FoliageComponent::UpdateFoliageCullingData(
             foliage.RebuildWorldMatrix();
 
             const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
-            Mesh* mesh = foliageType.m_mesh.get();
-            if (!mesh)
+            // MBC9 — 바운드는 typed generation 메시가 소유한다.
+            if (!foliageType.m_modelGeneration
+                || foliageType.m_modelMeshIndex >= foliageType.m_modelGeneration->Meshes().size())
             {
                 foliage.m_isCulled = true; // 안전 기본값
                 continue;
@@ -348,7 +373,7 @@ void FoliageComponent::UpdateFoliageCullingData(
             if(SceneManagers->IsGameStart())
             {
 				const math::aabb worldBounds = math::transform(
-					mesh->GetBoundingBox(),
+					foliageType.m_modelGeneration->Meshes()[foliageType.m_modelMeshIndex].bounds,
 					foliage.m_worldMatrix);
 				foliage.m_isCulled = cameraFrustum.has_value() &&
 					!worldBounds.is_empty() &&
@@ -390,32 +415,14 @@ void FoliageComponent::OnDeserialized()
 
 	LoadFoliageAsset(m_foliageAssetGuid);
 
-	auto& types = const_cast<std::vector<FoliageType>&>(GetFoliageTypes());
-	for (auto& type : types)
+	// MBC9 — 타입은 LoadFoliageAsset → AddFoliageType이 이미 typed 바인딩했다.
+	// 여기서는 바인딩 실패(모델 부재)를 한 번 더 관측한다.
+	for (const FoliageType& type : GetFoliageTypes())
 	{
-		if (type.m_modelName.empty())
-			continue;
-
-		std::shared_ptr<Model> model;
-		std::array<std::string, 5> exts{ ".fbx", ".gltf", ".glb", ".obj", ".asset" };
-		for (const auto& ext : exts)
-		{
-			auto path = PathFinder::Relative("Models\\" + type.m_modelName + ext);
-			if (std::filesystem::exists(path))
-			{
-				model = DataSystems->LoadCachedModelShared(path.string());
-				break;
-			}
-		}
-		if (!model)
+		if (!type.m_modelName.empty() && !type.m_modelGeneration)
 		{
 			Debug->LogError("Failed to load model for FoliageType: " + type.m_modelName);
-			continue;
 		}
-		type.m_mesh = model->GetMeshShared(0);
-		type.m_material = model->GetMaterialShared(0);
-		// I5-D5a — m_mesh 재해석 직후 experiment 핸들도 잇는다.
-		BindExperimentMesh(type);
 	}
 
 	SetEnabled(true); // 구 분기 말미의 강제 활성 보존

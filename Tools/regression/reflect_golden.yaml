@@ -15,10 +15,6 @@ AniTransition:
   exitTime: 0.1
   blendTime: 0.2
   hasExitTime: false
-Animation:
-  m_name: ""
-  m_isLoop: true
-  m_keyFrameEvent: ~
 AnimationController:
   name: None
   m_curState: ~
@@ -413,7 +409,6 @@ MeshRenderer:
   m_isEnabled: true
   m_FileID: 00000000-0000-0000-0000-000000000000
   m_Material: ~
-  m_Mesh: ~
   m_LightMapping:
     lightmapIndex: -1
     ligthmapResolution: 0
@@ -426,6 +421,7 @@ MeshRenderer:
   m_shadowCast: true
   m_isEnableLOD: false
   m_modelGuid: 00000000-0000-0000-0000-000000000000
+  m_meshAssetId: 00000000-0000-0000-0000-000000000000
 Navigation:
   mode: 0
   parentHops: 4294967295
@@ -617,9 +613,6 @@ ShadowMapPassSetting:
   cloudMoveSpeed: 6e-05
   cloudAlpha: 1
   epsilon: 0.001
-Skeleton:
-  m_animations: ~
-  m_rootTransform: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 SoundComponent:
   SoundComponent: 5659791535691865235
   m_typeUUID: f2441c9e-234b-42cd-8067-2276a3c985fe

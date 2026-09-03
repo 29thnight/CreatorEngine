@@ -59,22 +59,23 @@ if (-not $proc.WaitForExit($TimeoutSec * 1000)) {
 $log = Get-Content $stdout -Raw
 $fail = @()
 
-# ① 드롭 경로가 experiment 로더를 탄다. 이것이 비면 아래 셋이 전부 따라 무너진다.
-if ($log -notmatch 'model\.dual\] experiment 경로: Gunner_F_Mythic') {
-    $fail += "1 드롭 경로가 experiment 로더를 타지 않았다 — LoadCachedModelShared를 확인하라"
-}
-# ② 배치도 experiment 직행이어야 한다(legacy 재귀 인스턴스화는 I6-E에서 죽는다).
-if ($log -notmatch 'model\.instantiate\] experiment: Gunner_F_Mythic') {
-    $fail += "2 드롭한 모델의 인스턴스화가 legacy로 갔다"
+# ①② 드롭 경로가 typed generation 인스턴스화를 탄다(MBC9: 유일한 경로 —
+#    [model.dual] experiment 로더 관측은 로더와 함께 은퇴했다).
+# MBC10: 관측은 읽기 전용 스냅샷(assets.modeldiag)이다 — 제품 stdout 토큰은 없다.
+$diag = [regex]::Match($log, '\[CLI\] assets\.modeldiag meshResolveGeneration=(\d+) meshResolveFailed=(\d+) instantiateGeneration=(\d+) instantiateRejected=(\d+) tickGeneration=(\d+) tickNone=(\d+) lastInstantiated=(\S+)')
+if (-not $diag.Success) { $fail += "1 assets.modeldiag 스냅샷이 없다" }
+elseif ([int]$diag.Groups[3].Value -lt 1 -or $diag.Groups[7].Value -ne 'Gunner_F_Mythic') {
+    $fail += "1 드롭한 모델의 인스턴스화가 generation 경로가 아니다 — LoadModelAssetGenerationByPath를 확인하라: $($diag.Value)"
 }
 # ③ ★ 핵심 — 재생 바인딩이 섰는가. 'none'은 "이 애니메이터는 안 돈다"이고,
 #    그 상태가 곧 화면에서 사라지는 원인이다(팔레트 미기록).
-$tickNone = ([regex]::Matches($log, '\[anim\.tick\] none')).Count
+$tickNone = if ($diag.Success) { [int]$diag.Groups[6].Value } else { -1 }
 if ($tickNone -ne 0) {
-    $fail += "3 드롭한 애니메이션 모델의 재생 바인딩이 비었다 — [anim.tick] none $tickNone 건"
+    $fail += "3 드롭한 애니메이션 모델의 재생 바인딩이 비었다 — tickNone $tickNone 건"
 }
-if ($log -notmatch '\[anim\.tick\] experiment') {
-    $fail += "3b 드롭한 모델이 experiment 틱을 한 번도 안 탔다"
+# MBC8/MBC9: UUIDv8 모델의 재생 정본은 typed generation 틱 하나다.
+if (-not $diag.Success -or [int]$diag.Groups[5].Value -lt 1) {
+    $fail += "3b 드롭한 모델이 generation 틱을 한 번도 안 탔다"
 }
 # ④ 포즈 산출까지 실제로 성립하는가(바인딩만 서고 표본이 0이면 ③이 공짜다).
 if ($log -notmatch 'experiment\.animtick pass animators=[1-9]\d* .* samples=[1-9]\d*') {
@@ -88,5 +89,5 @@ if ($fail.Count -gt 0) {
     exit 1
 }
 
-"에디터 드롭 재생 바인딩 통과 — 드롭 경로 experiment · 인스턴스화 experiment · anim.tick none 0건"
+"에디터 드롭 재생 바인딩 통과 — 인스턴스화 generation · tickGeneration ≥ 1 · tickNone 0(읽기 전용 스냅샷)"
 exit 0

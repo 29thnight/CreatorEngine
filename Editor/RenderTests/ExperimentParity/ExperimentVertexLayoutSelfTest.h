@@ -12,4 +12,5 @@ namespace RenderTest
     //    오프셋 이동)를 명시 단정한다 — 이 차이 명세가 D4(정점 버퍼와 동시
     //    전환)가 지켜야 할 계약이다.
     [[nodiscard]] bool RunExperimentVertexLayoutSelfTest(std::string& outLog);
+    [[nodiscard]] bool RunModelRenderWiringSelfTest(std::string& outLog);
 }

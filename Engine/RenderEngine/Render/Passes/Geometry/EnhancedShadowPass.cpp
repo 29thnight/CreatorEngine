@@ -4,8 +4,8 @@
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../../RHI/RHIEncoder.h"
-#include "../../../Experiment/VertexLayout.h" // I5-D34b: 스킨 마스크
-#include "../../../RHI/ExperimentVertexInputLayout.h" // I5-D34b: 레이아웃 유도
+#include "../../../Assets/ModelVertexLayout.h"
+#include "../../../RHI/ModelVertexInputLayout.h"
 #include "../../../Mesh.h"
 
 #include <mathematics/frustum.hpp>
@@ -31,14 +31,14 @@ namespace
     constexpr const char* kShadowShaderFile = "Shadow.hlsl";
 
     bool CompileShadowShader(const char* entry, const char* target, bool skinning,
-        bool experimentLayout, RHIShaderBlob& outBlob, std::string& outError)
+        uint32_t modelVertexMask, RHIShaderBlob& outBlob, std::string& outError)
     {
         RHIShaderPermutation permutation;
         if (skinning && !permutation.Enable("SHADOW_SKINNING", outError))
             return false;
-        // I5-D34b: experiment packed 스킨 — BLENDINDICES를 uint4로 선언한다.
-        if (experimentLayout
-            && !permutation.Enable("EXPERIMENT_SKINNED_VERTEX", outError))
+        if (0 != modelVertexMask
+            && !ModelVertexInput::ApplyShaderPermutation(modelVertexMask,
+                permutation, outError))
             return false;
 
         return RHIShaderCompiler::CompileFile(kShadowShaderFile, entry, target,
@@ -50,12 +50,8 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
 {
     RHIShaderBlob vsBlob;
     RHIShaderBlob skinnedVsBlob;
-    RHIShaderBlob experimentSkinnedVsBlob;
-    if (!CompileShadowShader("VSMain", "vs_5_0", false, false, vsBlob, outError)) return false;
-    if (!CompileShadowShader("VSMain", "vs_5_0", true, false, skinnedVsBlob, outError)) return false;
-    if (!CompileShadowShader("VSMain", "vs_5_0", true, true,
-            experimentSkinnedVsBlob, outError))
-        return false;
+    if (!CompileShadowShader("VSMain", "vs_5_0", false, 0, vsBlob, outError)) return false;
+    if (!CompileShadowShader("VSMain", "vs_5_0", true, 0, skinnedVsBlob, outError)) return false;
 
     // 인스턴스 배열은 루트 SRV로 넘긴다. 업로드 링에서 자른 조각의 GPU 주소를
     // 그대로 꽂으면 되므로 디스크립터를 만들 필요가 없다 — 배치마다 바뀌는
@@ -120,29 +116,33 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     m_skinnedPso = context.psoManager->GetOrCreate(desc, outError);
     if (!m_skinnedPso.IsValid()) return false;
 
-    // I5-D34b: experiment packed 스킨 변형. 레이아웃은 D2 유도 정본에서 —
-    // 6원소 전체를 선언해도 VS가 읽는 시맨틱만 조립되므로 부분집합을 다시
-    // 적지 않는다(오프셋 재기재 금지).
-    static std::vector<RHIInputElement> experimentSkinnedElements;
-    static std::string experimentSkinnedError;
-    static const bool experimentSkinnedBuilt =
-        ExperimentVertexInput::BuildInputElements(
-            experiment::kV2VertexAttributes, experimentSkinnedElements,
-            experimentSkinnedError);
-    if (!experimentSkinnedBuilt)
+    m_modelPsos.clear();
+    for (uint32_t mask : assets::kModelVertexMasks)
     {
-        outError = "Shadow experiment 입력 레이아웃 유도 실패: "
-            + experimentSkinnedError;
-        return false;
+        const bool skinned = 0 != (mask & assets::kSkinVertexAttributes);
+        RHIShaderBlob modelVsBlob;
+        if (!CompileShadowShader("VSMain", "vs_5_0", skinned, mask,
+                modelVsBlob, outError)) return false;
+        // Depth-only Shadow가 실제로 읽는 필드만 IA에 선언한다. 오프셋은 전체
+        // layout mask에서 유도하므로 COLOR가 들어간 SU의 bone 64/68도 보존된다.
+        // Vulkan은 셰이더가 읽지 않는 NORMAL/UV/TANGENT/COLOR까지 선언하면
+        // validation warning을 내므로 full mask와 consumed mask를 섞지 않는다.
+        const uint32_t consumedMask =
+            assets::Bit(assets::VertexAttribute::Position)
+            | (mask & assets::kSkinVertexAttributes);
+        const auto* elements = ModelVertexInput::ResolveInputElements(
+            mask, consumedMask, outError);
+        if (nullptr == elements) return false;
+        desc.inputElements = elements->data();
+        desc.inputElementCount = static_cast<uint32_t>(elements->size());
+        desc.vsBytecode = modelVsBlob.Data();
+        desc.vsSize = modelVsBlob.Size();
+        const RHIPipelineHandle pipeline =
+            context.psoManager->GetOrCreate(desc, outError);
+        if (!pipeline.IsValid()) return false;
+        m_modelPsos.emplace(mask, pipeline);
     }
-    desc.inputElements = experimentSkinnedElements.data();
-    desc.inputElementCount =
-        static_cast<uint32_t>(experimentSkinnedElements.size());
-    desc.vsBytecode = experimentSkinnedVsBlob.Data();
-    desc.vsSize = experimentSkinnedVsBlob.Size();
-
-    m_experimentSkinnedPso = context.psoManager->GetOrCreate(desc, outError);
-    return m_experimentSkinnedPso.IsValid();
+    return m_modelPsos.size() == assets::kModelVertexMasks.size();
 }
 
 bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
@@ -351,9 +351,8 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         std::string uploadError;
         // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선(같은 stableKey라
         // GBuffer가 올린 것을 캐시 히트로 받는 계약도 그대로다).
-        const auto entry = (0 != draw.experimentView.stableKey)
-            ? context.meshCache->GetOrUploadExperiment(
-                draw.experimentView, uploadError)
+        const auto entry = draw.modelMeshView.IsComplete()
+            ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
             : context.meshCache->GetOrUpload(draw.mesh, uploadError);
         if (!entry.IsValid())
         {
@@ -601,18 +600,19 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                             // 뭉쳐 두었으므로 전환은 그룹 경계에서 한 번뿐이다.
                             // I5-D34b: 스킨드 안에서도 버퍼 레이아웃으로 갈린다 —
                             // 배치는 메시 단위라 마스크가 배치 안에서 섞이지 않는다.
-                            uint32_t batchMask = 0;
-                            if (batchSkinned)
+                            const uint32_t batchMask = found->second.entry
+                                .vertexAttributeMask;
+                            RHIPipelineHandle wanted{};
+                            if (0 != batchMask)
                             {
-                                const auto geometry = m_drawGeometry.find(batchGeometryKey);
-                                if (geometry != m_drawGeometry.end())
-                                    batchMask = geometry->second.entry
-                                        .vertexAttributeMask;
+                                const auto model = m_modelPsos.find(batchMask);
+                                if (model == m_modelPsos.end()) return;
+                                wanted = model->second;
                             }
-                            RHIPipelineHandle wanted = !batchSkinned ? m_pso
-                                : 0 != (batchMask
-                                    & experiment::kSkinVertexAttributes)
-                                    ? m_experimentSkinnedPso : m_skinnedPso;
+                            else
+                            {
+                                wanted = batchSkinned ? m_skinnedPso : m_pso;
+                            }
                             if (wanted != boundPso)
                             {
                                 // 루트 시그니처는 위에서 이미 걸었다. 그대로 다시
@@ -683,7 +683,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                         found->second.entry.vertexAttributeMask;
                     const bool skinnableBuffer = 0 == drawVertexMask
                         || 0 != (drawVertexMask
-                            & experiment::kSkinVertexAttributes);
+                            & assets::kSkinVertexAttributes);
                     const bool skinned =
                         (nullptr != draw.bonePalette) && (0 != draw.boneCount)
                         && skinnableBuffer;
@@ -763,6 +763,5 @@ void EnhancedShadowPass::Shutdown()
     m_boneOffsets.clear();
     m_pso = {};
     m_skinnedPso = {};
-    m_experimentSkinnedPso = {};
+    m_modelPsos.clear();
 }
-

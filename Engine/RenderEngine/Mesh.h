@@ -3,7 +3,6 @@
 #include "Core.Minimal.h"
 #include "MetaPolymorphic.h"
 #include "EngineResourceCensus.h"
-#include <assimp/mesh.h>
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector2.hpp>
@@ -61,42 +60,6 @@ struct Vertex
 	Vertex(const math::vector3& _position, const math::vector3& _normal, const math::vector2& _uv) :
 		position(_position), normal(_normal), uv0(_uv) {}
 
-	static Vertex ConvertToAiMesh(aiMesh* mesh, uint32 i)
-	{
-		if (!mesh->HasPositions() || !mesh->HasNormals() || !mesh->HasTangentsAndBitangents())
-		{
-			throw std::runtime_error("Mesh does not have required vertex attributes.");
-		}
-
-		if (mesh->mVertices == nullptr || mesh->mNormals == nullptr || mesh->mTangents == nullptr || mesh->mBitangents == nullptr)
-		{
-			throw std::runtime_error("Mesh vertex data is null.");
-		}
-
-		bool hasTexCoords = mesh->mTextureCoords[0] != nullptr;
-		bool hasTexCoords1 = mesh->mTextureCoords[1] != nullptr;
-
-		Vertex vertex;
-		vertex.position		= { mesh->mVertices[i].x,	mesh->mVertices[i].y,	mesh->mVertices[i].z	};
-		vertex.normal		= { mesh->mNormals[i].x,	mesh->mNormals[i].y,	mesh->mNormals[i].z		};
-		vertex.tangent		= { mesh->mTangents[i].x,	mesh->mTangents[i].y,	mesh->mTangents[i].z	};
-		vertex.bitangent	= { mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z	};
-		if (hasTexCoords)
-		{
-			vertex.uv0 = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
-
-			if (hasTexCoords1)
-			{
-				vertex.uv1 = { mesh->mTextureCoords[1][i].x, mesh->mTextureCoords[1][i].y };
-			}
-			else
-			{
-				vertex.uv1 = vertex.uv0;
-			}
-		}
-
-		return vertex;
-	}
 };
 
 static_assert(std::is_same_v<decltype(ModelNode::m_transform), math::matrix4x4>);
@@ -104,7 +67,7 @@ static_assert(sizeof(math::matrix4x4) == 64u);
 static_assert(std::is_standard_layout_v<Vertex>);
 static_assert(std::is_trivially_copyable_v<Vertex>);
 static_assert(alignof(Vertex) == alignof(float));
-static_assert(sizeof(Vertex) == 96u, "CEMA v2/GPU vertex stride changed");
+static_assert(sizeof(Vertex) == 96u, "legacy GPU vertex stride changed");
 static_assert(offsetof(Vertex, position) == 0u);
 static_assert(offsetof(Vertex, normal) == 12u);
 static_assert(offsetof(Vertex, uv0) == 24u);
@@ -182,15 +145,7 @@ public:
 	HashedGuid m_hashingMesh{ make_guid() };
 
 private:
-	friend class ModelLoader;
 	friend class MeshOptimizer;
-	// I5-D4f-1 — 역브리지(DataSystem::BuildLegacyModelFromExperiment)가
-	// experiment 정본 bounds를 직접 주입한다. 정점 시공을 끊은 뒤에는
-	// RecalculateBounds()가 원본을 잃어(빈 배열이면 즉시 반환) 바운드가
-	// 기본값으로 남고, 컬링·피킹·그림자 반경이 조용히 틀어진다.
-	// Model.h가 같은 브리지를 위해 이미 든 선례고, 브리지와 함께 I6에서
-	// 죽는다. 값 계산은 experiment 임포터가 하므로 식이 갈리지 않는다.
-	friend class DataSystem;
 
 	std::string m_name;
 

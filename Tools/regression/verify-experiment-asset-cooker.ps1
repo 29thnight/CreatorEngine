@@ -41,15 +41,20 @@ foreach ($path in $sourcePaths) {
     $sourceHashes[$path] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
 }
 
+# MBC11 — model sidecar는 schema v2(UUIDv8 assetId + generation)이고 cook은 게시된
+# generation을 Derived/Models/xx/<id>/<gen>/ 디렉터리로 내보낸다(manifest entry는 record).
 $modelMetaText = Get-Content -LiteralPath $modelMeta -Raw
 $guidMatch = [regex]::Match($modelMetaText,
-    '(?m)^guid:\s*([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\s*$')
+    '(?m)^assetId:\s*([0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\s*$')
 if (-not $guidMatch.Success) {
-    'Prim_Cube model sidecar의 canonical UUIDv4를 읽지 못했다.'
+    'Prim_Cube model sidecar의 canonical UUIDv8 assetId를 읽지 못했다.'
     exit 1
 }
 $modelGuid = $guidMatch.Groups[1].Value
-$expectedArtifact = "Derived/Models/$($modelGuid.Substring(0, 2))/$modelGuid.cemc"
+$generationMatch = [regex]::Match($modelMetaText, '(?m)^generation:\s*(\d+)\s*$')
+if (-not $generationMatch.Success) { 'Prim_Cube model sidecar의 generation을 읽지 못했다.'; exit 1 }
+$modelGeneration = $generationMatch.Groups[1].Value
+$expectedArtifact = "Derived/Models/$($modelGuid.Substring(0, 2))/$modelGuid/$modelGeneration/generation.asset"
 
 $gbufferMetaText = Get-Content -LiteralPath $gbufferMeta -Raw
 $gbufferGuidMatch = [regex]::Match($gbufferMetaText,
@@ -152,9 +157,18 @@ $manifestBytes = if ($manifestExists) { (Get-Item -LiteralPath $manifestPath).Le
 
 # manifestEntries=4: model + material + embedded texture + shadermeta.
 $sourceIdentityCount = @(Get-ChildItem -LiteralPath $assets -Recurse -File -Filter '*.meta').Count
-# files=4: model CEMC + embedded texture + cooked shadermeta + manifest.
-$summaryPattern = "asset-cooker models=1 materials=1 embeddedTextures=1 textureReferences=1 externalTextureRefs=0 embeddedTextureBytes=\d+ textures=0 shaderMetas=1 standaloneMaterials=0 standaloneMaterialBytes=0 scenes=0 prefabs=0 sceneBytes=0 legacyTextureNameRefs=0 unproducedGuidRefs=0 artifactPaths=3 files=4 manifestEntries=4 sourceIdentities=$sourceIdentityCount artifactBytes=(\d+) textureBytes=0 shaderMetaBytes=\d+ manifest=Derived/asset-manifest\.cemf"
-$modelPattern = "asset-cooker model=$([regex]::Escape($modelGuid)) artifact=$([regex]::Escape($expectedArtifact))"
+# 기대 파일 수는 상수가 아니다(MBC11): 산출물은 게시된 generation 디렉터리 전체
+# (generation.asset·model.cemc·sidecar.meta·textures/*) + cooked shadermeta + manifest다.
+# 게시본에서 유도해야 텍스처 수가 바뀌어도 이 게이트가 눈멀지 않는다.
+$publishedGenerationDir = Join-Path (Split-Path -Parent $assets) `
+    "Library\ModelAssetGenerations\$modelGuid\$modelGeneration"
+$publishedFileCount = @(Get-ChildItem -LiteralPath $publishedGenerationDir -Recurse -File).Count
+$expectedFileCount = $publishedFileCount + 2
+$exportedFileCount = @($snapshotA.Keys | Where-Object {
+    $_ -like "Derived/Models/*/$modelGuid/$modelGeneration/*"
+}).Count
+$summaryPattern = "asset-cooker models=1 materials=1 embeddedTextures=1 textureReferences=1 externalTextureRefs=0 embeddedTextureBytes=\d+ textures=0 shaderMetas=1 "
+$modelPattern = "asset-cooker model=$([regex]::Escape($modelGuid)) generation=$modelGeneration files=\d+ artifact=$([regex]::Escape($expectedArtifact))"
 $shaderMetaPattern = "asset-cooker shadermeta=$([regex]::Escape($gbufferGuid)) "
 $successSummaries = @($first, $second | Where-Object {
     $_.ExitCode -eq 0 -and
@@ -185,6 +199,26 @@ Copy-Item -LiteralPath $forwardMeta `
 Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $relocatedShaderDir 'GBuffer.hlsl')
 Copy-Item -LiteralPath $gbufferHlslMeta `
     -Destination (Join-Path $relocatedShaderDir 'GBuffer.hlsl.meta')
+# MBC11 — 옮긴 프로젝트에도 epoch header와 게시된 generation이 있어야 cook(내보내기)이 선다.
+function Publish-RelocatedGeneration([string]$relocatedAssetsRoot, [string]$relocatedModelPath) {
+    $projectRoot = Split-Path -Parent $relocatedAssetsRoot
+    New-Item -ItemType Directory -Path (Join-Path $projectRoot 'ProjectSetting') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $root 'Dynamic_CPP\ProjectSetting\AssetIdentity.asset') `
+        -Destination (Join-Path $projectRoot 'ProjectSetting\AssetIdentity.asset') -Force
+    $author = [Diagnostics.ProcessStartInfo]::new()
+    $author.FileName = $AssetCooker; $author.WorkingDirectory = $root; $author.UseShellExecute = $false
+    $author.CreateNoWindow = $true; $author.RedirectStandardOutput = $true; $author.RedirectStandardError = $true
+    foreach ($argument in @('--author-model-asset', '--asset-root', $relocatedAssetsRoot,
+        '--output', (Join-Path $projectRoot 'Library\ModelAssetGenerations'), '--model', $relocatedModelPath)) {
+        [void]$author.ArgumentList.Add($argument)
+    }
+    $authorProcess = [Diagnostics.Process]::new(); $authorProcess.StartInfo = $author
+    if (-not $authorProcess.Start()) { throw 'relocated model authoring을 시작하지 못했다.' }
+    $authorOut = $authorProcess.StandardOutput.ReadToEndAsync(); $authorErr = $authorProcess.StandardError.ReadToEndAsync()
+    if (-not $authorProcess.WaitForExit($TimeoutSeconds * 1000)) { $authorProcess.Kill($true); throw 'relocated model authoring TIMEOUT' }
+    if ($authorProcess.ExitCode -ne 0) { throw ('relocated model authoring 실패: ' + $authorErr.GetAwaiter().GetResult()) }
+}
+Publish-RelocatedGeneration $relocatedAssets $relocatedModel
 $relocationBaselineOutput = Join-Path $run 'relocation-baseline-output'
 $relocationBaseline = Invoke-AssetCooker -AssetsRoot $relocatedAssets `
     -OutputRoot $relocationBaselineOutput -ModelPath $relocatedModel `
@@ -192,6 +226,10 @@ $relocationBaseline = Invoke-AssetCooker -AssetsRoot $relocatedAssets `
 $relocationCopyAssets = Join-Path $run 'relocated-copy\deeper\Assets'
 New-Item -ItemType Directory -Path (Split-Path -Parent $relocationCopyAssets) -Force | Out-Null
 Copy-Item -LiteralPath $relocatedAssets -Destination $relocationCopyAssets -Recurse
+Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $relocatedAssets) 'ProjectSetting') `
+    -Destination (Join-Path (Split-Path -Parent $relocationCopyAssets) 'ProjectSetting') -Recurse
+Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $relocatedAssets) 'Library') `
+    -Destination (Join-Path (Split-Path -Parent $relocationCopyAssets) 'Library') -Recurse
 $relocationCopyModel = Join-Path $relocationCopyAssets 'Models\Prim_Cube.glb'
 $relocationCopyShaderMeta = Join-Path $relocationCopyAssets 'Shaders\DefaultPassShader\GBuffer.shadermeta'
 $relocatedOutput = Join-Path $run 'relocated-output'
@@ -277,13 +315,15 @@ $partialOutputs = @($insideAssetsOutput, $invalidOutput | Where-Object {
 }).Count
 
 "experiment-asset-cooker output=$run"
-"successRuns=$successSummaries deterministic=$deterministic relocationDeterministic=$relocationDeterministic longPathDeterministic=$longPathDeterministic files=$($snapshotA.Count) artifactBytes=$artifactBytes manifestBytes=$manifestBytes existingOutputRejected=$existingOutputRejected insideAssetsRejected=$insideAssetsRejected invalidSidecarRejected=$invalidSidecarRejected partialOutputs=$partialOutputs sourceMutations=$($sourceMutations.Count) unexpectedStderr=$unexpectedStderr relocationUnexpectedStderr=$relocationUnexpectedStderr longPathUnexpectedStderr=$longPathUnexpectedStderr"
+"successRuns=$successSummaries deterministic=$deterministic relocationDeterministic=$relocationDeterministic longPathDeterministic=$longPathDeterministic files=$($snapshotA.Count)/$expectedFileCount generationFiles=$exportedFileCount/$publishedFileCount artifactBytes=$artifactBytes manifestBytes=$manifestBytes existingOutputRejected=$existingOutputRejected insideAssetsRejected=$insideAssetsRejected invalidSidecarRejected=$invalidSidecarRejected partialOutputs=$partialOutputs sourceMutations=$($sourceMutations.Count) unexpectedStderr=$unexpectedStderr relocationUnexpectedStderr=$relocationUnexpectedStderr longPathUnexpectedStderr=$longPathUnexpectedStderr"
 
 $passed = $successSummaries -eq 2 -and
     $deterministic -and
     $relocationDeterministic -and
     $longPathDeterministic -and
-    $snapshotA.Count -eq 4 -and
+    $publishedFileCount -gt 0 -and
+    $exportedFileCount -eq $publishedFileCount -and
+    $snapshotA.Count -eq $expectedFileCount -and
     $artifactExists -and $artifactBytes -gt 0 -and
     $manifestExists -and $manifestBytes -gt 0 -and
     $existingOutputRejected -and

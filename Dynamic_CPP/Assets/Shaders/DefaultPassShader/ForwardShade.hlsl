@@ -1,15 +1,19 @@
-// I5-D34c: EXPERIMENT_STATIC_VERTEX는 experiment packed 레이아웃이다 —
-// BINORMAL이 없고 TANGENT.w(handedness)로 bitangent를 재구성한다(GBuffer와
-// 같은 계약). Forward는 본을 읽지 않으므로 스킨 마스크(68B) 메시도 이
-// 레이아웃으로 그려진다 — 48B 프리픽스(POSITION/NORMAL/TEXCOORD/TANGENT)가
-// 두 마스크에서 동일하고 stride는 바인딩이 나른다.
-#ifdef EXPERIMENT_STATIC_VERTEX
+// MBC6: ModelAssetGeneration의 전체 mask가 입력 레이아웃과 shader 축을 함께
+// 만든다. Forward도 GBuffer/Shadow와 같은 palette 규약으로 skin pose를 계산한다.
+#ifdef MODEL_VERTEX_LAYOUT
 struct VSIn
 {
     float3 position : POSITION;
     float3 normal   : NORMAL;
     float2 uv       : TEXCOORD;
     float4 tangent  : TANGENT;
+#ifdef MODEL_VERTEX_COLOR
+    float4 color : COLOR0;
+#endif
+#ifdef MODEL_VERTEX_SKINNING
+    uint4 boneIndices : BLENDINDICES;
+    float4 boneWeights : BLENDWEIGHT;
+#endif
 };
 #else
 struct VSIn
@@ -53,6 +57,8 @@ struct ShadeInstance
     float2   flowUvScroll;
     float    flowTotalSeconds;
     float    flowDeltaSeconds;
+    uint     boneOffset;
+    uint3    bonePadding;
 };
 
 // M6-P2b Standard Forward material numeric contract. ShaderMeta reflection owns
@@ -93,6 +99,10 @@ StructuredBuffer<ShadeInstance> gInstances : register(t0);
 StructuredBuffer<float4>        gLights    : register(t1);
 StructuredBuffer<uint>          gTileCount : register(t2);
 StructuredBuffer<uint>          gTileList  : register(t3);
+#ifdef MODEL_VERTEX_SKINNING
+StructuredBuffer<float4x4>      gBones     : register(t12);
+#define NO_SKINNING 0xFFFFFFFFu
+#endif
 
 // M6-P2d-c: 물리 슬롯은 t4..t7/space0으로 유지하되 texture property 이름은
 // ShaderMeta/HLSL reflection 정본이다. Wind fixture가 t4를 windMap으로 바꿔
@@ -208,13 +218,35 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
     const ShadeInstance instance = gInstances[instanceId];
 
+#ifdef MODEL_VERTEX_SKINNING
+    if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
+    {
+        float4x4 boneTransform = input.boneWeights[0]
+            * gBones[instance.boneOffset + input.boneIndices[0]];
+        [unroll]
+        for (int i = 1; i < 4; ++i)
+        {
+            boneTransform += input.boneWeights[i]
+                * gBones[instance.boneOffset + input.boneIndices[i]];
+        }
+        input.position = mul(float4(input.position, 1.0f), boneTransform).xyz;
+        input.normal = normalize(mul(float4(input.normal, 0.0f), boneTransform).xyz);
+        input.tangent.xyz = normalize(
+            mul(float4(input.tangent.xyz, 0.0f), boneTransform).xyz);
+    }
+#endif
+
     const float4 worldPosition = mul(float4(input.position, 1.0f), instance.world);
 
     VSOut output;
     output.position  = mul(worldPosition, gViewProjection);
     output.worldPos  = worldPosition.xyz;
     output.uv        = input.uv;
+#ifdef MODEL_VERTEX_COLOR
+    output.baseColor = instance.baseColor * input.color;
+#else
     output.baseColor = instance.baseColor;
+#endif
     output.material  = float4(instance.metallic, instance.roughness,
         (float)instance.useNormalMap, (float)instance.materialFlags);
     // flow 승격의 CB 선택은 PS에서 한다 — VS가 b2를 읽으면 root signature의
@@ -227,7 +259,7 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     // 법선·탄젠트는 회전만 적용한다(GBuffer와 같은 처리). 비균등 스케일에는
     // 역전치가 필요한데, 그건 GBuffer가 아직 안 하므로 여기서만 하면 두
     // 경로가 갈린다.
-#ifdef EXPERIMENT_STATIC_VERTEX
+#ifdef MODEL_VERTEX_LAYOUT
     const float3 localTangent   = input.tangent.xyz;
     const float3 localBitangent =
         cross(input.normal, input.tangent.xyz) * input.tangent.w;

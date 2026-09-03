@@ -23,6 +23,7 @@
 #include "DX12PersistentHeap.h"
 #include "DX12ResourceEntries.h"
 #include <cstdint>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <wrl/client.h>
@@ -54,14 +55,8 @@ public:
     {
         uint32_t hits{ 0 };
         uint32_t uploads{ 0 };
-        // I5-D34a: uploads 중 experiment packed 정점으로 올라간 수. 이 계수가
-        // 없으면 "전부 legacy로 올라갔다"와 구분되지 않는다 — [model.dual]과
-        // 같은 눈먼 초록 방지다.
-        uint32_t experimentUploads{ 0 };
-        // I5-D4b: 그중 핸들 진입점(GetOrUploadExperiment)으로 올라간 수.
-        // lookup 폴백과 분리해야 "핸들이 안 실려도 lookup이 받쳐 초록"이라는
-        // 눈먼 통과를 게이트가 가른다.
-        uint32_t experimentHandleUploads{ 0 };
+        // MBC6/MBC9: 그중 typed generation 진입점(GetOrUploadModel)으로 올라간 수.
+        uint32_t modelGenerationUploads{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
 
@@ -95,21 +90,11 @@ public:
     /// (BeginFrame과 EndFrame 사이). 패스 기록 중에 부르면 안 된다 —
     /// Record는 리소스를 만들지 않는다는 3-6의 규약을 어기는 것이다.
     Entry GetOrUpload(Mesh* mesh, std::string& outError) override;
-    /// I5-D4b 핸들 진입점 — 키·정점·인덱스가 뷰에 완비돼 legacy Mesh 객체
-    /// 없이 업로드가 완결된다. 본문은 GetOrUpload와 같은 UploadResolved 하나다.
-    Entry GetOrUploadExperiment(
-        const RHIExperimentVertexView& view, std::string& outError) override;
-    void SetExperimentVertexLookup(RHIExperimentVertexLookup lookup) override
+    Entry GetOrUploadModel(
+        const RHIModelMeshView& view, std::string& outError) override;
+    uint32_t GetModelGenerationUploadCount() const override
     {
-        m_experimentLookup = std::move(lookup);
-    }
-    uint32_t GetExperimentUploadCount() const override
-    {
-        return m_stats.experimentUploads;
-    }
-    uint32_t GetExperimentHandleUploadCount() const override
-    {
-        return m_stats.experimentHandleUploads;
+        return m_stats.modelGenerationUploads;
     }
     void OnUploadSubmitted(uint64_t recordingId,
         RHICompletionPoint completion) override;
@@ -135,7 +120,7 @@ public:
         result.persistentHeap = m_persistentHeap.GetStats();
         return result;
     }
-    size_t GetCachedCount() const { return m_entries.size(); }
+    size_t GetCachedCount() const { return m_entries.size() + m_modelEntries.size(); }
 
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -159,21 +144,22 @@ private:
         const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
         DX12PersistentHeap::Allocation& destination, std::string& outError);
 
-    /// I5-D4b — 업로드 정본. 두 진입점(GetOrUpload/GetOrUploadExperiment)이
-    /// 키와 데이터 소스만 다르게 이 하나를 부른다. 키 조회(히트)도 여기서 한다.
-    Entry UploadResolved(HashedGuid key,
+    /// 업로드 정본. 두 진입점(GetOrUpload/GetOrUploadModel)이 키와 데이터
+    /// 소스만 다르게 이 하나를 부른다. 키 조회(히트)도 여기서 한다.
+    Entry UploadResolved(HashedGuid legacyKey,
+        const assets::ModelMeshHandle* modelKey,
         const void* vertexData, uint64_t vertexBytes, uint32_t vertexStride,
         uint32_t attributeMask, const uint32_t* indexData, uint32_t indexCount,
-        bool viaExperimentHandle, std::string& outError);
+        std::string& outError);
 
     DX12DeviceResources* m_resources{ nullptr };
-    RHIExperimentVertexLookup m_experimentLookup;
     // ── 키가 주소가 아니라 자산 신원이다 (자산 상주 관리 ①) ──
     //
     // 텍스처 캐시와 같은 이유다. 자산 수명이 shared_ptr 공동 소유라 죽은 뒤
     // 같은 주소에 새 메시가 올라오면 이전 것의 정점 버퍼를 돌려줬다.
     // Mesh는 m_hashingMesh를 이미 들고 있어 새로 만들 것이 없었다.
     std::unordered_map<HashedGuid, Buffers> m_entries;
+    std::map<assets::ModelMeshHandle, Buffers> m_modelEntries;
 
     /// 은퇴했으나 아직 GPU가 놓아 주지 않은 것들(③). 정점·인덱스 둘을
     /// 함께 든다 — 하나만 놓으면 나머지가 어디에도 안 잡힌다.

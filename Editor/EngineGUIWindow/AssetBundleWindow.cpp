@@ -4,7 +4,7 @@
 #include "Scene.h"
 #include "ReflectionImGuiHelper.h"
 #include "IconsFontAwesome6.h"
-#include "Model.h"
+#include "Assets/ModelAssetGeneration.h" // MBC9
 #include "Material.h"
 #include "Texture.h"
 #include "fa.h"
@@ -69,12 +69,14 @@ AssetBundleWindow::AssetBundleWindow()
         // 드래그-소스에 사용할 임시 엔트리 변수 (ImGui가 payload를 복사하므로 지역변수로 충분)
         if (ImGui::CollapsingHeader("Models"))
         {
-            const auto models = DataSystems->SnapshotModels();
-            for (const auto& [name, ptr] : models)
+            // MBC9: loaded models = generation cache current set
+            const auto models = DataSystems->SnapshotCurrentModelAssetGenerations();
+            for (const auto& generation : models)
             {
+                const std::string name = generation->SourcePath().stem().string();
                 // 경로 일관성: 프로젝트 상대/절대 등 엔진 규약에 맞춰 사용
                 // 필요하면 .filename() 으로 바꿔도 됨
-                std::filesystem::path filePath = ptr->path.filename();
+                std::filesystem::path filePath = generation->SourcePath().filename();
 
                 AssetEntry containTest{ ManagedAssetType::Model ,filePath };
                 if (bundle.ContainsAsset(containTest))

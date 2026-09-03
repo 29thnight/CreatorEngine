@@ -6,6 +6,7 @@
 
 class Material;
 struct ShaderMeta;
+namespace assets { struct ModelMaterialAsset; class ModelAssetGeneration; } // MBC7
 
 // I5-M5 S1 — legacy `::Material` ↔ `experiment::Material` 변환의 **단일 정본**.
 // 두 번째 변환기를 만들지 않는다 — M4 sealing 브리지도 여기에 위임한다.
@@ -45,4 +46,13 @@ namespace ExperimentMaterialMigration
     // 논리 값 → legacy 호환 스칼라 사본(m_materialInfo·m_flowInfo) 동기화.
     // ConvertToLegacyMaterial 말미와 ApplyPropertyToLegacy가 공유한다.
     void SynchronizeLegacyScalarMirrors(Material& legacy);
+
+    // PHASE 3.75 MBC7 — runtime generation의 immutable material → experiment
+    // 저작 표현. Scene bridge가 generation으로 세운 MeshRenderer의 저작 base로
+    // 심고, sealing은 texture를 같은 generation closure에서 푼다. 값은 1:1이고
+    // (두 표현의 variant 대안이 같다) embedded TextureHandle은 TextureReference
+    // {assetId, 이름, colorSpace}가 된다. 순수 함수 — DataSystem을 보지 않는다.
+    void ConvertModelMaterialAsset(const assets::ModelMaterialAsset& source,
+        const assets::ModelAssetGeneration& generation,
+        experiment::Material& outMaterial);
 }

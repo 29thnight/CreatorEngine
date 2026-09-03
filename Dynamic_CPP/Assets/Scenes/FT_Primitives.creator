@@ -164,7 +164,7 @@ m_Entities:
               m_boolValue: false
               m_textureGuid: 524e9895-230d-4a3d-a187-06ec6df9d59e
           m_keywordSelections: ~
-          m_fileGuid: eef1dfaa-cf3a-4ce7-899b-d3e496f59d17
+          m_fileGuid: 8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45
           m_renderingMode: 0
         m_Mesh:
           m_name: Prim_Plane
@@ -236,7 +236,7 @@ m_Entities:
               m_boolValue: false
               m_textureGuid: eeadbf9a-d493-4ace-8a78-b5fb9711f1cf
           m_keywordSelections: ~
-          m_fileGuid: 68b21a01-958e-44ed-8820-a2b9aa289587
+          m_fileGuid: 8a69bd42-f950-8265-9c0e-0ff597095141
           m_renderingMode: 0
         m_Mesh:
           m_name: Prim_Cube
@@ -308,7 +308,7 @@ m_Entities:
               m_boolValue: false
               m_textureGuid: 21b841d1-9443-4eb5-8f39-e6263f43b2f0
           m_keywordSelections: ~
-          m_fileGuid: 79d6d261-1ba9-46c2-939e-82add54ba500
+          m_fileGuid: df464176-385d-8563-98b9-5b1d266415bd
           m_renderingMode: 0
         m_Mesh:
           m_name: Prim_Sphere
@@ -380,7 +380,7 @@ m_Entities:
               m_boolValue: false
               m_textureGuid: d4a134d8-46ea-4640-bc43-d4241a803aa2
           m_keywordSelections: ~
-          m_fileGuid: a177fa64-e7ba-401b-adf6-1972c14bb699
+          m_fileGuid: 63c7b8bc-3057-833b-86ae-870fa7a6aed7
           m_renderingMode: 0
         m_Mesh:
           m_name: Prim_IcoSphere
@@ -452,7 +452,7 @@ m_Entities:
               m_boolValue: false
               m_textureGuid: 24b956be-ba20-41b9-9b06-fc0221a28d0b
           m_keywordSelections: ~
-          m_fileGuid: 6723b433-dc6c-4b55-88b7-5abd646b59d5
+          m_fileGuid: cdf2f89b-32f4-85d5-adc6-c652c61a071c
           m_renderingMode: 0
         m_Mesh:
           m_name: Prim_Cylinder
@@ -524,7 +524,7 @@ m_Entities:
               m_boolValue: false
               m_textureGuid: 9444798b-d1e8-4fa3-960e-bb07327d67db
           m_keywordSelections: ~
-          m_fileGuid: 1cc56957-c0eb-4924-8439-f5f74e78df27
+          m_fileGuid: 9888e325-a6fb-8378-b297-aa1f10eca2dc
           m_renderingMode: 0
         m_Mesh:
           m_name: Prim_Cone
@@ -596,7 +596,7 @@ m_Entities:
               m_boolValue: false
               m_textureGuid: 465fca74-0eea-4e7d-b4ca-526e56bce230
           m_keywordSelections: ~
-          m_fileGuid: 61079d31-7d1d-48fb-91ad-df8feff43723
+          m_fileGuid: 17d1efaf-9c93-8adb-ab23-6f4a04810c46
           m_renderingMode: 0
         m_Mesh:
           m_name: Prim_Torus
@@ -668,7 +668,7 @@ m_Entities:
               m_boolValue: false
               m_textureGuid: 5a78bcdd-7eaf-4bf7-aee2-7cefc96272a2
           m_keywordSelections: ~
-          m_fileGuid: dfd9b94f-cbf4-4712-9a41-01ee8453c7fa
+          m_fileGuid: 987a8d42-3964-8d46-9024-7f280c92f986
           m_renderingMode: 0
         m_Mesh:
           m_name: Prim_Suzanne

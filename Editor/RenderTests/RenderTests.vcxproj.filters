@@ -66,18 +66,6 @@
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp">
       <Filter>RHI\DX12\Tests</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentAnimationPlayback.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentGltfImportSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentImportPathSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentLegacyBridge.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
@@ -129,9 +117,6 @@
     <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentModelBridgeSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
@@ -141,8 +126,11 @@
     <ClCompile Include="AssetIdentity\AssetSidecarSchemaSelfTest.cpp">
       <Filter>AssetIdentity</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentModelParitySelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
+    <ClCompile Include="AssetIdentity\ModelAssetGenerationSelfTest.cpp">
+      <Filter>AssetIdentity</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetIdentity\SceneModelGenerationSelfTest.cpp">
+      <Filter>AssetIdentity</Filter>
     </ClCompile>
     <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp">
       <Filter>RHI</Filter>
@@ -248,25 +236,10 @@
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
       <Filter>RHI\DX12\Tests</Filter>
     </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentAnimationPlayback.h">
-      <Filter>ExperimentParity</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentGltfImportSelfTest.h">
-      <Filter>ExperimentParity</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentImportPathSelfTest.h">
-      <Filter>ExperimentParity</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentLegacyBridge.h">
-      <Filter>ExperimentParity</Filter>
-    </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h">
       <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h">
-      <Filter>ExperimentParity</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentModelBridgeSelfTest.h">
       <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h">
@@ -281,8 +254,11 @@
     <ClInclude Include="AssetIdentity\AssetSidecarSchemaSelfTest.h">
       <Filter>AssetIdentity</Filter>
     </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentModelParitySelfTest.h">
-      <Filter>ExperimentParity</Filter>
+    <ClInclude Include="AssetIdentity\ModelAssetGenerationSelfTest.h">
+      <Filter>AssetIdentity</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h">
+      <Filter>AssetIdentity</Filter>
     </ClInclude>
     <ClInclude Include="RHI\ShaderReflectionSelfTest.h">
       <Filter>RHI</Filter>

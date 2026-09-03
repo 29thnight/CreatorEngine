@@ -1,5 +1,5 @@
 #include "AvatarMask.h"
-#include "Skeleton.h"
+#include "BoneRegion.h"
 AvatarMask::~AvatarMask()
 {
     for (auto& mask : m_BoneMasks)
@@ -62,19 +62,3 @@ bool AvatarMask::IsBoneEnabled(const std::string& name)
     return false; 
 }
 
-BoneMask* AvatarMask::MakeBoneMask(Bone* Bone)
-{
-    if (!Bone) return nullptr;
-
-    BoneMask* newMask = new BoneMask();
-    newMask->boneName = Bone->m_name;
-    newMask->isEnabled = true;
-
-    m_BoneMasks.push_back(newMask);
-    for (auto& child : Bone->m_children)
-    {
-        BoneMask* childMask = MakeBoneMask(child);
-        newMask->m_children.push_back(childMask);
-    }
-    return newMask;
-}

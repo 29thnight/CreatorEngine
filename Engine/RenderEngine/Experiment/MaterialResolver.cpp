@@ -135,6 +135,21 @@ namespace experiment
             if (!reference) continue;
             if (!reference->assetId.IsValid()) continue; // nil = 텍스처 없음
 
+            // MBC7 — 모델 generation closure가 첫 축이다. embedded texture는
+            // 파일이 없어 경로 해석이 원리적으로 실패하던 자리였다(Gunner 콜드
+            // 로드가 이름 폴백으로 떨어진 결함). closure에 없으면 예전 그대로.
+            if (services.resolveEmbeddedTexture)
+            {
+                if (std::shared_ptr<Texture> owner =
+                    services.resolveEmbeddedTexture(reference->assetId))
+                {
+                    ++notes.generationTextures;
+                    textures.push_back({ property.name, reference->assetId,
+                        std::move(owner), false, true });
+                    continue;
+                }
+            }
+
             std::filesystem::path path;
             bool fromCooked = false;
             if (services.resolveCookedArtifactPath)

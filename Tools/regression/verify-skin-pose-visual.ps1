@@ -16,8 +16,8 @@
 #   1  세 팔 전부 dx12.scene 통과 · 커버리지가 0 도 포화(65536)도 아니다
 #   2  place ≠ bind — 포즈가 실제로 그림을 움직인다(같으면 팔레트가 화면에 안 닿는다)
 #   3  place 커버리지·팔레트 digest 골든 — 포즈 산술이나 스키닝 규약이 바뀌면 붉는다
-#   4  place·drop 팔에 `[anim.tick] none` 0 · animlive enabled=1 — 틱이 실제로 돈다
-#   5  drop 팔이 experiment 경로이고 place 와 **커버리지·팔레트 동수** — 같은
+#   4  place·drop 팔에 tickNone 0(assets.modeldiag 스냅샷) · animlive enabled=1 — 틱이 실제로 돈다
+#   5  drop 팔이 generation 경로(MBC9: 유일한 경로)이고 place 와 **커버리지·팔레트 동수** — 같은
 #      로더면 같은 그림이어야 한다(B4b 의 A/B). legacy 틱이 살아 있던 마지막
 #      창(2026-09-02, B4b 직전)의 실측은 drop legacy 51297 vs place 49617 였고
 #      (정점·스켈레톤 출처가 달랐다), B4b 착지 뒤 drop 은 49617 로 동수가 됐다.
@@ -74,7 +74,7 @@ function Invoke-Arm([string]$label, [string]$loadCmd, [string]$animatorPre, [str
         label = $label
         scenePass = ($log -match '\[CLI\] dx12\.scene 통과')
         coverage = -1
-        tickNone = ([regex]::Matches($log, '\[anim\.tick\] none')).Count
+        tickNone = -1
         path = ''
         enabled = -1
         palette = ''
@@ -83,6 +83,8 @@ function Invoke-Arm([string]$label, [string]$loadCmd, [string]$animatorPre, [str
     }
     # 첫 매치가 [3/4] 씬 카메라 렌더의 커버리지다(vertex-live 와 같은 읽기).
     if ($log -match '커버리지\s+(\d+)/65536') { $arm.coverage = [int]$Matches[1] }
+    # MBC10 — 틱 경로는 읽기 전용 스냅샷(assets.modeldiag)에서 읽는다.
+    if ($log -match 'assets\.modeldiag .* tickGeneration=(\d+) tickNone=(\d+)') { $arm.tickNone = [int]$Matches[2] }
     if ($log -match 'animlive \S+ path=(\S+) enabled=(\d+) .* palette=([0-9A-F]{8})') {
         $arm.path = $Matches[1]; $arm.enabled = [int]$Matches[2]; $arm.palette = $Matches[3]
     }
@@ -140,9 +142,9 @@ if ($place.ratio -lt 0 -or $place.ratio -gt 4.0) {
 
 # 4 — 틱이 실제로 돈다.
 foreach ($arm in @($place, $drop)) {
-    if ($arm.tickNone -gt 0) { $fail += "4 $($arm.label) 팔 [anim.tick] none $($arm.tickNone)건 — 틱이 안 돈다" }
+    if ($arm.tickNone -ne 0) { $fail += "4 $($arm.label) 팔 tickNone=$($arm.tickNone) — 틱이 안 돌거나 스냅샷이 없다" }
     if ($arm.enabled -ne 1) { $fail += "4b $($arm.label) 팔 animlive enabled=$($arm.enabled) — 애니메이터가 꺼져 있다" }
-    if ($arm.path -ne 'experiment' -and $arm.path -ne 'legacy') {
+    if ($arm.path -ne 'generation') {
         $fail += "4c $($arm.label) 팔 animlive 경로를 못 읽었다('$($arm.path)')"
     }
 }
@@ -153,8 +155,8 @@ foreach ($arm in @($place, $drop)) {
 #     drop 은 49617 로 place 와 동수가 됐다 — 틱 단일화가 그림을 안 바꿨다는 증거.
 #     legacy 로 새면(experiment 로더 실패 → Assimp 폴백) 틱이 없어 4 가 먼저 붉는다.
 $dropNote = ''
-if ($drop.path -ne 'experiment') {
-    $fail += "5c 드롭 경로가 experiment 가 아니다('$($drop.path)') — LoadCachedModelShared 가 experiment 로더를 안 탄다"
+if ($drop.path -ne 'generation') {
+    $fail += "5c 드롭 경로가 generation 이 아니다('$($drop.path)') — LoadModelAssetGenerationByPath 를 확인하라"
 }
 if ($drop.coverage -ne $place.coverage) {
     $fail += "5 드롭 경로 커버리지 $($drop.coverage) ≠ place $($place.coverage) — 같은 로더인데 그림이 다르다"

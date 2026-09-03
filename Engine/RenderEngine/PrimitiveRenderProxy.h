@@ -37,8 +37,8 @@ enum class PrimitiveProxyType
 class Material;
 class Mesh;
 class MeshRenderer;
-namespace experiment { class Model; } // I5-D4b 핸들 병행(shared_ptr 보관용)
 namespace experiment { struct Material; } // I5-D5c2-2 저작 정본 스냅샷
+namespace assets { class ModelAssetGeneration; } // PHASE 3.75 MBC7 typed 정본
 class TerrainMesh;
 class TerrainMaterial;
 class TerrainComponent;
@@ -117,13 +117,12 @@ public:
 	// 컴포넌트에서 스냅샷할 때 shared_ptr을 그대로 복사하므로,
 	// 원본이 파괴되거나 언로드되어도 이 프록시가 그리는 중에는 안전하다.
 	std::shared_ptr<Material>		m_Material{};
-	std::shared_ptr<Mesh>			m_Mesh{};
-	// I5-D4b — experiment 핸들 병행. 프록시 생성이 legacy Mesh 신원으로
-	// (모델, 메시 인덱스)를 조회해 싣고, 렌더는 이것으로 캐시의 핸들 진입점을
-	// 부른다 — m_Mesh는 정렬·지오메트리 맵의 포인터 정체성과 폴백으로 남는다
-	// (은퇴는 D4f). null이면 핸들 경로 아님(A/B off·Assimp 폴백·절차 메시).
-	std::shared_ptr<const experiment::Model>	m_experimentModel{};
-	uint32							m_experimentMeshIndex{ 0 };
+	// PHASE 3.75 MBC7/MBC9 — typed 정본이 유일한 지오메트리 출처다. 컴포넌트가
+	// 붙든 immutable generation과 메시 인덱스의 사본. drawPool이 이것으로
+	// RHIModelMeshView를 만들어 패스에 싣고, shared_ptr이 뷰가 가리키는 정점·인덱스
+	// 저장소의 수명을 이 프레임 동안 잡아 준다. null이면 그릴 것이 없다.
+	std::shared_ptr<const assets::ModelAssetGeneration>	m_modelGeneration{};
+	uint32							m_modelMeshIndex{ 0 };
 	// I5-D5c2-2 — 재질 저작 정본의 **값 스냅샷**(base+override 합성 결과).
 	// MeshRenderer의 MaterialInstance에서 프록시 생성 시 한 번 만든다 —
 	// 프록시 갱신 커맨드가 재질을 바꾸면 그 경로가 다시 만든다. null이면
@@ -191,16 +190,14 @@ public:
 
 	struct DrawSource
 	{
-		std::shared_ptr<Mesh> mesh{};
 		std::shared_ptr<Material> material{};
-		// I5-D5a — experiment 메시 핸들(FoliageType 병행 필드의 사본).
-		// drawPool이 이것으로 아이템 experimentView를 만들어 D4b 핸들 사슬에
-		// 합류한다 — 없으면 legacy lookup 폴백.
-		std::shared_ptr<const experiment::Model> experimentModel{};
-		uint32 experimentMeshIndex{ 0 };
 		// I5-D5c4 — 재질 저작 정본(FoliageType 병행 필드의 사본). drawPool이
 		// pooled.authoredMaterialSource로 옮겨 sealing 직행에 합류시킨다.
 		std::shared_ptr<const experiment::Material> authoredMaterial{};
+		// PHASE 3.75 MBC8/MBC9 — typed 정본(FoliageType 필드의 사본). drawPool이
+		// 이것으로 RHIModelMeshView를 만들어 싣는다 — 유일한 지오메트리 출처다.
+		std::shared_ptr<const assets::ModelAssetGeneration> modelGeneration{};
+		uint32 modelMeshIndex{ 0 };
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::aabb worldBounds{};
 		uint32 foliageTypeID{};

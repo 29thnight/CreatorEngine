@@ -296,7 +296,10 @@
     <ClCompile Include="MeshRenderer.cpp">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClCompile>
-    <ClCompile Include="ModelSceneBridge.cpp">
+    <ClCompile Include="ModelConsumptionDiagnostics.cpp">
+      <Filter>Bridges</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelSceneInstantiation.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
     <ClCompile Include="Object.cpp">
@@ -608,6 +611,12 @@
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
     <ClInclude Include="MeshRenderer.h">
+      <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelConsumptionDiagnostics.h">
+      <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelSceneInstantiation.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
     <ClInclude Include="NodeBase.h">

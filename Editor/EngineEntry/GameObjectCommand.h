@@ -2,7 +2,9 @@
 #include "MetaStateCommand.h"
 #include <functional>
 #include "Scene.h"
-#include "Model.h"
+#include "ModelSceneInstantiation.h" // MBC9: generation 인스턴스화
+#include "DataSystem.h"
+#include "Assets/ModelAssetGeneration.h"
 #include "SceneManager.h"
 #include "Entity.h"
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
@@ -227,9 +229,10 @@ namespace Meta
     class LoadModelToSceneObjCommand : public IUndoableCommand
     {
     public:
-        LoadModelToSceneObjCommand(Scene* scene, std::shared_ptr<Model> model,
+        LoadModelToSceneObjCommand(Scene* scene,
+            std::shared_ptr<const assets::ModelAssetGeneration> generation,
             Entity** outObj = nullptr)
-            : m_scene(scene), m_model(std::move(model)), m_outObj(outObj) {
+            : m_scene(scene), m_generation(std::move(generation)), m_outObj(outObj) {
         }
 
         void Undo() override
@@ -243,8 +246,14 @@ namespace Meta
 
         void Redo() override
         {
-            Entity* obj = (m_model && m_scene)
-                ? Model::LoadModelToSceneObj(m_model.get(), *m_scene) : nullptr;
+            Entity* obj = nullptr;
+            if (m_generation && m_scene)
+            {
+                ModelSceneInstantiation::Options options{};
+                options.createMeshCollider = DataSystems->ReadModelCreateMeshCollider(
+                    FileGuid(m_generation->Identity().modelId));
+                obj = ModelSceneInstantiation::Instantiate(*m_scene, m_generation, options);
+            }
             m_rootIndex = obj ? obj->m_index : Entity::INVALID_INDEX;
             if (m_outObj)
                 *m_outObj = obj;
@@ -252,7 +261,7 @@ namespace Meta
 
     private:
         Scene* m_scene{};
-        std::shared_ptr<Model> m_model{};
+        std::shared_ptr<const assets::ModelAssetGeneration> m_generation{};
         Entity::Index m_rootIndex{ Entity::INVALID_INDEX };
         Entity** m_outObj{};
     };

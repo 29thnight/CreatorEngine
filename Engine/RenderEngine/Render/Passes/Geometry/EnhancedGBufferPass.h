@@ -233,7 +233,9 @@ private:
         // variant 생성 시점에는 어떤 메시가 이 재질로 그려질지 모르므로 셋을
         // 함께 만들고, 배치가 메시 바인딩의 마스크로 고른다.
         RHIGraphicsPipelineRequest experimentRequest;
+        RHIGraphicsPipelineRequest experimentColorRequest;
         RHIGraphicsPipelineRequest experimentSkinnedRequest;
+        RHIGraphicsPipelineRequest experimentColorSkinnedRequest;
         std::shared_ptr<const ShaderMetaBindingLayout> layout{};
     };
 
@@ -304,10 +306,11 @@ private:
     // I5-D34a/b: default request의 experiment 레이아웃 짝 둘(위 ShaderVariant와
     // 같은 지위).
     RHIGraphicsPipelineRequest m_experimentPipelineRequest;
+    RHIGraphicsPipelineRequest m_experimentColorPipelineRequest;
     RHIGraphicsPipelineRequest m_experimentSkinnedPipelineRequest;
+    RHIGraphicsPipelineRequest m_experimentColorSkinnedPipelineRequest;
     ShaderMetaHandle           m_shaderMetaHandle{};
     RHIShaderPermutationKey     m_defaultPermutationKey{};
     std::shared_ptr<const ShaderMetaBindingLayout> m_shaderBindingLayout{};
     std::map<ShaderVariantKey, ShaderVariant> m_shaderVariants;
 };
-

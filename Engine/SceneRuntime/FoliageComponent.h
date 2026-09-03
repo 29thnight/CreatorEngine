@@ -40,12 +40,10 @@ public:
     void AddFoliageType(const FoliageType& type);
     void RemoveFoliageType(uint32 typeID);
 
-    // I5-D5a — experiment 메시 핸들 바인딩(신원 조회 — MeshRenderer
-    // EnsureExperimentBinding과 같은 결). m_mesh가 비었거나 바인딩 미등록
-    // (Assimp 폴백·A/B off)이면 핸들이 빈 채로 남아 렌더는 legacy lookup
-    // 폴백을 탄다. AddFoliageType(저작·자산 로드)과 OnDeserialized(m_mesh
-    // 재해석 후)가 부른다.
-    static void BindExperimentMesh(FoliageType& type);
+    // PHASE 3.75 MBC9 — typed 바인딩. m_modelName → ModelId → 현재 generation으로
+    // 잇고, 재질(0번 메시의 재질)을 generation에서 시공해 embedded texture를 같은
+    // closure에서 푼다. AddFoliageType(저작·자산 로드)과 OnDeserialized가 부른다.
+    static void BindModelGeneration(FoliageType& type);
 
     void AddFoliageInstance(const FoliageInstance& instance);
     void RemoveFoliageInstance(size_t index);

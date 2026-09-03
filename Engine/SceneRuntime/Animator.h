@@ -11,7 +11,7 @@
 #include <mathematics/matrix4x4.hpp>
 #include <optional>
 #include <type_traits>
-constexpr uint32 MAX_BONES{ 512 };
+#include "BoneRegion.h" // MAX_BONES·BoneRegion
 
 // I5-D4e-2 — 클립별 이벤트·루프 오버라이드. 소유는 씬(Animator)이다(D0a 판정):
 // legacy조차 모델 자산에 직렬화한 적이 없고(.asset 캐시 포맷에 이벤트 없음) 씬
@@ -26,10 +26,23 @@ struct AnimatorClipOverride final
 	std::vector<KeyFrameEvent> events{};
 };
 
-class Skeleton;
 class AnimationController;
 class Socket;
-namespace experiment { class Model; } // I5-D4e-1: 재생 데이터 핸들(shared_ptr 보관용)
+namespace assets // PHASE 3.75 MBC8: typed 재생 정본(shared_ptr 보관용)
+{
+    class ModelAssetGeneration;
+    struct ModelSkeletonAsset;
+    struct ModelAnimationAsset;
+}
+
+// PHASE 3.75 MBC8/MBC9 — Animator 창구의 데이터 출처(진단·게이트 관측 축).
+// MBC9에서 Experiment·Legacy 축이 은퇴해 Generation 하나만 남았다. 열거형은
+// 관측 토큰 호환을 위해 유지한다.
+enum class AnimatorDataPath : std::uint8_t
+{
+    None,
+    Generation,
+};
 
 // K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
 // 않고 this를 프레임-로컬 raw 포인터로만 관찰한다(Awake/OnDestroy 참조).
@@ -99,23 +112,24 @@ public:
     AnimatorClipOverride* FindClipOverride(int clipIndex);
     const AnimatorClipOverride* FindClipOverride(int clipIndex) const;
     AnimatorClipOverride& EnsureClipOverride(int clipIndex);
-    bool IsClipLooping(int clipIndex) const; // 오버라이드 → 자산(experiment→legacy) 폴백
+    bool IsClipLooping(int clipIndex) const; // 오버라이드 → generation 자산값
     void SetClipLooping(int clipIndex, bool looping);
     // I5-D5b — 클립 목록의 열거 창구. D4e-2가 편집(루프·이벤트)을 Animator
     // 소유로 옮겼지만 에디터의 **열거·이름**은 여전히 공유 자산
     // (m_Skeleton->m_animations)을 직접 훑고 있었다 — 인덱스 축이 두 출처로
     // 갈리면 편집 정본과 표시 대상이 어긋난다. experiment가 정본, legacy는
     // 폴백(Assimp 모델). outViaExperiment는 게이트 관측 창구.
-    [[nodiscard]] std::size_t GetClipCount(bool* outViaExperiment = nullptr) const;
+    [[nodiscard]] std::size_t GetClipCount(bool* outViaExperiment = nullptr,
+        AnimatorDataPath* outPath = nullptr) const;
     // 범위 밖이면 빈 문자열. 이름은 오버라이드 대상이 아니다(자산 값).
     [[nodiscard]] std::string GetClipName(int clipIndex,
-        bool* outViaExperiment = nullptr) const;
+        bool* outViaExperiment = nullptr, AnimatorDataPath* outPath = nullptr) const;
     // 클립의 키프레임 수 = **유니크 키 시각 개수**(legacy 임포터 정의가 정본 —
     // experiment::clip::CountUniqueKeyTimes). 이벤트 저작이 frameKey 상한과
     // key(0~1 진행률) 환산에 쓴다 — 두 로드 경로가 다른 값을 주면 같은 자산이
     // 경로에 따라 다른 시점에 발화한다(D5b 실측).
     [[nodiscard]] std::size_t GetClipFrameCount(int clipIndex,
-        bool* outViaExperiment = nullptr) const;
+        bool* outViaExperiment = nullptr, AnimatorDataPath* outPath = nullptr) const;
     void AddClipEvent(int clipIndex);                 // 이름 유일화 신규(구 Animation::AddEvent())
     void DeleteClipEvent(int clipIndex, int eventIndex);
     // 발화 — 트리거 매칭 계수를 돌려준다(CLR 미준비여도 계수는 정확하다 —
@@ -131,7 +145,8 @@ public:
     // I6-B2 — 본 캐시 무효화의 신원. experiment 핸들이 있으면 그 generation이
     // 정본이고, 없을 때만 legacy Skeleton::m_serial로 떨어진다. 두 축은 번호
     // 공간이 겹치지 않는다(experiment::Model::Generation 주석 참조).
-    [[nodiscard]] uint64 GetSkeletonSerial(bool* outViaExperiment = nullptr) const;
+    [[nodiscard]] uint64 GetSkeletonSerial(bool* outViaExperiment = nullptr,
+        AnimatorDataPath* outPath = nullptr) const;
     // 이름→본 인덱스(1:1 계약으로 두 경로 동일 값). 실패는 -1.
     // outViaExperiment: 실제로 experiment 해석을 탔는가 — 게이트 관측 창구.
     // I6-B3 — 진단 표면이 legacy 스켈레톤을 직접 훑지 않게 하는 창구 둘.
@@ -140,19 +155,28 @@ public:
     // 진단 창구 — 클립 길이. 두 축의 단위가 다르다(experiment durationTicks vs
     // legacy m_duration)는 것 자체가 관측 대상이라 값 변환을 하지 않는다.
     [[nodiscard]] double GetClipDuration(int clipIndex,
-        bool* outViaExperiment = nullptr) const;
-    [[nodiscard]] std::size_t GetBoneCount(bool* outViaExperiment = nullptr) const;
+        bool* outViaExperiment = nullptr, AnimatorDataPath* outPath = nullptr) const;
+    [[nodiscard]] std::size_t GetBoneCount(bool* outViaExperiment = nullptr,
+        AnimatorDataPath* outPath = nullptr) const;
     [[nodiscard]] std::string GetBoneName(int boneIndex,
-        bool* outViaExperiment = nullptr) const;
+        bool* outViaExperiment = nullptr, AnimatorDataPath* outPath = nullptr) const;
 
     [[nodiscard]] int ResolveBoneIndex(const std::string& boneName,
-        bool* outViaExperiment = nullptr) const;
+        bool* outViaExperiment = nullptr, AnimatorDataPath* outPath = nullptr) const;
     // AvatarMask의 BoneMask 트리 생성 — m_BoneMasks 순서가 저장분 인덱스
     // 대응(ReCreateMask)이라 legacy MakeBoneMask와 같은 DFS 선순을 재현한다.
     // legacy 폴백에서만 MarkRegionSkeleton(공유 자산 region 태깅 — 이름
     // 파생이라 멱등)을 유지한다. outViaExperiment는 게이트 관측 창구.
     BoneMask* BuildAvatarBoneMasks(AvatarMask& mask,
-        bool* outViaExperiment = nullptr);
+        bool* outViaExperiment = nullptr, AnimatorDataPath* outPath = nullptr);
+
+    // PHASE 3.75 MBC8 — typed 정본 창구. m_Motion(ModelId)으로 붙든 immutable
+    // generation의 skeleton·clip. 스위치와 무관하며, 있으면 모든 창구·틱이 이것을
+    // 우선한다. null이면 experiment → legacy 폴백(MBC9까지의 전환기).
+    [[nodiscard]] const assets::ModelSkeletonAsset* TypedSkeleton() const noexcept;
+    [[nodiscard]] std::size_t TypedClipCount() const noexcept;
+    [[nodiscard]] const assets::ModelAnimationAsset* TypedClip(int clipIndex) const noexcept;
+    [[nodiscard]] AnimatorDataPath GetSkeletonPath() const noexcept;
 
     bool HasSocket() { return !socketvec.empty(); };
     void ClearControllersAndParams();
@@ -165,7 +189,6 @@ public:
     ConditionParameter* FindParameter(std::string valueName);
 
 public:
-    Skeleton* m_Skeleton{ nullptr };
     float m_TimeElapsed{};
     uint32_t m_AnimIndexChosen{};
     math::matrix4x4 m_localTransforms[MAX_BONES]{};
@@ -189,17 +212,15 @@ private:
     bool m_IsEnabled = false;
 
 public:
-    // I5-D4e-1 — 재생 데이터의 experiment 핸들. m_Motion(모델 GUID — 역브리지
-    // 폴백 규약)으로 EnsureExperimentAnimationBinding이 채우고, AnimationJob
-    // 틱이 이것이 있으면 experiment 경로(단일 순회)를, 없으면 legacy 경로를
-    // 탄다. 비직렬화 — 영속 신원은 m_Motion이 진다.
-    std::shared_ptr<const experiment::Model> m_experimentModel{};
-    // 본별 BoneRegion 파생 캐시(uint8 저장 — 헤더가 Skeleton.h의 enum을 열지
-    // 않기 위한 불투명 표현). AvatarMask humanoid 레이어 판정이 소비한다.
-    std::vector<std::uint8_t> m_experimentBoneRegions{};
+    // PHASE 3.75 MBC8/MBC9 — typed 재생 정본. m_Motion(ModelId)으로
+    // EnsureAnimationBinding이 채운다. 비직렬화 — 영속 신원은 m_Motion이 진다.
+    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+    // 본별 BoneRegion 파생 캐시(uint8 저장 — 헤더가 BoneRegion.h를 열지 않기 위한
+    // 불투명 표현). AvatarMask humanoid 레이어 판정이 소비한다.
+    std::vector<std::uint8_t> m_boneRegions{};
     // [anim.tick] 경로 관측을 애니메이터당 1회로 줄이는 플래그.
     bool m_tickPathLogged{ false };
-    void EnsureExperimentAnimationBinding();
+    void EnsureAnimationBinding();
 
     // I5-D4e-2 — 클립별 이벤트·루프 오버라이드(위 구조 주석 참조). 영속은
     // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.

@@ -80,6 +80,14 @@ public:
 	static std::shared_ptr<Texture> LoadSharedFromMemory(
 		std::span<const std::byte> bytes, bool isCompress = false);
 
+	// PHASE 3.75 MBC7 — 이미 디코드된 이미지(mip·array 포함)를 그대로 CPU 픽셀로
+	// 삼는다. ModelAssetGeneration의 embedded texture는 generation load가 검증·
+	// 디코드해 둔 RGBA8 픽셀이라 파일 로더를 다시 태울 이유가 없다 — 여기서
+	// 두 번째 디코드가 생기면 generation의 SHA-256 검증이 뜻을 잃는다. 이미지가
+	// 비었으면 nullptr.
+	static std::shared_ptr<Texture> CreateSharedFromScratchImage(
+		std::string_view name, std::shared_ptr<DirectX::ScratchImage> image);
+
 	static std::unique_ptr<Texture> LoadManagedFromPath(
 		const file::path& path, bool isCompress = false);
 

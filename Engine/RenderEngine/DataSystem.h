@@ -7,8 +7,11 @@
 #include "ClassProperty.h"
 #include "AssetBundle.h"
 #include "ShaderMetaHandle.h"
+#include "Assets/ModelAssetGeneration.h"
+#include <atomic>
 #include <cstddef>
 #include <iosfwd>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <unordered_set>
@@ -23,12 +26,9 @@ class Model;
 class Material;
 struct ShaderMeta;
 namespace Authoring { class WriteNode; }
-namespace experiment { class Model; } // I5-D1a 역브리지 입력
 namespace experiment { struct Material; } // I5-D5c1 저작 원본 보관
 namespace experiment::cooked { class CookedAssetCatalog; } // I7-C1
 namespace experiment { struct AssetId; } // I7-C2
-class Mesh; // I5-D34a 병행 바인딩 조회 입력
-struct RHIExperimentVertexView; // I5-D34a 병행 바인딩 조회 출력
 
 enum class RuntimeAssetType
 {
@@ -103,13 +103,66 @@ public:
 	void RetainAssets(const AssetBundle& bundle);
 	void ClearRetainedAssets();
 	void UnloadUnusedAssets();
-	//Resource Model
-	Model* LoadModelGUID(FileGuid guid);
+	//Resource Model — PHASE 3.75 MBC9: 모델의 유일한 런타임 표현은 immutable
+	// assets::ModelAssetGeneration이다(legacy Model·Assimp·역브리지·병행 핸들 은퇴).
+	// schema-v2 generation을 전부 검증한 뒤 aggregate 하나를 cache에 게시한다.
+	// cache의 key/handle은 이름·주소를 쓰지 않는다({ModelId, generation}).
+	[[nodiscard]] assets::ModelAssetGeneration::Shared LoadModelAssetGeneration(
+		FileGuid guid);
+	// 경로(소스 파일) → registry GUID → generation. 에디터 드롭·CLI의 경로 창구.
+	[[nodiscard]] assets::ModelAssetGeneration::Shared LoadModelAssetGenerationByPath(
+		std::string_view filePath);
+	// 파일 stem(확장자 없는 이름) → GUID → generation. 이름 신원(Foliage·CLI)의 창구.
+	[[nodiscard]] assets::ModelAssetGeneration::Shared FindModelAssetGenerationByStem(
+		std::string_view stem);
+	// sidecar(ModelImporter.CreateMeshCollider)의 씬 인스턴스화 옵션. 없으면 false.
+	[[nodiscard]] bool ReadModelCreateMeshCollider(FileGuid guid) const;
+	[[nodiscard]] assets::ModelAssetGeneration::Shared ResolveModelAssetGeneration(
+		assets::ModelAssetGenerationHandle handle) const;
+	[[nodiscard]] assets::ModelAssetGenerationCacheSnapshot
+		SnapshotModelAssetGenerations() const;
+	[[nodiscard]] std::vector<assets::ModelAssetGeneration::Shared>
+		SnapshotCurrentModelAssetGenerations() const;
+	// MBC11 — generation 로드의 출처 계수(읽기 전용). cooked catalog가 마운트돼 그 안의
+	// generation 레코드로 읽었으면 catalog, 아니면 Library(저작 정본).
+	struct ModelGenerationSourceSnapshot final
+	{
+		std::uint64_t fromCatalog{ 0 };
+		std::uint64_t fromLibrary{ 0 };
+		std::uint64_t failed{ 0 };
+	};
+	[[nodiscard]] ModelGenerationSourceSnapshot SnapshotModelGenerationSources() const noexcept;
+	// PHASE 3.75 MBC7 — generation closure의 embedded texture를 GPU 업로드 가능한
+	// Texture generation owner로 만든다. 키는 {TextureId, generation}이라 reimport가
+	// generation을 갈아 끼우면 이전 texture owner는 다시 나오지 않는다(retire와 함께
+	// 떨어진다). 이 캐시가 임베디드 등록부(RegisterEmbeddedTexture)·이름 폴백·로드
+	// 순서에 기대지 않는 유일한 embedded texture 창구다 — MeshRenderer가 모델
+	// generation을 먼저 붙들고 재질의 texture GUID를 그 closure에서 푼다(§6.2).
+	// 이 generation에 없는 TextureId면 nullptr(호출자가 다른 축으로 내려간다).
+	struct ModelGenerationTextureCacheSnapshot
+	{
+		std::size_t live{};
+		std::uint64_t created{};
+		std::uint64_t hits{};
+		std::uint64_t retired{};
+		std::uint64_t rejected{};
+	};
+	[[nodiscard]] std::shared_ptr<Texture> ResolveModelGenerationTexture(
+		const assets::ModelAssetGeneration& generation,
+		const Uuid::Uuid16& textureId);
+	[[nodiscard]] ModelGenerationTextureCacheSnapshot
+		SnapshotModelGenerationTextures() const;
+	// 재질의 texture property(GUID 정본) 중 이 generation closure 안의 TextureId를
+	// generation owner로 묶는다. 표준 5슬롯과 ShaderMeta 임의 texture property를
+	// 같은 규칙으로 다룬다. 묶은 수를 돌려준다(0이면 이 재질은 이 모델의
+	// embedded texture를 참조하지 않는다).
+	std::size_t BindModelGenerationTextures(Material& material,
+		const assets::ModelAssetGeneration& generation);
 	// I5-D1a — experiment::Model → legacy ::Model 역브리지(전환기, I6 은퇴).
 	// 렌더 소유가 아직 legacy인 동안 experiment 로드 결과를 기존 파이프에
 	// 소비시키는 어댑터다(I5-M의 ConvertToLegacyMaterial과 같은 지위).
 	// Model 컨테이너가 private+friend라 DataSystem 멤버로만 시공 가능하다 —
-	// 정의는 ExperimentModelMigration.cpp(별도 TU).
+	// 정의는 DataSystem.cpp(별도 TU).
 	// I7-C1 — cooked catalog 기동. `<derivedRoot>/Derived/asset-manifest.cemf`를
 	// 읽어 자산 GUID→cooked artifact 표를 세운다. 파일이 없으면 **무동작**이다
 	// (에디터 작업 트리에는 Derived가 없다 — 마운트 실패가 아니라 미게시다).
@@ -138,51 +191,6 @@ public:
 	[[nodiscard]] file::path ResolveCatalogAssetPath(FileGuid assetGuid) const;
 	[[nodiscard]] std::size_t CookedCatalogStaleCount() const;
 
-	[[nodiscard]] bool BuildLegacyModelFromExperiment(
-		const experiment::Model& source, std::shared_ptr<Model>& outModel,
-		std::string& outError);
-	// I5-D1b — 로더 이중화의 experiment 쪽 절반: cooked→source 해석 디코더로
-	// 로드해 역브리지로 내린다. 실패는 null(호출자가 Assimp 폴백). cookedPath는
-	// cooked 게시 규약(pak)이 서기 전까지 빈 경로다(resolver가 Info로 계수).
-	[[nodiscard]] std::shared_ptr<Model> LoadModelViaExperiment(
-		FileGuid guid, const file::path& sourcePath);
-	// I2-E 후속(2026-09-02) — 임베디드 텍스처 등록부. 키는 모델 sidecar의
-	// subasset UUIDv4(cook 과 같은 신원)이고 값은 임베디드 바이트에서 메모리로
-	// 만든 텍스처다. 소스 로드(LoadModelViaExperiment)가 채우고,
-	// FinalizeMaterialRuntime 이 registry 경로 해석에 실패한 GUID 를 여기서 푼다
-	// — registry 는 subasset GUID 의 경로를 원리적으로 모른다(파일이 없다).
-	// legacy Assimp 경로가 Materials\ 에 파일로 뽑아 이름으로 찾던 자리의
-	// experiment 판이다. B4b 로 에디터 드롭이 experiment 로더를 타면서
-	// "텍스처가 안 들어온다"로 드러났다.
-	void RegisterEmbeddedTexture(FileGuid guid, std::shared_ptr<Texture> texture);
-	[[nodiscard]] std::shared_ptr<Texture> FindEmbeddedTexture(FileGuid guid) const;
-	// I5-D34a — 병행 바인딩 조회: legacy Mesh 신원(m_hashingMesh)으로 experiment
-	// packed 정점 뷰를 돌려준다. 스킨 레이아웃은 D34b 전까지 닫혀 있다(false).
-	// RHI 메시 캐시에 함수로 주입되는 것이 소비자다 — 캐시는 이 클래스를 모른다.
-	[[nodiscard]] bool TryGetExperimentVertexView(
-		const Mesh& mesh, RHIExperimentVertexView& outView);
-	// I5-D4b — 핸들 병행: 프록시 생성이 legacy Mesh 신원으로 experiment
-	// (모델, 메시 인덱스) 페어를 얻어 렌더 사슬에 싣는다. A/B 스위치가 꺼져
-	// 있으면 false(핸들 자체가 실리지 않아 대조군이 성립한다).
-	[[nodiscard]] bool TryGetExperimentMeshBinding(const Mesh& mesh,
-		std::shared_ptr<const experiment::Model>& outModel,
-		std::uint32_t& outMeshIndex);
-	// I5-D4b — 핸들→뷰 변환(순수, 스위치 무관). 신원 키(stableKey)까지 채워
-	// 뷰가 IsHandleComplete가 되면 캐시의 핸들 진입점이 소비한다.
-	[[nodiscard]] static bool BuildExperimentVertexView(
-		const experiment::Model& model, std::uint32_t meshIndex,
-		RHIExperimentVertexView& outView);
-	// I5-D4c — 모델 GUID로 experiment 모델을 얻는다. MeshRenderer postLoad의
-	// 이름→메시 해석이 experiment를 정본으로 삼는 창구다. A/B 스위치가 꺼져
-	// 있거나 Assimp 폴백 모델이면 null(해석이 legacy로 간다).
-	[[nodiscard]] std::shared_ptr<const experiment::Model>
-		TryGetExperimentModel(FileGuid modelGuid);
-	void LoadModel(std::string_view filePath);
-	std::shared_ptr<Model> LoadCachedModelShared(std::string_view filePath);
-	// 즉시 사용 legacy 호출부 호환. 참조를 보관하는 쪽은 위 shared API를 쓴다.
-	Model* LoadCashedModel(std::string_view filePath);
-	std::shared_ptr<Model> FindCachedModel(std::string_view name);
-	std::vector<std::pair<std::string, std::shared_ptr<Model>>> SnapshotModels();
 	//Resource Texture
 	Texture* LoadTextureGUID(FileGuid guid);
 	Texture* LoadTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
@@ -245,7 +253,6 @@ public:
 	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;
 
-	DataContainer<Model>		Models;
 	DataContainer<Material>		Materials;
 	DataContainer<Texture>		Textures;
 	DataContainer<Texture>		UITextures;
@@ -254,8 +261,7 @@ public:
 
 	std::string m_trasfarShader{};
 
-	// 캐시별 보호 규약.
-	//   m_modelMutex    : Models
+	// 캐시별 보호 규약(모델 generation cache는 자체 동기화 — ModelAssetGenerationCache).
 	//   m_materialMutex : Materials
 	//   m_textureMutex  : Textures / UITextures / SpriteSheets
 	//   m_fontMutex     : SFonts
@@ -263,7 +269,6 @@ public:
 	// 조회·삽입 시 반드시 해당 뮤텍스를 잡아야 한다.
 	std::mutex m_textureMutex;
 	std::mutex m_materialMutex;
-	std::mutex m_modelMutex;
 	std::mutex m_fontMutex;
 
 	// I5-D5c1 — base 재질 자산의 저작 원본 캐시(GUID 키). legacy Materials
@@ -274,39 +279,35 @@ public:
 	std::unordered_map<FileGuid,
 		std::shared_ptr<const experiment::Material>> m_authoredMaterials;
 
-	// 임베디드 텍스처 등록부(위 RegisterEmbeddedTexture). Textures 캐시와
-	// 별개다 — 그쪽은 파일 stem 이름 키라 subasset GUID 와 충돌할 수 있다.
-	mutable std::mutex m_embeddedTextureMutex;
-	std::unordered_map<FileGuid, std::shared_ptr<Texture>> m_embeddedTextures;
-
-	// I5-D34a — 병행 바인딩: legacy Mesh 신원 → {experiment 모델, 메시 인덱스}.
-	// LoadModelViaExperiment 성공 시 채워지고, 조회는 렌더 캐시 주입 함수가
-	// 한다. shared_ptr이 experiment 모델의 수명을 여기서 잡아 준다 — 역브리지가
-	// legacy만 남기고 버리면 packed 정점의 출처가 사라지기 때문이다. 항목은
-	// Models 캐시와 같은 성격의 영구 캐시다(브리지와 함께 I6에서 은퇴).
-	struct ExperimentMeshBinding
-	{
-		std::shared_ptr<const experiment::Model> model;
-		std::uint32_t meshIndex{ 0 };
-	};
-	std::unordered_map<HashedGuid, ExperimentMeshBinding> m_experimentMeshBindings;
-	// I5-D4c — 모델 GUID(.meta 정본)→experiment 모델. 병행 바인딩과 같은
-	// 지점에서 등록되고 같은 뮤텍스를 쓴다.
-	std::unordered_map<FileGuid,
-		std::shared_ptr<const experiment::Model>> m_experimentModels;
-	std::mutex m_experimentMeshMutex;
+	// MBC5 정본 cache. {ModelId,generation}을 주소 키로 쓰고 current generation
+	// 교체/retire를 aggregate 전체에 원자 적용한다.
+	assets::ModelAssetGenerationCache m_modelAssetGenerations;
+	// MBC7 — generation embedded texture owner. 값은 generation 픽셀에서 만든
+	// Texture고, 소유자 색인은 retire가 generation 단위로 걷기 위한 역참조다.
+	mutable std::mutex m_modelGenerationTextureMutex;
+	std::map<assets::ModelTextureHandle, std::shared_ptr<Texture>>
+		m_modelGenerationTextures;
+	std::map<assets::ModelAssetGenerationHandle,
+		std::vector<assets::ModelTextureHandle>> m_modelGenerationTextureOwners;
+	mutable ModelGenerationTextureCacheSnapshot m_modelGenerationTextureStats;
 	// I7-C1 — cooked catalog. immutable 표라 교체는 포인터 하나 바꾸기다.
 	std::shared_ptr<const experiment::cooked::CookedAssetCatalog> m_cookedCatalog;
 	mutable std::mutex m_cookedCatalogMutex;
 	// I7-C2 — 마운트 때 한 번 판정한 stale 집합. 해석마다 stat을 두 번 하면
 	// sealing이 매 프레임 그 값을 문다.
 	std::unordered_set<FileGuid> m_cookedStaleAssets;
+	std::atomic<std::uint64_t> m_generationFromCatalog{ 0 };
+	std::atomic<std::uint64_t> m_generationFromLibrary{ 0 };
+	std::atomic<std::uint64_t> m_generationLoadFailed{ 0 };
 
 private:
-	void AddModel(const file::path& filepath, const file::path& dir);
 	void LoadAssetCatalog(const file::path& root);
 	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path,
 		FileGuid guid, bool remove);
+	// MBC7 — 한 generation의 embedded texture owner를 전부 캐시에서 떼어 낸다.
+	// 이미 그 owner를 붙든 Material은 자기 shared_ptr로 살려 두므로 그리는 중에
+	// 사라지지 않는다 — 새로 해석하는 쪽만 새 generation의 것을 받는다.
+	void RetireModelGenerationTextures(assets::ModelAssetGenerationHandle handle);
 	void InvalidateShaderMeta(FileGuid guid, bool remove);
 	void SynchronizeLegacyMaterialProperties(Material& material) const;
 

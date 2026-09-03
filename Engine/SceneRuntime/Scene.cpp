@@ -25,7 +25,7 @@
 #include "CameraComponent.h"
 #include "TweenManager.h"
 #include "CharacterControllerSystem.h"
-#include "Skeleton.h"
+#include "BoneRegion.h"
 #include "BoneComponent.h"
 #include "PhysicsManager.h"
 #include "BoxColliderComponent.h"
@@ -4293,6 +4293,27 @@ bool Scene::ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
 }
 
 AnimatorPoseUploadMetrics Scene::PublishAnimatorPose(Animator& animator)
+{
+	// MBC10 — 제품 publish는 그대로 돌고, 결과만 읽기 전용 스냅샷에 남긴다.
+	const AnimatorPoseUploadMetrics metrics = PublishAnimatorPoseImpl(animator);
+	{
+		std::lock_guard<std::mutex> guard(m_lastAnimatorPoseMetricsMutex);
+		m_lastAnimatorPoseMetrics[&animator] = metrics;
+	}
+	return metrics;
+}
+
+bool Scene::TryGetLastAnimatorPoseMetrics(const Animator& animator,
+	AnimatorPoseUploadMetrics& outMetrics) const
+{
+	std::lock_guard<std::mutex> guard(m_lastAnimatorPoseMetricsMutex);
+	const auto found = m_lastAnimatorPoseMetrics.find(&animator);
+	if (found == m_lastAnimatorPoseMetrics.end()) return false;
+	outMetrics = found->second;
+	return true;
+}
+
+AnimatorPoseUploadMetrics Scene::PublishAnimatorPoseImpl(Animator& animator)
 {
 	using State = TransformExecutionGraphState;
 	using ExecIndex = State::ExecIndex;

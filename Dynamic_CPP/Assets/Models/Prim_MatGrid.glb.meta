@@ -1,4 +1,191 @@
-guid: 0ecb57e2-cc63-47bc-85fd-ad00544c84ba
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:1c1e5ebcd6a9ad4f83d5d996a404b39c36ba03671450af0d088c37c3b0d15092
+assetId: 00a707fb-b734-8b3e-8430-f050b56bbcd0
+generation: 2
+sourceFingerprint: sha256:d63a6851b8aafc0cef16c206cf95890e157e74674531c6f494d7c3d38098f270
+subAssets:
+  - kind: material
+    stableKey: name:MatGrid_R0_C0_Mat
+    assetId: 54041fe4-8acf-875a-8ceb-08dde5e5466b
+    binding: gltf/material/0
+    name: MatGrid_R0_C0_Mat
+    fingerprint: sha256:8af62619af7763a7a350bd5a517550fe95fee7ba2fefae34ea8f51efe4aa70a2
+  - kind: material
+    stableKey: name:MatGrid_R0_C1_Mat
+    assetId: fe2af89e-004d-8656-8a50-8abd744cfaff
+    binding: gltf/material/1
+    name: MatGrid_R0_C1_Mat
+    fingerprint: sha256:97acc27ef1539263f0231caa1b1d7008cd7d394ee03967e8790ae94e235a6508
+  - kind: material
+    stableKey: name:MatGrid_R0_C2_Mat
+    assetId: 523879e3-dcae-8968-9537-6b5d51c04c09
+    binding: gltf/material/2
+    name: MatGrid_R0_C2_Mat
+    fingerprint: sha256:b85effc65725aaf3c14e627c54b2283225701cda2de13062062e7798fea99010
+  - kind: material
+    stableKey: name:MatGrid_R0_C3_Mat
+    assetId: 990028d3-2c0b-815c-9d96-dc75b5123f1e
+    binding: gltf/material/3
+    name: MatGrid_R0_C3_Mat
+    fingerprint: sha256:4309d833508676e34714b0c584224d5159dbf6c3d9df548353c0c5219c97d10c
+  - kind: material
+    stableKey: name:MatGrid_R0_C4_Mat
+    assetId: 66958ba6-61ab-833d-a317-8152d54bb82d
+    binding: gltf/material/4
+    name: MatGrid_R0_C4_Mat
+    fingerprint: sha256:2aa84e8fd410d5c314f83b4ec71e1db4f31f2bbb91e9ac717720687eb06054ee
+  - kind: material
+    stableKey: name:MatGrid_R1_C0_Mat
+    assetId: 9739d55b-2c14-80b2-bfbf-40a57f22b21e
+    binding: gltf/material/5
+    name: MatGrid_R1_C0_Mat
+    fingerprint: sha256:6e72cd9bb1e68afaf68a4a6b8fa84264e7db3a3d8bfd3f0e86d37ccc90878455
+  - kind: material
+    stableKey: name:MatGrid_R1_C1_Mat
+    assetId: 9903024e-eab9-8b6c-b122-7ff035483373
+    binding: gltf/material/6
+    name: MatGrid_R1_C1_Mat
+    fingerprint: sha256:05f974428b9e0afdf24150978b618c98f5e54933e49b5be5614a3671a24d336c
+  - kind: material
+    stableKey: name:MatGrid_R1_C2_Mat
+    assetId: 1a0992f0-4b9b-845c-b8ba-d50328aa6253
+    binding: gltf/material/7
+    name: MatGrid_R1_C2_Mat
+    fingerprint: sha256:d5741017902213b8e00548ad8e0a22a872d0c62bbc951334f8b854660e7df06c
+  - kind: material
+    stableKey: name:MatGrid_R1_C3_Mat
+    assetId: f0b1c434-5966-8631-9432-74d066ad681a
+    binding: gltf/material/8
+    name: MatGrid_R1_C3_Mat
+    fingerprint: sha256:eb7436910adf6ef1083b1e2afe08fa27c357f07a29ff00e6165ea8aa1a7341b6
+  - kind: material
+    stableKey: name:MatGrid_R1_C4_Mat
+    assetId: ce5472df-2a62-8d4f-8672-b8ccaae70b58
+    binding: gltf/material/9
+    name: MatGrid_R1_C4_Mat
+    fingerprint: sha256:7387d8f3ed0e09f34842af2b489949d93b0fceba0507fe9cab305ffa9ec589fa
+  - kind: texture
+    stableKey: name:MatGrid_R0_C0_Mat_BaseColor
+    assetId: 513a9b4d-4d57-897e-9a77-1d73a4a32adf
+    binding: gltf/image/0
+    name: MatGrid_R0_C0_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R0_C1_Mat_BaseColor
+    assetId: 34babdd7-8357-890a-90e7-370b66bd08b3
+    binding: gltf/image/1
+    name: MatGrid_R0_C1_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R0_C2_Mat_BaseColor
+    assetId: f891ce04-82ef-86dd-ad2e-8d5dbb9e44e2
+    binding: gltf/image/2
+    name: MatGrid_R0_C2_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R0_C3_Mat_BaseColor
+    assetId: 3eda50b5-d7fa-8a7e-ab53-822b35d67dc9
+    binding: gltf/image/3
+    name: MatGrid_R0_C3_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R0_C4_Mat_BaseColor
+    assetId: 613e183a-af5d-8b41-a88f-5c48e2385e57
+    binding: gltf/image/4
+    name: MatGrid_R0_C4_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R1_C0_Mat_BaseColor
+    assetId: 0733ac68-597e-8193-8ff8-8787ee0c522b
+    binding: gltf/image/5
+    name: MatGrid_R1_C0_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R1_C1_Mat_BaseColor
+    assetId: 0a846c15-d153-8a41-9b9a-3006f0995f50
+    binding: gltf/image/6
+    name: MatGrid_R1_C1_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R1_C2_Mat_BaseColor
+    assetId: e12bc7ea-a04b-827a-9aa6-6b663102c705
+    binding: gltf/image/7
+    name: MatGrid_R1_C2_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R1_C3_Mat_BaseColor
+    assetId: 3192e1ad-8ec6-8a19-94c8-29d876c3f5cf
+    binding: gltf/image/8
+    name: MatGrid_R1_C3_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: texture
+    stableKey: name:MatGrid_R1_C4_Mat_BaseColor
+    assetId: 73a4dd7c-b357-838e-9723-c076f33ca930
+    binding: gltf/image/9
+    name: MatGrid_R1_C4_Mat_BaseColor
+    fingerprint: sha256:f95ea21b38d817849275107505f969160b6390f6b4ca61f313864c6f28e29699
+  - kind: mesh
+    stableKey: name:MatGrid_R0_C0
+    assetId: 6451a1b6-10be-8ec7-874f-2f34a3491159
+    binding: mesh/0
+    name: MatGrid_R0_C0
+    fingerprint: sha256:9cfc470b26fac107e421f438162f771f543642e720f39a33c6e8a365a024ace1
+  - kind: mesh
+    stableKey: name:MatGrid_R0_C1
+    assetId: 941d87a7-4157-8c33-9b03-b4f72cc47896
+    binding: mesh/1
+    name: MatGrid_R0_C1
+    fingerprint: sha256:a6b44a37f85d3cdd88f35c13065e3d9e0053d4b6eeb5a8281e4e27439059eed3
+  - kind: mesh
+    stableKey: name:MatGrid_R0_C2
+    assetId: cf7f43fb-2772-8d88-b63a-c6b5d3ab8f7e
+    binding: mesh/2
+    name: MatGrid_R0_C2
+    fingerprint: sha256:b83493c49a4060235acfda2c40ea55ba6f36a5c61675292e7672df8860dd6b8c
+  - kind: mesh
+    stableKey: name:MatGrid_R0_C3
+    assetId: db8241d7-9e60-8e04-8dbf-b5b6c997f6fb
+    binding: mesh/3
+    name: MatGrid_R0_C3
+    fingerprint: sha256:241e0151bbc00eb2a68f31ac8bf5644edce93e347f4ee3a59c2644e1165e6b62
+  - kind: mesh
+    stableKey: name:MatGrid_R0_C4
+    assetId: 3f5ce941-c6fc-8d0a-9569-d02e7caac7e7
+    binding: mesh/4
+    name: MatGrid_R0_C4
+    fingerprint: sha256:c4ad877830c46a68f481badfcf629a1d409ab57525ad52a53d31df53e869ff80
+  - kind: mesh
+    stableKey: name:MatGrid_R1_C0
+    assetId: ff73d515-9010-8539-af79-5cc96c2ea2a4
+    binding: mesh/5
+    name: MatGrid_R1_C0
+    fingerprint: sha256:c77aabfca796c483102bbbe525857c6c040acc39492c9f4940f0d84671e0de79
+  - kind: mesh
+    stableKey: name:MatGrid_R1_C1
+    assetId: 7e6a3eae-e206-8d0e-8ca4-0c409ae3d49c
+    binding: mesh/6
+    name: MatGrid_R1_C1
+    fingerprint: sha256:76fae1cf1cf1174cdab8336b98b3f2797bb0bb960f9ee32b4ec02435f8c26ae8
+  - kind: mesh
+    stableKey: name:MatGrid_R1_C2
+    assetId: 879d3ae1-6b4c-8c3b-b814-f281339f64a6
+    binding: mesh/7
+    name: MatGrid_R1_C2
+    fingerprint: sha256:19f5dc5696aadaae3d8d33ade8e4accf70e115c374937ec103601add63719f5a
+  - kind: mesh
+    stableKey: name:MatGrid_R1_C3
+    assetId: 43ed8c75-48c3-818d-b92c-7e31618a5405
+    binding: mesh/8
+    name: MatGrid_R1_C3
+    fingerprint: sha256:abae770cae301b10d9b6628c71a05c47bfc1e812d875b6e600da08e8d6960dca
+  - kind: mesh
+    stableKey: name:MatGrid_R1_C4
+    assetId: a7e9d4cc-fa3e-8d25-bad6-8bd17805e801
+    binding: mesh/9
+    name: MatGrid_R1_C4
+    fingerprint: sha256:ba3fcb220b515e46080873b4067725d7a8807a96604a2a33a93e9104bab8f952
 importSettings:
   extension: .glb
   timestamp: 134300494798307662
@@ -6,67 +193,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: gltf/material/0
-      name: MatGrid_R0_C0_Mat
-      guid: 96884377-7ac3-4603-ab1d-7d004b80a97f
-    - key: gltf/material/1
-      name: MatGrid_R0_C1_Mat
-      guid: 36f082f4-e43d-48d1-a326-944708565ca2
-    - key: gltf/material/2
-      name: MatGrid_R0_C2_Mat
-      guid: 170ca457-7730-4ad5-8a36-236b5a485558
-    - key: gltf/material/3
-      name: MatGrid_R0_C3_Mat
-      guid: 65d8b5ed-0b82-4426-be7a-65fb05b1ab1c
-    - key: gltf/material/4
-      name: MatGrid_R0_C4_Mat
-      guid: 310196b9-070e-4555-9942-c6d372cb1a0c
-    - key: gltf/material/5
-      name: MatGrid_R1_C0_Mat
-      guid: 33b9041f-7c52-41fd-9e42-306c2a0f0d5f
-    - key: gltf/material/6
-      name: MatGrid_R1_C1_Mat
-      guid: b075587a-9e4e-42d2-bcca-eb266b38c9b9
-    - key: gltf/material/7
-      name: MatGrid_R1_C2_Mat
-      guid: f1c2ea19-c25b-4719-b692-f01ed363da16
-    - key: gltf/material/8
-      name: MatGrid_R1_C3_Mat
-      guid: 3471216e-53c9-4775-82fc-481fdd5f2692
-    - key: gltf/material/9
-      name: MatGrid_R1_C4_Mat
-      guid: 5de7d30e-a6d6-4af7-8726-77cab62d728b
-  embeddedTextures:
-    - key: gltf/image/0
-      name: MatGrid_R0_C0_Mat_BaseColor
-      guid: f348d157-0cd9-4b02-ae4c-1ae4da58d12c
-    - key: gltf/image/1
-      name: MatGrid_R0_C1_Mat_BaseColor
-      guid: 3226631a-afe5-4893-b183-e0e823c4998b
-    - key: gltf/image/2
-      name: MatGrid_R0_C2_Mat_BaseColor
-      guid: ac6e5045-a6f7-4931-9a82-0248c60a0e11
-    - key: gltf/image/3
-      name: MatGrid_R0_C3_Mat_BaseColor
-      guid: 4e0e6959-8de6-4227-84e8-ffc3ea5925fb
-    - key: gltf/image/4
-      name: MatGrid_R0_C4_Mat_BaseColor
-      guid: 22ea13cd-0f8e-4541-a154-4cbe6d398975
-    - key: gltf/image/5
-      name: MatGrid_R1_C0_Mat_BaseColor
-      guid: dafd1416-b785-491b-a37c-dd640abe04b7
-    - key: gltf/image/6
-      name: MatGrid_R1_C1_Mat_BaseColor
-      guid: ad81c967-2fb8-4a51-b166-3c2381ff4874
-    - key: gltf/image/7
-      name: MatGrid_R1_C2_Mat_BaseColor
-      guid: 266769a6-b286-4564-ba5f-1379c0ed075e
-    - key: gltf/image/8
-      name: MatGrid_R1_C3_Mat_BaseColor
-      guid: e9692aa3-b1c9-4f98-9327-ebbb8ad80879
-    - key: gltf/image/9
-      name: MatGrid_R1_C4_Mat_BaseColor
-      guid: f981c2dc-09af-4ea3-a366-7ec78e027ba1

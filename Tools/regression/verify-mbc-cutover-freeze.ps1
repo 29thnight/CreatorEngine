@@ -75,21 +75,42 @@ $surfaces = [ordered]@{
     'diag.mesh.resolve'                            = '\[mesh\.resolve\]'
     'diag.model.instantiate'                       = '\[model\.instantiate\]'
     'diag.anim.tick'                               = '\[anim\.tick\]'
-    'diag.experiment.animlive'                     = 'experiment\.animlive'
 }
+# MBC10 — 아래 표면은 래칫이 아니라 **하드 0**이다. 기준선이 0이어도 "증가만 막는"
+# 규칙은 0→1을 잡지만, 표면 이름이 바뀌거나 기준선을 다시 뜨면 통과로 새기 때문에
+# 별도 계약으로 못 박는다(§5.2 제거 목록·§8.2 구조).
+$hardZeroSurfaces = @(
+    'legacy-bridge.BuildLegacyModelFromExperiment', 'ab-switch.CREATOR_EXPERIMENT_VERTEX',
+    'dual-state.m_experimentMeshBindings', 'assimp.include', 'pseudo-v5.DeterministicSubAssetId',
+    'pseudo-v5.Uuid::FromName-call', 'legacy-bridge.ModelSceneBridge',
+    'legacy-fallback.LoadModelViaExperiment', 'diag.material.finalize', 'diag.mesh.resolve',
+    'diag.model.instantiate', 'diag.anim.tick')
+# ⑤ m_hashingMesh는 모델이 아닌 절차 지오메트리(스프라이트 쿼드·지형·기즈모)의 legacy
+#    Mesh 캐시 키로만 남는다 — 아래 파일 밖에서 나타나면 모델 경로로 되돌아온 것이다.
+$hashingMeshAllow = @(
+    'Engine\RenderEngine\Mesh.h', 'Engine\RenderEngine\Mesh.cpp', 'Engine\RenderEngine\Texture.h',
+    'Engine\RenderEngine\Render\Graph\EnhancedDrawIdentity.h', 'Engine\RenderEngine\Render\Graph\EnhancedRenderPass.h',
+    'Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.cpp', 'Engine\RenderEngine\RHI\IRenderDeviceServices.h',
+    'Engine\RenderEngine\RHI\DX12\DX12MeshCache.h', 'Engine\RenderEngine\RHI\DX12\DX12MeshCache.cpp',
+    'Engine\RenderEngine\RHI\Vulkan\VulkanRenderServices.cpp')
+# ⑥ 제품 소비자는 ModelAssetGeneration handle만 쓴다 — experiment 모델 객체를 직접 소비하지 않는다.
+$productConsumerPrefixes = @('Engine\SceneRuntime\', 'Engine\RenderEngine\Render\',
+    'Engine\RenderEngine\PrimitiveRenderProxy', 'Editor\EngineGUIWindow\')
+$experimentConsumerPattern = 'experiment::Model\b|->TryGetMesh\(|\.TryGetMesh\('
+# ⑦ generation 게시 진입점은 DataSystem 하나다(부분 게시 경로 0).
+$publishPattern = 'm_modelAssetGenerations\.Publish\('
 
 $counts = [ordered]@{}
 $filesBySurface = @{}
 foreach ($name in $surfaces.Keys) { $counts[$name] = 0; $filesBySurface[$name] = @() }
 
 # ── 하드 계약(래칫이 아니라 0/허용목록) ──────────────────────────────────────
-# ① model sidecar writer는 허용목록 밖에 생기지 않는다. MBC3가 ModelAssetAuthoringTransaction
-#    하나로 합칠 때까지 현존 둘만 허용한다. 셋째가 생기면 즉시 실패.
+# ① model sidecar writer는 codec/transaction 밖에 생기지 않는다. Editor와
+#    AssetCooker는 transaction을 호출할 뿐 직접 문서를 쓰지 않는다.
 $sidecarWriterPattern = '\["(subAssets|ModelImporter)"\]\s*(\[|=)'
 $sidecarWriterAllow = @(
-    'Editor\EngineEntry\EditorAssetDatabase.cpp',        # legacy — MBC3가 제거
-    'Tools\AssetCooker\ModelIdentityRefresher.cpp',      # legacy — MBC3가 제거
-    'Engine\RenderEngine\Assets\ModelSidecarV2.cpp'     # v2 코덱 — MBC3 transaction의 유일한 writer 후보
+    'Engine\RenderEngine\Assets\ModelSidecarV2.cpp',
+    'Engine\RenderEngine\Assets\ModelAssetAuthoringTransaction.cpp'
 )
 # ② 검사 전용 seam은 제품 코드에서 0건. 정의(Assets/)는 제외한다.
 $testSeamPattern = 'DeriveIdentityWithProfile|InsertUncheckedForTest'
@@ -112,6 +133,27 @@ foreach ($file in $files) {
         }
     }
 
+    if ($relative -notin $hashingMeshAllow) {
+        $hashingHits = ([regex]::Matches($code, 'm_hashingMesh')).Count
+        if ($hashingHits -gt 0) {
+            $hardFailures.Add("m_hashingMesh가 절차 지오메트리 허용목록 밖에 있다($hashingHits): $relative")
+        }
+    }
+    foreach ($prefix in $productConsumerPrefixes) {
+        if ($relative.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            $expHits = ([regex]::Matches($code, $experimentConsumerPattern)).Count
+            if ($expHits -gt 0) {
+                $hardFailures.Add("제품 소비자가 experiment 모델 객체를 직접 소비한다($expHits): $relative")
+            }
+            break
+        }
+    }
+    if ($relative -ne 'Engine\RenderEngine\DataSystem.cpp') {
+        $publishHits = ([regex]::Matches($code, $publishPattern)).Count
+        if ($publishHits -gt 0) {
+            $hardFailures.Add("generation 게시 진입점이 DataSystem 밖에 있다($publishHits): $relative")
+        }
+    }
     if ([regex]::IsMatch($code, $sidecarWriterPattern)) {
         $sidecarWriters.Add($relative)
         if ($sidecarWriterAllow -notcontains $relative) {
@@ -141,6 +183,33 @@ if (Test-Path -LiteralPath $vcpkgJson) {
 }
 $counts['assimp.vcpkg-port'] = $assimpPorts
 $filesBySurface['assimp.vcpkg-port'] = @("vcpkg.json($assimpPorts)")
+if ($assimpPorts -ne 0) { $hardFailures.Add("vcpkg.json에 assimp port가 있다($assimpPorts)") }
+foreach ($name in $hardZeroSurfaces) {
+    if ($counts[$name] -ne 0) {
+        $hardFailures.Add("하드 0 표면에 접촉이 있다: $name = $($counts[$name]) [" + ($filesBySurface[$name] -join ' ') + ']')
+    }
+}
+# ⑧ 상태를 바꾸는 진단 명령 0 — experiment.animlive는 제품 publish를 부르지 않는다
+#    (읽기 전용 스냅샷만 읽는다). scene.transformbulk probe는 합성 fixture라 예외.
+$consolePath = Join-Path $repoRoot 'Editor\EngineEntry\ConsoleCommandSystem.cpp'
+if (Test-Path -LiteralPath $consolePath) {
+    $console = Get-CodeText $consolePath
+    $animliveStart = $console.IndexOf('static void Cmd_experiment_animlive(')
+    if ($animliveStart -lt 0) { $hardFailures.Add('experiment.animlive 진단이 없다(시그니처 변경?)') }
+    else {
+        $open = $console.IndexOf('{', $animliveStart); $depth = 0; $end = -1
+        for ($i = $open; $i -lt $console.Length; $i++) {
+            if ($console[$i] -eq '{') { $depth++ } elseif ($console[$i] -eq '}') { $depth--; if ($depth -eq 0) { $end = $i; break } }
+        }
+        $body = if ($end -gt 0) { $console.Substring($open, $end - $open + 1) } else { '' }
+        if ($body -match 'PublishAnimatorPose\(' -or $body -notmatch 'TryGetLastAnimatorPoseMetrics\(') {
+            $hardFailures.Add('experiment.animlive가 상태를 바꾼다(PublishAnimatorPose) 또는 읽기 전용 스냅샷을 읽지 않는다')
+        }
+    }
+    if ($console -notmatch 'Cmd_assets_modeldiag') {
+        $hardFailures.Add('읽기 전용 모델 소비 스냅샷 명령(assets.modeldiag)이 없다')
+    }
+}
 
 # ── 출력·판정 ──────────────────────────────────────────────────────────────────
 "scanned files=$($files.Count) sidecarWriters=$($sidecarWriters -join ',')"
@@ -148,7 +217,12 @@ $filesBySurface['assimp.vcpkg-port'] = @("vcpkg.json($assimpPorts)")
 if ($Baseline) {
     $lines = @("surface`tcount`tfiles")
     foreach ($name in $counts.Keys) {
-        $lines += "$name`t$($counts[$name])`t$($filesBySurface[$name] -join ' ')"
+        $fileList = $filesBySurface[$name] -join ' '
+        $lines += if ([string]::IsNullOrEmpty($fileList)) {
+            "$name`t$($counts[$name])"
+        } else {
+            "$name`t$($counts[$name])`t$fileList"
+        }
     }
     [IO.File]::WriteAllText($baselinePath, (($lines -join "`n") + "`n"),
         (New-Object Text.UTF8Encoding($false)))
@@ -205,5 +279,5 @@ if ($hardFailures.Count -gt 0 -or $failures.Count -gt 0) {
     if ($failures.Count -gt 0) { '래칫 위반(접촉 증가):'; $failures | ForEach-Object { "  $_" } }
     exit 1
 }
-'통과 — cutover 동결 표면이 늘지 않았고 sidecar writer는 허용목록 안에 있다'
+'통과 — cutover 동결 표면이 늘지 않았고(제거 표면 하드 0), sidecar writer·generation 게시·m_hashingMesh가 허용목록 안이며 진단은 읽기 전용이다'
 exit 0

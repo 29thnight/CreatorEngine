@@ -23,14 +23,16 @@ function Assert-DoesNotMatch([string]$relativePath, [string]$pattern) {
     }
 }
 
-# ModelLoader may build an in-memory cache payload, but filesystem mutation and
-# embedded-image encoding belong to the Editor adapter.
-Assert-DoesNotMatch "Engine\RenderEngine\ModelLoader.cpp" `
+# PHASE 3.75 MBC9 — legacy ModelLoader(Assimp)와 그 cache/embedded-image writer 경로는
+# 물리 삭제됐다. 모델 sidecar/generation 쓰기는 Assets/ModelAssetAuthoringTransaction만
+# 소유한다(verify-mbc-cutover-freeze의 sidecar writer 허용목록). 여기서는 되살아나지
+# 않았는지와 generation 로더가 파일을 쓰지 않는지만 잰다.
+if (Test-Path -LiteralPath (Join-Path $repoRoot "Engine\RenderEngine\ModelLoader.cpp")) {
+    throw "legacy ModelLoader.cpp가 되살아났다 — 모델 로드는 Assets/ModelAssetGeneration만 탄다"
+}
+Assert-DoesNotMatch "Engine\RenderEngine\Assets\ModelAssetGeneration.cpp" `
     'std::ofstream|SaveToWICFile|create_directories\s*\('
-Assert-Matches "Engine\RenderEngine\ModelLoader.cpp" `
-    'AssetAuthoringPort::WriteModelCache'
-Assert-Matches "Engine\RenderEngine\ModelLoader.cpp" `
-    'AssetAuthoringPort::WriteEmbeddedTexture'
+Assert-DoesNotMatch "Engine\RenderEngine\DataSystem.cpp" 'SaveToWICFile'
 
 # Terrain produces only a value snapshot. PNG/texture/descriptor publication and
 # transaction lifetime belong to the Editor adapter.

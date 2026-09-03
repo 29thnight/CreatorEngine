@@ -1,4 +1,29 @@
-guid: eef1dfaa-cf3a-4ce7-899b-d3e496f59d17
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:66c51bbfea5b8107c3ce7270a8ef20ade5adf334210a07a92b76f137bc2c3045
+assetId: 8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45
+generation: 2
+sourceFingerprint: sha256:8fad178c35795dcacdf7c4cc8cc9366a03c01c539fbdd4ae2d3902e7e04905d5
+subAssets:
+  - kind: material
+    stableKey: name:Plane_Mat
+    assetId: bded2162-3902-8f9b-9449-18c1566f261a
+    binding: gltf/material/0
+    name: Plane_Mat
+    fingerprint: sha256:836a9cbfd2dd9706f93cd7e3a08efaca6c7f686db43b9f399858d02bc8ff142b
+  - kind: texture
+    stableKey: name:Plane_Mat_BaseColor
+    assetId: 388a4211-7126-8e36-9341-634cd99fc6ff
+    binding: gltf/image/0
+    name: Plane_Mat_BaseColor
+    fingerprint: sha256:e20ba51ac8a2ebf7e5b098f412016ca3d13a9f41d24190ae8d3547e13f598abf
+  - kind: mesh
+    stableKey: name:Prim_Plane
+    assetId: 178dd85b-7088-8e3e-af23-a2c983ca1e7e
+    binding: mesh/0
+    name: Prim_Plane
+    fingerprint: sha256:efc7f1466dbc2830c8e1843ac6c8ab4e58ce4af1028f681182b95e360f9d4277
 importSettings:
   extension: .glb
   timestamp: 134300494793780860
@@ -6,13 +31,3 @@ ModelImporter:
   OptimizeMeshes: true
   ImproveCacheLocality: true
   CreateMeshCollider: false
-subAssets:
-  schemaVersion: 1
-  materials:
-    - key: gltf/material/0
-      name: Plane_Mat
-      guid: 4cd17519-3c9f-4e87-8e24-99234fb7252c
-  embeddedTextures:
-    - key: gltf/image/0
-      name: Plane_Mat_BaseColor
-      guid: 4f6842aa-a4a9-4ce5-a06d-16adda89352e

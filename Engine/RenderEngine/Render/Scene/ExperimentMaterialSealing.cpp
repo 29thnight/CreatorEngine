@@ -66,7 +66,8 @@ namespace ExperimentMaterialSealing
     }
 
     bool BuildSealSourceFromAuthored(const experiment::Material& authored,
-        const ShaderMeta& meta, SealSource& outSource, std::string& outError)
+        const ShaderMeta& meta, SealSource& outSource, std::string& outError,
+        const assets::ModelAssetGeneration* generation)
     {
         SealSource source;
         source.material = authored;
@@ -75,7 +76,11 @@ namespace ExperimentMaterialSealing
         // texture owner는 M2 resolver 정본이다(c3-2와 같은 함수). 실패는
         // false로 올려 호출부가 legacy 시공으로 내려가게 한다 — 텍스처가
         // 조용히 빠진 그림보다 전환기 경로가 낫다.
-        if (!ApplyAuthoredTextures(source, meta, outError)) return false;
+        if (!ApplyAuthoredTextures(source, meta, outError, nullptr, nullptr,
+            generation))
+        {
+            return false;
+        }
 
         if (const auto* wind = FindPropertyValue<math::vector4>(authored,
             standard_material::property::FlowWindVector))
@@ -121,7 +126,8 @@ namespace ExperimentMaterialSealing
 
     bool ApplyAuthoredTextures(SealSource& source, const ShaderMeta& meta,
         std::string& outError, std::size_t* outCooked,
-        std::size_t* outSourceFallback)
+        std::size_t* outSourceFallback,
+        const assets::ModelAssetGeneration* generation)
     {
         // I7-C1 — catalog가 서면 texture artifact를 cooked 우선으로 해석한다.
         // c3-2가 "catalog가 서면 이 자리가 그대로 cooked 우선이 된다"고 적어
@@ -131,7 +137,8 @@ namespace ExperimentMaterialSealing
         // 마운트가 렌더 중에 표를 갈아 끼울 수 있다.
         const auto catalog = DataSystems->GetCookedCatalog();
         const experiment::MaterialResolveServices services =
-            experiment::MakeDataSystemMaterialResolveServices(catalog.get());
+            experiment::MakeDataSystemMaterialResolveServices(catalog.get(),
+                generation);
         experiment::ResolvedMaterial resolved;
         if (!experiment::ResolveMaterial(source.material, services, resolved,
             outError))

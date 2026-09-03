@@ -1,7 +1,11 @@
 #pragma once
+// PHASE 3.75 MBC11 — legacy v1 model subasset sidecar 리더(`guid` + subAssets schema 1)와
+// import 결과 대조(`ValidateModelCookIdentity`)는 은퇴했다. 모델 신원은 schema v2(UUIDv8,
+// `Assets/ModelSidecarV2`)뿐이고 cook은 게시된 generation을 내보낸다
+// (`ModelGenerationExportProducer`). 여기에는 다른 자산(texture·shadermeta·material)
+// sidecar의 최상위 `guid`만 읽는 리더가 남는다.
 
 #include "../AssetIdentity.h"
-#include "../Import/ImportedScene.h"
 
 #include <string>
 #include <string_view>
@@ -26,39 +30,8 @@ namespace experiment::cooked
         std::string message{};
     };
 
-    struct ModelSubAssetIdentity final
-    {
-        std::string sourceKey{};
-        std::string name{}; // 진단/재import UI용이며 identity 판정에는 쓰지 않는다.
-        AssetId assetId{};
-    };
-
-    struct ModelCookIdentity final
-    {
-        AssetId modelAssetId{};
-        std::vector<ModelSubAssetIdentity> materials{};
-        std::vector<ModelSubAssetIdentity> embeddedTextures{};
-
-        [[nodiscard]] AssetId FindMaterial(std::string_view sourceKey) const noexcept;
-        [[nodiscard]] AssetId FindEmbeddedTexture(std::string_view sourceKey) const noexcept;
-    };
-
     // 임의 asset sidecar의 최상위 guid만 읽는다. canonical UUIDv4 외의 표기는
-    // legacy 호환 없이 거부한다.
+    // legacy 호환 없이 거부한다(모델 sidecar는 여기로 오지 않는다 — v2 리더가 본다).
     [[nodiscard]] bool ReadAssetIdFromMeta(std::string_view yaml,
         AssetId& outAssetId, std::vector<ModelIdentityIssue>& outIssues);
-
-    // model sidecar schema:
-    // subAssets.schemaVersion: 1
-    // subAssets.materials[] / embeddedTextures[]: { key, name?, guid }
-    [[nodiscard]] bool ReadModelCookIdentity(std::string_view yaml,
-        ModelCookIdentity& outIdentity,
-        std::vector<ModelIdentityIssue>& outIssues);
-
-    // sidecar가 현재 import 결과와 정확히 일치하는지 검사한다. 누락뿐 아니라
-    // source에서 사라진 stale subasset도 게시 전에 막는다.
-    [[nodiscard]] bool ValidateModelCookIdentity(
-        const importer::ImportedScene& scene,
-        const ModelCookIdentity& identity,
-        std::vector<ModelIdentityIssue>& outIssues);
 }

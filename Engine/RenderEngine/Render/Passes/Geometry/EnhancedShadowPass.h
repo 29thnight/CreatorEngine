@@ -2,6 +2,7 @@
 #include "../../../RHI/RHIFormat.h"
 #include <array>
 #include <atomic>
+#include <map>
 #include <unordered_map>
 #include <vector>
 #include <wrl/client.h>
@@ -182,6 +183,5 @@ private:
     // I5-D34b: experiment packed(68B) 스킨 짝 — BLENDINDICES가 RGBA8Uint@48이라
     // legacy 스킨 PSO(RGBA32Float@64)로는 팔레트 밖을 짚는다. 정적 experiment
     // 메시는 POSITION@0이 legacy와 같아 m_pso를 그대로 쓴다.
-    RHIPipelineHandle m_experimentSkinnedPso;
+    std::map<uint32_t, RHIPipelineHandle> m_modelPsos;
 };
-

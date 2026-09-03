@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -590,8 +591,6 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
 
 struct VulkanMeshCache::Impl
 {
-    RHIExperimentVertexLookup experimentLookup;
-
     struct Buffers
     {
         RHIMeshBinding binding;
@@ -614,6 +613,7 @@ struct VulkanMeshCache::Impl
 
     VulkanDeviceResources* resources{ nullptr };
     std::unordered_map<HashedGuid, Buffers> entries;
+    std::map<assets::ModelMeshHandle, Buffers> modelEntries;
     RHICompletionRetireQueue<RetiredBuffers> retireQueue;
     VulkanPersistentHeap persistentHeap;
     uint64_t frameIndex{ 0 };
@@ -652,6 +652,7 @@ bool VulkanMeshCache::Initialize(VulkanDeviceResources* resources,
         return false;
     }
     m_impl->entries.clear();
+    m_impl->modelEntries.clear();
     m_impl->frameIndex = 0;
     m_impl->stats = {};
     resources->RegisterUploadTransactionListener(this);
@@ -664,6 +665,7 @@ void VulkanMeshCache::Shutdown()
 
     m_impl->resources->UnregisterUploadTransactionListener(this);
     for (auto& pair : m_impl->entries) m_impl->Release(pair.second);
+    for (auto& pair : m_impl->modelEntries) m_impl->Release(pair.second);
     m_impl->retireQueue.Drain([&](Impl::RetiredBuffers& retired)
         {
             m_impl->resources->ReleaseBuffer(retired.vertices);
@@ -672,6 +674,7 @@ void VulkanMeshCache::Shutdown()
             m_impl->persistentHeap.Release(retired.indexAllocation);
         });
     m_impl->entries.clear();
+    m_impl->modelEntries.clear();
     m_impl->persistentHeap.Shutdown();
     m_impl->stats.residentCount = 0;
     m_impl->stats.residentBytes = 0;
@@ -679,16 +682,6 @@ void VulkanMeshCache::Shutdown()
     m_impl->stats.graveyardBytes = 0;
     m_impl->frameIndex = 0;
     m_impl->resources = nullptr;
-}
-
-void VulkanMeshCache::SetExperimentVertexLookup(RHIExperimentVertexLookup lookup)
-{
-    if (m_impl) m_impl->experimentLookup = std::move(lookup);
-}
-
-uint32_t VulkanMeshCache::GetExperimentUploadCount() const
-{
-    return m_impl ? m_impl->stats.experimentUploads : 0u;
 }
 
 RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
@@ -708,71 +701,54 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         return found->second.binding;
     }
 
-    // I5-D34a: DX12MeshCache::GetOrUpload와 대칭 — 한쪽만 고치면 vk 대조
-    // 게이트가 stride 불일치로 붉는다. I5-D4b: 위임 구조도 대칭이다.
-    RHIExperimentVertexView experimentView{};
-    const bool useExperiment = m_impl->experimentLookup
-        && m_impl->experimentLookup(*mesh, experimentView)
-        && experimentView.IsValid();
-
-    // I5-D4f-1 — 빈 메시 판정을 **실제로 올릴 원본**에 대해 한다. DX12는 D4f-0이
-    // 이미 고쳤고 여기만 남아 있었다 — 바로 위 주석이 "DX12와 대칭"이라
-    // 적어 둔 그 계약을 이 가드가 깨고 있었다. 역브리지가 정점 복사를
-    // 그만두는 순간(D4f-1) vk 경로만 모든 메시를 떨군다.
+    // MBC9 — 절차 지오메트리의 legacy 96B 경로(DX12와 대칭). 모델 지오메트리는
+    // GetOrUploadModel(typed generation 뷰)만 탄다.
     const auto& vertices = mesh->GetVertices();
     const auto& indices = mesh->GetIndices();
-    const bool viewHasVertices = useExperiment
-        && nullptr != experimentView.data && 0 != experimentView.bytes;
-    const bool viewHasIndices = useExperiment
-        && nullptr != experimentView.indexData && 0 != experimentView.indexCount;
-    if ((!viewHasVertices && vertices.empty())
-        || (!viewHasIndices && indices.empty()))
-    {
-        return empty;
-    }
-
-    if (useExperiment)
-    {
-        return UploadResolved(mesh->m_hashingMesh.m_ID_Data,
-            experimentView.data, experimentView.bytes, experimentView.stride,
-            experimentView.attributeMask,
-            viewHasIndices ? experimentView.indexData : indices.data(),
-            viewHasIndices ? experimentView.indexCount
-                           : static_cast<uint32_t>(indices.size()),
-            false, outError);
-    }
-    return UploadResolved(mesh->m_hashingMesh.m_ID_Data, vertices.data(),
+    if (vertices.empty() || indices.empty()) return empty;
+    return UploadResolved(mesh->m_hashingMesh.m_ID_Data, nullptr, vertices.data(),
         static_cast<uint64_t>(vertices.size()) * sizeof(Vertex),
         sizeof(Vertex), 0, indices.data(),
-        static_cast<uint32_t>(indices.size()), false, outError);
+        static_cast<uint32_t>(indices.size()), outError);
 }
 
-RHIMeshBinding VulkanMeshCache::GetOrUploadExperiment(
-    const RHIExperimentVertexView& view, std::string& outError)
+RHIMeshBinding VulkanMeshCache::GetOrUploadModel(
+    const RHIModelMeshView& view, std::string& outError)
 {
     RHIMeshBinding empty{};
-    if (!m_impl || nullptr == m_impl->resources || !view.IsHandleComplete())
+    if (!m_impl || nullptr == m_impl->resources || !view.IsComplete())
     {
-        outError = "Vulkan 메시 캐시: 핸들 뷰가 완비되지 않았다";
+        outError = "Vulkan 메시 캐시: ModelAssetGeneration 뷰가 완비되지 않았다";
         return empty;
     }
-    return UploadResolved(view.stableKey, view.data, view.bytes, view.stride,
-        view.attributeMask, view.indexData, view.indexCount, true, outError);
+    return UploadResolved(0, &view.handle, view.vertexData, view.vertexBytes,
+        view.vertexStride, view.vertexAttributeMask, view.indexData,
+        view.indexCount, outError);
 }
 
-RHIMeshBinding VulkanMeshCache::UploadResolved(size_t key,
-    const void* vertexData, uint64_t vertexBytes, uint32_t vertexStride,
+RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
+    const assets::ModelMeshHandle* modelKey, const void* vertexData,
+    uint64_t vertexBytes, uint32_t vertexStride,
     uint32_t attributeMask, const uint32_t* indexData, uint32_t indexCount,
-    bool viaExperimentHandle, std::string& outError)
+    std::string& outError)
 {
     RHIMeshBinding empty{};
-    const HashedGuid cacheKey{ key };
-    const auto found = m_impl->entries.find(cacheKey);
-    if (found != m_impl->entries.end())
+    Impl::Buffers* cached = nullptr;
+    if (nullptr != modelKey)
+    {
+        const auto found = m_impl->modelEntries.find(*modelKey);
+        if (found != m_impl->modelEntries.end()) cached = &found->second;
+    }
+    else
+    {
+        const auto found = m_impl->entries.find(HashedGuid{ legacyKey });
+        if (found != m_impl->entries.end()) cached = &found->second;
+    }
+    if (nullptr != cached)
     {
         ++m_impl->stats.hits;
-        found->second.lastUsedFrame = m_impl->frameIndex;
-        return found->second.binding;
+        cached->lastUsedFrame = m_impl->frameIndex;
+        return cached->binding;
     }
 
     if (nullptr == vertexData || 0 == vertexBytes || 0 == vertexStride ||
@@ -898,19 +874,24 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t key,
 
     ++m_impl->stats.uploads;
     // DX12와 대칭 — experiment 여부는 마스크가 말하고, 핸들 경로는 별도 계수.
-    if (0 != attributeMask) ++m_impl->stats.experimentUploads;
-    if (viaExperimentHandle) ++m_impl->stats.experimentHandleUploads;
+    if (nullptr != modelKey) ++m_impl->stats.modelGenerationUploads;
     m_impl->stats.bytesUploaded += buffers.bytes;
     ++m_impl->stats.residentCount;
     m_impl->stats.residentBytes += buffers.bytes;
 
-    const auto inserted = m_impl->entries.emplace(cacheKey, std::move(buffers));
+    if (nullptr != modelKey)
+    {
+        const auto inserted = m_impl->modelEntries.emplace(*modelKey, std::move(buffers));
+        return inserted.first->second.binding;
+    }
+    const auto inserted = m_impl->entries.emplace(HashedGuid{ legacyKey }, std::move(buffers));
     return inserted.first->second.binding;
 }
 
-uint32_t VulkanMeshCache::GetExperimentHandleUploadCount() const
+
+uint32_t VulkanMeshCache::GetModelGenerationUploadCount() const
 {
-    return m_impl ? m_impl->stats.experimentHandleUploads : 0;
+    return m_impl ? m_impl->stats.modelGenerationUploads : 0;
 }
 
 void VulkanMeshCache::OnUploadSubmitted(uint64_t recordingId,
@@ -927,6 +908,16 @@ void VulkanMeshCache::OnUploadSubmitted(uint64_t recordingId,
             ? RHIUploadTransactionState::Queued
             : RHIUploadTransactionState::Quarantined;
     }
+    for (auto& pair : m_impl->modelEntries)
+    {
+        Impl::Buffers& buffers = pair.second;
+        if (buffers.state != RHIUploadTransactionState::Recording
+            || buffers.recordingId != recordingId) continue;
+        buffers.completionValue = completion.value;
+        buffers.state = completion.IsValid()
+            ? RHIUploadTransactionState::Queued
+            : RHIUploadTransactionState::Quarantined;
+    }
 }
 
 void VulkanMeshCache::OnUploadCompleted(uint64_t completedValue)
@@ -937,6 +928,13 @@ void VulkanMeshCache::OnUploadCompleted(uint64_t completedValue)
         Impl::Buffers& buffers = pair.second;
         if (buffers.state == RHIUploadTransactionState::Queued &&
             buffers.completionValue <= completedValue)
+            buffers.state = RHIUploadTransactionState::Resident;
+    }
+    for (auto& pair : m_impl->modelEntries)
+    {
+        Impl::Buffers& buffers = pair.second;
+        if (buffers.state == RHIUploadTransactionState::Queued
+            && buffers.completionValue <= completedValue)
             buffers.state = RHIUploadTransactionState::Resident;
     }
 }
@@ -959,6 +957,21 @@ void VulkanMeshCache::OnUploadAborted(uint64_t recordingId)
         --m_impl->stats.residentCount;
         m_impl->stats.residentBytes -= buffers.bytes;
         it = m_impl->entries.erase(it);
+    }
+    auto modelIt = m_impl->modelEntries.begin();
+    while (modelIt != m_impl->modelEntries.end())
+    {
+        Impl::Buffers& buffers = modelIt->second;
+        if (buffers.state != RHIUploadTransactionState::Recording
+            || buffers.recordingId != recordingId)
+        {
+            ++modelIt;
+            continue;
+        }
+        m_impl->Release(buffers);
+        --m_impl->stats.residentCount;
+        m_impl->stats.residentBytes -= buffers.bytes;
+        modelIt = m_impl->modelEntries.erase(modelIt);
     }
 }
 
@@ -1023,6 +1036,47 @@ uint64_t VulkanMeshCache::RetireUnused(uint64_t completionValue,
             evictionPass->RecordRetired(buffers.bytes, selected.pressureDriven);
         m_impl->entries.erase(it);
     }
+
+    std::vector<assets::ModelMeshHandle> modelKeys;
+    std::vector<RHIAssetEvictionCandidate> modelCandidates;
+    modelKeys.reserve(m_impl->modelEntries.size());
+    modelCandidates.reserve(m_impl->modelEntries.size());
+    for (const auto& pair : m_impl->modelEntries)
+    {
+        modelKeys.push_back(pair.first);
+        modelCandidates.push_back(RHIAssetEvictionCandidate{
+            static_cast<uint64_t>(modelKeys.size() - 1u),
+            pair.second.lastUsedFrame, pair.second.bytes,
+            pair.second.state == RHIUploadTransactionState::Resident });
+    }
+    const RHIAssetEvictionSelection modelSelection =
+        SelectRHIAssetEvictionCandidates(modelCandidates, m_impl->frameIndex,
+            evictionPass);
+    for (const RHIAssetEvictionSelectionEntry& selected : modelSelection.entries)
+    {
+        if (selected.assetId >= modelKeys.size()) continue;
+        const auto it = m_impl->modelEntries.find(
+            modelKeys[static_cast<size_t>(selected.assetId)]);
+        if (it == m_impl->modelEntries.end()) continue;
+        Impl::Buffers& buffers = it->second;
+        m_impl->retireQueue.Enqueue(RHICompletionPoint{ completionValue },
+            Impl::RetiredBuffers{ buffers.binding.vertices.buffer,
+                buffers.binding.indices.buffer, std::move(buffers.vertices),
+                std::move(buffers.indices) }, buffers.bytes);
+        --m_impl->stats.residentCount;
+        m_impl->stats.residentBytes -= buffers.bytes;
+        ++m_impl->stats.retired;
+        m_impl->stats.retiredBytes += buffers.bytes;
+        retiredBytes += buffers.bytes;
+        if (selected.pressureDriven)
+        {
+            ++m_impl->stats.eviction.pressureRetired;
+            m_impl->stats.eviction.pressureRetiredBytes += buffers.bytes;
+        }
+        if (nullptr != evictionPass)
+            evictionPass->RecordRetired(buffers.bytes, selected.pressureDriven);
+        m_impl->modelEntries.erase(it);
+    }
     return retiredBytes;
 }
 
@@ -1055,7 +1109,7 @@ VulkanMeshCache::Stats VulkanMeshCache::GetStats() const
 
 size_t VulkanMeshCache::GetCachedCount() const
 {
-    return m_impl ? m_impl->entries.size() : 0;
+    return m_impl ? m_impl->entries.size() + m_impl->modelEntries.size() : 0;
 }
 
 // ────────────────────────────────────────────────────────────── 만드는 것

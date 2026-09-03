@@ -182,10 +182,9 @@ struct EnhancedDrawItem
     // I6-C — 그림자 캐스터 반경. 예전에는 Shadow 패스가 draw.mesh를
     // 역참조해 읽었다(legacy Mesh의 **데이터** 소비 마지막 자리).
     float          boundRadius{ 0.f };
-    // I5-D4b — experiment 핸들 경로의 뷰. stableKey != 0이면 3패스가 캐시의
-    // GetOrUploadExperiment로 올린다.
-    // 뷰의 포인터 수명은 drawPool의 experimentSource(shared_ptr)가 진다.
-    RHIExperimentVertexView experimentView{};
+    // MBC6 제품 뷰. MBC7 scene cutover가 채우며, 패스/RHI는 이 값이 있으면
+    // legacy Mesh보다 먼저 소비한다(MBC9: 모델은 이 뷰만 탄다).
+    RHIModelMeshView modelMeshView{};
 
     math::matrix4x4 worldMatrix{};
 
@@ -360,4 +359,3 @@ public:
 
     virtual void Shutdown() {}
 };
-

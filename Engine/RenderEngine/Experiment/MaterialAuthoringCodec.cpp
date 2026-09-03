@@ -1,6 +1,7 @@
 #include "MaterialAuthoringCodec.h"
 
 #include "AssetIdentity.h"
+#include "../Assets/AssetIdentityProfile.h" // MBC7: UUIDv8 subasset 신원(재질·embedded texture)
 #include "AuthoringReadNode.h"
 #include "AuthoringWriteNode.h"
 
@@ -36,9 +37,17 @@ namespace experiment
             }
             if (!TryParseCanonicalAssetId(text, out))
             {
-                outError = std::string(context)
-                    + " GUID가 canonical UUIDv4가 아니다: " + text;
-                return false;
+                // PHASE 3.75 MBC7 — 혼합 신원 계약(PHASE 17 Strict): 비모델 자산은
+                // UUIDv4, 모델 재질(assetId)과 embedded texture 참조는 UUIDv8 subasset
+                // 신원이다. writer(SerializeMaterialPayload)는 이미 v8을 적고 있었는데
+                // reader만 v4를 고집해 저장 씬의 모델 재질이 통째로 해석 실패했다
+                // (실측: Gunner 콜드 로드 재질 property 0). 소문자 canonical만 받는다.
+                if (!assets::TryParseCanonicalUuidV8(text, out.value))
+                {
+                    outError = std::string(context)
+                        + " GUID가 canonical UUIDv4/UUIDv8가 아니다: " + text;
+                    return false;
+                }
             }
             return true;
         }
