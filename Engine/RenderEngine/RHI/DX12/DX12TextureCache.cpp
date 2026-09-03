@@ -265,9 +265,21 @@ DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outE
     if (nullptr == m_resources) return Entry{};
     if (!m_ormNeutral.IsValid())
     {
-        // R 오클루전 1 · G 거칠기 1 · B 금속 0 — 팩터가 곱해지고 더해지는
-        // 슬롯이라 이 조합이라야 팩터 값이 그대로 살아남는다.
-        const uint8_t ormNeutral[4] = { 255, 255, 0, 255 };
+        // R 오클루전 1 · G 거칠기 1 · B 금속 1 — 세 채널 모두 팩터가 곱해지는
+        // 슬롯이므로 중립은 1 이다. 그래야 ORM 텍스처가 없는 재질에서
+        // metallic = orm.b * factor 가 저작한 factor 그대로 남는다(glTF 규격도
+        // "MR 텍스처가 없으면 metallic = metallicFactor" 다).
+        //
+        // ★ B 가 0 이었던 이유와 그것이 낡은 경위 ─ 예전 셰이더는 금속을
+        //   `orm.b + metallic` 으로 **더했다**. 그때는 B=1 이면 metallic 이 1 을
+        //   넘겨 확산이 통째로 죽었고, 그래서 0 이 중립이었다. a2e5ecdc 가
+        //   결합을 곱셈으로 바꾸면서 그 전제가 뒤집혔는데 이 상수가 따라가지
+        //   않았다 — 그 뒤로 ORM 텍스처가 없는 재질은 저작한 metallic 과
+        //   무관하게 전부 비금속으로 그려졌다.
+        //
+        //   dx12.gbuffer 자가 검증이 이것을 계속 붉게 알리고 있었다
+        //   (MetalRough 기대 (1, 0.75, 0.25) vs 실측 (1, 0.75, 0.000)).
+        const uint8_t ormNeutral[4] = { 255, 255, 255, 255 };
         if (!CreateSolidTexture(ormNeutral, L"DX12DefaultOrmNeutral",
             m_ormNeutralResource, m_ormNeutral, outError))
         {
