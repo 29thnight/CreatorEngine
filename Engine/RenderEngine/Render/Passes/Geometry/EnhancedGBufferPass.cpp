@@ -545,7 +545,10 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         instance.baseColorFactor = draw.baseColorFactor;
         instance.metallic = draw.metallic;
         instance.roughness = draw.roughness;
-        instance.useNormalMap = draw.useNormalMap;
+        // 제품 draw는 immutable material snapshot이 의미 상태의 정본이다.
+        // draw.useNormalMap은 snapshot이 없는 격리 fixture 호환 경계에만 남는다.
+        instance.useNormalMap = key.snapshot
+            ? key.snapshot->useNormalMap : draw.useNormalMap;
 
         // 스키닝 오프셋. 팔레트가 없으면 kNoSkinning으로 남아 셰이더가
         // 바인드 포즈로 그린다 — 스킨드와 비스킨드가 한 배치에 섞여도 된다.

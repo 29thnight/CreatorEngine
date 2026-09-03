@@ -118,11 +118,16 @@ struct EnhancedMaterialDrawSnapshot
     ShaderMetaBindingLayout bindingLayout{};
     std::vector<std::uint16_t> keywordSelections{};
     std::vector<std::uint8_t> propertyBytes{};
+    // normalMap 슬롯에는 항상 폴백 texture까지 묶이므로 texture handle만으로는
+    // 저작된 normal map의 유무를 셰이더가 구분할 수 없다. sealing 때 계산한
+    // 의미 상태를 snapshot이 함께 소유한다.
+    std::uint32_t useNormalMap{ 0 };
     std::vector<EnhancedMaterialTextureBinding> textureBindings{};
 
     bool IsValid() const noexcept
     {
-        return shaderMetaHandle.IsValid()
+        return useNormalMap <= 1u
+            && shaderMetaHandle.IsValid()
             && !bindingLayout.constantBufferName.empty()
             && bindingLayout.constantBufferByteSize == propertyBytes.size();
     }

@@ -2032,6 +2032,7 @@ bool RunVulkanGBufferTest(std::string& outLog)
         {
             return snapshot;
         }
+        snapshot->useNormalMap = material.GetNormalMapShared() ? 1u : 0u;
         constexpr std::array<std::string_view, 4> textureProperties{
             standard_material::property::BaseColorMap,
             standard_material::property::NormalMap,
@@ -2126,6 +2127,10 @@ bool RunVulkanGBufferTest(std::string& outLog)
         || !fixture.draws[1].materialSnapshot->IsValid()
         || !fixture.draws[2].materialSnapshot->IsValid()
         || !fixture.draws[3].materialSnapshot->IsValid()
+        || fixture.draws[0].materialSnapshot->useNormalMap != 0u
+        || fixture.draws[1].materialSnapshot->useNormalMap != 1u
+        || fixture.draws[2].materialSnapshot->useNormalMap != 1u
+        || fixture.draws[3].materialSnapshot->useNormalMap != 1u
         || fixture.draws[1].materialSnapshot->permutationKey
             == fixture.draws[2].materialSnapshot->permutationKey
         || fixture.draws[1].materialSnapshot->shaderMetaHandle

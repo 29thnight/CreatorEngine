@@ -3173,6 +3173,7 @@ namespace
                     return false;
                 }
                 snapshot->bindingLayout = *layout;
+                snapshot->useNormalMap = sealSource.useNormalMap;
                 if (!ExperimentMaterialSealing::SealCore(sealSource,
                         *materialShader.value, *layout, snapshot->propertyBytes,
                         snapshot->textureBindings, outError))
@@ -5829,4 +5830,3 @@ void EnhancedSceneRenderer::ShutdownLive()
         state.runtimeInitialized = false;
     }
 }
-
