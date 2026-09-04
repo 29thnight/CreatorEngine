@@ -49,7 +49,7 @@
    Editor 종료 통지에서 descriptor와 설치 inventory를 다시 읽는다. Editor만 descriptor가 선언한 저작
    root들을 efsw에 동적으로 등록한다.
 9. Player는 프로젝트 감시, Launcher 상태, efsw를 링크하지 않는다. Cooked content만 읽는다.
-10. Launcher는 빌드 로직을 재구현하지 않는다. PHASE 12의 동일 orchestrator를 별도 프로세스로
+10. Launcher는 빌드 로직을 재구현하지 않는다. PHASE 12.5의 동일 orchestrator를 별도 프로세스로
     실행하고 진행률·취소·로그만 중계한다.
 
 이 페이즈의 핵심은 설치 UI가 아니다. 다음 네 정본이 한 줄로 이어지는 것이 완료 상태다.
@@ -137,7 +137,7 @@ adapter를 추가한다.
 
 ### 2.2 비목표
 
-- 게임 배포 패키지를 엔진 MSI와 합치지 않는다. 게임 산출물은 PHASE 12의 별도 결과다.
+- 게임 배포 패키지를 엔진 MSI와 합치지 않는다. 게임 산출물은 PHASE 12.5의 별도 결과다.
 - Launcher 안에서 여러 프로젝트 Scene/Asset DB를 동시에 열지 않는다.
 - Launcher가 모든 등록 프로젝트의 `Assets`를 상시 재귀 감시하지 않는다.
 - `%ProgramFiles%`의 엔진 설치물을 Editor가 즉석에서 수정하거나 self-patch하지 않는다.
@@ -368,7 +368,7 @@ Player와 Launcher의 link/import/stage에는 `efsw`가 없어야 한다.
 
 ### 7.4 빌드
 
-- Launcher는 PHASE 12 orchestrator를 child process로 호출한다.
+- Launcher는 PHASE 12.5 orchestrator를 child process로 호출한다.
 - project descriptor path, target, config, backend, output을 명시적으로 전달한다.
 - stdout 텍스트 scraping만으로 상태를 추론하지 않도록 versioned machine-readable progress/event를 추가한다.
 - cancel은 process tree와 임시 stage를 안전하게 정리하고 마지막 정상 release pointer를 보존해야 한다.
@@ -469,7 +469,7 @@ channel metadata (signed)
 
 - Editor, 도구, template, runtime dependency를 version stage에 닫는다.
 - `engine.manifest.json`, file digest, build ID, ABI/schema 범위를 생성한다.
-- PHASE 12 산출물을 Launcher/installer가 소비하는 하나의 distribution contract로 만든다.
+- PHASE 12.5 산출물을 Launcher/installer가 소비하는 하나의 distribution contract로 만든다.
 - PHASE 22의 pinned miniaudio source hash/license와 FMOD-free dependency audit 결과를 provenance에 포함한다.
 
 **판정:** repo checkout과 vcpkg 없이 staged engine으로 외부 project를 열고, 누락/변조 파일은 catalog
@@ -495,7 +495,7 @@ digest로 복원된다.
 
 ### DL8 — Launcher build/cook 연동 (P1, 4일)
 
-- PHASE 12 orchestrator에 descriptor adapter와 machine-readable progress/cancel을 추가한다.
+- PHASE 12.5 orchestrator에 descriptor adapter와 machine-readable progress/cancel을 추가한다.
 - Launcher build UI는 child process 상태와 artifact/log link만 제공한다.
 - Workspace/Tracked의 저장소 전용 가정과 일반 Project 제품 경계를 분리한다.
 
@@ -527,21 +527,21 @@ digest로 복원된다.
 PHASE 23은 대시보드상 마지막이다. 단, 선행 연구와 기반 구현을 마지막까지 미룬다는 뜻은 아니다.
 
 ```text
-PHASE 12 B2 ───────────────┐
+PHASE 12.5 B2 ───────────────┐
 PHASE 17 D5 ────────────┐  │
 PHASE 21 W8 ─────────┐  │  │
 PHASE 22 AU8/AU9 ─┐  │  │  │
                  v  v  v  v
 DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
           \-> DL2 --/        \-----------> DL9 -> DL10
-                    DL4 + PHASE 12 B2/B3/B4/B5 -> DL8 --/
+                    DL4 + PHASE 12.5 B2/B3/B4/B5 -> DL8 --/
 ```
 
 - **DL0~DL4**는 PHASE 23의 선행 slice로 먼저 진행할 수 있다. 프로젝트 정본과 watcher 경계는 다른
   작업에도 필요하다.
-- **DL5** distribution closure는 PHASE 12 B2/B3/B4의 안정된 산출물 계약과 PHASE 22 AU8의
+- **DL5** distribution closure는 PHASE 12.5 B2/B3/B4의 안정된 산출물 계약과 PHASE 22 AU8의
   FMOD-free runtime stage를 요구한다.
-- **DL8/DL9 release gate**는 PHASE 12 B5 game CI, PHASE 17 D5 cooked manifest, PHASE 21 W8 Editor,
+- **DL8/DL9 release gate**는 PHASE 12.5 B5 game CI, PHASE 17 D5 cooked manifest, PHASE 21 W8 Editor,
   PHASE 22 AU9 audio device/performance/soak 회귀가 닫힌 뒤 판정한다.
 - PHASE 21의 UI shell을 Launcher에 복제하지 않는다. Launcher는 별도 작고 안정적인 제품 UI다.
 - EnginePackagingPlan P1~P5는 내부 링크/프로젝트 경계이고, 이 문서의 MSI/distribution ownership을
@@ -585,7 +585,7 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 | `%ProgramFiles%` 설치물을 Launcher가 직접 patch | 기각 | 부분 update, 권한, repair 정본이 갈라진다. 새 불변 version을 설치한다 |
 | project를 MSI component로 등록 | 기각 | uninstall/repair가 사용자 원본에 소유권을 갖게 된다 |
 | “latest” engine 자동 전환 | 기각 | migration과 재현 가능한 build를 깨뜨린다. exact pin과 명시적 transaction을 쓴다 |
-| Launcher 안에 별도 build pipeline | 기각 | CLI/CI/GUI 결과가 갈라진다. PHASE 12 orchestrator 하나만 둔다 |
+| Launcher 안에 별도 build pipeline | 기각 | CLI/CI/GUI 결과가 갈라진다. PHASE 12.5 orchestrator 하나만 둔다 |
 | 상주 elevated update service | 초기 릴리스 기각 | 공격면과 운영 복잡도가 크다. 표준 MSI 승격을 필요 시점에 사용한다 |
 
 ---

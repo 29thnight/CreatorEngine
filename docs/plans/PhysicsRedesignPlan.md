@@ -378,7 +378,7 @@ Native 테이블 물리 45개. `Colliders.cs`의 기형(트리거·활성화가 
 | **SceneGraphRedesignPlan 트랙 S** (Transform 컴포넌트화) | 물리가 Transform을 매 스텝 읽고 쓴다. S가 Transform 저장 위치를 바꾸면 B2의 동기화 경로가 그 위에 얹혀야 한다. **S 확정 후 B2 착수**를 권장하되, S가 지연되면 B2는 현 Transform API 위에서 진행하고 접점만 얇게 유지한다 |
 | **PHASE 17 직렬화** | M2가 `SerializationPlan`의 마이그레이션 규칙에 등록된다. 쿠킹 대상에 물리 컴포넌트가 포함됨 |
 | **PHASE 18 리플렉션** (완결) | typed 순회가 이미 있으므로 M2가 이름 기반 왕복을 안전하게 할 수 있다. 선행 조건 충족 |
-| **PHASE 12 빌드 파이프라인** | A1이 `Physics/`를 밀봉하면 Player 링크 경계가 정리된다. 상승 작용 |
+| **PHASE 12.5 빌드 파이프라인** | A1이 `Physics/`를 밀봉하면 Player 링크 경계가 정리된다. 상승 작용 |
 | **PHASE 14 프로파일러** | B2·T1의 효과 측정에 프레임 캡처가 있으면 훨씬 정확하다. 없어도 진행 가능(벽시계 측정으로 대체) |
 | **PHASE 20 네트워크 N3/N8** | N3가 render frame과 실제 fixed Simulation Tick을 분리하면 물리는 `fixedDelta` 소비자가 된다. T0의 소유 스레드·`simulate/fetchResults` 규칙을 우회하지 않는다. N8 prediction/rewind의 지원 범위는 backend 결정론 실측 뒤 정하며, 이 계획의 기본 완료 조건은 아니다 |
 

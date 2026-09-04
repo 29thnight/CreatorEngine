@@ -667,7 +667,7 @@ pipeline/pass stable IDs + asset/source fingerprint
 ```
 
 캐시가 없거나 키가 다르면 다시 컴파일한다. 캐시 파일을 수동 편집하는 경로는 없다.
-물리 asset 포맷과 Player 패키징 위치는 PHASE 12 BuildPipelinePlan의 규약을 따른다.
+물리 asset 포맷과 Player 패키징 위치는 PHASE 12.5 BuildPipelinePlan의 규약을 따른다.
 
 ### 11.2 에디터 표면
 

@@ -3,7 +3,7 @@
 - 수립일: 2026-08-24
 - 재검토일: 2026-08-27 — efsw 유지 결정과 소스 재감사 반영
 - 상태: **계획 수립 · 구현 미착수**
-- 배치: PHASE 17 직렬화·Asset/Cook 경계와 PHASE 12 package gate 뒤, PHASE 23 MSI·Launcher 제품화 앞
+- 배치: PHASE 17 직렬화·Asset/Cook 경계와 PHASE 12.5 package gate 뒤, PHASE 23 MSI·Launcher 제품화 앞
 - 초기 추정: **45 인일**. AU0 기준선과 device/backend 스파이크 뒤 갱신
 - 확정 포맷: **WAV · MP3 · FLAC만 지원**. OGG/Vorbis와 그 밖의 포맷은 importer에서 명시적으로 거부
 - 백엔드 결정: **miniaudio를 소스 벤더링한 첫 `IAudioBackend` 구현체로 채택**
@@ -430,7 +430,7 @@ handle 증가 0이며 public/managed header의 FMOD/miniaudio token이 0이다.
 - CreatorEditor/Editor/SceneRuntime/Player 프로젝트의 FMOD include/lib를 제거한다.
 - `ThirdParty/Fmod`, `fmod_vc.lib`, `fmodL_vc.lib`, `fmod.dll`, `fmodL.dll` stage를 제거한다.
 - `Tools/build.ps1`, CI, third-party notice, allowlist를 miniaudio source provenance에 맞춘다.
-- PHASE 12 B5 clean-checkout Game leg를 다시 연다.
+- PHASE 12.5 B5 clean-checkout Game leg를 다시 연다.
 
 **판정:** source/project/stage/PE import에서 FMOD dependency 0, miniaudio runtime DLL 0, clean checkout
 Editor+Player+Game package link/smoke와 license/SBOM scan이 통과한다.
@@ -453,10 +453,10 @@ device cycle 20회와 Editor/Player 종료 100회에서 thread/handle/voice/reso
 
 ```text
 PHASE 17 D2/D5 -> AU2
-PHASE 12 B2/B3 -> AU0 -> AU1 -> AU3
+PHASE 12.5 B2/B3 -> AU0 -> AU1 -> AU3
 (AU2 + AU3) -> AU4 -> (AU5 + AU6) -> AU7 -> AU8 -> AU9
 
-AU8/AU9 -> PHASE 12 B5 clean CI
+AU8/AU9 -> PHASE 12.5 B5 clean CI
 AU8/AU9 -> PHASE 23 DL5/DL9/DL10 distribution/release gate
 AU5/AU9 -> PHASE 14 Audio profiler provider
 ```

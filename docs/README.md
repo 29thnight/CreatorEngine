@@ -21,7 +21,8 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | 문서 | 대상 |
 |---|---|
 | **[Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md)** | **PHASE 4 통합 계획 — 순서·우선순위·공수의 정본. 계획서 5종의 충돌 13건 판정과 성능 우선 정렬** |
-| [BuildPipelinePlan.md](plans/BuildPipelinePlan.md) | 게임 빌드·패키징 파이프라인 (PHASE 12) |
+| [TexturePipelinePlan.md](plans/TexturePipelinePlan.md) | 텍스처 임포트·cook·런타임 소비 파이프라인 (PHASE 12) |
+| [BuildPipelinePlan.md](plans/BuildPipelinePlan.md) | 게임 빌드·패키징 파이프라인 (PHASE 12.5) |
 | [SceneGraphRedesignPlan.md](plans/SceneGraphRedesignPlan.md) | 씬 그래프·엔티티·컴포넌트·프리팹 재설계 (PHASE 8.5) |
 | [TransformUpdatePlan.md](plans/TransformUpdatePlan.md) | Transform 갱신 구조·성능 재설계 (PHASE 8.75) |
 | [TransformUpdatePipeline.html](plans/TransformUpdatePipeline.html) | ↑의 §3.5(목표 구조·플로우차트 7종)를 조판한 자립형 페이지. mermaid 런타임을 벤더링해 오프라인에서 열린다 — 그래서 3MB대다 |
