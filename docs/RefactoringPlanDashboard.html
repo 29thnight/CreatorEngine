@@ -351,6 +351,8 @@
       <div class="why">파이프라인 조립의 기술(記述)화. 그래프에 흡수하지 않은 근거 셋. 슬라이스 1·2 완료, 뷰 정책 잔여와 덤프 명령이 남았다.</div></div>
     <div class="doc"><a href="plans/Phase5CouplingPlan.md">Phase5CouplingPlan.md</a><span class="tie">5-1 · 5-2</span>
       <div class="why">렌더→게임플레이 커플링 절단의 실행 설계. A(죽은 include)·B(데이터 헤더 소속 정정)·C(행위 커플링 6종)·D(검증). 실측 간선 154 → 14.</div></div>
+    <div class="doc"><a href="plans/ScriptSurfacePlan.md">ScriptSurfacePlan.md</a><span class="tie">PHASE 9.5</span>
+      <div class="why">C# 스크립트 표면의 기준을 <b>사라진 게임 코퍼스의 호출 빈도</b>에서 <b>현재 네이티브 구조와 실제 저작분</b>으로 옮긴다(W1~W7). <code>ScriptApiMigrationPlan.html</code> §11 등급표를 승계·폐기한다 — 그 표의 기준 코퍼스는 <code>8ae17250</code>에서 통째로 삭제됐는데 표만 남아 있었다. W1(골격)·W2(Light·Camera 노출) 완료, W3(입력 값 통로)~W7 대기.</div></div>
     <div class="doc"><a href="plans/BehaviorTreeManagedPlan.md">BehaviorTreeManagedPlan.md</a><span class="tie">9-8</span>
       <div class="why">행동 트리를 C# 우선으로 재설계. ★ 트리 전체를 관리 측으로 옮기는 이유 — BT 틱이 동기라 "노드만 C#"은 불변식을 깬다.</div></div>
     <div class="doc"><a href="plans/EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">E0~E7</span>
@@ -410,7 +412,7 @@
     <div class="doc is-ref"><a href="design/ResourceOwnershipDesign.html">ResourceOwnershipDesign.html</a>
       <div class="why">자원 소유권·경계 설계. PHASE 2의 근거.</div></div>
     <div class="doc is-ref"><a href="plans/ScriptApiMigrationPlan.html">ScriptApiMigrationPlan.html</a>
-      <div class="why">스크립트 API 이전 설계(ModuleBehavior → C#). PHASE 2 후반과 9-4의 근거.</div></div>
+      <div class="why">스크립트 API 이전 설계(ModuleBehavior → C#). PHASE 2 후반과 9-4의 근거. <b>★ §11의 T1~T4 등급표는 폐기됐다</b> — 그 기준이 된 <code>Dynamic_CPP\Assets\Script</code> 코퍼스가 <code>8ae17250</code>에서 포팅 없이 삭제됐고(349파일·37,788줄), &quot;Transform은 컴포넌트가 아니다&quot;도 <code>c9bbdd56</code>(S1-b)에서 뒤집혔다. 표면 작업의 현재 정본은 <a href="plans/ScriptSurfacePlan.md">ScriptSurfacePlan.md</a>(PHASE 9.5).</div></div>
     <div class="doc is-ref"><a href="analysis/RectTransformAnalysis.html">RectTransformAnalysis.html</a>
       <div class="why">RectTransform 분석. PHASE 8(UI 레이아웃 해상도 독립)의 근거.</div></div>
     <div class="doc is-ref"><a href="design/ReflectionRetentionDecision.md">ReflectionRetentionDecision.md</a>
@@ -808,6 +810,52 @@
         <span style="color:var(--text-dim)">— 3사이클: update 리스트 2→2 · 관리 힙 0.1MB 유지 · VRAM 사이클당 +0MB · 엔진 에셋 0 변동</span></li>
     </ul>
   </div>
+</section>
+
+<!-- ===== PHASE 9.5 ===== -->
+<section class="phase" id="phase-9.5">
+  <h2 class="sec"><span class="no">PHASE 9.5</span>스크립트 표면 재설계 (C# 계층 기준 재수립) <span class="phase-pct" data-phase-pct="9.5"></span></h2>
+  <div class="phase-meta">예상 공수: 17일 · 선행 조건: PHASE 9 완료(생명주기 6단계 확정) · 병행: 다른 페이즈와 병행 가능 · 설계 문서: <a href="plans/ScriptSurfacePlan.md" style="color:var(--accent)">ScriptSurfacePlan.md</a></div>
+  <div class="phase-goal"><b>목표:</b> C# 스크립트 표면의 기준을 <b>사라진 게임 코퍼스의 호출 빈도</b>에서 <b>현재 네이티브 구조와 실제 저작분</b>으로 옮긴다.
+  <br><br>
+  <b>왜 지금인가.</b> 표면은 엔진을 따라가지 못한 것이 아니라 <b>애초에 엔진을 따라가도록 설계되지 않았다.</b>
+  <code>ScriptApiMigrationPlan.html</code> §11의 T1~T4 등급표는 2026-07-29 시점 <code>Dynamic_CPP\Assets\Script</code> 코퍼스를 실측해 만든 것이고,
+  그 코퍼스는 <code>8ae17250</code>에서 포팅 없이 통째로 삭제됐다(349파일 · 37,788줄 · 새 GameScripts 0건).
+  <b>기준이 사라졌는데 표가 갱신되지 않았고</b>, 그 계획서의 S3·S4는 대시보드 항목이 된 적이 없다. 같은 기간 <code>Engine\</code>에 115커밋이 들어왔다.
+  <br><br>
+  그래서 표면이 &quot;옛 게임 코드가 그때 무엇을 얼마나 불렀는가&quot;로 굳어 있었다 —
+  Transform이 자유 함수 묶음이었고(그 전제는 <code>c9bbdd56</code>에서 뒤집혔다),
+  입력이 폴링 전용이었고(등급표가 &quot;T3: 호출이 적어 단순 래핑으로 충분&quot;이라 적었다),
+  컴포넌트 32종 중 13종만 노출돼 있었다(나머지는 늦게 생긴 것이 아니라 애초에 범위 밖이었다).
+  <br><br>
+  <b>이 페이즈가 지키는 원칙 넷.</b>
+  ① <b>저작분이 규모를 정한다</b> — 계획서 목록이 아니라 실제 자산 건수를 세고, 0건이면 착수하지 않는다(관리 측이 컴포넌트를 붙일 수 없어 죽은 표면이 된다).
+  ② <b>값 왕복 단정만으로 통과시키지 않는다</b> — 컴포넌트 필드는 바뀌므로 되읽으면 언제나 새 값이 나온다. 그 값이 소비자(렌더·직렬화·이벤트)까지 가는 축을 따로 잰다.
+  ③ <b>컴포넌트마다 검증할 사슬이 다르다</b> — Light는 dirty 사슬이 있고 Camera는 없다. 같은 형태의 게이트를 복사하면 한쪽은 아무것도 재지 않는다.
+  ④ <b>못 잡는 것을 적는 데까지가 증명이다</b> — 하네스가 볼 수 없는 칸은 실측치와 함께 게이트 파일에 남긴다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="9.5"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li class="done-item">✔ 관리 측 기반 클래스가 네이티브와 1:1 — Behaviour 층 제거, Transform이 <code>NativeComponent</code> 파생
+        <span style="color:var(--text-dim)">— W1. 게이트 3종(API 표 · BT 열거 · 진입점 이름)을 함께 세웠다</span></li>
+      <li class="done-item">✔ 저작분 있는 미노출 컴포넌트 0 — <code>LightComponent</code> 30건 · <code>CameraComponent</code> 20건 노출
+        <span style="color:var(--text-dim)">— W2. 나머지 11종은 저작 0건이라 착수 대상이 아니다</span></li>
+      <li>스크립트가 입력 액션 <b>값</b>을 받는다 — <code>PlayerInputComponent</code>를 붙인 씬과 액션 맵 저작분 위에서 회귀가 돈다</li>
+      <li>인스펙터 저작 경로가 렌더 프록시까지 닿는다 — <code>LightComponent</code> 값 필드를 <code>private</code>으로 내려도 저작이 멈추지 않는다</li>
+      <li>렌더 델타 적용을 관측하는 하네스가 있다 — Light 게이트의 ② 축이 누계가 아니라 프록시 <b>값</b>을 대조하고, dirty 제거 변이에 붉어진다</li>
+      <li>손으로 맞춘 경계 계약에 게이트 0건이 없다 — <code>ScriptLifecyclePhase</code> · <code>ScriptFieldType</code> · <code>ScriptMessage</code> 배치 + <code>SerializeField</code> 7종 실자산 왕복</li>
+      <li><code>ScriptApiMigrationPlan.html</code> §11 등급표에 폐기 표시와 승계 문서 포인터가 박혀 있다</li>
+    </ul>
+  </div>
+  <div class="risknote"><b>착수 순서.</b> <b>W5 → W4 → W3 → W6 → W7</b>을 권한다.
+  W5(관측 하네스)가 먼저 서야 W4(저작 dirty)의 &quot;고쳤다&quot;가 관측 가능해지고,
+  W3의 값 통로 결정(<code>ScriptMessage</code> 확장이냐 질의 API냐)이 W6의 미러 계약을 정하므로 W6보다 앞서야 한다.
+  W7은 언제든 가능하다.
+  <br><br>
+  <b>W3의 정면 과제는 배선이 아니라 소비자다.</b> 어느 씬에도 <code>PlayerInputComponent</code>가 <b>0건</b>이라 그 경로는 지금 한 번도 돌지 않는다 —
+  액션 맵 자산과 컴포넌트를 붙인 씬을 함께 저작하지 않으면 검증이 성립하지 않는다.
+  같은 함정이 W6의 <code>SerializeField</code>에도 있다(직렬화된 값 0건).</div>
 </section>
 
 <!-- ===== PHASE 10 ===== -->
@@ -1821,6 +1869,41 @@ const TASKS = [
     detail: "GC.GetGCMemoryInfo()·CollectionCount(0/1/2)를 틱당 1회 blittable로 경계 너머로 수출, 리소스 카운터 HUD(0-2)에 gen0/1/2 수집 횟수·관리 힙 크기 표시. 2-9 '메모리 평탄성 검증'의 판정 기준을 '네이티브·관리 힙 모두 기준선 복귀'로 확장.",
     refs: "LifecycleRedesignPlan §07 A-2 · 2-9", priority: "P1", days: 0.25, status: "done", note: "코드 완료 · C# 측 빌드 검증 통과 · 네이티브 빌드는 별도 진행. GcStats(gen0/1/2 수집 횟수·힙 크기·단편화·GC 점유율)를 blittable 구조체로 포인터 하나에 담아 넘긴다 — 물리 이벤트와 같은 규약이다. ★ 배치 불일치는 경고 없이 그럴듯한 쓰레기 값을 만들어 눈으로 알아채기 어려우므로 양쪽에 못을 박았다: C++에 static_assert(sizeof==48), 그리고 실제로 확인했다 — 컴파일된 어셈블리에서 Marshal.SizeOf=48, HeapSizeBytes 오프셋 16(int32 셋 12 + 정렬 패딩 4)으로 C++ 자연 정렬과 정확히 일치. HUD: ResourceCounterWindow에 '관리 힙 (.NET GC)' 섹션 추가. 게임 스레드의 ImGui 패스에서 그려지므로 경계 규약을 지키고, 갱신 주기가 0.5초라 틱마다 넘지도 않는다. 수집 횟수는 단조 증가라 증감의 뜻이 다르다는 점을 표시에 반영했다 — '기준선 이후 몇 번 돌았나'이고, 씬 전환마다 gen2가 정확히 늘어나는지가 9-6의 확인점이다. 벤치 확장: scene_churn_benchmark와 lifecycle_baseline에 gc.delta/gc.stats를 넣어 2-9의 판정 기준을 '네이티브·관리 양쪽 모두 기준선 복귀'로 넓혔다 — 스크립트가 C#으로 간 뒤로 씬이 붙들던 것의 상당수가 관리 힙에 있어, gpu.delta만 보면 평탄성의 절반만 본다. gc.delta는 기준선이 없으면 조용히 0을 찍는 대신 집계로 남기고 기준선을 세운다(0을 '변화 없음'으로 오독하는 것을 막는다). ★ 빌드·회귀 통과(2026-08-07) — 완료." },
 
+  // ---------- PHASE 9.5: 스크립트 표면 재설계 (C# 계층 기준 재수립) ----------
+  //
+  // ★ 2026-09-04 신설. PHASE 9가 네이티브 생명주기를 재설계하는 동안 C# 표면은
+  //   옛 게임 코퍼스의 호출 빈도를 기준으로 굳어 있었고, 그 코퍼스가 8ae17250에서
+  //   통째로 삭제된 뒤에도 기준이 갱신되지 않았다. ScriptApiMigrationPlan.html
+  //   §11의 T1~T4 등급표가 그 낡은 기준이다(W7에서 폐기 표시).
+  { phase: 9.5, id: "W1", title: "골격 — 기반 클래스를 네이티브와 1:1로",
+    detail: "Behaviour 층 폐기(네이티브에서 6단계 생명주기를 소유하는 계층 이름이 Component다), Transform을 자유 함수 묶음에서 NativeComponent 파생으로 승격(S1-b의 관리 측 귀결), BehaviourRegistry→ScriptRegistry·BehaviourGenerator→ScriptGenerator 개명, Transform_Exists 신설.",
+    refs: "ScriptSurfacePlan.md §1 · 79ac93ae", priority: "P1", days: 2, status: "done",
+    note: "완료(2026-09-04). Behaviour는 일어나지 않은 Unity 관례 이식의 잔재였다 — 네이티브는 Transform·MeshRenderer·ScriptComponent가 전부 Component에서 파생하는 2층인데 관리 측만 3층이었다. 개명이 필요했던 이유: Component 방향으로 가면 BehaviourRegistry라는 이름이 네이티브 ComponentFactory·RegisterAllComponents(컴포넌트 타입 등록부)와 뜻이 부딪힌다. ★ Transform_Exists를 새로 판 이유 — UI/Canvas 오브젝트는 Transform이 없고 Entity::Transform_()이 공유 더미를 돌려주므로 쓰기가 조용히 버려진다. 썽크는 HasTransform()을 직접 보게 했다(전자를 쓰면 검사가 항상 '있다'가 되어 아무것도 재지 않는다). 애니메이션의 SetBehaviour·CreateBehaviour 계열은 별개 체계라 개명 대상이 아니다. 게이트 3종을 함께 세웠다: check-api-table(순서·개수 대조) · check-bt-enums · check-entry-points(문자열 이름 바인딩은 컴파일러도 API 표 게이트도 못 본다)." },
+  { phase: 9.5, id: "W2", title: "컴포넌트 노출 — LightComponent · CameraComponent",
+    detail: "저작 자산에 있는데 스크립트가 만질 길이 없던 컴포넌트를 연다. 각각 회귀 프로브와 게이트를 함께 세운다.",
+    refs: "ScriptSurfacePlan.md §1 · 84419886 · ebab7c7f", priority: "P1", days: 2, status: "done",
+    note: "완료(2026-09-04). ★ 저작분이 규모를 정했다 — 착수 메모는 미노출 19종을 적었지만 실측하니 Light 30건·Camera 20건 외에는 전부 0건이거나(Terrain·Volume·Decal·Foliage·Ragdoll·MeshCollider·PlayerInput·SpriteRenderer·SpriteSheet·StateMachine·TerrainCollider) 노출할 것이 없었다(BoneComponent는 저작 234건이지만 필드 0·메서드 1의 마커). 관리 측이 네이티브 컴포넌트를 붙일 수단이 없으므로(CreateComponent는 네이티브→관리 방향이다) 저작분 0인 타입에 래퍼를 만들면 GetComponent가 원리적으로 늘 null인 죽은 표면이 된다. ★ 두 컴포넌트의 검증할 사슬이 서로 달랐다: Light는 렌더 프록시를 쓰므로 값 writer가 dirty를 안 내면 화면이 그대로인데 되읽으면 새 값이 나온다 — 값 왕복 단정은 이 결함에 원리적으로 눈멀어 dirty 사슬 축을 따로 세웠다. Camera는 프록시를 안 쓰고(Scene.cpp의 프록시 Kind 열거에 Camera가 없다) 매 프레임 CaptureFrameSnapshot으로 읽히므로 발행할 dirty가 애초에 없고 축도 하나다. 같은 형태의 게이트를 복사했으면 한쪽은 아무것도 재지 않았다. 부수: Mesh_SetMaterialFloat의 죽은 buffer 인자 제거(kApiVersion 21→22) — 순서 대조 게이트는 한쪽만 올린 버전 상승에 구조적으로 눈멀고 실제로 스크립트를 돌리는 회귀만 왕복을 증명한다. 명명 규칙 확인: C# 래퍼는 네이티브 이름 그대로이고 예외가 없다(15종 대조)." },
+  { phase: 9.5, id: "W3", title: "입력 액션 값 통로 — 이름만 넘고 값이 끊긴다",
+    detail: "PlayerInputComponent가 액션 발화를 스크립트에 알릴 때 함수 이름만 넘긴다. ActionMap이 계산한 v2Value를 스크립트가 받을 통로를 연다. 착수 전에 방식을 정해야 한다 — ScriptMessage에 값 필드를 더할 것인가, 질의 API를 따로 둘 것인가.",
+    refs: "ScriptSurfacePlan.md §2 W3 · ActionMap.cpp:317,327 · ClrHost.h:130", priority: "P1", days: 4, status: "todo",
+    note: "값이 두 곳에서 끊긴다. ① ActionMap.cpp:317,327의 valueAction(action->value.v2Value)이 주석 처리돼 있다 — 바로 위에서 키보드 4방향/게임패드 스틱으로 v2Value를 채워 놓고 onFired(funName)만 부르므로 계산된 값이 그 자리에서 버려진다. ② ScriptMessage가 {int instanceId; char name[64]}뿐이라 ①을 살려도 실을 곳이 없다. 안 A(ScriptMessage에 값 필드): 구조체 배치가 바뀌어 kApiVersion 상승 + 모든 메시지가 안 쓰는 값 필드를 든다. 안 B(Input_GetActionValue 질의 API): 발화와 질의 사이에 값이 바뀔 수 있다(틱 경계라 실제로는 안전하나 계약이 약해진다). ★ 소비자도 함께 저작해야 한다 — 어느 씬에도 PlayerInputComponent가 0건이라 이 경로는 지금 한 번도 돌지 않는다. 액션 맵 자산과 컴포넌트를 붙인 씬 없이는 고쳤다를 증명할 수 없다. 이 결정이 W6의 ScriptMessage 미러 계약을 정하므로 W6보다 앞서야 한다." },
+  { phase: 9.5, id: "W4", title: "저작 dirty 통로 — 인스펙터가 값만 대입하고 dirty를 모른다",
+    detail: "ReflectionTypedDraw가 컴포넌트 필드를 직접 쓰면서 PublishRenderProxyDirty를 내지 않는다. 리플렉션 draw에 값 변경 통지 훅을 두고, 렌더 프록시를 쓰는 컴포넌트가 그 훅에서 dirty를 발행하게 한다.",
+    refs: "ScriptSurfacePlan.md §2 W4 · ReflectionTypedDraw.h", priority: "P1", days: 3, status: "todo",
+    note: "ReflectionTypedDraw.h에 ProxyDirty 언급이 0건이다. 그래서 인스펙터에서 라이트 색·세기를 바꾸면 컴포넌트 필드는 바뀌지만 LightRenderProxy는 낡은 채 남는다. ★ W2가 세운 게이트의 변이 상태가 정확히 지금의 인스펙터 경로다 — LightComponent setter의 PublishRenderProxyDirty 6줄을 지우면 값 왕복 15건은 그대로 통과하고 dirty 사슬 축만 붉어진다. W2는 setter 신설에서 멈췄다: 필드가 여전히 public이라 우회할 수 있는데, 지금 private으로 내리면 저작 경로가 멈춘다(인스펙터가 그 필드를 직접 쓴다). 순서는 훅 신설 → 컴포넌트가 훅에서 발행 → 그 뒤에야 필드를 private으로. 완료 증명이 W5에 걸린다." },
+  { phase: 9.5, id: "W5", title: "렌더 델타 관측 하네스 — 헤드리스가 프록시 적용을 못 본다",
+    detail: "--script 헤드리스는 렌더 프레임이 거의 돌지 않아 프록시 값을 관측할 수 없다. 렌더 프레임을 N회 강제로 도는 CLI 또는 게임 스레드에서 델타를 동기 적용하는 검사 전용 진입점을 세운다.",
+    refs: "ScriptSurfacePlan.md §2 W5 · verify-light-script.ps1", priority: "P2", days: 3, status: "todo",
+    note: "실측(2026-09-04, 기본 씬 라이트에 스크립트로 8회 쓰기): 기준선 publish=1 committed=1 queued=3 applied=2 → 이후 publish=9 committed=2 queued=4 applied=2. 게임 스레드 쪽은 전부 정상이고 applied만 멈춰 있다. RenderScene::UpdateCommand는 프록시에 쓰지 않고 ProxyCommandQueue에 델타를 넣을 뿐이며 그것을 적용하는 ExecuteBatch는 렌더 소비 스레드 전용이다. 같은 실행의 종료 로그가 publish 64 / consume 3 / latest-wins 61 / overflow 61. ★ 이 한계를 제품 결함으로 오진한 적이 있다 — scene.switch로 씬을 열면 그 씬의 광원이 프록시에 안 잡히고 옛 씬 값이 남는 것을 씬 전환 시 광원 미등록으로 보고했는데, 새 광원의 RegisterCommand도 옛 광원의 UnregisterCommand도 같은 큐로 가므로 같은 한계의 두 얼굴이었다. 갈라 준 것은 enqueued/applied 한 쌍이다. 그래서 W2의 Light 게이트는 게임 스레드 쪽 사슬까지만 재고 마지막 한 칸을 파일 머리에 실측치와 함께 적어 뒀다. 이것이 서야 W4의 고쳤다가 관측 가능해진다." },
+  { phase: 9.5, id: "W6", title: "미러 커버리지 — 검사 없는 경계 계약 3종 + SerializeField 왕복",
+    detail: "ScriptLifecyclePhase · ScriptFieldType · ScriptMessage 배치는 C++와 C#이 손으로 맞춘 미러인데 게이트가 0건이다. 각각 대조를 세우고 변이로 이빨을 증명한다. SerializeField 7종 왕복도 실자산 저작본으로 게이트를 세운다.",
+    refs: "ScriptSurfacePlan.md §2 W6 · ClrHost.h", priority: "P2", days: 2, status: "todo",
+    note: "셋 다 ClrHost.h에 정의가 있고 주석만 'C#과 맞춰야 한다'고 적는다. 어긋나면: ScriptLifecyclePhase는 6단계 훅이 엉뚱한 단계로 불리고, ScriptFieldType은 SerializeField 값이 잘못된 타입으로 왕복하고, ScriptMessage 배치는 메시지 이름이 깨진다(W3이 필드를 더하면 더 위험해진다 — 그래서 W3의 결정이 이 항목보다 앞선다). ★ SerializeField 왕복 게이트도 없다: CaptureFields/RestoreFields가 7종 대칭인데 저작 자산에 직렬화된 값이 0건이라 실자산 왕복 전례가 없다. 저작분을 만들어 저장/로드 왕복을 재야 한다 — 배선을 만들었어도 저작분이 0이면 그 경로는 한 번도 돌지 않는다." },
+  { phase: 9.5, id: "W7", title: "문서 청산 — 폐기된 등급표와 뒤집힌 전제",
+    detail: "ScriptApiMigrationPlan.html §11의 T1~T4 등급표에 폐기 표시와 ScriptSurfacePlan.md 포인터를 박는다. 같은 문서의 'Transform은 컴포넌트가 아니다'와 BehaviorTreeManagedPlan.md의 BehaviourRegistry 지목을 정정한다.",
+    refs: "ScriptSurfacePlan.md §2 W7", priority: "P3", days: 1, status: "todo",
+    note: "§11의 등급표는 2026-07-29 시점 Dynamic_CPP\\Assets\\Script 코퍼스를 실측해 만든 것이다(GetComponent 734회·Transform 접근 1위·입력 43회 같은 숫자가 표면의 모양을 정했다). 그 코퍼스는 8ae17250에서 포팅 없이 통째로 삭제됐다(349파일·37,788줄 삭제·새 GameScripts 0건) — 기준이 사라졌는데 표가 남아 다음 작업자를 잘못 이끈다. 그 표가 '입력은 호출이 적어 단순 래핑으로 충분(T3)'이라 적은 것이 W3이 지금까지 열리지 않은 이유다. 'Transform은 컴포넌트가 아니다'는 트랙 L2가 닫힌 이틀 뒤 c9bbdd56(S1-b)에서 뒤집혔다. ★ 애니메이션의 SetBehaviour/CreateBehaviour 계열은 별개 체계라 개명 대상이 아니라는 경계를 함께 적는다 — 적어 두지 않으면 다음 스윕이 또 건드린다." },
+
   // ---------- PHASE 10: 파티클·이펙트 백지 재작성 (최후순위) ----------
   //
   // ★ 2026-08-08(사용자 판단): "이식하며 고친다"에서 "백지에서 새로 쓴다"로
@@ -2609,7 +2692,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "텍스처 파이프라인 (임포트·cook·런타임 소비)", 12.5: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 9.5: "스크립트 표면 재설계 (C# 계층 기준 재수립)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "텍스처 파이프라인 (임포트·cook·런타임 소비)", 12.5: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨", stopped: "중단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked", stopped: "st-stopped" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0, stopped: 0 };
