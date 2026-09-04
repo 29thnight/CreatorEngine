@@ -748,6 +748,48 @@ mutating command를 다음 넷으로 전수 분류하고 descriptor에 표시한
 | Test/diagnostic probe | GUI 의미가 없고 관측/격리 검사용 | `dx12.*`, `vk.*`, `profile.*` |
 | Raw fixture authoring | 회귀 fixture 생성용으로 Undo를 의도적으로 우회 | 일부 `*.authoring.probe` |
 
+### 9.2 동등성 — 하나는 고치고 나머지는 분류했다 (2026-09-04 LC6)
+
+**고친 것: GUI Play와 서비스 `play`가 서로 다른 Undo 스택을 쓰고 있었다.**
+
+`m_isGameMode` 대입이 `MenuBarWindow`의 Play 버튼 안에 인라인으로 있었고, 저장소
+전체에서 그 한 줄이 유일한 쓰기였다. 버튼을 눌러야만 실행되니 CLI·서비스로 재생하면
+영원히 false다 — 재생 중의 편집이 게임 스택이 아니라 **편집 스택**에 쌓인다. 사람이
+GUI로 한 것과 에이전트가 HTTP로 한 것이 같은 조작인데 다른 곳에 기록된다.
+
+앞선 슬라이스(E3-2)가 이미 이것을 발견해 게이트에 "이것은 결함이지 의도가 아니다"로
+못 박고 고치면 눈에 띄게 표시를 남겨 두었다. 대입을 `Editor::PlayModeController`로
+옮겼다 — Undo 폐기가 이미 사는 곳이고, GUI든 CLI든 `SetGameStart`를 지나면 같은
+이벤트가 온다. GUI의 인라인 두 줄은 지웠다(소유자는 하나여야 한다).
+
+| | 전 | 후 |
+|---|---|---|
+| 서비스 `play` 후 `isGameMode` | `false` | `true` |
+| 서비스 `stop` 후 | `false` | `false` |
+
+`verify-play-selection-undo.ps1`의 판정 C를 **기록하는 줄에서 단정하는 줄로** 바꿨다.
+기록만 하고 통과시키면 되돌아가도 조용하다.
+
+**분류한 것: `editor_operation` 8개 중 하나만 Undo를 남긴다.**
+
+| 명령 | Undo 기록 |
+|---|---|
+| `object.create.undoable` | **남긴다** |
+| `object.create` · `object.rename` · `object.duplicate` · `object.parent` · `object.transform` · `component.add` · `object.property` | 남기지 않는다 |
+
+`object.create`와 `object.create.undoable`이 **따로 존재한다는 것 자체**가 신호였다.
+
+13개에 Undo를 붙이는 것은 각 명령의 저작 의미를 정하는 일이라 파일 분리와 같은
+슬라이스에 들어갈 크기가 아니다. §9의 완료 기준도 "GUI/서비스 의미 차이 **미분류** 0"
+— 없애라가 아니라 분류하라다. `verify-cli-editor-operation.ps1`이 지금 참인 것을 값으로
+못 박는다. Undo를 **늘리면** 그 게이트가 붉어지는데 그것은 좋은 변경이므로, 래칫을
+옮기라고 실패 문구에 적었다.
+
+★ 관측 창구 둘(`undo.state`·`play.state`)을 결과형으로 옮겼다. stdout 만으로는 게이트가
+정규식을 긁게 되고, 그것은 LC6이 RenderTest 56개에서 없앤 바로 그 모양이다.
+
+---
+
 완료 판정 예: GUI Play와 서비스 `play`가 `IsGameStart`·edit/game Undo depth·selection을
 같은 규약으로 전이 · GUI duplicate와 서비스 duplicate가 부모·선택·Undo를 동일하게 반영 ·
 raw fixture command는 Undo 우회가 명시되고 일반 회귀와 분리.

@@ -165,14 +165,26 @@ try {
             "editUndo=$($undoPlaying.EditUndo) editRedo=$($undoPlaying.EditRedo)")
     }
 
-    # ── 판정 C: CLI 재생은 m_isGameMode를 켜지 않는다 (실측 고정) ──
-    # 이것은 결함이지 의도가 아니다. 지금 참인 것을 못 박아 두어, E3-2가 이 성질을
-    # 고치면(파생값으로 바꾸면) 이 줄이 붉어져 변경이 눈에 띄게 한다.
-    $gameModeNote = if ($undoPlaying.IsGameMode -eq 0) {
-        "cli-play-does-not-set-gamemode(known defect)"
-    } else {
-        "gamemode-now-tracks-play(CHANGED)"
+    # ── 판정 C: CLI 재생도 m_isGameMode를 켠다 (LC6 §9에서 고쳤다) ──
+    #
+    # 이 줄은 원래 그 반대를 못 박고 있었다 — "CLI 재생은 m_isGameMode를 켜지
+    # 않는다(known defect)". 대입이 MenuBarWindow의 Play 버튼 안에 인라인으로
+    # 있었고 저장소 전체에서 그 한 줄이 유일한 쓰기였기 때문이다. 그래서 같은
+    # 조작인데 사람이 버튼으로 하면 게임 스택에, 에이전트가 HTTP로 하면 편집
+    # 스택에 쌓였다.
+    #
+    # LC6이 그 대입을 Editor::PlayModeController로 옮겨 GUI·CLI가 같은 이벤트를
+    # 지나게 했다. 이제 **결함을 기록하는 줄이 아니라 계약을 단정하는 줄**이다 —
+    # 되돌아가면 붉어져야 한다. 기록만 하고 통과시키면 되돌아가도 조용하다.
+    if ($undoPlaying.IsGameMode -ne 1) {
+        throw ("CLI 재생이 m_isGameMode를 켜지 않았다(got $($undoPlaying.IsGameMode)) — " +
+            "GUI Play와 서비스 play가 다른 Undo 스택을 쓰게 된다(§9 동등성)")
     }
+    if ($undoStop.IsGameMode -ne 0) {
+        throw ("정지가 m_isGameMode를 끄지 않았다(got $($undoStop.IsGameMode)) — " +
+            "정지 뒤의 편집이 게임 스택에 쌓인다")
+    }
+    $gameModeNote = "gamemode=play(1)/stop(0)"
 
     # ── 판정 D: 정지는 선택을 해제한다 (복원이 아니다) ──
     if ($selRestored.Primary -ne "(none)") {

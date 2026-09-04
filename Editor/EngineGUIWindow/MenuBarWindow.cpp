@@ -466,9 +466,14 @@ void MenuBarWindow::RenderMenuBar()
             const bool isGameRunning = SceneManagers->IsGameStart();
             if (ImGui::Button(isGameRunning ? ICON_FA_STOP : ICON_FA_PLAY))
             {
-                Meta::UndoManager::GetInstance()->ClearGameMode();
+                // ★ LC6(§9): Undo 정책은 `Editor::PlayModeController` 가 소유한다.
+                //
+                //   예전에는 이 버튼이 `ClearGameMode()` 와 `m_isGameMode` 대입을
+                //   직접 했다. 그래서 그 둘이 **버튼을 누른 경우에만** 일어났고,
+                //   CLI·서비스로 재생하면 일어나지 않았다 — 같은 조작인데 기록되는
+                //   스택이 달랐다. 이제 `SetGameStart` 가 던지는 PlayModeEvent 를
+                //   컨트롤러가 받아 양쪽에 똑같이 적용한다.
                 SceneManagers->SetGameStart(!isGameRunning);
-                Meta::UndoManager::GetInstance()->m_isGameMode = SceneManagers->IsGameStart();
             }
 
             ImVec2 curPos = ImGui::GetCursorPos();

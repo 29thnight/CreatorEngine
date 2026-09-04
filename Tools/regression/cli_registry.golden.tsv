@@ -131,7 +131,7 @@ perf.reflect	-	long	editor	probe	live	no	[반복]	씬 직렬화와 프리팹 역
 pipeline.nodes	-	immediate	editor	engine_service	live	no	-	라이브 파이프라인의 노드 조립 결과를 한 줄씩 낸다
 pix.capture	-	frames	editor	probe	live	no	begin|end|status	PIX 주입 실행의 명시적 GPU 캡처 경계
 play	stop	frames	editor	editor_operation	live	no	-	에디터의 재생·정지와 같은 동작
-play.state	-	immediate	editor	engine_service	live	no	-	재생 상태(gameStart·paused·씬 로드)를 낸다
+play.state	-	immediate	editor	engine_service	live	yes	-	재생 상태(gameStart·paused·씬 로드)를 낸다
 prefab.corpus.digest	-	long	editor	probe	live	no	<라벨> <이름> ...	prefab identity/override 왕복 digest
 prefab.create	-	frames	editor	editor_operation	live	no	<오브젝트 이름> <프리팹 이름>	오브젝트로 프리팹을 만들어 저장한다
 prefab.instantiate	-	frames	editor	editor_operation	live	no	<프리팹 이름> [인스턴스 이름]	프리팹을 씬에 소환한다
@@ -190,7 +190,7 @@ ui.navprobe	-	frames	editor	engine_service	live	no	-	UI 내비게이션 저작 �
 ui.rect	-	frames	editor	engine_service	live	no	<오브젝트|*>	오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다
 ui.status	-	immediate	editor	engine_service	live	no	-	UI 계층·캔버스 연결 상태를 낸다
 undo	redo	frames	editor	editor_operation	live	no	-	에디터의 Ctrl+Z / Ctrl+Y와 같은 호출
-undo.state	-	immediate	editor	engine_service	live	no	<라벨>	편집 스택과 게임 스택의 Undo 깊이를 따로 낸다
+undo.state	-	immediate	editor	engine_service	live	yes	<라벨>	편집 스택과 게임 스택의 Undo 깊이를 따로 낸다
 vk.decal	-	frames	editor	probe	live	yes	-	Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조
 vk.deferred	-	frames	editor	probe	live	yes	-	Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조
 vk.fog	-	frames	editor	probe	live	yes	-	VolumetricFog 공용 패스 — 3D scatter/history/composite 대조

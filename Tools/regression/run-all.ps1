@@ -106,6 +106,15 @@ Run-Step "CLI 명령 표 보존(LC6)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-registry-golden.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 14.5 LC6 §9 — editor_operation 이 Undo 에 남기는 흔적.
+#
+# §9 의 완료 기준은 "GUI/서비스 의미 차이 **미분류** 0" 이다 — 없애라가 아니라
+# 분류하라다. 실측하면 8 개 중 하나만 Undo 를 남긴다. 그 사실을 값으로 못 박아,
+# 누가 Undo 를 붙이든 있던 것을 떨어뜨리든 조용히 지나가지 않게 한다.
+Run-Step "CLI editor_operation Undo 특성화(LC6)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-editor-operation.ps1") -Exe $Exe
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

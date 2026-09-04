@@ -1564,17 +1564,29 @@ namespace ConsoleCmd
     // transform digest만으로는 "play가 무시됐는데 상태가 그대로라 통과"가 성립한다.
     // 왕복 게이트가 전이 자체를 확인할 수 있어야 그 뒤의 복원 단정이 의미를 갖는다.
 
-    static void Cmd_play_state(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_play_state(const ConsoleCommandContext& ctx)
     {
         (void)ctx;
         const Scene* scene = SceneManagers->GetActiveScene();
+
+        const bool        gameStart   = SceneManagers->IsGameStart();
+        const bool        paused      = SceneManagers->IsGamePaused();
+        const bool        editorReady = SceneManagers->IsEditorSceneLoaded();
+        const bool        pending     = SceneManagers->HasPendingSceneStructureChange();
+        const std::size_t entities    = scene ? scene->m_Entities.size() : 0u;
+
         std::printf("[play.state] gameStart=%d paused=%d editorSceneLoaded=%d "
             "pending=%d entities=%zu\n",
-            SceneManagers->IsGameStart() ? 1 : 0,
-            SceneManagers->IsGamePaused() ? 1 : 0,
-            SceneManagers->IsEditorSceneLoaded() ? 1 : 0,
-            SceneManagers->HasPendingSceneStructureChange() ? 1 : 0,
-            scene ? scene->m_Entities.size() : 0u);
+            gameStart ? 1 : 0, paused ? 1 : 0, editorReady ? 1 : 0,
+            pending ? 1 : 0, entities);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("gameStart",         CommandCore::CommandData::Bool(gameStart));
+        data.Set("paused",            CommandCore::CommandData::Bool(paused));
+        data.Set("editorSceneLoaded", CommandCore::CommandData::Bool(editorReady));
+        data.Set("pending",           CommandCore::CommandData::Bool(pending));
+        data.Set("entities",          CommandCore::CommandData::Int(static_cast<int64_t>(entities)));
+        return CommandCore::Ok("play state", std::move(data));
     }
 
     // ── 파이프라인 구성 프로브 (E4 게이트용) ──
@@ -1588,20 +1600,40 @@ namespace ConsoleCmd
     // LivePipelineDesc::Dump()는 이미 있고 디버그 스냅샷에도 실려 있었는데
     // 아무도 찍지 않았다. 한 줄씩 파싱 가능한 형태로 내보낸다.
 
-    static void Cmd_undo_state(const ConsoleCommandContext& ctx)
+    // ★ LC6: 값으로 낸다.
+    //
+    //   §9 의 동등성(GUI 와 서비스가 Undo·selection·play 상태를 같은 규약으로
+    //   전이하는가)을 검사하려면 그 상태를 **밖에서 읽을 수 있어야** 한다.
+    //   printf 만 있으면 게이트가 stdout 을 정규식으로 긁게 되고, 그것은 LC6 이
+    //   RenderTest 56 개에서 없앤 바로 그 모양이다. printf 는 그대로 둔다 —
+    //   기존 소비자가 읽고 있다.
+    static CommandCore::CommandResult Cmd_undo_state(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string label = (parts.size() >= 2) ? parts[1] : "state";
 
+        Meta::UndoManager* undo = Meta::UndoManager::GetInstance();
+        const bool        isGameMode = undo->m_isGameMode;
+        const bool        gameStart  = SceneManagers->IsGameStart();
+        const std::size_t editUndo   = undo->EditUndoDepth();
+        const std::size_t editRedo   = undo->EditRedoDepth();
+        const std::size_t gameUndo   = undo->GameUndoDepth();
+        const std::size_t gameRedo   = undo->GameRedoDepth();
+
         std::printf("[undo.state:%s] isGameMode=%d gameStart=%d "
             "editUndo=%zu editRedo=%zu gameUndo=%zu gameRedo=%zu\n",
-            label.c_str(),
-            Meta::UndoManager::GetInstance()->m_isGameMode ? 1 : 0,
-            SceneManagers->IsGameStart() ? 1 : 0,
-            Meta::UndoManager::GetInstance()->EditUndoDepth(),
-            Meta::UndoManager::GetInstance()->EditRedoDepth(),
-            Meta::UndoManager::GetInstance()->GameUndoDepth(),
-            Meta::UndoManager::GetInstance()->GameRedoDepth());
+            label.c_str(), isGameMode ? 1 : 0, gameStart ? 1 : 0,
+            editUndo, editRedo, gameUndo, gameRedo);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("label",      CommandCore::CommandData::String(label));
+        data.Set("isGameMode", CommandCore::CommandData::Bool(isGameMode));
+        data.Set("gameStart",  CommandCore::CommandData::Bool(gameStart));
+        data.Set("editUndo",   CommandCore::CommandData::Int(static_cast<int64_t>(editUndo)));
+        data.Set("editRedo",   CommandCore::CommandData::Int(static_cast<int64_t>(editRedo)));
+        data.Set("gameUndo",   CommandCore::CommandData::Int(static_cast<int64_t>(gameUndo)));
+        data.Set("gameRedo",   CommandCore::CommandData::Int(static_cast<int64_t>(gameRedo)));
+        return CommandCore::Ok("undo state", std::move(data));
     }
 
     // 에디터의 Ctrl+Z / Ctrl+Y와 같은 호출.
@@ -1725,8 +1757,8 @@ namespace ConsoleCmd
         reg.Legacy({ "component.list" }, &Cmd_component_list);
         reg.Legacy({ "prefab.create" }, &Cmd_prefab_create);
         reg.Legacy({ "play", "stop" }, &Cmd_play);
-        reg.Legacy({ "play.state" }, &Cmd_play_state);
-        reg.Legacy({ "undo.state" }, &Cmd_undo_state);
+        reg.Result({ "play.state" }, &Cmd_play_state);
+        reg.Result({ "undo.state" }, &Cmd_undo_state);
         reg.Legacy({ "undo", "redo" }, &Cmd_undo_redo);
         reg.Legacy({ "object.create.undoable" }, &Cmd_object_create_undoable);
         reg.Legacy({ "scene.selection" }, &Cmd_scene_selection);
