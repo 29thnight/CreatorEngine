@@ -45,7 +45,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 22;
+	constexpr int kApiVersion = 23;
 
 	struct Float3 { float x, y, z; };
 
@@ -193,10 +193,30 @@ namespace
 		void   (__stdcall* Image_SetClipPercent)(ScriptObjectHandle handle, float percent);
 		void   (__stdcall* Image_SetNativeSize)(ScriptObjectHandle handle);
 
-		// 카메라. 월드→스크린 변환을 손으로 하는 파일이 11개나 되어 한 번에 접는다.
-		int    (__stdcall* Camera_Exists)();
+		// 카메라 — 주 카메라 기준 질의. 월드→스크린 변환을 손으로 하는 파일이
+		// 11개나 되어 한 번에 접는다. 이 셋은 핸들을 받지 않는다(전역 접근점).
+		int    (__stdcall* Camera_PrimaryExists)();
 		Float2 (__stdcall* Camera_GetScreenSize)();
 		Float3 (__stdcall* Camera_WorldToScreenPoint)(Float3 world);
+
+		// CameraComponent — 오브젝트에 붙은 카메라 하나를 가리킨다(저작 20건).
+		//
+		// LightComponent와 달리 dirty를 발행하지 않는다. 카메라는 렌더 프록시를
+		// 쓰지 않고(Scene.cpp의 Kind 열거에 Camera가 없다) 매 프레임
+		// CaptureFrameSnapshot으로 읽히므로, 값을 바꾸면 다음 프레임에 그대로 반영된다.
+		//
+		// 위치·방향은 여기 없다 — CameraComponent::ResolveCamera가 Transform에서
+		// 매번 유도한다. 카메라를 움직이려면 Transform을 옮기는 것이 정본이다.
+		int    (__stdcall* Camera_Exists)(ScriptObjectHandle handle);
+		float  (__stdcall* Camera_GetFov)(ScriptObjectHandle handle);
+		void   (__stdcall* Camera_SetFov)(ScriptObjectHandle handle, float degrees);
+		float  (__stdcall* Camera_GetNearPlane)(ScriptObjectHandle handle);
+		void   (__stdcall* Camera_SetNearPlane)(ScriptObjectHandle handle, float value);
+		float  (__stdcall* Camera_GetFarPlane)(ScriptObjectHandle handle);
+		void   (__stdcall* Camera_SetFarPlane)(ScriptObjectHandle handle, float value);
+		int    (__stdcall* Camera_IsPrimary)(ScriptObjectHandle handle);
+		void   (__stdcall* Camera_SetPrimary)(ScriptObjectHandle handle, int primary);
+		ScriptObjectHandle (__stdcall* Camera_GetPrimaryHandle)();
 
 		// LightComponent. 저작 자산에 30개가 있는데 스크립트가 만질 길이 없었다.
 		//
@@ -1137,7 +1157,7 @@ namespace
 		return (nullptr != scene) ? scene->Cameras().GetPrimaryCamera() : nullptr;
 	}
 
-	int __stdcall Api_Camera_Exists()
+	int __stdcall Api_Camera_PrimaryExists()
 	{
 		return ResolvePrimaryCamera() ? 1 : 0;
 	}
@@ -1172,6 +1192,85 @@ namespace
 
 		const auto size = camera->GetCamera()->GetScreenSize();
 		return { (ndcX + 1.f) * 0.5f * size.width, (1.f - ndcY) * 0.5f * size.height, w };
+	}
+
+	// ── CameraComponent (오브젝트에 붙은 카메라) ──
+	//
+	// dirty를 발행하지 않는다 — 카메라는 렌더 프록시를 쓰지 않는다(표 선언 주석).
+	// 위치·방향도 없다. ResolveCamera가 Transform에서 매번 유도하므로 그쪽이 정본이다.
+
+	CameraComponent* ResolveCameraComponent(ScriptObjectHandle handle)
+	{
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
+		return (nullptr != object) ? object->GetComponent<CameraComponent>() : nullptr;
+	}
+
+	int __stdcall Api_Camera_Exists(ScriptObjectHandle handle)
+	{
+		return (nullptr != ResolveCameraComponent(handle)) ? 1 : 0;
+	}
+
+	float __stdcall Api_Camera_GetFov(ScriptObjectHandle handle)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		return (nullptr != camera) ? camera->GetCamera()->m_fov : 0.f;
+	}
+
+	void __stdcall Api_Camera_SetFov(ScriptObjectHandle handle, float degrees)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		if (nullptr != camera) camera->GetCamera()->m_fov = degrees;
+	}
+
+	float __stdcall Api_Camera_GetNearPlane(ScriptObjectHandle handle)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		return (nullptr != camera) ? camera->GetCamera()->m_nearPlane : 0.f;
+	}
+
+	void __stdcall Api_Camera_SetNearPlane(ScriptObjectHandle handle, float value)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		if (nullptr != camera) camera->GetCamera()->m_nearPlane = value;
+	}
+
+	float __stdcall Api_Camera_GetFarPlane(ScriptObjectHandle handle)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		return (nullptr != camera) ? camera->GetCamera()->m_farPlane : 0.f;
+	}
+
+	void __stdcall Api_Camera_SetFarPlane(ScriptObjectHandle handle, float value)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		if (nullptr != camera) camera->GetCamera()->m_farPlane = value;
+	}
+
+	int __stdcall Api_Camera_IsPrimary(ScriptObjectHandle handle)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		return (nullptr != camera && camera->IsPrimary()) ? 1 : 0;
+	}
+
+	// 여럿이 primary여도 막지 않는다 — CameraSystem::GetPrimaryCamera가 그중
+	// instanceID가 가장 작은 것을 고른다. 여기서 남의 플래그를 내리면 스크립트가
+	// 모르는 사이에 다른 오브젝트의 저작값이 바뀐다.
+	void __stdcall Api_Camera_SetPrimary(ScriptObjectHandle handle, int primary)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		if (nullptr != camera) camera->SetPrimary(0 != primary);
+	}
+
+	// 주 카메라의 소유 오브젝트 핸들. 없으면 무효 핸들이라 C# 쪽에서 IsAlive로 걸린다.
+	ScriptObjectHandle __stdcall Api_Camera_GetPrimaryHandle()
+	{
+		CameraComponent* camera = ResolvePrimaryCamera();
+		if (nullptr == camera) return {};
+
+		Entity* owner = camera->GetOwner();
+		if (nullptr == owner) return {};
+
+		return ScriptObjectRegistry::Get().Register(owner);
 	}
 
 	// ── LightComponent ──
@@ -2214,9 +2313,20 @@ namespace
 		g_apiTable.Image_SetClipPercent        = &Api_Image_SetClipPercent;
 		g_apiTable.Image_SetNativeSize         = &Api_Image_SetNativeSize;
 
-		g_apiTable.Camera_Exists               = &Api_Camera_Exists;
+		g_apiTable.Camera_PrimaryExists        = &Api_Camera_PrimaryExists;
 		g_apiTable.Camera_GetScreenSize        = &Api_Camera_GetScreenSize;
 		g_apiTable.Camera_WorldToScreenPoint   = &Api_Camera_WorldToScreenPoint;
+
+		g_apiTable.Camera_Exists               = &Api_Camera_Exists;
+		g_apiTable.Camera_GetFov               = &Api_Camera_GetFov;
+		g_apiTable.Camera_SetFov               = &Api_Camera_SetFov;
+		g_apiTable.Camera_GetNearPlane         = &Api_Camera_GetNearPlane;
+		g_apiTable.Camera_SetNearPlane         = &Api_Camera_SetNearPlane;
+		g_apiTable.Camera_GetFarPlane          = &Api_Camera_GetFarPlane;
+		g_apiTable.Camera_SetFarPlane          = &Api_Camera_SetFarPlane;
+		g_apiTable.Camera_IsPrimary            = &Api_Camera_IsPrimary;
+		g_apiTable.Camera_SetPrimary           = &Api_Camera_SetPrimary;
+		g_apiTable.Camera_GetPrimaryHandle     = &Api_Camera_GetPrimaryHandle;
 
 		g_apiTable.Light_Exists                = &Api_Light_Exists;
 		g_apiTable.Light_GetColor              = &Api_Light_GetColor;

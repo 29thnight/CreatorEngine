@@ -147,9 +147,22 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, void> Image_SetNativeSize;
 
     // 카메라. 월드→스크린 변환이 게임 스크립트 11개 파일에 복제돼 있어 하나로 접었다.
-    public delegate* unmanaged<int> Camera_Exists;
+    public delegate* unmanaged<int> Camera_PrimaryExists;
     public delegate* unmanaged<Float2> Camera_GetScreenSize;
     public delegate* unmanaged<Float3, Float3> Camera_WorldToScreenPoint;
+
+    // CameraComponent. dirty를 발행하지 않는다 — 카메라는 렌더 프록시를 쓰지 않고
+    // 매 프레임 스냅샷으로 읽힌다. 위치·방향은 Transform이 소유한다.
+    public delegate* unmanaged<ObjectHandle, int> Camera_Exists;
+    public delegate* unmanaged<ObjectHandle, float> Camera_GetFov;
+    public delegate* unmanaged<ObjectHandle, float, void> Camera_SetFov;
+    public delegate* unmanaged<ObjectHandle, float> Camera_GetNearPlane;
+    public delegate* unmanaged<ObjectHandle, float, void> Camera_SetNearPlane;
+    public delegate* unmanaged<ObjectHandle, float> Camera_GetFarPlane;
+    public delegate* unmanaged<ObjectHandle, float, void> Camera_SetFarPlane;
+    public delegate* unmanaged<ObjectHandle, int> Camera_IsPrimary;
+    public delegate* unmanaged<ObjectHandle, int, void> Camera_SetPrimary;
+    public delegate* unmanaged<ObjectHandle> Camera_GetPrimaryHandle;
 
     // LightComponent. setter는 네이티브에서 컴포넌트 writer를 거쳐 dirty를 발행한다.
     public delegate* unmanaged<ObjectHandle, int> Light_Exists;
@@ -287,7 +300,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 22;
+    public const int ExpectedVersion = 23;
 
     private static ScriptApiTable _api;
     private static bool _ready;
@@ -858,7 +871,7 @@ internal static unsafe class Native
     // ── 카메라 ──
 
     public static bool HasCamera()
-        => _ready && _api.Camera_Exists != null && _api.Camera_Exists() != 0;
+        => _ready && _api.Camera_PrimaryExists != null && _api.Camera_PrimaryExists() != 0;
 
     public static Float2 CameraGetScreenSize()
         => _ready && _api.Camera_GetScreenSize != null ? _api.Camera_GetScreenSize() : default;
@@ -866,6 +879,44 @@ internal static unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 CameraWorldToScreenPoint(Float3 world)
         => _ready && _api.Camera_WorldToScreenPoint != null ? _api.Camera_WorldToScreenPoint(world) : default;
+
+    public static bool CameraExists(ObjectHandle h)
+        => _ready && _api.Camera_Exists != null && _api.Camera_Exists(h) != 0;
+
+    public static float CameraGetFov(ObjectHandle h)
+        => _ready && _api.Camera_GetFov != null ? _api.Camera_GetFov(h) : 0f;
+
+    public static void CameraSetFov(ObjectHandle h, float degrees)
+    {
+        if (_ready && _api.Camera_SetFov != null) _api.Camera_SetFov(h, degrees);
+    }
+
+    public static float CameraGetNearPlane(ObjectHandle h)
+        => _ready && _api.Camera_GetNearPlane != null ? _api.Camera_GetNearPlane(h) : 0f;
+
+    public static void CameraSetNearPlane(ObjectHandle h, float value)
+    {
+        if (_ready && _api.Camera_SetNearPlane != null) _api.Camera_SetNearPlane(h, value);
+    }
+
+    public static float CameraGetFarPlane(ObjectHandle h)
+        => _ready && _api.Camera_GetFarPlane != null ? _api.Camera_GetFarPlane(h) : 0f;
+
+    public static void CameraSetFarPlane(ObjectHandle h, float value)
+    {
+        if (_ready && _api.Camera_SetFarPlane != null) _api.Camera_SetFarPlane(h, value);
+    }
+
+    public static bool CameraIsPrimary(ObjectHandle h)
+        => _ready && _api.Camera_IsPrimary != null && _api.Camera_IsPrimary(h) != 0;
+
+    public static void CameraSetPrimary(ObjectHandle h, bool primary)
+    {
+        if (_ready && _api.Camera_SetPrimary != null) _api.Camera_SetPrimary(h, primary ? 1 : 0);
+    }
+
+    public static ObjectHandle CameraGetPrimaryHandle()
+        => _ready && _api.Camera_GetPrimaryHandle != null ? _api.Camera_GetPrimaryHandle() : default;
 
     public static bool LightExists(ObjectHandle h)
         => _ready && _api.Light_Exists != null && _api.Light_Exists(h) != 0;

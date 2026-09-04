@@ -54,8 +54,14 @@ internal static class NativeComponentTable
         [typeof(Transform)]      = new(handle => new Transform      { OwnerHandle = handle }, Native.HasTransform),
 
         [typeof(SoundComponent)] = new(handle => new SoundComponent { OwnerHandle = handle }, Native.HasSoundComponent),
-        [typeof(Light)]          = new(handle => new Light           { OwnerHandle = handle }, Native.LightExists),
         [typeof(Animator)]       = new(handle => new Animator       { OwnerHandle = handle }, Native.HasAnimator),
+
+        // W2 — 저작 자산에 LightComponent 30건 · CameraComponent 20건이 있는데
+        // 스크립트가 만질 길이 없었다.
+        [typeof(LightComponent)] =
+            new(handle => new LightComponent { OwnerHandle = handle }, Native.LightExists),
+        [typeof(CameraComponent)] =
+            new(handle => new CameraComponent { OwnerHandle = handle }, Native.CameraExists),
 
         [typeof(CharacterControllerComponent)] =
             new(handle => new CharacterControllerComponent { OwnerHandle = handle }, Native.HasCct),

@@ -177,6 +177,22 @@ Run-Step "Light 래퍼 경계" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-light-script.ps1") -Exe $Exe -Work $Work
 }
 
+# CameraComponent 래퍼(W2, 9-4). 저작 20건인데 스크립트에서 만질 길이 없었다 —
+# 있던 것은 핸들을 받지 않는 전역 질의 셋뿐이라 "이 오브젝트의 카메라"라는 축이
+# 아예 없었다.
+#
+# Light와 달리 축이 하나다. 카메라는 렌더 프록시를 쓰지 않고(Scene.cpp의 프록시
+# Kind 열거에 Camera가 없다) 매 프레임 CaptureFrameSnapshot으로 읽히므로 발행할
+# dirty가 애초에 없다. 대신 프로브가 Camera.Main과의 일치를 함께 단정한다 —
+# 컴포넌트 축과 전역 접근점이 같은 카메라를 가리키는지 재는 유일한 자리다.
+#
+# 이빨 확인(2026-09-04): Api_Camera_SetFov의 대입을 지우니 "fov 왕복" 한 건만
+# 붉어졌고, Api_Camera_GetPrimaryHandle을 무효 핸들로 바꾸니 Camera.Main 관련
+# 2건이 붉어졌다. 둘 다 되돌려 초록을 다시 확인했다.
+Run-Step "Camera 래퍼 경계" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-camera-script.ps1") -Exe $Exe -Work $Work
+}
+
 # 프리팹 왕복(트랙 P, P2에서 완료).
 #
 # 다른 검사는 전부 한 번 띄운 상태만 본다. 저장했다 다시 여는 왕복이 없어서

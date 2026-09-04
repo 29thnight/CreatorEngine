@@ -1,20 +1,21 @@
 namespace CreatorEngine.Scripts;
 
 /// <summary>
-/// <c>Light</c> 래퍼의 경계 왕복 검증(W2).
+/// <c>LightComponent</c> 래퍼의 경계 왕복 검증(W2).
 ///
 /// 이 프로브는 <b>스크립트에서 보이는 것</b>만 판정한다. 값을 쓰고 되읽으면
-/// 언제나 새 값이 나오므로, 이것만으로는 렌더가 그 값을 실제로 쓰는지 알 수 없다 —
-/// 프록시가 갱신됐는지는 네이티브 쪽에서 재야 하고 그 축은 회귀 스크립트가
-/// <c>light.proxy</c>로 따로 본다(verify-light-script.ps1).
+/// 언제나 새 값이 나오므로, 이것만으로는 그 값이 렌더 쪽으로 가는지 알 수 없다 —
+/// dirty가 실제로 섰는지는 회귀 스크립트가 <c>light.proxy</c>의 누계로 따로
+/// 본다(verify-light-script.ps1).
 ///
-/// 대상은 <b>에디터 기본 씬</b>의 "Directional Light"다(EditorMain.cpp의
+/// 대상은 <b>에디터 기본 씬</b>의 "Directional Light" 오브젝트다(EditorMain.cpp의
 /// newSceneCreatedEvent가 만든다 — status만 StaticShadows이고 나머지는 기본값).
-/// 저작 씬을 쓰지 않는 이유가 있다: 지금 <c>scene.switch</c>로 씬을 열면
-/// 그 씬의 광원이 렌더 프록시에 등록되지 않는다(2026-09-04 실측 — 전환 후에도
-/// 기본 씬 라이트의 값이 그대로 나온다). 그 결함이 닫히면 저작 씬으로 옮기는
-/// 편이 낫다 — 기본 씬은 자산이 아니라 코드가 만드는 것이라, 그 정책이 바뀌면
-/// 이 프로브의 기준값도 함께 바뀐다.
+/// 저작 씬을 열지 않는 이유: <c>--script</c> 헤드리스는 렌더 프레임이 거의 돌지
+/// 않아 프록시 커맨드가 소비되지 않는다. 씬을 전환하면 새 광원의 등록도 옛 광원의
+/// 해제도 그 큐로 가므로 어느 쪽도 반영되지 않는다(2026-09-04 실측 — queued는
+/// 늘고 applied는 멈춘다). 렌더가 실제로 도는 하네스가 생기면 저작 씬으로
+/// 옮기는 편이 낫다 — 기본 씬은 자산이 아니라 코드가 만드는 것이라, 그 정책이
+/// 바뀌면 이 프로브의 기준값도 함께 바뀐다.
 /// </summary>
 public sealed partial class LightScriptProbe : Component
 {
@@ -25,10 +26,10 @@ public sealed partial class LightScriptProbe : Component
 
     public override void OnInitialized()
     {
-        Light? light = Entity.GetComponent<Light>();
+        LightComponent? light = Entity.GetComponent<LightComponent>();
         if (light is null)
         {
-            LogError($"[LightScriptProbe] '{Entity.Name}'에 Light가 없다 — 대상 오브젝트가 맞는지 확인할 것");
+            LogError($"[LightScriptProbe] '{Entity.Name}'에 LightComponent가 없다 — 대상 오브젝트가 맞는지 확인할 것");
             return;
         }
 
@@ -45,7 +46,7 @@ public sealed partial class LightScriptProbe : Component
     }
 
     /// <summary>저작값을 그대로 읽어 오는가 — 경계가 값을 뭉개지 않는지.</summary>
-    private void CheckAuthoredValues(Light light)
+    private void CheckAuthoredValues(LightComponent light)
     {
         Assert("저작 intensity=1", Near(light.Intensity, 1f), $"{light.Intensity}");
         Assert("저작 range=10", Near(light.Range, 10f), $"{light.Range}");
@@ -59,7 +60,7 @@ public sealed partial class LightScriptProbe : Component
     }
 
     /// <summary>쓴 값이 그대로 돌아오는가. 마지막에 저작값으로 되돌린다.</summary>
-    private void CheckRoundTrip(Light light)
+    private void CheckRoundTrip(LightComponent light)
     {
         light.Intensity = 4.25f;
         Assert("intensity 왕복", Near(light.Intensity, 4.25f), $"{light.Intensity}");
@@ -88,7 +89,7 @@ public sealed partial class LightScriptProbe : Component
     }
 
     /// <summary>범위를 벗어난 열거는 무시되어야 한다 — 정의되지 않은 광원을 만들지 않는다.</summary>
-    private void CheckEnumGuards(Light light)
+    private void CheckEnumGuards(LightComponent light)
     {
         LightType before = light.Type;
         light.Type = (LightType)99;
@@ -117,7 +118,7 @@ public sealed partial class LightScriptProbe : Component
             return;
         }
 
-        Assert($"'{camera.Name}'에는 Light가 없다", camera.GetComponent<Light>() is null, "찾아졌습니다");
+        Assert($"'{camera.Name}'에는 LightComponent가 없다", camera.GetComponent<LightComponent>() is null, "찾아졌습니다");
     }
 
     private static bool Near(float a, float b) => System.MathF.Abs(a - b) < Epsilon;

@@ -37,7 +37,7 @@ public enum LightStatus
 /// 이 래퍼의 setter는 네이티브에서 <c>LightComponent</c>의 writer를 부르고,
 /// 그 writer가 <c>PublishRenderProxyDirty</c>를 함께 발행한다.
 /// </summary>
-public sealed class Light : NativeComponent
+public sealed class LightComponent : NativeComponent
 {
     /// <summary>광원의 색. 알파는 세기와 별개로 패킹에서 덮어써진다.</summary>
     public Color4 Color
