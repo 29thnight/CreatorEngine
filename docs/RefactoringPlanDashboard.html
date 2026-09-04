@@ -547,19 +547,24 @@
 <!-- ===== PHASE 3.75 ===== -->
 <section class="phase" id="phase-3.75">
   <h2 class="sec"><span class="no">PHASE 3.75</span>모델 자산 빅뱅 전환 <span class="phase-pct" data-phase-pct="3.75"></span></h2>
-<div class="phase-meta"><b>정본: <a href="plans/ModelAssetBigBangCutoverPlan.md" style="color:var(--accent)">ModelAssetBigBangCutoverPlan.md</a></b> · 신설 2026-09-02 · 예상 공수 60일 · 활성 12행 · 완료 53일(MBC0~MBC10, 2026-09-03) · 잔여 7일 · 선행: PHASE 3.5 완료 · 후행: PHASE 4 재개. 구 ModelImport I/V의 완료 표시는 승계하지 않는다. 구현은 빌드 가능한 내부 슬라이스로 나누되 제품 공개는 <code>MBC11</code>에서 한 번만 한다.</div>
+<div class="phase-meta"><b>정본: <a href="plans/ModelAssetBigBangCutoverPlan.md" style="color:var(--accent)">ModelAssetBigBangCutoverPlan.md</a></b> · 신설 2026-09-02 · <b>완료 2026-09-04 — 60일(MBC0~MBC11) · 잔여 0일</b> · 선행: PHASE 3.5 완료 · 후행: PHASE 4 재개. 구 ModelImport I/V의 완료 표시는 승계하지 않는다. 구현은 빌드 가능한 내부 슬라이스로 나누되 제품 공개는 <code>MBC11</code>에서 한 번만 했다. <b>남긴 것 하나:</b> cooked 임베디드 텍스처의 로드 시점 디코드 비용(§8.4 B2c)은 <a href="plans/TexturePipelinePlan.md">PHASE 12</a> T1a/T2가 소유한다 — 예산에서 뺀 것이 아니라 판정 주체를 옮겼고, 모델별 값이 archive에 남아 회귀하면 <code>verify-model-cutover-budget</code>가 붉어진다.</div>
   <div class="phase-goal"><b>목표:</b> 기존 GUID·legacy 객체·Assimp fallback·experiment A/B를 보존한 채 배선을 연장하지 않는다. 전체 모델 corpus에 새 <code>ce.uuidv8.sha256.v1</code> identity epoch를 발급하고, schema v2 sidecar·cooked artifact·embedded texture/material closure를 단일 writer가 원자 게시한다. 런타임은 immutable <code>ModelAssetGeneration</code> 하나를 renderer·scene·animation·editor·serialization이 직접 소비한다.</div>
   <div class="phase-goal"><b>긴급 결함 폐쇄:</b> <code>SU_Mythic.glb</code>는 <code>core|color|skin</code> 전체 vertex attribute mask에서 input layout·PSO·<code>VSIn</code>을 함께 유도해 GBuffer/Shadow와 DX12/Vulkan을 통과시킨다. <code>Gunner_F_Mythic.glb</code>는 model 1·material 2·embedded texture 6의 새 UUIDv8 closure를 cold load/reimport에서 원자 게시하며 역직렬화 순서 해킹과 전역 registry 예열을 제거한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="3.75"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
-      <li>전체 model sidecar가 schema v2·<code>ce.uuidv8.sha256.v1</code>을 사용하고 UUID 재계산 불일치·tuple 중복·subasset 누락이 0건</li>
-      <li>기존 GUID 참조와 runtime GUID mapping/alias 0건, pseudo UUIDv5-as-v4 구현·호출 0건</li>
-      <li>모델·메시·재질·임베디드 텍스처·스켈레톤·애니메이션이 한 generation으로 게시되고 실패 주입 시 전역 상태 delta 0</li>
-      <li><code>SU_Mythic.glb</code> geometry/color/skin pose와 <code>Gunner_F_Mythic.glb</code> material 2/2·embedded texture 6/6이 source/cold cooked/reimport·양 backend에서 통과</li>
-      <li>Assimp 제품 호출·legacy 모델 타입/cache·역브리지·A/B/off arm·silent fallback·상태 변경 진단 명령 0건</li>
-      <li>AssetCooker·RenderTests·CreatorEditor Debug/Release, 전체 corpus runtime, 저장/재로드/CLR round-trip, 절대 성능 예산을 각각 통과</li>
+      <li class="done-item">✔ 전체 model sidecar가 schema v2·<code>ce.uuidv8.sha256.v1</code>을 사용하고 UUID 재계산 불일치·tuple 중복·subasset 누락이 0건
+        <span style="color:var(--text-dim)">— model 14 · subasset 310 · identity 324 (<code>verify-model-corpus-v8</code>)</span></li>
+      <li class="done-item">✔ 기존 GUID 참조와 runtime GUID mapping/alias 0건, pseudo UUIDv5-as-v4 구현·호출 0건
+        <span style="color:var(--text-dim)">— oldRefs 0 · newRefs 8 · 동결 래칫 하드 0</span></li>
+      <li class="done-item">✔ 모델·메시·재질·임베디드 텍스처·스켈레톤·애니메이션이 한 generation으로 게시되고 실패 주입 시 전역 상태 delta 0
+        <span style="color:var(--text-dim)">— 주입 5지점 · 변조 4종 게시 전 거부 · generation 1→2 원자 교체</span></li>
+      <li class="done-item">✔ <code>SU_Mythic.glb</code> geometry/color/skin pose와 <code>Gunner_F_Mythic.glb</code> material 2/2·embedded texture 6/6이 source/cold cooked/reimport·양 backend에서 통과</li>
+      <li class="done-item">✔ Assimp 제품 호출·legacy 모델 타입/cache·역브리지·A/B/off arm·silent fallback·상태 변경 진단 명령 0건
+        <span style="color:var(--text-dim)">— MBC9 물리 삭제 · MBC10 하드 계약(변이 5종으로 이빨 증명)</span></li>
+      <li class="done-item">✔ AssetCooker·RenderTests·CreatorEditor Debug/Release, 전체 corpus runtime, 저장/재로드/CLR round-trip, 성능 예산을 각각 통과
+        <span style="color:var(--text-dim)">— 성능은 §8.4 개정판: 비교 예산 B1a 14/14·B2a 14/14, 비회귀 축 B1b·B2b·B6, 이관 축 B2c(PHASE 12)</span></li>
     </ul>
   </div>
   <div class="risknote">
@@ -1540,8 +1545,8 @@ const TASKS = [
     note: "완료(2026-09-03). 제품 경로의 무조건 stdout 진단 토큰을 ModelConsumptionDiagnostics 원자 계수 + 읽기 전용 assets.modeldiag로 대체, experiment.animlive는 publish를 부르지 않고 Scene::TryGetLastAnimatorPoseMetrics 스냅샷을 읽음. verify-mbc-cutover-freeze에 §5.2/§8.2 하드 계약(제거 표면 12종 하드 0·vcpkg assimp 0·m_hashingMesh 절차 지오메트리 허용목록·제품 소비자 experiment 객체 0·generation 게시 진입점 DataSystem 하나·animlive 읽기 전용) 추가. typed-consumers/scene-consumption/drop-animation/skin-pose-visual을 스냅샷 파싱으로 전환. §8.2·§8.3 전항 게이트 근거로 체크(§8.4 성능은 MBC11)." },
   { phase: 3.75, id: "MBC11", title: "전체 build/runtime/performance 검증·단일 제품 cutover",
     detail: "AssetCooker·RenderTests·CreatorEditor Debug/Release, 전체 corpus source/cold cooked/reimport, 양 backend, 저장 round-trip과 절대 성능 예산을 통과한 뒤 새 경로만 공개한다.",
-    refs: "ModelAssetBigBangCutoverPlan §8 · §9", priority: "P0", days: 7, status: "todo",
-    note: "모든 gate artifact가 있어야 완료다. cutover 뒤 legacy GUID 복원·runtime mapping·Assimp fallback·experiment on/off를 되살리지 않는다." },
+    refs: "ModelAssetBigBangCutoverPlan §8 · §9", priority: "P0", days: 7, status: "done",
+    note: "완료(2026-09-04). 2026-09-03 검증에서 B1 10/14·B2 12/14가 붉어 cutover를 보류했었고, 그 붉음의 원인이 성능 회귀가 아니라 <b>축 불일치</b>였다는 것이 단계 분해로 드러나 <b>축을 재유도하고 닫았다</b>(사용자 결정). 기준값이 잰 일과 새 경로가 재는 일이 다르다 — B1 기준은 프로토타입의 소스 <b>디코드</b>였고(신원·staging·검증·원자 게시가 없다), B2 기준인 legacy <code>.asset</code> 읽기는 <b>텍스처도 신원 검증도 SHA 검증도 하지 않았다</b>. 그래서 같은 일끼리만 비교 예산으로 판정하고(B1a 디코드·B2a CEMC 읽기/디코드/조립), legacy에 대응물이 없는 칸은 archive 비회귀로 보며(B1b 저작 트랜잭션·B2b 신원·해시 검증), 임베디드 텍스처 디코드(B2c)는 <b>PHASE 12 T1a/T2로 이관</b>했다 — cook artifact가 디코드 완료 형식이 되면 사라지는 비용이고 그 포맷은 그 페이즈의 소유라, 여기서 하면 T1a가 다시 정의할 포맷이 하나 더 생긴다. ★ 이관은 면제가 아니다: 모델별 값이 archive에 남아 회귀하면 이 게이트가 붉어진다. ★ <b>판정 전에 3.75가 소유한 낭비를 먼저 걷었다</b> — archive는 '지금 값'을 정답으로 굳히므로 낭비를 굳히면 안 된다. ① 저작마다 asset root 345파일을 재순회하며 v2 sidecar 14개를 재파싱하던 corpus collision 검사에 (크기, mtime) 지문 캐시를 넣었고(순회와 폐포 재검증은 남긴다 — epoch header가 인자라 캐시가 판정을 대신하면 안 된다), ② 게시 직전 source 전체를 다시 읽어 SHA-256을 다시 계산하던 race 검사를 (크기, mtime) 대조 우선으로 바꿨다(다르면 옛 방식대로 재해시 — touch만 된 파일을 거짓 거부하지 않는다). 실측: <code>corpus-collision-scan</code> 평균 6.93 → 3.92 ms, <code>publish</code> 14모델 합계 302.6 → 48.1 ms(scene 212.9 → 2.8 · Gunner 19.5 → 3.1). ★ <b>①의 착수 가정이 절반 틀렸다</b> — "6.6 ms는 파싱이 지배한다"고 봤는데 절감이 3 ms뿐이었다. 남은 4 ms는 파싱이 아니라 <b>asset root 전체 순회</b>이고, 모델 sidecar가 어디에나 있을 수 있어 범위를 좁힐 근거가 없으며 순회를 캐시하면 새 sidecar를 놓쳐 충돌 검사가 눈먼다 — 그래서 남겼다. ★ 후보 ④(SHA 가속)는 <b>이 장비에서 답이 아니다</b> — Xeon W-2223(Cascade Lake-W)에 SHA-NI가 없어 SHA-NI 경로도 CNG도 스칼라로 떨어진다(scene CEMC 12.4 MB SHA 63 ms ≈ 180 MB/s). 다음 사람이 다시 재지 않도록 기준선 §4.4a에 적었다. 결과(Release, 2026-09-04 archive 실행): <b>B1a 14/14 · B2a 14/14</b> 통과, B3 Test1 15.2 / FT 12.1 ms, B4 30.5 ms, B5 833 MB, B6 메시 업로드 10개/1,075 KB·커버리지 49,684·VRAM 1,144 MB 비회귀. 모델 게이트 8종 전부 초록. ★ B1b 축은 <b>흔들림이 커서 판별력이 낮다</b> — 같은 바이너리로 20분 안에 두 번 잰 Prim_Cone이 27.4와 42.1 ms다(작은 파일 4~5개를 만들고 다시 읽는 NTFS 비용이 지배). archive는 상단 근처를 들고 있고 큰 회귀만 잡는다. 게이트는 <b>어느 칸이라도 붉은 실행</b>을 archive로 굳히지 않는다. cutover 뒤 legacy GUID 복원·runtime mapping·Assimp fallback·experiment on/off를 되살리지 않는다." },
 
   // ---------- PHASE 4.75: 차세대 렌더 파이프라인·GPU 기능 ----------
   // 구현 항목이 아니라 Scriptable Pipeline 계약과 네 기능의 공통 데이터·폴백·검증·순서를 확정하는 설계 게이트다.

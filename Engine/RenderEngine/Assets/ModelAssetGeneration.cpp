@@ -583,6 +583,10 @@ namespace assets
                 "modelArtifact", "CEMC model artifact를 읽지 못했다.");
             return result;
         }
+        // ★ 읽기와 해시를 따로 표시한다(MBC11 §8.4). B2 비교 예산의 기준은 legacy
+        //   `.asset` 읽기인데 legacy는 artifact를 해시하지 않았다 — 한 칸에 묶어
+        //   두면 "축이 다르다"는 말을 수치로 보일 수 없다.
+        markPhase("cemc-read");
         if (record.modelArtifactFingerprint != Fingerprint(cookedBytes))
         {
             AddIssue(result, ModelAssetGenerationIssueCode::FingerprintMismatch,
@@ -590,7 +594,7 @@ namespace assets
             return result;
         }
 
-        markPhase("cemc-read+sha");
+        markPhase("cemc-sha");
         experiment::ModelDraft draft;
         std::vector<experiment::ModelLoadIssue> cookedIssues;
         if (!ck::Read(cookedBytes, draft, cookedIssues))

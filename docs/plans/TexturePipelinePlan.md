@@ -42,8 +42,22 @@ cook 도구의 라이브러리 선택은 성능 문제가 아니라 이식성 �
 |---|---|---|
 | cook 코드 | 있음 (`ModelAssetGeneration`) | 있음 (`TextureCookProducer`) |
 | **저작분** | 있음 (`Library/ModelAssetGenerations/`) | **0건** |
-| artifact 내용 | RGBA8 raw | **pass-through**(원본 바이트) |
-| 런타임 소비 | 있음 (`ResolveModelGenerationTexture`) | **0건** — 원본 PNG 직독 |
+| artifact 내용 | **pass-through**(원본 PNG) | **pass-through**(원본 바이트) |
+| 런타임 소비 | 있음 (`ResolveModelGenerationTexture`) — 로드마다 디코드 | **0건** — 원본 PNG 직독 |
+
+★ **초안의 "RGBA8 raw"는 틀렸다**(2026-09-04 정정). RGBA8인 것은 `ModelAssetGeneration`
+이 메모리에 들고 있는 `ModelTextureAsset::pixels`이고, 디스크 artifact는 원본 PNG
+그대로다 — `Library/ModelAssetGenerations` 아래 파일이 **PNG 411개**라는 §2.3의 계수가
+같은 사실을 이미 적고 있었다(`textures/<TextureId>.png`). 그래서 generation 로드는
+매번 WIC 디코드를 다시 돈다.
+
+**PHASE 3.75가 남긴 실측 의무.** MBC11 §8.4가 이 칸을 수치로 잡았다 — cooked
+generation 로드에서 `textures-read+sha+decode`가 **로드의 66~80%**다(512² 1장 2.6~3.6 ms,
+Gunner 6장 46 ms, scene 69장 551 ms — 실행마다 ±30% 흔들린다). PHASE 3.75는 이 축을 자기 예산에서 판정하지
+않고 여기로 이관했다(B2c) — cook artifact가 디코드 완료 형식이 되면 사라지는 비용이고,
+그 artifact 포맷이 §5 T1a의 소유이기 때문이다. `verify-model-cutover-budget`가 모델별
+값을 archive에 들고 회귀만 막고 있으니, T1a·T2가 닫으면 그 표가 내려가는 것으로
+증명된다. §8의 "런타임 텍스처 로드 < 1 ms/장"이 이 칸의 완료선이다.
 
 `TextureCookProducer.h` 가 pass-through 인 이유를 스스로 적어 두었다:
 
