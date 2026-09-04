@@ -24,7 +24,7 @@
 # 시험하면 이중 호출이 있어도 관측 가능한 부작용이 아예 없다(우연히 멱등).
 #
 # 그래서 시나리오(script_add_awake_once.txt)는 **등록되지 않은 스크립트
-# 타입**을 붙인다. CreateBehaviour가 항상 실패해 HasInstance()가 절대
+# 타입**을 붙인다. CreateComponent가 항상 실패해 HasInstance()가 절대
 # true가 되지 않으므로 그 가드가 절대 두 번째 호출을 막지 못하고, 호출될
 # 때마다 로그 한 줄을 남긴다 — 그 줄 수가 곧 OnInitialized 호출 횟수다.
 #
@@ -112,7 +112,7 @@ $attachFailedSeen = ($logText -match [regex]::Escape("부착 실패 — 타입=$
 
 "명령 실행 확인 — 부착 실패 로그 관측: $attachFailedSeen (프로브 타입은 항상 실패하므로 참이어야 한다)"
 "드레인 확인(보조) — OnInitialized 트레이스 $traceCount 건 (0이면 드레인 자체가 안 돈 것)"
-"OnInitialized 호출 흔적 — 로그 $callCount 줄 (기대: 1 — CreateBehaviour/CLR 실패 로그가 호출마다 한 줄씩 남는다)"
+"OnInitialized 호출 흔적 — 로그 $callCount 줄 (기대: 1 — CreateComponent/CLR 실패 로그가 호출마다 한 줄씩 남는다)"
 ""
 
 $failed = @()

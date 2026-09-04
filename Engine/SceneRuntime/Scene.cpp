@@ -780,7 +780,7 @@ std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
     // DDOL 이송 중에도 핸들이 죽는다 — 그리고 그 이송 창(Detach 직후·재부착
     // 이전) 동안 실제로 SceneManager::LoadSceneImmediate가
     // ClrHost::NotifySceneUnload를 부르고, 그 안에서
-    // ScriptRegistry.SweepOrphans가 모든 활성 Behaviour의 GameObject.IsAlive를
+    // ScriptRegistry.SweepOrphans가 모든 활성 스크립트의 Entity.IsAlive를
     // 확인한다(ScriptCore/ScriptRegistry.cs:324, "살아 있다 — DDOL 포함"). 여기서
     // 핸들을 무효화하면 살아있는 DDOL 스크립트가 씬 전환마다 고아로 오판되어
     // 뜯겨나간다. 스크립트 핸들 무효화의 정본 지점은 대신 GameObject::Destroy()다

@@ -333,7 +333,7 @@ public:
 
 	// ── 노출 필드 ──
 	// 소스 제너레이터가 만든 접근자를 통해 인스펙터·직렬화가 값을 주고받는다.
-	// 관리 객체의 필드 주소를 직접 잡지 않는 이유는 ScriptCore의 Behaviour 주석 참고.
+	// 관리 객체의 필드 주소를 직접 잡지 않는 이유는 ScriptCore의 Component 주석 참고.
 	enum class ScriptFieldType : int
 	{
 		Unknown = 0, Float = 1, Int32 = 2, Bool = 3, Float3 = 4, String = 5, Object = 6, Float2 = 7

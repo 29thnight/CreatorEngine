@@ -20,7 +20,7 @@ class Entity;
 // 어느 씬의 슬롯에도 없다. 그런데 바로 이 구간에서 실제로 관리 코드가 도는 지점이
 // 있다 — SceneManager::LoadSceneImmediate가 Detach 직후·재부착 이전에
 // ClrHost::NotifySceneUnload를 부르고, 그 안에서 ScriptRegistry.SweepOrphans가
-// 모든 활성 Behaviour의 Entity.IsAlive를 확인한다(주석에 "살아 있다 — DDOL
+// 모든 활성 스크립트의 Entity.IsAlive를 확인한다(주석에 "살아 있다 — DDOL
 // 포함"이라고 명시되어 있다 — ScriptCore/ScriptRegistry.cs:324). 세대 판정을
 // Scene에 위임했다면 이 순간 DDOL 오브젝트가 전부 "죽었다"로 오판되어
 // SweepOrphans가 살아있는 스크립트를 매 씬 전환마다 뜯어냈을 것이다 — 자가
