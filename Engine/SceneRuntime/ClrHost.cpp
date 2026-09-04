@@ -45,7 +45,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 23;
+	constexpr int kApiVersion = 24;
 
 	struct Float3 { float x, y, z; };
 
@@ -79,6 +79,13 @@ namespace
 		int  (__stdcall* Entity_IsAlive)(ScriptObjectHandle handle);
 		int  (__stdcall* Entity_GetName)(ScriptObjectHandle handle, char* buffer, int capacity);
 		void (__stdcall* Entity_SetEnabled)(ScriptObjectHandle handle, int enabled);
+
+		// 스크립트 컴포넌트 하나의 활성 상태. 오브젝트 전체(Entity_SetEnabled)와 달리
+		// 이 스크립트만 켜고 끈다 — 관리 측 Component.Enabled의 setter가 이것을 부르고,
+		// OnEnable/OnDisable 훅은 그 결과로 네이티브가 되돌려 준다(드라이버 단일화).
+		// owner를 함께 받는 이유: instanceId만으로는 어느 Entity의 컴포넌트인지 알 수
+		// 없고, 역맵을 두면 그 맵이 dangling의 새 원천이 된다.
+		int  (__stdcall* Script_SetEnabled)(ScriptObjectHandle owner, int instanceId, int enabled);
 
 		// 계층 접근. 실측에서 m_childrenIndices 76 · Entity::FindIndex 100 ·
 		// m_parentIndex 32로, 남은 어떤 컴포넌트 래퍼보다 큰 표면이다.
@@ -420,6 +427,37 @@ namespace
 		{
 			object->SetEnabled(0 != enabled);
 		}
+	}
+
+	/// 스크립트 컴포넌트 하나만 켜고 끈다(PHASE 9 트랙 L · 활성 축).
+	///
+	/// ── 왜 역맵을 두지 않는가 ──
+	///
+	/// instanceId → ScriptComponent* 맵을 들면 파괴·핫리로드·재생 왕복마다 그 맵을
+	/// 정확히 걷어야 하고, 한 번이라도 놓치면 dangling을 역참조한다. 관리 측은 이미
+	/// 자기 Entity 핸들을 들고 있으므로, 그 오브젝트의 ScriptComponent들만 훑어
+	/// id로 고르면 새 상태를 만들지 않는다 — QueueManagedCollision이 쓰는 것과 같은
+	/// 관용구다. 오브젝트 하나의 스크립트 수는 한 자리라 선형 탐색으로 충분하다.
+	///
+	/// 돌려주는 값은 "실제로 그 컴포넌트를 찾아 적용했는가"다. 0이면 관리 측이
+	/// 국소 폴백으로 내려가고 경고를 남긴다 — 조용히 무시되면 스크립트가 자기를
+	/// 껐는데 계속 도는, 이 슬라이스가 고치려는 바로 그 증상이 다시 생긴다.
+	int __stdcall Api_Script_SetEnabled(ScriptObjectHandle owner, int instanceId, int enabled)
+	{
+		Entity* object = ScriptObjectRegistry::Get().Resolve(owner);
+		if (nullptr == object) return 0;
+
+		for (ScriptComponent* script : object->GetComponents<ScriptComponent>())
+		{
+			if (nullptr == script || script->GetInstanceId() != instanceId) continue;
+
+			// Component::SetEnabled가 전이일 때만 OnEnable/OnDisable을 부르고,
+			// ScriptComponent의 그 override가 관리 측으로 되돌려 준다. 여기서
+			// 훅을 직접 부르지 않는 것이 요점이다 — 드라이버가 하나여야 한다.
+			script->SetEnabled(0 != enabled);
+			return 1;
+		}
+		return 0;
 	}
 
 	/// C#의 setter 직후 GetWorld* 계약을 packed targeted pull에 연결한다.
@@ -2224,6 +2262,7 @@ namespace
 		g_apiTable.Entity_IsAlive          = &Api_Entity_IsAlive;
 		g_apiTable.Entity_GetName          = &Api_Entity_GetName;
 		g_apiTable.Entity_SetEnabled       = &Api_Entity_SetEnabled;
+		g_apiTable.Script_SetEnabled       = &Api_Script_SetEnabled;
 		g_apiTable.Entity_GetChildCount    = &Api_Entity_GetChildCount;
 		g_apiTable.Entity_GetChild         = &Api_Entity_GetChild;
 		g_apiTable.Entity_GetParent        = &Api_Entity_GetParent;
@@ -2557,6 +2596,7 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"FlushAniEvents", &fn))      return false;  m_fnFlushAniEvents      = reinterpret_cast<FlushAniFn>(fn);
 	if (!bind(L"DestroyComponent", &fn)) return false;  m_fnDestroyComponent = reinterpret_cast<DestroyFn>(fn);
 	if (!bind(L"DispatchLifecycle", &fn)) return false;  m_fnDispatchLifecycle = reinterpret_cast<LifecycleFn>(fn);
+	if (!bind(L"SetScriptEnabled", &fn)) return false;  m_fnSetScriptEnabled = reinterpret_cast<LifecycleFn>(fn);
 
 	// 스크립트 어셈블리 로드·핫리로드
 	if (!bind(L"LoadScripts", &fn))            return false;  m_fnLoadScripts = reinterpret_cast<LoadScriptsFn>(fn);
@@ -2912,6 +2952,16 @@ bool ClrHost::DestroyComponent(int instanceId)
 {
 	if (!m_ready || nullptr == m_fnDestroyComponent) return false;
 	return 0 == m_fnDestroyComponent(instanceId);
+}
+
+bool ClrHost::DispatchEnabled(int instanceId, bool enabled)
+{
+	if (!m_ready || nullptr == m_fnSetScriptEnabled) return false;
+
+	// 6단계 전송로(DispatchLifecycle)를 쓰지 않는다. 활성은 **단계가 아니라 상태**라
+	// ScriptLifecyclePhase에 값을 더하면 그 enum이 두 가지를 뜻하게 된다
+	// (같은 이유로 틱도 거기 오지 않는다 — ScriptLifecyclePhase.h 상단).
+	return 0 == m_fnSetScriptEnabled(instanceId, enabled ? 1 : 0);
 }
 
 bool ClrHost::DispatchLifecycle(int instanceId, ScriptLifecyclePhase phase)

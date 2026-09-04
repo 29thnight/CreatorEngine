@@ -295,6 +295,18 @@ void ScriptComponent::OnRemovingFromScene()
 	NotifyManagedLifecycle(ScriptLifecyclePhase::OnRemovingFromScene);
 }
 
+void ScriptComponent::OnEnable()
+{
+	if (!HasInstance()) return;
+	ClrHost::Get().DispatchEnabled(m_instanceId, true);
+}
+
+void ScriptComponent::OnDisable()
+{
+	if (!HasInstance()) return;
+	ClrHost::Get().DispatchEnabled(m_instanceId, false);
+}
+
 void ScriptComponent::NotifyManagedLifecycle(ScriptLifecyclePhase phase)
 {
 	if (!HasInstance())

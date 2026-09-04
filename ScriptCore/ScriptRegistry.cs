@@ -248,6 +248,47 @@ internal static class ScriptRegistry
     }
 
     /// <summary>
+    /// 네이티브가 활성 전이 하나를 이 인스턴스에 전달한다(트랙 L · 활성 축).
+    ///
+    /// 부르는 곳은 <c>ScriptComponent::OnEnable/OnDisable</c> 하나뿐이고, 그것은
+    /// <c>Component::SetEnabled</c>가 **전이일 때만** 부른다 — 즉 여기까지 온 것은
+    /// 이미 "값이 실제로 바뀌었다"는 뜻이다. 그래도 <see cref="ApplyEnabled"/>가
+    /// 한 번 더 비교하는 이유는, 관리 측이 먼저 바꾼 뒤 네이티브를 부른 경우
+    /// (Component.Enabled의 폴백 경로)와 창구를 공유하기 때문이다.
+    ///
+    /// ── IsAlive를 보지 않는다 ──
+    ///
+    /// 6단계 전송로와 다른 점이다. 활성 전이는 파괴 표시된 오브젝트에도 온다
+    /// (<c>Entity::SetEnabled</c>는 생존을 묻지 않는다). 여기서 IsAlive로 걸러내면
+    /// 축소가 경계에서 버려지던 것과 같은 종류의 조용한 소실이 하나 더 생긴다.
+    /// </summary>
+    public static bool DispatchEnabled(int instanceId, bool enabled)
+    {
+        var b = ScriptFactory.Find(instanceId);
+        if (b is null) return false;
+
+        ApplyEnabled(b, enabled);
+        return true;
+    }
+
+    /// <summary>
+    /// 활성 상태를 세우고 짝이 되는 훅을 부른다. 네이티브 전달과 관리 측 폴백이
+    /// 공유하는 <b>유일한</b> 자리다 — 훅을 부르는 곳이 둘이면 그 둘이 어긋난다.
+    ///
+    /// 초기화 전 인스턴스에는 훅을 흘리지 않는다("Initialized 없이 그 다음 없음",
+    /// <see cref="Component.IsInitialized"/>). 값은 그래도 세운다 — 나중에
+    /// 초기화될 때 틱 게이트가 옳은 값을 봐야 한다.
+    /// </summary>
+    internal static void ApplyEnabled(Component b, bool enabled)
+    {
+        if (!b.SetEnabledState(enabled)) return;
+        if (!b.IsInitialized) return;
+
+        if (enabled) Invoke(b, static x => x.OnEnable(), nameof(Component.OnEnable));
+        else Invoke(b, static x => x.OnDisable(), nameof(Component.OnDisable));
+    }
+
+    /// <summary>
     /// 시뮬레이션 본문을 띄운다 (설계 문서 §4 트랙 L5). OnBeginSimulation 직후다.
     ///
     /// 태스크를 어디에도 보관하지 않는 이유: 수명은 <see cref="SimulationScope"/>가
@@ -461,7 +502,10 @@ internal static class ScriptRegistry
         {
             if (!b.IsInitialized) continue;   // Flush로 목록에만 들어오고 아직 초기화되지 않은 것
 
-            if (b.Enabled) Invoke(b, static x => x.OnDisable(), nameof(Component.OnDisable));
+            // ApplyEnabled를 거친다 — 훅을 부르는 자리가 둘이면 그 둘이 어긋난다
+            // (여기서 직접 부르면 _enabled가 true로 남아 상태와 훅이 갈라졌다).
+            // 네이티브를 부르지 않으므로 어셈블리 리로드·종료 경로에서도 안전하다.
+            ApplyEnabled(b, false);
             TearDown(b);
         }
 

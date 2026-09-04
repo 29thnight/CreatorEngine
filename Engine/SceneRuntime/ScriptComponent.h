@@ -41,6 +41,19 @@ public:
 	void OnEndSimulation() override;
 	void OnRemovingFromScene() override;
 
+	// ── 활성 축 (PHASE 9 트랙 L · 6단계와 직교) ──
+	//
+	// 이 둘이 없던 것이 활성 축이 경계에서 통째로 끊겨 있던 원인이다.
+	// LifecycleRegistry의 마스크는 "기반 클래스와 함수 주소가 다른가"로 비트를
+	// 세우므로(LifecycleRegistry.h), override가 없으면 Bit_OnEnable/Bit_OnDisable이
+	// 아예 서지 않는다 — 인스펙터 체크박스도 Entity::SetEnabled의 컴포넌트 전파도
+	// 기반 클래스의 빈 함수를 부르고 끝났다. 스크립트는 자기가 꺼진 것을 모른 채
+	// 계속 틱을 받았다(관리 측 Component.Enabled는 여전히 true였다).
+	//
+	// 6단계와 창구를 나눈 이유는 ClrHost::DispatchEnabled 선언부에 있다.
+	void OnEnable() override;
+	void OnDisable() override;
+
 	// 네이티브에서만 일어나는 사건을 관리 인스턴스에 흘린다(트랙 L · L3 잔여).
 	//
 	// 가상 훅으로 만들지 않은 이유: Scene::FlushPendingDestroy가 **모든 파괴에서**

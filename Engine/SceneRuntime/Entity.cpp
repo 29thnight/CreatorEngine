@@ -534,9 +534,18 @@ void Entity::SetEnabled(bool able)
 	}
 	m_isEnabled = able;
 
-	for (auto& component : m_components)
+	// ★ 인덱스로 돈다 — 이 루프 안에서 m_components가 자랄 수 있다.
+	//
+	// 지금까지는 OnEnable/OnDisable을 구현한 컴포넌트가 0개라 이 루프가 사용자
+	// 코드를 부르는 일이 없었다. ScriptComponent가 그 둘을 override하면서
+	// (활성 축 배선) 스크립트의 OnDisable이 이 한복판에서 돈다 — 거기서
+	// AddComponent를 부르면 push_back이 참조 순회를 무효화한다.
+	//
+	// 매 바퀴 크기를 다시 읽으므로 도중에 늘어난 컴포넌트도 같은 전이를 받는다.
+	// 그것이 옳다: 꺼지는 오브젝트에 붙은 것은 꺼진 채로 시작해야 한다.
+	for (size_t i = 0; i < m_components.size(); ++i)
 	{
-		if (component)
+		if (Component* component = m_components[i].get())
 		{
 			component->SetEnabled(able);
 		}

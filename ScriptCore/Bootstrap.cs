@@ -312,6 +312,20 @@ public static class Bootstrap
         catch (Exception ex) { Report(ex, nameof(DispatchLifecycle)); return -1; }
     }
 
+    /// <summary>
+    /// 네이티브가 활성 전이 하나를 인스턴스 하나에 전달한다(트랙 L · 활성 축).
+    ///
+    /// 6단계와 창구를 나눈 이유: 활성은 <b>단계가 아니라 상태</b>다. phase enum에
+    /// 값을 더하면 그 enum이 두 가지를 뜻하게 되고, 그러면 "순서가 있는 축"이라는
+    /// 전제가 무너진다(같은 이유로 틱도 그 enum에 오지 않는다).
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static int SetScriptEnabled(int instanceId, int enabled)
+    {
+        try { return ScriptRegistry.DispatchEnabled(instanceId, 0 != enabled) ? 0 : -1; }
+        catch (Exception ex) { Report(ex, nameof(SetScriptEnabled)); return -1; }
+    }
+
     // ── 스크립트 어셈블리 로드·핫리로드 ──
     //
     // ScriptCore(이 어셈블리)는 기본 컨텍스트에 상주한다. 네이티브가 붙잡은 진입점이

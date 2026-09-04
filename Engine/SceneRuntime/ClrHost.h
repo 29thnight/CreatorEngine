@@ -287,6 +287,13 @@ public:
 	/// 씬 편입/이탈 두 단계만 DDOL 이송 경로에서 태운다.
 	bool DispatchLifecycle(int instanceId, ScriptLifecyclePhase phase);
 
+	// 활성 전이 하나를 관리 인스턴스에 전달한다(PHASE 9 트랙 L · 활성 축).
+	//
+	// 6단계와 직교한 축이라 DispatchLifecycle과 창구를 나눈다 — 활성은 단계가
+	// 아니라 상태이고, ScriptLifecyclePhase에 값을 더하면 그 enum이 두 가지를
+	// 뜻하게 된다. 부르는 곳은 ScriptComponent::OnEnable/OnDisable 뿐이다.
+	bool DispatchEnabled(int instanceId, bool enabled);
+
 	// 등록된 스크립트 타입 이름 목록 — 에디터의 컴포넌트 추가 메뉴용.
 	// 선택 바인딩이라 구 어셈블리에서는 빈 목록을 돌려줄 수 있다.
 	std::vector<std::string> GetComponentTypeNames();
@@ -464,6 +471,7 @@ private:
 	CreateFn     m_fnCreateComponent{ nullptr };
 	DestroyFn    m_fnDestroyComponent{ nullptr };
 	LifecycleFn  m_fnDispatchLifecycle{ nullptr };
+	LifecycleFn  m_fnSetScriptEnabled{ nullptr };   // (instanceId, enabled) — LifecycleFn과 서명이 같다
 	TypeNamesFn  m_fnGetComponentTypeNames{ nullptr };
 
 	LoadScriptsFn m_fnLoadScripts{ nullptr };

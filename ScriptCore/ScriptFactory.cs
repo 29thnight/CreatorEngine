@@ -62,6 +62,12 @@ internal static class ScriptFactory
         b.BindTransform(Native.HasTransform(owner) ? new Transform { OwnerHandle = owner } : null);
 
         int id = _nextInstanceId++;
+
+        // id를 등록보다 **먼저** 인스턴스에 심는다. 스크립트가 OnInitialized에서
+        // 곧바로 Enabled를 만질 수 있는데, 그 setter가 이 값으로 네이티브
+        // ScriptComponent를 찾는다(Component.Enabled). 0이면 폴백 경고가 뜬다.
+        b.InstanceId = id;
+
         _instances[id] = b;
         ScriptRegistry.Add(b);
         return id;

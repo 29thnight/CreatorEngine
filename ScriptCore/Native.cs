@@ -32,6 +32,11 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, byte*, int, int> Entity_GetName;
     public delegate* unmanaged<ObjectHandle, int, void> Entity_SetEnabled;
 
+    // 스크립트 컴포넌트 하나의 활성 상태. 오브젝트 전체가 아니라 이 스크립트만
+    // 켜고 끈다. 돌려주는 값은 "그 컴포넌트를 찾아 적용했는가"다 — 0이면
+    // Component.Enabled가 국소 폴백으로 내려간다.
+    public delegate* unmanaged<ObjectHandle, int, int, int> Script_SetEnabled;
+
     // 계층 접근. 실측 208곳(자식 76 · FindIndex 100 · 부모 32)으로 표면이 가장 넓다.
     public delegate* unmanaged<ObjectHandle, int> Entity_GetChildCount;
     public delegate* unmanaged<ObjectHandle, int, ObjectHandle> Entity_GetChild;
@@ -300,7 +305,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 23;
+    public const int ExpectedVersion = 24;
 
     private static ScriptApiTable _api;
     private static bool _ready;
@@ -377,6 +382,16 @@ internal static unsafe class Native
     {
         if (_ready && _api.Entity_SetEnabled != null) _api.Entity_SetEnabled(h, enabled ? 1 : 0);
     }
+
+    /// <summary>
+    /// 스크립트 컴포넌트 하나만 켜고 끈다. 훅(OnEnable/OnDisable)은 여기서 부르지
+    /// 않는다 — 네이티브 Component::SetEnabled가 전이일 때만 부르고 그것이
+    /// 관리 측으로 되돌아온다(드라이버 단일화, ScriptLifecyclePhase.h와 같은 이유).
+    /// </summary>
+    /// <returns>해당 컴포넌트를 찾아 적용했으면 true.</returns>
+    public static bool ScriptSetEnabled(ObjectHandle h, int instanceId, bool enabled)
+        => _ready && _api.Script_SetEnabled != null
+           && _api.Script_SetEnabled(h, instanceId, enabled ? 1 : 0) != 0;
 
     // ── 계층 ──
 

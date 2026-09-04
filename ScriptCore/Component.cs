@@ -51,11 +51,30 @@ public abstract class Component
     /// <summary>팩토리가 생성 직후 한 번 채운다. 없으면 null을 넣는다.</summary>
     internal void BindTransform(Transform? transform) => _transform = transform;
 
+    /// <summary>
+    /// 이 인스턴스의 id. 네이티브 ScriptComponent가 들고 있는 값과 같고,
+    /// <see cref="ScriptFactory"/>가 생성 직후 채운다. 0이면 아직 등록 전이다.
+    /// </summary>
+    internal int InstanceId { get; set; }
+
     private bool _enabled = true;
 
     /// <summary>
-    /// 꺼진 스크립트는 순회에서 건너뛴다. 네이티브를 거치지 않으므로 호출 비용이 없다
-    /// (실측에서 SetEnabled 호출이 148회였는데, 대상이 스크립트면 경계를 넘지 않는다).
+    /// 꺼진 스크립트는 순회에서 건너뛴다.
+    ///
+    /// ── 정본은 네이티브다 ──
+    ///
+    /// 예전에는 이 setter가 관리 측 필드를 직접 뒤집고 훅까지 스스로 불렀다.
+    /// 그래서 활성 상태의 정본이 둘이 되어 갈라졌다 — 인스펙터 체크박스와
+    /// <c>Entity::SetEnabled</c>는 네이티브 쪽만 바꾸고, 이 setter는 관리 쪽만
+    /// 바꿨다. 그 결과 오브젝트를 꺼도 스크립트는 계속 틱을 받았다(틱 게이트가
+    /// 보는 것이 이 필드였다).
+    ///
+    /// 지금은 요청만 보낸다. 전이 판정과 훅 발화는 네이티브
+    /// <c>Component::SetEnabled</c>가 하고, 그 결과가
+    /// <see cref="ScriptRegistry.DispatchEnabled"/>로 되돌아와 이 필드를 세운다 —
+    /// 6단계에서 드라이버를 네이티브 하나로 모은 것과 같은 이유다
+    /// (ScriptLifecyclePhase.h 상단).
     /// </summary>
     public bool Enabled
     {
@@ -63,11 +82,30 @@ public abstract class Component
         set
         {
             if (_enabled == value) return;
-            _enabled = value;
 
-            if (value) OnEnable();
-            else OnDisable();
+            // 성공하면 훅과 필드 갱신이 되돌아오는 길에 일어난다.
+            if (Native.ScriptSetEnabled(Entity.Handle, InstanceId, value)) return;
+
+            // 전달하지 못한 경우: 아직 등록 전(InstanceId 0)이거나, 오브젝트가
+            // 이미 사라졌거나, 표에 이 진입점이 없는 낡은 호스트다. 조용히
+            // 무시하면 '껐는데 계속 도는' 바로 그 증상으로 되돌아가므로,
+            // 관리 측에만 적용하고 소란스럽게 남긴다.
+            LogWarning($"[{GetType().Name}] Enabled={value} 를 네이티브에 전달하지 못했다 " +
+                       $"— 관리 측에만 적용한다(instanceId={InstanceId}).");
+            ScriptRegistry.ApplyEnabled(this, value);
         }
+    }
+
+    /// <summary>
+    /// 활성 필드만 세운다. 훅은 부르지 않는다 — 예외 격리가 필요해서
+    /// <see cref="ScriptRegistry"/>가 <c>Invoke</c>로 감싸 부른다.
+    /// </summary>
+    /// <returns>실제로 값이 바뀌었으면 true.</returns>
+    internal bool SetEnabledState(bool value)
+    {
+        if (_enabled == value) return false;
+        _enabled = value;
+        return true;
     }
 
     /// <summary>파괴 표시가 되었거나 대상 오브젝트가 사라졌으면 false.</summary>

@@ -1,0 +1,60 @@
+# 생명주기 축 프로브 — 편집/재생 경계 · 축소 전달 · 활성 전파
+#
+# 사용법:
+#   pwsh Tools\regression\verify-lifecycle-axis.ps1
+#   (게이트가 이 파일을 --script 로 태운다)
+#
+# ── 무엇을 재현하는가 ──
+#
+# 기존 ddol_script_probe.txt는 "훅이 왔는가·순서가 맞는가"를 본다. 이 시나리오는
+# 그 훅들이 **어느 모드에서** 왔고 **틱이 함께 돌았는가**를 본다. 세 결함이
+# 그 구분에서만 보인다(GameScripts/LifecycleAxisProbe.cs 클래스 주석의 T1·T2·T3).
+#
+# ── 구간 ──
+#
+#   A 편집 모드   script.add 직후 150프레임. 훅이 오는지 / 틱이 도는지.
+#   B 재생        play 후. 틱이 돌고, 프로브가 스스로 비활성 왕복을 몬다.
+#   C 정지 후     stop 후 편집 모드 300프레임. 축소가 오는지 / 복원분이 뜨는지.
+#
+# ── #1과 #2를 왜 가르는가 ──
+#
+# script.add는 **자기가 DrainPendingLifecycle을 동기로 부른다**
+# (ConsoleCommandSystem.cpp:6650). 그래서 #1이 편집 모드에서 훅을 받은 것은
+# 그 명령 탓일 수도 있어 원인 귀속이 오염돼 있다.
+#
+# 정지가 씬을 백업에서 되살리면 ScriptComponent가 새로 하나 뜨고, 거기엔 어떤
+# 명령도 관여하지 않는다 — 그 #2가 오염 없는 증거다. 편집 모드에서 #2에 훅이
+# 찍히면 그것은 SceneManagers->Editor()의 매 프레임 드레인밖에 원인이 없다.
+#
+# ── 시간축이 아니라 프레임 예산 ──
+#
+# 헤드리스 프레임 속도를 모르므로 프로브의 전이는 Scope.Delay(초)로 몰고,
+# 시나리오는 그것이 끝날 만큼 넉넉한 프레임을 준다. 예열 0.15 + 관측 0.15 × 2
+# = 0.45초. B 구간 700프레임은 30fps에서도 23초라 충분하고, 빠른 헤드리스에서는
+# 남는 프레임만큼 postreenable 이후 틱이 더 쌓일 뿐 판정에 영향이 없다.
+
+wait 60
+
+scene.new LifecycleAxis
+wait 30
+
+object.create AxisProbe
+wait 10
+
+# ── 구간 A: 편집 모드 ──
+script.add AxisProbe LifecycleAxisProbe
+wait 150
+play.state
+
+# ── 구간 B: 재생 ──
+play
+wait 700
+play.state
+
+# ── 구간 C: 정지 후 편집 모드 ──
+stop
+wait 300
+play.state
+
+log.flush
+quit
