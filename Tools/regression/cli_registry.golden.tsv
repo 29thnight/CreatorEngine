@@ -173,11 +173,11 @@ scene.transformpull	-	frames	editor	probe	live	no	print|probe	X6 C# 즉시 pull�
 scene.transformstats	-	frames	editor	probe	live	no	[0|1|print]	X0 UI/Spatial·단계·구성·프레임 topology 계측
 scene.transformwritestats	-	frames	editor	probe	live	no	[0|1|print|probe]	X1 로컬 쓰기 publish 출처 계측
 scene.traversalbench	-	long	editor	probe	live	no	<오브젝트수> <프레임수> [flat|wide|deep|skeleton]	X0 Release 벤치(0=현재 씬)
-script.add	-	frames	editor	engine_service	live	no	<오브젝트> <타입>	C# 스크립트를 오브젝트에 부착한다
+script.add	-	frames	editor	engine_service	live	yes	<오브젝트> <타입>	C# 스크립트를 오브젝트에 부착한다
 script.fields	-	frames	editor	engine_service	live	no	<id>	스크립트의 노출 필드와 현재 값을 확인한다
-script.reload	-	frames	editor	engine_service	live	no	-	게임 스크립트 어셈블리를 다시 로드한다(핫리로드)
+script.reload	-	frames	editor	engine_service	live	yes	-	게임 스크립트 어셈블리를 다시 로드한다(핫리로드)
 script.set	-	frames	editor	engine_service	live	no	<id> <인덱스> <값>	노출 필드 값을 바꾼다
-script.status	-	immediate	editor	engine_service	live	no	-	CLR 상태와 활성 스크립트 수를 확인한다
+script.status	-	immediate	editor	engine_service	live	yes	-	CLR 상태와 활성 스크립트 수를 확인한다
 serialize.bench	-	long	editor	probe	live	no	boot | scene <경로> [반복] | prefab <이름> [반복]	직렬화 경로별 시간을 잰다
 serialize.nodeequal	-	frames	editor	probe	live	no	-	저작 노드 구조 비교 규칙을 판정한다(맵 키 순서 무시가 의도)
 serialize.rymlerror	-	frames	editor	probe	live	no	-	ryml 에러 정책이 abort를 막는지 판정한다

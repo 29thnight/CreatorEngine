@@ -115,6 +115,16 @@ Run-Step "CLI editor_operation Undo 특성화(LC6)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-editor-operation.ps1") -Exe $Exe
 }
 
+# PHASE 14.5 LC7 §10.2 — 리로드 실패가 반쯤 교체된 상태를 남기지 않는다.
+#
+# 관리 쪽 Reload()가 `Unload(); Load();` 라, 새 어셈블리가 깨져 있으면 이전 것은
+# 이미 사라진 뒤였고 에디터에 스크립트가 하나도 남지 않았다(실측). 빌드가 깨진 채
+# 리로드를 부르는 것은 가장 흔한 일이라, 그때마다 에디터가 못 쓰게 되면 라이브
+# 코드 교체라고 부를 수 없다. 이 게이트가 그 시나리오를 그대로 태운다.
+Run-Step "CLI 스크립트 리로드 계약(LC7)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-script-reload.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

@@ -133,7 +133,23 @@ if ($callCount -eq 0) {
     $failed += "OnInitialized 호출 흔적이 $callCount 건이다 — 예상 밖의 추가 호출(별도 조사 대상)"
 }
 
-if ($proc.ExitCode -ne 0) { $failed += ("종료 코드 비정상: 0x{0:X8}" -f $proc.ExitCode) }
+# ── 종료 코드: 이 시나리오는 **일부러 실패한다** ──────────────────────────
+#
+# 이 검사는 존재하지 않는 프로브 타입을 붙여 "OnInitialized가 정확히 한 번"을 본다.
+# 부착은 반드시 실패하고, 그것이 시나리오의 전제다(위 attachFailedSeen 단정).
+#
+# 예전에는 `script.add`가 legacy void 핸들러라 실패해도 종료 코드가 0이었고, 그래서
+# 여기서 0을 기대했다. LC7이 그것을 결과형으로 옮기면서 실패가 session을 거쳐
+# 종료 코드에 닿는다(Failed → 4). 그것이 LC1이 세운 규약이다.
+#
+# 그래서 기대값을 4로 **올린다** — 느슨하게 "0이 아니어도 통과"로 두지 않는다.
+# 여기서 0이 돌아오면 `script.add`가 실패를 다시 삼키기 시작했다는 뜻이고,
+# 그것은 이 시나리오가 아니라 명령 계약이 깨진 것이다.
+$expectedExit = 4
+if ($proc.ExitCode -ne $expectedExit) {
+    $failed += ("종료 코드 {0} 을 기대했는데 0x{1:X8} 이다 — " -f $expectedExit, $proc.ExitCode) +
+               "0 이면 script.add 가 부착 실패를 보고하지 않는다는 뜻이다(LC1 규약 위반)"
+}
 
 if ($failed.Count -gt 0) {
     "실패 $($failed.Count)건:"
