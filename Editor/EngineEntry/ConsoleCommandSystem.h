@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <future>
 #include <mutex>
 #include <string>
@@ -90,6 +91,39 @@ public:
     ///   LC4 의 수신 스레드가 쓸 진입점이고, 오늘은 `--exec-args` 가 같은 문을 쓴다.
     void EnqueueStructured(std::vector<std::string> arguments);
 
+    /// 명령 하나의 실행이 끝났을 때 불린다. **게임 스레드에서 불린다.**
+    struct CommandTiming
+    {
+        double   queuedMs{ 0.0 };
+        uint32_t waitedFrames{ 0 };
+        double   executedMs{ 0.0 };
+    };
+    using CommandCompletion =
+        std::function<void(const CommandCore::CommandResult&, const CommandTiming&)>;
+
+    /// 결과를 받을 사람이 있는 구조화 주입(LC4 의 HTTP 수신 스레드).
+    ///
+    /// completion 은 GT 에서 불리므로 **짧아야 한다**. 수신 스레드는 그 안에서
+    /// 값을 넘겨받고 곧바로 깨어난다.
+    void EnqueueStructured(std::vector<std::string> arguments, CommandCompletion completion);
+
+    // ── 서비스가 GT 밖에서 읽는 상태 (LC4) ──────────────────────────────
+    //
+    // ★ **게임 스레드가 멈춰 있어도 답해야 한다.** LC0 실측이 그 근거다 —
+    //   `scene.load` 가 큐를 2.4초 막는 동안 `Pump()` 는 아예 돌지 않았고,
+    //   그 구간에 상태를 못 내면 §7.3 의 "멈춤은 지연이 아니라 상태다"가
+    //   성립하지 않는다. 그래서 이 값들은 `Pump()` 가 아니라 **명령 실행 전후**에
+    //   찍히고, 큐 뮤텍스는 실행 중에는 잡고 있지 않다.
+    struct ServiceStatus
+    {
+        uint64_t    frame{ 0 };
+        std::size_t queueDepth{ 0 };
+        double      oldestQueuedMs{ 0.0 };
+        bool        executing{ false };
+        std::string currentCommand;
+    };
+    ServiceStatus SnapshotStatus() const;
+
     // ── 핸들러가 쓰는 표면 ───────────────────────────────────────────────
     //
     // 명령 본문이 독립 함수로 나가면서, 예전에 멤버를 직접 만지던 세 자리가
@@ -166,6 +200,9 @@ private:
         std::chrono::steady_clock::time_point enqueuedAt{};
         uint64_t                              enqueuedFrame{};
 
+        /// 결과를 기다리는 사람이 있으면 채워진다(LC4).
+        CommandCompletion                     completion;
+
         bool IsStructured() const noexcept { return !arguments.empty(); }
     };
 
@@ -175,6 +212,11 @@ private:
     // Pump가 도는 횟수. 프레임 경계에서 정확히 한 번이라 프레임 수와 같다.
     // Enqueue가 게임 스레드 밖에서 읽으므로 원자적이어야 한다.
     std::atomic<uint64_t> m_frameIndex{ 0 };
+
+    // 서비스가 GT 밖에서 읽는 실행 상태. 짧게만 잡는다.
+    mutable std::mutex    m_statusMutex;
+    std::string           m_currentCommand;
+    std::atomic<bool>     m_executing{ false };
 
     // 표준 입력 읽기 스레드.
     //

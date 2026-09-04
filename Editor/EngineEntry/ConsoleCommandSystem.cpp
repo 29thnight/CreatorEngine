@@ -3,7 +3,8 @@
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
-#include "CommandCore/CommandDescriptorSeeds.h"  // LC2: 토크나이저와 소유형 invocation
+#include "CommandCore/CommandDescriptorSeeds.h"
+#include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
@@ -578,6 +579,7 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
     // 종료 구간 힙 손상(0xC0000374)의 구조적 원인이다.
     // 콘솔 자체(출력)는 세 경우 모두 필요하므로 wantConsole과는 분리한다.
     bool wantStdinReader = false;
+    bool wantCommandService = false;
 
     auto toUtf8 = [](const wchar_t* w) -> std::string
     {
@@ -637,6 +639,15 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
             EnqueueStructured(std::move(arguments));
             wantConsole = true;
         }
+        else if (arg == "--command-service")
+        {
+            // ★ 기본은 off 다(§8). 켜는 것은 이 명시 플래그뿐이다.
+            //
+            //   서비스는 실행 표면이라, "설정 파일에 켜져 있었다"로 열리면
+            //   안 된다. 실패해도 에디터는 계속 뜬다 — 서비스가 안 열린 것과
+            //   에디터가 못 뜨는 것은 다른 사건이다.
+            wantCommandService = true;
+        }
         else if (arg == "--fail-fast")
         {
             // 기본은 continue + aggregate 다(§3.1). 시나리오 하나가 실패해도
@@ -646,6 +657,22 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
         }
     }
     ::LocalFree(argv);
+
+    // LC4: 서비스를 켠다. 배치 프론트엔드와 독립이라 --console 과 무관하게 뜬다.
+    if (wantCommandService)
+    {
+        std::string error;
+        if (EditorCommandService::Start(PathFinder::BaseProjectPath().string(), error))
+        {
+            std::printf("[CLI] command service listening 127.0.0.1:%u\n",
+                        static_cast<unsigned>(EditorCommandService::Port()));
+        }
+        else
+        {
+            std::fprintf(stderr, "[CLI] command service 시작 실패: %s\n", error.c_str());
+            std::fflush(stderr);
+        }
+    }
 
     if (wantConsole)
     {
@@ -737,9 +764,44 @@ void ConsoleCommandSystem::Enqueue(std::string command)
 
 void ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments)
 {
+    EnqueueStructured(std::move(arguments), CommandCompletion{});
+}
+
+ConsoleCommandSystem::ServiceStatus ConsoleCommandSystem::SnapshotStatus() const
+{
+    ServiceStatus status;
+    status.frame     = m_frameIndex.load(std::memory_order_acquire);
+    status.executing = m_executing.load(std::memory_order_acquire);
+
+    {
+        // ★ 이 락은 실행 중에는 잡혀 있지 않다.
+        //
+        //   `Pump()` 는 큐에서 꺼낼 때만 잡고 곧 놓은 뒤 명령을 실행한다.
+        //   그래서 `scene.load` 가 2.4초 도는 동안에도 여기서 즉시 잠긴다 —
+        //   그것이 §7.3 이 성립하는 이유다.
+        std::lock_guard<std::mutex> guard(const_cast<std::mutex&>(m_mutex));
+        status.queueDepth = m_pending.size();
+        if (!m_pending.empty())
+        {
+            const std::chrono::duration<double, std::milli> age =
+                std::chrono::steady_clock::now() - m_pending.front().enqueuedAt;
+            status.oldestQueuedMs = age.count();
+        }
+    }
+    {
+        std::lock_guard<std::mutex> guard(m_statusMutex);
+        status.currentCommand = m_currentCommand;
+    }
+    return status;
+}
+
+void ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments,
+                                             CommandCompletion completion)
+{
     if (arguments.empty()) return;
 
     PendingCommand pending;
+    pending.completion = std::move(completion);
 
     // 진단용 재구성. **이 문자열은 다시 파싱되지 않는다** — 실행은 arguments 로
     // 한다. 로그와 계측이 "무엇을 불렀나"를 사람 눈으로 볼 수 있게만 만든다.
@@ -819,6 +881,15 @@ void ConsoleCommandSystem::Pump()
 
     const auto dequeuedAt = std::chrono::steady_clock::now();
 
+    // 실행 중임을 GT 밖에서도 볼 수 있게 찍는다(LC4). 큐 락은 이미 놓았으므로
+    // 서비스는 이 명령이 오래 돌아도 상태를 읽을 수 있다.
+    {
+        const auto nameEnd = line.find_first_of(" \t");
+        std::lock_guard<std::mutex> guard(m_statusMutex);
+        m_currentCommand = line.substr(0, (nameEnd == std::string::npos) ? line.size() : nameEnd);
+    }
+    m_executing.store(true, std::memory_order_release);
+
     // 구조화 입력은 라인 문법을 거치지 않는다(LC2). 재구성한 문자열은 진단용
     // 으로만 넘긴다 — 그것을 다시 파싱하면 §3.2 의 왕복 손실이 되살아난다.
     const CommandCore::CommandResult result = pending.IsStructured()
@@ -826,6 +897,11 @@ void ConsoleCommandSystem::Pump()
         : Execute(line);
 
     const auto finishedAt = std::chrono::steady_clock::now();
+    m_executing.store(false, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> guard(m_statusMutex);
+        m_currentCommand.clear();
+    }
 
     // 이름만 남긴다. 인자는 경로·오브젝트 이름이 섞여 있어 계측 artifact에
     // 그대로 실으면 기계마다 다른 문자열이 들어간다.
@@ -847,6 +923,17 @@ void ConsoleCommandSystem::Pump()
         ? (frameIndex - pending.enqueuedFrame) : 0;
 
     CommandBaseline::NoteCommand(name, queued.count(), waitedFrames, executed.count());
+
+    // 결과를 기다리는 사람(LC4 의 수신 스레드)을 깨운다. **GT 에서 불린다** —
+    // 여기서 오래 걸리면 다음 프레임이 밀린다. 어댑터는 값만 넘기고 곧 반환한다.
+    if (pending.completion)
+    {
+        CommandTiming timing;
+        timing.queuedMs     = queued.count();
+        timing.waitedFrames = static_cast<uint32_t>(waitedFrames);
+        timing.executedMs   = executed.count();
+        pending.completion(result, timing);
+    }
 }
 
 namespace
@@ -12469,6 +12556,10 @@ void ConsoleCommandSystem::PrintHelp() const
 
 void ConsoleCommandSystem::Shutdown()
 {
+    // 서비스를 먼저 내린다 — 수신 스레드가 살아 있는 채로 엔진이 정리되면
+    // 그 스레드가 사라진 것을 만진다. endpoint 파일도 여기서 지워진다.
+    EditorCommandService::Stop();
+
     m_running.store(false, std::memory_order_release);
 
     if (!m_stdinThread.joinable()) return;

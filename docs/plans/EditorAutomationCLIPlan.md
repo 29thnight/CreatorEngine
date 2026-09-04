@@ -315,7 +315,7 @@ snapshot을 그대로 낸다 — 에이전트가 무엇을 부를 수 있는지 
 | 전송 | **로컬 HTTP/1.1 + JSON** | 언어 중립. `curl`·PowerShell `Invoke-RestMethod`·에이전트가 추가 클라이언트 없이 소비한다 |
 | bind | **127.0.0.1 / ::1 전용** | 서비스는 실행 표면이다. 비 loopback bind는 정적 게이트로 금지 |
 | 인증 | **요청마다 Bearer token** | 같은 머신의 다른 프로세스도 loopback에 붙을 수 있다 |
-| HTTP 구현 | **자체 최소 서브셋(Winsock2)** | 필요한 것은 loopback POST/GET·Content-Length·keep-alive뿐. 1st-party 소스의 소켓 의존이 0인 상태에서 포트를 새로 들이는 비용 > 구현 비용. 기각 근거는 §17 |
+| HTTP 구현 | **자체 최소 서브셋(Winsock2)**, 단 소켓 호출은 **플랫폼 이음매 뒤에** | 필요한 것은 loopback POST/GET·Content-Length·keep-alive뿐. 1st-party 소스의 소켓 의존이 0인 상태에서 포트를 새로 들이는 비용 > 구현 비용. 기각 근거는 §17. 이음매 근거는 §4.1 |
 | JSON | **자체 codec** | 스키마가 작고 고정이다. ryml 재사용은 authoring 계측 경로(`AuthoringParsedDocument`)와 얽혀 Player의 `runtime.text-parser calls=0` 게이트를 흔든다 |
 | 배치 CLI | **유지** | 소비자 81개와 CI. 서비스는 대체가 아니라 추가 프론트엔드 |
 | canonical ID | dotted ID 유지 | 기존 scenario 호환 |
@@ -329,6 +329,55 @@ snapshot을 그대로 낸다 — 에이전트가 무엇을 부를 수 있는지 
 | Player | **Development 구성 전용 · 기본 off · 명시 플래그** | Shipping 표면 0 |
 | headless | 비범위 | 현재 Editor 창·renderer 의존과 다른 문제 |
 | MCP | **여전히 이 계획 밖** | 다만 보류 근거가 바뀐다 — §16 |
+
+### 4.1 소켓은 이음매 뒤에 둔다 (2026-09-04 결정)
+
+Winsock2 는 Windows 전용이다. 그것이 새 제약을 만드는가를 먼저 쟀다.
+
+| 항목 | 실측 |
+|---|---|
+| 빌드 시스템 | `.sln`/`.vcxproj` 전용 — CMake 없음 |
+| `Windows.h` 계열을 include 하는 1st-party 파일 | 32 |
+| `HWND`/`HINSTANCE`/`WndProc` 를 쓰는 파일 | 29 |
+| `#ifdef __linux__` 류 플랫폼 분기 | **0** |
+
+엔진은 이미 Win32 에 묶여 있고 **이식을 시도한 흔적이 한 번도 없다**. 소켓이
+포터블해져도 창·DX12·빌드 시스템이 따라오지 않는다. 그리고 이 저장소에는 이미
+방침이 있다 — `EngineDistributionAndLauncherPlan.md` §147: "초기 릴리스에서
+macOS/Linux 설치기를 함께 설계하지 않는다. **descriptor와 Host 계약만 플랫폼
+중립으로 둔다.**" 구현은 Windows, 계약은 중립이다.
+
+그래서 진짜 질문은 "Winsock2 가 Windows 전용인가"가 아니라 **"LC4 가 원래 중립이어도
+될 곳까지 Windows 로 물들이는가"** 이고, 그것은 실재하는 위험이다. 이유 셋.
+
+1. §12 가 `Engine/CommandService` 를 **Editor 와 Player 가 공유**하게 두었다.
+   LC8 이 Development/Shipping 을 가를 때 이 모듈이 양쪽에 들어간다.
+2. §12 의 규칙("CommandService 는 Editor 헤더를 include 하지 않는다")과 같은 규율이
+   플랫폼 헤더에도 적용돼야 한다.
+3. **`<winsock2.h>` 는 `<windows.h>` 보다 먼저 와야 한다.** 순서가 뒤집히면
+   windows.h 가 끌고 오는 WinSock 1.1 선언과 충돌해 재정의 오류가 난다. 이것을
+   공개 헤더에 두면 CommandService 를 include 하는 **모든 TU** 가 그 지뢰를 물려받는다.
+
+**결정: Winsock2 를 쓰되 소켓 호출을 `.cpp` 한 곳에 가둔다.**
+
+```text
+Engine/CommandService/
+  SocketPlatform.h          중립 타입(listen/accept/recv/send·오류 코드)
+  SocketPlatform_Win32.cpp  <winsock2.h> 는 여기에만
+  HttpRequest.*             파싱·헤더 한계          — 중립
+  HttpListener.*            수신 루프·keep-alive     — 중립
+  CommandService.*          라우팅·인증·operation 표 — 중립
+  JsonValue.*               codec                    — 중립
+```
+
+이식 시 남는 델타는 `WSAStartup`/`WSACleanup` · `SOCKET` 대 `int` ·
+`closesocket` 대 `close` · `WSAGetLastError` 대 `errno` 정도다(`WSAPoll` 은
+`poll` 과 시그니처가 같다). **이음매 비용은 사실상 0 이고, 없을 때의 비용은
+LC4 본체 전부가 Windows 맛이 되는 것**이다.
+
+라이브러리(asio·cpp-httplib)로 가지 않는다. §17 이 이미 기각했고, 엔진이 어차피
+Windows-only 인 지금 이식성은 그 결정을 뒤집을 근거가 못 된다. §17 이 적어 둔
+되돌릴 조건은 그대로다 — **자체 파서의 결함을 §14.3 으로 통제하지 못하면** 재판정.
 
 ---
 
@@ -1163,6 +1212,68 @@ descriptor 에 애초에 담기지 않는다 — `CommandRegistry::Add` 안의 �
 완료 기준: 켜져 있는 에디터에 `curl`로 명령을 보내 결과 JSON을 받는다 · 비 loopback bind
 정적 게이트 통과 · 토큰 없는 요청 전부 401(`/health` 포함) · `Origin` 있는 요청 거부 ·
 본문 초과 413 · 서비스 off가 기본이고 off일 때 소켓 0 · 배치 경로 회귀 0.
+
+**상태: 완료 (2026-09-04).**
+
+| 완료 기준 | 증거 |
+|---|---|
+| `curl` 왕복 | `curl -H "Authorization: Bearer …" -d '{"command":"object.create","args":["Big Boss Character"]}'` → 결과 JSON. 에디터가 그 이름 그대로 오브젝트를 만들었다 |
+| bind 정적 게이트 | `s_addr` 대입 중 `INADDR_LOOPBACK` 아닌 것 0건 |
+| 토큰 없는 요청 401 | `/health` 포함 예외 없음 |
+| `Origin`/`Referer` 거부 | 403 |
+| 본문 초과 413 | 1MiB+64B → 413, 프로세스 생존 |
+| 기본 off | `--command-service` 없으면 endpoint 파일도 소켓도 없다 |
+| 배치 회귀 0 | 전체 회귀 세트가 LC3 기준선과 동일 |
+
+★ **구조화 인자가 왕복 손실 없이 닿는다.** JSON `args` 배열이 `EnqueueStructured`
+(LC2)로 곧장 들어가 라인 문법을 한 번도 거치지 않는다. `"Big Boss Character"` 가
+공백째 그대로 씬에 도착하는 것을 게이트가 확인한다.
+
+★ **게이트 자체가 두 번 스스로 걸렸다.** ① 유령 endpoint 검사가 미리 만든 파일을
+먼저 읽어 포트 1 로 접속했다(존재가 아니라 **우리 pid** 를 기다려야 한다).
+② 에디터 stdout 을 파이프로 받고 읽지 않아 버퍼가 차서 종료가 막혔다 — 증상은
+"endpoint 파일이 남았다"였는데 원인은 파이프였다.
+
+★★ **보안 검토가 CRITICAL 하나와 HIGH 하나를 잡았다.**
+
+1. **`RestrictToCurrentUser` 가 아무것도 제한하지 않았다.**
+   `SetFileAttributesW(FILE_ATTRIBUTE_NORMAL)` 을 부르고 주석에 "상속을 끊고
+   소유자 권한만 남긴다"고 적어 뒀다. 그 함수는 읽기전용·숨김 같은 **속성 비트**만
+   건드리고 ACL 은 손도 대지 않는다. 즉 평문 토큰이 든 `endpoint.json` 이 부모
+   디렉터리에서 상속한 권한 그대로 놓여 있었고, 같은 머신의 다른 계정이 읽으면
+   실행 표면의 자물쇠가 통째로 넘어간다. **주석이 사실이 아닌 채로 통과할 뻔했다.**
+
+   프로세스 토큰의 SID 로 명시적 DACL 을 만들고 `SE_DACL_PROTECTED` 로 상속을
+   끊었다. 권한을 **먼저** 세우고 그 핸들로 쓴다(쓴 뒤 고치면 그 사이에 노출된
+   파일이 존재한다). 권한을 못 세우면 **쓰지 않고 서비스도 뜨지 않는다** — 토큰이
+   유일한 자물쇠라, 보호할 수 없는데 적어 두는 것보다 안 여는 편이 낫다.
+
+   변이로 이빨을 확인했다: 실제 구현은 `Protected=true · 허용 ACE 1개`,
+   `icacls /inheritance:e` 로 상속을 되살리면 `Protected=false · 허용 ACE 4개` —
+   게이트가 잡는다. **그 4개가 처음 구현이 남기던 상태다.**
+
+2. **인증 이전 단계의 서비스 정지가 가능했다.** 수신 루프가 연결을 직접 처리해서,
+   아무 로컬 프로세스나 연결만 열고 아무것도 안 보내면 유일한 스레드를 잡았다.
+   유휴 타임아웃은 `recv` 마다 새로 30초를 주므로 29초마다 1바이트씩 흘리면
+   **영원히** 산다. 토큰도 필요 없다. 덤으로 `maxConnections` 검사는 동시 연결이
+   1 을 넘을 수 없어 **죽은 코드**였다.
+
+   연결을 작업 스레드로 넘기고, 유휴 타임아웃과 별개로 **요청 절대 기한**(10초)을
+   두었다. 게이트가 미완성 요청을 붙여 둔 채 정상 요청을 보내 확인한다 — **6ms**.
+
+   함께 고친 둘: 작업 스레드에 예외 경계가 없어 요청 하나가 `std::terminate` 로
+   에디터를 죽일 수 있었고, 종료 시 `recv` 로 막힌 스레드를 그냥 기다리면 종료가
+   최대 30초 늦어졌다(`shutdown` 으로 깨운다).
+
+★★ **게이트의 사각지대도 함께 메웠다.** 검토가 "지워도 초록"이라고 짚은 것들이다 —
+`Transfer-Encoding` 거부(요청 밀수 방어 전체가 이 한 줄에 걸려 있었다) · 헤더 개수
+상한 · endpoint 파일 DACL · slowloris. 그리고 bind 정적 검사가 **이름만 막고 있었다**:
+`INADDR_ANY` 는 그냥 0 이라 `s_addr = 0` 으로 쓰면 정규식을 조용히 통과하고 모든
+인터페이스에 열린다. 이제 주소 대입 자체를 보고 `INADDR_LOOPBACK` 이 아닌 것을 잡는다.
+
+이번 슬라이스에 넣지 않은 것: `/operations` 폴링·취소·스트리밍과 프레임 예산 드레인은
+LC5 다. 지금은 `timeoutMs` 를 넘기면 **실행은 계속되고 응답만 먼저** 돌아간다
+(§5.2 — 이미 시작한 GT 작업을 끊는 것이 더 위험하다).
 
 ### LC5 — 프레임 예산 드레인·세션·operation·스트리밍 (P0 · 2.5일) ★ 신규
 

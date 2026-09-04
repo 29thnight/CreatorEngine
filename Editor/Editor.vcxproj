@@ -37,6 +37,7 @@
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.h" />
     <ClInclude Include="EngineEntry\BuildSettings.h" />
     <ClInclude Include="EngineEntry\CommandBaseline.h" />
+    <ClInclude Include="EngineEntry\EditorCommandServiceHost.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandParser.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandDescriptor.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandDescriptorSeeds.h" />
@@ -102,6 +103,7 @@
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.cpp" />
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp" />
     <ClCompile Include="EngineEntry\CommandBaseline.cpp" />
+    <ClCompile Include="EngineEntry\EditorCommandServiceHost.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandParser.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandDescriptorSeeds.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandRegistry.cpp" />
@@ -146,6 +148,9 @@
     <ClCompile Include="ImGuiHelper\widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Engine\CommandService\CommandService.vcxproj">
+      <Project>{3f7a1c62-8d94-4b05-a1e7-6c25d80f9b34}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>

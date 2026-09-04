@@ -75,6 +75,17 @@ Run-Step "CLI discovery(LC3)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-discovery.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 14.5 LC4 — 로컬 HTTP/JSON 서비스.
+#
+# 서비스는 실행 표면이다(§8). 그래서 이 게이트는 "동작하는가"보다 **"열리지
+# 말아야 할 것이 닫혀 있는가"**를 먼저 본다 — 기본 off · 토큰 없는 요청 401
+# (/health 포함) · Origin 거부 · 본문 413 · winsock 헤더가 이음매 밖으로 새지
+# 않음 · 비 loopback bind 0. 기능 검사만 있고 통제 검사가 없으면 통제가 조용히
+# 사라져도 초록이다.
+Run-Step "CLI command service(LC4)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-service.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.
