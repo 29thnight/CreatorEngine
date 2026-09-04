@@ -180,7 +180,22 @@ internal static class ScriptRegistry
     public static bool DispatchLifecycle(int instanceId, int phase)
     {
         var b = ScriptFactory.Find(instanceId);
-        if (b is null || !b.IsAlive) return false;
+        if (b is null) return false;
+
+        // ★ 축소 삼단은 생존을 묻지 않는다(2026-09-05).
+        //
+        // 예전에는 여기서 무조건 IsAlive를 봤는데, 그 판정은 소유자의 파괴 표시를
+        // 본다(Api_Entity_IsAlive). 그런데 축소는 **정의상 죽는 중에** 오고,
+        // 파괴 경로에서 그것을 부르는 Scene::FlushPendingDestroy는 표시가 선 뒤에
+        // 돈다 — 즉 오브젝트 파괴에서는 세 단계가 전부 이 문턱에서 버려졌다.
+        //
+        // 그 결과 축소가 관리 측 폴백(TearDown)으로만 왔고, 그 폴백은 관리 틱 안의
+        // Flush에만 있어 편집 모드에서는 돌지 않았다. 실측: 재생을 정지한 f964에
+        // 와야 할 훅이 프로세스 종료의 f1266에 왔다(302프레임 뒤).
+        //
+        // 앞쪽 세 단계는 반대다 — 죽어가는 오브젝트를 초기화하면 안 되므로
+        // 생존을 계속 묻는다.
+        if ((LifecyclePhase)phase < LifecyclePhase.OnEndSimulation && !b.IsAlive) return false;
 
         // OnInitialized는 그 가드 **앞**이다 — 이 단계가 곧 IsInitialized를 세운다.
         if ((LifecyclePhase)phase == LifecyclePhase.OnInitialized)
@@ -219,6 +234,23 @@ internal static class ScriptRegistry
             case LifecyclePhase.OnEndSimulation:
                 // 축소의 시작이다 — 여기서 묶음 표시를 세운다.
                 b.MarkTeardownDelivered();
+
+                // 축소는 비활성으로 시작한다(2026-09-05). Unity가 파괴에서
+                // OnDisable → OnDestroy를 보장하는 것과 같은 계약이고,
+                // OnEnable/OnDisable에 구독을 거는 흔한 형태가 파괴에서도
+                // 짝이 맞으려면 이것이 있어야 한다.
+                //
+                // 어셈블리 리로드 경로(Clear)는 예전부터 이것을 하고 있었다 —
+                // 즉 이 줄이 없으면 **같은 최종 정리가 경로마다 다르다.**
+                // 실측으로 드러났다: 재생 정지의 축소에는 OnDisable이 없고
+                // 종료의 축소에는 있었다.
+                //
+                // 이미 꺼진 스크립트에는 발화하지 않는다(전이가 아니므로) —
+                // 그것도 Unity와 같다. 네이티브 계층에는 대응 배선을 두지
+                // 않는다: FlushPendingDestroy에서 SetEnabled를 부르면 파괴 중에
+                // 렌더 프록시 dirty가 발행되고, 애초에 OnDisable을 구현한
+                // 네이티브 컴포넌트는 0개라 관측 가능한 대칭이 없다.
+                ApplyEnabled(b, false);
 
                 // ★ 취소가 OnEndSimulation보다 **먼저**여야 한다(트랙 L5). 대기 중이던
                 // 태스크가 사용자의 OnEndSimulation 코드보다 먼저 취소돼야 "구독만 있고
@@ -498,6 +530,15 @@ internal static class ScriptRegistry
     /// </summary>
     public static void Clear()
     {
+        // ★ 보류 큐를 먼저 반영한다(2026-09-05).
+        //
+        // 관리 틱이 한 번도 돌지 않은 인스턴스는 _pendingAdd에 머문다 — 편집
+        // 모드에는 관리 틱이 없으므로 거기서 만들어진 스크립트가 전부 그렇다.
+        // 아래 루프는 _active만 훑으므로, 이 Flush가 없으면 그것들은 축소 훅을
+        // **한 번도 받지 못한 채** 사라진다(실측: 정지 후 복원된 인스턴스가
+        // OnUninitializing을 영영 못 받았다). 잡은 것이 전부 그대로 샌다.
+        Flush();
+
         foreach (var b in _active)
         {
             if (!b.IsInitialized) continue;   // Flush로 목록에만 들어오고 아직 초기화되지 않은 것

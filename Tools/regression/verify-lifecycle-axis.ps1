@@ -287,6 +287,52 @@ if ($iSelfDis -lt 0 -or $iPostSelfDis -lt 0) {
     }
 }
 
+# ── 판정 7 — 축소 훅에서 자기 오브젝트에 닿는가 ──
+#
+# 훅이 왔다는 것만으로는 반쪽이다. Entity::Destroy가 파괴 **표시** 시점에 스크립트
+# 핸들을 무효화하면, 축소가 발화하는 FlushPendingDestroy 무렵에는 이미 닿을 수
+# 없다 — 이름은 빈 문자열이고 GetComponent는 전부 무응답이다. 크래시가 아니라
+# '정리 코드가 조용히 아무 일도 안 하는' 모습이라 개수 판정으로는 안 보인다.
+$reachable = @($events | Where-Object { $_.Kind -eq 'mark' -and $_.Name -eq 'ownerreachable' })
+$lost      = @($events | Where-Object { $_.Kind -eq 'mark' -and $_.Name -eq 'ownerlost' })
+"판정 7  축소 중 소유자  : 도달 $($reachable.Count) 건 · 유실 $($lost.Count) 건 (기대: 유실 0, 도달 >= 1)"
+if ($lost.Count -gt 0) {
+    $failed += "축소 훅에서 자기 오브젝트에 닿지 못한 인스턴스가 $($lost.Count)건이다 — 파괴 표시 시점에 스크립트 핸들이 무효화되어 마지막 훅이 빈손으로 온다(Entity::Destroy의 ScriptObjectRegistry::Unregister 위치 확인)"
+}
+if ($reachable.Count -lt 1) {
+    $failed += "축소 훅에서 소유자 도달을 확인한 인스턴스가 0건이다 — OnUninitializing 자체가 오지 않았거나 프로브가 그 마크를 남기지 못했다"
+}
+
+# ── 판정 8 — 축소가 경로와 무관하게 비활성으로 시작하는가 ──
+#
+# Unity가 파괴에서 OnDisable → OnDestroy를 보장하는 것과 같은 계약이다.
+# 어셈블리 리로드 경로(ScriptRegistry.Clear)는 예전부터 이것을 했지만 재생 정지의
+# 파괴 경로는 하지 않았다 — 같은 최종 정리가 경로마다 달랐다. 인스턴스마다
+# OnEndSimulation 바로 앞에 OnDisable이 있는지 본다.
+#
+# 프로브는 항상 활성 상태로 파괴되므로 "있어야 한다"가 옳다. 이미 꺼진
+# 스크립트라면 전이가 아니라 발화하지 않는 것이 맞다(그것도 Unity와 같다).
+$teardownOrderBad = @()
+foreach ($o in $ordinals) {
+    $own = @($events | Where-Object { $_.Ordinal -eq $o })
+    $iEnd = Get-MarkIndex -List $own -Kind 'hook' -Name 'OnEndSimulation'
+    if ($iEnd -lt 0) { continue }
+    $before = @($own[0..$iEnd] | Where-Object { $_.Kind -eq 'hook' -and $_.Name -eq 'OnDisable' })
+    # 축소 직전의 OnDisable인지 확인한다 — 앞선 비활성 왕복의 것과 섞이면 안 되므로
+    # 마지막 OnDisable이 OnEndSimulation 직전 2줄 안에 있어야 한다.
+    if ($before.Count -eq 0) { $teardownOrderBad += $o; continue }
+    $iLastDisable = -1
+    for ($i = $iEnd; $i -ge 0; --$i) {
+        if ($own[$i].Kind -eq 'hook' -and $own[$i].Name -eq 'OnDisable') { $iLastDisable = $i; break }
+    }
+    if ($iEnd - $iLastDisable -gt 2) { $teardownOrderBad += $o }
+}
+"판정 8  축소 시작 비활성: 어긋난 인스턴스 $($teardownOrderBad.Count) 개 (기대 0) · 전체 $($ordinals.Count) 개"
+if ($teardownOrderBad.Count -gt 0) {
+    $list = ($teardownOrderBad | ForEach-Object { "#$_" }) -join ', '
+    $failed += "$list 의 축소가 OnDisable 없이 시작한다 — 파괴 경로와 어셈블리 리로드 경로(Clear)가 같은 최종 정리를 다르게 한다. OnEnable/OnDisable에 구독을 건 스크립트가 파괴에서 해지되지 않는다"
+}
+
 if ($proc.ExitCode -ne 0) { $failed += ("종료 코드 비정상: 0x{0:X8}" -f $proc.ExitCode) }
 
 ""

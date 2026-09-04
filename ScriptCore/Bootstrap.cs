@@ -196,6 +196,14 @@ public static class Bootstrap
         // 오늘 기준으로는 0건이어야 하고, 0이 아니면 수명 배선에 구멍이 생긴 것이다.
         try
         {
+            // 보류 큐를 먼저 반영한다(2026-09-05). 재생 정지 시퀀스는
+            // FlushPendingDestroy가 축소를 전달한 **뒤** 이 진입점을 부르는데,
+            // 그 사이에 관리 틱이 한 번도 없다(정지 직후는 편집 모드다).
+            // Flush가 없으면 방금 제거된 인스턴스가 _pendingRemove에 남아
+            // _active에서 빠지지 않고, 다음 재생 세션 첫 프레임까지 목록에
+            // 시체로 머문다.
+            ScriptRegistry.FlushRegistrations();
+
             int behaviours = ScriptRegistry.SweepOrphans();
             int trees = BehaviorTreeRegistry.SweepOrphans();
 

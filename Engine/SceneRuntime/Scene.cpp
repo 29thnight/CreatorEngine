@@ -8,6 +8,7 @@
 #include "Entity.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
+#include "ScriptObjectRegistry.h"
 #include "LightComponent.h"
 #include "MeshRenderer.h"
 #include "SpriteRenderer.h"
@@ -783,8 +784,11 @@ std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
     // ScriptRegistry.SweepOrphans가 모든 활성 스크립트의 Entity.IsAlive를
     // 확인한다(ScriptCore/ScriptRegistry.cs:324, "살아 있다 — DDOL 포함"). 여기서
     // 핸들을 무효화하면 살아있는 DDOL 스크립트가 씬 전환마다 고아로 오판되어
-    // 뜯겨나간다. 스크립트 핸들 무효화의 정본 지점은 대신 GameObject::Destroy()다
-    // (진짜 파괴만 지나가는, 재귀까지 포함하는 유일한 경로 — Entity.cpp 참고).
+    // 뜯겨나간다. 스크립트 핸들 무효화의 정본 지점은 대신 이 함수의 **호출부**인
+    // DestroyEntities다(2026-09-05 재배치 — 그전에는 Entity::Destroy였는데, 그러면
+    // 축소 삼단이 발화하기 전에 핸들이 죽어 스크립트가 자기 마지막 훅에서 자기
+    // 오브젝트에 닿지 못했다). DestroyEntities는 파괴 표시된 엔티티만 훑으므로
+    // DDOL 이송(DetachEntityHierarchy)은 여전히 그 루프를 지나지 않는다.
 	const bool removedTopologyNode = nullptr != m_Entities[index]
 		&& m_hierarchyStore.IsOccupied(static_cast<size_t>(index));
 	std::unique_ptr<Entity> released = std::move(m_Entities[index]);
@@ -3379,6 +3383,17 @@ void Scene::DestroyEntities()
         // 부모(또는 씬 루트)의 children 목록에서 자신을 뗀다 — 안 하면 죽은
         // 인덱스가 남아, 슬롯이 재사용됐을 때 엉뚱한 객체를 가리킨다.
         UnlinkFromParentChildren(static_cast<Entity::Index>(index));
+
+        // 스크립트 핸들 무효화의 정본 지점(트랙 E4 · 2026-09-05 재배치).
+        //
+        // 예전에는 Entity::Destroy(파괴 **표시**)에 있었는데, 그러면 축소 삼단이
+        // 발화하는 FlushPendingDestroy보다 먼저 핸들이 죽어 스크립트가 자기
+        // 마지막 훅에서 자기 오브젝트에 닿지 못했다. 여기는 실제 해제 직전이라
+        // 그 창이 닫힌다.
+        //
+        // DDOL 이송은 여전히 배제된다 — 이 루프는 파괴 표시된 엔티티만 돌고,
+        // 이송은 DetachEntityHierarchy가 ReleaseSlot을 직접 부른다.
+        ScriptObjectRegistry::Get().Unregister(obj.get());
 
         ReleaseSlot(static_cast<Entity::Index>(index));
     }

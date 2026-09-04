@@ -74,7 +74,20 @@ public sealed partial class LifecycleAxisProbe : Component
     public override void OnBeginSimulation()   => Emit("hook", "OnBeginSimulation");
     public override void OnEndSimulation()     => Emit("hook", "OnEndSimulation");
     public override void OnRemovingFromScene() => Emit("hook", "OnRemovingFromScene");
-    public override void OnUninitializing()    => Emit("hook", "OnUninitializing");
+
+    /// <summary>
+    /// 마지막 훅. 여기서 <b>자기 오브젝트에 닿는지</b>도 함께 남긴다.
+    ///
+    /// 훅이 왔다는 것만으로는 반쪽이다 — 예전에는 <c>Entity::Destroy</c>가 파괴
+    /// 표시 시점에 스크립트 핸들을 무효화해서, 축소 훅이 도착할 무렵이면 이미
+    /// 자기 오브젝트에 닿을 수 없었다(이름은 빈 문자열, GetComponent는 무응답).
+    /// 정리 코드가 조용히 아무 일도 안 하는 모습이라 눈으로는 알아채기 어렵다.
+    /// </summary>
+    public override void OnUninitializing()
+    {
+        Emit("hook", "OnUninitializing");
+        Emit("mark", 0 < Entity.Name.Length ? "ownerreachable" : "ownerlost");
+    }
 
     // ── 활성 축 ──
     //
