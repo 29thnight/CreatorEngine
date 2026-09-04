@@ -3,6 +3,7 @@
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
+#include "Commands/CommandRegistrar.h"          // LC6: 도메인 TU 등록 창구
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
@@ -4023,7 +4024,30 @@ namespace ConsoleCmd
     {
         (void)ctx;
         const CommandCore::CommandRegistry& registry = CommandCore::CommandRegistry::Get();
-        const std::vector<std::string>& problems = registry.Problems();
+
+        // ★ **반대 방향을 본다: seed 는 있는데 등록이 사라진 명령.**
+        //
+        //   `Add()` 는 "등록하려는 이름에 seed 가 있나"만 본다. 그 방향만으로는
+        //   등록 줄 하나가 통째로 빠진 경우를 못 본다 — 그 명령은 registry 에도
+        //   help 에도 없으므로 **둘을 맞대 보는 검사는 전부 초록**이다. 실제로
+        //   확인했다: `reg({"ai.status"}, ...)` 한 줄을 지우고 discovery 게이트를
+        //   돌리니 "전체 통과"가 났고, 같은 출력에 `seed=212 명령=211` 이 이미
+        //   찍혀 있었다 — 증거를 인쇄해 놓고 판정하지 않고 있었다.
+        //
+        //   LC6 은 핸들러 8,700 줄을 도메인 파일 일곱 개로 옮긴다. 등록 줄을
+        //   빠뜨리는 것이 그 작업의 대표적 사고라, 표를 옮기기 전에 엔진이
+        //   스스로 잡게 만든다.
+        std::vector<std::string> problems = registry.Problems();
+        for (std::size_t i = 0; i < CommandCore::DescriptorSeedCount(); ++i)
+        {
+            const CommandCore::DescriptorSeed* seed = CommandCore::DescriptorSeedAt(i);
+            if (nullptr == seed) continue;
+            if (nullptr == registry.Find(seed->name))
+            {
+                problems.push_back("seed 는 있는데 등록되지 않았다: "
+                                   + std::string(seed->name));
+            }
+        }
 
         std::printf("[commands.selftest] 명령=%zu 이름=%zu seed=%zu 문제=%zu\n",
                     registry.CommandCount(), registry.NameCount(),
@@ -4885,78 +4909,6 @@ namespace ConsoleCmd
             euler.x, euler.y, euler.z, scale.x, scale.y, scale.z);
         Debug->LogWarning(message);
         std::printf("%s\n", message);
-    }
-
-    static void Cmd_render_matmode(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // render.matmode <오브젝트> <opaque|transparent>
-        //
-        // 재질의 렌더링 모드를 바꾼다. 이것이 프록시가 deferred 큐로 가느냐
-        // forward 큐로 가느냐를 정한다(RenderPassData가 이 값 하나로 나눈다).
-        //
-        // 전용 명령을 만든 이유: object.property는 컴포넌트의 반사 필드를
-        // 설정하는데, m_renderingMode는 컴포넌트가 아니라 그 아래 Material의
-        // 필드라 경로가 닿지 않는다. 그리고 이 값 없이는 Forward+ 경로를
-        // 실제 씬에서 한 번도 실행해 볼 수 없다 — 씬에 투명 재질이 없으면
-        // forward 큐가 늘 비고, 그러면 '되는지 안 되는지 모르는' 상태가 된다.
-        if (parts.size() < 3)
-        {
-            std::printf("[CLI] 사용법: render.matmode <오브젝트> <opaque|transparent>\n");
-            return;
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
-
-        auto object = scene->GetEntity(parts[1]);
-        if (!object)
-        {
-            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
-            return;
-        }
-
-        const bool transparent = ("transparent" == parts[2]);
-        if (!transparent && "opaque" != parts[2])
-        {
-            std::printf("[CLI] 모드는 opaque 또는 transparent여야 한다: %s\n",
-                parts[2].c_str());
-            return;
-        }
-
-        // 자식까지 훑는다. 모델 하나가 메시 여러 개로 들어오는 것이 보통이라
-        // 루트만 바꾸면 큐가 그대로 비어 있고, 그건 '명령이 안 먹었다'와
-        // 구분되지 않는다.
-        //
-        // ★ 재질은 모델 단위로 공유된다. 같은 모델을 두 번 배치한 뒤 하나만
-        //   바꾸려 해도 둘 다 바뀐다 — Material 객체가 하나이기 때문이다.
-        //   '불투명 하나 + 투명 하나' 배치를 만들려다 이것으로 한 번 헛돌았다.
-        //   그렇게 하려면 재질 복제가 먼저 필요하고, 그건 이 명령의 몫이 아니다.
-        uint32_t changed = 0;
-        std::function<void(Entity*)> apply = [&](Entity* node)
-        {
-            if (nullptr == node) return;
-            for (const auto& component : node->m_components)
-            {
-                auto* renderer = dynamic_cast<MeshRenderer*>(component.get());
-                if (nullptr == renderer || nullptr == renderer->m_Material) continue;
-
-                renderer->m_Material->m_renderingMode = transparent
-                    ? MaterialRenderingMode::Transparent
-                    : MaterialRenderingMode::Opaque;
-                ++changed;
-            }
-            for (auto child : node->GetChildrenIndices())
-            {
-                apply(node->OwnerSceneFindIndex(child));
-            }
-        };
-		apply(object);
-
-        Debug->LogWarning("[CLI] 렌더링 모드 " + parts[2] + " — 재질 "
-            + std::to_string(changed) + "개");
-        std::printf("[CLI] 렌더링 모드 %s — 재질 %u개\n", parts[2].c_str(), changed);
     }
 
     static void Cmd_object_property(const ConsoleCommandContext& ctx)
@@ -8271,26 +8223,6 @@ namespace ConsoleCmd
         }
     }
 
-    static void Cmd_dx12_selftest(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // EnhancedSceneRenderer 브링업 자가 검증(PHASE 3-3). 자체 디바이스·큐·펜스로
-        // 돌므로 DX11 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
-        const std::string outputPath = ResolveTestArtifactPath("DX12",
-            (parts.size() > 1) ? parts[1] : std::string("dx12_selftest.png"));
-
-        std::string log;
-        const bool passed = DX12Test::RunSelfTest(outputPath, 6, log);
-
-        for (const auto& line : { log })
-        {
-            std::printf("%s", line.c_str());
-        }
-        Debug->LogWarning(std::string("[dx12.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] dx12.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
-    }
-
     static void Cmd_assets_identity(const ConsoleCommandContext&)
     {
         // MBC1 — ce.uuidv8.sha256.v1 신원 프로필·충돌 registry 합성 검사. CPU 전용.
@@ -9920,229 +9852,6 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.resolver %s\n", passed ? "통과" : "실패");
     }
 
-    static void Cmd_vk_selftest(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // Vulkan 골격 자가 검증. 자체 인스턴스·디바이스로 돌므로 DX12 렌더러와
-        // 충돌하지 않는다 — dx12.selftest 와 같은 이유다.
-        //
-        // ★ 이 검사가 재는 것은 '삼각형이 나왔는가'가 아니라 **계약이
-        //   맞는가**다. 처음 만들 때는 "Vulkan 이 구현할 수 있는 인터페이스가
-        //   IRHIDeviceResources 하나뿐"이라고 여기 적혀 있었다 — 5 가 끝나며
-        //   6/7 이 됐고, 검사도 골격 전용 패스 대신 중립 계약
-        //   (IRenderDeviceServices + RHIEncoder)으로 그린다. 실제 패스의
-        //   대조는 vk.grid 가 한다.
-        const std::string outputPath = ResolveTestArtifactPath("Vulkan",
-            (parts.size() > 1) ? parts[1] : std::string("vk_selftest.png"));
-
-        std::string log;
-        const bool passed = RunVulkanSelfTest(outputPath, log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
-    }
-
-    static void Cmd_vk_grid(const ConsoleCommandContext& ctx)
-    {
-        // 그리드 패스를 Vulkan 으로 (5d). EnhancedGridPass 를 한 줄도 안 고치고
-        // 돌려 dx12.grid 기준선과 픽셀 대조한다 — 지표 ②(공유 패스)와
-        // ③(픽셀 대조)이 처음으로 0 을 벗어나는 검사다.
-        std::string log;
-        const bool passed = RunVulkanGridTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.grid] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.grid %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_parallel(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanParallelRecordingTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.parallel] ")
-            + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.parallel %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_skybox(const ConsoleCommandContext& ctx)
-    {
-        // EnhancedSkyBoxPass를 그대로 돌려 b0 + t0 큐브 SRV + 정적 s0가
-        // DX12 검사와 같은 면 색을 내는지 대조한다.
-        std::string log;
-        const bool passed = RunVulkanSkyBoxTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.skybox] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.skybox %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_ibl(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanIBLTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.ibl] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.ibl %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_gizmoicon(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanGizmoIconTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.gizmoicon] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.gizmoicon %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_gizmoline(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanGizmoLineTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.gizmoline] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.gizmoline %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_wireframe(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanWireFrameTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.wireframe] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.wireframe %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_ui(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanUITest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.ui] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.ui %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_shadow(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanShadowTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.shadow] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.shadow %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_gbuffer(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = RunVulkanGBufferTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[vk.gbuffer] ") +
-            (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] vk.gbuffer %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_forward(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanForwardTest(result);
-        std::printf("%s", result.c_str());
-        Debug->LogWarning(std::string("[vk.forward] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.forward %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_deferred(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanDeferredTest(result);
-        Debug->LogWarning(std::string("[vk.deferred] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.deferred %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_decal(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanDecalTest(result);
-        Debug->LogWarning(std::string("[vk.decal] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.decal %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_ssao(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanSSAOTest(result);
-        Debug->LogWarning(std::string("[vk.ssao] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.ssao %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_sss(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanSSSTest(result);
-        std::printf("%s", result.c_str());
-        Debug->LogWarning(std::string("[vk.sss] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.sss %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_ssr(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanSSRTest(result);
-        std::printf("%s", result.c_str());
-        Debug->LogWarning(std::string("[vk.ssr] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.ssr %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_fog(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanVolumetricFogTest(result);
-        std::printf("%s", result.c_str());
-        Debug->LogWarning(std::string("[vk.fog] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.fog %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_post(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanPostChainTest(result);
-        std::printf("%s", result.c_str());
-        Debug->LogWarning(std::string("[vk.post] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.post %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_vk_ssgi(const ConsoleCommandContext& ctx)
-    {
-        std::string result;
-        const bool passed = RunVulkanSSGITest(result);
-        Debug->LogWarning(std::string("[vk.ssgi] ") +
-            (passed ? "통과\n" : "실패\n") + result);
-        std::printf("[CLI] vk.ssgi %s\n", passed ? "통과" : "실패");
-    }
-
     static void Cmd_profile_selftest(const ConsoleCommandContext& ctx)
     {
         // 현행 CPU 프로파일러의 계약을 못박는 특성화 검사(PHASE 14 P0).
@@ -10172,322 +9881,6 @@ namespace ConsoleCmd
         const std::string report = GetProfilerStatsReport();
         std::printf("%s", report.c_str());
         Debug->LogWarning(report);
-    }
-
-    static void Cmd_dx12_psocache(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // PSO 캐시 자가 검증(PHASE 3-4) — 매니저를 두 번 세워 캐시가 컴파일을
-        // 실제로 없애는지 확인한다.
-        const std::string cachePath = ResolveTestArtifactPath("DX12/Cache",
-            (parts.size() > 1) ? parts[1] : std::string("dx12_pso.cache"));
-
-        std::string log;
-        const bool passed = DX12Test::RunPsoCacheTest(cachePath, log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] dx12.psocache %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_rhi_uploadsegments(const ConsoleCommandContext& ctx)
-    {
-        std::string dx12Log;
-        const bool dx12Passed = DX12Test::RunUploadSegmentTest(dx12Log);
-
-        std::string vkLog;
-        const std::string vkOutput =
-            ResolveTestArtifactPath("Vulkan", "rhi_uploadsegments_vk.png");
-        const bool vkPassed = RunVulkanSelfTest(vkOutput, vkLog);
-        const bool passed = dx12Passed && vkPassed;
-
-        std::printf("[DX12 upload segments]\n%s", dx12Log.c_str());
-        std::printf("[Vulkan upload segments]\n%s", vkLog.c_str());
-        Debug->LogWarning(std::string("[rhi.uploadsegments] ")
-            + (passed ? "통과" : "실패") + "\n" + dx12Log + vkLog);
-        std::printf("[CLI] rhi.uploadsegments %s (DX12=%s Vulkan=%s)\n",
-            passed ? "통과" : "실패", dx12Passed ? "통과" : "실패",
-            vkPassed ? "통과" : "실패");
-    }
-
-    static void Cmd_dx12_uploadring(const ConsoleCommandContext& ctx)
-    {
-        // 업로드 링 자가 검증(PHASE 3-3). 자체 디바이스로 돌므로 DX11 렌더
-        // 스레드와 충돌하지 않는다.
-        std::string log;
-        const bool passed = DX12Test::RunUploadSegmentTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] dx12.uploadring %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_dx12_forward(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunForwardPlusTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.forward] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.forward %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_forwardshade(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunForwardPlusShadeTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.forwardshade] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.forwardshade %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_forwardscale(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunForwardPlusScaleTest(log);
-        const std::string verdict = passed ? "완료" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.forwardscale] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.forwardscale %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_ssao(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunSSAOTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.ssao] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.ssao %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_ssaoscale(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunSSAOScaleTest(log);
-        const std::string verdict = passed ? "완료" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.ssaoscale] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.ssaoscale %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_post(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunPostChainTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.post] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.post %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_postscale(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunPostChainScaleTest(log);
-        const std::string verdict = passed ? "완료" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.postscale] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.postscale %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_ui(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunUITest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.ui] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.ui %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_grid(const ConsoleCommandContext& ctx)
-    {
-        // 그리드 패스 검증(PHASE 3-6, Gizmo 계열 첫 슬라이스).
-        std::string log;
-        const bool passed = DX12Test::RunGridTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.grid] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.grid %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_gizmoline(const ConsoleCommandContext& ctx)
-    {
-        // 기즈모 라인 패스 검증(PHASE 3-6, Gizmo 계열 2차 슬라이스).
-        std::string log;
-        const bool passed = DX12Test::RunGizmoLineTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.gizmoline] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.gizmoline %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_gizmoicon(const ConsoleCommandContext& ctx)
-    {
-        // 기즈모 아이콘 패스 검증(PHASE 3-6, Gizmo 계열 3차 슬라이스).
-        std::string log;
-        const bool passed = DX12Test::RunGizmoIconTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.gizmoicon] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.gizmoicon %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_wireframe(const ConsoleCommandContext& ctx)
-    {
-        // 와이어프레임 패스 검증(PHASE 3-6, Gizmo 계열 4차 슬라이스).
-        std::string log;
-        const bool passed = DX12Test::RunWireFrameTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.wireframe] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.wireframe %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_gizmoscene(const ConsoleCommandContext& ctx)
-    {
-        // Gizmo 계열 씬 연결 검증(PHASE 3-6, Gizmo 계열 5차 슬라이스).
-        std::string log;
-        const bool passed = DX12Test::RunGizmoSceneTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.gizmoscene] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.gizmoscene %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_shadowquality(const ConsoleCommandContext& ctx)
-    {
-        // 그림자 품질 검증(PHASE 3-6 — 경사 비례 편향·캐스케이드 경계 블렌딩).
-        std::string log;
-        const bool passed = DX12Test::RunShadowQualityTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.shadowquality] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.shadowquality %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_skybox(const ConsoleCommandContext& ctx)
-    {
-        // 스카이박스 패스 검증(PHASE 3-6).
-        std::string log;
-        const bool passed = DX12Test::RunSkyBoxTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.skybox] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.skybox %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_ibl(const ConsoleCommandContext& ctx)
-    {
-        // IBL 생성 체인 검증(PHASE 3-6).
-        std::string log;
-        const bool passed = DX12Test::RunIBLTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.ibl] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.ibl %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_sss(const ConsoleCommandContext& ctx)
-    {
-        // SSS 패스 검증(PHASE 3-6, 미구현 패스 이식 1차).
-        std::string log;
-        const bool passed = DX12Test::RunSSSTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.sss] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.sss %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_decal(const ConsoleCommandContext& ctx)
-    {
-        // 데칼 패스 검증(PHASE 3-6, 미구현 패스 이식 2차).
-        std::string log;
-        const bool passed = DX12Test::RunDecalTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.decal] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.decal %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_ssr(const ConsoleCommandContext& ctx)
-    {
-        // SSR 패스 검증(PHASE 3-6, 미구현 패스 이식 3차).
-        std::string log;
-        const bool passed = DX12Test::RunSSRTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.ssr] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.ssr %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_fog(const ConsoleCommandContext& ctx)
-    {
-        // 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
-        std::string log;
-        const bool passed = DX12Test::RunVolumetricFogTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.fog] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.fog %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_skinning(const ConsoleCommandContext& ctx)
-    {
-        // GBuffer 스키닝 검증(PHASE 3-6).
-        std::string log;
-        const bool passed = DX12Test::RunSkinningTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.skinning] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.skinning %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_iblshade(const ConsoleCommandContext& ctx)
-    {
-        // IBL 앰비언트 소비 검증(PHASE 3-6).
-        std::string log;
-        const bool passed = DX12Test::RunIBLShadeTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.iblshade] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.iblshade %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_ssgi(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunSSGITest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.ssgi] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.ssgi %s\n", verdict.c_str());
     }
 
     static void Cmd_camera_editor(const ConsoleCommandContext& ctx)
@@ -10550,283 +9943,6 @@ namespace ConsoleCmd
             describe("게임  ", nullptr != gameCamera ? gameCamera->GetInstanceID() : 0,
                 nullptr != gameCamera ? &gameSnapshot : nullptr);
         }
-    }
-
-    static void Cmd_render_backend(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        const std::string backend = (parts.size() >= 2) ? parts[1] : "status";
-        if (backend == "dx12" || backend == "enhanced" ||
-            backend == "vulkan" || backend == "vk")
-        {
-            std::printf("[CLI] render.backend %s 거부 — backend는 부팅 고정이다. Editor는 Settings, Player는 Build Settings에서 저장한 뒤 새 프로세스로 실행한다\n",
-                backend.c_str());
-        }
-        else if (backend == "dx11")
-        {
-            std::printf("[CLI] render.backend dx11 — 지원하지 않음: SceneRenderer는 dead code다\n");
-        }
-        else
-        {
-            const char* active = EnhancedLiveBackend::Vulkan ==
-                EnhancedSceneRenderer::GetLiveBackend() ? "enhanced-vulkan" : "enhanced-dx12";
-            std::printf("[CLI] render.backend — configured: %s · scene: %s · ImGui: %s (부팅 고정)\n",
-				RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
-                active, GetImGuiHost().GetBackendName());
-            const std::string status = EnhancedSceneRenderer::GetLiveStatus();
-            std::printf("%s\n", status.c_str());
-            Debug->LogWarning(std::string("[render.backend] scene=") + active +
-                " imgui=" + GetImGuiHost().GetBackendName() + " · " + status);
-        }
-    }
-
-    static void Cmd_dx12_live(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
-
-        if (mode == "on")
-        {
-            EnhancedSceneRenderer::EnableLive();
-            std::printf("[CLI] dx12.live 켜짐 — EnhancedRenderer가 메인 렌더러다\n");
-        }
-        else if (mode == "off")
-        {
-            std::printf("[CLI] dx12.live off — 지원하지 않음: 단독 메인 렌더러는 끌 수 없다\n");
-        }
-        else
-        {
-            const std::string status = EnhancedSceneRenderer::GetLiveStatus();
-            std::printf("%s\n", status.c_str());
-            Debug->LogWarning("[dx12.live] " + status);
-        }
-    }
-
-    static void Cmd_render_livecheck(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        const uint32_t expectedWidth = (parts.size() >= 3)
-            ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[1].c_str())))
-            : ScreenResizeBus::Get().GetWidth();
-        const uint32_t expectedHeight = (parts.size() >= 3)
-            ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[2].c_str())))
-            : ScreenResizeBus::Get().GetHeight();
-
-		const RenderBackend configured = RuntimeSettings::Get().GetRenderBackend();
-        const EnhancedLiveBackend scene = EnhancedSceneRenderer::GetLiveBackend();
-        const bool backendMatch =
-            ((RenderBackend::DX12 == configured && EnhancedLiveBackend::DX12 == scene) ||
-             (RenderBackend::Vulkan == configured && EnhancedLiveBackend::Vulkan == scene)) &&
-            ((RenderBackend::DX12 == configured &&
-                0 == std::strcmp(GetImGuiHost().GetBackendName(), "DX12")) ||
-             (RenderBackend::Vulkan == configured &&
-                0 == std::strcmp(GetImGuiHost().GetBackendName(), "Vulkan")));
-
-        std::string log;
-        const bool displayPassed = EnhancedSceneRenderer::RunLiveDisplayRegression(
-            expectedWidth, expectedHeight, log);
-        const bool passed = backendMatch && displayPassed;
-        std::printf("[render.livecheck] backend configured=%s scene=%s imgui=%s — %s\n",
-            RenderBackendName(configured),
-            EnhancedLiveBackend::Vulkan == scene ? "vulkan" : "dx12",
-            GetImGuiHost().GetBackendName(), backendMatch ? "일치" : "불일치");
-        std::printf("%s", log.c_str());
-        std::printf("[CLI] render.livecheck %s\n", passed ? "통과" : "실패");
-        Debug->LogWarning(std::string("[render.livecheck] ") +
-            (passed ? "통과\n" : "실패\n") + log);
-    }
-
-    static void Cmd_dx12_bench11(const ConsoleCommandContext& ctx)
-    {
-        // DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제 검증.
-        // 전용 디바이스 둘을 새로 세우므로 에디터 씬과 무관하게 언제든 돈다.
-        std::string log;
-        const bool passed = DX12Test::RunApiOverheadBench(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.bench11] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.bench11 %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_encoderbench(const ConsoleCommandContext& ctx)
-    {
-        // 인코더 오버헤드 실측 — R3 착수 조건(RhiBoundaryPlan §5).
-        // 자체 디바이스를 세우므로 에디터 씬과 무관하게 언제든 돈다.
-        // Release로 재야 의미가 있다(Debug는 검증 레이어가 vtable 비용을 덮는다).
-        std::string log;
-        const bool passed = DX12Test::RunEncoderOverheadBench(log);
-        const std::string verdict = passed ? "완료" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.encoderbench] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.encoderbench %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_scene(const ConsoleCommandContext& ctx)
-    {
-        // 씬 연결 검증(PHASE 3-6). 활성 씬의 카메라와 프록시를 DX12로 그린다.
-        std::string log;
-        const bool passed = DX12Test::RunSceneBindingTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.scene] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.scene %s\n", verdict.c_str());
-    }
-
-    static void Cmd_render_rtinfo(const ConsoleCommandContext& ctx)
-    {
-
-        // 화면 크기와 그것을 따라가는 텍스처들을 나란히 찍는다.
-        //
-        // ★ 예전에는 '클라이언트 · 뷰포트 · 버스' 셋을 비교했다. 셋이 어긋나는
-        //   것이 '화면이 구석에 몰린다'의 정체였기 때문인데, 앞의 둘은 DX11
-        //   전역이었고 D4에서 사라졌다. 이제 출처가 버스 하나라 어긋날 자리가
-        //   없다 - 비교 대신 아래 명부(따라가야 하는데 안 따라간 텍스처)가
-        //   같은 질문에 답한다.
-        std::string report;
-        {
-            char line[224]{};
-            std::snprintf(line, sizeof(line), "화면 %ux%u\n",
-                ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
-            report += line;
-        }
-
-        // ★ 카메라별 DX11 렌더타깃·깊이 크기 리포트를 걷었다 (T6, 2026-08-08).
-        //   RenderPassData가 들던 그 둘의 마지막 소비자가 이 진단이었고,
-        //   실제로 그리는 쪽은 이미 0이었다(EffectSystem이 마지막이었는데
-        //   PHASE 10-0에서 사라졌다). 아래 명부가 화면 추종 텍스처 전부를
-        //   훑으므로 관측이 줄지도 않는다.
-
-        // 화면 추종을 선언한 텍스처 전부. 카메라 렌더 타깃만 보면 GBuffer나
-        // 포스트 체인이 어긋난 것을 놓친다 — 그것들은 중간 결과라 화면에
-        // 직접 보이지 않는다.
-        const uint32_t screenWidth = ScreenResizeBus::Get().GetWidth();
-        const uint32_t screenHeight = ScreenResizeBus::Get().GetHeight();
-
-        const auto entries = ScreenSizedRegistry::Get().Snapshot();
-        uint32_t mismatched = 0;
-        std::string mismatchReport;
-
-        for (const auto& entry : entries)
-        {
-            if (!entry.querySize) continue;
-
-            const auto [width, height] = entry.querySize();
-
-            // 1/N 버퍼도 있으므로 '화면 크기와 다르다'만으로는 못 잡는다.
-            // 화면을 정수로 나눈 값 중 하나면 정상으로 본다.
-            bool plausible = false;
-            // SSGI가 1/16까지 쓴다(ssratio 4의 4배). 상한을 그보다 낮게 잡으면
-            // 정상인 것을 어긋난 것으로 센다.
-            for (uint32_t divisor = 1; divisor <= 16; ++divisor)
-            {
-                if (width == (screenWidth / divisor) && height == (screenHeight / divisor))
-                {
-                    plausible = true;
-                    break;
-                }
-            }
-
-            if (!plausible)
-            {
-                ++mismatched;
-                char line[224]{};
-                std::snprintf(line, sizeof(line), "    %-34s %ux%u\n",
-                    entry.name.c_str(), width, height);
-                mismatchReport += line;
-            }
-        }
-
-        {
-            char line[160]{};
-            std::snprintf(line, sizeof(line),
-                "  추종 선언 텍스처 %zu개 · 화면과 어긋난 것 %u개\n",
-                entries.size(), mismatched);
-            report += line;
-        }
-        report += mismatchReport;
-
-        Debug->LogWarning("[렌더 타깃]\n" + report);
-        std::printf("[CLI] 렌더 타깃\n%s", report.c_str());
-    }
-
-    static void Cmd_render_post(const ConsoleCommandContext& ctx)
-    {
-        // 기존 명령은 DX11 SceneRenderer가 소비하는 구 전역 설정만 바꿨다.
-        // EnhancedRenderer에는 전달되지 않아 성공처럼 출력되는 무효 명령이므로
-        // 새 DX12 런타임 튜닝 API가 생기기 전까지 명시적으로 차단한다.
-        std::printf("[CLI] render.post — DX11 레거시 제어는 비활성화됨; Enhanced PostChain 튜닝 API가 필요하다\n");
-    }
-
-    static void Cmd_render_exposure(const ConsoleCommandContext& ctx)
-    {
-        // 기존 구현은 SceneRenderer가 갱신하는 DX11 ToneMapPass의 정적 값을
-        // 읽었다. 단독 모드에서 그 값을 출력하면 정상처럼 보이는 오래된 0값을
-        // 진단값으로 오인하게 되므로 새 DX12 계측이 붙기 전까지 차단한다.
-        std::printf("[CLI] render.exposure — DX11 레거시 진단은 비활성화됨; PIX의 Enhanced PostChain을 확인한다\n");
-    }
-
-    static void Cmd_dx12_resize(const ConsoleCommandContext& ctx)
-    {
-        // 크기 추종 검증(해상도 슬라이스).
-        std::string log;
-        const bool passed = DX12Test::RunScreenResizeTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.resize] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.resize %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_parallel(const ConsoleCommandContext& ctx)
-    {
-        // 커맨드 기록 병렬화 검증(PHASE 3-6).
-        std::string log;
-        const bool passed = DX12Test::RunParallelRecordTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.parallel] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.parallel %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_gbuffer(const ConsoleCommandContext& ctx)
-    {
-        // GBuffer 패스 검증(PHASE 3-6).
-        std::string log;
-        const bool passed = DX12Test::RunGBufferTest(log);
-        const std::string verdict = passed ? "통과" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.gbuffer] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.gbuffer %s\n", verdict.c_str());
-    }
-
-    static void Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
-    {
-        // 렌더 그래프 자가 검증(PHASE 3-5).
-        std::string log;
-        const bool passed = DX12Test::RunRenderGraphTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] dx12.rendergraph %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_dx12_descriptorheap(const ConsoleCommandContext& ctx)
-    {
-        // completion 기반 descriptor page recycler·샘플러 힙 자가 검증.
-        std::string log;
-        const bool passed = DX12Test::RunDescriptorHeapTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[dx12.descriptorheap] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] dx12.descriptorheap %s\n", passed ? "통과" : "실패");
     }
 
     static void Cmd_window_info(const ConsoleCommandContext& ctx)
@@ -11306,57 +10422,6 @@ namespace ConsoleCmd
     //
     // LivePipelineDesc::Dump()는 이미 있고 디버그 스냅샷에도 실려 있었는데
     // 아무도 찍지 않았다. 한 줄씩 파싱 가능한 형태로 내보낸다.
-    static void Cmd_pipeline_nodes(const ConsoleCommandContext& ctx)
-    {
-        (void)ctx;
-        const EnhancedLiveDebugSnapshot snapshot =
-            EnhancedSceneRenderer::GetLiveDebugSnapshot();
-
-        if (!snapshot.enabled)
-        {
-            std::printf("[pipeline.nodes] 러너 비활성\n");
-            return;
-        }
-
-        // Dump()는 "  <i>. <이름>  [active|inactive]" 형태의 여러 줄을 낸다.
-        // 게이트가 정규식 하나로 읽도록 노드 줄만 접두어를 붙여 다시 낸다.
-        size_t nodeCount = 0;
-        std::istringstream stream(snapshot.pipelineDescription);
-        std::string line;
-        while (std::getline(stream, line))
-        {
-            const size_t dot = line.find(". ");
-            if (std::string::npos == dot) continue;
-            if (line.find_first_not_of(" \t") != 2) continue; // 노드 줄은 2칸 들여쓰기
-
-            std::string name = line.substr(dot + 2);
-            const size_t bracket = name.find("  [");
-            std::string state = "always";
-            if (std::string::npos != bracket)
-            {
-                state = name.substr(bracket + 3);
-                if (!state.empty() && ']' == state.back()) state.pop_back();
-                name = name.substr(0, bracket);
-            }
-            std::printf("[pipeline.node] %s|%s\n", name.c_str(), state.c_str());
-            ++nodeCount;
-        }
-
-        std::printf("[pipeline.nodes] 합계 %zu · valid=%d · ready=%d\n",
-            nodeCount, snapshot.pipelineDescriptionValid ? 1 : 0,
-            snapshot.pipelineReady ? 1 : 0);
-    }
-
-    // ── Undo/선택 프로브 (E3-2+3 게이트용) ──
-    //
-    // 이 셋이 없어서 "재생 진입이 Undo 이력을 실제로 비웠는가", "정지가 선택을
-    // 어떻게 하는가"를 잴 수 없었다. 세트 전체에 selection/undo 단정이 0건이었다.
-    //
-    // ⚠ 편집 스택과 게임 스택을 **따로** 찍는다. UndoManager가 어느 쪽에 넣을지
-    //   고르는 기준인 m_isGameMode는 이름과 달리 "에디터 UI의 Play 버튼을 눌렀는가"라
-    //   저장소 전체에서 MenuBarWindow 한 줄만 쓴다 — CLI로 재생하면 영원히 false다.
-    //   "지금 유효한 스택" 하나만 찍으면 CLI 게이트가 편집 스택을 보면서 게임 스택을
-    //   검사한다고 착각한다. 그 착각이 곧 아무것도 검증하지 않는 게이트다.
     static void Cmd_undo_state(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -12056,61 +11121,6 @@ namespace ConsoleCmd
         std::printf("[CLI] 로그 flush\n");
     }
 
-    static void Cmd_render_shadowinfo(const ConsoleCommandContext& ctx)
-    {
-        // 카메라 입력은 RenderPassData가 아니라 프레임 패킷의 값 스냅샷이다.
-        // 이 명령은 활성 씬의 저작 카메라를 같은 방식으로 밀봉해 입력을 확인한다.
-        char line[512]{};
-        std::string report;
-        Scene* activeScene = SceneManagers->GetActiveScene();
-
-        const std::vector<CameraComponent*>* cameras = nullptr != activeScene
-            ? &activeScene->Cameras().GetRegisteredCameras() : nullptr;
-        if (nullptr != cameras) for (CameraComponent* camera : *cameras)
-        {
-            if (nullptr == camera || nullptr == camera->GetOwner()) continue;
-            if (camera->GetOwner()->GetScene() != activeScene) continue;
-
-            const FrameCameraSnapshot snapshot = camera->CaptureFrameSnapshot();
-            std::snprintf(line, sizeof(line),
-                "camera component %llu%s\n"
-                "  snapshot: eye(%.6f %.6f %.6f) fwd(%.6f %.6f %.6f)"
-                " fov %.6f near %.6f far %.6f ortho %d\n",
-                static_cast<unsigned long long>(camera->GetInstanceID()),
-                camera->IsPrimary() ? " primary" : "",
-                snapshot.eyePosition.x, snapshot.eyePosition.y, snapshot.eyePosition.z,
-                snapshot.forward.x, snapshot.forward.y, snapshot.forward.z,
-                snapshot.fov, snapshot.nearPlane, snapshot.farPlane,
-                static_cast<int>(snapshot.isOrthographic));
-            report += line;
-
-            const char* matrixNames[4] = { "view", "proj", "invView", "invProj" };
-            const math::matrix4x4 matrices[4] = {
-                snapshot.view, snapshot.projection,
-                snapshot.inverseView, snapshot.inverseProjection };
-
-            for (int m = 0; m < 4; ++m)
-            {
-                report += "  ";
-                report += matrixNames[m];
-                for (int r = 0; r < 4; ++r)
-                {
-                    for (int c = 0; c < 4; ++c)
-                    {
-                        std::snprintf(line, sizeof(line), " %.6f", matrices[m].m[r][c]);
-                        report += line;
-                    }
-                }
-                report += "\n";
-            }
-        }
-
-        if (report.empty()) report = "(활성 씬 카메라 없음)\n";
-        report += "shadow cascades: EnhancedShadowPass render-owned state\n";
-        std::printf("[shadowinfo]\n%s", report.c_str());
-        std::fflush(stdout);
-        Debug->LogWarning("[shadowinfo]\n" + report);
-    }
     static void Cmd_crash_status(const ConsoleCommandContext& ctx)
     {
         // 이번 실행이 덤프를 남길 수 있는 상태인지 확인한다.
@@ -12328,6 +11338,36 @@ namespace ConsoleCmd
                 regEntry(names, entry, reinterpret_cast<const void*>(fn));
             };
 
+            // ── LC6: 도메인 TU 가 자기 명령을 등록한다 ──────────────────
+            //
+            // 창구 하나를 넘겨 주고, 도메인은 "무엇을 등록할지"만 말한다.
+            // 등록에 붙는 일 넷(조회 표 · 중복 보고 · descriptor · inventory)은
+            // 위의 `regEntry` 한 곳에 그대로 남는다 — 그 넷을 도메인마다
+            // 되풀이하게 두면 한 곳만 빠뜨려도 그 도메인이 조용히
+            // half-registered 가 된다.
+            // 가상 함수가 있으므로 집합체가 아니다 — 생성자로 묶는다.
+            struct TableRegistrar final : Registrar
+            {
+                decltype(reg)*         legacy;
+                decltype(regResult)*   result;
+                decltype(regEscaping)* escaping;
+
+                TableRegistrar(decltype(reg)& l, decltype(regResult)& r,
+                               decltype(regEscaping)& e) noexcept
+                    : legacy(&l), result(&r), escaping(&e) {}
+
+                void Legacy(std::initializer_list<const char*> names,
+                            ConsoleCommandHandler fn) override { (*legacy)(names, fn); }
+                void Result(std::initializer_list<const char*> names,
+                            ConsoleCommandResultHandler fn) override { (*result)(names, fn); }
+                void Escaping(std::initializer_list<const char*> names,
+                              ConsoleCommandHandler fn) override { (*escaping)(names, fn); }
+            };
+            TableRegistrar registrar(reg, regResult, regEscaping);
+
+            RegisterRenderTestCommands(registrar);
+            RegisterRenderDebugCommands(registrar);
+
             regResult({ "help" }, &Cmd_help);
             // LC3: discovery. 소비자가 C++ 소스를 긁지 않게 한다.
             regResult({ "commands.list" }, &Cmd_commands_list);
@@ -12353,7 +11393,6 @@ namespace ConsoleCmd
             reg({ "object.rootref" }, &Cmd_object_rootref);
             reg({ "object.duplicate" }, &Cmd_object_duplicate);
             reg({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
-            reg({ "render.matmode" }, &Cmd_render_matmode);
             reg({ "object.property" }, &Cmd_object_property);
             reg({ "model.load" }, &Cmd_model_load);
 			reg({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
@@ -12386,27 +11425,6 @@ namespace ConsoleCmd
             reg({ "ui.hitbox" }, &Cmd_ui_hitbox);
 			reg({ "ui.navprobe" }, &Cmd_ui_navprobe);
             reg({ "pix.capture" }, &Cmd_pix_capture);
-            reg({ "dx12.selftest" }, &Cmd_dx12_selftest);
-            reg({ "vk.selftest" }, &Cmd_vk_selftest);
-            reg({ "vk.grid" }, &Cmd_vk_grid);
-            reg({ "vk.parallel" }, &Cmd_vk_parallel);
-            reg({ "vk.skybox" }, &Cmd_vk_skybox);
-            reg({ "vk.ibl" }, &Cmd_vk_ibl);
-            reg({ "vk.gizmoicon" }, &Cmd_vk_gizmoicon);
-            reg({ "vk.gizmoline" }, &Cmd_vk_gizmoline);
-            reg({ "vk.wireframe" }, &Cmd_vk_wireframe);
-            reg({ "vk.ui" }, &Cmd_vk_ui);
-            reg({ "vk.shadow" }, &Cmd_vk_shadow);
-            reg({ "vk.gbuffer" }, &Cmd_vk_gbuffer);
-            reg({ "vk.forward" }, &Cmd_vk_forward);
-            reg({ "vk.deferred" }, &Cmd_vk_deferred);
-            reg({ "vk.decal" }, &Cmd_vk_decal);
-            reg({ "vk.ssao" }, &Cmd_vk_ssao);
-            reg({ "vk.sss" }, &Cmd_vk_sss);
-            reg({ "vk.ssr" }, &Cmd_vk_ssr);
-            reg({ "vk.fog" }, &Cmd_vk_fog);
-            reg({ "vk.post" }, &Cmd_vk_post);
-            reg({ "vk.ssgi" }, &Cmd_vk_ssgi);
             reg({ "profile.selftest" }, &Cmd_profile_selftest);
             reg({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
             reg({ "assets.identity" }, &Cmd_assets_identity);
@@ -12447,47 +11465,7 @@ namespace ConsoleCmd
             reg({ "experiment.resolver" }, &Cmd_experiment_resolver);
             reg({ "experiment.catalog" }, &Cmd_experiment_catalog);
             reg({ "profile.stats" }, &Cmd_profile_stats);
-            reg({ "dx12.psocache" }, &Cmd_dx12_psocache);
-            reg({ "rhi.uploadsegments" }, &Cmd_rhi_uploadsegments);
-            reg({ "dx12.uploadring" }, &Cmd_dx12_uploadring);
-            reg({ "dx12.forward" }, &Cmd_dx12_forward);
-            reg({ "dx12.forwardshade" }, &Cmd_dx12_forwardshade);
-            reg({ "dx12.forwardscale" }, &Cmd_dx12_forwardscale);
-            reg({ "dx12.ssao" }, &Cmd_dx12_ssao);
-            reg({ "dx12.ssaoscale" }, &Cmd_dx12_ssaoscale);
-            reg({ "dx12.post" }, &Cmd_dx12_post);
-            reg({ "dx12.postscale" }, &Cmd_dx12_postscale);
-            reg({ "dx12.ui" }, &Cmd_dx12_ui);
-            reg({ "dx12.grid" }, &Cmd_dx12_grid);
-            reg({ "dx12.gizmoline" }, &Cmd_dx12_gizmoline);
-            reg({ "dx12.gizmoicon" }, &Cmd_dx12_gizmoicon);
-            reg({ "dx12.wireframe" }, &Cmd_dx12_wireframe);
-            reg({ "dx12.gizmoscene" }, &Cmd_dx12_gizmoscene);
-            reg({ "dx12.shadowquality" }, &Cmd_dx12_shadowquality);
-            reg({ "dx12.skybox" }, &Cmd_dx12_skybox);
-            reg({ "dx12.ibl" }, &Cmd_dx12_ibl);
-            reg({ "dx12.sss" }, &Cmd_dx12_sss);
-            reg({ "dx12.decal" }, &Cmd_dx12_decal);
-            reg({ "dx12.ssr" }, &Cmd_dx12_ssr);
-            reg({ "dx12.fog" }, &Cmd_dx12_fog);
-            reg({ "dx12.skinning" }, &Cmd_dx12_skinning);
-            reg({ "dx12.iblshade" }, &Cmd_dx12_iblshade);
-            reg({ "dx12.ssgi" }, &Cmd_dx12_ssgi);
             reg({ "camera.editor" }, &Cmd_camera_editor);
-            reg({ "render.backend" }, &Cmd_render_backend);
-            reg({ "dx12.live" }, &Cmd_dx12_live);
-            reg({ "render.livecheck" }, &Cmd_render_livecheck);
-            reg({ "dx12.bench11" }, &Cmd_dx12_bench11);
-            reg({ "dx12.encoderbench" }, &Cmd_dx12_encoderbench);
-            reg({ "dx12.scene" }, &Cmd_dx12_scene);
-            reg({ "render.rtinfo" }, &Cmd_render_rtinfo);
-            reg({ "render.post" }, &Cmd_render_post);
-            reg({ "render.exposure" }, &Cmd_render_exposure);
-            reg({ "dx12.resize" }, &Cmd_dx12_resize);
-            reg({ "dx12.parallel" }, &Cmd_dx12_parallel);
-            reg({ "dx12.gbuffer" }, &Cmd_dx12_gbuffer);
-            reg({ "dx12.rendergraph" }, &Cmd_dx12_rendergraph);
-            reg({ "dx12.descriptorheap" }, &Cmd_dx12_descriptorheap);
             reg({ "window.info" }, &Cmd_window_info);
             reg({ "ui.status" }, &Cmd_ui_status);
             reg({ "dump.crash" }, &Cmd_dump_crash);
@@ -12501,7 +11479,6 @@ namespace ConsoleCmd
             reg({ "script.status" }, &Cmd_script_status);
             reg({ "play", "stop" }, &Cmd_play);
             reg({ "play.state" }, &Cmd_play_state);
-            reg({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
             reg({ "undo.state" }, &Cmd_undo_state);
             reg({ "undo", "redo" }, &Cmd_undo_redo);
             reg({ "object.create.undoable" }, &Cmd_object_create_undoable);
@@ -12519,7 +11496,6 @@ namespace ConsoleCmd
             reg({ "bt.status", "bt.reset" }, &Cmd_bt_status);
             reg({ "gc.collect" }, &Cmd_gc_collect);
             reg({ "log.flush" }, &Cmd_log_flush);
-            reg({ "render.shadowinfo" }, &Cmd_render_shadowinfo);
             reg({ "crash.status" }, &Cmd_crash_status);
             // 죽는 것이 일인 명령 — 예외 경계를 통과시킨다(위 regEscaping 주석).
             regEscaping({ "crash.test" }, &Cmd_crash_test);

@@ -23,4 +23,14 @@ namespace CommandCore
     const DescriptorSeed* FindDescriptorSeed(std::string_view canonical);
 
     std::size_t DescriptorSeedCount() noexcept;
+
+    /// 표를 순서대로 훑는다. 범위를 벗어나면 nullptr.
+    ///
+    /// ★ **반대 방향을 볼 수 있어야 한다.** `FindDescriptorSeed` 는 "등록하려는
+    ///   이름에 seed 가 있나"를 묻는다. 그 방향만으로는 **seed 는 있는데 등록이
+    ///   사라진** 경우를 영영 못 본다 — 등록 줄 하나가 빠지면 그 명령은 조용히
+    ///   없어지고, registry 와 help 는 둘 다 그것을 모르므로 자기 일관성 검사는
+    ///   전부 초록이다. LC6 이 핸들러 8,700 줄을 도메인 파일로 옮기는데, 등록
+    ///   줄을 빠뜨리는 것이 그 작업에서 가장 흔한 사고다.
+    const DescriptorSeed* DescriptorSeedAt(std::size_t index) noexcept;
 }

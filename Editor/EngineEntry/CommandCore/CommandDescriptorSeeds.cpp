@@ -277,4 +277,10 @@ namespace CommandCore
     {
         return sizeof(kSeeds) / sizeof(kSeeds[0]);
     }
+
+    const DescriptorSeed* DescriptorSeedAt(std::size_t index) noexcept
+    {
+        if (index >= DescriptorSeedCount()) return nullptr;
+        return &kSeeds[index];
+    }
 }

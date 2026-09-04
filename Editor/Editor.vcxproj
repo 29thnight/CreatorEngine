@@ -45,6 +45,8 @@
     <ClInclude Include="EngineEntry\CommandCore\CommandResult.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandSession.h" />
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
+    <ClInclude Include="EngineEntry\Commands\CommandRegistrar.h" />
+    <ClInclude Include="EngineEntry\Commands\CommandSupport.h" />
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
     <ClInclude Include="EngineEntry\EditorImGuiTexture.h" />
@@ -110,6 +112,21 @@
     <ClCompile Include="EngineEntry\CommandCore\CommandResult.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandSession.cpp" />
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
+    <!-- LC6(PHASE 14.5): 도메인 명령 TU.
+         유니티에서 **일부러 뺀다.** §12 가 "include 는 각 TU 가 직접 소유한다"고
+         못 박았는데, 유니티에 넣으면 앞 파일이 들여온 헤더에 기대도 통과한다 —
+         그 규칙이 지켜지는지가 평상시 빌드에서 검사되지 않는다. 빼 두면 매
+         빌드가 검사다. (non-unity 전체 빌드는 오늘 SceneRuntime 에서 이미
+         깨져 있어 그쪽에 기댈 수 없다.) -->
+    <ClCompile Include="EngineEntry\Commands\CommandSupport.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\RenderTestCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\RenderDebugCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
     <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp" />

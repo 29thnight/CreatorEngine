@@ -96,6 +96,16 @@ Run-Step "CLI drain·operation·SLO(LC5)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-drain.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 14.5 LC6 — 명령 표 보존.
+#
+# LC3 의 discovery 게이트는 registry 의 **자기 일관성**만 본다. 그래서 명령이
+# registry 와 help 양쪽에서 함께 사라지면 초록으로 남는다 — 실측으로 확인했다.
+# 이 게이트는 이동 전에 찍어 둔 골든과 맞대 **보존**을 본다. LC6 이 핸들러
+# 8,700 줄을 도메인 파일로 옮기는 동안 표가 조용히 움직이지 않게 하는 그물이다.
+Run-Step "CLI 명령 표 보존(LC6)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-registry-golden.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

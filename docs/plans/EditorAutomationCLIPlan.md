@@ -912,6 +912,40 @@ Editor/EngineEntry/ConsoleCommandSystem.h/.cpp
 | Player 링크 | **구성 조건부 `ProjectReference`** | 심볼 0을 링크 단계에서 보장한다. `#ifdef`로 본문만 비우면 lib은 여전히 들어온다 |
 | 구성 추가 시점 | **LC8**. LC4는 Editor만 | 13개 vcxproj와 `Tools/build.ps1`을 건드리는 일을 전송 계층 신설과 같은 슬라이스에 넣지 않는다 |
 
+### 12.2 non-unity 빌드는 오늘 이미 깨져 있다 (2026-09-04 LC6 실측)
+
+§12는 "domain 하나를 옮길 때마다 Editor unity/non-unity build를 둘 다 통과한다"를
+완료 기준으로 적었다. **그 기준은 착수 시점에 성립하지 않았다.**
+
+`-p:EnableUnitySupport=false` 로 돌리면 CLI 코드가 아니라 `Engine/SceneRuntime` 에서
+먼저 깨진다 — `ComponentFactory.h` 의 `Meta` 미선언, `EntityAuthoringRead.cpp` 의
+`ExtractTypeFromYAML`, `PrefabUtility.cpp` 의 불완전 타입 `Authoring::NodeViewAccess`
+등 18건. 전부 유니티 빌드가 전이 include로 가려 온 것들이고, LC6이 고칠 대상이 아니다.
+
+결정: **요구의 의도를 더 강하게 만족시키는 쪽으로 바꾼다.**
+
+| 항목 | 원안 | 바꾼 것 | 이유 |
+|---|---|---|---|
+| include 자립 검사 | non-unity 전체 빌드 | 새 `Commands/*.cpp` 에 `IncludeInUnityFile=false` | 의도는 "각 TU가 include를 소유한다"이고, 유니티에서 빼 두면 그것이 **평상시 빌드마다** 검사된다. 아무도 안 돌리는 별도 모드보다 낫고, 전제(전체 non-unity가 성립함)가 오늘 거짓이다 |
+
+전례가 있다 — `EngineGUIWindow/EnhancedRenderDebugWindow.cpp` 가 같은 이유로 유니티에서
+빠져 있다. SceneRuntime 의 non-unity 결함은 별도 작업으로 남긴다.
+
+### 12.3 파일 분리와 서명 이행을 같은 커밋에 넣지 않는다
+
+§13 LC6은 "이동하는 handler를 result-bearing으로 **함께** 바꾸되"라고 적었는데, §12는
+"파일 분리는 기능 변경과 **한 덩어리로 하지 않는다**"고 못 박는다. 둘이 충돌한다.
+
+**나눈다.** 이유는 증거다. 이동이 옳았다는 증거는 `verify-cli-registry-golden.ps1` 이
+한 글자도 안 변하는 것 하나뿐이다. 서명 이행을 같은 커밋에 넣으면 골든의
+`result_bearing` 열이 **정당하게** 바뀌고, 그 순간 "이동이 뭘 깨뜨렸나"와 "이행이 뭘
+바꿨나"를 가를 수 없게 된다. 증거를 스스로 버리는 셈이다.
+
+순서: 도메인 일곱 개를 먼저 옮기고(골든 불변), 그 다음 도메인 단위로 서명을 이행한다
+(골든의 `result_bearing` 열만 의도적으로 움직인다).
+
+---
+
 ★ **`Tools/build.ps1`이 구성 이름을 문자열로 안다.** 구성을 추가하면서 그 스크립트와 CI
 호출부를 같이 옮기지 않으면 Player smoke가 빈 출력으로 통과한다 — false-green이 게이트
 자체에서 난다. LC8의 완료 기준에 "새 구성으로 `Tools/build.ps1`이 Player smoke를 실제로
