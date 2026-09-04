@@ -373,13 +373,13 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
 
     const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
     std::unique_ptr<Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
-    if (!cameraIcon || nullptr == cameraIcon->GetCpuPixels())
+    if (!cameraIcon || cameraIcon->GetImageView().IsEmpty())
     {
         outLog += "[1/4] CameraGizmo.png 로드 실패: " + cameraIconPath.string() + "\n";
         return false;
     }
-    const TextureImage* iconPixels = cameraIcon->GetCpuPixels();
-    if (128 != iconPixels->Width() || 128 != iconPixels->Height() ||
+    const TextureImageView iconPixels = cameraIcon->GetImageView();
+    if (128 != iconPixels.Width() || 128 != iconPixels.Height() ||
         !cameraIcon->IsTextureAlpha())
     {
         outLog += "[1/4] CameraGizmo.png가 기대한 128x128 RGBA 자산이 아니다\n";
@@ -466,14 +466,14 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     std::shared_ptr<Texture> bgraTexture(Texture::CreateFromPixels(
         1, 1, "vk_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
 
-    if (!compressedIcon || nullptr == compressedIcon->GetCpuPixels() ||
-        RHIFormat::BC1UnormSrgb != compressedIcon->GetCpuPixels()->Format())
+    if (!compressedIcon ||
+        RHIFormat::BC1UnormSrgb != compressedIcon->GetImageView().Format())
         return fail("[1/4] baseColor 압축 경로가 BC1_SRGB를 만들지 않았다\n");
-    if (!blockNoise || nullptr == blockNoise->GetCpuPixels() ||
-        RHIFormat::BC3Unorm != blockNoise->GetCpuPixels()->Format())
+    if (!blockNoise ||
+        RHIFormat::BC3Unorm != blockNoise->GetImageView().Format())
         return fail("[1/4] blueNoise.dds가 BC3로 로드되지 않았다\n");
-    if (!bgraTexture || nullptr == bgraTexture->GetCpuPixels() ||
-        RHIFormat::BGRA8Unorm != bgraTexture->GetCpuPixels()->Format())
+    if (!bgraTexture ||
+        RHIFormat::BGRA8Unorm != bgraTexture->GetImageView().Format())
         return fail("[1/4] BGRA8 자산을 만들지 못했다\n");
 
     outLog += "[1/4] 실제 CameraGizmo.png 로드 · SPIR-V·파이프라인 생성 · "

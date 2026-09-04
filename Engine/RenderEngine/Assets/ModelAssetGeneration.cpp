@@ -289,9 +289,9 @@ namespace assets
             {
                 for (std::uint32_t mip = 0; mip < image.MipLevels(); ++mip)
                 {
-                    const TextureImage::Subresource* source = image.Find(mip, item);
+                    const TextureSubimage* source = image.Find(mip, item);
                     const std::byte* pixels = (nullptr != source)
-                        ? image.PixelsAt(*source) : nullptr;
+                        ? source->pixels : nullptr;
                     if (nullptr == source || nullptr == pixels
                         || 0u == source->slicePitch)
                     {

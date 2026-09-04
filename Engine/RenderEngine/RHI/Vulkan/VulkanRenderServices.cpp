@@ -118,7 +118,7 @@ struct VulkanTextureCache::Impl
     // 비대칭이었다. 셋 다 원인이 하나다: 상위 어휘에 그 포맷이 없었다.
     //
     // 지금은 CPU 이미지가 이미 RHIFormat 을 들고 오므로 그대로 쓴다.
-    bool UploadImage(const TextureImage* image, const uint8_t* solid,
+    bool UploadImage(const TextureImageView& image, const uint8_t* solid,
         const wchar_t* name, VulkanPersistentHeap::ImageAllocation& outAllocation,
         RHITextureEntry& outEntry, uint64_t& outBytes, std::string& outError)
     {
@@ -135,17 +135,18 @@ struct VulkanTextureCache::Impl
         uint32_t height = 1;
         uint32_t mipLevels = 1;
         RHIFormat format = RHIFormat::RGBA8Unorm;
-        if (nullptr != image)
+        const bool hasImage = !image.IsEmpty();
+        if (hasImage)
         {
-            if (!image->IsValid() || 1 != image->ArraySize())
+            if (1 != image.ArraySize())
             {
                 outError = "Vulkan 텍스처 캐시는 2D 단일 자산만 올린다";
                 return false;
             }
-            format = image->Format();
-            width = image->Width();
-            height = image->Height();
-            mipLevels = image->MipLevels();
+            format = image.Format();
+            width = image.Width();
+            height = image.Height();
+            mipLevels = image.MipLevels();
         }
         if (VK_FORMAT_UNDEFINED == ToVulkan(format))
         {
@@ -188,11 +189,11 @@ struct VulkanTextureCache::Impl
             std::byte* destination =
                 static_cast<std::byte*>(upload.cpuAddress) + localOffset;
 
-            if (nullptr != image)
+            if (hasImage)
             {
-                const TextureImage::Subresource* source = image->Find(mip, 0);
+                const TextureSubimage* source = image.Find(mip, 0);
                 const std::byte* sourcePixels = (nullptr != source)
-                    ? image->PixelsAt(*source) : nullptr;
+                    ? source->pixels : nullptr;
                 if (nullptr == source || nullptr == sourcePixels
                     || source->rowPitch < tightRow)
                 {
@@ -201,8 +202,21 @@ struct VulkanTextureCache::Impl
                 }
                 // 압축이면 한 행이 블록 한 줄이다 — RHIFormatRowCount 가 그
                 // 차이를 흡수하므로 여기 루프는 두 경우에 같다.
+                const uint32_t copyRows = RHIFormatRowCount(format, mipHeight);
                 CopyImageRows(destination, tightRow, sourcePixels, source->rowPitch,
-                    RHIFormatRowCount(format, mipHeight), tightRow);
+                    copyRows, tightRow);
+
+                // A/B 대조용 다이제스트. 이쪽 행 간격은 빈틈이 없어 그대로가
+                // 유효 바이트다. solid 폴백(image 없음)은 먹이지 않는다 —
+                // 대조하려는 것은 자산이지 기본 텍스처가 아니다.
+                if (RHIUploadDigestEnabled())
+                {
+                    for (uint32_t row = 0; row < copyRows; ++row)
+                    {
+                        stats.uploadDigest.FeedRow(
+                            destination + static_cast<size_t>(row) * tightRow, tightRow);
+                    }
+                }
             }
             else
             {
@@ -288,7 +302,7 @@ struct VulkanTextureCache::Impl
     {
         if (cache.IsValid()) return cache;
         uint64_t bytes = 0;
-        if (!UploadImage(nullptr, rgba, name, allocation, cache, bytes,
+        if (!UploadImage(TextureImageView{}, rgba, name, allocation, cache, bytes,
             outError)) ++stats.failures;
         return cache;
     }
@@ -365,8 +379,8 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
         return found->second.entry;
     }
 
-    const TextureImage* pixels = texture->GetCpuPixels();
-    if (nullptr == pixels)
+    const TextureImageView pixels = texture->GetImageView();
+    if (pixels.IsEmpty())
     {
         ++m_impl->stats.failures;
         outError = "Texture에 CPU 픽셀이 없다";

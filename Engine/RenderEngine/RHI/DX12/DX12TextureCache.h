@@ -76,6 +76,10 @@ public:
         // 같아야 정상이고, 갈리면 어딘가 다른 경로가 생겼다는 뜻이다.
         uint32_t fromCpuPixels{ 0 };
 
+        /// 이 캐시가 올린 논리 픽셀의 누적 다이제스트(A/B 대조용).
+        /// SetRHIUploadDigestEnabled(true) 일 때만 채워진다.
+        RHIUploadDigest uploadDigest;
+
         // ── 지금 들고 있는 양 (자산 상주 관리 ②) ──
         //
         // ★ bytesUploaded와 다르다. 그쪽은 누적이라 한 번 올린 것을 영원히
@@ -187,7 +191,7 @@ private:
     ///
     /// 로더가 압축까지 끝낸 이미지를 Texture에 남겨 두므로
     /// (Texture::m_cpuPixels) 그것을 그대로 업로드 링에 밀어 넣는다.
-    bool UploadFromCpuPixels(const TextureImage& image,
+    bool UploadFromCpuPixels(const TextureImageView& image,
         const wchar_t* debugName, DX12PersistentHeap::Allocation& outAllocation,
         Entry& outEntry, std::string& outError);
 

@@ -298,16 +298,16 @@ DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outE
 // CopyResource로 GPU에서 끌어내린 뒤 Map으로 읽는 경로였고, Texture가 픽셀을
 // 들고 있지 않던 시절의 유일한 방법이었다. T1이 로더에게 최종 이미지를
 // 남기게 하면서 그쪽 소비자가 사라졌고, T4에서 함께 걷었다.
-bool DX12TextureCache::UploadFromCpuPixels(const TextureImage& image,
+bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
     const wchar_t* debugName, DX12PersistentHeap::Allocation& outAllocation,
     Entry& outEntry, std::string& outError)
 {
     auto* device = m_resources->GetDevice();
     outEntry = {};
 
-    // ★ 2D 여부·치수 검사는 이제 타입이 대신 답한다(축 A). TextureImage 는
-    //   2D 밉·배열 체인만 표현하고, 자리를 잡지 못하면 유효하지 않다.
-    if (!image.IsValid())
+    // ★ 2D 여부·치수 검사는 이제 타입이 대신 답한다(축 A). 뷰는 2D 밉·배열
+    //   체인만 표현하고, 서브리소스가 없으면 비어 있다.
+    if (image.IsEmpty())
     {
         outError = "CPU 픽셀 메타데이터가 비어 있다";
         return false;
@@ -356,9 +356,8 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImage& image,
     {
         // 늘어놓은 순서가 DX12 서브리소스 번호와 같다 — 둘 다
         // (mip + arraySlice * mipLevels) 규칙이다(TextureImage.h 레이아웃 규약).
-        const TextureImage::Subresource* source = image.At(subresource);
-        const std::byte* sourcePixels = (nullptr != source)
-            ? image.PixelsAt(*source) : nullptr;
+        const TextureSubimage* source = image.At(subresource);
+        const std::byte* sourcePixels = (nullptr != source) ? source->pixels : nullptr;
         if (nullptr == source || nullptr == sourcePixels)
         {
             outError = "CPU 이미지에 서브리소스가 없다";
@@ -377,6 +376,20 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImage& image,
         CopyImageRows(reinterpret_cast<std::byte*>(destinationBase + footprint.Offset),
             footprint.Footprint.RowPitch, sourcePixels, source->rowPitch,
             rows, static_cast<size_t>(rowSize));
+
+        // A/B 대조용 다이제스트. 방금 쓴 자리에서 **유효 바이트만** 읽는다 —
+        // 256바이트 정렬 패딩을 먹이면 Vulkan 과 절대 같아질 수 없다.
+        // footprint 는 드라이버(GetCopyableFootprints)가 정한 것이므로,
+        // Vulkan 이 직접 계산한 배치와 독립이다.
+        if (RHIUploadDigestEnabled())
+        {
+            for (uint32_t row = 0; row < rows; ++row)
+            {
+                m_stats.uploadDigest.FeedRow(destinationBase + footprint.Offset
+                    + static_cast<size_t>(row) * footprint.Footprint.RowPitch,
+                    static_cast<size_t>(rowSize));
+            }
+        }
     }
 
     DX12PersistentHeap::Allocation allocation;
@@ -478,8 +491,8 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     //   move해 왔는데, 그 전제인 "한 번 올리면 캐시가 영원히 들고 있다"를
     //   ③(미사용 기반 은퇴)이 깼다. 은퇴 뒤 재요청에서 픽셀이 비어 있어
     //   재업로드가 실패했다(실측 3102건 · 화면에 흰색).
-    const TextureImage* pixels = texture->GetCpuPixels();
-    if (nullptr == pixels)
+    const TextureImageView pixels = texture->GetImageView();
+    if (pixels.IsEmpty())
     {
         // ★ CPU 픽셀이 없는 텍스처가 여기 오면 그것 자체가 신호다.
         //
@@ -499,7 +512,7 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     const std::wstring wideName(texture->m_name.begin(), texture->m_name.end());
     DX12PersistentHeap::Allocation allocation;
     Entry entry{};
-    if (!UploadFromCpuPixels(*pixels, wideName.c_str(), allocation, entry, outError))
+    if (!UploadFromCpuPixels(pixels, wideName.c_str(), allocation, entry, outError))
     {
         ++m_stats.failures;
         return m_white;

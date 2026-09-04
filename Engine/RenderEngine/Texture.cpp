@@ -10,10 +10,38 @@
 // ASan 구성은 블롭을 끄므로 직접 받는다(PHASE 9-9).
 using namespace DirectX;
 
+// ── 코덱 산출물 (축 A) ────────────────────────────────────────────────────
+//
+// Texture 가 드는 것은 이 struct 이고, 정의는 이 파일에만 있다. 헤더는
+// 전방선언만 알므로 DirectXTex 도 DirectX:: 이름도 나가지 않는다.
+//
+// ★ 픽셀을 옮기지 않는다. 디코더가 낸 자리에 그대로 두고 서브리소스 표만
+//   만든다 — 그 표가 가리키는 것이 scratch(또는 owned)의 내부 버퍼다.
+//   컨테이너로 옮기면 로드마다 전량 복사가 붙는데, 4K HDR equirect 한 장이
+//   128MB 라 그 한 번이 무시되지 않는다.
+struct Texture::CodecImage
+{
+    /// 출처 A — 파일·메모리 디코드. DirectXTex 가 픽셀을 소유한 채 남는다.
+    ScratchImage scratch;
+
+    /// 출처 B — 이미 중립인 픽셀을 받아 든 것(cooked generation · 합성 픽셀).
+    TextureImage owned;
+
+    /// 위 둘 중 살아 있는 쪽의 내부를 가리킨다.
+    std::vector<TextureSubimage> subresources;
+
+    RHIFormat format{ RHIFormat::Unknown };
+    uint32_t  width{ 0 };
+    uint32_t  height{ 0 };
+    uint32_t  mipLevels{ 0 };
+    uint32_t  arraySize{ 0 };
+    bool      isCube{ false };
+};
+
 // ── DirectXTex 와 나머지 엔진의 유일한 접점 (축 A) ──────────────────────
 //
 // 이 파일 위쪽(로더 넷)은 DirectXTex 로 디코드·압축하고, 아래 헬퍼가 그
-// 결과를 백엔드 중립 이미지로 옮긴다. 그 지점부터는 저장소 어디에도
+// 결과를 중립 서술로 감싼다. 그 지점부터는 저장소 어디에도
 // DirectX::ScratchImage 가 없다 — 디코더나 압축기를 갈아 끼우는 날 봐야
 // 할 파일은 이것 하나다.
 //
@@ -43,8 +71,137 @@ namespace
 		}
 	}
 
-	/// 픽셀을 옮긴다. 포맷이 표에 있다는 것은 호출자가 이미 확인했다.
-	bool TextureCopyScratchToCpuImage(const ScratchImage& image, RHIFormat format,
+	/// 2D 밉·배열 체인으로 다룰 수 있는 이미지인지.
+	bool TextureIsUploadableShape(const TexMetadata& metadata)
+	{
+		return TEX_DIMENSION_TEXTURE2D == metadata.dimension
+			&& 0 != metadata.width && 0 != metadata.height
+			&& 0 != metadata.mipLevels && 0 != metadata.arraySize
+			&& metadata.width <= UINT32_MAX && metadata.height <= UINT32_MAX;
+	}
+
+	/// scratch 를 CodecImage 로 **옮긴 뒤** 서브리소스 표를 채운다.
+	///
+	/// ★ 옮긴 뒤여야 한다. ScratchImage 의 이동은 내부 버퍼를 넘기므로,
+	///   옮기기 전에 얻은 GetImage() 포인터는 그 뒤로 유효를 보장하지 않는다.
+	bool TextureAdoptScratch(Texture::CodecImage& out, ScratchImage&& image,
+		RHIFormat format)
+	{
+		out.scratch = std::move(image);
+		const TexMetadata& metadata = out.scratch.GetMetadata();
+
+		out.format = format;
+		out.width = static_cast<uint32_t>(metadata.width);
+		out.height = static_cast<uint32_t>(metadata.height);
+		out.mipLevels = static_cast<uint32_t>(metadata.mipLevels);
+		out.arraySize = static_cast<uint32_t>(metadata.arraySize);
+		out.isCube = metadata.IsCubemap();
+
+		out.subresources.clear();
+		out.subresources.reserve(
+			static_cast<size_t>(out.arraySize) * out.mipLevels);
+		// item 바깥, mip 안쪽 — TextureImage.h 의 레이아웃 규약과 같다.
+		for (uint32_t item = 0; item < out.arraySize; ++item)
+		{
+			for (uint32_t mip = 0; mip < out.mipLevels; ++mip)
+			{
+				const Image* source = out.scratch.GetImage(mip, item, 0);
+				if (nullptr == source || nullptr == source->pixels) return false;
+				TextureSubimage subresource;
+				subresource.pixels = reinterpret_cast<const std::byte*>(source->pixels);
+				subresource.rowPitch = source->rowPitch;
+				subresource.slicePitch = source->slicePitch;
+				subresource.width = static_cast<uint32_t>(source->width);
+				subresource.height = static_cast<uint32_t>(source->height);
+				out.subresources.push_back(subresource);
+			}
+		}
+		return !out.subresources.empty();
+	}
+
+	/// 이미 중립인 이미지를 CodecImage 로 옮긴다(cooked generation · 합성 픽셀).
+	bool TextureAdoptImage(Texture::CodecImage& out, TextureImage&& image)
+	{
+		if (!image.IsValid()) return false;
+		out.owned = std::move(image);
+
+		out.format = out.owned.Format();
+		out.width = out.owned.Width();
+		out.height = out.owned.Height();
+		out.mipLevels = out.owned.MipLevels();
+		out.arraySize = out.owned.ArraySize();
+		out.isCube = out.owned.IsCube();
+
+		out.subresources.clear();
+		out.subresources.reserve(
+			static_cast<size_t>(out.arraySize) * out.mipLevels);
+		for (uint32_t item = 0; item < out.arraySize; ++item)
+		{
+			for (uint32_t mip = 0; mip < out.mipLevels; ++mip)
+			{
+				const TextureSubimage* source = out.owned.Find(mip, item);
+				if (nullptr == source || nullptr == source->pixels) return false;
+				out.subresources.push_back(*source);
+			}
+		}
+		return !out.subresources.empty();
+	}
+
+	/// 표에 없는 디코더 산출 포맷을 RGBA8 로 내린다.
+	///
+	/// ★ 거절하지 않는 이유: 거절하면 그 자산이 화면에서 통째로 사라진다.
+	///   어휘에 이름이 없다는 이유로 그림을 잃는 것보다 한 번 변환하는 편이
+	///   낫고, 여기 걸리는 포맷이 실제로 나오면 그것이 어휘에 더할 후보다.
+	///   전달 함수는 건드리지 않는다 — 목표의 sRGB 성질을 소스와 같게 두면
+	///   DirectXTex 가 감마에 손대지 않는다(Texture::DecodeToRgba8 주석 참고).
+	bool TextureLowerToRgba8(const ScratchImage& image, ScratchImage& out)
+	{
+		const TexMetadata& metadata = image.GetMetadata();
+		const DXGI_FORMAT target = IsSRGB(metadata.format)
+			? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+		const HRESULT lowering = IsCompressed(metadata.format)
+			? Decompress(image.GetImages(), image.GetImageCount(), metadata,
+				target, out)
+			: Convert(image.GetImages(), image.GetImageCount(), metadata, target,
+				TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, out);
+		return SUCCEEDED(lowering) && 0 != out.GetImageCount();
+	}
+
+	/// 디코드 결과를 Texture 가 들 형태로 감싼다. 픽셀 복사 0.
+	std::shared_ptr<Texture::CodecImage> TextureMakeCodecImage(ScratchImage&& image)
+	{
+		if (!TextureIsUploadableShape(image.GetMetadata())) return nullptr;
+
+		auto codec = std::make_shared<Texture::CodecImage>();
+		const RHIFormat known = TextureDecodedFormatToRHI(image.GetMetadata().format);
+		if (RHIFormat::Unknown != known)
+		{
+			if (!TextureAdoptScratch(*codec, std::move(image), known)) return nullptr;
+			return codec;
+		}
+
+		ScratchImage lowered;
+		if (!TextureLowerToRgba8(image, lowered)) return nullptr;
+		const RHIFormat loweredFormat =
+			TextureDecodedFormatToRHI(lowered.GetMetadata().format);
+		if (RHIFormat::Unknown == loweredFormat) return nullptr;
+		if (!TextureAdoptScratch(*codec, std::move(lowered), loweredFormat))
+			return nullptr;
+		return codec;
+	}
+
+	/// 이미 중립인 이미지를 Texture 가 들 형태로 감싼다.
+	std::shared_ptr<Texture::CodecImage> TextureMakeCodecImage(TextureImage&& image)
+	{
+		auto codec = std::make_shared<Texture::CodecImage>();
+		if (!TextureAdoptImage(*codec, std::move(image))) return nullptr;
+		return codec;
+	}
+
+	/// 디코드 결과를 소유 컨테이너로 **복사한다**. cook 경로 전용이다 —
+	/// 그쪽은 픽셀을 ModelTextureAsset 으로 다시 옮기므로 어차피 한 번 복사가
+	/// 필요하고, 런타임 로드 경로처럼 128MB 를 다루지 않는다.
+	bool TextureCopyScratchToImage(const ScratchImage& image, RHIFormat format,
 		TextureImage& out)
 	{
 		const TexMetadata& metadata = image.GetMetadata();
@@ -60,7 +217,7 @@ namespace
 		{
 			for (uint32_t mip = 0; mip < out.MipLevels(); ++mip)
 			{
-				const TextureImage::Subresource* destination = out.Find(mip, item);
+				const TextureSubimage* destination = out.Find(mip, item);
 				const Image* source = image.GetImage(mip, item, 0);
 				if (nullptr == destination || nullptr == source
 					|| nullptr == source->pixels) return false;
@@ -75,49 +232,6 @@ namespace
 			}
 		}
 		return true;
-	}
-
-	/// 디코드 결과를 중립 이미지로 옮긴다. 실패하면 nullptr.
-	std::shared_ptr<const TextureImage> TextureMakeCpuImage(const ScratchImage& image)
-	{
-		const TexMetadata& metadata = image.GetMetadata();
-		if (TEX_DIMENSION_TEXTURE2D != metadata.dimension
-			|| 0 == metadata.width || 0 == metadata.height
-			|| metadata.width > UINT32_MAX || metadata.height > UINT32_MAX)
-			return nullptr;
-
-		TextureImage result;
-		const RHIFormat known = TextureDecodedFormatToRHI(metadata.format);
-		if (RHIFormat::Unknown != known)
-		{
-			if (!TextureCopyScratchToCpuImage(image, known, result)) return nullptr;
-			return std::make_shared<const TextureImage>(std::move(result));
-		}
-
-		// ★ 표에 없는 포맷은 거절하지 않고 RGBA8 로 내려 받는다.
-		//
-		//   거절하면 그 자산이 화면에서 통째로 사라진다. 어휘에 이름이
-		//   없다는 이유로 그림을 잃는 것보다 한 번 변환하는 편이 낫고,
-		//   여기 걸리는 포맷이 실제로 나오면 그것이 어휘에 더할 후보다.
-		//   전달 함수는 건드리지 않는다 — 목표의 sRGB 성질을 소스와 같게
-		//   두면 DirectXTex 가 감마에 손대지 않는다(아래 DecodeToRgba8 의
-		//   주석에 그 사정이 자세히 있다).
-		const DXGI_FORMAT lowered = IsSRGB(metadata.format)
-			? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-		ScratchImage converted;
-		const HRESULT lowering = IsCompressed(metadata.format)
-			? Decompress(image.GetImages(), image.GetImageCount(), metadata,
-				lowered, converted)
-			: Convert(image.GetImages(), image.GetImageCount(), metadata, lowered,
-				TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, converted);
-		if (FAILED(lowering) || 0 == converted.GetImageCount()) return nullptr;
-
-		const RHIFormat loweredFormat = TextureDecodedFormatToRHI(
-			converted.GetMetadata().format);
-		if (RHIFormat::Unknown == loweredFormat) return nullptr;
-		if (!TextureCopyScratchToCpuImage(converted, loweredFormat, result))
-			return nullptr;
-		return std::make_shared<const TextureImage>(std::move(result));
 	}
 
 	/// 인코딩된 바이트를 매직으로 갈라 디코드한다.
@@ -166,6 +280,16 @@ namespace
 	}
 }
 
+TextureImageView Texture::GetImageView() const
+{
+	if (!m_codecImage || m_codecImage->subresources.empty()) return {};
+	const CodecImage& codec = *m_codecImage;
+	return TextureImageView(codec.format, codec.width, codec.height,
+		codec.mipLevels, codec.arraySize, codec.isCube,
+		codec.subresources.data(),
+		static_cast<uint32_t>(codec.subresources.size()));
+}
+
 //static functions
 Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 	_In_ std::string_view name, _In_ RHIFormat textureFormat,
@@ -179,7 +303,7 @@ Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 	TextureImage image = TextureImage::Allocate(textureFormat, width, height, 1, 1);
 	if (!image.IsValid()) return nullptr;
 
-	const TextureImage::Subresource* destination = image.Find(0, 0);
+	const TextureSubimage* destination = image.Find(0, 0);
 	if (nullptr == destination) return nullptr;
 	std::byte* destinationPixels = image.MutablePixelsAt(*destination);
 	if (nullptr == destinationPixels) return nullptr;
@@ -202,29 +326,43 @@ Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 	texture->m_size = { float(width), float(height) };
 
 	// 파일 로더가 남기는 자리와 같다 — 텍스처 캐시가 여기서 가져간다(T1·T4).
-	texture->m_cpuPixels = std::make_shared<const TextureImage>(std::move(image));
+	texture->m_codecImage = TextureMakeCodecImage(std::move(image));
+	if (!texture->m_codecImage)
+	{
+		delete texture;
+		return nullptr;
+	}
 
 	return texture;
 }
 
-std::shared_ptr<Texture> Texture::CreateSharedFromCpuImage(
-	std::string_view name, std::shared_ptr<const TextureImage> image)
+std::shared_ptr<Texture> Texture::CreateSharedFromImage(
+	std::string_view name, TextureImage image)
 {
-	if (!image || !image->IsValid()) return nullptr;
+	if (!image.IsValid()) return nullptr;
+
+	const bool isCube = image.IsCube();
+	const uint32_t arraySize = image.ArraySize();
+	const float width = float(image.Width());
+	const float height = float(image.Height());
+	const RHIFormat format = image.Format();
+
+	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	if (!codecImage) return nullptr;
 
 	auto texture = std::shared_ptr<Texture>(new Texture());
 	texture->m_name = std::string(name);
-	texture->m_textureType = image->IsCube()
+	texture->m_textureType = isCube
 		? TextureType::TextureCube
-		: (image->ArraySize() > 1 ? TextureType::TextureArray : TextureType::ImageTexture);
-	texture->m_size = { float(image->Width()), float(image->Height()) };
+		: (arraySize > 1 ? TextureType::TextureArray : TextureType::ImageTexture);
+	texture->m_size = { width, height };
 	// ★ 예전에는 DirectX::HasAlpha(포맷)를 물었다. 그 물음은 "이 포맷에
 	//   알파 채널이 있는가"이지 "이 그림에 투명한 데가 있는가"가 아니다 —
 	//   중립 어휘의 8비트 색 포맷은 전부 알파를 가지므로 답이 늘 참이었다.
 	//   지금은 채널 수로 같은 답을 준다(뜻이 바뀌지 않는다).
-	texture->m_isTextureAlpha = (4 == RHIFormatChannels(image->Format()))
-		|| RHIFormatIsBlockCompressed(image->Format());
-	texture->m_cpuPixels = std::move(image);
+	texture->m_isTextureAlpha = (4 == RHIFormatChannels(format))
+		|| RHIFormatIsBlockCompressed(format);
+	texture->m_codecImage = std::move(codecImage);
 	return texture;
 }
 
@@ -321,10 +459,14 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 		}
 	}
 
-	// 중립 이미지로 옮긴 뒤에 자산을 세운다 — 옮기지 못하면 텍스처 자체를
+	// 코덱 산출물을 감싼 뒤에 자산을 세운다 — 감싸지 못하면 텍스처 자체를
 	// 만들지 않는다(픽셀 없는 Texture는 캐시에서 흰색으로 나온다).
-	std::shared_ptr<const TextureImage> cpuImage = TextureMakeCpuImage(image);
-	if (!cpuImage) return nullptr;
+	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
+	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
+	const bool hasAlpha = !image.IsAlphaAllOpaque();
+
+	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	if (!codecImage) return nullptr;
 
     Texture* texture = new Texture();
 	// ★ 여기 있던 DX11 SRV 생성을 걷었다 (T6, 2026-08-08).
@@ -336,10 +478,10 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { float(metadata.width),float(metadata.height) };
-	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+	texture->m_isTextureAlpha = hasAlpha;
 	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->m_cpuPixels = std::move(cpuImage);
+	texture->m_codecImage = std::move(codecImage);
 
 	return texture;
 }
@@ -445,19 +587,25 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 		}
 	}
 
-	std::shared_ptr<const TextureImage> cpuImage = TextureMakeCpuImage(image);
-	if (!cpuImage) return nullptr;
+	const float imageWidth = float(image.GetMetadata().width);
+	const float imageHeight = float(image.GetMetadata().height);
+	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
+	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
+	const bool hasAlpha = !image.IsAlphaAllOpaque();
+
+	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	if (!codecImage) return nullptr;
 
 	auto texture = std::make_shared<Texture>();
 
 	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
 
 	texture->m_textureType = TextureType::ImageTexture;
-	texture->m_size = { float(image.GetMetadata().width),float(image.GetMetadata().height) };
-	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+	texture->m_size = { imageWidth, imageHeight };
+	texture->m_isTextureAlpha = hasAlpha;
 	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->m_cpuPixels = std::move(cpuImage);
+	texture->m_codecImage = std::move(codecImage);
 
 	return texture;
 }
@@ -486,14 +634,20 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 		}
 	}
 
-	std::shared_ptr<const TextureImage> cpuImage = TextureMakeCpuImage(image);
-	if (!cpuImage) return nullptr;
+	const float imageWidth = float(image.GetMetadata().width);
+	const float imageHeight = float(image.GetMetadata().height);
+	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
+	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
+	const bool hasAlpha = !image.IsAlphaAllOpaque();
+
+	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	if (!codecImage) return nullptr;
 
 	auto texture = std::make_shared<Texture>();
 	texture->m_textureType = TextureType::ImageTexture;
-	texture->m_size = { float(image.GetMetadata().width), float(image.GetMetadata().height) };
-	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
-	texture->m_cpuPixels = std::move(cpuImage);
+	texture->m_size = { imageWidth, imageHeight };
+	texture->m_isTextureAlpha = hasAlpha;
+	texture->m_codecImage = std::move(codecImage);
 	return texture;
 }
 
@@ -591,8 +745,12 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 		}
 	}
 
-	std::shared_ptr<const TextureImage> cpuImage = TextureMakeCpuImage(image);
-	if (!cpuImage) return nullptr;
+	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
+	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
+	const bool hasAlpha = !image.IsAlphaAllOpaque();
+
+	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	if (!codecImage) return nullptr;
 
 	auto texture = std::make_unique<Texture>();
 
@@ -600,10 +758,10 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { float(metadata.width),float(metadata.height) };
-	texture->m_isTextureAlpha = !image.IsAlphaAllOpaque();
+	texture->m_isTextureAlpha = hasAlpha;
 	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->m_cpuPixels = std::move(cpuImage);
+	texture->m_codecImage = std::move(codecImage);
 
 	return texture;
 }
@@ -682,7 +840,7 @@ bool Texture::DecodeToRgba8(std::span<const std::byte> bytes,
 
 	const RHIFormat format = TextureDecodedFormatToRHI(finalMetadata.format);
 	if (RHIFormat::Unknown == format
-		|| !TextureCopyScratchToCpuImage(*finalImage, format, outImage))
+		|| !TextureCopyScratchToImage(*finalImage, format, outImage))
 	{
 		outFailure = "decoded texture subresource가 비었다.";
 		return false;
@@ -699,7 +857,7 @@ bool Texture::DecodeToRgba8(std::span<const std::byte> bytes,
 //   남은 것은 CPU 자료뿐이고, 그것은 shared_ptr과 값이라 옮기기만 하면 된다.
 Texture::Texture(Texture&& texture) noexcept
 {
-	m_cpuPixels = std::move(texture.m_cpuPixels);
+	m_codecImage = std::move(texture.m_codecImage);
 	m_assetId = texture.m_assetId;
 	m_textureType = texture.m_textureType;
 	m_name = std::move(texture.m_name);

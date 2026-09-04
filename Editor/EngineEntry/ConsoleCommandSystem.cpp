@@ -298,6 +298,9 @@ namespace CrtAllocProbe
 #endif
 }
 #include <DXProgrammableCapture.h>
+// assets.texturebench 이 디코드·밉·압축 단계를 직접 재느라 든다.
+// (Core.Definition.h 가 이걸 뿌리던 시절이 있었으나 축 A 에서 걷었다)
+#include <DirectXTex.h>
 #include <chrono>
 #include <dxgidebug.h>
 #include <wrl/client.h>
@@ -7753,6 +7756,131 @@ namespace ConsoleCmd
     //           (소스 디코드 → sidecar → generation 게시)을 N회 재고(min/avg ms). 작업
     //           트리의 sidecar를 건드리지 않도록 사본에서만 부른다(게이트가 사본을 만든다).
     //   끝에 프로세스 peak working set과 VRAM 사용량을 찍는다.
+    // ── 텍스처 파이프라인 실측 (T0 착수 전 기준선) ──────────────────────
+    //
+    // 재는 것은 둘이다.
+    //   ① cook 이 얼마나 걸리나 — 디코드·밉 생성·BC1 압축을 단계별로.
+    //      증분 cook 이 필요한지, 저장 때마다 굽는 것이 견딜 만한지 답한다.
+    //   ② 런타임 로드에서 디코드가 차지하는 비중 — cooked artifact 를 읽는
+    //      경로로 바꿨을 때 얼마가 사라지는지 답한다.
+    //
+    // ★ Release 로만 재라. Debug 는 같은 조건에서 자릿수가 달라진다.
+    static void Cmd_assets_texturebench(const ConsoleCommandContext& ctx)
+    {
+        namespace chrono = std::chrono;
+        const int limit = ctx.parts.size() > 1
+            ? (std::max)(1, std::atoi(ctx.parts[1].c_str())) : 64;
+        const file::path root = PathFinder::Relative();
+
+        std::vector<file::path> sources;
+        std::error_code walkError;
+        for (auto it = file::recursive_directory_iterator(root, walkError);
+            it != file::recursive_directory_iterator(); it.increment(walkError))
+        {
+            if (walkError) break;
+            if (!it->is_regular_file(walkError)) continue;
+            std::string ext = it->path().extension().string();
+            for (char& c : ext) c = static_cast<char>(std::tolower(c));
+            if (ext == ".png") sources.push_back(it->path());
+            if (static_cast<int>(sources.size()) >= limit) break;
+        }
+        if (sources.empty())
+        {
+            std::printf("[CLI] assets.texturebench fail PNG 를 찾지 못했다: %s\n",
+                root.string().c_str());
+            return;
+        }
+
+        double readMs = 0.0, decodeMs = 0.0, mipMs = 0.0, compressMs = 0.0, legacyMs = 0.0;
+        uint64_t sourceBytes = 0, decodedBytes = 0, mippedBytes = 0, compressedBytes = 0;
+        uint32_t decoded = 0, mipped = 0, compressed = 0;
+
+        for (const file::path& path : sources)
+        {
+            // ① 파일 바이트 읽기 — cooked artifact 로드의 하한이다.
+            //    (artifact 는 헤더 파싱 + mmap 이므로 디코드가 0 이다)
+            auto t0 = chrono::steady_clock::now();
+            std::ifstream stream(path, std::ios::binary | std::ios::ate);
+            if (!stream) continue;
+            const std::streamsize size = stream.tellg();
+            stream.seekg(0);
+            std::vector<char> raw(static_cast<size_t>(size));
+            stream.read(raw.data(), size);
+            stream.close();
+            auto t1 = chrono::steady_clock::now();
+            readMs += chrono::duration<double, std::milli>(t1 - t0).count();
+            sourceBytes += static_cast<uint64_t>(size);
+
+            // ② 디코드 — 지금 런타임이 로드마다 하는 일.
+            DirectX::ScratchImage image;
+            DirectX::TexMetadata metadata{};
+            t0 = chrono::steady_clock::now();
+            HRESULT hr = DirectX::LoadFromWICMemory(
+                reinterpret_cast<const uint8_t*>(raw.data()), raw.size(),
+                DirectX::WIC_FLAGS_IGNORE_SRGB, &metadata, image);
+            t1 = chrono::steady_clock::now();
+            if (FAILED(hr)) continue;
+            decodeMs += chrono::duration<double, std::milli>(t1 - t0).count();
+            decodedBytes += image.GetPixelsSize();
+            ++decoded;
+
+            // ③ 밉 생성 — 지금 파이프라인에 아예 없는 단계.
+            DirectX::ScratchImage mips;
+            t0 = chrono::steady_clock::now();
+            hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(),
+                metadata, DirectX::TEX_FILTER_DEFAULT, 0, mips);
+            t1 = chrono::steady_clock::now();
+            const bool hasMips = SUCCEEDED(hr) && 0 != mips.GetImageCount();
+            if (hasMips)
+            {
+                mipMs += chrono::duration<double, std::milli>(t1 - t0).count();
+                mippedBytes += mips.GetPixelsSize();
+                ++mipped;
+            }
+
+            // ④ BC1 압축 — 지금은 baseColorMap 만, 그것도 런타임에.
+            const DirectX::ScratchImage& compressSource = hasMips ? mips : image;
+            DirectX::ScratchImage block;
+            t0 = chrono::steady_clock::now();
+            hr = DirectX::Compress(compressSource.GetImages(),
+                compressSource.GetImageCount(), compressSource.GetMetadata(),
+                DXGI_FORMAT_BC1_UNORM_SRGB,
+                DirectX::TEX_COMPRESS_SRGB | DirectX::TEX_COMPRESS_UNIFORM,
+                0.5f, block);
+            t1 = chrono::steady_clock::now();
+            if (SUCCEEDED(hr))
+            {
+                compressMs += chrono::duration<double, std::milli>(t1 - t0).count();
+                compressedBytes += block.GetPixelsSize();
+                ++compressed;
+            }
+
+            // ⑤ 지금의 런타임 로드 경로 전체(디코드 + 중립 이미지 감싸기).
+            t0 = chrono::steady_clock::now();
+            std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(path);
+            t1 = chrono::steady_clock::now();
+            if (texture) legacyMs += chrono::duration<double, std::milli>(t1 - t0).count();
+        }
+
+        const double mb = 1024.0 * 1024.0;
+        std::printf("[CLI] assets.texturebench %u장\n", decoded);
+        std::printf("  파일 읽기      %8.1f ms  (%.1f MB)   <- cooked artifact 로드 하한\n",
+            readMs, static_cast<double>(sourceBytes) / mb);
+        std::printf("  디코드         %8.1f ms  (%.1f MB)   <- 런타임이 매번 하는 일\n",
+            decodeMs, static_cast<double>(decodedBytes) / mb);
+        std::printf("  밉 생성        %8.1f ms  (%.1f MB, %u장)\n",
+            mipMs, static_cast<double>(mippedBytes) / mb, mipped);
+        std::printf("  BC1 압축       %8.1f ms  (%.1f MB, %u장)\n",
+            compressMs, static_cast<double>(compressedBytes) / mb, compressed);
+        std::printf("  cook 합계      %8.1f ms  (디코드+밉+압축)\n",
+            decodeMs + mipMs + compressMs);
+        std::printf("  현재 로드 경로 %8.1f ms  (LoadSharedFromPath)\n", legacyMs);
+        std::printf("  장당 평균 — 디코드 %.2f ms · cook %.2f ms · 읽기 %.2f ms\n",
+            decodeMs / (std::max)(1u, decoded),
+            (decodeMs + mipMs + compressMs) / (std::max)(1u, decoded),
+            readMs / (std::max)(1u, decoded));
+    }
+
     static void Cmd_assets_modelbench(const ConsoleCommandContext& ctx)
     {
         const int iterations = ctx.parts.size() > 2
@@ -9331,6 +9459,17 @@ namespace ConsoleCmd
         Debug->LogWarning(std::string("[vk.gizmoicon] ") +
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.gizmoicon %s\n", passed ? "통과" : "실패");
+    }
+
+    static void Cmd_vk_texturecodec(const ConsoleCommandContext& ctx)
+    {
+        std::string log;
+        const bool passed = RunVulkanTextureCodecTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.texturecodec] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.texturecodec %s\n", passed ? "통과" : "실패");
     }
 
     static void Cmd_vk_gizmoline(const ConsoleCommandContext& ctx)
@@ -11573,6 +11712,7 @@ namespace ConsoleCmd
             reg({ "vk.skybox" }, &Cmd_vk_skybox);
             reg({ "vk.ibl" }, &Cmd_vk_ibl);
             reg({ "vk.gizmoicon" }, &Cmd_vk_gizmoicon);
+            reg({ "vk.texturecodec" }, &Cmd_vk_texturecodec);
             reg({ "vk.gizmoline" }, &Cmd_vk_gizmoline);
             reg({ "vk.wireframe" }, &Cmd_vk_wireframe);
             reg({ "vk.ui" }, &Cmd_vk_ui);
@@ -11597,6 +11737,7 @@ namespace ConsoleCmd
             reg({ "assets.scenemodel" }, &Cmd_assets_scenemodel);
             reg({ "assets.modeldiag" }, &Cmd_assets_modeldiag);
             reg({ "assets.modelbench" }, &Cmd_assets_modelbench);
+            reg({ "assets.texturebench" }, &Cmd_assets_texturebench);
             reg({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
             reg({ "experiment.animpose" }, &Cmd_experiment_animpose);
             reg({ "experiment.animlive" }, &Cmd_experiment_animlive);

@@ -113,7 +113,7 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
     // CameraIcon 연결이 다시 nullptr로 퇴행하거나 WIC 알파가 사라져도 통과한다.
     const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
     std::unique_ptr<Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
-    if (!cameraIcon || nullptr == cameraIcon->GetCpuPixels())
+    if (!cameraIcon || cameraIcon->GetImageView().IsEmpty())
     {
         outLog += "[1/4] CameraGizmo.png 로드 실패: " + cameraIconPath.string() + "\n";
         return false;
@@ -122,8 +122,8 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
     // 알파 판정은 Texture 가 로드 때 재어 둔 값을 본다. 예전에는 여기서
     // ScratchImage::IsAlphaAllOpaque 를 직접 불렀는데, 그 물음의 답은
     // m_isTextureAlpha 에 이미 들어 있다(로더가 같은 함수로 잰다).
-    const TextureImage* cameraPixels = cameraIcon->GetCpuPixels();
-    if (128 != cameraPixels->Width() || 128 != cameraPixels->Height() ||
+    const TextureImageView cameraPixels = cameraIcon->GetImageView();
+    if (128 != cameraPixels.Width() || 128 != cameraPixels.Height() ||
         !cameraIcon->IsTextureAlpha())
     {
         outLog += "[1/4] CameraGizmo.png가 기대한 128x128 RGBA 자산이 아니다\n";
@@ -504,12 +504,12 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
         std::shared_ptr<Texture> bgraTexture(Texture::CreateFromPixels(
             1, 1, "dx12_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
 
-        if (!compressedIcon || nullptr == compressedIcon->GetCpuPixels() ||
-            RHIFormat::BC1UnormSrgb != compressedIcon->GetCpuPixels()->Format() ||
-            !blockNoise || nullptr == blockNoise->GetCpuPixels() ||
-            RHIFormat::BC3Unorm != blockNoise->GetCpuPixels()->Format() ||
-            !bgraTexture || nullptr == bgraTexture->GetCpuPixels() ||
-            RHIFormat::BGRA8Unorm != bgraTexture->GetCpuPixels()->Format())
+        if (!compressedIcon ||
+            RHIFormat::BC1UnormSrgb != compressedIcon->GetImageView().Format() ||
+            !blockNoise ||
+            RHIFormat::BC3Unorm != blockNoise->GetImageView().Format() ||
+            !bgraTexture ||
+            RHIFormat::BGRA8Unorm != bgraTexture->GetImageView().Format())
         {
             passed = false;
             outLog += "[4/4] 코덱 자산 셋(BC1_SRGB·BC3·BGRA8)을 준비하지 못했다\n";

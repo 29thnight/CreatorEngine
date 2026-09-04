@@ -89,8 +89,8 @@ public:
 	// 디코드해 둔 RGBA8 픽셀이라 파일 로더를 다시 태울 이유가 없다 — 여기서
 	// 두 번째 디코드가 생기면 generation의 SHA-256 검증이 뜻을 잃는다. 이미지가
 	// 비었으면 nullptr.
-	static std::shared_ptr<Texture> CreateSharedFromCpuImage(
-		std::string_view name, std::shared_ptr<const TextureImage> image);
+	static std::shared_ptr<Texture> CreateSharedFromImage(
+		std::string_view name, TextureImage image);
 
 	// ── 디코드 전용 창구 (축 A) ──
 	//
@@ -107,7 +107,7 @@ public:
 	static std::unique_ptr<Texture> LoadManagedFromPath(
 		const file::path& path, bool isCompress = false);
 
-	// ── DX12 직결 업로드용 CPU 픽셀 (PHASE 3-1 재정의, T1) ──
+	// ── 업로드용 CPU 픽셀 (PHASE 3-1 재정의, T1 · 축 A) ──
 	//
 	// 파일에서 읽어 압축까지 끝낸 최종 이미지다. 예전에는 이것으로 DX11 SRV를
 	// 만든 뒤 그냥 버렸고, DX12가 쓸 때는 그 DX11 텍스처에서 되읽었다
@@ -132,14 +132,24 @@ public:
 	// shared_ptr인 이유: Texture가 이동되는 경로가 있어 소유권을 하나로
 	// 묶어야 하고, unique_ptr이면 그 경로들이 깨진다.
 	//
-	// ★ const 인 이유(축 A): 만든 뒤로는 아무도 고치지 않는다. 캐시 둘이
-	//   같은 픽셀을 각자 읽어 가므로(DX12·Vulkan) 쓰기 창구를 열어 두면
-	//   그 공유가 곧 경합이 된다.
-	std::shared_ptr<const TextureImage> m_cpuPixels;
+	// ★ 불투명 타입인 이유(축 A). 코덱이 낸 픽셀을 **그 자리에 그대로 둔다**.
+	//   컨테이너로 옮기면 로드마다 전량 복사가 한 번 붙는데, 4K HDR equirect
+	//   한 장이 128MB 라 그 한 번이 무시할 수 없다(저장소에 19장). 그래서
+	//   소유는 코덱 산출물 그대로 들고, 경계로는 뷰만 낸다.
+	//
+	//   정의가 Texture.cpp 에만 있으므로 이 헤더는 DirectXTex 는 물론
+	//   DirectX:: 이름조차 알지 않는다. 디코더를 갈아 끼우는 날 바뀌는 것은
+	//   그 struct 의 정의 하나뿐이고 이 선언은 그대로다.
+	struct CodecImage;
+	std::shared_ptr<CodecImage> m_codecImage;
 
-	/// GPU 업로드용. 소유권을 넘기지 않는다 — 은퇴 후 재업로드가 같은
+	/// GPU 업로드용 뷰. 소유권을 넘기지 않는다 — 은퇴 후 재업로드가 같은
 	/// 픽셀을 다시 읽어야 한다.
-	const TextureImage* GetCpuPixels() const { return m_cpuPixels.get(); }
+	///
+	/// ★ 뷰는 이 Texture 보다 오래 살 수 없다. 소비자 둘(DX12·Vulkan 텍스처
+	///   캐시)은 GetOrUpload 안에서 받아 그 안에서 다 쓰고 버린다. 멤버로
+	///   들거나 프레임을 넘기면 그 순간 규약이 깨진다.
+	TextureImageView GetImageView() const;
 
 	// ── 자산 신원 (PHASE 3-1 재정의, 자산 상주 관리 ①) ──
 	//

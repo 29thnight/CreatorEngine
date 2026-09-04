@@ -422,14 +422,14 @@ namespace
 	//   되돌려 DirectX::ScratchImage 를 세웠고, Vulkan 캐시가 그 DXGI_FORMAT
 	//   을 다시 RHIFormat 으로 환원했다. 포맷 왕복 두 번이 순수한 어댑터
 	//   비용이었다 — 지금은 양쪽 어휘가 처음부터 같아 옮기기만 한다.
-	[[nodiscard]] std::shared_ptr<const TextureImage> BuildGenerationCpuImage(
+	[[nodiscard]] TextureImage BuildGenerationCpuImage(
 		const assets::ModelTextureAsset& texture, std::string& outError)
 	{
 		if (RHIFormat::RGBA8Unorm != texture.format
 			&& RHIFormat::RGBA8UnormSrgb != texture.format)
 		{
 			outError = "generation texture 포맷이 RGBA8 계열이 아니다";
-			return nullptr;
+			return {};
 		}
 		if (texture.isCube || 0 == texture.width || 0 == texture.height
 			|| 0 == texture.mipLevels || 0 == texture.arraySize
@@ -437,7 +437,7 @@ namespace
 				!= static_cast<std::size_t>(texture.mipLevels) * texture.arraySize)
 		{
 			outError = "generation texture descriptor와 subresource 수가 맞지 않는다";
-			return nullptr;
+			return {};
 		}
 
 		TextureImage image = TextureImage::Allocate(texture.format, texture.width,
@@ -445,7 +445,7 @@ namespace
 		if (!image.IsValid())
 		{
 			outError = "중립 CPU 이미지 초기화 실패";
-			return nullptr;
+			return {};
 		}
 		for (std::uint32_t item = 0; item < texture.arraySize; ++item)
 		{
@@ -455,7 +455,7 @@ namespace
 				// item 바깥, mip 안쪽. TextureImage 도 같은 규약이다.
 				const assets::ModelTextureSubresource& source =
 					texture.subresources[static_cast<std::size_t>(item) * texture.mipLevels + mip];
-				const TextureImage::Subresource* destination = image.Find(mip, item);
+				const TextureSubimage* destination = image.Find(mip, item);
 				std::byte* destinationPixels = (nullptr != destination)
 					? image.MutablePixelsAt(*destination) : nullptr;
 				if (nullptr == destination || nullptr == destinationPixels
@@ -465,7 +465,7 @@ namespace
 					|| destination->height != source.height)
 				{
 					outError = "generation texture subresource가 이미지 기술과 어긋난다";
-					return nullptr;
+					return {};
 				}
 				const std::uint32_t sourceRows = static_cast<std::uint32_t>(
 					source.slicePitch / source.rowPitch);
@@ -476,7 +476,7 @@ namespace
 					destination->rowPitch);
 			}
 		}
-		return std::make_shared<const TextureImage>(std::move(image));
+		return image;
 	}
 }
 
@@ -496,10 +496,9 @@ std::shared_ptr<Texture> DataSystem::ResolveModelGenerationTexture(
 	}
 
 	std::string error;
-	std::shared_ptr<const TextureImage> image =
-		BuildGenerationCpuImage(*texture, error);
-	std::shared_ptr<Texture> owner = image
-		? Texture::CreateSharedFromCpuImage(texture->name, std::move(image))
+	TextureImage image = BuildGenerationCpuImage(*texture, error);
+	std::shared_ptr<Texture> owner = image.IsValid()
+		? Texture::CreateSharedFromImage(texture->name, std::move(image))
 		: nullptr;
 	if (!owner)
 	{

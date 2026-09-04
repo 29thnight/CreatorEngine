@@ -29,6 +29,11 @@ bool RunVulkanIBLTest(std::string& outLog);
 /// buffer와 t1 2D SRV의 픽셀·검증 레이어 결과를 DX12 기준과 대조한다.
 bool RunVulkanGizmoIconTest(std::string& outLog);
 
+/// BC1·BC3·BGRA8·비압축 자산 넷을 두 백엔드에 같은 순서로 올려, 업로드
+/// 스테이징에 쓴 논리 픽셀의 누적 다이제스트를 대조한다. 배치(footprint)는
+/// 각자 유도하므로 한쪽 계산이 어긋나면 값이 갈린다.
+bool RunVulkanTextureCodecTest(std::string& outLog);
+
 /// EnhancedGizmoLinePass의 CPU 도형 생성, line-list 정점 업로드, 단일 드로우와
 /// 카메라 반응을 같은 입력으로 실행해 DX12/Vulkan 전체 RGBA를 대조한다.
 bool RunVulkanGizmoLineTest(std::string& outLog);
