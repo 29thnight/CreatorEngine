@@ -1109,7 +1109,7 @@
   <div class="risknote"><div class="vt">위임 가능성 판정 (2026-09-04 사전 정찰 · 설계 문서 §6)</div>
   이 페이즈는 <b>일부를 다른 개발자에게 위임할 수 있다.</b> 가르는 기준은 난이도가 아니라 경계다 — ①값 경계에서 닫히는가 ②담당자가 검증을 스스로 돌릴 수 있는가 ③공유 대형 파일을 건드리지 않는가.
   아래 표의 각 항목에 <b>구간 A</b>(위임 가능) · <b>B</b>(사내 필수) · <b>C</b>(계약은 사내, 알고리즘만 위임)를 표기했다.
-  <b>단 ND가 먼저다</b> — 지금은 회귀 세트의 verify 호출 84건 중 50건이 Editor/Player exe를 태우고 단위 테스트 프레임워크가 0이라, 헤드리스 인수 창구 없이 위임하면 병목만 옮긴다.
+  <b>발주 지점은 ND-a(1일) 뒤다</b> — 계약 헤더 6종이 서면 N4를 바로 넘길 수 있다. 헤드리스 인수 창구(<b>ND-b</b>, 3일)는 <b>발주와 병행</b>하되 인수 전에는 반드시 선다 — 지금은 회귀 세트의 verify 호출 84건 중 50건이 Editor/Player exe를 태우고 단위 테스트 프레임워크가 0이라, 담당자가 자기 하네스로 낸 초록을 인수 판정으로 쓸 수 없다.
   <b>N3는 위임 불가</b> — 착지점은 <code>RuntimeFrame.cpp</code> 92줄이지만 파급이 물리 스텝 수·C# <code>SimulationScope.Delay</code>·회귀 세트 전체다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
@@ -2225,11 +2225,16 @@ const TASKS = [
   //
   // 소유 구간(설계 문서 §6.3, 2026-09-04 사전 정찰):
   //   A = 위임 가능(값 경계에서 닫힘) · B = 사내 필수 · C = 계약은 사내, 알고리즘만 위임
-  // ND는 위임의 전제이며 §6.5가 근거다. 이 항목 없이 A 구간을 발주하지 않는다.
-  { phase: 20, id: "ND", title: "위임 준비 — 헤드리스 인수 창구·계약 동결·인수 게이트",
-    detail: "NetTests.exe(Console Application, SceneRuntime 링크, 렌더 장치 없음)를 세우고, 계약 헤더 11종을 동결하며, verify-net-wire-boundary·loopback-correctness·id-lifecycle을 run-all에 배선한다. 각 게이트는 변이로 이빨을 먼저 증명한다.",
-    refs: "NetworkFrameworkPlan §6.4·§6.5", priority: "P0", days: 4, status: "todo",
-    note: "구간 B(사내 필수) — 위임의 전제다. 현재 단위 테스트 프레임워크 0, run-all의 verify 호출 84건 중 50건이 Editor/Player exe를 태운다. 선례는 Tools/AssetCooker(Console Application)이고, SceneRuntime이 RenderEngine·DirectX를 참조하는 파일은 헤더 5개뿐이라 분리가 현실적이다. 공수는 추정치." },
+  // ND-a는 **발주**의 전제, ND-b는 **인수**의 전제다(§6.5). 초판은 둘을 묶어 4일 전부를
+  // 발주 전 필수로 뒀는데 그것은 과했다 — 인수 게이트가 필요한 시점은 발주가 아니라 인수다.
+  { phase: 20, id: "ND-a", title: "계약 헤더 6종 동결과 변경 절차",
+    detail: "지금 근거가 서 있는 6종(NetWireIds·INetworkTransport·NetProtocolHeader·INetChannelPolicy·INetTelemetrySink·INetworkEntityRegistry)만 동결하고 wire ID tombstone 규율을 문서로 고정한다. quantizer·snapshot 배치·backpressure 임계는 N0 계측 전에 정하지 않는다.",
+    refs: "NetworkFrameworkPlan §6.4·§6.5", priority: "P0", days: 1, status: "todo",
+    note: "구간 B(사내) — 발주의 전제다. 이 6종이 서면 N4(Loopback)를 즉시 발주할 수 있다. 공수 근거: 이 저장소의 기존 인터페이스·정책 헤더는 19~429줄(중앙값 ~160)이고 절반 이상이 주석이라 6종이면 600~1,000줄 규모다. 추정치이며 착수 뒤 실측으로 갱신한다." },
+  { phase: 20, id: "ND-b", title: "헤드리스 인수 창구와 게이트 3종",
+    detail: "NetTests.exe(Console Application, SceneRuntime 링크, 렌더 장치 없음)를 세우고 verify-net-wire-boundary·loopback-correctness·id-lifecycle을 run-all에 배선한다. 각 게이트는 변이로 이빨을 먼저 증명한다.",
+    refs: "NetworkFrameworkPlan §6.5", priority: "P0", days: 3, status: "todo",
+    note: "구간 B(사내) — 인수의 전제이며 N4 발주와 병행한다. 현재 단위 테스트 프레임워크 0, run-all의 verify 호출 84건 중 50건이 Editor/Player exe를 태운다. 선례는 Tools/AssetCooker(Console Application)이고, SceneRuntime이 RenderEngine·DirectX를 참조하는 파일은 헤더 5개뿐이라 분리가 현실적이다. ★ 담당자가 자기 하네스로 낸 초록은 개발 신호이지 인수 판정이 아니다 — 이것 없이 완료를 기록하지 않는다." },
   { phase: 20, id: "N0", title: "기준선·금지 타입·telemetry 실패 게이트",
     detail: "frame/physics tick, Entity/Component 변화량을 계측하고 EntityHandle·HashedGuid·YAML/JSON Node의 wire 유입을 실패시킨다. packet/encode/alloc/queue/drop 공통 telemetry를 먼저 세운다.",
     refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo",
