@@ -47,8 +47,14 @@ namespace CreatorEngine.Scripts;
 /// </summary>
 public sealed partial class LifecycleAxisProbe : Component
 {
-    /// <summary>틱 로그를 몇 번째마다 남기는가. 전량을 남기면 로그가 폭주한다.</summary>
-    private const int BeatEvery = 300;
+    /// <summary>
+    /// 틱 로그를 몇 번째마다 남기는가. 전량을 남기면 로그가 폭주한다.
+    ///
+    /// 이 값이 곧 "마지막 틱 프레임" 앵커의 정밀도다 — 게이트의 판정 2b가
+    /// 축소 시점을 그 앵커에서 잰다. 300이면 정지 시점을 최대 300프레임 늦게
+    /// 볼 수 있어, 실제 결함(302프레임 지연)과 구분이 안 된다.
+    /// </summary>
+    private const int BeatEvery = 30;
 
     /// <summary>비활성 전이 전 예열. 초 단위 — 헤드리스 프레임 속도를 모르므로 시간축을 쓴다.</summary>
     private const float WarmupSeconds = 0.15f;

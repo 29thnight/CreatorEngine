@@ -29,6 +29,29 @@ public:
 	void OnInitialized() override;
 	void OnUninitializing() override;
 
+	// 관리 인스턴스를 만들고 저장된 필드 값을 되돌린다. **생명주기 훅은 부르지 않는다.**
+	//
+	// ── 왜 OnInitialized에서 갈라 냈나 (2026-09-05) ──
+	//
+	// 편집 모드에서는 C# 스크립트가 돌지 않아야 한다(Unity 규약, EditorMain.cpp).
+	// 그런데 인스펙터의 [SerializeField] 편집은 **관리 인스턴스를 통해서만**
+	// 동작한다(InspectorWindow::DrawManagedScripts — 필드 목록·타입·값을 전부
+	// ClrHost::GetField*로 읽는다). 인스턴스가 없으면 "인스턴스 없음" 경고만 뜨고
+	// 필드를 못 고친다.
+	//
+	// 그래서 둘을 분리한다: 인스턴스 생성은 편집 모드에도, 훅 전달은 재생 중에만.
+	// 유니티의 실제 모델도 이쪽이다 — 에디터에 MonoBehaviour 인스턴스는 존재하고
+	// [ExecuteAlways] 없이는 훅만 오지 않는다.
+	//
+	// 편집 모드에서 이 함수는 드레인이 **매 프레임** 부른다(컴포넌트가 큐에 남는다).
+	// 그래서 실패를 기억해 재시도를 멈춘다 — 등록되지 않은 타입이 로그를 폭주시키지
+	// 않게. 재시도는 RetryInstance로만 연다.
+	void EnsureInstance();
+
+	// 실패 기억을 지우고 한 번 더 시도한다. 인스펙터의 "다시 만들기" 버튼과
+	// 타입 선택이 부른다 — CLR이 뒤늦게 준비됐거나 어셈블리를 다시 읽은 경우다.
+	void RetryInstance();
+
 	// 6단계 전부를 가상으로 받아 관리 측에 전달한다(트랙 L · L3 완결).
 	// 드라이버가 네이티브 하나여야 "관리 큐가 부르는 것"과 "네이티브가 부르는 것"이
 	// 어긋날 수 없다 — 그 이원화가 DDOL 이송 신호가 스크립트에 닿지 않던 원인이었다.
@@ -103,4 +126,8 @@ public:
 
 private:
 	int m_instanceId{ -1 };
+
+	// EnsureInstance가 한 번 실패했는가. 편집 모드에서는 드레인이 매 프레임
+	// 부르므로 이것이 없으면 실패 로그가 프레임마다 쌓인다.
+	bool m_instanceCreateFailed{ false };
 };

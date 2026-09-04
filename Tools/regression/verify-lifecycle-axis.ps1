@@ -177,20 +177,30 @@ foreach ($hook in @('OnEndSimulation', 'OnRemovingFromScene', 'OnUninitializing'
 
 # ── 판정 2b (T2) — 축소가 **정지 시점**에 오는가 ──
 #
-# 개수가 아니라 시점을 본다. 옳은 계약은 "정지가 옛 인스턴스를 정리한 뒤에
-# 복원분이 선다"이므로, #1의 OnUninitializing은 #2의 첫 줄보다 앞서야 한다.
+# 개수가 아니라 시점을 본다. 지금 결함이 있으면 축소는 프로세스 종료의
+# ScriptRegistry.Clear까지 밀리는데, 개수만 세면 그것도 1건이라 초록이다.
+#
+# ── 앵커를 왜 마지막 틱으로 잡는가 ──
+#
+# 처음에는 "#1의 축소가 복원분(#2)의 첫 줄보다 앞선다"로 잡았다. 그런데 편집
+# 모드에서 스크립트 훅이 오지 않게 고치면 #2가 로그를 한 줄도 남기지 않아
+# 그 앵커가 사라진다 — 착지하면 전제가 뒤집히는 판정이었다.
+#
+# 틱은 재생 중에만 돈다. 즉 **마지막 틱 프레임 ≈ 정지 프레임**이고, 그 값은
+# 시나리오가 프레임 수로 대기하므로 헤드리스 속도와 무관하다. 실측 대비:
+# 정상이면 수 프레임, 종료까지 밀리면 stop 뒤 wait 300 만큼 벌어진다.
+$AnchorTolerance = 100
 $uninit1 = @($e1 | Where-Object { $_.Kind -eq 'hook' -and $_.Name -eq 'OnUninitializing' })
-if ($e2.Count -eq 0) {
-    "판정 2b 축소 시점      : 판정 불가 — 앵커(#2)가 없다"
-    $failed += "복원분 인스턴스(#2)가 없어 축소 시점을 판정할 수 없다. 정지가 스크립트를 되살리지 않았거나 T1 고침으로 편집 모드 생성이 사라진 것이다 — 후자라면 이 판정의 앵커를 다시 잡을 것(빈 집합을 통과로 읽지 않으려고 일부러 실패시킨다)"
-} elseif ($uninit1.Count -lt 1) {
-    "판정 2b 축소 시점      : 판정 불가 — #1 OnUninitializing 없음"
+$ticks1  = @($e1 | Where-Object { $_.Kind -eq 'tick' })
+if ($uninit1.Count -lt 1 -or $ticks1.Count -lt 1) {
+    "판정 2b 축소 시점      : 판정 불가 — Uninit $($uninit1.Count) 건 · tick $($ticks1.Count) 건"
+    $failed += "축소 시점을 잴 앵커가 없다(#1의 OnUninitializing 또는 tick 로그 부재) — 재생이 돌지 않았거나 축소가 아예 오지 않았다"
 } else {
-    $uninitFrame = $uninit1[0].Frame
-    $anchorFrame = $e2[0].Frame
-    "판정 2b 축소 시점      : #1 Uninit f$uninitFrame vs #2 첫 줄 f$anchorFrame (기대: 앞서야 함)"
-    if ($uninitFrame -ge $anchorFrame) {
-        $failed += "#1의 축소가 복원분(#2)보다 늦다(f$uninitFrame >= f$anchorFrame) — 정지 시퀀스의 네이티브 축소가 DispatchLifecycle의 IsAlive 가드에 버려지고, 폴백 TearDown은 관리 틱 안의 Flush에만 있어 편집 모드에서 돌지 않는다. 지금 실제 발화 지점은 프로세스 종료의 ScriptRegistry.Clear다"
+    $lastTickFrame = ($ticks1 | Measure-Object -Property Frame -Maximum).Maximum
+    $gap = $uninit1[0].Frame - $lastTickFrame
+    "판정 2b 축소 시점      : 마지막 틱 f$lastTickFrame → Uninit f$($uninit1[0].Frame) (간격 $gap · 기대 <= $AnchorTolerance)"
+    if ($gap -gt $AnchorTolerance) {
+        $failed += "축소가 정지보다 $gap 프레임 늦게 왔다 — 네이티브 축소가 DispatchLifecycle의 IsAlive 가드에 버려지고, 폴백 TearDown은 관리 틱 안의 Flush에만 있어 편집 모드에서 돌지 않는다. 실제 발화 지점이 프로세스 종료의 ScriptRegistry.Clear다"
     }
 }
 
@@ -204,9 +214,13 @@ if ($e2.Count -eq 0) {
 # 서수를 특정하지 않고 "축소를 못 받은 인스턴스 수"로 재는 이유: T1이 고쳐져
 # 편집 모드 생성이 사라지면 #2 자체가 없어지는데, 그때 이 판정은 0으로 자연히
 # 초록이 된다(빈 집합을 통과로 읽는 것이 아니라 실제로 대상이 없어진 것이다).
+# ★ "OnInitialized를 받은" 인스턴스만 대상이다. 초기화를 받은 적 없는 인스턴스는
+#   축소도 받지 않는 것이 계약이다("Initialized 없이 Uninitializing 없음").
 $ordinals = @($events | ForEach-Object { $_.Ordinal } | Sort-Object -Unique)
 $neverTornDown = @()
 foreach ($o in $ordinals) {
+    $init = @($events | Where-Object { $_.Ordinal -eq $o -and $_.Kind -eq 'hook' -and $_.Name -eq 'OnInitialized' })
+    if ($init.Count -eq 0) { continue }
     $own = @($events | Where-Object { $_.Ordinal -eq $o -and $_.Kind -eq 'hook' -and $_.Name -eq 'OnUninitializing' })
     if ($own.Count -eq 0) { $neverTornDown += $o }
 }

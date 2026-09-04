@@ -28,6 +28,10 @@ wait 60
 # 이름에 공백이 있지만 따옴표로 묶지 않는다 — script.add는 마지막 토큰을
 # 타입으로 보고 그 앞 전체를 이름으로 쓴다(따옴표를 쓰면 그것까지 이름에 들어간다).
 script.add Main Camera CameraScriptProbe
+wait 10
+
+# 프로브의 OnInitialized는 재생에서 온다(2026-09-05 — 편집 모드에서는 훅이 오지 않는다).
+play
 wait 20
 
 log.flush

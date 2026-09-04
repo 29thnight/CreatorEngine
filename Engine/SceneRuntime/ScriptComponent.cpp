@@ -51,7 +51,7 @@ namespace
 	}
 }
 
-void ScriptComponent::OnInitialized()
+void ScriptComponent::EnsureInstance()
 {
 	if (m_scriptType.empty())
 	{
@@ -60,31 +60,79 @@ void ScriptComponent::OnInitialized()
 
 	if (HasInstance())
 	{
-		return;   // 재생/정지 왕복 등으로 Awake가 다시 불려도 인스턴스는 하나만 만든다
+		return;   // 재생/정지 왕복 등으로 다시 불려도 인스턴스는 하나만 만든다
+	}
+
+	if (m_instanceCreateFailed)
+	{
+		// 이미 한 번 실패했다. 편집 모드에서는 드레인이 매 프레임 이 함수를
+		// 부르므로 여기서 멈추지 않으면 같은 실패가 프레임마다 쌓인다.
+		// 다시 시도하려면 RetryInstance를 부른다.
+		return;
 	}
 
 	auto& clr = ClrHost::Get();
 	if (!clr.IsReady())
 	{
-		Debug->LogWarning("[스크립트] CLR이 준비되지 않아 " + m_scriptType + " 을 만들지 못했습니다");
+		m_instanceCreateFailed = true;
 		return;
 	}
 
 	m_instanceId = clr.CreateComponent(GetOwner(), m_scriptType);
 	if (!HasInstance())
 	{
-		Debug->LogError("[스크립트] 인스턴스 생성 실패 — 등록되지 않은 타입: " + m_scriptType);
+		m_instanceCreateFailed = true;
 		return;
 	}
 
-	// 저장돼 있던 값을 되돌린다. 관리 측 OnInitialized는 바로 아래에서 부르므로
-	// 스크립트가 그 안에서 필드를 읽어도 복원된 값을 본다.
+	// 저장돼 있던 값을 되돌린다. 인스펙터가 편집 모드에 이 값을 보여 주고,
+	// 재생에서 관리 측 OnInitialized가 그 값을 그대로 읽는다.
 	ApplyFields();
+}
 
-	// 관리 측 OnInitialized도 여기서 부른다(트랙 L · L3 잔여 2단계). 예전에는
+void ScriptComponent::RetryInstance()
+{
+	m_instanceCreateFailed = false;
+	EnsureInstance();
+}
+
+void ScriptComponent::OnInitialized()
+{
+	if (m_scriptType.empty())
+	{
+		return;
+	}
+
+	EnsureInstance();
+
+	if (!HasInstance())
+	{
+		// ★ 이 로그가 곧 "OnInitialized가 몇 번 불렸는가"다.
+		//
+		// verify-script-add-awake-once가 이 줄 수를 세어 이중 초기화를 잡는다
+		// (등록되지 않은 타입을 붙여 HasInstance가 절대 참이 되지 않게 한다).
+		// 그래서 이 로그는 EnsureInstance가 아니라 **여기** 있어야 한다 —
+		// EnsureInstance는 실패를 기억해 두 번째부터 조용히 반환하므로,
+		// 거기서 찍으면 이중 호출이 한 줄로 보여 그 게이트가 눈멀게 된다.
+		auto& clr = ClrHost::Get();
+		if (!clr.IsReady())
+		{
+			Debug->LogWarning("[스크립트] CLR이 준비되지 않아 " + m_scriptType + " 을 만들지 못했습니다");
+		}
+		else
+		{
+			Debug->LogError("[스크립트] 인스턴스 생성 실패 — 등록되지 않은 타입: " + m_scriptType);
+		}
+		return;
+	}
+
+	// 관리 측 OnInitialized를 여기서 부른다(트랙 L · L3 잔여 2단계). 예전에는
 	// ScriptRegistry가 자기 큐(_pendingAwake)로 다음 틱에 불렀는데, 그러면
 	// 관리 측 생명주기의 드라이버가 네이티브와 둘이 된다 — 그 이원화가 DDOL 이송
 	// 신호가 스크립트에 닿지 않던 원인이었다(ScriptLifecyclePhase.h).
+	//
+	// 이 함수가 편집 모드에서 불리지 않는 것은 Scene::DrainPendingPhases가
+	// 보장한다 — 그쪽은 EnsureInstance만 부르고 컴포넌트를 큐에 되돌린다.
 	NotifyManagedLifecycle(ScriptLifecyclePhase::OnInitialized);
 }
 
@@ -94,8 +142,10 @@ void ScriptComponent::PrepareForReload()
 	CaptureFields();
 
 	// 관리 측이 통째로 내려가므로 여기서 파괴를 요청할 필요가 없다.
-	// id만 버려서 다음 Awake가 새로 만들게 한다.
+	// id만 버려서 다음 EnsureInstance가 새로 만들게 한다. 실패 기억도 함께
+	// 지운다 — 리로드는 "등록되지 않은 타입"이 등록되는 대표적 계기다.
 	m_instanceId = -1;
+	m_instanceCreateFailed = false;
 }
 
 void ScriptComponent::SuspendInstance()

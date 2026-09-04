@@ -2244,6 +2244,26 @@ Scene::RegistryCounts Scene::GetRegistryCounts() const
     };
 }
 
+namespace
+{
+    /// C# 스크립트에 생명주기를 흘려도 되는 상태인가.
+    ///
+    /// IsGameStart만으로는 이르다. 재생 버튼이 눌린 **그 프레임**에는 아직
+    /// BeginPlayTransaction이 돌지 않았는데(에디터도 플레이어도 프레임 후반의
+    /// ApplyPendingSceneStructureChange에서 돈다), 그 트랜잭션이 씬 스냅샷을
+    /// 뜬다. 스크립트를 먼저 깨우면 그 안에서 스폰한 오브젝트가 스냅샷에 섞여
+    /// 들어가 정지할 때 편집 씬으로 복원된다.
+    ///
+    /// HasPendingSceneStructureChange는 정확히 그 창(재생 표시는 섰고 트랜잭션은
+    /// 아직)에 참이다. 그래서 스크립트는 한 프레임 뒤부터 시작한다 — 관리 틱이
+    /// 같은 조건으로 건너뛰는 것과도 짝이 맞는다(RuntimeFrame.cpp).
+    bool IsManagedScriptSimulationActive()
+    {
+        return SceneManagers->IsGameStart()
+            && !SceneManagers->HasPendingSceneStructureChange();
+    }
+}
+
 void Scene::DrainPendingPhases()
 {
     // 큐를 통째로 옮겨 놓고 돈다.
@@ -2270,6 +2290,35 @@ void Scene::DrainPendingPhases()
             // 늘지 않는다)을 그대로 써서 "편입은 전부 이 경로로"를 지킨다.
             m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingInitialize);
             continue;
+        }
+
+        // ── C# 스크립트는 재생 중에만 생명주기를 받는다 (2026-09-05) ──
+        //
+        // 네이티브 컴포넌트는 편집 모드에도 초기화되어야 한다 — 카메라·라이트·
+        // 메시가 뷰포트 프리뷰를 그리려면 그래야 한다. 반면 게임 로직은 재생을
+        // 눌러야 도는 것이 규약이고(EditorMain.cpp의 편집 모드 분기), 그것이
+        // 유니티와 같은 계약이다.
+        //
+        // 그런데 이 드레인은 SceneManagers->Editor()가 편집 모드에도 매 프레임
+        // 돌리므로, 여기서 가르지 않으면 스크립트가 편집 모드에 OnInitialized ~
+        // OnBeginSimulation과 OnSimulate 시작까지 전부 받아 버린다. 그리고 재생
+        // 시작에는 State_Initialized가 이미 서 있어 **훅이 하나도 다시 불리지
+        // 않는다** — 재생을 눌러도 게임이 시작되지 않는 셈이다(2026-09-05 실측).
+        //
+        // 비활성 처리와 같은 모양으로 큐에 되돌린다. 재생에 들어가면 그대로
+        // 정상 드레인이 돌아 "모두 Initialized → 모두 BeginSimulation" 순서
+        // 계약도 공짜로 지켜진다 — 별도 진입 지점을 만들 필요가 없다.
+        if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<ScriptComponent>())
+        {
+            // 인스턴스는 편집 모드에도 만든다 — 인스펙터의 [SerializeField]
+            // 편집이 이 인스턴스를 통해서만 동작한다(ScriptComponent::EnsureInstance).
+            static_cast<ScriptComponent*>(component)->EnsureInstance();
+
+            if (!IsManagedScriptSimulationActive())
+            {
+                m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingInitialize);
+                continue;
+            }
         }
 
         component->MarkLifecycleState(Component::State_Initialized);

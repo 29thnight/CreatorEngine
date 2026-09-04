@@ -34,6 +34,13 @@
 # (EditorMain.cpp의 newSceneCreatedEvent). 렌더가 실제로 도는 하네스가
 # 생기면 저작 씬으로 옮기는 편이 낫다.
 
+
+# ── 왜 play가 필요한가 (2026-09-05) ──
+#
+# C# 스크립트는 재생 중에만 생명주기를 받는다(Unity 규약, Scene::DrainPendingPhases).
+# 편집 모드에서는 인스턴스만 만들어지고 훅은 오지 않으므로, play 없이 script.add만
+# 하면 프로브가 아무것도 하지 않는다 — 그 침묵은 "배선이 죽었다"와 구분되지 않는다.
+
 # 기본 씬이 서고 라이트가 프록시에 등록될 때까지 기다린다.
 wait 60
 
@@ -46,7 +53,11 @@ light.proxy
 # 따옴표를 쓰면 그것까지 이름에 들어가 오브젝트를 못 찾는다(Split의 따옴표
 # 처리는 parts에만 적용되고 이 커맨드는 원문 line을 쓴다).
 script.add Directional Light LightScriptProbe
-wait 20
+wait 10
+
+# 프로브의 OnInitialized는 재생에서 온다.
+play
+wait 60
 
 # 프록시 커밋은 프레임 경계에서 일어난다 — 스크립트가 값을 넣은 프레임에는
 # 아직 실리지 않았을 수 있으므로 몇 프레임 더 돌린 뒤에 읽는다.

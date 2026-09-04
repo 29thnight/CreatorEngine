@@ -548,7 +548,11 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 				if (ImGui::Selectable(typeName.c_str()))
 				{
 					script->m_scriptType = typeName;
-					script->OnInitialized();
+
+					// 인스턴스만 만든다 — 생명주기 훅은 재생에서 온다
+					// (ScriptComponent::EnsureInstance의 주석). 편집 모드에
+					// 필드를 그리려면 인스턴스가 필요하다.
+					script->RetryInstance();
 				}
 			}
 			ImGui::EndCombo();
@@ -564,7 +568,9 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		// CLR이 뒤늦게 준비됐거나 어셈블리를 다시 읽은 경우를 위한 수동 재시도.
 		if (clr.IsReady() && ImGui::Button("인스턴스 다시 만들기"))
 		{
-			script->OnInitialized();
+			// 실패 기억을 지우고 다시 시도한다. OnInitialized를 부르면 안 된다 —
+			// 그것은 생명주기 전달까지 하는 창구라 편집 모드에서 훅이 새어 나간다.
+			script->RetryInstance();
 		}
 		return;
 	}
