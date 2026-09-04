@@ -1106,11 +1106,11 @@
   <div class="phase-meta">신설: 2026-08-22 · 기준선 재실측 2026-09-04 · 설계 문서: <a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계 <b>완료</b>, SceneGraph E1·H3·L5 <b>완료</b> · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신 · <b>소유권 분할은 설계 문서 §6</b></div>
   <div class="phase-goal"><b>목표:</b> 서버 권위 replication을 실제 fixed Simulation Tick과 값 기반 thread boundary 위에 세운다.
   Authoring YAML/JSON DOM, process-local EntityHandle, live Scene/Entity pointer를 wire에서 배제하고, Loopback correctness를 닫은 뒤 실제 transport와 선택적 prediction/headless server를 판정한다.</div>
-  <div class="risknote"><div class="vt">위임 가능성 판정 (2026-09-04 사전 정찰 · 설계 문서 §6)</div>
-  이 페이즈는 <b>일부를 다른 개발자에게 위임할 수 있다.</b> 가르는 기준은 난이도가 아니라 경계다 — ①값 경계에서 닫히는가 ②담당자가 검증을 스스로 돌릴 수 있는가 ③공유 대형 파일을 건드리지 않는가.
-  아래 표의 각 항목에 <b>구간 A</b>(위임 가능) · <b>B</b>(사내 필수) · <b>C</b>(계약은 사내, 알고리즘만 위임)를 표기했다.
-  <b>발주 지점은 ND-a(1일) 뒤다</b> — 계약 헤더 6종이 서면 N4를 바로 넘길 수 있다. 헤드리스 인수 창구(<b>ND-b</b>, 3일)는 <b>발주와 병행</b>하되 인수 전에는 반드시 선다 — 지금은 회귀 세트의 verify 호출 84건 중 50건이 Editor/Player exe를 태우고 단위 테스트 프레임워크가 0이라, 담당자가 자기 하네스로 낸 초록을 인수 판정으로 쓸 수 없다.
-  <b>N3는 위임 불가</b> — 착지점은 <code>RuntimeFrame.cpp</code> 92줄이지만 파급이 물리 스텝 수·C# <code>SimulationScope.Delay</code>·회귀 세트 전체다.</div>
+  <div class="risknote"><div class="vt">이양 경계 (2026-09-04 · 설계 문서 §6 2판)</div>
+  <b>목표는 분업이 아니라 완전 이양이다.</b> 1판은 슬라이스를 A/B/C 세 구간으로 갈랐는데, C(계약은 사내·알고리즘만 위임)가 있는 한 담당자가 매번 사내 작업을 기다린다. 2판은 구간을 둘로 줄였다 — <b>사내가 한 번 세우는 것</b>과 <b>담당자가 전부 소유하는 것</b>.
+  가능케 하는 것은 인터페이스가 아니라 <b>확장점</b>이다. 인터페이스는 담당자가 엔진을 부르고, 확장점은 엔진이 담당자를 부른다 — 후자가 없으면 담당자는 결국 <code>Scene.cpp</code>에 자기 호출을 심는다.
+  <b>실측: 확장점 3종의 자리가 이미 다 있다</b> — 슬롯 수명은 <code>Scene::AllocateSlot/ReleaseSlot</code>(호출부 13건 전부 Scene 내부), tick 경계는 <code>Runtime::TickSimulationFrame</code>(92줄 단일 정본), 쓰기 dirty는 <code>Component::OnPropertyChanged</code>의 X8 writer boundary(소비자 39건).
+  <b>N3는 PHASE 20 위임 범위 밖</b> — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. 사내가 먼저 닫으며, 작업량의 본체는 누산기가 아니라 CCT 등 <b>스텝당 단위 저작값 재보정</b>과 <b>렌더 보간 신설</b>(현재 배관 0건)이다. 관리 측은 고정 축 전용 훅 <code>OnSimulationTick</code>을 신설하고(§4.4 2판) 기존 <code>PrePhysics</code>/<code>PostPhysics</code>는 프레임 축에 남긴다 — 통째로 옮기면 <code>FlushAniEvents</code>가 <code>AnimatorSystem</code> 결과에 거는 의존이 깨진다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
 
@@ -2225,60 +2225,66 @@ const TASKS = [
   //
   // 소유 구간(설계 문서 §6.3, 2026-09-04 사전 정찰):
   //   A = 위임 가능(값 경계에서 닫힘) · B = 사내 필수 · C = 계약은 사내, 알고리즘만 위임
-  // ND-a는 **발주**의 전제, ND-b는 **인수**의 전제다(§6.5). 초판은 둘을 묶어 4일 전부를
-  // 발주 전 필수로 뒀는데 그것은 과했다 — 인수 게이트가 필요한 시점은 발주가 아니라 인수다.
-  { phase: 20, id: "ND-a", title: "계약 헤더 6종 동결과 변경 절차",
-    detail: "지금 근거가 서 있는 6종(NetWireIds·INetworkTransport·NetProtocolHeader·INetChannelPolicy·INetTelemetrySink·INetworkEntityRegistry)만 동결하고 wire ID tombstone 규율을 문서로 고정한다. quantizer·snapshot 배치·backpressure 임계는 N0 계측 전에 정하지 않는다.",
-    refs: "NetworkFrameworkPlan §6.4·§6.5", priority: "P0", days: 1, status: "todo",
-    note: "구간 B(사내) — 발주의 전제다. 이 6종이 서면 N4(Loopback)를 즉시 발주할 수 있다. 공수 근거: 이 저장소의 기존 인터페이스·정책 헤더는 19~429줄(중앙값 ~160)이고 절반 이상이 주석이라 6종이면 600~1,000줄 규모다. 추정치이며 착수 뒤 실측으로 갱신한다." },
-  { phase: 20, id: "ND-b", title: "헤드리스 인수 창구와 게이트 3종",
-    detail: "NetTests.exe(Console Application, SceneRuntime 링크, 렌더 장치 없음)를 세우고 verify-net-wire-boundary·loopback-correctness·id-lifecycle을 run-all에 배선한다. 각 게이트는 변이로 이빨을 먼저 증명한다.",
-    refs: "NetworkFrameworkPlan §6.5", priority: "P0", days: 3, status: "todo",
-    note: "구간 B(사내) — 인수의 전제이며 N4 발주와 병행한다. 현재 단위 테스트 프레임워크 0, run-all의 verify 호출 84건 중 50건이 Editor/Player exe를 태운다. 선례는 Tools/AssetCooker(Console Application)이고, SceneRuntime이 RenderEngine·DirectX를 참조하는 파일은 헤더 5개뿐이라 분리가 현실적이다. ★ 담당자가 자기 하네스로 낸 초록은 개발 신호이지 인수 판정이 아니다 — 이것 없이 완료를 기록하지 않는다." },
+  // 소유는 두 구간뿐이다(§6.5 2판) — 사내가 1회 세우는 것(ND-a·ND-b·N3·N1)과
+  // 담당자가 전량 소유하는 것(N0·N2·N4·N5·N6·N7·N10). 1판의 C 구간(계약은 사내,
+  // 알고리즘만 위임)은 확장점 2종으로 해소됐다. 헤드리스 테스트 호스트는 담당자의
+  // 개발 루프이므로 담당자가 만든다 — 사내는 SceneRuntime이 렌더 없이 서는지만 본다.
+  { phase: 20, id: "ND-a", title: "계약 헤더 6종 동결 · 변경 절차 · 경계 게이트",
+    detail: "NetWireIds·INetworkTransport·NetProtocolHeader·INetChannelPolicy·INetTelemetrySink·INetworkEntityRegistry를 동결하고 wire ID tombstone 규율을 문서로 고정한다. 사내가 소유하는 유일한 게이트 verify-net-wire-boundary(금지 타입 canary 포함)를 변이로 증명해 run-all에 배선한다.",
+    refs: "NetworkFrameworkPlan §6.4·§6.6", priority: "P0", days: 2, status: "todo",
+    note: "사내 1회 — N4 발주를 여는 열쇠다. quantizer·snapshot 배치·backpressure 임계(헤더 8·9·10)는 N0 계측 전에 정하지 않는다 — 추정을 계약으로 굳히지 않는다. 공수 근거: 기존 인터페이스·정책 헤더가 19~429줄(중앙값 ~160)이고 절반 이상이 주석이다. 추정치이며 착수 뒤 실측으로 갱신한다." },
+  { phase: 20, id: "ND-b", title: "확장점 2종 — 엔티티 수명 · 쓰기 dirty",
+    detail: "ISceneEntityObserver를 Scene::AllocateSlot/ReleaseSlot과 DDOL 이송 경로에, IComponentWriteObserver를 Component::OnPropertyChanged의 X8 writer boundary에 붙인다. 담당자가 Scene.cpp를 한 번도 열지 않고 N2·N5·N6를 끝낼 수 있게 만드는 것이 판정 기준이다.",
+    refs: "NetworkFrameworkPlan §6.3·§6.6", priority: "P0", days: 2.5, status: "todo",
+    note: "사내 1회 — 이것이 서면 C 구간이 사라지고 전량 이양이 닫힌다. 붙일 자리는 실측으로 이미 확인했다(슬롯 호출부 13건 전부 Scene 내부, writer boundary 소비자 39건). ★ 공수의 대부분은 훅 삽입이 아니라 ProxyDirty의 렌더 전용 의미론을 일반 관찰자로 넓히는 설계다 — 그대로 재사용하면 비렌더 컴포넌트의 쓰기를 놓친다." },
   { phase: 20, id: "N0", title: "기준선·금지 타입·telemetry 실패 게이트",
     detail: "frame/physics tick, Entity/Component 변화량을 계측하고 EntityHandle·HashedGuid·YAML/JSON Node의 wire 유입을 실패시킨다. packet/encode/alloc/queue/drop 공통 telemetry를 먼저 세운다.",
     refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo",
-    note: "구간 A(위임 가능) — telemetry 값 타입과 금지 타입 정적 게이트라 값 경계에서 닫힌다. 단 게이트의 run-all 배선은 ND가 소유한다." },
+    note: "담당자 전량 — telemetry 값 타입과 계측이라 값 경계에서 닫힌다. 여기서 나온 실측으로 사내가 헤더 8·9·10(quantizer·snapshot 배치·backpressure 임계)을 동결한다." },
   { phase: 20, id: "N1", title: "Archive·Parser 경계 밀봉",
     detail: "format-neutral schema 위에 Authoring/Cooked archive를 분리하고 Runtime/NetCore 후보 헤더의 yaml-cpp·nlohmann 의존을 제거한다. 남은 것은 이 판정을 회귀 세트에 배선해 되돌아가지 않게 만드는 일이다.",
     refs: "NetworkFrameworkPlan N1", priority: "P0", days: 0.5, status: "progress",
-    note: "구간 B — 2026-09-04 재실측으로 판정 조건이 이미 참이다. PHASE 17 D3/D4가 닫았다: yaml-cpp include 0, nlohmann 0, SceneRuntime의 ryml include 0, ComponentFactory 인자는 Authoring::NodeView. 구현 슬라이스가 아니므로 공수를 4일→0.5일로 낮췄다(게이트 배선분)." },
+    note: "사내 — 2026-09-04 재실측으로 판정 조건이 이미 참이다. PHASE 17 D3/D4가 닫았다: yaml-cpp include 0, nlohmann 0, SceneRuntime의 ryml include 0, ComponentFactory 인자는 Authoring::NodeView. 구현 슬라이스가 아니므로 공수를 4일→0.5일로 낮췄다(게이트 배선분)." },
   { phase: 20, id: "N2", title: "Network ID와 schema 정본",
     detail: "NetworkObjectId·고정폭 type/field ID·tombstone registry와 replicated schema validation을 만든다. DDOL/scene transfer/destroy의 Bind·Rebind·Unbind 순서를 검증한다.",
     refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo",
-    note: "구간 A/C 분할 — ID 표기·tombstone·schema 검증기는 위임(A), Bind/Rebind/Unbind 호출 지점은 Scene.cpp(5,054줄) 접촉이라 사내(C). ComponentTypeUUID::kTable 32종이 리네임 불변 규율을 이미 갖고 있어 새로 만들지 말고 재료로 쓴다." },
-  { phase: 20, id: "N3", title: "Fixed Simulation Clock",
-    detail: "render clock과 simulation clock을 분리하고 accumulator/catch-up/pause/scene-switch 규칙을 Editor·Player·Server 공통 driver로 만든다.",
-    refs: "NetworkFrameworkPlan N3", priority: "P0", days: 4, status: "todo",
-    note: "구간 B(위임 불가) — 네트워크 작업이 아니라 게임플레이 변경이다. 착지점은 Runtime::TickSimulationFrame(RuntimeFrame.cpp 92줄, E3-7이 Editor/Player 공통으로 만들었다) 한 곳이지만 파급은 물리 스텝 수·C# SimulationScope.Delay·AI·회귀 세트 전체다. 설계 문서 §9대로 네트워크보다 먼저 독립 회귀로 닫는다." },
+    note: "담당자 전량 — ND-b의 ISceneEntityObserver 위에서 구현하므로 Scene.cpp를 열지 않는다(1판에서는 이 항목이 C 구간이었다). ComponentTypeUUID::kTable 32종이 리네임 불변 규율을 이미 갖고 있어 새로 만들지 말고 재료로 쓴다." },
+  { phase: 20, id: "N3-a", title: "관리 측 오버라이드 감지",
+    detail: "BehaviourRegistry가 _active 전체를 순회하며 빈 가상 호출과 람다를 겪는 구조를 마스크 기반으로 바꾼다. 네이티브 Lifecycle::MaskOfType<T>()가 선례이고, 관리 측은 타입당 1회 계산해 캐시한다.",
+    refs: "NetworkFrameworkPlan N3-a · §4.4", priority: "P0", days: 1, status: "todo",
+    note: "사내 · OnSimulationTick의 전제다. 지금도 낭비다 — override void PrePhysics는 0건인데 Behaviour 파생 28개를 매 프레임 순회한다. tick당 도는 훅을 감지 없이 더하면 30fps에서 프레임당 28→56회가 된다." },
+  { phase: 20, id: "N3-b", title: "Fixed Simulation Clock + OnSimulationTick",
+    detail: "render clock과 simulation clock을 분리하고 §4.4의 루프 안/밖 배치를 구현한다. 고정 축 전용 관리 훅 OnSimulationTick(fixedDelta)을 배선 6곳으로 신설하고, Scope.Tick을 고정 축으로 옮기며, OnTickCommitted 확장점을 같은 파일에서 함께 심는다.",
+    refs: "NetworkFrameworkPlan N3-b · §4.4", priority: "P0", days: 4, status: "todo",
+    note: "사내 · PHASE 20 위임 범위 밖 — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. ★ 2026-09-04 생명주기 실측으로 1판 설계를 정정했다: Initialization은 비동기 씬 활성화를 폴링하고 GameLogic은 UpdateRenderData로 끝나므로 둘 다 tick 루프에 못 들어간다. 기존 PrePhysics/PostPhysics도 프레임 축에 남긴다 — FlushAniEvents가 AnimatorSystem 결과에 의존하기 때문이다. override void PostPhysics 17건은 필요한 것부터 점진 이주하며 이주는 완료 조건이 아니다. ★ 작업량의 본체는 누산기가 아니라 CCT 등 스텝당 단위 저작값 재보정과 렌더 보간 신설(배관 0건)이다." },
   { phase: 20, id: "N4", title: "Loopback Transport와 메시지 프레이밍",
     detail: "message-oriented INetworkTransport, bounded reader/writer, handshake와 loss/reorder/duplicate/corruption simulator를 실제 socket 없이 완결한다.",
     refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo",
-    note: "구간 A(위임 가능) — 소켓 없는 메모리 어댑터라 값 in/값 out으로 닫힌다. 위임의 첫 후보이며 N3 없이 착수할 수 있다(snapshot의 tick 통합만 N3 뒤)." },
+    note: "담당자 전량 · ND-a 직후 첫 발주 — 소켓 없는 메모리 어댑터라 값 in/값 out으로 닫힌다. N3를 기다리지 않는다. 헤드리스 개발 하네스도 담당자가 소유한다." },
   { phase: 20, id: "N5", title: "Spawn/Despawn과 Full Snapshot",
     detail: "server-authoritative lifecycle과 immutable full snapshot, interpolation buffer를 Loopback 2-peer에서 검증한다. stale snapshot은 개체를 부활시키지 못해야 한다.",
     refs: "NetworkFrameworkPlan N5", priority: "P0", days: 5, status: "todo",
-    note: "구간 A/C 분할 — snapshot 값 구조와 인코더는 위임(A), tick 끝의 capture 호출 지점은 Scene/SceneManager 접촉이라 사내(C)." },
+    note: "담당자 전량 — N3가 심는 ISimulationFrameObserver::OnTickCommitted 위에서 capture하므로 tick 루프를 열지 않는다(1판에서는 이 항목이 C 구간이었다)." },
   { phase: 20, id: "N6", title: "Dirty Delta·Quantization·Interest",
     detail: "revision/dirty mask, acknowledged baseline, 실측 quantizer와 최소 interest grid로 full snapshot 대비 bytes/tick·encode·allocation을 줄인다.",
     refs: "NetworkFrameworkPlan N6", priority: "P1", days: 5, status: "todo",
-    note: "구간 A/C 분할 — delta·quantizer·interest 알고리즘은 위임(A), dirty를 만드는 쓰기 창구는 공유 파일이라 사내(C)." },
+    note: "담당자 전량 — ND-b의 IComponentWriteObserver 위에서 dirty를 받는다(1판에서는 이 항목이 C 구간이었다). 쓰기 배관은 X8 writer boundary로 이미 서 있어 새로 만들지 않는다." },
   { phase: 20, id: "N7", title: "실제 Transport A/B 판정과 adapter",
     detail: "동일 N6 workload로 GNS/ENet 후보를 비교하고 선택 근거를 기록한다. 구체 library API는 NetCore 경계 밖 adapter에 가둔다.",
     refs: "NetworkFrameworkPlan N7", priority: "P1", days: 3, status: "todo",
-    note: "구간 A(위임 가능) — INetworkTransport 뒤의 구현 교체다. 단 vcpkg.json 편집과 패키징 판정은 사내가 소유한다." },
+    note: "담당자 전량 — INetworkTransport 뒤의 구현 교체다. vcpkg.json 편집과 패키징 판정만 사내가 대행한다(의존 매니페스트는 저장소 소유)." },
   { phase: 20, id: "N8", title: "Client Prediction·Reconciliation (선택)",
     detail: "gameplay 요구가 확정될 때만 locally-owned movement를 tick-keyed history로 rewind/replay한다. 요구가 없으면 전체 완료 조건이 아니다.",
     refs: "NetworkFrameworkPlan N8", priority: "P2", days: 4, status: "stopped",
-    note: "구간 A(요구 확정 시 위임 가능) · 중단 — gameplay 요구가 확정되지 않았고 계획 원문도 전체 완료 조건에서 제외한다. locally-owned movement와 허용 오차가 제품 요구로 정해질 때 별도 슬라이스로 재개한다." },
+    note: "담당자 전량(요구 확정 시) · 중단 — gameplay 요구가 확정되지 않았고 계획 원문도 전체 완료 조건에서 제외한다. locally-owned movement와 허용 오차가 제품 요구로 정해질 때 별도 슬라이스로 재개한다." },
   { phase: 20, id: "N9", title: "Headless Server target (선택 제품)",
     detail: "Editor/ImGui/RenderCore/authoring parser 없이 cooked content와 공통 simulation tick으로 2-client smoke를 통과한다. 제품 요구가 있을 때 착수한다.",
     refs: "NetworkFrameworkPlan N9", priority: "P2", days: 5, status: "stopped",
-    note: "구간 B(사내) — .sln·vcxproj·링크 경계 수술이다. 중단 — dedicated/headless 제품 요구가 없으므로 현재 네트워크 기반의 완료 조건에서 제외한다. 서버 배포 모델과 운영 요구가 확정되면 새 제품 타깃으로 재개한다." },
+    note: "사내 — .sln·vcxproj·링크 경계 수술이다. 중단 — dedicated/headless 제품 요구가 없으므로 현재 네트워크 기반의 완료 조건에서 제외한다. 서버 배포 모델과 운영 요구가 확정되면 새 제품 타깃으로 재개한다." },
   { phase: 20, id: "N10", title: "Hardening·관측·soak",
     detail: "bounds/authority/rate limit, queue backpressure, disconnect/shutdown 순서, 장시간 soak와 운영 telemetry를 완결한다.",
     refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo",
-    note: "구간 A(위임 가능) — fuzz corpus와 soak 자동화는 독립 산출물이다." },
+    note: "담당자 전량 — fuzz corpus와 soak 자동화는 독립 산출물이다." },
 
   // ---------- PHASE 21: 에디터 워크스페이스·도킹·ViewportHost ----------
   { phase: 21, id: "W0", title: "관측 표면·기준선·실패 게이트",

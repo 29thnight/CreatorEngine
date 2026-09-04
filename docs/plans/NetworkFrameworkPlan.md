@@ -27,7 +27,11 @@ Simulation Tick, 네트워크 정체성, Replication, Transport adapter.
 4. **현재 타입명 기반 `typeID`도 wire에 쓰지 않는다.** 고정 폭의 명시적
    `NetComponentTypeId`, `NetMessageTypeId`, `NetFieldId`를 별도로 관리한다.
 5. **현재의 프레임당 1회 가변 `FixedUpdate`를 실제 고정 Simulation Tick으로
-   바꾼다.** Render frame과 Simulation tick을 분리한다.
+   바꾼다.** Render frame과 Simulation tick을 분리하고, **고정 축 전용 관리 훅
+   `OnSimulationTick`을 신설한다**(2026-09-04 결정 · §4.4). 기존 `PrePhysics`/
+   `PostPhysics`와 `GameLogic`은 프레임 축에 그대로 둔다 — 실측상 `GameLogic`은
+   `UpdateRenderData`로 끝나고 `Initialization`은 씬 활성화를 폴링하므로 tick 루프에
+   들어갈 수 없다.
 6. **Network Thread는 live Scene을 만지지 않는다.** 검증된 값 명령과 불변
    snapshot만 bounded queue로 교환한다.
 7. **상태와 사건을 분리한다.** 상태 snapshot은 unreliable/latest-wins,
@@ -39,6 +43,9 @@ Simulation Tick, 네트워크 정체성, Replication, Transport adapter.
    network는 tick·baseline·quantization·권한·상한 검증을 별도 계약으로 가진다.
 10. **리플렉션 메서드는 자동 RPC가 아니다.** RPC와 spawn 가능 타입은 명시적
     allowlist로 등록한다.
+11. **이 페이즈는 통째로 이양한다**(2026-09-04 결정 · §6). 사내는 확장점 3종과 계약
+    헤더를 한 번 세우고, N0·N2·N4·N5·N6·N7·N10은 담당자가 전량 소유한다. N3 고정
+    틱만 네트워크가 아닌 엔진 기반 작업이라 사내가 먼저 닫는다.
 
 ---
 
@@ -279,23 +286,110 @@ meta::field<&Self::m_health>.with(
 
 ### 4.4 실제 고정 Simulation Tick
 
+**결정(2026-09-04, 2판): 고정 축 전용 관리 훅 `OnSimulationTick(float fixedDelta)`을
+신설한다. 기존 `PrePhysics`/`PostPhysics`와 `GameLogic`은 프레임 축에 그대로 둔다.**
+
+1판은 "관리 틱을 고정 루프 안에"라고만 적고 `Initialization`과 `GameLogic`까지 루프
+안에 넣었다. **생명주기를 읽지 않고 Unity를 유추한 배치였고, 실측으로 틀렸음이
+드러났다.** 아래 표가 그 정정이다.
+
+#### 실측한 배치 (2026-09-04)
+
+| 호출 | 실제로 하는 일 | 배치 | 근거 |
+|---|---|---|---|
+| `SceneManagers->Initialization` | **비동기 씬 로딩 완료 폴링 → `ActivateScene`** + `DrainPendingLifecycle`(Awake/Start 드레인) | **밖** | tick 루프 안에서 활성 씬이 바뀌면 같은 프레임의 남은 tick이 다른 씬을 돈다 |
+| `SceneManagers->InputEvents` | 입력 샘플 | **밖** | 프레임 이벤트다. 30fps에서 두 tick이 같은 입력을 소비하는 것은 정상이며 §4.6의 "input은 server tick에 귀속"과 일치 |
+| `IsGamePaused`/`Pausing` | — | **밖** | 일시정지는 누산 자체를 멈춘다 |
+| `SceneManagers->Physics`<br>= `Scene::FixedUpdate` | AI future 회수 · `AllUpdateWorldMatrix(FixedUpdate)` · `SetInternalPhysicData` · `CharacterControllerSystems->FixedUpdate` · `PhysicsManagers->Update`(PhysX simulate) | **안** | 고정 스텝의 본체. CCT가 PhysX **앞**이어야 한다는 기존 순서 규약은 tick 안에서 그대로 성립한다 |
+| **`OnSimulationTick`(신설)** | C# 고정 축 훅 | **안 · 물리 뒤** | 게임 로직이 옮겨갈 자리(아래) |
+| `Scope.Tick` | `SimulationScope.Delay` 시간 진행 | **안**(이동) | "결정적 지연"을 표방하는데 프레임 dt로 흐르면 FPS에 따라 재개 tick이 달라져 표방이 거짓이 된다 |
+| `SceneManagers->GameLogic`<br>= `Scene::Update` + `LateUpdate` | Animator · Decal · Foliage · UITick · Sound · Camera 시스템, 그리고 **`UpdateRenderData()`** | **밖** | 표현 축이다. 루프 안에 넣으면 **프레임당 렌더 페이로드를 N번 만든다** |
+| `TickManagedPrePhysics`/`PostPhysics` | Flush 5종 + C# `PrePhysics`/`PostPhysics` | **밖 · 현 위치 유지** | `FlushAniEvents`가 `GameLogic` 안 `AnimatorSystem->Update`가 쌓은 Enter/Update/Exit에 의존한다. 루프로 옮기면 상태 머신이 돌기 전에 이벤트를 흘린다 |
+
 ```text
 Render frame
-  Time accumulation
-    while accumulator >= fixedDelta:
+  Initialization()                  ← 밖: 씬 활성화 폴링 포함
+  InputEvents(frameDelta)           ← 밖
+  if paused: Pausing(); return
+
+  accumulator += frameDelta
+  clamp(accumulator, catchUpMax)
+
+  while accumulator >= fixedDelta:
+      Scope.Tick(fixedDelta)              ← 결정적 지연은 고정 축
       Drain validated commands(tick)
-      Apply input/authority decisions
-      PrePhysics(fixedDelta)
-      Physics(fixedDelta)
-      PostPhysics/GameLogic(fixedDelta)
+      Physics(fixedDelta)                 ← Scene::FixedUpdate (PhysX)
+      FlushPhysicsEvents                  ← 이 tick의 충돌을 이 tick에서 보게
+      OnSimulationTick(fixedDelta)   ★    ← 신설 관리 훅
       Commit spawn/despawn
-      Capture replication snapshot(tick)
+      OnTickCommitted(tick, fixedDelta)   ← 확장점: replication snapshot capture
       tick++
+      accumulator -= fixedDelta
+
+  GameLogic(frameDelta)             ← 밖: Animator·UI·Sound·Camera·UpdateRenderData
+  TickManagedPostPhysics(frameDelta) ← 밖: 현 위치 유지
+  interpolationAlpha = accumulator / fixedDelta
   Render(interpolationAlpha)
 ```
 
-- fixed rate 값은 N3 계측에서 정하고 하드코딩하지 않는다.
-- pause, scene switch, time scale, long-frame catch-up 상한을 명시한다.
+#### 왜 기존 훅을 옮기지 않고 신설하는가
+
+2026-09-04 실측: `override void PrePhysics` **0건**, `override void PostPhysics`
+**17건**, `Behaviour` 파생 **28개**. 즉 **게임플레이 로직의 본체가 C#의 물리-뒤
+축에 있다.** 그것을 프레임 축에 두면 서버가 tick당 물리를 두 번 돌 때 스크립트
+판단은 한 번이라 서버와 클라이언트가 갈린다.
+
+그렇다고 `PostPhysics`를 통째로 루프 안으로 옮기면 위 표의 `FlushAniEvents` 의존이
+깨진다. **신설이 그 둘을 모두 피한다** — 17개를 한꺼번에 옮길 필요 없이 결정론이
+필요한 것부터 이주하고, 기존 순서 계약은 하나도 건드리지 않는다.
+
+| C# 훅 | 축 | 상태 |
+|---|---|---|
+| `PrePhysics(dt)` | 프레임 · 물리 앞 | 유지 (현재 오버라이드 0건) |
+| `PostPhysics(dt)` | 프레임 · 물리 뒤 | 유지 (현재 17건) |
+| **`OnSimulationTick(fixedDelta)`** | **고정 tick · 물리 뒤** | **신설.** 결정론이 필요한 로직이 여기로 이주한다 |
+
+**이름은 `FixedUpdate`로 하지 않는다.** `ClrHost.h`가 그 이름을 의도적으로 버렸다 —
+*옛 FixedUpdate/Update/LateUpdate 셋을 대체한다. 셋 다 실제로는 물리 뒤였고, **이름이
+그 사실을 감추고 있었다.*** 같은 이름을 되살리면 그 교훈이 무너진다.
+`OnSimulationTick`은 축을 이름에 드러낸다.
+
+#### 선행: 관리 측 오버라이드 감지
+
+`BehaviourRegistry`는 `_active` 전체를 순회하며 `Invoke(b, x => x.PrePhysics(dt), ...)`를
+부른다 — **오버라이드하지 않은 스크립트도 빈 가상 호출과 람다를 겪는다.** 지금도
+낭비다(`PrePhysics`는 오버라이드 0건인데 매 프레임 28회 돈다). 여기에 tick당 도는
+훅을 더하면 30fps에서 프레임당 56회가 된다.
+
+**그래서 오버라이드 감지를 `OnSimulationTick`보다 먼저 넣는다.** 네이티브에 선례가
+있다 — `Lifecycle::MaskOfType<T>()`가 `&T::Hook != &Component::Hook`으로 컴파일
+타임에 판정하고 `PhaseBits` 마스크를 세운다. 관리 측은 컴파일 타임이 아니므로
+**타입당 1회 계산해 캐시**한다(`GetType().GetMethod(...).DeclaringType != typeof(Behaviour)`,
+또는 기존 `ScriptCore.Generators/BehaviourGenerator`가 마스크를 생성). 어느 쪽이든
+디스패치는 마스크로 걸러진 목록만 순회한다.
+
+#### 배선 지점 6곳
+
+기존 `PrePhysics`/`PostPhysics`가 이미 밟은 길이므로 설계가 아니라 복제다.
+
+| # | 파일 | 내용 |
+|---|---|---|
+| 1 | `ScriptCore/Behaviour.cs` | `public virtual void OnSimulationTick(float fixedDelta) { }` |
+| 2 | `ScriptCore/BehaviourRegistry.cs` | 디스패치 루프(`PostPhysicsTick` 형태 복제, 마스크로 필터) |
+| 3 | `ScriptCore/Bootstrap.cs` | `[UnmanagedCallersOnly]` 진입점 |
+| 4 | `Engine/SceneRuntime/ClrHost.cpp` | `bind(L"SimulationTick", ...)` + 호출 래퍼 |
+| 5 | `Engine/SceneRuntime/ClrHost.h` | `TickFn m_fnSimulationTick` + 선언 |
+| 6 | `Engine/SceneRuntime/RuntimeFrame.cpp` | 고정 루프 안에서 호출 |
+
+#### 아직 정하지 않은 것
+
+- `fixedDelta` 값과 catch-up 상한은 N3 계측에서 정하고 하드코딩하지 않는다.
+- **물리 앞 고정 훅**(`OnSimulationPreTick`)은 만들지 않는다. 지금 `PrePhysics`
+  오버라이드가 0건이라 수요가 없다. 힘·입력을 tick당 적용하는 스크립트가 실제로
+  생기면 그때 같은 패턴으로 추가한다.
+- 관리 크로싱은 tick당 1회 늘어난다. `ClrHost.h`·`RuntimeFrame.cpp`의 규약 "스크립트가
+  몇 개든 **프레임당** 통과 횟수는 고정"은 "**축마다** 고정"으로 갱신한다 — 프레임 축
+  훅은 프레임당, 고정 축 훅은 tick당이며, 어느 쪽도 스크립트 수에 비례하지 않는다.
 - 네트워크 tick은 render frame number와 다른 타입을 쓴다.
 - dedicated server는 같은 tick driver를 render 없이 실행한다.
 - client는 snapshot interpolation buffer를 가지며, prediction은 N8 전에는 선택하지
@@ -424,19 +518,53 @@ gate를 실제로 붉게 만든다.
 **판정:** 서로 다른 두 Scene에서 같은 local index가 있어도 NetId resolve가 섞이지
 않고, stale/despawn ID가 fail-close하며, ID 중복 canary가 실패한다.
 
-### N3 — Fixed Simulation Clock
+### N3 — Fixed Simulation Clock (위임 대상 아님 · 사전 작업)
 
 **선행:** SceneGraph L5 완료(현재 충족). PHASE 19 T0과 hot zone 조정.
 
-- render clock과 simulation clock을 분리한다.
+**소유:** 사내. 이것은 네트워크 작업이 아니라 **게임플레이 변경**이며, PHASE 19
+물리와 PHASE 14 프로파일링도 같은 clock을 기다린다. PHASE 20 위임보다 **먼저**
+닫는다 — 닫히면 `SimulationTick.h`가 확정돼 계약 헤더 11종 중 10종을 동결할 수 있고,
+N5의 tick 통합 대기가 사라져 담당자가 N5를 온전히 받는다(§6).
+
+**N3-a — 관리 측 오버라이드 감지 (선행, 약 1일).** `BehaviourRegistry`가 `_active`
+전체를 순회하며 빈 가상 호출과 람다를 겪는 구조를 마스크 기반으로 바꾼다. 네이티브
+`Lifecycle::MaskOfType<T>()`가 선례이며, 관리 측은 타입당 1회 계산해 캐시한다.
+**이것이 먼저인 이유:** `OnSimulationTick`은 tick당 돌기 때문에 감지 없이 추가하면
+30fps에서 프레임당 순회가 28→56회가 된다. 지금도 `PrePhysics`는 오버라이드 0건인데
+매 프레임 28회 돈다.
+
+**N3-b — 고정 클럭과 `OnSimulationTick` (본체).**
+
+- render clock과 simulation clock을 분리하고 §4.4의 루프 안/밖 배치를 구현한다.
 - accumulator, catch-up 상한, pause/scene-switch/time-scale 규칙을 구현한다.
-- `PrePhysics → Physics → PostPhysics/GameLogic → replication capture` 순서를
-  Editor/Player/Server 공통 driver로 만든다.
-- C# `SimulationScope.Delay`와 managed crossing이 frame 횟수가 아니라 simulation
-  tick 계약과 일치하는지 골든을 추가한다.
+- **`OnSimulationTick(float fixedDelta)`을 §4.4의 배선 6곳으로 신설한다.** 기존
+  `PrePhysics`/`PostPhysics`는 프레임 축에 그대로 둔다 — 통째로 옮기면
+  `FlushAniEvents`가 `AnimatorSystem` 결과에 거는 의존이 깨진다.
+- `Scope.Tick`을 고정 축으로 옮긴다. `SimulationScope.Delay`가 표방하는 "결정적
+  지연"은 고정 dt로 흘러야 성립한다.
+- **`ISimulationFrameObserver::OnTickCommitted(tick, fixedDelta)` 확장점을 같이
+  심는다.** N5의 snapshot capture가 여기 붙는다. 자리가 같은 파일
+  (`RuntimeFrame.cpp`)이라 따로 열지 않는다.
+- C# `SimulationScope.Delay`와 managed crossing이 §4.4의 tick 계약과 일치하는지
+  골든을 추가한다.
+
+**2026-09-04 실측 — 파급 재산정.** 이 문서의 이전 서술("파급이 회귀 세트 전체")은
+과했다. 실제로는 다음과 같다.
+
+| 위험 후보 | 실측 | 판정 |
+|---|---|---|
+| 회귀 게이트의 프레임 수 단정 | `Tools/regression`에서 프레임 **수**를 단정하는 게이트 **0건**. 유일한 프레임 상수는 Player smoke의 `frameLimit`인데 종료 조건이지 판정이 아니다 | 낮음 |
+| C# `SimulationScope.Delay` | 프레임 횟수가 아니라 **초 누적**이다(`Remaining = seconds`를 엔진 dt로 깎는다). 총 경과 시간이 보존된다 | 낮음 |
+| **물리 저작값** | PhysX가 지금은 프레임당 1회 가변 dt로 돌고 그 위에서 값이 튜닝돼 있다. 특히 **CCT 이동값이 "스텝당 단위"**라(PhysicsRedesignPlan 함정) 스텝 수가 바뀌면 이동 속도가 그대로 바뀐다 — 60fps에서 1스텝, 30fps에서 2스텝 | **높음. N3 작업량의 본체는 누산기가 아니라 이 재보정이다** |
+| **렌더 보간 부재** | §4.4가 적은 `Render(interpolationAlpha)` 배관이 현재 0건 | **높음. 없으면 고정 틱 도입 즉시 화면이 떤다(60Hz tick / 144Hz 렌더)** |
+| 관리 크로싱 횟수 | §4.4 2판 결정으로 **tick당 1회 추가**(`OnSimulationTick`). 기존 Pre/PostPhysics는 프레임 축이라 늘지 않는다 | 중간. N3-a의 오버라이드 감지가 순회 비용을 먼저 낮춘다 |
+| C# 로직 이주 | `override void PostPhysics` 17건이 결정론 대상 후보다. 한꺼번에 옮기지 않고 필요한 것부터 `OnSimulationTick`으로 이주한다 | 중간. 이주는 N3 완료 조건이 아니다 |
 
 **판정:** 가변 render FPS에서 같은 입력 tick 수와 물리 step 수가 나오며, 한 프레임
-stall 뒤 catch-up 상한과 drop/debt 계수가 예상값과 일치한다.
+stall 뒤 catch-up 상한과 drop/debt 계수가 예상값과 일치한다. 추가로 CCT를 포함한
+이동 저작값이 30/60/144fps에서 같은 궤적을 그리고, `interpolationAlpha` 적용 뒤
+시각적 떨림이 없다.
 
 ### N4 — Loopback Transport와 메시지 프레이밍
 
@@ -532,263 +660,214 @@ corrupt corpus crash 0.
 
 ### 5.1 순서 요약
 
-```text
-PHASE 17 D3-a/D3-b/D4 ─► N1 ─► N2 ─► N4(loopback) ─┐
-                                    └───────────────┼─► N5 ─► N6 ─► N7 ─► N9/N10
-SceneGraph L5 ─────────────────► N3 ────────────────┘
+선행이던 PHASE 17 D3-a/D3-b/D4와 SceneGraph L5는 **모두 완료**다(§1). 남은 순서는
+이양 경계(§6)가 정한다.
 
-N8(prediction)는 N3+N5 뒤 gameplay 요구가 있을 때만
+```text
+사내 1회                                    담당자 전량
+──────────────────────────────────────────────────────────
+ND-a 계약 6종 + 경계 게이트 ─┬───────────► N4(loopback)  ← 첫 발주
+                             └───────────► N0(telemetry)
+N3-a 오버라이드 감지
+  └ N3-b 고정 틱 + OnSimulationTick
+        + OnTickCommitted ─ 헤더 7 동결 ──► N5
+                       (N0 실측으로 헤더 8·9·10 동결)
+ND-b 확장점 2종 ─────────────────────────► N2 · N6 · N7 · N10
+                                            ── 이후 접점 없음 ──
+
+N1은 게이트 배선 잔여(사내). N8/N9는 제품 요구가 있을 때만.
 ```
 
-N0는 즉시 가능하다. N2와 N3도 담당 파일이 겹치지 않으면 병행할 수 있다. N7에서
-실제 외부 네트워크 라이브러리를 추가하기 전까지는 dependency manifest를 늘리지 않는다.
+세 사내 단계는 순차로 볼 필요가 없다 — ND-a가 끝나면 담당자가 N4로 4일을 쓰는 동안
+사내가 N3를 진행한다. 담당자가 대기하는 구간이 없다. N7에서 실제 외부 네트워크
+라이브러리를 추가하기 전까지는 dependency manifest를 늘리지 않는다.
 
 ---
 
-## 6. 인터페이스 계약과 소유권 분할
+## 6. 이양 경계 — 인터페이스 계약과 확장점
 
-작성: 2026-09-04 · 목적: 이 계획의 일부를 **저장소 주 개발자가 아닌 다른 개발자가
-담당**할 수 있도록, 위임 가능한 경계와 위임할 수 없는 경계를 실측으로 가른다.
+작성: 2026-09-04 · 개정: 2026-09-04(2판) · 목적: PHASE 20을 **다른 개발자에게 통째로
+넘기기 위한** 경계를 정한다.
 
-이 절은 새 슬라이스를 추가하지 않는다. N0~N10의 소유권만 나눈다.
+**초판은 목표를 잘못 잡았다.** 슬라이스를 A(위임 가능)/B(사내)/C(계약은 사내,
+알고리즘만 위임) 세 구간으로 갈랐는데, C가 있는 한 담당자는 매번 사내 작업을
+기다린다. 그것은 이양이 아니라 영구 분업이다. 2판은 구간을 **둘**로 줄인다 —
+**사내가 한 번 세우는 것**과 **담당자가 전부 소유하는 것**.
 
-### 6.1 전제 — §1 기준선은 이미 낡았다
+### 6.1 전제 — §1 기준선은 갱신 완료다
 
-§1은 2026-08-22 실측이고, 그 뒤 PHASE 17 D3-a/D3-b/D4가 완료되면서 이 계획의
-선행 조건 상당수가 이미 충족됐다. 위임 범위를 §1로 산정하면 **없는 일을 발주하게
-된다.** 2026-09-04 재실측:
+§1은 2026-09-04에 재실측으로 갱신했다. 요지: PHASE 17 D3/D4가 닫히면서 N1의 판정
+조건이 이미 참이고, `Runtime::TickSimulationFrame`이 시뮬레이션 순서의 단일
+소유자이며, `ComponentTypeUUID`가 tombstone 규율을 이미 갖고 있다. 이후 §1이 다시
+낡으면 같은 규칙을 적용한다 — 재실측 전에는 어떤 슬라이스도 발주하지 않는다.
 
-| 항목 | §1 (2026-08-22) | 재실측 (2026-09-04) | 영향 |
+### 6.2 완전 이양의 조건
+
+담당자가 **공유 파일을 한 번도 건드리지 않고** PHASE 20의 모든 슬라이스를 끝낼 수
+있어야 한다. 그러려면 두 종류의 경계가 필요하며, 둘은 방향이 반대다.
+
+| | 방향 | 이 계획에서 |
+|---|---|---|
+| **인터페이스** | 담당자 코드가 엔진을 **부른다** | 6.4의 계약 헤더 |
+| **확장점** | 엔진이 담당자 코드를 **부른다** | 6.3의 관찰자 3종 |
+
+초판이 놓친 것은 두 번째다. 인터페이스만 주면 담당자는 "언제 무엇이 일어났는지"를
+알 수 없어 결국 `Scene.cpp`에 자기 호출을 심어야 한다 — 그것이 C 구간의 정체였다.
+**C는 지속적 협업이 아니라 확장점 부재였다.**
+
+### 6.3 확장점 3종 — 붙일 자리는 이미 다 있다
+
+2026-09-04 실측. 셋 다 새로 설계할 것이 아니라 **기존 단일점에 관찰자를 붙이는**
+일이다.
+
+| 확장점 | 붙일 자리 | 실측 근거 | 소유 |
 |---|---|---|---|
-| `YAML::`/`MetaYml::`/yaml-cpp 소비 | 43파일 · 268건 | **17파일 · 31건** | N1 대폭 축소 |
-| `nlohmann::json` 소비 | 16파일 · 44건 | **0** | PHASE 17 D4가 은퇴 |
-| `ComponentFactory::LoadComponent` 인자 | `MetaYml::detail::iterator_value` | **`Authoring::NodeView`** | N1 목표 달성 |
-| `Entity.h`의 yaml-cpp include | 있음 | **0건**(주석 언급만) | N1 목표 달성 |
-| 시뮬레이션 틱 드라이버 | Player/Editor가 각자 소유 | **`Runtime::TickSimulationFrame` 단일 정본**(`Engine/SceneRuntime/RuntimeFrame.cpp`, 92줄, E3-7) | N3 착지점이 1파일 |
-| `EntityHandle` | 슬롯 정체성만 언급 | `{sceneId,index,generation}` + `Scene::Resolve` 존재 | N2 선행 충족 |
-| `MetaSchema`의 `.with(...)` | 확장점 존재 | consteval 가변 인자(633줄) | N2 속성은 **순수 추가** |
-| EngineLayerSeparation E6 | 미완 | **완료**(2026-08-24) | N9 선행 하나 충족 |
-| PHASE 20 진행 | 신설 | 대시보드 N0~N10 전부 `todo` | 미착수 |
+| `ISimulationFrameObserver`<br>`OnTickCommitted(tick, fixedDelta)` | `Runtime::TickSimulationFrame` | 92줄 단일 정본이고 Editor·Player가 같은 함수를 탄다(E3-7) | **N3에 얹는다** — 같은 파일이라 따로 열지 않는다 |
+| `ISceneEntityObserver`<br>`OnEntityBound`/`Rebound`/`Unbound` | `Scene::AllocateSlot` · `ReleaseSlot` | 슬롯 수명 단일점. 호출부 13건이 **전부 `Scene.cpp`/`Entity.cpp` 내부**이고 외부 호출 0. DDOL 이송도 `DetachEntityHierarchy`가 "BFS+슬롯 해제 단일점"이라고 주석에 명시 | **ND-b** |
+| `IComponentWriteObserver`<br>`OnComponentFieldWritten(...)` | `Component::OnPropertyChanged(name, source)` | **"X8 writer boundary"가 이미 서 있다.** 주석 그대로 — *리플렉션 기반 필드는 이 훅을 상속하고, 명시 setter는 `PublishRenderProxyDirty`를 직접 부른다.* 소비자 39건 | **ND-b** |
 
-**판정:** N1은 실질적으로 완료 상태에 가깝고, 남은 것은 잔여 확인 게이트다.
-§1은 2026-09-04에 이 재실측으로 갱신 완료했다. 이후 §1이 다시 낡으면 같은 규칙을
-적용한다 — 재실측 전에는 어떤 슬라이스도 발주하지 않는다.
-
-### 6.2 분할 기준
-
-슬라이스 하나를 위임할 수 있는지는 세 질문으로 판정한다. 셋 다 참일 때만 위임한다.
-
-1. **값 경계에서 닫히는가.** 입력과 출력이 값 타입이고 live Scene·RHI·Editor 상태를
-   읽지 않는가. 이 저장소에는 이미 그 형태의 선례가 있다 —
-   `RHIAssetEvictionPolicy.h`는 값 구조체와 순수 판정 함수만으로 정책을 소유하고
-   device를 모른다. 위임 가능한 슬라이스는 전부 이 형태여야 한다.
-2. **검증을 담당자가 스스로 돌릴 수 있는가.** 판정이 Editor 전체 빌드에 묶여 있으면
-   위임이 아니라 병목 이전이다. 이 질문은 두 시점으로 갈린다 — 담당자의 **개발
-   루프**는 자기 하네스로 굴려도 되지만, 사내의 **인수 판정**은 ND-b가 세운
-   헤드리스 게이트로만 한다(6.5).
-3. **공유 대형 파일을 건드리지 않는가.** 6.6의 접촉 금지 목록에 편집이 필요하면
-   위임 대상이 아니다.
-
-이 기준은 "네트워크 지식이 필요한가"가 아니다. 난이도가 아니라 **경계**로 가른다.
-
-### 6.3 슬라이스별 소유 판정
-
-| 슬라이스 | 구간 | 소유 | 사유 |
-|---|---|---|---|
-| ND-a 계약 헤더 6종 동결·변경 절차 | **B** | 사내 | 발주의 전제. 계약을 위임하면 헤더가 구현을 따라간다 |
-| ND-b 헤드리스 호스트·인수 게이트 | **B** | 사내 | 인수의 전제. 발주와 병행하되 완료 기록 전에는 선다 |
-| N0 기준선·telemetry 값 타입 | **A** | 위임 가능 | 계측 구조체와 금지 타입 게이트는 값·정적 검사 |
-| N1 Archive·Parser 경계 밀봉 | **B** | 사내 | 6.1대로 실질 완료. 잔여는 게이트 확인이라 발주 단위가 아님 |
-| N2 wire ID·registry·schema 검증 | **A/C** | 분할 | ID 표기·tombstone·schema 검증기는 위임(A). `Bind/Rebind/Unbind` 호출 지점은 `Scene.cpp` 접촉이라 사내(C) |
-| N3 Fixed Simulation Clock | **B** | **사내 필수** | 네트워크 작업이 아니라 게임플레이 변경이다. §9가 이미 "N3는 네트워크보다 먼저 독립 회귀로 닫는다"고 적었다. PhysX 스텝·CLR 크로싱·C# `SimulationScope.Delay` 계약이 전부 걸린다 |
-| N4 Loopback·프레이밍·loss simulator | **A** | 위임 가능 | 소켓 없는 메모리 어댑터. 값 in/값 out의 교과서적 형태 |
-| N5 spawn/despawn·full snapshot | **A/C** | 분할 | snapshot 값 구조와 인코더는 위임(A). tick 끝의 capture 호출 지점은 사내(C) |
-| N6 delta·quantization·interest | **A/C** | 분할 | 알고리즘은 위임(A). dirty를 만드는 **쓰기 창구**는 공유 파일이라 사내(C) |
-| N7 Transport 결정·adapter | **A** | 위임 가능 | `INetworkTransport` 뒤의 구현 교체. 단 vcpkg 매니페스트 편집은 사내 |
-| N8 prediction (선택) | **A** | 위임 가능 | 요구가 확정된 뒤에만 |
-| N9 Headless Server target | **B** | 사내 | `.sln`·`.vcxproj`·링크 경계 수술 |
-| N10 hardening·fuzz·soak | **A** | 위임 가능 | corpus와 자동화는 독립 산출물 |
-
-구간 정의 — **A**: 신규 파일만으로 닫히는 위임 가능 슬라이스. **B**: 사내가 먼저
-닫아야 하는 슬라이스. **C**: 계약은 사내가 쓰고 알고리즘만 위임하는 공동 슬라이스.
+세 번째가 특히 크다. N6의 "매 tick 전체 리플렉션 비교를 없애고 쓰기 시점 dirty로"가
+이 계획에서 가장 무거운 항목인데, **그 배관이 이미 렌더 프록시용으로 서 있다.**
+남은 일은 그 채널을 렌더 전용 의미론에서 일반 관찰자로 넓히는 것이다 — 현재
+`ProxyDirty`가 렌더 프록시 레지스트리에 묶여 있어 **설계 확인이 필요하고, 이것이
+ND-b의 실제 난이도다.**
 
 ### 6.4 동결 계약 헤더
 
-아래 헤더는 **사내가 작성해 동결**한다(계약 소유는 예외 없이 사내다). 위임 담당자는
-이 헤더를 수정하지 않고 구현만 제출한다. 헤더 변경이 필요하면 6.5의 계약 변경
-절차를 탄다.
+계약 소유는 예외 없이 사내다. 담당자는 이 헤더를 수정하지 않고 구현만 제출한다.
+변경이 필요하면 6.6의 계약 변경 절차를 탄다.
 
-**11종을 한 번에 동결하지 않는다.** 헤더의 비용은 타이핑이 아니라 담기는 결정인데,
-quantizer 표현·snapshot 값 배치·backpressure 임계는 N0 계측 전에 정하면 추정을
-계약으로 굳히는 것이 된다. "동결 시점" 열이 그 판정이며, **ND-a는 6종만 세운다.**
+**N3가 먼저 닫히면 11종 중 10종을 동결할 수 있다.** 남는 하나는 권한 요구가
+정한다.
 
 | # | 헤더 | 소유하는 정책 | 동결 시점 | 구현 |
 |---|---|---|---|---|
 | 1 | `NetWireIds.h` | `NetworkObjectId`·`NetComponentTypeId`·`NetMessageTypeId`·`NetFieldId` 고정폭 표기와 tombstone 표 | **ND-a** | 사내 |
-| 2 | `INetworkTransport.h` | message-oriented send/recv, lane, 연결 상태, 통계 | **ND-a** | **위임**(Loopback·GNS·ENet) |
+| 2 | `INetworkTransport.h` | message-oriented send/recv, lane, 연결 상태, 통계 | **ND-a** | **위임** |
 | 3 | `NetProtocolHeader.h` + bounded reader/writer | §4.7 헤더 필드, 고정폭·endian 명시 | **ND-a** | **위임** |
-| 4 | `INetChannelPolicy.h` | §4.6 전송 정책 표의 코드화 — 종류 → reliability/lane 매핑 | **ND-a** | **위임** |
+| 4 | `INetChannelPolicy.h` | §4.6 전송 정책 표의 코드화 | **ND-a** | **위임** |
 | 5 | `INetTelemetrySink.h` | enqueued/applied/dropped/pending/invalid/unauthorized 계수 | **ND-a** | **위임** |
-| 6 | `INetworkEntityRegistry.h` | `Bind`/`Rebind`/`Unbind`/`Resolve` 순서 계약 | **ND-a** | 사내 |
-| 7 | `NetReplicationPolicy.h` | replication condition(everyone/owner/relevant/initial-only), quantizer, interpolation, validation bounds. **값 in/값 out 순수 함수** | N0 계측 뒤 | **위임** |
-| 8 | `ReplicationSnapshot.h` | 불변 snapshot 값 구조. 포인터·`EntityHandle`·`ryml::NodeRef` 금지 | N0 계측 뒤 | 인코더 **위임** |
-| 9 | `INetCommandSink.h` | 검증된 inbound 값 명령과 backpressure 정책 | N0 계측 뒤 | **위임** |
-| 10 | `SimulationTick.h` | render frame과 **다른 타입**의 tick, `ISimulationClock` | N3 뒤 | 사내(N3) |
+| 6 | `INetworkEntityRegistry.h` | `Bind`/`Rebind`/`Unbind`/`Resolve` 순서 계약 | **ND-a** | **위임**(6.3의 관찰자 위에서) |
+| 7 | `SimulationTick.h` | render frame과 **다른 타입**의 tick, `ISimulationClock` | **N3 완료 시** | 사내(N3) |
+| 8 | `NetReplicationPolicy.h` | replication condition, quantizer, interpolation, validation bounds. **값 in/값 out 순수 함수** | N0 계측 뒤 | **위임** |
+| 9 | `ReplicationSnapshot.h` | 불변 snapshot 값 구조. 포인터·`EntityHandle`·`ryml::NodeRef` 금지 | N0 계측 뒤 | **위임** |
+| 10 | `INetCommandSink.h` | 검증된 inbound 값 명령과 backpressure 정책 | N0 계측 뒤 | **위임** |
 | 11 | `INetAuthorityPolicy.h` | RPC·spawn allowlist와 권한 판정 | 권한 요구 확정 뒤 | **위임** |
 
-앞 6종이 서면 **N4(Loopback)를 즉시 발주할 수 있다** — 2·3·4·5가 N4의 입출력을
-전부 덮고, N4는 소켓도 Scene도 만지지 않는다.
+8~10을 미리 동결하지 않는 이유는 quantizer 표현·snapshot 배치·backpressure 임계가
+N0 계측 전에는 추정이기 때문이다. **추정을 계약으로 굳히지 않는다.** 다만 N0 자체를
+담당자에게 맡기므로, 그 결과를 받아 사내가 동결한다.
 
 `meta::replicated(id, quantizer, condition)` 속성은 `MetaSchema.h`의 기존
-`.with(...)`에 **순수 추가**로 붙는다 — 기존 소비자의 재컴파일 외에 의미 변경이
-없다. 이 성질이 N2 위임 가능성의 핵심 근거다. 반대로 속성을 매크로로 도입하면
-PHASE 18이 없앤 매크로 0종을 되돌리므로 금지한다.
+`.with(...)`에 **순수 추가**로 붙는다 — `.with`가 consteval 가변 인자라 기존 소비자의
+의미가 바뀌지 않는다. 반대로 속성을 매크로로 도입하면 PHASE 18이 없앤 매크로 0종을
+되돌리므로 금지한다.
 
-### 6.5 위임 준비 — ND-a와 ND-b
+### 6.5 이양 경계표
 
-이 절의 초판은 인프라 3종을 모두 "위임 전 필수"로 못박았다. 그것은 과했다.
-**인수 게이트가 필요한 시점은 발주 시점이 아니라 인수 시점이다.** 담당자가 코드를
-쓰는 동안 사내가 인수 창구를 만들면 되고, 그러면 위임 착수가 나흘 앞당겨진다.
-그래서 준비를 둘로 나눈다.
+| | 사내 (1회, 그 뒤 접점 없음) | 담당자 (전량 소유) |
+|---|---|---|
+| 슬라이스 | **N3-a · N3-b**(사전 작업 · 위임 대상 아님) · **N1**(게이트 배선 잔여) | **N0 · N2 · N4 · N5 · N6 · N7 · N10 전 구간** |
+| 경계 | 확장점 3종(6.3) · 계약 헤더(6.4) | 그 뒤에서의 모든 구현 |
+| 하네스 | — | 자기 개발 하네스와 헤드리스 호스트 |
+| 게이트 | 계약 위반 자동 검출 1종 | 기능 게이트 전부 |
+| 링크 | `SceneRuntime`이 렌더 없이 서는지 보장 | — |
 
-| | 내용 | 공수 | 성격 |
+**초판과 달라진 것 셋.**
+
+1. **C 구간이 사라졌다.** 확장점 3종이 서면 N2·N5·N6가 전부 담당자 소유가 된다.
+2. **헤드리스 테스트 호스트를 담당자에게 넘긴다.** 그것은 담당자의 개발 루프이므로
+   담당자가 만드는 편이 자연스럽다. 사내는 `SceneRuntime`이 렌더 장치 없이
+   링크되는지만 보장한다 — 실측상 `Engine/SceneRuntime`이 RenderEngine·DirectX를
+   참조하는 파일은 헤더 5개(구현 포함 15개)뿐이고, `Tools/AssetCooker`가 Console
+   Application 선례를 이미 갖고 있다.
+3. **N3를 PHASE 20 위임 범위에서 뺀다.** 고정 틱은 네트워크 요구가 아니라 엔진
+   기반이고 PHASE 19·14도 같은 clock을 기다린다. 사내가 먼저 닫는다.
+
+### 6.6 사내 1회 선행 — ND-a와 ND-b
+
+| | 내용 | 공수 | 여는 것 |
 |---|---|---:|---|
-| **ND-a** | 지금 동결 가능한 계약 헤더 6종 + 계약 변경 절차 | **1일** | 발주의 전제 |
-| **ND-b** | 헤드리스 `NetTests.exe` + `verify-net-*` 게이트 3종 | **3일** | 인수의 전제 · 발주와 **병행** |
+| **ND-a** | 계약 헤더 6종 동결 + 계약 변경 절차 + 경계 게이트 1종 | **2일** | **N4 발주** |
+| **N3-a** | 관리 측 오버라이드 감지 (`OnSimulationTick`의 전제) | 1일 | — |
+| **N3-b** | 고정 틱 + `OnSimulationTick` + `OnTickCommitted` 확장점 | 4일 | 헤더 7번 동결 · **N5 발주** |
+| **ND-b** | 확장점 2종(엔티티 수명 · 쓰기 dirty) | **2.5일** | **N2 · N6 발주 = 전량 이양** |
 
-공수 근거: 이 저장소의 기존 인터페이스·정책 헤더는 19~429줄이고 중앙값이 약
-160줄이며 절반 이상이 주석이다(`EntityHandle.h`는 61줄 중 40줄이 주석). 6종이면
-600~1,000줄 규모라 작성 자체는 하루다. 게이트는 1종당 반나절이 이 저장소의
-관행이고, 헤드리스 호스트는 `Tools/AssetCooker` 선례 복제에 링크 경계 정리가
-붙는다. **이 숫자들은 여전히 추정이며 ND-a 착수 뒤 실측으로 갱신한다.**
+공수 근거: 이 저장소의 기존 인터페이스·정책 헤더는 19~429줄이고 중앙값이 약 160줄,
+절반 이상이 주석이다(`EntityHandle.h`는 61줄 중 40줄이 주석). 확장점 2종은 자리가
+이미 있어 훅 삽입 자체는 싸지만, `ProxyDirty`의 렌더 전용 의미론을 넓히는 설계가
+ND-b 공수의 대부분이다. **여전히 추정이며 착수 뒤 실측으로 갱신한다.**
 
-#### ND-a — 계약 헤더 동결과 변경 절차 (1일)
+**경계 게이트(ND-a) — 사내가 소유하는 단 하나의 게이트.**
+`verify-net-wire-boundary`가 wire 구조체에 `size_t`·포인터·`EntityHandle`·STL ABI
+컨테이너·yaml/json 타입이 들어오면 붉어진다. 금지 타입 canary를 함께 두고 **변이로
+이빨을 증명한 뒤** `run-all.ps1`에 배선한다. 세트에 없는 게이트는 없는 것과 같다.
+기능 게이트(loopback correctness, ID lifecycle 등)는 담당자가 소유한다.
 
-6.4의 11종을 한 번에 동결하지 않는다. 헤더의 진짜 비용은 타이핑이 아니라 **결정**인데,
-그중 일부는 지금 근거가 없다. 6.4 표의 "동결 시점" 열이 그 판정이다.
-
-- **지금 동결(6종)** — `NetWireIds.h`, `INetworkTransport.h`, `NetProtocolHeader.h`,
-  `INetTelemetrySink.h`, `INetChannelPolicy.h`, `INetworkEntityRegistry.h`.
-  이 여섯이 서면 **N4(Loopback)를 즉시 발주할 수 있다.** N4는 소켓 없는 순수
-  로직이라 담당자가 자기 개발 루프를 스스로 굴릴 수 있고, transport 인터페이스와
-  헤더 프레이밍만 있으면 시작된다.
-- **나중 동결(5종)** — quantizer 표현·snapshot 값 배치·backpressure 임계는 N0 계측
-  전에 정하면 추정을 계약으로 굳히는 것이다. tick 타입은 N3가, allowlist는 권한
-  요구가 정한다.
-
-계약 변경 절차도 여기서 문서로 고정한다. wire ID는 리네임 하나가 프로토콜
-파손이다(§9).
+**계약 변경 절차.** wire ID는 리네임 하나가 프로토콜 파손이다(§9).
 
 - 6.4 헤더 수정은 사내 승인 없이 하지 않는다.
 - `NetFieldId`·`Net*TypeId`는 삭제 후 재사용하지 않고 tombstone에 남긴다.
 - tombstone 표는 이 계획 문서가 소유하며 코드 주석이 정본이 아니다.
 
-#### ND-b — 헤드리스 인수 창구와 게이트 (3일, N4 발주와 병행)
-
-**헤드리스 테스트 호스트는 현재 0이다.**
-
-- vcpkg 매니페스트에 단위 테스트 프레임워크가 없다(gtest·catch2·doctest 0).
-- `Editor/RenderTests`는 Editor에 링크되는 `StaticLibrary`라 독립 실행이 아니다.
-- `Tools/regression/run-all.ps1`의 verify 호출 84건 중 **50건이 Editor/Player exe를
-  인자로 받는다.** 나머지 34건은 정적 소스 검사이거나 AssetCooker 계열이다.
-
-즉 지금 구조에서는 Loopback 테스트 하나를 **사내가** 돌리는 데에도 vcpkg + 그래픽
-SDK + CoreCLR + Editor 전체 빌드가 필요하다. 담당자에게 이 진입 비용을 그대로
-지우면 첫 주가 빌드 싸움으로 사라진다 — 그래서 병행하되 **인수 전에는 반드시
-선다.**
-
-**선례는 있다.** `Tools/AssetCooker`가 `ConfigurationType=Application` ·
-`SubSystem=Console`이고 RenderEngine과 Utility_Framework만 참조한다. 또한
-`Engine/SceneRuntime`이 RenderEngine·DirectX를 참조하는 파일은 헤더 5개(구현 포함
-15개)뿐이라 분리가 현실적이다.
-
-→ `NetTests.exe`(Console Application, SceneRuntime 링크, 렌더 장치 없음).
-
-**인수 게이트 최소 3종.** 이 저장소의 반복된 실패 양식은 "게이트 없이 받은 완료"가
-눈먼 초록이었다는 것이다.
-
-- `verify-net-wire-boundary` — wire 구조체에 `size_t`·포인터·`EntityHandle`·
-  STL ABI 컨테이너·yaml/json 타입이 들어오면 붉어진다. 금지 타입 canary를 함께 둔다.
-- `verify-net-loopback-correctness` — loss/reorder/duplicate 조건에서 reliable
-  control과 unreliable latest-wins의 차이를 판정한다.
-- `verify-net-id-lifecycle` — 서로 다른 두 Scene의 같은 local index, stale/despawn
-  ID fail-close, ID 중복 canary.
-
-각 게이트는 **변이로 이빨을 증명한 뒤** 도는 세트(`run-all.ps1`)에 배선한다. 세트에
-없는 게이트는 없는 것과 같다.
-
-**판정:** ND-b가 서지 않은 상태에서 위임 산출물을 "완료"로 기록하지 않는다.
-담당자가 자기 하네스로 낸 초록은 개발 신호이지 인수 판정이 아니다.
-
-### 6.6 접촉 금지 파일과 우회 경로
-
-아래는 규모가 크고 다른 트랙이 동시에 편집하는 파일이다. 위임 담당자는 편집하지
-않는다.
-
-| 파일 | 규모 | 필요해지는 슬라이스 | 우회 |
-|---|---|---:|---|
-| `Engine/SceneRuntime/Scene.cpp` | 5,054줄 | N2 Bind/Rebind, N5 | 사내가 호출 지점만 심고, 담당자는 6.4의 인터페이스 뒤에서 구현 |
-| `Engine/SceneRuntime/SceneManager.cpp` | 2,039줄 | N3, N5 | 사내 |
-| `Engine/SceneRuntime/RuntimeFrame.cpp` | 92줄 | N3 | 사내(작지만 게임플레이 계약의 단일 소유자) |
-| `Editor/EngineEntry/ConsoleCommandSystem.cpp` | 12,109줄 | 관측 커맨드 | `net.*` 커맨드를 **별도 파일**로 분리해 담당자에게 넘긴다 |
-| `CreatorEngine.sln` · `*.vcxproj` | 프로젝트 15 | N7 의존 추가, N9 | 사내 |
-| `vcpkg.json` | — | N7 | 사내 |
-
-관측 커맨드 분리는 위임과 무관하게 이득이다 — 지금은 관측 표면 전체가 한 파일에
-있어 어떤 트랙이든 같은 지점에서 충돌한다.
-
-### 6.7 위임 착수 순서
+### 6.7 착수 순서
 
 ```text
-사내                                                위임
-──────────────────────────────────────────────────────────────────────
-§1 기준선 갱신(6.1) ─ 완료(2026-09-04)
-  │
-  └─ ND-a 계약 헤더 6종 동결 + 변경 절차 (1일)
-        ├──────────────────────────────────────────► N4 Loopback  ◄ 발주 지점
-        │                                              (담당자 자기 하네스로 개발)
-        ├─ ND-b NetTests.exe + verify-net-* (3일) ─── 병행 · 인수 전 완료
-        │
-        ├─ N0 telemetry (사내 또는 위임)
-        │     └─ 헤더 3종 추가 동결(7·8·9) ─────────► N5 인코더 / N6
-        │
-        └─ N3 Fixed Clock (독립 회귀로 먼저 닫음)
-              └─ N2 Bind 호출 지점 ─────────────────► N2 검증기 / N7 / N10
+사내 (1회)                                    담당자 (전량)
+──────────────────────────────────────────────────────────────
+ND-a 계약 6종 + 경계 게이트 (2일)
+   └───────────────────────────────────────► N4 Loopback
+                                             N0 telemetry
+N3-a 오버라이드 감지 (1일)
+   └─ N3-b 고정 틱 + OnSimulationTick + OnTickCommitted (4일)
+         └─ SimulationTick.h 동결 ──────────► N5 spawn/snapshot
+                                             (N0 결과로 헤더 8·9·10 동결)
+ND-b 확장점 2종 (2.5일)
+   └───────────────────────────────────────► N2 · N6 · N7 · N10
+                                             ── 이 시점부터 접점 없음 ──
 ```
 
-- **발주 지점은 ND-a 뒤다.** 초판은 ND 전체(4일)를 발주 전 필수로 뒀는데 그것은
-  과했다 — 인수 게이트가 필요한 시점은 발주가 아니라 인수다. 이 분할로 위임 착수가
-  나흘에서 하루로 당겨진다.
-- **ND-b는 인수 전에 반드시 선다.** 담당자가 자기 하네스로 낸 초록은 개발 신호이지
-  인수 판정이 아니다.
-- N3와 위임 슬라이스는 **병행 가능하다.** 담당자는 Loopback과 프레이밍을
-  simulation clock 없이 시작할 수 있다. snapshot의 tick 통합만 N3 뒤다(§5.1과 동일).
-- 해당 헤더가 동결되기 전에 그 구현을 시작하면 헤더가 구현을 따라가게 되고, 그러면
-  위임이 아니라 사후 승인이 된다. 나중 동결 5종에 걸린 슬라이스를 미리 발주하지 않는
-  이유가 이것이다.
+- 세 단계는 **순차로 볼 필요가 없다.** ND-a가 끝나면 담당자는 N4로 4일을 쓰고, 그
+  동안 사내는 N3를 진행한다. 담당자가 대기하는 구간이 없다.
+- 해당 헤더가 동결되기 전에 그 구현을 발주하지 않는다. 그러면 헤더가 구현을
+  따라가게 되고, 위임이 아니라 사후 승인이 된다.
 
-### 6.8 이 절이 판정하지 않는 것
+### 6.8 접점은 0이 되지 않는다 — 남는 셋
 
-- **인원·일정·계약 조건.** 6.3의 구간 판정은 기술 경계이지 공수 배분이 아니다.
-  대시보드 공수는 여전히 N0 실측 뒤 갱신 대상이다.
-- **담당자의 저장소 접근 형태.** 별도 클론인지 워크트리인지, 브랜치 정책이 무엇인지는
-  이 문서 밖이다. 다만 6.6의 파일 목록은 어느 형태든 그대로 적용된다.
+정직하게 적는다. 다만 이들은 **일상적 협업이 아니라 인터페이스 변경 요청**이라
+빈도가 낮다.
+
+1. **확장점이 정보를 덜 줄 때.** 담당자가 "여기서 이 값도 필요하다"고 요청한다.
+   확장점 설계가 부실할수록 잦아지므로, ND-b에서 담당자가 필요할 정보를 넉넉히
+   싣는다. 이 항목의 빈도가 이양 설계의 품질 지표다.
+2. **wire ID tombstone 승인.** 프로토콜 파손 방지라 양보하지 않는다.
+3. **최종 인수.** 경계 게이트가 자동 판정하고 사내는 그 결과를 본다.
+
+### 6.9 이 절이 판정하지 않는 것
+
+- **인원·일정·계약 조건.** 6.5는 기술 경계이지 공수 배분이 아니다.
+- **담당자의 저장소 접근 형태.** 별도 클론인지 워크트리인지, 브랜치 정책이
+  무엇인지는 이 문서 밖이다.
 - **협업 규약.** 이 저장소에는 `.editorconfig`·`.clang-format`·`CONTRIBUTING.md`가
-  없고, 최근 200커밋 중 191이 단일 저자다. 다중 저자 규약은 휴면 상태이며 위임과
-  함께 되살려야 하지만, 그 내용은 이 계획의 범위가 아니다.
+  없고 최근 200커밋 중 191이 단일 저자다. 다중 저자 규약은 휴면 상태이며 이양과
+  함께 되살려야 하지만 이 계획의 범위가 아니다.
 
-### 6.9 이 절 고유의 함정
+### 6.10 이 절 고유의 함정
 
-- **"인터페이스가 있으니 위임 가능하다"는 오독.** 인터페이스 존재는 필요조건이고,
-  판정은 6.2의 세 질문 전부다. 6.5의 인프라 없이 헤더만 넘기면 담당자는 자기 코드가
-  맞는지 확인할 방법이 없다.
-- **N3를 "틱 루프 한 파일"로 오해.** 착지점은 92줄이지만 파급은 물리 스텝 수·C#
-  delay·AI·회귀 세트 전체다. 파일 크기로 위임 가능성을 판정하지 않는다.
+- **확장점 없이 인터페이스만 주는 것.** 초판이 그랬다. 담당자는 "언제 무엇이
+  일어났는가"를 알 수 없어 결국 공유 파일에 자기 호출을 심는다. 인터페이스와
+  확장점은 방향이 반대이고 **둘 다** 있어야 이양이 닫힌다.
+- **N3를 "틱 루프 한 파일"로 오해.** 착지점은 92줄이지만 작업량의 본체는 물리
+  저작값 재보정과 렌더 보간 신설이다(N3 슬라이스의 파급 표).
 - **관측 커맨드를 통해 계약을 우회.** `net.*` 커맨드가 live Scene을 직접 읽으면
-  §4.5의 스레드 경계가 커맨드 표면으로 새어 나간다. 커맨드도 값 snapshot만 읽는다.
-- **위임 산출물의 초록을 그대로 수용.** 새 게이트가 첫 실행부터 전부 통과하면 변이로
-  이빨을 먼저 증명한다. 이것은 담당자에 대한 불신이 아니라 이 저장소가 자기 게이트에
-  적용해 온 규칙과 같다.
+  §4.5의 스레드 경계가 커맨드 표면으로 샌다. 커맨드도 값 snapshot만 읽는다. 등록은
+  `ConsoleCommandSystem.cpp`(12,109줄)를 건드리지 않도록 별도 파일로 분리해 담당자에게
+  넘긴다.
+- **위임 산출물의 초록을 그대로 수용.** 담당자가 자기 하네스로 낸 초록은 개발
+  신호다. 인수 판정은 사내 경계 게이트가 한다.
+- **확장점을 심으면서 의미를 좁히는 것.** `OnPropertyChanged`를 렌더 프록시 의미
+  그대로 재사용하면 네트워크가 필요로 하는 쓰기(비렌더 컴포넌트)를 놓친다. ND-b는
+  채널을 넓히는 작업이지 재사용하는 작업이 아니다.
 
 ---
 
