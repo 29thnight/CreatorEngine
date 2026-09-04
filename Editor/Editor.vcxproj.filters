@@ -84,6 +84,15 @@
     <ClInclude Include="EngineEntry\CommandCore\CommandParser.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\CommandCore\CommandDescriptor.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\CommandCore\CommandDescriptorSeeds.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\CommandCore\CommandRegistry.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\CommandCore\CommandResult.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
@@ -264,6 +273,12 @@
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\CommandCore\CommandParser.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\CommandCore\CommandDescriptorSeeds.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\CommandCore\CommandRegistry.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\CommandCore\CommandResult.cpp">

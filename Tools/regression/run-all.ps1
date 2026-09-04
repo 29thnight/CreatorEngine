@@ -65,6 +65,16 @@ Run-Step "CLI invocation(LC2)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-invocation.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 14.5 LC3 — help 와 registry 가 같은 집합인가.
+#
+# 예전에는 손으로 쓴 help 와 registry 가 별도라 조용히 벌어졌다 — 등록 205개 중
+# help 게재 130개(63%)였고, 반대로 help 는 등록되지도 않은 이름 6개를 안내했다.
+# 문서가 없는 것보다 틀린 문서가 나쁘다. 이제 help 가 descriptor 에서 생성되고,
+# 이 게이트가 양방향(커버리지·고아)과 snapshot 결정성을 함께 본다.
+Run-Step "CLI discovery(LC3)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-discovery.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

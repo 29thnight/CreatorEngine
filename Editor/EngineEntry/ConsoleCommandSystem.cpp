@@ -1,7 +1,9 @@
 #include "ConsoleCommandSystem.h"
 #include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
-#include "CommandCore/CommandParser.h"  // LC2: 토크나이저와 소유형 invocation
+#include "CommandCore/CommandParser.h"
+#include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
+#include "CommandCore/CommandDescriptorSeeds.h"  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
@@ -3692,8 +3694,136 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_help(const ConsoleCommandContext& ctx)
     {
+        const CommandCore::CommandRegistry& registry = CommandCore::CommandRegistry::Get();
+
+        // `help <이름>` — 명령 하나의 상세.
+        if (ctx.parts.size() > 1)
+        {
+            const std::string& name = ctx.parts[1];
+            const CommandCore::CommandDescriptor* descriptor = registry.Find(name);
+            if (nullptr == descriptor)
+            {
+                std::printf("[CLI] 알 수 없는 명령: %s\n", name.c_str());
+                return CommandCore::InvalidArguments(
+                    "알 수 없는 명령: " + name, "command.unknown");
+            }
+            std::fputs(CommandCore::RenderCommandDetail(*descriptor).c_str(), stdout);
+            return CommandCore::Ok();
+        }
+
         ctx.system.PrintHelp();
         return CommandCore::Ok();
+    }
+
+    /// commands.list [경로]
+    ///
+    /// discovery TSV. 소비자가 C++ 소스를 긁는 것을 여기서 끝낸다(§2.4) —
+    /// `Invoke-Dx12Suite.ps1` 이 `cmd == "dx12.*"` 리터럴을 정규식으로 뽑다가
+    /// 두 번 틀린(26/35 만 실행, 그리고 0/35 로 읽음) 그 방식이다.
+    /// LC4 의 `GET /commands` 가 같은 snapshot 을 JSON 으로 낸다.
+    static CommandCore::CommandResult Cmd_commands_list(const ConsoleCommandContext& ctx)
+    {
+        const CommandCore::CommandRegistry& registry = CommandCore::CommandRegistry::Get();
+        const std::string tsv = CommandCore::RenderDiscoveryTsv(registry);
+
+        if (ctx.parts.size() > 1)
+        {
+            const std::string path = ResolveTestArtifactPath("lc3", ctx.parts[1]);
+            std::FILE* raw = nullptr;
+            if (0 != fopen_s(&raw, path.c_str(), "wb") || nullptr == raw)
+            {
+                return CommandCore::InternalError("commands.write_failed",
+                    "commands.list: " + path + " 를 쓸 수 없다");
+            }
+            // 닫기를 소유권에 묶는다. 지금 경로는 전부 닫지만, 사이에 조기
+            // 반환이 하나만 끼어도 새는 형태였다.
+            const std::unique_ptr<std::FILE, int(*)(std::FILE*)> out(raw, &std::fclose);
+
+            std::fwrite(tsv.data(), 1, tsv.size(), out.get());
+            const bool failed = (0 != std::ferror(out.get()));
+            if (failed)
+            {
+                return CommandCore::InternalError("commands.write_failed",
+                    "commands.list: " + path + " 를 온전히 쓰지 못했다");
+            }
+            std::printf("[CLI] commands.list 완료 명령=%zu 이름=%zu 경로=%s\n",
+                        registry.CommandCount(), registry.NameCount(), path.c_str());
+        }
+        else
+        {
+            std::fputs(tsv.c_str(), stdout);
+        }
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("commands", CommandCore::CommandData::Int(
+            static_cast<int64_t>(registry.CommandCount())));
+        data.Set("names", CommandCore::CommandData::Int(
+            static_cast<int64_t>(registry.NameCount())));
+        data.Set("problems", CommandCore::CommandData::Int(
+            static_cast<int64_t>(registry.Problems().size())));
+        return CommandCore::Ok("registry snapshot", std::move(data));
+    }
+
+    /// commands.describe <이름>
+    static CommandCore::CommandResult Cmd_commands_describe(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 2)
+        {
+            return CommandCore::InvalidArguments(
+                "commands.describe: 명령 이름이 필요하다", "commands.name_missing");
+        }
+
+        const CommandCore::CommandRegistry& registry = CommandCore::CommandRegistry::Get();
+        const CommandCore::CommandDescriptor* descriptor = registry.Find(ctx.parts[1]);
+        if (nullptr == descriptor)
+        {
+            return CommandCore::InvalidArguments(
+                "알 수 없는 명령: " + ctx.parts[1], "command.unknown");
+        }
+
+        std::fputs(CommandCore::RenderCommandDetail(*descriptor).c_str(), stdout);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("canonical", CommandCore::CommandData::String(descriptor->canonical));
+        data.Set("cost", CommandCore::CommandData::String(
+            std::string(CommandCore::ToString(descriptor->cost))));
+        data.Set("roles", CommandCore::CommandData::String(
+            std::string(CommandCore::ToString(descriptor->roles))));
+        data.Set("resultBearing", CommandCore::CommandData::Bool(descriptor->resultBearing));
+        return CommandCore::Ok("descriptor", std::move(data));
+    }
+
+    /// commands.selftest
+    ///
+    /// registry 무결성. 이름 중복·요약 누락·descriptor 부재를 **실패로** 낸다.
+    /// 예전에는 이름 중복이 `printf` 한 줄로 지나가고 그 뒤로 조용히 한쪽이 먹혔다.
+    static CommandCore::CommandResult Cmd_commands_selftest(const ConsoleCommandContext& ctx)
+    {
+        (void)ctx;
+        const CommandCore::CommandRegistry& registry = CommandCore::CommandRegistry::Get();
+        const std::vector<std::string>& problems = registry.Problems();
+
+        std::printf("[commands.selftest] 명령=%zu 이름=%zu seed=%zu 문제=%zu\n",
+                    registry.CommandCount(), registry.NameCount(),
+                    CommandCore::DescriptorSeedCount(), problems.size());
+        for (const std::string& problem : problems)
+        {
+            std::printf("[commands.selftest] 문제: %s\n", problem.c_str());
+        }
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("commands", CommandCore::CommandData::Int(
+            static_cast<int64_t>(registry.CommandCount())));
+        data.Set("problems", CommandCore::CommandData::Int(
+            static_cast<int64_t>(problems.size())));
+
+        if (!problems.empty())
+        {
+            return CommandCore::Fail("registry.integrity",
+                "registry 무결성 위반 " + std::to_string(problems.size()) + "건",
+                std::move(data));
+        }
+        return CommandCore::Ok("registry 무결성 통과", std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_quit(const ConsoleCommandContext& ctx)
@@ -11855,6 +11985,50 @@ namespace ConsoleCmd
                 }
 
                 CommandBaseline::RecordRegistration(accepted, rejected, handlerKey);
+
+                // ── LC3: schema 를 함께 세운다 ──────────────────────────
+                //
+                // descriptor 가 없으면 registry 가 문제로 기록하고, selftest 가
+                // 그것을 판정한다. 서명이 요구하지 않으면 아무도 안 쓴다 —
+                // 78 개가 help 에 없던 이유가 그것이므로, 여기서 막는다.
+                CommandCore::CommandRegistry& registry = CommandCore::CommandRegistry::Get();
+
+                // 조회 표에 못 들어간 이름을 registry 에도 알린다.
+                //
+                // 이것이 없으면 `Add` 안의 중복 검사가 죽은 코드다 — 진 이름은
+                // descriptor 에 애초에 담기지 않으므로 검사가 볼 것이 없다.
+                // 그 상태에서 `commands.selftest` 는 "조용히 한쪽이 먹혔다"를
+                // 못 잡으면서 잡는다고 주장하게 된다.
+                const std::string canonicalForReport =
+                    accepted.empty() ? std::string(*names.begin()) : accepted.front();
+                for (const char* name : rejected)
+                {
+                    registry.RecordRejectedName(name, canonicalForReport);
+                }
+
+                if (accepted.empty()) return;
+
+                const std::string canonical = accepted.front();
+                const CommandCore::DescriptorSeed* seed =
+                    CommandCore::FindDescriptorSeed(canonical);
+
+                CommandCore::CommandDescriptor descriptor;
+                descriptor.canonical        = canonical;
+                descriptor.resultBearing    = (nullptr != entry.modern);
+                descriptor.exceptionsEscape = entry.letExceptionsEscape;
+                for (std::size_t i = 1; i < accepted.size(); ++i)
+                {
+                    descriptor.aliases.emplace_back(accepted[i]);
+                }
+
+                if (nullptr != seed)
+                {
+                    descriptor.summary = seed->summary;
+                    descriptor.usage   = seed->usage;
+                    descriptor.cost    = seed->cost;
+                }
+                // summary 가 비면 Add 가 거부하고 사유를 남긴다.
+                registry.Add(std::move(descriptor));
             };
 
             // 이행 전 핸들러. 결과를 내지 않으므로 LegacyUnreported 가 된다.
@@ -11894,6 +12068,10 @@ namespace ConsoleCmd
             };
 
             regResult({ "help" }, &Cmd_help);
+            // LC3: discovery. 소비자가 C++ 소스를 긁지 않게 한다.
+            regResult({ "commands.list" }, &Cmd_commands_list);
+            regResult({ "commands.describe" }, &Cmd_commands_describe);
+            regResult({ "commands.selftest" }, &Cmd_commands_selftest);
             regResult({ "quit", "exit" }, &Cmd_quit);
             // LC0(PHASE 14.5) 기준선 계측. 거동 변경 0 — 재고 찍기만 한다.
             reg({ "commands.dump" }, &Cmd_commands_dump);
@@ -12252,165 +12430,34 @@ bool ConsoleCommandSystem::MatchEditorCameraToGameCamera()
 
 const char* ConsoleCommandSystem::HelpText() noexcept
 {
-    // 이 문자열이 help의 정본이다. 예전에는 printf의 인자로만 존재해서
-    // "무엇이 안내되고 있는가"를 프로그램이 스스로 알 수 없었다 — §3.4의
-    // help/registry drift가 아무에게도 안 보인 이유가 그것이다. 이제
-    // commands.dump가 이 문자열과 등록 표를 대조해 누락과 고아를 센다.
-    static constexpr const char* kHelpText =
-        "\n[CLI] 사용 가능한 명령\n"
-        "  scene.new [이름]     빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)\n"
-        "  scene.load <경로>    씬을 로드한다(활성 씬은 그대로)\n"
-        "  scene.switch <경로>  씬을 로드하고 활성 씬으로 교체한다(언로드 유발)\n"
-        "  scene.save <경로>    활성 씬을 .creator로 저장한다\n"
-        "  scene.dump [라벨]    활성 씬의 오브젝트 계층을 로그에 남긴다\n"
-        "  scene.dirtytraversal [0|1]  S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)\n"
-        "  scene.bonecache [0|1]       E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)\n"
-		"  scene.transformstats [0|1|print]  X0 UI/Spatial·단계·구성·프레임 topology 계측\n"
-		"  scene.transformwritestats [0|1|print|probe]  X1 로컬 쓰기 publish 출처 계측\n"
-		"  scene.transformdomains probe  X2 UI/Spatial 독립 dirty gate·paused/subtree 검사\n"
-		"  scene.hierarchymutation probe  X3 reparent 검증·대칭성·topology version 검사\n"
-		"  scene.executiongraph probe|bench <N> [samples]  X4 packed projection 불변식·compile 비용 검사\n"
-		"  scene.sparseresolver 0|1|print|probe|bench <N> <frames>  X5 dirty-root sparse resolve·A/B 검사\n"
-		"  scene.transformpull print|probe  X6 C# 즉시 pull·sibling global 전파 검사\n"
-		"  scene.transformbulk probe  X7 Animator pose·Physics world batch·Socket barrier 검사\n"
-		"  scene.proxydirty probe  X8 frame-persistent render dirty mask·generation 검사\n"
-        "  scene.ddol <이름>           오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용\n"
-		"  scene.traversalbench <오브젝트수> <프레임수> [flat|wide|deep|skeleton]  X0 Release 벤치(0=현재 씬)\n"
-		"  scene.proxybench <프레임수> [등록수]  X8 정지 dirty-queue 커밋 비용(선택: 합성 등록수)\n"
-        "  scene.bonedump [개수]        대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)\n"
-        "  scene.transformdigest [라벨]  활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)\n"
-        "  game.pak             Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다\n"
-        "  model.load <경로>    모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)\n"
-		"  material.corpus.probe <이름>...  standalone material identity/reference 왕복\n"
-		"  terrain.authoring.probe <이름> <텍스처|->  Terrain writer 트랜잭션 회귀 검사\n"
-        "  model.place <이름>   임포트한 모델을 활성 씬에 배치한다\n"
-        "  object.create <이름> [타입]  빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)\n"
-        "  object.rename <이전> <새>  오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)\n"
-        "  object.transform <이름> <px py pz> [rx ry rz] [sx sy sz]  변환을 지정한다(회전은 도)\n"
-		"  object.rootref <오브젝트> [루트|-]  Bone형 same-scene root 참조를 설정/조회한다\n"
-		"  prefab.corpus.digest <라벨> <이름>...  prefab identity/override 왕복 digest\n"
-        "  object.property <오브젝트> <컴포넌트> <필드> <값>  리플렉션으로 프로퍼티를 설정한다\n"
-        "  play / stop          에디터의 재생·정지와 같은 동작\n"
-        "  lifecycle.trace on [틱프레임]|off|clear|status  생명주기 호출 순서를 받아 적는다\n"
-        "  lifecycle.registry on|off|status  생명주기 디스패치 경로 전환(9-1, 씬 재로드 필요)\n"
-        "  lifecycle.dump [파일]  기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)\n"
-        "  lifecycle.stress destroy|churn|reentrant [개수]  수명 경로를 흔든다(reentrant는 순회 한복판)\n"
-        "  gc.stats|gc.delta [라벨]  관리 힙 지표(수집 횟수·힙 크기). delta는 첫 호출을 기준선으로\n"
-        "  gc.collect           관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)\n"
-        "  mem.stats|mem.delta [라벨]  CRT 힙의 live 블록·바이트\n"
-        "  mem.reset            churn 누계와 기준선을 0으로 — 구간 측정용\n"
-        "  mem.hook on|stack|off|status  CRT 할당 호출 계수. stack은 호출 스택까지(느리다)\n"
-        "  mem.hook top [N]     할당 호출 지점 상위 N개를 심볼과 함께(stack 모드 필요)\n"
-        "  bt.status            행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)\n"
-        "  bt.reset             BT 누계만 0으로(트리는 그대로) — 구간 측정용\n"
-        "  camera.editor match|follow on|off|status  에디터 카메라를 게임 카메라와 같은 시점으로\n"
-        "  window.resize <너비> <높이>  창 클라이언트 크기를 바꾼다(해상도 검증용)\n"
-        "  window.info          엔진이 인식하는 클라이언트 크기를 출력한다\n"
-        "  profile.selftest     CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)\n"
-        "                       ★ 프레임 경계를 넘으므로 라이브 캡처를 교란한다\n"
-        "  profile.stats        프로파일러 자체 비용과 용량 소진(교란 없음)\n"
-        "  experiment.model <경로>  legacy↔Experiment 모델 로딩 패리티 검증(검증 이슈·구조 diff·설계 갭 실측)\n"
-        "  assets.generation <project root> UUIDv8 model generation closure·원자 cache publish/retire 검증\n"
-        "  assets.generationcorpus <content root> 현재 MBC4 model corpus generation cold-load 검증\n"
-        "  experiment.anim <경로>   Experiment clip 재생 배선 검증(legacy 참조 팔레트 파리티·포즈 변화)\n"
-        "  experiment.import <경로> 임포트 경로 검증(legacy→ImportedScene→ModelDraft, 손실 계수·경로 비교)\n"
-        "  experiment.gltf <경로>   fastgltf 임포터 검증(Assimp 기준선 대비 삼각형·AABB·이름 집합)\n"
-        "  experiment.fbx <경로>    ufbx 임포터 검증(experiment.gltf 와 같은 게이트)\n"
-        "  experiment.sampler       보간 합성 검사(Step/Linear 계단·강등·키 뭉침, 자산 무관)\n"
-        "  experiment.tangent       탄젠트 합성 검사(mikktspace 축·handedness·이음매 분리, 자산 무관)\n"
-        "  experiment.normal        평면 법선 합성 검사(감김·면 분리·퇴화 처리, 자산 무관)\n"
-        "  experiment.weld                정점 용접 — 합치는가/안 합치는가(실자산은 0건이라 이것만이 증거다)\n"
-        "  experiment.cacheopt            정점 캐시/페치 순서 — ACMR 이 실제로 낮아지는가 + 기하 보존\n"
-        "  experiment.texcook [루트 텍스처]  텍스처 쿠킹 — GUID 주소·내용 해시·fail-closed(실자산은 .dds 미포함)\n"
-        "  experiment.smcook [루트 메타]    ShaderMeta 쿠킹 — 정본 파서 검증·source 해소(실자산엔 거부 사례 0)\n"
-        "  experiment.matcook [루트 재질 모델] 재질 의존 폐포 — standalone 재질 + 모델의 임베디드 texture 추출\n"
-        "  experiment.scenecook [루트 씬]   scene/prefab 의존 추출 — 자기참조 제외·못 그린 참조 계수\n"
-        "  experiment.resolver             CookedThenSource resolver — 호출 순서와 폴백 관측(자산 무관)\n"
-        "  experiment.catalog [Derived부모] CEMF catalog — 전 GUID 해석·내용 검증·폐포 위상 순서\n"
-        "  experiment.cooked [경로]        쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)\n"
-        "  experiment.bench <경로> [반복]  legacy 로드 대 Experiment 경계 비용(브리지·Validate·게시·포즈 샘플링)\n"
-        "  dx12.selftest [파일]  DX12 브링업 자가 검증(삼각형 렌더 → PNG)\n"
-        "  vk.selftest [파일]    Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)\n"
-        "  vk.parallel          Vulkan RenderGraph 병렬 command pool·제출·픽셀 검증\n"
-        "  vk.grid              그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)\n"
-        "  vk.skybox            스카이박스를 Vulkan 으로 — 큐브 SRV·정적 샘플러 픽셀 대조\n"
-        "  vk.ibl               IBL 생성기를 Vulkan 으로 — 면·밉·LUT DX12 픽셀 대조\n"
-        "  vk.gizmoicon         실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조\n"
-        "  vk.gizmoline         GizmoLine 공용 패스 — line-list 전체 RGBA DX12/Vulkan 대조\n"
-        "  vk.wireframe         WireFrame 공용 패스 — non-solid fill·skinning DX12/Vulkan 대조\n"
-        "  vk.ui                UI 공용 패스 — layer·blend·texture batch DX12/Vulkan 대조\n"
-        "  vk.shadow            Shadow 공용 패스 — depth array·mesh DX12/Vulkan 대조\n"
-        "  vk.gbuffer           GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조\n"
-        "  vk.forward           Forward+ 공용 패스 — compute·buffer·blend·mesh DX12/Vulkan 대조\n"
-        "  vk.deferred          Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조\n"
-        "  vk.decal             Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조\n"
-        "  vk.ssao              SSAO 공용 패스 — depth/normal compute·filter DX12/Vulkan 대조\n"
-        "  vk.sss               SSS 공용 패스 — 2축 blur·depth gate 전체 픽셀 대조\n"
-        "  vk.ssr               SSR 공용 패스 — ray hit·metal/thickness/bitmask 픽셀 대조\n"
-        "  vk.fog               VolumetricFog 공용 패스 — 3D scatter/history/composite 대조\n"
-        "  vk.post              PostChain 공용 패스 — bloom/tonemap/vignette/FXAA 대조\n"
-        "  vk.ssgi              SSGI 공용 패스 — Hi-Z·temporal·filter·composite 대조\n"
-        "  dx12.psocache [파일]  PSO 캐시 자가 검증(2회차 컴파일 0건)\n"
-        "  rhi.uploadsegments  DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증\n"
-        "  dx12.uploadring      구 명령 별칭(DX12 업로드 세그먼트 검증)\n"
-        "  dx12.descriptorheap  descriptor version recycler 검증(completion·Abort·격리·넘침)\n"
-        "  dx12.rendergraph     렌더 그래프 검증(순서·흐름·배리어·컬링·실행)\n"
-        "  dx12.gbuffer         GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)\n"
-        "  dx12.resize          크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)\n"
-        "  dx12.parallel        커맨드 기록 병렬화 검증(링 원자성·순차 대비 동일성)\n"
-        "  render.exposure      자동 노출이 무엇을 재고 무엇을 결정했는지\n"
-        "  render.post           비활성 레거시 명령(DX11 포스트 설정)\n"
-        "  render.rtinfo        창·뷰포트·추종 텍스처 크기를 나란히 찍는다\n"
-        "  dx12.scene           씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)\n"
-        "  dx12.grid            그리드 패스 검증(라인·셀 내부·밀도·카메라 반응)\n"
-        "  dx12.gizmoline       기즈모 라인 패스 검증(도형 정점 수·픽셀·드로우 병합)\n"
-        "  dx12.gizmoicon       기즈모 아이콘 패스 검증(빌보드 회전·알파 상한·배칭)\n"
-        "  dx12.wireframe       와이어프레임 패스 검증(변·내부 비채움·인스턴싱·메시 캐시)\n"
-        "  dx12.gizmoscene      Gizmo 씬 연결 검증(밀봉 복사·4패스 체인·타깃 공유)\n"
-        "  dx12.shadowquality   그림자 품질 검증(경사 비례 편향·캐스케이드 경계 블렌딩 A/B)\n"
-        "  dx12.skybox          스카이박스 패스 검증(면 방향·원평면 밀어넣기·전면 커버)\n"
-        "  dx12.ibl             IBL 생성 체인 검증(rect→cube·조도·프리필터·BRDF LUT)\n"
-        "  dx12.iblshade        IBL 앰비언트 소비 검증(끔=검정·조도 방향성·금속 정반사)\n"
-        "  dx12.skinning        GBuffer 스키닝 검증(본 이동·가중 혼합·비스킨드 불변)\n"
-        "  dx12.sss             SSS 패스 검증(번짐·축 분리·표면 추종·에너지)\n"
-        "  dx12.decal           데칼 패스 검증(상자 판정·하늘 게이트·원본 혼합 3종·배칭)\n"
-        "  dx12.ssr             SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)\n"
-        "  dx12.fog             볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)\n"
-        "  dx12.bench11         DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)\n"
-        "  dx12.encoderbench    인코더 오버헤드 실측(R3 착수 조건 · Release 전용)\n"
-        "  dx12.live on|status      EnhancedRenderer 메인 런타임 상태\n"
-        "  render.livecheck [너비 높이]  resize·다중 뷰·표시 슬롯 회전 회귀 판정\n"
-        "  render.backend status      부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)\n"
-        "  pix.capture begin|end|status  PIX 주입 실행의 명시적 GPU 캡처 경계\n"
-        "  ui.rect <오브젝트|*>  오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다\n"
-        "  ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>  앵커를 직접 지정한다\n"
-        "  ui.size <오브젝트> <x> <y>  sizeDelta를 직접 지정한다\n"
-        "  ui.hitbox            버튼의 rect와 클릭 판정 상자를 나란히 출력한다\n"
-        "  script.add <오브젝트> <타입>  C# 스크립트를 오브젝트에 부착한다\n"
-        "  script.fields <id>   스크립트의 노출 필드와 현재 값을 확인한다\n"
-        "  script.set <id> <인덱스> <값>  노출 필드 값을 바꾼다\n"
-        "  script.reload        게임 스크립트 어셈블리를 다시 로드한다(핫리로드)\n"
-        "  script.status        CLR 상태와 활성 스크립트 수를 확인한다\n"
-        "  gpu.baseline         현재 상태를 기준선으로 삼는다\n"
-        "  gpu.census [라벨]    VRAM과 엔진 에셋 수를 로그에 기록\n"
-        "  gpu.delta [라벨]     기준선 대비 증감을 기록(씬 왕복 누수 확인용)\n"
-        "  assets.unload        사용하지 않는 에셋 캐시 정리\n"
-        "  wait <프레임>        지정 프레임만큼 다음 명령을 미룬다\n"
-        "  log.flush            로그를 디스크에 즉시 반영\n"
-        "  render.shadowinfo    그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)\n"
-        "  crash.status         크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다\n"
-        "  crash.test <종류>    일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)\n"
-        "  quit                 에디터 종료\n"
-        "  commands.dump [경로]  등록 명령 표를 TSV로 덤프한다(LC0 기준선, 소스 스크래핑 대체)\n"
-        "  cli.probe.timing [reset|off|경로]  프레임 시간 분포와 명령 왕복 지연(LC0, 기본 off)\n"
-        "  cli.echo.args <인자>  tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)\n"
-        "\n실행 인자: --exec \"<명령>\"  |  --script <파일>  |  --console\n"
-        "           --exec-args <명령> <인자>... [--]  라인 문법을 거치지 않는 구조화 입력\n"
-        "                        --로 끝내면 뒤에 다른 인자를 이어 쓸 수 있다\n"
-        "           --heapcheck  CRT 디버그 힙 전수 검사(힙 손상을 손상 시점에서 잡는다, 매우 느림)\n"
-        "           --fail-fast  첫 실패에서 남은 명령을 버리고 종료한다(기본은 계속 실행 후 집계)\n\n";
+    // ★ LC3: 손으로 쓴 목록이 사라졌다.
+    //
+    //   예전에는 여기에 143 줄짜리 문자열이 있었고 registry 는 별도 표였다.
+    //   둘을 잇는 것이 없어서 조용히 벌어졌다 — 등록 205 개 중 help 에 실린
+    //   것이 130 개(63%)였고, 반대로 help 는 **등록돼 있지도 않은 이름 6 개**를
+    //   안내하고 있었다(`experiment.anim` 등). 문서가 없는 것보다 틀린 문서가
+    //   나쁘고, 그 틀림을 아무도 못 알아챈 이유는 대조할 것이 없었기 때문이다.
+    //
+    //   이제 descriptor 에서 **생성**하므로 갈라질 자리가 없다.
+    //
+    //   문자열을 static 으로 한 번만 만든다 — 이 함수는 `const char*` 를
+    //   돌려주므로 호출자보다 오래 살아야 하고, help 는 등록이 끝난 뒤로는
+    //   바뀌지 않는다.
+    //
+    // ★ 등록을 **여기서 강제로 끝낸다.**
+    //
+    //   `CommandRegistry::Get()` 은 싱글턴 참조만 돌려주고 채우지 않는다.
+    //   registry 를 채우는 것은 `GetTable()` 의 function-local static 이다.
+    //   오늘의 호출 경로는 전부 `ExecuteParsed` 를 거치고 그것이 `GetTable()` 을
+    //   먼저 부르므로 순서가 맞지만, 그 순서는 **호출자 규율**일 뿐이다.
+    //   magic static 은 한 번만 초기화되므로, 앞으로 누가 `--help` 조기 처리나
+    //   LC4 의 수신 스레드에서 이 함수를 먼저 부르면 help 가 "0개"로 **영구
+    //   동결**된다. 되돌릴 방법이 없다. 여기서 직접 부르면 그 위험이 사라진다.
+    (void)ConsoleCmd::GetTable();
 
-    return kHelpText;
+    static const std::string help =
+        CommandCore::RenderHelp(CommandCore::CommandRegistry::Get());
+    return help.c_str();
 }
 
 void ConsoleCommandSystem::PrintHelp() const

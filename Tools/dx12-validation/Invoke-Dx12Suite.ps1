@@ -16,7 +16,11 @@
 
     그래서 이 스크립트는 셋을 구조로 막는다:
 
-      · 목록을 **소스**(ConsoleCommandSystem.cpp 의 `cmd == "dx12.*"`)에서 뽑는다.
+      · 목록을 **엔진의 런타임 discovery**(`commands.list`)에서 뽑는다.
+        2026-09-04 이전에는 C++ 소스에서 뽑았는데, 그것도 두 번 틀렸다 —
+        등록이 if-else 체인에서 등록 표로 바뀌자 35종을 0종으로 읽었고,
+        문자열 리터럴 전수로 바꾼 뒤에도 "소스가 이렇게 생겼다"는 가정이
+        남아 있었다. 이제 정본은 프로그램 안에 있다(PHASE 14.5 LC3).
       · 판정은 `[CLI] <검사> <통과|실패|완료>` 형태로만 읽는다. 진행 마커
         (예: `[dx12.scene] [1/4] 씬 입력 확보 완료`)에 '완료'가 들어 있어서,
         문자열 검색으로 세면 그것이 판정으로 잡힌다.
@@ -62,33 +66,48 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if ([string]::IsNullOrWhiteSpace($Exe)) {
     $Exe = Join-Path $repoRoot "Bin\x64-Debug\Editor\CreatorEditor.exe"
 }
-if ([string]::IsNullOrWhiteSpace($CommandSource)) {
-    $CommandSource = Join-Path $repoRoot "Editor\EngineEntry\ConsoleCommandSystem.cpp"
-}
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
     throw "실행 파일이 없다: $Exe (Debug x64 를 먼저 빌드한다)"
 }
-if (-not (Test-Path -LiteralPath $CommandSource -PathType Leaf)) {
-    throw "명령 소스가 없다: $CommandSource"
-}
+# $CommandSource 는 더 이상 쓰지 않는다(LC3). 파라미터는 호출 호환을 위해 남긴다 —
+# 세트와 문서가 그 이름을 넘기고 있어서, 지우면 호출부가 먼저 깨진다.
+$null = $CommandSource
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $OutDir = [IO.Path]::GetFullPath($OutDir)
 
-# ── 검사 목록: 도움말이 아니라 소스에서 ──
+# ── 검사 목록: 런타임 discovery 에서 ──
 #
-# ★ 등록 **형태**를 파싱하지 않는다 (2026-08-20 교정).
-#   원래는 `cmd == "dx12.x"` 를 찾았는데, 명령 등록이 if-else 체인에서
-#   `reg({ "dx12.x" }, &Cmd_...)` 등록 테이블로 바뀌면서 그 패턴이 소스에서
-#   사라졌다 — 이 스크립트는 35종을 0종으로 읽었다. 도움말 대신 소스를 보게
-#   만들어 막으려던 바로 그 부패가 소스 쪽에서 재발한 것이다.
-#   그래서 지금은 형태와 무관하게 `"dx12.<이름>"` **문자열 리터럴 전부**를 뽑는다.
-#   교정 시점 실측: 리터럴 전수 35종 = reg 등록 35종, 차집합 0 (오탐 없음).
+# ★ 소스 스크래핑을 은퇴한다 (2026-09-04, PHASE 14.5 LC3).
+#
+#   이 자리는 두 번 틀렸다. 처음에는 도움말을 읽다가 낡은 help 때문에 35종 중
+#   26종만 돌렸고, 소스를 읽게 바꿨더니 이번에는 등록 **형태**가 if-else 체인에서
+#   등록 표로 바뀌면서 35종을 **0종**으로 읽었다. 형태와 무관하게 문자열 리터럴을
+#   뽑는 것으로 또 한 번 막았지만, 그것도 "소스가 이렇게 생겼다"는 가정이다.
+#
+#   근본 원인은 **명령 목록의 정본이 프로그램 밖에 있었다**는 것이다. 이제
+#   엔진이 `commands.list` 로 자기 registry snapshot 을 낸다 — 등록 형태가
+#   어떻게 바뀌든 그 출력은 등록된 것 그대로다.
 #
 # @() 로 감싼다 — 결과가 하나면 파이프라인이 스칼라를 돌려주어 .Count 가 없다.
-$source = Get-Content -LiteralPath $CommandSource -Raw
-$tests = @([regex]::Matches($source, '"(dx12\.[a-z0-9]+)"') |
-    ForEach-Object { $_.Groups[1].Value } |
+$discoveryPath = Join-Path $OutDir 'commands.tsv'
+$discoveryScript = Join-Path $OutDir '_discover.txt'
+"commands.list $discoveryPath`nquit" | Set-Content -LiteralPath $discoveryScript -Encoding UTF8
+
+$discoverProc = Start-Process -FilePath $Exe -ArgumentList '--script', $discoveryScript `
+    -WorkingDirectory (Split-Path -Parent $Exe) `
+    -RedirectStandardOutput (Join-Path $OutDir '_discover.out') `
+    -RedirectStandardError  (Join-Path $OutDir '_discover.err') -PassThru
+$discoverProc.WaitForExit(180000) | Out-Null
+if (-not $discoverProc.HasExited) { $discoverProc.Kill(); throw 'commands.list 가 끝나지 않았다' }
+if (-not (Test-Path -LiteralPath $discoveryPath -PathType Leaf)) {
+    throw "discovery 산출물이 없다: $discoveryPath (commands.list 실패)"
+}
+
+$tests = @(Get-Content -LiteralPath $discoveryPath -Encoding UTF8 |
+    Where-Object { $_ -notmatch '^#' -and $_ -notmatch '^canonical\t' } |
+    ForEach-Object { ($_ -split "`t")[0] } |
+    Where-Object { $_ -like 'dx12.*' } |
     Sort-Object -Unique)
 if ($Only.Count -gt 0) {
     $tests = @($tests | Where-Object { $Only -contains $_ })

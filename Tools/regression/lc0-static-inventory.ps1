@@ -110,9 +110,19 @@ foreach ($root in $consumerRoots) {
         $invokesCli   = $text -match '--exec|--script|CreatorEditor\.exe|Academy_4Q\.exe'
         if (-not $invokesCli) { continue }
 
-        # 소스 스크래핑: C++ 파일에서 명령 목록을 뽑는 소비자(§2.4). LC3의
+        # 소스 스크래핑: C++ 파일을 **데이터로 읽는** 소비자(§2.4). LC3의
         # discovery가 이들을 대체하고 LC9가 정적 게이트로 재도입을 막는다.
-        $scrapesSource = $text -match 'ConsoleCommandSystem\.cpp'
+        #
+        # ★ 주석에서 파일 이름을 언급하는 것은 스크래핑이 아니다.
+        #   처음에는 문자열이 들어 있기만 하면 셌는데, 그중 절반은 "예전에 이
+        #   파일의 이 함수가 이랬다"는 주석이었다. 고칠 수 없는 것을 눈금에
+        #   넣으면 래칫이 0 에 닿지 못한다. verify-cli-discovery.ps1 의 래칫과
+        #   **같은 정의**를 쓴다 — 두 눈금이 다른 수를 내면 어느 쪽도 못 믿는다.
+        $scrapesSource = $false
+        foreach ($hit in (Select-String -LiteralPath $file.FullName -Pattern 'ConsoleCommandSystem\.cpp')) {
+            if ($hit.Line -match '^\s*#') { continue }
+            if ($hit.Line -match 'Path|Get-Content|LiteralPath') { $scrapesSource = $true; break }
+        }
         # 한국어 판정 문안 정규식: LC9가 JSON 결과로 옮긴다.
         $readsVerdict  = $text -match '통과\|실패|실패\|통과|\(통과\|실패\|완료\)'
 
@@ -125,7 +135,13 @@ foreach ($root in $consumerRoots) {
 }
 
 Add-Row 'cli_consumer_files' $consumerFiles.Count '--exec/--script/에디터 exe 를 부르는 자동화 파일'
-Add-Row 'consumers_scraping_source' (@($consumerFiles | Where-Object scrapesSource).Count) 'C++ 소스에서 명령 목록을 뽑는 소비자 — LC3 discovery 가 대체'
+# ★ 모집단을 이름에 적는다.
+#
+#   이 수는 **CLI 를 부르는 파일 중** 소스를 데이터로 읽는 것이다.
+#   verify-cli-discovery.ps1 의 래칫은 CLI 호출 여부와 무관하게 Tools/scripts
+#   전체를 세므로 값이 더 크다(6). 두 수가 다른 것은 정상이지만, 이름이 같으면
+#   어느 쪽도 못 믿게 된다 — 판정 기준은 같고 모집단만 다르다.
+Add-Row 'cli_consumers_scraping_source' (@($consumerFiles | Where-Object scrapesSource).Count) 'CLI 를 부르는 소비자 중 소스를 데이터로 읽는 것 — 전체 수는 verify-cli-discovery 래칫'
 Add-Row 'consumers_reading_verdict' (@($consumerFiles | Where-Object readsVerdict).Count) '한국어 판정 문안을 정규식으로 읽는 소비자 — LC9 가 JSON 으로 이관'
 
 # ── 산출 ────────────────────────────────────────────────────────────────

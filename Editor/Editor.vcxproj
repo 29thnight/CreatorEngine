@@ -38,6 +38,9 @@
     <ClInclude Include="EngineEntry\BuildSettings.h" />
     <ClInclude Include="EngineEntry\CommandBaseline.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandParser.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandDescriptor.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandDescriptorSeeds.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandRegistry.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandResult.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandSession.h" />
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
@@ -100,6 +103,8 @@
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp" />
     <ClCompile Include="EngineEntry\CommandBaseline.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandParser.cpp" />
+    <ClCompile Include="EngineEntry\CommandCore\CommandDescriptorSeeds.cpp" />
+    <ClCompile Include="EngineEntry\CommandCore\CommandRegistry.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandResult.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandSession.cpp" />
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />

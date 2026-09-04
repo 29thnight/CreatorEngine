@@ -1088,6 +1088,69 @@ LC9 가 "아무도 안 쓴다"를 근거로 규약을 뗄 때 근거가 여섯 �
 canary 발화 · registry snapshot 순서 deterministic · descriptor 없이 새 handler 등록 불가 ·
 모든 명령이 `cost`와 `roles`를 갖는다.
 
+**상태: 완료 (2026-09-04).**
+
+| 완료 기준 | 증거 |
+|---|---|
+| help coverage 100% | **211 / 211**(LC0 실측은 130/205 = 63%). 게이트가 **양방향**을 본다 — 등록→help(커버리지)와 help→등록(고아). 한 방향만 보면 LC0 이 찾은 결함 둘 중 하나를 놓친다 |
+| help 고아 0 | `experiment.anim`·`bench`·`fbx`·`gltf`·`import`·`model` 6 개가 사라졌다. 등록에 없는 이름은 schema 에도 없다 |
+| 수동 `PrintHelp` 목록 0 | 143 줄짜리 손글씨 문자열이 사라지고 `RenderHelp(registry)` 가 대신한다 |
+| 이름 중복 canary | `commands.selftest` 가 중복·요약 누락·descriptor 부재를 **exit 4** 로 낸다. 예전에는 `printf` 한 줄로 지나가고 그 뒤 조용히 한쪽이 먹혔다 |
+| snapshot deterministic | 두 실행의 `commands.list` 출력이 바이트 동일(212 행) |
+| descriptor 없이 등록 불가 | seed 가 없으면 `summary` 가 비고 `CommandRegistry::Add` 가 거부한다 |
+| `cost`·`roles` 전수 | 211 개 전부. cost 분포 — Immediate 31 · Frames 153 · Long 24. roles 는 전부 `Editor`(오늘 Player 에 여는 명령이 없다. LC8 이 고른다) |
+| `Invoke-Dx12Suite` 이관 | C++ 소스 스크래핑을 끊고 `commands.list` 를 읽는다. 소스를 데이터로 읽는 소비자 7 → **6** |
+
+★ **게이트가 착수 직후 자기 자신을 잡았다.** `commands.list`·`commands.describe`·
+`commands.selftest` 를 등록하자마자 `commands.selftest` 가 **문제 3 건**을 냈다 —
+그 셋에 seed 가 없었기 때문이다. "descriptor 없이 새 handler 등록 불가"가 문서의
+약속이 아니라 실제로 도는 규칙이라는 것을 첫 세 명령이 증명했다.
+
+★ **요약 78 개는 지어낸 것이 아니다.** 131 개는 현행 help 문자열에서 그대로
+가져왔고(그것이 오늘의 정본 문서다), 나머지 77 개는 핸들러의 주석과 `printf`
+문안을 읽고 적었다. help 에 한 번도 실린 적 없던 것들이고, 그래서 커버리지가
+63% 였다. 자동 추출로 채우고 검토하지 않는 편이 빨랐겠지만, 그렇게 만든 문서는
+**틀린 문서**가 되고 이 슬라이스가 없애려던 것이 정확히 그것이다.
+
+★ **`cost` 는 기본값을 주지 않았다.** seed 표에 없으면 등록이 거부된다. 기본값을
+두면 208 개가 전부 `Immediate` 로 서고, LC5 의 서비스가 그 값을 보고 동기 응답을
+고른다 — 틀린 값이 있는 편이 값이 없는 편보다 나쁘다. 판단이 애매할 때는 비싼
+쪽(`Frames`)으로 적었다. 틀리는 방향이 안전하기 때문이다: `Long` 을 `Immediate`
+로 적으면 지연 계약이 깨지지만, 반대는 응답이 202 로 한 번 더 도는 것뿐이다.
+
+★★ **검토가 잡은 것: 중복 검사가 죽은 코드였다.**
+
+`commands.selftest` 는 "이름 중복을 실패로 낸다"고 적어 두었는데, 실제로는 **발화할
+수 없었다.** 이름 충돌은 조회 표(`unordered_map::emplace`)에서 일어나고 진 이름은
+descriptor 에 애초에 담기지 않는다 — `CommandRegistry::Add` 안의 충돌 검사는 볼
+것이 없는 검사였다. 검사가 없는 것보다 **있다고 믿는 검사가 없는 것**이 나쁘고,
+이 슬라이스가 없애려던 것이 정확히 그 모양이다(help 가 그랬듯이).
+
+진 이름을 `RecordRejectedName` 으로 registry 에 따로 넘겨 고쳤다. 그리고 §14.7 대로
+**변이로 이빨을 확인했다** — `scene.new` 를 일부러 두 번 등록하니 `commands.selftest`
+가 `exit 4` 와 `이름 중복으로 등록되지 못함: scene.new` 를 냈다. 고치기 전에는 같은
+변이가 `printf` 한 줄만 남기고 exit 0 이었다.
+
+같은 검토에서 셋을 더 고쳤다.
+
+- **별칭 충돌이 canonical 충돌과 다르게 처리됐다.** 문제만 적고 descriptor 를 그대로
+  저장해서, 충돌한 별칭으로는 영영 닿을 수 없는 descriptor 가 표에 남았다. 이름만
+  바꾼 "조용히 한쪽이 먹힘"이라 canonical 과 같게 버리도록 맞췄다.
+- **seed 표 정렬이 아무것도 지키지 않았다.** 이진 탐색이 전제하는 불변식인데 표는
+  손으로 유지한다. 행 하나를 엉뚱한 자리에 넣으면 그 근처 이름들이 조용히 "요약 없음"
+  으로 등록을 거부당한다 — seed 가 분명히 있는데 없다고 하는 상태다. `static_assert`
+  로 컴파일 타임에 못박았다(비용 0).
+- **`HelpText()` 의 magic static 이 순서에 기대고 있었다.** registry 를 채우는 것은
+  `GetTable()` 이고, 오늘은 모든 호출 경로가 그것을 먼저 지나서 맞다. 그러나 앞으로
+  `--help` 조기 처리나 LC4 의 수신 스레드가 먼저 부르면 help 가 "0개"로 **영구 동결**
+  된다(magic static 은 되돌릴 수 없다). `HelpText()` 가 직접 `GetTable()` 을 부르게 했다.
+
+★ **인자 스키마(§6.2 의 `arguments`)는 넣지 않았다.** 211 개의 인자 타입·필수성을
+한 슬라이스에서 정확히 적는 것은 사실상 지어내기가 된다. 대신 `usage` 문자열
+(`<필수> [선택]`)까지를 정본으로 세우고, 구조화된 argument 스키마는 domain 을
+옮기는 LC6 에서 그 domain 을 아는 사람이 채운다. 비워 두되 비어 있다는 사실이
+`CommandDescriptor` 주석에 적혀 있다.
+
 ### LC4 — 로컬 HTTP/JSON 서비스 (P0 · 3일) ★ 신규 핵심
 
 - `Engine/CommandService` 신설: Winsock loopback listener, HTTP/1.1 최소 서브셋
