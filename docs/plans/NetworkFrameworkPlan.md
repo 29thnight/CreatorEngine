@@ -334,9 +334,9 @@ Render frame
 
 #### 왜 기존 훅을 옮기지 않고 신설하는가
 
-2026-09-04 실측: `override void PrePhysics` **0건**, `override void PostPhysics`
-**17건**, `Behaviour` 파생 **28개**. 즉 **게임플레이 로직의 본체가 C#의 물리-뒤
-축에 있다.** 그것을 프레임 축에 두면 서버가 tick당 물리를 두 번 돌 때 스크립트
+2026-09-04 실측(PHASE 9.5 W1 개명 후 재확인): `override void PrePhysics` **0건**,
+`override void PostPhysics` **17건**, `Component` 파생 **42개**. 즉 **게임플레이
+로직의 본체가 C#의 물리-뒤 축에 있다.** 그것을 프레임 축에 두면 서버가 tick당 물리를 두 번 돌 때 스크립트
 판단은 한 번이라 서버와 클라이언트가 갈린다.
 
 그렇다고 `PostPhysics`를 통째로 루프 안으로 옮기면 위 표의 `FlushAniEvents` 의존이
@@ -354,19 +354,17 @@ Render frame
 그 사실을 감추고 있었다.*** 같은 이름을 되살리면 그 교훈이 무너진다.
 `OnSimulationTick`은 축을 이름에 드러낸다.
 
-#### 선행: 관리 측 오버라이드 감지
+#### 선행: 관리 측 오버라이드 감지 — **PHASE 9.5 W8이 소유한다**
 
-`BehaviourRegistry`는 `_active` 전체를 순회하며 `Invoke(b, x => x.PrePhysics(dt), ...)`를
-부른다 — **오버라이드하지 않은 스크립트도 빈 가상 호출과 람다를 겪는다.** 지금도
-낭비다(`PrePhysics`는 오버라이드 0건인데 매 프레임 28회 돈다). 여기에 tick당 도는
-훅을 더하면 30fps에서 프레임당 56회가 된다.
+`ScriptRegistry`는 `_active` 전체를 순회하며 `Invoke(b, x => x.PrePhysics(dt), ...)`를
+부른다 — 오버라이드하지 않은 스크립트도 빈 가상 호출을 겪고, 틱 훅은 `dt`를 캡처해
+할당까지 붙는다(6단계 훅은 이미 `static` 람다다). 지금도 낭비다: `PrePhysics`는
+오버라이드 0건인데 `Component` 파생 42개를 매 프레임 돈다. 여기에 **tick당** 도는
+훅을 더하면 30fps에서 프레임당 84회가 된다.
 
-**그래서 오버라이드 감지를 `OnSimulationTick`보다 먼저 넣는다.** 네이티브에 선례가
-있다 — `Lifecycle::MaskOfType<T>()`가 `&T::Hook != &Component::Hook`으로 컴파일
-타임에 판정하고 `PhaseBits` 마스크를 세운다. 관리 측은 컴파일 타임이 아니므로
-**타입당 1회 계산해 캐시**한다(`GetType().GetMethod(...).DeclaringType != typeof(Behaviour)`,
-또는 기존 `ScriptCore.Generators/BehaviourGenerator`가 마스크를 생성). 어느 쪽이든
-디스패치는 마스크로 걸러진 목록만 순회한다.
+**이 작업은 PHASE 20이 아니라 `ScriptSurfacePlan` W8이 소유한다.** 성격상 스크립트
+표면 작업이고, `ScriptRegistry.cs`를 그 페이즈가 일관되게 소유해야 동시 편집이
+생기지 않는다. PHASE 20은 **N3-b의 선행으로 참조만 한다.**
 
 #### 배선 지점 6곳
 
@@ -374,8 +372,8 @@ Render frame
 
 | # | 파일 | 내용 |
 |---|---|---|
-| 1 | `ScriptCore/Behaviour.cs` | `public virtual void OnSimulationTick(float fixedDelta) { }` |
-| 2 | `ScriptCore/BehaviourRegistry.cs` | 디스패치 루프(`PostPhysicsTick` 형태 복제, 마스크로 필터) |
+| 1 | `ScriptCore/Component.cs` | `public virtual void OnSimulationTick(float fixedDelta) { }` |
+| 2 | `ScriptCore/ScriptRegistry.cs` | 디스패치 루프(`PostPhysicsTick` 형태 복제, 마스크로 필터) |
 | 3 | `ScriptCore/Bootstrap.cs` | `[UnmanagedCallersOnly]` 진입점 |
 | 4 | `Engine/SceneRuntime/ClrHost.cpp` | `bind(L"SimulationTick", ...)` + 호출 래퍼 |
 | 5 | `Engine/SceneRuntime/ClrHost.h` | `TickFn m_fnSimulationTick` + 선언 |
@@ -524,7 +522,7 @@ gate를 실제로 붉게 만든다.
 **판정:** 서로 다른 두 Scene에서 같은 local index가 있어도 NetId resolve가 섞이지
 않고, stale/despawn ID가 fail-close하며, ID 중복 canary가 실패한다.
 
-### N3 — Fixed Simulation Clock (위임 대상 아님 · 사전 작업)
+### N3 — Fixed Simulation Clock (위임 대상 아님 · 사전 작업 · 선행 W8)
 
 **선행:** SceneGraph L5 완료(현재 충족). PHASE 19 T0과 hot zone 조정.
 
@@ -533,14 +531,10 @@ gate를 실제로 붉게 만든다.
 닫는다 — 닫히면 `SimulationTick.h`가 확정돼 계약 헤더 11종 중 10종을 동결할 수 있고,
 N5의 tick 통합 대기가 사라져 담당자가 N5를 온전히 받는다(§6).
 
-**N3-a — 관리 측 오버라이드 감지 (선행, 약 1일).** `BehaviourRegistry`가 `_active`
-전체를 순회하며 빈 가상 호출과 람다를 겪는 구조를 마스크 기반으로 바꾼다. 네이티브
-`Lifecycle::MaskOfType<T>()`가 선례이며, 관리 측은 타입당 1회 계산해 캐시한다.
-**이것이 먼저인 이유:** `OnSimulationTick`은 tick당 돌기 때문에 감지 없이 추가하면
-30fps에서 프레임당 순회가 28→56회가 된다. 지금도 `PrePhysics`는 오버라이드 0건인데
-매 프레임 28회 돈다.
-
-**N3-b — 고정 클럭과 `OnSimulationTick` (본체).**
+**선행 하나가 이 페이즈 밖에 있다: `ScriptSurfacePlan` W8(디스패치 오버라이드 감지).**
+`OnSimulationTick`은 tick당 돌므로 감지 없이 추가하면 30fps에서 프레임당 순회가
+42→84회가 된다. 그 작업은 성격상 스크립트 표면이고 `ScriptRegistry.cs`를 PHASE 9.5가
+일관되게 소유해야 하므로 그쪽이 가진다(2026-09-04 이관). **W8 없이 착수하지 않는다.**
 
 - render clock과 simulation clock을 분리하고 §4.4의 루프 안/밖 배치를 구현한다.
 - accumulator, catch-up 상한, pause/scene-switch/time-scale 규칙을 구현한다.
@@ -564,7 +558,7 @@ N5의 tick 통합 대기가 사라져 담당자가 N5를 온전히 받는다(§6
 | C# `SimulationScope.Delay` | 프레임 횟수가 아니라 **초 누적**이다(`Remaining = seconds`를 엔진 dt로 깎는다). 총 경과 시간이 보존된다 | 낮음 |
 | **물리 저작값** | PhysX가 지금은 프레임당 1회 가변 dt로 돌고 그 위에서 값이 튜닝돼 있다. 특히 **CCT 이동값이 "스텝당 단위"**라(PhysicsRedesignPlan 함정) 스텝 수가 바뀌면 이동 속도가 그대로 바뀐다 — 60fps에서 1스텝, 30fps에서 2스텝 | **높음. N3 작업량의 본체는 누산기가 아니라 이 재보정이다** |
 | **렌더 보간 부재** | §4.4가 적은 `Render(interpolationAlpha)` 배관이 현재 0건 | **높음. 없으면 고정 틱 도입 즉시 화면이 떤다(60Hz tick / 144Hz 렌더)** |
-| 관리 크로싱 횟수 | §4.4 2판 결정으로 **tick당 1회 추가**(`OnSimulationTick`). 기존 Pre/PostPhysics는 프레임 축이라 늘지 않는다 | 중간. N3-a의 오버라이드 감지가 순회 비용을 먼저 낮춘다 |
+| 관리 크로싱 횟수 | §4.4 2판 결정으로 **tick당 1회 추가**(`OnSimulationTick`). 기존 Pre/PostPhysics는 프레임 축이라 늘지 않는다 | 중간. PHASE 9.5 W8이 순회 비용을 먼저 낮춘다 |
 | C# 로직 이주 | `override void PostPhysics` 17건이 결정론 대상 후보다. 한꺼번에 옮기지 않고 필요한 것부터 `OnSimulationTick`으로 이주한다 | 중간. 이주는 N3 완료 조건이 아니다 |
 
 **판정:** 가변 render FPS에서 같은 입력 tick 수와 물리 step 수가 나오며, 한 프레임
@@ -674,11 +668,12 @@ corrupt corpus crash 0.
 ──────────────────────────────────────────────────────────
 ND-a 계약 6종 + 경계 게이트 ─┬───────────► N4(loopback)  ← 첫 발주
                              └───────────► N0(telemetry)
-N3-a 오버라이드 감지
+[9.5 W8] 디스패치 감지
   └ N3-b 고정 틱 + OnSimulationTick
         + OnTickCommitted ─ 헤더 7 동결 ──► N5
                        (N0 실측으로 헤더 8·9·10 동결)
-ND-b 확장점 2종 ─────────────────────────► N2 · N6 · N7 · N10
+[9.5 W4] 저작 dirty 통로
+  └ ND-b 확장점 2종 ─────────────────────► N2 · N6 · N7 · N10
                                             ── 이후 접점 없음 ──
 
 N1은 게이트 배선 잔여(사내). N8/N9는 제품 요구가 있을 때만.
@@ -730,13 +725,20 @@ N1은 게이트 배선 잔여(사내). N8/N9는 제품 요구가 있을 때만.
 |---|---|---|---|
 | `ISimulationFrameObserver`<br>`OnTickCommitted(tick, fixedDelta)` | `Runtime::TickSimulationFrame` | 92줄 단일 정본이고 Editor·Player가 같은 함수를 탄다(E3-7) | **N3에 얹는다** — 같은 파일이라 따로 열지 않는다 |
 | `ISceneEntityObserver`<br>`OnEntityBound`/`Rebound`/`Unbound` | `Scene::AllocateSlot` · `ReleaseSlot` | 슬롯 수명 단일점. 호출부 13건이 **전부 `Scene.cpp`/`Entity.cpp` 내부**이고 외부 호출 0. DDOL 이송도 `DetachEntityHierarchy`가 "BFS+슬롯 해제 단일점"이라고 주석에 명시 | **ND-b** |
-| `IComponentWriteObserver`<br>`OnComponentFieldWritten(...)` | `Component::OnPropertyChanged(name, source)` | **"X8 writer boundary"가 이미 서 있다.** 주석 그대로 — *리플렉션 기반 필드는 이 훅을 상속하고, 명시 setter는 `PublishRenderProxyDirty`를 직접 부른다.* 소비자 39건 | **ND-b** |
+| `IComponentWriteObserver`<br>`OnComponentFieldWritten(...)` | `Component::OnPropertyChanged(name, source)` | "X8 writer boundary"라는 **이름은 서 있으나 저작 축이 비어 있다**(아래) | **ND-b · PHASE 9.5 W4 뒤** |
 
-세 번째가 특히 크다. N6의 "매 tick 전체 리플렉션 비교를 없애고 쓰기 시점 dirty로"가
-이 계획에서 가장 무거운 항목인데, **그 배관이 이미 렌더 프록시용으로 서 있다.**
-남은 일은 그 채널을 렌더 전용 의미론에서 일반 관찰자로 넓히는 것이다 — 현재
-`ProxyDirty`가 렌더 프록시 레지스트리에 묶여 있어 **설계 확인이 필요하고, 이것이
-ND-b의 실제 난이도다.**
+**세 번째는 2026-09-04 재실측으로 판정이 뒤집혔다.** 초판은 주석을 근거로 "배관이
+이미 서 있다"고 적었는데, 실제로는 **`OnPropertyChanged`를 부르는 곳이
+`ReflectionTypedYml.h`(직렬화·로드 경로) 하나뿐이고 `ReflectionTypedDraw.h`(인스펙터
+편집 경로)에는 0건**이다. 오버라이드 구현체도 4개(`Component`·`Canvas`·
+`RectTransformComponent`·`Transform`)뿐이다. 즉 쓰기 경계는 **로드/저장 축에만 있고
+저작 축에는 없다.** 주석의 "리플렉션 기반 필드는 이 훅을 상속한다"는 참이지만,
+상속과 호출은 다르다.
+
+그 구멍을 닫는 것이 **`ScriptSurfacePlan` W4(저작 dirty 통로)** 다 — 리플렉션 draw가
+값 변경을 알릴 훅을 만들고 렌더 프록시 컴포넌트가 거기서 dirty를 발행한다.
+**따라서 ND-b는 W4에 의존한다.** W4가 통로를 세우고, ND-b는 그 훅에 네트워크
+관찰자를 분기한다. 순서가 뒤집히면 통로 없는 관찰자를 만들게 된다.
 
 ### 6.4 동결 계약 헤더
 
@@ -773,7 +775,7 @@ N0 계측 전에는 추정이기 때문이다. **추정을 계약으로 굳히�
 
 | | 사내 (1회, 그 뒤 접점 없음) | 담당자 (전량 소유) |
 |---|---|---|
-| 슬라이스 | **N3-a · N3-b**(사전 작업 · 위임 대상 아님) · **N1**(게이트 배선 잔여) | **N0 · N2 · N4 · N5 · N6 · N7 · N10 전 구간** |
+| 슬라이스 | **N3-b**(사전 작업 · 위임 대상 아님) · **N1**(게이트 배선 잔여) · PHASE 9.5의 **W8·W4** 대기 | **N0 · N2 · N4 · N5 · N6 · N7 · N10 전 구간** |
 | 경계 | 확장점 3종(6.3) · 계약 헤더(6.4) | 그 뒤에서의 모든 구현 |
 | 하네스 | — | 자기 개발 하네스와 헤드리스 호스트 |
 | 게이트 | 계약 위반 자동 검출 1종 | 기능 게이트 전부 |
@@ -795,9 +797,15 @@ N0 계측 전에는 추정이기 때문이다. **추정을 계약으로 굳히�
 | | 내용 | 공수 | 여는 것 |
 |---|---|---:|---|
 | **ND-a** | 계약 헤더 6종 동결 + 계약 변경 절차 + 경계 게이트 1종 | **2일** | **N4 발주** |
-| **N3-a** | 관리 측 오버라이드 감지 (`OnSimulationTick`의 전제) | 1일 | — |
 | **N3-b** | 고정 틱 + `OnSimulationTick` + `OnTickCommitted` 확장점 | 4일 | 헤더 7번 동결 · **N5 발주** |
 | **ND-b** | 확장점 2종(엔티티 수명 · 쓰기 dirty) | **2.5일** | **N2 · N6 발주 = 전량 이양** |
+
+**이 페이즈 밖 선행 둘 — `ScriptSurfacePlan`(PHASE 9.5)이 소유한다.**
+
+| 선행 | 여는 것 | 이유 |
+|---|---|---|
+| **W8** 디스패치 오버라이드 감지 (1일) | N3-b | tick당 도는 훅을 감지 없이 더하면 순회가 배가 된다 |
+| **W4** 저작 dirty 통로 (3일) | **ND-b** | 저작 축에 훅 통로 자체가 없다(§6.3). W4가 통로를 세우고 ND-b가 관찰자를 분기한다 |
 
 공수 근거: 이 저장소의 기존 인터페이스·정책 헤더는 19~429줄이고 중앙값이 약 160줄,
 절반 이상이 주석이다(`EntityHandle.h`는 61줄 중 40줄이 주석). 확장점 2종은 자리가
@@ -824,17 +832,21 @@ ND-b 공수의 대부분이다. **여전히 추정이며 착수 뒤 실측으로
 ND-a 계약 6종 + 경계 게이트 (2일)
    └───────────────────────────────────────► N4 Loopback
                                              N0 telemetry
-N3-a 오버라이드 감지 (1일)
+[PHASE 9.5 W8] 디스패치 감지
    └─ N3-b 고정 틱 + OnSimulationTick + OnTickCommitted (4일)
          └─ SimulationTick.h 동결 ──────────► N5 spawn/snapshot
                                              (N0 결과로 헤더 8·9·10 동결)
-ND-b 확장점 2종 (2.5일)
-   └───────────────────────────────────────► N2 · N6 · N7 · N10
+[PHASE 9.5 W4] 저작 dirty 통로
+   └─ ND-b 확장점 2종 (2.5일)
+         └───────────────────────────────────► N2 · N6 · N7 · N10
                                              ── 이 시점부터 접점 없음 ──
 ```
 
-- 세 단계는 **순차로 볼 필요가 없다.** ND-a가 끝나면 담당자는 N4로 4일을 쓰고, 그
-  동안 사내는 N3를 진행한다. 담당자가 대기하는 구간이 없다.
+- ND-a는 다른 무엇도 기다리지 않는다. 끝나면 담당자가 N4로 4일을 쓰고, 그 동안
+  사내는 W8→N3-b를 진행한다. 담당자가 대기하는 구간이 없다.
+- **전량 이양 시점은 PHASE 9.5 W4에 묶여 있다**(2026-09-04 확인). ND-b가 W4의 훅 위에
+  서기 때문이다. W4가 늦으면 N2·N6 발주도 같이 밀리므로, 이양 일정을 세울 때
+  PHASE 9.5의 진행을 함께 본다.
 - 해당 헤더가 동결되기 전에 그 구현을 발주하지 않는다. 그러면 헤더가 구현을
   따라가게 되고, 위임이 아니라 사후 승인이 된다.
 
@@ -874,6 +886,10 @@ ND-b 확장점 2종 (2.5일)
 - **확장점을 심으면서 의미를 좁히는 것.** `OnPropertyChanged`를 렌더 프록시 의미
   그대로 재사용하면 네트워크가 필요로 하는 쓰기(비렌더 컴포넌트)를 놓친다. ND-b는
   채널을 넓히는 작업이지 재사용하는 작업이 아니다.
+- **주석의 "이미 있다"를 호출로 읽는 것.** §6.3의 writer boundary가 그랬다 —
+  `Component.h` 주석이 "리플렉션 기반 필드는 이 훅을 상속한다"고 적어서 통로가 있다고
+  읽었는데, 상속은 참이고 **인스펙터가 그 훅을 부르지 않았다**. 확장점의 자리를 잴
+  때는 선언이 아니라 **호출자**를 센다.
 - **`ScriptLifecyclePhase` enum에 `OnSimulationTick`을 더하려는 충동.** 이 페이즈가
   통째로 이양되므로 **담당자가 가장 먼저 부딪힐 지점**이다. 그 enum은 생명주기
   **단계**(OnInitialized~OnRemovingFromScene 6종)의 네이티브↔관리 대응표이고,

@@ -205,6 +205,31 @@ W2는 setter를 신설하는 데서 멈췄다. 필드가 여전히 `public`이�
 - 애니메이션의 `SetBehaviour`/`CreateBehaviour` 계열은 **별개 체계**라 개명 대상이
   아니다. 문서에 그 경계를 적어 두지 않으면 다음 스윕이 또 건드린다
 
+### W8 — 디스패치 오버라이드 감지 (대기 · P1 · 1일)
+
+**`ScriptRegistry`가 훅마다 `_active` 전체를 돈다.** 오버라이드하지 않은 스크립트도
+빈 가상 호출을 겪는다. 2026-09-04 실측: `override void PrePhysics`는 **0건**인데
+`Component` 파생 42개를 매 프레임 순회한다.
+
+같은 파일 안에서 이미 갈려 있다 — 6단계 훅은 `Invoke(b, static x => x.OnEnable(), ...)`로
+할당 없는 static 람다인데, 틱 훅만 `Invoke(b, x => x.PrePhysics(dt), ...)`라 `dt`를
+캡처해 **호출마다 할당**이 붙는다.
+
+네이티브에 선례가 있다. `Lifecycle::MaskOfType<T>()`가
+`&T::Hook != &Component::Hook`으로 컴파일 타임에 판정하고 `PhaseBits` 마스크를
+세운다(옛 틱 비트 `1u<<3~5`는 2026-09-04 `5b9c8250`에서 철거했고 8개 단계 훅
+판정만 남았다). 관리 측은 컴파일 타임이 아니므로 **타입당 1회 계산해 캐시**한다 —
+`GetType().GetMethod(...).DeclaringType != typeof(Component)`, 또는 `ScriptGenerator`가
+마스크를 생성. 디스패치는 마스크로 걸러진 목록만 순회한다.
+
+**왜 지금인가.** `NetworkFrameworkPlan` N3-b가 고정 축 훅
+`OnSimulationTick(fixedDelta)`을 신설하는데, 그것은 **tick당** 돈다. 감지 없이
+추가하면 30fps에서 프레임당 순회가 42→84회가 된다. **W8이 그 슬라이스의 선행이며,
+`ScriptRegistry`를 이 페이즈가 일관되게 소유하도록 PHASE 20이 아니라 여기에 둔다.**
+
+완료 조건: 훅별 구독 목록이 실제 오버라이드 수에 비례하고, 오버라이드 0건인 훅의
+순회가 0이 된다. 생명주기 순서 게이트가 개명 때와 같이 사건 순서를 보존한다.
+
 ---
 
 ## 3. 착수 순서와 의존
@@ -213,13 +238,23 @@ W2는 setter를 신설하는 데서 멈췄다. 필드가 여전히 `public`이�
 W3 (입력) ── 독립. 단, 결정 A/B가 W6의 ScriptMessage 미러 계약을 바꾼다
 W4 (저작 dirty) ──┐
                   ├── W5가 없으면 W4의 완료를 증명할 수 없다
-W5 (관측 하네스) ─┘
+W5 (관측 하네스) ─┘   └─► NetworkFrameworkPlan ND-b가 W4의 훅에 관찰자를 분기한다
 W6 (미러 커버리지) ── W3의 결정 뒤에 ScriptMessage 항목을 확정
 W7 (문서) ── 언제든
+W8 (디스패치 감지) ── 독립 ─► NetworkFrameworkPlan N3-b의 선행
 ```
 
 권장: **W5 → W4 → W3 → W6 → W7**. W5가 먼저 서야 W4의 "고쳤다"가 관측 가능해지고,
-W3의 결정은 W6의 계약을 정하므로 W6보다 앞서야 한다.
+W3의 결정은 W6의 계약을 정하므로 W6보다 앞서야 한다. W8은 이 사슬과 독립이라
+언제든 넣을 수 있으나, PHASE 20이 N3-b를 착수하기 전에는 서야 한다.
+
+**PHASE 20이 이 페이즈에 거는 의존 둘.** 네트워크 페이즈는 통째로 외부 담당자에게
+이양할 것이므로(`NetworkFrameworkPlan` §6), 그 경계가 이 페이즈의 산출물 위에 선다.
+
+| PHASE 20 슬라이스 | 이 페이즈의 선행 | 이유 |
+|---|---|---|
+| N3-b 고정 클럭 + `OnSimulationTick` | **W8** | tick당 도는 훅을 감지 없이 더하면 순회가 배가 된다 |
+| ND-b 쓰기 dirty 확장점 | **W4** | W4가 리플렉션 draw → 훅 통로를 세워야 그 위에 관찰자를 붙인다. 지금은 `ReflectionTypedDraw.h`에 `ProxyDirty`·`OnPropertyChanged` 언급이 0건이라 저작 축에 통로 자체가 없다 |
 
 ## 4. 이 페이즈가 지키는 원칙
 

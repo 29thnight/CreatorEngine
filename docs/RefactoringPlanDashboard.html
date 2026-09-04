@@ -1163,7 +1163,7 @@
   <b>목표는 분업이 아니라 완전 이양이다.</b> 1판은 슬라이스를 A/B/C 세 구간으로 갈랐는데, C(계약은 사내·알고리즘만 위임)가 있는 한 담당자가 매번 사내 작업을 기다린다. 2판은 구간을 둘로 줄였다 — <b>사내가 한 번 세우는 것</b>과 <b>담당자가 전부 소유하는 것</b>.
   가능케 하는 것은 인터페이스가 아니라 <b>확장점</b>이다. 인터페이스는 담당자가 엔진을 부르고, 확장점은 엔진이 담당자를 부른다 — 후자가 없으면 담당자는 결국 <code>Scene.cpp</code>에 자기 호출을 심는다.
   <b>실측: 확장점 3종의 자리가 이미 다 있다</b> — 슬롯 수명은 <code>Scene::AllocateSlot/ReleaseSlot</code>(호출부 13건 전부 Scene 내부), tick 경계는 <code>Runtime::TickSimulationFrame</code>(92줄 단일 정본), 쓰기 dirty는 <code>Component::OnPropertyChanged</code>의 X8 writer boundary(소비자 39건).
-  <b>N3는 PHASE 20 위임 범위 밖</b> — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. 사내가 먼저 닫으며, 작업량의 본체는 누산기가 아니라 CCT 등 <b>스텝당 단위 저작값 재보정</b>과 <b>렌더 보간 신설</b>(현재 배관 0건)이다. 관리 측은 고정 축 전용 훅 <code>OnSimulationTick</code>을 신설하고(§4.4 2판) 기존 <code>PrePhysics</code>/<code>PostPhysics</code>는 프레임 축에 남긴다 — 통째로 옮기면 <code>FlushAniEvents</code>가 <code>AnimatorSystem</code> 결과에 거는 의존이 깨진다.</div>
+  <b>N3는 PHASE 20 위임 범위 밖</b> — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. 사내가 먼저 닫으며, 작업량의 본체는 누산기가 아니라 CCT 등 <b>스텝당 단위 저작값 재보정</b>과 <b>렌더 보간 신설</b>(현재 배관 0건)이다. 관리 측은 고정 축 전용 훅 <code>OnSimulationTick</code>을 신설하고(§4.4 2판) 기존 <code>PrePhysics</code>/<code>PostPhysics</code>는 프레임 축에 남긴다 — 통째로 옮기면 <code>FlushAniEvents</code>가 <code>AnimatorSystem</code> 결과에 거는 의존이 깨진다.<br><b>이 페이즈 밖 선행 둘 — PHASE 9.5가 소유한다.</b> <b>W8</b>(디스패치 오버라이드 감지)이 N3의 선행이고, <b>W4</b>(저작 dirty 통로)가 <b>ND-b의 선행</b>이다 — 2026-09-04 재실측 결과 <code>OnPropertyChanged</code>를 부르는 곳은 <code>ReflectionTypedYml</code>(직렬화)뿐이고 <code>ReflectionTypedDraw</code>(인스펙터)에는 0건이라 저작 축에 통로 자체가 없다. <b>전량 이양 시점이 W4에 묶여 있으므로</b> 이양 일정은 PHASE 9.5 진행과 함께 본다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
 
@@ -1908,6 +1908,10 @@ const TASKS = [
     detail: "ScriptApiMigrationPlan.html §11의 T1~T4 등급표에 폐기 표시와 ScriptSurfacePlan.md 포인터를 박는다. 같은 문서의 'Transform은 컴포넌트가 아니다'와 BehaviorTreeManagedPlan.md의 BehaviourRegistry 지목을 정정한다.",
     refs: "ScriptSurfacePlan.md §2 W7", priority: "P3", days: 1, status: "todo",
     note: "§11의 등급표는 2026-07-29 시점 Dynamic_CPP\\Assets\\Script 코퍼스를 실측해 만든 것이다(GetComponent 734회·Transform 접근 1위·입력 43회 같은 숫자가 표면의 모양을 정했다). 그 코퍼스는 8ae17250에서 포팅 없이 통째로 삭제됐다(349파일·37,788줄 삭제·새 GameScripts 0건) — 기준이 사라졌는데 표가 남아 다음 작업자를 잘못 이끈다. 그 표가 '입력은 호출이 적어 단순 래핑으로 충분(T3)'이라 적은 것이 W3이 지금까지 열리지 않은 이유다. 'Transform은 컴포넌트가 아니다'는 트랙 L2가 닫힌 이틀 뒤 c9bbdd56(S1-b)에서 뒤집혔다. ★ 애니메이션의 SetBehaviour/CreateBehaviour 계열은 별개 체계라 개명 대상이 아니라는 경계를 함께 적는다 — 적어 두지 않으면 다음 스윕이 또 건드린다." },
+  { phase: 9.5, id: "W8", title: "디스패치 오버라이드 감지",
+    detail: "ScriptRegistry가 훅마다 _active 전체를 도는 구조를 마스크 기반으로 바꾼다. 네이티브 Lifecycle::MaskOfType<T>()가 선례이고, 관리 측은 타입당 1회 계산해 캐시하거나 ScriptGenerator가 마스크를 생성한다.",
+    refs: "ScriptSurfacePlan W8", priority: "P1", days: 1, status: "todo",
+    note: "지금도 낭비다 — override void PrePhysics는 0건인데 Component 파생 42개를 매 프레임 순회한다. 6단계 훅은 이미 static 람다인데 틱 훅만 dt를 캡처해 할당까지 붙는다. ★ NetworkFrameworkPlan N3의 선행: tick당 도는 OnSimulationTick을 감지 없이 더하면 30fps에서 프레임당 42→84회가 된다. ScriptRegistry.cs를 이 페이즈가 일관되게 소유하도록 PHASE 20에서 이관했다(2026-09-04)." },
 
   // ---------- PHASE 10: 파티클·이펙트 백지 재작성 (최후순위) ----------
   //
@@ -2324,7 +2328,7 @@ const TASKS = [
   { phase: 20, id: "ND-b", title: "확장점 2종 — 엔티티 수명 · 쓰기 dirty",
     detail: "ISceneEntityObserver를 Scene::AllocateSlot/ReleaseSlot과 DDOL 이송 경로에, IComponentWriteObserver를 Component::OnPropertyChanged의 X8 writer boundary에 붙인다. 담당자가 Scene.cpp를 한 번도 열지 않고 N2·N5·N6를 끝낼 수 있게 만드는 것이 판정 기준이다.",
     refs: "NetworkFrameworkPlan §6.3·§6.6", priority: "P0", days: 2.5, status: "todo",
-    note: "사내 1회 — 이것이 서면 C 구간이 사라지고 전량 이양이 닫힌다. 붙일 자리는 실측으로 이미 확인했다(슬롯 호출부 13건 전부 Scene 내부, writer boundary 소비자 39건). ★ 공수의 대부분은 훅 삽입이 아니라 ProxyDirty의 렌더 전용 의미론을 일반 관찰자로 넓히는 설계다 — 그대로 재사용하면 비렌더 컴포넌트의 쓰기를 놓친다." },
+    note: "사내 1회 — 이것이 서면 C 구간이 사라지고 전량 이양이 닫힌다. ★ 선행 PHASE 9.5 W4(저작 dirty 통로): 2026-09-04 재실측 결과 OnPropertyChanged를 부르는 곳은 ReflectionTypedYml(직렬화)뿐이고 ReflectionTypedDraw(인스펙터)에는 0건이라 저작 축에 통로 자체가 없다. W4가 통로를 세워야 그 위에 관찰자를 분기할 수 있다. 엔티티 수명 쪽 자리는 실측 확인됨(슬롯 호출부 13건 전부 Scene 내부)." },
   { phase: 20, id: "N0", title: "기준선·금지 타입·telemetry 실패 게이트",
     detail: "frame/physics tick, Entity/Component 변화량을 계측하고 EntityHandle·HashedGuid·YAML/JSON Node의 wire 유입을 실패시킨다. packet/encode/alloc/queue/drop 공통 telemetry를 먼저 세운다.",
     refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo",
@@ -2337,14 +2341,10 @@ const TASKS = [
     detail: "NetworkObjectId·고정폭 type/field ID·tombstone registry와 replicated schema validation을 만든다. DDOL/scene transfer/destroy의 Bind·Rebind·Unbind 순서를 검증한다.",
     refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo",
     note: "담당자 전량 — ND-b의 ISceneEntityObserver 위에서 구현하므로 Scene.cpp를 열지 않는다(1판에서는 이 항목이 C 구간이었다). ComponentTypeUUID::kTable 32종이 리네임 불변 규율을 이미 갖고 있어 새로 만들지 말고 재료로 쓴다." },
-  { phase: 20, id: "N3-a", title: "관리 측 오버라이드 감지",
-    detail: "BehaviourRegistry가 _active 전체를 순회하며 빈 가상 호출과 람다를 겪는 구조를 마스크 기반으로 바꾼다. 네이티브 Lifecycle::MaskOfType<T>()가 선례이고, 관리 측은 타입당 1회 계산해 캐시한다.",
-    refs: "NetworkFrameworkPlan N3-a · §4.4", priority: "P0", days: 1, status: "todo",
-    note: "사내 · OnSimulationTick의 전제다. 지금도 낭비다 — override void PrePhysics는 0건인데 Behaviour 파생 28개를 매 프레임 순회한다. tick당 도는 훅을 감지 없이 더하면 30fps에서 프레임당 28→56회가 된다." },
-  { phase: 20, id: "N3-b", title: "Fixed Simulation Clock + OnSimulationTick",
+  { phase: 20, id: "N3", title: "Fixed Simulation Clock + OnSimulationTick",
     detail: "render clock과 simulation clock을 분리하고 §4.4의 루프 안/밖 배치를 구현한다. 고정 축 전용 관리 훅 OnSimulationTick(fixedDelta)을 배선 6곳으로 신설하고, Scope.Tick을 고정 축으로 옮기며, OnTickCommitted 확장점을 같은 파일에서 함께 심는다.",
-    refs: "NetworkFrameworkPlan N3-b · §4.4", priority: "P0", days: 4, status: "todo",
-    note: "사내 · PHASE 20 위임 범위 밖 — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. ★ 2026-09-04 생명주기 실측으로 1판 설계를 정정했다: Initialization은 비동기 씬 활성화를 폴링하고 GameLogic은 UpdateRenderData로 끝나므로 둘 다 tick 루프에 못 들어간다. 기존 PrePhysics/PostPhysics도 프레임 축에 남긴다 — FlushAniEvents가 AnimatorSystem 결과에 의존하기 때문이다. override void PostPhysics 17건은 필요한 것부터 점진 이주하며 이주는 완료 조건이 아니다. ★ 작업량의 본체는 누산기가 아니라 CCT 등 스텝당 단위 저작값 재보정과 렌더 보간 신설(배관 0건)이다." },
+    refs: "NetworkFrameworkPlan N3 · §4.4", priority: "P0", days: 4, status: "todo",
+    note: "사내 · PHASE 20 위임 범위 밖 · ★ 선행 PHASE 9.5 W8(디스패치 오버라이드 감지) — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. ★ 2026-09-04 생명주기 실측으로 1판 설계를 정정했다: Initialization은 비동기 씬 활성화를 폴링하고 GameLogic은 UpdateRenderData로 끝나므로 둘 다 tick 루프에 못 들어간다. 기존 PrePhysics/PostPhysics도 프레임 축에 남긴다 — FlushAniEvents가 AnimatorSystem 결과에 의존하기 때문이다. override void PostPhysics 17건은 필요한 것부터 점진 이주하며 이주는 완료 조건이 아니다. ★ 작업량의 본체는 누산기가 아니라 CCT 등 스텝당 단위 저작값 재보정과 렌더 보간 신설(배관 0건)이다." },
   { phase: 20, id: "N4", title: "Loopback Transport와 메시지 프레이밍",
     detail: "message-oriented INetworkTransport, bounded reader/writer, handshake와 loss/reorder/duplicate/corruption simulator를 실제 socket 없이 완결한다.",
     refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo",
