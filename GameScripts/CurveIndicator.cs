@@ -12,7 +12,7 @@ namespace CreatorEngine.Scripts;
 ///  · 재질 사본을 만드는 이유를 <see cref="MeshRenderer.InstantiateMaterial"/>에 담았다.
 ///  · 원본은 자식에 MeshRenderer가 없으면 널 역참조로 죽었다 — 아래 주석 참고.
 /// </summary>
-public sealed partial class CurveIndicator : Behaviour
+public sealed partial class CurveIndicator : Component
 {
     /// <summary>표식 사이 간격. 이 값과 거리로 곡선 위 위치가 정해진다.</summary>
     [SerializeField] private float _interval = 1f;
@@ -40,9 +40,13 @@ public sealed partial class CurveIndicator : Behaviour
             // 재질을 공유한 채로 색을 바꾸면 같은 재질을 쓰는 다른 오브젝트까지 함께 변한다.
             renderer.InstantiateMaterial("IndicatorMaterial");
 
+            // 공간이 없는 자식(UI 계열)은 곡선 위에 놓을 수 없다 — 세 목록의 길이가
+            // 짝을 이뤄야 하므로 여기서 함께 걸러 낸다.
+            if (child.Transform is not { } childTransform) continue;
+
             _indicators.Add(child);
             _renderers.Add(renderer);
-            _initialScales.Add(child.Transform.LocalScale);
+            _initialScales.Add(childTransform.LocalScale);
         }
     }
 
@@ -69,13 +73,13 @@ public sealed partial class CurveIndicator : Behaviour
 
             Float3 a = Float3.Lerp(_start, control, t);
             Float3 b = Float3.Lerp(control, _end, t);
-            indicator.Transform.SetLocalPosition(Float3.Lerp(a, b, t));
+            indicator.Transform?.SetLocalPosition(Float3.Lerp(a, b, t));
 
             // 곡선 가운데(t≈0.5)에서 가장 크고 진하게. 원본의 sin(t) 곡선을 그대로 둔다.
             float alpha = MathF.Sin(t);
             float scale = Math.Clamp(alpha * 3f, _minScale, 1f);
 
-            indicator.Transform.SetLocalScale(_initialScales[i] * scale);
+            indicator.Transform?.SetLocalScale(_initialScales[i] * scale);
             _renderers[i].BaseColor = _renderers[i].BaseColor.WithAlpha(alpha);
         }
     }

@@ -44,7 +44,7 @@ public:
 	// 네이티브에서만 일어나는 사건을 관리 인스턴스에 흘린다(트랙 L · L3 잔여).
 	//
 	// 가상 훅으로 만들지 않은 이유: Scene::FlushPendingDestroy가 **모든 파괴에서**
-	// OnEndSimulation/OnRemovingFromScene을 부르고 그 뒤 DestroyBehaviour가 관리 측
+	// OnEndSimulation/OnRemovingFromScene을 부르고 그 뒤 DestroyComponent가 관리 측
 	// TearDown을 태워 같은 둘을 또 부른다 — 가상으로 받으면 파괴마다 이중 발화한다.
 	// 그래서 지금은 이중이 구조적으로 불가능한 자리(DDOL 이송 경로) 두 곳만 이
 	// 창구를 부른다. 자세한 사유와 최종형은 ScriptLifecyclePhase.h 상단에 있다.

@@ -6,7 +6,7 @@ namespace CreatorEngine.Scripts;
 /// Unity라면 Instantiate가 반환된 시점에 Awake가 끝나 있어야 한다.
 /// 여기서는 그 가정이 성립하는지를 프레임 번호로 비교한다.
 /// </summary>
-public sealed partial class ProbeSpawner : Behaviour
+public sealed partial class ProbeSpawner : Component
 {
     [SerializeField] private string _prefabName = "";
     [SerializeField] private int _spawnAtFrame = 30;

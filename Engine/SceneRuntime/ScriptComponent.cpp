@@ -70,7 +70,7 @@ void ScriptComponent::OnInitialized()
 		return;
 	}
 
-	m_instanceId = clr.CreateBehaviour(GetOwner(), m_scriptType);
+	m_instanceId = clr.CreateComponent(GetOwner(), m_scriptType);
 	if (!HasInstance())
 	{
 		Debug->LogError("[스크립트] 인스턴스 생성 실패 — 등록되지 않은 타입: " + m_scriptType);
@@ -82,7 +82,7 @@ void ScriptComponent::OnInitialized()
 	ApplyFields();
 
 	// 관리 측 OnInitialized도 여기서 부른다(트랙 L · L3 잔여 2단계). 예전에는
-	// BehaviourRegistry가 자기 큐(_pendingAwake)로 다음 틱에 불렀는데, 그러면
+	// ScriptRegistry가 자기 큐(_pendingAwake)로 다음 틱에 불렀는데, 그러면
 	// 관리 측 생명주기의 드라이버가 네이티브와 둘이 된다 — 그 이원화가 DDOL 이송
 	// 신호가 스크립트에 닿지 않던 원인이었다(ScriptLifecyclePhase.h).
 	NotifyManagedLifecycle(ScriptLifecyclePhase::OnInitialized);
@@ -105,7 +105,7 @@ void ScriptComponent::SuspendInstance()
 	// 값을 먼저 챙긴다 — 인스턴스가 사라지면 읽을 수 없다.
 	CaptureFields();
 
-	ClrHost::Get().DestroyBehaviour(m_instanceId);
+	ClrHost::Get().DestroyComponent(m_instanceId);
 	m_instanceId = -1;
 }
 
@@ -316,7 +316,7 @@ void ScriptComponent::OnUninitializing()
 	// 자기 마지막 훅을 못 받는다(트랙 L · L3 완결).
 	NotifyManagedLifecycle(ScriptLifecyclePhase::OnUninitializing);
 
-	ClrHost::Get().DestroyBehaviour(m_instanceId);
+	ClrHost::Get().DestroyComponent(m_instanceId);
 	m_instanceId = -1;
 }
 

@@ -1,7 +1,7 @@
 namespace CreatorEngine.Scripts;
 
 /// <summary>Text · Canvas · UI 그리기 순서 바인딩 검증.</summary>
-public sealed partial class UiTextProbe : Behaviour
+public sealed partial class UiTextProbe : Component
 {
     [SerializeField] private int _checkAfterFrames = 20;
 

@@ -1,7 +1,7 @@
 namespace CreatorEngine.Scripts;
 
 /// <summary>계층 접근(자식·부모·인덱스) 검증.</summary>
-public sealed partial class HierarchyProbe : Behaviour
+public sealed partial class HierarchyProbe : Component
 {
     private int _passed;
     private int _failed;

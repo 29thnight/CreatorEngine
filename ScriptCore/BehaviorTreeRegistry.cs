@@ -134,7 +134,7 @@ internal static class BehaviorTreeRegistry
     /// <summary>
     /// 소유자가 사라진 트리를 거둔다. 거둔 수를 돌려준다.
     ///
-    /// 씬 언로드에서 <see cref="Clear"/>를 부르면 안 되는 이유는 Behaviour 쪽과 같다 —
+    /// 씬 언로드에서 <see cref="Clear"/>를 부르면 안 되는 이유는 Component 쪽과 같다 —
     /// DontDestroyOnLoad 오브젝트의 트리까지 없어진다. 소유자 생존으로 가른다.
     ///
     /// 정상 경로는 BehaviorTreeComponent::OnDestroy → DestroyBehaviorTree이고, 그쪽을

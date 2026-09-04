@@ -10,7 +10,7 @@ namespace CreatorEngine.Scripts;
 /// 관찰해 판정한다. 스스로 리사이즈하지 않는 이유는 실제 엔진 리사이즈 경로
 /// (g_ClientRect 갱신 → 다음 프레임 레이아웃)를 그대로 태우기 위해서다.
 /// </summary>
-public sealed partial class RectLayoutProbe : Behaviour
+public sealed partial class RectLayoutProbe : Component
 {
     /// <summary>검사할 캔버스 오브젝트 이름.</summary>
     [SerializeField] private string _canvasName = "Canvas";

@@ -7,11 +7,11 @@ namespace CreatorEngine;
 /// 순회 도중 스크립트가 추가·삭제될 수 있으므로 보류 큐를 두고 틱 경계에서 반영한다 —
 /// 네이티브의 <c>AllDestroyMark</c> 지연 파괴와 같은 철학이다.
 /// </summary>
-internal static class BehaviourRegistry
+internal static class ScriptRegistry
 {
-    private static readonly List<Behaviour> _active = new();
-    private static readonly List<Behaviour> _pendingAdd = new();
-    private static readonly List<Behaviour> _pendingRemove = new();
+    private static readonly List<Component> _active = new();
+    private static readonly List<Component> _pendingAdd = new();
+    private static readonly List<Component> _pendingRemove = new();
 
     /// <summary>
     /// 오브젝트별 스크립트 목록. GetComponent가 경계를 넘지 않고 답하기 위한 색인이다.
@@ -21,7 +21,7 @@ internal static class BehaviourRegistry
     /// 보류 큐를 거치지 않고 즉시 갱신하는 이유는, 스폰 직후 Awake 안에서 바로
     /// GetComponent를 부르는 패턴이 흔하기 때문이다.
     /// </summary>
-    private static readonly Dictionary<ObjectHandle, List<Behaviour>> _byObject = new();
+    private static readonly Dictionary<ObjectHandle, List<Component>> _byObject = new();
 
     // 앞쪽 세 단계(OnInitialized·OnAddedToScene·OnBeginSimulation)의 큐는 은퇴했다
     // (설계 문서 §4 트랙 L · L3 잔여 2단계). 이제 네이티브 ScriptComponent의 같은
@@ -35,7 +35,7 @@ internal static class BehaviourRegistry
 
     public static int ActiveCount => _active.Count;
 
-    public static void Add(Behaviour behaviour)
+    public static void Add(Component behaviour)
     {
         // _pendingAdd는 **틱 멤버십**이다(_active 편입) — 생명주기 단계와 무관하며
         // "경계는 틱당 1회"의 근거라 그대로 둔다.
@@ -44,13 +44,13 @@ internal static class BehaviourRegistry
         ObjectHandle owner = behaviour.Entity.Handle;
         if (!_byObject.TryGetValue(owner, out var list))
         {
-            list = new List<Behaviour>(2);
+            list = new List<Component>(2);
             _byObject[owner] = list;
         }
         list.Add(behaviour);
     }
 
-    public static void Remove(Behaviour behaviour)
+    public static void Remove(Component behaviour)
     {
         behaviour.MarkDestroyed();
         _pendingRemove.Add(behaviour);
@@ -66,7 +66,7 @@ internal static class BehaviourRegistry
     /// <summary>
     /// 오브젝트에 붙은 T 타입 컴포넌트 하나. 없으면 null.
     /// GetComponent가 Component 제약으로 열려 있어 여기도 같은 제약을 받는다 —
-    /// 관리 스크립트만 이 색인에 들어 있으므로 실제로 걸리는 것은 Behaviour 파생뿐이다.
+    /// 관리 스크립트만 이 색인에 들어 있으므로 실제로 걸리는 것은 Component 파생뿐이다.
     /// </summary>
     public static T? FindComponent<T>(ObjectHandle owner) where T : Component
     {
@@ -74,15 +74,15 @@ internal static class BehaviourRegistry
 
         for (int i = 0; i < list.Count; ++i)
         {
-            // 살아 있는지는 Behaviour 쪽에서 본다 — T는 Component까지만 보장되기 때문이다.
-            Behaviour entry = list[i];
+            // 살아 있는지는 Component 쪽에서 본다 — T는 Component까지만 보장되기 때문이다.
+            Component entry = list[i];
             if (entry.IsAlive && entry is T match) return match;
         }
         return null;
     }
 
     /// <summary>오브젝트에 붙은 T 타입 스크립트 전부.</summary>
-    public static List<T> FindAll<T>(ObjectHandle owner) where T : Behaviour
+    public static List<T> FindAll<T>(ObjectHandle owner) where T : Component
     {
         var result = new List<T>();
         if (!_byObject.TryGetValue(owner, out var list)) return result;
@@ -109,7 +109,7 @@ internal static class BehaviourRegistry
             {
                 _active.Remove(b);
 
-                // Initialized 없이 Uninitializing 없음(설계 문서 §4 트랙 L, Behaviour.cs
+                // Initialized 없이 Uninitializing 없음(설계 문서 §4 트랙 L, Component.cs
                 // IsInitialized 참고). OnInitialized에서 잡은 것을 OnUninitializing에서
                 // 놓는 것이 흔한 형태라, 짝이 맞지 않으면 초기화하지 않은 상태를
                 // 정리하려 든다.
@@ -132,7 +132,7 @@ internal static class BehaviourRegistry
     /// OnEndSimulation 코드보다 먼저 취소돼야 "구독만 있고 해지가 없는" 상태가 한 프레임도
     /// 남지 않기 때문이다.
     /// </summary>
-    private static void TearDown(Behaviour b)
+    private static void TearDown(Component b)
     {
         // 네이티브가 이미 축소를 전달했으면 여기서 또 부르지 않는다(설계 문서 §4
         // 트랙 L · L3 완결). 살아 있는 컴포넌트의 파괴는 전부 네이티브
@@ -145,9 +145,9 @@ internal static class BehaviourRegistry
         if (b.TeardownDelivered) return;
 
         b.Scope.Cancel();
-        Invoke(b, static x => x.OnEndSimulation(), nameof(Behaviour.OnEndSimulation));
-        Invoke(b, static x => x.OnRemovingFromScene(), nameof(Behaviour.OnRemovingFromScene));
-        Invoke(b, static x => x.OnUninitializing(), nameof(Behaviour.OnUninitializing));
+        Invoke(b, static x => x.OnEndSimulation(), nameof(Component.OnEndSimulation));
+        Invoke(b, static x => x.OnRemovingFromScene(), nameof(Component.OnRemovingFromScene));
+        Invoke(b, static x => x.OnUninitializing(), nameof(Component.OnUninitializing));
     }
 
     /// <summary>
@@ -187,7 +187,7 @@ internal static class BehaviourRegistry
         {
             if (b.IsInitialized) return false;   // 두 번 초기화하지 않는다
             b.MarkInitialized();
-            Invoke(b, static x => x.OnInitialized(), nameof(Behaviour.OnInitialized));
+            Invoke(b, static x => x.OnInitialized(), nameof(Component.OnInitialized));
             return true;
         }
 
@@ -198,7 +198,7 @@ internal static class BehaviourRegistry
         switch ((LifecyclePhase)phase)
         {
             case LifecyclePhase.OnAddedToScene:
-                Invoke(b, static x => x.OnAddedToScene(), nameof(Behaviour.OnAddedToScene));
+                Invoke(b, static x => x.OnAddedToScene(), nameof(Component.OnAddedToScene));
 
                 // 최초 진입에서만 OnEnable을 이어 붙인다. 활성 축은 6단계와 직교라
                 // 네이티브 단계로 오지 않는데, 예전 드레인이 이 자리에서
@@ -207,13 +207,13 @@ internal static class BehaviourRegistry
                 if (!b.EnterDelivered)
                 {
                     b.MarkEnterDelivered();
-                    if (b.Enabled) Invoke(b, static x => x.OnEnable(), nameof(Behaviour.OnEnable));
+                    if (b.Enabled) Invoke(b, static x => x.OnEnable(), nameof(Component.OnEnable));
                 }
                 return true;
             case LifecyclePhase.OnRemovingFromScene:
                 // 이송에서도 파괴에서도 온다. 이송은 여러 번 정상 발화하므로 여기서
                 // 막지 않는다 — 파괴 경로의 중복은 TeardownDelivered가 TearDown 쪽에서 가른다.
-                Invoke(b, static x => x.OnRemovingFromScene(), nameof(Behaviour.OnRemovingFromScene));
+                Invoke(b, static x => x.OnRemovingFromScene(), nameof(Component.OnRemovingFromScene));
                 return true;
 
             case LifecyclePhase.OnEndSimulation:
@@ -225,11 +225,11 @@ internal static class BehaviourRegistry
                 // 해지가 없는" 상태가 한 프레임도 남지 않는다. TearDown이 지키던 순서를
                 // 네이티브 구동에서도 그대로 지킨다.
                 b.Scope.Cancel();
-                Invoke(b, static x => x.OnEndSimulation(), nameof(Behaviour.OnEndSimulation));
+                Invoke(b, static x => x.OnEndSimulation(), nameof(Component.OnEndSimulation));
                 return true;
 
             case LifecyclePhase.OnUninitializing:
-                Invoke(b, static x => x.OnUninitializing(), nameof(Behaviour.OnUninitializing));
+                Invoke(b, static x => x.OnUninitializing(), nameof(Component.OnUninitializing));
                 return true;
             case LifecyclePhase.OnBeginSimulation:
                 // 네이티브 드레인이 "OnInitialized 다음 정거장"으로 부른다. 꺼져 있으면
@@ -237,7 +237,7 @@ internal static class BehaviourRegistry
                 // 꺼질 수 있으므로 여기서도 본다(옛 _pendingStart 드레인과 같은 조건).
                 if (b.Enabled)
                 {
-                    Invoke(b, static x => x.OnBeginSimulation(), nameof(Behaviour.OnBeginSimulation));
+                    Invoke(b, static x => x.OnBeginSimulation(), nameof(Component.OnBeginSimulation));
                     StartSimulation(b);
                 }
                 return true;
@@ -255,7 +255,7 @@ internal static class BehaviourRegistry
     /// Scope.Delay가 그 자리에서 취소되며 본문이 풀린다 — 목록을 따로 들면 그
     /// 단일 소유가 둘로 갈린다.
     /// </summary>
-    private static void StartSimulation(Behaviour b)
+    private static void StartSimulation(Component b)
     {
         Task task;
         try
@@ -287,7 +287,7 @@ internal static class BehaviourRegistry
             TaskScheduler.Default);
     }
 
-    private static void ReportSimulationFault(Behaviour b, Task task)
+    private static void ReportSimulationFault(Component b, Task task)
     {
         // 취소는 정상 종료다 — 엔티티 제거가 그 경로다(설계 문서 §4 트랙 L5).
         if (!task.IsFaulted) return;
@@ -299,7 +299,7 @@ internal static class BehaviourRegistry
     /// 스크립트 하나의 예외가 에디터 전체를 죽이지 않게 한다.
     /// 같은 예외가 매 프레임 반복되어 로그가 폭주하지 않도록 해당 스크립트만 끈다(설계 문서 10.2).
     /// </summary>
-    private static void Invoke(Behaviour b, Action<Behaviour> call, string phase)
+    private static void Invoke(Component b, Action<Component> call, string phase)
     {
         try
         {
@@ -343,7 +343,7 @@ internal static class BehaviourRegistry
             b.Scope.Tick(dt);
 
             if (!b.Enabled) continue;
-            Invoke(b, x => x.PrePhysics(dt), nameof(Behaviour.PrePhysics));
+            Invoke(b, x => x.PrePhysics(dt), nameof(Component.PrePhysics));
         }
     }
 
@@ -354,7 +354,7 @@ internal static class BehaviourRegistry
         {
             var b = _active[i];
             if (!b.IsAlive || !b.Enabled) continue;
-            Invoke(b, x => x.PostPhysics(dt), nameof(Behaviour.PostPhysics));
+            Invoke(b, x => x.PostPhysics(dt), nameof(Component.PostPhysics));
         }
 
         Flush();
@@ -364,7 +364,7 @@ internal static class BehaviourRegistry
     /// 물리 이벤트 하나를 해당 스크립트에 전달한다.
     /// 예외 격리는 다른 콜백과 같게 처리한다 — 충돌 콜백 하나가 프레임 전체를 죽이지 않는다.
     /// </summary>
-    public static void DispatchPhysics(Behaviour target, PhysicsEventKind kind, in Collision collision)
+    public static void DispatchPhysics(Component target, PhysicsEventKind kind, in Collision collision)
     {
         try
         {
@@ -392,7 +392,7 @@ internal static class BehaviourRegistry
     /// 해당 스크립트만 끈다. 다만 이름이 안 맞아 못 찾은 것은 예외가 아니라
     /// 데이터와 코드가 어긋난 것이므로 경고만 남기고 넘어간다.
     /// </summary>
-    public static void DispatchMessage(Behaviour target, string message)
+    public static void DispatchMessage(Component target, string message)
     {
         try
         {
@@ -436,7 +436,7 @@ internal static class BehaviourRegistry
         // (지연 제거) 규약을 지켜 두는 편이 나중에 안전하다.
         for (int i = _active.Count - 1; i >= 0; --i)
         {
-            Behaviour b = _active[i];
+            Component b = _active[i];
             if (b.IsMarkedDestroyed) continue;   // 정상 경로가 이미 잡았다
             if (b.Entity.IsAlive) continue;  // 살아 있다 — DDOL 포함
 
@@ -461,7 +461,7 @@ internal static class BehaviourRegistry
         {
             if (!b.IsInitialized) continue;   // Flush로 목록에만 들어오고 아직 초기화되지 않은 것
 
-            if (b.Enabled) Invoke(b, static x => x.OnDisable(), nameof(Behaviour.OnDisable));
+            if (b.Enabled) Invoke(b, static x => x.OnDisable(), nameof(Component.OnDisable));
             TearDown(b);
         }
 

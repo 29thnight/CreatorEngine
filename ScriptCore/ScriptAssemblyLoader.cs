@@ -12,19 +12,19 @@ namespace CreatorEngine;
 /// 교체되는 것은 GameScripts 쪽뿐이다.
 ///
 /// 언로드는 참조가 하나라도 남으면 실패한다. 그래서 리로드 전에 인스턴스를 전부
-/// 버리고(BehaviourRegistry.Clear) 팩토리 표도 비운다. 표에 담긴 델리게이트가
+/// 버리고(ScriptRegistry.Clear) 팩토리 표도 비운다. 표에 담긴 델리게이트가
 /// 스크립트 타입을 가리키고 있어, 이것 하나만 남아도 컨텍스트가 살아남는다.
 /// </summary>
 internal sealed class ScriptLoadContext(string name) : AssemblyLoadContext(name, isCollectible: true)
 {
     // 지금 실행 중인 ScriptCore. 호스트가 hostfxr로 직접 올린 것이라
     // 일반적인 probing 경로로는 찾을 수 없어(FileNotFoundException) 여기서 직접 물려준다.
-    private static readonly Assembly CoreAssembly = typeof(Behaviour).Assembly;
+    private static readonly Assembly CoreAssembly = typeof(Component).Assembly;
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         // 공용 어셈블리는 반드시 이미 로드된 것을 그대로 쓴다.
-        // 새로 로드하면 같은 타입이 두 벌 생겨 Behaviour 캐스팅이 조용히 깨진다.
+        // 새로 로드하면 같은 타입이 두 벌 생겨 Component 캐스팅이 조용히 깨진다.
         if (assemblyName.Name == CoreAssembly.GetName().Name)
         {
             return CoreAssembly;
@@ -118,14 +118,14 @@ internal static class ScriptAssemblyLoader
         MethodInfo? method = registry?.GetMethod("RegisterAll", BindingFlags.Public | BindingFlags.Static);
         if (method is null) return false;
 
-        Action<string, Func<Behaviour>> register = ScriptFactory.Register;
+        Action<string, Func<Component>> register = ScriptFactory.Register;
         method.Invoke(null, [register]);
 
         // 애니메이션 상태 스크립트는 별도 목록이다. 없는 프로젝트도 있으므로 없으면 건너뛴다.
         MethodInfo? aniMethod = registry?.GetMethod("RegisterAllAni", BindingFlags.Public | BindingFlags.Static);
         if (aniMethod is not null)
         {
-            Action<string, Func<AniBehaviour>> registerAni = AniBehaviourFactory.Register;
+            Action<string, Func<AniBehavior>> registerAni = AniBehaviorFactory.Register;
             aniMethod.Invoke(null, [registerAni]);
         }
 
@@ -149,17 +149,17 @@ internal static class ScriptAssemblyLoader
         if (_context is null) return;
 
         // 스크립트 타입을 가리키는 참조를 전부 끊는다.
-        BehaviourRegistry.Clear();
+        ScriptRegistry.Clear();
         ScriptFactory.ClearRegistrations();
-        AniBehaviourFactory.ClearRegistrations();
+        AniBehaviorFactory.ClearRegistrations();
         BTNodeFactory.ClearRegistrations();
 
         // 살아 있는 트리도 끊어야 한다. BTNodeFactory를 비우는 것은 '앞으로 만들지
         // 않겠다'일 뿐, 이미 만들어진 노드 인스턴스는 그대로 남아 스크립트 타입을
         // 붙든다 — 그러면 컨텍스트가 언로드되지 않고 다음 리로드부터 타입이 두 벌이 된다.
         //
-        // 여기가 빠져 있었다. 팩토리 표 셋만 비우고 인스턴스 목록은 BehaviourRegistry만
-        // 비웠는데, 트리는 BehaviourRegistry가 아니라 자기 목록에 있다(수명 주체가
+        // 여기가 빠져 있었다. 팩토리 표 셋만 비우고 인스턴스 목록은 ScriptRegistry만
+        // 비웠는데, 트리는 ScriptRegistry가 아니라 자기 목록에 있다(수명 주체가
         // 달라 따로 둔 것이다 — BehaviorTreeRegistry 주석 참고).
         BehaviorTreeRegistry.Clear();
 

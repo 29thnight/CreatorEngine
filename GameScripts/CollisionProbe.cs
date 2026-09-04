@@ -6,7 +6,7 @@ namespace CreatorEngine.Scripts;
 /// 충돌·트리거를 받아 로그로 남긴다. Stay는 매 프레임 쏟아지므로 횟수만 세고,
 /// Enter/Exit만 그때그때 기록한다.
 /// </summary>
-public sealed partial class CollisionProbe : Behaviour
+public sealed partial class CollisionProbe : Component
 {
     [SerializeField] private bool _logStay;
 

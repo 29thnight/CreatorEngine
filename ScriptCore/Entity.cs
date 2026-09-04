@@ -13,38 +13,35 @@ public readonly struct Entity(ObjectHandle handle) : IEquatable<Entity>
     public string Name => Native.GetName(Handle);
 
     /// <summary>
-    /// 엔진에서 Transform은 **컴포넌트다**(S1-b + S3에서 TransformComponent로 승격).
-    /// 그런데도 여기서 프로퍼티로 노출하는 이유는 C# 쪽 Transform이 Component 파생이
-    /// 아니라 핸들 위의 값 뷰라, GetComponent&lt;T&gt;의 제약(T : Component)으로
-    /// 표현할 수 없기 때문이다. 네이티브의 형상이 아니라 관리 측 표현의 제약이다.
-    /// 그래서 컴포넌트 조회가 아니라 프로퍼티로 노출한다.
+    /// 이 오브젝트의 Transform. UI/Canvas처럼 갖지 않는 오브젝트면 null이다(S3).
+    ///
+    /// <c>GetComponent&lt;Transform&gt;()</c>과 같은 것을 돌려주는 짧은 이름이다 —
+    /// Transform 접근은 실측 1위라 매번 조회를 쓰게 하면 코드가 길어진다.
     /// </summary>
-    public Transform Transform => new(Handle);
+    public Transform? Transform => GetComponent<Transform>();
 
     public void SetEnabled(bool enabled) => Native.SetEnabled(Handle, enabled);
 
     // ── 컴포넌트 조회 ──
     //
-    // 지금은 관리 스크립트(Behaviour 파생)만 찾는다. 이 호출들은 경계를 넘지 않고
+    // 지금은 관리 스크립트(Component 파생)만 찾는다. 이 호출들은 경계를 넘지 않고
     // C# 안에서 끝나며, 실측 GetComponent 734회의 상당수가 여기 해당한다.
     //
-    // 네이티브 컴포넌트(Animator·SoundComponent 등)는 아직 래퍼가 없다.
+    // 네이티브 컴포넌트는 NativeComponentTable에 래퍼가 등재된 것만 찾을 수 있다.
     // 제약을 타입 파라미터로 못 박아 두면 "찾았는데 null"이 아니라 컴파일 단계에서
     // 걸리므로, 나중에 래퍼가 생겼을 때 오버로드를 더하기도 쉽다.
-    // Transform은 네이티브에선 컴포넌트지만 관리 측 표현이 값 뷰라 위의 프로퍼티로
-    // 접근한다(사유는 그 프로퍼티 주석).
 
     /// <summary>
     /// 붙어 있는 T 컴포넌트 하나. 없으면 null.
     ///
-    /// 스크립트(Behaviour 파생)면 관리 영역에서 바로 찾고, 네이티브 래퍼면 존재 확인만
+    /// 스크립트(Component 파생)면 관리 영역에서 바로 찾고, 네이티브 래퍼면 존재 확인만
     /// 경계를 넘는다. 분기는 <see cref="ComponentKind{T}"/>가 정적으로 판정해 둔다.
     /// </summary>
     public T? GetComponent<T>() where T : Component
     {
         if (ComponentKind<T>.IsManaged)
         {
-            return BehaviourRegistry.FindComponent<T>(Handle);
+            return ScriptRegistry.FindComponent<T>(Handle);
         }
 
         if (ComponentKind<T>.Exists is { } exists && ComponentKind<T>.Wrap is { } wrap)
@@ -56,8 +53,8 @@ public readonly struct Entity(ObjectHandle handle) : IEquatable<Entity>
     }
 
     /// <summary>붙어 있는 T 스크립트 전부. 네이티브 컴포넌트는 오브젝트당 하나뿐이다.</summary>
-    public List<T> GetComponents<T>() where T : Behaviour
-        => BehaviourRegistry.FindAll<T>(Handle);
+    public List<T> GetComponents<T>() where T : Component
+        => ScriptRegistry.FindAll<T>(Handle);
 
     /// <summary>Unity 관례의 Try 형태. 찾으면 true.</summary>
     public bool TryGetComponent<T>(out T component) where T : Component
@@ -169,93 +166,3 @@ public readonly struct Entity(ObjectHandle handle) : IEquatable<Entity>
     public static bool operator !=(Entity a, Entity b) => !a.Equals(b);
     public override string ToString() => IsAlive ? $"Entity({Name})" : "Entity(<destroyed>)";
 }
-
-/// <summary>
-/// Entity의 위치·회전을 다루는 얼굴. 역시 핸들만 들고 있다.
-/// </summary>
-public readonly struct Transform(ObjectHandle handle)
-{
-    internal readonly ObjectHandle Handle = handle;
-
-    // ── 로컬 ──
-
-    public Float3 LocalPosition
-    {
-        get => Native.GetLocalPosition(Handle);
-        set => Native.SetLocalPosition(Handle, value);
-    }
-
-    public Quaternion LocalRotation
-    {
-        get => Native.GetLocalRotation(Handle);
-        set => Native.SetLocalRotation(Handle, value);
-    }
-
-    public Float3 LocalScale
-    {
-        get => Native.GetLocalScale(Handle);
-        set => Native.SetLocalScale(Handle, value);
-    }
-
-    // ── 월드 ──
-    //
-    // 월드 위치·회전·스케일은 읽기는 캐시된 값이고 쓰기는 부모 역행렬을 거쳐
-    // 로컬로 환산된다(엔진 SetWorldPosition/SetWorldRotation과 같은 경로).
-
-    public Float3 WorldPosition
-    {
-        get => Native.GetWorldPosition(Handle);
-        set => Native.SetWorldPosition(Handle, value);
-    }
-
-    public Quaternion WorldRotation
-    {
-        get => Native.GetWorldRotation(Handle);
-        set => Native.SetWorldRotation(Handle, value);
-    }
-
-    public Float3 WorldScale
-    {
-        get => Native.GetWorldScale(Handle);
-        set => Native.SetWorldScale(Handle, value);
-    }
-
-    // ── 방향축 ──
-    // 월드 기준이고 정규화되어 있다. 조준·이동에서 가장 많이 쓰인다(GetForward 실측 41회).
-
-    public Float3 Forward => Native.GetForward(Handle);
-    public Float3 Right   => Native.GetRight(Handle);
-    public Float3 Up      => Native.GetUp(Handle);
-
-    // ── 누적 ──
-    // 읽고-고쳐-쓰기로 하면 경계를 두 번 넘는다. 네이티브가 한 번에 처리한다.
-
-    public void Translate(Float3 delta) => Native.AddLocalPosition(Handle, delta);
-
-    /// <summary>기존 회전에 이어 붙인다(엔진 AddRotation과 같은 순서).</summary>
-    public void Rotate(Quaternion delta) => Native.AddLocalRotation(Handle, delta);
-
-    // ── 남의 오브젝트를 고칠 때 ──
-    //
-    // Transform은 핸들만 담은 struct라 Entity.Transform 프로퍼티가 임시 복사본을
-    // 돌려준다. 그래서 obj.Transform.LocalPosition = ... 은 컴파일이 막힌다.
-    // 자기 것을 고칠 때는 Behaviour.Transform이 필드라 위의 프로퍼티를 그냥 쓰면 된다.
-
-    public void SetLocalPosition(Float3 p) => Native.SetLocalPosition(Handle, p);
-    public void SetLocalRotation(Quaternion q) => Native.SetLocalRotation(Handle, q);
-    public void SetLocalScale(Float3 s) => Native.SetLocalScale(Handle, s);
-
-    public void SetWorldPosition(Float3 p) => Native.SetWorldPosition(Handle, p);
-    public void SetWorldRotation(Quaternion q) => Native.SetWorldRotation(Handle, q);
-    public void SetWorldScale(Float3 s) => Native.SetWorldScale(Handle, s);
-
-    /// <summary>주어진 지점을 바라보게 한다. 위쪽은 +Y로 잡는다.</summary>
-    public void LookAt(Float3 target)
-    {
-        Float3 direction = target - WorldPosition;
-        if (direction.LengthSquared < 1e-12f) return;
-
-        Native.SetWorldRotation(Handle, Quaternion.LookRotation(direction));
-    }
-}
-

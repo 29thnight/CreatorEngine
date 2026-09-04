@@ -18,12 +18,12 @@ public:
 	explicit ManagedAniBehavior(std::string_view typeName)
 	{
 		m_name = std::string(typeName);
-		m_instanceId = ClrHost::Get().CreateAniBehaviour(typeName);
+		m_instanceId = ClrHost::Get().CreateAniBehavior(typeName);
 	}
 
 	~ManagedAniBehavior() override
 	{
-		if (HasInstance()) ClrHost::Get().DestroyAniBehaviour(m_instanceId);
+		if (HasInstance()) ClrHost::Get().DestroyAniBehavior(m_instanceId);
 	}
 
 	ManagedAniBehavior(const ManagedAniBehavior&) = delete;

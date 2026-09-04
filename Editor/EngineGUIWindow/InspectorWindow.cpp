@@ -81,7 +81,7 @@ static void AttachManagedScript(Entity* obj, const std::string& typeName)
 	}
 
 	// m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
-	// CreateBehaviour를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
+	// CreateComponent를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
 	script->m_scriptType = typeName;
 
 	if (Scene* scene = obj->GetScene())
@@ -420,7 +420,7 @@ InspectorWindow::InspectorWindow()
 				ImGui::Separator();
 				ImGui::TextColored(ImVec4(0.6f, 0.85f, 1.f, 1.f), "C# Scripts");
 
-				const auto managedTypeNames = ClrHost::Get().GetBehaviourTypeNames();
+				const auto managedTypeNames = ClrHost::Get().GetComponentTypeNames();
 				if (managedTypeNames.empty())
 				{
 					ImGui::TextDisabled(ClrHost::Get().IsReady()
@@ -533,7 +533,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 	{
 		ImGui::TextDisabled("스크립트 타입이 지정되지 않았습니다");
 
-		const auto typeNames = clr.GetBehaviourTypeNames();
+		const auto typeNames = clr.GetComponentTypeNames();
 		if (typeNames.empty())
 		{
 			ImGui::TextDisabled(clr.IsReady() ? "등록된 C# 스크립트가 없습니다"

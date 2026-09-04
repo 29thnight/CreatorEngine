@@ -7,10 +7,10 @@ namespace CreatorEngine;
 ///
 /// Verse의 spawn/suspends를 C#으로 번안한 것이다(설계 문서 SceneGraphRedesignPlan §4
 /// 트랙 L). OnBeginSimulation에서 시작한 태스크·이벤트 구독은 여기 등록해 두면
-/// OnEndSimulation 직전에 <see cref="BehaviourRegistry"/>가 일괄 취소한다 —
+/// OnEndSimulation 직전에 <see cref="ScriptRegistry"/>가 일괄 취소한다 —
 /// "구독만 있고 해지가 없는" 구조(설계 문서가 지목한 N-4)가 이 스코프 하나로 막힌다.
 ///
-/// <see cref="Delay"/>는 관리 측 프레임 틱(<see cref="BehaviourRegistry.Update"/>)에서
+/// <see cref="Delay"/>는 관리 측 프레임 틱(<see cref="ScriptRegistry.Update"/>)에서
 /// 구동되는 결정적 지연이다. <c>Task.Delay</c>(벽시계)를 쓰지 않는 이유는, 벽시계는
 /// 일시정지·프레임 배속과 무관하게 흐르기 때문이다 — 여기서는 엔진 dt가 시간의
 /// 유일한 정본이다. 시뮬레이션 태스크는 경계를 넘지 않고 이 클래스 안에서만
@@ -79,7 +79,7 @@ public sealed class SimulationScope
     }
 
     /// <summary>
-    /// 매 프레임 대기열을 한 칸 흘려보낸다. <see cref="BehaviourRegistry.Update"/>가 부른다.
+    /// 매 프레임 대기열을 한 칸 흘려보낸다. <see cref="ScriptRegistry.Update"/>가 부른다.
     /// </summary>
     internal void Tick(float dt)
     {
@@ -100,7 +100,7 @@ public sealed class SimulationScope
 
     /// <summary>
     /// 등록된 작업을 전부 취소하고 다음 시뮬레이션을 위해 토큰을 새로 연다.
-    /// <see cref="BehaviourRegistry"/>가 OnEndSimulation 직전에 부른다.
+    /// <see cref="ScriptRegistry"/>가 OnEndSimulation 직전에 부른다.
     /// </summary>
     internal void Cancel()
     {

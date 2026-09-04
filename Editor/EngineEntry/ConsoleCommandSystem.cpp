@@ -6556,7 +6556,7 @@ namespace ConsoleCmd
         }
 
         // m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
-        // CreateBehaviour를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
+        // CreateComponent를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
         script->m_scriptType = typeName;
 
         // (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다("씬의 초기화

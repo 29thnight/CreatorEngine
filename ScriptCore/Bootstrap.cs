@@ -37,7 +37,7 @@ public static class Bootstrap
     {
         try
         {
-            BehaviourRegistry.Clear();
+            ScriptRegistry.Clear();
             return 0;
         }
         catch { return -1; }
@@ -57,7 +57,7 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int FlushRegistrations()
     {
-        try { BehaviourRegistry.FlushRegistrations(); return BehaviourRegistry.ActiveCount; }
+        try { ScriptRegistry.FlushRegistrations(); return ScriptRegistry.ActiveCount; }
         catch (Exception ex) { Report(ex, nameof(FlushRegistrations)); return -1; }
     }
 
@@ -65,7 +65,7 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int PrePhysicsTick(float dt)
     {
-        try { BehaviourRegistry.PrePhysicsTick(dt); return BehaviourRegistry.ActiveCount; }
+        try { ScriptRegistry.PrePhysicsTick(dt); return ScriptRegistry.ActiveCount; }
         catch (Exception ex) { Report(ex, nameof(PrePhysicsTick)); return -1; }
     }
 
@@ -73,7 +73,7 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int PostPhysicsTick(float dt)
     {
-        try { BehaviourRegistry.PostPhysicsTick(dt); return BehaviourRegistry.ActiveCount; }
+        try { ScriptRegistry.PostPhysicsTick(dt); return ScriptRegistry.ActiveCount; }
         catch (Exception ex) { Report(ex, nameof(PostPhysicsTick)); return -1; }
     }
 
@@ -96,10 +96,10 @@ public static class Bootstrap
             {
                 ref readonly PhysicsEvent e = ref events[i];
 
-                Behaviour? target = ScriptFactory.Find(e.InstanceId);
+                Component? target = ScriptFactory.Find(e.InstanceId);
                 if (target is null || !target.IsAlive || !target.Enabled) continue;
 
-                BehaviourRegistry.DispatchPhysics(target, (PhysicsEventKind)e.Kind, in e.Collision);
+                ScriptRegistry.DispatchPhysics(target, (PhysicsEventKind)e.Kind, in e.Collision);
             }
             return count;
         }
@@ -121,10 +121,10 @@ public static class Bootstrap
             {
                 ScriptMessage* message = &messages[i];
 
-                Behaviour? target = ScriptFactory.Find(message->InstanceId);
+                Component? target = ScriptFactory.Find(message->InstanceId);
                 if (target is null || !target.IsAlive || !target.Enabled) continue;
 
-                BehaviourRegistry.DispatchMessage(target, ScriptMessage.ReadName(message));
+                ScriptRegistry.DispatchMessage(target, ScriptMessage.ReadName(message));
             }
             return count;
         }
@@ -137,33 +137,33 @@ public static class Bootstrap
     // 콜백은 물리와 같이 틱 경계에서 한 번에 전달된다.
 
     [UnmanagedCallersOnly]
-    public static unsafe int CreateAniBehaviour(byte* typeNameUtf8)
+    public static unsafe int CreateAniBehavior(byte* typeNameUtf8)
     {
         try
         {
             string typeName = Marshal.PtrToStringUTF8((nint)typeNameUtf8) ?? string.Empty;
-            return AniBehaviourFactory.Create(typeName);
+            return AniBehaviorFactory.Create(typeName);
         }
-        catch (Exception ex) { Report(ex, nameof(CreateAniBehaviour)); return -1; }
+        catch (Exception ex) { Report(ex, nameof(CreateAniBehavior)); return -1; }
     }
 
     [UnmanagedCallersOnly]
-    public static int DestroyAniBehaviour(int instanceId)
+    public static int DestroyAniBehavior(int instanceId)
     {
-        try { return AniBehaviourFactory.Destroy(instanceId) ? 0 : -1; }
-        catch (Exception ex) { Report(ex, nameof(DestroyAniBehaviour)); return -1; }
+        try { return AniBehaviorFactory.Destroy(instanceId) ? 0 : -1; }
+        catch (Exception ex) { Report(ex, nameof(DestroyAniBehavior)); return -1; }
     }
 
     /// <summary>이 이름의 애니메이션 스크립트가 C#에 있는지. 네이티브 팩토리와 이름이 겹치지 않게 확인용.</summary>
     [UnmanagedCallersOnly]
-    public static unsafe int HasAniBehaviour(byte* typeNameUtf8)
+    public static unsafe int HasAniBehavior(byte* typeNameUtf8)
     {
         try
         {
             string typeName = Marshal.PtrToStringUTF8((nint)typeNameUtf8) ?? string.Empty;
-            return AniBehaviourFactory.Exists(typeName) ? 1 : 0;
+            return AniBehaviorFactory.Exists(typeName) ? 1 : 0;
         }
-        catch (Exception ex) { Report(ex, nameof(HasAniBehaviour)); return 0; }
+        catch (Exception ex) { Report(ex, nameof(HasAniBehavior)); return 0; }
     }
 
     [UnmanagedCallersOnly]
@@ -175,7 +175,7 @@ public static class Bootstrap
 
             for (int i = 0; i < count; ++i)
             {
-                AniBehaviourFactory.Dispatch(in events[i]);
+                AniBehaviorFactory.Dispatch(in events[i]);
             }
             return count;
         }
@@ -196,7 +196,7 @@ public static class Bootstrap
         // 오늘 기준으로는 0건이어야 하고, 0이 아니면 수명 배선에 구멍이 생긴 것이다.
         try
         {
-            int behaviours = BehaviourRegistry.SweepOrphans();
+            int behaviours = ScriptRegistry.SweepOrphans();
             int trees = BehaviorTreeRegistry.SweepOrphans();
 
             // 0건이면 조용히 넘어간다. 매 씬 전환마다 '0건'을 찍으면 로그가 흐려지고,
@@ -219,14 +219,14 @@ public static class Bootstrap
     /// 실패하면 음수를 돌려준다(0 이상은 생성된 인스턴스 id).
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int CreateBehaviour(ObjectHandle owner, byte* typeNameUtf8)
+    public static unsafe int CreateComponent(ObjectHandle owner, byte* typeNameUtf8)
     {
         try
         {
             string typeName = Marshal.PtrToStringUTF8((nint)typeNameUtf8) ?? string.Empty;
             return ScriptFactory.Create(owner, typeName);
         }
-        catch (Exception ex) { Report(ex, nameof(CreateBehaviour)); return -1; }
+        catch (Exception ex) { Report(ex, nameof(CreateComponent)); return -1; }
     }
 
     // ── 행동 트리 (PHASE 9-8) ──
@@ -294,21 +294,21 @@ public static class Bootstrap
     }
 
     [UnmanagedCallersOnly]
-    public static int DestroyBehaviour(int instanceId)
+    public static int DestroyComponent(int instanceId)
     {
         try { return ScriptFactory.Destroy(instanceId) ? 0 : -1; }
-        catch (Exception ex) { Report(ex, nameof(DestroyBehaviour)); return -1; }
+        catch (Exception ex) { Report(ex, nameof(DestroyComponent)); return -1; }
     }
 
     /// <summary>
     /// 네이티브가 생명주기 단계 하나를 인스턴스 하나에 직접 전달한다
-    /// (설계 문서 §4 트랙 L · L3 잔여). phase는 BehaviourRegistry.LifecyclePhase 값이고
+    /// (설계 문서 §4 트랙 L · L3 잔여). phase는 ScriptRegistry.LifecyclePhase 값이고
     /// 네이티브 ScriptBinder/ScriptLifecyclePhase.h와 값이 같아야 한다.
     /// </summary>
     [UnmanagedCallersOnly]
     public static int DispatchLifecycle(int instanceId, int phase)
     {
-        try { return BehaviourRegistry.DispatchLifecycle(instanceId, phase) ? 0 : -1; }
+        try { return ScriptRegistry.DispatchLifecycle(instanceId, phase) ? 0 : -1; }
         catch (Exception ex) { Report(ex, nameof(DispatchLifecycle)); return -1; }
     }
 
@@ -398,7 +398,7 @@ public static class Bootstrap
     /// 에디터의 컴포넌트 추가 메뉴가 C# 스크립트 목록을 그릴 때 쓴다.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int GetBehaviourTypeNames(byte* buffer, int capacity)
+    public static unsafe int GetComponentTypeNames(byte* buffer, int capacity)
     {
         try
         {
@@ -414,13 +414,13 @@ public static class Bootstrap
 
     /// <summary>등록된 애니메이션 상태 스크립트 이름 목록. 애니메이터 편집기가 쓴다.</summary>
     [UnmanagedCallersOnly]
-    public static unsafe int GetAniBehaviourTypeNames(byte* buffer, int capacity)
+    public static unsafe int GetAniBehaviorTypeNames(byte* buffer, int capacity)
     {
         try
         {
             if (buffer == null || capacity <= 0) return 0;
 
-            string joined = string.Join('\n', AniBehaviourFactory.RegisteredTypeNames);
+            string joined = string.Join('\n', AniBehaviorFactory.RegisteredTypeNames);
             if (joined.Length == 0) return 0;
 
             return System.Text.Encoding.UTF8.GetBytes(joined, new Span<byte>(buffer, capacity));

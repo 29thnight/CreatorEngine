@@ -39,7 +39,12 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<int, ObjectHandle> Entity_FindByIndex;
     public delegate* unmanaged<ObjectHandle, int> Entity_GetIndex;
 
-    // Transform (네이티브에선 컴포넌트지만 관리 측 표현은 Entity 위의 값 뷰다 — Entity.cs 참고)
+    // Transform. 네이티브와 같은 컴포넌트다(S1-b 승격).
+    //
+    // Exists가 맨 앞에 있는 이유: S3부터 UI/Canvas는 Transform을 갖지 않는다. 부재를
+    // 묻지 못하면 없는 Transform에 값을 쓰고도 성공한 것처럼 보인다 — 네이티브가
+    // 공유 더미로 받아 로그 한 줄만 남기고 값을 버리기 때문이다.
+    public delegate* unmanaged<ObjectHandle, int> Transform_Exists;
     public delegate* unmanaged<ObjectHandle, Float3> Transform_GetLocalPosition;
     public delegate* unmanaged<ObjectHandle, Float3, void> Transform_SetLocalPosition;
     public delegate* unmanaged<ObjectHandle, Float3> Transform_GetWorldPosition;
@@ -267,7 +272,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 19;
+    public const int ExpectedVersion = 20;
 
     private static ScriptApiTable _api;
     private static bool _ready;
@@ -366,6 +371,16 @@ internal static unsafe class Native
         => _ready && _api.Entity_GetIndex != null ? _api.Entity_GetIndex(h) : -1;
 
     // ── Transform ──
+
+    /// <summary>
+    /// 이 오브젝트가 Transform을 갖는가. UI/Canvas는 갖지 않는다(S3).
+    ///
+    /// 바인딩이 없는 구 호스트에서는 false가 아니라 <c>true</c>로 답한다 — 없다고
+    /// 답하면 Transform이 멀쩡한 오브젝트까지 전부 없는 것으로 보여 더 나쁘다.
+    /// </summary>
+    public static bool HasTransform(ObjectHandle h)
+        => !_ready || _api.Transform_Exists == null || _api.Transform_Exists(h) != 0;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 GetLocalPosition(ObjectHandle h)
         => _ready && _api.Transform_GetLocalPosition != null ? _api.Transform_GetLocalPosition(h) : default;

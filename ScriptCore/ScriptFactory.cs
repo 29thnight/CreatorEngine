@@ -12,8 +12,8 @@ namespace CreatorEngine;
 /// </summary>
 internal static class ScriptFactory
 {
-    private static readonly Dictionary<string, Func<Behaviour>> _creators = new(StringComparer.Ordinal);
-    private static readonly Dictionary<int, Behaviour> _instances = new();
+    private static readonly Dictionary<string, Func<Component>> _creators = new(StringComparer.Ordinal);
+    private static readonly Dictionary<int, Component> _instances = new();
     private static int _nextInstanceId = 1;
 
     public static void Initialize()
@@ -24,7 +24,7 @@ internal static class ScriptFactory
     }
 
     /// <summary>스크립트 어셈블리의 생성기 산출물이 이 메서드로 자기 타입들을 등록한다.</summary>
-    public static void Register(string typeName, Func<Behaviour> factory)
+    public static void Register(string typeName, Func<Component> factory)
         => _creators[typeName] = factory;
 
     /// <summary>
@@ -54,24 +54,27 @@ internal static class ScriptFactory
             return -1;
         }
 
-        Behaviour b = factory();
+        Component b = factory();
         b.Entity = new Entity(owner);
-        b.Transform = new Transform(owner);
+
+        // Transform이 없는 오브젝트가 있다(UI/Canvas — S3). 여기서 한 번 갈라 두면
+        // 없는 Transform에 값을 쓰는 일이 조용히 넘어가지 않는다(Component.Transform 주석).
+        b.BindTransform(Native.HasTransform(owner) ? new Transform { OwnerHandle = owner } : null);
 
         int id = _nextInstanceId++;
         _instances[id] = b;
-        BehaviourRegistry.Add(b);
+        ScriptRegistry.Add(b);
         return id;
     }
 
     public static bool Destroy(int instanceId)
     {
         if (!_instances.Remove(instanceId, out var b)) return false;
-        BehaviourRegistry.Remove(b);
+        ScriptRegistry.Remove(b);
         return true;
     }
 
     /// <summary>인스펙터·직렬화가 인스턴스를 집어 오는 통로.</summary>
-    public static Behaviour? Find(int instanceId)
+    public static Component? Find(int instanceId)
         => _instances.TryGetValue(instanceId, out var b) ? b : null;
 }

@@ -10,7 +10,7 @@
 // ScriptObjectHandle은 전역이어야 하고, 무엇보다 DontDestroyOnLoad 이송 창
 // (Scene::DetachEntityHierarchy가 슬롯을 놓고 AttachExistingEntity*가
 // 다시 잡기 전 구간)에서 그 오브젝트는 어느 씬의 EntityHandle도 갖지 않는데
-// 그 창에서 실제로 관리 코드(BehaviourRegistry.SweepOrphans)가 도는 것을 코드
+// 그 창에서 실제로 관리 코드(ScriptRegistry.SweepOrphans)가 도는 것을 코드
 // 추적으로 확인했다(ScriptObjectRegistry.h 상단 주석에 전말). 그래서 두 핸들은
 // 세대 시퀀스가 계속 별개다 — ScriptObjectRegistry가 자기 세대를
 // Entity::Destroy() 한 지점에서만 올린다. C# 쪽 ObjectHandle과 배치를 맞춰야

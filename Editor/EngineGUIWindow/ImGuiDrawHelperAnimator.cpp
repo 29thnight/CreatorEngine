@@ -1083,11 +1083,11 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 
 					// C# 애니메이션 상태 스크립트 목록. 등록된 타입 이름은 ClrHost가 내준다
 					// (구 C++ 팩토리 목록을 대체한다 — 9-4).
-					const auto aniTypeNames = ClrHost::Get().GetAniBehaviourTypeNames();
+					const auto aniTypeNames = ClrHost::Get().GetAniBehaviorTypeNames();
 					if (aniTypeNames.empty())
 					{
 						ImGui::TextDisabled(ClrHost::Get().IsReady()
-							? "등록된 AniBehaviour가 없습니다"
+							? "등록된 AniBehavior가 없습니다"
 							: "CLR이 준비되지 않았습니다");
 					}
 

@@ -8,7 +8,7 @@
 //
 // 관리 측 생명주기의 드라이버를 **하나로** 만드는 전송로다(사용자 결정 2026-08-20).
 // 예전에는 둘이었다 — 네이티브 ScriptComponent가 생성과 파괴만 알리고 그 사이
-// 단계는 BehaviourRegistry가 자기 큐로 굴렸다. 그래서 네이티브에서만 일어나는
+// 단계는 ScriptRegistry가 자기 큐로 굴렸다. 그래서 네이티브에서만 일어나는
 // 사건 — 대표적으로 DontDestroyOnLoad 이송 —이 관리 측에 닿지 않았다. 오브젝트는
 // 살아서 씬을 건너는데 스크립트는 그 사실을 모르고, SimulationScope의 구독·대기가
 // 옛 씬 기준으로 계속 흘렀다.
@@ -17,7 +17,7 @@
 //
 // **6단계 전부가 이 전송로를 지난다.** ScriptComponent가 여섯 훅을 모두
 // 오버라이드해 NotifyManagedLifecycle로 넘기고, 관리 측 DispatchLifecycle이 받는다.
-// 옛 관리 큐 _pendingAwake·_pendingStart는 **선언 자체가 없다** — BehaviourRegistry에
+// 옛 관리 큐 _pendingAwake·_pendingStart는 **선언 자체가 없다** — ScriptRegistry에
 // 남은 _pendingAdd·_pendingRemove는 틱 멤버십(_active 편입/이탈)이지 생명주기
 // 단계가 아니다.
 //
@@ -32,7 +32,7 @@
 //
 // ── 값 규약 ──
 //
-// ScriptCore/BehaviourRegistry.cs의 LifecyclePhase와 **값이 같아야 한다.** 경계를
+// ScriptCore/ScriptRegistry.cs의 LifecyclePhase와 **값이 같아야 한다.** 경계를
 // 넘는 것은 int 하나이므로 컴파일러가 불일치를 잡아 주지 않는다. 한쪽을 고치면
 // 반드시 다른 쪽도 고칠 것 — 순서는 Component.h의 6단계 선언 순서를 따른다.
 //

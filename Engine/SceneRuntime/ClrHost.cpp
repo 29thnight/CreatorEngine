@@ -44,7 +44,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 19;
+	constexpr int kApiVersion = 20;
 
 	struct Float3 { float x, y, z; };
 
@@ -86,6 +86,16 @@ namespace
 		ScriptObjectHandle (__stdcall* Entity_GetParent)(ScriptObjectHandle handle);
 		ScriptObjectHandle (__stdcall* Entity_FindByIndex)(int index);
 		int  (__stdcall* Entity_GetIndex)(ScriptObjectHandle handle);
+
+		// ★ S3부터 Transform은 없을 수 있다 — UI/Canvas는 RectTransformComponent만 갖는다.
+		//
+		// 이 하나가 없으면 관리 측은 부재를 표현할 방법이 아예 없다. 그러면 C#이
+		// Transform을 잡아 값을 쓰는 순간 Entity::Transform_()가 공유 더미로 떨어지고
+		// (Entity.cpp MissingTransformFallback) 오브젝트 이름당 로그 한 줄만 남긴 채
+		// 값이 사라진다 — 크래시도 예외도 없어 스크립트 쪽에서는 성공과 구분되지 않는다.
+		// 다른 컴포넌트의 *_Exists와 같은 역할이고, 그것들과 달리 늦게 생긴 이유는
+		// 승격(S1-b) 전에는 Transform이 GameObject의 값 멤버라 부재가 없었기 때문이다.
+		int    (__stdcall* Transform_Exists)(ScriptObjectHandle handle);
 
 		Float3 (__stdcall* Transform_GetLocalPosition)(ScriptObjectHandle handle);
 		void   (__stdcall* Transform_SetLocalPosition)(ScriptObjectHandle handle, Float3 position);
@@ -440,6 +450,14 @@ namespace
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? static_cast<int>(object->m_index) : -1;
+	}
+
+	// Transform_()를 부르지 않는다 — 그것은 부재 시 더미를 돌려주므로 여기서 쓰면
+	// 언제나 "있다"가 되어 검사가 아무것도 말하지 않게 된다. HasTransform()을 직접 본다.
+	int __stdcall Api_Transform_Exists(ScriptObjectHandle handle)
+	{
+		const Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
+		return (nullptr != object && object->HasTransform()) ? 1 : 0;
 	}
 
 	Float3 __stdcall Api_Transform_GetLocalPosition(ScriptObjectHandle handle)
@@ -1985,6 +2003,7 @@ namespace
 		g_apiTable.Entity_GetParent        = &Api_Entity_GetParent;
 		g_apiTable.Entity_FindByIndex      = &Api_Entity_FindByIndex;
 		g_apiTable.Entity_GetIndex         = &Api_Entity_GetIndex;
+		g_apiTable.Transform_Exists            = &Api_Transform_Exists;
 		g_apiTable.Transform_GetLocalPosition  = &Api_Transform_GetLocalPosition;
 		g_apiTable.Transform_SetLocalPosition  = &Api_Transform_SetLocalPosition;
 		g_apiTable.Transform_GetWorldPosition  = &Api_Transform_GetWorldPosition;
@@ -2253,12 +2272,12 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"PostPhysicsTick", &fn))  return false;  m_fnPostPhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<AwakeFn>(fn);
 	if (!bind(L"FlushPhysicsEvents", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
-	if (!bind(L"CreateBehaviour", &fn))  return false;  m_fnCreateBehaviour = reinterpret_cast<CreateFn>(fn);
+	if (!bind(L"CreateComponent", &fn))  return false;  m_fnCreateComponent = reinterpret_cast<CreateFn>(fn);
 
 	// 선택 바인딩 — 구 ScriptCore 어셈블리에는 없을 수 있다. 실패해도 계속 간다
 	// (해당 기능만 조용히 꺼진다: 목록 UI는 빈 목록, 메시지는 전달되지 않음).
-	if (bind(L"GetBehaviourTypeNames", &fn))    m_fnGetBehaviourTypeNames    = reinterpret_cast<TypeNamesFn>(fn);
-	if (bind(L"GetAniBehaviourTypeNames", &fn)) m_fnGetAniBehaviourTypeNames = reinterpret_cast<TypeNamesFn>(fn);
+	if (bind(L"GetComponentTypeNames", &fn))    m_fnGetComponentTypeNames    = reinterpret_cast<TypeNamesFn>(fn);
+	if (bind(L"GetAniBehaviorTypeNames", &fn)) m_fnGetAniBehaviorTypeNames = reinterpret_cast<TypeNamesFn>(fn);
 	if (bind(L"FlushScriptMessages", &fn))      m_fnFlushScriptMessages      = reinterpret_cast<FlushMessageFn>(fn);
 
 	// 행동 트리(9-8). 트리는 관리 측이 소유하고 네이티브는 인스턴스 id만 든다.
@@ -2281,11 +2300,11 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	}
 
 	// 애니메이션 상태 스크립트
-	if (!bind(L"HasAniBehaviour", &fn))     return false;  m_fnHasAniBehaviour     = reinterpret_cast<HasAniFn>(fn);
-	if (!bind(L"CreateAniBehaviour", &fn))  return false;  m_fnCreateAniBehaviour  = reinterpret_cast<CreateAniFn>(fn);
-	if (!bind(L"DestroyAniBehaviour", &fn)) return false;  m_fnDestroyAniBehaviour = reinterpret_cast<DestroyAniFn>(fn);
+	if (!bind(L"HasAniBehavior", &fn))     return false;  m_fnHasAniBehavior     = reinterpret_cast<HasAniFn>(fn);
+	if (!bind(L"CreateAniBehavior", &fn))  return false;  m_fnCreateAniBehavior  = reinterpret_cast<CreateAniFn>(fn);
+	if (!bind(L"DestroyAniBehavior", &fn)) return false;  m_fnDestroyAniBehavior = reinterpret_cast<DestroyAniFn>(fn);
 	if (!bind(L"FlushAniEvents", &fn))      return false;  m_fnFlushAniEvents      = reinterpret_cast<FlushAniFn>(fn);
-	if (!bind(L"DestroyBehaviour", &fn)) return false;  m_fnDestroyBehaviour = reinterpret_cast<DestroyFn>(fn);
+	if (!bind(L"DestroyComponent", &fn)) return false;  m_fnDestroyComponent = reinterpret_cast<DestroyFn>(fn);
 	if (!bind(L"DispatchLifecycle", &fn)) return false;  m_fnDispatchLifecycle = reinterpret_cast<LifecycleFn>(fn);
 
 	// 스크립트 어셈블리 로드·핫리로드
@@ -2419,27 +2438,27 @@ void ClrHost::Shutdown()
 	// 종료 직전이라 정리 이득도 없다.
 }
 
-bool ClrHost::HasAniBehaviour(std::string_view typeName)
+bool ClrHost::HasAniBehavior(std::string_view typeName)
 {
-	if (!m_ready || nullptr == m_fnHasAniBehaviour) return false;
+	if (!m_ready || nullptr == m_fnHasAniBehavior) return false;
 
 	const std::string name(typeName);
-	return 0 != m_fnHasAniBehaviour(name.c_str());
+	return 0 != m_fnHasAniBehavior(name.c_str());
 }
 
-int ClrHost::CreateAniBehaviour(std::string_view typeName)
+int ClrHost::CreateAniBehavior(std::string_view typeName)
 {
-	if (!m_ready || nullptr == m_fnCreateAniBehaviour) return -1;
+	if (!m_ready || nullptr == m_fnCreateAniBehavior) return -1;
 
 	const std::string name(typeName);
-	return m_fnCreateAniBehaviour(name.c_str());
+	return m_fnCreateAniBehavior(name.c_str());
 }
 
-void ClrHost::DestroyAniBehaviour(int instanceId)
+void ClrHost::DestroyAniBehavior(int instanceId)
 {
-	if (m_ready && nullptr != m_fnDestroyAniBehaviour && instanceId >= 0)
+	if (m_ready && nullptr != m_fnDestroyAniBehavior && instanceId >= 0)
 	{
-		m_fnDestroyAniBehaviour(instanceId);
+		m_fnDestroyAniBehavior(instanceId);
 	}
 }
 
@@ -2629,19 +2648,19 @@ bool ClrHost::DestroyBehaviorTree(int instanceId)
 	return 0 == m_fnDestroyBehaviorTree(instanceId);
 }
 
-int ClrHost::CreateBehaviour(Entity* owner, std::string_view typeName)
+int ClrHost::CreateComponent(Entity* owner, std::string_view typeName)
 {
-	if (!m_ready || nullptr == m_fnCreateBehaviour || nullptr == owner) return -1;
+	if (!m_ready || nullptr == m_fnCreateComponent || nullptr == owner) return -1;
 
 	const ScriptObjectHandle handle = ScriptObjectRegistry::Get().Register(owner);
 	const std::string name(typeName);
-	return m_fnCreateBehaviour(handle, name.c_str());
+	return m_fnCreateComponent(handle, name.c_str());
 }
 
-bool ClrHost::DestroyBehaviour(int instanceId)
+bool ClrHost::DestroyComponent(int instanceId)
 {
-	if (!m_ready || nullptr == m_fnDestroyBehaviour) return false;
-	return 0 == m_fnDestroyBehaviour(instanceId);
+	if (!m_ready || nullptr == m_fnDestroyComponent) return false;
+	return 0 == m_fnDestroyComponent(instanceId);
 }
 
 bool ClrHost::DispatchLifecycle(int instanceId, ScriptLifecyclePhase phase)
@@ -2680,9 +2699,9 @@ namespace
 	}
 }
 
-std::vector<std::string> ClrHost::GetBehaviourTypeNames()
+std::vector<std::string> ClrHost::GetComponentTypeNames()
 {
-	return m_ready ? ReadTypeNameList(m_fnGetBehaviourTypeNames) : std::vector<std::string>{};
+	return m_ready ? ReadTypeNameList(m_fnGetComponentTypeNames) : std::vector<std::string>{};
 }
 
 bool ClrHost::HasBTNodeType(std::string_view typeName)
@@ -2717,9 +2736,9 @@ std::vector<std::string> ClrHost::GetBTNodeTypeNames(BTNodeKind kind)
 	return names;
 }
 
-std::vector<std::string> ClrHost::GetAniBehaviourTypeNames()
+std::vector<std::string> ClrHost::GetAniBehaviorTypeNames()
 {
-	return m_ready ? ReadTypeNameList(m_fnGetAniBehaviourTypeNames) : std::vector<std::string>{};
+	return m_ready ? ReadTypeNameList(m_fnGetAniBehaviorTypeNames) : std::vector<std::string>{};
 }
 
 void ClrHost::QueueScriptMessage(int instanceId, std::string_view methodName)

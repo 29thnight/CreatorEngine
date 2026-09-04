@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// SetSelected로 직접 만들어 검증한다. 클릭도 마우스가 없으니 빈 폴링의 안전성과
 /// 래치 규약(읽으면 내려감)을 본다.
 /// </summary>
-public sealed partial class UiNavProbe : Behaviour
+public sealed partial class UiNavProbe : Component
 {
     [SerializeField] private int _checkAfterFrames = 20;
 

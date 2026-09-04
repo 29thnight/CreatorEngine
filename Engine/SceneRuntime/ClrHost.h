@@ -107,14 +107,14 @@ public:
 		ScriptObjectHandle owner;
 	};
 
-	bool HasAniBehaviour(std::string_view typeName);
-	int  CreateAniBehaviour(std::string_view typeName);
-	void DestroyAniBehaviour(int instanceId);
+	bool HasAniBehavior(std::string_view typeName);
+	int  CreateAniBehavior(std::string_view typeName);
+	void DestroyAniBehavior(int instanceId);
 	void QueueAniEvent(int instanceId, AniEventKind kind, float deltaTime, Entity* owner);
 	void FlushAniEvents();
 
 	// 등록된 애니메이션 상태 스크립트 이름 목록 — 애니메이터 편집기의 선택 목록용.
-	std::vector<std::string> GetAniBehaviourTypeNames();
+	std::vector<std::string> GetAniBehaviorTypeNames();
 
 	// ── 이름으로 부르는 콜백 ──
 	//
@@ -278,8 +278,8 @@ public:
 
 	// ── 인스턴스 ──
 	// 성공하면 0 이상의 인스턴스 id, 실패하면 음수.
-	int CreateBehaviour(Entity* owner, std::string_view typeName);
-	bool DestroyBehaviour(int instanceId);
+	int CreateComponent(Entity* owner, std::string_view typeName);
+	bool DestroyComponent(int instanceId);
 
 	/// 관리 인스턴스 하나에 생명주기 단계 하나를 직접 전달한다(트랙 L · L3 잔여).
 	/// 사유와 값 규약은 ScriptLifecyclePhase.h 상단에 있다 — 요약하면 관리 측
@@ -289,7 +289,7 @@ public:
 
 	// 등록된 스크립트 타입 이름 목록 — 에디터의 컴포넌트 추가 메뉴용.
 	// 선택 바인딩이라 구 어셈블리에서는 빈 목록을 돌려줄 수 있다.
-	std::vector<std::string> GetBehaviourTypeNames();
+	std::vector<std::string> GetComponentTypeNames();
 
 
 	// 마지막 틱에서 관리 측이 보고한 활성 스크립트 수(경계 로그·진단용).
@@ -445,12 +445,12 @@ private:
 	using FlushAniFn     = int(__stdcall*)(const ScriptAniEvent*, int);
 	using FlushMessageFn = int(__stdcall*)(const ScriptMessage*, int);
 	FlushPhysicsFn m_fnFlushPhysicsEvents{ nullptr };
-	HasAniFn       m_fnHasAniBehaviour{ nullptr };
-	CreateAniFn    m_fnCreateAniBehaviour{ nullptr };
-	DestroyAniFn   m_fnDestroyAniBehaviour{ nullptr };
+	HasAniFn       m_fnHasAniBehavior{ nullptr };
+	CreateAniFn    m_fnCreateAniBehavior{ nullptr };
+	DestroyAniFn   m_fnDestroyAniBehavior{ nullptr };
 	FlushAniFn     m_fnFlushAniEvents{ nullptr };
 	FlushMessageFn m_fnFlushScriptMessages{ nullptr };
-	TypeNamesFn    m_fnGetAniBehaviourTypeNames{ nullptr };
+	TypeNamesFn    m_fnGetAniBehaviorTypeNames{ nullptr };
 
 	// 한 프레임에 모이는 충돌 이벤트. 매 프레임 clear 하되 용량은 유지한다.
 	std::vector<ScriptPhysicsEvent> m_physicsEvents;
@@ -461,10 +461,10 @@ private:
 	std::atomic_flag m_aiTickFlag = ATOMIC_FLAG_INIT;
 	std::vector<ScriptMessage> m_scriptMessages;
 	std::atomic_flag           m_scriptMessageFlag{};   // 잡 스레드가 함께 담는다
-	CreateFn     m_fnCreateBehaviour{ nullptr };
-	DestroyFn    m_fnDestroyBehaviour{ nullptr };
+	CreateFn     m_fnCreateComponent{ nullptr };
+	DestroyFn    m_fnDestroyComponent{ nullptr };
 	LifecycleFn  m_fnDispatchLifecycle{ nullptr };
-	TypeNamesFn  m_fnGetBehaviourTypeNames{ nullptr };
+	TypeNamesFn  m_fnGetComponentTypeNames{ nullptr };
 
 	LoadScriptsFn m_fnLoadScripts{ nullptr };
 	ReloadFn      m_fnReloadScripts{ nullptr };

@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 생성 → 참조 보관 → 파괴가 한 스크립트 안에서 도는 흐름이라
 /// 핸들 수명과 지연 파괴 규약을 함께 확인할 수 있다.
 /// </summary>
-public sealed partial class Spawner : Behaviour
+public sealed partial class Spawner : Component
 {
     [SerializeField] private string _prefabName = "";
     [SerializeField] private float _interval = 1.0f;
@@ -71,7 +71,7 @@ public sealed partial class Spawner : Behaviour
 
         // 생성 위치는 스포너 기준 오프셋. 스폰마다 조금씩 어긋나게 둬서 겹치지 않게 한다.
         Float3 basePos = Transform.LocalPosition;
-        instance.Transform.SetLocalPosition(basePos + _spawnOffset * (1f + _spawnCount * 0.1f));
+        instance.Transform?.SetLocalPosition(basePos + _spawnOffset * (1f + _spawnCount * 0.1f));
 
         _spawned.Enqueue(instance);
         ++_spawnCount;

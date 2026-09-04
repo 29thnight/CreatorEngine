@@ -1,7 +1,7 @@
 namespace CreatorEngine.Scripts;
 
 /// <summary>RectTransform · Image · Camera 바인딩 검증.</summary>
-public sealed partial class UiProbe : Behaviour
+public sealed partial class UiProbe : Component
 {
     private int _passed;
     private int _failed;

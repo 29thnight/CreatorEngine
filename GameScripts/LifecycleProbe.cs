@@ -6,7 +6,7 @@ namespace CreatorEngine.Scripts;
 /// 프레임 번호는 엔진에서 직접 받는다. 스크립트가 세는 값을 쓰면 TickAwake가
 /// TickUpdate보다 먼저 도는 탓에 "같은 프레임"으로 잘못 보인다.
 /// </summary>
-public sealed partial class LifecycleProbe : Behaviour
+public sealed partial class LifecycleProbe : Component
 {
     private ulong _awakeFrame;
 
@@ -22,7 +22,7 @@ public sealed partial class LifecycleProbe : Behaviour
     }
 
     // 씬 편입/이탈 — 이 둘은 두 기제에서 온다(설계 문서 §4 트랙 L · L3 잔여).
-    //   · 생성 시   : BehaviourRegistry의 드레인(관리 측 자체 큐)
+    //   · 생성 시   : ScriptRegistry의 드레인(관리 측 자체 큐)
     //   · 이송 시   : 네이티브 Scene::DetachEntityHierarchy/
     //                 AttachExistingEntityHierarchy의 직접 전달
     // 후자가 실제로 닿는지 재는 것이 이 두 로그의 목적이다 — DontDestroyOnLoad

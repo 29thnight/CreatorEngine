@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 참조 대상이 파괴되었는지는 세대 핸들이 알려주므로(IsAlive) 널 검사만으로 충분하다 —
 /// 네이티브 포인터를 들고 있었다면 알 수 없는 상황이다.
 /// </summary>
-public sealed partial class FollowTarget : Behaviour
+public sealed partial class FollowTarget : Component
 {
     [SerializeField] private Entity _target;
     [SerializeField] private Float3 _offset = new(0f, 2f, 0f);
@@ -36,7 +36,10 @@ public sealed partial class FollowTarget : Behaviour
 
         _warnedMissing = false;
 
-        Float3 goal = _target.Transform.LocalPosition + _offset;
+        // 대상에 공간이 없으면(UI 계열) 따라갈 위치 자체가 없다.
+        if (_target.Transform is not { } targetTransform) return;
+
+        Float3 goal = targetTransform.LocalPosition + _offset;
         Float3 here = Transform.LocalPosition;
 
         // 프레임 독립적인 감쇠 — tick이 커져도 목표를 지나치지 않는다.

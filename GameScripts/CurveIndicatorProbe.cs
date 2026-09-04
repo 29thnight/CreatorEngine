@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 그래서 호출부 역할을 대신하는데, 덤으로 스크립트끼리의 GetComponent도 함께 검증된다.
 /// 구동은 Update 첫 프레임에 한다 — Start 순서에 기대지 않기 위해서다.
 /// </summary>
-public sealed partial class CurveIndicatorProbe : Behaviour
+public sealed partial class CurveIndicatorProbe : Component
 {
     [SerializeField] private int _checkAfterFrames = 10;
 
@@ -66,8 +66,8 @@ public sealed partial class CurveIndicatorProbe : Behaviour
         foreach (MeshRenderer renderer in renderers)
         {
             Entity owner = renderer.Entity;
-            Log($"[CurveIndicatorProbe] {owner.Name} — pos={owner.Transform.LocalPosition} " +
-                $"scale={owner.Transform.LocalScale} 재질='{renderer.MaterialName}' 색={renderer.BaseColor}");
+            Log($"[CurveIndicatorProbe] {owner.Name} — pos={owner.Transform?.LocalPosition} " +
+                $"scale={owner.Transform?.LocalScale} 재질='{renderer.MaterialName}' 색={renderer.BaseColor}");
 
             // 재질 사본을 만들었으므로 이름에 지정한 문자열이 들어가야 한다.
             Assert($"'{owner.Name}' 재질이 사본으로 교체됨",

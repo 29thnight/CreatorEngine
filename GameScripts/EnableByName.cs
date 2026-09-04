@@ -4,7 +4,7 @@ namespace CreatorEngine.Scripts;
 /// 이름으로 오브젝트를 찾아 켠다. CLI에 오브젝트 활성화 명령이 없어서 만든 검증 보조 —
 /// 비활성 캔버스(설정 메뉴 등)를 게임 흐름대로 깨웠을 때 지연 연결이 따라오는지 본다.
 /// </summary>
-public sealed partial class EnableByName : Behaviour
+public sealed partial class EnableByName : Component
 {
     [SerializeField] private string _target = "";
 
