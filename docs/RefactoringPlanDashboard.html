@@ -922,7 +922,11 @@
   VRAM 은 현재 RGBA8 무밉 <b>420 MB</b> → BC1+밉 <b>70 MB</b>(0.17x). 저작 코퍼스는 PNG 583(전부 8비트) · HDR 19(장당 128 MB) · DDS 1 · TGA/JPEG/BMP/EXR <b>0</b>.
   <br><br>
   <b>★ 라이브러리 구성:</b> 크로스플랫폼이 로드맵이므로 <code>stb_image</code> 도입은 확장 대비가 아니라 필수 조건이다 — DirectXTex 의 WIC 부분만 Windows 전용인데 그것이 하필 자산의 99%(PNG)를 막는다.
-  구성은 <code>stb_image</code> + <code>stb_image_resize2</code>(둘 다 이미 설치) + <code>bc7enc_rdo</code> + DDS 미니 파서이고, 그러면 <b>DirectXTex 가 0</b>이 된다.
+  구성은 <code>stb_image</code> + <code>stb_image_resize2</code>(둘 다 이미 설치) + <code>bc7enc_rdo</code> + DDS 미니 파서이고, 그러면 <b>WIC 종속이 0</b>이 된다.
+  <b>PNG 685장 A/B 바이트 대조는 2026-09-04 전수 통과했다</b>(불일치 0 · BGRA 419장은 정규화 후, 266장은 원본끼리 — 양쪽 다 일치).
+  다만 <b>HDR 은 갈지 않는다</b> — 같은 대조에서 19장 전부 값이 달랐다(mantissa 1 차이 · 비율 59/58 로 일정 · RGBE 반올림 규약 차이).
+  IBL 프리필터 결과가 바뀌고 픽셀 골든이 깨지는데, DirectXTex 의 HDR 로더는 WIC 이 아니라 이식 가능하므로 갈아서 얻을 것이 없다.
+  DirectXTex 는 HDR·DDS 로더로 남는다 — "제거"는 목표가 아니었고 침투 차단은 축 A 가 이미 끝냈다.
   ISPC 는 BC 블록이 SPMD 에 완벽히 맞지만 빌드에 언어가 하나 늘어나는 대가가 있어 우리 규모(510장·17초)에서는 값을 못 한다 — T1b 의 열린 항목.
   <br><br>
   <b>★ 경량 · 선택집중:</b> 매크로가 아니라 <b>프로젝트 분리</b>다(<code>EngineLayerSeparationPlan</code> §8 — "해당 코드가 Core 프로젝트에서 컴파일되지 않아야 한다").
@@ -935,7 +939,8 @@
       <li>런타임 텍스처 로드 <b>&lt; 1 ms/장</b> (현재 5.34) · 텍스처 VRAM <b>&lt; 120 MB</b> (현재 420)</li>
       <li>cook <b>&lt; 50 ms/장</b> (현재 34) · 에디터 저장 → 화면 반영 <b>+50 ms 이내</b></li>
       <li>게임 런타임 산출물의 이미지 라이브러리 <b>0개</b> · 런타임 → <code>TextureCodec.*</code> 의존 간선 <b>0</b>(CI 래칫)</li>
-      <li>583장 A/B 바이트 대조 통과 — DirectXTex 와 stb_image 가 같은 PNG 를 같은 픽셀로 디코드</li>
+      <li><s>PNG A/B 바이트 대조 통과 — DirectXTex 와 stb_image 가 같은 PNG 를 같은 픽셀로 디코드</s> <b>2026-09-04 확인: 685장 전수 일치</b></li>
+      <li>HDR A/B 대조는 <b>회귀 감시용</b>으로 유지 — 19장 전부 불일치가 현재 값이고, 0이 되면 누군가 HDR 디코더를 바꾼 것이다</li>
       <li>artifact 로드 픽셀 = 원본 직독 픽셀(같은 자산, 두 경로) · 기존 <code>vk.texturecodec</code> A/B 다이제스트 유지</li>
     </ul>
   </div>
@@ -1098,9 +1103,14 @@
 <!-- ===== PHASE 20 ===== -->
 <section class="phase" id="phase-20">
   <h2 class="sec"><span class="no">PHASE 20</span>네트워크 준비형 런타임 · Replication 기반 <span class="phase-pct" data-phase-pct="20"></span></h2>
-  <div class="phase-meta">신설: 2026-08-22 · 설계 문서: <a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계, SceneGraph E1·H3·L5 · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신</div>
+  <div class="phase-meta">신설: 2026-08-22 · 기준선 재실측 2026-09-04 · 설계 문서: <a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계 <b>완료</b>, SceneGraph E1·H3·L5 <b>완료</b> · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신 · <b>소유권 분할은 설계 문서 §6</b></div>
   <div class="phase-goal"><b>목표:</b> 서버 권위 replication을 실제 fixed Simulation Tick과 값 기반 thread boundary 위에 세운다.
   Authoring YAML/JSON DOM, process-local EntityHandle, live Scene/Entity pointer를 wire에서 배제하고, Loopback correctness를 닫은 뒤 실제 transport와 선택적 prediction/headless server를 판정한다.</div>
+  <div class="risknote"><div class="vt">위임 가능성 판정 (2026-09-04 사전 정찰 · 설계 문서 §6)</div>
+  이 페이즈는 <b>일부를 다른 개발자에게 위임할 수 있다.</b> 가르는 기준은 난이도가 아니라 경계다 — ①값 경계에서 닫히는가 ②담당자가 검증을 스스로 돌릴 수 있는가 ③공유 대형 파일을 건드리지 않는가.
+  아래 표의 각 항목에 <b>구간 A</b>(위임 가능) · <b>B</b>(사내 필수) · <b>C</b>(계약은 사내, 알고리즘만 위임)를 표기했다.
+  <b>단 ND가 먼저다</b> — 지금은 회귀 세트의 verify 호출 84건 중 50건이 Editor/Player exe를 태우고 단위 테스트 프레임워크가 0이라, 헤드리스 인수 창구 없이 위임하면 병목만 옮긴다.
+  <b>N3는 위임 불가</b> — 착지점은 <code>RuntimeFrame.cpp</code> 92줄이지만 파급이 물리 스텝 수·C# <code>SimulationScope.Delay</code>·회귀 세트 전체다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
 
@@ -1894,7 +1904,7 @@ const TASKS = [
   { phase: 12, id: "12-1", title: "T1a — cook 트랜스코딩 (TexturePipeline · TextureCodec.Stb · TextureCodec.Bc7Enc 신설)",
     detail: "TextureCookProducer 가 pass-through 를 그만두고 굽는다. 처리 순서: 디코드 → 색공간 확정 → 리사이즈 → 밉 생성 → 채널 처리 → 압축. artifact 는 헤더(포맷·치수·밉·배열) + 서브리소스 바이트 — TextureImage 의 직렬화형이다. formatVersion 1 → 2. ITextureDecoder/ITextureEncoder 를 세우되 구현체는 실제로 도는 것만. ★ 압축을 한 함수(EncodeBlocks)로 가둬 T1b 의 교체가 그 함수 교체로 끝나게 한다.",
     refs: "TexturePipelinePlan §5 T1a·§4", priority: "P0", days: 8, status: "todo",
-    note: "게이트: 583장 A/B 바이트 대조(DirectXTex vs stb_image) · 밉 체인 자기 대조(치수·바이트가 RHIFormatSlicePitch 와 일치). ★ 착수 첫 행동은 A/B 대조 측정이어야 한다 — stb 와 WIC 가 같은 바이트를 낼 것으로 보지만 재지 않았고, 다르면 이 슬라이스의 전제가 무너진다. bc7enc_rdo 의 vcpkg 포트 유무도 미확인(없으면 ThirdParty 벤더링)." },
+    note: "게이트: PNG 전수 A/B 바이트 대조(assets.decodeab) · 밉 체인 자기 대조(치수·바이트가 RHIFormatSlicePitch 와 일치). ★ <b>착수 조건이 해소됐다(2026-09-04)</b> — PNG 685장 전수 일치(픽셀 불일치 0 · 치수 불일치 0 · 실패 0). WIC 이 BGRA 로 낸 419장은 RGBA8 정규화 후, 나머지 266장은 원본끼리 비교했고 양쪽 다 일치했다(정규화가 결과를 만든 것이 아니다). ★ <b>다만 HDR 은 갈지 않는다</b> — 같은 측정에서 19장 전부 값이 달랐다(0.057617 vs 0.056641 = mantissa 1 차이 · 비율 59/58 로 일정 · 알파만 일치). RGBE 반올림 규약 차이이고, 밝기 0.86% 라 눈에는 안 띄지만 IBL 프리필터와 픽셀 골든이 깨진다. 잔여 미확인: bc7enc_rdo 의 vcpkg 포트 유무(없으면 ThirdParty 벤더링)." },
   { phase: 12, id: "12-2", title: "T2 — 런타임 소비 전환 (artifact 직독 · 디코드 0)",
     detail: "DataSystem 이 원본 PNG 대신 artifact 를 읽는다. 로드 = 파일 읽기 + 헤더 파싱. ★ 에디터는 원본 직독 경로를 남긴다 — 아직 안 구워진 자산도 보여야 하고 상용 엔진도 같다. 이 지점이 성능의 본체이고(5.34 → 0.6 ms/장), 게임 런타임의 코덱 0개도 여기서 자동으로 달성된다.",
     refs: "TexturePipelinePlan §5 T2·§6", priority: "P0", days: 5, status: "todo",
@@ -2212,41 +2222,58 @@ const TASKS = [
 
   // ---------- PHASE 20: 네트워크 준비형 런타임 ----------
   // 공수는 dashboard 초기 추정치다. NetworkFrameworkPlan N0 기준선 뒤 갱신한다.
+  //
+  // 소유 구간(설계 문서 §6.3, 2026-09-04 사전 정찰):
+  //   A = 위임 가능(값 경계에서 닫힘) · B = 사내 필수 · C = 계약은 사내, 알고리즘만 위임
+  // ND는 위임의 전제이며 §6.5가 근거다. 이 항목 없이 A 구간을 발주하지 않는다.
+  { phase: 20, id: "ND", title: "위임 준비 — 헤드리스 인수 창구·계약 동결·인수 게이트",
+    detail: "NetTests.exe(Console Application, SceneRuntime 링크, 렌더 장치 없음)를 세우고, 계약 헤더 11종을 동결하며, verify-net-wire-boundary·loopback-correctness·id-lifecycle을 run-all에 배선한다. 각 게이트는 변이로 이빨을 먼저 증명한다.",
+    refs: "NetworkFrameworkPlan §6.4·§6.5", priority: "P0", days: 4, status: "todo",
+    note: "구간 B(사내 필수) — 위임의 전제다. 현재 단위 테스트 프레임워크 0, run-all의 verify 호출 84건 중 50건이 Editor/Player exe를 태운다. 선례는 Tools/AssetCooker(Console Application)이고, SceneRuntime이 RenderEngine·DirectX를 참조하는 파일은 헤더 5개뿐이라 분리가 현실적이다. 공수는 추정치." },
   { phase: 20, id: "N0", title: "기준선·금지 타입·telemetry 실패 게이트",
     detail: "frame/physics tick, Entity/Component 변화량을 계측하고 EntityHandle·HashedGuid·YAML/JSON Node의 wire 유입을 실패시킨다. packet/encode/alloc/queue/drop 공통 telemetry를 먼저 세운다.",
-    refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo",
+    note: "구간 A(위임 가능) — telemetry 값 타입과 금지 타입 정적 게이트라 값 경계에서 닫힌다. 단 게이트의 run-all 배선은 ND가 소유한다." },
   { phase: 20, id: "N1", title: "Archive·Parser 경계 밀봉",
-    detail: "format-neutral schema 위에 Authoring/Cooked archive를 분리하고 Runtime/NetCore 후보 헤더의 yaml-cpp·nlohmann 의존을 제거한다.",
-    refs: "NetworkFrameworkPlan N1", priority: "P0", days: 4, status: "todo", note: "" },
+    detail: "format-neutral schema 위에 Authoring/Cooked archive를 분리하고 Runtime/NetCore 후보 헤더의 yaml-cpp·nlohmann 의존을 제거한다. 남은 것은 이 판정을 회귀 세트에 배선해 되돌아가지 않게 만드는 일이다.",
+    refs: "NetworkFrameworkPlan N1", priority: "P0", days: 0.5, status: "progress",
+    note: "구간 B — 2026-09-04 재실측으로 판정 조건이 이미 참이다. PHASE 17 D3/D4가 닫았다: yaml-cpp include 0, nlohmann 0, SceneRuntime의 ryml include 0, ComponentFactory 인자는 Authoring::NodeView. 구현 슬라이스가 아니므로 공수를 4일→0.5일로 낮췄다(게이트 배선분)." },
   { phase: 20, id: "N2", title: "Network ID와 schema 정본",
     detail: "NetworkObjectId·고정폭 type/field ID·tombstone registry와 replicated schema validation을 만든다. DDOL/scene transfer/destroy의 Bind·Rebind·Unbind 순서를 검증한다.",
-    refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo",
+    note: "구간 A/C 분할 — ID 표기·tombstone·schema 검증기는 위임(A), Bind/Rebind/Unbind 호출 지점은 Scene.cpp(5,054줄) 접촉이라 사내(C). ComponentTypeUUID::kTable 32종이 리네임 불변 규율을 이미 갖고 있어 새로 만들지 말고 재료로 쓴다." },
   { phase: 20, id: "N3", title: "Fixed Simulation Clock",
     detail: "render clock과 simulation clock을 분리하고 accumulator/catch-up/pause/scene-switch 규칙을 Editor·Player·Server 공통 driver로 만든다.",
-    refs: "NetworkFrameworkPlan N3", priority: "P0", days: 4, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N3", priority: "P0", days: 4, status: "todo",
+    note: "구간 B(위임 불가) — 네트워크 작업이 아니라 게임플레이 변경이다. 착지점은 Runtime::TickSimulationFrame(RuntimeFrame.cpp 92줄, E3-7이 Editor/Player 공통으로 만들었다) 한 곳이지만 파급은 물리 스텝 수·C# SimulationScope.Delay·AI·회귀 세트 전체다. 설계 문서 §9대로 네트워크보다 먼저 독립 회귀로 닫는다." },
   { phase: 20, id: "N4", title: "Loopback Transport와 메시지 프레이밍",
     detail: "message-oriented INetworkTransport, bounded reader/writer, handshake와 loss/reorder/duplicate/corruption simulator를 실제 socket 없이 완결한다.",
-    refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo",
+    note: "구간 A(위임 가능) — 소켓 없는 메모리 어댑터라 값 in/값 out으로 닫힌다. 위임의 첫 후보이며 N3 없이 착수할 수 있다(snapshot의 tick 통합만 N3 뒤)." },
   { phase: 20, id: "N5", title: "Spawn/Despawn과 Full Snapshot",
     detail: "server-authoritative lifecycle과 immutable full snapshot, interpolation buffer를 Loopback 2-peer에서 검증한다. stale snapshot은 개체를 부활시키지 못해야 한다.",
-    refs: "NetworkFrameworkPlan N5", priority: "P0", days: 5, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N5", priority: "P0", days: 5, status: "todo",
+    note: "구간 A/C 분할 — snapshot 값 구조와 인코더는 위임(A), tick 끝의 capture 호출 지점은 Scene/SceneManager 접촉이라 사내(C)." },
   { phase: 20, id: "N6", title: "Dirty Delta·Quantization·Interest",
     detail: "revision/dirty mask, acknowledged baseline, 실측 quantizer와 최소 interest grid로 full snapshot 대비 bytes/tick·encode·allocation을 줄인다.",
-    refs: "NetworkFrameworkPlan N6", priority: "P1", days: 5, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N6", priority: "P1", days: 5, status: "todo",
+    note: "구간 A/C 분할 — delta·quantizer·interest 알고리즘은 위임(A), dirty를 만드는 쓰기 창구는 공유 파일이라 사내(C)." },
   { phase: 20, id: "N7", title: "실제 Transport A/B 판정과 adapter",
     detail: "동일 N6 workload로 GNS/ENet 후보를 비교하고 선택 근거를 기록한다. 구체 library API는 NetCore 경계 밖 adapter에 가둔다.",
-    refs: "NetworkFrameworkPlan N7", priority: "P1", days: 3, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N7", priority: "P1", days: 3, status: "todo",
+    note: "구간 A(위임 가능) — INetworkTransport 뒤의 구현 교체다. 단 vcpkg.json 편집과 패키징 판정은 사내가 소유한다." },
   { phase: 20, id: "N8", title: "Client Prediction·Reconciliation (선택)",
     detail: "gameplay 요구가 확정될 때만 locally-owned movement를 tick-keyed history로 rewind/replay한다. 요구가 없으면 전체 완료 조건이 아니다.",
     refs: "NetworkFrameworkPlan N8", priority: "P2", days: 4, status: "stopped",
-    note: "중단 — gameplay 요구가 확정되지 않았고 계획 원문도 전체 완료 조건에서 제외한다. locally-owned movement와 허용 오차가 제품 요구로 정해질 때 별도 슬라이스로 재개한다." },
+    note: "구간 A(요구 확정 시 위임 가능) · 중단 — gameplay 요구가 확정되지 않았고 계획 원문도 전체 완료 조건에서 제외한다. locally-owned movement와 허용 오차가 제품 요구로 정해질 때 별도 슬라이스로 재개한다." },
   { phase: 20, id: "N9", title: "Headless Server target (선택 제품)",
     detail: "Editor/ImGui/RenderCore/authoring parser 없이 cooked content와 공통 simulation tick으로 2-client smoke를 통과한다. 제품 요구가 있을 때 착수한다.",
     refs: "NetworkFrameworkPlan N9", priority: "P2", days: 5, status: "stopped",
-    note: "중단 — dedicated/headless 제품 요구가 없으므로 현재 네트워크 기반의 완료 조건에서 제외한다. 서버 배포 모델과 운영 요구가 확정되면 새 제품 타깃으로 재개한다." },
+    note: "구간 B(사내) — .sln·vcxproj·링크 경계 수술이다. 중단 — dedicated/headless 제품 요구가 없으므로 현재 네트워크 기반의 완료 조건에서 제외한다. 서버 배포 모델과 운영 요구가 확정되면 새 제품 타깃으로 재개한다." },
   { phase: 20, id: "N10", title: "Hardening·관측·soak",
     detail: "bounds/authority/rate limit, queue backpressure, disconnect/shutdown 순서, 장시간 soak와 운영 telemetry를 완결한다.",
-    refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo",
+    note: "구간 A(위임 가능) — fuzz corpus와 soak 자동화는 독립 산출물이다." },
 
   // ---------- PHASE 21: 에디터 워크스페이스·도킹·ViewportHost ----------
   { phase: 21, id: "W0", title: "관측 표면·기준선·실패 게이트",
