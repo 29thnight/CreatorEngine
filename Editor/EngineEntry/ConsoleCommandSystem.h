@@ -105,7 +105,43 @@ public:
     ///
     /// completion 은 GT 에서 불리므로 **짧아야 한다**. 수신 스레드는 그 안에서
     /// 값을 넘겨받고 곧바로 깨어난다.
-    void EnqueueStructured(std::vector<std::string> arguments, CommandCompletion completion);
+    /// ★ **서비스 큐로 들어간다**(LC5). 배치 큐와 분리한 이유는 §7.2 다 —
+    ///   `scripts/scene_churn_benchmark.txt` 같은 기존 시나리오는 프레임 수로
+    ///   시간을 재고 `wait N` 이 정확히 N 프레임을 뜻한다는 전제 위에 있다.
+    ///   서비스 지연을 위해 드레인을 바꾸면서 그 전제를 같이 바꾸면 81 개
+    ///   소비자의 측정값이 조용히 이동한다.
+    /// 결과를 돌려받을 사람이 있는 적재(서비스 경로).
+    ///
+    /// `serviceQueueCap` 이 0 이 아니면 그 상한을 **적재와 같은 락 안에서**
+    /// 확인하고, 넘으면 넣지 않고 false 를 돌려준다. 검사와 적재를 떼어 놓으면
+    /// 동시 요청이 전부 검사를 통과한 뒤 차례로 들어와 상한을 넘긴다.
+    bool EnqueueStructured(std::vector<std::string> arguments, CommandCompletion completion,
+                           std::size_t serviceQueueCap = 0);
+
+    /// 서비스 큐의 깊이. 상한을 넘으면 수신 스레드가 429 를 낸다(§7.3).
+    std::size_t ServiceQueueDepth() const;
+    std::size_t BatchQueueDepth() const;
+
+    /// 명령 등록을 **지금** 끝낸다.
+    ///
+    /// ★ registry 는 `GetTable()` 의 function-local static 이 채운다. 그 함수는
+    ///   오늘 `ExecuteParsed` 에서만 불리므로, 명령이 하나도 안 돈 상태에서는
+    ///   표가 비어 있다. `--command-service` 만 준 실행이 정확히 그 상태로
+    ///   수신 스레드를 띄운다 — 그러면 ① 첫 요청의 `cost` 조회가 "없는 명령"이
+    ///   되어 `game.pak` 같은 Long 명령이 동기로 돌고(§6.2 가 무력화된다)
+    ///   ② 게임 스레드가 표를 채우는 도중 수신 스레드가 그것을 훑어 vector 에
+    ///   대한 read/write 경합이 난다. 서비스를 열기 전에 여기서 끝내 둔다.
+    static void EnsureRegistryPopulated();
+
+    /// 드레인 예산(§7.2). 0 으로 두면 서비스 큐가 돌지 않는다 —
+    /// SLO 게이트가 그 상태로 **자기 이빨을 확인한다**(§14.7).
+    struct DrainBudget
+    {
+        double      timeMs{ 2.0 };
+        std::size_t count{ 8 };
+    };
+    void        SetDrainBudget(DrainBudget budget) noexcept;
+    DrainBudget GetDrainBudget() const noexcept;
 
     // ── 서비스가 GT 밖에서 읽는 상태 (LC4) ──────────────────────────────
     //
@@ -117,10 +153,27 @@ public:
     struct ServiceStatus
     {
         uint64_t    frame{ 0 };
-        std::size_t queueDepth{ 0 };
-        double      oldestQueuedMs{ 0.0 };
+
+        // ★ **두 큐를 따로 낸다(LC5).**
+        //
+        //   LC5 가 큐를 둘로 쪼갠 뒤에도 여기는 배치 큐만 보고 있었다. 그래서
+        //   `--command-service` 만으로 띄운 자동화 실행 — 배치 입력이 아예 없는
+        //   실행 — 에서는 `/health` 가 서비스 큐가 상한까지 차 있어도 **항상**
+        //   `queueDepth 0` 을 냈다. 클라이언트는 429 를 받기 직전까지 한가한
+        //   서버를 본다. "멈춤은 지연이 아니라 상태다"를 지키겠다고 만든 창구가
+        //   정작 LC5 가 새로 만든 줄에 대해서만 눈을 감고 있었다.
+        std::size_t serviceQueueDepth{ 0 };
+        double      oldestQueuedMs{ 0.0 };   ///< 서비스 큐 선두의 대기 시간
+        std::size_t batchQueueDepth{ 0 };
+
         bool        executing{ false };
         std::string currentCommand;
+
+        // 실행 중이 아니어도 큐가 안 도는 구간이 있다. `wait N` 과 씬 로딩은
+        // `Pump()` 를 조기 반환시키므로 `executing` 이 거짓인 채로 서비스 큐가
+        // 통째로 멈춘다. 그 구간을 "한가함"으로 내면 관측이 거짓말을 한다.
+        bool        sceneLoading{ false };
+        uint32_t    waitFramesRemaining{ 0 };
     };
     ServiceStatus SnapshotStatus() const;
 
@@ -203,11 +256,31 @@ private:
         /// 결과를 기다리는 사람이 있으면 채워진다(LC4).
         CommandCompletion                     completion;
 
+        /// 서비스(HTTP)에서 왔는가.
+        ///
+        /// ★ 큐를 가르는 축이자 **session 을 가르는 축**이다. LC4 직후에는
+        ///   서비스 명령의 실패가 배치 session 에 누적돼 프로세스 종료 코드를
+        ///   바꿨다 — HTTP 로 부른 `scene.load` 하나가 에디터를 exit 3 으로
+        ///   끝내게 만들었다. 배치 session 은 배치 시나리오의 판정이어야 한다.
+        bool                                  fromService{ false };
+
         bool IsStructured() const noexcept { return !arguments.empty(); }
     };
 
-    std::deque<PendingCommand> m_pending;
-    std::mutex m_mutex;
+    // 배치 큐와 서비스 큐를 나눈다(§7.2).
+    //
+    // 나누는 것은 구현 편의가 아니라 **기존 측정 의미의 보존**이다. 배치 큐는
+    // 프레임당 정확히 하나를 유지하고, 서비스 큐만 예산만큼 드레인한다.
+    std::deque<PendingCommand> m_pending;         ///< 배치(--exec·--script·stdin)
+    std::deque<PendingCommand> m_servicePending;  ///< 서비스(HTTP)
+    mutable std::mutex m_mutex;
+
+    /// 서비스 큐 상한. 0 이면 무제한. 서비스가 `Start` 에서 밀어 넣는다.
+    std::atomic<size_t>   m_serviceQueueCap{ 0 };
+
+    /// `Pump()` 가 매 프레임 갱신하는 조기 반환 사유. GT 밖에서 읽는다.
+    std::atomic<bool>     m_sceneLoading{ false };
+    std::atomic<uint32_t> m_waitFramesRemaining{ 0 };
 
     // Pump가 도는 횟수. 프레임 경계에서 정확히 한 번이라 프레임 수와 같다.
     // Enqueue가 게임 스레드 밖에서 읽으므로 원자적이어야 한다.
@@ -217,6 +290,21 @@ private:
     mutable std::mutex    m_statusMutex;
     std::string           m_currentCommand;
     std::atomic<bool>     m_executing{ false };
+
+    // 드레인 예산. 게이트가 0 으로 바꿔 SLO 회귀를 재현한다(§14.7).
+    std::atomic<double>      m_drainTimeMs{ 2.0 };
+    std::atomic<size_t>      m_drainCount{ 8 };
+
+    /// 지금 도는 명령이 서비스에서 왔나.
+    ///
+    /// 원자적이지 않아도 되는 이유: 쓰는 곳(`RunOne`)과 읽는 곳(`ExecuteParsed`)이
+    /// 같은 동기 호출 사슬(`Pump → RunOne → ExecuteParsed`) 안이라 **항상 게임
+    /// 스레드 하나**다. 그 전제가 깨지면(다른 스레드가 `RunOne` 을 부르면) 이
+    /// 변수는 조용히 경합한다 — `RunOne` 은 게임 스레드 전용이다.
+    bool                     m_executingFromService{ false };
+
+    /// 큐에서 하나를 꺼내 실행하고 계측·판정을 남긴다. 실행했으면 true.
+    bool RunOne(PendingCommand pending, uint64_t frameIndex);
 
     // 표준 입력 읽기 스레드.
     //

@@ -661,6 +661,15 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
     // LC4: 서비스를 켠다. 배치 프론트엔드와 독립이라 --console 과 무관하게 뜬다.
     if (wantCommandService)
     {
+        // ★ 표를 **열기 전에** 채운다.
+        //
+        //   `--command-service` 만 준 실행에는 배치 입력이 없어서, 첫 HTTP 요청이
+        //   올 때까지 `ExecuteParsed` 가 한 번도 안 돈다 = registry 가 비어 있다.
+        //   그 상태로 수신 스레드를 띄우면 첫 요청의 `cost` 조회가 빗나가 Long
+        //   명령이 동기로 돌고(LC5 가 존재하는 이유가 사라진다), 동시에 게임
+        //   스레드가 211 개를 밀어 넣는 중인 vector 를 수신 스레드가 훑는다.
+        EnsureRegistryPopulated();
+
         std::string error;
         if (EditorCommandService::Start(PathFinder::BaseProjectPath().string(), error))
         {
@@ -779,15 +788,20 @@ ConsoleCommandSystem::ServiceStatus ConsoleCommandSystem::SnapshotStatus() const
         //   `Pump()` 는 큐에서 꺼낼 때만 잡고 곧 놓은 뒤 명령을 실행한다.
         //   그래서 `scene.load` 가 2.4초 도는 동안에도 여기서 즉시 잠긴다 —
         //   그것이 §7.3 이 성립하는 이유다.
-        std::lock_guard<std::mutex> guard(const_cast<std::mutex&>(m_mutex));
-        status.queueDepth = m_pending.size();
-        if (!m_pending.empty())
+        std::lock_guard<std::mutex> guard(m_mutex);
+        status.serviceQueueDepth = m_servicePending.size();
+        status.batchQueueDepth   = m_pending.size();
+        if (!m_servicePending.empty())
         {
             const std::chrono::duration<double, std::milli> age =
-                std::chrono::steady_clock::now() - m_pending.front().enqueuedAt;
+                std::chrono::steady_clock::now() - m_servicePending.front().enqueuedAt;
             status.oldestQueuedMs = age.count();
         }
     }
+
+    status.sceneLoading        = m_sceneLoading.load(std::memory_order_acquire);
+    status.waitFramesRemaining = m_waitFramesRemaining.load(std::memory_order_acquire);
+
     {
         std::lock_guard<std::mutex> guard(m_statusMutex);
         status.currentCommand = m_currentCommand;
@@ -795,10 +809,11 @@ ConsoleCommandSystem::ServiceStatus ConsoleCommandSystem::SnapshotStatus() const
     return status;
 }
 
-void ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments,
-                                             CommandCompletion completion)
+bool ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments,
+                                             CommandCompletion completion,
+                                             std::size_t serviceQueueCap)
 {
-    if (arguments.empty()) return;
+    if (arguments.empty()) return false;
 
     PendingCommand pending;
     pending.completion = std::move(completion);
@@ -815,8 +830,23 @@ void ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments,
     pending.enqueuedAt    = std::chrono::steady_clock::now();
     pending.enqueuedFrame = m_frameIndex.load(std::memory_order_acquire);
 
+    // completion 이 있으면 결과를 기다리는 사람이 있다는 뜻이고, 오늘 그것은
+    // 서비스뿐이다. `--exec-args` 는 completion 없이 들어와 배치 큐로 간다.
+    pending.fromService = static_cast<bool>(pending.completion);
+
     std::lock_guard<std::mutex> guard(m_mutex);
-    m_pending.push_back(std::move(pending));
+    if (pending.fromService)
+    {
+        // 상한 확인과 적재가 **같은 락 안**이다. 이것이 상한을 불변식으로
+        // 만드는 유일한 배치다 — 서비스 쪽의 사전 검사는 빠른 길일 뿐이다.
+        if (0 != serviceQueueCap && m_servicePending.size() >= serviceQueueCap) return false;
+        m_servicePending.push_back(std::move(pending));
+    }
+    else
+    {
+        m_pending.push_back(std::move(pending));
+    }
+    return true;
 }
 
 void ConsoleCommandSystem::Pump()
@@ -858,6 +888,16 @@ void ConsoleCommandSystem::Pump()
         CommandBaseline::NoteFrame(frameState);
     }
 
+    // ★ 조기 반환 사유를 **밖에서 볼 수 있게 남긴다.**
+    //
+    //   아래 두 반환은 서비스 큐까지 통째로 멈춘다. 그 구간에는 `RunOne` 에
+    //   들어가지 않으므로 `m_executing` 도 `m_currentCommand` 도 비어 있고,
+    //   `/health` 는 "idle"을 낸다 — HTTP 클라이언트는 자기 요청이 씬 전환에
+    //   막혀 있는 동안 한가한 서버를 본다. LC0 실측으로 이 구간은 2.4초까지
+    //   간다. 멈춘 것을 한가한 것으로 내면 §7.3 이 성립하지 않는다.
+    m_sceneLoading.store(sceneLoading, std::memory_order_release);
+    m_waitFramesRemaining.store(static_cast<uint32_t>(m_waitFrames), std::memory_order_release);
+
     // wait 명령으로 보류 중이면 프레임만 소모한다.
     if (m_waitFrames > 0)
     {
@@ -869,14 +909,72 @@ void ConsoleCommandSystem::Pump()
     // (전환 중 측정하면 중간값이 섞인다)
     if (sceneLoading) return;
 
-    PendingCommand pending;
+    // ── 배치 큐: 프레임당 정확히 하나 (§7.2 · 기존 의미 보존) ───────────
+    //
+    // 이 수를 바꾸면 프레임 수로 시간을 재는 기존 시나리오의 측정값이 조용히
+    // 이동한다. `wait N` 이 정확히 N 프레임이라는 전제도 여기 걸려 있다.
     {
-        std::lock_guard<std::mutex> guard(m_mutex);
-        if (m_pending.empty()) return;
-        pending = std::move(m_pending.front());
-        m_pending.pop_front();
+        PendingCommand pending;
+        bool           has = false;
+        {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            if (!m_pending.empty())
+            {
+                pending = std::move(m_pending.front());
+                m_pending.pop_front();
+                has = true;
+            }
+        }
+        if (has) RunOne(std::move(pending), frameIndex);
     }
 
+    // ── 서비스 큐: 예산만큼 (§7.2) ──────────────────────────────────────
+    //
+    // 명령 N 개가 N 프레임을 기다리지 않게 하는 자리다. 예산은 시간과 개수 둘
+    // 다이고, `cost=Long` 을 만나면 이번 프레임은 그것 하나만 돈다 — 긴 명령이
+    // 예산 안에서 다른 명령의 지연을 통째로 먹지 않게.
+    const double      budgetMs    = m_drainTimeMs.load(std::memory_order_relaxed);
+    const std::size_t budgetCount = m_drainCount.load(std::memory_order_relaxed);
+    const auto        drainBegan  = std::chrono::steady_clock::now();
+
+    for (std::size_t drained = 0; drained < budgetCount; ++drained)
+    {
+        if (drained > 0)
+        {
+            const std::chrono::duration<double, std::milli> spent =
+                std::chrono::steady_clock::now() - drainBegan;
+            if (spent.count() >= budgetMs) break;
+        }
+
+        PendingCommand pending;
+        bool           isLong = false;
+        {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            if (m_servicePending.empty()) break;
+
+            // 비용을 **꺼내기 전에** 본다. 긴 명령을 만났는데 이미 이 프레임에서
+            // 뭔가 돌렸다면 다음 프레임으로 미룬다.
+            const std::string& name = m_servicePending.front().arguments.empty()
+                ? m_servicePending.front().text
+                : m_servicePending.front().arguments.front();
+            if (const CommandCore::CommandDescriptor* descriptor =
+                    CommandCore::CommandRegistry::Get().Find(name))
+            {
+                isLong = (CommandCore::CommandCost::Long == descriptor->cost);
+            }
+            if (isLong && drained > 0) break;
+
+            pending = std::move(m_servicePending.front());
+            m_servicePending.pop_front();
+        }
+
+        RunOne(std::move(pending), frameIndex);
+        if (isLong) break;   // 긴 명령은 그 프레임을 혼자 쓴다
+    }
+}
+
+bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex)
+{
     const std::string line = TrimLine(pending.text);
 
     const auto dequeuedAt = std::chrono::steady_clock::now();
@@ -889,6 +987,7 @@ void ConsoleCommandSystem::Pump()
         m_currentCommand = line.substr(0, (nameEnd == std::string::npos) ? line.size() : nameEnd);
     }
     m_executing.store(true, std::memory_order_release);
+    m_executingFromService = pending.fromService;
 
     // 구조화 입력은 라인 문법을 거치지 않는다(LC2). 재구성한 문자열은 진단용
     // 으로만 넘긴다 — 그것을 다시 파싱하면 §3.2 의 왕복 손실이 되살아난다.
@@ -898,6 +997,7 @@ void ConsoleCommandSystem::Pump()
 
     const auto finishedAt = std::chrono::steady_clock::now();
     m_executing.store(false, std::memory_order_release);
+    m_executingFromService = false;
     {
         std::lock_guard<std::mutex> guard(m_statusMutex);
         m_currentCommand.clear();
@@ -914,8 +1014,16 @@ void ConsoleCommandSystem::Pump()
                   0, (nameEnd == std::string::npos) ? line.size() : nameEnd);
           }();
 
-    // 계측보다 먼저 판정을 남긴다 — 여기서 죽더라도 결과는 session 에 있다.
-    if (!name.empty()) PublishResult(std::string(name), result);
+    // ★ 서비스 명령은 배치 session 에 누적하지 않는다(LC5).
+    //
+    //   LC4 직후에는 둘이 같은 session 을 썼다. 그래서 HTTP 로 부른
+    //   `scene.load` 하나가 실패하면 **에디터 프로세스가 exit 3 으로 끝났다** —
+    //   배치 시나리오는 아무 잘못이 없는데 그 판정이 뒤집힌다. 배치 session 은
+    //   배치의 판정이어야 한다. 서비스 요청의 판정은 HTTP 응답으로 간다.
+    if (!name.empty() && !pending.fromService)
+    {
+        PublishResult(std::string(name), result);
+    }
 
     const std::chrono::duration<double, std::milli> queued   = dequeuedAt - pending.enqueuedAt;
     const std::chrono::duration<double, std::milli> executed = finishedAt - dequeuedAt;
@@ -934,6 +1042,33 @@ void ConsoleCommandSystem::Pump()
         timing.executedMs   = executed.count();
         pending.completion(result, timing);
     }
+    return true;
+}
+
+std::size_t ConsoleCommandSystem::ServiceQueueDepth() const
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_servicePending.size();
+}
+
+std::size_t ConsoleCommandSystem::BatchQueueDepth() const
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_pending.size();
+}
+
+void ConsoleCommandSystem::SetDrainBudget(DrainBudget budget) noexcept
+{
+    m_drainTimeMs.store(budget.timeMs, std::memory_order_relaxed);
+    m_drainCount.store(budget.count, std::memory_order_relaxed);
+}
+
+ConsoleCommandSystem::DrainBudget ConsoleCommandSystem::GetDrainBudget() const noexcept
+{
+    DrainBudget budget;
+    budget.timeMs = m_drainTimeMs.load(std::memory_order_relaxed);
+    budget.count  = m_drainCount.load(std::memory_order_relaxed);
+    return budget;
 }
 
 namespace
@@ -4003,6 +4138,45 @@ namespace ConsoleCmd
             return;
         }
         std::printf("[CLI] cli.probe.timing 완료 경로=%s\n", path.c_str());
+    }
+
+    /// cli.drain.budget [<시간ms> <개수>]
+    ///
+    /// 서비스 큐 드레인 예산을 읽거나 바꾼다(§7.2).
+    ///
+    /// ★ 있는 이유는 **게이트가 자기 이빨을 확인하기 위해서**다(§14.7).
+    ///   예산을 0 으로 만들면 서비스 큐가 돌지 않고, 그 상태에서 SLO 게이트가
+    ///   붉어져야 한다. 붉어지지 않으면 그 게이트는 아무것도 안 지키고 있다.
+    static CommandCore::CommandResult Cmd_cli_drain_budget(const ConsoleCommandContext& ctx)
+    {
+        ConsoleCommandSystem::DrainBudget budget = ctx.system.GetDrainBudget();
+
+        if (ctx.parts.size() >= 3)
+        {
+            try
+            {
+                budget.timeMs = std::stod(ctx.parts[1]);
+                budget.count  = static_cast<std::size_t>(std::stoull(ctx.parts[2]));
+            }
+            catch (const std::exception&)
+            {
+                return CommandCore::InvalidArguments(
+                    "cli.drain.budget: <시간ms> <개수> 가 숫자여야 한다", "drain.not_a_number");
+            }
+            if (budget.timeMs < 0.0)
+            {
+                return CommandCore::InvalidArguments(
+                    "cli.drain.budget: 시간이 음수다", "drain.negative");
+            }
+            ctx.system.SetDrainBudget(budget);
+        }
+
+        std::printf("[CLI] cli.drain.budget time=%.3fms count=%zu\n", budget.timeMs, budget.count);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("timeMs", CommandCore::CommandData::Double(budget.timeMs));
+        data.Set("count",  CommandCore::CommandData::Int(static_cast<int64_t>(budget.count)));
+        return CommandCore::Ok("드레인 예산", std::move(data));
     }
 
     /// cli.echo.args <아무 인자>
@@ -12164,6 +12338,7 @@ namespace ConsoleCmd
             reg({ "commands.dump" }, &Cmd_commands_dump);
             reg({ "cli.probe.timing" }, &Cmd_cli_probe_timing);
             reg({ "cli.echo.args" }, &Cmd_cli_echo_args);
+            regResult({ "cli.drain.budget" }, &Cmd_cli_drain_budget);
             regResult({ "game.pak" }, &Cmd_game_pak);
             regResult({ "wait" }, &Cmd_wait);
             regResult({ "scene.load", "scene.switch" }, &Cmd_scene_load);
@@ -12413,6 +12588,18 @@ CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
             "알 수 없는 명령: " + cmd + "  ('help' 참고)", "command.unknown");
     }
 
+    // ★ 서비스 세션에서 `wait` 를 금지한다(§7.2).
+    //
+    //   `wait N` 은 **전역 프레임 보류**다. 배치 시나리오에서는 그것이 문법이고
+    //   측정의 단위지만, 동시 세션이 있는 서비스에서 한 요청이 프레임을 붙잡으면
+    //   다른 요청 전부의 지연이 된다. 자기 요청만 늦추는 것이 아니다.
+    if (m_executingFromService && "wait" == cmd)
+    {
+        return CommandCore::InvalidArguments(
+            "wait 는 배치 시나리오의 문법이다. 서비스 세션에서는 전역 프레임 보류가 "
+            "다른 요청의 지연이 되므로 받지 않는다", "service.wait_forbidden");
+    }
+
     const ConsoleCommandContext ctx{ cmd, parts, diagnosticLine, *this };
 
     // 일부러 죽는 명령은 그대로 죽게 둔다(`crash.test`). 크래시 덤프 경로는
@@ -12481,6 +12668,9 @@ void ConsoleCommandSystem::PublishResult(const std::string& commandId,
 
 void ConsoleCommandSystem::DiscardPending()
 {
+    // `--fail-fast` 는 **배치** 시나리오의 규약이다. 서비스 큐를 함께 비우면
+    // 결과를 기다리는 HTTP 요청이 응답 없이 버려지고, 그쪽은 타임아웃으로만
+    // 알게 된다 — 배치의 판단이 서비스 요청을 조용히 죽이는 것은 옳지 않다.
     std::lock_guard<std::mutex> guard(m_mutex);
     m_pending.clear();
 }
@@ -12540,11 +12730,23 @@ const char* ConsoleCommandSystem::HelpText() noexcept
     //   magic static 은 한 번만 초기화되므로, 앞으로 누가 `--help` 조기 처리나
     //   LC4 의 수신 스레드에서 이 함수를 먼저 부르면 help 가 "0개"로 **영구
     //   동결**된다. 되돌릴 방법이 없다. 여기서 직접 부르면 그 위험이 사라진다.
-    (void)ConsoleCmd::GetTable();
+    EnsureRegistryPopulated();
 
     static const std::string help =
         CommandCore::RenderHelp(CommandCore::CommandRegistry::Get());
     return help.c_str();
+}
+
+void ConsoleCommandSystem::EnsureRegistryPopulated()
+{
+    // magic static 이라 몇 번을 불러도 채우는 것은 한 번이다.
+    (void)ConsoleCmd::GetTable();
+
+    // 정렬 캐시까지 여기서 만든다. `Sorted()` 는 `mutable` 캐시를 **지연**
+    // 생성하므로, 비워 둔 채 수신 스레드 둘이 동시에 부르면 const 메서드가
+    // 서로의 쓰기를 밟는다. 채우는 쪽을 게임 스레드 한 곳으로 고정하면 이후의
+    // 조회는 순수한 읽기가 된다.
+    (void)CommandCore::CommandRegistry::Get().Sorted();
 }
 
 void ConsoleCommandSystem::PrintHelp() const

@@ -17,6 +17,7 @@
 //   · 감사 로그에 토큰과 인자 원문을 남기지 않는다.
 
 #include "CommandGateway.h"
+#include "OperationTable.h"
 #include "HttpRequest.h"
 #include "SocketPlatform.h"
 
@@ -49,6 +50,9 @@ namespace CommandService
         ///   29초마다 1바이트씩 흘리는 연결이 **영원히** 산다. 인증 이전 단계라
         ///   토큰도 필요 없다. 절대 기한을 따로 둔다.
         int          requestDeadlineMs{ 10000 };
+
+        int          maxQueueDepth{ 64 };     ///< 429 (§7.3)
+        int          streamTimeoutMs{ 60000 };
 
         HttpLimits   limits;
     };
@@ -101,6 +105,19 @@ namespace CommandService
         std::atomic<bool> m_stopping{ false };
         std::atomic<int>  m_connections{ 0 };
         std::atomic<uint64_t> m_rejected{ 0 };
+
+        /// 진행 중 operation 표.
+        ///
+        /// ★ **값이 아니라 shared_ptr 인 이유가 수명이다.**
+        ///
+        ///   `ExecuteAsync` 가 넘기는 completion 은 게임 스레드가 그 명령을
+        ///   드레인할 때 불린다. 그 시점은 큐 적체·씬 로딩에 따라 얼마든지
+        ///   뒤로 밀린다. 표를 값 멤버로 두고 람다가 `&m_operations` 를 담으면,
+        ///   그 사이에 `Service` 가 사라지는 순간 use-after-free 다. 오늘은
+        ///   호출자가 magic static 하나뿐이라 안 터지지만, 그것은 **이 클래스가
+        ///   보장하는 성질이 아니라 호출자의 우연**이다. LC8 의 Player 가
+        ///   레벨 전환마다 서비스를 껐다 켜면 바로 드러난다.
+        std::shared_ptr<OperationTable> m_operations{ std::make_shared<OperationTable>() };
 
         /// 연결 하나를 맡은 작업 스레드.
         ///

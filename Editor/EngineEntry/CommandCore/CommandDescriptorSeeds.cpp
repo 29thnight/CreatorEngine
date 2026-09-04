@@ -49,6 +49,7 @@ namespace CommandCore
             { "blackboard.authoring.probe", CommandCost::Frames, "<이름> [empty|noname]", "Blackboard 저장·재로드 왕복으로 키 값이 살아 돌아오는지 본다" },
             { "bt.status", CommandCost::Immediate, "", "행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)" },
             { "camera.editor", CommandCost::Frames, "match|follow on|off|status", "에디터 카메라를 게임 카메라와 같은 시점으로" },
+            { "cli.drain.budget", CommandCost::Immediate, "[<시간ms> <개수>]", "서비스 큐 드레인 예산을 읽거나 바꾼다(LC5 · SLO 게이트의 변이용)" },
             { "cli.echo.args", CommandCost::Immediate, "<인자>", "tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)" },
             { "cli.probe.timing", CommandCost::Immediate, "[reset|off|경로]", "프레임 시간 분포와 명령 왕복 지연(LC0, 기본 off)" },
             { "collisionmatrix.authoring.probe", CommandCost::Frames, "[escape]", "충돌 행렬 저장·재로드 왕복과 설정 루트 이탈 거부를 본다" },

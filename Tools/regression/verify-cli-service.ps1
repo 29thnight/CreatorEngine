@@ -191,18 +191,45 @@ try {
     finally { if ($null -ne $slow) { $slow.Close() } }
 
     # ── 4) 명령이 값으로 돌아온다 ───────────────────────────────────────
-    $r = Req '/command' $auth 'POST' '{"command":"wait","args":["5"],"correlationId":"lc4"}'
+    #
+    # ★ 예전에는 이 검사가 `wait 5` 로 `data.frames == 5` 를 봤다. LC5 가
+    #   **서비스 세션에서 `wait` 를 금지**하면서 그 표본을 쓸 수 없게 됐다 —
+    #   전역 프레임 보류는 자기 요청만 늦추는 것이 아니라 다른 요청 전부의
+    #   지연이 되기 때문이다(§7.2). 표본을 `commands.describe` 로 바꾼다:
+    #   값을 돌려주고, 프레임을 잡지 않고, 결정적이다.
+    #
+    #   금지 자체는 아래에서 따로 단정한다. 검사를 조용히 바꾸기만 하면
+    #   "왜 이 표본이 바뀌었나"가 기록에서 사라진다.
+    $r = Req '/command' $auth 'POST' '{"command":"commands.describe","args":["help"],"correlationId":"lc4"}'
     $json = $r.Content | ConvertFrom-Json
-    "{0,-24} HTTP {1} status={2} data.frames={3}" -f 'command-ok', $r.StatusCode, $json.status, $json.data.frames
-    if ($r.StatusCode -ne 200)            { $failures.Add("command-ok : HTTP $($r.StatusCode)") }
-    if ($json.status -ne 'succeeded')     { $failures.Add("command-ok : status=$($json.status)") }
-    if ($json.data.frames -ne 5)          { $failures.Add('command-ok : data.frames 가 값으로 돌아오지 않았다') }
-    if ($json.correlationId -ne 'lc4')    { $failures.Add('command-ok : correlationId 가 되돌아오지 않았다') }
-    if ($null -eq $json.timing.queuedMs)  { $failures.Add('command-ok : timing 이 없다') }
+    "{0,-24} HTTP {1} status={2} data.canonical={3}" -f 'command-ok', $r.StatusCode, $json.status, $json.data.canonical
+    if ($r.StatusCode -ne 200)             { $failures.Add("command-ok : HTTP $($r.StatusCode)") }
+    if ($json.status -ne 'succeeded')      { $failures.Add("command-ok : status=$($json.status)") }
+    if ($json.data.canonical -ne 'help')   { $failures.Add('command-ok : data 가 값으로 돌아오지 않았다') }
+    if ($json.correlationId -ne 'lc4')     { $failures.Add('command-ok : correlationId 가 되돌아오지 않았다') }
+    if ($null -eq $json.timing.queuedMs)   { $failures.Add('command-ok : timing 이 없다') }
+
+    # LC5 가 들인 금지를 여기서도 못 박는다. 이 줄이 붉어지면 서비스가 전역
+    # 프레임 보류를 다시 받아들이기 시작했다는 뜻이다.
+    $r = Req '/command' $auth 'POST' '{"command":"wait","args":["5"]}'
+    $json = $r.Content | ConvertFrom-Json
+    "{0,-24} HTTP {1} code={2} (LC5 이후 금지)" -f 'wait-forbidden', $r.StatusCode, $json.code
+    if ($r.StatusCode -ne 400 -or $json.code -ne 'service.wait_forbidden') {
+        $failures.Add("wait-forbidden : 서비스가 wait 를 받았다 (HTTP $($r.StatusCode))")
+    }
 
     # ── 5) 상태 사상 (§5.3) ─────────────────────────────────────────────
+    #
+    # ★ `precondition` 은 **`mode:"sync"` 를 명시한다.**
+    #
+    #   `scene.load` 는 `cost=Long` 이라, LC5 이후 기본 `auto` 에서는 실행하기도
+    #   전에 202 + operationId 로 승격된다 — 그러면 여기서 보려는 동기 상태
+    #   사상(§5.3)이 아예 일어나지 않는다. 승격 자체는 옳은 거동이므로 게이트가
+    #   기대값을 202 로 낮추는 것이 아니라, **동기 경로를 골라서** 사상을 본다.
+    #   기대값을 옮겼다면 "409 를 내야 할 실패가 409 로 온다"는 검사가 조용히
+    #   사라졌을 것이다.
     $map = @(
-        @{ label='precondition'; expect=409; body='{"command":"scene.load","args":["Assets/Scenes/NoSuchScene.creator"]}' }
+        @{ label='precondition'; expect=409; body='{"command":"scene.load","args":["Assets/Scenes/NoSuchScene.creator"],"mode":"sync"}' }
         @{ label='bad-args';     expect=400; body='{"command":"wait","args":["abc"]}' }
         @{ label='unknown-cmd';  expect=404; body='{"command":"this.does.not.exist"}' }
         @{ label='args-type';    expect=400; body='{"command":"wait","args":[7]}' }

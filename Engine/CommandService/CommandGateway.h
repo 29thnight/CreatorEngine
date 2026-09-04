@@ -10,7 +10,9 @@
 // Editor 쪽에 살면서 그 둘을 아래 값 타입으로 바꿔 준다. LC8 의 Player 는 같은
 // 인터페이스에 자기 어댑터를 끼운다.
 
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -54,6 +56,37 @@ namespace CommandService
         virtual CommandOutcome Execute(const std::vector<std::string>& arguments,
                                        int timeoutMs) = 0;
 
+        /// 명령의 비용 등급(LC3 descriptor). 없는 명령이면 false.
+        ///
+        /// ★ 서비스가 동기/202 를 **추측하지 않게** 하는 값이다(§6.2).
+        ///   추측하면 `game.pak` 같은 초 단위 명령을 동기로 기다리게 되고,
+        ///   §7.1 의 지연 계약이 그 순간 거짓말이 된다.
+        virtual bool IsLongRunning(const std::string& command, bool& outFound) = 0;
+
+        /// 결과를 기다리지 않고 넣는다. 완료되면 `onDone` 이 **게임 스레드에서**
+        /// 불린다 — operation 표를 채우는 데 쓴다.
+        ///
+        /// 상한에서 거절되면 false — 그때 넣지 **않은** 것이므로 `onDone` 도
+        /// 불리지 않는다.
+        using AsyncCompletion = std::function<void(const CommandOutcome&)>;
+        virtual bool ExecuteAsync(const std::vector<std::string>& arguments,
+                                  AsyncCompletion onDone) = 0;
+
+        /// 서비스 큐 깊이. 관측용이다(`/health`).
+        virtual std::size_t QueueDepth() = 0;
+
+        /// 배치 큐 깊이. HTTP 호출자가 앉는 줄은 아니지만, 이것이 차 있으면
+        /// 서비스 큐의 소진도 같이 느려진다 — `/health` 가 둘을 따로 낸다.
+        virtual std::size_t BatchQueueDepth() = 0;
+
+        /// 큐 상한을 알린다. 서비스가 `Start` 에서 한 번 밀어 넣는다.
+        ///
+        /// ★ **상한을 적재 지점이 알아야 한다.** 예전에는 서비스가 `QueueDepth()`
+        ///   를 읽어 보고 넘으면 429 를 냈다. 읽기와 넣기가 별개의 임계구역이라,
+        ///   동시 요청 여러 개가 전부 검사를 통과한 뒤 차례로 넣으면 상한을
+        ///   넘긴다. 검사와 적재가 한 락 안에 있어야 상한이 실제 불변식이 된다.
+        virtual void SetQueueCapacity(std::size_t capacity) = 0;
+
         /// `GET /commands` 의 본문(JSON 배열). LC3 의 registry snapshot 이다.
         virtual std::string CommandsJson() = 0;
 
@@ -70,8 +103,9 @@ namespace CommandService
         {
             std::string role;          ///< "editor" | "player"
             uint64_t    frame{ 0 };
-            std::size_t queueDepth{ 0 };
-            double      oldestQueuedMs{ 0.0 };
+            std::size_t queueDepth{ 0 };        ///< 서비스 큐 — HTTP 호출자가 앉는 줄
+            std::size_t batchQueueDepth{ 0 };   ///< 배치 큐(--exec·--script·stdin)
+            double      oldestQueuedMs{ 0.0 };  ///< 서비스 큐 선두가 기다린 시간
             std::string state;         ///< "idle" | "busy"
             std::string blockedReason; ///< 비어 있으면 막혀 있지 않다
             std::string currentCommand;

@@ -8,6 +8,7 @@
 #include "../../Engine/CommandService/CommandService.h"
 #include "../../Engine/CommandService/JsonValue.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -110,7 +111,7 @@ namespace EditorCommandService
                 };
                 auto slot = std::make_shared<Slot>();
 
-                ConsoleCommandSystem::Get().EnqueueStructured(arguments,
+                const bool accepted = ConsoleCommandSystem::Get().EnqueueStructured(arguments,
                     [slot](const CommandCore::CommandResult& result,
                            const ConsoleCommandSystem::CommandTiming& timing)
                     {
@@ -122,9 +123,22 @@ namespace EditorCommandService
                             slot->done   = true;
                         }
                         slot->ready.notify_one();
-                    });
+                    },
+                    m_queueCapacity.load(std::memory_order_relaxed));
 
                 CommandService::CommandOutcome outcome;
+
+                if (!accepted)
+                {
+                    // 상한에서 거절됐다. 넣지 않았으므로 기다릴 것도 없다 —
+                    // 여기서 곧장 429 를 돌려준다.
+                    outcome.httpStatus = 429;
+                    outcome.status     = "error";
+                    outcome.code       = "service.queue_full";
+                    outcome.message    = "서비스 큐가 상한에 찼다";
+                    outcome.dataJson   = "{}";
+                    return outcome;
+                }
 
                 std::unique_lock<std::mutex> lock(slot->mutex);
                 const bool finished = slot->ready.wait_for(
@@ -164,6 +178,53 @@ namespace EditorCommandService
                 return outcome;
             }
 
+            bool IsLongRunning(const std::string& command, bool& outFound) override
+            {
+                const CommandCore::CommandDescriptor* descriptor =
+                    CommandCore::CommandRegistry::Get().Find(command);
+                outFound = (nullptr != descriptor);
+                if (!outFound) return false;
+                return CommandCore::CommandCost::Long == descriptor->cost;
+            }
+
+            bool ExecuteAsync(const std::vector<std::string>& arguments,
+                              AsyncCompletion onDone) override
+            {
+                return ConsoleCommandSystem::Get().EnqueueStructured(arguments,
+                    [onDone](const CommandCore::CommandResult& result,
+                             const ConsoleCommandSystem::CommandTiming& timing)
+                    {
+                        CommandService::CommandOutcome outcome;
+                        outcome.httpStatus   = HttpStatusFor(result.status, result.code);
+                        outcome.status       = std::string(CommandCore::ToString(result.status));
+                        outcome.code         = result.code;
+                        outcome.message      = result.message;
+                        outcome.dataJson     =
+                            (CommandCore::CommandData::Kind::Null == result.data.GetKind())
+                            ? std::string("{}") : ToJson(result.data).Serialize();
+                        outcome.queuedMs     = timing.queuedMs;
+                        outcome.executedMs   = timing.executedMs;
+                        outcome.waitedFrames = timing.waitedFrames;
+                        onDone(outcome);
+                    },
+                    m_queueCapacity.load(std::memory_order_relaxed));
+            }
+
+            std::size_t QueueDepth() override
+            {
+                return ConsoleCommandSystem::Get().ServiceQueueDepth();
+            }
+
+            std::size_t BatchQueueDepth() override
+            {
+                return ConsoleCommandSystem::Get().BatchQueueDepth();
+            }
+
+            void SetQueueCapacity(std::size_t capacity) override
+            {
+                m_queueCapacity.store(capacity, std::memory_order_relaxed);
+            }
+
             std::string CommandsJson() override
             {
                 // LC3 의 snapshot 을 그대로 낸다. 정렬도 그쪽이 보장한다 —
@@ -198,20 +259,41 @@ namespace EditorCommandService
                     ConsoleCommandSystem::Get().SnapshotStatus();
 
                 HealthSnapshot health;
-                health.role           = "editor";
-                health.frame          = status.frame;
-                health.queueDepth     = status.queueDepth;
-                health.oldestQueuedMs = status.oldestQueuedMs;
-                health.currentCommand = status.currentCommand;
-                health.state          = status.executing ? "busy" : "idle";
+                health.role            = "editor";
+                health.frame           = status.frame;
+                health.queueDepth      = status.serviceQueueDepth;
+                health.batchQueueDepth = status.batchQueueDepth;
+                health.oldestQueuedMs  = status.oldestQueuedMs;
+                health.currentCommand  = status.currentCommand;
+                health.state           = status.executing ? "busy" : "idle";
 
                 // 막혀 있음을 "지연"이 아니라 "상태"로 낸다(§7.3).
+                //
+                // ★ 실행 중이 아닌 정지도 정지다. `wait N` 과 씬 로딩은 `Pump()`
+                //   를 조기 반환시켜 서비스 큐를 통째로 세운다 — 그 동안
+                //   `executing` 은 거짓이라, 이 세 갈래가 없으면 "idle"만 나간다.
                 if (status.executing && !status.currentCommand.empty())
                 {
                     health.blockedReason = "command.running:" + status.currentCommand;
                 }
+                else if (status.sceneLoading)
+                {
+                    health.state         = "blocked";
+                    health.blockedReason = "scene.loading";
+                }
+                else if (status.waitFramesRemaining > 0)
+                {
+                    health.state         = "blocked";
+                    health.blockedReason = "batch.wait:"
+                                         + std::to_string(status.waitFramesRemaining);
+                }
                 return health;
             }
+
+        private:
+            /// 서비스가 `Start` 에서 알려 주는 큐 상한. 0 이면 무제한이다.
+            /// 수신 스레드 여럿이 읽으므로 원자적이어야 한다.
+            std::atomic<std::size_t> m_queueCapacity{ 0 };
         };
 
         EditorGateway&           Gateway() { static EditorGateway gateway; return gateway; }

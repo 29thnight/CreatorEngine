@@ -86,6 +86,16 @@ Run-Step "CLI command service(LC4)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-service.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 14.5 LC5 — 드레인 예산·operation·지연 SLO.
+#
+# SLO 상한은 목표(§7.1 의 50/150/300ms)가 아니라 **실측 + 여유**다. 목표를 그대로
+# 게이트로 쓰면 바닥값의 20배라 20배 퇴행이 초록으로 통과한다. 그리고 이 게이트는
+# 드레인 예산을 0 으로 만들어 **자기 이빨을 확인한다**(§14.7) — 그 상태에서
+# 붉어지지 않으면 SLO 검사는 아무것도 지키고 있지 않은 것이다.
+Run-Step "CLI drain·operation·SLO(LC5)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-drain.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

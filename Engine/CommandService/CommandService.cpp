@@ -4,6 +4,7 @@
 #include "ServiceEndpointFile.h"
 
 #include <chrono>
+#include <thread>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -56,6 +57,7 @@ namespace CommandService
 
         m_config  = config;
         m_gateway = &gateway;
+        m_gateway->SetQueueCapacity(static_cast<std::size_t>(m_config.maxQueueDepth));
 
         m_endpointPath = config.endpointPath;
         if (m_endpointPath.empty())
@@ -398,6 +400,8 @@ namespace CommandService
             root.Set("state",          JsonValue::String(health.state));
             root.Set("blockedReason",  JsonValue::String(health.blockedReason));
             root.Set("queueDepth",     JsonValue::Int(static_cast<int64_t>(health.queueDepth)));
+            root.Set("batchQueueDepth",
+                     JsonValue::Int(static_cast<int64_t>(health.batchQueueDepth)));
             root.Set("oldestQueuedMs", JsonValue::Double(health.oldestQueuedMs));
             root.Set("currentCommand", JsonValue::String(health.currentCommand));
             return finish(200, root.Serialize(), "");
@@ -468,6 +472,39 @@ namespace CommandService
                 }
             }
 
+            // ── 큐 상한 (§7.3) ──────────────────────────────────────────
+            //
+            // 무한 적재는 지연을 숨기는 가장 흔한 방법이다. 깊이가 상한을 넘으면
+            // 받아 놓고 늦게 답하는 대신 **지금 거절한다** — 호출자가 그것을
+            // 보고 물러설 수 있다.
+            //
+            // ★ 이 검사는 **빠른 길일 뿐 불변식이 아니다.** 읽기와 적재 사이가
+            //   벌어져 있어 동시 요청이 함께 통과할 수 있다. 상한을 실제로 지키는
+            //   것은 적재 지점(`SetQueueCapacity`)이다. 여기서 먼저 거르는 이유는
+            //   확실히 찰 요청에 operation 기록을 만들지 않기 위해서다.
+            if (m_gateway->QueueDepth() >= static_cast<std::size_t>(m_config.maxQueueDepth))
+            {
+                return finish(429, ErrorBody("service.queue_full",
+                    "서비스 큐가 상한(" + std::to_string(m_config.maxQueueDepth) + ")에 찼다"),
+                    "queue-full");
+            }
+
+            // ── mode (§5.2) ─────────────────────────────────────────────
+            std::string mode = "auto";
+            if (const JsonValue* value = parsed.value.Find("mode"))
+            {
+                if (JsonValue::Kind::String != value->GetKind())
+                {
+                    return finish(400, ErrorBody("request.mode_type", "mode 는 문자열이어야 한다"), "mode-type");
+                }
+                mode = value->AsString();
+                if ("auto" != mode && "sync" != mode && "async" != mode)
+                {
+                    return finish(400, ErrorBody("request.mode_unknown",
+                        "mode 는 auto|sync|async 다: " + mode), "mode-unknown");
+                }
+            }
+
             int timeoutMs = m_config.defaultCommandTimeoutMs;
             if (const JsonValue* value = parsed.value.Find("timeoutMs"))
             {
@@ -483,6 +520,62 @@ namespace CommandService
             if (const JsonValue* value = parsed.value.Find("correlationId"))
             {
                 if (JsonValue::Kind::String == value->GetKind()) correlationId = value->AsString();
+            }
+
+            // ── 비용을 보고 동기/202 를 **판정**한다 (§6.2) ─────────────
+            //
+            // 추측하지 않는다. LC3 이 211 개 전부에 `cost` 를 붙여 둔 이유가 이것이다.
+            bool found = false;
+            const bool isLong = m_gateway->IsLongRunning(arguments.front(), found);
+
+            const bool async = ("async" == mode) || ("auto" == mode && found && isLong);
+            if (async)
+            {
+                const std::string operationId = m_operations->Create(arguments.front());
+                m_operations->MarkRunning(operationId);
+
+                // ★ 표를 **약하게** 잡는다.
+                //
+                //   이 람다는 게임 스레드가 이 명령을 드레인할 때 불린다. 그
+                //   시점까지 `Service` 가 살아 있다는 보장은 어디에도 없다 —
+                //   오늘은 호출자가 magic static 이라 우연히 성립할 뿐이다.
+                //   `weak_ptr` 로 두면 서비스가 먼저 사라진 경우 결과를 **버린다**.
+                //   기다리는 사람이 이미 없으므로 버리는 것이 맞고, 무엇보다
+                //   죽은 표에 쓰지 않는다.
+                std::weak_ptr<OperationTable> table = m_operations;
+                const bool enqueued = m_gateway->ExecuteAsync(arguments,
+                    [table, operationId](const CommandOutcome& done)
+                {
+                    if (const std::shared_ptr<OperationTable> alive = table.lock())
+                    {
+                        alive->Complete(operationId, done.status, done.code, done.message,
+                                        done.dataJson, done.queuedMs, done.executedMs,
+                                        done.waitedFrames);
+                    }
+                });
+
+                if (!enqueued)
+                {
+                    // 적재가 상한에서 거절됐다. 위의 사전 검사를 통과하고도 여기서
+                    // 걸릴 수 있다 — 그 둘 사이에 다른 요청이 자리를 채웠다는 뜻이다.
+                    // 만들어 둔 기록은 종결시킨다. 영원히 running 인 operation 을
+                    // 남기면 폴링하는 쪽이 끝나지 않는 것을 기다린다.
+                    m_operations->Complete(operationId, "failed", "service.queue_full",
+                                           "서비스 큐가 상한에 찼다", "{}", 0.0, 0.0, 0);
+                    return finish(429, ErrorBody("service.queue_full",
+                        "서비스 큐가 상한(" + std::to_string(m_config.maxQueueDepth) + ")에 찼다"),
+                        "queue-full-race");
+                }
+
+                JsonValue accepted = JsonValue::Object();
+                accepted.Set("schemaVersion", JsonValue::Int(1));
+                if (!correlationId.empty()) accepted.Set("correlationId", JsonValue::String(correlationId));
+                accepted.Set("command",     JsonValue::String(arguments.front()));
+                accepted.Set("status",      JsonValue::String("accepted"));
+                accepted.Set("operationId", JsonValue::String(operationId));
+                accepted.Set("poll",        JsonValue::String("/operations/" + operationId));
+                accepted.Set("stream",      JsonValue::String("/operations/" + operationId + "/stream"));
+                return finish(202, accepted.Serialize(), "async:" + operationId);
             }
 
             const CommandOutcome outcome = m_gateway->Execute(arguments, timeoutMs);
@@ -509,6 +602,102 @@ namespace CommandService
 
             return finish(outcome.httpStatus, root.Serialize(),
                           outcome.timedOut ? "timeout" : "");
+        }
+
+        // ── /operations/{id} · /cancel · /stream (§5.2 · §7.4) ──────────
+        if (0 == request.path.rfind("/operations/", 0))
+        {
+            std::string rest = request.path.substr(std::string("/operations/").size());
+
+            std::string suffix;
+            const std::size_t slash = rest.find('/');
+            if (slash != std::string::npos)
+            {
+                suffix = rest.substr(slash + 1);
+                rest   = rest.substr(0, slash);
+            }
+
+            OperationRecord record;
+            if (!m_operations->Get(rest, record))
+            {
+                return finish(404, ErrorBody("operation.unknown",
+                                             "없는 operation: " + rest), "no-operation");
+            }
+
+            if (suffix.empty() && "GET" == request.method)
+            {
+                return finish(200, OperationTable::ToJson(record).Serialize(), "");
+            }
+
+            if ("cancel" == suffix && "POST" == request.method)
+            {
+                // ★ 취소 지점을 가진 명령이 오늘 하나도 없다.
+                //
+                //   §7.4 대로 **취소 불가 명령의 cancel 은 409** 다. 끊는 시늉을
+                //   하고 실제로는 계속 도는 것이 가장 나쁘다 — 호출자는 끝났다고
+                //   믿고 그 위에서 다음 판단을 한다. 요청은 기록해 두어, 취소
+                //   지점을 가진 명령이 생기면 그때 소비한다.
+                m_operations->RequestCancel(rest);
+                return finish(409, ErrorBody("operation.not_cancellable",
+                    "이 명령은 취소 지점을 갖지 않는다. 요청은 기록했고 실행은 계속된다"),
+                    "cancel-unsupported");
+            }
+
+            if ("stream" == suffix && "GET" == request.method)
+            {
+                // 상태 전이 이벤트를 흘린다. 완료될 때까지 기다렸다 한 번에 낸다 —
+                // keep-alive 응답 하나로 끝나므로 클라이언트가 폴링을 안 해도 된다.
+                //
+                // ★ **명령 단위 진행률은 아직 없다.** 그것을 내려면 명령이 진행을
+                //   생산해야 하는데 오늘 그런 명령이 하나도 없다(OperationTable.h).
+                const auto deadline = std::chrono::steady_clock::now()
+                    + std::chrono::milliseconds(m_config.streamTimeoutMs);
+
+                std::string body;
+                std::size_t emitted = 0;
+                while (true)
+                {
+                    OperationRecord current;
+                    if (!m_operations->Get(rest, current)) break;
+
+                    for (; emitted < current.events.size(); ++emitted)
+                    {
+                        body += "event: " + current.events[emitted] + "\n";
+                        body += "data: " + OperationTable::ToJson(current).Serialize() + "\n\n";
+                    }
+                    if (OperationState::Completed == current.state) break;
+
+                    // ★ **종료 신호를 여기서도 본다.**
+                    //
+                    //   `Stop()` 은 작업 스레드를 `ShutdownSocket` 으로 깨운 뒤
+                    //   join 한다. 그것이 통하는 이유는 그 스레드들이 `recv` 에서
+                    //   막혀 있기 때문이다. 이 루프는 **소켓을 만지지 않는다** —
+                    //   sleep 과 표 조회만 한다. 그래서 shutdown 이 아무 효과도
+                    //   없고, 스트림을 연 클라이언트가 하나만 있어도 에디터 종료가
+                    //   `streamTimeoutMs`(기본 60초)만큼 통째로 늦어진다. LC4 가
+                    //   없앤 30초 정지를 이름만 바꿔 되살리는 셈이라, 요청 마감
+                    //   시한과 **별개의** 종료 조건으로 둔다.
+                    if (m_stopping.load(std::memory_order_acquire))
+                    {
+                        body += "event: stream_shutdown\ndata: {}\n\n";
+                        break;
+                    }
+                    if (std::chrono::steady_clock::now() > deadline)
+                    {
+                        body += "event: stream_timeout\ndata: {}\n\n";
+                        break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                }
+                const std::chrono::duration<double, std::milli> elapsed =
+                    std::chrono::steady_clock::now() - started;
+                Audit(peerPort, request.method, request.path, 200, elapsed.count(), "stream");
+                return BuildHttpResponse(200, "text/event-stream; charset=utf-8",
+                                         body, request.keepAlive);
+            }
+
+            return finish(405, ErrorBody("route.method",
+                "operation 경로에서 지원하지 않는 메서드: " + request.method), "bad-method");
         }
 
         return finish(404, ErrorBody("route.unknown",
