@@ -175,7 +175,6 @@ namespace CommandCore
             { "render.exposure", CommandCost::Frames, "", "자동 노출이 무엇을 재고 무엇을 결정했는지", CommandClass::EngineService, CommandLiveness::Live },
             { "render.livecheck", CommandCost::Frames, "[너비 높이]", "resize·다중 뷰·표시 슬롯 회전 회귀 판정", CommandClass::Probe, CommandLiveness::Live },
             { "render.matmode", CommandCost::Frames, "<오브젝트> <opaque|transparent>", "오브젝트 재질의 렌더링 모드를 바꾼다", CommandClass::EngineService, CommandLiveness::Live },
-            { "render.post", CommandCost::Frames, "", "비활성 레거시 명령(DX11 포스트 설정)", CommandClass::EngineService, CommandLiveness::Live },
             { "render.rtinfo", CommandCost::Frames, "", "창·뷰포트·추종 텍스처 크기를 나란히 찍는다", CommandClass::EngineService, CommandLiveness::Live },
             { "render.shadowinfo", CommandCost::Frames, "", "그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)", CommandClass::EngineService, CommandLiveness::Live },
             { "rhi.uploadsegments", CommandCost::Frames, "", "DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증", CommandClass::Probe, CommandLiveness::RequiresRestart },

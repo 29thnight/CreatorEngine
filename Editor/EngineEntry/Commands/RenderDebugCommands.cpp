@@ -10,7 +10,6 @@
 //   render.shadowinfo  그림자 캐스케이드 계산 결과
 //   render.matmode     활성 씬 재질의 렌더링 모드를 **바꾼다**
 //   render.backend     부팅 시 고정된 RHI 조회(변경은 Settings — 재시작이 필요하다)
-//   render.post        비활성 레거시(아래 ★★)
 //
 // ── 왜 이름 접두사가 아니라 여기서 갈랐는가 ─────────────────────────────
 //
@@ -31,12 +30,22 @@
 // 그래서 이 명령은 조회만 한다. 그 사실이 주석에만 있으면 호출자는 알 길이
 // 없으므로 descriptor 의 재시작 축에 적는다.
 //
-// ── ★★ `render.post` 는 죽어 있다 ──────────────────────────────────────
+// ── ★★ `render.post` 는 **제거했다** ────────────────────────────────────
 //
-// 본문이 "비활성화됨" 한 줄을 찍고 끝난다. 그런데 등록은 살아 있어 help 와
-// `commands.list` 에 정상 명령으로 실린다 — 소비자는 이것이 동작한다고 믿을
-// 근거를 표에서 얻는다. 등록을 빼는 것이 맞지만 그러면 명령 수가 212→211 로
-// 줄어 골든이 바뀌므로, 이동과 섞지 않고 별도 변경으로 처리한다.
+// 본문이 "비활성화됨" 한 줄을 찍고 끝나는데 등록은 살아 있어 help 와
+// `commands.list` 에 정상 명령으로 실려 있었다. 소비자는 그것이 동작한다고
+// 믿을 근거를 표에서 얻는다.
+//
+// ★ 실제로 두 하네스가 믿고 있었다. `Tools/featuretest/run-featuretests.ps1`
+//   과 `Tools/showcase/Start-MaterialShowcase.ps1` 이 캡처 직전에
+//   `render.post fog off` 를 걸고 있었고, README 는 "포그를 끈다"고 적었으며
+//   끄고 싶지 않은 사람을 위한 `-KeepFog` 플래그까지 있었다. 아무것도 안
+//   꺼지고 있었다 — 포그가 최종 색의 85% 를 덮은 채로 기능 확인용 그림이
+//   전부 찍혀 왔다는 뜻이다.
+//
+//   명령을 지우면서 그 호출부와 문서도 사실에 맞췄다. 런타임 포그 토글은
+//   Enhanced PostChain 튜닝 API 가 생겨야 가능하고, 그것은 이 슬라이스가
+//   할 일이 아니다. 없는 기능을 있는 것처럼 적어 두지 않는 것이 지금 할 일이다.
 
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
@@ -385,14 +394,6 @@ namespace ConsoleCmd
         std::printf("[CLI] 렌더 타깃\n%s", report.c_str());
     }
 
-    static void Cmd_render_post(const ConsoleCommandContext& ctx)
-    {
-        // 기존 명령은 DX11 SceneRenderer가 소비하는 구 전역 설정만 바꿨다.
-        // EnhancedRenderer에는 전달되지 않아 성공처럼 출력되는 무효 명령이므로
-        // 새 DX12 런타임 튜닝 API가 생기기 전까지 명시적으로 차단한다.
-        std::printf("[CLI] render.post — DX11 레거시 제어는 비활성화됨; Enhanced PostChain 튜닝 API가 필요하다\n");
-    }
-
     static void Cmd_render_exposure(const ConsoleCommandContext& ctx)
     {
         // 기존 구현은 SceneRenderer가 갱신하는 DX11 ToneMapPass의 정적 값을
@@ -515,7 +516,6 @@ namespace ConsoleCmd
         reg.Legacy({ "render.backend" }, &Cmd_render_backend);
         reg.Legacy({ "dx12.live" }, &Cmd_dx12_live);
         reg.Legacy({ "render.rtinfo" }, &Cmd_render_rtinfo);
-        reg.Legacy({ "render.post" }, &Cmd_render_post);
         reg.Legacy({ "render.exposure" }, &Cmd_render_exposure);
         reg.Legacy({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
         reg.Legacy({ "render.shadowinfo" }, &Cmd_render_shadowinfo);

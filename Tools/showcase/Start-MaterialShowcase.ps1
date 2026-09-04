@@ -110,7 +110,11 @@ if ($ResizeTo) {
 }
 $commands += @("scene.switch `"$sceneCliPath`"", "wait $WarmupFrames")
 if (-not $KeepFog) {
-    $commands += @("render.post fog off", "wait 60")
+    # ★ 포그를 런타임으로 끌 수 없다. `render.post fog off` 는 DX12 전환 이후
+    #   아무것도 안 하는 무효 명령이었고 LC6 이 표에서 지웠다. 자세한 사연은
+    #   `Tools/featuretest/run-featuretests.ps1` 의 같은 자리에 적었다.
+    Write-Warning ("포그를 런타임으로 끌 수 없다(Enhanced PostChain 튜닝 API 부재). " +
+                   "그림에 포그가 남는다 — 이전 캡처도 마찬가지였다.")
 }
 $commands += @(
     "scene.dump MaterialShowcase",
