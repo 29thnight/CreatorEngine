@@ -18,4 +18,9 @@ namespace ConsoleCmd
     /// 가 함께 쓴다.
     std::string ResolveTestArtifactPath(std::string_view category,
                                         std::string_view requestedPath);
+    /// 앞뒤 공백·개행을 뗀다.
+    ///
+    /// Core(입력 한 줄 정리)와 ScriptUiAnimator 가 함께 쓴다.
+    std::string TrimLine(const std::string& text);
+
 }

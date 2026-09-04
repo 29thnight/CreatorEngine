@@ -26,4 +26,13 @@ namespace ConsoleCmd
         std::filesystem::create_directories(output.parent_path(), error);
         return output.string();
     }
+
+    std::string TrimLine(const std::string& text)
+    {
+        static constexpr const char* kBlank = " \t\r\n";
+        const auto begin = text.find_first_not_of(kBlank);
+        if (begin == std::string::npos) return {};
+        const auto end = text.find_last_not_of(kBlank);
+        return text.substr(begin, end - begin + 1);
+    }
 }

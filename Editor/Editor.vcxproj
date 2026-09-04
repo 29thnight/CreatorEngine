@@ -127,6 +127,21 @@
     <ClCompile Include="EngineEntry\Commands\RenderDebugCommands.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\DiagnosticsCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\ScriptUiAnimatorCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\SceneObjectCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\AssetAuthoringCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\CoreCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
     <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp" />

@@ -210,6 +210,14 @@ public:
     /// 게임 스레드의 프레임 경계(App)에서만 읽는다.
     static bool IsEditorCameraFollowing() noexcept;
 
+    /// `camera.editor follow on|off` 이 쓴다.
+    ///
+    /// ★ 상태를 **파사드가 소유한다.** 읽는 쪽(`IsEditorCameraFollowing`)이
+    ///   App 프레임 경계에 있어서, 이 값을 도메인 TU 로 옮기면 파사드가 도메인을
+    ///   거꾸로 참조하게 된다(§12 의 의존 방향이 뒤집힌다). 대신 좁은 설정
+    ///   창구만 연다 — 게임 스레드 전용이라 원자성은 필요 없다.
+    static void SetEditorCameraFollowing(bool follow) noexcept;
+
 private:
     ConsoleCommandSystem() = default;
     ~ConsoleCommandSystem() = default;

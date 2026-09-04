@@ -66,5 +66,10 @@ namespace ConsoleCmd
     //   `verify-cli-registry-golden.ps1` 이 이동 전 표와 맞댄다.
 
     void RegisterRenderTestCommands(Registrar& reg);   // 검증 프로브 56
-    void RegisterRenderDebugCommands(Registrar& reg);  // 라이브 조회·조정 8
+    void RegisterRenderDebugCommands(Registrar& reg);
+    void RegisterDiagnosticsCommands(Registrar& reg);
+    void RegisterScriptUiAnimatorCommands(Registrar& reg);
+    void RegisterSceneObjectCommands(Registrar& reg);
+    void RegisterAssetAuthoringCommands(Registrar& reg);
+    void RegisterCoreCommands(Registrar& reg);  // 라이브 조회·조정 8
 }

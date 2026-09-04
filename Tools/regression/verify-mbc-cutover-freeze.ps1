@@ -191,9 +191,25 @@ foreach ($name in $hardZeroSurfaces) {
 }
 # ⑧ 상태를 바꾸는 진단 명령 0 — experiment.animlive는 제품 publish를 부르지 않는다
 #    (읽기 전용 스냅샷만 읽는다). scene.transformbulk probe는 합성 fixture라 예외.
-$consolePath = Join-Path $repoRoot 'Editor\EngineEntry\ConsoleCommandSystem.cpp'
-if (Test-Path -LiteralPath $consolePath) {
-    $console = Get-CodeText $consolePath
+#
+# ★ 명령 계층 **전체**를 본다. 한 파일이 아니다.
+#
+#   예전에는 `ConsoleCommandSystem.cpp` 하나를 열었다. LC6 이 핸들러를 도메인
+#   TU 일곱 개로 나누자 `Cmd_experiment_animlive` 와 `Cmd_assets_modeldiag` 가
+#   `Commands/AssetAuthoringCommands.cpp` 로 가면서 이 검사가 "명령이 없다"로
+#   붉어졌다 — 명령은 그대로 있었고(골든 212 불변) 파일만 옮겨졌다.
+#
+#   여기서 지키려는 것은 "이 진단이 제품 상태를 바꾸지 않는다"이지 "이 파일에
+#   있다"가 아니다. 그러니 파일 하나를 박아 두면 안 된다. 명령 계층을 통째로
+#   이어 붙여 놓고 찾는다 — 다음 이동에도 이 검사는 그대로 성립한다.
+$commandSources = @(Join-Path $repoRoot 'Editor\EngineEntry\ConsoleCommandSystem.cpp')
+$commandSources += @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'Editor\EngineEntry\Commands') `
+                        -Filter *.cpp -File -ErrorAction SilentlyContinue |
+                     ForEach-Object { $_.FullName })
+$commandSources = @($commandSources | Where-Object { Test-Path -LiteralPath $_ })
+
+if ($commandSources.Count -gt 0) {
+    $console = ($commandSources | ForEach-Object { Get-CodeText $_ }) -join "`n"
     $animliveStart = $console.IndexOf('static void Cmd_experiment_animlive(')
     if ($animliveStart -lt 0) { $hardFailures.Add('experiment.animlive 진단이 없다(시그니처 변경?)') }
     else {
