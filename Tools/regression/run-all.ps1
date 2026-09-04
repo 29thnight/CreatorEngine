@@ -30,6 +30,50 @@ Run-Step "HashingString 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hashing-string.ps1")
 }
 
+# 네이티브 ↔ 관리 미러 대조(9-4). exe가 필요 없는 정적 검사라 앞쪽에 둔다.
+#
+# ── 왜 세트 안에 있어야 하는가 ──
+#
+# 두 검사는 수동 실행 전제로 ScriptCore\ 밑에 있었고, 세트 밖이라 2026-08-24의
+# ScriptBinder → Engine\SceneRuntime 개명(E7-e)에 경로가 낡은 채로 남았다.
+# 그날부터 실행하면 첫 Get-Content에서 예외로 죽었는데, 아무도 부르지 않으니
+# 빨개질 곳이 없어 12일간 드러나지 않았다. 그 사이 표가 맞았던 것은 가드가
+# 지켜서가 아니라 관리 측을 아무도 건드리지 않아서다. 세트에 태우는 것이
+# 경로 파손 자체를 잡는 유일한 방법이다(경로가 없으면 종료 코드 1이다).
+#
+# ── 무엇을 잡는가 ──
+#
+# 버전·구조체 크기 검사는 순서가 뒤바뀐 것을 잡지 못한다. 실제로 필드 하나가
+# 표 끝으로 밀렸는데 개수와 크기가 그대로라 통과했고, 관리 코드가 엉뚱한 함수
+# 포인터를 불러 접근 위반으로 죽었다. 열거 5종은 값이 int로 경계를 넘으므로
+# 어긋나도 컴파일과 링크가 통과하고 런타임에만 다른 판정이 난다.
+#
+# ── 이빨 확인(2026-09-04) ──
+#
+# Native.cs의 인접한 두 필드를 순서만 맞바꾸니 개수는 182/182로 같은 채
+# [91] 첫 불일치로 빨개졌고, BTEnum.h의 ParallelPolicy 항목을 뒤바꾸니
+# ParallelPolicy [0]에서 빨개졌다. 둘 다 되돌려 초록을 다시 확인했다.
+Run-Step "스크립트 API 표 순서" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-api-table.ps1")
+}
+
+Run-Step "BT 열거 미러 대조" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-bt-enums.ps1")
+}
+
+# 진입점 이름 결합(9-4). 위 두 검사가 못 보는 세 번째 결합면이다.
+#
+# ClrHost는 관리 함수를 문자열 이름으로 찾는다. API 표 검사는 함수 포인터의 배치를
+# 볼 뿐 이 결합은 보지 않으므로, C# 쪽 이름만 바뀌면 컴파일·링크·표 검사가 모두
+# 통과하고 런타임에 "CLR 초기화 실패"로만 드러난다.
+#
+# 이빨 확인(2026-09-04): Bootstrap.cs의 CreateComponent 하나를 CreateComponentX로
+# 바꾸니 그 이름을 지목하며 빨개졌고, 되돌리니 초록. 덤으로 같은 날 실수로 Bootstrap.cs를
+# 옛 이름 상태로 되돌렸을 때도 이 검사가 먼저 잡았다.
+Run-Step "스크립트 진입점 결합" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-entry-points.ps1")
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

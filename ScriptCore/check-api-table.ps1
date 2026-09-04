@@ -10,7 +10,7 @@
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$nativePath = Join-Path $root 'ScriptBinder\ClrHost.cpp'
+$nativePath = Join-Path $root 'Engine\SceneRuntime\ClrHost.cpp'
 $managedPath = Join-Path $root 'ScriptCore\Native.cs'
 
 function Get-NativeOrder {

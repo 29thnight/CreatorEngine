@@ -18,12 +18,12 @@ $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 # 검사 대상: 열거 이름 → (네이티브 파일, 관리 파일)
 $targets = @(
-    @{ Name = 'NodeStatus';        Native = 'ScriptBinder\BTEnum.h';         Managed = 'ScriptCore\BehaviorTree.cs' },
-    @{ Name = 'BehaviorNodeType';  Native = 'ScriptBinder\BTEnum.h';         Managed = 'ScriptCore\BehaviorTree.cs' },
-    @{ Name = 'ParallelPolicy';    Native = 'ScriptBinder\BTEnum.h';         Managed = 'ScriptCore\BehaviorTree.cs' },
-    @{ Name = 'BlackBoardType';    Native = 'ScriptBinder\BlackBoardEnum.h'; Managed = 'ScriptCore\BlackBoard.cs' },
+    @{ Name = 'NodeStatus';        Native = 'Engine\SceneRuntime\BTEnum.h';         Managed = 'ScriptCore\BehaviorTree.cs' },
+    @{ Name = 'BehaviorNodeType';  Native = 'Engine\SceneRuntime\BTEnum.h';         Managed = 'ScriptCore\BehaviorTree.cs' },
+    @{ Name = 'ParallelPolicy';    Native = 'Engine\SceneRuntime\BTEnum.h';         Managed = 'ScriptCore\BehaviorTree.cs' },
+    @{ Name = 'BlackBoardType';    Native = 'Engine\SceneRuntime\BlackBoardEnum.h'; Managed = 'ScriptCore\BlackBoard.cs' },
     # 갈래는 ClrHost 안의 중첩 열거라 'enum class BTNodeKind' 형태로 그대로 잡힌다(B6).
-    @{ Name = 'BTNodeKind';        Native = 'ScriptBinder\ClrHost.h';       Managed = 'ScriptCore\BTNodeFactory.cs' }
+    @{ Name = 'BTNodeKind';        Native = 'Engine\SceneRuntime\ClrHost.h';       Managed = 'ScriptCore\BTNodeFactory.cs' }
 )
 
 # 열거 본문에서 (이름, 값) 목록을 뽑는다.
