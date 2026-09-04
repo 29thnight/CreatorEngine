@@ -1,0 +1,18 @@
+{
+  "schema": "lc1-exit-spine-ratchet/1",
+  "recorded": "2026-09-04",
+  "maxDirectExitWrites": 16,
+  "note": "EngineBootstrap::SetExitCode 를 직접 부르는 자리의 상한. session adapter(CommandCore/CommandSession.cpp)와 선언부(EngineBootstrap.h)는 세지 않는다. 늘면 붉어지고, 줄면 -UpdateRatchet 으로 상한을 낮춘다 — 한 방향으로만 도는 래칫이다.",
+  "history": [
+    {
+      "date": "2026-09-04",
+      "value": 18,
+      "why": "LC0 실측 기준선. Editor 12곳(값 5·6) + Player 6곳(값 2·3·4)."
+    },
+    {
+      "date": "2026-09-04",
+      "value": 16,
+      "why": "LC1 — game.pak 과 inputmap.authoring.probe 를 CommandResult 로 이행하며 Editor 2곳이 빠졌다. 남은 Editor 10곳은 terrain/foliage/animator.scene/inputmap.corpus/asset.guid.rename/material.corpus/prefab.corpus.digest 의 legacy 핸들러이고 LC6이 도메인 분리와 함께 옮긴다. Player 6곳은 LC8이 §5.4 표로 이관한다."
+    }
+  ]
+}

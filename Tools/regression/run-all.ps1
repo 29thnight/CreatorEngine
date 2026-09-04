@@ -46,6 +46,16 @@ Run-Step "CLI tokenizer 골든(LC0)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-parser-golden.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 14.5 LC1 — exit spine 의 반대편.
+#
+# 위 canary 가 "실패가 종료 코드로 나오는가"를 본다면 이것은 "성공이 여전히 0
+# 인가"와 "직접 exit 쓰기가 늘지 않았는가"를 본다. 실패를 잡느라 성공을 비-0 으로
+# 만드는 과잉 교정이 이 슬라이스에서 가장 흔한 사고이고, 그러면 세트 전체가
+# 붉어져 정작 진짜 실패가 묻힌다.
+Run-Step "CLI exit spine(LC1)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-exit-spine.ps1") -Exe $Exe
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

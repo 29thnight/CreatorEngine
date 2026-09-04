@@ -37,6 +37,8 @@
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.h" />
     <ClInclude Include="EngineEntry\BuildSettings.h" />
     <ClInclude Include="EngineEntry\CommandBaseline.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandResult.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandSession.h" />
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
@@ -96,6 +98,8 @@
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.cpp" />
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp" />
     <ClCompile Include="EngineEntry\CommandBaseline.cpp" />
+    <ClCompile Include="EngineEntry\CommandCore\CommandResult.cpp" />
+    <ClCompile Include="EngineEntry\CommandCore\CommandSession.cpp" />
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />

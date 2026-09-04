@@ -930,6 +930,88 @@ LC0의 두 래칫은 `Tools/regression/run-all.ps1`에 들어갔다. 둘 다 오
 
 **이 슬라이스 없이는 HTTP 응답 본문이 존재하지 않는다.** 순서를 앞당길 수 없다.
 
+**상태: 완료 (2026-09-04).**
+
+| 완료 기준 | 증거 |
+|---|---|
+| 실패→`quit` 가 비-0 | canary `failure-then-quit` = exit 3. `quit` 은 성공을 내지만 session 이 가장 심한 결과를 보존한다 |
+| 전부 성공은 0 | `verify-cli-exit-spine.ps1` `all-success` = 0. 이행 명령과 legacy 명령을 섞어 돌린다 |
+| unknown/parse/precondition 사상 | `command.unknown`→2 · `wait.not_a_number`/`wait.negative`→2 · `scene.not_found`→3 |
+| crash code 비가림 | `g_exitCode` 는 `EngineBootstrap::Run` 이 **정상 반환할 때만** 읽힌다. 미처리 예외는 그 지점에 닿지 않는다. 실측 증거: 회귀 세트의 해상도 스위프가 명령 전부 성공(session 0) 뒤 크래시했고 프로세스 종료 코드는 `0x0000087D` 였다 — session 값이 크래시 코드를 덮지 않았다 |
+| ratchet 가동 | `cli_exit_spine.ratchet.json` 상한 16(=18−2). 늘면 붉어지고 줄면 상한을 낮춘다 |
+| 기본 continue · `--fail-fast` | 같은 시나리오를 두 모드로 돌려 **표식 명령의 실행 여부**로 판정한다 — 종료 코드만으로는 큐를 버렸는지 구분되지 않는다 |
+
+이행한 명령 6 개: `help` · `quit`/`exit` · `wait` · `scene.load`/`scene.switch` ·
+`game.pak` · `inputmap.authoring.probe`. 나머지 199 개는 `LegacyUnreported` 다.
+
+★ **`LegacyUnreported` 는 성공이 아니라 "모른다"다.** severity 순위에서는 성공보다
+아래지만 exit code 는 0 이다. 둘을 갈라 둔 이유 — 순위를 성공과 같게 두면 미이행
+명령이 성공으로 집계되어 남은 이행 대상을 셀 수가 없고, exit 을 비-0 으로 두면
+아직 결과를 안 내는 명령 199 개가 전부 실패로 뒤집혀 회귀 세트가 통째로 붉어진다.
+`SeverityRank` 와 `ExitCodeFor` 를 별개 함수로 둔 것이 이 구분을 가능하게 한다.
+
+★ **이행하며 드러난 결함 셋.** 계획이 예상하지 못한 것들이라 적어 둔다.
+
+1. **`wait` 가 인자 오류를 조용히 삼켰다.** `std::atoi` 는 실패를 0 으로 돌려주고
+   `std::max(0, ...)` 가 음수를 0 으로 바꾼다. 그래서 `wait abc` 와 `wait -5` 가
+   대기 없이 지나가고도 성공이었다 — **프레임 수로 시간을 재는 시나리오가 시간을
+   재지 않고 통과할 수 있었다**는 뜻이다. §14.2 의 "조용한 0 변환 금지"가 겨냥한
+   자리이고, LC1 이 `InvalidArguments` 로 닫았다.
+2. **selftest 실패가 infrastructure 오류로 보고되고 있었다.**
+   `inputmap.authoring.probe` 의 왕복 불일치가 `SetExitCode(5)` 였다. 5 는 §5.4 에서
+   build/IO 오류다. 검사가 정직하게 판정한 실패와 디스크가 죽은 것을 같은 숫자로
+   알리면 자동화가 재시도해서는 안 될 것을 재시도한다. `Failed`(4)로 바로잡았다.
+3. **핸들러 예외가 프로세스를 죽였다.** `Execute` 에 예외 경계가 없어서, 무인
+   실행 중 예외 하나가 남은 시나리오를 통째로 날리고 어디까지 갔는지도 남기지
+   않았다. 이제 `InternalError`(5)로 바뀌고 세션은 계속 돈다.
+
+★★ **LC1 이 스스로 만든 회귀 둘. 검토와 회귀 세트가 각각 하나씩 잡았다.**
+
+이 슬라이스는 "실패가 종료 코드에 닿게 한다"가 목표인데, 착수 직후의 구현이 그
+목표를 두 곳에서 정확히 반대로 뒤집었다. 적어 두는 이유는 이행 중인 다음
+슬라이스(LC6·LC8)가 같은 모양의 함정을 만나기 때문이다.
+
+1. **session 이 legacy 의 직접 exit 쓰기를 덮어썼다.** session 이 명령마다
+   exit code 를 쓰기 시작하자, 아직 이행되지 않은 핸들러가 직접 쓴 값이 **같은
+   프레임 안에서** 0 으로 덮였다. `material.corpus.probe` 를 인자 없이 부르면
+   핸들러가 6 을 쓰는데 프로세스는 0 으로 끝났다 — LC1 이전보다 나빠진 상태다.
+   해당 명령 7 개(`terrain.authoring.probe` · `foliage.authoring.probe` ·
+   `animator.scene.probe` · `inputmap.corpus.probe` · `asset.guid.rename.probe` ·
+   `material.corpus.probe` · `prefab.corpus.digest`)가 전부 조용해질 뻔했다.
+
+   고친 방법: legacy adapter 가 핸들러 전후의 exit code 를 관측해 §5.4 표로
+   되읽고(`LegacyDirectExit`) 원래 값을 복원한다. 최종 값을 정하는 곳은 여전히
+   session 하나다.
+
+   ★ **정적 래칫이 이것을 못 잡는다.** `verify-cli-exit-spine.ps1` 의 래칫은
+   직접 쓰기의 **수**를 세지 그 값이 살아남는지 보지 않는다. 수를 세는 게이트와
+   효과를 보는 게이트는 다른 물건이다 — 동적 케이스(`legacy-direct-exit`)를
+   따로 넣었고, 래칫이 0 에 닿을 때까지 유지한다.
+
+2. **예외 경계가 `crash.test` 를 무력화했다.** 3 번 결함을 고치려고 `Execute` 에
+   try/catch 를 두자, **일부러 죽는 것이 일인 명령**이 죽지 않게 됐다. 크래시
+   덤프 경로 회귀가 프로세스 종료를 기다리다 타임아웃 났다. 그 검사는 크래시가
+   나야만 도는 것이라, 무력화되면 덤프 경로 전체가 조용한 사각지대가 된다.
+
+   고친 방법: registry entry 에 `letExceptionsEscape` 를 두고 `crash.test` 만
+   경계를 통과시킨다. 좋은 기본값에도 예외가 있어야 한다.
+
+이 둘 모두 **exit code 를 지키는 게이트가 아니라 다른 검사**가 잡았다는 점을 적어
+둔다. LC0 canary 는 넷 다 초록이었고 exit spine 게이트도 초록이었다.
+
+★ **LC0 의 정적·런타임 대조가 곧바로 일을 했다.** `regResult(`/`regEscaping(` 이
+생기자 정적 집계가 201, 런타임이 208 로 갈라졌다 — 소스 스크래핑이 구현 형식
+변화에 깨지는 §2.4 의 결함과 같은 모양이고, 이번에는 **대조가 있어서 같은 날
+드러났다**. 집계 패턴을 세 형식으로 넓혀 208=208 로 맞췄고, 이행 진행도
+(`registrations_result_bearing` 6 / `registrations_legacy` 202)를 지표로 추가했다.
+LC9 의 완료 조건 하나가 legacy 0 이므로 이 수가 그 눈금이다.
+
+★ **이행 중 출력이 겹친다(의도).** 이행한 명령이 실패하면 핸들러 자신의 한국어
+문안과 `PublishResult` 의 기계용 줄이 둘 다 나온다. 지금은 그대로 둔다 — 사람이
+읽는 문안을 정규식으로 읽는 소비자가 아직 살아 있고(§2.1.1: 1 건), LC9 가 그것을
+JSON 으로 옮긴 뒤에 핸들러의 printf 를 정리한다. 이행 전 명령 199 개는 출력이
+전혀 늘지 않는다(`LegacyUnreported` 는 조용히 지나간다).
+
 ### LC2 — 소유형 invocation·raw 재해석 제거 (P0 · 2일)
 
 - lexical parser와 source location 분리. 배치 라인 문법은 여기서만 산다.

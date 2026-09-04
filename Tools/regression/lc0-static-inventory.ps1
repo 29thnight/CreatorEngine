@@ -38,7 +38,20 @@ function Add-Row([string]$Metric, [int]$Count, [string]$Note) {
 
 # ── 1) CLI 소스의 규모 ──────────────────────────────────────────────────
 Add-Row 'cli_source_lines' $cliLines.Count 'ConsoleCommandSystem.cpp 줄 수'
-Add-Row 'registration_calls' (@($cliLines | Select-String -Pattern '(?<![A-Za-z_])reg\(' -AllMatches).Count) 'reg( 호출 수 — 런타임 그룹 수와 대조하라'
+# ★ 등록 형식이 하나가 아니다.
+#
+#   LC1 이 result-bearing 핸들러를 들이면서 `regResult(` 가, crash.test 의 예외
+#   통과를 위해 `regEscaping(` 이 생겼다. 처음 이 지표는 `reg(` 만 세도록 쓰여
+#   있었고, 그래서 LC1 직후 정적 201 대 런타임 208 로 갈라졌다 — 소스 스크래핑이
+#   구현 형식 변화에 깨지는 바로 그 방식이고(§2.4 의 Invoke-Dx12Suite 와 같은 결함)
+#   이번에는 대조가 있어서 즉시 드러났다. 내부 헬퍼 `regEntry(` 는 등록마다
+#   한 번 불리므로 세면 중복이다.
+$registrationLines = @($cliLines | Select-String -Pattern '^\s*(reg|regResult|regEscaping)\(\s*\{')
+Add-Row 'registration_calls' $registrationLines.Count '등록 호출 수(reg/regResult/regEscaping) — 런타임 그룹 수와 일치해야 한다'
+
+# 이행 진행도. LC9 의 완료 조건 중 하나가 legacy 0 이다.
+Add-Row 'registrations_result_bearing' (@($cliLines | Select-String -Pattern '^\s*regResult\(\s*\{').Count) 'CommandResult 를 내는 등록(LC1~)'
+Add-Row 'registrations_legacy' (@($cliLines | Select-String -Pattern '^\s*(reg|regEscaping)\(\s*\{').Count) 'LegacyUnreported 로 남은 등록 — LC9 가 0 으로 민다'
 Add-Row 'printf_calls' (@($cliLines | Select-String -Pattern 'std::printf' -AllMatches).Count) '결과가 값이 아니라 문자열로만 존재하는 자리'
 
 # ── 2) LC1이 0으로 밀어야 할 것 ─────────────────────────────────────────

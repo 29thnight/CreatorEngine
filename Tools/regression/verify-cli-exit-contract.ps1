@@ -92,7 +92,9 @@ foreach ($case in $baseline.cases) {
     if ($result.ExitCode -ne $case.observed) {
         $baselineDrift.Add(("{0}: 관측 {1} ≠ baseline {2}" -f $case.name, $result.ExitCode, $case.observed))
     }
-    if ($case.observed -ne $case.contract) { $contractGap++ }
+    # 관측과 계약을 비교한다. baseline 과 비교하면 안 된다 — baseline 은
+    # "지난번에 이랬다"이고, 지금 몇 건이 계약을 어기는가는 방금 잰 값이 말한다.
+    if ($result.ExitCode -ne $case.contract) { $contractGap++ }
 
     $rows.Add([pscustomobject]@{
         Case     = $case.name

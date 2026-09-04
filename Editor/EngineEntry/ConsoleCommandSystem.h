@@ -1,4 +1,6 @@
 #pragma once
+#include "CommandCore/CommandResult.h"
+
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -32,7 +34,15 @@ struct ConsoleCommandContext
     ConsoleCommandSystem&           system;
 };
 
+// 이행 전 핸들러. 결과를 내지 않는다.
+//
+// LC1 이 이 서명을 한 번에 갈아엎지 않는 이유는 §15 의 위험 표에 있다 —
+// 205 개 등록을 동시에 바꾸는 patch 는 검토할 수 없고, 그 안에 섞인 거동 변경
+// 하나를 아무도 못 본다. 두 서명이 공존하고 domain 단위로 넘어간다.
 using ConsoleCommandHandler = void(*)(const ConsoleCommandContext&);
+
+// LC1 이후의 핸들러. 정확히 하나의 terminal 결과를 만든다.
+using ConsoleCommandResultHandler = CommandCore::CommandResult(*)(const ConsoleCommandContext&);
 
 // 콘솔 명령 계층.
 //
@@ -108,7 +118,18 @@ private:
 
     void StartStdinReader();
     void LoadScriptFile(const std::string& path);
-    void Execute(const std::string& line);
+
+    /// 한 줄을 실행하고 그 명령의 terminal 결과를 낸다.
+    ///
+    /// 반환값이 생긴 것이 LC1 이다. 예전에는 void 였고, 그래서 unknown command 가
+    /// printf 한 줄 뒤 그냥 return 했다 — 오타 하나가 조용히 exit 0 이었다.
+    CommandCore::CommandResult Execute(const std::string& line);
+
+    /// 결과를 session 에 넣고 사람이 읽는 줄을 찍는다.
+    void PublishResult(const std::string& commandId, const CommandCore::CommandResult& result);
+
+    /// 큐에 남은 명령을 버린다(`--fail-fast`).
+    void DiscardPending();
 
     // 큐에 든 명령 하나.
     //

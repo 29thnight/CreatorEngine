@@ -1,5 +1,6 @@
 #include "ConsoleCommandSystem.h"
-#include "CommandBaseline.h"   // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
+#include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
+#include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
@@ -125,7 +126,9 @@
 #include <algorithm>
 #include <atomic>
 #include <cctype>
+#include <limits>
 #include <random>
+#include <stdexcept>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -636,6 +639,13 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
         {
             EnableHeapValidation();
         }
+        else if (arg == "--fail-fast")
+        {
+            // 기본은 continue + aggregate 다(§3.1). 시나리오 하나가 실패해도
+            // 뒤의 진단 명령이 돌아야 무엇이 왜 실패했는지 같은 실행에서 본다.
+            // --fail-fast 는 그 반대를 원하는 호출자(이등분 탐색 등)를 위한 것이다.
+            CommandCore::CommandSession::Batch().SetFailFast(true);
+        }
     }
     ::LocalFree(argv);
 
@@ -788,7 +798,7 @@ void ConsoleCommandSystem::Pump()
     const std::string line = TrimLine(pending.text);
 
     const auto dequeuedAt = std::chrono::steady_clock::now();
-    Execute(line);
+    const CommandCore::CommandResult result = Execute(line);
     const auto finishedAt = std::chrono::steady_clock::now();
 
     // 이름만 남긴다. 인자는 경로·오브젝트 이름이 섞여 있어 계측 artifact에
@@ -796,6 +806,9 @@ void ConsoleCommandSystem::Pump()
     const auto nameEnd = line.find_first_of(" \t");
     const std::string_view name = std::string_view(line).substr(
         0, (nameEnd == std::string::npos) ? line.size() : nameEnd);
+
+    // 계측보다 먼저 판정을 남긴다 — 여기서 죽더라도 결과는 session 에 있다.
+    if (!name.empty()) PublishResult(std::string(name), result);
 
     const std::chrono::duration<double, std::milli> queued   = dequeuedAt - pending.enqueuedAt;
     const std::chrono::duration<double, std::milli> executed = finishedAt - dequeuedAt;
@@ -3648,15 +3661,24 @@ namespace ConsoleCmd
         return output.string();
     }
 
-    static void Cmd_help(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_help(const ConsoleCommandContext& ctx)
     {
         ctx.system.PrintHelp();
+        return CommandCore::Ok();
     }
 
-    static void Cmd_quit(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_quit(const ConsoleCommandContext& ctx)
     {
         std::printf("[CLI] 종료 요청\n");
         ctx.system.RequestQuit();
+
+        // ★ quit 이 성공을 낸다고 앞의 실패가 지워지지 않는다.
+        //
+        //   session 은 가장 심한 결과를 보존하므로(§3.1) 실패 뒤 quit 이 와도
+        //   exit 은 내려가지 않는다. 이 성질이 없으면 시나리오 끝에 습관처럼
+        //   붙는 quit 하나가 모든 판정을 지운다 — LC0 canary 의
+        //   failure-then-quit 케이스가 정확히 그 상태를 고정해 두었다.
+        return CommandCore::Ok("종료 요청");
     }
 
     // ── LC0 (PHASE 14.5) 기준선 계측 명령 ───────────────────────────────
@@ -3757,29 +3779,77 @@ namespace ConsoleCmd
         }
     }
 
-    static void Cmd_game_pak(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_game_pak(const ConsoleCommandContext& ctx)
     {
+        (void)ctx;
         const bool buildOk = GameBuilderSystem::GetInstance()->BuildGame();
         std::printf("[CLI] game.pak Release Player 패키지 %s\n",
             buildOk ? "빌드·검증·게시 완료" : "실패");
+
+        // 예전에는 여기서 SetExitCode(5) 를 직접 썼다. 의도는 옳았지만 —
+        // "뒤의 quit/진단 명령은 계속 실행하되 최종 결과는 비-0" — 그 규약을
+        // 이 핸들러 혼자 지켰고, 뒤에 오는 다른 직접 쓰기가 값을 덮을 수 있었다.
+        // 이제 session 이 가장 심한 결과를 보존하므로 규약이 전역으로 성립한다.
         if (!buildOk)
         {
-            // 무인 --exec/--script 호출자가 printf를 파싱하지 않아도 실패를 안다.
-            // 뒤의 quit/진단 명령은 계속 실행하되 최종 프로세스 결과는 비-0으로 남긴다.
-            EngineBootstrap::SetExitCode(5);
+            return CommandCore::InternalError(
+                "build.failed", "game.pak: Release Player 패키지 빌드 실패");
         }
+        return CommandCore::Ok("Release Player 패키지 완료");
     }
 
-    static void Cmd_wait(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_wait(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
 
-        const int frames = (parts.size() > 1) ? std::max(0, std::atoi(parts[1].c_str())) : 1;
+        // ★ `atoi` 는 실패를 0 으로 돌려준다.
+        //
+        //   `wait abc` 가 조용히 `wait 0` 이 되어, 프레임 수로 시간을 재는
+        //   시나리오가 대기 없이 지나가고도 성공으로 끝났다. §14.2 의
+        //   "숫자 overflow/garbage → 조용한 0 변환 금지"가 이 자리다.
+        //   `max(0, ...)` 도 같은 성격이다 — 음수를 오류가 아니라 0 으로 바꾼다.
+        int frames = 1;
+        if (parts.size() > 1)
+        {
+            const std::string& raw = parts[1];
+            std::size_t consumed = 0;
+            long long   parsed   = 0;
+            try
+            {
+                parsed = std::stoll(raw, &consumed);
+            }
+            catch (const std::exception&)
+            {
+                return CommandCore::InvalidArguments(
+                    "wait: 프레임 수가 숫자가 아니다: " + raw, "wait.not_a_number");
+            }
+            if (consumed != raw.size())
+            {
+                return CommandCore::InvalidArguments(
+                    "wait: 프레임 수 뒤에 남는 문자가 있다: " + raw, "wait.trailing_garbage");
+            }
+            if (parsed < 0)
+            {
+                return CommandCore::InvalidArguments(
+                    "wait: 프레임 수가 음수다: " + raw, "wait.negative");
+            }
+            if (parsed > static_cast<long long>(std::numeric_limits<int>::max()))
+            {
+                return CommandCore::InvalidArguments(
+                    "wait: 프레임 수가 너무 크다: " + raw, "wait.too_large");
+            }
+            frames = static_cast<int>(parsed);
+        }
+
         ctx.system.SetWaitFrames(frames);
         std::printf("[CLI] %d 프레임 대기\n", frames);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("frames", CommandCore::CommandData::Int(frames));
+        return CommandCore::Ok("프레임 대기", std::move(data));
     }
 
-    static void Cmd_scene_load(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_scene_load(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -3787,7 +3857,8 @@ namespace ConsoleCmd
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: %s <씬 경로>\n", cmd.c_str());
-            return;
+            return CommandCore::InvalidArguments(
+                cmd + ": 씬 경로가 없다", "scene.path_missing");
         }
 
         // scene.load  : 씬을 열기만 한다(기존 씬 유지)
@@ -3810,7 +3881,11 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 씬 로드 실패: " + parts[1]);
             std::printf("[CLI] 씬 로드 실패: %s\n", parts[1].c_str());
-            return;
+
+            // 선행조건 불충족이지 명령의 결함이 아니다 — 부를 수는 있으나
+            // 그 경로에 씬이 없다. §5.4 의 exit 3 이고 서비스에서는 409 다.
+            return CommandCore::PreconditionFailed(
+                "scene.not_found", cmd + ": 씬을 열 수 없다: " + parts[1]);
         }
 
         if (cmd == "scene.switch")
@@ -3820,6 +3895,11 @@ namespace ConsoleCmd
             std::printf("[CLI] ActivateScene 반환\n");
         }
         std::printf("[CLI] %s 완료: %s\n", cmd.c_str(), parts[1].c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("path",     CommandCore::CommandData::String(parts[1]));
+        data.Set("activated", CommandCore::CommandData::Bool(cmd == "scene.switch"));
+        return CommandCore::Ok(cmd + " 완료", std::move(data));
     }
 
     // DontDestroyOnLoad 지정 — 씬 이송 경로를 시나리오에서 태우기 위한 진단 명령.
@@ -4816,12 +4896,20 @@ namespace ConsoleCmd
 
 	// 입력 액션맵은 맵마다 YAML `.inputmap` 하나다. 이름에 '.'이 든 맵과 실제
 	// action/key payload가 저장·재기동 후 그대로 복원되는지를 함께 본다.
-	static void Cmd_inputmap_authoring_probe(const ConsoleCommandContext& ctx)
+	// LC1 대표 selftest.
+	//
+	// 이 핸들러 하나에 §5.4 의 네 결과가 전부 들어 있어 이행 본보기로 골랐다 —
+	// 사용법 오류(2) · 선행조건 불충족(3) · 판정 실패(4) · 성공(0). 예전에는
+	// 넷 중 셋이 `printf` 뒤 `return` 이었고 판정 실패만 `SetExitCode(5)` 로
+	// infrastructure 오류인 척했다.
+	static CommandCore::CommandResult Cmd_inputmap_authoring_probe(const ConsoleCommandContext& ctx)
 	{
 		if (ctx.parts.size() < 2)
 		{
 			std::printf("[inputmap.authoring.probe] usage: <save|verify> <name>\n");
-			return;
+			return CommandCore::InvalidArguments(
+				"inputmap.authoring.probe: <save|verify> <name> 가 필요하다",
+				"inputmap.usage");
 		}
 
 		const std::string& action = ctx.parts[1];
@@ -4833,7 +4921,9 @@ namespace ConsoleCmd
 			if (nullptr == map)
 			{
 				std::printf("[inputmap.authoring.probe] rejected no-map\n");
-				return;
+				return CommandCore::PreconditionFailed(
+					"inputmap.map_unavailable",
+					"inputmap.authoring.probe: action map 을 만들 수 없다: " + name);
 			}
 			InputAction* probeAction = map->AddAction();
 			probeAction->actionName = "ProbeMove";
@@ -4850,7 +4940,17 @@ namespace ConsoleCmd
 			const bool saved = InputActionManagers->SaveMap(map);
 			std::printf("[inputmap.authoring.probe] save=%s\n",
 				saved ? "ok" : "failed");
-			return;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("action", CommandCore::CommandData::String("save"));
+			data.Set("name",   CommandCore::CommandData::String(name));
+			data.Set("saved",  CommandCore::CommandData::Bool(saved));
+			if (!saved)
+			{
+				return CommandCore::Fail("inputmap.save_failed",
+					"inputmap.authoring.probe: 저장 실패: " + name, std::move(data));
+			}
+			return CommandCore::Ok("inputmap 저장", std::move(data));
 		}
 
 		if (action == "verify")
@@ -4883,11 +4983,32 @@ namespace ConsoleCmd
 			std::printf(
 				"[inputmap.authoring.probe] verify found=%zu actions=%zu stable=%d\n",
 				found, actionCount, stable ? 1 : 0);
-			if (found != 1 || !stable) EngineBootstrap::SetExitCode(5);
-			return;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("action",  CommandCore::CommandData::String("verify"));
+			data.Set("name",    CommandCore::CommandData::String(name));
+			data.Set("found",   CommandCore::CommandData::Int(static_cast<int64_t>(found)));
+			data.Set("actions", CommandCore::CommandData::Int(static_cast<int64_t>(actionCount)));
+			data.Set("stable",  CommandCore::CommandData::Bool(stable));
+
+			// ★ 예전에는 `SetExitCode(5)` 였다.
+			//
+			//   5 는 §5.4 에서 infrastructure 오류다. 검사가 정직하게 "저장한
+			//   것과 읽은 것이 다르다"를 판정한 것과 디스크가 죽은 것을 같은
+			//   숫자로 알리면, 자동화가 재시도해서는 안 될 것을 재시도한다.
+			//   판정 실패는 `Failed`(exit 4)다.
+			if (found != 1 || !stable)
+			{
+				return CommandCore::Fail("inputmap.roundtrip_mismatch",
+					"inputmap.authoring.probe: 왕복 결과가 저장한 것과 다르다",
+					std::move(data));
+			}
+			return CommandCore::Ok("inputmap 왕복 일치", std::move(data));
 		}
 
 		std::printf("[inputmap.authoring.probe] unknown action %s\n", action.c_str());
+		return CommandCore::InvalidArguments(
+			"inputmap.authoring.probe: 알 수 없는 동작: " + action, "inputmap.unknown_action");
 	}
 
 	static void Cmd_inputmap_corpus_probe(const ConsoleCommandContext&)
@@ -11650,15 +11771,65 @@ namespace ConsoleCmd
 
     // 이미 별도 함수로 빠져 있던 진단·벤치 명령들.
 
-    using Table = std::unordered_map<std::string, ConsoleCommandHandler>;
+    // 표의 값이 함수 포인터 하나에서 둘 중 하나를 든 entry 로 바뀌었다(LC1).
+    //
+    // std::function 을 쓰지 않는다 — 205 개 entry 에서 비용이 문제여서가 아니라,
+    // "어느 쪽 서명인가"가 타입에 드러나야 이행 진행도를 셀 수 있기 때문이다.
+    // legacy 가 0 이 되는 날이 LC9 의 완료 조건 중 하나다.
+    struct CommandEntry
+    {
+        ConsoleCommandHandler       legacy{ nullptr };
+        ConsoleCommandResultHandler modern{ nullptr };
+
+        // 예외를 결과로 바꾸지 않고 그대로 빠져나가게 둔다.
+        //
+        // ★ 이 플래그가 없어서 `crash.test throw` 를 깨뜨렸다.
+        //
+        //   `Execute` 에 예외 경계를 두자 **일부러 죽는 것이 일인 명령**이 죽지
+        //   않게 됐다. 크래시 덤프 경로 회귀가 프로세스 종료를 기다리다 타임아웃
+        //   났고, 덤프 검증은 크래시가 나야만 돌아가는 검사라 그대로 사각지대가
+        //   될 뻔했다. 예외 경계는 좋은 기본값이지만 기본값에는 예외가 있어야 한다.
+        bool letExceptionsEscape{ false };
+
+        CommandCore::CommandResult Invoke(const ConsoleCommandContext& ctx) const
+        {
+            if (nullptr != modern) return modern(ctx);
+            if (nullptr == legacy)
+            {
+                return CommandCore::InternalError("command.empty_entry", "핸들러가 비어 있다");
+            }
+
+            // ★ legacy 핸들러가 exit code 로 남긴 판정을 되읽는다.
+            //
+            //   session 이 매 명령마다 exit code 를 쓰므로, 이 관측이 없으면
+            //   아직 이행되지 않은 핸들러가 직접 쓴 값이 같은 프레임 안에서
+            //   0 으로 덮인다. 실측으로 확인한 회귀다 — `material.corpus.probe`
+            //   를 인자 없이 부르면 핸들러가 6 을 썼는데 프로세스는 0 으로 끝났다.
+            //
+            //   관측한 뒤 값을 원래대로 되돌린다. 최종 exit code 를 정하는 곳은
+            //   session 하나여야 하고(§14.1), 여기서 남겨 두면 그 규약이 깨진다.
+            const int before = EngineBootstrap::g_exitCode;
+            legacy(ctx);
+            const int written = EngineBootstrap::g_exitCode;
+            EngineBootstrap::g_exitCode = before;
+
+            if (written != before) return CommandCore::LegacyDirectExit(written);
+            return CommandCore::LegacyUnreported();
+        }
+    };
+
+    using Table = std::unordered_map<std::string, CommandEntry>;
 
     const Table& GetTable()
     {
         static const Table table = []
         {
             Table t;
-            auto reg = [&t](std::initializer_list<const char*> names,
-                            ConsoleCommandHandler fn)
+
+            // 등록 본체. 두 서명이 같은 경로로 들어가야 중복 검사·inventory 가
+            // 한 곳에 남는다.
+            auto regEntry = [&t](std::initializer_list<const char*> names,
+                                 CommandEntry entry, const void* handlerKey)
             {
                 // LC0: canonical↔alias 관계와 handler 그룹을 한 벌 더 남긴다.
                 //
@@ -11677,28 +11848,59 @@ namespace ConsoleCmd
                 for (const char* n : names)
                 {
                     // 같은 이름을 두 번 등록하면 조용히 한쪽이 먹힌다.
-                    const bool inserted = t.emplace(n, fn).second;
+                    const bool inserted = t.emplace(n, entry).second;
                     if (!inserted) { std::printf("[CLI] 명령 이름 중복 등록: %s\n", n); }
                     (inserted ? accepted : rejected).push_back(n);
                 }
 
+                CommandBaseline::RecordRegistration(accepted, rejected, handlerKey);
+            };
+
+            // 이행 전 핸들러. 결과를 내지 않으므로 LegacyUnreported 가 된다.
+            auto reg = [&regEntry](std::initializer_list<const char*> names,
+                                   ConsoleCommandHandler fn)
+            {
                 // 함수 포인터 → const void* 는 표준이 conditionally-supported로
                 // 두는 변환이다. MSVC/Win32에서는 성립하고 이 값은 **비교와
                 // 그룹핑에만** 쓴다(주소를 artifact에 싣지 않는다). LC4에서 이
                 // 파일이 Engine 공용 모듈로 옮겨 갈 때 다시 판정할 자리다.
-                CommandBaseline::RecordRegistration(
-                    accepted, rejected, reinterpret_cast<const void*>(fn));
+                CommandEntry entry;
+                entry.legacy = fn;
+                regEntry(names, entry, reinterpret_cast<const void*>(fn));
             };
 
-            reg({ "help" }, &Cmd_help);
-            reg({ "quit", "exit" }, &Cmd_quit);
+            // LC1 이후의 핸들러. 결과를 낸다.
+            //
+            // 이름을 `reg` 와 다르게 둔 것은 오버로드 해석에 기대지 않기
+            // 위해서다 — 두 서명이 겹칠 일은 없지만, 이행 중에는 "이 명령이
+            // 넘어갔는가"가 등록 줄만 보고 눈에 보여야 한다.
+            auto regResult = [&regEntry](std::initializer_list<const char*> names,
+                                         ConsoleCommandResultHandler fn)
+            {
+                CommandEntry entry;
+                entry.modern = fn;
+                regEntry(names, entry, reinterpret_cast<const void*>(fn));
+            };
+
+            // 일부러 프로세스를 죽이는 명령. 예외 경계를 통과시킨다.
+            auto regEscaping = [&regEntry](std::initializer_list<const char*> names,
+                                           ConsoleCommandHandler fn)
+            {
+                CommandEntry entry;
+                entry.legacy              = fn;
+                entry.letExceptionsEscape = true;
+                regEntry(names, entry, reinterpret_cast<const void*>(fn));
+            };
+
+            regResult({ "help" }, &Cmd_help);
+            regResult({ "quit", "exit" }, &Cmd_quit);
             // LC0(PHASE 14.5) 기준선 계측. 거동 변경 0 — 재고 찍기만 한다.
             reg({ "commands.dump" }, &Cmd_commands_dump);
             reg({ "cli.probe.timing" }, &Cmd_cli_probe_timing);
             reg({ "cli.echo.args" }, &Cmd_cli_echo_args);
-            reg({ "game.pak" }, &Cmd_game_pak);
-            reg({ "wait" }, &Cmd_wait);
-            reg({ "scene.load", "scene.switch" }, &Cmd_scene_load);
+            regResult({ "game.pak" }, &Cmd_game_pak);
+            regResult({ "wait" }, &Cmd_wait);
+            regResult({ "scene.load", "scene.switch" }, &Cmd_scene_load);
             reg({ "scene.new" }, &Cmd_scene_new);
             reg({ "scene.ddol" }, &Cmd_scene_ddol);
 			reg({ "ai.status" }, &Cmd_ai_status);
@@ -11722,7 +11924,7 @@ namespace ConsoleCmd
 				&Cmd_collisionmatrix_authoring_probe);
 			reg({ "shadermeta.probe" }, &Cmd_shadermeta_probe);
 			reg({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
-			reg({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
+			regResult({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
 			reg({ "animator.scene.probe" }, &Cmd_animator_scene_probe);
 			reg({ "inputmap.corpus.probe" }, &Cmd_inputmap_corpus_probe);
             reg({ "model.loadcached" }, &Cmd_model_loadcached);
@@ -11878,7 +12080,8 @@ namespace ConsoleCmd
             reg({ "log.flush" }, &Cmd_log_flush);
             reg({ "render.shadowinfo" }, &Cmd_render_shadowinfo);
             reg({ "crash.status" }, &Cmd_crash_status);
-            reg({ "crash.test" }, &Cmd_crash_test);
+            // 죽는 것이 일인 명령 — 예외 경계를 통과시킨다(위 regEscaping 주석).
+            regEscaping({ "crash.test" }, &Cmd_crash_test);
             reg({ "reflect.golden" }, [](const ConsoleCommandContext& c) { HandleReflectGolden(c.parts); });
             reg({ "perf.reflect" }, [](const ConsoleCommandContext& c) { HandlePerfReflect(c.parts); });
             reg({ "scene.dirtytraversal" }, [](const ConsoleCommandContext& c) { HandleSceneDirtyTraversal(c.parts); });
@@ -11907,12 +12110,14 @@ namespace ConsoleCmd
     }
 }
 
-void ConsoleCommandSystem::Execute(const std::string& line)
+CommandCore::CommandResult ConsoleCommandSystem::Execute(const std::string& line)
 {
-    if (line.empty()) return;
+    // 빈 줄은 명령이 아니다 — 결과도 없다. 시나리오 파일의 빈 줄이 여기까지
+    // 오지는 않지만(LoadScriptFile 이 거른다) stdin 은 빈 줄을 보낸다.
+    if (line.empty()) return CommandCore::Ok();
 
     const auto parts = Split(line);
-    if (parts.empty()) return;
+    if (parts.empty()) return CommandCore::Ok();
 
     const std::string& cmd = parts[0];
 
@@ -11920,12 +12125,85 @@ void ConsoleCommandSystem::Execute(const std::string& line)
     const auto it = table.find(cmd);
     if (it == table.end())
     {
-        std::printf("[CLI] 알 수 없는 명령: %s  ('help' 참고)\n", cmd.c_str());
-        return;
+        // ★ 예전에는 여기서 printf 하고 그냥 return 했다.
+        //
+        //   그래서 오타 하나가 exit 0 이었고, help 가 안내하지만 등록돼 있지
+        //   않은 이름 6 개(experiment.anim 등, LC0 §2.1.1)도 성공으로 끝났다.
+        //   자동화가 "명령이 돌았다"와 "이름이 없다"를 구분할 방법이 없었다.
+        return CommandCore::InvalidArguments(
+            "알 수 없는 명령: " + cmd + "  ('help' 참고)", "command.unknown");
     }
 
     const ConsoleCommandContext ctx{ cmd, parts, line, *this };
-    it->second(ctx);
+
+    // 일부러 죽는 명령은 그대로 죽게 둔다(`crash.test`). 크래시 덤프 경로는
+    // 크래시가 나야만 도는 검사라, 여기서 삼키면 그 검사가 통째로 사각지대가 된다.
+    if (it->second.letExceptionsEscape) return it->second.Invoke(ctx);
+
+    // 핸들러가 던지면 그것은 명령의 실패가 아니라 내부 결함이다. 프로세스를
+    // 죽이지 않고 결과로 바꾼다 — 무인 실행에서 예외 하나가 남은 시나리오를
+    // 통째로 날리면 어디까지 갔는지 알 수 없다.
+    try
+    {
+        return it->second.Invoke(ctx);
+    }
+    catch (const std::bad_alloc&)
+    {
+        // 할당 실패 뒤에 다음 명령을 계속 밀어 넣지 않는다. 남은 시나리오가
+        // 무엇을 하든 같은 벽에 부딪히고, 그 과정에서 남기는 진단이 오히려
+        // 원인을 밀어낸다. 여기서 멈추고 종료 코드로 알린다.
+        RequestQuit();
+        return CommandCore::InternalError("command.out_of_memory",
+            "메모리 할당 실패 — 남은 명령을 실행하지 않는다");
+    }
+    catch (const std::exception& error)
+    {
+        return CommandCore::InternalError("command.exception",
+            std::string("핸들러 예외: ") + error.what());
+    }
+    catch (...)
+    {
+        return CommandCore::InternalError("command.exception", "핸들러에서 알 수 없는 예외");
+    }
+}
+
+void ConsoleCommandSystem::PublishResult(const std::string& commandId,
+                                         const CommandCore::CommandResult& result)
+{
+    CommandCore::CommandSession& session = CommandCore::CommandSession::Batch();
+    session.Record(commandId, result);
+
+    // 사람이 읽는 줄. **판정의 정본이 아니다** — 정본은 session 이 든 결과다.
+    //
+    // 성공과 legacy 는 조용히 지나간다. 이행 전 핸들러 184 개가 매번 한 줄을
+    // 더 찍으면 기존 시나리오의 출력 형상이 통째로 달라지고, 그 출력을 정규식으로
+    // 읽는 소비자가 아직 살아 있다(LC0 실측: 1 개). LC9 가 그것을 옮긴 뒤에
+    // 사람용 출력을 정리한다.
+    if (CommandCore::CommandStatus::Succeeded == result.status ||
+        CommandCore::CommandStatus::LegacyUnreported == result.status)
+    {
+        return;
+    }
+
+    std::printf("[CLI] %s %.*s (%s) %s\n",
+                commandId.c_str(),
+                static_cast<int>(CommandCore::ToString(result.status).size()),
+                CommandCore::ToString(result.status).data(),
+                result.code.c_str(),
+                result.message.c_str());
+
+    if (session.ShouldStopEarly())
+    {
+        std::printf("[CLI] --fail-fast: 남은 명령을 버리고 종료한다\n");
+        DiscardPending();
+        RequestQuit();
+    }
+}
+
+void ConsoleCommandSystem::DiscardPending()
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_pending.clear();
 }
 
 void ConsoleCommandSystem::RequestQuit() noexcept
@@ -12113,7 +12391,8 @@ const char* ConsoleCommandSystem::HelpText() noexcept
         "  cli.probe.timing [reset|off|경로]  프레임 시간 분포와 명령 왕복 지연(LC0, 기본 off)\n"
         "  cli.echo.args <인자>  tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)\n"
         "\n실행 인자: --exec \"<명령>\"  |  --script <파일>  |  --console\n"
-        "           --heapcheck  CRT 디버그 힙 전수 검사(힙 손상을 손상 시점에서 잡는다, 매우 느림)\n\n";
+        "           --heapcheck  CRT 디버그 힙 전수 검사(힙 손상을 손상 시점에서 잡는다, 매우 느림)\n"
+        "           --fail-fast  첫 실패에서 남은 명령을 버리고 종료한다(기본은 계속 실행 후 집계)\n\n";
 
     return kHelpText;
 }
