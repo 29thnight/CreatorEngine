@@ -54,6 +54,7 @@ internal static class NativeComponentTable
         [typeof(Transform)]      = new(handle => new Transform      { OwnerHandle = handle }, Native.HasTransform),
 
         [typeof(SoundComponent)] = new(handle => new SoundComponent { OwnerHandle = handle }, Native.HasSoundComponent),
+        [typeof(Light)]          = new(handle => new Light           { OwnerHandle = handle }, Native.LightExists),
         [typeof(Animator)]       = new(handle => new Animator       { OwnerHandle = handle }, Native.HasAnimator),
 
         [typeof(CharacterControllerComponent)] =

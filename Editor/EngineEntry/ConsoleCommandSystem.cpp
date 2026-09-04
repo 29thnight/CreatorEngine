@@ -1993,6 +1993,82 @@ namespace
 		owner->Destroy();
 	}
 
+	// light.proxy — LightRenderProxy가 지금 들고 있는 값을 그대로 찍는다(W2).
+	//
+	// ── 왜 컴포넌트가 아니라 프록시를 읽는가 ──
+	//
+	// 렌더는 LightComponent를 보지 않는다. Scene::CommitRenderProxies가 dirty 큐에
+	// 실린 것만 프록시로 옮기고, EnhancedLightPacking은 그 프록시만 읽는다. 그래서
+	// 값을 넣는 쪽이 dirty를 발행하지 않으면 화면이 그대로인데 — 컴포넌트 필드는
+	// 바뀌었으므로 되읽는 쪽에는 새 값이 나온다. 스크립트의 자기 판정으로는
+	// 이 구멍이 보이지 않는다. 프록시를 직접 봐야 dirty 발행이 증명된다.
+	//
+	// 스냅샷은 꺼진 광원(LightStatus::Disabled)을 이미 걸러서 준다 —
+	// count가 0이면 광원이 없는 것이 아니라 전부 꺼져 있을 수도 있다.
+	void HandleLightProxy(const std::vector<std::string>& parts)
+	{
+		(void)parts;
+
+		RenderScene* renderScene = SceneManagers->GetRenderScene();
+		if (nullptr == renderScene)
+		{
+			std::printf("[light.proxy] renderScene=none\n");
+			return;
+		}
+
+		const auto proxies = renderScene->GetLightProxySnapshot();
+
+		// 커밋 누계를 함께 찍는다. 값이 안 바뀌었을 때 "발행이 없었나(publish=0)"와
+		// "발행은 됐는데 안 실렸나(publish>0 · committed 그대로)"를 갈라 준다.
+		// 앞은 writer가 dirty를 안 냈다는 뜻이고, 뒤는 등록이 없어 stale로
+		// 버려졌다는 뜻이라 고칠 자리가 다르다.
+		// 커밋 누계와 프록시 커맨드 큐를 함께 찍는다. 값이 안 바뀌었을 때
+		// 세 자리를 갈라 준다.
+		//
+		//   publish=0                      writer가 dirty를 안 냈다
+		//   publish>0 · committed 그대로    등록이 없어 stale로 버려졌다
+		//   committed 늘고 applied 안 늘면  커맨드가 소비되지 않았다
+		//                                  (렌더 스레드가 안 도는 헤드리스가 그렇다)
+		//
+		// 셋은 고칠 자리가 전혀 다르다. 값만 보고 첫째로 단정하기 쉬운데,
+		// 실제로 물린 것은 셋째였다.
+		if (Scene* scene = SceneManagers->GetActiveScene())
+		{
+			const RenderProxyCommitMetrics m = scene->GetRenderProxyCommitMetrics();
+			const auto q = ProxyCommandQueue->GetStats();
+			std::printf("[light.proxy] count=%zu publish=%llu committed=%llu pending=%llu"
+				" queued=%llu applied=%llu dropped=%llu stale=%llu superseded=%llu\n",
+				proxies.size(),
+				(unsigned long long)m.publishCalls,
+				(unsigned long long)m.committed,
+				(unsigned long long)m.pending,
+				(unsigned long long)q.enqueued,
+				(unsigned long long)q.applied,
+				(unsigned long long)q.dropped,
+				(unsigned long long)q.staleEpoch,
+				(unsigned long long)q.superseded);
+		}
+		else
+		{
+			std::printf("[light.proxy] count=%zu (활성 씬 없음 — 커밋 누계 생략)\n",
+				proxies.size());
+		}
+
+		size_t index = 0;
+		for (const auto& proxy : proxies)
+		{
+			if (nullptr == proxy) { ++index; continue; }
+
+			std::printf(
+				"[light.proxy] #%zu intensity=%.3f range=%.3f spot=%.3f type=%d status=%d"
+				" color=(%.3f,%.3f,%.3f,%.3f)\n",
+				index, proxy->m_intensity, proxy->m_range, proxy->m_spotLightAngle,
+				proxy->m_lightType, proxy->m_lightStatus,
+				proxy->m_color.r, proxy->m_color.g, proxy->m_color.b, proxy->m_color.a);
+			++index;
+		}
+	}
+
 	void HandleSceneTransformWriteStats(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
@@ -12137,6 +12213,7 @@ namespace ConsoleCmd
             reg({ "serialize.rymlerror" }, [](const ConsoleCommandContext& c) { HandleSerializeRymlError(c.parts); });
             reg({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { HandleSceneProxyBench(c.parts); });
 			reg({ "scene.proxydirty" }, [](const ConsoleCommandContext& c) { HandleSceneProxyDirty(c.parts); });
+			reg({ "light.proxy" }, [](const ConsoleCommandContext& c) { HandleLightProxy(c.parts); });
 
             return t;
         }();
@@ -12215,6 +12292,7 @@ void ConsoleCommandSystem::PrintHelp() const
 		"  scene.transformpull print|probe  X6 C# 즉시 pull·sibling global 전파 검사\n"
 		"  scene.transformbulk probe  X7 Animator pose·Physics world batch·Socket barrier 검사\n"
 		"  scene.proxydirty probe  X8 frame-persistent render dirty mask·generation 검사\n"
+		"  light.proxy             LightRenderProxy가 들고 있는 값(dirty 발행 확인용)\n"
         "  scene.ddol <이름>           오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용\n"
 		"  scene.traversalbench <오브젝트수> <프레임수> [flat|wide|deep|skeleton]  X0 Release 벤치(0=현재 씬)\n"
 		"  scene.proxybench <프레임수> [등록수]  X8 정지 dirty-queue 커밋 비용(선택: 합성 등록수)\n"

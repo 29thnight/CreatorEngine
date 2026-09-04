@@ -1,0 +1,54 @@
+# Light 래퍼 회귀 (W2).
+#
+# 사용법:
+#   CreatorEditor.exe --script ..\..\scripts\light_script_probe.txt
+#   (Tools\regression\verify-light-script.ps1 이 이 파일을 부른다)
+#
+# ── 무엇을 재현하는가 ──
+#
+# 저작 자산에 LightComponent가 30개 있는데 스크립트가 만질 길이 없었다.
+# W2에서 Light 래퍼를 열었고, 이 시나리오가 그 경계를 실제로 태운다.
+#
+# ── 왜 프록시까지 봐야 하는가 ──
+#
+# 엔진은 광원 값을 LightRenderProxy에 복사해 두고 렌더는 그 프록시만 읽는다.
+# 프록시 갱신은 Scene::CommitRenderProxies가 하는데 dirty 큐에 실린 것만 훑는다.
+# 그래서 값을 넣는 쪽이 dirty를 발행하지 않으면 화면이 그대로인데,
+# **스크립트가 값을 되읽으면 새 값이 나온다** — 컴포넌트 필드는 바뀌었으니까.
+#
+# 그래서 스크립트 자기 판정(LightScriptProbe)만으로는 절반이다. light.proxy로
+# 프록시가 실제로 그 값을 받았는지 따로 봐야 dirty 발행이 증명된다.
+#
+# ── 왜 저작 씬을 열지 않는가 ──
+#
+# scene.switch로 씬을 열면 그 씬의 광원이 렌더 프록시에 등록되지 않는다
+# (2026-09-04 실측). FT_Material.creator로 전환해도 프록시는 계속 기본 씬
+# 라이트의 값(intensity=1)을 들고 있고, 그 씬의 저작값(intensity=2)은
+# 어디에도 나타나지 않는다. 새 씬 라이트는 등록되지 않고 옛 씬 라이트는
+# 지워지지 않는다 — 둘 다 이 시나리오가 고칠 것이 아니라 별개 결함이다.
+#
+# 그래서 대상은 에디터가 코드로 만드는 기본 씬의 "Directional Light"다
+# (EditorMain.cpp의 newSceneCreatedEvent). 그 결함이 닫히면 저작 씬으로
+# 옮기는 편이 낫다.
+
+# 기본 씬이 서고 라이트가 프록시에 등록될 때까지 기다린다.
+wait 60
+
+# 기준선 — 스크립트가 손대기 전 프록시 값. 검증 스크립트가 이 줄과
+# 나중 줄을 비교해 "정말 바뀌었는가"를 본다.
+light.proxy
+
+# 이름에 공백이 있지만 따옴표로 묶지 않는다 — script.add는 마지막 토큰을
+# 타입으로 보고 그 앞 전체를 이름으로 쓰므로 공백이 그대로 통한다.
+# 따옴표를 쓰면 그것까지 이름에 들어가 오브젝트를 못 찾는다(Split의 따옴표
+# 처리는 parts에만 적용되고 이 커맨드는 원문 line을 쓴다).
+script.add Directional Light LightScriptProbe
+wait 20
+
+# 프록시 커밋은 프레임 경계에서 일어난다 — 스크립트가 값을 넣은 프레임에는
+# 아직 실리지 않았을 수 있으므로 몇 프레임 더 돌린 뒤에 읽는다.
+light.proxy
+wait 5
+
+log.flush
+quit

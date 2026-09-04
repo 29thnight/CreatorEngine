@@ -18,6 +18,7 @@
 #include "CameraComponent.h"
 #include "CameraSystem.h"
 #include "MeshRenderer.h"
+#include "LightComponent.h"
 #include "../RenderEngine/Material.h"
 #include "InputManager.h"
 #include "PhysicsManager.h"
@@ -44,7 +45,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 21;
+	constexpr int kApiVersion = 22;
 
 	struct Float3 { float x, y, z; };
 
@@ -196,6 +197,24 @@ namespace
 		int    (__stdcall* Camera_Exists)();
 		Float2 (__stdcall* Camera_GetScreenSize)();
 		Float3 (__stdcall* Camera_WorldToScreenPoint)(Float3 world);
+
+		// LightComponent. 저작 자산에 30개가 있는데 스크립트가 만질 길이 없었다.
+		//
+		// setter는 전부 LightComponent의 writer를 거친다 — 필드에 직접 대입하면
+		// dirty가 서지 않아 LightRenderProxy가 낡은 채 남는다(LightComponent.h 주석).
+		int    (__stdcall* Light_Exists)(ScriptObjectHandle handle);
+		Float4 (__stdcall* Light_GetColor)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetColor)(ScriptObjectHandle handle, Float4 color);
+		float  (__stdcall* Light_GetIntensity)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetIntensity)(ScriptObjectHandle handle, float intensity);
+		float  (__stdcall* Light_GetRange)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetRange)(ScriptObjectHandle handle, float range);
+		float  (__stdcall* Light_GetSpotAngle)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetSpotAngle)(ScriptObjectHandle handle, float degrees);
+		int    (__stdcall* Light_GetLightType)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetLightType)(ScriptObjectHandle handle, int type);
+		int    (__stdcall* Light_GetLightStatus)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetLightStatus)(ScriptObjectHandle handle, int status);
 
 		// MeshRenderer + Material. 스크립트가 만지는 것은 사실상 셋뿐이다 —
 		// 재질 사본 만들기(6회) · 셰이더 상수 넣기(24회) · 베이스 색 알파.
@@ -1155,6 +1174,109 @@ namespace
 		return { (ndcX + 1.f) * 0.5f * size.width, (1.f - ndcY) * 0.5f * size.height, w };
 	}
 
+	// ── LightComponent ──
+	//
+	// setter가 필드에 직접 대입하지 않고 컴포넌트 writer를 부르는 것이 핵심이다.
+	// Scene::CommitRenderProxies는 dirtyQueue만 훑으므로, 발행 없이 값만 넣으면
+	// LightRenderProxy가 낡은 채 남아 화면이 그대로다 — 되읽으면 새 값이 나와
+	// 스크립트 쪽에서는 성공한 것처럼 보인다.
+
+	LightComponent* ResolveLight(ScriptObjectHandle handle)
+	{
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
+		return (nullptr != object) ? object->GetComponent<LightComponent>() : nullptr;
+	}
+
+	int __stdcall Api_Light_Exists(ScriptObjectHandle handle)
+	{
+		return (nullptr != ResolveLight(handle)) ? 1 : 0;
+	}
+
+	Float4 __stdcall Api_Light_GetColor(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr == light) return { 1.f, 1.f, 1.f, 1.f };
+
+		const math::color& c = light->m_color;
+		return { c.r, c.g, c.b, c.a };
+	}
+
+	void __stdcall Api_Light_SetColor(ScriptObjectHandle handle, Float4 color)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr == light) return;
+
+		light->SetColor(math::color{ color.x, color.y, color.z, color.w });
+	}
+
+	float __stdcall Api_Light_GetIntensity(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? light->m_intencity : 0.f;
+	}
+
+	void __stdcall Api_Light_SetIntensity(ScriptObjectHandle handle, float intensity)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr != light) light->SetIntensity(intensity);
+	}
+
+	float __stdcall Api_Light_GetRange(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? light->m_range : 0.f;
+	}
+
+	void __stdcall Api_Light_SetRange(ScriptObjectHandle handle, float range)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr != light) light->SetRange(range);
+	}
+
+	float __stdcall Api_Light_GetSpotAngle(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? light->m_spotLightAngle : 0.f;
+	}
+
+	void __stdcall Api_Light_SetSpotAngle(ScriptObjectHandle handle, float degrees)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr != light) light->SetSpotAngle(degrees);
+	}
+
+	// 열거는 int로 건넌다. LightType/LightStatus는 uint16_t라 값 범위는 넉넉하고,
+	// 미러 대조는 check-api-table이 아니라 관리 측 enum 정의가 진다.
+	int __stdcall Api_Light_GetLightType(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? static_cast<int>(light->m_lightType) : 0;
+	}
+
+	void __stdcall Api_Light_SetLightType(ScriptObjectHandle handle, int type)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr == light) return;
+		if (type < DirectionalLight || type > SpotLight) return;
+
+		light->SetLightType(static_cast<LightType>(type));
+	}
+
+	int __stdcall Api_Light_GetLightStatus(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? static_cast<int>(light->m_lightStatus) : 0;
+	}
+
+	void __stdcall Api_Light_SetLightStatus(ScriptObjectHandle handle, int status)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr == light) return;
+		if (status < Disabled || status > StaticShadows) return;
+
+		light->SetLightStatus(static_cast<LightStatus>(status));
+	}
+
 	// ── MeshRenderer · Material ──
 	//
 	// Material에 별도 핸들을 주지 않고 MeshRenderer를 통해서만 만진다.
@@ -2095,6 +2217,20 @@ namespace
 		g_apiTable.Camera_Exists               = &Api_Camera_Exists;
 		g_apiTable.Camera_GetScreenSize        = &Api_Camera_GetScreenSize;
 		g_apiTable.Camera_WorldToScreenPoint   = &Api_Camera_WorldToScreenPoint;
+
+		g_apiTable.Light_Exists                = &Api_Light_Exists;
+		g_apiTable.Light_GetColor              = &Api_Light_GetColor;
+		g_apiTable.Light_SetColor              = &Api_Light_SetColor;
+		g_apiTable.Light_GetIntensity          = &Api_Light_GetIntensity;
+		g_apiTable.Light_SetIntensity          = &Api_Light_SetIntensity;
+		g_apiTable.Light_GetRange              = &Api_Light_GetRange;
+		g_apiTable.Light_SetRange              = &Api_Light_SetRange;
+		g_apiTable.Light_GetSpotAngle          = &Api_Light_GetSpotAngle;
+		g_apiTable.Light_SetSpotAngle          = &Api_Light_SetSpotAngle;
+		g_apiTable.Light_GetLightType          = &Api_Light_GetLightType;
+		g_apiTable.Light_SetLightType          = &Api_Light_SetLightType;
+		g_apiTable.Light_GetLightStatus        = &Api_Light_GetLightStatus;
+		g_apiTable.Light_SetLightStatus        = &Api_Light_SetLightStatus;
 
 		g_apiTable.Mesh_Exists                 = &Api_Mesh_Exists;
 		g_apiTable.Mesh_InstantiateMaterial    = &Api_Mesh_InstantiateMaterial;

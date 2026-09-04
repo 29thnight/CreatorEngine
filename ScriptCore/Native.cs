@@ -151,6 +151,21 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<Float2> Camera_GetScreenSize;
     public delegate* unmanaged<Float3, Float3> Camera_WorldToScreenPoint;
 
+    // LightComponent. setter는 네이티브에서 컴포넌트 writer를 거쳐 dirty를 발행한다.
+    public delegate* unmanaged<ObjectHandle, int> Light_Exists;
+    public delegate* unmanaged<ObjectHandle, Color4> Light_GetColor;
+    public delegate* unmanaged<ObjectHandle, Color4, void> Light_SetColor;
+    public delegate* unmanaged<ObjectHandle, float> Light_GetIntensity;
+    public delegate* unmanaged<ObjectHandle, float, void> Light_SetIntensity;
+    public delegate* unmanaged<ObjectHandle, float> Light_GetRange;
+    public delegate* unmanaged<ObjectHandle, float, void> Light_SetRange;
+    public delegate* unmanaged<ObjectHandle, float> Light_GetSpotAngle;
+    public delegate* unmanaged<ObjectHandle, float, void> Light_SetSpotAngle;
+    public delegate* unmanaged<ObjectHandle, int> Light_GetLightType;
+    public delegate* unmanaged<ObjectHandle, int, void> Light_SetLightType;
+    public delegate* unmanaged<ObjectHandle, int> Light_GetLightStatus;
+    public delegate* unmanaged<ObjectHandle, int, void> Light_SetLightStatus;
+
     // MeshRenderer + Material (m_Material 42회 — 대부분 셰이더 상수 넣기)
     public delegate* unmanaged<ObjectHandle, int> Mesh_Exists;
     public delegate* unmanaged<ObjectHandle, byte*, void> Mesh_InstantiateMaterial;
@@ -272,7 +287,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 21;
+    public const int ExpectedVersion = 22;
 
     private static ScriptApiTable _api;
     private static bool _ready;
@@ -851,6 +866,57 @@ internal static unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 CameraWorldToScreenPoint(Float3 world)
         => _ready && _api.Camera_WorldToScreenPoint != null ? _api.Camera_WorldToScreenPoint(world) : default;
+
+    public static bool LightExists(ObjectHandle h)
+        => _ready && _api.Light_Exists != null && _api.Light_Exists(h) != 0;
+
+    public static Color4 LightGetColor(ObjectHandle h)
+        => _ready && _api.Light_GetColor != null ? _api.Light_GetColor(h) : Color4.White;
+
+    public static void LightSetColor(ObjectHandle h, Color4 color)
+    {
+        if (_ready && _api.Light_SetColor != null) _api.Light_SetColor(h, color);
+    }
+
+    public static float LightGetIntensity(ObjectHandle h)
+        => _ready && _api.Light_GetIntensity != null ? _api.Light_GetIntensity(h) : 0f;
+
+    public static void LightSetIntensity(ObjectHandle h, float intensity)
+    {
+        if (_ready && _api.Light_SetIntensity != null) _api.Light_SetIntensity(h, intensity);
+    }
+
+    public static float LightGetRange(ObjectHandle h)
+        => _ready && _api.Light_GetRange != null ? _api.Light_GetRange(h) : 0f;
+
+    public static void LightSetRange(ObjectHandle h, float range)
+    {
+        if (_ready && _api.Light_SetRange != null) _api.Light_SetRange(h, range);
+    }
+
+    public static float LightGetSpotAngle(ObjectHandle h)
+        => _ready && _api.Light_GetSpotAngle != null ? _api.Light_GetSpotAngle(h) : 0f;
+
+    public static void LightSetSpotAngle(ObjectHandle h, float degrees)
+    {
+        if (_ready && _api.Light_SetSpotAngle != null) _api.Light_SetSpotAngle(h, degrees);
+    }
+
+    public static int LightGetLightType(ObjectHandle h)
+        => _ready && _api.Light_GetLightType != null ? _api.Light_GetLightType(h) : 0;
+
+    public static void LightSetLightType(ObjectHandle h, int type)
+    {
+        if (_ready && _api.Light_SetLightType != null) _api.Light_SetLightType(h, type);
+    }
+
+    public static int LightGetLightStatus(ObjectHandle h)
+        => _ready && _api.Light_GetLightStatus != null ? _api.Light_GetLightStatus(h) : 0;
+
+    public static void LightSetLightStatus(ObjectHandle h, int status)
+    {
+        if (_ready && _api.Light_SetLightStatus != null) _api.Light_SetLightStatus(h, status);
+    }
 
     // ── MeshRenderer · Material ──
 

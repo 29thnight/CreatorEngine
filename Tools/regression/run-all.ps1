@@ -156,6 +156,27 @@ Run-Step "스크립트 부착 초기화 1회" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-script-add-awake-once.ps1") -Exe $Exe -Work $Work
 }
 
+# Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
+# 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
+#
+# 두 축을 함께 본다. ① 경계 왕복은 프로브가 스스로 판정하고, ② dirty 사슬은
+# 발행→커밋→큐잉 누계를 잰다. ①만 있으면 눈먼 곳이 생긴다: 렌더는
+# LightComponent가 아니라 LightRenderProxy를 읽고 그 복사는 dirty 큐에 실린
+# 것만 따라가는데, 값을 넣는 쪽이 dirty를 안 내도 **되읽으면 새 값이 나온다**.
+# 그 상태가 지금 리플렉션 인스펙터가 놓인 자리다(ReflectionTypedDraw.h는
+# 값을 대입만 하고 dirty를 모른다).
+#
+# 이빨 확인(2026-09-04): LightComponent의 setter 5종에서
+# PublishRenderProxyDirty 6줄을 지우니 ①은 15건 그대로 통과하고 ②만
+# publish 증가분 8 → 0으로 붉어졌다. 되돌려 초록을 다시 확인했다.
+#
+# 못 보는 것도 적어 둔다: 렌더 스레드가 프록시에 실제로 적용하는 마지막
+# 한 칸은 --script 헤드리스에서 관측할 수 없다(queued는 늘고 applied는
+# 멈춰 있다 — 게이트 파일 머리에 실측치가 있다).
+Run-Step "Light 래퍼 경계" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-light-script.ps1") -Exe $Exe -Work $Work
+}
+
 # 프리팹 왕복(트랙 P, P2에서 완료).
 #
 # 다른 검사는 전부 한 번 띄운 상태만 본다. 저장했다 다시 여는 왕복이 없어서
