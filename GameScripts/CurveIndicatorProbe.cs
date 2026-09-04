@@ -79,8 +79,12 @@ public sealed partial class CurveIndicatorProbe : Component
         }
 
         // 셰이더 상수 넣기 경로도 확인한다. 없는 이름이면 false여야 한다.
-        Assert("없는 상수 버퍼는 false 반환",
-            !renderers[0].SetMaterialFloat("__없는버퍼__", "__없는값__", 1f), "true가 나왔습니다");
+        //
+        // 예전에는 상수 버퍼 이름도 함께 넘겼는데, 그 축은 판별력이 없었다 —
+        // fb6e4f55 이후 네이티브가 버퍼 인자를 읽지 않았으므로 아무 문자열을
+        // 넣어도 결과가 같았다. 9-4에 인자 자체를 걷어 이름 축만 남겼다.
+        Assert("없는 상수 이름은 false 반환",
+            !renderers[0].SetMaterialFloat("__없는값__", 1f), "true가 나왔습니다");
     }
 
     private void Assert(string name, bool ok, string detail)

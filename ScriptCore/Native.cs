@@ -155,8 +155,8 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, int> Mesh_Exists;
     public delegate* unmanaged<ObjectHandle, byte*, void> Mesh_InstantiateMaterial;
     public delegate* unmanaged<ObjectHandle, byte*, int, int> Mesh_GetMaterialName;
-    public delegate* unmanaged<ObjectHandle, byte*, byte*, float, int> Mesh_SetMaterialFloat;
-    public delegate* unmanaged<ObjectHandle, byte*, byte*, int, int> Mesh_SetMaterialInt;
+    public delegate* unmanaged<ObjectHandle, byte*, float, int> Mesh_SetMaterialFloat;
+    public delegate* unmanaged<ObjectHandle, byte*, int, int> Mesh_SetMaterialInt;
     public delegate* unmanaged<ObjectHandle, Color4> Mesh_GetBaseColor;
     public delegate* unmanaged<ObjectHandle, Color4, void> Mesh_SetBaseColor;
 
@@ -272,7 +272,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 20;
+    public const int ExpectedVersion = 21;
 
     private static ScriptApiTable _api;
     private static bool _ready;
@@ -875,30 +875,24 @@ internal static unsafe class Native
         return len > 0 ? System.Text.Encoding.UTF8.GetString(buffer, len) : string.Empty;
     }
 
-    public static bool MeshSetMaterialFloat(ObjectHandle h, string cbuffer, string name, float value)
+    public static bool MeshSetMaterialFloat(ObjectHandle h, string name, float value)
     {
         if (!_ready || _api.Mesh_SetMaterialFloat == null) return false;
 
-        byte* bufferName = stackalloc byte[NameBufferSize];
-        EncodeName(cbuffer, bufferName);
-
         byte* valueName = stackalloc byte[NameBufferSize];
         EncodeName(name, valueName);
 
-        return _api.Mesh_SetMaterialFloat(h, bufferName, valueName, value) != 0;
+        return _api.Mesh_SetMaterialFloat(h, valueName, value) != 0;
     }
 
-    public static bool MeshSetMaterialInt(ObjectHandle h, string cbuffer, string name, int value)
+    public static bool MeshSetMaterialInt(ObjectHandle h, string name, int value)
     {
         if (!_ready || _api.Mesh_SetMaterialInt == null) return false;
 
-        byte* bufferName = stackalloc byte[NameBufferSize];
-        EncodeName(cbuffer, bufferName);
-
         byte* valueName = stackalloc byte[NameBufferSize];
         EncodeName(name, valueName);
 
-        return _api.Mesh_SetMaterialInt(h, bufferName, valueName, value) != 0;
+        return _api.Mesh_SetMaterialInt(h, valueName, value) != 0;
     }
 
     public static Color4 MeshGetBaseColor(ObjectHandle h)

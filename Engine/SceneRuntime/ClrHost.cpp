@@ -44,7 +44,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 20;
+	constexpr int kApiVersion = 21;
 
 	struct Float3 { float x, y, z; };
 
@@ -202,8 +202,8 @@ namespace
 		int   (__stdcall* Mesh_Exists)(ScriptObjectHandle handle);
 		void  (__stdcall* Mesh_InstantiateMaterial)(ScriptObjectHandle handle, const char* newName);
 		int   (__stdcall* Mesh_GetMaterialName)(ScriptObjectHandle handle, char* buffer, int capacity);
-		int   (__stdcall* Mesh_SetMaterialFloat)(ScriptObjectHandle handle, const char* buffer, const char* name, float value);
-		int   (__stdcall* Mesh_SetMaterialInt)(ScriptObjectHandle handle, const char* buffer, const char* name, int value);
+		int   (__stdcall* Mesh_SetMaterialFloat)(ScriptObjectHandle handle, const char* name, float value);
+		int   (__stdcall* Mesh_SetMaterialInt)(ScriptObjectHandle handle, const char* name, int value);
 		Float4 (__stdcall* Mesh_GetBaseColor)(ScriptObjectHandle handle);
 		void  (__stdcall* Mesh_SetBaseColor)(ScriptObjectHandle handle, Float4 color);
 
@@ -1210,12 +1210,17 @@ namespace
 	}
 
 	// I5-M5 S3 — 논리 property를 이름으로 갱신한다. legacy TrySetValue와 달리
-	// RuntimeSchema 설치나 CB 이름에 기대지 않는다(buffer 인자는 ABI 유지용으로
-	// 받고 검증하지 않는다 — 라우팅은 ShaderMeta 선언이 한다). 이름/타입이
-	// 틀리면 0을 돌려준다 — 오타를 삼키지 않으려면 호출부가 봐야 한다.
-	int __stdcall Api_Mesh_SetMaterialFloat(ScriptObjectHandle handle, const char* buffer, const char* name, float value)
+	// RuntimeSchema 설치나 CB 이름에 기대지 않는다 — 라우팅은 ShaderMeta 선언이
+	// 한다. 이름/타입이 틀리면 0을 돌려준다 — 오타를 삼키지 않으려면 호출부가
+	// 봐야 한다.
+	//
+	// 9-4에 상수 버퍼 이름 인자를 걷었다. fb6e4f55에서 라우팅이 ShaderMeta로
+	// 넘어간 뒤로 받기만 하고 쓰지 않았는데, 시그니처에 남아 있으니 호출부는
+	// 여전히 맞는 버퍼 이름을 골라 넘기려 했다. 순서 비교 게이트는 "받지만
+	// 안 쓰는 인자"에 원리적으로 눈멀어 이것을 잡을 수 없다.
+	int __stdcall Api_Mesh_SetMaterialFloat(ScriptObjectHandle handle, const char* name, float value)
 	{
-		if (nullptr == buffer || nullptr == name) return 0;
+		if (nullptr == name) return 0;
 
 		MeshRenderer* mesh = ResolveMesh(handle);
 		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
@@ -1227,9 +1232,9 @@ namespace
 			mesh->GetMaterialInstance()) ? 1 : 0;
 	}
 
-	int __stdcall Api_Mesh_SetMaterialInt(ScriptObjectHandle handle, const char* buffer, const char* name, int value)
+	int __stdcall Api_Mesh_SetMaterialInt(ScriptObjectHandle handle, const char* name, int value)
 	{
-		if (nullptr == buffer || nullptr == name) return 0;
+		if (nullptr == name) return 0;
 
 		MeshRenderer* mesh = ResolveMesh(handle);
 		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
