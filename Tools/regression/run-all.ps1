@@ -156,6 +156,18 @@ Run-Step "스크립트 부착 초기화 1회" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-script-add-awake-once.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기의 6단계가 아니라 그 둘레의 두 축을 잰다(9-5) — 훅이 **어느 모드에서**
+# 왔는가(편집/재생)와 그때 **틱이 함께 돌았는가**. 위 항목들은 훅의 순서와 횟수를
+# 보므로 이 둘에 원리적으로 눈이 멀다: 편집 모드에서 6단계가 모두 소진돼도
+# "순서 맞음·1회씩"이라 전부 초록이었다.
+#
+# 판정 여덟이 각각 결함 하나씩을 지킨다. 특히 판정 6은 관리 → 네이티브 방향
+# 다리가 죽었는지를 **폴백 경고 건수**로 잰다 — 폴백이 훅도 틱도 똑같이 만들어
+# 결과만 보면 판별력이 0이기 때문이다.
+Run-Step "생명주기 활성·모드 축" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-axis.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
