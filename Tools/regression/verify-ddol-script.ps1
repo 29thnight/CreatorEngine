@@ -4,7 +4,8 @@
 #
 # 관리 측 생명주기의 드라이버가 둘이다. 네이티브 ScriptComponent는 인스턴스의
 # 생성(OnInitialized)과 파괴(OnUninitializing)만 알리고, 그 사이 네 단계는
-# BehaviourRegistry가 자기 큐(_pendingAwake/_pendingStart/_pendingRemove)로 굴린다.
+# BehaviourRegistry가 자기 큐(_pendingAwake/_pendingStart/_pendingRemove)로 굴렸다
+# (L3 완결로 앞 둘은 은퇴 — 지금은 네이티브 ScriptComponent가 6단계 전부를 구동한다).
 # 그래서 네이티브에서만 일어나는 사건 — DontDestroyOnLoad 이송 —이 스크립트에
 # 전혀 닿지 않았다. 오브젝트는 살아서 씬을 건너는데 스크립트는 모른다.
 #

@@ -13,8 +13,8 @@ class CharacterControllerComponent;
 // ── 무엇을 대신하는가 ──
 //
 // 예전에는 CharacterControllerComponent가 Component::FixedUpdate/LateUpdate를
-// 오버라이드해 Lifecycle::Registry의 오버라이드 감지 마스크(Bit_FixedUpdate·
-// Bit_LateUpdate)에 걸리고, Scene::RegisterComponent가 SystemSchedule::
+// 오버라이드해 Lifecycle::Registry의 오버라이드 감지 마스크(옛 Bit_FixedUpdate·
+// Bit_LateUpdate — C3 완결로 철거)에 걸리고, Scene::RegisterComponent가 SystemSchedule::
 // SubscribeImplicit으로 Scene 하나뿐인 m_schedule.FixedUpdateList()/
 // LateUpdateList()에 다른 컴포넌트와 섞어 넣었다. 여기서는 전용 조밀
 // std::vector<CharacterControllerComponent*>를 따로 두고 한 번에 순회한다.

@@ -6562,15 +6562,15 @@ namespace ConsoleCmd
         // (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다("씬의 초기화
         // 단계는 이미 지나갔을 수 있으므로 여기서 직접 깨운다"). 하지만
         // AddComponentAllowMultiple 안의 AttachComponentLifecycle이 이미 이 컴포넌트를
-        // PendingAwake 큐에 넣어 뒀고(State_AwakeCalled 비트는 아직 서지 않은 채),
-        // 직접 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::RegistryDrainAwakeAndStart가
+        // PendingInitialize 큐에 넣어 뒀고(State_Initialized 비트는 아직 서지 않은 채),
+        // 직접 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::DrainPendingPhases가
         // 큐에 남은 같은 컴포넌트를 또 한 번 깨운다 — OnInitialized 이중 호출.
         // ScriptComponent::OnInitialized의 `if (HasInstance()) return;` 가드가 보통은
         // 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다.
         //
         // Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
         // 직후 scene->DrainPendingLifecycle()을 동기로 불러 정상 드레인 경로를 태운다.
-        // 이미 깨운 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
+        // 이미 깨운 컴포넌트는 State_Initialized로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
         scene->DrainPendingLifecycle();
 
         if (!script->HasInstance())
@@ -11227,8 +11227,8 @@ namespace ConsoleCmd
         if (nullptr != scene)
         {
             const auto counts = scene->GetRegistryCounts();
-            std::printf("[CLI]   pendingAwake %zu · pendingStart %zu\n",
-                counts.pendingAwake, counts.pendingStart);
+            std::printf("[CLI]   pendingInitialize %zu · pendingSimulation %zu\n",
+                counts.pendingInitialize, counts.pendingSimulation);
 
             // 트랙 L4 래칫 측정용 — 명시 구독(Schedule().Subscribe) 대 암묵 구독
             // (RegisterComponent 경유)의 잔존 수. 통합 단계에서 배선.

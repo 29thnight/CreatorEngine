@@ -295,7 +295,7 @@ void MeshRenderer::OnInitialized()
 
 void MeshRenderer::OnAddedToScene()
 {
-	if (!HasLifecycleState(State_AwakeCalled) || !GetOwner()) return;
+	if (!HasLifecycleState(State_Initialized) || !GetOwner()) return;
 	if (Scene* scene = GetOwner()->GetScene())
 	{
 		scene->CollectMeshRenderer(this);

@@ -419,7 +419,7 @@ void SceneManager::Initialization()
 
     // 옛 Awake→OnEnable→Start 3단은 뒤의 둘이 빈 함수라 사실상 드레인 하나였다
     // (트랙 C · C4). 활성 전이는 Component::SetEnabled가 그 자리에서 처리하고,
-    // Start는 이 드레인이 pendingStart까지 소진한다.
+    // OnBeginSimulation은 이 드레인이 PendingSimulation까지 소진한다.
     PROFILE_CPU_BEGIN("DrainPendingLifecycle");
 	m_activeScene.load()->DrainPendingLifecycle();
     PROFILE_CPU_END();
@@ -1500,7 +1500,7 @@ bool SceneManager::RestoreSceneSnapshot()
 // ── 시뮬레이션 primitive (E3-1) ──
 //
 // OnBeginSimulation 같은 훅을 여기서 부르지 않는다 — Start()는 이미 매 프레임 드는
-// pendingAwake/Start 드레인이 State_StartCalled 가드로 정확히 한 번만 부르고 있어
+// pendingInitialize/Start 드레인이 State_SimulationBegun 가드로 정확히 한 번만 부르고 있어
 // (에디터 틱도 예외가 아니다), 여기서 다시 부르면 그 가드를 건너뛰고 두 번 불린다.
 // phase 필드는 그 드레인과 무관하게 상태 기계 자체를 정확히 유지하기 위한 부기다.
 void SceneManager::SetSimulationPhase(ScenePhase phase)

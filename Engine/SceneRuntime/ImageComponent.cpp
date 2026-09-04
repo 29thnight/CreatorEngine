@@ -126,7 +126,7 @@ void ImageComponent::OnAddedToScene()
 {
 	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterImage(this);
-	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	if (HasLifecycleState(State_Initialized) && GetOwner())
 	{
 		if (Scene* scene = GetOwner()->GetScene())
 		{

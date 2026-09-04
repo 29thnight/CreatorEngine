@@ -18,7 +18,7 @@ void SpriteRenderer::OnInitialized()
 
 void SpriteRenderer::OnAddedToScene()
 {
-	if (!HasLifecycleState(State_AwakeCalled) || !GetOwner()) return;
+	if (!HasLifecycleState(State_Initialized) || !GetOwner()) return;
 	if (Scene* scene = GetOwner()->GetScene())
 	{
 		scene->CollectSpriteRenderer(this);

@@ -27,21 +27,31 @@
 namespace Lifecycle
 {
     // 트랙 L1: 8비트(Awake~OnDestroy) → 11비트(6단계 + OnEnable/OnDisable + 틱3).
+    // 트랙 C3 완결 후 8비트 — 틱 3비트를 뺐다(아래).
     //
     // Bit_OnInitialized·Bit_OnBeginSimulation·Bit_OnUninitializing은 옛 이름
-    // (Bit_Awake·Bit_Start·Bit_OnDestroy)의 후신이다 — 판정 자체가 "옛 훅 또는
-    // 새 훅 중 하나라도 오버라이드했는가"로 넓어졌을 뿐 비트 값(자리)은 그대로다.
+    // (Bit_Awake·Bit_Start·Bit_OnDestroy)의 후신이다 — 비트 값(자리)은 그대로다.
     // 나머지 셋(Bit_OnAddedToScene·Bit_OnEndSimulation·Bit_OnRemovingFromScene)은
     // 대응하는 옛 훅이 없는 신설 축이라 새 자리를 받는다.
+    //
+    // ★ 옛 Bit_FixedUpdate(1u<<3)·Bit_Update(1u<<4)·Bit_LateUpdate(1u<<5)는
+    //   철거했다. 트랙 C3가 Component에서 가상 Update/LateUpdate/FixedUpdate를
+    //   통째로 걷어낸 순간 아래 MaskOfType의 `&T::Update != &Component::Update`
+    //   비교가 성립할 수 없게 됐고, 그때부터 이 셋은 **세우는 코드가 하나도 없는
+    //   영구 0**이었다. 값만 남은 비트는 "언젠가 서는 것"으로 읽혀 오히려
+    //   판단을 방해한다 — 전용 시스템의 조밀 배열이 무엇을 언제 도는지 전부
+    //   말하므로(SystemSchedule.h 클래스 주석) 이 축은 되살아나지 않는다.
+    //
+    //   자리(1u<<3~5)는 비워 둔다. NetworkFrameworkPlan N3-b가 신설하는 고정 축
+    //   훅 OnSimulationTick은 **관리 측 전용**이라(배선 6곳에 Component.h가 없다)
+    //   네이티브 비트를 요구하지 않는다. 네이티브 컴포넌트에도 고정 축 훅이
+    //   필요해지면 그때 축을 드러내는 새 이름으로 이 자리를 받는다.
     enum PhaseBits : uint16_t
     {
-        Bit_None                = 0,
+        Bit_None                 = 0,
         Bit_OnInitialized        = 1u << 0,
         Bit_OnEnable             = 1u << 1,
         Bit_OnBeginSimulation    = 1u << 2,
-        Bit_FixedUpdate          = 1u << 3,
-        Bit_Update               = 1u << 4,
-        Bit_LateUpdate           = 1u << 5,
         Bit_OnDisable            = 1u << 6,
         Bit_OnUninitializing     = 1u << 7,
         Bit_OnAddedToScene       = 1u << 8,
@@ -55,9 +65,14 @@ namespace Lifecycle
     /// "그 인터페이스를 상속했는가"를 묻게 되지만, Component와 비교하면
     /// "기본 구현을 덮었는가"를 묻는다 — 후자가 실제로 알고 싶은 것이다.
     ///
-    /// 전환기 브리지 셋(OnInitialized 등)은 옛 훅과 새 훅 어느 쪽을 오버라이드해도
-    /// 같은 비트가 선다 — 옛 훅만 오버라이드한 기존 컴포넌트 30종과, 앞으로 새
-    /// 훅을 직접 오버라이드할 컴포넌트를 같은 디스패치 목록이 함께 받아야 한다.
+    /// ★ 전환기 브리지는 없다(트랙 L · L3 완결). 옛 Awake/Start/OnDestroy와 그
+    /// 기본 구현이 새 훅을 부르던 다리를 걷어냈으므로, 지금 이 판정이 묻는 것은
+    /// 오직 "6단계 훅 중 무엇을 덮었는가" 하나다. 옛 이름은 Component에 존재하지
+    /// 않아 비교 대상 자체가 없다.
+    ///
+    /// 이 함수는 NetworkFrameworkPlan N3-a(관리 측 오버라이드 감지)가 선례로
+    /// 지목한 자리다 — 관리 측은 컴파일 타임이 아니므로 타입당 1회 계산해
+    /// 캐시하지만, "덮은 것만 디스패치 목록에 넣는다"는 규약은 같다.
     template<typename T>
     constexpr uint16_t MaskOfType()
     {

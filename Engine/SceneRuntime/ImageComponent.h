@@ -47,9 +47,9 @@ public:
 
 	// 옛 Update(float tick)의 본문 그대로(RefreshTransformFromRect() 하나) —
 	// UITickSystem::Update가 가드를 통과시킨 뒤 호출한다. 이름을 TickLayout으로
-	// 맞춘 이유 둘: ① Component::Update와 이름이 같으면 LifecycleRegistry::
-	// MaskOfType이 여전히 Bit_Update를 세워 암묵 구독이 되살아난다(이름이 달라야
-	// 감지되지 않는다). ② SpriteSheetComponent::TickLayout·TextComponent::TickLayout과
+	// 맞춘 이유 둘: ① 트랙 C3 당시 Component::Update와 이름이 같으면 오버라이드
+	// 감지에 걸려 암묵 구독이 되살아났다(그 메커니즘은 C3 완결로 사라졌다 —
+	// Component의 가상 틱 3종과 Bit_Update가 함께 철거됐다). ② SpriteSheetComponent::TickLayout·TextComponent::TickLayout과
 	// 본문 성격이 동형이다(둘 다 "RectTransform 월드 rect를 읽어 pos/scale을
 	// 다시 잡는다") — 서로 다른 클래스라 이름이 같아도 컴파일 충돌은 없고,
 	// 오히려 같은 이름을 쓰는 쪽이 "이 셋이 같은 부류의 틱"이라는 사실을

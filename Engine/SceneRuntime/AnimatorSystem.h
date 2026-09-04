@@ -9,7 +9,7 @@ class Animator;
 // ── 무엇을 대신하는가 ──
 //
 // 예전에는 Animator가 Component::Update를 오버라이드해 Lifecycle::Registry의
-// 오버라이드 감지 마스크(Bit_Update)에 걸리고, Scene::RegisterComponent가
+// 오버라이드 감지 마스크(옛 Bit_Update — C3 완결로 철거)에 걸리고, Scene::RegisterComponent가
 // SystemSchedule::SubscribeImplicit(component, Phase::Update)로 Scene 하나뿐인
 // m_schedule.UpdateList()에 다른 컴포넌트(스크립트 포함)와 함께 섞어 넣었다.
 // 여기서는 Animator 전용 조밀 std::vector<Animator*>를 따로 두고 한 번에
@@ -24,8 +24,8 @@ class Animator;
 // Animator::Awake/OnDestroy는 RenderScene 등록용으로 그대로 남기고(과제
 // 지시대로 손대지 않는다), 이 시스템 등록은 별도 훅 쌍을 쓴다 — 이유는
 // DDOL(DontDestroyOnLoad) 오브젝트가 씬을 건널 때다. Awake는
-// Component::State_AwakeCalled 비트로 컴포넌트 평생 1회만 불리므로(
-// Scene::RegistryDrainAwakeAndStart), DDOL 재부착 시 다시 불리지 않는다 —
+// Component::State_Initialized 비트로 컴포넌트 평생 1회만 불리므로(
+// Scene::DrainPendingPhases), DDOL 재부착 시 다시 불리지 않는다 —
 // 만약 이 시스템 등록을 Awake에 걸면 "최초 생성 씬"의 등록부에서만 존재하고
 // 새 씬으로 넘어간 뒤에는 영원히 틱을 못 받는(추적에서 영구 이탈하는) 결함이
 // 새로 생긴다. 반대로 OnAddedToScene/OnRemovingFromScene은 게이트가 없어

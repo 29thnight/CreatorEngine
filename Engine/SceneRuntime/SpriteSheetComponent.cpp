@@ -85,7 +85,7 @@ void SpriteSheetComponent::OnAddedToScene()
 {
 	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterSpriteSheet(this);
-	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	if (HasLifecycleState(State_Initialized) && GetOwner())
 	{
 		if (Scene* scene = GetOwner()->GetScene())
 		{

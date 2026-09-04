@@ -532,7 +532,7 @@ public:
     ///
     /// 이 시험이 실제로 지키는 것: Destroy는 프레임 끝 FlushPendingDestroy 한
     /// 지점에서만 물리적으로 벗겨지고(GameObject::Destroy는 마크만), 새 컴포넌트의
-    /// 등록은 PendingAwake 큐를 거쳐 다음 프레임에야 각 시스템 vector에 들어간다
+    /// 등록은 PendingInitialize 큐를 거쳐 다음 프레임에야 각 시스템 vector에 들어간다
     /// (Scene::RegisterComponent). 이 "3겹 지연"이 유지되는 한 시스템 루프
     /// 한복판에서 파괴·생성을 일으켜도 그 루프가 도는 vector 자체는 흔들리지
     /// 않는다 — 그 전제가 앞으로도 유지되는지를 지키는 것이 이 시험의 값어치다
@@ -574,8 +574,12 @@ private:
     void FireReentrancyStress(bool midTraversal, const std::string& origin);
 public:
 
-    /// 프레임 끝의 유일한 파괴 지점. 파괴 표시된 것들의 OnDisable→OnDestroy를 부르고
+    /// 프레임 끝의 유일한 파괴 지점. 파괴 표시된 것들의 축소 3단계
+    /// (OnEndSimulation→OnRemovingFromScene→OnUninitializing)를 순서대로 부르고
     /// 리스트에서 뺀다. 실제 메모리 해제는 기존 DestroyEntities가 이어서 한다.
+    ///
+    /// ★ OnDisable은 여기서 부르지 않는다 — 활성 축은 6단계와 직교하고 전이는
+    ///   Component::SetEnabled가 그 자리에서 처리한다(PHASE 9-2).
     void FlushPendingDestroy();
 
     /// 진단용 — 각 리스트 크기. update·lateUpdate·fixedUpdate 세 필드는 트랙 C3
@@ -583,7 +587,7 @@ public:
     /// 구독자가 0인 리스트의 크기를 진단으로 남겨 봐야 항상 0만 찍혔다
     /// (SystemSchedule.h 클래스 주석 참고). destroyWatch는 원래도 이 구조체에
     /// 없었다 — 그 관례를 그대로 따른다.
-    struct RegistryCounts { size_t pendingAwake, pendingStart; };
+    struct RegistryCounts { size_t pendingInitialize, pendingSimulation; };
     RegistryCounts GetRegistryCounts() const;
 
     /// 진단용 — 암묵/명시 구독 잔존 수(트랙 L4 래칫 측정 기반). 프로파일러
@@ -593,10 +597,10 @@ public:
 private:
     // ── 페이즈 리스트 저장소 (트랙 C1·L4 — SceneGraphRedesignPlan §4) ──
     //
-    // 예전에는 벡터 6종(m_pendingAwake·m_pendingStart·m_updateList·
+    // 예전에는 벡터 6종(옛 이름으로 m_pendingAwake·m_pendingStart·m_updateList·
     // m_lateUpdateList·m_fixedUpdateList·m_destroyWatchList)이 여기 직접
     // 흩어져 있었다. 지금은 SystemSchedule 하나가 들고 Scene은 위임한다 —
-    // RegisterComponent/UnregisterComponent/RegistryDrainAwakeAndStart/
+    // RegisterComponent/UnregisterComponent/DrainPendingPhases/
     // FlushPendingDestroy의 호출 순서·대상 집합은 이 편입으로 바뀌지 않는다
     // (회귀 세트 생명주기 순서 92 사건 불변 게이트).
     //
@@ -605,15 +609,18 @@ private:
     // 컴포넌트의 틱을 전용 시스템(AnimatorSystem 등)의 조밀 vector로 옮기면서
     // 구독자가 0이 됐다 — 옛 RegistryTick도 그 시점에 소멸했다(3d8ff9a4). 그
     // 셋을 SystemSchedule에서 철거했으니(SystemSchedule.h) 지금 여기 남는 것은
-    // PendingAwake·PendingStart·DestroyWatch 셋뿐이다.
+    // PendingInitialize·PendingSimulation·DestroyWatch 셋뿐이다.
     SystemSchedule m_schedule;
 	CameraSystem m_cameraSystem;
 	// math::tween<T> 값과 engine binding의 Scene-scoped 소유자. 전방 선언 +
 	// unique_ptr로 Scene.h의 광범위한 소비자가 tween.hpp까지 전이 include하지 않게 한다.
 	std::unique_ptr<TweenManager> m_tweenManager;
 
-    // 레지스트리 경로의 단계 실행. 위 Awake()/Update() 등이 스위치를 보고 부른다.
-    void RegistryDrainAwakeAndStart();
+    // 진입 방향 3단계(OnInitialized·OnAddedToScene·OnBeginSimulation)를 큐에서
+    // 소진한다. 공개 창구는 DrainPendingLifecycle 하나이고 이 함수가 그 본체다 —
+    // 옛 주석이 말하던 "스위치를 보고 부르는" 델리게이트/레지스트리 이중 경로는
+    // PHASE 9-3에서, 그 스위치를 읽던 RegistryTick은 트랙 C3에서 사라졌다.
+    void DrainPendingPhases();
     // C3 완결 — RegistryTick 소멸. 틱은 전용 시스템이 돈다.
     // 트랙 C2-0으로 순회 중 발화점(CameraSystem::Update)이 되살아난 뒤로는
     // 이 함수가 "그 시스템의 vector가 비어 순회 중 지점이 아예 안 돈 경우"를

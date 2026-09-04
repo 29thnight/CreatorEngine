@@ -1760,7 +1760,7 @@ Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::In
     }
 
     // 씬 편입 통지(트랙 L1) — DDOL 재부착은 이미 초기화가 끝난 컴포넌트가
-    // 대부분이라 pendingAwake 큐(이미 지난 정거장)를 다시 타지 않는다. 대칭짝은
+    // 대부분이라 pendingInitialize 큐(이미 지난 정거장)를 다시 타지 않는다. 대칭짝은
     // DetachEntityHierarchy의 OnRemovingFromScene. 이 자리도 기록한다(C5).
 	object->m_scenePhase = ScenePhase::InScene;
 	for (auto& component : object->m_components)
@@ -2199,18 +2199,18 @@ void Scene::RegisterComponent(Component* component)
     // 다시 등록한다. 상태를 보지 않으면 그때마다 Awake가 또 돈다.
     //
     // OnAddedToScene(트랙 L1, 신설 축)은 대응하는 옛 훅이 없어 자기 상태 비트가
-    // 없다 — OnInitialized와 같은 자리(RegistryDrainAwakeAndStart의 첫 loop)에서
+    // 없다 — OnInitialized와 같은 자리(DrainPendingPhases의 첫 loop)에서
     // 함께 따라잡히므로 같은 조건으로 이 큐에 태운다.
     // 편입은 SystemSchedule::SubscribeImplicit을 거친다(트랙 C1·L4) — 저장소가
     // 어디 있는지는 이 함수가 몰라도 된다. 카운트만 "암묵"으로 표시된다.
     if ((mask & (Lifecycle::Bit_OnInitialized | Lifecycle::Bit_OnAddedToScene)) &&
-        !component->HasLifecycleState(Component::State_AwakeCalled))
+        !component->HasLifecycleState(Component::State_Initialized))
     {
-        m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingAwake);
+        m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingInitialize);
     }
-    else if ((mask & Lifecycle::Bit_OnBeginSimulation) && !component->HasLifecycleState(Component::State_StartCalled))
+    else if ((mask & Lifecycle::Bit_OnBeginSimulation) && !component->HasLifecycleState(Component::State_SimulationBegun))
     {
-        m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingStart);
+        m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingSimulation);
     }
 
 
@@ -2236,22 +2236,25 @@ Scene::RegistryCounts Scene::GetRegistryCounts() const
     // 그 리스트 자체를 철거해서(SystemSchedule.h 클래스 주석), 여기서 크기를 잴
     // 대상이 없어졌다.
     return RegistryCounts{
-        m_schedule.PendingAwakeList().size(), m_schedule.PendingStartList().size(),
+        m_schedule.PendingInitializeList().size(), m_schedule.PendingSimulationList().size(),
     };
 }
 
-void Scene::RegistryDrainAwakeAndStart()
+void Scene::DrainPendingPhases()
 {
     // 큐를 통째로 옮겨 놓고 돈다.
     //
-    // Awake 안에서 AddComponent를 부르면 새 컴포넌트가 pendingAwake에 들어오는데,
-    // 원본을 순회 중이면 그 push_back이 순회를 무효화한다. 옮겨 두면 새로 들어온
-    // 것은 이번 바퀴에 끼지 않고 다음 프레임에 처리된다 — 이것이 재진입 안전의
-    // 핵심이고, 델리게이트 경로가 하지 못하던 것이다.
-    std::vector<Component*> awaking;
-    awaking.swap(m_schedule.PendingAwakeList());
+    // OnInitialized 안에서 AddComponent를 부르면 새 컴포넌트가 PendingInitialize에
+    // 들어오는데, 원본을 순회 중이면 그 push_back이 순회를 무효화한다. 옮겨 두면
+    // 새로 들어온 것은 이번 바퀴에 끼지 않고 다음 프레임에 처리된다 — 이것이
+    // 재진입 안전의 핵심이고, 델리게이트 경로가 하지 못하던 것이다.
+    //
+    // 이 큐 하나가 앞 두 단계(OnInitialized·OnAddedToScene)를 함께 처리한다 —
+    // OnAddedToScene은 자기 상태 비트가 없어 같은 자리에서 따라잡힌다.
+    std::vector<Component*> initializing;
+    initializing.swap(m_schedule.PendingInitializeList());
 
-    for (Component* component : awaking)
+    for (Component* component : initializing)
     {
         if (nullptr == component) continue;
         Entity* owner = component->GetOwner();
@@ -2261,11 +2264,11 @@ void Scene::RegistryDrainAwakeAndStart()
             // 아직 비활성 — 다음 프레임에 다시 시도한다. 이미 편입된 구독을
             // 유지하는 것뿐이라 SubscribeImplicit(카운트는 집합이라 재삽입해도
             // 늘지 않는다)을 그대로 써서 "편입은 전부 이 경로로"를 지킨다.
-            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingAwake);
+            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingInitialize);
             continue;
         }
 
-        component->MarkLifecycleState(Component::State_AwakeCalled);
+        component->MarkLifecycleState(Component::State_Initialized);
         LIFECYCLE_TRACE(Lifecycle::Phase::OnInitialized, Lifecycle::Trace::TypeNameOf(component),
             owner->m_name.ToString().c_str(), component->GetInstanceID());
         component->OnInitialized();
@@ -2283,27 +2286,27 @@ void Scene::RegistryDrainAwakeAndStart()
         }
 
         const uint16_t mask = Lifecycle::Registry::Find(component->GetTypeID().m_ID_Data);
-        if ((mask & Lifecycle::Bit_OnBeginSimulation) && !component->HasLifecycleState(Component::State_StartCalled))
+        if ((mask & Lifecycle::Bit_OnBeginSimulation) && !component->HasLifecycleState(Component::State_SimulationBegun))
         {
-            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingStart);
+            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingSimulation);
         }
     }
 
-    std::vector<Component*> starting;
-    starting.swap(m_schedule.PendingStartList());
+    std::vector<Component*> beginningSimulation;
+    beginningSimulation.swap(m_schedule.PendingSimulationList());
 
-    for (Component* component : starting)
+    for (Component* component : beginningSimulation)
     {
         if (nullptr == component) continue;
         Entity* owner = component->GetOwner();
         if (nullptr == owner || owner->IsDestroyMark()) continue;
         if (!component->IsEnabled())
         {
-            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingStart);
+            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingSimulation);
             continue;
         }
 
-        component->MarkLifecycleState(Component::State_StartCalled);
+        component->MarkLifecycleState(Component::State_SimulationBegun);
         LIFECYCLE_TRACE(Lifecycle::Phase::OnBeginSimulation, Lifecycle::Trace::TypeNameOf(component),
             owner->m_name.ToString().c_str(), component->GetInstanceID());
         component->OnBeginSimulation();
@@ -2346,7 +2349,7 @@ void Scene::FireReentrancyStress(bool midTraversal, const std::string& origin)
         // 시험이 도는지 아닌지 구분되지 않았다. 새로 만들어 붙이면 항상 성립하고,
         // 덤으로 '순회 중 Entity 생성'까지 함께 시험한다.
         //
-        // 확인할 불변식(트랙 C3 이후): 새 컴포넌트는 pendingAwake로 가야 한다.
+        // 확인할 불변식(트랙 C3 이후): 새 컴포넌트는 PendingInitialize로 가야 한다.
         // 예전에는 "지금 도는 update 리스트에 끼어들면 안 된다"는 조건도 있었다
         // — RegistryTick이 그 자리에서 update 리스트를 순회했기 때문이다. C3가
         // RegistryTick과 update/lateUpdate/fixedUpdate 리스트를 통째로 걷어낸
@@ -2363,7 +2366,7 @@ void Scene::FireReentrancyStress(bool midTraversal, const std::string& origin)
     }
 
     // update 리스트 크기는 더 이상 찍지 않는다 — 트랙 C3로 SystemSchedule에서
-    // 그 리스트가 철거됐다(위 for문 앞 주석). 남은 pendingAwake만 진단으로 남긴다.
+    // 그 리스트가 철거됐다(위 for문 앞 주석). 남은 PendingInitialize만 진단으로 남긴다.
     //
     // 문구는 회귀 스크립트가 그대로 매치하는 계약이다 — "순회 중"/"리스트 비어
     // 순회 밖"의 두 어절은 트랙 C2-0 이전부터 있던 것을 그대로 유지했고(문자열
@@ -2375,7 +2378,7 @@ void Scene::FireReentrancyStress(bool midTraversal, const std::string& origin)
         + " · " + origin
         + ") — 파괴 " + std::to_string(destroyed)
         + " · 생성+컴포넌트 " + std::to_string(added)
-        + " (pendingAwake " + std::to_string(m_schedule.PendingAwakeList().size()) + ")";
+        + " (pendingInitialize " + std::to_string(m_schedule.PendingInitializeList().size()) + ")";
 
     Debug->LogWarning(fireLine);
 
@@ -2486,9 +2489,10 @@ void Scene::FlushPendingDestroy()
 
 void Scene::DrainPendingLifecycle()
 {
-    // 이 드레인이 pendingStart까지 소진한다 — 그래서 뒤이어 Start를 따로 부르는
-    // 단계가 없다(옛 Scene::Start는 그 사실을 적은 빈 함수였고 C4에서 지웠다).
-    RegistryDrainAwakeAndStart();
+    // 이 드레인이 PendingSimulation까지 소진한다 — 그래서 뒤이어 OnBeginSimulation을
+    // 따로 부르는 단계가 없다(옛 Scene::Start는 그 사실을 적은 빈 함수였고 C4에서
+    // 지웠다).
+    DrainPendingPhases();
 }
 
 void Scene::FixedUpdate(float deltaSecond)
@@ -2692,9 +2696,10 @@ void Scene::EndFramePass()
 	// 비소유 AI snapshot이 Entity/Component 주소를 읽는 동안 파괴가 겹치지 않게
 	// 실제 구조 변경 전에 future를 회수한다.
 	DrainAIUpdate();
-    PROFILE_CPU_BEGIN("OnDestroyBroadcast");
+    PROFILE_CPU_BEGIN("FlushPendingDestroy");
     // 이 자리가 프레임 끝의 파괴 지점이다 — 바로 아래에서 DestroyComponents와
-    // DestroyEntities가 실제 해제를 하므로, 그 직전이 OnDestroy를 부를 마지막 기회다.
+    // DestroyEntities가 실제 해제를 하므로, 그 직전이 축소 3단계를 부를 마지막
+    // 기회다.
     //
     // 레지스트리 경로는 여기서만 파괴가 일어난다는 것을 불변식으로 쓴다: 순회하는
     // 동안에는 리스트에서 아무것도 빠지지 않으므로 '순회 중인 것이 죽는' 상황이
