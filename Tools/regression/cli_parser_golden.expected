@@ -65,14 +65,12 @@
 [CLI] cli.echo.args arg[2] len=17 <<<escaped-quote-try>>>
 [CLI] cli.echo.args count=2 line_len=26
 [CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
-[CLI] cli.echo.args arg[1] len=8 <<<say \hi\>>>
+[CLI] cli.echo.args arg[1] len=8 <<<say "hi">>>
 [CLI] cli.echo.args count=3 line_len=33
 [CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
 [CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
 [CLI] cli.echo.args arg[2] len=14 <<<unclosed-quote>>>
-[CLI] cli.echo.args count=2 line_len=27
-[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
-[CLI] cli.echo.args arg[1] len=12 <<<never closed>>>
+[CLI] cli.echo.args invalid_arguments (parse.unclosed_quote) 닫히지 않은 따옴표: cli.echo.args "never closed
 [CLI] cli.echo.args count=3 line_len=33
 [CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
 [CLI] cli.echo.args arg[1] len=4 <<<CASE>>>

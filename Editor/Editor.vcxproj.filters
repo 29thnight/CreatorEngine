@@ -81,6 +81,9 @@
     <ClInclude Include="EngineEntry\CommandBaseline.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\CommandCore\CommandParser.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\CommandCore\CommandResult.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
@@ -258,6 +261,9 @@
       <Filter>EditorRender\Render\Passes\Editor</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\CommandBaseline.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\CommandCore\CommandParser.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\CommandCore\CommandResult.cpp">

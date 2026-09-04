@@ -56,6 +56,15 @@ Run-Step "CLI exit spine(LC1)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-exit-spine.ps1") -Exe $Exe
 }
 
+# PHASE 14.5 LC2 — 토큰이 실제 조작까지 온전히 닿는가.
+#
+# 골든은 tokenizer 의 형상만 본다. 예전 결함은 tokenizer 가 옳게 잘라 놓은 것을
+# 핸들러가 버리고 원문을 다시 자르는 데 있었으므로 형상만으로는 안 잡혔다 —
+# 따옴표 쓴 두 이름이 실제 씬 계층을 바꾸는 것까지 확인한다.
+Run-Step "CLI invocation(LC2)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-invocation.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

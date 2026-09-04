@@ -1,6 +1,7 @@
 #include "ConsoleCommandSystem.h"
 #include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
+#include "CommandCore/CommandParser.h"  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
@@ -337,43 +338,12 @@ namespace
         return s.substr(begin, end - begin + 1);
     }
 
-    /// 공백으로 쪼개되 큰따옴표로 묶은 구간은 한 토큰으로 본다.
-    ///
-    /// 이름에 공백이 들어가는 경우가 실제로 있다 — 기본 씬의 카메라가
-    /// "Main Camera"라서 object.transform이 이 오브젝트를 영영 못 찾았다
-    /// (parts[1]이 `"Main`이 된다). 따옴표를 안 쓰면 동작이 예전과 같으므로
-    /// 기존 스크립트는 그대로 돈다.
-    std::vector<std::string> Split(const std::string& line)
-    {
-        std::vector<std::string> parts;
-        std::string token;
-        bool inQuotes = false;
-        // 빈 따옴표("")도 '값을 비웠다'는 뜻이라 토큰으로 남긴다 —
-        // 길이만 보면 그것을 버리게 된다.
-        bool hasToken = false;
-
-        const auto flush = [&parts, &token, &hasToken]
-        {
-            if (!hasToken) return;
-            parts.push_back(token);
-            token.clear();
-            hasToken = false;
-        };
-
-        for (const char c : line)
-        {
-            if ('"' == c) { inQuotes = !inQuotes; hasToken = true; continue; }
-            if (!inQuotes && (' ' == c || '\t' == c || '\r' == c || '\n' == c))
-            {
-                flush();
-                continue;
-            }
-            token.push_back(c);
-            hasToken = true;
-        }
-        flush();
-        return parts;
-    }
+    // tokenizer 는 LC2 에서 CommandCore/CommandParser 로 옮겼다.
+    //
+    // 여기 있던 `Split()` 은 따옴표를 상태 토글로만 다뤄서 escape 가 없었고,
+    // 닫히지 않은 따옴표를 조용히 통과시켰다. 무엇보다 **핸들러들이 그 결과를
+    // 버리고 원문을 다시 잘랐다**(§3.2). 문법을 한 곳에 모으지 않으면 그
+    // 재해석을 막을 자리가 없다.
 
     // "1,2,3" 또는 "1 2 3"을 성분으로 쪼갠다. 두 형태를 다 받는 이유는
     // 벡터를 한 토큰으로 쓰는 편이 스크립트에서 읽기 쉽지만, 손으로 칠 때는
@@ -639,6 +609,32 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
         {
             EnableHeapValidation();
         }
+        else if (arg == "--exec-args" && i + 1 < argc)
+        {
+            // `--exec-args <명령> [인자]... [--]`
+            //
+            // ★ 이것이 오늘 존재하는 **구조화 입력 경로**다. OS 가 이미 갈라 준
+            //   argv 를 라인으로 이어 붙이지 않고 그대로 owned argument 로 쓴다.
+            //   따옴표 있는 이름을 라인 경로와 구조화 경로 양쪽으로 넣어 같은
+            //   invocation 이 나오는지 단정할 수 있게 됐다(§14.2).
+            //
+            //   `--` 로 끝낸다. 처음에는 남은 argv 를 전부 먹게 했는데, 그러면
+            //   **뒤에 `--exec quit` 을 붙일 수가 없어** 무인 실행이 종료하지
+            //   못하고 하네스 타임아웃까지 살아 있었다. 실제로 겪었다.
+            //   `--` 가 없으면 끝까지 먹는 것은 그대로 둔다(대화형 편의).
+            std::vector<std::string> arguments;
+            int j = i + 1;
+            for (; j < argc; ++j)
+            {
+                std::string token = toUtf8(argv[j]);
+                if ("--" == token) { ++j; break; }
+                arguments.push_back(std::move(token));
+            }
+            i = j - 1;
+
+            EnqueueStructured(std::move(arguments));
+            wantConsole = true;
+        }
         else if (arg == "--fail-fast")
         {
             // 기본은 continue + aggregate 다(§3.1). 시나리오 하나가 실패해도
@@ -737,6 +733,28 @@ void ConsoleCommandSystem::Enqueue(std::string command)
     m_pending.push_back(std::move(pending));
 }
 
+void ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments)
+{
+    if (arguments.empty()) return;
+
+    PendingCommand pending;
+
+    // 진단용 재구성. **이 문자열은 다시 파싱되지 않는다** — 실행은 arguments 로
+    // 한다. 로그와 계측이 "무엇을 불렀나"를 사람 눈으로 볼 수 있게만 만든다.
+    for (const std::string& argument : arguments)
+    {
+        if (!pending.text.empty()) pending.text.push_back(' ');
+        pending.text += argument;
+    }
+
+    pending.arguments     = std::move(arguments);
+    pending.enqueuedAt    = std::chrono::steady_clock::now();
+    pending.enqueuedFrame = m_frameIndex.load(std::memory_order_acquire);
+
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_pending.push_back(std::move(pending));
+}
+
 void ConsoleCommandSystem::Pump()
 {
     // 생명주기 기록기의 프레임 경계(PHASE 9-0).
@@ -798,14 +816,25 @@ void ConsoleCommandSystem::Pump()
     const std::string line = TrimLine(pending.text);
 
     const auto dequeuedAt = std::chrono::steady_clock::now();
-    const CommandCore::CommandResult result = Execute(line);
+
+    // 구조화 입력은 라인 문법을 거치지 않는다(LC2). 재구성한 문자열은 진단용
+    // 으로만 넘긴다 — 그것을 다시 파싱하면 §3.2 의 왕복 손실이 되살아난다.
+    const CommandCore::CommandResult result = pending.IsStructured()
+        ? ExecuteParsed(pending.arguments, line)
+        : Execute(line);
+
     const auto finishedAt = std::chrono::steady_clock::now();
 
     // 이름만 남긴다. 인자는 경로·오브젝트 이름이 섞여 있어 계측 artifact에
     // 그대로 실으면 기계마다 다른 문자열이 들어간다.
-    const auto nameEnd = line.find_first_of(" \t");
-    const std::string_view name = std::string_view(line).substr(
-        0, (nameEnd == std::string::npos) ? line.size() : nameEnd);
+    const std::string_view name = pending.IsStructured()
+        ? std::string_view(pending.arguments[0])
+        : [&line]
+          {
+              const auto nameEnd = line.find_first_of(" \t");
+              return std::string_view(line).substr(
+                  0, (nameEnd == std::string::npos) ? line.size() : nameEnd);
+          }();
 
     // 계측보다 먼저 판정을 남긴다 — 여기서 죽더라도 결과는 session 에 있다.
     if (!name.empty()) PublishResult(std::string(name), result);
@@ -3920,7 +3949,7 @@ namespace ConsoleCmd
             return;
         }
 
-        const std::string name = TrimLine(ctx.line.substr(ctx.cmd.size()));
+        const std::string name = CommandCore::JoinFrom(ctx.parts, 1);
         auto obj = scene->GetEntity(name);
         if (!obj)
         {
@@ -3955,13 +3984,12 @@ namespace ConsoleCmd
     static void Cmd_scene_new(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // 빈 씬에서 시작한다. 기능별 테스트 씬은 '무엇이 들어 있는지'를 전부
         // 알아야 결과를 판정할 수 있는데, 열려 있던 씬 위에 쌓으면 그게 깨진다.
         const std::string name = (parts.size() > 1)
-            ? TrimLine(line.substr(cmd.size())) : std::string("FeatureTest");
+            ? CommandCore::JoinFrom(parts, 1) : std::string("FeatureTest");
 
         // SceneManager::CreateScene을 쓰지 않는다. 그쪽은 옛 씬을 그 자리에서
         // 해체하고 새 씬을 활성으로 바꾸는데, 그 '그 자리'가 프레임 중간이라
@@ -3989,7 +4017,6 @@ namespace ConsoleCmd
     static void Cmd_scene_save(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 2)
@@ -3999,7 +4026,7 @@ namespace ConsoleCmd
         }
 
         // 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
-        const std::string path = TrimLine(line.substr(cmd.size()));
+        const std::string path = CommandCore::JoinFrom(parts, 1);
 
         if (!SceneManagers->GetActiveScene())
         {
@@ -4088,7 +4115,6 @@ namespace ConsoleCmd
     static void Cmd_object_rename(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // 같은 모델을 여러 번 배치하면 이름이 겹쳐 이후 명령이 첫 번째만 잡는다.
@@ -4105,9 +4131,9 @@ namespace ConsoleCmd
         // 이전 이름에 공백이 흔하다. 같은 모델을 두 번 놓으면 엔진이
         // "Prim_Cube (1)"처럼 번호를 붙이기 때문이다. 그래서 새 이름을 마지막
         // 토큰으로 보고 그 앞 전체를 이전 이름으로 본다(prefab.create와 같은 규칙).
-        const std::string newName = parts.back();
-        std::string rest = TrimLine(line.substr(cmd.size()));
-        const std::string oldName = TrimLine(rest.substr(0, rest.rfind(newName)));
+        const auto names = CommandCore::SplitTrailingName(parts, 1);
+        const std::string& oldName = names.leading;
+        const std::string& newName = names.trailing;
 
         auto object = scene->GetEntity(oldName);
         if (!object)
@@ -4218,7 +4244,6 @@ namespace ConsoleCmd
     static void Cmd_object_duplicate(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // object.duplicate <오브젝트> [새 이름]
@@ -4237,17 +4262,18 @@ namespace ConsoleCmd
 
         // 이름 규칙은 object.rename·prefab.create와 같다 — 인자가 둘이면 마지막
         // 토큰이 새 이름이고 그 앞 전체가 원본 이름이다(공백 있는 이름 때문).
+        // LC2: 원문 재해석 제거. 토큰만 본다.
         std::string sourceName;
         std::string newName;
         if (parts.size() >= 3)
         {
-            newName = parts.back();
-            std::string rest = TrimLine(line.substr(cmd.size()));
-            sourceName = TrimLine(rest.substr(0, rest.rfind(newName)));
+            const auto names = CommandCore::SplitTrailingName(parts, 1);
+            sourceName = names.leading;
+            newName    = names.trailing;
         }
         else
         {
-            sourceName = TrimLine(line.substr(cmd.size()));
+            sourceName = CommandCore::JoinFrom(parts, 1);
         }
 
         auto source = scene->GetEntity(sourceName);
@@ -4283,7 +4309,6 @@ namespace ConsoleCmd
     static void Cmd_object_parent(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // object.parent <자식> <부모>
@@ -4306,9 +4331,13 @@ namespace ConsoleCmd
         // 이름에 공백이 흔하므로(엔진이 "Prim_Cube (1)"처럼 번호를 붙인다)
         // 부모를 마지막 토큰으로 보고 그 앞 전체를 자식으로 본다
         // — object.rename·prefab.create와 같은 규칙이다.
-        const std::string parentName = parts.back();
-        std::string rest = TrimLine(line.substr(cmd.size()));
-        const std::string childName = TrimLine(rest.substr(0, rest.rfind(parentName)));
+        //
+        // LC2: 예전에는 원문을 `rfind` 로 잘랐다. 그래서 따옴표를 쓴 입력
+        // (`object.parent "Big Boss" "Main Characters"`)에서 자식 이름에
+        // **따옴표가 남았고** 씬에서 영영 못 찾았다. 이제 토큰만 본다.
+        const auto names = CommandCore::SplitTrailingName(parts, 1);
+        const std::string& childName  = names.leading;
+        const std::string& parentName = names.trailing;
 
         auto child = scene->GetEntity(childName);
         if (!child)
@@ -4542,7 +4571,6 @@ namespace ConsoleCmd
     static void Cmd_object_property(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // object.property <오브젝트> <컴포넌트> <필드> <값...>
@@ -4585,7 +4613,7 @@ namespace ConsoleCmd
         }
 
         // 값에 쉼표로 구분한 성분이 들어올 수 있다(벡터·색). 필드 이름 뒤 전체.
-        std::string rest = TrimLine(line.substr(cmd.size()));
+        std::string rest = CommandCore::JoinFrom(parts, 1);
         for (size_t i = 1; i <= 3; ++i) rest = TrimLine(rest.substr(rest.find(parts[i]) + parts[i].size()));
         const std::string rawValue = rest;
 
@@ -4621,7 +4649,6 @@ namespace ConsoleCmd
     static void Cmd_model_load(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 2)
@@ -4631,7 +4658,7 @@ namespace ConsoleCmd
         }
 
 		// 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
-		const std::string path = TrimLine(line.substr(cmd.size()));
+		const std::string path = CommandCore::JoinFrom(parts, 1);
 		const std::string modelName = file::path(path).stem().string();
 		const std::shared_ptr<const assets::ModelAssetGeneration> previousGeneration =
 			DataSystems->FindModelAssetGenerationByStem(modelName);
@@ -6777,7 +6804,6 @@ namespace ConsoleCmd
     static void Cmd_script_add(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 3)
@@ -6791,9 +6817,9 @@ namespace ConsoleCmd
 
         // 오브젝트 이름에 공백이 흔하다("Main Camera"). 타입은 마지막 토큰으로 보고,
         // 그 앞 전체를 이름으로 취급한다.
-        const std::string typeName = parts.back();
-        std::string rest = TrimLine(line.substr(cmd.size()));
-        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(typeName)));
+        const auto names = CommandCore::SplitTrailingName(parts, 1);
+        const std::string& objectName = names.leading;
+        const std::string& typeName = names.trailing;
 
         auto object = scene->GetEntity(objectName);
         if (!object)
@@ -6855,7 +6881,6 @@ namespace ConsoleCmd
     static void Cmd_scene_select(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 2)
@@ -6867,7 +6892,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        const std::string objectName = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = CommandCore::JoinFrom(parts, 1);
         auto object = scene->GetEntity(objectName);
         if (!object)
         {
@@ -6948,7 +6973,6 @@ namespace ConsoleCmd
     static void Cmd_script_set(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 4)
@@ -6962,7 +6986,7 @@ namespace ConsoleCmd
         const int index = std::atoi(parts[2].c_str());
 
         // 값에 공백이 들어갈 수 있다(문자열·오브젝트 이름). 인덱스 뒤 전체를 값으로 본다.
-        std::string rest = TrimLine(line.substr(cmd.size()));
+        std::string rest = CommandCore::JoinFrom(parts, 1);
         rest = TrimLine(rest.substr(parts[1].size()));
         const std::string rawValue = TrimLine(rest.substr(parts[2].size()));
 
@@ -7043,7 +7067,6 @@ namespace ConsoleCmd
     static void Cmd_component_add(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 3)
@@ -7056,9 +7079,9 @@ namespace ConsoleCmd
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
         // 오브젝트 이름에 공백이 흔하므로 컴포넌트 타입을 마지막 토큰으로 본다.
-        const std::string typeName = parts.back();
-        std::string rest = TrimLine(line.substr(cmd.size()));
-        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(typeName)));
+        const auto names = CommandCore::SplitTrailingName(parts, 1);
+        const std::string& objectName = names.leading;
+        const std::string& typeName = names.trailing;
 
         auto object = scene->GetEntity(objectName);
         if (!object)
@@ -7127,7 +7150,6 @@ namespace ConsoleCmd
     static void Cmd_prefab_overrides(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // prefab.overrides <오브젝트>
@@ -7153,7 +7175,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        const std::string objectName = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = CommandCore::JoinFrom(parts, 1);
         auto object = scene->GetEntity(objectName);
         if (!object)
         {
@@ -7188,7 +7210,6 @@ namespace ConsoleCmd
     static void Cmd_prefab_update(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // prefab.update <소스 오브젝트> <프리팹 이름>
@@ -7212,9 +7233,9 @@ namespace ConsoleCmd
 
         // 이름 규칙은 prefab.create/object.rename과 같다 — 마지막 토큰이 프리팹
         // 이름이고 그 앞 전체가 오브젝트 이름이다(엔진이 공백 있는 이름을 만든다).
-        const std::string prefabName = parts.back();
-        std::string rest = TrimLine(line.substr(cmd.size()));
-        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(prefabName)));
+        const auto names = CommandCore::SplitTrailingName(parts, 1);
+        const std::string& objectName = names.leading;
+        const std::string& prefabName = names.trailing;
 
         auto source = scene->GetEntity(objectName);
         if (!source)
@@ -7485,7 +7506,6 @@ namespace ConsoleCmd
     static void Cmd_ui_rect(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
 
         // 오브젝트 이하 전체의 worldRect를 재귀로 찍는다. 이름 대신 *를 주면 씬의
         // 모든 RectTransform을 훑는다 — 해상도를 바꿔 가며, 또는 코드를 고치기
@@ -7628,7 +7648,6 @@ namespace ConsoleCmd
 
     static void Cmd_ui_hitbox(const ConsoleCommandContext& ctx)
     {
-        const std::string& line = ctx.line;
 
         // 버튼의 클릭 판정 상자를 rect와 나란히 찍는다. 두 값이 같아야 보이는 곳과
         // 눌리는 곳이 일치한다 — 해상도가 바뀌어도 유지되는지가 검증 대상이다(PHASE 7-7).
@@ -7864,7 +7883,6 @@ namespace ConsoleCmd
     static void Cmd_dx12_selftest(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
 
         // EnhancedSceneRenderer 브링업 자가 검증(PHASE 3-3). 자체 디바이스·큐·펜스로
         // 돌므로 DX11 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
@@ -9218,19 +9236,14 @@ namespace ConsoleCmd
     static void Cmd_experiment_catalog(const ConsoleCommandContext& ctx)
     {
         namespace ck = experiment::cooked;
-        // 경로에 공백이 있을 수 있어 토큰이 아니라 원문에서 잘라 쓴다.
+        // 경로에 공백이 있을 수 있다. 예전에는 그래서 원문에서 잘라 썼는데,
+        // 그 방식은 `find("mount")` 가 **경로 안의 "mount" 를 먼저 만나면**
+        // 엉뚱한 곳을 자른다(`experiment.catalog mount D:/mount/x`). 토큰을
+        // 이어 붙이면 그 함정이 없고 따옴표도 이미 벗겨져 있다(LC2).
         if (ctx.parts.size() >= 3 && ctx.parts[1] == "mount")
         {
-            const std::size_t head = ctx.line.find("mount");
-            std::string rootText = ctx.line.substr(head + 5);
-            while (!rootText.empty() && (rootText.front() == ' '
-                || rootText.front() == '	')) rootText.erase(0, 1);
-            while (!rootText.empty() && (rootText.back() == ' '
-                || rootText.back() == '' || rootText.back() == '	'))
-            {
-                rootText.pop_back();
-            }
-            const file::path root = std::filesystem::path(rootText);
+            const file::path root =
+                std::filesystem::path(CommandCore::JoinFrom(ctx.parts, 2));
             std::string error;
             const bool mounted = DataSystems->MountCookedCatalog(root, error);
             std::printf("[CLI] experiment.catalog mount %s root=%s entries=%zu sources=%zu stale=%zu%s%s\n",
@@ -9249,15 +9262,8 @@ namespace ConsoleCmd
         if (ctx.parts.size() >= 3 && ctx.parts[1] == "probe")
         {
             const auto mounted = DataSystems->GetCookedCatalog();
-            const std::size_t head = ctx.line.find("probe");
-            std::string pathText = ctx.line.substr(head + 5);
-            while (!pathText.empty() && (pathText.front() == ' '
-                || pathText.front() == '\t')) pathText.erase(0, 1);
-            while (!pathText.empty() && (pathText.back() == ' '
-                || pathText.back() == '\r' || pathText.back() == '\t'))
-            {
-                pathText.pop_back();
-            }
+            // LC2: mount 분기와 같은 이유로 토큰을 잇는다.
+            const std::string pathText = CommandCore::JoinFrom(ctx.parts, 2);
             const FileGuid textureGuid =
                 DataSystems->GetFileGuid(std::filesystem::path(pathText));
             const file::path metaPath = PathFinder::Relative("Shaders\\")
@@ -10283,7 +10289,6 @@ namespace ConsoleCmd
 
     static void Cmd_render_rtinfo(const ConsoleCommandContext& ctx)
     {
-        const std::string& line = ctx.line;
 
         // 화면 크기와 그것을 따라가는 텍스처들을 나란히 찍는다.
         //
@@ -10526,7 +10531,6 @@ namespace ConsoleCmd
     static void Cmd_dump_list(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // 크래시가 나면 덤프(.dmp)와 요약(.txt)이 같은 이름으로 함께 남는다.
@@ -10604,7 +10608,6 @@ namespace ConsoleCmd
     static void Cmd_animator_state(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // 애니메이션 상태와 거기 붙는 스크립트는 원래 컨트롤러 편집기에서 만든다.
@@ -10618,10 +10621,10 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        const std::string behaviourName = parts.back();
-        const std::string stateName = parts[parts.size() - 2];
-        std::string rest = TrimLine(line.substr(cmd.size()));
-        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(stateName)));
+        const auto names = CommandCore::SplitTrailingName(parts, 1, 2);
+        const std::string& objectName = names.leading;
+        const std::string& stateName = parts[parts.size() - 2];
+        const std::string& behaviourName = names.trailing;
 
         auto object = scene->GetEntity(objectName);
         if (!object) { std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str()); return; }
@@ -10661,7 +10664,6 @@ namespace ConsoleCmd
     static void Cmd_animator_exit(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // 상태에서 빠져나가는 것까지 확인하려면 전이 조건을 짜야 하는데 CLI로는 과하다.
@@ -10675,7 +10677,7 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
-        const std::string objectName = TrimLine(line.substr(cmd.size()));
+        const std::string objectName = CommandCore::JoinFrom(parts, 1);
         auto object = scene->GetEntity(objectName);
         if (!object) { std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str()); return; }
 
@@ -10703,7 +10705,6 @@ namespace ConsoleCmd
     static void Cmd_animator_param(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         // 애니메이터 파라미터는 원래 컨트롤러 편집기에서 선언한다. 스크립트에서는 만들 수 없어
@@ -10718,10 +10719,10 @@ namespace ConsoleCmd
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
         // 오브젝트 이름에 공백이 흔하므로 뒤의 두 토큰을 파라미터 이름·타입으로 본다.
-        const std::string typeName = parts.back();
-        const std::string paramName = parts[parts.size() - 2];
-        std::string rest = TrimLine(line.substr(cmd.size()));
-        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(paramName)));
+        const auto names = CommandCore::SplitTrailingName(parts, 1, 2);
+        const std::string& objectName = names.leading;
+        const std::string& paramName = parts[parts.size() - 2];
+        const std::string& typeName = names.trailing;
 
         auto object = scene->GetEntity(objectName);
         if (!object)
@@ -10772,7 +10773,6 @@ namespace ConsoleCmd
     static void Cmd_prefab_create(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
-        const std::string& line = ctx.line;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 3)
@@ -10785,9 +10785,10 @@ namespace ConsoleCmd
         if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
 
         // 오브젝트 이름에 공백이 흔하므로 프리팹 이름을 마지막 토큰으로 본다.
-        const std::string prefabName = parts.back();
-        std::string rest = TrimLine(line.substr(cmd.size()));
-        const std::string objectName = TrimLine(rest.substr(0, rest.rfind(prefabName)));
+        // LC2: 원문 재해석 제거.
+        const auto names = CommandCore::SplitTrailingName(parts, 1);
+        const std::string& objectName = names.leading;
+        const std::string& prefabName = names.trailing;
 
         auto object = scene->GetEntity(objectName);
         if (!object)
@@ -12116,7 +12117,20 @@ CommandCore::CommandResult ConsoleCommandSystem::Execute(const std::string& line
     // 오지는 않지만(LoadScriptFile 이 거른다) stdin 은 빈 줄을 보낸다.
     if (line.empty()) return CommandCore::Ok();
 
-    const auto parts = Split(line);
+    // LC2: 라인 문법은 여기서만 산다. 아래로는 owned 토큰만 내려간다.
+    const CommandCore::TokenizeResult tokenized = CommandCore::Tokenize(line);
+    if (!tokenized.ok)
+    {
+        return CommandCore::InvalidArguments(tokenized.errorMessage + ": " + line,
+                                             tokenized.errorCode);
+    }
+
+    return ExecuteParsed(tokenized.tokens, line);
+}
+
+CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
+    const std::vector<std::string>& parts, const std::string& diagnosticLine)
+{
     if (parts.empty()) return CommandCore::Ok();
 
     const std::string& cmd = parts[0];
@@ -12134,7 +12148,7 @@ CommandCore::CommandResult ConsoleCommandSystem::Execute(const std::string& line
             "알 수 없는 명령: " + cmd + "  ('help' 참고)", "command.unknown");
     }
 
-    const ConsoleCommandContext ctx{ cmd, parts, line, *this };
+    const ConsoleCommandContext ctx{ cmd, parts, diagnosticLine, *this };
 
     // 일부러 죽는 명령은 그대로 죽게 둔다(`crash.test`). 크래시 덤프 경로는
     // 크래시가 나야만 도는 검사라, 여기서 삼키면 그 검사가 통째로 사각지대가 된다.
@@ -12391,6 +12405,8 @@ const char* ConsoleCommandSystem::HelpText() noexcept
         "  cli.probe.timing [reset|off|경로]  프레임 시간 분포와 명령 왕복 지연(LC0, 기본 off)\n"
         "  cli.echo.args <인자>  tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)\n"
         "\n실행 인자: --exec \"<명령>\"  |  --script <파일>  |  --console\n"
+        "           --exec-args <명령> <인자>... [--]  라인 문법을 거치지 않는 구조화 입력\n"
+        "                        --로 끝내면 뒤에 다른 인자를 이어 쓸 수 있다\n"
         "           --heapcheck  CRT 디버그 힙 전수 검사(힙 손상을 손상 시점에서 잡는다, 매우 느림)\n"
         "           --fail-fast  첫 실패에서 남은 명령을 버리고 종료한다(기본은 계속 실행 후 집계)\n\n";
 

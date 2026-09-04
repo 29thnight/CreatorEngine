@@ -72,10 +72,20 @@ Add-Row 'human_verdict_prints' $verdictPrints.Count 'LC9 전까지 문안 고정
 
 # ── 3) LC2가 0으로 밀어야 할 것 ─────────────────────────────────────────
 #
-# handler가 tokenizer 결과를 버리고 원문을 다시 자르는 자리. `ctx.line`이나
-# 지역 `line`에 substr/rfind를 거는 형태가 그것이다(§3.2).
-$rawLineAccess = @($cliLines | Select-String -Pattern '(ctx\.line|(?<![A-Za-z_])line)\.(substr|rfind|find)\(')
-Add-Row 'raw_line_reinterpretation' $rawLineAccess.Count 'LC2 완료 시 migrated handler에서 0(계획 §13 LC2)'
+# handler가 tokenizer 결과를 버리고 원문을 다시 자르는 자리(§3.2).
+#
+# ★ `ctx.line` 만 센다. 처음에는 지역 `line` 도 함께 셌는데, 그 패턴은
+#   `pipeline.nodes` 가 **자기 출력 텍스트**를 줄 단위로 읽는 지역 변수까지
+#   잡았다. 원문 재해석과 무관한 코드를 눈금에 넣으면 래칫이 0 에 닿을 수 없고,
+#   닿을 수 없는 눈금은 아무도 안 본다.
+$rawLineAccess = @($cliLines | Select-String -Pattern 'ctx\.line\.(substr|rfind|find)\(')
+Add-Row 'raw_line_reinterpretation' $rawLineAccess.Count 'LC2 가 0 으로 밀었다(계획 §13 LC2)'
+
+# 원문에 손대는 자리 전부(길이 조회 포함). cli.echo.args 의 진단용 1 건만 남아야 한다.
+$rawLineTouch = @($cliLines | Select-String -Pattern 'ctx\.line')
+Add-Row 'raw_line_any_access' $rawLineTouch.Count 'cli.echo.args 의 line_len 진단 1건만 정상'
+
+Add-Row 'legacy_line_aliases' (@($cliLines | Select-String -Pattern 'const std::string& line = ctx\.line;').Count) 'ctx.line 별칭 — LC2 가 전부 걷었다'
 
 # ── 4) 소비자 ───────────────────────────────────────────────────────────
 $consumerRoots = @('Tools', 'scripts') |

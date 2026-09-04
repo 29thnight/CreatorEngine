@@ -1024,6 +1024,59 @@ JSON 으로 옮긴 뒤에 핸들러의 printf 를 정리한다. 이행 전 명�
 통과 · 기존 command file 소비 경로 입력 호환 · 같은 인자를 라인/JSON 두 경로로 넣었을 때
 동일 invocation · parser mutation canary 전부 발화.
 
+**상태: 완료 (2026-09-04).**
+
+| 완료 기준 | 증거 |
+|---|---|
+| raw line 접근 0 | `raw_line_reinterpretation` **25 → 0**. `ctx.line` 별칭 22 개 전부 제거. 남은 `ctx.line` 은 `cli.echo.args` 의 `line_len` 진단 1 건뿐이고, 그것은 파서를 되비추는 프로브라 원문 길이가 산출물이다 |
+| quoted 두 이름이 실제 조작 통과 | `object.create "Big Boss Character"` → `object.parent "Big Boss Character" "Main Characters"` 뒤 `scene.hierarchycheck` 가 **오브젝트 3 · 최상위 1**. 판정을 "못 찾음 메시지가 없다"로 두지 않았다 — 그것은 명령이 아예 안 돌아도 참이다 |
+| 입력 호환 | 시나리오 파일의 따옴표는 전부 주석 안이고 `\"` 는 0 건, 명령 줄의 홀수 따옴표도 0 건. 전체 회귀 세트로 확인 |
+| 두 경로 동일 invocation | 라인 `--script` 와 구조화 `--exec-args` 가 **같은 `arg[]` 3 줄**을 낸다 |
+| mutation canary 발화 | 골든 diff 가 정확히 두 곳 — `"say \"hi\""` 가 `say \hi\` → `say "hi"`, 닫히지 않은 따옴표가 조용한 토큰 → `parse.unclosed_quote`(exit 2). 나머지 14 케이스 불변 |
+
+★ **문법을 한 곳에 모으는 것이 목적이 아니라 수단이다.** 예전 `Split()` 은 이미
+따옴표를 옳게 잘랐다 — 결함은 tokenizer 가 아니라 **핸들러가 그 결과를 버리고
+원문을 다시 자른 것**이었다. 그래서 형상만 보는 골든으로는 잡히지 않았고,
+`object.parent "A B" "C D"` 는 자식 이름에 따옴표가 남은 채 "이름을 못 찾음"
+한 줄로 끝났다. 따옴표 문법이 사실상 동작하지 않는다는 것이 오래 보이지 않은
+이유가 그 한 줄이다.
+
+★ **`--exec-args` — 오늘 존재하는 구조화 입력 경로.** OS 가 이미 갈라 준 argv 를
+라인으로 이어 붙이지 않고 그대로 owned argument 로 쓴다. LC4 의 수신 스레드가
+같은 문(`EnqueueStructured`)을 쓴다. 종결자 `--` 를 둔 이유는 실측이다 — 처음에는
+남은 argv 를 전부 먹게 했더니 **뒤에 `--exec quit` 을 붙일 수 없어** 무인 실행이
+종료하지 못하고 하네스 타임아웃까지 살아 있었다.
+
+★ **바꾼 것 하나를 명시한다: 따옴표 없는 여러 토큰에서 공백 연속이 접힌다.**
+`TrimLine(line.substr(cmd.size()))` 14 곳을 `JoinFrom(parts, 1)` 로 옮기면서,
+따옴표 없이 여러 토큰으로 준 값의 공백 **연속**이 하나로 접힌다.
+
+검토가 이것을 이름·경로가 아닌 곳에서도 짚었다 — `object.property` 와 `script.set`
+은 이름이 아니라 **값**을 받고, 그 값에 공백 연속이 들어갈 수 있다. 다만 옛 코드도
+그 자리에서 안전하지 않았다: `rest.substr(parts[1].size())` 로 **토큰 길이만큼**
+원문을 잘랐기 때문에, 이름을 따옴표로 감싸면 원문이 두 글자 더 길어져 값이
+어긋났다. 즉 옛 방식은 "따옴표를 쓰면 값이 깨지고", 새 방식은 "따옴표를 안 쓰면
+공백이 접힌다"이다.
+
+결정: §3.2 가 이미 정한 대로 **공백이 값의 일부이면 따옴표로 감싼다.** 따옴표 안은
+한 토큰이라 내부 공백이 손대지 않은 채로 간다(게이트의 `payload-spaces` 가 그것을
+못박는다). 따옴표 없는 여러 토큰은 오류가 아니라 legacy 형식이고, `JoinFrom` 과
+`SplitTrailingName` 이 **그 사용을 센다**(`LegacyJoinUseCount`). LC9 가 그 수로
+제거 시점을 정한다. 진짜 자유 형식 payload 가 필요해지면 `Remainder`
+argument kind(§6.3)를 세워야 하고 join 으로 다루면 안 된다.
+
+★ **같은 규약을 쓰는 명령은 같은 함수를 부른다.** 처음에는 계획이 이름을 댄 셋만
+`SplitTrailingName` 으로 옮기고 나머지 여섯(`object.rename` · `script.add` ·
+`component.add` · `prefab.update` · `animator.state` · `animator.param`)은 자기
+`rfind` 를 그대로 뒀다. 기능은 같았지만 **legacy 사용 계수가 그 여섯을 못 본다** —
+LC9 가 "아무도 안 쓴다"를 근거로 규약을 뗄 때 근거가 여섯 개만큼 비어 있게 된다.
+아홉 곳 전부 같은 함수를 부르게 바꿨다. `animator.state` 처럼 뒤 토큰이 둘인
+명령을 위해 `trailingCount` 를 받는다.
+
+★ **`experiment.catalog` 는 원문 재해석의 최악 형태였다.** `ctx.line.find("mount")`
+로 잘랐기 때문에 **경로 안에 "mount" 가 있으면 엉뚱한 곳을 잘랐다**
+(`experiment.catalog mount D:/mount/x`). 토큰을 이어 붙이는 방식에는 그 함정이 없다.
+
 ### LC3 — Descriptor registry·discovery (P0 · 2.5일)
 
 - descriptor와 argument/capability/cost/role metadata 도입.

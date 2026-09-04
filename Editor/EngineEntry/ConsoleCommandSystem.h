@@ -79,6 +79,17 @@ public:
     // 외부에서 명령을 밀어 넣는다(스레드 안전).
     void Enqueue(std::string command);
 
+    /// 이미 갈라진 인자로 명령을 밀어 넣는다(스레드 안전).
+    ///
+    /// ★ **라인 문법을 거치지 않는다.** `arguments[0]` 이 명령 이름이고 나머지가
+    ///   인자다. 따옴표도 escape 도 개입하지 않는다 — 이미 갈라져 있으므로.
+    ///
+    ///   계획 §3.2 가 지적한 왕복 손실이 여기서 원천적으로 없어진다. JSON 이
+    ///   `{"args":["Big Boss","Main Characters"]}` 로 가져온 값을 라인으로 이어
+    ///   붙였다 다시 자르면 그 과정에서 따옴표가 새는데, 이 경로는 이을 일이 없다.
+    ///   LC4 의 수신 스레드가 쓸 진입점이고, 오늘은 `--exec-args` 가 같은 문을 쓴다.
+    void EnqueueStructured(std::vector<std::string> arguments);
+
     // ── 핸들러가 쓰는 표면 ───────────────────────────────────────────────
     //
     // 명령 본문이 독립 함수로 나가면서, 예전에 멤버를 직접 만지던 세 자리가
@@ -119,11 +130,18 @@ private:
     void StartStdinReader();
     void LoadScriptFile(const std::string& path);
 
-    /// 한 줄을 실행하고 그 명령의 terminal 결과를 낸다.
+    /// 한 줄을 토큰으로 자른 뒤 실행한다. **라인 문법은 여기까지만 산다.**
     ///
     /// 반환값이 생긴 것이 LC1 이다. 예전에는 void 였고, 그래서 unknown command 가
     /// printf 한 줄 뒤 그냥 return 했다 — 오타 하나가 조용히 exit 0 이었다.
     CommandCore::CommandResult Execute(const std::string& line);
+
+    /// 이미 갈라진 토큰으로 실행한다. `parts[0]` 이 명령 이름이다.
+    ///
+    /// 라인 경로와 구조화 경로가 **정확히 여기서 만난다.** 두 입력이 같은
+    /// invocation 을 만든다는 §14.2 의 단정이 성립하는 이유다.
+    CommandCore::CommandResult ExecuteParsed(const std::vector<std::string>& parts,
+                                             const std::string&              diagnosticLine);
 
     /// 결과를 session 에 넣고 사람이 읽는 줄을 찍는다.
     void PublishResult(const std::string& commandId, const CommandCore::CommandResult& result);
@@ -139,9 +157,16 @@ private:
     // LC5가 서비스 응답의 timing.queuedMs / waitedFrames로 그대로 승계한다.
     struct PendingCommand
     {
+        /// 라인 입력의 원문. structured 입력에서는 진단용으로만 채운다.
         std::string                           text;
+
+        /// 구조화 입력의 토큰(`[0]` 이 명령 이름). 비어 있으면 라인 입력이다.
+        std::vector<std::string>              arguments;
+
         std::chrono::steady_clock::time_point enqueuedAt{};
         uint64_t                              enqueuedFrame{};
+
+        bool IsStructured() const noexcept { return !arguments.empty(); }
     };
 
     std::deque<PendingCommand> m_pending;
