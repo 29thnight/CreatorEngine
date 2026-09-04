@@ -3708,9 +3708,11 @@ namespace ConsoleCmd
 
                 if (nullptr != seed)
                 {
-                    descriptor.summary = seed->summary;
-                    descriptor.usage   = seed->usage;
-                    descriptor.cost    = seed->cost;
+                    descriptor.summary  = seed->summary;
+                    descriptor.usage    = seed->usage;
+                    descriptor.cost     = seed->cost;
+                    descriptor.cls      = seed->cls;
+                    descriptor.liveness = seed->liveness;
                 }
                 // summary 가 비면 Add 가 거부하고 사유를 남긴다.
                 registry.Add(std::move(descriptor));

@@ -17,6 +17,15 @@ namespace CommandCore
         CommandCost cost;
         const char* usage;    ///< `<필수> [선택]`. 없으면 빈 문자열
         const char* summary;  ///< 한 줄. 비어 있으면 등록이 거부된다
+
+        /// ★ 기본값을 **주지 않는다.**
+        ///
+        ///   LC3 이 같은 실수를 한 번 했다 — 요약을 선택으로 뒀더니 205 개 중
+        ///   78 개가 비었고, 아무도 그것을 몰랐다. 서명이 요구하지 않으면 아무도
+        ///   안 쓴다. 그래서 이 둘은 표의 **모든 줄이 말하게** 한다. 새 명령을
+        ///   더할 때 분류를 빼먹으면 컴파일이 거부한다.
+        CommandClass    cls;
+        CommandLiveness liveness;
     };
 
     /// canonical 이름으로 찾는다. 없으면 nullptr — 그 명령은 등록되지 않는다.

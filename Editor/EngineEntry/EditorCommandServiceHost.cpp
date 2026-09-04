@@ -89,6 +89,8 @@ namespace EditorCommandService
             object.Set("usage",         JV::String(d.usage));
             object.Set("cost",          JV::String(std::string(CommandCore::ToString(d.cost))));
             object.Set("roles",         JV::String(std::string(CommandCore::ToString(d.roles))));
+            object.Set("class",         JV::String(std::string(CommandCore::ToString(d.cls))));
+            object.Set("liveness",      JV::String(std::string(CommandCore::ToString(d.liveness))));
             object.Set("resultBearing", JV::Bool(d.resultBearing));
             return object;
         }

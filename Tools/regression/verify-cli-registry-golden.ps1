@@ -71,6 +71,7 @@ if (-not (Test-Path -LiteralPath $goldenPath)) {
 function Read-Rows([string]$Path) {
     $rows = [ordered]@{}
     $meta = [ordered]@{}
+    $header = @()
     foreach ($line in [IO.File]::ReadAllLines($Path)) {
         $line = $line.TrimEnd("`r")
         if ($line -eq '') { continue }
@@ -80,10 +81,10 @@ function Read-Rows([string]$Path) {
             continue
         }
         $name = $line.Split("`t")[0]
-        if ($name -eq 'canonical') { continue }   # 열 머리글
+        if ($name -eq 'canonical') { $header = $line.Split("`t"); continue }
         $rows[$name] = $line
     }
-    return @{ Rows = $rows; Meta = $meta }
+    return @{ Rows = $rows; Meta = $meta; Header = $header }
 }
 
 $golden = Read-Rows $goldenPath
@@ -100,6 +101,26 @@ $changed = @($goldNames | Where-Object { $now.Rows.Contains($_) -and $now.Rows[$
 
 "{0,-24} 골든 {1}개 · 현재 {2}개" -f 'registry-golden', $goldNames.Count, $nowNames.Count
 
+# ★ 열 구성이 바뀌면 **위치 비교가 무의미하다.**
+#
+#   행마다 n 번째 칸을 맞대는 방식이라, 열이 하나 끼어들면 그 뒤가 전부 밀려
+#   "result_bearing 이 engine_service 로 바뀌었다" 같은 거짓 설명이 212 행 ×
+#   여러 칸 쏟아진다. 진짜 사실 하나(스키마가 바뀌었다)가 잡음에 묻힌다.
+#   그러니 먼저 그 하나만 말하고 멈춘다.
+$goldHeader = ($golden.Header -join "`t")
+$nowHeader  = ($now.Header -join "`t")
+if ($goldHeader -ne $nowHeader) {
+    ""
+    "실패:"
+    "  - snapshot 스키마가 바뀌었다(열 구성)"
+    "      골든: $goldHeader"
+    "      현재: $nowHeader"
+    ""
+    "열이 바뀌면 행 비교는 뜻이 없다. 의도한 변경이면 -Update 로 골든을 다시"
+    "기록하고, 소비자(열 이름으로 읽는 하네스)가 따라오는지 함께 확인할 것."
+    exit 1
+}
+
 if ($removed.Count -gt 0) {
     $failures.Add("사라진 명령 $($removed.Count)개: $(($removed | Select-Object -First 8) -join ', ')")
 }
@@ -109,7 +130,11 @@ if ($added.Count -gt 0) {
 foreach ($name in ($changed | Select-Object -First 8)) {
     $g = $golden.Rows[$name].Split("`t")
     $n = $now.Rows[$name].Split("`t")
-    $cols = @('canonical', 'aliases', 'cost', 'roles', 'result_bearing', 'usage', 'summary')
+    # ★ 열 이름을 **파일 머리글에서 읽는다.** 박아 두면 열이 늘어난 순간
+    #   진단이 어긋난 이름을 댄다 — LC6 이 class·liveness 를 넣자 실제로
+    #   "result_bearing 이 engine_service 로 바뀌었다" 같은 거짓 설명이 나왔다.
+    #   틀린 진단은 없는 진단보다 나쁘다.
+    $cols = if ($golden.Header.Count -gt 0) { $golden.Header } else { $now.Header }
     for ($i = 0; $i -lt [Math]::Max($g.Count, $n.Count); $i++) {
         $gv = if ($i -lt $g.Count) { $g[$i] } else { '(없음)' }
         $nv = if ($i -lt $n.Count) { $n[$i] } else { '(없음)' }

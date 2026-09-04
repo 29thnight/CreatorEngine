@@ -68,6 +68,58 @@ namespace CommandCore
 
     std::string_view ToString(CommandRoles roles) noexcept;
 
+    /// 이 명령이 GUI 와 **어디까지 같아야 하는가**(§9).
+    ///
+    /// ★ 서비스가 이 분류를 급하게 만들었다. 사람이 `--exec` 로 한 번 부르던
+    ///   것과 에이전트가 초당 여러 번 부르는 것은 Undo 스택에 남기는 흔적이
+    ///   다르다. 어느 명령이 GUI 와 Undo 까지 맞아야 하고 어느 것이 결과만
+    ///   맞으면 되는지가 표에 없으면, 동등성 검사를 무엇에 걸어야 할지 아무도
+    ///   모른다.
+    enum class CommandClass : uint8_t
+    {
+        /// GUI 와 Undo·selection·transaction 까지 같아야 한다.
+        /// play/stop, 일반 duplicate, undo/redo.
+        EditorOperation,
+
+        /// GUI 와 low-level 결과만 같으면 된다.
+        /// scene load/save, prefab save, script reload, 라이브 조회·조정.
+        EngineService,
+
+        /// GUI 의미가 없고 관측·격리 검사용이다. `dx12.*`, `vk.*`, `profile.*`.
+        Probe,
+
+        /// 회귀 fixture 를 만들려고 Undo 를 **의도적으로 우회**한다.
+        /// 표기되지 않으면 일반 회귀와 섞여, 동등성을 검사해야 할 것과
+        /// 검사하면 안 되는 것을 가릴 수 없다. 대부분 `*.authoring.probe`.
+        RawFixture,
+    };
+
+    std::string_view ToString(CommandClass cls) noexcept;
+
+    /// 켜져 있는 프로세스에서 되는가.
+    ///
+    /// ★ **기본은 라이브다.** 요구가 "특정 명령을 제외하면 에디터·플레이어를
+    ///   껐다 켜지 않고 동작해야 한다"이므로, 예외인 쪽이 표기 대상이다.
+    ///
+    /// ★★ 이 값은 **실측에서 왔다.** 착수 때는 `dx12.*`·`vk.*` 56 개가 전부
+    ///   프로세스를 새로 띄워야 하는 줄 알았다 — 하네스가 그렇게 부르고 있어서
+    ///   그렇게 읽었다. 켜져 있는 에디터에 HTTP 로 64 개를 붙여 보니 61 개가
+    ///   그대로 돌았고, 못 도는 셋은 전부 디바이스·스왑체인을 **세우는** 것이었다.
+    ///   하네스가 프로세스를 새로 띄우는 것은 격리 관행이지 재시작 요구가 아니다.
+    enum class CommandLiveness : uint8_t
+    {
+        /// 켜져 있는 프로세스에서 그대로 된다.
+        Live,
+
+        /// 이미 초기화된 프로세스에서는 안 된다. 디바이스 브링업 프로브.
+        RequiresRestart,
+
+        /// 부르면 프로세스가 끝난다. 서비스로 부르면 응답을 못 받는다.
+        TerminatesProcess,
+    };
+
+    std::string_view ToString(CommandLiveness liveness) noexcept;
+
     /// 명령 하나의 schema.
     ///
     /// argument·capability 는 LC3 범위 밖이다(§13 은 그것들을 여기 두라고 하지만,
@@ -88,6 +140,11 @@ namespace CommandCore
 
         CommandCost              cost{ CommandCost::Immediate };
         CommandRoles             roles{ CommandRoles::Editor };
+
+        /// §9 분류와 라이브 여부. seed 가 정한다 — 여기 기본값이 있는 이유는
+        /// descriptor 가 seed 없이 만들어지는 경로(등록 거부 직전)뿐이다.
+        CommandClass             cls{ CommandClass::EngineService };
+        CommandLiveness          liveness{ CommandLiveness::Live };
 
         /// 결과를 내는 핸들러인가(LC1 이행 여부). discovery 가 그대로 낸다.
         bool                     resultBearing{ false };

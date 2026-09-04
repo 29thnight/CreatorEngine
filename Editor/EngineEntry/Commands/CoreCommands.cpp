@@ -267,6 +267,10 @@ namespace ConsoleCmd
             std::string(CommandCore::ToString(descriptor->cost))));
         data.Set("roles", CommandCore::CommandData::String(
             std::string(CommandCore::ToString(descriptor->roles))));
+        data.Set("class", CommandCore::CommandData::String(
+            std::string(CommandCore::ToString(descriptor->cls))));
+        data.Set("liveness", CommandCore::CommandData::String(
+            std::string(CommandCore::ToString(descriptor->liveness))));
         data.Set("resultBearing", CommandCore::CommandData::Bool(descriptor->resultBearing));
         return CommandCore::Ok("descriptor", std::move(data));
     }

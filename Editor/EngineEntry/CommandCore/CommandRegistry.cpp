@@ -27,6 +27,29 @@ namespace CommandCore
         return "unknown";
     }
 
+    std::string_view ToString(CommandClass cls) noexcept
+    {
+        switch (cls)
+        {
+        case CommandClass::EditorOperation: return "editor_operation";
+        case CommandClass::EngineService:   return "engine_service";
+        case CommandClass::Probe:           return "probe";
+        case CommandClass::RawFixture:      return "raw_fixture";
+        }
+        return "unknown";
+    }
+
+    std::string_view ToString(CommandLiveness liveness) noexcept
+    {
+        switch (liveness)
+        {
+        case CommandLiveness::Live:              return "live";
+        case CommandLiveness::RequiresRestart:   return "requires_restart";
+        case CommandLiveness::TerminatesProcess: return "terminates_process";
+        }
+        return "unknown";
+    }
+
     CommandRegistry& CommandRegistry::Get()
     {
         static CommandRegistry registry;
@@ -243,7 +266,10 @@ namespace CommandCore
         {
             tsv += "# problem\t" + problem + "\n";
         }
-        tsv += "canonical\taliases\tcost\troles\tresult_bearing\tusage\tsummary\n";
+        // ★ 새 열은 **끝이 아니라 `usage` 앞**에 넣는다. `summary` 는 자유 문장이라
+        //   맨 뒤여야 하고(탭이 섞일 여지가 가장 큰 열이다), 분류는 기계가 읽는
+        //   값이므로 앞쪽 고정 폭 구역에 모아 둔다. 소비자는 열 이름으로 읽는다.
+        tsv += "canonical\taliases\tcost\troles\tclass\tliveness\tresult_bearing\tusage\tsummary\n";
 
         for (const CommandDescriptor& descriptor : registry.Sorted())
         {
@@ -259,6 +285,8 @@ namespace CommandCore
             tsv += '\t'; tsv += aliases;
             tsv += '\t'; tsv += ToString(descriptor.cost);
             tsv += '\t'; tsv += ToString(descriptor.roles);
+            tsv += '\t'; tsv += ToString(descriptor.cls);
+            tsv += '\t'; tsv += ToString(descriptor.liveness);
             tsv += '\t'; tsv += descriptor.resultBearing ? "yes" : "no";
             tsv += '\t'; tsv += descriptor.usage.empty() ? "-" : descriptor.usage;
             tsv += '\t'; tsv += descriptor.summary;
