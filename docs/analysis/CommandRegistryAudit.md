@@ -489,7 +489,7 @@ operation 레코드**가 생긴다(`CommandService.cpp:566-575`가 enqueue 전�
 | ~~1~~ | ~~`dump.crash` 제거~~ | **완료 2026-09-05** | |
 | ~~2~~ | ~~`render.exposure` 제거~~ | **완료 2026-09-05** | |
 | 3 | `experiment.*` 계층 1+2 12개를 contract probe로 이관 | **5/12 완료 2026-09-05** (§6.2) | 나머지는 결정 필요 |
-| 4 | `model.place` undo 배선 (3줄) | 거동 변경 | 쉬움 |
+| 4 | `model.place` undo 배선 (3줄) | **배선 완료 2026-09-05 · 런타임 미검증** (§6.3) | |
 | 5 | `object.create`에 undo 배선 → `object.create.undoable` 제거 | 거동 변경 | 중간 |
 | 6 | `*scale` 셋의 요약·`cost` 정정 | 표기만 | 쉬움 |
 | 7 | 죽은 별칭 이름 4개 제거(`mem.delta`·`mem.reset`·`mem.hook`·`dump.show`) | 이름 −4 | 쉬움 |
@@ -572,6 +572,40 @@ RenderTests 두 프로젝트가 include 순서를 **서로 다르게** 두기 �
 파일은 `Editor/RenderTests/ExperimentParity/` 에 **그대로 뒀다.** 에디터 빌드
 (`RenderTests.vcxproj`)에서만 뺐다 — 파일 이동과 명령 제거를 같은 커밋에 넣지
 않는다(§12.3). 위치 정리는 순수 기계적 후속이다.
+
+### 6.3 4번 실행 기록 — 배선 완료, 런타임 미검증 (2026-09-05)
+
+`Cmd_model_place` 가 씬을 직접 `Instantiate` 하던 세 줄을, GUI 가 이미 쓰던
+`Meta::LoadModelToSceneObjCommand` 를 `UndoManager::Execute` 로 태우는 것으로
+바꿨다. **로직을 옮긴 것이 아니다** — 그 command 의 `Redo()` 가 여기 있던 것과
+같은 일을 하고(옵션 조회까지 같다), `Undo()` 는 루트를 **인덱스로** 지운다.
+
+▲ **이 기계에서 돌려 본 것은 아니다.** `model.place Prim_Cone` 이 성공 경로에
+  닿지 못한다 — `assets.modeldiag` 가 `generationFromCatalog=0
+  generationFromLibrary=0` 을 낸다. 게시된 model generation 이 하나도 없다.
+  변경 **전에도** 이 명령은 같은 자리에서 빠져나왔으므로 회귀는 아니지만,
+  "고쳤다" 와 "고친 것을 봤다" 는 다른 문장이다. LC8 의 Player smoke 를 막은 것과
+  같은 환경 결손이다(`Dynamic_CPP/Assets` 대부분이 gitignore).
+
+**대신 게이트를 넓혔다.** `verify-cli-editor-operation.ps1` 이 `editor_operation`
+8개만 재고 있었고 — §4.4 에 적은 구멍 — `model.place` 는 class 가
+`engine_service` 라는 이유로 밖에 있었다. GUI 는 Undo 를 남기고 CLI 만 안 남기던
+바로 그 명령이 **분류 때문에 측정 대상이 아니었다.** 이제 잰다.
+
+★ **측정 불가를 거짓값으로 적지 않는다.** 모델이 없으면 `editUndo` 는 당연히
+  그대로인데, 그 0 을 "Undo 를 안 남긴다" 로 래칫에 기록하면 **고쳐 놓은 동작을
+  안 고쳐진 것으로 못 박는다.** 측정 실패와 측정 결과는 다르다. 그래서 전제가 안
+  서면 값을 만들지 않고 `exit 1` 로 낸다 — 조용히 건너뛰면 그 명령에 대해 이
+  게이트는 영원히 초록이다.
+
+  전제 판정은 **씬 오브젝트 수 변화**로 한다. 결과 message 로는 알 수 없다 —
+  이 핸들러는 legacy 라 낼 message 가 없고 "찾을 수 없음" 은 stdout 으로만
+  나간다(그 방식으로 먼저 짰다가 못 잡았다). 수가 늘었는데 `editUndo` 가
+  그대로면 그것은 **진짜 판정**이고, 수도 안 늘었으면 측정 불가다.
+
+그래서 이 게이트는 지금 이 기계에서 **붉다.** 모델 코퍼스가 있는 기계에서, 또는
+`-ModelStem` 으로 있는 모델을 지정하면 판정이 난다. 기존 8개는 래칫과 그대로
+일치한다(`object.create.undoable` 만 기록, 나머지 7개는 안 남김).
 
 ## 7. 이 조사가 **하지 않은** 것
 

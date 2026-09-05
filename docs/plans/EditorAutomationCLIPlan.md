@@ -786,6 +786,18 @@ GUI로 한 것과 에이전트가 HTTP로 한 것이 같은 조작인데 다른 
 
 `object.create`와 `object.create.undoable`이 **따로 존재한다는 것 자체**가 신호였다.
 
+★ **2026-09-05 — 이 표 밖에 더 나쁜 자리가 있었다: `model.place`.**
+
+  GUI 는 이 조작을 `LoadModelToSceneObjCommand` 로 Undo 에 남기고 CLI 만 안
+  남기고 있었다. §9 가 잡으려는 정확히 그 비대칭인데, class 가
+  `editor_operation` 이 아니라 `engine_service` 라는 이유로 **위 표에도, 그
+  표를 못 박는 게이트에도 들어 있지 않았다.** 분류가 측정 범위를 정하고 있었고,
+  분류가 틀린 자리는 그래서 보이지 않았다.
+
+  CLI 도 같은 command 를 쓰게 고쳤고 게이트를 그 명령까지 넓혔다. 다만 이
+  기계에는 게시된 model generation 이 없어 **런타임 검증은 못 했다** —
+  경위는 `docs/analysis/CommandRegistryAudit.md` §6.3.
+
 13개에 Undo를 붙이는 것은 각 명령의 저작 의미를 정하는 일이라 파일 분리와 같은
 슬라이스에 들어갈 크기가 아니다. §9의 완료 기준도 "GUI/서비스 의미 차이 **미분류** 0"
 — 없애라가 아니라 분류하라다. `verify-cli-editor-operation.ps1`이 지금 참인 것을 값으로

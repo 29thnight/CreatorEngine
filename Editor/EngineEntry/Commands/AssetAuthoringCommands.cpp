@@ -930,10 +930,20 @@ namespace ConsoleCmd
             return;
         }
 
-        ModelSceneInstantiation::Options options{};
-        options.createMeshCollider = DataSystems->ReadModelCreateMeshCollider(
-            FileGuid(generation->Identity().modelId));
-        Entity* root = ModelSceneInstantiation::Instantiate(*scene, generation, options);
+        // ★ GUI 는 Undo 를 남기고 CLI 만 안 남기고 있었다(2026-09-05 이전).
+        //
+        //   같은 조작 — 콘텐츠 브라우저에서 씬으로 끌어다 놓기 — 인데 사람이
+        //   GUI 로 하면 Ctrl+Z 로 되돌아가고 에이전트가 HTTP 로 하면 안 되돌아갔다.
+        //   §9 의 "Shared Editor operation 은 GUI 와 Undo 까지 같아야 함" 이
+        //   깨져 있던 자리다.
+        //
+        //   `LoadModelToSceneObjCommand::Redo()` 가 여기 있던 세 줄과 **같은 일**을
+        //   한다 — 옵션 조회까지 같다. 그래서 로직을 옮긴 것이 아니라 이미 GUI 가
+        //   쓰던 것을 CLI 도 쓰게 했을 뿐이다. Undo 는 루트를 **인덱스로** 지운다
+        //   (포인터가 아니라서 씬이 흔들려도 매달리지 않는다).
+        Entity* root = nullptr;
+        Meta::UndoManager::GetInstance()->Execute(
+            std::make_unique<Meta::LoadModelToSceneObjCommand>(scene, generation, &root));
         std::printf("[CLI] 씬에 배치: %s (%s)\n", parts[1].c_str(), root ? "ok" : "fail");
     }
 
