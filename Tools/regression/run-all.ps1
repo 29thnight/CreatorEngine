@@ -213,6 +213,22 @@ Run-Step "생명주기 활성·모드 축" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-axis.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 실패 경로(9-5). 위 항목들과 두 골든은 전부 **정상 경로**를 굳힌다 —
+# 훅이 던졌을 때 무슨 일이 벌어지는지는 그 어디에도 한 줄도 없었다.
+#
+# 픽스처 일곱이 실패를 만들고 판정 여섯이 그 뒤를 본다:
+#   A·B·C 실패한 훅이 뒤 단계를 끌고 가지 않는가(LC1 — 성공한 훅의 짝만 부른다)
+#   E     정리 콜백 예외가 종료 절차를 끊지 않고, 원인이 보고되는가(LC2)
+#   F     동기 throw·즉시 faulted·나중 faulted가 같은 정책을 따르는가(LC5)
+#   D     대조군 — 이웃의 예외가 정상 인스턴스를 끊지 않는가
+#
+# D가 있어야 "픽스처가 조용하다"를 고침이 들었다고 읽을지 하네스가 죽었다고
+# 읽을지 가를 수 있다. F는 일관성만이 아니라 **방향**(격리)까지 못 박는다 —
+# 일관성만 재면 정책이 반대로 통일돼도 초록이다.
+Run-Step "생명주기 실패 경로" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-failure.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #

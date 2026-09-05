@@ -385,14 +385,16 @@ internal static class ScriptRegistry
         }
         catch (Exception ex)
         {
-            Native.Log(3, $"[{b.GetType().Name}] OnSimulate 시작 예외 — 이 스크립트를 비활성화합니다.\n{ex}");
-            b.Enabled = false;
+            // ① 동기 throw — async를 붙이지 않은 본문이 첫 await 전에 던졌다.
+            FaultSimulation(b, ex);
             return;
         }
 
         if (task.IsCompleted)
         {
-            // 본문이 없거나(기본 구현) await 없이 끝났다. 예외만 확인하고 끝낸다.
+            // ② 즉시 faulted — async 본문이 첫 await 전에 던지면 컴파일러가 예외를
+            //    이미 완료된 faulted Task로 감싸 반환한다. 본문이 없거나(기본 구현)
+            //    await 없이 정상 종료한 경우도 여기로 온다.
             ReportSimulationFault(b, task);
             return;
         }
@@ -410,9 +412,58 @@ internal static class ScriptRegistry
     private static void ReportSimulationFault(Component b, Task task)
     {
         // 취소는 정상 종료다 — 엔티티 제거가 그 경로다(설계 문서 §4 트랙 L5).
+        // 이 조기 반환이 "취소와 fault를 혼동하지 않는다"(LC5)를 지킨다.
         if (!task.IsFaulted) return;
 
-        Native.Log(3, $"[{b.GetType().Name}] OnSimulate 예외\n{task.Exception}");
+        // ②③ 두 갈래가 여기로 모인다. 정책은 ①과 같아야 한다.
+        FaultSimulation(b, task.Exception!);
+    }
+
+    /// <summary>
+    /// 시뮬레이션 본문 실패의 <b>유일한</b> 정책 지점 (LC5 · 2026-09-05).
+    ///
+    /// ── 왜 하나여야 하는가 ──
+    ///
+    /// 같은 논리적 실패가 세 갈래로 도착한다:
+    ///
+    ///   ① 동기 throw        — async 없는 본문의 첫 await 전 예외
+    ///   ② 즉시 faulted Task — async 본문의 첫 await 전 예외(컴파일러가 감싼다)
+    ///   ③ 나중 faulted Task — await를 지난 뒤의 예외
+    ///
+    /// 저작자가 <c>async</c>를 붙이느냐 마느냐는 취향에 가까운데, 예전에는 그것으로
+    /// 엔진의 실패 정책이 갈렸다 — ①만 인스턴스를 끄고 ②③은 로그만 남겼다.
+    /// 실측(verify-lifecycle-failure 판정 F): ① 실패 후 틱 0회, ③ 13회.
+    /// 죽은 루틴을 가진 인스턴스가 아무 일 없다는 듯 계속 돌았다.
+    ///
+    /// ── 왜 '끈다'로 통일하는가 ──
+    ///
+    /// LC1이 정한 방향과 같다 — 실패한 것은 격리하고, 되살리는 것은 명시적
+    /// 재생성 경계(RetryInstance·script.reload)로만 한다. 반대 방향(둘 다 로그만)은
+    /// 본문이 죽은 것을 행동으로는 알 수 없게 만들어 더 나쁘다.
+    ///
+    /// ── 스레드 ──
+    ///
+    /// ③은 continuation에서 온다. 지원 경로(<c>Scope.Delay</c>)의 완료는
+    /// <c>SimulationScope.Tick</c>이 게임 스레드에서 일으키므로 여기도 게임
+    /// 스레드다. 외부 Task를 await하면 워커에서 올 수 있는데, 그때
+    /// <c>Enabled</c> 대입은 네이티브를 건드린다. 그래서 스레드를 확인하고,
+    /// 아니면 상태를 바꾸지 않고 진단만 남긴다.
+    ///
+    /// <b>이것은 진단이지 강제가 아니다.</b> 외부 await 자체를 막지 않으며,
+    /// 그 경계를 실제로 닫는 것은 LC5의 남은 갈래다.
+    /// </summary>
+    private static void FaultSimulation(Component b, Exception ex)
+    {
+        if (!Native.IsGameThread)
+        {
+            Native.Log(3,
+                $"[{b.GetType().Name}] OnSimulate 예외가 게임 스레드 밖에서 도착했다 — " +
+                $"외부 Task를 await한 경로다. 상태를 바꾸지 않고 남긴다(지원 범위 밖).\n{ex}");
+            return;
+        }
+
+        Native.Log(3, $"[{b.GetType().Name}] OnSimulate 예외 — 이 스크립트를 비활성화합니다.\n{ex}");
+        b.Enabled = false;
     }
 
     /// <summary>

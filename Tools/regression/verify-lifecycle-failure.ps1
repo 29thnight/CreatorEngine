@@ -1,11 +1,11 @@
 # 생명주기 실패 픽스처 게이트 — 훅·정리·루틴이 실패한 뒤 무엇이 오는가 (LC0 · LC1/LC2/LC5).
 #
-# ★ 이 게이트는 아직 **붉은 것이 정상이다.** 진행 상황:
-#     A·B·C  LC1 착지로 초록 (2026-09-05)
-#     E      LC2 대기 — 붉음
-#     F      LC5 대기 — 붉음
-#     D      대조군 — 항상 초록이어야 한다
-#   E·F가 초록이 되면 run-all.ps1에 넣는다. 그 전에 넣으면 세트가 항상 실패한다.
+# ★ 이 게이트는 결함을 증명하려고 붉은 채로 세웠고, LC1·LC2·LC5가 차례로 착지해
+#   2026-09-05에 여섯 판정이 전부 초록이 되어 run-all.ps1에 편입됐다.
+#     A·B·C  LC1 — 성공한 훅의 짝만 부른다
+#     E      LC2 — 취소의 네 가지 일을 갈랐다(격리 + 원인 보고)
+#     F      LC5 — 세 갈래 실패를 한 정책(격리)으로 모았다
+#     D      대조군 — 처음부터 끝까지 초록이어야 한다
 #
 # ── 무엇을 메우는가 ──
 #
@@ -219,9 +219,6 @@ if ($reported -lt 2) {
 #   구분되지 않는다. 그래서 훅의 유무가 아니라 **결과**를 잰다: 실패한 뒤에도
 #   틱을 계속 받는가. 두 픽스처가 PostPhysics에서 30틱마다 beat를 남긴다.
 
-$syncHooks  = Hooks-Of 'failsimsync'
-$asyncHooks = Hooks-Of 'failsimasync'
-
 # 실패 시점(OnSimulate) 이후의 beat만 센다.
 function Beats-After-Simulate($hooks) {
     $i = [array]::IndexOf($hooks, 'OnSimulate')
@@ -229,18 +226,45 @@ function Beats-After-Simulate($hooks) {
     return @($hooks[($i + 1)..($hooks.Count - 1)] | Where-Object { $_ -eq 'beat' }).Count
 }
 
-$syncBeats  = Beats-After-Simulate $syncHooks
-$asyncBeats = Beats-After-Simulate $asyncHooks
+# 계획서가 센 세 종류다 — 직접 throw · 즉시 faulted Task · await 이후 faulted Task.
+# 저작자에게 async를 붙이고 안 붙이고는 취향에 가까운데, 그것으로 엔진의 실패
+# 정책이 갈리면 안 된다.
+$kinds = @(
+    @{ Kind = 'failsimsync';  Label = '동기 throw' },
+    @{ Kind = 'failsimimm';   Label = '즉시 faulted' },
+    @{ Kind = 'failsimasync'; Label = '나중 faulted' }
+)
 
-"판정 F 실패 정책 일관: 실패 후 틱 — 동기 $syncBeats 회 · Task $asyncBeats 회 (기대: 같음)"
-if ($syncBeats -lt 0 -or $asyncBeats -lt 0) {
-    "  두 픽스처 중 하나가 루틴에 들어가지 못했다 — 비교가 성립하지 않는다."
+$beatRows = @($kinds | ForEach-Object {
+    $h = Hooks-Of $_.Kind
+    [pscustomobject]@{ Label = $_.Label; Beats = (Beats-After-Simulate $h) }
+})
+
+$summary = ($beatRows | ForEach-Object { "$($_.Label) $($_.Beats)회" }) -join ' · '
+"판정 F 실패 정책 일관: 실패 후 틱 — $summary (기대: 셋 다 같음)"
+
+$missing = @($beatRows | Where-Object { $_.Beats -lt 0 })
+if ($missing.Count -gt 0) {
+    "  루틴에 들어가지 못한 픽스처가 있다: $(($missing | ForEach-Object { $_.Label }) -join ', ')"
+    "  → 비교가 성립하지 않는다."
     $failed.Add('F(픽스처)')
 }
-elseif (($syncBeats -eq 0) -ne ($asyncBeats -eq 0)) {
-    "  → 발생 형태에 따라 실패 후 살아남는지가 갈린다(LC5). 동기는 꺼지고 Task는 계속 돈다."
-    "  → 통일 방향(둘 다 끈다 / 둘 다 로그만)은 LC5가 정한다."
-    $failed.Add('F')
+else {
+    # 절대값이 아니라 "살아남았는가"로 본다 — 틱 수는 프레임 속도에 흔들린다.
+    $survived = @($beatRows | Where-Object { $_.Beats -gt 0 })
+
+    if ($survived.Count -ne 0 -and $survived.Count -ne $beatRows.Count) {
+        "  → 발생 형태에 따라 실패 후 살아남는지가 갈린다(LC5)."
+        "  → 살아남은 것: $(($survived | ForEach-Object { $_.Label }) -join ', ')"
+        $failed.Add('F')
+    }
+    elseif ($survived.Count -eq $beatRows.Count) {
+        # 일관성만 재면 정책이 **반대로** 통일돼도 초록이다. LC5가 고른 방향은
+        # 격리(끈다)이므로 그것도 함께 못 박는다.
+        "  → 셋이 일관되지만 방향이 반대다 — 실패한 루틴을 가진 인스턴스가 계속 돈다."
+        "  → LC5가 고른 정책은 격리다(LC1과 같은 방향)."
+        $failed.Add('F(정책)')
+    }
 }
 
 # ── 판정 D: 대조군은 온전하다 ─────────────────────────────────────────────────

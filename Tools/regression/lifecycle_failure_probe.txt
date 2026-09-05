@@ -45,9 +45,15 @@ object.create FailSimSync
 script.add FailSimSync FailSimulateSyncProbe
 wait 10
 
-# ⑥ 루틴이 await **뒤에** 던진다 (LC5 · Task 경로)
-#    ⑤와 같은 논리적 실패를 발생 형태만 달리해 낸다. 둘을 나란히 둬야
-#    "같은 실패인데 남는 상태가 다르다"를 잴 수 있다.
+# ⑥ async 루틴이 첫 await **전에** 던진다 (LC5 · 즉시 faulted Task)
+#    ⑤와 코드 모양이 거의 같은데 async가 붙어 컴파일러가 예외를 Task로 감싼다.
+#    저작자에게는 취향 차이인 것이 엔진의 실패 정책을 가르면 안 된다.
+object.create FailSimImm
+script.add FailSimImm FailSimulateImmediateProbe
+wait 10
+
+# ⑦ 루틴이 await **뒤에** 던진다 (LC5 · 나중 faulted Task)
+#    셋을 나란히 둬야 "같은 실패인데 남는 상태가 다르다"를 잴 수 있다.
 object.create FailSimAsync
 script.add FailSimAsync FailSimulateAsyncProbe
 wait 10

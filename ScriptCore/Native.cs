@@ -312,8 +312,29 @@ internal static unsafe class Native
 
     public static bool IsReady => _ready;
 
+    /// <summary>
+    /// 게임 스레드의 관리 스레드 id (LC5 · 2026-09-05).
+    ///
+    /// <see cref="Bind"/>는 네이티브 ClrHost 초기화에서 딱 한 번, 게임 스레드에서
+    /// 불린다. 이 표의 함수들은 전부 게임 스레드 전용이므로(ClrHost.h 규약) 그
+    /// 시점의 스레드가 곧 정본이다.
+    ///
+    /// 0은 "아직 모른다"이고, 그때는 <see cref="IsGameThread"/>가 참을 돌려준다 —
+    /// 초기화 전 경로를 이 검사로 막아 버리면 진단이 진단이 아니라 새 장애가 된다.
+    /// </summary>
+    private static int _gameThreadId;
+
+    /// <summary>
+    /// 지금 게임 스레드인가. <b>진단용이다</b> — 이 값으로 막는 것은 네이티브
+    /// 상태를 바꾸는 몇 자리뿐이고, 외부 Task await 자체를 금지하지 않는다.
+    /// </summary>
+    public static bool IsGameThread
+        => 0 == _gameThreadId || Environment.CurrentManagedThreadId == _gameThreadId;
+
     public static bool Bind(ScriptApiTable* table)
     {
+        _gameThreadId = Environment.CurrentManagedThreadId;
+
         if (table == null) return false;
         if (table->Version != ExpectedVersion) return false;
         if (table->StructSize != sizeof(ScriptApiTable)) return false;
