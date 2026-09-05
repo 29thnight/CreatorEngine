@@ -318,6 +318,22 @@ Run-Step "생명주기 대기 참조 유지" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-retention.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 재생 세대(9-5 · LC7). 위 생명주기 항목이 전부 재생을 **한 번**만
+# 태운다 — 두 번째 재생에서 무엇이 되는지는 어느 게이트도 보지 않았다. 그런데
+# 재생·정지 반복은 저작 중 가장 자주 하는 일이고, 정지는 씬을 백업에서 되살리는
+# 방식이라 인스턴스가 통째로 새로 만들어진다(설계 문서 §4 트랙 L1).
+#
+#   X 세대 분리   재생마다 새 인스턴스가 하나씩 서고 세대 구간이 겹치지 않는다
+#   Y 세대 완결   각 세대가 전체 생명주기를 정확히 한 번씩 받는다
+#   Z 누수 없음   대기가 정지에서 취소되고 다음 세대로 흘러가지 않는다
+#
+# Z 는 취소 건수와 누수 건수를 **함께** 센다. 변이(정지 축소의 Scope.Cancel 제거)
+# 에서 누수는 여전히 0이었다 — 컴포넌트가 목록에서 빠져 재개될 기회 자체가 없기
+# 때문이다. "누수 0" 만으로는 아무것도 증명되지 않는다.
+Run-Step "생명주기 재생 세대" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-generation.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
