@@ -26,6 +26,26 @@ function Run-Step([string]$name, [scriptblock]$body) {
 # PHASE 15 트랙 H — 캐시 해시/문자열 불변식, 부분 string_view 길이,
 # 해시 컨테이너 키 계약을 Debug/Release 독립 프로브로 고정한다. 인스펙터 경로는
 # mutable data()를 다시 열지 않는지도 정적 래칫으로 함께 본다.
+#
+# ── 이 스텝은 12일간 스크립트 없이 서 있었다(2026-09-05 확인) ──
+#
+# 733b0008이 Run-Step만 넣고 verify-hashing-string.ps1은 커밋하지 않았다. 저장소
+# 어느 ref에도 그 파일의 이력이 없다 — 계획만 있고 구현이 없던 자리다. 그 사이
+# 세트는 매 실행 "스크립트 파일 이름으로 인식되지 않습니다"로 이 칸이 빨갰다.
+#
+# ── 어느 바이너리를 재는가 ──
+#
+# 아무것도 재지 않는다. 게이트가 제품 헤더를 그 자리에서 Debug/Release로 각각
+# 컴파일하므로 Bin\ 산출물과 무관하다 — 그래서 -Exe를 넘기지 않는다.
+#
+# ── 이빨 확인(2026-09-05) ──
+#
+# 여섯 변이가 각각 정확한 자리에서 빨개졌다. ① string_view 대입의 해시 갱신
+# 삭제 → 그 경로 8건만("대입(string_view)"·"부분 뷰 대입"), ② string_view
+# 생성자가 .data()를 받게 → 부분 뷰 축 10건만, ③ std::hash 특수화가 다른 값을
+# 내게 → 특수화 단정만 전 경로, ④ ==를 해시 전용으로 되돌림 → 정적 래칫,
+# ⑤ data()의 char* 재개방 → 정적 래칫(고치기 전 HEAD가 정확히 이 상태였다),
+# ⑥ 인스펙터 브랜치 원복 → 정적 래칫. 여섯 다 되돌려 Debug/Release 초록 재확인.
 Run-Step "HashingString 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hashing-string.ps1")
 }

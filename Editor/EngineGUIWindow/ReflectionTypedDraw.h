@@ -245,12 +245,29 @@ namespace Meta::TypedDraw
         }
         else if constexpr (std::is_same_v<MemberT, HashingString>)
         {
-            HashingString v = value;
+            // PHASE 15 H-a. 예전에는 HashingString 복사본을 만들어 그 내부 버퍼를
+            // ImGui에 직접 넘겼다. 셋이 한꺼번에 깨져 있었다 — ImGui가 버퍼에
+            // 써도 m_hash가 갱신되지 않아 문자열과 해시가 어긋났고, 버퍼 크기로
+            // 현재 길이를 넘겨 이름을 늘릴 수 없었으며, 늘리면 범위 밖 쓰기였다.
+            //
+            // 바로 위 std::string 브랜치와 같은 모양으로 맞춘다. 편집은
+            // std::string 버퍼에서 하고(리사이즈 콜백이 성장을 감당한다),
+            // 확정할 때 HashingString을 새로 만들어 setter로 커밋한다 —
+            // 그래야 해시가 다시 계산된다.
+            std::string buffer = value.ToString();
             ImGui::PushID(name);
-            if (ImGui::InputText(label, v.data(), v.size() + 1))
+            if (ImGui::InputText(label, buffer.data(), buffer.size() + 1,
+                ImGuiInputTextFlags_CallbackResize, Meta::InputTextCallback,
+                static_cast<void*>(&buffer)))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
-                value = v;
+                // 빈 이름은 HashingString의 대입 어설션에 걸린다(H5 빈 문자열
+                // 정책이 아직 4갈래라 여기서 정하지 않고 커밋만 막는다).
+                if (InputManagement->IsKeyPressed(VK_RETURN) && !buffer.empty())
+                {
+                    HashingString committed(std::string_view{ buffer });
+                    CommitMemberChange<Owner, MemberT, MP>(&obj, value, committed);
+                    value = committed;
+                }
             }
             ImGui::PopID();
         }

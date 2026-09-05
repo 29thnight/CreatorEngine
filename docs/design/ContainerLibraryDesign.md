@@ -80,7 +80,8 @@ Unity C++ 코어(`dynamic_array`) 모두 STL을 쓰지 않는다. 그러나 **�
 이 저장소에서 **버그와 죽은 코드는 전부 자체 제작물에서 나왔다**:
 
 - `HashingString::operator==`가 해시만 비교 — `operator<=>`(문자열까지 비교)와
-  서로 모순되는 **정확성 결함**
+  서로 모순되는 **정확성 결함** (2026-09-05 수정, PHASE 15 H-c. 게이트는
+  `verify-hashing-string.ps1`)
 - `MyAllocator::allocate` 정렬 인자 무시 — 과다 정렬 타입에서 조용한 미정렬
 - 프로파일러 `LinearAllocator` 동일 결함
 - `MemoryPool` · `ce::` 컨테이너 alias 20여 개 · `Core.Fence` — 소비자 0으로 사망

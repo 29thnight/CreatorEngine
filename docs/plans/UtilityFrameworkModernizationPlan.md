@@ -444,6 +444,25 @@ M0을 U0 직후에 두는 이유는 이득/위험 비가 가장 좋기 때문이
 
 ### 트랙 H — HashingString
 
+#### 진행 상태 (2026-09-05)
+
+H0~H4를 착지시켰다. 게이트는 `Tools/regression/verify-hashing-string.ps1` +
+`hashing_string_contract_probe.cpp`이고 회귀 세트에 배선돼 있다.
+
+| 항목 | 상태 | 비고 |
+|---|---|---|
+| H-a 인스펙터 3중 파손 | **닫힘** | `ReflectionTypedDraw.h`의 HashingString 브랜치를 바로 위 `std::string` 브랜치와 같은 모양(버퍼 + 리사이즈 콜백 + setter 커밋)으로 맞췄다. 게이트는 정적 래칫으로만 본다 — ImGui 컨텍스트가 필요해 프로브가 태우지 못한다 |
+| H-b `.data()` UB | **이미 닫혀 있었다** | `Scene::GetEntity`가 `string_view` 오버로드를 타고 있다. 프로브의 부분 뷰 축이 되돌림을 잡는다 |
+| H-c `==`/`<=>` 불일치 | **닫힘** | `==`가 해시 → 문자열 순으로 본다. 손으로 쓰던 `!=`는 지웠다(컴파일러 합성) |
+| H-d 값 반환 | **닫힘** | `GetHashedName()`은 이미 `const&`였고, `ToString()`을 `const&`로 바꿨다 |
+| H-e `std::hash` 특수화 | **닫힘** | `GetHash()` + 특수화. `unordered_map`/`unordered_set` 키 계약을 프로브가 512키로 잰다 |
+| H-f `GetGameObject` O(n) | **이 트랙 밖** | 아래 H4 단서대로 `SceneGraphRedesignPlan` 트랙 E 소관 |
+| H-g `data()`/`size()` non-const | **닫힘** | `const char* data() const` / `size() const`. 내부 버퍼의 쓰기 권한을 닫은 것이 H-a의 근본 원인 제거다 |
+| H-h 빈 문자열 정책 4갈래 | **열려 있음** | H5는 결정이 먼저다(아래). 인스펙터는 그때까지 빈 이름 커밋만 막아 둔다 |
+
+전체 솔루션 Debug 빌드 통과(exit 0). 헤더 밖 `HashingString` 참조가 23곳뿐이라
+`data()` 봉인의 파급이 인스펙터 한 곳으로 끝났다.
+
 #### H0. 인스펙터 편집 복구 (기능 파손)
 
 `ReflectionImGuiHelper.h:538-540`. 고정 버퍼로 받아 편집하고, 변경 시 `prop.setter`를
