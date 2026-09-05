@@ -2,9 +2,13 @@ param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
-    [int]$ExpectedScenes = 8,
-    [int]$ExpectedPrefabs = 9,
-    [int]$ExpectedMaterials = 2
+    # 개수 단정의 목적은 "코퍼스가 비었는데 0개를 돌고 통과"하는 빈 집합 함정을
+    # 막는 것이지 자산 개수를 고정하는 것이 아니다. 고정값이던 시절에는 씬을
+    # 하나 추가할 때마다 이 게이트가 빨개졌다(8로 굳어 있는 동안 실제로는 14가
+    # 됐다). 하한으로 바꾸면 코퍼스가 자라도 깨지지 않고 빈 집합은 여전히 막는다.
+    [int]$MinimumScenes = 8,
+    [int]$MinimumPrefabs = 9,
+    [int]$MinimumMaterials = 2
 )
 
 Set-StrictMode -Version Latest
@@ -24,10 +28,10 @@ $prefabs = @(Get-ChildItem -LiteralPath (Join-Path $assets 'Prefabs') -File -Fil
 $materials = @(Get-ChildItem -LiteralPath (Join-Path $assets 'Materials') -File -Filter '*.asset' |
     Sort-Object FullName)
 
-if ($scenes.Count -ne $ExpectedScenes -or
-    $prefabs.Count -ne $ExpectedPrefabs -or
-    $materials.Count -ne $ExpectedMaterials) {
-    "corpus count mismatch scenes=$($scenes.Count)/$ExpectedScenes prefabs=$($prefabs.Count)/$ExpectedPrefabs materials=$($materials.Count)/$ExpectedMaterials"
+if ($scenes.Count -lt $MinimumScenes -or
+    $prefabs.Count -lt $MinimumPrefabs -or
+    $materials.Count -lt $MinimumMaterials) {
+    "corpus below minimum scenes=$($scenes.Count)/$MinimumScenes prefabs=$($prefabs.Count)/$MinimumPrefabs materials=$($materials.Count)/$MinimumMaterials"
     exit 1
 }
 

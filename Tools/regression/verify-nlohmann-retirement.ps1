@@ -26,20 +26,35 @@ if ((Get-Content -LiteralPath $manifest -Raw) -match 'nlohmann-json') {
     $failures.Add('manifest: vcpkg.json still declares nlohmann-json')
 }
 
+# ── installed 트리 검사 (2026-09-05 정정) ──
+#
+# 여기에 결함이 둘 있었다.
+#
+# 1. 실물 경로가 틀렸다. 매니페스트 모드의 설치 트리는
+#    `vcpkg_installed\x64-windows\x64-windows\{include,share}`로 **한 단계 더**
+#    중첩된다. 한 단계 얕은 경로를 보고 있었으므로 이 두 단정은 존재할 수 없는
+#    경로를 검사하는 죽은 단정이었다 — 무엇이 설치돼도 초록이었다.
+#
+# 2. status 텍스트 단정이 유령을 잡고 있었다. `vcpkg_installed\vcpkg\status`에
+#    nlohmann-json stanza가 둘 남아 있는데, x64-windows는
+#    `purge ok not-installed`이고 x64-windows-idl0은 `install ok installed`다.
+#    그런데 그 트리플렛 디렉터리는 존재하지 않고, 어떤 포트도 nlohmann-json을
+#    Depends로 선언하지 않으며, vcpkg.json도 선언하지 않는다. 즉 과거 설치의
+#    기록만 남은 것이다. status는 기록이고 **정본은 실물**이므로, 경로를 고쳐
+#    실물을 재는 것으로 이 축을 대신한다. (로컬 트리를 재설치하면 그 기록도
+#    사라지지만, 그것은 저장소가 아니라 각자 기계의 상태다 — vcpkg_installed는
+#    .gitignore 대상이다.)
 $installedRoot = Join-Path $repoRoot 'vcpkg_installed\x64-windows'
 $installedTargets = @(
     (Join-Path $installedRoot 'include\nlohmann'),
-    (Join-Path $installedRoot 'share\nlohmann-json')
+    (Join-Path $installedRoot 'share\nlohmann-json'),
+    (Join-Path $installedRoot 'x64-windows\include\nlohmann'),
+    (Join-Path $installedRoot 'x64-windows\share\nlohmann-json')
 )
 foreach ($target in $installedTargets) {
     if (Test-Path -LiteralPath $target) {
         $failures.Add("installed tree remains: $target")
     }
-}
-$statusFile = Join-Path $repoRoot 'vcpkg_installed\vcpkg\status'
-if ((Test-Path -LiteralPath $statusFile) -and
-    (Get-Content -LiteralPath $statusFile -Raw) -match '(?m)^Package:\s*nlohmann-json\s*$') {
-    $failures.Add('installed status still registers nlohmann-json')
 }
 
 $serializableHeader = Join-Path $repoRoot 'Engine\SceneRuntime\ISerializable.h'

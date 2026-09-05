@@ -28,7 +28,14 @@ $inventory = @(
     [pscustomobject]@{ Writer = "Socket"; Path = "Engine\SceneRuntime\Socket.cpp"; Pattern = "TransformWriteReason::Socket"; Count = 2 },
     [pscustomobject]@{ Writer = "Gizmo"; Path = "Editor\EngineGUIWindow\SceneViewWindow.cpp"; Pattern = "TransformWriteReason::Gizmo"; Count = 7 },
     [pscustomobject]@{ Writer = "Animator socket cache"; Path = "Engine\SceneRuntime\AnimationJob.cpp"; Pattern = "TransformWriteReason::Animator"; Count = 1 },
-    [pscustomobject]@{ Writer = "Model import"; Path = "Engine\SceneRuntime\ModelSceneBridge.cpp"; Pattern = "TransformWriteReason::ModelImport"; Count = 9 },
+    # MBC3-11(7732d380)이 ModelSceneBridge.cpp(595줄)를 지우고
+    # ModelSceneInstantiation.cpp(254줄)로 통합했다. 이 게이트는 사라진 파일을
+    # 계속 요구해 그날부터 빨갰다 — 인벤토리가 이주를 따라가지 못한 것이지
+    # 발행이 깨진 것이 아니다(나머지 변이 5종은 그동안에도 정상 RED였다).
+    # 9 → 3은 통합의 결과다. ConsoleCommandSystem.cpp에도 ModelImport 호출이
+    # 하나 있지만 그것은 모든 reason을 한 번씩 태우는 CLI 자가 검증 프로브라
+    # 제품 writer가 아니다 — 인벤토리에 넣지 않는다.
+    [pscustomobject]@{ Writer = "Model import"; Path = "Engine\SceneRuntime\ModelSceneInstantiation.cpp"; Pattern = "TransformWriteReason::ModelImport"; Count = 3 },
     [pscustomobject]@{ Writer = "Hierarchy"; Path = "Engine\SceneRuntime\Transform.cpp"; Pattern = "PublishLocalWrite\(TransformWriteReason::Hierarchy\);"; Count = 1 },
     [pscustomobject]@{ Writer = "Reset"; Path = "Engine\SceneRuntime\Transform.cpp"; Pattern = "void Transform::TransformReset\(TransformWriteReason reason\)"; Count = 1 }
 )

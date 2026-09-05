@@ -683,8 +683,31 @@ Run-Step "계층 mutation transaction" {
 # TransformUpdatePlan X4 — stable Entity identity와 실행 위치를 분리한 두 packed
 # projection의 mapping/nearest-parent/preorder range를 검증하고, 10k topology
 # transaction compile이 60 Hz 프레임 예산 안인지 Release에서 4회 잰다.
-Run-Step "Transform sparse execution graph" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-execution-graphs.ps1") -Exe $Exe -Work $Work
+# ★ 이 게이트는 **Release로만** 잰다(2026-09-05 정정).
+#
+# 게이트 자체의 기본 -Exe는 Release인데 세트가 `-Exe $Exe`(Debug)로 덮고 있었다.
+# 10k 노드 벤치의 예산 16,666µs는 한 프레임이고 Release 기준으로 잡은 값이다.
+# 같은 기계에서 나란히 쟀다:
+#
+#     Release  median   5,872 µs  → PASS
+#     Debug    median 168,833 µs  → FAIL   (28.7배)
+#
+# 즉 이 칸의 빨강은 제품 회귀가 아니라 축 불일치였다 — 성능 판정은 Release로만
+# 한다는 규칙이 세트 배선에서 깨져 있었다.
+# 다른 Release 전용 게이트들과 같은 관례로 옮긴다 — Release가 없으면 건너뛰고
+# Debug로 대체하지 않는다.
+#
+# 아래 X5·X6도 같은 `-Exe $Exe` 덮어쓰기를 받는다. 그쪽 성능 단정은 절대 예산이
+# 아니라 A/B 상대 비교라 Debug에서도 통과하므로 지금 옮기지 않는다 — 옮긴다면
+# 그것은 별도 슬라이스이고, 낡은 Release exe를 재게 되는 쪽이 더 큰 위험이다.
+$x4ReleaseExe = Join-Path $PSScriptRoot "..\..\Bin\x64-Release\Editor\CreatorEditor.exe"
+if (Test-Path -LiteralPath $x4ReleaseExe -PathType Leaf) {
+    Run-Step "Transform sparse execution graph" {
+        & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-execution-graphs.ps1") -Work $Work
+    }
+} else {
+    "=== Transform sparse execution graph === 건너뜀 (Release 미빌드 — Debug로 대체하지 않는다)"
+    ""
 }
 
 # TransformUpdatePlan X5 — setter publish를 node epoch로 dedupe하고 canonical preorder

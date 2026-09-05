@@ -479,8 +479,8 @@ H0~H4를 착지시켰다. 게이트는 `Tools/regression/verify-hashing-string.p
 
 ★ **지목한 두 곳 말고 두 곳이 더 있었다**(2026-09-05). `Scene.h`의
 `CreateNewScene`·`LoadScene`이 `m_sceneName = sceneName.data();`로 같은 결함을
-갖고 있었다 — 계획서가 세어 둔 목록이 전수가 아니었다([[dependency-proven-by-removal]]와
-같은 모양). 둘 다 닫았고, 게이트에 `m_sceneName = *.data()` 정적 래칫을 넣었다.
+갖고 있었다 — 계획서가 세어 둔 목록이 전수가 아니었다. 둘 다 닫았고, 게이트에
+`m_sceneName = *.data()` 정적 래칫을 넣었다.
 
 #### H2. `==`/`<=>` 일관성 + `data()` 봉인
 
