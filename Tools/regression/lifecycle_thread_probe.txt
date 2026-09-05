@@ -20,6 +20,12 @@ wait 30
 
 object.create ExternalAwait
 script.add ExternalAwait ExternalAwaitProbe
+wait 10
+
+# 워커 몸통에서 엔진 API를 부른다 (LC5-c). 위 픽스처가 재는 "await 뒤"와 달리
+# 여기는 마셜링이 원리적으로 닿지 못하는 자리다.
+object.create WorkerCall
+script.add WorkerCall WorkerCallProbe
 wait 60
 
 play
