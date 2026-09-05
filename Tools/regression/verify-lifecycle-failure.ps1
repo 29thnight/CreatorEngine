@@ -181,17 +181,29 @@ if ($dis -notcontains 'OnDisable') {
 # 끊긴다. 계획서가 "그 둘은 별개의 문제"라고 적어 둔 자리다.
 
 $cleanup = Hooks-Of 'failcleanup'
-$siblings = @($cleanup | Where-Object { $_ -eq 'cleanup1' -or $_ -eq 'cleanup3' })
+$siblings = @($cleanup | Where-Object { $_ -like 'cleanup*' })
 $endAfterCleanupFail = @($cleanup | Where-Object { $_ -eq 'OnEndSimulation' })
 
-"판정 E 정리 예외 격리: 형제 콜백 $($siblings.Count)/2 · 그 뒤 OnEndSimulation $($endAfterCleanupFail.Count) 건 (기대 2 / 1)"
-if ($siblings.Count -lt 2) {
+# 픽스처는 정리 콜백 다섯을 걸고 그중 둘(등록 1번·4번)이 던진다. 실행 순서가
+# 규약으로 못 박혀 있지 않으므로 양 끝과 가운데를 동시에 덮는 배치다.
+"판정 E 정리 예외 격리: 형제 콜백 $($siblings.Count)/3 · 그 뒤 OnEndSimulation $($endAfterCleanupFail.Count) 건 (기대 3 / 1)"
+if ($siblings.Count -lt 3) {
     "  형제 콜백이 끊겼다: 받은 것 $($siblings -join ', ')"
     $failed.Add('E(형제)')
 }
 if ($endAfterCleanupFail.Count -eq 0) {
-    "  → Scope.Cancel()이 Invoke 밖이라, 콜백 예외가 그 뒤 OnEndSimulation을 통째로 건너뛴다(LC2)."
+    "  → Scope.Cancel()의 예외가 경계를 넘어 그 뒤 OnEndSimulation을 통째로 건너뛴다(LC2)."
     $failed.Add('E')
+}
+
+# 삼킨 것과 격리한 것은 다르다. 위 둘만 보면 Cancel이 예외를 조용히 버려도
+# 초록이므로, 최초 원인이 보고됐는지를 함께 센다(계획서 LC2: "예외를 삼키고
+# 성공으로 표시하지 않는다"). 픽스처가 던지는 콜백은 둘이다.
+$reported = ([regex]::Matches($logText, '\[SimulationScope\] 정리 콜백 예외')).Count
+"판정 E 원인 보존: 정리 콜백 예외 보고 $reported 건 (기대 2)"
+if ($reported -lt 2) {
+    "  → 예외가 삼켜졌다. 격리는 원인을 지우는 것이 아니다(LC2)."
+    $failed.Add('E(보고)')
 }
 
 # ── 판정 F: 같은 실패는 같은 상태로 끝난다 (LC5) ──────────────────────────────

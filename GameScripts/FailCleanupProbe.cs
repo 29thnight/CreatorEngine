@@ -47,10 +47,18 @@ public sealed partial class FailCleanupProbe : Component
     {
         Mark("OnBeginSimulation");
 
-        // 셋을 거는 이유: 콜백 실행 순서(대개 LIFO)에 판정이 기대지 않게 하려는 것이다.
-        // 던지는 것이 가운데 있으므로 앞뒤 어느 쪽이 먼저 돌든 형제 둘은 관측된다.
+        // 다섯을 걸고 그중 둘이 던진다. LC2의 완료 조건이 "첫/중간/마지막 콜백이
+        // 실패해도"를 요구하는데, 콜백 실행 순서는 규약으로 못 박혀 있지 않으므로
+        // 순서에 기대지 않고 **양 끝과 가운데를 동시에** 덮는 배치를 쓴다 —
+        // 등록 1번과 4번이 던지므로, 실행이 어느 방향이든 던지는 것 하나는 끝에
+        // 오고 하나는 가운데에 온다.
+        //
+        // 판정은 "로그 셋이 전부 남았는가"다. 순서는 게이트가 트레이스에 그대로
+        // 찍어 눈으로 훑게 둔다.
+        Scope.RegisterCleanup(() => throw new InvalidOperationException("[LC2] 의도한 실패 — 정리 콜백 A가 던진다"));
         Scope.RegisterCleanup(() => Mark("cleanup1"));
-        Scope.RegisterCleanup(() => throw new InvalidOperationException("[LC2] 의도한 실패 — 정리 콜백이 던진다"));
+        Scope.RegisterCleanup(() => Mark("cleanup2"));
+        Scope.RegisterCleanup(() => throw new InvalidOperationException("[LC2] 의도한 실패 — 정리 콜백 B가 던진다"));
         Scope.RegisterCleanup(() => Mark("cleanup3"));
     }
 

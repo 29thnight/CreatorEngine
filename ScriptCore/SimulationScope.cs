@@ -104,9 +104,61 @@ public sealed class SimulationScope
     /// </summary>
     internal void Cancel()
     {
-        _cts.Cancel();
+        // 네 가지 일을 갈라 둔다(LC2 · 2026-09-05) — ① 취소 통지, ② 대기 목록 해제,
+        // ③ 토큰 폐기, ④ 새 토큰. 예전에는 넷이 한 줄씩 이어져 있었고 ①이 던지면
+        // 나머지 셋이 통째로 날아갔다.
+        //
+        // ①은 사용자 코드를 부른다 — RegisterCleanup·Subscribe로 등록한 정리
+        // 콜백이 여기서 돈다. 그래서 던지는 것이 정상 범위의 사건이고, 그것이
+        // ②③④를 막으면 스코프가 취소 상태로 굳은 채 목록도 안 비워진다.
+        //
+        // 더 나쁜 것은 호출자였다. ScriptRegistry의 축소 경로는
+        // `Scope.Cancel(); Invoke(OnEndSimulation);` 순인데, ①의 예외가 그
+        // 경계를 넘어 **OnEndSimulation을 통째로 건너뛰게** 했다(실측: 축소
+        // 삼단 중 가운데만 빠졌다).
+        //
+        // 호출자 쪽에 try/catch를 덧대지 않는다. 이 함수가 던지지 않는 것이
+        // 계약이고, 그 계약이 깨지면 게이트가 붉어져야 한다 — 감싸 두면 다음
+        // 회귀가 조용히 지나간다.
+        CancellationTokenSource old = _cts;
+
+        // ① 취소 통지. 인자 없는 Cancel은 throwOnFirstException:false라 등록된
+        //    콜백을 **전부** 돌린 뒤 AggregateException으로 모아 던진다 — 형제
+        //    콜백은 이미 보호되고 있었다. 여기서 잡는 것은 그 다음을 잇기 위해서다.
+        try
+        {
+            old.Cancel();
+        }
+        catch (AggregateException aggregate)
+        {
+            // 최초 원인을 삼키지 않는다. 콜백마다 한 줄씩 남겨 어느 것이
+            // 실패했는지 스택으로 짚을 수 있게 한다(게이트가 이 건수를 센다 —
+            // 삼켜도 격리는 되므로, 보고를 세지 않으면 삼킴이 초록으로 지나간다).
+            foreach (Exception inner in aggregate.InnerExceptions)
+            {
+                Native.Log(3, $"[SimulationScope] 정리 콜백 예외 — 나머지 정리는 계속한다.\n{inner}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Native.Log(3, $"[SimulationScope] 취소 통지 예외 — 나머지 정리는 계속한다.\n{ex}");
+        }
+
+        // ② 대기 목록 해제. 통지가 어떻게 끝났든 반드시 비운다.
         _pending.Clear();
-        _cts.Dispose();
+
+        // ③ 토큰 폐기. Dispose는 등록 해제를 기다릴 수 있어 여기서도 막힐 수 있다.
+        try
+        {
+            old.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Native.Log(3, $"[SimulationScope] 토큰 폐기 예외 — 새 토큰으로 계속한다.\n{ex}");
+        }
+
+        // ④ 다음 시뮬레이션을 위한 새 토큰. 이것이 서지 않으면 재사용되는
+        //    인스턴스(DDOL 이송·재생 재시작)가 영영 취소 상태로 남는다.
         _cts = new CancellationTokenSource();
     }
 }
