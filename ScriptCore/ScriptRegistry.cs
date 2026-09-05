@@ -513,16 +513,35 @@ internal static class ScriptRegistry
     {
         Flush();
 
+        // ① 스코프 시간 진행. 만기된 Scope.Delay가 여기서 완료 통지를 낸다.
+        //
+        // 시뮬레이션 스코프는 Enabled와 무관하게 흐른다 — 꺼진 스크립트도 대기 중인
+        // Scope.Delay는 계속 흘러야 한다(설계 문서 §4 트랙 L2).
         for (int i = 0; i < _active.Count; ++i)
         {
             var b = _active[i];
             if (!b.IsAlive) continue;
-
-            // 시뮬레이션 스코프는 Enabled와 무관하게 흐른다 — 꺼진 스크립트도 대기 중인
-            // Scope.Delay는 계속 흘러야 한다(설계 문서 §4 트랙 L2).
             b.Scope.Tick(dt);
+        }
 
-            if (!b.Enabled) continue;
+        // ② 재개. ①의 완료 통지와 지난 프레임 이후 도착한 외부 완료가 여기서
+        //    본문으로 이어진다 — 전부 게임 스레드다(LC5-b).
+        //
+        //    자리가 여기인 이유: "await Scope.Delay는 프레임의 일이 시작되기 전에
+        //    재개된다"가 지켜야 할 순서이기 때문이다. 컨텍스트가 서기 전에는
+        //    TaskCompletionSource의 인라인 완료가 그것을 Tick 안에서 해 주고 있었다.
+        //
+        //    ①③을 한 루프로 합칠 수 없는 이유이기도 하다. 합치면 배수 자리가
+        //    인스턴스 사이 어딘가로 들어가 앞뒤 인스턴스가 서로 다른 규칙을 받는다.
+        //    대신 재개는 이제 **모든** PrePhysics보다 앞선다 — 예전에는 자기
+        //    인스턴스의 PrePhysics보다만 앞섰다. 프레임과 스레드는 그대로다.
+        GameThreadSynchronizationContext.Installed?.Drain();
+
+        // ③ 프레임의 일.
+        for (int i = 0; i < _active.Count; ++i)
+        {
+            var b = _active[i];
+            if (!b.IsAlive || !b.Enabled) continue;
             Invoke(b, x => x.PrePhysics(dt), nameof(Component.PrePhysics));
         }
     }
@@ -661,6 +680,16 @@ internal static class ScriptRegistry
         _pendingAdd.Clear();
         _pendingRemove.Clear();
         _byObject.Clear();
+
+        // 아직 돌지 못한 재개를 버린다(LC5-b). 이 경로는 스크립트 타입 참조를 하나도
+        // 남기면 안 되는데, 대기열의 재개는 그 타입의 상태 기계를 그대로 쥐고 있다.
+        //
+        // 되살리는 선택지는 없다 — 위에서 스코프를 전부 취소했으므로 이어 봐야
+        // 사라진 객체를 만진다. 다만 건수는 남긴다. 0이 아니면 그만큼의 async 본문이
+        // 완료되지 않은 채 끊긴 것이고, 그것은 참조 유지(LC3)에서 다시 볼 자리다.
+        int dropped = GameThreadSynchronizationContext.Installed?.DropPending() ?? 0;
+        if (dropped > 0)
+            Native.Log(2, $"[ScriptCore] 리로드로 재개 {dropped} 건을 버렸다 — 그만큼의 async 본문이 완료되지 않았다.");
     }
 }
 

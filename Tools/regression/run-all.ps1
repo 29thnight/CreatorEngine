@@ -229,6 +229,22 @@ Run-Step "생명주기 실패 경로" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-failure.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 스레드 경계(9-5 · LC5-b). 위 항목들이 전부 "무엇이 언제 오는가"를
+# 재는 데 반해 이것은 "그것이 **어느 스레드**에서 도는가"를 잰다.
+#
+# 관리 훅은 전부 게임 스레드 전용인데(ClrHost.h 규약) await 한 줄로 그 밖에
+# 나갈 수 있었다. 나간 뒤의 본문은 여전히 Transform·Entity를 부른다 — 함수
+# 포인터로 C++에 곧장 들어가는 것들이다.
+#
+#   H  외부 await 재개가 게임 스레드로 돌아오는가 (프레임 경계 마셜링)
+#   G  지원 경로(Scope.Delay) 재개는 그대로인가   (비회귀)
+#   I  워커가 실제로 다른 스레드였는가            (H의 거짓 초록 방지)
+#
+# I가 없으면 Task.Run이 인라인된 실행에서 H가 고쳐진 것처럼 보인다.
+Run-Step "생명주기 스레드 경계" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-thread.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #

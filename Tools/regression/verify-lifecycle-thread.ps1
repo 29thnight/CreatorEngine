@@ -1,7 +1,10 @@
 # 생명주기 스레드 경계 게이트 — await가 어느 스레드에서 재개되는가 (LC5-b).
 #
-# ★ 이 게이트는 결함을 증명하려고 붉은 채로 세운다. 판정 H가 오늘 붉고, LC5-b가
-#   착지하면 초록으로 넘어간다. G·I는 처음부터 초록이어야 한다.
+# ★ 이 게이트는 결함을 증명하려고 붉은 채로 세웠고, LC5-b(프레임 경계 마셜링)가
+#   착지해 2026-09-05에 세 판정이 전부 초록이 됐다.
+#     H  외부 await 재개가 게임 스레드로 돌아온다        ← RED→GREEN
+#     G  지원 경로 재개는 그대로 게임 스레드다            (비회귀)
+#     I  워커가 실제로 다른 스레드였다                    (H의 거짓 초록 방지)
 #
 # ── 무엇을 메우는가 ──
 #
@@ -14,9 +17,16 @@
 #
 #   G 지원 경로 재개
 #     `await Scope.Delay` 뒤의 본문이 게임 스레드에서 이어지는가.
-#     오늘 초록이다. 다만 그것은 계약이 아니라 TaskCompletionSource 기본값
-#     (인라인 완료)에 얹힌 결과다 — 이 판정은 그 성질을 못 박아 둔다.
-#     누군가 RunContinuationsAsynchronously를 붙이면 여기가 붉어진다.
+#     LC5-b 전에도 초록이었다. 그때는 계약이 아니라 TaskCompletionSource 기본값
+#     (인라인 완료)에 얹힌 결과였고, 완료를 일으키는 SimulationScope.Tick이
+#     게임 스레드에 있어서 그 자리로 이어졌을 뿐이다. 지금은 컨텍스트가 지킨다.
+#
+#     ★ 이 판정은 그 기본값이 바뀌는 것을 잡지 못한다 — 변이로 확인했다.
+#       TaskCompletionSource에 RunContinuationsAsynchronously를 붙여도 G는
+#       초록이었다. 컨텍스트가 재개를 어차피 게임 스레드로 되돌리기 때문이다.
+#       그 변이가 깨는 것은 스레드가 아니라 **시점**이고(재개가 그 프레임의
+#       배수를 놓친다), 붉어진 것은 verify-lifecycle-baseline의 관리 축이었다
+#       (ScriptHostB의 SimulateStart·SimulateResume 소실). 그 축은 저기 있다.
 #
 #   H 외부 await 재개                                     ← LC5-b가 고칠 자리
 #     `await Task.Run(...)` 뒤의 본문이 게임 스레드에서 이어지는가.
@@ -159,7 +169,7 @@ if ($external -ne $game) {
 ""
 if ($failed.Count -gt 0) {
     "붉은 판정: $($failed -join ', ')"
-    "LC5-b가 착지하기 전까지 H는 붉은 것이 정상이다. G나 I가 붉으면 하네스를 먼저 볼 것."
+    "세 판정은 LC5-b 착지 이후 전부 초록이 정본이다. I가 붉으면 하네스를 먼저 볼 것."
     exit 1
 }
 

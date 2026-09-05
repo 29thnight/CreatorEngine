@@ -22,6 +22,11 @@ public static class Bootstrap
             if (!Native.Bind((ScriptApiTable*)apiTable))
                 return -1;  // 버전/크기 불일치 — 네이티브와 C# 표가 어긋났다
 
+            // 이 함수는 게임 스레드에서 딱 한 번 불린다. 컨텍스트는 스레드마다
+            // 따로이므로 그 사실이 곧 설치 조건이다(LC5-b). 여기서부터 관리 측의
+            // 모든 await는 재개를 프레임 경계로 돌려보낸다.
+            GameThreadSynchronizationContext.Install();
+
             ScriptFactory.Initialize();
             Native.Log(1, "[ScriptCore] 초기화 완료");
             return 0;
