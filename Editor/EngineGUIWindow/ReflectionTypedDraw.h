@@ -260,8 +260,9 @@ namespace Meta::TypedDraw
                 ImGuiInputTextFlags_CallbackResize, Meta::InputTextCallback,
                 static_cast<void*>(&buffer)))
             {
-                // 빈 이름은 HashingString의 대입 어설션에 걸린다(H5 빈 문자열
-                // 정책이 아직 4갈래라 여기서 정하지 않고 커밋만 막는다).
+                // 빈 이름 커밋은 저작 UX 판단으로 막는다. HashingString 자체는
+                // 빈 문자열을 합법으로 다루지만(H5 결정), 이름이 비면 하이어라키에서
+                // 그 오브젝트를 다시 고를 수 없다 — 되돌리기 어려운 편집이다.
                 if (InputManagement->IsKeyPressed(VK_RETURN) && !buffer.empty())
                 {
                     HashingString committed(std::string_view{ buffer });

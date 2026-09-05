@@ -666,10 +666,14 @@ public:
 
     void AllDestroyMark();
 
+	// PHASE 15 H-b 잔존분(2026-09-05). `.data()`를 붙이면 string_view의 길이가
+	// 사라져 const char* 오버로드가 골라진다 — 널 종료가 없는 부분 뷰였다면
+	// 뷰 뒤쪽까지 딸려 들어오거나 버퍼 밖을 읽는다. string_view 오버로드가
+	// 이미 있으므로 그냥 넘기면 된다.
 	static Scene* CreateNewScene(std::string_view sceneName = "SampleScene")
 	{
 		Scene* allocScene = new Scene();
-		allocScene->m_sceneName = sceneName.data();
+		allocScene->m_sceneName = sceneName;
 		allocScene->AddRootEntity(sceneName);
 		return allocScene;
 	}
@@ -677,7 +681,7 @@ public:
 	static Scene* LoadScene(std::string_view name)
 	{
 		Scene* allocScene = new Scene();
-		allocScene->m_sceneName = name.data();
+		allocScene->m_sceneName = name;
 		return allocScene;
 	}
 

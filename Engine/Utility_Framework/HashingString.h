@@ -1,11 +1,31 @@
 #pragma once
 #include "Core.Minimal.h"
-#include <cassert>
 
+// ── 빈 문자열 정책 (PHASE 15 H5, 2026-09-05 결정) ──
+//
+// **빈 문자열은 합법이다.** 예전에는 경로마다 넷으로 갈렸다 — 기본 생성은 통과,
+// std::string·string_view 경로는 Debug 어설션으로 즉사, const char* 경로는
+// nullptr만 막고 빈 문자열은 통과, SetString은 무검사. 어설션은 Release에서
+// 사라지므로 그 "금지"는 규약이 아니라 Debug에서만 죽는 함정이었다.
+//
+// 합법으로 정한 이유는 강제 수단이 없어서가 아니라, 강제할 자리가 여기가 아니기
+// 때문이다. 이름·태그는 저작 UI와 역직렬화가 매 입력마다 만드는 값이고, 빈 값은
+// 잘못된 프로그램이 아니라 "사용자가 지웠다"는 정상 입력이다. "이름 없는 엔티티를
+// 만들지 마라"는 상위 정책이며 실제로 그 층(멤버 기본값·인스펙터 커밋 가드)이
+// 막고 있다. 이 값 타입은 빈 문자열을 다른 문자열과 똑같이 다룬다.
+//
+// nullptr은 여전히 던진다 — 그것은 정책이 아니라 UB 방지다.
 class HashingString
 {
 public:
-	HashingString() = default;
+	// 기본 생성도 빈 문자열의 해시를 갖는다. `= default`였을 때는 m_hash가 0으로
+	// 남아 `HashingString()`과 `HashingString("")`이 같은 내용인데 다르다고
+	// 판정됐다(0 vs FNV offset basis) — 빈 상태가 둘이었다. 정책 이전의 결함이다.
+	HashingString()
+		: m_hash(std::hash<std::string_view>{}(std::string_view{}))
+	{
+	}
+
 	HashingString(const char* str)
 	{
 		if (str == nullptr) 
@@ -18,14 +38,12 @@ public:
 
 	HashingString(const std::string& str)
 	{
-		assert(!str.empty() && "HashingString: 빈 문자열로 생성했다");
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(str);
 	}
 
 	HashingString(std::string_view str)
 	{
-		assert(!str.empty() && "HashingString: 빈 문자열로 생성했다");
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(str);
 	}
@@ -43,7 +61,6 @@ public:
 
 	HashingString& operator=(const std::string& str)
 	{
-		assert(!str.empty() && "HashingString: 빈 문자열을 대입했다");
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(m_string);
 		return *this;
@@ -51,7 +68,12 @@ public:
 
 	HashingString& operator=(std::string_view str)
 	{
-		assert(!str.empty() && "HashingString: 빈 문자열을 대입했다");
+		// 길이가 있는데 포인터가 없는 뷰는 호출부 버그다 — 읽는 순간 UB다.
+		// 빈 뷰(std::string_view{})는 읽을 것이 없으므로 정상 입력이다.
+		if (nullptr == str.data() && 0 != str.size())
+		{
+			throw std::invalid_argument("Sized view with a null pointer provided to HashingString.");
+		}
 		m_string = str;
 		m_hash = std::hash<std::string_view>{}(m_string);
 		return *this;
@@ -88,14 +110,11 @@ public:
 		return m_string;
 	}
 
+	// 대입에 위임한다. 예전에는 여기만 검사 규칙이 또 달라서(널 포인터는 던지고
+	// 빈 문자열은 통과) 정책이 넷으로 갈린 네 번째 갈래가 이 함수였다.
 	void SetString(std::string_view str)
 	{
-		if (nullptr == str.data())
-		{
-			throw std::invalid_argument("Null pointer provided in SetString.");
-		}
-		m_string = str;
-		m_hash = std::hash<std::string_view>{}(str);
+		*this = str;
 	}
 
 	// 내부 버퍼의 쓰기 권한을 밖으로 주지 않는다(H-a의 근본 원인·H-g).

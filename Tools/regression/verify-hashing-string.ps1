@@ -67,6 +67,31 @@ if ($headerText -notmatch 'const\s+std::string\s*&\s*ToString\s*\(\s*\)\s*const'
     throw 'HashingString::ToString() still returns by value (allocates per call).'
 }
 
+# ── 래칫 1b. 빈 문자열 정책 (H5, 2026-09-05 결정: 합법) ──
+#
+# 어설션으로 금지하던 판은 Release에서 사라져 규약이 아니라 Debug 함정이었다.
+# 실행 축(프로브의 빈 문자열 축)이 Debug에서도 돌아야 하므로 어설션이 되살아나면
+# 그쪽이 먼저 죽지만, 의도를 문서가 아니라 게이트에 남기려고 여기서도 본다.
+if ($headerText -match 'assert\s*\([^\r\n]*empty\s*\(\s*\)') {
+    throw 'HashingString reintroduced an empty-string assertion (H5 decided empty is legal).'
+}
+# 기본 생성이 `= default`면 m_hash가 0으로 남아 빈 상태가 둘이 된다.
+if ($headerText -match 'HashingString\s*\(\s*\)\s*=\s*default') {
+    throw 'HashingString default constructor no longer hashes the empty string.'
+}
+
+# ── 래칫 1c. string_view 길이 소실 (H-b) ──
+#
+# `.data()`를 붙이면 const char* 오버로드가 골라져 뷰의 길이가 사라진다.
+# 계획서가 지목한 두 곳은 닫혔고, 2026-09-05에 Scene.h에서 두 곳을 더 찾았다.
+$sceneHeader = Join-Path $repoRoot 'Engine\SceneRuntime\Scene.h'
+if (-not (Test-Path -LiteralPath $sceneHeader -PathType Leaf)) {
+    throw "HashingString contract input is missing: $sceneHeader"
+}
+if ((Get-Content -LiteralPath $sceneHeader -Raw) -match 'm_sceneName\s*=\s*\w+\s*\.\s*data\s*\(\s*\)') {
+    throw 'Scene assigns m_sceneName through string_view::data() again (length is lost).'
+}
+
 # ── 래칫 2. 해시 컨테이너 키 계약 ──
 if ($headerText -notmatch 'struct\s+hash\s*<\s*HashingString\s*>') {
     throw 'std::hash<HashingString> specialization is missing.'

@@ -46,6 +46,12 @@ function Run-Step([string]$name, [scriptblock]$body) {
 # 내게 → 특수화 단정만 전 경로, ④ ==를 해시 전용으로 되돌림 → 정적 래칫,
 # ⑤ data()의 char* 재개방 → 정적 래칫(고치기 전 HEAD가 정확히 이 상태였다),
 # ⑥ 인스펙터 브랜치 원복 → 정적 래칫. 여섯 다 되돌려 Debug/Release 초록 재확인.
+#
+# H5(빈 문자열 정책) 착지분에 세 개를 더했다(같은 날). ⑦ 기본 생성자를
+# `= default`로 복귀 → 정적 래칫, ⑧ 래칫을 우회해 기본 생성자가 0을 캐시하게
+# → 실행 축 8건("기본 생성"·빈 상태 수렴), ⑨ 빈 문자열 금지를 어설션 아닌
+# 형태로 되살림 → Debug 실행이 죽어 빨강(정책을 주석이 아니라 실행이 지킨다),
+# ⑩ Scene.h의 `m_sceneName = *.data()` 복귀 → 정적 래칫.
 Run-Step "HashingString 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hashing-string.ps1")
 }

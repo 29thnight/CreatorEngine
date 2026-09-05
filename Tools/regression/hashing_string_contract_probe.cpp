@@ -15,6 +15,10 @@
 //      호출부가 `sv.data()`를 const char*로 넘기던 UB(§1.8 H-b)가 되살아나면
 //      길이 정보가 사라져 뷰 뒤쪽 문자열까지 딸려 들어온다.
 //
+//   2b. 빈 문자열 정책 — 빈 상태가 **하나**인가(H5 결정: 빈 문자열은 합법).
+//      이 축이 Debug에서도 돈다는 사실 자체가 정책의 강제 수단이다 — 빈 문자열
+//      어설션이 되살아나면 Debug 실행이 죽어 게이트가 빨개진다.
+//
 //   3. 해시 컨테이너 키 계약 — std::hash 특수화와 ==가 unordered 컨테이너의
 //      요구를 만족하는가(§1.8 H-e). 순서 컨테이너(<=>)도 같이 본다.
 //
@@ -154,6 +158,67 @@ void RunPartialViewAxis()
         "부분 뷰가 전체 문자열과 같은 값이 됐다(길이 소실)");
 }
 
+// ── 축 2b. 빈 문자열 정책 (H5, 2026-09-05 결정: 합법) ──
+//
+// 이 축은 Debug에서도 돌아야 한다는 사실 자체가 정책의 강제 수단이다. 빈 문자열
+// 어설션이 되살아나면 Debug 실행이 어설션으로 죽어 게이트가 빨개진다 — 주석이
+// 아니라 실행이 정책을 지킨다.
+//
+// 그리고 "빈 상태는 하나"를 단정한다. 기본 생성이 해시를 계산하지 않던 시절에는
+// HashingString()과 HashingString("")이 같은 내용인데 다르다고 판정됐다.
+void RunEmptyStringAxis()
+{
+    const HashingString defaulted;
+    CheckStoredState(defaulted, "", "기본 생성");
+
+    CheckStoredState(HashingString(""), "", "빈 문자열 생성자(const char*)");
+    CheckStoredState(HashingString(std::string()), "", "빈 문자열 생성자(std::string)");
+    CheckStoredState(HashingString(std::string_view()), "", "빈 문자열 생성자(string_view)");
+
+    // 기본 생성과 명시적 빈 문자열은 같은 상태여야 한다(빈 상태가 둘이면 안 된다).
+    Check(defaulted == HashingString(""), "기본 생성과 빈 문자열이 서로 다른 값이다");
+    Check((defaulted <=> HashingString("")) == 0, "기본 생성과 빈 문자열의 순서가 다르다");
+
+    // 채워진 값을 비우는 경로도 같은 상태로 수렴해야 한다.
+    HashingString subject("채워진값");
+
+    subject = "";
+    CheckStoredState(subject, "", "빈 문자열 대입(const char*)");
+    Check(subject == defaulted, "빈 문자열 대입 결과가 기본 생성과 다르다");
+
+    subject = HashingString("다시채움");
+    subject = std::string();
+    CheckStoredState(subject, "", "빈 문자열 대입(std::string)");
+
+    subject = HashingString("다시채움");
+    subject = std::string_view();
+    CheckStoredState(subject, "", "빈 문자열 대입(string_view)");
+
+    subject = HashingString("다시채움");
+    subject.SetString("");
+    CheckStoredState(subject, "", "빈 문자열 SetString");
+    Check(subject == defaulted, "SetString(\"\") 결과가 기본 생성과 다르다");
+
+    // 빈 뷰는 data()가 널이다. 읽을 것이 없으므로 정상 입력이어야 한다 —
+    // 예전에는 SetString만 여기서 던져 정책의 네 번째 갈래가 됐다.
+    subject = HashingString("다시채움");
+    subject.SetString(std::string_view());
+    CheckStoredState(subject, "", "빈 뷰 SetString");
+
+    // 길이가 있는데 포인터가 없는 뷰를 던지는 가드는 **여기서 잴 수 없다.**
+    // 그런 뷰를 만드는 것 자체가 UB라, MSVC 디버그 STL이 string_view 생성자에서
+    // 먼저 죽는다(실제로 시도했다가 STATUS_BREAKPOINT로 게이트가 죽었다).
+    // 가드는 헤더에 남기되 이 프로브의 사각지대로 적어 둔다.
+
+    // 빈 값도 컨테이너 키로 쓸 수 있어야 한다 — 합법이라면 예외를 두지 않는다.
+    std::unordered_map<HashingString, int> byName;
+    byName.emplace(HashingString(), 1);
+    Check(byName.find(HashingString("")) != byName.end(),
+        "빈 키를 기본 생성 인스턴스로 찾지 못한다");
+    Check(byName.emplace(HashingString(""), 2).second == false,
+        "기본 생성과 빈 문자열이 서로 다른 키로 들어간다");
+}
+
 // ── 축 3. 해시 컨테이너 키 계약 ──
 void RunHashContainerAxis()
 {
@@ -249,6 +314,7 @@ int main()
 {
     RunCacheInvariantAxis();
     RunPartialViewAxis();
+    RunEmptyStringAxis();
     RunHashContainerAxis();
 
     if (g_failures != 0)
