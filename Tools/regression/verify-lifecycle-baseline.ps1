@@ -19,6 +19,26 @@
 # 알고 싶은 것은 "몇 번째 프레임에 불렸나"가 아니라 "어떤 순서로 불렸나"다.
 #
 # 남는 것은 (단계, 타입, 오브젝트 이름) 세 열의 순서다. 그것이 생명주기의 계약이다.
+#
+# ── 축이 둘이다 (LC0 · 2026-09-05) ──
+#
+# 이 게이트는 실행 하나에서 **두 트레이스**를 받아 각각 골든에 대조한다.
+#
+#   네이티브 축 — Scene.cpp의 LIFECYCLE_TRACE가 찍는 lifecycle_baseline.tsv.
+#   관리   축 — LifecycleProbe의 훅 본문이 에디터 로그에 찍는
+#               lifecycle_managed_baseline.tsv.
+#
+# 둘을 나눈 이유는 네이티브 골든이 관리 측 결함에 **원리적으로 눈멀기** 때문이다.
+# 네이티브 트레이스는 "엔진이 훅을 불렀다"까지만 말하고, 그것이 C# 인스턴스에
+# 닿았는지는 말하지 않는다.
+#
+# 변이로 확인했다(2026-09-05): ScriptRegistry의 축소 경로에서 ApplyEnabled(b,false)
+# 한 줄을 지우자 관리 축은 51건 차이로 빨개졌고(모든 축소에서 Disable이 사라졌다)
+# **네이티브 축 239 사건은 전부 통과했다** — ScriptComponent 행 18건을 포함해서다.
+# 두 축의 유도 경로가 독립이라 서로의 대조군이 된다.
+#
+# 그 전까지 이 기준선에는 ScriptComponent 행이 0건이었다. 계측 구멍이 아니라
+# 시나리오가 스크립트를 한 번도 붙이지 않아서였다(LIFECYCLE_TRACE는 타입 무관).
 
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
@@ -85,10 +105,27 @@ $exeArgs = @("--script", $scenario)
 # 9-2에서 26종이 레지스트리로 옮겨 가며 델리게이트 경로에 구독자가 0이 됐으므로,
 # 레지스트리 기준선이 곧 엔진의 기준선이다.
 $baselineFile = Join-Path $PSScriptRoot "lifecycle_baseline.tsv"
+
+# 관리 측 골든 (LC0 · 2026-09-05).
+#
+# 네이티브 tsv는 **네이티브가 훅을 불렀다**까지만 말한다. 그것이 C# 인스턴스에
+# 실제로 닿았는지는 다른 축이고, 그 축이 비어 있으면 "네이티브는 불렀는데 관리
+# 측에 안 닿았다"가 원리적으로 안 보인다 — 이 계획(LC0)이 지목한 구멍이다.
+#
+# 두 트레이스의 유도 경로가 **완전히 독립**인 것이 요점이다. 네이티브 쪽은
+# Scene.cpp의 LIFECYCLE_TRACE가, 관리 쪽은 LifecycleProbe의 훅 본문이 찍는다.
+# 같은 실행에서 나오므로 서로의 대조군이 된다(프로세스 안 대조가 같은 출처를
+# 두 번 읽는 동어반복이 되는 함정을 피한다).
+$managedBaselineFile = Join-Path $PSScriptRoot "lifecycle_managed_baseline.tsv"
 # lifecycle.dump의 상대 경로는 Editor 테스트 산출물 루트 아래로 해석된다.
 $producedFile = Join-Path $repoRoot "Artifacts\Tests\Editor\Traces\lifecycle_trace.tsv"
 
 if (Test-Path $producedFile) { Remove-Item $producedFile -Force }
+
+# 에디터 로그를 고를 기준 시각. 관리 훅은 표준 출력이 아니라 Saved\Log\Editor_*.html로
+# 간다 — "가장 최신"만으로 고르면 이번 실행이 로그를 못 남겼을 때 옛 파일을 읽고
+# 조용히 통과한다(빈 집합을 통과로 읽는 그 함정이다).
+$runStart = Get-Date
 
 $proc = Start-Process -FilePath $Exe -ArgumentList $exeArgs `
     -WorkingDirectory $exeDir `
@@ -134,10 +171,45 @@ if ($produced.Count -eq 0) {
     exit 1
 }
 
+# ── 관리 측 트레이스 수확 ──────────────────────────────────────────────────────
+#
+# LifecycleProbe가 훅마다 남기는 한 줄을 (훅, 오브젝트) 쌍으로 정규화한다.
+# 프레임 번호는 뺀다 — 네이티브 골든이 프레임을 빼는 것과 같은 이유이고,
+# 헤드리스 프레임 속도는 기계마다 다르다.
+$logDir = Join-Path $exeDir "Saved\Log"
+$editorLog = @(Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
+    Where-Object { $_.LastWriteTime -ge $runStart } |
+    Sort-Object LastWriteTime -Descending)
+
+if ($editorLog.Count -eq 0) {
+    "이번 실행의 에디터 로그가 없다: $logDir\Editor_*.html ($runStart 이후)"
+    "관리 훅은 이 파일로만 나오므로 관리 축을 판정할 수 없다."
+    exit 1
+}
+
+$logText = (Get-Content -LiteralPath $editorLog[0].FullName -Raw) -replace '<[^>]+>', ''
+
+# 대시는 유니코드 em dash라 문자를 직접 박지 않고 문자 종류로 받는다.
+$probeRx = '\[Probe\]\s+([A-Za-z]+)\s+\p{Pd}\s+([A-Za-z0-9_]+)'
+$managed = @([regex]::Matches($logText, $probeRx) | ForEach-Object {
+    "$($_.Groups[1].Value)`t$($_.Groups[2].Value)"
+})
+
+if ($managed.Count -eq 0) {
+    "관리 훅 기록이 0건이다. 네이티브가 ScriptComponent를 $(($produced | Where-Object { $_ -match 'ScriptComponent' }).Count)건 찍었는데"
+    "그중 어느 것도 C# 인스턴스에 닿지 않았다는 뜻이다 — 또는 프로브가 씬에서 빠졌다."
+    "로그: $($editorLog[0].FullName)"
+    exit 1
+}
+
 if ($Baseline) {
     Copy-Item $producedFile $baselineFile -Force
+    Set-Content -LiteralPath $managedBaselineFile -Value (@(
+        "# managed lifecycle trace v1",
+        "# hook`tobject") + $managed) -Encoding UTF8
     "기준선 저장: $baselineFile ($($produced.Count) 사건)"
-    "이 파일을 커밋하면 이후 실행이 여기에 대조된다."
+    "관리 기준선: $managedBaselineFile ($($managed.Count) 사건)"
+    "두 파일을 커밋하면 이후 실행이 여기에 대조된다."
     exit 0
 }
 
@@ -147,13 +219,42 @@ if (-not (Test-Path $baselineFile)) {
     exit 1
 }
 
+if (-not (Test-Path $managedBaselineFile)) {
+    "관리 기준선이 없다: $managedBaselineFile"
+    "먼저 -Baseline 으로 한 번 떠 둘 것."
+    exit 1
+}
+
+# ── 관리 축 판정 ───────────────────────────────────────────────────────────────
+
+$managedExpected = @(Get-Content $managedBaselineFile |
+    Where-Object { $_ -notmatch '^\s*#' -and $_.Trim() -ne '' })
+
+$managedDiffs = Compare-Object -ReferenceObject $managedExpected -DifferenceObject $managed -SyncWindow 0
+$managedOk = ($null -eq $managedDiffs -or $managedDiffs.Count -eq 0)
+
+if ($managedOk) {
+    "관리 축 통과 ($($managed.Count) 사건 · 순서 동일)"
+} else {
+    "관리 축이 달라졌다 — 차이 $($managedDiffs.Count) 건 (앞 20건만 표시)"
+    $managedDiffs | Select-Object -First 20 | ForEach-Object {
+        $mark = if ($_.SideIndicator -eq '<=') { "기준선에만" } else { "현재에만  " }
+        "  $mark  $($_.InputObject)"
+    }
+    "관리 기준선: $managedBaselineFile"
+    ""
+}
+
+# ── 네이티브 축 판정 ───────────────────────────────────────────────────────────
+
 $expected = @(Get-Normalized $baselineFile)
 
 $diffs = Compare-Object -ReferenceObject $expected -DifferenceObject $produced -SyncWindow 0
 
 if ($null -eq $diffs -or $diffs.Count -eq 0) {
-    "전체 통과 ($($produced.Count) 사건 · 순서 동일)"
-    exit 0
+    "네이티브 축 통과 ($($produced.Count) 사건 · 순서 동일)"
+    if ($managedOk) { exit 0 }
+    exit 1
 }
 
 # 실패했을 때 "무엇이 다른가"를 한 단계 더 갈라 준다.
