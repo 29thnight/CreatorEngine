@@ -83,6 +83,31 @@ namespace CommandService
             return false;
         }
 
+        // ★ Winsock 을 여기서 올린다(2026-09-06).
+        //
+        //   `SocketSubsystem` 은 "프로세스당 한 번, Win32 의 WSAStartup 이 여기
+        //   산다" 로 설계돼 있었는데 **저장소 전체에서 인스턴스가 0 이었다.**
+        //   선언과 정의만 있고 아무도 만들지 않았다.
+        //
+        //   그런데 Debug 에서는 서비스가 떴다 — 다른 의존이 자기 목적으로
+        //   `WSAStartup` 을 해 주고 있었고, 우리 소켓이 **남의 초기화에 얹혀**
+        //   있었다. Release 에는 그것이 없어 `socket()` 이 WSA 10093
+        //   (WSANOTINITIALISED) 으로 떨어진다.
+        //
+        //   LC4~LC8 의 서비스 검증이 전부 Debug 에서 돌아 아무도 보지 못했다.
+        //   "게이트가 초록이다" 와 "게이트가 이 구성을 보고 초록이다" 는 다른
+        //   문장이라는 것을 이 저장소는 이미 두 번 배웠다(LC8 의 구성 표식,
+        //   scene 이행 때의 낡은 바이너리).
+        //
+        //   함수 지역 static 이라 첫 `Start` 에서 한 번 초기화되고 프로세스
+        //   종료까지 산다 — 스레드 안전한 초기화는 표준이 보장한다.
+        static SocketSubsystem s_sockets;
+        if (!s_sockets.ok)
+        {
+            outError = s_sockets.error;
+            return false;
+        }
+
         uint16_t bound = 0;
         m_listener = ListenLoopback(config.port, config.backlog, bound, outError);
         if (!IsValid(m_listener)) return false;

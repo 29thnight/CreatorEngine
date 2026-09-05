@@ -280,10 +280,41 @@ mutating 명령 전수를 registry로 셀 수 없다.
 
 | 이름 | 소비자 | 처분 |
 |---|---:|---|
-| `mem.delta` · `mem.reset` · `mem.hook` · `dump.show` | **0** | 죽은 이름 |
+| `mem.delta` · `mem.reset` · `mem.hook` · `dump.show` | **0** | ~~죽은 이름~~ → **틀렸다. 아래 ★** |
 | `ui.size` · `ui.pos` · `ui.screenpos` | golden + 게이트 | `ui.anchor`의 인자 |
 | `play`/`stop`, `undo`/`redo` | 다수 | 진짜 다른 동사 — descriptor를 가른다(이름은 이미 있으므로 명령이 늘지 않는다) |
 | `scene.switch` (`scene.load` 별칭) | **34** | 진짜 동의어. 손대지 않는다 |
+
+★ **"죽은 이름 4개" 는 2026-09-06 에 철회한다 — 넷 다 살아 있는 조작이다.**
+
+소비자 수 0 을 "기능 없음" 으로 읽은 것이 오독이었다. 핸들러를 열어 보면 넷 다
+자기 분기를 갖고 있다:
+
+| 이름 | 실제로 하는 일 |
+|---|---|
+| `mem.hook` | CRT 할당 훅 — `on\|stack\|off\|top\|status` 모드를 가진 147줄 하위 도구(`_DEBUG` 전용) |
+| `mem.reset` | 계수 기준선 재설정 |
+| `mem.delta` | 기준선 대비 증감 |
+| `dump.show` | 가장 최근 덤프의 **내용**까지 찍는다(`dump.list` 는 목록만) |
+
+지우면 중복이 사라지는 것이 아니라 **진단 능력이 사라진다.** §3.4 의
+`*.authoring.probe` 여섯과 같은 부류다 — 유일한 창구인데 소비자가 없을 뿐이다.
+
+남은 진짜 문제는 §3.5 가 적은 그대로다: 이것들이 `aliases` 칸에 들어 있어
+**descriptor 가 거짓말을 한다.** `commands.list`·help·`GET /commands` 는 넷을
+`mem.stats`/`dump.list` 와 같은 명령으로 보여 주고, `cost`·`class`·요약이 하나로
+묶인다. `mem.reset` 은 상태를 바꾸는데 조회 descriptor 뒤에 있다.
+
+처분은 둘 중 하나이고 **이 문서가 고르지 않는다**:
+
+- **(가) descriptor 를 가른다.** 이름은 이미 있으므로 명령이 느는 것이 아니라
+  registry 가 정직해진다. 명령 수는 204 → 208 로 오르지만 그것은 지금까지
+  **덜 세고 있었다**는 뜻이다.
+- **(나) 모드 인자로 접는다.** `mem.stats hook top` · `dump.list show`. 이 저장소의
+  주된 관례가 그것이고(`sparseresolver 0|1|print|probe|bench`,
+  `experiment.catalog mount|probe`) 이름이 218 → 214 로 준다. 다만 `mem.*` 가
+  뭉쳐 있는 이유는 응집이 아니라 **MSVC C1061 우회**였으므로, 그 관례를 따를
+  근거가 이 자리에는 없다.
 
 ## 4. 축 B — undo 배선
 
@@ -492,7 +523,7 @@ operation 레코드**가 생긴다(`CommandService.cpp:566-575`가 enqueue 전�
 | 4 | `model.place` undo 배선 (3줄) | **배선 완료 2026-09-05 · 런타임 미검증** (§6.3) | |
 | ~~5~~ | ~~`object.create` undo 배선 → `object.create.undoable` 제거~~ | **완료 2026-09-05** (§6.4) | |
 | 6 | `*scale` 셋의 요약·`cost` 정정 | 표기만 | 쉬움 |
-| 7 | 죽은 별칭 이름 4개 제거(`mem.delta`·`mem.reset`·`mem.hook`·`dump.show`) | 이름 −4 | 쉬움 |
+| ~~7~~ | ~~죽은 별칭 이름 4개 제거~~ | **철회 2026-09-06** — 넷 다 살아 있는 조작이다(§3.5 ★). 처분은 (가)/(나) 결정 사항 | |
 | 8 | `uploadring`/`uploadsegments` 짝 결정 | registry −1 | 결정 필요 |
 | 9 | `window.info`→`render.rtinfo`, `model.loadcached` 처분 | registry −2 | 중간 |
 | 10 | scene X0·X8 병합, 토글 둘을 `traversalbench` 인자로 | registry −4 | 중간 |
@@ -645,6 +676,35 @@ RenderTests 두 프로젝트가 include 순서를 **서로 다르게** 두기 �
 **게이트**: registry-golden · discovery · exit-spine · exit-contract ·
 consumer-contract · experiment-contract · play-selection-undo 통과.
 editor-operation 은 §6.3 의 `model.place` 측정 불가로 붉다(의도).
+
+### 6.5 곁가지로 나온 것 — 명령 서비스가 Release 에서 안 떴다 (2026-09-06)
+
+§6 의 12번(`cost` 실측)을 하려고 Release 바이너리로 서비스를 띄우다 걸렸다.
+
+```
+[CLI] command service 시작 실패: socket 실패 (WSA 10093)
+```
+
+`WSA 10093` 은 `WSANOTINITIALISED` — `WSAStartup` 이 안 됐다는 뜻이다. 찾아보니
+`SocketPlatform.h` 의 `SocketSubsystem` 이 **"프로세스당 한 번, Win32 의
+`WSAStartup` 이 여기 산다"** 로 설계돼 있는데 **저장소 전체에서 인스턴스가 0**
+이었다. 선언과 정의만 있고 아무도 만들지 않았다.
+
+★ **그런데 Debug 에서는 떴다.** 다른 의존이 자기 목적으로 `WSAStartup` 을 해 주고
+  있었고 서비스 소켓이 **남의 초기화에 얹혀** 있었다. Release 에는 그것이 없다.
+
+★★ **왜 아무도 못 봤나 — 서비스 게이트 여섯이 전부 `-Exe` 기본값이 Debug 다.**
+  `verify-cli-service` · `verify-cli-drain` · `verify-cli-editor-operation` ·
+  `verify-cli-script-reload` · `verify-cli-script-invoke` ·
+  `lc6-live-classification`. LC4~LC8 이 연 것 전부가 Debug 에서만 검증됐고,
+  §18 의 "Editor Debug/Release 가 통과한다" 는 서비스에 대해 **참인 적이 없었다.**
+
+  이 저장소는 같은 모양을 이미 두 번 겪었다 — LC8 이 `build.ps1` 에 구성 표식을
+  넣은 이유, scene 이행 때 9/4 Release 바이너리로 초록을 받을 뻔한 일. 셋 다
+  "게이트가 초록이다" 와 "게이트가 **이 구성을** 보고 초록이다" 의 차이다.
+
+고친 것은 `Service::Start` 에 함수 지역 static `SocketSubsystem` 하나다.
+고친 뒤 `verify-cli-service.ps1` 을 **Release 로** 돌려 전체 통과를 확인했다.
 
 ## 7. 이 조사가 **하지 않은** 것
 
