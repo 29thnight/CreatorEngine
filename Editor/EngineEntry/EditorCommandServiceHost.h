@@ -18,7 +18,10 @@ namespace EditorCommandService
     ///
     /// 실패하면 false 와 사유. 실패해도 에디터는 계속 뜬다 — 서비스가 안 열린
     /// 것과 에디터가 못 뜨는 것은 다른 사건이고, 후자로 만들 이유가 없다.
-    bool Start(const std::string& projectRoot, std::string& outError);
+    /// `allowUserCode` 는 `--allow-user-code` 다. **서비스를 켜는 것과 별개의
+    /// 결정**이라 인자가 따로 있다(§8 · LC7) — 켜지 않으면 `ExecutesUserCode`
+    /// 명령은 403 이다.
+    bool Start(const std::string& projectRoot, bool allowUserCode, std::string& outError);
 
     void Stop() noexcept;
 

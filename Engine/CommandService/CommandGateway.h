@@ -63,6 +63,14 @@ namespace CommandService
         ///   §7.1 의 지연 계약이 그 순간 거짓말이 된다.
         virtual bool IsLongRunning(const std::string& command, bool& outFound) = 0;
 
+        /// 이 명령이 **사용자 코드를 부르는가**(LC3 descriptor 의 `ExecutesUserCode`).
+        ///
+        /// ★ §8 의 "사용자 코드" 줄이 이 값 위에 선다 — 별도 플래그 없이 켜진
+        ///   서비스는 이런 명령을 403 으로 돌려보낸다. 서비스는 어느 명령이
+        ///   그런지 스스로 알 수 없고 알아서도 안 된다(이름 목록을 서비스에
+        ///   박으면 registry 와 갈라진다). registry 가 답하는 것을 받는다.
+        virtual bool ExecutesUserCode(const std::string& command) = 0;
+
         /// 결과를 기다리지 않고 넣는다. 완료되면 `onDone` 이 **게임 스레드에서**
         /// 불린다 — operation 표를 채우는 데 쓴다.
         ///

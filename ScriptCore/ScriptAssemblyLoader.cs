@@ -48,6 +48,18 @@ internal static class ScriptAssemblyLoader
     public static bool IsLoaded => _context is not null;
 
     /// <summary>
+    /// 지금 올라와 있는 게임 스크립트 어셈블리.
+    ///
+    /// ★ **결과를 붙들지 말 것.** 정적 필드에 <see cref="Assembly"/> 를 담으면 그것이
+    ///   컨텍스트를 붙들어 언로드가 영영 실패하고, 다음 리로드부터 같은 타입이 두 벌이
+    ///   된다. 컨텍스트에서 매번 새로 물어 오는 이유가 그것이다 — 여기에도 캐시가 없다.
+    ///
+    /// 호출자(<see cref="EngineCallableInvoker"/>)는 이것을 지역에 두었다 곧 버린다.
+    /// </summary>
+    public static Assembly[] LoadedAssemblies()
+        => _context is null ? [] : [.. _context.Assemblies];
+
+    /// <summary>
     /// 스크립트 어셈블리를 로드하고 등록을 수행한다.
     /// 파일을 잠그지 않도록 바이트로 읽어 올린다 — 잠그면 다음 빌드가 실패한다.
     /// </summary>

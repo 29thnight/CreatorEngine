@@ -133,6 +133,7 @@
 #include <cctype>
 #include <limits>
 #include <random>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
@@ -258,6 +259,15 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
     bool wantStdinReader = false;
     bool wantCommandService = false;
 
+    // `--allow-user-code`. **서비스에만 걸린다**(§8 · LC7).
+    //
+    // ★ 배치(`--exec`·`--script`)와 stdin 은 이 플래그를 보지 않는다. 그 경로로
+    //   명령을 넣는 사람은 이미 이 기계에서 이 실행 파일을 인자와 함께 띄운
+    //   사람이고, 그에게 사용자 코드 호출을 한 번 더 묻는 것은 통제가 아니라
+    //   의식이다. §8 이 통제를 요구하는 것은 **프로세스 경계 밖**에서 오는
+    //   호출이고, 그것이 서비스다.
+    bool wantUserCode = false;
+
     auto toUtf8 = [](const wchar_t* w) -> std::string
     {
         if (!w) return {};
@@ -325,6 +335,20 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
             //   에디터가 못 뜨는 것은 다른 사건이다.
             wantCommandService = true;
         }
+        else if (arg == "--allow-user-code")
+        {
+            // ★ 서비스를 켠 것과 사용자 코드를 연 것은 다른 결정이다(§8 · LC7).
+            //
+            //   `--command-service` 안에는 씬을 열고 자산을 저작하는 것까지
+            //   들어 있지만, 그것들은 전부 **엔진이 쓴 코드**가 하는 일이다.
+            //   `script.invoke` 는 엔진이 쓰지 않은 코드를 부른다. 둘을 한
+            //   플래그에 묶으면 서비스를 켜는 모든 실행이 뒤엣것에 동의한
+            //   셈이 되므로, 동의를 따로 받는다.
+            //
+            //   이 플래그만 주고 서비스를 안 켜면 아무 일도 하지 않는다 —
+            //   배치·stdin 경로는 애초에 이 플래그를 보지 않는다(아래 주석).
+            wantUserCode = true;
+        }
         else if (arg == "--fail-fast")
         {
             // 기본은 continue + aggregate 다(§3.1). 시나리오 하나가 실패해도
@@ -348,10 +372,18 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
         EnsureRegistryPopulated();
 
         std::string error;
-        if (EditorCommandService::Start(PathFinder::BaseProjectPath().string(), error))
+        if (EditorCommandService::Start(PathFinder::BaseProjectPath().string(), wantUserCode, error))
         {
             std::printf("[CLI] command service listening 127.0.0.1:%u\n",
                         static_cast<unsigned>(EditorCommandService::Port()));
+
+            // 사용자 코드를 열었다는 것은 **로그에 남아야 한다.** 이 실행의
+            // 표면이 다른 실행과 다르고, 감사에서 그 사실이 보여야 한다.
+            if (wantUserCode)
+            {
+                std::printf("[CLI] command service: 사용자 코드 실행 허용 "
+                            "(--allow-user-code)\n");
+            }
         }
         else
         {
@@ -3607,6 +3639,13 @@ namespace ConsoleCmd
         //   될 뻔했다. 예외 경계는 좋은 기본값이지만 기본값에는 예외가 있어야 한다.
         bool letExceptionsEscape{ false };
 
+        // LC7 — 이 명령이 사용자 코드를 부를 수 있는가(§6.2 의 `ExecutesUserCode`).
+        //
+        // seed 표가 정하고 `ExecuteParsed` 가 읽는다. 참인 명령만 실행 동안
+        // `ClrHost::UserCodeScope` 를 열고, 그 창 밖에서의 호출은 `NotPermitted`
+        // 로 거부된다. 오늘 참인 것은 `script.invoke` 하나다.
+        bool executesUserCode{ false };
+
         CommandCore::CommandResult Invoke(const ConsoleCommandContext& ctx) const
         {
             if (nullptr != modern) return modern(ctx);
@@ -3713,6 +3752,22 @@ namespace ConsoleCmd
                     descriptor.cost     = seed->cost;
                     descriptor.cls      = seed->cls;
                     descriptor.liveness = seed->liveness;
+
+                    // ── LC7: 사용자 코드 창을 여는 권한을 조회 표에도 박는다 ──
+                    //
+                    // descriptor 는 discovery 가 읽고, 조회 표는 **실행이** 읽는다.
+                    // `ExecuteParsed` 가 매 명령마다 registry 를 다시 뒤지지 않게
+                    // 하려고 여기서 한 번 옮겨 둔다.
+                    //
+                    // ★ 등록된 **이름 전부**에 박는다. 별칭으로 부른 호출이 창을
+                    //   못 열면 같은 명령이 이름에 따라 다르게 동작한다 — 오늘
+                    //   `script.invoke` 는 별칭이 없지만, 없다는 사실에 기대어
+                    //   canonical 만 칠하면 별칭이 붙는 날 조용히 갈라진다.
+                    descriptor.executesUserCode = seed->executesUserCode;
+                    if (seed->executesUserCode)
+                    {
+                        for (const char* name : accepted) t[name].executesUserCode = true;
+                    }
                 }
                 // summary 가 비면 Add 가 거부하고 사유를 남긴다.
                 registry.Add(std::move(descriptor));
@@ -3870,6 +3925,25 @@ CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
     }
 
     const ConsoleCommandContext ctx{ cmd, parts, diagnosticLine, *this };
+
+    // ── LC7: 사용자 코드에 닿는 창은 표시된 명령에만 열린다 (§6.2 · §10.2) ──
+    //
+    // ★ 이것이 "`ExecutesUserCode` 없는 경로로는 B 에 도달 불가" 를 규약이
+    //   아니라 **구조**로 만드는 자리다. 규약으로만 두면 — "그 capability 를
+    //   가진 핸들러에서만 `ClrHost::InvokeCallableStatic` 을 부르기로 한다" 로 두면 —
+    //   지켜지는지 확인할 방법이 소스를 눈으로 훑는 것뿐이고, 두 번째 호출자가
+    //   생기는 날 아무도 모른 채 경계가 사라진다.
+    //
+    // 창은 명령 하나의 실행 동안만 열린다. 범위를 더 좁힐 수는 없다 — 핸들러
+    // 안에서 어느 줄이 부를지는 여기서 보이지 않기 때문이다.
+    //
+    // ※ RAII 로 둔 이유는 아래 세 갈래의 catch 다. 핸들러가 던지면 창을 닫는
+    //   줄을 건너뛰게 되고, 그러면 그 뒤 **모든 명령**이 사용자 코드를 부를 수 있다.
+    struct UserCodeGate
+    {
+        std::optional<ClrHost::UserCodeScope> scope;
+        explicit UserCodeGate(bool allow) { if (allow) scope.emplace(); }
+    } gate(it->second.executesUserCode);
 
     // 일부러 죽는 명령은 그대로 죽게 둔다(`crash.test`). 크래시 덤프 경로는
     // 크래시가 나야만 도는 검사라, 여기서 삼키면 그 검사가 통째로 사각지대가 된다.

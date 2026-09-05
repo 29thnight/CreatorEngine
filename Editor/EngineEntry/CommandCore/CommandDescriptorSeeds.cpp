@@ -203,6 +203,15 @@ namespace CommandCore
             { "scene.traversalbench", CommandCost::Long, "<오브젝트수> <프레임수> [flat|wide|deep|skeleton]", "X0 Release 벤치(0=현재 씬)", CommandClass::Probe, CommandLiveness::Live },
             { "script.add", CommandCost::Frames, "<오브젝트> <타입>", "C# 스크립트를 오브젝트에 부착한다", CommandClass::EngineService, CommandLiveness::Live },
             { "script.fields", CommandCost::Frames, "<id>", "스크립트의 노출 필드와 현재 값을 확인한다", CommandClass::EngineService, CommandLiveness::Live },
+            // ★ 이 표에서 `executesUserCode` 가 참인 **유일한 줄**이다(LC7 · §10.2).
+            //
+            //   cost 가 `Long` 인 것도 이 하나뿐인 성질에서 온다. 나머지 211 개의
+            //   소요는 엔진이 쓴 코드가 정하지만, 이것은 **엔진이 쓰지 않은 코드**가
+            //   정한다 — 표식된 메서드가 1ms 일지 10 초일지 표가 알 방법이 없다.
+            //   descriptor 머리말의 규칙("틀릴 때는 비싼 쪽으로")이 정확히 이런
+            //   경우를 위한 것이라, 기본을 202 로 두고 빠른 호출은 `mode:"sync"` 로
+            //   명시하게 한다.
+            { "script.invoke", CommandCost::Long, "<타입> <메서드> [인자]...", "표식된 static 메서드를 호출한다([EngineCallable] 없는 것은 거부)", CommandClass::EngineService, CommandLiveness::Live, true },
             { "script.reload", CommandCost::Frames, "", "게임 스크립트 어셈블리를 다시 로드한다(핫리로드)", CommandClass::EngineService, CommandLiveness::Live },
             { "script.set", CommandCost::Frames, "<id> <인덱스> <값>", "노출 필드 값을 바꾼다", CommandClass::EngineService, CommandLiveness::Live },
             { "script.status", CommandCost::Immediate, "", "CLR 상태와 활성 스크립트 수를 확인한다", CommandClass::EngineService, CommandLiveness::Live },

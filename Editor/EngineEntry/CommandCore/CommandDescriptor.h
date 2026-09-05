@@ -146,6 +146,20 @@ namespace CommandCore
         CommandClass             cls{ CommandClass::EngineService };
         CommandLiveness          liveness{ CommandLiveness::Live };
 
+        /// 이 명령이 **사용자 코드를 부르는가**(§6.2 의 `ExecutesUserCode` capability).
+        ///
+        /// ★ §6.2 는 capability 를 열셋짜리 비트마스크로 그린다. 그중 **하나만**
+        ///   여기 서 있는 이유는 나머지 열둘이 아직 쓰이는 자리가 없기 때문이다 —
+        ///   `RequiresDX12` 같은 것을 지금 212 개에 적으면 그것은 관측이 아니라
+        ///   지어내기가 된다(LC3 이 인자 스키마를 비워 둔 것과 같은 판단이다).
+        ///   이 하나는 다르다. LC7 이 L3 등급 B 를 열면서 **승인 경계를 그을
+        ///   유일한 표식**이 되고, 그 경계는 오늘 존재한다.
+        ///
+        /// 두 곳이 이 값을 읽는다. ① `ExecuteParsed` 가 `ClrHost::UserCodeScope` 를
+        /// 이 값일 때만 연다 — 그래서 표시 없는 명령은 사용자 코드에 **도달하지
+        /// 못한다**. ② 서비스가 별도 플래그 없이 이 명령을 받으면 403 이다(§8).
+        bool                     executesUserCode{ false };
+
         /// 결과를 내는 핸들러인가(LC1 이행 여부). discovery 가 그대로 낸다.
         bool                     resultBearing{ false };
 

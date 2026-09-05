@@ -125,6 +125,20 @@ Run-Step "CLI 스크립트 리로드 계약(LC7)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-script-reload.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 14.5 LC7 §10.2 — L3 등급 B: 표식된 메서드 호출과 라이브 코드 교체.
+#
+# 리로드 게이트가 "실패해도 이전 것이 남는가" 를 본다면, 이쪽은 **성공했을 때
+# 새 코드가 실제로 도는가** 를 본다. 프로브의 반환값을 실행마다 다른 토큰으로
+# 바꿔 빌드·리로드하고 그 토큰이 나오는지 확인하므로, 리로드가 아무 일도 하지
+# 않으면 붉어진다. 표식 없는 메서드가 거부되는 것과 사용자 예외가 에디터를
+# 죽이지 않는 것도 같은 실행에서 본다.
+#
+# ★ 이 게이트는 `GameScripts/EngineCallableProbe.cs` 를 그 자리에서 고쳤다
+#   되돌리고, 되돌린 결과를 해시로 대조한다. 붉어지면 그 파일 상태를 먼저 볼 것.
+Run-Step "CLI script.invoke 계약(LC7)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-script-invoke.ps1") -Exe $Exe -Work $Work
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

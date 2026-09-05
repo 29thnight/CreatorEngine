@@ -269,7 +269,7 @@ namespace CommandCore
         // ★ 새 열은 **끝이 아니라 `usage` 앞**에 넣는다. `summary` 는 자유 문장이라
         //   맨 뒤여야 하고(탭이 섞일 여지가 가장 큰 열이다), 분류는 기계가 읽는
         //   값이므로 앞쪽 고정 폭 구역에 모아 둔다. 소비자는 열 이름으로 읽는다.
-        tsv += "canonical\taliases\tcost\troles\tclass\tliveness\tresult_bearing\tusage\tsummary\n";
+        tsv += "canonical\taliases\tcost\troles\tclass\tliveness\tuser_code\tresult_bearing\tusage\tsummary\n";
 
         for (const CommandDescriptor& descriptor : registry.Sorted())
         {
@@ -287,6 +287,9 @@ namespace CommandCore
             tsv += '\t'; tsv += ToString(descriptor.roles);
             tsv += '\t'; tsv += ToString(descriptor.cls);
             tsv += '\t'; tsv += ToString(descriptor.liveness);
+            // LC7 — 사용자 코드를 부르는 명령을 표에서 **눈으로 셀 수 있게** 한다.
+            // 오늘 `yes` 는 하나뿐이고, 둘이 되는 날 골든 diff 가 그것을 말한다.
+            tsv += '\t'; tsv += descriptor.executesUserCode ? "yes" : "no";
             tsv += '\t'; tsv += descriptor.resultBearing ? "yes" : "no";
             tsv += '\t'; tsv += descriptor.usage.empty() ? "-" : descriptor.usage;
             tsv += '\t'; tsv += descriptor.summary;

@@ -1,216 +1,217 @@
 # lc3-commands v1
-# commands	211
-# names	225
+# commands	212
+# names	226
 # problems	0
-canonical	aliases	cost	roles	class	liveness	result_bearing	usage	summary
-ai.status	-	immediate	editor	engine_service	live	no	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
-animator.exit	-	immediate	editor	engine_service	live	no	<오브젝트>	Animator의 현재 상태를 빠져나가게 한다
-animator.param	-	frames	editor	engine_service	live	no	<오브젝트> <파라미터> <bool|float|int|trigger>	Animator 파라미터를 저작한다
-animator.scene.probe	-	frames	editor	probe	live	no	-	Animator 컨트롤러 그래프를 scene reflection YAML로 왕복시킨다
-animator.state	-	frames	editor	engine_service	live	no	<오브젝트> <상태 이름> <스크립트 타입>	Animator 컨트롤러에 상태와 행동을 저작한다
-asset.guid.rename.probe	-	frames	editor	probe	live	no	-	자산 GUID가 이름 변경을 건너 보존되는지 본다(재질 왕복 포함)
-assets.generation	-	long	editor	engine_service	live	no	<project root>	UUIDv8 model generation closure·원자 cache publish/retire 검증
-assets.generationcorpus	-	long	editor	engine_service	live	no	<content root>	현재 MBC4 model corpus generation cold-load 검증
-assets.identity	-	long	editor	engine_service	live	no	-	자산 identity(UUID·epoch·프로필) 전수 계약을 판정한다
-assets.modelbench	-	long	editor	engine_service	live	no	<dir|-> <반복> [cooked|author]	모델 로드·저작 트랜잭션 시간과 peak working set을 잰다
-assets.modeldiag	-	immediate	editor	engine_service	live	no	-	모델 소비 계수를 읽는다(상태를 바꾸지 않는다)
-assets.modelrender	-	frames	editor	engine_service	live	no	-	모델 렌더 배선(mesh·재질 해석)을 판정한다
-assets.scenemodel	-	frames	editor	engine_service	live	no	[reload <모델 이름>]	활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다
-assets.sidecar	-	long	editor	engine_service	live	no	-	모델 sidecar v2 스키마를 전수로 판정한다
-assets.unload	-	frames	editor	engine_service	live	no	-	사용하지 않는 에셋 캐시 정리
-blackboard.authoring.probe	-	frames	editor	raw_fixture	live	no	<이름> [empty|noname]	Blackboard 저장·재로드 왕복으로 키 값이 살아 돌아오는지 본다
-bt.status	bt.reset	immediate	editor	engine_service	live	no	-	행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)
-camera.editor	-	frames	editor	engine_service	live	no	match|follow on|off|status	에디터 카메라를 게임 카메라와 같은 시점으로
-cli.drain.budget	-	immediate	editor	engine_service	live	yes	[<시간ms> <개수>]	서비스 큐 드레인 예산을 읽거나 바꾼다(LC5 · SLO 게이트의 변이용)
-cli.echo.args	-	immediate	editor	engine_service	live	no	<인자>	tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)
-cli.probe.timing	-	immediate	editor	probe	live	no	[reset|off|경로]	프레임 시간 분포와 명령 왕복 지연(LC0, 기본 off)
-collisionmatrix.authoring.probe	-	frames	editor	raw_fixture	live	no	[escape]	충돌 행렬 저장·재로드 왕복과 설정 루트 이탈 거부를 본다
-commands.describe	-	immediate	editor	engine_service	live	yes	<이름>	명령 하나의 descriptor 상세를 낸다
-commands.dump	-	immediate	editor	engine_service	live	no	[경로]	등록 명령 표를 TSV로 덤프한다(LC0 기준선, 소스 스크래핑 대체)
-commands.list	-	immediate	editor	engine_service	live	yes	[경로]	등록 명령 snapshot 을 TSV 로 낸다(소스 스크래핑 대체)
-commands.selftest	-	immediate	editor	probe	live	yes	-	registry 무결성을 판정한다(이름 중복·요약 누락·descriptor 부재)
-component.add	-	frames	editor	editor_operation	live	no	<오브젝트 이름> <컴포넌트 타입>	오브젝트에 컴포넌트를 붙인다
-component.list	-	immediate	editor	engine_service	live	no	-	등록된 컴포넌트 타입을 로그에 남긴다
-crash.status	-	immediate	editor	probe	live	no	-	크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다
-crash.test	-	immediate	editor	probe	terminates_process	no	<종류>	일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)
-dump.crash	-	immediate	editor	probe	terminates_process	no	<access|abort|terminate|throw>	일부러 죽여 크래시 덤프 경로를 검증한다
-dump.list	dump.show	immediate	editor	probe	live	no	[이름]	크래시 덤프 목록 또는 요약 하나를 낸다
-dx12.bench11	-	long	editor	probe	live	yes	-	DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)
-dx12.decal	-	frames	editor	probe	live	yes	-	데칼 패스 검증(상자 판정·하늘 게이트·원본 혼합 3종·배칭)
-dx12.descriptorheap	-	frames	editor	probe	live	yes	-	descriptor version recycler 검증(completion·Abort·격리·넘침)
-dx12.encoderbench	-	long	editor	probe	live	yes	-	인코더 오버헤드 실측(R3 착수 조건 · Release 전용)
-dx12.fog	-	frames	editor	probe	live	yes	-	볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)
-dx12.forward	-	frames	editor	probe	live	yes	-	DX12 forward 패스를 격리 씬에서 리드백으로 판정한다
-dx12.forwardscale	-	frames	editor	probe	live	yes	-	DX12 forward 해상도 스케일을 판정한다
-dx12.forwardshade	-	frames	editor	probe	live	yes	-	DX12 forward 셰이딩 결과를 리드백으로 판정한다
-dx12.gbuffer	-	frames	editor	probe	live	yes	-	GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)
-dx12.gizmoicon	-	frames	editor	probe	live	yes	-	기즈모 아이콘 패스 검증(빌보드 회전·알파 상한·배칭)
-dx12.gizmoline	-	frames	editor	probe	live	yes	-	기즈모 라인 패스 검증(도형 정점 수·픽셀·드로우 병합)
-dx12.gizmoscene	-	frames	editor	probe	live	yes	-	Gizmo 씬 연결 검증(밀봉 복사·4패스 체인·타깃 공유)
-dx12.grid	-	frames	editor	probe	live	yes	-	그리드 패스 검증(라인·셀 내부·밀도·카메라 반응)
-dx12.ibl	-	frames	editor	probe	live	yes	-	IBL 생성 체인 검증(rect→cube·조도·프리필터·BRDF LUT)
-dx12.iblshade	-	frames	editor	probe	live	yes	-	IBL 앰비언트 소비 검증(끔=검정·조도 방향성·금속 정반사)
-dx12.live	-	frames	editor	engine_service	live	no	on|status	EnhancedRenderer 메인 런타임 상태
-dx12.parallel	-	frames	editor	probe	live	yes	-	커맨드 기록 병렬화 검증(링 원자성·순차 대비 동일성)
-dx12.post	-	frames	editor	probe	live	yes	-	DX12 후처리 패스를 리드백으로 판정한다
-dx12.postscale	-	frames	editor	probe	live	yes	-	DX12 후처리 해상도 스케일을 판정한다
-dx12.psocache	-	frames	editor	probe	live	yes	[파일]	PSO 캐시 자가 검증(2회차 컴파일 0건)
-dx12.rendergraph	-	frames	editor	probe	live	yes	-	렌더 그래프 검증(순서·흐름·배리어·컬링·실행)
-dx12.resize	-	frames	editor	probe	live	yes	-	크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)
-dx12.scene	-	frames	editor	probe	live	yes	-	씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)
-dx12.selftest	-	frames	editor	probe	requires_restart	yes	[파일]	DX12 브링업 자가 검증(삼각형 렌더 → PNG)
-dx12.shadowquality	-	frames	editor	probe	live	yes	-	그림자 품질 검증(경사 비례 편향·캐스케이드 경계 블렌딩 A/B)
-dx12.skinning	-	frames	editor	probe	live	yes	-	GBuffer 스키닝 검증(본 이동·가중 혼합·비스킨드 불변)
-dx12.skybox	-	frames	editor	probe	live	yes	-	스카이박스 패스 검증(면 방향·원평면 밀어넣기·전면 커버)
-dx12.ssao	-	frames	editor	probe	live	yes	-	DX12 SSAO 패스를 리드백으로 판정한다
-dx12.ssaoscale	-	frames	editor	probe	live	yes	-	DX12 SSAO 해상도 스케일을 판정한다
-dx12.ssgi	-	frames	editor	probe	live	yes	-	DX12 SSGI 패스를 리드백으로 판정한다
-dx12.ssr	-	frames	editor	probe	live	yes	-	SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)
-dx12.sss	-	frames	editor	probe	live	yes	-	SSS 패스 검증(번짐·축 분리·표면 추종·에너지)
-dx12.ui	-	frames	editor	probe	live	yes	-	DX12 UI 패스를 리드백으로 판정한다
-dx12.uploadring	-	frames	editor	probe	live	yes	-	구 명령 별칭(DX12 업로드 세그먼트 검증)
-dx12.wireframe	-	frames	editor	probe	live	yes	-	와이어프레임 패스 검증(변·내부 비채움·인스턴싱·메시 캐시)
-experiment.animevent	-	frames	editor	probe	live	no	seed|verify	애니메이션 이벤트·루프 오버라이드의 소유 이관을 판정한다
-experiment.animlive	-	frames	editor	probe	live	no	-	라이브 팔레트 digest를 낸다(두 번 불러 재생 중인지 가른다)
-experiment.animmask	-	frames	editor	probe	live	no	-	AvatarMask 트리 생성을 legacy 재귀와 A/B로 대조한다
-experiment.animpose	-	frames	editor	probe	live	no	<0..1> [클립]	클립의 특정 지점 포즈를 고정 계산해 판정한다
-experiment.animtick	-	frames	editor	probe	live	no	-	Animator 틱 경로의 패리티를 판정한다
-experiment.boneresolve	-	frames	editor	probe	live	no	-	본 이름 해석 창구를 전수 A/B로 대조한다
-experiment.cacheopt	-	frames	editor	probe	live	no	-	정점 캐시/페치 순서 — ACMR 이 실제로 낮아지는가 + 기하 보존
-experiment.catalog	-	frames	editor	probe	live	no	[Derived부모]	CEMF catalog — 전 GUID 해석·내용 검증·폐포 위상 순서
-experiment.cooked	-	long	editor	probe	live	no	[경로]	쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)
-experiment.editorsurface	-	frames	editor	probe	live	no	-	에디터 표면 질의(클립 축·mesh 축)의 A/B 동치를 판정한다
-experiment.foliage	-	frames	editor	probe	live	no	seed <자산디렉터리> | verify	Foliage 메시의 experiment 핸들 합류를 합성으로 판정한다
-experiment.matcodec	-	frames	editor	probe	live	no	-	재질 저작 값 인코딩 왕복을 판정한다
-experiment.matcook	-	long	editor	probe	live	no	[루트 재질 모델]	재질 의존 폐포 — standalone 재질 + 모델의 임베디드 texture 추출
-experiment.matinstance	-	frames	editor	probe	live	no	-	MaterialInstance 생성·프로퍼티 블록을 판정한다
-experiment.matmigrate	-	frames	editor	probe	live	no	-	legacy 재질의 experiment 왕복 이관을 판정한다
-experiment.matparity	-	frames	editor	probe	live	no	-	재질 해석의 legacy 대 experiment 패리티를 판정한다
-experiment.matresolve	-	frames	editor	probe	live	no	-	제품 resolver가 cooked를 고르는지 판정한다
-experiment.matruntime	-	frames	editor	probe	live	no	[edit]	런타임 MaterialInstance 경로를 판정한다
-experiment.matscript	-	frames	editor	probe	live	no	-	스크립트가 보는 재질 표면을 판정한다
-experiment.matseal	-	frames	editor	probe	live	no	-	재질 sealing 결과를 판정한다
-experiment.normal	-	frames	editor	probe	live	no	-	평면 법선 합성 검사(감김·면 분리·퇴화 처리, 자산 무관)
-experiment.resolver	-	frames	editor	probe	live	no	-	CookedThenSource resolver — 호출 순서와 폴백 관측(자산 무관)
-experiment.sampler	-	frames	editor	probe	live	no	-	보간 합성 검사(Step/Linear 계단·강등·키 뭉침, 자산 무관)
-experiment.scenecook	-	long	editor	probe	live	no	[루트 씬]	scene/prefab 의존 추출 — 자기참조 제외·못 그린 참조 계수
-experiment.skinbounds	-	frames	editor	probe	live	no	-	스킨 팔레트의 유한성·인덱스 범위·크기 상한을 판정한다
-experiment.smcook	-	long	editor	probe	live	no	[루트 메타]	ShaderMeta 쿠킹 — 정본 파서 검증·source 해소(실자산엔 거부 사례 0)
-experiment.tangent	-	frames	editor	probe	live	no	-	탄젠트 합성 검사(mikktspace 축·handedness·이음매 분리, 자산 무관)
-experiment.texcook	-	long	editor	probe	live	no	[루트 텍스처]	텍스처 쿠킹 — GUID 주소·내용 해시·fail-closed(실자산은 .dds 미포함)
-experiment.vertexlayout	-	frames	editor	probe	live	no	-	typed 정점 레이아웃 디코드를 판정한다
-experiment.weld	-	frames	editor	probe	live	no	-	정점 용접 — 합치는가/안 합치는가(실자산은 0건이라 이것만이 증거다)
-foliage.authoring.probe	-	frames	editor	raw_fixture	live	no	<이름> [escape]	Foliage 저작 트랜잭션 왕복과 루트 이탈 거부를 본다
-game.pak	-	long	editor	engine_service	live	yes	-	Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다
-gc.collect	-	frames	editor	probe	live	no	-	관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)
-gc.stats	gc.delta	immediate	editor	probe	live	no	-	관리 힙 지표를 낸다(gc.delta는 직전 대비 증감)
-gpu.baseline	-	frames	editor	probe	live	no	-	현재 상태를 기준선으로 삼는다
-gpu.census	gpu.delta	frames	editor	probe	live	no	[라벨]	VRAM과 엔진 에셋 수를 로그에 기록
-help	-	immediate	editor	engine_service	live	yes	[명령]	명령 목록 또는 명령 하나의 상세를 낸다
-inputmap.authoring.probe	-	frames	editor	raw_fixture	live	yes	<save|verify> <이름>	입력 액션맵 저장·재기동 왕복으로 payload 복원을 본다
-inputmap.corpus.probe	-	long	editor	probe	live	no	-	입력 액션맵 코퍼스를 전수로 읽어 계수를 낸다
-lifecycle.dump	-	immediate	editor	engine_service	live	no	[파일]	기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)
-lifecycle.registry	-	frames	editor	engine_service	live	no	on|off|status	생명주기 디스패치 경로 전환(9-1, 씬 재로드 필요)
-lifecycle.stress	-	frames	editor	engine_service	live	no	destroy|churn|reentrant [개수]	수명 경로를 흔든다(reentrant는 순회 한복판)
-lifecycle.trace	-	frames	editor	engine_service	live	no	on [틱프레임]|off|clear|status	생명주기 호출 순서를 받아 적는다
-log.flush	-	immediate	editor	engine_service	live	no	-	로그를 디스크에 즉시 반영
-material.corpus.probe	-	long	editor	probe	live	no	<이름> ...	standalone material identity/reference 왕복
-mem.stats	mem.delta,mem.reset,mem.hook	frames	editor	probe	live	no	-	churn 누계와 기준선을 0으로 — 구간 측정용
-model.load	-	long	editor	engine_service	live	no	<경로>	모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)
-model.loadcached	-	long	editor	engine_service	live	no	<모델 경로>	에디터 드롭 경로(LoadCachedModelShared)로 모델을 연다
-model.place	-	frames	editor	engine_service	live	no	<이름>	임포트한 모델을 활성 씬에 배치한다
-object.create	-	frames	editor	editor_operation	live	no	<이름> [타입]	빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)
-object.create.undoable	-	frames	editor	editor_operation	live	no	<이름>	Undo 이력을 쌓으며 오브젝트를 만든다
-object.duplicate	-	frames	editor	editor_operation	live	no	<오브젝트> [새 이름]	오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)
-object.parent	-	frames	editor	editor_operation	live	no	<자식> <부모 | ->	오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)
-object.property	-	frames	editor	editor_operation	live	no	<오브젝트> <컴포넌트> <필드> <값>	리플렉션으로 프로퍼티를 설정한다
-object.rename	-	frames	editor	editor_operation	live	no	<이전> <새>	오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)
-object.rootref	-	frames	editor	editor_operation	live	no	<오브젝트> [루트|-]	Bone형 same-scene root 참조를 설정/조회한다
-object.transform	-	frames	editor	editor_operation	live	no	<이름> <px py pz> [rx ry rz] [sx sy sz]	변환을 지정한다(회전은 도)
-perf.reflect	-	long	editor	probe	live	no	[반복]	씬 직렬화와 프리팹 역직렬화 시간을 잰다
-pipeline.nodes	-	immediate	editor	engine_service	live	no	-	라이브 파이프라인의 노드 조립 결과를 한 줄씩 낸다
-pix.capture	-	frames	editor	probe	live	no	begin|end|status	PIX 주입 실행의 명시적 GPU 캡처 경계
-play	stop	frames	editor	editor_operation	live	no	-	에디터의 재생·정지와 같은 동작
-play.state	-	immediate	editor	engine_service	live	yes	-	재생 상태(gameStart·paused·씬 로드)를 낸다
-prefab.corpus.digest	-	long	editor	probe	live	no	<라벨> <이름> ...	prefab identity/override 왕복 digest
-prefab.create	-	frames	editor	editor_operation	live	no	<오브젝트 이름> <프리팹 이름>	오브젝트로 프리팹을 만들어 저장한다
-prefab.instantiate	-	frames	editor	editor_operation	live	no	<프리팹 이름> [인스턴스 이름]	프리팹을 씬에 소환한다
-prefab.objectguid	-	immediate	editor	engine_service	live	no	<오브젝트 이름>	오브젝트의 프리팹 objectGuid를 낸다
-prefab.overrides	-	immediate	editor	engine_service	live	no	<오브젝트>	프리팹 인스턴스에 기록된 오버라이드를 나열한다
-prefab.status	-	immediate	editor	engine_service	live	no	-	프리팹 등록·캐시 상태를 낸다
-prefab.update	-	frames	editor	editor_operation	live	no	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
-profile.selftest	-	frames	editor	probe	live	no	-	CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)
-profile.stats	-	immediate	editor	probe	live	no	-	프로파일러 자체 비용과 용량 소진(교란 없음)
-quit	exit	immediate	editor	engine_service	terminates_process	yes	-	에디터 종료
-reflect.golden	-	long	editor	probe	live	no	[출력 경로]	등록된 전 타입의 직렬화 출력을 골든 문서로 쓴다
-render.backend	-	frames	editor	engine_service	live	no	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
-render.exposure	-	frames	editor	engine_service	live	no	-	자동 노출이 무엇을 재고 무엇을 결정했는지
-render.livecheck	-	frames	editor	probe	live	yes	[너비 높이]	resize·다중 뷰·표시 슬롯 회전 회귀 판정
-render.matmode	-	frames	editor	engine_service	live	no	<오브젝트> <opaque|transparent>	오브젝트 재질의 렌더링 모드를 바꾼다
-render.rtinfo	-	frames	editor	engine_service	live	no	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
-render.shadowinfo	-	frames	editor	engine_service	live	no	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)
-rhi.uploadsegments	-	frames	editor	probe	requires_restart	yes	-	DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증
-scene.bonecache	-	frames	editor	probe	live	no	[0|1]	E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)
-scene.bonedump	-	frames	editor	probe	live	no	[개수]	대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)
-scene.ddol	-	frames	editor	engine_service	live	no	<이름>	오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용
-scene.dirtytraversal	-	frames	editor	probe	live	no	[0|1]	S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)
-scene.dump	-	immediate	editor	engine_service	live	no	[라벨]	활성 씬의 오브젝트 계층을 로그에 남긴다
-scene.executiongraph	-	frames	editor	probe	live	no	probe|bench <N> [samples]	X4 packed projection 불변식·compile 비용 검사
-scene.hierarchycheck	-	frames	editor	engine_service	live	no	-	씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)
-scene.hierarchymutation	-	frames	editor	probe	live	no	probe	X3 reparent 검증·대칭성·topology version 검사
-scene.load	scene.switch	long	editor	engine_service	live	yes	<경로>	씬을 로드한다(활성 씬은 그대로)
-scene.new	-	frames	editor	engine_service	live	no	[이름]	빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)
-scene.proxybench	-	long	editor	probe	live	no	<프레임수> [등록수]	X8 정지 dirty-queue 커밋 비용(선택: 합성 등록수)
-scene.proxydirty	-	frames	editor	probe	live	no	probe	X8 frame-persistent render dirty mask·generation 검사
-scene.save	-	frames	editor	engine_service	live	no	<경로>	활성 씬을 .creator로 저장한다
-scene.select	-	immediate	editor	engine_service	live	no	<오브젝트 이름>	오브젝트를 에디터 선택으로 지정한다
-scene.selection	-	immediate	editor	engine_service	live	no	<라벨>	단일 선택과 복수 선택을 따로 낸다(둘의 어긋남을 드러낸다)
-scene.sparseresolver	-	frames	editor	probe	live	no	0|1|print|probe|bench <N> <frames>	X5 dirty-root sparse resolve·A/B 검사
-scene.transformbulk	-	frames	editor	probe	live	no	probe	X7 Animator pose·Physics world batch·Socket barrier 검사
-scene.transformdigest	-	frames	editor	probe	live	no	[라벨]	활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)
-scene.transformdomains	-	frames	editor	probe	live	no	probe	X2 UI/Spatial 독립 dirty gate·paused/subtree 검사
-scene.transformpull	-	frames	editor	probe	live	no	print|probe	X6 C# 즉시 pull·sibling global 전파 검사
-scene.transformstats	-	frames	editor	probe	live	no	[0|1|print]	X0 UI/Spatial·단계·구성·프레임 topology 계측
-scene.transformwritestats	-	frames	editor	probe	live	no	[0|1|print|probe]	X1 로컬 쓰기 publish 출처 계측
-scene.traversalbench	-	long	editor	probe	live	no	<오브젝트수> <프레임수> [flat|wide|deep|skeleton]	X0 Release 벤치(0=현재 씬)
-script.add	-	frames	editor	engine_service	live	yes	<오브젝트> <타입>	C# 스크립트를 오브젝트에 부착한다
-script.fields	-	frames	editor	engine_service	live	no	<id>	스크립트의 노출 필드와 현재 값을 확인한다
-script.reload	-	frames	editor	engine_service	live	yes	-	게임 스크립트 어셈블리를 다시 로드한다(핫리로드)
-script.set	-	frames	editor	engine_service	live	no	<id> <인덱스> <값>	노출 필드 값을 바꾼다
-script.status	-	immediate	editor	engine_service	live	yes	-	CLR 상태와 활성 스크립트 수를 확인한다
-serialize.bench	-	long	editor	probe	live	no	boot | scene <경로> [반복] | prefab <이름> [반복]	직렬화 경로별 시간을 잰다
-serialize.nodeequal	-	frames	editor	probe	live	no	-	저작 노드 구조 비교 규칙을 판정한다(맵 키 순서 무시가 의도)
-serialize.rymlerror	-	frames	editor	probe	live	no	-	ryml 에러 정책이 abort를 막는지 판정한다
-shadermeta.probe	-	frames	editor	probe	live	no	-	ShaderMeta 실자산 수용과 잘못된 문서 거절을 함께 판정한다
-tag.authoring.probe	-	frames	editor	raw_fixture	live	no	list | <add|has|remove> <이름>	태그·레이어 저작 자산을 읽고 고친다
-terrain.authoring.probe	-	frames	editor	raw_fixture	live	no	<이름> <텍스처|->	Terrain writer 트랜잭션 회귀 검사
-ui.anchor	ui.size,ui.pos,ui.screenpos	frames	editor	engine_service	live	no	<오브젝트> <minX> <minY> <maxX> <maxY>	앵커를 직접 지정한다
-ui.hitbox	-	frames	editor	engine_service	live	no	-	버튼의 rect와 클릭 판정 상자를 나란히 출력한다
-ui.navprobe	-	frames	editor	engine_service	live	no	-	UI 내비게이션 저작 계층을 세워 탐색 결과를 판정한다
-ui.rect	-	frames	editor	engine_service	live	no	<오브젝트|*>	오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다
-ui.status	-	immediate	editor	engine_service	live	no	-	UI 계층·캔버스 연결 상태를 낸다
-undo	redo	frames	editor	editor_operation	live	no	-	에디터의 Ctrl+Z / Ctrl+Y와 같은 호출
-undo.state	-	immediate	editor	engine_service	live	yes	<라벨>	편집 스택과 게임 스택의 Undo 깊이를 따로 낸다
-vk.decal	-	frames	editor	probe	live	yes	-	Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조
-vk.deferred	-	frames	editor	probe	live	yes	-	Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조
-vk.fog	-	frames	editor	probe	live	yes	-	VolumetricFog 공용 패스 — 3D scatter/history/composite 대조
-vk.forward	-	frames	editor	probe	live	yes	-	Forward+ 공용 패스 — compute·buffer·blend·mesh DX12/Vulkan 대조
-vk.gbuffer	-	frames	editor	probe	live	yes	-	GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조
-vk.gizmoicon	-	frames	editor	probe	live	yes	-	실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조
-vk.gizmoline	-	frames	editor	probe	live	yes	-	GizmoLine 공용 패스 — line-list 전체 RGBA DX12/Vulkan 대조
-vk.grid	-	frames	editor	probe	live	yes	-	그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)
-vk.ibl	-	frames	editor	probe	live	yes	-	IBL 생성기를 Vulkan 으로 — 면·밉·LUT DX12 픽셀 대조
-vk.parallel	-	frames	editor	probe	live	yes	-	Vulkan RenderGraph 병렬 command pool·제출·픽셀 검증
-vk.post	-	frames	editor	probe	live	yes	-	PostChain 공용 패스 — bloom/tonemap/vignette/FXAA 대조
-vk.selftest	-	frames	editor	probe	requires_restart	yes	[파일]	Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)
-vk.shadow	-	frames	editor	probe	live	yes	-	Shadow 공용 패스 — depth array·mesh DX12/Vulkan 대조
-vk.skybox	-	frames	editor	probe	live	yes	-	스카이박스를 Vulkan 으로 — 큐브 SRV·정적 샘플러 픽셀 대조
-vk.ssao	-	frames	editor	probe	live	yes	-	SSAO 공용 패스 — depth/normal compute·filter DX12/Vulkan 대조
-vk.ssgi	-	frames	editor	probe	live	yes	-	SSGI 공용 패스 — Hi-Z·temporal·filter·composite 대조
-vk.ssr	-	frames	editor	probe	live	yes	-	SSR 공용 패스 — ray hit·metal/thickness/bitmask 픽셀 대조
-vk.sss	-	frames	editor	probe	live	yes	-	SSS 공용 패스 — 2축 blur·depth gate 전체 픽셀 대조
-vk.ui	-	frames	editor	probe	live	yes	-	UI 공용 패스 — layer·blend·texture batch DX12/Vulkan 대조
-vk.wireframe	-	frames	editor	probe	live	yes	-	WireFrame 공용 패스 — non-solid fill·skinning DX12/Vulkan 대조
-wait	-	immediate	editor	engine_service	live	yes	<프레임>	지정 프레임만큼 다음 명령을 미룬다
-window.info	-	immediate	editor	engine_service	live	no	-	엔진이 인식하는 클라이언트 크기를 출력한다
-window.resize	-	frames	editor	engine_service	live	no	<너비> <높이>	창 클라이언트 크기를 바꾼다(해상도 검증용)
+canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
+ai.status	-	immediate	editor	engine_service	live	no	no	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
+animator.exit	-	immediate	editor	engine_service	live	no	no	<오브젝트>	Animator의 현재 상태를 빠져나가게 한다
+animator.param	-	frames	editor	engine_service	live	no	no	<오브젝트> <파라미터> <bool|float|int|trigger>	Animator 파라미터를 저작한다
+animator.scene.probe	-	frames	editor	probe	live	no	no	-	Animator 컨트롤러 그래프를 scene reflection YAML로 왕복시킨다
+animator.state	-	frames	editor	engine_service	live	no	no	<오브젝트> <상태 이름> <스크립트 타입>	Animator 컨트롤러에 상태와 행동을 저작한다
+asset.guid.rename.probe	-	frames	editor	probe	live	no	no	-	자산 GUID가 이름 변경을 건너 보존되는지 본다(재질 왕복 포함)
+assets.generation	-	long	editor	engine_service	live	no	no	<project root>	UUIDv8 model generation closure·원자 cache publish/retire 검증
+assets.generationcorpus	-	long	editor	engine_service	live	no	no	<content root>	현재 MBC4 model corpus generation cold-load 검증
+assets.identity	-	long	editor	engine_service	live	no	no	-	자산 identity(UUID·epoch·프로필) 전수 계약을 판정한다
+assets.modelbench	-	long	editor	engine_service	live	no	no	<dir|-> <반복> [cooked|author]	모델 로드·저작 트랜잭션 시간과 peak working set을 잰다
+assets.modeldiag	-	immediate	editor	engine_service	live	no	no	-	모델 소비 계수를 읽는다(상태를 바꾸지 않는다)
+assets.modelrender	-	frames	editor	engine_service	live	no	no	-	모델 렌더 배선(mesh·재질 해석)을 판정한다
+assets.scenemodel	-	frames	editor	engine_service	live	no	no	[reload <모델 이름>]	활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다
+assets.sidecar	-	long	editor	engine_service	live	no	no	-	모델 sidecar v2 스키마를 전수로 판정한다
+assets.unload	-	frames	editor	engine_service	live	no	no	-	사용하지 않는 에셋 캐시 정리
+blackboard.authoring.probe	-	frames	editor	raw_fixture	live	no	no	<이름> [empty|noname]	Blackboard 저장·재로드 왕복으로 키 값이 살아 돌아오는지 본다
+bt.status	bt.reset	immediate	editor	engine_service	live	no	no	-	행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)
+camera.editor	-	frames	editor	engine_service	live	no	no	match|follow on|off|status	에디터 카메라를 게임 카메라와 같은 시점으로
+cli.drain.budget	-	immediate	editor	engine_service	live	no	yes	[<시간ms> <개수>]	서비스 큐 드레인 예산을 읽거나 바꾼다(LC5 · SLO 게이트의 변이용)
+cli.echo.args	-	immediate	editor	engine_service	live	no	no	<인자>	tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)
+cli.probe.timing	-	immediate	editor	probe	live	no	no	[reset|off|경로]	프레임 시간 분포와 명령 왕복 지연(LC0, 기본 off)
+collisionmatrix.authoring.probe	-	frames	editor	raw_fixture	live	no	no	[escape]	충돌 행렬 저장·재로드 왕복과 설정 루트 이탈 거부를 본다
+commands.describe	-	immediate	editor	engine_service	live	no	yes	<이름>	명령 하나의 descriptor 상세를 낸다
+commands.dump	-	immediate	editor	engine_service	live	no	no	[경로]	등록 명령 표를 TSV로 덤프한다(LC0 기준선, 소스 스크래핑 대체)
+commands.list	-	immediate	editor	engine_service	live	no	yes	[경로]	등록 명령 snapshot 을 TSV 로 낸다(소스 스크래핑 대체)
+commands.selftest	-	immediate	editor	probe	live	no	yes	-	registry 무결성을 판정한다(이름 중복·요약 누락·descriptor 부재)
+component.add	-	frames	editor	editor_operation	live	no	no	<오브젝트 이름> <컴포넌트 타입>	오브젝트에 컴포넌트를 붙인다
+component.list	-	immediate	editor	engine_service	live	no	no	-	등록된 컴포넌트 타입을 로그에 남긴다
+crash.status	-	immediate	editor	probe	live	no	no	-	크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다
+crash.test	-	immediate	editor	probe	terminates_process	no	no	<종류>	일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)
+dump.crash	-	immediate	editor	probe	terminates_process	no	no	<access|abort|terminate|throw>	일부러 죽여 크래시 덤프 경로를 검증한다
+dump.list	dump.show	immediate	editor	probe	live	no	no	[이름]	크래시 덤프 목록 또는 요약 하나를 낸다
+dx12.bench11	-	long	editor	probe	live	no	yes	-	DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)
+dx12.decal	-	frames	editor	probe	live	no	yes	-	데칼 패스 검증(상자 판정·하늘 게이트·원본 혼합 3종·배칭)
+dx12.descriptorheap	-	frames	editor	probe	live	no	yes	-	descriptor version recycler 검증(completion·Abort·격리·넘침)
+dx12.encoderbench	-	long	editor	probe	live	no	yes	-	인코더 오버헤드 실측(R3 착수 조건 · Release 전용)
+dx12.fog	-	frames	editor	probe	live	no	yes	-	볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)
+dx12.forward	-	frames	editor	probe	live	no	yes	-	DX12 forward 패스를 격리 씬에서 리드백으로 판정한다
+dx12.forwardscale	-	frames	editor	probe	live	no	yes	-	DX12 forward 해상도 스케일을 판정한다
+dx12.forwardshade	-	frames	editor	probe	live	no	yes	-	DX12 forward 셰이딩 결과를 리드백으로 판정한다
+dx12.gbuffer	-	frames	editor	probe	live	no	yes	-	GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)
+dx12.gizmoicon	-	frames	editor	probe	live	no	yes	-	기즈모 아이콘 패스 검증(빌보드 회전·알파 상한·배칭)
+dx12.gizmoline	-	frames	editor	probe	live	no	yes	-	기즈모 라인 패스 검증(도형 정점 수·픽셀·드로우 병합)
+dx12.gizmoscene	-	frames	editor	probe	live	no	yes	-	Gizmo 씬 연결 검증(밀봉 복사·4패스 체인·타깃 공유)
+dx12.grid	-	frames	editor	probe	live	no	yes	-	그리드 패스 검증(라인·셀 내부·밀도·카메라 반응)
+dx12.ibl	-	frames	editor	probe	live	no	yes	-	IBL 생성 체인 검증(rect→cube·조도·프리필터·BRDF LUT)
+dx12.iblshade	-	frames	editor	probe	live	no	yes	-	IBL 앰비언트 소비 검증(끔=검정·조도 방향성·금속 정반사)
+dx12.live	-	frames	editor	engine_service	live	no	no	on|status	EnhancedRenderer 메인 런타임 상태
+dx12.parallel	-	frames	editor	probe	live	no	yes	-	커맨드 기록 병렬화 검증(링 원자성·순차 대비 동일성)
+dx12.post	-	frames	editor	probe	live	no	yes	-	DX12 후처리 패스를 리드백으로 판정한다
+dx12.postscale	-	frames	editor	probe	live	no	yes	-	DX12 후처리 해상도 스케일을 판정한다
+dx12.psocache	-	frames	editor	probe	live	no	yes	[파일]	PSO 캐시 자가 검증(2회차 컴파일 0건)
+dx12.rendergraph	-	frames	editor	probe	live	no	yes	-	렌더 그래프 검증(순서·흐름·배리어·컬링·실행)
+dx12.resize	-	frames	editor	probe	live	no	yes	-	크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)
+dx12.scene	-	frames	editor	probe	live	no	yes	-	씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)
+dx12.selftest	-	frames	editor	probe	requires_restart	no	yes	[파일]	DX12 브링업 자가 검증(삼각형 렌더 → PNG)
+dx12.shadowquality	-	frames	editor	probe	live	no	yes	-	그림자 품질 검증(경사 비례 편향·캐스케이드 경계 블렌딩 A/B)
+dx12.skinning	-	frames	editor	probe	live	no	yes	-	GBuffer 스키닝 검증(본 이동·가중 혼합·비스킨드 불변)
+dx12.skybox	-	frames	editor	probe	live	no	yes	-	스카이박스 패스 검증(면 방향·원평면 밀어넣기·전면 커버)
+dx12.ssao	-	frames	editor	probe	live	no	yes	-	DX12 SSAO 패스를 리드백으로 판정한다
+dx12.ssaoscale	-	frames	editor	probe	live	no	yes	-	DX12 SSAO 해상도 스케일을 판정한다
+dx12.ssgi	-	frames	editor	probe	live	no	yes	-	DX12 SSGI 패스를 리드백으로 판정한다
+dx12.ssr	-	frames	editor	probe	live	no	yes	-	SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)
+dx12.sss	-	frames	editor	probe	live	no	yes	-	SSS 패스 검증(번짐·축 분리·표면 추종·에너지)
+dx12.ui	-	frames	editor	probe	live	no	yes	-	DX12 UI 패스를 리드백으로 판정한다
+dx12.uploadring	-	frames	editor	probe	live	no	yes	-	구 명령 별칭(DX12 업로드 세그먼트 검증)
+dx12.wireframe	-	frames	editor	probe	live	no	yes	-	와이어프레임 패스 검증(변·내부 비채움·인스턴싱·메시 캐시)
+experiment.animevent	-	frames	editor	probe	live	no	no	seed|verify	애니메이션 이벤트·루프 오버라이드의 소유 이관을 판정한다
+experiment.animlive	-	frames	editor	probe	live	no	no	-	라이브 팔레트 digest를 낸다(두 번 불러 재생 중인지 가른다)
+experiment.animmask	-	frames	editor	probe	live	no	no	-	AvatarMask 트리 생성을 legacy 재귀와 A/B로 대조한다
+experiment.animpose	-	frames	editor	probe	live	no	no	<0..1> [클립]	클립의 특정 지점 포즈를 고정 계산해 판정한다
+experiment.animtick	-	frames	editor	probe	live	no	no	-	Animator 틱 경로의 패리티를 판정한다
+experiment.boneresolve	-	frames	editor	probe	live	no	no	-	본 이름 해석 창구를 전수 A/B로 대조한다
+experiment.cacheopt	-	frames	editor	probe	live	no	no	-	정점 캐시/페치 순서 — ACMR 이 실제로 낮아지는가 + 기하 보존
+experiment.catalog	-	frames	editor	probe	live	no	no	[Derived부모]	CEMF catalog — 전 GUID 해석·내용 검증·폐포 위상 순서
+experiment.cooked	-	long	editor	probe	live	no	no	[경로]	쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)
+experiment.editorsurface	-	frames	editor	probe	live	no	no	-	에디터 표면 질의(클립 축·mesh 축)의 A/B 동치를 판정한다
+experiment.foliage	-	frames	editor	probe	live	no	no	seed <자산디렉터리> | verify	Foliage 메시의 experiment 핸들 합류를 합성으로 판정한다
+experiment.matcodec	-	frames	editor	probe	live	no	no	-	재질 저작 값 인코딩 왕복을 판정한다
+experiment.matcook	-	long	editor	probe	live	no	no	[루트 재질 모델]	재질 의존 폐포 — standalone 재질 + 모델의 임베디드 texture 추출
+experiment.matinstance	-	frames	editor	probe	live	no	no	-	MaterialInstance 생성·프로퍼티 블록을 판정한다
+experiment.matmigrate	-	frames	editor	probe	live	no	no	-	legacy 재질의 experiment 왕복 이관을 판정한다
+experiment.matparity	-	frames	editor	probe	live	no	no	-	재질 해석의 legacy 대 experiment 패리티를 판정한다
+experiment.matresolve	-	frames	editor	probe	live	no	no	-	제품 resolver가 cooked를 고르는지 판정한다
+experiment.matruntime	-	frames	editor	probe	live	no	no	[edit]	런타임 MaterialInstance 경로를 판정한다
+experiment.matscript	-	frames	editor	probe	live	no	no	-	스크립트가 보는 재질 표면을 판정한다
+experiment.matseal	-	frames	editor	probe	live	no	no	-	재질 sealing 결과를 판정한다
+experiment.normal	-	frames	editor	probe	live	no	no	-	평면 법선 합성 검사(감김·면 분리·퇴화 처리, 자산 무관)
+experiment.resolver	-	frames	editor	probe	live	no	no	-	CookedThenSource resolver — 호출 순서와 폴백 관측(자산 무관)
+experiment.sampler	-	frames	editor	probe	live	no	no	-	보간 합성 검사(Step/Linear 계단·강등·키 뭉침, 자산 무관)
+experiment.scenecook	-	long	editor	probe	live	no	no	[루트 씬]	scene/prefab 의존 추출 — 자기참조 제외·못 그린 참조 계수
+experiment.skinbounds	-	frames	editor	probe	live	no	no	-	스킨 팔레트의 유한성·인덱스 범위·크기 상한을 판정한다
+experiment.smcook	-	long	editor	probe	live	no	no	[루트 메타]	ShaderMeta 쿠킹 — 정본 파서 검증·source 해소(실자산엔 거부 사례 0)
+experiment.tangent	-	frames	editor	probe	live	no	no	-	탄젠트 합성 검사(mikktspace 축·handedness·이음매 분리, 자산 무관)
+experiment.texcook	-	long	editor	probe	live	no	no	[루트 텍스처]	텍스처 쿠킹 — GUID 주소·내용 해시·fail-closed(실자산은 .dds 미포함)
+experiment.vertexlayout	-	frames	editor	probe	live	no	no	-	typed 정점 레이아웃 디코드를 판정한다
+experiment.weld	-	frames	editor	probe	live	no	no	-	정점 용접 — 합치는가/안 합치는가(실자산은 0건이라 이것만이 증거다)
+foliage.authoring.probe	-	frames	editor	raw_fixture	live	no	no	<이름> [escape]	Foliage 저작 트랜잭션 왕복과 루트 이탈 거부를 본다
+game.pak	-	long	editor	engine_service	live	no	yes	-	Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다
+gc.collect	-	frames	editor	probe	live	no	no	-	관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)
+gc.stats	gc.delta	immediate	editor	probe	live	no	no	-	관리 힙 지표를 낸다(gc.delta는 직전 대비 증감)
+gpu.baseline	-	frames	editor	probe	live	no	no	-	현재 상태를 기준선으로 삼는다
+gpu.census	gpu.delta	frames	editor	probe	live	no	no	[라벨]	VRAM과 엔진 에셋 수를 로그에 기록
+help	-	immediate	editor	engine_service	live	no	yes	[명령]	명령 목록 또는 명령 하나의 상세를 낸다
+inputmap.authoring.probe	-	frames	editor	raw_fixture	live	no	yes	<save|verify> <이름>	입력 액션맵 저장·재기동 왕복으로 payload 복원을 본다
+inputmap.corpus.probe	-	long	editor	probe	live	no	no	-	입력 액션맵 코퍼스를 전수로 읽어 계수를 낸다
+lifecycle.dump	-	immediate	editor	engine_service	live	no	no	[파일]	기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)
+lifecycle.registry	-	frames	editor	engine_service	live	no	no	on|off|status	생명주기 디스패치 경로 전환(9-1, 씬 재로드 필요)
+lifecycle.stress	-	frames	editor	engine_service	live	no	no	destroy|churn|reentrant [개수]	수명 경로를 흔든다(reentrant는 순회 한복판)
+lifecycle.trace	-	frames	editor	engine_service	live	no	no	on [틱프레임]|off|clear|status	생명주기 호출 순서를 받아 적는다
+log.flush	-	immediate	editor	engine_service	live	no	no	-	로그를 디스크에 즉시 반영
+material.corpus.probe	-	long	editor	probe	live	no	no	<이름> ...	standalone material identity/reference 왕복
+mem.stats	mem.delta,mem.reset,mem.hook	frames	editor	probe	live	no	no	-	churn 누계와 기준선을 0으로 — 구간 측정용
+model.load	-	long	editor	engine_service	live	no	no	<경로>	모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)
+model.loadcached	-	long	editor	engine_service	live	no	no	<모델 경로>	에디터 드롭 경로(LoadCachedModelShared)로 모델을 연다
+model.place	-	frames	editor	engine_service	live	no	no	<이름>	임포트한 모델을 활성 씬에 배치한다
+object.create	-	frames	editor	editor_operation	live	no	no	<이름> [타입]	빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)
+object.create.undoable	-	frames	editor	editor_operation	live	no	no	<이름>	Undo 이력을 쌓으며 오브젝트를 만든다
+object.duplicate	-	frames	editor	editor_operation	live	no	no	<오브젝트> [새 이름]	오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)
+object.parent	-	frames	editor	editor_operation	live	no	no	<자식> <부모 | ->	오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)
+object.property	-	frames	editor	editor_operation	live	no	no	<오브젝트> <컴포넌트> <필드> <값>	리플렉션으로 프로퍼티를 설정한다
+object.rename	-	frames	editor	editor_operation	live	no	no	<이전> <새>	오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)
+object.rootref	-	frames	editor	editor_operation	live	no	no	<오브젝트> [루트|-]	Bone형 same-scene root 참조를 설정/조회한다
+object.transform	-	frames	editor	editor_operation	live	no	no	<이름> <px py pz> [rx ry rz] [sx sy sz]	변환을 지정한다(회전은 도)
+perf.reflect	-	long	editor	probe	live	no	no	[반복]	씬 직렬화와 프리팹 역직렬화 시간을 잰다
+pipeline.nodes	-	immediate	editor	engine_service	live	no	no	-	라이브 파이프라인의 노드 조립 결과를 한 줄씩 낸다
+pix.capture	-	frames	editor	probe	live	no	no	begin|end|status	PIX 주입 실행의 명시적 GPU 캡처 경계
+play	stop	frames	editor	editor_operation	live	no	no	-	에디터의 재생·정지와 같은 동작
+play.state	-	immediate	editor	engine_service	live	no	yes	-	재생 상태(gameStart·paused·씬 로드)를 낸다
+prefab.corpus.digest	-	long	editor	probe	live	no	no	<라벨> <이름> ...	prefab identity/override 왕복 digest
+prefab.create	-	frames	editor	editor_operation	live	no	no	<오브젝트 이름> <프리팹 이름>	오브젝트로 프리팹을 만들어 저장한다
+prefab.instantiate	-	frames	editor	editor_operation	live	no	no	<프리팹 이름> [인스턴스 이름]	프리팹을 씬에 소환한다
+prefab.objectguid	-	immediate	editor	engine_service	live	no	no	<오브젝트 이름>	오브젝트의 프리팹 objectGuid를 낸다
+prefab.overrides	-	immediate	editor	engine_service	live	no	no	<오브젝트>	프리팹 인스턴스에 기록된 오버라이드를 나열한다
+prefab.status	-	immediate	editor	engine_service	live	no	no	-	프리팹 등록·캐시 상태를 낸다
+prefab.update	-	frames	editor	editor_operation	live	no	no	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
+profile.selftest	-	frames	editor	probe	live	no	no	-	CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)
+profile.stats	-	immediate	editor	probe	live	no	no	-	프로파일러 자체 비용과 용량 소진(교란 없음)
+quit	exit	immediate	editor	engine_service	terminates_process	no	yes	-	에디터 종료
+reflect.golden	-	long	editor	probe	live	no	no	[출력 경로]	등록된 전 타입의 직렬화 출력을 골든 문서로 쓴다
+render.backend	-	frames	editor	engine_service	live	no	no	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
+render.exposure	-	frames	editor	engine_service	live	no	no	-	자동 노출이 무엇을 재고 무엇을 결정했는지
+render.livecheck	-	frames	editor	probe	live	no	yes	[너비 높이]	resize·다중 뷰·표시 슬롯 회전 회귀 판정
+render.matmode	-	frames	editor	engine_service	live	no	no	<오브젝트> <opaque|transparent>	오브젝트 재질의 렌더링 모드를 바꾼다
+render.rtinfo	-	frames	editor	engine_service	live	no	no	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
+render.shadowinfo	-	frames	editor	engine_service	live	no	no	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)
+rhi.uploadsegments	-	frames	editor	probe	requires_restart	no	yes	-	DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증
+scene.bonecache	-	frames	editor	probe	live	no	no	[0|1]	E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)
+scene.bonedump	-	frames	editor	probe	live	no	no	[개수]	대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)
+scene.ddol	-	frames	editor	engine_service	live	no	no	<이름>	오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용
+scene.dirtytraversal	-	frames	editor	probe	live	no	no	[0|1]	S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)
+scene.dump	-	immediate	editor	engine_service	live	no	no	[라벨]	활성 씬의 오브젝트 계층을 로그에 남긴다
+scene.executiongraph	-	frames	editor	probe	live	no	no	probe|bench <N> [samples]	X4 packed projection 불변식·compile 비용 검사
+scene.hierarchycheck	-	frames	editor	engine_service	live	no	no	-	씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)
+scene.hierarchymutation	-	frames	editor	probe	live	no	no	probe	X3 reparent 검증·대칭성·topology version 검사
+scene.load	scene.switch	long	editor	engine_service	live	no	yes	<경로>	씬을 로드한다(활성 씬은 그대로)
+scene.new	-	frames	editor	engine_service	live	no	no	[이름]	빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)
+scene.proxybench	-	long	editor	probe	live	no	no	<프레임수> [등록수]	X8 정지 dirty-queue 커밋 비용(선택: 합성 등록수)
+scene.proxydirty	-	frames	editor	probe	live	no	no	probe	X8 frame-persistent render dirty mask·generation 검사
+scene.save	-	frames	editor	engine_service	live	no	no	<경로>	활성 씬을 .creator로 저장한다
+scene.select	-	immediate	editor	engine_service	live	no	no	<오브젝트 이름>	오브젝트를 에디터 선택으로 지정한다
+scene.selection	-	immediate	editor	engine_service	live	no	no	<라벨>	단일 선택과 복수 선택을 따로 낸다(둘의 어긋남을 드러낸다)
+scene.sparseresolver	-	frames	editor	probe	live	no	no	0|1|print|probe|bench <N> <frames>	X5 dirty-root sparse resolve·A/B 검사
+scene.transformbulk	-	frames	editor	probe	live	no	no	probe	X7 Animator pose·Physics world batch·Socket barrier 검사
+scene.transformdigest	-	frames	editor	probe	live	no	no	[라벨]	활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)
+scene.transformdomains	-	frames	editor	probe	live	no	no	probe	X2 UI/Spatial 독립 dirty gate·paused/subtree 검사
+scene.transformpull	-	frames	editor	probe	live	no	no	print|probe	X6 C# 즉시 pull·sibling global 전파 검사
+scene.transformstats	-	frames	editor	probe	live	no	no	[0|1|print]	X0 UI/Spatial·단계·구성·프레임 topology 계측
+scene.transformwritestats	-	frames	editor	probe	live	no	no	[0|1|print|probe]	X1 로컬 쓰기 publish 출처 계측
+scene.traversalbench	-	long	editor	probe	live	no	no	<오브젝트수> <프레임수> [flat|wide|deep|skeleton]	X0 Release 벤치(0=현재 씬)
+script.add	-	frames	editor	engine_service	live	no	yes	<오브젝트> <타입>	C# 스크립트를 오브젝트에 부착한다
+script.fields	-	frames	editor	engine_service	live	no	no	<id>	스크립트의 노출 필드와 현재 값을 확인한다
+script.invoke	-	long	editor	engine_service	live	yes	yes	<타입> <메서드> [인자]...	표식된 static 메서드를 호출한다([EngineCallable] 없는 것은 거부)
+script.reload	-	frames	editor	engine_service	live	no	yes	-	게임 스크립트 어셈블리를 다시 로드한다(핫리로드)
+script.set	-	frames	editor	engine_service	live	no	no	<id> <인덱스> <값>	노출 필드 값을 바꾼다
+script.status	-	immediate	editor	engine_service	live	no	yes	-	CLR 상태와 활성 스크립트 수를 확인한다
+serialize.bench	-	long	editor	probe	live	no	no	boot | scene <경로> [반복] | prefab <이름> [반복]	직렬화 경로별 시간을 잰다
+serialize.nodeequal	-	frames	editor	probe	live	no	no	-	저작 노드 구조 비교 규칙을 판정한다(맵 키 순서 무시가 의도)
+serialize.rymlerror	-	frames	editor	probe	live	no	no	-	ryml 에러 정책이 abort를 막는지 판정한다
+shadermeta.probe	-	frames	editor	probe	live	no	no	-	ShaderMeta 실자산 수용과 잘못된 문서 거절을 함께 판정한다
+tag.authoring.probe	-	frames	editor	raw_fixture	live	no	no	list | <add|has|remove> <이름>	태그·레이어 저작 자산을 읽고 고친다
+terrain.authoring.probe	-	frames	editor	raw_fixture	live	no	no	<이름> <텍스처|->	Terrain writer 트랜잭션 회귀 검사
+ui.anchor	ui.size,ui.pos,ui.screenpos	frames	editor	engine_service	live	no	no	<오브젝트> <minX> <minY> <maxX> <maxY>	앵커를 직접 지정한다
+ui.hitbox	-	frames	editor	engine_service	live	no	no	-	버튼의 rect와 클릭 판정 상자를 나란히 출력한다
+ui.navprobe	-	frames	editor	engine_service	live	no	no	-	UI 내비게이션 저작 계층을 세워 탐색 결과를 판정한다
+ui.rect	-	frames	editor	engine_service	live	no	no	<오브젝트|*>	오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다
+ui.status	-	immediate	editor	engine_service	live	no	no	-	UI 계층·캔버스 연결 상태를 낸다
+undo	redo	frames	editor	editor_operation	live	no	no	-	에디터의 Ctrl+Z / Ctrl+Y와 같은 호출
+undo.state	-	immediate	editor	engine_service	live	no	yes	<라벨>	편집 스택과 게임 스택의 Undo 깊이를 따로 낸다
+vk.decal	-	frames	editor	probe	live	no	yes	-	Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조
+vk.deferred	-	frames	editor	probe	live	no	yes	-	Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조
+vk.fog	-	frames	editor	probe	live	no	yes	-	VolumetricFog 공용 패스 — 3D scatter/history/composite 대조
+vk.forward	-	frames	editor	probe	live	no	yes	-	Forward+ 공용 패스 — compute·buffer·blend·mesh DX12/Vulkan 대조
+vk.gbuffer	-	frames	editor	probe	live	no	yes	-	GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조
+vk.gizmoicon	-	frames	editor	probe	live	no	yes	-	실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조
+vk.gizmoline	-	frames	editor	probe	live	no	yes	-	GizmoLine 공용 패스 — line-list 전체 RGBA DX12/Vulkan 대조
+vk.grid	-	frames	editor	probe	live	no	yes	-	그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)
+vk.ibl	-	frames	editor	probe	live	no	yes	-	IBL 생성기를 Vulkan 으로 — 면·밉·LUT DX12 픽셀 대조
+vk.parallel	-	frames	editor	probe	live	no	yes	-	Vulkan RenderGraph 병렬 command pool·제출·픽셀 검증
+vk.post	-	frames	editor	probe	live	no	yes	-	PostChain 공용 패스 — bloom/tonemap/vignette/FXAA 대조
+vk.selftest	-	frames	editor	probe	requires_restart	no	yes	[파일]	Vulkan 골격 자가 검증(디바이스·중립 서비스 경로·스왑체인 → PNG)
+vk.shadow	-	frames	editor	probe	live	no	yes	-	Shadow 공용 패스 — depth array·mesh DX12/Vulkan 대조
+vk.skybox	-	frames	editor	probe	live	no	yes	-	스카이박스를 Vulkan 으로 — 큐브 SRV·정적 샘플러 픽셀 대조
+vk.ssao	-	frames	editor	probe	live	no	yes	-	SSAO 공용 패스 — depth/normal compute·filter DX12/Vulkan 대조
+vk.ssgi	-	frames	editor	probe	live	no	yes	-	SSGI 공용 패스 — Hi-Z·temporal·filter·composite 대조
+vk.ssr	-	frames	editor	probe	live	no	yes	-	SSR 공용 패스 — ray hit·metal/thickness/bitmask 픽셀 대조
+vk.sss	-	frames	editor	probe	live	no	yes	-	SSS 공용 패스 — 2축 blur·depth gate 전체 픽셀 대조
+vk.ui	-	frames	editor	probe	live	no	yes	-	UI 공용 패스 — layer·blend·texture batch DX12/Vulkan 대조
+vk.wireframe	-	frames	editor	probe	live	no	yes	-	WireFrame 공용 패스 — non-solid fill·skinning DX12/Vulkan 대조
+wait	-	immediate	editor	engine_service	live	no	yes	<프레임>	지정 프레임만큼 다음 명령을 미룬다
+window.info	-	immediate	editor	engine_service	live	no	no	-	엔진이 인식하는 클라이언트 크기를 출력한다
+window.resize	-	frames	editor	engine_service	live	no	no	<너비> <높이>	창 클라이언트 크기를 바꾼다(해상도 검증용)

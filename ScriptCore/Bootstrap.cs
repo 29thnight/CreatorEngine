@@ -358,6 +358,82 @@ public static class Bootstrap
         catch { return 0; }
     }
 
+    // ── 표식된 static 메서드 호출 (L3-B · LC7 · §10.2) ──
+    //
+    // 인자를 왜 이렇게 넘기는가: 인자 목록을 US(\x1f)로 이어 붙이고 **개수를 따로**
+    // 준다. 개수가 없으면 "인자 0 개" 와 "빈 문자열 하나" 를 구분할 수 없고, 그 둘은
+    // 오버로드 해석에서 다른 메서드로 간다. 구분자를 \n 이 아니라 \x1f 로 둔 것은
+    // HTTP 로 온 인자에 줄바꿈이 들어올 수 있어서다.
+
+    /// <summary>
+    /// 표식된 static 메서드를 부른다. 반환값은 <c>InvokeOutcome</c>(0 이면 성공).
+    ///
+    /// <paramref name="outBuffer"/> 에 NUL 로 끝나는 UTF-8 payload 를 쓴다 —
+    /// 성공하면 <c>반환타입 \x1f 반환값</c>, 실패하면 사람이 읽는 사유다.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int InvokeCallable(byte* typeNameUtf8, byte* methodNameUtf8,
+                                            byte* argsUtf8, int argCount,
+                                            byte* outBuffer, int capacity)
+    {
+        try
+        {
+            string typeName   = Marshal.PtrToStringUTF8((nint)typeNameUtf8) ?? string.Empty;
+            string methodName = Marshal.PtrToStringUTF8((nint)methodNameUtf8) ?? string.Empty;
+
+            string[] args;
+            if (argCount <= 0)
+            {
+                args = [];
+            }
+            else
+            {
+                string joined = Marshal.PtrToStringUTF8((nint)argsUtf8) ?? string.Empty;
+                args = joined.Split('\x1f');
+                if (args.Length != argCount)
+                {
+                    WriteUtf8($"인자 전달이 어긋났다 — {argCount} 개라고 했는데 {args.Length} 개가 왔다",
+                              outBuffer, capacity);
+                    return (int)InvokeOutcome.Internal;
+                }
+            }
+
+            InvokeOutcome outcome = EngineCallableInvoker.Invoke(typeName, methodName, args,
+                                                                out string payload);
+            WriteUtf8(payload, outBuffer, capacity);
+            return (int)outcome;
+        }
+        catch (Exception ex)
+        {
+            Report(ex, nameof(InvokeCallable));
+            try { WriteUtf8($"{ex.GetType().Name}: {ex.Message}", outBuffer, capacity); } catch { }
+            return (int)InvokeOutcome.Internal;
+        }
+    }
+
+    /// <summary>
+    /// NUL 로 끝나는 UTF-8 을 버퍼에 쓴다. 넘치면 **문자 경계에서** 자른다.
+    ///
+    /// 바이트로 자르면 다중바이트 문자 중간이 잘려 네이티브 쪽에 깨진 UTF-8 이
+    /// 남는다 — 사유가 한국어라 이것이 실제로 걸리는 경우다.
+    /// </summary>
+    private static unsafe void WriteUtf8(string text, byte* buffer, int capacity)
+    {
+        if (buffer == null || capacity <= 0) return;
+
+        var span = new Span<byte>(buffer, capacity);
+        int chars = text.Length;
+        while (chars > 0 && System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, chars)) >= capacity)
+        {
+            chars = chars * 3 / 4;
+        }
+
+        int written = (chars > 0)
+            ? System.Text.Encoding.UTF8.GetBytes(text.AsSpan(0, chars), span)
+            : 0;
+        span[written] = 0;
+    }
+
     // ── 노출 필드 (인스펙터·직렬화) ──
     //
     // 소스 제너레이터가 만든 접근자를 그대로 경계에 내보낸다.

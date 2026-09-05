@@ -91,6 +91,7 @@ namespace EditorCommandService
             object.Set("roles",         JV::String(std::string(CommandCore::ToString(d.roles))));
             object.Set("class",         JV::String(std::string(CommandCore::ToString(d.cls))));
             object.Set("liveness",      JV::String(std::string(CommandCore::ToString(d.liveness))));
+            object.Set("userCode",      JV::Bool(d.executesUserCode));
             object.Set("resultBearing", JV::Bool(d.resultBearing));
             return object;
         }
@@ -187,6 +188,19 @@ namespace EditorCommandService
                 outFound = (nullptr != descriptor);
                 if (!outFound) return false;
                 return CommandCore::CommandCost::Long == descriptor->cost;
+            }
+
+            bool ExecutesUserCode(const std::string& command) override
+            {
+                const CommandCore::CommandDescriptor* descriptor =
+                    CommandCore::CommandRegistry::Get().Find(command);
+
+                // ★ 없는 명령은 **참으로 답하지 않는다.**
+                //
+                //   없는 이름은 404 로 끝나야 하고(§5.3), 여기서 참을 내면 오타
+                //   하나가 403 이 된다 — 호출자는 이름이 틀린 것을 권한 문제로
+                //   읽고 플래그를 켜 가며 재시도한다.
+                return (nullptr != descriptor) && descriptor->executesUserCode;
             }
 
             bool ExecuteAsync(const std::vector<std::string>& arguments,
@@ -302,11 +316,12 @@ namespace EditorCommandService
         CommandService::Service& Instance() { static CommandService::Service service; return service; }
     }
 
-    bool Start(const std::string& projectRoot, std::string& outError)
+    bool Start(const std::string& projectRoot, bool allowUserCode, std::string& outError)
     {
         CommandService::ServiceConfig config;
-        config.role        = "editor";
-        config.projectRoot = projectRoot;
+        config.role          = "editor";
+        config.projectRoot   = projectRoot;
+        config.allowUserCode = allowUserCode;
         return Instance().Start(config, Gateway(), outError);
     }
 

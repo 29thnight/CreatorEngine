@@ -1167,6 +1167,106 @@ namespace ConsoleCmd
         return CommandCore::Ok("script status", std::move(data));
     }
 
+    // ★ LC7: L3 등급 B — 표식된 static 메서드를 이름으로 부른다(§10.2).
+    //
+    // ── 무엇이 없었나 ───────────────────────────────────────────────────
+    //
+    //   `script.reload` 는 어셈블리를 갈아 끼우지만, 갈아 낀 코드를 **부를**
+    //   방법이 없었다. 새 코드가 도는 것을 보려면 씬 안의 인스턴스가 다음 틱을
+    //   맞을 때까지 기다려야 했고, 그러면 "C# 을 고쳐 반영됐는지" 를 확인하는
+    //   왕복이 프레임 루프의 부수 효과를 통해서만 닫혔다. 그것은 측정이 아니다.
+    //
+    // ── 왜 표식인가 ─────────────────────────────────────────────────────
+    //
+    //   이름만으로 부를 수 있으면 이 명령 하나가 곧 "로드된 어셈블리의 아무
+    //   static 메서드나 부르는 API" 다. 표식(`[EngineCallable]`)이 그 표면을
+    //   저자가 고르게 한다. 표식 없는 메서드는 **있다는 사실을 알려 주고**
+    //   거부한다 — "없다" 로 답하면 오타와 거부를 구분해 셀 수 없다.
+    //
+    // ── 도달 경계 ───────────────────────────────────────────────────────
+    //
+    //   이 핸들러가 `ClrHost::InvokeCallableStatic` 의 유일한 호출자다. 그리고
+    //   그 사실에 기대지 않는다 — seed 의 `executesUserCode` 가 참일 때만
+    //   `ExecuteParsed` 가 창을 열고, 창 밖의 호출은 `NotPermitted` 로 거부된다.
+    static CommandCore::CommandResult Cmd_script_invoke(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: script.invoke <타입> <메서드> [인자]...\n");
+            return CommandCore::InvalidArguments(
+                "script.invoke: <타입> <메서드> 가 필요하다");
+        }
+
+        const std::string& typeName   = ctx.parts[1];
+        const std::string& methodName = ctx.parts[2];
+        const std::vector<std::string> args(ctx.parts.begin() + 3, ctx.parts.end());
+
+        const ClrHost::InvokeResult invoked =
+            ClrHost::Get().InvokeCallableStatic(typeName, methodName, args);
+
+        // 요청한 것을 결과에 되싣는다. 비동기(202)로 돌면 호출자는 이 응답만
+        // 보게 되므로, 무엇을 부른 결과인지가 응답 안에 있어야 한다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("type",     CommandCore::CommandData::String(typeName));
+        data.Set("method",   CommandCore::CommandData::String(methodName));
+        data.Set("argCount", CommandCore::CommandData::Int(
+            static_cast<int64_t>(args.size())));
+
+        if (invoked.Succeeded())
+        {
+            data.Set("returnType",  CommandCore::CommandData::String(invoked.returnType));
+            data.Set("returnValue", CommandCore::CommandData::String(invoked.returnValue));
+
+            std::printf("[CLI] script.invoke %s.%s -> %s %s\n", typeName.c_str(),
+                methodName.c_str(), invoked.returnType.c_str(), invoked.returnValue.c_str());
+            return CommandCore::Ok(typeName + "." + methodName + " 호출 완료", std::move(data));
+        }
+
+        std::printf("[CLI] script.invoke 실패: %s\n", invoked.reason.c_str());
+
+        // ★ 갈래마다 **다른 코드**를 낸다.
+        //
+        //   전부 `script.invoke_failed` 로 내면 자동화가 "오타" 와 "표식 없음" 과
+        //   "사용자 코드가 던졌다" 를 구분할 수 없다. 그 셋은 호출자가 할 일이
+        //   각각 다르다 — 이름을 고치거나, 표식을 달거나, 스크립트를 고친다.
+        switch (invoked.outcome)
+        {
+        case ClrHost::InvokeOutcome::NotMarked:
+            // §10.2 의 "표식 없는 메서드 호출 0" 이 세어지는 자리다.
+            return CommandCore::Fail("script.invoke_not_callable", invoked.reason,
+                                     std::move(data));
+
+        case ClrHost::InvokeOutcome::TypeNotFound:
+        case ClrHost::InvokeOutcome::TypeAmbiguous:
+        case ClrHost::InvokeOutcome::MethodNotFound:
+        case ClrHost::InvokeOutcome::MethodAmbiguous:
+            return CommandCore::Fail("script.invoke_unresolved", invoked.reason,
+                                     std::move(data));
+
+        case ClrHost::InvokeOutcome::ArgumentMismatch:
+            return CommandCore::InvalidArguments(invoked.reason, "script.invoke_bad_arguments");
+
+        case ClrHost::InvokeOutcome::Threw:
+            // 사용자 코드가 던진 것은 **명령의 실패**이지 엔진의 내부 결함이 아니다.
+            // 500 으로 내면 호출자가 재시도해서는 안 될 것을 재시도한다.
+            return CommandCore::Fail("script.invoke_threw", invoked.reason, std::move(data));
+
+        case ClrHost::InvokeOutcome::NoAssembly:
+        case ClrHost::InvokeOutcome::NotBound:
+            return CommandCore::PreconditionFailed("script.invoke_unavailable", invoked.reason);
+
+        case ClrHost::InvokeOutcome::NotPermitted:
+            // 여기 오는 것은 배선 결함이다 — seed 가 `executesUserCode` 를 잃었거나
+            // 이 핸들러가 창 밖에서 불렸다. 조용히 "실패" 로 섞지 않는다.
+            return CommandCore::InternalError("script.invoke_not_permitted", invoked.reason);
+
+        case ClrHost::InvokeOutcome::Ok:
+        case ClrHost::InvokeOutcome::Internal:
+            break;
+        }
+        return CommandCore::InternalError("script.invoke_internal", invoked.reason);
+    }
+
     void RegisterScriptUiAnimatorCommands(Registrar& reg)
     {
         reg.Legacy({ "animator.scene.probe" }, &Cmd_animator_scene_probe);
@@ -1181,6 +1281,7 @@ namespace ConsoleCmd
         reg.Legacy({ "animator.state" }, &Cmd_animator_state);
         reg.Legacy({ "animator.exit" }, &Cmd_animator_exit);
         reg.Legacy({ "animator.param" }, &Cmd_animator_param);
+        reg.Result({ "script.invoke" }, &Cmd_script_invoke);
         reg.Result({ "script.reload" }, &Cmd_script_reload);
         reg.Result({ "script.status" }, &Cmd_script_status);
     }

@@ -472,6 +472,25 @@ namespace CommandService
                 }
             }
 
+            // ── 사용자 코드 (§8) ────────────────────────────────────────
+            //
+            // `ExecutesUserCode` 명령은 별도 플래그가 없으면 403 이다.
+            //
+            // ★ **큐 상한보다 먼저** 본다. 순서를 뒤집으면 큐가 찬 순간 이
+            //   명령이 429 로 답하게 되고, 429 는 "잠시 뒤 다시 걸어라" 라는
+            //   뜻이다 — 영영 허락되지 않을 요청에 재시도를 권하는 셈이다.
+            //   권한 판정은 부하와 무관해야 한다.
+            //
+            // ★★ 이름 목록을 여기 박지 않는다. registry 가 답한다 — 박아 두면
+            //   명령이 하나 더 생기는 날 이 목록만 조용히 뒤처진다.
+            if (!m_config.allowUserCode && m_gateway->ExecutesUserCode(arguments.front()))
+            {
+                return finish(403, ErrorBody("service.user_code_forbidden",
+                    arguments.front() + " 는 사용자 코드를 실행한다. 서비스는 별도 플래그"
+                    "(--allow-user-code) 없이 이 명령을 받지 않는다"),
+                    "user-code-forbidden");
+            }
+
             // ── 큐 상한 (§7.3) ──────────────────────────────────────────
             //
             // 무한 적재는 지연을 숨기는 가장 흔한 방법이다. 깊이가 상한을 넘으면
