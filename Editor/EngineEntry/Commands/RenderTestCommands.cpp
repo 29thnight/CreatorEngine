@@ -726,29 +726,21 @@ namespace ConsoleCmd
         return CommandCore::Ok("rhi.uploadsegments 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_dx12_uploadring(const ConsoleCommandContext& ctx)
-    {
-        // 업로드 링 자가 검증(PHASE 3-3). 자체 디바이스로 돌므로 DX11 렌더
-        // 스레드와 충돌하지 않는다.
-        std::string log;
-        const bool passed = DX12Test::RunUploadSegmentTest(log);
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
-        std::printf("[CLI] dx12.uploadring %s\n", passed ? "통과" : "실패");
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.uploadring 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.uploadring 통과", std::move(data));
-    }
+    // ★ `dx12.uploadring` 을 지웠다(2026-09-06). **이미 교체가 선언된 명령이었다.**
+    //
+    //   `docs/design/RhiGpuMemoryLifetimeDesign.md` §12.2 가 "기존 회귀 —
+    //   `dx12.uploadring` 을 새 `rhi.uploadsegments` 로 교체" 라고 적어 두었는데
+    //   구 명령이 남아 있었다. seed 요약도 스스로 "구 명령 별칭" 이라고 했지만
+    //   **별칭이 아니었다** — `aliases` 칸이 `-` 이고 자기 canonical 이름으로
+    //   따로 등록되어 있었다.
+    //
+    //   몸통은 `Cmd_rhi_uploadsegments` 의 DX12 절반과 같은
+    //   `DX12Test::RunUploadSegmentTest` 하나였다. 남는 쪽이 그것을 그대로 부르니
+    //   검사 자체는 하나도 잃지 않는다 — Vulkan 절반이 함께 도는 것이 다르다.
+    //
+    //   `Tools/dx12-validation/README.md` 는 이것이 9 회 중 1 회 실패하는
+    //   비결정적 검사라 기준선에서 빼라고 적어 두었다. 기준선이 믿지 않는 검사를
+    //   `Invoke-Dx12Suite` 의 전수 스윕이 계속 태우고 있었다.
 
     static CommandCore::CommandResult Cmd_dx12_forward(const ConsoleCommandContext& ctx)
     {
@@ -1558,7 +1550,6 @@ namespace ConsoleCmd
         reg.Result({ "vk.ssgi" }, &Cmd_vk_ssgi);
         reg.Result({ "dx12.psocache" }, &Cmd_dx12_psocache);
         reg.Result({ "rhi.uploadsegments" }, &Cmd_rhi_uploadsegments);
-        reg.Result({ "dx12.uploadring" }, &Cmd_dx12_uploadring);
         reg.Result({ "dx12.forward" }, &Cmd_dx12_forward);
         reg.Result({ "dx12.forwardshade" }, &Cmd_dx12_forwardshade);
         reg.Result({ "dx12.forwardscale" }, &Cmd_dx12_forwardscale);

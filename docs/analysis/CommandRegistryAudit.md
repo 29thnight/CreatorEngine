@@ -530,8 +530,8 @@ operation 레코드**가 생긴다(`CommandService.cpp:566-575`가 enqueue 전�
 | 4 | `model.place` undo 배선 (3줄) | **배선 완료 2026-09-05 · 런타임 미검증** (§6.3) | |
 | ~~5~~ | ~~`object.create` undo 배선 → `object.create.undoable` 제거~~ | **완료 2026-09-05** (§6.4) | |
 | ~~6~~ | ~~`*scale` 셋의 요약·`cost` 정정~~ | **완료 2026-09-06** (§6.6) | |
-| ~~7~~ | ~~죽은 별칭 이름 4개 제거~~ | **철회 2026-09-06** — 넷 다 살아 있는 조작이다(§3.5 ★). 처분은 (가)/(나) 결정 사항 | |
-| 8 | `uploadring`/`uploadsegments` 짝 결정 | registry −1 | 결정 필요 |
+| ~~7~~ | ~~죽은 별칭 이름 4개 제거~~ | **철회 후 (가)로 재실행 — descriptor 분리 완료 2026-09-06** (§6.8) | |
+| ~~8~~ | ~~`uploadring`/`uploadsegments` 짝 결정~~ | **완료 2026-09-06 — `dx12.uploadring` 제거** (§6.8) | |
 | ~~9~~ | ~~`window.info`→`render.rtinfo`, `model.loadcached` 처분~~ | **철회 2026-09-06** — 양쪽 다 살아 있다(§6.7) | |
 | ~~10~~ | ~~scene X0·X8 병합, 토글 둘~~ | **부분 완료 2026-09-06** — 토글 둘만 합쳤다(§6.7). X0·X8 은 기각 | |
 | ~~11~~ | ~~게이트 확장~~ | **완료 2026-09-06** (§6.7) | |
@@ -823,6 +823,51 @@ editor-operation 은 `model.place` 측정 불가로 붉다(§6.3, 의도).
   "소비자 수 0" 또는 "출력 겹침" 을 **중복**으로 읽은 것이었다. §1 의 한계 항목에
   하나를 더한다: **구조적 유사성은 중복의 증거가 아니다.** 부작용(파일을 쓰는가)과
   의존 방향(누가 누구를 부르는가)을 봐야 갈린다.
+
+### 6.8 7·8번 (2026-09-06)
+
+**8번 — `dx12.uploadring` 제거.** 이 짝은 어느 쪽을 남길지가 결정 사항이었고,
+결정은 구 명령을 빼는 쪽이었다. 근거가 이미 문서에 있었다:
+
+> `docs/design/RhiGpuMemoryLifetimeDesign.md` §12.2 —
+> "기존 회귀 | `dx12.uploadring`을 새 `rhi.uploadsegments`로 교체"
+
+**교체가 선언돼 있었는데 구 명령이 남아 있었다.** 몸통은
+`DX12Test::RunUploadSegmentTest` 하나였고 남는 쪽이 그것을 그대로 부르므로
+**검사는 하나도 잃지 않는다** — Vulkan 자가 검증이 함께 도는 것이 다르다.
+
+곁가지로 하나 정리됐다: `Tools/dx12-validation/README.md` 가 이 명령을 "9 회 중
+1 회 실패하는 비결정적 검사라 기준선에서 빼라" 고 적어 두었는데, `Invoke-Dx12Suite`
+의 `dx12.*` 전수 스윕은 그것을 계속 태우고 있었다. 이제 스윕에서도 빠진다.
+README 의 실측 기록은 **왜 뺐는지의 근거**로 남겼다.
+
+**7번 — descriptor 분리.** §3.5 ★ 에서 (가)/(나) 로 갈라 둔 것 중 (가)다.
+
+`mem.stats`·`mem.delta`·`mem.reset`·`mem.hook` 과 `dump.list`·`dump.show` 가 각각
+한 descriptor 를 공유하고 있었다. 이름은 그대로고 핸들러도 하나 그대로다 —
+**registry 가 넷을 하나로 보고하던 것만 고쳤다.**
+
+★ **분리가 필요하다는 증거가 seed 안에 있었다.** `mem.stats` 의 요약이
+  *"churn 누계와 기준선을 0으로 — 구간 측정용"* 이었다. 그것은 `mem.reset` 의
+  설명이다. 한 descriptor 가 네 동사를 대표하니 **요약이 엉뚱한 동사를 설명하고
+  있었고**, `commands.list`·help·`GET /commands` 를 읽는 쪽에는 그것이 전부였다.
+  넷에 각자 맞는 요약을 줬다.
+
+같이 닫히는 것: **상태를 바꾸는 `mem.reset`·`mem.hook` 이 조회 descriptor 뒤에
+숨어 있었다.** §3.5 가 "mutating 명령을 registry 로 셀 수 없다" 고 적은 자리다.
+
+핸들러가 넷으로 갈리지 않고 하나로 남은 것은 **MSVC 의 C1061 중첩 한계** 때문이다
+(그 경위가 `DiagnosticsCommands.cpp` 주석에 있다). 구현 제약이지 이 넷이 한
+명령이라는 뜻이 아니므로, 제약은 그대로 두고 계약만 갈랐다.
+
+**수치**: 명령 203 → **206**(분리 +4, `uploadring` −1), 이름 217 → **216**,
+registry problems **0**.
+
+**게이트**: registry-golden · discovery · exit-spine · exit-contract · crash-dump
+통과. 여섯이 각자 `aliases=-` 로 서고, `dx12.uploadring` 은 `command.unknown` 이다.
+
+★★ **명령 수가 늘어난 것은 registry 가 정직해진 것이지 명령이 는 것이 아니다.**
+  네 이름은 전부터 부를 수 있었다. 지금까지 **덜 세고 있었을** 뿐이다.
 
 ## 7. 이 조사가 **하지 않은** 것
 

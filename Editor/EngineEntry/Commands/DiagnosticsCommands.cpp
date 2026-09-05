@@ -1194,11 +1194,35 @@ namespace ConsoleCmd
         reg.Legacy({ "pix.capture" }, &Cmd_pix_capture);
         reg.Legacy({ "profile.selftest" }, &Cmd_profile_selftest);
         reg.Legacy({ "profile.stats" }, &Cmd_profile_stats);
-        reg.Legacy({ "dump.list", "dump.show" }, &Cmd_dump_list);
+        // ★ 별칭이 아니라 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).
+        //   `dump.list` 는 목록만, `dump.show` 는 가장 최근 요약의 내용까지 찍는다
+        //   (`Cmd_dump_list` 안에서 `cmd == "dump.show"` 로 갈린다). 한 descriptor 를
+        //   공유하면 `commands.list`·help·`GET /commands` 가 둘을 같은 명령으로
+        //   보여 주고 요약도 하나만 실린다. 핸들러는 그대로 하나다.
+        reg.Legacy({ "dump.list" }, &Cmd_dump_list);
+        reg.Legacy({ "dump.show" }, &Cmd_dump_list);
         reg.Legacy({ "gpu.baseline" }, &Cmd_gpu_baseline);
         reg.Legacy({ "gpu.census", "gpu.delta" }, &Cmd_gpu_census);
         reg.Legacy({ "gc.stats", "gc.delta" }, &Cmd_gc_stats);
-        reg.Legacy({ "mem.stats", "mem.delta", "mem.reset", "mem.hook" }, &Cmd_mem_stats);
+        // ★ 넷 다 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).
+        //
+        //   `Cmd_mem_stats` 는 `cmd` 로 갈린다 — `mem.reset` 은 기준선을 0 으로,
+        //   `mem.delta` 는 기준선 대비 증감, `mem.hook` 은 CRT 할당 훅
+        //   (`on|stack|off|top|status`, 147 줄짜리 하위 도구), `mem.stats` 는 현재
+        //   live 블록. 이것들이 한 descriptor 를 공유하는 바람에 **요약이 엉뚱한
+        //   동사를 설명하고 있었다** — `mem.stats` 의 seed 요약이 "churn 누계와
+        //   기준선을 0으로", 즉 `mem.reset` 의 설명이었다.
+        //
+        //   상태를 바꾸는 `mem.reset`·`mem.hook` 이 조회 descriptor 뒤에 숨어
+        //   있으면 mutating 명령을 registry 로 셀 수 없다는 문제도 같이 붙는다.
+        //
+        //   핸들러가 넷으로 갈리지 않고 하나로 남아 있는 것은 **MSVC 의 C1061
+        //   중첩 한계** 때문이다(이 파일 안 주석에 그 경위가 있다). 그것은 구현
+        //   제약이지 이 넷이 한 명령이라는 뜻이 아니다.
+        reg.Legacy({ "mem.stats" }, &Cmd_mem_stats);
+        reg.Legacy({ "mem.delta" }, &Cmd_mem_stats);
+        reg.Legacy({ "mem.reset" }, &Cmd_mem_stats);
+        reg.Legacy({ "mem.hook"  }, &Cmd_mem_stats);
         reg.Legacy({ "gc.collect" }, &Cmd_gc_collect);
         reg.Legacy({ "crash.status" }, &Cmd_crash_status);
         reg.Escaping({ "crash.test" }, &Cmd_crash_test);
