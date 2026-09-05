@@ -379,6 +379,22 @@ Run-Step "생명주기 어셈블리 리로드" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-reload.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 즉시 제거(9-5 · LC7-e). 컴포넌트를 프레임 **중간에** 그 자리에서
+# 소멸시키는 경로는 PrefabUtility::ApplyComponentDiff의 차집합 하나뿐이다. 씬의
+# 정상 파괴는 전부 FlushPendingDestroy를 지나 프레임 경계에서 일어난다.
+#
+# 그 경로의 축소 삼단 배선이 **관리 스크립트에 닿는지**를 아무도 재지 않았다.
+# 네이티브에는 닿고 ScriptComponent에서 끊기면 구독·대기가 해제되지 않은 채
+# 인스턴스만 사라진다.
+#
+#   TT 제거 발생 · UU 축소 전달 · VV 대기 취소 · WW 시점 확인
+#
+# WW가 축이다. 축소를 통째로 없애는 변이에서 UU·VV는 초록이었다 — 뒤이은 정지가
+# 폴백으로 같은 삼단을 주기 때문이다. 시점을 가르지 않으면 이 결함에 눈이 먼다.
+Run-Step "생명주기 즉시 제거" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-immediate.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
