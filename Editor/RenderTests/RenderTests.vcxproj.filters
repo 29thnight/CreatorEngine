@@ -69,15 +69,6 @@
     <ClCompile Include="ExperimentParity\ExperimentCookedSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentCacheOptSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentTextureCookSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentShaderMetaCookSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialCookSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
@@ -85,15 +76,6 @@
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialResolveSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialInstanceSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialSealSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialCodecSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.cpp">
@@ -106,9 +88,6 @@
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="AssetIdentity\AssetIdentitySelfTest.cpp">
@@ -226,9 +205,6 @@
     </ClInclude>
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
       <Filter>RHI\DX12\Tests</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h">
-      <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h">
       <Filter>AssetIdentity</Filter>

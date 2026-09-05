@@ -19,16 +19,33 @@
 //
 // 빌드는 `Tools/regression/verify-experiment-contract.ps1` 이 한다.
 
-// ★ 여기 없는 것들 — `cacheopt` · `vertexlayout` · `texcook` · `matcodec` · `matinstance` ·
-//   `matseal` · `smcook` 은 아직 명령으로 남아 있다. 링크 폐포를 실측해 보니
-//   `Mesh` · `MeshOptimizer` · `Core::TimeSystem` · `Material` · `Texture` 의
-//   정의를 요구하고, 그것들이 GPU·런타임 의존을 끌고 온다. 자기 코드가 디바이스를
-//   안 쓰는 것과 **링커가 정의를 요구하지 않는 것은 다른 문제다.**
-//   감사 문서(§3.2)가 include 표면만 보고 "엔진 표면 0"으로 적은 자리이고,
-//   실측이 그 추정을 정정했다.
+// ★★★ 2026-09-06 — 나머지 일곱이 들어왔다. **엔진 정적 라이브러리를 링크한다.**
+//
+//   `cacheopt` · `vertexlayout` · `texcook` · `matcodec` · `matinstance` ·
+//   `matseal` · `smcook` 은 `Mesh` · `MeshOptimizer` · `Core::TimeSystem` ·
+//   `Material` · `Texture` · rapidyaml 의 **정의**를 요구한다. 그 .cpp 를 하나씩
+//   끌어오는 대신 `RenderEngine.lib` · `SceneRuntime.lib` · `Utility_Framework.lib`
+//   을 링크한다.
+//
+//   그 대가로 이 probe 는 더 이상 "엔진 빌드 없이 도는" 것이 아니다 — 엔진
+//   라이브러리와 그 DLL 이 있어야 돈다. 선례 셋(mathematics·hashing_string·
+//   authoring_base64)과 다른 성질이므로 게이트 주석에 그 차이를 적어 두었다.
+//   **얻는 것은 그대로다**: 에디터 프로세스도, 디바이스도, 씬도 없이 돈다.
+//
+//   부수 효과 하나가 좋다 — `VertexCacheOptimization` 을 직접 컴파일하지 않으므로
+//   `"meshoptimizer.h"` 가 엔진의 `MeshOptimizer.h` 로 풀리던 대소문자 충돌을
+//   아예 만나지 않는다. 라이브러리 안의 그 TU 는 엔진의 include 순서로 이미
+//   올바르게 지어져 있다.
 
+#include "ExperimentParity/ExperimentCacheOptSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentSamplerSelfTest.h"
+#include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
+#include "ExperimentParity/ExperimentTextureCookSelfTest.h"
+#include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
 
 #include <cstdio>
@@ -49,11 +66,18 @@ namespace
     //   있었다는 뜻이다. 여기서는 진입점 그대로 셋을 유지한다 — 단정 집합이 실제로
     //   다르기 때문이다. 다만 이름이 셋이라는 사실이 registry 밖으로 나왔다.
     constexpr Contract kContracts[] = {
-        { "normal",   &RenderTest::RunExperimentNormalSelfTest },
-        { "resolver", &RenderTest::RunExperimentResolverSelfTest },
-        { "sampler",  &RenderTest::RunExperimentSamplerSelfTest },
-        { "tangent",  &RenderTest::RunExperimentTangentSelfTest },
-        { "weld",     &RenderTest::RunExperimentWeldSelfTest },
+        { "cacheopt",     &RenderTest::RunExperimentCacheOptSelfTest },
+        { "matcodec",     &RenderTest::RunExperimentMaterialCodecSelfTest },
+        { "matinstance",  &RenderTest::RunExperimentMaterialInstanceSelfTest },
+        { "matseal",      &RenderTest::RunExperimentMaterialSealSelfTest },
+        { "normal",       &RenderTest::RunExperimentNormalSelfTest },
+        { "resolver",     &RenderTest::RunExperimentResolverSelfTest },
+        { "sampler",      &RenderTest::RunExperimentSamplerSelfTest },
+        { "smcook",       &RenderTest::RunExperimentShaderMetaCookSelfTest },
+        { "tangent",      &RenderTest::RunExperimentTangentSelfTest },
+        { "texcook",      &RenderTest::RunExperimentTextureCookSelfTest },
+        { "vertexlayout", &RenderTest::RunExperimentVertexLayoutSelfTest },
+        { "weld",         &RenderTest::RunExperimentWeldSelfTest },
     };
 }
 

@@ -526,7 +526,7 @@ operation 레코드**가 생긴다(`CommandService.cpp:566-575`가 enqueue 전�
 |---|---|---|---|
 | ~~1~~ | ~~`dump.crash` 제거~~ | **완료 2026-09-05** | |
 | ~~2~~ | ~~`render.exposure` 제거~~ | **완료 2026-09-05** | |
-| 3 | `experiment.*` 계층 1+2 12개를 contract probe로 이관 | **5/12 완료 2026-09-05** (§6.2) | 나머지는 결정 필요 |
+| ~~3~~ | ~~`experiment.*` 계층 1+2 12개를 contract probe로 이관~~ | **12/12 완료** — 5개 2026-09-05(§6.2) · 7개 2026-09-06(§6.9) | |
 | 4 | `model.place` undo 배선 (3줄) | **배선 완료 2026-09-05 · 런타임 미검증** (§6.3) | |
 | ~~5~~ | ~~`object.create` undo 배선 → `object.create.undoable` 제거~~ | **완료 2026-09-05** (§6.4) | |
 | ~~6~~ | ~~`*scale` 셋의 요약·`cost` 정정~~ | **완료 2026-09-06** (§6.6) | |
@@ -868,6 +868,52 @@ registry problems **0**.
 
 ★★ **명령 수가 늘어난 것은 registry 가 정직해진 것이지 명령이 는 것이 아니다.**
   네 이름은 전부터 부를 수 있었다. 지금까지 **덜 세고 있었을** 뿐이다.
+
+### 6.9 3번 마무리 — 나머지 7개 (2026-09-06)
+
+엔진 정적 라이브러리 링크를 허용하는 결정이 났고, 그러자 남은 일곱이 한 번에
+들어왔다. 명령 **206 → 199**, 이름 216 → 209. `experiment.*` 30 → **18**.
+
+**결정의 대가와 얻은 것.** 이 probe 는 더 이상 "엔진 빌드 없이 도는" 것이 아니다 —
+`Build/Lib/x64-<구성>` 의 세 라이브러리와 `Bin/x64-<구성>/Editor` 의 DLL 이 있어야
+돈다. 선례 셋(`mathematics`·`hashing_string`·`authoring_base64`)과 성질이 달라
+게이트 주석에 그 차이를 적었다. **얻는 것은 그대로다**: 에디터 프로세스도,
+디바이스도, 씬도 없이 돈다.
+
+★ **오히려 단순해졌다.** `.cpp` 를 하나씩 끌어오던 폐포 추적이 통째로 사라졌다.
+  `RenderEngine.lib` 이 `ExperimentImport_*` 를 이미 갖고 있어 self-test 만
+  컴파일하면 되고, §6.2 에서 걸렸던 `meshoptimizer.h` 대소문자 충돌도 **아예
+  만나지 않는다** — 라이브러리 안의 그 TU 는 엔진의 include 순서로 이미 올바르게
+  지어져 있다.
+
+**★★ `experiment.smcook` 이 원래 붉었다.** probe 에 넣자 실패했고, 같은 검사를
+에디터에서 돌려도 똑같이 실패했다 — probe 가 만든 실패가 아니다.
+
+원인은 **한 파일 안의 모순**이었다. `ExperimentShaderMetaCookSelfTest.cpp` 의
+합성 절반(264행)은 `formatVersion == ShaderMeta::kSchemaVersion` 을 단정하는데,
+실자산 절반(463행)은 `(kSchemaVersion << 16) | Authoring::kCookedDocumentVersion`
+을 단정한다. 프로듀서는 후자를 쓴다("schema 정본에서 유도한다. 손으로 올리는
+숫자가 아니다"). **옳은 단정과 낡은 단정이 한 파일에 같이 있었고, 낡은 쪽만 돌고
+있었다** — 실자산 절반은 CLI 인자 둘을 요구하는데 그것을 주는 스크립트가 없다.
+
+아무도 안 도는 절반에 정답이 있으면 드리프트는 영원히 산다. 264행을 실자산
+절반과 프로듀서에 맞췄다. 이제 12/12 가 Debug·Release 양쪽에서 통과한다.
+
+★★★ **파일 하나는 에디터 빌드에 남겨야 했다.**
+`ExperimentVertexLayoutSelfTest.{h,cpp}` 는 진입점을 **둘** 갖는다 — 옮긴
+`RunExperimentVertexLayoutSelfTest` 와, 아직 살아 있는 `assets.modelrender` 가
+쓰는 `RunModelRenderWiringSelfTest`. `RenderTests.vcxproj` 에서 뺐다가 빌드가
+깨져서 알았다. 되돌리고 include 에 이유를 적었다. **명령을 옮기는 것과 파일을
+옮기는 것은 같은 단위가 아니다.**
+
+**게이트**: experiment-contract(Debug/Release **12/12**, 에디터 미기동) ·
+registry-golden · discovery · exit-spine · exit-contract · consumer-contract 통과.
+제거된 일곱은 `command.unknown` 이고 `assets.modelrender` 는 그대로 돈다.
+
+`verify-model-render-wiring` 은 붉은데 **기존 실패다** — 실패 항목이 모델 코퍼스
+(`Prim_Torus`·`Gunner_F_Mythic`·`SU_Mythic`)와 `vk.gbuffer`/`vk.forward` 실GPU
+패스이고, 후자는 이 변경 **이전에 뜬** `cli_cost.measured.tsv` 에 이미 `failed`
+로 기록되어 있다.
 
 ## 7. 이 조사가 **하지 않은** 것
 

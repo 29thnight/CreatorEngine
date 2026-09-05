@@ -108,22 +108,16 @@
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
 #include "ProfilerSelfTest.h"
-#include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
 #include "AssetIdentity/ModelAssetGenerationSelfTest.h"
 #include "AssetIdentity/SceneModelGenerationSelfTest.h"
+#include "ExperimentParity/ExperimentVertexLayoutSelfTest.h" // RunModelRenderWiringSelfTest — assets.modelrender 가 쓴다
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
-#include "ExperimentParity/ExperimentCacheOptSelfTest.h"
-#include "ExperimentParity/ExperimentTextureCookSelfTest.h"
 #include "ShaderMeta.h"
-#include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
 #include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
@@ -2089,26 +2083,6 @@ namespace ConsoleCmd
             passed ? "PASS" : "FAIL");
     }
 
-    static void Cmd_experiment_vertexlayout(const ConsoleCommandContext&)
-    {
-        // I5-D2(V4) — 마스크→RHI 입력 레이아웃 유도 합성 검사. CPU 전용.
-        std::string log;
-        const bool passed = RenderTest::RunExperimentVertexLayoutSelfTest(log);
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.vertexlayout] 통과\n")
-                + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.vertexlayout] 실패\n")
-                + log);
-        }
-        std::printf("[CLI] experiment.vertexlayout %s\n",
-            passed ? "통과" : "실패");
-    }
-
     static void Cmd_assets_modelrender(const ConsoleCommandContext&)
     {
         std::string log;
@@ -2359,24 +2333,6 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[assets.scenemodel] 실패\n") + log);
     }
 
-    static void Cmd_experiment_cacheopt(const ConsoleCommandContext&)
-    {
-        // 정점 캐시/페치 최적화의 합성 검사. 자산을 읽지 않는다.
-        std::string log;
-        const bool passed = RenderTest::RunExperimentCacheOptSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.cacheopt] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.cacheopt] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.cacheopt %s\n", passed ? "통과" : "실패");
-    }
-
     static void Cmd_experiment_cooked(const ConsoleCommandContext& ctx)
     {
         // 인자가 없으면 합성 검사, 있으면 그 자산으로 실자산 왕복까지 돌다.
@@ -2401,56 +2357,6 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.cooked] 실패\n") + log);
         }
         std::printf("[CLI] experiment.cooked %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_texcook(const ConsoleCommandContext& ctx)
-    {
-        // 인자가 없으면 합성 검사, <assetRoot> <texture> 두 개면 실자산까지.
-        std::string log;
-        bool passed = RenderTest::RunExperimentTextureCookSelfTest(log);
-        if (ctx.parts.size() > 2)
-        {
-            // ★ && 로 이어 붙이지 않는다 — 단축 평가로 두 번째가 안 돌면
-            //   "합성만 돌고 통과"가 실자산 통과처럼 보인다.
-            const bool real = RenderTest::RunExperimentTextureCookReal(
-                ctx.parts[1], ctx.parts[2], log);
-            passed = passed && real;
-        }
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.texcook] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.texcook] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.texcook %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_smcook(const ConsoleCommandContext& ctx)
-    {
-        // 인자가 없으면 합성 검사, <assetRoot> <shadermeta> 두 개면 실자산까지.
-        std::string log;
-        bool passed = RenderTest::RunExperimentShaderMetaCookSelfTest(log);
-        if (ctx.parts.size() > 2)
-        {
-            const bool real = RenderTest::RunExperimentShaderMetaCookReal(
-                ctx.parts[1], ctx.parts[2], log);
-            passed = passed && real;
-        }
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.smcook] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.smcook] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.smcook %s\n", passed ? "통과" : "실패");
     }
 
     static void Cmd_experiment_matcook(const ConsoleCommandContext& ctx)
@@ -3433,65 +3339,6 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matresolve %s\n", passed ? "통과" : "실패");
     }
 
-    static void Cmd_experiment_matinstance(const ConsoleCommandContext& ctx)
-    {
-        // I5-M3 — MaterialInstance. base+override 합성·불변성·CB bytes 동등.
-        (void)ctx;
-        std::string log;
-        const bool passed =
-            RenderTest::RunExperimentMaterialInstanceSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.matinstance] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.matinstance] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.matinstance %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_matseal(const ConsoleCommandContext& ctx)
-    {
-        // I5-M4 — sealing 브리지 패리티. 픽셀 게이트가 못 밟는 MaterialInfo
-        // 폴백 경로를 직접 잰다.
-        (void)ctx;
-        std::string log;
-        const bool passed = RenderTest::RunExperimentMaterialSealSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.matseal] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.matseal] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.matseal %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_matcodec(const ConsoleCommandContext& ctx)
-    {
-        // I5-M5 S0 — experiment 저작 YAML 코덱. 왕복·골든·fail-closed.
-        (void)ctx;
-        std::string log;
-        const bool passed = RenderTest::RunExperimentMaterialCodecSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.matcodec] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.matcodec] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.matcodec %s\n", passed ? "통과" : "실패");
-    }
-
     static void Cmd_experiment_matmigrate(const ConsoleCommandContext& ctx)
     {
         // I5-M5 S1 — legacy ↔ experiment 변환 정본 + DataSystem 읽기 이중화.
@@ -3634,7 +3481,6 @@ namespace ConsoleCmd
         reg.Legacy({ "inputmap.corpus.probe" }, &Cmd_inputmap_corpus_probe);
         reg.Legacy({ "model.loadcached" }, &Cmd_model_loadcached);
         reg.Legacy({ "model.place" }, &Cmd_model_place);
-        reg.Legacy({ "experiment.vertexlayout" }, &Cmd_experiment_vertexlayout);
         reg.Legacy({ "assets.identity" }, &Cmd_assets_identity);
         reg.Legacy({ "assets.sidecar" }, &Cmd_assets_sidecar);
         reg.Legacy({ "assets.generation" }, &Cmd_assets_generation);
@@ -3653,16 +3499,10 @@ namespace ConsoleCmd
         reg.Legacy({ "experiment.animmask" }, &Cmd_experiment_animmask);
         reg.Legacy({ "experiment.editorsurface" }, &Cmd_experiment_editorsurface);
         reg.Legacy({ "experiment.cooked" }, &Cmd_experiment_cooked);
-        reg.Legacy({ "experiment.cacheopt" }, &Cmd_experiment_cacheopt);
-        reg.Legacy({ "experiment.texcook" }, &Cmd_experiment_texcook);
-        reg.Legacy({ "experiment.smcook" }, &Cmd_experiment_smcook);
         reg.Legacy({ "experiment.matcook" }, &Cmd_experiment_matcook);
         reg.Legacy({ "experiment.matparity" }, &Cmd_experiment_matparity);
         reg.Legacy({ "experiment.matresolve" }, &Cmd_experiment_matresolve);
         reg.Legacy({ "experiment.matruntime" }, &Cmd_experiment_matruntime);
-        reg.Legacy({ "experiment.matinstance" }, &Cmd_experiment_matinstance);
-        reg.Legacy({ "experiment.matseal" }, &Cmd_experiment_matseal);
-        reg.Legacy({ "experiment.matcodec" }, &Cmd_experiment_matcodec);
         reg.Legacy({ "experiment.matmigrate" }, &Cmd_experiment_matmigrate);
         reg.Legacy({ "experiment.matscript" }, &Cmd_experiment_matscript);
         reg.Legacy({ "experiment.scenecook" }, &Cmd_experiment_scenecook);

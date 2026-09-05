@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	206
-# names	216
+# commands	199
+# names	209
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	no	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -75,25 +75,18 @@ experiment.animmask	-	frames	editor	probe	live	no	no	-	AvatarMask 트리 생성�
 experiment.animpose	-	frames	editor	probe	live	no	no	<0..1> [클립]	클립의 특정 지점 포즈를 고정 계산해 판정한다
 experiment.animtick	-	frames	editor	probe	live	no	no	-	Animator 틱 경로의 패리티를 판정한다
 experiment.boneresolve	-	frames	editor	probe	live	no	no	-	본 이름 해석 창구를 전수 A/B로 대조한다
-experiment.cacheopt	-	frames	editor	probe	live	no	no	-	정점 캐시/페치 순서 — ACMR 이 실제로 낮아지는가 + 기하 보존
 experiment.catalog	-	frames	editor	probe	live	no	no	[Derived부모]	CEMF catalog — 전 GUID 해석·내용 검증·폐포 위상 순서
 experiment.cooked	-	long	editor	probe	live	no	no	[경로]	쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)
 experiment.editorsurface	-	frames	editor	probe	live	no	no	-	에디터 표면 질의(클립 축·mesh 축)의 A/B 동치를 판정한다
 experiment.foliage	-	frames	editor	probe	live	no	no	seed <자산디렉터리> | verify	Foliage 메시의 experiment 핸들 합류를 합성으로 판정한다
-experiment.matcodec	-	frames	editor	probe	live	no	no	-	재질 저작 값 인코딩 왕복을 판정한다
 experiment.matcook	-	long	editor	probe	live	no	no	[루트 재질 모델]	재질 의존 폐포 — standalone 재질 + 모델의 임베디드 texture 추출
-experiment.matinstance	-	frames	editor	probe	live	no	no	-	MaterialInstance 생성·프로퍼티 블록을 판정한다
 experiment.matmigrate	-	frames	editor	probe	live	no	no	-	legacy 재질의 experiment 왕복 이관을 판정한다
 experiment.matparity	-	frames	editor	probe	live	no	no	-	재질 해석의 legacy 대 experiment 패리티를 판정한다
 experiment.matresolve	-	frames	editor	probe	live	no	no	-	제품 resolver가 cooked를 고르는지 판정한다
 experiment.matruntime	-	frames	editor	probe	live	no	no	[edit]	런타임 MaterialInstance 경로를 판정한다
 experiment.matscript	-	frames	editor	probe	live	no	no	-	스크립트가 보는 재질 표면을 판정한다
-experiment.matseal	-	frames	editor	probe	live	no	no	-	재질 sealing 결과를 판정한다
 experiment.scenecook	-	long	editor	probe	live	no	no	[루트 씬]	scene/prefab 의존 추출 — 자기참조 제외·못 그린 참조 계수
 experiment.skinbounds	-	frames	editor	probe	live	no	no	-	스킨 팔레트의 유한성·인덱스 범위·크기 상한을 판정한다
-experiment.smcook	-	long	editor	probe	live	no	no	[루트 메타]	ShaderMeta 쿠킹 — 정본 파서 검증·source 해소(실자산엔 거부 사례 0)
-experiment.texcook	-	long	editor	probe	live	no	no	[루트 텍스처]	텍스처 쿠킹 — GUID 주소·내용 해시·fail-closed(실자산은 .dds 미포함)
-experiment.vertexlayout	-	frames	editor	probe	live	no	no	-	typed 정점 레이아웃 디코드를 판정한다
 foliage.authoring.probe	-	frames	editor	raw_fixture	live	no	no	<이름> [escape]	Foliage 저작 트랜잭션 왕복과 루트 이탈 거부를 본다
 game.pak	-	long	editor	engine_service	live	no	yes	-	Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다
 gc.collect	-	frames	editor	probe	live	no	no	-	관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)
