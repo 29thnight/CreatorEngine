@@ -23,6 +23,20 @@ public sealed class SimulationScope
     {
         public float Remaining;
         public TaskCompletionSource<bool> Completion = null!;
+
+        /// <summary>
+        /// 이 대기의 취소 등록 (LC3 · 2026-09-05).
+        ///
+        /// 예전에는 <c>token.Register(...)</c>의 반환을 <b>버렸다</b>. 그러면 그
+        /// 등록의 클로저가 이 객체를 잡고, 이 객체가 <see cref="Completion"/>을,
+        /// 그것이 완료된 <c>Task</c>를 잡는다 — <c>_pending</c>에서 빠진 뒤에도
+        /// 취소 토큰 쪽에서 계속 도달할 수 있다.
+        ///
+        /// 실측(<c>verify-lifecycle-retention</c>): 완료된 대기 50개 중 50개가
+        /// 스코프가 살아 있는 동안 회수되지 않았다. 재생 내내 사는 컴포넌트가
+        /// 초당 몇 번씩 기다리면 그 수만큼 그대로 쌓인다.
+        /// </summary>
+        public CancellationTokenRegistration Registration;
     }
 
     private CancellationTokenSource _cts = new();
@@ -44,7 +58,11 @@ public sealed class SimulationScope
         var pending = new PendingDelay { Remaining = seconds, Completion = new TaskCompletionSource<bool>() };
         _pending.Add(pending);
 
-        token.Register(() => pending.Completion.TrySetCanceled(token));
+        // 등록을 레코드가 소유한다 — 정상 완료 시 Tick이 놓는다(LC3).
+        // 위에서 이미 취소 여부를 확인했으므로 이 Register가 그 자리에서 콜백을
+        // 실행하는 일은 없다. 만에 하나 그렇더라도 필드에는 기본값이 남고,
+        // 기본 등록의 Dispose는 아무 일도 하지 않는다.
+        pending.Registration = token.Register(() => pending.Completion.TrySetCanceled(token));
         return pending.Completion.Task;
     }
 
@@ -94,6 +112,15 @@ public sealed class SimulationScope
             if (p.Remaining > 0f) continue;
 
             _pending.RemoveAt(i);
+
+            // 등록을 **완료보다 먼저** 놓는다(LC3). 순서가 중요하다 — 완료가
+            // 먼저면 그 자리에서 이어지는 continuation이 도는 동안 등록이 아직
+            // 토큰에 매달려 있고, 그 사이에 취소가 오면 이미 결정된 대기에
+            // TrySetCanceled가 한 번 더 날아간다(결과는 무시되지만 하지 않을 일이다).
+            //
+            // 자기 콜백 안에서 부르는 Dispose는 교착하지 않는다 — 다른 스레드가
+            // 실행 중일 때만 기다리는데, 이 목록은 게임 스레드 전용이다.
+            p.Registration.Dispose();
             p.Completion.TrySetResult(true);
         }
     }

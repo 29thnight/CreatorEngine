@@ -302,6 +302,22 @@ Run-Step "생명주기 자기 제거" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-selfremove.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 대기 참조 유지(9-5 · LC3). Delay가 token.Register의 반환 등록을 버려
+# 완료된 대기가 취소 토큰 쪽에서 계속 도달 가능했다 — 오래 사는 스코프에서
+# 누적된다. 실측 50/50 → 고침 뒤 0/50.
+#
+# 축을 메모리 총량이 아니라 **도달 가능성**으로 잡았다. GC.GetTotalMemory는 엔진
+# 전체의 잡음을 함께 재서 몇십 KB 차이가 묻힌다. 완료된 Task마다 약한 참조를
+# 남기고 강한 참조를 버린 뒤 GC를 돌려 몇 개가 살아남는지 세면 잡음이 0이고
+# 살아남은 개수가 곧 누수 개수다.
+#
+#   U 생성 확인  50개를 실제로 만들었다 (0개를 만들면 0개가 살아남는다)
+#   V 회수       스코프가 살아 있는 채로 완료 Task가 전부 회수된다
+#   W 축소 온전  참조 해제가 종료 절차를 깨뜨리지 않는다
+Run-Step "생명주기 대기 참조 유지" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-retention.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
