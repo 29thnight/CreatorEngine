@@ -353,6 +353,8 @@
       <div class="why">렌더→게임플레이 커플링 절단의 실행 설계. A(죽은 include)·B(데이터 헤더 소속 정정)·C(행위 커플링 6종)·D(검증). 실측 간선 154 → 14.</div></div>
     <div class="doc"><a href="plans/ScriptSurfacePlan.md">ScriptSurfacePlan.md</a><span class="tie">PHASE 9.5</span>
       <div class="why">C# 스크립트 표면의 기준을 <b>사라진 게임 코퍼스의 호출 빈도</b>에서 <b>현재 네이티브 구조와 실제 저작분</b>으로 옮긴다(W1~W7). <code>ScriptApiMigrationPlan.html</code> §11 등급표를 승계·폐기한다 — 그 표의 기준 코퍼스는 <code>8ae17250</code>에서 통째로 삭제됐는데 표만 남아 있었다. W1(골격)·W2(Light·Camera 노출) 완료, W3(입력 값 통로)~W7 대기.</div></div>
+    <div class="doc"><a href="plans/ScriptLifecycleContractHardeningPlan.md">ScriptLifecycleContractHardeningPlan.md</a><span class="tie">현행 안정화 · LC0~LC7 · LC1·LC2 완료</span>
+      <div class="why">현재 C# 생명주기·Task 스코프의 실패 단계, 취소 정리 예외, 완료 대기 참조 유지, 재진입·스레드 경계를 안정화한다. 기존 즉시 시작·비활성 중 대기·DDOL·Task 취소 의미를 보존한다. <b>미래 PHASE 24를 기다리지 않는 독립 작업</b>이며, 관리 회귀와 네이티브 기준선의 증거 범위를 구분한다.</div></div>
     <div class="doc"><a href="plans/BehaviorTreeManagedPlan.md">BehaviorTreeManagedPlan.md</a><span class="tie">9-8</span>
       <div class="why">행동 트리를 C# 우선으로 재설계. ★ 트리 전체를 관리 측으로 옮기는 이유 — BT 틱이 동기라 "노드만 C#"은 불변식을 깬다.</div></div>
     <div class="doc"><a href="plans/EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">E0~E7</span>
@@ -387,6 +389,12 @@
       <div class="why">물리 컴포넌트 구조 설계 — <b>저작은 컴포넌트, 런타임은 데이터</b>. 컴포넌트는 저작값 + BodyHandle만 들고 런타임 상태는 평탄 스토어가 소유한다. 원칙 5: 권위를 레인으로 표현(Static은 순회 자체가 없음 · Kinematic push · Dynamic pull은 활성만 · Character 독립) · 커맨드 파이프로 O(바디)→O(변경) · 콜라이더는 순수 데이터(ICollider 폐기, 빈 몸통 가상 6개+vtable 제거) · 이벤트는 고정 크기 스트림(현 Collision의 매달린 vector 참조 제거) · 읽기는 메인 전용, 워커는 커맨드만. <b>유니티에서 가져올 것/버릴 것을 이유와 함께 갈랐다</b> — 유니티가 옳게 한 것(콜라이더 단독=정적, 컴파운드)은 가져오고, 관리/네이티브 경계 제약 때문에 그랬던 것은 버린다. ECS는 도입하지 않는다(SceneGraph 게이트 D).</div></div>
     <div class="doc"><a href="design/RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">3-1 후속</span>
       <div class="why">RHI GPU 메모리·수명 관리 재설계. Slice A~D와 E-a(descriptor versioned recycler) 완료, SBT는 실소비 경로 대기.</div></div>
+  </div>
+
+  <h3>미래 계획 — 현재 리팩토링 이후</h3>
+  <div class="doc-grid">
+    <div class="doc is-ref"><a href="plans/SimulationEffectContractPlan.md">SimulationEffectContractPlan.md</a><span class="tie">PHASE 24 · 보류 · 구현 미착수</span>
+      <div class="why">효과 계약 런타임과 <b>CreatorEngine용 PrSM 수정·도입</b>까지가 목표다. C# 백엔드를 유지하고 공통 효과·수명 검사, 컴포넌트 등록·직렬화, 빌드·원문 진단·리로드를 연결한다. 현재 리팩토링 완료 후 코드·저작분·공수를 재산정하며, 현행 생명주기 안정화와 완료를 구분한다. 현재 실행 작업의 공수·진척 집계에는 포함하지 않는다.</div></div>
   </div>
 
   <h3>구현 기록 — 닫힌 작업</h3>
