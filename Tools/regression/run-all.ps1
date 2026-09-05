@@ -87,6 +87,25 @@ Run-Step "BT 열거 미러 대조" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-bt-enums.ps1")
 }
 
+# 생명주기 6단계 미러(9-5). 위 미러 셋과 같은 종류인데 여기만 비어 있었다 —
+# ScriptLifecyclePhase.h가 "값이 같아야 한다, 컴파일러가 잡아 주지 않는다"고
+# 스스로 적어 두고 그것을 재는 검사가 없었다.
+#
+# 값 축만 보면 얕아서 셋으로 세웠다. ① 두 열거의 자리별 이름·값, ② 열거 순서가
+# Component.h의 6단계 virtual 선언 순서와 같은가(양쪽을 함께 틀리게 고치면 ①이
+# 초록이다), ③ ScriptComponent가 6단계를 모두 override하고 각각 자기 단계를
+# 넘기는가. ③이 가장 조용한 결함을 막는다 — MaskOfType은
+# `&T::Hook != &Component::Hook`으로 비트를 세우므로 override를 빠뜨리면 비트가
+# 안 서고 그 단계가 아무 소리 없이 사라진다.
+#
+# 이빨 확인(2026-09-05): 변이 넷을 각각 심어 자기 축만 붉는 것을 봤다.
+# ① 관리 열거의 값 3↔4 교환 → 판정 1 [3]. ② 양쪽 열거를 함께 2↔3 재배열 →
+# 판정 1은 초록이고 판정 2 [2]만 빨강. ③ ScriptComponent.h의 override 한 줄 제거,
+# ④ OnAddedToScene이 OnBeginSimulation을 넘기게 변경 → 둘 다 판정 3만 빨강.
+Run-Step "생명주기 단계 미러 대조" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-lifecycle-enums.ps1")
+}
+
 # 진입점 이름 결합(9-4). 위 두 검사가 못 보는 세 번째 결합면이다.
 #
 # ClrHost는 관리 함수를 문자열 이름으로 찾는다. API 표 검사는 함수 포인터의 배치를

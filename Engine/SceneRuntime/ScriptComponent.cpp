@@ -148,17 +148,6 @@ void ScriptComponent::PrepareForReload()
 	m_instanceCreateFailed = false;
 }
 
-void ScriptComponent::SuspendInstance()
-{
-	if (!HasInstance()) return;
-
-	// 값을 먼저 챙긴다 — 인스턴스가 사라지면 읽을 수 없다.
-	CaptureFields();
-
-	ClrHost::Get().DestroyComponent(m_instanceId);
-	m_instanceId = -1;
-}
-
 void ScriptComponent::CaptureFields()
 {
 	m_fieldData.clear();

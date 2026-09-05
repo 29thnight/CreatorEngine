@@ -107,14 +107,6 @@ public:
 	// 편집 중이던 상태가 유지되는 것이 핫리로드의 목적이다.
 	void PrepareForReload();
 
-	// 관리 인스턴스를 접어 둔다. 값은 m_fieldData에 남으므로 다음 Awake가 그대로 되살린다.
-	//
-	// 재생을 시작하면 엔진이 에디터 씬을 직렬화해 PlayScene을 따로 만든다(사본 방식).
-	// 원본 씬은 파괴되지 않고 그대로 살아 있어서, 원본의 관리 인스턴스를 두면
-	// 사본의 인스턴스와 함께 둘 다 틱을 받아 게임 로직이 두 벌 돈다.
-	// PrepareForReload와 달리 관리 측이 내려가지 않으므로 파괴를 직접 요청한다.
-	void SuspendInstance();
-
 	// m_fieldData를 관리 인스턴스에 밀어 넣는다(인스턴스 생성 직후).
 	void ApplyFields();
 
