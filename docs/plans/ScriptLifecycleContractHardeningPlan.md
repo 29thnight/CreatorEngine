@@ -637,7 +637,7 @@ setter가 두 종류를 가르게 고쳤다 — 게임 스레드 밖이면 폴�
 | 정상 생성, 초기 비활성, 재활성 | `verify-lifecycle-axis` | 덮임 |
 | disable 중 대기, 일시 정지, 같은 프레임 연쇄 대기 | `verify-lifecycle-axis`(앞 둘) · `verify-lifecycle-delayarg` 판정 DD(연쇄) | **일시 정지만 남음** |
 | 각 훅·본문·정리 콜백의 실패 | `verify-lifecycle-failure` | 덮임 |
-| 자기 제거·일반 파괴·즉시 제거·orphan | `verify-lifecycle-selfremove` · `verify-lifecycle-generation` | **즉시 제거·orphan 남음** |
+| 자기 제거·일반 파괴·즉시 제거·orphan | `verify-lifecycle-selfremove` · `verify-lifecycle-generation` · `verify-lifecycle-immediate` · `verify-lifecycle-orphan` | 덮임 |
 | DDOL detach/attach | `verify-ddol-script`(통지) · `verify-lifecycle-ddolwait`(시뮬레이션 유지) | 덮임 |
 | 플레이 종료·재시작, 편집 중 인스턴스, 리로드 | `verify-lifecycle-generation` · `verify-lifecycle-axis` · `verify-lifecycle-reload` | 덮임 |
 | 대량 반복 대기·완료·취소 | `verify-lifecycle-retention` | 덮임 |
@@ -657,13 +657,23 @@ setter가 두 종류를 가르게 고쳤다 — 게임 스레드 밖이면 폴�
 이미 서 있어 "다 돌았다"로 보였다. `PrepareForReload` 의 짝으로 `RestoreAfterReload` 를
 두어 리로드 전 상태를 잇는다.
 
-**남은 셋**과 그 성격.
+**즉시 제거·orphan 추가 착지**(2026-09-06, `5a825393`·`2ac596bf`). 둘 다 결함은 없었고
+관측만 없었다. 각각의 게이트에서 **시점·수단을 가르는 판정이 없으면 눈이 먼다**는 것이
+변이로 드러났다.
+
+`verify-lifecycle-immediate` — 즉시 소멸(차집합)이 축소를 관리 스크립트에 전달하는지.
+축소 삼단 호출을 통째로 없앤 변이에서도 "삼단 각 1회"와 "취소 1건"은 초록이었다. 뒤이은
+정지가 폴백으로 같은 삼단을 주기 때문이다. 축소가 **갱신 완료 로그보다 앞에** 왔는지를
+보는 판정만 붉었다.
+
+`verify-lifecycle-orphan` — 씬 언로드가 고아를 남기지 않는지. 관리 인스턴스 제거를
+빠뜨린 변이에서 축소 훅 표지는 그대로 나왔고 고아 건수만 1이 됐다. 훅만 세는 게이트는
+이 누수를 보지 못한다.
+
+**남은 둘**과 그 성격.
 
 *일시 정지 중 대기* — CLI 에 일시 정지 명령이 없어 헤드리스 시나리오로 몰 수 없다.
 저작 표면을 먼저 열어야 한다.
-
-*즉시 제거·orphan* — `PrefabUtility` 의 즉시 소멸과 `SweepOrphans` 경로다.
-`verify-lifecycle-selfremove` 가 자기 제거 세 자리와 배수 재진입을 덮지만 이 둘은 아니다.
 
 *세대 게이트의 판정 X* — 제품 변이로 붉히지 못했다. 붉으려면 "재생마다 인스턴스가 새로
 서지 않는다"여야 하는데 그건 네이티브 씬 백업·복원 자체의 결함이고 관리 측 변이로는
