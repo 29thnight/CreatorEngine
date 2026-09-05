@@ -1,14 +1,14 @@
-# 생명주기 실패 픽스처 게이트 — 훅이 던지거나 스스로 꺼진 뒤 무엇이 오는가 (LC0/LC1).
+# 생명주기 실패 픽스처 게이트 — 훅·정리·루틴이 실패한 뒤 무엇이 오는가 (LC0 · LC1/LC2/LC5).
 #
-# ★ 이 게이트는 지금 **붉은 것이 정상이다.** LC1이 지목한 결함을 눈에 보이게
-#   만들려고 세운 것이고, 고침이 착지하면 초록이 된다. 그때 run-all.ps1에 넣는다 —
-#   지금 넣으면 세트가 항상 실패한다.
+# ★ 이 게이트는 지금 **붉은 것이 정상이다.** LC1·LC2·LC5가 지목한 결함을 눈에
+#   보이게 만들려고 세운 것이고, 고침이 착지하면 초록이 된다. 그때 run-all.ps1에
+#   넣는다 — 지금 넣으면 세트가 항상 실패한다.
 #
 # ── 무엇을 메우는가 ──
 #
 # verify-lifecycle-baseline의 두 축(네이티브·관리)은 **정상 경로**의 순서를 굳힌다.
 # 훅이 실패했을 때 무슨 일이 벌어지는지는 그 골든에 한 줄도 없다. 그래서
-# ScriptLifecycleContractHardeningPlan이 LC1로 지목한 결함 둘이 어느 게이트로도
+# ScriptLifecycleContractHardeningPlan이 지목한 결함들이 어느 게이트로도
 # 붉어지지 않았다.
 #
 # ── 재는 결함 (계획서 §2) ──
@@ -26,6 +26,18 @@
 #     같은 자리의 다른 얼굴이다. if (b.Enabled)는 훅 **앞에서** 한 번만 보므로
 #     훅 안에서 끈 것이 루틴 시작 결정에 반영되지 않는다. B와 성격이 달라 따로
 #     잰다 — 예외는 격리해야 하지만 자기 비활성화는 존중해야 한다.
+#
+#   E 정리 예외가 종료 절차를 중단 (LC2)
+#     Scope.Cancel()은 Invoke로 감싸여 있지 않다. 정리 콜백이 던지면 그 뒤의
+#     Invoke(OnEndSimulation)가 통째로 건너뛰어진다. 다만 **형제 콜백은
+#     살아남는다** — Cancel()을 인자 없이 부르면 콜백을 전부 돌린 뒤 모아
+#     던지기 때문이다. 그 둘은 별개의 문제이므로 갈라서 잰다.
+#
+#   F 동기/Task 실패 정책 불일치 (LC5)
+#     같은 논리적 실패를 발생 형태만 달리해 두 번 낸다. 동기 throw는
+#     StartSimulation의 catch가 인스턴스를 끄고, await 뒤 faulted Task는
+#     ReportSimulationFault가 로그만 남긴다. 통일 방향은 LC5가 정하고 이
+#     판정은 **다르다는 사실**만 잡는다.
 #
 #   D 대조군
 #     정상 인스턴스가 11훅을 그대로 받는가. 이것이 없으면 "실패 픽스처가
@@ -158,6 +170,64 @@ if ($dis -notcontains 'OnDisable') {
     $failed.Add('C(전파)')
 }
 
+# ── 판정 E: 정리 콜백 예외가 종료 절차를 끊지 않는다 (LC2) ────────────────────
+#
+# 두 가지를 갈라 본다. ① 형제 콜백은 살아남는가 — CancellationTokenSource.Cancel()은
+# 인자 없이 부르면 콜백을 전부 돌린 뒤 모아 던지므로 살아남아야 한다. ② 호출자 쪽
+# 후속 생명주기는 살아남는가 — Scope.Cancel()이 Invoke로 감싸여 있지 않아 이쪽이
+# 끊긴다. 계획서가 "그 둘은 별개의 문제"라고 적어 둔 자리다.
+
+$cleanup = Hooks-Of 'failcleanup'
+$siblings = @($cleanup | Where-Object { $_ -eq 'cleanup1' -or $_ -eq 'cleanup3' })
+$endAfterCleanupFail = @($cleanup | Where-Object { $_ -eq 'OnEndSimulation' })
+
+"판정 E 정리 예외 격리: 형제 콜백 $($siblings.Count)/2 · 그 뒤 OnEndSimulation $($endAfterCleanupFail.Count) 건 (기대 2 / 1)"
+if ($siblings.Count -lt 2) {
+    "  형제 콜백이 끊겼다: 받은 것 $($siblings -join ', ')"
+    $failed.Add('E(형제)')
+}
+if ($endAfterCleanupFail.Count -eq 0) {
+    "  → Scope.Cancel()이 Invoke 밖이라, 콜백 예외가 그 뒤 OnEndSimulation을 통째로 건너뛴다(LC2)."
+    $failed.Add('E')
+}
+
+# ── 판정 F: 같은 실패는 같은 상태로 끝난다 (LC5) ──────────────────────────────
+#
+# 동기 throw는 StartSimulation의 catch가 b.Enabled = false로 끄고, await 뒤의
+# faulted Task는 ReportSimulationFault가 로그만 남긴다. 같은 논리적 실패인데
+# 남는 활성 상태가 다르다. 어느 쪽으로 통일할지는 LC5가 정하고, 이 판정은
+# **다르다는 사실**만 잡는다.
+#
+# ★ 축을 'OnDisable이 왔는가'로 두면 안 된다 — 처음에 그렇게 짰다가 두 픽스처가
+#   나란히 초록이었다. 축소가 ApplyEnabled(b, false)로 **모든** 인스턴스에
+#   OnDisable을 주므로(2026-09-05), 재생 중에 꺼진 것과 정지가 끈 것이 한 축에서
+#   구분되지 않는다. 그래서 훅의 유무가 아니라 **결과**를 잰다: 실패한 뒤에도
+#   틱을 계속 받는가. 두 픽스처가 PostPhysics에서 30틱마다 beat를 남긴다.
+
+$syncHooks  = Hooks-Of 'failsimsync'
+$asyncHooks = Hooks-Of 'failsimasync'
+
+# 실패 시점(OnSimulate) 이후의 beat만 센다.
+function Beats-After-Simulate($hooks) {
+    $i = [array]::IndexOf($hooks, 'OnSimulate')
+    if ($i -lt 0) { return -1 }
+    return @($hooks[($i + 1)..($hooks.Count - 1)] | Where-Object { $_ -eq 'beat' }).Count
+}
+
+$syncBeats  = Beats-After-Simulate $syncHooks
+$asyncBeats = Beats-After-Simulate $asyncHooks
+
+"판정 F 실패 정책 일관: 실패 후 틱 — 동기 $syncBeats 회 · Task $asyncBeats 회 (기대: 같음)"
+if ($syncBeats -lt 0 -or $asyncBeats -lt 0) {
+    "  두 픽스처 중 하나가 루틴에 들어가지 못했다 — 비교가 성립하지 않는다."
+    $failed.Add('F(픽스처)')
+}
+elseif (($syncBeats -eq 0) -ne ($asyncBeats -eq 0)) {
+    "  → 발생 형태에 따라 실패 후 살아남는지가 갈린다(LC5). 동기는 꺼지고 Task는 계속 돈다."
+    "  → 통일 방향(둘 다 끈다 / 둘 다 로그만)은 LC5가 정한다."
+    $failed.Add('F')
+}
+
 # ── 판정 D: 대조군은 온전하다 ─────────────────────────────────────────────────
 #
 # 정상 경로의 11훅. 이웃의 예외가 이 인스턴스의 생명주기를 끊지 않아야 한다.
@@ -180,7 +250,7 @@ if ($missingControl.Count -gt 0) {
 ""
 if ($failed.Count -gt 0) {
     "붉은 판정: $($failed -join ', ')"
-    "LC1이 착지하기 전까지 A·B·C는 붉은 것이 정상이다. D가 붉으면 하네스를 먼저 볼 것."
+    "LC1~LC5가 착지하기 전까지 A·B·C·E·F는 붉은 것이 정상이다. D가 붉으면 하네스를 먼저 볼 것."
     exit 1
 }
 

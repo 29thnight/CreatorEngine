@@ -35,6 +35,23 @@ object.create DisableBegin
 script.add DisableBegin DisableInBeginProbe
 wait 10
 
+# ④ 정리 콜백 하나가 던진다 (LC2)
+object.create FailCleanup
+script.add FailCleanup FailCleanupProbe
+wait 10
+
+# ⑤ 루틴이 첫 await **전에** 던진다 (LC5 · 동기 경로)
+object.create FailSimSync
+script.add FailSimSync FailSimulateSyncProbe
+wait 10
+
+# ⑥ 루틴이 await **뒤에** 던진다 (LC5 · Task 경로)
+#    ⑤와 같은 논리적 실패를 발생 형태만 달리해 낸다. 둘을 나란히 둬야
+#    "같은 실패인데 남는 상태가 다르다"를 잴 수 있다.
+object.create FailSimAsync
+script.add FailSimAsync FailSimulateAsyncProbe
+wait 10
+
 # 대조군 — 아무것도 실패하지 않는다
 object.create Control
 script.add Control LifecycleProbe

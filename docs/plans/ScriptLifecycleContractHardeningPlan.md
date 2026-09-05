@@ -113,12 +113,15 @@ LC1은 관리 플래그 한 줄을 이동하는 것만으로 끝나지 않는다
 `verify-lifecycle-failure`가 실엔진에서 받아 적은 결과다. 대역이 아니라 에디터를
 띄워 재생까지 몬 것이고, 정상 인스턴스(`Control`)를 같은 실행에 두어 대조했다.
 
-| 픽스처 | 받은 훅 (순서대로) |
-|---|---|
-| 초기화가 던짐 | `OnInitialized` → **`OnDisable`** → `OnAddedToScene` → `OnEndSimulation` → `OnRemovingFromScene` → `OnUninitializing` |
-| 시작 훅이 던짐 | … `OnEnable` → `OnBeginSimulation` → **`OnDisable`** → **`OnSimulate`** → 축소 삼단 |
-| 시작 훅에서 자기 비활성화 | … `OnBeginSimulation` → `OnDisable` → **`OnSimulate`** → 축소 삼단 |
-| 대조군(정상) | 11훅 전부 · 누락 0 |
+| 픽스처 | 받은 훅 (순서대로) | 트랙 |
+|---|---|---|
+| 초기화가 던짐 | `OnInitialized` → **`OnDisable`** → `OnAddedToScene` → `OnEndSimulation` → `OnRemovingFromScene` → `OnUninitializing` | LC1 |
+| 시작 훅이 던짐 | … `OnEnable` → `OnBeginSimulation` → **`OnDisable`** → **`OnSimulate`** → 축소 삼단 | LC1 |
+| 시작 훅에서 자기 비활성화 | … `OnBeginSimulation` → `OnDisable` → **`OnSimulate`** → 축소 삼단 | LC1 |
+| 정리 콜백이 던짐 | … `OnDisable` → `OnSimulateCancel` → `cleanup3` → `cleanup1` → **(`OnEndSimulation` 없음)** → `OnRemovingFromScene` → `OnUninitializing` | LC2 |
+| 루틴이 첫 await 전 던짐 | … `OnSimulate` → `OnDisable` → **실패 후 틱 0회** → 축소 삼단 | LC5 |
+| 루틴이 await 뒤 던짐 | … `OnSimulate` → `OnSimulateResume` → **실패 후 틱 13회** → 축소 삼단 | LC5 |
+| 대조군(정상) | 11훅 전부 · 누락 0 | — |
 
 **`Invoke`의 끄기는 이미 격리 장치다.** 그래서 초기화 실패는 Begin/Simulate까지
 가지 못한다 — `OnBeginSimulation` 갈래의 `if (b.Enabled)`가 막는다. 남는 구멍은
@@ -129,8 +132,22 @@ LC1은 관리 플래그 한 줄을 이동하는 것만으로 끝나지 않는다
 시작한다. LC1의 고침은 여기서 **끄기를 새로 만드는 것이 아니라 이미 일어난 끄기를
 읽는 것**이다.
 
+**LC2는 §2의 예상대로 둘로 갈렸다.** 형제 콜백은 2/2 살아남았고(인자 없는
+`Cancel()`이 `throwOnFirstException: false`라 전부 돌린 뒤 모아 던진다),
+끊긴 것은 **호출자 쪽 후속 생명주기**다 — `Scope.Cancel()`이 `Invoke` 밖이라
+그 다음 줄의 `Invoke(OnEndSimulation)`이 통째로 건너뛰어진다. `OnRemovingFromScene`과
+`OnUninitializing`은 별개 단계로 오므로, 결과는 "축소 삼단 중 가운데만 빠진" 모양이다.
+경계에서 죽지는 않는다 — `Bootstrap.DispatchLifecycle`이 잡아 -1을 돌려준다.
+
+**LC5는 결과 축으로만 갈린다.** 처음에는 판정을 "`OnDisable`이 왔는가"로 짰는데
+**두 픽스처가 나란히 초록**이었다. 축소가 `ApplyEnabled(b, false)`로 모든
+인스턴스에 `OnDisable`을 주므로(2026-09-05 슬라이스 2), 재생 중에 꺼진 것과 정지가
+끈 것이 그 축에서 구분되지 않는다. 훅의 유무가 아니라 **실패 후에도 틱을 받는가**로
+바꾸자 동기 0회 · Task 13회로 갈렸다. 이 문서의 고침이 나중 판정의 축을 오염시킬 수
+있다는 실례다.
+
 대조군이 온전한 것도 함께 확인됐다 — 한 인스턴스의 예외가 이웃의 생명주기를 끊지
-않는다(LC2가 다루는 정리 경로와는 다른 축이다).
+않는다.
 
 미래 계획에 보존한 참조 구현의 **992 B는 루틴 코어·홀더·스코프·대기 1건을 합한 값**이다.
 위 304 B와 측정 단위가 다르므로 두 값을 나눠 성능 개선/악화 배수로 쓰지 않는다. 평균 할당은
@@ -163,13 +180,15 @@ LC1은 관리 플래그 한 줄을 이동하는 것만으로 끝나지 않는다
       축소에서 `ApplyEnabled(b, false)` 한 줄을 지우자 관리 축은 51건 차이로 빨갛고
       **네이티브 축 239 사건은 전부 통과**했다. 네이티브 골든은 관리 측 결함에
       원리적으로 눈멀다는 이 문서의 전제가 실측으로 섰다.
-- [~] **실패 픽스처.** LC1 몫을 세웠다 — `verify-lifecycle-failure`(판정 A·B·C가
-      **의도적으로 빨강**, 대조군 D는 초록) + 픽스처 셋(`FailInitializedProbe`,
-      `FailBeginProbe`, `DisableInBeginProbe`). LC1이 착지하면 초록이 되고 그때
-      run-all에 넣는다. 실측 결과는 §2.2에 있고, 그 과정에서 §2의 LC1 두 행을
-      정정했다(`Invoke`가 예외를 잡으면서 인스턴스를 끈다는 사실이 빠져 있었다).
-      남은 몫: LC2(정리 콜백 예외)·LC5(동기/Task 실패 비대칭)·자기 제거·프레임
-      경계 재진입.
+- [~] **실패 픽스처.** LC1·LC2·LC5 몫을 세웠다 — `verify-lifecycle-failure`의
+      판정 A·B·C·E·F가 **의도적으로 빨강**, 대조군 D는 초록. 픽스처 여섯:
+      `FailInitializedProbe`·`FailBeginProbe`·`DisableInBeginProbe`(LC1),
+      `FailCleanupProbe`(LC2), `FailSimulateSyncProbe`·`FailSimulateAsyncProbe`(LC5).
+      각 트랙이 착지하면 해당 판정이 초록이 되고, 전부 초록일 때 run-all에 넣는다.
+      실측은 §2.2에 있다. 그 과정에서 §2의 LC1 두 행을 정정했다(`Invoke`가 예외를
+      잡으면서 인스턴스를 끈다는 사실이 빠져 있었다).
+      남은 몫: 자기 제거 · 프레임 경계 재진입 · LC3(완료된 대기의 참조 유지 —
+      실엔진에서 재려면 유지 메모리 관측이 필요하다).
 - [ ] **§2.1 격리 재현 이관.** 대역 시험과 실엔진 시험을 별도 결과로 기록한다.
       `Enabled` setter 경로는 대역이 덮으므로 실엔진 쪽에 남긴다(§2.1 주의 참고).
 
