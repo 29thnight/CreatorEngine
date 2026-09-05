@@ -5,7 +5,6 @@
 //
 //   dx12.live          EnhancedRenderer 런타임 상태
 //   pipeline.nodes     라이브 파이프라인의 노드 조립 결과
-//   render.exposure    자동 노출이 무엇을 재고 무엇을 결정했는지
 //   render.rtinfo      창·뷰포트·추종 텍스처 크기
 //   render.shadowinfo  그림자 캐스케이드 계산 결과
 //   render.matmode     활성 씬 재질의 렌더링 모드를 **바꾼다**
@@ -394,13 +393,14 @@ namespace ConsoleCmd
         std::printf("[CLI] 렌더 타깃\n%s", report.c_str());
     }
 
-    static void Cmd_render_exposure(const ConsoleCommandContext& ctx)
-    {
-        // 기존 구현은 SceneRenderer가 갱신하는 DX11 ToneMapPass의 정적 값을
-        // 읽었다. 단독 모드에서 그 값을 출력하면 정상처럼 보이는 오래된 0값을
-        // 진단값으로 오인하게 되므로 새 DX12 계측이 붙기 전까지 차단한다.
-        std::printf("[CLI] render.exposure — DX11 레거시 진단은 비활성화됨; PIX의 Enhanced PostChain을 확인한다\n");
-    }
+    // ★ `render.exposure` 를 지웠다(2026-09-05). 몸통이 **printf 한 줄**이었다 —
+    //   "DX11 레거시 진단은 비활성화됨" 이라는 안내만 하고 아무것도 재지 않았다.
+    //   그런데 registry 요약은 "자동 노출이 무엇을 재고 무엇을 결정했는지" 라고
+    //   적혀 있어, `commands.list` 를 읽는 쪽에는 계측 명령으로 보였다.
+    //
+    //   DX12 계측이 붙으면 그때 명령을 새로 만든다. 그때까지 "있는데 아무것도
+    //   안 하는 것" 보다 "없는 것" 이 정직하다 — 앞서 같은 이유로 지운
+    //   `render.post` 와 같은 처분이다.
 
     static void Cmd_pipeline_nodes(const ConsoleCommandContext& ctx)
     {
@@ -516,7 +516,6 @@ namespace ConsoleCmd
         reg.Legacy({ "render.backend" }, &Cmd_render_backend);
         reg.Legacy({ "dx12.live" }, &Cmd_dx12_live);
         reg.Legacy({ "render.rtinfo" }, &Cmd_render_rtinfo);
-        reg.Legacy({ "render.exposure" }, &Cmd_render_exposure);
         reg.Legacy({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
         reg.Legacy({ "render.shadowinfo" }, &Cmd_render_shadowinfo);
     }

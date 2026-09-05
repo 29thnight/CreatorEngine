@@ -824,6 +824,12 @@ LC6 의 이동으로 확보된 것이라 추측이 아니다. 규칙마다 판�
 - `dump.crash` 를 놓칠 뻔했다. 이름으로는 `crash.test` 하나만 종료 명령 같은데,
   핸들러 본문을 전수 스캔(`std::abort`/`std::terminate`)하니 둘이었다.
 
+  ★ **그 둘째는 2026-09-05 에 지웠다.** 본문 스캔이 찾아낸 것은 맞지만, 그 명령은
+    `reg.Escaping` 이 아니라 `reg.Legacy` 로 등록되어 있어 **실제로는 죽지 않았다** —
+    예외가 포집되어 `internal_error` 가 되고 프로세스가 살아남았다. 즉 분류는
+    본문을 옳게 읽었는데 **본문이 등록 방식과 어긋나 있었다.** 본문 스캔만으로는
+    그것을 못 본다. 경위는 `docs/analysis/CommandRegistryAudit.md` §3.4.
+
 #### 라이브 축 — 기본은 라이브, 예외가 표기 대상
 
 요구는 "특정 명령을 제외하면 에디터·플레이어를 껐다 켜지 않고 동작해야 한다"이다.
@@ -831,9 +837,12 @@ LC6 의 이동으로 확보된 것이라 추측이 아니다. 규칙마다 판�
 
 | 값 | 수 | 무엇 |
 |---|---|---|
-| `live` | 206 | 켜져 있는 프로세스에서 그대로 된다 |
+| `live` | 205 | 켜져 있는 프로세스에서 그대로 된다 |
 | `requires_restart` | 3 | `dx12.selftest` · `vk.selftest` · `rhi.uploadsegments` — 디바이스·스왑체인을 **세우는** 프로브 |
-| `terminates_process` | 3 | `crash.test` · `dump.crash` · `quit` |
+| `terminates_process` | 2 | `crash.test` · `quit` |
+
+(2026-09-05 갱신: `dump.crash` 제거로 `terminates_process` 3→2,
+`render.exposure` 제거로 `live` 206→205. 명령 212→**210**, 이름 226→224.)
 
 ★★ **이 값은 실측에서 왔고, 착수 때의 판단을 뒤집었다.** 처음에는 `dx12.*`·`vk.*`
 56 개가 전부 프로세스를 새로 띄워야 하는 "커맨드렛"인 줄 알았다 — `Invoke-Dx12Suite`

@@ -670,40 +670,19 @@ namespace ConsoleCmd
         Debug->LogWarning(report);
     }
 
-    static void Cmd_dump_crash(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // 크래시 처리 자체를 검증하기 위한 명령. 종류별로 경로가 달라서
-        // (SEH / abort / terminate) 각각 실제로 덤프가 남는지 확인해야 한다.
-        const std::string kind = (parts.size() > 1) ? parts[1] : std::string("access");
-
-        Debug->LogWarning("[CLI] 의도적 크래시: " + kind);
-        Log::FlushNow();
-
-        if ("abort" == kind)
-        {
-            std::abort();
-        }
-        else if ("terminate" == kind)
-        {
-            std::terminate();
-        }
-        else if ("throw" == kind)
-        {
-            // 처리되지 않은 C++ 예외 → std::terminate 경로
-            throw std::runtime_error("dump.crash throw");
-        }
-        else if ("access" == kind)
-        {
-            volatile int* p = nullptr;
-            *p = 1;
-        }
-        else
-        {
-            std::printf("[CLI] 사용법: dump.crash <access|abort|terminate|throw>\n");
-        }
-    }
+    // ★ `dump.crash` 를 지웠다(2026-09-05). `crash.test` 와 같은 네 분기를 가진
+    //   중복이었고, 호출자가 없었으며, **죽지 않았다.**
+    //
+    //   `reg.Escaping` 이 아니라 `reg.Legacy` 로 등록되어 있어서 `dump.crash throw`
+    //   가 ConsoleCommandSystem 의 핸들러 예외 포집에 잡혀 `internal_error
+    //   (command.exception)` 로 바뀌었다. 실측:
+    //
+    //     dump.crash throw   죽지 않음 · quit 실행됨 · Finalize 완료 · exit 5
+    //     crash.test  throw  죽음 · quit 미실행 · Finalize 미도달 · exit 3
+    //
+    //   일부러 죽어서 덤프 경로를 검증하는 것이 존재 이유인데 죽지 않으므로,
+    //   덤프도 남지 않았다. descriptor 는 `terminates_process` 라고 적고 있었다.
+    //   검증하지 못하는 검증 명령은 없는 것만 못하다.
 
     static void Cmd_dump_list(const ConsoleCommandContext& ctx)
     {
@@ -1215,7 +1194,6 @@ namespace ConsoleCmd
         reg.Legacy({ "pix.capture" }, &Cmd_pix_capture);
         reg.Legacy({ "profile.selftest" }, &Cmd_profile_selftest);
         reg.Legacy({ "profile.stats" }, &Cmd_profile_stats);
-        reg.Legacy({ "dump.crash" }, &Cmd_dump_crash);
         reg.Legacy({ "dump.list", "dump.show" }, &Cmd_dump_list);
         reg.Legacy({ "gpu.baseline" }, &Cmd_gpu_baseline);
         reg.Legacy({ "gpu.census", "gpu.delta" }, &Cmd_gpu_census);

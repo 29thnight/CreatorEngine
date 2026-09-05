@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	212
-# names	226
+# commands	210
+# names	224
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	no	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -33,7 +33,6 @@ component.add	-	frames	editor	editor_operation	live	no	no	<오브젝트 이름> 
 component.list	-	immediate	editor	engine_service	live	no	no	-	등록된 컴포넌트 타입을 로그에 남긴다
 crash.status	-	immediate	editor	probe	live	no	no	-	크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다
 crash.test	-	immediate	editor	probe	terminates_process	no	no	<종류>	일부러 죽여 덤프 경로를 검증한다(av|abort|terminate|throw)
-dump.crash	-	immediate	editor	probe	terminates_process	no	no	<access|abort|terminate|throw>	일부러 죽여 크래시 덤프 경로를 검증한다
 dump.list	dump.show	immediate	editor	probe	live	no	no	[이름]	크래시 덤프 목록 또는 요약 하나를 낸다
 dx12.bench11	-	long	editor	probe	live	no	yes	-	DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)
 dx12.decal	-	frames	editor	probe	live	no	yes	-	데칼 패스 검증(상자 판정·하늘 게이트·원본 혼합 3종·배칭)
@@ -144,7 +143,6 @@ profile.stats	-	immediate	editor	probe	live	no	no	-	프로파일러 자체 비�
 quit	exit	immediate	both	engine_service	terminates_process	no	yes	-	호스트를 종료한다
 reflect.golden	-	long	editor	probe	live	no	no	[출력 경로]	등록된 전 타입의 직렬화 출력을 골든 문서로 쓴다
 render.backend	-	frames	editor	engine_service	live	no	no	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
-render.exposure	-	frames	editor	engine_service	live	no	no	-	자동 노출이 무엇을 재고 무엇을 결정했는지
 render.livecheck	-	frames	editor	probe	live	no	yes	[너비 높이]	resize·다중 뷰·표시 슬롯 회전 회귀 판정
 render.matmode	-	frames	editor	engine_service	live	no	no	<오브젝트> <opaque|transparent>	오브젝트 재질의 렌더링 모드를 바꾼다
 render.rtinfo	-	frames	editor	engine_service	live	no	no	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
