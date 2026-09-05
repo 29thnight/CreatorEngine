@@ -350,6 +350,19 @@ Run-Step "생명주기 대기 인자" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-delayarg.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 DDOL 이송 중 대기(9-5 · LC7-c). 설계 문서 §1.2-5는 "DDOL 이동은 씬
+# 통지를 주며 인스턴스와 시뮬레이션을 유지한다"를 보존 대상으로 적었는데, 기존
+# verify-ddol-script는 그 문장의 앞 절반(통지가 왔는가)만 잰다. 이송은 씬 그래프에서
+# 오브젝트를 떼는 일이라 떼는 쪽을 파괴로 오독하면 통지는 정확한데 루틴만 죽는다.
+#
+#   FF 대기 생존 · GG 루틴 단일 · HH 진입 단일 · II 이송 통지
+#
+# FF를 "취소 표지가 없다"로 재지 않는다. 취소로 풀린 것과 영영 풀리지 않은 것이
+# 구별되지 않기 때문이다 — 재개 표지가 이송 프레임보다 뒤에 1건 있을 것을 요구한다.
+Run-Step "생명주기 이송 중 대기" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-ddolwait.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
