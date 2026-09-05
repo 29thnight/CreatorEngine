@@ -24,6 +24,7 @@
     <ClInclude Include="HttpRequest.h" />
     <ClInclude Include="JsonValue.h" />
     <ClInclude Include="OperationTable.h" />
+    <ClInclude Include="ResultEnvelope.h" />
     <ClInclude Include="ServiceEndpointFile.h" />
     <ClInclude Include="SocketPlatform.h" />
   </ItemGroup>
@@ -32,6 +33,7 @@
     <ClCompile Include="HttpRequest.cpp" />
     <ClCompile Include="JsonValue.cpp" />
     <ClCompile Include="OperationTable.cpp" />
+    <ClCompile Include="ResultEnvelope.cpp" />
     <ClCompile Include="ServiceEndpointFile.cpp" />
     <ClCompile Include="SocketPlatform_Win32.cpp" />
   </ItemGroup>

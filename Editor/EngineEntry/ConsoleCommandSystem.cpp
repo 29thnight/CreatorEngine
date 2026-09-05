@@ -5,6 +5,7 @@
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
 #include "Commands/CommandRegistrar.h"          // LC6: 도메인 TU 등록 창구
 #include "CommandCore/CommandDescriptorSeeds.h"
+#include "CommandResultJson.h"          // LC9: 배치 JSONL 과 서비스 JSON 의 단일 정본
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
@@ -348,6 +349,39 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
             //   이 플래그만 주고 서비스를 안 켜면 아무 일도 하지 않는다 —
             //   배치·stdin 경로는 애초에 이 플래그를 보지 않는다(아래 주석).
             wantUserCode = true;
+        }
+        else if (arg == "--result-format" && i + 1 < argc)
+        {
+            // LC9 — 배치 결과를 schema v1 JSONL 로 낸다(§18).
+            //
+            // ★ 오늘 형식은 `jsonl` 하나다. 그래도 값을 받는 이유는 이름이
+            //   `--result-jsonl` 이 아니라 `--result-format` 이기 때문이다 —
+            //   계획이 그 이름을 골랐고, 그 이름은 값이 늘어날 자리를 약속한다.
+            //   모르는 값을 조용히 무시하면 오타가 "형식 없음"으로 지나간다.
+            const std::string format = toUtf8(argv[++i]);
+            if ("jsonl" == format) { m_resultJsonl = true; }
+            else
+            {
+                std::fprintf(stderr, "[CLI] 알 수 없는 --result-format: %s (jsonl)\n",
+                             format.c_str());
+                std::fflush(stderr);
+
+                // ★ `SetExitCode` 를 직접 부르지 않는다(§14.1).
+                //
+                //   여기는 명령이 아니라 **인자** 오류라 CommandResult 를 낼
+                //   핸들러가 없다. 그래도 exit code 를 직접 쓰면 "쓰는 곳은
+                //   session 하나" 라는 불변식이 깨지고, 뒤의 성공이 이 실패를
+                //   지우는 옛 구조로 한 걸음 돌아간다. session 에 기록하면
+                //   그 한 곳이 §5.4 의 2 를 정한다.
+                CommandCore::CommandSession::Batch().Record("--result-format",
+                    CommandCore::InvalidArguments(
+                        "알 수 없는 --result-format: " + format, "args.invalid"));
+                m_quitRequested.store(true, std::memory_order_release);
+            }
+        }
+        else if (arg == "--result-file" && i + 1 < argc)
+        {
+            m_resultFilePath = toUtf8(argv[++i]);
         }
         else if (arg == "--fail-fast")
         {
@@ -740,6 +774,17 @@ bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex)
         ? (frameIndex - pending.enqueuedFrame) : 0;
 
     CommandBaseline::NoteCommand(name, queued.count(), waitedFrames, executed.count());
+
+    // ── LC9: 배치 결과를 기계가 읽는 형태로 낸다 (§18) ──────────────────
+    //
+    // ★ 서비스 요청은 제외한다. 그쪽 판정은 HTTP 응답으로 가고, JSONL 은 **배치
+    //   시나리오의 기록**이다. 둘을 한 파일에 섞으면 `--script` 하나를 돌린
+    //   소비자가 자기가 넣지 않은 줄을 읽게 된다.
+    if (!name.empty() && !pending.fromService)
+    {
+        WriteResultLine(std::string(name), result,
+                        queued.count(), static_cast<uint32_t>(waitedFrames), executed.count());
+    }
 
     // 결과를 기다리는 사람(LC4 의 수신 스레드)을 깨운다. **GT 에서 불린다** —
     // 여기서 오래 걸리면 다음 프레임이 밀린다. 어댑터는 값만 넘기고 곧 반환한다.
@@ -3977,6 +4022,51 @@ CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
     }
 }
 
+void ConsoleCommandSystem::WriteResultLine(const std::string& commandId,
+                                           const CommandCore::CommandResult& result,
+                                           double queuedMs, uint32_t waitedFrames,
+                                           double executedMs)
+{
+    if (!m_resultJsonl) return;
+
+    // 파일은 첫 줄에서 연다. 시작할 때 열면 `--result-format` 만 주고 명령을
+    // 하나도 안 돌린 실행이 빈 파일을 남기고, 소비자는 그것을 "0 건 성공"으로
+    // 읽는다 — 실제로는 아무것도 돌지 않은 것이다.
+    if (!m_resultFilePath.empty() && nullptr == m_resultFile)
+    {
+        if (0 != fopen_s(&m_resultFile, m_resultFilePath.c_str(), "wb") || nullptr == m_resultFile)
+        {
+            // ★ 조용히 stdout 으로 흘리지 않는다. 소비자는 파일을 읽으려고
+            //   기다리고 있고, 그 파일이 영영 안 생기면 원인이 여기라는 것을
+            //   알 방법이 없다. 이 실행은 판정을 낼 수 없으므로 실패로 끝낸다.
+            std::fprintf(stderr, "[CLI] --result-file 을 열 수 없다: %s\n",
+                         m_resultFilePath.c_str());
+            std::fflush(stderr);
+            m_resultJsonl = false;
+
+            // exit code 를 쓰는 곳은 session 하나다(§14.1). 여기서 직접 쓰면
+            // 그 불변식이 깨진다 — 위 `--result-format` 과 같은 이유.
+            CommandCore::CommandSession::Batch().Record("--result-file",
+                CommandCore::InternalError("results.write_failed",
+                    "--result-file 을 열 수 없다: " + m_resultFilePath));
+            RequestQuit();
+            return;
+        }
+    }
+
+    const std::string line = EditorCommandJson::ResultLine(
+        commandId, result, queuedMs, waitedFrames, executedMs);
+
+    std::FILE* out = (nullptr != m_resultFile) ? m_resultFile : stdout;
+    std::fwrite(line.data(), 1, line.size(), out);
+    std::fputc('\n', out);
+
+    // ★ 줄마다 flush 한다. 프로세스가 중간에 죽어도 그때까지의 판정이 파일에
+    //   남아야 한다 — session 이 명령마다 exit code 를 쓰는 것과 같은 이유다.
+    //   비용은 시나리오당 명령 수만큼이고, 그 수는 수십이다.
+    std::fflush(out);
+}
+
 void ConsoleCommandSystem::PublishResult(const std::string& commandId,
                                          const CommandCore::CommandResult& result)
 {
@@ -4110,6 +4200,14 @@ void ConsoleCommandSystem::Shutdown()
     // 서비스를 먼저 내린다 — 수신 스레드가 살아 있는 채로 엔진이 정리되면
     // 그 스레드가 사라진 것을 만진다. endpoint 파일도 여기서 지워진다.
     EditorCommandService::Stop();
+
+    // LC9 — JSONL 파일을 닫는다. 줄마다 flush 하므로 내용은 이미 디스크에 있고,
+    // 여기는 핸들 회수다. `return` 이 아래에 여럿 있어 이 자리에 둔다.
+    if (nullptr != m_resultFile)
+    {
+        std::fclose(m_resultFile);
+        m_resultFile = nullptr;
+    }
 
     m_running.store(false, std::memory_order_release);
 

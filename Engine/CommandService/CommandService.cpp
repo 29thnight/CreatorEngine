@@ -1,6 +1,7 @@
 #include "CommandService.h"
 
 #include "JsonValue.h"
+#include "ResultEnvelope.h"
 #include "ServiceEndpointFile.h"
 
 #include <chrono>
@@ -599,25 +600,16 @@ namespace CommandService
 
             const CommandOutcome outcome = m_gateway->Execute(arguments, timeoutMs);
 
-            JsonValue root = JsonValue::Object();
-            root.Set("schemaVersion", JsonValue::Int(1));
-            if (!correlationId.empty()) root.Set("correlationId", JsonValue::String(correlationId));
-            root.Set("command", JsonValue::String(arguments.front()));
-            root.Set("status",  JsonValue::String(outcome.status));
-            root.Set("code",    JsonValue::String(outcome.code));
-            root.Set("message", JsonValue::String(outcome.message));
-
-            // data 는 어댑터가 이미 직렬화했다. 다시 파싱하지 않고 넣는다 —
-            // 여기서 파싱하면 왕복이 하나 더 생기고, 그 왕복마다 손실이 가능하다.
-            const JsonParseResult data = ParseJson(outcome.dataJson.empty() ? "{}" : outcome.dataJson);
-            root.Set("data", data.ok ? data.value : JsonValue::Object());
-
-            // timing 은 장식이 아니라 지연 계약의 증거다(§5.2).
-            JsonValue timing = JsonValue::Object();
-            timing.Set("queuedMs",     JsonValue::Double(outcome.queuedMs));
-            timing.Set("waitedFrames", JsonValue::Int(static_cast<int64_t>(outcome.waitedFrames)));
-            timing.Set("executedMs",   JsonValue::Double(outcome.executedMs));
-            root.Set("timing", std::move(timing));
+            // ★ LC9: 봉투를 **여기서 조립하지 않는다.**
+            //
+            //   §18 이 "배치 JSONL 과 서비스 JSON 이 같은 schema v1 을 공유한다"를
+            //   요구한다. 두 곳에서 같은 모양을 각자 조립하면 그 조건은 작성
+            //   시점에만 참이고, 한쪽에 필드가 하나 늘어나는 날 조용히 갈라진다.
+            //   `BuildResultEnvelope` 가 그 자리를 하나로 만든다.
+            const JsonValue root = BuildResultEnvelope(
+                arguments.front(), outcome.status, outcome.code, outcome.message,
+                outcome.dataJson, outcome.queuedMs, outcome.waitedFrames,
+                outcome.executedMs, correlationId);
 
             return finish(outcome.httpStatus, root.Serialize(),
                           outcome.timedOut ? "timeout" : "");

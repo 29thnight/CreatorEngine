@@ -44,6 +44,7 @@
     <ClInclude Include="EngineEntry\CommandCore\CommandRegistry.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandResult.h" />
     <ClInclude Include="EngineEntry\CommandCore\CommandSession.h" />
+    <ClInclude Include="EngineEntry\CommandResultJson.h" />
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
     <ClInclude Include="EngineEntry\Commands\CommandRegistrar.h" />
     <ClInclude Include="EngineEntry\Commands\CommandSupport.h" />
@@ -111,6 +112,7 @@
     <ClCompile Include="EngineEntry\CommandCore\CommandRegistry.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandResult.cpp" />
     <ClCompile Include="EngineEntry\CommandCore\CommandSession.cpp" />
+    <ClCompile Include="EngineEntry\CommandResultJson.cpp" />
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
     <!-- LC6(PHASE 14.5): 도메인 명령 TU.
          유니티에서 **일부러 뺀다.** §12 가 "include 는 각 TU 가 직접 소유한다"고

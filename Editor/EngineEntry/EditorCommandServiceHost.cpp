@@ -8,6 +8,8 @@
 #include "../../Engine/CommandService/CommandService.h"
 #include "../../Engine/CommandService/JsonValue.h"
 
+#include "CommandResultJson.h"   // LC9: 변환·봉투의 단일 정본
+
 #include <atomic>
 #include <condition_variable>
 #include <memory>
@@ -17,37 +19,12 @@ namespace EditorCommandService
 {
     namespace
     {
-        /// `CommandCore::CommandData` → `CommandService::JsonValue`.
-        ///
-        /// 두 트리가 같은 모양인데 타입이 다른 이유는 §12 의 의존 방향이다 —
-        /// 서비스는 Editor 헤더를 모른다. 변환 한 번이 그 값을 치른다.
-        CommandService::JsonValue ToJson(const CommandCore::CommandData& data)
-        {
-            using CK = CommandCore::CommandData::Kind;
-            using JV = CommandService::JsonValue;
-
-            switch (data.GetKind())
-            {
-            case CK::Null:   return JV();
-            case CK::Bool:   return JV::Bool(data.AsBool());
-            case CK::Int:    return JV::Int(data.AsInt());
-            case CK::Double: return JV::Double(data.AsDouble());
-            case CK::String: return JV::String(data.AsString());
-            case CK::Array:
-            {
-                JV array = JV::Array();
-                for (const CommandCore::CommandData& item : data.Items()) array.Append(ToJson(item));
-                return array;
-            }
-            case CK::Object:
-            {
-                JV object = JV::Object();
-                for (const auto& field : data.Fields()) object.Set(field.first, ToJson(field.second));
-                return object;
-            }
-            }
-            return JV();
-        }
+        // ★ LC9: `ToJson` 이 여기 있었다 — 지금은 `CommandResultJson` 하나뿐이다.
+        //
+        //   배치 JSONL 이 생기면서 같은 변환이 두 벌이 될 뻔했고, 두 벌이 되는
+        //   순간 §18 의 "배치 JSONL 과 서비스 JSON 이 같은 schema v1 을 공유한다"
+        //   는 작성 시점에만 참인 문장이 된다. 변환도 봉투도 한 곳에서 나온다.
+        using EditorCommandJson::ToJson;
 
         /// §5.3 의 상태 사상.
         ///

@@ -145,6 +145,16 @@ Run-Step "CLI script.invoke 계약(LC7)" {
 # 실제 격리는 Player.vcxproj 의 구성 조건부 ProjectReference 가 하고, 이 게이트는
 # 두 구성을 나란히 지어 import 표를 맞대 본다 — Development 에 소켓이 **있는지**도
 # 함께 단정한다(없으면 "Shipping 에 0" 은 아무것도 확인하지 않은 것이다).
+# PHASE 14.5 LC9 §18 — 자동화 소비자가 사람용 문자열을 판정에 쓰지 않는가.
+#
+# 정적 검사 둘이다: ① 판정 어휘를 매칭 문맥에서 읽는 소비자 수(래칫 — 오늘 0 이
+# 아니고, 도메인 단위로 내려간다) ② 토큰 검사보다 앞서는 라우트 0(§8).
+# ②는 처음에 Yoda 비교를 못 찾아 **라우트를 하나도 못 본 채 통과**했다. 지금은
+# 하나도 못 찾으면 실패한다 — 아무것도 안 보는 검사는 없는 것만 못하다.
+Run-Step "CLI 소비자 계약(LC9)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-consumer-contract.ps1")
+}
+
 Run-Step "Player Shipping 격리(LC8)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-player-shipping-isolation.ps1")
 }

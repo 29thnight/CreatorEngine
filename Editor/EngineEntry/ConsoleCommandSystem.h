@@ -2,6 +2,7 @@
 #include "CommandCore/CommandResult.h"
 
 #include <atomic>
+#include <cstdio>
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -241,6 +242,19 @@ private:
     /// 결과를 session 에 넣고 사람이 읽는 줄을 찍는다.
     void PublishResult(const std::string& commandId, const CommandCore::CommandResult& result);
 
+    /// LC9 — 배치 결과 한 줄을 schema v1 JSONL 로 쓴다.
+    ///
+    /// `--result-format jsonl` 이 아니면 아무 일도 하지 않는다. 목적지는
+    /// `--result-file` 이고, 없으면 stdout 이다.
+    ///
+    /// ★ **소비자는 `--result-file` 을 쓸 것.** stdout 에는 명령들이 찍는 사람용
+    ///   줄이 함께 흐른다. 파일로 받으면 소비자가 골라낼 일이 없다 — §18 의
+    ///   "자동화 consumer 가 source/help/한국어 verdict 문자열을 파싱하지 않는다"
+    ///   는 "다른 것을 파싱한다"가 아니라 **파싱하지 않는다**여야 한다.
+    void WriteResultLine(const std::string& commandId,
+                         const CommandCore::CommandResult& result,
+                         double queuedMs, uint32_t waitedFrames, double executedMs);
+
     /// 큐에 남은 명령을 버린다(`--fail-fast`).
     void DiscardPending();
 
@@ -332,4 +346,13 @@ private:
 
     // --script가 파일을 못 열었는가. 명령이 하나도 없는 무인 실행은 종료시킨다.
     bool m_scriptLoadFailed{ false };
+
+    // ── LC9: 배치 결과 JSONL ────────────────────────────────────────────
+    //
+    // 게임 스레드에서만 쓴다(`RunOne` 하나가 부른다). 파일은 첫 줄에서 열고
+    // 프로세스가 끝날 때까지 연 채로 둔다 — 명령마다 열고 닫으면 시나리오
+    // 하나에 파일 열기가 명령 수만큼 생긴다.
+    bool        m_resultJsonl{ false };
+    std::string m_resultFilePath;
+    std::FILE*  m_resultFile{ nullptr };
 };
