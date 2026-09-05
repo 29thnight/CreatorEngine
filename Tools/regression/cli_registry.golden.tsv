@@ -172,11 +172,11 @@ serialize.rymlerror	-	frames	editor	probe	live	no	no	-	ryml 에러 정책이 abo
 shadermeta.probe	-	frames	editor	probe	live	no	no	-	ShaderMeta 실자산 수용과 잘못된 문서 거절을 함께 판정한다
 tag.authoring.probe	-	frames	editor	raw_fixture	live	no	no	list | <add|has|remove> <이름>	태그·레이어 저작 자산을 읽고 고친다
 terrain.authoring.probe	-	frames	editor	raw_fixture	live	no	no	<이름> <텍스처|->	Terrain writer 트랜잭션 회귀 검사
-ui.anchor	ui.size,ui.pos,ui.screenpos	frames	editor	engine_service	live	no	no	<오브젝트> <minX> <minY> <maxX> <maxY>	앵커를 직접 지정한다
-ui.hitbox	-	frames	editor	engine_service	live	no	no	-	버튼의 rect와 클릭 판정 상자를 나란히 출력한다
-ui.navprobe	-	frames	editor	engine_service	live	no	no	-	UI 내비게이션 저작 계층을 세워 탐색 결과를 판정한다
-ui.rect	-	frames	editor	engine_service	live	no	no	<오브젝트|*>	오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다
-ui.status	-	immediate	editor	engine_service	live	no	no	-	UI 계층·캔버스 연결 상태를 낸다
+ui.anchor	ui.size,ui.pos,ui.screenpos	frames	editor	engine_service	live	no	yes	<오브젝트> <minX> <minY> <maxX> <maxY>	앵커를 직접 지정한다
+ui.hitbox	-	frames	editor	engine_service	live	no	yes	-	버튼의 rect와 클릭 판정 상자를 나란히 출력한다
+ui.navprobe	-	frames	editor	engine_service	live	no	yes	-	UI 내비게이션 저작 계층을 세워 탐색 결과를 판정한다
+ui.rect	-	frames	editor	engine_service	live	no	yes	<오브젝트|*>	오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다
+ui.status	-	immediate	editor	engine_service	live	no	yes	-	UI 계층·캔버스 연결 상태를 낸다
 undo	redo	frames	editor	editor_operation	live	no	no	-	에디터의 Ctrl+Z / Ctrl+Y와 같은 호출
 undo.state	-	immediate	editor	engine_service	live	no	yes	<라벨>	편집 스택과 게임 스택의 Undo 깊이를 따로 낸다
 vk.decal	-	long	editor	probe	live	no	yes	-	Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조

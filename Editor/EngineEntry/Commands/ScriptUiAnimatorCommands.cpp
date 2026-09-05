@@ -515,7 +515,18 @@ namespace ConsoleCmd
         std::printf("[CLI] 필드 설정 완료\n");
     }
 
-    static void Cmd_ui_rect(const ConsoleCommandContext& ctx)
+    // ★ LC9 — `ui.*` 다섯을 결과형으로 옮긴다(2026-09-06).
+    //
+    //   **핸들러가 찍는 줄은 한 글자도 바꾸지 않는다.** 이 도메인의 출력은
+    //   `verify-ui-layout-golden.ps1` 이 골든으로 대조하고 `resolution_sweep.txt` 가
+    //   해상도마다 읽는다. 서명을 바꾸면서 문안까지 손대면 그것들이 한꺼번에
+    //   붉어지고, 붉어진 이유가 "이행이 잘못됐다" 인지 "문안이 달라졌다" 인지
+    //   가릴 수 없다.
+    //
+    //   다만 stdout 이 통째로 불변인 것은 아니다 — 실패·precondition 결과에는
+    //   `PublishResult` 가 `[CLI] <명령> <status> (<code>) <메시지>` 를 **덧붙인다**.
+    //   덧붙는 줄이지 고쳐 쓰는 줄이 아니라 기존 정규식은 그대로 맞는다.
+    static CommandCore::CommandResult Cmd_ui_rect(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
 
@@ -525,11 +536,17 @@ namespace ConsoleCmd
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: ui.rect <오브젝트 이름 | *>\n");
-            return;
+            return CommandCore::InvalidArguments("ui.rect: <오브젝트 이름 | *> 가 필요하다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("ui.rect.no_scene", "활성 씬이 없다");
+        }
+
+        int reportedRects = 0;
 
         // 재귀 깊이 상한 — 계층이 순환하더라도 CLI가 스택을 태우지 않게 한다.
         constexpr int kMaxDepth = 32;
@@ -564,6 +581,7 @@ namespace ConsoleCmd
 
                 std::printf("[CLI] %s\n", line.c_str());
                 Debug->LogWarning("[ui.rect] " + line);
+                ++reportedRects;
             }
 
             for (auto childIndex : obj->GetChildrenIndices())
@@ -594,12 +612,24 @@ namespace ConsoleCmd
         else
         {
 			Entity* target = scene->GetEntity(parts[1]);
-            if (!target) { std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str()); return; }
+            if (!target)
+            {
+                std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str());
+                return CommandCore::Fail("ui.rect.object_missing",
+                    "오브젝트가 없다: " + parts[1]);
+            }
             dump(target, 0);
         }
+
+        // ★ rect 가 0 개인 것은 **실패가 아니다.** UI 가 없는 씬에서 물어본 것일 수
+        //   있고, 이 명령은 "무엇이 있나" 를 답하는 조회다. 개수는 값으로 낸다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("target", CommandCore::CommandData::String(parts[1]));
+        data.Set("rects", CommandCore::CommandData::Int(reportedRects));
+        return CommandCore::Ok("ui.rect", std::move(data));
     }
 
-    static void Cmd_ui_anchor(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_ui_anchor(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -613,17 +643,34 @@ namespace ConsoleCmd
         {
             std::printf("[CLI] 사용법: ui.anchor <오브젝트> <minX> <minY> <maxX> <maxY>"
                 " · ui.size <오브젝트> <x> <y> · ui.pos/ui.screenpos <오브젝트> <x> <y>\n");
-            return;
+            return CommandCore::InvalidArguments(cmd + ": 인자가 모자란다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("ui.anchor.no_scene", "활성 씬이 없다");
+        }
 
 		Entity* target = scene->GetEntity(parts[1]);
-        if (!target) { std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str()); return; }
+        if (!target)
+        {
+            std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str());
+            return CommandCore::Fail("ui.anchor.object_missing",
+                "오브젝트가 없다: " + parts[1]);
+        }
 
         auto* rect = target->GetComponent<RectTransformComponent>();
-        if (!rect) { std::printf("[CLI] RectTransform 없음: %s\n", parts[1].c_str()); return; }
+        if (!rect)
+        {
+            // ★ 이것은 precondition 이지 인자 오류가 아니다. 이름은 맞는데 그
+            //   오브젝트가 UI 가 아닌 것이고, 고치려면 인자가 아니라 **씬**을
+            //   바꿔야 한다.
+            std::printf("[CLI] RectTransform 없음: %s\n", parts[1].c_str());
+            return CommandCore::PreconditionFailed("ui.anchor.no_rect",
+                "RectTransform 이 없다: " + parts[1]);
+        }
 
         if (cmd == "ui.anchor")
         {
@@ -656,15 +703,24 @@ namespace ConsoleCmd
             rect->SetSizeDelta(size);
             std::printf("[CLI] %s sizeDelta = (%.2f,%.2f)\n", parts[1].c_str(), size.x, size.y);
         }
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("verb", CommandCore::CommandData::String(cmd));
+        data.Set("target", CommandCore::CommandData::String(parts[1]));
+        return CommandCore::Ok(cmd, std::move(data));
     }
 
-    static void Cmd_ui_hitbox(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_ui_hitbox(const ConsoleCommandContext& ctx)
     {
 
         // 버튼의 클릭 판정 상자를 rect와 나란히 찍는다. 두 값이 같아야 보이는 곳과
         // 눌리는 곳이 일치한다 — 해상도가 바뀌어도 유지되는지가 검증 대상이다(PHASE 7-7).
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("ui.hitbox.no_scene", "활성 씬이 없다");
+        }
 
         int reported = 0;
         for (const auto& owned : scene->m_Entities)
@@ -695,10 +751,17 @@ namespace ConsoleCmd
             ++reported;
         }
 
+        // ★ 버튼 0 개는 **실패가 아니다.** 버튼이 없는 씬에서 물어본 것일 수 있고,
+        //   이 명령은 "무엇이 있나" 를 답하는 조회다. 개수를 값으로 낸다 —
+        //   0 을 실패로 내면 상태를 물어본 실행이 붉어진다.
         if (0 == reported) std::printf("[CLI] 버튼 없음\n");
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("buttons", CommandCore::CommandData::Int(reported));
+        return CommandCore::Ok("ui.hitbox", std::move(data));
     }
 
-	static void Cmd_ui_navprobe(const ConsoleCommandContext&)
+	static CommandCore::CommandResult Cmd_ui_navprobe(const ConsoleCommandContext&)
 	{
 		// U7/E7-c 전용 무자산 회귀. 형제+손자 경로를 가진 UI 프리팹을 메모리에서
 		// 굽고 두 번 소환해, Navigation이 각 인스턴스 내부에서만 풀리는지와 UI도
@@ -708,27 +771,27 @@ namespace ConsoleCmd
 		if (!scene)
 		{
 			std::printf("[ui.navprobe] FAIL 활성 씬 없음\n");
-			return;
+			return CommandCore::PreconditionFailed("ui.navprobe.no_scene", "활성 씬이 없다");
 		}
 
 		auto authorRoot = scene->CreateEntity("__NavAuthorRoot", GameObjectType::Canvas);
 		if (!authorRoot)
 		{
 			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
-			return;
+			return CommandCore::PreconditionFailed("ui.navprobe.author_create", "저작 계층을 만들지 못했다");
 		}
 		auto source = scene->CreateEntity("__NavSource", GameObjectType::UI, authorRoot->m_index);
 		auto branch = scene->CreateEntity("__NavBranch", GameObjectType::UI, authorRoot->m_index);
 		if (!source || !branch)
 		{
 			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
-			return;
+			return CommandCore::PreconditionFailed("ui.navprobe.author_create", "저작 계층을 만들지 못했다");
 		}
 		auto target = scene->CreateEntity("__NavTarget", GameObjectType::UI, branch->m_index);
 		if (!target)
 		{
 			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
-			return;
+			return CommandCore::PreconditionFailed("ui.navprobe.author_create", "저작 계층을 만들지 못했다");
 		}
 
 		ImageComponent* sourceImage = source->AddComponent<ImageComponent>();
@@ -736,7 +799,7 @@ namespace ConsoleCmd
 		if (!sourceImage)
 		{
 			std::printf("[ui.navprobe] FAIL ImageComponent 생성 실패\n");
-			return;
+			return CommandCore::PreconditionFailed("ui.navprobe.image_create", "ImageComponent 를 만들지 못했다");
 		}
 		sourceImage->SetNavi(Direction::Right, target);
 
@@ -756,7 +819,8 @@ namespace ConsoleCmd
 		if (!prefab)
 		{
 			std::printf("[ui.navprobe] FAIL 프리팹 생성 실패\n");
-			return;
+			return CommandCore::PreconditionFailed("ui.navprobe.prefab_create",
+				"프리팹을 만들지 못했다");
 		}
 		makeSequenceData(prefab);
 
@@ -840,14 +904,35 @@ namespace ConsoleCmd
 			freshIds ? "PASS" : "FAIL",
 			spatialComposition ? "PASS" : "FAIL",
 			legacyOk ? "PASS" : "FAIL");
+
+		// ★ **이 명령은 스스로 PASS/FAIL 을 찍고도 그 판정을 버리고 있었다.**
+		//   probe 가 `FAIL` 을 인쇄해도 프로세스는 0 으로 끝났고, 자동화는 그
+		//   실행을 성공으로 읽었다 — `scene.transformbulk` 와 같은 모양이다.
+		//   이제 다섯 축을 값으로 함께 내고, 하나라도 어긋나면 실패다.
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("schema", CommandCore::CommandData::Bool(schemaOk));
+		data.Set("isolated", CommandCore::CommandData::Bool(isolated));
+		data.Set("freshIds", CommandCore::CommandData::Bool(freshIds));
+		data.Set("spatial", CommandCore::CommandData::Bool(spatialComposition));
+		data.Set("legacy", CommandCore::CommandData::Bool(legacyOk));
+		if (!passed)
+		{
+			return CommandCore::Fail("ui.navprobe.failed",
+				"UI 내비게이션 probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("ui.navprobe PASS", std::move(data));
 	}
 
-    static void Cmd_ui_status(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_ui_status(const ConsoleCommandContext& ctx)
     {
         // 지연 연결 상태를 숫자로 본다. 레지스트리 등록 수와 그중 캔버스가 연결된 수,
         // 그리고 씬의 캔버스 목록 — 검증에서 눈으로 대조할 기준선이다.
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("ui.status.no_scene", "활성 씬이 없다");
+        }
 
         int imageLinked = 0;
         for (auto* image : UIManagers->Images) { if (image && image->GetOwnerCanvas()) ++imageLinked; }
@@ -884,6 +969,23 @@ namespace ConsoleCmd
 
         Debug->LogWarning(line);
         std::printf("%s\n", line);
+
+        // ★ 연결되지 않은 UI 가 있어도 **실패로 내지 않는다.** 이 명령은 지연 연결의
+        //   현재 분포를 답하는 조회이고, "아직 연결 전" 은 정상 상태다. 무엇이
+        //   어긋났는지는 값을 받은 쪽이 판정한다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("imageLinked", CommandCore::CommandData::Int(imageLinked));
+        data.Set("imageTotal", CommandCore::CommandData::Int(
+            static_cast<int64_t>(UIManagers->Images.size())));
+        data.Set("textLinked", CommandCore::CommandData::Int(textLinked));
+        data.Set("textTotal", CommandCore::CommandData::Int(
+            static_cast<int64_t>(UIManagers->Texts.size())));
+        data.Set("spriteLinked", CommandCore::CommandData::Int(spriteLinked));
+        data.Set("spriteTotal", CommandCore::CommandData::Int(
+            static_cast<int64_t>(UIManagers->SpriteSheets.size())));
+        data.Set("canvases", CommandCore::CommandData::Int(
+            static_cast<int64_t>(scene->GetCanvases().size())));
+        return CommandCore::Ok("ui.status", std::move(data));
     }
 
     static void Cmd_animator_state(const ConsoleCommandContext& ctx)
@@ -1273,11 +1375,11 @@ namespace ConsoleCmd
         reg.Result({ "script.add" }, &Cmd_script_add);
         reg.Legacy({ "script.fields" }, &Cmd_script_fields);
         reg.Legacy({ "script.set" }, &Cmd_script_set);
-        reg.Legacy({ "ui.rect" }, &Cmd_ui_rect);
-        reg.Legacy({ "ui.anchor", "ui.size", "ui.pos", "ui.screenpos" }, &Cmd_ui_anchor);
-        reg.Legacy({ "ui.hitbox" }, &Cmd_ui_hitbox);
-        reg.Legacy({ "ui.navprobe" }, &Cmd_ui_navprobe);
-        reg.Legacy({ "ui.status" }, &Cmd_ui_status);
+        reg.Result({ "ui.rect" }, &Cmd_ui_rect);
+        reg.Result({ "ui.anchor", "ui.size", "ui.pos", "ui.screenpos" }, &Cmd_ui_anchor);
+        reg.Result({ "ui.hitbox" }, &Cmd_ui_hitbox);
+        reg.Result({ "ui.navprobe" }, &Cmd_ui_navprobe);
+        reg.Result({ "ui.status" }, &Cmd_ui_status);
         reg.Legacy({ "animator.state" }, &Cmd_animator_state);
         reg.Legacy({ "animator.exit" }, &Cmd_animator_exit);
         reg.Legacy({ "animator.param" }, &Cmd_animator_param);

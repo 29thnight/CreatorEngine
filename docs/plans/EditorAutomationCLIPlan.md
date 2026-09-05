@@ -1816,18 +1816,59 @@ direct exit write 1곳 · 소비자의 한국어 verdict regex 0 · §18 전부 
   찾으면 실패**로 만들었다. 지금은 라우트 6 개를 보고 전부 토큰 검사 뒤에 있음을
   단정한다. 아무것도 안 보는 검사는 없는 것만 못하다.
 
-▲ **남은 것: 핸들러 118 개의 서명 이행.**
+▲ **남은 것: 핸들러 102 개의 서명 이행.**
 
   §18 의 "모든 command 가 정확히 하나의 terminal `CommandResult` 를 만든다" 가
-  212 중 **94** 다. 도메인별 잔량:
+  **199 중 97** 이다(2026-09-06). 분모가 212 에서 199 로 준 것은 이행이 아니라
+  **명령이 준 것**이다 — 경위는 `docs/analysis/CommandRegistryAudit.md`.
 
   | 도메인 | 미이행 | | 도메인 | 미이행 |
   |---|---:|---|---|---:|
-  | `experiment.*` | 30 | | `prefab.*` | 7 |
-  | `assets.*` | 9 | | `ui.*` | 5 |
-  | `object.*` | 8 | | 나머지 | 59 |
+  | `experiment.*` | 18 | | `prefab.*` | 7 |
+  | `assets.*` | 9 | | `object.*` | 7 |
+  | `mem.*`·`lifecycle.*`·`animator.*`·`render.*` | 4 씩 | | 나머지 | 41 |
 
   ~~`scene.*` 22~~ → **0 (2026-09-05 이행 완료, 아래)**
+  ~~`ui.*` 5~~ → **0 (2026-09-06 이행 완료, 아래)**
+
+#### ui 도메인 서명 이행 (2026-09-06)
+
+다섯 전부를 결과형으로 옮겼다(`ui.rect` · `ui.anchor`(+별칭 셋) · `ui.hitbox` ·
+`ui.navprobe` · `ui.status`). 파일은 옮기지 않았다 — 전부
+`Commands/ScriptUiAnimatorCommands.cpp` 에 그대로 있다(§12.3).
+
+★ **`ui.navprobe` 가 스스로 PASS/FAIL 을 찍고도 그 판정을 버리고 있었다.**
+  다섯 축(schema · isolated · freshIds · spatial · legacy)을 계산해 인쇄하는데
+  프로세스는 0 으로 끝났다. `scene.transformbulk` 와 같은 모양이고, 이제 축을
+  값으로 함께 내고 하나라도 어긋나면 실패다.
+
+★★ **핸들러가 찍는 줄은 한 글자도 바꾸지 않았다.** 이 도메인의 출력은
+  `verify-ui-layout-golden.ps1` 이 골든으로 통째 대조하고
+  `verify-resolution-sweep.ps1` 이 해상도마다 읽는다. 둘 다 통과했고, 통과가
+  **비어 있지 않다**는 것도 함께 나온다 — 골든 diff 0 에 rect 14 · 히트박스 1,
+  스윕 단정 12 건.
+
+★ **조회는 실패가 아니다.** `ui.rect` 가 rect 0 개를 찾거나 `ui.hitbox` 가 버튼
+  0 개를 찾는 것은 UI 없는 씬에서 물어본 결과다. 개수를 값으로 내고 판정은
+  받는 쪽에 맡긴다 — 0 을 실패로 내면 상태를 물어본 실행이 붉어진다.
+  `ui.status` 도 같다: "아직 연결 전" 은 정상 상태다.
+
+★ **"RectTransform 없음" 은 precondition 으로, "오브젝트 없음" 은 실패로 냈다.**
+  전자는 이름이 맞는데 그 오브젝트가 UI 가 아닌 것이라 고치려면 인자가 아니라
+  씬을 바꿔야 한다. 후자는 이 저장소의 기존 관례를 따랐다
+  (`scene.ddol.not_found` · `object.not_found` 도 `Fail` 이다).
+
+실측 — 한 배치에서 판정이 실제로 나간다:
+
+```
+ui.status      succeeded            ok
+ui.hitbox      succeeded            ok
+ui.rect *      succeeded            ok
+ui.navprobe    succeeded            ok
+ui.rect        invalid_arguments    args.invalid
+ui.anchor …    failed               ui.anchor.object_missing
+exit=4
+```
 
 #### scene 도메인 서명 이행 (2026-09-05)
 
