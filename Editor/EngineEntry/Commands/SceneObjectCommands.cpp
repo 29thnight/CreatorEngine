@@ -386,15 +386,19 @@ namespace ConsoleCmd
     // 만들었고, L3의 잔여(이송 신호를 C#까지 전달)도 검증 수단이 없었다.
     // 이 명령이 그 둘의 공통 선행이다.
 
-    static void Cmd_scene_ddol(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_scene_ddol(const ConsoleCommandContext& ctx)
     {
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+        }
 
         if (ctx.parts.size() < 2)
         {
             std::printf("[CLI] 사용법: scene.ddol <오브젝트이름>\n");
-            return;
+            return CommandCore::InvalidArguments("scene.ddol: <오브젝트이름> 이 필요하다");
         }
 
         const std::string name = CommandCore::JoinFrom(ctx.parts, 1);
@@ -402,12 +406,19 @@ namespace ConsoleCmd
         if (!obj)
         {
             std::printf("[CLI] scene.ddol 대상 없음: %s\n", name.c_str());
-            return;
+            return CommandCore::Fail("scene.ddol.not_found",
+                "대상 오브젝트가 없다: " + name);
         }
 
 		Object::SetDontDestroyOnLoad(obj);
         std::printf("[CLI] scene.ddol 지정: %s (DDOL=%d)\n",
             name.c_str(), obj->IsDontDestroyOnLoad() ? 1 : 0);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("name", CommandCore::CommandData::String(name));
+        data.Set("dontDestroyOnLoad", CommandCore::CommandData::Bool(
+            obj->IsDontDestroyOnLoad()));
+        return CommandCore::Ok("scene.ddol 지정: " + name, std::move(data));
     }
 
 	static void Cmd_ai_status(const ConsoleCommandContext& ctx)
@@ -429,7 +440,7 @@ namespace ConsoleCmd
 			scene ? scene->GetSceneId() : 0u);
 	}
 
-    static void Cmd_scene_new(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_scene_new(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -453,16 +464,20 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 씬 생성 실패: " + name);
             std::printf("[CLI] 씬 생성 실패: %s\n", name.c_str());
-            return;
+            return CommandCore::Fail("scene.create_failed", "씬을 만들지 못했다: " + name);
         }
 
         SceneManagers->ActivateScene(scene, true);
 
         Debug->LogWarning("[CLI] 새 씬: " + name);
         std::printf("[CLI] 새 씬: %s\n", name.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("name", CommandCore::CommandData::String(name));
+        return CommandCore::Ok("새 씬: " + name, std::move(data));
     }
 
-    static void Cmd_scene_save(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_scene_save(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -470,7 +485,7 @@ namespace ConsoleCmd
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: scene.save <저장 경로>\n");
-            return;
+            return CommandCore::InvalidArguments("scene.save: <저장 경로> 가 필요하다");
         }
 
         // 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
@@ -479,7 +494,7 @@ namespace ConsoleCmd
         if (!SceneManagers->GetActiveScene())
         {
             std::printf("[CLI] 활성 씬 없음\n");
-            return;
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
         }
 
         // 상위 디렉터리를 만들어 준다. 없으면 ofstream이 조용히 실패하고
@@ -494,13 +509,21 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 씬 저장 실패: " + path);
             std::printf("[CLI] 씬 저장 실패: %s\n", path.c_str());
-            return;
+            // ★ `SaveScene` 은 실패를 돌려주지 않는다. 파일 존재로 확인한 이
+            //   판정이 이제 종료 코드에 닿는다 — 예전에는 "저장 실패" 를 찍고도
+            //   프로세스가 0 으로 끝났다.
+            return CommandCore::Fail("scene.save_failed", "씬을 저장하지 못했다: " + path);
         }
 
         const auto bytes = file::file_size(path);
         Debug->LogWarning("[CLI] 씬 저장: " + path);
         std::printf("[CLI] 씬 저장: %s (%llu 바이트)\n", path.c_str(),
             static_cast<unsigned long long>(bytes));
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("path", CommandCore::CommandData::String(path));
+        data.Set("bytes", CommandCore::CommandData::Int(static_cast<int64_t>(bytes)));
+        return CommandCore::Ok("씬 저장: " + path, std::move(data));
     }
 
     static void Cmd_object_create(const ConsoleCommandContext& ctx)
@@ -596,7 +619,7 @@ namespace ConsoleCmd
         std::printf("[CLI] 이름 변경: %s -> %s\n", oldName.c_str(), newName.c_str());
     }
 
-    static void Cmd_scene_hierarchycheck(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_scene_hierarchycheck(const ConsoleCommandContext& ctx)
     {
         (void)ctx;
 
@@ -617,7 +640,11 @@ namespace ConsoleCmd
         // 둘 다 씬 루트의 children에는 들어가므로, "-1인데 루트 children에 있음"이
         // 정상처럼 보인다. 그 상태를 세는 것이 topLevelInvalid다.
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+        }
 
         const auto& objects = scene->m_Entities;
 
@@ -687,6 +714,30 @@ namespace ConsoleCmd
         std::printf("[scene.hierarchycheck] 오브젝트 %zu · 최상위(0표기) %zu · 최상위(-1표기) %zu"
             " · 쌍불일치 %zu · 고아 %zu · 순회미도달 %zu · Store불일치 %zu\n",
             total, topLevelRoot, topLevelInvalid, pairMismatch, orphan, unreachable, storeMismatch);
+
+        // ★ **이 명령에는 진짜 판정이 있다.** 쌍불일치·고아·순회미도달·Store불일치는
+        //   전부 "순회가 서브트리를 통째로 빠뜨리는" 상태이고, 그것이 뼈 61 개를
+        //   순회 밖에 두었던 결함이다(위 주석). 지금까지는 그 수를 찍기만 하고
+        //   프로세스는 0 으로 끝났다 — 세어 놓고 판정하지 않고 있었다.
+        //
+        //   최상위(-1표기)는 세되 **판정에 넣지 않는다.** 그것은 같은 뜻의 표기가
+        //   둘이라는 이미 알려진 상태이고(트랙 E), 순회를 깨뜨리지는 않는다.
+        const size_t broken = pairMismatch + orphan + unreachable + storeMismatch;
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("objects", CommandCore::CommandData::Int(static_cast<int64_t>(total)));
+        data.Set("topLevelRoot", CommandCore::CommandData::Int(static_cast<int64_t>(topLevelRoot)));
+        data.Set("topLevelInvalid", CommandCore::CommandData::Int(static_cast<int64_t>(topLevelInvalid)));
+        data.Set("pairMismatch", CommandCore::CommandData::Int(static_cast<int64_t>(pairMismatch)));
+        data.Set("orphan", CommandCore::CommandData::Int(static_cast<int64_t>(orphan)));
+        data.Set("unreachable", CommandCore::CommandData::Int(static_cast<int64_t>(unreachable)));
+        data.Set("storeMismatch", CommandCore::CommandData::Int(static_cast<int64_t>(storeMismatch)));
+        if (broken > 0)
+        {
+            return CommandCore::Fail("scene.hierarchy_broken",
+                "계층 불변식 위반 " + std::to_string(broken) + "건", std::move(data));
+        }
+        return CommandCore::Ok("계층 불변식 통과", std::move(data));
     }
 
     static void Cmd_object_duplicate(const ConsoleCommandContext& ctx)
@@ -1023,7 +1074,7 @@ namespace ConsoleCmd
             rawValue.c_str());
     }
 
-    static void Cmd_scene_select(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_scene_select(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -1031,24 +1082,33 @@ namespace ConsoleCmd
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: scene.select <오브젝트 이름>\n");
-            return;
+            return CommandCore::InvalidArguments("scene.select: <오브젝트 이름> 이 필요하다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+        }
 
         const std::string objectName = CommandCore::JoinFrom(parts, 1);
         auto object = scene->GetEntity(objectName);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
-            return;
+            return CommandCore::Fail("object.not_found",
+                "오브젝트를 찾을 수 없다: " + objectName);
         }
 
         // 인스펙터가 보는 선택 상태를 그대로 바꾼다(에디터에서 클릭한 것과 같은 효과).
 		scene->m_selectedEntity = object;
         Debug->LogWarning("[CLI] 선택: " + objectName);
         std::printf("[CLI] 선택: %s\n", objectName.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("name", CommandCore::CommandData::String(objectName));
+        return CommandCore::Ok("선택: " + objectName, std::move(data));
     }
 
     static void Cmd_component_add(const ConsoleCommandContext& ctx)
@@ -1673,7 +1733,7 @@ namespace ConsoleCmd
     //   scene.select는 단일만 대입하고 벡터는 건드리지 않아 둘이 어긋나 있다.
     //   합쳐서 찍으면 그 어긋남이 가려진다 — 지금 동작을 정직하게 못 박는다.
 
-    static void Cmd_scene_selection(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string label = (parts.size() >= 2) ? parts[1] : "selection";
@@ -1682,7 +1742,7 @@ namespace ConsoleCmd
         if (!scene)
         {
             std::printf("[selection:%s] 활성 씬 없음\n", label.c_str());
-            return;
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
         }
 
         const Entity* primary = scene->m_selectedEntity;
@@ -1696,9 +1756,16 @@ namespace ConsoleCmd
             std::printf("[selection:%s] multi|%s\n", label.c_str(),
                 entity ? entity->m_name.ToString().c_str() : "(null)");
         }
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("primary", CommandCore::CommandData::String(
+            primary ? primary->m_name.ToString() : std::string("")));
+        data.Set("multi", CommandCore::CommandData::Int(
+            static_cast<int64_t>(scene->m_selectedEntities.size())));
+        return CommandCore::Ok("scene.selection", std::move(data));
     }
 
-    static void Cmd_scene_dump(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_scene_dump(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
 
@@ -1708,7 +1775,7 @@ namespace ConsoleCmd
         if (!scene)
         {
             std::printf("[CLI] 활성 씬 없음\n");
-            return;
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
         }
 
         const std::string label = (parts.size() > 1) ? parts[1] : std::string("dump");
@@ -1729,24 +1796,30 @@ namespace ConsoleCmd
                 ", pos=" + position + ")");
         }
         std::printf("[CLI] 씬 덤프 기록: %s (%zu개)\n", label.c_str(), scene->m_Entities.size());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("label", CommandCore::CommandData::String(label));
+        data.Set("objects", CommandCore::CommandData::Int(
+            static_cast<int64_t>(scene->m_Entities.size())));
+        return CommandCore::Ok("씬 덤프: " + label, std::move(data));
     }
 
     void RegisterSceneObjectCommands(Registrar& reg)
     {
         reg.Result({ "scene.load", "scene.switch" }, &Cmd_scene_load);
-        reg.Legacy({ "scene.new" }, &Cmd_scene_new);
-        reg.Legacy({ "scene.ddol" }, &Cmd_scene_ddol);
+        reg.Result({ "scene.new" }, &Cmd_scene_new);
+        reg.Result({ "scene.ddol" }, &Cmd_scene_ddol);
         reg.Legacy({ "ai.status" }, &Cmd_ai_status);
-        reg.Legacy({ "scene.save" }, &Cmd_scene_save);
+        reg.Result({ "scene.save" }, &Cmd_scene_save);
         reg.Legacy({ "object.create" }, &Cmd_object_create);
         reg.Legacy({ "object.rename" }, &Cmd_object_rename);
         reg.Legacy({ "object.transform" }, &Cmd_object_transform);
         reg.Legacy({ "object.parent" }, &Cmd_object_parent);
         reg.Legacy({ "object.rootref" }, &Cmd_object_rootref);
         reg.Legacy({ "object.duplicate" }, &Cmd_object_duplicate);
-        reg.Legacy({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
+        reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
         reg.Legacy({ "object.property" }, &Cmd_object_property);
-        reg.Legacy({ "scene.select" }, &Cmd_scene_select);
+        reg.Result({ "scene.select" }, &Cmd_scene_select);
         reg.Legacy({ "component.add" }, &Cmd_component_add);
         reg.Legacy({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
         reg.Legacy({ "prefab.status" }, &Cmd_prefab_status);
@@ -1761,7 +1834,7 @@ namespace ConsoleCmd
         reg.Result({ "undo.state" }, &Cmd_undo_state);
         reg.Legacy({ "undo", "redo" }, &Cmd_undo_redo);
         reg.Legacy({ "object.create.undoable" }, &Cmd_object_create_undoable);
-        reg.Legacy({ "scene.selection" }, &Cmd_scene_selection);
-        reg.Legacy({ "scene.dump" }, &Cmd_scene_dump);
+        reg.Result({ "scene.selection" }, &Cmd_scene_selection);
+        reg.Result({ "scene.dump" }, &Cmd_scene_dump);
     }
 }

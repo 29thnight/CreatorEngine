@@ -973,13 +973,13 @@ namespace
     // 출력은 저장·재로드 전후로 그대로 비교할 수 있게 인덱스 순서 고정·고정소수점이다.
     // 소수 4자리인 이유: 이 검사가 잡으려는 것은 값의 **소실**(0/항등으로 무너짐)이지
     // 십진 왕복의 마지막 비트 흔들림이 아니다 — 더 조이면 거짓 실패가 난다.
-    void HandleSceneTransformDigest(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneTransformDigest(const std::vector<std::string>& parts)
     {
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
         {
             std::printf("[CLI] 활성 씬 없음\n");
-            return;
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
         }
 
         const std::string label = (parts.size() > 1) ? parts[1] : std::string("digest");
@@ -1049,6 +1049,20 @@ namespace
             label.c_str(), emitted, static_cast<unsigned long long>(hash));
         std::printf("%s\n", summary);
         Debug->LogWarning(summary);
+
+        // ★ 해시를 **문자열로** 낸다. `%016llx` 로 찍는 값과 같은 표기여야 소비자가
+        //   stdout 과 JSON 을 같은 값으로 읽는다. Int 로 내면 64비트 부호 없는 값이
+        //   JSON 에서 음수로 보이는 경우가 생긴다.
+        char hashText[24]{};
+        std::snprintf(hashText, sizeof(hashText), "%016llx",
+            static_cast<unsigned long long>(hash));
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("label", CommandCore::CommandData::String(label));
+        data.Set("objects", CommandCore::CommandData::Int(
+            static_cast<int64_t>(emitted)));
+        data.Set("hash", CommandCore::CommandData::String(hashText));
+        return CommandCore::Ok(summary, std::move(data));
     }
 
     // S4 측정 게이트 (SceneGraphRedesignPlan §4 트랙 S, S4).
@@ -1442,18 +1456,23 @@ namespace
         std::printf("[CLI] serialize.bench: 알 수 없는 모드 '%s'\n", mode.c_str());
     }
 
-	void HandleSceneProxyBench(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneProxyBench(const std::vector<std::string>& parts)
     {
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: scene.proxybench <프레임수> [등록수]\n");
-            return;
+            return CommandCore::InvalidArguments(
+                "scene.proxybench: <프레임수> [등록수] 가 필요하다");
         }
 
         const int frames = (std::max)(1, std::atoi(parts[1].c_str()));
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+        }
 
 		const size_t requestedCount = parts.size() > 2
 			? static_cast<size_t>((std::max)(0, std::atoi(parts[2].c_str()))) : 0u;
@@ -1477,7 +1496,9 @@ namespace
             // 0개를 재고 "빠르다"고 보고하는 사고를 막는다 — 하한 가드가 없으면
             // 빈 씬에서 측정이 눈을 감는다(회귀 세트의 README 원칙과 같은 이유).
             std::printf("[CLI] scene.proxybench: 등록된 렌더 컴포넌트가 0개다 — 잴 것이 없다\n");
-            return;
+            // 잴 것이 없는 것은 이 기계/씬의 상태이지 벤치의 실패가 아니다.
+            return CommandCore::PreconditionFailed("scene.proxybench.empty",
+                "등록된 렌더 컴포넌트가 0개다");
         }
 
         using PerfClock = std::chrono::steady_clock;
@@ -1518,17 +1539,64 @@ namespace
 		{
 			if (owner) owner->Destroy();
 		}
+
+        // ★ selfcheck 가 이 벤치의 판정이다. `committed` 가 0 이 아니면 정지 씬에서
+        //   프록시가 커밋됐다는 뜻이고, 그러면 잰 값이 무엇의 값인지 알 수 없다.
+        const bool selfcheck = (0 == metrics.committed);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("registered", CommandCore::CommandData::Int(
+            static_cast<int64_t>(componentCount)));
+        data.Set("frames", CommandCore::CommandData::Int(frames));
+        data.Set("avgUs", CommandCore::CommandData::Double(avg));
+        data.Set("committed", CommandCore::CommandData::Int(
+            static_cast<int64_t>(metrics.committed)));
+        data.Set("selfcheck", CommandCore::CommandData::Bool(selfcheck));
+        if (!selfcheck)
+        {
+            return CommandCore::Fail("scene.proxybench.selfcheck",
+                "정지 씬인데 프록시가 커밋됐다(selfcheck=FAIL)", std::move(data));
+        }
+        return CommandCore::Ok("scene.proxybench", std::move(data));
     }
 
     // S2 A/B 토글의 유일한 쓰기 지점(SceneGraphRedesignPlan §4 트랙 S, S2 —
     // Scene::SetDirtyTraversalEnabled). 인자 없이 부르면 현재값만 보여준다.
-    void HandleSceneDirtyTraversal(const std::vector<std::string>& parts)
+    // ── LC9 서명 이행 · scene 도메인 ────────────────────────────────────
+    //
+    // ★ **핸들러가 찍는 줄은 한 글자도 바꾸지 않는다.**
+    //
+    //   이 도메인의 probe 출력은 오늘 `verify-transform-*.ps1`·
+    //   `verify-render-proxy-dirty.ps1` 여섯이 정규식으로 읽고 있다(LC9 의
+    //   소비자 래칫에 그대로 세어져 있다). 서명을 바꾸면서 문안까지 손대면
+    //   그 여섯이 한꺼번에 붉어지고, 붉어진 이유가 "이행이 잘못됐다"인지
+    //   "문안이 달라졌다"인지 가릴 수 없다. 이행과 문안 정리는 다른 슬라이스다
+    //   (§12.3 의 "파일 분리와 서명 이행을 같은 커밋에 넣지 않는다"와 같은 이유).
+    //
+    // ★★ **다만 stdout 이 통째로 불변인 것은 아니다.** 실패·precondition 결과에는
+    //   `PublishResult` 가 `[CLI] <명령> <status> (<code>) <메시지>` 한 줄을 덧붙인다.
+    //   이행 전에는 이 도메인이 전부 `LegacyUnreported` 라 그 줄이 나오지 않았다.
+    //   덧붙는 줄이지 고쳐 쓰는 줄이 아니므로 기존 정규식은 그대로 맞고, 실측으로
+    //   확인했다 — 여섯 게이트의 판정이 이행 전후로 같다.
+    //
+    // ★★★ 이 이행이 **더하는** 것은 하나다: 지금까지 `printf` 에만 있던 판정이
+    //   `CommandResult` 로도 나온다. 그 값이 session 을 거쳐 배치 종료 코드가 되고,
+    //   `--result-format jsonl` 로 기계가 읽는다. 예전에는 `probe=FAIL` 을 찍고도
+    //   프로세스가 0 으로 끝났다 — 세어 놓고 판정하지 않고 있었다.
+
+    CommandCore::CommandResult HandleSceneDirtyTraversal(const std::vector<std::string>& parts)
     {
         if (parts.size() < 2)
         {
             std::printf("[CLI] scene.dirtytraversal 현재값: %s (사용법: scene.dirtytraversal 0|1)\n",
                 Scene::IsDirtyTraversalEnabled() ? "1(dirty만 재계산)" : "0(항상 재계산 — 옛 경로)");
-            return;
+
+            // 인자 없이 부르는 것은 오류가 아니라 **조회**다. 이 도메인의 토글
+            // 넷이 전부 그렇게 쓰여 있고, 조회를 InvalidArguments 로 내면
+            // 상태를 물어본 실행이 exit 2 로 끝난다.
+            CommandCore::CommandData data = CommandCore::CommandData::Object();
+            data.Set("enabled", CommandCore::CommandData::Bool(Scene::IsDirtyTraversalEnabled()));
+            return CommandCore::Ok("scene.dirtytraversal 현재값", std::move(data));
         }
 
         const bool enable = ("1" == parts[1] || "on" == parts[1] || "true" == parts[1]);
@@ -1536,7 +1604,7 @@ namespace
         if (!enable && !disable)
         {
             std::printf("[CLI] 사용법: scene.dirtytraversal 0|1\n");
-            return;
+            return CommandCore::InvalidArguments("scene.dirtytraversal: 0|1 이 필요하다");
         }
 
         Scene::SetDirtyTraversalEnabled(enable);
@@ -1544,17 +1612,24 @@ namespace
             + (enable ? "켬(1) — dirty·worldChanged만 재계산" : "끔(0) — 항상 재계산(옛 경로, A/B 대조용)");
         Debug->LogWarning(msg);
         std::printf("[CLI] %s\n", msg.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("enabled", CommandCore::CommandData::Bool(enable));
+        return CommandCore::Ok(msg, std::move(data));
     }
 
     // E7-b A/B 토글의 유일한 쓰기 지점(SceneGraphRedesignPlan 트랙 E, E7-b —
     // Scene::SetBoneCacheEnabled). 인자 없이 부르면 현재값만 보여준다.
-    void HandleSceneBoneCache(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneBoneCache(const std::vector<std::string>& parts)
     {
         if (parts.size() < 2)
         {
             std::printf("[CLI] scene.bonecache 현재값: %s (사용법: scene.bonecache 0|1)\n",
                 Scene::IsBoneCacheEnabled() ? "1(인덱스 캐시)" : "0(매 프레임 FindBone — 옛 경로)");
-            return;
+
+            CommandCore::CommandData data = CommandCore::CommandData::Object();
+            data.Set("enabled", CommandCore::CommandData::Bool(Scene::IsBoneCacheEnabled()));
+            return CommandCore::Ok("scene.bonecache 현재값", std::move(data));
         }
 
         const bool enable = ("1" == parts[1] || "on" == parts[1] || "true" == parts[1]);
@@ -1562,7 +1637,7 @@ namespace
         if (!enable && !disable)
         {
             std::printf("[CLI] 사용법: scene.bonecache 0|1\n");
-            return;
+            return CommandCore::InvalidArguments("scene.bonecache: 0|1 이 필요하다");
         }
 
         Scene::SetBoneCacheEnabled(enable);
@@ -1571,6 +1646,10 @@ namespace
                       : "끔(0) — 매 프레임 FindBone 선형 탐색(옛 경로, A/B 대조용)");
         Debug->LogWarning(msg);
         std::printf("[CLI] %s\n", msg.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("enabled", CommandCore::CommandData::Bool(enable));
+        return CommandCore::Ok(msg, std::move(data));
     }
 
     // 뼈 이름 조회와 순회 도달성을 한 화면에 놓고 대조하는 진단(트랙 E, E7-b 후속).
@@ -1587,10 +1666,14 @@ namespace
     // 그래서 이 명령은 둘을 **나란히** 찍는다. 이름 조회(FindBone 직접 호출)와
     // 순회 도달성(조상 사슬이 전부 부모의 children에 실려 있는가)은 서로 다른
     // 고장이고, 어느 하나만 보면 반드시 오진한다.
-    void HandleSceneBoneDump(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneBoneDump(const std::vector<std::string>& parts)
     {
         Scene* scene = SceneManagers->GetActiveScene();
-        if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+        }
 
         const int limit = (parts.size() >= 2) ? (std::max)(0, std::atoi(parts[1].c_str())) : 8;
 
@@ -1733,7 +1816,15 @@ namespace
         else
         {
             std::printf("[scene.bonedump] 스켈레톤에 도달한 뼈 오브젝트가 없다 — 관문 앞에서 끊겼다\n");
+
+            // ★ **판정이 아니라 조회다.** 이 명령은 오진을 막으려고 만든 진단이고
+            //   (이름 조회와 순회 도달성을 나란히 찍는다), "도달한 뼈가 없다" 는
+            //   그 진단이 답해야 할 상태이지 이 명령의 실패가 아니다. 실패로 내면
+            //   스켈레톤 없는 씬에서 이 진단을 부르는 것만으로 배치가 붉어진다.
+            return CommandCore::Ok("scene.bonedump — 도달한 뼈 오브젝트 0");
         }
+
+        return CommandCore::Ok("scene.bonedump");
     }
 
     // 진단용(트랙 P · P4-a 게이트) — prefab.objectguid.
@@ -1761,7 +1852,15 @@ namespace
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            // ★ `prefab.objectguid` 는 아직 legacy 서명이다(prefab 도메인 몫).
+            //   LC9 의 scene 이행이 이 자리를 함께 바꿀 뻔했는데, 도메인이 다르면
+            //   같은 커밋에 넣지 않는다 — 그 원칙이 없으면 "scene 이행" 커밋에
+            //   prefab 거동 변경이 섞여 들어간다.
+            std::printf("[CLI] 활성 씬 없음\n");
+            return;
+        }
 
         auto object = scene->GetEntity(parts[1]);
         if (!object)
@@ -1866,10 +1965,14 @@ namespace
         }
     }
 
-    void HandleSceneTransformStats(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneTransformStats(const std::vector<std::string>& parts)
     {
         Scene* scene = SceneManagers->GetActiveScene();
-        if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+        }
 
         if (parts.size() > 1 && ("0" == parts[1] || "1" == parts[1]))
         {
@@ -1878,7 +1981,10 @@ namespace
             if (enabled) scene->ResetTransformDiagnostics();
             std::printf("[scene.transformstats] enabled=%d build=%s; 노드별 clock/atomic 계측은 ON 동안만 발생\n",
                 enabled ? 1 : 0, TransformBuildConfiguration());
-            return;
+
+            CommandCore::CommandData data = CommandCore::CommandData::Object();
+            data.Set("enabled", CommandCore::CommandData::Bool(enabled));
+            return CommandCore::Ok("scene.transformstats 계측 토글", std::move(data));
         }
 
         std::printf("[scene.transformstats] enabled=%d build=%s; worker-sum은 병렬 CPU 합계라 wall에 더하지 말 것\n",
@@ -1930,6 +2036,15 @@ namespace
             static_cast<unsigned long long>(total.created),
             static_cast<unsigned long long>(total.destroyed),
 			static_cast<unsigned long long>(total.reparented));
+
+        // 계측 조회다 — 판정할 것이 없다. `Ok` 는 "물어본 것을 냈다" 이지
+        // "지표가 좋다" 가 아니다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("enabled", CommandCore::CommandData::Bool(
+            Scene::IsTransformDiagnosticsEnabled()));
+        data.Set("windowFrames", CommandCore::CommandData::Int(
+            static_cast<int64_t>(windowFrames)));
+        return CommandCore::Ok("scene.transformstats", std::move(data));
     }
 
 	void PrintTransformWriteMetrics(const TransformWriteMetrics& metrics)
@@ -1949,14 +2064,18 @@ namespace
 		}
 	}
 
-	void HandleSceneProxyDirty(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneProxyDirty(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
-		if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (!scene)
+		{
+		    std::printf("[CLI] 활성 씬 없음\n");
+		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+		}
 		if (parts.size() < 2 || "probe" != parts[1])
 		{
 			std::printf("[CLI] 사용법: scene.proxydirty probe\n");
-			return;
+			return CommandCore::InvalidArguments("scene.proxydirty: probe");
 		}
 
 		Entity* owner = scene->CreateEntity("__proxy_dirty_probe", GameObjectType::Empty);
@@ -1965,7 +2084,8 @@ namespace
 		{
 			if (owner) owner->Destroy();
 			std::printf("[scene.proxydirty] probe=FAIL create=0\n");
-			return;
+			return CommandCore::Fail("scene.proxydirty.probe_create",
+				"probe 픽스처를 만들지 못했다(create=0)");
 		}
 
 		scene->DrainPendingLifecycle();
@@ -2059,12 +2179,25 @@ namespace
 			pass ? "PASS" : "FAIL");
 
 		owner->Destroy();
+
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("pass", CommandCore::CommandData::Bool(pass));
+		if (!pass)
+		{
+			return CommandCore::Fail("scene.proxydirty.probe_failed",
+				"probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("scene.proxydirty probe PASS", std::move(data));
 	}
 
-	void HandleSceneTransformWriteStats(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneTransformWriteStats(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
-		if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (nullptr == scene)
+		{
+		    std::printf("[CLI] 활성 씬 없음\n");
+		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+		}
 
 		const std::string action = parts.size() > 1 ? parts[1] : "print";
 		if ("0" == action || "1" == action)
@@ -2074,7 +2207,10 @@ namespace
 			if (enabled) scene->ResetTransformWriteDiagnostics();
 			std::printf("[scene.transformwritestats] enabled=%d build=%s\n",
 				enabled ? 1 : 0, TransformBuildConfiguration());
-			return;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("enabled", CommandCore::CommandData::Bool(enabled));
+			return CommandCore::Ok("scene.transformwritestats 계측 토글", std::move(data));
 		}
 
 		if ("probe" == action)
@@ -2091,7 +2227,8 @@ namespace
 				if (probe) probe->Destroy();
 				Scene::SetTransformWriteDiagnosticsEnabled(wasEnabled);
 				std::printf("[scene.transformwritestats] probe=FAIL create=0\n");
-				return;
+				return CommandCore::Fail("scene.transformwritestats.probe_create",
+					"probe 픽스처를 만들지 못했다(create=0)");
 			}
 
 			const EntityHandle handle = scene->HandleOf(probe->m_index);
@@ -2143,23 +2280,40 @@ namespace
 			child->Destroy();
 			probe->Destroy();
 			Scene::SetTransformWriteDiagnosticsEnabled(wasEnabled);
-			return;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("pass", CommandCore::CommandData::Bool(pass));
+			if (!pass)
+			{
+				return CommandCore::Fail("scene.transformwritestats.probe_failed",
+					"probe 판정 실패", std::move(data));
+			}
+			return CommandCore::Ok("scene.transformwritestats probe PASS", std::move(data));
 		}
 
 		std::printf("[scene.transformwritestats] enabled=%d build=%s\n",
 			Scene::IsTransformWriteDiagnosticsEnabled() ? 1 : 0,
 			TransformBuildConfiguration());
 		PrintTransformWriteMetrics(scene->GetTransformWriteMetrics());
+
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("enabled", CommandCore::CommandData::Bool(
+			Scene::IsTransformWriteDiagnosticsEnabled()));
+		return CommandCore::Ok("scene.transformwritestats", std::move(data));
 	}
 
-	void HandleSceneTransformDomains(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneTransformDomains(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
-		if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (nullptr == scene)
+		{
+		    std::printf("[CLI] 활성 씬 없음\n");
+		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+		}
 		if (parts.size() < 2 || "probe" != parts[1])
 		{
 			std::printf("[CLI] 사용법: scene.transformdomains probe\n");
-			return;
+			return CommandCore::InvalidArguments("scene.transformdomains: probe");
 		}
 
 		const bool wasDiagnosticsEnabled = Scene::IsTransformDiagnosticsEnabled();
@@ -2176,7 +2330,8 @@ namespace
 			if (spatial) spatial->Destroy();
 			Scene::SetTransformDiagnosticsEnabled(wasDiagnosticsEnabled);
 			std::printf("[scene.transformdomains] probe=FAIL create=0\n");
-			return;
+			return CommandCore::Fail("scene.transformdomains.probe_create",
+				"probe 픽스처를 만들지 못했다(create=0)");
 		}
 
 		auto snapshot = [&]() -> TransformUpdateMetrics
@@ -2252,16 +2407,29 @@ namespace
 		ui->Destroy();
 		spatial->Destroy();
 		Scene::SetTransformDiagnosticsEnabled(wasDiagnosticsEnabled);
+
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("pass", CommandCore::CommandData::Bool(pass));
+		if (!pass)
+		{
+			return CommandCore::Fail("scene.transformdomains.probe_failed",
+				"probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("scene.transformdomains probe PASS", std::move(data));
 	}
 
-	void HandleSceneHierarchyMutation(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneHierarchyMutation(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
-		if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (nullptr == scene)
+		{
+		    std::printf("[CLI] 활성 씬 없음\n");
+		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+		}
 		if (parts.size() < 2 || "probe" != parts[1])
 		{
 			std::printf("[CLI] 사용법: scene.hierarchymutation probe\n");
-			return;
+			return CommandCore::InvalidArguments("scene.hierarchymutation: probe");
 		}
 
 		Entity* ancestor = scene->CreateEntity(
@@ -2276,7 +2444,8 @@ namespace
 			if (parent) parent->Destroy();
 			if (ancestor) ancestor->Destroy();
 			std::printf("[scene.hierarchymutation] probe=FAIL create=0\n");
-			return;
+			return CommandCore::Fail("scene.hierarchymutation.probe_create",
+				"probe 픽스처를 만들지 못했다(create=0)");
 		}
 
 		const EntityHandle ancestorHandle = scene->HandleOf(ancestor->m_index);
@@ -2363,16 +2532,30 @@ namespace
 		child->Destroy();
 		parent->Destroy();
 		ancestor->Destroy();
+
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("pass", CommandCore::CommandData::Bool(pass));
+		if (!pass)
+		{
+			return CommandCore::Fail("scene.hierarchymutation.probe_failed",
+				"probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("scene.hierarchymutation probe PASS", std::move(data));
 	}
 
-	void HandleSceneExecutionGraph(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneExecutionGraph(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
-		if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (nullptr == scene)
+		{
+		    std::printf("[CLI] 활성 씬 없음\n");
+		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+		}
 		if (parts.size() < 2 || ("probe" != parts[1] && "bench" != parts[1]))
 		{
 			std::printf("[CLI] 사용법: scene.executiongraph probe | bench <N> [samples]\n");
-			return;
+			return CommandCore::InvalidArguments(
+				"scene.executiongraph: probe | bench <N> [samples]");
 		}
 
 		if ("bench" == parts[1])
@@ -2401,7 +2584,13 @@ namespace
 				if (parentA) parentA->Destroy();
 				if (parentB) parentB->Destroy();
 				std::printf("[scene.executiongraph] bench=FAIL create=0\n");
-				return;
+
+				// ★ 픽스처를 못 세운 것은 **판정 실패**다(§5.4 의 4).
+				//
+				//   예전에는 이 자리가 `printf` 뒤 `return;` 이라 프로세스가 0 으로
+				//   끝났다 — 벤치가 아무것도 재지 못했는데 자동화는 성공으로 읽었다.
+				return CommandCore::Fail("scene.executiongraph.bench_create",
+					"벤치 픽스처를 만들지 못했다(create=0)");
 			}
 
 			const EntityHandle moverHandle = scene->HandleOf(mover->m_index);
@@ -2450,7 +2639,22 @@ namespace
 			std::printf("[scene.executiongraph] bench=%s\n", pass ? "PASS" : "FAIL");
 			parentA->Destroy();
 			parentB->Destroy();
-			return;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("mode", CommandCore::CommandData::String("bench"));
+			data.Set("nodes", CommandCore::CommandData::Int(objectCount));
+			data.Set("samples", CommandCore::CommandData::Int(sampleCount));
+			data.Set("medianUs", CommandCore::CommandData::Double(median));
+			data.Set("p95Us", CommandCore::CommandData::Double(p95));
+			data.Set("maxUs", CommandCore::CommandData::Double(maximum));
+			data.Set("budgetUs", CommandCore::CommandData::Double(frameBudgetUs));
+			data.Set("pass", CommandCore::CommandData::Bool(pass));
+			if (!pass)
+			{
+				return CommandCore::Fail("scene.executiongraph.bench_failed",
+					"bench 판정 실패", std::move(data));
+			}
+			return CommandCore::Ok("scene.executiongraph bench PASS", std::move(data));
 		}
 
 		Entity* spatialAncestor = nullptr;
@@ -2489,7 +2693,8 @@ namespace
 		if (!created)
 		{
 			std::printf("[scene.executiongraph] probe=FAIL create=0\n");
-			return;
+			return CommandCore::Fail("scene.executiongraph.probe_create",
+				"probe 픽스처를 만들지 못했다(create=0)");
 		}
 
 		const EntityHandle spatialAncestorHandle = scene->HandleOf(spatialAncestor->m_index);
@@ -2613,6 +2818,8 @@ namespace
 			static_cast<unsigned long long>(cleanCompileDelta));
 		std::printf("[scene.executiongraph] probe=%s\n", pass ? "PASS" : "FAIL");
 
+		// ★ 정리를 **먼저** 하고 결과를 낸다. 여기서 조기 반환하면 아래 Destroy 가
+		//   건너뛰어져 프로브가 만든 엔티티가 씬에 남고, 다음 명령이 그 위에서 돈다.
 		if (bulkChild) bulkChild->Destroy();
 		if (bulkParent) bulkParent->Destroy();
 		spatialChild->Destroy();
@@ -2622,16 +2829,31 @@ namespace
 		layoutBridge->Destroy();
 		layoutAncestor->Destroy();
 		canvasEntity->Destroy();
+
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("mode", CommandCore::CommandData::String("probe"));
+		data.Set("pass", CommandCore::CommandData::Bool(pass));
+		if (!pass)
+		{
+			return CommandCore::Fail("scene.executiongraph.probe_failed",
+				"probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("scene.executiongraph probe PASS", std::move(data));
 	}
 
-	void HandleSceneSparseResolver(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneSparseResolver(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
-		if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (!scene)
+		{
+		    std::printf("[CLI] 활성 씬 없음\n");
+		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+		}
 		if (parts.size() < 2)
 		{
 			std::printf("[CLI] 사용법: scene.sparseresolver 0|1|print|probe|bench <N> <frames>\n");
-			return;
+			return CommandCore::InvalidArguments(
+				"scene.sparseresolver: 0|1|print|probe|bench <N> <frames>");
 		}
 
 		if ("0" == parts[1] || "1" == parts[1])
@@ -2640,7 +2862,10 @@ namespace
 			Scene::SetSparseSpatialResolverEnabled(enabled);
 			scene->MarkSpatialTransformsDirty();
 			std::printf("[scene.sparseresolver] enabled=%d\n", enabled ? 1 : 0);
-			return;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("enabled", CommandCore::CommandData::Bool(enabled));
+			return CommandCore::Ok("scene.sparseresolver 토글", std::move(data));
 		}
 
 		if ("print" == parts[1])
@@ -2660,7 +2885,13 @@ namespace
 				static_cast<unsigned long long>(m.resolvedNodes),
 				static_cast<unsigned long long>(m.localComposes),
 				static_cast<unsigned long long>(m.worldWrites), m.resolveUs);
-			return;
+
+			// 계측 조회다 - 판정할 것이 없다.
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("resolvedNodes", CommandCore::CommandData::Int(
+				static_cast<int64_t>(m.resolvedNodes)));
+			data.Set("resolveUs", CommandCore::CommandData::Double(m.resolveUs));
+			return CommandCore::Ok("scene.sparseresolver print", std::move(data));
 		}
 
 		if ("bench" == parts[1])
@@ -2668,7 +2899,8 @@ namespace
 			if (parts.size() < 4)
 			{
 				std::printf("[CLI] 사용법: scene.sparseresolver bench <N> <frames>\n");
-				return;
+				return CommandCore::InvalidArguments(
+					"scene.sparseresolver bench: <N> <frames> 가 필요하다");
 			}
 			const int objectCount = (std::max)(1, std::atoi(parts[2].c_str()));
 			const int frames = (std::max)(4, std::atoi(parts[3].c_str()));
@@ -2692,7 +2924,8 @@ namespace
 				if (root) root->Destroy();
 				Scene::SetSparseSpatialResolverEnabled(wasSparse);
 				std::printf("[scene.sparseresolver] bench=FAIL create=0\n");
-				return;
+				return CommandCore::Fail("scene.sparseresolver.bench_create",
+					"벤치 픽스처를 만들지 못했다(create=0)");
 			}
 
 			scene->SyncDerivedState(TransformSyncPoint::Benchmark);
@@ -2808,13 +3041,24 @@ namespace
 					? sparse[4].resolveMedianUs / legacy[4].resolveMedianUs : 0.0);
 			root->Destroy();
 			Scene::SetSparseSpatialResolverEnabled(wasSparse);
-			return;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("mode", CommandCore::CommandData::String("bench"));
+			data.Set("objects", CommandCore::CommandData::Int(objectCount));
+			data.Set("pass", CommandCore::CommandData::Bool(pass));
+			if (!pass)
+			{
+				return CommandCore::Fail("scene.sparseresolver.bench_failed",
+					"bench 판정 실패", std::move(data));
+			}
+			return CommandCore::Ok("scene.sparseresolver bench PASS", std::move(data));
 		}
 
 		if ("probe" != parts[1])
 		{
 			std::printf("[CLI] 사용법: scene.sparseresolver 0|1|print|probe|bench <N> <frames>\n");
-			return;
+			return CommandCore::InvalidArguments(
+				"scene.sparseresolver: 0|1|print|probe|bench <N> <frames>");
 		}
 
 		const bool wasSparse = Scene::IsSparseSpatialResolverEnabled();
@@ -2837,7 +3081,8 @@ namespace
 		{
 			std::printf("[scene.sparseresolver] probe=FAIL create=0\n");
 			Scene::SetSparseSpatialResolverEnabled(wasSparse);
-			return;
+			return CommandCore::Fail("scene.sparseresolver.probe_create",
+				"probe 픽스처를 만들지 못했다(create=0)");
 		}
 
 		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
@@ -2900,16 +3145,30 @@ namespace
 		leaf->Destroy();
 		sibling->Destroy();
 		Scene::SetSparseSpatialResolverEnabled(wasSparse);
+
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("mode", CommandCore::CommandData::String("probe"));
+		data.Set("pass", CommandCore::CommandData::Bool(pass));
+		if (!pass)
+		{
+			return CommandCore::Fail("scene.sparseresolver.probe_failed",
+				"probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("scene.sparseresolver probe PASS", std::move(data));
 	}
 
-	void HandleSceneTransformPull(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneTransformPull(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
-		if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (!scene)
+		{
+		    std::printf("[CLI] 활성 씬 없음\n");
+		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+		}
 		if (parts.size() < 2 || ("print" != parts[1] && "probe" != parts[1]))
 		{
 			std::printf("[CLI] 사용법: scene.transformpull print|probe\n");
-			return;
+			return CommandCore::InvalidArguments("scene.transformpull: print|probe");
 		}
 
 		if ("print" == parts[1])
@@ -2931,7 +3190,11 @@ namespace
 				static_cast<unsigned long long>(m.pendingRequestsAfter),
 				static_cast<unsigned long long>(m.dirtyEpochBefore),
 				static_cast<unsigned long long>(m.dirtyEpochAfter));
-			return;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("recomputedNodes", CommandCore::CommandData::Int(
+				static_cast<int64_t>(m.recomputedNodes)));
+			return CommandCore::Ok("scene.transformpull print", std::move(data));
 		}
 
 		const bool wasSparse = Scene::IsSparseSpatialResolverEnabled();
@@ -2952,7 +3215,8 @@ namespace
 			if (parent) parent->Destroy();
 			Scene::SetSparseSpatialResolverEnabled(wasSparse);
 			std::printf("[scene.transformpull] probe=FAIL create=0\n");
-			return;
+			return CommandCore::Fail("scene.transformpull.probe_create",
+				"probe 픽스처를 만들지 못했다(create=0)");
 		}
 
 		childA->Transform_().SetPosition({ 1.f, 2.f, 3.f });
@@ -3098,16 +3362,30 @@ namespace
 
 		parent->Destroy();
 		Scene::SetSparseSpatialResolverEnabled(wasSparse);
+
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("pass", CommandCore::CommandData::Bool(pass));
+		data.Set("fallbackPass", CommandCore::CommandData::Bool(fallbackPass));
+		if (!pass)
+		{
+			return CommandCore::Fail("scene.transformpull.probe_failed",
+				"probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("scene.transformpull probe PASS", std::move(data));
 	}
 
-	void HandleSceneTransformBulk(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneTransformBulk(const std::vector<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
-		if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+		if (!scene)
+		{
+		    std::printf("[CLI] 활성 씬 없음\n");
+		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+		}
 		if (parts.size() < 2 || "probe" != parts[1])
 		{
 			std::printf("[CLI] 사용법: scene.transformbulk probe\n");
-			return;
+			return CommandCore::InvalidArguments("scene.transformbulk: probe");
 		}
 
 		const auto pose = [](const math::vector3& position)
@@ -3132,7 +3410,10 @@ namespace
 			|| !su || nullptr == su->Skeleton())
 		{
 			std::printf("[scene.transformbulk] probe=FAIL skeleton=0\n");
-			return;
+			// 스켈레톤 자산이 없으면 잴 것이 없다. 자산 부재는 이 기계의 사정이라
+			// precondition 이고, 픽스처 생성 실패(아래 create=0)와는 다른 사건이다.
+			return CommandCore::PreconditionFailed("scene.transformbulk.no_skeleton",
+				"스켈레톤이 없다(skeleton=0)");
 		}
 		const std::string boneAName = gunnerSkeleton->bones[0].name;
 		const std::string boneBName = gunnerSkeleton->bones[1].name;
@@ -3179,7 +3460,8 @@ namespace
 			if (physicsParent) physicsParent->Destroy();
 			if (socketTarget) socketTarget->Destroy();
 			std::printf("[scene.transformbulk] probe=FAIL create=0\n");
-			return;
+			return CommandCore::Fail("scene.transformbulk.probe_create",
+				"probe 픽스처를 만들지 못했다(create=0)");
 		}
 
 		bindAnimator(*animator, FileGuid(gunner->Identity().modelId));
@@ -3283,6 +3565,15 @@ namespace
 		animatorRoot->Destroy();
 		physicsParent->Destroy();
 		socketTarget->Destroy();
+
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("pass", CommandCore::CommandData::Bool(pass));
+		if (!pass)
+		{
+			return CommandCore::Fail("scene.transformbulk.probe_failed",
+				"probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("scene.transformbulk probe PASS", std::move(data));
 	}
 
     // X0 측정 게이트(TransformUpdatePlan). flat fan-out, wide tree, deep chain,
@@ -3297,12 +3588,13 @@ namespace
     // 드러나기 때문이다. 시나리오는 "전부 정지" 하나뿐이다(판단) — "10% 이동"은
     // 대상을 골라 매 프레임 실제 Transform 위치를 덮어쓰고 되돌리지 않는데,
     // 합성 오브젝트라면 무해해도 저작 오브젝트에 그대로 쓰면 씬을 오염시킨다.
-    void HandleSceneTraversalBench(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneTraversalBench(const std::vector<std::string>& parts)
     {
         if (parts.size() < 3)
         {
 			std::printf("[CLI] 사용법: scene.traversalbench <오브젝트수> <프레임수> [flat|wide|deep|skeleton] (0 = 현재 씬)\n");
-            return;
+            return CommandCore::InvalidArguments(
+                "scene.traversalbench: <오브젝트수> <프레임수> 가 필요하다");
         }
 
         const int objectCount = (std::max)(0, std::atoi(parts[1].c_str()));
@@ -3313,11 +3605,16 @@ namespace
 			&& "deep" != topology && "skeleton" != topology)
 		{
 			std::printf("[CLI] topology는 flat|wide|deep|skeleton 중 하나여야 한다\n");
-			return;
+			return CommandCore::InvalidArguments(
+				"scene.traversalbench: topology 는 flat|wide|deep|skeleton 이다");
 		}
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (nullptr == scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (nullptr == scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+        }
 
 		const bool diagnosticsWasEnabled = Scene::IsTransformDiagnosticsEnabled();
 		struct DiagnosticsRestore
@@ -3360,7 +3657,8 @@ namespace
                 // 0개를 재고 "빠르다"고 보고하는 사고를 막는다 — scene.proxybench
                 // (HandleSceneProxyBench)와 같은 하한 가드 관례.
                 std::printf("[CLI] scene.traversalbench: 활성 씬에 오브젝트가 0개다 — 잴 것이 없다\n");
-                return;
+                return CommandCore::PreconditionFailed("scene.traversalbench.empty",
+                    "활성 씬에 오브젝트가 0개다");
             }
 
             char header[192]{};
@@ -3419,7 +3717,8 @@ namespace
 			if (created.empty())
 			{
 				std::printf("[CLI] scene.traversalbench: 합성 오브젝트 생성 실패\n");
-				return;
+				return CommandCore::Fail("scene.traversalbench.create_failed",
+					"합성 오브젝트를 만들지 못했다");
 			}
 
 			// 10%만 매 프레임 이동시킬 대상.
@@ -3640,6 +3939,14 @@ namespace
             }
             std::printf("[CLI] scene.traversalbench: 오브젝트 %zu개 파괴 마크 완료\n", created.size());
         }
+
+        // 벤치는 재는 것이 일이라 PASS/FAIL 판정이 없다. 값만 낸다 —
+        // 예산 판정은 `verify-transform-*.ps1` 이 자기 상한으로 한다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("topology", CommandCore::CommandData::String(topology));
+        data.Set("objects", CommandCore::CommandData::Int(objectCount));
+        data.Set("frames", CommandCore::CommandData::Int(frames));
+        return CommandCore::Ok("scene.traversalbench", std::move(data));
     }
 }
 
@@ -3895,25 +4202,25 @@ namespace ConsoleCmd
             // 죽는 것이 일인 명령 — 예외 경계를 통과시킨다(위 regEscaping 주석).
             reg({ "reflect.golden" }, [](const ConsoleCommandContext& c) { HandleReflectGolden(c.parts); });
             reg({ "perf.reflect" }, [](const ConsoleCommandContext& c) { HandlePerfReflect(c.parts); });
-            reg({ "scene.dirtytraversal" }, [](const ConsoleCommandContext& c) { HandleSceneDirtyTraversal(c.parts); });
-            reg({ "scene.bonecache" }, [](const ConsoleCommandContext& c) { HandleSceneBoneCache(c.parts); });
+            regResult({ "scene.dirtytraversal" }, [](const ConsoleCommandContext& c) { return HandleSceneDirtyTraversal(c.parts); });
+            regResult({ "scene.bonecache" }, [](const ConsoleCommandContext& c) { return HandleSceneBoneCache(c.parts); });
             reg({ "prefab.objectguid" }, [](const ConsoleCommandContext& c) { HandlePrefabObjectGuid(c.parts); });
-			reg({ "scene.transformstats" }, [](const ConsoleCommandContext& c) { HandleSceneTransformStats(c.parts); });
-			reg({ "scene.transformwritestats" }, [](const ConsoleCommandContext& c) { HandleSceneTransformWriteStats(c.parts); });
-			reg({ "scene.transformdomains" }, [](const ConsoleCommandContext& c) { HandleSceneTransformDomains(c.parts); });
-			reg({ "scene.hierarchymutation" }, [](const ConsoleCommandContext& c) { HandleSceneHierarchyMutation(c.parts); });
-			reg({ "scene.executiongraph" }, [](const ConsoleCommandContext& c) { HandleSceneExecutionGraph(c.parts); });
-			reg({ "scene.sparseresolver" }, [](const ConsoleCommandContext& c) { HandleSceneSparseResolver(c.parts); });
-			reg({ "scene.transformpull" }, [](const ConsoleCommandContext& c) { HandleSceneTransformPull(c.parts); });
-			reg({ "scene.transformbulk" }, [](const ConsoleCommandContext& c) { HandleSceneTransformBulk(c.parts); });
-            reg({ "scene.traversalbench" }, [](const ConsoleCommandContext& c) { HandleSceneTraversalBench(c.parts); });
-            reg({ "scene.bonedump" }, [](const ConsoleCommandContext& c) { HandleSceneBoneDump(c.parts); });
-            reg({ "scene.transformdigest" }, [](const ConsoleCommandContext& c) { HandleSceneTransformDigest(c.parts); });
+			regResult({ "scene.transformstats" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformStats(c.parts); });
+			regResult({ "scene.transformwritestats" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformWriteStats(c.parts); });
+			regResult({ "scene.transformdomains" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformDomains(c.parts); });
+			regResult({ "scene.hierarchymutation" }, [](const ConsoleCommandContext& c) { return HandleSceneHierarchyMutation(c.parts); });
+			regResult({ "scene.executiongraph" }, [](const ConsoleCommandContext& c) { return HandleSceneExecutionGraph(c.parts); });
+			regResult({ "scene.sparseresolver" }, [](const ConsoleCommandContext& c) { return HandleSceneSparseResolver(c.parts); });
+			regResult({ "scene.transformpull" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformPull(c.parts); });
+			regResult({ "scene.transformbulk" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformBulk(c.parts); });
+            regResult({ "scene.traversalbench" }, [](const ConsoleCommandContext& c) { return HandleSceneTraversalBench(c.parts); });
+            regResult({ "scene.bonedump" }, [](const ConsoleCommandContext& c) { return HandleSceneBoneDump(c.parts); });
+            regResult({ "scene.transformdigest" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformDigest(c.parts); });
             reg({ "serialize.bench" }, [](const ConsoleCommandContext& c) { HandleSerializeBench(c.parts); });
             reg({ "serialize.nodeequal" }, [](const ConsoleCommandContext& c) { HandleSerializeNodeEqual(c.parts); });
             reg({ "serialize.rymlerror" }, [](const ConsoleCommandContext& c) { HandleSerializeRymlError(c.parts); });
-            reg({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { HandleSceneProxyBench(c.parts); });
-			reg({ "scene.proxydirty" }, [](const ConsoleCommandContext& c) { HandleSceneProxyDirty(c.parts); });
+            regResult({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { return HandleSceneProxyBench(c.parts); });
+			regResult({ "scene.proxydirty" }, [](const ConsoleCommandContext& c) { return HandleSceneProxyDirty(c.parts); });
 
             return t;
         }();

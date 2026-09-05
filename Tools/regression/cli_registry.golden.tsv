@@ -150,29 +150,29 @@ render.matmode	-	frames	editor	engine_service	live	no	no	<오브젝트> <opaque|
 render.rtinfo	-	frames	editor	engine_service	live	no	no	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
 render.shadowinfo	-	frames	editor	engine_service	live	no	no	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)
 rhi.uploadsegments	-	frames	editor	probe	requires_restart	no	yes	-	DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증
-scene.bonecache	-	frames	editor	probe	live	no	no	[0|1]	E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)
-scene.bonedump	-	frames	editor	probe	live	no	no	[개수]	대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)
-scene.ddol	-	frames	editor	engine_service	live	no	no	<이름>	오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용
-scene.dirtytraversal	-	frames	editor	probe	live	no	no	[0|1]	S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)
-scene.dump	-	immediate	editor	engine_service	live	no	no	[라벨]	활성 씬의 오브젝트 계층을 로그에 남긴다
-scene.executiongraph	-	frames	editor	probe	live	no	no	probe|bench <N> [samples]	X4 packed projection 불변식·compile 비용 검사
-scene.hierarchycheck	-	frames	editor	engine_service	live	no	no	-	씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)
-scene.hierarchymutation	-	frames	editor	probe	live	no	no	probe	X3 reparent 검증·대칭성·topology version 검사
+scene.bonecache	-	frames	editor	probe	live	no	yes	[0|1]	E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)
+scene.bonedump	-	frames	editor	probe	live	no	yes	[개수]	대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)
+scene.ddol	-	frames	editor	engine_service	live	no	yes	<이름>	오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용
+scene.dirtytraversal	-	frames	editor	probe	live	no	yes	[0|1]	S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)
+scene.dump	-	immediate	editor	engine_service	live	no	yes	[라벨]	활성 씬의 오브젝트 계층을 로그에 남긴다
+scene.executiongraph	-	frames	editor	probe	live	no	yes	probe|bench <N> [samples]	X4 packed projection 불변식·compile 비용 검사
+scene.hierarchycheck	-	frames	editor	engine_service	live	no	yes	-	씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)
+scene.hierarchymutation	-	frames	editor	probe	live	no	yes	probe	X3 reparent 검증·대칭성·topology version 검사
 scene.load	scene.switch	long	editor	engine_service	live	no	yes	<경로>	씬을 로드한다(활성 씬은 그대로)
-scene.new	-	frames	editor	engine_service	live	no	no	[이름]	빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)
-scene.proxybench	-	long	editor	probe	live	no	no	<프레임수> [등록수]	X8 정지 dirty-queue 커밋 비용(선택: 합성 등록수)
-scene.proxydirty	-	frames	editor	probe	live	no	no	probe	X8 frame-persistent render dirty mask·generation 검사
-scene.save	-	frames	editor	engine_service	live	no	no	<경로>	활성 씬을 .creator로 저장한다
-scene.select	-	immediate	editor	engine_service	live	no	no	<오브젝트 이름>	오브젝트를 에디터 선택으로 지정한다
-scene.selection	-	immediate	editor	engine_service	live	no	no	<라벨>	단일 선택과 복수 선택을 따로 낸다(둘의 어긋남을 드러낸다)
-scene.sparseresolver	-	frames	editor	probe	live	no	no	0|1|print|probe|bench <N> <frames>	X5 dirty-root sparse resolve·A/B 검사
-scene.transformbulk	-	frames	editor	probe	live	no	no	probe	X7 Animator pose·Physics world batch·Socket barrier 검사
-scene.transformdigest	-	frames	editor	probe	live	no	no	[라벨]	활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)
-scene.transformdomains	-	frames	editor	probe	live	no	no	probe	X2 UI/Spatial 독립 dirty gate·paused/subtree 검사
-scene.transformpull	-	frames	editor	probe	live	no	no	print|probe	X6 C# 즉시 pull·sibling global 전파 검사
-scene.transformstats	-	frames	editor	probe	live	no	no	[0|1|print]	X0 UI/Spatial·단계·구성·프레임 topology 계측
-scene.transformwritestats	-	frames	editor	probe	live	no	no	[0|1|print|probe]	X1 로컬 쓰기 publish 출처 계측
-scene.traversalbench	-	long	editor	probe	live	no	no	<오브젝트수> <프레임수> [flat|wide|deep|skeleton]	X0 Release 벤치(0=현재 씬)
+scene.new	-	frames	editor	engine_service	live	no	yes	[이름]	빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)
+scene.proxybench	-	long	editor	probe	live	no	yes	<프레임수> [등록수]	X8 정지 dirty-queue 커밋 비용(선택: 합성 등록수)
+scene.proxydirty	-	frames	editor	probe	live	no	yes	probe	X8 frame-persistent render dirty mask·generation 검사
+scene.save	-	frames	editor	engine_service	live	no	yes	<경로>	활성 씬을 .creator로 저장한다
+scene.select	-	immediate	editor	engine_service	live	no	yes	<오브젝트 이름>	오브젝트를 에디터 선택으로 지정한다
+scene.selection	-	immediate	editor	engine_service	live	no	yes	<라벨>	단일 선택과 복수 선택을 따로 낸다(둘의 어긋남을 드러낸다)
+scene.sparseresolver	-	frames	editor	probe	live	no	yes	0|1|print|probe|bench <N> <frames>	X5 dirty-root sparse resolve·A/B 검사
+scene.transformbulk	-	frames	editor	probe	live	no	yes	probe	X7 Animator pose·Physics world batch·Socket barrier 검사
+scene.transformdigest	-	frames	editor	probe	live	no	yes	[라벨]	활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)
+scene.transformdomains	-	frames	editor	probe	live	no	yes	probe	X2 UI/Spatial 독립 dirty gate·paused/subtree 검사
+scene.transformpull	-	frames	editor	probe	live	no	yes	print|probe	X6 C# 즉시 pull·sibling global 전파 검사
+scene.transformstats	-	frames	editor	probe	live	no	yes	[0|1|print]	X0 UI/Spatial·단계·구성·프레임 topology 계측
+scene.transformwritestats	-	frames	editor	probe	live	no	yes	[0|1|print|probe]	X1 로컬 쓰기 publish 출처 계측
+scene.traversalbench	-	long	editor	probe	live	no	yes	<오브젝트수> <프레임수> [flat|wide|deep|skeleton]	X0 Release 벤치(0=현재 씬)
 script.add	-	frames	editor	engine_service	live	no	yes	<오브젝트> <타입>	C# 스크립트를 오브젝트에 부착한다
 script.fields	-	frames	editor	engine_service	live	no	no	<id>	스크립트의 노출 필드와 현재 값을 확인한다
 script.invoke	-	long	editor	engine_service	live	yes	yes	<타입> <메서드> [인자]...	표식된 static 메서드를 호출한다([EngineCallable] 없는 것은 거부)
