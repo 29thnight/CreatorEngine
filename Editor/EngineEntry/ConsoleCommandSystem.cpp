@@ -1584,70 +1584,101 @@ namespace
     //   `--result-format jsonl` 로 기계가 읽는다. 예전에는 `probe=FAIL` 을 찍고도
     //   프로세스가 0 으로 끝났다 — 세어 놓고 판정하지 않고 있었다.
 
-    CommandCore::CommandResult HandleSceneDirtyTraversal(const std::vector<std::string>& parts)
+    // ★ `scene.dirtytraversal` 과 `scene.bonecache` 를 하나로 합쳤다(2026-09-06).
+    //
+    //   둘은 **순수 boolean get/set** 이었고, 33 줄과 31 줄이 접근자 쌍과 문자열
+    //   넷을 빼면 줄 단위로 같았다 — 조작 하나에 64 줄의 near-duplicate 다.
+    //   이 도메인에서 진짜 토글은 이 둘뿐이다(`transformstats` ·
+    //   `transformwritestats` · `sparseresolver` 는 `0|1` **분기만** 공유하고
+    //   명령 자체는 실질 내용이 있다).
+    //
+    //   `scene.traversalbench` 로 접지 않은 이유: 그 벤치는 이 플래그들을 **읽어
+    //   헤더에 찍는다**(`dirtytraversal=%s bonecache=%s`). 벤치 전용 인자로 만들면
+    //   다른 명령을 이 플래그 아래에서 재 볼 방법이 사라진다. 플래그는 프로세스
+    //   전역이고 벤치만의 것이 아니다.
+    //
+    // ★★ 인자 없이 부르는 것은 오류가 아니라 **조회**다. 조회를 InvalidArguments
+    //   로 내면 상태를 물어본 실행이 exit 2 로 끝난다.
+    CommandCore::CommandResult HandleSceneFlag(const std::vector<std::string>& parts)
     {
+        struct Flag
+        {
+            const char* name;
+            bool (*get)();
+            void (*set)(bool);
+            const char* onText;
+            const char* offText;
+        };
+
+        static constexpr Flag kFlags[] = {
+            { "dirtytraversal", &Scene::IsDirtyTraversalEnabled, &Scene::SetDirtyTraversalEnabled,
+              "1(dirty·worldChanged만 재계산)", "0(항상 재계산 — 옛 경로, A/B 대조용)" },
+            { "bonecache", &Scene::IsBoneCacheEnabled, &Scene::SetBoneCacheEnabled,
+              "1(인덱스 캐시)", "0(매 프레임 FindBone — 옛 경로)" },
+        };
+
+        const auto names = []() {
+            std::string all;
+            for (const Flag& f : kFlags)
+            {
+                if (!all.empty()) all += "|";
+                all += f.name;
+            }
+            return all;
+        };
+
         if (parts.size() < 2)
         {
-            std::printf("[CLI] scene.dirtytraversal 현재값: %s (사용법: scene.dirtytraversal 0|1)\n",
-                Scene::IsDirtyTraversalEnabled() ? "1(dirty만 재계산)" : "0(항상 재계산 — 옛 경로)");
-
-            // 인자 없이 부르는 것은 오류가 아니라 **조회**다. 이 도메인의 토글
-            // 넷이 전부 그렇게 쓰여 있고, 조회를 InvalidArguments 로 내면
-            // 상태를 물어본 실행이 exit 2 로 끝난다.
+            // 이름을 안 주면 전부 찍는다. "지금 무엇이 켜져 있나" 가 이 명령에
+            // 물을 수 있는 가장 흔한 질문이다.
             CommandCore::CommandData data = CommandCore::CommandData::Object();
-            data.Set("enabled", CommandCore::CommandData::Bool(Scene::IsDirtyTraversalEnabled()));
-            return CommandCore::Ok("scene.dirtytraversal 현재값", std::move(data));
+            for (const Flag& f : kFlags)
+            {
+                const bool on = f.get();
+                std::printf("[CLI] scene.flag %s = %s\n", f.name, on ? f.onText : f.offText);
+                data.Set(f.name, CommandCore::CommandData::Bool(on));
+            }
+            return CommandCore::Ok("scene.flag 현재값", std::move(data));
         }
 
-        const bool enable = ("1" == parts[1] || "on" == parts[1] || "true" == parts[1]);
-        const bool disable = ("0" == parts[1] || "off" == parts[1] || "false" == parts[1]);
+        const Flag* found = nullptr;
+        for (const Flag& f : kFlags)
+        {
+            if (parts[1] == f.name) { found = &f; break; }
+        }
+        if (nullptr == found)
+        {
+            std::printf("[CLI] 사용법: scene.flag <%s> [0|1]\n", names().c_str());
+            return CommandCore::InvalidArguments(
+                "scene.flag: 알 수 없는 플래그 '" + parts[1] + "' (가능: " + names() + ")");
+        }
+
+        if (parts.size() < 3)
+        {
+            const bool on = found->get();
+            std::printf("[CLI] scene.flag %s = %s\n", found->name, on ? found->onText : found->offText);
+            CommandCore::CommandData data = CommandCore::CommandData::Object();
+            data.Set("flag", CommandCore::CommandData::String(found->name));
+            data.Set("enabled", CommandCore::CommandData::Bool(on));
+            return CommandCore::Ok(std::string("scene.flag ") + found->name + " 현재값", std::move(data));
+        }
+
+        const bool enable  = ("1" == parts[2] || "on"  == parts[2] || "true"  == parts[2]);
+        const bool disable = ("0" == parts[2] || "off" == parts[2] || "false" == parts[2]);
         if (!enable && !disable)
         {
-            std::printf("[CLI] 사용법: scene.dirtytraversal 0|1\n");
-            return CommandCore::InvalidArguments("scene.dirtytraversal: 0|1 이 필요하다");
+            std::printf("[CLI] 사용법: scene.flag <%s> [0|1]\n", names().c_str());
+            return CommandCore::InvalidArguments("scene.flag: 0|1 이 필요하다");
         }
 
-        Scene::SetDirtyTraversalEnabled(enable);
-        const std::string msg = std::string("[scene.dirtytraversal] ")
-            + (enable ? "켬(1) — dirty·worldChanged만 재계산" : "끔(0) — 항상 재계산(옛 경로, A/B 대조용)");
+        found->set(enable);
+        const std::string msg = std::string("[scene.flag] ") + found->name + " = "
+            + (enable ? found->onText : found->offText);
         Debug->LogWarning(msg);
         std::printf("[CLI] %s\n", msg.c_str());
 
         CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("enabled", CommandCore::CommandData::Bool(enable));
-        return CommandCore::Ok(msg, std::move(data));
-    }
-
-    // E7-b A/B 토글의 유일한 쓰기 지점(SceneGraphRedesignPlan 트랙 E, E7-b —
-    // Scene::SetBoneCacheEnabled). 인자 없이 부르면 현재값만 보여준다.
-    CommandCore::CommandResult HandleSceneBoneCache(const std::vector<std::string>& parts)
-    {
-        if (parts.size() < 2)
-        {
-            std::printf("[CLI] scene.bonecache 현재값: %s (사용법: scene.bonecache 0|1)\n",
-                Scene::IsBoneCacheEnabled() ? "1(인덱스 캐시)" : "0(매 프레임 FindBone — 옛 경로)");
-
-            CommandCore::CommandData data = CommandCore::CommandData::Object();
-            data.Set("enabled", CommandCore::CommandData::Bool(Scene::IsBoneCacheEnabled()));
-            return CommandCore::Ok("scene.bonecache 현재값", std::move(data));
-        }
-
-        const bool enable = ("1" == parts[1] || "on" == parts[1] || "true" == parts[1]);
-        const bool disable = ("0" == parts[1] || "off" == parts[1] || "false" == parts[1]);
-        if (!enable && !disable)
-        {
-            std::printf("[CLI] 사용법: scene.bonecache 0|1\n");
-            return CommandCore::InvalidArguments("scene.bonecache: 0|1 이 필요하다");
-        }
-
-        Scene::SetBoneCacheEnabled(enable);
-        const std::string msg = std::string("[scene.bonecache] ")
-            + (enable ? "켬(1) — 뼈 인덱스 캐시 적중 시 FindBone 생략"
-                      : "끔(0) — 매 프레임 FindBone 선형 탐색(옛 경로, A/B 대조용)");
-        Debug->LogWarning(msg);
-        std::printf("[CLI] %s\n", msg.c_str());
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("flag", CommandCore::CommandData::String(found->name));
         data.Set("enabled", CommandCore::CommandData::Bool(enable));
         return CommandCore::Ok(msg, std::move(data));
     }
@@ -4202,8 +4233,7 @@ namespace ConsoleCmd
             // 죽는 것이 일인 명령 — 예외 경계를 통과시킨다(위 regEscaping 주석).
             reg({ "reflect.golden" }, [](const ConsoleCommandContext& c) { HandleReflectGolden(c.parts); });
             reg({ "perf.reflect" }, [](const ConsoleCommandContext& c) { HandlePerfReflect(c.parts); });
-            regResult({ "scene.dirtytraversal" }, [](const ConsoleCommandContext& c) { return HandleSceneDirtyTraversal(c.parts); });
-            regResult({ "scene.bonecache" }, [](const ConsoleCommandContext& c) { return HandleSceneBoneCache(c.parts); });
+            regResult({ "scene.flag" }, [](const ConsoleCommandContext& c) { return HandleSceneFlag(c.parts); });
             reg({ "prefab.objectguid" }, [](const ConsoleCommandContext& c) { HandlePrefabObjectGuid(c.parts); });
 			regResult({ "scene.transformstats" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformStats(c.parts); });
 			regResult({ "scene.transformwritestats" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformWriteStats(c.parts); });

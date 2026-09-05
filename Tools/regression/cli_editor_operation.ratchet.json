@@ -1,6 +1,6 @@
 {
   "schema": "lc6-editor-operation-undo v1",
-  "recorded": "2026-09-05",
+  "recorded": "2026-09-06",
   "note": "editor_operation 명령이 편집 Undo 스택에 항목을 남기는가. 실측값이다.",
   "undo": {
     "object.create": true,
@@ -9,6 +9,10 @@
     "object.parent": false,
     "object.transform": false,
     "component.add": false,
-    "object.property": false
+    "object.property": false,
+    "object.rootref": false,
+    "prefab.create": false,
+    "prefab.instantiate": false,
+    "prefab.update": false
   }
 }

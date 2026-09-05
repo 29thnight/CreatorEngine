@@ -11,6 +11,9 @@ param(
     # "Undo 안 남김"으로 못 박아 버린다 — 아래 ★★ 를 볼 것.
     [string]$ModelStem = 'Prim_Cone',
 
+    # 프리팹 케이스가 쓸 이름. 실행이 끝나면 이 이름의 `.prefab`/`.meta` 를 지운다.
+    [string]$PrefabName = 'OpGateFab',
+
     # 지금 상태를 래칫에 다시 기록한다. **의도한 변경일 때만** 쓴다.
     [switch]$Update
 )
@@ -112,14 +115,37 @@ function Get-SceneObjects {
 }
 
 # 각 항목: 라벨 · 보낼 명령 · 이 명령을 부르기 전에 준비할 것
+#
+# ★ `play`/`stop` 과 `undo`/`redo` 는 **일부러 뺐다.**
+#
+#   둘 다 편집 스택 자체를 다루는 명령이라 "editUndo 가 늘었는가" 로 재는 것이
+#   말이 안 된다 — `undo` 는 스택을 **줄이는** 것이 일이고, `play` 는 진입할 때
+#   양쪽 스택을 **비운다**(`EditorPlayModeController`). 여기서 재면 값이 늘 false
+#   인데 그것은 "Undo 를 안 남긴다" 가 아니라 "그 질문이 이 명령에 안 맞는다" 다.
+#   기록해 두면 다음 사람이 그 false 를 결함으로 읽는다.
+#
+#   그 둘의 계약은 `verify-play-selection-undo.ps1` 이 따로 단정한다 — play 전이가
+#   스택을 비우는가, 선택이 정지에서 지워지는가.
 $cases = @(
     @{ Name = 'object.create';          Body = '{"command":"object.create","args":["OpProbeA"],"mode":"sync"}' }
     @{ Name = 'object.rename';          Body = '{"command":"object.rename","args":["OpProbeA","OpProbeA2"],"mode":"sync"}' }
     @{ Name = 'object.duplicate';       Body = '{"command":"object.duplicate","args":["OpProbeB"],"mode":"sync"}' }
     @{ Name = 'object.parent';          Body = '{"command":"object.parent","args":["OpProbeB","OpProbeA2"],"mode":"sync"}' }
-    @{ Name = 'object.transform';       Body = '{"command":"object.transform","args":["OpProbeB","position","1","0","0"],"mode":"sync"}' }
+    # ★ 인자를 고쳤다(2026-09-06). 예전에는 `["OpProbeB","position","1","0","0"]`
+    #   를 보냈는데 핸들러 문법은 `<이름> <px> <py> <pz>` 다. `"position"` 이
+    #   `std::atof` 로 **0** 이 되어 (0,1,0) 을 넣고 있었다 — 명령이 돌기는 했으니
+    #   판정 자체는 무의미하지 않았지만, 케이스 이름이 말하는 것을 검사하고 있지
+    #   않았다.
+    @{ Name = 'object.transform';       Body = '{"command":"object.transform","args":["OpProbeB","1","2","3"],"mode":"sync"}' }
     @{ Name = 'component.add';          Body = '{"command":"component.add","args":["OpProbeB","MeshRenderer"],"mode":"sync"}' }
     @{ Name = 'object.property';        Body = '{"command":"object.property","args":["OpProbeB","MeshRenderer","m_IsEnabled","false"],"mode":"sync"}' }
+    @{ Name = 'object.rootref';         Body = '{"command":"object.rootref","args":["OpProbeB","OpProbeA2"],"mode":"sync"}' }
+
+    # ★ 프리팹 셋은 **디스크에 파일을 쓴다.** 아래 finally 에서 지운다 —
+    #   게이트가 저작 트리에 흔적을 남기면 다음 실행의 전제가 조용히 달라진다.
+    @{ Name = 'prefab.create';          Body = '{"command":"prefab.create","args":["OpProbeB","' + $PrefabName + '"],"mode":"sync"}' }
+    @{ Name = 'prefab.instantiate';     Body = '{"command":"prefab.instantiate","args":["' + $PrefabName + '"],"mode":"sync"}' }
+    @{ Name = 'prefab.update';          Body = '{"command":"prefab.update","args":["OpProbeB","' + $PrefabName + '"],"mode":"sync"}' }
 
     # ★ `model.place` 는 class 가 `engine_service` 라 이 게이트 밖에 있었다.
     #   그런데 GUI 는 이 조작을 `LoadModelToSceneObjCommand` 로 Undo 에 남기고
@@ -144,6 +170,12 @@ $cases = @(
 #
 #   그래서 여기서 만든다. 이 호출은 측정 대상이 아니다.
 $null = Invoke-Cmd '{"command":"object.create","args":["OpProbeB"],"mode":"sync"}'
+
+# 전체 무의미성 방지: 이 게이트가 도는 동안 씬 오브젝트는 **늘어야 한다**
+# (`object.create` · `object.duplicate` · `prefab.instantiate` 가 각각 더한다).
+# 늘지 않았다면 케이스들이 없는 오브젝트를 가리키며 헛돌았다는 뜻이고, 그때
+# 기록되는 `false` 는 판정이 아니라 사고다.
+$objectsAtStart = Get-SceneObjects
 
 $observed = [ordered]@{}
 $unmeasured = New-Object System.Collections.Generic.List[string]
@@ -186,8 +218,27 @@ try {
         "{0,-26} editUndo {1} -> {2}   undo={3}" -f `
             $case.Name, $before, $after, $(if ($records) { '기록함' } else { '기록 안 함' })
     }
+
+    $objectsAtEnd = Get-SceneObjects
+    if ($objectsAtEnd -le $objectsAtStart) {
+        throw ("씬 오브젝트가 늘지 않았다($objectsAtStart -> $objectsAtEnd) — " +
+               "케이스들이 헛돌았다. 이 상태의 판정은 전부 무의미하다.")
+    }
+    "오브젝트 {0} -> {1} (무의미성 방지 통과)" -f $objectsAtStart, $objectsAtEnd
 }
-finally { Stop-AllEditors }
+finally {
+    Stop-AllEditors
+
+    # 프리팹 케이스가 저작 트리에 남긴 파일을 지운다. 에디터를 먼저 세운 뒤에
+    # 지워야 핸들이 잡혀 있지 않다.
+    $prefabDir = Join-Path $repoRoot 'Dynamic_CPP\Assets\Prefabs'
+    foreach ($suffix in @('.prefab', '.prefab.meta')) {
+        $leftover = Join-Path $prefabDir ($PrefabName + $suffix)
+        if (Test-Path -LiteralPath $leftover) {
+            Remove-Item -LiteralPath $leftover -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
 
 if ($Update) {
     $payload = [ordered]@{

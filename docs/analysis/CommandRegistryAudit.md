@@ -532,9 +532,9 @@ operation 레코드**가 생긴다(`CommandService.cpp:566-575`가 enqueue 전�
 | ~~6~~ | ~~`*scale` 셋의 요약·`cost` 정정~~ | **완료 2026-09-06** (§6.6) | |
 | ~~7~~ | ~~죽은 별칭 이름 4개 제거~~ | **철회 2026-09-06** — 넷 다 살아 있는 조작이다(§3.5 ★). 처분은 (가)/(나) 결정 사항 | |
 | 8 | `uploadring`/`uploadsegments` 짝 결정 | registry −1 | 결정 필요 |
-| 9 | `window.info`→`render.rtinfo`, `model.loadcached` 처분 | registry −2 | 중간 |
-| 10 | scene X0·X8 병합, 토글 둘을 `traversalbench` 인자로 | registry −4 | 중간 |
-| 11 | 게이트 확장(8→전수, `object.transform` 케이스 수정) | 검증 강화 | 쉬움 |
+| ~~9~~ | ~~`window.info`→`render.rtinfo`, `model.loadcached` 처분~~ | **철회 2026-09-06** — 양쪽 다 살아 있다(§6.7) | |
+| ~~10~~ | ~~scene X0·X8 병합, 토글 둘~~ | **부분 완료 2026-09-06** — 토글 둘만 합쳤다(§6.7). X0·X8 은 기각 | |
+| ~~11~~ | ~~게이트 확장~~ | **완료 2026-09-06** (§6.7) | |
 | ~~12~~ | ~~`lc6-live-classification.ps1` 재실행 + TSV 커밋~~ | **완료 2026-09-06** (§6.6) | |
 | ~~13~~ | ~~12번 수치로 `cost` 재분류~~ | **완료 2026-09-06 — 55개가 아니라 13개였다** (§6.6) | |
 
@@ -764,6 +764,65 @@ gitignore 라 거기 두면 같은 일이 반복된다.
 **게이트**: registry-golden · discovery · service · drain · exit-spine 통과.
 `drain` 은 `game.pak`(`Long`)이 **202 로 오는 것**을 단정하는 게이트라 이 변경의
 직접 대조군이다.
+
+### 6.7 9·10·11번 (2026-09-06)
+
+**11번 — 게이트 확장. 완료.** `verify-cli-editor-operation.ps1` 이 7개를 재던 것을
+**11개**로 넓혔다(`object.rootref` · `prefab.create` · `prefab.instantiate` ·
+`prefab.update` 추가). 셋은 확인한 뒤에 넣었다 — 손으로 태워 보니 프리팹 파일이
+실제로 써지고 `prefab.instantiate` 가 오브젝트를 2→3 으로 늘린다.
+
+- `object.transform` 케이스의 인자를 고쳤다. `["OpProbeB","position","1","0","0"]`
+  을 보내고 있었는데 문법은 `<이름> <px> <py> <pz>` 라 `"position"` 이 `atof` 로
+  **0** 이 되어 (0,1,0) 을 넣고 있었다.
+- **`play`/`stop` 과 `undo`/`redo` 는 일부러 뺐다.** 둘 다 편집 스택 **자체**를
+  다루는 명령이라 "editUndo 가 늘었는가" 라는 질문이 안 맞는다 — `undo` 는 줄이는
+  것이 일이고 `play` 는 진입할 때 비운다. 재면 늘 `false` 인데 그것은 결함이
+  아니라 질문이 틀린 것이다. 그 둘은 `verify-play-selection-undo.ps1` 이 맡는다.
+- 프리팹 케이스가 디스크에 남기는 파일을 `finally` 에서 지운다.
+- **전체 무의미성 방지**를 넣었다: 실행 동안 씬 오브젝트가 늘지 않으면 실패다.
+  §6.4 에서 픽스처가 사라져 케이스들이 헛돌 뻔한 일이 있었고, 그때 기록되는
+  `false` 는 판정이 아니라 사고다. 실측 4 → 7.
+
+**9번 — 철회. 양쪽 다 살아 있다.**
+
+| 후보 | 실제 |
+|---|---|
+| `model.loadcached` | 소비자 **8곳**(verify-*.ps1 넷 포함). 그리고 `model.load` 와 **다르다** — `model.load` 는 `ImportSourceAsset` 로 **파일을 프로젝트에 복사**하고 `.meta` 를 쓴다. `loadcached` 는 그 쓰기 없이 로드만 한다. 지우면 읽기 전용 로드를 하려고 파일을 들여와야 한다 |
+| `window.info` | `verify-resolution-sweep.ps1` 이 **해상도마다** 부르고, 그 값에서 기대 rect 를 계산한다. 합치려던 `render.rtinfo` 는 소비자가 사실상 없다 — **많이 쓰는 쪽을 지우고 안 쓰는 쪽을 남기는** 거래였다 |
+
+§3.4 가 이 둘을 "중복" 으로 적은 근거는 **출력 값의 겹침**이었다. 값이 겹치는
+것과 명령이 중복인 것은 다르고, 이번에도 그 구분을 소비자와 부작용이 갈랐다.
+§7 의 첫 줄(소비자 텍스트 검색은 손 호출을 못 본다)과 같은 한계의 반대편이다.
+
+**10번 — 부분 완료.** 근거가 선 것만 했다.
+
+- ✅ **순수 토글 둘 → `scene.flag <이름> [0|1]`.** `scene.dirtytraversal`(33줄)과
+  `scene.bonecache`(31줄)가 접근자 쌍과 문자열 넷을 빼면 **줄 단위로 같았다** —
+  조작 하나에 64줄의 near-duplicate. 명령 2 → 1. 인자 없이 부르면 전부 조회하고,
+  모르는 이름은 가능한 목록과 함께 거부한다.
+  `traversalbench` 인자로 접지 **않았다**: 그 벤치는 이 플래그들을 읽어 헤더에
+  찍는데(`dirtytraversal=%s bonecache=%s`), 벤치 전용 인자로 만들면 다른 명령을
+  이 플래그 아래에서 재 볼 방법이 사라진다. 플래그는 프로세스 전역이다.
+- ❌ **X8(`proxydirty`+`proxybench`) 기각.** 둘은 서로의 조합이 아니고 어느 쪽도
+  중복이 아니다(단정 대 측정). 합칠 근거는 "다른 슬라이스가 `probe|bench` 한
+  이름을 쓴다" 는 **스타일**뿐이라 §0 의 기준에 걸리지 않는다. 게다가
+  `verify-render-proxy-dirty.ps1` 이 `[scene.proxydirty]`·`[scene.proxybench]`
+  마커를 정규식으로 읽어, 합치면 마커가 **없는 명령 이름을 가리킨다.** registry
+  한 행을 얻고 그 불일치를 사는 거래다.
+- ❌ **X0(`transformstats`+`traversalbench`) 기각.**
+  `docs/plans/TransformUpdatePlan.md` 가 그 슬라이스의 **진입점을 둘로 명시**한다.
+  설계 의도를 스타일로 뒤집지 않는다.
+
+명령 **204 → 203**, 이름 218 → 217.
+
+**게이트**: registry-golden · discovery · exit-spine · render-proxy-dirty 통과.
+editor-operation 은 `model.place` 측정 불가로 붉다(§6.3, 의도).
+
+★ **이 세 항목에서 내 감사가 두 번 더 틀렸다.** 7번(별칭 넷)·9번(둘) 전부
+  "소비자 수 0" 또는 "출력 겹침" 을 **중복**으로 읽은 것이었다. §1 의 한계 항목에
+  하나를 더한다: **구조적 유사성은 중복의 증거가 아니다.** 부작용(파일을 쓰는가)과
+  의존 방향(누가 누구를 부르는가)을 봐야 갈린다.
 
 ## 7. 이 조사가 **하지 않은** 것
 

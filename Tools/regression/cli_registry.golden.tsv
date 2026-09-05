@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	204
-# names	218
+# commands	203
+# names	217
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	no	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -142,12 +142,11 @@ render.matmode	-	immediate	editor	engine_service	live	no	no	<오브젝트> <opaq
 render.rtinfo	-	immediate	editor	engine_service	live	no	no	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
 render.shadowinfo	-	immediate	editor	engine_service	live	no	no	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)
 rhi.uploadsegments	-	frames	editor	probe	requires_restart	no	yes	-	DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증
-scene.bonecache	-	frames	editor	probe	live	no	yes	[0|1]	E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)
 scene.bonedump	-	frames	editor	probe	live	no	yes	[개수]	대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)
 scene.ddol	-	frames	editor	engine_service	live	no	yes	<이름>	오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용
-scene.dirtytraversal	-	frames	editor	probe	live	no	yes	[0|1]	S2 A/B 토글 — dirty만 재계산(1,기본)/항상 재계산(0)
 scene.dump	-	immediate	editor	engine_service	live	no	yes	[라벨]	활성 씬의 오브젝트 계층을 로그에 남긴다
 scene.executiongraph	-	frames	editor	probe	live	no	yes	probe|bench <N> [samples]	X4 packed projection 불변식·compile 비용 검사
+scene.flag	-	immediate	editor	engine_service	live	no	yes	[<dirtytraversal|bonecache> [0|1]]	씬 진단 플래그를 읽거나 바꾼다(인자 없으면 전부 조회)
 scene.hierarchycheck	-	frames	editor	engine_service	live	no	yes	-	씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)
 scene.hierarchymutation	-	frames	editor	probe	live	no	yes	probe	X3 reparent 검증·대칭성·topology version 검사
 scene.load	scene.switch	long	editor	engine_service	live	no	yes	<경로>	씬을 로드한다(활성 씬은 그대로)
