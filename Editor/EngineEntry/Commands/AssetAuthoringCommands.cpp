@@ -113,9 +113,7 @@
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
 #include "AssetIdentity/ModelAssetGenerationSelfTest.h"
 #include "AssetIdentity/SceneModelGenerationSelfTest.h"
-#include "ExperimentParity/ExperimentSamplerSelfTest.h"
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
-#include "ExperimentParity/ExperimentWeldSelfTest.h"
 #include "ExperimentParity/ExperimentCacheOptSelfTest.h"
 #include "ExperimentParity/ExperimentTextureCookSelfTest.h"
 #include "ShaderMeta.h"
@@ -129,7 +127,6 @@
 #include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
-#include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
 #include "ReflectionYml.h"
@@ -2352,60 +2349,6 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[assets.scenemodel] 실패\n") + log);
     }
 
-    static void Cmd_experiment_sampler(const ConsoleCommandContext&)
-    {
-        // 합성 보간 검사. 자산을 읽지 않으므로 인자가 없고 항상 같은 것을 잰다.
-        std::string log;
-        const bool passed = RenderTest::RunExperimentSamplerSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.sampler] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.sampler] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.sampler %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_tangent(const ConsoleCommandContext&)
-    {
-        // mikktspace 탄젠트 생성의 합성 검사. 자산을 읽지 않는다.
-        std::string log;
-        const bool passed = RenderTest::RunExperimentTangentSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.tangent] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.tangent] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.tangent %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_normal(const ConsoleCommandContext&)
-    {
-        // 평면 법선 생성의 합성 검사. 자산을 읽지 않는다.
-        std::string log;
-        const bool passed = RenderTest::RunExperimentNormalSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.normal] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.normal] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.normal %s\n", passed ? "통과" : "실패");
-    }
-
     static void Cmd_experiment_cacheopt(const ConsoleCommandContext&)
     {
         // 정점 캐시/페치 최적화의 합성 검사. 자산을 읽지 않는다.
@@ -2422,24 +2365,6 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.cacheopt] 실패\n") + log);
         }
         std::printf("[CLI] experiment.cacheopt %s\n", passed ? "통과" : "실패");
-    }
-
-    static void Cmd_experiment_weld(const ConsoleCommandContext&)
-    {
-        // 정점 용접의 합성 검사. 자산을 읽지 않는다.
-        std::string log;
-        const bool passed = RenderTest::RunExperimentWeldSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.weld] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.weld] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.weld %s\n", passed ? "통과" : "실패");
     }
 
     static void Cmd_experiment_cooked(const ConsoleCommandContext& ctx)
@@ -3620,24 +3545,6 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.scenecook %s\n", passed ? "통과" : "실패");
     }
 
-    static void Cmd_experiment_resolver(const ConsoleCommandContext&)
-    {
-        // 자산을 읽지 않는다. 가짜 decoder 로 호출 순서와 폴백 관측을 본다.
-        std::string log;
-        const bool passed = RenderTest::RunExperimentResolverSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.resolver] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.resolver] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.resolver %s\n", passed ? "통과" : "실패");
-    }
-
     static void Cmd_assets_unload(const ConsoleCommandContext& ctx)
     {
         DataSystems->UnloadUnusedAssets();
@@ -3735,11 +3642,7 @@ namespace ConsoleCmd
         reg.Legacy({ "experiment.foliage" }, &Cmd_experiment_foliage);
         reg.Legacy({ "experiment.animmask" }, &Cmd_experiment_animmask);
         reg.Legacy({ "experiment.editorsurface" }, &Cmd_experiment_editorsurface);
-        reg.Legacy({ "experiment.sampler" }, &Cmd_experiment_sampler);
-        reg.Legacy({ "experiment.tangent" }, &Cmd_experiment_tangent);
-        reg.Legacy({ "experiment.normal" }, &Cmd_experiment_normal);
         reg.Legacy({ "experiment.cooked" }, &Cmd_experiment_cooked);
-        reg.Legacy({ "experiment.weld" }, &Cmd_experiment_weld);
         reg.Legacy({ "experiment.cacheopt" }, &Cmd_experiment_cacheopt);
         reg.Legacy({ "experiment.texcook" }, &Cmd_experiment_texcook);
         reg.Legacy({ "experiment.smcook" }, &Cmd_experiment_smcook);
@@ -3753,7 +3656,6 @@ namespace ConsoleCmd
         reg.Legacy({ "experiment.matmigrate" }, &Cmd_experiment_matmigrate);
         reg.Legacy({ "experiment.matscript" }, &Cmd_experiment_matscript);
         reg.Legacy({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
-        reg.Legacy({ "experiment.resolver" }, &Cmd_experiment_resolver);
         reg.Legacy({ "experiment.catalog" }, &Cmd_experiment_catalog);
         reg.Legacy({ "assets.unload" }, &Cmd_assets_unload);
         reg.Legacy({ "bt.status", "bt.reset" }, &Cmd_bt_status);

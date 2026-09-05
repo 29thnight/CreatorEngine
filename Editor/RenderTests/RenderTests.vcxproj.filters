@@ -66,13 +66,7 @@
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp">
       <Filter>RHI\DX12\Tests</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCookedSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentWeldSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCacheOptSelfTest.cpp">
@@ -109,9 +103,6 @@
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentResolverSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
@@ -235,12 +226,6 @@
     </ClInclude>
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
       <Filter>RHI\DX12\Tests</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h">
-      <Filter>ExperimentParity</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h">
-      <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h">
       <Filter>ExperimentParity</Filter>

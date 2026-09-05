@@ -125,6 +125,29 @@ LC9가 dx12 쪽에서 없앤 바로 그 방식이다.
 계층 1의 근거: 그 파일들에 `DataSystems`·`SceneManagers`·`GetActiveScene`·`ID3D12`·
 `GameObject`가 **0회** 나온다. include가 순수 알고리즘 헤더뿐이다.
 
+> ★ **이 근거는 절반만 맞았다 — 2026-09-05 실측이 정정한다.**
+>
+> include 표면과 **링크 폐포는 다른 문제다.** 자기 코드가 디바이스를 안 쓰더라도
+> 링커는 참조한 심볼의 **정의**를 요구하고, 그 정의가 사는 `.cpp` 가 GPU·런타임
+> 의존을 끌고 온다. 12개를 다 옮기려다 실측으로 갈렸다:
+>
+> | 명령 | 링크가 추가로 요구한 것 | 결과 |
+> |---|---|---|
+> | `weld` · `resolver` · `sampler` · `tangent` · `normal` | `Experiment/Import` 계열 `.cpp` 7개 + `mikktspace.c` | **이관 완료** |
+> | `texcook` | `ReadAssetIdFromMeta` → `Authoring::ParsedDocument` → **rapidyaml 전체** | 보류 |
+> | `cacheopt` · `vertexlayout` | `Mesh` · `MeshOptimizer` · `Core::TimeSystem` | 보류 |
+> | `matcodec` · `matinstance` · `matseal` · `smcook` | `Material` · `Texture` · `Core::TimeSystem` | 보류 |
+>
+> 그래서 §6의 3번은 **12개가 아니라 5개**가 닫혔다. 나머지 7개는 "옮길 수 없다"가
+> 아니라 "옮기려면 엔진 정적 라이브러리를 링크해야 하고, 그러면 기존 contract
+> probe 셋의 성격(엔진 빌드 없이 도는 단독 실행)이 바뀐다" 이다. 그 결정을 이
+> 조사가 대신 내리지 않는다.
+>
+> ★★ 컴파일은 **10개 전부 통과했다.** 문서가 위험으로 적었던 `matinstance`·
+> `matseal` 의 include 표면(`Texture.h`·`ShaderMetaReflection.h`)은 문제가 아니었다 —
+> `/external:W0` 로 엔진 헤더 경고를 빼고 `NOMINMAX` 를 주면 깨끗하다. 위험은
+> 예상한 곳이 아니라 링크 단계에 있었다.
+
 계층 2의 근거: `smcook`/`texcook`의 "실자산" 부분은 파일 읽기 + memcmp + SHA-256이고,
 프로듀서가 `DataSystem.h`를 아예 include하지 않는다. 게다가 그 부분은 CLI 인자 둘을
 요구하는데 **어떤 스크립트도 그 인자를 주지 않아 오늘 한 번도 안 돈다.**
@@ -465,7 +488,7 @@ operation 레코드**가 생긴다(`CommandService.cpp:566-575`가 enqueue 전�
 |---|---|---|---|
 | ~~1~~ | ~~`dump.crash` 제거~~ | **완료 2026-09-05** | |
 | ~~2~~ | ~~`render.exposure` 제거~~ | **완료 2026-09-05** | |
-| 3 | `experiment.*` 계층 1+2 12개를 contract probe로 이관 | 코드 이동, registry −12 | 쉬움 |
+| 3 | `experiment.*` 계층 1+2 12개를 contract probe로 이관 | **5/12 완료 2026-09-05** (§6.2) | 나머지는 결정 필요 |
 | 4 | `model.place` undo 배선 (3줄) | 거동 변경 | 쉬움 |
 | 5 | `object.create`에 undo 배선 → `object.create.undoable` 제거 | 거동 변경 | 중간 |
 | 6 | `*scale` 셋의 요약·`cost` 정정 | 표기만 | 쉬움 |
@@ -514,6 +537,41 @@ consumer-contract · crash-dump 전부 통과.
   돌렸는데 `verify-cli-consumer-contract.ps1` 은 그 인자를 받지 않는 정적 게이트라
   호출이 실패했고, `$LASTEXITCODE` 가 **앞 게이트의 0** 을 그대로 들고 있어 통과로
   보였다. 인자 없이 다시 돌려 진짜 통과를 확인했다.
+
+### 6.2 3번 실행 기록 — 5/12 (2026-09-05)
+
+명령 **210 → 205**, 이름 224 → 219. 옮긴 것: `weld` · `resolver` · `sampler` ·
+`tangent` · `normal`.
+
+새 자산 둘: `Tools/regression/experiment_contract_probe.cpp` (실행 파일 하나가
+전부를 돌리고, 인자를 주면 그것만 돌린다) 와 `verify-experiment-contract.ps1`.
+**검사 하나에 게이트 하나를 두지 않았다** — 명령 다섯을 게이트 다섯으로 바꾸면
+줄이려던 그 실수를 이름만 바꿔 되풀이하는 것이다.
+
+Debug/Release 양쪽에서 5건 전부 통과하고, **에디터를 띄우지 않는다.**
+
+세 가지가 빌드에서 걸렸고 전부 게이트 주석에 남겼다:
+
+1. **경고 수준을 소스 출처별로 나눠야 했다.** `/W4 /WX` 를 통째로 걸면 엔진
+   `.cpp`(`CookedAssetManifest.cpp`)의 기존 경고로 이 게이트가 붉어진다. probe·
+   self-test 는 `/W4 /WX`, 엔진 소스는 `/W0`, 엔진 헤더는 `/external:W0`.
+2. **`/Fd:` 가 없으면 Debug 가 죽는다.** `/Zi` 가 PDB 를 작업 디렉터리(저장소
+   루트)에 만들려다 실패하고, 컴파일 전체가 exit 2 로 끝난다.
+3. **`/Fo:"...\"` 는 뒤의 소스 목록을 통째로 먹는다.** 끝 백슬래시가 닫는 따옴표를
+   이스케이프한다. cl 은 `D8003: 소스 파일 이름이 없습니다` 만 내고 원인이 인용
+   부호라는 말은 하지 않는다. `\\"` 로 써야 한다.
+
+★ **대소문자 충돌을 하나 발견했다(고치지 않았다).** `VertexCacheOptimization.cpp`
+는 vcpkg 의 `meshoptimizer.h` 를 노리고 `"meshoptimizer.h"` 를 include 하는데,
+Windows 는 대소문자를 구분하지 않아 엔진 자신의
+`Engine/RenderEngine/MeshOptimizer.h` 로 풀린다. 오늘 무사한 것은 RenderEngine 과
+RenderTests 두 프로젝트가 include 순서를 **서로 다르게** 두기 때문이다. 한 번의
+`cl` 호출로는 두 순서를 동시에 만족할 수 없어, `cacheopt` 이관이 이것을 다시
+만난다. 지금은 그 TU 를 쓰지 않으므로 게이트에 주석으로만 적어 두었다.
+
+파일은 `Editor/RenderTests/ExperimentParity/` 에 **그대로 뒀다.** 에디터 빌드
+(`RenderTests.vcxproj`)에서만 뺐다 — 파일 이동과 명령 제거를 같은 커밋에 넣지
+않는다(§12.3). 위치 정리는 순수 기계적 후속이다.
 
 ## 7. 이 조사가 **하지 않은** 것
 

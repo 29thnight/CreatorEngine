@@ -842,7 +842,11 @@ LC6 의 이동으로 확보된 것이라 추측이 아니다. 규칙마다 판�
 | `terminates_process` | 2 | `crash.test` · `quit` |
 
 (2026-09-05 갱신: `dump.crash` 제거로 `terminates_process` 3→2,
-`render.exposure` 제거로 `live` 206→205. 명령 212→**210**, 이름 226→224.)
+`render.exposure` 제거로 `live` 206→205. 명령 212→**210**, 이름 226→224.
+이어서 `experiment.*` 다섯(`weld`·`resolver`·`sampler`·`tangent`·`normal`)을
+`Tools/regression/verify-experiment-contract.ps1` 로 옮겨 **205 / 219**.
+그 다섯은 엔진 프로세스가 필요 없는 합성 단정이라 명령일 이유가 없었다 —
+경위는 `docs/analysis/CommandRegistryAudit.md` §3.2·§6.2.)
 
 ★★ **이 값은 실측에서 왔고, 착수 때의 판단을 뒤집었다.** 처음에는 `dx12.*`·`vk.*`
 56 개가 전부 프로세스를 새로 띄워야 하는 "커맨드렛"인 줄 알았다 — `Invoke-Dx12Suite`

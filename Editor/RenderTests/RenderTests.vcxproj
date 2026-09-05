@@ -27,10 +27,7 @@
     <ClInclude Include="AssetIdentity\AssetSidecarSchemaSelfTest.h" />
     <ClInclude Include="AssetIdentity\ModelAssetGenerationSelfTest.h" />
     <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h" />
-    <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentWeldSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCacheOptSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentTextureCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentShaderMetaCookSelfTest.h" />
@@ -43,7 +40,6 @@
     <ClInclude Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialScriptSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentSceneCookSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentResolverSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCatalogSelfTest.h" />
     <ClInclude Include="RHI\ShaderReflectionSelfTest.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
@@ -71,13 +67,7 @@
     <ClCompile Include="AssetIdentity\SceneModelGenerationSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCookedSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentWeldSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCacheOptSelfTest.cpp">
@@ -114,9 +104,6 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentResolverSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
