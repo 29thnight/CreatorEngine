@@ -1,0 +1,48 @@
+# LC7 고아 청소 픽스처 (ScriptLifecycleContractHardeningPlan · LC7-f)
+#
+# 판정은 verify-lifecycle-orphan.ps1이 한다.
+#
+# ── 무엇을 메우는가 ──
+#
+# ScriptRegistry.SweepOrphans는 씬 언로드에서 "정상 파괴 경로를 타지 못한 관리
+# 인스턴스"를 거두고, 거둔 게 있으면 경고를 남긴다 — 그 경고가 곧 **수명 배선에
+# 구멍이 생겼다**는 신호다. 0건이 계약이다.
+#
+# 그런데 그 경고를 보는 게이트가 없다. 씬을 전환하는 시나리오는 여럿 있지만
+# (ddol_script_probe, lifecycle_ddolwait_probe) 전부 이송된 쪽을 보고, 이송되지
+# 않고 파괴되는 쪽이 정상 경로로 접히는지는 아무도 재지 않았다.
+#
+# ── 표지 부재를 어떻게 피하는가 ──
+#
+# "경고가 없다"만으로는 부족하다. 씬 언로드가 아예 안 일어났을 때와 구별되지
+# 않기 때문이다. 픽스처가 축소 삼단을 남기므로 그것이 "언로드가 일어났고 정상
+# 경로가 인스턴스를 잡았다"의 양의 증거가 된다. 두 축을 함께 봐야 판정이 선다.
+#
+# ── DDOL을 쓰지 않는 이유 ──
+#
+# 여기서 재는 것은 이송되지 **않는** 오브젝트다. scene.ddol을 부르면 그 오브젝트는
+# 파괴 경로를 지나지 않아 고아가 될 자리 자체가 없다.
+
+wait 60
+
+# 목적지 씬을 먼저 만들어 저장한다. 경로는 검사 스크립트가 채운다.
+scene.new L7OrphanDest
+wait 30
+scene.save {{DEST_SCENE}}
+wait 30
+
+scene.new L7OrphanSrc
+wait 30
+object.create Orphan
+script.add Orphan GenerationProbe
+wait 60
+
+play
+wait 60
+
+# 언로드. 이 오브젝트는 이송되지 않으므로 파괴 경로를 지나야 한다.
+scene.switch {{DEST_SCENE}}
+wait 180
+
+log.flush
+quit

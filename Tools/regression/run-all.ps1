@@ -395,6 +395,22 @@ Run-Step "생명주기 즉시 제거" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-immediate.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 고아 청소(9-5 · LC7-f). ScriptRegistry.SweepOrphans는 씬 언로드에서
+# "정상 파괴 경로를 타지 못한 관리 인스턴스"를 거두고, 거둔 게 있으면 경고를
+# 남긴다 — 그 경고가 곧 수명 배선에 구멍이 생겼다는 신호다. 0건이 계약이고, 그래서
+# 0건일 때는 일부러 아무 로그도 남기지 않는다.
+#
+# 그 경고를 보는 게이트가 없었다. 씬을 전환하는 시나리오는 여럿 있지만 전부
+# 이송된 쪽을 보고, 이송되지 않고 파괴되는 쪽은 아무도 재지 않았다.
+#
+#   XX 정상 축소 · YY 고아 0건
+#
+# 둘을 함께 봐야 한다. YY는 표지 부재로 재는 판정이라 홀로 두면 "씬 언로드가 아예
+# 안 일어난 경우"와 구별되지 않는다 — 아무 일도 안 하면 언제나 초록이다.
+Run-Step "생명주기 고아 청소" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-orphan.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
