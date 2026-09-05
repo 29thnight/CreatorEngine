@@ -690,6 +690,11 @@ internal static class ScriptRegistry
         int dropped = GameThreadSynchronizationContext.Installed?.DropPending() ?? 0;
         if (dropped > 0)
             Native.Log(2, $"[ScriptCore] 리로드로 재개 {dropped} 건을 버렸다 — 그만큼의 async 본문이 완료되지 않았다.");
+
+        // 경계 밖 호출 진단을 다시 열어 둔다(LC5-c). "API 이름마다 한 번"을 프로세스
+        // 수명 내내 유지하면 리로드 뒤의 같은 결함이 조용히 지나간다 — 저작 중에는
+        // 고치고 다시 돌리는 것이 기본 동작이므로 그 자리가 바로 다음 회차다.
+        Native.ResetOffThreadReports();
     }
 }
 

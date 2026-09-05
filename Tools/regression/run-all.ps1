@@ -106,6 +106,24 @@ Run-Step "생명주기 단계 미러 대조" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-lifecycle-enums.ps1")
 }
 
+# 엔진 API 진입 검사 전수 대조(9-5 · LC5-c). 게임 스레드 검사는 Native의 정적
+# 메서드 206곳에 하나씩 들어간다. 그 규약을 사람이 지키게 두면 곧 드리프트한다 —
+# 새 API를 더하면서 검사를 빠뜨려도 컴파일은 되고, 실행 게이트
+# (verify-lifecycle-thread)는 자기가 부르는 두 API만 보므로 나머지가 새는 것을
+# 못 본다. 그래서 "빠진 곳이 있는가"는 실행이 아니라 소스에서 센다.
+#
+#   1 전수 배선  _api 를 만지는 메서드는 전부 Entered() 를 거친다
+#   2 우회 없음  _bound 원본은 허용된 자리에서만 읽힌다
+#   3 검사 실질  Entered 가 실제로 스레드를 비교하고 경계 밖을 보고한다
+#
+# 이빨 확인(2026-09-05): 변이 셋이 각각 자기 축만 붉혔다. ① 한 메서드에서
+# Entered() 제거 → 판정 1. ② Entered()를 부르되 결과를 버리고 _bound 로 우회 →
+# 판정 1은 초록이고 판정 2만 빨강(이것이 판정 2의 존재 이유다). ③ Entered 안의
+# 스레드 비교 삭제 → 판정 3만 빨강.
+Run-Step "엔진 API 진입 검사 대조" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-native-thread-guard.ps1")
+}
+
 # 진입점 이름 결합(9-4). 위 두 검사가 못 보는 세 번째 결합면이다.
 #
 # ClrHost는 관리 함수를 문자열 이름으로 찾는다. API 표 검사는 함수 포인터의 배치를
