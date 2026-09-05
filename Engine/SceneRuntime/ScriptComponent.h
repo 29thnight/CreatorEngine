@@ -107,6 +107,22 @@ public:
 	// 편집 중이던 상태가 유지되는 것이 핫리로드의 목적이다.
 	void PrepareForReload();
 
+	// 핫리로드 직후에 부른다. PrepareForReload의 짝이다.
+	//
+	// 인스턴스를 다시 만드는 것만으로는 부족하다. 나머지 진입 단계 — 씬 편입,
+	// 활성, 시뮬레이션 시작 — 는 평소 Scene::DrainPendingLifecycle이 상태 비트를
+	// 보고 구동하는데, 리로드는 그 비트를 지우지 않으므로 엔티티 쪽에는 "이미 다
+	// 돌았다"로 보인다. 그래서 아무도 다시 부르지 않는다.
+	//
+	// 실측(verify-lifecycle-reload 착수 시점): 재생 중 리로드하면 새 인스턴스가
+	// OnInitialized만 받고 OnAddedToScene·OnEnable·OnBeginSimulation·OnSimulate를
+	// 하나도 못 받았다. 스크립트가 죽은 채로 재생이 계속된다 — 저작자에게는
+	// "리로드했더니 코드가 안 돈다"로 보이고, 아무 오류도 남지 않는다.
+	//
+	// 리로드 전 상태를 그대로 이어 준다. 시뮬레이션을 시작했었는지는
+	// State_SimulationBegun 비트가 알고 있다(리로드가 지우지 않는다).
+	void RestoreAfterReload();
+
 	// m_fieldData를 관리 인스턴스에 밀어 넣는다(인스턴스 생성 직후).
 	void ApplyFields();
 

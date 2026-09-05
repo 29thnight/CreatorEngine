@@ -363,6 +363,22 @@ Run-Step "생명주기 이송 중 대기" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-ddolwait.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 어셈블리 리로드(9-5 · LC7-d). script.reload는 CLI에 있는데 어떤 회귀
+# 시나리오도 부르지 않았다 — ScriptRegistry.Clear가 도는 경로 전체가 관측 밖이었다.
+#
+# 착수 시 실측에서 결함 하나가 나왔다: 재생 중 핫리로드하면 새 인스턴스가
+# OnInitialized만 받고 씬 진입·시뮬레이션 시작을 못 받아, 스크립트가 죽은 채로
+# 재생이 계속됐다. 저작자에게는 "리로드했더니 코드가 안 돈다"로 보인다.
+#
+#   NN 리로드 발생 · OO 이전 세대 축소 · PP 대기 비유출 · QQ 새 세대 완결
+#   RR 문맥 회수 · SS 편집 모드 무음
+#
+# 시나리오가 리로드를 두 번 부른다 — 재생 전(편집 모드)과 재생 중. 앞의 것이 SS의
+# 자리이고, 고침이 만든 편집 모드 분기를 태우는 것이 목적이다.
+Run-Step "생명주기 어셈블리 리로드" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-reload.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #

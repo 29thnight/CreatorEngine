@@ -11064,11 +11064,17 @@ namespace ConsoleCmd
             return;
         }
 
-        // 3) 인스턴스를 다시 만들고 챙겨 둔 값을 되돌린다
+        // 3) 인스턴스를 다시 만들고, 리로드 전 진입 상태를 그대로 이어 준다.
+        //
+        // 예전에는 OnInitialized()만 불렀다. 나머지 단계는 평소
+        // Scene::DrainPendingLifecycle이 상태 비트를 보고 구동하는데, 리로드는 그
+        // 비트를 지우지 않으므로 엔티티 쪽에는 "이미 다 돌았다"로 보여 아무도 다시
+        // 부르지 않았다 — 재생 중 리로드하면 스크립트가 죽은 채로 재생이 계속됐다
+        // (verify-lifecycle-reload 판정 QQ).
         int restored = 0;
         for (ScriptComponent* script : scripts)
         {
-            script->OnInitialized();
+            script->RestoreAfterReload();
             if (script->HasInstance()) ++restored;
         }
 
