@@ -1,0 +1,43 @@
+# LC4 재진입 픽스처 (ScriptLifecycleContractHardeningPlan · LC4)
+#
+# Tick 순회 한복판에서 저작 코드가 도는 창을 열고, 그 안에서 자기를 제거하거나
+# 네이티브를 왕복한다. 판정은 verify-lifecycle-reentrancy.ps1이 한다.
+#
+# ── 대조군이 판정의 절반이다 ──
+#
+# 이 결함이 터지면 Tick이 던지고 ScriptRegistry.PrePhysicsTick 전체가 중단된다.
+# 곧 그 프레임의 **모든** 인스턴스가 PrePhysics와 배수를 잃는다. 픽스처 자신은
+# 이미 제거·비활성화 중이라 그 손실이 잘 안 보이지만, 아무 잘못도 하지 않은
+# 이웃이 훅을 잃는 것은 또렷하게 보인다. 그래서 Control을 같은 실행에 둔다.
+#
+# ── 왜 play가 필요한가 ──
+#
+# C# 스크립트는 재생 중에만 생명주기를 받는다(2026-09-05, 편집/재생 경계 고침).
+
+wait 60
+scene.new LifecycleReentrancy
+wait 30
+
+# ① 순회 중 자기 제거
+object.create ReentrantDestroy
+script.add ReentrantDestroy ReentrantDestroyProbe
+wait 10
+
+# ② 순회 중 네이티브 왕복(비활성화 → OnDisable 되돌아옴)
+object.create ReentrantDisable
+script.add ReentrantDisable ReentrantDisableProbe
+wait 10
+
+# 대조군 — 아무것도 하지 않는다. 이웃이 훅을 잃는지가 판정의 절반이다.
+object.create Control
+script.add Control LifecycleProbe
+wait 60
+
+play
+wait 400
+
+stop
+wait 200
+
+log.flush
+quit

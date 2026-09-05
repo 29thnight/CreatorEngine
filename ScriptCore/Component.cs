@@ -86,6 +86,27 @@ public abstract class Component
             // 성공하면 훅과 필드 갱신이 되돌아오는 길에 일어난다.
             if (Native.ScriptSetEnabled(Entity.Handle, InstanceId, value)) return;
 
+            // ★ 전달 실패에는 두 종류가 있다(LC5-c 후속 · 2026-09-05).
+            //
+            // 진입 검사가 도입되기 전에는 한 종류뿐이었다 — 표가 아직 없거나
+            // 대상을 못 찾은 경우. 지금은 **게임 스레드 밖이라 거부된 경우**가
+            // 더해졌고, 둘의 반환값이 같다(거부는 일부러 "표가 없을 때"의 길을
+            // 그대로 탄다).
+            //
+            // 그 둘을 여기서 갈라야 한다. 아래 폴백은 관리 상태를 바꾸고
+            // OnDisable 사용자 훅까지 그 자리에서 돌리는데, 워커에서 그것을 하면
+            // 방금 거부로 막은 일의 축소판을 관리 측에 다시 만드는 셈이다.
+            // 실측으로 확인했다 — `await ....ConfigureAwait(false)` 뒤의
+            // `Enabled = false`가 워커에서 OnDisable을 돌리고 있었다.
+            if (!Native.IsGameThread)
+            {
+                LogError($"[{GetType().Name}] Enabled={value} 를 게임 스레드 밖에서 바꾸려 했다 " +
+                         $"— 아무것도 적용하지 않는다(instanceId={InstanceId}). " +
+                         $"await 뒤의 재개는 프레임 경계로 돌아오지만 ConfigureAwait(false)는 그것을 " +
+                         $"포기한다 — 그 뒤에서는 엔진 상태를 만지지 마라.");
+                return;
+            }
+
             // 전달하지 못한 경우: 아직 등록 전(InstanceId 0)이거나, 오브젝트가
             // 이미 사라졌거나, 표에 이 진입점이 없는 낡은 호스트다. 조용히
             // 무시하면 '껐는데 계속 도는' 바로 그 증상으로 되돌아가므로,

@@ -263,6 +263,26 @@ Run-Step "생명주기 스레드 경계" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-thread.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 재진입(9-5 · LC4). §2.1의 대역 시험은 완료 continuation이 내부
+# Cancel()을 불러 _pending이 비면 다음 인덱스 접근이 터지는 것을 재현했다.
+# 그 시험은 내부 메서드를 직접 불렀다 — 저작 표면에서 같은 일이 되는지는 재지
+# 않았고, 계획서도 그것을 "강제 재현"이라고 적어 두었다.
+#
+# 이 항목이 그 간극을 잰다. 창을 여는 조건 둘을 저작 수단만으로 만든다:
+# ConfigureAwait(false)로 재개를 Tick 루프 안에 두고(LC5-b의 컨텍스트를 포기하는
+# 유일한 길), 대기 둘 중 나중 것을 먼저 기다려 역순 순회에 방문할 항목을 남긴다.
+#
+#   L 순회 무사고  Tick이 던지지 않았다
+#   M 이웃 온전    대조군이 훅을 잃지 않았다
+#   N 대기 생존    비활성화 뒤에도 남은 대기가 재개됐다
+#
+# M이 L의 절반을 진다 — Tick이 던지면 PrePhysicsTick 전체가 중단되어 그 프레임의
+# 모든 인스턴스가 훅과 배수를 잃는데, 픽스처 자신은 이미 제거·비활성화 중이라
+# 그 손실이 잘 안 보인다.
+Run-Step "생명주기 재진입" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-reentrancy.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
