@@ -283,6 +283,25 @@ Run-Step "생명주기 재진입" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-reentrancy.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 자기 제거·배수 재진입(9-5 · LC0 잔여). 위 항목들이 실패·스레드·재진입
+# 창을 덮는 동안 **자기 제거**는 어느 것도 보지 않았다.
+#
+# 자리를 셋으로 나눈다 — 부르는 순간 엔진이 무엇을 순회하고 있는지가 다르다.
+# ① 시작 훅 안(네이티브 드레인) ② 틱 안(_active 순회) ③ 배수 안.
+# ③은 LC5-b가 이번 세션에 새로 만든 실행 지점이다. 새 자리를 만들고 그 위에서
+# 무엇이 되는지 재지 않으면 결함이 생겨도 어느 게이트도 보지 않는다.
+#
+#   Q 축소 한 번   셋 다 end·removing·uninit 을 정확히 한 번씩 (0도 2도 아니다)
+#   R 순회 무사고  틱 예외 0 · 경계 밖 거부 0
+#   S 배수 예산    배수 안의 재게시가 다음 프레임으로 넘어간다
+#   T 대조군 온전  하네스 생존 확인
+#
+# S는 건수로 재면 안 된다 — 예산이 없어도 열 번은 다 온다. 가르는 것은 몇
+# 프레임에 걸쳤는가다. 변이로 확인했다(예산 제거 → 10회가 1프레임에 몰림).
+Run-Step "생명주기 자기 제거" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-selfremove.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
