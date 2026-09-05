@@ -37,11 +37,11 @@ dump.list	dump.show	immediate	editor	probe	live	no	no	[이름]	크래시 덤프 
 dx12.bench11	-	long	editor	probe	live	no	yes	-	DX11 vs DX12 API 오버헤드 실측(전제 검증 · Release 전용)
 dx12.decal	-	frames	editor	probe	live	no	yes	-	데칼 패스 검증(상자 판정·하늘 게이트·원본 혼합 3종·배칭)
 dx12.descriptorheap	-	frames	editor	probe	live	no	yes	-	descriptor version recycler 검증(completion·Abort·격리·넘침)
-dx12.encoderbench	-	long	editor	probe	live	no	yes	-	인코더 오버헤드 실측(R3 착수 조건 · Release 전용)
+dx12.encoderbench	-	frames	editor	probe	live	no	yes	-	인코더 오버헤드 실측(R3 착수 조건 · Release 전용)
 dx12.fog	-	frames	editor	probe	live	no	yes	-	볼류메트릭 포그 검증(산란·누적 투과율·시간축 히스토리·합성)
-dx12.forward	-	frames	editor	probe	live	no	yes	-	DX12 forward 패스를 격리 씬에서 리드백으로 판정한다
-dx12.forwardscale	-	frames	editor	probe	live	no	yes	-	DX12 forward 해상도 스케일을 판정한다
-dx12.forwardshade	-	frames	editor	probe	live	no	yes	-	DX12 forward 셰이딩 결과를 리드백으로 판정한다
+dx12.forward	-	long	editor	probe	live	no	yes	-	DX12 forward 패스를 격리 씬에서 리드백으로 판정한다
+dx12.forwardscale	-	long	editor	probe	live	no	yes	-	Forward+ 컬링이 광원 수 몇 개부터 이득인지 시간으로 잰다(벤치 · 기본 크기로는 못 돈다)
+dx12.forwardshade	-	long	editor	probe	live	no	yes	-	DX12 forward 셰이딩 결과를 리드백으로 판정한다
 dx12.gbuffer	-	frames	editor	probe	live	no	yes	-	GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)
 dx12.gizmoicon	-	frames	editor	probe	live	no	yes	-	기즈모 아이콘 패스 검증(빌보드 회전·알파 상한·배칭)
 dx12.gizmoline	-	frames	editor	probe	live	no	yes	-	기즈모 라인 패스 검증(도형 정점 수·픽셀·드로우 병합)
@@ -49,20 +49,20 @@ dx12.gizmoscene	-	frames	editor	probe	live	no	yes	-	Gizmo 씬 연결 검증(밀�
 dx12.grid	-	frames	editor	probe	live	no	yes	-	그리드 패스 검증(라인·셀 내부·밀도·카메라 반응)
 dx12.ibl	-	frames	editor	probe	live	no	yes	-	IBL 생성 체인 검증(rect→cube·조도·프리필터·BRDF LUT)
 dx12.iblshade	-	frames	editor	probe	live	no	yes	-	IBL 앰비언트 소비 검증(끔=검정·조도 방향성·금속 정반사)
-dx12.live	-	frames	editor	engine_service	live	no	no	on|status	EnhancedRenderer 메인 런타임 상태
+dx12.live	-	immediate	editor	engine_service	live	no	no	on|status	EnhancedRenderer 메인 런타임 상태
 dx12.parallel	-	frames	editor	probe	live	no	yes	-	커맨드 기록 병렬화 검증(링 원자성·순차 대비 동일성)
 dx12.post	-	frames	editor	probe	live	no	yes	-	DX12 후처리 패스를 리드백으로 판정한다
-dx12.postscale	-	frames	editor	probe	live	no	yes	-	DX12 후처리 해상도 스케일을 판정한다
+dx12.postscale	-	frames	editor	probe	live	no	yes	-	Uber post 한 패스 대 플래그별 4 패스의 시간을 비교한다(벤치)
 dx12.psocache	-	frames	editor	probe	live	no	yes	[파일]	PSO 캐시 자가 검증(2회차 컴파일 0건)
 dx12.rendergraph	-	frames	editor	probe	live	no	yes	-	렌더 그래프 검증(순서·흐름·배리어·컬링·실행)
 dx12.resize	-	frames	editor	probe	live	no	yes	-	크기 추종 검증(DX11 정책·DX12 리사이즈·리사이즈 후 렌더)
-dx12.scene	-	frames	editor	probe	live	no	yes	-	씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)
+dx12.scene	-	long	editor	probe	live	no	yes	-	씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)
 dx12.selftest	-	frames	editor	probe	requires_restart	no	yes	[파일]	DX12 브링업 자가 검증(삼각형 렌더 → PNG)
 dx12.shadowquality	-	frames	editor	probe	live	no	yes	-	그림자 품질 검증(경사 비례 편향·캐스케이드 경계 블렌딩 A/B)
 dx12.skinning	-	frames	editor	probe	live	no	yes	-	GBuffer 스키닝 검증(본 이동·가중 혼합·비스킨드 불변)
 dx12.skybox	-	frames	editor	probe	live	no	yes	-	스카이박스 패스 검증(면 방향·원평면 밀어넣기·전면 커버)
 dx12.ssao	-	frames	editor	probe	live	no	yes	-	DX12 SSAO 패스를 리드백으로 판정한다
-dx12.ssaoscale	-	frames	editor	probe	live	no	yes	-	DX12 SSAO 해상도 스케일을 판정한다
+dx12.ssaoscale	-	frames	editor	probe	live	no	yes	-	반해상도 SSAO 대 옛 64샘플 전해상도의 시간을 비교한다(벤치)
 dx12.ssgi	-	frames	editor	probe	live	no	yes	-	DX12 SSGI 패스를 리드백으로 판정한다
 dx12.ssr	-	frames	editor	probe	live	no	yes	-	SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)
 dx12.sss	-	frames	editor	probe	live	no	yes	-	SSS 패스 검증(번짐·축 분리·표면 추종·에너지)
@@ -136,11 +136,11 @@ profile.selftest	-	frames	editor	probe	live	no	no	-	CPU 프로파일러 특성�
 profile.stats	-	immediate	editor	probe	live	no	no	-	프로파일러 자체 비용과 용량 소진(교란 없음)
 quit	exit	immediate	both	engine_service	terminates_process	no	yes	-	호스트를 종료한다
 reflect.golden	-	long	editor	probe	live	no	no	[출력 경로]	등록된 전 타입의 직렬화 출력을 골든 문서로 쓴다
-render.backend	-	frames	editor	engine_service	live	no	no	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
-render.livecheck	-	frames	editor	probe	live	no	yes	[너비 높이]	resize·다중 뷰·표시 슬롯 회전 회귀 판정
-render.matmode	-	frames	editor	engine_service	live	no	no	<오브젝트> <opaque|transparent>	오브젝트 재질의 렌더링 모드를 바꾼다
-render.rtinfo	-	frames	editor	engine_service	live	no	no	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
-render.shadowinfo	-	frames	editor	engine_service	live	no	no	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)
+render.backend	-	immediate	editor	engine_service	live	no	no	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
+render.livecheck	-	immediate	editor	probe	live	no	yes	[너비 높이]	resize·다중 뷰·표시 슬롯 회전 회귀 판정
+render.matmode	-	immediate	editor	engine_service	live	no	no	<오브젝트> <opaque|transparent>	오브젝트 재질의 렌더링 모드를 바꾼다
+render.rtinfo	-	immediate	editor	engine_service	live	no	no	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
+render.shadowinfo	-	immediate	editor	engine_service	live	no	no	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)
 rhi.uploadsegments	-	frames	editor	probe	requires_restart	no	yes	-	DX12/Vulkan 완료점 기반 업로드 세그먼트 공통 검증
 scene.bonecache	-	frames	editor	probe	live	no	yes	[0|1]	E7-b A/B 토글 — 뼈 인덱스 캐시(1,기본)/매 프레임 FindBone(0)
 scene.bonedump	-	frames	editor	probe	live	no	yes	[개수]	대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)
@@ -184,11 +184,11 @@ ui.rect	-	frames	editor	engine_service	live	no	no	<오브젝트|*>	오브젝트 
 ui.status	-	immediate	editor	engine_service	live	no	no	-	UI 계층·캔버스 연결 상태를 낸다
 undo	redo	frames	editor	editor_operation	live	no	no	-	에디터의 Ctrl+Z / Ctrl+Y와 같은 호출
 undo.state	-	immediate	editor	engine_service	live	no	yes	<라벨>	편집 스택과 게임 스택의 Undo 깊이를 따로 낸다
-vk.decal	-	frames	editor	probe	live	no	yes	-	Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조
+vk.decal	-	long	editor	probe	live	no	yes	-	Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조
 vk.deferred	-	frames	editor	probe	live	no	yes	-	Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조
 vk.fog	-	frames	editor	probe	live	no	yes	-	VolumetricFog 공용 패스 — 3D scatter/history/composite 대조
 vk.forward	-	frames	editor	probe	live	no	yes	-	Forward+ 공용 패스 — compute·buffer·blend·mesh DX12/Vulkan 대조
-vk.gbuffer	-	frames	editor	probe	live	no	yes	-	GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조
+vk.gbuffer	-	long	editor	probe	live	no	yes	-	GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조
 vk.gizmoicon	-	frames	editor	probe	live	no	yes	-	실제 Camera Gizmo PNG — 2D SRV·root instance 픽셀 대조
 vk.gizmoline	-	frames	editor	probe	live	no	yes	-	GizmoLine 공용 패스 — line-list 전체 RGBA DX12/Vulkan 대조
 vk.grid	-	frames	editor	probe	live	no	yes	-	그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)

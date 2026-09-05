@@ -410,7 +410,14 @@ undo와 별개로, **활성 씬에 엔티티를 남기고 끝나는 명령이 �
 동기로 답하고 드레인을 독점한다. 서비스 기본 `mode`가 `"auto"`
 (`CommandService.cpp:513`)라 명시하지 않는 소비자에게는 이 값이 실제로 작동한다.
 
-### 5.1 싸게 적힌 것 — 55개
+> ★★★ **아래 §5.1 의 추정은 2026-09-06 실측이 뒤집었다. §6.6 을 먼저 볼 것.**
+>
+> "렌더 프로브 52개가 디바이스를 세우니 초 단위일 것" 은 구조로는 맞고 **크기로는
+> 틀렸다.** Release 실측에서 62개 중 1초를 넘는 것은 **7개**뿐이고 절반 가까이가
+> 100ms 미만이다. 디바이스를 세우는 것은 사실이지만 그 비용이 초 단위가 아니었다.
+> 결과적으로 `cost` 를 고친 것은 55개가 아니라 **13개**다.
+
+### 5.1 싸게 적힌 것 — 55개 (추정 · 뒤집혔다)
 
 **렌더 프로브 52개는 한 핸들러 호출 안에서 그래픽 디바이스를 새로 세운다.**
 추론이 아니라 구조다. `VulkanGridTest.cpp:107` `LoadLoader` → `:115`
@@ -522,14 +529,14 @@ operation 레코드**가 생긴다(`CommandService.cpp:566-575`가 enqueue 전�
 | 3 | `experiment.*` 계층 1+2 12개를 contract probe로 이관 | **5/12 완료 2026-09-05** (§6.2) | 나머지는 결정 필요 |
 | 4 | `model.place` undo 배선 (3줄) | **배선 완료 2026-09-05 · 런타임 미검증** (§6.3) | |
 | ~~5~~ | ~~`object.create` undo 배선 → `object.create.undoable` 제거~~ | **완료 2026-09-05** (§6.4) | |
-| 6 | `*scale` 셋의 요약·`cost` 정정 | 표기만 | 쉬움 |
+| ~~6~~ | ~~`*scale` 셋의 요약·`cost` 정정~~ | **완료 2026-09-06** (§6.6) | |
 | ~~7~~ | ~~죽은 별칭 이름 4개 제거~~ | **철회 2026-09-06** — 넷 다 살아 있는 조작이다(§3.5 ★). 처분은 (가)/(나) 결정 사항 | |
 | 8 | `uploadring`/`uploadsegments` 짝 결정 | registry −1 | 결정 필요 |
 | 9 | `window.info`→`render.rtinfo`, `model.loadcached` 처분 | registry −2 | 중간 |
 | 10 | scene X0·X8 병합, 토글 둘을 `traversalbench` 인자로 | registry −4 | 중간 |
 | 11 | 게이트 확장(8→전수, `object.transform` 케이스 수정) | 검증 강화 | 쉬움 |
-| 12 | **`lc6-live-classification.ps1` 재실행 + TSV 커밋** | 측정 | 쉬움 |
-| 13 | 12번 수치로 `cost` 재분류(55개 `Long`, 11개 `Immediate`) | 표기 + 서비스 거동 | 중간 |
+| ~~12~~ | ~~`lc6-live-classification.ps1` 재실행 + TSV 커밋~~ | **완료 2026-09-06** (§6.6) | |
+| ~~13~~ | ~~12번 수치로 `cost` 재분류~~ | **완료 2026-09-06 — 55개가 아니라 13개였다** (§6.6) | |
 
 12번은 따로 떼어 둘 만하다. `cost`를 구조 추론으로 55개나 옮기는 것보다, **이미
 있는 스크립트를 한 번 돌려 명령별 ms를 남기는 편이 싸고 정직하다.** LC6이 그
@@ -693,11 +700,17 @@ editor-operation 은 §6.3 의 `model.place` 측정 불가로 붉다(의도).
 ★ **그런데 Debug 에서는 떴다.** 다른 의존이 자기 목적으로 `WSAStartup` 을 해 주고
   있었고 서비스 소켓이 **남의 초기화에 얹혀** 있었다. Release 에는 그것이 없다.
 
-★★ **왜 아무도 못 봤나 — 서비스 게이트 여섯이 전부 `-Exe` 기본값이 Debug 다.**
+★★ **왜 아무도 못 봤나 — 서비스 게이트 일곱이 전부 Debug 를 기본으로 쓴다.**
   `verify-cli-service` · `verify-cli-drain` · `verify-cli-editor-operation` ·
   `verify-cli-script-reload` · `verify-cli-script-invoke` ·
-  `lc6-live-classification`. LC4~LC8 이 연 것 전부가 Debug 에서만 검증됐고,
-  §18 의 "Editor Debug/Release 가 통과한다" 는 서비스에 대해 **참인 적이 없었다.**
+  `lc6-live-classification` 은 `-Exe` 기본값이 `x64-Debug` 이고,
+  `verify-player-command-service` 는 `-Config` 기본값이 `Debug` 다.
+  LC4~LC8 이 연 것 전부가 Debug 에서만 검증됐고, §18 의 "Editor Debug/Release 가
+  통과한다" 는 서비스에 대해 **참인 적이 없었다.**
+
+  Player 도 같은 `Service::Start` 를 쓰므로 이 수정이 함께 덮는다. 다만 이
+  기계의 Release Player 는 9 월 2 일자 — LC8 이 `CommandService` 를 솔루션에
+  넣기 전이라 서비스 자체가 없다. **Release Player 는 미검증으로 남는다.**
 
   이 저장소는 같은 모양을 이미 두 번 겪었다 — LC8 이 `build.ps1` 에 구성 표식을
   넣은 이유, scene 이행 때 9/4 Release 바이너리로 초록을 받을 뻔한 일. 셋 다
@@ -705,6 +718,52 @@ editor-operation 은 §6.3 의 `model.place` 측정 불가로 붉다(의도).
 
 고친 것은 `Service::Start` 에 함수 지역 static `SocketSubsystem` 하나다.
 고친 뒤 `verify-cli-service.ps1` 을 **Release 로** 돌려 전체 통과를 확인했다.
+
+### 6.6 12·13번 실행 기록 — `cost` 를 재서 고쳤다 (2026-09-06)
+
+`lc6-live-classification.ps1` 을 **Release 로** 돌려 62개의 명령별 왕복 ms 를
+얻었다. 산출물을 `Tools/regression/cli_cost.measured.tsv` 로 **커밋했다** —
+LC6 때 이 측정을 이미 했는데 `$env:TEMP` 로 보내 잃었고(§5.1), `artifacts/` 는
+gitignore 라 거기 두면 같은 일이 반복된다.
+
+**분포 (Release, pass1)**
+
+| 구간 | 수 |
+|---|---:|
+| ≥ 1,000ms | **7** |
+| 100 ~ 999ms | 30 |
+| < 100ms | 25 |
+
+★ **가설이 뒤집혔다.** §5.1 은 "렌더 프로브 52개가 한 호출 안에서 그래픽
+  디바이스를 세우니 `Long`(초 단위)" 이라고 적었다. 구조는 맞았다 — 실제로 세운다.
+  **크기가 틀렸다.** 대부분 수십~수백 ms 다. include 표면으로 링크 폐포를 추정했다
+  실측에 정정당한 §3.2 와 같은 종류의 오독이고, 이번에도 정정한 것은 측정이다.
+
+**고친 13개**
+
+| 방향 | 명령 | 실측 |
+|---|---|---|
+| `frames` → `long` | `dx12.forwardshade` 5,251 · `vk.gbuffer` 5,237 · `dx12.forwardscale` 1,930 · `dx12.scene` 1,656 · `dx12.forward` 1,491 · `vk.decal` 1,106 | ms |
+| `long` → `frames` | `dx12.encoderbench` | **93ms** — 이름이 bench 라 비싸게 적혀 있었다 |
+| `frames` → `immediate` | `render.livecheck` 6 · `render.matmode` 5 · `dx12.live` 4 · `render.backend` 4 · `render.shadowinfo` 4 · `render.rtinfo` 3 | ms |
+
+`dx12.encoderbench` 가 반대 방향이라는 것이 §5.3 의 진단을 확인한다 — 값은 동작이
+아니라 **요약 문구의 낱말**("bench")을 보고 정해지고 있었다.
+
+분포: `long` 25 → **30**, `frames` 145 → **134**, `immediate` 34 → **40**.
+
+**§6 의 6번도 같이 닫았다.** `*scale` 셋의 요약이 "해상도 스케일을 판정한다" 였는데
+셋 다 **시간 비교 벤치**다. 문구를 실제 동작으로 고쳤다. `dx12.forwardscale` 만
+`Long` 이고 `postscale`(950ms) · `ssaoscale`(603ms) 은 측정상 `Frames` 다 —
+이름이 같은 계열이라고 값이 같지 않다.
+
+★★ **`dx12.live` 는 pass1 4ms, 단독 재검 4,014ms 다.** 단독은 에디터를 새로
+  띄우므로 첫 접촉 비용이 섞인다. 서비스는 **켜져 있는 에디터**에 붙는 창구이므로
+  pass1(웜) 이 그 계약에 맞는 값이다. 두 열을 TSV 에 다 남겨 두었다.
+
+**게이트**: registry-golden · discovery · service · drain · exit-spine 통과.
+`drain` 은 `game.pak`(`Long`)이 **202 로 오는 것**을 단정하는 게이트라 이 변경의
+직접 대조군이다.
 
 ## 7. 이 조사가 **하지 않은** 것
 

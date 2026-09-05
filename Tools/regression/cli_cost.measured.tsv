@@ -1,0 +1,63 @@
+command	verdict	pass1_http	pass1_status	pass1_ms	solo_http	solo_status	solo_ms	message
+dx12.bench11	not-live	200	failed	1888	200	failed	2114	dx12.bench11 실패
+dx12.decal	live	200	succeeded	123				dx12.decal 통과
+dx12.descriptorheap	live	200	succeeded	43				dx12.descriptorheap 통과
+dx12.encoderbench	live	200	succeeded	93				dx12.encoderbench 통과
+dx12.fog	live	200	succeeded	254				dx12.fog 통과
+dx12.forward	live	200	succeeded	1491				dx12.forward 통과
+dx12.forwardscale	live	200	succeeded	1930				dx12.forwardscale 통과
+dx12.forwardshade	live	200	succeeded	5251				dx12.forwardshade 통과
+dx12.gbuffer	live	200	succeeded	253				dx12.gbuffer 통과
+dx12.gizmoicon	live	200	succeeded	84				dx12.gizmoicon 통과
+dx12.gizmoline	live	200	succeeded	64				dx12.gizmoline 통과
+dx12.gizmoscene	live	200	succeeded	148				dx12.gizmoscene 통과
+dx12.grid	live	200	succeeded	84				dx12.grid 통과
+dx12.ibl	live	200	succeeded	141				dx12.ibl 통과
+dx12.iblshade	live	200	succeeded	513				dx12.iblshade 통과
+dx12.live	not-live	200	legacy_unreported	4	200	legacy_unreported	4014	
+dx12.parallel	live	200	succeeded	60				dx12.parallel 통과
+dx12.post	live	200	succeeded	189				dx12.post 통과
+dx12.postscale	live	200	succeeded	950				dx12.postscale 통과
+dx12.psocache	live	200	succeeded	125				dx12.psocache 통과
+dx12.rendergraph	live	200	succeeded	44				dx12.rendergraph 통과
+dx12.resize	live	200	succeeded	43				dx12.resize 통과
+dx12.scene	not-live	200	failed	1656	200	failed	5651	dx12.scene 실패
+dx12.selftest	not-live	500	internal_error	45	500	internal_error	2069	핸들러 예외: Unknown exception
+dx12.shadowquality	live	200	succeeded	434				dx12.shadowquality 통과
+dx12.skinning	live	200	succeeded	379				dx12.skinning 통과
+dx12.skybox	live	200	succeeded	71				dx12.skybox 통과
+dx12.ssao	live	200	succeeded	131				dx12.ssao 통과
+dx12.ssaoscale	live	200	succeeded	603				dx12.ssaoscale 통과
+dx12.ssgi	live	200	succeeded	314				dx12.ssgi 통과
+dx12.ssr	live	200	succeeded	91				dx12.ssr 통과
+dx12.sss	live	200	succeeded	81				dx12.sss 통과
+dx12.ui	live	200	succeeded	71				dx12.ui 통과
+dx12.uploadring	not-live	200	failed	57	200	failed	2017	dx12.uploadring 실패
+dx12.wireframe	live	200	succeeded	82				dx12.wireframe 통과
+pipeline.nodes	not-live	200	legacy_unreported	3	200	legacy_unreported	1968	
+render.backend	not-live	200	legacy_unreported	4	200	legacy_unreported	4106	
+render.livecheck	live	200	succeeded	6				render.livecheck 통과
+render.matmode	not-live	200	legacy_unreported	5	200	legacy_unreported	1858	
+render.rtinfo	not-live	200	legacy_unreported	3	200	legacy_unreported	1843	
+render.shadowinfo	not-live	200	legacy_unreported	4	200	legacy_unreported	1850	
+rhi.uploadsegments	not-live	500	internal_error	85	500	internal_error	2127	핸들러 예외: Unknown exception
+vk.decal	live	200	succeeded	1106				vk.decal 통과
+vk.deferred	not-live	200	failed	804	200	failed	3366	vk.deferred 실패
+vk.fog	live	200	succeeded	751				vk.fog 통과
+vk.forward	not-live	200	failed	151	200	failed	2068	vk.forward 실패
+vk.gbuffer	not-live	200	failed	5237	200	failed	8949	vk.gbuffer 실패
+vk.gizmoicon	live	200	succeeded	141				vk.gizmoicon 통과
+vk.gizmoline	live	200	succeeded	218				vk.gizmoline 통과
+vk.grid	live	200	succeeded	143				vk.grid 통과
+vk.ibl	live	200	succeeded	219				vk.ibl 통과
+vk.parallel	live	200	succeeded	88				vk.parallel 통과
+vk.post	live	200	succeeded	445				vk.post 통과
+vk.selftest	not-live	500	internal_error	35	500	internal_error	2082	핸들러 예외: Unknown exception
+vk.shadow	live	200	succeeded	356				vk.shadow 통과
+vk.skybox	live	200	succeeded	133				vk.skybox 통과
+vk.ssao	live	200	succeeded	296				vk.ssao 통과
+vk.ssgi	live	200	succeeded	488				vk.ssgi 통과
+vk.ssr	live	200	succeeded	302				vk.ssr 통과
+vk.sss	live	200	succeeded	241				vk.sss 통과
+vk.ui	live	200	succeeded	296				vk.ui 통과
+vk.wireframe	live	200	succeeded	235				vk.wireframe 통과
