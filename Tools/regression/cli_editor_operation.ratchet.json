@@ -1,10 +1,9 @@
 {
   "schema": "lc6-editor-operation-undo v1",
-  "recorded": "2026-09-04",
+  "recorded": "2026-09-05",
   "note": "editor_operation 명령이 편집 Undo 스택에 항목을 남기는가. 실측값이다.",
   "undo": {
-    "object.create": false,
-    "object.create.undoable": true,
+    "object.create": true,
     "object.rename": false,
     "object.duplicate": false,
     "object.parent": false,

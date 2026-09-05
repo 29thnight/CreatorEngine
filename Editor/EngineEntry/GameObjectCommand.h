@@ -39,6 +39,12 @@ namespace Meta
             m_index = obj ? obj->m_index : Entity::INVALID_INDEX;
         }
 
+        // 만들어진 오브젝트의 인덱스. `Execute` 가 `Redo` 를 부른 뒤에 유효하고,
+        // 실패했으면 `INVALID_INDEX` 다. 형제인 `DuplicateGameObjectCommand` 가
+        // 같은 이름의 접근자를 이미 갖고 있다 — 호출부가 생성 성공 여부를
+        // 알아야 하는데 command 가 그것을 삼키고 있었다.
+        [[nodiscard]] Entity::Index GetCreatedIndex() const noexcept { return m_index; }
+
     private:
         Scene* m_scene;
         std::string m_name;

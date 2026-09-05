@@ -54,7 +54,11 @@ try {
         "wait 5"
         "scene.selection edit_before"      # 기준선 — 비어 있어야 이후 단정이 의미를 갖는다
         "undo.state edit_pre"
-        "object.create.undoable $undoProbe"
+        # 2026-09-05: `object.create.undoable` 이 사라졌다 — `object.create` 가
+        # Undo 를 남기게 되면서 우회로일 이유가 없어졌다. 이 게이트가 필요로 하는
+        # 것은 "편집 스택에 항목 하나를 확실히 밀어 넣는 것" 이고, 아래 무의미성
+        # 방지 3 이 그것이 실제로 먹었는지를 여전히 단정한다.
+        "object.create $undoProbe"
         "undo.state edit_pushed"           # 무의미성 방지: push가 실제로 먹었는가
         "scene.select $selectTarget"
         "scene.selection edit_selected"    # 무의미성 방지: select가 실제로 먹었는가
@@ -143,7 +147,7 @@ try {
 
     # ── 무의미성 방지 3: undo push가 실제로 먹었는가 ──
     if ($undoPushed.EditUndo -ne ($undoPre.EditUndo + 1)) {
-        throw ("object.create.undoable did not push onto the edit stack: " +
+        throw ("object.create did not push onto the edit stack: " +
             "before=$($undoPre.EditUndo) after=$($undoPushed.EditUndo) — " +
             "the clear assertion below would be vacuous")
     }

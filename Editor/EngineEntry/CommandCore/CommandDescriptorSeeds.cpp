@@ -143,7 +143,6 @@ namespace CommandCore
             { "model.loadcached", CommandCost::Long, "<모델 경로>", "에디터 드롭 경로(LoadCachedModelShared)로 모델을 연다", CommandClass::EngineService, CommandLiveness::Live },
             { "model.place", CommandCost::Frames, "<이름>", "임포트한 모델을 활성 씬에 배치한다", CommandClass::EngineService, CommandLiveness::Live },
             { "object.create", CommandCost::Frames, "<이름> [타입]", "빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)", CommandClass::EditorOperation, CommandLiveness::Live },
-            { "object.create.undoable", CommandCost::Frames, "<이름>", "Undo 이력을 쌓으며 오브젝트를 만든다", CommandClass::EditorOperation, CommandLiveness::Live },
             { "object.duplicate", CommandCost::Frames, "<오브젝트> [새 이름]", "오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)", CommandClass::EditorOperation, CommandLiveness::Live },
             { "object.parent", CommandCost::Frames, "<자식> <부모 | ->", "오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)", CommandClass::EditorOperation, CommandLiveness::Live },
             { "object.property", CommandCost::Frames, "<오브젝트> <컴포넌트> <필드> <값>", "리플렉션으로 프로퍼티를 설정한다", CommandClass::EditorOperation, CommandLiveness::Live },

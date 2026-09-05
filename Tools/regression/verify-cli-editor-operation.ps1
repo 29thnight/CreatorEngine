@@ -24,16 +24,31 @@ param(
 #
 # ── 실측이 말한 것 ──────────────────────────────────────────────────────
 #
-# 서비스로 불러 `undo.state` 의 editUndo 를 앞뒤로 재 보면, **14 개 중 하나만**
-# Undo 를 남긴다(`object.create.undoable`). `object.create` 도 `object.rename` 도
-# `object.duplicate` 도 남기지 않는다. 사람이 GUI 로 한 것과 에이전트가 HTTP 로
-# 한 것이 같은 조작인데 한쪽만 되돌릴 수 있다.
+# 서비스로 불러 `undo.state` 의 editUndo 를 앞뒤로 재 보면, 2026-09-04 시점에는
+# **8 개 중 하나만** Undo 를 남겼다 — 그런데 그 하나가 `object.create.undoable`,
+# 즉 `object.create` 를 못 고쳐서 만든 우회로였다. 조작이 하나인데 이름이 둘이고,
+# 갈린 이유가 "게이트가 깨질까 봐" 였다.
 #
-# ── 왜 고치지 않고 못 박는가 ────────────────────────────────────────────
+# ── 2026-09-05 에 둘을 하나로 만들었다 ──────────────────────────────────
+#
+# `object.create` 가 GUI 와 같은 `CreateEntityCommand` 를 쓰게 하고,
+# `object.create.undoable` 을 지웠다. 실측으로 갈렸다:
+#
+#   이행 전  create 후 editUndo 0 · undo 해도 오브젝트가 남음
+#   이행 후  create 후 editUndo 1 · undo 하면 사라지고 redo 스택 1
+#
+# 부모 인덱스는 바뀌지 않았다(양쪽 digest 가 `|0|`) — `Scene::CreateEntity` 의
+# `parentIndex >= size` 폴백이 `-1` 과 `0` 을 같은 곳으로 보낸다.
+#
+# 같은 날 `model.place` 도 붙였다. 그것은 class 가 `engine_service` 라 이 게이트
+# 밖에 있었는데, **분류가 측정 범위를 정하고 있어서 분류가 틀린 자리가 보이지
+# 않았다.**
+#
+# ── 왜 나머지는 고치지 않고 못 박는가 ───────────────────────────────────
 #
 # §9 의 완료 기준은 "GUI/서비스 의미 차이 **미분류** 0" 이다. 없애라가 아니라
-# 분류하라다. 13 개에 Undo 를 붙이는 것은 각 명령의 저작 의미를 정하는 일이라
-# 파일 분리와 같은 슬라이스에 들어갈 크기가 아니다.
+# 분류하라다. 남은 것들에 Undo 를 붙이는 것은 각 명령의 저작 의미를 정하는
+# 일이라(무엇을 하나의 되돌림 단위로 볼 것인가) 한 슬라이스에 다 들어가지 않는다.
 #
 # 그래서 지금 참인 것을 값으로 적어 둔다. 이 표가 바뀌면 — 누가 Undo 를 붙였든
 # 있던 것을 떨어뜨렸든 — 붉어진다. 분류되지 않은 채 조용히 움직이는 것만 막는다.
@@ -99,7 +114,6 @@ function Get-SceneObjects {
 # 각 항목: 라벨 · 보낼 명령 · 이 명령을 부르기 전에 준비할 것
 $cases = @(
     @{ Name = 'object.create';          Body = '{"command":"object.create","args":["OpProbeA"],"mode":"sync"}' }
-    @{ Name = 'object.create.undoable'; Body = '{"command":"object.create.undoable","args":["OpProbeB"],"mode":"sync"}' }
     @{ Name = 'object.rename';          Body = '{"command":"object.rename","args":["OpProbeA","OpProbeA2"],"mode":"sync"}' }
     @{ Name = 'object.duplicate';       Body = '{"command":"object.duplicate","args":["OpProbeB"],"mode":"sync"}' }
     @{ Name = 'object.parent';          Body = '{"command":"object.parent","args":["OpProbeB","OpProbeA2"],"mode":"sync"}' }
@@ -115,6 +129,21 @@ $cases = @(
     @{ Name = 'model.place'; RequiresModel = $true
        Body = '{"command":"model.place","args":["' + $ModelStem + '"],"mode":"sync"}' }
 )
+
+# ★ 픽스처를 **측정 밖에서** 세운다.
+#
+#   `OpProbeB` 는 예전에 `object.create.undoable` 케이스가 만들어 주고 있었다.
+#   그 명령이 2026-09-05 에 사라지면서(=`object.create` 가 Undo 를 남기게 되어
+#   존재 이유가 없어졌다) 이 이름을 만드는 곳이 없어졌고, 뒤의 다섯 케이스
+#   (`duplicate`·`parent`·`transform`·`component.add`·`property`)가 **없는
+#   오브젝트를 가리키게 됐다.**
+#
+#   그러면 그것들은 아무것도 못 하고 editUndo 가 그대로라 `false` 를 기록하는데,
+#   래칫에도 `false` 라 **초록으로 통과한다.** 판정이 맞아서가 아니라 둘 다
+#   아무것도 안 해서 맞는 것이다 — 이 게이트가 잡으려는 바로 그 종류의 거짓말이다.
+#
+#   그래서 여기서 만든다. 이 호출은 측정 대상이 아니다.
+$null = Invoke-Cmd '{"command":"object.create","args":["OpProbeB"],"mode":"sync"}'
 
 $observed = [ordered]@{}
 $unmeasured = New-Object System.Collections.Generic.List[string]
@@ -160,13 +189,6 @@ try {
 }
 finally { Stop-AllEditors }
 
-if ($unmeasured.Count -ne 0) {
-    "측정하지 못한 케이스가 있다 — 초록으로 넘기지 않는다:"
-    $unmeasured | ForEach-Object { "  $_" }
-    "  (모델 코퍼스가 있는 기계에서 돌리거나 -ModelStem 으로 있는 모델을 지정할 것)"
-    exit 1
-}
-
 if ($Update) {
     $payload = [ordered]@{
         schema   = 'lc6-editor-operation-undo v1'
@@ -176,7 +198,23 @@ if ($Update) {
     }
     $payload | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ratchetPath -Encoding UTF8
     "래칫을 지금 상태로 기록했다: $ratchetPath"
+    # ★ 측정 못 한 케이스는 **애초에 observed 에 없으므로** 래칫에도 안 들어간다.
+    #   있던 값을 지우는 것이 아니라 없는 값을 안 만드는 것이다. 그래도 무엇을
+    #   못 쟀는지는 말해 준다 — 조용히 빠지면 다음 사람이 그 명령이 검사되고
+    #   있다고 믿는다.
+    if ($unmeasured.Count -ne 0) {
+        "다만 아래는 이번에 재지 못해 래칫에 넣지 않았다:"
+        $unmeasured | ForEach-Object { "  $_" }
+    }
     exit 0
+}
+
+# 검증 경로에서는 측정 실패를 통과로 넘기지 않는다.
+if ($unmeasured.Count -ne 0) {
+    "측정하지 못한 케이스가 있다 — 초록으로 넘기지 않는다:"
+    $unmeasured | ForEach-Object { "  $_" }
+    "  (모델 코퍼스가 있는 기계에서 돌리거나 -ModelStem 으로 있는 모델을 지정할 것)"
+    exit 1
 }
 
 if (-not (Test-Path -LiteralPath $ratchetPath)) {

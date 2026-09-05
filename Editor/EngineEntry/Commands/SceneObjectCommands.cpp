@@ -572,8 +572,24 @@ namespace ConsoleCmd
             }
         }
 
-        auto object = scene->CreateEntity(name, type);
-        if (!object)
+        // ★ 2026-09-05 — Undo 를 남긴다. 예전에는 `scene->CreateEntity` 를 직접
+        //   불렀고, 그래서 사람이 GUI 로 만든 오브젝트는 Ctrl+Z 로 지워지는데
+        //   에이전트가 HTTP 로 만든 것은 남았다. GUI 가 쓰던 command 를 이제
+        //   CLI 도 쓴다(`HierarchyWindow` 와 같은 것).
+        //
+        // ★★ **부모 인덱스는 바뀌지 않는다.** 예전 호출은 3번째 인자를 생략해
+        //   `parentIndex = -1` 이었고 `CreateEntityCommand` 의 기본값은 `0` 이라
+        //   갈리는 것처럼 보이지만, `Scene::CreateEntity` 안의
+        //   `parentIndex >= m_Entities.size()` 폴백이 둘을 만나게 한다 —
+        //   `Entity::Index` 는 unsigned 라 `-1` 이 `INVALID_INDEX` 가 되고,
+        //   그 값은 언제나 size 보다 크므로 `kSceneRootIndex(0)` 로 정규화된다.
+        //   조사 단계에서 이 자리를 "거동이 갈린다" 로 적었는데, 폴백을 읽지 않은
+        //   판단이었다. 실측으로도 확인했다(아래 회귀).
+        auto command = std::make_unique<Meta::CreateEntityCommand>(scene, name, type);
+        Meta::CreateEntityCommand* created = command.get();
+        Meta::UndoManager::GetInstance()->Execute(std::move(command));
+
+        if (!Entity::IsValidIndex(created->GetCreatedIndex()))
         {
             std::printf("[CLI] 오브젝트 생성 실패: %s\n", name.c_str());
             return;
@@ -1708,24 +1724,6 @@ namespace ConsoleCmd
     // 기존 object.create는 Undo 스택을 건드리지 않는다. 그 성질에 이미 여러 게이트가
     // 기대고 있으므로 바꾸지 않고, 이력을 쌓는 별도 명령을 둔다.
 
-    static void Cmd_object_create_undoable(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-        if (parts.size() < 2)
-        {
-            std::printf("[CLI] 사용법: object.create.undoable <이름>\n");
-            return;
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
-
-        Meta::UndoManager::GetInstance()->Execute(
-            std::make_unique<Meta::CreateEntityCommand>(
-                scene, parts[1], GameObjectType::Empty));
-        std::printf("[CLI] undo 기록과 함께 생성: %s\n", parts[1].c_str());
-    }
-
     // 선택 상태 관측. scene.select가 실제로 먹었는지, 정지가 선택을 어떻게 하는지
     // 둘 다 이것으로 본다.
     //
@@ -1833,7 +1831,6 @@ namespace ConsoleCmd
         reg.Result({ "play.state" }, &Cmd_play_state);
         reg.Result({ "undo.state" }, &Cmd_undo_state);
         reg.Legacy({ "undo", "redo" }, &Cmd_undo_redo);
-        reg.Legacy({ "object.create.undoable" }, &Cmd_object_create_undoable);
         reg.Result({ "scene.selection" }, &Cmd_scene_selection);
         reg.Result({ "scene.dump" }, &Cmd_scene_dump);
     }

@@ -490,7 +490,7 @@ operation 레코드**가 생긴다(`CommandService.cpp:566-575`가 enqueue 전�
 | ~~2~~ | ~~`render.exposure` 제거~~ | **완료 2026-09-05** | |
 | 3 | `experiment.*` 계층 1+2 12개를 contract probe로 이관 | **5/12 완료 2026-09-05** (§6.2) | 나머지는 결정 필요 |
 | 4 | `model.place` undo 배선 (3줄) | **배선 완료 2026-09-05 · 런타임 미검증** (§6.3) | |
-| 5 | `object.create`에 undo 배선 → `object.create.undoable` 제거 | 거동 변경 | 중간 |
+| ~~5~~ | ~~`object.create` undo 배선 → `object.create.undoable` 제거~~ | **완료 2026-09-05** (§6.4) | |
 | 6 | `*scale` 셋의 요약·`cost` 정정 | 표기만 | 쉬움 |
 | 7 | 죽은 별칭 이름 4개 제거(`mem.delta`·`mem.reset`·`mem.hook`·`dump.show`) | 이름 −4 | 쉬움 |
 | 8 | `uploadring`/`uploadsegments` 짝 결정 | registry −1 | 결정 필요 |
@@ -606,6 +606,45 @@ RenderTests 두 프로젝트가 include 순서를 **서로 다르게** 두기 �
 그래서 이 게이트는 지금 이 기계에서 **붉다.** 모델 코퍼스가 있는 기계에서, 또는
 `-ModelStem` 으로 있는 모델을 지정하면 판정이 난다. 기존 8개는 래칫과 그대로
 일치한다(`object.create.undoable` 만 기록, 나머지 7개는 안 남김).
+
+### 6.4 5번 실행 기록 (2026-09-05)
+
+명령 **205 → 204**. `object.create` 가 GUI 와 같은 `Meta::CreateEntityCommand` 를
+쓰게 하고, 그 우회로였던 `object.create.undoable` 을 지웠다.
+
+이행 전후를 같은 시나리오로 각각 태웠다(이행 전 = 9/4 Release):
+
+| | 이행 전 | 이행 후 |
+|---|---|---|
+| create 후 `editUndo` | **0** | **1** |
+| `undo` 후 오브젝트 | **남음** | **사라짐**(redo 스택 1) |
+| digest 의 parent 표기 | `1\|OcAlpha\|0\|…` | **같음** |
+| `hierarchycheck` 오브젝트 수 | 2 | 1 |
+
+★ **조사가 "부모가 갈린다" 고 적은 것은 틀렸다.** `object.create` 는 3번째 인자를
+  생략해 `parentIndex = -1`, `CreateEntityCommand` 의 기본값은 `0` 이라 갈리는
+  것처럼 보였다. 그런데 `Scene::CreateEntity` 안에
+  `if (parentIndex >= m_Entities.size()) parentIndex = kSceneRootIndex;` 가 있고,
+  `Entity::Index` 가 unsigned 라 `-1` 은 `INVALID_INDEX` 가 되어 **항상** 그 폴백에
+  걸린다. 호출부만 읽고 판단한 결과였다. 위 표의 `|0|` 이 실측 확인이다.
+
+`CreateEntityCommand` 에 `GetCreatedIndex()` 를 더했다 — 호출부가 생성 성공 여부를
+알아야 하는데 command 가 그것을 삼키고 있었다. 형제인 `DuplicateGameObjectCommand`
+가 같은 이름의 접근자를 이미 갖고 있다.
+
+★★ **게이트에서 조용한 거짓 초록을 하나 만들 뻔했다.** 지운 케이스가
+  `OpProbeB` 를 만들어 주던 자리였고, 뒤의 다섯 케이스가 그 이름을 쓴다. 그대로
+  두면 그것들이 없는 오브젝트를 가리켜 아무것도 못 하고 `false` 를 기록하는데,
+  **래칫에도 `false` 라 통과한다** — 판정이 맞아서가 아니라 양쪽이 다 아무것도
+  안 해서 맞는 것이다. 픽스처 생성을 측정 밖으로 뺐다.
+
+`verify-play-selection-undo.ps1` 도 이 명령을 쓰고 있었다(exit 2 로 붉어져서
+알았다). `object.create` 로 옮겼고, 그 게이트의 무의미성 방지 검사가 push 가
+실제로 먹었는지를 여전히 단정한다 — 통과.
+
+**게이트**: registry-golden · discovery · exit-spine · exit-contract ·
+consumer-contract · experiment-contract · play-selection-undo 통과.
+editor-operation 은 §6.3 의 `model.place` 측정 불가로 붉다(의도).
 
 ## 7. 이 조사가 **하지 않은** 것
 

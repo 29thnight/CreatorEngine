@@ -784,6 +784,13 @@ GUI로 한 것과 에이전트가 HTTP로 한 것이 같은 조작인데 다른 
 | `object.create.undoable` | **남긴다** |
 | `object.create` · `object.rename` · `object.duplicate` · `object.parent` · `object.transform` · `component.add` · `object.property` | 남기지 않는다 |
 
+★ **2026-09-05 — 이 표의 첫 줄이 사라졌다.** `object.create` 가 GUI 와 같은
+  `CreateEntityCommand` 를 쓰게 되면서 `object.create.undoable` 은 존재 이유가
+  없어져 제거됐다. 실측: create 후 `editUndo` 0 → **1**, `undo` 하면 오브젝트가
+  실제로 사라진다(이행 전에는 남았다). 부모 표기는 불변이다. 지금 표는
+  `object.create` **남긴다** · 나머지 여섯 남기지 않는다 이고, 래칫이 그것을
+  못 박는다. 경위는 `docs/analysis/CommandRegistryAudit.md` §6.4.
+
 `object.create`와 `object.create.undoable`이 **따로 존재한다는 것 자체**가 신호였다.
 
 ★ **2026-09-05 — 이 표 밖에 더 나쁜 자리가 있었다: `model.place`.**
