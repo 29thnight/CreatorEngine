@@ -1,0 +1,26 @@
+# LC7 대기 인자 픽스처 (ScriptLifecycleContractHardeningPlan · LC7-b)
+#
+# 판정은 verify-lifecycle-delayarg.ps1이 한다.
+#
+# 재생 하나면 충분하다 — 여기서 재는 것은 세대 간 비교가 아니라 한 재생 안에서
+# 대기 인자 다섯 종이 각각 몇 프레임을 쓰는가다. 다섯 사례가 순서대로 이어지므로
+# 재생 구간이 그것들을 전부 담을 만큼 길어야 한다(연쇄 5칸 + 앞의 셋 + 여유).
+#
+# 마지막 사례(무한대)는 정지가 끊어야 풀린다. 그래서 stop 전에 재생을 넉넉히
+# 두고, stop 뒤에도 취소 표지가 로그에 닿을 시간을 준다.
+
+wait 60
+scene.new LifecycleDelayArg
+wait 30
+
+object.create DelayArg
+script.add DelayArg DelayArgumentProbe
+wait 60
+
+play
+wait 180
+stop
+wait 60
+
+log.flush
+quit

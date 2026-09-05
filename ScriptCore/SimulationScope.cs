@@ -37,6 +37,20 @@ public sealed class SimulationScope
         /// 초당 몇 번씩 기다리면 그 수만큼 그대로 쌓인다.
         /// </summary>
         public CancellationTokenRegistration Registration;
+
+        /// <summary>
+        /// 이 대기가 등록된 엔진 프레임 (LC7-b · 2026-09-05).
+        ///
+        /// <see cref="SimulationScope.Tick"/>이 이 프레임에는 만기 판정을 하지 않는다.
+        /// 없으면 <c>Delay(0f)</c>가 등록 위치에 따라 0 프레임이 되기도, 1 프레임이
+        /// 되기도 한다 — 갈림은 등록이 그 프레임의 <c>Tick</c>보다 앞이냐 뒤냐이고,
+        /// 그것은 네이티브가 훅을 프레임의 어느 지점에서 부르는지에 달렸다.
+        /// 저작자가 볼 수도 제어할 수도 없는 값이라 계약이 될 수 없다.
+        ///
+        /// 실측(착수 시점): OnSimulate 첫 줄의 <c>Delay(0f)</c>는 159 → 159,
+        /// 그 다음 줄의 것은 159 → 160.
+        /// </summary>
+        public ulong CreatedFrame;
     }
 
     private CancellationTokenSource _cts = new();
@@ -49,13 +63,47 @@ public sealed class SimulationScope
     /// seconds 뒤에 완료되는 태스크. 엔진 프레임 dt로 흐르므로 <c>await Scope.Delay(3f)</c>가
     /// <c>while(timer &gt; 3) yield</c> 폴링을 대신하는 관용구가 된다. 스코프가 먼저
     /// 취소되면(OnEndSimulation) 대기도 함께 취소된다.
+    ///
+    /// ── 인자의 뜻 (LC7-b) ──
+    ///
+    /// <list type="bullet">
+    /// <item><b>0 이하</b> — 다음 프레임까지. 음수는 0과 같다(이미 지난 시각에 따로
+    /// 뜻을 주지 않는다). <c>await Scope.Delay(0f)</c>가 "한 프레임 양보"의
+    /// 관용구다.</item>
+    /// <item><b>양의 무한대</b> — 스스로 완료되지 않는다. 스코프 취소로만 풀리므로
+    /// "끝날 때까지 매달려 있기"의 관용구가 된다.</item>
+    /// <item><b>NaN</b> — 거부한다. 뜻을 줄 수 있는 값이 아니고, 무엇보다 만기
+    /// 판정(<c>Remaining &gt; 0f</c>)이 NaN에 거짓이라 <b>0초와 구별되지 않는다</b>.
+    /// 거부하지 않으면 저작자의 계산 실수가 "한 프레임 대기"로 삼켜져 아무 신호도
+    /// 남지 않는다.</item>
+    /// </list>
+    ///
+    /// 어느 인자든 <b>최소 한 프레임</b>을 쓴다 — 등록한 프레임에는 만기 판정을
+    /// 하지 않는다(<see cref="PendingDelay.CreatedFrame"/>).
     /// </summary>
+    /// <exception cref="ArgumentException">seconds가 NaN일 때.</exception>
     public Task Delay(float seconds)
     {
+        // 만기 판정보다 앞에서 걸러야 한다. 뒤로 미루면 NaN은 0초와 같은 길로 가고
+        // 그 길에는 이 값을 되돌아볼 자리가 없다.
+        if (float.IsNaN(seconds))
+        {
+            throw new ArgumentException(
+                "Scope.Delay(NaN)은 뜻을 줄 수 없다 — 만기 판정에서 0초와 구별되지 않아 " +
+                "계산 실수가 '한 프레임 대기'로 조용히 삼켜진다. 대기 시간을 계산한 " +
+                "식을 확인하라(0으로 나눔, 미초기화 값).",
+                nameof(seconds));
+        }
+
         CancellationToken token = _cts.Token;
         if (token.IsCancellationRequested) return Task.FromCanceled(token);
 
-        var pending = new PendingDelay { Remaining = seconds, Completion = new TaskCompletionSource<bool>() };
+        var pending = new PendingDelay
+        {
+            Remaining = seconds,
+            Completion = new TaskCompletionSource<bool>(),
+            CreatedFrame = Native.FrameCount,
+        };
         _pending.Add(pending);
 
         // 등록을 레코드가 소유한다 — 정상 완료 시 Tick이 놓는다(LC3).
@@ -103,11 +151,22 @@ public sealed class SimulationScope
     {
         if (_pending.Count == 0) return;
 
+        // 등록 프레임을 가리기 위한 값. 대기가 없으면 여기까지 오지 않으므로
+        // 대기를 쓰지 않는 스코프에는 이 읽기 비용이 붙지 않는다.
+        ulong frame = Native.FrameCount;
+
         // 완료된 항목을 먼저 골라내고 지운다 — 완료 콜백이 같은 스코프에 새 Delay를
         // 걸 수 있어(연쇄 지연), 원본을 그대로 돌면서 지우면 순회가 흔들린다.
         for (int i = _pending.Count - 1; i >= 0; --i)
         {
             PendingDelay p = _pending[i];
+
+            // 등록된 프레임에는 만기를 판정하지도, 시간을 흘리지도 않는다(LC7-b).
+            // dt는 "등록 이후 흐른 시간"이어야 하는데 이 프레임의 dt는 등록보다
+            // 앞선 구간까지 담고 있다. 이 한 줄이 없으면 Delay(0f)의 길이가 등록이
+            // 이 Tick보다 앞이냐 뒤냐에 따라 0 프레임이 되기도 1 프레임이 되기도 한다.
+            if (p.CreatedFrame == frame) continue;
+
             p.Remaining -= dt;
             if (p.Remaining > 0f) continue;
 

@@ -334,6 +334,22 @@ Run-Step "생명주기 재생 세대" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-generation.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기 대기 인자(9-5 · LC7-b). Scope.Delay(seconds)는 저작 표면의 관용구인데
+# 인자의 뜻이 적힌 적이 없다. 착수 시 실측에서 둘이 결함이었다.
+#
+#   · NaN이 조용히 삼켜졌다 — `Remaining > 0f`가 NaN에 거짓이라 0초와 구별되지
+#     않는다. 저작자의 계산 실수가 "한 프레임 대기"가 되고 신호가 남지 않는다.
+#   · 같은 Delay(0f)가 첫 호출에서 0프레임, 이후엔 1프레임을 썼다. 갈림은 등록이
+#     그 프레임의 Scope.Tick보다 앞이냐 뒤냐인데, 그건 네이티브가 훅을 프레임의
+#     어느 지점에서 부르는지에 달렸다 — 저작자가 볼 수 없는 우연이다.
+#
+#   AA 0초 계약 · BB 음수 동치 · CC NaN 거부 · DD 연쇄 진행 · EE 무한 대기
+#
+# DD가 LC4에서 넘어온 "무한 같은 프레임 재개 방지"의 실측 자리다.
+Run-Step "생명주기 대기 인자" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-delayarg.ps1") -Exe $Exe -Work $Work
+}
+
 # Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
 # 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
 #
