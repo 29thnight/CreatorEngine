@@ -129,13 +129,46 @@ public abstract class Component
     /// 둔다 — 재생을 시작하면 엔진이 에디터 씬 사본으로 갈아타면서 원본 쪽 인스턴스를
     /// 접는데, 그때 아직 한 번도 초기화되지 않은 인스턴스가 생긴다.
     ///
-    /// "Initialized 없이 Uninitializing 없음"이 이 값이 지키는 계약이다(설계 문서
+    /// "Initialized 없이 Uninitializing 없음"이 이 값이 **뜻하던** 계약이다(설계 문서
     /// SceneGraphRedesignPlan §4 트랙 L) — OnInitialized를 받은 적 없는 인스턴스는
     /// 나머지 다섯 훅도 받지 않는다. 짝이 맞지 않으면 스크립트가 초기화하지 않은 것을
     /// 정리하려 든다.
+    ///
+    /// 그 계약을 실제로 지키는 것은 이제 <see cref="InitializeSucceeded"/>다(LC1 ·
+    /// 2026-09-05). 이 값은 훅을 부르기 전에 서므로 **던진 초기화도 참**이 되어,
+    /// 위 문장이 막으려던 바로 그 상황을 통과시키고 있었다. 이 값의 일은
+    /// 재진입 방지 하나로 좁혔다.
     /// </summary>
     internal bool IsInitialized { get; private set; }
     internal void MarkInitialized() => IsInitialized = true;
+
+    /// <summary>
+    /// 여는 훅이 <b>예외 없이</b> 끝났는지 (LC1 · 2026-09-05).
+    ///
+    /// <see cref="IsInitialized"/>와 나누어 둔다. 그쪽은 <b>재진입 방지</b>가 일이라
+    /// 훅을 부르기 **전에** 서야 하고(그래야 두 번 초기화하지 않는다), 이쪽은
+    /// <b>짝 맞추기</b>가 일이라 훅이 돌아온 **뒤에** 선다. 하나로 합치면 둘 중
+    /// 하나가 반드시 틀린 시점에 서게 된다.
+    ///
+    /// 위 <see cref="IsInitialized"/> 주석이 규정한 "짝이 맞지 않으면 스크립트가
+    /// 초기화하지 않은 것을 정리하려 든다"는 계약은 원래 이 축으로 재야 했다 —
+    /// **불렸는가**가 아니라 **성공했는가**다. 예외로 끝난 초기화는 아무것도
+    /// 잡지 못했을 수 있고, 그 상태로 도는 정리 코드가 새 예외를 만든다.
+    ///
+    /// 셋을 따로 두는 이유는 짝이 셋이기 때문이다:
+    /// Initialized↔Uninitializing · AddedToScene↔RemovingFromScene ·
+    /// BeginSimulation↔EndSimulation.
+    /// </summary>
+    internal bool InitializeSucceeded { get; private set; }
+    internal void MarkInitializeSucceeded() => InitializeSucceeded = true;
+
+    /// <summary>OnAddedToScene이 예외 없이 끝났는지. 짝은 OnRemovingFromScene이다.</summary>
+    internal bool EnterSucceeded { get; private set; }
+    internal void MarkEnterSucceeded() => EnterSucceeded = true;
+
+    /// <summary>OnBeginSimulation이 예외 없이 끝났는지. 짝은 OnEndSimulation이다.</summary>
+    internal bool BeginSucceeded { get; private set; }
+    internal void MarkBeginSucceeded() => BeginSucceeded = true;
 
     /// <summary>
     /// 최초 씬 진입(OnAddedToScene)이 한 번 전달됐는지. 활성 축(OnEnable)을 그 뒤에

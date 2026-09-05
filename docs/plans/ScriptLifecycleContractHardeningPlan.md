@@ -1,6 +1,6 @@
 # 효과 계약 도입 전 스크립트 생명주기·Task 계약 안정화 계획
 
-> **상태: 분석·계획 작성, 구현 미착수.** 2026-09-05 결정.
+> **상태: LC0 진행 · LC1 완료.** 2026-09-05 결정, 같은 날 착수.
 > [PrSM 기반 효과 계약 계획](SimulationEffectContractPlan.md)은 현재 리팩토링 이후의 미래
 > 작업이다. 이 문서는 그 도입을 기다리지 않고 현행 C# 컴포넌트·Task 스코프에서 처리할
 > 결함, 유지할 실행 의미, 검증 기준을 정한다. 새 실행기나 PrSM을 구현하는 문서가 아니다.
@@ -123,6 +123,17 @@ LC1은 관리 플래그 한 줄을 이동하는 것만으로 끝나지 않는다
 | 루틴이 await 뒤 던짐 | … `OnSimulate` → `OnSimulateResume` → **실패 후 틱 13회** → 축소 삼단 | LC5 |
 | 대조군(정상) | 11훅 전부 · 누락 0 | — |
 
+위 표의 LC1 세 줄은 **고침 전** 관측이다. LC1 착지 뒤 같은 픽스처는 이렇게 바뀌었다:
+
+| 픽스처 | 고침 후 |
+|---|---|
+| 초기화가 던짐 | `OnInitialized` **하나뿐** — 이후 어떤 단계도 오지 않는다 |
+| 시작 훅이 던짐 | … `OnBeginSimulation` → `OnDisable` → `OnRemovingFromScene` → `OnUninitializing` (`OnSimulate` 없음, `OnEndSimulation` 없음) |
+| 시작 훅에서 자기 비활성화 | … `OnBeginSimulation` → `OnDisable` → **축소 삼단 전부** (`OnSimulate`만 없음) |
+
+뒤 두 줄의 차이가 이 트랙의 계약을 보여 준다 — 던진 시작 훅은 짝을 못 받고,
+성공적으로 끝난 뒤 스스로 끈 것은 짝을 받는다.
+
 **`Invoke`의 끄기는 이미 격리 장치다.** 그래서 초기화 실패는 Begin/Simulate까지
 가지 못한다 — `OnBeginSimulation` 갈래의 `if (b.Enabled)`가 막는다. 남는 구멍은
 그 검사를 하지 않는 자리들이다: `OnAddedToScene`, 그리고 축소 삼단.
@@ -212,6 +223,47 @@ LC1은 관리 플래그 한 줄을 이동하는 것만으로 끝나지 않는다
 
 **완료 조건**: 실패한 Initialized/Begin 이후 루틴이 시작되지 않고, 반복 프레임·활성 전환에도
 실패 훅이 자동 반복되지 않는다. 부분 초기화 자원과 정상 인스턴스의 대칭 정리가 모두 검증된다.
+
+**완료 (2026-09-05).** `verify-lifecycle-failure`의 판정 A·B·C가 RED에서 GREEN으로
+넘어갔고, 기존 게이트 다섯(네이티브·관리 골든, 활성 축, DDOL, 부착 초기화 1회,
+단계 미러)은 그대로 초록이다.
+
+**고친 것은 축 하나다.** `Invoke`를 `bool` 반환으로 바꾸고, 여는 훅이 예외 없이
+끝났을 때만 서는 표식 셋을 두었다 — `InitializeSucceeded`·`EnterSucceeded`·
+`BeginSucceeded`. `IsInitialized`는 그대로 남기고 일을 **재진입 방지 하나로** 좁혔다
+(그 값은 훅을 부르기 **전에** 서야 두 번 초기화하지 않는다). 계획서가 경계한
+"성공 플래그를 뒤로 옮기는 수정"을 피한 형태다.
+
+**계약: 성공한 훅의 짝만 부른다.**
+
+| 여는 훅 | 닫는 짝 |
+|---|---|
+| `OnInitialized` | `OnUninitializing` |
+| `OnAddedToScene` | `OnRemovingFromScene` |
+| `OnBeginSimulation` | `OnEndSimulation` |
+
+`Component.IsInitialized`의 주석이 원래 규정하던 "짝이 맞지 않으면 스크립트가
+초기화하지 않은 것을 정리하려 든다"가 이 계약이다. 재던 축이 **불렸는가**여서
+던진 초기화도 참이 됐고, 그래서 막으려던 바로 그 상황을 통과시키고 있었다.
+
+**단계가 열리는 것과 루틴이 시작되는 것을 갈랐다.** 처음 구현에서 이 둘을 한
+줄로 뭉갰더니 자기 비활성화한 인스턴스가 짝(`OnEndSimulation`)을 못 받았다 —
+훅은 성공적으로 끝났는데도. 실패 픽스처 트레이스가 그것을 잡아 줬다. 지금은
+`OnBeginSimulation`이 예외 없이 끝나면 `BeginSucceeded`를 세우고, 활성·생존은
+`StartSimulation` 여부만 정한다. 실측 대조:
+
+- 시작 훅이 **던진** 인스턴스 → `OnRemovingFromScene`·`OnUninitializing`만, `OnEndSimulation` 없음
+- 시작 훅에서 **스스로 끈** 인스턴스 → 축소 삼단 전부, `OnSimulate`만 없음
+
+**정책 결정 (계획서가 LC1에 위임한 것).** 실패한 단계는 **격리**한다 — 자동
+재시도 없음. `Invoke`가 이미 인스턴스를 끄고, 성공 표식이 이후 단계를 막는다.
+재시도는 명시적 재생성 경계로만 한다(인스펙터의 `RetryInstance`, `script.reload`).
+
+**받아들인 잔여.** 초기화가 자원을 잡은 **뒤에** 던지면 그것을 놓을 엔진 제공
+훅이 없다 — `OnUninitializing`을 부르지 않기로 했기 때문이다. 반쪽 상태에서 도는
+정리 코드가 새 예외를 만드는 쪽(§2.2에서 LC2가 보여 준 모양)이 더 나쁘다고 판단했다.
+스크립트는 `OnInitialized` 안에서 자기 자원을 스스로 다뤄야 한다. 이 판단을
+뒤집으려면 "부분 초기화 전용 정리 훅"이 필요하고, 그것은 이 트랙의 범위 밖이다.
 
 ### LC2 — 취소·정리 예외 격리와 종료 보장 (P1 · LC0 선행)
 

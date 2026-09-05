@@ -113,7 +113,7 @@ internal static class ScriptRegistry
                 // IsInitialized 참고). OnInitialized에서 잡은 것을 OnUninitializing에서
                 // 놓는 것이 흔한 형태라, 짝이 맞지 않으면 초기화하지 않은 상태를
                 // 정리하려 든다.
-                if (b.IsInitialized) TearDown(b);
+                if (b.InitializeSucceeded) TearDown(b);
             }
             _pendingRemove.Clear();
         }
@@ -145,8 +145,11 @@ internal static class ScriptRegistry
         if (b.TeardownDelivered) return;
 
         b.Scope.Cancel();
-        Invoke(b, static x => x.OnEndSimulation(), nameof(Component.OnEndSimulation));
-        Invoke(b, static x => x.OnRemovingFromScene(), nameof(Component.OnRemovingFromScene));
+
+        // 폴백 경로도 짝 규칙을 지킨다(LC1) — 네이티브 구동과 다른 계약을 쓰면
+        // "고아 청소로 사라진 인스턴스만 정리 훅을 더 받는" 비대칭이 생긴다.
+        if (b.BeginSucceeded) Invoke(b, static x => x.OnEndSimulation(), nameof(Component.OnEndSimulation));
+        if (b.EnterSucceeded) Invoke(b, static x => x.OnRemovingFromScene(), nameof(Component.OnRemovingFromScene));
         Invoke(b, static x => x.OnUninitializing(), nameof(Component.OnUninitializing));
     }
 
@@ -202,18 +205,32 @@ internal static class ScriptRegistry
         {
             if (b.IsInitialized) return false;   // 두 번 초기화하지 않는다
             b.MarkInitialized();
-            Invoke(b, static x => x.OnInitialized(), nameof(Component.OnInitialized));
+            if (Invoke(b, static x => x.OnInitialized(), nameof(Component.OnInitialized)))
+            {
+                b.MarkInitializeSucceeded();
+            }
             return true;
         }
 
-        // 초기화 전 인스턴스에 중간 단계를 흘리면 "Initialized 없이 그 다음"이 되어
-        // 설계 문서 §4 트랙 L의 순서 규약이 깨진다.
-        if (!b.IsInitialized) return false;
+        // 초기화가 **성공하지** 못했으면 어떤 단계도 흘리지 않는다(LC1).
+        //
+        // 예전에는 IsInitialized(불렸는가)로 재서, 던진 초기화도 "초기화됐다"로
+        // 남아 이후 단계가 성공한 초기화를 전제로 진행했다. 축소 삼단까지 그대로
+        // 전달돼, 아무것도 잡지 못한 인스턴스가 정리 코드를 돌렸다.
+        //
+        // Component.IsInitialized 주석이 규정한 "짝이 맞지 않으면 스크립트가
+        // 초기화하지 않은 것을 정리하려 든다"가 원래 이 축을 뜻한 것이다.
+        if (!b.InitializeSucceeded) return false;
 
         switch ((LifecyclePhase)phase)
         {
             case LifecyclePhase.OnAddedToScene:
-                Invoke(b, static x => x.OnAddedToScene(), nameof(Component.OnAddedToScene));
+                // 실패하면 짝(OnRemovingFromScene)도 뒤에 오지 않는다(LC1).
+                if (!Invoke(b, static x => x.OnAddedToScene(), nameof(Component.OnAddedToScene)))
+                {
+                    return true;
+                }
+                b.MarkEnterSucceeded();
 
                 // 최초 진입에서만 OnEnable을 이어 붙인다. 활성 축은 6단계와 직교라
                 // 네이티브 단계로 오지 않는데, 예전 드레인이 이 자리에서
@@ -228,6 +245,9 @@ internal static class ScriptRegistry
             case LifecyclePhase.OnRemovingFromScene:
                 // 이송에서도 파괴에서도 온다. 이송은 여러 번 정상 발화하므로 여기서
                 // 막지 않는다 — 파괴 경로의 중복은 TeardownDelivered가 TearDown 쪽에서 가른다.
+                //
+                // 짝(OnAddedToScene)이 던졌으면 이쪽도 부르지 않는다(LC1).
+                if (!b.EnterSucceeded) return true;
                 Invoke(b, static x => x.OnRemovingFromScene(), nameof(Component.OnRemovingFromScene));
                 return true;
 
@@ -257,7 +277,14 @@ internal static class ScriptRegistry
                 // 해지가 없는" 상태가 한 프레임도 남지 않는다. TearDown이 지키던 순서를
                 // 네이티브 구동에서도 그대로 지킨다.
                 b.Scope.Cancel();
-                Invoke(b, static x => x.OnEndSimulation(), nameof(Component.OnEndSimulation));
+
+                // 짝이 열리지 않았으면 닫지 않는다(LC1). Scope.Cancel은 그 위에서
+                // 무조건 돈다 — 다른 훅이 건 구독·정리가 있을 수 있고, 그것은
+                // OnBeginSimulation의 성공과 무관하다.
+                if (b.BeginSucceeded)
+                {
+                    Invoke(b, static x => x.OnEndSimulation(), nameof(Component.OnEndSimulation));
+                }
                 return true;
 
             case LifecyclePhase.OnUninitializing:
@@ -267,11 +294,31 @@ internal static class ScriptRegistry
                 // 네이티브 드레인이 "OnInitialized 다음 정거장"으로 부른다. 꺼져 있으면
                 // 네이티브 쪽 게이트에서 이미 걸러지지만, 관리 측 Enabled는 따로
                 // 꺼질 수 있으므로 여기서도 본다(옛 _pendingStart 드레인과 같은 조건).
-                if (b.Enabled)
+                if (!b.Enabled) return true;
+
+                // 실패하면 루틴을 시작하지 않는다(LC1). 예전에는 Invoke 다음 줄이
+                // 바로 StartSimulation이라, 훅이 던져 **Invoke가 방금 이 인스턴스를
+                // 껐는데도** 루틴이 시작됐다.
+                if (!Invoke(b, static x => x.OnBeginSimulation(), nameof(Component.OnBeginSimulation)))
                 {
-                    Invoke(b, static x => x.OnBeginSimulation(), nameof(Component.OnBeginSimulation));
-                    StartSimulation(b);
+                    return true;
                 }
+
+                // 훅이 끝까지 돌았으므로 이 단계는 **열렸다.** 짝인 OnEndSimulation은
+                // 아래 자기 비활성화와 무관하게 와야 한다 — 훅 안에서 잡은 것을
+                // 그 짝에서 놓는 형태가 흔하다.
+                b.MarkBeginSucceeded();
+
+                // 훅 안에서 스스로 껐거나 자기를 제거했으면 그 뜻을 존중한다(LC1).
+                // "단계가 열렸는가"와 "루틴을 시작하는가"는 다른 물음이다 — 처음에
+                // 이 둘을 한 줄로 뭉갰더니, 정상적으로 끝난 시작 훅이 짝을 못 받았다
+                // (실패 픽스처 트레이스가 잡아 줬다).
+                //
+                // 예외와도 성격이 다르다. 실패는 격리이고 이쪽은 정상적인 의사
+                // 표현이라, 뒤에 붙는 정책(재시도·진단)이 갈려야 한다.
+                if (!b.Enabled || !b.IsAlive) return true;
+
+                StartSimulation(b);
                 return true;
             default:
                 Native.Log(2, $"[생명주기] 알 수 없는 단계가 들어왔다: {(LifecyclePhase)phase}");
@@ -314,7 +361,7 @@ internal static class ScriptRegistry
     internal static void ApplyEnabled(Component b, bool enabled)
     {
         if (!b.SetEnabledState(enabled)) return;
-        if (!b.IsInitialized) return;
+        if (!b.InitializeSucceeded) return;
 
         if (enabled) Invoke(b, static x => x.OnEnable(), nameof(Component.OnEnable));
         else Invoke(b, static x => x.OnDisable(), nameof(Component.OnDisable));
@@ -372,16 +419,25 @@ internal static class ScriptRegistry
     /// 스크립트 하나의 예외가 에디터 전체를 죽이지 않게 한다.
     /// 같은 예외가 매 프레임 반복되어 로그가 폭주하지 않도록 해당 스크립트만 끈다(설계 문서 10.2).
     /// </summary>
-    private static void Invoke(Component b, Action<Component> call, string phase)
+    /// <returns>
+    /// 예외 없이 끝났으면 true (LC1 · 2026-09-05).
+    ///
+    /// 예전에는 void였다. 그래서 호출자가 "전달했다"와 "성공했다"를 구분할 수 없었고,
+    /// 실패한 단계 뒤에 다음 단계가 그대로 이어졌다. 반환값을 무시해도 되는 자리가
+    /// 있지만(축소 훅처럼 이미 짝 검사를 지난 것들), 여는 훅에서는 반드시 봐야 한다.
+    /// </returns>
+    private static bool Invoke(Component b, Action<Component> call, string phase)
     {
         try
         {
             call(b);
+            return true;
         }
         catch (Exception ex)
         {
             Native.Log(3, $"[{b.GetType().Name}] {phase} 예외 — 이 스크립트를 비활성화합니다.\n{ex}");
             b.Enabled = false;
+            return false;
         }
     }
 
@@ -541,7 +597,7 @@ internal static class ScriptRegistry
 
         foreach (var b in _active)
         {
-            if (!b.IsInitialized) continue;   // Flush로 목록에만 들어오고 아직 초기화되지 않은 것
+            if (!b.InitializeSucceeded) continue;   // Flush로 목록에만 들어오고 아직 초기화되지 않은 것
 
             // ApplyEnabled를 거친다 — 훅을 부르는 자리가 둘이면 그 둘이 어긋난다
             // (여기서 직접 부르면 _enabled가 true로 남아 상태와 훅이 갈라졌다).
