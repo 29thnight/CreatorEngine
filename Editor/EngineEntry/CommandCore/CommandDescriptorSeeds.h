@@ -41,6 +41,20 @@ namespace CommandCore
         ///   `ClrHost::UserCodeScope` 가 열리지 않아 `NotPermitted` 로 실패한다.
         ///   빠뜨림이 조용한 구멍이 아니라 소리 나는 실패다.
         bool executesUserCode = false;
+
+        /// 어느 실행체가 이 명령을 등록하는가(§6.2 · §11.2 · LC8).
+        ///
+        /// ★ **런타임 거부가 아니라 부재다.** `Player` 가 없는 명령은 Player
+        ///   registry 에 애초에 들어가지 않는다 — 있는데 거절하는 것과 없는 것은
+        ///   discovery 에서 다르게 보이고, 에이전트가 보는 표는 후자여야 한다.
+        ///
+        /// ★★ `executesUserCode` 와 같은 이유로 기본값을 준다. 오늘 212 개가 전부
+        ///   `Editor` 이고, 그 211+ 줄에 같은 값을 적게 하면 diff 가 그것으로 차서
+        ///   정작 예외인 몇 줄을 덮는다. 예외를 적는 표다.
+        ///
+        /// ★★★ 빠뜨림의 방향: 여기서 `Player` 를 빠뜨린 명령은 Player 에 **없다.**
+        ///   조용히 열리는 쪽이 아니라 조용히 빠지는 쪽이고, 그것이 안전한 방향이다.
+        CommandRoles roles = CommandRoles::Editor;
     };
 
     /// canonical 이름으로 찾는다. 없으면 nullptr — 그 명령은 등록되지 않는다.

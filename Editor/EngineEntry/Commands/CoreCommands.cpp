@@ -302,6 +302,16 @@ namespace ConsoleCmd
         {
             const CommandCore::DescriptorSeed* seed = CommandCore::DescriptorSeedAt(i);
             if (nullptr == seed) continue;
+
+            // ★ LC8: **이 호스트의 몫만 본다.**
+            //
+            //   seed 표는 Editor 와 Player 가 나눠 쓴다(§11.2). role 을 안 보면
+            //   Player 전용 seed 가 여기서 "등록되지 않았다" 로 잡히고, 그것을
+            //   피하려고 표를 둘로 가르면 schema 의 단일 정본이 깨진다(LC3 이
+            //   없앤 바로 그 drift 다). 부재는 결함이 아니라 **설계**다 —
+            //   `roles` 에 Editor 가 없는 명령은 여기 없는 것이 맞다.
+            if (!CommandCore::HasRole(seed->roles, CommandCore::CommandRoles::Editor)) continue;
+
             if (nullptr == registry.Find(seed->name))
             {
                 problems.push_back("seed 는 있는데 등록되지 않았다: "

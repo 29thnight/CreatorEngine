@@ -139,6 +139,25 @@ Run-Step "CLI script.invoke 계약(LC7)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-script-invoke.ps1") -Exe $Exe -Work $Work
 }
 
+# PHASE 14.5 LC8 §11.2·§12.1 — Shipping Player 에 서비스·소켓이 0 인가.
+#
+# 격리를 `#ifdef` 로 하면 lib 이 여전히 링크되고 소켓 심볼도 그대로 들어온다.
+# 실제 격리는 Player.vcxproj 의 구성 조건부 ProjectReference 가 하고, 이 게이트는
+# 두 구성을 나란히 지어 import 표를 맞대 본다 — Development 에 소켓이 **있는지**도
+# 함께 단정한다(없으면 "Shipping 에 0" 은 아무것도 확인하지 않은 것이다).
+Run-Step "Player Shipping 격리(LC8)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-player-shipping-isolation.ps1")
+}
+
+# PHASE 14.5 LC8 §11.2·§11.3 — 실행 중인 Development Player 에 붙는다.
+#
+# 상태를 읽고, player.move 로 옮긴 값을 되읽어 **재시작 없는 반영**을 판정하고,
+# Editor 전용 명령이 404(부재)인지 본다. Player 는 패키지된 호스트라 스테이지된
+# 번들이 필요하다 — 없으면 게이트가 그 사실을 말하고 멈춘다.
+Run-Step "Player 명령 서비스(LC8)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-player-command-service.ps1")
+}
+
 Run-Step "UI 생성 순서 회귀" {
     # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
     # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.

@@ -3752,6 +3752,7 @@ namespace ConsoleCmd
                     descriptor.cost     = seed->cost;
                     descriptor.cls      = seed->cls;
                     descriptor.liveness = seed->liveness;
+                    descriptor.roles    = seed->roles;   // LC8
 
                     // ── LC7: 사용자 코드 창을 여는 권한을 조회 표에도 박는다 ──
                     //

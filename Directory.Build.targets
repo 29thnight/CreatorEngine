@@ -51,6 +51,29 @@
     </ClCompile>
   </ItemDefinitionGroup>
 
+  <!--
+    ── Development/Shipping 매크로 (PHASE 14.5 LC8) ──
+
+    스위치는 Directory.Build.props 의 EngineShipping 이고, 여기서 그것을 소스가 볼 수
+    있는 이름으로 바꾼다. props 가 아니라 targets 인 이유는 이 파일 머리말과 같다 —
+    프로젝트보다 뒤에 임포트되어야 각 vcxproj 의 설정을 이긴다.
+
+    ★ **둘 다 항상 정의하고 값으로 가른다.** `CE_SHIPPING` 을 Shipping 에서만
+      정의하면 `#if CE_SHIPPING` 은 정의되지 않은 쪽에서 조용히 0 이 되고, 이름을
+      잘못 적은 `#if CE_SHIPPNG` 도 똑같이 조용히 0 이 된다 — 두 경우가 구분되지
+      않는다. 둘 다 정의해 두면 오타는 여전히 조용하지만, 적어도 "정의되지 않아서
+      꺼졌다" 와 "꺼져 있어서 꺼졌다" 를 코드에서 가를 수 있다.
+
+    ProfilingCapturePlan §5.2 의 `CE_PROFILE_ENABLED` 가 이 매크로 위에 선다.
+    구분을 두 벌 만들면 Shipping 격리 게이트가 둘로 갈리므로, 그쪽은 이것을 소비한다.
+  -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <ClCompile>
+      <PreprocessorDefinitions Condition="'$(EngineShipping)' == 'true'">CE_SHIPPING=1;CE_DEVELOPMENT=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(EngineShipping)' != 'true'">CE_SHIPPING=0;CE_DEVELOPMENT=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
   <PropertyGroup Condition="'$(EngineAsan)' == 'true' and '$(MSBuildProjectExtension)' == '.vcxproj'">
     <LinkIncremental>false</LinkIncremental>
     <WholeProgramOptimization>false</WholeProgramOptimization>

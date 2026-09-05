@@ -30,6 +30,18 @@ param(
     [switch]$BuildNative,
     [switch]$SkipVerify,
 
+    # PHASE 14.5 LC8 — Player 를 Shipping 으로 짓는다(§11.2 · §12.1).
+    #
+    # ★ 이 스위치가 하는 일은 링크에서 `CommandService` 를 빼는 것이다. 켜면
+    #   Player 바이너리에 소켓 import 도 서비스 심볼도 0 이 되고,
+    #   `--command-service` 를 줘도 서비스가 없다. `verify-player-shipping-isolation.ps1`
+    #   이 두 바이너리를 나란히 놓고 그 차이를 판정한다.
+    #
+    # ★★ 스모크는 **두 구성 모두** 돈다. Shipping 만 검증하면 개발자가 매일 쓰는
+    #   Development 가 검증되지 않고, Development 만 검증하면 실제로 배포되는 것이
+    #   검증되지 않는다.
+    [switch]$Shipping,
+
     [ValidateRange(1, 1000000)]
     [int]$SmokeFrames = 120,
 
@@ -57,11 +69,20 @@ $stageRootPath = [IO.Path]::GetFullPath($stageRootArgument)
 $templatePath = Join-Path $repoRoot 'Tools\packaging\templates\EngineSettings.runtime.yml'
 $canonicalScenePath = Join-Path $projectRoot 'Assets\Scenes\FT_Primitives.creator'
 $solutionPath = Join-Path $repoRoot 'CreatorEngine.sln'
-$engineBinaryRoot = Join-Path $repoRoot "Bin\x64-$Config"
+# PHASE 14.5 LC8 — Development/Shipping 은 솔루션 구성이 아니라 스위치다
+# (Directory.Build.props 의 EngineShipping). 산출물 키가 갈리므로 이 뿌리도 갈린다.
+#
+# ★ **Player 만 Shipping 으로 짓는다.** 에디터에는 Shipping 개념이 없고(§12.1),
+#   패키지에 들어가는 것은 Player 뿐이다. 도구(AssetPacker·AssetCooker)도
+#   Development 그대로다 — 패키지에 실리지 않고, 그것들까지 두 벌로 만들면
+#   빌드 시간만 두 배가 된다.
+$engineConfigKey = if ($Shipping) { "$Config-Shipping" } else { $Config }
+$engineBinaryRoot = Join-Path $repoRoot "Bin\x64-$engineConfigKey"
+$toolBinaryRoot = Join-Path $repoRoot "Bin\x64-$Config"
 $playerOutput = Join-Path $engineBinaryRoot 'Player'
-$packerOutput = Join-Path $engineBinaryRoot 'Tools\AssetPacker'
-$cookerOutput = Join-Path $engineBinaryRoot 'Tools\AssetCooker'
-$managedOutput = Join-Path $engineBinaryRoot 'Managed'
+$packerOutput = Join-Path $toolBinaryRoot 'Tools\AssetPacker'
+$cookerOutput = Join-Path $toolBinaryRoot 'Tools\AssetCooker'
+$managedOutput = Join-Path $toolBinaryRoot 'Managed'
 
 if (-not ('CreatorEnginePathIdentity' -as [type])) {
     Add-Type -TypeDefinition @'
@@ -1210,6 +1231,28 @@ function Invoke-PlayerSmoke {
 	if ($cookedSceneDocuments -lt 1 -or $authoringSceneDocuments -ne 0) {
 		throw "Player scene document route mismatch: cooked=$cookedSceneDocuments, authoring=$authoringSceneDocuments"
 	}
+    # ── PHASE 14.5 LC8: 스모크가 **어느 구성을 돌렸는지** 스스로 말하게 한다 ──
+    #
+    # ★ §13 LC8 완료 기준이 이 검사를 이름으로 요구한다: "구성 이름만 바꾸고
+    #   스크립트를 두면 빈 출력이 통과한다."
+    #
+    #   -Shipping 을 주고도 Development 바이너리가 돌면 아래 text-parser·씬 마커는
+    #   전부 통과한다 — 그 마커들은 구성과 무관하기 때문이다. 그러면 격리를
+    #   검증했다고 적어 놓고 실제로는 아무것도 검증하지 않은 게 된다. Player 가
+    #   자기 빌드에 서비스가 컴파일돼 있는지 찍고, 여기서 요청한 구성과 맞대 본다.
+    $serviceMarker = [regex]::Match($stdout,
+        '\[player\.service\]\s*compiled=(yes|no)\s+enabled=(yes|no)')
+    if (-not $serviceMarker.Success) {
+        throw 'Player smoke lacks the [player.service] configuration marker (LC8).'
+    }
+    $serviceCompiled = ($serviceMarker.Groups[1].Value -eq 'yes')
+    $expectCompiled = -not $Shipping
+    if ($serviceCompiled -ne $expectCompiled) {
+        throw ("Player smoke ran the wrong configuration: requested " +
+            "$(if ($Shipping) { 'Shipping' } else { 'Development' }) but the binary reports " +
+            "compiled=$($serviceMarker.Groups[1].Value).")
+    }
+
     $textParserMarker = [regex]::Match($stdout,
         '\[runtime\.text-parser\]\s*calls=(\d+)')
     if (-not $textParserMarker.Success) {
@@ -1473,8 +1516,17 @@ try {
     Write-Host '[1/6 BuildNative]' -ForegroundColor Cyan
     if ($BuildNative) {
         $msbuild = Find-MSBuild
-        Invoke-NativeChecked -FilePath $msbuild -Label 'native Player/tool build' -Arguments @(
-            $solutionPath, '/m', '/t:Tools\AssetPacker;Tools\AssetCooker;Player', "/p:Configuration=$Config", '/p:Platform=x64',
+
+        # 도구는 항상 Development 다 — 패키지에 실리지 않는다(위 $toolBinaryRoot).
+        Invoke-NativeChecked -FilePath $msbuild -Label 'native tool build' -Arguments @(
+            $solutionPath, '/m', '/t:Tools\AssetPacker;Tools\AssetCooker', "/p:Configuration=$Config", '/p:Platform=x64',
+            '/nologo', '/verbosity:minimal')
+
+        # Player 만 요청된 구성으로 짓는다. -Shipping 이면 CommandService 가
+        # ProjectReference 단계에서 빠지므로 소켓 심볼이 링크되지 않는다(§12.1).
+        Invoke-NativeChecked -FilePath $msbuild -Label "native Player build ($engineConfigKey)" -Arguments @(
+            $solutionPath, '/m', '/t:Player', "/p:Configuration=$Config", '/p:Platform=x64',
+            "/p:EngineShipping=$(if ($Shipping) { 'true' } else { 'false' })",
             '/nologo', '/verbosity:minimal')
     } else {
         Write-Host '  skipped (use -BuildNative for a clean/CI native build)'

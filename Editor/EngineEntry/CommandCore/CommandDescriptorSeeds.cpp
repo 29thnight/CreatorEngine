@@ -134,7 +134,8 @@ namespace CommandCore
             { "gc.stats", CommandCost::Immediate, "", "관리 힙 지표를 낸다(gc.delta는 직전 대비 증감)", CommandClass::Probe, CommandLiveness::Live },
             { "gpu.baseline", CommandCost::Frames, "", "현재 상태를 기준선으로 삼는다", CommandClass::Probe, CommandLiveness::Live },
             { "gpu.census", CommandCost::Frames, "[라벨]", "VRAM과 엔진 에셋 수를 로그에 기록", CommandClass::Probe, CommandLiveness::Live },
-            { "help", CommandCost::Immediate, "[명령]", "명령 목록 또는 명령 하나의 상세를 낸다", CommandClass::EngineService, CommandLiveness::Live },
+            // LC8 — 두 호스트가 같은 뜻으로 갖는 둘 중 하나다. 요약은 이미 호스트 중립이다.
+            { "help", CommandCost::Immediate, "[명령]", "명령 목록 또는 명령 하나의 상세를 낸다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both },
             { "inputmap.authoring.probe", CommandCost::Frames, "<save|verify> <이름>", "입력 액션맵 저장·재기동 왕복으로 payload 복원을 본다", CommandClass::RawFixture, CommandLiveness::Live },
             { "inputmap.corpus.probe", CommandCost::Long, "", "입력 액션맵 코퍼스를 전수로 읽어 계수를 낸다", CommandClass::Probe, CommandLiveness::Live },
             { "lifecycle.dump", CommandCost::Immediate, "[파일]", "기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)", CommandClass::EngineService, CommandLiveness::Live },
@@ -160,6 +161,31 @@ namespace CommandCore
             { "pix.capture", CommandCost::Frames, "begin|end|status", "PIX 주입 실행의 명시적 GPU 캡처 경계", CommandClass::Probe, CommandLiveness::Live },
             { "play", CommandCost::Frames, "", "에디터의 재생·정지와 같은 동작", CommandClass::EditorOperation, CommandLiveness::Live },
             { "play.state", CommandCost::Immediate, "", "재생 상태(gameStart·paused·씬 로드)를 낸다", CommandClass::EngineService, CommandLiveness::Live },
+            // ── Player registry (PHASE 14.5 LC8 · §11.2) ────────────────────
+            //
+            // ★ 이 다섯은 **Editor 에 등록되지 않는다.** `roles` 가 `Player` 뿐이라
+            //   Editor 표에는 부재하고, `commands.selftest` 의 "seed 는 있는데 등록되지
+            //   않았다" 검사도 role 을 보고 건너뛴다.
+            //
+            // ★★ 왜 `player.*` 라는 **새 이름**인가 — Editor 명령을 재사용하지 않는다.
+            //
+            //   Editor 핸들러는 도메인 TU 안에서 `static` 이고 에디터 시스템(자산
+            //   저작·선택·Undo)에 매여 있어 Player 에서 링크할 수 없다. 그러면 같은
+            //   이름에 **다른 구현**을 다는 수밖에 없는데, 그것은 §9 가 없애려는
+            //   drift 를 이름 단위로 새로 만드는 일이다. 두 호스트가 같은 이름으로
+            //   다른 일을 하는 것보다, 다른 이름으로 자기 일을 하는 편이 정직하다.
+            //   의미를 맞춰 이름을 합치는 것은 §9 동등성 작업이지 이 슬라이스가 아니다.
+            //
+            //   예외는 `help`·`quit` 둘이다(아래 `Both`). 그 둘은 호스트에 무관하게
+            //   같은 뜻이고, 그래서 요약도 호스트 중립으로 고쳤다.
+            // ★★★ `player.move` 가 §11.3 의 "값이 게임을 재시작하지 않고 반영된다" 를
+            //   **관측 가능하게** 만드는 자리다. 쓰기만 있고 읽기가 없으면 반영을
+            //   주장만 할 수 있다 — `player.object` 로 되읽어야 판정이 된다.
+            { "player.move", CommandCost::Frames, "<이름> <x> <y> <z>", "오브젝트의 로컬 위치를 옮긴다(재시작 없이 반영된다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
+            { "player.object", CommandCost::Immediate, "<이름>", "오브젝트 하나의 위치·회전·크기를 낸다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
+            { "player.objects", CommandCost::Immediate, "[이름 조각]", "활성 씬의 오브젝트 이름을 나열한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
+            { "player.scene", CommandCost::Immediate, "", "활성 씬 이름과 오브젝트 수를 낸다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
+            { "player.status", CommandCost::Immediate, "", "프레임 수·재생 상태·명령 큐 깊이를 낸다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
             { "prefab.corpus.digest", CommandCost::Long, "<라벨> <이름> ...", "prefab identity/override 왕복 digest", CommandClass::Probe, CommandLiveness::Live },
             { "prefab.create", CommandCost::Frames, "<오브젝트 이름> <프리팹 이름>", "오브젝트로 프리팹을 만들어 저장한다", CommandClass::EditorOperation, CommandLiveness::Live },
             { "prefab.instantiate", CommandCost::Frames, "<프리팹 이름> [인스턴스 이름]", "프리팹을 씬에 소환한다", CommandClass::EditorOperation, CommandLiveness::Live },
@@ -169,7 +195,9 @@ namespace CommandCore
             { "prefab.update", CommandCost::Frames, "<소스 오브젝트> <프리팹 이름>", "기존 프리팹을 소스 오브젝트로 갱신한다", CommandClass::EditorOperation, CommandLiveness::Live },
             { "profile.selftest", CommandCost::Frames, "", "CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)", CommandClass::Probe, CommandLiveness::Live },
             { "profile.stats", CommandCost::Immediate, "", "프로파일러 자체 비용과 용량 소진(교란 없음)", CommandClass::Probe, CommandLiveness::Live },
-            { "quit", CommandCost::Immediate, "", "에디터 종료", CommandClass::EngineService, CommandLiveness::TerminatesProcess },
+            // LC8 — 요약을 **호스트 중립으로 고쳤다.** 두 registry 가 같은 seed 를
+            // 나눠 쓰므로 "에디터 종료" 는 Player 의 help 에서 거짓이 된다.
+            { "quit", CommandCost::Immediate, "", "호스트를 종료한다", CommandClass::EngineService, CommandLiveness::TerminatesProcess, false, CommandRoles::Both },
             { "reflect.golden", CommandCost::Long, "[출력 경로]", "등록된 전 타입의 직렬화 출력을 골든 문서로 쓴다", CommandClass::Probe, CommandLiveness::Live },
             { "render.backend", CommandCost::Frames, "status", "부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)", CommandClass::EngineService, CommandLiveness::Live },
             { "render.exposure", CommandCost::Frames, "", "자동 노출이 무엇을 재고 무엇을 결정했는지", CommandClass::EngineService, CommandLiveness::Live },

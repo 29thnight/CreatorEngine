@@ -106,7 +106,7 @@ gc.collect	-	frames	editor	probe	live	no	no	-	관리 힙 확정 수집(씬 전�
 gc.stats	gc.delta	immediate	editor	probe	live	no	no	-	관리 힙 지표를 낸다(gc.delta는 직전 대비 증감)
 gpu.baseline	-	frames	editor	probe	live	no	no	-	현재 상태를 기준선으로 삼는다
 gpu.census	gpu.delta	frames	editor	probe	live	no	no	[라벨]	VRAM과 엔진 에셋 수를 로그에 기록
-help	-	immediate	editor	engine_service	live	no	yes	[명령]	명령 목록 또는 명령 하나의 상세를 낸다
+help	-	immediate	both	engine_service	live	no	yes	[명령]	명령 목록 또는 명령 하나의 상세를 낸다
 inputmap.authoring.probe	-	frames	editor	raw_fixture	live	no	yes	<save|verify> <이름>	입력 액션맵 저장·재기동 왕복으로 payload 복원을 본다
 inputmap.corpus.probe	-	long	editor	probe	live	no	no	-	입력 액션맵 코퍼스를 전수로 읽어 계수를 낸다
 lifecycle.dump	-	immediate	editor	engine_service	live	no	no	[파일]	기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)
@@ -141,7 +141,7 @@ prefab.status	-	immediate	editor	engine_service	live	no	no	-	프리팹 등록·�
 prefab.update	-	frames	editor	editor_operation	live	no	no	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
 profile.selftest	-	frames	editor	probe	live	no	no	-	CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)
 profile.stats	-	immediate	editor	probe	live	no	no	-	프로파일러 자체 비용과 용량 소진(교란 없음)
-quit	exit	immediate	editor	engine_service	terminates_process	no	yes	-	에디터 종료
+quit	exit	immediate	both	engine_service	terminates_process	no	yes	-	호스트를 종료한다
 reflect.golden	-	long	editor	probe	live	no	no	[출력 경로]	등록된 전 타입의 직렬화 출력을 골든 문서로 쓴다
 render.backend	-	frames	editor	engine_service	live	no	no	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
 render.exposure	-	frames	editor	engine_service	live	no	no	-	자동 노출이 무엇을 재고 무엇을 결정했는지

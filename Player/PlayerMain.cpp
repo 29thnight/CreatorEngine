@@ -1,5 +1,10 @@
 #include "PlayerMain.h"
 
+// PHASE 14.5 LC8 — Player 명령 계층. Shipping 에서는 서비스 본문이 비고 lib 이
+// 링크에서 빠지지만, 이 두 include 는 그대로다 — 호출부에 `#if` 를 흩지 않는다.
+#include "PlayerCommandService.h"
+#include "PlayerCommands.h"
+
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/IImGuiHost.h"
 #include "RHI/ImGuiHostPresentationSink.h"
@@ -45,6 +50,36 @@ namespace
 	}
 
 	// 표시 sink 어댑터는 HostImGuiPresentation의 공용 타입을 쓴다(E4-6c).
+
+	// ── runtime text-parser 계수 (PHASE 14.5 LC8 에서 자리를 옮겼다) ──
+	//
+	// ★ 예전에는 **스모크 성공 분기 안에서만** 찍었다.
+	//
+	//   그래서 `--smoke` 없이 띄운 Player 는 이 값을 한 번도 내지 않았고,
+	//   LC8 이 연 명령 서비스 세션 — 정확히 이 계수가 흔들릴 수 있는 새 경로 —
+	//   에서는 확인할 방법이 없었다. "Player 전용 JSON codec 이 authoring 문서
+	//   경로를 쓰지 않는다"(§11.2)가 서비스를 쓰는 실행에서 검증되지 않는 셈이다.
+	//
+	//   종료 경로 어디서 나가든 한 번 찍는다. 스모크 출력의 마커는 그대로이므로
+	//   `Tools/build.ps1` 의 정규식은 예전과 같이 찾는다.
+	//
+	// ★★ **한 번만** 찍는다. 스모크 분기와 Finalize 가 둘 다 지나는 실행에서
+	//   두 번 찍으면 계수가 두 벌 보이고, 그것을 세는 소비자가 생기면 그 순간
+	//   거짓이 된다.
+	std::atomic<bool> g_textParseTelemetryEmitted{ false };
+
+	void EmitTextParseTelemetry()
+	{
+		if (g_textParseTelemetryEmitted.exchange(true)) return;
+
+		const Authoring::TextParseTelemetrySnapshot parseTelemetry =
+			Authoring::GetTextParseTelemetry();
+		std::printf("[runtime.text-parser] calls=%llu\n",
+			static_cast<unsigned long long>(parseTelemetry.calls));
+		for (const std::string& context : parseTelemetry.contexts)
+			std::printf("[runtime.text-parser.call] source=%s\n", context.c_str());
+		std::fflush(stdout);
+	}
 }
 
 Player::PlayerMain::PlayerMain()
@@ -79,6 +114,8 @@ void Player::PlayerMain::Initialize()
 	}
 
 
+	// (텔레메트리 출력은 EmitTextParseTelemetry 가 한 번만 찍는다 — 아래 정의)
+
 	// 표시 sink 설치(E4-6a) — 렌더러 초기화(렌더 스레드 기동) 전이어야
 	// RT의 첫 리드백 프레임 게시부터 실린다. Core는 ImGui 셸을 모른다.
 	EnhancedSceneRenderer::SetDisplayPresentationSink(
@@ -92,7 +129,16 @@ void Player::PlayerMain::Initialize()
 	{
 		// 렌더러 없이는 아무것도 못 한다 — 스모크가 이 실패를 종료 코드로
 		// 구분할 수 있게 남기고 죽는다(§2.3 Verify 규약).
-		EngineBootstrap::SetExitCode(2);
+		//
+		// ★ **2 → 5 (PHASE 14.5 LC8 · §5.4).** 새 표에서 5 는 infrastructure 이고
+		//   2 는 "CLI 문법·unknown command·argument 오류" 다. 렌더러가 서지 않은
+		//   것은 호출자가 잘못 부른 것이 아니라 이 기계에서 디바이스가 안 선
+		//   것이므로 5 다 — 계획 §5.4 가 이 이동을 이름으로 지목한다.
+		//
+		//   안전한 근거: 소비자 중 특정 비-0 값을 판정에 쓰는 곳이 없다(§3.1
+		//   inventory). 실측으로 다시 확인했다 — `Tools/build.ps1` 의 스모크 판정은
+		//   `if ($exitCode -ne 0)` 하나뿐이다.
+		EngineBootstrap::SetExitCode(5);
 		throw std::runtime_error(enhancedError);
 	}
 	SceneManagers->SetRenderScene(EnhancedSceneRenderer::GetRenderScene());
@@ -120,7 +166,7 @@ void Player::PlayerMain::Initialize()
 		if (!GetImGuiHost().Initialize(PlayerWindowHandle(), hostError))
 		{
 			GetImGuiHost().Shutdown();
-			EngineBootstrap::SetExitCode(2);
+			EngineBootstrap::SetExitCode(5);   // infrastructure (§5.4 · LC8)
 			throw std::runtime_error("Player ImGui backend 초기화 실패: " + hostError);
 		}
 	}
@@ -128,7 +174,7 @@ void Player::PlayerMain::Initialize()
 		GetImGuiHost().GetBackendKind();
 	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
 	{
-		EngineBootstrap::SetExitCode(2);
+		EngineBootstrap::SetExitCode(5);   // infrastructure (§5.4 · LC8)
 		throw std::runtime_error("Player scene/ImGui backend 설정 불일치");
 	}
 	std::printf("[RenderBackend] source=runtime.render.backend active=%s scene=%s imgui=%s\n",
@@ -172,6 +218,9 @@ void Player::PlayerMain::Initialize()
 			Debug->LogError("[SMOKE] startup scene load FAILED: " + scenePath.string());
 			if (g_smoke.IsActive())
 			{
+				// §5.4 의 3 = precondition 불충족. LC8 이 표를 이관하며 다시 봤고
+				// **그대로 둔다** — 시작 씬이 없는 것은 부를 수 없는 상태이지
+				// infrastructure 고장이 아니다.
 				EngineBootstrap::SetExitCode(3);
 			}
 		}
@@ -186,6 +235,39 @@ void Player::PlayerMain::Initialize()
 			std::cout << "Scene loaded: " << scenePath.string() << std::endl;
 		}
 	}
+
+	// ── 명령 서비스 (PHASE 14.5 LC8 · §11.2) ────────────────────────────
+	//
+	// ★ **씬이 선 뒤에 연다.** 서비스가 먼저 열리면 첫 요청이 씬 없는 상태를
+	//   만나 `scene.none` 을 받는다 — 붙는 쪽은 "붙었다" 와 "붙었는데 아직
+	//   아무것도 없다" 를 구분할 수 없고, 그 구간은 프레임 몇 개가 아니라
+	//   씬 로드만큼(LC0 실측 2.4 초) 길다.
+	//
+	// ★★ 실패해도 게임은 계속 돈다. 서비스가 안 열린 것과 게임이 못 뜨는 것은
+	//    다른 사건이다.
+	if (g_service.enabled)
+	{
+		std::string error;
+		if (PlayerCommandService::Start(g_service.endpointRoot, error))
+		{
+			std::printf("[PLAYER] command service listening 127.0.0.1:%u\n",
+				static_cast<unsigned>(PlayerCommandService::Port()));
+		}
+		else
+		{
+			std::fprintf(stderr, "[PLAYER] command service 시작 실패: %s\n", error.c_str());
+			std::fflush(stderr);
+		}
+	}
+
+	// ★ 컴파일 여부를 **항상** 찍는다.
+	//
+	//   플래그를 주지 않은 실행에서도 찍는다. 이 한 줄이 없으면 스모크 로그에서
+	//   "서비스를 안 켰다" 와 "이 빌드에는 서비스가 없다" 가 똑같이 침묵으로
+	//   보이고, Shipping 격리 게이트가 무엇을 확인했는지도 로그에 남지 않는다.
+	std::printf("[player.service] compiled=%s enabled=%s\n",
+		PlayerCommandService::IsCompiledIn() ? "yes" : "no",
+		g_service.enabled ? "yes" : "no");
 
 	StartPresentationThread();
 }
@@ -224,7 +306,7 @@ void Player::PlayerMain::StartPresentationThread()
 
 	lock.unlock();
 	if (m_presentationThread.joinable()) m_presentationThread.join();
-	EngineBootstrap::SetExitCode(2);
+	EngineBootstrap::SetExitCode(5);   // infrastructure (§5.4 · LC8)
 	throw std::runtime_error("Player PresentationThread COM 초기화 실패");
 }
 
@@ -329,6 +411,18 @@ void Player::PlayerMain::NotifyRenderFramePublished(uint64_t frameId)
 
 void Player::PlayerMain::Finalize()
 {
+	// ★ 서비스를 **가장 먼저** 닫는다(LC8).
+	//
+	//   수신 스레드가 살아 있는 동안 아래 해체가 진행되면, 그 사이에 들어온
+	//   요청이 이미 헐린 씬을 만난다. `Stop()` 은 수신 스레드를 회수하고
+	//   endpoint 파일을 지운 뒤에 돌아온다 — 지우지 않으면 다음 실행이 죽은
+	//   pid 의 포트로 붙으려 든다.
+	PlayerCommandService::Stop();
+
+	// 서비스를 닫은 **뒤에** 찍는다. 서비스가 도는 동안 authoring 파서를 불렀다면
+	// 그 호출까지 세어야 하고, 닫기 전에 찍으면 마지막 요청이 빠진다.
+	EmitTextParseTelemetry();
+
 	// 순서는 에디터 종료가 실측으로 다듬은 그대로다: 관리 측 → 표시/렌더
 	// 소비자 join → 씬 해체 → 렌더러. 새 frame 발행은 메인 루프 종료와 함께 끝났다.
 	ClrHost::Get().Shutdown();
@@ -356,6 +450,25 @@ void Player::PlayerMain::Finalize()
 
 void Player::PlayerMain::Update()
 {
+	// ── 명령 드레인 (PHASE 14.5 LC8) ────────────────────────────────────
+	//
+	// ★ **프레임 경계에서, 시뮬레이션 앞에서** 편다. 요청이 바꾼 상태가 같은
+	//   프레임의 시뮬레이션에 반영되게 하려는 것이다 — 뒤에 두면 `player.move`
+	//   가 옮긴 위치를 그 프레임의 물리·애니메이션이 못 보고, 한 프레임 늦게
+	//   반영되는 것이 "가끔 한 프레임 어긋난다" 로 나타난다.
+	//
+	// Shipping 에서도 이 줄은 돈다. 큐는 늘 비어 있다 — 넣을 수 있는 통로가
+	// 없기 때문이고, 그래서 여기에 `#if` 를 두지 않는다.
+	PlayerCmd::CommandHost::Get().Pump();
+
+	if (PlayerCmd::CommandHost::Get().IsQuitRequested())
+	{
+		// 창을 닫아 정상 종료 경로를 탄다. 여기서 곧장 죽으면 RenderThread 와
+		// presentation 스레드 회수가 통째로 건너뛰어진다.
+		PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+		return;
+	}
+
 	Time->Tick([&]
 	{
 		m_frameDeltaTime = Runtime::ResolveFrameDelta();
@@ -391,6 +504,8 @@ void Player::PlayerMain::Update()
 				renderState.lastError);
 			std::printf("[SMOKE] render pipeline FAILED: %s\n",
 				renderState.lastError.c_str());
+			// §5.4 의 4 = 명령·selftest 판정 실패. 그대로 둔다(LC8 재검토) —
+			// 파이프라인이 스스로 "실패" 를 판정한 것이고 그것이 4 의 뜻이다.
 			EngineBootstrap::SetExitCode(4);
 			PostMessage(handle, WM_CLOSE, 0, 0);
 			return;
@@ -453,12 +568,7 @@ void Player::PlayerMain::Update()
 			+ std::to_string(Time->GetFrameCount()) + " GT frames, display frame "
 			+ std::to_string(gameDisplay.completedFrameId) + ", promotions "
 			+ std::to_string(gameDisplay.promotionCount) + ")");
-		const Authoring::TextParseTelemetrySnapshot parseTelemetry =
-			Authoring::GetTextParseTelemetry();
-		std::printf("[runtime.text-parser] calls=%llu\n",
-			static_cast<unsigned long long>(parseTelemetry.calls));
-		for (const std::string& context : parseTelemetry.contexts)
-			std::printf("[runtime.text-parser.call] source=%s\n", context.c_str());
+		EmitTextParseTelemetry();
 		PostMessage(handle, WM_CLOSE, 0, 0);
 		return;
 	}

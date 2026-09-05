@@ -1632,6 +1632,96 @@ Shipping 바이너리에 서비스·소켓 심볼 0 · Player smoke의 text-pars
 Player smoke를 실제로 돌리고 `runtime.text-parser calls=0`를 읽는다**(구성 이름만 바꾸고
 스크립트를 두면 빈 출력이 통과한다) · Player의 현행 exit `2`/`3`/`4`가 §5.4 표로 이관됨.
 
+**상태: 완료 (2026-09-05). 단, 아래 ▲ 한 줄은 이 기계에서 실행하지 못했다.**
+
+| 완료 기준 | 증거 |
+|---|---|
+| 실행 중인 Development Player에 붙어 상태를 읽고 런타임 명령을 반영 | `verify-player-command-service.ps1`. `/health` 가 `role:"player"`, `player.scene` 이 `FT_Primitives` 오브젝트 11, `player.move` 로 **실행마다 다른 난수 좌표**를 넣고 `player.object` 로 되읽어 일치 확인 |
+| Shipping 바이너리에 서비스·소켓 심볼 0 | `verify-player-shipping-isolation.ps1`. Development 는 `WS2_32.dll` import 31 개 중 하나로 갖고, Shipping 은 29 개 중 **없다**. 문자열(`WSAStartup`·`endpoint.json`·`CommandService`)도 Shipping 에서 0 |
+| `roles`에 Player가 없는 명령은 Player registry에 부재 | `scene.save`·`prefab.create`·`script.invoke`·`commands.selftest` 가 전부 **404 `command.unknown`**. 403·409 가 아니다 — 부재이지 런타임 거부가 아니다(§11.2) |
+| Player의 exit `2`/`3`/`4` 가 §5.4 로 이관 | 렌더러·ImGui·backend 불일치·PresentationThread COM 실패 넷과 runtime root 준비 실패가 `2` → **`5`**(infrastructure). `3`(시작 씬 부재=precondition)·`4`(파이프라인 판정 실패)는 재검토 후 그대로. 안전 근거를 실측으로 재확인했다 — `Tools/build.ps1` 의 스모크 판정은 `-ne 0` 하나뿐이고 특정 값을 읽는 소비자가 없다 |
+| ▲ **새 구성으로 `build.ps1` 이 Player smoke 를 돌린다** | 배선과 판정은 넣었으나 **이 기계에서 실행하지 못했다** — 아래 ▲ |
+
+★ **`runtime.text-parser calls=0` 은 스모크가 아니라 서비스 세션에서 검증했고, 그쪽이 더 강하다.**
+
+  계수 출력이 스모크 성공 분기 **안에만** 있었다. 그래서 `--smoke` 없이 띄운 Player 는
+  그 값을 한 번도 내지 않았고, 하필 LC8 이 연 명령 서비스가 그 계수를 흔들 수 있는
+  유일한 새 경로다 — 스모크는 서비스를 켜지 않으므로, 서비스가 authoring 문서 경로를
+  건드려도 스모크의 `calls=0` 은 **그대로 0 이다.** 검사가 새 위험을 보지 못하는 자리에
+  있었다.
+
+  출력을 종료 경로로 옮겼다(한 번만 찍는다). 이제 게이트가 명령 열 몇 개 — JSON 파싱,
+  씬 읽기, 오브젝트 이동 — 를 태운 세션의 끝에서 `calls=0` 을 단정한다. 스모크 출력의
+  마커는 그대로라 `build.ps1` 의 정규식은 예전과 같이 찾는다.
+
+▲ **실행하지 못한 것: `Tools/build.ps1` 의 Player smoke.**
+
+  패키징이 이 기계에서 Cook 단계에 걸린다 — `게시된 generation이 없다
+  (--author-model-asset 먼저)`. `Dynamic_CPP/Assets` 대부분이 gitignore 라 모델 코퍼스가
+  불완전하고, 같은 실패가 이 슬라이스 전에도 회귀 세트에 있었다(`Experiment cooked
+  catalog 기동`). 배선(`-Shipping` 스위치 · Player 만 요청 구성으로 빌드 · 구성 표식
+  대조)은 넣었고 그 코드는 리뷰 대상이지만, **돌려서 초록을 본 것은 아니다.**
+
+  대신 스테이지된 기존 번들에 방금 지은 Player 를 얹어 서비스 검사를 돌렸다. 그 번들의
+  셰이더가 현행 빌드보다 낡아 `--smoke` 는 파이프라인 실패(exit 4)로 끝난다 — 그래서
+  스모크 경로만 미검증으로 남는다.
+
+★★ **구성 이름만 바꾼 통과를 막는 표식을 넣었다.** 완료 기준이 이름으로 요구한 것이다.
+  Player 가 `[player.service] compiled=yes|no enabled=yes|no` 를 **항상** 찍고,
+  `build.ps1` 이 요청한 구성과 맞대 본다. 이것이 없으면 `-Shipping` 을 주고도
+  Development 바이너리가 돌 때 text-parser·씬 마커가 전부 통과한다 — 그 마커들은
+  구성과 무관하기 때문이다.
+
+### LC8 부록 — 구성이 아니라 스위치로 만든 이유
+
+§12.1 은 "13개 프로젝트에 구성을 추가하는 솔루션 전역 변경"을 지시한다. **그렇게 하지
+않았다.** `Directory.Build.props` 가 `EngineAsan` 자리에 그 비용을 이미 적어 두었기
+때문이다:
+
+> 구성을 늘리면 vcxproj 여덟 개 × ItemDefinitionGroup을 전부 복제해야 하고, 그렇게
+> 늘어난 구성은 아무도 갱신하지 않아 곧 실제 빌드와 어긋난다.
+
+그 문장은 이 저장소가 이 저장소에 대해 쓴 것이고, 프로젝트가 여덟에서 열셋으로 는
+지금 더 강하게 성립한다. `EngineShipping` 스위치가 완료 기준이 요구하는 셋을 그대로
+준다 — compile-out 매크로(`CE_SHIPPING`/`CE_DEVELOPMENT`), 구성 조건부
+`ProjectReference`, 그리고 나란히 존재하는 산출물(`Bin\x64-Release-Shipping\`). 잃는
+것은 IDE 구성 드롭다운 하나다.
+
+★ **산출물 키를 가르는 것이 스위치의 필수 조건이다.** ASan 은 진단 빌드라 같은 자리에
+덮어써도 됐지만, 격리 게이트는 두 바이너리를 **같은 실행에서 견줘야** 한다. 한 자리를
+공유하면 방금 덮어쓴 쪽만 보게 되고, 그러면 "Shipping 에 소켓 0" 은 Development 를
+지운 결과일 수도 있다. 게이트가 그것을 먼저 단정한다(두 바이너리의 해시가 같으면 실패).
+
+### LC8 부록 — `CommandService` 가 솔루션에 없었다
+
+LC4 가 `Engine/CommandService/CommandService.vcxproj` 를 만들었지만 **`CreatorEngine.sln`
+에 넣지 않았다.** Editor 는 `ProjectReference` 로 직접 끌어와 빌드가 되고 있었고, 그래서
+아무도 몰랐다.
+
+Player 가 같은 프로젝트를 참조하자 드러났다 — 솔루션 경유 빌드에서 그 프로젝트는 구성
+매핑이 없어 **x86 으로 협상됐고**, vcpkg 가 `x86-windows` 트리플릿을 설치하려다 실패했다
+(`physx is only supported on ... x64`). 솔루션에 x64 매핑과 함께 등록했다.
+
+★ 이것이 §12.1 이 "파일을 만든다고 빌드에 들어가지 않는다"고 적어 둔 바로 그 함정이다.
+  계획이 경고한 것을 계획을 이행하다 밟았고, 밟은 자리는 계획이 가리킨 자리와 한 칸
+  달랐다 — 프로젝트는 만들어졌는데 **솔루션에 등록되지 않은** 중간 상태였다.
+
+### LC8 부록 — Player 명령을 `player.*` 로 새로 만든 이유
+
+Editor 명령을 재사용하지 않았다. 핸들러가 도메인 TU 안에서 `static` 이고 에디터
+시스템(자산 저작·선택·Undo)에 매여 있어 Player 에서 링크할 수 없다. 남는 선택은 "같은
+이름에 다른 구현" 인데, 그것은 §9 가 없애려는 drift 를 이름 단위로 새로 만드는 일이다.
+두 호스트가 같은 이름으로 다른 일을 하는 것보다 다른 이름으로 자기 일을 하는 편이
+정직하다. 의미를 맞춰 이름을 합치는 것은 §9 동등성 작업이지 이 슬라이스가 아니다.
+
+예외는 `help`·`quit` 둘이다(`roles = Both`). 호스트에 무관하게 같은 뜻이라 seed 를
+공유하고, 그래서 `quit` 의 요약을 "에디터 종료" → "호스트를 종료한다" 로 고쳤다 —
+공유하는 순간 그 문장이 Player 의 help 에서 거짓이 된다.
+
+★ Player 는 `Editor.lib` 을 링크하지 않는다. 대신 role 중립 코어(`CommandCore`) 다섯
+  .cpp 를 함께 컴파일한다. 같은 코어를 두 번 컴파일하는 값은, 저작 명령 190 개와 그
+  의존을 Player 에 들이는 값에 비하면 싸다.
+
 ### LC9 — 소비자 이관·legacy 제거·최종 ratchet (P1 · 2.5일)
 
 - JSONL 결과 모드(`--result-format jsonl`)와 서비스 JSON이 같은 schema v1을 공유.
