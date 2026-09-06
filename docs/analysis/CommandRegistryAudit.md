@@ -915,6 +915,69 @@ registry-golden · discovery · exit-spine · exit-contract · consumer-contract
 패스이고, 후자는 이 변경 **이전에 뜬** `cli_cost.measured.tsv` 에 이미 `failed`
 로 기록되어 있다.
 
+### 6.10 `experiment.*` 미참조 6 개의 처분 (2026-09-06)
+
+12 개를 contract probe 로 옮긴 뒤 `experiment.*` 는 **18** 개다. 그중 자동화
+소비자가 없는 것이 **6** 개다.
+
+판정 기준을 하나 더 썼다 — `.txt` 시나리오가 참조해도 **그 `.txt` 를 읽는
+`.ps1` 이 없으면** 자동화가 돌지 않는다. 그 기준으로 `skinbounds` 는 살아 있고
+(`verify-skin-pose-integrity` · `verify-skin-pose-visual` 이 그 스크립트를 읽는다)
+`animevent` · `matruntime` · `matmigrate` 는 고아다.
+
+**여섯 전부가 `ModelImportPipelinePlan.md` 로 간다** — 2026-09-02 에 대체 선언된
+그 계획이다. `matmigrate` 만 `SerializationPlan.md` 에도 나오는데 그것은
+"검증: … 전부 통과" 라는 **과거 기록**이지 살아 있는 요구가 아니다.
+
+그런데 **소속 계획이 죽었다고 검사가 다 죽는 것은 아니다.** 헤더의 의도를 읽어
+둘로 갈렸다.
+
+**갈래 A — legacy 대조가 존재 이유다. cutover 와 함께 죽는다 (2)**
+
+| 명령 | 무엇을 재나 |
+|---|---|
+| `matparity` (I5-M1) | `experiment::Material` 의 CB bytes 가 **legacy** `Material::BuildShaderPropertyBlock` 과 비트 단위로 같은가 |
+| `matmigrate` (I5-M5 S1) | legacy ↔ experiment 변환 왕복과 CB bytes 패리티 |
+
+둘 다 비교 대상의 **한쪽이 legacy** 다. `ModelAssetBigBangCutoverPlan`(PHASE 3.75)
+이 "전환 완료 뒤 legacy `Model` 계층·A/B 스위치를 제품에서 제거" 라고 적었으므로,
+그 제거와 함께 이 둘은 잴 것이 없어진다.
+
+▲ **지금 지우지 않는다.** cutover 가 43/60 일이고 `Engine/RenderEngine/Material.cpp`
+  가 아직 있다. 대조 상대가 살아 있는 동안은 남긴다. 다만 **LC9 의 서명 이행
+  대상에서는 뺀다** — 폐기 예정인 것을 결과형으로 옮기면 골든 행·descriptor 가
+  되어 영구 유지 대상으로 승격된다(§0 의 이유 그대로).
+
+**갈래 B — 제품 거동을 단정한다. 살아야 한다 (4)**
+
+| 명령 | 무엇을 재나 |
+|---|---|
+| `matresolve` (I5-M2) | cooked 우선·source 폴백의 **호출 순서** — 가짜 서비스를 꽂아 계수로 본다 |
+| `matscript` (I5-M5 S3) | CLR property API 의 논리 값 경로(RuntimeSchema 없이 동작·ShaderMeta 기준 거부) |
+| `animevent` (I5-D4e-2) | 이벤트·루프 오버라이드 소유 이관 — 저장·재로드 왕복과 **공유 자산 비오염** |
+| `matruntime` (I5-D5c1) | MaterialInstance 런타임 — 프록시 스냅샷까지 |
+
+이 넷은 legacy 가 사라져도 잴 것이 남는다. **문제는 아무도 안 돌린다는 것이다.**
+
+★ **그런데 돌릴 재료는 이미 있다.** `scripts/skinned_pose_visual.txt`(100 줄)가
+  experiment 여덟을 태우고, `animevent` 와 `matruntime` 을 구동하는 **유일한
+  자리**다. 빠진 것은 그 스크립트를 읽는 `.ps1` 하나뿐이다.
+
+  이름이 `skin_pose_visual.txt`(살아 있는 것)와 **한 글자 차이**라 고아가 된
+  것으로 보인다.
+
+  다만 그 시나리오는 `Gunner_F_Mythic` 을 쓴다 — 이 기계에 없는 자산이라 게이트를
+  만들면 여기서는 붉다. 기존 모델 게이트들과 같은 부류다.
+
+**정리한 것 (1)**
+
+`Tools/regression/material_writer_probe.txt` 를 지웠다. `experiment.matcodec` 과
+`experiment.matmigrate` 를 부르는 4 줄짜리인데, **`matcodec` 은 2026-09-06 에
+probe 로 옮겨져 이미 없다** — 지금 돌리면 `command.unknown` 으로 exit 2 다.
+읽는 `.ps1` 도 없다. 고쳐서 살릴 대상이 아니라 깨진 잔해다.
+
+`scripts/skinned_pose_visual.txt` 는 **남긴다** — 갈래 B 의 게이트 재료다.
+
 ## 7. 이 조사가 **하지 않은** 것
 
 - 명령을 하나도 지우거나 고치지 않았다. 코드 변경 0.
