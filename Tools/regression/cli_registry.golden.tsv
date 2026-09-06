@@ -109,13 +109,13 @@ mem.stats	-	immediate	editor	probe	live	no	no	[라벨]	CRT 현재 live 블록·�
 model.load	-	long	editor	engine_service	live	no	no	<경로>	모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)
 model.loadcached	-	long	editor	engine_service	live	no	no	<모델 경로>	에디터 드롭 경로(LoadCachedModelShared)로 모델을 연다
 model.place	-	frames	editor	engine_service	live	no	no	<이름>	임포트한 모델을 활성 씬에 배치한다
-object.create	-	frames	editor	editor_operation	live	no	no	<이름> [타입]	빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)
-object.duplicate	-	frames	editor	editor_operation	live	no	no	<오브젝트> [새 이름]	오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)
-object.parent	-	frames	editor	editor_operation	live	no	no	<자식> <부모 | ->	오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)
-object.property	-	frames	editor	editor_operation	live	no	no	<오브젝트> <컴포넌트> <필드> <값>	리플렉션으로 프로퍼티를 설정한다
-object.rename	-	frames	editor	editor_operation	live	no	no	<이전> <새>	오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)
-object.rootref	-	frames	editor	editor_operation	live	no	no	<오브젝트> [루트|-]	Bone형 same-scene root 참조를 설정/조회한다
-object.transform	-	frames	editor	editor_operation	live	no	no	<이름> <px py pz> [rx ry rz] [sx sy sz]	변환을 지정한다(회전은 도)
+object.create	-	frames	editor	editor_operation	live	no	yes	<이름> [타입]	빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)
+object.duplicate	-	frames	editor	editor_operation	live	no	yes	<오브젝트> [새 이름]	오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)
+object.parent	-	frames	editor	editor_operation	live	no	yes	<자식> <부모 | ->	오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)
+object.property	-	frames	editor	editor_operation	live	no	yes	<오브젝트> <컴포넌트> <필드> <값>	리플렉션으로 프로퍼티를 설정한다
+object.rename	-	frames	editor	editor_operation	live	no	yes	<이전> <새>	오브젝트 이름을 바꾼다(같은 모델 여러 번 배치용)
+object.rootref	-	frames	editor	editor_operation	live	no	yes	<오브젝트> [루트|-]	Bone형 same-scene root 참조를 설정/조회한다
+object.transform	-	frames	editor	editor_operation	live	no	yes	<이름> <px py pz> [rx ry rz] [sx sy sz]	변환을 지정한다(회전은 도)
 perf.reflect	-	long	editor	probe	live	no	no	[반복]	씬 직렬화와 프리팹 역직렬화 시간을 잰다
 pipeline.nodes	-	immediate	editor	engine_service	live	no	no	-	라이브 파이프라인의 노드 조립 결과를 한 줄씩 낸다
 pix.capture	-	frames	editor	probe	live	no	no	begin|end|status	PIX 주입 실행의 명시적 GPU 캡처 경계

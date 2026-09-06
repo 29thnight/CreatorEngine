@@ -526,18 +526,22 @@ namespace ConsoleCmd
         return CommandCore::Ok("씬 저장: " + path, std::move(data));
     }
 
-    static void Cmd_object_create(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_object_create(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
 
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: object.create <이름> [Empty|Light|Camera|Mesh|UI|Canvas]\n");
-            return;
+            return CommandCore::InvalidArguments("object.create: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("object.create.no_scene", "활성 씬이 없다");
+        }
 
         GameObjectType type = GameObjectType::Empty;
         std::string name = parts[1];
@@ -568,7 +572,7 @@ namespace ConsoleCmd
             else if (typeName != "Empty")
             {
                 std::printf("[CLI] 알 수 없는 오브젝트 타입: %s\n", typeName.c_str());
-                return;
+                return CommandCore::InvalidArguments("object.create: 알 수 없는 오브젝트 타입");
             }
         }
 
@@ -592,14 +596,20 @@ namespace ConsoleCmd
         if (!Entity::IsValidIndex(created->GetCreatedIndex()))
         {
             std::printf("[CLI] 오브젝트 생성 실패: %s\n", name.c_str());
-            return;
+            return CommandCore::Fail("object.create.create_failed", "오브젝트를 만들지 못했다");
         }
 
         Debug->LogWarning("[CLI] 오브젝트 생성: " + name);
         std::printf("[CLI] 오브젝트 생성: %s\n", name.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("name", CommandCore::CommandData::String(name));
+        data.Set("index", CommandCore::CommandData::Int(
+            static_cast<int64_t>(created->GetCreatedIndex())));
+        return CommandCore::Ok("오브젝트 생성: " + name, std::move(data));
     }
 
-    static void Cmd_object_rename(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_object_rename(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -609,11 +619,15 @@ namespace ConsoleCmd
         if (parts.size() < 3)
         {
             std::printf("[CLI] 사용법: object.rename <이전 이름> <새 이름>\n");
-            return;
+            return CommandCore::InvalidArguments("object.rename: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("object.rename.no_scene", "활성 씬이 없다");
+        }
 
         // 이전 이름에 공백이 흔하다. 같은 모델을 두 번 놓으면 엔진이
         // "Prim_Cube (1)"처럼 번호를 붙이기 때문이다. 그래서 새 이름을 마지막
@@ -627,12 +641,17 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + oldName);
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", oldName.c_str());
-            return;
+            return CommandCore::Fail("object.rename.not_found", "오브젝트가 없다");
         }
 
         object->m_name = newName;
         Debug->LogWarning("[CLI] 이름 변경: " + oldName + " -> " + newName);
         std::printf("[CLI] 이름 변경: %s -> %s\n", oldName.c_str(), newName.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("from", CommandCore::CommandData::String(oldName));
+        data.Set("to", CommandCore::CommandData::String(newName));
+        return CommandCore::Ok("이름 변경: " + oldName + " -> " + newName, std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_scene_hierarchycheck(const ConsoleCommandContext& ctx)
@@ -756,7 +775,7 @@ namespace ConsoleCmd
         return CommandCore::Ok("계층 불변식 통과", std::move(data));
     }
 
-    static void Cmd_object_duplicate(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_object_duplicate(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -769,11 +788,15 @@ namespace ConsoleCmd
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: object.duplicate <오브젝트> [새 이름]\n");
-            return;
+            return CommandCore::InvalidArguments("object.duplicate: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("object.duplicate.no_scene", "활성 씬이 없다");
+        }
 
         // 이름 규칙은 object.rename·prefab.create와 같다 — 인자가 둘이면 마지막
         // 토큰이 새 이름이고 그 앞 전체가 원본 이름이다(공백 있는 이름 때문).
@@ -796,7 +819,7 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + sourceName);
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", sourceName.c_str());
-            return;
+            return CommandCore::Fail("object.duplicate.not_found", "오브젝트가 없다");
         }
 
         const std::string finalName = newName.empty() ? source->m_name.ToString() : newName;
@@ -804,7 +827,7 @@ namespace ConsoleCmd
         if (!cloned)
         {
             std::printf("[CLI] 복제 실패: %s\n", sourceName.c_str());
-            return;
+            return CommandCore::Fail("object.duplicate.duplicate_failed", "복제하지 못했다");
         }
 
         // Object::Instantiate가 newName을 반영하지만(Object.cpp:113) 씬 편입이
@@ -819,9 +842,15 @@ namespace ConsoleCmd
         std::printf("[CLI] 복제: %s -> %s (index=%d)\n",
             sourceName.c_str(), cloned->m_name.ToString().c_str(),
             static_cast<int>(cloned->m_index));
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("source", CommandCore::CommandData::String(sourceName));
+        data.Set("clone", CommandCore::CommandData::String(cloned->m_name.ToString()));
+        data.Set("index", CommandCore::CommandData::Int(static_cast<int64_t>(cloned->m_index)));
+        return CommandCore::Ok("복제: " + sourceName, std::move(data));
     }
 
-    static void Cmd_object_parent(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_object_parent(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -837,11 +866,15 @@ namespace ConsoleCmd
         {
             std::printf("[CLI] 사용법: object.parent <자식> <부모 | ->\n"
                 "       부모에 -를 주면 씬 루트로 올린다\n");
-            return;
+            return CommandCore::InvalidArguments("object.parent: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("object.parent.no_scene", "활성 씬이 없다");
+        }
 
         // 이름에 공백이 흔하므로(엔진이 "Prim_Cube (1)"처럼 번호를 붙인다)
         // 부모를 마지막 토큰으로 보고 그 앞 전체를 자식으로 본다
@@ -859,7 +892,7 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 자식 오브젝트를 찾을 수 없음: " + childName);
             std::printf("[CLI] 자식 오브젝트를 찾을 수 없음: %s\n", childName.c_str());
-            return;
+            return CommandCore::Fail("object.parent.child_not_found", "자식 오브젝트가 없다");
         }
 
 		Entity* parent =
@@ -868,13 +901,13 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 부모 오브젝트를 찾을 수 없음: " + parentName);
             std::printf("[CLI] 부모 오브젝트를 찾을 수 없음: %s\n", parentName.c_str());
-            return;
+            return CommandCore::Fail("object.parent.parent_not_found", "부모 오브젝트가 없다");
         }
 
         if (parent->m_index == child->m_index)
         {
             std::printf("[CLI] 자기 자신을 부모로 삼을 수 없음: %s\n", childName.c_str());
-            return;
+            return CommandCore::Fail("object.parent.self_parent", "자기 자신을 부모로 삼을 수 없다");
         }
 
         // 순환을 막는다 — 자기 자손을 부모로 삼으면 순회가 무한이 된다.
@@ -884,7 +917,7 @@ namespace ConsoleCmd
             {
                 Debug->LogError("[CLI] 순환 계층 거부: " + childName + " <- " + parentName);
                 std::printf("[CLI] 순환이 된다(부모가 자식의 자손): %s\n", parentName.c_str());
-                return;
+                return CommandCore::Fail("object.parent.cycle", "순환이 된다(부모가 자식의 자손)");
             }
             const Entity::Index ancestorParent = ancestor->GetParentIndex();
             if (Entity::INVALID_INDEX == ancestorParent) break;
@@ -898,28 +931,37 @@ namespace ConsoleCmd
 
         Debug->LogWarning("[CLI] 부모 지정: " + childName + " -> " + parentName);
         std::printf("[CLI] 부모 지정: %s -> %s\n", childName.c_str(), parentName.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("child", CommandCore::CommandData::String(childName));
+        data.Set("parent", CommandCore::CommandData::String(parentName));
+        return CommandCore::Ok("부모 지정: " + childName + " -> " + parentName, std::move(data));
     }
 
     // H2 root-reference 회귀용. m_rootIndex는 일반 parent와 별개의 same-scene
     // 참조라서 DDOL/Prefab 슬롯 재배정 때 따로 remap해야 한다. 모델 자산 없이
     // 그 경계를 태울 수 있도록 설정과 조회를 한 명령에 둔다.
 
-    static void Cmd_object_rootref(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_object_rootref(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() < 2)
         {
             std::printf("[CLI] 사용법: object.rootref <오브젝트> [루트오브젝트 | -]\n");
-            return;
+            return CommandCore::InvalidArguments("object.rootref: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("object.rootref.no_scene", "활성 씬이 없다");
+        }
 
         Entity* object = scene->GetEntity(ctx.parts[1]);
         if (!object)
         {
             std::printf("[CLI] rootref 대상 없음: %s\n", ctx.parts[1].c_str());
-            return;
+            return CommandCore::Fail("object.rootref.target_not_found", "rootref 대상이 없다");
         }
 
         if (ctx.parts.size() >= 3)
@@ -934,7 +976,7 @@ namespace ConsoleCmd
                 if (!root)
                 {
                     std::printf("[CLI] rootref 루트 없음: %s\n", ctx.parts[2].c_str());
-                    return;
+                    return CommandCore::Fail("object.rootref.root_not_found", "rootref 루트가 없다");
                 }
                 object->SetRootIndex(root->m_index);
             }
@@ -945,9 +987,17 @@ namespace ConsoleCmd
         std::printf("[object.rootref] %s root=%d name=%s\n",
             object->GetHashedName().ToString().c_str(), static_cast<int>(rootIndex),
             root ? root->GetHashedName().ToString().c_str() : "<invalid>");
+
+        // ★ root 가 무효인 것은 **실패가 아니다.** 최상위 오브젝트는 루트 참조가
+        //   없는 것이 정상이고, 이 명령은 그 상태를 답하는 조회다. 값으로 낸다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("object", CommandCore::CommandData::String(object->GetHashedName().ToString()));
+        data.Set("rootIndex", CommandCore::CommandData::Int(static_cast<int64_t>(rootIndex)));
+        data.Set("rootValid", CommandCore::CommandData::Bool(nullptr != root));
+        return CommandCore::Ok("object.rootref", std::move(data));
     }
 
-    static void Cmd_object_transform(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_object_transform(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
 
@@ -959,17 +1009,21 @@ namespace ConsoleCmd
             std::printf("[CLI] 사용법: object.transform <이름> <px> <py> <pz>"
                 " [rx ry rz] [sx sy sz]\n"
                 "       이름에 공백이 있으면 따옴표로 묶는다: \"Main Camera\"\n");
-            return;
+            return CommandCore::InvalidArguments("object.transform: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("object.transform.no_scene", "활성 씬이 없다");
+        }
 
         auto object = scene->GetEntity(parts[1]);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
-            return;
+            return CommandCore::Fail("object.transform.not_found", "오브젝트가 없다");
         }
 
         const auto number = [&](size_t index, float fallback) -> float
@@ -1010,9 +1064,13 @@ namespace ConsoleCmd
             euler.x, euler.y, euler.z, scale.x, scale.y, scale.z);
         Debug->LogWarning(message);
         std::printf("%s\n", message);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("object", CommandCore::CommandData::String(parts[1]));
+        return CommandCore::Ok("변환 설정: " + parts[1], std::move(data));
     }
 
-    static void Cmd_object_property(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_object_property(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -1025,17 +1083,21 @@ namespace ConsoleCmd
         if (parts.size() < 5)
         {
             std::printf("[CLI] 사용법: object.property <오브젝트> <컴포넌트> <필드> <값...>\n");
-            return;
+            return CommandCore::InvalidArguments("object.property: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("object.property.no_scene", "활성 씬이 없다");
+        }
 
         auto object = scene->GetEntity(parts[1]);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
-            return;
+            return CommandCore::Fail("object.property.not_found", "오브젝트가 없다");
         }
 
         const Meta::Type* requestedType = Meta::Find(parts[2]);
@@ -1053,7 +1115,7 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 컴포넌트를 찾을 수 없음: " + parts[1] + "." + parts[2]);
             std::printf("[CLI] 컴포넌트를 찾을 수 없음: %s\n", parts[2].c_str());
-            return;
+            return CommandCore::Fail("object.property.component_not_found", "컴포넌트가 없다");
         }
 
         // 값에 쉼표로 구분한 성분이 들어올 수 있다(벡터·색). 필드 이름 뒤 전체.
@@ -1068,7 +1130,7 @@ namespace ConsoleCmd
             Debug->LogError("[CLI] 프로퍼티 설정 실패: " + parts[2] + "." + parts[3]
                 + " = " + rawValue);
             std::printf("[CLI] 프로퍼티 설정 실패: %s.%s\n", parts[2].c_str(), parts[3].c_str());
-            return;
+            return CommandCore::Fail("object.property.set_failed", "프로퍼티를 설정하지 못했다");
         }
 
         // ★ 저작 의도의 기록 지점 (SceneGraphRedesignPlan P-write S3).
@@ -1088,6 +1150,13 @@ namespace ConsoleCmd
             + parts[3] + " = " + rawValue);
         std::printf("[CLI] 프로퍼티 설정: %s.%s = %s\n", parts[2].c_str(), parts[3].c_str(),
             rawValue.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("object", CommandCore::CommandData::String(parts[1]));
+        data.Set("component", CommandCore::CommandData::String(parts[2]));
+        data.Set("field", CommandCore::CommandData::String(parts[3]));
+        data.Set("value", CommandCore::CommandData::String(rawValue));
+        return CommandCore::Ok("프로퍼티 설정: " + parts[2] + "." + parts[3], std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_scene_select(const ConsoleCommandContext& ctx)
@@ -1809,14 +1878,14 @@ namespace ConsoleCmd
         reg.Result({ "scene.ddol" }, &Cmd_scene_ddol);
         reg.Legacy({ "ai.status" }, &Cmd_ai_status);
         reg.Result({ "scene.save" }, &Cmd_scene_save);
-        reg.Legacy({ "object.create" }, &Cmd_object_create);
-        reg.Legacy({ "object.rename" }, &Cmd_object_rename);
-        reg.Legacy({ "object.transform" }, &Cmd_object_transform);
-        reg.Legacy({ "object.parent" }, &Cmd_object_parent);
-        reg.Legacy({ "object.rootref" }, &Cmd_object_rootref);
-        reg.Legacy({ "object.duplicate" }, &Cmd_object_duplicate);
+        reg.Result({ "object.create" }, &Cmd_object_create);
+        reg.Result({ "object.rename" }, &Cmd_object_rename);
+        reg.Result({ "object.transform" }, &Cmd_object_transform);
+        reg.Result({ "object.parent" }, &Cmd_object_parent);
+        reg.Result({ "object.rootref" }, &Cmd_object_rootref);
+        reg.Result({ "object.duplicate" }, &Cmd_object_duplicate);
         reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
-        reg.Legacy({ "object.property" }, &Cmd_object_property);
+        reg.Result({ "object.property" }, &Cmd_object_property);
         reg.Result({ "scene.select" }, &Cmd_scene_select);
         reg.Legacy({ "component.add" }, &Cmd_component_add);
         reg.Legacy({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
