@@ -8,8 +8,6 @@
 #include "../Experiment/ModelLoader.h"
 #include "../Texture.h"
 
-#include <DirectXTex.h>
-
 #include <algorithm>
 #include <fstream>
 #include <limits>
@@ -267,107 +265,47 @@ namespace assets
             ModelTextureColorSpace colorSpace, ModelTextureAsset& out,
             std::string& failure)
         {
-            const std::shared_ptr<Texture> decoded = Texture::LoadSharedFromMemory(
-                encoded, false);
-            const DirectX::ScratchImage* source = decoded
-                ? decoded->GetCpuPixels() : nullptr;
-            if (nullptr == source || source->GetImageCount() == 0u)
-            {
-                failure = "image decoder가 픽셀을 만들지 못했다.";
-                return false;
-            }
-
-            const DirectX::TexMetadata sourceMetadata = source->GetMetadata();
-
-            // ── 색공간은 라벨로만 정한다 ──────────────────────────────────
-            //
-            // ★ 여기 있던 코드는 target 을 semantic(_UNORM_SRGB)으로 잡고
-            //   Convert 를 불렀다. DirectXTex 는 **출력 포맷이 IsSRGB 면
-            //   SRGB_OUT 이 기본 on** 이라고 스스로 문서화한다
-            //   (DirectXTex.h "if the output format type is IsSRGB(), then
-            //   SRGB_OUT is on by default"). 입력은 _UNORM 이라 SRGB_IN 이
-            //   꺼진 채로, 이미 sRGB 로 인코딩된 PNG 바이트에 linear→sRGB
-            //   인코드가 한 번 더 먹었다.
-            //
-            //   런타임 SRV 는 out.format(= semantic) 을 쓰므로 하드웨어가
-            //   디코드를 한 번 한다. 두 연산이 정확히 상쇄돼 **셰이더가 받는
-            //   알베도가 sRGB 바이트값 그대로**였다 — Gunner 본체 텍스처
-            //   기준 밝기 2.1~3.7 배, 채도비 2.96 → 1.70 (43% 탈색).
-            //
-            //   고침은 "바이트를 건드리지 않는다"다. 레이아웃만 RGBA8 로
-            //   맞추되 목표 포맷의 sRGB 성질을 **소스와 같게** 두면
-            //   DirectXTex 가 전달 함수에 손대지 않는다. 최종 라벨은
-            //   아래 out.format 이 semantic 으로 따로 정한다.
-            const DXGI_FORMAT layoutTarget = DirectX::IsSRGB(sourceMetadata.format)
-                ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
-                : DXGI_FORMAT_R8G8B8A8_UNORM;
-
-            DirectX::ScratchImage converted;
-            const DirectX::ScratchImage* finalImage = source;
-            HRESULT conversion = S_OK;
-            if (DirectX::IsCompressed(sourceMetadata.format))
-            {
-                conversion = DirectX::Decompress(source->GetImages(),
-                    source->GetImageCount(), sourceMetadata, layoutTarget, converted);
-                finalImage = &converted;
-            }
-            else if (sourceMetadata.format != layoutTarget)
-            {
-                conversion = DirectX::Convert(source->GetImages(),
-                    source->GetImageCount(), sourceMetadata, layoutTarget,
-                    DirectX::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT,
-                    converted);
-                finalImage = &converted;
-            }
-            if (FAILED(conversion) || finalImage->GetImageCount() == 0u)
-            {
-                failure = "image를 backend-neutral RGBA8로 변환하지 못했다.";
-                return false;
-            }
-
-            const DirectX::TexMetadata metadata = finalImage->GetMetadata();
-            if (metadata.dimension != DirectX::TEX_DIMENSION_TEXTURE2D
-                || metadata.width == 0u || metadata.height == 0u
-                || metadata.mipLevels == 0u || metadata.arraySize == 0u
-                || metadata.width > (std::numeric_limits<std::uint32_t>::max)()
-                || metadata.height > (std::numeric_limits<std::uint32_t>::max)()
-                || metadata.mipLevels > (std::numeric_limits<std::uint32_t>::max)()
-                || metadata.arraySize > (std::numeric_limits<std::uint32_t>::max)())
-            {
-                failure = "2D texture descriptor 범위를 벗어났다.";
-                return false;
-            }
+            // ★ 디코드는 Texture 가 한다(축 A). 여기 있던 DirectXTex 호출
+            //   — LoadSharedFromMemory 로 한 번 텍스처를 세운 뒤 Convert ·
+            //   Decompress · IsSRGB 를 직접 부르던 것 — 은 전부
+            //   Texture::DecodeToRgba8 로 옮겼다. "색공간은 라벨로만 정한다"
+            //   는 규약과 그것이 생긴 사연(43% 탈색)도 그 함수의 주석에 함께
+            //   있다. cook 경로가 필요한 것은 "바이트 -> 중립 RGBA8" 하나였고,
+            //   그것 때문에 디코더를 아는 파일이 둘이었다.
+            TextureImage image;
+            if (!Texture::DecodeToRgba8(encoded, image, failure)) return false;
 
             out.colorSpace = colorSpace;
             out.format = colorSpace == ModelTextureColorSpace::Srgb
                 ? RHIFormat::RGBA8UnormSrgb : RHIFormat::RGBA8Unorm;
-            out.width = static_cast<std::uint32_t>(metadata.width);
-            out.height = static_cast<std::uint32_t>(metadata.height);
-            out.mipLevels = static_cast<std::uint32_t>(metadata.mipLevels);
-            out.arraySize = static_cast<std::uint32_t>(metadata.arraySize);
-            out.isCube = metadata.IsCubemap();
+            out.width = image.Width();
+            out.height = image.Height();
+            out.mipLevels = image.MipLevels();
+            out.arraySize = image.ArraySize();
+            out.isCube = image.IsCube();
 
-            for (std::size_t item = 0; item < metadata.arraySize; ++item)
+            // item 바깥, mip 안쪽. TextureImage 도 같은 규약이라 순서가 같다.
+            for (std::uint32_t item = 0; item < image.ArraySize(); ++item)
             {
-                for (std::size_t mip = 0; mip < metadata.mipLevels; ++mip)
+                for (std::uint32_t mip = 0; mip < image.MipLevels(); ++mip)
                 {
-                    const DirectX::Image* image = finalImage->GetImage(mip, item, 0);
-                    if (nullptr == image || nullptr == image->pixels
-                        || image->slicePitch == 0u)
+                    const TextureSubimage* source = image.Find(mip, item);
+                    const std::byte* pixels = (nullptr != source)
+                        ? source->pixels : nullptr;
+                    if (nullptr == source || nullptr == pixels
+                        || 0u == source->slicePitch)
                     {
                         failure = "decoded texture subresource가 비었다.";
                         return false;
                     }
                     ModelTextureSubresource subresource;
-                    subresource.width = static_cast<std::uint32_t>(image->width);
-                    subresource.height = static_cast<std::uint32_t>(image->height);
+                    subresource.width = source->width;
+                    subresource.height = source->height;
                     subresource.offset = out.pixels.size();
-                    subresource.rowPitch = image->rowPitch;
-                    subresource.slicePitch = image->slicePitch;
-                    const std::byte* begin = reinterpret_cast<const std::byte*>(
-                        image->pixels);
-                    out.pixels.insert(out.pixels.end(), begin,
-                        begin + image->slicePitch);
+                    subresource.rowPitch = source->rowPitch;
+                    subresource.slicePitch = source->slicePitch;
+                    out.pixels.insert(out.pixels.end(), pixels,
+                        pixels + source->slicePitch);
                     out.subresources.push_back(subresource);
                 }
             }
@@ -645,6 +583,10 @@ namespace assets
                 "modelArtifact", "CEMC model artifact를 읽지 못했다.");
             return result;
         }
+        // ★ 읽기와 해시를 따로 표시한다(MBC11 §8.4). B2 비교 예산의 기준은 legacy
+        //   `.asset` 읽기인데 legacy는 artifact를 해시하지 않았다 — 한 칸에 묶어
+        //   두면 "축이 다르다"는 말을 수치로 보일 수 없다.
+        markPhase("cemc-read");
         if (record.modelArtifactFingerprint != Fingerprint(cookedBytes))
         {
             AddIssue(result, ModelAssetGenerationIssueCode::FingerprintMismatch,
@@ -652,7 +594,7 @@ namespace assets
             return result;
         }
 
-        markPhase("cemc-read+sha");
+        markPhase("cemc-sha");
         experiment::ModelDraft draft;
         std::vector<experiment::ModelLoadIssue> cookedIssues;
         if (!ck::Read(cookedBytes, draft, cookedIssues))

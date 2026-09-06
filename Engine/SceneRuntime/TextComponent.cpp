@@ -112,7 +112,7 @@ void TextComponent::OnAddedToScene()
 {
 	UIComponent::OnAddedToScene();
 	UITickSystems->RegisterText(this);
-	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	if (HasLifecycleState(State_Initialized) && GetOwner())
 	{
 		if (Scene* scene = GetOwner()->GetScene())
 		{

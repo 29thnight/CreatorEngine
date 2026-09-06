@@ -31,6 +31,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$Work = [IO.Path]::GetFullPath($Work)
+$Exe = [IO.Path]::GetFullPath($Exe)
 
 $goldenPath = Join-Path $PSScriptRoot 'cli_registry.golden.tsv'
 
@@ -43,16 +45,18 @@ if (Test-Path -LiteralPath $snapshotPath) { Remove-Item -LiteralPath $snapshotPa
 
 $scriptPath = Join-Path $Work 'registry_golden_cmd.txt'
 Set-Content -LiteralPath $scriptPath -Encoding UTF8 -Value @(
-    "commands.list $snapshotPath"
+    'commands.list "' + $snapshotPath + '"'
     'quit'
 )
 
-$proc = Start-Process -FilePath $Exe -ArgumentList '--script', $scriptPath -WorkingDirectory $exeDir `
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--script', ('"'+$scriptPath+'"')) -WindowStyle Hidden -WorkingDirectory $exeDir `
     -RedirectStandardOutput (Join-Path $Work 'registry_golden.out') `
     -RedirectStandardError  (Join-Path $Work 'registry_golden.err') -PassThru
 $proc.WaitForExit(180000) | Out-Null
 if (-not $proc.HasExited) { $proc.Kill(); "snapshot 생성 타임아웃"; exit 1 }
 if (-not (Test-Path -LiteralPath $snapshotPath)) { "snapshot 이 만들어지지 않았다"; exit 1 }
+
+if ($proc.ExitCode -ne 0) { "Registry snapshot process failed: $($proc.ExitCode)"; exit 1 }
 
 if ($Update) {
     Copy-Item -LiteralPath $snapshotPath -Destination $goldenPath -Force

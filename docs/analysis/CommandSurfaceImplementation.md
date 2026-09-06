@@ -1,14 +1,16 @@
 # 엔진 명령 표면 정리 — 2026-09-06
 
+> master 병합 후보: `6b9c2b79`의 `light.proxy` 제품 조회와 텍스처 Commandlet 4개를 보존했다. 통합 검증 및 원본 작업 보존은 [병합 준비 기록](Phase14_5MergePreparation.md)을 따른다.
+
 기준 HEAD `55374f16`. 과거 CLI 보존을 목표로 한 계획을 종료하고, 제품 편집 API와
-검증 Commandlet의 등록·실행·소비 경로를 분리했다. 제품 명령 98개(이름 105개),
-Commandlet 103개이며 두 집합과 처분표가 일치한다. 최초 정리에서 이름 4개와 파일 13개를 제거했고, 후속 정리에서는 종료된 벤치
+검증 Commandlet의 등록·실행·소비 경로를 분리했다. 제품 명령 99개(이름 106개),
+Commandlet 107개이며 두 집합과 처분표가 일치한다. 최초 정리에서 이름 4개와 파일 13개를 제거했고, 후속 정리에서는 종료된 벤치
 6개·이전된 구 진입점 2개와 벤치 C++ 5개·셰이더 4개를 추가 제거했다. 개별 처분은
 [CommandSurfaceDisposition.tsv](CommandSurfaceDisposition.tsv)에 기록한다.
 
 ## 현재 마무리 상태
 
-제품 98개 모두 소유형 terminal 결과를 반환한다. named JSON 입력은 58개, Undo 선언은 21개다.
+제품 99개 모두 소유형 terminal 결과를 반환한다. named JSON 입력은 59개, Undo 선언은 21개다.
 `assets.scenemodel`은 Commandlet으로 이동했고 사용하지 않는 `animator.state/exit` 하네스를 제거했다.
 `animator.param`과 `render.matmode`는 GUI와 같은 공통 Undo 작업을 사용한다.
 `LegacyUnreported`, void 등록 및 직접 exit 변환 어댑터는 제거했다.

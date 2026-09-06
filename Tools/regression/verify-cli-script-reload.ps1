@@ -33,6 +33,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) { throw 'Close the existing editor before running this isolated gate.' }
+$script:ownedEditors = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) { "실행 파일이 없다: $Exe"; exit 1 }
 $exeDir   = Split-Path -Parent $Exe
@@ -47,7 +49,7 @@ $backup = Join-Path $Work 'GameScripts.backup.dll'
 Copy-Item -LiteralPath $scriptDll -Destination $backup -Force
 
 function Stop-AllEditors {
-    Get-Process CreatorEditor -ErrorAction SilentlyContinue | ForEach-Object {
+    $script:ownedEditors | Where-Object { -not $_.HasExited } | ForEach-Object {
         try { $_.Kill(); $_.WaitForExit(20000) | Out-Null } catch { }
     }
     if (Test-Path -LiteralPath $endpointPath) { Remove-Item -LiteralPath $endpointPath -Force }
@@ -57,9 +59,10 @@ $failures = New-Object System.Collections.Generic.List[string]
 
 try {
     Stop-AllEditors
-    $proc = Start-Process -FilePath $Exe -ArgumentList '--command-service' -WorkingDirectory $exeDir `
+    $proc = Start-Process -WindowStyle Hidden -FilePath $Exe -ArgumentList '--command-service' -WorkingDirectory $exeDir `
         -RedirectStandardOutput (Join-Path $Work 'reload.out') `
         -RedirectStandardError  (Join-Path $Work 'reload.err') -PassThru
+    $script:ownedEditors.Add($proc)
 
     $deadline = (Get-Date).AddSeconds($BootTimeoutSec)
     $info = $null

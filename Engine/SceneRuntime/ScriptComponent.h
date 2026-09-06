@@ -29,6 +29,29 @@ public:
 	void OnInitialized() override;
 	void OnUninitializing() override;
 
+	// 관리 인스턴스를 만들고 저장된 필드 값을 되돌린다. **생명주기 훅은 부르지 않는다.**
+	//
+	// ── 왜 OnInitialized에서 갈라 냈나 (2026-09-05) ──
+	//
+	// 편집 모드에서는 C# 스크립트가 돌지 않아야 한다(Unity 규약, EditorMain.cpp).
+	// 그런데 인스펙터의 [SerializeField] 편집은 **관리 인스턴스를 통해서만**
+	// 동작한다(InspectorWindow::DrawManagedScripts — 필드 목록·타입·값을 전부
+	// ClrHost::GetField*로 읽는다). 인스턴스가 없으면 "인스턴스 없음" 경고만 뜨고
+	// 필드를 못 고친다.
+	//
+	// 그래서 둘을 분리한다: 인스턴스 생성은 편집 모드에도, 훅 전달은 재생 중에만.
+	// 유니티의 실제 모델도 이쪽이다 — 에디터에 MonoBehaviour 인스턴스는 존재하고
+	// [ExecuteAlways] 없이는 훅만 오지 않는다.
+	//
+	// 편집 모드에서 이 함수는 드레인이 **매 프레임** 부른다(컴포넌트가 큐에 남는다).
+	// 그래서 실패를 기억해 재시도를 멈춘다 — 등록되지 않은 타입이 로그를 폭주시키지
+	// 않게. 재시도는 RetryInstance로만 연다.
+	void EnsureInstance();
+
+	// 실패 기억을 지우고 한 번 더 시도한다. 인스펙터의 "다시 만들기" 버튼과
+	// 타입 선택이 부른다 — CLR이 뒤늦게 준비됐거나 어셈블리를 다시 읽은 경우다.
+	void RetryInstance();
+
 	// 6단계 전부를 가상으로 받아 관리 측에 전달한다(트랙 L · L3 완결).
 	// 드라이버가 네이티브 하나여야 "관리 큐가 부르는 것"과 "네이티브가 부르는 것"이
 	// 어긋날 수 없다 — 그 이원화가 DDOL 이송 신호가 스크립트에 닿지 않던 원인이었다.
@@ -41,10 +64,23 @@ public:
 	void OnEndSimulation() override;
 	void OnRemovingFromScene() override;
 
+	// ── 활성 축 (PHASE 9 트랙 L · 6단계와 직교) ──
+	//
+	// 이 둘이 없던 것이 활성 축이 경계에서 통째로 끊겨 있던 원인이다.
+	// LifecycleRegistry의 마스크는 "기반 클래스와 함수 주소가 다른가"로 비트를
+	// 세우므로(LifecycleRegistry.h), override가 없으면 Bit_OnEnable/Bit_OnDisable이
+	// 아예 서지 않는다 — 인스펙터 체크박스도 Entity::SetEnabled의 컴포넌트 전파도
+	// 기반 클래스의 빈 함수를 부르고 끝났다. 스크립트는 자기가 꺼진 것을 모른 채
+	// 계속 틱을 받았다(관리 측 Component.Enabled는 여전히 true였다).
+	//
+	// 6단계와 창구를 나눈 이유는 ClrHost::DispatchEnabled 선언부에 있다.
+	void OnEnable() override;
+	void OnDisable() override;
+
 	// 네이티브에서만 일어나는 사건을 관리 인스턴스에 흘린다(트랙 L · L3 잔여).
 	//
 	// 가상 훅으로 만들지 않은 이유: Scene::FlushPendingDestroy가 **모든 파괴에서**
-	// OnEndSimulation/OnRemovingFromScene을 부르고 그 뒤 DestroyBehaviour가 관리 측
+	// OnEndSimulation/OnRemovingFromScene을 부르고 그 뒤 DestroyComponent가 관리 측
 	// TearDown을 태워 같은 둘을 또 부른다 — 가상으로 받으면 파괴마다 이중 발화한다.
 	// 그래서 지금은 이중이 구조적으로 불가능한 자리(DDOL 이송 경로) 두 곳만 이
 	// 창구를 부른다. 자세한 사유와 최종형은 ScriptLifecyclePhase.h 상단에 있다.
@@ -71,13 +107,21 @@ public:
 	// 편집 중이던 상태가 유지되는 것이 핫리로드의 목적이다.
 	void PrepareForReload();
 
-	// 관리 인스턴스를 접어 둔다. 값은 m_fieldData에 남으므로 다음 Awake가 그대로 되살린다.
+	// 핫리로드 직후에 부른다. PrepareForReload의 짝이다.
 	//
-	// 재생을 시작하면 엔진이 에디터 씬을 직렬화해 PlayScene을 따로 만든다(사본 방식).
-	// 원본 씬은 파괴되지 않고 그대로 살아 있어서, 원본의 관리 인스턴스를 두면
-	// 사본의 인스턴스와 함께 둘 다 틱을 받아 게임 로직이 두 벌 돈다.
-	// PrepareForReload와 달리 관리 측이 내려가지 않으므로 파괴를 직접 요청한다.
-	void SuspendInstance();
+	// 인스턴스를 다시 만드는 것만으로는 부족하다. 나머지 진입 단계 — 씬 편입,
+	// 활성, 시뮬레이션 시작 — 는 평소 Scene::DrainPendingLifecycle이 상태 비트를
+	// 보고 구동하는데, 리로드는 그 비트를 지우지 않으므로 엔티티 쪽에는 "이미 다
+	// 돌았다"로 보인다. 그래서 아무도 다시 부르지 않는다.
+	//
+	// 실측(verify-lifecycle-reload 착수 시점): 재생 중 리로드하면 새 인스턴스가
+	// OnInitialized만 받고 OnAddedToScene·OnEnable·OnBeginSimulation·OnSimulate를
+	// 하나도 못 받았다. 스크립트가 죽은 채로 재생이 계속된다 — 저작자에게는
+	// "리로드했더니 코드가 안 돈다"로 보이고, 아무 오류도 남지 않는다.
+	//
+	// 리로드 전 상태를 그대로 이어 준다. 시뮬레이션을 시작했었는지는
+	// State_SimulationBegun 비트가 알고 있다(리로드가 지우지 않는다).
+	void RestoreAfterReload();
 
 	// m_fieldData를 관리 인스턴스에 밀어 넣는다(인스턴스 생성 직후).
 	void ApplyFields();
@@ -93,4 +137,8 @@ public:
 private:
 	int m_instanceId{ -1 };
 	std::uint64_t m_initializationAttempts{};
+
+	// EnsureInstance가 한 번 실패했는가. 편집 모드에서는 드레인이 매 프레임
+	// 부르므로 이것이 없으면 실패 로그가 프레임마다 쌓인다.
+	bool m_instanceCreateFailed{ false };
 };

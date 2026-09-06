@@ -1981,13 +1981,13 @@ bool RunVulkanGBufferTest(std::string& outLog)
     const std::array<std::uint8_t, 4> sharedNormalPixel{
         255u, 128u, 128u, 255u };
     std::shared_ptr<Texture> firstBaseColorOwner{ Texture::CreateFromPixels(
-        1, 1, "m6_p1b2a_first_base_color", DXGI_FORMAT_R8G8B8A8_UNORM,
+        1, 1, "m6_p1b2a_first_base_color", RHIFormat::RGBA8Unorm,
         firstBaseColorPixel.data(), firstBaseColorPixel.size()) };
     std::shared_ptr<Texture> secondBaseColorOwner{ Texture::CreateFromPixels(
-        1, 1, "m6_p1b2a_second_base_color", DXGI_FORMAT_R8G8B8A8_UNORM,
+        1, 1, "m6_p1b2a_second_base_color", RHIFormat::RGBA8Unorm,
         secondBaseColorPixel.data(), secondBaseColorPixel.size()) };
     std::shared_ptr<Texture> sharedNormalOwner{ Texture::CreateFromPixels(
-        1, 1, "m6_p1b2b1_shared_normal", DXGI_FORMAT_R8G8B8A8_UNORM,
+        1, 1, "m6_p1b2b1_shared_normal", RHIFormat::RGBA8Unorm,
         sharedNormalPixel.data(), sharedNormalPixel.size()) };
     if (!firstBaseColorOwner || !secondBaseColorOwner || !sharedNormalOwner)
     {
@@ -2817,7 +2817,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     for (std::size_t index = 0; index < emissionOwners.size(); ++index)
     {
         emissionOwners[index].reset(Texture::CreateFromPixels(1, 1,
-            textureNames[index], DXGI_FORMAT_R8G8B8A8_UNORM,
+            textureNames[index], RHIFormat::RGBA8Unorm,
             emissionPixels[index].data(), emissionPixels[index].size()));
         if (!emissionOwners[index])
         {
@@ -2829,7 +2829,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     constexpr std::array<std::uint8_t, 4> genericWindPixel{
         255u, 255u, 255u, 255u };
     std::shared_ptr<Texture> genericWindOwner(Texture::CreateFromPixels(1, 1,
-        "m6_p2d_c_wind_map", DXGI_FORMAT_R8G8B8A8_UNORM,
+        "m6_p2d_c_wind_map", RHIFormat::RGBA8Unorm,
         genericWindPixel.data(), genericWindPixel.size()));
     if (!genericWindOwner)
     {
@@ -3568,11 +3568,11 @@ namespace
             const uint8_t normalPixel[4] = { 128, 128, 255, 255 };
             const uint8_t ormPixel[4] = { 0, 0, 255, 255 };
             diffuse = Texture::CreateFromPixels(1, 1, "vk_decal_diffuse",
-                DXGI_FORMAT_R8G8B8A8_UNORM, diffusePixel);
+                RHIFormat::RGBA8Unorm, diffusePixel);
             normal = Texture::CreateFromPixels(1, 1, "vk_decal_normal",
-                DXGI_FORMAT_R8G8B8A8_UNORM, normalPixel);
+                RHIFormat::RGBA8Unorm, normalPixel);
             orm = Texture::CreateFromPixels(1, 1, "vk_decal_orm",
-                DXGI_FORMAT_R8G8B8A8_UNORM, ormPixel);
+                RHIFormat::RGBA8Unorm, ormPixel);
 
             EnhancedDecalPass::Item item{};
             // 화면 중앙 24x24 안팎만 덮고, z=0.5 표면을 관통한다. 화면 가장자리의

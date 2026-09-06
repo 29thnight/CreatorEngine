@@ -15,7 +15,7 @@ class ImageComponent;
 //
 // AnimatorSystem(ScriptBinder/AnimatorSystem.h)과 완전히 같은 패턴이다. 예전에는
 // 두 컴포넌트가 Component::Update를 오버라이드해 LifecycleRegistry의 오버라이드
-// 감지 마스크(Bit_Update)에 걸리고, Scene::RegisterComponent가
+// 감지 마스크(옛 Bit_Update — C3 완결로 철거)에 걸리고, Scene::RegisterComponent가
 // SystemSchedule::SubscribeImplicit(component, Phase::Update)로 Scene 하나뿐인
 // m_schedule.UpdateList()에 스크립트·다른 컴포넌트와 섞어 넣었다. 여기서는 이
 // 시스템 전용 조밀 벡터 두 개(타입별로 분리 — 멤버가 다르고 같은 벡터에 섞으면
@@ -32,8 +32,8 @@ class ImageComponent;
 // RenderScene 커맨드 등록·UIManager 캔버스-연결 등록용으로 그대로 두고(과제
 // 지시대로 손대지 않는다), 이 시스템 등록은 별도 훅 쌍을 쓴다 — 이유는
 // AnimatorSystem.h와 동일: DDOL(DontDestroyOnLoad) 오브젝트가 씬을 건널 때
-// Awake는 Component::State_AwakeCalled 비트로 컴포넌트 평생 1회만 불리므로
-// (Scene::RegistryDrainAwakeAndStart) 재부착 시 다시 불리지 않는다 — 이 시스템
+// Awake는 Component::State_Initialized 비트로 컴포넌트 평생 1회만 불리므로
+// (Scene::DrainPendingPhases) 재부착 시 다시 불리지 않는다 — 이 시스템
 // 등록을 Awake에 걸면 최초 생성 씬의 등록부에서만 존재하고 새 씬으로 넘어간 뒤
 // 영원히 틱을 못 받는 결함이 생긴다. OnAddedToScene/OnRemovingFromScene은
 // 게이트가 없어 씬에 들고 날 때마다(최초 생성 때도, DDOL Detach/Attach 때도)

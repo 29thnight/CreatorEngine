@@ -14,7 +14,7 @@ dx12.gizmoscene	live	200	succeeded	148				dx12.gizmoscene 통과
 dx12.grid	live	200	succeeded	84				dx12.grid 통과
 dx12.ibl	live	200	succeeded	141				dx12.ibl 통과
 dx12.iblshade	live	200	succeeded	513				dx12.iblshade 통과
-dx12.live	not-live	200	legacy_unreported	4	200	legacy_unreported	4014	
+dx12.live	not-live	200	legacy_unreported	4	200	legacy_unreported	4014	-
 dx12.parallel	live	200	succeeded	60				dx12.parallel 통과
 dx12.post	live	200	succeeded	189				dx12.post 통과
 dx12.postscale	live	200	succeeded	950				dx12.postscale 통과
@@ -34,12 +34,12 @@ dx12.sss	live	200	succeeded	81				dx12.sss 통과
 dx12.ui	live	200	succeeded	71				dx12.ui 통과
 dx12.uploadring	not-live	200	failed	57	200	failed	2017	dx12.uploadring 실패
 dx12.wireframe	live	200	succeeded	82				dx12.wireframe 통과
-pipeline.nodes	not-live	200	legacy_unreported	3	200	legacy_unreported	1968	
-render.backend	not-live	200	legacy_unreported	4	200	legacy_unreported	4106	
+pipeline.nodes	not-live	200	legacy_unreported	3	200	legacy_unreported	1968	-
+render.backend	not-live	200	legacy_unreported	4	200	legacy_unreported	4106	-
 render.livecheck	live	200	succeeded	6				render.livecheck 통과
-render.matmode	not-live	200	legacy_unreported	5	200	legacy_unreported	1858	
-render.rtinfo	not-live	200	legacy_unreported	3	200	legacy_unreported	1843	
-render.shadowinfo	not-live	200	legacy_unreported	4	200	legacy_unreported	1850	
+render.matmode	not-live	200	legacy_unreported	5	200	legacy_unreported	1858	-
+render.rtinfo	not-live	200	legacy_unreported	3	200	legacy_unreported	1843	-
+render.shadowinfo	not-live	200	legacy_unreported	4	200	legacy_unreported	1850	-
 rhi.uploadsegments	not-live	500	internal_error	85	500	internal_error	2127	핸들러 예외: Unknown exception
 vk.decal	live	200	succeeded	1106				vk.decal 통과
 vk.deferred	not-live	200	failed	804	200	failed	3366	vk.deferred 실패

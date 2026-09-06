@@ -1,0 +1,73 @@
+# LC1 실패 픽스처 시나리오 (ScriptLifecycleContractHardeningPlan · LC0)
+#
+# 훅이 던지거나 스스로 꺼졌을 때 그 뒤 단계가 어떻게 되는지를 받아 적는다.
+# 판정은 verify-lifecycle-failure.ps1이 한다.
+#
+# ── 대조군을 같은 실행에 두는 이유 ──
+#
+# Control(LifecycleProbe)은 아무것도 실패하지 않는 정상 인스턴스다. 이것이 없으면
+# "실패 픽스처가 조용하다"를 두 가지로 읽을 수 있다 — 고침이 들었거나, 아니면
+# 하네스가 애초에 아무것도 못 받고 있거나. 대조군이 11훅을 그대로 받는 것을 함께
+# 보면 그 둘이 갈린다. 덤으로 한 인스턴스의 예외가 이웃의 생명주기를 끊지
+# 않는다는 것(LC2의 방향)도 같은 자리에서 관측된다.
+#
+# ── 왜 play가 필요한가 ──
+#
+# C# 스크립트는 재생 중에만 생명주기를 받는다(2026-09-05, 편집/재생 경계 고침).
+# 편집 모드에서는 인스턴스만 만들어지고 훅은 한 건도 오지 않는다.
+
+wait 60
+scene.new LifecycleFailure
+wait 30
+
+# ① 초기화가 던진다
+object.create FailInit
+script.add FailInit FailInitializedProbe
+wait 10
+
+# ② 시작 훅이 던진다
+object.create FailBegin
+script.add FailBegin FailBeginProbe
+wait 10
+
+# ③ 시작 훅 안에서 스스로 끈다 (예외가 아니다)
+object.create DisableBegin
+script.add DisableBegin DisableInBeginProbe
+wait 10
+
+# ④ 정리 콜백 하나가 던진다 (LC2)
+object.create FailCleanup
+script.add FailCleanup FailCleanupProbe
+wait 10
+
+# ⑤ 루틴이 첫 await **전에** 던진다 (LC5 · 동기 경로)
+object.create FailSimSync
+script.add FailSimSync FailSimulateSyncProbe
+wait 10
+
+# ⑥ async 루틴이 첫 await **전에** 던진다 (LC5 · 즉시 faulted Task)
+#    ⑤와 코드 모양이 거의 같은데 async가 붙어 컴파일러가 예외를 Task로 감싼다.
+#    저작자에게는 취향 차이인 것이 엔진의 실패 정책을 가르면 안 된다.
+object.create FailSimImm
+script.add FailSimImm FailSimulateImmediateProbe
+wait 10
+
+# ⑦ 루틴이 await **뒤에** 던진다 (LC5 · 나중 faulted Task)
+#    셋을 나란히 둬야 "같은 실패인데 남는 상태가 다르다"를 잴 수 있다.
+object.create FailSimAsync
+script.add FailSimAsync FailSimulateAsyncProbe
+wait 10
+
+# 대조군 — 아무것도 실패하지 않는다
+object.create Control
+script.add Control LifecycleProbe
+wait 60
+
+play
+wait 400
+
+stop
+wait 200
+
+log.flush
+quit

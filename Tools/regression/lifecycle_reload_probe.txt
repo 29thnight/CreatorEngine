@@ -1,0 +1,62 @@
+# LC7 어셈블리 리로드 세대 픽스처 (ScriptLifecycleContractHardeningPlan · LC7-d)
+#
+# 판정은 verify-lifecycle-reload.ps1이 한다.
+#
+# ── 왜 이 시나리오가 없었나 ──
+#
+# `script.reload`는 CLI에 있는데 **어떤 회귀 시나리오도 부르지 않는다**. 그래서
+# ScriptRegistry.Clear가 도는 경로 전체가 관측 밖이다 — LC5-b에서 그 자리에 넣은
+# "재개 n건을 버렸다" 배수 폐기까지 포함해서.
+#
+# 설계 문서 §3 LC7이 이 시나리오에 요구하는 불변식: 대기·구독·팩터리·BT 참조 해제,
+# **이전 로드 문맥 회수**, 새 세대 오염 없음.
+#
+# ── 픽스처를 새로 만들지 않는 이유 ──
+#
+# GenerationProbe가 이미 필요한 것을 전부 남긴다: 정적 카운터로 세대를 가르고,
+# 훅 여덟 종을 세고, 긴 대기의 정상 완료와 취소를 갈라 표지한다. 리로드에서
+# 재는 것도 정확히 그 셋이다. 하나 다른 점이 오히려 판정을 준다 — **리로드는
+# 어셈블리를 갈아치우므로 정적 카운터가 1로 되돌아간다.** 재생 재시작(세대 게이트)
+# 에서는 계속 증가했다. 그 차이가 "리로드가 실제로 일어났는가"의 증거다.
+#
+# ── script.status ──
+#
+# 이전 어셈블리의 잔존 여부를 로그에 남긴다. 리로드 호출 스택이 아직 살아 있으면
+# 항상 "잔존"으로 나오므로(명령 구현의 주석), 몇 프레임 지난 뒤에 묻는다.
+
+wait 60
+scene.new LifecycleReload
+wait 30
+
+object.create Reload
+script.add Reload GenerationProbe
+wait 60
+
+# ── 편집 모드 리로드 ──
+#
+# 재생 전에 한 번 리로드한다. 편집 모드에서는 관리 훅을 돌리지 않는 것이 규약이고
+# (bd13620c), 리로드 복원은 CLI가 직접 부르므로 Scene 드레인의 그 가드를 지나지
+# 않는다. 여기서 태우지 않으면 복원의 편집 모드 분기가 코드에만 있고 아무도
+# 밟지 않는 채로 남는다.
+#
+# 이 구간에서 픽스처 표지가 하나라도 나오면 훅이 새어 나간 것이다.
+script.reload
+script.invoke GenerationProbe RecordedHooks
+wait 60
+
+play
+# 대기가 걸릴 시간만 준다. 리로드는 대기 안쪽이어야 한다.
+wait 60
+
+script.reload
+wait 120
+
+# 리로드 호출 스택이 풀린 뒤에 묻는다.
+script.status
+wait 60
+
+stop
+wait 60
+
+log.flush
+quit

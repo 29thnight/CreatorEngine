@@ -17,11 +17,22 @@ $gbufferShaderMeta = Join-Path $assets 'Shaders\DefaultPassShader\GBuffer.shader
 $gbufferMeta = $gbufferShaderMeta + '.meta'
 # 재질 cook은 --shadermeta 인자와 별개로 asset root의 잘 알려진 경로에서
 # Forward sidecar도 읽고(shader.forward), shadermeta cook은 sourceGuid가
-# 가리키는 source 셰이더(.hlsl)와 그 sidecar까지 검증한다. fixture에 이들이
+# 가리키는 source 셰이더(.hlsl 또는 .slang)와 그 sidecar까지 검증한다. fixture에 이들이
 # 없으면 cook이 거부된다.
 $forwardMeta = Join-Path $assets 'Shaders\DefaultPassShader\Forward.shadermeta.meta'
 $forwardShaderMeta = $forwardMeta.Substring(0, $forwardMeta.Length - '.meta'.Length)
-$gbufferHlsl = Join-Path $assets 'Shaders\DefaultPassShader\GBuffer.hlsl'
+# * source 파일 이름을 여기 박지 않는다(2026-09-04). GBuffer의 source가
+#   `GBuffer.hlsl`에서 `GBuffer.slang`으로 옮겨간 커밋(5ac55b17, PBR 코어 Slang 이관)
+#   뒤로 이 게이트가 'source 파일이 없다'로 붉어 있었다 — fixture가 옛 이름을 복사하고
+#   있었기 때문이다(AssetCooker 암묵 폐포 입력의 같은 함정). 그래서 shadermeta 문서의
+#   `source:` 줄에서 유도한다.
+$gbufferSourceName = (Select-String -LiteralPath $gbufferShaderMeta -Pattern '^\s*source:\s*(\S+)' |
+    Select-Object -First 1).Matches[0].Groups[1].Value
+if ([string]::IsNullOrWhiteSpace($gbufferSourceName)) {
+    "GBuffer.shadermeta에서 source: 줄을 읽지 못했다: $gbufferShaderMeta"
+    exit 1
+}
+$gbufferHlsl = Join-Path $assets ('Shaders\DefaultPassShader\' + $gbufferSourceName)
 $gbufferHlslMeta = $gbufferHlsl + '.meta'
 
 if (-not (Test-Path -LiteralPath $AssetCooker -PathType Leaf)) {
@@ -196,9 +207,9 @@ Copy-Item -LiteralPath $forwardShaderMeta `
     -Destination (Join-Path $relocatedShaderDir 'Forward.shadermeta')
 Copy-Item -LiteralPath $forwardMeta `
     -Destination (Join-Path $relocatedShaderDir 'Forward.shadermeta.meta')
-Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $relocatedShaderDir 'GBuffer.hlsl')
+Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $relocatedShaderDir $gbufferSourceName)
 Copy-Item -LiteralPath $gbufferHlslMeta `
-    -Destination (Join-Path $relocatedShaderDir 'GBuffer.hlsl.meta')
+    -Destination (Join-Path $relocatedShaderDir ($gbufferSourceName + '.meta'))
 # MBC11 — 옮긴 프로젝트에도 epoch header와 게시된 generation이 있어야 cook(내보내기)이 선다.
 function Publish-RelocatedGeneration([string]$relocatedAssetsRoot, [string]$relocatedModelPath) {
     $projectRoot = Split-Path -Parent $relocatedAssetsRoot
@@ -288,8 +299,8 @@ Copy-Item -LiteralPath $gbufferShaderMeta -Destination $fixtureShaderMeta
 Copy-Item -LiteralPath $gbufferMeta -Destination ($fixtureShaderMeta + '.meta')
 Copy-Item -LiteralPath $forwardShaderMeta -Destination (Join-Path $fixtureShaderDir 'Forward.shadermeta')
 Copy-Item -LiteralPath $forwardMeta -Destination (Join-Path $fixtureShaderDir 'Forward.shadermeta.meta')
-Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $fixtureShaderDir 'GBuffer.hlsl')
-Copy-Item -LiteralPath $gbufferHlslMeta -Destination (Join-Path $fixtureShaderDir 'GBuffer.hlsl.meta')
+Copy-Item -LiteralPath $gbufferHlsl -Destination (Join-Path $fixtureShaderDir $gbufferSourceName)
+Copy-Item -LiteralPath $gbufferHlslMeta -Destination (Join-Path $fixtureShaderDir ($gbufferSourceName + '.meta'))
 $invalidMeta = $modelMetaText -replace
     '(?m)^guid:\s*[0-9a-f-]+\s*$',
     'guid: 68b21a01-958e-14ed-8820-a2b9aa289587'

@@ -586,7 +586,7 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 | PHASE 5 (커플링 절단) | `AnimationJob`의 RenderEngine 헤더/ScriptBinder 구현 기형이 S6에서 해소. **추가로 S8이 `AnimationController.h` → `imgui_node_editor` 간선을 소멸시킨다** — 둘 다 래칫 게이트 통과 필수 |
 | PHASE 9 (생명주기) | 스케줄러는 `InternalAnimationUpdateEvent` 델리게이트 단계를 그대로 쓴다 — 델리게이트 은퇴가 이 단계에 오면 그때 이관(이 페이즈에서 선제 이동 안 함) |
 | MultiCameraRenderPlan | significance는 활성 카메라 최대값 — 뷰별 시간축 상태 원칙(잔상 교훈)과 충돌 없음(포즈는 뷰 무관 단일) |
-| PHASE 12 (빌드) | 무관 — 파일 충돌만 회피 |
+| PHASE 12.5 (빌드) | 무관 — 파일 충돌만 회피 |
 | BehaviorTreeManagedPlan (9-8) | BT가 애니메이터 파라미터를 만지는 경로는 `SetParameter`(뮤텍스) 유지 — 계약 변화 없음 |
 
 ## 6. 리스크

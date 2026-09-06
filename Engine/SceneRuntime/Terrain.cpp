@@ -778,7 +778,7 @@ void TerrainComponent::OnInitialized()
 
 void TerrainComponent::OnAddedToScene()
 {
-	if (!HasLifecycleState(State_AwakeCalled) || !GetOwner()) return;
+	if (!HasLifecycleState(State_Initialized) || !GetOwner()) return;
 	if (Scene* scene = GetOwner()->GetScene())
 	{
 		scene->CollectTerrainComponent(this);

@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 그래서 호출부 역할을 대신하는데, 덤으로 스크립트끼리의 GetComponent도 함께 검증된다.
 /// 구동은 Update 첫 프레임에 한다 — Start 순서에 기대지 않기 위해서다.
 /// </summary>
-public sealed partial class CurveIndicatorProbe : Behaviour
+public sealed partial class CurveIndicatorProbe : Component
 {
     [SerializeField] private int _checkAfterFrames = 10;
 
@@ -66,8 +66,8 @@ public sealed partial class CurveIndicatorProbe : Behaviour
         foreach (MeshRenderer renderer in renderers)
         {
             Entity owner = renderer.Entity;
-            Log($"[CurveIndicatorProbe] {owner.Name} — pos={owner.Transform.LocalPosition} " +
-                $"scale={owner.Transform.LocalScale} 재질='{renderer.MaterialName}' 색={renderer.BaseColor}");
+            Log($"[CurveIndicatorProbe] {owner.Name} — pos={owner.Transform?.LocalPosition} " +
+                $"scale={owner.Transform?.LocalScale} 재질='{renderer.MaterialName}' 색={renderer.BaseColor}");
 
             // 재질 사본을 만들었으므로 이름에 지정한 문자열이 들어가야 한다.
             Assert($"'{owner.Name}' 재질이 사본으로 교체됨",
@@ -79,8 +79,12 @@ public sealed partial class CurveIndicatorProbe : Behaviour
         }
 
         // 셰이더 상수 넣기 경로도 확인한다. 없는 이름이면 false여야 한다.
-        Assert("없는 상수 버퍼는 false 반환",
-            !renderers[0].SetMaterialFloat("__없는버퍼__", "__없는값__", 1f), "true가 나왔습니다");
+        //
+        // 예전에는 상수 버퍼 이름도 함께 넘겼는데, 그 축은 판별력이 없었다 —
+        // fb6e4f55 이후 네이티브가 버퍼 인자를 읽지 않았으므로 아무 문자열을
+        // 넣어도 결과가 같았다. 9-4에 인자 자체를 걷어 이름 축만 남겼다.
+        Assert("없는 상수 이름은 false 반환",
+            !renderers[0].SetMaterialFloat("__없는값__", 1f), "true가 나왔습니다");
     }
 
     private void Assert(string name, bool ok, string detail)

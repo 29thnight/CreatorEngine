@@ -61,7 +61,21 @@ object.create ScriptAddRegressionTarget Empty
 wait 5
 
 script.add ScriptAddRegressionTarget NoSuchScriptType_C2_2_Regression
-wait 20
+wait 10
+
+# ── 왜 play가 필요한가 (2026-09-05) ──
+#
+# C# 스크립트는 재생 중에만 생명주기를 받는다(Scene::DrainPendingPhases). 편집
+# 모드에서는 드레인이 EnsureInstance만 부르고 컴포넌트를 큐에 되돌리므로
+# OnInitialized 자체가 불리지 않는다 — 이 회귀가 세는 실패 로그도 0줄이 되어
+# "판정 불가"로 떨어진다. 재생에 들어가면 큐에 남아 있던 컴포넌트가 그대로
+# 정상 드레인을 타고, 그때 OnInitialized가 정확히 한 번 불린다.
+#
+# 이중 초기화 결함(수동 OnInitialized + 자동 드레인)은 여전히 2줄로 드러난다 —
+# 실패 기억(m_instanceCreateFailed)은 EnsureInstance 안에만 있고, 로그는
+# OnInitialized가 호출마다 남기기 때문이다.
+play
+wait 60
 
 script.status
 lifecycle.trace status

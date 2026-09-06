@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 빌드 → 로드 → 라이프사이클 → 엔진 API 호출 전 구간이 실제로 관통되는지 보는 것이다.
 /// 오브젝트를 제자리에서 위아래로 흔들어, 값이 네이티브까지 왕복하는지 눈으로 확인한다.
 /// </summary>
-public sealed partial class Bobber : Behaviour
+public sealed partial class Bobber : Component
 {
     // 소스 제너레이터가 이 필드들을 보고 인덱스 기반 접근자를 만든다.
     // 인스펙터 표시와 직렬화가 그 접근자를 함께 쓴다(설계 문서 04절).

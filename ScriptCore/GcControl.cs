@@ -33,7 +33,7 @@ public struct GcStats
 public static class GcControl
 {
     /// <summary>
-    /// 씬 경계에서 확정 수집한다. 파괴된 씬의 Behaviour와 그 필드가 참조하던
+    /// 씬 경계에서 확정 수집한다. 파괴된 씬의 Component와 그 필드가 참조하던
     /// 관리 객체를 이 시점에 회수해, 다음 씬이 깨끗한 힙에서 시작하게 한다.
     ///
     /// blocking·compacting으로 부르는 이유는 "언젠가 회수된다"로는 씬 전환 벤치의

@@ -91,16 +91,22 @@ public:
 
 	// 생명주기 진행 상태 (PHASE 9-1).
 	//
-	// Awake·Start는 컴포넌트당 한 번뿐이라는 것이 계약이다. 그런데 등록은 한 번이
-	// 아니다 — DDOL 오브젝트는 씬을 건널 때마다 새 씬에 다시 등록되고, 경로 전환도
-	// 재등록을 부른다. 상태를 컴포넌트가 들고 있지 않으면 그때마다 Awake가 다시 돈다.
+	// OnInitialized·OnBeginSimulation은 컴포넌트당 한 번뿐이라는 것이 계약이다.
+	// 그런데 등록은 한 번이 아니다 — DDOL 오브젝트는 씬을 건널 때마다 새 씬에 다시
+	// 등록되고, 경로 전환도 재등록을 부른다. 상태를 컴포넌트가 들고 있지 않으면
+	// 그때마다 OnInitialized가 다시 돈다.
 	//
 	// (델리게이트 경로는 같은 상태를 IRegistableEvent가 들고 있었다. 훅이 Component로
 	//  온 이상 상태도 여기 있어야 짝이 맞는다.)
+	//
+	// ★ OnAddedToScene에는 대응 비트가 없다 — 그 훅은 **씬에 편입될 때마다** 발화하는
+	//   것이 계약이라(DDOL 이송의 OnRemovingFromScene과 대칭짝) 1회 가드를 두면
+	//   오히려 계약을 깬다. 큐는 State_Initialized 하나로 앞 두 단계를 함께 태운다
+	//   (Scene::DrainPendingPhases).
 	enum LifecycleState : uint8_t
 	{
-		State_AwakeCalled = 1u << 0,
-		State_StartCalled = 1u << 1,
+		State_Initialized     = 1u << 0,
+		State_SimulationBegun = 1u << 1,
 	};
 
 	bool HasLifecycleState(uint8_t bit) const noexcept { return 0 != (m_lifecycleState & bit); }

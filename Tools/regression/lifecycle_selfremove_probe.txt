@@ -1,0 +1,62 @@
+# LC0 자기 제거·배수 재진입 픽스처 (ScriptLifecycleContractHardeningPlan · LC0)
+#
+# 판정은 verify-lifecycle-selfremove.ps1이 한다.
+#
+# ── 왜 자리를 셋으로 나누는가 ──
+#
+# "자기 제거"는 하나의 시나리오가 아니다. 부르는 순간 엔진이 무엇을 순회하고
+# 있는지가 다르고, 깨질 수 있는 것도 다르다.
+#
+#   ① 시작 훅 안   — 네이티브 드레인 한복판. 바로 다음 줄이 StartSimulation이다.
+#   ② 틱 안        — 관리 _active 순회 한복판. 인덱스가 걸린다.
+#   ③ 배수 안      — LC5-b가 새로 만든 자리. 그 프레임의 PrePhysics가 아직 안 왔다.
+#
+# ③은 이번 세션에 생긴 실행 지점이다. 새 자리를 만들고 그 위에서 무엇이 되는지
+# 재지 않으면 결함이 생겨도 어느 게이트도 보지 않는다.
+#
+# ── 대조군이 필요한 이유 ──
+#
+# ②의 보호(보류 큐)가 깨지면 순회가 이웃 하나를 건너뛴다. 자기 자신은 이미
+# 사라지는 중이라 그 손실이 안 보이고, 아무 잘못도 하지 않은 이웃에서만 보인다.
+#
+# ── 왜 play가 필요한가 ──
+#
+# C# 스크립트는 재생 중에만 생명주기를 받는다(2026-09-05, 편집/재생 경계 고침).
+
+wait 60
+scene.new LifecycleSelfRemove
+wait 30
+
+# ① 시작 훅 안에서 제거
+object.create SelfDestroyBegin
+script.add SelfDestroyBegin SelfDestroyInBeginProbe
+wait 10
+
+# ② 틱 순회 안에서 제거
+object.create SelfDestroyTick
+script.add SelfDestroyTick SelfDestroyInTickProbe
+wait 10
+
+# ③ 배수 지점에서 제거 (LC5-b가 만든 자리)
+object.create SelfDestroyResume
+script.add SelfDestroyResume SelfDestroyInResumeProbe
+wait 10
+
+# 배수 예산 — 배수 안에서 다시 게시하면 다음 프레임으로 넘어가는가
+object.create DrainReentry
+script.add DrainReentry DrainReentryProbe
+wait 10
+
+# 대조군 — 이웃이 순회에서 건너뛰어지지 않는지가 ②의 판정이다
+object.create Control
+script.add Control LifecycleProbe
+wait 60
+
+play
+wait 400
+
+stop
+wait 200
+
+log.flush
+quit

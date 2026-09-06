@@ -32,6 +32,11 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, byte*, int, int> Entity_GetName;
     public delegate* unmanaged<ObjectHandle, int, void> Entity_SetEnabled;
 
+    // 스크립트 컴포넌트 하나의 활성 상태. 오브젝트 전체가 아니라 이 스크립트만
+    // 켜고 끈다. 돌려주는 값은 "그 컴포넌트를 찾아 적용했는가"다 — 0이면
+    // Component.Enabled가 국소 폴백으로 내려간다.
+    public delegate* unmanaged<ObjectHandle, int, int, int> Script_SetEnabled;
+
     // 계층 접근. 실측 208곳(자식 76 · FindIndex 100 · 부모 32)으로 표면이 가장 넓다.
     public delegate* unmanaged<ObjectHandle, int> Entity_GetChildCount;
     public delegate* unmanaged<ObjectHandle, int, ObjectHandle> Entity_GetChild;
@@ -39,7 +44,12 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<int, ObjectHandle> Entity_FindByIndex;
     public delegate* unmanaged<ObjectHandle, int> Entity_GetIndex;
 
-    // Transform (네이티브에선 컴포넌트지만 관리 측 표현은 Entity 위의 값 뷰다 — Entity.cs 참고)
+    // Transform. 네이티브와 같은 컴포넌트다(S1-b 승격).
+    //
+    // Exists가 맨 앞에 있는 이유: S3부터 UI/Canvas는 Transform을 갖지 않는다. 부재를
+    // 묻지 못하면 없는 Transform에 값을 쓰고도 성공한 것처럼 보인다 — 네이티브가
+    // 공유 더미로 받아 로그 한 줄만 남기고 값을 버리기 때문이다.
+    public delegate* unmanaged<ObjectHandle, int> Transform_Exists;
     public delegate* unmanaged<ObjectHandle, Float3> Transform_GetLocalPosition;
     public delegate* unmanaged<ObjectHandle, Float3, void> Transform_SetLocalPosition;
     public delegate* unmanaged<ObjectHandle, Float3> Transform_GetWorldPosition;
@@ -142,16 +152,44 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, void> Image_SetNativeSize;
 
     // 카메라. 월드→스크린 변환이 게임 스크립트 11개 파일에 복제돼 있어 하나로 접었다.
-    public delegate* unmanaged<int> Camera_Exists;
+    public delegate* unmanaged<int> Camera_PrimaryExists;
     public delegate* unmanaged<Float2> Camera_GetScreenSize;
     public delegate* unmanaged<Float3, Float3> Camera_WorldToScreenPoint;
+
+    // CameraComponent. dirty를 발행하지 않는다 — 카메라는 렌더 프록시를 쓰지 않고
+    // 매 프레임 스냅샷으로 읽힌다. 위치·방향은 Transform이 소유한다.
+    public delegate* unmanaged<ObjectHandle, int> Camera_Exists;
+    public delegate* unmanaged<ObjectHandle, float> Camera_GetFov;
+    public delegate* unmanaged<ObjectHandle, float, void> Camera_SetFov;
+    public delegate* unmanaged<ObjectHandle, float> Camera_GetNearPlane;
+    public delegate* unmanaged<ObjectHandle, float, void> Camera_SetNearPlane;
+    public delegate* unmanaged<ObjectHandle, float> Camera_GetFarPlane;
+    public delegate* unmanaged<ObjectHandle, float, void> Camera_SetFarPlane;
+    public delegate* unmanaged<ObjectHandle, int> Camera_IsPrimary;
+    public delegate* unmanaged<ObjectHandle, int, void> Camera_SetPrimary;
+    public delegate* unmanaged<ObjectHandle> Camera_GetPrimaryHandle;
+
+    // LightComponent. setter는 네이티브에서 컴포넌트 writer를 거쳐 dirty를 발행한다.
+    public delegate* unmanaged<ObjectHandle, int> Light_Exists;
+    public delegate* unmanaged<ObjectHandle, Color4> Light_GetColor;
+    public delegate* unmanaged<ObjectHandle, Color4, void> Light_SetColor;
+    public delegate* unmanaged<ObjectHandle, float> Light_GetIntensity;
+    public delegate* unmanaged<ObjectHandle, float, void> Light_SetIntensity;
+    public delegate* unmanaged<ObjectHandle, float> Light_GetRange;
+    public delegate* unmanaged<ObjectHandle, float, void> Light_SetRange;
+    public delegate* unmanaged<ObjectHandle, float> Light_GetSpotAngle;
+    public delegate* unmanaged<ObjectHandle, float, void> Light_SetSpotAngle;
+    public delegate* unmanaged<ObjectHandle, int> Light_GetLightType;
+    public delegate* unmanaged<ObjectHandle, int, void> Light_SetLightType;
+    public delegate* unmanaged<ObjectHandle, int> Light_GetLightStatus;
+    public delegate* unmanaged<ObjectHandle, int, void> Light_SetLightStatus;
 
     // MeshRenderer + Material (m_Material 42회 — 대부분 셰이더 상수 넣기)
     public delegate* unmanaged<ObjectHandle, int> Mesh_Exists;
     public delegate* unmanaged<ObjectHandle, byte*, void> Mesh_InstantiateMaterial;
     public delegate* unmanaged<ObjectHandle, byte*, int, int> Mesh_GetMaterialName;
-    public delegate* unmanaged<ObjectHandle, byte*, byte*, float, int> Mesh_SetMaterialFloat;
-    public delegate* unmanaged<ObjectHandle, byte*, byte*, int, int> Mesh_SetMaterialInt;
+    public delegate* unmanaged<ObjectHandle, byte*, float, int> Mesh_SetMaterialFloat;
+    public delegate* unmanaged<ObjectHandle, byte*, int, int> Mesh_SetMaterialInt;
     public delegate* unmanaged<ObjectHandle, Color4> Mesh_GetBaseColor;
     public delegate* unmanaged<ObjectHandle, Color4, void> Mesh_SetBaseColor;
 
@@ -267,21 +305,112 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 19;
+    public const int ExpectedVersion = 24;
 
     private static ScriptApiTable _api;
-    private static bool _ready;
+    private static bool _bound;
 
-    public static bool IsReady => _ready;
+    public static bool IsReady => _bound;
+
+    /// <summary>
+    /// 게임 스레드의 관리 스레드 id (LC5 · 2026-09-05).
+    ///
+    /// <see cref="Bind"/>는 네이티브 ClrHost 초기화에서 딱 한 번, 게임 스레드에서
+    /// 불린다. 이 표의 함수들은 전부 게임 스레드 전용이므로(ClrHost.h 규약) 그
+    /// 시점의 스레드가 곧 정본이다.
+    ///
+    /// 0은 "아직 모른다"이고, 그때는 <see cref="IsGameThread"/>가 참을 돌려준다 —
+    /// 초기화 전 경로를 이 검사로 막아 버리면 진단이 진단이 아니라 새 장애가 된다.
+    /// </summary>
+    private static int _gameThreadId;
+
+    /// <summary>
+    /// 지금 게임 스레드인가. 표가 연결되기 전(<c>_gameThreadId</c>가 0)에는 참을
+    /// 돌려준다 — 초기화 전 경로를 이 검사로 막으면 진단이 아니라 새 장애가 된다.
+    /// </summary>
+    public static bool IsGameThread
+        => 0 == _gameThreadId || Environment.CurrentManagedThreadId == _gameThreadId;
+
+    /// <summary>
+    /// 엔진 API 진입 검사 (LC5-c · 2026-09-05). 이 표의 함수는 전부 게임 스레드
+    /// 전용이다(ClrHost.h 규약).
+    ///
+    /// ── 왜 여기인가 ──
+    ///
+    /// 실제 진입 경계는 이 클래스의 정적 메서드 206개다. 훅 입구에서 한 번 보는
+    /// 것으로는 부족하다 — <c>Task.Run</c> 몸통이나 <c>ConfigureAwait(false)</c>
+    /// 뒤의 호출은 훅을 거치지 않고 바로 여기로 들어온다.
+    ///
+    /// ── 왜 통과가 아니라 거부인가 ──
+    ///
+    /// 통과시키면 게임 스레드가 같은 순간에 고치고 있는 씬 그래프를 워커가 읽고
+    /// 쓴다. 그 결과는 경계가 없다 — 운이 좋으면 낡은 값, 나쁘면 접근 위반이다.
+    /// 거부는 결과가 <b>정해져 있고</b> 기록이 남는다.
+    ///
+    /// 거부가 새 분기를 만들지 않는다는 점이 이 자리를 고른 이유이기도 하다.
+    /// 모든 메서드는 "표가 아직 없을 때"의 반환값을 이미 정의하고 있다 — 거부는
+    /// 그 길을 그대로 탄다.
+    ///
+    /// ── 무엇을 못 막는가 ──
+    ///
+    /// 이것은 <b>관리 측 진입</b>만 막는다. 네이티브가 스스로 다른 스레드에서
+    /// 관리 코드를 부르는 경로가 생기면 여기서는 보이지 않는다. 또한 거부된 뒤의
+    /// 저작 코드가 기본값으로 무엇을 하는지까지 책임지지 않는다.
+    /// </summary>
+    /// <returns>표가 연결됐고 게임 스레드이면 true.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool Entered([CallerMemberName] string api = "")
+    {
+        if (!_bound) return false;
+
+        // _bound가 참이면 Bind가 끝났다는 뜻이고, Bind는 맨 먼저 _gameThreadId를
+        // 채운다. 그래서 여기서는 IsGameThread의 "0이면 참" 완화가 필요 없다.
+        if (Environment.CurrentManagedThreadId == _gameThreadId) return true;
+
+        ReportOffThread(api);
+        return false;
+    }
+
+    /// <summary>
+    /// 경계 밖 호출을 <b>API 이름마다 한 번</b> 남긴다.
+    ///
+    /// 매번 남기면 매 프레임 부르는 워커 하나가 로그를 덮어 다른 진단을 못 읽게
+    /// 만든다. 이름마다 한 번이면 상한이 표의 크기(206)로 묶이면서도 어떤 API가
+    /// 새는지는 전부 드러난다 — 건수가 아니라 <b>어디</b>가 필요한 정보다.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _offThreadSeen = new();
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ReportOffThread(string api)
+    {
+        if (!_offThreadSeen.TryAdd(api, 0)) return;
+
+        // Log는 이 검사에서 면제돼 있다. 진단이 나가는 통로 자체를 막으면 거부가
+        // 조용해져, 저작자에게는 "왜 갑자기 빈 값이지"만 남는다.
+        Log(3,
+            $"[Native] 게임 스레드 밖에서 {api} 호출 — 거부했다(표가 없을 때와 같은 값을 돌려준다).\n" +
+            $"  호출 스레드 {Environment.CurrentManagedThreadId} · 게임 스레드 {_gameThreadId}\n" +
+            $"  엔진 API는 게임 스레드 전용이다. Task.Run 몸통이나 ConfigureAwait(false) 뒤라면\n" +
+            $"  그 자리에서 부르지 말고 값을 돌려받아 게임 스레드에서 써라 — await 뒤의 재개는\n" +
+            $"  프레임 경계로 돌아온다(LC5-b).\n{Environment.StackTrace}");
+    }
+
+    /// <summary>
+    /// 어셈블리 리로드로 새 진단이 다시 나올 수 있게 한다. 이름마다 한 번 규칙을
+    /// 프로세스 수명 내내 유지하면, 리로드 뒤 같은 결함이 조용히 지나간다.
+    /// </summary>
+    internal static void ResetOffThreadReports() => _offThreadSeen.Clear();
 
     public static bool Bind(ScriptApiTable* table)
     {
+        _gameThreadId = Environment.CurrentManagedThreadId;
+
         if (table == null) return false;
         if (table->Version != ExpectedVersion) return false;
         if (table->StructSize != sizeof(ScriptApiTable)) return false;
 
         _api = *table;
-        _ready = true;
+        _bound = true;
         return true;
     }
 
@@ -289,7 +418,7 @@ internal static unsafe class Native
     // 문자열은 호출 시점에만 필요하므로 스택 버퍼로 UTF-8 변환한다(할당 없음).
     public static void Log(int level, string message)
     {
-        if (!_ready || _api.Log == null) return;
+        if (!_bound || _api.Log == null) return;
 
         const int stackLimit = 512;
         int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(message.Length) + 1;
@@ -316,7 +445,7 @@ internal static unsafe class Native
     // ── Entity ──
     public static ObjectHandle FindByName(string name)
     {
-        if (!_ready || _api.Entity_FindByName == null) return ObjectHandle.Invalid;
+        if (!Entered() || _api.Entity_FindByName == null) return ObjectHandle.Invalid;
 
         const int cap = 256;
         byte* buffer = stackalloc byte[cap];
@@ -327,11 +456,11 @@ internal static unsafe class Native
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsAlive(ObjectHandle h)
-        => _ready && _api.Entity_IsAlive != null && _api.Entity_IsAlive(h) != 0;
+        => Entered() && _api.Entity_IsAlive != null && _api.Entity_IsAlive(h) != 0;
 
     public static string GetName(ObjectHandle h)
     {
-        if (!_ready || _api.Entity_GetName == null) return string.Empty;
+        if (!Entered() || _api.Entity_GetName == null) return string.Empty;
 
         const int cap = 256;
         byte* buffer = stackalloc byte[cap];
@@ -342,122 +471,142 @@ internal static unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetEnabled(ObjectHandle h, bool enabled)
     {
-        if (_ready && _api.Entity_SetEnabled != null) _api.Entity_SetEnabled(h, enabled ? 1 : 0);
+        if (Entered() && _api.Entity_SetEnabled != null) _api.Entity_SetEnabled(h, enabled ? 1 : 0);
     }
+
+    /// <summary>
+    /// 스크립트 컴포넌트 하나만 켜고 끈다. 훅(OnEnable/OnDisable)은 여기서 부르지
+    /// 않는다 — 네이티브 Component::SetEnabled가 전이일 때만 부르고 그것이
+    /// 관리 측으로 되돌아온다(드라이버 단일화, ScriptLifecyclePhase.h와 같은 이유).
+    /// </summary>
+    /// <returns>해당 컴포넌트를 찾아 적용했으면 true.</returns>
+    public static bool ScriptSetEnabled(ObjectHandle h, int instanceId, bool enabled)
+        => Entered() && _api.Script_SetEnabled != null
+           && _api.Script_SetEnabled(h, instanceId, enabled ? 1 : 0) != 0;
 
     // ── 계층 ──
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int GetChildCount(ObjectHandle h)
-        => _ready && _api.Entity_GetChildCount != null ? _api.Entity_GetChildCount(h) : 0;
+        => Entered() && _api.Entity_GetChildCount != null ? _api.Entity_GetChildCount(h) : 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ObjectHandle GetChild(ObjectHandle h, int index)
-        => _ready && _api.Entity_GetChild != null ? _api.Entity_GetChild(h, index) : ObjectHandle.Invalid;
+        => Entered() && _api.Entity_GetChild != null ? _api.Entity_GetChild(h, index) : ObjectHandle.Invalid;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ObjectHandle GetParent(ObjectHandle h)
-        => _ready && _api.Entity_GetParent != null ? _api.Entity_GetParent(h) : ObjectHandle.Invalid;
+        => Entered() && _api.Entity_GetParent != null ? _api.Entity_GetParent(h) : ObjectHandle.Invalid;
 
     public static ObjectHandle FindByIndex(int index)
-        => _ready && _api.Entity_FindByIndex != null ? _api.Entity_FindByIndex(index) : ObjectHandle.Invalid;
+        => Entered() && _api.Entity_FindByIndex != null ? _api.Entity_FindByIndex(index) : ObjectHandle.Invalid;
 
     public static int GetIndex(ObjectHandle h)
-        => _ready && _api.Entity_GetIndex != null ? _api.Entity_GetIndex(h) : -1;
+        => Entered() && _api.Entity_GetIndex != null ? _api.Entity_GetIndex(h) : -1;
 
     // ── Transform ──
+
+    /// <summary>
+    /// 이 오브젝트가 Transform을 갖는가. UI/Canvas는 갖지 않는다(S3).
+    ///
+    /// 바인딩이 없는 구 호스트에서는 false가 아니라 <c>true</c>로 답한다 — 없다고
+    /// 답하면 Transform이 멀쩡한 오브젝트까지 전부 없는 것으로 보여 더 나쁘다.
+    /// </summary>
+    public static bool HasTransform(ObjectHandle h)
+        => !Entered() || _api.Transform_Exists == null || _api.Transform_Exists(h) != 0;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 GetLocalPosition(ObjectHandle h)
-        => _ready && _api.Transform_GetLocalPosition != null ? _api.Transform_GetLocalPosition(h) : default;
+        => Entered() && _api.Transform_GetLocalPosition != null ? _api.Transform_GetLocalPosition(h) : default;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetLocalPosition(ObjectHandle h, Float3 p)
     {
-        if (_ready && _api.Transform_SetLocalPosition != null) _api.Transform_SetLocalPosition(h, p);
+        if (Entered() && _api.Transform_SetLocalPosition != null) _api.Transform_SetLocalPosition(h, p);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 GetWorldPosition(ObjectHandle h)
-        => _ready && _api.Transform_GetWorldPosition != null ? _api.Transform_GetWorldPosition(h) : default;
+        => Entered() && _api.Transform_GetWorldPosition != null ? _api.Transform_GetWorldPosition(h) : default;
 
     // 아래는 전부 같은 모양이다 — 준비 전이거나 표에 없으면 무해한 기본값을 돌려준다.
     // 회전의 기본값은 default(=0,0,0,0)가 아니라 단위 쿼터니언이어야 한다.
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion GetLocalRotation(ObjectHandle h)
-        => _ready && _api.Transform_GetLocalRotation != null ? _api.Transform_GetLocalRotation(h) : Quaternion.Identity;
+        => Entered() && _api.Transform_GetLocalRotation != null ? _api.Transform_GetLocalRotation(h) : Quaternion.Identity;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetLocalRotation(ObjectHandle h, Quaternion q)
     {
-        if (_ready && _api.Transform_SetLocalRotation != null) _api.Transform_SetLocalRotation(h, q);
+        if (Entered() && _api.Transform_SetLocalRotation != null) _api.Transform_SetLocalRotation(h, q);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 GetLocalScale(ObjectHandle h)
-        => _ready && _api.Transform_GetLocalScale != null ? _api.Transform_GetLocalScale(h) : Float3.One;
+        => Entered() && _api.Transform_GetLocalScale != null ? _api.Transform_GetLocalScale(h) : Float3.One;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetLocalScale(ObjectHandle h, Float3 s)
     {
-        if (_ready && _api.Transform_SetLocalScale != null) _api.Transform_SetLocalScale(h, s);
+        if (Entered() && _api.Transform_SetLocalScale != null) _api.Transform_SetLocalScale(h, s);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void AddLocalPosition(ObjectHandle h, Float3 delta)
     {
-        if (_ready && _api.Transform_AddLocalPosition != null) _api.Transform_AddLocalPosition(h, delta);
+        if (Entered() && _api.Transform_AddLocalPosition != null) _api.Transform_AddLocalPosition(h, delta);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void AddLocalRotation(ObjectHandle h, Quaternion delta)
     {
-        if (_ready && _api.Transform_AddLocalRotation != null) _api.Transform_AddLocalRotation(h, delta);
+        if (Entered() && _api.Transform_AddLocalRotation != null) _api.Transform_AddLocalRotation(h, delta);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetWorldPosition(ObjectHandle h, Float3 p)
     {
-        if (_ready && _api.Transform_SetWorldPosition != null) _api.Transform_SetWorldPosition(h, p);
+        if (Entered() && _api.Transform_SetWorldPosition != null) _api.Transform_SetWorldPosition(h, p);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion GetWorldRotation(ObjectHandle h)
-        => _ready && _api.Transform_GetWorldRotation != null ? _api.Transform_GetWorldRotation(h) : Quaternion.Identity;
+        => Entered() && _api.Transform_GetWorldRotation != null ? _api.Transform_GetWorldRotation(h) : Quaternion.Identity;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetWorldRotation(ObjectHandle h, Quaternion q)
     {
-        if (_ready && _api.Transform_SetWorldRotation != null) _api.Transform_SetWorldRotation(h, q);
+        if (Entered() && _api.Transform_SetWorldRotation != null) _api.Transform_SetWorldRotation(h, q);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 GetWorldScale(ObjectHandle h)
-        => _ready && _api.Transform_GetWorldScale != null ? _api.Transform_GetWorldScale(h) : Float3.One;
+        => Entered() && _api.Transform_GetWorldScale != null ? _api.Transform_GetWorldScale(h) : Float3.One;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SetWorldScale(ObjectHandle h, Float3 s)
     {
-        if (_ready && _api.Transform_SetWorldScale != null) _api.Transform_SetWorldScale(h, s);
+        if (Entered() && _api.Transform_SetWorldScale != null) _api.Transform_SetWorldScale(h, s);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 GetForward(ObjectHandle h)
-        => _ready && _api.Transform_GetForward != null ? _api.Transform_GetForward(h) : Float3.Forward;
+        => Entered() && _api.Transform_GetForward != null ? _api.Transform_GetForward(h) : Float3.Forward;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 GetRight(ObjectHandle h)
-        => _ready && _api.Transform_GetRight != null ? _api.Transform_GetRight(h) : Float3.Right;
+        => Entered() && _api.Transform_GetRight != null ? _api.Transform_GetRight(h) : Float3.Right;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 GetUp(ObjectHandle h)
-        => _ready && _api.Transform_GetUp != null ? _api.Transform_GetUp(h) : Float3.Up;
+        => Entered() && _api.Transform_GetUp != null ? _api.Transform_GetUp(h) : Float3.Up;
 
     // ── 프리팹·수명 ──
 
     public static bool PrefabExists(string name)
     {
-        if (!_ready || _api.Prefab_Exists == null) return false;
+        if (!Entered() || _api.Prefab_Exists == null) return false;
 
         const int cap = 512;
         byte* buffer = stackalloc byte[cap];
@@ -468,7 +617,7 @@ internal static unsafe class Native
 
     public static ObjectHandle InstantiatePrefab(string prefabName, string instanceName)
     {
-        if (!_ready || _api.Prefab_Instantiate == null) return ObjectHandle.Invalid;
+        if (!Entered() || _api.Prefab_Instantiate == null) return ObjectHandle.Invalid;
 
         const int cap = 512;
         byte* nameBuffer = stackalloc byte[cap];
@@ -485,43 +634,43 @@ internal static unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void DestroyObject(ObjectHandle h)
     {
-        if (_ready && _api.Entity_Destroy != null) _api.Entity_Destroy(h);
+        if (Entered() && _api.Entity_Destroy != null) _api.Entity_Destroy(h);
     }
 
     public static ulong FrameCount
-        => _ready && _api.Engine_GetFrameCount != null ? _api.Engine_GetFrameCount() : 0;
+        => Entered() && _api.Engine_GetFrameCount != null ? _api.Engine_GetFrameCount() : 0;
 
     // ── SoundComponent ──
 
     public static bool HasSoundComponent(ObjectHandle h)
-        => _ready && _api.Sound_Exists != null && _api.Sound_Exists(h) != 0;
+        => Entered() && _api.Sound_Exists != null && _api.Sound_Exists(h) != 0;
 
     public static void SoundPlay(ObjectHandle h)
     {
-        if (_ready && _api.Sound_Play != null) _api.Sound_Play(h);
+        if (Entered() && _api.Sound_Play != null) _api.Sound_Play(h);
     }
 
     public static void SoundStop(ObjectHandle h)
     {
-        if (_ready && _api.Sound_Stop != null) _api.Sound_Stop(h);
+        if (Entered() && _api.Sound_Stop != null) _api.Sound_Stop(h);
     }
 
     public static void SoundPause(ObjectHandle h, bool pause)
     {
-        if (_ready && _api.Sound_Pause != null) _api.Sound_Pause(h, pause ? 1 : 0);
+        if (Entered() && _api.Sound_Pause != null) _api.Sound_Pause(h, pause ? 1 : 0);
     }
 
     public static bool SoundIsPlaying(ObjectHandle h)
-        => _ready && _api.Sound_IsPlaying != null && _api.Sound_IsPlaying(h) != 0;
+        => Entered() && _api.Sound_IsPlaying != null && _api.Sound_IsPlaying(h) != 0;
 
     public static void SoundPlayOneShot(ObjectHandle h)
     {
-        if (_ready && _api.Sound_PlayOneShot != null) _api.Sound_PlayOneShot(h);
+        if (Entered() && _api.Sound_PlayOneShot != null) _api.Sound_PlayOneShot(h);
     }
 
     public static string SoundGetClipKey(ObjectHandle h)
     {
-        if (!_ready || _api.Sound_GetClipKey == null) return string.Empty;
+        if (!Entered() || _api.Sound_GetClipKey == null) return string.Empty;
 
         const int cap = 256;
         byte* buffer = stackalloc byte[cap];
@@ -531,7 +680,7 @@ internal static unsafe class Native
 
     public static void SoundSetClipKey(ObjectHandle h, string value)
     {
-        if (!_ready || _api.Sound_SetClipKey == null) return;
+        if (!Entered() || _api.Sound_SetClipKey == null) return;
 
         const int cap = 256;
         byte* buffer = stackalloc byte[cap];
@@ -541,19 +690,19 @@ internal static unsafe class Native
     }
 
     public static float SoundGetVolume(ObjectHandle h)
-        => _ready && _api.Sound_GetVolume != null ? _api.Sound_GetVolume(h) : 0f;
+        => Entered() && _api.Sound_GetVolume != null ? _api.Sound_GetVolume(h) : 0f;
 
     public static void SoundSetVolume(ObjectHandle h, float value)
     {
-        if (_ready && _api.Sound_SetVolume != null) _api.Sound_SetVolume(h, value);
+        if (Entered() && _api.Sound_SetVolume != null) _api.Sound_SetVolume(h, value);
     }
 
     public static float SoundGetPitch(ObjectHandle h)
-        => _ready && _api.Sound_GetPitch != null ? _api.Sound_GetPitch(h) : 0f;
+        => Entered() && _api.Sound_GetPitch != null ? _api.Sound_GetPitch(h) : 0f;
 
     public static void SoundSetPitch(ObjectHandle h, float value)
     {
-        if (_ready && _api.Sound_SetPitch != null) _api.Sound_SetPitch(h, value);
+        if (Entered() && _api.Sound_SetPitch != null) _api.Sound_SetPitch(h, value);
     }
 
     // ── Animator ──
@@ -565,7 +714,7 @@ internal static unsafe class Native
     private const int NameBufferSize = 128;
 
     public static bool HasAnimator(ObjectHandle h)
-        => _ready && _api.Animator_Exists != null && _api.Animator_Exists(h) != 0;
+        => Entered() && _api.Animator_Exists != null && _api.Animator_Exists(h) != 0;
 
     /// <summary>이름을 스택 버퍼에 UTF-8로 담는다. 잘리면 그만큼만 넘어간다.</summary>
     private static int EncodeName(string name, byte* buffer)
@@ -577,7 +726,7 @@ internal static unsafe class Native
 
     public static bool AnimatorHasParameter(ObjectHandle h, string name)
     {
-        if (!_ready || _api.Animator_HasParameter == null) return false;
+        if (!Entered() || _api.Animator_HasParameter == null) return false;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -586,7 +735,7 @@ internal static unsafe class Native
 
     public static void AnimatorSetBool(ObjectHandle h, string name, bool value)
     {
-        if (!_ready || _api.Animator_SetBool == null) return;
+        if (!Entered() || _api.Animator_SetBool == null) return;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -595,7 +744,7 @@ internal static unsafe class Native
 
     public static void AnimatorSetFloat(ObjectHandle h, string name, float value)
     {
-        if (!_ready || _api.Animator_SetFloat == null) return;
+        if (!Entered() || _api.Animator_SetFloat == null) return;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -604,7 +753,7 @@ internal static unsafe class Native
 
     public static void AnimatorSetInt(ObjectHandle h, string name, int value)
     {
-        if (!_ready || _api.Animator_SetInt == null) return;
+        if (!Entered() || _api.Animator_SetInt == null) return;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -613,7 +762,7 @@ internal static unsafe class Native
 
     public static void AnimatorSetTrigger(ObjectHandle h, string name)
     {
-        if (!_ready || _api.Animator_SetTrigger == null) return;
+        if (!Entered() || _api.Animator_SetTrigger == null) return;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -622,7 +771,7 @@ internal static unsafe class Native
 
     public static void AnimatorResetTrigger(ObjectHandle h, string name)
     {
-        if (!_ready || _api.Animator_ResetTrigger == null) return;
+        if (!Entered() || _api.Animator_ResetTrigger == null) return;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -631,7 +780,7 @@ internal static unsafe class Native
 
     public static bool AnimatorGetBool(ObjectHandle h, string name)
     {
-        if (!_ready || _api.Animator_GetBool == null) return false;
+        if (!Entered() || _api.Animator_GetBool == null) return false;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -640,7 +789,7 @@ internal static unsafe class Native
 
     public static float AnimatorGetFloat(ObjectHandle h, string name)
     {
-        if (!_ready || _api.Animator_GetFloat == null) return 0f;
+        if (!Entered() || _api.Animator_GetFloat == null) return 0f;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -649,7 +798,7 @@ internal static unsafe class Native
 
     public static int AnimatorGetInt(ObjectHandle h, string name)
     {
-        if (!_ready || _api.Animator_GetInt == null) return 0;
+        if (!Entered() || _api.Animator_GetInt == null) return 0;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -659,192 +808,281 @@ internal static unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void AnimatorSetUseLayer(ObjectHandle h, int layerIndex, bool useLayer)
     {
-        if (_ready && _api.Animator_SetUseLayer != null) _api.Animator_SetUseLayer(h, layerIndex, useLayer ? 1 : 0);
+        if (Entered() && _api.Animator_SetUseLayer != null) _api.Animator_SetUseLayer(h, layerIndex, useLayer ? 1 : 0);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void AnimatorStopAnimation(ObjectHandle h, float duration)
     {
-        if (_ready && _api.Animator_StopAnimation != null) _api.Animator_StopAnimation(h, duration);
+        if (Entered() && _api.Animator_StopAnimation != null) _api.Animator_StopAnimation(h, duration);
     }
 
     // ── CharacterControllerComponent ──
 
     public static bool HasCct(ObjectHandle h)
-        => _ready && _api.Cct_Exists != null && _api.Cct_Exists(h) != 0;
+        => Entered() && _api.Cct_Exists != null && _api.Cct_Exists(h) != 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctMove(ObjectHandle h, float inputX, float inputY)
     {
-        if (_ready && _api.Cct_Move != null) _api.Cct_Move(h, inputX, inputY);
+        if (Entered() && _api.Cct_Move != null) _api.Cct_Move(h, inputX, inputY);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctTriggerForcedMove(ObjectHandle h, Float3 velocity, float duration)
     {
-        if (_ready && _api.Cct_TriggerForcedMove != null) _api.Cct_TriggerForcedMove(h, velocity, duration);
+        if (Entered() && _api.Cct_TriggerForcedMove != null) _api.Cct_TriggerForcedMove(h, velocity, duration);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctStopForcedMove(ObjectHandle h)
     {
-        if (_ready && _api.Cct_StopForcedMove != null) _api.Cct_StopForcedMove(h);
+        if (Entered() && _api.Cct_StopForcedMove != null) _api.Cct_StopForcedMove(h);
     }
 
     public static bool CctIsInForcedMove(ObjectHandle h)
-        => _ready && _api.Cct_IsInForcedMove != null && _api.Cct_IsInForcedMove(h) != 0;
+        => Entered() && _api.Cct_IsInForcedMove != null && _api.Cct_IsInForcedMove(h) != 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctSetAutomaticRotation(ObjectHandle h, bool useAuto)
     {
-        if (_ready && _api.Cct_SetAutomaticRotation != null) _api.Cct_SetAutomaticRotation(h, useAuto ? 1 : 0);
+        if (Entered() && _api.Cct_SetAutomaticRotation != null) _api.Cct_SetAutomaticRotation(h, useAuto ? 1 : 0);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctSetLookDirection(ObjectHandle h, Float3 direction)
     {
-        if (_ready && _api.Cct_SetLookDirection != null) _api.Cct_SetLookDirection(h, direction);
+        if (Entered() && _api.Cct_SetLookDirection != null) _api.Cct_SetLookDirection(h, direction);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctClearLookDirection(ObjectHandle h)
     {
-        if (_ready && _api.Cct_ClearLookDirection != null) _api.Cct_ClearLookDirection(h);
+        if (Entered() && _api.Cct_ClearLookDirection != null) _api.Cct_ClearLookDirection(h);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctForcedSetPosition(ObjectHandle h, Float3 position)
     {
-        if (_ready && _api.Cct_ForcedSetPosition != null) _api.Cct_ForcedSetPosition(h, position);
+        if (Entered() && _api.Cct_ForcedSetPosition != null) _api.Cct_ForcedSetPosition(h, position);
     }
 
     public static float CctGetBaseSpeed(ObjectHandle h)
-        => _ready && _api.Cct_GetBaseSpeed != null ? _api.Cct_GetBaseSpeed(h) : 0f;
+        => Entered() && _api.Cct_GetBaseSpeed != null ? _api.Cct_GetBaseSpeed(h) : 0f;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctSetBaseSpeed(ObjectHandle h, float speed)
     {
-        if (_ready && _api.Cct_SetBaseSpeed != null) _api.Cct_SetBaseSpeed(h, speed);
+        if (Entered() && _api.Cct_SetBaseSpeed != null) _api.Cct_SetBaseSpeed(h, speed);
     }
 
     public static bool CctIsOnMove(ObjectHandle h)
-        => _ready && _api.Cct_IsOnMove != null && _api.Cct_IsOnMove(h) != 0;
+        => Entered() && _api.Cct_IsOnMove != null && _api.Cct_IsOnMove(h) != 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void CctSetOnMove(ObjectHandle h, bool isMove)
     {
-        if (_ready && _api.Cct_SetOnMove != null) _api.Cct_SetOnMove(h, isMove ? 1 : 0);
+        if (Entered() && _api.Cct_SetOnMove != null) _api.Cct_SetOnMove(h, isMove ? 1 : 0);
     }
 
     public static bool CctIsFalling(ObjectHandle h)
-        => _ready && _api.Cct_IsFalling != null && _api.Cct_IsFalling(h) != 0;
+        => Entered() && _api.Cct_IsFalling != null && _api.Cct_IsFalling(h) != 0;
 
     public static float CctGetRadius(ObjectHandle h)
-        => _ready && _api.Cct_GetRadius != null ? _api.Cct_GetRadius(h) : 0f;
+        => Entered() && _api.Cct_GetRadius != null ? _api.Cct_GetRadius(h) : 0f;
 
     public static float CctGetHeight(ObjectHandle h)
-        => _ready && _api.Cct_GetHeight != null ? _api.Cct_GetHeight(h) : 0f;
+        => Entered() && _api.Cct_GetHeight != null ? _api.Cct_GetHeight(h) : 0f;
 
     public static uint CctGetId(ObjectHandle h)
-        => _ready && _api.Cct_GetId != null ? _api.Cct_GetId(h) : 0u;
+        => Entered() && _api.Cct_GetId != null ? _api.Cct_GetId(h) : 0u;
 
     // ── RectTransformComponent ──
 
     public static bool HasRect(ObjectHandle h)
-        => _ready && _api.Rect_Exists != null && _api.Rect_Exists(h) != 0;
+        => Entered() && _api.Rect_Exists != null && _api.Rect_Exists(h) != 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float2 RectGetAnchoredPosition(ObjectHandle h)
-        => _ready && _api.Rect_GetAnchoredPosition != null ? _api.Rect_GetAnchoredPosition(h) : default;
+        => Entered() && _api.Rect_GetAnchoredPosition != null ? _api.Rect_GetAnchoredPosition(h) : default;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void RectSetAnchoredPosition(ObjectHandle h, Float2 p)
     {
-        if (_ready && _api.Rect_SetAnchoredPosition != null) _api.Rect_SetAnchoredPosition(h, p);
+        if (Entered() && _api.Rect_SetAnchoredPosition != null) _api.Rect_SetAnchoredPosition(h, p);
     }
 
     public static Float2 RectGetScreenPosition(ObjectHandle h)
-        => _ready && _api.Rect_GetScreenPosition != null ? _api.Rect_GetScreenPosition(h) : default;
+        => Entered() && _api.Rect_GetScreenPosition != null ? _api.Rect_GetScreenPosition(h) : default;
 
     public static void RectSetScreenPosition(ObjectHandle h, Float2 p)
     {
-        if (_ready && _api.Rect_SetScreenPosition != null) _api.Rect_SetScreenPosition(h, p);
+        if (Entered() && _api.Rect_SetScreenPosition != null) _api.Rect_SetScreenPosition(h, p);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float2 RectGetSizeDelta(ObjectHandle h)
-        => _ready && _api.Rect_GetSizeDelta != null ? _api.Rect_GetSizeDelta(h) : default;
+        => Entered() && _api.Rect_GetSizeDelta != null ? _api.Rect_GetSizeDelta(h) : default;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void RectSetSizeDelta(ObjectHandle h, Float2 s)
     {
-        if (_ready && _api.Rect_SetSizeDelta != null) _api.Rect_SetSizeDelta(h, s);
+        if (Entered() && _api.Rect_SetSizeDelta != null) _api.Rect_SetSizeDelta(h, s);
     }
 
     public static Float2 RectGetPivot(ObjectHandle h)
-        => _ready && _api.Rect_GetPivot != null ? _api.Rect_GetPivot(h) : default;
+        => Entered() && _api.Rect_GetPivot != null ? _api.Rect_GetPivot(h) : default;
 
     public static void RectSetPivot(ObjectHandle h, Float2 p)
     {
-        if (_ready && _api.Rect_SetPivot != null) _api.Rect_SetPivot(h, p);
+        if (Entered() && _api.Rect_SetPivot != null) _api.Rect_SetPivot(h, p);
     }
 
     // ── ImageComponent ──
 
     public static bool HasImage(ObjectHandle h)
-        => _ready && _api.Image_Exists != null && _api.Image_Exists(h) != 0;
+        => Entered() && _api.Image_Exists != null && _api.Image_Exists(h) != 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ImageSetTexture(ObjectHandle h, int index)
     {
-        if (_ready && _api.Image_SetTexture != null) _api.Image_SetTexture(h, index);
+        if (Entered() && _api.Image_SetTexture != null) _api.Image_SetTexture(h, index);
     }
 
     public static int ImageGetTextureCount(ObjectHandle h)
-        => _ready && _api.Image_GetTextureCount != null ? _api.Image_GetTextureCount(h) : 0;
+        => Entered() && _api.Image_GetTextureCount != null ? _api.Image_GetTextureCount(h) : 0;
 
     public static Color4 ImageGetColor(ObjectHandle h)
-        => _ready && _api.Image_GetColor != null ? _api.Image_GetColor(h) : Color4.White;
+        => Entered() && _api.Image_GetColor != null ? _api.Image_GetColor(h) : Color4.White;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ImageSetColor(ObjectHandle h, Color4 c)
     {
-        if (_ready && _api.Image_SetColor != null) _api.Image_SetColor(h, c);
+        if (Entered() && _api.Image_SetColor != null) _api.Image_SetColor(h, c);
     }
 
     public static float ImageGetClipPercent(ObjectHandle h)
-        => _ready && _api.Image_GetClipPercent != null ? _api.Image_GetClipPercent(h) : 0f;
+        => Entered() && _api.Image_GetClipPercent != null ? _api.Image_GetClipPercent(h) : 0f;
 
     public static void ImageSetClipPercent(ObjectHandle h, float percent)
     {
-        if (_ready && _api.Image_SetClipPercent != null) _api.Image_SetClipPercent(h, percent);
+        if (Entered() && _api.Image_SetClipPercent != null) _api.Image_SetClipPercent(h, percent);
     }
 
     public static void ImageSetNativeSize(ObjectHandle h)
     {
-        if (_ready && _api.Image_SetNativeSize != null) _api.Image_SetNativeSize(h);
+        if (Entered() && _api.Image_SetNativeSize != null) _api.Image_SetNativeSize(h);
     }
 
     // ── 카메라 ──
 
     public static bool HasCamera()
-        => _ready && _api.Camera_Exists != null && _api.Camera_Exists() != 0;
+        => Entered() && _api.Camera_PrimaryExists != null && _api.Camera_PrimaryExists() != 0;
 
     public static Float2 CameraGetScreenSize()
-        => _ready && _api.Camera_GetScreenSize != null ? _api.Camera_GetScreenSize() : default;
+        => Entered() && _api.Camera_GetScreenSize != null ? _api.Camera_GetScreenSize() : default;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Float3 CameraWorldToScreenPoint(Float3 world)
-        => _ready && _api.Camera_WorldToScreenPoint != null ? _api.Camera_WorldToScreenPoint(world) : default;
+        => Entered() && _api.Camera_WorldToScreenPoint != null ? _api.Camera_WorldToScreenPoint(world) : default;
+
+    public static bool CameraExists(ObjectHandle h)
+        => Entered() && _api.Camera_Exists != null && _api.Camera_Exists(h) != 0;
+
+    public static float CameraGetFov(ObjectHandle h)
+        => Entered() && _api.Camera_GetFov != null ? _api.Camera_GetFov(h) : 0f;
+
+    public static void CameraSetFov(ObjectHandle h, float degrees)
+    {
+        if (Entered() && _api.Camera_SetFov != null) _api.Camera_SetFov(h, degrees);
+    }
+
+    public static float CameraGetNearPlane(ObjectHandle h)
+        => Entered() && _api.Camera_GetNearPlane != null ? _api.Camera_GetNearPlane(h) : 0f;
+
+    public static void CameraSetNearPlane(ObjectHandle h, float value)
+    {
+        if (Entered() && _api.Camera_SetNearPlane != null) _api.Camera_SetNearPlane(h, value);
+    }
+
+    public static float CameraGetFarPlane(ObjectHandle h)
+        => Entered() && _api.Camera_GetFarPlane != null ? _api.Camera_GetFarPlane(h) : 0f;
+
+    public static void CameraSetFarPlane(ObjectHandle h, float value)
+    {
+        if (Entered() && _api.Camera_SetFarPlane != null) _api.Camera_SetFarPlane(h, value);
+    }
+
+    public static bool CameraIsPrimary(ObjectHandle h)
+        => Entered() && _api.Camera_IsPrimary != null && _api.Camera_IsPrimary(h) != 0;
+
+    public static void CameraSetPrimary(ObjectHandle h, bool primary)
+    {
+        if (Entered() && _api.Camera_SetPrimary != null) _api.Camera_SetPrimary(h, primary ? 1 : 0);
+    }
+
+    public static ObjectHandle CameraGetPrimaryHandle()
+        => Entered() && _api.Camera_GetPrimaryHandle != null ? _api.Camera_GetPrimaryHandle() : default;
+
+    public static bool LightExists(ObjectHandle h)
+        => Entered() && _api.Light_Exists != null && _api.Light_Exists(h) != 0;
+
+    public static Color4 LightGetColor(ObjectHandle h)
+        => Entered() && _api.Light_GetColor != null ? _api.Light_GetColor(h) : Color4.White;
+
+    public static void LightSetColor(ObjectHandle h, Color4 color)
+    {
+        if (Entered() && _api.Light_SetColor != null) _api.Light_SetColor(h, color);
+    }
+
+    public static float LightGetIntensity(ObjectHandle h)
+        => Entered() && _api.Light_GetIntensity != null ? _api.Light_GetIntensity(h) : 0f;
+
+    public static void LightSetIntensity(ObjectHandle h, float intensity)
+    {
+        if (Entered() && _api.Light_SetIntensity != null) _api.Light_SetIntensity(h, intensity);
+    }
+
+    public static float LightGetRange(ObjectHandle h)
+        => Entered() && _api.Light_GetRange != null ? _api.Light_GetRange(h) : 0f;
+
+    public static void LightSetRange(ObjectHandle h, float range)
+    {
+        if (Entered() && _api.Light_SetRange != null) _api.Light_SetRange(h, range);
+    }
+
+    public static float LightGetSpotAngle(ObjectHandle h)
+        => Entered() && _api.Light_GetSpotAngle != null ? _api.Light_GetSpotAngle(h) : 0f;
+
+    public static void LightSetSpotAngle(ObjectHandle h, float degrees)
+    {
+        if (Entered() && _api.Light_SetSpotAngle != null) _api.Light_SetSpotAngle(h, degrees);
+    }
+
+    public static int LightGetLightType(ObjectHandle h)
+        => Entered() && _api.Light_GetLightType != null ? _api.Light_GetLightType(h) : 0;
+
+    public static void LightSetLightType(ObjectHandle h, int type)
+    {
+        if (Entered() && _api.Light_SetLightType != null) _api.Light_SetLightType(h, type);
+    }
+
+    public static int LightGetLightStatus(ObjectHandle h)
+        => Entered() && _api.Light_GetLightStatus != null ? _api.Light_GetLightStatus(h) : 0;
+
+    public static void LightSetLightStatus(ObjectHandle h, int status)
+    {
+        if (Entered() && _api.Light_SetLightStatus != null) _api.Light_SetLightStatus(h, status);
+    }
 
     // ── MeshRenderer · Material ──
 
     public static bool HasMesh(ObjectHandle h)
-        => _ready && _api.Mesh_Exists != null && _api.Mesh_Exists(h) != 0;
+        => Entered() && _api.Mesh_Exists != null && _api.Mesh_Exists(h) != 0;
 
     public static void MeshInstantiateMaterial(ObjectHandle h, string newName)
     {
-        if (!_ready || _api.Mesh_InstantiateMaterial == null) return;
+        if (!Entered() || _api.Mesh_InstantiateMaterial == null) return;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(newName, buffer);
@@ -853,46 +1091,40 @@ internal static unsafe class Native
 
     public static string MeshGetMaterialName(ObjectHandle h)
     {
-        if (!_ready || _api.Mesh_GetMaterialName == null) return string.Empty;
+        if (!Entered() || _api.Mesh_GetMaterialName == null) return string.Empty;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         int len = _api.Mesh_GetMaterialName(h, buffer, NameBufferSize);
         return len > 0 ? System.Text.Encoding.UTF8.GetString(buffer, len) : string.Empty;
     }
 
-    public static bool MeshSetMaterialFloat(ObjectHandle h, string cbuffer, string name, float value)
+    public static bool MeshSetMaterialFloat(ObjectHandle h, string name, float value)
     {
-        if (!_ready || _api.Mesh_SetMaterialFloat == null) return false;
-
-        byte* bufferName = stackalloc byte[NameBufferSize];
-        EncodeName(cbuffer, bufferName);
+        if (!Entered() || _api.Mesh_SetMaterialFloat == null) return false;
 
         byte* valueName = stackalloc byte[NameBufferSize];
         EncodeName(name, valueName);
 
-        return _api.Mesh_SetMaterialFloat(h, bufferName, valueName, value) != 0;
+        return _api.Mesh_SetMaterialFloat(h, valueName, value) != 0;
     }
 
-    public static bool MeshSetMaterialInt(ObjectHandle h, string cbuffer, string name, int value)
+    public static bool MeshSetMaterialInt(ObjectHandle h, string name, int value)
     {
-        if (!_ready || _api.Mesh_SetMaterialInt == null) return false;
-
-        byte* bufferName = stackalloc byte[NameBufferSize];
-        EncodeName(cbuffer, bufferName);
+        if (!Entered() || _api.Mesh_SetMaterialInt == null) return false;
 
         byte* valueName = stackalloc byte[NameBufferSize];
         EncodeName(name, valueName);
 
-        return _api.Mesh_SetMaterialInt(h, bufferName, valueName, value) != 0;
+        return _api.Mesh_SetMaterialInt(h, valueName, value) != 0;
     }
 
     public static Color4 MeshGetBaseColor(ObjectHandle h)
-        => _ready && _api.Mesh_GetBaseColor != null ? _api.Mesh_GetBaseColor(h) : Color4.White;
+        => Entered() && _api.Mesh_GetBaseColor != null ? _api.Mesh_GetBaseColor(h) : Color4.White;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void MeshSetBaseColor(ObjectHandle h, Color4 c)
     {
-        if (_ready && _api.Mesh_SetBaseColor != null) _api.Mesh_SetBaseColor(h, c);
+        if (Entered() && _api.Mesh_SetBaseColor != null) _api.Mesh_SetBaseColor(h, c);
     }
 
     // ── 입력 ──
@@ -900,49 +1132,49 @@ internal static unsafe class Native
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static KeyState GetKeyState(int key)
-        => _ready && _api.Input_GetKeyState != null ? (KeyState)_api.Input_GetKeyState(key) : KeyState.Idle;
+        => Entered() && _api.Input_GetKeyState != null ? (KeyState)_api.Input_GetKeyState(key) : KeyState.Idle;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static KeyState GetMouseButtonState(int button)
-        => _ready && _api.Input_GetMouseButtonState != null
+        => Entered() && _api.Input_GetMouseButtonState != null
             ? (KeyState)_api.Input_GetMouseButtonState(button) : KeyState.Idle;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static KeyState GetControllerButtonState(int index, int button)
-        => _ready && _api.Input_GetControllerButtonState != null
+        => Entered() && _api.Input_GetControllerButtonState != null
             ? (KeyState)_api.Input_GetControllerButtonState(index, button) : KeyState.Idle;
 
     public static bool InputIsAnyKeyPressed()
-        => _ready && _api.Input_IsAnyKeyPressed != null && _api.Input_IsAnyKeyPressed() != 0;
+        => Entered() && _api.Input_IsAnyKeyPressed != null && _api.Input_IsAnyKeyPressed() != 0;
 
     public static Float2 InputGetMousePosition()
-        => _ready && _api.Input_GetMousePosition != null ? _api.Input_GetMousePosition() : default;
+        => Entered() && _api.Input_GetMousePosition != null ? _api.Input_GetMousePosition() : default;
 
     public static Float2 InputGetMouseDelta()
-        => _ready && _api.Input_GetMouseDelta != null ? _api.Input_GetMouseDelta() : default;
+        => Entered() && _api.Input_GetMouseDelta != null ? _api.Input_GetMouseDelta() : default;
 
     public static int InputGetWheelDelta()
-        => _ready && _api.Input_GetWheelDelta != null ? _api.Input_GetWheelDelta() : 0;
+        => Entered() && _api.Input_GetWheelDelta != null ? _api.Input_GetWheelDelta() : 0;
 
     public static void InputSetCursorVisible(bool visible)
     {
-        if (_ready && _api.Input_SetCursorVisible != null) _api.Input_SetCursorVisible(visible ? 1 : 0);
+        if (Entered() && _api.Input_SetCursorVisible != null) _api.Input_SetCursorVisible(visible ? 1 : 0);
     }
 
     public static bool InputIsControllerConnected(int index)
-        => _ready && _api.Input_IsControllerConnected != null && _api.Input_IsControllerConnected(index) != 0;
+        => Entered() && _api.Input_IsControllerConnected != null && _api.Input_IsControllerConnected(index) != 0;
 
     public static bool InputIsControllerTriggerL(int index)
-        => _ready && _api.Input_IsControllerTriggerL != null && _api.Input_IsControllerTriggerL(index) != 0;
+        => Entered() && _api.Input_IsControllerTriggerL != null && _api.Input_IsControllerTriggerL(index) != 0;
 
     public static bool InputIsControllerTriggerR(int index)
-        => _ready && _api.Input_IsControllerTriggerR != null && _api.Input_IsControllerTriggerR(index) != 0;
+        => Entered() && _api.Input_IsControllerTriggerR != null && _api.Input_IsControllerTriggerR(index) != 0;
 
     public static Float2 InputGetControllerThumbL(int index)
-        => _ready && _api.Input_GetControllerThumbL != null ? _api.Input_GetControllerThumbL(index) : default;
+        => Entered() && _api.Input_GetControllerThumbL != null ? _api.Input_GetControllerThumbL(index) : default;
 
     public static Float2 InputGetControllerThumbR(int index)
-        => _ready && _api.Input_GetControllerThumbR != null ? _api.Input_GetControllerThumbR(index) : default;
+        => Entered() && _api.Input_GetControllerThumbR != null ? _api.Input_GetControllerThumbR(index) : default;
 
     // ── 물리 질의 ──
     //
@@ -952,7 +1184,7 @@ internal static unsafe class Native
         uint layerMask, out RaycastHit hit)
     {
         hit = default;
-        if (!_ready || _api.Physics_Raycast == null) return false;
+        if (!Entered() || _api.Physics_Raycast == null) return false;
 
         fixed (RaycastHit* p = &hit)
         {
@@ -963,7 +1195,7 @@ internal static unsafe class Native
     public static int PhysicsRaycastAll(Float3 origin, Float3 direction, float distance,
         uint layerMask, Span<RaycastHit> results)
     {
-        if (!_ready || _api.Physics_RaycastAll == null || results.IsEmpty) return 0;
+        if (!Entered() || _api.Physics_RaycastAll == null || results.IsEmpty) return 0;
 
         fixed (RaycastHit* p = results)
         {
@@ -974,7 +1206,7 @@ internal static unsafe class Native
     public static int PhysicsOverlapSphere(Float3 position, float radius,
         uint layerMask, Span<RaycastHit> results)
     {
-        if (!_ready || _api.Physics_OverlapSphere == null || results.IsEmpty) return 0;
+        if (!Entered() || _api.Physics_OverlapSphere == null || results.IsEmpty) return 0;
 
         fixed (RaycastHit* p = results)
         {
@@ -985,177 +1217,177 @@ internal static unsafe class Native
     // ── RigidBodyComponent ──
 
     public static bool HasRigid(ObjectHandle h)
-        => _ready && _api.Rigid_Exists != null && _api.Rigid_Exists(h) != 0;
+        => Entered() && _api.Rigid_Exists != null && _api.Rigid_Exists(h) != 0;
 
     public static Float3 RigidGetLinearVelocity(ObjectHandle h)
-        => _ready && _api.Rigid_GetLinearVelocity != null ? _api.Rigid_GetLinearVelocity(h) : default;
+        => Entered() && _api.Rigid_GetLinearVelocity != null ? _api.Rigid_GetLinearVelocity(h) : default;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void RigidSetLinearVelocity(ObjectHandle h, Float3 v)
     {
-        if (_ready && _api.Rigid_SetLinearVelocity != null) _api.Rigid_SetLinearVelocity(h, v);
+        if (Entered() && _api.Rigid_SetLinearVelocity != null) _api.Rigid_SetLinearVelocity(h, v);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void RigidAddLinearVelocity(ObjectHandle h, Float3 v)
     {
-        if (_ready && _api.Rigid_AddLinearVelocity != null) _api.Rigid_AddLinearVelocity(h, v);
+        if (Entered() && _api.Rigid_AddLinearVelocity != null) _api.Rigid_AddLinearVelocity(h, v);
     }
 
     public static Float3 RigidGetAngularVelocity(ObjectHandle h)
-        => _ready && _api.Rigid_GetAngularVelocity != null ? _api.Rigid_GetAngularVelocity(h) : default;
+        => Entered() && _api.Rigid_GetAngularVelocity != null ? _api.Rigid_GetAngularVelocity(h) : default;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void RigidSetAngularVelocity(ObjectHandle h, Float3 v)
     {
-        if (_ready && _api.Rigid_SetAngularVelocity != null) _api.Rigid_SetAngularVelocity(h, v);
+        if (Entered() && _api.Rigid_SetAngularVelocity != null) _api.Rigid_SetAngularVelocity(h, v);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void RigidAddForce(ObjectHandle h, Float3 force, int mode)
     {
-        if (_ready && _api.Rigid_AddForce != null) _api.Rigid_AddForce(h, force, mode);
+        if (Entered() && _api.Rigid_AddForce != null) _api.Rigid_AddForce(h, force, mode);
     }
 
     public static void RigidSetBodyType(ObjectHandle h, int bodyType)
     {
-        if (_ready && _api.Rigid_SetBodyType != null) _api.Rigid_SetBodyType(h, bodyType);
+        if (Entered() && _api.Rigid_SetBodyType != null) _api.Rigid_SetBodyType(h, bodyType);
     }
 
     public static bool RigidIsKinematic(ObjectHandle h)
-        => _ready && _api.Rigid_IsKinematic != null && _api.Rigid_IsKinematic(h) != 0;
+        => Entered() && _api.Rigid_IsKinematic != null && _api.Rigid_IsKinematic(h) != 0;
 
     public static void RigidSetKinematic(ObjectHandle h, bool v)
     {
-        if (_ready && _api.Rigid_SetKinematic != null) _api.Rigid_SetKinematic(h, v ? 1 : 0);
+        if (Entered() && _api.Rigid_SetKinematic != null) _api.Rigid_SetKinematic(h, v ? 1 : 0);
     }
 
     public static bool RigidIsTrigger(ObjectHandle h)
-        => _ready && _api.Rigid_IsTrigger != null && _api.Rigid_IsTrigger(h) != 0;
+        => Entered() && _api.Rigid_IsTrigger != null && _api.Rigid_IsTrigger(h) != 0;
 
     public static void RigidSetIsTrigger(ObjectHandle h, bool v)
     {
-        if (_ready && _api.Rigid_SetIsTrigger != null) _api.Rigid_SetIsTrigger(h, v ? 1 : 0);
+        if (Entered() && _api.Rigid_SetIsTrigger != null) _api.Rigid_SetIsTrigger(h, v ? 1 : 0);
     }
 
     public static bool RigidIsColliderEnabled(ObjectHandle h)
-        => _ready && _api.Rigid_IsColliderEnabled != null && _api.Rigid_IsColliderEnabled(h) != 0;
+        => Entered() && _api.Rigid_IsColliderEnabled != null && _api.Rigid_IsColliderEnabled(h) != 0;
 
     public static void RigidSetColliderEnabled(ObjectHandle h, bool v)
     {
-        if (_ready && _api.Rigid_SetColliderEnabled != null) _api.Rigid_SetColliderEnabled(h, v ? 1 : 0);
+        if (Entered() && _api.Rigid_SetColliderEnabled != null) _api.Rigid_SetColliderEnabled(h, v ? 1 : 0);
     }
 
     public static bool RigidIsUsingGravity(ObjectHandle h)
-        => _ready && _api.Rigid_IsUsingGravity != null && _api.Rigid_IsUsingGravity(h) != 0;
+        => Entered() && _api.Rigid_IsUsingGravity != null && _api.Rigid_IsUsingGravity(h) != 0;
 
     public static void RigidUseGravity(ObjectHandle h, bool v)
     {
-        if (_ready && _api.Rigid_UseGravity != null) _api.Rigid_UseGravity(h, v ? 1 : 0);
+        if (Entered() && _api.Rigid_UseGravity != null) _api.Rigid_UseGravity(h, v ? 1 : 0);
     }
 
     public static float RigidGetMass(ObjectHandle h)
-        => _ready && _api.Rigid_GetMass != null ? _api.Rigid_GetMass(h) : 0f;
+        => Entered() && _api.Rigid_GetMass != null ? _api.Rigid_GetMass(h) : 0f;
 
     public static void RigidSetMass(ObjectHandle h, float mass)
     {
-        if (_ready && _api.Rigid_SetMass != null) _api.Rigid_SetMass(h, mass);
+        if (Entered() && _api.Rigid_SetMass != null) _api.Rigid_SetMass(h, mass);
     }
 
     public static void RigidSetLinearDamping(ObjectHandle h, float d)
     {
-        if (_ready && _api.Rigid_SetLinearDamping != null) _api.Rigid_SetLinearDamping(h, d);
+        if (Entered() && _api.Rigid_SetLinearDamping != null) _api.Rigid_SetLinearDamping(h, d);
     }
 
     public static void RigidSetAngularDamping(ObjectHandle h, float d)
     {
-        if (_ready && _api.Rigid_SetAngularDamping != null) _api.Rigid_SetAngularDamping(h, d);
+        if (Entered() && _api.Rigid_SetAngularDamping != null) _api.Rigid_SetAngularDamping(h, d);
     }
 
     public static void RigidSetScale(ObjectHandle h, Float3 s)
     {
-        if (_ready && _api.Rigid_SetScale != null) _api.Rigid_SetScale(h, s);
+        if (Entered() && _api.Rigid_SetScale != null) _api.Rigid_SetScale(h, s);
     }
 
     public static void RigidSetLockLinear(ObjectHandle h, bool x, bool y, bool z)
     {
-        if (_ready && _api.Rigid_SetLockLinear != null) _api.Rigid_SetLockLinear(h, x ? 1 : 0, y ? 1 : 0, z ? 1 : 0);
+        if (Entered() && _api.Rigid_SetLockLinear != null) _api.Rigid_SetLockLinear(h, x ? 1 : 0, y ? 1 : 0, z ? 1 : 0);
     }
 
     public static void RigidSetLockAngular(ObjectHandle h, bool x, bool y, bool z)
     {
-        if (_ready && _api.Rigid_SetLockAngular != null) _api.Rigid_SetLockAngular(h, x ? 1 : 0, y ? 1 : 0, z ? 1 : 0);
+        if (Entered() && _api.Rigid_SetLockAngular != null) _api.Rigid_SetLockAngular(h, x ? 1 : 0, y ? 1 : 0, z ? 1 : 0);
     }
 
     // ── 콜라이더 3종 ──
 
     public static bool HasCollider(ObjectHandle h, int kind)
-        => _ready && _api.Collider_Exists != null && _api.Collider_Exists(h, kind) != 0;
+        => Entered() && _api.Collider_Exists != null && _api.Collider_Exists(h, kind) != 0;
 
     public static float ColliderGetRadius(ObjectHandle h, int kind)
-        => _ready && _api.Collider_GetRadius != null ? _api.Collider_GetRadius(h, kind) : 0f;
+        => Entered() && _api.Collider_GetRadius != null ? _api.Collider_GetRadius(h, kind) : 0f;
 
     public static void ColliderSetRadius(ObjectHandle h, int kind, float v)
     {
-        if (_ready && _api.Collider_SetRadius != null) _api.Collider_SetRadius(h, kind, v);
+        if (Entered() && _api.Collider_SetRadius != null) _api.Collider_SetRadius(h, kind, v);
     }
 
     public static float ColliderGetHeight(ObjectHandle h, int kind)
-        => _ready && _api.Collider_GetHeight != null ? _api.Collider_GetHeight(h, kind) : 0f;
+        => Entered() && _api.Collider_GetHeight != null ? _api.Collider_GetHeight(h, kind) : 0f;
 
     public static void ColliderSetHeight(ObjectHandle h, int kind, float v)
     {
-        if (_ready && _api.Collider_SetHeight != null) _api.Collider_SetHeight(h, kind, v);
+        if (Entered() && _api.Collider_SetHeight != null) _api.Collider_SetHeight(h, kind, v);
     }
 
     public static Float3 ColliderGetExtents(ObjectHandle h, int kind)
-        => _ready && _api.Collider_GetExtents != null ? _api.Collider_GetExtents(h, kind) : default;
+        => Entered() && _api.Collider_GetExtents != null ? _api.Collider_GetExtents(h, kind) : default;
 
     public static void ColliderSetExtents(ObjectHandle h, int kind, Float3 v)
     {
-        if (_ready && _api.Collider_SetExtents != null) _api.Collider_SetExtents(h, kind, v);
+        if (Entered() && _api.Collider_SetExtents != null) _api.Collider_SetExtents(h, kind, v);
     }
 
     public static Float3 ColliderGetPositionOffset(ObjectHandle h, int kind)
-        => _ready && _api.Collider_GetPositionOffset != null ? _api.Collider_GetPositionOffset(h, kind) : default;
+        => Entered() && _api.Collider_GetPositionOffset != null ? _api.Collider_GetPositionOffset(h, kind) : default;
 
     public static void ColliderSetPositionOffset(ObjectHandle h, int kind, Float3 v)
     {
-        if (_ready && _api.Collider_SetPositionOffset != null) _api.Collider_SetPositionOffset(h, kind, v);
+        if (Entered() && _api.Collider_SetPositionOffset != null) _api.Collider_SetPositionOffset(h, kind, v);
     }
 
     public static float ColliderGetRestitution(ObjectHandle h, int kind)
-        => _ready && _api.Collider_GetRestitution != null ? _api.Collider_GetRestitution(h, kind) : 0f;
+        => Entered() && _api.Collider_GetRestitution != null ? _api.Collider_GetRestitution(h, kind) : 0f;
 
     public static void ColliderSetRestitution(ObjectHandle h, int kind, float v)
     {
-        if (_ready && _api.Collider_SetRestitution != null) _api.Collider_SetRestitution(h, kind, v);
+        if (Entered() && _api.Collider_SetRestitution != null) _api.Collider_SetRestitution(h, kind, v);
     }
 
     public static float ColliderGetStaticFriction(ObjectHandle h, int kind)
-        => _ready && _api.Collider_GetStaticFriction != null ? _api.Collider_GetStaticFriction(h, kind) : 0f;
+        => Entered() && _api.Collider_GetStaticFriction != null ? _api.Collider_GetStaticFriction(h, kind) : 0f;
 
     public static void ColliderSetStaticFriction(ObjectHandle h, int kind, float v)
     {
-        if (_ready && _api.Collider_SetStaticFriction != null) _api.Collider_SetStaticFriction(h, kind, v);
+        if (Entered() && _api.Collider_SetStaticFriction != null) _api.Collider_SetStaticFriction(h, kind, v);
     }
 
     public static float ColliderGetDynamicFriction(ObjectHandle h, int kind)
-        => _ready && _api.Collider_GetDynamicFriction != null ? _api.Collider_GetDynamicFriction(h, kind) : 0f;
+        => Entered() && _api.Collider_GetDynamicFriction != null ? _api.Collider_GetDynamicFriction(h, kind) : 0f;
 
     public static void ColliderSetDynamicFriction(ObjectHandle h, int kind, float v)
     {
-        if (_ready && _api.Collider_SetDynamicFriction != null) _api.Collider_SetDynamicFriction(h, kind, v);
+        if (Entered() && _api.Collider_SetDynamicFriction != null) _api.Collider_SetDynamicFriction(h, kind, v);
     }
 
     // ── TextComponent ──
 
     public static bool HasText(ObjectHandle h)
-        => _ready && _api.Text_Exists != null && _api.Text_Exists(h) != 0;
+        => Entered() && _api.Text_Exists != null && _api.Text_Exists(h) != 0;
 
     public static string TextGetMessage(ObjectHandle h)
     {
-        if (!_ready || _api.Text_GetMessage == null) return string.Empty;
+        if (!Entered() || _api.Text_GetMessage == null) return string.Empty;
 
         // 대사 한 줄이 들어갈 만큼은 되어야 한다. 넘치면 잘린다.
         const int cap = 1024;
@@ -1166,7 +1398,7 @@ internal static unsafe class Native
 
     public static void TextSetMessage(ObjectHandle h, string message)
     {
-        if (!_ready || _api.Text_SetMessage == null) return;
+        if (!Entered() || _api.Text_SetMessage == null) return;
 
         const int cap = 1024;
         byte* buffer = stackalloc byte[cap];
@@ -1176,64 +1408,64 @@ internal static unsafe class Native
     }
 
     public static Color4 TextGetColor(ObjectHandle h)
-        => _ready && _api.Text_GetColor != null ? _api.Text_GetColor(h) : Color4.White;
+        => Entered() && _api.Text_GetColor != null ? _api.Text_GetColor(h) : Color4.White;
 
     public static void TextSetColor(ObjectHandle h, Color4 c)
     {
-        if (_ready && _api.Text_SetColor != null) _api.Text_SetColor(h, c);
+        if (Entered() && _api.Text_SetColor != null) _api.Text_SetColor(h, c);
     }
 
     public static float TextGetAlpha(ObjectHandle h)
-        => _ready && _api.Text_GetAlpha != null ? _api.Text_GetAlpha(h) : 0f;
+        => Entered() && _api.Text_GetAlpha != null ? _api.Text_GetAlpha(h) : 0f;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void TextSetAlpha(ObjectHandle h, float alpha)
     {
-        if (_ready && _api.Text_SetAlpha != null) _api.Text_SetAlpha(h, alpha);
+        if (Entered() && _api.Text_SetAlpha != null) _api.Text_SetAlpha(h, alpha);
     }
 
     public static float TextGetFontSize(ObjectHandle h)
-        => _ready && _api.Text_GetFontSize != null ? _api.Text_GetFontSize(h) : 0f;
+        => Entered() && _api.Text_GetFontSize != null ? _api.Text_GetFontSize(h) : 0f;
 
     public static void TextSetFontSize(ObjectHandle h, float size)
     {
-        if (_ready && _api.Text_SetFontSize != null) _api.Text_SetFontSize(h, size);
+        if (Entered() && _api.Text_SetFontSize != null) _api.Text_SetFontSize(h, size);
     }
 
     public static Float2 TextGetRelativePosition(ObjectHandle h)
-        => _ready && _api.Text_GetRelativePosition != null ? _api.Text_GetRelativePosition(h) : default;
+        => Entered() && _api.Text_GetRelativePosition != null ? _api.Text_GetRelativePosition(h) : default;
 
     public static void TextSetRelativePosition(ObjectHandle h, Float2 p)
     {
-        if (_ready && _api.Text_SetRelativePosition != null) _api.Text_SetRelativePosition(h, p);
+        if (Entered() && _api.Text_SetRelativePosition != null) _api.Text_SetRelativePosition(h, p);
     }
 
     // ── UIComponent 공통 ──
 
     public static int UiGetOrder(ObjectHandle h)
-        => _ready && _api.Ui_GetOrder != null ? _api.Ui_GetOrder(h) : 0;
+        => Entered() && _api.Ui_GetOrder != null ? _api.Ui_GetOrder(h) : 0;
 
     public static void UiSetOrder(ObjectHandle h, int order)
     {
-        if (_ready && _api.Ui_SetOrder != null) _api.Ui_SetOrder(h, order);
+        if (Entered() && _api.Ui_SetOrder != null) _api.Ui_SetOrder(h, order);
     }
 
     // ── Canvas ──
 
     public static bool HasCanvas(ObjectHandle h)
-        => _ready && _api.Canvas_Exists != null && _api.Canvas_Exists(h) != 0;
+        => Entered() && _api.Canvas_Exists != null && _api.Canvas_Exists(h) != 0;
 
     public static int CanvasGetOrder(ObjectHandle h)
-        => _ready && _api.Canvas_GetOrder != null ? _api.Canvas_GetOrder(h) : 0;
+        => Entered() && _api.Canvas_GetOrder != null ? _api.Canvas_GetOrder(h) : 0;
 
     public static void CanvasSetOrder(ObjectHandle h, int order)
     {
-        if (_ready && _api.Canvas_SetOrder != null) _api.Canvas_SetOrder(h, order);
+        if (Entered() && _api.Canvas_SetOrder != null) _api.Canvas_SetOrder(h, order);
     }
 
     public static string CanvasGetName(ObjectHandle h)
     {
-        if (!_ready || _api.Canvas_GetName == null) return string.Empty;
+        if (!Entered() || _api.Canvas_GetName == null) return string.Empty;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         int len = _api.Canvas_GetName(h, buffer, NameBufferSize);
@@ -1242,7 +1474,7 @@ internal static unsafe class Native
 
     public static void CanvasSetName(ObjectHandle h, string name)
     {
-        if (!_ready || _api.Canvas_SetName == null) return;
+        if (!Entered() || _api.Canvas_SetName == null) return;
 
         byte* buffer = stackalloc byte[NameBufferSize];
         EncodeName(name, buffer);
@@ -1252,44 +1484,44 @@ internal static unsafe class Native
     // ── UI 내비게이션·버튼·Image 잔여 ──
 
     public static bool UiIsSelected(ObjectHandle h)
-        => _ready && _api.Ui_IsSelected != null && _api.Ui_IsSelected(h) != 0;
+        => Entered() && _api.Ui_IsSelected != null && _api.Ui_IsSelected(h) != 0;
 
     public static bool UiIsNavLocked(ObjectHandle h)
-        => _ready && _api.Ui_IsNavLocked != null && _api.Ui_IsNavLocked(h) != 0;
+        => Entered() && _api.Ui_IsNavLocked != null && _api.Ui_IsNavLocked(h) != 0;
 
     public static void UiSetNavLock(ObjectHandle h, bool locked)
     {
-        if (_ready && _api.Ui_SetNavLock != null) _api.Ui_SetNavLock(h, locked ? 1 : 0);
+        if (Entered() && _api.Ui_SetNavLock != null) _api.Ui_SetNavLock(h, locked ? 1 : 0);
     }
 
     public static ObjectHandle UiNavGetSelected()
-        => _ready && _api.UiNav_GetSelected != null ? _api.UiNav_GetSelected() : ObjectHandle.Invalid;
+        => Entered() && _api.UiNav_GetSelected != null ? _api.UiNav_GetSelected() : ObjectHandle.Invalid;
 
     public static void UiNavSetSelected(ObjectHandle h)
     {
-        if (_ready && _api.UiNav_SetSelected != null) _api.UiNav_SetSelected(h);
+        if (Entered() && _api.UiNav_SetSelected != null) _api.UiNav_SetSelected(h);
     }
 
     public static bool HasButton(ObjectHandle h)
-        => _ready && _api.Button_Exists != null && _api.Button_Exists(h) != 0;
+        => Entered() && _api.Button_Exists != null && _api.Button_Exists(h) != 0;
 
     public static bool ButtonConsumeClicked(ObjectHandle h)
-        => _ready && _api.Button_ConsumeClicked != null && _api.Button_ConsumeClicked(h) != 0;
+        => Entered() && _api.Button_ConsumeClicked != null && _api.Button_ConsumeClicked(h) != 0;
 
     public static int ImageGetTextureIndex(ObjectHandle h)
-        => _ready && _api.Image_GetTextureIndex != null ? _api.Image_GetTextureIndex(h) : 0;
+        => Entered() && _api.Image_GetTextureIndex != null ? _api.Image_GetTextureIndex(h) : 0;
 
     public static float ImageGetRotation(ObjectHandle h)
-        => _ready && _api.Image_GetRotation != null ? _api.Image_GetRotation(h) : 0f;
+        => Entered() && _api.Image_GetRotation != null ? _api.Image_GetRotation(h) : 0f;
 
     public static void ImageSetRotation(ObjectHandle h, float rotation)
     {
-        if (_ready && _api.Image_SetRotation != null) _api.Image_SetRotation(h, rotation);
+        if (Entered() && _api.Image_SetRotation != null) _api.Image_SetRotation(h, rotation);
     }
 
     // Color4를 (x, y, width, height) 운반체로 재활용한다 — 4 float 블리터블이면 충분하다.
     public static Color4 RectGetWorldRect(ObjectHandle h)
-        => _ready && _api.Rect_GetWorldRect != null ? _api.Rect_GetWorldRect(h) : default;
+        => Entered() && _api.Rect_GetWorldRect != null ? _api.Rect_GetWorldRect(h) : default;
 }
 
 

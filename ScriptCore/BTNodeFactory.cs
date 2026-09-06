@@ -12,7 +12,7 @@ public enum BTNodeKind
 /// <summary>
 /// 이름으로 사용자 BT 노드를 만든다.
 ///
-/// <see cref="ScriptFactory"/>·<see cref="AniBehaviourFactory"/>와 같은 구조다.
+/// <see cref="ScriptFactory"/>·<see cref="AniBehaviorFactory"/>와 같은 구조다.
 /// 목록을 따로 두는 이유도 같다 — 수명 주체가 다르고(트리가 소유한다),
 /// 에디터가 갈래별로 목록을 보여 줘야 한다.
 /// </summary>

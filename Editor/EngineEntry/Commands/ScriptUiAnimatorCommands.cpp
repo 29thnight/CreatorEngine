@@ -314,7 +314,7 @@ namespace ConsoleCmd
         }
 
         // m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
-        // CreateBehaviour를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
+        // CreateComponent를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
         script->m_scriptType = typeName;
 
         // (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다("씬의 초기화
@@ -995,7 +995,7 @@ namespace ConsoleCmd
             int recovered = 0;
             for (ScriptComponent* script : scripts)
             {
-                script->OnInitialized();
+                script->RestoreAfterReload();
                 if (script->HasInstance()) ++recovered;
             }
 
@@ -1014,7 +1014,7 @@ namespace ConsoleCmd
         CommandCore::CommandData failedList = CommandCore::CommandData::Array();
         for (ScriptComponent* script : scripts)
         {
-            script->OnInitialized();
+            script->RestoreAfterReload();
             if (script->HasInstance()) { ++restored; continue; }
 
             // 복원되지 못한 것을 **이름으로** 낸다. 수만 내면 무엇이 빠졌는지

@@ -107,6 +107,7 @@
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSSRTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSSSTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSkyBoxTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanTextureCodecTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanUITest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanVolumetricFogTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanWireFrameTest.cpp" />

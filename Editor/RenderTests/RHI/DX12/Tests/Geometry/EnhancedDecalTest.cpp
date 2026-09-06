@@ -252,18 +252,18 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         // ③의 측정에 섞이지 않게 하기 위해서다.
         const uint8_t diffusePixel[4] = { 255, 0, 0, 128 };
         decalDiffuse = Texture::CreateFromPixels(1, 1, "decalTestDiffuse",
-            DXGI_FORMAT_R8G8B8A8_UNORM, diffusePixel);
+            RHIFormat::RGBA8Unorm, diffusePixel);
 
         // 노멀: 평평한 접선 공간 노멀(0.5, 0.5, 1).
         const uint8_t normalPixel[4] = { 128, 128, 255, 255 };
         decalNormal = Texture::CreateFromPixels(1, 1, "decalTestNormal",
-            DXGI_FORMAT_R8G8B8A8_UNORM, normalPixel);
+            RHIFormat::RGBA8Unorm, normalPixel);
 
         // ORM: (occ 0 · rough 0 · metal 1). 셰이더가 (b,g,r)로 뒤집어
         // (metal 1, rough 0, occ 0)을 쓴다 — 첫 채널 1이 ⑤의 재료다.
         const uint8_t ormPixel[4] = { 0, 0, 255, 255 };
         decalOrm = Texture::CreateFromPixels(1, 1, "decalTestOrm",
-            DXGI_FORMAT_R8G8B8A8_UNORM, ormPixel);
+            RHIFormat::RGBA8Unorm, ormPixel);
 
         if (nullptr == decalDiffuse || nullptr == decalNormal || nullptr == decalOrm)
         {

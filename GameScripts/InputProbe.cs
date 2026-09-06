@@ -8,7 +8,7 @@ namespace CreatorEngine.Scripts;
 /// 마우스·패드 질의가 그럴듯한 값을 주는지.
 /// 사람이 직접 눌러 볼 때를 위해 상태 변화를 로그로 남기는 모드도 둔다.
 /// </summary>
-public sealed partial class InputProbe : Behaviour
+public sealed partial class InputProbe : Component
 {
     /// <summary>켜면 매 프레임 입력 변화를 로그로 남긴다. 손으로 확인할 때 쓴다.</summary>
     [SerializeField] private bool _watch;

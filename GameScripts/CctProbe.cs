@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 그래서 즉시 판정 가능한 것(속성 왕복·강제 이동 상태·형상 정보)은 Awake에서 보고,
 /// 실제 이동은 몇 프레임 뒤 위치 변화를 확인한다.
 /// </summary>
-public sealed partial class CctProbe : Behaviour
+public sealed partial class CctProbe : Component
 {
     /// <summary>이동 확인에 쓸 입력. 기본은 +X 방향.</summary>
     [SerializeField] private float _moveInputX = 1f;

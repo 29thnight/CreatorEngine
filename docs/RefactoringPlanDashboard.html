@@ -316,7 +316,9 @@
 
   <h3>실행 계획 — 진행 중</h3>
   <div class="doc-grid">
-    <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12</span>
+    <div class="doc"><a href="plans/TexturePipelinePlan.md">TexturePipelinePlan.md</a><span class="tie">PHASE 12 · 미착수</span>
+      <div class="why"><b>2026-09-04 신설.</b> 텍스처가 저작에서 GPU까지 가는 길. 지금 그 길에는 임포트 설정도 밉도 cook 트랜스코딩도 없고 런타임이 매 로드마다 디코드·압축을 한다(실측 5.34 ms/장 · VRAM 420 MB · 밉 호출 0건 · <code>.meta</code> importSettings 는 확장자와 타임스탬프뿐). <code>TextureCookProducer</code> 는 이미 있으나 pass-through 이고 저작분 0 이다 — 주소 체계(GUID·해시·manifest)만 세우고 트랜스코딩 자리를 <code>formatVersion</code> 1 로 예약해 뒀다. 이 계획은 그 칸을 채운다. 선행 <code>TextureCodecBoundaryDesign.md</code>(축 A)가 자체 타입·중립 어휘를 이미 세웠다.</div></div>
+    <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12.5</span>
       <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계 — 승계분 중 D·L2'·L4'는 E축 재편(2026-08-24 — E0~E6 중 E2 저작 writer 2종만 잔여)이 흡수 완결했고, 트랙 B(B1~B5)와 L3'가 남았다(L5'는 E7이 완결).</div></div>
     <div class="doc"><a href="plans/ModelAssetBigBangCutoverPlan.md">ModelAssetBigBangCutoverPlan.md</a><span class="tie">PHASE 3.75 · 정본</span>
       <div class="why"><b>2026-09-02 신설.</b> 기존 experiment 배선의 연장이 아니라 모델 자산 체계를 한 번에 교체하는 단방향 cutover 계획. 기존 GUID를 보존·매핑·재활용하지 않고 <code>ce.uuidv8.sha256.v1</code> identity epoch를 새로 발급한다. schema v2 sidecar와 cooked artifact를 단일 writer가 원자 게시하고, <code>ModelAssetGeneration</code>을 renderer·scene·animation·editor가 직접 소비한 뒤 Assimp·역브리지·A/B·silent fallback을 제품에서 0으로 만든다. 12슬라이스 60일이며 <code>SU_Mythic</code> 전체 vertex mask와 <code>Gunner_F_Mythic</code> cold-load 재질 closure가 필수 게이트다.</div></div>
@@ -349,6 +351,10 @@
       <div class="why">파이프라인 조립의 기술(記述)화. 그래프에 흡수하지 않은 근거 셋. 슬라이스 1·2 완료, 뷰 정책 잔여와 덤프 명령이 남았다.</div></div>
     <div class="doc"><a href="plans/Phase5CouplingPlan.md">Phase5CouplingPlan.md</a><span class="tie">5-1 · 5-2</span>
       <div class="why">렌더→게임플레이 커플링 절단의 실행 설계. A(죽은 include)·B(데이터 헤더 소속 정정)·C(행위 커플링 6종)·D(검증). 실측 간선 154 → 14.</div></div>
+    <div class="doc"><a href="plans/ScriptSurfacePlan.md">ScriptSurfacePlan.md</a><span class="tie">PHASE 9.5</span>
+      <div class="why">C# 스크립트 표면의 기준을 <b>사라진 게임 코퍼스의 호출 빈도</b>에서 <b>현재 네이티브 구조와 실제 저작분</b>으로 옮긴다(W1~W7). <code>ScriptApiMigrationPlan.html</code> §11 등급표를 승계·폐기한다 — 그 표의 기준 코퍼스는 <code>8ae17250</code>에서 통째로 삭제됐는데 표만 남아 있었다. W1(골격)·W2(Light·Camera 노출) 완료, W3(입력 값 통로)~W7 대기.</div></div>
+    <div class="doc"><a href="plans/ScriptLifecycleContractHardeningPlan.md">ScriptLifecycleContractHardeningPlan.md</a><span class="tie">현행 안정화 · LC0~LC7 · LC1·LC2 완료</span>
+      <div class="why">현재 C# 생명주기·Task 스코프의 실패 단계, 취소 정리 예외, 완료 대기 참조 유지, 재진입·스레드 경계를 안정화한다. 기존 즉시 시작·비활성 중 대기·DDOL·Task 취소 의미를 보존한다. <b>미래 PHASE 24를 기다리지 않는 독립 작업</b>이며, 관리 회귀와 네이티브 기준선의 증거 범위를 구분한다.</div></div>
     <div class="doc"><a href="plans/BehaviorTreeManagedPlan.md">BehaviorTreeManagedPlan.md</a><span class="tie">9-8</span>
       <div class="why">행동 트리를 C# 우선으로 재설계. ★ 트리 전체를 관리 측으로 옮기는 이유 — BT 틱이 동기라 "노드만 C#"은 불변식을 깬다.</div></div>
     <div class="doc"><a href="plans/EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">E0~E7</span>
@@ -385,6 +391,12 @@
       <div class="why">RHI GPU 메모리·수명 관리 재설계. Slice A~D와 E-a(descriptor versioned recycler) 완료, SBT는 실소비 경로 대기.</div></div>
   </div>
 
+  <h3>미래 계획 — 현재 리팩토링 이후</h3>
+  <div class="doc-grid">
+    <div class="doc is-ref"><a href="plans/SimulationEffectContractPlan.md">SimulationEffectContractPlan.md</a><span class="tie">PHASE 24 · 보류 · 구현 미착수</span>
+      <div class="why">효과 계약 런타임과 <b>CreatorEngine용 PrSM 수정·도입</b>까지가 목표다. C# 백엔드를 유지하고 공통 효과·수명 검사, 컴포넌트 등록·직렬화, 빌드·원문 진단·리로드를 연결한다. 현재 리팩토링 완료 후 코드·저작분·공수를 재산정하며, 현행 생명주기 안정화와 완료를 구분한다. 현재 실행 작업의 공수·진척 집계에는 포함하지 않는다.</div></div>
+  </div>
+
   <h3>구현 기록 — 닫힌 작업</h3>
   <div class="doc-grid">
     <div class="doc is-done"><a href="plans/ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a><span class="tie">PHASE 18 완결</span>
@@ -408,7 +420,7 @@
     <div class="doc is-ref"><a href="design/ResourceOwnershipDesign.html">ResourceOwnershipDesign.html</a>
       <div class="why">자원 소유권·경계 설계. PHASE 2의 근거.</div></div>
     <div class="doc is-ref"><a href="plans/ScriptApiMigrationPlan.html">ScriptApiMigrationPlan.html</a>
-      <div class="why">스크립트 API 이전 설계(ModuleBehavior → C#). PHASE 2 후반과 9-4의 근거.</div></div>
+      <div class="why">스크립트 API 이전 설계(ModuleBehavior → C#). PHASE 2 후반과 9-4의 근거. <b>★ §11의 T1~T4 등급표는 폐기됐다</b> — 그 기준이 된 <code>Dynamic_CPP\Assets\Script</code> 코퍼스가 <code>8ae17250</code>에서 포팅 없이 삭제됐고(349파일·37,788줄), &quot;Transform은 컴포넌트가 아니다&quot;도 <code>c9bbdd56</code>(S1-b)에서 뒤집혔다. 표면 작업의 현재 정본은 <a href="plans/ScriptSurfacePlan.md">ScriptSurfacePlan.md</a>(PHASE 9.5).</div></div>
     <div class="doc is-ref"><a href="analysis/RectTransformAnalysis.html">RectTransformAnalysis.html</a>
       <div class="why">RectTransform 분석. PHASE 8(UI 레이아웃 해상도 독립)의 근거.</div></div>
     <div class="doc is-ref"><a href="design/ReflectionRetentionDecision.md">ReflectionRetentionDecision.md</a>
@@ -543,19 +555,24 @@
 <!-- ===== PHASE 3.75 ===== -->
 <section class="phase" id="phase-3.75">
   <h2 class="sec"><span class="no">PHASE 3.75</span>모델 자산 빅뱅 전환 <span class="phase-pct" data-phase-pct="3.75"></span></h2>
-<div class="phase-meta"><b>정본: <a href="plans/ModelAssetBigBangCutoverPlan.md" style="color:var(--accent)">ModelAssetBigBangCutoverPlan.md</a></b> · 신설 2026-09-02 · 예상 공수 60일 · 활성 12행 · 완료 53일(MBC0~MBC10, 2026-09-03) · 잔여 7일 · 선행: PHASE 3.5 완료 · 후행: PHASE 4 재개. 구 ModelImport I/V의 완료 표시는 승계하지 않는다. 구현은 빌드 가능한 내부 슬라이스로 나누되 제품 공개는 <code>MBC11</code>에서 한 번만 한다.</div>
+<div class="phase-meta"><b>정본: <a href="plans/ModelAssetBigBangCutoverPlan.md" style="color:var(--accent)">ModelAssetBigBangCutoverPlan.md</a></b> · 신설 2026-09-02 · <b>완료 2026-09-04 — 60일(MBC0~MBC11) · 잔여 0일</b> · 선행: PHASE 3.5 완료 · 후행: PHASE 4 재개. 구 ModelImport I/V의 완료 표시는 승계하지 않는다. 구현은 빌드 가능한 내부 슬라이스로 나누되 제품 공개는 <code>MBC11</code>에서 한 번만 했다. <b>남긴 것 하나:</b> cooked 임베디드 텍스처의 로드 시점 디코드 비용(§8.4 B2c)은 <a href="plans/TexturePipelinePlan.md">PHASE 12</a> T1a/T2가 소유한다 — 예산에서 뺀 것이 아니라 판정 주체를 옮겼고, 모델별 값이 archive에 남아 회귀하면 <code>verify-model-cutover-budget</code>가 붉어진다.</div>
   <div class="phase-goal"><b>목표:</b> 기존 GUID·legacy 객체·Assimp fallback·experiment A/B를 보존한 채 배선을 연장하지 않는다. 전체 모델 corpus에 새 <code>ce.uuidv8.sha256.v1</code> identity epoch를 발급하고, schema v2 sidecar·cooked artifact·embedded texture/material closure를 단일 writer가 원자 게시한다. 런타임은 immutable <code>ModelAssetGeneration</code> 하나를 renderer·scene·animation·editor·serialization이 직접 소비한다.</div>
   <div class="phase-goal"><b>긴급 결함 폐쇄:</b> <code>SU_Mythic.glb</code>는 <code>core|color|skin</code> 전체 vertex attribute mask에서 input layout·PSO·<code>VSIn</code>을 함께 유도해 GBuffer/Shadow와 DX12/Vulkan을 통과시킨다. <code>Gunner_F_Mythic.glb</code>는 model 1·material 2·embedded texture 6의 새 UUIDv8 closure를 cold load/reimport에서 원자 게시하며 역직렬화 순서 해킹과 전역 registry 예열을 제거한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="3.75"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
     <ul>
-      <li>전체 model sidecar가 schema v2·<code>ce.uuidv8.sha256.v1</code>을 사용하고 UUID 재계산 불일치·tuple 중복·subasset 누락이 0건</li>
-      <li>기존 GUID 참조와 runtime GUID mapping/alias 0건, pseudo UUIDv5-as-v4 구현·호출 0건</li>
-      <li>모델·메시·재질·임베디드 텍스처·스켈레톤·애니메이션이 한 generation으로 게시되고 실패 주입 시 전역 상태 delta 0</li>
-      <li><code>SU_Mythic.glb</code> geometry/color/skin pose와 <code>Gunner_F_Mythic.glb</code> material 2/2·embedded texture 6/6이 source/cold cooked/reimport·양 backend에서 통과</li>
-      <li>Assimp 제품 호출·legacy 모델 타입/cache·역브리지·A/B/off arm·silent fallback·상태 변경 진단 명령 0건</li>
-      <li>AssetCooker·RenderTests·CreatorEditor Debug/Release, 전체 corpus runtime, 저장/재로드/CLR round-trip, 절대 성능 예산을 각각 통과</li>
+      <li class="done-item">✔ 전체 model sidecar가 schema v2·<code>ce.uuidv8.sha256.v1</code>을 사용하고 UUID 재계산 불일치·tuple 중복·subasset 누락이 0건
+        <span style="color:var(--text-dim)">— model 14 · subasset 310 · identity 324 (<code>verify-model-corpus-v8</code>)</span></li>
+      <li class="done-item">✔ 기존 GUID 참조와 runtime GUID mapping/alias 0건, pseudo UUIDv5-as-v4 구현·호출 0건
+        <span style="color:var(--text-dim)">— oldRefs 0 · newRefs 8 · 동결 래칫 하드 0</span></li>
+      <li class="done-item">✔ 모델·메시·재질·임베디드 텍스처·스켈레톤·애니메이션이 한 generation으로 게시되고 실패 주입 시 전역 상태 delta 0
+        <span style="color:var(--text-dim)">— 주입 5지점 · 변조 4종 게시 전 거부 · generation 1→2 원자 교체</span></li>
+      <li class="done-item">✔ <code>SU_Mythic.glb</code> geometry/color/skin pose와 <code>Gunner_F_Mythic.glb</code> material 2/2·embedded texture 6/6이 source/cold cooked/reimport·양 backend에서 통과</li>
+      <li class="done-item">✔ Assimp 제품 호출·legacy 모델 타입/cache·역브리지·A/B/off arm·silent fallback·상태 변경 진단 명령 0건
+        <span style="color:var(--text-dim)">— MBC9 물리 삭제 · MBC10 하드 계약(변이 5종으로 이빨 증명)</span></li>
+      <li class="done-item">✔ AssetCooker·RenderTests·CreatorEditor Debug/Release, 전체 corpus runtime, 저장/재로드/CLR round-trip, 성능 예산을 각각 통과
+        <span style="color:var(--text-dim)">— 성능은 §8.4 개정판: 비교 예산 B1a 14/14·B2a 14/14, 비회귀 축 B1b·B2b·B6, 이관 축 B2c(PHASE 12)</span></li>
     </ul>
   </div>
   <div class="risknote">
@@ -806,6 +823,52 @@
   </div>
 </section>
 
+<!-- ===== PHASE 9.5 ===== -->
+<section class="phase" id="phase-9.5">
+  <h2 class="sec"><span class="no">PHASE 9.5</span>스크립트 표면 재설계 (C# 계층 기준 재수립) <span class="phase-pct" data-phase-pct="9.5"></span></h2>
+  <div class="phase-meta">예상 공수: 17일 · 선행 조건: PHASE 9 완료(생명주기 6단계 확정) · 병행: 다른 페이즈와 병행 가능 · 설계 문서: <a href="plans/ScriptSurfacePlan.md" style="color:var(--accent)">ScriptSurfacePlan.md</a></div>
+  <div class="phase-goal"><b>목표:</b> C# 스크립트 표면의 기준을 <b>사라진 게임 코퍼스의 호출 빈도</b>에서 <b>현재 네이티브 구조와 실제 저작분</b>으로 옮긴다.
+  <br><br>
+  <b>왜 지금인가.</b> 표면은 엔진을 따라가지 못한 것이 아니라 <b>애초에 엔진을 따라가도록 설계되지 않았다.</b>
+  <code>ScriptApiMigrationPlan.html</code> §11의 T1~T4 등급표는 2026-07-29 시점 <code>Dynamic_CPP\Assets\Script</code> 코퍼스를 실측해 만든 것이고,
+  그 코퍼스는 <code>8ae17250</code>에서 포팅 없이 통째로 삭제됐다(349파일 · 37,788줄 · 새 GameScripts 0건).
+  <b>기준이 사라졌는데 표가 갱신되지 않았고</b>, 그 계획서의 S3·S4는 대시보드 항목이 된 적이 없다. 같은 기간 <code>Engine\</code>에 115커밋이 들어왔다.
+  <br><br>
+  그래서 표면이 &quot;옛 게임 코드가 그때 무엇을 얼마나 불렀는가&quot;로 굳어 있었다 —
+  Transform이 자유 함수 묶음이었고(그 전제는 <code>c9bbdd56</code>에서 뒤집혔다),
+  입력이 폴링 전용이었고(등급표가 &quot;T3: 호출이 적어 단순 래핑으로 충분&quot;이라 적었다),
+  컴포넌트 32종 중 13종만 노출돼 있었다(나머지는 늦게 생긴 것이 아니라 애초에 범위 밖이었다).
+  <br><br>
+  <b>이 페이즈가 지키는 원칙 넷.</b>
+  ① <b>저작분이 규모를 정한다</b> — 계획서 목록이 아니라 실제 자산 건수를 세고, 0건이면 착수하지 않는다(관리 측이 컴포넌트를 붙일 수 없어 죽은 표면이 된다).
+  ② <b>값 왕복 단정만으로 통과시키지 않는다</b> — 컴포넌트 필드는 바뀌므로 되읽으면 언제나 새 값이 나온다. 그 값이 소비자(렌더·직렬화·이벤트)까지 가는 축을 따로 잰다.
+  ③ <b>컴포넌트마다 검증할 사슬이 다르다</b> — Light는 dirty 사슬이 있고 Camera는 없다. 같은 형태의 게이트를 복사하면 한쪽은 아무것도 재지 않는다.
+  ④ <b>못 잡는 것을 적는 데까지가 증명이다</b> — 하네스가 볼 수 없는 칸은 실측치와 함께 게이트 파일에 남긴다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="9.5"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li class="done-item">✔ 관리 측 기반 클래스가 네이티브와 1:1 — Behaviour 층 제거, Transform이 <code>NativeComponent</code> 파생
+        <span style="color:var(--text-dim)">— W1. 게이트 3종(API 표 · BT 열거 · 진입점 이름)을 함께 세웠다</span></li>
+      <li class="done-item">✔ 저작분 있는 미노출 컴포넌트 0 — <code>LightComponent</code> 30건 · <code>CameraComponent</code> 20건 노출
+        <span style="color:var(--text-dim)">— W2. 나머지 11종은 저작 0건이라 착수 대상이 아니다</span></li>
+      <li>스크립트가 입력 액션 <b>값</b>을 받는다 — <code>PlayerInputComponent</code>를 붙인 씬과 액션 맵 저작분 위에서 회귀가 돈다</li>
+      <li>인스펙터 저작 경로가 렌더 프록시까지 닿는다 — <code>LightComponent</code> 값 필드를 <code>private</code>으로 내려도 저작이 멈추지 않는다</li>
+      <li>렌더 델타 적용을 관측하는 하네스가 있다 — Light 게이트의 ② 축이 누계가 아니라 프록시 <b>값</b>을 대조하고, dirty 제거 변이에 붉어진다</li>
+      <li>손으로 맞춘 경계 계약에 게이트 0건이 없다 — <code>ScriptLifecyclePhase</code> · <code>ScriptFieldType</code> · <code>ScriptMessage</code> 배치 + <code>SerializeField</code> 7종 실자산 왕복</li>
+      <li><code>ScriptApiMigrationPlan.html</code> §11 등급표에 폐기 표시와 승계 문서 포인터가 박혀 있다</li>
+    </ul>
+  </div>
+  <div class="risknote"><b>착수 순서.</b> <b>W5 → W4 → W3 → W6 → W7</b>을 권한다.
+  W5(관측 하네스)가 먼저 서야 W4(저작 dirty)의 &quot;고쳤다&quot;가 관측 가능해지고,
+  W3의 값 통로 결정(<code>ScriptMessage</code> 확장이냐 질의 API냐)이 W6의 미러 계약을 정하므로 W6보다 앞서야 한다.
+  W7은 언제든 가능하다.
+  <br><br>
+  <b>W3의 정면 과제는 배선이 아니라 소비자다.</b> 어느 씬에도 <code>PlayerInputComponent</code>가 <b>0건</b>이라 그 경로는 지금 한 번도 돌지 않는다 —
+  액션 맵 자산과 컴포넌트를 붙인 씬을 함께 저작하지 않으면 검증이 성립하지 않는다.
+  같은 함정이 W6의 <code>SerializeField</code>에도 있다(직렬화된 값 0건).</div>
+</section>
+
 <!-- ===== PHASE 10 ===== -->
 <section class="phase" id="phase-10">
   <h2 class="sec"><span class="no">PHASE 10</span>파티클·이펙트 백지 재작성 <span class="phase-pct" data-phase-pct="10"></span></h2>
@@ -905,7 +968,46 @@
 
 <!-- ===== PHASE 12 ===== -->
 <section class="phase" id="phase-12">
-  <h2 class="sec"><span class="no">PHASE 12</span>빌드 파이프라인 신설과 계층 전면 개편 <span class="phase-pct" data-phase-pct="12"></span></h2>
+  <h2 class="sec"><span class="no">PHASE 12</span>텍스처 파이프라인 — 임포트 · cook · 런타임 소비 <span class="phase-pct" data-phase-pct="12"></span></h2>
+  <div class="phase-meta">신설 2026-09-04 · 선행: TextureCodecBoundaryDesign(축 A, 완료) · 설계 문서: <a href="plans/TexturePipelinePlan.md" style="color:var(--accent)">TexturePipelinePlan.md</a> · 병행: PHASE 12.5 빌드 파이프라인(패키징 산출물 계약)</div>
+  <div class="phase-goal"><b>목표:</b> 상용 엔진의 표준 구도를 세운다 — <b>cook 시점에 굽고, 런타임은 구운 것을 읽는다.</b>
+  <br><br>
+  <b>★ 착수 근거(2026-09-04 실측):</b> 파이프라인의 절반은 이미 서 있다. <code>TextureCookProducer</code> 가 GUID 주소·내용 해시·manifest 등재를 갖추고 있고,
+  트랜스코딩 자리를 <code>formatVersion</code> 1 로 <b>예약해 뒀다</b>("트랜스코딩이 들어오는 날 2 가 되고 구버전 artifact 는 자동으로 거부된다").
+  없는 것은 넷이다 — ① <code>.meta</code> 의 importSettings 가 <code>extension</code>·<code>timestamp</code> 둘뿐이라 자산별 정책이 불가능하고(지금은 코드가 baseColorMap 에만 <code>compress=true</code> 를 박는다),
+  ② <code>GenerateMipMaps</code> 호출 0건, ③ cook 이 pass-through 이며 독립 텍스처 저작분 0건, ④ 런타임이 원본 PNG 를 직독·디코드한다.
+  <br><br>
+  <b>★ 실측 수치(Release · 99장):</b> 런타임 로드 <b>5.34 ms/장</b>(디코드 3.52) · cook 34.1 ms/장(<b>BC1 압축이 65%</b>) · artifact 로드 하한 0.58 ms/장.
+  VRAM 은 현재 RGBA8 무밉 <b>420 MB</b> → BC1+밉 <b>70 MB</b>(0.17x). 저작 코퍼스는 PNG 583(전부 8비트) · HDR 19(장당 128 MB) · DDS 1 · TGA/JPEG/BMP/EXR <b>0</b>.
+  <br><br>
+  <b>★ 라이브러리 구성:</b> 크로스플랫폼이 로드맵이므로 <code>stb_image</code> 도입은 확장 대비가 아니라 필수 조건이다 — DirectXTex 의 WIC 부분만 Windows 전용인데 그것이 하필 자산의 99%(PNG)를 막는다.
+  구성은 <code>stb_image</code> + <code>stb_image_resize2</code>(둘 다 이미 설치) + <code>bc7enc_rdo</code> + DDS 미니 파서이고, 그러면 <b>WIC 종속이 0</b>이 된다.
+  <b>PNG 685장 A/B 바이트 대조는 2026-09-04 전수 통과했다</b>(불일치 0 · BGRA 419장은 정규화 후, 266장은 원본끼리 — 양쪽 다 일치).
+  다만 <b>HDR 은 갈지 않는다</b> — 같은 대조에서 19장 전부 값이 달랐다(mantissa 1 차이 · 비율 59/58 로 일정 · RGBE 반올림 규약 차이).
+  IBL 프리필터 결과가 바뀌고 픽셀 골든이 깨지는데, DirectXTex 의 HDR 로더는 WIC 이 아니라 이식 가능하므로 갈아서 얻을 것이 없다.
+  DirectXTex 는 HDR·DDS 로더로 남는다 — "제거"는 목표가 아니었고 침투 차단은 축 A 가 이미 끝냈다.
+  ISPC 는 BC 블록이 SPMD 에 완벽히 맞지만 빌드에 언어가 하나 늘어나는 대가가 있어 우리 규모(510장·17초)에서는 값을 못 한다 — T1b 의 열린 항목.
+  <br><br>
+  <b>★ 경량 · 선택집중:</b> 매크로가 아니라 <b>프로젝트 분리</b>다(<code>EngineLayerSeparationPlan</code> §8 — "해당 코드가 Core 프로젝트에서 컴파일되지 않아야 한다").
+  <code>TextureCodec.*</code> 를 프로젝트로 쪼개 링크 여부가 곧 포함 여부가 되게 하고, 등록은 호스트가 명시 호출한다(자동 등록을 쓰면 누락이 조용해진다).
+  <b>게임 런타임은 T2 후 자동으로 코덱 0개</b>이고, 툴 빌드만 타깃별로 조합한다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="12"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준 (TexturePipelinePlan.md §8)</div>
+    <ul>
+      <li>런타임 텍스처 로드 <b>&lt; 1 ms/장</b> (현재 5.34) · 텍스처 VRAM <b>&lt; 120 MB</b> (현재 420)</li>
+      <li>cook <b>&lt; 50 ms/장</b> (현재 34) · 에디터 저장 → 화면 반영 <b>+50 ms 이내</b></li>
+      <li>게임 런타임 산출물의 이미지 라이브러리 <b>0개</b> · 런타임 → <code>TextureCodec.*</code> 의존 간선 <b>0</b>(CI 래칫)</li>
+      <li><s>PNG A/B 바이트 대조 통과 — DirectXTex 와 stb_image 가 같은 PNG 를 같은 픽셀로 디코드</s> <b>2026-09-04 확인: 685장 전수 일치</b></li>
+      <li>HDR A/B 대조는 <b>회귀 감시용</b>으로 유지 — 19장 전부 불일치가 현재 값이고, 0이 되면 누군가 HDR 디코더를 바꾼 것이다</li>
+      <li>artifact 로드 픽셀 = 원본 직독 픽셀(같은 자산, 두 경로) · 기존 <code>vk.texturecodec</code> A/B 다이제스트 유지</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== PHASE 12.5 ===== -->
+<section class="phase" id="phase-12.5">
+  <h2 class="sec"><span class="no">PHASE 12.5</span>빌드 파이프라인 신설과 계층 전면 개편 <span class="phase-pct" data-phase-pct="12.5"></span></h2>
   <div class="phase-meta">예상 공수: 30일 · 선행 조건: 없음(트랙 B 즉시 착수 가능) · 설계 문서: BuildPipelinePlan.md · 병행: DX12 트랙(R4·R5)과 파일 충돌만 회피</div>
   <div class="phase-goal"><b>목표:</b> 심판(빌드 파이프라인)을 먼저 세우고, 계층 개편의 모든 슬라이스를 그 심판 아래서 진행한다 —
   판정이 "컴파일된다"에서 <b>"에디터 없이 패키지한 게임이 돈다"</b>로 올라간다.
@@ -925,7 +1027,7 @@
   <b>두 트랙:</b> 트랙 B(심판 세우기 — 플레이어 재건·빌드 기술 단일화·오케스트레이터·셰이더 쿡·C# 편입·CI 게임 레그)가 선행하고,
   트랙 L(구 EngineLayerSeparationPlan L2~L4 승계 — 에디터 적출·게임 프로젝트화·공통 부트 추출·저장소 재편)이 B1 이후 그 아래서 진행된다.
   독립 슬라이스 D(죽은 가드 DYNAMICCPP_EXPORTS 187곳 일소)는 어느 트랙도 기다리지 않는다.</div>
-  <div class="task-wrap"><table class="tasks" data-phase="12"><!-- JS 생성 --></table></div>
+  <div class="task-wrap"><table class="tasks" data-phase="12.5"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준 (BuildPipelinePlan.md §6)</div>
     <ul>
@@ -1014,7 +1116,7 @@
   <h2 class="sec"><span class="no">PHASE 14.5</span>라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어) <span class="phase-pct" data-phase-pct="14.5"></span></h2>
   <div class="phase-meta">갱신: 2026-09-06 · <a href="plans/EditorAutomationCLIPlan.md">계획</a> · <a href="analysis/CommandSurfaceTable.md">현재 명령 도표</a> · <a href="analysis/Phase14_5Closure.md">종결 검토와 실행 증거</a></div>
   <div class="phase-goal"><b>목표:</b> 개발자용 편집·진단은 공통 엔진 API와 HTTP/JSON 제품 명령으로 제공하고, 검증은 프로세스 범위 Commandlet으로 분리한다. 닫힌 일회성 하네스는 제거한다. 향후 MCP는 discovery·schema·result를 연결하는 어댑터로 추가하며 이번 페이즈의 구현 대상은 아니다.</div>
-  <div class="note">현재 Editor 제품 98개(105이름), Player 7개, Commandlet 103개. 제품 명령 전부 결과 반환, named JSON 입력 58개, Undo 선언 21개. 자동 계약 게이트는 통과했다. 전체 페이즈 종결은 GUI 수동 확인과 canonical 성능 회귀 확인 전까지 보류한다. 도메인 코퍼스 미검증은 종결 검토에서 구분한다.</div>
+  <div class="note">현재 Editor 제품 99개(106이름), Player 7개, Commandlet 107개. 제품 명령 전부 결과 반환, named JSON 입력 59개, Undo 선언 21개. 자동 계약 게이트는 통과했다. 전체 페이즈 종결은 GUI 수동 확인과 canonical 성능 회귀 확인 전까지 보류한다. 도메인 코퍼스 미검증은 종결 검토에서 구분한다.</div>
   <div class="table-wrap"><table class="tasks" data-phase="14.5"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준 (EditorAutomationCLIPlan.md §18)</div>
@@ -1088,9 +1190,14 @@
 <!-- ===== PHASE 20 ===== -->
 <section class="phase" id="phase-20">
   <h2 class="sec"><span class="no">PHASE 20</span>네트워크 준비형 런타임 · Replication 기반 <span class="phase-pct" data-phase-pct="20"></span></h2>
-  <div class="phase-meta">신설: 2026-08-22 · 설계 문서: <a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계, SceneGraph E1·H3·L5 · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신</div>
+  <div class="phase-meta">신설: 2026-08-22 · 기준선 재실측 2026-09-04 · 설계 문서: <a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계 <b>완료</b>, SceneGraph E1·H3·L5 <b>완료</b> · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신 · <b>소유권 분할은 설계 문서 §6</b></div>
   <div class="phase-goal"><b>목표:</b> 서버 권위 replication을 실제 fixed Simulation Tick과 값 기반 thread boundary 위에 세운다.
   Authoring YAML/JSON DOM, process-local EntityHandle, live Scene/Entity pointer를 wire에서 배제하고, Loopback correctness를 닫은 뒤 실제 transport와 선택적 prediction/headless server를 판정한다.</div>
+  <div class="risknote"><div class="vt">이양 경계 (2026-09-04 · 설계 문서 §6 2판)</div>
+  <b>목표는 분업이 아니라 완전 이양이다.</b> 1판은 슬라이스를 A/B/C 세 구간으로 갈랐는데, C(계약은 사내·알고리즘만 위임)가 있는 한 담당자가 매번 사내 작업을 기다린다. 2판은 구간을 둘로 줄였다 — <b>사내가 한 번 세우는 것</b>과 <b>담당자가 전부 소유하는 것</b>.
+  가능케 하는 것은 인터페이스가 아니라 <b>확장점</b>이다. 인터페이스는 담당자가 엔진을 부르고, 확장점은 엔진이 담당자를 부른다 — 후자가 없으면 담당자는 결국 <code>Scene.cpp</code>에 자기 호출을 심는다.
+  <b>실측: 확장점 3종의 자리가 이미 다 있다</b> — 슬롯 수명은 <code>Scene::AllocateSlot/ReleaseSlot</code>(호출부 13건 전부 Scene 내부), tick 경계는 <code>Runtime::TickSimulationFrame</code>(92줄 단일 정본), 쓰기 dirty는 <code>Component::OnPropertyChanged</code>의 X8 writer boundary(소비자 39건).
+  <b>N3는 PHASE 20 위임 범위 밖</b> — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. 사내가 먼저 닫으며, 작업량의 본체는 누산기가 아니라 CCT 등 <b>스텝당 단위 저작값 재보정</b>과 <b>렌더 보간 신설</b>(현재 배관 0건)이다. 관리 측은 고정 축 전용 훅 <code>OnSimulationTick</code>을 신설하고(§4.4 2판) 기존 <code>PrePhysics</code>/<code>PostPhysics</code>는 프레임 축에 남긴다 — 통째로 옮기면 <code>FlushAniEvents</code>가 <code>AnimatorSystem</code> 결과에 거는 의존이 깨진다.<br><b>이 페이즈 밖 선행 둘 — PHASE 9.5가 소유한다.</b> <b>W8</b>(디스패치 오버라이드 감지)이 N3의 선행이고, <b>W4</b>(저작 dirty 통로)가 <b>ND-b의 선행</b>이다 — 2026-09-04 재실측 결과 <code>OnPropertyChanged</code>를 부르는 곳은 <code>ReflectionTypedYml</code>(직렬화)뿐이고 <code>ReflectionTypedDraw</code>(인스펙터)에는 0건이라 저작 축에 통로 자체가 없다. <b>전량 이양 시점이 W4에 묶여 있으므로</b> 이양 일정은 PHASE 9.5 진행과 함께 본다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
 
@@ -1472,8 +1579,8 @@ const TASKS = [
     note: "완료(2026-09-03). 제품 경로의 무조건 stdout 진단 토큰을 ModelConsumptionDiagnostics 원자 계수 + 읽기 전용 assets.modeldiag로 대체, experiment.animlive는 publish를 부르지 않고 Scene::TryGetLastAnimatorPoseMetrics 스냅샷을 읽음. verify-mbc-cutover-freeze에 §5.2/§8.2 하드 계약(제거 표면 12종 하드 0·vcpkg assimp 0·m_hashingMesh 절차 지오메트리 허용목록·제품 소비자 experiment 객체 0·generation 게시 진입점 DataSystem 하나·animlive 읽기 전용) 추가. typed-consumers/scene-consumption/drop-animation/skin-pose-visual을 스냅샷 파싱으로 전환. §8.2·§8.3 전항 게이트 근거로 체크(§8.4 성능은 MBC11)." },
   { phase: 3.75, id: "MBC11", title: "전체 build/runtime/performance 검증·단일 제품 cutover",
     detail: "AssetCooker·RenderTests·CreatorEditor Debug/Release, 전체 corpus source/cold cooked/reimport, 양 backend, 저장 round-trip과 절대 성능 예산을 통과한 뒤 새 경로만 공개한다.",
-    refs: "ModelAssetBigBangCutoverPlan §8 · §9", priority: "P0", days: 7, status: "todo",
-    note: "모든 gate artifact가 있어야 완료다. cutover 뒤 legacy GUID 복원·runtime mapping·Assimp fallback·experiment on/off를 되살리지 않는다." },
+    refs: "ModelAssetBigBangCutoverPlan §8 · §9", priority: "P0", days: 7, status: "done",
+    note: "완료(2026-09-04). 2026-09-03 검증에서 B1 10/14·B2 12/14가 붉어 cutover를 보류했었고, 그 붉음의 원인이 성능 회귀가 아니라 <b>축 불일치</b>였다는 것이 단계 분해로 드러나 <b>축을 재유도하고 닫았다</b>(사용자 결정). 기준값이 잰 일과 새 경로가 재는 일이 다르다 — B1 기준은 프로토타입의 소스 <b>디코드</b>였고(신원·staging·검증·원자 게시가 없다), B2 기준인 legacy <code>.asset</code> 읽기는 <b>텍스처도 신원 검증도 SHA 검증도 하지 않았다</b>. 그래서 같은 일끼리만 비교 예산으로 판정하고(B1a 디코드·B2a CEMC 읽기/디코드/조립), legacy에 대응물이 없는 칸은 archive 비회귀로 보며(B1b 저작 트랜잭션·B2b 신원·해시 검증), 임베디드 텍스처 디코드(B2c)는 <b>PHASE 12 T1a/T2로 이관</b>했다 — cook artifact가 디코드 완료 형식이 되면 사라지는 비용이고 그 포맷은 그 페이즈의 소유라, 여기서 하면 T1a가 다시 정의할 포맷이 하나 더 생긴다. ★ 이관은 면제가 아니다: 모델별 값이 archive에 남아 회귀하면 이 게이트가 붉어진다. ★ <b>판정 전에 3.75가 소유한 낭비를 먼저 걷었다</b> — archive는 '지금 값'을 정답으로 굳히므로 낭비를 굳히면 안 된다. ① 저작마다 asset root 345파일을 재순회하며 v2 sidecar 14개를 재파싱하던 corpus collision 검사에 (크기, mtime) 지문 캐시를 넣었고(순회와 폐포 재검증은 남긴다 — epoch header가 인자라 캐시가 판정을 대신하면 안 된다), ② 게시 직전 source 전체를 다시 읽어 SHA-256을 다시 계산하던 race 검사를 (크기, mtime) 대조 우선으로 바꿨다(다르면 옛 방식대로 재해시 — touch만 된 파일을 거짓 거부하지 않는다). 실측: <code>corpus-collision-scan</code> 평균 6.93 → 3.92 ms, <code>publish</code> 14모델 합계 302.6 → 48.1 ms(scene 212.9 → 2.8 · Gunner 19.5 → 3.1). ★ <b>①의 착수 가정이 절반 틀렸다</b> — &quot;6.6 ms는 파싱이 지배한다&quot;고 봤는데 절감이 3 ms뿐이었다. 남은 4 ms는 파싱이 아니라 <b>asset root 전체 순회</b>이고, 모델 sidecar가 어디에나 있을 수 있어 범위를 좁힐 근거가 없으며 순회를 캐시하면 새 sidecar를 놓쳐 충돌 검사가 눈먼다 — 그래서 남겼다. ★ 후보 ④(SHA 가속)는 <b>이 장비에서 답이 아니다</b> — Xeon W-2223(Cascade Lake-W)에 SHA-NI가 없어 SHA-NI 경로도 CNG도 스칼라로 떨어진다(scene CEMC 12.4 MB SHA 63 ms ≈ 180 MB/s). 다음 사람이 다시 재지 않도록 기준선 §4.4a에 적었다. 결과(Release, 2026-09-04 archive 실행): <b>B1a 14/14 · B2a 14/14</b> 통과, B3 Test1 15.2 / FT 12.1 ms, B4 30.5 ms, B5 833 MB, B6 메시 업로드 10개/1,075 KB·커버리지 49,684·VRAM 1,144 MB 비회귀. 모델 게이트 8종 전부 초록. ★ B1b 축은 <b>흔들림이 커서 판별력이 낮다</b> — 같은 바이너리로 20분 안에 두 번 잰 Prim_Cone이 27.4와 42.1 ms다(작은 파일 4~5개를 만들고 다시 읽는 NTFS 비용이 지배). archive는 상단 근처를 들고 있고 큰 회귀만 잡는다. 게이트는 <b>어느 칸이라도 붉은 실행</b>을 archive로 굳히지 않는다. cutover 뒤 legacy GUID 복원·runtime mapping·Assimp fallback·experiment on/off를 되살리지 않는다." },
 
   // ---------- PHASE 4.75: 차세대 렌더 파이프라인·GPU 기능 ----------
   // 구현 항목이 아니라 Scriptable Pipeline 계약과 네 기능의 공통 데이터·폴백·검증·순서를 확정하는 설계 게이트다.
@@ -1555,7 +1662,7 @@ const TASKS = [
     refs: "3장 커플링", priority: "P1", days: 5, status: "done", note: "CI 게이트 가동: scripts/check_include_boundary.py(래칫 — 기존 간선 allowlist 동결, 새 간선은 실패) + build.yml include-boundary 잡. ★ 슬라이스 A(죽은 include): 30간선 제거 + 고아 2파일 삭제(Transform.cpp 사본, PremitiveRenderProxy.h). 부수 발견 — 전이 include 의존 다수(사용처 직접 include로 정정), Scene.h는 GameObject.h 선행 include 요구(GameObject.inl→IRegistableEvent.h→Scene.h 순환 때문에 자체 포함 불가 — TU 8곳에 선행 삽입, 근본 해소는 C2), 유니티 빌드 심볼 누수 1건(MeshRenderer.h 죽은 멤버 m_OctreeNodes + 전역 OctreeNode 전방선언이 CullingManager.cpp using namespace와 모호성 — 제거). ★ 슬라이스 B(데이터 헤더 소속 정정): LightProperty·TerrainBuffers·LightMapping·FoliageInstance·FoliageType(+generated 3종)을 RenderEngine/Interfaces/로 이관, 소비 프로젝트 8종 include 경로 추가. ★ 슬라이스 C1(프록시 생성 → 게임플레이 소유): ProxyCommand.cpp 전체 이동(D3D 참조 0인 순수 어댑터 — 선언이 전방 선언 구조라 호출부 무수정, 정적 링크라 심볼 위치만 이동) + PrimitiveRenderProxy 분할(컴포넌트 읽는 생성자 5종 → ScriptBinder/PrimitiveProxyBridge.cpp, Draw 계열 렌더 로직은 잔류). ★ C1 완결: UIRenderProxy 생성자 3종 → UIProxyBridge.cpp, RenderScene의 컴포넌트 접점(Register/Update/Unregister/InvaildCheck/MakeProxyCommand 계열 8종, ~390행) → RenderSceneBridge.cpp 캐빙. 프록시 생성 4개 지점 전부 게임플레이 소유로 이동 완료. ★ C2 착수: GameObject::Index를 독립 헤더(GameObjectIndex.h)로 분리해 Scene.h↔GameObject.inl↔IRegistableEvent.h 순환 절단 — Scene.h가 자급자족(선행 include 요구 소멸). ★ DX11 구 렌더러 은퇴의 배당: 구 패스 파일들이 사라지며 간선 92 → 43 자연 감소(allowlist 51항목 소멸 정리). ★ C3·C6 슬라이스: AnimationJob.cpp(애니메이션 갱신 잡)·Animation.cpp→AnimationEventBridge.cpp(KeyFrameEvent→ModuleBehavior 디스패치)·EnhancedGizmoSceneBinding.cpp(씬→DX12 기즈모 어댑터) 3파일 통이동(전부 D3D 참조 0, 동명 헤더 섀도잉 없음 확인). ★ C5(모델 씬 인스턴스화 역전): 파싱(assimp→Mesh/Material/Skeleton)은 렌더에 잔류, 씬에 세우는 일(LoadModelToScene 계열 2함수 + GenerateSceneObjectHierarchy 계열 4함수 — GameObject 계층 생성·컴포넌트 부착)은 ScriptBinder/ModelSceneBridge.cpp로 캐빙. Model.h·ModelLoader.h는 전방 선언으로 전환(시그니처 전부 참조/포인터, shared_ptr 멤버는 불완전 타입 안전). 부수: DataSystem.cpp가 Model.h 전이 include에 숨어 쓰던 Scene/GameObject를 직접 include로 명시화(숨은 커플링의 가시화 — 5-3에서 해소). ── 간선 154 → 23(-85%). C1·C3까지 회귀 세트 통과로 검증, C3 3파일 이동·C5는 빌드 검증 보류(사용자 지시 — 다음 빌드에서 유니티 블롭 전이 include 결손 가능성 유의). 남은 23간선: C6 Camera 3(에디터 입력) · Socket.cpp 3 · RenderScene.cpp 4 + RenderScene.h 1 · RenderPassData 1 · ShaderSystem 1 · Navigation 분리 2(ClipDirection·TextAlignment → Interfaces) · Transform.h 2(MeshRendererProxy.h·Socket.h) · UIComponent 1 · C4 DataSystem 5(5-3 합류) — C5 완료. ── ★ 소형 클러스터(2026-08-09): 남은 23간선 중 여덟을 끊었다(994a9dee) — Camera 에디터 입력 · Socket · RenderPassData · ShaderSystem 계열의 자잘한 것들이다. 실측 간선 154 → 14(-91%). ── ★ 래칫을 조였다(2026-08-09): 허용 목록에 죽은 항목 12개가 남아 있었다. 슬라이스 B가 *PassSetting.h를 RenderEngine/Interfaces/로 옮긴 뒤 옛 경로를 가리키던 것들이라, 게이트가 실제보다 12만큼 헐거웠다. 손으로 지워 허용 26 → 14 — 이제 목록 크기와 실측 간선 수가 정확히 같아, 간선 하나만 늘어도 CI가 잡는다. ★ --update로 줄이지 않은 이유를 파일 머리에 적어 두었다: 그 옵션은 죽은 항목을 걷는 동시에 그 순간 워킹트리에 있는 미완성 간선까지 허용으로 흡수한다(같은 트리에서 다른 세션이 작업 중이면 남의 중간 상태가 래칫에 박힌다). ── ★ RenderScene 5간선 절단(2026-08-09, 커밋 4d4fd25d): 다섯 중 넷은 이미 죽어 있었다 — GameObject.h(전방 선언이 바로 아래 줄에 이미 있다) · Scene.h(심볼 사용 0, include 줄에만 있던 이름) · UIManager.h(사용 0) · Animator.h(MAX_BONES 하나 때문이었는데 그걸 쓰는 TRANSFORM_SIZE 자체가 정의만 있고 미사용). 다섯째 SceneManager.h만 진짜였고, 본문이 'm_currentScene = SceneManagers->GetActiveScene();' 한 줄인 RenderScene::Update가 유일한 소비자였다. ★ 그런데 이 당김이 푸시를 덮고 있었다 — SetActiveScene은 SetScene(scene) 직후 Update(0.f)를 부르는데 그 Update가 방금 받은 scene을 버리고 전역 활성 씬으로 되돌렸다. 둘이 어긋나는 전환 순간에만 드러나는 종류라 조용했다. 씬은 이미 세 자리 전부 SetActiveScene을 거쳐 밀려 들어오므로(Dx11Main.cpp 71·80·92) 당김은 잉여였다. 함수·선언·호출부 둘을 함께 걷었다. 실측 14 → 9(-94%), 허용 목록도 손으로 9로. ── ★ 덤: 비유니티 빌드가 드러낸 include 결손 10자리(오류 227건)를 같은 커밋에서 메웠다. RHIEncoder 미정의 4(DX12 테스트 — 같은 디렉토리 패스 .cpp 20여 개는 전부 직접 include하는데 이 넷만 빠졌다) · Vertex 1 · ThrowIfFailed 1 · boost/uuid 구문 붕괴 186건(windows.h의 max 매크로, TypeTrait.h 한 자리로 봉합 — 뒤에 5-7이 boost를 걷으며 이 가드도 함께 사라졌다) · DirectXTex의 DX11 가드(Texture.h가 d3d11.h 없이 DirectXTex.h를 먼저 들여 #pragma once로 순서가 굳었다) · Scene 불완전형 3(MenuBarWindow·ConsoleCommandSystem) · DataSystems 1. ★ 교훈: 9-9(ASan)에서 8건을 메운 뒤 다시 10건이 쌓였다 — 유니티 빌드는 같은 블롭의 앞선 파일이 의존을 공급해 이것을 구조적으로 못 본다. 비유니티를 CI에 넣을지는 5페이즈 마무리에서 판단. ── ★ 값싼 절단은 여기서 소진됐다(2026-08-10, 커밋 7ea1e777): 죽은 간선 셋을 걷으려 했는데 하나만 죽어 있었다(Camera.cpp→MeshRenderer.h). 9 → 8. ★ 나머지 둘을 '죽었다'고 본 것은 내 측정 도구의 결함이었다 — ① 싱글턴 별칭을 '*Manager(s)' 이름 규칙으로만 잡아 InputManagement를 통째로 놓쳤다 ② 타입 '이름'의 출현만 셌는데, `포인터변수->멤버` 형태는 소스 어디에도 타입 이름이 안 나오면서 완전 타입을 요구한다(ShaderSystem.cpp의 m_selectImageTarget->SetCustomPixelShader — 게다가 그 멤버는 기반 클래스 UIComponent의 것이라 헤더 텍스트를 훑어도 안 잡힌다). 텍스트 분석으로 원리상 못 푸는 종류라, 스크립트를 '후보만 좁히고 확정은 비유니티 컴파일에 맡기는' 방식으로 바꿨다. ★ ShaderSystem.cpp에는 그 사연을 적은 주석이 이미 붙어 있었는데 내 자동 측정이 그 위를 덮었다 — 코드가 남긴 설명이 스크립트보다 우선한다. ── 남은 8간선에 죽은 include는 0이고, 넷 다 각자 다른 설계 문제이며 갈 곳이 정해져 있다: DataSystem 5(5-3) · Camera→InputManager(카메라 조작이 입력을 직접 읽는다) · ShaderSystem→ImageComponent(에디터 ImGui 조각 — L2 에디터 적출 몫) · Skeleton→Socket(Skeleton(렌더)이 GameObject*를 드는 게임플레이 개념을 소유·파괴한다. 소비자는 이미 대부분 Animator 쪽이므로 소유권을 그리로 옮기면 끊긴다). ── ★ 0 도달(2026-08-11): 남은 여덟을 네 슬라이스로 끊었다. 실측 간선 154 → 0, 허용 목록도 비었다. Skeleton→Socket은 이미 죽은 껍데기였고(MakeSocket 본문이 통째로 주석 — 소유권은 진작 Animator::socketvec으로 갔다) DataSystem 5는 5-3이, Camera→InputManager와 ShaderSystem→ImageComponent는 5-3의 슬라이스 4·5가 걷었다. ★ 마지막 둘은 같은 모양이었다 — 렌더 계층 타입에 얹힌 에디터 도구. HandleMovement는 부르는 쪽이 씬 뷰 하나뿐이고 대상은 언제나 editorCamera였으며(씬에 저장되는 게임 카메라는 이 경로를 한 번도 타지 않는다), 셰이더 선택 창 둘도 여는 쪽·지정하는 쪽이 전부 층 6이고 조각만 아래 남아 있었다. 각각 EditorCameraController·ShaderSelectionWindow로 나갔다. ★ 래칫은 이제 '하나라도 생기면 실패'다 — 허용 목록이 비었으므로 새 상향 include는 예외 없이 CI가 잡는다." },
   { phase: 5, id: "5-3", title: "DataSystem에서 에디터 UI 분리",
     detail: "콘텐츠 브라우저(OpenContentsBrowser/DrawFileTile 등)를 EngineGUIWindow 측 ContentsBrowserWindow로 이동 — 리소스 시스템은 데이터 API만 노출. EffectEditor의 에디터 전용 부분도 동일 방향.",
-    refs: "4.4, 13장 리스크1", priority: "P1", days: 4, status: "done", note: "완료(2026-08-11). 다섯 슬라이스로 나눠 진행했고, 빌드는 매번 유니티·비유니티 양쪽을 태웠다. ── ★ 슬라이스 1(커밋 ec0bb112): 게임플레이 지식을 걷었다. DataSystem이 GameObject를 찾아 Prefab을 만들어 저장하고 .prefab을 PrefabEditor로 넘기고 있었다. 무엇을 할지는 에디터가 정해 걸도록 훅 둘로 밀어냈다. 간선 5 → 3. ★ 부수 발견 — 드래그드롭 처리 블록 셋이 md5까지 같은 복사본이었고, 그 중복이 5간선 중 3의 원인이었다. ── ★ 슬라이스 2(커밋 00e3096a): 콘텐츠 브라우저를 창째로 EngineGUIWindow/ContentsBrowserWindow로 옮겼다. 창 등록 71줄 + 그리기 함수 일곱 463줄 + UI 상태(현재 폴더·검색 필터·선택 메타·확장자→아이콘 표). DataSystem.cpp 1735 → 1107줄. 간선은 그대로다 — 이 슬라이스의 값어치는 계층 분리다. ★ 옮기다 이중 상태 둘을 걷었다: m_ContentsBrowserStyle은 EngineSetting의 사본인데 MenuBarWindow가 두 곳을 나란히 세우고 있었고, Open/CloseContentsBrowser는 ImGui::GetContext(...).Open() 한 줄 래퍼인데 MenuBarWindow는 바로 아래에서 이미 직접 부르고 있었다. 덕분에 MenuBarWindow가 브라우저를 참조할 이유가 사라졌다. ★ 슬라이스 1의 드롭 훅은 여기서 사라졌다(창이 층 6으로 왔으니 우회로가 불필요). OpenFileOverride는 남긴다 — OpenFile은 App·MenuBar도 부르는 일반 서비스이고 확장자 분기는 계속 에디터 정책이다. ── ★ 슬라이스 3(커밋 f8212d1d): 작업자 풀의 소유를 층 1로 내렸다. LoadAssetBundle이 SceneManagers->m_threadPool을 빌려 쓰느라 층 3이 층 4를 올려다봤는데, 풀의 타입은 처음부터 Core.ThreadPool.h(층 1) 것이었다 — 층을 어긴 것은 타입이 아니라 인스턴스였다. Utility_Framework/WorkerPool.h로 내리고 호출부 13곳을 옮겼다. 수명은 그대로(ManagerInitialize가 Startup, 소멸 자리가 Shutdown). 간선 3 → 2. ★ SceneManager.h를 빼자 Meta::Serialize 7곳이 끊겼다 — ReflectionYml.h를 대신 끌어와 주고 있었다. 직접 들게 했다. ── ★ 슬라이스 4(커밋 18449246): 에디터 카메라 조작을 Camera에서 들어냈다. HandleMovement 74줄이 InputManager를 11번 ImGui를 7번 부르던 Camera.cpp의 유일한 이유였고, 부르는 쪽은 씬 뷰 하나였다. EditorCameraController로 이동. 간선 2 → 1. ★ 처음엔 m_speed를 남기려 했다 — [[Property]]라 씬 12개에 기록돼 있어 형식 변경으로 봤다. 틀렸다. 역직렬화는 타입의 프로퍼티 목록을 순회하며 node[prop.name]을 찾으므로 대응 없는 키는 방문조차 되지 않고(오류도 경고도 없다), 저장된 값은 12개 씬 모두 기본값 10이었으며 그것을 읽어 쓰는 코드 경로가 없었다 — 쓰기만 하고 아무도 읽지 않는 데이터였다. 자산 파일은 손대지 않았고 Camera.generated.h는 MetaGenerator가 자동으로 걷었다. 덤으로 Camera.cpp에서 ImGui 의존도 사라졌다. ── ★ 슬라이스 5(마지막 간선): 셰이더 선택 창 둘을 ShaderSelectionWindow로 옮겼다. ShaderSystem이 ImageComponent.h를 연 이유는 SetCustomPixelShader 한 줄이고 그 메서드는 기반 클래스 UIComponent 것이다 — 완전 타입이 필요해서였을 뿐이다. 여는 쪽·지정하는 쪽은 전부 층 6이었다. 간선 1 → 0. ★ 죽은 API 둘(Clear*SelectionTarget — 호출자 0)이 함께 사라졌고, 플레이어는 이제 이 창들을 등록조차 하지 않는다(전에는 등록은 하되 그리지 않는 회피였고 PlayerMain에 그 사연이 적혀 있었다 — 주석도 사실에 맞게 고쳤다). ── ★ 남은 것: DataSystem에 엔진 층 ImGui 창 둘(SelectMatarial · TextureType Selector)이 아직 있다. 간선을 만들지는 않지만(양쪽 다 렌더 계층 타입만 쓴다) 계층상 같은 성격의 잔재이고, PHASE 12 L2 몫이다. ★ 범위 정정: 5-7의 노트가 'UF의 ImGui 의존은 이동 대상이 5-3과 겹치니 그때 함께'라 적어 두었는데, 여기서 하지 않았다. 겹치지 않는다 — 5-3은 DataSystem의 에디터 UI를 뜯는 일이고, UF의 ImGui는 Core.Minimal.h→Reflection.hpp→ReflectionMecro.h→ReflectionFunction.h→<imgui.h> 사슬이 299파일에 닿는 별개 문제다(남은 자리: ReflectionFunction.h · CoreWindow.h · EngineSetting). BuildPipelinePlan L2' 몫으로 남긴다. 함께 미뤄졌던 ReflectionImGuiHelper.h는 이미 EngineGUIWindow에 있어 해당 없음." },
+    refs: "4.4, 13장 리스크1", priority: "P1", days: 4, status: "done", note: "완료(2026-08-11). 다섯 슬라이스로 나눠 진행했고, 빌드는 매번 유니티·비유니티 양쪽을 태웠다. ── ★ 슬라이스 1(커밋 ec0bb112): 게임플레이 지식을 걷었다. DataSystem이 GameObject를 찾아 Prefab을 만들어 저장하고 .prefab을 PrefabEditor로 넘기고 있었다. 무엇을 할지는 에디터가 정해 걸도록 훅 둘로 밀어냈다. 간선 5 → 3. ★ 부수 발견 — 드래그드롭 처리 블록 셋이 md5까지 같은 복사본이었고, 그 중복이 5간선 중 3의 원인이었다. ── ★ 슬라이스 2(커밋 00e3096a): 콘텐츠 브라우저를 창째로 EngineGUIWindow/ContentsBrowserWindow로 옮겼다. 창 등록 71줄 + 그리기 함수 일곱 463줄 + UI 상태(현재 폴더·검색 필터·선택 메타·확장자→아이콘 표). DataSystem.cpp 1735 → 1107줄. 간선은 그대로다 — 이 슬라이스의 값어치는 계층 분리다. ★ 옮기다 이중 상태 둘을 걷었다: m_ContentsBrowserStyle은 EngineSetting의 사본인데 MenuBarWindow가 두 곳을 나란히 세우고 있었고, Open/CloseContentsBrowser는 ImGui::GetContext(...).Open() 한 줄 래퍼인데 MenuBarWindow는 바로 아래에서 이미 직접 부르고 있었다. 덕분에 MenuBarWindow가 브라우저를 참조할 이유가 사라졌다. ★ 슬라이스 1의 드롭 훅은 여기서 사라졌다(창이 층 6으로 왔으니 우회로가 불필요). OpenFileOverride는 남긴다 — OpenFile은 App·MenuBar도 부르는 일반 서비스이고 확장자 분기는 계속 에디터 정책이다. ── ★ 슬라이스 3(커밋 f8212d1d): 작업자 풀의 소유를 층 1로 내렸다. LoadAssetBundle이 SceneManagers->m_threadPool을 빌려 쓰느라 층 3이 층 4를 올려다봤는데, 풀의 타입은 처음부터 Core.ThreadPool.h(층 1) 것이었다 — 층을 어긴 것은 타입이 아니라 인스턴스였다. Utility_Framework/WorkerPool.h로 내리고 호출부 13곳을 옮겼다. 수명은 그대로(ManagerInitialize가 Startup, 소멸 자리가 Shutdown). 간선 3 → 2. ★ SceneManager.h를 빼자 Meta::Serialize 7곳이 끊겼다 — ReflectionYml.h를 대신 끌어와 주고 있었다. 직접 들게 했다. ── ★ 슬라이스 4(커밋 18449246): 에디터 카메라 조작을 Camera에서 들어냈다. HandleMovement 74줄이 InputManager를 11번 ImGui를 7번 부르던 Camera.cpp의 유일한 이유였고, 부르는 쪽은 씬 뷰 하나였다. EditorCameraController로 이동. 간선 2 → 1. ★ 처음엔 m_speed를 남기려 했다 — [[Property]]라 씬 12개에 기록돼 있어 형식 변경으로 봤다. 틀렸다. 역직렬화는 타입의 프로퍼티 목록을 순회하며 node[prop.name]을 찾으므로 대응 없는 키는 방문조차 되지 않고(오류도 경고도 없다), 저장된 값은 12개 씬 모두 기본값 10이었으며 그것을 읽어 쓰는 코드 경로가 없었다 — 쓰기만 하고 아무도 읽지 않는 데이터였다. 자산 파일은 손대지 않았고 Camera.generated.h는 MetaGenerator가 자동으로 걷었다. 덤으로 Camera.cpp에서 ImGui 의존도 사라졌다. ── ★ 슬라이스 5(마지막 간선): 셰이더 선택 창 둘을 ShaderSelectionWindow로 옮겼다. ShaderSystem이 ImageComponent.h를 연 이유는 SetCustomPixelShader 한 줄이고 그 메서드는 기반 클래스 UIComponent 것이다 — 완전 타입이 필요해서였을 뿐이다. 여는 쪽·지정하는 쪽은 전부 층 6이었다. 간선 1 → 0. ★ 죽은 API 둘(Clear*SelectionTarget — 호출자 0)이 함께 사라졌고, 플레이어는 이제 이 창들을 등록조차 하지 않는다(전에는 등록은 하되 그리지 않는 회피였고 PlayerMain에 그 사연이 적혀 있었다 — 주석도 사실에 맞게 고쳤다). ── ★ 남은 것: DataSystem에 엔진 층 ImGui 창 둘(SelectMatarial · TextureType Selector)이 아직 있다. 간선을 만들지는 않지만(양쪽 다 렌더 계층 타입만 쓴다) 계층상 같은 성격의 잔재이고, PHASE 12.5 L2 몫이다. ★ 범위 정정: 5-7의 노트가 'UF의 ImGui 의존은 이동 대상이 5-3과 겹치니 그때 함께'라 적어 두었는데, 여기서 하지 않았다. 겹치지 않는다 — 5-3은 DataSystem의 에디터 UI를 뜯는 일이고, UF의 ImGui는 Core.Minimal.h→Reflection.hpp→ReflectionMecro.h→ReflectionFunction.h→<imgui.h> 사슬이 299파일에 닿는 별개 문제다(남은 자리: ReflectionFunction.h · CoreWindow.h · EngineSetting). BuildPipelinePlan L2' 몫으로 남긴다. 함께 미뤄졌던 ReflectionImGuiHelper.h는 이미 EngineGUIWindow에 있어 해당 없음." },
   { phase: 5, id: "5-4", title: "Mono 데드 코드 제거",
     detail: "Managed/, MonoBleedingEdge/, Assembly-CSharp/, MonoManager, CSharpScriptComponent, *_Binding.h, UNUSE_MONO_LIB 가드 일괄 제거 (git 히스토리에 보존됨). 저장소·빌드 표면 축소.",
     refs: "6.2, 13장 리스크3", priority: "P2", days: 1.5, status: "done", note: "9-4(레거시 은퇴)와 같은 묶음으로 함께 단행 — 상세 기록은 9-4 항목에 있다. 요약: Mono 계층은 외부 참조 0의 닫힌 섬이었다(서로만 참조하는 고리라 아무도 진입하지 않는다). 소스 10파일 + 런타임 데이터 3디렉터리 51파일 제거, vcxproj 세 구성의 mono-2.0 include 경로(머신 절대 경로) 정리, 구 C++ 스크립트 전용 코드젠 도구(AutoRegisterCreateScriptReflection)도 함께 제거. MSBuildHelper.h는 GameBuilderSystem이 아직 쓰므로 존치. 빌드 검증 보류(지시) — 완료 판정은 빌드 통과 후. ★ 빌드·회귀 통과(2026-08-07) — 완료." },
@@ -1778,6 +1885,45 @@ const TASKS = [
     detail: "GC.GetGCMemoryInfo()·CollectionCount(0/1/2)를 틱당 1회 blittable로 경계 너머로 수출, 리소스 카운터 HUD(0-2)에 gen0/1/2 수집 횟수·관리 힙 크기 표시. 2-9 '메모리 평탄성 검증'의 판정 기준을 '네이티브·관리 힙 모두 기준선 복귀'로 확장.",
     refs: "LifecycleRedesignPlan §07 A-2 · 2-9", priority: "P1", days: 0.25, status: "done", note: "코드 완료 · C# 측 빌드 검증 통과 · 네이티브 빌드는 별도 진행. GcStats(gen0/1/2 수집 횟수·힙 크기·단편화·GC 점유율)를 blittable 구조체로 포인터 하나에 담아 넘긴다 — 물리 이벤트와 같은 규약이다. ★ 배치 불일치는 경고 없이 그럴듯한 쓰레기 값을 만들어 눈으로 알아채기 어려우므로 양쪽에 못을 박았다: C++에 static_assert(sizeof==48), 그리고 실제로 확인했다 — 컴파일된 어셈블리에서 Marshal.SizeOf=48, HeapSizeBytes 오프셋 16(int32 셋 12 + 정렬 패딩 4)으로 C++ 자연 정렬과 정확히 일치. HUD: ResourceCounterWindow에 '관리 힙 (.NET GC)' 섹션 추가. 게임 스레드의 ImGui 패스에서 그려지므로 경계 규약을 지키고, 갱신 주기가 0.5초라 틱마다 넘지도 않는다. 수집 횟수는 단조 증가라 증감의 뜻이 다르다는 점을 표시에 반영했다 — '기준선 이후 몇 번 돌았나'이고, 씬 전환마다 gen2가 정확히 늘어나는지가 9-6의 확인점이다. 벤치 확장: scene_churn_benchmark와 lifecycle_baseline에 gc.delta/gc.stats를 넣어 2-9의 판정 기준을 '네이티브·관리 양쪽 모두 기준선 복귀'로 넓혔다 — 스크립트가 C#으로 간 뒤로 씬이 붙들던 것의 상당수가 관리 힙에 있어, gpu.delta만 보면 평탄성의 절반만 본다. gc.delta는 기준선이 없으면 조용히 0을 찍는 대신 집계로 남기고 기준선을 세운다(0을 '변화 없음'으로 오독하는 것을 막는다). ★ 빌드·회귀 통과(2026-08-07) — 완료." },
 
+  // ---------- PHASE 9.5: 스크립트 표면 재설계 (C# 계층 기준 재수립) ----------
+  //
+  // ★ 2026-09-04 신설. PHASE 9가 네이티브 생명주기를 재설계하는 동안 C# 표면은
+  //   옛 게임 코퍼스의 호출 빈도를 기준으로 굳어 있었고, 그 코퍼스가 8ae17250에서
+  //   통째로 삭제된 뒤에도 기준이 갱신되지 않았다. ScriptApiMigrationPlan.html
+  //   §11의 T1~T4 등급표가 그 낡은 기준이다(W7에서 폐기 표시).
+  { phase: 9.5, id: "W1", title: "골격 — 기반 클래스를 네이티브와 1:1로",
+    detail: "Behaviour 층 폐기(네이티브에서 6단계 생명주기를 소유하는 계층 이름이 Component다), Transform을 자유 함수 묶음에서 NativeComponent 파생으로 승격(S1-b의 관리 측 귀결), BehaviourRegistry→ScriptRegistry·BehaviourGenerator→ScriptGenerator 개명, Transform_Exists 신설.",
+    refs: "ScriptSurfacePlan.md §1 · 79ac93ae", priority: "P1", days: 2, status: "done",
+    note: "완료(2026-09-04). Behaviour는 일어나지 않은 Unity 관례 이식의 잔재였다 — 네이티브는 Transform·MeshRenderer·ScriptComponent가 전부 Component에서 파생하는 2층인데 관리 측만 3층이었다. 개명이 필요했던 이유: Component 방향으로 가면 BehaviourRegistry라는 이름이 네이티브 ComponentFactory·RegisterAllComponents(컴포넌트 타입 등록부)와 뜻이 부딪힌다. ★ Transform_Exists를 새로 판 이유 — UI/Canvas 오브젝트는 Transform이 없고 Entity::Transform_()이 공유 더미를 돌려주므로 쓰기가 조용히 버려진다. 썽크는 HasTransform()을 직접 보게 했다(전자를 쓰면 검사가 항상 '있다'가 되어 아무것도 재지 않는다). 애니메이션의 SetBehaviour·CreateBehaviour 계열은 별개 체계라 개명 대상이 아니다. 게이트 3종을 함께 세웠다: check-api-table(순서·개수 대조) · check-bt-enums · check-entry-points(문자열 이름 바인딩은 컴파일러도 API 표 게이트도 못 본다)." },
+  { phase: 9.5, id: "W2", title: "컴포넌트 노출 — LightComponent · CameraComponent",
+    detail: "저작 자산에 있는데 스크립트가 만질 길이 없던 컴포넌트를 연다. 각각 회귀 프로브와 게이트를 함께 세운다.",
+    refs: "ScriptSurfacePlan.md §1 · 84419886 · ebab7c7f", priority: "P1", days: 2, status: "done",
+    note: "완료(2026-09-04). ★ 저작분이 규모를 정했다 — 착수 메모는 미노출 19종을 적었지만 실측하니 Light 30건·Camera 20건 외에는 전부 0건이거나(Terrain·Volume·Decal·Foliage·Ragdoll·MeshCollider·PlayerInput·SpriteRenderer·SpriteSheet·StateMachine·TerrainCollider) 노출할 것이 없었다(BoneComponent는 저작 234건이지만 필드 0·메서드 1의 마커). 관리 측이 네이티브 컴포넌트를 붙일 수단이 없으므로(CreateComponent는 네이티브→관리 방향이다) 저작분 0인 타입에 래퍼를 만들면 GetComponent가 원리적으로 늘 null인 죽은 표면이 된다. ★ 두 컴포넌트의 검증할 사슬이 서로 달랐다: Light는 렌더 프록시를 쓰므로 값 writer가 dirty를 안 내면 화면이 그대로인데 되읽으면 새 값이 나온다 — 값 왕복 단정은 이 결함에 원리적으로 눈멀어 dirty 사슬 축을 따로 세웠다. Camera는 프록시를 안 쓰고(Scene.cpp의 프록시 Kind 열거에 Camera가 없다) 매 프레임 CaptureFrameSnapshot으로 읽히므로 발행할 dirty가 애초에 없고 축도 하나다. 같은 형태의 게이트를 복사했으면 한쪽은 아무것도 재지 않았다. 부수: Mesh_SetMaterialFloat의 죽은 buffer 인자 제거(kApiVersion 21→22) — 순서 대조 게이트는 한쪽만 올린 버전 상승에 구조적으로 눈멀고 실제로 스크립트를 돌리는 회귀만 왕복을 증명한다. 명명 규칙 확인: C# 래퍼는 네이티브 이름 그대로이고 예외가 없다(15종 대조)." },
+  { phase: 9.5, id: "W3", title: "입력 액션 값 통로 — 이름만 넘고 값이 끊긴다",
+    detail: "PlayerInputComponent가 액션 발화를 스크립트에 알릴 때 함수 이름만 넘긴다. ActionMap이 계산한 v2Value를 스크립트가 받을 통로를 연다. 착수 전에 방식을 정해야 한다 — ScriptMessage에 값 필드를 더할 것인가, 질의 API를 따로 둘 것인가.",
+    refs: "ScriptSurfacePlan.md §2 W3 · ActionMap.cpp:317,327 · ClrHost.h:130", priority: "P1", days: 4, status: "todo",
+    note: "값이 두 곳에서 끊긴다. ① ActionMap.cpp:317,327의 valueAction(action->value.v2Value)이 주석 처리돼 있다 — 바로 위에서 키보드 4방향/게임패드 스틱으로 v2Value를 채워 놓고 onFired(funName)만 부르므로 계산된 값이 그 자리에서 버려진다. ② ScriptMessage가 {int instanceId; char name[64]}뿐이라 ①을 살려도 실을 곳이 없다. 안 A(ScriptMessage에 값 필드): 구조체 배치가 바뀌어 kApiVersion 상승 + 모든 메시지가 안 쓰는 값 필드를 든다. 안 B(Input_GetActionValue 질의 API): 발화와 질의 사이에 값이 바뀔 수 있다(틱 경계라 실제로는 안전하나 계약이 약해진다). ★ 소비자도 함께 저작해야 한다 — 어느 씬에도 PlayerInputComponent가 0건이라 이 경로는 지금 한 번도 돌지 않는다. 액션 맵 자산과 컴포넌트를 붙인 씬 없이는 고쳤다를 증명할 수 없다. 이 결정이 W6의 ScriptMessage 미러 계약을 정하므로 W6보다 앞서야 한다." },
+  { phase: 9.5, id: "W4", title: "저작 dirty 통로 — 인스펙터가 값만 대입하고 dirty를 모른다",
+    detail: "ReflectionTypedDraw가 컴포넌트 필드를 직접 쓰면서 PublishRenderProxyDirty를 내지 않는다. 리플렉션 draw에 값 변경 통지 훅을 두고, 렌더 프록시를 쓰는 컴포넌트가 그 훅에서 dirty를 발행하게 한다.",
+    refs: "ScriptSurfacePlan.md §2 W4 · ReflectionTypedDraw.h", priority: "P1", days: 3, status: "todo",
+    note: "ReflectionTypedDraw.h에 ProxyDirty 언급이 0건이다. 그래서 인스펙터에서 라이트 색·세기를 바꾸면 컴포넌트 필드는 바뀌지만 LightRenderProxy는 낡은 채 남는다. ★ W2가 세운 게이트의 변이 상태가 정확히 지금의 인스펙터 경로다 — LightComponent setter의 PublishRenderProxyDirty 6줄을 지우면 값 왕복 15건은 그대로 통과하고 dirty 사슬 축만 붉어진다. W2는 setter 신설에서 멈췄다: 필드가 여전히 public이라 우회할 수 있는데, 지금 private으로 내리면 저작 경로가 멈춘다(인스펙터가 그 필드를 직접 쓴다). 순서는 훅 신설 → 컴포넌트가 훅에서 발행 → 그 뒤에야 필드를 private으로. 완료 증명이 W5에 걸린다." },
+  { phase: 9.5, id: "W5", title: "렌더 델타 관측 하네스 — 헤드리스가 프록시 적용을 못 본다",
+    detail: "--script 헤드리스는 렌더 프레임이 거의 돌지 않아 프록시 값을 관측할 수 없다. 렌더 프레임을 N회 강제로 도는 CLI 또는 게임 스레드에서 델타를 동기 적용하는 검사 전용 진입점을 세운다.",
+    refs: "ScriptSurfacePlan.md §2 W5 · verify-light-script.ps1", priority: "P2", days: 3, status: "todo",
+    note: "실측(2026-09-04, 기본 씬 라이트에 스크립트로 8회 쓰기): 기준선 publish=1 committed=1 queued=3 applied=2 → 이후 publish=9 committed=2 queued=4 applied=2. 게임 스레드 쪽은 전부 정상이고 applied만 멈춰 있다. RenderScene::UpdateCommand는 프록시에 쓰지 않고 ProxyCommandQueue에 델타를 넣을 뿐이며 그것을 적용하는 ExecuteBatch는 렌더 소비 스레드 전용이다. 같은 실행의 종료 로그가 publish 64 / consume 3 / latest-wins 61 / overflow 61. ★ 이 한계를 제품 결함으로 오진한 적이 있다 — scene.switch로 씬을 열면 그 씬의 광원이 프록시에 안 잡히고 옛 씬 값이 남는 것을 씬 전환 시 광원 미등록으로 보고했는데, 새 광원의 RegisterCommand도 옛 광원의 UnregisterCommand도 같은 큐로 가므로 같은 한계의 두 얼굴이었다. 갈라 준 것은 enqueued/applied 한 쌍이다. 그래서 W2의 Light 게이트는 게임 스레드 쪽 사슬까지만 재고 마지막 한 칸을 파일 머리에 실측치와 함께 적어 뒀다. 이것이 서야 W4의 고쳤다가 관측 가능해진다." },
+  { phase: 9.5, id: "W6", title: "미러 커버리지 — 검사 없는 경계 계약 3종 + SerializeField 왕복",
+    detail: "ScriptLifecyclePhase · ScriptFieldType · ScriptMessage 배치는 C++와 C#이 손으로 맞춘 미러인데 게이트가 0건이다. 각각 대조를 세우고 변이로 이빨을 증명한다. SerializeField 7종 왕복도 실자산 저작본으로 게이트를 세운다.",
+    refs: "ScriptSurfacePlan.md §2 W6 · ClrHost.h", priority: "P2", days: 2, status: "todo",
+    note: "셋 다 ClrHost.h에 정의가 있고 주석만 'C#과 맞춰야 한다'고 적는다. 어긋나면: ScriptLifecyclePhase는 6단계 훅이 엉뚱한 단계로 불리고, ScriptFieldType은 SerializeField 값이 잘못된 타입으로 왕복하고, ScriptMessage 배치는 메시지 이름이 깨진다(W3이 필드를 더하면 더 위험해진다 — 그래서 W3의 결정이 이 항목보다 앞선다). ★ SerializeField 왕복 게이트도 없다: CaptureFields/RestoreFields가 7종 대칭인데 저작 자산에 직렬화된 값이 0건이라 실자산 왕복 전례가 없다. 저작분을 만들어 저장/로드 왕복을 재야 한다 — 배선을 만들었어도 저작분이 0이면 그 경로는 한 번도 돌지 않는다." },
+  { phase: 9.5, id: "W7", title: "문서 청산 — 폐기된 등급표와 뒤집힌 전제",
+    detail: "ScriptApiMigrationPlan.html §11의 T1~T4 등급표에 폐기 표시와 ScriptSurfacePlan.md 포인터를 박는다. 같은 문서의 'Transform은 컴포넌트가 아니다'와 BehaviorTreeManagedPlan.md의 BehaviourRegistry 지목을 정정한다.",
+    refs: "ScriptSurfacePlan.md §2 W7", priority: "P3", days: 1, status: "todo",
+    note: "§11의 등급표는 2026-07-29 시점 Dynamic_CPP\\Assets\\Script 코퍼스를 실측해 만든 것이다(GetComponent 734회·Transform 접근 1위·입력 43회 같은 숫자가 표면의 모양을 정했다). 그 코퍼스는 8ae17250에서 포팅 없이 통째로 삭제됐다(349파일·37,788줄 삭제·새 GameScripts 0건) — 기준이 사라졌는데 표가 남아 다음 작업자를 잘못 이끈다. 그 표가 '입력은 호출이 적어 단순 래핑으로 충분(T3)'이라 적은 것이 W3이 지금까지 열리지 않은 이유다. 'Transform은 컴포넌트가 아니다'는 트랙 L2가 닫힌 이틀 뒤 c9bbdd56(S1-b)에서 뒤집혔다. ★ 애니메이션의 SetBehaviour/CreateBehaviour 계열은 별개 체계라 개명 대상이 아니라는 경계를 함께 적는다 — 적어 두지 않으면 다음 스윕이 또 건드린다." },
+  { phase: 9.5, id: "W8", title: "디스패치 오버라이드 감지",
+    detail: "ScriptRegistry가 훅마다 _active 전체를 도는 구조를 마스크 기반으로 바꾼다. 네이티브 Lifecycle::MaskOfType<T>()가 선례이고, 관리 측은 타입당 1회 계산해 캐시하거나 ScriptGenerator가 마스크를 생성한다.",
+    refs: "ScriptSurfacePlan W8", priority: "P1", days: 1, status: "todo",
+    note: "지금도 낭비다 — override void PrePhysics는 0건인데 Component 파생 42개를 매 프레임 순회한다. 6단계 훅은 이미 static 람다인데 틱 훅만 dt를 캡처해 할당까지 붙는다. ★ NetworkFrameworkPlan N3의 선행: tick당 도는 OnSimulationTick을 감지 없이 더하면 30fps에서 프레임당 42→84회가 된다. ScriptRegistry.cs를 이 페이즈가 일관되게 소유하도록 PHASE 20에서 이관했다(2026-09-04)." },
+
   // ---------- PHASE 10: 파티클·이펙트 백지 재작성 (최후순위) ----------
   //
   // ★ 2026-08-08(사용자 판단): "이식하며 고친다"에서 "백지에서 새로 쓴다"로
@@ -1853,46 +1999,67 @@ const TASKS = [
     refs: "9-8 후속 · 045b0a56에서 발생", priority: "P1", days: 0.5, status: "done",
     note: "발단: NotifySceneUnload가 정의·선언·필수 바인딩까지 있는데 <b>호출자가 0개</b>였다. 이력을 보니 PHASE 9가 깬 것이 아니라 도입 커밋(045b0a56, 2026-07-31 CoreCLR 계층)부터 한 번도 불린 적이 없다 — 태어날 때부터 죽어 있었다. 필수 바인딩(실패 시 초기화 중단)이라 '중요해 보이는데 아무 일도 안 하는' 상태였다. ★ 계획대로 붙였으면 조용한 오작동이 됐다. sceneUnloadedEvent에 붙이는 것이 자연스러워 보이지만, 발화 지점 5곳 전부가 <code>Broadcast(); AllDestroyMark(); OnDisable(); OnDestroy();</code> 순서라 <b>파괴 앞</b>이다. 게다가 관리 측 OnSceneUnload가 부르던 Clear는 목록을 통째로 돌며 OnDisable·OnDestroy를 부르는데, Scene::AllDestroyMark가 <b>DontDestroyOnLoad를 건너뛰므로</b> DDOL 오브젝트의 스크립트는 파괴 표시조차 안 된 채 목록에 남아 있다 — 통째로 비우면 오브젝트는 살아서 다음 씬으로 가는데 스크립트만 죽는다. 크래시가 아니라 '저 오브젝트만 스크립트가 안 돈다'로 나타난다. ★ 그래서 형태를 바꿨다: Clear가 아니라 <b>SweepOrphans</b>(소유자가 죽은 것만 거둔다, 세대 핸들 비교라 슬롯 재사용에 속지 않음)이고, 이미 파괴 표시된 것은 건드리지 않는다(정상 경로가 Flush에서 OnDestroy를 부를 예정이라 두 번 불린다). 호출은 파괴 <b>뒤</b> 5곳(SceneManager 4 + PrefabEditor 1). Clear는 어셈블리 리로드 전용으로 용도를 좁히고 주석에 명시. ★ 실측: 씬 왕복 2회에 트리·스크립트 모두 기준선 복귀 — <b>누수가 애초에 없다</b>. 즉 이것은 청소부가 아니라 그물이고, 걸리면 로그를 남긴다. 그물이 실제로 던져지는지는 임시 무조건 로그로 확인(6회 발화 · 매번 0건) — 0건 로그는 함수가 도는지 모르면 아무 의미가 없다. ★ <b>조사 중 진짜 결함 발견</b>: ScriptAssemblyLoader.Unload가 BehaviourRegistry와 팩토리 표 3종은 비우면서 <b>BehaviorTreeRegistry를 빠뜨렸다</b>. 팩토리를 비우는 것은 '앞으로 만들지 않겠다'일 뿐, 이미 만들어진 노드 인스턴스가 스크립트 타입을 붙든다. A/B 실측 — 수정 없음: 리로드 후 트리 2개 잔존 · <b>이전 어셈블리 잔존(참조 누수)</b> / 수정 적용: 트리 0개 · 정리됨. 원 지시가 우려한 '어셈블리 언로드를 막는다'가 씬 언로드가 아니라 여기서 실제로 일어나고 있었다. ── 부수: 다른 세션 커밋 3128a48f가 DX12MeshCache.h·DX12TextureCache.h에서 HashedGuid를 include 없이 써서 빌드가 깨져 있었다(유니티 빌드가 전이로 공급하던 것). 검증이 막혀 TypeTrait.h include 2줄로 풀었다 — 이 커밋의 주제는 아니다." },
 
-  // ---------- PHASE 12: 빌드 파이프라인 신설과 계층 전면 개편 ----------
-  { phase: 12, id: "12-0", title: "B0 — 플레이어 재건 (유니티식 전환: TrainAsis·GameBuild.sln 제거)",
+  // ---------- PHASE 12: 텍스처 파이프라인 — 임포트 · cook · 런타임 소비 ----------
+  { phase: 12, id: "12-0", title: "T0 — 임포트 설정 어휘 (.meta importSettings)",
+    detail: "색공간(sRGB/Linear) · 압축(None/BC1/BC3/BC7/Auto) · 밉 생성 · 최대 크기 · wrap · filter · 노멀맵 여부를 자산마다 정한다. 지금 하드코딩된 compress=true(baseColorMap)를 이 설정으로 대체하고 에디터 인스펙터에서 편집한다. ★ 기본값은 기존 동작을 재현해야 한다 — baseColorMap 만 BC1_SRGB, 나머지 무압축. 그래야 T0 이 그림을 바꾸지 않는다.",
+    refs: "TexturePipelinePlan §5 T0", priority: "P0", days: 3, status: "todo",
+    note: "먼저인 이유: 없으면 T1 의 모든 정책이 코드에 박힌다. DataSystem::FinalizeMaterialRuntime 이 슬롯 이름으로 압축을 정하는 것이 그 증상이다. 미검증 전제 — .meta 스키마 확장이 기존 자산 583개의 재임포트를 요구하는지 확인하지 않았다." },
+  { phase: 12, id: "12-1", title: "T1a — cook 트랜스코딩 (TexturePipeline · TextureCodec.Stb · TextureCodec.Bc7Enc 신설)",
+    detail: "TextureCookProducer 가 pass-through 를 그만두고 굽는다. 처리 순서: 디코드 → 색공간 확정 → 리사이즈 → 밉 생성 → 채널 처리 → 압축. artifact 는 헤더(포맷·치수·밉·배열) + 서브리소스 바이트 — TextureImage 의 직렬화형이다. formatVersion 1 → 2. ITextureDecoder/ITextureEncoder 를 세우되 구현체는 실제로 도는 것만. ★ 압축을 한 함수(EncodeBlocks)로 가둬 T1b 의 교체가 그 함수 교체로 끝나게 한다.",
+    refs: "TexturePipelinePlan §5 T1a·§4", priority: "P0", days: 8, status: "todo",
+    note: "게이트: PNG 전수 A/B 바이트 대조(assets.decodeab) · 밉 체인 자기 대조(치수·바이트가 RHIFormatSlicePitch 와 일치). ★ <b>착수 조건이 해소됐다(2026-09-04)</b> — PNG 685장 전수 일치(픽셀 불일치 0 · 치수 불일치 0 · 실패 0). WIC 이 BGRA 로 낸 419장은 RGBA8 정규화 후, 나머지 266장은 원본끼리 비교했고 양쪽 다 일치했다(정규화가 결과를 만든 것이 아니다). ★ <b>다만 HDR 은 갈지 않는다</b> — 같은 측정에서 19장 전부 값이 달랐다(0.057617 vs 0.056641 = mantissa 1 차이 · 비율 59/58 로 일정 · 알파만 일치). RGBE 반올림 규약 차이이고, 밝기 0.86% 라 눈에는 안 띄지만 IBL 프리필터와 픽셀 골든이 깨진다. 잔여 미확인: bc7enc_rdo 의 vcpkg 포트 유무(없으면 ThirdParty 벤더링)." },
+  { phase: 12, id: "12-2", title: "T2 — 런타임 소비 전환 (artifact 직독 · 디코드 0)",
+    detail: "DataSystem 이 원본 PNG 대신 artifact 를 읽는다. 로드 = 파일 읽기 + 헤더 파싱. ★ 에디터는 원본 직독 경로를 남긴다 — 아직 안 구워진 자산도 보여야 하고 상용 엔진도 같다. 이 지점이 성능의 본체이고(5.34 → 0.6 ms/장), 게임 런타임의 코덱 0개도 여기서 자동으로 달성된다.",
+    refs: "TexturePipelinePlan §5 T2·§6", priority: "P0", days: 5, status: "todo",
+    note: "게이트: 런타임 → TextureCodec.* 간선 0 (CI 래칫) · artifact 로드 픽셀 = 원본 직독 픽셀. ★ dead-produce-only-pipeline 의 둘째 사례가 정확히 이 자리였다 — 'cooked 파이프라인은 지울 게 아니라 이을 것이었고, 잇는 순간 첫 소비에서 결함이 나왔다'. 잇는 슬라이스는 결함을 기대하고 들어간다." },
+  { phase: 12, id: "12-3", title: "T1b — DirectXTex 잔여 청산 · 압축기 재검토",
+    detail: "DDS 미니 파서(헤더 128B + 블록 데이터, ~100줄)로 마지막 DirectXTex 소비를 걷는다. BC7·BC5 도입 판단(품질)과 BC6H 판단(HDR 128MB 압축). 압축이 빌드 시간을 지배하기 시작하면 ISPC 재검토.",
+    refs: "TexturePipelinePlan §5 T1b·§4.4", priority: "P1", days: 4, status: "todo",
+    note: "stb_image 는 DDS 를 읽지 못한다(JPEG·PNG·TGA·BMP·PSD·GIF·HDR·PIC·PNM). 자산은 blueNoise.dds 하나뿐이지만 파서가 필요하다. ★ 압축 품질은 게이트가 못 잡는다 — BC1 이 BC7 보다 나쁜지는 사람이 화면을 봐야 한다." },
+  { phase: 12, id: "12-4", title: "T3 — 모바일 · Web (TextureCodec.Astc · .Basis)",
+    detail: "플랫폼별 압축 정책을 CompressionPolicy 에 넣는다 — Windows/Linux: Albedo BC7 sRGB · Normal BC5 Linear · ORM BC1/BC7 · HDR BC6H. Android/iOS: ASTC 전면. Web: KTX2 → Basis 트랜스코딩.",
+    refs: "TexturePipelinePlan §5 T3", priority: "P2", days: 10, status: "todo",
+    note: "★ 착수 조건이 붙는다 — 해당 플랫폼 타깃이 실제로 생겼을 때. 지금 vcxproj 는 Win32/x64 뿐이고 EXR 자산도 0개다(tinyexr 보류). 빈 프로젝트를 미리 만들면 그것이 곧 죽은 코드다. 확장 대비의 실체는 구현체가 아니라 ITextureEncoder 가 그 모양을 받아들이는가이고, 그것은 T1a 의 시그니처 설계로 충족된다." },
+  // ---------- PHASE 12.5: 빌드 파이프라인 신설과 계층 전면 개편 ----------
+  { phase: 12.5, id: "12.5-0", title: "B0 — 플레이어 재건 (유니티식 전환: TrainAsis·GameBuild.sln 제거)",
     detail: "가장 먼저이고 트랙 B 최대 슬라이스. 소생이 아니라 교체다. ① 런타임 모드 도입(EngineMode: Editor|Player — BUILD_FLAG 행동 가드 ~17곳 전환, 진입점에서 한 번·불변·assert) ② Player 프로젝트 신설(CreatorEngine.sln 소속, Debug/Release 라이브러리 링크, 전용 구성 없음. main은 Dx11Main 참조해 새로 쓰되 Dx11Main은 수정 안 함 — R5 충돌 회피. 명세: DX12 InitializeRuntime+SetRenderScene · 씬 델리게이트 2종 · ShaderSystem->Initialize · ClrHost+프레임별 TickScripts · ScreenResizeBus · WinProcProxy 드레인 · --smoke N. ImGuiRenderer는 얹지 않는 것이 기본) ③ TrainAsis·GameBuild.sln 삭제 + 참조 정리(build.yml·check_include_boundary.py) + TRAIN_ASIS 하드코딩 잠정 상수화 ④ 시작 씬 정합(EngineSettings.asset이 없는 씬을 가리킨다).",
     refs: "BuildPipelinePlan §2.0·§3 B0", priority: "P0", days: 4, status: "done",
     note: "완료(2026-08-10, 4커밋: e70d17e3 런타임 모드 · ca4a1635 Player 신설 · 0615fe7f TrainAsis 은퇴 · 00211d00 스모크 통과) — Player.exe --smoke 120이 pak 언팩 → Scene loaded(FT_Primitives) → 120프레임 렌더 → 정상 종료(종료 코드 0). §0의 '실행 가능한 게임을 만든 적 없다'가 처음 뒤집혔고, Player.exe는 첫 시도에 링크됐다(TrainAsis가 한 번도 못 간 지점). ── ★ 미답 경로의 첫 가동이 잡은 것: ① 구 GameApp의 BUILD_FLAG 전용 종료 절차 둘이 전부 결함이었다(한 번도 실행된 적 없던 코드) — DataSystems->Finalize()는 Destroy와 이중 해제(AV), 종료 시점 CleanupUnpackedGameAssets는 엔진 해체가 밟는 %TEMP% 트리를 먼저 지움(fail-fast). 정리를 다음 부팅의 언팩 직전으로 이전 — 크래시 잔재까지 치우는 종료 비의존 패턴. ② TrainAsis 삭제로 basename 모호성이 풀려 경계 게이트가 CoreWindow(UF)→EngineEntry/Resource.h 상향 간선을 적발 — 아이콘 ID를 생성자 인자로 역전. ── 표시 경로 정정: 초안의 'ImGui 미탑재'는 불가(비셸 DX11 publish 경로가 D4에서 사멸) — DX12 셸로 게임 카메라를 전체 화면 블릿, ImGui 완전 제거는 L2'+L4'. ── 남긴 발견: EngineSettings.asset이 *.asset gitignore 대상이라 시작 씬 정합이 로컬에만 있다(자가 생성 기본값 SampleScene도 실존하지 않음) — 프로젝트 설정의 저장소 진실 부재는 산성 테스트 v2의 구멍이고 L3'(Project.cproj)의 입력이다. game.pak CLI 신설(B2의 Pak 단계 입구). Package 출력(x64\\GameBuild\\)과 Unpackage 탐색(exe 옆)의 경로 불일치는 B2 Stage가 잇는다." },
-  { phase: 12, id: "12-1", title: "B1 — 빌드 기술 단일화 (구성 축소 + props 승격)",
+  { phase: 12.5, id: "12.5-1", title: "B1 — 빌드 기술 단일화 (구성 축소 + props 승격)",
     detail: "★ 방향이 초안과 반대 — 구성을 늘리는(GameDebug) 대신 줄인다: GameBuild 구성 제거(B0에서 소비자 소멸) · x86(Win32) 죽은 열 제거 · 공통 속성(PlatformToolset 52회 등)을 Directory.Build.props로 승격 · EngineOutput.props 흡수 은퇴. 디버깅 가능한 플레이어는 구성 신설이 아니라 Player의 Debug 라이브러리 링크로 자연 획득. 판정: 구성 매트릭스 {Debug,Release}×{x64}.",
     refs: "BuildPipelinePlan §2.2·§3 B1", priority: "P0", days: 2, status: "progress",
     note: "★ vcxproj 동시 편집 — 다른 세션과 충돌 가능한 전역 변경이라 착수 직전 HEAD 재대조. ── 부분 완료(2026-08-24, 458f824d): <b>GameBuild 구성 제거는 끝났다</b> — 실측하니 sln에 그 구성이 애초에 없어(Debug/Release뿐) vcxproj 10파일의 블록 92개(802줄)와 산출물 6디렉터리가 전부 죽은 잔재였고, 일괄 제거했다. 잔여: x86(Win32) 죽은 열(sln 50매치·vcxproj 13파일 실측)과 공통 속성 props 승격·EngineOutput.props 은퇴." },
-  { phase: 12, id: "12-2", title: "B2 — 오케스트레이터 (Tools/build.ps1 + MSBuild 기계 은퇴)",
+  { phase: 12.5, id: "12.5-2", title: "B2 — 오케스트레이터 (Tools/build.ps1 + MSBuild 기계 은퇴)",
     detail: "6단계((BuildNative)→BuildManaged→Cook→Stage→Pak→Verify)를 한 스크립트로 — 에디터 버튼과 CI가 같은 스크립트를 부르되, 에디터 버튼은 BuildNative를 건너뛴다(Player는 에디터와 함께 이미 빌드돼 있다). GameBuilderSystem은 호출+진행률 중계로 축소. ★ 에디터의 MSBuild 의존은 수리가 아니라 제거 — MSBuildHelper(315줄)·ExecuteVsWhere·MSBuild 경로 하드코딩 3벌이 소비자를 잃는다(잔여 소비자 확인 후). Verify는 종료 코드 + 로그 마커 이중 판정.",
     refs: "BuildPipelinePlan §2.3·§3 B2", priority: "P0", days: 2, status: "progress", earnedDays: 1.5,
     note: "부분 완료 — Tools/build.ps1의 6단계·원자 publish, Project/Workspace 입력, Editor game.pak 연동, MSBuildHelper/중복 toolchain 탐색 제거와 package smoke까지 완료했다. 잔여는 Tracked clean-checkout gate, 비동기 progress/cancel/timeout, forged pak·stage namespace·orphan GC hardening과 PHASE 22 뒤 FMOD-free Release다." },
-  { phase: 12, id: "12-3", title: "B3 — 셰이더 쿡 + 스테이징",
+  { phase: 12.5, id: "12.5-3", title: "B3 — 셰이더 쿡 + 스테이징",
     detail: "HLSLCompiler 재사용 헤드리스 쿡 도구(DX11 디바이스 의존 0건·컴파일 옵션 진실 한 벌 — 검증됨). cso를 Stage에 배치, 플레이어의 PrecompiledShaderPath를 스테이징 규약에 맞춤. 경로는 PathFinder에 기대지 않고 인자로(L3'보다 앞서므로). 판정: 패키지 첫 실행에서 셰이더 런타임 컴파일 0건.",
     refs: "BuildPipelinePlan §3 B3", priority: "P1", days: 2, status: "todo", note: "" },
-  { phase: 12, id: "12-4", title: "B4 — C# 빌드 편입 + Managed 배치",
+  { phase: 12.5, id: "12.5-4", title: "B4 — C# 빌드 편입 + Managed 배치",
     detail: "C# 빌드의 진실이 지금 Academy_4Q PreBuildEvent 4곳에 있다(에디터 빌드에만 묶임). build.ps1 단계와 에디터가 같은 정의를 쓰도록 공용 targets로 승격, PreBuildEvent 4중 복제 제거, Managed/를 Stage로.",
     refs: "BuildPipelinePlan §3 B4", priority: "P0", days: 1.5, status: "progress", earnedDays: 1,
     note: "부분 완료 — build.ps1이 ScriptCore→GameScripts 순서와 exact managed allowlist 배치를 소유하고 패키지에서 C# 초기화·시뮬레이션 smoke를 통과했다. 잔여는 CreatorEditor PreBuildEvent 복제를 공용 targets로 옮겨 Editor와 오케스트레이터가 같은 managed build 정의를 쓰게 하는 일이다." },
-  { phase: 12, id: "12-5", title: "B5 — CI 게임 레그",
+  { phase: 12.5, id: "12.5-5", title: "B5 — CI 게임 레그",
     detail: "선행 결정: FMOD 바이너리 공급 — (a) 사설 아티팩트/캐시 공급(권고) vs (b) 오디오 컴파일 아웃 스위치. 결정 후 build.yml에 build.ps1 -Target Game 레그 + 패키지 아티팩트. 판정: 산성 테스트 v2(클린 머신).",
     refs: "BuildPipelinePlan §3 B5 · AudioBackendModernizationPlan AU8/AU9", priority: "P1", days: 1.5, status: "blocked",
     note: "차단 — FMOD 바이너리를 CI에 별도 공급하거나 오디오를 compile-out하는 우회는 하지 않기로 결정했다. PHASE 22 AU8/AU9에서 FMOD를 제거하고 miniaudio를 정적으로 통합한 뒤 전체 build.ps1 게임 레그를 연다." },
-  { phase: 12, id: "12-6", title: "D — 죽은 가드 일소 (DYNAMICCPP_EXPORTS 187곳)",
+  { phase: 12.5, id: "12.5-6", title: "D — 죽은 가드 일소 (DYNAMICCPP_EXPORTS 187곳)",
     detail: "C++ 핫리로드 은퇴(9-4) 후 이 매크로를 정의하는 빌드가 0 — 187개 #ifndef 블록 전부가 상시 통과 래퍼. 184파일 접촉이라 동시 작업과 정면 충돌하는 종류 — 착수 직전 HEAD 재대조 → 한 커밋 단행 → 즉시 공유. 어느 트랙도 이것을 기다리지 않는다.",
     refs: "BuildPipelinePlan §3 D", priority: "P2", days: 1, status: "done",
     note: "완료(2026-08-24, aff87fe0 — E축 스윕에서 흡수): 170파일 373줄 한 커밋 단행. 상당수는 E3~E6 이동 슬라이스가 파일을 만질 때마다 함께 걷어 잔여가 계획 시점 187보다 줄어 있었다. LifecycleTrace.h의 #else 빈 스텁은 자기 주석('모듈이 은퇴하면 이 분기도 함께 사라진다')의 이행. 파일별 전처리 균형을 제거 전후 대조로 검증 — BOM 붙은 #ifndef를 정규식이 못 세는 함정이 있었다. 동류인 BUILD_FLAG(sln에 구성 자체가 없는 죽은 매크로)·무효화된 WITH_PROFILING도 같은 스윕(458f824d)에서 전멸 — 라이브러리 4종 소스의 BUILD_FLAG 잔여는 EngineMode.h의 설계 근거 주석뿐(실측)." },
-  { phase: 12, id: "12-7", title: "L2' — 에디터 적출 (구 L2 승계)",
+  { phase: 12.5, id: "12.5-7", title: "L2' — 에디터 적출 (구 L2 승계)",
     detail: "소슬라이스 7: ① ReflectionFunction.h의 무가드 imgui include 절단(Core.Minimal.h 경유 90여 파일 전이 — 숨은 의존의 가시화) ② 노드에디터 자료 분리(BT·애니메이터 4종 헤더) ③ Camera ImGui 폴백 6건(★5-2 C6과 같은 함수·다른 간선 — 별개 완료 조건) ④ DataSystem 분리(=5-3) ⑤ PrefabEditor 이주 ⑥ RenderEngine ImGui 잔여 3분류(디버그 오버레이는 R4·R5 뒤로) ⑦ EDITOR 매크로 정리. 판정: 엔진 라이브러리 4종의 ImGui include 0 · BUILD_FLAG 48→0 단조 감소.",
     refs: "BuildPipelinePlan §3 L2' · 구 EngineLayerSeparationPlan L2 → 현 E축", priority: "P1", days: 6, status: "done",
     note: "완료(2026-08-24) — EngineLayerSeparationPlan E축 재편이 이 항목을 흡수·완결했다. ★ 판정 기준 둘 다 실측 성립: 엔진 라이브러리 4종(Utility·Physics·RenderEngine·ScriptBinder) 소스의 ImGui include <b>0건</b>(잔여 매치는 x64\\ 산출물의 낡은 유니티 스텁뿐), BUILD_FLAG 실코드 <b>0</b>(EngineMode.h 설계 근거 주석만). 소슬라이스 매핑: ①ReflectionFunction.h 절단→E1-6(Undo 물리 이관, MakeCustomChangeCommand까지 에디터로 — Core 리플렉션이 Undo를 아는 마지막 지점 소멸) ②노드에디터 자료 분리→E3-5(Animation은 에디터 사이드 테이블, BT는 BTEditorBridge — PinId는 ID<<1 순수 유도로 리플렉션 필드 자체가 사라짐) ⑤PrefabEditor 이주→E3-4 ⑥RenderEngine ImGui 잔여→E4-6(셸 7파일을 HostImGuiPresentation.vcxproj로, Core는 IDisplayPresentationSink 역전 — RenderEngine→ImGuiHelper 참조 0) ⑦EDITOR 매크로→E3(EngineMode 가드는 Core에서 0, 정책은 호출자 부재로 보장). ── 초안의 '판정: BUILD_FLAG 48→0 단조 감소'는 실측이 뒤집었다: BUILD_FLAG는 도달 불가능한 죽은 매크로였다(GameBuild 구성이 sln에 없음) — 감소 추적이 아니라 일괄 등가 제거가 옳았다." },
-  { phase: 12, id: "12-8", title: "L3' — 게임 프로젝트화 (구 L3 승계)",
+  { phase: 12.5, id: "12.5-8", title: "L3' — 게임 프로젝트화 (구 L3 승계)",
     detail: "Project.cproj 도입 · PathFinder 역전(하드코딩 17곳이 작업 목록) · pak 이름 프로젝트화(TRAIN_ASIS 2곳 제거) · GameScripts 프로젝트 소속화. 판정: Dynamic_CPP를 다른 경로에 복사해 인자로 열어도 동일 동작.",
     refs: "BuildPipelinePlan §3 L3'", priority: "P1", days: 5, status: "todo", note: "" },
-  { phase: 12, id: "12-9", title: "L4' — 공통 부트 추출",
+  { phase: 12.5, id: "12.5-9", title: "L4' — 공통 부트 추출",
     detail: "B0가 새로 쓴 Player main과 Dx11Main의 중복을 공용 런타임 부트 한 벌로 추출 — 에디터/플레이어는 각자의 창·GUI 어댑터만 얹는다. L2'가 라이브러리 내부 ImGui를 걷은 뒤이므로 완료 기준 '플레이어 ImGui 심볼 0'이 여기서 닫힌다. Dx11Main 수정이 커서 R5(구 RHI 은퇴)가 그 파일을 정리한 뒤로.",
     refs: "BuildPipelinePlan §3 L4' → 현 EngineLayerSeparationPlan E1·E6", priority: "P1", days: 3, status: "done",
     note: "완료(2026-08-24) — E축이 실현했다. Dx11Main은 소멸(파일 부재 실측)했고 공용 부트 한 벌은 <b>EngineBootstrap.h</b>(264줄, 헤더 온리)로 실존 — EditorMain과 PlayerMain이 같은 include로 공유하고 각자의 창·어댑터만 얹는다(E6-2 실측: HostRuntime.vcxproj 신설은 speculative generality라 만들지 않음). ★ 완료 기준 정정: '플레이어 ImGui 심볼 0'은 B0 note의 설계 변경(DX12 셸로 게임 카메라 전체 화면 블릿)으로 무효 — Player는 HostImGuiPresentation 셸을 정식 최소 소비한다(Initialize/일치 가드/Begin/End/Shutdown, ImGuiRegister 펌프·Win32 입력 없음). 실제로 닫힌 경계는 <b>Player→에디터 층(EditorRuntime·EditorUI·EditorRender) 프로젝트 참조 0</b>이고, 마지막 1건(Player→ImGuiHelper — ScriptBinder의 Profiler.h 링크 의존)도 14-1 P1a(수집 코어의 EngineDiagnostics 이관, 2026-08-24)가 닫아 Player의 에디터 계열 참조가 전무해졌다." },
-  { phase: 12, id: "12-10", title: "L5' — 저장소 재편 (선택 · 마지막)",
+  { phase: 12.5, id: "12.5-10", title: "L5' — 저장소 재편 (선택 · 마지막)",
     detail: "Engine/ · Editor/ · Projects/ git mv(구 L4-2 승계). 5-5가 실측해 둔 함정(경로 없는 include 약 1,000곳) 흡수. 착수 조건 셋: L2'~L4' 완료 · 동시 세션 없음 · 하루 통짜. 이것 없이도 나머지 가치는 전부 성립 — 무기한 미뤄도 된다.",
     refs: "BuildPipelinePlan §3 L5' · 대시보드 5-5 · EngineLayerSeparationPlan E7", priority: "P3", days: 2, status: "done",
     note: "완료(2026-08-24, E7-a/b/c 3커밋) — <b>Engine\\ 5 · Editor\\ 6 프로젝트 물리 재배치 + sln 가상 폴더 + CreatorEditor 개명</b>(구 Academy_4Q — 이름 3중 분열 해소). ★ 5-5가 실측한 '경로 없는 include 약 1,000곳' 함정의 실체: bare include는 vcxproj /I 갱신이 전부 흡수하고, 프로젝트 간 상대 include 55건도 같은 그룹 이웃이면 그대로 산다 — 실제 소스 재작성은 그룹 경계를 넘는 <b>5건</b>뿐이었다. ★ 새 함정 둘: sln 폴더에 중첩된 프로젝트는 MSBuild 타깃이 '폴더\\이름'이 된다(CI $targets·build.ps1 갱신, 이후 수동 빌드는 /t:Editor\\CreatorEditor 형식) · Directory.Build.props 시점에 $(ProjectName)은 미정의라 $(MSBuildProjectName)을 써야 한다(전 lib obj가 한 솥에 섞일 뻔). 함께 산출물 규약화(Build\\Obj·Build\\Lib 격리, exe는 EngineOutDir 단일 진실로 위치 불변 — 게이트 32파일 무변경)와 filters 정리(빈 필터 24 제거·정렬). 검증: 빌드 5레그·래칫 0/0·회귀 세트·dx12 스위트 기준선 일치. 잔여였던 재명명 중 ScriptBinder→SceneRuntime은 E7-e로 완료(2026-08-24, GUID 불변·검사기 키·게이트 10파일·CI 스윕 — 그 과정에서 부재 단정이 빈 집합 위에서 돌던 게이트 2건 추가 적발·정정), RenderEngine→RenderCore만 남았다(즉시 가능 — 계획서 E7 잔여 총괄)." },
@@ -1985,9 +2152,9 @@ const TASKS = [
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 2, status: "done",
     note: "parser golden 117줄/16케이스, invocation 회귀 통과. 정수 스키마에서 분수·범위 초과를 거부한다." },
   { phase: 14.5, id: "LC3", title: "제품·검증 registry와 discovery",
-    detail: "Editor 제품 98개/105이름, Player 7개, Commandlet 100+3개를 별도 표면으로 제공한다.",
+    detail: "Editor 제품 99개/106이름, Player 7개, Commandlet 104+3개를 별도 표면으로 제공한다.",
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 2.5, status: "done",
-    note: "named JSON 입력 58개, Undo 선언 21개. Commandlet은 HTTP·일반 batch에 부재. 명령 도표는 docs/analysis/CommandSurfaceTable.md." },
+    note: "named JSON 입력 59개, Undo 선언 21개. Commandlet은 HTTP·일반 batch에 부재. 명령 도표는 docs/analysis/CommandSurfaceTable.md." },
   { phase: 14.5, id: "LC4", title: "로컬 HTTP/JSON 서비스",
     detail: "명시적 활성화, loopback, 토큰, 요청 크기·형식 검증과 감사 경로를 제공한다.",
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 3, status: "done",
@@ -2011,7 +2178,7 @@ const TASKS = [
   { phase: 14.5, id: "LC9", title: "소비자 이관과 최종 계약 검증",
     detail: "사람용 verdict와 소스 기반 명령 존재 판정을 제거하고 JSON 결과와 현재 실행 증거로 판정한다.",
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 2.5, status: "progress",
-    note: "제품 결과 이행·한국어 verdict 13→0·명령 소스 존재 6→0·미보고 어댑터 제거 및 자동 계약 검증 완료. Debug 281/Release 280, HTTP 재질 포함 236단정 통과. 지연 100회 p50/p95/p99=3.84/4.74/5.02ms. 전체 페이즈 종결은 GUI 수동 및 canonical 성능 회귀 확인까지 보류한다. 상세 증거: docs/analysis/Phase14_5Closure.md." },
+    note: "제품 결과 이행·한국어 verdict 13→0·명령 소스 존재 6→0·미보고 어댑터 제거 및 자동 계약 검증 완료. 통합 전 Debug 281/Release 280, HTTP 재질 포함 236단정 통과. master 병합 후보 재검증은 analysis/Phase14_5MergePreparation.md. 지연 100회 p50/p95/p99=3.84/4.74/5.02ms. 전체 페이즈 종결은 GUI 수동 및 canonical 성능 회귀 확인까지 보류한다. 상세 증거: docs/analysis/Phase14_5Closure.md." },
 
   // ---------- PHASE 15: 유틸리티 프레임워크 현대화 ----------
   // 신설(2026-08-14). 설계: UtilityFrameworkModernizationPlan.md. 공수는 계획 추정치.
@@ -2202,41 +2369,65 @@ const TASKS = [
 
   // ---------- PHASE 20: 네트워크 준비형 런타임 ----------
   // 공수는 dashboard 초기 추정치다. NetworkFrameworkPlan N0 기준선 뒤 갱신한다.
+  //
+  // 소유 구간(설계 문서 §6.3, 2026-09-04 사전 정찰):
+  //   A = 위임 가능(값 경계에서 닫힘) · B = 사내 필수 · C = 계약은 사내, 알고리즘만 위임
+  // 소유는 두 구간뿐이다(§6.5 2판) — 사내가 1회 세우는 것(ND-a·ND-b·N3·N1)과
+  // 담당자가 전량 소유하는 것(N0·N2·N4·N5·N6·N7·N10). 1판의 C 구간(계약은 사내,
+  // 알고리즘만 위임)은 확장점 2종으로 해소됐다. 헤드리스 테스트 호스트는 담당자의
+  // 개발 루프이므로 담당자가 만든다 — 사내는 SceneRuntime이 렌더 없이 서는지만 본다.
+  { phase: 20, id: "ND-a", title: "계약 헤더 6종 동결 · 변경 절차 · 경계 게이트",
+    detail: "NetWireIds·INetworkTransport·NetProtocolHeader·INetChannelPolicy·INetTelemetrySink·INetworkEntityRegistry를 동결하고 wire ID tombstone 규율을 문서로 고정한다. 사내가 소유하는 유일한 게이트 verify-net-wire-boundary(금지 타입 canary 포함)를 변이로 증명해 run-all에 배선한다.",
+    refs: "NetworkFrameworkPlan §6.4·§6.6", priority: "P0", days: 2, status: "todo",
+    note: "사내 1회 — N4 발주를 여는 열쇠다. quantizer·snapshot 배치·backpressure 임계(헤더 8·9·10)는 N0 계측 전에 정하지 않는다 — 추정을 계약으로 굳히지 않는다. 공수 근거: 기존 인터페이스·정책 헤더가 19~429줄(중앙값 ~160)이고 절반 이상이 주석이다. 추정치이며 착수 뒤 실측으로 갱신한다." },
+  { phase: 20, id: "ND-b", title: "확장점 2종 — 엔티티 수명 · 쓰기 dirty",
+    detail: "ISceneEntityObserver를 Scene::AllocateSlot/ReleaseSlot과 DDOL 이송 경로에, IComponentWriteObserver를 Component::OnPropertyChanged의 X8 writer boundary에 붙인다. 담당자가 Scene.cpp를 한 번도 열지 않고 N2·N5·N6를 끝낼 수 있게 만드는 것이 판정 기준이다.",
+    refs: "NetworkFrameworkPlan §6.3·§6.6", priority: "P0", days: 2.5, status: "todo",
+    note: "사내 1회 — 이것이 서면 C 구간이 사라지고 전량 이양이 닫힌다. ★ 선행 PHASE 9.5 W4(저작 dirty 통로): 2026-09-04 재실측 결과 OnPropertyChanged를 부르는 곳은 ReflectionTypedYml(직렬화)뿐이고 ReflectionTypedDraw(인스펙터)에는 0건이라 저작 축에 통로 자체가 없다. W4가 통로를 세워야 그 위에 관찰자를 분기할 수 있다. 엔티티 수명 쪽 자리는 실측 확인됨(슬롯 호출부 13건 전부 Scene 내부)." },
   { phase: 20, id: "N0", title: "기준선·금지 타입·telemetry 실패 게이트",
     detail: "frame/physics tick, Entity/Component 변화량을 계측하고 EntityHandle·HashedGuid·YAML/JSON Node의 wire 유입을 실패시킨다. packet/encode/alloc/queue/drop 공통 telemetry를 먼저 세운다.",
-    refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo",
+    note: "담당자 전량 — telemetry 값 타입과 계측이라 값 경계에서 닫힌다. 여기서 나온 실측으로 사내가 헤더 8·9·10(quantizer·snapshot 배치·backpressure 임계)을 동결한다." },
   { phase: 20, id: "N1", title: "Archive·Parser 경계 밀봉",
-    detail: "format-neutral schema 위에 Authoring/Cooked archive를 분리하고 Runtime/NetCore 후보 헤더의 yaml-cpp·nlohmann 의존을 제거한다.",
-    refs: "NetworkFrameworkPlan N1", priority: "P0", days: 4, status: "todo", note: "" },
+    detail: "format-neutral schema 위에 Authoring/Cooked archive를 분리하고 Runtime/NetCore 후보 헤더의 yaml-cpp·nlohmann 의존을 제거한다. 남은 것은 이 판정을 회귀 세트에 배선해 되돌아가지 않게 만드는 일이다.",
+    refs: "NetworkFrameworkPlan N1", priority: "P0", days: 0.5, status: "progress",
+    note: "사내 — 2026-09-04 재실측으로 판정 조건이 이미 참이다. PHASE 17 D3/D4가 닫았다: yaml-cpp include 0, nlohmann 0, SceneRuntime의 ryml include 0, ComponentFactory 인자는 Authoring::NodeView. 구현 슬라이스가 아니므로 공수를 4일→0.5일로 낮췄다(게이트 배선분)." },
   { phase: 20, id: "N2", title: "Network ID와 schema 정본",
     detail: "NetworkObjectId·고정폭 type/field ID·tombstone registry와 replicated schema validation을 만든다. DDOL/scene transfer/destroy의 Bind·Rebind·Unbind 순서를 검증한다.",
-    refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo", note: "" },
-  { phase: 20, id: "N3", title: "Fixed Simulation Clock",
-    detail: "render clock과 simulation clock을 분리하고 accumulator/catch-up/pause/scene-switch 규칙을 Editor·Player·Server 공통 driver로 만든다.",
-    refs: "NetworkFrameworkPlan N3", priority: "P0", days: 4, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo",
+    note: "담당자 전량 — ND-b의 ISceneEntityObserver 위에서 구현하므로 Scene.cpp를 열지 않는다(1판에서는 이 항목이 C 구간이었다). ComponentTypeUUID::kTable 32종이 리네임 불변 규율을 이미 갖고 있어 새로 만들지 말고 재료로 쓴다." },
+  { phase: 20, id: "N3", title: "Fixed Simulation Clock + OnSimulationTick",
+    detail: "render clock과 simulation clock을 분리하고 §4.4의 루프 안/밖 배치를 구현한다. 고정 축 전용 관리 훅 OnSimulationTick(fixedDelta)을 배선 6곳으로 신설하고, Scope.Tick을 고정 축으로 옮기며, OnTickCommitted 확장점을 같은 파일에서 함께 심는다.",
+    refs: "NetworkFrameworkPlan N3 · §4.4", priority: "P0", days: 4, status: "todo",
+    note: "사내 · PHASE 20 위임 범위 밖 · ★ 선행 PHASE 9.5 W8(디스패치 오버라이드 감지) — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. ★ 2026-09-04 생명주기 실측으로 1판 설계를 정정했다: Initialization은 비동기 씬 활성화를 폴링하고 GameLogic은 UpdateRenderData로 끝나므로 둘 다 tick 루프에 못 들어간다. 기존 PrePhysics/PostPhysics도 프레임 축에 남긴다 — FlushAniEvents가 AnimatorSystem 결과에 의존하기 때문이다. override void PostPhysics 17건은 필요한 것부터 점진 이주하며 이주는 완료 조건이 아니다. ★ 작업량의 본체는 누산기가 아니라 CCT 등 스텝당 단위 저작값 재보정과 렌더 보간 신설(배관 0건)이다." },
   { phase: 20, id: "N4", title: "Loopback Transport와 메시지 프레이밍",
     detail: "message-oriented INetworkTransport, bounded reader/writer, handshake와 loss/reorder/duplicate/corruption simulator를 실제 socket 없이 완결한다.",
-    refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo",
+    note: "담당자 전량 · ND-a 직후 첫 발주 — 소켓 없는 메모리 어댑터라 값 in/값 out으로 닫힌다. N3를 기다리지 않는다. 헤드리스 개발 하네스도 담당자가 소유한다." },
   { phase: 20, id: "N5", title: "Spawn/Despawn과 Full Snapshot",
     detail: "server-authoritative lifecycle과 immutable full snapshot, interpolation buffer를 Loopback 2-peer에서 검증한다. stale snapshot은 개체를 부활시키지 못해야 한다.",
-    refs: "NetworkFrameworkPlan N5", priority: "P0", days: 5, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N5", priority: "P0", days: 5, status: "todo",
+    note: "담당자 전량 — N3가 심는 ISimulationFrameObserver::OnTickCommitted 위에서 capture하므로 tick 루프를 열지 않는다(1판에서는 이 항목이 C 구간이었다)." },
   { phase: 20, id: "N6", title: "Dirty Delta·Quantization·Interest",
     detail: "revision/dirty mask, acknowledged baseline, 실측 quantizer와 최소 interest grid로 full snapshot 대비 bytes/tick·encode·allocation을 줄인다.",
-    refs: "NetworkFrameworkPlan N6", priority: "P1", days: 5, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N6", priority: "P1", days: 5, status: "todo",
+    note: "담당자 전량 — ND-b의 IComponentWriteObserver 위에서 dirty를 받는다(1판에서는 이 항목이 C 구간이었다). 쓰기 배관은 X8 writer boundary로 이미 서 있어 새로 만들지 않는다." },
   { phase: 20, id: "N7", title: "실제 Transport A/B 판정과 adapter",
     detail: "동일 N6 workload로 GNS/ENet 후보를 비교하고 선택 근거를 기록한다. 구체 library API는 NetCore 경계 밖 adapter에 가둔다.",
-    refs: "NetworkFrameworkPlan N7", priority: "P1", days: 3, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N7", priority: "P1", days: 3, status: "todo",
+    note: "담당자 전량 — INetworkTransport 뒤의 구현 교체다. vcpkg.json 편집과 패키징 판정만 사내가 대행한다(의존 매니페스트는 저장소 소유)." },
   { phase: 20, id: "N8", title: "Client Prediction·Reconciliation (선택)",
     detail: "gameplay 요구가 확정될 때만 locally-owned movement를 tick-keyed history로 rewind/replay한다. 요구가 없으면 전체 완료 조건이 아니다.",
     refs: "NetworkFrameworkPlan N8", priority: "P2", days: 4, status: "stopped",
-    note: "중단 — gameplay 요구가 확정되지 않았고 계획 원문도 전체 완료 조건에서 제외한다. locally-owned movement와 허용 오차가 제품 요구로 정해질 때 별도 슬라이스로 재개한다." },
+    note: "담당자 전량(요구 확정 시) · 중단 — gameplay 요구가 확정되지 않았고 계획 원문도 전체 완료 조건에서 제외한다. locally-owned movement와 허용 오차가 제품 요구로 정해질 때 별도 슬라이스로 재개한다." },
   { phase: 20, id: "N9", title: "Headless Server target (선택 제품)",
     detail: "Editor/ImGui/RenderCore/authoring parser 없이 cooked content와 공통 simulation tick으로 2-client smoke를 통과한다. 제품 요구가 있을 때 착수한다.",
     refs: "NetworkFrameworkPlan N9", priority: "P2", days: 5, status: "stopped",
-    note: "중단 — dedicated/headless 제품 요구가 없으므로 현재 네트워크 기반의 완료 조건에서 제외한다. 서버 배포 모델과 운영 요구가 확정되면 새 제품 타깃으로 재개한다." },
+    note: "사내 — .sln·vcxproj·링크 경계 수술이다. 중단 — dedicated/headless 제품 요구가 없으므로 현재 네트워크 기반의 완료 조건에서 제외한다. 서버 배포 모델과 운영 요구가 확정되면 새 제품 타깃으로 재개한다." },
   { phase: 20, id: "N10", title: "Hardening·관측·soak",
     detail: "bounds/authority/rate limit, queue backpressure, disconnect/shutdown 순서, 장시간 soak와 운영 telemetry를 완결한다.",
-    refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo", note: "" },
+    refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo",
+    note: "담당자 전량 — fuzz corpus와 soak 자동화는 독립 산출물이다." },
 
   // ---------- PHASE 21: 에디터 워크스페이스·도킹·ViewportHost ----------
   { phase: 21, id: "W0", title: "관측 표면·기준선·실패 게이트",
@@ -2325,7 +2516,7 @@ const TASKS = [
     detail: "서명 channel metadata와 hash/signature 검증, backup→dry-run→migrate→commit project 전환을 구현해 변조와 실패·취소·crash를 안전하게 복구한다.",
     refs: "EngineDistributionAndLauncherPlan DL7", priority: "P0", days: 4, status: "todo", note: "" },
   { phase: 23, id: "DL8", title: "Launcher build/cook 연동",
-    detail: "PHASE 12 orchestrator에 descriptor adapter와 machine-readable progress/cancel을 추가하고 Launcher와 CLI의 package manifest/content digest를 일치시킨다.",
+    detail: "PHASE 12.5 orchestrator에 descriptor adapter와 machine-readable progress/cancel을 추가하고 Launcher와 CLI의 package manifest/content digest를 일치시킨다.",
     refs: "EngineDistributionAndLauncherPlan DL8", priority: "P1", days: 4, status: "todo", note: "" },
   { phase: 23, id: "DL9", title: "clean-VM E2E·다중 프로젝트/버전·watch soak",
     detail: "install→create/import→open→asset/audio change→build→repair→update→rollback→uninstall과 Unicode/long path, 2 project, WAV/MP3/FLAC smoke, 32 root, overflow/crash soak를 자동화한다.",
@@ -2561,7 +2752,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 14.5: "라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어)", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 9.5: "스크립트 표면 재설계 (C# 계층 기준 재수립)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "텍스처 파이프라인 (임포트·cook·런타임 소비)", 12.5: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 14.5: "라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어)", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨", stopped: "중단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked", stopped: "st-stopped" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0, stopped: 0 };

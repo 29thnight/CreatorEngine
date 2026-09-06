@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	98
-# names	105
+# commands	99
+# names	106
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -31,6 +31,7 @@ help	-	immediate	both	engine_service	live	no	yes	[명령]	명령 목록 또는 �
 lifecycle.dump	-	immediate	editor	engine_service	live	no	yes	[파일]	기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)
 lifecycle.registry	-	frames	editor	engine_service	live	no	yes	-	생명주기 등록 수와 대기 중인 초기화 수를 조회한다
 lifecycle.trace	-	frames	editor	engine_service	live	no	yes	on [틱프레임]|off|clear|status	생명주기 호출 순서를 받아 적는다
+light.proxy	-	frames	editor	engine_service	live	no	yes	-	Read live light proxy values and publication counters
 log.flush	-	immediate	editor	engine_service	live	no	yes	-	로그를 디스크에 즉시 반영
 mem.delta	-	immediate	editor	engine_service	live	no	yes	[라벨]	기준선 대비 CRT 블록·바이트 증감(기준선이 없으면 지금을 기준선으로 삼는다)
 mem.hook	-	immediate	editor	engine_service	live	no	yes	on|stack|off|top|status	CRT 할당 훅 — 호출 계수, stack 은 귀속까지(디버그 CRT 전용)

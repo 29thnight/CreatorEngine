@@ -11,7 +11,7 @@ class Component;
 // 명시 구독화).
 //
 // 예전에는 Scene이 std::vector<Component*> 여섯 개를 직접 멤버로 들고 있었다
-// (m_pendingAwake·m_pendingStart·m_updateList·m_lateUpdateList·
+// (옛 이름으로 m_pendingAwake·m_pendingStart·m_updateList·m_lateUpdateList·
 // m_fixedUpdateList·m_destroyWatchList). 그 여섯이 여기로 옮겨 왔었다(C1).
 //
 // 그중 셋(m_updateList·m_lateUpdateList·m_fixedUpdateList)은 트랙 C3가
@@ -22,17 +22,17 @@ class Component;
 // (Scene::GetRegistryCounts·FireReentrancyStress의 로그) 둘뿐이었고, 그
 // 진단이 세던 것도 결국 "아무도 안 쓰는 리스트의 크기"였다. 옛 RegistryTick도
 // 그 시점에 소멸했다(3d8ff9a4) — 그래서 트랙 C3 완결에 맞춰 이 셋을 여기서
-// 철거한다. 남은 셋(PendingAwake·PendingStart·DestroyWatch)은 지금도
+// 철거한다. 남은 셋(PendingInitialize·PendingSimulation·DestroyWatch)은 지금도
 // RegisterComponent/UnregisterComponent가 실제로 쓴다.
 //
-// 실행 순서(어느 페이즈를 언제 도는가)는 여전히 Scene::Awake/FixedUpdate/
-// Update/LateUpdate/FlushPendingDestroy의 호출 순서가 정한다 — 이 타입은
+// 실행 순서(어느 페이즈를 언제 도는가)는 여전히 Scene::DrainPendingLifecycle/
+// FixedUpdate/Update/LateUpdate/FlushPendingDestroy의 호출 순서가 정한다 — 이 타입은
 // "무엇을 들고 있는가"만 관리하고 "언제 도는가"는 건드리지 않는다
 // (회귀 세트 생명주기 순서 92 사건 불변이 이 슬라이스의 절대 게이트다).
 class SystemSchedule
 {
 public:
-    // Scene 내부의 세 리스트에 대응한다 — PendingAwake·PendingStart는 지연
+    // Scene 내부의 세 리스트에 대응한다 — PendingInitialize·PendingSimulation은 지연
     // 편입 큐, DestroyWatch는 파괴 감시 목록이다. Update/LateUpdate/
     // FixedUpdate는 트랙 C3 완결로 철거했다(위 클래스 주석 참고) — 네이티브
     // 컴포넌트의 프레임 틱은 이제 이 타입을 거치지 않고 전용 시스템의 조밀
@@ -48,27 +48,27 @@ public:
     // 오히려 틀린 모델이 된다.
     enum class Phase : uint8_t
     {
-        PendingAwake,
-        PendingStart,
+        PendingInitialize,
+        PendingSimulation,
         DestroyWatch,
     };
 
     // ── 저장소 접근 ──
     //
-    // 기존 RegistryDrainAwakeAndStart/FlushPendingDestroy가 swap·인덱스 순회로
-    // 벡터를 직접 다루던 자리는 그대로 Scene.cpp에 남는다 — 여기서는 그 벡터가
-    // 사는 자리만 옮겼다. 재진입 안전을 위한 swap
-    // (예: `awaking.swap(m_schedule.PendingAwakeList())`)도 그대로 성립한다.
+    // 드레인(Scene::DrainPendingPhases)과 FlushPendingDestroy가 swap·인덱스
+    // 순회로 벡터를 직접 다루던 자리는 그대로 Scene.cpp에 남는다 — 여기서는 그
+    // 벡터가 사는 자리만 옮겼다. 재진입 안전을 위한 swap
+    // (예: `initializing.swap(m_schedule.PendingInitializeList())`)도 그대로 성립한다.
     // UpdateList/LateUpdateList/FixedUpdateList는 트랙 C3 완결로 철거했다 —
     // 옛 RegistryTick이 이 자리에서 그 셋을 순회하며 컴포넌트의 가상 Update/
     // LateUpdate/FixedUpdate를 불렀는데, RegistryTick 자체가 소멸하며(위 클래스
     // 주석 참고) 이 접근자들도 부를 곳이 없어졌다.
-    std::vector<Component*>& PendingAwakeList() { return m_pendingAwake; }
-    std::vector<Component*>& PendingStartList() { return m_pendingStart; }
+    std::vector<Component*>& PendingInitializeList() { return m_pendingInitialize; }
+    std::vector<Component*>& PendingSimulationList() { return m_pendingSimulation; }
     std::vector<Component*>& DestroyWatchList() { return m_destroyWatchList; }
 
-    const std::vector<Component*>& PendingAwakeList() const { return m_pendingAwake; }
-    const std::vector<Component*>& PendingStartList() const { return m_pendingStart; }
+    const std::vector<Component*>& PendingInitializeList() const { return m_pendingInitialize; }
+    const std::vector<Component*>& PendingSimulationList() const { return m_pendingSimulation; }
     const std::vector<Component*>& DestroyWatchList() const { return m_destroyWatchList; }
 
     // ── 명시 구독 API (트랙 L4 정본) ──
@@ -112,8 +112,8 @@ public:
 private:
     std::vector<Component*>& ListFor(Phase phase);
 
-    std::vector<Component*> m_pendingAwake;
-    std::vector<Component*> m_pendingStart;
+    std::vector<Component*> m_pendingInitialize;
+    std::vector<Component*> m_pendingSimulation;
     std::vector<Component*> m_destroyWatchList;
 
     // 컴포넌트별 편입 경로. UnsubscribeAll에서 어느 카운터를 줄일지 여기서
@@ -152,15 +152,15 @@ inline std::vector<Component*>& SystemSchedule::ListFor(Phase phase)
 {
     switch (phase)
     {
-    case Phase::PendingAwake:  return m_pendingAwake;
-    case Phase::PendingStart:  return m_pendingStart;
+    case Phase::PendingInitialize:  return m_pendingInitialize;
+    case Phase::PendingSimulation:  return m_pendingSimulation;
     case Phase::DestroyWatch:  return m_destroyWatchList;
     }
     // 전 열거값을 위에서 다뤘다 — 여기 닿으면 새 Phase가 추가되고 이 switch가
     // 안 갱신된 것이다(Update/LateUpdate/FixedUpdate는 트랙 C3 완결로 철거했다
     // — 위 클래스 주석 참고). 크래시 대신 방어적으로라도 값을 돌려줘야 컴파일이
     // 성립하므로 첫 리스트로 고정한다.
-    return m_pendingAwake;
+    return m_pendingInitialize;
 }
 
 inline void SystemSchedule::Subscribe(Component* component, Phase phase)
@@ -187,8 +187,8 @@ inline void SystemSchedule::UnsubscribeAll(Component* component)
 {
     if (nullptr == component) return;
 
-    SystemSchedule_Internal::RemoveFromList(m_pendingAwake, component);
-    SystemSchedule_Internal::RemoveFromList(m_pendingStart, component);
+    SystemSchedule_Internal::RemoveFromList(m_pendingInitialize, component);
+    SystemSchedule_Internal::RemoveFromList(m_pendingSimulation, component);
     SystemSchedule_Internal::RemoveFromList(m_destroyWatchList, component);
 
     m_implicitOrigin.erase(component);
@@ -202,8 +202,8 @@ inline SystemSchedule::SubscriptionCounts SystemSchedule::GetSubscriptionCounts(
 
 inline void SystemSchedule::Clear()
 {
-    m_pendingAwake.clear();
-    m_pendingStart.clear();
+    m_pendingInitialize.clear();
+    m_pendingSimulation.clear();
     m_destroyWatchList.clear();
 
     m_implicitOrigin.clear();

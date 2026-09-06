@@ -552,7 +552,7 @@ void Player::PlayerMain::Update()
 			+ std::to_string(gameDisplay.completedFrameId) + ", promotions "
 			+ std::to_string(gameDisplay.promotionCount) + ")");
         std::printf("[player.smoke] {\"schemaVersion\":1,\"ready\":%s,\"registeredScriptTypes\":%zu,\"frames\":%llu,\"displayPromotions\":%llu}\n",
-            ClrHost::Get().IsReady() ? "true" : "false", ClrHost::Get().GetBehaviourTypeNames().size(),
+            ClrHost::Get().IsReady() ? "true" : "false", ClrHost::Get().GetComponentTypeNames().size(),
             static_cast<unsigned long long>(Time->GetFrameCount()), static_cast<unsigned long long>(gameDisplay.promotionCount));
 		EmitTextParseTelemetry();
 		PostMessage(handle, WM_CLOSE, 0, 0);

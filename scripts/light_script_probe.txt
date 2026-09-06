@@ -1,0 +1,69 @@
+# Light 래퍼 회귀 (W2).
+#
+# 사용법:
+#   CreatorEditor.exe --script ..\..\scripts\light_script_probe.txt
+#   (Tools\regression\verify-light-script.ps1 이 이 파일을 부른다)
+#
+# ── 무엇을 재현하는가 ──
+#
+# 저작 자산에 LightComponent가 30개 있는데 스크립트가 만질 길이 없었다.
+# W2에서 Light 래퍼를 열었고, 이 시나리오가 그 경계를 실제로 태운다.
+#
+# ── 왜 프록시까지 봐야 하는가 ──
+#
+# 엔진은 광원 값을 LightRenderProxy에 복사해 두고 렌더는 그 프록시만 읽는다.
+# 프록시 갱신은 Scene::CommitRenderProxies가 하는데 dirty 큐에 실린 것만 훑는다.
+# 그래서 값을 넣는 쪽이 dirty를 발행하지 않으면 화면이 그대로인데,
+# **스크립트가 값을 되읽으면 새 값이 나온다** — 컴포넌트 필드는 바뀌었으니까.
+#
+# 그래서 스크립트 자기 판정(LightScriptProbe)만으로는 절반이다. light.proxy로
+# dirty가 실제로 섰는지 따로 봐야 그 사슬이 증명된다.
+#
+# ── 왜 저작 씬을 열지 않는가 ──
+#
+# --script 헤드리스는 렌더 프레임이 거의 돌지 않아 프록시 커맨드가 소비되지
+# 않는다(2026-09-04 실측 — queued는 늘고 applied는 멈춘다). 씬을 전환하면
+# 새 광원의 RegisterCommand도 옛 광원의 UnregisterCommand도 그 큐로 가므로
+# 어느 쪽도 반영되지 않는다: FT_Material.creator로 전환해도 프록시는 계속
+# 기본 씬 라이트의 intensity=1을 들고 있고 그 씬의 저작값 2는 나타나지 않는다.
+#
+# 이것을 처음에는 "씬 전환 시 광원이 등록되지 않는" 제품 결함으로 의심했는데,
+# 큐 계측이 원인을 렌더 소비 스레드 부재로 옮겼다. 씬 전환 경로의 문제가 아니다.
+#
+# 그래서 대상은 에디터가 코드로 만드는 기본 씬의 "Directional Light"다
+# (EditorMain.cpp의 newSceneCreatedEvent). 렌더가 실제로 도는 하네스가
+# 생기면 저작 씬으로 옮기는 편이 낫다.
+
+
+# ── 왜 play가 필요한가 (2026-09-05) ──
+#
+# C# 스크립트는 재생 중에만 생명주기를 받는다(Unity 규약, Scene::DrainPendingPhases).
+# 편집 모드에서는 인스턴스만 만들어지고 훅은 오지 않으므로, play 없이 script.add만
+# 하면 프로브가 아무것도 하지 않는다 — 그 침묵은 "배선이 죽었다"와 구분되지 않는다.
+
+# 기본 씬이 서고 라이트가 프록시에 등록될 때까지 기다린다.
+wait 60
+
+# 기준선 — 스크립트가 손대기 전 프록시 값. 검증 스크립트가 이 줄과
+# 나중 줄을 비교해 "정말 바뀌었는가"를 본다.
+light.proxy
+
+# 이름에 공백이 있지만 따옴표로 묶지 않는다 — script.add는 마지막 토큰을
+# 타입으로 보고 그 앞 전체를 이름으로 쓰므로 공백이 그대로 통한다.
+# 따옴표를 쓰면 그것까지 이름에 들어가 오브젝트를 못 찾는다(Split의 따옴표
+# 처리는 parts에만 적용되고 이 커맨드는 원문 line을 쓴다).
+script.add Directional Light LightScriptProbe
+wait 10
+
+# 프로브의 OnInitialized는 재생에서 온다.
+play
+wait 60
+
+# 프록시 커밋은 프레임 경계에서 일어난다 — 스크립트가 값을 넣은 프레임에는
+# 아직 실리지 않았을 수 있으므로 몇 프레임 더 돌린 뒤에 읽는다.
+light.proxy
+wait 5
+
+script.invoke LightScriptProbe Results
+log.flush
+quit

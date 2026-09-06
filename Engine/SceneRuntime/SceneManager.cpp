@@ -419,7 +419,7 @@ void SceneManager::Initialization()
 
     // 옛 Awake→OnEnable→Start 3단은 뒤의 둘이 빈 함수라 사실상 드레인 하나였다
     // (트랙 C · C4). 활성 전이는 Component::SetEnabled가 그 자리에서 처리하고,
-    // Start는 이 드레인이 pendingStart까지 소진한다.
+    // OnBeginSimulation은 이 드레인이 PendingSimulation까지 소진한다.
     PROFILE_CPU_BEGIN("DrainPendingLifecycle");
 	m_activeScene.load()->DrainPendingLifecycle();
     PROFILE_CPU_END();
@@ -1245,7 +1245,7 @@ void SceneManager::BeforeAwakeSceneLoad()
 
         // 관리 힙도 같은 경계에서 정리한다(PHASE 9-6).
         //
-        // 네이티브 캐시만 비우면 반쪽이다 — 파괴된 씬의 Behaviour와 그 필드가 잡고
+        // 네이티브 캐시만 비우면 반쪽이다 — 파괴된 씬의 스크립트와 그 필드가 잡고
         // 있던 관리 객체는 GC가 돌아야 사라지고, 그 시점을 런타임에 맡기면 다음 씬
         // 한복판에서 일어난다. 그러면 프레임이 튀고, 그 튐이 재설계 탓인지 GC 탓인지
         // 구분되지 않는다. 두 힙을 같은 지점에서 평탄하게 만들어야 씬 churn 벤치의
@@ -1500,7 +1500,7 @@ bool SceneManager::RestoreSceneSnapshot()
 // ── 시뮬레이션 primitive (E3-1) ──
 //
 // OnBeginSimulation 같은 훅을 여기서 부르지 않는다 — Start()는 이미 매 프레임 드는
-// pendingAwake/Start 드레인이 State_StartCalled 가드로 정확히 한 번만 부르고 있어
+// pendingInitialize/Start 드레인이 State_SimulationBegun 가드로 정확히 한 번만 부르고 있어
 // (에디터 틱도 예외가 아니다), 여기서 다시 부르면 그 가드를 건너뛰고 두 번 불린다.
 // phase 필드는 그 드레인과 무관하게 상태 기계 자체를 정확히 유지하기 위한 부기다.
 void SceneManager::SetSimulationPhase(ScenePhase phase)

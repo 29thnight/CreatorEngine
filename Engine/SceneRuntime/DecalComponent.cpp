@@ -30,7 +30,7 @@ void DecalComponent::OnInitialized()
 void DecalComponent::OnAddedToScene()
 {
     DecalSystems->Register(this);
-	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	if (HasLifecycleState(State_Initialized) && GetOwner())
 	{
 		if (Scene* scene = GetOwner()->GetScene())
 		{

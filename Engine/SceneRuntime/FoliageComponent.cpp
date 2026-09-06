@@ -41,7 +41,7 @@ void FoliageComponent::OnInitialized()
 void FoliageComponent::OnAddedToScene()
 {
     FoliageSystems->Register(this);
-	if (HasLifecycleState(State_AwakeCalled) && GetOwner())
+	if (HasLifecycleState(State_Initialized) && GetOwner())
 	{
 		if (Scene* scene = GetOwner()->GetScene())
 		{

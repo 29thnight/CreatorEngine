@@ -24,16 +24,18 @@ public sealed class MeshRenderer : NativeComponent
     public void InstantiateMaterial(string newName) => Native.MeshInstantiateMaterial(OwnerHandle, newName);
 
     /// <summary>
-    /// 셰이더 상수 버퍼에 float 값을 넣는다.
-    /// 버퍼 이름이나 변수 이름이 틀리면 <c>false</c>다 — 엔진이 조용히 실패하므로
-    /// 값이 안 먹으면 이 반환값부터 확인할 것.
+    /// 재질의 float 값을 이름으로 갱신한다. 이름이 틀리면 <c>false</c>다 —
+    /// 엔진이 조용히 실패하므로 값이 안 먹으면 이 반환값부터 확인할 것.
+    ///
+    /// 상수 버퍼 이름은 받지 않는다. 라우팅은 ShaderMeta 선언이 하므로
+    /// 호출부가 버퍼를 고를 일이 없다(9-4에 인자를 걷었다).
     /// </summary>
-    public bool SetMaterialFloat(string bufferName, string valueName, float value)
-        => Native.MeshSetMaterialFloat(OwnerHandle, bufferName, valueName, value);
+    public bool SetMaterialFloat(string valueName, float value)
+        => Native.MeshSetMaterialFloat(OwnerHandle, valueName, value);
 
     /// <summary><see cref="SetMaterialFloat"/>의 int 판.</summary>
-    public bool SetMaterialInt(string bufferName, string valueName, int value)
-        => Native.MeshSetMaterialInt(OwnerHandle, bufferName, valueName, value);
+    public bool SetMaterialInt(string valueName, int value)
+        => Native.MeshSetMaterialInt(OwnerHandle, valueName, value);
 
     /// <summary>
     /// 재질의 베이스 색. 알파를 낮춰 페이드하는 데 주로 쓴다.

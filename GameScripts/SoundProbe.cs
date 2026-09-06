@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 잡아 속성을 읽고 쓰고 재생을 걸어 본다. 관리 스크립트 조회와 달리 여기서는
 /// 존재 확인 한 번만 경계를 넘고, 이후 호출은 각각 함수 포인터 직행이다.
 /// </summary>
-public sealed partial class SoundProbe : Behaviour
+public sealed partial class SoundProbe : Component
 {
     /// <summary>비워 두면 이미 인스펙터에 설정된 클립을 그대로 쓴다.</summary>
     [SerializeField] private string _clipKey = "";

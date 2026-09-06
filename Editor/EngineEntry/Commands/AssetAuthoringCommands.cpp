@@ -1,4 +1,7 @@
-﻿#include "../EditorDiagnostics.h"
+﻿#include <DirectXTex.h>
+#include <stb_image.h>
+#include "Texture.h"
+#include "../EditorDiagnostics.h"
 #include "../EditorProjectOperations.h"
 // LC6 (PHASE 14.5) — AssetAuthoring 도메인 명령.
 //
@@ -2237,6 +2240,426 @@ namespace ConsoleCmd
     //           트리의 sidecar를 건드리지 않도록 사본에서만 부른다(게이트가 사본을 만든다).
     //   끝에 프로세스 peak working set과 VRAM 사용량을 찍는다.
 
+    static CommandCore::CommandResult Cmd_assets_decodeab(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 3) return InvalidArguments("assets.decodeab [root] [limit]");
+        int parsedLimit = 0;
+        if (ctx.parts.size() > 2 && (!ParseNumber(ctx.parts[2], parsedLimit) || parsedLimit < 0)) return InvalidArguments("limit must be a nonnegative integer");
+        // 인자: [루트] [상한]. 루트를 '-' 로 주면 저작 자산 트리.
+        //
+        // ★ 기본값을 저장소 루트로 둔다. 디코더를 태우는 PNG 는 저작 자산
+        //   (Dynamic_CPP/Assets)만이 아니다 — generation 이 뽑아 둔 모델
+        //   임베디드 텍스처와 에디터 아이콘도 같은 로더를 지난다.
+        const file::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
+            ? file::path(ctx.parts[1]) : PathFinder::Relative();
+        const int limit = ctx.parts.size() > 2
+            ? parsedLimit : 0;   // 0 = 전수
+
+        std::vector<file::path> sources;
+        std::error_code walkError;
+        for (auto it = file::recursive_directory_iterator(root, walkError);
+            it != file::recursive_directory_iterator(); it.increment(walkError))
+        {
+            if (walkError) break;
+            if (!it->is_regular_file(walkError)) continue;
+            std::string ext = it->path().extension().string();
+            for (char& c : ext) c = static_cast<char>(std::tolower(c));
+            if (ext == ".png") sources.push_back(it->path());
+            if (0 != limit && static_cast<int>(sources.size()) >= limit) break;
+        }
+
+        uint32_t compared = 0, identical = 0, sizeMismatch = 0, wicWasBgra = 0;
+        uint32_t wicFailed = 0, stbFailed = 0, differing = 0;
+        uint64_t totalDiffBytes = 0;
+        uint32_t maxDelta = 0;
+        uint32_t channelDiff[4] = { 0, 0, 0, 0 };
+        std::vector<std::string> samples;
+
+        for (const file::path& path : sources)
+        {
+            std::ifstream stream(path, std::ios::binary | std::ios::ate);
+            if (!stream) continue;
+            const std::streamsize size = stream.tellg();
+            stream.seekg(0);
+            std::vector<char> raw(static_cast<size_t>(size));
+            stream.read(raw.data(), size);
+            stream.close();
+            const auto* bytes = reinterpret_cast<const uint8_t*>(raw.data());
+
+            // ── A: DirectXTex(WIC) → RGBA8 정규화 ──
+            DirectX::ScratchImage wic;
+            DirectX::TexMetadata meta{};
+            if (FAILED(DirectX::LoadFromWICMemory(bytes, raw.size(),
+                DirectX::WIC_FLAGS_IGNORE_SRGB, &meta, wic))) { ++wicFailed; continue; }
+
+            DirectX::ScratchImage converted;
+            const DirectX::ScratchImage* wicFinal = &wic;
+            if (DXGI_FORMAT_R8G8B8A8_UNORM != meta.format)
+            {
+                // ★ 이 계수가 0 이면 아래 Convert 가 한 번도 안 돌았다는 뜻이고,
+                //   그러면 대조는 "WIC 원본 vs stb" 그대로다. 0 이 아니면
+                //   "WIC→Convert vs stb" 이므로 Convert 가 채널 순서만 바꾼다는
+                //   전제가 결과에 섞인다.
+                ++wicWasBgra;
+                // BGRA8_UNORM -> RGBA8_UNORM 은 채널 순서만 바꾼다(둘 다 IsSRGB
+                // 가 false 라 DirectXTex 가 전달 함수에 손대지 않는다).
+                if (FAILED(DirectX::Convert(wic.GetImages(), wic.GetImageCount(),
+                    meta, DXGI_FORMAT_R8G8B8A8_UNORM, DirectX::TEX_FILTER_DEFAULT,
+                    DirectX::TEX_THRESHOLD_DEFAULT, converted))) { ++wicFailed; continue; }
+                wicFinal = &converted;
+            }
+            const DirectX::Image* a = wicFinal->GetImage(0, 0, 0);
+            if (nullptr == a || nullptr == a->pixels) { ++wicFailed; continue; }
+
+            // ── B: stb_image → RGBA8 ──
+            int w = 0, h = 0, channelsInFile = 0;
+            stbi_uc* b = stbi_load_from_memory(bytes, static_cast<int>(raw.size()),
+                &w, &h, &channelsInFile, 4);
+            if (nullptr == b) { ++stbFailed; continue; }
+
+            ++compared;
+            if (static_cast<size_t>(w) != a->width || static_cast<size_t>(h) != a->height)
+            {
+                ++sizeMismatch;
+                if (samples.size() < 5)
+                    samples.push_back(path.filename().string() + " 치수 "
+                        + std::to_string(a->width) + "x" + std::to_string(a->height)
+                        + " vs " + std::to_string(w) + "x" + std::to_string(h));
+                stbi_image_free(b);
+                continue;
+            }
+
+            // 행 간격이 다를 수 있다(WIC 쪽은 정렬). 행 단위로 센다.
+            uint64_t diffBytes = 0;
+            uint32_t localMax = 0;
+            const size_t rowBytes = static_cast<size_t>(w) * 4u;
+            for (int y = 0; y < h; ++y)
+            {
+                const uint8_t* ra = a->pixels + static_cast<size_t>(y) * a->rowPitch;
+                const uint8_t* rb = b + static_cast<size_t>(y) * rowBytes;
+                for (size_t x = 0; x < rowBytes; ++x)
+                {
+                    if (ra[x] == rb[x]) continue;
+                    ++diffBytes;
+                    const uint32_t delta = static_cast<uint32_t>(
+                        std::abs(static_cast<int>(ra[x]) - static_cast<int>(rb[x])));
+                    if (delta > localMax) localMax = delta;
+                    ++channelDiff[x % 4];
+                }
+            }
+            stbi_image_free(b);
+
+            if (0 == diffBytes) { ++identical; continue; }
+            ++differing;
+            totalDiffBytes += diffBytes;
+            if (localMax > maxDelta) maxDelta = localMax;
+            if (samples.size() < 5)
+            {
+                char line[256]{};
+                std::snprintf(line, sizeof(line), "%s — 다른 바이트 %llu / %llu (최대 편차 %u)",
+                    path.filename().string().c_str(),
+                    static_cast<unsigned long long>(diffBytes),
+                    static_cast<unsigned long long>(rowBytes * h), localMax);
+                samples.push_back(line);
+            }
+        }
+
+        std::printf("[CLI] assets.decodeab PNG %zu장 중 %u장 대조\n",
+            sources.size(), compared);
+        std::printf("  완전 일치      %u\n", identical);
+        std::printf("  픽셀 불일치    %u  (다른 바이트 누적 %llu · 최대 편차 %u)\n",
+            differing, static_cast<unsigned long long>(totalDiffBytes), maxDelta);
+        std::printf("  치수 불일치    %u\n", sizeMismatch);
+        std::printf("  WIC 실패 %u · stb 실패 %u\n", wicFailed, stbFailed);
+        std::printf("  WIC 이 BGRA 로 낸 장수 %u  (0 이면 정규화 없이 원본끼리 대조한 것)\n",
+            wicWasBgra);
+        if (0 != differing)
+        {
+            std::printf("  채널별 불일치 R %u · G %u · B %u · A %u\n",
+                channelDiff[0], channelDiff[1], channelDiff[2], channelDiff[3]);
+        }
+        for (const std::string& sample : samples)
+            std::printf("    %s\n", sample.c_str());
+        std::printf("[CLI] assets.decodeab %s\n",
+            (0 == differing && 0 == sizeMismatch && 0 == wicFailed && 0 == stbFailed)
+                ? "통과" : "차이 있음");
+        auto data = CommandData::Object();
+        data.Set("found", CommandData::Int(sources.size()));
+        data.Set("compared", CommandData::Int(compared));
+        data.Set("identical", CommandData::Int(identical));
+        data.Set("differing", CommandData::Int(differing));
+        data.Set("sizeMismatch", CommandData::Int(sizeMismatch));
+        data.Set("wicFailed", CommandData::Int(wicFailed));
+        data.Set("stbFailed", CommandData::Int(stbFailed));
+        data.Set("totalDiffBytes", CommandData::Int(totalDiffBytes));
+        data.Set("maxDelta", CommandData::Int(maxDelta));
+        if (!(!walkError && !sources.empty() && compared == sources.size() && identical == compared && !wicFailed && !stbFailed)) return Fail("texture.validation_failed", "Texture measurement incomplete or mismatched", std::move(data));
+        return Ok("Texture measurement completed", std::move(data));
+
+    }
+
+    static CommandCore::CommandResult Cmd_assets_decodeabhdr(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("assets.decodeabhdr [root]");
+        const file::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
+            ? file::path(ctx.parts[1]) : PathFinder::Relative();
+
+        std::vector<file::path> sources;
+        std::error_code walkError;
+        for (auto it = file::recursive_directory_iterator(root, walkError);
+            it != file::recursive_directory_iterator(); it.increment(walkError))
+        {
+            if (walkError) break;
+            if (!it->is_regular_file(walkError)) continue;
+            std::string ext = it->path().extension().string();
+            for (char& c : ext) c = static_cast<char>(std::tolower(c));
+            if (ext == ".hdr") sources.push_back(it->path());
+        }
+
+        uint32_t compared = 0, identical = 0, differing = 0, failed = 0;
+        uint32_t stbChannels = 0;
+        double maxDelta = 0.0;
+        uint64_t diffSamples = 0;
+        std::vector<std::string> samples;
+
+        for (const file::path& path : sources)
+        {
+            std::ifstream stream(path, std::ios::binary | std::ios::ate);
+            if (!stream) continue;
+            const std::streamsize size = stream.tellg();
+            stream.seekg(0);
+            std::vector<char> raw(static_cast<size_t>(size));
+            stream.read(raw.data(), size);
+            stream.close();
+            const auto* bytes = reinterpret_cast<const uint8_t*>(raw.data());
+
+            DirectX::ScratchImage hdr;
+            DirectX::TexMetadata meta{};
+            if (FAILED(DirectX::LoadFromHDRMemory(bytes, raw.size(), &meta, hdr)))
+            { ++failed; continue; }
+            const DirectX::Image* a = hdr.GetImage(0, 0, 0);
+            if (nullptr == a || DXGI_FORMAT_R32G32B32A32_FLOAT != meta.format)
+            { ++failed; continue; }
+
+            int w = 0, h = 0, channelsInFile = 0;
+            float* b = stbi_loadf_from_memory(bytes, static_cast<int>(raw.size()),
+                &w, &h, &channelsInFile, 4);
+            if (nullptr == b) { ++failed; continue; }
+            stbChannels = static_cast<uint32_t>(channelsInFile);
+
+            if (static_cast<size_t>(w) != a->width || static_cast<size_t>(h) != a->height)
+            { ++failed; stbi_image_free(b); continue; }
+            ++compared;
+            double localMax = 0.0;
+            uint64_t localDiff = 0;
+            if (static_cast<size_t>(w) == a->width && static_cast<size_t>(h) == a->height)
+            {
+                for (int y = 0; y < h; ++y)
+                {
+                    const auto* ra = reinterpret_cast<const float*>(
+                        a->pixels + static_cast<size_t>(y) * a->rowPitch);
+                    const float* rb = b + static_cast<size_t>(y) * w * 4;
+                    for (int x = 0; x < w * 4; ++x)
+                    {
+                        const double delta = std::abs(
+                            static_cast<double>(ra[x]) - static_cast<double>(rb[x]));
+                        if (!std::isfinite(delta) || delta > 0.0) { ++localDiff; if (delta > localMax) localMax = delta; }
+                    }
+                }
+            }
+            // ★ 첫 불일치 자산에서 실제 값을 찍는다. "다르다"와 "몇 배
+            //   다르다"는 대응이 갈린다 — 비율이 일정하면 스케일 규약 차이이고
+            //   보정 가능하지만, 들쭉날쭉하면 디코드 자체가 다른 것이다.
+            if (0 != localDiff && 0 == differing)
+            {
+                const auto* ra = reinterpret_cast<const float*>(a->pixels);
+                for (int s = 0; s < (std::min)(4, w * h); ++s)
+                {
+                    const int o = s * 4;
+                    std::printf("    표본%d WIC(%.6f %.6f %.6f %.3f) stb(%.6f %.6f %.6f %.3f) 비율 %.5f\n",
+                        s, ra[o], ra[o + 1], ra[o + 2], ra[o + 3],
+                        b[o], b[o + 1], b[o + 2], b[o + 3],
+                        (0.0f != b[o]) ? (ra[o] / b[o]) : 0.0f);
+                }
+            }
+            stbi_image_free(b);
+
+            if (0 == localDiff) { ++identical; continue; }
+            ++differing;
+            diffSamples += localDiff;
+            if (localMax > maxDelta) maxDelta = localMax;
+            if (samples.size() < 5)
+            {
+                char line[256]{};
+                std::snprintf(line, sizeof(line), "%s — 다른 표본 %llu (최대 편차 %.6f)",
+                    path.filename().string().c_str(),
+                    static_cast<unsigned long long>(localDiff), localMax);
+                samples.push_back(line);
+            }
+        }
+
+        std::printf("[CLI] assets.decodeabhdr HDR %zu장 중 %u장 대조\n",
+            sources.size(), compared);
+        std::printf("  완전 일치      %u\n", identical);
+        std::printf("  값 불일치      %u  (다른 표본 %llu · 최대 편차 %.6f)\n",
+            differing, static_cast<unsigned long long>(diffSamples), maxDelta);
+        std::printf("  실패           %u\n", failed);
+        std::printf("  파일의 채널 수 %u  (stbi_loadf 는 4로 강제 요청했다)\n", stbChannels);
+        for (const std::string& sample : samples)
+            std::printf("    %s\n", sample.c_str());
+        std::printf("[CLI] assets.decodeabhdr %s\n",
+            (0 == differing && 0 == failed) ? "통과" : "차이 있음");
+        auto data = CommandData::Object();
+        data.Set("found", CommandData::Int(sources.size()));
+        data.Set("compared", CommandData::Int(compared));
+        data.Set("identical", CommandData::Int(identical));
+        data.Set("differing", CommandData::Int(differing));
+        data.Set("failed", CommandData::Int(failed));
+        data.Set("diffSamples", CommandData::Int(diffSamples));
+        data.Set("maxDelta", CommandData::Double(maxDelta));
+        if (!(!walkError && !sources.empty() && compared == sources.size() && identical == compared && !failed)) return Fail("texture.validation_failed", "Texture measurement incomplete or mismatched", std::move(data));
+        return Ok("Texture measurement completed", std::move(data));
+
+    }
+
+    static CommandCore::CommandResult Cmd_assets_texturebench(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        int parsedLimit = 64;
+        if (ctx.parts.size() > 2 || (ctx.parts.size() > 1 && (!ParseNumber(ctx.parts[1], parsedLimit) || parsedLimit < 1))) return InvalidArguments("assets.texturebench [positive limit]");
+        namespace chrono = std::chrono;
+        const int limit = ctx.parts.size() > 1
+            ? parsedLimit : 64;
+        const file::path root = PathFinder::Relative();
+
+        std::vector<file::path> sources;
+        std::error_code walkError;
+        for (auto it = file::recursive_directory_iterator(root, walkError);
+            it != file::recursive_directory_iterator(); it.increment(walkError))
+        {
+            if (walkError) break;
+            if (!it->is_regular_file(walkError)) continue;
+            std::string ext = it->path().extension().string();
+            for (char& c : ext) c = static_cast<char>(std::tolower(c));
+            if (ext == ".png") sources.push_back(it->path());
+            if (static_cast<int>(sources.size()) >= limit) break;
+        }
+        if (sources.empty())
+        {
+            std::printf("[CLI] assets.texturebench fail PNG 를 찾지 못했다: %s\n",
+                root.string().c_str());
+            return PreconditionFailed("texture.corpus_missing", "No PNG input found");
+        }
+
+        double readMs = 0.0, decodeMs = 0.0, mipMs = 0.0, compressMs = 0.0, legacyMs = 0.0;
+        uint64_t sourceBytes = 0, decodedBytes = 0, mippedBytes = 0, compressedBytes = 0;
+        uint32_t decoded = 0, mipped = 0, compressed = 0;
+
+        for (const file::path& path : sources)
+        {
+            // ① 파일 바이트 읽기 — cooked artifact 로드의 하한이다.
+            //    (artifact 는 헤더 파싱 + mmap 이므로 디코드가 0 이다)
+            auto t0 = chrono::steady_clock::now();
+            std::ifstream stream(path, std::ios::binary | std::ios::ate);
+            if (!stream) continue;
+            const std::streamsize size = stream.tellg();
+            stream.seekg(0);
+            std::vector<char> raw(static_cast<size_t>(size));
+            stream.read(raw.data(), size);
+            stream.close();
+            auto t1 = chrono::steady_clock::now();
+            readMs += chrono::duration<double, std::milli>(t1 - t0).count();
+            sourceBytes += static_cast<uint64_t>(size);
+
+            // ② 디코드 — 지금 런타임이 로드마다 하는 일.
+            DirectX::ScratchImage image;
+            DirectX::TexMetadata metadata{};
+            t0 = chrono::steady_clock::now();
+            HRESULT hr = DirectX::LoadFromWICMemory(
+                reinterpret_cast<const uint8_t*>(raw.data()), raw.size(),
+                DirectX::WIC_FLAGS_IGNORE_SRGB, &metadata, image);
+            t1 = chrono::steady_clock::now();
+            if (FAILED(hr)) continue;
+            decodeMs += chrono::duration<double, std::milli>(t1 - t0).count();
+            decodedBytes += image.GetPixelsSize();
+            ++decoded;
+
+            // ③ 밉 생성 — 지금 파이프라인에 아예 없는 단계.
+            DirectX::ScratchImage mips;
+            t0 = chrono::steady_clock::now();
+            hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(),
+                metadata, DirectX::TEX_FILTER_DEFAULT, 0, mips);
+            t1 = chrono::steady_clock::now();
+            const bool hasMips = SUCCEEDED(hr) && 0 != mips.GetImageCount();
+            if (hasMips)
+            {
+                mipMs += chrono::duration<double, std::milli>(t1 - t0).count();
+                mippedBytes += mips.GetPixelsSize();
+                ++mipped;
+            }
+
+            // ④ BC1 압축 — 지금은 baseColorMap 만, 그것도 런타임에.
+            const DirectX::ScratchImage& compressSource = hasMips ? mips : image;
+            DirectX::ScratchImage block;
+            t0 = chrono::steady_clock::now();
+            hr = DirectX::Compress(compressSource.GetImages(),
+                compressSource.GetImageCount(), compressSource.GetMetadata(),
+                DXGI_FORMAT_BC1_UNORM_SRGB,
+                DirectX::TEX_COMPRESS_SRGB | DirectX::TEX_COMPRESS_UNIFORM,
+                0.5f, block);
+            t1 = chrono::steady_clock::now();
+            if (SUCCEEDED(hr))
+            {
+                compressMs += chrono::duration<double, std::milli>(t1 - t0).count();
+                compressedBytes += block.GetPixelsSize();
+                ++compressed;
+            }
+
+            // ⑤ 지금의 런타임 로드 경로 전체(디코드 + 중립 이미지 감싸기).
+            t0 = chrono::steady_clock::now();
+            std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(path);
+            t1 = chrono::steady_clock::now();
+            if (texture) legacyMs += chrono::duration<double, std::milli>(t1 - t0).count();
+        }
+
+        const double mb = 1024.0 * 1024.0;
+        std::printf("[CLI] assets.texturebench %u장\n", decoded);
+        std::printf("  파일 읽기      %8.1f ms  (%.1f MB)   <- cooked artifact 로드 하한\n",
+            readMs, static_cast<double>(sourceBytes) / mb);
+        std::printf("  디코드         %8.1f ms  (%.1f MB)   <- 런타임이 매번 하는 일\n",
+            decodeMs, static_cast<double>(decodedBytes) / mb);
+        std::printf("  밉 생성        %8.1f ms  (%.1f MB, %u장)\n",
+            mipMs, static_cast<double>(mippedBytes) / mb, mipped);
+        std::printf("  BC1 압축       %8.1f ms  (%.1f MB, %u장)\n",
+            compressMs, static_cast<double>(compressedBytes) / mb, compressed);
+        std::printf("  cook 합계      %8.1f ms  (디코드+밉+압축)\n",
+            decodeMs + mipMs + compressMs);
+        std::printf("  현재 로드 경로 %8.1f ms  (LoadSharedFromPath)\n", legacyMs);
+        std::printf("  장당 평균 — 디코드 %.2f ms · cook %.2f ms · 읽기 %.2f ms\n",
+            decodeMs / (std::max)(1u, decoded),
+            (decodeMs + mipMs + compressMs) / (std::max)(1u, decoded),
+            readMs / (std::max)(1u, decoded));
+        auto data = CommandData::Object();
+        data.Set("readMs", CommandData::Double(readMs));
+        data.Set("decodeMs", CommandData::Double(decodeMs));
+        data.Set("mipMs", CommandData::Double(mipMs));
+        data.Set("compressMs", CommandData::Double(compressMs));
+        data.Set("legacyMs", CommandData::Double(legacyMs));
+        data.Set("decoded", CommandData::Int(decoded));
+        data.Set("mipped", CommandData::Int(mipped));
+        data.Set("compressed", CommandData::Int(compressed));
+        data.Set("sourceBytes", CommandData::Int(sourceBytes));
+        data.Set("decodedBytes", CommandData::Int(decodedBytes));
+        data.Set("mippedBytes", CommandData::Int(mippedBytes));
+        data.Set("compressedBytes", CommandData::Int(compressedBytes));
+        data.Set("found", CommandData::Int(sources.size()));
+        if (!(!walkError && decoded == sources.size() && mipped == decoded && compressed == decoded)) return Fail("texture.validation_failed", "Texture measurement incomplete or mismatched", std::move(data));
+        return Ok("Texture measurement completed", std::move(data));
+
+    }
+
     static CommandCore::CommandResult Cmd_assets_modelbench(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -3597,6 +4020,9 @@ namespace ConsoleCmd
 
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
+        reg.Result({ "assets.decodeab" }, &Cmd_assets_decodeab);
+        reg.Result({ "assets.decodeabhdr" }, &Cmd_assets_decodeabhdr);
+        reg.Result({ "assets.texturebench" }, &Cmd_assets_texturebench);
         reg.Result({ "collisionmatrix.authoring.probe" },
                    &Cmd_collisionmatrix_authoring_probe);
         reg.Result({ "model.load" }, &Cmd_model_load);

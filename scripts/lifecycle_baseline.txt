@@ -33,6 +33,19 @@
 #   ★ 저작은 `lifecycle.trace clear`보다 **앞**이어야 한다. 뒤에 두면 만드는
 #   과정의 Awake가 기록에 섞여, 무엇이 왕복의 결과인지 구분되지 않는다.
 #
+#   ── 스크립트 호스트 (LC0 · 2026-09-05) ──
+#
+#   두 씬에 LifecycleProbe를 하나씩 둔다. 그 전까지 이 기준선 223줄에
+#   `ScriptComponent` 행이 **0건**이었다 — 계측 구멍이 아니라 시나리오가
+#   스크립트를 한 번도 붙이지 않아서였다(LIFECYCLE_TRACE는 타입 무관이다).
+#   네이티브 생명주기 골든이 스크립트를 한 번도 태우지 않으면, 스크립트에만
+#   생기는 회귀는 이 게이트로 원리적으로 안 보인다.
+#
+#   덤으로 같은 실행이 **관리 측 트레이스**도 남긴다. LifecycleProbe는 훅마다
+#   `[Probe] ...` 한 줄을 찍고, 그 유도 경로는 네이티브 tsv와 완전히 독립이다
+#   (네이티브 트레이서 vs C# 훅 본문). 그래서 둘을 함께 보면 "네이티브는 불렀는데
+#   관리 측에 안 닿았다"가 바로 드러난다 — 어느 한쪽만으로는 못 가르는 축이다.
+#
 #   ★ 저작을 마치면 **빈 씬으로 한 번 비운다**(LifecycleScratch). 안 비우면 첫
 #   `scene.switch {{SCENE_A}}`가 방금 저작하던 씬을 통째로 파괴하며 그 기록이
 #   첫 줄들을 차지한다. 옛 기준선의 첫 줄이 정확히 그 모양이었다(기본 씬의
@@ -68,6 +81,12 @@ object.create UILabel UI
 component.add UILabel TextComponent
 object.parent UILabel UICanvas
 wait 30
+
+# 스크립트 호스트 (LC0). 아래 씬 A의 것과 짝이다 — 머리말의 '스크립트 호스트' 참고.
+object.create ScriptHostB
+script.add ScriptHostB LifecycleProbe
+wait 20
+
 scene.save {{SCENE_B}}
 wait 40
 
@@ -107,6 +126,14 @@ component.add Mesh11 MeshRenderer
 object.create Mesh12
 component.add Mesh12 MeshRenderer
 wait 40
+
+# 스크립트 호스트 (LC0). 메시 **뒤**에 만든다 — lifecycle.stress는
+# m_Entities를 인덱스 1부터 훑어 앞에서 8개를 집으므로, 앞에 끼우면 파괴
+# 대상이 바뀌어 기존 골든이 통째로 흔들린다.
+object.create ScriptHostA
+script.add ScriptHostA LifecycleProbe
+wait 20
+
 scene.save {{SCENE_A}}
 wait 40
 

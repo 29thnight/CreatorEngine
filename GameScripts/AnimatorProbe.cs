@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 그래서 "선언된 파라미터가 있으면 왕복을 검사하고, 없으면 건너뛴다"로 짰다.
 /// 파라미터가 하나도 없는 모델에서도 존재 확인·레이어·정지 경로는 그대로 검증된다.
 /// </summary>
-public sealed partial class AnimatorProbe : Behaviour
+public sealed partial class AnimatorProbe : Component
 {
     /// <summary>왕복 검사에 쓸 bool 파라미터 이름. 컨트롤러에 있는 것으로 지정한다.</summary>
     [SerializeField] private string _boolParameter = "";

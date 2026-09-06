@@ -39,9 +39,9 @@ namespace
             const uint8_t red[4] = { 255, 0, 0, 255 };
             const uint8_t blue[4] = { 0, 0, 255, 255 };
             redTexture = Texture::CreateFromPixels(1, 1, "rhi_ui_red",
-                DXGI_FORMAT_R8G8B8A8_UNORM, red);
+                RHIFormat::RGBA8Unorm, red);
             blueTexture = Texture::CreateFromPixels(1, 1, "rhi_ui_blue",
-                DXGI_FORMAT_R8G8B8A8_UNORM, blue);
+                RHIFormat::RGBA8Unorm, blue);
 
             EnhancedUIPass::Rect redRect{};
             redRect.left = 10.f;

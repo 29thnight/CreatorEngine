@@ -3,7 +3,7 @@ namespace CreatorEngine;
 /// <summary>
 /// 네이티브 <c>AniBehavior</c>에 대응하는 애니메이션 상태 스크립트.
 ///
-/// <see cref="Behaviour"/>와 다른 축이다. Behaviour는 오브젝트에 붙어 매 프레임 도는 반면,
+/// <see cref="Component"/>와 다른 축이다. Component는 오브젝트에 붙어 매 프레임 도는 반면,
 /// 이쪽은 애니메이션 컨트롤러의 <b>상태 하나</b>에 붙어 그 상태에 들어오고 나갈 때만 불린다.
 /// 대시·공격처럼 "상태 진입 시 한 번" 처리하는 로직이 여기 들어간다.
 ///
@@ -11,13 +11,17 @@ namespace CreatorEngine;
 /// 상태 전이마다 경계를 넘으면 "틱당 1회" 원칙이 무너진다(설계 문서 02절).
 /// 순서는 발생 순서 그대로 유지된다.
 /// </summary>
-public abstract class AniBehaviour
+public abstract class AniBehavior
 {
     /// <summary>이 상태를 소유한 애니메이터가 붙어 있는 오브젝트.</summary>
     public Entity Entity { get; internal set; }
 
-    /// <summary>소유 오브젝트의 Transform. <see cref="Behaviour.Transform"/>과 같은 이유로 필드다.</summary>
-    public Transform Transform;
+    /// <summary>
+    /// 소유 오브젝트의 Transform. <see cref="Component.Transform"/>과 같이 없을 수 있다.
+    /// 여기서는 이벤트가 올 때마다 다시 잡는다 — 아래 주석대로 소유자가 생성 시점에
+    /// 정해지지 않기 때문이다.
+    /// </summary>
+    public Transform? Transform { get; internal set; }
 
     /// <summary>대상 오브젝트가 살아 있는지.</summary>
     public bool IsAlive => Entity.IsAlive;
@@ -32,7 +36,7 @@ public abstract class AniBehaviour
     public virtual void Exit() { }
 
     // ── 편의 ──
-    // 소유 오브젝트를 대상으로 하는 조회. Behaviour와 같은 표기를 쓸 수 있게 둔다.
+    // 소유 오브젝트를 대상으로 하는 조회. Component와 같은 표기를 쓸 수 있게 둔다.
 
     public T? GetComponent<T>() where T : Component => Entity.GetComponent<T>();
     public T? GetComponentInParent<T>(bool includeSelf = true) where T : Component

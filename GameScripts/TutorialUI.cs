@@ -12,7 +12,7 @@ namespace CreatorEngine.Scripts;
 ///  · <c>weak_ptr&lt;Entity&gt;</c>이 필요 없다 — 세대 핸들이 같은 일을 한다.
 ///  · 원본 Start의 컴포넌트 조회에 버그가 있었다(아래 주석 참고). 의도대로 고쳐 옮겼다.
 /// </summary>
-public sealed partial class TutorialUI : Behaviour
+public sealed partial class TutorialUI : Component
 {
     /// <summary>화면 좌표에 더할 보정. 대상 머리 위에 띄우려고 보통 Y를 음수로 둔다.</summary>
     [SerializeField] private Float2 _screenOffset = new(0f, -50f);
@@ -49,7 +49,10 @@ public sealed partial class TutorialUI : Behaviour
         // 씬 전환 직후에는 카메라가 아직 없을 수 있다. 다음 프레임에 다시 시도한다.
         if (!Camera.Exists) return;
 
-        Float3 screen = Camera.WorldToScreenPoint(_target.Transform.WorldPosition);
+        // 따라다닐 대상이 UI라면 월드 좌표가 없다 — 화면 좌표로 옮길 것이 없다.
+        if (_target.Transform is not { } targetTransform) return;
+
+        Float3 screen = Camera.WorldToScreenPoint(targetTransform.WorldPosition);
 
         // Z가 0 이하면 대상이 카메라 뒤다 — 이때 X·Y는 의미가 없어 그대로 두고 넘긴다.
         if (screen.Z <= 0f) return;

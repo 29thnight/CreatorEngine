@@ -23,16 +23,30 @@
 //   DX11 디바이스가 사라진 뒤(DeviceResources 은퇴) 실제로 필요한 곳을 세니
 //   넷이었고, 넷 다 자기가 직접 든다:
 //     · Texture.h                  — DirectXTex의 DX11 가드(__d3d11_h__) 때문
+//                                    (* 축 A 로 사라졌다. Texture.h 는 이제
+//                                     d3d11.h 도 DirectXTex 도 들지 않는다 —
+//                                     지금 남은 소비자는 셋이다)
 //     · ShaderPSO.h                — <d3d11shader.h> (셰이더 리플렉션, 디바이스 불요)
 //     · ImGuiDrawHelperMeshRenderer.cpp — 같은 리플렉션
 //     · EnhancedApiOverheadBench.cpp    — DX11 대비 실측(비교 대상이라 있어야 한다)
 //
 //   dxgi는 남는다. DXGI는 DX11이 아니라 어댑터·스왑체인 계층이고 DX12가 쓴다.
+//
+// * <DirectXTex.h>도 여기 있었다 (축 A, 2026-09-04). 같은 부류의 두 번째다.
+//
+//   이 헤더를 직접 include 하는 파일이 113개이고 그 전이까지 치면 더 넓은데,
+//   DirectXTex 심볼을 실제로 쓰는 파일은 저장소 전체에서 넷이다
+//   (Texture.cpp · EditorAssetDatabase.cpp · EnhancedSceneRendererSelfTest.cpp ·
+//   VulkanSelfTest.cpp). 넷 다 이미 자기가 직접 든다 — 실측으로 확인했다.
+//
+//   여기 있던 이유는 Texture.h 가 m_cpuPixels 로 DirectX::ScratchImage 를
+//   들었기 때문이다. 축 A 가 그것을 중립 타입으로 바꾸면서 명분이 사라졌다.
+//   (ReflectionRedesignPlan CT3 이 Reflection.hpp 를 280 TU 에서 걷어낸 것과
+//   같은 모양이다 — 내용이 아니라 헤더가 무거웠다.)
 #include <dxgi1_4.h>
 #include <dxgi1_6.h>
 #include <d3dcompiler.h>
 #include <d3dcommon.h>
-#include <DirectXTex.h>
 #include <windows.h>
 #include <wincodec.h>
 #include <dxgidebug.h>

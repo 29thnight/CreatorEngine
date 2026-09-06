@@ -1,7 +1,7 @@
 namespace CreatorEngine.Scripts;
 
 /// <summary>RigidBody · 콜라이더 바인딩 검증.</summary>
-public sealed partial class RigidBodyProbe : Behaviour
+public sealed partial class RigidBodyProbe : Component
 {
     [SerializeField] private int _checkAfterFrames = 30;
 

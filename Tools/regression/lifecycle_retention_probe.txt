@@ -1,0 +1,37 @@
+# LC3 대기 참조 유지 픽스처 (ScriptLifecycleContractHardeningPlan · LC3)
+#
+# 판정은 verify-lifecycle-retention.ps1이 한다.
+#
+# ── 왜 인스턴스가 하나뿐인가 ──
+#
+# 재는 것이 "이 스코프가 완료된 Task를 붙잡고 있는가"이고, 그 답은 인스턴스
+# 하나로 완전히 결정된다. 여럿을 두면 GC 시점이 서로 얽혀 살아남은 개수의
+# 출처가 흐려진다.
+#
+# 대조군도 두지 않는다. 다른 생명주기 게이트에서 대조군이 하는 일은 "하네스가
+# 죽었는가"를 가르는 것인데, 여기서는 픽스처 자신의 created 표지가 그 일을 한다 —
+# 50개를 만들었다는 기록이 없으면 판정을 내지 않는다.
+#
+# ── 왜 play가 필요한가 ──
+#
+# C# 스크립트는 재생 중에만 생명주기를 받는다(2026-09-05, 편집/재생 경계 고침).
+# 게다가 Scope.Tick은 관리 틱에서만 도므로 편집 모드에서는 대기가 완료되지 않는다.
+
+wait 60
+scene.new LifecycleRetention
+wait 30
+
+object.create DelayRetention
+script.add DelayRetention DelayRetentionProbe
+wait 60
+
+play
+
+# 5틱 뒤 50개 생성 → 0.05초 대기 만기 → 30틱째 GC·계수. 넉넉히 둔다.
+wait 400
+
+stop
+wait 200
+
+log.flush
+quit

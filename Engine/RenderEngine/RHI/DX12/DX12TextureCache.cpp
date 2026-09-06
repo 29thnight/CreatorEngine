@@ -1,10 +1,12 @@
 #include "DX12TextureCache.h"
-#include <DirectXTex.h>
 #include "DX12DeviceResources.h"
 #include "../../Texture.h"
 
-// d3d11.h를 직접 include하지 않는다 — T4로 이 파일에 DX11 타입이 남지 않았다.
-// (Texture.h가 아직 전이로 끌어오지만 그건 T6이 걷을 몫이다.)
+// ★ <DirectXTex.h> 를 걷었다(축 A). 업로드가 받는 것이 중립 CPU 이미지가
+//   되면서 이 파일에 DirectXTex 타입이 하나도 남지 않았다.
+//
+// d3d11.h도 직접 include하지 않는다 — T4로 이 파일에 DX11 타입이 남지 않았고,
+// Texture.h가 전이로 끌어오던 것마저 축 A가 걷었다.
 
 #include <vector>
 
@@ -296,39 +298,38 @@ DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outE
 // CopyResource로 GPU에서 끌어내린 뒤 Map으로 읽는 경로였고, Texture가 픽셀을
 // 들고 있지 않던 시절의 유일한 방법이었다. T1이 로더에게 최종 이미지를
 // 남기게 하면서 그쪽 소비자가 사라졌고, T4에서 함께 걷었다.
-bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
+bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
     const wchar_t* debugName, DX12PersistentHeap::Allocation& outAllocation,
     Entry& outEntry, std::string& outError)
 {
     auto* device = m_resources->GetDevice();
-    const DirectX::TexMetadata& metadata = image.GetMetadata();
     outEntry = {};
 
-    if (0 == metadata.width || 0 == metadata.height || 0 == metadata.mipLevels)
+    // ★ 2D 여부·치수 검사는 이제 타입이 대신 답한다(축 A). 뷰는 2D 밉·배열
+    //   체인만 표현하고, 서브리소스가 없으면 비어 있다.
+    if (image.IsEmpty())
     {
         outError = "CPU 픽셀 메타데이터가 비어 있다";
         return false;
     }
 
-    // 3D 텍스처는 이 경로로 오지 않는다(재질·아이콘은 전부 2D나 큐브다).
-    // 조용히 이상한 것을 만드는 대신 거절하고 호출부가 DX11 경로로 물러선다.
-    if (DirectX::TEX_DIMENSION_TEXTURE2D != metadata.dimension)
+    const DXGI_FORMAT nativeFormat = ToDXGI(image.Format());
+    if (DXGI_FORMAT_UNKNOWN == nativeFormat)
     {
-        outError = "2D가 아닌 CPU 이미지는 직결 업로드하지 않는다";
+        outError = "DX12가 모르는 CPU 픽셀 포맷이다";
         return false;
     }
 
     D3D12_RESOURCE_DESC desc{};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    desc.Width = metadata.width;
-    desc.Height = static_cast<UINT>(metadata.height);
-    desc.DepthOrArraySize = static_cast<UINT16>(metadata.arraySize);
-    desc.MipLevels = static_cast<UINT16>(metadata.mipLevels);
-    desc.Format = metadata.format;
+    desc.Width = image.Width();
+    desc.Height = image.Height();
+    desc.DepthOrArraySize = static_cast<UINT16>(image.ArraySize());
+    desc.MipLevels = static_cast<UINT16>(image.MipLevels());
+    desc.Format = nativeFormat;
     desc.SampleDesc.Count = 1;
 
-    const uint32_t subresourceCount =
-        static_cast<uint32_t>(metadata.mipLevels * metadata.arraySize);
+    const uint32_t subresourceCount = image.SubresourceCount();
 
     std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprints(subresourceCount);
     std::vector<UINT>   rowCounts(subresourceCount);
@@ -353,13 +354,11 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     // 이미 기록한 command가 파괴된 resource를 가리키는 partial batch를 막는다.
     for (uint32_t subresource = 0; subresource < subresourceCount; ++subresource)
     {
-        // DX12 서브리소스 번호를 (밉, 배열 슬라이스)로 되돌린다 —
-        // subresource = mip + arraySlice * mipLevels 가 규칙이다.
-        const size_t mip = subresource % metadata.mipLevels;
-        const size_t item = subresource / metadata.mipLevels;
-
-        const DirectX::Image* sourceImage = image.GetImage(mip, item, 0);
-        if (nullptr == sourceImage)
+        // 늘어놓은 순서가 DX12 서브리소스 번호와 같다 — 둘 다
+        // (mip + arraySlice * mipLevels) 규칙이다(TextureImage.h 레이아웃 규약).
+        const TextureSubimage* source = image.At(subresource);
+        const std::byte* sourcePixels = (nullptr != source) ? source->pixels : nullptr;
+        if (nullptr == source || nullptr == sourcePixels)
         {
             outError = "CPU 이미지에 서브리소스가 없다";
             return false;
@@ -369,15 +368,27 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
         const uint32_t rows = rowCounts[subresource];
         const uint64_t rowSize = rowSizes[subresource];
 
-        // 행 간격이 다르다. DirectXTex는 자기 rowPitch를, DX12는 256바이트
+        // 행 간격이 다르다. CPU 이미지는 빈틈없는 간격을, DX12는 256바이트
         // 정렬을 쓰므로 행 단위로 옮긴다(DX11 경로와 같은 이유).
-        for (uint32_t row = 0; row < rows; ++row)
+        //
+        // ★ 블록 압축이면 여기서 '행'은 블록 한 줄이다. GetCopyableFootprints
+        //   가 rowCounts에 블록 줄 수를 주므로 이 루프는 그대로 맞는다.
+        CopyImageRows(reinterpret_cast<std::byte*>(destinationBase + footprint.Offset),
+            footprint.Footprint.RowPitch, sourcePixels, source->rowPitch,
+            rows, static_cast<size_t>(rowSize));
+
+        // A/B 대조용 다이제스트. 방금 쓴 자리에서 **유효 바이트만** 읽는다 —
+        // 256바이트 정렬 패딩을 먹이면 Vulkan 과 절대 같아질 수 없다.
+        // footprint 는 드라이버(GetCopyableFootprints)가 정한 것이므로,
+        // Vulkan 이 직접 계산한 배치와 독립이다.
+        if (RHIUploadDigestEnabled())
         {
-            const uint8_t* sourceRow = sourceImage->pixels
-                + static_cast<size_t>(row) * sourceImage->rowPitch;
-            uint8_t* destinationRow = destinationBase + footprint.Offset
-                + static_cast<size_t>(row) * footprint.Footprint.RowPitch;
-            memcpy(destinationRow, sourceRow, static_cast<size_t>(rowSize));
+            for (uint32_t row = 0; row < rows; ++row)
+            {
+                m_stats.uploadDigest.FeedRow(destinationBase + footprint.Offset
+                    + static_cast<size_t>(row) * footprint.Footprint.RowPitch,
+                    static_cast<size_t>(rowSize));
+            }
         }
     }
 
@@ -429,12 +440,12 @@ bool DX12TextureCache::UploadFromCpuPixels(const DirectX::ScratchImage& image,
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     commandList->ResourceBarrier(1, &barrier);
 
-    outEntry.format = FromDXGI(metadata.format);
-    outEntry.width = static_cast<uint32_t>(metadata.width);
-    outEntry.height = static_cast<uint32_t>(metadata.height);
-    outEntry.mipLevels = static_cast<uint32_t>(metadata.mipLevels);
-    outEntry.arraySize = static_cast<uint32_t>(metadata.arraySize);
-    outEntry.isCube = metadata.IsCubemap();
+    outEntry.format = image.Format();
+    outEntry.width = image.Width();
+    outEntry.height = image.Height();
+    outEntry.mipLevels = image.MipLevels();
+    outEntry.arraySize = image.ArraySize();
+    outEntry.isCube = image.IsCube();
 
     m_stats.bytesUploaded += totalBytes;
     outAllocation = std::move(allocation);
@@ -480,8 +491,8 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     //   move해 왔는데, 그 전제인 "한 번 올리면 캐시가 영원히 들고 있다"를
     //   ③(미사용 기반 은퇴)이 깼다. 은퇴 뒤 재요청에서 픽셀이 비어 있어
     //   재업로드가 실패했다(실측 3102건 · 화면에 흰색).
-    const DirectX::ScratchImage* pixels = texture->GetCpuPixels();
-    if (nullptr == pixels)
+    const TextureImageView pixels = texture->GetImageView();
+    if (pixels.IsEmpty())
     {
         // ★ CPU 픽셀이 없는 텍스처가 여기 오면 그것 자체가 신호다.
         //
@@ -501,7 +512,7 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::str
     const std::wstring wideName(texture->m_name.begin(), texture->m_name.end());
     DX12PersistentHeap::Allocation allocation;
     Entry entry{};
-    if (!UploadFromCpuPixels(*pixels, wideName.c_str(), allocation, entry, outError))
+    if (!UploadFromCpuPixels(pixels, wideName.c_str(), allocation, entry, outError))
     {
         ++m_stats.failures;
         return m_white;

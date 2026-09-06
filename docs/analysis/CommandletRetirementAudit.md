@@ -1,7 +1,9 @@
 # Commandlet 정리 결과 — 2026-09-06
 
+> master 병합 후보: `6b9c2b79`의 `light.proxy` 제품 조회와 텍스처 Commandlet 4개를 보존했다. 통합 검증 및 원본 작업 보존은 [병합 준비 기록](Phase14_5MergePreparation.md)을 따른다.
+
 기준 HEAD `55374f16`의 미커밋 작업 트리에 적용했다. 현재 런타임 discovery는
-**제품 명령 98개(이름 105개), Commandlet 103개**다. 이번 후속 정리 전의
+**제품 명령 99개(이름 106개), Commandlet 107개**다. 이번 후속 정리 전의
 95/111에서 제품 진단·태그 기능을 옮기고 종료된 비교 벤치를 제거했다.
 [처분표](CommandSurfaceDisposition.tsv)는 실제 이름 집합과 대조했으며,
 [전체 구조](CommandSurfaceImplementation.md)에 앞선 CLI/Commandlet 분리 기록이 있다.
@@ -9,7 +11,7 @@
 ## 이번 마무리 반영
 
 `assets.scenemodel`을 Commandlet으로 이동했고 사용하지 않는 `animator.state/exit`를 제거했다.
-제품 98개 모두 결과를 반환하며 named JSON 입력 58개·Undo 선언 21개다.
+제품 99개 모두 결과를 반환하며 named JSON 입력 59개·Undo 선언 21개다.
 `animator.param`·`render.matmode`는 GUI 공통 Undo 경로를 사용한다.
 미보고 상태와 void/직접 exit 어댑터, 한국어 verdict 소비자 13개 및 명령 소스 존재 소비자 6개를 정리했다.
 최신 실행 결과 및 전체 종결을 보류하는 검증 경계는 [Phase14_5Closure.md](Phase14_5Closure.md)를 본다.

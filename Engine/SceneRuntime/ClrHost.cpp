@@ -18,6 +18,7 @@
 #include "CameraComponent.h"
 #include "CameraSystem.h"
 #include "MeshRenderer.h"
+#include "LightComponent.h"
 #include "../RenderEngine/Material.h"
 #include "InputManager.h"
 #include "PhysicsManager.h"
@@ -44,7 +45,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 19;
+	constexpr int kApiVersion = 24;
 
 	struct Float3 { float x, y, z; };
 
@@ -79,6 +80,13 @@ namespace
 		int  (__stdcall* Entity_GetName)(ScriptObjectHandle handle, char* buffer, int capacity);
 		void (__stdcall* Entity_SetEnabled)(ScriptObjectHandle handle, int enabled);
 
+		// 스크립트 컴포넌트 하나의 활성 상태. 오브젝트 전체(Entity_SetEnabled)와 달리
+		// 이 스크립트만 켜고 끈다 — 관리 측 Component.Enabled의 setter가 이것을 부르고,
+		// OnEnable/OnDisable 훅은 그 결과로 네이티브가 되돌려 준다(드라이버 단일화).
+		// owner를 함께 받는 이유: instanceId만으로는 어느 Entity의 컴포넌트인지 알 수
+		// 없고, 역맵을 두면 그 맵이 dangling의 새 원천이 된다.
+		int  (__stdcall* Script_SetEnabled)(ScriptObjectHandle owner, int instanceId, int enabled);
+
 		// 계층 접근. 실측에서 m_childrenIndices 76 · Entity::FindIndex 100 ·
 		// m_parentIndex 32로, 남은 어떤 컴포넌트 래퍼보다 큰 표면이다.
 		int  (__stdcall* Entity_GetChildCount)(ScriptObjectHandle handle);
@@ -86,6 +94,16 @@ namespace
 		ScriptObjectHandle (__stdcall* Entity_GetParent)(ScriptObjectHandle handle);
 		ScriptObjectHandle (__stdcall* Entity_FindByIndex)(int index);
 		int  (__stdcall* Entity_GetIndex)(ScriptObjectHandle handle);
+
+		// ★ S3부터 Transform은 없을 수 있다 — UI/Canvas는 RectTransformComponent만 갖는다.
+		//
+		// 이 하나가 없으면 관리 측은 부재를 표현할 방법이 아예 없다. 그러면 C#이
+		// Transform을 잡아 값을 쓰는 순간 Entity::Transform_()가 공유 더미로 떨어지고
+		// (Entity.cpp MissingTransformFallback) 오브젝트 이름당 로그 한 줄만 남긴 채
+		// 값이 사라진다 — 크래시도 예외도 없어 스크립트 쪽에서는 성공과 구분되지 않는다.
+		// 다른 컴포넌트의 *_Exists와 같은 역할이고, 그것들과 달리 늦게 생긴 이유는
+		// 승격(S1-b) 전에는 Transform이 GameObject의 값 멤버라 부재가 없었기 때문이다.
+		int    (__stdcall* Transform_Exists)(ScriptObjectHandle handle);
 
 		Float3 (__stdcall* Transform_GetLocalPosition)(ScriptObjectHandle handle);
 		void   (__stdcall* Transform_SetLocalPosition)(ScriptObjectHandle handle, Float3 position);
@@ -182,18 +200,56 @@ namespace
 		void   (__stdcall* Image_SetClipPercent)(ScriptObjectHandle handle, float percent);
 		void   (__stdcall* Image_SetNativeSize)(ScriptObjectHandle handle);
 
-		// 카메라. 월드→스크린 변환을 손으로 하는 파일이 11개나 되어 한 번에 접는다.
-		int    (__stdcall* Camera_Exists)();
+		// 카메라 — 주 카메라 기준 질의. 월드→스크린 변환을 손으로 하는 파일이
+		// 11개나 되어 한 번에 접는다. 이 셋은 핸들을 받지 않는다(전역 접근점).
+		int    (__stdcall* Camera_PrimaryExists)();
 		Float2 (__stdcall* Camera_GetScreenSize)();
 		Float3 (__stdcall* Camera_WorldToScreenPoint)(Float3 world);
+
+		// CameraComponent — 오브젝트에 붙은 카메라 하나를 가리킨다(저작 20건).
+		//
+		// LightComponent와 달리 dirty를 발행하지 않는다. 카메라는 렌더 프록시를
+		// 쓰지 않고(Scene.cpp의 Kind 열거에 Camera가 없다) 매 프레임
+		// CaptureFrameSnapshot으로 읽히므로, 값을 바꾸면 다음 프레임에 그대로 반영된다.
+		//
+		// 위치·방향은 여기 없다 — CameraComponent::ResolveCamera가 Transform에서
+		// 매번 유도한다. 카메라를 움직이려면 Transform을 옮기는 것이 정본이다.
+		int    (__stdcall* Camera_Exists)(ScriptObjectHandle handle);
+		float  (__stdcall* Camera_GetFov)(ScriptObjectHandle handle);
+		void   (__stdcall* Camera_SetFov)(ScriptObjectHandle handle, float degrees);
+		float  (__stdcall* Camera_GetNearPlane)(ScriptObjectHandle handle);
+		void   (__stdcall* Camera_SetNearPlane)(ScriptObjectHandle handle, float value);
+		float  (__stdcall* Camera_GetFarPlane)(ScriptObjectHandle handle);
+		void   (__stdcall* Camera_SetFarPlane)(ScriptObjectHandle handle, float value);
+		int    (__stdcall* Camera_IsPrimary)(ScriptObjectHandle handle);
+		void   (__stdcall* Camera_SetPrimary)(ScriptObjectHandle handle, int primary);
+		ScriptObjectHandle (__stdcall* Camera_GetPrimaryHandle)();
+
+		// LightComponent. 저작 자산에 30개가 있는데 스크립트가 만질 길이 없었다.
+		//
+		// setter는 전부 LightComponent의 writer를 거친다 — 필드에 직접 대입하면
+		// dirty가 서지 않아 LightRenderProxy가 낡은 채 남는다(LightComponent.h 주석).
+		int    (__stdcall* Light_Exists)(ScriptObjectHandle handle);
+		Float4 (__stdcall* Light_GetColor)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetColor)(ScriptObjectHandle handle, Float4 color);
+		float  (__stdcall* Light_GetIntensity)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetIntensity)(ScriptObjectHandle handle, float intensity);
+		float  (__stdcall* Light_GetRange)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetRange)(ScriptObjectHandle handle, float range);
+		float  (__stdcall* Light_GetSpotAngle)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetSpotAngle)(ScriptObjectHandle handle, float degrees);
+		int    (__stdcall* Light_GetLightType)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetLightType)(ScriptObjectHandle handle, int type);
+		int    (__stdcall* Light_GetLightStatus)(ScriptObjectHandle handle);
+		void   (__stdcall* Light_SetLightStatus)(ScriptObjectHandle handle, int status);
 
 		// MeshRenderer + Material. 스크립트가 만지는 것은 사실상 셋뿐이다 —
 		// 재질 사본 만들기(6회) · 셰이더 상수 넣기(24회) · 베이스 색 알파.
 		int   (__stdcall* Mesh_Exists)(ScriptObjectHandle handle);
 		void  (__stdcall* Mesh_InstantiateMaterial)(ScriptObjectHandle handle, const char* newName);
 		int   (__stdcall* Mesh_GetMaterialName)(ScriptObjectHandle handle, char* buffer, int capacity);
-		int   (__stdcall* Mesh_SetMaterialFloat)(ScriptObjectHandle handle, const char* buffer, const char* name, float value);
-		int   (__stdcall* Mesh_SetMaterialInt)(ScriptObjectHandle handle, const char* buffer, const char* name, int value);
+		int   (__stdcall* Mesh_SetMaterialFloat)(ScriptObjectHandle handle, const char* name, float value);
+		int   (__stdcall* Mesh_SetMaterialInt)(ScriptObjectHandle handle, const char* name, int value);
 		Float4 (__stdcall* Mesh_GetBaseColor)(ScriptObjectHandle handle);
 		void  (__stdcall* Mesh_SetBaseColor)(ScriptObjectHandle handle, Float4 color);
 
@@ -373,6 +429,37 @@ namespace
 		}
 	}
 
+	/// 스크립트 컴포넌트 하나만 켜고 끈다(PHASE 9 트랙 L · 활성 축).
+	///
+	/// ── 왜 역맵을 두지 않는가 ──
+	///
+	/// instanceId → ScriptComponent* 맵을 들면 파괴·핫리로드·재생 왕복마다 그 맵을
+	/// 정확히 걷어야 하고, 한 번이라도 놓치면 dangling을 역참조한다. 관리 측은 이미
+	/// 자기 Entity 핸들을 들고 있으므로, 그 오브젝트의 ScriptComponent들만 훑어
+	/// id로 고르면 새 상태를 만들지 않는다 — QueueManagedCollision이 쓰는 것과 같은
+	/// 관용구다. 오브젝트 하나의 스크립트 수는 한 자리라 선형 탐색으로 충분하다.
+	///
+	/// 돌려주는 값은 "실제로 그 컴포넌트를 찾아 적용했는가"다. 0이면 관리 측이
+	/// 국소 폴백으로 내려가고 경고를 남긴다 — 조용히 무시되면 스크립트가 자기를
+	/// 껐는데 계속 도는, 이 슬라이스가 고치려는 바로 그 증상이 다시 생긴다.
+	int __stdcall Api_Script_SetEnabled(ScriptObjectHandle owner, int instanceId, int enabled)
+	{
+		Entity* object = ScriptObjectRegistry::Get().Resolve(owner);
+		if (nullptr == object) return 0;
+
+		for (ScriptComponent* script : object->GetComponents<ScriptComponent>())
+		{
+			if (nullptr == script || script->GetInstanceId() != instanceId) continue;
+
+			// Component::SetEnabled가 전이일 때만 OnEnable/OnDisable을 부르고,
+			// ScriptComponent의 그 override가 관리 측으로 되돌려 준다. 여기서
+			// 훅을 직접 부르지 않는 것이 요점이다 — 드라이버가 하나여야 한다.
+			script->SetEnabled(0 != enabled);
+			return 1;
+		}
+		return 0;
+	}
+
 	/// C#의 setter 직후 GetWorld* 계약을 packed targeted pull에 연결한다.
 	/// Scene은 target의 parentExec chain만 정방향 계산하며 global dirty-root queue와
 	/// 자식 전파 신호를 소비하지 않는다.
@@ -440,6 +527,14 @@ namespace
 	{
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		return (nullptr != object) ? static_cast<int>(object->m_index) : -1;
+	}
+
+	// Transform_()를 부르지 않는다 — 그것은 부재 시 더미를 돌려주므로 여기서 쓰면
+	// 언제나 "있다"가 되어 검사가 아무것도 말하지 않게 된다. HasTransform()을 직접 본다.
+	int __stdcall Api_Transform_Exists(ScriptObjectHandle handle)
+	{
+		const Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
+		return (nullptr != object && object->HasTransform()) ? 1 : 0;
 	}
 
 	Float3 __stdcall Api_Transform_GetLocalPosition(ScriptObjectHandle handle)
@@ -1100,7 +1195,7 @@ namespace
 		return (nullptr != scene) ? scene->Cameras().GetPrimaryCamera() : nullptr;
 	}
 
-	int __stdcall Api_Camera_Exists()
+	int __stdcall Api_Camera_PrimaryExists()
 	{
 		return ResolvePrimaryCamera() ? 1 : 0;
 	}
@@ -1135,6 +1230,188 @@ namespace
 
 		const auto size = camera->GetCamera()->GetScreenSize();
 		return { (ndcX + 1.f) * 0.5f * size.width, (1.f - ndcY) * 0.5f * size.height, w };
+	}
+
+	// ── CameraComponent (오브젝트에 붙은 카메라) ──
+	//
+	// dirty를 발행하지 않는다 — 카메라는 렌더 프록시를 쓰지 않는다(표 선언 주석).
+	// 위치·방향도 없다. ResolveCamera가 Transform에서 매번 유도하므로 그쪽이 정본이다.
+
+	CameraComponent* ResolveCameraComponent(ScriptObjectHandle handle)
+	{
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
+		return (nullptr != object) ? object->GetComponent<CameraComponent>() : nullptr;
+	}
+
+	int __stdcall Api_Camera_Exists(ScriptObjectHandle handle)
+	{
+		return (nullptr != ResolveCameraComponent(handle)) ? 1 : 0;
+	}
+
+	float __stdcall Api_Camera_GetFov(ScriptObjectHandle handle)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		return (nullptr != camera) ? camera->GetCamera()->m_fov : 0.f;
+	}
+
+	void __stdcall Api_Camera_SetFov(ScriptObjectHandle handle, float degrees)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		if (nullptr != camera) camera->GetCamera()->m_fov = degrees;
+	}
+
+	float __stdcall Api_Camera_GetNearPlane(ScriptObjectHandle handle)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		return (nullptr != camera) ? camera->GetCamera()->m_nearPlane : 0.f;
+	}
+
+	void __stdcall Api_Camera_SetNearPlane(ScriptObjectHandle handle, float value)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		if (nullptr != camera) camera->GetCamera()->m_nearPlane = value;
+	}
+
+	float __stdcall Api_Camera_GetFarPlane(ScriptObjectHandle handle)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		return (nullptr != camera) ? camera->GetCamera()->m_farPlane : 0.f;
+	}
+
+	void __stdcall Api_Camera_SetFarPlane(ScriptObjectHandle handle, float value)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		if (nullptr != camera) camera->GetCamera()->m_farPlane = value;
+	}
+
+	int __stdcall Api_Camera_IsPrimary(ScriptObjectHandle handle)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		return (nullptr != camera && camera->IsPrimary()) ? 1 : 0;
+	}
+
+	// 여럿이 primary여도 막지 않는다 — CameraSystem::GetPrimaryCamera가 그중
+	// instanceID가 가장 작은 것을 고른다. 여기서 남의 플래그를 내리면 스크립트가
+	// 모르는 사이에 다른 오브젝트의 저작값이 바뀐다.
+	void __stdcall Api_Camera_SetPrimary(ScriptObjectHandle handle, int primary)
+	{
+		CameraComponent* camera = ResolveCameraComponent(handle);
+		if (nullptr != camera) camera->SetPrimary(0 != primary);
+	}
+
+	// 주 카메라의 소유 오브젝트 핸들. 없으면 무효 핸들이라 C# 쪽에서 IsAlive로 걸린다.
+	ScriptObjectHandle __stdcall Api_Camera_GetPrimaryHandle()
+	{
+		CameraComponent* camera = ResolvePrimaryCamera();
+		if (nullptr == camera) return {};
+
+		Entity* owner = camera->GetOwner();
+		if (nullptr == owner) return {};
+
+		return ScriptObjectRegistry::Get().Register(owner);
+	}
+
+	// ── LightComponent ──
+	//
+	// setter가 필드에 직접 대입하지 않고 컴포넌트 writer를 부르는 것이 핵심이다.
+	// Scene::CommitRenderProxies는 dirtyQueue만 훑으므로, 발행 없이 값만 넣으면
+	// LightRenderProxy가 낡은 채 남아 화면이 그대로다 — 되읽으면 새 값이 나와
+	// 스크립트 쪽에서는 성공한 것처럼 보인다.
+
+	LightComponent* ResolveLight(ScriptObjectHandle handle)
+	{
+		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
+		return (nullptr != object) ? object->GetComponent<LightComponent>() : nullptr;
+	}
+
+	int __stdcall Api_Light_Exists(ScriptObjectHandle handle)
+	{
+		return (nullptr != ResolveLight(handle)) ? 1 : 0;
+	}
+
+	Float4 __stdcall Api_Light_GetColor(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr == light) return { 1.f, 1.f, 1.f, 1.f };
+
+		const math::color& c = light->m_color;
+		return { c.r, c.g, c.b, c.a };
+	}
+
+	void __stdcall Api_Light_SetColor(ScriptObjectHandle handle, Float4 color)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr == light) return;
+
+		light->SetColor(math::color{ color.x, color.y, color.z, color.w });
+	}
+
+	float __stdcall Api_Light_GetIntensity(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? light->m_intencity : 0.f;
+	}
+
+	void __stdcall Api_Light_SetIntensity(ScriptObjectHandle handle, float intensity)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr != light) light->SetIntensity(intensity);
+	}
+
+	float __stdcall Api_Light_GetRange(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? light->m_range : 0.f;
+	}
+
+	void __stdcall Api_Light_SetRange(ScriptObjectHandle handle, float range)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr != light) light->SetRange(range);
+	}
+
+	float __stdcall Api_Light_GetSpotAngle(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? light->m_spotLightAngle : 0.f;
+	}
+
+	void __stdcall Api_Light_SetSpotAngle(ScriptObjectHandle handle, float degrees)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr != light) light->SetSpotAngle(degrees);
+	}
+
+	// 열거는 int로 건넌다. LightType/LightStatus는 uint16_t라 값 범위는 넉넉하고,
+	// 미러 대조는 check-api-table이 아니라 관리 측 enum 정의가 진다.
+	int __stdcall Api_Light_GetLightType(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? static_cast<int>(light->m_lightType) : 0;
+	}
+
+	void __stdcall Api_Light_SetLightType(ScriptObjectHandle handle, int type)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr == light) return;
+		if (type < DirectionalLight || type > SpotLight) return;
+
+		light->SetLightType(static_cast<LightType>(type));
+	}
+
+	int __stdcall Api_Light_GetLightStatus(ScriptObjectHandle handle)
+	{
+		LightComponent* light = ResolveLight(handle);
+		return (nullptr != light) ? static_cast<int>(light->m_lightStatus) : 0;
+	}
+
+	void __stdcall Api_Light_SetLightStatus(ScriptObjectHandle handle, int status)
+	{
+		LightComponent* light = ResolveLight(handle);
+		if (nullptr == light) return;
+		if (status < Disabled || status > StaticShadows) return;
+
+		light->SetLightStatus(static_cast<LightStatus>(status));
 	}
 
 	// ── MeshRenderer · Material ──
@@ -1192,12 +1469,17 @@ namespace
 	}
 
 	// I5-M5 S3 — 논리 property를 이름으로 갱신한다. legacy TrySetValue와 달리
-	// RuntimeSchema 설치나 CB 이름에 기대지 않는다(buffer 인자는 ABI 유지용으로
-	// 받고 검증하지 않는다 — 라우팅은 ShaderMeta 선언이 한다). 이름/타입이
-	// 틀리면 0을 돌려준다 — 오타를 삼키지 않으려면 호출부가 봐야 한다.
-	int __stdcall Api_Mesh_SetMaterialFloat(ScriptObjectHandle handle, const char* buffer, const char* name, float value)
+	// RuntimeSchema 설치나 CB 이름에 기대지 않는다 — 라우팅은 ShaderMeta 선언이
+	// 한다. 이름/타입이 틀리면 0을 돌려준다 — 오타를 삼키지 않으려면 호출부가
+	// 봐야 한다.
+	//
+	// 9-4에 상수 버퍼 이름 인자를 걷었다. fb6e4f55에서 라우팅이 ShaderMeta로
+	// 넘어간 뒤로 받기만 하고 쓰지 않았는데, 시그니처에 남아 있으니 호출부는
+	// 여전히 맞는 버퍼 이름을 골라 넘기려 했다. 순서 비교 게이트는 "받지만
+	// 안 쓰는 인자"에 원리적으로 눈멀어 이것을 잡을 수 없다.
+	int __stdcall Api_Mesh_SetMaterialFloat(ScriptObjectHandle handle, const char* name, float value)
 	{
-		if (nullptr == buffer || nullptr == name) return 0;
+		if (nullptr == name) return 0;
 
 		MeshRenderer* mesh = ResolveMesh(handle);
 		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
@@ -1209,9 +1491,9 @@ namespace
 			mesh->GetMaterialInstance()) ? 1 : 0;
 	}
 
-	int __stdcall Api_Mesh_SetMaterialInt(ScriptObjectHandle handle, const char* buffer, const char* name, int value)
+	int __stdcall Api_Mesh_SetMaterialInt(ScriptObjectHandle handle, const char* name, int value)
 	{
-		if (nullptr == buffer || nullptr == name) return 0;
+		if (nullptr == name) return 0;
 
 		MeshRenderer* mesh = ResolveMesh(handle);
 		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
@@ -1980,11 +2262,13 @@ namespace
 		g_apiTable.Entity_IsAlive          = &Api_Entity_IsAlive;
 		g_apiTable.Entity_GetName          = &Api_Entity_GetName;
 		g_apiTable.Entity_SetEnabled       = &Api_Entity_SetEnabled;
+		g_apiTable.Script_SetEnabled       = &Api_Script_SetEnabled;
 		g_apiTable.Entity_GetChildCount    = &Api_Entity_GetChildCount;
 		g_apiTable.Entity_GetChild         = &Api_Entity_GetChild;
 		g_apiTable.Entity_GetParent        = &Api_Entity_GetParent;
 		g_apiTable.Entity_FindByIndex      = &Api_Entity_FindByIndex;
 		g_apiTable.Entity_GetIndex         = &Api_Entity_GetIndex;
+		g_apiTable.Transform_Exists            = &Api_Transform_Exists;
 		g_apiTable.Transform_GetLocalPosition  = &Api_Transform_GetLocalPosition;
 		g_apiTable.Transform_SetLocalPosition  = &Api_Transform_SetLocalPosition;
 		g_apiTable.Transform_GetWorldPosition  = &Api_Transform_GetWorldPosition;
@@ -2068,9 +2352,34 @@ namespace
 		g_apiTable.Image_SetClipPercent        = &Api_Image_SetClipPercent;
 		g_apiTable.Image_SetNativeSize         = &Api_Image_SetNativeSize;
 
-		g_apiTable.Camera_Exists               = &Api_Camera_Exists;
+		g_apiTable.Camera_PrimaryExists        = &Api_Camera_PrimaryExists;
 		g_apiTable.Camera_GetScreenSize        = &Api_Camera_GetScreenSize;
 		g_apiTable.Camera_WorldToScreenPoint   = &Api_Camera_WorldToScreenPoint;
+
+		g_apiTable.Camera_Exists               = &Api_Camera_Exists;
+		g_apiTable.Camera_GetFov               = &Api_Camera_GetFov;
+		g_apiTable.Camera_SetFov               = &Api_Camera_SetFov;
+		g_apiTable.Camera_GetNearPlane         = &Api_Camera_GetNearPlane;
+		g_apiTable.Camera_SetNearPlane         = &Api_Camera_SetNearPlane;
+		g_apiTable.Camera_GetFarPlane          = &Api_Camera_GetFarPlane;
+		g_apiTable.Camera_SetFarPlane          = &Api_Camera_SetFarPlane;
+		g_apiTable.Camera_IsPrimary            = &Api_Camera_IsPrimary;
+		g_apiTable.Camera_SetPrimary           = &Api_Camera_SetPrimary;
+		g_apiTable.Camera_GetPrimaryHandle     = &Api_Camera_GetPrimaryHandle;
+
+		g_apiTable.Light_Exists                = &Api_Light_Exists;
+		g_apiTable.Light_GetColor              = &Api_Light_GetColor;
+		g_apiTable.Light_SetColor              = &Api_Light_SetColor;
+		g_apiTable.Light_GetIntensity          = &Api_Light_GetIntensity;
+		g_apiTable.Light_SetIntensity          = &Api_Light_SetIntensity;
+		g_apiTable.Light_GetRange              = &Api_Light_GetRange;
+		g_apiTable.Light_SetRange              = &Api_Light_SetRange;
+		g_apiTable.Light_GetSpotAngle          = &Api_Light_GetSpotAngle;
+		g_apiTable.Light_SetSpotAngle          = &Api_Light_SetSpotAngle;
+		g_apiTable.Light_GetLightType          = &Api_Light_GetLightType;
+		g_apiTable.Light_SetLightType          = &Api_Light_SetLightType;
+		g_apiTable.Light_GetLightStatus        = &Api_Light_GetLightStatus;
+		g_apiTable.Light_SetLightStatus        = &Api_Light_SetLightStatus;
 
 		g_apiTable.Mesh_Exists                 = &Api_Mesh_Exists;
 		g_apiTable.Mesh_InstantiateMaterial    = &Api_Mesh_InstantiateMaterial;
@@ -2253,12 +2562,12 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"PostPhysicsTick", &fn))  return false;  m_fnPostPhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<AwakeFn>(fn);
 	if (!bind(L"FlushPhysicsEvents", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
-	if (!bind(L"CreateBehaviour", &fn))  return false;  m_fnCreateBehaviour = reinterpret_cast<CreateFn>(fn);
+	if (!bind(L"CreateComponent", &fn))  return false;  m_fnCreateComponent = reinterpret_cast<CreateFn>(fn);
 
 	// 선택 바인딩 — 구 ScriptCore 어셈블리에는 없을 수 있다. 실패해도 계속 간다
 	// (해당 기능만 조용히 꺼진다: 목록 UI는 빈 목록, 메시지는 전달되지 않음).
-	if (bind(L"GetBehaviourTypeNames", &fn))    m_fnGetBehaviourTypeNames    = reinterpret_cast<TypeNamesFn>(fn);
-	if (bind(L"GetAniBehaviourTypeNames", &fn)) m_fnGetAniBehaviourTypeNames = reinterpret_cast<TypeNamesFn>(fn);
+	if (bind(L"GetComponentTypeNames", &fn))    m_fnGetComponentTypeNames    = reinterpret_cast<TypeNamesFn>(fn);
+	if (bind(L"GetAniBehaviorTypeNames", &fn)) m_fnGetAniBehaviorTypeNames = reinterpret_cast<TypeNamesFn>(fn);
 	if (bind(L"FlushScriptMessages", &fn))      m_fnFlushScriptMessages      = reinterpret_cast<FlushMessageFn>(fn);
 
 	// 행동 트리(9-8). 트리는 관리 측이 소유하고 네이티브는 인스턴스 id만 든다.
@@ -2281,12 +2590,13 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	}
 
 	// 애니메이션 상태 스크립트
-	if (!bind(L"HasAniBehaviour", &fn))     return false;  m_fnHasAniBehaviour     = reinterpret_cast<HasAniFn>(fn);
-	if (!bind(L"CreateAniBehaviour", &fn))  return false;  m_fnCreateAniBehaviour  = reinterpret_cast<CreateAniFn>(fn);
-	if (!bind(L"DestroyAniBehaviour", &fn)) return false;  m_fnDestroyAniBehaviour = reinterpret_cast<DestroyAniFn>(fn);
+	if (!bind(L"HasAniBehavior", &fn))     return false;  m_fnHasAniBehavior     = reinterpret_cast<HasAniFn>(fn);
+	if (!bind(L"CreateAniBehavior", &fn))  return false;  m_fnCreateAniBehavior  = reinterpret_cast<CreateAniFn>(fn);
+	if (!bind(L"DestroyAniBehavior", &fn)) return false;  m_fnDestroyAniBehavior = reinterpret_cast<DestroyAniFn>(fn);
 	if (!bind(L"FlushAniEvents", &fn))      return false;  m_fnFlushAniEvents      = reinterpret_cast<FlushAniFn>(fn);
-	if (!bind(L"DestroyBehaviour", &fn)) return false;  m_fnDestroyBehaviour = reinterpret_cast<DestroyFn>(fn);
+	if (!bind(L"DestroyComponent", &fn)) return false;  m_fnDestroyComponent = reinterpret_cast<DestroyFn>(fn);
 	if (!bind(L"DispatchLifecycle", &fn)) return false;  m_fnDispatchLifecycle = reinterpret_cast<LifecycleFn>(fn);
+	if (!bind(L"SetScriptEnabled", &fn)) return false;  m_fnSetScriptEnabled = reinterpret_cast<LifecycleFn>(fn);
 
 	// 스크립트 어셈블리 로드·핫리로드
 	if (!bind(L"LoadScripts", &fn))            return false;  m_fnLoadScripts = reinterpret_cast<LoadScriptsFn>(fn);
@@ -2516,27 +2826,27 @@ void ClrHost::Shutdown()
 	// 종료 직전이라 정리 이득도 없다.
 }
 
-bool ClrHost::HasAniBehaviour(std::string_view typeName)
+bool ClrHost::HasAniBehavior(std::string_view typeName)
 {
-	if (!m_ready || nullptr == m_fnHasAniBehaviour) return false;
+	if (!m_ready || nullptr == m_fnHasAniBehavior) return false;
 
 	const std::string name(typeName);
-	return 0 != m_fnHasAniBehaviour(name.c_str());
+	return 0 != m_fnHasAniBehavior(name.c_str());
 }
 
-int ClrHost::CreateAniBehaviour(std::string_view typeName)
+int ClrHost::CreateAniBehavior(std::string_view typeName)
 {
-	if (!m_ready || nullptr == m_fnCreateAniBehaviour) return -1;
+	if (!m_ready || nullptr == m_fnCreateAniBehavior) return -1;
 
 	const std::string name(typeName);
-	return m_fnCreateAniBehaviour(name.c_str());
+	return m_fnCreateAniBehavior(name.c_str());
 }
 
-void ClrHost::DestroyAniBehaviour(int instanceId)
+void ClrHost::DestroyAniBehavior(int instanceId)
 {
-	if (m_ready && nullptr != m_fnDestroyAniBehaviour && instanceId >= 0)
+	if (m_ready && nullptr != m_fnDestroyAniBehavior && instanceId >= 0)
 	{
-		m_fnDestroyAniBehaviour(instanceId);
+		m_fnDestroyAniBehavior(instanceId);
 	}
 }
 
@@ -2727,19 +3037,29 @@ bool ClrHost::DestroyBehaviorTree(int instanceId)
 	return 0 == m_fnDestroyBehaviorTree(instanceId);
 }
 
-int ClrHost::CreateBehaviour(Entity* owner, std::string_view typeName)
+int ClrHost::CreateComponent(Entity* owner, std::string_view typeName)
 {
-	if (!m_ready || nullptr == m_fnCreateBehaviour || nullptr == owner) return -1;
+	if (!m_ready || nullptr == m_fnCreateComponent || nullptr == owner) return -1;
 
 	const ScriptObjectHandle handle = ScriptObjectRegistry::Get().Register(owner);
 	const std::string name(typeName);
-	return m_fnCreateBehaviour(handle, name.c_str());
+	return m_fnCreateComponent(handle, name.c_str());
 }
 
-bool ClrHost::DestroyBehaviour(int instanceId)
+bool ClrHost::DestroyComponent(int instanceId)
 {
-	if (!m_ready || nullptr == m_fnDestroyBehaviour) return false;
-	return 0 == m_fnDestroyBehaviour(instanceId);
+	if (!m_ready || nullptr == m_fnDestroyComponent) return false;
+	return 0 == m_fnDestroyComponent(instanceId);
+}
+
+bool ClrHost::DispatchEnabled(int instanceId, bool enabled)
+{
+	if (!m_ready || nullptr == m_fnSetScriptEnabled) return false;
+
+	// 6단계 전송로(DispatchLifecycle)를 쓰지 않는다. 활성은 **단계가 아니라 상태**라
+	// ScriptLifecyclePhase에 값을 더하면 그 enum이 두 가지를 뜻하게 된다
+	// (같은 이유로 틱도 거기 오지 않는다 — ScriptLifecyclePhase.h 상단).
+	return 0 == m_fnSetScriptEnabled(instanceId, enabled ? 1 : 0);
 }
 
 bool ClrHost::DispatchLifecycle(int instanceId, ScriptLifecyclePhase phase)
@@ -2778,9 +3098,9 @@ namespace
 	}
 }
 
-std::vector<std::string> ClrHost::GetBehaviourTypeNames()
+std::vector<std::string> ClrHost::GetComponentTypeNames()
 {
-	return m_ready ? ReadTypeNameList(m_fnGetBehaviourTypeNames) : std::vector<std::string>{};
+	return m_ready ? ReadTypeNameList(m_fnGetComponentTypeNames) : std::vector<std::string>{};
 }
 
 bool ClrHost::HasBTNodeType(std::string_view typeName)
@@ -2815,9 +3135,9 @@ std::vector<std::string> ClrHost::GetBTNodeTypeNames(BTNodeKind kind)
 	return names;
 }
 
-std::vector<std::string> ClrHost::GetAniBehaviourTypeNames()
+std::vector<std::string> ClrHost::GetAniBehaviorTypeNames()
 {
-	return m_ready ? ReadTypeNameList(m_fnGetAniBehaviourTypeNames) : std::vector<std::string>{};
+	return m_ready ? ReadTypeNameList(m_fnGetAniBehaviorTypeNames) : std::vector<std::string>{};
 }
 
 void ClrHost::QueueScriptMessage(int instanceId, std::string_view methodName)

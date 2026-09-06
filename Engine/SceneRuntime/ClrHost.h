@@ -107,14 +107,14 @@ public:
 		ScriptObjectHandle owner;
 	};
 
-	bool HasAniBehaviour(std::string_view typeName);
-	int  CreateAniBehaviour(std::string_view typeName);
-	void DestroyAniBehaviour(int instanceId);
+	bool HasAniBehavior(std::string_view typeName);
+	int  CreateAniBehavior(std::string_view typeName);
+	void DestroyAniBehavior(int instanceId);
 	void QueueAniEvent(int instanceId, AniEventKind kind, float deltaTime, Entity* owner);
 	void FlushAniEvents();
 
 	// 등록된 애니메이션 상태 스크립트 이름 목록 — 애니메이터 편집기의 선택 목록용.
-	std::vector<std::string> GetAniBehaviourTypeNames();
+	std::vector<std::string> GetAniBehaviorTypeNames();
 
 	// ── 이름으로 부르는 콜백 ──
 	//
@@ -278,8 +278,8 @@ public:
 
 	// ── 인스턴스 ──
 	// 성공하면 0 이상의 인스턴스 id, 실패하면 음수.
-	int CreateBehaviour(Entity* owner, std::string_view typeName);
-	bool DestroyBehaviour(int instanceId);
+	int CreateComponent(Entity* owner, std::string_view typeName);
+	bool DestroyComponent(int instanceId);
 
 	/// 관리 인스턴스 하나에 생명주기 단계 하나를 직접 전달한다(트랙 L · L3 잔여).
 	/// 사유와 값 규약은 ScriptLifecyclePhase.h 상단에 있다 — 요약하면 관리 측
@@ -287,9 +287,16 @@ public:
 	/// 씬 편입/이탈 두 단계만 DDOL 이송 경로에서 태운다.
 	bool DispatchLifecycle(int instanceId, ScriptLifecyclePhase phase);
 
+	// 활성 전이 하나를 관리 인스턴스에 전달한다(PHASE 9 트랙 L · 활성 축).
+	//
+	// 6단계와 직교한 축이라 DispatchLifecycle과 창구를 나눈다 — 활성은 단계가
+	// 아니라 상태이고, ScriptLifecyclePhase에 값을 더하면 그 enum이 두 가지를
+	// 뜻하게 된다. 부르는 곳은 ScriptComponent::OnEnable/OnDisable 뿐이다.
+	bool DispatchEnabled(int instanceId, bool enabled);
+
 	// 등록된 스크립트 타입 이름 목록 — 에디터의 컴포넌트 추가 메뉴용.
 	// 선택 바인딩이라 구 어셈블리에서는 빈 목록을 돌려줄 수 있다.
-	std::vector<std::string> GetBehaviourTypeNames();
+	std::vector<std::string> GetComponentTypeNames();
 
 
 	// 마지막 틱에서 관리 측이 보고한 활성 스크립트 수(경계 로그·진단용).
@@ -333,7 +340,7 @@ public:
 
 	// ── 노출 필드 ──
 	// 소스 제너레이터가 만든 접근자를 통해 인스펙터·직렬화가 값을 주고받는다.
-	// 관리 객체의 필드 주소를 직접 잡지 않는 이유는 ScriptCore의 Behaviour 주석 참고.
+	// 관리 객체의 필드 주소를 직접 잡지 않는 이유는 ScriptCore의 Component 주석 참고.
 	enum class ScriptFieldType : int
 	{
 		Unknown = 0, Float = 1, Int32 = 2, Bool = 3, Float3 = 4, String = 5, Object = 6, Float2 = 7
@@ -524,12 +531,12 @@ private:
 	using FlushAniFn     = int(__stdcall*)(const ScriptAniEvent*, int);
 	using FlushMessageFn = int(__stdcall*)(const ScriptMessage*, int);
 	FlushPhysicsFn m_fnFlushPhysicsEvents{ nullptr };
-	HasAniFn       m_fnHasAniBehaviour{ nullptr };
-	CreateAniFn    m_fnCreateAniBehaviour{ nullptr };
-	DestroyAniFn   m_fnDestroyAniBehaviour{ nullptr };
+	HasAniFn       m_fnHasAniBehavior{ nullptr };
+	CreateAniFn    m_fnCreateAniBehavior{ nullptr };
+	DestroyAniFn   m_fnDestroyAniBehavior{ nullptr };
 	FlushAniFn     m_fnFlushAniEvents{ nullptr };
 	FlushMessageFn m_fnFlushScriptMessages{ nullptr };
-	TypeNamesFn    m_fnGetAniBehaviourTypeNames{ nullptr };
+	TypeNamesFn    m_fnGetAniBehaviorTypeNames{ nullptr };
 
 	// 한 프레임에 모이는 충돌 이벤트. 매 프레임 clear 하되 용량은 유지한다.
 	std::vector<ScriptPhysicsEvent> m_physicsEvents;
@@ -540,10 +547,11 @@ private:
 	std::atomic_flag m_aiTickFlag = ATOMIC_FLAG_INIT;
 	std::vector<ScriptMessage> m_scriptMessages;
 	std::atomic_flag           m_scriptMessageFlag{};   // 잡 스레드가 함께 담는다
-	CreateFn     m_fnCreateBehaviour{ nullptr };
-	DestroyFn    m_fnDestroyBehaviour{ nullptr };
+	CreateFn     m_fnCreateComponent{ nullptr };
+	DestroyFn    m_fnDestroyComponent{ nullptr };
 	LifecycleFn  m_fnDispatchLifecycle{ nullptr };
-	TypeNamesFn  m_fnGetBehaviourTypeNames{ nullptr };
+	LifecycleFn  m_fnSetScriptEnabled{ nullptr };   // (instanceId, enabled) — LifecycleFn과 서명이 같다
+	TypeNamesFn  m_fnGetComponentTypeNames{ nullptr };
 
 	LoadScriptsFn m_fnLoadScripts{ nullptr };
 	ReloadFn      m_fnReloadScripts{ nullptr };

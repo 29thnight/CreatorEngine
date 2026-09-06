@@ -44,6 +44,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) { throw 'Close the existing editor before running this isolated gate.' }
+$script:ownedEditors = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) { "실행 파일이 없다: $Exe"; exit 1 }
 $exeDir   = Split-Path -Parent $Exe
@@ -76,7 +78,7 @@ $failures = New-Object System.Collections.Generic.List[string]
 $timings  = [ordered]@{}
 
 function Stop-AllEditors {
-    Get-Process CreatorEditor -ErrorAction SilentlyContinue | ForEach-Object {
+    $script:ownedEditors | Where-Object { -not $_.HasExited } | ForEach-Object {
         try { $_.Kill(); $_.WaitForExit(20000) | Out-Null } catch { }
     }
     if (Test-Path -LiteralPath $endpointPath) { Remove-Item -LiteralPath $endpointPath -Force }
@@ -86,10 +88,11 @@ function Start-Editor {
     param([string[]]$ExtraArgs, [string]$Tag)
 
     Stop-AllEditors
-    $proc = Start-Process -FilePath $Exe -ArgumentList (@('--command-service') + $ExtraArgs) `
+    $proc = Start-Process -WindowStyle Hidden -FilePath $Exe -ArgumentList (@('--command-service') + $ExtraArgs) `
         -WorkingDirectory $exeDir `
         -RedirectStandardOutput (Join-Path $Work "invoke_$Tag.out") `
         -RedirectStandardError  (Join-Path $Work "invoke_$Tag.err") -PassThru
+    $script:ownedEditors.Add($proc)
 
     $deadline = (Get-Date).AddSeconds($BootTimeoutSec)
     while ((Get-Date) -lt $deadline) {

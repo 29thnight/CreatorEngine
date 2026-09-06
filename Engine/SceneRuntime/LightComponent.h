@@ -38,9 +38,52 @@ public:
     void OnDeserialized() { SetEnabled(true); }
 
 	LightComponent() = default;
+
+	// ── 값 writer는 반드시 dirty를 발행한다 ──
+	//
+	// Scene::CommitRenderProxies는 dirtyQueue만 훑는다. 발행하지 않고 필드에
+	// 값만 넣으면 LightRenderProxy가 낡은 채로 남아 화면이 그대로다 —
+	// 컴파일도 되고 필드를 되읽어도 새 값이라 눈에 띄지 않는다.
+	//
+	// 아래 필드들은 여전히 public이라 우회할 수 있다. 리플렉션 인스펙터가
+	// 그렇게 쓰고 있어(ReflectionTypedDraw.h는 값을 대입만 하고 dirty를
+	// 모른다) 지금 private으로 내리면 저작 경로가 멈춘다. 그 축은 별도로
+	// 닫아야 하고, 그때까지 새 코드는 이 writer들만 쓴다.
 	void SetLightType(LightType type)
 	{
 		m_lightType = type;
+		PublishRenderProxyDirty(ProxyDirty::Payload);
+	}
+
+	void SetColor(const math::color& color)
+	{
+		m_color = color;
+		PublishRenderProxyDirty(ProxyDirty::Payload);
+	}
+
+	// 세기는 EnhancedLight::color.a로 실린다(EnhancedLightPacking.h).
+	void SetIntensity(float intensity)
+	{
+		m_intencity = intensity;
+		PublishRenderProxyDirty(ProxyDirty::Payload);
+	}
+
+	void SetRange(float range)
+	{
+		m_range = range;
+		PublishRenderProxyDirty(ProxyDirty::Payload);
+	}
+
+	// 도 단위로 받는다 — 패킹이 radians()로 바꿔 싣는다.
+	void SetSpotAngle(float degrees)
+	{
+		m_spotLightAngle = degrees;
+		PublishRenderProxyDirty(ProxyDirty::Payload);
+	}
+
+	void SetLightStatus(LightStatus status)
+	{
+		m_lightStatus = status;
 		PublishRenderProxyDirty(ProxyDirty::Payload);
 	}
 

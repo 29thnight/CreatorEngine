@@ -1,0 +1,21 @@
+# LC6 진입 검사 비용 측정 픽스처 (ScriptLifecycleContractHardeningPlan · LC6)
+#
+# 수치는 measure-entry-guard-cost.ps1이 뽑는다. **판정이 아니라 측정**이다 —
+# 회귀 세트(run-all)에 넣지 않는다. 이유는 그 스크립트 머리에 적었다.
+#
+# 재생 구간이 400프레임인 이유: 워밍업 30프레임을 버리고 표본 15개를 뽑는데,
+# 표본 하나가 호출 200만 회(guarded 100만 + bare 100만)라 프레임을 넘긴다.
+# 넉넉히 두지 않으면 표본이 다 차기 전에 정지가 온다.
+
+wait 60
+scene.new LC6Bench
+wait 30
+object.create Bench
+script.add Bench EntryGuardBenchProbe
+wait 30
+play
+wait 400
+stop
+wait 30
+log.flush
+quit

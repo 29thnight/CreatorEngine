@@ -1,5 +1,7 @@
 # Editor 명령 / Commandlet 경계
 
+> master 병합 후보: `6b9c2b79`의 `light.proxy` 제품 조회와 텍스처 Commandlet 4개를 보존했다. 통합 검증 및 원본 작업 보존은 [병합 준비 기록](../analysis/Phase14_5MergePreparation.md)을 따른다.
+
 2026-09-06 · 현재 작업 기준 HEAD `55374f16`
 
 ## 목표
@@ -55,7 +57,7 @@ CLI HTTP/JSON ────┘
 
 ## 2026-09-06 후속 정리
 
-제품 명령은 98개(이름 105개), Commandlet은 103개다.
+제품 명령은 99개(이름 106개), Commandlet은 107개다.
 `experiment.matruntime`의 seed 텍스처도 명시적 입력으로 받으며, 코퍼스 전용
 검사는 일반 명령과 구별한다. 종료된 비교 벤치
 `dx12.bench11`, `dx12.encoderbench`, `dx12.ssaoscale`, `dx12.postscale`,
@@ -76,7 +78,7 @@ CLI HTTP/JSON ────┘
 
 ## 마무리 반영
 
-- 제품 98개 전부 결과 반환, named JSON 입력 58개, Undo 선언 21개.
+- 제품 99개 전부 결과 반환, named JSON 입력 59개, Undo 선언 21개.
 - `assets.scenemodel`은 검증 표로 이동, 사용하지 않는 `animator.state/exit` 제거.
 - `animator.param`·`render.matmode`는 공통 GUI/Undo 작업으로 연결.
 - 미보고 상태·void 등록·legacy 직접 exit 어댑터 제거.

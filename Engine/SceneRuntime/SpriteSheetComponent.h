@@ -38,9 +38,10 @@ public:
 	void OnAddedToScene() override;
 	void OnRemovingFromScene() override;
 	// 옛 Update(float tick)의 본문 그대로 — UITickSystem::Update가 가드를
-	// 통과시킨 뒤 호출한다. 이름을 바꾼 이유는 이 시그니처가 Update로 남아
-	// 있으면 LifecycleRegistry::MaskOfType이 여전히 Bit_Update를 세워 암묵
-	// 구독이 되살아나기 때문이다(Component::Update와 이름이 같아야 감지된다).
+	// 통과시킨 뒤 호출한다. 이름을 바꾼 것은 트랙 C3 당시 이 시그니처가 Update로
+	// 남아 있으면 오버라이드 감지에 걸려 암묵 구독이 되살아났기 때문이다. 그
+	// 메커니즘은 C3 완결로 사라졌다 — Component의 가상 틱 3종과 Bit_Update가
+	// 함께 철거됐다.
 	void TickLayout(float tick);
 
 	ImageInfo				 uiinfo{};

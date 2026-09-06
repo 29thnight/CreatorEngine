@@ -26,8 +26,115 @@ function Run-Step([string]$name, [scriptblock]$body) {
 # PHASE 15 트랙 H — 캐시 해시/문자열 불변식, 부분 string_view 길이,
 # 해시 컨테이너 키 계약을 Debug/Release 독립 프로브로 고정한다. 인스펙터 경로는
 # mutable data()를 다시 열지 않는지도 정적 래칫으로 함께 본다.
+#
+# ── 이 스텝은 12일간 스크립트 없이 서 있었다(2026-09-05 확인) ──
+#
+# 733b0008이 Run-Step만 넣고 verify-hashing-string.ps1은 커밋하지 않았다. 저장소
+# 어느 ref에도 그 파일의 이력이 없다 — 계획만 있고 구현이 없던 자리다. 그 사이
+# 세트는 매 실행 "스크립트 파일 이름으로 인식되지 않습니다"로 이 칸이 빨갰다.
+#
+# ── 어느 바이너리를 재는가 ──
+#
+# 아무것도 재지 않는다. 게이트가 제품 헤더를 그 자리에서 Debug/Release로 각각
+# 컴파일하므로 Bin\ 산출물과 무관하다 — 그래서 -Exe를 넘기지 않는다.
+#
+# ── 이빨 확인(2026-09-05) ──
+#
+# 여섯 변이가 각각 정확한 자리에서 빨개졌다. ① string_view 대입의 해시 갱신
+# 삭제 → 그 경로 8건만("대입(string_view)"·"부분 뷰 대입"), ② string_view
+# 생성자가 .data()를 받게 → 부분 뷰 축 10건만, ③ std::hash 특수화가 다른 값을
+# 내게 → 특수화 단정만 전 경로, ④ ==를 해시 전용으로 되돌림 → 정적 래칫,
+# ⑤ data()의 char* 재개방 → 정적 래칫(고치기 전 HEAD가 정확히 이 상태였다),
+# ⑥ 인스펙터 브랜치 원복 → 정적 래칫. 여섯 다 되돌려 Debug/Release 초록 재확인.
+#
+# H5(빈 문자열 정책) 착지분에 세 개를 더했다(같은 날). ⑦ 기본 생성자를
+# `= default`로 복귀 → 정적 래칫, ⑧ 래칫을 우회해 기본 생성자가 0을 캐시하게
+# → 실행 축 8건("기본 생성"·빈 상태 수렴), ⑨ 빈 문자열 금지를 어설션 아닌
+# 형태로 되살림 → Debug 실행이 죽어 빨강(정책을 주석이 아니라 실행이 지킨다),
+# ⑩ Scene.h의 `m_sceneName = *.data()` 복귀 → 정적 래칫.
 Run-Step "HashingString 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hashing-string.ps1")
+}
+
+# 네이티브 ↔ 관리 미러 대조(9-4). exe가 필요 없는 정적 검사라 앞쪽에 둔다.
+#
+# ── 왜 세트 안에 있어야 하는가 ──
+#
+# 두 검사는 수동 실행 전제로 ScriptCore\ 밑에 있었고, 세트 밖이라 2026-08-24의
+# ScriptBinder → Engine\SceneRuntime 개명(E7-e)에 경로가 낡은 채로 남았다.
+# 그날부터 실행하면 첫 Get-Content에서 예외로 죽었는데, 아무도 부르지 않으니
+# 빨개질 곳이 없어 12일간 드러나지 않았다. 그 사이 표가 맞았던 것은 가드가
+# 지켜서가 아니라 관리 측을 아무도 건드리지 않아서다. 세트에 태우는 것이
+# 경로 파손 자체를 잡는 유일한 방법이다(경로가 없으면 종료 코드 1이다).
+#
+# ── 무엇을 잡는가 ──
+#
+# 버전·구조체 크기 검사는 순서가 뒤바뀐 것을 잡지 못한다. 실제로 필드 하나가
+# 표 끝으로 밀렸는데 개수와 크기가 그대로라 통과했고, 관리 코드가 엉뚱한 함수
+# 포인터를 불러 접근 위반으로 죽었다. 열거 5종은 값이 int로 경계를 넘으므로
+# 어긋나도 컴파일과 링크가 통과하고 런타임에만 다른 판정이 난다.
+#
+# ── 이빨 확인(2026-09-04) ──
+#
+# Native.cs의 인접한 두 필드를 순서만 맞바꾸니 개수는 182/182로 같은 채
+# [91] 첫 불일치로 빨개졌고, BTEnum.h의 ParallelPolicy 항목을 뒤바꾸니
+# ParallelPolicy [0]에서 빨개졌다. 둘 다 되돌려 초록을 다시 확인했다.
+Run-Step "스크립트 API 표 순서" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-api-table.ps1")
+}
+
+Run-Step "BT 열거 미러 대조" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-bt-enums.ps1")
+}
+
+# 생명주기 6단계 미러(9-5). 위 미러 셋과 같은 종류인데 여기만 비어 있었다 —
+# ScriptLifecyclePhase.h가 "값이 같아야 한다, 컴파일러가 잡아 주지 않는다"고
+# 스스로 적어 두고 그것을 재는 검사가 없었다.
+#
+# 값 축만 보면 얕아서 셋으로 세웠다. ① 두 열거의 자리별 이름·값, ② 열거 순서가
+# Component.h의 6단계 virtual 선언 순서와 같은가(양쪽을 함께 틀리게 고치면 ①이
+# 초록이다), ③ ScriptComponent가 6단계를 모두 override하고 각각 자기 단계를
+# 넘기는가. ③이 가장 조용한 결함을 막는다 — MaskOfType은
+# `&T::Hook != &Component::Hook`으로 비트를 세우므로 override를 빠뜨리면 비트가
+# 안 서고 그 단계가 아무 소리 없이 사라진다.
+#
+# 이빨 확인(2026-09-05): 변이 넷을 각각 심어 자기 축만 붉는 것을 봤다.
+# ① 관리 열거의 값 3↔4 교환 → 판정 1 [3]. ② 양쪽 열거를 함께 2↔3 재배열 →
+# 판정 1은 초록이고 판정 2 [2]만 빨강. ③ ScriptComponent.h의 override 한 줄 제거,
+# ④ OnAddedToScene이 OnBeginSimulation을 넘기게 변경 → 둘 다 판정 3만 빨강.
+Run-Step "생명주기 단계 미러 대조" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-lifecycle-enums.ps1")
+}
+
+# 엔진 API 진입 검사 전수 대조(9-5 · LC5-c). 게임 스레드 검사는 Native의 정적
+# 메서드 206곳에 하나씩 들어간다. 그 규약을 사람이 지키게 두면 곧 드리프트한다 —
+# 새 API를 더하면서 검사를 빠뜨려도 컴파일은 되고, 실행 게이트
+# (verify-lifecycle-thread)는 자기가 부르는 두 API만 보므로 나머지가 새는 것을
+# 못 본다. 그래서 "빠진 곳이 있는가"는 실행이 아니라 소스에서 센다.
+#
+#   1 전수 배선  _api 를 만지는 메서드는 전부 Entered() 를 거친다
+#   2 우회 없음  _bound 원본은 허용된 자리에서만 읽힌다
+#   3 검사 실질  Entered 가 실제로 스레드를 비교하고 경계 밖을 보고한다
+#
+# 이빨 확인(2026-09-05): 변이 셋이 각각 자기 축만 붉혔다. ① 한 메서드에서
+# Entered() 제거 → 판정 1. ② Entered()를 부르되 결과를 버리고 _bound 로 우회 →
+# 판정 1은 초록이고 판정 2만 빨강(이것이 판정 2의 존재 이유다). ③ Entered 안의
+# 스레드 비교 삭제 → 판정 3만 빨강.
+Run-Step "엔진 API 진입 검사 대조" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-native-thread-guard.ps1")
+}
+
+# 진입점 이름 결합(9-4). 위 두 검사가 못 보는 세 번째 결합면이다.
+#
+# ClrHost는 관리 함수를 문자열 이름으로 찾는다. API 표 검사는 함수 포인터의 배치를
+# 볼 뿐 이 결합은 보지 않으므로, C# 쪽 이름만 바뀌면 컴파일·링크·표 검사가 모두
+# 통과하고 런타임에 "CLR 초기화 실패"로만 드러난다.
+#
+# 이빨 확인(2026-09-04): Bootstrap.cs의 CreateComponent 하나를 CreateComponentX로
+# 바꾸니 그 이름을 지목하며 빨개졌고, 되돌리니 초록. 덤으로 같은 날 실수로 Bootstrap.cs를
+# 옛 이름 상태로 되돌렸을 때도 이 검사가 먼저 잡았다.
+Run-Step "스크립트 진입점 결합" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-entry-points.ps1")
 }
 
 # Tokenizer 골든은 문자열 입력의 토큰 경계를 검증한다.
@@ -216,6 +323,235 @@ Run-Step "스크립트 부착 초기화 1회" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-script-add-awake-once.ps1") -Exe $Exe -Work $Work
 }
 
+# 생명주기의 6단계가 아니라 그 둘레의 두 축을 잰다(9-5) — 훅이 **어느 모드에서**
+# 왔는가(편집/재생)와 그때 **틱이 함께 돌았는가**. 위 항목들은 훅의 순서와 횟수를
+# 보므로 이 둘에 원리적으로 눈이 멀다: 편집 모드에서 6단계가 모두 소진돼도
+# "순서 맞음·1회씩"이라 전부 초록이었다.
+#
+# 판정 여덟이 각각 결함 하나씩을 지킨다. 특히 판정 6은 관리 → 네이티브 방향
+# 다리가 죽었는지를 **폴백 경고 건수**로 잰다 — 폴백이 훅도 틱도 똑같이 만들어
+# 결과만 보면 판별력이 0이기 때문이다.
+Run-Step "생명주기 활성·모드 축" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-axis.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 실패 경로(9-5). 위 항목들과 두 골든은 전부 **정상 경로**를 굳힌다 —
+# 훅이 던졌을 때 무슨 일이 벌어지는지는 그 어디에도 한 줄도 없었다.
+#
+# 픽스처 일곱이 실패를 만들고 판정 여섯이 그 뒤를 본다:
+#   A·B·C 실패한 훅이 뒤 단계를 끌고 가지 않는가(LC1 — 성공한 훅의 짝만 부른다)
+#   E     정리 콜백 예외가 종료 절차를 끊지 않고, 원인이 보고되는가(LC2)
+#   F     동기 throw·즉시 faulted·나중 faulted가 같은 정책을 따르는가(LC5)
+#   D     대조군 — 이웃의 예외가 정상 인스턴스를 끊지 않는가
+#
+# D가 있어야 "픽스처가 조용하다"를 고침이 들었다고 읽을지 하네스가 죽었다고
+# 읽을지 가를 수 있다. F는 일관성만이 아니라 **방향**(격리)까지 못 박는다 —
+# 일관성만 재면 정책이 반대로 통일돼도 초록이다.
+Run-Step "생명주기 실패 경로" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-failure.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 스레드 경계(9-5 · LC5-b). 위 항목들이 전부 "무엇이 언제 오는가"를
+# 재는 데 반해 이것은 "그것이 **어느 스레드**에서 도는가"를 잰다.
+#
+# 관리 훅은 전부 게임 스레드 전용인데(ClrHost.h 규약) await 한 줄로 그 밖에
+# 나갈 수 있었다. 나간 뒤의 본문은 여전히 Transform·Entity를 부른다 — 함수
+# 포인터로 C++에 곧장 들어가는 것들이다.
+#
+#   H  외부 await 재개가 게임 스레드로 돌아오는가 (프레임 경계 마셜링)
+#   G  지원 경로(Scope.Delay) 재개는 그대로인가   (비회귀)
+#   I  워커가 실제로 다른 스레드였는가            (H의 거짓 초록 방지)
+#
+# I가 없으면 Task.Run이 인라인된 실행에서 H가 고쳐진 것처럼 보인다.
+Run-Step "생명주기 스레드 경계" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-thread.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 재진입(9-5 · LC4). §2.1의 대역 시험은 완료 continuation이 내부
+# Cancel()을 불러 _pending이 비면 다음 인덱스 접근이 터지는 것을 재현했다.
+# 그 시험은 내부 메서드를 직접 불렀다 — 저작 표면에서 같은 일이 되는지는 재지
+# 않았고, 계획서도 그것을 "강제 재현"이라고 적어 두었다.
+#
+# 이 항목이 그 간극을 잰다. 창을 여는 조건 둘을 저작 수단만으로 만든다:
+# ConfigureAwait(false)로 재개를 Tick 루프 안에 두고(LC5-b의 컨텍스트를 포기하는
+# 유일한 길), 대기 둘 중 나중 것을 먼저 기다려 역순 순회에 방문할 항목을 남긴다.
+#
+#   L 순회 무사고  Tick이 던지지 않았다
+#   M 이웃 온전    대조군이 훅을 잃지 않았다
+#   N 대기 생존    비활성화 뒤에도 남은 대기가 재개됐다
+#
+# M이 L의 절반을 진다 — Tick이 던지면 PrePhysicsTick 전체가 중단되어 그 프레임의
+# 모든 인스턴스가 훅과 배수를 잃는데, 픽스처 자신은 이미 제거·비활성화 중이라
+# 그 손실이 잘 안 보인다.
+Run-Step "생명주기 재진입" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-reentrancy.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 자기 제거·배수 재진입(9-5 · LC0 잔여). 위 항목들이 실패·스레드·재진입
+# 창을 덮는 동안 **자기 제거**는 어느 것도 보지 않았다.
+#
+# 자리를 셋으로 나눈다 — 부르는 순간 엔진이 무엇을 순회하고 있는지가 다르다.
+# ① 시작 훅 안(네이티브 드레인) ② 틱 안(_active 순회) ③ 배수 안.
+# ③은 LC5-b가 이번 세션에 새로 만든 실행 지점이다. 새 자리를 만들고 그 위에서
+# 무엇이 되는지 재지 않으면 결함이 생겨도 어느 게이트도 보지 않는다.
+#
+#   Q 축소 한 번   셋 다 end·removing·uninit 을 정확히 한 번씩 (0도 2도 아니다)
+#   R 순회 무사고  틱 예외 0 · 경계 밖 거부 0
+#   S 배수 예산    배수 안의 재게시가 다음 프레임으로 넘어간다
+#   T 대조군 온전  하네스 생존 확인
+#
+# S는 건수로 재면 안 된다 — 예산이 없어도 열 번은 다 온다. 가르는 것은 몇
+# 프레임에 걸쳤는가다. 변이로 확인했다(예산 제거 → 10회가 1프레임에 몰림).
+Run-Step "생명주기 자기 제거" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-selfremove.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 대기 참조 유지(9-5 · LC3). Delay가 token.Register의 반환 등록을 버려
+# 완료된 대기가 취소 토큰 쪽에서 계속 도달 가능했다 — 오래 사는 스코프에서
+# 누적된다. 실측 50/50 → 고침 뒤 0/50.
+#
+# 축을 메모리 총량이 아니라 **도달 가능성**으로 잡았다. GC.GetTotalMemory는 엔진
+# 전체의 잡음을 함께 재서 몇십 KB 차이가 묻힌다. 완료된 Task마다 약한 참조를
+# 남기고 강한 참조를 버린 뒤 GC를 돌려 몇 개가 살아남는지 세면 잡음이 0이고
+# 살아남은 개수가 곧 누수 개수다.
+#
+#   U 생성 확인  50개를 실제로 만들었다 (0개를 만들면 0개가 살아남는다)
+#   V 회수       스코프가 살아 있는 채로 완료 Task가 전부 회수된다
+#   W 축소 온전  참조 해제가 종료 절차를 깨뜨리지 않는다
+Run-Step "생명주기 대기 참조 유지" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-retention.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 재생 세대(9-5 · LC7). 위 생명주기 항목이 전부 재생을 **한 번**만
+# 태운다 — 두 번째 재생에서 무엇이 되는지는 어느 게이트도 보지 않았다. 그런데
+# 재생·정지 반복은 저작 중 가장 자주 하는 일이고, 정지는 씬을 백업에서 되살리는
+# 방식이라 인스턴스가 통째로 새로 만들어진다(설계 문서 §4 트랙 L1).
+#
+#   X 세대 분리   재생마다 새 인스턴스가 하나씩 서고 세대 구간이 겹치지 않는다
+#   Y 세대 완결   각 세대가 전체 생명주기를 정확히 한 번씩 받는다
+#   Z 누수 없음   대기가 정지에서 취소되고 다음 세대로 흘러가지 않는다
+#
+# Z 는 취소 건수와 누수 건수를 **함께** 센다. 변이(정지 축소의 Scope.Cancel 제거)
+# 에서 누수는 여전히 0이었다 — 컴포넌트가 목록에서 빠져 재개될 기회 자체가 없기
+# 때문이다. "누수 0" 만으로는 아무것도 증명되지 않는다.
+Run-Step "생명주기 재생 세대" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-generation.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 대기 인자(9-5 · LC7-b). Scope.Delay(seconds)는 저작 표면의 관용구인데
+# 인자의 뜻이 적힌 적이 없다. 착수 시 실측에서 둘이 결함이었다.
+#
+#   · NaN이 조용히 삼켜졌다 — `Remaining > 0f`가 NaN에 거짓이라 0초와 구별되지
+#     않는다. 저작자의 계산 실수가 "한 프레임 대기"가 되고 신호가 남지 않는다.
+#   · 같은 Delay(0f)가 첫 호출에서 0프레임, 이후엔 1프레임을 썼다. 갈림은 등록이
+#     그 프레임의 Scope.Tick보다 앞이냐 뒤냐인데, 그건 네이티브가 훅을 프레임의
+#     어느 지점에서 부르는지에 달렸다 — 저작자가 볼 수 없는 우연이다.
+#
+#   AA 0초 계약 · BB 음수 동치 · CC NaN 거부 · DD 연쇄 진행 · EE 무한 대기
+#
+# DD가 LC4에서 넘어온 "무한 같은 프레임 재개 방지"의 실측 자리다.
+Run-Step "생명주기 대기 인자" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-delayarg.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 DDOL 이송 중 대기(9-5 · LC7-c). 설계 문서 §1.2-5는 "DDOL 이동은 씬
+# 통지를 주며 인스턴스와 시뮬레이션을 유지한다"를 보존 대상으로 적었는데, 기존
+# verify-ddol-script는 그 문장의 앞 절반(통지가 왔는가)만 잰다. 이송은 씬 그래프에서
+# 오브젝트를 떼는 일이라 떼는 쪽을 파괴로 오독하면 통지는 정확한데 루틴만 죽는다.
+#
+#   FF 대기 생존 · GG 루틴 단일 · HH 진입 단일 · II 이송 통지
+#
+# FF를 "취소 표지가 없다"로 재지 않는다. 취소로 풀린 것과 영영 풀리지 않은 것이
+# 구별되지 않기 때문이다 — 재개 표지가 이송 프레임보다 뒤에 1건 있을 것을 요구한다.
+Run-Step "생명주기 이송 중 대기" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-ddolwait.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 어셈블리 리로드(9-5 · LC7-d). script.reload는 CLI에 있는데 어떤 회귀
+# 시나리오도 부르지 않았다 — ScriptRegistry.Clear가 도는 경로 전체가 관측 밖이었다.
+#
+# 착수 시 실측에서 결함 하나가 나왔다: 재생 중 핫리로드하면 새 인스턴스가
+# OnInitialized만 받고 씬 진입·시뮬레이션 시작을 못 받아, 스크립트가 죽은 채로
+# 재생이 계속됐다. 저작자에게는 "리로드했더니 코드가 안 돈다"로 보인다.
+#
+#   NN 리로드 발생 · OO 이전 세대 축소 · PP 대기 비유출 · QQ 새 세대 완결
+#   RR 문맥 회수 · SS 편집 모드 무음
+#
+# 시나리오가 리로드를 두 번 부른다 — 재생 전(편집 모드)과 재생 중. 앞의 것이 SS의
+# 자리이고, 고침이 만든 편집 모드 분기를 태우는 것이 목적이다.
+Run-Step "생명주기 어셈블리 리로드" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-reload.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 즉시 제거(9-5 · LC7-e). 컴포넌트를 프레임 **중간에** 그 자리에서
+# 소멸시키는 경로는 PrefabUtility::ApplyComponentDiff의 차집합 하나뿐이다. 씬의
+# 정상 파괴는 전부 FlushPendingDestroy를 지나 프레임 경계에서 일어난다.
+#
+# 그 경로의 축소 삼단 배선이 **관리 스크립트에 닿는지**를 아무도 재지 않았다.
+# 네이티브에는 닿고 ScriptComponent에서 끊기면 구독·대기가 해제되지 않은 채
+# 인스턴스만 사라진다.
+#
+#   TT 제거 발생 · UU 축소 전달 · VV 대기 취소 · WW 시점 확인
+#
+# WW가 축이다. 축소를 통째로 없애는 변이에서 UU·VV는 초록이었다 — 뒤이은 정지가
+# 폴백으로 같은 삼단을 주기 때문이다. 시점을 가르지 않으면 이 결함에 눈이 먼다.
+Run-Step "생명주기 즉시 제거" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-immediate.ps1") -Exe $Exe -Work $Work
+}
+
+# 생명주기 고아 청소(9-5 · LC7-f). ScriptRegistry.SweepOrphans는 씬 언로드에서
+# "정상 파괴 경로를 타지 못한 관리 인스턴스"를 거두고, 거둔 게 있으면 경고를
+# 남긴다 — 그 경고가 곧 수명 배선에 구멍이 생겼다는 신호다. 0건이 계약이고, 그래서
+# 0건일 때는 일부러 아무 로그도 남기지 않는다.
+#
+# 그 경고를 보는 게이트가 없었다. 씬을 전환하는 시나리오는 여럿 있지만 전부
+# 이송된 쪽을 보고, 이송되지 않고 파괴되는 쪽은 아무도 재지 않았다.
+#
+#   XX 정상 축소 · YY 고아 0건
+#
+# 둘을 함께 봐야 한다. YY는 표지 부재로 재는 판정이라 홀로 두면 "씬 언로드가 아예
+# 안 일어난 경우"와 구별되지 않는다 — 아무 일도 안 하면 언제나 초록이다.
+Run-Step "생명주기 고아 청소" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-lifecycle-orphan.ps1") -Exe $Exe -Work $Work
+}
+
+# Light 래퍼(W2, 9-4). 저작 자산에 LightComponent가 30개 있는데 스크립트가
+# 만질 길이 없었다 — 그 경계를 열고 이 항목이 실제로 태운다.
+#
+# 두 축을 함께 본다. ① 경계 왕복은 프로브가 스스로 판정하고, ② dirty 사슬은
+# 발행→커밋→큐잉 누계를 잰다. ①만 있으면 눈먼 곳이 생긴다: 렌더는
+# LightComponent가 아니라 LightRenderProxy를 읽고 그 복사는 dirty 큐에 실린
+# 것만 따라가는데, 값을 넣는 쪽이 dirty를 안 내도 **되읽으면 새 값이 나온다**.
+# 그 상태가 지금 리플렉션 인스펙터가 놓인 자리다(ReflectionTypedDraw.h는
+# 값을 대입만 하고 dirty를 모른다).
+#
+# 이빨 확인(2026-09-04): LightComponent의 setter 5종에서
+# PublishRenderProxyDirty 6줄을 지우니 ①은 15건 그대로 통과하고 ②만
+# publish 증가분 8 → 0으로 붉어졌다. 되돌려 초록을 다시 확인했다.
+#
+# 못 보는 것도 적어 둔다: 렌더 스레드가 프록시에 실제로 적용하는 마지막
+# 한 칸은 --script 헤드리스에서 관측할 수 없다(queued는 늘고 applied는
+# 멈춰 있다 — 게이트 파일 머리에 실측치가 있다).
+Run-Step "Light 래퍼 경계" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-light-script.ps1") -Exe $Exe -Work $Work
+}
+
+# CameraComponent 래퍼(W2, 9-4). 저작 20건인데 스크립트에서 만질 길이 없었다 —
+# 있던 것은 핸들을 받지 않는 전역 질의 셋뿐이라 "이 오브젝트의 카메라"라는 축이
+# 아예 없었다.
+#
+# Light와 달리 축이 하나다. 카메라는 렌더 프록시를 쓰지 않고(Scene.cpp의 프록시
+# Kind 열거에 Camera가 없다) 매 프레임 CaptureFrameSnapshot으로 읽히므로 발행할
+# dirty가 애초에 없다. 대신 프로브가 Camera.Main과의 일치를 함께 단정한다 —
+# 컴포넌트 축과 전역 접근점이 같은 카메라를 가리키는지 재는 유일한 자리다.
+#
+# 이빨 확인(2026-09-04): Api_Camera_SetFov의 대입을 지우니 "fov 왕복" 한 건만
+# 붉어졌고, Api_Camera_GetPrimaryHandle을 무효 핸들로 바꾸니 Camera.Main 관련
+# 2건이 붉어졌다. 둘 다 되돌려 초록을 다시 확인했다.
+Run-Step "Camera 래퍼 경계" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-camera-script.ps1") -Exe $Exe -Work $Work
+}
+
 # 프리팹 왕복(트랙 P, P2에서 완료).
 #
 # 다른 검사는 전부 한 번 띄운 상태만 본다. 저장했다 다시 여는 왕복이 없어서
@@ -270,7 +606,7 @@ Run-Step "DDOL 캔버스 재등록" {
 # DDOL 이송 신호가 C#까지 닿는가(트랙 L · L3 잔여).
 #
 # 관리 측 생명주기는 드라이버가 둘이라(네이티브는 생성·파괴만, 나머지는
-# BehaviourRegistry의 자체 큐) 네이티브에서만 일어나는 이송이 스크립트에 닿지
+# ScriptRegistry의 자체 큐) 네이티브에서만 일어나는 이송이 스크립트에 닿지
 # 않았다. 이 검사는 그 통지가 실제로 도착하는지와, 그 과정에서 관리 핸들이
 # 죽지 않는지를 함께 본다 — 후자는 ScriptObjectRegistry::Clear가 살아남는 DDOL
 # 오브젝트의 핸들까지 지우던 결함이다(스크립트가 자기 GameObject를 잃는다).
@@ -668,8 +1004,31 @@ Run-Step "계층 mutation transaction" {
 # TransformUpdatePlan X4 — stable Entity identity와 실행 위치를 분리한 두 packed
 # projection의 mapping/nearest-parent/preorder range를 검증하고, 10k topology
 # transaction compile이 60 Hz 프레임 예산 안인지 Release에서 4회 잰다.
-Run-Step "Transform sparse execution graph" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-execution-graphs.ps1") -Exe $Exe -Work $Work
+# ★ 이 게이트는 **Release로만** 잰다(2026-09-05 정정).
+#
+# 게이트 자체의 기본 -Exe는 Release인데 세트가 `-Exe $Exe`(Debug)로 덮고 있었다.
+# 10k 노드 벤치의 예산 16,666µs는 한 프레임이고 Release 기준으로 잡은 값이다.
+# 같은 기계에서 나란히 쟀다:
+#
+#     Release  median   5,872 µs  → PASS
+#     Debug    median 168,833 µs  → FAIL   (28.7배)
+#
+# 즉 이 칸의 빨강은 제품 회귀가 아니라 축 불일치였다 — 성능 판정은 Release로만
+# 한다는 규칙이 세트 배선에서 깨져 있었다.
+# 다른 Release 전용 게이트들과 같은 관례로 옮긴다 — Release가 없으면 건너뛰고
+# Debug로 대체하지 않는다.
+#
+# 아래 X5·X6도 같은 `-Exe $Exe` 덮어쓰기를 받는다. 그쪽 성능 단정은 절대 예산이
+# 아니라 A/B 상대 비교라 Debug에서도 통과하므로 지금 옮기지 않는다 — 옮긴다면
+# 그것은 별도 슬라이스이고, 낡은 Release exe를 재게 되는 쪽이 더 큰 위험이다.
+$x4ReleaseExe = Join-Path $PSScriptRoot "..\..\Bin\x64-Release\Editor\CreatorEditor.exe"
+if (Test-Path -LiteralPath $x4ReleaseExe -PathType Leaf) {
+    Run-Step "Transform sparse execution graph" {
+        & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-execution-graphs.ps1") -Work $Work
+    }
+} else {
+    "=== Transform sparse execution graph === 건너뜀 (Release 미빌드 — Debug로 대체하지 않는다)"
+    ""
 }
 
 # TransformUpdatePlan X5 — setter publish를 node epoch로 dedupe하고 canonical preorder

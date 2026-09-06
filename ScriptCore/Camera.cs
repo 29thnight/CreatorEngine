@@ -24,4 +24,23 @@ public static class Camera
     /// 스무 줄짜리를 똑같이 복제하고 있었다. 행렬을 경계 너머로 넘기는 대신 결과만 받는다.
     /// </summary>
     public static Float3 WorldToScreenPoint(Float3 world) => Native.CameraWorldToScreenPoint(world);
+
+    /// <summary>
+    /// 지금 주 카메라로 골라진 <see cref="CameraComponent"/>. 없으면 null.
+    ///
+    /// 엔진은 켜져 있고 primary 표시가 붙은 것들 중 인스턴스 ID가 가장 작은 것을
+    /// 고르고, 그런 것이 하나도 없으면 켜져 있는 것 중 가장 작은 것으로 물러선다
+    /// (CameraSystem::GetPrimaryCamera). 그래서 <c>IsPrimary</c>가 참인 컴포넌트가
+    /// 여럿일 수 있고, 그중 이것 하나만 실제로 쓰인다.
+    ///
+    /// 매번 경계를 넘어 다시 찾으므로 프레임마다 여러 번 부를 것이면 담아 두라.
+    /// </summary>
+    public static CameraComponent? Main
+    {
+        get
+        {
+            var owner = new Entity(Native.CameraGetPrimaryHandle());
+            return owner.IsAlive ? owner.GetComponent<CameraComponent>() : null;
+        }
+    }
 }

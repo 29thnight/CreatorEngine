@@ -135,16 +135,20 @@ void Entity::Destroy()
 
 	m_destroyMark = true;
 	TypeTrait::GUIDCreator::EraseGUID(m_instanceID);
-	// 스크립트 핸들 무효화의 정본 지점(SceneGraphRedesignPlan 트랙 E4 — G1의 임시
-	// 배선을 여기로 회수·확정한다). Scene::ReleaseSlot(슬롯 해제 단일점)이 아니라
-	// 여기인 이유: ReleaseSlot은 진짜 파괴(DestroyEntities)와 DDOL 이송
-	// (DetachEntityHierarchy)이 공유하는데, 후자는 오브젝트가 살아서 다른 씬으로
-	// 옮겨가는 것뿐이라 스크립트 핸들이 죽으면 안 된다. Destroy()는 자식까지
-	// 재귀하는 유일한 진짜 파괴 API이고 DDOL 이송은 이 경로를 타지 않으므로,
-	// 여기서 Unregister하면 "진짜 파괴"만 정확히 걸러진다 — N-4가 이 함수 하나로
-	// 구조적으로 재발 불가능해진다(코드베이스 전체에서 Unregister 호출은 이
-	// 줄뿐이다).
-	ScriptObjectRegistry::Get().Unregister(this);
+
+	// ★ 스크립트 핸들은 여기서 죽이지 않는다 — Scene::DestroyEntities로 옮겼다.
+	//
+	// 여기서 Unregister하면 표시 시점에 핸들이 죽는데, 축소 삼단
+	// (OnEndSimulation → OnRemovingFromScene → OnUninitializing)은 그보다 **뒤**인
+	// Scene::FlushPendingDestroy에서 발화한다. 그래서 스크립트가 자기 마지막 훅을
+	// 받는 동안 이미 자기 오브젝트에 닿을 수 없었다 — Entity.Name은 빈 문자열,
+	// GetComponent는 전부 무응답. 크래시가 아니라 '정리 코드가 조용히 아무 일도
+	// 하지 않는' 모습이라 알아채기 어렵다(2026-09-05 프로브 실측).
+	//
+	// 옮긴 자리가 DDOL 이송을 여전히 배제한다: DestroyEntities는 파괴 표시된
+	// 엔티티만 훑고, 이송은 DetachEntityHierarchy가 ReleaseSlot을 직접 부르므로
+	// 그 루프를 지나지 않는다. 즉 이 함수 주석이 지키려던 "진짜 파괴만 걸러낸다"는
+	// 성질은 그대로고, 무효화 시점만 표시에서 실제 해제로 미뤄진다.
 
 	for (auto& component : m_components)
 	{
@@ -534,9 +538,18 @@ void Entity::SetEnabled(bool able)
 	}
 	m_isEnabled = able;
 
-	for (auto& component : m_components)
+	// ★ 인덱스로 돈다 — 이 루프 안에서 m_components가 자랄 수 있다.
+	//
+	// 지금까지는 OnEnable/OnDisable을 구현한 컴포넌트가 0개라 이 루프가 사용자
+	// 코드를 부르는 일이 없었다. ScriptComponent가 그 둘을 override하면서
+	// (활성 축 배선) 스크립트의 OnDisable이 이 한복판에서 돈다 — 거기서
+	// AddComponent를 부르면 push_back이 참조 순회를 무효화한다.
+	//
+	// 매 바퀴 크기를 다시 읽으므로 도중에 늘어난 컴포넌트도 같은 전이를 받는다.
+	// 그것이 옳다: 꺼지는 오브젝트에 붙은 것은 꺼진 채로 시작해야 한다.
+	for (size_t i = 0; i < m_components.size(); ++i)
 	{
-		if (component)
+		if (Component* component = m_components[i].get())
 		{
 			component->SetEnabled(able);
 		}

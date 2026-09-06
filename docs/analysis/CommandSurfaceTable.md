@@ -7,12 +7,12 @@
 
 | 표면 | 정식 명령 | 별칭 포함 | 실행 경로 |
 |---|--:|--:|---|
-| Editor 제품 | 98 | 105 | console·batch·HTTP/JSON; `wait`는 HTTP 실행 제외 |
+| Editor 제품 | 99 | 106 | console·batch·HTTP/JSON; `wait`는 HTTP 실행 제외 |
 | Player 제품 | 7 | 7 | Development Player registry; 전용 5개 + 공통 `help`·`quit` |
-| 등록형 Commandlet | 100 | 100 | `--commandlet` / `--commandlet-script` |
+| 등록형 Commandlet | 104 | 104 | `--commandlet` / `--commandlet-script` |
 | 독립 Commandlet | 3 | 3 | 같은 실행 모드, 별도 진입점 표 |
 
-Editor 제품과 Commandlet 103개의 이름 집합은 겹치지 않는다. 제거한 이름은 14개다. MCP 서버는 후속 범위이며 HTTP discovery와 결과를 연결하는 어댑터로 추가한다.
+Editor 제품과 Commandlet 107개의 이름 집합은 겹치지 않는다. 제거한 이름은 14개다. MCP 서버는 후속 범위이며 HTTP discovery와 결과를 연결하는 어댑터로 추가한다.
 
 ```mermaid
 flowchart LR
@@ -23,9 +23,9 @@ flowchart LR
     Harness[Commandlet 실행 모드] --> Verify[독립 검증 / 제품 API 검사]
 ```
 
-## 2. Editor 제품 명령 — 98개
+## 2. Editor 제품 명령 — 99개
 
-모든 제품 명령이 `CommandResult`를 반환한다. JSON `parameters` 지원 58개, Undo 선언 21개다. `()`는 인자 없는 스키마다. 빈 칸은 positional `args` 사용이다. 동작에 따라 인자 구성이 달라지는 명령에 허위 스키마를 만들지 않았다.
+모든 제품 명령이 `CommandResult`를 반환한다. JSON `parameters` 지원 59개, Undo 선언 21개다. `()`는 인자 없는 스키마다. 빈 칸은 positional `args` 사용이다. 동작에 따라 인자 구성이 달라지는 명령에 허위 스키마를 만들지 않았다.
 
 `Immediate`·`Frames`·`Long`은 스케줄링 분류이며 실행 시간 보장이 아니다. Undo 선언은 편집 작업에만 적용된다. 저장·리로드·관리 코드 실행 등 서비스 작업은 별도 수명과 실패 결과를 갖는다.
 
@@ -136,6 +136,12 @@ flowchart LR
 | `lifecycle.dump` | - | `[파일]` | Immediate | — | `path=lifecycle_trace.tsv` | 기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다) |
 | `lifecycle.registry` | - | — | Frames | — | `()` | 생명주기 등록 수와 대기 중인 초기화 수를 조회한다 |
 | `lifecycle.trace` | - | `on [틱프레임]\|off\|clear\|status` | Frames | — | — | 생명주기 호출 순서를 받아 적는다 |
+
+### light — 1
+
+| 명령 | 별칭 | 인자 | 비용 | Undo | JSON parameters | 동작 |
+|---|---|---|---|:-:|---|---|
+| `light.proxy` | - | — | Frames | — | `()` | Read live light proxy values and publication counters |
 
 ### log — 1
 
@@ -297,7 +303,7 @@ flowchart LR
 | `window.info` | - | — | Immediate | — | `()` | 엔진이 인식하는 클라이언트 크기를 출력한다 |
 | `window.resize` | - | `<너비> <높이>` | Frames | — | `width:integer,height:integer` | 창 클라이언트 크기를 바꾼다(해상도 검증용) |
 
-## 3. Commandlet — 103개
+## 3. Commandlet — 107개
 
 검증 완료 후 역할이 끝난 일회성 하네스는 제거한다. 현재 제품 계약을 지키는 회귀·측정 Commandlet은 유지한다. 코퍼스 요구사항과 실제 실행 성공은 별개다. 모든 정상 반환 경로는 terminal 결과를 내며, `crash.test`의 유효한 입력은 덤프 검증을 위해 프로세스를 의도적으로 종료한다.
 
@@ -305,6 +311,8 @@ flowchart LR
 |---|---|---|---|
 | `animator.scene.probe` | — | Frames | Animator 컨트롤러 그래프를 scene reflection YAML로 왕복시킨다 |
 | `asset.guid.rename.probe` | — | Frames | 자산 GUID가 이름 변경을 건너 보존되는지 본다(재질 왕복 포함) |
+| `assets.decodeab` | `[root] [limit]` | Long | Compare PNG decoder bytes |
+| `assets.decodeabhdr` | `[root]` | Long | Compare HDR decoder values |
 | `assets.generation` | `<project root>` | Long | UUIDv8 model generation closure·원자 cache publish/retire 검증 |
 | `assets.generationcorpus` | `<content root>` | Long | 현재 MBC4 model corpus generation cold-load 검증 |
 | `assets.identity` | — | Long | 자산 identity(UUID·epoch·프로필) 전수 계약을 판정한다 |
@@ -312,6 +320,7 @@ flowchart LR
 | `assets.modelrender` | — | Frames | 모델 렌더 배선(mesh·재질 해석)을 판정한다 |
 | `assets.scenemodel` | `[reload <모델 이름>]` | Frames | 활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다 |
 | `assets.sidecar` | — | Long | 모델 sidecar v2 스키마를 전수로 판정한다 |
+| `assets.texturebench` | `[limit]` | Long | Measure texture decode mip and compression stages |
 | `blackboard.authoring.probe` | `<이름> [empty\|noname]` | Frames | Blackboard 저장·재로드 왕복으로 키 값이 살아 돌아오는지 본다 |
 | `collisionmatrix.authoring.probe` | `[escape]` | Frames | 충돌 행렬 저장·재로드 왕복과 설정 루트 이탈 거부를 본다 |
 | `crash.test` | `[av\|abort\|terminate\|throw]` | Immediate | 의도적인 프로세스 종료로 덤프 경로를 검증한다 |
@@ -401,6 +410,7 @@ flowchart LR
 | `vk.ssgi` | — | Frames | SSGI 공용 패스 — Hi-Z·temporal·filter·composite 대조 |
 | `vk.ssr` | — | Frames | SSR 공용 패스 — ray hit·metal/thickness/bitmask 픽셀 대조 |
 | `vk.sss` | — | Frames | SSS 공용 패스 — 2축 blur·depth gate 전체 픽셀 대조 |
+| `vk.texturecodec` | — | Frames | Validate neutral texture bytes across DX12 and Vulkan |
 | `vk.ui` | — | Frames | UI 공용 패스 — layer·blend·texture batch DX12/Vulkan 대조 |
 | `vk.wireframe` | — | Frames | WireFrame 공용 패스 — non-solid fill·skinning DX12/Vulkan 대조 |
 | `experiment.matmigrate` | — | 독립 진입점 | 합성 검사와 실제 제품 경로 검사 |
@@ -446,6 +456,7 @@ Shipping에서는 명령 서비스·소켓이 빌드에서 제외된다. 아래�
 
 
 
+
 | 제품 | 제품 인자 | 검증 Commandlet | 검증 인자 |
 |---|---|---|---|
 | `scene.sparseresolver` | `0\|1\|print` | `scene.sparseresolver.check` | `probe` / `bench <N> <frames>` |
@@ -479,6 +490,7 @@ Shipping에서는 명령 서비스·소켓이 빌드에서 제외된다. 아래�
 | 내장 shader/meta fixture | 엔진 계약용 검사 입력 | 엔진의 기본 셰이더와 자가 검사 셰이더 |
 
 코퍼스 파일 부재는 검사 통과나 기능 미구현의 증거가 아니다.
+
 
 
 

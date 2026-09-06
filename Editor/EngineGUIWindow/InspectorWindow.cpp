@@ -59,15 +59,15 @@ namespace ed = ax::NodeEditor;
 //
 // (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다. 하지만
 // AddComponentAllowMultiple 안의 AttachComponentLifecycle이 이미 이 컴포넌트를
-// PendingAwake 큐에 넣어 뒀고(State_AwakeCalled 비트는 아직 서지 않은 채), 직접
-// 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::RegistryDrainAwakeAndStart가
+// PendingInitialize 큐에 넣어 뒀고(State_Initialized 비트는 아직 서지 않은 채), 직접
+// 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::DrainPendingPhases가
 // 큐에 남은 같은 컴포넌트를 또 한 번 깨운다 — OnInitialized 이중 호출.
 // ScriptComponent::OnInitialized의 `if (HasInstance()) return;` 가드가 보통은
 // 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다(ScriptComponent.cpp).
 //
 // Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
 // 직후 scene->DrainPendingLifecycle()을 동기로 불러 정상 드레인 경로를 태운다. 이미 깨운
-// 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
+// 컴포넌트는 State_Initialized로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
 static void AttachManagedScript(Entity* obj, const std::string& typeName)
 {
 	const Meta::Type* scriptType = Meta::Find(type_guid(ScriptComponent));
@@ -83,7 +83,7 @@ static void AttachManagedScript(Entity* obj, const std::string& typeName)
 	}
 
 	// m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
-	// CreateBehaviour를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
+	// CreateComponent를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
 	script->m_scriptType = typeName;
 
 	if (Scene* scene = obj->GetScene())
@@ -418,7 +418,7 @@ InspectorWindow::InspectorWindow()
 				ImGui::Separator();
 				ImGui::TextColored(ImVec4(0.6f, 0.85f, 1.f, 1.f), "C# Scripts");
 
-				const auto managedTypeNames = ClrHost::Get().GetBehaviourTypeNames();
+				const auto managedTypeNames = ClrHost::Get().GetComponentTypeNames();
 				if (managedTypeNames.empty())
 				{
 					ImGui::TextDisabled(ClrHost::Get().IsReady()
@@ -531,7 +531,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 	{
 		ImGui::TextDisabled("스크립트 타입이 지정되지 않았습니다");
 
-		const auto typeNames = clr.GetBehaviourTypeNames();
+		const auto typeNames = clr.GetComponentTypeNames();
 		if (typeNames.empty())
 		{
 			ImGui::TextDisabled(clr.IsReady() ? "등록된 C# 스크립트가 없습니다"
@@ -546,7 +546,11 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 				if (ImGui::Selectable(typeName.c_str()))
 				{
 					script->m_scriptType = typeName;
-					script->OnInitialized();
+
+					// 인스턴스만 만든다 — 생명주기 훅은 재생에서 온다
+					// (ScriptComponent::EnsureInstance의 주석). 편집 모드에
+					// 필드를 그리려면 인스턴스가 필요하다.
+					script->RetryInstance();
 				}
 			}
 			ImGui::EndCombo();
@@ -562,7 +566,9 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		// CLR이 뒤늦게 준비됐거나 어셈블리를 다시 읽은 경우를 위한 수동 재시도.
 		if (clr.IsReady() && ImGui::Button("인스턴스 다시 만들기"))
 		{
-			script->OnInitialized();
+			// 실패 기억을 지우고 다시 시도한다. OnInitialized를 부르면 안 된다 —
+			// 그것은 생명주기 전달까지 하는 창구라 편집 모드에서 훅이 새어 나간다.
+			script->RetryInstance();
 		}
 		return;
 	}

@@ -51,7 +51,7 @@ void AnimationState::SetBehaviour(std::string name, bool isReload)
 	}
 
 	// C++ 핫리로드 은퇴(9-4) — 애니메이션 상태 스크립트는 C#(ManagedAniBehavior)만 지원한다.
-	if (ClrHost::Get().HasAniBehaviour(behaviourName))
+	if (ClrHost::Get().HasAniBehavior(behaviourName))
 	{
 		auto managed = std::make_shared<ManagedAniBehavior>(behaviourName);
 		if (managed->HasInstance())

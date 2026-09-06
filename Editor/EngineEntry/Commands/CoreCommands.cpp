@@ -656,10 +656,10 @@ namespace ConsoleCmd
         if (nullptr != scene)
         {
             const auto counts = scene->GetRegistryCounts();
-            data.Set("pendingAwake", CommandData::Int(counts.pendingAwake));
-            data.Set("pendingStart", CommandData::Int(counts.pendingStart));
-            std::printf("[CLI]   pendingAwake %zu · pendingStart %zu\n",
-                counts.pendingAwake, counts.pendingStart);
+            data.Set("pendingInitialize", CommandData::Int(counts.pendingInitialize));
+            data.Set("pendingSimulation", CommandData::Int(counts.pendingSimulation));
+            std::printf("[CLI]   pendingInitialize %zu · pendingSimulation %zu\n",
+                counts.pendingInitialize, counts.pendingSimulation);
 
             // 트랙 L4 래칫 측정용 — 명시 구독(Schedule().Subscribe) 대 암묵 구독
             // (RegisterComponent 경유)의 잔존 수. 통합 단계에서 배선.

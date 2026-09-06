@@ -33,6 +33,11 @@ inline DXGI_FORMAT ToDXGI(RHIFormat format)
     case RHIFormat::D32Float:       return DXGI_FORMAT_D32_FLOAT;
     case RHIFormat::D32FloatS8Uint: return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
     case RHIFormat::RGBA8Uint:      return DXGI_FORMAT_R8G8B8A8_UINT;
+    case RHIFormat::BC1Unorm:       return DXGI_FORMAT_BC1_UNORM;
+    case RHIFormat::BC1UnormSrgb:   return DXGI_FORMAT_BC1_UNORM_SRGB;
+    case RHIFormat::BC3Unorm:       return DXGI_FORMAT_BC3_UNORM;
+    case RHIFormat::BGRA8Unorm:     return DXGI_FORMAT_B8G8R8A8_UNORM;
+    case RHIFormat::BGRA8UnormSrgb: return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
     default:                        return DXGI_FORMAT_UNKNOWN;
     }
 }
@@ -57,6 +62,11 @@ inline RHIFormat FromDXGI(DXGI_FORMAT format)
     case DXGI_FORMAT_D32_FLOAT:             return RHIFormat::D32Float;
     case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:  return RHIFormat::D32FloatS8Uint;
     case DXGI_FORMAT_R8G8B8A8_UINT:         return RHIFormat::RGBA8Uint;
+    case DXGI_FORMAT_BC1_UNORM:             return RHIFormat::BC1Unorm;
+    case DXGI_FORMAT_BC1_UNORM_SRGB:        return RHIFormat::BC1UnormSrgb;
+    case DXGI_FORMAT_BC3_UNORM:             return RHIFormat::BC3Unorm;
+    case DXGI_FORMAT_B8G8R8A8_UNORM:        return RHIFormat::BGRA8Unorm;
+    case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:   return RHIFormat::BGRA8UnormSrgb;
     default:                                return RHIFormat::Unknown;
     }
 }

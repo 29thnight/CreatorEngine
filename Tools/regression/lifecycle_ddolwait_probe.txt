@@ -1,0 +1,53 @@
+# LC7 DDOL 이송 중 대기 픽스처 (ScriptLifecycleContractHardeningPlan · LC7-c)
+#
+# 판정은 verify-lifecycle-ddolwait.ps1이 한다.
+#
+# ── 기존 DDOL 시나리오와 무엇이 다른가 ──
+#
+# ddol_script_probe.txt는 이송 **통지**를 잰다(Removing/Added가 각 1회 더 왔는가).
+# 여기서는 그 통지 아래에서 **시뮬레이션이 살아 있는가**를 잰다. 통지는 정확한데
+# 루틴만 죽는 상태가 가능하고, 그것이 지금 관측 밖이다(설계 문서 §1.2-5).
+#
+# ── 시간 배치 ──
+#
+# 프로브가 1초 대기를 걸어 두고, 이송을 그 **안쪽**에 넣는다. 이송이 대기보다
+# 늦으면 재개가 이송 전에 끝나 아무것도 재지 못한다 — 그래서 재생 직후에 바로
+# 이송하고, 재개를 기다릴 시간은 이송 뒤에 둔다.
+#
+# 헤드리스 프레임이 얼마나 빠른지는 프로브가 dt 표지로 남긴다. 이송 뒤 대기는 그
+# 환산보다 넉넉히 준다 — 모자라면 "죽었다"와 "아직이다"가 같은 모양으로 보인다.
+#
+# ── 목적지 씬 ──
+#
+# ddol_script_probe.txt와 같은 이유로 시나리오가 직접 만든다. 검사 스크립트가
+# 실행 **전에** 그 파일을 지우므로, scene.save가 죽으면 switch가 실패하고 판정이
+# 그것을 잡는다. 경로는 검사 스크립트가 실행 직전에 채운다({{DEST_SCENE}}).
+
+wait 60
+
+# 목적지 씬을 만들어 저장한다. 빈 씬이라 이송분과 섞일 것이 없다.
+scene.new L7DdolWaitDest
+wait 30
+scene.save {{DEST_SCENE}}
+wait 30
+
+scene.new L7DdolWaitSrc
+wait 30
+object.create DdolWait
+wait 10
+script.add DdolWait DdolWaitProbe
+wait 10
+
+play
+# 대기가 걸릴 시간만 준다. 이송은 대기 안쪽이어야 한다.
+wait 40
+scene.ddol DdolWait
+wait 10
+scene.switch {{DEST_SCENE}}
+
+# 재개를 기다린다. 대기가 헤드리스에서 몇 프레임인지는 프로브의 dt 표지가 남긴다 —
+# 여기 wait 가 그보다 짧으면 "죽었다"와 "아직이다"를 못 가르므로 넉넉히 준다.
+wait 3000
+
+log.flush
+quit

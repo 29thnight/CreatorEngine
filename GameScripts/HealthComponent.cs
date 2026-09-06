@@ -3,7 +3,7 @@ namespace CreatorEngine.Scripts;
 /// <summary>
 /// GetComponent 검증용 — 다른 스크립트가 찾아 쓰는 쪽.
 /// </summary>
-public sealed partial class HealthComponent : Behaviour
+public sealed partial class HealthComponent : Component
 {
     [SerializeField] private int _maxHp = 100;
 

@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$Exe = (Join-Path $PSScriptRoot '../../Bin/x64-Debug/Editor/CreatorEditor.exe'),
     [string]$Work = (Join-Path $env:TEMP 'creator-command-surface'),
@@ -142,6 +142,11 @@ try {
     Assert ($schema.undoable -and $schema.inputSchema.properties.name.type -eq 'string') 'Rename discovery schema missing'
     $discovery = Invoke-RestMethod "$base/commands" -Headers $headers
     Assert (-not ($discovery.commands.name -contains 'selftest')) 'selftest leaked into live discovery'
+    $light = Invoke-Body @{command='light.proxy';parameters=@{}}
+    Expect-Ok $light
+    Assert ($light.data.count -ge 0 -and $null -ne $light.data.lights) 'Light proxy must return an owned snapshot'
+    Assert ($null -ne $light.data.publish -and $null -ne $light.data.queued) 'Light publication metrics are missing'
+    Assert ((Invoke-Cmd 'light.proxy' @('extra')).status -eq 'invalid_arguments') 'Light proxy accepted unused arguments'
     Expect-Ok (Invoke-Cmd 'scene.new' @('CommandSurfaceGate'))
     Expect-Ok (Invoke-Cmd 'object.create' @('Before name'))
     $initial = Read-Object 'Before name'; Expect-Ok $initial
@@ -180,7 +185,7 @@ try {
     Expect-Ok (Invoke-Body @{command='object.rename';parameters=@{target=$second;name='Branch'}})
     Assert ((Read-Object 'Branch').code -eq 'object.ambiguous') 'Duplicate names must not silently choose an object'
     Assert ((Read-Object $id).data.name -eq 'Branch') 'Stable id must resolve ambiguous names'
-    foreach ($name in @('selftest','experiment.matparity','experiment.matresolve','dx12.bench11','dx12.encoderbench','dx12.ssaoscale','dx12.postscale','dx12.forwardscale','perf.reflect','experiment.animlive','tag.authoring.probe')) {
+    foreach ($name in @('selftest','experiment.matparity','experiment.matresolve','dx12.bench11','dx12.encoderbench','dx12.ssaoscale','dx12.postscale','dx12.forwardscale','perf.reflect','experiment.animlive','tag.authoring.probe','assets.decodeab','assets.decodeabhdr','assets.texturebench','vk.texturecodec')) {
         Assert ((Invoke-Cmd $name).code -eq 'command.unknown') "Commandlet/retired harness leaked into HTTP: $name"
     }
     # Verify state restoration, not only the existence of undo records.

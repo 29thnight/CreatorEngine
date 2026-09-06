@@ -9,7 +9,7 @@ using Microsoft.CodeAnalysis.Text;
 namespace CreatorEngine.Generators;
 
 /// <summary>
-/// Behaviour 파생 클래스를 훑어 두 가지를 생성한다.
+/// Component 파생 클래스를 훑어 두 가지를 생성한다.
 ///
 ///  1) [SerializeField] 필드에 대한 인덱스 기반 접근자 — 인스펙터와 직렬화가 함께 쓴다.
 ///  2) 타입 이름 → 생성자 표 — ScriptFactory가 Activator 없이 인스턴스를 만든다.
@@ -18,10 +18,19 @@ namespace CreatorEngine.Generators;
 /// 컴파일 타임에 확정되므로 Native AOT에서도 트리밍되지 않는다.
 /// </summary>
 [Generator]
-public sealed class BehaviourGenerator : IIncrementalGenerator
+public sealed class ScriptGenerator : IIncrementalGenerator
 {
-    private const string BehaviourFullName = "CreatorEngine.Behaviour";
-    private const string AniBehaviourFullName = "CreatorEngine.AniBehaviour";
+    private const string ComponentFullName = "CreatorEngine.Component";
+
+    // 네이티브 래퍼를 걸러 내기 위한 표지.
+    //
+    // 예전에는 스크립트가 Behaviour를, 래퍼가 NativeComponent를 상속해 상속만으로
+    // 갈렸다. 스크립트가 Component를 직접 상속하게 되면서 래퍼도 Component 파생이
+    // 되었으므로, 이제 "Component 파생"만으로는 둘을 구분할 수 없다.
+    // ScriptCore의 ComponentKind&lt;T&gt;가 같은 방향으로 판정한다.
+    private const string NativeComponentFullName = "CreatorEngine.NativeComponent";
+
+    private const string AniBehaviorFullName = "CreatorEngine.AniBehavior";
 
     // 행동 트리의 사용자 노드. 세 갈래를 구분해 두는 이유는 에디터가 노드 종류별로
     // 목록을 따로 보여 주고, 저작 그래프도 Action/Condition/ConditionDecorator를
@@ -33,7 +42,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        IncrementalValuesProvider<BehaviourInfo?> candidates = context.SyntaxProvider
+        IncrementalValuesProvider<ComponentInfo?> candidates = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (node, _) => node is ClassDeclarationSyntax { BaseList: not null },
                 transform: static (ctx, _) => Analyze(ctx))
@@ -42,7 +51,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(candidates.Collect(), Emit);
     }
 
-    private static BehaviourInfo? Analyze(GeneratorSyntaxContext context)
+    private static ComponentInfo? Analyze(GeneratorSyntaxContext context)
     {
         var declaration = (ClassDeclarationSyntax)context.Node;
         if (context.SemanticModel.GetDeclaredSymbol(declaration) is not INamedTypeSymbol symbol)
@@ -50,15 +59,22 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
         if (symbol.IsAbstract) return null;
 
-        // 여러 계열을 한 번에 훑는다. Behaviour는 필드 접근자까지, 나머지는 등록만 생성한다.
-        bool isAni = InheritsFrom(symbol, AniBehaviourFullName);
+        // 여러 계열을 한 번에 훑는다. Component는 필드 접근자까지, 나머지는 등록만 생성한다.
+        bool isAni = InheritsFrom(symbol, AniBehaviorFullName);
 
         BTNodeKind btKind = BTNodeKind.None;
         if (InheritsFrom(symbol, BTConditionDecoratorFullName)) btKind = BTNodeKind.ConditionDecorator;
         else if (InheritsFrom(symbol, BTConditionFullName)) btKind = BTNodeKind.Condition;
         else if (InheritsFrom(symbol, BTActionFullName)) btKind = BTNodeKind.Action;
 
-        if (!isAni && btKind == BTNodeKind.None && !InheritsFrom(symbol, BehaviourFullName)) return null;
+        // 네이티브 래퍼(SoundComponent 등)는 Component 파생이지만 스크립트가 아니다 —
+        // 실체가 C++에 있고 이쪽은 핸들만 든다. 걸러 내지 않으면 생성기가 그것들까지
+        // 훑어 ScriptFactory에 등록하려 들고, 인스펙터의 '붙일 수 있는 스크립트' 목록에
+        // 네이티브 컴포넌트가 섞인다.
+        bool isScript = InheritsFrom(symbol, ComponentFullName)
+                     && !InheritsFrom(symbol, NativeComponentFullName);
+
+        if (!isAni && btKind == BTNodeKind.None && !isScript) return null;
 
         var fields = new List<FieldInfo>();
         foreach (ISymbol member in symbol.GetMembers())
@@ -100,7 +116,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
         bool isPartial = declaration.Modifiers.Any(m => m.ValueText == "partial");
 
-        return new BehaviourInfo(
+        return new ComponentInfo(
             Namespace: symbol.ContainingNamespace.IsGlobalNamespace ? null : symbol.ContainingNamespace.ToDisplayString(),
             TypeName: symbol.Name,
             FullName: symbol.ToDisplayString(),
@@ -166,13 +182,13 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         _                          => FieldKind.Unsupported,
     };
 
-    private static void Emit(SourceProductionContext context, ImmutableArray<BehaviourInfo?> items)
+    private static void Emit(SourceProductionContext context, ImmutableArray<ComponentInfo?> items)
     {
         var behaviours = items.Where(i => i is not null).Select(i => i!).ToList();
         if (behaviours.Count == 0)
             return;
 
-        foreach (BehaviourInfo info in behaviours)
+        foreach (ComponentInfo info in behaviours)
         {
             // partial이 아니면 부분 클래스를 덧붙일 수 없다. 생성할 것이 없으면 알릴 필요도 없다.
             if (!info.IsPartial)
@@ -194,10 +210,10 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
             SourceText.From(EmitRegistrations(behaviours), Encoding.UTF8));
     }
 
-    private static string EmitAccessors(BehaviourInfo info)
+    private static string EmitAccessors(ComponentInfo info)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("// <auto-generated/> BehaviourGenerator가 만든 파일입니다. 직접 고치지 마세요.");
+        sb.AppendLine("// <auto-generated/> ScriptGenerator가 만든 파일입니다. 직접 고치지 마세요.");
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
 
@@ -258,7 +274,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
     }
 
     /// <summary>이름 → 메서드 직접 호출 switch. 리플렉션 없이 AOT에서 동작한다.</summary>
-    private static void EmitMessageDispatch(StringBuilder sb, BehaviourInfo info)
+    private static void EmitMessageDispatch(StringBuilder sb, ComponentInfo info)
     {
         if (info.Messages.Length == 0) return;
 
@@ -276,7 +292,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         sb.AppendLine();
     }
 
-    private static void EmitTypedAccessor(StringBuilder sb, BehaviourInfo info, FieldKind kind,
+    private static void EmitTypedAccessor(StringBuilder sb, ComponentInfo info, FieldKind kind,
         string typeName, string getter, string setter, string fallback)
     {
         var matching = new List<(int Index, string Name)>();
@@ -310,10 +326,10 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         sb.AppendLine();
     }
 
-    private static string EmitRegistrations(List<BehaviourInfo> behaviours)
+    private static string EmitRegistrations(List<ComponentInfo> behaviours)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("// <auto-generated/> BehaviourGenerator가 만든 파일입니다. 직접 고치지 마세요.");
+        sb.AppendLine("// <auto-generated/> ScriptGenerator가 만든 파일입니다. 직접 고치지 마세요.");
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
         sb.AppendLine("namespace CreatorEngine.Generated;");
@@ -328,16 +344,16 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         sb.AppendLine("/// </summary>");
         sb.AppendLine("public static class ScriptRegistry");
         sb.AppendLine("{");
-        sb.AppendLine("    public static void RegisterAll(global::System.Action<string, global::System.Func<global::CreatorEngine.Behaviour>> register)");
+        sb.AppendLine("    public static void RegisterAll(global::System.Action<string, global::System.Func<global::CreatorEngine.Component>> register)");
         sb.AppendLine("    {");
 
-        // BT 노드도 제외해야 한다. 이 표의 델리게이트는 Behaviour를 돌려주기로 되어
+        // BT 노드도 제외해야 한다. 이 표의 델리게이트는 Component를 돌려주기로 되어
         // 있는데 BT 노드는 BTNode 파생이라 캐스팅이 성립하지 않는다 — 하나라도 있으면
         // 생성된 코드가 컴파일되지 않는다(CS0029).
         //
         // B5 이후 지금까지 드러나지 않은 이유는 BT 노드를 쓴 사람이 없었기 때문이다.
         // 첫 노드를 만들자마자 어셈블리 전체가 빌드되지 않았다.
-        foreach (BehaviourInfo info in behaviours
+        foreach (ComponentInfo info in behaviours
             .Where(b => !b.IsAni && b.BTKind == BTNodeKind.None)
             .OrderBy(b => b.TypeName))
         {
@@ -349,11 +365,11 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         sb.AppendLine();
 
         // 애니메이션 상태 스크립트는 목록을 따로 둔다 — 수명을 상태 머신이 쥐고 있어
-        // Behaviour와 섞으면 어느 팩토리로 만들지 구분할 수 없다.
-        sb.AppendLine("    public static void RegisterAllAni(global::System.Action<string, global::System.Func<global::CreatorEngine.AniBehaviour>> register)");
+        // Component와 섞으면 어느 팩토리로 만들지 구분할 수 없다.
+        sb.AppendLine("    public static void RegisterAllAni(global::System.Action<string, global::System.Func<global::CreatorEngine.AniBehavior>> register)");
         sb.AppendLine("    {");
 
-        foreach (BehaviourInfo info in behaviours.Where(b => b.IsAni).OrderBy(b => b.TypeName))
+        foreach (ComponentInfo info in behaviours.Where(b => b.IsAni).OrderBy(b => b.TypeName))
         {
             sb.AppendLine($"        register(\"{info.TypeName}\", static () => new global::{info.FullName}());");
         }
@@ -365,7 +381,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
         sb.AppendLine("    public static void RegisterAllBTNodes(global::System.Action<string, int, global::System.Func<global::CreatorEngine.BTNode>> register)");
         sb.AppendLine("    {");
 
-        foreach (BehaviourInfo info in behaviours
+        foreach (ComponentInfo info in behaviours
             .Where(b => b.BTKind != BTNodeKind.None)
             .OrderBy(b => b.TypeName))
         {
@@ -396,7 +412,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
     private static readonly DiagnosticDescriptor NotPartialRule = new(
         id: "CE001",
-        title: "Behaviour에 partial이 필요합니다",
+        title: "Component에 partial이 필요합니다",
         messageFormat: "'{0}'에 [SerializeField] 필드가 있지만 partial이 아니라 접근자를 생성할 수 없습니다",
         category: "CreatorEngine",
         defaultSeverity: DiagnosticSeverity.Warning,
@@ -409,7 +425,7 @@ public sealed class BehaviourGenerator : IIncrementalGenerator
 
     private enum BTNodeKind { None, Action, Condition, ConditionDecorator }
 
-    private sealed record BehaviourInfo(
+    private sealed record ComponentInfo(
         string? Namespace,
         string TypeName,
         string FullName,

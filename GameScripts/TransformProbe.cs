@@ -7,7 +7,7 @@ namespace CreatorEngine.Scripts;
 /// 좌표계 규약에 의존하는 값(Forward 방향 등)은 단정하지 않고 로그로만 남긴다 —
 /// 엔진이 왼손 좌표계인지 여기서 다시 못 박으면 규약이 바뀔 때 거짓 실패가 난다.
 /// </summary>
-public sealed partial class TransformProbe : Behaviour
+public sealed partial class TransformProbe : Component
 {
     private const float Epsilon = 1e-3f;
 

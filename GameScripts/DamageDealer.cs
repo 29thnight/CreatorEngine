@@ -6,7 +6,7 @@ namespace CreatorEngine.Scripts;
 /// 같은 오브젝트의 HealthComponent와, 지정한 대상 오브젝트의 HealthComponent를
 /// 각각 찾아 본다. 둘 다 경계를 넘지 않고 관리 영역에서 해결된다.
 /// </summary>
-public sealed partial class DamageDealer : Behaviour
+public sealed partial class DamageDealer : Component
 {
     [SerializeField] private Entity _target;
     [SerializeField] private int _damage = 7;

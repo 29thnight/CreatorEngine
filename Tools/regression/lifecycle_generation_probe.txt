@@ -1,0 +1,50 @@
+# LC7 재생 세대 픽스처 (ScriptLifecycleContractHardeningPlan · LC7)
+#
+# 판정은 verify-lifecycle-generation.ps1이 한다.
+#
+# ── 왜 이 시나리오가 없었나 ──
+#
+# 기존 생명주기 게이트는 전부 재생을 **한 번**만 태운다. 두 번째 재생에서 무엇이
+# 되는지는 어느 게이트도 보지 않았다. 그런데 에디터에서 재생·정지 반복은 저작 중
+# 가장 자주 하는 일이고, 정지는 씬을 백업에서 되살리므로 인스턴스가 통째로 새로
+# 만들어진다(설계 문서 §4 트랙 L1).
+#
+# ── 세 번 도는 이유 ──
+#
+# 두 번으로는 "두 번째가 특별한가"와 "매번 같은가"를 가를 수 없다. 세 번이면
+# 2세대와 3세대가 같은 모양인지까지 보이고, 세대마다 무언가가 쌓이는 결함(예:
+# 축소가 세대 수만큼 누적)이 드러난다.
+#
+# ── 대조군을 두지 않는 이유 ──
+#
+# 여기서 재는 것은 같은 인스턴스 자리의 **세대 간 비교**이고, 그 비교 대상이
+# 서로의 대조군이다. 1세대가 온전한데 2세대가 어긋나면 그 자체가 판정이다.
+
+wait 60
+scene.new LifecycleGeneration
+wait 30
+
+object.create Generation
+script.add Generation GenerationProbe
+wait 60
+
+# 1세대
+play
+wait 120
+stop
+wait 60
+
+# 2세대
+play
+wait 120
+stop
+wait 60
+
+# 3세대
+play
+wait 120
+stop
+wait 60
+
+log.flush
+quit

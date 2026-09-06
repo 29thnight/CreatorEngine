@@ -6,7 +6,7 @@ namespace CreatorEngine.Scripts;
 /// 씬에 콜라이더가 있어야 실제로 맞는 걸 볼 수 있으므로, 콜라이더가 있으면 명중을 확인하고
 /// 없으면 "안전하게 0을 돌려주는지"만 본다. 버퍼가 모자랄 때의 규약도 함께 검사한다.
 /// </summary>
-public sealed partial class PhysicsProbe : Behaviour
+public sealed partial class PhysicsProbe : Component
 {
     /// <summary>탐지 반경.</summary>
     [SerializeField] private float _radius = 10f;

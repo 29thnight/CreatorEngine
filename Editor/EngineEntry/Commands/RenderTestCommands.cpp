@@ -353,6 +353,29 @@ namespace ConsoleCmd
         return CommandCore::Ok("vk.gizmoicon 통과", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_vk_texturecodec(const ConsoleCommandContext& ctx)
+    {
+        std::string log;
+        const bool passed = RunVulkanTextureCodecTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[vk.texturecodec] ") +
+            (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] vk.texturecodec %s\n", passed ? "통과" : "실패");
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "vk.texturecodec 실패", std::move(data));
+        }
+        return CommandCore::Ok("vk.texturecodec 통과", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_vk_gizmoline(const ConsoleCommandContext& ctx)
     {
         std::string log;
@@ -1432,6 +1455,7 @@ namespace ConsoleCmd
         reg.Result({ "vk.skybox" }, &Cmd_vk_skybox);
         reg.Result({ "vk.ibl" }, &Cmd_vk_ibl);
         reg.Result({ "vk.gizmoicon" }, &Cmd_vk_gizmoicon);
+        reg.Result({ "vk.texturecodec" }, &Cmd_vk_texturecodec);
         reg.Result({ "vk.gizmoline" }, &Cmd_vk_gizmoline);
         reg.Result({ "vk.wireframe" }, &Cmd_vk_wireframe);
         reg.Result({ "vk.ui" }, &Cmd_vk_ui);

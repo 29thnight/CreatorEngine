@@ -460,6 +460,11 @@ public:
         uint32_t failures{ 0 };
         uint32_t fromCpuPixels{ 0 };
         uint64_t bytesUploaded{ 0 };
+
+        /// 이 캐시가 올린 논리 픽셀의 누적 다이제스트(A/B 대조용).
+        /// DX12 쪽과 같은 값이어야 한다 — 배치는 각자 유도하지만 픽셀은 같다.
+        RHIUploadDigest uploadDigest;
+
         uint32_t residentCount{ 0 };
         uint64_t residentBytes{ 0 };
         uint32_t retired{ 0 };

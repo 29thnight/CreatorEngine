@@ -188,6 +188,95 @@
 
 namespace ConsoleCmd
 {
+	CommandCore::CommandResult Cmd_light_proxy(const ConsoleCommandContext& ctx)
+	{
+		using namespace CommandCore;
+		if (ctx.parts.size() != 1) return InvalidArguments("light.proxy");
+		auto data = CommandData::Object();
+		auto rows = CommandData::Array();
+
+		RenderScene* renderScene = SceneManagers->GetRenderScene();
+		if (nullptr == renderScene)
+		{
+			std::printf("[light.proxy] renderScene=none\n");
+			return PreconditionFailed("scene.missing", "No render scene");
+		}
+
+		const auto proxies = renderScene->GetLightProxySnapshot();
+
+		// 커밋 누계를 함께 찍는다. 값이 안 바뀌었을 때 "발행이 없었나(publish=0)"와
+		// "발행은 됐는데 안 실렸나(publish>0 · committed 그대로)"를 갈라 준다.
+		// 앞은 writer가 dirty를 안 냈다는 뜻이고, 뒤는 등록이 없어 stale로
+		// 버려졌다는 뜻이라 고칠 자리가 다르다.
+		// 커밋 누계와 프록시 커맨드 큐를 함께 찍는다. 값이 안 바뀌었을 때
+		// 세 자리를 갈라 준다.
+		//
+		//   publish=0                      writer가 dirty를 안 냈다
+		//   publish>0 · committed 그대로    등록이 없어 stale로 버려졌다
+		//   committed 늘고 applied 안 늘면  커맨드가 소비되지 않았다
+		//                                  (렌더 스레드가 안 도는 헤드리스가 그렇다)
+		//
+		// 셋은 고칠 자리가 전혀 다르다. 값만 보고 첫째로 단정하기 쉬운데,
+		// 실제로 물린 것은 셋째였다.
+		if (Scene* scene = SceneManagers->GetActiveScene())
+		{
+			const RenderProxyCommitMetrics m = scene->GetRenderProxyCommitMetrics();
+			const auto q = ProxyCommandQueue->GetStats();
+			data.Set("publish", CommandData::Int(m.publishCalls));
+			data.Set("committed", CommandData::Int(m.committed));
+			data.Set("pending", CommandData::Int(m.pending));
+			data.Set("queued", CommandData::Int(q.enqueued));
+			data.Set("applied", CommandData::Int(q.applied));
+			data.Set("dropped", CommandData::Int(q.dropped));
+			data.Set("stale", CommandData::Int(q.staleEpoch));
+			data.Set("superseded", CommandData::Int(q.superseded));
+
+			std::printf("[light.proxy] count=%zu publish=%llu committed=%llu pending=%llu"
+				" queued=%llu applied=%llu dropped=%llu stale=%llu superseded=%llu\n",
+				proxies.size(),
+				(unsigned long long)m.publishCalls,
+				(unsigned long long)m.committed,
+				(unsigned long long)m.pending,
+				(unsigned long long)q.enqueued,
+				(unsigned long long)q.applied,
+				(unsigned long long)q.dropped,
+				(unsigned long long)q.staleEpoch,
+				(unsigned long long)q.superseded);
+		}
+		else
+		{
+			std::printf("[light.proxy] count=%zu (활성 씬 없음 — 커밋 누계 생략)\n",
+				proxies.size());
+		}
+
+		size_t index = 0;
+		for (const auto& proxy : proxies)
+		{
+			if (nullptr == proxy) { ++index; continue; }
+
+			std::printf(
+				"[light.proxy] #%zu intensity=%.3f range=%.3f spot=%.3f type=%d status=%d"
+				" color=(%.3f,%.3f,%.3f,%.3f)\n",
+				index, proxy->m_intensity, proxy->m_range, proxy->m_spotLightAngle,
+				proxy->m_lightType, proxy->m_lightStatus,
+				proxy->m_color.r, proxy->m_color.g, proxy->m_color.b, proxy->m_color.a);
+            auto row = CommandData::Object();
+            row.Set("index", CommandData::Int(index));
+            row.Set("intensity", CommandData::Double(proxy->m_intensity));
+            row.Set("range", CommandData::Double(proxy->m_range));
+            row.Set("spot", CommandData::Double(proxy->m_spotLightAngle));
+            row.Set("type", CommandData::Int(proxy->m_lightType));
+            row.Set("status", CommandData::Int(proxy->m_lightStatus));
+            auto color = CommandData::Array();
+            for (float value : {proxy->m_color.r, proxy->m_color.g, proxy->m_color.b, proxy->m_color.a}) color.Append(CommandData::Double(value));
+            row.Set("color", std::move(color)); rows.Append(std::move(row));
+            ++index;
+		}
+        data.Set("count", CommandData::Int(proxies.size()));
+        data.Set("lights", std::move(rows));
+        return Ok("Light proxy snapshot", std::move(data));
+	}
+
     static CommandCore::CommandResult Cmd_render_matmode(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -435,6 +524,7 @@ namespace ConsoleCmd
 
     void RegisterRenderDebugCommands(Registrar& reg)
     {
+        reg.Result({ "light.proxy" }, &Cmd_light_proxy);
         reg.Result({ "render.matmode" }, &Cmd_render_matmode);
         reg.Result({ "render.backend" }, &Cmd_render_backend);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);

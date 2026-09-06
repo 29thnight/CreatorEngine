@@ -1,0 +1,62 @@
+# LC7 즉시 제거 픽스처 (ScriptLifecycleContractHardeningPlan · LC7-e)
+#
+# 판정은 verify-lifecycle-immediate.ps1이 한다.
+#
+# ── 무엇을 메우는가 ──
+#
+# 컴포넌트를 **그 자리에서** 소멸시키는 경로는 하나뿐이다 —
+# PrefabUtility::ApplyComponentDiff의 차집합 적용. 씬의 정상 파괴는 전부
+# Scene::FlushPendingDestroy를 지나 프레임 경계에서 일어나는데, 이 경로만 프레임
+# 중간에 컴포넌트를 지운다.
+#
+# 그 경로에 축소 삼단 배선이 들어 있다(PrefabUtility.cpp — 예전에는
+# OnRemovingFromScene을 빠뜨렸고 그것이 고쳐졌다). 그런데 그 배선이 **관리
+# 스크립트에 실제로 닿는지**는 어느 게이트도 재지 않았다. 네이티브 컴포넌트에는
+# 닿고 ScriptComponent에서 끊기는 상태가 가능하고, 그러면 스크립트의 구독·대기가
+# 해제되지 않은 채 인스턴스만 사라진다.
+#
+# ── 어떻게 그 경로를 여는가 ──
+#
+# 차집합은 "정의에 없고 인스턴스에 있는" 컴포넌트를 지운다. 그래서 소스에는
+# 스크립트를 붙이지 않고, **인스턴스에만** 붙인 뒤 정의를 갱신한다.
+#
+#   object.create Src            소스 — 스크립트 없음
+#   prefab.create Src ImmProbe   정의도 스크립트 없음
+#   prefab.instantiate → Inst    인스턴스
+#   script.add Inst ...          인스턴스에만 스크립트
+#   play                         재생 중에 해야 축소가 의미를 갖는다
+#   prefab.update Src ImmProbe   차집합이 Inst의 스크립트를 그 자리에서 지운다
+#
+# script.remove 명령이 없어 반대 방향(정의에서 빼기)은 몰 수 없다. 이 방향은
+# 명령이 전부 있다.
+#
+# 재생 중에 지우는 것이 핵심이다. 편집 모드에서는 관리 훅이 애초에 돌지 않아
+# (bd13620c) 축소가 올 자리가 없다.
+
+wait 60
+scene.new LifecycleImmediate
+wait 30
+
+object.create Src
+wait 15
+prefab.create Src ImmProbe
+wait 30
+
+prefab.instantiate ImmProbe Inst
+wait 45
+
+script.add Inst GenerationProbe
+wait 30
+
+play
+# 대기가 걸릴 시간만 준다. 즉시 제거는 대기 안쪽이어야 한다.
+wait 60
+
+prefab.update Src ImmProbe
+wait 120
+
+stop
+wait 60
+
+log.flush
+quit

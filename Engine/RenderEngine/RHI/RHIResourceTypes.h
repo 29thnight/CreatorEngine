@@ -9,6 +9,68 @@
 #include "RHIHandle.h"
 #include "RHIResourceState.h"
 
+#include <atomic>
+
+// ── 업로드 A/B 다이제스트 (축 A 게이트) ─────────────────────────────────
+//
+// 두 백엔드가 같은 자산을 같은 픽셀로 올렸는지 묻는다.
+//
+// ★ 왜 '논리' 바이트인가. DX12 는 256바이트 정렬 행 간격을 쓰고 Vulkan 은
+//   빈틈없는 간격을 쓴다 — 스테이징 원본을 그대로 해시하면 두 백엔드가
+//   절대 같은 값을 낼 수 없다. 행마다 유효 바이트만 순서대로 먹이면
+//   "같은 픽셀을 같은 순서로 올렸는가"만 남는다.
+//
+// ★ 왜 동어반복이 아닌가. 두 백엔드는 목적지 배치를 **각자 유도한다** —
+//   DX12 는 GetCopyableFootprints 로 드라이버에게 묻고, Vulkan 은
+//   RHIFormatRowPitch 로 직접 계산한다. 같은 뷰를 읽되 배치가 독립이므로
+//   한쪽 계산이 틀어지면 값이 갈린다. 블록 압축이 들어오면서 그 계산이
+//   블록 단위로 바뀌었고, 이 대조가 지키는 것이 정확히 그 자리다.
+//
+// ★ 못 잡는 것(문서화까지가 증명). 소스(뷰)가 틀리면 두 백엔드가 사이좋게
+//   같은 쓰레기를 올려 값이 일치한다. 그 축은 DX12 픽셀 골든이 담당한다 —
+//   dx12.gizmoicon 이 뷰 포인터 16행 밀기 변이를 실제로 잡는 것을 확인했다.
+struct RHIUploadDigest
+{
+    uint64_t hash{ 0xcbf29ce484222325ull };   ///< FNV-1a 64 오프셋 기저
+    uint64_t bytes{ 0 };
+    uint32_t rows{ 0 };
+
+    /// 유효 바이트 한 행을 먹인다. 행 단위인 것이 요점이다 — 패딩을 건너뛴다.
+    void FeedRow(const void* data, size_t size)
+    {
+        const auto* cursor = static_cast<const uint8_t*>(data);
+        uint64_t value = hash;
+        for (size_t index = 0; index < size; ++index)
+        {
+            value ^= cursor[index];
+            value *= 0x100000001b3ull;
+        }
+        hash = value;
+        bytes += size;
+        ++rows;
+    }
+
+    bool IsEmpty() const { return 0 == bytes; }
+
+    bool operator==(const RHIUploadDigest& other) const
+    {
+        return hash == other.hash && bytes == other.bytes && rows == other.rows;
+    }
+    bool operator!=(const RHIUploadDigest& other) const { return !(*this == other); }
+};
+
+/// 다이제스트 수집 스위치. **기본 off** — 4K HDR 128MB 를 매번 해시하면
+/// 로드가 눈에 띄게 느려진다. 자가 검증만 켠다.
+inline std::atomic<bool> g_rhiUploadDigestEnabled{ false };
+inline bool RHIUploadDigestEnabled()
+{
+    return g_rhiUploadDigestEnabled.load(std::memory_order_relaxed);
+}
+inline void SetRHIUploadDigestEnabled(bool enabled)
+{
+    g_rhiUploadDigestEnabled.store(enabled, std::memory_order_relaxed);
+}
+
 /// 자산 텍스처 캐시가 패스에 돌려주는 중립 설명.
 ///
 /// 캐시는 GPU 리소스의 소유권을 계속 들고, 패스는 이 값으로 그 프레임의
