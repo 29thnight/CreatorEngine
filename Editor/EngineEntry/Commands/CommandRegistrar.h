@@ -50,6 +50,27 @@ namespace ConsoleCmd
         virtual void Escaping(std::initializer_list<const char*> names,
                               ConsoleCommandHandler fn) = 0;
 
+        /// ★ **검증은 명령이 아니다**(2026-09-06).
+        ///
+        /// 이 저장소의 기준은 "기본 동작만 명령으로 둔다" 이다. 그런데 registry
+        /// 199 개 중 114 개가 특정 자산·시나리오에 묶인 **검증 프로브**였다 —
+        /// `dx12.ssao` · `vk.gbuffer` · `experiment.boneresolve` 처럼 하나의
+        /// 검사에 하나의 이름이 붙어 있었다.
+        ///
+        /// 그것들이 명령이 되면 골든 행 · descriptor · help 줄 · 서명 이행
+        /// 대상이 되어 영구 유지 비용을 문다. §18 이 "모든 command 가 terminal
+        /// `CommandResult` 를 만든다" 를 요구하므로, 이행하는 순간 **나가야 할
+        /// 것이 못 나가게 박힌다.**
+        ///
+        /// 그래서 이름을 registry 에서 뺀다. 기본 동작은 하나다 — **"이름을
+        /// 받아 그 검사를 돌린다"**. `selftest <이름>` 이 그것이고, 목록은
+        /// registry 가 아니라 아래 표가 갖는다.
+        ///
+        /// 도메인 TU 는 여기에 검사를 등록한다. `Result` 와 달리 이름이
+        /// `commands.list` 에 나오지 않는다 — 명령이 아니기 때문이다.
+        virtual void SelfTest(const char* name,
+                              ConsoleCommandResultHandler fn) = 0;
+
     protected:
         // 창구는 표가 소유한다. 도메인이 지울 수 있으면 안 된다.
         ~Registrar() = default;

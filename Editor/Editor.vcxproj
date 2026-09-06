@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
     에디터 통합 정적 라이브러리 (E7-d, 2026-08-24).
@@ -120,6 +120,9 @@
          그 규칙이 지켜지는지가 평상시 빌드에서 검사되지 않는다. 빼 두면 매
          빌드가 검사다. (non-unity 전체 빌드는 오늘 SceneRuntime 에서 이미
          깨져 있어 그쪽에 기댈 수 없다.) -->
+    <ClCompile Include="EngineEntry\Commands\SelfTestTable.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="EngineEntry\Commands\CommandSupport.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>

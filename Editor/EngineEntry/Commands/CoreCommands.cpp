@@ -21,6 +21,7 @@
 // include 는 이 TU 가 직접 소유한다(유니티에서 빠져 있다).
 
 #include "CommandRegistrar.h"
+#include "SelfTestTable.h"
 #include "CommandSupport.h"
 
 #include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
@@ -803,9 +804,52 @@ namespace ConsoleCmd
         std::printf("[CLI] 로그 flush\n");
     }
 
+
+    // ★ 검증 프로브의 **유일한** 창구(2026-09-06).
+    //
+    //   기준은 "기본 동작만 명령으로 둔다" 이다. 검사 하나에 명령 하나를 두면
+    //   골든 행·descriptor·help 줄·서명 이행 대상이 그 수만큼 는다 — 2026-09-06
+    //   시점 registry 199 개 중 **114 개가 그런 프로브**였다.
+    //
+    //   조작은 하나다: **이름을 받아 그 검사를 돌린다.** 목록은 registry 가 아니라
+    //   `SelfTestTable` 이 갖고, 그래서 `commands.list` 에 나오지 않는다.
+    static CommandCore::CommandResult Cmd_selftest(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::vector<std::string> names = ConsoleCmd::SelfTestNames();
+
+        if (parts.size() < 2)
+        {
+            // 인자 없이 부르는 것은 오류가 아니라 **목록 조회**다.
+            for (const std::string& name : names)
+            {
+                std::printf("[CLI] selftest %s\n", name.c_str());
+            }
+            CommandCore::CommandData data = CommandCore::CommandData::Object();
+            data.Set("count", CommandCore::CommandData::Int(
+                static_cast<int64_t>(names.size())));
+            return CommandCore::Ok("selftest 목록", std::move(data));
+        }
+
+        const ConsoleCmd::SelfTestHandler fn = ConsoleCmd::FindSelfTest(parts[1]);
+        if (nullptr == fn)
+        {
+            // ★ 없는 이름을 **조용히 통과시키지 않는다.** 게이트가 이름을 틀리게
+            //   적으면 0 건을 돌고 초록이 되는데, 그것이 이 저장소가 이미 두 번
+            //   겪은 사고다(무인증 경로 검사·필터가 아무것도 못 고른 probe).
+            std::printf("[CLI] selftest: 알 수 없는 검사 %s (등록 %zu건)\n",
+                parts[1].c_str(), names.size());
+            return CommandCore::InvalidArguments(
+                "selftest: 알 수 없는 검사 '" + parts[1] + "'");
+        }
+
+        return fn(ctx);
+    }
+
     void RegisterCoreCommands(Registrar& reg)
     {
         reg.Result({ "help" }, &Cmd_help);
+        reg.Result({ "selftest" }, &Cmd_selftest);
         reg.Result({ "commands.list" }, &Cmd_commands_list);
         reg.Result({ "commands.describe" }, &Cmd_commands_describe);
         reg.Result({ "commands.selftest" }, &Cmd_commands_selftest);

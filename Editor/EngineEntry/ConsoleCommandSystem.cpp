@@ -3,7 +3,8 @@
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
-#include "Commands/CommandRegistrar.h"          // LC6: 도메인 TU 등록 창구
+#include "Commands/CommandRegistrar.h"
+#include "Commands/SelfTestTable.h"          // LC6: 도메인 TU 등록 창구
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "CommandResultJson.h"          // LC9: 배치 JSONL 과 서비스 JSON 의 단일 정본
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
@@ -4222,6 +4223,13 @@ namespace ConsoleCmd
                             ConsoleCommandResultHandler fn) override { (*result)(names, fn); }
                 void Escaping(std::initializer_list<const char*> names,
                               ConsoleCommandHandler fn) override { (*escaping)(names, fn); }
+
+                // 검사는 명령이 아니다 — registry 를 거치지 않고 표로 간다.
+                void SelfTest(const char* name,
+                              ConsoleCommandResultHandler fn) override
+                {
+                    ConsoleCmd::RegisterSelfTest(name, fn);
+                }
             };
             TableRegistrar registrar(reg, regResult, regEscaping);
 

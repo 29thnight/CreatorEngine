@@ -2390,7 +2390,7 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.matcook %s\n", passed ? "통과" : "실패");
     }
 
-    static void Cmd_experiment_matparity(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_matparity(const ConsoleCommandContext& ctx)
     {
         // I5-M1 — experiment::Material → 정본 packer CB bytes의 legacy 비트
         // 패리티. 합성(타입 8종) + 실사(Slang reflection layout) 두 leg 다 돈다.
@@ -2409,6 +2409,16 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.matparity] 실패\n") + log);
         }
         std::printf("[CLI] experiment.matparity %s\n", passed ? "통과" : "실패");
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(log));
+        if (!passed)
+        {
+            return CommandCore::Fail("experiment.matparity.failed",
+                "재질 해석 패리티 판정 실패", std::move(data));
+        }
+        return CommandCore::Ok("experiment.matparity 통과", std::move(data));
     }
 
     // I5-D5c1 — 재질 런타임 병행 표현의 전수 A/B, 그리고 **왕복 손실의 실측**.
@@ -3318,7 +3328,7 @@ namespace ConsoleCmd
             catalog->DerivedRoot().string().c_str());
     }
 
-    static void Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)
     {
         // I5-M2 — MaterialResolver. 합성(가짜 서비스·호출 계수) + 실사(DataSystem
         // 바인딩) 두 leg 다 돈다.
@@ -3337,9 +3347,19 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.matresolve] 실패\n") + log);
         }
         std::printf("[CLI] experiment.matresolve %s\n", passed ? "통과" : "실패");
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(log));
+        if (!passed)
+        {
+            return CommandCore::Fail("experiment.matresolve.failed",
+                "MaterialResolver 호출 순서 판정 실패", std::move(data));
+        }
+        return CommandCore::Ok("experiment.matresolve 통과", std::move(data));
     }
 
-    static void Cmd_experiment_matmigrate(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_matmigrate(const ConsoleCommandContext& ctx)
     {
         // I5-M5 S1 — legacy ↔ experiment 변환 정본 + DataSystem 읽기 이중화.
         (void)ctx;
@@ -3357,9 +3377,19 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.matmigrate] 실패\n") + log);
         }
         std::printf("[CLI] experiment.matmigrate %s\n", passed ? "통과" : "실패");
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(log));
+        if (!passed)
+        {
+            return CommandCore::Fail("experiment.matmigrate.failed",
+                "legacy 재질 왕복 이관 판정 실패", std::move(data));
+        }
+        return CommandCore::Ok("experiment.matmigrate 통과", std::move(data));
     }
 
-    static void Cmd_experiment_matscript(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_matscript(const ConsoleCommandContext& ctx)
     {
         // I5-M5 S3 — CLR property API의 논리 값 경로.
         (void)ctx;
@@ -3377,6 +3407,16 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.matscript] 실패\n") + log);
         }
         std::printf("[CLI] experiment.matscript %s\n", passed ? "통과" : "실패");
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(log));
+        if (!passed)
+        {
+            return CommandCore::Fail("experiment.matscript.failed",
+                "스크립트가 보는 재질 표면 판정 실패", std::move(data));
+        }
+        return CommandCore::Ok("experiment.matscript 통과", std::move(data));
     }
 
     static void Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
@@ -3500,11 +3540,11 @@ namespace ConsoleCmd
         reg.Legacy({ "experiment.editorsurface" }, &Cmd_experiment_editorsurface);
         reg.Legacy({ "experiment.cooked" }, &Cmd_experiment_cooked);
         reg.Legacy({ "experiment.matcook" }, &Cmd_experiment_matcook);
-        reg.Legacy({ "experiment.matparity" }, &Cmd_experiment_matparity);
-        reg.Legacy({ "experiment.matresolve" }, &Cmd_experiment_matresolve);
+        reg.SelfTest("experiment.matparity", &Cmd_experiment_matparity);
+        reg.SelfTest("experiment.matresolve", &Cmd_experiment_matresolve);
         reg.Legacy({ "experiment.matruntime" }, &Cmd_experiment_matruntime);
-        reg.Legacy({ "experiment.matmigrate" }, &Cmd_experiment_matmigrate);
-        reg.Legacy({ "experiment.matscript" }, &Cmd_experiment_matscript);
+        reg.SelfTest("experiment.matmigrate", &Cmd_experiment_matmigrate);
+        reg.SelfTest("experiment.matscript", &Cmd_experiment_matscript);
         reg.Legacy({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
         reg.Legacy({ "experiment.catalog" }, &Cmd_experiment_catalog);
         reg.Legacy({ "assets.unload" }, &Cmd_assets_unload);
