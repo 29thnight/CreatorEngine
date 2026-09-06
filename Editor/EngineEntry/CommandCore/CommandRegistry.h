@@ -18,6 +18,7 @@ namespace CommandCore
     {
     public:
         static CommandRegistry& Get();
+        static CommandRegistry& Commandlets();
 
         /// 등록 하나를 기록한다. 실패 사유는 `Problems()` 에 쌓인다.
         void Add(CommandDescriptor descriptor);

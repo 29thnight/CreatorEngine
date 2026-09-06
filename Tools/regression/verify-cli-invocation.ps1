@@ -35,7 +35,7 @@ function Invoke-Script {
     $scriptPath = Join-Path $Work "inv_$Name.txt"
     (($Commands + 'quit') -join "`n") | Set-Content -LiteralPath $scriptPath -Encoding UTF8
     $outPath = Join-Path $Work "inv_$Name.out"
-    $proc = Start-Process -FilePath $Exe -ArgumentList '--script', $scriptPath -WorkingDirectory $exeDir `
+    $proc = Start-Process -FilePath $Exe -ArgumentList '--commandlet-script', $scriptPath -WorkingDirectory $exeDir `
         -RedirectStandardOutput $outPath -RedirectStandardError (Join-Path $Work "inv_$Name.err") -PassThru
     $proc.WaitForExit(180000) | Out-Null
     if (-not $proc.HasExited) { $proc.Kill(); return $null }

@@ -1,4 +1,4 @@
-#Requires -Version 7
+﻿#Requires -Version 7
 <#
 .SYNOPSIS
     dx12.* 자가 검증 전수 스윕. 판정을 CSV 로 남기고 기준선과 대조한다.
@@ -16,7 +16,7 @@
 
     그래서 이 스크립트는 셋을 구조로 막는다:
 
-      · 목록을 **엔진의 런타임 discovery**(`commands.list`)에서 뽑는다.
+      · 목록을 **엔진의 런타임 discovery**(`--commandlet list`)에서 뽑는다.
         2026-09-04 이전에는 C++ 소스에서 뽑았는데, 그것도 두 번 틀렸다 —
         등록이 if-else 체인에서 등록 표로 바뀌자 35종을 0종으로 읽었고,
         문자열 리터럴 전수로 바꾼 뒤에도 "소스가 이렇게 생겼다"는 가정이
@@ -57,7 +57,7 @@ param(
     [string]$OutDir,
 
     [string]$Exe = "",
-    [string]$CommandSource = "",
+    [string]$TexturePath = (Join-Path $PSScriptRoot "../../Dynamic_CPP/Assets/Materials/Cube_Mat_BaseColor.png"),
     [int]$WarmupFrames = 240,
     [int]$TimeoutSec = 300,
     [string[]]$Only = @(),
@@ -74,10 +74,6 @@ if ([string]::IsNullOrWhiteSpace($Exe)) {
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
     throw "실행 파일이 없다: $Exe (Debug x64 를 먼저 빌드한다)"
 }
-# $CommandSource 는 더 이상 쓰지 않는다(LC3). 파라미터는 호출 호환을 위해 남긴다 —
-# 세트와 문서가 그 이름을 넘기고 있어서, 지우면 호출부가 먼저 깨진다.
-$null = $CommandSource
-
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $OutDir = [IO.Path]::GetFullPath($OutDir)
 
@@ -91,30 +87,24 @@ $OutDir = [IO.Path]::GetFullPath($OutDir)
 #   뽑는 것으로 또 한 번 막았지만, 그것도 "소스가 이렇게 생겼다"는 가정이다.
 #
 #   근본 원인은 **명령 목록의 정본이 프로그램 밖에 있었다**는 것이다. 이제
-#   엔진이 `commands.list` 로 자기 registry snapshot 을 낸다 — 등록 형태가
+#   엔진이 `--commandlet list` 로 검증 registry 목록을 낸다 — 등록 형태가
 #   어떻게 바뀌든 그 출력은 등록된 것 그대로다.
 #
 # @() 로 감싼다 — 결과가 하나면 파이프라인이 스칼라를 돌려주어 .Count 가 없다.
-$discoveryPath = Join-Path $OutDir 'commands.tsv'
-$discoveryScript = Join-Path $OutDir '_discover.txt'
-"commands.list $discoveryPath`nquit" | Set-Content -LiteralPath $discoveryScript -Encoding UTF8
-
-$discoverProc = Start-Process -FilePath $Exe -ArgumentList '--script', $discoveryScript `
-    -WorkingDirectory (Split-Path -Parent $Exe) `
+$discoveryPath = Join-Path $OutDir 'commandlets.jsonl'
+if (Test-Path -LiteralPath $discoveryPath) { Remove-Item -LiteralPath $discoveryPath }
+$discoverProc = Start-Process -FilePath $Exe -ArgumentList '--commandlet', 'list', '--', '--result-file', ('"'+$discoveryPath+'"') `
+    -WorkingDirectory (Split-Path -Parent $Exe) -WindowStyle Hidden `
     -RedirectStandardOutput (Join-Path $OutDir '_discover.out') `
-    -RedirectStandardError  (Join-Path $OutDir '_discover.err') -PassThru
-$discoverProc.WaitForExit(180000) | Out-Null
-if (-not $discoverProc.HasExited) { $discoverProc.Kill(); throw 'commands.list 가 끝나지 않았다' }
-if (-not (Test-Path -LiteralPath $discoveryPath -PathType Leaf)) {
-    throw "discovery 산출물이 없다: $discoveryPath (commands.list 실패)"
-}
-
-$tests = @(Get-Content -LiteralPath $discoveryPath -Encoding UTF8 |
-    Where-Object { $_ -notmatch '^#' -and $_ -notmatch '^canonical\t' } |
-    ForEach-Object { ($_ -split "`t")[0] } |
-    Where-Object { $_ -like 'dx12.*' } |
-    Sort-Object -Unique)
+    -RedirectStandardError (Join-Path $OutDir '_discover.err') -PassThru
+if (-not $discoverProc.WaitForExit(180000)) { $discoverProc.Kill(); throw 'Commandlet discovery timed out' }
+if ($discoverProc.ExitCode -ne 0) { throw "Commandlet discovery failed: $($discoverProc.ExitCode)" }
+$discovery = Get-Content -LiteralPath $discoveryPath | ConvertFrom-Json
+if ($discovery.status -ne 'succeeded') { throw 'Commandlet discovery did not succeed' }
+$tests = @($discovery.data.names | Where-Object { $_ -like 'dx12.*' } | Sort-Object -Unique)
 if ($Only.Count -gt 0) {
+    $missing = @($Only | Where-Object { $tests -notcontains $_ })
+    if ($missing.Count) { throw "Unknown Commandlet(s): $($missing -join ', ')" }
     $tests = @($tests | Where-Object { $Only -contains $_ })
 }
 if ($tests.Count -eq 0) { throw "검사를 하나도 못 찾았다" }
@@ -131,7 +121,8 @@ foreach ($name in $tests) {
 
     $commands = @()
     if ($WarmupFrames -gt 0) { $commands += "wait $WarmupFrames" }
-    $commands += @($name, "wait 10", "quit")
+    $invocation = if ($name -eq "dx12.selftest") { "$name `"$([IO.Path]::GetFullPath($TexturePath))`"" } else { $name }
+    $commands += @($invocation, "wait 10", "quit")
     Set-Content -LiteralPath $cmdFile -Value $commands -Encoding UTF8
 
     # ── LC9: 판정을 사람용 출력이 아니라 결과 스트림에서 읽는다 (§18) ────
@@ -152,7 +143,7 @@ foreach ($name in $tests) {
     #   consumer 는 text fallback 을 유지하지 않는다. 이중 parser 는 새 drift 를
     #   만든다." 결과 줄이 없으면 그것은 **무판정**이고, 무판정은 통과가 아니다.
     $process = Start-Process -FilePath $Exe `
-        -ArgumentList "--script", "`"$cmdFile`"", "--result-format", "jsonl", "--result-file", "`"$resultFile`"" `
+        -ArgumentList "--commandlet-script", "`"$cmdFile`"", "--result-format", "jsonl", "--result-file", "`"$resultFile`"" `
         -PassThru -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile
 
     if (-not $process.WaitForExit($TimeoutSec * 1000)) {
@@ -232,3 +223,8 @@ if (-not [string]::IsNullOrWhiteSpace($Baseline)) {
         exit 1
     }
 }
+
+# A failed/absent terminal record or a failed process must fail the consumer too.
+# CSV collection alone used to return exit 0 even when the engine exited 5.
+$failed = @($rows | Where-Object { $_.Status -ne 'succeeded' -or $_.Exit -ne 0 })
+if ($failed.Count) { Write-Error "DX12 Commandlet failure: $($failed.Test -join ', ')"; exit 1 }

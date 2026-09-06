@@ -18,7 +18,7 @@ $scenario = Join-Path $Work "ai_registry_resolved.txt"
 
 $outPath = Join-Path $Work "ai_registry.out"
 $errPath = Join-Path $Work "ai_registry.err"
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null

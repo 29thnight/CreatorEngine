@@ -8,7 +8,7 @@
 # `Transform` dirty가 올라가 그때만 툭 갱신된다(사용자 보고로 확인).
 #
 # ★ 이 결함이 왜 기존 게이트를 전부 통과했는가:
-#   · 헤드리스(`--script`)는 프레임을 완성하지 않아 그림을 못 본다.
+#   · 헤드리스(`--commandlet-script`)는 프레임을 완성하지 않아 그림을 못 본다.
 #   · 라이브 게이트는 비결정성 때문에 저장 직전 **Animator를 꺼 버린다** —
 #     즉 재는 것이 바인드 포즈다.
 #   · `experiment.animtick`은 포즈를 **다시 계산**할 뿐 라이브 팔레트가
@@ -50,7 +50,7 @@ $stderr = Join-Path $Work "skinned_proxy_refresh.err.log"
     Replace('__MODEL__', $model.Replace('\', '/')) |
     Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $scenario) `
     -WorkingDirectory $repoRoot -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 if (-not $proc.WaitForExit($TimeoutSec * 1000)) {
@@ -64,7 +64,7 @@ $fail = @()
 
 # ① 재생이 실제로 돌아야 아래 축이 의미를 가진다(elapsed·팔레트 digest 변화).
 $samples = [regex]::Matches($log,
-    'animlive \S+ path=(\S+) enabled=(\d+) clip=\d+ elapsed=([\d.]+) .* palette=([0-9A-F]{8})')
+    'animator\.status \S+ path=(\S+) enabled=(\d+) clip=\d+ elapsed=([\d.]+) .* palette=([0-9A-F]{8})')
 if ($samples.Count -lt 2) {
     $fail += "1 표본이 2개 미만이다 — 애니메이터를 못 잡았거나 시나리오가 끊겼다"
 }
@@ -80,7 +80,7 @@ else {
 
 # ② ★ 핵심 — 프록시 커밋이 늘어야 최신 팔레트가 렌더로 간다.
 #    수정 전 실측은 두 표본 모두 11로 **고정**이었다(재생 중인데 커밋 0).
-$commits = [regex]::Matches($log, 'animlive done animators=(\d+) proxyCommitted=(\d+)')
+$commits = [regex]::Matches($log, 'animator\.status done animators=(\d+) proxyCommitted=(\d+)')
 if ($commits.Count -lt 2) {
     $fail += "3 프록시 커밋 표본이 2개 미만이다"
 }

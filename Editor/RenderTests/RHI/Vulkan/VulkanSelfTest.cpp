@@ -121,11 +121,11 @@ namespace
     };
 }
 
-bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
+bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& modelPath, const std::string& texturePath, std::string& outLog)
 {
     std::string error;
 
-    if (!RenderTest::RunShaderReflectionSelfTest(outLog)) return false;
+    if (!RenderTest::RunShaderReflectionSelfTest(texturePath, outLog)) return false;
 
     // ── [1/4] 로더·인스턴스·디바이스 ──
 
@@ -179,7 +179,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         return false;
     }
 
-    const file::path scenePath = PathFinder::ModelSourcePath() / L"scene.glb";
+    const file::path scenePath = file::path(modelPath);
     // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
     const std::shared_ptr<const assets::ModelAssetGeneration> sceneModel =
         DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
@@ -216,7 +216,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
     {
         meshCache.Shutdown();
         pipelineCache.Shutdown();
-        outLog += "[2/4] scene.glb의 유효 mesh 누적 업로드가 16MiB를 넘지 않는다"
+        outLog += "[2/4] 입력 모델의 유효 mesh 누적 업로드가 16MiB를 넘지 않는다"
             " (mesh " + std::to_string(sceneMeshes.size()) + "개 · 누적 "
             + std::to_string(sceneUploadBytes) + "B): " + scenePath.string() + "\n";
         return false;
@@ -261,7 +261,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
 
         if (!resources.BeginFrame(error)) return fail("[2/4] BeginFrame 실패: " + error + "\n");
 
-        // 문제를 일으킨 실제 scene.glb의 모든 유효 Mesh를 같은 recording에
+        // 문제를 일으킨 실제 입력 모델의 모든 유효 Mesh를 같은 recording에
         // cache 계약으로 올린다. 개별 mesh가 아니라 모델 누적 업로드가 기존
         // 16MiB ring 경계를 넘는 실제 자산 구조를 그대로 재현한다.
         meshCache.BeginFrame(0);
@@ -275,7 +275,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             if (!binding.IsValid() || binding.vertices.size != vertexBytes ||
                 binding.indices.size != indexBytes)
             {
-                return fail("[2/4] scene.glb 실제 mesh 누적 cache upload가 실패했다: "
+                return fail("[2/4] 입력 모델 실제 mesh 누적 cache upload가 실패했다: "
                     + meshError + "\n");
             }
             if (mesh.handle == sceneMesh.handle) sceneBinding = binding;
@@ -289,10 +289,10 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             sceneUploadBytes != firstMeshStats.bytesUploaded ||
             0 != firstMeshStats.failures)
         {
-            return fail("[2/4] scene.glb 실제 mesh 누적 cache 통계가 일치하지 않는다\n");
+            return fail("[2/4] 입력 모델 실제 mesh 누적 cache 통계가 일치하지 않는다\n");
         }
 
-        // scene.glb는 여러 regular segment를 누적으로 넘기는 실제 사례다.
+        // 입력 모델는 여러 regular segment를 누적으로 넘기는 실제 사례다.
         // 단일 요청 dedicated-large 경로는 자산 형상과 섞지 않고 별도로 잰다.
         const RHIBufferSlice largeUpload = services.AllocateUpload(RHIUploadRequest{
             20ull * 1024 * 1024, RHIUploadUsage::BufferCopy, 16 });
@@ -509,7 +509,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         const float extentX = component(meshMax, axes[0]) - component(meshMin, axes[0]);
         const float extentY = component(meshMax, axes[1]) - component(meshMin, axes[1]);
         if (!(extentX > 1e-6f) || !(extentY > 1e-6f))
-            return fail("[3/4] scene.glb mesh bounds가 투영 가능한 면을 만들지 못한다\n");
+            return fail("[3/4] 입력 모델 mesh bounds가 투영 가능한 면을 만들지 못한다\n");
 
         struct alignas(16) MeshConstants
         {
@@ -679,7 +679,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
                 + " (완료값 " + std::to_string(completedBefore) + " → "
                 + std::to_string(completedAfter) + " · 서명 "
                 + std::to_string(signaled)
-            + " · scene.glb 정점 " + std::to_string(sceneVertexBytes / (1024 * 1024))
+            + " · 입력 모델 정점 " + std::to_string(sceneVertexBytes / (1024 * 1024))
             + "MiB/인덱스 " + std::to_string(sceneIndexBytes / (1024 * 1024))
             + "MiB 첫 cache upload · 비동기 flush 3회"
             + " · 병렬 64MiB CAS 재시도 " + std::to_string(parallelCasRetries)
@@ -730,7 +730,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
         {
             char detail[160]{};
             std::snprintf(detail, sizeof(detail),
-                "[3/4] scene.glb indexed draw 픽셀 검증 실패 — green %u · blue %u\n",
+                "[3/4] 입력 모델 indexed draw 픽셀 검증 실패 — green %u · blue %u\n",
                 greenPixels, bluePixels);
             return fail(detail);
         }
@@ -760,7 +760,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, std::string& outLog)
             meshCache.GetStats().persistentHeap;
         char line[512]{};
         std::snprintf(line, sizeof(line),
-            "[3/4] scene.glb 중립 mesh 경로 통과 — mesh %zu개 · 누적 %lluB"
+            "[3/4] 입력 모델 중립 mesh 경로 통과 — mesh %zu개 · 누적 %lluB"
             " · draw 정점 %lluB · 인덱스 %lluB"
             " · indexed %u · green %u · blue %u · PSO %u · reload collected %u · segment 사용 %uB"
             " · persistent %u장/%lluB 사용 · pooled %u"

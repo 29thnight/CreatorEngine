@@ -75,7 +75,7 @@ $scenario = Join-Path $Work "lifecycle_baseline_resolved.txt"
     -replace '\{\{REGISTRY_SETUP\}\}', $registrySetup |
     Set-Content $scenario -Encoding UTF8
 
-$exeArgs = @("--script", $scenario)
+$exeArgs = @("--commandlet-script", $scenario)
 
 
 # 기준선은 하나다.

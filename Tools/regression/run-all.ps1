@@ -30,28 +30,12 @@ Run-Step "HashingString 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hashing-string.ps1")
 }
 
-# PHASE 14.5 LC0 — CLI 계약의 래칫 둘.
-#
-# 둘 다 "계약을 지켰는가"가 아니라 "거동이 기록된 것과 같은가"를 본다. 오늘의
-# 거동은 계약 위반이고(실패를 출력하고 exit 0), 그것을 지금 붉게 만들면 세트가
-# 첫날부터 붉어 아무도 안 본다. 대신 관측을 baseline/golden에 적어 두고 **달라질
-# 때** 붉어지게 했다 — LC1이 exit spine을 세우거나 LC2가 tokenizer를 바꾸면
-# 여기가 먼저 알린다. 그때 -UpdateBaseline / -UpdateGolden 으로 한 번 갱신하고
-# 그 diff를 커밋에 남긴다.
-Run-Step "CLI exit 계약 canary(LC0)" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-exit-contract.ps1") -Exe $Exe -Work $Work
-}
-
+# Tokenizer 골든은 문자열 입력의 토큰 경계를 검증한다.
 Run-Step "CLI tokenizer 골든(LC0)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-parser-golden.ps1") -Exe $Exe -Work $Work
 }
 
-# PHASE 14.5 LC1 — exit spine 의 반대편.
-#
-# 위 canary 가 "실패가 종료 코드로 나오는가"를 본다면 이것은 "성공이 여전히 0
-# 인가"와 "직접 exit 쓰기가 늘지 않았는가"를 본다. 실패를 잡느라 성공을 비-0 으로
-# 만드는 과잉 교정이 이 슬라이스에서 가장 흔한 사고이고, 그러면 세트 전체가
-# 붉어져 정작 진짜 실패가 묻힌다.
+# 성공·인자 오류·검사 실패·실패 누적을 실제 종료 코드로 검증한다.
 Run-Step "CLI exit spine(LC1)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-exit-spine.ps1") -Exe $Exe
 }
@@ -100,19 +84,15 @@ Run-Step "CLI drain·operation·SLO(LC5)" {
 #
 # LC3 의 discovery 게이트는 registry 의 **자기 일관성**만 본다. 그래서 명령이
 # registry 와 help 양쪽에서 함께 사라지면 초록으로 남는다 — 실측으로 확인했다.
-# 이 게이트는 이동 전에 찍어 둔 골든과 맞대 **보존**을 본다. LC6 이 핸들러
-# 8,700 줄을 도메인 파일로 옮기는 동안 표가 조용히 움직이지 않게 하는 그물이다.
-Run-Step "CLI 명령 표 보존(LC6)" {
+# 의도한 하네스 제거/API 추가는 처분 기록과 골든을 함께 바꾼다. 과거 명령의
+# 영구 보존이 아니라, 검토되지 않은 제품 표면 변경을 검출한다.
+Run-Step "CLI 제품 표면 변경 검증" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-registry-golden.ps1") -Exe $Exe -Work $Work
 }
 
-# PHASE 14.5 LC6 §9 — editor_operation 이 Undo 에 남기는 흔적.
-#
-# §9 의 완료 기준은 "GUI/서비스 의미 차이 **미분류** 0" 이다 — 없애라가 아니라
-# 분류하라다. 실측하면 8 개 중 하나만 Undo 를 남긴다. 그 사실을 값으로 못 박아,
-# 누가 Undo 를 붙이든 있던 것을 떨어뜨리든 조용히 지나가지 않게 한다.
-Run-Step "CLI editor_operation Undo 특성화(LC6)" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-editor-operation.ps1") -Exe $Exe
+# 편집 완료는 상태 복원으로 판정한다. 폐기한 스택 깊이 특성화의 false 표를 유지하지 않는다.
+Run-Step "Commandlet 격리 및 공통 편집 API" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-command-surface.ps1") -Exe $Exe -Work (Join-Path $Work 'command-surface')
 }
 
 # PHASE 14.5 LC7 §10.2 — 리로드 실패가 반쯤 교체된 상태를 남기지 않는다.
@@ -169,41 +149,27 @@ Run-Step "Player 명령 서비스(LC8)" {
 }
 
 Run-Step "UI 생성 순서 회귀" {
-    # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
-    # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.
-    $template = Join-Path $PSScriptRoot "ui_regression.txt"
-    $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-    $modelPath = Join-Path $repoRoot "Dynamic_CPP\Assets\Models\Prim_Suzanne.glb"
-    if (-not (Test-Path $modelPath)) {
-        "모델이 없다: $modelPath"; $global:LASTEXITCODE = 1; return
-    }
-    $script = Join-Path $Work "ui_regression_resolved.txt"
-    (Get-Content $template -Raw) -replace '\{\{MODEL_PATH\}\}', ($modelPath -replace '\\', '/') |
-        Set-Content $script -Encoding UTF8
-
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
+    $template = Join-Path $PSScriptRoot 'ui_regression.txt'
+    $script = Join-Path $Work 'ui_regression_resolved.txt'
+    Copy-Item -LiteralPath $template -Destination $script -Force
+    . (Join-Path $PSScriptRoot 'CommandResults.ps1')
+    $resultPath = Join-Path $Work 'ui_regression.results.jsonl'
+    if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+    $proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
         -WorkingDirectory $exeDir `
         -RedirectStandardOutput (Join-Path $Work "ui_regression.out") `
         -RedirectStandardError (Join-Path $Work "ui_regression.err") -PassThru
     $proc.WaitForExit(300000) | Out-Null
     if (-not $proc.HasExited) { $proc.Kill(); "TIMEOUT"; $global:LASTEXITCODE = 1; return }
 
-    # UiTextProbe가 로그에 통과/실패를 남긴다. 종료 코드만으로는 단정 실패를 알 수 없다.
-    $log = Get-ChildItem (Join-Path $exeDir "Saved\Log\Editor_*.html") |
-           Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    $text = (Get-Content $log.FullName -Raw) -replace '<[^>]+>', ''
-    $passes = ([regex]::Matches($text, 'UiTextProbe\] 전체 통과')).Count
-    $fails = ([regex]::Matches($text, 'UiTextProbe\] .*실패')).Count
-    $crash = $text -match '미처리 예외'
-
-    "통과 $passes 회 · 실패 $fails 회 · 종료 코드 $($proc.ExitCode)"
-    if ($crash) { "크래시가 기록됐다" }
-    # 종료 코드도 판정에 넣는다 — 프로브가 다 통과하고도 종료 시점 힙 손상
-    # (0xC0000374)으로 죽은 실행이 '전체 통과'로 지나간 적이 있다. 간헐 크래시는
-    # 검사를 흔들리게 만들지만, 숨겨지는 것보다 흔들리는 쪽이 낫다.
-    $exitOk = ($proc.ExitCode -eq 0)
-    if (-not $exitOk) { ("종료 코드 비정상: 0x{0:X8}" -f $proc.ExitCode) }
-    $global:LASTEXITCODE = if ($passes -ge 4 -and $fails -eq 0 -and -not $crash -and $exitOk) { 0 } else { 1 }
+    $results = @(Read-CommandResults $resultPath)
+    $invocations = @($results | Where-Object command -eq 'script.invoke')
+    if ($invocations.Count -ne 2 -or @($results | Where-Object status -ne 'succeeded').Count -ne 0) {
+        throw 'UI scenario contains missing or failed command results'
+    }
+    $probe = $invocations[1].data.returnValue | ConvertFrom-Json
+    "UI completed=$($probe.completed) passed=$($probe.passed) failed=$($probe.failed) exit=$($proc.ExitCode)"
+    $global:LASTEXITCODE = if ($probe.completed -ge 4 -and $probe.passed -ge 40 -and $probe.failed -eq 0 -and $proc.ExitCode -eq 0) { 0 } else { 1 }
 }
 
 # "저작 배치 재현"(verify-authored-rects)은 2026-08-21 은퇴했다. 그 검사는 저작

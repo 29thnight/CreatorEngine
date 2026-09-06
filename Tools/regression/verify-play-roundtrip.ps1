@@ -1,4 +1,4 @@
-# Edit → Play → Stop 왕복 구조 대조 (E3 착수 전 필수 게이트)
+﻿# Edit → Play → Stop 왕복 구조 대조 (E3 착수 전 필수 게이트)
 #
 # 왜 필요한가
 # ───────────
@@ -68,7 +68,7 @@ try {
     ))
 
     $process = Start-Process -FilePath $Exe `
-        -ArgumentList "--console", "--script", $commandFile `
+        -ArgumentList "--commandlet-script", $commandFile `
         -WorkingDirectory (Split-Path $Exe -Parent) `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     if (-not $process.WaitForExit(180000)) {

@@ -1,4 +1,5 @@
 #pragma once
+#include "../Core/EnhancedLivePipelineDesc.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -449,6 +450,7 @@ struct EnhancedLiveDebugSnapshot
     /// 파이프라인 재구축이나 활성 상태 변경 때만 다시 만들고 창에는 복사본을 준다.
     bool pipelineDescriptionValid{ false };
     std::string pipelineDescription;
+    std::vector<LivePassNodeSnapshot> pipelineNodes;
 
     /// 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 선언 순서 그대로다.
     std::vector<EnhancedLivePassTiming> passTimings;

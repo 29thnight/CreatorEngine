@@ -60,7 +60,7 @@ foreach ($item in $materials) {
 $commands.Add('quit')
 $commands | Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario) `
+$process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', $scenario) `
     -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 $process.WaitForExit($TimeoutSeconds * 1000) | Out-Null

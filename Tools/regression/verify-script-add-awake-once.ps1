@@ -46,6 +46,7 @@ param(
 
 $ProbeType = "NoSuchScriptType_C2_2_Regression"
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
@@ -58,7 +59,9 @@ $errPath = Join-Path $Work "script_add_awake_once.err"
 $producedTrace = Join-Path $PSScriptRoot "..\..\Artifacts\Tests\Editor\Traces\script_add_awake_once_trace.tsv"
 if (Test-Path $producedTrace) { Remove-Item $producedTrace -Force }
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
+$resultPath = Join-Path $Work "script_add_awake_once.results.jsonl"
+if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru
@@ -72,25 +75,11 @@ if (-not $proc.HasExited) {
 
 if (-not (Test-Path $outPath)) { "표준 출력이 없다: $outPath"; exit 1 }
 
-# ── 로그 줄 수 — 주 판정 ──
-#
-# Debug->LogWarning/LogError는 stdout에 안 나간다(인메모리·HTML 로그 싱크뿐 —
-# verify-asan-lifecycle.ps1의 같은 주석 참고). Editor_*.html에서 읽는다.
-$logDir = Join-Path $exeDir "Saved\Log"
-$editorLog = Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
-             Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-if (-not $editorLog) {
-    "에디터 로그를 찾지 못했다: $logDir\Editor_*.html"
-    exit 1
-}
-
-$logText = (Get-Content -LiteralPath $editorLog.FullName -Raw) -replace '<[^>]+>', ''
-
-$escapedType = [regex]::Escape($ProbeType)
-$pattern = "(?:인스턴스 생성 실패 — 등록되지 않은 타입: $escapedType|CLR이 준비되지 않아 $escapedType 을 만들지 못했습니다)"
-$hits = [regex]::Matches($logText, $pattern)
-$callCount = $hits.Count
+$results = @(Read-CommandResults $resultPath)
+$status = Get-SucceededCommand $results 'script.status'
+$components = @($status.components | Where-Object { $_.type -eq $ProbeType -and $_.owner -eq 'ScriptAddRegressionTarget' })
+if ($components.Count -ne 1) { throw "Expected one rejected script component, found $($components.Count)" }
+$callCount = [int]$components[0].initializationAttempts
 
 # ── 보조 신호: lifecycle.trace ──
 #
@@ -106,13 +95,12 @@ if (Test-Path $producedTrace) {
     }).Count
 }
 
-$stdoutText = Get-Content -LiteralPath $outPath -Raw
-$attachFailedSeen = ($logText -match [regex]::Escape("부착 실패 — 타입=$ProbeType")) `
-    -or ($stdoutText -match [regex]::Escape("스크립트 부착 실패 (타입=$ProbeType)"))
+$attach = Get-CommandResult $results 'script.add'
+$attachFailedSeen = $attach.status -eq 'failed' -and $components[0].instanceId -lt 0
 
 "명령 실행 확인 — 부착 실패 로그 관측: $attachFailedSeen (프로브 타입은 항상 실패하므로 참이어야 한다)"
 "드레인 확인(보조) — OnInitialized 트레이스 $traceCount 건 (0이면 드레인 자체가 안 돈 것)"
-"OnInitialized 호출 흔적 — 로그 $callCount 줄 (기대: 1 — CreateBehaviour/CLR 실패 로그가 호출마다 한 줄씩 남는다)"
+"OnInitialized 호출 흔적 — 네이티브 진입 $callCount 회 (기대: 1 — CreateBehaviour/CLR 실패 로그가 호출마다 한 줄씩 남는다)"
 ""
 
 $failed = @()

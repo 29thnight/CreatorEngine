@@ -41,7 +41,6 @@ struct ConsoleCommandContext
 // LC1 이 이 서명을 한 번에 갈아엎지 않는 이유는 §15 의 위험 표에 있다 —
 // 205 개 등록을 동시에 바꾸는 patch 는 검토할 수 없고, 그 안에 섞인 거동 변경
 // 하나를 아무도 못 본다. 두 서명이 공존하고 domain 단위로 넘어간다.
-using ConsoleCommandHandler = void(*)(const ConsoleCommandContext&);
 
 // LC1 이후의 핸들러. 정확히 하나의 terminal 결과를 만든다.
 using ConsoleCommandResultHandler = CommandCore::CommandResult(*)(const ConsoleCommandContext&);
@@ -220,6 +219,12 @@ public:
     static void SetEditorCameraFollowing(bool follow) noexcept;
 
 private:
+    bool m_commandletMode{false};
+    bool m_commandletDone{false};
+    std::string m_commandletScript;
+    std::string m_commandletError;
+    std::vector<std::string> m_commandletArguments;
+
     ConsoleCommandSystem() = default;
     ~ConsoleCommandSystem() = default;
 

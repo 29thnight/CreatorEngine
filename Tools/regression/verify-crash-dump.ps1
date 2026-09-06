@@ -14,6 +14,7 @@ param(
     [string]$Work = $env:TEMP
 )
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
@@ -46,13 +47,18 @@ foreach ($case in $cases) {
     #   생긴 파일을 찾는다.
     $launchTime = Get-Date
 
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
+    $resultPath = Join-Path $Work "crash_$kind.results.jsonl"
+    if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+    $proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
         -WorkingDirectory $exeDir `
         -RedirectStandardOutput (Join-Path $Work "crash_$kind.out") `
         -RedirectStandardError (Join-Path $Work "crash_$kind.err") -PassThru
     $proc.WaitForExit(300000) | Out-Null
     if (-not $proc.HasExited) { $proc.Kill(); $failures += "${kind}: 타임아웃"; continue }
 
+    $crashStatus = Get-SucceededCommand (Read-CommandResults $resultPath) 'crash.status'
+    if (-not $crashStatus.ready) { $failures += "${kind}: crash writer is not ready" }
+    $dumpDir = $crashStatus.directory
     # 1. 덤프가 새로 생겼는가 — 이 실행이 시작된 뒤에 쓰인 파일만 센다.
     $dump = Get-ChildItem (Join-Path $dumpDir "*.dmp") -ErrorAction SilentlyContinue |
             Where-Object { $_.LastWriteTime -gt $launchTime } |
@@ -89,14 +95,6 @@ foreach ($case in $cases) {
     $frames = ([regex]::Matches($report, '(?m)^\s+#\d\d ')).Count
     if ($frames -lt 5) {
         $failures += "${kind}: 스택 프레임이 $frames 개뿐이다"
-    }
-
-    # 4. 이번 실행이 덤프를 남길 수 있는 상태였다는 기록
-    $log = Get-ChildItem (Join-Path $logDir "Editor_*.html") |
-           Sort-Object LastWriteTime | Select-Object -Last 1
-    $logText = (Get-Content $log.FullName -Raw) -replace '<[^>]+>', ''
-    if ($logText -notmatch '크래시 덤프 기록자 등록 완료') {
-        $failures += "${kind}: 세션 로그에 기록자 등록 줄이 없다"
     }
 
     "{0,-10} 덤프 {1:N0} 바이트 · 스택 {2} 프레임 · {3}" -f `

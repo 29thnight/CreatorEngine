@@ -114,7 +114,7 @@ foreach ($name in $scenes) {
     Write-Host ""
     Write-Host "[$name] 실행 중..."
 
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--script `"$cmdFile`"" `
+    $proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script `"$cmdFile`"" `
         -WorkingDirectory (Split-Path -Parent $Exe) -PassThru -NoNewWindow
 
     # 씬 로드와 첫 프레임이 안정될 때까지 기다린 뒤 찍는다. 너무 일찍 찍으면

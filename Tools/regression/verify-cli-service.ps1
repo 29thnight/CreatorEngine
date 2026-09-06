@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Exe  = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = (Join-Path $env:TEMP "lc4"),
@@ -26,10 +26,13 @@ New-Item -ItemType Directory -Force -Path $Work | Out-Null
 $endpointPath = Join-Path $repoRoot 'Dynamic_CPP\Library\CommandService\endpoint.json'
 $failures = New-Object System.Collections.Generic.List[string]
 
+if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) { throw 'Close the existing editor before running this isolated gate.' }
+$script:gateProcesses = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 function Stop-Editors {
-    Get-Process CreatorEditor -ErrorAction SilentlyContinue | ForEach-Object {
-        try { $_.Kill(); $_.WaitForExit(10000) | Out-Null } catch { }
+    foreach ($owned in $script:gateProcesses) {
+        try { if (-not $owned.HasExited) { $owned.Kill(); $owned.WaitForExit(15000) | Out-Null } } catch { }
     }
+    $script:gateProcesses.Clear()
 }
 
 # ★ 파이프가 아니라 파일로 리다이렉트한다.
@@ -39,9 +42,11 @@ function Stop-Editors {
 #   절차가 끝까지 못 가고, endpoint 파일이 남은 채 하네스가 프로세스를 죽인다.
 #   실제로 그렇게 실패했고, 증상은 "정상 종료 뒤에도 파일이 남았다"였다.
 function Start-Editor([string[]]$Arguments) {
-    Start-Process -FilePath $Exe -ArgumentList $Arguments -WorkingDirectory $exeDir `
+    $started = Start-Process -FilePath $Exe -ArgumentList $Arguments -WorkingDirectory $exeDir -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $Work 'service.out') `
         -RedirectStandardError  (Join-Path $Work 'service.err') -PassThru
+    $script:gateProcesses.Add($started)
+    return $started
 }
 
 # ★ 파일이 "있다"로 기다리면 안 된다.
@@ -261,7 +266,13 @@ try {
     $json = $r.Content | ConvertFrom-Json
     "{0,-24} HTTP {1} count={2}" -f 'discovery', $r.StatusCode, $json.count
     if ($r.StatusCode -ne 200)       { $failures.Add("discovery : HTTP $($r.StatusCode)") }
-    if ($json.count -lt 200)         { $failures.Add("discovery : 명령 수가 $($json.count) 뿐이다") }
+    if ($json.count -ne @($json.commands).Count) { $failures.Add('discovery : count disagrees with entries') }
+    foreach ($name in @('scene.load','object.create','object.describe','object.rename','object.delete','undo')) {
+        if ($json.commands.name -notcontains $name) { $failures.Add("discovery : product command missing: $name") }
+    }
+    foreach ($name in @('selftest','dx12.selftest','scene.hierarchymutation','experiment.matparity')) {
+        if ($json.commands.name -contains $name) { $failures.Add("discovery : harness leaked into product commands: $name") }
+    }
 
     $r = Req '/commands/scene.load' $auth
     $one = $r.Content | ConvertFrom-Json

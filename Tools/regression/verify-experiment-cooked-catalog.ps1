@@ -158,7 +158,7 @@ try {
 
         $stdout = Join-Path $run "$label.out.log"
         $stderr = Join-Path $run "$label.err.log"
-        $proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+        $proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $scenario) `
             -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
             -RedirectStandardOutput $stdout -RedirectStandardError $stderr
         if (-not $proc.WaitForExit($TimeoutSec * 1000)) {

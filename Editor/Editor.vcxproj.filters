@@ -63,6 +63,18 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="EngineEntry\EditorObjectOperations.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorProjectOperations.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorDiagnostics.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Commandlets\EditorCommandlets.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.h">
       <Filter>EditorRender\Render\Passes\Editor</Filter>
     </ClInclude>
@@ -77,9 +89,6 @@
     </ClInclude>
     <ClInclude Include="EngineEntry\BuildSettings.h">
       <Filter>EditorRuntime\Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\CommandBaseline.h">
-      <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\CommandCore\CommandParser.h">
       <Filter>EditorRuntime\Runtime</Filter>
@@ -257,6 +266,18 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="EngineEntry\EditorObjectOperations.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorProjectOperations.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorDiagnostics.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commandlets\EditorCommandlets.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.cpp">
       <Filter>EditorRender\Render\Passes\Editor</Filter>
     </ClCompile>
@@ -268,9 +289,6 @@
     </ClCompile>
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp">
       <Filter>EditorRender\Render\Passes\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\CommandBaseline.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\CommandCore\CommandParser.cpp">
       <Filter>EditorRuntime\Runtime</Filter>

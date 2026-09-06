@@ -1,3 +1,9 @@
+> 2026-09-06 방향 수정: 이 문서는 과거 조사 기록이다. 아래의 "살려서 게이트에 건다",
+> "명령 보존", "남은 probe 이관"은 자동 실행 지침이 아니다. 현재 처분은
+> [CommandSurfaceDisposition.tsv](CommandSurfaceDisposition.tsv), 구현 순서는
+> [현재 구현 순서](../plans/EditorAutomationCLIPlan.md)를 따른다. 닫힌 하네스는 제거하고,
+> 현재 제품 계약 검사만 Commandlet으로 남긴다. GUI·HTTP 공통 편집 API가 제품 목표다.
+
 # 명령 registry 전면 재조사 — 제거·병합·undo·cost
 
 작성 2026-09-05. 대상은 Editor registry의 **명령 212개 / 이름 226개**

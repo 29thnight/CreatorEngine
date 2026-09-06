@@ -15,7 +15,6 @@ namespace CommandCore
         case CommandStatus::Cancelled:           return "cancelled";
         case CommandStatus::TimedOut:            return "timed_out";
         case CommandStatus::InternalError:       return "internal_error";
-        case CommandStatus::LegacyUnreported:    return "legacy_unreported";
         }
         return "unknown";
     }
@@ -25,11 +24,6 @@ namespace CommandCore
         switch (status)
         {
         case CommandStatus::Succeeded:           return 0;
-
-        // 성공보다 나쁘다. "모른다"가 "됐다"보다 아래에 있어야, 이행이 끝나지
-        // 않은 명령이 섞인 session 을 보고 "전부 성공"이라 읽지 않는다.
-        // 다만 exit code 는 0 이다(오늘 거동 보존) — 순위와 exit 은 다른 축이다.
-        case CommandStatus::LegacyUnreported:    return 1;
 
         case CommandStatus::InvalidArguments:    return 2;
         case CommandStatus::PreconditionsFailed: return 3;
@@ -188,43 +182,4 @@ namespace CommandCore
         return result;
     }
 
-    CommandResult LegacyUnreported()
-    {
-        CommandResult result;
-        result.status = CommandStatus::LegacyUnreported;
-        result.code   = "legacy.unreported";
-        return result;
-    }
-
-    CommandResult LegacyDirectExit(int exitCode)
-    {
-        if (0 == exitCode) return LegacyUnreported();
-
-        CommandResult result;
-        result.code    = "legacy.direct_exit";
-        result.message = "legacy 핸들러가 exit code " + std::to_string(exitCode) + " 을 직접 남겼다";
-
-        switch (exitCode)
-        {
-        case 2:  result.status = CommandStatus::InvalidArguments;    break;
-        case 3:  result.status = CommandStatus::PreconditionsFailed; break;
-        case 4:  result.status = CommandStatus::Failed;              break;
-
-        // 5 는 §5.4 에서 infrastructure 다. 현행 핸들러도 그 뜻으로 쓴다.
-        case 5:  result.status = CommandStatus::InternalError;       break;
-
-        // 6 은 §5.4 표에 없다. 현행 코드에서 6 은 전부 selftest 판정 실패이고
-        // (asset.guid.rename / material.corpus / prefab.corpus.digest), 그것은
-        // 새 표에서 4 다. LC6 가 이 핸들러들을 이행하면 이 분기는 사라진다.
-        case 6:  result.status = CommandStatus::Failed;              break;
-
-        // 모르는 값을 성공 쪽으로 내리지 않는다. 알 수 없는 실패는 가장 심하게 본다.
-        default: result.status = CommandStatus::InternalError;       break;
-        }
-
-        CommandData data = CommandData::Object();
-        data.Set("legacyExitCode", CommandData::Int(exitCode));
-        result.data = std::move(data);
-        return result;
-    }
 }

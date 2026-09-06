@@ -15,7 +15,6 @@
 #   2  직렬화 타입 수가 최소치 이상           — 검사가 조용히 건너뛰지 않았다(README 원칙)
 #   3  실패 0                                 — 직렬화 도중 예외가 없다
 #   4  골든 파일과 diff 0                     — ★ 출력 동등 (전환 구간의 존재 이유)
-#   5  perf.reflect 수치 기록                 — 기준선 표에 옮겨 적는 원천(판정 아님)
 #
 # 기준선 뜨기(최초 1회, 이후 의도된 포맷 변경 시에만 갱신):
 #   pwsh Tools/regression/verify-reflection-golden.ps1 -Baseline
@@ -34,14 +33,6 @@ if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
 $template = Join-Path $PSScriptRoot "reflect_golden.txt"
 
-# 이 시나리오가 굽는 픽스처(2026-08-20 CLI 이전 — 그전에는 저작 자산 BTProbe를
-# 소환했다). 이전 실행의 잔재를 미리 지운다(.gitignore 대상).
-$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$prefabDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Prefabs"
-foreach ($p in @((Join-Path $prefabDir "ReflectGoldenProbe.prefab"),
-                 (Join-Path $prefabDir "ReflectGoldenProbe.prefab.meta"))) {
-    if (Test-Path $p) { Remove-Item $p -Force }
-}
 if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 
 $goldenPath = Join-Path $PSScriptRoot "reflect_golden.yaml"
@@ -58,7 +49,7 @@ $scenario = Join-Path $Work "reflect_golden_resolved.txt"
 $outFile = Join-Path $Work "reflect_golden.out"
 $errFile = Join-Path $Work "reflect_golden.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $scenario) `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -91,11 +82,6 @@ if ($failCount -gt 0) {
 if (-not (Test-Path $outYaml)) {
     $hard += "덤프 파일이 없다: $outYaml"
 }
-
-# 5 — perf 수치는 판정하지 않고 기록만 한다. 시간은 머신·부하에 흔들리므로
-# 문턱을 걸면 검사가 거짓 실패로 신뢰를 잃는다. 기준선 표는 사람이 옮겨 적는다.
-$perf = [regex]::Match($text, '\[perf\.reflect\] [^\r\n]+')
-if ($perf.Success) { $perf.Value } else { "perf.reflect 기록 없음 (판정 아님)" }
 
 if ($hard.Count -gt 0) {
     foreach ($h in $hard) { "실패: $h" }

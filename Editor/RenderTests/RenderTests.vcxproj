@@ -29,7 +29,6 @@
     <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialCookSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentMaterialParitySelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialResolveSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialScriptSelfTest.h" />
@@ -42,8 +41,6 @@
     <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoIconTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoLineTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoSceneTest.cpp" />
@@ -69,9 +66,6 @@
     <ClCompile Include="ExperimentParity\ExperimentMaterialCookSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialParitySelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialResolveSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
@@ -90,21 +84,18 @@
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp" />
     <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedShadowQualityTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLShadeTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSGITest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSRTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSSTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp" />

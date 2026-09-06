@@ -1,4 +1,4 @@
-﻿#Requires -Version 7.0
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     프레임 프로파일러 수집 코어 검증 진입점 (PHASE 14).
@@ -77,7 +77,7 @@ function Invoke-Build {
     }
 }
 
-# 엔진을 --script 로 무인 기동하고 stdout/stderr 를 합쳐 돌려준다.
+# 엔진을 --commandlet-script 로 무인 기동하고 stdout/stderr 를 합쳐 돌려준다.
 function Invoke-EngineScript {
     param([string[]]$Commands, [string]$Label)
 
@@ -91,9 +91,9 @@ function Invoke-EngineScript {
     Set-Content -Path $commandFile -Value $Commands -Encoding UTF8
 
     $exeDir = Split-Path -Parent $Exe
-    Write-Host "[run] $Label — $Exe --script $commandFile"
+    Write-Host "[run] $Label — $Exe --commandlet-script $commandFile"
 
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $commandFile `
+    $proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $commandFile `
         -WorkingDirectory $exeDir `
         -RedirectStandardOutput $outFile `
         -RedirectStandardError $errFile `

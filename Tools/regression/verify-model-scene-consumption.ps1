@@ -44,6 +44,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $run = Join-Path $Work ('creator-mbc7-scene-' + [guid]::NewGuid().ToString('N'))
@@ -56,7 +57,9 @@ function Invoke-Editor([string]$Label, [string[]]$Commands) {
         [Text.UTF8Encoding]::new($false))
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $Editor
-    $start.Arguments = '--script "' + $scenario.Replace('"', '\"') + '"'
+    $start.Arguments = '--commandlet-script "' + $scenario.Replace('"', '\"') + '"'
+    $resultPath = Join-Path $run ($Label + '.results.jsonl')
+    $start.Arguments += ' --result-file "' + $resultPath + '"'
     $start.WorkingDirectory = $root
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -78,27 +81,17 @@ function Invoke-Editor([string]$Label, [string[]]$Commands) {
         [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $run ($Label + '.stderr.txt')), $stderr,
         [Text.UTF8Encoding]::new($false))
-    return [pscustomobject]@{ Stdout = $stdout; Stderr = $stderr; ExitCode = $process.ExitCode }
+    return [pscustomobject]@{ Results = @(Read-CommandResults $resultPath); Stdout = $stdout; Stderr = $stderr; ExitCode = $process.ExitCode }
 }
 
-function Assert-SceneModelClosure([string]$Label, [string]$Stdout) {
-    # MBC9 — legacy 축(legacyOnly/legacyParity/registryTextures)은 은퇴했다. UUIDv8인데
-    # generation이 없는 renderer는 unbound다(그릴 것이 없다 — 0이어야 한다).
-    $line = [regex]::Match($Stdout, '\[CLI\] assets\.scenemodel (pass|fail) renderers=(\d+) generation=(\d+) unbound=(\d+) handleInvalid=(\d+) rhiView=(\d+) meshIdPersisted=(\d+) textureProps=(\d+) embedded=(\d+) generationTextures=(\d+) otherTextures=(\d+) missing=(\d+) gunner=(\d+)/(\d+)')
-    if (-not $line.Success) { Add-Failure "$Label assets.scenemodel 요약 줄이 없다."; return }
-    if ($line.Groups[1].Value -ne 'pass') { Add-Failure "$Label assets.scenemodel fail: $($line.Value)" }
-    $generation = [int]$line.Groups[3].Value
-    if ($generation -lt 2) { Add-Failure "$Label typed generation renderer가 2 미만이다: $generation" }
-    if ([int]$line.Groups[4].Value -ne 0) { Add-Failure "$Label generation 없는 UUIDv8 renderer(unbound)가 남았다." }
-    if ([int]$line.Groups[6].Value -ne $generation) { Add-Failure "$Label rhiView가 generation 수와 다르다." }
-    if ([int]$line.Groups[7].Value -ne $generation) { Add-Failure "$Label m_meshAssetId가 전부 채워지지 않았다." }
-    if ([int]$line.Groups[9].Value -ne 6 -or [int]$line.Groups[10].Value -ne 6) {
-        Add-Failure "$Label Gunner embedded texture closure가 6/6이 아니다: embedded=$($line.Groups[9].Value) generationTextures=$($line.Groups[10].Value)"
+function Assert-SceneModelClosure([string]$Label, $Results) {
+    $data = Get-SucceededCommand @($Results | Where-Object { $_.command -ne 'assets.scenemodel' -or -not $_.data.reload }) 'assets.scenemodel'
+    if ($data.generationBound -lt 2 -or $data.unbound -ne 0 -or $data.handleInvalid -ne 0 -or
+        $data.rhiView -ne $data.generationBound -or $data.meshIdPersisted -ne $data.generationBound -or
+        $data.embeddedProps -ne 6 -or $data.generationTextures -ne 6 -or $data.otherTextures -ne 0 -or
+        $data.missingTextures -ne 0 -or $data.gunnerEmbedded -ne 6) {
+        Add-Failure "$Label typed scene model closure failed: $($data | ConvertTo-Json -Compress)"
     }
-    if ([int]$line.Groups[11].Value -ne 0 -or [int]$line.Groups[12].Value -ne 0) {
-        Add-Failure "$Label texture owner가 비었거나 출처 불명이다."
-    }
-    if ([int]$line.Groups[14].Value -ne 6) { Add-Failure "$Label Gunner embedded 계수가 6이 아니다." }
 }
 
 try {
@@ -137,15 +130,12 @@ try {
     if ($author.ExitCode -ne 0) { Add-Failure "A 종료 코드 $($author.ExitCode)" }
     if (-not [string]::IsNullOrWhiteSpace($author.Stderr)) { Add-Failure 'A stderr가 비어 있지 않다.' }
     # MBC10 — 배치 관측은 읽기 전용 스냅샷이다(제품 stdout 토큰 없음).
-    $authorDiag = [regex]::Match($author.Stdout, '\[CLI\] assets\.modeldiag meshResolveGeneration=(\d+) meshResolveFailed=(\d+) instantiateGeneration=(\d+) instantiateRejected=(\d+) tickGeneration=(\d+) tickNone=(\d+) lastInstantiated=(\S+)')
-    if (-not $authorDiag.Success) { Add-Failure '1 A assets.modeldiag 스냅샷이 없다.' }
-    elseif ([int]$authorDiag.Groups[3].Value -ne 1 -or $authorDiag.Groups[7].Value -ne 'Gunner_F_Mythic' -or [int]$authorDiag.Groups[4].Value -ne 0) {
-        Add-Failure "1 배치가 typed generation 1회가 아니다: $($authorDiag.Value)"
-    }
+    $authorDiag = Get-SucceededCommand $author.Results 'assets.modeldiag'
+    if ($authorDiag.instantiateGeneration -ne 1 -or $authorDiag.lastInstantiated -ne 'Gunner_F_Mythic' -or $authorDiag.instantiateRejected -ne 0) { Add-Failure 'A typed model placement coverage failed' }
     if ($author.Stdout -match '\[(mesh\.resolve|model\.instantiate|anim\.tick|material\.finalize)\]') {
         Add-Failure '1c 제품 경로가 무조건 진단 토큰을 다시 찍는다(MBC10).'
     }
-    Assert-SceneModelClosure '2(A)' $author.Stdout
+    Assert-SceneModelClosure '2(A)' $author.Results
 
     if (-not (Test-Path -LiteralPath $savedScene)) { throw "저장 씬이 없다: $savedScene" }
     $sceneText = [IO.File]::ReadAllText($savedScene)
@@ -169,35 +159,13 @@ try {
     if ($cold.ExitCode -ne 0) { Add-Failure "B 종료 코드 $($cold.ExitCode)" }
     if (-not [string]::IsNullOrWhiteSpace($cold.Stderr)) { Add-Failure 'B stderr가 비어 있지 않다.' }
     # FT 프리미티브 8 + Gunner 2 — UUIDv8 corpus라 전량 typed여야 한다(해석 실패 0).
-    $coldDiag = [regex]::Match($cold.Stdout, '\[CLI\] assets\.modeldiag meshResolveGeneration=(\d+) meshResolveFailed=(\d+) instantiateGeneration=(\d+) instantiateRejected=(\d+) tickGeneration=(\d+) tickNone=(\d+) lastInstantiated=(\S+)')
-    if (-not $coldDiag.Success) { Add-Failure '4 B assets.modeldiag 스냅샷이 없다.' }
-    elseif ([int]$coldDiag.Groups[1].Value -lt 10 -or [int]$coldDiag.Groups[2].Value -ne 0) {
-        Add-Failure "4 콜드 로드 메시 해석 generation $($coldDiag.Groups[1].Value) · 실패 $($coldDiag.Groups[2].Value) — typed 정본이 아니다(기대 generation 10)."
-    }
-    Assert-SceneModelClosure '5(B)' $cold.Stdout
-    $reload = [regex]::Match($cold.Stdout,
-        '\[CLI\] assets\.scenemodel reload (pass|fail) model=Gunner_F_Mythic textures=(\d+) reused=(\d+) created=(\d+) missing=(\d+) retired=(\d+) sameAggregate=(\d)')
-    if (-not $reload.Success) { Add-Failure '6 reload 요약 줄이 없다.' }
-    elseif ($reload.Groups[1].Value -ne 'pass' -or [int]$reload.Groups[2].Value -ne 6 -or
-        [int]$reload.Groups[3].Value -ne 0 -or [int]$reload.Groups[6].Value -ne 6 -or
-        $reload.Groups[7].Value -ne '0') {
-        Add-Failure "6 reimport 뒤 texture generation 재사용 판정 실패: $($reload.Value)"
-    }
-    if ($cold.Stdout -notmatch '\[CLI\] dx12\.scene 통과') { Add-Failure '7 dx12.scene이 통과하지 않았다.' }
-    # MBC9 — 업로드 요약은 (generation N, KB)뿐이다. 총계 == generation이어야 legacy 업로드 0.
-    $upload = [regex]::Match($cold.Stdout, '메시 업로드\s+(\d+)\(generation\s+(\d+),')
-    if (-not $upload.Success) { Add-Failure '7 dx12.scene 업로드 요약(generation 계수)이 없다.' }
-    else {
-        $total = [int]$upload.Groups[1].Value
-        $generationUploads = [int]$upload.Groups[2].Value
-        if ($total -lt 1 -or $generationUploads -ne $total) {
-            Add-Failure "7 실GPU 업로드가 전량 typed generation이 아니다: 총 $total · generation $generationUploads"
-        }
-    }
-    $coverage = [regex]::Match($cold.Stdout, '커버리지\s+(\d+)/65536')
-    if (-not $coverage.Success -or [int]$coverage.Groups[1].Value -le 0) {
-        Add-Failure '7 커버리지가 0이다 — typed 업로드로 그린 그림이 비었다.'
-    }
+    $coldDiag = Get-SucceededCommand $cold.Results 'assets.modeldiag'
+    if ($coldDiag.meshResolveGeneration -lt 10 -or $coldDiag.meshResolveFailed -ne 0) { Add-Failure 'Cold typed model resolution coverage failed' }
+    Assert-SceneModelClosure '5(B)' $cold.Results
+    $reload = Get-SucceededCommand @($cold.Results | Where-Object { $_.command -eq 'assets.scenemodel' -and $_.data.reload }) 'assets.scenemodel'
+    if ($reload.textures -ne 6 -or $reload.reused -ne 0 -or $reload.retired -ne 6 -or $reload.sameAggregate) { Add-Failure 'Reload generation retirement failed' }
+    $sceneData = Get-SucceededCommand $cold.Results 'dx12.scene'
+    if ($sceneData.meshUploads -lt 1 -or $sceneData.generationUploads -ne $sceneData.meshUploads -or $sceneData.coverage -le 0) { Add-Failure 'Typed GPU upload and coverage failed' }
 
     # ── 8: 정적 ──
     $meshRenderer = [IO.File]::ReadAllText((Join-Path $root 'Engine\SceneRuntime\MeshRenderer.cpp'))

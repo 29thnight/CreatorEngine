@@ -481,7 +481,15 @@ namespace CommandService
             std::vector<std::string> arguments;
             arguments.push_back(command->AsString());
 
-            if (const JsonValue* args = parsed.value.Find("args"))
+            if (const JsonValue* parameters = parsed.value.Find("parameters"))
+            {
+                if (parsed.value.Find("args"))
+                    return finish(400, ErrorBody("request.parameters_conflict", "Use parameters or args, not both"), "parameters-conflict");
+                std::string error;
+                if (!m_gateway->BuildNamedArguments(command->AsString(), *parameters, arguments, error))
+                    return finish(400, ErrorBody("request.parameters_invalid", error), "parameters-invalid");
+            }
+            else if (const JsonValue* args = parsed.value.Find("args"))
             {
                 if (JsonValue::Kind::Array != args->GetKind())
                 {

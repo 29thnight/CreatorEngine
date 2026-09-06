@@ -124,6 +124,24 @@ namespace
     }
 }
 
+bool GpuDiagnostics::Capture(Snapshot& out, bool advanceBaseline)
+{
+    auto* device = GetDiagnosticsDeviceResources();
+    if (!device) return false;
+    out.current = device->CaptureLiveObjectCensus(false);
+    out.resources = Diagnostics::CaptureResourceSnapshot();
+    out.hasBaseline = g_hasBaseline;
+    out.baseline = g_baselineCensus;
+    out.baselineResources = g_baselineResources;
+    if (advanceBaseline)
+    {
+        g_baselineCensus = out.current;
+        g_baselineResources = out.resources;
+        g_hasBaseline = true;
+    }
+    return true;
+}
+
 void GpuDiagnostics::LogCensus(std::string_view label, bool allowDeviceEnumeration)
 {
     auto* resources = GetDiagnosticsDeviceResources();

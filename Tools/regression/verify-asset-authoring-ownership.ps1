@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$EditorExe = ""
 )
 
@@ -295,7 +295,7 @@ function Invoke-Import([string]$suffix) {
     $stdout = Join-Path $tempRoot ("stdout-" + $suffix + ".txt")
     $stderr = Join-Path $tempRoot ("stderr-" + $suffix + ".txt")
     $process = Start-Process -FilePath $EditorExe `
-        -ArgumentList "--console", "--script", $commandFile `
+        -ArgumentList "--commandlet-script", $commandFile `
         -WorkingDirectory $editorRuntimeDirectory `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     if (-not $process.WaitForExit(120000)) {
@@ -596,11 +596,11 @@ try {
     $tagProbeName = "CE_TagProbe_" + $probeName.Substring($probeName.Length - 12)
 
     [IO.File]::WriteAllLines($commandFile, @(
-        "tag.authoring.probe add $tagProbeName"
+        "tag.add $tagProbeName"
         "quit"
     ))
     $tagAddOutput = Invoke-Import "tag-add"
-    if ($tagAddOutput -notmatch '\[tag\.authoring\.probe\] add has=true') {
+    if ($tagAddOutput -notmatch '\[tag\.add\] has=true') {
         throw "TagManager did not accept the probe tag in memory"
     }
     if ((Get-FileHash -LiteralPath $tagAsset -Algorithm SHA256).Hash -eq $tagBefore) {
@@ -608,15 +608,15 @@ try {
     }
 
     [IO.File]::WriteAllLines($commandFile, @(
-        "tag.authoring.probe has $tagProbeName"
-        "tag.authoring.probe remove $tagProbeName"
+        "tag.has $tagProbeName"
+        "tag.remove $tagProbeName"
         "quit"
     ))
     $tagReloadOutput = Invoke-Import "tag-reload"
-    if ($tagReloadOutput -notmatch '\[tag\.authoring\.probe\] has has=true') {
+    if ($tagReloadOutput -notmatch '\[tag\.has\] has=true') {
         throw "restarted Editor did not load the persisted probe tag"
     }
-    if ($tagReloadOutput -notmatch '\[tag\.authoring\.probe\] remove has=false') {
+    if ($tagReloadOutput -notmatch '\[tag\.remove\] has=false') {
         throw "TagManager did not remove the probe tag"
     }
     if ((Get-FileHash -LiteralPath $tagAsset -Algorithm SHA256).Hash -ne $tagBefore) {

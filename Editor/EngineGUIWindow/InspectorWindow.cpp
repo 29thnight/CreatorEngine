@@ -1,4 +1,6 @@
+#include "../EngineEntry/EditorProjectOperations.h"
 #include "InspectorWindow.h"
+#include "EditorObjectOperations.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
 #include "EditorImGuiTexture.h"
@@ -406,11 +408,7 @@ InspectorWindow::InspectorWindow()
 					if (ImGui::MenuItem(type_name.c_str()))
 					{
 						// K2 스테이지 A: AddComponent가 raw Component*를 돌려준다.
-						auto* component = selectedSceneObject->AddComponent(*type);
-						if (auto* initializable = dynamic_cast<System::IInitializable*>(component))
-						{
-							initializable->Initialize();
-						}
+						EditorObjectOperations::AddComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), type_name);
 					}
 				}
 
@@ -468,7 +466,7 @@ InspectorWindow::InspectorWindow()
 				if (ImGui::MenuItem("		Remove Component"))
 				{
 					if (selectedComponent) {
-						selectedSceneObject->RemoveComponent(selectedComponent);
+						EditorObjectOperations::RemoveComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), "#" + std::to_string(selectedComponent->GetInstanceID()));
 					}
 					ImGui::CloseCurrentPopup();
 					selectedComponent = nullptr;
@@ -701,7 +699,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 		Meta::InputTextCallback,
 		static_cast<void*>(&name)))
 	{
-		gameObject->m_name.SetString(name);
+		EditorObjectOperations::Rename(gameObject->GetScene()->HandleOf(gameObject->m_index), name);
 	}
 
 	ImGui::SameLine();
@@ -835,7 +833,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 		{
 			if (strlen(newTagName) > 0)
 			{
-				TagManagers->AddTag(newTagName);
+				const auto tagResult = EditorProjectOperations::AddTag(newTagName);
+                        if (!tagResult.IsSuccess()) Debug->LogError(tagResult.message);
 				selectedTag = newTagName;
 				selectedTagIndex = tagCount; // 새로 추가된 태그 인덱스
 				tagCount = TagManagers->GetTags().size(); // 태그 개수 업데이트
@@ -914,16 +913,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		{
 			if (prevPosition != position)
 			{
-				Meta::MakeCustomChangeCommand([=]
-				{
-					gameObject->Transform_().SetPositionValue(
-						prevPosition, TransformWriteReason::Inspector);
-				},
-				[=]
-				{
-					gameObject->Transform_().SetPositionValue(
-						position, TransformWriteReason::Inspector);
-				});
+				gameObject->Transform_().SetPositionValue(prevPosition, TransformWriteReason::Inspector);
+                EditorObjectOperations::Transform(gameObject->GetScene()->HandleOf(gameObject->m_index), math::vector3{position.x, position.y, position.z}, gameObject->Transform_().GetRotation(), gameObject->Transform_().GetScale());
 			}
 			editingPosition = false;
 		}
@@ -982,16 +973,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 				compareQuaternion.z, compareQuaternion.w };
 			if (compare != rotation)
 			{
-				Meta::MakeCustomChangeCommand([=]
-				{
-					gameObject->Transform_().SetRotationValue(
-						prevRotation, TransformWriteReason::Inspector);
-				},
-				[=]
-				{
-					gameObject->Transform_().SetRotationValue(
-						rotation, TransformWriteReason::Inspector);
-				});
+				gameObject->Transform_().SetRotationValue(prevRotation, TransformWriteReason::Inspector);
+                EditorObjectOperations::Transform(gameObject->GetScene()->HandleOf(gameObject->m_index), gameObject->Transform_().GetPosition(), math::quaternion{rotation.x, rotation.y, rotation.z, rotation.w}, gameObject->Transform_().GetScale());
 			}
 			editingRotation = false;
 		}
@@ -1015,16 +998,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		{
 			if (prevScale != scale)
 			{
-				Meta::MakeCustomChangeCommand([=]
-				{
-					gameObject->Transform_().SetScaleValue(
-						prevScale, TransformWriteReason::Inspector);
-				},
-				[=]
-				{
-					gameObject->Transform_().SetScaleValue(
-						scale, TransformWriteReason::Inspector);
-				});
+				gameObject->Transform_().SetScaleValue(prevScale, TransformWriteReason::Inspector);
+                EditorObjectOperations::Transform(gameObject->GetScene()->HandleOf(gameObject->m_index), gameObject->Transform_().GetPosition(), gameObject->Transform_().GetRotation(), math::vector3{scale.x, scale.y, scale.z});
 			}
 			editingScale = false;
 		}

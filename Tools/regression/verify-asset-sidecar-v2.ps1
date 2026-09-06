@@ -22,6 +22,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) { "실행 파일이 없다: $Exe"; exit 1 }
 $Exe = (Resolve-Path -LiteralPath $Exe).Path
@@ -41,9 +42,10 @@ New-Item -ItemType Directory -Path $run -Force | Out-Null
 $scenario = Join-Path $run 'commands.txt'
 $stdout = Join-Path $run 'stdout.txt'
 $stderr = Join-Path $run 'stderr.txt'
+$resultPath = Join-Path $run 'results.jsonl'
 @("assets.sidecar $($assets.Replace('\', '/'))", 'quit') | Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario) `
+$process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) `
     -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 $process.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -52,34 +54,19 @@ if (-not $process.HasExited) { $process.Kill(); "TIMEOUT output=$run"; exit 1 }
 $text = if (Test-Path -LiteralPath $stdout) { Get-Content -LiteralPath $stdout -Raw -Encoding UTF8 } else { '' }
 $failures = New-Object System.Collections.Generic.List[string]
 
-$cliPass = ([regex]::Matches($text, '\[CLI\] assets\.sidecar 통과')).Count
-$summary = [regex]::Match($text, '단정 (\d+)건 중 통과 (\d+) · 실패 (\d+)')
-$assertions = 0; $assertFailed = -1
-if ($summary.Success) { $assertions = [int]$summary.Groups[1].Value; $assertFailed = [int]$summary.Groups[3].Value }
-if ($cliPass -ne 1) { $failures.Add("[CLI] assets.sidecar 통과가 1회가 아니다: $cliPass") }
-if (-not $summary.Success) { $failures.Add('단정 요약 줄이 없다') }
-elseif ($assertFailed -ne 0) { $failures.Add("selftest 단정 실패 $assertFailed 건") }
-elseif ($assertions -lt 80) { $failures.Add("단정 수가 너무 적다($assertions) — 검사 범위가 줄었다") }
-if ($text -match 'corpus 검사 건너뜀') { $failures.Add('corpus 검사가 건너뛰어졌다 — 실자산 축이 없다') }
-
-# corpus 줄 파싱
+$data = Get-SucceededCommand (Read-CommandResults $resultPath) 'assets.sidecar'
+$cliPass = 1
+$assertions = [int]$data.assertions; $assertFailed = [int]$data.failed
+if ($assertFailed -ne 0 -or $assertions -lt 80) { $failures.Add("Sidecar coverage failed: assertions=$assertions failed=$assertFailed") }
 $models = @{}
-foreach ($m in [regex]::Matches($text,
-    '(?m)^\s*sidecar (\S+) ok=(\d) mat=(\d+)\(sem (\d+)/auth (\d+)\) tex=(\d+)\(sem (\d+)/auth (\d+)\) mesh=(\d+)\(sem (\d+)/auth (\d+)\) skel=(\d+) anim=(\d+)\(sem (\d+)/auth (\d+)\) issues=(\d+)')) {
-    $models[$m.Groups[1].Value] = @{
-        ok = [int]$m.Groups[2].Value
-        mat = [int]$m.Groups[3].Value; matSem = [int]$m.Groups[4].Value; matAuth = [int]$m.Groups[5].Value
-        tex = [int]$m.Groups[6].Value; texSem = [int]$m.Groups[7].Value; texAuth = [int]$m.Groups[8].Value
-        mesh = [int]$m.Groups[9].Value; skel = [int]$m.Groups[12].Value; anim = [int]$m.Groups[13].Value
-    }
+foreach ($model in $data.corpus) {
+    if ($models.ContainsKey($model.name)) { throw "Duplicate model result: $($model.name)" }
+    $models[$model.name] = $model
 }
-$summaryLine = [regex]::Match($text, 'corpus models=(\d+) ok=(\d+) subassets=(\d+) registry=(\d+)')
-if (-not $summaryLine.Success) { $failures.Add('corpus 요약 줄이 없다') }
-else {
-    $count = [int]$summaryLine.Groups[1].Value; $ok = [int]$summaryLine.Groups[2].Value
-    if ($count -lt 11) { $failures.Add("corpus 모델이 tracked 11 미만이다: $count") }
-    if ($ok -ne $count) { $failures.Add("corpus 모델 폐포 실패: ok=$ok / $count") }
-    if ([int]$summaryLine.Groups[3].Value -ne [int]$summaryLine.Groups[4].Value) { $failures.Add('registry 크기 ≠ subasset 합 — 등록 거부가 있었다') }
+if ($data.models -lt 11 -or $data.modelsPassed -ne $data.models -or $models.Count -ne $data.models) { $failures.Add('Sidecar corpus coverage failed') }
+if ($data.subAssets -ne $data.registry) { $failures.Add('Sidecar registry differs from subasset count') }
+foreach ($required in @('Gunner_F_Mythic.glb','scene.glb')) {
+    if (-not $models.ContainsKey($required)) { $failures.Add("Required corpus model missing: $required") }
 }
 if ($models.ContainsKey('Gunner_F_Mythic.glb')) {
     $g = $models['Gunner_F_Mythic.glb']
@@ -104,7 +91,7 @@ if ($mutated.Count -gt 0) { $failures.Add("원본/sidecar가 바뀌었다(이 �
 if ($process.ExitCode -ne 0) { $failures.Add("종료 코드 $($process.ExitCode)") }
 
 "asset-sidecar-v2 exit=$($process.ExitCode) output=$run"
-"cliPass=$cliPass assertions=$assertions assertFailed=$assertFailed corpusModels=$($models.Count) $($summaryLine.Value)"
+"cliPass=$cliPass assertions=$assertions assertFailed=$assertFailed corpusModels=$($models.Count) models=$($data.models) registry=$($data.registry)"
 if ($failures.Count -gt 0) { '실패:'; $failures | ForEach-Object { "  $_" }; exit 1 }
 "전체 통과 — epoch header·stable key·sidecar v2 단정 $assertions 건, corpus $($models.Count) 모델 폐포·registry 충돌 0, 원본 불변"
 exit 0

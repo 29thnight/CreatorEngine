@@ -536,29 +536,12 @@ void Player::PlayerMain::Update()
 		{
 			const EnhancedLiveDebugSnapshot pipelineState =
 				EnhancedSceneRenderer::GetLiveDebugSnapshot();
-			size_t nodeCount = 0;
-			std::istringstream stream(pipelineState.pipelineDescription);
-			std::string line;
-			while (std::getline(stream, line))
-			{
-				const size_t dot = line.find(". ");
-				if (std::string::npos == dot) continue;
-				if (line.find_first_not_of(" \t") != 2) continue;
-
-				std::string name = line.substr(dot + 2);
-				const size_t bracket = name.find("  [");
-				std::string state = "always";
-				if (std::string::npos != bracket)
-				{
-					state = name.substr(bracket + 3);
-					if (!state.empty() && ']' == state.back()) state.pop_back();
-					name = name.substr(0, bracket);
-				}
-				Debug->LogDebug("[SMOKE] pipeline.node " + name + "|" + state);
-				++nodeCount;
-			}
-			Debug->LogDebug("[SMOKE] pipeline.nodes 합계 "
-				+ std::to_string(nodeCount));
+            for (const auto& node : pipelineState.pipelineNodes)
+            {
+                const std::string state = !node.conditional ? "always" : node.active ? "active" : "inactive";
+                Debug->LogDebug("[SMOKE] pipeline.node " + node.name + "|" + state);
+            }
+            Debug->LogDebug("[SMOKE] pipeline.nodes 합계 " + std::to_string(pipelineState.pipelineNodes.size()));
 		}
 
 		// 성공 마커 — Verify는 이 줄과 "Scene loaded"(SceneManager), 종료
@@ -568,6 +551,9 @@ void Player::PlayerMain::Update()
 			+ std::to_string(Time->GetFrameCount()) + " GT frames, display frame "
 			+ std::to_string(gameDisplay.completedFrameId) + ", promotions "
 			+ std::to_string(gameDisplay.promotionCount) + ")");
+        std::printf("[player.smoke] {\"schemaVersion\":1,\"ready\":%s,\"registeredScriptTypes\":%zu,\"frames\":%llu,\"displayPromotions\":%llu}\n",
+            ClrHost::Get().IsReady() ? "true" : "false", ClrHost::Get().GetBehaviourTypeNames().size(),
+            static_cast<unsigned long long>(Time->GetFrameCount()), static_cast<unsigned long long>(gameDisplay.promotionCount));
 		EmitTextParseTelemetry();
 		PostMessage(handle, WM_CLOSE, 0, 0);
 		return;

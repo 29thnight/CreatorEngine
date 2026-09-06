@@ -43,7 +43,7 @@ quit
 "@ | Set-Content -LiteralPath $authorScript -Encoding UTF8
 
 function Invoke-Probe([string]$script, [string]$outPath, [string]$errPath) {
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
+    $proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $script `
         -WorkingDirectory $exeDir -RedirectStandardOutput $outPath `
         -RedirectStandardError $errPath -PassThru
     $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null

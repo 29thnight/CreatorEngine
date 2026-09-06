@@ -31,7 +31,6 @@
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
 
-#include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
@@ -115,6 +114,7 @@
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
 #include "ProfilerSelfTest.h"
+#include "Profiler.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
@@ -128,13 +128,9 @@
 #include "ShaderMeta.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
-#include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -226,11 +222,10 @@ namespace CrtAllocProbe
             : TRUE;
     }
 
-    inline void Enable()
+    inline void Enable(bool resetCounters = true)
     {
         if (g_enabled.exchange(true)) { return; }
-        g_count.store(0, std::memory_order_relaxed);
-        g_bytes.store(0, std::memory_order_relaxed);
+        if (resetCounters) { g_count.store(0, std::memory_order_relaxed); g_bytes.store(0, std::memory_order_relaxed); }
         g_prev = _CrtSetAllocHook(&Hook);
     }
 
@@ -356,244 +351,255 @@ namespace
 
 namespace ConsoleCmd
 {
-	static void Cmd_shadermeta_probe(const ConsoleCommandContext& ctx)
-	{
-		(void)ctx;
-
-		auto propertyTypeName = [](ShaderPropertyType type) -> const char*
-		{
-			switch (type)
-			{
-			case ShaderPropertyType::Float:     return "float";
-			case ShaderPropertyType::Float2:    return "float2";
-			case ShaderPropertyType::Float3:    return "float3";
-			case ShaderPropertyType::Float4:    return "float4";
-			case ShaderPropertyType::Int:       return "int";
-			case ShaderPropertyType::Bool:      return "bool";
-			case ShaderPropertyType::Float4x4:  return "float4x4";
-			case ShaderPropertyType::Texture2D: return "texture2d";
-			}
-			return "?";
-		};
-		// 기본값은 **어떤 대안이 채워졌는지**를 찍는다. 값까지 찍으면 부동소수 표기가
-		// 게이트를 부서지게 만들고, 여기서 재려는 것은 "타입별 해석이 갈리지 않는가"다.
-		auto defaultKind = [](const ShaderPropertyDefault& value) -> const char*
-		{
-			switch (value.index())
-			{
-			case 0: return "none";
-			case 1: return "float";
-			case 2: return "float2";
-			case 3: return "float3";
-			case 4: return "float4";
-			case 5: return "int";
-			case 6: return "bool";
-			case 7: return "float4x4";
-			case 8: return "guid";
-			}
-			return "?";
-		};
-		auto queueName = [](ShaderPassQueue queue) -> const char*
-		{
-			switch (queue)
-			{
-			case ShaderPassQueue::Opaque:      return "opaque";
-			case ShaderPassQueue::Transparent: return "transparent";
-			case ShaderPassQueue::Shadow:      return "shadow";
-			case ShaderPassQueue::Compute:     return "compute";
-			}
-			return "?";
-		};
-		auto fillName = [](RHIFillMode mode) -> const char*
-		{
-			return RHIFillMode::Wireframe == mode ? "wireframe" : "solid";
-		};
-		auto cullName = [](RHICullMode mode) -> const char*
-		{
-			if (RHICullMode::None == mode) return "none";
-			if (RHICullMode::Front == mode) return "front";
-			return "back";
-		};
-		auto blendName = [](ShaderBlendMode mode) -> const char*
-		{
-			if (ShaderBlendMode::Alpha == mode) return "alpha";
-			if (ShaderBlendMode::Additive == mode) return "additive";
-			return "off";
-		};
-		auto depthName = [](RHICompareOp op) -> const char*
-		{
-			if (RHICompareOp::None == op) return "off";
-			if (RHICompareOp::LessEqual == op) return "lessEqual";
-			return "less";
-		};
-		auto topologyName = [](RHITopologyType type) -> const char*
-		{
-			if (RHITopologyType::Line == type) return "line";
-			if (RHITopologyType::Point == type) return "point";
-			return "triangle";
-		};
-		auto entryOf = [](const std::optional<ShaderStageEntry>& stage) -> std::string
-		{
-			return stage.has_value() ? stage->entry : std::string("-");
-		};
-
-		const file::path assetRoot = PathFinder::Relative();
-		std::vector<file::path> metaPaths;
-		std::error_code walkError;
-		for (file::recursive_directory_iterator it(assetRoot, walkError), end;
-			it != end && !walkError; it.increment(walkError))
-		{
-			if (!it->is_regular_file()) continue;
-			if (it->path().extension() != ".shadermeta") continue;
-			metaPaths.push_back(it->path());
-		}
-		// 순서를 고정한다. 디렉터리 순회 순서는 파일 시스템이 정하므로 그대로 두면
-		// 게이트가 재실행마다 다른 순서를 본다.
-		std::sort(metaPaths.begin(), metaPaths.end());
-
-		std::uint32_t parsed = 0;
-		for (const file::path& metaPath : metaPaths)
-		{
-			std::string relative = file::relative(metaPath, assetRoot).generic_string();
-
-			// GUID는 파싱 의미론의 일부가 아니지만 nil이면 로더가 거부한다. 카탈로그가
-			// 아는 것을 쓰되, 모르는 파일(자가 검증 fixture 등)은 sentinel로 대신한다 —
-			// 그 구분을 함께 찍어 "sidecar가 없어서 통과했다"를 감출 수 없게 한다.
-			FileGuid guid = DataSystems->GetFileGuid(metaPath);
-			const bool fromCatalog = (guid != FileGuid{});
-			if (!fromCatalog) guid = FileGuid::CreateRandomV4();
-
-			std::ifstream input(metaPath, std::ios::binary);
-			std::ostringstream buffer;
-			buffer << input.rdbuf();
-			const std::string text = buffer.str();
-
-			ShaderMeta meta;
-			std::string error;
-			const bool ok = ShaderMetaLoader::Parse(text, metaPath, guid, meta, error);
-			std::printf("[shadermeta.probe] file=%s ok=%d guidFromCatalog=%d"
-				" name=%s source=%s props=%zu keywords=%zu passes=%zu err=%s\n",
-				relative.c_str(), ok ? 1 : 0, fromCatalog ? 1 : 0,
-				ok ? meta.name.c_str() : "-",
-				ok ? meta.source.generic_string().c_str() : "-",
-				meta.properties.size(), meta.keywords.size(), meta.passes.size(),
-				ok ? "-" : error.c_str());
-			if (!ok) continue;
-			++parsed;
-
-			for (const ShaderPropertyDesc& property : meta.properties)
-			{
-				std::printf("[shadermeta.probe] prop=%s|%s|%s|%s|%s\n",
-					relative.c_str(), property.name.c_str(),
-					property.label.c_str(), propertyTypeName(property.type),
-					defaultKind(property.defaultValue));
-			}
-			for (const ShaderKeywordAxis& axis : meta.keywords)
-			{
-				std::string values;
-				for (const std::string& value : axis.values)
-				{
-					if (!values.empty()) values += ",";
-					values += value;
-				}
-				std::printf("[shadermeta.probe] axis=%s|%s|%s\n",
-					relative.c_str(), axis.name.c_str(), values.c_str());
-			}
-			for (const ShaderPassDesc& pass : meta.passes)
-			{
-				std::printf("[shadermeta.probe] pass=%s|%s|vs=%s|ps=%s|cs=%s|queue=%s"
-					"|fill=%s|cull=%s|blend=%s|depthWrite=%d|depthTest=%s|topology=%s\n",
-					relative.c_str(), pass.name.c_str(),
-					entryOf(pass.vertex).c_str(), entryOf(pass.pixel).c_str(),
-					entryOf(pass.compute).c_str(), queueName(pass.queue),
-					fillName(pass.state.fillMode), cullName(pass.state.cullMode),
-					blendName(pass.state.blendMode), pass.state.depthWrite ? 1 : 0,
-					depthName(pass.state.depthTest), topologyName(pass.state.topologyType));
-			}
-		}
-
-		// ── 거절 계약 ────────────────────────────────────────────────────────────
-		//
-		// 실자산 코퍼스는 전부 유효하다. 여기가 없으면 "무엇이든 통과시키는 파서"가
-		// 만점을 받는다. 사유 문자열까지 대조하는 이유는, 다른 이유로 실패한 것을
-		// "거부했다"로 읽으면 계약이 아니라 우연을 재기 때문이다.
-		struct RejectCase
-		{
-			const char* name;
-			const char* text;
-			const char* reason;
-		};
-		// 기준 경로는 실재하는 fixture 옆이어야 한다 — `source` 해소가 파일 존재를
-		// 확인하므로, 존재하지 않는 디렉터리를 쓰면 전부 "source 없음"으로 거부되어
-		// 정작 재려던 사유가 가려진다.
-		const file::path rejectOrigin = assetRoot
-			/ "Shaders" / "DefaultPassShader" / "SelfTest" / "RejectProbe.shadermeta";
-		static const RejectCase kRejects[] = {
-			{ "duplicate-property",
-			  "schema: 1\nname: RejectDuplicate\nsource: ShaderMetaFixture.hlsl\n"
-			  "properties:\n  - { name: v, type: float, default: 0.0 }\n"
-			  "  - { name: v, type: float, default: 1.0 }\n"
-			  "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
-			  " queue: opaque }\n",
-			  "중복" },
-			{ "unknown-field",
-			  "schema: 1\nname: RejectUnknown\nsource: ShaderMetaFixture.hlsl\n"
-			  "passes:\n  - name: Main\n    vs: { entry: VSMain }\n"
-			  "    ps: { entry: PSMain }\n    state: { depthWriet: false }\n"
-			  "    queue: opaque\n",
-			  "알 수 없는 field" },
-			{ "escaping-source",
-			  "schema: 1\nname: RejectPath\nsource: ../ShaderMetaFixture.hlsl\n"
-			  "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
-			  " queue: opaque }\n",
-			  "상위 이동 없는 상대" },
-			// ★ YAML 1.1 bool 표. `1`은 bool이 아니다 — 스칼라 파리티(D3-b-2b-0)가
-			//   두 backend에서 갈리는 것으로 실측한 부류라 상시로 밟는다.
-			{ "numeric-bool",
-			  "schema: 1\nname: RejectBool\nsource: ShaderMetaFixture.hlsl\n"
-			  "passes:\n  - name: Main\n    vs: { entry: VSMain }\n"
-			  "    ps: { entry: PSMain }\n    state: { depthWrite: 1 }\n"
-			  "    queue: opaque\n",
-			  "true|false" },
-			// ★ 없는 키. ryml `operator[]`는 여기서 **abort** 한다 — 어댑터가
-			//   `find_child`로 흡수하는 것이 맞는지 실제로 밟아 확인한다.
-			{ "missing-source",
-			  "schema: 1\nname: RejectMissing\n"
-			  "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
-			  " queue: opaque }\n",
-			  "필수 scalar 'source'" },
-			// ★ 루트가 map이 아닌 경우. 시퀀스 루트에 map 연산을 걸면 backend마다
-			//   반응이 다르다.
-			{ "sequence-root",
-			  "- schema: 1\n- name: RejectRoot\n",
-			  "map이어야 한다" },
-		};
-
-		std::uint32_t rejected = 0;
-		for (const RejectCase& item : kRejects)
-		{
-			ShaderMeta ignored;
-			std::string error;
-			const bool accepted = ShaderMetaLoader::Parse(
-				item.text, rejectOrigin, FileGuid::CreateRandomV4(), ignored, error);
-			const bool reasonMatched = !accepted
-				&& std::string::npos != error.find(item.reason);
-			if (reasonMatched) ++rejected;
-			std::printf("[shadermeta.probe] reject=%s accepted=%d reasonMatched=%d err=%s\n",
-				item.name, accepted ? 1 : 0, reasonMatched ? 1 : 0,
-				accepted ? "-" : error.c_str());
-		}
-
-		std::printf("[shadermeta.probe] files=%zu parsed=%u rejectCases=%zu rejected=%u\n",
-			metaPaths.size(), parsed,
-			sizeof(kRejects) / sizeof(kRejects[0]), rejected);
-	}
-
-    static void Cmd_pix_capture(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_shadermeta_probe(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("shadermeta.probe");
+        (void)ctx;
+
+        auto propertyTypeName = [](ShaderPropertyType type) -> const char*
+        {
+            switch (type)
+            {
+            case ShaderPropertyType::Float:     return "float";
+            case ShaderPropertyType::Float2:    return "float2";
+            case ShaderPropertyType::Float3:    return "float3";
+            case ShaderPropertyType::Float4:    return "float4";
+            case ShaderPropertyType::Int:       return "int";
+            case ShaderPropertyType::Bool:      return "bool";
+            case ShaderPropertyType::Float4x4:  return "float4x4";
+            case ShaderPropertyType::Texture2D: return "texture2d";
+            }
+            return "?";
+        };
+        // 기본값은 **어떤 대안이 채워졌는지**를 찍는다. 값까지 찍으면 부동소수 표기가
+        // 게이트를 부서지게 만들고, 여기서 재려는 것은 "타입별 해석이 갈리지 않는가"다.
+        auto defaultKind = [](const ShaderPropertyDefault& value) -> const char*
+        {
+            switch (value.index())
+            {
+            case 0: return "none";
+            case 1: return "float";
+            case 2: return "float2";
+            case 3: return "float3";
+            case 4: return "float4";
+            case 5: return "int";
+            case 6: return "bool";
+            case 7: return "float4x4";
+            case 8: return "guid";
+            }
+            return "?";
+        };
+        auto queueName = [](ShaderPassQueue queue) -> const char*
+        {
+            switch (queue)
+            {
+            case ShaderPassQueue::Opaque:      return "opaque";
+            case ShaderPassQueue::Transparent: return "transparent";
+            case ShaderPassQueue::Shadow:      return "shadow";
+            case ShaderPassQueue::Compute:     return "compute";
+            }
+            return "?";
+        };
+        auto fillName = [](RHIFillMode mode) -> const char*
+        {
+            return RHIFillMode::Wireframe == mode ? "wireframe" : "solid";
+        };
+        auto cullName = [](RHICullMode mode) -> const char*
+        {
+            if (RHICullMode::None == mode) return "none";
+            if (RHICullMode::Front == mode) return "front";
+            return "back";
+        };
+        auto blendName = [](ShaderBlendMode mode) -> const char*
+        {
+            if (ShaderBlendMode::Alpha == mode) return "alpha";
+            if (ShaderBlendMode::Additive == mode) return "additive";
+            return "off";
+        };
+        auto depthName = [](RHICompareOp op) -> const char*
+        {
+            if (RHICompareOp::None == op) return "off";
+            if (RHICompareOp::LessEqual == op) return "lessEqual";
+            return "less";
+        };
+        auto topologyName = [](RHITopologyType type) -> const char*
+        {
+            if (RHITopologyType::Line == type) return "line";
+            if (RHITopologyType::Point == type) return "point";
+            return "triangle";
+        };
+        auto entryOf = [](const std::optional<ShaderStageEntry>& stage) -> std::string
+        {
+            return stage.has_value() ? stage->entry : std::string("-");
+        };
+
+        const file::path assetRoot = PathFinder::Relative();
+        std::vector<file::path> metaPaths;
+        std::error_code walkError;
+        for (file::recursive_directory_iterator it(assetRoot, walkError), end;
+            it != end && !walkError; it.increment(walkError))
+        {
+            if (!it->is_regular_file()) continue;
+            if (it->path().extension() != ".shadermeta") continue;
+            metaPaths.push_back(it->path());
+        }
+        // 순서를 고정한다. 디렉터리 순회 순서는 파일 시스템이 정하므로 그대로 두면
+        // 게이트가 재실행마다 다른 순서를 본다.
+        std::sort(metaPaths.begin(), metaPaths.end());
+
+        std::uint32_t parsed = 0;
+        for (const file::path& metaPath : metaPaths)
+        {
+            std::string relative = file::relative(metaPath, assetRoot).generic_string();
+
+            // GUID는 파싱 의미론의 일부가 아니지만 nil이면 로더가 거부한다. 카탈로그가
+            // 아는 것을 쓰되, 모르는 파일(자가 검증 fixture 등)은 sentinel로 대신한다 —
+            // 그 구분을 함께 찍어 "sidecar가 없어서 통과했다"를 감출 수 없게 한다.
+            FileGuid guid = DataSystems->GetFileGuid(metaPath);
+            const bool fromCatalog = (guid != FileGuid{});
+            if (!fromCatalog) guid = FileGuid::CreateRandomV4();
+
+            std::ifstream input(metaPath, std::ios::binary);
+            std::ostringstream buffer;
+            buffer << input.rdbuf();
+            const std::string text = buffer.str();
+
+            ShaderMeta meta;
+            std::string error;
+            const bool ok = ShaderMetaLoader::Parse(text, metaPath, guid, meta, error);
+            std::printf("[shadermeta.probe] file=%s ok=%d guidFromCatalog=%d"
+                " name=%s source=%s props=%zu keywords=%zu passes=%zu err=%s\n",
+                relative.c_str(), ok ? 1 : 0, fromCatalog ? 1 : 0,
+                ok ? meta.name.c_str() : "-",
+                ok ? meta.source.generic_string().c_str() : "-",
+                meta.properties.size(), meta.keywords.size(), meta.passes.size(),
+                ok ? "-" : error.c_str());
+            if (!ok) continue;
+            ++parsed;
+
+            for (const ShaderPropertyDesc& property : meta.properties)
+            {
+                std::printf("[shadermeta.probe] prop=%s|%s|%s|%s|%s\n",
+                    relative.c_str(), property.name.c_str(),
+                    property.label.c_str(), propertyTypeName(property.type),
+                    defaultKind(property.defaultValue));
+            }
+            for (const ShaderKeywordAxis& axis : meta.keywords)
+            {
+                std::string values;
+                for (const std::string& value : axis.values)
+                {
+                    if (!values.empty()) values += ",";
+                    values += value;
+                }
+                std::printf("[shadermeta.probe] axis=%s|%s|%s\n",
+                    relative.c_str(), axis.name.c_str(), values.c_str());
+            }
+            for (const ShaderPassDesc& pass : meta.passes)
+            {
+                std::printf("[shadermeta.probe] pass=%s|%s|vs=%s|ps=%s|cs=%s|queue=%s"
+                    "|fill=%s|cull=%s|blend=%s|depthWrite=%d|depthTest=%s|topology=%s\n",
+                    relative.c_str(), pass.name.c_str(),
+                    entryOf(pass.vertex).c_str(), entryOf(pass.pixel).c_str(),
+                    entryOf(pass.compute).c_str(), queueName(pass.queue),
+                    fillName(pass.state.fillMode), cullName(pass.state.cullMode),
+                    blendName(pass.state.blendMode), pass.state.depthWrite ? 1 : 0,
+                    depthName(pass.state.depthTest), topologyName(pass.state.topologyType));
+            }
+        }
+
+        // ── 거절 계약 ────────────────────────────────────────────────────────────
+        //
+        // 실자산 코퍼스는 전부 유효하다. 여기가 없으면 "무엇이든 통과시키는 파서"가
+        // 만점을 받는다. 사유 문자열까지 대조하는 이유는, 다른 이유로 실패한 것을
+        // "거부했다"로 읽으면 계약이 아니라 우연을 재기 때문이다.
+        struct RejectCase
+        {
+            const char* name;
+            const char* text;
+            const char* reason;
+        };
+        // 기준 경로는 실재하는 fixture 옆이어야 한다 — `source` 해소가 파일 존재를
+        // 확인하므로, 존재하지 않는 디렉터리를 쓰면 전부 "source 없음"으로 거부되어
+        // 정작 재려던 사유가 가려진다.
+        const file::path rejectOrigin = assetRoot
+            / "Shaders" / "DefaultPassShader" / "SelfTest" / "RejectProbe.shadermeta";
+        static const RejectCase kRejects[] = {
+            { "duplicate-property",
+              "schema: 1\nname: RejectDuplicate\nsource: ShaderMetaFixture.hlsl\n"
+              "properties:\n  - { name: v, type: float, default: 0.0 }\n"
+              "  - { name: v, type: float, default: 1.0 }\n"
+              "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
+              " queue: opaque }\n",
+              "중복" },
+            { "unknown-field",
+              "schema: 1\nname: RejectUnknown\nsource: ShaderMetaFixture.hlsl\n"
+              "passes:\n  - name: Main\n    vs: { entry: VSMain }\n"
+              "    ps: { entry: PSMain }\n    state: { depthWriet: false }\n"
+              "    queue: opaque\n",
+              "알 수 없는 field" },
+            { "escaping-source",
+              "schema: 1\nname: RejectPath\nsource: ../ShaderMetaFixture.hlsl\n"
+              "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
+              " queue: opaque }\n",
+              "상위 이동 없는 상대" },
+            // ★ YAML 1.1 bool 표. `1`은 bool이 아니다 — 스칼라 파리티(D3-b-2b-0)가
+            //   두 backend에서 갈리는 것으로 실측한 부류라 상시로 밟는다.
+            { "numeric-bool",
+              "schema: 1\nname: RejectBool\nsource: ShaderMetaFixture.hlsl\n"
+              "passes:\n  - name: Main\n    vs: { entry: VSMain }\n"
+              "    ps: { entry: PSMain }\n    state: { depthWrite: 1 }\n"
+              "    queue: opaque\n",
+              "true|false" },
+            // ★ 없는 키. ryml `operator[]`는 여기서 **abort** 한다 — 어댑터가
+            //   `find_child`로 흡수하는 것이 맞는지 실제로 밟아 확인한다.
+            { "missing-source",
+              "schema: 1\nname: RejectMissing\n"
+              "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
+              " queue: opaque }\n",
+              "필수 scalar 'source'" },
+            // ★ 루트가 map이 아닌 경우. 시퀀스 루트에 map 연산을 걸면 backend마다
+            //   반응이 다르다.
+            { "sequence-root",
+              "- schema: 1\n- name: RejectRoot\n",
+              "map이어야 한다" },
+        };
+
+        std::uint32_t rejected = 0;
+        for (const RejectCase& item : kRejects)
+        {
+            ShaderMeta ignored;
+            std::string error;
+            const bool accepted = ShaderMetaLoader::Parse(
+                item.text, rejectOrigin, FileGuid::CreateRandomV4(), ignored, error);
+            const bool reasonMatched = !accepted
+                && std::string::npos != error.find(item.reason);
+            if (reasonMatched) ++rejected;
+            std::printf("[shadermeta.probe] reject=%s accepted=%d reasonMatched=%d err=%s\n",
+                item.name, accepted ? 1 : 0, reasonMatched ? 1 : 0,
+                accepted ? "-" : error.c_str());
+        }
+
+        std::printf("[shadermeta.probe] files=%zu parsed=%u rejectCases=%zu rejected=%u\n",
+            metaPaths.size(), parsed,
+            sizeof(kRejects) / sizeof(kRejects[0]), rejected);
+        auto data = CommandData::Object();
+        data.Set("files", CommandData::Int(metaPaths.size()));
+        data.Set("parsed", CommandData::Int(parsed));
+        data.Set("rejectCases", CommandData::Int(sizeof(kRejects) / sizeof(kRejects[0])));
+        data.Set("rejected", CommandData::Int(rejected));
+        return !walkError && !metaPaths.empty() && parsed == metaPaths.size() && rejected == sizeof(kRejects) / sizeof(kRejects[0]) ? Ok({}, std::move(data)) : Fail("shadermeta.failed", "Commandlet verification failed", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_pix_capture(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
         const std::vector<std::string>& parts = ctx.parts;
 
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
+        if (parts.size() > 2 || (mode != "begin" && mode != "end" && mode != "status"))
+            return InvalidArguments("pix.capture [begin|end|status]");
         if (mode == "begin")
         {
             if (g_pixGraphicsAnalysis)
@@ -608,6 +614,7 @@ namespace ConsoleCmd
                 {
                     std::printf("[CLI] pix.capture begin 실패 0x%08X — PIX/pixtool로 실행했는지 확인\n",
                         static_cast<unsigned>(hr));
+                    return PreconditionFailed("pix.unavailable", "PIX capture interface unavailable");
                 }
                 else
                 {
@@ -637,10 +644,15 @@ namespace ConsoleCmd
             std::printf("[CLI] pix.capture — %s\n",
                 g_pixGraphicsAnalysis ? "캡처 중" : "대기");
         }
+        auto data = CommandData::Object();
+        data.Set("capturing", CommandData::Bool(bool(g_pixGraphicsAnalysis)));
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_profile_selftest(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_profile_selftest(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("profile.selftest");
         // 현행 CPU 프로파일러의 계약을 못박는 특성화 검사(PHASE 14 P0).
         // 프레임 경계를 스스로 넘으므로 라이브 캡처를 교란한다 — 성능을 재는
         // 도중에 부르지 말 것. 게임 스레드에서 도는 것은 Pump()가 보장한다.
@@ -659,15 +671,45 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[profile.selftest] 실패\n") + log);
         }
         std::printf("[CLI] profile.selftest %s\n", passed ? "통과" : "실패");
+        auto data = CommandData::Object();
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("profile.selftest.failed", "Commandlet verification failed", std::move(data));
     }
 
-    static void Cmd_profile_stats(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_profile_stats(const ConsoleCommandContext& ctx)
     {
-        // 프로파일러 자신의 비용과 용량 소진. 프레임을 넘기지 않으므로
-        // 라이브 캡처를 건드리지 않는다 — 측정 중에 불러도 안전하다.
-        const std::string report = GetProfilerStatsReport();
-        std::printf("%s", report.c_str());
-        Debug->LogWarning(report);
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("profile.stats takes no arguments");
+        const auto stats = gCPUProfiler.GetStats();
+        const auto range = gCPUProfiler.GetFrameRange();
+        auto data = CommandData::Object();
+        data.Set("paused", CommandData::Bool(gCPUProfiler.IsPaused()));
+        data.Set("frameBegin", CommandData::Int(range.Begin)); data.Set("frameEnd", CommandData::Int(range.End));
+        data.Set("ticksPerSecond", CommandData::Int(CPUProfiler::GetTicksPerSecond()));
+        data.Set("lastTickTicks", CommandData::Int(stats.LastTickTicks));
+        data.Set("peakTickTicks", CommandData::Int(stats.PeakTickTicks));
+        data.Set("totalTickTicks", CommandData::Int(stats.TotalTickTicks));
+        data.Set("tickCount", CommandData::Int(stats.TickCount));
+        data.Set("lastFrameEvents", CommandData::Int(stats.LastFrameEvents));
+        data.Set("peakFrameEvents", CommandData::Int(stats.PeakFrameEvents));
+        data.Set("eventCapacity", CommandData::Int(stats.EventCapacity));
+        data.Set("lastFrameNameBytes", CommandData::Int(stats.LastFrameNameBytes));
+        data.Set("peakFrameNameBytes", CommandData::Int(stats.PeakFrameNameBytes));
+        data.Set("nameCapacity", CommandData::Int(stats.NameCapacity));
+        data.Set("totalDroppedEvents", CommandData::Int(stats.TotalDroppedEvents));
+        data.Set("totalDroppedNames", CommandData::Int(stats.TotalDroppedNames));
+        data.Set("retiredThreads", CommandData::Int(stats.RetiredThreads));
+        data.Set("malformedScopes", CommandData::Int(stats.MalformedScopes));
+        auto threads = CommandData::Array();
+        for (const auto& thread : gCPUProfiler.GetThreads())
+        {
+            auto entry = CommandData::Object();
+            entry.Set("index", CommandData::Int(thread.Index)); entry.Set("name", CommandData::String(thread.Name));
+            entry.Set("threadId", CommandData::Int(thread.ThreadID)); entry.Set("retired", CommandData::Bool(thread.pTLS == nullptr));
+            threads.Append(std::move(entry));
+        }
+        data.Set("threads", std::move(threads));
+        return Ok({}, std::move(data));
     }
 
     // ★ `dump.crash` 를 지웠다(2026-09-05). `crash.test` 와 같은 네 분기를 가진
@@ -684,164 +726,133 @@ namespace ConsoleCmd
     //   덤프도 남지 않았다. descriptor 는 `terminates_process` 라고 적고 있었다.
     //   검증하지 못하는 검증 명령은 없는 것만 못하다.
 
-    static void Cmd_dump_list(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_dump_list(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        // 크래시가 나면 덤프(.dmp)와 요약(.txt)이 같은 이름으로 함께 남는다.
-        // dump.list는 목록만, dump.show는 가장 최근 요약의 내용까지 찍는다.
-        const file::path dumpDir = PathFinder::DumpPath();
-        std::printf("[CLI] 덤프 경로: %ls\n", dumpDir.c_str());
-
-        std::error_code ec{};
-        if (!file::exists(dumpDir, ec))
+        using namespace CommandCore;
+        size_t limit = 10;
+        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && (!ParseNumber(ctx.parts[1], limit) || limit == 0 || limit > 1000)))
+            return InvalidArguments("dump.list/show [limit: 1..1000]");
+        const file::path directory = PathFinder::DumpPath();
+        std::error_code error;
+        std::vector<std::pair<file::path, file::file_time_type>> dumps;
+        if (file::exists(directory, error))
         {
-            std::printf("[CLI] 덤프 폴더가 없습니다\n");
-            return;
+            file::directory_iterator it(directory, error), end;
+            for (; !error && it != end; it.increment(error))
+            {
+                if (!it->is_regular_file(error) || it->path().extension() != ".dmp") continue;
+                const auto time = it->last_write_time(error);
+                if (!error) dumps.emplace_back(it->path(), time);
+            }
         }
-
-        // 최신순으로 보여 준다 — 방금 난 크래시가 맨 위에 있어야 쓸모가 있다.
-        std::vector<file::directory_entry> dumps;
-        for (const auto& entry : file::directory_iterator(dumpDir, ec))
-        {
-            if (entry.is_regular_file(ec) && entry.path().extension() == ".dmp") dumps.push_back(entry);
-        }
-
-        std::sort(dumps.begin(), dumps.end(), [](const auto& a, const auto& b)
-        {
-            std::error_code cmpEc{};
-            return file::last_write_time(a, cmpEc) > file::last_write_time(b, cmpEc);
-        });
-
-        if (dumps.empty())
-        {
-            Debug->LogWarning("[CLI] 덤프 없음");
-            std::printf("[CLI] 덤프 없음\n");
-            return;
-        }
-
-        // 콘솔은 별도 창이라 스크립트로 돌린 실행에서는 눈에 띄지 않는다.
-        // 로그에도 남겨야 CI나 사후 확인에서 쓸 수 있다.
-        const size_t limit = (parts.size() > 1) ? static_cast<size_t>(std::max(1, std::atoi(parts[1].c_str()))) : 10;
+        if (error) return Fail("dump.read_failed", error.message());
+        std::sort(dumps.begin(), dumps.end(), [](const auto& a, const auto& b) { return a.second != b.second ? a.second > b.second : a.first < b.first; });
+        auto data = CommandData::Object();
+        auto entries = CommandData::Array();
         for (size_t i = 0; i < dumps.size() && i < limit; ++i)
         {
-            std::error_code sizeEc{};
-            const auto bytes = file::file_size(dumps[i], sizeEc);
-
-            char entry[512]{};
-            std::snprintf(entry, sizeof(entry), "[CLI] 덤프 [%zu] %s (%.1f MB)",
-                i, dumps[i].path().filename().string().c_str(),
-                static_cast<double>(bytes) / (1024.0 * 1024.0));
-
-            Debug->LogWarning(entry);
-            std::printf("%s\n", entry);
+            auto entry = CommandData::Object();
+            const auto bytes = file::file_size(dumps[i].first, error);
+            if (error) return Fail("dump.read_failed", error.message());
+            entry.Set("path", CommandData::String(dumps[i].first.string())); entry.Set("bytes", CommandData::Int(bytes));
+            entries.Append(std::move(entry));
         }
-
-        if (cmd == "dump.show")
+        data.Set("directory", CommandData::String(directory.string()));
+        data.Set("total", CommandData::Int(dumps.size())); data.Set("dumps", std::move(entries));
+        if (ctx.cmd == "dump.show")
         {
-            file::path reportPath = dumps.front().path();
-            reportPath.replace_extension(".txt");
-
-            std::ifstream report(reportPath);
-            if (!report)
-            {
-                Debug->LogWarning("[CLI] 요약 파일 없음: " + reportPath.string());
-                std::printf("[CLI] 요약 파일 없음: %ls\n", reportPath.c_str());
-                return;
-            }
-
-            Debug->LogWarning("[CLI] 크래시 요약 " + reportPath.filename().string());
-            std::string line;
-            while (std::getline(report, line))
-            {
-                Debug->LogWarning("  " + line);
-                std::printf("%s\n", line.c_str());
-            }
+            if (dumps.empty()) return PreconditionFailed("dump.not_found", "No crash dump exists");
+            auto path = dumps.front().first; path.replace_extension(".txt");
+            std::ifstream stream(path, std::ios::binary);
+            if (!stream) return PreconditionFailed("dump.summary_missing", "No summary for latest dump: " + path.string());
+            const auto bytes = file::file_size(path, error);
+            if (error) return Fail("dump.read_failed", error.message());
+            if (bytes > 1024 * 1024) return Fail("dump.summary_too_large", "Summary exceeds 1 MiB; read the artifact directly", std::move(data));
+            std::string summary((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+            if (stream.bad()) return Fail("dump.read_failed", "Summary read failed");
+            data.Set("summaryPath", CommandData::String(path.string())); data.Set("summary", CommandData::String(std::move(summary)));
         }
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_gpu_baseline(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_gpu_baseline(const ConsoleCommandContext& ctx)
     {
-        GpuDiagnostics::ResetBaseline();
-        std::printf("[CLI] 기준선 초기화 (이후 gpu.delta는 이 시점과 비교)\n");
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("gpu.baseline takes no arguments");
+        GpuDiagnostics::Snapshot snapshot;
+        if (!GpuDiagnostics::Capture(snapshot, true)) return PreconditionFailed("gpu.unavailable", "No diagnostics device");
+        return Ok("GPU baseline reset");
     }
 
-    static void Cmd_gpu_census(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_gpu_census(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        const std::string label = (parts.size() > 1) ? parts[1] : std::string("CLI 요청");
-        // 실행 중에는 VRAM만 남는다. 타입별 집계는 디버그 레이어를 망가뜨려
-        // 이후 렌더에서 죽으므로 종료 시점 리포트로만 얻을 수 있다.
-        if (cmd == "gpu.delta") GpuDiagnostics::LogDelta(label);
-        else                    GpuDiagnostics::LogCensus(label);
-
-        std::printf("[CLI] GPU %s 기록: %s (VRAM 기준, 타입별 집계는 종료 리포트 참조)\n",
-            (cmd == "gpu.delta") ? "증감" : "집계", label.c_str());
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("gpu.census/delta [label]");
+        GpuDiagnostics::Snapshot snapshot;
+        const bool requestedDelta = ctx.cmd == "gpu.delta";
+        if (!GpuDiagnostics::Capture(snapshot, requestedDelta)) return PreconditionFailed("gpu.unavailable", "No diagnostics device");
+        const bool delta = requestedDelta && snapshot.hasBaseline;
+        auto data = CommandData::Object();
+        data.Set("label", CommandData::String(ctx.parts.size() == 2 ? ctx.parts[1] : ""));
+        data.Set("objectCensusAvailable", CommandData::Bool(snapshot.current.available));
+        data.Set("vramUsedMB", CommandData::Int(snapshot.current.vramUsedMB)); data.Set("vramBudgetMB", CommandData::Int(snapshot.current.vramBudgetMB));
+        data.Set("baselineEstablished", CommandData::Bool(requestedDelta && !snapshot.hasBaseline));
+        data.Set("vramDeltaMB", delta ? CommandData::Int(static_cast<int64_t>(snapshot.current.vramUsedMB) - static_cast<int64_t>(snapshot.baseline.vramUsedMB)) : CommandData{});
+        auto resources = CommandData::Object(); auto differences = CommandData::Object();
+        for (size_t i = 0; i < snapshot.resources.counts.size(); ++i)
+        {
+            const std::string name(Diagnostics::kEngineResourceNames[i]);
+            resources.Set(name, CommandData::Int(snapshot.resources.counts[i]));
+            if (delta) differences.Set(name, CommandData::Int(snapshot.resources.counts[i] - snapshot.baselineResources.counts[i]));
+        }
+        data.Set("resources", std::move(resources)); data.Set("resourceDelta", delta ? std::move(differences) : CommandData{});
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_gc_stats(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_gc_stats(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        // 관리 힙 지표(PHASE 9-7). 씬 churn 벤치의 판정 기준을 네이티브에서
-        // "네이티브·관리 양쪽 모두 기준선 복귀"로 넓히기 위한 것이다 —
-        // gpu.delta만 보면 평탄성의 절반만 본다.
-        static ClrHost::ScriptGcStats s_baseline{};
-        static bool s_hasBaseline = false;
-
-        ClrHost::ScriptGcStats gc{};
-        if (!ClrHost::Get().GetManagedGcStats(gc))
-        {
-            std::printf("[CLI] 관리 힙 지표 없음 — 스크립트 계층 비활성\n");
-            return;
-        }
-
-        const std::string label = (parts.size() > 1) ? parts[1] : std::string("CLI 요청");
-        constexpr double kBytesPerMB = 1024.0 * 1024.0;
-
-        char line[512]{};
-        if (cmd == "gc.delta" && s_hasBaseline)
-        {
-            std::snprintf(line, sizeof(line),
-                "[gc.delta] %s — gen0 %+d · gen1 %+d · gen2 %+d · 힙 %+.1f MB (현재 %.1f MB)",
-                label.c_str(),
-                gc.gen0Collections - s_baseline.gen0Collections,
-                gc.gen1Collections - s_baseline.gen1Collections,
-                gc.gen2Collections - s_baseline.gen2Collections,
-                (gc.heapSizeBytes - s_baseline.heapSizeBytes) / kBytesPerMB,
-                gc.heapSizeBytes / kBytesPerMB);
-        }
-        else
-        {
-            // 기준선이 없으면 delta 요청이어도 집계로 남기고 기준선을 세운다.
-            // 조용히 0을 찍으면 "변화 없음"으로 오독된다.
-            s_baseline = gc;
-            s_hasBaseline = true;
-            std::snprintf(line, sizeof(line),
-                "[gc.stats] %s — gen0 %d · gen1 %d · gen2 %d · 힙 %.1f MB · 단편화 %.1f MB · GC 점유 %.2f%%",
-                label.c_str(),
-                gc.gen0Collections, gc.gen1Collections, gc.gen2Collections,
-                gc.heapSizeBytes / kBytesPerMB,
-                gc.fragmentedBytes / kBytesPerMB,
-                gc.pauseTimePercentageX100 / 100.0);
-        }
-
-        std::printf("[CLI] %s\n", line);
-        Debug->LogWarning(line);
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("gc.stats/delta [label]");
+        static ClrHost::ScriptGcStats baseline{};
+        static bool hasBaseline = false;
+        ClrHost::ScriptGcStats current{};
+        if (!ClrHost::Get().GetManagedGcStats(current)) return PreconditionFailed("script.gc_unavailable", "Managed GC stats unavailable");
+        const bool delta = ctx.cmd == "gc.delta" && hasBaseline;
+        auto data = CommandData::Object();
+        data.Set("baselineEstablished", CommandData::Bool(!delta));
+        data.Set("label", CommandData::String(ctx.parts.size() == 2 ? ctx.parts[1] : ""));
+        auto differences = CommandData::Object();
+        data.Set("gen0Collections", CommandData::Int(current.gen0Collections));
+        if (delta) differences.Set("gen0Collections", CommandData::Int(static_cast<int64_t>(current.gen0Collections) - baseline.gen0Collections));
+        data.Set("gen1Collections", CommandData::Int(current.gen1Collections));
+        if (delta) differences.Set("gen1Collections", CommandData::Int(static_cast<int64_t>(current.gen1Collections) - baseline.gen1Collections));
+        data.Set("gen2Collections", CommandData::Int(current.gen2Collections));
+        if (delta) differences.Set("gen2Collections", CommandData::Int(static_cast<int64_t>(current.gen2Collections) - baseline.gen2Collections));
+        data.Set("heapSizeBytes", CommandData::Int(current.heapSizeBytes));
+        if (delta) differences.Set("heapSizeBytes", CommandData::Int(static_cast<int64_t>(current.heapSizeBytes) - baseline.heapSizeBytes));
+        data.Set("totalAllocatedBytes", CommandData::Int(current.totalAllocatedBytes));
+        if (delta) differences.Set("totalAllocatedBytes", CommandData::Int(static_cast<int64_t>(current.totalAllocatedBytes) - baseline.totalAllocatedBytes));
+        data.Set("fragmentedBytes", CommandData::Int(current.fragmentedBytes));
+        if (delta) differences.Set("fragmentedBytes", CommandData::Int(static_cast<int64_t>(current.fragmentedBytes) - baseline.fragmentedBytes));
+        data.Set("pauseTimePercentageX100", CommandData::Int(current.pauseTimePercentageX100));
+        if (delta) differences.Set("pauseTimePercentageX100", CommandData::Int(static_cast<int64_t>(current.pauseTimePercentageX100) - baseline.pauseTimePercentageX100));
+        data.Set("delta", delta ? std::move(differences) : CommandData{});
+        if (!delta) { baseline = current; hasBaseline = true; }
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_mem_stats(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_mem_stats(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        auto data = CommandData::Object();
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         // ★ mem.* 넷을 한 분기에 몰아 둔다 — else-if 사슬을 하나 더 늘리면
         // MSVC의 블록 중첩 한계(C1061)에 걸린다(실측). 이 파일의 명령 사슬은
         // 이미 그 한계에 붙어 있으므로 새 명령은 기존 분기에 합쳐 넣을 것.
+        if (cmd != "mem.hook" && parts.size() > (cmd == "mem.reset" ? 1u : 2u))
+            return InvalidArguments("mem.stats/delta [label] | mem.reset");
         if (cmd == "mem.hook")
         {
         // CRT 할당 **churn** 계측 (ContainerLibraryDesign §5 C0).
@@ -856,6 +867,11 @@ namespace ConsoleCmd
         // 그 안에서 절대 할당하지 않는다(재진입).
 #if defined(_DEBUG)
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
+        if ((mode != "on" && mode != "off" && mode != "stack" && mode != "status" && mode != "top") ||
+            parts.size() > (mode == "top" ? 3u : 2u)) return InvalidArguments("mem.hook [on|off|stack|status|top [limit]]");
+        int limit = 12;
+        if (mode == "top" && parts.size() == 3 && (!ParseNumber(parts[2], limit) || limit < 1 || limit > 1000))
+            return InvalidArguments("mem.hook top limit must be 1..1000");
         if (mode == "on" || mode == "stack")
         {
             // stack 모드는 할당마다 스택을 걷는다 — 훨씬 느리다. 귀속이 필요할
@@ -878,7 +894,7 @@ namespace ConsoleCmd
             const bool wasOn = CrtAllocProbe::IsEnabled();
             CrtAllocProbe::Disable();
 
-            const int limit = (parts.size() >= 3) ? std::max(1, std::atoi(parts[2].c_str())) : 12;
+
 
             std::vector<size_t> order;
             order.reserve(CrtAllocProbe::kMaxSites);
@@ -944,43 +960,20 @@ namespace ConsoleCmd
             std::printf("[CLI]   └ 실제 코드 할당 %zu건 (%.1f%%) ← IDL=0이면 이 값만 남는다\n",
                 realCount, (0 != total) ? (100.0 * realCount / total) : 0.0);
 
-            // ── 크기 분포 (C0 Tier 1의 판정 입력) ──────────────────────────
-            //
-            // _Container_proxy는 전부 16바이트다(실측: 1.46MB / 95,901건 = 15.9B).
-            // 그래서 16B 버킷에서 프록시 건수를 빼면 "실제 코드"의 분포가 된다 —
-            // 훅에서 스택을 걷지 않고도 분리할 수 있는 이유다.
-            //
-            // 오른쪽 열은 mem.bench의 Release 실측을 대입한 것이다. 크기별
-            // 절감(ns)은 ≤256B ≈ 40, 512B~2KB ≈ 선형 보간, ≥4KB ≈ 1,700으로 잡는다 —
-            // 4KB 절벽이 어디서 시작하는지는 재지 않았으므로 그 사이는 근사다.
-            std::printf("[CLI]   ── 크기 분포 (프록시 제외) ──\n");
-            size_t frames = 120;   // mem_top 시나리오의 측정 구간
-            double gainNsTotal = 0.0;
-            size_t realTotal = 0;
-            for (int b = 0; b < CrtAllocProbe::kSizeBuckets; ++b)
+            auto histogram = CommandData::Array();
+            for (int bucket = 0; bucket < CrtAllocProbe::kSizeBuckets; ++bucket)
             {
-                size_t c = CrtAllocProbe::g_sizeHist[b].load(std::memory_order_relaxed);
-                if (1 == b) { c = (c > proxyCount) ? (c - proxyCount) : 0; }   // 16B에서 프록시 제거
-                if (0 == c) { continue; }
-
-                const size_t cap = static_cast<size_t>(8) << b;
-                const double saveNs = (cap <= 256) ? 40.0
-                                    : (cap >= 4096) ? 1700.0
-                                    : (40.0 + (cap - 256) * (1700.0 - 40.0) / (4096.0 - 256.0));
-                realTotal += c;
-                gainNsTotal += saveNs * static_cast<double>(c);
-
-                std::printf("[CLI]     <=%6zuB  %8zu건 (%5.1f%%)  절감가정 %6.0f ns\n",
-                    cap, c, (0 != realCount) ? (100.0 * c / realCount) : 0.0, saveNs);
+                auto item = CommandData::Object();
+                item.Set("upperBytes", CommandData::Int(static_cast<size_t>(8) << bucket));
+                item.Set("count", CommandData::Int(CrtAllocProbe::g_sizeHist[bucket].load(std::memory_order_relaxed)));
+                item.Set("overflowBucket", CommandData::Bool(bucket == CrtAllocProbe::kSizeBuckets - 1));
+                histogram.Append(std::move(item));
             }
-            if (0 != realTotal)
-            {
-                const double perFrameUs = (gainNsTotal / static_cast<double>(frames)) / 1000.0;
-                std::printf("[CLI]   ⇒ 가중 이득 %.1f us/frame (%.3f%% of 16.67ms) — 실제코드 %zu건/%zu프레임 = %.0f건/frame\n",
-                    perFrameUs, (perFrameUs / 16666.7) * 100.0,
-                    realTotal, frames, static_cast<double>(realTotal) / frames);
-            }
-
+            data.Set("histogram", std::move(histogram));
+            data.Set("siteCount", CommandData::Int(order.size())); data.Set("total", CommandData::Int(total));
+            data.Set("proxyCount", CommandData::Int(proxyCount)); data.Set("proxyBytes", CommandData::Int(proxyBytes));
+            data.Set("siteOverflow", CommandData::Int(CrtAllocProbe::g_siteOverflow.load(std::memory_order_relaxed)));
+            auto sites = CommandData::Array();
             const int shown = static_cast<int>(std::min<size_t>(order.size(), static_cast<size_t>(limit)));
             for (int k = 0; k < shown; ++k)
             {
@@ -990,6 +983,9 @@ namespace ConsoleCmd
                 std::printf("[CLI] #%d  %zu건 (%.1f%%) / %.2f MB\n",
                     k + 1, c, (0 != total) ? (100.0 * c / total) : 0.0, b / (1024.0 * 1024.0));
 
+                auto item = CommandData::Object();
+                item.Set("count", CommandData::Int(c)); item.Set("bytes", CommandData::Int(b));
+                auto frames = CommandData::Array();
                 // CRT 할당 계층을 건너뛰고 실제 호출자부터 보여 준다.
                 int  printed = 0;
                 bool reachedCaller = false;
@@ -1018,11 +1014,18 @@ namespace ConsoleCmd
 
                     if (hasLine) { std::printf("[CLI]      %s  (%s:%lu)\n", name, li.FileName, li.LineNumber); }
                     else         { std::printf("[CLI]      %s\n", name); }
+                    auto frame = CommandData::Object();
+                    frame.Set("symbol", CommandData::String(name));
+                    if (hasLine) { frame.Set("file", CommandData::String(li.FileName)); frame.Set("line", CommandData::Int(li.LineNumber)); }
+                    frames.Append(std::move(frame));
                     ++printed;
                 }
+                item.Set("frames", std::move(frames));
+                sites.Append(std::move(item));
             }
+            data.Set("sites", std::move(sites));
             SymCleanup(proc);
-            if (wasOn) { CrtAllocProbe::Enable(); }
+            if (wasOn) { CrtAllocProbe::Enable(false); }
         }
         else
         {
@@ -1033,10 +1036,16 @@ namespace ConsoleCmd
                 CrtAllocProbe::g_stackMode.load(std::memory_order_relaxed) ? "(stack)" : "",
                 c, b / (1024.0 * 1024.0));
         }
+        size_t count{}, bytes{};
+        CrtAllocProbe::Read(&count, &bytes);
+        data.Set("enabled", CommandData::Bool(CrtAllocProbe::IsEnabled()));
+        data.Set("stack", CommandData::Bool(CrtAllocProbe::g_stackMode.load(std::memory_order_relaxed)));
+        data.Set("count", CommandData::Int(count)); data.Set("bytes", CommandData::Int(bytes));
+        return Ok({}, std::move(data));
 #else
         std::printf("[CLI] mem.hook — 디버그 CRT가 아니라 사용할 수 없다\n");
 #endif
-            return;
+            return PreconditionFailed("memory.debug_crt_required", "Allocation hook requires the debug CRT");
         }
 
         // 힙 사용량 (ContainerLibraryDesign §5 C0).
@@ -1060,7 +1069,7 @@ namespace ConsoleCmd
 #endif
             s_hasBaseline = false;
             std::printf("[CLI] mem — churn 누계와 기준선 초기화 (CRT live 블록은 CRT 소유라 못 지운다)\n");
-            return;
+            return Ok("Allocation counters and baseline reset");
         }
 
         size_t crtBlocks = 0, crtBytes = 0;
@@ -1076,6 +1085,12 @@ namespace ConsoleCmd
         crtAvailable = true;
 #endif
 
+        if (!crtAvailable) return PreconditionFailed("memory.debug_crt_required", "Live CRT heap counters require the debug CRT");
+        const bool delta = cmd == "mem.delta" && s_hasBaseline;
+        data.Set("blocks", CommandData::Int(crtBlocks)); data.Set("bytes", CommandData::Int(crtBytes));
+        data.Set("baselineEstablished", CommandData::Bool(!delta));
+        data.Set("blockDelta", delta ? CommandData::Int(static_cast<int64_t>(crtBlocks) - static_cast<int64_t>(s_crtBlocks)) : CommandData{});
+        data.Set("byteDelta", delta ? CommandData::Int(static_cast<int64_t>(crtBytes) - static_cast<int64_t>(s_crtBytes)) : CommandData{});
         const std::string label = (parts.size() > 1) ? parts[1] : std::string("CLI 요청");
         constexpr double kBytesPerMB = 1024.0 * 1024.0;
 
@@ -1111,6 +1126,7 @@ namespace ConsoleCmd
         {
             size_t churnCount = 0, churnBytes = 0;
             CrtAllocProbe::Read(&churnCount, &churnBytes);
+            data.Set("churnCount", CommandData::Int(churnCount)); data.Set("churnBytes", CommandData::Int(churnBytes));
             std::printf("[CLI]   CRT churn(할당 호출 누계) %zu건 / %.2f MB — mem.reset 이후\n",
                 churnCount, churnBytes / (1024.0 * 1024.0));
         }
@@ -1120,27 +1136,29 @@ namespace ConsoleCmd
         }
 #endif
         Debug->LogWarning(line);
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_gc_collect(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_gc_collect(const ConsoleCommandContext& ctx)
     {
-        // 씬 전환이 자동으로 부르는 것과 같은 경로를 손으로 부른다.
-        // 벤치에서 "전환 없이도 회수되는가"를 가르는 데 쓴다.
-        ClrHost::Get().CollectManagedHeap();
-        std::printf("[CLI] 관리 힙 확정 수집 요청\n");
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("gc.collect takes no arguments");
+        if (!ClrHost::Get().CollectManagedHeap()) return PreconditionFailed("script.gc_unavailable", "Managed collection entry point unavailable");
+        return Ok("Managed heap collection completed");
     }
 
-    static void Cmd_crash_status(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_crash_status(const ConsoleCommandContext& ctx)
     {
-        // 이번 실행이 덤프를 남길 수 있는 상태인지 확인한다.
-        // 크래시가 난 뒤에 '덤프가 없네'로 알게 되는 일이 없도록 하는 것이 목적.
-        const bool ready = Log::HasCrashDumpWriter();
-        std::printf("[CLI] 크래시 덤프 기록자: %s\n", ready ? "등록됨" : "미등록");
-        std::printf("[CLI] 덤프 경로: %ls\n", PathFinder::DumpPath().c_str());
-        std::printf("[CLI] 무인 모드: %s\n", CoreWindow::IsUnattended() ? "예(대화상자 없음)" : "아니오");
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("crash.status takes no arguments");
+        auto data = CommandData::Object();
+        data.Set("ready", CommandData::Bool(Log::HasCrashDumpWriter()));
+        data.Set("directory", CommandData::String(PathFinder::DumpPath().string()));
+        data.Set("unattended", CommandData::Bool(CoreWindow::IsUnattended()));
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_crash_test(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_crash_test(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
 
@@ -1149,7 +1167,11 @@ namespace ConsoleCmd
         // 덤프 경로는 크래시가 나야만 실행되므로 평소에는 검증이 안 되고,
         // 검증되지 않은 채로 조용히 망가져 있었다(로그에 CRASH 줄만 남고 .dmp 없음).
         // 종류별로 일부러 죽여서 각 경로가 .dmp와 .txt를 남기는지 본다.
+        if (parts.size() > 2) return CommandCore::InvalidArguments("crash.test [av|abort|terminate|throw]");
         const std::string kind = (parts.size() > 1) ? parts[1] : std::string("av");
+
+        if (kind != "av" && kind != "abort" && kind != "terminate" && kind != "throw")
+            return CommandCore::InvalidArguments("crash.test [av|abort|terminate|throw]");
 
         std::printf("[CLI] crash.test %s - 의도적으로 프로세스를 죽인다\n", kind.c_str());
         Debug->LogWarning("[crash.test] 의도적 크래시: " + kind);
@@ -1174,10 +1196,7 @@ namespace ConsoleCmd
             // 미처리 C++ 예외 → terminate 경로.
             throw std::runtime_error("crash.test throw");
         }
-        else
-        {
-            std::printf("[CLI] 알 수 없는 종류: %s (av|abort|terminate|throw)\n", kind.c_str());
-        }
+        return CommandCore::InternalError("crash.returned", "Intentional crash unexpectedly returned");
     }
 
     // 이미 별도 함수로 빠져 있던 진단·벤치 명령들.
@@ -1190,20 +1209,20 @@ namespace ConsoleCmd
 
     void RegisterDiagnosticsCommands(Registrar& reg)
     {
-        reg.Legacy({ "shadermeta.probe" }, &Cmd_shadermeta_probe);
-        reg.Legacy({ "pix.capture" }, &Cmd_pix_capture);
-        reg.Legacy({ "profile.selftest" }, &Cmd_profile_selftest);
-        reg.Legacy({ "profile.stats" }, &Cmd_profile_stats);
+        reg.Result({ "shadermeta.probe" }, &Cmd_shadermeta_probe);
+        reg.Result({ "pix.capture" }, &Cmd_pix_capture);
+        reg.Result({ "profile.selftest" }, &Cmd_profile_selftest);
+        reg.Result({ "profile.stats" }, &Cmd_profile_stats);
         // ★ 별칭이 아니라 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).
         //   `dump.list` 는 목록만, `dump.show` 는 가장 최근 요약의 내용까지 찍는다
         //   (`Cmd_dump_list` 안에서 `cmd == "dump.show"` 로 갈린다). 한 descriptor 를
         //   공유하면 `commands.list`·help·`GET /commands` 가 둘을 같은 명령으로
         //   보여 주고 요약도 하나만 실린다. 핸들러는 그대로 하나다.
-        reg.Legacy({ "dump.list" }, &Cmd_dump_list);
-        reg.Legacy({ "dump.show" }, &Cmd_dump_list);
-        reg.Legacy({ "gpu.baseline" }, &Cmd_gpu_baseline);
-        reg.Legacy({ "gpu.census", "gpu.delta" }, &Cmd_gpu_census);
-        reg.Legacy({ "gc.stats", "gc.delta" }, &Cmd_gc_stats);
+        reg.Result({ "dump.list" }, &Cmd_dump_list);
+        reg.Result({ "dump.show" }, &Cmd_dump_list);
+        reg.Result({ "gpu.baseline" }, &Cmd_gpu_baseline);
+        reg.Result({ "gpu.census", "gpu.delta" }, &Cmd_gpu_census);
+        reg.Result({ "gc.stats", "gc.delta" }, &Cmd_gc_stats);
         // ★ 넷 다 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).
         //
         //   `Cmd_mem_stats` 는 `cmd` 로 갈린다 — `mem.reset` 은 기준선을 0 으로,
@@ -1219,12 +1238,12 @@ namespace ConsoleCmd
         //   핸들러가 넷으로 갈리지 않고 하나로 남아 있는 것은 **MSVC 의 C1061
         //   중첩 한계** 때문이다(이 파일 안 주석에 그 경위가 있다). 그것은 구현
         //   제약이지 이 넷이 한 명령이라는 뜻이 아니다.
-        reg.Legacy({ "mem.stats" }, &Cmd_mem_stats);
-        reg.Legacy({ "mem.delta" }, &Cmd_mem_stats);
-        reg.Legacy({ "mem.reset" }, &Cmd_mem_stats);
-        reg.Legacy({ "mem.hook"  }, &Cmd_mem_stats);
-        reg.Legacy({ "gc.collect" }, &Cmd_gc_collect);
-        reg.Legacy({ "crash.status" }, &Cmd_crash_status);
+        reg.Result({ "mem.stats" }, &Cmd_mem_stats);
+        reg.Result({ "mem.delta" }, &Cmd_mem_stats);
+        reg.Result({ "mem.reset" }, &Cmd_mem_stats);
+        reg.Result({ "mem.hook"  }, &Cmd_mem_stats);
+        reg.Result({ "gc.collect" }, &Cmd_gc_collect);
+        reg.Result({ "crash.status" }, &Cmd_crash_status);
         reg.Escaping({ "crash.test" }, &Cmd_crash_test);
     }
 }

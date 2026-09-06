@@ -44,17 +44,17 @@ namespace Meta
             if (false == m_isGameMode)
             {
                 if (m_undoStack.empty()) return;
+                m_undoStack.top()->Undo();
                 auto cmd = std::move(m_undoStack.top());
                 m_undoStack.pop();
-                cmd->Undo();
                 m_redoStack.push(std::move(cmd));
             }
             else
             {
                 if (m_gameModeUndoStack.empty()) return;
+                m_gameModeUndoStack.top()->Undo();
                 auto cmd = std::move(m_gameModeUndoStack.top());
                 m_gameModeUndoStack.pop();
-                cmd->Undo();
                 m_gameModeRedoStack.push(std::move(cmd));
             }
         }
@@ -64,17 +64,17 @@ namespace Meta
             if (false == m_isGameMode)
             {
                 if (m_redoStack.empty()) return;
+                m_redoStack.top()->Redo();
                 auto cmd = std::move(m_redoStack.top());
                 m_redoStack.pop();
-                cmd->Redo();
                 m_undoStack.push(std::move(cmd));
             }
             else
             {
                 if (m_gameModeRedoStack.empty()) return;
+                m_gameModeRedoStack.top()->Redo();
                 auto cmd = std::move(m_gameModeRedoStack.top());
                 m_gameModeRedoStack.pop();
-                cmd->Redo();
                 m_gameModeUndoStack.push(std::move(cmd));
             }
         }

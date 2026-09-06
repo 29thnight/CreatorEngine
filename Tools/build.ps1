@@ -1270,12 +1270,9 @@ function Invoke-PlayerSmoke {
     if ($combined -notmatch $sceneMarkerPattern) {
         throw 'Player smoke lacks the startup scene success marker.'
     }
-    if ($combined -notmatch '\[ScriptCore\]\s*초기화 완료') {
-        throw 'Player smoke lacks the ScriptCore initialization marker.'
-    }
-    $scriptRegistration = [regex]::Match($combined, '\[ScriptCore\]\s*스크립트\s+([1-9]\d*)종\s+등록')
-    if (-not $scriptRegistration.Success) {
-        throw 'Player smoke did not register any managed script types.'
+    $smokeRows = @($stdout -split "`r?`n" | Where-Object { $_.StartsWith('[player.smoke] ') } | ForEach-Object { $_.Substring(15) | ConvertFrom-Json })
+    if ($smokeRows.Count -ne 1 -or $smokeRows[0].schemaVersion -ne 1 -or -not $smokeRows[0].ready -or $smokeRows[0].registeredScriptTypes -le 0) {
+        throw 'Player smoke lacks a valid managed runtime readiness result.'
     }
     $managedLifecycle = $false
     if ($Preflight.RequiresManagedLifecycle) {
@@ -1368,7 +1365,7 @@ function Invoke-PlayerSmoke {
         GameThreadFrames = $gameThreadFrames
         DisplayFrame = $displayFrame
         Promotions = $promotions
-        RegisteredScripts = [int]$scriptRegistration.Groups[1].Value
+        RegisteredScripts = [int]$smokeRows[0].registeredScriptTypes
         ManagedLifecycle = $managedLifecycle
         CatalogSource = 'cemf'
         MetaParsed = 0

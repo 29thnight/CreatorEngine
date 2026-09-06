@@ -1,3 +1,4 @@
+#include "EditorObjectOperations.h"
 #include "EditorMain.h"
 #include "ReflectionUndo.h"
 #include "CoreWindow.h"
@@ -224,11 +225,11 @@ void Editor::EditorMain::Initialize()
 			InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
 		if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
 		{
-			Meta::UndoManager::GetInstance()->Undo();
+			EditorObjectOperations::UndoRedo(false);
 		}
 		if (isPressedCtrl && InputManagement->IsKeyDown('Y'))
 		{
-			Meta::UndoManager::GetInstance()->Redo();
+			EditorObjectOperations::UndoRedo(true);
 		}
 
 		UIManagers->Update();

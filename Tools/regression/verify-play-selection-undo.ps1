@@ -1,4 +1,4 @@
-# Edit→Play→Stop 왕복에서 선택과 Undo가 어떻게 되는가 (E3-2+3 착수 전 필수 게이트)
+﻿# Edit→Play→Stop 왕복에서 선택과 Undo가 어떻게 되는가 (E3-2+3 착수 전 필수 게이트)
 #
 # 왜 필요한가
 # ───────────
@@ -60,7 +60,7 @@ try {
         # 방지 3 이 그것이 실제로 먹었는지를 여전히 단정한다.
         "object.create $undoProbe"
         "undo.state edit_pushed"           # 무의미성 방지: push가 실제로 먹었는가
-        "scene.select $selectTarget"
+        "scene.select `"$selectTarget`""
         "scene.selection edit_selected"    # 무의미성 방지: select가 실제로 먹었는가
         "play"
         "wait 5"
@@ -74,7 +74,7 @@ try {
     ))
 
     $process = Start-Process -FilePath $Exe `
-        -ArgumentList "--console", "--script", $commandFile `
+        -ArgumentList "--commandlet-script", $commandFile `
         -WorkingDirectory (Split-Path $Exe -Parent) `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     if (-not $process.WaitForExit(180000)) {

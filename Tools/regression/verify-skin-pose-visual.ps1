@@ -28,6 +28,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 
 if ([string]::IsNullOrEmpty($Exe)) {
@@ -60,7 +61,9 @@ function Invoke-Arm([string]$label, [string]$loadCmd, [string]$animatorPre, [str
         Replace('__ANIMATOR_POST__', $animatorPost) |
         Set-Content -LiteralPath $scenario -Encoding UTF8
 
-    $proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+    $resultPath = Join-Path $Work "skin_pose_visual_$label.results.jsonl"
+    if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+    $proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) `
         -WorkingDirectory $repoRoot -WindowStyle Hidden `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     if (-not $proc.WaitForExit($TimeoutSec * 1000)) {
@@ -68,33 +71,21 @@ function Invoke-Arm([string]$label, [string]$loadCmd, [string]$animatorPre, [str
         "[$label] $TimeoutSec 초 내에 끝나지 않았다."
         exit 1
     }
-    $log = Get-Content $stdout -Raw
-
+    if ($proc.ExitCode -ne 0) { throw "Skin pose $label exited $($proc.ExitCode)" }
+    $results = @(Read-CommandResults $resultPath)
+    $sceneData = Get-SucceededCommand $results 'dx12.scene'
+    $modelData = Get-SucceededCommand $results 'assets.modeldiag'
+    $animatorData = Get-SucceededCommand $results 'animator.status'
+    $bounds = Get-SucceededCommand $results 'experiment.skinbounds'
+    $animators = @($animatorData.animators | Where-Object name -eq $modelName)
+    if ($animators.Count -ne 1) { throw "Expected one animator for $modelName" }
+    $animator = $animators[0]
     $arm = [ordered]@{
-        label = $label
-        scenePass = ($log -match '\[CLI\] dx12\.scene 통과')
-        coverage = -1
-        tickNone = -1
-        path = ''
-        enabled = -1
-        palette = ''
-        ratio = -1.0
-        log = $stdout
+        label = $label; scenePass = $true; coverage = [int]$sceneData.coverage
+        tickNone = [int]$modelData.tickNone; path = $animator.path; enabled = [int]$animator.enabled
+        palette = $animator.palette; ratio = [double]$bounds.worstRatio; log = $stdout
+        draws = [int]$sceneData.draws; texturedDraws = [int]$sceneData.texturedDraws
     }
-    # 첫 매치가 [3/4] 씬 카메라 렌더의 커버리지다(vertex-live 와 같은 읽기).
-    if ($log -match '커버리지\s+(\d+)/65536') { $arm.coverage = [int]$Matches[1] }
-    # MBC10 — 틱 경로는 읽기 전용 스냅샷(assets.modeldiag)에서 읽는다.
-    if ($log -match 'assets\.modeldiag .* tickGeneration=(\d+) tickNone=(\d+)') { $arm.tickNone = [int]$Matches[2] }
-    if ($log -match 'animlive \S+ path=(\S+) enabled=(\d+) .* palette=([0-9A-F]{8})') {
-        $arm.path = $Matches[1]; $arm.enabled = [int]$Matches[2]; $arm.palette = $Matches[3]
-    }
-    if ($log -match 'skinbounds \w+ .* worstRatio=([0-9.]+)') { $arm.ratio = [double]$Matches[1] }
-    # 재질 축 — 드로우 수와 baseColor 를 가진 드로우 수. 스킨 메시의 임베디드
-    # 텍스처가 experiment 경로에서 빠지면 여기서 갈린다(legacy 드롭 10/10 vs
-    # experiment 8/10 — 2026-09-02 사용자 보고 "텍스처가 안 들어온다").
-    $arm.draws = -1; $arm.texturedDraws = -1
-    if ($log -match '\[3/4\] 씬 카메라 렌더 — 드로우\s+(\d+)') { $arm.draws = [int]$Matches[1] }
-    if ($log -match 'baseColor 있는 드로우 (\d+)') { $arm.texturedDraws = [int]$Matches[1] }
     return $arm
 }
 

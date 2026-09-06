@@ -121,8 +121,9 @@ namespace RenderTest
         }
     }
 
-    bool RunAssetSidecarSchemaSelfTest(const std::string& assetRoot, std::string& outLog)
+    bool RunAssetSidecarSchemaSelfTest(const std::string& assetRoot, std::string& outLog, AssetSidecarReport* report)
     {
+        if (report) *report = {};
         SidecarChecker check{ outLog };
         outLog += "[assets.sidecar] epoch header·stable key·sidecar schema v2 검사\n";
         g_factoryCounter = 0;
@@ -591,6 +592,16 @@ namespace RenderTest
                 if (modelOk) ++ok;
                 totalSub += sidecar.subAssets.size();
                 auto count = [&](K kind, assets::StableKeyOrigin origin) { return keys.CountOrigin(kind, origin); };
+                if (report)
+                {
+                    using O = assets::StableKeyOrigin;
+                    report->corpus.push_back({file, modelOk,
+                        count(K::Material, O::Semantic) + count(K::Material, O::Authoring), count(K::Material, O::Semantic), count(K::Material, O::Authoring),
+                        count(K::Texture, O::Semantic) + count(K::Texture, O::Authoring), count(K::Texture, O::Semantic), count(K::Texture, O::Authoring),
+                        count(K::Mesh, O::Semantic) + count(K::Mesh, O::Authoring),
+                        count(K::Skeleton, O::Semantic) + count(K::Skeleton, O::Authoring),
+                        count(K::Animation, O::Semantic) + count(K::Animation, O::Authoring)});
+                }
                 char line[512];
                 std::snprintf(line, sizeof(line),
                     "    sidecar %s ok=%d mat=%zu(sem %zu/auth %zu) tex=%zu(sem %zu/auth %zu) mesh=%zu(sem %zu/auth %zu) skel=%zu anim=%zu(sem %zu/auth %zu) issues=%zu\n",
@@ -615,12 +626,14 @@ namespace RenderTest
             std::vector<std::string> bijection;
             check.Check(global.VerifyBijection(bijection), "전 corpus registry bijection ("
                 + std::to_string(bijection.size()) + " issues)");
+            if (report) { report->models = models; report->modelsPassed = ok; report->subAssets = totalSub; report->registry = global.Size(); }
             outLog += "    corpus models=" + std::to_string(models) + " ok=" + std::to_string(ok)
                 + " subassets=" + std::to_string(totalSub) + " registry=" + std::to_string(global.Size()) + "\n";
         }
 
         outLog += "  단정 " + std::to_string(check.passed + check.failed) + "건 중 통과 "
             + std::to_string(check.passed) + " · 실패 " + std::to_string(check.failed) + "\n";
+        if (report) { report->passed = check.passed; report->failed = check.failed; }
         return check.failed == 0;
     }
 }

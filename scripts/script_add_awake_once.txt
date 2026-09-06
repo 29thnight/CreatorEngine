@@ -63,6 +63,7 @@ wait 5
 script.add ScriptAddRegressionTarget NoSuchScriptType_C2_2_Regression
 wait 20
 
+script.status
 lifecycle.trace status
 lifecycle.dump script_add_awake_once_trace.tsv
 log.flush

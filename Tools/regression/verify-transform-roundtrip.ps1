@@ -106,7 +106,7 @@ $scenario = Join-Path $Work "transform_roundtrip_resolved.txt"
 $outFile = Join-Path $Work "transform_roundtrip.out"
 $errFile = Join-Path $Work "transform_roundtrip.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null

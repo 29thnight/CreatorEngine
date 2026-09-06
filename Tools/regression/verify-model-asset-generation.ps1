@@ -104,7 +104,7 @@ createdAt: 2026-09-02T00:00:00Z
         [Text.UTF8Encoding]::new($false))
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $Editor
-    $start.Arguments = '--script "' + $scenario.Replace('"', '\"') + '"'
+    $start.Arguments = '--commandlet-script "' + $scenario.Replace('"', '\"') + '"'
     $start.WorkingDirectory = $root
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true

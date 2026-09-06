@@ -146,9 +146,9 @@ try {
     if ($wrongRole.Count -gt 0) {
         $failures.Add("player-registry : roles 에 Player 가 없는 명령이 등록돼 있다: $(($wrongRole | ForEach-Object { $_.name }) -join ', ')")
     }
-    if ($commands.count -lt 3) {
-        # 표가 비다시피 하면 아래 검사가 전부 "없어서 통과" 가 된다.
-        $failures.Add("player-registry : 등록된 명령이 $($commands.count) 개뿐이다 — 표가 서지 않았고 아래 검사가 공허해진다")
+    $expectedNames = @('help','quit','player.status','player.scene','player.objects','player.object','player.move') | Sort-Object
+    if (@(Compare-Object $expectedNames $names).Count -ne 0 -or $commands.count -ne $expectedNames.Count) {
+        $failures.Add("Player discovery differs from the supported command contract: $($names -join ',')")
     }
 
     # ── ③ 상태를 읽는다 ────────────────────────────────────────────────

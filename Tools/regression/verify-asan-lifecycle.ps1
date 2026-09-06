@@ -95,7 +95,7 @@ $outLog = Join-Path $Work "asan_lifecycle.out"
 $errLog = Join-Path $Work "asan_lifecycle.err"
 
 "=== ASan 수명 스트레스 ($SceneA <-> $SceneB) ==="
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $scenario) `
     -WorkingDirectory $exeDir -RedirectStandardOutput $outLog -RedirectStandardError $errLog `
     -PassThru
 

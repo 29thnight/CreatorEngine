@@ -43,11 +43,13 @@ New-Item -ItemType Directory -Force -Path $Work | Out-Null
 $endpointPath = Join-Path $repoRoot 'Dynamic_CPP\Library\CommandService\endpoint.json'
 $failures = New-Object System.Collections.Generic.List[string]
 
+if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) { throw 'Close the existing editor before running this isolated gate.' }
+$script:gateProcesses = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 function Stop-AllEditors {
-    Get-Process CreatorEditor -ErrorAction SilentlyContinue | ForEach-Object {
-        try { $_.Kill(); $_.WaitForExit(15000) | Out-Null } catch { }
+    foreach ($owned in $script:gateProcesses) {
+        try { if (-not $owned.HasExited) { $owned.Kill(); $owned.WaitForExit(15000) | Out-Null } } catch { }
     }
-    if (Test-Path -LiteralPath $endpointPath) { Remove-Item -LiteralPath $endpointPath -Force }
+    $script:gateProcesses.Clear()
 }
 
 # 에디터를 띄우고 endpoint 가 우리 프로세스의 것으로 확정될 때까지 기다린다.
@@ -61,9 +63,10 @@ function Start-Editor {
                     else             { @('--command-service') }
 
     $started = Start-Process -FilePath $Exe -ArgumentList $argumentList `
-        -WorkingDirectory $exeDir `
+        -WorkingDirectory $exeDir -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $Work "$Tag.out") `
         -RedirectStandardError  (Join-Path $Work "$Tag.err") -PassThru
+    $script:gateProcesses.Add($started)
 
     $waitUntil = (Get-Date).AddSeconds($BootTimeoutSec)
     while ((Get-Date) -lt $waitUntil) {
@@ -307,6 +310,30 @@ finally { Stop-AllEditors }
 #   재현 조건을 만든다: 드레인 예산을 0 으로 두면 async 로 넣은 operation 이
 #   영원히 `queued` 로 남고, 그 위의 스트림은 완료를 못 본다. 그 상태에서
 #   창을 닫고 프로세스가 실제로 언제 사라지는지 잰다.
+# CloseMainWindow ignores hidden windows. Target only this gate's PID and engine window class.
+Add-Type -TypeDefinition @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class CommandGateWindow {
+    private delegate bool EnumProc(IntPtr window, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc callback, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder text, int count);
+    [DllImport("user32.dll", SetLastError=true)] private static extern bool PostMessage(IntPtr window, uint message, IntPtr wparam, IntPtr lparam);
+    public static bool Close(int processId) {
+        IntPtr target = IntPtr.Zero;
+        EnumWindows((window, parameter) => {
+            uint owner; GetWindowThreadProcessId(window, out owner);
+            if (owner != (uint)processId) return true;
+            var name = new StringBuilder(128); GetClassName(window, name, name.Capacity);
+            if (name.ToString() != "CoreWindowApp") return true;
+            target = window; return false;
+        }, IntPtr.Zero);
+        return target != IntPtr.Zero && PostMessage(target, 0x0010, IntPtr.Zero, IntPtr.Zero);
+    }
+}
+"@
 $ShutdownBudgetSec = 25
 $life = Start-Editor -Tag 'shutdown' -WithConsole
 if ($null -eq $life) {
@@ -338,7 +365,7 @@ else {
             Start-Sleep -Milliseconds 700   # 작업 스레드가 루프에 들어갈 시간
 
             $sw = [Diagnostics.Stopwatch]::StartNew()
-            $asked = $lifeProc.CloseMainWindow()
+            $asked = [CommandGateWindow]::Close($lifeProc.Id)
             if (-not $asked) {
                 # 종료 경로를 못 잡았으면 **통과로 처리하지 않는다.** 여기서
                 # 조용히 넘어가면 이 검사는 아무것도 지키지 않는 채 초록이 된다.

@@ -167,6 +167,14 @@ bool TagManager::Save()
 // 부재로 에디터 전용이다 — 호출자는 Inspector와 에디터 CLI뿐이고 Player는
 // 그 층(EngineEntry·EngineGUIWindow)을 링크하지 않는다. Load는 이 경로를
 // 거치지 않고 컨테이너를 직접 채운다.
+void TagManager::SetTagDefinitions(const std::vector<std::string>& tags)
+{
+    std::unordered_map<std::string, size_t> indices;
+    for (size_t index = 0; index < tags.size(); ++index) indices.emplace(tags[index], index);
+    m_tags = tags;
+    m_tagMap = std::move(indices);
+}
+
 void TagManager::AddTag(std::string_view tag)
 {
 	if (tag.empty() || tag == "Untagged")

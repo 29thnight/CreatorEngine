@@ -1,24 +1,9 @@
 {
   "schema": "lc9-consumer-ratchet/1",
-  "recorded": "2026-09-05",
-  "maxVerdictParsers": 14,
+  "recorded": "2026-09-06",
+  "maxVerdictParsers": 0,
   "note": "자동화 소비자가 사람용 판정 문자열(통과·실패·완료·어서션·무판정)을 매칭 문맥에서 읽는 파일의 상한. 주석은 세지 않는다 - 고칠 수 없는 것(설명)을 눈금에 넣으면 래칫이 0 에 닿지 못한다. 늘면 붉어지고, 소비자를 --result-format jsonl 로 옮길 때마다 -UpdateRatchet 으로 내린다. §18: '자동화 consumer 가 source/help/한국어 verdict 문자열을 파싱하지 않는다'.",
-  "files": [
-    "Tools/build.ps1",
-    "Tools/dx12-validation/Invoke-DX12Validation.ps1",
-    "Tools/regression/lc0-static-inventory.ps1",
-    "Tools/regression/run-all.ps1",
-    "Tools/regression/verify-asset-identity.ps1",
-    "Tools/regression/verify-asset-sidecar-v2.ps1",
-    "Tools/regression/verify-crash-dump.ps1",
-    "Tools/regression/verify-experiment-ft-primitives.ps1",
-    "Tools/regression/verify-light-slot-restore.ps1",
-    "Tools/regression/verify-model-cutover-budget.ps1",
-    "Tools/regression/verify-model-render-wiring.ps1",
-    "Tools/regression/verify-model-scene-consumption.ps1",
-    "Tools/regression/verify-script-add-awake-once.ps1",
-    "Tools/regression/verify-skin-pose-visual.ps1"
-  ],
+  "files": [],
   "history": [
     {
       "date": "2026-09-05",

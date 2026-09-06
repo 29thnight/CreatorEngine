@@ -1,4 +1,4 @@
-#include "EditorCommandServiceHost.h"
+﻿#include "EditorCommandServiceHost.h"
 
 #include "ConsoleCommandSystem.h"
 #include "CommandCore/CommandRegistry.h"
@@ -11,9 +11,12 @@
 #include "CommandResultJson.h"   // LC9: 변환·봉투의 단일 정본
 
 #include <atomic>
+#include <algorithm>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <sstream>
+#include <cmath>
 
 namespace EditorCommandService
 {
@@ -41,7 +44,6 @@ namespace EditorCommandService
             switch (status)
             {
             case CommandCore::CommandStatus::Succeeded:           return 200;
-            case CommandCore::CommandStatus::LegacyUnreported:    return 200;
             case CommandCore::CommandStatus::Failed:              return 200;
             case CommandCore::CommandStatus::InvalidArguments:    return 400;
             case CommandCore::CommandStatus::PreconditionsFailed: return 409;
@@ -70,12 +72,123 @@ namespace EditorCommandService
             object.Set("liveness",      JV::String(std::string(CommandCore::ToString(d.liveness))));
             object.Set("userCode",      JV::Bool(d.executesUserCode));
             object.Set("resultBearing", JV::Bool(d.resultBearing));
+            object.Set("undoable", JV::Bool(d.undoable));
+            if (d.hasNamedInput)
+            {
+                JV schema = JV::Object(), properties = JV::Object(), required = JV::Array();
+                schema.Set("type", JV::String("object"));
+                for (const auto& parameter : d.namedParameters)
+                {
+                    JV field = JV::Object();
+                    if (parameter.kind == "vec3")
+                    {
+                        field.Set("type", JV::String("array")); field.Set("minItems", JV::Int(3)); field.Set("maxItems", JV::Int(3));
+                        JV item = JV::Object(); item.Set("type", JV::String("number")); field.Set("items", std::move(item));
+                    }
+                    else if (parameter.kind == "value")
+                    {
+                        JV kinds = JV::Array();
+                        for (auto kind : {"string", "number", "boolean", "array"}) kinds.Append(JV::String(kind));
+                        field.Set("type", std::move(kinds));
+                        JV item = JV::Object(); item.Set("type", JV::String("number")); field.Set("items", std::move(item));
+                        field.Set("minItems", JV::Int(2)); field.Set("maxItems", JV::Int(4));
+                    }
+                    else
+                    {
+                        field.Set("type", JV::String(parameter.kind));
+                        if (parameter.kind == "string" && !parameter.optional) field.Set("minLength", JV::Int(1));
+                    }
+                    if (parameter.optional && parameter.kind == "string") field.Set("default", JV::String(parameter.defaultValue));
+                    if (parameter.optional && parameter.kind == "integer") field.Set("default", JV::Int(std::stoll(parameter.defaultValue)));
+                    properties.Set(parameter.name, std::move(field));
+                    if (!parameter.optional) required.Append(JV::String(parameter.name));
+                }
+                schema.Set("properties", std::move(properties));
+                schema.Set("required", std::move(required));
+                schema.Set("additionalProperties", JV::Bool(false));
+                object.Set("inputSchema", std::move(schema));
+            }
             return object;
         }
 
         class EditorGateway final : public CommandService::ICommandGateway
         {
         public:
+            bool BuildNamedArguments(const std::string& command, const CommandService::JsonValue& parameters,
+                                     std::vector<std::string>& arguments, std::string& error) override
+            {
+                using JV = CommandService::JsonValue;
+                const auto* descriptor = CommandCore::CommandRegistry::Get().Find(command);
+                if (!descriptor || !descriptor->hasNamedInput || parameters.GetKind() != JV::Kind::Object)
+                {
+                    error = "This command requires a supported named parameter object";
+                    return false;
+                }
+                const auto& parametersSpec = descriptor->namedParameters;
+                for (const auto& field : parameters.Fields())
+                    if (std::none_of(parametersSpec.begin(), parametersSpec.end(), [&](const auto& p) { return p.name == field.first; }))
+                    { error = "Unknown parameter: " + field.first; return false; }
+                const auto isNumber = [](const JV& value) { return value.GetKind() == JV::Kind::Int || value.GetKind() == JV::Kind::Double; };
+                for (const auto& parameter : parametersSpec)
+                {
+                    const auto* value = parameters.Find(parameter.name);
+                    if (!value)
+                    {
+                        if (!parameter.optional) { error = "Missing parameter: " + parameter.name; return false; }
+                        if (parameter.kind == "vec3")
+                        {
+                            std::istringstream defaults(parameter.defaultValue); std::string number;
+                            while (defaults >> number) arguments.push_back(number);
+                        }
+                        else arguments.push_back(parameter.defaultValue);
+                        continue;
+                    }
+                    bool valid = true;
+                    if (parameter.kind == "string")
+                    {
+                        valid = value->GetKind() == JV::Kind::String && value->AsString().find('\0') == std::string::npos
+                            && (parameter.optional || !value->AsString().empty());
+                        if (valid) arguments.push_back(value->AsString());
+                    }
+                    else if (parameter.kind == "integer")
+                    {
+                        if (value->GetKind() == JV::Kind::Int) arguments.push_back(value->Serialize());
+                        else if (value->GetKind() == JV::Kind::Double)
+                        {
+                            const double number = value->AsDouble();
+                            valid = std::isfinite(number) && std::trunc(number) == number && number >= -9223372036854775808.0 && number < 9223372036854775808.0;
+                            if (valid) arguments.push_back(std::to_string(static_cast<int64_t>(number)));
+                        }
+                        else valid = false;
+                    }
+                    else if (parameter.kind == "number")
+                    { valid = isNumber(*value); if (valid) arguments.push_back(value->Serialize()); }
+                    else if (parameter.kind == "vec3")
+                    {
+                        valid = value->GetKind() == JV::Kind::Array && value->Items().size() == 3;
+                        if (valid) for (const auto& number : value->Items())
+                        { if (!isNumber(number)) { valid = false; break; } arguments.push_back(number.Serialize()); }
+                    }
+                    else if (parameter.kind == "value")
+                    {
+                        if (value->GetKind() == JV::Kind::String)
+                        { valid = value->AsString().find('\0') == std::string::npos; if (valid) arguments.push_back(value->AsString()); }
+                        else if (isNumber(*value) || value->GetKind() == JV::Kind::Bool) arguments.push_back(value->Serialize());
+                        else if (value->GetKind() == JV::Kind::Array && value->Items().size() >= 2 && value->Items().size() <= 4)
+                        {
+                            std::string joined;
+                            for (const auto& number : value->Items())
+                            { if (!isNumber(number)) { valid = false; break; } if (!joined.empty()) joined += ' '; joined += number.Serialize(); }
+                            if (valid) arguments.push_back(std::move(joined));
+                        }
+                        else valid = false;
+                    }
+                    else valid = false;
+                    if (!valid) { error = "Invalid " + parameter.kind + " parameter: " + parameter.name; return false; }
+                }
+                return true;
+            }
+
             CommandService::CommandOutcome Execute(const std::vector<std::string>& arguments,
                                                    int timeoutMs) override
             {

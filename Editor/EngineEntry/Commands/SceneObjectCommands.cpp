@@ -1,3 +1,4 @@
+#include "../EditorDiagnostics.h"
 // LC6 (PHASE 14.5) — SceneObject 도메인 명령.
 //
 // `object.*` · `scene.*` · `prefab.*` · `component.*` · `camera.*` · `undo.*` ·
@@ -18,8 +19,8 @@
 
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
+#include "EditorObjectOperations.h"
 
-#include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
@@ -116,13 +117,9 @@
 #include "ShaderMeta.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
-#include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -142,6 +139,8 @@
 #include <limits>
 #include <random>
 #include <stdexcept>
+#include <charconv>
+#include <cmath>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -161,167 +160,8 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-
-namespace
-{
-    // "1,2,3" 또는 "1 2 3"을 성분으로 쪼갠다. 두 형태를 다 받는 이유는
-    // 벡터를 한 토큰으로 쓰는 편이 스크립트에서 읽기 쉽지만, 손으로 칠 때는
-    // 공백이 더 자연스러워서다.
-    std::vector<float> ParseNumbers(const std::string& raw)
-    {
-        std::vector<float> numbers;
-        std::string buffer = raw;
-        for (char& c : buffer) { if (',' == c) c = ' '; }
-
-        std::istringstream iss(buffer);
-        float value = 0.f;
-        while (iss >> value) numbers.push_back(value);
-        return numbers;
-    }
-
-    float NumberAt(const std::vector<float>& numbers, size_t index, float fallback)
-    {
-        return (index < numbers.size()) ? numbers[index] : fallback;
-    }
-
-    // ★ LC6: `object.property` 전용 반사 헬퍼라 함께 옮겨 왔다.
-    // 리플렉션으로 프로퍼티 하나를 설정한다.
-    //
-    // 인스펙터(ReflectionImGuiHelper)가 하는 일과 같은 목록을 훑는다. 컴포넌트마다
-    // 전용 CLI를 만들지 않는 이유가 그것이다 — 종류가 늘 때마다 두 곳을 고치게 된다.
-    //
-    // 부모 타입까지 올라간다. 컴포넌트 프로퍼티는 상속 계층에 흩어져 있고
-    // (m_isEnabled는 Component에, m_lightType은 LightComponent에) 인스펙터도
-    // 재귀로 훑는다.
-    bool ApplyReflectedProperty(void* instance, const Meta::Type* type,
-        const std::string& field, const std::string& raw)
-    {
-        if (nullptr == type) return false;
-
-        for (const auto& prop : type->properties)
-        {
-            if (nullptr == prop.name || field != prop.name) continue;
-            if (!prop.setter) return false;
-
-            const HashedGuid hash = prop.typeID;
-            const auto numbers = ParseNumbers(raw);
-
-            if (hash == GUIDCreator::GetTypeID<float>())
-            {
-                prop.setter(instance, NumberAt(numbers, 0, 0.f));
-                return true;
-            }
-            if (hash == GUIDCreator::GetTypeID<int>())
-            {
-                prop.setter(instance, static_cast<int>(NumberAt(numbers, 0, 0.f)));
-                return true;
-            }
-            if (hash == GUIDCreator::GetTypeID<unsigned int>() || prop.typeName == "UINT")
-            {
-                prop.setter(instance, static_cast<unsigned int>(NumberAt(numbers, 0, 0.f)));
-                return true;
-            }
-            if (hash == GUIDCreator::GetTypeID<bool>() || prop.typeName == "bool32")
-            {
-                prop.setter(instance, raw == "true" || raw == "1");
-                return true;
-            }
-            if (hash == GUIDCreator::GetTypeID<std::string>())
-            {
-                prop.setter(instance, raw);
-                return true;
-            }
-            // ★ 자산 참조(FileGuid) — 2026-08-20 추가.
-            //
-            // 없는 동안 **CLI로는 자산을 참조하는 컴포넌트를 저작할 수 없었다.**
-            // BehaviorTreeComponent의 m_BehaviorTreeGuid·m_BlackBoardGuid가 그렇고
-            // (실측: "지원하지 않는 프로퍼티 타입 ... (FileGuid)" -> 트리 0개),
-            // 머티리얼·메시 참조도 같은 타입이다. 즉 BT만의 문제가 아니라 자산을
-            // 가리키는 모든 필드에 걸리던 구멍이다.
-            //
-            // FileGuid는 문자열 생성자를 갖고(TypeTrait.h) FromString은 못 읽으면
-            // 던진다 — 잘못된 값을 조용히 널 guid로 삼키지 않도록 여기서 잡아
-            // 실패로 돌려준다(널 guid는 "자산 없음"이라 조용히 넘기면 컴포넌트가
-            // 초기화에 실패하고 그 이유가 로그에 안 남는다).
-            if (prop.typeName == "FileGuid")
-            {
-                try
-                {
-                    prop.setter(instance, FileGuid(raw));
-                    return true;
-                }
-                catch (const std::exception&)
-                {
-                    std::printf("[CLI] guid 형식이 아니다: %s = '%s'\n",
-                        prop.name, raw.c_str());
-                    return false;
-                }
-            }
-            if (hash == GUIDCreator::GetTypeID<math::vector2>())
-            {
-                prop.setter(instance, math::vector2{
-                    NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f) });
-                return true;
-            }
-            if (hash == GUIDCreator::GetTypeID<math::vector3>())
-            {
-                prop.setter(instance, math::vector3{
-                    NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f),
-                    NumberAt(numbers, 2, 0.f) });
-                return true;
-            }
-            if (hash == GUIDCreator::GetTypeID<math::vector4>())
-            {
-                prop.setter(instance, math::vector4{
-                    NumberAt(numbers, 0, 0.f), NumberAt(numbers, 1, 0.f),
-                    NumberAt(numbers, 2, 0.f), NumberAt(numbers, 3, 1.f) });
-                return true;
-            }
-            if (hash == GUIDCreator::GetTypeID<math::color>())
-            {
-                prop.setter(instance, math::color{
-                    NumberAt(numbers, 0, 1.f), NumberAt(numbers, 1, 1.f),
-                    NumberAt(numbers, 2, 1.f), NumberAt(numbers, 3, 1.f) });
-                return true;
-            }
-
-            // 열거형은 이름으로도 숫자로도 받는다. 이름 쪽이 스크립트를 읽을 때
-            // 무슨 뜻인지 바로 보인다(Directional vs 0). 열거형 점검(8-17):
-            // 이름 키 등록소 조회 → 프로퍼티가 직접 든 enum 표. 등록 안 된
-            // 열거형이 조용히 "지원하지 않는 타입"으로 빠지던 구멍도 함께 닫힌다.
-            if (const Meta::EnumType* enumType = prop.enumType)
-            {
-                for (const auto& entry : enumType->values)
-                {
-                    if (nullptr != entry.name && raw == entry.name)
-                    {
-                        prop.setter(instance, entry.value);
-                        return true;
-                    }
-                }
-
-                if (!numbers.empty())
-                {
-                    prop.setter(instance, static_cast<int>(numbers[0]));
-                    return true;
-                }
-            }
-
-            std::printf("[CLI] 지원하지 않는 프로퍼티 타입: %s (%s)\n",
-                prop.name, prop.typeName.c_str());
-            return false;
-        }
-
-        return ApplyReflectedProperty(instance, type->parent, field, raw);
-    }
-
-    bool ApplyReflectedProperty(Component* component, const std::string& field,
-        const std::string& raw)
-    {
-        if (nullptr == component) return false;
-        return ApplyReflectedProperty(component, Meta::Find(component->GetTypeID().m_ID_Data), field, raw);
-    }
-}
+#include <charconv>
+#include <cmath>
 
 namespace ConsoleCmd
 {
@@ -421,24 +261,26 @@ namespace ConsoleCmd
         return CommandCore::Ok("scene.ddol 지정: " + name, std::move(data));
     }
 
-	static void Cmd_ai_status(const ConsoleCommandContext& ctx)
-	{
-		const size_t total = AIManagers->GetRegisteredAIComponentCount();
-		if (ctx.parts.size() < 2)
-		{
-			std::printf("[AI 레지스트리] total=%zu\n", total);
-			return;
-		}
-
-		Scene* scene = SceneManagers->GetActiveScene();
-		Entity* object = scene ? scene->GetEntity(ctx.parts[1]) : nullptr;
-		StateMachineComponent* component = object
-			? object->GetComponent<StateMachineComponent>() : nullptr;
-		const bool registered = AIManagers->IsAIComponentRegistered(component);
-		std::printf("[AI 레지스트리] object=%s registered=%d total=%zu scene=%u\n",
-			ctx.parts[1].c_str(), registered ? 1 : 0, total,
-			scene ? scene->GetSceneId() : 0u);
-	}
+    static CommandCore::CommandResult Cmd_ai_status(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("ai.status [object]");
+        auto data = CommandData::Object();
+        data.Set("total", CommandData::Int(AIManagers->GetRegisteredAIComponentCount()));
+        if (ctx.parts.size() == 2)
+        {
+            EntityHandle target;
+            auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+            if (!result.IsSuccess()) return result;
+            auto* scene = SceneManagers->GetActiveScene();
+            auto* object = scene ? scene->Resolve(target) : nullptr;
+            auto* component = object ? object->GetComponent<StateMachineComponent>() : nullptr;
+            data.Set("id", CommandData::String(EditorObjectOperations::ObjectId(target)));
+            data.Set("registered", CommandData::Bool(AIManagers->IsAIComponentRegistered(component)));
+            data.Set("hasComponent", CommandData::Bool(component != nullptr));
+        }
+        return Ok({}, std::move(data));
+    }
 
     static CommandCore::CommandResult Cmd_scene_new(const ConsoleCommandContext& ctx)
     {
@@ -526,416 +368,93 @@ namespace ConsoleCmd
         return CommandCore::Ok("씬 저장: " + path, std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_object_properties(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("object.properties <target> <component>");
+        EntityHandle target;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        return result.IsSuccess() ? EditorObjectOperations::Properties(target, ctx.parts[2]) : result;
+    }
+
+    static CommandCore::CommandResult Cmd_object_delete(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("object.delete <target>");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        return EditorObjectOperations::Delete(target);
+    }
+
+    static CommandCore::CommandResult Cmd_component_remove(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("component.remove <target> <component>");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        return EditorObjectOperations::RemoveComponent(target, ctx.parts[2]);
+    }
+
     static CommandCore::CommandResult Cmd_object_create(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        if (parts.size() < 2)
-        {
-            std::printf("[CLI] 사용법: object.create <이름> [Empty|Light|Camera|Mesh|UI|Canvas]\n");
-            return CommandCore::InvalidArguments("object.create: 인자가 올바르지 않다");
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene)
-        {
-            std::printf("[CLI] 활성 씬 없음\n");
-            return CommandCore::PreconditionFailed("object.create.no_scene", "활성 씬이 없다");
-        }
-
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return CommandCore::InvalidArguments("object.create <name> [type]");
         GameObjectType type = GameObjectType::Empty;
-        std::string name = parts[1];
-        if (parts.size() > 2)
+        if (ctx.parts.size() == 3)
         {
-            const std::string& typeName = parts[2];
-            if (typeName == "Light")       type = GameObjectType::Light;
-            else if (typeName == "Camera") type = GameObjectType::Camera;
-            else if (typeName == "Mesh")   type = GameObjectType::Mesh;
-            // ★ UI·Canvas 추가 (2026-08-20, 자산·게이트 CLI 이전).
-            //
-            // 이 둘이 없어 **CLI로는 UI 오브젝트를 아예 저작할 수 없었다.**
-            // RectTransformComponent는 손으로 붙일 수 없고(ComponentFactory가
-            // 의도적으로 목록에서 뺀다 — 3D 오브젝트에 붙으면 UI 레이아웃 순회에
-            // 끼어들어 자식에게 스크린 좌표계를 조용히 전파한다), 그 부착은
-            // GameObject::AttachSpatialComponent가 **오브젝트 타입으로** 정한다:
-            // UI는 rect만, Canvas는 rect와 Transform 둘 다, 나머지는 Transform만.
-            //
-            // 즉 타입을 못 주면 rect가 없는 오브젝트만 만들 수 있고, ui.rect·
-            // ui.hitbox가 전부 "RectTransform 없음"으로 떨어진다(실측). ui.* 명령은
-            // 관측·설정이지 **생성이 아니다** — §0.05의 "CLI 저작 표면은 이미 서
-            // 있다"가 UI에 대해서는 성립하지 않았다.
-            //
-            // 해상도 스윕 게이트 이전과 verify-authored-rects의 후계가 **둘 다**
-            // 이 능력을 선행으로 요구한다.
-            else if (typeName == "UI")     type = GameObjectType::UI;
-            else if (typeName == "Canvas") type = GameObjectType::Canvas;
-            else if (typeName != "Empty")
-            {
-                std::printf("[CLI] 알 수 없는 오브젝트 타입: %s\n", typeName.c_str());
-                return CommandCore::InvalidArguments("object.create: 알 수 없는 오브젝트 타입");
-            }
+            const auto& name = ctx.parts[2];
+            if (name == "Light") type = GameObjectType::Light;
+            else if (name == "Camera") type = GameObjectType::Camera;
+            else if (name == "Mesh") type = GameObjectType::Mesh;
+            else if (name == "UI") type = GameObjectType::UI;
+            else if (name == "Canvas") type = GameObjectType::Canvas;
+            else if (name != "Empty") return CommandCore::InvalidArguments("Unknown object type");
         }
-
-        // ★ 2026-09-05 — Undo 를 남긴다. 예전에는 `scene->CreateEntity` 를 직접
-        //   불렀고, 그래서 사람이 GUI 로 만든 오브젝트는 Ctrl+Z 로 지워지는데
-        //   에이전트가 HTTP 로 만든 것은 남았다. GUI 가 쓰던 command 를 이제
-        //   CLI 도 쓴다(`HierarchyWindow` 와 같은 것).
-        //
-        // ★★ **부모 인덱스는 바뀌지 않는다.** 예전 호출은 3번째 인자를 생략해
-        //   `parentIndex = -1` 이었고 `CreateEntityCommand` 의 기본값은 `0` 이라
-        //   갈리는 것처럼 보이지만, `Scene::CreateEntity` 안의
-        //   `parentIndex >= m_Entities.size()` 폴백이 둘을 만나게 한다 —
-        //   `Entity::Index` 는 unsigned 라 `-1` 이 `INVALID_INDEX` 가 되고,
-        //   그 값은 언제나 size 보다 크므로 `kSceneRootIndex(0)` 로 정규화된다.
-        //   조사 단계에서 이 자리를 "거동이 갈린다" 로 적었는데, 폴백을 읽지 않은
-        //   판단이었다. 실측으로도 확인했다(아래 회귀).
-        auto command = std::make_unique<Meta::CreateEntityCommand>(scene, name, type);
-        Meta::CreateEntityCommand* created = command.get();
-        Meta::UndoManager::GetInstance()->Execute(std::move(command));
-
-        if (!Entity::IsValidIndex(created->GetCreatedIndex()))
-        {
-            std::printf("[CLI] 오브젝트 생성 실패: %s\n", name.c_str());
-            return CommandCore::Fail("object.create.create_failed", "오브젝트를 만들지 못했다");
-        }
-
-        Debug->LogWarning("[CLI] 오브젝트 생성: " + name);
-        std::printf("[CLI] 오브젝트 생성: %s\n", name.c_str());
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("name", CommandCore::CommandData::String(name));
-        data.Set("index", CommandCore::CommandData::Int(
-            static_cast<int64_t>(created->GetCreatedIndex())));
-        return CommandCore::Ok("오브젝트 생성: " + name, std::move(data));
+        return EditorObjectOperations::Create(SceneManagers->GetActiveScene(), ctx.parts[1], type);
     }
 
     static CommandCore::CommandResult Cmd_object_rename(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
+        if (ctx.parts.size() != 3)
+            return CommandCore::InvalidArguments("object.rename <name-or-id> <new-name>; quote names with spaces");
+        EntityHandle target;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (result.status != CommandCore::CommandStatus::Succeeded) return result;
+        return EditorObjectOperations::Rename(target, ctx.parts[2]);
+    }
 
-        // 같은 모델을 여러 번 배치하면 이름이 겹쳐 이후 명령이 첫 번째만 잡는다.
-        // 하나 놓고 바로 이름을 바꾸면 그 문제가 없다.
-        if (parts.size() < 3)
-        {
-            std::printf("[CLI] 사용법: object.rename <이전 이름> <새 이름>\n");
-            return CommandCore::InvalidArguments("object.rename: 인자가 올바르지 않다");
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene)
-        {
-            std::printf("[CLI] 활성 씬 없음\n");
-            return CommandCore::PreconditionFailed("object.rename.no_scene", "활성 씬이 없다");
-        }
-
-        // 이전 이름에 공백이 흔하다. 같은 모델을 두 번 놓으면 엔진이
-        // "Prim_Cube (1)"처럼 번호를 붙이기 때문이다. 그래서 새 이름을 마지막
-        // 토큰으로 보고 그 앞 전체를 이전 이름으로 본다(prefab.create와 같은 규칙).
-        const auto names = CommandCore::SplitTrailingName(parts, 1);
-        const std::string& oldName = names.leading;
-        const std::string& newName = names.trailing;
-
-        auto object = scene->GetEntity(oldName);
-        if (!object)
-        {
-            Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + oldName);
-            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", oldName.c_str());
-            return CommandCore::Fail("object.rename.not_found", "오브젝트가 없다");
-        }
-
-        object->m_name = newName;
-        Debug->LogWarning("[CLI] 이름 변경: " + oldName + " -> " + newName);
-        std::printf("[CLI] 이름 변경: %s -> %s\n", oldName.c_str(), newName.c_str());
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("from", CommandCore::CommandData::String(oldName));
-        data.Set("to", CommandCore::CommandData::String(newName));
-        return CommandCore::Ok("이름 변경: " + oldName + " -> " + newName, std::move(data));
+    static CommandCore::CommandResult Cmd_object_describe(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("object.describe <name-or-id>");
+        EntityHandle target;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (result.status != CommandCore::CommandStatus::Succeeded) return result;
+        return EditorObjectOperations::Describe(target);
     }
 
     static CommandCore::CommandResult Cmd_scene_hierarchycheck(const ConsoleCommandContext& ctx)
     {
-        (void)ctx;
-
-        // scene.hierarchycheck — 계층 표기의 불변식을 잰다.
-        //
-        // 재는 불변식은 하나다:
-        //
-        //     자식이 부모의 m_childrenIndices에 실려 있다  <=>  자식의 m_parentIndex가 그 부모다
-        //
-        // 이 쌍이 깨지면 순회(m_Entities[0]->m_childrenIndices에서만 내려간다)가
-        // 서브트리를 통째로 빠뜨리는데 에러도 로그도 없다 — 뼈 61개가 그렇게
-        // 순회 밖에 있었다.
-        //
-        // 최상위 오브젝트의 표기가 갈려 있는 것이 그 뿌리다(SceneGraphRedesignPlan
-        // 트랙 E). 같은 뜻인데 두 값이 쓰인다:
-        //   · Entity::AddChild            -> m_parentIndex = 부모 인덱스(루트면 0)
-        //   · Scene::AttachExistingEntity / DDOL 이탈 -> INVALID_INDEX(-1)
-        // 둘 다 씬 루트의 children에는 들어가므로, "-1인데 루트 children에 있음"이
-        // 정상처럼 보인다. 그 상태를 세는 것이 topLevelInvalid다.
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene)
-        {
-            std::printf("[CLI] 활성 씬 없음\n");
-            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
-        }
-
-        const auto& objects = scene->m_Entities;
-
-        size_t total = 0;
-        size_t topLevelRoot = 0;      // 최상위인데 m_parentIndex == 0 (쌍이 맞는 표기)
-        size_t topLevelInvalid = 0;   // 최상위인데 m_parentIndex == INVALID (쌍이 어긋난 표기)
-        size_t pairMismatch = 0;      // 부모의 children에 있는데 m_parentIndex가 그 부모가 아님
-        size_t orphan = 0;            // 아무의 children에도 없음(씬 루트 제외)
-        size_t unreachable = 0;       // 씬 루트에서 children만 따라 내려가 닿지 못함
-
-        // 어느 부모의 children에 실려 있는지 역인덱스를 만든다.
-        std::unordered_map<Entity::Index, Entity::Index> listedUnder;
-        for (const auto& obj : objects)
-        {
-            if (!obj) continue;
-            for (Entity::Index childIdx : obj->GetChildrenIndices())
-            {
-                listedUnder[childIdx] = obj->m_index;
-            }
-        }
-
-        // 씬 루트에서 children만 따라 내려가 닿는 집합.
-        std::unordered_set<Entity::Index> reached;
-        if (!objects.empty() && objects[0])
-        {
-            std::vector<Entity::Index> stack{ objects[0]->m_index };
-            reached.insert(objects[0]->m_index);
-            while (!stack.empty())
-            {
-                const Entity::Index cur = stack.back();
-                stack.pop_back();
-                const auto& node = scene->TryGetEntity(cur);
-                if (!node) continue;
-                for (Entity::Index childIdx : node->GetChildrenIndices())
-                {
-                    if (reached.insert(childIdx).second) stack.push_back(childIdx);
-                }
-            }
-        }
-
-        for (const auto& obj : objects)
-        {
-            if (!obj) continue;
-            ++total;
-            if (Entity::kSceneRootIndex == obj->m_index) continue;   // 씬 루트 자신은 제외
-
-            auto it = listedUnder.find(obj->m_index);
-            if (it == listedUnder.end())
-            {
-                ++orphan;
-            }
-            else if (it->second == Entity::kSceneRootIndex)
-            {
-                if (Entity::IsInvalidIndex(obj->GetParentIndex())) ++topLevelInvalid;
-                else if (Entity::kSceneRootIndex == obj->GetParentIndex()) ++topLevelRoot;
-                else ++pairMismatch;
-            }
-            else if (it->second != obj->GetParentIndex())
-            {
-                ++pairMismatch;
-            }
-
-            if (reached.find(obj->m_index) == reached.end()) ++unreachable;
-        }
-
-        const size_t storeMismatch = scene->CountHierarchyStoreMismatches();
-        std::printf("[scene.hierarchycheck] 오브젝트 %zu · 최상위(0표기) %zu · 최상위(-1표기) %zu"
-            " · 쌍불일치 %zu · 고아 %zu · 순회미도달 %zu · Store불일치 %zu\n",
-            total, topLevelRoot, topLevelInvalid, pairMismatch, orphan, unreachable, storeMismatch);
-
-        // ★ **이 명령에는 진짜 판정이 있다.** 쌍불일치·고아·순회미도달·Store불일치는
-        //   전부 "순회가 서브트리를 통째로 빠뜨리는" 상태이고, 그것이 뼈 61 개를
-        //   순회 밖에 두었던 결함이다(위 주석). 지금까지는 그 수를 찍기만 하고
-        //   프로세스는 0 으로 끝났다 — 세어 놓고 판정하지 않고 있었다.
-        //
-        //   최상위(-1표기)는 세되 **판정에 넣지 않는다.** 그것은 같은 뜻의 표기가
-        //   둘이라는 이미 알려진 상태이고(트랙 E), 순회를 깨뜨리지는 않는다.
-        const size_t broken = pairMismatch + orphan + unreachable + storeMismatch;
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("objects", CommandCore::CommandData::Int(static_cast<int64_t>(total)));
-        data.Set("topLevelRoot", CommandCore::CommandData::Int(static_cast<int64_t>(topLevelRoot)));
-        data.Set("topLevelInvalid", CommandCore::CommandData::Int(static_cast<int64_t>(topLevelInvalid)));
-        data.Set("pairMismatch", CommandCore::CommandData::Int(static_cast<int64_t>(pairMismatch)));
-        data.Set("orphan", CommandCore::CommandData::Int(static_cast<int64_t>(orphan)));
-        data.Set("unreachable", CommandCore::CommandData::Int(static_cast<int64_t>(unreachable)));
-        data.Set("storeMismatch", CommandCore::CommandData::Int(static_cast<int64_t>(storeMismatch)));
-        if (broken > 0)
-        {
-            return CommandCore::Fail("scene.hierarchy_broken",
-                "계층 불변식 위반 " + std::to_string(broken) + "건", std::move(data));
-        }
-        return CommandCore::Ok("계층 불변식 통과", std::move(data));
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("scene.hierarchycheck accepts no arguments");
+        return EditorDiagnostics::ValidateHierarchy(SceneManagers->GetActiveScene());
     }
 
     static CommandCore::CommandResult Cmd_object_duplicate(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        // object.duplicate <오브젝트> [새 이름]
-        //
-        // 에디터의 Ctrl+D(DuplicateGameObjectCommand::Redo)와 **같은 원시 함수**를
-        // 부른다 — Object::Instantiate. 에디터 전용 경로를 CLI에서도 태울 수 있어야
-        // 회귀가 그 경로를 잴 수 있다. 지금 이 경로는 게이트가 하나도 없다.
-        if (parts.size() < 2)
-        {
-            std::printf("[CLI] 사용법: object.duplicate <오브젝트> [새 이름]\n");
-            return CommandCore::InvalidArguments("object.duplicate: 인자가 올바르지 않다");
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene)
-        {
-            std::printf("[CLI] 활성 씬 없음\n");
-            return CommandCore::PreconditionFailed("object.duplicate.no_scene", "활성 씬이 없다");
-        }
-
-        // 이름 규칙은 object.rename·prefab.create와 같다 — 인자가 둘이면 마지막
-        // 토큰이 새 이름이고 그 앞 전체가 원본 이름이다(공백 있는 이름 때문).
-        // LC2: 원문 재해석 제거. 토큰만 본다.
-        std::string sourceName;
-        std::string newName;
-        if (parts.size() >= 3)
-        {
-            const auto names = CommandCore::SplitTrailingName(parts, 1);
-            sourceName = names.leading;
-            newName    = names.trailing;
-        }
-        else
-        {
-            sourceName = CommandCore::JoinFrom(parts, 1);
-        }
-
-        auto source = scene->GetEntity(sourceName);
-        if (!source)
-        {
-            Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + sourceName);
-            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", sourceName.c_str());
-            return CommandCore::Fail("object.duplicate.not_found", "오브젝트가 없다");
-        }
-
-        const std::string finalName = newName.empty() ? source->m_name.ToString() : newName;
-		auto* cloned = dynamic_cast<Entity*>(Object::Instantiate(source, finalName));
-        if (!cloned)
-        {
-            std::printf("[CLI] 복제 실패: %s\n", sourceName.c_str());
-            return CommandCore::Fail("object.duplicate.duplicate_failed", "복제하지 못했다");
-        }
-
-        // Object::Instantiate가 newName을 반영하지만(Object.cpp:113) 씬 편입이
-        // 고유 이름 생성으로 그것을 덮는다("Orig" -> "Orig (1)"). 회귀가 이름으로
-        // 대상을 집으므로 반환 뒤에 한 번 더 지정한다.
-        if (!newName.empty())
-        {
-            cloned->m_name = newName;
-        }
-
-        Debug->LogWarning("[CLI] 복제: " + sourceName + " -> " + cloned->m_name.ToString());
-        std::printf("[CLI] 복제: %s -> %s (index=%d)\n",
-            sourceName.c_str(), cloned->m_name.ToString().c_str(),
-            static_cast<int>(cloned->m_index));
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("source", CommandCore::CommandData::String(sourceName));
-        data.Set("clone", CommandCore::CommandData::String(cloned->m_name.ToString()));
-        data.Set("index", CommandCore::CommandData::Int(static_cast<int64_t>(cloned->m_index)));
-        return CommandCore::Ok("복제: " + sourceName, std::move(data));
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return CommandCore::InvalidArguments("object.duplicate <target> [name]");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        return EditorObjectOperations::Duplicate(target, ctx.parts.size() == 3 ? ctx.parts[2] : "");
     }
 
     static CommandCore::CommandResult Cmd_object_parent(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        // object.parent <자식> <부모>
-        //
-        // 계층을 가진 자산을 CLI로 저작하기 위한 명령이다. 이것이 없으면
-        // object.create가 만드는 것은 전부 루트라, 회귀 게이트가 쓰는 픽스처를
-        // 저작 자산 없이 만들 수 없었다(SceneGraphRedesignPlan §0.05).
-        //
-        // 부모를 "-"로 주면 씬 루트로 되돌린다.
-        if (parts.size() < 3)
-        {
-            std::printf("[CLI] 사용법: object.parent <자식> <부모 | ->\n"
-                "       부모에 -를 주면 씬 루트로 올린다\n");
-            return CommandCore::InvalidArguments("object.parent: 인자가 올바르지 않다");
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene)
-        {
-            std::printf("[CLI] 활성 씬 없음\n");
-            return CommandCore::PreconditionFailed("object.parent.no_scene", "활성 씬이 없다");
-        }
-
-        // 이름에 공백이 흔하므로(엔진이 "Prim_Cube (1)"처럼 번호를 붙인다)
-        // 부모를 마지막 토큰으로 보고 그 앞 전체를 자식으로 본다
-        // — object.rename·prefab.create와 같은 규칙이다.
-        //
-        // LC2: 예전에는 원문을 `rfind` 로 잘랐다. 그래서 따옴표를 쓴 입력
-        // (`object.parent "Big Boss" "Main Characters"`)에서 자식 이름에
-        // **따옴표가 남았고** 씬에서 영영 못 찾았다. 이제 토큰만 본다.
-        const auto names = CommandCore::SplitTrailingName(parts, 1);
-        const std::string& childName  = names.leading;
-        const std::string& parentName = names.trailing;
-
-        auto child = scene->GetEntity(childName);
-        if (!child)
-        {
-            Debug->LogError("[CLI] 자식 오브젝트를 찾을 수 없음: " + childName);
-            std::printf("[CLI] 자식 오브젝트를 찾을 수 없음: %s\n", childName.c_str());
-            return CommandCore::Fail("object.parent.child_not_found", "자식 오브젝트가 없다");
-        }
-
-		Entity* parent =
-            ("-" == parentName) ? scene->GetRootEntity() : scene->GetEntity(parentName);
-        if (!parent)
-        {
-            Debug->LogError("[CLI] 부모 오브젝트를 찾을 수 없음: " + parentName);
-            std::printf("[CLI] 부모 오브젝트를 찾을 수 없음: %s\n", parentName.c_str());
-            return CommandCore::Fail("object.parent.parent_not_found", "부모 오브젝트가 없다");
-        }
-
-        if (parent->m_index == child->m_index)
-        {
-            std::printf("[CLI] 자기 자신을 부모로 삼을 수 없음: %s\n", childName.c_str());
-            return CommandCore::Fail("object.parent.self_parent", "자기 자신을 부모로 삼을 수 없다");
-        }
-
-        // 순환을 막는다 — 자기 자손을 부모로 삼으면 순회가 무한이 된다.
-        for (auto ancestor = parent; ancestor; )
-        {
-            if (ancestor->m_index == child->m_index)
-            {
-                Debug->LogError("[CLI] 순환 계층 거부: " + childName + " <- " + parentName);
-                std::printf("[CLI] 순환이 된다(부모가 자식의 자손): %s\n", parentName.c_str());
-                return CommandCore::Fail("object.parent.cycle", "순환이 된다(부모가 자식의 자손)");
-            }
-            const Entity::Index ancestorParent = ancestor->GetParentIndex();
-            if (Entity::INVALID_INDEX == ancestorParent) break;
-            auto next = scene->GetEntity(ancestorParent);
-            if (next == ancestor) break;
-            ancestor = next;
-        }
-
-        // 부모 인덱스·Transform 부모 ID·자식 목록을 한 점에서 함께 옮긴다.
-		parent->AddChild(child);
-
-        Debug->LogWarning("[CLI] 부모 지정: " + childName + " -> " + parentName);
-        std::printf("[CLI] 부모 지정: %s -> %s\n", childName.c_str(), parentName.c_str());
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("child", CommandCore::CommandData::String(childName));
-        data.Set("parent", CommandCore::CommandData::String(parentName));
-        return CommandCore::Ok("부모 지정: " + childName + " -> " + parentName, std::move(data));
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("object.parent <target> <parent|->");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        EntityHandle parent;
+        if (ctx.parts[2] == "-") parent = SceneManagers->GetActiveScene()->HandleOf(0);
+        else { auto result = EditorObjectOperations::ResolveTarget(ctx.parts[2], parent); if (!result.IsSuccess()) return result; }
+        return EditorObjectOperations::Parent(target, parent);
     }
 
     // H2 root-reference 회귀용. m_rootIndex는 일반 parent와 별개의 same-scene
@@ -999,290 +518,56 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_object_transform(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // object.transform <이름> <px> <py> <pz> [rx ry rz] [sx sy sz]
-        // 회전은 오일러 각(도)이다. 라디안을 쓰면 스크립트를 읽을 때 값이
-        // 무슨 뜻인지 바로 안 보인다.
-        if (parts.size() < 5)
+        if (ctx.parts.size() != 5 && ctx.parts.size() != 8 && ctx.parts.size() != 11)
+            return CommandCore::InvalidArguments("object.transform <target> px py pz [rx ry rz] [sx sy sz]");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        float values[]{0,0,0,0,0,0,1,1,1};
+        for (size_t i = 2; i < ctx.parts.size(); ++i)
         {
-            std::printf("[CLI] 사용법: object.transform <이름> <px> <py> <pz>"
-                " [rx ry rz] [sx sy sz]\n"
-                "       이름에 공백이 있으면 따옴표로 묶는다: \"Main Camera\"\n");
-            return CommandCore::InvalidArguments("object.transform: 인자가 올바르지 않다");
+            const auto& raw = ctx.parts[i];
+            auto parsed = std::from_chars(raw.data(), raw.data()+raw.size(), values[i-2]);
+            if (parsed.ec != std::errc{} || parsed.ptr != raw.data()+raw.size() || !std::isfinite(values[i-2]))
+                return CommandCore::InvalidArguments("Transform requires finite numbers", "transform.number_invalid");
         }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene)
-        {
-            std::printf("[CLI] 활성 씬 없음\n");
-            return CommandCore::PreconditionFailed("object.transform.no_scene", "활성 씬이 없다");
-        }
-
-        auto object = scene->GetEntity(parts[1]);
-        if (!object)
-        {
-            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
-            return CommandCore::Fail("object.transform.not_found", "오브젝트가 없다");
-        }
-
-        const auto number = [&](size_t index, float fallback) -> float
-        {
-            return (parts.size() > index)
-                ? static_cast<float>(std::atof(parts[index].c_str())) : fallback;
-        };
-
-        const math::vector3 position{ number(2, 0.f), number(3, 0.f), number(4, 0.f) };
-        const math::vector3 euler{ number(5, 0.f), number(6, 0.f), number(7, 0.f) };
-        const math::vector3 scale{ number(8, 1.f), number(9, 1.f), number(10, 1.f) };
-
-        object->Transform_().SetPosition(position);
-        object->Transform_().SetRotation(math::quaternion_from_pitch_yaw_roll(
-            math::radians(euler.x), math::radians(euler.y), math::radians(euler.z)));
-        object->Transform_().SetScale(scale);
-        object->Transform_().UpdateWorldMatrix();
-
-        // ★ 이 경로도 오버라이드로 기록한다 (SceneGraphRedesignPlan P-write S4).
-        //
-        // object.property와 달리 여기는 리플렉션 세터(ApplyReflectedProperty)를
-        // 지나지 않고 Transform의 세터를 직접 부른다 — 실측으로 확인한, CLI에서
-        // Property::setter를 우회하는 유일한 다른 쓰기 경로다. 이 슬라이스를 빼면
-        // object.transform으로 만든 로컬 수정은 S3 이후에도 여전히 조용히 유실된다.
-        //
-        // Transform은 S1-b+S3에서 컴포넌트로 승격됐으므로 다른 컴포넌트와 똑같이
-        // 다룬다(순번도 ComputeComponentSlot이 센다). 세 필드는 Transform::reflect()
-        // 의 이름 그대로다 — 이름이 어긋나면 RecordPropertyOverride가 프로퍼티 노드를
-        // 못 찾고 조용히 아무것도 안 남기므로, 필드명을 바꿀 때 여기도 함께 본다.
-        PrefabUtility::RecordPropertyOverride(*object, object->Transform_(), "position");
-        PrefabUtility::RecordPropertyOverride(*object, object->Transform_(), "rotation");
-        PrefabUtility::RecordPropertyOverride(*object, object->Transform_(), "scale");
-
-        char message[192]{};
-        std::snprintf(message, sizeof(message),
-            "[CLI] 변환 설정: %s pos(%.2f %.2f %.2f) rot(%.1f %.1f %.1f) scale(%.2f %.2f %.2f)",
-            parts[1].c_str(), position.x, position.y, position.z,
-            euler.x, euler.y, euler.z, scale.x, scale.y, scale.z);
-        Debug->LogWarning(message);
-        std::printf("%s\n", message);
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("object", CommandCore::CommandData::String(parts[1]));
-        return CommandCore::Ok("변환 설정: " + parts[1], std::move(data));
+        return EditorObjectOperations::Transform(target, {values[0],values[1],values[2]},
+            math::quaternion_from_pitch_yaw_roll(math::radians(values[3]), math::radians(values[4]), math::radians(values[5])),
+            {values[6],values[7],values[8]});
     }
 
     static CommandCore::CommandResult Cmd_object_property(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        // object.property <오브젝트> <컴포넌트> <필드> <값...>
-        //
-        // 리플렉션으로 설정한다. 컴포넌트마다 전용 명령을 만들면 종류가 늘 때마다
-        // CLI가 같이 늘고, 그건 인스펙터가 이미 하는 일을 두 번 하는 것이다 —
-        // 인스펙터도 같은 프로퍼티 목록을 훑는다.
-        if (parts.size() < 5)
-        {
-            std::printf("[CLI] 사용법: object.property <오브젝트> <컴포넌트> <필드> <값...>\n");
-            return CommandCore::InvalidArguments("object.property: 인자가 올바르지 않다");
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene)
-        {
-            std::printf("[CLI] 활성 씬 없음\n");
-            return CommandCore::PreconditionFailed("object.property.no_scene", "활성 씬이 없다");
-        }
-
-        auto object = scene->GetEntity(parts[1]);
-        if (!object)
-        {
-            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
-            return CommandCore::Fail("object.property.not_found", "오브젝트가 없다");
-        }
-
-        const Meta::Type* requestedType = Meta::Find(parts[2]);
-        Component* target = nullptr;
-        for (const auto& component : object->m_components)
-        {
-            if (component && (component->ToString() == parts[2]
-                || (requestedType && component->GetTypeID() == requestedType->typeID)))
-            {
-                target = component.get();
-                break;
-            }
-        }
-        if (nullptr == target)
-        {
-            Debug->LogError("[CLI] 컴포넌트를 찾을 수 없음: " + parts[1] + "." + parts[2]);
-            std::printf("[CLI] 컴포넌트를 찾을 수 없음: %s\n", parts[2].c_str());
-            return CommandCore::Fail("object.property.component_not_found", "컴포넌트가 없다");
-        }
-
-        // 값에 쉼표로 구분한 성분이 들어올 수 있다(벡터·색). 필드 이름 뒤 전체.
-        std::string rest = CommandCore::JoinFrom(parts, 1);
-        for (size_t i = 1; i <= 3; ++i) rest = TrimLine(rest.substr(rest.find(parts[i]) + parts[i].size()));
-        const std::string rawValue = rest;
-
-        if (!ApplyReflectedProperty(target, parts[3], rawValue))
-        {
-            // 실패를 로그에도 남긴다. 콘솔 출력은 스크립트 실행에서 리다이렉트되지
-            // 않아 보이지 않고, 그러면 '설정한 줄 알았는데 안 된' 씬이 저장된다.
-            Debug->LogError("[CLI] 프로퍼티 설정 실패: " + parts[2] + "." + parts[3]
-                + " = " + rawValue);
-            std::printf("[CLI] 프로퍼티 설정 실패: %s.%s\n", parts[2].c_str(), parts[3].c_str());
-            return CommandCore::Fail("object.property.set_failed", "프로퍼티를 설정하지 못했다");
-        }
-
-        // ★ 저작 의도의 기록 지점 (SceneGraphRedesignPlan P-write S3).
-        //
-        // 프리팹 인스턴스라면 이 수정이 "로컬 수정"이고, 기록해 두지 않으면 다음
-        // 프리팹 갱신이 에러도 로그도 없이 덮어쓴다. 값은 넘기지 않는다 —
-        // RecordPropertyOverride가 방금 쓰인 컴포넌트 상태에서 직접 뽑는다.
-        //
-        // 부수 효과 하나를 알고 쓴다: 이 목록이 비어 있지 않게 되는 순간
-        // UpdateInstances의 과도기 시딩(m_prefabOverrides.empty() 조건)이 더 이상
-        // 돌지 않는다. 그건 손실이 아니라 이득이다 — 그 시딩은 m_name·m_instanceID·
-        // m_index·m_parentIndex 같은 **엔진 장부까지 사용자 수정으로 오기록**한다
-        // (실측: 8건 중 7건). 정본이 서면 추론은 물러나는 것이 맞다.
-        PrefabUtility::RecordPropertyOverride(*object, *target, parts[3]);
-
-        Debug->LogWarning("[CLI] 프로퍼티 설정: " + parts[1] + "." + parts[2] + "."
-            + parts[3] + " = " + rawValue);
-        std::printf("[CLI] 프로퍼티 설정: %s.%s = %s\n", parts[2].c_str(), parts[3].c_str(),
-            rawValue.c_str());
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("object", CommandCore::CommandData::String(parts[1]));
-        data.Set("component", CommandCore::CommandData::String(parts[2]));
-        data.Set("field", CommandCore::CommandData::String(parts[3]));
-        data.Set("value", CommandCore::CommandData::String(rawValue));
-        return CommandCore::Ok("프로퍼티 설정: " + parts[2] + "." + parts[3], std::move(data));
+        if (ctx.parts.size() < 5) return CommandCore::InvalidArguments("object.property <target> <component> <field> <value>");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        return EditorObjectOperations::Property(target, ctx.parts[2], ctx.parts[3], CommandCore::JoinFrom(ctx.parts, 4));
     }
 
     static CommandCore::CommandResult Cmd_scene_select(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        if (parts.size() < 2)
-        {
-            std::printf("[CLI] 사용법: scene.select <오브젝트 이름>\n");
-            return CommandCore::InvalidArguments("scene.select: <오브젝트 이름> 이 필요하다");
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene)
-        {
-            std::printf("[CLI] 활성 씬 없음\n");
-            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
-        }
-
-        const std::string objectName = CommandCore::JoinFrom(parts, 1);
-        auto object = scene->GetEntity(objectName);
-        if (!object)
-        {
-            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
-            return CommandCore::Fail("object.not_found",
-                "오브젝트를 찾을 수 없다: " + objectName);
-        }
-
-        // 인스펙터가 보는 선택 상태를 그대로 바꾼다(에디터에서 클릭한 것과 같은 효과).
-		scene->m_selectedEntity = object;
-        Debug->LogWarning("[CLI] 선택: " + objectName);
-        std::printf("[CLI] 선택: %s\n", objectName.c_str());
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("name", CommandCore::CommandData::String(objectName));
-        return CommandCore::Ok("선택: " + objectName, std::move(data));
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("scene.select <target|->");
+        if (ctx.parts[1] == "-") return EditorObjectOperations::Select(SceneManagers->GetActiveScene(), {});
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        return EditorObjectOperations::Select(SceneManagers->GetActiveScene(), {target});
     }
 
-    static void Cmd_component_add(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_component_add(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::string& cmd = ctx.cmd;
-
-        if (parts.size() < 3)
-        {
-            std::printf("[CLI] 사용법: component.add <오브젝트 이름> <컴포넌트 타입>\n");
-            return;
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
-
-        // 오브젝트 이름에 공백이 흔하므로 컴포넌트 타입을 마지막 토큰으로 본다.
-        const auto names = CommandCore::SplitTrailingName(parts, 1);
-        const std::string& objectName = names.leading;
-        const std::string& typeName = names.trailing;
-
-        auto object = scene->GetEntity(objectName);
-        if (!object)
-        {
-            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
-            return;
-        }
-
-        // 에디터의 Add Component 메뉴와 같은 경로.
-        auto found = ComponentFactorys->m_componentTypes.find(typeName);
-        if (found == ComponentFactorys->m_componentTypes.end() || nullptr == found->second)
-        {
-            std::printf("[CLI] 알 수 없는 컴포넌트 타입: %s\n", typeName.c_str());
-            return;
-        }
-
-        auto component = object->AddComponent(*found->second);
-        if (!component)
-        {
-            std::printf("[CLI] 컴포넌트 추가 실패\n");
-            return;
-        }
-
-        if (auto* initializable = dynamic_cast<System::IInitializable*>(component))
-        {
-            initializable->Initialize();
-        }
-
-        Debug->LogWarning("[CLI] 컴포넌트 추가: " + objectName + " <- " + typeName);
-        std::printf("[CLI] 컴포넌트 추가: %s <- %s\n", objectName.c_str(), typeName.c_str());
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("component.add <target> <type>");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        return EditorObjectOperations::AddComponent(target, ctx.parts[2]);
     }
 
     static CommandCore::CommandResult Cmd_prefab_instantiate(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // 실제 게임 콘텐츠(프리팹)를 씬에 소환한다. UI 프리팹의 지연 연결 검증에
-        // 필요해 추가했지만, 콘텐츠가 걸린 회귀라면 어디든 쓸 수 있다.
-        if (parts.size() < 2)
-        {
-            std::printf("[CLI] 사용법: prefab.instantiate <프리팹 이름> [인스턴스 이름]\n");
-            return CommandCore::InvalidArguments("prefab.instantiate: 인자가 올바르지 않다");
-        }
-
-        Prefab* prefab = PrefabUtilitys->LoadPrefab(parts[1]);
-        if (nullptr == prefab)
-        {
-            Debug->LogError("[CLI] 프리팹을 찾을 수 없음: " + parts[1]);
-            std::printf("[CLI] 프리팹을 찾을 수 없음: %s\n", parts[1].c_str());
-            return CommandCore::Fail("prefab.instantiate.prefab_not_found", "프리팹이 없다");
-        }
-
-        const std::string instanceName = (parts.size() > 2) ? parts[2] : parts[1];
-        Entity* instance = PrefabUtilitys->InstantiatePrefab(prefab, instanceName);
-        if (nullptr == instance)
-        {
-            std::printf("[CLI] 인스턴스 생성 실패: %s\n", parts[1].c_str());
-            return CommandCore::Fail("prefab.instantiate.instantiate_failed", "인스턴스를 만들지 못했다");
-        }
-
-        Debug->LogWarning("[CLI] 프리팹 소환: " + parts[1] + " -> " + instanceName);
-        std::printf("[CLI] 프리팹 소환: %s -> %s (index=%d)\n",
-            parts[1].c_str(), instanceName.c_str(), static_cast<int>(instance->m_index));
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("prefab", CommandCore::CommandData::String(parts[1]));
-        data.Set("instance", CommandCore::CommandData::String(instanceName));
-        data.Set("index", CommandCore::CommandData::Int(static_cast<int64_t>(instance->m_index)));
-        return CommandCore::Ok("프리팹 소환: " + parts[1], std::move(data));
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return CommandCore::InvalidArguments("prefab.instantiate <prefab> [name]");
+        return EditorObjectOperations::InstantiatePrefab(ctx.parts[1], ctx.parts.size() == 3 ? ctx.parts[2] : "");
     }
 
     static CommandCore::CommandResult Cmd_prefab_overrides(const ConsoleCommandContext& ctx)
@@ -1621,87 +906,59 @@ namespace ConsoleCmd
 		return CommandCore::Ok("prefab.corpus.digest", std::move(data));
 	}
 
-    static void Cmd_camera_editor(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_camera_editor(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // camera.editor match|follow on|follow off|status
-        //
-        // 씬 뷰와 게임 뷰가 서로 다른 시점이면 두 그림의 차이가 시점 탓인지
-        // 렌더 탓인지 갈리지 않는다. 시점을 통일해 두면 남는 차이가 곧
-        // 렌더 경로의 차이다.
-        const std::string action = (parts.size() >= 2) ? parts[1] : "status";
-
-        if (action == "match")
+        using namespace CommandCore;
+        const auto& parts = ctx.parts;
+        const std::string action = parts.size() >= 2 ? parts[1] : "status";
+        if ((action != "status" && action != "match" && action != "follow") ||
+            parts.size() > (action == "follow" ? 3u : 2u))
+            return InvalidArguments("camera.editor match | follow [on|off] | status");
+        if (action == "match" && !ConsoleCommandSystem::MatchEditorCameraToGameCamera())
+            return PreconditionFailed("camera.unavailable", "No game camera to match");
+        if (action == "follow")
         {
-            if (ConsoleCommandSystem::MatchEditorCameraToGameCamera())
-            {
-                std::printf("[CLI] camera.editor match — 게임 카메라 자세로 맞춤\n");
-            }
-            else
-            {
-                std::printf("[CLI] camera.editor match 실패: 게임 카메라가 없다\n");
-            }
+            const std::string mode = parts.size() == 3 ? parts[2] : "on";
+            if (mode != "on" && mode != "off" && mode != "1" && mode != "0")
+                return InvalidArguments("follow requires on or off");
+            const bool following = mode == "on" || mode == "1";
+            if (following && !ConsoleCommandSystem::MatchEditorCameraToGameCamera())
+                return PreconditionFailed("camera.unavailable", "No game camera to follow");
+            ConsoleCommandSystem::SetEditorCameraFollowing(following);
         }
-        else if (action == "follow")
-        {
-            const std::string mode = (parts.size() >= 3) ? parts[2] : "on";
-            ConsoleCommandSystem::SetEditorCameraFollowing(mode != "off" && mode != "0");
-            // 켤 때 한 번 맞춰 둔다 — 다음 프레임을 기다리지 않고 바로 보인다.
-            if (ConsoleCommandSystem::IsEditorCameraFollowing())
-            {
-                ConsoleCommandSystem::MatchEditorCameraToGameCamera();
-            }
-            std::printf("[CLI] camera.editor follow %s\n",
-                ConsoleCommandSystem::IsEditorCameraFollowing() ? "on" : "off");
-        }
-        else
-        {
-            const Camera* editorCamera = EditorSessionState::Get().EditorCamera();
-            Scene* activeScene = SceneManagers->GetActiveScene();
-            CameraComponent* gameCamera = (nullptr != activeScene)
-                ? activeScene->Cameras().GetPrimaryCamera() : nullptr;
-
-            const auto describe = [](const char* label, uint64_t viewId,
-                const FrameCameraSnapshot* snapshot)
-            {
-                if (nullptr == snapshot) { std::printf("  %s: 없음\n", label); return; }
-                std::printf("  %s: view %llu · pos(%.3f %.3f %.3f)"
-                    " · forward(%.3f %.3f %.3f) · fov %.1f\n",
-                    label, static_cast<unsigned long long>(viewId),
-                    snapshot->eyePosition.x, snapshot->eyePosition.y, snapshot->eyePosition.z,
-                    snapshot->forward.x, snapshot->forward.y, snapshot->forward.z, snapshot->fov);
-            };
-
-            std::printf("[CLI] camera.editor status (follow %s)\n",
-                ConsoleCommandSystem::IsEditorCameraFollowing() ? "on" : "off");
-            const FrameCameraSnapshot editorSnapshot = (nullptr != editorCamera)
-                ? editorCamera->CaptureFrameSnapshot() : FrameCameraSnapshot{};
-            const FrameCameraSnapshot gameSnapshot = (nullptr != gameCamera)
-                ? gameCamera->CaptureFrameSnapshot() : FrameCameraSnapshot{};
-            describe("에디터", kEnhancedEditorViewId,
-                nullptr != editorCamera ? &editorSnapshot : nullptr);
-            describe("게임  ", nullptr != gameCamera ? gameCamera->GetInstanceID() : 0,
-                nullptr != gameCamera ? &gameSnapshot : nullptr);
-        }
+        const auto vector = [](const auto& v) { auto a = CommandData::Array(); a.Append(CommandData::Double(v.x)); a.Append(CommandData::Double(v.y)); a.Append(CommandData::Double(v.z)); return a; };
+        const auto describe = [&](const FrameCameraSnapshot& s, uint64_t id) {
+            auto d = CommandData::Object();
+            d.Set("viewId", CommandData::Int(id));
+            d.Set("position", vector(s.eyePosition)); d.Set("forward", vector(s.forward));
+            d.Set("fov", CommandData::Double(s.fov));
+            return d;
+        };
+        auto data = CommandData::Object();
+        data.Set("following", CommandData::Bool(ConsoleCommandSystem::IsEditorCameraFollowing()));
+        const auto* editor = EditorSessionState::Get().EditorCamera();
+        auto* scene = SceneManagers->GetActiveScene();
+        const auto* game = scene ? scene->Cameras().GetPrimaryCamera() : nullptr;
+        data.Set("editor", editor ? describe(editor->CaptureFrameSnapshot(), kEnhancedEditorViewId) : CommandData{});
+        data.Set("game", game ? describe(game->CaptureFrameSnapshot(), game->GetInstanceID()) : CommandData{});
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_component_list(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_component_list(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // 붙일 수 있는 컴포넌트 타입을 훑어본다(콜라이더 이름 확인용).
-        const std::string filter = (parts.size() > 1) ? parts[1] : std::string{};
-
-        int count = 0;
-        for (const auto& [typeName, type] : ComponentFactorys->m_componentTypes)
-        {
-            if (!filter.empty() && typeName.find(filter) == std::string::npos) continue;
-
-            Debug->LogWarning("[CLI]   " + typeName);
-            ++count;
-        }
-        std::printf("[CLI] 컴포넌트 타입 %d개 기록\n", count);
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("component.list [filter]");
+        const std::string filter = ctx.parts.size() == 2 ? ctx.parts[1] : "";
+        std::vector<std::string> names;
+        for (const auto& [name, type] : ComponentFactorys->m_componentTypes)
+            if (filter.empty() || name.find(filter) != std::string::npos) names.push_back(name);
+        std::sort(names.begin(), names.end());
+        auto data = CommandData::Object();
+        auto types = CommandData::Array();
+        for (const auto& name : names) { types.Append(CommandData::String(name)); Debug->LogWarning("[CLI] " + name); }
+        data.Set("types", std::move(types));
+        data.Set("count", CommandData::Int(names.size()));
+        return Ok({}, std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_prefab_create(const ConsoleCommandContext& ctx)
@@ -1759,13 +1016,15 @@ namespace ConsoleCmd
         return CommandCore::Ok("프리팹 생성: " + prefabName, std::move(data));
     }
 
-    static void Cmd_play(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_play(const ConsoleCommandContext& ctx)
     {
-        const std::string& cmd = ctx.cmd;
-
-        // 에디터의 재생/정지 버튼과 같은 경로(SceneManager::Editor가 다음 프레임에 처리).
-        SceneManagers->SetGameStart(cmd == "play");
-        std::printf("[CLI] %s 요청\n", cmd.c_str());
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("play | stop takes no arguments");
+        if (!SceneManagers->GetActiveScene()) return PreconditionFailed("scene.not_found", "No active scene");
+        SceneManagers->SetGameStart(ctx.cmd == "play");
+        auto data = CommandData::Object();
+        data.Set("requestedPlaying", CommandData::Bool(ctx.cmd == "play"));
+        return Ok("Play state change requested; scene manager applies it at the next frame", std::move(data));
     }
 
     // 재생 상태를 관측한다. 재생 진입은 좌표를 바꾸지 않고 phase만 바꾸므로,
@@ -1846,15 +1105,12 @@ namespace ConsoleCmd
 
     // 에디터의 Ctrl+Z / Ctrl+Y와 같은 호출.
 
-    static void Cmd_undo_redo(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_undo_redo(const ConsoleCommandContext& ctx)
     {
-        if (ctx.cmd == "undo") Meta::UndoManager::GetInstance()->Undo();
-        else                   Meta::UndoManager::GetInstance()->Redo();
-        std::printf("[CLI] %s 실행\n", ctx.cmd.c_str());
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("undo/redo accepts no arguments");
+        return EditorObjectOperations::UndoRedo(ctx.cmd == "redo");
     }
 
-    // 기존 object.create는 Undo 스택을 건드리지 않는다. 그 성질에 이미 여러 게이트가
-    // 기대고 있으므로 바꾸지 않고, 이력을 쌓는 별도 명령을 둔다.
 
     // 선택 상태 관측. scene.select가 실제로 먹었는지, 정지가 선택을 어떻게 하는지
     // 둘 다 이것으로 본다.
@@ -1939,9 +1195,13 @@ namespace ConsoleCmd
         reg.Result({ "scene.load", "scene.switch" }, &Cmd_scene_load);
         reg.Result({ "scene.new" }, &Cmd_scene_new);
         reg.Result({ "scene.ddol" }, &Cmd_scene_ddol);
-        reg.Legacy({ "ai.status" }, &Cmd_ai_status);
+        reg.Result({ "ai.status" }, &Cmd_ai_status);
         reg.Result({ "scene.save" }, &Cmd_scene_save);
         reg.Result({ "object.create" }, &Cmd_object_create);
+        reg.Result({ "object.delete" }, &Cmd_object_delete);
+        reg.Result({ "object.properties" }, &Cmd_object_properties);
+        reg.Result({ "component.remove" }, &Cmd_component_remove);
+        reg.Result({ "object.describe" }, &Cmd_object_describe);
         reg.Result({ "object.rename" }, &Cmd_object_rename);
         reg.Result({ "object.transform" }, &Cmd_object_transform);
         reg.Result({ "object.parent" }, &Cmd_object_parent);
@@ -1950,19 +1210,19 @@ namespace ConsoleCmd
         reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
         reg.Result({ "object.property" }, &Cmd_object_property);
         reg.Result({ "scene.select" }, &Cmd_scene_select);
-        reg.Legacy({ "component.add" }, &Cmd_component_add);
+        reg.Result({ "component.add" }, &Cmd_component_add);
         reg.Result({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
         reg.Result({ "prefab.status" }, &Cmd_prefab_status);
         reg.Result({ "prefab.corpus.digest" }, &Cmd_prefab_corpus_digest);
         reg.Result({ "prefab.overrides" }, &Cmd_prefab_overrides);
         reg.Result({ "prefab.update" }, &Cmd_prefab_update);
-        reg.Legacy({ "camera.editor" }, &Cmd_camera_editor);
-        reg.Legacy({ "component.list" }, &Cmd_component_list);
+        reg.Result({ "camera.editor" }, &Cmd_camera_editor);
+        reg.Result({ "component.list" }, &Cmd_component_list);
         reg.Result({ "prefab.create" }, &Cmd_prefab_create);
-        reg.Legacy({ "play", "stop" }, &Cmd_play);
+        reg.Result({ "play", "stop" }, &Cmd_play);
         reg.Result({ "play.state" }, &Cmd_play_state);
         reg.Result({ "undo.state" }, &Cmd_undo_state);
-        reg.Legacy({ "undo", "redo" }, &Cmd_undo_redo);
+        reg.Result({ "undo", "redo" }, &Cmd_undo_redo);
         reg.Result({ "scene.selection" }, &Cmd_scene_selection);
         reg.Result({ "scene.dump" }, &Cmd_scene_dump);
     }

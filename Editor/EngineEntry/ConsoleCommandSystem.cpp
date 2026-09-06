@@ -1,10 +1,10 @@
+﻿#include "Commands/CommandSupport.h"
 #include "ConsoleCommandSystem.h"
-#include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
 #include "Commands/CommandRegistrar.h"
-#include "Commands/SelfTestTable.h"          // LC6: 도메인 TU 등록 창구
+#include "Commandlets/EditorCommandlets.h"
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "CommandResultJson.h"          // LC9: 배치 JSONL 과 서비스 JSON 의 단일 정본
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
@@ -102,13 +102,9 @@
 #include "ShaderMeta.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
-#include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -259,6 +255,7 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
     // 종료 구간 힙 손상(0xC0000374)의 구조적 원인이다.
     // 콘솔 자체(출력)는 세 경우 모두 필요하므로 wantConsole과는 분리한다.
     bool wantStdinReader = false;
+    bool hasBatchInput = false;
     bool wantCommandService = false;
 
     // `--allow-user-code`. **서비스에만 걸린다**(§8 · LC7).
@@ -283,13 +280,37 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
     {
         const std::string arg = toUtf8(argv[i]);
 
-        if (arg == "--exec" && i + 1 < argc)
+        if (arg == "--commandlet")
         {
+            if (m_commandletMode) m_commandletError = "Only one --commandlet is allowed";
+            m_commandletMode = true;
+            wantConsole = true;
+            m_resultJsonl = true;
+            for (++i; i < argc; ++i)
+            {
+                std::string token = toUtf8(argv[i]);
+                if (token == "--") break;
+                m_commandletArguments.push_back(std::move(token));
+            }
+        }
+        else if (arg == "--commandlet-script")
+        {
+            if (m_commandletMode) m_commandletError = "Only one Commandlet input is allowed";
+            m_commandletMode = true;
+            if (i + 1 < argc) m_commandletScript = toUtf8(argv[++i]);
+            else m_commandletError = "--commandlet-script requires a file path";
+            wantConsole = true;
+            m_resultJsonl = true;
+        }
+        else if (arg == "--exec" && i + 1 < argc)
+        {
+            hasBatchInput = true;
             Enqueue(toUtf8(argv[++i]));
             wantConsole = true;
         }
         else if (arg == "--script" && i + 1 < argc)
         {
+            hasBatchInput = true;
             LoadScriptFile(toUtf8(argv[++i]));
             wantConsole = true;
         }
@@ -325,6 +346,7 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
             }
             i = j - 1;
 
+            hasBatchInput = true;
             EnqueueStructured(std::move(arguments));
             wantConsole = true;
         }
@@ -393,6 +415,15 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
         }
     }
     ::LocalFree(argv);
+    if (m_commandletMode)
+    {
+        if (hasBatchInput || wantStdinReader || wantCommandService)
+            m_commandletError = "--commandlet cannot be combined with batch, console or HTTP service";
+        wantCommandService = false;
+        wantStdinReader = false;
+        std::lock_guard<std::mutex> guard(m_mutex);
+        m_pending.clear();
+    }
 
     // LC4: 서비스를 켠다. 배치 프론트엔드와 독립이라 --console 과 무관하게 뜬다.
     if (wantCommandService)
@@ -445,7 +476,7 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
 
     // 스크립트를 못 열었는데 타이핑할 사람도 없다면, 이 실행은 아무것도 하지
     // 못한다. 계속 돌게 두면 하네스가 타임아웃으로 죽여야 하고 원인도 안 보인다.
-    if (m_scriptLoadFailed && !wantStdinReader)
+    if (m_scriptLoadFailed && !wantStdinReader && !m_commandletMode)
     {
         std::fputs("[CLI] 실행할 명령이 없어 종료한다.\n", stderr);
         std::fflush(stderr);
@@ -603,34 +634,9 @@ void ConsoleCommandSystem::Pump()
     // 프레임이고, 그 사이에 일어난 Awake/OnDestroy가 어느 프레임 것인지 알아야 한다.
     Lifecycle::Trace::BeginFrame();
 
-    // LC0(PHASE 14.5) 프레임 계측.
-    //
-    // BeginFrame과 같은 이유로 조기 반환들보다 앞이다 — wait 중이거나 씬 로딩
-    // 중인 프레임도 프레임이고, §7.1의 예산은 "명령이 도는 프레임"이 아니라
-    // "에디터가 도는 프레임"을 분모로 삼아야 한다. 조기 반환 뒤에 두면 큐가
-    // 멈춘 구간이 통째로 표본에서 빠져, 가장 느린 구간만 못 보는 계측이 된다.
-    // ★ 계측이 꺼져 있으면 원자 변수 읽기 하나로 끝난다.
-    //
-    //   `GetForegroundWindow()`는 시스템 호출이다. 그것을 아무도 재지 않는
-    //   실행에도 매 프레임 물리면 ① 제품에 상시 비용이 붙고 ② 하필 재려는
-    //   대상인 프레임 시간을 흔든다. 관측이 관측 대상을 바꾸면 그 값은
-    //   §7.1의 분모로 못 쓴다. 기본은 off이고 `cli.probe.timing reset`이 켠다.
+    // Count every editor frame, including frames waiting for scene activation.
     const uint64_t frameIndex = m_frameIndex.fetch_add(1, std::memory_order_acq_rel) + 1;
     const bool sceneLoading = SceneManagers->IsSceneLoading();
-    if (CommandBaseline::IsCollecting())
-    {
-        CommandBaseline::FrameState frameState;
-        frameState.sceneLoading = sceneLoading;
-        frameState.playing      = SceneManagers->IsGameStart();
-        frameState.waiting      = (m_waitFrames > 0);
-
-        const CoreWindow* window = CoreWindow::GetForCurrentInstance();
-        const HWND handle = (nullptr != window) ? window->GetHandle() : nullptr;
-        frameState.windowKnown = (nullptr != handle);
-        frameState.focused     = frameState.windowKnown && (::GetForegroundWindow() == handle);
-
-        CommandBaseline::NoteFrame(frameState);
-    }
 
     // ★ 조기 반환 사유를 **밖에서 볼 수 있게 남긴다.**
     //
@@ -653,6 +659,41 @@ void ConsoleCommandSystem::Pump()
     // (전환 중 측정하면 중간값이 섞인다)
     if (sceneLoading) return;
 
+    if (m_commandletMode && !m_commandletDone)
+    {
+        m_commandletDone = true;
+        EnsureRegistryPopulated();
+        if (!m_commandletError.empty())
+        {
+            const auto result = CommandCore::InvalidArguments(m_commandletError, "commandlet.mode_conflict");
+            PublishResult("--commandlet", result);
+            WriteResultLine("--commandlet", result, 0, 0, 0);
+            RequestQuit();
+            return;
+        }
+        if (!m_commandletScript.empty())
+        {
+            LoadScriptFile(m_commandletScript);
+            if (m_scriptLoadFailed)
+            {
+                const auto result = CommandCore::InvalidArguments("Cannot open commandlet script", "commandlet.script_missing");
+                PublishResult("--commandlet-script", result); WriteResultLine("--commandlet-script", result, 0, 0, 0);
+                RequestQuit(); return;
+            }
+        }
+        else if (!m_commandletArguments.empty() && CommandCore::CommandRegistry::Commandlets().Find(m_commandletArguments[0]))
+            EnqueueStructured(m_commandletArguments);
+        else
+        {
+            const auto result = EditorCommandlets::Run(m_commandletArguments);
+            const auto name = m_commandletArguments.empty() ? "--commandlet" : m_commandletArguments[0];
+            PublishResult(name, result);
+            WriteResultLine(name, result, 0, 0, 0);
+            RequestQuit();
+            return;
+        }
+    }
+
     // ── 배치 큐: 프레임당 정확히 하나 (§7.2 · 기존 의미 보존) ───────────
     //
     // 이 수를 바꾸면 프레임 수로 시간을 재는 기존 시나리오의 측정값이 조용히
@@ -670,6 +711,7 @@ void ConsoleCommandSystem::Pump()
             }
         }
         if (has) RunOne(std::move(pending), frameIndex);
+        else if (m_commandletMode) { RequestQuit(); return; }
     }
 
     // ── 서비스 큐: 예산만큼 (§7.2) ──────────────────────────────────────
@@ -692,6 +734,7 @@ void ConsoleCommandSystem::Pump()
 
         PendingCommand pending;
         bool           isLong = false;
+        bool           needsFrame = false;
         {
             std::lock_guard<std::mutex> guard(m_mutex);
             if (m_servicePending.empty()) break;
@@ -705,6 +748,7 @@ void ConsoleCommandSystem::Pump()
                     CommandCore::CommandRegistry::Get().Find(name))
             {
                 isLong = (CommandCore::CommandCost::Long == descriptor->cost);
+                needsFrame = (CommandCore::CommandCost::Immediate != descriptor->cost);
             }
             if (isLong && drained > 0) break;
 
@@ -713,7 +757,7 @@ void ConsoleCommandSystem::Pump()
         }
 
         RunOne(std::move(pending), frameIndex);
-        if (isLong) break;   // 긴 명령은 그 프레임을 혼자 쓴다
+        if (needsFrame) break; // Let frame-end lifecycle work finish before the next mutation.
     }
 }
 
@@ -774,7 +818,6 @@ bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex)
     const uint64_t waitedFrames = (frameIndex > pending.enqueuedFrame)
         ? (frameIndex - pending.enqueuedFrame) : 0;
 
-    CommandBaseline::NoteCommand(name, queued.count(), waitedFrames, executed.count());
 
     // ── LC9: 배치 결과를 기계가 읽는 형태로 낸다 (§18) ──────────────────
     //
@@ -832,8 +875,10 @@ namespace
     // Meta::Serialize 출력을 한 문서로 쓴다 — 컴파일타임 전환(CT4~CT5) 동안
     // "직렬화 출력이 한 글자도 안 변했다"를 diff 0으로 증명하는 자다.
     // 씬·프리팹 콘텐츠에 기대지 않으므로 게임 데이터가 바뀌어도 흔들리지 않는다.
-    void HandleReflectGolden(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleReflectGolden(const std::vector<std::string>& parts)
     {
+        using namespace CommandCore;
+        if (parts.size() > 2) return InvalidArguments("reflect.golden [path]");
         const std::string outPath = (parts.size() > 1) ? parts[1] : std::string("reflect_golden.yaml");
 
         auto names = Meta::Registry::GetInstance()->GetAllTypeNames();
@@ -886,11 +931,12 @@ namespace
         if (!out)
         {
             std::printf("[CLI] reflect.golden: 출력 파일을 열 수 없음: %s\n", outPath.c_str());
-            return;
+            return Fail("reflection.write_failed", "Cannot open output: " + outPath);
         }
 		out << "# reflect.golden — 등록 전 타입 default-Serialize 덤프 (PHASE 18 CT0)\n"
 			<< document.Dump();
         out.close();
+        if (!out) return Fail("reflection.write_failed", "Cannot write output: " + outPath);
 
         char line[320]{};
         std::snprintf(line, sizeof(line),
@@ -898,62 +944,9 @@ namespace
             names.size(), serialized, noFactory, failed, outPath.c_str());
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
-    }
-
-    // 리플렉션 기준선 계측(PHASE 18 CT0). ① 활성 씬 전체 Meta::Serialize
-    // (씬 저장·Instantiate·프리팹 시딩이 모두 타는 경로), ② InstantiatePrefab
-    // (스폰마다 무는 역직렬화 전체 경로) 반복 시간. CT6 이후 같은 명령으로
-    // 재측정해 개선을 CT0 기준선 대비 수치로 보고한다.
-    void HandlePerfReflect(const std::vector<std::string>& parts)
-    {
-        const std::string prefabName = (parts.size() > 1) ? parts[1] : std::string("BTProbe");
-        const int iterations = (parts.size() > 2) ? std::max(1, std::atoi(parts[2].c_str())) : 50;
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (nullptr == scene)
-        {
-            std::printf("[CLI] perf.reflect: 활성 씬 없음\n");
-            return;
-        }
-
-        using PerfClock = std::chrono::steady_clock;
-
-        size_t objectCount = 0;
-        const auto serializeStart = PerfClock::now();
-        for (int i = 0; i < iterations; ++i)
-        {
-            objectCount = 0;
-            for (const auto& obj : scene->m_Entities)
-            {
-                if (nullptr == obj) continue;
-				[[maybe_unused]] Authoring::WriteDocument document =
-					Meta::SerializeDocument(obj.get(), Meta::TypeOf<Entity>());
-                ++objectCount;
-            }
-        }
-        const double serializeMs =
-            std::chrono::duration<double, std::milli>(PerfClock::now() - serializeStart).count()
-            / iterations;
-
-        double instantiateMs = -1.0;
-        if (Prefab* prefab = PrefabUtilitys->LoadPrefab(prefabName))
-        {
-            const auto instantiateStart = PerfClock::now();
-            for (int i = 0; i < iterations; ++i)
-            {
-                PrefabUtilitys->InstantiatePrefab(prefab, prefabName + "_perf" + std::to_string(i));
-            }
-            instantiateMs =
-                std::chrono::duration<double, std::milli>(PerfClock::now() - instantiateStart).count()
-                / iterations;
-        }
-
-        char line[320]{};
-        std::snprintf(line, sizeof(line),
-            "[perf.reflect] 반복 %d · 씬 Serialize %.3fms/회(오브젝트 %zu개) · Instantiate(%s) %.3fms/회",
-            iterations, serializeMs, objectCount, prefabName.c_str(), instantiateMs);
-        std::printf("[CLI] %s\n", line);
-        Debug->LogWarning(line);
+        auto data = CommandData::Object(); data.Set("path", CommandData::String(outPath)); data.Set("types", CommandData::Int(names.size()));
+        data.Set("serialized", CommandData::Int(serialized)); data.Set("noFactory", CommandData::Int(noFactory)); data.Set("failed", CommandData::Int(failed));
+        return failed == 0 && serialized > 0 ? Ok({}, std::move(data)) : Fail("reflection.golden_failed", "Default serialization failed or had no coverage", std::move(data));
     }
 
     // 트랜스폼 값 다이제스트 (SceneGraphRedesignPlan §4 트랙 S, S1-b 선행 게이트).
@@ -1082,8 +1075,10 @@ namespace
     //   이빨을 갖는다. ryml은 잘못된 문서를 만나면 예외가 아니라 프로세스를
     //   abort하므로, 콜백이 빠지거나 채널 하나를 놓치면 이 명령은 종료 코드가
     //   아니라 프로세스 사망으로 끝난다. 게이트는 그것도 실패로 읽는다.
-    void HandleSerializeRymlError(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSerializeRymlError(const std::vector<std::string>& parts)
     {
+        using namespace CommandCore;
+        if (parts.size() > 2) return InvalidArguments("serialize.rymlerror [path]");
         // 인자가 있으면 그 파일을 **있는 그대로** ryml에 넣는다. 무엇이 실제로
         // abort를 일으키는지는 지어내지 말고 재야 한다 — 처음 만든 합성 재현
         // 둘을 ryml이 조용히 받아들였다. 프로세스가 죽으면 그것이 답이다.
@@ -1094,7 +1089,7 @@ namespace
             {
                 std::printf("[serialize.rymlerror] probe=fail reason=open-failed path=%s\n",
                     parts[1].c_str());
-                return;
+                return PreconditionFailed("serialization.file_missing", "Cannot open input document");
             }
             const std::string text((std::istreambuf_iterator<char>(input)),
                 std::istreambuf_iterator<char>());
@@ -1104,7 +1099,9 @@ namespace
                 static_cast<unsigned long long>(attempt.nodeCount));
             std::printf("[serialize.rymlerror] probeMessage=%s\n",
                 attempt.message.empty() ? "(none)" : attempt.message.c_str());
-            return;
+            auto data = CommandData::Object(); data.Set("bytes", CommandData::Int(text.size())); data.Set("parsed", CommandData::Bool(attempt.parsed));
+            data.Set("threw", CommandData::Bool(attempt.threw)); data.Set("nodes", CommandData::Int(attempt.nodeCount)); data.Set("message", CommandData::String(attempt.message));
+            return attempt.parsed || attempt.threw ? Ok("Parser attempt completed without abort", std::move(data)) : Fail("serialization.parse_unreported", "No parse result", std::move(data));
         }
 
         const Authoring::RymlErrorPolicyProbe probe = Authoring::ProbeRymlErrorPolicy();
@@ -1135,6 +1132,10 @@ namespace
             (nullptr == fail) ? "pass" : "fail",
             (nullptr == fail) ? "" : " reason=",
             (nullptr == fail) ? "" : fail);
+        auto data = CommandData::Object();
+        data.Set("loneCr", CommandData::Bool(probe.threwOnLoneCr)); data.Set("tabIndent", CommandData::Bool(probe.threwOnTabIndent)); data.Set("distinctChannels", CommandData::Bool(probe.coveredDistinctChannels));
+        data.Set("validParsed", CommandData::Bool(probe.parsedValidDocument)); data.Set("crlfParsed", CommandData::Bool(probe.parsedCrLfDocument));
+        return fail == nullptr ? Ok({}, std::move(data)) : Fail("serialization.error_policy_failed", fail, std::move(data));
     }
 
 
@@ -1143,8 +1144,10 @@ namespace
     // 이 검사가 재는 것은 성능이 아니라 **판정 규칙**이다. 구조 비교는 Dump 비교의
     // 동작을 그대로 옮기지 않는다 — 맵 키 순서를 무시하는 것이 의도된 차이이므로,
     // 그 차이를 검사가 직접 단정해 "실수로 바뀐 것"과 구분한다.
-    void HandleSerializeNodeEqual(const std::vector<std::string>&)
+    CommandCore::CommandResult HandleSerializeNodeEqual(const std::vector<std::string>& parts)
     {
+        using namespace CommandCore;
+        if (parts.size() != 1) return InvalidArguments("serialize.nodeequal takes no arguments");
         struct Case
         {
             const char* name;
@@ -1231,9 +1234,12 @@ namespace
         {
             // 전부 Dump와 같은 답이면 이 슬라이스는 아무것도 바꾸지 않은 것이다.
             std::printf("[serialize.nodeequal] selfcheck=fail reason=no-divergence-covered\n");
-            return;
+            return Fail("serialization.no_divergence", "No divergence covered");
         }
         std::printf("[serialize.nodeequal] selfcheck=%s\n", (0 == failed) ? "pass" : "fail");
+        auto data = CommandData::Object(); data.Set("cases", CommandData::Int(std::size(kCases))); data.Set("passed", CommandData::Int(passed));
+        data.Set("failed", CommandData::Int(failed)); data.Set("divergedFromDump", CommandData::Int(divergedFromDump));
+        return failed == 0 ? Ok({}, std::move(data)) : Fail("serialization.node_equality_failed", "Node comparison verification failed", std::move(data));
     }
 
     // ── D0(SerializationPlan): 직렬화 기준선 ───────────────────────────────────
@@ -1295,35 +1301,51 @@ namespace
         "Debug";
 #endif
 
-    void HandleSerializeBench(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSerializeBench(const std::vector<std::string>& parts)
     {
+        using namespace CommandCore;
         std::printf("[serialize.bench] config=%s\n", kSerializeBenchConfig);
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: serialize.bench boot\n");
             std::printf("[CLI]         serialize.bench scene <절대경로> [반복=3]\n");
             std::printf("[CLI]         serialize.bench prefab <이름|경로> [반복=3]\n");
-            return;
+            return InvalidArguments("serialize.bench boot | scene/prefab <target> [iterations]");
         }
 
         const std::string mode = parts[1];
 
         if ("boot" == mode)
         {
+            if (parts.size() != 2) return InvalidArguments("serialize.bench boot takes no target");
             PrintSerializationBoot();
-            return;
+            const auto snapshot = SerializationProfile::TakeBoot();
+            const auto& sample = snapshot[SerializationProfile::Stage::AssetCatalog];
+            auto data = CommandData::Object(); data.Set("mode", CommandData::String("boot")); data.Set("config", CommandData::String(kSerializeBenchConfig));
+            data.Set("parsedMeta", CommandData::Int(sample.calls)); data.Set("totalMs", CommandData::Double(sample.nanoseconds / 1000000.0));
+            return sample.calls > 0 ? Ok({}, std::move(data)) : Fail("serialization.boot_coverage_missing", "No catalog entries measured", std::move(data));
         }
 
         if (parts.size() < 3)
         {
             std::printf("[CLI] serialize.bench %s: 대상이 없다\n", mode.c_str());
-            return;
+            return InvalidArguments("serialize.bench requires a target");
         }
 
         const std::string target = parts[2];
-        const int iterations = (parts.size() >= 4)
-            ? (std::max)(1, std::atoi(parts[3].c_str()))
-            : 3;
+        int iterations = 3;
+        if (parts.size() > 4 || (parts.size() == 4 && (!ConsoleCmd::ParseNumber(parts[3], iterations) || iterations < 1 || iterations > 10000)))
+            return InvalidArguments("iterations must be 1..10000");
+        const auto stageData = [iterations](const SerializationProfile::Snapshot& snapshot) {
+            auto rows = CommandData::Array();
+            for (uint32_t i = 0; i < SerializationProfile::kStageCount; ++i) {
+                const auto stage = static_cast<SerializationProfile::Stage>(i); const auto& sample = snapshot[stage];
+                auto row = CommandData::Object(); row.Set("stage", CommandData::String(std::string(SerializationProfile::StageName(stage))));
+                row.Set("calls", CommandData::Int(sample.calls)); row.Set("totalUs", CommandData::Double(sample.nanoseconds / 1000.0));
+                row.Set("perIterUs", CommandData::Double(sample.nanoseconds / (1000.0 * iterations))); rows.Append(std::move(row));
+            }
+            return rows;
+        };
 
         if ("scene" == mode)
         {
@@ -1335,7 +1357,7 @@ namespace
             {
                 std::printf("[serialize.bench] mode=scene selfcheck=fail reason=warmup-load-failed target=%s\n",
                     target.c_str());
-                return;
+                return PreconditionFailed("scene.load_failed", "Benchmark warmup scene failed to load");
             }
 
             SerializationProfile::Reset();
@@ -1391,7 +1413,10 @@ namespace
                 std::printf("[serialize.bench] mode=scene selfcheck=fail reason=%s\n", failReason);
             else
                 std::printf("[serialize.bench] mode=scene selfcheck=pass\n");
-            return;
+            auto data = CommandData::Object(); data.Set("mode", CommandData::String(mode)); data.Set("config", CommandData::String(kSerializeBenchConfig));
+            data.Set("target", CommandData::String(target)); data.Set("iterations", CommandData::Int(iterations)); data.Set("loaded", CommandData::Int(loaded));
+            data.Set("stages", stageData(snapshot)); data.Set("rootUs", CommandData::Double(rootUs)); data.Set("childSumUs", CommandData::Double(childUs));
+            return failReason == nullptr ? Ok({}, std::move(data)) : Fail("serialization.benchmark_failed", failReason, std::move(data));
         }
 
         if ("prefab" == mode)
@@ -1407,7 +1432,7 @@ namespace
                 SerializationProfile::SetEnabled(false);
                 std::printf("[serialize.bench] mode=prefab selfcheck=fail reason=load-failed target=%s\n",
                     target.c_str());
-                return;
+                return PreconditionFailed("prefab.not_found", "Benchmark prefab failed to load");
             }
 
             int instantiated = 0;
@@ -1451,10 +1476,14 @@ namespace
                 std::printf("[serialize.bench] mode=prefab selfcheck=fail reason=%s\n", failReason);
             else
                 std::printf("[serialize.bench] mode=prefab selfcheck=pass\n");
-            return;
+            auto data = CommandData::Object(); data.Set("mode", CommandData::String(mode)); data.Set("config", CommandData::String(kSerializeBenchConfig));
+            data.Set("target", CommandData::String(target)); data.Set("iterations", CommandData::Int(iterations)); data.Set("instantiated", CommandData::Int(instantiated));
+            data.Set("stages", stageData(snapshot)); data.Set("parseOnLoad", CommandData::Int(parseOnLoad)); data.Set("nestedParse", CommandData::Int(totalParse >= parseOnLoad ? totalParse - parseOnLoad : 0));
+            return failReason == nullptr ? Ok({}, std::move(data)) : Fail("serialization.benchmark_failed", failReason, std::move(data));
         }
 
         std::printf("[CLI] serialize.bench: 알 수 없는 모드 '%s'\n", mode.c_str());
+        return InvalidArguments("Unknown serialization benchmark mode");
     }
 
 	CommandCore::CommandResult HandleSceneProxyBench(const std::vector<std::string>& parts)
@@ -3419,9 +3448,9 @@ namespace
 		    std::printf("[CLI] 활성 씬 없음\n");
 		    return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
 		}
-		if (parts.size() < 2 || "probe" != parts[1])
+		if (parts.size() != 4 || "probe" != parts[1])
 		{
-			std::printf("[CLI] 사용법: scene.transformbulk probe\n");
+			std::printf("[CLI] 사용법: scene.transformbulk probe <pose-model-path> <rebind-model-path>\n");
 			return CommandCore::InvalidArguments("scene.transformbulk: probe");
 		}
 
@@ -3436,15 +3465,14 @@ namespace
 				&& std::abs(lhs.y - rhs.y) <= 1e-4f
 				&& std::abs(lhs.z - rhs.z) <= 1e-4f;
 		};
-		// MBC9 — 합성 legacy Skeleton 대신 코퍼스의 typed generation 둘(Gunner·SU)을
-		// 쓴다. 본 엔티티 이름은 Gunner 스켈레톤의 첫 두 본에서 읽고(인덱스 0·1 →
-		// m_localTransforms[0..1]), 재로드 축은 SU로 rebind해 신원이 바뀌는 것을 잰다.
-		const auto gunner = DataSystems->FindModelAssetGenerationByStem("Gunner_F_Mythic");
-		const auto su = DataSystems->FindModelAssetGenerationByStem("SU_Mythic");
-		const assets::ModelSkeletonAsset* gunnerSkeleton =
-			gunner ? gunner->Skeleton() : nullptr;
-		if (nullptr == gunnerSkeleton || gunnerSkeleton->bones.size() < 2
-			|| !su || nullptr == su->Skeleton())
+		// The caller owns both fixture inputs; the probe requires two distinct skeleton identities.
+		const auto poseModel = DataSystems->LoadModelAssetGenerationByPath(parts[2]);
+		const auto rebindModel = DataSystems->LoadModelAssetGenerationByPath(parts[3]);
+		const assets::ModelSkeletonAsset* poseSkeleton =
+			poseModel ? poseModel->Skeleton() : nullptr;
+		if (nullptr == poseSkeleton || poseSkeleton->bones.size() < 2
+			|| !rebindModel || nullptr == rebindModel->Skeleton()
+            || poseModel == rebindModel)
 		{
 			std::printf("[scene.transformbulk] probe=FAIL skeleton=0\n");
 			// 스켈레톤 자산이 없으면 잴 것이 없다. 자산 부재는 이 기계의 사정이라
@@ -3452,8 +3480,8 @@ namespace
 			return CommandCore::PreconditionFailed("scene.transformbulk.no_skeleton",
 				"스켈레톤이 없다(skeleton=0)");
 		}
-		const std::string boneAName = gunnerSkeleton->bones[0].name;
-		const std::string boneBName = gunnerSkeleton->bones[1].name;
+		const std::string boneAName = poseSkeleton->bones[0].name;
+		const std::string boneBName = poseSkeleton->bones[1].name;
 		const auto bindAnimator = [](Animator& target, const FileGuid& modelId)
 		{
 			target.m_Motion = modelId;
@@ -3501,7 +3529,7 @@ namespace
 				"probe 픽스처를 만들지 못했다(create=0)");
 		}
 
-		bindAnimator(*animator, FileGuid(gunner->Identity().modelId));
+		bindAnimator(*animator, FileGuid(poseModel->Identity().modelId));
 		invalidBone->Transform_().SetPosition({ 0.f, 7.f, 0.f });
 		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
 
@@ -3533,7 +3561,7 @@ namespace
 		const bool reenabledWorld = nearVector(
 			boneB->Transform_().GetWorldPosition(), { 9.f, 4.f, 0.f });
 
-		bindAnimator(*animator, FileGuid(su->Identity().modelId));
+		bindAnimator(*animator, FileGuid(rebindModel->Identity().modelId));
 		const AnimatorPoseUploadMetrics reloaded = scene->PublishAnimatorPose(*animator);
 		scene->SyncDerivedState(TransformSyncPoint::Benchmark);
 		const bool animatorPass = first.packed && first.rebound
@@ -3610,7 +3638,7 @@ namespace
 			return CommandCore::Fail("scene.transformbulk.probe_failed",
 				"probe 판정 실패", std::move(data));
 		}
-		return CommandCore::Ok("scene.transformbulk probe PASS", std::move(data));
+		return CommandCore::Ok("scene.transformbulk probe <pose-model-path> <rebind-model-path> PASS", std::move(data));
 	}
 
     // X0 측정 게이트(TransformUpdatePlan). flat fan-out, wide tree, deep chain,
@@ -4015,7 +4043,6 @@ namespace ConsoleCmd
 
     struct CommandEntry
     {
-        ConsoleCommandHandler       legacy{ nullptr };
         ConsoleCommandResultHandler modern{ nullptr };
 
         // 예외를 결과로 바꾸지 않고 그대로 빠져나가게 둔다.
@@ -4037,32 +4064,13 @@ namespace ConsoleCmd
 
         CommandCore::CommandResult Invoke(const ConsoleCommandContext& ctx) const
         {
-            if (nullptr != modern) return modern(ctx);
-            if (nullptr == legacy)
-            {
-                return CommandCore::InternalError("command.empty_entry", "핸들러가 비어 있다");
-            }
-
-            // ★ legacy 핸들러가 exit code 로 남긴 판정을 되읽는다.
-            //
-            //   session 이 매 명령마다 exit code 를 쓰므로, 이 관측이 없으면
-            //   아직 이행되지 않은 핸들러가 직접 쓴 값이 같은 프레임 안에서
-            //   0 으로 덮인다. 실측으로 확인한 회귀다 — `material.corpus.probe`
-            //   를 인자 없이 부르면 핸들러가 6 을 썼는데 프로세스는 0 으로 끝났다.
-            //
-            //   관측한 뒤 값을 원래대로 되돌린다. 최종 exit code 를 정하는 곳은
-            //   session 하나여야 하고(§14.1), 여기서 남겨 두면 그 규약이 깨진다.
-            const int before = EngineBootstrap::g_exitCode;
-            legacy(ctx);
-            const int written = EngineBootstrap::g_exitCode;
-            EngineBootstrap::g_exitCode = before;
-
-            if (written != before) return CommandCore::LegacyDirectExit(written);
-            return CommandCore::LegacyUnreported();
+            return modern ? modern(ctx) : CommandCore::InternalError("command.empty_entry", "Command handler is empty");
         }
     };
 
     using Table = std::unordered_map<std::string, CommandEntry>;
+
+    Table& CommandletTable() { static Table table; return table; }
 
     const Table& GetTable()
     {
@@ -4073,7 +4081,7 @@ namespace ConsoleCmd
             // 등록 본체. 두 서명이 같은 경로로 들어가야 중복 검사·inventory 가
             // 한 곳에 남는다.
             auto regEntry = [&t](std::initializer_list<const char*> names,
-                                 CommandEntry entry, const void* handlerKey)
+                                 CommandEntry entry)
             {
                 // LC0: canonical↔alias 관계와 handler 그룹을 한 벌 더 남긴다.
                 //
@@ -4087,24 +4095,26 @@ namespace ConsoleCmd
                 //   그대로 inventory에 적으면 실제로는 죽어 있는 이름이 "이
                 //   handler로 간다"고 주장하게 된다. LC0이 없애려는 drift를
                 //   LC0이 만드는 셈이라, 살아남은 이름과 버려진 이름을 나눈다.
+                const auto* registrationSeed = CommandCore::FindDescriptorSeed(*names.begin());
+                const bool commandlet = registrationSeed && registrationSeed->commandlet;
+                Table& destination = commandlet ? CommandletTable() : t;
                 std::vector<const char*> accepted;
                 std::vector<const char*> rejected;
                 for (const char* n : names)
                 {
                     // 같은 이름을 두 번 등록하면 조용히 한쪽이 먹힌다.
-                    const bool inserted = t.emplace(n, entry).second;
+                    const bool inserted = destination.emplace(n, entry).second;
                     if (!inserted) { std::printf("[CLI] 명령 이름 중복 등록: %s\n", n); }
                     (inserted ? accepted : rejected).push_back(n);
                 }
 
-                CommandBaseline::RecordRegistration(accepted, rejected, handlerKey);
 
                 // ── LC3: schema 를 함께 세운다 ──────────────────────────
                 //
                 // descriptor 가 없으면 registry 가 문제로 기록하고, selftest 가
                 // 그것을 판정한다. 서명이 요구하지 않으면 아무도 안 쓴다 —
                 // 78 개가 help 에 없던 이유가 그것이므로, 여기서 막는다.
-                CommandCore::CommandRegistry& registry = CommandCore::CommandRegistry::Get();
+                CommandCore::CommandRegistry& registry = commandlet ? CommandCore::CommandRegistry::Commandlets() : CommandCore::CommandRegistry::Get();
 
                 // 조회 표에 못 들어간 이름을 registry 에도 알린다.
                 //
@@ -4142,6 +4152,24 @@ namespace ConsoleCmd
                     descriptor.cls      = seed->cls;
                     descriptor.liveness = seed->liveness;
                     descriptor.roles    = seed->roles;   // LC8
+                    descriptor.undoable = seed->undoable;
+                    const std::string fields = seed->namedParameters;
+                    descriptor.hasNamedInput = !fields.empty();
+                    if (fields != "()") for (std::size_t start = 0; start < fields.size();)
+                    {
+                        const auto comma = fields.find(',', start);
+                        std::string spec = fields.substr(start, comma == std::string::npos ? comma : comma - start);
+                        CommandCore::CommandParameter parameter;
+                        const auto equal = spec.find('=');
+                        parameter.optional = equal != std::string::npos;
+                        if (parameter.optional) { parameter.defaultValue = spec.substr(equal + 1); spec.resize(equal); }
+                        const auto colon = spec.find(':');
+                        parameter.name = spec.substr(0, colon);
+                        if (colon != std::string::npos) parameter.kind = spec.substr(colon + 1);
+                        descriptor.namedParameters.push_back(std::move(parameter));
+                        if (comma == std::string::npos) break;
+                        start = comma + 1;
+                    }
 
                     // ── LC7: 사용자 코드 창을 여는 권한을 조회 표에도 박는다 ──
                     //
@@ -4156,47 +4184,29 @@ namespace ConsoleCmd
                     descriptor.executesUserCode = seed->executesUserCode;
                     if (seed->executesUserCode)
                     {
-                        for (const char* name : accepted) t[name].executesUserCode = true;
+                        for (const char* name : accepted) destination[name].executesUserCode = true;
                     }
                 }
                 // summary 가 비면 Add 가 거부하고 사유를 남긴다.
                 registry.Add(std::move(descriptor));
             };
 
-            // 이행 전 핸들러. 결과를 내지 않으므로 LegacyUnreported 가 된다.
-            auto reg = [&regEntry](std::initializer_list<const char*> names,
-                                   ConsoleCommandHandler fn)
-            {
-                // 함수 포인터 → const void* 는 표준이 conditionally-supported로
-                // 두는 변환이다. MSVC/Win32에서는 성립하고 이 값은 **비교와
-                // 그룹핑에만** 쓴다(주소를 artifact에 싣지 않는다). LC4에서 이
-                // 파일이 Engine 공용 모듈로 옮겨 갈 때 다시 판정할 자리다.
-                CommandEntry entry;
-                entry.legacy = fn;
-                regEntry(names, entry, reinterpret_cast<const void*>(fn));
-            };
-
-            // LC1 이후의 핸들러. 결과를 낸다.
-            //
-            // 이름을 `reg` 와 다르게 둔 것은 오버로드 해석에 기대지 않기
-            // 위해서다 — 두 서명이 겹칠 일은 없지만, 이행 중에는 "이 명령이
-            // 넘어갔는가"가 등록 줄만 보고 눈에 보여야 한다.
             auto regResult = [&regEntry](std::initializer_list<const char*> names,
                                          ConsoleCommandResultHandler fn)
             {
                 CommandEntry entry;
                 entry.modern = fn;
-                regEntry(names, entry, reinterpret_cast<const void*>(fn));
+                regEntry(names, entry);
             };
 
             // 일부러 프로세스를 죽이는 명령. 예외 경계를 통과시킨다.
             auto regEscaping = [&regEntry](std::initializer_list<const char*> names,
-                                           ConsoleCommandHandler fn)
+                                           ConsoleCommandResultHandler fn)
             {
                 CommandEntry entry;
-                entry.legacy              = fn;
+                entry.modern              = fn;
                 entry.letExceptionsEscape = true;
-                regEntry(names, entry, reinterpret_cast<const void*>(fn));
+                regEntry(names, entry);
             };
 
             // ── LC6: 도메인 TU 가 자기 명령을 등록한다 ──────────────────
@@ -4209,29 +4219,20 @@ namespace ConsoleCmd
             // 가상 함수가 있으므로 집합체가 아니다 — 생성자로 묶는다.
             struct TableRegistrar final : Registrar
             {
-                decltype(reg)*         legacy;
                 decltype(regResult)*   result;
                 decltype(regEscaping)* escaping;
 
-                TableRegistrar(decltype(reg)& l, decltype(regResult)& r,
+                TableRegistrar(decltype(regResult)& r,
                                decltype(regEscaping)& e) noexcept
-                    : legacy(&l), result(&r), escaping(&e) {}
+                    : result(&r), escaping(&e) {}
 
-                void Legacy(std::initializer_list<const char*> names,
-                            ConsoleCommandHandler fn) override { (*legacy)(names, fn); }
                 void Result(std::initializer_list<const char*> names,
                             ConsoleCommandResultHandler fn) override { (*result)(names, fn); }
                 void Escaping(std::initializer_list<const char*> names,
-                              ConsoleCommandHandler fn) override { (*escaping)(names, fn); }
+                              ConsoleCommandResultHandler fn) override { (*escaping)(names, fn); }
 
-                // 검사는 명령이 아니다 — registry 를 거치지 않고 표로 간다.
-                void SelfTest(const char* name,
-                              ConsoleCommandResultHandler fn) override
-                {
-                    ConsoleCmd::RegisterSelfTest(name, fn);
-                }
             };
-            TableRegistrar registrar(reg, regResult, regEscaping);
+            TableRegistrar registrar(regResult, regEscaping);
 
             RegisterRenderTestCommands(registrar);
             RegisterRenderDebugCommands(registrar);
@@ -4244,24 +4245,38 @@ namespace ConsoleCmd
             // LC3: discovery. 소비자가 C++ 소스를 긁지 않게 한다.
             // LC0(PHASE 14.5) 기준선 계측. 거동 변경 0 — 재고 찍기만 한다.
             // 죽는 것이 일인 명령 — 예외 경계를 통과시킨다(위 regEscaping 주석).
-            reg({ "reflect.golden" }, [](const ConsoleCommandContext& c) { HandleReflectGolden(c.parts); });
-            reg({ "perf.reflect" }, [](const ConsoleCommandContext& c) { HandlePerfReflect(c.parts); });
+            regResult({ "reflect.golden" }, [](const ConsoleCommandContext& c) { return HandleReflectGolden(c.parts); });
             regResult({ "scene.flag" }, [](const ConsoleCommandContext& c) { return HandleSceneFlag(c.parts); });
             regResult({ "prefab.objectguid" }, [](const ConsoleCommandContext& c) { return HandlePrefabObjectGuid(c.parts); });
 			regResult({ "scene.transformstats" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformStats(c.parts); });
-			regResult({ "scene.transformwritestats" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformWriteStats(c.parts); });
+			regResult({ "scene.transformwritestats" }, [](const ConsoleCommandContext& c) { if (c.parts.size() > 2 || (c.parts.size() == 2 && c.parts[1] != "0" && c.parts[1] != "1" && c.parts[1] != "print")) return CommandCore::InvalidArguments("Verification requires --commandlet scene.transformwritestats.check", "commandlet.required"); return HandleSceneTransformWriteStats(c.parts); });
 			regResult({ "scene.transformdomains" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformDomains(c.parts); });
 			regResult({ "scene.hierarchymutation" }, [](const ConsoleCommandContext& c) { return HandleSceneHierarchyMutation(c.parts); });
 			regResult({ "scene.executiongraph" }, [](const ConsoleCommandContext& c) { return HandleSceneExecutionGraph(c.parts); });
-			regResult({ "scene.sparseresolver" }, [](const ConsoleCommandContext& c) { return HandleSceneSparseResolver(c.parts); });
-			regResult({ "scene.transformpull" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformPull(c.parts); });
+			regResult({ "scene.sparseresolver" }, [](const ConsoleCommandContext& c) { if (c.parts.size() > 2 || (c.parts.size() == 2 && c.parts[1] != "0" && c.parts[1] != "1" && c.parts[1] != "print")) return CommandCore::InvalidArguments("Verification requires --commandlet scene.sparseresolver.check", "commandlet.required"); return HandleSceneSparseResolver(c.parts); });
+			regResult({ "scene.transformpull" }, [](const ConsoleCommandContext& c) { if (c.parts.size() > 2 || (c.parts.size() == 2 && c.parts[1] != "print")) return CommandCore::InvalidArguments("Verification requires --commandlet scene.transformpull.check", "commandlet.required"); return HandleSceneTransformPull(c.parts); });
 			regResult({ "scene.transformbulk" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformBulk(c.parts); });
             regResult({ "scene.traversalbench" }, [](const ConsoleCommandContext& c) { return HandleSceneTraversalBench(c.parts); });
+            regResult({ "scene.transformwritestats.check" }, [](const ConsoleCommandContext& c) {
+                if (c.parts.size() != 2 || c.parts[1] != "probe")
+                    return CommandCore::InvalidArguments("Commandlet requires probe");
+                return HandleSceneTransformWriteStats(c.parts);
+            });
+            regResult({ "scene.sparseresolver.check" }, [](const ConsoleCommandContext& c) {
+                if (c.parts.size() < 2 || (c.parts[1] != "probe" && c.parts[1] != "bench"))
+                    return CommandCore::InvalidArguments("Commandlet requires probe or bench");
+                return HandleSceneSparseResolver(c.parts);
+            });
+            regResult({ "scene.transformpull.check" }, [](const ConsoleCommandContext& c) {
+                if (c.parts.size() != 2 || c.parts[1] != "probe")
+                    return CommandCore::InvalidArguments("Commandlet requires probe");
+                return HandleSceneTransformPull(c.parts);
+            });
             regResult({ "scene.bonedump" }, [](const ConsoleCommandContext& c) { return HandleSceneBoneDump(c.parts); });
             regResult({ "scene.transformdigest" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformDigest(c.parts); });
-            reg({ "serialize.bench" }, [](const ConsoleCommandContext& c) { HandleSerializeBench(c.parts); });
-            reg({ "serialize.nodeequal" }, [](const ConsoleCommandContext& c) { HandleSerializeNodeEqual(c.parts); });
-            reg({ "serialize.rymlerror" }, [](const ConsoleCommandContext& c) { HandleSerializeRymlError(c.parts); });
+            regResult({ "serialize.bench" }, [](const ConsoleCommandContext& c) { return HandleSerializeBench(c.parts); });
+            regResult({ "serialize.nodeequal" }, [](const ConsoleCommandContext& c) { return HandleSerializeNodeEqual(c.parts); });
+            regResult({ "serialize.rymlerror" }, [](const ConsoleCommandContext& c) { return HandleSerializeRymlError(c.parts); });
             regResult({ "scene.proxybench" }, [](const ConsoleCommandContext& c) { return HandleSceneProxyBench(c.parts); });
 			regResult({ "scene.proxydirty" }, [](const ConsoleCommandContext& c) { return HandleSceneProxyDirty(c.parts); });
 
@@ -4295,10 +4310,13 @@ CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
 
     const std::string& cmd = parts[0];
 
-    const auto& table = ConsoleCmd::GetTable();
+    const auto& live = ConsoleCmd::GetTable();
+    const auto& tests = ConsoleCmd::CommandletTable();
+    const auto& table = m_commandletMode && tests.contains(cmd) ? tests : live;
     const auto it = table.find(cmd);
     if (it == table.end())
     {
+        if (m_commandletMode) return EditorCommandlets::Run(parts);
         // ★ 예전에는 여기서 printf 하고 그냥 return 했다.
         //
         //   그래서 오타 하나가 exit 0 이었고, help 가 안내하지만 등록돼 있지
@@ -4425,12 +4443,8 @@ void ConsoleCommandSystem::PublishResult(const std::string& commandId,
 
     // 사람이 읽는 줄. **판정의 정본이 아니다** — 정본은 session 이 든 결과다.
     //
-    // 성공과 legacy 는 조용히 지나간다. 이행 전 핸들러 184 개가 매번 한 줄을
-    // 더 찍으면 기존 시나리오의 출력 형상이 통째로 달라지고, 그 출력을 정규식으로
-    // 읽는 소비자가 아직 살아 있다(LC0 실측: 1 개). LC9 가 그것을 옮긴 뒤에
-    // 사람용 출력을 정리한다.
-    if (CommandCore::CommandStatus::Succeeded == result.status ||
-        CommandCore::CommandStatus::LegacyUnreported == result.status)
+    // Successful results are recorded without an additional diagnostic line.
+    if (CommandCore::CommandStatus::Succeeded == result.status)
     {
         return;
     }

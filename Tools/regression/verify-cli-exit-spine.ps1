@@ -9,7 +9,7 @@ param(
 
 # LC1 (PHASE 14.5) — exit spine 의 동적 판정 + 이행 래칫.
 #
-# verify-cli-exit-contract.ps1 이 "실패가 종료 코드로 나오는가"를 보는 반면,
+# Completed LC0 canaries were consolidated here; this gate checks terminal outcomes.
 # 이 게이트는 그 반대편 셋을 본다.
 #
 #   ① 성공만 있는 실행은 0 이어야 한다. 실패를 잡느라 성공을 비-0 으로 만드는
@@ -92,7 +92,7 @@ function Invoke-Scenario {
     (($Commands + 'quit') -join "`n") | Set-Content -LiteralPath $scriptPath -Encoding UTF8
 
     $outPath = Join-Path $Work "spine_$Name.out"
-    $arguments = @('--script', $scriptPath) + $ExtraArgs
+    $arguments = @('--commandlet-script', $scriptPath) + $ExtraArgs
     $proc = Start-Process -FilePath $Exe -ArgumentList $arguments -WorkingDirectory $exeDir `
         -RedirectStandardOutput $outPath `
         -RedirectStandardError (Join-Path $Work "spine_$Name.err") -PassThru
@@ -114,25 +114,13 @@ function Assert-Exit {
     "{0,-24} exit={1} (기대 {2})" -f $Name, $Result.ExitCode, $Expected
 }
 
-# ① 성공만 있는 실행은 0 이다.
-#
-#    이행한 명령(help/wait/scene.load…)과 legacy 명령을 섞는다. legacy 는
-#    LegacyUnreported 를 내는데 그것이 exit 0 으로 사상되지 않으면 아직
-#    이행되지 않은 명령 199 개가 전부 실패로 뒤집힌다.
-Assert-Exit 'all-success' (Invoke-Scenario 'all_success' @('help', 'wait 2', 'crash.status')) 0 `
-    'LegacyUnreported 가 exit 0 으로 사상되지 않으면 미이행 명령이 전부 실패가 된다'
+Assert-Exit 'unknown-command' (Invoke-Scenario 'unknown' @('this.command.does.not.exist')) 2 'Unknown commandlet must fail'
 
-# ★ legacy 핸들러의 직접 exit 쓰기가 살아남는가.
-#
-#   이 케이스가 없어서 실제 회귀를 놓쳤다. session 이 매 명령마다 exit code 를
-#   쓰기 시작하자, 아직 이행되지 않은 핸들러가 직접 쓴 값이 같은 프레임 안에서
-#   0 으로 덮였다 — `material.corpus.probe` 를 인자 없이 부르면 핸들러가 6 을
-#   쓰는데 프로세스는 0 으로 끝났다. LC1 이 고치려던 결함을 LC1 이 더 나쁜
-#   형태로 만든 자리였고, 정적 래칫은 호출 **수**만 세므로 잡지 못했다.
-#
-#   래칫이 0 에 닿을 때까지(=legacy 직접 쓰기가 남아 있는 동안) 이 케이스를 둔다.
-Assert-Exit 'legacy-direct-exit' (Invoke-Scenario 'legacy_direct' @('material.corpus.probe')) 4 `
-    'legacy 핸들러의 SetExitCode(6)가 session 에 흡수돼 §5.4 의 4 로 나와야 한다'
+# Terminal success and validation failures must reach the process exit code.
+Assert-Exit 'all-success' (Invoke-Scenario 'all_success' @('help', 'wait 2', 'crash.status')) 0 'Successful commands must exit 0'
+Assert-Exit 'commandlet-invalid' (Invoke-Scenario 'commandlet_invalid' @('material.corpus.probe')) 2 'Malformed Commandlet arguments must exit 2'
+
+Assert-Exit 'commandlet-failure' (Invoke-Scenario 'commandlet_failure' @('material.corpus.probe __missing_material__')) 4 'Domain verification failure must exit 4'
 
 # 인자 오류.
 Assert-Exit 'wait-garbage' (Invoke-Scenario 'wait_garbage' @('wait abc')) 2 `

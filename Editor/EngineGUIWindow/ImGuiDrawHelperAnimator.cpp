@@ -1,3 +1,4 @@
+#include "EditorObjectOperations.h"
 #include "ReflectionImGuiHelper.h"
 #include "ReflectionTypedDraw.h"
 #include "ClrHost.h"
@@ -387,19 +388,19 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 						{
 							if (ImGui::MenuItem("Add Float"))
 							{
-								animator->AddDefaultParameter(ValueType::Float);
+								EditorObjectOperations::AnimatorDefaultParameter(*animator, ValueType::Float);
 							}
 							if (ImGui::MenuItem("Add Int"))
 							{
-								animator->AddDefaultParameter(ValueType::Int);
+								EditorObjectOperations::AnimatorDefaultParameter(*animator, ValueType::Int);
 							}
 							if (ImGui::MenuItem("Add Bool"))
 							{
-								animator->AddDefaultParameter(ValueType::Bool);
+								EditorObjectOperations::AnimatorDefaultParameter(*animator, ValueType::Bool);
 							}
 							if (ImGui::MenuItem("Add Trigger"))
 							{
-								animator->AddDefaultParameter(ValueType::Trigger);
+								EditorObjectOperations::AnimatorDefaultParameter(*animator, ValueType::Trigger);
 							}
 							ImGui::EndPopup();
 						}

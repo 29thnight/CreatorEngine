@@ -1,3 +1,5 @@
+﻿#include "../EditorDiagnostics.h"
+#include "../EditorProjectOperations.h"
 // LC6 (PHASE 14.5) — AssetAuthoring 도메인 명령.
 //
 // `assets.*` · `asset.*` · `material.*` · `model.*` · `terrain.*` · `foliage.*` ·
@@ -23,8 +25,8 @@
 
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
+#include "EditorObjectOperations.h"
 
-#include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
@@ -116,10 +118,6 @@
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
 #include "ShaderMeta.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
-#include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
@@ -160,15 +158,16 @@
 
 namespace ConsoleCmd
 {
-    static void Cmd_model_load(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_model_load(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: model.load <모델 경로>\n");
-            return;
+            return InvalidArguments("model.load requires a model path");
         }
 
 		// 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
@@ -181,167 +180,187 @@ namespace ConsoleCmd
 		if (imported.empty())
 		{
 			std::printf("[CLI] 모델 임포트 실패: %s\n", path.c_str());
-			return;
+			return Fail("model.import_failed", "Model import failed: " + path);
 		}
 		const std::shared_ptr<const assets::ModelAssetGeneration> loadedGeneration =
 			DataSystems->LoadModelAssetGenerationByPath(imported.string());
 		if (!loadedGeneration)
 		{
 			std::printf("[CLI] 모델 generation 로드 실패: %s\n", imported.string().c_str());
-			return;
+			return Fail("model.load_failed", "Model generation load failed: " + imported.string());
 		}
 		const char* cacheResult = previousGeneration &&
 			previousGeneration != loadedGeneration ? "reloaded" : "loaded";
 		std::printf("[CLI] 모델 임포트 및 로드 요청: %s (runtime-cache=%s)\n",
 			imported.string().c_str(), cacheResult);
+        auto data = CommandData::Object();
+        data.Set("path", CommandData::String(imported.string()));
+        data.Set("cache", CommandData::String(cacheResult));
+        return Ok({}, std::move(data));
     }
 
-	static void Cmd_terrain_authoring_probe(const ConsoleCommandContext& ctx)
-	{
-		if (ctx.parts.size() < 3)
-		{
-			std::printf("[terrain.authoring.probe] usage: <name> <texture|->\n");
-			return;
-		}
+    static CommandCore::CommandResult Cmd_terrain_authoring_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 3) return InvalidArguments("terrain.authoring.probe <name> <texture|->");
+        if (ctx.parts.size() < 3)
+        {
+            std::printf("[terrain.authoring.probe] usage: <name> <texture|->\n");
+            return InvalidArguments("terrain.authoring.probe <name> <texture|->");
+        }
 
-		TerrainAuthoringRequest request{};
-		request.destinationDirectory = PathFinder::Relative("Terrain");
-		request.name = StringToWstring(ctx.parts[1]);
-		request.terrainId = 73;
-		request.width = 2;
-		request.height = 2;
-		request.minHeight = -4.0f;
-		request.maxHeight = 8.0f;
-		request.heightMap = { -4.0f, 0.5f, 3.0f, 8.0f };
+        TerrainAuthoringRequest request{};
+        request.destinationDirectory = PathFinder::Relative("Terrain");
+        request.name = StringToWstring(ctx.parts[1]);
+        request.terrainId = 73;
+        request.width = 2;
+        request.height = 2;
+        request.minHeight = -4.0f;
+        request.maxHeight = 8.0f;
+        request.heightMap = { -4.0f, 0.5f, 3.0f, 8.0f };
 
-		TerrainAuthoringLayerSnapshot layer{};
-		layer.layerId = 0;
-		layer.name = "ProbeLayer";
-		layer.diffuseTextureSource = ctx.parts[2] == "-"
-			? request.destinationDirectory / "__missing_terrain_probe__.png"
-			: file::path(ctx.parts[2]);
-		layer.tiling = 2.0f;
-		layer.splatWeights = { 0.0f, 0.25f, 0.75f, 1.0f };
-		request.layers.push_back(std::move(layer));
+        TerrainAuthoringLayerSnapshot layer{};
+        layer.layerId = 0;
+        layer.name = "ProbeLayer";
+        layer.diffuseTextureSource = ctx.parts[2] == "-"
+            ? request.destinationDirectory / "__missing_terrain_probe__.png"
+            : file::path(ctx.parts[2]);
+        layer.tiling = 2.0f;
+        layer.splatWeights = { 0.0f, 0.25f, 0.75f, 1.0f };
+        request.layers.push_back(std::move(layer));
 
-		TerrainAuthoringResult result{};
-		const bool written = AssetAuthoringPort::WriteTerrain(request, result);
-		bool roundTrip = false;
-		std::size_t layers = 0;
-		if (written)
-		{
-			TerrainComponent restored;
-			roundTrip = restored.Load(result.descriptorPath.wstring());
-			layers = restored.GetLayerCount().size();
-			const float* heights = restored.GetHeightMap();
-			roundTrip = roundTrip && restored.GetWidth() == 2
-				&& restored.GetHeight() == 2 && layers == 1 && heights
-				&& heights[0] == -4.0f && heights[1] == 0.5f
-				&& heights[2] == 3.0f && heights[3] == 8.0f
-				&& restored.m_trrainAssetGuid == result.guid;
-		}
-		std::printf(
-			"[terrain.authoring.probe] %s path=%s guid=%s roundtrip=%s "
-			"width=2 height=2 layers=%zu\n",
-			written ? "committed" : "rejected",
-			result.descriptorPath.string().c_str(),
-			result.guid.ToString().c_str(), roundTrip ? "PASS" : "FAIL", layers);
-		if (written && !roundTrip) EngineBootstrap::SetExitCode(5);
-	}
+        TerrainAuthoringResult result{};
+        const bool written = AssetAuthoringPort::WriteTerrain(request, result);
+        bool roundTrip = false;
+        std::size_t layers = 0;
+        if (written)
+        {
+            TerrainComponent restored;
+            roundTrip = restored.Load(result.descriptorPath.wstring());
+            layers = restored.GetLayerCount().size();
+            const float* heights = restored.GetHeightMap();
+            roundTrip = roundTrip && restored.GetWidth() == 2
+                && restored.GetHeight() == 2 && layers == 1 && heights
+                && heights[0] == -4.0f && heights[1] == 0.5f
+                && heights[2] == 3.0f && heights[3] == 8.0f
+                && restored.m_trrainAssetGuid == result.guid;
+        }
+        std::printf(
+            "[terrain.authoring.probe] %s path=%s guid=%s roundtrip=%s "
+            "width=2 height=2 layers=%zu\n",
+            written ? "committed" : "rejected",
+            result.descriptorPath.string().c_str(),
+            result.guid.ToString().c_str(), roundTrip ? "PASS" : "FAIL", layers);
+
+        auto data = CommandData::Object();
+        data.Set("written", CommandData::Bool(written));
+        data.Set("roundTrip", CommandData::Bool(roundTrip));
+        data.Set("path", CommandData::String(result.descriptorPath.string()));
+        data.Set("layers", CommandData::Int(layers));
+        return (ctx.parts[2] == "-" ? !written : written && roundTrip) ? Ok({}, std::move(data)) : Fail("terrain.authoring.failed", "Commandlet verification failed", std::move(data));
+    }
 
 	// Foliage 저작 트랜잭션을 실행 중인 Editor에서 그대로 태운다. escape 인자는
 	// 목적지가 Foliage 루트를 벗어났을 때 거부되는지 보는 음성 경로다.
 
-	static void Cmd_foliage_authoring_probe(const ConsoleCommandContext& ctx)
-	{
-		if (ctx.parts.size() < 2)
-		{
-			std::printf("[foliage.authoring.probe] usage: <name> [escape]\n");
-			return;
-		}
+    static CommandCore::CommandResult Cmd_foliage_authoring_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3 || (ctx.parts.size() == 3 && ctx.parts[2] != "escape")) return InvalidArguments("foliage.authoring.probe <name> [escape]");
+        if (ctx.parts.size() < 2)
+        {
+            std::printf("[foliage.authoring.probe] usage: <name> [escape]\n");
+            return InvalidArguments("foliage.authoring.probe <name> [escape]");
+        }
 
-		const bool escape = ctx.parts.size() >= 3 && ctx.parts[2] == "escape";
+        const bool escape = ctx.parts.size() >= 3 && ctx.parts[2] == "escape";
 
-		TextAssetAuthoringRequest request{};
-		request.destinationDirectory = escape
-			? PathFinder::Relative("Terrain") : PathFinder::Relative("Foliage");
-		request.name = StringToWstring(ctx.parts[1]);
+        TextAssetAuthoringRequest request{};
+        request.destinationDirectory = escape
+            ? PathFinder::Relative("Terrain") : PathFinder::Relative("Foliage");
+        request.name = StringToWstring(ctx.parts[1]);
 
-		FoliageInstance source{};
-		source.m_position = { 12.5f, 3.25f, -8.75f };
-		source.m_rotation = { 15.f, 90.f, 270.f };
-		source.m_scale = { 0.5f, 1.25f, 2.f };
-		source.m_foliageTypeID = 7;
-		source.m_isCulled = true;
-		source.RebuildWorldMatrix();
+        FoliageInstance source{};
+        source.m_position = { 12.5f, 3.25f, -8.75f };
+        source.m_rotation = { 15.f, 90.f, 270.f };
+        source.m_scale = { 0.5f, 1.25f, 2.f };
+        source.m_foliageTypeID = 7;
+        source.m_isCulled = true;
+        source.RebuildWorldMatrix();
 
-		Authoring::WriteDocument assetDocument;
-		const Authoring::WriteNode foliageAsset =
-			assetDocument.Root().Child("FoliageAsset");
-		foliageAsset.Child("Types").SetSequence();
-		const Authoring::WriteNode instances = foliageAsset.Child("Instances");
-		instances.SetSequence();
-		Meta::SerializeInto(&source, Meta::TypeOf<FoliageInstance>(),
-			instances.Append());
-		request.payload = assetDocument.Dump();
+        Authoring::WriteDocument assetDocument;
+        const Authoring::WriteNode foliageAsset =
+            assetDocument.Root().Child("FoliageAsset");
+        foliageAsset.Child("Types").SetSequence();
+        const Authoring::WriteNode instances = foliageAsset.Child("Instances");
+        instances.SetSequence();
+        Meta::SerializeInto(&source, Meta::TypeOf<FoliageInstance>(),
+            instances.Append());
+        request.payload = assetDocument.Dump();
 
-		TextAssetAuthoringResult result{};
-		const bool written = AssetAuthoringPort::WriteFoliage(request, result);
-		bool schemaStable = false;
-		bool roundTrip = false;
-		bool derivedWorld = false;
-		if (written)
-		{
-			try
-			{
-				std::string parseError;
-				Authoring::ParsedDocument published =
-					Authoring::ParsedDocument::ParseFile(result.assetPath.string(), parseError);
-				if (!published)
-					throw std::runtime_error(parseError);
-				const Authoring::ReadNode publishedInstances =
-					published.Root()["FoliageAsset"]["Instances"];
-				if (publishedInstances.IsSequence() && 1 == publishedInstances.Size())
-				{
-					const Authoring::ReadNode instanceNode = publishedInstances.At(0);
-					schemaStable = 4 == instanceNode.Size() &&
-						instanceNode["m_position"] && instanceNode["m_rotation"] &&
-						instanceNode["m_scale"] && instanceNode["m_foliageTypeID"] &&
-						!instanceNode["m_isCulled"] && !instanceNode["m_worldMatrix"];
+        TextAssetAuthoringResult result{};
+        const bool written = AssetAuthoringPort::WriteFoliage(request, result);
+        bool schemaStable = false;
+        bool roundTrip = false;
+        bool derivedWorld = false;
+        if (written)
+        {
+            try
+            {
+                std::string parseError;
+                Authoring::ParsedDocument published =
+                    Authoring::ParsedDocument::ParseFile(result.assetPath.string(), parseError);
+                if (!published)
+                    throw std::runtime_error(parseError);
+                const Authoring::ReadNode publishedInstances =
+                    published.Root()["FoliageAsset"]["Instances"];
+                if (publishedInstances.IsSequence() && 1 == publishedInstances.Size())
+                {
+                    const Authoring::ReadNode instanceNode = publishedInstances.At(0);
+                    schemaStable = 4 == instanceNode.Size() &&
+                        instanceNode["m_position"] && instanceNode["m_rotation"] &&
+                        instanceNode["m_scale"] && instanceNode["m_foliageTypeID"] &&
+                        !instanceNode["m_isCulled"] && !instanceNode["m_worldMatrix"];
 
-					FoliageInstance loaded{};
-					Meta::Deserialize(&loaded, instanceNode);
-					roundTrip = loaded.m_position == source.m_position &&
-						loaded.m_rotation == source.m_rotation &&
-						loaded.m_scale == source.m_scale &&
-						loaded.m_foliageTypeID == source.m_foliageTypeID &&
-						!loaded.m_isCulled &&
-						loaded.m_worldMatrix == math::matrix4x4::identity();
-					loaded.RebuildWorldMatrix();
-					derivedWorld = math::near_equal(
-						loaded.m_worldMatrix, source.m_worldMatrix);
-				}
-			}
-			catch (const std::exception&)
-			{
-				schemaStable = false;
-				roundTrip = false;
-				derivedWorld = false;
-			}
-		}
+                    FoliageInstance loaded{};
+                    Meta::Deserialize(&loaded, instanceNode);
+                    roundTrip = loaded.m_position == source.m_position &&
+                        loaded.m_rotation == source.m_rotation &&
+                        loaded.m_scale == source.m_scale &&
+                        loaded.m_foliageTypeID == source.m_foliageTypeID &&
+                        !loaded.m_isCulled &&
+                        loaded.m_worldMatrix == math::matrix4x4::identity();
+                    loaded.RebuildWorldMatrix();
+                    derivedWorld = math::near_equal(
+                        loaded.m_worldMatrix, source.m_worldMatrix);
+                }
+            }
+            catch (const std::exception&)
+            {
+                schemaStable = false;
+                roundTrip = false;
+                derivedWorld = false;
+            }
+        }
 
-		const bool verified = written && schemaStable && roundTrip && derivedWorld;
-		std::printf("[foliage.authoring.probe] %s path=%s guid=%s fields=%s "
-			"roundtrip=%s derived=%s\n",
-			written ? (verified ? "committed" : "invalid") : "rejected",
-			result.assetPath.string().c_str(),
-			result.guid.ToString().c_str(),
-			schemaStable ? "4-runtime-absent" : "invalid",
-			roundTrip ? "PASS" : "FAIL",
-			derivedWorld ? "PASS" : "FAIL");
-		if (written && !verified)
-			EngineBootstrap::SetExitCode(5);
-	}
+        const bool verified = written && schemaStable && roundTrip && derivedWorld;
+        std::printf("[foliage.authoring.probe] %s path=%s guid=%s fields=%s "
+            "roundtrip=%s derived=%s\n",
+            written ? (verified ? "committed" : "invalid") : "rejected",
+            result.assetPath.string().c_str(),
+            result.guid.ToString().c_str(),
+            schemaStable ? "4-runtime-absent" : "invalid",
+            roundTrip ? "PASS" : "FAIL",
+            derivedWorld ? "PASS" : "FAIL");
+
+        auto data = CommandData::Object();
+        data.Set("written", CommandData::Bool(written));
+        data.Set("roundTrip", CommandData::Bool(roundTrip));
+        data.Set("schemaStable", CommandData::Bool(schemaStable));
+        data.Set("derivedWorld", CommandData::Bool(derivedWorld));
+        data.Set("path", CommandData::String(result.assetPath.string()));
+        return (escape ? !written : verified) ? Ok({}, std::move(data)) : Fail("foliage.authoring.failed", "Commandlet verification failed", std::move(data));
+    }
 
 
 	// D4: Animator controller graph의 유일한 영속 경로인 scene reflection YAML을
@@ -456,53 +475,64 @@ namespace ConsoleCmd
 			"inputmap.authoring.probe: 알 수 없는 동작: " + action, "inputmap.unknown_action");
 	}
 
-	static void Cmd_inputmap_corpus_probe(const ConsoleCommandContext&)
-	{
-		InputActionManagers->LoadManager();
-		std::size_t maps = 0;
-		std::size_t actions = 0;
-		std::size_t keys = 0;
-		std::size_t keyboard = 0;
-		std::size_t gamepad = 0;
-		std::size_t buttons = 0;
-		std::size_t values = 0;
-		std::size_t invalid = 0;
-		std::unordered_set<std::string> names;
-		for (const ActionMap* map : InputActionManagers->m_actionMaps)
-		{
-			if (!map || map->m_name.empty() || !names.insert(map->m_name).second)
-			{
-				++invalid;
-				continue;
-			}
-			++maps;
-			for (const InputAction* action : map->m_actions)
-			{
-				if (!action || action->actionName.empty() || action->key.empty()
-					|| action->key.size() > 4)
-				{
-					++invalid;
-					continue;
-				}
-				++actions;
-				keys += action->key.size();
-				if (action->inputType == InputType::KeyBoard) ++keyboard;
-				else if (action->inputType == InputType::GamePad) ++gamepad;
-				else ++invalid;
-				if (action->actionType == ActionType::Button) ++buttons;
-				else if (action->actionType == ActionType::Value) ++values;
-				else ++invalid;
-			}
-		}
+    static CommandCore::CommandResult Cmd_inputmap_corpus_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("inputmap.corpus.probe");
+        InputActionManagers->LoadManager();
+        std::size_t maps = 0;
+        std::size_t actions = 0;
+        std::size_t keys = 0;
+        std::size_t keyboard = 0;
+        std::size_t gamepad = 0;
+        std::size_t buttons = 0;
+        std::size_t values = 0;
+        std::size_t invalid = 0;
+        std::unordered_set<std::string> names;
+        for (const ActionMap* map : InputActionManagers->m_actionMaps)
+        {
+            if (!map || map->m_name.empty() || !names.insert(map->m_name).second)
+            {
+                ++invalid;
+                continue;
+            }
+            ++maps;
+            for (const InputAction* action : map->m_actions)
+            {
+                if (!action || action->actionName.empty() || action->key.empty()
+                    || action->key.size() > 4)
+                {
+                    ++invalid;
+                    continue;
+                }
+                ++actions;
+                keys += action->key.size();
+                if (action->inputType == InputType::KeyBoard) ++keyboard;
+                else if (action->inputType == InputType::GamePad) ++gamepad;
+                else ++invalid;
+                if (action->actionType == ActionType::Button) ++buttons;
+                else if (action->actionType == ActionType::Value) ++values;
+                else ++invalid;
+            }
+        }
 
-		const bool passed = maps > 0 && actions > 0 && keys > 0 && invalid == 0;
-		std::printf(
-			"[inputmap.corpus.probe] maps=%zu actions=%zu keys=%zu keyboard=%zu "
-			"gamepad=%zu buttons=%zu values=%zu invalid=%zu selfcheck=%s\n",
-			maps, actions, keys, keyboard, gamepad, buttons, values, invalid,
-			passed ? "pass" : "fail");
-		if (!passed) EngineBootstrap::SetExitCode(5);
-	}
+        const bool passed = maps > 0 && actions > 0 && keys > 0 && invalid == 0;
+        std::printf(
+            "[inputmap.corpus.probe] maps=%zu actions=%zu keys=%zu keyboard=%zu "
+            "gamepad=%zu buttons=%zu values=%zu invalid=%zu selfcheck=%s\n",
+            maps, actions, keys, keyboard, gamepad, buttons, values, invalid,
+            passed ? "pass" : "fail");
+        auto data = CommandData::Object();
+        data.Set("maps", CommandData::Int(maps));
+        data.Set("actions", CommandData::Int(actions));
+        data.Set("keys", CommandData::Int(keys));
+        data.Set("keyboard", CommandData::Int(keyboard));
+        data.Set("gamepad", CommandData::Int(gamepad));
+        data.Set("buttons", CommandData::Int(buttons));
+        data.Set("values", CommandData::Int(values));
+        data.Set("invalid", CommandData::Int(invalid));
+        return passed ? Ok({}, std::move(data)) : Fail("inputmap.corpus.failed", "Commandlet verification failed", std::move(data));
+    }
 
 	// 태그 저작은 편집이 아니라 **종료 시 Finalize**가 디스크에 반영한다. 그 저장이
 	// authoring handler 수명 창 안에서 일어나는지는 "추가하고 정상 종료 → 다시 켜서
@@ -526,419 +556,411 @@ namespace ConsoleCmd
 	//   하므로(어댑터가 `find_child`로 흡수한다) "필수 키 누락"이 조용한 실패가 아니라
 	//   프로세스 사망이 될 수 있다. 그 경계를 여기서 상시로 밟는다.
 
-	static void Cmd_tag_authoring_probe(const ConsoleCommandContext& ctx)
-	{
-		// D3-b-L: `list`는 **디스크에서 읽은 결과**를 찍는다. 나머지 동작은
-		// 메모리 조작이라 Load 경로를 전혀 재지 않았다 — 그래서 TagManager를
-		// ryml로 옮겼을 때 어떤 게이트도 그 변이를 잡지 못했다(실측).
-		if (ctx.parts.size() >= 2 && ctx.parts[1] == "list")
-		{
-			TagManagers->Load();
-			const auto& tags = TagManagers->GetTags();
-			const auto& layers = TagManagers->GetLayers();
-			std::printf("[tag.authoring.probe] loaded tags=%zu layers=%zu\n",
-				tags.size(), layers.size());
-			for (const std::string& tag : tags)
-				std::printf("[tag.authoring.probe] tag=%s\n", tag.c_str());
-			for (const std::string& layer : layers)
-				std::printf("[tag.authoring.probe] layer=%s\n", layer.c_str());
-			return;
-		}
+    static CommandCore::CommandResult Cmd_tag_list(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("tag.list accepts no arguments");
+        return EditorProjectOperations::Tags();
+    }
+    static CommandCore::CommandResult Cmd_tag_add(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("tag.add <name>");
+        return EditorProjectOperations::AddTag(ctx.parts[1]);
+    }
+    static CommandCore::CommandResult Cmd_tag_has(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("tag.has <name>");
+        return EditorProjectOperations::HasTag(ctx.parts[1]);
+    }
+    static CommandCore::CommandResult Cmd_tag_remove(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("tag.remove <name>");
+        return EditorProjectOperations::RemoveTag(ctx.parts[1]);
+    }
 
-		if (ctx.parts.size() < 3)
-		{
-			std::printf("[tag.authoring.probe] usage: list | <add|has|remove> <name>\n");
-			return;
-		}
-
-		const std::string& action = ctx.parts[1];
-		const std::string& name = ctx.parts[2];
-
-		if (action == "add") TagManagers->AddTag(name);
-		else if (action == "remove") TagManagers->RemoveTag(name);
-		else if (action != "has")
-		{
-			std::printf("[tag.authoring.probe] unknown action %s\n", action.c_str());
-			return;
-		}
-
-		std::printf("[tag.authoring.probe] %s has=%s\n", action.c_str(),
-			TagManagers->HasTag(name) ? "true" : "false");
-	}
 
 	// 충돌 행렬은 프로젝트 설정 자산이라 meta를 만들지 않는다. 저장 후 다시 읽어
 	// 값이 돌아오는지 보고, escape 인자로 설정 루트 밖 목적지가 거부되는지 본다.
 
-	static void Cmd_collisionmatrix_authoring_probe(const ConsoleCommandContext& ctx)
-	{
-		const bool escape = ctx.parts.size() >= 2 && ctx.parts[1] == "escape";
-		if (escape)
-		{
-			UncatalogedAuthoringRequest request{};
-			request.destinationPath =
-				PathFinder::Relative("Foliage") / "CollisionMatrix.asset";
-			request.payload = "0:\n  0: true\n";
-			const bool written = AssetAuthoringPort::WriteCollisionMatrix(request);
-			std::printf("[collisionmatrix.authoring.probe] %s\n",
-				written ? "committed" : "rejected");
-			return;
-		}
+    static CommandCore::CommandResult Cmd_collisionmatrix_authoring_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "escape")) return InvalidArguments("collisionmatrix.authoring.probe [escape]");
+        const bool escape = ctx.parts.size() >= 2 && ctx.parts[1] == "escape";
+        if (escape)
+        {
+            UncatalogedAuthoringRequest request{};
+            request.destinationPath =
+                PathFinder::Relative("Foliage") / "CollisionMatrix.asset";
+            request.payload = "0:\n  0: true\n";
+            const bool written = AssetAuthoringPort::WriteCollisionMatrix(request);
+            std::printf("[collisionmatrix.authoring.probe] %s\n",
+                written ? "committed" : "rejected");
+            auto data = CommandData::Object(); data.Set("written", CommandData::Bool(written));
+            return !written ? Ok("Escaping path rejected", std::move(data)) : Fail("authoring.escape_accepted", "Escaping path was accepted", std::move(data));
+        }
 
-		auto matrix = PhysicsManagers->GetCollisionMatrix();
-		if (matrix.size() < 2 || matrix[0].size() < 2)
-		{
-			std::printf("[collisionmatrix.authoring.probe] rejected matrix=%zu\n",
-				matrix.size());
-			return;
-		}
+        auto matrix = PhysicsManagers->GetCollisionMatrix();
+        if (matrix.size() < 2 || matrix[0].size() < 2)
+        {
+            std::printf("[collisionmatrix.authoring.probe] rejected matrix=%zu\n",
+                matrix.size());
+            return PreconditionFailed("collisionmatrix.coverage_missing", "Collision matrix requires at least two layers");
+        }
 
-		const uint8_t before = matrix[0][1];
-		matrix[0][1] = before ? 0 : 1;
-		PhysicsManagers->SetCollisionMatrix(matrix);
-		if (!PhysicsManagers->SaveCollisionMatrix())
-		{
-			std::printf("[collisionmatrix.authoring.probe] rejected\n");
-			return;
-		}
+        const uint8_t before = matrix[0][1];
+        matrix[0][1] = before ? 0 : 1;
+        PhysicsManagers->SetCollisionMatrix(matrix);
+        if (!PhysicsManagers->SaveCollisionMatrix())
+        {
+            std::printf("[collisionmatrix.authoring.probe] rejected\n");
+            matrix[0][1] = before; PhysicsManagers->SetCollisionMatrix(matrix);
+            return Fail("collisionmatrix.save_failed", "Collision matrix save failed");
+        }
 
-		// 메모리를 되돌린 뒤 파일에서 다시 읽는다. 디스크를 실제로 거치지 않았다면
-		// 여기서 뒤집힌 값이 돌아오지 않는다.
-		matrix[0][1] = before;
-		PhysicsManagers->SetCollisionMatrix(matrix);
-		PhysicsManagers->LoadCollisionMatrix();
-		const uint8_t reloaded = PhysicsManagers->GetCollisionMatrix()[0][1];
+        // 메모리를 되돌린 뒤 파일에서 다시 읽는다. 디스크를 실제로 거치지 않았다면
+        // 여기서 뒤집힌 값이 돌아오지 않는다.
+        matrix[0][1] = before;
+        PhysicsManagers->SetCollisionMatrix(matrix);
+        PhysicsManagers->LoadCollisionMatrix();
+        const uint8_t reloaded = PhysicsManagers->GetCollisionMatrix()[0][1];
 
-		// 저장소의 CollisionMatrix.asset을 원래대로 돌려놓는다.
-		matrix[0][1] = before;
-		PhysicsManagers->SetCollisionMatrix(matrix);
-		const bool restored = PhysicsManagers->SaveCollisionMatrix();
+        // 저장소의 CollisionMatrix.asset을 원래대로 돌려놓는다.
+        matrix[0][1] = before;
+        PhysicsManagers->SetCollisionMatrix(matrix);
+        const bool restored = PhysicsManagers->SaveCollisionMatrix();
 
-		std::printf("[collisionmatrix.authoring.probe] committed roundtrip=%s restored=%s\n",
-			reloaded != before ? "ok" : "mismatch", restored ? "ok" : "failed");
-	}
+        std::printf("[collisionmatrix.authoring.probe] committed roundtrip=%s restored=%s\n",
+            reloaded != before ? "ok" : "mismatch", restored ? "ok" : "failed");
+        auto data = CommandData::Object();
+        data.Set("roundTrip", CommandData::Bool(reloaded != before));
+        data.Set("restored", CommandData::Bool(restored));
+        return reloaded != before && restored ? Ok({}, std::move(data)) : Fail("collisionmatrix.authoring.failed", "Commandlet verification failed", std::move(data));
+    }
 
 	// Blackboard는 Foliage와 달리 실제 runtime 타입의 직렬화 경로를 그대로 태운다.
 	// key 하나를 넣고 저장한 뒤 같은 이름으로 다시 읽어 값이 살아 돌아오는지 본다.
 
-	static void Cmd_blackboard_authoring_probe(const ConsoleCommandContext& ctx)
-	{
-		if (ctx.parts.size() < 2)
-		{
-			std::printf("[blackboard.authoring.probe] usage: <name> [empty|noname]\n");
-			return;
-		}
+    static CommandCore::CommandResult Cmd_blackboard_authoring_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3 || (ctx.parts.size() == 3 && ctx.parts[2] != "empty" && ctx.parts[2] != "noname")) return InvalidArguments("blackboard.authoring.probe <name> [empty|noname]");
+        if (ctx.parts.size() < 2)
+        {
+            std::printf("[blackboard.authoring.probe] usage: <name> [empty|noname]\n");
+            return InvalidArguments("blackboard.authoring.probe requires a name");
+        }
 
-		const std::string mode = ctx.parts.size() >= 3 ? ctx.parts[2] : "";
-		const bool empty = mode == "empty";
-		const bool noName = mode == "noname";
+        const std::string mode = ctx.parts.size() >= 3 ? ctx.parts[2] : "";
+        const bool empty = mode == "empty";
+        const bool noName = mode == "noname";
 
-		BlackBoard board;
-		if (!empty)
-		{
-			board.SetValueAsInt("ProbeKey", 4177);
-		}
+        BlackBoard board;
+        if (!empty)
+        {
+            board.SetValueAsInt("ProbeKey", 4177);
+        }
 
-		if (!board.Serialize(noName ? std::string_view{} : ctx.parts[1]))
-		{
-			std::printf("[blackboard.authoring.probe] rejected\n");
-			return;
-		}
+        if (!board.Serialize(noName ? std::string_view{} : ctx.parts[1]))
+        {
+            std::printf("[blackboard.authoring.probe] rejected\n");
+            return (empty || noName) ? Ok("Invalid board rejected") : Fail("blackboard.write_failed", "Board serialization failed");
+        }
 
-		BlackBoard reloaded;
-		int roundTrip = 0;
-		try
-		{
-			reloaded.Deserialize(ctx.parts[1]);
-			if (reloaded.HasKey("ProbeKey"))
-				roundTrip = reloaded.GetValueAsInt("ProbeKey");
-		}
-		catch (const std::exception& exception)
-		{
-			std::printf("[blackboard.authoring.probe] reload-failed %s\n",
-				exception.what());
-			return;
-		}
+        BlackBoard reloaded;
+        int roundTrip = 0;
+        try
+        {
+            reloaded.Deserialize(ctx.parts[1]);
+            if (reloaded.HasKey("ProbeKey"))
+                roundTrip = reloaded.GetValueAsInt("ProbeKey");
+        }
+        catch (const std::exception& exception)
+        {
+            std::printf("[blackboard.authoring.probe] reload-failed %s\n",
+                exception.what());
+            return Fail("blackboard.reload_failed", exception.what());
+        }
 
-		std::printf("[blackboard.authoring.probe] committed keys=%zu roundtrip=%d\n",
-			reloaded.GetValues().size(), roundTrip);
-	}
+        std::printf("[blackboard.authoring.probe] committed keys=%zu roundtrip=%d\n",
+            reloaded.GetValues().size(), roundTrip);
+        auto data = CommandData::Object();
+        data.Set("keys", CommandData::Int(reloaded.GetValues().size()));
+        data.Set("roundTrip", CommandData::Int(roundTrip));
+        return !empty && !noName && roundTrip == 4177 ? Ok({}, std::move(data)) : Fail("blackboard.authoring.failed", "Commandlet verification failed", std::move(data));
+    }
 
-	static void Cmd_asset_guid_rename_probe(const ConsoleCommandContext&)
-	{
-		// D2-c: 새 material payload와 sidecar가 같은 UUIDv4를 갖고, target+meta
-		// rename 뒤에도 catalog의 GUID->path 참조가 그대로 새 경로를 가리키는지
-		// 한 transaction으로 확인한다. 고정 이름을 쓰지 않아 이전 실패 잔재나
-		// 병렬 실행과 충돌하지 않는다.
-		const FileGuid requestedGuid = FileGuid::CreateRandomV4();
-		std::string suffix = requestedGuid.ToString();
-		std::erase(suffix, '-');
-		const std::string sourceName = "D2GuidRenameProbe_" + suffix;
-		const std::string destinationName = sourceName + "_Renamed";
-		const file::path sourcePath = PathFinder::Relative("Materials\\") /
-			(sourceName + ".asset");
-		const file::path destinationPath = PathFinder::Relative("Materials\\") /
-			(destinationName + ".asset");
-		const file::path sourceMeta = sourcePath.string() + ".meta";
-		const file::path destinationMeta = destinationPath.string() + ".meta";
+    static CommandCore::CommandResult Cmd_asset_guid_rename_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("asset.guid.rename.probe");
+        // D2-c: 새 material payload와 sidecar가 같은 UUIDv4를 갖고, target+meta
+        // rename 뒤에도 catalog의 GUID->path 참조가 그대로 새 경로를 가리키는지
+        // 한 transaction으로 확인한다. 고정 이름을 쓰지 않아 이전 실패 잔재나
+        // 병렬 실행과 충돌하지 않는다.
+        const FileGuid requestedGuid = FileGuid::CreateRandomV4();
+        std::string suffix = requestedGuid.ToString();
+        std::erase(suffix, '-');
+        const std::string sourceName = "D2GuidRenameProbe_" + suffix;
+        const std::string destinationName = sourceName + "_Renamed";
+        const file::path sourcePath = PathFinder::Relative("Materials\\") /
+            (sourceName + ".asset");
+        const file::path destinationPath = PathFinder::Relative("Materials\\") /
+            (destinationName + ".asset");
+        const file::path sourceMeta = sourcePath.string() + ".meta";
+        const file::path destinationMeta = destinationPath.string() + ".meta";
 
-		auto cleanup = [](const file::path& assetPath)
-		{
-			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
-				RuntimeAssetType::Material, {}, assetPath });
-			std::error_code ignored;
-			file::remove(assetPath, ignored);
-			ignored.clear();
-			file::remove(assetPath.string() + ".meta", ignored);
-		};
+        auto cleanup = [](const file::path& assetPath)
+        {
+            DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+                RuntimeAssetType::Material, {}, assetPath });
+            std::error_code ignored;
+            file::remove(assetPath, ignored);
+            ignored.clear();
+            file::remove(assetPath.string() + ".meta", ignored);
+        };
 
-		Material authored;
-		authored.m_name = sourceName;
-		authored.m_fileGuid = requestedGuid;
-		authored.m_materialInfo.m_roughness = 0.375f;
+        Material authored;
+        authored.m_name = sourceName;
+        authored.m_fileGuid = requestedGuid;
+        authored.m_materialInfo.m_roughness = 0.375f;
 
-		bool saved = false;
-		bool renamed = false;
-		bool identityPreserved = false;
-		bool materialRoundTrip = false;
-		FileGuid canonicalGuid{};
-		try
-		{
-			saved = EditorAssetDatabase::Get().SaveMaterial(&authored);
-			canonicalGuid = DataSystems->GetFileGuid(sourcePath);
-			if (saved && canonicalGuid == requestedGuid)
-			{
-				const FileGuid movedGuid = EditorAssetDatabase::Get().RenameAsset(
-					sourcePath, destinationPath);
-				renamed = movedGuid == canonicalGuid;
-				identityPreserved = renamed
-					&& !file::exists(sourcePath) && !file::exists(sourceMeta)
-					&& file::is_regular_file(destinationPath)
-					&& file::is_regular_file(destinationMeta)
-					&& DataSystems->GetFileGuid(sourcePath) == FileGuid{}
-					&& DataSystems->GetFileGuid(destinationPath) == canonicalGuid
-					&& DataSystems->GetFilePath(canonicalGuid).lexically_normal()
-						== destinationPath.lexically_normal();
+        bool saved = false;
+        bool renamed = false;
+        bool identityPreserved = false;
+        bool materialRoundTrip = false;
+        FileGuid canonicalGuid{};
+        try
+        {
+            saved = EditorAssetDatabase::Get().SaveMaterial(&authored);
+            canonicalGuid = DataSystems->GetFileGuid(sourcePath);
+            if (saved && canonicalGuid == requestedGuid)
+            {
+                const FileGuid movedGuid = EditorAssetDatabase::Get().RenameAsset(
+                    sourcePath, destinationPath);
+                renamed = movedGuid == canonicalGuid;
+                identityPreserved = renamed
+                    && !file::exists(sourcePath) && !file::exists(sourceMeta)
+                    && file::is_regular_file(destinationPath)
+                    && file::is_regular_file(destinationMeta)
+                    && DataSystems->GetFileGuid(sourcePath) == FileGuid{}
+                    && DataSystems->GetFileGuid(destinationPath) == canonicalGuid
+                    && DataSystems->GetFilePath(canonicalGuid).lexically_normal()
+                        == destinationPath.lexically_normal();
 
-				if (identityPreserved)
-				{
-					std::string parseError;
-					const Authoring::ParsedDocument persistedDocument =
-						Authoring::ParsedDocument::ParseFile(
-							destinationPath.string(), parseError);
-					const Authoring::ReadNode persisted =
-						persistedDocument.Root();
-					Material decoded;
-					Authoring::WriteDocument reserializedDocument;
-					materialRoundTrip = persistedDocument
-						&& DataSystems->DeserializeMaterialPayload(
-						decoded, Authoring::NodeViewAccess::Make(persisted))
-						&& decoded.m_fileGuid == canonicalGuid
-						&& decoded.m_materialInfo.m_roughness
-							== authored.m_materialInfo.m_roughness
-						&& DataSystems->SerializeMaterialPayload(
-							decoded, reserializedDocument.Root())
-						&& persisted.Dump() == reserializedDocument.Dump();
-				}
-			}
-		}
-		catch (const std::exception& exception)
-		{
-			Debug->LogError("[asset.guid.rename] probe exception: "
-				+ std::string(exception.what()));
-		}
+                if (identityPreserved)
+                {
+                    std::string parseError;
+                    const Authoring::ParsedDocument persistedDocument =
+                        Authoring::ParsedDocument::ParseFile(
+                            destinationPath.string(), parseError);
+                    const Authoring::ReadNode persisted =
+                        persistedDocument.Root();
+                    Material decoded;
+                    Authoring::WriteDocument reserializedDocument;
+                    materialRoundTrip = persistedDocument
+                        && DataSystems->DeserializeMaterialPayload(
+                        decoded, Authoring::NodeViewAccess::Make(persisted))
+                        && decoded.m_fileGuid == canonicalGuid
+                        && decoded.m_materialInfo.m_roughness
+                            == authored.m_materialInfo.m_roughness
+                        && DataSystems->SerializeMaterialPayload(
+                            decoded, reserializedDocument.Root())
+                        && persisted.Dump() == reserializedDocument.Dump();
+                }
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            Debug->LogError("[asset.guid.rename] probe exception: "
+                + std::string(exception.what()));
+        }
 
-		cleanup(sourcePath);
-		cleanup(destinationPath);
-		const bool passed = saved && renamed && identityPreserved
-			&& materialRoundTrip
-			&& canonicalGuid.IsRandomV4();
-		std::printf("[asset.guid.rename] %s guid=%s save=%s move=%s "
-			"identity=%s material-roundtrip=%s cleanup=%s\n",
-			passed ? "pass" : "fail", canonicalGuid.ToString().c_str(),
-			saved ? "yes" : "no", renamed ? "yes" : "no",
-			identityPreserved ? "yes" : "no",
-			materialRoundTrip ? "yes" : "no",
-			(!file::exists(sourcePath) && !file::exists(sourceMeta)
-				&& !file::exists(destinationPath) && !file::exists(destinationMeta))
-				? "yes" : "no");
-		if (!passed) EngineBootstrap::SetExitCode(6);
-	}
+        cleanup(sourcePath);
+        cleanup(destinationPath);
+        const bool passed = saved && renamed && identityPreserved
+            && materialRoundTrip
+            && canonicalGuid.IsRandomV4();
+        std::printf("[asset.guid.rename] %s guid=%s save=%s move=%s "
+            "identity=%s material-roundtrip=%s cleanup=%s\n",
+            passed ? "pass" : "fail", canonicalGuid.ToString().c_str(),
+            saved ? "yes" : "no", renamed ? "yes" : "no",
+            identityPreserved ? "yes" : "no",
+            materialRoundTrip ? "yes" : "no",
+            (!file::exists(sourcePath) && !file::exists(sourceMeta)
+                && !file::exists(destinationPath) && !file::exists(destinationMeta))
+                ? "yes" : "no");
+        auto data = CommandData::Object();
+        data.Set("saved", CommandData::Bool(saved));
+        data.Set("renamed", CommandData::Bool(renamed));
+        data.Set("identityPreserved", CommandData::Bool(identityPreserved));
+        data.Set("materialRoundTrip", CommandData::Bool(materialRoundTrip));
+        data.Set("guid", CommandData::String(canonicalGuid.ToString()));
+        return passed ? Ok({}, std::move(data)) : Fail("asset.guid.rename.failed", "Commandlet verification failed", std::move(data));
+    }
 
-	static void Cmd_material_corpus_probe(const ConsoleCommandContext& ctx)
-	{
-		// D2-d: 실제 standalone material corpus를 파일 수정 없이 메모리에서 두 번
-		// 왕복한다. UUID version은 전역 strict gate의 책임이고, 여기서는 sidecar
-		// 정본과 payload mirror가 같은 identity인지 및 asset reference가 보존되는지만
-		// 판정한다.
-		if (ctx.parts.size() < 2)
-		{
-			std::printf("[CLI] 사용법: material.corpus.probe <머티리얼 이름>...\n");
-			EngineBootstrap::SetExitCode(6);
-			return;
-		}
+    static CommandCore::CommandResult Cmd_material_corpus_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        // D2-d: 실제 standalone material corpus를 파일 수정 없이 메모리에서 두 번
+        // 왕복한다. UUID version은 전역 strict gate의 책임이고, 여기서는 sidecar
+        // 정본과 payload mirror가 같은 identity인지 및 asset reference가 보존되는지만
+        // 판정한다.
+        if (ctx.parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: material.corpus.probe <머티리얼 이름>...\n");
+            return InvalidArguments("material.corpus.probe requires material names");
+        }
 
-		auto captureReferences = [](const Material& material)
-		{
-			std::vector<std::string> rows;
-			rows.push_back("shader|" + material.m_shaderMetaGuid.ToString());
-			for (const MaterialPropertyValue& property : material.m_propertyValues)
-			{
-				if (property.m_textureGuid == FileGuid{}) continue;
-				rows.push_back("texture|" + property.m_name + "|"
-					+ property.m_textureGuid.ToString());
-			}
-			std::ranges::sort(rows);
-			return rows;
-		};
+        auto captureReferences = [](const Material& material)
+        {
+            std::vector<std::string> rows;
+            rows.push_back("shader|" + material.m_shaderMetaGuid.ToString());
+            for (const MaterialPropertyValue& property : material.m_propertyValues)
+            {
+                if (property.m_textureGuid == FileGuid{}) continue;
+                rows.push_back("texture|" + property.m_name + "|"
+                    + property.m_textureGuid.ToString());
+            }
+            std::ranges::sort(rows);
+            return rows;
+        };
 
-		size_t passedCount = 0;
-		size_t textureReferenceCount = 0;
-		for (size_t index = 1; index < ctx.parts.size(); ++index)
-		{
-			const std::string& name = ctx.parts[index];
-			const file::path assetPath = PathFinder::Relative("Materials\\") /
-				(name + ".asset");
-			bool decoded = false;
-			bool identity = false;
-			bool shader = false;
-			bool textures = false;
-			bool stable = false;
-			size_t materialTextureReferences = 0;
-			try
-			{
-				const FileGuid catalogGuid = DataSystems->GetFileGuid(assetPath);
-				std::string parseError;
-				const Authoring::ParsedDocument sourceDocument =
-					Authoring::ParsedDocument::ParseFile(
-						assetPath.string(), parseError);
-				const Authoring::ReadNode source = sourceDocument.Root();
-				Material first;
-				decoded = sourceDocument
-					&& DataSystems->DeserializeMaterialPayload(
-					first, Authoring::NodeViewAccess::Make(source));
-				identity = decoded && catalogGuid != FileGuid{}
-					&& first.m_fileGuid == catalogGuid;
+        size_t passedCount = 0;
+        size_t textureReferenceCount = 0;
+        for (size_t index = 1; index < ctx.parts.size(); ++index)
+        {
+            const std::string& name = ctx.parts[index];
+            const file::path assetPath = PathFinder::Relative("Materials\\") /
+                (name + ".asset");
+            bool decoded = false;
+            bool identity = false;
+            bool shader = false;
+            bool textures = false;
+            bool stable = false;
+            size_t materialTextureReferences = 0;
+            try
+            {
+                const FileGuid catalogGuid = DataSystems->GetFileGuid(assetPath);
+                std::string parseError;
+                const Authoring::ParsedDocument sourceDocument =
+                    Authoring::ParsedDocument::ParseFile(
+                        assetPath.string(), parseError);
+                const Authoring::ReadNode source = sourceDocument.Root();
+                Material first;
+                decoded = sourceDocument
+                    && DataSystems->DeserializeMaterialPayload(
+                    first, Authoring::NodeViewAccess::Make(source));
+                identity = decoded && catalogGuid != FileGuid{}
+                    && first.m_fileGuid == catalogGuid;
 
-				const file::path shaderPath = decoded
-					? DataSystems->GetFilePath(first.m_shaderMetaGuid) : file::path{};
-				shader = decoded && first.m_shaderMetaGuid != FileGuid{}
-					&& !shaderPath.empty() && file::is_regular_file(shaderPath)
-					&& shaderPath.extension() == ".shadermeta";
+                const file::path shaderPath = decoded
+                    ? DataSystems->GetFilePath(first.m_shaderMetaGuid) : file::path{};
+                shader = decoded && first.m_shaderMetaGuid != FileGuid{}
+                    && !shaderPath.empty() && file::is_regular_file(shaderPath)
+                    && shaderPath.extension() == ".shadermeta";
 
-				textures = decoded;
-				if (decoded)
-				{
-					for (const MaterialPropertyValue& property : first.m_propertyValues)
-					{
-						if (property.m_textureGuid == FileGuid{}) continue;
-						++materialTextureReferences;
-						const file::path texturePath = DataSystems->GetFilePath(
-							property.m_textureGuid);
-						if (texturePath.empty() || !file::is_regular_file(texturePath))
-							textures = false;
-					}
-				}
+                textures = decoded;
+                if (decoded)
+                {
+                    for (const MaterialPropertyValue& property : first.m_propertyValues)
+                    {
+                        if (property.m_textureGuid == FileGuid{}) continue;
+                        ++materialTextureReferences;
+                        const file::path texturePath = DataSystems->GetFilePath(
+                            property.m_textureGuid);
+                        if (texturePath.empty() || !file::is_regular_file(texturePath))
+                            textures = false;
+                    }
+                }
 
-				if (decoded)
-				{
-					Authoring::WriteDocument firstCanonicalDocument;
-					const bool firstCanonicalWritten =
-						DataSystems->SerializeMaterialPayload(
-							first, firstCanonicalDocument.Root());
-					const Authoring::ReadNode firstCanonical =
-						firstCanonicalDocument.Root().Read();
-					Material second;
-					const bool decodedAgain = firstCanonicalWritten
-						&& DataSystems->DeserializeMaterialPayload(
-						second, Authoring::NodeViewAccess::Make(firstCanonical));
-					Authoring::WriteDocument secondCanonicalDocument;
-					const bool secondCanonicalWritten = decodedAgain
-						&& DataSystems->SerializeMaterialPayload(
-							second, secondCanonicalDocument.Root());
-					stable = decodedAgain
-						&& secondCanonicalWritten
-						&& second.m_fileGuid == first.m_fileGuid
-						&& captureReferences(second) == captureReferences(first)
-						&& secondCanonicalDocument.Dump()
-							== firstCanonicalDocument.Dump();
-				}
-			}
-			catch (const std::exception& exception)
-			{
-				Debug->LogError("[material.corpus] " + name + ": "
-					+ exception.what());
-			}
+                if (decoded)
+                {
+                    Authoring::WriteDocument firstCanonicalDocument;
+                    const bool firstCanonicalWritten =
+                        DataSystems->SerializeMaterialPayload(
+                            first, firstCanonicalDocument.Root());
+                    const Authoring::ReadNode firstCanonical =
+                        firstCanonicalDocument.Root().Read();
+                    Material second;
+                    const bool decodedAgain = firstCanonicalWritten
+                        && DataSystems->DeserializeMaterialPayload(
+                        second, Authoring::NodeViewAccess::Make(firstCanonical));
+                    Authoring::WriteDocument secondCanonicalDocument;
+                    const bool secondCanonicalWritten = decodedAgain
+                        && DataSystems->SerializeMaterialPayload(
+                            second, secondCanonicalDocument.Root());
+                    stable = decodedAgain
+                        && secondCanonicalWritten
+                        && second.m_fileGuid == first.m_fileGuid
+                        && captureReferences(second) == captureReferences(first)
+                        && secondCanonicalDocument.Dump()
+                            == firstCanonicalDocument.Dump();
+                }
+            }
+            catch (const std::exception& exception)
+            {
+                Debug->LogError("[material.corpus] " + name + ": "
+                    + exception.what());
+            }
 
-			const bool passed = decoded && identity && shader && textures && stable;
-			if (passed) ++passedCount;
-			textureReferenceCount += materialTextureReferences;
-			std::printf("[material.corpus] %s %s identity=%s shader=%s "
-				"textures=%zu/%s stable=%s\n",
-				name.c_str(), passed ? "pass" : "fail",
-				identity ? "yes" : "no", shader ? "yes" : "no",
-				materialTextureReferences, textures ? "valid" : "invalid",
-				stable ? "yes" : "no");
-		}
+            const bool passed = decoded && identity && shader && textures && stable;
+            if (passed) ++passedCount;
+            textureReferenceCount += materialTextureReferences;
+            std::printf("[material.corpus] %s %s identity=%s shader=%s "
+                "textures=%zu/%s stable=%s\n",
+                name.c_str(), passed ? "pass" : "fail",
+                identity ? "yes" : "no", shader ? "yes" : "no",
+                materialTextureReferences, textures ? "valid" : "invalid",
+                stable ? "yes" : "no");
+        }
 
-		const size_t total = ctx.parts.size() - 1;
-		const bool passed = passedCount == total;
-		std::printf("[material.corpus] %s materials=%zu/%zu textureRefs=%zu\n",
-			passed ? "pass" : "fail", passedCount, total, textureReferenceCount);
-		if (!passed) EngineBootstrap::SetExitCode(6);
-	}
+        const size_t total = ctx.parts.size() - 1;
+        const bool passed = passedCount == total;
+        std::printf("[material.corpus] %s materials=%zu/%zu textureRefs=%zu\n",
+            passed ? "pass" : "fail", passedCount, total, textureReferenceCount);
+        auto data = CommandData::Object();
+        data.Set("passed", CommandData::Int(passedCount));
+        data.Set("total", CommandData::Int(total));
+        data.Set("textureReferences", CommandData::Int(textureReferenceCount));
+        return passed ? Ok({}, std::move(data)) : Fail("material.corpus.failed", "Commandlet verification failed", std::move(data));
+    }
 
     // I6-B4b 후속 — **에디터 드롭 경로**를 CLI로 연다. 콘텐츠 브라우저에서
     // 씬으로 끌어다 놓을 때 도는 것은 model.load(LoadModel)가 아니라
     // DataSystems->LoadCachedModelShared다(HierarchyWindow·SceneViewWindow).
     // 그 둘이 서로 다른 로더라는 것이 이 게이트 세트의 구멍이었다.
 
-    static void Cmd_model_loadcached(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_model_loadcached(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
         const std::vector<std::string>& parts = ctx.parts;
-        if (parts.size() < 2)
+        if (parts.size() != 2)
         {
             std::printf("[CLI] 사용법: model.loadcached <모델 경로>\n");
-            return;
+            return InvalidArguments("model.loadcached requires one model path");
         }
         const auto generation = DataSystems->LoadModelAssetGenerationByPath(parts[1]);
         std::printf("[CLI] model.loadcached %s: %s\n",
             generation ? "ok" : "fail", parts[1].c_str());
+        auto data = CommandData::Object();
+        data.Set("path", CommandData::String(parts[1]));
+        return generation ? Ok({}, std::move(data)) : Fail("model.load_failed", "Model generation load failed", std::move(data));
     }
 
-    static void Cmd_model_place(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_model_place(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        if (parts.size() < 2)
-        {
-            std::printf("[CLI] 사용법: model.place <모델 이름>\n");
-            return;
-        }
-
-        // 콘텐츠 브라우저에서 씬으로 끌어다 놓는 것과 같은 경로.
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2 || ctx.parts[1].empty()) return InvalidArguments("model.place requires a model name");
         Scene* scene = SceneManagers->GetActiveScene();
-        const auto generation = DataSystems->FindModelAssetGenerationByStem(parts[1]);
-        if (!scene || !generation)
-        {
-            std::printf("[CLI] 씬 또는 모델을 찾을 수 없음: %s\n", parts[1].c_str());
-            return;
-        }
-
-        // ★ GUI 는 Undo 를 남기고 CLI 만 안 남기고 있었다(2026-09-05 이전).
-        //
-        //   같은 조작 — 콘텐츠 브라우저에서 씬으로 끌어다 놓기 — 인데 사람이
-        //   GUI 로 하면 Ctrl+Z 로 되돌아가고 에이전트가 HTTP 로 하면 안 되돌아갔다.
-        //   §9 의 "Shared Editor operation 은 GUI 와 Undo 까지 같아야 함" 이
-        //   깨져 있던 자리다.
-        //
-        //   `LoadModelToSceneObjCommand::Redo()` 가 여기 있던 세 줄과 **같은 일**을
-        //   한다 — 옵션 조회까지 같다. 그래서 로직을 옮긴 것이 아니라 이미 GUI 가
-        //   쓰던 것을 CLI 도 쓰게 했을 뿐이다. Undo 는 루트를 **인덱스로** 지운다
-        //   (포인터가 아니라서 씬이 흔들려도 매달리지 않는다).
+        const auto generation = DataSystems->FindModelAssetGenerationByStem(ctx.parts[1]);
+        if (!scene || !generation) return PreconditionFailed("model.not_found", "Scene or imported model is unavailable");
         Entity* root = nullptr;
-        Meta::UndoManager::GetInstance()->Execute(
-            std::make_unique<Meta::LoadModelToSceneObjCommand>(scene, generation, &root));
-        std::printf("[CLI] 씬에 배치: %s (%s)\n", parts[1].c_str(), root ? "ok" : "fail");
+        Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::LoadModelToSceneObjCommand>(scene, generation, &root));
+        if (!root) return Fail("model.place.failed", "Model could not be instantiated");
+        std::printf("[CLI] 씬에 배치: %s (ok)\n", ctx.parts[1].c_str());
+        auto result = EditorObjectOperations::Describe(scene->HandleOf(root->m_index));
+        result.data.Set("changed", CommandData::Bool(true));
+        return result;
     }
 
     // I5-D4e-2 — 이벤트·루프 오버라이드의 소유 이관 게이트. 코퍼스에 저작분이
@@ -950,13 +972,15 @@ namespace ConsoleCmd
     // 하는가)을 잰다. 이관은 A/B 스위치와 무관한 무조건 경로라 on/off 대조군
     // 양쪽에서 같은 판정이어야 한다.
 
-    static void Cmd_experiment_animevent(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_animevent(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2 || (ctx.parts[1] != "seed" && ctx.parts[1] != "verify")) return InvalidArguments("experiment.animevent seed|verify");
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene || ctx.parts.size() < 2)
         {
             std::printf("[CLI] 사용법: experiment.animevent seed|verify\n");
-            return;
+            return PreconditionFailed("scene.not_found", "No active scene");
         }
         const bool isSeed = "seed" == ctx.parts[1];
 
@@ -979,7 +1003,7 @@ namespace ConsoleCmd
         {
             std::printf("[CLI] experiment.animevent %s skip animators=0\n",
                 ctx.parts[1].c_str());
-            return;
+            return PreconditionFailed("animation.coverage_missing", "No typed Animator fixture");
         }
 
         if (isSeed)
@@ -1003,7 +1027,7 @@ namespace ConsoleCmd
             clipOverride.events.push_back(late);
             std::printf("[CLI] experiment.animevent seed done clip=0 "
                 "loop=false events=2\n");
-            return;
+            return Ok("Animation event fixture seeded");
         }
 
         std::vector<std::string> failures;
@@ -1099,6 +1123,10 @@ namespace ConsoleCmd
             std::printf("[CLI] experiment.animevent verify fail%s\n",
                 joined.c_str());
         }
+        auto data = CommandData::Object();
+        data.Set("failures", CommandData::Int(failures.size()));
+        data.Set("contamination", CommandData::String(contaminationAxis));
+        return failures.empty() && animator->TypedClip(0) != nullptr ? Ok({}, std::move(data)) : Fail("experiment.animevent.failed", "Commandlet verification failed", std::move(data));
     }
 
     // I5-D5a — Foliage 메시의 experiment 핸들 합류 게이트. 코퍼스에 Foliage
@@ -1110,27 +1138,31 @@ namespace ConsoleCmd
     // poolFoliage 분기는 헤드리스 관측 밖(라이브 렌더 0프레임 + dx12.scene
     // 하네스에 Foliage 대칭 구성 없음) — 계획서 한계 기록.
 
-    static void Cmd_experiment_foliage(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_foliage(const ConsoleCommandContext& ctx)
     {
+        if (ctx.parts.size() < 2 || (ctx.parts[1] != "seed" && ctx.parts[1] != "verify"))
+            return CommandCore::InvalidArguments("experiment.foliage seed <asset-directory> <model-path> | verify");
+        if (ctx.parts[1] == "verify" && ctx.parts.size() != 2)
+            return CommandCore::InvalidArguments("experiment.foliage verify accepts no other arguments");
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene || ctx.parts.size() < 2)
         {
-            std::printf("[CLI] 사용법: experiment.foliage seed <자산디렉터리> | verify\n");
-            return;
+            std::printf("[CLI] 사용법: experiment.foliage seed <asset-directory> <model-path> | verify\n");
+            return CommandCore::PreconditionFailed("scene.none", "No active scene");
         }
 
         if ("seed" == ctx.parts[1])
         {
-            if (ctx.parts.size() < 3)
+            if (ctx.parts.size() != 4)
             {
-                std::printf("[CLI] experiment.foliage seed <자산디렉터리>\n");
-                return;
+                std::printf("[CLI] experiment.foliage seed <asset-directory> <model-path>\n");
+                return CommandCore::InvalidArguments("experiment.foliage seed <asset-directory> <model-path>");
             }
-            const auto generation = DataSystems->FindModelAssetGenerationByStem("Gunner_F_Mythic");
+            const auto generation = DataSystems->LoadModelAssetGenerationByPath(ctx.parts[3]);
             if (!generation)
             {
                 std::printf("[CLI] experiment.foliage seed fail 모델 없음\n");
-                return;
+                return CommandCore::PreconditionFailed("model.not_found", "Cannot load the supplied foliage fixture model");
             }
             Entity* entity = scene->CreateEntity("GateFoliage",
                 GameObjectType::Mesh, 0);
@@ -1149,7 +1181,7 @@ namespace ConsoleCmd
                 "assetGuid=%s\n", published ? "done" : "fail",
                 foliage->GetFoliageTypes().size(),
                 published ? "ok" : "nil");
-            return;
+            return published ? CommandCore::Ok("Foliage fixture published") : CommandCore::Fail("foliage.publish_failed", "Cannot publish the foliage fixture");
         }
 
         FoliageComponent* foliage = nullptr;
@@ -1166,7 +1198,7 @@ namespace ConsoleCmd
         if (nullptr == foliage)
         {
             std::printf("[CLI] experiment.foliage verify skip components=0\n");
-            return;
+            return CommandCore::PreconditionFailed("foliage.missing", "No foliage component to verify");
         }
 
         std::vector<std::string> failures;
@@ -1244,6 +1276,13 @@ namespace ConsoleCmd
                 joined += " [" + failure + "]";
             std::printf("[CLI] experiment.foliage verify fail%s\n", joined.c_str());
         }
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("types", CommandCore::CommandData::Int(types.size()));
+        data.Set("draws", CommandCore::CommandData::Int(draws.size()));
+        data.Set("generationTypes", CommandCore::CommandData::Int(generationTypes));
+        data.Set("generationViews", CommandCore::CommandData::Int(generationViews));
+        return failures.empty() ? CommandCore::Ok("Foliage contract", std::move(data))
+            : CommandCore::Fail("foliage.contract_failed", "Foliage contract failed", std::move(data));
     }
 
     // I5-D4e-3 — 본 이름 해석 창구의 전수 A/B 대조. Scene 본 전파가 쓰는
@@ -1252,13 +1291,15 @@ namespace ConsoleCmd
     // 계수(viaExperiment)는 창구 내부의 실분기 관측이다 — 조건 재현이 아니라서
     // experiment 분기 소실이 legacy 폴백으로 조용히 덮여도 여기서 갈린다.
 
-    static void Cmd_experiment_boneresolve(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_boneresolve(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("experiment.boneresolve");
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
         {
             std::printf("[CLI] experiment.boneresolve fail 활성 씬 없음\n");
-            return;
+            return PreconditionFailed("scene.not_found", "No active scene or render scene");
         }
         // MBC9 — 본 이름 해석 창구(Animator::ResolveBoneIndex)를 BoneComponent 전수에
         // 태운다. 독립 유도 대조는 name→index→name 왕복이고, 경로·신원 계수는 창구
@@ -1297,6 +1338,14 @@ namespace ConsoleCmd
             passed ? "pass" : (boneCount == 0 ? "skip" : "fail"),
             boneCount, viaGenerationCount, unresolvedCount,
             serialGenerationCount, roundtripMismatch);
+        auto data = CommandData::Object();
+        data.Set("bones", CommandData::Int(boneCount));
+        data.Set("generation", CommandData::Int(viaGenerationCount));
+        data.Set("unresolved", CommandData::Int(unresolvedCount));
+        data.Set("serialGeneration", CommandData::Int(serialGenerationCount));
+        data.Set("roundtrip", CommandData::Int(roundtripMismatch));
+        if (boneCount == 0) { auto result = PreconditionFailed("animation.coverage_missing", "Typed model fixture is absent"); result.data = std::move(data); return result; }
+        return passed ? Ok({}, std::move(data)) : Fail("experiment.boneresolve.failed", "Commandlet verification failed", std::move(data));
     }
 
     // I5-D4e-3 — AvatarMask 트리 생성의 A/B 대조. 실물 창구
@@ -1305,13 +1354,15 @@ namespace ConsoleCmd
     // (boneName 열)·자식 계수를 대조한다 — 순서가 저장분 인덱스 대응
     // (ReCreateMask)이라 순서 재현이 곧 저작 호환이다.
 
-    static void Cmd_experiment_animmask(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_animmask(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("experiment.animmask");
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
         {
             std::printf("[CLI] experiment.animmask fail 활성 씬 없음\n");
-            return;
+            return PreconditionFailed("scene.not_found", "No active scene");
         }
         Animator* animator = nullptr;
         for (const auto& object : scene->m_Entities)
@@ -1325,7 +1376,7 @@ namespace ConsoleCmd
         if (nullptr == animator)
         {
             std::printf("[CLI] experiment.animmask skip animators=0\n");
-            return;
+            return PreconditionFailed("animation.coverage_missing", "No typed Animator fixture");
         }
 
         AvatarMask channelMask; // 실물 창구 산출
@@ -1430,6 +1481,12 @@ namespace ConsoleCmd
             std::printf("[CLI] experiment.animmask fail viaGeneration=%d%s\n",
                 viaGeneration ? 1 : 0, joined.c_str());
         }
+        auto data = CommandData::Object();
+        data.Set("masks", CommandData::Int(channelMask.m_BoneMasks.size()));
+        data.Set("viaGeneration", CommandData::Bool(viaGeneration));
+        data.Set("structure", CommandData::String(structureAxis));
+        data.Set("failures", CommandData::Int(failures.size()));
+        return failures.empty() ? Ok({}, std::move(data)) : Fail("experiment.animmask.failed", "Commandlet verification failed", std::move(data));
     }
 
     // I5-D5b — 에디터 실소비 창구의 전수 A/B. 에디터 UI 자체는 헤드리스
@@ -1448,13 +1505,15 @@ namespace ConsoleCmd
     // 아니라서 experiment 분기가 소실돼 legacy 폴백으로 조용히 덮여도 여기서
     // 갈린다.
 
-    static void Cmd_experiment_editorsurface(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_editorsurface(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("experiment.editorsurface");
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
         {
             std::printf("[CLI] experiment.editorsurface fail 활성 씬 없음\n");
-            return;
+            return PreconditionFailed("scene.not_found", "No active scene");
         }
 
         // MBC9 — 창구(GetClipCount/GetClipName/GetClipFrameCount·HasRenderableMesh)가
@@ -1558,6 +1617,19 @@ namespace ConsoleCmd
             renderers, meshPresent, meshGuardMismatch,
             firstMismatch.empty() ? "" : " first=",
             firstMismatch.c_str());
+        auto data = CommandData::Object();
+        data.Set("animators", CommandData::Int(animators));
+        data.Set("clipViaGeneration", CommandData::Int(clipViaGeneration));
+        data.Set("clipsChecked", CommandData::Int(clipsChecked));
+        data.Set("clipCountMismatch", CommandData::Int(clipCountMismatch));
+        data.Set("clipNameMismatch", CommandData::Int(clipNameMismatch));
+        data.Set("clipFrameMismatch", CommandData::Int(clipFrameMismatch));
+        data.Set("renderers", CommandData::Int(renderers));
+        data.Set("meshPresent", CommandData::Int(meshPresent));
+        data.Set("meshGuardMismatch", CommandData::Int(meshGuardMismatch));
+        data.Set("firstMismatch", CommandData::String(firstMismatch));
+        if (!(covered)) { auto result = PreconditionFailed("model.coverage_missing", "Typed model fixture coverage is missing"); result.data = std::move(data); return result; }
+        return passed ? Ok({}, std::move(data)) : Fail("experiment.editorsurface.failed", "Commandlet verification failed", std::move(data));
     }
 
     // I6-B4b — 재생 팔레트 골든. D4e-1은 legacy 재귀와 experiment 단일 순회를
@@ -1647,13 +1719,15 @@ namespace ConsoleCmd
     //   셰이더(mul(v, P) 행 벡터)와 같은 산술이라 비율이 곧 화면의 크기다.
     //   그래서 유한성·인덱스 범위에 **크기 상한**을 더한다.
 
-    static void Cmd_experiment_skinbounds(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_skinbounds(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("experiment.skinbounds");
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
         {
             std::printf("[CLI] experiment.skinbounds fail 활성 씬 없음\n");
-            return;
+            return PreconditionFailed("scene.not_found", "No active scene");
         }
 
         std::size_t meshes = 0, nonFinite = 0, emptyWeights = 0, outOfRange = 0;
@@ -1814,6 +1888,20 @@ namespace ConsoleCmd
             meshes, nonFinite, outOfRange, emptyWeights, worstRatio,
             worstMesh.empty() ? "-" : worstMesh.c_str(), digest,
             renderers, withModel, withSkin, withAnimator);
+        auto data = CommandData::Object();
+        data.Set("meshes", CommandData::Int(meshes));
+        data.Set("nonFinite", CommandData::Int(nonFinite));
+        data.Set("emptyWeights", CommandData::Int(emptyWeights));
+        data.Set("outOfRange", CommandData::Int(outOfRange));
+        data.Set("renderers", CommandData::Int(renderers));
+        data.Set("withModel", CommandData::Int(withModel));
+        data.Set("withSkin", CommandData::Int(withSkin));
+        data.Set("withAnimator", CommandData::Int(withAnimator));
+        data.Set("digest", CommandData::Int(digest));
+        data.Set("worstRatio", CommandData::Double(worstRatio));
+        data.Set("worstMesh", CommandData::String(worstMesh));
+        if (!(meshes > 0)) { auto result = PreconditionFailed("model.coverage_missing", "Typed model fixture coverage is missing"); result.data = std::move(data); return result; }
+        return passed ? Ok({}, std::move(data)) : Fail("experiment.skinbounds.failed", "Commandlet verification failed", std::move(data));
     }
 
     // 결정적 포즈 고정 — experiment.animpose <fraction>
@@ -1829,22 +1917,26 @@ namespace ConsoleCmd
     //   틱이 매 프레임 **같은 시각의 포즈를 다시 계산**하므로 결과가 안정적이다.
     //   애니메이터를 끄지 않으므로 프록시가 팔레트를 계속 나른다.
 
-    static void Cmd_experiment_animpose(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_animpose(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return InvalidArguments("experiment.animpose <0..1> [clip]");
         const std::vector<std::string>& parts = ctx.parts;
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: experiment.animpose <0..1> [클립]\n");
-            return;
+            return InvalidArguments("experiment.animpose <0..1> [clip]");
         }
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
         {
             std::printf("[CLI] experiment.animpose fail 활성 씬 없음\n");
-            return;
+            return PreconditionFailed("scene.not_found", "No active scene");
         }
-        const double fraction = std::atof(parts[1].c_str());
-        const int clip = parts.size() >= 3 ? std::atoi(parts[2].c_str()) : 0;
+        double fraction{}; int clip{};
+        if (!ParseNumber(parts[1], fraction) || fraction < 0 || fraction > 1 ||
+            (parts.size() == 3 && (!ParseNumber(parts[2], clip) || clip < 0)))
+            return InvalidArguments("Expected fraction 0..1 and non-negative clip index");
 
         std::size_t posed = 0;
         for (const auto& object : scene->m_Entities)
@@ -1866,9 +1958,13 @@ namespace ConsoleCmd
         }
         std::printf("[CLI] experiment.animpose done posed=%zu fraction=%.4f\n",
             posed, fraction);
+        auto data = CommandData::Object(); data.Set("posed", CommandData::Int(posed));
+        data.Set("fraction", CommandData::Double(fraction)); data.Set("clip", CommandData::Int(clip));
+        if (posed == 0) { auto result = PreconditionFailed("animation.coverage_missing", "No matching typed Animator clip"); result.data = std::move(data); return result; }
+        return Ok({}, std::move(data));
     }
 
-    // 라이브 재생 관측 — experiment.animlive
+    // 라이브 재생 관측 — animator.status
     //
     // ★ 이 저장소에는 **살아 있는 애니메이터가 실제로 도는가**를 재는 축이
     //   없었다(헤드리스는 프레임을 완성하지 않고, 라이브 게이트는 저장 직전에
@@ -1881,102 +1977,22 @@ namespace ConsoleCmd
     // 달라져야 "재생 중"이다 — 같으면 팔레트가 굳은 것이고, 그것이 화면에서
     // 안 움직이는 것의 직접 원인이다.
 
-    static void Cmd_experiment_animlive(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_animator_status(const ConsoleCommandContext& ctx)
     {
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (nullptr == scene)
-        {
-            std::printf("[CLI] experiment.animlive fail 활성 씬 없음\n");
-            return;
-        }
-        std::size_t animatorCount = 0;
-        for (const auto& object : scene->m_Entities)
-        {
-            if (!object || object->IsDestroyMark()) continue;
-            Animator* animator = object->GetComponent<Animator>();
-            if (nullptr == animator) continue;
-            if (0 == animator->GetSkeletonSerial()) continue;
-
-            ++animatorCount;
-            std::uint32_t digest = 2166136261u;
-            const std::size_t bones =
-                (std::min)(animator->GetBoneCount(), (std::size_t)MAX_BONES);
-            for (std::size_t bone = 0; bone < bones; ++bone)
-            {
-                const float* values = &animator->m_FinalTransforms[bone].m[0][0];
-                for (int element = 0; element < 16; ++element)
-                {
-                    const std::int32_t quantized = static_cast<std::int32_t>(
-                        std::lround(static_cast<double>(values[element]) * 4096.0));
-                    std::uint32_t bits = static_cast<std::uint32_t>(quantized);
-                    for (int byte = 0; byte < 4; ++byte)
-                    {
-                        digest ^= (bits >> (byte * 8)) & 0xFFu;
-                        digest *= 16777619u;
-                    }
-                }
-            }
-            // 루프 판정과 클립 길이를 함께 찍는다 — elapsed만 보면 "끝에서
-            // 멈춘 것"과 "긴 클립을 지나는 중"을 구별할 수 없다(실측으로
-            // 그 둘을 혼동할 뻔했다).
-            const int clipIndex = static_cast<int>(animator->m_AnimIndexChosen);
-            const double duration = animator->GetClipDuration(clipIndex);
-            // 팔레트가 갱신되는데 화면이 안 움직이면 그 다음 구간이다 —
-            // Scene::PublishAnimatorPose가 팔레트를 씬 packed storage와
-            // 부착 오브젝트 Transform으로 commit하는 자리. MBC10: 진단이 publish를
-            // **다시 부르지 않는다**(상태 변경) — 제품 barrier가 남긴 마지막 메트릭을
-            // 읽기 전용 스냅샷으로 읽는다. source=none이면 아직 barrier가 한 번도
-            // 안 돌았거나 애니메이터가 barrier 대상이 아니었던 것이다.
-            AnimatorPoseUploadMetrics publish{};
-            const bool hasPublish =
-                scene->TryGetLastAnimatorPoseMetrics(*animator, publish);
-            std::printf("[CLI] experiment.animlive publish %s source=%s uploaded=%d "
-                "packed=%d legacyFallback=%d rebound=%d disabled=%d "
-                "staleOwner=%d skeletonMissing=%d bindLookups=%llu "
-                "validBones=%llu invalidBones=%llu localWrites=%llu "
-                "queuedRoots=%llu paletteDirty=%llu\n",
-                object->GetHashedName().ToString().c_str(),
-                hasPublish ? "product" : "none",
-                publish.uploaded ? 1 : 0, publish.packed ? 1 : 0,
-                publish.legacyFallback ? 1 : 0, publish.rebound ? 1 : 0,
-                publish.disabled ? 1 : 0, publish.staleOwner ? 1 : 0,
-                publish.skeletonMissing ? 1 : 0,
-                (unsigned long long)publish.bindLookups,
-                (unsigned long long)publish.validBones,
-                (unsigned long long)publish.invalidBones,
-                (unsigned long long)publish.localWrites,
-                (unsigned long long)publish.queuedRoots,
-                (unsigned long long)publish.paletteDirty);
-            std::printf("[CLI] experiment.animlive %s path=%s enabled=%d "
-                "clip=%u elapsed=%.4f duration=%.4f loop=%d clips=%zu "
-                "bones=%zu palette=%08X\n",
-                object->GetHashedName().ToString().c_str(),
-                animator->TypedSkeleton() ? "generation" : "none",
-                animator->IsEnabled() ? 1 : 0,
-                animator->m_AnimIndexChosen, animator->m_TimeElapsed,
-                duration, animator->IsClipLooping(clipIndex) ? 1 : 0,
-                animator->GetClipCount(), bones, digest);
-        }
-        // 프록시 커밋 누계 — 팔레트가 렌더로 가려면 프록시가 다시 만들어져야
-        // 한다. 시간을 두고 두 번 부를 때 committed가 늘지 않으면 최신 팔레트가
-        // 렌더에 도달하지 않는다(그 상태가 "메시는 나오는데 안 움직인다"다).
-        const RenderProxyCommitMetrics proxy = scene->GetRenderProxyCommitMetrics();
-        std::printf("[CLI] experiment.animlive done animators=%zu "
-            "proxyCommitted=%llu proxyPending=%llu proxyPublishCalls=%llu\n",
-            animatorCount,
-            (unsigned long long)proxy.committed,
-            (unsigned long long)proxy.pending,
-            (unsigned long long)proxy.publishCalls);
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("animator.status accepts no arguments");
+        return EditorDiagnostics::AnimatorStatus(SceneManagers->GetActiveScene());
     }
 
-    static void Cmd_experiment_animtick(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_animtick(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("experiment.animtick");
         Scene* scene = SceneManagers->GetActiveScene();
         RenderScene* renderScene = SceneManagers->GetRenderScene();
         if (nullptr == scene || nullptr == renderScene)
         {
             std::printf("[CLI] experiment.animtick fail 활성 씬/렌더 씬 없음\n");
-            return;
+            return PreconditionFailed("scene.not_found", "No active scene or render scene");
         }
         AnimationJob& job = renderScene->GetAnimationJob();
 
@@ -2005,14 +2021,26 @@ namespace ConsoleCmd
             axis.failedEvaluations, axis.poseDigest,
             animatorCount > 0 ? "generation" : "none",
             typedAnimators);
+        auto data = CommandData::Object();
+        data.Set("animators", CommandData::Int(animatorCount));
+        data.Set("typed", CommandData::Int(typedAnimators));
+        data.Set("clips", CommandData::Int(axis.clipCount));
+        data.Set("samples", CommandData::Int(axis.sampleCount));
+        data.Set("failedEval", CommandData::Int(axis.failedEvaluations));
+        data.Set("poseDigest", CommandData::Int(axis.poseDigest));
+        if (animatorCount == 0) { auto result = PreconditionFailed("animation.coverage_missing", "Typed model fixture is absent"); result.data = std::move(data); return result; }
+        return passed ? Ok({}, std::move(data)) : Fail("experiment.animtick.failed", "Commandlet verification failed", std::move(data));
     }
 
-    static void Cmd_assets_identity(const ConsoleCommandContext&)
+    static CommandCore::CommandResult Cmd_assets_identity(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("assets.identity");
         // MBC1 — ce.uuidv8.sha256.v1 신원 프로필·충돌 registry 합성 검사. CPU 전용.
         // `assets.` 접두는 experiment가 아닌 정식 자산 계층(§5.1)의 명령이다.
+        RenderTest::AssetIdentityReport report;
         std::string log;
-        const bool passed = RenderTest::RunAssetIdentitySelfTest(log);
+        const bool passed = RenderTest::RunAssetIdentitySelfTest(log, &report);
         std::printf("%s", log.c_str());
         if (passed)
         {
@@ -2023,15 +2051,35 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[assets.identity] 실패\n") + log);
         }
         std::printf("[CLI] assets.identity %s\n", passed ? "통과" : "실패");
+        auto data = CommandData::Object();
+        data.Set("passed", CommandData::Int(report.passed));
+        data.Set("failed", CommandData::Int(report.failed));
+        data.Set("bcryptMatched", CommandData::Int(report.bcryptMatched));
+        data.Set("bcryptTotal", CommandData::Int(report.bcryptTotal));
+        data.Set("assertions", CommandData::Int(report.passed + report.failed));
+        auto items = CommandData::Array();
+        for (const auto& row : report.vectors)
+        {
+            auto item = CommandData::Object();
+            item.Set("name", CommandData::String(row.name));
+            item.Set("uuid", CommandData::String(row.uuid));
+            items.Append(std::move(item));
+        }
+        data.Set("vectors", std::move(items));
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("assets.identity.failed", "Commandlet verification failed", std::move(data));
     }
 
-    static void Cmd_assets_sidecar(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_assets_sidecar(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("assets.sidecar [asset-root]");
         // MBC2 — epoch header·stable key·sidecar schema v2. 인자로 asset root를 주면
         // 실자산 corpus를 임포트해 폐포를 검증한다(디스크에 쓰지 않는다 — 쓰기는 MBC3).
         const std::string assetRoot = ctx.parts.size() > 1 ? ctx.parts[1] : std::string();
+        RenderTest::AssetSidecarReport report;
         std::string log;
-        const bool passed = RenderTest::RunAssetSidecarSchemaSelfTest(assetRoot, log);
+        const bool passed = RenderTest::RunAssetSidecarSchemaSelfTest(assetRoot, log, &report);
         std::printf("%s", log.c_str());
         if (passed)
         {
@@ -2042,15 +2090,45 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[assets.sidecar] 실패\n") + log);
         }
         std::printf("[CLI] assets.sidecar %s\n", passed ? "통과" : "실패");
+        auto data = CommandData::Object();
+        data.Set("passed", CommandData::Int(report.passed));
+        data.Set("failed", CommandData::Int(report.failed));
+        data.Set("models", CommandData::Int(report.models));
+        data.Set("modelsPassed", CommandData::Int(report.modelsPassed));
+        data.Set("subAssets", CommandData::Int(report.subAssets));
+        data.Set("registry", CommandData::Int(report.registry));
+        data.Set("assertions", CommandData::Int(report.passed + report.failed));
+        auto items = CommandData::Array();
+        for (const auto& row : report.corpus)
+        {
+            auto item = CommandData::Object();
+            item.Set("name", CommandData::String(row.name));
+            item.Set("ok", CommandData::Bool(row.ok));
+            item.Set("mat", CommandData::Int(row.mat));
+            item.Set("matSem", CommandData::Int(row.matSem));
+            item.Set("matAuth", CommandData::Int(row.matAuth));
+            item.Set("tex", CommandData::Int(row.tex));
+            item.Set("texSem", CommandData::Int(row.texSem));
+            item.Set("texAuth", CommandData::Int(row.texAuth));
+            item.Set("mesh", CommandData::Int(row.mesh));
+            item.Set("skel", CommandData::Int(row.skel));
+            item.Set("anim", CommandData::Int(row.anim));
+            items.Append(std::move(item));
+        }
+        data.Set("corpus", std::move(items));
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("assets.sidecar.failed", "Commandlet verification failed", std::move(data));
     }
 
-    static void Cmd_assets_generation(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_assets_generation(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2) return InvalidArguments("assets.generation <project-root>");
         if (ctx.parts.size() < 2)
         {
             Debug->LogWarning("[assets.generation] 사용법: assets.generation <fixture project root>");
             std::printf("[CLI] assets.generation 사용법: assets.generation <project root>\n");
-            return;
+            return InvalidArguments("assets.generation <project-root>");
         }
         std::string log;
         const bool passed = RenderTest::RunModelAssetGenerationSelfTest(
@@ -2061,15 +2139,20 @@ namespace ConsoleCmd
         else
             Debug->LogError(std::string("[assets.generation] 실패\n") + log);
         std::printf("[CLI] assets.generation %s\n", passed ? "PASS" : "FAIL");
+        auto data = CommandData::Object();
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("assets.generation.failed", "Commandlet verification failed", std::move(data));
     }
 
-    static void Cmd_assets_generationcorpus(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_assets_generationcorpus(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2) return InvalidArguments("assets.generationcorpus <content-root>");
         if (ctx.parts.size() < 2)
         {
             Debug->LogWarning("[assets.generationcorpus] 사용법: assets.generationcorpus <runtime content root>");
             std::printf("[CLI] assets.generationcorpus 사용법: assets.generationcorpus <content root>\n");
-            return;
+            return InvalidArguments("assets.generationcorpus <content-root>");
         }
         std::string log;
         const bool passed = RenderTest::RunModelAssetGenerationCorpusSelfTest(
@@ -2081,10 +2164,15 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[assets.generationcorpus] 실패\n") + log);
         std::printf("[CLI] assets.generationcorpus %s\n",
             passed ? "PASS" : "FAIL");
+        auto data = CommandData::Object();
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("assets.generationcorpus.failed", "Commandlet verification failed", std::move(data));
     }
 
-    static void Cmd_assets_modelrender(const ConsoleCommandContext&)
+    static CommandCore::CommandResult Cmd_assets_modelrender(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("assets.modelrender");
         std::string log;
         const bool passed = RenderTest::RunModelRenderWiringSelfTest(log);
         std::printf("%s", log.c_str());
@@ -2093,6 +2181,9 @@ namespace ConsoleCmd
         else
             Debug->LogError(std::string("[assets.modelrender] 실패\n") + log);
         std::printf("[CLI] assets.modelrender %s\n", passed ? "PASS" : "FAIL");
+        auto data = CommandData::Object();
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("assets.modelrender.failed", "Commandlet verification failed", std::move(data));
     }
 
     // PHASE 3.75 MBC7 — 활성 씬의 MeshRenderer가 typed generation handle·closure
@@ -2102,8 +2193,10 @@ namespace ConsoleCmd
     // 인스턴스화·Animator 틱)는 stdout 토큰 대신 계수만 올리고, 이 명령이 그것을 읽는다.
     // 아무 상태도 바꾸지 않는다(리셋도 없다).
 
-    static void Cmd_assets_modeldiag(const ConsoleCommandContext&)
+    static CommandCore::CommandResult Cmd_assets_modeldiag(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
         const ModelConsumptionSnapshot snapshot = ModelConsumptionDiagnostics::Snapshot();
         const DataSystem::ModelGenerationSourceSnapshot sources =
             DataSystems->SnapshotModelGenerationSources();
@@ -2121,6 +2214,18 @@ namespace ConsoleCmd
             (unsigned long long)sources.fromCatalog,
             (unsigned long long)sources.fromLibrary,
             (unsigned long long)sources.failed);
+        auto data = CommandData::Object();
+        data.Set("meshResolveGeneration", CommandData::Int(snapshot.meshResolveGeneration));
+        data.Set("meshResolveFailed", CommandData::Int(snapshot.meshResolveFailed));
+        data.Set("instantiateGeneration", CommandData::Int(snapshot.instantiateGeneration));
+        data.Set("instantiateRejected", CommandData::Int(snapshot.instantiateRejected));
+        data.Set("tickGeneration", CommandData::Int(snapshot.tickGeneration));
+        data.Set("tickNone", CommandData::Int(snapshot.tickNone));
+        data.Set("lastInstantiated", CommandData::String(snapshot.lastInstantiated));
+        data.Set("generationFromCatalog", CommandData::Int(sources.fromCatalog));
+        data.Set("generationFromLibrary", CommandData::Int(sources.fromLibrary));
+        data.Set("generationLoadFailed", CommandData::Int(sources.failed));
+        return Ok({}, std::move(data));
     }
 
     // PHASE 3.75 MBC11 — §8.4 B1/B2/B5/B6 계측.
@@ -2132,10 +2237,19 @@ namespace ConsoleCmd
     //           트리의 sidecar를 건드리지 않도록 사본에서만 부른다(게이트가 사본을 만든다).
     //   끝에 프로세스 peak working set과 VRAM 사용량을 찍는다.
 
-    static void Cmd_assets_modelbench(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_assets_modelbench(const ConsoleCommandContext& ctx)
     {
-        const int iterations = ctx.parts.size() > 2
-            ? (std::max)(1, std::atoi(ctx.parts[2].c_str())) : 5;
+        using namespace CommandCore;
+        if (ctx.parts.size() > 4 || (ctx.parts.size() == 4 && ctx.parts[3] != "author" && ctx.parts[3] != "cooked")) return InvalidArguments("assets.modelbench [root|-] [iterations] [author|cooked]");
+        int iterations = 5;
+        if (ctx.parts.size() > 2 && (!ParseNumber(ctx.parts[2], iterations) || iterations < 1 || iterations > 10000))
+            return InvalidArguments("iterations must be 1..10000");
+        auto rows = CommandData::Array();
+        const auto phasesData = [](const assets::ModelAssetPhaseTimeline& phases) {
+            auto result = CommandData::Array();
+            for (const auto& phase : phases) { auto item = CommandData::Object(); item.Set("phase", CommandData::String(phase.phase)); item.Set("milliseconds", CommandData::Double(phase.milliseconds)); result.Append(std::move(item)); }
+            return result;
+        };
         const bool authorMode = ctx.parts.size() > 3 && ctx.parts[3] == "author";
         file::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
             ? file::path(ctx.parts[1]) : file::path(PathFinder::ModelSourcePath());
@@ -2144,7 +2258,7 @@ namespace ConsoleCmd
         {
             std::printf("[CLI] assets.modelbench fail 디렉터리가 아니다: %s\n",
                 root.string().c_str());
-            return;
+            return PreconditionFailed("model.corpus_missing", "Model directory is unavailable");
         }
         std::vector<file::path> models;
         for (file::recursive_directory_iterator it(root, error), end; !error && it != end;
@@ -2156,9 +2270,10 @@ namespace ConsoleCmd
                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
             if (ext == ".glb" || ext == ".gltf" || ext == ".fbx") models.push_back(it->path());
         }
+        if (error) return Fail("model.corpus_read_failed", error.message());
         std::sort(models.begin(), models.end());
 
-        std::size_t failed = 0, measured = 0;
+        std::size_t failed = 0, measured = 0, skipped = 0;
         if (authorMode)
         {
             // 사본 프로젝트 배치: <project>/Assets/<sub>/<model>.
@@ -2170,7 +2285,7 @@ namespace ConsoleCmd
             {
                 std::printf("[CLI] assets.modelbench fail author 모드는 <project>/Assets/<sub> 사본과 "
                     "ProjectSetting/AssetIdentity.asset이 필요하다: %s\n", root.string().c_str());
-                return;
+                return InvalidArguments("Author mode requires a fixture project with Assets and AssetIdentity.asset");
             }
             const auto formatPhases = [](const assets::ModelAssetPhaseTimeline& phases)
                 {
@@ -2245,6 +2360,13 @@ namespace ConsoleCmd
                     continue;
                 }
                 ++measured;
+            auto row = CommandData::Object();
+            row.Set("model", CommandData::String(model.stem().string()));
+            row.Set("meshes", CommandData::Int(meshes)); row.Set("vertices", CommandData::Int(vertices));
+                row.Set("authorMinMs", CommandData::Double(minMs)); row.Set("authorAvgMs", CommandData::Double(sumMs / iterations));
+                row.Set("cookedMinMs", CommandData::Double(loadMinMs)); row.Set("cookedAvgMs", CommandData::Double(loadSumMs / iterations));
+                row.Set("authorPhases", phasesData(minPhases)); row.Set("cookedPhases", phasesData(loadPhases));
+                row.Set("subAssets", CommandData::Int(subAssets)); rows.Append(std::move(row));
                 std::printf("[CLI] assets.modelbench model=%s authorMinMs=%.3f authorAvgMs=%.3f "
                     "subAssets=%zu cookedMinMs=%.3f cookedAvgMs=%.3f meshes=%zu vertices=%llu "
                     "authorPhases=%s cookedPhases=%s\n",
@@ -2259,6 +2381,7 @@ namespace ConsoleCmd
             const FileGuid guid = DataSystems->GetFilenameToGuid(model.filename().string());
             if (FileGuid{} == guid || !assets::IsUuidV8(guid.m_guid))
             {
+                ++skipped;
                 std::printf("[CLI] assets.modelbench model=%s skip reason=no-v8-identity\n",
                     model.stem().string().c_str());
                 continue;
@@ -2294,6 +2417,10 @@ namespace ConsoleCmd
                 continue;
             }
             ++measured;
+            auto row = CommandData::Object();
+            row.Set("model", CommandData::String(model.stem().string()));
+            row.Set("meshes", CommandData::Int(meshes)); row.Set("vertices", CommandData::Int(vertices));
+            row.Set("cookedMinMs", CommandData::Double(minMs)); row.Set("cookedAvgMs", CommandData::Double(sumMs / iterations)); rows.Append(std::move(row));
             std::printf("[CLI] assets.modelbench model=%s cookedMinMs=%.3f cookedAvgMs=%.3f "
                 "meshes=%zu vertices=%llu\n", model.stem().string().c_str(), minMs,
                 sumMs / iterations, meshes, vertices);
@@ -2313,28 +2440,66 @@ namespace ConsoleCmd
             "iterations=%d peakWorkingSetMB=%.1f vramUsedMB=%llu vramBudgetMB=%llu\n",
             authorMode ? "author" : "cooked", measured, failed,
             iterations, peakMb, vramUsedMb, vramBudgetMb);
+        auto data = CommandData::Object(); data.Set("models", std::move(rows));
+        data.Set("mode", CommandData::String(authorMode ? "author" : "cooked"));
+        data.Set("measured", CommandData::Int(measured)); data.Set("failed", CommandData::Int(failed)); data.Set("skipped", CommandData::Int(skipped));
+        data.Set("iterations", CommandData::Int(iterations)); data.Set("peakWorkingSetMB", CommandData::Double(peakMb));
+        data.Set("vramUsedMB", CommandData::Int(vramUsedMb)); data.Set("vramBudgetMB", CommandData::Int(vramBudgetMb));
+        if (failed) return Fail("model.benchmark_failed", "Model benchmark failed", std::move(data));
+        if (!measured) { auto result = PreconditionFailed("model.coverage_missing", "No typed model measured"); result.data = std::move(data); return result; }
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_assets_scenemodel(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_assets_scenemodel(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1 && (ctx.parts.size() != 3 || ctx.parts[1] != "reload"))
+            return InvalidArguments("assets.scenemodel [reload <model-name>]");
+        RenderTest::SceneModelReport report;
         std::string log;
         bool passed = false;
         if (ctx.parts.size() >= 3 && "reload" == ctx.parts[1])
         {
-            passed = RenderTest::RunSceneModelGenerationReloadSelfTest(ctx.parts[2], log);
+            passed = RenderTest::RunSceneModelGenerationReloadSelfTest(ctx.parts[2], log, &report);
         }
         else
         {
-            passed = RenderTest::RunSceneModelGenerationSelfTest(log);
+            passed = RenderTest::RunSceneModelGenerationSelfTest(log, &report);
         }
         if (passed)
             Debug->LogWarning(std::string("[assets.scenemodel] 통과\n") + log);
         else
             Debug->LogError(std::string("[assets.scenemodel] 실패\n") + log);
+        auto data = CommandData::Object();
+        data.Set("renderers", CommandData::Int(report.renderers));
+        data.Set("generationBound", CommandData::Int(report.generationBound));
+        data.Set("unbound", CommandData::Int(report.unbound));
+        data.Set("handleInvalid", CommandData::Int(report.handleInvalid));
+        data.Set("rhiView", CommandData::Int(report.rhiView));
+        data.Set("meshIdPersisted", CommandData::Int(report.meshIdPersisted));
+        data.Set("textureProps", CommandData::Int(report.textureProps));
+        data.Set("embeddedProps", CommandData::Int(report.embeddedProps));
+        data.Set("generationTextures", CommandData::Int(report.generationTextures));
+        data.Set("otherTextures", CommandData::Int(report.otherTextures));
+        data.Set("missingTextures", CommandData::Int(report.missingTextures));
+        data.Set("gunnerRenderers", CommandData::Int(report.gunnerRenderers));
+        data.Set("gunnerEmbedded", CommandData::Int(report.gunnerEmbedded));
+        data.Set("textures", CommandData::Int(report.textures));
+        data.Set("reused", CommandData::Int(report.reused));
+        data.Set("created", CommandData::Int(report.created));
+        data.Set("missing", CommandData::Int(report.missing));
+        data.Set("retired", CommandData::Int(report.retired));
+        data.Set("reload", CommandData::Bool(report.reload));
+        data.Set("sameAggregate", CommandData::Bool(report.sameAggregate));
+
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("scenemodel.failed", "Scene model generation verification failed", std::move(data));
     }
 
-    static void Cmd_experiment_cooked(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_cooked(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("experiment.cooked [asset]");
         // 인자가 없으면 합성 검사, 있으면 그 자산으로 실자산 왕복까지 돌다.
         std::string log;
         bool passed = RenderTest::RunExperimentCookedSelfTest(log);
@@ -2357,10 +2522,15 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.cooked] 실패\n") + log);
         }
         std::printf("[CLI] experiment.cooked %s\n", passed ? "통과" : "실패");
+        auto data = CommandData::Object();
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("experiment.cooked.failed", "Commandlet verification failed", std::move(data));
     }
 
-    static void Cmd_experiment_matcook(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_matcook(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() == 2 || ctx.parts.size() > 4) return InvalidArguments("experiment.matcook [asset-root material [model]]");
         // 인자 없으면 합성. <assetRoot> <material> [model] 이면 실자산까지.
         std::string log;
         bool passed = RenderTest::RunExperimentMaterialCookSelfTest(log);
@@ -2388,37 +2558,9 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.matcook] 실패\n") + log);
         }
         std::printf("[CLI] experiment.matcook %s\n", passed ? "통과" : "실패");
-    }
-
-    static CommandCore::CommandResult Cmd_experiment_matparity(const ConsoleCommandContext& ctx)
-    {
-        // I5-M1 — experiment::Material → 정본 packer CB bytes의 legacy 비트
-        // 패리티. 합성(타입 8종) + 실사(Slang reflection layout) 두 leg 다 돈다.
-        (void)ctx;
-        std::string log;
-        bool passed = RenderTest::RunExperimentMaterialParitySelfTest(log);
-        passed = RenderTest::RunExperimentMaterialParityReal(log) && passed;
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.matparity] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.matparity] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.matparity %s\n", passed ? "통과" : "실패");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("experiment.matparity.failed",
-                "재질 해석 패리티 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("experiment.matparity 통과", std::move(data));
+        auto data = CommandData::Object();
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("experiment.matcook.failed", "Commandlet verification failed", std::move(data));
     }
 
     // I5-D5c1 — 재질 런타임 병행 표현의 전수 A/B, 그리고 **왕복 손실의 실측**.
@@ -2492,7 +2634,7 @@ namespace ConsoleCmd
     // base에 링크한 뒤 override 하나를 얹는다. 저장이 ref 표기를 내고, 재로드가
     // 병행 표현을 채운다.
     static bool SeedAuthoredMaterial(Scene& scene, const file::path& directory,
-        std::string& outError)
+        const file::path& texturePath, std::string& outError)
     {
         // ShaderMeta는 실물을 쓴다 — 지어낸 GUID로는 keywords 정규화도 property
         // 검증도 돌지 않아 seed가 검사 대상을 비껴간다.
@@ -2540,8 +2682,6 @@ namespace ConsoleCmd
         // ★ texture도 실어야 c3-2의 owner 축이 실제로 무언가를 비교한다.
         //   싣지 않으면 legacy 맵도 resolver도 nullptr을 주고 "동일"로 통과한다
         //   (nullptr끼리 비교하는 눈먼 초록 — 실제로 한 번 그렇게 나왔다).
-        const file::path texturePath =
-            PathFinder::Relative("Materials\\") / "Cube_Mat_BaseColor.png";
         const FileGuid textureGuid = DataSystems->GetFileGuid(texturePath);
         if (FileGuid{} == textureGuid)
         {
@@ -2564,6 +2704,20 @@ namespace ConsoleCmd
             // 두 경로가 같은 텍스처를 갖고, owner 대조는 그대로 성립한다.
         }
 
+        // 링크 대상은 씬의 첫 MeshRenderer다. legacy 사본은 base를 변환해
+        // 만든다 — 저작 경계의 ref 읽기와 같은 규약(base 소유 사본+override).
+        MeshRenderer* target = nullptr;
+        for (const auto& object : scene.m_Entities)
+        {
+            if (!object || object->IsDestroyMark()) continue;
+            if (MeshRenderer* candidate = object->GetComponent<MeshRenderer>())
+            {
+                target = candidate;
+                break;
+            }
+        }
+        if (nullptr == target) { outError = "씬에 MeshRenderer가 없다"; return false; }
+
 		Authoring::WriteDocument document;
 		if (!experiment::SerializeMaterialAuthoring(
 			authored, document.Root(), error))
@@ -2580,20 +2734,6 @@ namespace ConsoleCmd
             outError = "자산 게시 거부(저작 루트 가드): " + destination.string();
             return false;
         }
-
-        // 링크 대상은 씬의 첫 MeshRenderer다. legacy 사본은 base를 변환해
-        // 만든다 — 저작 경계의 ref 읽기와 같은 규약(base 소유 사본+override).
-        MeshRenderer* target = nullptr;
-        for (const auto& object : scene.m_Entities)
-        {
-            if (!object || object->IsDestroyMark()) continue;
-            if (MeshRenderer* candidate = object->GetComponent<MeshRenderer>())
-            {
-                target = candidate;
-                break;
-            }
-        }
-        if (nullptr == target) { outError = "씬에 MeshRenderer가 없다"; return false; }
 
         auto owned = std::make_shared<Material>();
         if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(authored,
@@ -2624,13 +2764,26 @@ namespace ConsoleCmd
         return true;
     }
 
-    static void Cmd_experiment_matruntime(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_matruntime(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        const bool seed = ctx.parts.size() >= 2 && ctx.parts[1] == "seed";
+        const bool edit = ctx.parts.size() == 2 && ctx.parts[1] == "edit";
+        if ((seed && ctx.parts.size() != 4) || (!seed && !edit && ctx.parts.size() != 1))
+            return InvalidArguments("experiment.matruntime [edit | seed <asset-directory> <texture-path>]");
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
         {
             std::printf("[CLI] experiment.matruntime fail 활성 씬 없음\n");
-            return;
+            return PreconditionFailed("scene.not_loaded", "No active scene");
+        }
+
+        if (seed)
+        {
+            std::string error;
+            if (!SeedAuthoredMaterial(*scene, file::path(ctx.parts[2]), file::path(ctx.parts[3]), error))
+                return Fail("material.seed_failed", error);
+            return Ok("Authored material fixture published");
         }
 
         // I5-D5c3 — 편집 반영 축. `MaterialScriptBinding.h`의 계약은 "논리 값
@@ -2657,7 +2810,7 @@ namespace ConsoleCmd
             {
                 std::printf("[CLI] experiment.matruntime edit skip "
                     "저작 정본 보유 renderer 0\n");
-                return;
+                return PreconditionFailed("material.no_instance", "No renderer with an authored material instance");
             }
 
             std::string error;
@@ -2669,7 +2822,7 @@ namespace ConsoleCmd
             {
                 std::printf("[CLI] experiment.matruntime edit fail meta=%s\n",
                     error.c_str());
-                return;
+                return Fail("material.meta_failed", error);
             }
             std::string propertyName;
             for (const ShaderPropertyDesc& desc : meta->properties)
@@ -2682,7 +2835,7 @@ namespace ConsoleCmd
             {
                 std::printf("[CLI] experiment.matruntime edit skip "
                     "float property 0\n");
-                return;
+                return PreconditionFailed("material.no_float", "No float property to edit");
             }
 
             // 실물 편집 창구를 그대로 태운다 — 재구현하면 게이트가 제품이
@@ -2755,24 +2908,10 @@ namespace ConsoleCmd
                     ? "pass" : "fail",
                 propertyName.c_str(), applied ? 1 : 0, legacyAfter,
                 instanceAfter, proxyAfter);
-            return;
+            return (applied && instanceFollowed && proxyFollowed) ? Ok("Material edit reached instance and proxy") : Fail("material.edit_mismatch", "Material edit did not reach instance and proxy");
         }
 
-        if (ctx.parts.size() >= 2 && "seed" == ctx.parts[1])
-        {
-            if (ctx.parts.size() < 3)
-            {
-                std::printf("[CLI] experiment.matruntime seed <자산디렉터리>\n");
-                return;
-            }
-            std::string error;
-            if (!SeedAuthoredMaterial(*scene, file::path(ctx.parts[2]), error))
-            {
-                std::printf("[CLI] experiment.matruntime seed fail %s\n",
-                    error.c_str());
-            }
-            return;
-        }
+
 
         const auto encodeValue = [](const std::string& name,
             const experiment::MaterialPropertyValue& value) -> std::string
@@ -3184,6 +3323,13 @@ namespace ConsoleCmd
             firstTexMismatch.c_str(),
             firstAuthoredSeal.empty() ? "" : " firstAuthoredSeal=",
             firstAuthoredSeal.c_str());
+        CommandData data = CommandData::Object();
+        data.Set("renderers", CommandData::Int(static_cast<std::int64_t>(renderers)));
+        data.Set("compared", CommandData::Int(static_cast<std::int64_t>(compared)));
+        data.Set("passed", CommandData::Bool(passed));
+        if (!covered) return PreconditionFailed("material.no_coverage", "No authored material instance was compared");
+        return passed ? Ok("Material runtime contract passed", std::move(data))
+            : Fail("material.runtime_mismatch", "Material runtime contract failed", std::move(data));
     }
 
     // I7-C1 — cooked catalog 관측·마운트. 굽는 쪽(AssetCooker → Derived/ +
@@ -3193,8 +3339,10 @@ namespace ConsoleCmd
     //   ② 게이트가 임시 Derived 트리를 명시적으로 마운트할 창구가 된다.
     // 저작 트리에는 Derived가 없으므로 인자 없는 실행은 미게시(skip)가 정상이다.
 
-    static void Cmd_experiment_catalog(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_catalog(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1 && (ctx.parts.size() < 3 || (ctx.parts[1] != "mount" && ctx.parts[1] != "probe"))) return InvalidArguments("experiment.catalog [mount <root>|probe <texture>]");
         namespace ck = experiment::cooked;
         // 경로에 공백이 있을 수 있다. 예전에는 그래서 원문에서 잘라 썼는데,
         // 그 방식은 `find("mount")` 가 **경로 안의 "mount" 를 먼저 만나면**
@@ -3212,7 +3360,10 @@ namespace ConsoleCmd
                 DataSystems->CookedCatalogSourceAssetCount(),
                 DataSystems->CookedCatalogStaleCount(),
                 error.empty() ? "" : " error=", error.c_str());
-            return;
+            auto data = CommandData::Object(); data.Set("root", CommandData::String(root.string()));
+            data.Set("entries", CommandData::Int(DataSystems->CookedCatalogEntryCount()));
+            data.Set("sources", CommandData::Int(DataSystems->CookedCatalogSourceAssetCount())); data.Set("stale", CommandData::Int(DataSystems->CookedCatalogStaleCount()));
+            return mounted ? Ok({}, std::move(data)) : Fail("catalog.mount_failed", error, std::move(data));
         }
 
         // I7-C1 — 제품 바인딩 소비 프로브. "표가 섰다"와 "resolver가 cooked를
@@ -3234,7 +3385,7 @@ namespace ConsoleCmd
                 std::printf("[CLI] experiment.catalog probe fail GUID 미해석 "
                     "texture=%d shader=%d\n",
                     FileGuid{} != textureGuid, FileGuid{} != shaderGuid);
-                return;
+                return PreconditionFailed("catalog.fixture_missing", "Texture or shader GUID is unavailable");
             }
 
             std::string metaError;
@@ -3246,7 +3397,7 @@ namespace ConsoleCmd
             {
                 std::printf("[CLI] experiment.catalog probe fail meta %s\n",
                     metaError.c_str());
-                return;
+                return Fail("catalog.meta_failed", metaError);
             }
 
             experiment::Material material;
@@ -3279,7 +3430,9 @@ namespace ConsoleCmd
                 (ok && owners > 0) ? "pass" : "fail",
                 nullptr != mounted, owners, cooked, sourceFallback,
                 error.empty() ? "" : " error=", error.c_str());
-            return;
+            auto data = CommandData::Object(); data.Set("catalog", CommandData::Bool(mounted != nullptr));
+            data.Set("textures", CommandData::Int(owners)); data.Set("cooked", CommandData::Int(cooked)); data.Set("sourceFallback", CommandData::Int(sourceFallback));
+            return ok && owners > 0 ? Ok({}, std::move(data)) : Fail("catalog.probe_failed", error, std::move(data));
         }
 
         const auto catalog = DataSystems->GetCookedCatalog();
@@ -3287,7 +3440,7 @@ namespace ConsoleCmd
         {
             // 미게시는 결함이 아니다 — 저작 트리의 정상 상태다.
             std::printf("[CLI] experiment.catalog skip 미게시(Derived 없음)\n");
-            return;
+            return PreconditionFailed("catalog.not_mounted", "No cooked catalog is mounted");
         }
 
         // 씬의 모델 GUID가 실제로 cooked artifact로 해석되는가 — 표가 서 있어도
@@ -3326,101 +3479,17 @@ namespace ConsoleCmd
             catalog->CountOfKind(ck::CookedAssetKind::Prefab),
             modelsProbed, modelsResolved, DataSystems->CookedCatalogStaleCount(),
             catalog->DerivedRoot().string().c_str());
+        auto data = CommandData::Object();
+        data.Set("entries", CommandData::Int(catalog->Size())); data.Set("sources", CommandData::Int(catalog->SourceAssetCount()));
+        data.Set("modelsProbed", CommandData::Int(modelsProbed)); data.Set("modelsResolved", CommandData::Int(modelsResolved));
+        data.Set("stale", CommandData::Int(DataSystems->CookedCatalogStaleCount())); data.Set("root", CommandData::String(catalog->DerivedRoot().string()));
+        return modelsProbed == modelsResolved ? Ok({}, std::move(data)) : Fail("catalog.resolve_failed", "Scene model resolution is incomplete", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_experiment_matresolve(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
     {
-        // I5-M2 — MaterialResolver. 합성(가짜 서비스·호출 계수) + 실사(DataSystem
-        // 바인딩) 두 leg 다 돈다.
-        (void)ctx;
-        std::string log;
-        bool passed = RenderTest::RunExperimentMaterialResolveSelfTest(log);
-        passed = RenderTest::RunExperimentMaterialResolveReal(log) && passed;
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.matresolve] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.matresolve] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.matresolve %s\n", passed ? "통과" : "실패");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("experiment.matresolve.failed",
-                "MaterialResolver 호출 순서 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("experiment.matresolve 통과", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_experiment_matmigrate(const ConsoleCommandContext& ctx)
-    {
-        // I5-M5 S1 — legacy ↔ experiment 변환 정본 + DataSystem 읽기 이중화.
-        (void)ctx;
-        std::string log;
-        bool passed = RenderTest::RunExperimentMaterialMigrateSelfTest(log);
-        passed = RenderTest::RunExperimentMaterialMigrateReal(log) && passed;
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.matmigrate] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.matmigrate] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.matmigrate %s\n", passed ? "통과" : "실패");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("experiment.matmigrate.failed",
-                "legacy 재질 왕복 이관 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("experiment.matmigrate 통과", std::move(data));
-    }
-
-    static CommandCore::CommandResult Cmd_experiment_matscript(const ConsoleCommandContext& ctx)
-    {
-        // I5-M5 S3 — CLR property API의 논리 값 경로.
-        (void)ctx;
-        std::string log;
-        bool passed = RenderTest::RunExperimentMaterialScriptSelfTest(log);
-        passed = RenderTest::RunExperimentMaterialScriptReal(log) && passed;
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug->LogWarning(std::string("[experiment.matscript] 통과\n") + log);
-        }
-        else
-        {
-            Debug->LogError(std::string("[experiment.matscript] 실패\n") + log);
-        }
-        std::printf("[CLI] experiment.matscript %s\n", passed ? "통과" : "실패");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("experiment.matscript.failed",
-                "스크립트가 보는 재질 표면 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("experiment.matscript 통과", std::move(data));
-    }
-
-    static void Cmd_experiment_scenecook(const ConsoleCommandContext& ctx)
-    {
+        using namespace CommandCore;
+        if (ctx.parts.size() == 2 || ctx.parts.size() > 3) return InvalidArguments("experiment.scenecook [asset-root scene]");
         std::string log;
         bool passed = RenderTest::RunExperimentSceneCookSelfTest(log);
         if (ctx.parts.size() > 2)
@@ -3440,16 +3509,24 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[experiment.scenecook] 실패\n") + log);
         }
         std::printf("[CLI] experiment.scenecook %s\n", passed ? "통과" : "실패");
+        auto data = CommandData::Object();
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data)) : Fail("experiment.scenecook.failed", "Commandlet verification failed", std::move(data));
     }
 
-    static void Cmd_assets_unload(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_assets_unload(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
         DataSystems->UnloadUnusedAssets();
         std::printf("[CLI] 사용하지 않는 에셋 정리 요청\n");
+        return Ok("Unused asset cleanup requested");
     }
 
-    static void Cmd_bt_status(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_bt_status(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
         const std::string& cmd = ctx.cmd;
 
         // 행동 트리 진단(PHASE 9-8 완료 기준 1·3).
@@ -3464,7 +3541,7 @@ namespace ConsoleCmd
             ClrHost::Get().ResetBehaviorTreeStats();
             ClrHost::Get().ResetAICrossings();
             std::printf("[CLI] BT 누계 초기화 (트리는 그대로)\n");
-            return;
+            return Ok("Behavior tree counters reset");
         }
 
         ClrHost::ScriptBTStats bt{};
@@ -3473,7 +3550,7 @@ namespace ConsoleCmd
             // 조용히 0을 찍지 않는다 — "트리 0개"와 "지표를 못 읽었다"는 전혀 다른
             // 상황인데 같은 숫자로 보이면 진단이 거꾸로 간다.
             std::printf("[CLI] BT 지표 없음 — 스크립트 계층 비활성이거나 구 어셈블리\n");
-            return;
+            return PreconditionFailed("script.stats_unavailable", "Behavior tree stats unavailable");
         }
 
         const ClrHost::AICrossingCounters& x = ClrHost::Get().AICrossings();
@@ -3504,50 +3581,61 @@ namespace ConsoleCmd
             static_cast<unsigned long long>(x.maxBatch));
         std::printf("[CLI] %s\n", cross);
         Debug->LogWarning(cross);
+        auto data = CommandData::Object();
+        data.Set("treeCount", CommandData::Int(bt.treeCount));
+        data.Set("nodeTypeCount", CommandData::Int(bt.nodeTypeCount));
+        data.Set("tickCount", CommandData::Int(bt.tickCount));
+        data.Set("skippedCount", CommandData::Int(bt.skippedCount));
+        data.Set("flushCalls", CommandData::Int(x.flushCalls));
+        data.Set("crossings", CommandData::Int(x.crossings));
+        data.Set("ticksDelivered", CommandData::Int(x.ticksDelivered));
+        data.Set("maxBatch", CommandData::Int(x.maxBatch));
+        data.Set("perFrame", CommandData::Double(perFrame));
+        data.Set("perCrossing", CommandData::Double(perCrossing));
+        return Ok({}, std::move(data));
     }
 
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
-        reg.Legacy({ "collisionmatrix.authoring.probe" },
+        reg.Result({ "collisionmatrix.authoring.probe" },
                    &Cmd_collisionmatrix_authoring_probe);
-        reg.Legacy({ "model.load" }, &Cmd_model_load);
-        reg.Legacy({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
-        reg.Legacy({ "foliage.authoring.probe" }, &Cmd_foliage_authoring_probe);
-        reg.Legacy({ "blackboard.authoring.probe" }, &Cmd_blackboard_authoring_probe);
-        reg.Legacy({ "asset.guid.rename.probe" }, &Cmd_asset_guid_rename_probe);
-        reg.Legacy({ "material.corpus.probe" }, &Cmd_material_corpus_probe);
-        reg.Legacy({ "tag.authoring.probe" }, &Cmd_tag_authoring_probe);
+        reg.Result({ "model.load" }, &Cmd_model_load);
+        reg.Result({ "terrain.authoring.probe" }, &Cmd_terrain_authoring_probe);
+        reg.Result({ "foliage.authoring.probe" }, &Cmd_foliage_authoring_probe);
+        reg.Result({ "blackboard.authoring.probe" }, &Cmd_blackboard_authoring_probe);
+        reg.Result({ "asset.guid.rename.probe" }, &Cmd_asset_guid_rename_probe);
+        reg.Result({ "material.corpus.probe" }, &Cmd_material_corpus_probe);
+        reg.Result({ "tag.list" }, &Cmd_tag_list);
+        reg.Result({ "tag.has" }, &Cmd_tag_has);
+        reg.Result({ "tag.add" }, &Cmd_tag_add);
+        reg.Result({ "tag.remove" }, &Cmd_tag_remove);
         reg.Result({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);
-        reg.Legacy({ "inputmap.corpus.probe" }, &Cmd_inputmap_corpus_probe);
-        reg.Legacy({ "model.loadcached" }, &Cmd_model_loadcached);
-        reg.Legacy({ "model.place" }, &Cmd_model_place);
-        reg.Legacy({ "assets.identity" }, &Cmd_assets_identity);
-        reg.Legacy({ "assets.sidecar" }, &Cmd_assets_sidecar);
-        reg.Legacy({ "assets.generation" }, &Cmd_assets_generation);
-        reg.Legacy({ "assets.generationcorpus" }, &Cmd_assets_generationcorpus);
-        reg.Legacy({ "assets.modelrender" }, &Cmd_assets_modelrender);
-        reg.Legacy({ "assets.scenemodel" }, &Cmd_assets_scenemodel);
-        reg.Legacy({ "assets.modeldiag" }, &Cmd_assets_modeldiag);
-        reg.Legacy({ "assets.modelbench" }, &Cmd_assets_modelbench);
-        reg.Legacy({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
-        reg.Legacy({ "experiment.animpose" }, &Cmd_experiment_animpose);
-        reg.Legacy({ "experiment.animlive" }, &Cmd_experiment_animlive);
-        reg.Legacy({ "experiment.animtick" }, &Cmd_experiment_animtick);
-        reg.Legacy({ "experiment.animevent" }, &Cmd_experiment_animevent);
-        reg.Legacy({ "experiment.boneresolve" }, &Cmd_experiment_boneresolve);
-        reg.Legacy({ "experiment.foliage" }, &Cmd_experiment_foliage);
-        reg.Legacy({ "experiment.animmask" }, &Cmd_experiment_animmask);
-        reg.Legacy({ "experiment.editorsurface" }, &Cmd_experiment_editorsurface);
-        reg.Legacy({ "experiment.cooked" }, &Cmd_experiment_cooked);
-        reg.Legacy({ "experiment.matcook" }, &Cmd_experiment_matcook);
-        reg.SelfTest("experiment.matparity", &Cmd_experiment_matparity);
-        reg.SelfTest("experiment.matresolve", &Cmd_experiment_matresolve);
-        reg.Legacy({ "experiment.matruntime" }, &Cmd_experiment_matruntime);
-        reg.SelfTest("experiment.matmigrate", &Cmd_experiment_matmigrate);
-        reg.SelfTest("experiment.matscript", &Cmd_experiment_matscript);
-        reg.Legacy({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
-        reg.Legacy({ "experiment.catalog" }, &Cmd_experiment_catalog);
-        reg.Legacy({ "assets.unload" }, &Cmd_assets_unload);
-        reg.Legacy({ "bt.status", "bt.reset" }, &Cmd_bt_status);
+        reg.Result({ "inputmap.corpus.probe" }, &Cmd_inputmap_corpus_probe);
+        reg.Result({ "model.loadcached" }, &Cmd_model_loadcached);
+        reg.Result({ "model.place" }, &Cmd_model_place);
+        reg.Result({ "assets.identity" }, &Cmd_assets_identity);
+        reg.Result({ "assets.sidecar" }, &Cmd_assets_sidecar);
+        reg.Result({ "assets.generation" }, &Cmd_assets_generation);
+        reg.Result({ "assets.generationcorpus" }, &Cmd_assets_generationcorpus);
+        reg.Result({ "assets.modelrender" }, &Cmd_assets_modelrender);
+        reg.Result({ "assets.scenemodel" }, &Cmd_assets_scenemodel);
+        reg.Result({ "assets.modeldiag" }, &Cmd_assets_modeldiag);
+        reg.Result({ "assets.modelbench" }, &Cmd_assets_modelbench);
+        reg.Result({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
+        reg.Result({ "experiment.animpose" }, &Cmd_experiment_animpose);
+        reg.Result({ "animator.status" }, &Cmd_animator_status);
+        reg.Result({ "experiment.animtick" }, &Cmd_experiment_animtick);
+        reg.Result({ "experiment.animevent" }, &Cmd_experiment_animevent);
+        reg.Result({ "experiment.boneresolve" }, &Cmd_experiment_boneresolve);
+        reg.Result({ "experiment.foliage" }, &Cmd_experiment_foliage);
+        reg.Result({ "experiment.animmask" }, &Cmd_experiment_animmask);
+        reg.Result({ "experiment.editorsurface" }, &Cmd_experiment_editorsurface);
+        reg.Result({ "experiment.cooked" }, &Cmd_experiment_cooked);
+        reg.Result({ "experiment.matcook" }, &Cmd_experiment_matcook);
+        reg.Result({ "experiment.matruntime" }, &Cmd_experiment_matruntime);
+        reg.Result({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
+        reg.Result({ "experiment.catalog" }, &Cmd_experiment_catalog);
+        reg.Result({ "assets.unload" }, &Cmd_assets_unload);
+        reg.Result({ "bt.status", "bt.reset" }, &Cmd_bt_status);
     }
 }

@@ -96,7 +96,6 @@ namespace PlayerCommandService
 			switch (status)
 			{
 			case CommandCore::CommandStatus::Succeeded:           return 200;
-			case CommandCore::CommandStatus::LegacyUnreported:    return 200;
 			case CommandCore::CommandStatus::Failed:              return 200;
 			case CommandCore::CommandStatus::InvalidArguments:    return 400;
 			case CommandCore::CommandStatus::PreconditionsFailed: return 409;

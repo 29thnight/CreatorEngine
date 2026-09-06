@@ -2635,13 +2635,14 @@ void ClrHost::NotifySceneUnload()
 	ScriptObjectRegistry::Get().Clear();
 }
 
-void ClrHost::CollectManagedHeap()
+bool ClrHost::CollectManagedHeap()
 {
 	// 씬 경계 전용이다. 프레임 루프에서 부르면 그 프레임이 통째로 GC에 묶인다 —
 	// CoreCLR의 블로킹 수집은 관리 스레드를 전부 세운다.
-	if (!m_ready || nullptr == m_fnGcCollectNow) return;
+	if (!m_ready || nullptr == m_fnGcCollectNow) return false;
 
 	m_fnGcCollectNow();
+	return true;
 }
 
 void ClrHost::SetManagedLatencyMode(bool lowLatency)

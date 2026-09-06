@@ -5,6 +5,7 @@ param(
     [int]$TimeoutSeconds = 180
 )
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $failed = $false
 $markers = @(
@@ -18,8 +19,7 @@ $markers = @(
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.cpp"; Pattern = "PublishRenderProxyDirty(handle, ProxyDirty::Transform)"; Label = "sparse resolver publication" },
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Component.cpp"; Pattern = "ProxyDirty::Visibility"; Label = "enabled writer publication" },
     [pscustomobject]@{ Path = "Engine\SceneRuntime\MeshRenderer.h"; Pattern = "ProxyDirty::Material"; Label = "material setter publication" },
-    [pscustomobject]@{ Path = "Engine\SceneRuntime\MeshRenderer.h"; Pattern = "ProxyDirty::LOD"; Label = "LOD setter publication" },
-    [pscustomobject]@{ Path = "Editor\EngineEntry\ConsoleCommandSystem.cpp"; Pattern = "scene.proxydirty"; Label = "X8 runtime probe" }
+    [pscustomobject]@{ Path = "Engine\SceneRuntime\MeshRenderer.h"; Pattern = "ProxyDirty::LOD"; Label = "LOD setter publication" }
 )
 foreach ($marker in $markers) {
     $path = Join-Path $repo $marker.Path
@@ -92,7 +92,8 @@ $commands = @(
 [System.IO.File]::WriteAllLines($scenario, $commands)
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$resultPath = $outFile + ".jsonl"
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) `
     -WorkingDirectory $exeDir -WindowStyle Hidden `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -102,6 +103,8 @@ if (-not $proc.HasExited) {
     exit 1
 }
 
+$commandResults = @(Read-CommandResults $resultPath)
+if (@($commandResults | Where-Object status -ne 'succeeded').Count -ne 0) { throw 'Runtime command failed or was unavailable' }
 $output = [System.IO.File]::ReadAllText($outFile)
 $dedupe = 'dedupe=PASS publish=5 folded=4 drained=1 mask=0x1f'
 $stationary = 'stationary=PASS passes=3 committed=0 phase=PASS pending=1 writers=PASS'

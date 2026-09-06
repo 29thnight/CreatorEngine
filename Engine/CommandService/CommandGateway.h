@@ -18,6 +18,7 @@
 
 namespace CommandService
 {
+    class JsonValue;
     /// 명령 하나의 실행 결과. `CommandCore::CommandResult` 의 전송용 사본이다.
     struct CommandOutcome
     {
@@ -45,6 +46,14 @@ namespace CommandService
     {
     public:
         virtual ~ICommandGateway() = default;
+
+        // Pure schema validation before queuing; no engine state may be read here.
+        virtual bool BuildNamedArguments(const std::string&, const JsonValue&,
+                                        std::vector<std::string>&, std::string& error)
+        {
+            error = "Named parameters are not supported for this command";
+            return false;
+        }
 
         /// 명령 하나를 게임 스레드에 넣고 결과를 기다린다.
         ///

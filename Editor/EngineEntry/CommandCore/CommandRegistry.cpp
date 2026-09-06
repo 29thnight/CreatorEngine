@@ -5,6 +5,12 @@
 
 namespace CommandCore
 {
+    CommandRegistry& CommandRegistry::Commandlets()
+    {
+        static CommandRegistry registry;
+        return registry;
+    }
+
     std::string_view ToString(CommandCost cost) noexcept
     {
         switch (cost)
@@ -251,7 +257,7 @@ namespace CommandCore
         detail += "\n  역할   : ";
         detail += ToString(descriptor.roles);
         detail += "\n  결과   : ";
-        detail += descriptor.resultBearing ? "CommandResult" : "미이행(LegacyUnreported)";
+        detail += descriptor.resultBearing ? "CommandResult" : "invalid: missing result handler";
         detail += "\n\n";
         return detail;
     }

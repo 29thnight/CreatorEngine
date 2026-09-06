@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 // LC3 (PHASE 14.5) — 명령 schema seed 표의 조회 표면.
 //
 // 표 본문은 `CommandDescriptorSeeds.cpp` 에 있다. 등록 줄이 아니라 별도 표에
@@ -55,6 +55,11 @@ namespace CommandCore
         /// ★★★ 빠뜨림의 방향: 여기서 `Player` 를 빠뜨린 명령은 Player 에 **없다.**
         ///   조용히 열리는 쪽이 아니라 조용히 빠지는 쪽이고, 그것이 안전한 방향이다.
         CommandRoles roles = CommandRoles::Editor;
+
+        // Named HTTP input: name[:kind][=default], comma-separated; () means no arguments.
+        const char* namedParameters = "";
+        bool undoable = false;
+        bool commandlet = false; // Registered only in the process-scoped verification table.
     };
 
     /// canonical 이름으로 찾는다. 없으면 nullptr — 그 명령은 등록되지 않는다.

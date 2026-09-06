@@ -30,15 +30,7 @@ namespace ConsoleCmd
     class Registrar
     {
     public:
-        /// 이행 전 핸들러. 결과를 내지 않아 `LegacyUnreported` 가 된다.
-        virtual void Legacy(std::initializer_list<const char*> names,
-                            ConsoleCommandHandler fn) = 0;
-
-        /// LC1 이후의 핸들러. 정확히 하나의 terminal 결과를 만든다.
-        ///
-        /// 이름을 `Legacy` 와 다르게 둔 것은 오버로드 해석에 기대지 않기
-        /// 위해서다 — 이행 중에는 "이 명령이 넘어갔는가"가 등록 줄만 보고
-        /// 눈에 보여야 한다.
+        /// Every command returns one terminal result, unless the process intentionally terminates.
         virtual void Result(std::initializer_list<const char*> names,
                             ConsoleCommandResultHandler fn) = 0;
 
@@ -48,27 +40,6 @@ namespace ConsoleCmd
         /// 경계를 두자 죽는 것이 일인 명령이 죽지 않게 됐고, 크래시 덤프 회귀가
         /// 프로세스 종료를 기다리다 타임아웃 났다.
         virtual void Escaping(std::initializer_list<const char*> names,
-                              ConsoleCommandHandler fn) = 0;
-
-        /// ★ **검증은 명령이 아니다**(2026-09-06).
-        ///
-        /// 이 저장소의 기준은 "기본 동작만 명령으로 둔다" 이다. 그런데 registry
-        /// 199 개 중 114 개가 특정 자산·시나리오에 묶인 **검증 프로브**였다 —
-        /// `dx12.ssao` · `vk.gbuffer` · `experiment.boneresolve` 처럼 하나의
-        /// 검사에 하나의 이름이 붙어 있었다.
-        ///
-        /// 그것들이 명령이 되면 골든 행 · descriptor · help 줄 · 서명 이행
-        /// 대상이 되어 영구 유지 비용을 문다. §18 이 "모든 command 가 terminal
-        /// `CommandResult` 를 만든다" 를 요구하므로, 이행하는 순간 **나가야 할
-        /// 것이 못 나가게 박힌다.**
-        ///
-        /// 그래서 이름을 registry 에서 뺀다. 기본 동작은 하나다 — **"이름을
-        /// 받아 그 검사를 돌린다"**. `selftest <이름>` 이 그것이고, 목록은
-        /// registry 가 아니라 아래 표가 갖는다.
-        ///
-        /// 도메인 TU 는 여기에 검사를 등록한다. `Result` 와 달리 이름이
-        /// `commands.list` 에 나오지 않는다 — 명령이 아니기 때문이다.
-        virtual void SelfTest(const char* name,
                               ConsoleCommandResultHandler fn) = 0;
 
     protected:

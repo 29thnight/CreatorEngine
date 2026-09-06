@@ -81,7 +81,7 @@ namespace CommandCore
     /// `trailingCount` 개의 뒤 토큰을 떼고 그 앞을 앞 이름으로 합친다.
     ///
     /// `trailingCount == 1` 이면 `trailing` 에 마지막 토큰이 담긴다. 2 이상이면
-    /// 호출자가 뒤 토큰들을 직접 읽는다(`animator.state <오브젝트> <상태> <행동>`
+    /// 호출자가 뒤 토큰들을 직접 읽는다(`animator.param <오브젝트> <이름> <타입>`
     /// 처럼 뒤가 둘인 명령이 있다).
     TrailingNameSplit SplitTrailingName(const std::vector<std::string>& parts,
                                         std::size_t                     firstIndex,

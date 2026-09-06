@@ -68,7 +68,7 @@ $scenario = Join-Path $Work "ddol_script_resolved.txt"
 $outPath = Join-Path $Work "ddol_script.out"
 $errPath = Join-Path $Work "ddol_script.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru

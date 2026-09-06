@@ -59,7 +59,7 @@ $scenario = Join-Path $Work "prefab_identity_injection_resolved.txt"
 $outPath = Join-Path $Work "prefab_identity_injection.out"
 $errPath = Join-Path $Work "prefab_identity_injection.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru

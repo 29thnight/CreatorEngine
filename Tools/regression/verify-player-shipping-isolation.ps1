@@ -123,34 +123,8 @@ foreach ($marker in $markers) {
     }
 }
 
-# ── Player registry 가 role 로 갈리는가 (§11.2) ─────────────────────────
-#
-# 실행 중인 Player 에 붙어 `/commands` 를 읽는 것이 정본 검사이지만, Player 는
-# 패키지된 호스트라 스테이징 없이는 뜨지 않는다(런타임 콘텐츠 준비 실패로 exit 2).
-# 그 검사는 `Tools/build.ps1` 의 스모크가 맡는다. 여기서는 **표 자체**를 본다 —
-# seed 표에서 Player role 을 가진 이름과 Player 가 등록하는 이름이 일치하는지.
-$seedFile = Join-Path $repoRoot 'Editor\EngineEntry\CommandCore\CommandDescriptorSeeds.cpp'
-$playerFile = Join-Path $repoRoot 'Player\PlayerCommands.cpp'
-$seedText = [IO.File]::ReadAllText($seedFile)
-$playerText = [IO.File]::ReadAllText($playerFile)
-
-$seedPlayerNames = @([regex]::Matches($seedText,
-    '\{\s*"([^"]+)"[^\r\n]*CommandRoles::(Player|Both)') |
-    ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-$registeredNames = @([regex]::Matches($playerText,
-    '\{\s*"([^"]+)",\s*&Cmd_') |
-    ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-
-"{0,-26} seed={1} 등록={2}" -f 'player-roles', $seedPlayerNames.Count, $registeredNames.Count
-
-$registeredWithoutRole = @($registeredNames | Where-Object { $seedPlayerNames -notcontains $_ })
-if ($registeredWithoutRole.Count -gt 0) {
-    $failures.Add("player-roles : role 에 Player 가 없는데 등록 표에 있다: $($registeredWithoutRole -join ', ') — 런타임이 거부하겠지만 표가 거짓말을 하고 있다")
-}
-$roleWithoutRegistration = @($seedPlayerNames | Where-Object { $registeredNames -notcontains $_ })
-if ($roleWithoutRegistration.Count -gt 0) {
-    $failures.Add("player-roles : role 은 Player 인데 등록되지 않았다: $($roleWithoutRegistration -join ', ') — 그 명령은 조용히 사라진다")
-}
+# Runtime Player discovery and Editor-only rejection are verified by verify-player-command-service.ps1.
+# This gate owns the independent binary import and Shipping compilation boundary.
 
 ""
 if ($failures.Count -gt 0) {

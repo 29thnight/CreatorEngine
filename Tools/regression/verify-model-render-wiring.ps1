@@ -7,6 +7,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $runtimeContent = Join-Path $root 'Dynamic_CPP'
@@ -35,7 +36,9 @@ try {
 
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $Editor
-    $start.Arguments = '--script "' + $scenario.Replace('"', '\"') + '"'
+    $start.Arguments = '--commandlet-script "' + $scenario.Replace('"', '\"') + '"'
+    $resultPath = Join-Path $run 'results.jsonl'
+    $start.Arguments += ' --result-file "' + $resultPath + '"'
     $start.WorkingDirectory = $root
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -62,12 +65,9 @@ try {
     [IO.File]::WriteAllText((Join-Path $run 'stderr.txt'), $stderr,
         [Text.UTF8Encoding]::new($false))
 
-    if (([regex]::Matches($stdout, '\[CLI\] assets\.modelrender PASS')).Count -ne 1) {
-        Add-Failure 'assets.modelrender PASS가 정확히 1회가 아니다.'
-    }
-    if (([regex]::Matches($stdout, '\[CLI\] assets\.generationcorpus PASS')).Count -ne 1) {
-        Add-Failure 'assets.generationcorpus PASS가 정확히 1회가 아니다.'
-    }
+    $results = @(Read-CommandResults $resultPath)
+    Get-SucceededCommand $results 'assets.modelrender' | Out-Null
+    Get-SucceededCommand $results 'assets.generationcorpus' | Out-Null
     $su = [regex]::Match($stdout,
         'su mask=(\d+) stride=(\d+) boneIndices=(\d+) boneWeights=(\d+) rhiView=(\d+)')
     if (-not $su.Success -or [int]$su.Groups[1].Value -ne 247 -or
@@ -80,13 +80,7 @@ try {
     }
     foreach ($pass in @('dx12.gbuffer', 'dx12.skinning', 'vk.shadow',
         'vk.gbuffer', 'vk.forward')) {
-        $escaped = [regex]::Escape($pass)
-        if (([regex]::Matches($stdout, "\[CLI\] $escaped 통과")).Count -ne 1) {
-            Add-Failure "$pass 실GPU pass 통과가 정확히 1회가 아니다."
-        }
-        if ($stdout -match "\[CLI\] $escaped 실패") {
-            Add-Failure "$pass 실GPU pass가 실패했다."
-        }
+        Get-SucceededCommand $results $pass | Out-Null
     }
     if (([regex]::Matches($stdout,
         'DX12/Vulkan ModelAssetGeneration direct upload 1/1')).Count -ne 1) {

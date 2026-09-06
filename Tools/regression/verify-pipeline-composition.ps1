@@ -1,4 +1,4 @@
-# 렌더 파이프라인 구성 (E4 착수 전 필수 게이트)
+﻿# 렌더 파이프라인 구성 (E4 착수 전 필수 게이트)
 #
 # 왜 필요한가
 # ───────────
@@ -154,10 +154,14 @@ if ([string]::IsNullOrWhiteSpace($Work)) {
 }
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
+
 try {
     $commandFile = Join-Path $Work "commands.txt"
     $stdout = Join-Path $Work "stdout.txt"
     $stderr = Join-Path $Work "stderr.txt"
+    $resultPath = Join-Path $Work "results.jsonl"
+    if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
 
     # 워밍업이 필요하다. 파이프라인은 첫 리사이즈·첫 뷰 확정 뒤에 서므로 바로 물으면
     # 러너가 아직 비활성이거나 desc가 비어 있다(dx12 스위트가 240프레임을 쓰는 이유와 같다).
@@ -175,7 +179,7 @@ try {
     ))
 
     $process = Start-Process -FilePath $Exe `
-        -ArgumentList "--console", "--script", $commandFile `
+        -ArgumentList @('--commandlet-script', ('"'+$commandFile+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
         -WorkingDirectory (Split-Path $Exe -Parent) `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     if (-not $process.WaitForExit(300000)) {
@@ -188,21 +192,12 @@ try {
         throw "pipeline composition probe exited with $($process.ExitCode): $errorText"
     }
 
-    $output = Get-Content -LiteralPath $stdout -Raw
-
-    $summary = [regex]::Match($output,
-        '\[pipeline\.nodes\] 합계 (\d+) · valid=(\d) · ready=(\d)')
-    if (-not $summary.Success) {
-        throw "pipeline.nodes 요약이 안 나왔다 — 프로브가 그 지점에 도달하지 못했다"
-    }
-    $declaredCount = [int]$summary.Groups[1].Value
-    $valid = [int]$summary.Groups[2].Value
-    $ready = [int]$summary.Groups[3].Value
-
-    $nodes = @([regex]::Matches($output, '\[pipeline\.node\] ([^|\r\n]+)\|(\w+)') |
-        ForEach-Object {
-            [pscustomobject]@{ Name = $_.Groups[1].Value; State = $_.Groups[2].Value }
-        })
+    $data = Get-SucceededCommand (Read-CommandResults $resultPath) 'pipeline.nodes'
+    $declaredCount = [int]$data.count
+    $valid = [int]$data.valid; $ready = [int]$data.ready
+    $nodes = @($data.nodes | ForEach-Object {
+        [pscustomobject]@{ Name = $_.name; State = if (-not $_.conditional) { 'always' } elseif ($_.active) { 'active' } else { 'inactive' } }
+    })
 
     # ── 무의미성 방지 1: 측정이 실제로 나왔는가 ──
     # 러너가 비활성이면 노드 0개로 "차이 없음"이 트리비얼하게 참이 된다.

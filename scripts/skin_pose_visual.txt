@@ -35,7 +35,7 @@ scene.switch __SAVED_SCENE__
 wait 120
 __ANIMATOR_POST__
 wait 30
-experiment.animlive
+animator.status
 experiment.skinbounds
 assets.modeldiag
 wait 10

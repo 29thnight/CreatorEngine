@@ -26,7 +26,6 @@
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
 
-#include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
@@ -122,13 +121,9 @@
 #include "ShaderMeta.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
-#include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -173,14 +168,15 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_dx12_selftest(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
+        if (parts.size() < 2 || parts.size() > 3) return CommandCore::InvalidArguments("dx12.selftest <texture-path> [output]");
 
         // EnhancedSceneRenderer 브링업 자가 검증(PHASE 3-3). 자체 디바이스·큐·펜스로
         // 돌므로 DX11 렌더 스레드와 충돌하지 않는다 — 게임 스레드에서 즉시 실행.
         const std::string outputPath = ResolveTestArtifactPath("DX12",
-            (parts.size() > 1) ? parts[1] : std::string("dx12_selftest.png"));
+            (parts.size() > 2) ? parts[2] : std::string("dx12_selftest.png"));
 
         std::string log;
-        const bool passed = DX12Test::RunSelfTest(outputPath, 6, log);
+        const bool passed = DX12Test::RunSelfTest(outputPath, 6, parts[1], log);
 
         for (const auto& line : { log })
         {
@@ -205,6 +201,7 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_vk_selftest(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
+        if (parts.size() < 3 || parts.size() > 4) return CommandCore::InvalidArguments("vk.selftest <model-path> <texture-path> [output]");
 
         // Vulkan 골격 자가 검증. 자체 인스턴스·디바이스로 돌므로 DX12 렌더러와
         // 충돌하지 않는다 — dx12.selftest 와 같은 이유다.
@@ -216,10 +213,10 @@ namespace ConsoleCmd
         //   (IRenderDeviceServices + RHIEncoder)으로 그린다. 실제 패스의
         //   대조는 vk.grid 가 한다.
         const std::string outputPath = ResolveTestArtifactPath("Vulkan",
-            (parts.size() > 1) ? parts[1] : std::string("vk_selftest.png"));
+            (parts.size() > 3) ? parts[3] : std::string("vk_selftest.png"));
 
         std::string log;
-        const bool passed = RunVulkanSelfTest(outputPath, log);
+        const bool passed = RunVulkanSelfTest(outputPath, parts[1], parts[2], log);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -696,13 +693,14 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_rhi_uploadsegments(const ConsoleCommandContext& ctx)
     {
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("rhi.uploadsegments <model-path> <texture-path>");
         std::string dx12Log;
-        const bool dx12Passed = DX12Test::RunUploadSegmentTest(dx12Log);
+        const bool dx12Passed = DX12Test::RunUploadSegmentTest(ctx.parts[1], dx12Log);
 
         std::string vkLog;
         const std::string vkOutput =
             ResolveTestArtifactPath("Vulkan", "rhi_uploadsegments_vk.png");
-        const bool vkPassed = RunVulkanSelfTest(vkOutput, vkLog);
+        const bool vkPassed = RunVulkanSelfTest(vkOutput, ctx.parts[1], ctx.parts[2], vkLog);
         const bool passed = dx12Passed && vkPassed;
 
         std::printf("[DX12 upload segments]\n%s", dx12Log.c_str());
@@ -788,28 +786,7 @@ namespace ConsoleCmd
         return CommandCore::Ok("dx12.forwardshade 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_dx12_forwardscale(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunForwardPlusScaleTest(log);
-        const std::string verdict = passed ? "완료" : "실패";
 
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.forwardscale] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.forwardscale %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.forwardscale 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.forwardscale 통과", std::move(data));
-    }
 
     static CommandCore::CommandResult Cmd_dx12_ssao(const ConsoleCommandContext& ctx)
     {
@@ -834,28 +811,7 @@ namespace ConsoleCmd
         return CommandCore::Ok("dx12.ssao 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_dx12_ssaoscale(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunSSAOScaleTest(log);
-        const std::string verdict = passed ? "완료" : "실패";
 
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.ssaoscale] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.ssaoscale %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.ssaoscale 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.ssaoscale 통과", std::move(data));
-    }
 
     static CommandCore::CommandResult Cmd_dx12_post(const ConsoleCommandContext& ctx)
     {
@@ -880,28 +836,7 @@ namespace ConsoleCmd
         return CommandCore::Ok("dx12.post 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_dx12_postscale(const ConsoleCommandContext& ctx)
-    {
-        std::string log;
-        const bool passed = DX12Test::RunPostChainScaleTest(log);
-        const std::string verdict = passed ? "완료" : "실패";
 
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.postscale] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.postscale %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.postscale 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.postscale 통과", std::move(data));
-    }
 
     static CommandCore::CommandResult Cmd_dx12_ui(const ConsoleCommandContext& ctx)
     {
@@ -1332,62 +1267,16 @@ namespace ConsoleCmd
         return CommandCore::Ok("render.livecheck 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_dx12_bench11(const ConsoleCommandContext& ctx)
-    {
-        // DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제 검증.
-        // 전용 디바이스 둘을 새로 세우므로 에디터 씬과 무관하게 언제든 돈다.
-        std::string log;
-        const bool passed = DX12Test::RunApiOverheadBench(log);
-        const std::string verdict = passed ? "통과" : "실패";
 
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.bench11] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.bench11 %s\n", verdict.c_str());
 
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.bench11 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.bench11 통과", std::move(data));
-    }
 
-    static CommandCore::CommandResult Cmd_dx12_encoderbench(const ConsoleCommandContext& ctx)
-    {
-        // 인코더 오버헤드 실측 — R3 착수 조건(RhiBoundaryPlan §5).
-        // 자체 디바이스를 세우므로 에디터 씬과 무관하게 언제든 돈다.
-        // Release로 재야 의미가 있다(Debug는 검증 레이어가 vtable 비용을 덮는다).
-        std::string log;
-        const bool passed = DX12Test::RunEncoderOverheadBench(log);
-        const std::string verdict = passed ? "완료" : "실패";
-
-        std::printf("%s", log.c_str());
-        Debug->LogWarning("[dx12.encoderbench] " + verdict + "\n" + log);
-        std::printf("[CLI] dx12.encoderbench %s\n", verdict.c_str());
-
-        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
-        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
-        // 무엇이 깨졌는지 가를 수 없게 된다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("log", CommandCore::CommandData::String(log));
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        if (!passed)
-        {
-            return CommandCore::Fail("rendertest.failed", "dx12.encoderbench 실패", std::move(data));
-        }
-        return CommandCore::Ok("dx12.encoderbench 통과", std::move(data));
-    }
 
     static CommandCore::CommandResult Cmd_dx12_scene(const ConsoleCommandContext& ctx)
     {
         // 씬 연결 검증(PHASE 3-6). 활성 씬의 카메라와 프록시를 DX12로 그린다.
+        DX12Test::SceneBindingReport report;
         std::string log;
-        const bool passed = DX12Test::RunSceneBindingTest(log);
+        const bool passed = DX12Test::RunSceneBindingTest(log, &report);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -1399,6 +1288,15 @@ namespace ConsoleCmd
         // 무엇이 깨졌는지 가를 수 없게 된다.
         CommandCore::CommandData data = CommandCore::CommandData::Object();
         data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("drawCandidates", CommandCore::CommandData::Int(report.drawCandidates));
+        data.Set("lights", CommandCore::CommandData::Int(report.lights));
+        data.Set("draws", CommandCore::CommandData::Int(report.draws));
+        data.Set("meshUploads", CommandCore::CommandData::Int(report.meshUploads));
+        data.Set("generationUploads", CommandCore::CommandData::Int(report.generationUploads));
+        data.Set("uploadKB", CommandCore::CommandData::Int(report.uploadKB));
+        data.Set("coverage", CommandCore::CommandData::Int(report.coverage));
+        data.Set("pixels", CommandCore::CommandData::Int(report.pixels));
+        data.Set("texturedDraws", CommandCore::CommandData::Int(report.texturedDraws));
         data.Set("passed", CommandCore::CommandData::Bool(passed));
         if (!passed)
         {
@@ -1552,11 +1450,8 @@ namespace ConsoleCmd
         reg.Result({ "rhi.uploadsegments" }, &Cmd_rhi_uploadsegments);
         reg.Result({ "dx12.forward" }, &Cmd_dx12_forward);
         reg.Result({ "dx12.forwardshade" }, &Cmd_dx12_forwardshade);
-        reg.Result({ "dx12.forwardscale" }, &Cmd_dx12_forwardscale);
         reg.Result({ "dx12.ssao" }, &Cmd_dx12_ssao);
-        reg.Result({ "dx12.ssaoscale" }, &Cmd_dx12_ssaoscale);
         reg.Result({ "dx12.post" }, &Cmd_dx12_post);
-        reg.Result({ "dx12.postscale" }, &Cmd_dx12_postscale);
         reg.Result({ "dx12.ui" }, &Cmd_dx12_ui);
         reg.Result({ "dx12.grid" }, &Cmd_dx12_grid);
         reg.Result({ "dx12.gizmoline" }, &Cmd_dx12_gizmoline);
@@ -1574,8 +1469,6 @@ namespace ConsoleCmd
         reg.Result({ "dx12.iblshade" }, &Cmd_dx12_iblshade);
         reg.Result({ "dx12.ssgi" }, &Cmd_dx12_ssgi);
         reg.Result({ "render.livecheck" }, &Cmd_render_livecheck);
-        reg.Result({ "dx12.bench11" }, &Cmd_dx12_bench11);
-        reg.Result({ "dx12.encoderbench" }, &Cmd_dx12_encoderbench);
         reg.Result({ "dx12.scene" }, &Cmd_dx12_scene);
         reg.Result({ "dx12.resize" }, &Cmd_dx12_resize);
         reg.Result({ "dx12.parallel" }, &Cmd_dx12_parallel);

@@ -50,7 +50,7 @@ foreach ($n in @('NestedProbeLeaf', 'NestedProbeParent')) {
 $outFile = Join-Path $Work "prefab_nested_probe.out"
 $errFile = Join-Path $Work "prefab_nested_probe.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $script) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $script) `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null

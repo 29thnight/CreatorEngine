@@ -28,9 +28,10 @@ param(
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
     # 시나리오가 직접 만드는 씬이다. 저작 자산이 아니다(§0.05).
-    [string]$SceneName = "LightSlotProbe"
+    [string]$SceneName = ("LightSlotProbe_" + [guid]::NewGuid().ToString("N"))
 )
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
@@ -40,10 +41,10 @@ if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $scenePath = Join-Path $repoRoot "Dynamic_CPP\Assets\Scenes\$SceneName.creator"
 
-# ★ 실행 전에 지운다. 남겨 두면 이전 실행이 만든 파일 덕에 scene.save가 실패해도
-# scene.switch가 성공해 버린다 — 저작이 죽은 채 옛 씬을 읽는 거짓 통과다.
-if (Test-Path $scenePath) { Remove-Item -LiteralPath $scenePath -Force }
-
+# This gate owns only a fresh generated scene. Preserve any existing project assets.
+$sceneFiles = @($scenePath, ($scenePath + '.meta'))
+foreach ($file in $sceneFiles) { if (Test-Path -LiteralPath $file) { throw "Gate asset already exists: $file" } }
+try {
 $scenario = Join-Path $Work "light_slot_resolved.txt"
 (Get-Content $template -Raw) -replace '\{\{SCENE\}\}', ($scenePath -replace '\\', '/') |
     Set-Content $scenario -Encoding UTF8
@@ -51,7 +52,9 @@ $scenario = Join-Path $Work "light_slot_resolved.txt"
 $outPath = Join-Path $Work "light_slot.out"
 $errPath = Join-Path $Work "light_slot.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$resultPath = Join-Path $Work "light_slot.results.jsonl"
+if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru
@@ -66,36 +69,17 @@ if (-not $proc.HasExited) {
 if (-not (Test-Path $outPath)) { "표준 출력이 없다: $outPath"; exit 1 }
 $out = Get-Content -LiteralPath $outPath
 
-$saveOk   = @($out | Where-Object { $_ -match '\[CLI\] 씬 저장:' }).Count -ge 1
-$loadOk   = @($out | Where-Object { $_ -match '\[CLI\] scene\.switch 완료:' }).Count -ge 1
-$checkLine = @($out | Where-Object { $_ -match '\[scene\.hierarchycheck\]' }) | Select-Object -First 1
-
+$results = @(Read-CommandResults $resultPath)
 $failed = @()
-
-"씬 저장    : $saveOk"
-"씬 로드    : $loadOk"
-
-if (-not $saveOk) { $failed += "씬이 저장되지 않았다 — scene.save 실패($scenePath). 이후 판정은 의미가 없다" }
-if (-not $loadOk) { $failed += "씬이 로드되지 않았다 — scene.switch가 완료 로그를 남기지 않았다" }
-
-# 판정 4 — 로드된 계층이 온전한가. 슬롯이 어긋나도 계층은 멀쩡할 수 있으므로
-# 이것만으로는 부족하지만, "로드가 실은 빈 씬을 열었다"를 잡는다.
-if ($null -eq $checkLine) {
-    $failed += "scene.hierarchycheck 줄이 없다 — 재생 전에 죽었을 수 있다"
-} else {
-    "계층 점검  : $checkLine"
-    if ($checkLine -match '오브젝트\s+(\d+)') {
-        $objects = [int]$Matches[1]
-        if ($objects -lt 5) {
-            $failed += "로드된 오브젝트가 $objects 개다 — 카메라 1 + 라이트 3 + 루트로 5 이상이어야 한다"
-        }
+try {
+    Get-SucceededCommand $results 'scene.save' | Out-Null
+    Get-SucceededCommand $results 'scene.switch' | Out-Null
+    $hierarchy = Get-SucceededCommand $results 'scene.hierarchycheck'
+    if ($hierarchy.objects -lt 5) { $failed += "Restored object coverage missing: $($hierarchy.objects)" }
+    foreach ($axis in @('pairMismatch','orphan','unreachable','storeMismatch')) {
+        if ($hierarchy.$axis -ne 0) { $failed += "Hierarchy $axis=$($hierarchy.$axis)" }
     }
-    foreach ($axis in @('쌍불일치', '고아', '순회미도달')) {
-        if ($checkLine -match "$axis\s+(\d+)") {
-            if ([int]$Matches[1] -ne 0) { $failed += "$axis 가 $($Matches[1]) 건이다 — 로드된 계층이 온전하지 않다" }
-        }
-    }
-}
+} catch { $failed += $_.Exception.Message }
 
 # 판정 3 — ★ 본 판정.
 "종료 코드  : 0x{0:X8}  ← 본 판정" -f $proc.ExitCode
@@ -113,3 +97,7 @@ if ($failed.Count -gt 0) {
 
 "전체 통과 — 라이트 3개짜리 씬이 저장·재로드·재생을 건넜다"
 exit 0
+
+} finally {
+    foreach ($file in $sceneFiles) { if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file } }
+}

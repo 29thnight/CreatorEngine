@@ -48,6 +48,7 @@ namespace CommandService
         const std::string& AsString() const noexcept { return m_string; }
 
         const std::vector<JsonValue>& Items() const noexcept { return m_array; }
+        const std::vector<std::pair<std::string, JsonValue>>& Fields() const noexcept { return m_object; }
 
         void Append(JsonValue value);
         void Set(std::string key, JsonValue value);

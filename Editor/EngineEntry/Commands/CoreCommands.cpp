@@ -1,4 +1,4 @@
-// LC6 (PHASE 14.5) — Core 도메인 명령.
+﻿// LC6 (PHASE 14.5) — Core 도메인 명령.
 //
 // `help` · `quit` · `wait` · `commands.*` · `cli.*` · `log.*` · `lifecycle.*` ·
 // `window.*` · `game.*`. 명령 계층 자신에 대한 것과 실행 수명에 관한 것.
@@ -21,10 +21,8 @@
 // include 는 이 TU 가 직접 소유한다(유니티에서 빠져 있다).
 
 #include "CommandRegistrar.h"
-#include "SelfTestTable.h"
 #include "CommandSupport.h"
 
-#include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
@@ -121,13 +119,9 @@
 #include "ShaderMeta.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
-#include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -299,10 +293,18 @@ namespace ConsoleCmd
         //   빠뜨리는 것이 그 작업의 대표적 사고라, 표를 옮기기 전에 엔진이
         //   스스로 잡게 만든다.
         std::vector<std::string> problems = registry.Problems();
+        const auto& commandletProblems = CommandCore::CommandRegistry::Commandlets().Problems();
+        problems.insert(problems.end(), commandletProblems.begin(), commandletProblems.end());
         for (std::size_t i = 0; i < CommandCore::DescriptorSeedCount(); ++i)
         {
             const CommandCore::DescriptorSeed* seed = CommandCore::DescriptorSeedAt(i);
             if (nullptr == seed) continue;
+            if (seed->commandlet)
+            {
+                if (!CommandCore::CommandRegistry::Commandlets().Find(seed->name))
+                    problems.push_back(std::string("Unregistered commandlet: ") + seed->name);
+                continue;
+            }
 
             // ★ LC8: **이 호스트의 몫만 본다.**
             //
@@ -357,86 +359,6 @@ namespace ConsoleCmd
         return CommandCore::Ok("종료 요청");
     }
 
-    // ── LC0 (PHASE 14.5) 기준선 계측 명령 ───────────────────────────────
-    //
-    // 셋 다 아무것도 바꾸지 않는다. 재고 찍기만 한다. 계획 §13 LC0의
-    // "거동 변경 0"이 이 셋에 걸린 제약이다.
-
-    /// commands.dump [경로]
-    ///
-    /// 런타임 등록 표를 TSV로 덤프한다. 소스를 긁지 않는다 — `Invoke-Dx12Suite`가
-    /// C++ 리터럴을 정규식으로 뽑다가 두 번 틀린(26/35만 실행, 그리고 0/35로 읽음)
-    /// 바로 그 방식을 여기서 끊는다. LC9가 그 소비자를 이 출력으로 옮긴다.
-
-    static void Cmd_commands_dump(const ConsoleCommandContext& ctx)
-    {
-        const std::string requested = (ctx.parts.size() > 1) ? ctx.parts[1]
-                                                             : std::string("lc0_command_inventory.tsv");
-        const std::string path = ResolveTestArtifactPath("lc0", requested);
-
-        if (!CommandBaseline::WriteInventory(path, ConsoleCommandSystem::HelpText()))
-        {
-            std::printf("[CLI] commands.dump 실패: %s 를 쓸 수 없다\n", path.c_str());
-            return;
-        }
-
-        const auto& registrations = CommandBaseline::Registrations();
-        std::size_t nameCount = 0;
-        for (const auto& registration : registrations)
-        {
-            nameCount += 1 + registration.aliases.size();
-        }
-
-        std::printf("[CLI] commands.dump 완료 그룹=%zu 이름=%zu 경로=%s\n",
-                    registrations.size(), nameCount, path.c_str());
-    }
-
-    /// cli.probe.timing [reset|off|경로]
-    ///
-    /// 프레임 시간 분포와 명령 왕복 지연의 **바닥값**을 낸다. §7.1의 예산표는
-    /// 분모가 없는 상태로 쓰여 있다 — 이 명령이 그 분모다.
-    ///
-    /// 계측은 기본이 off다. `reset`이 표본을 비우고 수집을 켜고, `off`가 끈다.
-    /// 상시 수집을 하지 않는 이유는 `Pump`의 주석에 있다 — 관측 비용이 관측
-    /// 대상(프레임 시간)에 섞이면 그 값을 예산의 분모로 못 쓴다.
-
-    static void Cmd_cli_probe_timing(const ConsoleCommandContext& ctx)
-    {
-        const std::string argument = (ctx.parts.size() > 1) ? ctx.parts[1] : std::string();
-
-        if ("reset" == argument)
-        {
-            CommandBaseline::SetCollecting(true);
-            std::printf("[CLI] cli.probe.timing 표본 초기화·수집 시작\n");
-            return;
-        }
-        if ("off" == argument)
-        {
-            CommandBaseline::SetCollecting(false);
-            std::printf("[CLI] cli.probe.timing 수집 중지\n");
-            return;
-        }
-
-        if (!CommandBaseline::IsCollecting())
-        {
-            // 표본 0개짜리 artifact를 조용히 내지 않는다. 전부 0인 표를 받은
-            // 사람은 그것을 "빠르다"로 읽는다 — 안 쟀다는 사실이 값처럼 보인다.
-            std::printf("[CLI] cli.probe.timing: 수집이 꺼져 있다. "
-                        "먼저 'cli.probe.timing reset' 으로 켜라\n");
-            return;
-        }
-
-        const std::string requested = argument.empty() ? std::string("lc0_timing.tsv") : argument;
-        const std::string path = ResolveTestArtifactPath("lc0", requested);
-
-        if (!CommandBaseline::WriteTiming(path))
-        {
-            std::printf("[CLI] cli.probe.timing 실패: %s 를 온전히 쓰지 못했다\n", path.c_str());
-            return;
-        }
-        std::printf("[CLI] cli.probe.timing 완료 경로=%s\n", path.c_str());
-    }
-
     /// cli.drain.budget [<시간ms> <개수>]
     ///
     /// 서비스 큐 드레인 예산을 읽거나 바꾼다(§7.2).
@@ -487,8 +409,9 @@ namespace ConsoleCmd
     /// 양쪽에서 이 명령을 부른다. 그때 비교 기준이 되려면 지금의 형상이 golden으로
     /// 고정돼 있어야 한다.
 
-    static void Cmd_cli_echo_args(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_cli_echo_args(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
         std::printf("[CLI] cli.echo.args count=%zu line_len=%zu\n",
                     ctx.parts.size(), ctx.line.size());
         for (std::size_t i = 0; i < ctx.parts.size(); ++i)
@@ -496,6 +419,13 @@ namespace ConsoleCmd
             std::printf("[CLI] cli.echo.args arg[%zu] len=%zu <<<%s>>>\n",
                         i, ctx.parts[i].size(), ctx.parts[i].c_str());
         }
+        auto data = CommandData::Object();
+        auto tokens = CommandData::Array();
+        for (const auto& token : ctx.parts) tokens.Append(CommandData::String(token));
+        data.Set("tokens", std::move(tokens));
+        data.Set("count", CommandData::Int(ctx.parts.size()));
+        data.Set("lineLength", CommandData::Int(ctx.line.size()));
+        return Ok({}, std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_game_pak(const ConsoleCommandContext& ctx)
@@ -568,25 +498,25 @@ namespace ConsoleCmd
         return CommandCore::Ok("프레임 대기", std::move(data));
     }
 
-    static void Cmd_window_resize(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_window_resize(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
         const std::vector<std::string>& parts = ctx.parts;
 
         // 해상도 독립 검증용(PHASE 7). 창을 실제로 리사이즈해 엔진의 리사이즈 경로를
         // 그대로 태운다 — g_ClientRect 갱신부터 UI 리플로우까지 실제 흐름을 검증해야
         // 의미가 있다.
-        if (parts.size() < 3)
+        if (parts.size() != 3)
         {
             std::printf("[CLI] 사용법: window.resize <너비> <높이>\n");
-            return;
+            return InvalidArguments("window.resize requires width >= 320 and height >= 240");
         }
 
-        const int width = std::atoi(parts[1].c_str());
-        const int height = std::atoi(parts[2].c_str());
-        if (width < 320 || height < 240)
+        int width{}, height{};
+        if (!ParseNumber(parts[1], width) || !ParseNumber(parts[2], height) || width < 320 || height < 240 || width > 32767 || height > 32767)
         {
             std::printf("[CLI] 너무 작은 크기입니다: %dx%d\n", width, height);
-            return;
+            return InvalidArguments("window.resize requires width >= 320 and height >= 240");
         }
 
         // GetActiveWindow는 창이 포그라운드가 아니면 null을 준다. 스크립트 실행은
@@ -607,22 +537,25 @@ namespace ConsoleCmd
                 return FALSE;
             }, reinterpret_cast<LPARAM>(&hwnd));
         }
-        if (nullptr == hwnd) { std::printf("[CLI] 창 핸들 없음\n"); return; }
+        if (nullptr == hwnd) { std::printf("[CLI] 창 핸들 없음\n"); return PreconditionFailed("window.unavailable", "No editor window"); }
 
         // 클라이언트 영역이 요청 크기가 되도록 창 전체 크기를 역산한다.
         RECT desired{ 0, 0, width, height };
         const LONG style = ::GetWindowLong(hwnd, GWL_STYLE);
         const LONG exStyle = ::GetWindowLong(hwnd, GWL_EXSTYLE);
-        ::AdjustWindowRectEx(&desired, style, FALSE, exStyle);
+        if (!::AdjustWindowRectEx(&desired, style, FALSE, exStyle))
+            return Fail("window.resize_failed", "AdjustWindowRectEx failed");
 
-        ::SetWindowPos(hwnd, nullptr, 0, 0,
+        if (!::SetWindowPos(hwnd, nullptr, 0, 0,
             desired.right - desired.left, desired.bottom - desired.top,
-            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
+            return Fail("window.resize_failed", "SetWindowPos failed");
 
         // 요청한 크기가 그대로 적용되지 않을 수 있다(모니터보다 큰 창은 잘린다).
         // 요청값만 찍으면 검증에서 엉뚱한 기준을 잡게 되므로 실제 결과를 읽어 보고한다.
         RECT actual{};
-        ::GetClientRect(hwnd, &actual);
+        if (!::GetClientRect(hwnd, &actual))
+            return Fail("window.query_failed", "GetClientRect failed after resize");
         const int actualWidth = actual.right - actual.left;
         const int actualHeight = actual.bottom - actual.top;
 
@@ -633,10 +566,19 @@ namespace ConsoleCmd
 
         Debug->LogWarning(message);
         std::printf("%s\n", message.c_str());
+        auto data = CommandData::Object();
+        data.Set("requestedWidth", CommandData::Int(width));
+        data.Set("requestedHeight", CommandData::Int(height));
+        data.Set("width", CommandData::Int(actualWidth));
+        data.Set("height", CommandData::Int(actualHeight));
+        data.Set("clamped", CommandData::Bool(actualWidth != width || actualHeight != height));
+        return Ok(message, std::move(data));
     }
 
-    static void Cmd_window_info(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_window_info(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
         // 엔진이 실제로 인식하는 클라이언트 크기. window.resize가 리사이즈 경로까지
         // 도달했는지를 UI 계산과 같은 출처(화면 크기 버스)로 확인한다.
         const uint32_t clientW = ScreenResizeBus::Get().GetWidth();
@@ -644,10 +586,15 @@ namespace ConsoleCmd
         std::printf("[CLI] 클라이언트 영역: %ux%u\n", clientW, clientH);
         Debug->LogWarning("[CLI] 클라이언트 영역: " +
             std::to_string(clientW) + "x" + std::to_string(clientH));
+        auto data = CommandData::Object();
+        data.Set("width", CommandData::Int(clientW));
+        data.Set("height", CommandData::Int(clientH));
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_lifecycle_trace(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_lifecycle_trace(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
         const std::vector<std::string>& parts = ctx.parts;
 
         // 생명주기 호출 순서를 받아 적는다(PHASE 9-0).
@@ -657,11 +604,16 @@ namespace ConsoleCmd
         // 교체 전에 받아 적어 두어야 교체 후 "동작이 같다"를 주장할 수 있다.
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
 
+        if ((mode != "on" && mode != "off" && mode != "clear" && mode != "status") ||
+            parts.size() > (mode == "on" ? 3u : 2u))
+            return InvalidArguments("lifecycle.trace on [frames] | off | clear | status");
         if (mode == "on")
         {
             // 틱 단계(Update·LateUpdate·FixedUpdate)를 적을 프레임 수.
             // 한 프레임 안의 순서가 알고 싶은 것이지 반복 횟수가 아니라서 예산을 둔다.
-            const int frames = (parts.size() >= 3) ? std::atoi(parts[2].c_str()) : 3;
+            int frames = 3;
+            if (parts.size() == 3 && (!ParseNumber(parts[2], frames) || frames < 0))
+                return InvalidArguments("frames must be a non-negative integer");
             Lifecycle::Trace::Enable(frames);
             std::printf("[CLI] lifecycle.trace on — 틱 %d프레임\n", frames);
         }
@@ -682,34 +634,51 @@ namespace ConsoleCmd
                 Lifecycle::Trace::Count(),
                 Lifecycle::Trace::RemainingTickFrames());
         }
+        auto data = CommandData::Object();
+        data.Set("enabled", CommandData::Bool(Lifecycle::Trace::IsEnabled()));
+        data.Set("count", CommandData::Int(Lifecycle::Trace::Count()));
+        data.Set("remainingTickFrames", CommandData::Int(Lifecycle::Trace::RemainingTickFrames()));
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_lifecycle_registry(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_lifecycle_registry(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
         // 상태 조회만 남았다(PHASE 9-3에서 델리게이트를 철거해 경로가 하나다).
         // 진단 가치는 그대로다 — 각 단계 리스트의 크기가 곧 '무엇이 매 프레임 도는가'이고,
         // 마스크 표 크기는 등록 목록이 실제로 채워졌는지를 알려 준다.
+        auto data = CommandData::Object();
+        data.Set("maskTypes", CommandData::Int(Lifecycle::Registry::Count()));
         Scene* scene = SceneManagers->GetActiveScene();
         std::printf("[CLI] lifecycle — 마스크 표 %zu종\n", Lifecycle::Registry::Count());
 
         if (nullptr != scene)
         {
             const auto counts = scene->GetRegistryCounts();
+            data.Set("pendingAwake", CommandData::Int(counts.pendingAwake));
+            data.Set("pendingStart", CommandData::Int(counts.pendingStart));
             std::printf("[CLI]   pendingAwake %zu · pendingStart %zu\n",
                 counts.pendingAwake, counts.pendingStart);
 
             // 트랙 L4 래칫 측정용 — 명시 구독(Schedule().Subscribe) 대 암묵 구독
             // (RegisterComponent 경유)의 잔존 수. 통합 단계에서 배선.
             const auto subCounts = scene->GetSubscriptionCounts();
+            data.Set("implicitSubscriptions", CommandData::Int(subCounts.implicitCount));
+            data.Set("explicitSubscriptions", CommandData::Int(subCounts.explicitCount));
             std::printf("[CLI]   구독 잔존 — 암묵 %zu · 명시 %zu\n",
                 subCounts.implicitCount, subCounts.explicitCount);
         }
+        data.Set("hasScene", CommandData::Bool(scene != nullptr));
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_lifecycle_dump(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_lifecycle_dump(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
         const std::vector<std::string>& parts = ctx.parts;
 
+        if (parts.size() > 2) return InvalidArguments("lifecycle.dump [path]");
         const std::string path = ResolveTestArtifactPath("Traces",
             (parts.size() >= 2) ? parts[1] : std::string("lifecycle_trace.tsv"));
         const size_t count = Lifecycle::Trace::Count();
@@ -719,21 +688,28 @@ namespace ConsoleCmd
             // 빈 파일을 성공으로 흘려보내면 "기준선을 떴다"고 착각한 채 다음으로 넘어간다.
             // 3-6에서 겪은 조용한 통과와 같은 부류라 여기서 실패로 못 박는다.
             std::printf("[CLI] lifecycle.dump 실패 — 기록 0건 (lifecycle.trace on 을 먼저 부를 것)\n");
-            return;
+            return PreconditionFailed("lifecycle.empty", "Enable lifecycle.trace before dumping");
         }
 
         if (Lifecycle::Trace::Dump(path))
         {
+            auto data = CommandData::Object();
+            data.Set("path", CommandData::String(path));
+            data.Set("count", CommandData::Int(count));
             std::printf("[CLI] lifecycle.dump %s — %zu건\n", path.c_str(), count);
+            return Ok({}, std::move(data));
         }
         else
         {
             std::printf("[CLI] lifecycle.dump 실패 — 파일을 열 수 없다: %s\n", path.c_str());
         }
+        return Fail("lifecycle.dump_failed", "Unable to write trace: " + path);
     }
 
-    static void Cmd_lifecycle_stress(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_lifecycle_stress(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return InvalidArguments("lifecycle.stress <mode> [count]");
         const std::vector<std::string>& parts = ctx.parts;
 
         // 파괴·생성을 몰아쳐 수명 경로를 흔든다(PHASE 9-0의 ASan 재현용).
@@ -742,10 +718,13 @@ namespace ConsoleCmd
         // "Update 안에서 AddComponent" 같은 재진입 재현은 9-1의 레지스트리가 선
         // 뒤에 붙인다 — 지금 구조에는 그 지점을 안전하게 잡을 자리가 없다.
         const std::string mode = (parts.size() >= 2) ? parts[1] : "";
-        const int count = (parts.size() >= 3) ? std::atoi(parts[2].c_str()) : 8;
+        int count = 8;
+        if (parts.size() == 3 && (!ParseNumber(parts[2], count) || count < 1 || count > 100000)) return InvalidArguments("count must be 1..100000");
+        if (mode != "destroy" && mode != "churn" && mode != "reentrant" && mode != "reentrant-destroy" && mode != "reentrant-add") return InvalidArguments("Unknown lifecycle stress mode");
+        auto data = CommandData::Object(); data.Set("mode", CommandData::String(mode)); data.Set("requested", CommandData::Int(count));
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return PreconditionFailed("scene.not_found", "No active scene"); }
 
         if (mode == "destroy")
         {
@@ -755,9 +734,10 @@ namespace ConsoleCmd
             {
                 const auto& owned = scene->m_Entities[i];
                 if (!owned || owned->IsDestroyMark()) continue;
-				scene->DestroyEntity(owned.get());
+                scene->DestroyEntity(owned.get());
                 ++marked;
             }
+            data.Set("marked", CommandData::Int(marked));
             std::printf("[CLI] lifecycle.stress destroy — %d개 파괴 표시\n", marked);
         }
         else if (mode == "churn")
@@ -768,13 +748,14 @@ namespace ConsoleCmd
             {
                 const auto& owned = scene->m_Entities[i];
                 if (!owned || owned->IsDestroyMark()) continue;
-				scene->DestroyEntity(owned.get());
+                scene->DestroyEntity(owned.get());
                 ++marked;
             }
             for (int i = 0; i < count; ++i)
             {
                 scene->CreateEntity("StressChurn_" + std::to_string(i));
             }
+            data.Set("marked", CommandData::Int(marked)); data.Set("created", CommandData::Int(count));
             std::printf("[CLI] lifecycle.stress churn — 파괴 %d · 생성 %d\n", marked, count);
         }
         else if (mode == "reentrant" || mode == "reentrant-destroy" || mode == "reentrant-add")
@@ -789,83 +770,40 @@ namespace ConsoleCmd
                 (mode == "reentrant-add")     ? Scene::StressKind::AddComponent :
                                                 Scene::StressKind::Both;
             scene->ArmReentrancyStress(kind, count);
+            data.Set("armed", CommandData::Bool(true));
             std::printf("[CLI] lifecycle.stress %s — 다음 Update 순회 한복판에서 %d건 발화\n",
                 mode.c_str(), count);
         }
-        else
-        {
-            std::printf("[CLI] lifecycle.stress destroy|churn|reentrant|reentrant-destroy|reentrant-add [개수]\n");
-        }
+        return Ok("Lifecycle stress operation applied or armed", std::move(data));
     }
 
-    static void Cmd_log_flush(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_log_flush(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
         Log::FlushNow();
         std::printf("[CLI] 로그 flush\n");
+        return Ok("Logs flushed");
     }
 
-
-    // ★ 검증 프로브의 **유일한** 창구(2026-09-06).
-    //
-    //   기준은 "기본 동작만 명령으로 둔다" 이다. 검사 하나에 명령 하나를 두면
-    //   골든 행·descriptor·help 줄·서명 이행 대상이 그 수만큼 는다 — 2026-09-06
-    //   시점 registry 199 개 중 **114 개가 그런 프로브**였다.
-    //
-    //   조작은 하나다: **이름을 받아 그 검사를 돌린다.** 목록은 registry 가 아니라
-    //   `SelfTestTable` 이 갖고, 그래서 `commands.list` 에 나오지 않는다.
-    static CommandCore::CommandResult Cmd_selftest(const ConsoleCommandContext& ctx)
-    {
-        const std::vector<std::string>& parts = ctx.parts;
-        const std::vector<std::string> names = ConsoleCmd::SelfTestNames();
-
-        if (parts.size() < 2)
-        {
-            // 인자 없이 부르는 것은 오류가 아니라 **목록 조회**다.
-            for (const std::string& name : names)
-            {
-                std::printf("[CLI] selftest %s\n", name.c_str());
-            }
-            CommandCore::CommandData data = CommandCore::CommandData::Object();
-            data.Set("count", CommandCore::CommandData::Int(
-                static_cast<int64_t>(names.size())));
-            return CommandCore::Ok("selftest 목록", std::move(data));
-        }
-
-        const ConsoleCmd::SelfTestHandler fn = ConsoleCmd::FindSelfTest(parts[1]);
-        if (nullptr == fn)
-        {
-            // ★ 없는 이름을 **조용히 통과시키지 않는다.** 게이트가 이름을 틀리게
-            //   적으면 0 건을 돌고 초록이 되는데, 그것이 이 저장소가 이미 두 번
-            //   겪은 사고다(무인증 경로 검사·필터가 아무것도 못 고른 probe).
-            std::printf("[CLI] selftest: 알 수 없는 검사 %s (등록 %zu건)\n",
-                parts[1].c_str(), names.size());
-            return CommandCore::InvalidArguments(
-                "selftest: 알 수 없는 검사 '" + parts[1] + "'");
-        }
-
-        return fn(ctx);
-    }
 
     void RegisterCoreCommands(Registrar& reg)
     {
         reg.Result({ "help" }, &Cmd_help);
-        reg.Result({ "selftest" }, &Cmd_selftest);
         reg.Result({ "commands.list" }, &Cmd_commands_list);
         reg.Result({ "commands.describe" }, &Cmd_commands_describe);
         reg.Result({ "commands.selftest" }, &Cmd_commands_selftest);
         reg.Result({ "quit", "exit" }, &Cmd_quit);
-        reg.Legacy({ "commands.dump" }, &Cmd_commands_dump);
-        reg.Legacy({ "cli.probe.timing" }, &Cmd_cli_probe_timing);
-        reg.Legacy({ "cli.echo.args" }, &Cmd_cli_echo_args);
+        reg.Result({ "cli.echo.args" }, &Cmd_cli_echo_args);
         reg.Result({ "cli.drain.budget" }, &Cmd_cli_drain_budget);
         reg.Result({ "game.pak" }, &Cmd_game_pak);
         reg.Result({ "wait" }, &Cmd_wait);
-        reg.Legacy({ "window.resize" }, &Cmd_window_resize);
-        reg.Legacy({ "window.info" }, &Cmd_window_info);
-        reg.Legacy({ "lifecycle.trace" }, &Cmd_lifecycle_trace);
-        reg.Legacy({ "lifecycle.registry" }, &Cmd_lifecycle_registry);
-        reg.Legacy({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
-        reg.Legacy({ "lifecycle.stress" }, &Cmd_lifecycle_stress);
-        reg.Legacy({ "log.flush" }, &Cmd_log_flush);
+        reg.Result({ "window.resize" }, &Cmd_window_resize);
+        reg.Result({ "window.info" }, &Cmd_window_info);
+        reg.Result({ "lifecycle.trace" }, &Cmd_lifecycle_trace);
+        reg.Result({ "lifecycle.registry" }, &Cmd_lifecycle_registry);
+        reg.Result({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
+        reg.Result({ "lifecycle.stress" }, &Cmd_lifecycle_stress);
+        reg.Result({ "log.flush" }, &Cmd_log_flush);
     }
 }

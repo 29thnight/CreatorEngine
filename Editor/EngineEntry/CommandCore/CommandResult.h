@@ -32,7 +32,7 @@ namespace CommandCore
 {
     // ── 상태 ────────────────────────────────────────────────────────────
     //
-    // 계획 §6.4 의 열거를 그대로 쓴다. `LegacyUnreported` 만 이행기 전용이다.
+    // 계획 §6.4의 terminal 상태. 이행기 void 핸들러와 미보고 상태는 제거했다.
     enum class CommandStatus : uint8_t
     {
         Succeeded,            ///< 명령이 의도한 일을 했다.
@@ -43,13 +43,6 @@ namespace CommandCore
         TimedOut,             ///< 시간 안에 끝나지 못했다(LC5).
         InternalError,        ///< 핸들러 밖의 결함. 예외·불변식 위반·IO 실패.
 
-        /// 이행기 전용 — 아직 결과를 내지 않는 legacy void 핸들러.
-        ///
-        /// "성공"이 아니라 **"모른다"** 이다. 둘을 같은 값으로 두면 미이행
-        /// 핸들러가 성공으로 집계되어, 남은 이행 대상이 몇 개인지 세는 자가
-        /// 사라진다. exit code 로는 0 이 되지만(오늘과 같은 거동) session 은
-        /// 이것을 따로 센다. LC9 가 이 값의 사용량 0 을 확인하고 제거한다.
-        LegacyUnreported,
     };
 
     /// 로그·discovery 표기용. 안정 문자열이라 소비자가 파싱해도 된다.
@@ -147,24 +140,4 @@ namespace CommandCore
     CommandResult PreconditionFailed(std::string code, std::string message);
     CommandResult InternalError(std::string code, std::string message);
 
-    /// 이행 전 legacy void 핸들러가 남기는 값.
-    CommandResult LegacyUnreported();
-
-    /// legacy 핸들러가 `EngineBootstrap::SetExitCode` 로 직접 남긴 코드를 상태로 되읽는다.
-    ///
-    /// ── 왜 이것이 필요한가 ──────────────────────────────────────────────
-    ///
-    /// session 이 매 명령마다 exit code 를 쓰기 시작하면서, 아직 이행되지 않은
-    /// 핸들러가 직접 쓴 값이 **같은 프레임 안에서 0 으로 덮인다.** 실측으로
-    /// 확인했다 — `material.corpus.probe` 를 인자 없이 부르면 핸들러가 6 을
-    /// 쓰지만 프로세스는 0 으로 끝났다. LC1 이 고치려던 결함을 LC1 이 더 나쁜
-    /// 형태로 만든 자리였다(예전에는 그 6 이 살아남았다).
-    ///
-    /// 그래서 adapter 가 핸들러 전후의 exit code 를 관측해 그 뜻을 상태로 되돌린다.
-    /// 값 자체를 그대로 보존하지 않고 §5.4 표로 사상하는 이유는 두 개의 exit code
-    /// 체계가 공존하면 소비자가 어느 쪽을 읽는지 알 수 없기 때문이다. 사상이
-    /// 안전한 근거는 §3.1 에 있다 — 특정 비-0 값에 의존하는 소비자가 0 건이다.
-    ///
-    /// `0` 은 "실패 없음"이라 `LegacyUnreported` 를 낸다.
-    CommandResult LegacyDirectExit(int exitCode);
 }

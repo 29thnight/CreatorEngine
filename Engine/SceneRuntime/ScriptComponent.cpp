@@ -53,6 +53,7 @@ namespace
 
 void ScriptComponent::OnInitialized()
 {
+	++m_initializationAttempts;
 	if (m_scriptType.empty())
 	{
 		return;   // 타입이 아직 정해지지 않은 빈 컴포넌트(인스펙터에서 막 추가한 상태)

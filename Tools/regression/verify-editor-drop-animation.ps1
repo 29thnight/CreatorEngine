@@ -47,7 +47,7 @@ $stderr = Join-Path $Work "editor_drop_animation.err.log"
     Replace('__MODEL__', $model.Replace('\', '/')) |
     Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $scenario) `
     -WorkingDirectory $repoRoot -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 if (-not $proc.WaitForExit($TimeoutSec * 1000)) {

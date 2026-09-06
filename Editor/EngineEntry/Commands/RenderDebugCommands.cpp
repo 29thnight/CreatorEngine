@@ -48,7 +48,7 @@
 
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
-#include "CommandBaseline.h"            // LC0(PHASE 14.5): 등록 표·프레임·왕복 지연 계측
+#include "EditorObjectOperations.h"
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
@@ -144,13 +144,9 @@
 #include "ShaderMeta.h"
 #include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialParitySelfTest.h"
-#include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
 #include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
-#include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
@@ -192,132 +188,52 @@
 
 namespace ConsoleCmd
 {
-    static void Cmd_render_matmode(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_render_matmode(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // render.matmode <오브젝트> <opaque|transparent>
-        //
-        // 재질의 렌더링 모드를 바꾼다. 이것이 프록시가 deferred 큐로 가느냐
-        // forward 큐로 가느냐를 정한다(RenderPassData가 이 값 하나로 나눈다).
-        //
-        // 전용 명령을 만든 이유: object.property는 컴포넌트의 반사 필드를
-        // 설정하는데, m_renderingMode는 컴포넌트가 아니라 그 아래 Material의
-        // 필드라 경로가 닿지 않는다. 그리고 이 값 없이는 Forward+ 경로를
-        // 실제 씬에서 한 번도 실행해 볼 수 없다 — 씬에 투명 재질이 없으면
-        // forward 큐가 늘 비고, 그러면 '되는지 안 되는지 모르는' 상태가 된다.
-        if (parts.size() < 3)
-        {
-            std::printf("[CLI] 사용법: render.matmode <오브젝트> <opaque|transparent>\n");
-            return;
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
-
-        auto object = scene->GetEntity(parts[1]);
-        if (!object)
-        {
-            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
-            return;
-        }
-
-        const bool transparent = ("transparent" == parts[2]);
-        if (!transparent && "opaque" != parts[2])
-        {
-            std::printf("[CLI] 모드는 opaque 또는 transparent여야 한다: %s\n",
-                parts[2].c_str());
-            return;
-        }
-
-        // 자식까지 훑는다. 모델 하나가 메시 여러 개로 들어오는 것이 보통이라
-        // 루트만 바꾸면 큐가 그대로 비어 있고, 그건 '명령이 안 먹었다'와
-        // 구분되지 않는다.
-        //
-        // ★ 재질은 모델 단위로 공유된다. 같은 모델을 두 번 배치한 뒤 하나만
-        //   바꾸려 해도 둘 다 바뀐다 — Material 객체가 하나이기 때문이다.
-        //   '불투명 하나 + 투명 하나' 배치를 만들려다 이것으로 한 번 헛돌았다.
-        //   그렇게 하려면 재질 복제가 먼저 필요하고, 그건 이 명령의 몫이 아니다.
-        uint32_t changed = 0;
-        std::function<void(Entity*)> apply = [&](Entity* node)
-        {
-            if (nullptr == node) return;
-            for (const auto& component : node->m_components)
-            {
-                auto* renderer = dynamic_cast<MeshRenderer*>(component.get());
-                if (nullptr == renderer || nullptr == renderer->m_Material) continue;
-
-                renderer->m_Material->m_renderingMode = transparent
-                    ? MaterialRenderingMode::Transparent
-                    : MaterialRenderingMode::Opaque;
-                ++changed;
-            }
-            for (auto child : node->GetChildrenIndices())
-            {
-                apply(node->OwnerSceneFindIndex(child));
-            }
-        };
-		apply(object);
-
-        Debug->LogWarning("[CLI] 렌더링 모드 " + parts[2] + " — 재질 "
-            + std::to_string(changed) + "개");
-        std::printf("[CLI] 렌더링 모드 %s — 재질 %u개\n", parts[2].c_str(), changed);
+        using namespace CommandCore;
+        if (ctx.parts.size() != 3 || (ctx.parts[2] != "opaque" && ctx.parts[2] != "transparent"))
+            return InvalidArguments("render.matmode <object> <opaque|transparent>");
+        EntityHandle target;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!result.IsSuccess()) return result;
+        return EditorObjectOperations::MaterialMode(target, ctx.parts[2] == "opaque" ? MaterialRenderingMode::Opaque : MaterialRenderingMode::Transparent);
     }
 
-    static void Cmd_render_backend(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_render_backend(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        const std::string backend = (parts.size() >= 2) ? parts[1] : "status";
-        if (backend == "dx12" || backend == "enhanced" ||
-            backend == "vulkan" || backend == "vk")
-        {
-            std::printf("[CLI] render.backend %s 거부 — backend는 부팅 고정이다. Editor는 Settings, Player는 Build Settings에서 저장한 뒤 새 프로세스로 실행한다\n",
-                backend.c_str());
-        }
-        else if (backend == "dx11")
-        {
-            std::printf("[CLI] render.backend dx11 — 지원하지 않음: SceneRenderer는 dead code다\n");
-        }
-        else
-        {
-            const char* active = EnhancedLiveBackend::Vulkan ==
-                EnhancedSceneRenderer::GetLiveBackend() ? "enhanced-vulkan" : "enhanced-dx12";
-            std::printf("[CLI] render.backend — configured: %s · scene: %s · ImGui: %s (부팅 고정)\n",
-				RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
-                active, GetImGuiHost().GetBackendName());
-            const std::string status = EnhancedSceneRenderer::GetLiveStatus();
-            std::printf("%s\n", status.c_str());
-            Debug->LogWarning(std::string("[render.backend] scene=") + active +
-                " imgui=" + GetImGuiHost().GetBackendName() + " · " + status);
-        }
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("render.backend [status]");
+        if (ctx.parts.size() == 2 && ctx.parts[1] != "status")
+            return InvalidArguments("Backend is fixed at startup; configure Settings and restart", "render.backend_fixed");
+        auto data = CommandData::Object();
+        data.Set("configured", CommandData::String(RenderBackendName(RuntimeSettings::Get().GetRenderBackend())));
+        data.Set("scene", CommandData::String(EnhancedLiveBackend::Vulkan == EnhancedSceneRenderer::GetLiveBackend() ? "vulkan" : "dx12"));
+        data.Set("imgui", CommandData::String(GetImGuiHost().GetBackendName()));
+        data.Set("status", CommandData::String(EnhancedSceneRenderer::GetLiveStatus()));
+        return Ok({}, std::move(data));
     }
 
-    static void Cmd_dx12_live(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_dx12_live(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
-
-        const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
-
-        if (mode == "on")
-        {
-            EnhancedSceneRenderer::EnableLive();
-            std::printf("[CLI] dx12.live 켜짐 — EnhancedRenderer가 메인 렌더러다\n");
-        }
-        else if (mode == "off")
-        {
-            std::printf("[CLI] dx12.live off — 지원하지 않음: 단독 메인 렌더러는 끌 수 없다\n");
-        }
-        else
-        {
-            const std::string status = EnhancedSceneRenderer::GetLiveStatus();
-            std::printf("%s\n", status.c_str());
-            Debug->LogWarning("[dx12.live] " + status);
-        }
+        using namespace CommandCore;
+        const std::string mode = ctx.parts.size() >= 2 ? ctx.parts[1] : "status";
+        if (ctx.parts.size() > 2 || (mode != "on" && mode != "status"))
+            return InvalidArguments("dx12.live [on|status]; the main renderer cannot be disabled");
+        if (mode == "on") EnhancedSceneRenderer::EnableLive();
+        const auto snapshot = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+        auto data = CommandData::Object();
+        data.Set("enabled", CommandData::Bool(snapshot.enabled));
+        data.Set("ready", CommandData::Bool(snapshot.pipelineReady));
+        data.Set("backend", CommandData::String(snapshot.backend == EnhancedLiveBackend::Vulkan ? "vulkan" : "dx12"));
+        data.Set("status", CommandData::String(EnhancedSceneRenderer::GetLiveStatus()));
+        return Ok(mode == "on" ? "Renderer enable requested" : "", std::move(data));
     }
 
-    static void Cmd_render_rtinfo(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_render_rtinfo(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+        auto data = CommandData::Object();
 
         // 화면 크기와 그것을 따라가는 텍스처들을 나란히 찍는다.
         //
@@ -347,6 +263,7 @@ namespace ConsoleCmd
         const uint32_t screenHeight = ScreenResizeBus::Get().GetHeight();
 
         const auto entries = ScreenSizedRegistry::Get().Snapshot();
+        auto textures = CommandData::Array();
         uint32_t mismatched = 0;
         std::string mismatchReport;
 
@@ -370,6 +287,9 @@ namespace ConsoleCmd
                 }
             }
 
+            auto item = CommandData::Object();
+            item.Set("name", CommandData::String(entry.name)); item.Set("width", CommandData::Int(width)); item.Set("height", CommandData::Int(height)); item.Set("plausible", CommandData::Bool(plausible));
+            textures.Append(std::move(item));
             if (!plausible)
             {
                 ++mismatched;
@@ -391,6 +311,9 @@ namespace ConsoleCmd
 
         Debug->LogWarning("[렌더 타깃]\n" + report);
         std::printf("[CLI] 렌더 타깃\n%s", report.c_str());
+            data.Set("width", CommandData::Int(screenWidth)); data.Set("height", CommandData::Int(screenHeight));
+        data.Set("textures", std::move(textures)); data.Set("registered", CommandData::Int(entries.size())); data.Set("mismatched", CommandData::Int(mismatched));
+        return Ok({}, std::move(data));
     }
 
     // ★ `render.exposure` 를 지웠다(2026-09-05). 몸통이 **printf 한 줄**이었다 —
@@ -402,45 +325,30 @@ namespace ConsoleCmd
     //   안 하는 것" 보다 "없는 것" 이 정직하다 — 앞서 같은 이유로 지운
     //   `render.post` 와 같은 처분이다.
 
-    static void Cmd_pipeline_nodes(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_pipeline_nodes(const ConsoleCommandContext& ctx)
     {
-        (void)ctx;
-        const EnhancedLiveDebugSnapshot snapshot =
-            EnhancedSceneRenderer::GetLiveDebugSnapshot();
-
-        if (!snapshot.enabled)
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("pipeline.nodes takes no arguments");
+        const auto snapshot = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+        if (!snapshot.enabled) return PreconditionFailed("render.unavailable", "Renderer is disabled");
+        auto data = CommandData::Object();
+        auto nodes = CommandData::Array();
+        const auto strings = [](const auto& values) { auto a = CommandData::Array(); for (const auto& v : values) a.Append(CommandData::String(v)); return a; };
+        for (const auto& node : snapshot.pipelineNodes)
         {
-            std::printf("[pipeline.nodes] 러너 비활성\n");
-            return;
+            auto d = CommandData::Object();
+            d.Set("name", CommandData::String(node.name));
+            d.Set("conditional", CommandData::Bool(node.conditional)); d.Set("active", CommandData::Bool(node.active));
+            d.Set("perView", CommandData::Bool(node.perView));
+            d.Set("reads", strings(node.reads)); d.Set("writes", strings(node.writes)); d.Set("modifies", strings(node.modifies));
+            nodes.Append(std::move(d));
+            std::printf("[pipeline.node] %s|%s\n", node.name.c_str(), node.conditional ? (node.active ? "active" : "inactive") : "always");
         }
-
-        // Dump()는 "  <i>. <이름>  [active|inactive]" 형태의 여러 줄을 낸다.
-        // 게이트가 정규식 하나로 읽도록 노드 줄만 접두어를 붙여 다시 낸다.
-        size_t nodeCount = 0;
-        std::istringstream stream(snapshot.pipelineDescription);
-        std::string line;
-        while (std::getline(stream, line))
-        {
-            const size_t dot = line.find(". ");
-            if (std::string::npos == dot) continue;
-            if (line.find_first_not_of(" \t") != 2) continue; // 노드 줄은 2칸 들여쓰기
-
-            std::string name = line.substr(dot + 2);
-            const size_t bracket = name.find("  [");
-            std::string state = "always";
-            if (std::string::npos != bracket)
-            {
-                state = name.substr(bracket + 3);
-                if (!state.empty() && ']' == state.back()) state.pop_back();
-                name = name.substr(0, bracket);
-            }
-            std::printf("[pipeline.node] %s|%s\n", name.c_str(), state.c_str());
-            ++nodeCount;
-        }
-
-        std::printf("[pipeline.nodes] 합계 %zu · valid=%d · ready=%d\n",
-            nodeCount, snapshot.pipelineDescriptionValid ? 1 : 0,
-            snapshot.pipelineReady ? 1 : 0);
+        data.Set("nodes", std::move(nodes));
+        data.Set("count", CommandData::Int(snapshot.pipelineNodes.size()));
+        data.Set("valid", CommandData::Bool(snapshot.pipelineDescriptionValid));
+        data.Set("ready", CommandData::Bool(snapshot.pipelineReady));
+        return Ok({}, std::move(data));
     }
 
     // ── Undo/선택 프로브 (E3-2+3 게이트용) ──
@@ -454,10 +362,14 @@ namespace ConsoleCmd
     //   "지금 유효한 스택" 하나만 찍으면 CLI 게이트가 편집 스택을 보면서 게임 스택을
     //   검사한다고 착각한다. 그 착각이 곧 아무것도 검증하지 않는 게이트다.
 
-    static void Cmd_render_shadowinfo(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_render_shadowinfo(const ConsoleCommandContext& ctx)
     {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+        auto data = CommandData::Object();
         // 카메라 입력은 RenderPassData가 아니라 프레임 패킷의 값 스냅샷이다.
         // 이 명령은 활성 씬의 저작 카메라를 같은 방식으로 밀봉해 입력을 확인한다.
+        auto cameraData = CommandData::Array();
         char line[512]{};
         std::string report;
         Scene* activeScene = SceneManagers->GetActiveScene();
@@ -470,6 +382,11 @@ namespace ConsoleCmd
             if (camera->GetOwner()->GetScene() != activeScene) continue;
 
             const FrameCameraSnapshot snapshot = camera->CaptureFrameSnapshot();
+            auto item = CommandData::Object();
+            item.Set("componentId", CommandData::Int(camera->GetInstanceID())); item.Set("primary", CommandData::Bool(camera->IsPrimary()));
+            const auto vector = [](const auto& v) { auto a = CommandData::Array(); a.Append(CommandData::Double(v.x)); a.Append(CommandData::Double(v.y)); a.Append(CommandData::Double(v.z)); return a; };
+            item.Set("position", vector(snapshot.eyePosition)); item.Set("forward", vector(snapshot.forward));
+            item.Set("fov", CommandData::Double(snapshot.fov)); item.Set("near", CommandData::Double(snapshot.nearPlane)); item.Set("far", CommandData::Double(snapshot.farPlane)); item.Set("orthographic", CommandData::Bool(snapshot.isOrthographic));
             std::snprintf(line, sizeof(line),
                 "camera component %llu%s\n"
                 "  snapshot: eye(%.6f %.6f %.6f) fwd(%.6f %.6f %.6f)"
@@ -491,16 +408,20 @@ namespace ConsoleCmd
             {
                 report += "  ";
                 report += matrixNames[m];
+                auto matrix = CommandData::Array();
                 for (int r = 0; r < 4; ++r)
                 {
                     for (int c = 0; c < 4; ++c)
                     {
                         std::snprintf(line, sizeof(line), " %.6f", matrices[m].m[r][c]);
                         report += line;
+                        matrix.Append(CommandData::Double(matrices[m].m[r][c]));
                     }
                 }
                 report += "\n";
+                item.Set(matrixNames[m], std::move(matrix));
             }
+            cameraData.Append(std::move(item));
         }
 
         if (report.empty()) report = "(활성 씬 카메라 없음)\n";
@@ -508,15 +429,17 @@ namespace ConsoleCmd
         std::printf("[shadowinfo]\n%s", report.c_str());
         std::fflush(stdout);
         Debug->LogWarning("[shadowinfo]\n" + report);
+            data.Set("cameras", std::move(cameraData));
+        return Ok({}, std::move(data));
     }
 
     void RegisterRenderDebugCommands(Registrar& reg)
     {
-        reg.Legacy({ "render.matmode" }, &Cmd_render_matmode);
-        reg.Legacy({ "render.backend" }, &Cmd_render_backend);
-        reg.Legacy({ "dx12.live" }, &Cmd_dx12_live);
-        reg.Legacy({ "render.rtinfo" }, &Cmd_render_rtinfo);
-        reg.Legacy({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
-        reg.Legacy({ "render.shadowinfo" }, &Cmd_render_shadowinfo);
+        reg.Result({ "render.matmode" }, &Cmd_render_matmode);
+        reg.Result({ "render.backend" }, &Cmd_render_backend);
+        reg.Result({ "dx12.live" }, &Cmd_dx12_live);
+        reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
+        reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
+        reg.Result({ "render.shadowinfo" }, &Cmd_render_shadowinfo);
     }
 }

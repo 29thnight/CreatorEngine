@@ -99,12 +99,12 @@ $scenario = Join-Path $Work "transform_write_publication_$runId.txt"
 $outFile = Join-Path $Work "transform_write_publication_$runId.out"
 $errFile = Join-Path $Work "transform_write_publication_$runId.err"
 [System.IO.File]::WriteAllLines($scenario, @(
-    "scene.transformwritestats probe",
+    "scene.transformwritestats.check probe",
     "quit"
 ))
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir -WindowStyle Hidden `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null

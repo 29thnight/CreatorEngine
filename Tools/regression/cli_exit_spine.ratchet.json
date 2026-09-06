@@ -1,7 +1,7 @@
 {
   "schema": "lc1-exit-spine-ratchet/1",
   "recorded": "2026-09-04",
-  "maxDirectExitWrites": 13,
+  "maxDirectExitWrites": 6,
   "note": "EngineBootstrap::SetExitCode 를 직접 부르는 자리의 상한. session adapter(CommandCore/CommandSession.cpp)와 선언부(EngineBootstrap.h)는 세지 않는다. 늘면 붉어지고, 줄면 -UpdateRatchet 으로 상한을 낮춘다 — 한 방향으로만 도는 래칫이다.",
   "history": [
     {

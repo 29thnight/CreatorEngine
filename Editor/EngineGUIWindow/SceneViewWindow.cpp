@@ -1,3 +1,4 @@
+﻿#include "EditorObjectOperations.h"
 #include "SceneViewWindow.h"
 #include "ReflectionUndo.h"
 #include "EditorCameraRig.h"
@@ -422,8 +423,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
-			static bool wasDragging = false;
 			static std::unordered_map<Entity*, math::vector2> startWorldPivots;
+            static std::vector<EditorObjectOperations::PropertyEdit> edits;
 			static math::vector2 startWorldPos{};
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
@@ -432,11 +433,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
-				startWorldPivots.clear();
+				startWorldPivots.clear(); edits.clear();
 				for (auto* target : selectedObjects)
 				{
 					if (auto* rt = target->GetComponent<RectTransformComponent>())
-						startWorldPivots[target] = rt->GetWorldPivotPosition();
+                    {
+                        startWorldPivots[target] = rt->GetWorldPivotPosition();
+                        edits.push_back(EditorObjectOperations::CapturePropertyEdit(*rt, {"m_anchoredPosition"}));
+                    }
 				}
 				auto world = rect->GetWorldRect();
 				startWorldPos = { world.x + world.width * rect->GetPivot().x,
@@ -479,45 +483,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				}
 			}
 
-			if (wasDragging && mouseReleased && matrixChanged)
-			{
-				auto oldPos = startWorldPivots[obj];
-				auto newPos = rect->GetWorldPivotPosition();
-				Meta::MakeCustomChangeCommand(
-				[=]
-				{
-					if (auto* r = obj->GetComponent<RectTransformComponent>())
-					{
-						r->SetWorldPivotPosition(oldPos);
-						// 부모 rect를 여기서 직접 만들지 않는다 — (0,0,W,H)로 적혀 있어 캔버스
-						// 규약과 (W/2,H/2)만큼 어긋났고, 자식으로 전파도 되지 않아 부모를 끌면
-						// 자식이 따라오지 않았다. 순회는 드라이버가 맡는다(PHASE 7-5).
-						if (Scene* scene = SceneManagers->GetActiveScene())
-							scene->LayoutUISubtree(obj);
-					}
-				},
-				[=]
-				{
-					if (auto* r = obj->GetComponent<RectTransformComponent>())
-					{
-						r->SetWorldPivotPosition(newPos);
-						// 부모 rect를 여기서 직접 만들지 않는다 — (0,0,W,H)로 적혀 있어 캔버스
-						// 규약과 (W/2,H/2)만큼 어긋났고, 자식으로 전파도 되지 않아 부모를 끌면
-						// 자식이 따라오지 않았다. 순회는 드라이버가 맡는다(PHASE 7-5).
-						if (Scene* scene = SceneManagers->GetActiveScene())
-							scene->LayoutUISubtree(obj);
-					}
-				}
-				);
-			}
+            if (mouseReleased && !edits.empty())
+                EditorObjectOperations::CommitPropertyEdits(std::move(edits));
 
-			wasDragging = isDragging;
 		}
 		else
 		{
-			static math::matrix4x4 oldLocalMatrix{};
-			static bool wasDragging = false;
 			static std::unordered_map<Entity*, math::matrix4x4> startWorldMatrices;
+            static std::vector<EditorObjectOperations::PropertyEdit> edits;
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 			bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
@@ -525,12 +498,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (isWindowHovered && !isDragging && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
-				oldLocalMatrix = obj->Transform_().GetLocalMatrix();
-				startWorldMatrices.clear();
+				startWorldMatrices.clear(); edits.clear();
 				for (auto* target : selectedObjects)
 				{
 					startWorldMatrices[target] =
 						target->Transform_().GetWorldMatrix();
+                    edits.push_back(EditorObjectOperations::CapturePropertyEdit(target->Transform_(), {"position", "rotation", "scale"}));
 				}
 			}
 
@@ -547,7 +520,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			const math::matrix4x4 newLocalMatrix =
 				manipulatedWorld * parentWorldInverse;
 
-			const bool matrixChanged = !(oldLocalMatrix == newLocalMatrix);
 			if (!(deltaMat == math::matrix4x4::identity()))
 			{
 			obj->Transform_().SetLocalMatrix(
@@ -579,23 +551,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				}
 			}
 
-			if (wasDragging && mouseReleased && matrixChanged)
-			{
-				Meta::MakeCustomChangeCommand(
-					[=]
-					{
-				obj->Transform_().SetLocalMatrix(
-					oldLocalMatrix, TransformWriteReason::Gizmo);
-					},
-					[=]
-					{
-				obj->Transform_().SetLocalMatrix(
-					newLocalMatrix, TransformWriteReason::Gizmo);
-				}
-				);
-			}
+            if (mouseReleased && !edits.empty())
+                EditorObjectOperations::CommitPropertyEdits(std::move(edits));
 
-			wasDragging = isDragging;
 		}
     }
 
@@ -622,17 +580,17 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		m_editorCameraRig->HandleMovement(Time->GetElapsedSeconds());
 	}
 
-	if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_G)) {
+	if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_G, false)) {
 		auto scene = SceneManagers->GetActiveScene();
 		auto selectedObjects = scene->m_selectedEntities;
-		for (auto* target : selectedObjects)
-		{
-		target->Transform_().SetWorldRotation(
-			cam->rotate, TransformWriteReason::Gizmo);
-
-		target->Transform_().SetWorldPosition(
-			cam->m_eyePosition, TransformWriteReason::Gizmo);
-		}
+        std::vector<EditorObjectOperations::PropertyEdit> edits;
+        for (auto* target : selectedObjects)
+        {
+            edits.push_back(EditorObjectOperations::CapturePropertyEdit(target->Transform_(), {"position", "rotation"}));
+            target->Transform_().SetWorldRotation(cam->rotate, TransformWriteReason::Gizmo);
+            target->Transform_().SetWorldPosition(cam->m_eyePosition, TransformWriteReason::Gizmo);
+        }
+        EditorObjectOperations::CommitPropertyEdits(std::move(edits));
 	}
 	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
 		auto scene = SceneManagers->GetActiveScene();
@@ -703,33 +661,16 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				m_currentHitIndex++;
 
 				bool shift = ImGui::GetIO().KeyShift;
-				auto prevList = selectedObjects;
-				Entity* prevSelection = sceneSelectedObj;
-				if (shift)
-				{
-					if (std::find(selectedObjects.begin(), selectedObjects.end(), selected) != selectedObjects.end())
-						scene->RemoveSelectedEntity(selected);
-					else
-						scene->AddSelectedEntity(selected);
-				}
-				else
-				{
-					scene->ClearSelectedEntities();
-					scene->AddSelectedEntity(selected);
-				}
-
-				auto newList = scene->m_selectedEntities;
-				Entity* newSelection = scene->m_selectedEntity;
-				Meta::MakeCustomChangeCommand(
-					[scene, prevList, prevSelection]() {
-						scene->m_selectedEntities = prevList;
-						scene->m_selectedEntity = prevSelection;
-					},
-					[scene, newList, newSelection]() {
-						scene->m_selectedEntities = newList;
-						scene->m_selectedEntity = newSelection;
-					}
-				);
+                auto desired = selectedObjects;
+                if (shift)
+                {
+                    auto it = std::find(desired.begin(), desired.end(), selected);
+                    if (it != desired.end()) desired.erase(it); else desired.push_back(selected);
+                }
+                else desired = {selected};
+                std::vector<EntityHandle> handles;
+                for (auto* target : desired) handles.push_back(scene->HandleOf(target->m_index));
+                EditorObjectOperations::Select(scene, handles);
 			}
 			else
 			{
@@ -810,7 +751,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				auto prefab = PrefabUtilitys->LoadPrefabFullPath(filepath.string().c_str());
 				if (prefab)
 				{
-					PrefabUtilitys->InstantiatePrefab(prefab, filename.stem().string());
+					EditorObjectOperations::InstantiatePrefab(prefab, filename.stem().string());
 				}
 			}
 

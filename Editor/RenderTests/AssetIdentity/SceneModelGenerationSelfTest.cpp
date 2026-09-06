@@ -130,8 +130,9 @@ namespace RenderTest
         }
     }
 
-    bool RunSceneModelGenerationSelfTest(std::string& outLog)
+    bool RunSceneModelGenerationSelfTest(std::string& outLog, SceneModelReport* report)
     {
+        if (report) *report = {};
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
         {
@@ -189,12 +190,29 @@ namespace RenderTest
             tally.firstProblem.c_str());
         outLog += line;
         std::printf("%s", line);
+        if (report)
+        {
+            report->renderers = tally.renderers;
+            report->generationBound = tally.generationBound;
+            report->unbound = tally.unbound;
+            report->handleInvalid = tally.handleInvalid;
+            report->rhiView = tally.rhiView;
+            report->meshIdPersisted = tally.meshIdPersisted;
+            report->textureProps = tally.textureProps;
+            report->embeddedProps = tally.embeddedProps;
+            report->generationTextures = tally.generationTextures;
+            report->otherTextures = tally.otherTextures;
+            report->missingTextures = tally.missingTextures;
+            report->gunnerRenderers = tally.gunnerRenderers;
+            report->gunnerEmbedded = tally.gunnerEmbedded;
+        }
         return passed;
     }
 
     bool RunSceneModelGenerationReloadSelfTest(const std::string& modelName,
-        std::string& outLog)
+        std::string& outLog, SceneModelReport* report)
     {
+        if (report) { *report = {}; report->reload = true; }
         const FileGuid guid = DataSystems->GetStemToGuid(modelName);
         const std::shared_ptr<const assets::ModelAssetGeneration> before =
             FileGuid{} == guid ? nullptr : DataSystems->LoadModelAssetGeneration(guid);
@@ -258,6 +276,15 @@ namespace RenderTest
             after == before ? 1 : 0);
         outLog += line;
         std::printf("%s", line);
+        if (report)
+        {
+            report->textures = before->Textures().size();
+            report->reused = reused;
+            report->created = created;
+            report->missing = missingAfter;
+            report->retired = retired;
+            report->sameAggregate = before == after;
+        }
         return passed;
     }
 }

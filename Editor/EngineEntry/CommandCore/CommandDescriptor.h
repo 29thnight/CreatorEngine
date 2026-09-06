@@ -127,6 +127,13 @@ namespace CommandCore
     /// 된다). 지금은 이름·별칭·요약·비용·역할까지를 정본으로 세우고, 인자
     /// 스키마는 domain 을 옮기는 LC6 에서 그 domain 을 아는 사람이 채운다.
     /// 그 자리를 비워 두되 **비어 있다는 사실이 보이게** 한다.
+    struct CommandParameter
+    {
+        std::string name;
+        std::string kind{"string"}; // string, integer, number, vec3, value
+        bool optional{};
+        std::string defaultValue;
+    };
     struct CommandDescriptor
     {
         std::string              canonical;
@@ -168,5 +175,9 @@ namespace CommandCore
 
         /// 등록 순서. snapshot 정렬은 이름으로 하지만, 원본 순서도 남긴다.
         std::size_t              registrationIndex{};
+
+        std::vector<CommandParameter> namedParameters;
+        bool hasNamedInput{};
+        bool undoable{false};
     };
 }

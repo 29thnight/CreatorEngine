@@ -323,7 +323,7 @@ public:
 
 	// 씬 경계에서 확정 수집한다. 비싸다(수십 ms) — 씬 전환에서만 부른다.
 	// 프레임 루프에서 부르면 그 프레임이 통째로 GC에 묶인다.
-	void CollectManagedHeap();
+	bool CollectManagedHeap();
 
 	// 재생 중에는 gen2 블로킹 수집을 억제한다(요청이지 보장은 아니다).
 	void SetManagedLatencyMode(bool lowLatency);
