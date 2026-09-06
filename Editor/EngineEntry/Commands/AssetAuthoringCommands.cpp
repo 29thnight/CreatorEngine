@@ -2007,7 +2007,7 @@ namespace ConsoleCmd
             typedAnimators);
     }
 
-    static CommandCore::CommandResult Cmd_assets_identity(const ConsoleCommandContext&)
+    static void Cmd_assets_identity(const ConsoleCommandContext&)
     {
         // MBC1 — ce.uuidv8.sha256.v1 신원 프로필·충돌 registry 합성 검사. CPU 전용.
         // `assets.` 접두는 experiment가 아닌 정식 자산 계층(§5.1)의 명령이다.
@@ -2023,19 +2023,9 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[assets.identity] 실패\n") + log);
         }
         std::printf("[CLI] assets.identity %s\n", passed ? "통과" : "실패");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("assets.identity.failed",
-                "자산 identity 계약 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("assets.identity 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_assets_sidecar(const ConsoleCommandContext& ctx)
+    static void Cmd_assets_sidecar(const ConsoleCommandContext& ctx)
     {
         // MBC2 — epoch header·stable key·sidecar schema v2. 인자로 asset root를 주면
         // 실자산 corpus를 임포트해 폐포를 검증한다(디스크에 쓰지 않는다 — 쓰기는 MBC3).
@@ -2052,25 +2042,15 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[assets.sidecar] 실패\n") + log);
         }
         std::printf("[CLI] assets.sidecar %s\n", passed ? "통과" : "실패");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("assets.sidecar.failed",
-                "모델 sidecar v2 스키마 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("assets.sidecar 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_assets_generation(const ConsoleCommandContext& ctx)
+    static void Cmd_assets_generation(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() < 2)
         {
             Debug->LogWarning("[assets.generation] 사용법: assets.generation <fixture project root>");
             std::printf("[CLI] assets.generation 사용법: assets.generation <project root>\n");
-            return CommandCore::InvalidArguments("assets.generation: 인자가 올바르지 않다");
+            return;
         }
         std::string log;
         const bool passed = RenderTest::RunModelAssetGenerationSelfTest(
@@ -2081,25 +2061,15 @@ namespace ConsoleCmd
         else
             Debug->LogError(std::string("[assets.generation] 실패\n") + log);
         std::printf("[CLI] assets.generation %s\n", passed ? "PASS" : "FAIL");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("assets.generation.failed",
-                "model generation closure 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("assets.generation 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_assets_generationcorpus(const ConsoleCommandContext& ctx)
+    static void Cmd_assets_generationcorpus(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() < 2)
         {
             Debug->LogWarning("[assets.generationcorpus] 사용법: assets.generationcorpus <runtime content root>");
             std::printf("[CLI] assets.generationcorpus 사용법: assets.generationcorpus <content root>\n");
-            return CommandCore::InvalidArguments("assets.generationcorpus: 인자가 올바르지 않다");
+            return;
         }
         std::string log;
         const bool passed = RenderTest::RunModelAssetGenerationCorpusSelfTest(
@@ -2111,19 +2081,9 @@ namespace ConsoleCmd
             Debug->LogError(std::string("[assets.generationcorpus] 실패\n") + log);
         std::printf("[CLI] assets.generationcorpus %s\n",
             passed ? "PASS" : "FAIL");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("assets.generationcorpus.failed",
-                "model corpus cold-load 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("assets.generationcorpus 통과", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_assets_modelrender(const ConsoleCommandContext&)
+    static void Cmd_assets_modelrender(const ConsoleCommandContext&)
     {
         std::string log;
         const bool passed = RenderTest::RunModelRenderWiringSelfTest(log);
@@ -2133,16 +2093,6 @@ namespace ConsoleCmd
         else
             Debug->LogError(std::string("[assets.modelrender] 실패\n") + log);
         std::printf("[CLI] assets.modelrender %s\n", passed ? "PASS" : "FAIL");
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("assets.modelrender.failed",
-                "모델 렌더 배선 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("assets.modelrender 통과", std::move(data));
     }
 
     // PHASE 3.75 MBC7 — 활성 씬의 MeshRenderer가 typed generation handle·closure
@@ -2152,7 +2102,7 @@ namespace ConsoleCmd
     // 인스턴스화·Animator 틱)는 stdout 토큰 대신 계수만 올리고, 이 명령이 그것을 읽는다.
     // 아무 상태도 바꾸지 않는다(리셋도 없다).
 
-    static CommandCore::CommandResult Cmd_assets_modeldiag(const ConsoleCommandContext&)
+    static void Cmd_assets_modeldiag(const ConsoleCommandContext&)
     {
         const ModelConsumptionSnapshot snapshot = ModelConsumptionDiagnostics::Snapshot();
         const DataSystem::ModelGenerationSourceSnapshot sources =
@@ -2171,20 +2121,6 @@ namespace ConsoleCmd
             (unsigned long long)sources.fromCatalog,
             (unsigned long long)sources.fromLibrary,
             (unsigned long long)sources.failed);
-
-        // 계수 조회다 — 판정하지 않는다. 무엇이 어긋났는지는 값을 받은 쪽이 본다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("instantiateGeneration", CommandCore::CommandData::Int(
-            static_cast<int64_t>(snapshot.instantiateGeneration)));
-        data.Set("instantiateRejected", CommandCore::CommandData::Int(
-            static_cast<int64_t>(snapshot.instantiateRejected)));
-        data.Set("fromCatalog", CommandCore::CommandData::Int(
-            static_cast<int64_t>(sources.fromCatalog)));
-        data.Set("fromLibrary", CommandCore::CommandData::Int(
-            static_cast<int64_t>(sources.fromLibrary)));
-        data.Set("loadFailed", CommandCore::CommandData::Int(
-            static_cast<int64_t>(sources.failed)));
-        return CommandCore::Ok("assets.modeldiag", std::move(data));
     }
 
     // PHASE 3.75 MBC11 — §8.4 B1/B2/B5/B6 계측.
@@ -2196,7 +2132,7 @@ namespace ConsoleCmd
     //           트리의 sidecar를 건드리지 않도록 사본에서만 부른다(게이트가 사본을 만든다).
     //   끝에 프로세스 peak working set과 VRAM 사용량을 찍는다.
 
-    static CommandCore::CommandResult Cmd_assets_modelbench(const ConsoleCommandContext& ctx)
+    static void Cmd_assets_modelbench(const ConsoleCommandContext& ctx)
     {
         const int iterations = ctx.parts.size() > 2
             ? (std::max)(1, std::atoi(ctx.parts[2].c_str())) : 5;
@@ -2208,7 +2144,7 @@ namespace ConsoleCmd
         {
             std::printf("[CLI] assets.modelbench fail 디렉터리가 아니다: %s\n",
                 root.string().c_str());
-            return CommandCore::InvalidArguments("assets.modelbench: 인자가 올바르지 않다");
+            return;
         }
         std::vector<file::path> models;
         for (file::recursive_directory_iterator it(root, error), end; !error && it != end;
@@ -2234,7 +2170,7 @@ namespace ConsoleCmd
             {
                 std::printf("[CLI] assets.modelbench fail author 모드는 <project>/Assets/<sub> 사본과 "
                     "ProjectSetting/AssetIdentity.asset이 필요하다: %s\n", root.string().c_str());
-                return CommandCore::InvalidArguments("assets.modelbench: 인자가 올바르지 않다");
+                return;
             }
             const auto formatPhases = [](const assets::ModelAssetPhaseTimeline& phases)
                 {
@@ -2377,33 +2313,9 @@ namespace ConsoleCmd
             "iterations=%d peakWorkingSetMB=%.1f vramUsedMB=%llu vramBudgetMB=%llu\n",
             authorMode ? "author" : "cooked", measured, failed,
             iterations, peakMb, vramUsedMb, vramBudgetMb);
-
-        // ★ 벤치는 **재는 것이 일이라 PASS/FAIL 이 없다.** 다만 실패한 반복이
-        //   있으면 그 수치는 못 믿으므로 실패로 낸다 — 0 건을 재고 "빠르다" 고
-        //   보고하는 사고를 막는 것과 같은 이유다.
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("mode", CommandCore::CommandData::String(authorMode ? "author" : "cooked"));
-        data.Set("measured", CommandCore::CommandData::Int(static_cast<int64_t>(measured)));
-        data.Set("failed", CommandCore::CommandData::Int(static_cast<int64_t>(failed)));
-        data.Set("iterations", CommandCore::CommandData::Int(iterations));
-        data.Set("peakWorkingSetMB", CommandCore::CommandData::Double(peakMb));
-        if (0 != failed)
-        {
-            return CommandCore::Fail("assets.modelbench.failed",
-                "측정 중 실패한 반복이 있다", std::move(data));
-        }
-        if (0 == measured)
-        {
-            // `PreconditionFailed` 는 data 를 받지 않는다. 여기서는 의미를 지키는
-            // 쪽을 택했다 — "잰 것이 0 건" 은 전제가 안 선 것이지 판정 실패가
-            // 아니고, 그 구분이 수치를 함께 싣는 것보다 중요하다.
-            return CommandCore::PreconditionFailed("assets.modelbench.nothing_measured",
-                "잰 것이 0 건이다");
-        }
-        return CommandCore::Ok("assets.modelbench", std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_assets_scenemodel(const ConsoleCommandContext& ctx)
+    static void Cmd_assets_scenemodel(const ConsoleCommandContext& ctx)
     {
         std::string log;
         bool passed = false;
@@ -2419,16 +2331,6 @@ namespace ConsoleCmd
             Debug->LogWarning(std::string("[assets.scenemodel] 통과\n") + log);
         else
             Debug->LogError(std::string("[assets.scenemodel] 실패\n") + log);
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("passed", CommandCore::CommandData::Bool(passed));
-        data.Set("log", CommandCore::CommandData::String(log));
-        if (!passed)
-        {
-            return CommandCore::Fail("assets.scenemodel.failed",
-                "씬 모델 소비 판정 실패", std::move(data));
-        }
-        return CommandCore::Ok("assets.scenemodel 통과", std::move(data));
     }
 
     static void Cmd_experiment_cooked(const ConsoleCommandContext& ctx)
@@ -3500,13 +3402,10 @@ namespace ConsoleCmd
         std::printf("[CLI] experiment.scenecook %s\n", passed ? "통과" : "실패");
     }
 
-    static CommandCore::CommandResult Cmd_assets_unload(const ConsoleCommandContext& ctx)
+    static void Cmd_assets_unload(const ConsoleCommandContext& ctx)
     {
         DataSystems->UnloadUnusedAssets();
         std::printf("[CLI] 사용하지 않는 에셋 정리 요청\n");
-
-        // 요청을 넣는 것이 일이다. 무엇이 얼마나 풀렸는지는 이 창구가 모른다.
-        return CommandCore::Ok("사용하지 않는 에셋 정리 요청");
     }
 
     static void Cmd_bt_status(const ConsoleCommandContext& ctx)
@@ -3582,14 +3481,14 @@ namespace ConsoleCmd
         reg.Legacy({ "inputmap.corpus.probe" }, &Cmd_inputmap_corpus_probe);
         reg.Legacy({ "model.loadcached" }, &Cmd_model_loadcached);
         reg.Legacy({ "model.place" }, &Cmd_model_place);
-        reg.Result({ "assets.identity" }, &Cmd_assets_identity);
-        reg.Result({ "assets.sidecar" }, &Cmd_assets_sidecar);
-        reg.Result({ "assets.generation" }, &Cmd_assets_generation);
-        reg.Result({ "assets.generationcorpus" }, &Cmd_assets_generationcorpus);
-        reg.Result({ "assets.modelrender" }, &Cmd_assets_modelrender);
-        reg.Result({ "assets.scenemodel" }, &Cmd_assets_scenemodel);
-        reg.Result({ "assets.modeldiag" }, &Cmd_assets_modeldiag);
-        reg.Result({ "assets.modelbench" }, &Cmd_assets_modelbench);
+        reg.Legacy({ "assets.identity" }, &Cmd_assets_identity);
+        reg.Legacy({ "assets.sidecar" }, &Cmd_assets_sidecar);
+        reg.Legacy({ "assets.generation" }, &Cmd_assets_generation);
+        reg.Legacy({ "assets.generationcorpus" }, &Cmd_assets_generationcorpus);
+        reg.Legacy({ "assets.modelrender" }, &Cmd_assets_modelrender);
+        reg.Legacy({ "assets.scenemodel" }, &Cmd_assets_scenemodel);
+        reg.Legacy({ "assets.modeldiag" }, &Cmd_assets_modeldiag);
+        reg.Legacy({ "assets.modelbench" }, &Cmd_assets_modelbench);
         reg.Legacy({ "experiment.skinbounds" }, &Cmd_experiment_skinbounds);
         reg.Legacy({ "experiment.animpose" }, &Cmd_experiment_animpose);
         reg.Legacy({ "experiment.animlive" }, &Cmd_experiment_animlive);
@@ -3608,7 +3507,7 @@ namespace ConsoleCmd
         reg.Legacy({ "experiment.matscript" }, &Cmd_experiment_matscript);
         reg.Legacy({ "experiment.scenecook" }, &Cmd_experiment_scenecook);
         reg.Legacy({ "experiment.catalog" }, &Cmd_experiment_catalog);
-        reg.Result({ "assets.unload" }, &Cmd_assets_unload);
+        reg.Legacy({ "assets.unload" }, &Cmd_assets_unload);
         reg.Legacy({ "bt.status", "bt.reset" }, &Cmd_bt_status);
     }
 }
