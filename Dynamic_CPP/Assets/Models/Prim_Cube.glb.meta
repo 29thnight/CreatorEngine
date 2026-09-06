@@ -3,7 +3,7 @@ identityProfile: ce.uuidv8.sha256.v1
 identityEpoch: 2026-09-model-bigbang
 authoringKey: authoring:a65883fc2f019dc05f198f571be23c7608390a86dbedaf09899a079802c0d8f6
 assetId: 8a69bd42-f950-8265-9c0e-0ff597095141
-generation: 4
+generation: 7
 sourceFingerprint: sha256:eed6b4e1846cc46cb574e6c2b99743e4352b41bc4d51ba32acc6d5dacf9d350e
 subAssets:
   - kind: material

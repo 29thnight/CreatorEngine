@@ -77,7 +77,7 @@ GPU-driven / Stochastic Lighting / DXR / DLSS 구상
 ```
 
 **2026-09-02 범위 개정:** 모델 자산 전환은 PHASE 3.75
-[`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md)로 분리됐다. 네 GPU
+[`ModelAssetBigBangCutoverPlan.md`](archive/ModelAssetBigBangCutoverPlan.md)로 분리됐다. 네 GPU
 기능은 그 페이즈가 게시한 model generation, typed subasset handle, vertex attribute schema를
 입력으로 받지만 PHASE 4.75에서 importer·GUID·legacy fallback을 다루지 않는다.
 

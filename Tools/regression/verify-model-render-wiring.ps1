@@ -147,10 +147,10 @@ try {
         $shadow -notmatch 'VertexAttribute::Position') {
         Add-Failure 'Shadow pass-specific input mask 유도가 빠졌다.'
     }
-    foreach ($shader in @('GBuffer.hlsl', 'ForwardShade.hlsl', 'Shadow.hlsl')) {
+    foreach ($shader in @('GBuffer.slang', 'ForwardShade.slang', 'Shadow.slang')) {
         $text = [IO.File]::ReadAllText((Join-Path $root `
             ('Dynamic_CPP\Assets\Shaders\DefaultPassShader\' + $shader)))
-        $hasModelContract = if ($shader -eq 'Shadow.hlsl') {
+        $hasModelContract = if ($shader -eq 'Shadow.slang') {
             $text -match 'MODEL_VERTEX_SKINNING'
         } else {
             $text -match 'MODEL_VERTEX_LAYOUT'
@@ -170,7 +170,7 @@ try {
         if ($stderr) { '--- editor stderr ---'; $stderr }
         exit 1
     }
-    '전체 통과 — typed generation upload, 4 mask PSO, SU 84B/64/68, DX12/Vulkan pass closure'
+    '전체 통과 — typed generation upload, 8 mask PSO, SU 84B/64/68, DX12/Vulkan pass closure'
     exit 0
 }
 finally {

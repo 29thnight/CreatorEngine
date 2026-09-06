@@ -1,5 +1,8 @@
 # 머테리얼 · 셰이더 파이프라인 재설계 (PHASE 3.5)
 
+> **보관 · 완료 (정리: 2026-09-06).** PHASE 3.5 M0~M7 종료. 현재 PBR 배선 수정은 PHASE 4, Material Graph는 PHASE 4.25에서 진행한다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 2026-08-11 작성, 2026-08-27 모델 임포트 교차 배선 재감사. Vulkan 골격
 (vk.selftest)이 선 직후 작성. RhiBoundaryPlan §7.2가 다음
 슬라이스로 V5(셰이더 컴파일 93건)·V6(파이프라인 상태 기술 107건)를 지목하는데,
@@ -1193,9 +1196,9 @@ CreatorEditor·Player가 빌드됐다.
 
 | 후속 | 이 문서가 제공하는 입력 | 후속 정본 |
 |---|---|---|
-| PHASE 4 | ShaderMeta, immutable material snapshot, Slang compiler/reflection, DXIL/SPIR-V | [`PBRWiringStabilizationPlan.md`](PBRWiringStabilizationPlan.md) |
-| PHASE 4.25 | property/texture override와 generation 수명 | [`BlenderMaterialGraphPlan.md`](BlenderMaterialGraphPlan.md) |
-| PHASE 4.75 | Pipeline/Shader Asset와 native pass 기반 | [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) |
+| PHASE 4 | ShaderMeta, immutable material snapshot, Slang compiler/reflection, DXIL/SPIR-V | [`PBRWiringStabilizationPlan.md`](../PBRWiringStabilizationPlan.md) |
+| PHASE 4.25 | property/texture override와 generation 수명 | [`BlenderMaterialGraphPlan.md`](../BlenderMaterialGraphPlan.md) |
+| PHASE 4.75 | Pipeline/Shader Asset와 native pass 기반 | [`ScriptableRenderPipelinePlan.md`](../ScriptableRenderPipelinePlan.md) |
 
 현재 PBR 제품 결함의 목록과 완료 판정은 PHASE 4가 다시 실측한 소스를 정본으로 한다.
 이 완료 문서의 과거 HLSL 줄 수나 당시 selftest 초록을 현재 제품 동작의 증거로 재사용하지

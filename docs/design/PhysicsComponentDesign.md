@@ -16,7 +16,7 @@
 
 이 설계는 백지에서 출발하지 않는다. 넷을 지킨다.
 
-1. **ECS를 도입하지 않는다.** [SceneGraphRedesignPlan](../plans/SceneGraphRedesignPlan.md) 게이트 D에서 EnTT/Flecs 채택 없음으로 결정됐다. GameObject + Component 저작 모델을 유지한다.
+1. **ECS를 도입하지 않는다.** [SceneGraphRedesignPlan](../plans/archive/SceneGraphRedesignPlan.md) 게이트 D에서 EnTT/Flecs 채택 없음으로 결정됐다. GameObject + Component 저작 모델을 유지한다.
 2. **기존 씬·프리팹이 로드돼야 한다.** 컴포넌트의 리플렉션 필드명을 보존한다.
 3. **게임 스크립트 82곳이 살아야 한다.** 표면 의미론을 바꾸되 형태는 최소로 바꾼다.
 4. **C# 경계 45개가 유지돼야 한다.** 함수 포인터 표의 시그니처는 대체로 그대로 쓸 수 있어야 한다.

@@ -166,12 +166,10 @@ namespace experiment
                 return false;
             }
 
-            // 압축 결정은 legacy 패리티다 — FinalizeMaterialRuntime이
-            // baseColorMap만 compress한다. colorSpace(sRGB) 기반 승격은 emissive
-            // 압축 여부를 바꾸므로 M4 픽셀 대조와 함께 판정한다.
-            const bool compress =
-                property.name == standard_material::property::BaseColorMap;
-            std::shared_ptr<Texture> owner = services.loadTexture(path, compress);
+            const bool compress = reference->colorSpace == TextureColorSpace::Srgb
+                && property.name == standard_material::property::BaseColorMap;
+            std::shared_ptr<Texture> owner = services.loadTexture(
+                path, compress, reference->colorSpace);
             if (!owner)
             {
                 outError = "texture 로드 실패: " + property.name + " ← "

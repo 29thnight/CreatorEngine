@@ -1,5 +1,8 @@
 # 라이브 파이프라인 기술(記述)화 설계 (LivePipelineDesc)
 
+> **보관 · 완료 (정리: 2026-09-06).** PHASE 3의 3-13 완료. 초기 문서의 전용 CLI 제안은 채택하지 않았고 진단은 기존 창·회귀 명령에 통합했다. 후속은 PHASE 4.75.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 2026-08-07. SSR·SSS·Decal 배선 직후 작성 — 그 배선이 이 설계의 실측 근거다.
 
 ---

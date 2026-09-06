@@ -1,5 +1,8 @@
 # RHI 경계 재설계 (PHASE 3-1 재정의)
 
+> **보관 · 완료 (정리: 2026-09-06).** PHASE 3의 3-1 및 필수 RHI 구조 작업 종료. GPU 메모리 후속 설계와 PHASE 4.75 확장은 별도 범위.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 2026-08-07 작성. DX11 구 렌더러 은퇴가 계기다. **목표는 멀티백엔드 RHI** —
 DX12 와 Vulkan 이 **같은 패스 코드**로 그린다.
 

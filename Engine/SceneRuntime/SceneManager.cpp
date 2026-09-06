@@ -617,12 +617,12 @@ Scene* SceneManager::SaveScene(std::string_view name)
 
 	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾸는데,
 	// 그러면 같은 내용을 저장할 때마다 개행이 뒤집혀 git 작업 트리가 흔들린다.
-	std::ofstream sceneFileOut(saveSceneFileName, std::ios::binary | std::ios::trunc);
 	Authoring::WriteDocument sceneDocument;
 
-    m_activeScene.load()->m_Entities[0]->m_name = saveSceneFileName.stem().string();
     try
     {
+		m_activeScene.load()->OnBeforeSerialize();
+		m_activeScene.load()->m_Entities[0]->m_name = saveSceneFileName.stem().string();
 		sceneDocument = Meta::SerializeDocument(m_activeScene.load());
     }
 	catch (const std::exception& e)
@@ -653,6 +653,7 @@ Scene* SceneManager::SaveScene(std::string_view name)
 		}
 	}
 
+	std::ofstream sceneFileOut(saveSceneFileName, std::ios::binary | std::ios::trunc);
 	sceneFileOut << sceneDocument.Dump();
 
     sceneFileOut.close();

@@ -12,6 +12,7 @@
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Scene/MaterialTextureTable.h"
 #include "../../../RHI/RHIGraphicsPipelineRequest.h"
 
 struct ShaderMeta;
@@ -120,7 +121,7 @@ public:
         RHICompletionPoint retireAfter, std::string& outError);
     /// frame packet이 소유한 material generation/keyword 조합의 일반/Reference
     /// PSO 쌍을 candidate-first로 준비한다. 모든 Forward material PSO는 primary와
-    /// 같은 pipeline layout을 써야 프레임/광원/타일/IBL binding을 보존할 수 있다.
+    /// table 길이가 다른 layout도 허용하고 배치마다 프레임/광원/타일/IBL을 다시 건다.
     bool EnsureShaderMetaVariant(const EnhancedFrameContext& context,
         ShaderMetaHandle handle, const ShaderMeta& meta,
         std::span<const std::uint16_t> keywordSelections,
@@ -367,12 +368,13 @@ private:
     // 그래프 실행 중에 부르면 기록 한가운데에 복사가 끼어든다
     // (GBuffer가 같은 이유로 PrepareFrame에서 올린다).
     //
-    // 키는 재질 텍스처 포인터 넷의 동일성이다 — GBuffer의 MaterialKey와
+    // 키는 재질 텍스처 포인터 목록의 동일성이다 — GBuffer의 MaterialKey와
     // 같은 근거이고, 메시가 아니라 재질로 키잉해야 같은 메시를 다른 재질로
     // 두 번 그릴 때 두 번째가 첫 번째의 텍스처로 그려지지 않는다.
     struct MaterialKey
     {
-        std::array<Texture*, 4> textures{}; // baseColor · normal · ORM · emissive
+        std::vector<Texture*> textures{};
+        std::vector<assets::TextureCoordinates> coordinates{}; // reflected register order
         std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> snapshot{};
 
         Texture* operator[](std::size_t i) const { return textures[i]; }
@@ -382,9 +384,7 @@ private:
 
     struct MaterialTextures
     {
-        RHITextureHandle resources[4]{};
-        RHIFormat       formats[4]{};
-        uint32_t        mipLevels[4]{};
+        MaterialTextureTable::Views views;
     };
 
     // P2a 제품 draw는 owning snapshot에서만 값을 푼다. snapshot이 없는 기존
@@ -392,7 +392,6 @@ private:
     // 섞지는 않는다.
     struct MaterialView
     {
-        Texture* textures[4]{};
         math::color baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
         float metallic{ 0.f };
         float roughness{ 1.f };
@@ -429,6 +428,7 @@ private:
 
     // 해시맵 대신 정렬 맵. 재질 종류는 프레임당 많아야 수십이고, 배열 키에
     // 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다(GBuffer와 같은 판단).
+    MaterialTextureTable::Schema m_legacyTextureSchema;
     std::map<MaterialKey, MaterialTextures> m_materialTextures;
 
     // Vulkan에서는 vkCmdCopyBuffer를 dynamic rendering 안에서 기록할 수 없다.

@@ -192,6 +192,9 @@
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\PbrShaderParityTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>

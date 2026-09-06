@@ -4,10 +4,10 @@
 Simulation Tick, 네트워크 정체성, Replication, Transport adapter.
 
 관련 문서: [SerializationPlan](SerializationPlan.md)(저작 YAML·쿠킹 바이너리·Archive
-경계), [SceneGraphRedesignPlan](SceneGraphRedesignPlan.md)(EntityHandle·Scene 수명주기),
+경계), [SceneGraphRedesignPlan](archive/SceneGraphRedesignPlan.md)(EntityHandle·Scene 수명주기),
 [EngineLayerSeparationPlan](EngineLayerSeparationPlan.md)(Runtime/Core 물리 경계),
 [PhysicsRedesignPlan](PhysicsRedesignPlan.md)(고정 스텝 소비자·스레딩),
-[ReflectionRedesignPlan](ReflectionRedesignPlan.md)(macro-free canonical schema).
+[ReflectionRedesignPlan](archive/ReflectionRedesignPlan.md)(macro-free canonical schema).
 
 이 문서는 **네트워크 라이브러리를 당장 링크하는 계획이 아니다.** 먼저 엔진 상태와
 시뮬레이션을 Transport로부터 분리하고, 소켓 없이 Loopback에서 계약을 증명한 다음

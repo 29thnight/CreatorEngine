@@ -119,7 +119,8 @@ namespace RenderTest
                     return left.assetId == right.assetId
                         && left.logicalName == right.logicalName
                         && left.fallbackPath == right.fallbackPath
-                        && left.colorSpace == right.colorSpace;
+                        && left.colorSpace == right.colorSpace
+                        && left.coordinates == right.coordinates;
                 }
                 else return left == right;
             }, a);
@@ -367,6 +368,7 @@ namespace RenderTest
             texture.logicalName = "_BaseMap";
             texture.fallbackPath = u8"C:/자산/텍스처 이름.png";
             texture.colorSpace = ex::TextureColorSpace::Srgb;
+            texture.coordinates = {1, {.25f, -.5f}, {-2.f, .75f}, .4f};
 
             material.properties.push_back(property("b", true));
             material.properties.push_back(property("i", std::int32_t{ -7 }));
@@ -793,6 +795,20 @@ namespace RenderTest
             check.Check(ok, "정상 페이로드를 읽는다");
             if (ok) CompareDrafts(original, restored, check, "합성");
             else for (const auto& issue : issues) outLog += "    사유: " + issue.message + "\n";
+        }
+
+        {
+            auto masked = original;
+            masked.materials[0].blendMode = ex::MaterialBlendMode::Masked;
+            masked.materials[0].properties.push_back({"doubleSided", true});
+            masked.materials[0].properties.push_back({"alphaCutoff", .375f});
+            masked.materials[0].properties.push_back({"emissiveStrength", 8.f});
+            const auto written = ck::Write(masked);
+            ex::ModelDraft restored;
+            std::vector<ex::ModelLoadIssue> issues;
+            const bool ok = written.Succeeded() && ck::Read(written.bytes, restored, issues);
+            check.Check(ok, "W4/W6 CEMC7 coverage/emissiveStrength round trip");
+            if (ok) CompareDrafts(masked, restored, check, "W4 coverage");
         }
 
         // ── 2. 결정성 — 같은 입력은 같은 바이트 ─────────────────────────

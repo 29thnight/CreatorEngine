@@ -1,6 +1,9 @@
 # 모델 자산 빅뱅 전환 계획 (PHASE 3.75)
 
-**신설 2026-09-02 · 예상 공수 60 개발일 · 상태: 진행 중 — MBC0~MBC8 완료(43/60일, 2026-09-03)**
+> **보관 · 완료 (정리: 2026-09-06).** 2026-09-04 MBC11 cutover·PHASE 3.75 종료 기록. 임베디드 텍스처 디코드는 PHASE 12 T1a/T2로 이관했고 비회귀 기준은 유지한다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
+**신설 2026-09-02 · 예상 공수 60 개발일 · 상태: 완료 — MBC0~MBC11 종료·cutover(60/60일, 2026-09-04)**
 
 이 계획은 기존 `experiment` 배선을 완성하거나 legacy 경로와 대조 운용하는 계획이 아니다.
 모델 자산의 신원·저장·로딩·런타임 소비를 새 계약으로 한 번에 교체하고, 전환 완료 뒤
@@ -474,7 +477,7 @@ MBC9가 걷고, ModelCookProducer의 v1 sidecar 리더(cooked-catalog RED)는 MB
 | `MBC8` | Animator/Foliage/Collider/Editor/Serialization/CLR 직접 소비 | MBC5 | 6 | **완료 2026-09-03** — Animator `m_modelGeneration`·`AnimatorDataPath`, `Assets/ModelAnimationSampler`(골든 8042DC1C 비트 동일), 틱 뷰 템플릿 단일화, Foliage typed 뷰, 인스펙터 read-only 블록, cook 참조 스캔 v8 수용, `verify-model-typed-consumers`(스위치 off typed 전량) |
 | `MBC9` | A/B·Assimp fallback·역브리지·legacy 타입/cache 제거 | MBC6~MBC8 | 5 | **완료 2026-09-03** — legacy `Model/ModelLoader/Skeleton/AnimatorData/Animation/ModelAssetFormat`·`ExperimentModelMigration`(역브리지·`LoadModelViaExperiment`·A/B 스위치)·`ModelSceneBridge`·Assimp include/vcpkg port 물리 삭제, `RHIExperimentVertexView`/`GetOrUploadExperiment`/experiment 계수·컴포넌트 병행 핸들(`m_experimentModel`·`m_Mesh`·`m_Skeleton`)·전역 임베디드 등록부·`Models` cache 제거, `ModelSceneInstantiation`(generation 직행)·`LoadModelAssetGenerationByPath`/`FindModelAssetGenerationByStem`/`ReadModelCreateMeshCollider`·`BoneRegion.h`(MAX_BONES) 신설, dx12/vulkan selftest·에디터 드롭·진단·transformbulk 프로브 typed 전환, 동결 래칫 제거 표면 0 재기준, `verify-experiment-vertex-live`·`phase17-local-model-corpus` 은퇴 |
 | `MBC10` | 진단 read-only화·정적/변이/실자산 gate 완결 | MBC1, MBC9 | 5 | **완료 2026-09-03** — 제품 경로의 무조건 stdout 토큰(`[mesh.resolve]`·`[model.instantiate]`·`[anim.tick]`) 제거 → `ModelConsumptionDiagnostics` 원자 계수 + 읽기 전용 `assets.modeldiag`, `experiment.animlive`는 publish를 부르지 않고 제품 barrier의 마지막 메트릭 스냅샷(`Scene::TryGetLastAnimatorPoseMetrics`)을 읽음, 동결 게이트에 §5.2/§8.2 하드 계약(제거 표면 하드 0·`m_hashingMesh` 절차 지오메트리 허용목록·제품 소비자 experiment 객체 0·generation 게시 진입점 DataSystem 하나·animlive 읽기 전용) 추가, 게이트 5종을 스냅샷 파싱으로 전환 |
-| `MBC11` | 전체 build/runtime/performance 검증·단일 제품 cutover | MBC4, MBC9, MBC10 | 7 | **검증 완료·cutover 보류 2026-09-03** — cook 경로 단일화(`ModelGenerationExportProducer`가 게시된 generation을 검증해 `Derived/Models/<xx>/<id>/<gen>/`로 내보내고 재질·텍스처·메시 subasset을 manifest에 등록, `ModelCookProducer` 삭제, `DataSystem::LoadModelAssetGeneration`이 cooked catalog → Library 순으로 해석·계수), 계측 공백 폐쇄(`assets.modelbench` author/cooked + `phases` 단계 분해 + peak WS/VRAM, `assets.modeldiag`의 generation 출처 계수), `verify-model-cutover-budget`(Release, run-all 배선). §8.4 실측: B3·B4·B5·B6 통과/기록, **B1 10/14·B2 12/14 초과**(원인: cooked 텍스처 재디코드·저작 트랜잭션 고정 비용) — [기준선 §4.5](ModelAssetBigBangCutoverBaseline.md). §8.4 규칙대로 cutover는 보류한다 |
+| `MBC11` | 전체 build/runtime/performance 검증·단일 제품 cutover | MBC4, MBC9, MBC10 | 7 | **완료·cutover 2026-09-04** — 최종 판정은 §10의 2026-09-04 종료 기록을 따른다. 아래는 2026-09-03 검증·보류 당시 기록이다: cook 경로 단일화(`ModelGenerationExportProducer`가 게시된 generation을 검증해 `Derived/Models/<xx>/<id>/<gen>/`로 내보내고 재질·텍스처·메시 subasset을 manifest에 등록, `ModelCookProducer` 삭제, `DataSystem::LoadModelAssetGeneration`이 cooked catalog → Library 순으로 해석·계수), 계측 공백 폐쇄(`assets.modelbench` author/cooked + `phases` 단계 분해 + peak WS/VRAM, `assets.modeldiag`의 generation 출처 계수), `verify-model-cutover-budget`(Release, run-all 배선). §8.4 실측: B3·B4·B5·B6 통과/기록, **B1 10/14·B2 12/14 초과**(원인: cooked 텍스처 재디코드·저작 트랜잭션 고정 비용) — [기준선 §4.5](ModelAssetBigBangCutoverBaseline.md). §8.4 규칙대로 cutover는 보류한다 |
 | **합계** | | | **60일** | |
 
 병렬 가능 범위는 `MBC3`과 `MBC5`, `MBC6`~`MBC8`이다. 한 명이 순차 수행하면 60

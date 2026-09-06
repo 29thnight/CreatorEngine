@@ -221,6 +221,7 @@ public:
     // [anim.tick] 경로 관측을 애니메이터당 1회로 줄이는 플래그.
     bool m_tickPathLogged{ false };
     void EnsureAnimationBinding();
+    void BindModelGeneration(std::shared_ptr<const assets::ModelAssetGeneration> generation);
 
     // I5-D4e-2 — 클립별 이벤트·루프 오버라이드(위 구조 주석 참조). 영속은
     // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.

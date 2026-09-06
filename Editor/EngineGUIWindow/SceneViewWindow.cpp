@@ -1,3 +1,4 @@
+#include "EditorModelPlacement.h"
 #include "SceneViewWindow.h"
 #include "ReflectionUndo.h"
 #include "EditorCameraRig.h"
@@ -739,56 +740,28 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
 
 		ImRect dropRect = ImRect(imageMin, imageMax);
-		static file::path previewModelPath;
-		static Entity* dragPreviewObject = nullptr;
-		static ImGuiPayload* dragPayload = nullptr;
-
-		if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
-		{
-			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model", ImGuiDragDropFlags_AcceptBeforeDelivery);
-			if (!dragPayload || dragPayload != payload)
-			{
-				dragPayload = const_cast<ImGuiPayload*>(payload);
-				if (previewModelPath.empty() && !dragPreviewObject && dragPayload)
-				{
-					const char* droppedFilePath = static_cast<const char*>(dragPayload->Data);
-					file::path filename = file::path(droppedFilePath).filename();
-					previewModelPath = PathFinder::Relative("Models\\") / filename;
-
-					Entity* createdObj = nullptr;
-					Meta::UndoManager::GetInstance()->Execute(
-						std::make_unique<Meta::LoadModelToSceneObjCommand>(
-							scene,
-							DataSystems->LoadModelAssetGenerationByPath(previewModelPath.string()),
-							&createdObj));
-					dragPreviewObject = createdObj;
-				}
-			}
-			else
-			{
-				ImVec2 mousePos = ImGui::GetMousePos();
-				Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
-
-				float distance;
-				if (RayIntersectsPlane(ray, { 0, 1, 0 }, { 0, 0, 0 }, distance))
-				{
-					const math::vector3 worldPos = ray.origin + ray.direction * distance;
-
-					if (payload->IsPreview() && dragPreviewObject)
-					{
-		dragPreviewObject->Transform_().SetPosition(
-			worldPos, TransformWriteReason::Gizmo);
-					}
-				}
-
-				if (!dragPayload->IsPreview() && dragPreviewObject)
-				{
-					dragPreviewObject = nullptr;
-					dragPayload = nullptr;
-					previewModelPath.clear();
-				}
-			}
-
+        if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model", ImGuiDragDropFlags_AcceptBeforeDelivery))
+            {
+                const ImVec2 mouse = ImGui::GetMousePos();
+                const Ray ray = CreateRayFromCamera(cam, mouse, imageMin, imageMax);
+                float distance = 0;
+                std::optional<math::vector3> position;
+                if (RayIntersectsPlane(ray, { 0, 1, 0 }, { 0, 0, 0 }, distance))
+                    position = ray.origin + ray.direction * distance;
+                if (payload->IsDelivery() && scene)
+                {
+                    const file::path filename = static_cast<const char*>(payload->Data);
+                    const file::path path = PathFinder::Relative("Models\\") / filename.filename();
+                    Editor::ModelPlacement::Get().Execute(scene->GetSceneId(), path.string(), position);
+                }
+                else
+                {
+                    ImGui::GetWindowDrawList()->AddCircle(mouse, 8.0f, IM_COL32(230, 200, 80, 255), 16, 2.0f);
+                    ImGui::SetTooltip("Drop to load and place model");
+                }
+            }
 			if (const ImGuiPayload* HDRPayload = ImGui::AcceptDragDropPayload("HDR"))
 			{
 				const char* droppedFilePath = (const char*)HDRPayload->Data;

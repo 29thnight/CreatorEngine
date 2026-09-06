@@ -39,6 +39,7 @@
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
+    <ClInclude Include="EngineEntry\EditorModelPlacement.h" />
     <ClInclude Include="EngineEntry\EditorImGuiTexture.h" />
     <ClInclude Include="EngineEntry\EditorPlatform.h" />
     <ClInclude Include="EngineEntry\EditorPlayModeController.h" />
@@ -97,6 +98,7 @@
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
+    <ClCompile Include="EngineEntry\EditorModelPlacement.cpp" />
     <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp" />
     <ClCompile Include="EngineEntry\EditorPlatform.cpp" />
     <ClCompile Include="EngineEntry\EditorPlayModeController.cpp" />

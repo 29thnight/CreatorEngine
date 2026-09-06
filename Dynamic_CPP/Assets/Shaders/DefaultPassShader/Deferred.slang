@@ -1,10 +1,10 @@
-#include "Includes/Ibl.slang"
+#include "Includes/PbrSurface.slang"
 
 // Deferred 조명. GBuffer 를 읽어 직접광 + IBL 앰비언트를 적분한다.
 //
 // ★ Deferred.hlsl 의 이식본이다. 바인딩(b0, t0..t8, s0..s2)과 상수 레이아웃은
 //   한 바이트도 바뀌지 않았다 ─ C++ 쪽 업로더가 그대로 쓴다. 바뀐 것은 BRDF
-//   본체이고, 그 정본은 Includes/Brdf.slang 과 Includes/Ibl.slang 이다.
+//   본체이고, 그 정본은 Includes/Brdf.slang 과 Includes/PbrSurface.slang 이다.
 //
 // ── HLSL 판과 달라진 것 ─────────────────────────────────────────────
 //
@@ -118,44 +118,6 @@ float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
     return shadow;
 }
 
-// ── 표면 ────────────────────────────────────────────────────────────
-
-// 광원마다 다시 유도하지 않는 항만 모은다. 직접광 루프가 L 에 의존하는
-// 절반만 계산하도록 하는 것이 이 구조체의 존재 이유다.
-struct SurfaceContext
-{
-    float3 position;
-    float3 normal;
-    float3 view;
-    float  ndotv;
-    float  alpha;          // roughness^2
-    float3 f0;
-    float3 diffuseBase;    // albedo * (1 - metallic) / PI
-    float3 energyComp;     // 다중산란 보상(Turquin 2019)
-    float  metallic;
-
-    float3 EvaluateLight(float3 toLight, float3 radiance)
-    {
-        const float ndotl = saturate(dot(normal, toLight));
-        if (ndotl <= 0.0) return float3(0.0);
-
-        const float3 halfVector = normalize(toLight + view);
-        const float  ndoth      = saturate(dot(normal, halfVector));
-        const float  vdoth      = saturate(dot(view, halfVector));
-
-        const float3 fresnel  = FresnelSchlick(f0, vdoth);
-        const float3 specular = fresnel * energyComp
-            * DistributionGGX(ndoth, alpha)
-            * VisibilitySmithHeightCorrelated(ndotv, ndotl, alpha);
-
-        // 에너지 보존: 반사되지 않은 몫만 확산으로 간다. diffuseBase 가
-        // (1 - metallic) 을 이미 품고 있다.
-        const float3 diffuse = (1.0 - fresnel) * diffuseBase;
-
-        return (diffuse + specular) * radiance * ndotl;
-    }
-};
-
 struct VSOut
 {
     float4 position : SV_POSITION;
@@ -205,28 +167,13 @@ float4 PSMain(VSOut input) : SV_TARGET
     const float4 worldHomogeneous = mul(float4(ndc, depth, 1.0), gInverseViewProjection);
     const float3 worldPosition    = worldHomogeneous.xyz / worldHomogeneous.w;
 
-    SurfaceContext surface;
-    surface.position = worldPosition;
-    surface.normal   = normal;
-    surface.view     = normalize(gEyePosition.xyz - worldPosition);
-    surface.ndotv    = saturate(dot(normal, surface.view)) + 1e-5;
-
-    // 거칠기를 그대로 쓰면 0 에서 정반사가 점 하나가 되어 화면에서 사라진다.
-    // 제곱해 쓰는 것이 관행이고, 하한을 두어 완전 거울을 피한다.
-    surface.alpha = max(rough * rough, 1e-3);
-
-    // 유전체의 기본 반사율 0.04 는 관행값이다(대부분의 비금속이 4% 근처).
-    // 금속은 알베도가 곧 반사색이다.
-    surface.f0       = lerp(float3(0.04), albedo, metallic);
-    surface.metallic = metallic;
-
-    // BRDF LUT 는 픽셀당 한 번만 읽는다. 에너지 보상과 앰비언트가 같은
-    // (NdotV, roughness) 로 같은 값을 원하므로 나눠 읽을 이유가 없다.
-    const float2 dfg = gBrdfLut.SampleLevel(gIblSampler,
-        float2(surface.ndotv, rough), 0.0).rg;
-
-    surface.diffuseBase = albedo * (1.0 - metallic) * INV_PI;
-    surface.energyComp  = SpecularEnergyCompensation(surface.f0, dfg);
+    const float3 view = normalize(gEyePosition.xyz - worldPosition);
+    float2 dfg = PbrNeutralDfg();
+    if (gHasIbl != 0u)
+        dfg = gBrdfLut.SampleLevel(gIblSampler,
+            float2(PbrNdotV(normal, view), rough), 0.0).rg;
+    const PbrSurface surface = BuildPbrSurface(worldPosition, normal, view,
+        albedo, rough, metallic, dfg);
 
     float3 lit = float3(0.0);
     for (uint i = 0u; i < gLightCount; ++i)
@@ -249,20 +196,11 @@ float4 PSMain(VSOut input) : SV_TARGET
             const float  distance = length(offset);
             toLight = offset / max(distance, 1e-4);
 
-            attenuation = 1.0 / (light.attenuation.x
-                + light.attenuation.y * distance
-                + light.attenuation.z * distance * distance);
-
-            // 반경 밖은 잘라낸다. 감쇠식만 쓰면 먼 광원이 미세하게 계속
-            // 기여해 광원 수에 비례해 화면이 밝아진다.
-            attenuation *= saturate(1.0 - distance / max(light.attenuation.w, 1e-4));
+            attenuation = PbrLocalLightFalloff(light.attenuation, distance);
 
             if (type == 2u)
             {
-                // 스포트 — 원뿔 밖을 부드럽게 끈다.
-                const float cosAngle = dot(-toLight, normalize(light.direction.xyz));
-                const float cutoff   = cos(light.direction.w * 0.5);
-                attenuation *= smoothstep(cutoff, lerp(cutoff, 1.0, 0.2), cosAngle);
+                attenuation *= PbrSpotFalloff(toLight, light.direction);
             }
         }
 

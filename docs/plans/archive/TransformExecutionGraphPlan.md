@@ -1,5 +1,8 @@
 # (통합됨) Sparse Compiled Transform Execution Graph 제안
 
+> **보관 · 통합됨 (정리: 2026-09-06).** 2026-08-25 TransformUpdatePlan으로 통합된 제안과 절 매핑.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 **이 문서의 내용은 2026-08-25에 [`TransformUpdatePlan.md`](TransformUpdatePlan.md)로
 통합됐다.** 여기서 유지하지 않는다.
 

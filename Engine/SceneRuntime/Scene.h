@@ -306,6 +306,11 @@ public:
 	Scene();
 	~Scene();
 
+    // Incremental construction cannot be captured as an authored scene halfway through.
+    void BeginIncrementalConstruction() { ++m_incrementalConstructions; }
+    void EndIncrementalConstruction() { if (m_incrementalConstructions) --m_incrementalConstructions; }
+    void OnBeforeSerialize() const;
+
 	// Entity의 단독 소유자. 외부에는 프레임 경계를 넘지 않는 raw pointer 또는
 	// EntityHandle만 노출한다. DDOL 이송은 unique_ptr 자체를 Scene 간 이동한다.
 	std::vector<std::unique_ptr<Entity>> m_Entities;
@@ -428,6 +433,7 @@ private:
     // 값이라 저장했다 복원해 봐야 의미가 없다(RenderEngine/Skeleton.h의
     // m_serial과 같은 이유로 직렬화 대상이 아니다).
     const uint32_t m_sceneId;
+    std::uint32_t m_incrementalConstructions{ 0 };
     // 씬 생성마다 단조 증가하는 일련번호 발급. SceneManager::m_scenes에서의
     // 위치(vector index)는 쓰지 않는다 — 씬이 삭제되면 그 위치가 다음 씬에게
     // 재사용돼 ABA가 난다(Skeleton::NextSerial 선례와 같은 사유, 그쪽 주석 참고).

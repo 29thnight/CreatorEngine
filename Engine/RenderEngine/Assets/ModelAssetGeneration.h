@@ -8,6 +8,7 @@
 #include "AssetIdentityProfile.h"
 #include "ModelAssetPhaseTiming.h"
 #include "ModelVertexLayout.h"
+#include "TextureCoordinates.h"
 #include "../RHI/RHIFormat.h"
 
 #include <mathematics/bounds.hpp>
@@ -86,6 +87,12 @@ namespace assets
         Srgb,
     };
 
+    struct ModelMaterialTexture final
+    {
+        ModelTextureHandle handle{};
+        TextureCoordinates coordinates{};
+    };
+
     using ModelMaterialPropertyValue = std::variant<
         bool,
         std::int32_t,
@@ -95,7 +102,7 @@ namespace assets
         math::vector3,
         math::vector4,
         std::string,
-        ModelTextureHandle>;
+        ModelMaterialTexture>;
 
     struct ModelMaterialProperty final
     {
@@ -109,6 +116,7 @@ namespace assets
         Uuid::Uuid16 shaderAssetId{};
         std::string name{};
         bool transparent{};
+        bool masked{};
         std::vector<ModelMaterialProperty> properties{};
         std::vector<std::string> keywords{};
         std::vector<std::uint16_t> keywordSelections{};

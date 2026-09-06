@@ -9,6 +9,7 @@
 #include "../../StandardMaterialProperty.h" // I5-D5c5
 
 #include <algorithm>
+#include <cstring>
 
 namespace ExperimentMaterialSealing
 {
@@ -184,6 +185,51 @@ namespace ExperimentMaterialSealing
         return true;
     }
 
+    bool SealCoverage(const SealSource& source, const ShaderMetaBindingLayout& layout,
+        std::span<const std::uint8_t> bytes, EnhancedMaterialCoverage& outCoverage,
+        std::string& outError)
+    {
+        EnhancedMaterialCoverage coverage;
+        coverage.flags = EnhancedMaterialCoverage::Enabled;
+        switch (source.material.blendMode)
+        {
+        case experiment::MaterialBlendMode::Opaque: break;
+        case experiment::MaterialBlendMode::Masked: coverage.flags |= EnhancedMaterialCoverage::Masked; break;
+        case experiment::MaterialBlendMode::Transparent: coverage.flags |= EnhancedMaterialCoverage::Blended; break;
+        default: outError = "Unknown material coverage mode"; return false;
+        }
+        bool foundDoubleSided = false;
+        for (const auto& property : source.material.properties)
+        {
+            if (property.name != standard_material::property::DoubleSided) continue;
+            const bool* value = std::get_if<bool>(&property.value);
+            if (!value || foundDoubleSided) { outError = "Invalid doubleSided property"; return false; }
+            foundDoubleSided = true;
+            if (*value) coverage.flags |= EnhancedMaterialCoverage::DoubleSided;
+        }
+        if (coverage.flags & EnhancedMaterialCoverage::Masked)
+        {
+            const auto read = [&](std::string_view name, ShaderPropertyType type,
+                uint32_t component, float& value) {
+                for (const auto& binding : layout.properties)
+                {
+                    if (binding.name != name || binding.propertyType != type) continue;
+                    const std::size_t offset = binding.byteOffset + component * sizeof(float);
+                    if (offset + sizeof(float) > bytes.size()) return false;
+                    std::memcpy(&value, bytes.data() + offset, sizeof(float));
+                    return true;
+                }
+                return false;
+            };
+            if (!read(standard_material::property::AlphaCutoff, ShaderPropertyType::Float, 0, coverage.cutoff)
+                || !read(standard_material::property::BaseColor, ShaderPropertyType::Float4, 3, coverage.baseAlpha))
+            { outError = "Masked material lacks baseColor/alphaCutoff bindings"; return false; }
+        }
+        if (!coverage.IsValid()) { outError = "Invalid material coverage values"; return false; }
+        outCoverage = coverage;
+        return true;
+    }
+
     bool SealCore(const SealSource& source, const ShaderMeta& meta,
         const ShaderMetaBindingLayout& layout,
         std::vector<std::uint8_t>& outPropertyBytes,
@@ -264,6 +310,9 @@ namespace ExperimentMaterialSealing
                     std::get_if<experiment::TextureReference>(&authored->value))
                 {
                     binding.textureGuid.m_guid = reference->assetId.value;
+                    binding.coordinates = reference->coordinates;
+                    if (!binding.coordinates.IsValid())
+                    { outError = "Invalid texture UV set/transform: " + property.name; return false; }
                 }
             }
             else if (const auto* defaultGuid =

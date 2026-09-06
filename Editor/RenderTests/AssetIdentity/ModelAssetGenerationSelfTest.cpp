@@ -212,11 +212,11 @@ namespace RenderTest
                 "MaterialId 직접 조회 " + material.name);
             for (const assets::ModelMaterialProperty& property : material.properties)
             {
-                const auto* texture = std::get_if<assets::ModelTextureHandle>(
+                const auto* texture = std::get_if<assets::ModelMaterialTexture>(
                     &property.value);
-                if (!texture || texture->generation == 0u) continue;
-                check.Check(texture->generation == second->Identity().generation
-                    && second->FindTexture(texture->textureId) != nullptr,
+                if (!texture || texture->handle.generation == 0u) continue;
+                check.Check(texture->handle.generation == second->Identity().generation
+                    && second->FindTexture(texture->handle.textureId) != nullptr,
                     "embedded texture handle가 같은 generation을 가리킴 "
                         + property.name);
             }
@@ -443,11 +443,11 @@ namespace RenderTest
             {
                 for (const assets::ModelMaterialProperty& property : material.properties)
                 {
-                    const auto* texture = std::get_if<assets::ModelTextureHandle>(
+                    const auto* texture = std::get_if<assets::ModelMaterialTexture>(
                         &property.value);
-                    if (!texture || texture->generation == 0u) continue;
-                    check.Check(texture->generation == generation->Identity().generation
-                        && generation->FindTexture(texture->textureId) != nullptr,
+                    if (!texture || texture->handle.generation == 0u) continue;
+                    check.Check(texture->handle.generation == generation->Identity().generation
+                        && generation->FindTexture(texture->handle.textureId) != nullptr,
                         "corpus embedded texture handle " + source.filename().string()
                             + "/" + property.name);
                 }

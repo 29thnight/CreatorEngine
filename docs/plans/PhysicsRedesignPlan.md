@@ -1,7 +1,7 @@
 # 물리 재설계 — 컴포넌트·백엔드·스레딩 전면 재작성 (PHASE 19)
 
 수립일: 2026-08-18 · 근거: 같은 날 물리 계층 전수 조사
-관련: [SceneGraphRedesignPlan](SceneGraphRedesignPlan.md)(트랙 S 순서 제약) · [SerializationPlan](SerializationPlan.md)(마이그레이션) · [EngineLayerSeparationPlan](EngineLayerSeparationPlan.md)(계층 침범) · [NetworkFrameworkPlan](NetworkFrameworkPlan.md)(고정 Simulation Tick·prediction 경계)
+관련: [SceneGraphRedesignPlan](archive/SceneGraphRedesignPlan.md)(트랙 S 순서 제약) · [SerializationPlan](SerializationPlan.md)(마이그레이션) · [EngineLayerSeparationPlan](EngineLayerSeparationPlan.md)(계층 침범) · [NetworkFrameworkPlan](NetworkFrameworkPlan.md)(고정 Simulation Tick·prediction 경계)
 
 ---
 

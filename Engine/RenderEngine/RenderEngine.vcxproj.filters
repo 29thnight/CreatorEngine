@@ -845,6 +845,9 @@
     <ClInclude Include="Assets\ModelVertexLayout.h">
       <Filter>Header Files\RenderEngine\Assets</Filter>
     </ClInclude>
+    <ClInclude Include="Assets\TextureCoordinates.h">
+      <Filter>Header Files\RenderEngine\Assets</Filter>
+    </ClInclude>
     <ClInclude Include="Experiment\VertexLayout.h">
       <Filter>Resources\Model\Experiment</Filter>
     </ClInclude>
@@ -938,7 +941,13 @@
     <ClInclude Include="Render\Scene\EnhancedSceneRenderer.h">
       <Filter>Render\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Render\Scene\EnhancedPbrCapture.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="Render\Scene\ExperimentMaterialSealing.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Scene\MaterialTextureTable.h">
       <Filter>Render\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Render\Scene\EnhancedSceneRendererLiveDX12Adapter.h">

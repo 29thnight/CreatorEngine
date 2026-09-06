@@ -9,6 +9,9 @@
 
 #include <array>
 #include <cstdio>
+#include <cstring>
+#include <limits>
+#include "Experiment/Import/SceneToModelDraft.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -138,6 +141,8 @@ namespace RenderTest
                 MaterialPropertyValue albedo;
                 albedo.m_name = "albedoMap";
                 albedo.m_textureGuid = authoredAlbedo;
+                albedo.m_textureUvSet = 1; albedo.m_textureUvOffset = {.25f, -.5f};
+                albedo.m_textureUvScale = {-2.f, .75f}; albedo.m_textureUvRotation = .4f;
                 legacy.m_propertyValues = { baseColor, metallic, albedo };
             }
             auto owner = std::make_shared<Texture>();
@@ -153,6 +158,7 @@ namespace RenderTest
                     "binding property/register 보존");
                 check.Check(bindings[0].textureOwner == owner,
                     "generation owner 보존");
+                check.Check(bindings[0].coordinates == assets::TextureCoordinates{1, {.25f, -.5f}, {-2.f, .75f}, .4f}, "UV metadata sealing");
                 check.Check(bindings[0].textureGuid == authoredAlbedo,
                     "저작 texture GUID 보존");
             }
@@ -196,6 +202,80 @@ namespace RenderTest
                 "keyword 정규화 (" + error + ")");
             check.Check(selections == std::vector<std::uint16_t>{ 1, 0 },
                 "legacy 인덱스 선택이 그대로 정규화된다");
+        }
+
+
+        // W4: coverage is sealed from reflected owned bytes, independent of
+        // legacy scalar mirrors and the material constant-buffer sentinel.
+        {
+            ExperimentMaterialSealing::SealSource source;
+            source.material.blendMode = experiment::MaterialBlendMode::Masked;
+            source.material.properties = {{"doubleSided", true}};
+            auto layout = contract.layout;
+            layout.properties.push_back(CbBinding("alphaCutoff", ShaderPropertyType::Float, 24, 4));
+            std::vector<uint8_t> bytes(32);
+            float alpha = .25f, cutoff = .125f;
+            std::memcpy(bytes.data() + 12, &alpha, 4);
+            std::memcpy(bytes.data() + 24, &cutoff, 4);
+            EnhancedMaterialCoverage coverage;
+            std::string error;
+            const auto seal = [&] { error.clear(); return ExperimentMaterialSealing::SealCoverage(
+                source, layout, bytes, coverage, error); };
+            check.Check(seal() && coverage.flags == 11 && coverage.cutoff == cutoff
+                && coverage.baseAlpha == alpha, "W4 reflected MASK/alpha/doubleSided seal");
+            source.material.properties[0].value = false;
+            check.Check(seal() && coverage.flags == 3, "W4 doubleSided false override");
+            source.material.properties[0].value = 1.f;
+            check.Check(!seal(), "W4 non-bool doubleSided rejected");
+            source.material.properties[0].value = true;
+            source.material.properties.push_back(source.material.properties[0]);
+            check.Check(!seal(), "W4 duplicate coverage property rejected");
+            source.material.properties.pop_back();
+            cutoff = std::numeric_limits<float>::quiet_NaN();
+            std::memcpy(bytes.data() + 24, &cutoff, 4);
+            check.Check(!seal(), "W4 nonfinite cutoff rejected");
+            cutoff = 1.1f; std::memcpy(bytes.data() + 24, &cutoff, 4);
+            check.Check(!seal(), "W4 out-of-range cutoff rejected");
+            bytes.resize(16);
+            check.Check(!seal(), "W4 truncated material bytes rejected");
+            source.material.blendMode = experiment::MaterialBlendMode::Opaque;
+            check.Check(seal() && coverage.flags == 9, "W4 OPAQUE ignores cutoff");
+            source.material.blendMode = experiment::MaterialBlendMode::Transparent;
+            check.Check(seal() && coverage.flags == 13, "W4 BLEND policy");
+            source.material.blendMode = static_cast<experiment::MaterialBlendMode>(255);
+            check.Check(!seal(), "W4 invalid alpha mode rejected");
+        }
+        {
+            experiment::importer::ImportedScene scene;
+            scene.nodes.emplace_back();
+            scene.materials.resize(3);
+            scene.materials[0].alphaMode = experiment::importer::AlphaMode::Mask;
+            scene.materials[0].alphaCutoff = .375f;
+            scene.materials[0].emissiveStrength = 8.f;
+            scene.materials[0].doubleSided = true;
+            scene.materials[1].alphaMode = experiment::importer::AlphaMode::Blend;
+            const auto converted = experiment::importer::ConvertToModelDraft(scene, {});
+            const bool ok = converted.draft && converted.draft->materials.size() == 3;
+            check.Check(ok, "W4 source material conversion");
+            if (ok)
+            {
+                const auto& materials = converted.draft->materials;
+                check.Check(materials[0].blendMode == experiment::MaterialBlendMode::Masked
+                    && materials[1].blendMode == experiment::MaterialBlendMode::Transparent
+                    && materials[2].blendMode == experiment::MaterialBlendMode::Opaque,
+                    "W4 importer preserves all alpha modes");
+                bool cutoff = false, sided = false;
+                for (const auto& property : materials[0].properties)
+                {
+                    if (property.name == "alphaCutoff") cutoff = std::get<float>(property.value) == .375f;
+                    if (property.name == "doubleSided") sided = std::get<bool>(property.value);
+                }
+                check.Check(cutoff && sided, "W4 importer preserves cutoff and doubleSided");
+                bool strength = false;
+                for (const auto& property : materials[0].properties)
+                    if (property.name == "emissiveStrength") strength = std::get<float>(property.value) == 8.f;
+                check.Check(strength, "W6 importer preserves HDR emissive strength");
+            }
         }
 
         char summary[160]{};

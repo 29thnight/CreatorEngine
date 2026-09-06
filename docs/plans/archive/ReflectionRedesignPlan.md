@@ -1,6 +1,9 @@
 # 컴파일타임 리플렉션 전환 — 헤더툴 은퇴와 typed 방문 계약 (PHASE 18)
 
-2026-08-16. 근거: [ReflectionSystemAnalysis.md](../analysis/ReflectionSystemAnalysis.md)(전수 실측 분석 — 병폐·비용·죽은
+> **보관 · 완료 (정리: 2026-09-06).** PHASE 18 CT0~CT11 종료. 매크로 없는 reflect()/meta::schema 계약과 검증 기록을 보존한다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
+2026-08-16. 근거: [ReflectionSystemAnalysis.md](../../analysis/ReflectionSystemAnalysis.md)(전수 실측 분석 — 병폐·비용·죽은
 코드 목록은 그 문서가 정본, 여기 반복하지 않는다). 방향 결정: "qlibs/reflect
 **류의 설계**로 전환" — 라이브러리 채택이 아니라 자작 컴파일타임 리플렉션이며,
 기법은 집합체 제약이 없는 **멤버 포인터 튜플 명시 메타**(glaze식)를 정본으로,

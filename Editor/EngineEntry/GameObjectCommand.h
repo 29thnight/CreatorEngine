@@ -2,9 +2,6 @@
 #include "MetaStateCommand.h"
 #include <functional>
 #include "Scene.h"
-#include "ModelSceneInstantiation.h" // MBC9: generation 인스턴스화
-#include "DataSystem.h"
-#include "Assets/ModelAssetGeneration.h"
 #include "SceneManager.h"
 #include "Entity.h"
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
@@ -226,43 +223,5 @@ namespace Meta
         std::vector<DuplicateGameObjectCommand> m_commands{};
     };
 
-    class LoadModelToSceneObjCommand : public IUndoableCommand
-    {
-    public:
-        LoadModelToSceneObjCommand(Scene* scene,
-            std::shared_ptr<const assets::ModelAssetGeneration> generation,
-            Entity** outObj = nullptr)
-            : m_scene(scene), m_generation(std::move(generation)), m_outObj(outObj) {
-        }
 
-        void Undo() override
-        {
-            resetSelectedObjectEvent.Broadcast();
-            if (Entity::IsValidIndex(m_rootIndex))
-            {
-                m_scene->DestroyEntity(m_rootIndex);
-            }
-        }
-
-        void Redo() override
-        {
-            Entity* obj = nullptr;
-            if (m_generation && m_scene)
-            {
-                ModelSceneInstantiation::Options options{};
-                options.createMeshCollider = DataSystems->ReadModelCreateMeshCollider(
-                    FileGuid(m_generation->Identity().modelId));
-                obj = ModelSceneInstantiation::Instantiate(*m_scene, m_generation, options);
-            }
-            m_rootIndex = obj ? obj->m_index : Entity::INVALID_INDEX;
-            if (m_outObj)
-                *m_outObj = obj;
-        }
-
-    private:
-        Scene* m_scene{};
-        std::shared_ptr<const assets::ModelAssetGeneration> m_generation{};
-        Entity::Index m_rootIndex{ Entity::INVALID_INDEX };
-        Entity** m_outObj{};
-    };
 }

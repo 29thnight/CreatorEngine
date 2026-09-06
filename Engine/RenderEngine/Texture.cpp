@@ -67,6 +67,7 @@ namespace
 		case DXGI_FORMAT_BC1_UNORM:           return RHIFormat::BC1Unorm;
 		case DXGI_FORMAT_BC1_UNORM_SRGB:      return RHIFormat::BC1UnormSrgb;
 		case DXGI_FORMAT_BC3_UNORM:           return RHIFormat::BC3Unorm;
+        case DXGI_FORMAT_BC3_UNORM_SRGB:      return RHIFormat::BC3UnormSrgb;
 		default:                              return RHIFormat::Unknown;
 		}
 	}
@@ -284,10 +285,43 @@ TextureImageView Texture::GetImageView() const
 {
 	if (!m_codecImage || m_codecImage->subresources.empty()) return {};
 	const CodecImage& codec = *m_codecImage;
-	return TextureImageView(codec.format, codec.width, codec.height,
+	return TextureImageView(m_samplingFormat == RHIFormat::Unknown ? codec.format : m_samplingFormat,
+        codec.width, codec.height,
 		codec.mipLevels, codec.arraySize, codec.isCube,
 		codec.subresources.data(),
 		static_cast<uint32_t>(codec.subresources.size()));
+}
+
+std::shared_ptr<Texture> Texture::WithColorSpace(
+    const std::shared_ptr<Texture>& source, bool srgb)
+{
+    if (!source || source->GetImageView().IsEmpty()) return nullptr;
+    const auto format = source->GetImageView().Format();
+    RHIFormat target = format;
+    switch (format)
+    {
+    case RHIFormat::RGBA8Unorm: case RHIFormat::RGBA8UnormSrgb:
+        target = srgb ? RHIFormat::RGBA8UnormSrgb : RHIFormat::RGBA8Unorm; break;
+    case RHIFormat::BGRA8Unorm: case RHIFormat::BGRA8UnormSrgb:
+        target = srgb ? RHIFormat::BGRA8UnormSrgb : RHIFormat::BGRA8Unorm; break;
+    case RHIFormat::BC1Unorm: case RHIFormat::BC1UnormSrgb:
+        target = srgb ? RHIFormat::BC1UnormSrgb : RHIFormat::BC1Unorm; break;
+    case RHIFormat::BC3Unorm: case RHIFormat::BC3UnormSrgb:
+        target = srgb ? RHIFormat::BC3UnormSrgb : RHIFormat::BC3Unorm; break;
+    // Floating-point HDR images are already linear radiance.
+    case RHIFormat::RGBA16Float: case RHIFormat::RGBA32Float: break;
+    default: if (srgb) return nullptr; break;
+    }
+    if (target == format) return source;
+    auto texture = std::make_shared<Texture>();
+    texture->m_codecImage = source->m_codecImage;
+    texture->m_samplingFormat = target;
+    texture->m_textureType = source->m_textureType;
+    texture->m_name = source->m_name;
+    texture->m_extension = source->m_extension;
+    texture->m_size = source->m_size;
+    texture->m_isTextureAlpha = source->m_isTextureAlpha;
+    return texture;
 }
 
 //static functions
@@ -494,15 +528,7 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 		return nullptr;
 	}
 
-	file::path preparePath{};
-	if (file::exists(matPath))
-	{
-		preparePath = matPath;
-	}
-	else
-	{
-		preparePath = path;
-	}
+	const file::path preparePath = file::exists(path) ? path : matPath;
 
 	ScratchImage image{};
 	TexMetadata metadata{};
@@ -858,6 +884,7 @@ bool Texture::DecodeToRgba8(std::span<const std::byte> bytes,
 Texture::Texture(Texture&& texture) noexcept
 {
 	m_codecImage = std::move(texture.m_codecImage);
+    m_samplingFormat = texture.m_samplingFormat;
 	m_assetId = texture.m_assetId;
 	m_textureType = texture.m_textureType;
 	m_name = std::move(texture.m_name);

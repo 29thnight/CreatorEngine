@@ -1,3 +1,4 @@
+#include "EditorModelPlacement.h"
 #include "HierarchyWindow.h"
 #include "ReflectionUndo.h"
 #include "SpriteRenderer.h"
@@ -205,10 +206,7 @@ HierarchyWindow::HierarchyWindow()
 
 					if (scene)
 					{
-						Meta::UndoManager::GetInstance()->Execute(
-							std::make_unique<Meta::LoadModelToSceneObjCommand>(
-								scene,
-								DataSystems->LoadModelAssetGenerationByPath(filepath.string())));
+                        Editor::ModelPlacement::Get().Execute(scene->GetSceneId(), filepath.string());
 					}
 				}
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))

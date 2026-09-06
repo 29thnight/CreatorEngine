@@ -179,7 +179,7 @@ namespace RenderTest
                     return meta;
                 };
             services.loadTexture =
-                [](const std::filesystem::path&, bool)
+                [](const std::filesystem::path&, bool, experiment::TextureColorSpace)
                 {
                     return std::make_shared<Texture>();
                 };

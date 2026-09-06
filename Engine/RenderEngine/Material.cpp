@@ -55,6 +55,7 @@ Material::Material(const Material& material) :
     m_keywordSelections(material.m_keywordSelections),
     m_fileGuid(material.m_fileGuid),
     m_renderingMode(material.m_renderingMode),
+    m_doubleSided(material.m_doubleSided),
     m_cbufferValues(material.m_cbufferValues),
     m_runtimeSchema(material.m_runtimeSchema),
 	m_shaderMetaHandle(material.m_shaderMetaHandle),
@@ -74,6 +75,7 @@ Material::Material(Material&& material) noexcept
     std::exchange(m_EmissiveTexName, material.m_EmissiveTexName);
     m_materialGuid = std::move(material.m_materialGuid);
     m_renderingMode = std::move(material.m_renderingMode);
+    m_doubleSided = material.m_doubleSided;
     m_materialInfo = std::move(material.m_materialInfo);
     m_flowInfo = std::move(material.m_flowInfo);
     m_shaderMetaGuid = std::exchange(material.m_shaderMetaGuid, {});

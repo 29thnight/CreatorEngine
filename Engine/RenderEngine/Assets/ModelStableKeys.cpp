@@ -103,6 +103,8 @@ namespace assets
             fp.F32(slot.tiling.x); fp.F32(slot.tiling.y);
             fp.U32(static_cast<std::uint32_t>(slot.wrapU));
             fp.U32(static_cast<std::uint32_t>(slot.wrapV));
+            // Preserve existing fingerprints for identity/default rotations.
+            if (slot.rotation != 0.f) { fp.Tag("uv.rotation"); fp.F32(slot.rotation); }
         }
 
         [[nodiscard]] std::string TextureFingerprint(const im::ImportedTexture& texture)

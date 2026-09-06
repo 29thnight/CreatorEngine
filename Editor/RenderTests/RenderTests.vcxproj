@@ -143,6 +143,7 @@
     <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\PbrShaderParityTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanIBLTest.cpp" />

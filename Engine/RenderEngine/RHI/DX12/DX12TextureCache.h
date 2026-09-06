@@ -127,7 +127,7 @@ public:
     /// ORM에 흰색이면 B(금속)가 1이라 확산이 통째로 죽는다(IBL 소비 검증이
     /// '끔=검정' 대조군으로 잡았다). 프레임이 열려 있어야 한다(첫 호출 생성).
     Entry GetBlackTexture(std::string& outError) override;
-    Entry GetOrmNeutralTexture(std::string& outError) override;   // (occ 1 · rough 1 · metal 0)
+    Entry GetOrmNeutralTexture(std::string& outError) override;   // Multiplicative identity (1, 1, 1).
 
     // ── 미사용 기반 은퇴 (자산 상주 관리 ③) ──
     //

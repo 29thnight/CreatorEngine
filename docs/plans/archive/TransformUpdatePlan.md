@@ -1,5 +1,8 @@
 # Transform 갱신 구조·성능 재설계 (PHASE 8.75)
 
+> **보관 · 완료·선택 중단 (정리: 2026-09-06).** PHASE 8.75 X0~X8 완료, X9 선택 확장 중단. Windows 제품 TSan 미지원 등 검증 경계는 원문 그대로 유지한다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 신설: 2026-08-25.
 **개정: 2026-08-25 — `TransformExecutionGraphPlan.md`(Sparse Compiled Transform
 Execution Graph 제안)를 이 문서로 통합했다.** 1차 실행 계획 T0~T5는 폐기하고

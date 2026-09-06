@@ -498,11 +498,11 @@ namespace RenderTest
             if (!material.shaderAssetId.IsNil()) ++shaderEdges;
             for (const assets::ModelMaterialProperty& property : material.properties)
             {
-                const auto* handle = std::get_if<assets::ModelTextureHandle>(&property.value);
-                if (nullptr == handle || handle->textureId.IsNil()) continue;
+                const auto* handle = std::get_if<assets::ModelMaterialTexture>(&property.value);
+                if (nullptr == handle || handle->handle.textureId.IsNil()) continue;
                 ++textureEdges;
-                referencedTextures.insert(handle->textureId);
-                if (!embeddedIds.contains(handle->textureId)) unresolvedTexture = true;
+                referencedTextures.insert(handle->handle.textureId);
+                if (!embeddedIds.contains(handle->handle.textureId)) unresolvedTexture = true;
             }
         }
         check.Check(materials == product.materialCount,

@@ -1,7 +1,6 @@
 #include "ModelSceneInstantiation.h"
 
-#include "Scene.h" // MeshCollider.h가 완전한 Scene을 전제한다 — 먼저 든다
-#include "SceneManager.h"
+#include "Scene.h"
 #include "Animator.h"
 #include "BoneComponent.h"
 #include "DataSystem.h"
@@ -10,245 +9,307 @@
 #include "Material.h"
 #include "MeshCollider.h"
 #include "MeshRenderer.h"
-#include "ModelConsumptionDiagnostics.h" // MBC10
+#include "ModelConsumptionDiagnostics.h"
 #include "RigidBodyComponent.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "Experiment/ModelData.h"
 
 #include <algorithm>
-#include <cstdio>
-#include <span>
+#include <limits>
+#include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace ModelSceneInstantiation
 {
-	namespace
-	{
-		[[nodiscard]] std::uint32_t IndexOfMesh(
-			std::span<const assets::ModelMeshAsset> meshes, const Uuid::Uuid16& meshId) noexcept
-		{
-			for (std::size_t index = 0; index < meshes.size(); ++index)
-			{
-				if (meshes[index].meshId == meshId) return static_cast<std::uint32_t>(index);
-			}
-			return assets::kInvalidModelAssetIndex;
-		}
+    struct PendingInstance::Impl
+    {
+        struct ObjectRecipe
+        {
+            std::string name;
+            std::size_t parent{ 0 };
+            std::uint32_t mesh{ assets::kInvalidModelAssetIndex };
+            math::matrix4x4 transform{ math::matrix4x4::identity() };
+            bool writeTransform{ false };
+            bool bone{ false };
+            GameObjectType type{ GameObjectType::Mesh };
+        };
+        std::shared_ptr<const assets::ModelAssetGeneration> generation;
+        Options options;
+        std::vector<ObjectRecipe> objects;
+        std::vector<std::shared_ptr<Material>> materials;
+        std::vector<std::shared_ptr<const experiment::Material>> authored;
+        std::vector<std::uint32_t> meshMaterials;
+        std::vector<EntityHandle> handles;
+        std::vector<std::size_t> renderers;
+        std::size_t created{ 0 };
+        std::size_t activated{ 0 };
+        bool animatorReady{ false };
+        bool hasBones{ false };
+        std::uint32_t constructionScene{ 0 };
+        Status status{ Status::Building };
+    };
 
-		[[nodiscard]] std::uint32_t IndexOfMaterial(
-			std::span<const assets::ModelMaterialAsset> materials,
-			const Uuid::Uuid16& materialId) noexcept
-		{
-			for (std::size_t index = 0; index < materials.size(); ++index)
-			{
-				if (materials[index].materialId == materialId)
-					return static_cast<std::uint32_t>(index);
-			}
-			return assets::kInvalidModelAssetIndex;
-		}
+    PendingInstance::PendingInstance(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
+    PendingInstance::~PendingInstance() = default;
 
-		// generation의 immutable material → renderer 소유 runtime Material. 값은
-		// 1:1이고 embedded texture owner는 BindModelGeneration이 같은 closure에서
-		// 묶는다. 변환 실패는 빈 재질이다 — 지어낸 재질로 조용히 그리지 않는다.
-		[[nodiscard]] std::shared_ptr<Material> MakeRuntimeMaterial(
-			const assets::ModelAssetGeneration& generation, std::uint32_t materialIndex)
-		{
-			const auto materials = generation.Materials();
-			if (materialIndex >= materials.size()) return nullptr;
-			experiment::Material converted;
-			ExperimentMaterialMigration::ConvertModelMaterialAsset(
-				materials[materialIndex], generation, converted);
-			auto material = std::make_shared<Material>();
-			std::string error;
-			if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(
-				converted, nullptr, *material, error))
-			{
-				Debug->LogWarning("generation 재질 변환 실패 — 빈 재질로 세운다: " + error);
-				return nullptr;
-			}
-			DataSystems->FinalizeMaterialRuntime(*material);
-			return material;
-		}
-	}
+    std::unique_ptr<PendingInstance> PendingInstance::Prepare(
+        std::shared_ptr<const assets::ModelAssetGeneration> generation, const Options& options)
+    {
+        const auto reject = []() -> std::unique_ptr<PendingInstance>
+        {
+            ModelConsumptionDiagnostics::NoteInstantiateRejected();
+            return {};
+        };
+        if (!generation) return reject();
+        const auto nodes = generation->Nodes();
+        const auto meshes = generation->Meshes();
+        const auto materials = generation->Materials();
+        if (nodes.empty() || nodes[0].parent != assets::kInvalidModelAssetIndex)
+            return reject();
 
-	Entity* Instantiate(Scene& scene,
-		const std::shared_ptr<const assets::ModelAssetGeneration>& generation,
-		const Options& options)
-	{
-		if (!generation) return nullptr;
-		const std::span<const assets::ModelNodeAsset> nodes = generation->Nodes();
-		const std::span<const assets::ModelMeshAsset> meshes = generation->Meshes();
-		const std::span<const assets::ModelMaterialAsset> materials = generation->Materials();
-		if (nodes.empty() || assets::kInvalidModelAssetIndex != nodes[0].parent)
-		{
-			ModelConsumptionDiagnostics::NoteInstantiateRejected();
-			return nullptr;
-		}
+        auto impl = std::make_unique<Impl>();
+        impl->generation = std::move(generation);
+        impl->options = options;
+        const auto* skeleton = impl->generation->Skeleton();
+        impl->hasBones = skeleton && !skeleton->bones.empty()
+            && skeleton->rootBone < skeleton->bones.size();
+        std::map<Uuid::Uuid16, std::uint32_t> meshIndices;
+        std::map<Uuid::Uuid16, std::uint32_t> materialIndices;
+        for (std::uint32_t i = 0; i < meshes.size(); ++i) meshIndices.emplace(meshes[i].meshId, i);
+        for (std::uint32_t i = 0; i < materials.size(); ++i) materialIndices.emplace(materials[i].materialId, i);
+        impl->meshMaterials.resize(meshes.size(), assets::kInvalidModelAssetIndex);
+        for (std::size_t i = 0; i < meshes.size(); ++i)
+            if (auto found = materialIndices.find(meshes[i].materialId); found != materialIndices.end())
+                impl->meshMaterials[i] = found->second;
 
-		// 전부 만들기 전에 계약을 검증한다 — 반쪽 시공 금지.
-		for (std::size_t nodeIndex = 0; nodeIndex < nodes.size(); ++nodeIndex)
-		{
-			const assets::ModelNodeAsset& node = nodes[nodeIndex];
-			if (0 != nodeIndex && (assets::kInvalidModelAssetIndex == node.parent
-				|| node.parent >= nodeIndex))
-			{
-				ModelConsumptionDiagnostics::NoteInstantiateRejected();
-				return nullptr;
-			}
-			for (const Uuid::Uuid16& meshId : node.meshes)
-			{
-				if (assets::kInvalidModelAssetIndex == IndexOfMesh(meshes, meshId))
-				{
-					ModelConsumptionDiagnostics::NoteInstantiateRejected();
-					return nullptr;
-				}
-			}
-		}
+        // 기존 계층 규약을 작업 스레드에서 평탄화한다. 부모는 항상 먼저 만들어진다.
+        impl->objects.push_back({ impl->generation->Name() });
+        std::unordered_map<std::string, std::size_t> boneCandidates;
+        boneCandidates.emplace(impl->generation->Name(), 0);
+        std::vector<std::size_t> attachPoints(nodes.size());
+        for (std::size_t i = 0; i < nodes.size(); ++i)
+        {
+            const auto& node = nodes[i];
+            if (i != 0 && node.parent >= i) return reject();
+            std::size_t parent = i == 0 ? 0 : attachPoints[node.parent];
+            for (const auto& meshId : node.meshes)
+            {
+                auto mesh = meshIndices.find(meshId);
+                if (mesh == meshIndices.end()) return reject();
+                if (nodes.size() == 1 && node.meshes.size() == 1)
+                {
+                    auto& root = impl->objects[0];
+                    root.mesh = mesh->second;
+                    root.transform = node.localTransform;
+                    root.writeTransform = true;
+                }
+                else
+                {
+                    impl->objects.push_back({ node.name, parent, mesh->second,
+                        node.localTransform, true });
+                    parent = impl->objects.size() - 1;
+                }
+            }
+            if (i != 0 && node.meshes.empty())
+            {
+                impl->objects.push_back({ node.name, parent, assets::kInvalidModelAssetIndex,
+                    node.localTransform, true });
+                parent = impl->objects.size() - 1;
+                boneCandidates.try_emplace(node.name, parent);
+            }
+            attachPoints[i] = parent;
+        }
+        if (impl->hasBones)
+        {
+            std::vector<std::size_t> boneAttach(skeleton->bones.size());
+            for (std::size_t i = 0; i < skeleton->bones.size(); ++i)
+            {
+                if (i == skeleton->rootBone) continue;
+                const auto& bone = skeleton->bones[i];
+                if (bone.parent != assets::kInvalidModelAssetIndex && bone.parent >= i)
+                    return reject();
+                const auto found = boneCandidates.find(bone.name);
+                std::size_t object;
+                if (found != boneCandidates.end()) object = found->second;
+                else
+                {
+                    object = impl->objects.size();
+                    const std::size_t parent = bone.parent < boneAttach.size() ? boneAttach[bone.parent] : 0;
+                    impl->objects.push_back({ bone.name, parent, assets::kInvalidModelAssetIndex,
+                        math::matrix4x4::identity(), false, true, GameObjectType::Bone });
+                }
+                impl->objects[object].bone = true;
+                boneAttach[i] = object;
+            }
+        }
+        for (std::size_t i = 0; i < impl->objects.size(); ++i)
+        {
+            if (impl->objects[i].name.empty()) return reject();
+            if (impl->objects[i].mesh != assets::kInvalidModelAssetIndex) impl->renderers.push_back(i);
+        }
 
-		const assets::ModelSkeletonAsset* skeleton = generation->Skeleton();
-		const bool hasBones = nullptr != skeleton && !skeleton->bones.empty()
-			&& skeleton->rootBone < skeleton->bones.size();
-		const std::string modelName = generation->Name();
+        // 재질 변환, 외부 이미지 디코드/압축, embedded 이미지 owner 생성을 모두
+        // 씬 생성 전에 끝낸다. mutable Material은 이 인스턴스만 소유한다.
+        impl->materials.resize(materials.size());
+        impl->authored.resize(materials.size());
+        for (const std::size_t objectIndex : impl->renderers)
+        {
+            const auto index = impl->meshMaterials[impl->objects[objectIndex].mesh];
+            if (index >= materials.size() || impl->materials[index]) continue;
+            auto converted = std::make_shared<experiment::Material>();
+            ExperimentMaterialMigration::ConvertModelMaterialAsset(materials[index], *impl->generation, *converted);
+            auto material = std::make_shared<Material>();
+            std::string error;
+            if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(*converted, nullptr, *material, error))
+                return reject();
+            DataSystems->FinalizeMaterialRuntime(*material);
+            DataSystems->BindModelGenerationTextures(*material, *impl->generation);
+            impl->materials[index] = std::move(material);
+            if (!materials[index].shaderAssetId.IsNil()) impl->authored[index] = std::move(converted);
+        }
+        impl->handles.resize(impl->objects.size());
+        return std::unique_ptr<PendingInstance>(new PendingInstance(std::move(impl)));
+    }
 
-		// 같은 재질을 여러 메시가 공유한다 — renderer마다 새로 변환하지 않는다.
-		std::vector<std::shared_ptr<Material>> runtimeMaterials(materials.size());
-		std::vector<bool> materialBuilt(materials.size(), false);
-		const auto materialFor = [&](const Uuid::Uuid16& materialId) -> std::shared_ptr<Material>
-		{
-			const std::uint32_t index = IndexOfMaterial(materials, materialId);
-			if (index >= materials.size()) return nullptr;
-			if (!materialBuilt[index])
-			{
-				runtimeMaterials[index] = MakeRuntimeMaterial(*generation, index);
-				materialBuilt[index] = true;
-			}
-			return runtimeMaterials[index];
-		};
+    PendingInstance::Status PendingInstance::Advance(Scene& scene, std::size_t maxSteps,
+        std::chrono::microseconds budget, std::size_t maxRendererActivations)
+    {
+        auto& state = *m_impl;
+        if (state.status != Status::Building) return state.status;
+        if (!state.constructionScene)
+        {
+            scene.BeginIncrementalConstruction();
+            state.constructionScene = scene.GetSceneId();
+        }
+        const auto deadline = std::chrono::steady_clock::now() + budget;
+        std::size_t steps = 0;
+        std::size_t activations = 0;
+        const auto fail = [&]()
+        {
+            Cancel(scene);
+            state.status = Status::Failed;
+            ModelConsumptionDiagnostics::NoteInstantiateRejected();
+            return state.status;
+        };
+        if (state.created && (!scene.Resolve(Root()) || scene.Resolve(Root())->IsDestroyMark())) return fail();
+        while (steps < maxSteps && (steps == 0 || std::chrono::steady_clock::now() < deadline))
+        {
+            if (state.created < state.objects.size())
+            {
+                const std::size_t index = state.created;
+                const auto& recipe = state.objects[index];
+                Entity* parent = index == 0 ? nullptr : scene.Resolve(state.handles[recipe.parent]);
+                if (index != 0 && (!parent || parent->IsDestroyMark())) return fail();
+                Entity* object = scene.CreateEntity(recipe.name, recipe.type,
+                    parent ? parent->m_index : Entity::kSceneRootIndex);
+                if (!object) return fail();
+                state.handles[index] = scene.HandleOf(object->m_index);
+                ++state.created; // 이후 단계가 실패해도 생성된 범위를 회수한다.
+                if (recipe.writeTransform)
+                    object->Transform_().SetLocalMatrix(recipe.transform, TransformWriteReason::ModelImport);
+                if (recipe.bone)
+                {
+                    object->AddComponent<BoneComponent>();
+                    object->SetRootIndex(state.handles[0].index);
+                }
+                if (recipe.mesh != assets::kInvalidModelAssetIndex)
+                {
+                    auto* renderer = object->AddComponent<MeshRenderer>();
+                    renderer->SetEnabled(false);
+                    renderer->m_isSkinnedMesh = state.hasBones;
+                    // 새 renderer는 아직 재질이 없다. 텍스처 owner가 준비된 재질을
+                    // 뒤에 붙여, 이 스레드에서 이미지 캐시 miss를 처리하지 않는다.
+                    if (!renderer->BindModelGeneration(state.generation, recipe.mesh)) return fail();
+                    const auto materialIndex = state.meshMaterials[recipe.mesh];
+                    if (materialIndex < state.materials.size())
+                    {
+                        renderer->SetMaterial(state.materials[materialIndex]);
+                        renderer->SetExperimentMaterialBase(state.authored[materialIndex]);
+                    }
+                }
+            }
+            else if (!state.animatorReady)
+            {
+                if (state.hasBones)
+                {
+                    auto* animator = scene.Resolve(Root())->AddComponent<Animator>();
+                    animator->m_Motion = FileGuid(state.generation->Identity().modelId);
+                    animator->BindModelGeneration(state.generation);
+                    animator->SetEnabled(true);
+                }
+                state.animatorReady = true;
+            }
+            else if (state.activated < state.renderers.size())
+            {
+                if (activations >= maxRendererActivations) break;
+                auto* object = scene.Resolve(state.handles[state.renderers[state.activated]]);
+                if (!object || object->IsDestroyMark()) return fail();
+                if (state.options.createMeshCollider)
+                {
+                    object->AddComponent<RigidBodyComponent>();
+                    auto* collider = object->AddComponent<MeshColliderComponent>();
+                    collider->SetDensity(0);
+                    collider->SetDynamicFriction(0);
+                    collider->SetStaticFriction(0);
+                    collider->SetRestitution(0);
+                }
+                object->GetComponent<MeshRenderer>()->SetEnabled(true);
+                ++state.activated;
+                ++activations;
+            }
+            else
+            {
+                scene.EndIncrementalConstruction();
+                state.constructionScene = 0;
+                state.status = Status::Complete;
+                ModelConsumptionDiagnostics::NoteInstantiated(state.generation->Name());
+                break;
+            }
+            ++steps;
+        }
+        return state.status;
+    }
 
-		const auto attachMeshRenderer = [&](Entity& object, std::uint32_t meshIndex)
-		{
-			MeshRenderer* meshRenderer = object.AddComponent<MeshRenderer>();
-			if (options.createMeshCollider)
-			{
-				object.AddComponent<RigidBodyComponent>();
-				MeshColliderComponent* convexMesh = object.AddComponent<MeshColliderComponent>();
-				convexMesh->SetDensity(0);
-				convexMesh->SetDynamicFriction(0);
-				convexMesh->SetStaticFriction(0);
-				convexMesh->SetRestitution(0);
-			}
-			const assets::ModelMeshAsset& mesh = meshes[meshIndex];
-			if (std::shared_ptr<Material> material = materialFor(mesh.materialId))
-			{
-				meshRenderer->SetMaterial(std::move(material));
-			}
-			meshRenderer->m_isSkinnedMesh = hasBones;
-			// typed 정본 + closure 텍스처 — SetMaterial 뒤에 부른다.
-			meshRenderer->BindModelGeneration(generation, meshIndex);
-			// 저작 base — shaderAssetId가 있는 재질만(nil이면 legacy 표기 재질이라
-			// resolver가 거부한다; legacy seal이 closure owner를 그대로 받는다).
-			const std::uint32_t materialIndex = IndexOfMaterial(materials, mesh.materialId);
-			if (materialIndex < materials.size()
-				&& !materials[materialIndex].shaderAssetId.IsNil())
-			{
-				auto authored = std::make_shared<experiment::Material>();
-				ExperimentMaterialMigration::ConvertModelMaterialAsset(
-					materials[materialIndex], *generation, *authored);
-				meshRenderer->SetExperimentMaterialBase(std::move(authored));
-			}
-		};
+    void PendingInstance::Cancel(Scene& scene)
+    {
+        // 핸들 세대 검증으로 삭제/슬롯 재사용 이후의 다른 오브젝트를 건드리지 않는다.
+        for (std::size_t i = m_impl->created; i > 0; --i)
+            if (auto* object = scene.Resolve(m_impl->handles[i - 1]); object && !object->IsDestroyMark())
+                scene.DestroyEntity(object->m_index);
+        if (m_impl->constructionScene == scene.GetSceneId())
+        {
+            scene.EndIncrementalConstruction();
+            m_impl->constructionScene = 0;
+        }
+        m_impl->status = Status::Failed;
+    }
+    EntityHandle PendingInstance::Root() const { return m_impl->created ? m_impl->handles[0] : EntityHandle{}; }
+    std::size_t PendingInstance::CompletedSteps() const
+    { return m_impl->created + (m_impl->animatorReady ? 1 : 0) + m_impl->activated; }
+    std::size_t PendingInstance::TotalSteps() const
+    { return m_impl->objects.size() + 1 + m_impl->renderers.size(); }
 
-		std::vector<int> attachPoint(nodes.size(), 0);
-		std::vector<Entity*> nameCandidates; // 본 이름 대조 목록(이 모델의 엔티티만)
-		Entity* rootObject = nullptr;
-		int rootIndex = 0;
-
-		for (std::size_t nodeIndex = 0; nodeIndex < nodes.size(); ++nodeIndex)
-		{
-			const assets::ModelNodeAsset& node = nodes[nodeIndex];
-			const bool isRoot = 0 == nodeIndex;
-			int nextIndex = 0;
-
-			if (isRoot)
-			{
-				rootObject = scene.CreateEntity(modelName, GameObjectType::Mesh, nextIndex);
-				nameCandidates.push_back(rootObject);
-				nextIndex = rootObject->m_index;
-				rootIndex = rootObject->m_index;
-
-				if (hasBones)
-				{
-					Animator* animator = rootObject->AddComponent<Animator>();
-					animator->SetEnabled(true);
-					// 재생 정본은 이 모델의 generation이다 — m_Motion이 ModelId를 든다.
-					animator->m_Motion = FileGuid(generation->Identity().modelId);
-					animator->EnsureAnimationBinding();
-				}
-
-				if (1 == nodes.size() && 1 == node.meshes.size())
-				{
-					attachMeshRenderer(*rootObject, IndexOfMesh(meshes, node.meshes[0]));
-					rootObject->Transform_().SetLocalMatrix(
-						node.localTransform, TransformWriteReason::ModelImport);
-					attachPoint[nodeIndex] = rootObject->m_index;
-					continue;
-				}
-			}
-			else
-			{
-				nextIndex = attachPoint[node.parent];
-			}
-
-			for (const Uuid::Uuid16& meshId : node.meshes)
-			{
-				Entity* object = scene.CreateEntity(node.name, GameObjectType::Mesh, nextIndex);
-				attachMeshRenderer(*object, IndexOfMesh(meshes, meshId));
-				object->Transform_().SetLocalMatrix(
-					node.localTransform, TransformWriteReason::ModelImport);
-				nextIndex = object->m_index;
-			}
-
-			if (!isRoot && node.meshes.empty())
-			{
-				Entity* object = scene.CreateEntity(node.name, GameObjectType::Mesh, nextIndex);
-				nameCandidates.push_back(object);
-				object->Transform_().SetLocalMatrix(
-					node.localTransform, TransformWriteReason::ModelImport);
-				nextIndex = object->m_index;
-			}
-
-			attachPoint[nodeIndex] = nextIndex;
-		}
-
-		if (hasBones)
-		{
-			std::vector<int> boneAttach(skeleton->bones.size(), rootIndex);
-			for (std::size_t boneIndex = 0; boneIndex < skeleton->bones.size(); ++boneIndex)
-			{
-				// 루트 본은 모델 루트 엔티티가 대신한다.
-				if (skeleton->rootBone == boneIndex) continue;
-				const assets::ModelBoneAsset& bone = skeleton->bones[boneIndex];
-				const int parentAttach =
-					(assets::kInvalidModelAssetIndex != bone.parent
-						&& bone.parent < boneAttach.size())
-					? boneAttach[bone.parent] : rootIndex;
-
-				const auto found = std::find_if(nameCandidates.begin(), nameCandidates.end(),
-					[&bone](Entity* candidate)
-					{ return candidate->RemoveSuffixNumberTag() == bone.name; });
-				Entity* boneObject = found != nameCandidates.end() ? *found : nullptr;
-				if (nullptr == boneObject)
-				{
-					boneObject = scene.CreateEntity(bone.name, GameObjectType::Bone, parentAttach);
-				}
-				boneObject->AddComponent<BoneComponent>();
-				boneObject->SetRootIndex(rootIndex);
-				boneAttach[boneIndex] = boneObject->m_index;
-			}
-		}
-
-		// MBC10 — 인스턴스화 관측은 읽기 전용 계수다(`assets.modeldiag`).
-		ModelConsumptionDiagnostics::NoteInstantiated(modelName);
-		WorkerPools->NotifyAllAndWait();
-		return rootObject;
-	}
+    Entity* Instantiate(Scene& scene,
+        const std::shared_ptr<const assets::ModelAssetGeneration>& generation, const Options& options)
+    {
+        auto pending = PendingInstance::Prepare(generation, options);
+        if (!pending) return nullptr;
+        try
+        {
+            if (pending->Advance(scene, (std::numeric_limits<std::size_t>::max)(),
+                std::chrono::hours(24), (std::numeric_limits<std::size_t>::max)())
+                != PendingInstance::Status::Complete)
+            {
+                pending->Cancel(scene);
+                return nullptr;
+            }
+        }
+        catch (...)
+        {
+            pending->Cancel(scene);
+            throw;
+        }
+        return scene.Resolve(pending->Root());
+    }
 }

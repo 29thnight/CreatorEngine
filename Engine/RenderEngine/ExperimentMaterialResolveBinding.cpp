@@ -30,10 +30,10 @@ namespace experiment
                 return DataSystems->ResolveShaderMeta(handle);
             };
         services.loadTexture =
-            [](const std::filesystem::path& path, bool compress)
+            [](const std::filesystem::path& path, bool compress, TextureColorSpace colorSpace)
             {
                 return DataSystems->LoadSharedMaterialTexture(
-                    path.string(), compress);
+                    path.string(), compress, colorSpace == TextureColorSpace::Srgb);
             };
         services.resolveSourcePath = [](const FileGuid& guid)
             {

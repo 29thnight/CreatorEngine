@@ -661,6 +661,7 @@ namespace assets
             material.name = std::move(source.name);
             material.transparent = source.blendMode
                 == experiment::MaterialBlendMode::Transparent;
+            material.masked = source.blendMode == experiment::MaterialBlendMode::Masked;
             material.keywords = std::move(source.keywords);
             material.keywordSelections = std::move(source.keywordSelections);
             material.properties.reserve(source.properties.size());
@@ -695,8 +696,8 @@ namespace assets
                             return result;
                         }
                     }
-                    target.value = ModelTextureHandle{ value->assetId.value,
-                        embedded ? sidecar.generation : 0u };
+                    target.value = ModelMaterialTexture{{ value->assetId.value,
+                        embedded ? sidecar.generation : 0u }, value->coordinates };
                 }
                 material.properties.push_back(std::move(target));
             }

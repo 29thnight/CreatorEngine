@@ -10,6 +10,9 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <array>
+#include <fstream>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,6 +69,7 @@ namespace RenderTest
             std::size_t sourceLookups{};
             std::vector<std::filesystem::path> loadedPaths{};
             std::vector<bool> loadedCompress{};
+            std::vector<experiment::TextureColorSpace> loadedColorSpaces{};
 
             // cooked 표: 여기 있는 GUID만 cooked 로 해석된다.
             std::vector<experiment::AssetId> cookedIds{};
@@ -106,11 +110,12 @@ namespace RenderTest
                             / (guid.ToString() + ".png");
                     };
                 services.loadTexture =
-                    [this](const std::filesystem::path& path, bool compress)
+                    [this](const std::filesystem::path& path, bool compress, experiment::TextureColorSpace colorSpace)
                         -> std::shared_ptr<Texture>
                     {
                         loadedPaths.push_back(path);
                         loadedCompress.push_back(compress);
+                        loadedColorSpaces.push_back(colorSpace);
                         if (textureLoadFails) return nullptr;
                         return std::make_shared<Texture>();
                     };
@@ -161,7 +166,7 @@ namespace RenderTest
             material.keywords = { "on" };            // FOG=on (이름, 정본)
             material.properties = {
                 { "baseColorMap",
-                  experiment::TextureReference{ cookedTexture, "albedo" } },
+                  experiment::TextureReference{ cookedTexture, "albedo", {}, experiment::TextureColorSpace::Srgb } },
                 { "ormMap",
                   experiment::TextureReference{ sourceTexture, "orm" } },
                 { "emissiveMap",
@@ -207,7 +212,9 @@ namespace RenderTest
                 check.Check(fake.shaderLoads == 1u, "shader 조회는 한 번");
                 check.Check(fake.loadedCompress
                     == std::vector<bool>{ true, false },
-                    "compress는 legacy 패리티 — baseColorMap만 true");
+                    "compress is limited to sRGB base color");
+                check.Check(fake.loadedColorSpaces == std::vector{experiment::TextureColorSpace::Srgb,
+                    experiment::TextureColorSpace::Linear}, "W6 source/cooked color space reaches loader");
                 check.Check(fake.loadedPaths.size() == 2u
                     && fake.loadedPaths[0].generic_string().starts_with("Derived/")
                     && fake.loadedPaths[1].generic_string().starts_with("Assets/"),
@@ -242,7 +249,7 @@ namespace RenderTest
             material.shaderAssetId = shaderId;
             material.properties = {
                 { "baseColorMap",
-                  experiment::TextureReference{ cookedTexture, "albedo" } },
+                  experiment::TextureReference{ cookedTexture, "albedo", {}, experiment::TextureColorSpace::Srgb } },
             };
             experiment::ResolvedMaterial resolved;
             std::string error;
@@ -423,6 +430,48 @@ namespace RenderTest
                 && 0u == resolved.notes.cookedTextures
                 && 0u == resolved.notes.sourceFallbackTextures,
                 "texture 없는 material은 owner도 계수도 없어야 한다");
+        }
+
+        // Real external/cooked loader boundary: encoded bytes do not inherit
+        // a prior role or collide with the same filename in another directory.
+        {
+            const auto directory = std::filesystem::temp_directory_path()
+                / ("creator-emission-" + FileGuid::CreateRandomV4().ToString());
+            std::filesystem::create_directories(directory / "a");
+            std::filesystem::create_directories(directory / "b");
+            const auto first = directory / "a" / "same.tga";
+            const auto second = directory / "b" / "same.tga";
+            std::array<unsigned char, 22> tga{};
+            tga[2] = 2; tga[12] = 1; tga[14] = 1; tga[16] = 32; tga[17] = 0x28;
+            tga[18] = 192; tga[19] = 64; tga[20] = 128; tga[21] = 255;
+            { std::ofstream file(first, std::ios::binary); file.write(reinterpret_cast<const char*>(tga.data()), tga.size()); }
+            tga[18] = 16;
+            { std::ofstream file(second, std::ios::binary); file.write(reinterpret_cast<const char*>(tga.data()), tga.size()); }
+            const auto linear = services.loadTexture(first, false, experiment::TextureColorSpace::Linear);
+            const auto srgb = services.loadTexture(first, false, experiment::TextureColorSpace::Srgb);
+            const auto other = services.loadTexture(second, false, experiment::TextureColorSpace::Srgb);
+            const bool loaded = linear && srgb && other;
+            check.Check(loaded, "W6 external texture loader accepts both color roles");
+            if (loaded)
+            {
+                check.Check(linear->GetImageView().Format() == RHIFormat::RGBA8Unorm
+                    || linear->GetImageView().Format() == RHIFormat::BGRA8Unorm,
+                    "W6 external data texture remains linear");
+                check.Check(srgb->GetImageView().Format() == RHIFormat::RGBA8UnormSrgb
+                    || srgb->GetImageView().Format() == RHIFormat::BGRA8UnormSrgb,
+                    "W6 external emission texture uses sRGB sampling");
+                check.Check(linear->m_assetId != srgb->m_assetId
+                    && std::memcmp(linear->GetImageView().At(0)->pixels, srgb->GetImageView().At(0)->pixels, 4) == 0,
+                    "W6 roles have separate GPU identities and identical encoded bytes");
+                check.Check(srgb == services.loadTexture(first, false, experiment::TextureColorSpace::Srgb)
+                    && srgb->m_assetId != other->m_assetId
+                    && std::memcmp(srgb->GetImageView().At(0)->pixels, other->GetImageView().At(0)->pixels, 4) != 0,
+                    "W6 cache reuses exact path/role and separates same filenames");
+            }
+            std::error_code ignored;
+            std::filesystem::remove(first, ignored); std::filesystem::remove(second, ignored);
+            std::filesystem::remove(directory / "a", ignored); std::filesystem::remove(directory / "b", ignored);
+            std::filesystem::remove(directory, ignored);
         }
 
         char summary[160]{};

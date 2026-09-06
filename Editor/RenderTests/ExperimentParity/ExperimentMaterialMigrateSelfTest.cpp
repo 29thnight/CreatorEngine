@@ -176,6 +176,8 @@ namespace RenderTest
                 MaterialPropertyValue albedo;
                 albedo.m_name = "albedoMap";
                 albedo.m_textureGuid = textureGuid;
+                albedo.m_textureUvSet = 1; albedo.m_textureUvOffset = {.25f, -.5f};
+                albedo.m_textureUvScale = {-2.f, .75f}; albedo.m_textureUvRotation = .4f;
                 legacy.m_propertyValues = { baseColor, metallic, albedo };
             }
 
@@ -198,7 +200,10 @@ namespace RenderTest
                     return value.m_name == "albedoMap";
                 });
             check.Check(albedoValue != restored.m_propertyValues.end()
-                && albedoValue->m_textureGuid == textureGuid,
+                && albedoValue->m_textureGuid == textureGuid
+                && albedoValue->m_textureUvSet == 1 && albedoValue->m_textureUvOffset.x == .25f
+                && albedoValue->m_textureUvOffset.y == -.5f && albedoValue->m_textureUvScale.x == -2.f
+                && albedoValue->m_textureUvScale.y == .75f && albedoValue->m_textureUvRotation == .4f,
                 "texture GUID 보존");
         }
 
@@ -322,6 +327,20 @@ namespace RenderTest
             check.Check(!ExperimentMaterialMigration::ConvertToLegacyMaterial(
                 material, nullptr, converted, error) && !error.empty(),
                 "int32 범위 밖 uint는 거부해야 한다");
+        }
+
+        {
+            Material legacy, restored;
+            legacy.m_fileGuid = assetGuid; legacy.m_shaderMetaGuid = shaderGuid;
+            legacy.m_renderingMode = MaterialRenderingMode::Masked;
+            legacy.m_doubleSided = true;
+            std::string error;
+            check.Check(RunFullChain(contract, legacy, restored, error)
+                && restored.m_renderingMode == MaterialRenderingMode::Masked
+                && restored.m_doubleSided, "W4 MASK/doubleSided bridge round trip");
+            check.Check(ExperimentMaterialMigration::ApplyPropertyToLegacy(restored,
+                    {"doubleSided", false}, error) && !restored.m_doubleSided,
+                "W4 doubleSided false instance override");
         }
 
         char summary[160]{};
@@ -619,7 +638,8 @@ namespace RenderTest
 
             // 카탈로그에 없는 GUID — LoadModelGUID는 조용히 실패하고, 이주는
             // 로드 성공 여부와 무관하게 일어나야 한다(정보 보존).
-            const FileGuid modelProbe = FileGuid::CreateRandomV4();
+            // PHASE 3.75 model identities are UUIDv8; UUIDv4 is a material identity.
+            const FileGuid modelProbe("11111111-1111-8111-8111-111111111111");
             MeshRenderer migrating;
             std::string parseError;
             Authoring::ParsedDocument carrierDocument =

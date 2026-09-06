@@ -68,7 +68,13 @@ namespace ExperimentMaterialMigration
             {
                 experiment::TextureReference reference;
                 reference.assetId.value = value.m_textureGuid.m_guid;
+                reference.coordinates = {value.m_textureUvSet,
+                    {value.m_textureUvOffset.x, value.m_textureUvOffset.y},
+                    {value.m_textureUvScale.x, value.m_textureUvScale.y}, value.m_textureUvRotation};
                 reference.logicalName = value.m_name;
+                reference.colorSpace = desc.name == standard_material::property::BaseColorMap
+                    || desc.name == standard_material::property::EmissiveMap
+                    ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;
                 outValue = std::move(reference);
                 return true;
             }
@@ -136,6 +142,10 @@ namespace ExperimentMaterialMigration
                 std::get_if<experiment::TextureReference>(&property.value))
             {
                 value.m_textureGuid.m_guid = reference->assetId.value;
+                value.m_textureUvSet = reference->coordinates.set;
+                value.m_textureUvOffset = {reference->coordinates.offset[0], reference->coordinates.offset[1]};
+                value.m_textureUvScale = {reference->coordinates.scale[0], reference->coordinates.scale[1]};
+                value.m_textureUvRotation = reference->coordinates.rotation;
             }
             else
             {
@@ -162,7 +172,8 @@ namespace ExperimentMaterialMigration
         material.blendMode =
             MaterialRenderingMode::Transparent == legacy.m_renderingMode
             ? experiment::MaterialBlendMode::Transparent
-            : experiment::MaterialBlendMode::Opaque;
+            : MaterialRenderingMode::Masked == legacy.m_renderingMode
+            ? experiment::MaterialBlendMode::Masked : experiment::MaterialBlendMode::Opaque;
         material.keywordSelections.assign(
             legacy.GetKeywordSelections().begin(),
             legacy.GetKeywordSelections().end());
@@ -226,6 +237,7 @@ namespace ExperimentMaterialMigration
             material.properties.push_back(std::move(property));
         }
 
+        material.properties.push_back({std::string(standard_material::property::DoubleSided), legacy.m_doubleSided});
         outMaterial = std::move(material);
         outError.clear();
         return true;
@@ -257,6 +269,7 @@ namespace ExperimentMaterialMigration
         }
 
         std::vector<MaterialPropertyValue> propertyValues;
+        bool doubleSided = false;
 
         for (const experiment::MaterialProperty& property : material.properties)
         {
@@ -264,6 +277,13 @@ namespace ExperimentMaterialMigration
             {
                 outError = "빈 property 이름이 있다: " + material.name;
                 return false;
+            }
+            if (property.name == standard_material::property::DoubleSided)
+            {
+                const bool* value = std::get_if<bool>(&property.value);
+                if (!value) { outError = "doubleSided must be bool"; return false; }
+                doubleSided = *value;
+                continue;
             }
             MaterialPropertyValue value;
             if (!ConvertPropertyToLegacyValue(property, value, outError))
@@ -280,7 +300,9 @@ namespace ExperimentMaterialMigration
         outLegacy.m_renderingMode =
             experiment::MaterialBlendMode::Transparent == material.blendMode
             ? MaterialRenderingMode::Transparent
-            : MaterialRenderingMode::Opaque;
+            : experiment::MaterialBlendMode::Masked == material.blendMode
+            ? MaterialRenderingMode::Masked : MaterialRenderingMode::Opaque;
+        outLegacy.m_doubleSided = doubleSided;
         outLegacy.m_keywordSelections = std::move(keywordSelections);
         outLegacy.m_propertyValues = std::move(propertyValues);
 
@@ -339,6 +361,14 @@ namespace ExperimentMaterialMigration
             outError = "빈 property 이름은 적용할 수 없다";
             return false;
         }
+        if (property.name == standard_material::property::DoubleSided)
+        {
+            const bool* value = std::get_if<bool>(&property.value);
+            if (!value) { outError = "doubleSided must be bool"; return false; }
+            legacy.m_doubleSided = *value;
+            outError.clear();
+            return true;
+        }
         MaterialPropertyValue value;
         if (!ConvertPropertyToLegacyValue(property, value, outError))
         {
@@ -373,6 +403,7 @@ namespace ExperimentMaterialMigration
         result.name = source.name;
         result.blendMode = source.transparent
             ? experiment::MaterialBlendMode::Transparent
+            : source.masked ? experiment::MaterialBlendMode::Masked
             : experiment::MaterialBlendMode::Opaque;
         result.keywords = source.keywords;
         result.keywordSelections = source.keywordSelections;
@@ -384,13 +415,19 @@ namespace ExperimentMaterialMigration
             std::visit([&](const auto& value)
             {
                 using T = std::decay_t<decltype(value)>;
-                if constexpr (std::is_same_v<T, assets::ModelTextureHandle>)
+                if constexpr (std::is_same_v<T, assets::ModelMaterialTexture>)
                 {
                     experiment::TextureReference reference;
-                    reference.assetId.value = value.textureId;
+                    reference.assetId.value = value.handle.textureId;
+                    reference.coordinates = value.coordinates;
                     reference.logicalName = property.name;
+                    // External handles have no generation texture record; their
+                    // Standard semantic still determines the sampling color space.
+                    reference.colorSpace = property.name == standard_material::property::BaseColorMap
+                        || property.name == standard_material::property::EmissiveMap
+                        ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;
                     if (const assets::ModelTextureAsset* texture =
-                        generation.FindTexture(value.textureId))
+                        generation.FindTexture(value.handle.textureId))
                     {
                         reference.colorSpace = texture->colorSpace
                             == assets::ModelTextureColorSpace::Srgb

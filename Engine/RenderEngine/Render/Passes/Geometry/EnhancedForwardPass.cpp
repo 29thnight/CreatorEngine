@@ -82,7 +82,7 @@ namespace
     // 잘못 떨어뜨리면 두 결과가 갈린다. 셰이더를 따로 쓰면 조명 계산 자체가
     // 달라져 무엇 때문에 다른지 알 수 없으므로, 광원을 고르는 부분만 다르게
     // 하고 나머지는 같은 코드를 쓴다.
-    constexpr const char* kShadeShaderFile = "ForwardShade.hlsl";
+    constexpr const char* kShadeShaderFile = "ForwardShade.slang";
 
     // snapshot이 없는 격리 selftest는 기존 ShadeInstance scalar를 쓰되 b2를
     // 비워 두지 않는다. 제품 draw는 reflection-packed 48B Standard prefix와
@@ -101,8 +101,6 @@ namespace
     static_assert(offsetof(ForwardLegacyMaterialConstants, alphaCutoff) == 44u);
     constexpr ForwardLegacyMaterialConstants kForwardLegacyMaterialConstants{};
 
-    constexpr std::uint32_t kForwardMaterialTextureFirstRegister = 4u;
-    constexpr std::uint32_t kForwardMaterialTextureSlotCount = 4u;
 
     struct ForwardNumericPrefixBinding
     {
@@ -206,94 +204,7 @@ namespace
         return true;
     }
 
-    bool ValidateForwardTextureLayout(const ShaderMetaBindingLayout& layout,
-        std::string& outError)
-    {
-        std::array<bool, kForwardMaterialTextureSlotCount> occupied{};
-        std::vector<std::string_view> names;
-        for (const ShaderMetaPropertyBinding& binding : layout.properties)
-        {
-            if (ShaderPropertyType::Texture2D != binding.propertyType) continue;
-            if (binding.name.empty()
-                || RHIShaderResourceKind::Texture != binding.resourceKind
-                || 0u != binding.registerSpace
-                || binding.registerIndex < kForwardMaterialTextureFirstRegister
-                || binding.registerIndex >= kForwardMaterialTextureFirstRegister
-                    + kForwardMaterialTextureSlotCount)
-            {
-                outError = "Forward texture property가 t4..t7/space0 범위 밖이다: "
-                    + binding.name;
-                return false;
-            }
-            const std::size_t slot = binding.registerIndex
-                - kForwardMaterialTextureFirstRegister;
-            if (occupied[slot]
-                || std::find(names.begin(), names.end(), binding.name) != names.end())
-            {
-                outError = "Forward texture property 이름/register가 중복이다: "
-                    + binding.name;
-                return false;
-            }
-            occupied[slot] = true;
-            names.push_back(binding.name);
-        }
-        return true;
-    }
 
-    bool ValidateForwardTextureSnapshot(
-        const EnhancedForwardMaterialDrawSnapshot& snapshot,
-        std::string& outError)
-    {
-        const std::size_t reflectedTextureCount = static_cast<std::size_t>(std::count_if(
-            snapshot.bindingLayout.properties.begin(), snapshot.bindingLayout.properties.end(),
-            [](const ShaderMetaPropertyBinding& binding)
-            {
-                return ShaderPropertyType::Texture2D == binding.propertyType;
-            }));
-        if (reflectedTextureCount != snapshot.textureBindings.size())
-        {
-            outError = "Forward draw texture owner 수가 reflection schema와 다르다";
-            return false;
-        }
-
-        std::array<bool, kForwardMaterialTextureSlotCount> occupied{};
-        std::vector<std::string_view> names;
-        for (const EnhancedMaterialTextureBinding& texture : snapshot.textureBindings)
-        {
-            const auto reflected = std::find_if(snapshot.bindingLayout.properties.begin(),
-                snapshot.bindingLayout.properties.end(), [&texture](const auto& binding)
-                {
-                    return binding.name == texture.propertyName;
-                });
-            if (texture.propertyName.empty()
-                || reflected == snapshot.bindingLayout.properties.end()
-                || ShaderPropertyType::Texture2D != reflected->propertyType
-                || RHIShaderResourceKind::Texture != reflected->resourceKind
-                || reflected->registerIndex != texture.registerIndex
-                || reflected->registerSpace != texture.registerSpace
-                || 0u != texture.registerSpace
-                || texture.registerIndex < kForwardMaterialTextureFirstRegister
-                || texture.registerIndex >= kForwardMaterialTextureFirstRegister
-                    + kForwardMaterialTextureSlotCount)
-            {
-                outError = "Forward draw texture binding이 reflection register와 다르다: ";
-                outError += texture.propertyName;
-                return false;
-            }
-            const std::size_t slot = texture.registerIndex
-                - kForwardMaterialTextureFirstRegister;
-            if (occupied[slot]
-                || std::find(names.begin(), names.end(), texture.propertyName) != names.end())
-            {
-                outError = "Forward draw texture 이름/register가 중복이다: "
-                    + texture.propertyName;
-                return false;
-            }
-            occupied[slot] = true;
-            names.push_back(texture.propertyName);
-        }
-        return true;
-    }
 
     // HLSL의 ShadeInstance와 크기·배치가 같아야 한다(구조화 버퍼 보폭).
     struct ShadeInstance
@@ -312,7 +223,9 @@ namespace
         float          flowTotalSeconds{ 0.f };
         float          flowDeltaSeconds{ 0.f };
         uint32_t       boneOffset{ 0xFFFFFFFFu };
-        uint32_t       bonePadding[3]{};
+        uint32_t       coverageFlags{};
+        float          coverageCutoff{ 0.5f };
+        uint32_t       bonePadding{};
     };
     // ★ 보폭이 어긋나면 컴파일도 검증도 통과하고 GPU만 엉뚱한 필드를 읽는다.
     //   마지막 넷이 정확히 16바이트를 채우는 것이 핵심 — 그래야 구조화
@@ -325,6 +238,7 @@ namespace
     static_assert(offsetof(ShadeInstance, flowTotalSeconds) == 120u);
     static_assert(offsetof(ShadeInstance, flowDeltaSeconds) == 124u);
     static_assert(offsetof(ShadeInstance, boneOffset) == 128u);
+    static_assert(offsetof(ShadeInstance, coverageFlags) == 132u);
     static_assert(std::is_trivially_copyable_v<ShadeInstance>);
 
     struct ShadeParams
@@ -393,7 +307,7 @@ namespace
 
 bool EnhancedForwardPass::MaterialKey::operator==(const MaterialKey& other) const
 {
-    if (textures != other.textures
+    if (coordinates != other.coordinates || textures != other.textures
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -428,6 +342,7 @@ bool EnhancedForwardPass::MaterialKey::operator<(const MaterialKey& other) const
         if (snapshot->flow.Values() != other.snapshot->flow.Values())
             return snapshot->flow.Values() < other.snapshot->flow.Values();
     }
+    if (coordinates != other.coordinates) return coordinates < other.coordinates;
     return std::lexicographical_compare(textures.begin(), textures.end(),
         other.textures.begin(), other.textures.end(), std::less<Texture*>{});
 }
@@ -444,13 +359,8 @@ bool EnhancedForwardPass::ResolveMaterialView(const EnhancedDrawItem& draw,
             outError = "Forward material snapshot의 b2/ShaderMeta 계약이 invalid다";
             return false;
         }
-        if (!ValidateForwardTextureSnapshot(snapshot, outError)) return false;
-        for (const EnhancedMaterialTextureBinding& binding : snapshot.textureBindings)
-        {
-            const std::size_t slot = binding.registerIndex
-                - kForwardMaterialTextureFirstRegister;
-            outView.textures[slot] = binding.textureOwner.get();
-        }
+        if (!MaterialTextureTable::ValidateSnapshot(snapshot, outError)) return false;
+            if (!MaterialTextureTable::ValidateMeshCoordinates(snapshot, draw.modelMeshView.vertexAttributeMask, outError)) return false;
         outView.baseColorFactor = snapshot.baseColorFactor;
         outView.metallic = snapshot.metallic;
         outView.roughness = snapshot.roughness;
@@ -459,10 +369,6 @@ bool EnhancedForwardPass::ResolveMaterialView(const EnhancedDrawItem& draw,
         return true;
     }
 
-    outView.textures[0] = draw.baseColor;
-    outView.textures[1] = draw.normalMap;
-    outView.textures[2] = draw.occRoughMetal;
-    outView.textures[3] = draw.emissive;
     outView.baseColorFactor = draw.baseColorFactor;
     outView.metallic = draw.metallic;
     outView.roughness = draw.roughness;
@@ -476,25 +382,13 @@ EnhancedForwardPass::MaterialKey EnhancedForwardPass::MakeMaterialKey(
     MaterialKey key{};
     if (draw.forwardMaterialSnapshot && draw.forwardMaterialSnapshot->IsValid())
     {
-        for (const EnhancedMaterialTextureBinding& binding :
-            draw.forwardMaterialSnapshot->textureBindings)
-        {
-            if (binding.registerSpace != 0u
-                || binding.registerIndex < kForwardMaterialTextureFirstRegister
-                || binding.registerIndex >= kForwardMaterialTextureFirstRegister
-                    + kForwardMaterialTextureSlotCount)
-            {
-                continue;
-            }
-            key.textures[binding.registerIndex
-                - kForwardMaterialTextureFirstRegister] = binding.textureOwner.get();
-        }
+        key.textures = MaterialTextureTable::Owners(*draw.forwardMaterialSnapshot);
+        key.coordinates = MaterialTextureTable::Coordinates(*draw.forwardMaterialSnapshot);
         key.snapshot = draw.forwardMaterialSnapshot;
     }
     else
     {
-        key.textures = {
-            draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+        key.textures = MaterialTextureTable::LegacyOwners(m_legacyTextureSchema, draw);
     }
     return key;
 }
@@ -619,38 +513,8 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     m_cullPSO = context.psoManager->GetOrCreateCompute(desc, outError);
     if (!m_cullPSO.IsValid()) return false;
 
-    // ── 셰이딩 루트 시그니처 ──
-    //
-    // b0 상수 · t0 인스턴스 · t1 광원 · t2 타일 카운트 · t3 타일 목록 ·
-    // t12 model bone palette.
-    // 넷 다 구조화 버퍼라 루트 SRV로 꽂는다 — 디스크립터 테이블을 만들 이유가
-    // 없고, 드로우마다 인스턴스 버퍼 주소만 바뀌므로 이쪽이 싸다.
-    //
-    // t4(재질 텍스처)와 s0(샘플러)만 테이블이다. 텍스처는 루트 SRV로 못
-    // 꽂는다 — 루트 SRV는 버퍼 전용이고 Texture2D는 디스크립터를 요구한다.
-    // t8~t11 은 프레임 내내 같은 텍스처들 — IBL 셋과 그림자 맵. 드로우마다
-    // 바뀌는 재질과 달리 한 번만 걸면 되므로 한 테이블에 묶는다. 차원이
-    // 섞여 있지만(TextureCube · Texture2D · Texture2DArray) SRV 범위는
-    // 그것을 가리지 않는다 — Deferred도 아홉을 한 범위로 묶는다.
-    const RHIPipelineLayoutParam shadeParams[] = {
-        RHILayout::Cbv(0),
-        RHILayout::Srv(0),
-        RHILayout::Srv(1),
-        RHILayout::Srv(2),
-        RHILayout::Srv(3),
-        RHILayout::SrvTable(4, 4, RHIShaderVisibility::Pixel),   // t4~t7 baseColor · normal · ORM · emissive
-        RHILayout::SrvTable(4, 8, RHIShaderVisibility::Pixel),   // t8~t11 조도 · 프리필터 · BRDF LUT · 그림자
-        RHILayout::SamplerTable(3, 0, RHIShaderVisibility::Pixel),  // 재질 · IBL · 그림자 비교
-        RHILayout::Cbv(2, RHIShaderVisibility::Pixel),           // b2 — M6 Forward material property block
-        RHILayout::Srv(12, RHIShaderVisibility::Vertex),         // t12 — model bone palette
-    };
-
-    RHIPipelineLayoutDesc shadeRootDesc{};
-    shadeRootDesc.params = shadeParams;
-    shadeRootDesc.allowInputAssembler = true;
-
-    const auto shadeRoot = context.rootSignatures->GetOrCreate(shadeRootDesc, outError);
-    if (!shadeRoot.IsValid()) return false;
+    if (!MaterialTextureTable::Reflect(kShadeShaderFile, "PSMain", forwardPermutation,
+            m_legacyTextureSchema, outError)) return false;
 
     // 샘플러 둘을 연속으로 만든다 — 테이블은 연속이어야 하므로 따로 만들어
     // 인접을 기대하면 안 된다(Deferred와 같은 이유).
@@ -677,14 +541,6 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
             return false;
         }
     }
-
-    static const RHIInputElement kInputElements[] = {
-        { "POSITION", 0, RHIFormat::RGB32Float, 0,  0, 0 },
-        { "NORMAL",   0, RHIFormat::RGB32Float, 0, 12, 0 },
-        { "TEXCOORD", 0, RHIFormat::RG32Float,    0, 24, 0 },
-        { "TANGENT",  0, RHIFormat::RGB32Float, 0, 40, 0 },
-        { "BINORMAL", 0, RHIFormat::RGB32Float, 0, 52, 0 },
-    };
 
     // GBuffer와 같은 정점 레이아웃을 쓰므로 같은 단정을 건다.
     static_assert(offsetof(Vertex, normal) == 12, "Vertex 레이아웃이 바뀌었다");
@@ -714,71 +570,13 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
 
     for (const ShadeVariant& variant : variants)
     {
-        RHIShaderPermutation shadePermutation = forwardPermutation;
-        if (variant.reference
-            && !shadePermutation.Enable("REFERENCE_PATH", outError))
-            return false;
-        if (0 != variant.modelVertexMask
-            && !ModelVertexInput::ApplyShaderPermutation(
-                variant.modelVertexMask, shadePermutation, outError))
-            return false;
-
-        RHIShaderBlob vsBlob;
-        RHIShaderBlob psBlob;
-        if (!CompileFwdShaderEntry(kShadeShaderFile, shadePermutation,
-                "VSMain", "vs_5_0", vsBlob, outError)) return false;
-        if (!CompileFwdShaderEntry(kShadeShaderFile, shadePermutation,
-                "PSMain", "ps_5_0", psBlob, outError)) return false;
-
-        RHIGraphicsPipelineDesc shadeDesc{};
-        if (0 != variant.modelVertexMask)
-        {
-            const auto* elements = ModelVertexInput::ResolveInputElements(
-                variant.modelVertexMask, outError);
-            if (nullptr == elements) return false;
-            shadeDesc.inputElements = elements->data();
-            shadeDesc.inputElementCount = static_cast<uint32_t>(elements->size());
-        }
-        else
-        {
-            shadeDesc.inputElements = kInputElements;
-            shadeDesc.inputElementCount = _countof(kInputElements);
-        }
-        shadeDesc.vsBytecode = vsBlob.Data();
-        shadeDesc.vsSize = vsBlob.Size();
-        shadeDesc.psBytecode = psBlob.Data();
-        shadeDesc.psSize = psBlob.Size();
-        shadeDesc.layout = shadeRoot;
-        // 깊이 테스트를 켠다. 포워드 물체는 이미 그려진 불투명 기하 뒤에
-        // 있으면 가려져야 한다 — 끄면 벽 뒤 물체가 비쳐 보이는데, 그것은
-        // 화면을 봐야만 알 수 있고 수치 검증에는 안 잡히는 부류다.
-        shadeDesc.depthEnable = true;
-        // ★ 깊이는 보되 쓰지 않는다. 투명이 깊이를 쓰면 뒤에 있는 다른
-        //   투명면이 그 깊이에 가려져 사라진다 — 앞의 유리가 뒤의 유리를
-        //   지워 버리는 그 증상이다. 테스트(LESS)는 유지해 불투명 기하가
-        //   투명을 가리는 것은 그대로 둔다.
-        shadeDesc.depthWriteMask = RHIDepthWrite::Zero;
-        // 알파 블렌딩(SRC_ALPHA/INV_SRC_ALPHA). 이것이 없으면 알파를 내도
-        // 덮어쓰기라 투명이 성립하지 않는다.
-        shadeDesc.blendEnable = true;
-        shadeDesc.dsvFormat = kDepthFormat;
-        // ★ 뒷면을 자른다.
-        //
-        //   GBuffer는 CULL_MODE_NONE인데도 멀쩡하다 — 깊이를 쓰기 때문에
-        //   앞면이 깊이 테스트로 뒷면을 막는다. 투명은 깊이를 쓰지 않으므로
-        //   (위의 depthWriteMask=ZERO) 그 보호가 없다: 닫힌 물체의 뒷면이
-        //   앞면 위에 덧그려져 법선이 반대인 어두운 얼룩이 생긴다. 구에서
-        //   먼저 눈에 띄었다.
-        //
-        //   양면 투명(잎사귀·천)은 뒷면→앞면 2패스가 정석이지만, 그건
-        //   재질이 '양면인가'를 알려 줘야 성립한다. 지금 재질에 그 표시가
-        //   없으므로 흔한 기본값(닫힌 물체)을 택한다.
-        shadeDesc.cullMode = RHICullMode::Back;
-        shadeDesc.numRenderTargets = 1;
-        shadeDesc.rtvFormats[0] = kOutputFormat;
-
-        if (!variant.target->Create(*context.psoManager, shadeDesc, outError))
-            return false;
+        RHIShaderPermutation permutation = forwardPermutation;
+        if (variant.reference && !permutation.Enable("REFERENCE_PATH", outError)) return false;
+        RHIShaderBlob vs, ps;
+        RHIGraphicsPipelineDesc desc{};
+        if (!BuildShadePipelineDesc(context, kShadeShaderFile, "VSMain", "PSMain",
+                nullptr, permutation, variant.modelVertexMask, desc, vs, ps, outError)
+            || !variant.target->Create(*context.psoManager, desc, outError)) return false;
     }
 
     return true;
@@ -813,17 +611,22 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
         return false;
     }
 
+    MaterialTextureTable::Schema textureSchema;
+    if (!MaterialTextureTable::Reflect(shaderFile, pixelEntry, *effectivePermutation,
+            textureSchema, outError)) return false;
     const RHIPipelineLayoutParam params[] = {
         RHILayout::Cbv(0),
         RHILayout::Srv(0),
         RHILayout::Srv(1),
         RHILayout::Srv(2),
         RHILayout::Srv(3),
-        RHILayout::SrvTable(4, 4, RHIShaderVisibility::Pixel),
+        RHILayout::SrvTable(static_cast<uint32_t>(textureSchema.size()),
+            MaterialTextureTable::FirstRegister, RHIShaderVisibility::Pixel),
         RHILayout::SrvTable(4, 8, RHIShaderVisibility::Pixel),
         RHILayout::SamplerTable(3, 0, RHIShaderVisibility::Pixel),
         RHILayout::Cbv(2, RHIShaderVisibility::Pixel),
         RHILayout::Srv(12, RHIShaderVisibility::Vertex),
+        RHILayout::Cbv(3, RHIShaderVisibility::Pixel), // texture coordinates by reflected register
     };
     RHIPipelineLayoutDesc rootDesc{};
     rootDesc.params = params;
@@ -866,6 +669,7 @@ bool EnhancedForwardPass::BuildShadePipelineDesc(
     outDesc.rtvFormats[0] = kOutputFormat;
     outDesc.dsvFormat = kDepthFormat;
     if (nullptr != renderState) renderState->ApplyTo(outDesc);
+    outDesc.cullMode = RHICullMode::None;
     return true;
 }
 
@@ -957,7 +761,7 @@ bool EnhancedForwardPass::BuildShaderMetaPipelineDesc(
     if (!ShaderMetaReflection::Resolve(meta, reflections, layout, outError))
         return false;
     if (!ValidateForwardNumericLayout(layout, outError)) return false;
-    if (!ValidateForwardTextureLayout(layout, outError)) return false;
+    if (!MaterialTextureTable::ValidateLayout(layout, reflections[1], outError)) return false;
 
     outPermutationKey = materialPermutation.key;
     outLayout = std::make_shared<ShaderMetaBindingLayout>(std::move(layout));
@@ -1183,12 +987,7 @@ bool EnhancedForwardPass::EnsureShaderMetaVariant(
         outError = "Forward material variant의 일반/Reference identity가 불완전하다";
         return false;
     }
-    if (!m_shadePipelineRequest.IsValid()
-        || shadeDesc.layout != m_shadePipelineRequest.GetDesc().layout)
-    {
-        outError = "Forward material ShaderMeta pipeline layout이 primary pass와 다르다";
-        return false;
-    }
+    if (!m_shadePipelineRequest.IsValid()) return false;
 
     struct ModelCandidate
     {
@@ -1452,42 +1251,13 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
             const MaterialKey key = MakeMaterialKey(draw);
             if (m_materialTextures.find(key) != m_materialTextures.end()) continue;
 
-            // 슬롯 의미를 따르는 폴백. 흰색 하나로 전부 때우면 뜻이 뒤집힌다 —
-            // emissive에 흰색이면 텍스처 없는 재질이 전부 자체발광이고,
-            // ORM에 흰색이면 B(금속)가 1이라 확산이 통째로 죽는다.
-            // GBuffer와 같은 규칙이라야 같은 재질이 두 경로에서 같아 보인다.
-            MaterialTextures textures{};
-            bool anyValid = false;
-            for (uint32_t i = 0; i < 4; ++i)
-            {
-                // ★ 실패를 IsValid로 거르려 하면 안 된다. GetOrUpload는 복구
-                //   가능한 실패(2D 아님·멀티샘플·업로드 실패)에서 폴백을
-                //   돌려주므로 IsValid는 늘 참이고, 그 자리에서 건너뛰면
-                //   textureError가 통째로 사라진다 — 텍스처가 안 나오는데
-                //   로그도 없는 상태가 된다. GBuffer처럼 무조건 전달한다.
-                std::string textureError;
-                RHITextureEntry uploaded{};
-                if (nullptr == key[i] && 2 == i)
-                {
-                    uploaded = context.textureCache->GetOrmNeutralTexture(textureError);
-                }
-                else if (nullptr == key[i] && 3 == i)
-                {
-                    uploaded = context.textureCache->GetBlackTexture(textureError);
-                }
-                else
-                {
-                    uploaded = context.textureCache->GetOrUpload(key[i], textureError);
-                }
-                if (!textureError.empty()) outError = textureError;
-
-                textures.resources[i] = uploaded.handle;
-            textures.formats[i] = uploaded.format;
-                textures.mipLevels[i] = uploaded.mipLevels;
-                anyValid = anyValid || uploaded.IsValid();
-            }
-
-            if (anyValid) m_materialTextures.emplace(key, textures);
+            auto schema = m_legacyTextureSchema;
+            if (key.snapshot && !MaterialTextureTable::FromLayout(
+                    key.snapshot->bindingLayout, schema, outError)) return false;
+            MaterialTextures textures;
+            if (!MaterialTextureTable::Upload(*context.textureCache, schema,
+                    key.textures, textures.views, outError, !key.snapshot)) return false;
+            m_materialTextures.emplace(key, std::move(textures));
         }
     }
 
@@ -1807,11 +1577,17 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         const EnhancedDrawItem& draw = (*context.forwardDraws)[i];
         MaterialView& material = materials[i];
         if (!ResolveMaterialView(draw, material, materialError)) return false;
+        instances[i] = {}; // recycled upload memory must not supply legacy flow/UV state
         instances[i].world = math::transpose(draw.worldMatrix);
         instances[i].baseColor = material.baseColorFactor.rgba();
         instances[i].metallic = material.metallic;
         instances[i].roughness = material.roughness;
         instances[i].useNormalMap = material.useNormalMap;
+        const auto& coverage = material.snapshot ? material.snapshot->coverage : draw.coverage;
+        instances[i].coverageFlags = !material.snapshot && coverage.flags == 0
+            ? EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::Blended
+            : coverage.flags; // legacy Forward retains backface rejection and authored alpha
+        instances[i].coverageCutoff = coverage.cutoff;
         instances[i].boneOffset = 0xFFFFFFFFu;
         if (nullptr != draw.bonePalette && 0 != draw.boneCount)
         {
@@ -1895,9 +1671,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
             static_cast<size_t>(paletteBytes));
     }
 
-    // root CBV/table을 걸기 전에 첫 material PSO로 layout을 확정한다. 이후
-    // batch별 PSO는 같은 layout이라 DX12 root arguments와 Vulkan descriptor
-    // pending state를 보존한다.
+    // Install the first layout before preparing frame bindings. Each batch
+    // rebinds them because its reflected material table may change the layout.
     const RHIPipelineHandle firstPipeline = m_useReferencePath
         ? m_batches.front().referencePipeline : m_batches.front().shadePipeline;
     if (!firstPipeline.IsValid()) return false;
@@ -1922,6 +1697,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     //
     // 포맷은 Deferred가 쓰는 것과 같아야 한다 — 생성기가 만든 리소스의
     // 실제 포맷이라 여기서만 다르게 적으면 어긋난 뷰가 된다.
+    RHIBindingTable frameTable;
     {
         // ★ 실패하면 그린 뒤가 아니라 여기서 접는다.
         //
@@ -1943,7 +1719,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
             RHIBindingDesc::SrvArray(hasShadow ? shadowResource : RHITextureHandle{},
                 RHIFormat::R32Float, kShadowCascadeCount).OrNull(),
         };
-        const RHIBindingTable frameTable = context.resources->CreateBindings(frameSrvs);
+        frameTable = context.resources->CreateBindings(frameSrvs);
         if (!frameTable.IsValid()) return false;
 
         encoder.SetBindings(RHIBindPoint::Graphics, 6, frameTable);
@@ -1960,6 +1736,14 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         if (geometry == m_drawGeometry.end() || !geometry->second.IsValid()) continue;
         const RHIMeshBinding& entry = geometry->second;
         encoder.SetPipeline(RHIBindPoint::Graphics, pipeline);
+        // A different material table can invalidate all root arguments.
+        encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, lightUpload);
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(m_tileCountBuffer));
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, RHIBufferSlice::Whole(m_tileListBuffer));
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, 9, paletteBuffer);
+        encoder.SetSamplers(RHIBindPoint::Graphics, 7, m_sampler);
+        encoder.SetBindings(RHIBindPoint::Graphics, 6, frameTable);
 
         const bool hasSnapshot = batch.material.snapshot
             && !batch.material.snapshot->propertyBytes.empty();
@@ -1973,40 +1757,25 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
             materialData, materialSize);
         if (!materialConstants.IsValid()) continue;
         encoder.SetConstantBuffer(RHIBindPoint::Graphics, 8, materialConstants);
+        const auto coordinates = MaterialTextureTable::UploadCoordinates(*context.resources, batch.material.coordinates);
+        if (!coordinates.IsValid()) continue;
+        encoder.SetConstantBuffer(RHIBindPoint::Graphics, 10, coordinates);
 
-        // ── 재질 텍스처 ──
-        //
-        // 테이블은 드로우마다 건다. 텍스처가 없는 드로우에도 걸어 두는 이유는
-        // 바인딩된 테이블의 디스크립터는 '초기화돼 있어야' 하기 때문이다 —
-        // 셰이더가 안 읽더라도(hasBaseColorMap=0) 비워 두면 규약 위반이다.
-        // 널 리소스 SRV는 유효한 디스크립터이고 읽으면 0을 준다.
-        //
-        // ★ 링은 프레임당 4096개를 전 패스가 나눠 쓴다. 여기서 소진되면
-        //   남은 투명이 조용히 빠지는 데서 끝나지 않고, 뒤에 오는 패스
-        //   (UI·기즈모)가 예산 부족을 겪어 엉뚱한 자리에서 증상이 난다 —
-        //   투명이 많아지면 DX12DescriptorRecycler의 overflows를 볼 것.
+        const auto found = m_materialTextures.find(batch.material);
+        MaterialTextureTable::Views untexturedViews;
+        if (found == m_materialTextures.end())
         {
-            const auto found = m_materialTextures.find(batch.material);
-
-            // 없는 슬롯은 널 디스크립터다(OrNull) — 셰이더가 hasXxxMap으로
-            // 안 읽더라도 테이블 칸은 초기화돼 있어야 한다.
-            const auto slotDesc = [&](uint32_t slot)
-            {
-                const bool has = (found != m_materialTextures.end())
-                    && found->second.resources[slot].IsValid();
-                return RHIBindingDesc::Srv2D(
-                    has ? found->second.resources[slot] : RHITextureHandle{},
-                    has ? found->second.formats[slot] : RHIFormat::RGBA8Unorm,
-                    0, has ? found->second.mipLevels[slot] : 1).OrNull();
-            };
-            const RHIBindingDesc materialSrvs[] = {
-                slotDesc(0), slotDesc(1), slotDesc(2), slotDesc(3) };
-            const RHIBindingTable srvTable =
-                context.resources->CreateBindings(materialSrvs);
-            if (!srvTable.IsValid()) break;
-
-            encoder.SetBindings(RHIBindPoint::Graphics, 5, srvTable);
+            // Isolated numeric-only fixtures omit the texture cache. Their
+            // hasTextures flag is false, but every reflected slot still needs
+            // an initialized descriptor. A product upload failure is not this path.
+            if (context.textureCache) return false;
+            untexturedViews.assign(batch.material.textures.size(),
+                RHIBindingDesc::Srv2D({}, RHIFormat::RGBA8Unorm).OrNull());
         }
+        const auto srvTable = context.resources->CreateBindings(
+            found != m_materialTextures.end() ? found->second.views : untexturedViews);
+        if (!srvTable.IsValid()) return false;
+        encoder.SetBindings(RHIBindPoint::Graphics, 5, srvTable);
 
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
             instanceUpload.SubRange(

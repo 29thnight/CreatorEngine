@@ -4,7 +4,7 @@
 등록 배선 추적). [ReflectionRetentionDecision.md](../design/ReflectionRetentionDecision.md)(존치 결정)의
 후속 문서다 — "존치한다"는 결론은 유지하되, **존치한 것을 어떻게 고칠 것인가**를
 다룬다. [SerializationPlan.md](../plans/SerializationPlan.md)(PHASE 17)와
-[SceneGraphRedesignPlan.md](../plans/SceneGraphRedesignPlan.md)(트랙 E·K)의 접점을 §5·§7에서 명시한다.
+[SceneGraphRedesignPlan.md](../plans/archive/SceneGraphRedesignPlan.md)(트랙 E·K)의 접점을 §5·§7에서 명시한다.
 
 ## 0. 요약
 
@@ -238,7 +238,7 @@ unique_ptr 전환을 **리플렉션 때문에** 후퇴시켰다. 이는 개별 �
 ## 7. 개선 트랙 제안
 
 > **승계(2026-08-16)**: 본 절의 RF 트랙과 §8의 전환 평가는
-> [ReflectionRedesignPlan.md](../plans/ReflectionRedesignPlan.md)(**PHASE 18**, 슬라이스 CT0~CT7)로 실행
+> [ReflectionRedesignPlan.md](../plans/archive/ReflectionRedesignPlan.md)(**PHASE 18**, 슬라이스 CT0~CT7)로 실행
 > 계획화됐다. 착수 순서·검증 기준은 그 문서가 정본이다.
 >
 > **완결(2026-08-17)**: CT0~CT7 전부 이행 완료. 본 문서의 병폐 목록은 이제

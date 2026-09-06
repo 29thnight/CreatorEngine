@@ -14,6 +14,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <unordered_set>
 #include <vector>
 
@@ -229,7 +230,8 @@ public:
 	// 캐시에서 제거되어도 사용 중인 머티리얼이 파괴되지 않는다.
 	std::shared_ptr<Material> LoadMaterialShared(std::string_view name);
     Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
-	std::shared_ptr<Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress);
+	std::shared_ptr<Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress,
+        std::optional<bool> srgb = std::nullopt);
 	Material* CreateMaterial();
 	// Asset Metadata
 	FileGuid GetFileGuid(const file::path& filepath) const;

@@ -73,7 +73,8 @@ namespace RenderTest
                 // 보존 대상 필드만 비교한다.
                 const auto& other = std::get<experiment::TextureReference>(right);
                 return value->assetId == other.assetId
-                    && value->colorSpace == other.colorSpace;
+                    && value->colorSpace == other.colorSpace
+                    && value->coordinates == other.coordinates;
             }
             return false;
         }
@@ -151,6 +152,7 @@ namespace RenderTest
             material.blendMode = experiment::MaterialBlendMode::Transparent;
             experiment::TextureReference srgbTexture{ textureId, "unstored" };
             srgbTexture.colorSpace = experiment::TextureColorSpace::Srgb;
+            srgbTexture.coordinates = {1, {.25f, -.5f}, {-2.f, .75f}, .4f};
             experiment::TextureReference nilTexture{};
             material.properties = {
                 { "flag", true },
@@ -226,6 +228,21 @@ namespace RenderTest
             check.Check(!restored.assetId.IsValid(), "nil assetId 보존");
         }
 
+        {
+            experiment::Material material;
+            material.shaderAssetId = shaderId;
+            material.blendMode = experiment::MaterialBlendMode::Masked;
+            material.properties = {{"doubleSided", true}, {"alphaCutoff", .375f}};
+            experiment::Material restored;
+            std::string dumped, error;
+            check.Check(RoundTrip(material, restored, dumped, error)
+                && restored.blendMode == material.blendMode
+                && restored.properties.size() == 2
+                && std::get<bool>(restored.properties[0].value)
+                && std::get<float>(restored.properties[1].value) == .375f,
+                "W4 MASK/doubleSided/cutoff authoring round trip");
+        }
+
         // ── 3. Serialize fail-closed ──────────────────────────────────────
         {
             experiment::Material material;   // shaderAssetId nil
@@ -290,9 +307,14 @@ namespace RenderTest
                 std::get_if<experiment::TextureReference>(&value);
             check.Check(ok && nullptr != texture
                 && texture->assetId == shaderId
-                && texture->colorSpace == experiment::TextureColorSpace::Srgb,
+                && texture->colorSpace == experiment::TextureColorSpace::Srgb
+                && texture->coordinates == assets::TextureCoordinates{},
                 "ryml texture property 역직렬화 (" + error + ")");
         }
+
+        for (const std::string fields : {"uvSet: 2", "uvRotation: .nan", "uvOffset: [1]", "uvScale: [1, .inf]"})
+            CheckDeserializeRejected(check, MinimalYaml("  - name: p\n    texture: {guid: "
+                + std::string(kShaderGuid) + ", colorSpace: linear, " + fields + "}\n"), "Invalid UV metadata");
 
         // ── 5. Deserialize fail-closed ────────────────────────────────────
         CheckDeserializeRejected(check,

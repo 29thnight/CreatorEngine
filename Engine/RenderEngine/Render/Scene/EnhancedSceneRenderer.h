@@ -464,8 +464,24 @@ struct EnhancedLiveDebugSnapshot
 // E5 실측대로 인스턴스 멤버 0의 순수 정적 facade라 class일 이유가 없어
 // namespace로 정리했다(E7 잔여 소진, 2026-08-26). 호출 문법과 구현 파일의
 // 한정 정의(EnhancedSceneRenderer::Foo)는 그대로다.
+enum class EnhancedPbrCaptureState : uint8_t { None, Pending, Recording, Complete, Failed };
+
+struct EnhancedLivePbrCaptureStatus
+{
+    EnhancedPbrCaptureState state{ EnhancedPbrCaptureState::None };
+    uint64_t frameId{};
+    std::string directory;
+    std::string error;
+};
+
 namespace EnhancedSceneRenderer
 {
+    // Diagnostic only: capture one subsequent product frame on the render thread.
+    // The output directory must not exist; incomplete data is never overwritten.
+    bool RequestLivePbrCapture(const std::string& directory,
+        EnhancedLiveDisplayTarget target, std::string& outError);
+    EnhancedLivePbrCaptureStatus GetLivePbrCaptureStatus();
+    void CancelLivePbrCapture();
 
     // ── 메인 런타임 렌더러 (PHASE 3-9 승격) ──
     //

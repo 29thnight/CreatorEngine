@@ -1,7 +1,10 @@
 # 효과 계약 도입 전 스크립트 생명주기·Task 계약 안정화 계획
 
+> **보관 · 완료·검증 한계 명시 (정리: 2026-09-06).** LC0~LC7 종료. LC6 변경은 측정 후 보류. LC7 일시 정지 중 대기와 세대 게이트 변이 판정은 미검증으로 남아 있으며 PrSM 도입 완료를 뜻하지 않는다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 > **상태: LC0~LC7 완료. LC6은 측정 후 변경 보류 · LC7 잔여 2항목 명시.** 2026-09-05 결정, 같은 날 착수.
-> [PrSM 기반 효과 계약 계획](SimulationEffectContractPlan.md)은 현재 리팩토링 이후의 미래
+> [PrSM 기반 효과 계약 계획](../SimulationEffectContractPlan.md)은 현재 리팩토링 이후의 미래
 > 작업이다. 이 문서는 그 도입을 기다리지 않고 현행 C# 컴포넌트·Task 스코프에서 처리할
 > 결함, 유지할 실행 의미, 검증 기준을 정한다. 새 실행기나 PrSM을 구현하는 문서가 아니다.
 >
@@ -33,13 +36,13 @@ LC0~LC5와 LC7을 현행 안정화의 필수 검증 범위로 두고, LC6 성능
 
 | 경계 | 현재 구현과 근거 |
 |---|---|
-| 네이티브 생명주기 구동 | [Scene.cpp](../../Engine/SceneRuntime/Scene.cpp)의 `DrainPendingLifecycle`(2543행)이 초기화·씬 진입·시뮬레이션 시작을 구동한다 |
-| 관리 인스턴스 연결 | [ScriptComponent.cpp](../../Engine/SceneRuntime/ScriptComponent.cpp)의 `EnsureInstance`, 단계별 훅, `OnUninitializing`이 인스턴스 생성·필드 적용·관리 통지·제거를 연결한다 |
-| 관리 단계·틱 목록 | [ScriptRegistry.cs](../../ScriptCore/ScriptRegistry.cs)의 `DispatchLifecycle`, `ApplyEnabled`, `StartSimulation`, `Flush`가 관리 상태와 틱 멤버십을 관리한다. `Flush`를 별도 초기화 드라이버로 되돌리지 않는다 |
-| 프레임 실행 | [RuntimeFrame.cpp](../../Engine/SceneRuntime/RuntimeFrame.cpp)의 `Runtime::TickSimulationFrame` 호출 순서는 초기화·입력 → 일시 정지 검사 → PrePhysics → 물리/GameLogic → 후처리 → PostPhysics다. 관리 Pre/Post와 `Scope.Delay`를 고정 시간 스텝이라고 간주하지 않는다 |
-| 대기 | [SimulationScope.cs](../../ScriptCore/SimulationScope.cs)의 `Delay`가 Task를 만들고, 관리 PrePhysics의 `Scope.Tick(dt)`가 완료한다 |
-| 파괴·즉시 제거 | `Scene::FlushPendingDestroy`와 [PrefabUtility.cpp](../../Engine/SceneRuntime/PrefabUtility.cpp)의 즉시 제거 경로가 End → Removing → Uninitializing을 전달한다 |
-| 어셈블리 종료 | [ScriptAssemblyLoader.cs](../../ScriptCore/ScriptAssemblyLoader.cs)의 `Unload`가 `ScriptRegistry.Clear` 이후 팩터리·BT를 정리하고 로드 문맥을 해제한다 |
+| 네이티브 생명주기 구동 | [Scene.cpp](../../../Engine/SceneRuntime/Scene.cpp)의 `DrainPendingLifecycle`(2543행)이 초기화·씬 진입·시뮬레이션 시작을 구동한다 |
+| 관리 인스턴스 연결 | [ScriptComponent.cpp](../../../Engine/SceneRuntime/ScriptComponent.cpp)의 `EnsureInstance`, 단계별 훅, `OnUninitializing`이 인스턴스 생성·필드 적용·관리 통지·제거를 연결한다 |
+| 관리 단계·틱 목록 | [ScriptRegistry.cs](../../../ScriptCore/ScriptRegistry.cs)의 `DispatchLifecycle`, `ApplyEnabled`, `StartSimulation`, `Flush`가 관리 상태와 틱 멤버십을 관리한다. `Flush`를 별도 초기화 드라이버로 되돌리지 않는다 |
+| 프레임 실행 | [RuntimeFrame.cpp](../../../Engine/SceneRuntime/RuntimeFrame.cpp)의 `Runtime::TickSimulationFrame` 호출 순서는 초기화·입력 → 일시 정지 검사 → PrePhysics → 물리/GameLogic → 후처리 → PostPhysics다. 관리 Pre/Post와 `Scope.Delay`를 고정 시간 스텝이라고 간주하지 않는다 |
+| 대기 | [SimulationScope.cs](../../../ScriptCore/SimulationScope.cs)의 `Delay`가 Task를 만들고, 관리 PrePhysics의 `Scope.Tick(dt)`가 완료한다 |
+| 파괴·즉시 제거 | `Scene::FlushPendingDestroy`와 [PrefabUtility.cpp](../../../Engine/SceneRuntime/PrefabUtility.cpp)의 즉시 제거 경로가 End → Removing → Uninitializing을 전달한다 |
+| 어셈블리 종료 | [ScriptAssemblyLoader.cs](../../../ScriptCore/ScriptAssemblyLoader.cs)의 `Unload`가 `ScriptRegistry.Clear` 이후 팩터리·BT를 정리하고 로드 문맥을 해제한다 |
 
 메서드명과 행 번호는 조사 시점의 탐색 기준이다. 변경 후에는 실제 호출 경로를 기준으로 갱신한다.
 
@@ -185,8 +188,8 @@ LC5-c 후속에서 나온 결함(거부가 폴백으로 새는 자리)은 **정�
 
 ### LC0 — 관리 생명주기 기준선과 실패 픽스처 (P1 · 선행)
 
-- [LifecycleProbe](../../GameScripts/LifecycleProbe.cs)와
-  [LifecycleAxisProbe](../../GameScripts/LifecycleAxisProbe.cs), 기존 관리 회귀를 조사해
+- [LifecycleProbe](../../../GameScripts/LifecycleProbe.cs)와
+  [LifecycleAxisProbe](../../../GameScripts/LifecycleAxisProbe.cs), 기존 관리 회귀를 조사해
   정상 호출 순서·횟수·소유자·프레임·활성 상태의 기준선을 고정한다.
 - Initialized/Added/Enable/Begin/Simulate/Disable/End/Removing/Uninitializing 각각의
   예외와 자기 비활성화·제거를 재현할 작은 픽스처를 추가한다. 프레임 경계 재진입도 포함한다.
@@ -589,7 +592,7 @@ setter가 두 종류를 가르게 고쳤다 — 게임 스레드 밖이면 폴�
 
 ### LC6 — 기존 틱·스코프 비용의 선택적 개선 (P2 · LC0 기준선, W8과 조정)
 
-- [ScriptSurfacePlan](ScriptSurfacePlan.md)의 W8과 소유권을 맞춰 빈 훅 호출·오버라이드
+- [ScriptSurfacePlan](../ScriptSurfacePlan.md)의 W8과 소유권을 맞춰 빈 훅 호출·오버라이드
   감지·활성 목록 비용을 측정한다. 수명 검사를 없애 얻은 속도를 개선으로 인정하지 않는다.
 - **W8의 전제 수치는 낡았으니 착수 전에 다시 잰다.** W8은 "`override void PrePhysics`는
   0건인데 `Component` 파생 42개를 매 프레임 순회한다"를 근거로 삼는데, 2026-09-05
@@ -635,7 +638,7 @@ W8의 "`override void PrePhysics`는 0건"은 **저작 코퍼스 기준으로는
 ##### ② LC5-c 진입 검사의 비용을 쟀다 — 분해능 아래다
 
 206곳에 넣고 한 번도 재지 않았던 것이라 여기서 잰다. Release · 호출 100만 × 표본 15
-([measure-entry-guard-cost.ps1](../../Tools/regression/measure-entry-guard-cost.ps1)):
+([measure-entry-guard-cost.ps1](../../../Tools/regression/measure-entry-guard-cost.ps1)):
 
 | | 중앙값 | 범위 |
 |---|---|---|
@@ -681,11 +684,11 @@ LC7-b가 `SimulationScope.Tick`에 넣은 프레임 번호 읽기도 같은 규�
 | 플레이 종료·재시작, 편집 중 인스턴스, 리로드 | 대기/구독/팩터리/BT 참조 해제, 이전 로드 문맥 회수, 새 세대 오염 없음 |
 | 대량 반복 대기·완료·취소 | 유지 메모리 누적 없음, 종료 시간과 예외 격리 확인 |
 
-기존 [생명주기 기준선](../../Tools/regression/verify-lifecycle-baseline.ps1),
-[관리 축](../../Tools/regression/verify-lifecycle-axis.ps1),
-[DDOL 스크립트](../../Tools/regression/verify-ddol-script.ps1),
-[추가 시 초기화 한 번](../../Tools/regression/verify-script-add-awake-once.ps1),
-[ASan 생명주기](../../Tools/regression/verify-asan-lifecycle.ps1)를 실제 지원 환경에 맞춰 사용하고
+기존 [생명주기 기준선](../../../Tools/regression/verify-lifecycle-baseline.ps1),
+[관리 축](../../../Tools/regression/verify-lifecycle-axis.ps1),
+[DDOL 스크립트](../../../Tools/regression/verify-ddol-script.ps1),
+[추가 시 초기화 한 번](../../../Tools/regression/verify-script-add-awake-once.ps1),
+[ASan 생명주기](../../../Tools/regression/verify-asan-lifecycle.ps1)를 실제 지원 환경에 맞춰 사용하고
 누락된 오류 주입·참조 회수 검사를 더한다. 기존 로그의 `Awake`/`Start` 같은 라벨은 진단 문자열이며
 은퇴한 API가 살아 있다는 근거로 쓰지 않는다.
 

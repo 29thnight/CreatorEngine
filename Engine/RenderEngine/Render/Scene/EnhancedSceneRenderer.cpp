@@ -1,5 +1,6 @@
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
+#include "EnhancedPbrCapture.h"
 
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../Graph/EnhancedRenderPass.h"
@@ -645,7 +646,7 @@ namespace
         bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
             uint64_t sourceFrameId, uint64_t backendGeneration,
             const std::function<bool(std::string&)>& prepareFrame,
-            std::string& outError)
+            std::string& outError, EnhancedPbrCapture* capture)
         {
             Slot* slot = nullptr;
             for (Slot& candidate : slots)
@@ -654,14 +655,30 @@ namespace
             }
             if (nullptr == slot) { outError = "Vulkan 라이브 리드백 슬롯이 모두 사용 중"; return false; }
 
-            if (!resources.BeginFrame(outError)) return false;
+            if (!resources.BeginFrame(outError))
+            {
+                if (capture) capture->Fail(outError);
+                return false;
+            }
             bool committed = false;
             struct FrameGuard
             {
                 VulkanDeviceResources& resources;
                 const bool& committed;
-                ~FrameGuard() { if (!committed) resources.AbortFrame(); }
-            } frameGuard{ resources, committed };
+                EnhancedPbrCapture* capture;
+                std::string& error;
+                ~FrameGuard()
+                {
+                    if (!committed) resources.AbortFrame();
+                    if (capture)
+                    {
+                        resources.WaitForGpu();
+                        capture->Release(resources);
+                        if (capture->result.state == EnhancedPbrCaptureState::Recording)
+                            capture->Fail(error);
+                    }
+                }
+            } frameGuard{ resources, committed, capture, outError };
 
             const uint32_t frameIndex = static_cast<uint32_t>(frameCounter++);
             commandPool.BeginFrame(commandPoolFrame);
@@ -690,6 +707,8 @@ namespace
                 EnhancedLiveViewFlags::SceneOverlay)
                 ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
             desc.DeclareAll(blackboard, graph, frameContext, binding);
+            if (capture && !capture->Declare(resources, graph, blackboard,
+                    width, height, outError)) return false;
 
             if (!blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
             {
@@ -722,12 +741,37 @@ namespace
             slot->key = viewPacket.key;
             slot->frameId = sourceFrameId;
             slot->pending = true;
+            if (capture)
+            {
+                resources.WaitForGpu();
+                std::string validation;
+                const uint32_t validationCount = resources.DrainDebugMessages(validation);
+                if (!capture->Save(resources, graph.GetStats(), outError,
+                        validationCount, validation)) return false;
+            }
             return true;
         }
     };
 
     struct LiveState
     {
+        std::unique_ptr<EnhancedPbrCapture> pbrCapture;
+
+        EnhancedPbrCapture* BeginPbrCapture(const EnhancedLiveFramePacket& frame,
+            const EnhancedLiveViewPacket& view)
+        {
+            if (!pbrCapture || pbrCapture->result.state != EnhancedPbrCaptureState::Pending
+                || pbrCapture->target != view.displayTarget
+                || frame.frameId <= pbrCapture->afterFrameId) return nullptr;
+            try { pbrCapture->Begin(frame, view, backend, draws, forwardDraws, lights, skyBoxPath); }
+            catch (const std::exception& error)
+            {
+                pbrCapture->Fail(error.what());
+                return nullptr;
+            }
+            return pbrCapture.get();
+        }
+
         std::atomic_bool enabled{ false };
         bool runtimeInitialized{ false };
         EnhancedLiveBackend backend{ EnhancedLiveBackend::DX12 };
@@ -2993,6 +3037,8 @@ namespace
                         return false;
                     }
 
+                    if (!ExperimentMaterialSealing::SealCoverage(sealSource, *layout,
+                            snapshot->propertyBytes, snapshot->coverage, error)) return false;
                     if (!snapshot->IsValid())
                     {
                         error = "Forward material snapshot sealing 결과가 invalid다";
@@ -3182,6 +3228,8 @@ namespace
                         outError += " (material " + sealSource.debugName + ")";
                     return false;
                 }
+                if (!ExperimentMaterialSealing::SealCoverage(sealSource, *layout,
+                        snapshot->propertyBytes, snapshot->coverage, outError)) return false;
                 if (!snapshot->IsValid())
                 {
                     outError = "GBuffer material snapshot sealing 결과가 invalid다";
@@ -3466,12 +3514,16 @@ namespace
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
         bool RenderOnce(LivePipeline::CameraView& view, int slotIndex,
             uint64_t sourceFrameId,
-            std::string& outError)
+            std::string& outError, EnhancedPbrCapture* capture)
         {
             LivePipeline& p = *pipeline;
             LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
 
-            if (!dx12.BeginFrame(outError)) return false;
+            if (!dx12.BeginFrame(outError))
+            {
+                if (capture) capture->Fail(outError);
+                return false;
+            }
 
             // 여기서부터는 커맨드 리스트가 열려 있다. 아래 어느 지점에서
             // 실패로 빠져나가든 닫고 나가야 한다 — 열린 채 두면 다음
@@ -3482,8 +3534,20 @@ namespace
             {
                 EnhancedSceneRendererLiveDX12Adapter& backend;
                 const bool& committed;
-                ~FrameGuard() { if (!committed) backend.AbortFrame(); }
-            } frameGuard{ dx12, frameCommitted };
+                EnhancedPbrCapture* capture;
+                std::string& error;
+                ~FrameGuard()
+                {
+                    if (!committed) backend.AbortFrame();
+                    if (capture)
+                    {
+                        backend.WaitForGpu();
+                        capture->Release(backend.Resources());
+                        if (capture->result.state == EnhancedPbrCaptureState::Recording)
+                            capture->Fail(error);
+                    }
+                }
+            } frameGuard{ dx12, frameCommitted, capture, outError };
 
             dx12.BeginProfilerFrame(frameCounter++);
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
@@ -3525,6 +3589,8 @@ namespace
                 ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
 
             p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
+            if (capture && !capture->Declare(dx12.Resources(), graph, p.blackboard,
+                    p.width, p.height, outError)) return false;
 
             if (!p.blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
             {
@@ -3566,6 +3632,14 @@ namespace
             slot.key = view.key;
 
             view.pendingQueue.push_back(slotIndex);
+            if (capture)
+            {
+                dx12.WaitForGpu();
+                std::string validation;
+                const uint32_t validationCount = dx12.DrainDebugMessages(validation);
+                if (!capture->Save(dx12.Resources(), graph.GetStats(), outError,
+                        validationCount, validation)) return false;
+            }
             return true;
         }
     };
@@ -4505,6 +4579,44 @@ EnhancedRenderThreadStats EnhancedSceneRenderer::GetLiveRenderThreadStats()
     return GetLiveState().GetRenderThreadStats();
 }
 
+bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
+    EnhancedLiveDisplayTarget target, std::string& outError)
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.renderStateMutex);
+    if (target >= EnhancedLiveDisplayTarget::Count || !state.enabled)
+    { outError = "capture requires an enabled live renderer and valid display target"; return false; }
+    if (state.pbrCapture && (state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
+        || state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording))
+    { outError = "a PBR capture is already pending"; return false; }
+    std::error_code error;
+    const std::filesystem::path path(directory);
+    if (!path.is_absolute() || !std::filesystem::create_directories(path, error) || error)
+    { outError = "capture requires a new absolute directory: " + directory; return false; }
+    state.pbrCapture = std::make_unique<EnhancedPbrCapture>();
+    state.pbrCapture->target = target;
+    state.pbrCapture->afterFrameId = state.publishedFrameId.load();
+    state.pbrCapture->result.directory = directory;
+    state.pbrCapture->result.state = EnhancedPbrCaptureState::Pending;
+    outError.clear();
+    return true;
+}
+
+EnhancedLivePbrCaptureStatus EnhancedSceneRenderer::GetLivePbrCaptureStatus()
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.renderStateMutex);
+    return state.pbrCapture ? state.pbrCapture->result : EnhancedLivePbrCaptureStatus{};
+}
+
+void EnhancedSceneRenderer::CancelLivePbrCapture()
+{
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> lock(state.renderStateMutex);
+    if (state.pbrCapture && state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending)
+        state.pbrCapture->Fail("capture timed out before a matching live view was rendered");
+}
+
 bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMilliseconds)
 {
     return GetLiveState().WaitForRenderThreadIdle(timeoutMilliseconds);
@@ -4736,8 +4848,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             if (!p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
                 frame.frameId,
                 GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
-                prepareFrame, error))
+                prepareFrame, error, state.BeginPbrCapture(frame, viewPacket)))
             {
+                if (state.pbrCapture && state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
+                    state.pbrCapture->Fail(error);
                 std::string validation;
                 p.resources.DrainDebugMessages(validation);
                 const uint32_t unimplemented = p.resources.GetUnimplementedCount()
@@ -5083,8 +5197,11 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         }
 
         std::string error;
-        if (!state.RenderOnce(*view, renderSlot, frame.frameId, error))
+        if (!state.RenderOnce(*view, renderSlot, frame.frameId, error,
+                state.BeginPbrCapture(frame, viewPacket)))
         {
+            if (state.pbrCapture && state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
+                state.pbrCapture->Fail(error);
             // 한 프레임 실패로 렌더러를 접지 않는다.
             //
             // 예전에는 여기서 바로 TeardownPipeline + enabled=false 였고,

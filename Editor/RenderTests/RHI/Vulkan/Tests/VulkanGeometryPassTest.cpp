@@ -419,7 +419,7 @@ namespace
         if (!ShaderMetaReflection::Resolve(outMeta, dxilStages, layout, outError))
             return false;
 
-        constexpr std::size_t kNumericPropertyCount = 7;
+        constexpr std::size_t kNumericPropertyCount = 8;
         const std::string_view expectedNames[kNumericPropertyCount] = {
             standard_material::property::BaseColor,
             standard_material::property::Metallic,
@@ -428,20 +428,22 @@ namespace
             standard_material::property::OcclusionStrength,
             standard_material::property::Emissive,
             standard_material::property::AlphaCutoff,
+            standard_material::property::EmissiveStrength,
         };
         constexpr std::uint32_t expectedOffsets[kNumericPropertyCount] = {
-            0, 16, 20, 24, 28, 32, 44,
+            0, 16, 20, 24, 28, 32, 44, 48,
         };
-        constexpr std::array<std::string_view, 4> expectedTextures{
+        constexpr std::array<std::string_view, 5> expectedTextures{
             standard_material::property::BaseColorMap,
             standard_material::property::NormalMap,
             standard_material::property::OrmMap,
             standard_material::property::EmissiveMap,
+            standard_material::property::AoMap,
         };
         bool layoutMatches = "MaterialProperties" == layout.constantBufferName
             && 2 == layout.constantBufferRegister
             && 0 == layout.constantBufferSpace
-            && 48 == layout.constantBufferByteSize
+            && 64 == layout.constantBufferByteSize
             && kNumericPropertyCount + expectedTextures.size()
                 == layout.properties.size();
         for (std::size_t i = 0; layoutMatches && i < kNumericPropertyCount; ++i)
@@ -458,7 +460,7 @@ namespace
             layoutMatches = expectedTextures[i] == binding.name
                 && ShaderPropertyType::Texture2D == binding.propertyType
                 && RHIShaderResourceKind::Texture == binding.resourceKind
-                && i == binding.registerIndex && 0 == binding.registerSpace;
+                && 16u + i == binding.registerIndex && 0 == binding.registerSpace;
         }
         if (!layoutMatches)
         {
@@ -476,12 +478,71 @@ namespace
             || !outMaterial.TrySetVector("MaterialProperties", "emissive",
                 math::vector3{ 0.0625f, 0.125f, 0.25f })
             || !outMaterial.TrySetFloat("MaterialProperties", "alphaCutoff", 0.875f)
-            || 48 != outMaterial.GetConstantBufferData().size())
+            || 64 != outMaterial.GetConstantBufferData().size())
         {
             if (outError.empty()) outError = "제품 GBuffer Standard property pack 실패";
             return false;
         }
         return true;
+    }
+
+    template <typename TResources>
+    bool ValidatePbrTextureDefaults(TResources& resources,
+        IRenderTextureCache& cache, const std::function<void()>& beginCaches,
+        std::string& outError)
+    {
+        std::array<RHIReadback, 3> readbacks{};
+        bool open = false;
+        const auto finish = [&](bool success)
+        {
+            if (open) resources.AbortFrame();
+            resources.WaitForGpu();
+            for (auto& readback : readbacks) resources.ReleaseReadback(readback);
+            return success;
+        };
+        for (auto& readback : readbacks)
+            if (!resources.CreateReadback(1, 1, RHIFormat::RGBA8Unorm, 1,
+                    readback, outError)) return finish(false);
+        if (!resources.BeginFrame(outError)) return finish(false);
+        open = true;
+        if (beginCaches) beginCaches();
+        const std::array<RHITextureEntry, 3> entries{
+            cache.GetOrUpload(nullptr, outError),
+            cache.GetOrmNeutralTexture(outError), cache.GetBlackTexture(outError) };
+        EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
+        for (uint32_t i = 0; i < entries.size(); ++i)
+        {
+            if (!entries[i].IsValid()) return finish(false);
+            const auto texture = graph.ImportTexture(entries[i].handle,
+                RHIResourceState::PixelShaderResource, "PBR.Default");
+            graph.AddPass("PBR.Default.Read", { { texture, RHIResourceState::CopySource } },
+                [&, texture, i](const EnhancedRenderGraph::ExecuteContext& context)
+                { context.encoder->CopyToReadback(readbacks[i], context.ResolveHandle(texture)); }, true);
+            graph.AddPass("PBR.Default.Restore", { { texture, RHIResourceState::PixelShaderResource } },
+                [](const EnhancedRenderGraph::ExecuteContext&) {}, true);
+        }
+        if (!graph.Compile(outError) || !graph.Execute(outError)
+            || !resources.EndFrame(outError)) return finish(false);
+        open = false;
+        resources.WaitForGpu();
+        for (uint32_t i = 0; i < readbacks.size(); ++i)
+        {
+            RHIReadbackImage image;
+            if (!resources.MapReadback(readbacks[i], image, outError)) return finish(false);
+            for (uint32_t channel = 0; channel < 4; ++channel)
+            {
+                const float expected = i == 2 && channel != 3 ? 0.f : 1.f;
+                const float actual = image.At(0, 0, channel);
+                if (!std::isfinite(actual) || std::fabs(actual - expected) > 1e-6f)
+                {
+                    outError = "PBR default texture " + std::to_string(i)
+                        + " channel " + std::to_string(channel) + ": expected "
+                        + std::to_string(expected) + ", actual " + std::to_string(actual);
+                    return finish(false);
+                }
+            }
+        }
+        return finish(true);
     }
 
     template <typename TResources>
@@ -493,6 +554,8 @@ namespace
         const ShaderMeta& secondaryMeta, ShaderMetaHandle secondaryMetaHandle,
         GBufferCapture& outCapture, std::string& outError)
     {
+        if (!ValidatePbrTextureDefaults(resources, textureCache, beginCaches, outError))
+            return false;
         EnhancedFrameContext context{};
         context.resources = &resources;
         context.psoManager = &pipelines;
@@ -1022,13 +1085,13 @@ namespace
             kStandardNumericPropertyCount> expectedOffsets{
             0, 16, 20, 24, 28, 32, 44,
         };
-        constexpr std::size_t kMaterialTextureSlotCount = 4;
+        constexpr std::size_t kMaterialTextureSlotCount = 5;
         bool layoutMatches = "MaterialProperties" == layout.constantBufferName
             && 2 == layout.constantBufferRegister
             && 0 == layout.constantBufferSpace
             && expectedConstantBytes == layout.constantBufferByteSize
-            // I5-M5 flow 승격 — 표준 7 + variant tail + flow 2 + texture 4.
-            && kStandardNumericPropertyCount + tailProperties.size() + 2u
+            // I5-M5 flow 승격 — 표준 7 + variant tail + flow 2 + texture 5.
+            && kStandardNumericPropertyCount + tailProperties.size() + 3u
                 + kMaterialTextureSlotCount
                 == layout.properties.size();
         for (std::size_t index = 0;
@@ -1069,10 +1132,13 @@ namespace
                 && flowBase == flowUv.byteOffset
                 && standard_material::property::FlowWindVector == flowWind.name
                 && ShaderPropertyType::Float4 == flowWind.propertyType
-                && flowBase + 16u == flowWind.byteOffset;
+                && flowBase + 16u == flowWind.byteOffset
+                && layout.properties[flowIndex + 2].name == standard_material::property::EmissiveStrength
+                && layout.properties[flowIndex + 2].propertyType == ShaderPropertyType::Float
+                && layout.properties[flowIndex + 2].byteOffset == flowBase + 32u;
         }
         const std::size_t texturePropertyOffset =
-            kStandardNumericPropertyCount + tailProperties.size() + 2u;
+            kStandardNumericPropertyCount + tailProperties.size() + 3u;
         std::array<bool, kMaterialTextureSlotCount> occupied{};
         std::vector<std::string_view> textureNames;
         for (std::size_t index = 0;
@@ -1083,11 +1149,11 @@ namespace
             layoutMatches = !binding.name.empty()
                 && ShaderPropertyType::Texture2D == binding.propertyType
                 && RHIShaderResourceKind::Texture == binding.resourceKind
-                && binding.registerIndex >= 4u && binding.registerIndex < 8u
+                && binding.registerIndex >= 16u && binding.registerIndex < 21u
                 && 0 == binding.registerSpace;
             if (layoutMatches)
             {
-                const std::size_t slot = binding.registerIndex - 4u;
+                const std::size_t slot = binding.registerIndex - 16u;
                 layoutMatches = !occupied[slot]
                     && std::find(textureNames.begin(), textureNames.end(), binding.name)
                         == textureNames.end();
@@ -1097,7 +1163,7 @@ namespace
         }
         if (!layoutMatches)
         {
-            outError = "제품 Forward b2/t4..t7 reflection layout 불일치";
+            outError = "제품 Forward b2/t16..t20 reflection layout 불일치";
             return false;
         }
 
@@ -2033,15 +2099,12 @@ bool RunVulkanGBufferTest(std::string& outLog)
             return snapshot;
         }
         snapshot->useNormalMap = material.GetNormalMapShared() ? 1u : 0u;
-        constexpr std::array<std::string_view, 4> textureProperties{
+        constexpr std::array<std::string_view, 5> textureProperties{
             standard_material::property::BaseColorMap,
             standard_material::property::NormalMap,
             standard_material::property::OrmMap,
             standard_material::property::EmissiveMap,
-        };
-        const std::array<std::shared_ptr<Texture>, 4> textureOwners{
-            material.GetBaseColorMapShared(), material.GetNormalMapShared(),
-            material.GetOccRoughMetalMapShared(), material.GetEmissiveMapShared(),
+            standard_material::property::AoMap,
         };
         snapshot->textureBindings.resize(textureProperties.size());
         for (std::size_t index = 0; index < textureProperties.size(); ++index)
@@ -2072,7 +2135,7 @@ bool RunVulkanGBufferTest(std::string& outLog)
             texture.textureGuid = logical->m_textureGuid;
             texture.registerIndex = reflected->registerIndex;
             texture.registerSpace = reflected->registerSpace;
-            texture.textureOwner = textureOwners[index];
+            texture.textureOwner = material.GetTextureMapShared(property);
         }
         return snapshot;
     };
@@ -2182,8 +2245,8 @@ bool RunVulkanGBufferTest(std::string& outLog)
         && fourthNormal.textureGuid == sharedNormalGuid
         && firstTexture.propertyName == standard_material::property::BaseColorMap
         && secondTexture.propertyName == standard_material::property::BaseColorMap
-        && 0 == firstTexture.registerIndex && 0 == firstTexture.registerSpace
-        && 0 == secondTexture.registerIndex && 0 == secondTexture.registerSpace
+        && 16 == firstTexture.registerIndex && 0 == firstTexture.registerSpace
+        && 16 == secondTexture.registerIndex && 0 == secondTexture.registerSpace
         && fixture.draws[1].materialSnapshot->keywordSelections
             == std::vector<std::uint16_t>{ 0 }
         && fixture.draws[2].materialSnapshot->keywordSelections
@@ -2413,15 +2476,16 @@ bool RunVulkanGBufferTest(std::string& outLog)
 
     const float expected[][4] = {
         { 0.0627451f, 0.25f, 0.12549f, 1.f },
-        { 0.375f, 0.625f, 0.75f, 1.f },
+        // No AO texture: occlusionStrength alone must not darken the surface.
+        { 1.f, 0.625f, 0.75f, 1.f },
         { 0.5f, 0.5f, 1.f, 1.f },
-        { 0.f, 0.f, 0.f, 1.f } };
+        { 0.0625f, 0.125f, 0.25f, 1.f } };
     float dxExpectedDelta = 0.f;
     const float secondExpected[][4] = {
         { 0.188235f, 0.0627451f, 0.25f, 1.f },
-        { 0.375f, 0.25f, 0.125f, 1.f },
+        { 1.f, 0.25f, 0.125f, 1.f },
         { 0.5f, 0.5f, 1.f, 1.f },
-        { 0.f, 0.f, 0.f, 1.f } };
+        { 0.0625f, 0.125f, 0.25f, 1.f } };
     for (uint32_t target = 0; target < 4; ++target)
     {
         if (2 == target) continue;
@@ -2434,9 +2498,9 @@ bool RunVulkanGBufferTest(std::string& outLog)
     float fourthExpectedDelta = 0.f;
     const float thirdExpected[][4] = {
         { 0.188235f, 0.0627451f, 0.25f, 1.f },
-        { 0.375f, 0.25f, 0.125f, 1.f },
+        { 1.f, 0.25f, 0.125f, 1.f },
         { 0.f, 0.f, 0.f, 0.f },
-        { 0.f, 0.f, 0.f, 1.f } };
+        { 0.0625f, 0.125f, 0.25f, 1.f } };
     for (uint32_t target = 0; target < 4; ++target)
     {
         if (2 == target) continue;
@@ -2481,9 +2545,15 @@ bool RunVulkanGBufferTest(std::string& outLog)
     {
         passed = false;
         outLog += "MRT·depth 픽셀 대조 허용 범위를 벗어났다\n";
+        outLog += "authored expected deltas: " + std::to_string(dxExpectedDelta)
+            + "/" + std::to_string(secondExpectedDelta)
+            + "/" + std::to_string(thirdExpectedDelta)
+            + "/" + std::to_string(fourthExpectedDelta)
+            + "; normal permutation deltas: " + std::to_string(dxPermutationNormalDelta)
+            + "/" + std::to_string(vkPermutationNormalDelta) + "\n";
     }
 
-    outLog += "[4/4] Standard numeric 7+texture 4·b2 48B"
+    outLog += "[4/4] Standard numeric 8+texture 5·b2 64B"
         " · baseColorMap GUID 2개→reflection t0/space0·서로 다른 owned texture 2 batch"
         " · 같은 texture/property+SHADING_QUALITY full/reduced→PSO 2개·normal 픽셀 분리"
         " · secondary ShaderMeta generation 동시 draw·candidate-first 교체·frame retirement"
@@ -2532,7 +2602,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     ShaderMeta primaryMeta{};
     Material primaryMaterial{};
     std::uint32_t forwardPassIndex = 0;
-    if (!PrepareForwardMaterialProbe("Forward.shadermeta", {}, 80u,
+    if (!PrepareForwardMaterialProbe("Forward.shadermeta", {}, 96u,
             primaryHandle, primaryMeta, primaryMaterial, forwardPassIndex, error))
     {
         outLog += "[1/4] 제품 Forward ShaderMeta 준비 실패: " + error + "\n";
@@ -2739,9 +2809,9 @@ bool RunVulkanForwardTest(std::string& outLog)
     ShaderMetaHandle windHandle{};
     ShaderMeta windMeta{};
     std::uint32_t windPassIndex = 0;
-    if (!PrepareForwardMaterialProbe("ForwardWater.shadermeta", waterTail, 96u,
+    if (!PrepareForwardMaterialProbe("ForwardWater.shadermeta", waterTail, 112u,
             waterHandle, waterMeta, waterMaterial, waterPassIndex, error)
-        || !PrepareForwardMaterialProbe("ForwardWind.shadermeta", windTail, 96u,
+        || !PrepareForwardMaterialProbe("ForwardWind.shadermeta", windTail, 112u,
             windHandle, windMeta, windMaterial, windPassIndex, error)
         || waterPassIndex != forwardPassIndex || windPassIndex != forwardPassIndex)
     {
@@ -3014,12 +3084,12 @@ bool RunVulkanForwardTest(std::string& outLog)
             [](const auto& packet) { return !packet || !packet->IsValid(); })
         || !mutatedWindPacket || !mutatedWindPacket->IsValid()
         || !invalidFlowRejected
-        || 80u != packets[0]->propertyBytes.size()
-        || 96u != packets[1]->propertyBytes.size()
-        || 96u != packets[3]->propertyBytes.size()
-        || 4u != packets[3]->textureBindings.size()
+        || 96u != packets[0]->propertyBytes.size()
+        || 112u != packets[1]->propertyBytes.size()
+        || 112u != packets[3]->propertyBytes.size()
+        || 5u != packets[3]->textureBindings.size()
         || "windMap" != packets[3]->textureBindings.front().propertyName
-        || 4u != packets[3]->textureBindings.front().registerIndex
+        || 16u != packets[3]->textureBindings.front().registerIndex
         || packets[3]->shaderMetaHandle != mutatedWindPacket->shaderMetaHandle
         || packets[3]->permutationKey != mutatedWindPacket->permutationKey
         || packets[3]->bindingLayout != mutatedWindPacket->bindingLayout
@@ -3115,7 +3185,7 @@ bool RunVulkanForwardTest(std::string& outLog)
             return false;
         }
     }
-    outLog += "[1/4] DX12 기준 Forward ShaderMeta·material PSO/b2/t4..t7·blend order 통과\n";
+    outLog += "[1/4] DX12 기준 Forward ShaderMeta·material PSO/b2/t16..t20·blend order 통과\n";
 
     if (!VulkanApi::LoadLoader(error))
     {
@@ -3235,7 +3305,8 @@ bool RunVulkanForwardTest(std::string& outLog)
     constexpr float expectedOverlap[3] = { 0.125f, 0.25f, 0.5f };
     // windSpeed=-pi/2, total=1, flow phase=3pi/2 => phase=pi/2,
     // response=0.1+0.7*1=0.8. alpha 0.5 합성까지 포함한 정확한 기대값이다.
-    constexpr float expectedWindAfter[3] = { 0.032f, 0.26f, 0.056f };
+    // Constant emission contributes 1 * alpha(0.5) before the animated tint.
+    constexpr float expectedWindAfter[3] = { 0.532f, 0.76f, 0.556f };
     float maxCustomBackendDelta = 0.f;
     float maxCustomExpectedDelta = 0.f;
     float maxCustomBefore = 0.f;
@@ -3276,9 +3347,9 @@ bool RunVulkanForwardTest(std::string& outLog)
                 std::fabs(dx12Capture.customAfter[channel]
                     - vkCapture.customAfter[channel]));
             maxCustomBefore = (std::max)(maxCustomBefore,
-                std::fabs(dx12Capture.customBefore[channel]));
+                std::fabs(dx12Capture.customBefore[channel] - .5f));
             maxCustomBefore = (std::max)(maxCustomBefore,
-                std::fabs(vkCapture.customBefore[channel]));
+                std::fabs(vkCapture.customBefore[channel] - .5f));
             maxCustomExpectedDelta = (std::max)(maxCustomExpectedDelta,
                 std::fabs(dx12Capture.customAfter[channel]
                     - expectedWindAfter[channel]));
@@ -3327,7 +3398,7 @@ bool RunVulkanForwardTest(std::string& outLog)
 
     outLog += "[4/4] P2d-e material-cache ShaderMeta scan 0·빈 packet primary-only 1/1·raw Material texture alias/setter 0·"
         "required-asset GUID packet 2개·non-cache Material owner 해제 뒤 유지·cache 로드 전 Water/Wind generation owner·canonical seed 0·"
-        "P2d-c windMap@t4 generic schema/owner vector·P2d-b m_flowInfo 32B+frame total/delta immutable snapshot·NaN fail-closed·"
+        "P2d-c windMap@t16 generic schema/owner vector·P2d-b m_flowInfo 32B+frame total/delta immutable snapshot·NaN fail-closed·"
         "Foliage type 1개·view-culling draw source 2개·owner 반환·"
         "Forward frame ShaderMeta owner 3개·48/64B material packet 5개·"
         "primary/water/wind PSO A/B/A/C·인접 7 draw→4 batch·"

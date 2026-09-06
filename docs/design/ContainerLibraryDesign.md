@@ -629,6 +629,6 @@ swap-and-pop을 대체한다. 타입을 안 바꾸니 리플렉션·직렬화에
 ## 9. 관련 문서
 
 - [UtilityFrameworkModernizationPlan.md](../plans/UtilityFrameworkModernizationPlan.md) — 상위 계획
-- [SceneGraphRedesignPlan.md](../plans/SceneGraphRedesignPlan.md) — K2 스테이지 B 폐기 결정, SBO 재적용 기준
-- [ReflectionRedesignPlan.md](../plans/ReflectionRedesignPlan.md) — 리플렉션 표면
+- [SceneGraphRedesignPlan.md](../plans/archive/SceneGraphRedesignPlan.md) — K2 스테이지 B 폐기 결정, SBO 재적용 기준
+- [ReflectionRedesignPlan.md](../plans/archive/ReflectionRedesignPlan.md) — 리플렉션 표면
 - [PPLContainerMigrationAnalysis.md](../analysis/PPLContainerMigrationAnalysis.md) — PPL 컨테이너 축

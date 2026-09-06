@@ -499,7 +499,9 @@
     <ClInclude Include="RHI\Vulkan\Shaders\VkTriangleSpv.h" />
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />
     <ClInclude Include="Render\Scene\EnhancedSceneRenderer.h" />
+    <ClInclude Include="Render\Scene\EnhancedPbrCapture.h" />
     <ClInclude Include="Render\Scene\ExperimentMaterialSealing.h" />
+    <ClInclude Include="Render\Scene\MaterialTextureTable.h" />
     <ClInclude Include="Render\Scene\EnhancedSceneRendererLiveDX12Adapter.h" />
     <ClInclude Include="Render\Core\EnhancedLightPacking.h" />
     <ClInclude Include="Camera.h" />
@@ -566,6 +568,7 @@
     <ClInclude Include="ExperimentMaterialMigration.h" />
     <ClInclude Include="Experiment\ModelData.h" />
     <ClInclude Include="Assets\ModelVertexLayout.h" />
+    <ClInclude Include="Assets\TextureCoordinates.h" />
     <ClInclude Include="Experiment\VertexLayout.h" />
     <ClInclude Include="RHI\ModelVertexInputLayout.h" />
     <ClInclude Include="Experiment\Model.h" />

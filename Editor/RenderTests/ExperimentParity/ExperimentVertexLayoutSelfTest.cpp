@@ -147,11 +147,13 @@ namespace RenderTest
                 "stride 96 → 68 — 버퍼와 레이아웃은 동시에만 바뀐다");
         }
 
-        // MBC6: 최소 네 조합이 layout과 shader permutation 양쪽에서 서로 다른
+        // core/color/skin 및 UV1 조합이 layout과 shader permutation 양쪽에서 서로 다른
         // key를 가져야 한다. skin bool 하나로 축약하면 이 단정이 붉어진다.
         {
-            const std::array<std::uint32_t, 4> expectedStride{{ 48u, 64u, 68u, 84u }};
-            const std::array<std::size_t, 4> expectedElements{{ 4u, 5u, 6u, 7u }};
+            constexpr std::array<std::uint32_t, 8> expectedStride{{ 48u, 64u, 68u, 84u, 56u, 72u, 76u, 92u }};
+            constexpr std::array<std::size_t, 8> expectedElements{{ 4u, 5u, 6u, 7u, 5u, 6u, 7u, 8u }};
+            static_assert(expectedStride.size() == assets::kModelVertexMasks.size());
+            static_assert(expectedElements.size() == assets::kModelVertexMasks.size());
             std::vector<RHIShaderPermutationKey> keys;
             for (std::size_t i = 0; i < assets::kModelVertexMasks.size(); ++i)
             {
@@ -172,7 +174,7 @@ namespace RenderTest
             std::sort(keys.begin(), keys.end(), [](const auto& left, const auto& right)
                 { return left.hi != right.hi ? left.hi < right.hi : left.lo < right.lo; });
             check.Check(std::adjacent_find(keys.begin(), keys.end()) == keys.end(),
-                "core/color/skin/color+skin PSO key 4종 분리");
+                "core/color/skin/color+skin 및 UV1 PSO key 8종 분리");
             check.Check(assets::StrideOf(assets::kCoreColorSkinVertexAttributes) == 84u
                 && assets::OffsetOf(assets::kCoreColorSkinVertexAttributes,
                     assets::VertexAttribute::BoneIndices) == 64u

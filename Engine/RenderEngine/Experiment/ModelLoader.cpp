@@ -437,7 +437,11 @@ namespace experiment
 						context + ".properties." + property.name,
 						"texture property에는 AssetId 또는 fallback path가 필요하다.");
 				}
-				if (!HasFiniteNumericValue(property.value))
+				if (const auto* texture = std::get_if<TextureReference>(&property.value);
+                    texture && !texture->coordinates.IsValid())
+                    AddIssue(issues, ModelLoadIssueCode::InvalidTextureReference,
+                        context + ".properties." + property.name, "Invalid texture UV set/transform.");
+                if (!HasFiniteNumericValue(property.value))
 				{
 					AddIssue(issues, ModelLoadIssueCode::InvalidMaterial,
 						context + ".properties." + property.name,

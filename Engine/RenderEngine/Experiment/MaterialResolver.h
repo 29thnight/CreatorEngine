@@ -40,7 +40,7 @@ namespace experiment
         std::function<std::shared_ptr<const ShaderMeta>(const ShaderMetaHandle&)>
             resolveShaderMeta{};
         // 경로 → texture generation owner. 정본: DataSystem::LoadSharedMaterialTexture.
-        std::function<std::shared_ptr<Texture>(const std::filesystem::path&, bool)>
+        std::function<std::shared_ptr<Texture>(const std::filesystem::path&, bool, TextureColorSpace)>
             loadTexture{};
         // GUID → cooked artifact 경로. 정본: CookedAssetCatalog::ResolveArtifactPath.
         // 비어 있으면(catalog 부재) source만 쓴다.

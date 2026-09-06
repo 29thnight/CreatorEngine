@@ -7,7 +7,7 @@
 > 저작분을 다시 조사해 범위·공수·이행 순서를 산정한다.
 >
 > 현행 생명주기·Task 스코프의 결함 수정은
-> [ScriptLifecycleContractHardeningPlan.md](ScriptLifecycleContractHardeningPlan.md)로 분리한다.
+> [ScriptLifecycleContractHardeningPlan.md](archive/ScriptLifecycleContractHardeningPlan.md)로 분리한다.
 > 그 작업은 PHASE 24를 기다리지 않으며, 이 문서의 PrSM 도입과 완료를 서로 대신하지 않는다.
 >
 > 기존 결정인 **폐쇄 효과 카탈로그, 즉시 효과와 중단의 분리, `Var<T>` 이름**은 유지한다.
@@ -41,7 +41,7 @@ PrSM은 저작 의도와 정적 계약을 표현하고, 생성된 C#은 기존 `
 
 기준점과 재개 조건:
 
-1. [현행 안정화 계획](ScriptLifecycleContractHardeningPlan.md)의 필수 항목과 관리 생명주기
+1. [현행 안정화 계획](archive/ScriptLifecycleContractHardeningPlan.md)의 필수 항목과 관리 생명주기
    게이트를 완료하거나, 적용하지 않는 항목의 근거를 명시한다.
 2. 현재 리팩토링의 결과로 확정된 `ScriptCore`, 클럭, 에셋·빌드·리로드 경계를 다시 조사한다.
 3. §3의 전환 의미와 §7의 PrSM 대상 계약을 확정하고, 원문부터 실행까지 연결되는 작은 슬라이스로 진행한다.
@@ -352,7 +352,7 @@ public readonly struct WaitAwaitable : ISimulationAwaiter
 | 식별자 | 루트·자식 루틴 식별자, 효과 순번, PrSM 원문 위치 및 컴파일 세대의 연결을 정의한다. 코드 변경 후 옛 테이프를 무조건 재사용하지 않는다 |
 | 트랜잭션 | 셀과 네이티브의 읽은 값이 일치하는 규약, 커밋 전 검증 및 부분 커밋 실패 정책을 정한다. 일반 필드·객체 내부 변경은 자동으로 되돌아오지 않는다 |
 
-현재 Task 스코프의 결함은 [별도 안정화 문서](ScriptLifecycleContractHardeningPlan.md)에서
+현재 Task 스코프의 결함은 [별도 안정화 문서](archive/ScriptLifecycleContractHardeningPlan.md)에서
 먼저 다룬다. 위 표는 그 수정에 `cold`나 비재개 취소를 미리 섞으라는 뜻이 아니다.
 
 ### 이 형태가 치르는 값
@@ -467,7 +467,7 @@ E3, PrSM 검사·변환, 향후 롤백 및 편집기 Undo가 분류를 활용할
 ### E4 — 실패 결과와 루틴 진단 통합 (P1 · E0·현행 안정화 LC1/LC2 선행)
 
 `Result<TValue, TError>`와 루틴 종료 상태를 기존의 성공 단계·실패 격리 계약에 연결한다.
-현행 훅 결함 수정은 [별도 문서 LC1/LC2](ScriptLifecycleContractHardeningPlan.md)의 소관이다.
+현행 훅 결함 수정은 [별도 문서 LC1/LC2](archive/ScriptLifecycleContractHardeningPlan.md)의 소관이다.
 
 - 확정된 성공 단계와 대칭 정리 규약을 생성된 PrSM 컴포넌트에도 동일하게 적용한다
 - 루틴의 `Faulted`(E0), 훅 실패, 정리 실패가 원인·소유자·원문 위치를 보존한 채 모인다
@@ -588,10 +588,10 @@ PrSM의 트랜잭션 참여 선언·외부 호출 정책과 네이티브 커밋�
 
 | 상대 | 관계 |
 |---|---|
-| [현행 생명주기 안정화](ScriptLifecycleContractHardeningPlan.md) | 현재 Task 계약을 유지하는 독립 수정. 미래 실행기로 고칠 것이라며 현행 결함을 방치하지 않는다. LC 완료는 PHASE 24 완료가 아니다 |
+| [현행 생명주기 안정화](archive/ScriptLifecycleContractHardeningPlan.md) | 현재 Task 계약을 유지하는 독립 수정. 미래 실행기로 고칠 것이라며 현행 결함을 방치하지 않는다. LC 완료는 PHASE 24 완료가 아니다 |
 | [PHASE 9.5 ScriptSurfacePlan](ScriptSurfacePlan.md) W8 | 기존 틱 순회·오버라이드 감지 최적화. 계약/DSL 없이도 가능하다. 같은 레지스트리 변경은 슬라이스를 나누고 측정 이득을 중복 계산하지 않는다 |
 | [PHASE 20 NetworkFrameworkPlan](NetworkFrameworkPlan.md) | 현재 클럭·replication 작업은 계속 독립 진행한다. 미래 E0/E2/E3는 당시 확정된 클럭·쓰기 경계를 입력으로 받아 연결하며, 기존 계획을 소급해 PHASE 24에 종속시키지 않는다 |
-| [BehaviorTreeManagedPlan](BehaviorTreeManagedPlan.md) | 판단·우선순위 저작의 역할을 유지한다. BT 내부 난수와 외부 효과도 미래 계약 적용 범위에 포함한다. PrSM 전체 BT 언어 신설은 첫 도입의 필수 조건이 아니다 |
+| [BehaviorTreeManagedPlan](archive/BehaviorTreeManagedPlan.md) | 판단·우선순위 저작의 역할을 유지한다. BT 내부 난수와 외부 효과도 미래 계약 적용 범위에 포함한다. PrSM 전체 BT 언어 신설은 첫 도입의 필수 조건이 아니다 |
 | 직렬화·에셋·리로드 및 에디터 Undo | 기존 소유권·식별자·성공/실패 규약을 재사용한다. `Var<T>` 도입만으로 네이티브 상태나 에디터 Undo가 완성됐다고 판정하지 않는다 |
 
 ## 6. 이 페이즈가 지키는 원칙

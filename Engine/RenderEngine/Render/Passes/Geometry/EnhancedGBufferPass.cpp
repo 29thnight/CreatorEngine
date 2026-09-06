@@ -40,10 +40,8 @@ namespace
 
     constexpr const char* kGBufferShaderFile = "GBuffer.slang";
 
-    // M6-P1a 전환 중 snapshot이 없는 격리 selftest/legacy draw가 제품 HLSL의
-    // b2를 비워 두지 않게 하는 sentinel이다. alphaCutoff < 0이면 shader가
-    // InstanceData의 기존 factor를 사용한다. 제품 BuildDrawPool은 이 경로를
-    // 쓰지 않고 항상 reflection-packed snapshot을 만든다.
+    // Isolated fixtures have an explicit instance flag for the property block.
+    // alphaCutoff is only a coverage threshold.
     struct LegacyMaterialConstants
     {
         float baseColor[4]{ 1.f, 1.f, 1.f, 1.f };
@@ -52,100 +50,11 @@ namespace
         float normalScale{ 1.f };
         float occlusionStrength{ 1.f };
         float emissive[3]{ 1.f, 1.f, 1.f };
-        float alphaCutoff{ -1.f };
+        float alphaCutoff{ 0.5f };
     };
     static_assert(sizeof(LegacyMaterialConstants) == 48u);
     static_assert(offsetof(LegacyMaterialConstants, alphaCutoff) == 44u);
     constexpr LegacyMaterialConstants kLegacyMaterialConstants{};
-
-    constexpr std::uint32_t kGBufferMaterialTextureFirstRegister = 0u;
-    constexpr std::uint32_t kGBufferMaterialTextureSlotCount = 4u;
-
-    bool ValidateGBufferTextureLayout(const ShaderMetaBindingLayout& layout,
-        std::string& outError)
-    {
-        std::array<bool, kGBufferMaterialTextureSlotCount> occupied{};
-        std::vector<std::string_view> names;
-        for (const ShaderMetaPropertyBinding& binding : layout.properties)
-        {
-            if (ShaderPropertyType::Texture2D != binding.propertyType) continue;
-            if (binding.name.empty()
-                || RHIShaderResourceKind::Texture != binding.resourceKind
-                || 0u != binding.registerSpace
-                || binding.registerIndex >= kGBufferMaterialTextureFirstRegister
-                    + kGBufferMaterialTextureSlotCount)
-            {
-                outError = "GBuffer texture property가 t0..t3/space0 범위 밖이다: "
-                    + binding.name;
-                return false;
-            }
-            const std::size_t slot = binding.registerIndex
-                - kGBufferMaterialTextureFirstRegister;
-            if (occupied[slot]
-                || std::find(names.begin(), names.end(), binding.name) != names.end())
-            {
-                outError = "GBuffer texture property 이름/register가 중복이다: "
-                    + binding.name;
-                return false;
-            }
-            occupied[slot] = true;
-            names.push_back(binding.name);
-        }
-        return true;
-    }
-
-    bool ValidateGBufferTextureSnapshot(const EnhancedMaterialDrawSnapshot& snapshot,
-        std::string& outError)
-    {
-        const std::size_t reflectedTextureCount = static_cast<std::size_t>(std::count_if(
-            snapshot.bindingLayout.properties.begin(), snapshot.bindingLayout.properties.end(),
-            [](const ShaderMetaPropertyBinding& binding)
-            {
-                return ShaderPropertyType::Texture2D == binding.propertyType;
-            }));
-        if (reflectedTextureCount != snapshot.textureBindings.size())
-        {
-            outError = "GBuffer draw texture owner 수가 reflection schema와 다르다";
-            return false;
-        }
-
-        std::array<bool, kGBufferMaterialTextureSlotCount> occupied{};
-        std::vector<std::string_view> names;
-        for (const EnhancedMaterialTextureBinding& texture : snapshot.textureBindings)
-        {
-            const auto reflected = std::find_if(snapshot.bindingLayout.properties.begin(),
-                snapshot.bindingLayout.properties.end(), [&texture](const auto& binding)
-                {
-                    return binding.name == texture.propertyName;
-                });
-            if (texture.propertyName.empty()
-                || reflected == snapshot.bindingLayout.properties.end()
-                || ShaderPropertyType::Texture2D != reflected->propertyType
-                || RHIShaderResourceKind::Texture != reflected->resourceKind
-                || reflected->registerIndex != texture.registerIndex
-                || reflected->registerSpace != texture.registerSpace
-                || 0u != texture.registerSpace
-                || texture.registerIndex >= kGBufferMaterialTextureFirstRegister
-                    + kGBufferMaterialTextureSlotCount)
-            {
-                outError = "GBuffer draw texture binding이 reflection register와 다르다: ";
-                outError += texture.propertyName;
-                return false;
-            }
-            const std::size_t slot = texture.registerIndex
-                - kGBufferMaterialTextureFirstRegister;
-            if (occupied[slot]
-                || std::find(names.begin(), names.end(), texture.propertyName) != names.end())
-            {
-                outError = "GBuffer draw texture 이름/register가 중복이다: "
-                    + texture.propertyName;
-                return false;
-            }
-            occupied[slot] = true;
-            names.push_back(texture.propertyName);
-        }
-        return true;
-    }
 
     bool CompileGBufferShader(const char* shaderFile, const char* entry, const char* target,
         const RHIShaderPermutation& permutation,
@@ -158,7 +67,7 @@ namespace
 
 bool EnhancedGBufferPass::MaterialKey::operator==(const MaterialKey& other) const
 {
-    if (textures != other.textures
+    if (coordinates != other.coordinates || textures != other.textures
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -191,6 +100,7 @@ bool EnhancedGBufferPass::MaterialKey::operator<(const MaterialKey& other) const
         if (snapshot->propertyBytes != other.snapshot->propertyBytes)
             return snapshot->propertyBytes < other.snapshot->propertyBytes;
     }
+    if (coordinates != other.coordinates) return coordinates < other.coordinates;
     return std::lexicographical_compare(textures.begin(), textures.end(),
         other.textures.begin(), other.textures.end(), std::less<Texture*>{});
 }
@@ -201,24 +111,13 @@ EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
     MaterialKey key{};
     if (draw.materialSnapshot && draw.materialSnapshot->IsValid())
     {
-        for (const EnhancedMaterialTextureBinding& binding :
-            draw.materialSnapshot->textureBindings)
-        {
-            if (binding.registerSpace != 0u
-                || binding.registerIndex >= kGBufferMaterialTextureFirstRegister
-                    + kGBufferMaterialTextureSlotCount)
-            {
-                continue;
-            }
-            key.textures[binding.registerIndex
-                - kGBufferMaterialTextureFirstRegister] = binding.textureOwner.get();
-        }
+        key.textures = MaterialTextureTable::Owners(*draw.materialSnapshot);
+        key.coordinates = MaterialTextureTable::Coordinates(*draw.materialSnapshot);
         key.snapshot = draw.materialSnapshot;
     }
     else
     {
-        key.textures = {
-            draw.baseColor, draw.normalMap, draw.occRoughMetal, draw.emissive };
+        key.textures = MaterialTextureTable::LegacyOwners(m_legacyTextureSchema, draw);
     }
     return key;
 }
@@ -231,31 +130,17 @@ bool EnhancedGBufferPass::ResolveShaderVariant(
     // I5-D34a/b: 마스크가 0이 아니면 experiment 레이아웃 짝(core/skin)을 준다.
     // 짝이 없으면 실패다 — legacy PSO로 폴백하면 96B 레이아웃 PSO에 packed
     // 버퍼가 물려 화면이 조용히 틀린다(fail-closed).
-    const bool experiment = 0 != vertexAttributeMask;
-    const auto resolveModelPipeline = [vertexAttributeMask](
-        const RHIGraphicsPipelineRequest& core,
-        const RHIGraphicsPipelineRequest& color,
-        const RHIGraphicsPipelineRequest& skin,
-        const RHIGraphicsPipelineRequest& colorSkin)
+    const bool experiment = vertexAttributeMask != 0;
+    const auto resolveModelPipeline = [vertexAttributeMask](const auto& requests)
     {
-        if (vertexAttributeMask == assets::kCoreVertexAttributes)
-            return core.GetHandle();
-        if (vertexAttributeMask == (assets::kCoreVertexAttributes
-            | assets::kColorVertexAttributes)) return color.GetHandle();
-        if (vertexAttributeMask == (assets::kCoreVertexAttributes
-            | assets::kSkinVertexAttributes)) return skin.GetHandle();
-        if (vertexAttributeMask == assets::kCoreColorSkinVertexAttributes)
-            return colorSkin.GetHandle();
-        return RHIPipelineHandle{};
+        const auto found = requests.find(vertexAttributeMask);
+        return found == requests.end() ? RHIPipelineHandle{} : found->second.GetHandle();
     };
     if (snapshot.shaderMetaHandle == m_shaderMetaHandle
         && snapshot.permutationKey == m_defaultPermutationKey)
     {
         outPipeline = !experiment ? m_pipelineRequest.GetHandle()
-            : resolveModelPipeline(m_experimentPipelineRequest,
-                m_experimentColorPipelineRequest,
-                m_experimentSkinnedPipelineRequest,
-                m_experimentColorSkinnedPipelineRequest);
+            : resolveModelPipeline(m_modelPipelineRequests);
         outLayout = m_shaderBindingLayout;
         return outPipeline.IsValid() && nullptr != outLayout;
     }
@@ -265,10 +150,7 @@ bool EnhancedGBufferPass::ResolveShaderVariant(
     const auto found = m_shaderVariants.find(key);
     if (found == m_shaderVariants.end()) return false;
     outPipeline = !experiment ? found->second.request.GetHandle()
-        : resolveModelPipeline(found->second.experimentRequest,
-            found->second.experimentColorRequest,
-            found->second.experimentSkinnedRequest,
-            found->second.experimentColorSkinnedRequest);
+        : resolveModelPipeline(found->second.modelRequests);
     outLayout = found->second.layout;
     return outPipeline.IsValid() && nullptr != outLayout;
 }
@@ -344,7 +226,8 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 outError = "GBuffer draw material permutation/layout이 준비된 variant와 다르다";
                 return false;
             }
-            if (!ValidateGBufferTextureSnapshot(material, outError)) return false;
+            if (!MaterialTextureTable::ValidateSnapshot(material, outError)) return false;
+            if (!MaterialTextureTable::ValidateMeshCoordinates(material, draw.modelMeshView.vertexAttributeMask, outError)) return false;
         }
 
         if (m_drawGeometry.find(enhanced_draw::GeometryKey(draw)) == m_drawGeometry.end())
@@ -371,46 +254,20 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
             continue;
         }
 
-        // 재질 텍스처. 없는 슬롯은 폴백이 채워 항상 넷이 채워지고, 셰이더에
-        // 분기가 필요 없다.
-        //
-        // ★ 폴백은 슬롯 의미를 따라간다. 흰색 하나로 전부 때우면 emissive는
-        //   전부 자체발광이 되고, ORM은 B(금속)가 1이라 확산이 통째로 죽는다 —
-        //   IBL 소비 검증의 '끔=검정' 대조군이 실측으로 잡았다.
         if (nullptr != context.textureCache)
         {
             const MaterialKey key = MakeMaterialKey(draw);
-
             if (m_drawTextures.find(key) == m_drawTextures.end())
             {
-                DrawTextures textures{};
-                for (uint32_t i = 0; i < 4; ++i)
-                {
-                    std::string textureError;
-                    DX12TextureCache::Entry uploaded{};
-                    if (nullptr == key.textures[i] && 2 == i)
-                    {
-                        uploaded = context.textureCache->GetOrmNeutralTexture(textureError);
-                    }
-                    else if (nullptr == key.textures[i] && 3 == i)
-                    {
-                        uploaded = context.textureCache->GetBlackTexture(textureError);
-                    }
-                    else
-                    {
-                        uploaded = context.textureCache->GetOrUpload(
-                            key.textures[i], textureError);
-                    }
-                    textures.resources[i] = uploaded.handle;
-            textures.formats[i] = uploaded.format;
-                    textures.mipLevels[i] = uploaded.mipLevels;
-
-                    if (!textureError.empty()) outError = textureError;
-                }
-                m_drawTextures.emplace(key, textures);
+                auto schema = m_legacyTextureSchema;
+                if (key.snapshot && !MaterialTextureTable::FromLayout(
+                        key.snapshot->bindingLayout, schema, outError)) return false;
+                DrawTextures textures;
+                if (!MaterialTextureTable::Upload(*context.textureCache, schema,
+                        key.textures, textures.views, outError, !key.snapshot)) return false;
+                m_drawTextures.emplace(key, std::move(textures));
             }
         }
-
         // 본 팔레트를 애니메이터별로 한 번씩만 담는다.
         //
         // 한 캐릭터의 메시가 여럿이면 프록시도 여럿인데 팔레트는 하나다 —
@@ -524,16 +381,8 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
             {
                 if (0 == vertexMask)
                     batch.pipeline = m_pipelineRequest.GetHandle();
-                else if (vertexMask == assets::kCoreVertexAttributes)
-                    batch.pipeline = m_experimentPipelineRequest.GetHandle();
-                else if (vertexMask == (assets::kCoreVertexAttributes
-                    | assets::kColorVertexAttributes))
-                    batch.pipeline = m_experimentColorPipelineRequest.GetHandle();
-                else if (vertexMask == (assets::kCoreVertexAttributes
-                    | assets::kSkinVertexAttributes))
-                    batch.pipeline = m_experimentSkinnedPipelineRequest.GetHandle();
-                else if (vertexMask == assets::kCoreColorSkinVertexAttributes)
-                    batch.pipeline = m_experimentColorSkinnedPipelineRequest.GetHandle();
+                else if (const auto model = m_modelPipelineRequests.find(vertexMask);
+                    model != m_modelPipelineRequests.end()) batch.pipeline = model->second.GetHandle();
             }
             batch.firstInstance = static_cast<uint32_t>(m_instances.size());
             batch.instanceCount = 0;
@@ -549,6 +398,10 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         // draw.useNormalMap은 snapshot이 없는 격리 fixture 호환 경계에만 남는다.
         instance.useNormalMap = key.snapshot
             ? key.snapshot->useNormalMap : draw.useNormalMap;
+        const auto& coverage = key.snapshot ? key.snapshot->coverage : draw.coverage;
+        instance.coverageFlags = coverage.flags;
+        instance.coverageCutoff = coverage.cutoff;
+        instance.usePropertyBlock = key.snapshot ? 1u : 0u;
 
         // 스키닝 오프셋. 팔레트가 없으면 kNoSkinning으로 남아 셰이더가
         // 바인드 포즈로 그린다 — 스킨드와 비스킨드가 한 배치에 섞여도 된다.
@@ -605,13 +458,18 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     // 없이 업로드 링의 GPU 주소를 그대로 꽂으면 되고, 본 팔레트는 프레임당
     // 한 번이면 배치가 몇 개든 그대로 쓴다 — 인스턴스가 자기 오프셋을
     // 들고 있어서다.
+    MaterialTextureTable::Schema textureSchema;
+    if (!MaterialTextureTable::Reflect(shaderFile, pixelEntry, *effectivePermutation,
+            textureSchema, outError)) return false;
     const RHIPipelineLayoutParam params[] = {
         RHILayout::Cbv(0, RHIShaderVisibility::Vertex),          // b0 — 프레임 상수
         RHILayout::Srv(4, RHIShaderVisibility::Vertex),          // t4 — 인스턴스 데이터
-        RHILayout::SrvTable(4, 0, RHIShaderVisibility::Pixel),   // baseColor · normal · occRoughMetal · emissive
+        RHILayout::SrvTable(static_cast<uint32_t>(textureSchema.size()),
+            MaterialTextureTable::FirstRegister, RHIShaderVisibility::Pixel),   // baseColor · normal · occRoughMetal · emissive
         RHILayout::SamplerTable(1, 0, RHIShaderVisibility::Pixel),
         RHILayout::Srv(5, RHIShaderVisibility::Vertex),          // t5 — 본 팔레트
         RHILayout::Cbv(2, RHIShaderVisibility::Pixel),           // b2 — M6 Material property block
+        RHILayout::Cbv(3, RHIShaderVisibility::Pixel), // texture coordinates by reflected register
     };
 
     RHIPipelineLayoutDesc rootDesc{};
@@ -680,6 +538,8 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     outDesc.dsvFormat = kDepthFormat;
 
     if (nullptr != renderState) renderState->ApplyTo(outDesc);
+    // W4 coverage owns sidedness per instance, including depth writes.
+    outDesc.cullMode = RHICullMode::None;
     return true;
 }
 
@@ -689,21 +549,14 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     RHIShaderBlob psBlob;
     RHIGraphicsPipelineDesc desc{};
     const RHIShaderPermutation emptyPermutation;
+    if (!MaterialTextureTable::Reflect(kGBufferShaderFile, "PSMain", emptyPermutation,
+            m_legacyTextureSchema, outError)) return false;
     if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain", nullptr,
             emptyPermutation, 0, desc, vsBlob, psBlob, outError)) return false;
 
     if (!m_pipelineRequest.Create(*context.psoManager, desc, outError))
         return false;
 
-    // I5-D34a/b: experiment 레이아웃 짝 둘(core / core+skin). 하나라도 없으면
-    // 초기화 실패다 — 배치가 마스크로 고르는 자리에서 폴백을 지어내지 않기
-    // 위해서다.
-    RHIGraphicsPipelineRequest* requests[] = {
-        &m_experimentPipelineRequest,
-        &m_experimentColorPipelineRequest,
-        &m_experimentSkinnedPipelineRequest,
-        &m_experimentColorSkinnedPipelineRequest,
-    };
     for (std::size_t i = 0; i < assets::kModelVertexMasks.size(); ++i)
     {
         // desc가 shader blob을 빌리므로 mask마다 blob 수명을 Create까지 보존한다.
@@ -713,7 +566,7 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
         if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain",
                 nullptr, emptyPermutation, assets::kModelVertexMasks[i], modelDesc,
                 modelVsBlob, modelPsBlob, outError)
-            || !requests[i]->Create(*context.psoManager, modelDesc, outError))
+            || !m_modelPipelineRequests[assets::kModelVertexMasks[i]].Create(*context.psoManager, modelDesc, outError))
         {
             return false;
         }
@@ -808,7 +661,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
             outError = "GBuffer Material property layout은 b2/space0이어야 한다";
             return false;
         }
-        if (!ValidateGBufferTextureLayout(layout, outError)) return false;
+        if (!MaterialTextureTable::ValidateLayout(layout, reflections[1], outError)) return false;
         candidateLayout = std::make_shared<ShaderMetaBindingLayout>(std::move(layout));
     }
 
@@ -817,200 +670,80 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
     return true;
 }
 
+bool EnhancedGBufferPass::BuildVariantCandidate(const EnhancedFrameContext& context,
+    const ShaderMeta& meta, std::span<const std::uint16_t> selections,
+    ShaderVariant& candidate, RHIShaderPermutationKey& key, std::string& error)
+{
+    // A failed mask must not publish any part of this material generation.
+    for (size_t i = 0; i <= assets::kModelVertexMasks.size(); ++i)
+    {
+        const uint32_t mask = i == 0 ? 0 : assets::kModelVertexMasks[i - 1];
+        RHIShaderBlob vs, ps;
+        RHIGraphicsPipelineDesc desc{};
+        RHIShaderPermutationKey resolved{};
+        std::shared_ptr<const ShaderMetaBindingLayout> layout;
+        if (!BuildShaderMetaPipelineDesc(context, meta, selections, mask,
+                desc, vs, ps, resolved, layout, error)) return false;
+        if (i == 0) { key = resolved; candidate.layout = layout; }
+        // Bootstrap ShaderMeta has no properties, so all masks may have no layout.
+        else if (bool(layout) != bool(candidate.layout)
+            || (layout && *layout != *candidate.layout))
+        { error = "GBuffer vertex mask changed material layout"; return false; }
+        auto& request = i == 0 ? candidate.request : candidate.modelRequests[mask];
+        if (!request.Create(*context.psoManager, desc, error)) return false;
+    }
+    return true;
+}
+
+void EnhancedGBufferPass::RetireUnusedPipelines(const EnhancedFrameContext& context,
+    const std::vector<RHIPipelineHandle>& candidates, RHICompletionPoint retireAfter)
+{
+    const auto contains = [](const auto& requests, RHIPipelineHandle pipeline) {
+        return std::any_of(requests.begin(), requests.end(), [pipeline](const auto& entry) {
+            return entry.second.GetHandle() == pipeline;
+        });
+    };
+    std::vector<uint32_t> invalidated;
+    for (const auto pipeline : candidates)
+    {
+        if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
+            || contains(m_modelPipelineRequests, pipeline)
+            || std::find(invalidated.begin(), invalidated.end(), pipeline.id) != invalidated.end()
+            || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(), [&](const auto& entry) {
+                return entry.second.request.GetHandle() == pipeline || contains(entry.second.modelRequests, pipeline);
+            })) continue;
+        context.psoManager->InvalidatePipeline(pipeline, retireAfter);
+        invalidated.push_back(pipeline.id);
+    }
+}
+
 bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     ShaderMetaHandle handle, const ShaderMeta& meta,
     RHICompletionPoint retireAfter, std::string& outError)
 {
-    if (!handle.IsValid())
-    {
-        outError = "GBuffer ShaderMeta generation handle이 비었다";
-        return false;
-    }
+    if (!handle.IsValid()) { outError = "Missing GBuffer ShaderMeta generation"; return false; }
     if (handle == m_shaderMetaHandle) return true;
-
-    RHIShaderBlob vsBlob;
-    RHIShaderBlob psBlob;
-    RHIGraphicsPipelineDesc desc{};
-    RHIShaderPermutationKey defaultPermutationKey{};
-    std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
-    const std::vector<std::uint16_t> defaultSelections(meta.keywords.size(), 0);
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections, 0,
-            desc, vsBlob, psBlob, defaultPermutationKey, candidateLayout, outError))
-        return false;
-
-    // I5-D34a/b: experiment 짝 desc 둘을 후보 단계에서 먼저 완성한다 — 하나라도
-    // 못 만들면 아무것도 교체하지 않는 것이 candidate-first 규약이다.
-    // ★ 블롭은 desc마다 분리한다. desc는 블롭 내부 버퍼를 빌려 가리키므로,
-    //   같은 변수를 재사용하면 앞의 desc가 뒤의 바이트코드(또는 재할당으로
-    //   죽은 메모리)를 가리켜 PSO 생성이 E_INVALIDARG로 죽는다 — 실제로 FT
-    //   라이브 전멸(드로우 0)로 나타났던 결함이다.
-    RHIShaderBlob experimentVsBlob;
-    RHIShaderBlob experimentPsBlob;
-    RHIGraphicsPipelineDesc experimentDesc{};
-    RHIShaderPermutationKey experimentKeyIgnored{};
-    std::shared_ptr<const ShaderMetaBindingLayout> experimentLayoutIgnored;
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections,
-            assets::kCoreVertexAttributes,
-            experimentDesc, experimentVsBlob, experimentPsBlob,
-            experimentKeyIgnored, experimentLayoutIgnored, outError))
-        return false;
-
-    RHIShaderBlob experimentColorVsBlob;
-    RHIShaderBlob experimentColorPsBlob;
-    RHIGraphicsPipelineDesc experimentColorDesc{};
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections,
-            assets::kCoreVertexAttributes | assets::kColorVertexAttributes,
-            experimentColorDesc, experimentColorVsBlob, experimentColorPsBlob,
-            experimentKeyIgnored, experimentLayoutIgnored, outError))
-        return false;
-
-    RHIShaderBlob experimentSkinnedVsBlob;
-    RHIShaderBlob experimentSkinnedPsBlob;
-    RHIGraphicsPipelineDesc experimentSkinnedDesc{};
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections,
-            assets::kCoreVertexAttributes | assets::kSkinVertexAttributes,
-            experimentSkinnedDesc, experimentSkinnedVsBlob,
-            experimentSkinnedPsBlob,
-            experimentKeyIgnored, experimentLayoutIgnored, outError))
-        return false;
-
-    RHIShaderBlob experimentColorSkinnedVsBlob;
-    RHIShaderBlob experimentColorSkinnedPsBlob;
-    RHIGraphicsPipelineDesc experimentColorSkinnedDesc{};
-    if (!BuildShaderMetaPipelineDesc(context, meta, defaultSelections,
-            assets::kCoreColorSkinVertexAttributes,
-            experimentColorSkinnedDesc, experimentColorSkinnedVsBlob,
-            experimentColorSkinnedPsBlob, experimentKeyIgnored,
-            experimentLayoutIgnored, outError))
-        return false;
-
-    const RHIPipelineHandle previousPipeline = m_pipelineRequest.GetHandle();
-    const bool previousShared = std::any_of(m_shaderVariants.begin(),
-        m_shaderVariants.end(), [previousPipeline](const auto& entry)
-        {
-            return entry.second.request.GetHandle() == previousPipeline;
-        });
-    // 후보가 완성된 뒤에만 기존 handle을 targeted retire한다. 실패하면 현재
-    // request와 m_shaderMetaHandle은 그대로라 다음 draw가 끊기지 않는다. 다른
-    // meta key가 같은 cache handle을 공유하면 그 holder가 사라질 때까지 보존한다.
-    if (!m_pipelineRequest.Replace(*context.psoManager, desc, retireAfter,
-            outError, !previousShared))
-        return false;
-
-    // I5-D34a/b: experiment 짝 둘도 같은 규약으로 교체한다. desc는 위에서 이미
-    // 완성됐으므로 여기 실패는 PSO 생성 실패뿐이고, 그때 앞쪽만 새것인 반쪽
-    // 상태가 되지만 실패 반환으로 프레임이 이 meta를 쓰지 않는다.
-    const RHIPipelineHandle previousExperiment =
-        m_experimentPipelineRequest.GetHandle();
-    const bool previousExperimentShared = std::any_of(m_shaderVariants.begin(),
-        m_shaderVariants.end(), [previousExperiment](const auto& entry)
-        {
-            return entry.second.experimentRequest.GetHandle()
-                == previousExperiment;
-        });
-    if (!m_experimentPipelineRequest.Replace(*context.psoManager, experimentDesc,
-            retireAfter, outError, !previousExperimentShared))
-        return false;
-
-    const RHIPipelineHandle previousExperimentColor =
-        m_experimentColorPipelineRequest.GetHandle();
-    const bool previousExperimentColorShared = std::any_of(m_shaderVariants.begin(),
-        m_shaderVariants.end(), [previousExperimentColor](const auto& entry)
-        {
-            return entry.second.experimentColorRequest.GetHandle()
-                == previousExperimentColor;
-        });
-    if (!m_experimentColorPipelineRequest.Replace(*context.psoManager,
-            experimentColorDesc, retireAfter, outError,
-            !previousExperimentColorShared))
-        return false;
-
-    const RHIPipelineHandle previousExperimentSkinned =
-        m_experimentSkinnedPipelineRequest.GetHandle();
-    const bool previousExperimentSkinnedShared = std::any_of(
-        m_shaderVariants.begin(), m_shaderVariants.end(),
-        [previousExperimentSkinned](const auto& entry)
-        {
-            return entry.second.experimentSkinnedRequest.GetHandle()
-                == previousExperimentSkinned;
-        });
-    if (!m_experimentSkinnedPipelineRequest.Replace(*context.psoManager,
-            experimentSkinnedDesc, retireAfter, outError,
-            !previousExperimentSkinnedShared))
-        return false;
-
-    const RHIPipelineHandle previousExperimentColorSkinned =
-        m_experimentColorSkinnedPipelineRequest.GetHandle();
-    const bool previousExperimentColorSkinnedShared = std::any_of(
-        m_shaderVariants.begin(), m_shaderVariants.end(),
-        [previousExperimentColorSkinned](const auto& entry)
-        {
-            return entry.second.experimentColorSkinnedRequest.GetHandle()
-                == previousExperimentColorSkinned;
-        });
-    if (!m_experimentColorSkinnedPipelineRequest.Replace(*context.psoManager,
-            experimentColorSkinnedDesc, retireAfter, outError,
-            !previousExperimentColorSkinnedShared))
-        return false;
-
-    // primary generation 교체는 같은 catalog slot의 옛 permutation만 지운다.
-    // 다른 material ShaderMeta slot은 현재 frame sealing이 성공한 뒤 Commit에서
-    // 판단한다. 같은 cache handle을 공유하는 holder가 남아 있으면 무효화하지 않는다.
-    std::vector<RHIPipelineHandle> removedPipelines;
-    const std::uint32_t previousSlot = m_shaderMetaHandle.slot;
+    ShaderVariant candidate;
+    RHIShaderPermutationKey key{};
+    const std::vector<std::uint16_t> selections(meta.keywords.size(), 0);
+    if (!BuildVariantCandidate(context, meta, selections, candidate, key, outError)) return false;
+    std::vector<RHIPipelineHandle> removed{m_pipelineRequest.GetHandle()};
+    for (const auto& [mask, request] : m_modelPipelineRequests) removed.push_back(request.GetHandle());
     for (auto it = m_shaderVariants.begin(); it != m_shaderVariants.end();)
     {
-        if (0 != previousSlot && it->first.meta.slot == previousSlot)
+        if (m_shaderMetaHandle.slot != 0 && it->first.meta.slot == m_shaderMetaHandle.slot)
         {
-            removedPipelines.push_back(it->second.request.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentRequest.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentColorRequest.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentSkinnedRequest.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentColorSkinnedRequest.GetHandle());
+            removed.push_back(it->second.request.GetHandle());
+            for (const auto& [mask, request] : it->second.modelRequests) removed.push_back(request.GetHandle());
             it = m_shaderVariants.erase(it);
         }
-        else
-        {
-            ++it;
-        }
+        else ++it;
     }
-    m_shaderMetaHandle = handle;
-    m_defaultPermutationKey = defaultPermutationKey;
-    m_shaderBindingLayout = std::move(candidateLayout);
-
-    std::vector<std::uint32_t> invalidated;
-    for (const RHIPipelineHandle pipeline : removedPipelines)
-    {
-        if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
-            || pipeline == m_experimentPipelineRequest.GetHandle()
-            || pipeline == m_experimentColorPipelineRequest.GetHandle()
-            || pipeline == m_experimentSkinnedPipelineRequest.GetHandle()
-            || pipeline == m_experimentColorSkinnedPipelineRequest.GetHandle()
-            || std::find(invalidated.begin(), invalidated.end(), pipeline.id)
-                != invalidated.end()
-            || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
-                [pipeline](const auto& entry)
-                {
-                    return entry.second.request.GetHandle() == pipeline
-                        || entry.second.experimentRequest.GetHandle()
-                            == pipeline
-                        || entry.second.experimentColorRequest.GetHandle()
-                            == pipeline
-                        || entry.second.experimentSkinnedRequest.GetHandle()
-                            == pipeline
-                        || entry.second.experimentColorSkinnedRequest.GetHandle()
-                            == pipeline;
-                }))
-        {
-            continue;
-        }
-        context.psoManager->InvalidatePipeline(pipeline, retireAfter);
-        invalidated.push_back(pipeline.id);
-    }
+    m_pipelineRequest = std::move(candidate.request);
+    m_modelPipelineRequests = std::move(candidate.modelRequests);
+    m_shaderBindingLayout = std::move(candidate.layout);
+    m_shaderMetaHandle = handle; m_defaultPermutationKey = key;
+    RetireUnusedPipelines(context, removed, retireAfter);
     return true;
 }
 
@@ -1059,93 +792,11 @@ bool EnhancedGBufferPass::EnsureShaderMetaVariant(
         return existing->second.request.IsValid() && nullptr != outLayout;
     }
 
-    RHIShaderBlob vsBlob;
-    RHIShaderBlob psBlob;
-    RHIGraphicsPipelineDesc desc{};
-    RHIShaderPermutationKey candidateKey{};
-    std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections, 0,
-            desc, vsBlob, psBlob, candidateKey, candidateLayout, outError))
-    {
-        return false;
-    }
-    if (candidateKey != resolved.key || !candidateLayout)
-    {
-        outError = "GBuffer material variant의 permutation/layout identity가 불완전하다";
-        return false;
-    }
-    if (!m_pipelineRequest.IsValid()
-        || desc.layout != m_pipelineRequest.GetDesc().layout)
-    {
-        outError = "GBuffer material ShaderMeta pipeline layout이 primary pass와 다르다";
-        return false;
-    }
-
-    // I5-D34a/b: experiment 짝 desc 둘. variant 생성 시점에는 어떤 메시가 이
-    // 재질로 그려질지 모르므로 셋을 함께 만든다 — 배치가 메시 마스크로 고른다.
-    // ★ 블롭 분리 — ApplyShaderMeta와 같은 이유(위 참조). 앞의 desc가 빌려
-    //   가리키는 버퍼를 덮으면 안 된다.
-    RHIShaderBlob experimentVsBlob;
-    RHIShaderBlob experimentPsBlob;
-    RHIGraphicsPipelineDesc experimentDesc{};
-    RHIShaderPermutationKey experimentKeyIgnored{};
-    std::shared_ptr<const ShaderMetaBindingLayout> experimentLayoutIgnored;
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections,
-            assets::kCoreVertexAttributes,
-            experimentDesc, experimentVsBlob, experimentPsBlob,
-            experimentKeyIgnored, experimentLayoutIgnored, outError))
-    {
-        return false;
-    }
-    RHIShaderBlob experimentColorVsBlob;
-    RHIShaderBlob experimentColorPsBlob;
-    RHIGraphicsPipelineDesc experimentColorDesc{};
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections,
-            assets::kCoreVertexAttributes | assets::kColorVertexAttributes,
-            experimentColorDesc, experimentColorVsBlob, experimentColorPsBlob,
-            experimentKeyIgnored, experimentLayoutIgnored, outError))
-    {
-        return false;
-    }
-    RHIShaderBlob experimentSkinnedVsBlob;
-    RHIShaderBlob experimentSkinnedPsBlob;
-    RHIGraphicsPipelineDesc experimentSkinnedDesc{};
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections,
-            assets::kCoreVertexAttributes | assets::kSkinVertexAttributes,
-            experimentSkinnedDesc, experimentSkinnedVsBlob,
-            experimentSkinnedPsBlob,
-            experimentKeyIgnored, experimentLayoutIgnored, outError))
-    {
-        return false;
-    }
-    RHIShaderBlob experimentColorSkinnedVsBlob;
-    RHIShaderBlob experimentColorSkinnedPsBlob;
-    RHIGraphicsPipelineDesc experimentColorSkinnedDesc{};
-    if (!BuildShaderMetaPipelineDesc(context, meta, keywordSelections,
-            assets::kCoreColorSkinVertexAttributes,
-            experimentColorSkinnedDesc, experimentColorSkinnedVsBlob,
-            experimentColorSkinnedPsBlob, experimentKeyIgnored,
-            experimentLayoutIgnored, outError))
-    {
-        return false;
-    }
-
     ShaderVariant candidate;
-    candidate.layout = candidateLayout;
-    if (!candidate.request.Create(*context.psoManager, desc, outError)) return false;
-    if (!candidate.experimentRequest.Create(*context.psoManager, experimentDesc,
-            outError))
-        return false;
-    if (!candidate.experimentColorRequest.Create(*context.psoManager,
-            experimentColorDesc, outError))
-        return false;
-    if (!candidate.experimentSkinnedRequest.Create(*context.psoManager,
-            experimentSkinnedDesc, outError))
-        return false;
-    if (!candidate.experimentColorSkinnedRequest.Create(*context.psoManager,
-            experimentColorSkinnedDesc, outError))
-        return false;
-
+    RHIShaderPermutationKey candidateKey{};
+    if (!BuildVariantCandidate(context, meta, keywordSelections, candidate, candidateKey, outError)) return false;
+    if (candidateKey != resolved.key || !candidate.layout)
+    { outError = "GBuffer material permutation/layout mismatch"; return false; }
     auto [inserted, accepted] = m_shaderVariants.emplace(key, std::move(candidate));
     if (!accepted)
     {
@@ -1177,14 +828,8 @@ std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
         if (!isActive(it->first.meta))
         {
             removedPipelines.push_back(it->second.request.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentRequest.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentColorRequest.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentSkinnedRequest.GetHandle());
-            removedPipelines.push_back(
-                it->second.experimentColorSkinnedRequest.GetHandle());
+            for (const auto& [mask, request] : it->second.modelRequests)
+                removedPipelines.push_back(request.GetHandle());
             it = m_shaderVariants.erase(it);
             ++removedKeys;
         }
@@ -1194,35 +839,7 @@ std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
         }
     }
 
-    std::vector<std::uint32_t> invalidated;
-    for (const RHIPipelineHandle pipeline : removedPipelines)
-    {
-        if (!pipeline.IsValid() || pipeline == m_pipelineRequest.GetHandle()
-            || pipeline == m_experimentPipelineRequest.GetHandle()
-            || pipeline == m_experimentColorPipelineRequest.GetHandle()
-            || pipeline == m_experimentSkinnedPipelineRequest.GetHandle()
-            || pipeline == m_experimentColorSkinnedPipelineRequest.GetHandle()
-            || std::find(invalidated.begin(), invalidated.end(), pipeline.id)
-                != invalidated.end()
-            || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(),
-                [pipeline](const auto& entry)
-                {
-                    return entry.second.request.GetHandle() == pipeline
-                        || entry.second.experimentRequest.GetHandle()
-                            == pipeline
-                        || entry.second.experimentColorRequest.GetHandle()
-                            == pipeline
-                        || entry.second.experimentSkinnedRequest.GetHandle()
-                            == pipeline
-                        || entry.second.experimentColorSkinnedRequest.GetHandle()
-                            == pipeline;
-                }))
-        {
-            continue;
-        }
-        context.psoManager->InvalidatePipeline(pipeline, retireAfter);
-        invalidated.push_back(pipeline.id);
-    }
+    RetireUnusedPipelines(context, removedPipelines, retireAfter);
     return removedKeys;
 }
 
@@ -1342,9 +959,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 encoder.ClearDepthTarget(boundTargets, 1.f);
             }
 
-            // 프레임/팔레트 상수를 걸기 전에 공용 root layout을 설치한다.
-            // batch loop는 같은 layout의 permutation PSO만 바꾸므로 DX12Encoder와
-            // VulkanEncoder 모두 이미 건 root/descriptor 상태를 보존한다.
+            // Install the default layout before preparing frame resources.
+            // Each batch rebinds arguments after selecting its reflected layout.
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pipelineRequest.GetHandle());
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
@@ -1372,29 +988,27 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 팔레트가 없어도 t5는 꽂는다. 스킨드가 없는 프레임에서도
             // 루트 SRV가 비면 셰이더가 읽지 않더라도 검증 레이어가 경고하고,
             // 조각(slice)마다 상태를 다시 걸어야 하므로 여기가 그 자리다.
+            const uint64_t paletteBytes = m_bonePalettes.empty()
+                ? sizeof(math::matrix4x4)
+                : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
+
+            const auto paletteBuffer = context.resources->AllocateUpload(
+                RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
+                    sizeof(math::matrix4x4) });
+            if (!paletteBuffer.IsValid()) return;
+
+            if (m_bonePalettes.empty())
             {
-                const uint64_t paletteBytes = m_bonePalettes.empty()
-                    ? sizeof(math::matrix4x4)
-                    : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
-
-                const auto paletteBuffer = context.resources->AllocateUpload(
-                    RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
-                        sizeof(math::matrix4x4) });
-                if (!paletteBuffer.IsValid()) return;
-
-                if (m_bonePalettes.empty())
-                {
-                    constexpr math::matrix4x4 identity = math::matrix4x4::identity();
-                    memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
-                }
-                else
-                {
-                    memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
-                        static_cast<size_t>(paletteBytes));
-                }
-
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer);
+                constexpr math::matrix4x4 identity = math::matrix4x4::identity();
+                memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
             }
+            else
+            {
+                memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
+                    static_cast<size_t>(paletteBytes));
+            }
+
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer);
 
             // 자기 몫의 배치만 그린다.
             //
@@ -1443,6 +1057,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 // 고른다. 같은 texture/property라도 keyword permutation이 다르면
                 // 서로 다른 pipeline handle로 기록된다.
                 encoder.SetPipeline(RHIBindPoint::Graphics, batch.pipeline);
+                // A material may change the reflected table length/root layout.
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameConstants);
+                encoder.SetSamplers(RHIBindPoint::Graphics, 3, m_sampler);
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer);
 
                 // M6-P1a: property bytes는 batch key의 일부다. 같은 texture/mesh라도
                 // 값이 다르면 batch가 갈리고, 그 batch를 기록하기 직전에 b2를
@@ -1461,6 +1079,9 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                     materialData, materialSize);
                 if (!materialConstants.IsValid()) continue;
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 5, materialConstants);
+                const auto coordinates = MaterialTextureTable::UploadCoordinates(*context.resources, batch.material.coordinates);
+                if (!coordinates.IsValid()) continue;
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 6, coordinates);
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
                     instanceBlock.SubRange(
@@ -1468,31 +1089,11 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                             * static_cast<uint64_t>(batch.firstInstance - sliceFirstInstance),
                         sizeof(InstanceData) * batch.instanceCount));
 
-                // 재질 텍스처 넷을 연속으로 잘라 테이블 하나로 묶는다.
-                // PrepareFrame이 올려 둔 것을 쓴다 — 기록 중에는 만들지 않는다.
                 const auto textures = m_drawTextures.find(batch.material);
-                if (textures != m_drawTextures.end())
-                {
-                    const DrawTextures& t = textures->second;
-                    const RHIBindingDesc srvs[] = {
-                        RHIBindingDesc::Srv2D(t.resources[0], t.formats[0], 0, t.mipLevels[0]),
-                        RHIBindingDesc::Srv2D(t.resources[1], t.formats[1], 0, t.mipLevels[1]),
-                        RHIBindingDesc::Srv2D(t.resources[2], t.formats[2], 0, t.mipLevels[2]),
-                        RHIBindingDesc::Srv2D(t.resources[3], t.formats[3], 0, t.mipLevels[3]),
-                    };
-                    const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
-
-                    // ★ 넷 중 하나라도 없으면 이 배치를 건너뛴다.
-                    //
-                    // 예전에는 널인 슬롯만 건너뛰고 나머지로 테이블을 걸었다.
-                    // 그러면 그 칸에 힙의 이전 내용이 남은 채로 셰이더가 읽는다 —
-                    // 화면에는 '가끔 엉뚱한 텍스처'로만 나타나고 검증 레이어도
-                    // 조용하다. PrepareFrame이 폴백으로 넷을 채우므로 널은
-                    // 업로드 실패뿐이고, 그때는 안 그리는 편이 낫다.
-                    if (!srvTable.IsValid()) continue;
-
-                    encoder.SetBindings(RHIBindPoint::Graphics, 2, srvTable);
-                }
+                if (textures == m_drawTextures.end()) continue;
+                const auto srvTable = context.resources->CreateBindings(textures->second.views);
+                if (!srvTable.IsValid()) continue;
+                encoder.SetBindings(RHIBindPoint::Graphics, 2, srvTable);
 
                 encoder.SetVertexBuffer(mesh->second.vertices, mesh->second.vertexStride);
                 encoder.SetIndexBuffer(mesh->second.indices, mesh->second.indexFormat);
@@ -1546,10 +1147,7 @@ void EnhancedGBufferPass::Shutdown()
     m_boneOffsets.clear();
     m_shaderVariants.clear();
     m_pipelineRequest = {};
-    m_experimentPipelineRequest = {};
-    m_experimentColorPipelineRequest = {};
-    m_experimentSkinnedPipelineRequest = {};
-    m_experimentColorSkinnedPipelineRequest = {};
+    m_modelPipelineRequests.clear();
     m_shaderMetaHandle = {};
     m_defaultPermutationKey = {};
     m_shaderBindingLayout.reset();

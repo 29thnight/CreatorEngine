@@ -1,6 +1,6 @@
 # PHASE 3.75 MBC11 — §8.4 성능 예산 게이트 (Release 전용).
 #
-# MBC0 기준선(docs/plans/ModelAssetBigBangCutoverBaseline.md §4)과 새 단일 경로를 **별도
+# MBC0 기준선(docs/plans/archive/ModelAssetBigBangCutoverBaseline.md §4)과 새 단일 경로를 **별도
 # 실행**으로 비교한다. legacy 런타임과 A/B 스위치는 제품에 없다 — 기준값은 이 스크립트에
 # 상수로 박혀 있고(기준선 문서의 표), 새 값은 지금 exe로 잰다.
 #

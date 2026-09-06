@@ -487,12 +487,14 @@ std::shared_ptr<Texture> DataSystem::ResolveModelGenerationTexture(
 	if (nullptr == texture) return nullptr;
 	const assets::ModelTextureHandle key{ textureId, generation.Identity().generation };
 
-	std::lock_guard lock(m_modelGenerationTextureMutex);
-	if (const auto found = m_modelGenerationTextures.find(key);
-		found != m_modelGenerationTextures.end())
 	{
-		++m_modelGenerationTextureStats.hits;
-		return found->second;
+		std::lock_guard lock(m_modelGenerationTextureMutex);
+		if (const auto found = m_modelGenerationTextures.find(key);
+			found != m_modelGenerationTextures.end())
+		{
+			++m_modelGenerationTextureStats.hits;
+			return found->second;
+		}
 	}
 
 	std::string error;
@@ -502,12 +504,20 @@ std::shared_ptr<Texture> DataSystem::ResolveModelGenerationTexture(
 		: nullptr;
 	if (!owner)
 	{
+		std::lock_guard lock(m_modelGenerationTextureMutex);
 		++m_modelGenerationTextureStats.rejected;
 		Debug->LogError("[model.generation] embedded texture owner 생성 실패: "
 			+ texture->name + " (" + error + ")");
 		return nullptr;
 	}
-	m_modelGenerationTextures.emplace(key, owner);
+	// 큰 픽셀 복사는 잠금 밖에서 끝낸다. 동시에 준비된 경우 먼저 게시된 owner를 쓴다.
+	std::lock_guard lock(m_modelGenerationTextureMutex);
+	const auto [entry, inserted] = m_modelGenerationTextures.emplace(key, owner);
+	if (!inserted)
+	{
+		++m_modelGenerationTextureStats.hits;
+		return entry->second;
+	}
 	m_modelGenerationTextureOwners[generation.Handle()].push_back(key);
 	++m_modelGenerationTextureStats.created;
 	m_modelGenerationTextureStats.live = m_modelGenerationTextures.size();
@@ -978,6 +988,8 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 	auto loadTexture = [this, &material](std::string_view property,
 		const std::string& name, bool compress)
 	{
+		const bool srgb = property == standard_material::property::BaseColorMap
+            || property == standard_material::property::EmissiveMap;
 		std::shared_ptr<Texture> texture;
 		const auto value = std::find_if(material.m_propertyValues.begin(),
 			material.m_propertyValues.end(), [property](const MaterialPropertyValue& candidate)
@@ -988,10 +1000,10 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 			&& value->m_textureGuid != FileGuid{})
 		{
 			const file::path path = GetFilePath(value->m_textureGuid);
-			if (!path.empty()) texture = LoadSharedMaterialTexture(path.string(), compress);
+			if (!path.empty()) texture = LoadSharedMaterialTexture(path.string(), compress, srgb);
 		}
 		if (!texture && !name.empty())
-			texture = LoadSharedMaterialTexture(name, compress);
+			texture = LoadSharedMaterialTexture(name, compress, srgb);
 		return texture;
 	};
 
@@ -1281,7 +1293,8 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
     return nullptr;
 }
 
-std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view filePath, bool isCompress)
+std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view filePath, bool isCompress,
+    std::optional<bool> srgb)
 {
 	// I7-C1 — 호출자가 준 경로가 **실재하면 그대로 쓴다**. 예전에는 파일명만
 	// 떼어 `Assets/Materials/` 아래로 다시 뿌리내렸는데, 그 규약이 cooked
@@ -1298,7 +1311,12 @@ std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view 
 		destination = PathFinder::Relative("Materials\\")
 			/ destination.filename();
 	}
-	std::string key = file::path(destination).stem().string();
+	// Authored textures distinguish path, compression and sampling color space.
+    // Legacy name lookups keep their existing keys.
+    std::string key = srgb.has_value()
+        ? "material:" + file::absolute(destination).lexically_normal().generic_string()
+            + (isCompress ? ":bc:" : ":raw:") + (*srgb ? "srgb" : "linear")
+        : file::path(destination).stem().string();
 
 	// 1차 조회 (락 짧게)
 	{
@@ -1309,6 +1327,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view 
 
 	// 로드 (락 없이 I/O)
 	auto loaded = Texture::LoadSharedFromPath(destination.string(), isCompress);
+    if (loaded && srgb.has_value()) loaded = Texture::WithColorSpace(loaded, *srgb);
 	if (!loaded)
 	{
 		Debug->LogError("TextureLoader::LoadTexture : file not found");

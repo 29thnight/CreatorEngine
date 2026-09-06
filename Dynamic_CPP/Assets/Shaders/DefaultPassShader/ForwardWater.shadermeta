@@ -1,6 +1,6 @@
 schema: 1
 name: EnhancedForwardWater
-source: ForwardWater.hlsl
+source: ForwardWater.slang
 properties:
   - { name: baseColor, label: Base Color, type: float4, default: [0.08, 0.32, 0.55, 0.65] }
   - { name: metallic, label: Metallic, type: float, default: 0.0 }
@@ -15,10 +15,12 @@ properties:
   - { name: waterTint, label: Water Tint, type: float, default: 0.8 }
   - { name: flowUvScroll, label: Flow UV Scroll, type: float2, default: [0.0, 0.0] }
   - { name: flowWindVector, label: Flow Wind Vector, type: float4, default: [0.0, 0.0, 0.0, 0.0] }
+  - { name: emissiveStrength, label: Emissive Strength, type: float, default: 1.0 }
   - { name: baseColorMap, label: Base Color Map, type: texture2d }
   - { name: normalMap, label: Normal Map, type: texture2d }
   - { name: ormMap, label: ORM Map, type: texture2d }
   - { name: emissiveMap, label: Emissive Map, type: texture2d }
+  - { name: aoMap, label: Occlusion Map, type: texture2d }
 keywords:
   - { axis: SHADING_QUALITY, values: [full, reduced] }
 passes:

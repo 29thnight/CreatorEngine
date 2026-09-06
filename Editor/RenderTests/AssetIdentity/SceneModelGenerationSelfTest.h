@@ -11,6 +11,7 @@ namespace RenderTest
     // 함께 단정한다. stdout 한 줄(`[CLI] assets.scenemodel pass|fail ...`)이 게이트
     // 관측 창구다.
     [[nodiscard]] bool RunSceneModelGenerationSelfTest(std::string& outLog);
+    [[nodiscard]] bool RunIncrementalModelCancellationSelfTest(const std::string& guardPath);
 
     // MBC7 — 모델 reimport(ContentReload) 뒤 이전 texture generation owner가
     // 재사용되지 않는가(§6.2 마지막 조건). 같은 프로세스에서 generation을 은퇴시키고

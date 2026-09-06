@@ -1,5 +1,8 @@
 # Light·Camera 관리 재편 — RenderScene(보유) × RenderView(프레임) 이층 구조
 
+> **보관 · 완료 (정리: 2026-09-06).** PHASE 3의 3-14 완료. 카메라 후속 이행은 MultiCameraRenderPlan §0을 참조한다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 작성: 2026-08-09 · 계기: "Unreal은 RenderScene 중심, Unity SRP는 View/CullingResults
 중심 — 우리는 둘을 결합해야 하지 않나"라는 질문.
 

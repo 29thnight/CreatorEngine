@@ -70,7 +70,11 @@ namespace experiment::cooked
     // 5 (2026-09-03): glTF UV를 원문 그대로 보존한다. v4 GLB 캐시는 legacy
     //   Assimp parity를 이유로 v = 1 - v를 저장해 텍스처가 수직으로 어긋난다.
     //   레이아웃이 아니라 값의 규약 변경이므로 구버전 cache를 재임포트한다.
-    inline constexpr std::uint32_t kFormatVersion = 5u;
+    // 6 (2026-09-06): MASK is distinct from Opaque and doubleSided survives
+    // material conversion. Older cached values already lost these semantics.
+    // 7: preserve emissiveStrength; old caches discarded non-unit strengths.
+    // 8: texture references preserve UV selection and affine transform.
+    inline constexpr std::uint32_t kFormatVersion = 8u;
 
     // V3부터 헤더는 특정 mesh mask가 아니라 전체 기술표의 지문을 기록한다.
     // 각 mesh의 실제 배치는 CookedMesh의 mask에서 같은 표로 유도한다.

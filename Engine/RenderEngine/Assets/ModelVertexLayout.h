@@ -177,14 +177,18 @@ namespace assets
     inline constexpr VertexAttributeMask kV2VertexAttributes =
         kCoreVertexAttributes | kSkinVertexAttributes;
 
-    /// MBC6 제품 경로가 반드시 분리하는 네 가지 기본 조합.
+    /// 제품 경로의 core/color/skin 조합과 각 UV1 변형.
     inline constexpr VertexAttributeMask kColorVertexAttributes =
         Bit(VertexAttribute::Color);
-    inline constexpr std::array<VertexAttributeMask, 4> kModelVertexMasks{{
+    inline constexpr std::array<VertexAttributeMask, 8> kModelVertexMasks{{
         kCoreVertexAttributes,
         kCoreVertexAttributes | kColorVertexAttributes,
         kCoreVertexAttributes | kSkinVertexAttributes,
         kCoreVertexAttributes | kColorVertexAttributes | kSkinVertexAttributes,
+        kCoreVertexAttributes | Bit(VertexAttribute::Uv1),
+        kCoreVertexAttributes | kColorVertexAttributes | Bit(VertexAttribute::Uv1),
+        kCoreVertexAttributes | kSkinVertexAttributes | Bit(VertexAttribute::Uv1),
+        kCoreVertexAttributes | kColorVertexAttributes | kSkinVertexAttributes | Bit(VertexAttribute::Uv1),
     }};
 
     [[nodiscard]] constexpr bool IsSupportedModelVertexLayout(

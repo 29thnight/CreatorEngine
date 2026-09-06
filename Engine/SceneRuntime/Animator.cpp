@@ -160,13 +160,17 @@ void Animator::EnsureAnimationBinding()
 	// PHASE 3.75 MBC9 — 재생 데이터의 유일한 출처는 typed generation이다. m_Motion은
 	// ModelId(UUIDv8)고, 여기서 직접 generation을 게시·해석한다. skeleton 불변식
 	// (본이 있다·루트가 범위 안)을 typed 쪽에서 검사한다.
+	BindModelGeneration(FileGuid{} == m_Motion ? nullptr
+		: DataSystems->LoadModelAssetGeneration(m_Motion));
+}
+
+void Animator::BindModelGeneration(
+	std::shared_ptr<const assets::ModelAssetGeneration> generation)
+{
 	m_modelGeneration.reset();
 	m_boneRegions.clear();
-	if (FileGuid{} == m_Motion) return;
-
-	std::shared_ptr<const assets::ModelAssetGeneration> generation =
-		DataSystems->LoadModelAssetGeneration(m_Motion);
 	if (!generation) return;
+	if (generation->Identity().modelId != m_Motion.m_guid) return;
 	const assets::ModelSkeletonAsset* skeleton = generation->Skeleton();
 	if (nullptr == skeleton || skeleton->bones.empty()
 		|| skeleton->rootBone >= skeleton->bones.size())

@@ -129,6 +129,12 @@
   .howto { background: var(--surface); border: 1px dashed var(--border); border-radius: 10px; padding: 16px 20px; margin: 40px 0; font-size: 13.5px; color: var(--text-dim); }
   .howto b { color: var(--text); }
 
+  .archive-block { border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 36px 0; background: var(--surface); }
+  summary { cursor: pointer; font-weight: 700; color: var(--accent-2); }
+  details[open] > summary { margin-bottom: 18px; }
+  .archive-block > p { color: var(--text-dim); margin: 12px 0; }
+  a { color: var(--accent); }
+
   footer { border-top: 1px solid var(--border); padding-top: 22px; color: var(--text-dim); font-size: 13px; }
 </style>
 </head>
@@ -141,8 +147,8 @@
   <div class="meta">
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
-    설계 문서 37종: <a href="#doc-index">아래 색인</a> ·
-수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-09-03</span>
+    실행 계획 25종 · 미래 계획 1종 · <a href="plans/archive/README.md">보관 19종</a> · <a href="#doc-index">문서 색인</a> ·
+수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-09-06</span>
   </div>
 
   <div class="overall">
@@ -153,13 +159,13 @@
       </svg>
       <div class="ring-label">
         <div class="pct" id="overall-pct">0%</div>
-        <div class="cap">전체 진행률</div>
+        <div class="cap">열린 페이즈 진행률</div>
       </div>
     </div>
     <div class="overall-side">
-      <h2>진행 현황 요약</h2>
+      <h2>열린 페이즈 진행 현황</h2>
       <p style="color:var(--text-dim);font-size:14px">
-        총 <b id="total-count" style="color:#fff">0</b>개 작업 항목, 30개 페이즈.
+        열린 <b id="open-phase-count" style="color:#fff">0</b>개 페이즈의 <b id="total-count" style="color:#fff">0</b>개 작업 항목.
         가중치는 예상 공수(일) 기준으로 계산됩니다. 중단 항목을 제외한 활성 공수: <b id="total-days" style="color:#fff">0</b>일 (1인 기준, 순수 작업일).
       </p>
       <div class="counts">
@@ -170,7 +176,7 @@
         <div class="count-chip c-stopped"><b id="cnt-stopped">0</b>중단됨</div>
       </div>
       <p style="color:var(--text-dim);font-size:12px;margin-top:10px">
-        중단됨은 후속 페이즈 승계·기준선 시효 만료·제품 요구 부재로 원 계획을 더 진행하지 않는 항목입니다. 재개 조건은 각 메모에 남기며 진행률 분모에서는 제외합니다.
+        종료 페이즈는 이 요약에서 제외하고 <a href="#closed-phases">접힌 이력</a>에 보존합니다. 중단됨은 후속 페이즈 승계·기준선 시효 만료·제품 요구 부재로 원 계획을 더 진행하지 않는 항목입니다. 재개 조건은 각 메모에 남기며 진행률 분모에서는 제외합니다.
       </p>
     </div>
   </div>
@@ -179,7 +185,8 @@
 </header>
 
 <!-- ===== 로드맵 ===== -->
-<div class="roadmap">
+<details class="roadmap">
+  <summary>초기 의존 로드맵 · 완료·승계 이력 포함</summary>
   <div class="roadmap-inner">
     <div class="rm-node" style="border-color:var(--accent-2)">
       <div class="rm-p" style="color:var(--accent-2)">PHASE 0</div>
@@ -286,7 +293,7 @@
   <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3.5가 머테리얼·셰이더 기반을 닫은 뒤 Phase 3.75에서 모델 자산 신원·로딩·소비를 단방향으로 교체한다. Phase 4는 현재 PBR 제품 배선을 안정화하고, Phase 4.25는 Blender형 Material Graph와 artist 성능 계약을 세우며, Phase 4.75가 그 결과를 입력으로 RenderGraph·SRP·라이트맵·차세대 GPU 기능을 진행한다.
   Phase 5는 Phase 3과 병행 가능하고, Phase 6은 각 페이즈 종료마다 부분 수행한다. Phase 7은 Phase 1 이후 병행 가능하며 Phase 8의 선행 조건이다.
   Phase 8.5(씬 그래프 재설계)는 2026-08-16 착수·완결분을 대시보드에 뒤늦게 편입한 것이고(2026-08-25), Phase 8.75는 그 트랙 S가 남긴 성능 축을 승계한다 — 8.75는 8.5 완료가 전제다.</div>
-</div>
+</details>
 
 <!-- ===== 설계 문서 색인 ===== -->
 <style>
@@ -308,128 +315,87 @@
 </style>
 <div class="docs" id="doc-index">
   <h2>설계 문서 색인</h2>
-  <p class="lead">
-    이 대시보드는 <b>무엇을 어디까지 했는가</b>만 담는다. <b>왜 그렇게 정했는가</b>는 아래 문서에 있고,
-    항목의 note가 짧게 요약한 판단의 원문이 저기 있다. 새 작업에 착수하기 전에 해당 문서를 먼저 읽는다 —
-    실측 수치와 한 번 틀렸다가 정정한 기록이 대부분 거기에만 남아 있다.
-  </p>
-
-  <h3>실행 계획 — 진행 중</h3>
+  <p class="lead">진행·대기·차단 상태의 실행 계획 25종을 먼저 표시한다. 종료·대체된 계획 19종은 <a href="plans/archive/README.md">보관함</a>에서 근거와 검증 한계를 확인한다.</p>
+  <h3>실행 계획 — 진행·대기·차단</h3>
   <div class="doc-grid">
-    <div class="doc"><a href="plans/TexturePipelinePlan.md">TexturePipelinePlan.md</a><span class="tie">PHASE 12 · 미착수</span>
-      <div class="why"><b>2026-09-04 신설.</b> 텍스처가 저작에서 GPU까지 가는 길. 지금 그 길에는 임포트 설정도 밉도 cook 트랜스코딩도 없고 런타임이 매 로드마다 디코드·압축을 한다(실측 5.34 ms/장 · VRAM 420 MB · 밉 호출 0건 · <code>.meta</code> importSettings 는 확장자와 타임스탬프뿐). <code>TextureCookProducer</code> 는 이미 있으나 pass-through 이고 저작분 0 이다 — 주소 체계(GUID·해시·manifest)만 세우고 트랜스코딩 자리를 <code>formatVersion</code> 1 로 예약해 뒀다. 이 계획은 그 칸을 채운다. 선행 <code>TextureCodecBoundaryDesign.md</code>(축 A)가 자체 타입·중립 어휘를 이미 세웠다.</div></div>
-    <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12.5</span>
-      <div class="why">빌드 파이프라인 신설 + 계층 전면 개편의 우산 계획. 실측 결론: 지금의 게임 빌드는 실행 가능한 게임을 만든 적이 없다(플레이어 컴파일 불능 · 셰이더/C#/DX12 미기동). 심판(파이프라인)을 먼저 세우고 계층 이동을 그 아래서 판정한다. EngineLayerSeparationPlan L2~L4 승계 — 승계분 중 D·L2'·L4'는 E축 재편(2026-08-24 — E0~E6 중 E2 저작 writer 2종만 잔여)이 흡수 완결했고, 트랙 B(B1~B5)와 L3'가 남았다(L5'는 E7이 완결).</div></div>
-    <div class="doc"><a href="plans/ModelAssetBigBangCutoverPlan.md">ModelAssetBigBangCutoverPlan.md</a><span class="tie">PHASE 3.75 · 정본</span>
-      <div class="why"><b>2026-09-02 신설.</b> 기존 experiment 배선의 연장이 아니라 모델 자산 체계를 한 번에 교체하는 단방향 cutover 계획. 기존 GUID를 보존·매핑·재활용하지 않고 <code>ce.uuidv8.sha256.v1</code> identity epoch를 새로 발급한다. schema v2 sidecar와 cooked artifact를 단일 writer가 원자 게시하고, <code>ModelAssetGeneration</code>을 renderer·scene·animation·editor가 직접 소비한 뒤 Assimp·역브리지·A/B·silent fallback을 제품에서 0으로 만든다. 12슬라이스 60일이며 <code>SU_Mythic</code> 전체 vertex mask와 <code>Gunner_F_Mythic</code> cold-load 재질 closure가 필수 게이트다.</div></div>
+    <div class="doc"><a href="plans/PBRWiringStabilizationPlan.md">PBRWiringStabilizationPlan.md</a><span class="tie">PHASE 4 · 진행</span>
+      <div class="why">현행 PBR 배선·재질 의미·backend 동등성과 실장면 회귀.</div></div>
+    <div class="doc"><a href="plans/BlenderMaterialGraphPlan.md">BlenderMaterialGraphPlan.md</a><span class="tie">PHASE 4.25 · 미착수</span>
+      <div class="why">Principled 기반 Material Graph와 artist workflow.</div></div>
     <div class="doc"><a href="plans/Phase4UnifiedPlan.md">Phase4UnifiedPlan.md</a><span class="tie">PHASE 4 계열 · 정본</span>
-      <div class="why"><b>2026-09-03 재분할.</b> 단일 PHASE 4의 267.5일을 PBR 제품 배선 18일, Blender형 Material Graph 34일, RenderGraph·라이트맵·일반 SRP·renderer/GPU 기능 215.5일로 분리했다. 구 단일 PBR 직선 레인은 폐기했고 배선·재질 모델·후처리를 서로의 완료 증거로 쓰지 않는다.</div></div>
-    <div class="doc"><a href="plans/PBRWiringStabilizationPlan.md">PBRWiringStabilizationPlan.md</a><span class="tie">PHASE 4 · PBR-W</span>
-      <div class="why">2026-09-03 실제 <code>GBuffer.slang</code>·<code>Deferred.slang</code>·Forward·Material·양 backend 배선을 감사한 결과를 정본화한다. Slang 제품 진입점, alpha/AO/emissive/UV/sampler/normal, neutral resource, generation 원자 밀봉과 검정·변색 플리커 회귀를 먼저 닫는다.</div></div>
-    <div class="doc"><a href="plans/BlenderMaterialGraphPlan.md">BlenderMaterialGraphPlan.md</a><span class="tie">PHASE 4.25 · MAT</span>
-      <div class="why">Blender 5.1.1 Principled 재질의 pre-tone linear HDR 응답을 목표로 <code>PrincipledSurface</code>·<code>MaterialFeatureMask</code>·typed Material Graph를 세운다. Standard/Layered/Special 자동 route, cook specialization과 artist용 비용 badge로 품질과 게임 성능을 함께 관리한다.</div></div>
-    <div class="doc"><a href="plans/LightmapBakerPlan.md">LightmapBakerPlan.md</a><span class="tie">PHASE 4.75 · 트랙 L</span>
-      <div class="why">라이트맵 베이커 <b>재작성</b>(복원 아님). <b>2026-08-25 신설.</b> 실측 결론: 현재 GI가 전부 스크린스페이스라 <b>화면 밖 간접광을 아는 경로가 하나도 없다</b> — 실시간 GI가 있어도 상용 엔진이 라이트맵을 유지하는 이유이고 둘은 보완재다.
-      BVH 레이트레이싱 컴퓨트 베이커(C++ 1,538줄 + 셰이더 964줄)가 DX11 렌더러 철거 때 삭제됐고 <b>그것이 <code>vertices[].uv1</code>의 원래 소비자였다</b>. 복원이 아니라 재작성인 이유: 성능만이 아니라 정확성에도 결함이 있다 — <b>BVH 리프 순회 off-by-one</b>(셰이더 <code>i &lt;= node.end</code> vs C++ 반개구간, 양쪽 커널에 존재), 패킹 롤백 렉트 재배치, padding 미확보, 바운스마다 텍스처 재생성.
-      성능 실측: <b>렉트마다 전체 캔버스를 디스패치</b>해 유효 스레드 15.6%(84% 낭비), BVH가 median split + 축 라운드로빈에 분할마다 <code>std::sort</code>로 O(N log²N), 패킹이 Shelf FF에 정렬까지 역방향, 렉트 크기가 표면적과 무관한 고정 정사각형.
-      백그라운드 베이킹은 <b>별도 COMPUTE 큐가 전제</b>인데 현재 큐는 <code>TYPE_DIRECT</code> 하나뿐이다.</div></div>
-<div class="doc"><a href="plans/MaterialPipelinePlan.md">MaterialPipelinePlan.md</a><span class="tie">PHASE 3.5 · 완료</span>
-<div class="why">머테리얼 → ShaderMeta → 퍼뮤테이션 → Slang → DXIL/SPIR-V 단일 파이프라인. M0~M7이 완료됐다. M5는 generation/소유 수명과 직렬화 정본을 닫았고, M6-P0~P2d-d는 GBuffer/Forward property·texture·ShaderMeta/PSO·Water/Wind·Foliage/flow·required assets를 제품 경로에 연결했다. P2d-e는 material-cache frame scan 2곳, Material raw texture alias/setter와 제품 draw pool legacy writer를 은퇴했다. 모델에 임베디드된 재질·텍스처의 새 신원과 원자 게시, legacy <code>::Material</code> 제거는 PHASE 3.75가 새 계약으로 수행한다.</div></div>
-    <div class="doc is-done"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4.75 · 4-1</span>
-      <div class="why">Pipeline Asset Inspector가 Pass 순서·슬롯·ResourceSchema·조건·폴백을 소유한다. <code>.shadergraph(domain=pass)</code>와 authored Slang은 일반 Custom Pass를 만들며, PHASE 4.25의 graph 기반은 재사용하되 Material Graph의 Principled 의미를 재정의하지 않는다.</div></div>
-    <div class="doc"><a href="plans/RenderGraphDependencySchedulingPlan.md">RenderGraphDependencySchedulingPlan.md</a><span class="tie">PHASE 4.75 · 트랙 RG</span>
-      <div class="why"><b>2026-08-28 신설.</b> 현재 <code>EnhancedRenderGraph</code>의 declaration-order 실행을 교체하지 않고 확장한다. 명시적 Read/Write/Modify와 resource version → stable single-queue DAG → culling/lifetime/barrier·병렬 기록 재계산 → 기본 19 node와 제품 Pass 이관 → DX12/Vulkan live cutover를 먼저 닫는다(RG0~RG6 57일). 그 뒤에만 transient buffer/aliasing → multi-queue async compute → subresource/split barrier·Resource Inspector를 연다(RG7~RG9 60일). 총 117일, 구현 미착수.</div></div>
-    <div class="doc"><a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
-      <div class="why">애니메이션 평가 엔진 3세대 전환 + 스케줄러 · LOD · CPU 버짓. 8-19 개정: 언리얼·유니티·Lumina 대조로 <b>평가 엔진이 한 세대 뒤</b>임이 드러나 두 겹이 됐다 — 아래층(포즈=값 · 태스크 레시피 · 도달성 실행 · 관측 본 물질화)과 위층(레시피 강등 L0~L7 · 태스크 EMA 기반 계산형 버짓). 실측 결론: 본 계산이 문자열 map 탐색 위에서, 공유 애셋(curKey·Bone)에 8스레드 쓰기 경합을 내며, 화면 밖 캐릭터까지 풀틱으로 돈다. 뼈=GameObject와 512행렬 프록시라는 <b>하이브리드 청구서를 동시에</b> 내는 중(744 뼈 노드 × 3순회 + 본 30개짜리도 32KB 복사).</div></div>
-    <div class="doc"><a href="plans/ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14</span>
-      <div class="why">표시 중심 프로파일러를 프레임 단위 녹화·정지 후 구간 분석 도구로 승격. 수집 코어(CaptureSession, EngineFrameId·SubmissionId)가 먼저고 ImGui는 불변 캡처의 reader일 뿐이다. 정적 점검 결론: collector가 producer TLS를 직접 리셋하고, GPU query record가 frame ring과 분리돼 2-in-flight·멀티카메라에서 프레임 매핑을 보장 못 하며, profiler가 에디터 모듈에 있어 Player 녹화 불가.</div></div>
-    <div class="doc"><a href="plans/EditorAutomationCLIPlan.md">EditorAutomationCLIPlan.md</a><span class="tie">PHASE 6 · CLI0~CLI7</span>
-      <div class="why">별칭 포함 176개 명령과 40개 자동화 소비 파일을 가진 기존 Editor CLI를 정식 command subsystem으로 승격한다. Result → Arguments → Descriptor → Module → JSONL 순으로 실패·인자·발견성·모듈·기계 판독 계약을 닫고, 기존 dotted ID와 frame-boundary Pump는 유지한다. <b>MCP는 보류하며 이 트랙의 범위와 작업에 포함하지 않는다.</b></div></div>
-    <div class="doc is-done"><a href="plans/RhiBoundaryPlan.md">RhiBoundaryPlan.md</a><span class="tie">3-1 완료</span>
-      <div class="why">RHI 경계 재설계 완료. 경계 인터페이스 7/7, 공용 패스 17/17, 양 backend 픽셀 대조 18개, Slice 7·8·R6와 최종 Debug/별도 프로세스/TickLive 통합 회귀까지 통과했다.</div></div>
-    <div class="doc"><a href="plans/LivePipelineDescPlan.md">LivePipelineDescPlan.md</a><span class="tie">3-13</span>
-      <div class="why">파이프라인 조립의 기술(記述)화. 그래프에 흡수하지 않은 근거 셋. 슬라이스 1·2 완료, 뷰 정책 잔여와 덤프 명령이 남았다.</div></div>
-    <div class="doc"><a href="plans/Phase5CouplingPlan.md">Phase5CouplingPlan.md</a><span class="tie">5-1 · 5-2</span>
-      <div class="why">렌더→게임플레이 커플링 절단의 실행 설계. A(죽은 include)·B(데이터 헤더 소속 정정)·C(행위 커플링 6종)·D(검증). 실측 간선 154 → 14.</div></div>
+      <div class="why">PHASE 4·4.25·4.75의 책임·순서·공수 통합 기준.</div></div>
+    <div class="doc"><a href="plans/RenderGraphDependencySchedulingPlan.md">RenderGraphDependencySchedulingPlan.md</a><span class="tie">PHASE 4.75 · RG</span>
+      <div class="why">리소스 의존성 스케줄링과 단계별 제품 전환.</div></div>
+    <div class="doc"><a href="plans/LightmapBakerPlan.md">LightmapBakerPlan.md</a><span class="tie">PHASE 4.75 · L</span>
+      <div class="why">라이트맵 베이커 재작성과 비동기 베이킹 계약.</div></div>
+    <div class="doc"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4.75 · SRP</span>
+      <div class="why">Pipeline Asset·Custom Pass·Shader Graph 저작과 제품 배선.</div></div>
+    <div class="doc"><a href="plans/EditorAutomationCLIPlan.md">EditorAutomationCLIPlan.md</a><span class="tie">PHASE 6 · CLI</span>
+      <div class="why">Editor 명령 결과·인자·등록·모듈·JSONL 정식화. MCP 보류.</div></div>
     <div class="doc"><a href="plans/ScriptSurfacePlan.md">ScriptSurfacePlan.md</a><span class="tie">PHASE 9.5</span>
-      <div class="why">C# 스크립트 표면의 기준을 <b>사라진 게임 코퍼스의 호출 빈도</b>에서 <b>현재 네이티브 구조와 실제 저작분</b>으로 옮긴다(W1~W7). <code>ScriptApiMigrationPlan.html</code> §11 등급표를 승계·폐기한다 — 그 표의 기준 코퍼스는 <code>8ae17250</code>에서 통째로 삭제됐는데 표만 남아 있었다. W1(골격)·W2(Light·Camera 노출) 완료, W3(입력 값 통로)~W7 대기.</div></div>
-    <div class="doc"><a href="plans/ScriptLifecycleContractHardeningPlan.md">ScriptLifecycleContractHardeningPlan.md</a><span class="tie">현행 안정화 · LC0~LC7 · LC1·LC2 완료</span>
-      <div class="why">현재 C# 생명주기·Task 스코프의 실패 단계, 취소 정리 예외, 완료 대기 참조 유지, 재진입·스레드 경계를 안정화한다. 기존 즉시 시작·비활성 중 대기·DDOL·Task 취소 의미를 보존한다. <b>미래 PHASE 24를 기다리지 않는 독립 작업</b>이며, 관리 회귀와 네이티브 기준선의 증거 범위를 구분한다.</div></div>
-    <div class="doc"><a href="plans/BehaviorTreeManagedPlan.md">BehaviorTreeManagedPlan.md</a><span class="tie">9-8</span>
-      <div class="why">행동 트리를 C# 우선으로 재설계. ★ 트리 전체를 관리 측으로 옮기는 이유 — BT 틱이 동기라 "노드만 C#"은 불변식을 깬다.</div></div>
-    <div class="doc"><a href="plans/EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">E0~E7</span>
-      <div class="why">코어 엔진·에디터·게임 프로젝트 3계층 분리. 구 L축을 E0~E7 트랙으로 재편 — 경계 래칫 부채 E0 기준선 98건 → <b>0 완주</b>(E4-7), 에디터 신설 프로젝트 5종(EditorUI·EditorRuntime·EditorRender·RenderTests·HostImGuiPresentation), Academy_4Q는 얇은 조립 CreatorEditor.exe. <b>E6 판정 4/4 완결(P1a 수집 코어 이관이 마지막을 닫음)</b>, E7도 재배치·개명·통폐합 완료(Engine\/Editor\ 그룹 + CreatorEditor 개명 + 에디터 4 vcxproj→Editor 1개 통합 14→11 + 구 ScriptBinder→SceneRuntime 개명, 2026-08-24). isEditorView 중립 개명은 카메라 아키텍처 완결이 해소(실코드 0). <b>잔여(2026-08-24 실측)</b>: E2의 Scene·Prefab 저작 writer 2종(SaveScene·SavePrefab — Core 직접 쓰기 잔존, SerializationPlan D축 순서 존중) · RenderEngine→RenderCore 개명(방법론 검증됨 — 수학 이주 WIP 착지 후) · <s>EnhancedSceneRenderer namespace 정리</s> E7-f 완료 · Player 모듈 경계 · ClrScript 분할 재평가(9-8·SceneGraph E1 후). <b>★ Player DLL화 판단 자료(<a href="analysis/PlayerModuleBoundaryAnalysis.md">PlayerModuleBoundaryAnalysis.md</a>, 2026-08-26)</b>: 분리축이 둘인데 게임코드↔엔진은 GameScripts.dll로 이미 달성, 남은 건 엔진코어↔호스트셸뿐. 옛 서술 2개가 실측으로 뒤집혔다 — "배포 계획 연계"는 <b>죽은 위임</b>(PHASE 23에 Player 바이너리 언급 0건)이었고, "단독 착수 실익 없음"도 틀렸다(GameBuilderSystem.cpp:121이 -BuildNative를 항상 넘겨 <b>오늘도 매 게임 빌드가 네이티브를 재컴파일</b>한다). 선행은 <b>Core ABI/version provenance</b> — 어느 계획도 소유하지 않은 공백. 비용 실측: DLL마다 사본이 생길 전역 115개(Singleton 36·리플렉션 타입 77·inline 2)와 즉시 터질 헤더 인라인 싱글턴 2곳(§2.3-5로 인벤토리 신규 등재 — 6개 페이즈 동안 누락).</div></div>
-    <div class="doc"><a href="plans/EnginePackagingPlan.md">EnginePackagingPlan.md</a><span class="tie">P1~P5</span>
-      <div class="why">엔진 코어 분리와 패키지화. ★ 먼저 정정하는 것 — 프로젝트는 이미 나뉘어 있다. 문제는 분할이 아니라 의존 방향이다.</div></div>
-    <div class="doc"><a href="plans/AssetResidencyPlan.md">AssetResidencyPlan.md</a>
-      <div class="why">자산 GPU 상주 관리. "콘텐츠 힙은 어떻게 관리하나"의 답이 "관리하지 않는다"였던 데서 출발. §7에 외부 엔진 방송과의 구조 비교(지연 해제·커스텀 힙·디스크립터 풀링)를 참고 사례로 실었다.</div></div>
-    <div class="doc is-done"><a href="plans/SceneGraphRedesignPlan.md">SceneGraphRedesignPlan.md</a><span class="tie">PHASE 8.5 · 트랙 G/E/K/H/S/P/C/L</span>
-      <div class="why">UE Scene Graph 구도를 반영한 오브젝트 모델 재설계(ObjectModelModernizationPlan 대체). 실측 결론: 파괴 단일점 부재 등 CRITICAL 4종. 채택/번안/기각 결정표 포함. K2 SBO·E5 unique_ptr는 PHASE 18 완결로 족쇄가 풀렸다. <b>트랙 8개 전부 완결</b>(2026-08-21) — 잔여였던 S4 dirty 게이트는 <a href="plans/TransformUpdatePlan.md">TransformUpdatePlan</a> T4로 이관(2026-08-25). ECS 도입은 게이트 D 폐지로 기각 확정.</div></div>
-    <div class="doc is-done"><a href="plans/TransformUpdatePlan.md">TransformUpdatePlan.md</a><span class="tie">PHASE 8.75 · X0~X8 완료 · X9 선택 중단</span>
-      <div class="why">Transform 갱신 구조·성능 재설계(X0~X9). <b>2026-09-01 현재 필수 슬라이스 X0~X8 완료, X9 선택 확장 중단</b>이다. 1차 안(T0~T5)은 측정 전제가 틀려 폐기했고, 두 도메인 계측에서 출발해 writer publication, canonical hierarchy mutation, packed execution graph, dirty-root sparse resolve, targeted pull, Animator/Physics bulk writer, render proxy dirty mask까지 순서대로 착지했다.
-          <b>현재 구조</b>: <code>HierarchyStore</code>에서 <code>SpatialExecutionGraph</code>/<code>UILayoutExecutionGraph</code>를 분리 컴파일하고 변경 subtree만 resolve한다. 렌더 변경은 frame-persistent <code>ProxyDirty</code> mask queue로 모여 Light 포함 최종 <code>CommitRenderProxies</code>에서 한 번만 발행되며 registration generation이 파괴·재사용을 막는다. 원격 통합·재링크 뒤 최종 Release 15표본×3세트 재검증은 X4 10k compile 세트 중앙 5,854.6µs(전체 최악 10,065.5µs), X5 leaf resolve 0.3µs, full-movement sparse/recursive 비율 0.379를 확인했다. X8 정지 proxy commit은 등록 1개 0.06µs, 256개 0.08µs다.
-      <b>남은 필수 작업 없음.</b> X7 실제 제품 바이너리 TSan은 Windows target 미지원으로 미확인이며 WSL canary·barrier 모델과 Release runtime golden까지만 승인했다. X9는 독립 A/B에서 이득이 확인된 항목만 별도 재개한다.</div> 조판본은 <a href="plans/TransformUpdatePipeline.html">TransformUpdatePipeline.html</a>에서 볼 수 있다(mermaid 벤더링 — 오프라인에서 그대로 열린다). 다만 그 조판본은 폐기된 T0~T5 기준이라 갱신이 필요하다.</div></div>
-    <div class="doc"><a href="plans/UtilityFrameworkModernizationPlan.md">UtilityFrameworkModernizationPlan.md</a><span class="tie">PHASE 15</span>
-      <div class="why">유틸리티 프레임워크 현대화. 실측 결론: include 카운트로는 죽은 코드를 못 가린다(Core.Minimal 전이 include) — namespace std 침범이 전 TU에 퍼졌는데 실사용은 2줄뿐이었다.</div></div>
-    <div class="doc"><a href="plans/UISystemRedesignPlan.md">UISystemRedesignPlan.md</a><span class="tie">PHASE 16</span>
-      <div class="why">uGUI 저작 · Slate 런타임 하이브리드 UI 재설계(U0~U7). 별도 위젯 트리 금지 근거, 클릭 0-나누기 등 CRITICAL 4종, "배선 완료 ≠ 화면에 나옴" 함정 기록.</div></div>
-    <div class="doc"><a href="plans/SerializationPlan.md">SerializationPlan.md</a><span class="tie">PHASE 17</span>
-      <div class="why">직렬화 이원화(D0~D7) — 저작은 YAML, 런타임은 쿠킹 바이너리. <b>2026-09-02 순차 구현:</b> D2 selective 재이주, D3-b-4 ryml 단일 backend, D4 canonical YAML/nlohmann 은퇴를 완료했다. D5는 CEMF v2 source identity 215개와 현존 corpus parity를 닫았고, D6은 CEDO1 문서 43개를 통해 Release Player text parser 호출 0을 달성했다. D3/D5 정본 성능 판정은 <code>Test1.creator</code> 복구 뒤 닫는다. D7 선택 중단.</div></div>
+      <div class="why">현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계.</div></div>
+    <div class="doc"><a href="plans/EnginePackagingPlan.md">EnginePackagingPlan.md</a><span class="tie">PHASE 10·11 등</span>
+      <div class="why">EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지.</div></div>
+    <div class="doc"><a href="plans/ModelGeometryTextureImprovementPlan.md">ModelGeometryTextureImprovementPlan.md</a><span class="tie">비동기 배치 완료 · 구조 개선 제안</span>
+      <div class="why">모델·Vertex·Mesh·Texture 경계와 로딩 개선. 기존 PHASE를 대체하거나 새 공수로 합산하지 않는다.</div></div>
+    <div class="doc"><a href="plans/TexturePipelinePlan.md">TexturePipelinePlan.md</a><span class="tie">PHASE 12 · 미착수</span>
+      <div class="why">텍스처 import 설정·mip·cook 트랜스코딩·런타임 소비.</div></div>
+    <div class="doc"><a href="plans/BuildPipelinePlan.md">BuildPipelinePlan.md</a><span class="tie">PHASE 12.5 · 진행</span>
+      <div class="why">게임 빌드·cook·stage·managed·CI 파이프라인. B/L 잔여 유지.</div></div>
+    <div class="doc"><a href="plans/EngineLayerSeparationPlan.md">EngineLayerSeparationPlan.md</a><span class="tie">E0~E7 · 잔여 있음</span>
+      <div class="why">Runtime Core·Editor·Host 경계. E2 writer와 E7 잔여 유지.</div></div>
+    <div class="doc"><a href="plans/AnimationSchedulerPlan.md">AnimationSchedulerPlan.md</a><span class="tie">PHASE 13</span>
+      <div class="why">애니메이션 스케줄러·LOD·CPU 버짓 재설계.</div></div>
+    <div class="doc"><a href="plans/ProfilingCapturePlan.md">ProfilingCapturePlan.md</a><span class="tie">PHASE 14 · 진행</span>
+      <div class="why">수집 코어·녹화·구간 분석과 프로파일러 소비 경로.</div></div>
+    <div class="doc"><a href="plans/RenderFrameDebuggerPlan.md">RenderFrameDebuggerPlan.md</a><span class="tie">PHASE 14 확장</span>
+      <div class="why">불변 프레임 캡처·그리기 출처·선택적 픽셀 재현.</div></div>
+    <div class="doc"><a href="plans/UtilityFrameworkModernizationPlan.md">UtilityFrameworkModernizationPlan.md</a><span class="tie">PHASE 15 · 진행</span>
+      <div class="why">유틸리티의 실제 소비·계약을 기준으로 정리.</div></div>
+    <div class="doc"><a href="plans/MathematicsMigrationPlan.md">MathematicsMigrationPlan.md</a><span class="tie">구조 완료 · 검증 잔여</span>
+      <div class="why">수학 라이브러리 이주. pixel·Physics runtime gate가 남아 있다.</div></div>
+    <div class="doc"><a href="plans/UISystemRedesignPlan.md">UISystemRedesignPlan.md</a><span class="tie">PHASE 16 · 진행</span>
+      <div class="why">Scene 소유 UI Runtime과 값 타입 렌더 제출.</div></div>
+    <div class="doc"><a href="plans/SerializationPlan.md">SerializationPlan.md</a><span class="tie">PHASE 17 · 진행</span>
+      <div class="why">저작 텍스트·쿠킹 바이너리 경계와 잔여 성능 판정.</div></div>
     <div class="doc"><a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a><span class="tie">PHASE 19</span>
-      <div class="why">물리 계층 ~9,500줄 전면 재작성(트랙 Z·X·A·B·C·T·M). 실측 결론: <b>병렬화의 선결조건은 스레드가 아니라 자료구조다</b> — 맵 순회 + 원소마다 RTTI + 원소마다 GetComponent 위에는 어떤 스레딩 전략도 못 얹는다. PhysX 차별점(차량·클로스·조인트·디포머블)을 하나도 안 쓰고 있다는 실측이 Jolt 판정의 근거이고, 결정은 스파이크 벤치(X0)가 한다. AI 스레드 ↔ 물리 데이터 레이스가 보호 없이 열려 있어 트랙 Z는 순서 밖 최우선. 구조 설계는 아래 PhysicsComponentDesign.</div></div>
+      <div class="why">물리 컴포넌트·backend·스레딩 전면 재설계.</div></div>
     <div class="doc"><a href="plans/NetworkFrameworkPlan.md">NetworkFrameworkPlan.md</a><span class="tie">PHASE 20</span>
-      <div class="why">서버 권위 replication 기반 네트워크 계획(N0~N10). Authoring/Cooked/Network archive 경계, 별도 NetworkObjectId, 실제 fixed Simulation Tick, Loopback correctness, delta/interest, transport 판정, 선택적 prediction/headless server 순으로 진행한다. YAML/JSON DOM과 live Scene pointer는 wire·network thread 경계를 넘지 않는다.</div></div>
+      <div class="why">네트워크 신원·fixed tick·replication 기반.</div></div>
     <div class="doc"><a href="plans/EditorWorkspaceRedesignPlan.md">EditorWorkspaceRedesignPlan.md</a><span class="tie">PHASE 21</span>
-      <div class="why">Dear ImGui를 유지하면서 S&amp;Box 공개 theme token을 이식하고, 소수 전용 위젯만 custom draw한다. 고정 중앙 ViewportHost + 주변 자유 도킹 ToolPanel, stable ID/workspace, Play 시 중앙 Game 전환, 선택적 Game Preview, 양 backend·DPI·시각·성능 gate를 하나의 실행 계획으로 묶는다.</div></div>
+      <div class="why">테마·도킹·ViewportHost와 편집·플레이 전환.</div></div>
     <div class="doc"><a href="plans/AudioBackendModernizationPlan.md">AudioBackendModernizationPlan.md</a><span class="tie">PHASE 22</span>
-      <div class="why">FMOD Core를 은퇴하고 miniaudio를 source-integrated backend로 채택한다. 제품 입력은 WAV/MP3/FLAC만 허용하고, canonical AssetId 기반 AudioClip cook, Scene-owned listener/source, backend-neutral handle, voice·3D·bus·reverb와 절대 device/성능 gate를 닫은 뒤 FMOD link·stage·PE import를 0으로 만든다. Editor Asset DB의 efsw 감시는 유지한다.</div></div>
+      <div class="why">FMOD 은퇴와 miniaudio 통합·오디오 회귀.</div></div>
     <div class="doc"><a href="plans/EngineDistributionAndLauncherPlan.md">EngineDistributionAndLauncherPlan.md</a><span class="tie">PHASE 23</span>
-      <div class="why">상용 엔진의 마지막 제품화 단계. 서명 MSI로 Launcher와 버전별 불변 엔진을 설치하고, <code>*.creatorproject</code>를 프로젝트 정본으로 삼아 exact engine version을 연결한다. Editor의 <code>--project</code> Host 계약, Editor-owned efsw 다중 root 수명, Launcher 프로젝트 관리·빌드 연동, clean-VM 설치·복구·업데이트·제거 회귀까지 닫는다.</div></div>
-    <div class="doc"><a href="design/PhysicsComponentDesign.md">PhysicsComponentDesign.md</a><span class="tie">PHASE 19 트랙 B</span>
-      <div class="why">물리 컴포넌트 구조 설계 — <b>저작은 컴포넌트, 런타임은 데이터</b>. 컴포넌트는 저작값 + BodyHandle만 들고 런타임 상태는 평탄 스토어가 소유한다. 원칙 5: 권위를 레인으로 표현(Static은 순회 자체가 없음 · Kinematic push · Dynamic pull은 활성만 · Character 독립) · 커맨드 파이프로 O(바디)→O(변경) · 콜라이더는 순수 데이터(ICollider 폐기, 빈 몸통 가상 6개+vtable 제거) · 이벤트는 고정 크기 스트림(현 Collision의 매달린 vector 참조 제거) · 읽기는 메인 전용, 워커는 커맨드만. <b>유니티에서 가져올 것/버릴 것을 이유와 함께 갈랐다</b> — 유니티가 옳게 한 것(콜라이더 단독=정적, 컴파운드)은 가져오고, 관리/네이티브 경계 제약 때문에 그랬던 것은 버린다. ECS는 도입하지 않는다(SceneGraph 게이트 D).</div></div>
-    <div class="doc"><a href="design/RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">3-1 후속</span>
-      <div class="why">RHI GPU 메모리·수명 관리 재설계. Slice A~D와 E-a(descriptor versioned recycler) 완료, SBT는 실소비 경로 대기.</div></div>
+      <div class="why">엔진 배포·Launcher·프로젝트 관리와 설치 회귀.</div></div>
   </div>
-
   <h3>미래 계획 — 현재 리팩토링 이후</h3>
   <div class="doc-grid">
     <div class="doc is-ref"><a href="plans/SimulationEffectContractPlan.md">SimulationEffectContractPlan.md</a><span class="tie">PHASE 24 · 보류 · 구현 미착수</span>
-      <div class="why">효과 계약 런타임과 <b>CreatorEngine용 PrSM 수정·도입</b>까지가 목표다. C# 백엔드를 유지하고 공통 효과·수명 검사, 컴포넌트 등록·직렬화, 빌드·원문 진단·리로드를 연결한다. 현재 리팩토링 완료 후 코드·저작분·공수를 재산정하며, 현행 생명주기 안정화와 완료를 구분한다. 현재 실행 작업의 공수·진척 집계에는 포함하지 않는다.</div></div>
+      <div class="why">PrSM과 효과 계약 도입. 현행 스크립트 안정화 완료와 구분하며 현재 실행 공수에 포함하지 않는다.</div></div>
   </div>
-
-  <h3>구현 기록 — 닫힌 작업</h3>
+  <h3>설계·분석·구현 근거</h3>
   <div class="doc-grid">
-    <div class="doc is-done"><a href="plans/ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a><span class="tie">PHASE 18 완결</span>
-      <div class="why">컴파일타임 리플렉션 전면 전환(CT0~CT10, 2026-08-16 신설 → 08-17 완결). 헤더툴 3종·generated.h 154개·매크로 전부 은퇴, 무변경 빌드 1m29s→7.1s(12.6×)·스폰 2.5×. 최종 표기는 reflect() + meta::schema&lt;Self&gt; 로컬 스키마 — 부모는 identity 선언에서 자동 추론, 코어는 std 전용 독립 계층(MetaSchema.h), magic_enum도 자급 대체. 전 구간 골든 diff 0으로 이행.</div></div>
-    <div class="doc is-done"><a href="plans/RenderSceneViewPlan.md">RenderSceneViewPlan.md</a><span class="tie">3-14</span>
-      <div class="why">RenderScene(보유) × RenderView(프레임) 이층 구조. 프록시 타입 분할·광원 프록시화·뷰별 선별·카메라 등록 정리. PIX 실측으로 잡은 루트 트랜스폼 캐시 버그 기록 포함.</div></div>
-    <div class="doc is-done"><a href="plans/MultiCameraRenderPlan.md">MultiCameraRenderPlan.md</a><span class="tie">3-9 후속</span>
-      <div class="why">씬뷰·게임뷰 동시 표시(카메라별 표시 슬롯). 구현 뒤에도 계속 자란 작업 일지 — 잔상 회귀, 볼류메트릭 포그·투명·Forward+ PBR·투명 그림자 배선이 §10~15에 이어진다.</div></div>
-    <div class="doc is-done"><a href="plans/LifecycleRedesignPlan.html">LifecycleRedesignPlan.html</a><span class="tie">PHASE 9</span>
-      <div class="why">델리게이트 프레임 루프 은퇴와 생명주기 재설계(L-0~L-5). 컴포넌트 26종 전환과 구 경로 철거까지.</div></div>
-    <div class="doc is-done"><a href="analysis/RendererPortingLog.html">RendererPortingLog.html</a><span class="tie">PHASE 3</span>
-      <div class="why">DX12 렌더러 이식의 슬라이스별 전체 기록. 대시보드 3-x 항목의 detail이 가리키는 원문.</div></div>
+    <div class="doc is-ref"><a href="design/PhysicsComponentDesign.md">PhysicsComponentDesign.md</a><span class="tie">PHASE 19</span>
+      <div class="why">물리 컴포넌트와 데이터 소유 계약.</div></div>
+    <div class="doc is-ref"><a href="design/RhiGpuMemoryLifetimeDesign.md">RhiGpuMemoryLifetimeDesign.md</a><span class="tie">RHI 후속</span>
+      <div class="why">GPU 메모리·수명 설계. SBT는 실제 소비 경로 대기.</div></div>
+    <div class="doc is-ref"><a href="analysis/EngineStructureAnalysis.html">EngineStructureAnalysis.html</a><span class="tie">출발점</span>
+      <div class="why">구조 분석과 원래 페이즈 수립 근거.</div></div>
+    <div class="doc is-ref"><a href="design/ResourceOwnershipDesign.html">ResourceOwnershipDesign.html</a><span class="tie">PHASE 2</span>
+      <div class="why">자원 소유권·경계 설계 기록.</div></div>
+    <div class="doc is-ref"><a href="analysis/RectTransformAnalysis.html">RectTransformAnalysis.html</a><span class="tie">PHASE 8</span>
+      <div class="why">RectTransform 분석 기록.</div></div>
+    <div class="doc is-ref"><a href="design/ReflectionRetentionDecision.md">ReflectionRetentionDecision.md</a><span class="tie">PHASE 18 근거</span>
+      <div class="why">리플렉션 존치 결정과 기각 근거.</div></div>
+    <div class="doc is-ref"><a href="analysis/ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a><span class="tie">PHASE 18 근거</span>
+      <div class="why">컴파일타임 전환 전 실측·결함 분석.</div></div>
+    <div class="doc is-ref"><a href="analysis/PPLContainerMigrationAnalysis.md">PPLContainerMigrationAnalysis.md</a><span class="tie">분석</span>
+      <div class="why">동시성 컨테이너의 실제 사용과 전면 교체 비권고 근거.</div></div>
+    <div class="doc is-ref"><a href="analysis/RendererPortingLog.html">RendererPortingLog.html</a><span class="tie">PHASE 3 기록</span>
+      <div class="why">DX12 렌더러 이식의 슬라이스별 구현 기록.</div></div>
   </div>
-
-  <h3>분석 · 결정 — 근거 문서</h3>
-  <div class="doc-grid">
-    <div class="doc is-ref"><a href="plans/ModelImportPipelinePlan.md">ModelImportPipelinePlan.md</a><span class="tie">역사 기록 · PHASE 3.75로 대체</span>
-      <div class="why">구 I/V experiment 배선의 구현·측정·실패 기록. 2026-09-02부터 활성 계획·공수·진행률의 정본이 아니며, 후속 작업은 <code>ModelAssetBigBangCutoverPlan.md</code>만 따른다. 과거 수치와 게이트 오진 사례를 근거 자료로 보존한다.</div></div>
-    <div class="doc is-ref"><a href="analysis/EngineStructureAnalysis.html">EngineStructureAnalysis.html</a>
-      <div class="why">구조 분석 보고서. 이 계획 전체의 출발점이고, 항목의 refs에 적힌 "12.3-②" 같은 번호가 이 문서의 절이다.</div></div>
-    <div class="doc is-ref"><a href="design/ResourceOwnershipDesign.html">ResourceOwnershipDesign.html</a>
-      <div class="why">자원 소유권·경계 설계. PHASE 2의 근거.</div></div>
-    <div class="doc is-ref"><a href="plans/ScriptApiMigrationPlan.html">ScriptApiMigrationPlan.html</a>
-      <div class="why">스크립트 API 이전 설계(ModuleBehavior → C#). PHASE 2 후반과 9-4의 근거. <b>★ §11의 T1~T4 등급표는 폐기됐다</b> — 그 기준이 된 <code>Dynamic_CPP\Assets\Script</code> 코퍼스가 <code>8ae17250</code>에서 포팅 없이 삭제됐고(349파일·37,788줄), &quot;Transform은 컴포넌트가 아니다&quot;도 <code>c9bbdd56</code>(S1-b)에서 뒤집혔다. 표면 작업의 현재 정본은 <a href="plans/ScriptSurfacePlan.md">ScriptSurfacePlan.md</a>(PHASE 9.5).</div></div>
-    <div class="doc is-ref"><a href="analysis/RectTransformAnalysis.html">RectTransformAnalysis.html</a>
-      <div class="why">RectTransform 분석. PHASE 8(UI 레이아웃 해상도 독립)의 근거.</div></div>
-    <div class="doc is-ref"><a href="design/ReflectionRetentionDecision.md">ReflectionRetentionDecision.md</a>
-      <div class="why">엔진 전용 리플렉션 <b>존치</b> 결정(폐지·대체 논의 종결). 이후 PHASE 18이 존치된 시스템을 컴파일타임 전환으로 전면 재설계해 완결 — 역사적 근거로 유지.</div></div>
-    <div class="doc is-ref"><a href="analysis/ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a>
-      <div class="why">리플렉션 전수 분석 — PHASE 18의 출발점. 병폐 실측(any/function 이중 타입소거, 전 TU 전파 280개, 헤더툴 재빌드 세금 ~3분)과 결함 F-1~F-7, §8 컴파일타임 전환 평가.</div></div>
-    <div class="doc is-ref"><a href="analysis/PPLContainerMigrationAnalysis.md">PPLContainerMigrationAnalysis.md</a>
-      <div class="why">PPL 동시성 컨테이너 → STL 교체 분석. 결론은 <b>전면 교체 비권고</b> — 사용 9곳 중 동시성이 실제로 필요한 곳은 둘뿐이다.</div></div>
-  </div>
+  <p class="lead" style="margin-top:18px;margin-bottom:0"><a href="plans/archive/README.md">종료·대체 계획 19종 보관함</a> · <a href="#closed-phases">종료 페이즈 이력 펼치기</a></p>
 </div>
 
 <!-- ===== PHASE 0 ===== -->
@@ -524,7 +490,7 @@
 <!-- ===== PHASE 3.5 ===== -->
 <section class="phase" id="phase-3.5">
   <h2 class="sec"><span class="no">PHASE 3.5</span>머테리얼 · 셰이더 파이프라인 재설계 <span class="phase-pct" data-phase-pct="3.5"></span></h2>
-        <div class="phase-meta">예상 공수: 23일 · 신설(2026-08-11) · 완료(2026-08-29) · 완료 공수 23일, 잔여 추정 0일 · M0~M7 완료 · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="plans/MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
+        <div class="phase-meta">예상 공수: 23일 · 신설(2026-08-11) · 완료(2026-08-29) · 완료 공수 23일, 잔여 추정 0일 · M0~M7 완료 · RhiBoundaryPlan §7.2의 <b>V5(셰이더 컴파일)·V6(파이프라인 상태 기술)를 이 페이즈가 승계</b>(M1=V5 · M3=V6) · 설계 문서: <a href="plans/archive/MaterialPipelinePlan.md" style="color:var(--accent)">MaterialPipelinePlan.md</a></div>
   <div class="phase-goal"><b>목표:</b> Material → ShaderMeta → (키워드 · Pass · RenderStates) → 퍼뮤테이션 → HLSL 소스 → Slang → DXIL | SPIR-V의 <b>단일 파이프라인</b>을 세운다.
   현재 컴파일러·캐시·퍼뮤테이션·중립 PSO 상태·ShaderMeta·양 타깃 reflection은 완료됐다. Material도 소유 프로퍼티 블록, typed YAML/CEMT v1 단일 codec, legacy texture GUID 이행, DataSystem 소유 ShaderMeta slot/generation handle까지 도달했다.
           C3a의 watcher <code>Modified</code>→GT CPU generation invalidation, C3b1의 DX12/Vulkan PSO handle generation, C3b2a의 completion 기반 bounded retirement, C3b2b1의 deep-owned graphics request/targeted invalidation과 C3b2b2의 ShaderMeta packet→GBuffer 대표 next-use를 완료했다. C4는 <code>FoliageType</code>과 Editor Undo의 장기 Model/Mesh/Material raw 소비를 소유 참조로 바꾸고 Model/Material 전역 retired generation 의존을 제거했다. M6-P0~P2d-d는 GBuffer/Forward의 property·texture generation·ShaderMeta/PSO·Water/Wind custom block·Foliage/flow·required-asset packet을 양 backend 제품 경로로 닫았다. P2d-e는 frame material-cache scan과 Material raw texture alias/setter, 제품 draw pool의 legacy writer를 은퇴했다. 빈 required packet의 primary-only 1/1과 명시 packet의 Forward primary+Water+Wind 3개를 판정했다.</div>
@@ -555,7 +521,7 @@
 <!-- ===== PHASE 3.75 ===== -->
 <section class="phase" id="phase-3.75">
   <h2 class="sec"><span class="no">PHASE 3.75</span>모델 자산 빅뱅 전환 <span class="phase-pct" data-phase-pct="3.75"></span></h2>
-<div class="phase-meta"><b>정본: <a href="plans/ModelAssetBigBangCutoverPlan.md" style="color:var(--accent)">ModelAssetBigBangCutoverPlan.md</a></b> · 신설 2026-09-02 · <b>완료 2026-09-04 — 60일(MBC0~MBC11) · 잔여 0일</b> · 선행: PHASE 3.5 완료 · 후행: PHASE 4 재개. 구 ModelImport I/V의 완료 표시는 승계하지 않는다. 구현은 빌드 가능한 내부 슬라이스로 나누되 제품 공개는 <code>MBC11</code>에서 한 번만 했다. <b>남긴 것 하나:</b> cooked 임베디드 텍스처의 로드 시점 디코드 비용(§8.4 B2c)은 <a href="plans/TexturePipelinePlan.md">PHASE 12</a> T1a/T2가 소유한다 — 예산에서 뺀 것이 아니라 판정 주체를 옮겼고, 모델별 값이 archive에 남아 회귀하면 <code>verify-model-cutover-budget</code>가 붉어진다.</div>
+<div class="phase-meta"><b>정본: <a href="plans/archive/ModelAssetBigBangCutoverPlan.md" style="color:var(--accent)">ModelAssetBigBangCutoverPlan.md</a></b> · 신설 2026-09-02 · <b>완료 2026-09-04 — 60일(MBC0~MBC11) · 잔여 0일</b> · 선행: PHASE 3.5 완료 · 후행: PHASE 4 재개. 구 ModelImport I/V의 완료 표시는 승계하지 않는다. 구현은 빌드 가능한 내부 슬라이스로 나누되 제품 공개는 <code>MBC11</code>에서 한 번만 했다. <b>남긴 것 하나:</b> cooked 임베디드 텍스처의 로드 시점 디코드 비용(§8.4 B2c)은 <a href="plans/TexturePipelinePlan.md">PHASE 12</a> T1a/T2가 소유한다 — 예산에서 뺀 것이 아니라 판정 주체를 옮겼고, 모델별 값이 archive에 남아 회귀하면 <code>verify-model-cutover-budget</code>가 붉어진다.</div>
   <div class="phase-goal"><b>목표:</b> 기존 GUID·legacy 객체·Assimp fallback·experiment A/B를 보존한 채 배선을 연장하지 않는다. 전체 모델 corpus에 새 <code>ce.uuidv8.sha256.v1</code> identity epoch를 발급하고, schema v2 sidecar·cooked artifact·embedded texture/material closure를 단일 writer가 원자 게시한다. 런타임은 immutable <code>ModelAssetGeneration</code> 하나를 renderer·scene·animation·editor·serialization이 직접 소비한다.</div>
   <div class="phase-goal"><b>긴급 결함 폐쇄:</b> <code>SU_Mythic.glb</code>는 <code>core|color|skin</code> 전체 vertex attribute mask에서 input layout·PSO·<code>VSIn</code>을 함께 유도해 GBuffer/Shadow와 DX12/Vulkan을 통과시킨다. <code>Gunner_F_Mythic.glb</code>는 model 1·material 2·embedded texture 6의 새 UUIDv8 closure를 cold load/reimport에서 원자 게시하며 역직렬화 순서 해킹과 전역 registry 예열을 제거한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="3.75"><!-- JS 생성 --></table></div>
@@ -584,7 +550,7 @@
 <!-- ===== PHASE 4 ===== -->
 <section class="phase" id="phase-4">
   <h2 class="sec"><span class="no">PHASE 4</span>PBR 제품 배선 안정화 <span class="phase-pct" data-phase-pct="4"></span></h2>
-  <div class="phase-meta"><b>정본: <a href="plans/PBRWiringStabilizationPlan.md" style="color:var(--accent)">PBRWiringStabilizationPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 18일 · 진행 기성 1.5일 · 잔여 16.5일</b> · 선행 PHASE 3.75.</div>
+  <div class="phase-meta"><b>정본: <a href="plans/PBRWiringStabilizationPlan.md" style="color:var(--accent)">PBRWiringStabilizationPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 18일 · 완료 8.5일 + 진행 기성 3일 · 잔여 6.5일</b> · 선행 PHASE 3.75.</div>
   <div class="phase-goal"><b>목표:</b> 현재 제품의 GBuffer/Deferred/Forward를 native Slang 한 계통과 immutable material generation으로 묶고, alpha/AO/emissive/UV/sampler/normal 의미 손실 및 backend 기본값 차이, 검정·변색 플리커를 먼저 제거한다. Blender Principled와 Material Graph, 그림자·probe·후처리는 이 완료선에 섞지 않는다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
   <div class="verify">
@@ -732,7 +698,7 @@
 <!-- ===== PHASE 8.5 ===== -->
 <section class="phase" id="phase-8.5">
   <h2 class="sec"><span class="no">PHASE 8.5</span>씬 그래프 재설계 (Entity · 계층 스토어 · 컴포넌트 · 프리팹 · 생명주기) <span class="phase-pct" data-phase-pct="8.5"></span></h2>
-  <div class="phase-meta">착수 2026-08-16 · 트랙 8개 완결 2026-08-21 · <b>대시보드 편입은 2026-08-25</b>(그때까지 미반영이었다) · 설계 문서: <a href="plans/SceneGraphRedesignPlan.md" style="color:var(--accent)">SceneGraphRedesignPlan.md</a> · 공수는 실적 추정치</div>
+  <div class="phase-meta">착수 2026-08-16 · 트랙 8개 완결 2026-08-21 · <b>대시보드 편입은 2026-08-25</b>(그때까지 미반영이었다) · 설계 문서: <a href="plans/archive/SceneGraphRedesignPlan.md" style="color:var(--accent)">SceneGraphRedesignPlan.md</a> · 공수는 실적 추정치</div>
   <div class="phase-goal"><b>목표:</b> UE Scene Graph 구도를 반영해 GameObject 모델을 <b>SceneGraph</b>로 재설계한다. 구 ObjectModelModernizationPlan을 대체·삭제하고 트랙 G/E/K/H/S/P/C/L 여덟으로 재편했다.
   <br><br>
   <b>왜 필요했나.</b> 재평가에서 CRITICAL 4종이 나왔고 뿌리가 같았다 — <b>파괴 단일점이 없다</b>. 계층·트랜스폼·컴포넌트·프리팹이 각자 수명을 관리해 어긋난 순간 널 역참조나 유령 슬롯이 됐다. Transform은 GameObject의 값 멤버라는 특례였고, 계층 3필드는 Entity와 파일에 흩어져 있었으며, 프리팹 정의는 캐시가 정본을 가렸다.
@@ -762,7 +728,7 @@
 <!-- ===== PHASE 8.75 ===== -->
 <section class="phase" id="phase-8.75">
   <h2 class="sec"><span class="no">PHASE 8.75</span>Transform 갱신 구조 · 성능 재설계 <span class="phase-pct" data-phase-pct="8.75"></span></h2>
-  <div class="phase-meta">신설: 2026-08-25 · <b>같은 날 개정 — 1차 안(T0~T5) 폐기, X0~X9로 교체</b>(<code>TransformExecutionGraphPlan.md</code> 통합) · 선행 조건: PHASE 8.5 트랙 S·H 완결 · <b>트랙 S의 잔여 S4를 X8이 승계</b> · 설계 문서: <a href="plans/TransformUpdatePlan.md" style="color:var(--accent)">TransformUpdatePlan.md</a> (§6·§8에 목표 구조·플로우차트 8종, 부록 A에 폐기 근거) · 공수는 계획 추정치</div>
+  <div class="phase-meta">신설: 2026-08-25 · <b>같은 날 개정 — 1차 안(T0~T5) 폐기, X0~X9로 교체</b>(<code>TransformExecutionGraphPlan.md</code> 통합) · 선행 조건: PHASE 8.5 트랙 S·H 완결 · <b>트랙 S의 잔여 S4를 X8이 승계</b> · 설계 문서: <a href="plans/archive/TransformUpdatePlan.md" style="color:var(--accent)">TransformUpdatePlan.md</a> (§6·§8에 목표 구조·플로우차트 8종, 부록 A에 폐기 근거) · 공수는 계획 추정치</div>
   <div class="phase-goal"><b>목표:</b> 월드 트랜스폼 갱신을 <b>전 노드 재귀 순회</b>에서 <b>저작 계층에서 컴파일한 sparse 실행 그래프의 영향 범위 계산</b>으로 옮기고, 렌더 전달을 <b>proxy dirty mask</b>로 바꾼다. 정지 프레임뿐 아니라 leaf 1개 이동·1% random movement 같은 실제 workload도 전체 Entity 수에서 분리하는 것이 목표다.
   <br><br>
   <b>★ 측정 전제부터 정정한다.</b> 기록된 <b>정지 10,000개 4,058.8µs</b>는 <code>UpdateModelRecursive</code>의 값이 <b>아니다</b> — <code>AllUpdateWorldMatrix</code>가 <code>UpdateUILayout()</code>을 먼저 부르므로(<code>Scene.cpp:2577</code>) 그 안에는 <b>직렬 UI 레이아웃 DFS 한 벌이 통째로</b> 들어 있다. 방문집합도 두 벌이다. 1차 안이 이 값을 통째로 Spatial에 귀속시켜 "노드당 406ns"를 계산했고, 거기서 나온 판정 수치(100µs)도 함께 무효다. <b>X0가 두 도메인을 가르기 전에는 어떤 구현 슬라이스도 완료로 판정하지 않는다.</b>
@@ -794,7 +760,7 @@
 <!-- ===== PHASE 9 ===== -->
 <section class="phase" id="phase-9">
   <h2 class="sec"><span class="no">PHASE 9</span>생명주기 재설계 (델리게이트 프레임 루프 은퇴) <span class="phase-pct" data-phase-pct="9"></span></h2>
-  <div class="phase-meta">예상 공수: 10.5일 · 선행 조건: PHASE 2 스크립트 C# 전환 완료(2-10~2-21) · 병행: PHASE 3와 병행 가능, 9-4는 브랜치 보존 확인 후 5-4와 묶어 진행 가능 · 설계 문서: <a href="plans/LifecycleRedesignPlan.html" style="color:var(--accent)">LifecycleRedesignPlan.html</a></div>
+  <div class="phase-meta">예상 공수: 10.5일 · 선행 조건: PHASE 2 스크립트 C# 전환 완료(2-10~2-21) · 병행: PHASE 3와 병행 가능, 9-4는 브랜치 보존 확인 후 5-4와 묶어 진행 가능 · 설계 문서: <a href="plans/archive/LifecycleRedesignPlan.html" style="color:var(--accent)">LifecycleRedesignPlan.html</a></div>
   <div class="phase-goal"><b>목표:</b> 컴포넌트 생명주기를 <b>CRTP + 델리게이트 구독</b>에서 <b>Scene 소유 단계 리스트 + 프레임 끝 단일 파괴 지점</b>으로 옮긴다.
   <br><br>
   <b>왜 지금인가.</b> 스크립트가 전면 C#으로 전환되면서(2-10~2-21) Scene 생명주기 델리게이트의 잔존 구독자는 엔진 내장 컴포넌트 26종뿐이 됐다.
@@ -1143,7 +1109,7 @@
 <!-- ===== PHASE 18 ===== -->
 <section class="phase" id="phase-18">
   <h2 class="sec"><span class="no">PHASE 18</span>컴파일타임 리플렉션 전환 <span class="phase-pct" data-phase-pct="18"></span></h2>
-  <div class="phase-meta">신설: 2026-08-16 → <b>완결: 2026-08-17</b> · 설계 문서: <a href="plans/ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a> · 분석: <a href="analysis/ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a> · 전 구간 골든 diff 0으로 이행</div>
+  <div class="phase-meta">신설: 2026-08-16 → <b>완결: 2026-08-17</b> · 설계 문서: <a href="plans/archive/ReflectionRedesignPlan.md">ReflectionRedesignPlan.md</a> · 분석: <a href="analysis/ReflectionSystemAnalysis.md">ReflectionSystemAnalysis.md</a> · 전 구간 골든 diff 0으로 이행</div>
   <div class="phase-goal"><b>완료 모습(달성):</b> 헤더툴 3종·generated.h 154개·매크로 전부 은퇴. 타입은 <code>reflect()</code> 레시피가
   <code>meta::schema&lt;Self&gt;(meta::field&lt;&amp;Self::x&gt;, .with(속성))</code> 로컬 스키마만 적고, 부모는 <code>meta::identity</code> 선언에서 자동 추론.
   코어는 std 전용 독립 계층(MetaSchema.h), magic_enum도 자급 대체. 무변경 증분 빌드 1m29s→7.1s(12.6×), InstantiatePrefab ~2.5×, 씬 Serialize ~40%↓.</div>
@@ -1153,7 +1119,7 @@
 <!-- ===== PHASE 19 ===== -->
 <section class="phase" id="phase-19">
   <h2 class="sec"><span class="no">PHASE 19</span>물리 재설계 (컴포넌트·백엔드·스레딩 전면 재작성) <span class="phase-pct" data-phase-pct="19"></span></h2>
-  <div class="phase-meta">신설: 2026-08-18 · 설계 문서: <a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a> · 순서 제약: B2는 <a href="plans/SceneGraphRedesignPlan.md">SceneGraph</a> 트랙 S(Transform 컴포넌트화) 확정 후 권장 · M2는 <a href="plans/SerializationPlan.md">직렬화</a> 마이그레이션에 등록 · 공수는 계획 추정치</div>
+  <div class="phase-meta">신설: 2026-08-18 · 설계 문서: <a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a> · 순서 제약: B2는 <a href="plans/archive/SceneGraphRedesignPlan.md">SceneGraph</a> 트랙 S(Transform 컴포넌트화) 확정 후 권장 · M2는 <a href="plans/SerializationPlan.md">직렬화</a> 마이그레이션에 등록 · 공수는 계획 추정치</div>
   <div class="phase-goal"><b>목표:</b> 물리 계층 ~9,500줄을 기존 설계를 남기지 않고 재작성한다. 소유권 4분할 · 오브젝트당 콜라이더 1개 제약 ·
   전량 푸시/풀 · 핫패스 <code>dynamic_cast</code> · 콜라이더의 RigidBody 필수 의존 · PhysX 헤더 전역 전이를 전부 뒤집는다.
   실측 결론: <b>병렬화의 선결조건은 스레드가 아니라 자료구조다</b> — <code>unordered_map</code> 순회 + 원소마다 RTTI + 원소마다 <code>GetComponent</code> 위에는 어떤 스레딩 전략도 못 얹는다.
@@ -1202,12 +1168,19 @@
   <div class="task-wrap"><table class="tasks" data-phase="23"><!-- JS 생성 --></table></div>
 </section>
 
+<details class="archive-block" id="closed-phases">
+  <summary>종료 페이즈 <span id="closed-phase-count">0</span>개 · 완료·중단 이력</summary>
+  <p>모든 항목이 완료 또는 중단인 페이즈를 모았습니다. <a href="plans/archive/README.md">보관 문서 19종</a>에서 종료 근거·이관 범위·검증 한계를 확인할 수 있습니다. 개별 상태와 과거 공수는 그대로 보존합니다.</p>
+  <div class="phase-summary" id="closed-phase-summary"></div>
+  <div id="closed-phase-sections"></div>
+</details>
+
 <div class="howto">
   <b>대시보드 갱신 방법:</b> 이 파일 하단 <code>&lt;script&gt;</code>의 <code>TASKS</code> 배열에서 해당 항목의
   <code>status</code> 값을 <code>"todo"</code> → <code>"progress"</code> → <code>"done"</code>으로 바꾸면
-  전체/페이즈 진행률·요약 카드가 자동 재계산됩니다. <code>note</code> 필드에 진행 메모를 남길 수 있습니다.
+  열린 페이즈 진행률·요약 카드가 자동 재계산됩니다. 모든 항목이 완료/중단이면 종료 이력으로 자동 분류됩니다. <code>note</code> 필드에 진행 메모를 남길 수 있습니다.
   외부 선행조건을 기다리면 <code>"blocked"</code>, 원 계획을 닫고 재개 조건만 남기면 <code>"stopped"</code>를 사용합니다.
-  갱신 시 상단 <code>last-updated</code>도 함께 수정하세요.
+  계획 문서까지 닫을 때는 <code>plans/archive/</code>로 옮기고 보관 색인·문서 링크를 갱신하세요. 갱신 시 상단 <code>last-updated</code>도 함께 수정하세요.
 </div>
 
 <footer>
@@ -2625,29 +2598,29 @@ const TASKS = [
   { phase: 4, id: "PBR-W0", title: "PBR 감사 정본·Gunner/primitive capture·strict gate",
     detail: "같은 카메라·광원·HDRI의 Gunner helmet/armor, primitive, alpha/AO/emissive/non-uniform scale fixture와 pre-tone HDR·GBuffer·generation artifact를 고정한다.",
     refs: "PBRWiringStabilizationPlan §1·§4", priority: "P0", days: 2, status: "progress", earnedDays: 1,
-    note: "2026-09-03 정적 Slang/Material/Renderer 감사는 완료. runtime capture와 실패 exit-code gate가 남았다." },
+    note: "2026-09-06 제품 frame capture·7 attachments·manifest·strict exit 구현. DX12/Vulkan primitive 8/Gunner 10 draw capture, validation 0. sampler/descriptor/PSO 기록과 의미별 fixture·W9 acceptance는 남았다." },
   { phase: 4, id: "PBR-W1", title: "normal-map 저작 유무 snapshot 단일화",
     detail: "Material의 normal map 유무를 scene snapshot과 GBuffer/Forward instance까지 보존하고 fallback texture 존재와 혼동하지 않는다.",
     refs: "PBRWiringStabilizationPlan PBR-W1", priority: "P0", days: 1, status: "progress", earnedDays: 0.5,
     note: "코드 수정과 CreatorEditor Debug x64 빌드는 통과. Gunner/primitive runtime acceptance 전이라 완료가 아니다." },
   { phase: 4, id: "PBR-W2", title: "native Slang 제품 진입점·공용 현행 평가",
     detail: "GBuffer/Deferred/Forward 제품 PBR을 native .slang 한 계통으로 만들고 현행 GGX/IBL/material evaluation 중복을 공용 모듈로 모은다.",
-    refs: "PBRWiringStabilizationPlan PBR-W2", priority: "P0", days: 2.5, status: "todo", note: "새 Principled lobe는 넣지 않고 현재 출력을 먼저 보존한다." },
+    refs: "PBRWiringStabilizationPlan §7", priority: "P0", days: 2.5, status: "done", note: "2026-09-06 Forward/Water/Wind native Slang 전환·공용 material/GGX/IBL 평가. Forward 보상 누락·null LUT 직접광 과보상 수정. DX12/Vulkan 36-case HDR 경로/백엔드 편차 0, 기존 ShaderMeta·제품 캡처 회귀 통과. W9 golden/장시간 acceptance 별도." },
   { phase: 4, id: "PBR-W3", title: "backend neutral resource·binding·exit code",
     detail: "DX12/Vulkan neutral base/normal/ORM/emissive/AO 값과 binding을 숫자로 고정하고, 회귀 실패가 프로세스 실패로 전파되게 한다.",
-    refs: "PBRWiringStabilizationPlan PBR-W3", priority: "P0", days: 1, status: "todo", note: "fixture 초록과 제품 live frame 초록은 별도 판정한다." },
+    refs: "PBRWiringStabilizationPlan PBR-W3·§6", priority: "P0", days: 1, status: "progress", earnedDays: 0.5, note: "2026-09-06 Vulkan ORM neutral 1,1,1,1·white/ORM/black 실GPU 수치 검사·56개 strict exit 판정 구현. AO 미저작 기대값 1로 수정. fixture와 제품 live 및 W9 acceptance를 구분한다." },
   { phase: 4, id: "PBR-W4", title: "alpha mode/cutoff·double-sided/cull",
     detail: "OPAQUE/MASK/BLEND를 분리하고 color/depth/shadow가 같은 cutoff를 쓰며 doubleSided가 cull과 뒷면 normal을 함께 결정하게 한다.",
-    refs: "PBRWiringStabilizationPlan PBR-W4", priority: "P0", days: 2, status: "todo", note: "alphaCutoff를 property-block sentinel로 재사용하지 않는다." },
+    refs: "PBRWiringStabilizationPlan §8", priority: "P0", days: 2, status: "done", note: "2026-09-06 MASK/양면 소유 snapshot·공용 color/depth/shadow coverage·Shadow Slang 완료. alphaCutoff sentinel 제거. 두 backend 각 40-case·material 왕복·CEMC6 모델 14개/하위 자산 310 ID 보존 검증. cull=None+픽셀 면 판정이며 W7 UV/sampler와 W9 golden/장시간 acceptance는 별도." },
   { phase: 4, id: "PBR-W5", title: "AO 소비·고정 4 texture slot 제거·GBuffer packing",
-    detail: "별도 AO semantic과 occlusionStrength를 실제 조명에 연결하고 reflection 기반 resource table로 전환한다. GBuffer 폭은 측정 뒤 축소한다.",
-    refs: "PBRWiringStabilizationPlan PBR-W5", priority: "P0", days: 2.5, status: "todo", note: "저작 근거 없이 ORM R을 AO로 간주하지 않는다." },
+    detail: "별도 AO semantic과 occlusionStrength를 실제 조명에 연결하고 reflection 기반 resource table로 전환한다. GBuffer 폭은 정밀도·소비자·저장량 검토로 유지/변경을 결정한다.",
+    refs: "PBRWiringStabilizationPlan §9", priority: "P0", days: 2.5, status: "done", note: "2026-09-06 독립 aoMap.R·strength의 IBL 소비, t16부터 reflection table·빈 칸/owner 검증·layout 전환 재바인딩. 양 backend 48-case에서 5/8/5 table 교체·AO/MR 독립·직접광/발광 불변, 최대 편차 0·validation 0. GBuffer 포맷 유지, W9 acceptance 별도." },
   { phase: 4, id: "PBR-W6", title: "emissive factor/strength·constant emission·색공간",
     detail: "texture가 없어도 constant emission이 살아 있게 하고 emissiveStrength와 factor를 보존한다. 색 texture와 non-color data upload를 구분한다.",
-    refs: "PBRWiringStabilizationPlan PBR-W6", priority: "P1", days: 1.5, status: "todo", note: "검정 emissive fallback이 상수 발광을 죽이지 않아야 한다." },
+    refs: "PBRWiringStabilizationPlan §10", priority: "P1", days: 1.5, status: "done", note: "2026-09-06 factor×strength×texture 공용 평가·상수 발광·sRGB/linear owner/cache 분리. 양 backend 78-case, 경로 편차 최대 0.000976562·backend 편차 0·validation 0. CEMC7 모델 14개/하위 ID 310개 보존, 전체 PBR·model wiring 회귀와 오류 주입 통과. W9 acceptance 별도." },
   { phase: 4, id: "PBR-W7", title: "UV set/transform/sampler/mip·normal/tangent transform",
     detail: "Material snapshot에 UV set/transform과 sampler state를 포함하고 mip을 실제 소비한다. non-uniform scale은 inverse-transpose와 tangent handedness를 보존한다.",
-    refs: "PBRWiringStabilizationPlan PBR-W7", priority: "P1", days: 2, status: "todo", note: "Blender 좌표계 비교가 아니라 현재 제품 배선 결함 수정이다." },
+    refs: "PBRWiringStabilizationPlan §11~§12", priority: "P1", days: 2, status: "progress", earnedDays: 1, note: "2026-09-06 normal/tangent 변환 128-case와 UV0/UV1·텍스처별 affine 변환 64-case를 양 backend에서 검증. 변환된 UV1 MASK/Shadow와 오류 주입 통과, validation 0. CEMC8 모델 14개/하위 ID 310개 보존. sampler/mip 전달과 W9 acceptance는 남아 있다." },
   { phase: 4, id: "PBR-W8", title: "material/descriptor/PSO generation 원자 밀봉",
     detail: "frame 안에서 material·texture·sampler·descriptor·PSO generation이 섞이지 않게 하고 reload/재임포트 실패는 마지막 정상 세대를 유지한다.",
     refs: "PBRWiringStabilizationPlan PBR-W8", priority: "P0", days: 2, status: "todo", note: "검정/변색 플리커는 추측 하나로 닫지 않고 generation 불변식과 fail-closed gate로 판정한다." },
@@ -2713,6 +2686,20 @@ const PR_CLASS = { P0: "pr-p0", P1: "pr-p1", P2: "pr-p2", P3: "pr-p3" };
 
 function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
+// 종료는 공수 비율이 아니라 모든 항목의 명시적 상태로 판정한다.
+const PHASE_IDS = Object.keys(PHASE_NAMES).map(Number).sort((a, b) => a - b);
+const CLOSED_PHASES = new Set(PHASE_IDS.filter(p => {
+  const rows = TASKS.filter(t => t.phase === p);
+  return rows.length > 0 && rows.every(t => t.status === "done" || t.status === "stopped");
+}));
+const closedSections = document.getElementById("closed-phase-sections");
+for (const p of CLOSED_PHASES) {
+  const section = document.getElementById("phase-" + p);
+  if (section) closedSections.appendChild(section);
+}
+document.getElementById("open-phase-count").textContent = PHASE_IDS.length - CLOSED_PHASES.size;
+document.getElementById("closed-phase-count").textContent = CLOSED_PHASES.size;
+
 // 페이즈별 테이블 렌더
 document.querySelectorAll("table.tasks").forEach(table => {
   const p = parseFloat(table.dataset.phase); // 3.5 같은 소수 페이즈가 있어 parseInt 금지
@@ -2742,11 +2729,11 @@ function phasePct(p) {
   const done = rows.reduce((s, t) => s + earnedDays(t), 0);
   return total ? Math.round(done / total * 100) : 0;
 }
-const VISIBLE_TASKS = TASKS.filter(t => Number.isFinite(t.phase));
+const VISIBLE_TASKS = TASKS.filter(t => Number.isFinite(t.phase) && !CLOSED_PHASES.has(t.phase));
 const activeTasks = VISIBLE_TASKS.filter(t => t.status !== "stopped");
 const totalDays = activeTasks.reduce((s, t) => s + t.days, 0);
 const doneDays = activeTasks.reduce((s, t) => s + earnedDays(t), 0);
-const overallPct = Math.round(doneDays / totalDays * 100);
+const overallPct = totalDays ? Math.round(doneDays / totalDays * 100) : 0;
 
 // 전체 링
 document.getElementById("overall-pct").textContent = overallPct + "%";
@@ -2764,7 +2751,7 @@ for (const st of ["done", "progress", "todo", "blocked", "stopped"]) {
 
 // 페이즈 요약 카드
 const summary = document.getElementById("phase-summary");
-for (const p of Object.keys(PHASE_NAMES).map(Number).sort((a, b) => a - b)) {
+for (const p of PHASE_IDS) {
   const rows = TASKS.filter(t => t.phase === p);
   const activeRows = rows.filter(t => t.status !== "stopped");
   const days = activeRows.reduce((s, t) => s + t.days, 0);
@@ -2778,13 +2765,28 @@ for (const p of Object.keys(PHASE_NAMES).map(Number).sort((a, b) => a - b)) {
     <div class="ps-head"><span class="ps-title">Phase ${p} · ${PHASE_NAMES[p]}</span><span class="ps-pct">${pct}%</span></div>
     <div class="bar"><div style="width:${pct}%"></div></div>
     <div class="ps-sub">${doneCnt}/${activeRows.length} 완료${stoppedCnt ? ` · ${stoppedCnt} 중단` : ""} · ${days}일 활성 규모</div>`;
-  summary.appendChild(el);
+  (CLOSED_PHASES.has(p) ? document.getElementById("closed-phase-summary") : summary).appendChild(el);
 }
 
 // 섹션 헤더 % 표기
 document.querySelectorAll(".phase-pct").forEach(el => {
   el.textContent = phasePct(parseFloat(el.dataset.phasePct)) + "%";
 });
+// 과거 #phase-* 링크도 종료 이력을 자동으로 펼쳐 같은 항목에 도착한다.
+function revealHashTarget() {
+  const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  if (!target) return;
+  for (let el = target; el; el = el.parentElement) {
+    if (el.tagName === "DETAILS") el.open = true;
+  }
+  target.scrollIntoView();
+}
+window.addEventListener("hashchange", revealHashTarget);
+document.addEventListener("click", event => {
+  const link = event.target.closest('a[href^="#"]');
+  if (link && link.getAttribute("href") === location.hash) revealHashTarget();
+});
+revealHashTarget();
 </script>
 </body>
 </html>

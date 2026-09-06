@@ -27,6 +27,7 @@ enum class MaterialRenderingMode
 {
 	Opaque,
 	Transparent,
+    Masked,
 };
 
 // MaterialPropertyValue(디스크 정본 논리 값)는 MaterialPropertyValue.h로 이전됐다 —
@@ -60,7 +61,8 @@ class Material : private Diagnostics::CountedResource<Diagnostics::EngineResourc
            meta::field<&Self::m_propertyValues>,
            meta::field<&Self::m_keywordSelections>,
            meta::field<&Self::m_fileGuid>,
-           meta::field<&Self::m_renderingMode>);
+           meta::field<&Self::m_renderingMode>,
+           meta::field<&Self::m_doubleSided>);
    }
 public:
 	Material();
@@ -198,6 +200,7 @@ public:
 	std::vector<std::uint16_t> m_keywordSelections{};
 	FileGuid m_fileGuid{};
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
+    bool m_doubleSided{ false };
 	HashedGuid m_materialGuid{ make_guid() };
 	// typed setter/getter와 legacy payload 왕복을 위한 CPU byte view. 값의 저장
 	// 정본은 위 m_propertyValues이고 제품 draw packet은 그 정본에서 다시 pack한다.

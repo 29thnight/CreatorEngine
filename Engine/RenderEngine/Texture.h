@@ -74,6 +74,11 @@ public:
 
 	static Texture* LoadFormPath(_In_ const file::path& path, bool isCompress = false);
 
+    // Shares encoded CPU pixels, but owns a distinct GPU cache identity when
+    // the sampling format changes. Never mutates a texture used by another role.
+    static std::shared_ptr<Texture> WithColorSpace(
+        const std::shared_ptr<Texture>& source, bool srgb);
+
 	static std::shared_ptr<Texture> LoadSharedFromPath(
 		const file::path& path, bool isCompress = false);
 
@@ -189,6 +194,7 @@ public:
 private:
 	friend class DataSystem;
 
+	RHIFormat m_samplingFormat{ RHIFormat::Unknown };
 	math::vector2 m_size{};
 	static_assert(std::is_same_v<decltype(m_size), math::vector2>);
 	bool   m_isTextureAlpha{ false };

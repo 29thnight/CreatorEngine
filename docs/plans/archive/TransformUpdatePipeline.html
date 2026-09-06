@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Transform 갱신 파이프라인</title>
 <!--
-  docs/plans/TransformUpdatePlan.md §3.5 의 목표 구조·플로우를 조판한 자립형 페이지.
+  docs/plans/archive/TransformUpdatePlan.md §3.5 의 목표 구조·플로우를 조판한 자립형 페이지.
   (Artifact 발행본과 같은 내용 — 이 파일은 더블클릭으로 바로 열린다.)
 
   mermaid 런타임을 파일 안에 넣었다. 저장소 문서는 오프라인에서 열리는 것이
@@ -263,7 +263,9 @@
   pre.mermaid foreignObject { overflow: visible; }
   pre.mermaid foreignObject > div { max-width: none !important; }
 
-  /* Mermaid measures each label in a scratch container it appends to <body>, where
+  /* Mermaid measures each label in a scratch container it appends to <body>
+<aside style="margin:20px auto;padding:16px;max-width:1100px;border:1px solid #68758b;border-radius:8px;font:14px/1.7 sans-serif"><strong>보관 · 구판 (정리: 2026-09-06)</strong><br>폐기된 T0~T5 기준의 시각화. 최종 X0~X9 계약은 TransformUpdatePlan에 있다.<br><a href="README.md">보관 색인</a> · <a href="../../RefactoringPlanDashboard.html#doc-index">활성 계획과 대시보드</a></aside>
+, where
      the page's own body font applies instead of the diagram's. It then draws the
      label in the diagram font, so every box is sized for the wrong typeface. Give
      the scratch container the diagram's font so the two agree. */
@@ -680,7 +682,7 @@ flowchart LR
   </section>
 
   <footer>
-    <span class="src">docs/plans/TransformUpdatePlan.md §3.5 · docs/RefactoringPlanDashboard.html #phase-8.75</span>
+    <span class="src">docs/plans/archive/TransformUpdatePlan.md §3.5 · docs/RefactoringPlanDashboard.html #phase-8.75</span>
     <span>수치는 SceneGraphRedesignPlan 트랙 S · S2 기록(Release x64 · 4회 중앙값)의 재해석이며, 이 문서를 위해 새로 측정한 값은 없다. 성능 판정은 Release로만 — 같은 조건이 Debug에서 25배 느리고 개선 폭의 방향까지 뒤집힌 기록이 있다.</span>
   </footer>
 

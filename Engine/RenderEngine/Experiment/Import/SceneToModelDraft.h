@@ -38,6 +38,7 @@ namespace experiment::importer
         std::string metallicFactor{ standard_material::property::Metallic };
         std::string roughnessFactor{ standard_material::property::Roughness };
         std::string emissiveFactor{ standard_material::property::Emissive };
+        std::string emissiveStrength{ standard_material::property::EmissiveStrength };
         std::string normalScale{ standard_material::property::NormalScale };
         std::string occlusionStrength{
             standard_material::property::OcclusionStrength };

@@ -10,9 +10,9 @@
 
 - [RefactoringPlanDashboard.html](../RefactoringPlanDashboard.html) — PHASE 21 진행 상태
 - [EngineLayerSeparationPlan.md](EngineLayerSeparationPlan.md) — EditorUI와 Host/RHI 경계
-- [MultiCameraRenderPlan.md](MultiCameraRenderPlan.md) — Editor/Game 표시 타깃과 동시 표시 기반
-- [RenderSceneViewPlan.md](RenderSceneViewPlan.md) — RenderScene/RenderView와 기즈모 뷰 경계
-- [SceneGraphRedesignPlan.md](SceneGraphRedesignPlan.md) — `HierarchyStore` 단독 정본
+- [MultiCameraRenderPlan.md](archive/MultiCameraRenderPlan.md) — Editor/Game 표시 타깃과 동시 표시 기반
+- [RenderSceneViewPlan.md](archive/RenderSceneViewPlan.md) — RenderScene/RenderView와 기즈모 뷰 경계
+- [SceneGraphRedesignPlan.md](archive/SceneGraphRedesignPlan.md) — `HierarchyStore` 단독 정본
 - [UISystemRedesignPlan.md](UISystemRedesignPlan.md) — 게임 UI Runtime 정본. 이 계획과 합치지 않는다
 
 외부 참고:

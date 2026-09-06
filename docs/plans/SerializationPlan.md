@@ -24,7 +24,7 @@ SceneGraphRedesignPlan §5("파일 포맷 불변·일괄 변환 금지")와 충�
 **신원 정본 재지정(2026-09-02, PHASE 3.75 병합):** 이 문서의 UUIDv4 설계와 D2
 실행 기록은 현재 디스크 코퍼스를 설명하는 **전환 전 역사**일 뿐, 최종 자산 신원
 계약이 아니다. 최종 모델 자산 신원은
-[`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md)의
+[`ModelAssetBigBangCutoverPlan.md`](archive/ModelAssetBigBangCutoverPlan.md)의
 `ce.uuidv8.sha256.v1`·schema v2·새 identity epoch가 유일한 정본이다. PHASE 17은
 UUIDv4 발급/보존/확장을 더 진행하지 않으며, 실제 226개 sidecar와 저장 참조의 일회성
 UUIDv8 재발급은 MBC3 원자 writer 뒤 MBC4가 소유한다. MBC2 완료는 규약·코덱·폐포

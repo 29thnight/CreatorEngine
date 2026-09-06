@@ -128,12 +128,18 @@ namespace experiment
             else if (const auto* value =
                 std::get_if<TextureReference>(&property.value))
             {
-				const Authoring::WriteNode texture = outEntry.Child("texture");
+				if (!value->coordinates.IsValid()) { outError = "Invalid texture UV coordinates"; return false; }
+                const Authoring::WriteNode texture = outEntry.Child("texture");
 				texture.SetMap(true);
 				texture.Child("guid").SetScalar(GuidText(value->assetId));
 				texture.Child("colorSpace").SetScalar(
 					TextureColorSpace::Srgb == value->colorSpace
 					? "srgb" : "linear");
+                const auto& uv = value->coordinates;
+                texture.Child("uvSet").SetScalar(uv.set);
+                WriteFloats(texture.Child("uvOffset"), {uv.offset[0], uv.offset[1]});
+                WriteFloats(texture.Child("uvScale"), {uv.scale[0], uv.scale[1]});
+                texture.Child("uvRotation").SetScalar(uv.rotation);
             }
             else
             {
@@ -221,11 +227,19 @@ namespace experiment
                         outError = "미지의 colorSpace다: " + colorSpaceText;
                         return false;
                     }
+                    auto& uv = reference.coordinates;
+                    if (value["uvSet"]) uv.set = value["uvSet"].As<std::uint32_t>();
+                    if (value["uvOffset"] && !ParseFloats(value["uvOffset"], "uvOffset", uv.offset, outError)) return false;
+                    if (value["uvScale"] && !ParseFloats(value["uvScale"], "uvScale", uv.scale, outError)) return false;
+                    if (value["uvRotation"]) uv.rotation = value["uvRotation"].As<float>();
+                    if (!uv.IsValid()) { outError = "Invalid texture UV coordinates"; return false; }
                     for (const Authoring::MapEntry texturePair : value.Map())
                     {
                         const std::string textureKey =
                             texturePair.key.AsString();
-                        if (textureKey != "guid" && textureKey != "colorSpace")
+                        if (textureKey != "guid" && textureKey != "colorSpace"
+                            && textureKey != "uvSet" && textureKey != "uvOffset"
+                            && textureKey != "uvScale" && textureKey != "uvRotation")
                         {
                             outError = "texture의 미지 키다: " + textureKey;
                             return false;
@@ -256,6 +270,10 @@ namespace experiment
     bool SerializeMaterialAuthoring(const Material& material,
 		Authoring::WriteNode outNode, std::string& outError)
     {
+        if (material.blendMode != MaterialBlendMode::Opaque
+            && material.blendMode != MaterialBlendMode::Transparent
+            && material.blendMode != MaterialBlendMode::Masked)
+        { outError = "Unknown material alpha mode"; return false; }
         if (!material.shaderAssetId.IsValid()
             || !IsAssetIdV4(material.shaderAssetId))
         {
@@ -275,7 +293,8 @@ namespace experiment
 		node.Child("name").SetScalar(material.name);
 		node.Child("blendMode").SetScalar(
 			MaterialBlendMode::Transparent == material.blendMode
-			? "transparent" : "opaque");
+			? "transparent" : MaterialBlendMode::Masked == material.blendMode
+            ? "masked" : "opaque");
 
 		const Authoring::WriteNode properties = node.Child("properties");
 		properties.SetSequence();
@@ -366,6 +385,8 @@ namespace experiment
         const std::string blendModeText = blendMode.AsString();
         if (blendModeText == "opaque")
             material.blendMode = MaterialBlendMode::Opaque;
+        else if (blendModeText == "masked")
+            material.blendMode = MaterialBlendMode::Masked;
         else if (blendModeText == "transparent")
             material.blendMode = MaterialBlendMode::Transparent;
         else

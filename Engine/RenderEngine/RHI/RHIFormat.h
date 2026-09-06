@@ -72,8 +72,7 @@ enum class RHIFormat : uint16_t
     // 여기도 끝에 붙인다(중간 삽입 금지).
     //
     // BC3 는 저작 자산에서 온다 — blueNoise.dds 가 DXT5 다. 그것도 DX12 만
-    // 통과하고 Vulkan 은 거절하던 자산이었다. SRGB 라벨은 실사용이 없어
-    // 넣지 않는다(필요해지면 그때 더한다).
+    // 통과하고 Vulkan 은 거절하던 자산이었다. BC3 sRGB는 W6에서 아래에 추가했다.
     BC1Unorm,
     BC1UnormSrgb,
     BC3Unorm,
@@ -90,6 +89,7 @@ enum class RHIFormat : uint16_t
     // 루프가 통째로 사라진다.
     BGRA8Unorm,
     BGRA8UnormSrgb,
+    BC3UnormSrgb,
 };
 
 /// 픽셀 하나의 바이트 수. 0이면 이 포맷을 모르는 것이다.
@@ -180,7 +180,8 @@ constexpr bool RHIFormatIsBlockCompressed(RHIFormat format)
     {
     case RHIFormat::BC1Unorm:
     case RHIFormat::BC1UnormSrgb:
-    case RHIFormat::BC3Unorm:       return true;
+    case RHIFormat::BC3Unorm:
+    case RHIFormat::BC3UnormSrgb:   return true;
     default:                        return false;
     }
 }
@@ -198,7 +199,8 @@ constexpr uint32_t RHIFormatBlockBytes(RHIFormat format)
     {
     case RHIFormat::BC1Unorm:
     case RHIFormat::BC1UnormSrgb:   return 8;
-    case RHIFormat::BC3Unorm:       return 16;
+    case RHIFormat::BC3Unorm:
+    case RHIFormat::BC3UnormSrgb:   return 16;
     default:                        return RHIFormatBytes(format);
     }
 }

@@ -1,5 +1,8 @@
 # 모델 임포트 파이프라인 · 정점 레이아웃 (역사 기록)
 
+> **보관 · 대체됨 (정리: 2026-09-06).** 2026-09-02 PHASE 3.75로 대체. 구 I/V experiment 계획은 구현·측정·실패의 역사 자료다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 > **2026-09-02 대체됨.** 이 문서의 I/V experiment 배선은 더 이상 PHASE 4의 활성 계획,
 > 공수, 진행률 또는 완료 기준이 아니다. 후속 구현의 유일한 정본은
 > [`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md), PHASE 3.75다.
@@ -3463,7 +3466,7 @@ m_commandList->IASetVertexBuffers(0, 1, &view);   // DX12Encoder.cpp:159
 > 대시보드에는 `V6` 행이 P1 2일 `todo`로 살아 있었고 PHASE 4 목표 문단도 V6를 전제로 적혀 있었다.
 > 행을 폐기하고, UV1 스트림 계약(라이트맵 대상 메시에만 부착 · 언랩 단계에서 생성 · 기존 `uv1` 슬롯
 > 재사용 없음)과 트랙 V 완료 기준의 "전 정점 부과 0" 판정을 `L1` 완료 기준으로 옮겼다.
-> 현재 라이트맵 위치는 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.3이다.
+> 현재 라이트맵 위치는 [`Phase4UnifiedPlan.md`](../Phase4UnifiedPlan.md) §6.3이다.
 
 **이 항목은 `LightmapBakerPlan.md`(트랙 L)로 이관됐다.** 착수 시점에는 "라이트맵
 존치/폐기 결정"이었으나, 삭제된 베이커 구현이 발견되면서(§1.9) 폐기 선택지가
@@ -3531,7 +3534,7 @@ I5(치환)와 V4에서 입력 레이아웃 5곳·셰이더 4개를 함께 전환
 
 > **이 문서는 2026-09-02부터 역사 기록이다.** 모델 교체의 순서·우선순위·공수는
 > [`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md), PHASE 3.75가 정본이다.
-> [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)는 완료된 typed model/vertex 결과를 소비하는
+> [`Phase4UnifiedPlan.md`](../Phase4UnifiedPlan.md)는 완료된 typed model/vertex 결과를 소비하는
 > PHASE 4/4.25/4.75 후속만 소유한다.
 
 | 계획 | 관계 |

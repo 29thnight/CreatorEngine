@@ -4,10 +4,8 @@
 
 // 표준 PBR BRDF 정본. 직접광과 IBL 이 같은 파일에서 항을 가져간다.
 //
-// ★ 직접광과 IBL 은 Smith 의 k 규약이 다르다 ─ 직접광은 (a+1)^2/8,
-//   IBL 은 a^2/2 다. 섞으면 반사가 어둡거나 과하게 밝아지는데, 두 값이
-//   같은 범위에 있어서 "조금 이상한" 정도로만 나타나 원인을 짚기 어렵다.
-//   그래서 이름에 규약을 박아 둔다.
+// 직접광은 height-correlated Smith, IBL LUT 적분은 Schlick 근사를 쓴다.
+// 두 가시성 함수의 규약을 이름으로 구분한다.
 
 // Trowbridge-Reitz(GGX) 법선 분포. alpha = roughness^2.
 float DistributionGGX(float ndoth, float alpha)

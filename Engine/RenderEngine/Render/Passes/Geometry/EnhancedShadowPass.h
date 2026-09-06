@@ -115,10 +115,14 @@ private:
     {
         math::matrix4x4 world{};
         uint32_t      boneOffset{ kNoSkinning };
-        uint32_t      padding[3]{};
+        uint32_t      coverageFlags{};
+        float         cutoff{0.5f};
+        float         baseAlpha{1.f};
+        std::array<float, 4> uvU{1, 0, 0, 0};
+        std::array<float, 4> uvV{0, 1, 0, 0};
     };
 
-    static_assert(sizeof(ShadowInstance) == 80u);
+    static_assert(sizeof(ShadowInstance) == 112u);
     static_assert(std::is_trivially_copyable_v<ShadowInstance>);
 
     static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
@@ -178,6 +182,8 @@ private:
     std::vector<math::matrix4x4>           m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;
 
+    RHISamplerTable m_sampler;
+    std::vector<RHITextureEntry> m_alphaTextures;
     RHIPipelineHandle m_pso;
     RHIPipelineHandle m_skinnedPso;
     // I5-D34b: experiment packed(68B) 스킨 짝 — BLENDINDICES가 RGBA8Uint@48이라

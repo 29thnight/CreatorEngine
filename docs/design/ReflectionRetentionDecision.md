@@ -76,9 +76,9 @@ DX12 라이브 파이프라인 작업 이후로 미룬다.
 갈래의 베이스 virtual 선언·호출처·빌드 배선이 전부 소멸한 상태였음이 실측됐고,
 PHASE 18 CT2가 매크로 갈래와 고아 바이너리 2종(ScriptReflectionHeaderTool ·
 ScriptReflectionAndFactoryClear)을 제거했다. 남은 헤더툴은 MetaGenerator 1종이며
-그 은퇴는 [ReflectionRedesignPlan.md](../plans/ReflectionRedesignPlan.md) CT7이 승계한다.
+그 은퇴는 [ReflectionRedesignPlan.md](../plans/archive/ReflectionRedesignPlan.md) CT7이 승계한다.
 
 ## 5. 연계
 
-- R1은 [Phase5CouplingPlan.md](../plans/Phase5CouplingPlan.md) §3-C4 / 5-3(에디터 UI 분리)에 귀속.
+- R1은 [Phase5CouplingPlan.md](../plans/archive/Phase5CouplingPlan.md) §3-C4 / 5-3(에디터 UI 분리)에 귀속.
 - 헤더 이동 시 MetaGenerator 스캔 경로 확인 필수 — 같은 문서 §3-B의 `Navigation.h` 항목과 동일 함정.

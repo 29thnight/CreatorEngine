@@ -327,11 +327,12 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         "waveSpeed", "waveAmplitude", "waveFrequency", "waterTint" };
     constexpr std::array<std::string_view, 4> windTail{
         "windSpeed", "windStrength", "windFrequency", "windTint" };
-    constexpr std::array<std::string_view, 4> textureProperties{
+    constexpr std::array<std::string_view, 5> textureProperties{
         standard_material::property::BaseColorMap,
         standard_material::property::NormalMap,
         standard_material::property::OrmMap,
         standard_material::property::EmissiveMap,
+        standard_material::property::AoMap,
     };
     const auto valid64ByteLayout = [&](const ShaderMetaBindingLayout& layout,
         const std::array<std::string_view, 4>& tail,
@@ -340,7 +341,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         if ("MaterialProperties" != layout.constantBufferName
             || 2u != layout.constantBufferRegister
             || 0u != layout.constantBufferSpace
-            || 96u != layout.constantBufferByteSize)
+            || 112u != layout.constantBufferByteSize)
         {
             return false;
         }
@@ -371,7 +372,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
             if (found == layout.properties.end()
                 || ShaderPropertyType::Texture2D != found->propertyType
                 || RHIShaderResourceKind::Texture != found->resourceKind
-                || 4u + index != found->registerIndex
+                || 16u + index != found->registerIndex
                 || 0u != found->registerSpace)
             {
                 return false;
@@ -379,14 +380,14 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         }
         return true;
     };
-    if (!primaryLayout || 80u != primaryLayout->constantBufferByteSize
+    if (!primaryLayout || 96u != primaryLayout->constantBufferByteSize
         || !waterLayout || !windLayout
         || !valid64ByteLayout(*waterLayout, waterTail,
             standard_material::property::BaseColorMap)
         || !valid64ByteLayout(*windLayout, windTail, "windMap")
         || 3u != forward.GetShaderVariantCount())
     {
-        return failRepresentative("80B primary/96B Water·Wind reflection 계약 불일치");
+        return failRepresentative("96B primary/112B Water·Wind reflection 계약 불일치");
     }
 
     const RHIPipelineHandle primaryShade = forward.GetShadePSO();
@@ -483,10 +484,10 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         makeWindPacket(mutatedWindMaterial);
     if (!windPacket || !mutatedWindPacket || !windPacket->IsValid()
         || !mutatedWindPacket->IsValid()
-        || 96u != windPacket->propertyBytes.size()
-        || 4u != windPacket->textureBindings.size()
+        || 112u != windPacket->propertyBytes.size()
+        || 5u != windPacket->textureBindings.size()
         || "windMap" != windPacket->textureBindings.front().propertyName
-        || 4u != windPacket->textureBindings.front().registerIndex
+        || 16u != windPacket->textureBindings.front().registerIndex
         || windPacket->propertyBytes == mutatedWindPacket->propertyBytes)
     {
         return failRepresentative(error.empty() ? "Wind draw packet 불일치" : error);
@@ -558,7 +559,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
         return failRepresentative("owner/fail-closed 계약 불일치");
     }
 
-    outLog += "[1/4] required-asset GUID packet 2개 + 실제 Water/Wind 64B b2·windMap@t4 generic texture·primary+2 variant·fail-closed 통과\n";
+    outLog += "[1/4] required-asset GUID packet 2개 + 실제 Water/Wind 64B b2·windMap@t16 generic texture·primary+2 variant·fail-closed 통과\n";
 
     // ── 깊이 평면 ──
     //

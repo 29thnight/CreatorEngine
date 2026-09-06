@@ -1,3 +1,4 @@
+#include "../../Scene/MaterialTextureTable.h"
 #include "EnhancedShadowPass.h"
 #include "../../Graph/EnhancedDrawIdentity.h" // I6-C
 #include "../../../RHI/DX12/DX12DeviceResources.h"
@@ -7,6 +8,7 @@
 #include "../../../Assets/ModelVertexLayout.h"
 #include "../../../RHI/ModelVertexInputLayout.h"
 #include "../../../Mesh.h"
+#include "../../../StandardMaterialProperty.h"
 
 #include <mathematics/frustum.hpp>
 #include <mathematics/transform.hpp>
@@ -19,16 +21,9 @@
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    //
-    // 셰이더는 하나이고 SHADOW_SKINNING 매크로로 두 벌을 만든다.
-    //
-    // ★ 왜 한 벌로 안 두는가: 그림자 패스는 "위치만 읽는다"가 설계다.
-    //   캐스케이드 셋을 전부 다시 그리므로 정점 대역폭이 세 배로 얹히고,
-    //   정적 메시가 대부분인 씬에서 본 인덱스·가중치 32바이트를 읽고 버리는
-    //   것은 그 설계를 무르는 일이다. 입력 레이아웃과 PSO를 갈라, 스킨드
-    //   배치에서만 그 32바이트를 읽는다.
-    constexpr const char* kShadowShaderFile = "Shadow.hlsl";
+    // Static and skinned inputs share alpha/face coverage. UV0 and optional
+    // COLOR alpha are required for MASK; bone attributes remain skin-only.
+    constexpr const char* kShadowShaderFile = "Shadow.slang";
 
     bool CompileShadowShader(const char* entry, const char* target, bool skinning,
         uint32_t modelVertexMask, RHIShaderBlob& outBlob, std::string& outError)
@@ -48,6 +43,8 @@ namespace
 
 bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std::string& outError)
 {
+    RHIShaderBlob psBlob;
+    if (!CompileShadowShader("PSMain", "ps_5_0", false, 0, psBlob, outError)) return false;
     RHIShaderBlob vsBlob;
     RHIShaderBlob skinnedVsBlob;
     if (!CompileShadowShader("VSMain", "vs_5_0", false, 0, vsBlob, outError)) return false;
@@ -64,6 +61,8 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
         RHILayout::Cbv(0, RHIShaderVisibility::Vertex),
         RHILayout::Srv(0, RHIShaderVisibility::Vertex),
         RHILayout::Srv(1, RHIShaderVisibility::Vertex),
+        RHILayout::SrvTable(1, 2, RHIShaderVisibility::Pixel),
+        RHILayout::SamplerTable(1, 0, RHIShaderVisibility::Pixel),
     };
 
     RHIPipelineLayoutDesc rootDesc{};
@@ -73,15 +72,16 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
 
-    // 위치만 읽는다. 정점 구조체는 같지만 나머지 요소를 선언하지 않으면
-    // 입력 조립이 그것들을 가져오지 않는다 — 대역폭이 그만큼 준다.
+    // Alpha-tested depth needs POSITION and UV0.
     static const RHIInputElement kInputElements[] = {
         { "POSITION", 0, RHIFormat::RGB32Float, 0, 0, 0 },
+        { "TEXCOORD", 0, RHIFormat::RG32Float, 0, 24, 0 },
     };
 
     // 스킨드 경로만 본 인덱스·가중치를 읽는다. 오프셋은 엔진 Vertex를 따른다.
     static const RHIInputElement kSkinnedInputElements[] = {
         { "POSITION",     0, RHIFormat::RGB32Float,    0,  0, 0 },
+        { "TEXCOORD", 0, RHIFormat::RG32Float, 0, 24, 0 },
         { "BLENDINDICES", 0, RHIFormat::RGBA32Float, 0, 64, 0 },
         { "BLENDWEIGHT",  0, RHIFormat::RGBA32Float, 0, 80, 0 },
     };
@@ -93,13 +93,11 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
     desc.inputElementCount = _countof(kInputElements);
     desc.vsBytecode = vsBlob.Data();
     desc.vsSize = vsBlob.Size();
-    desc.psBytecode = nullptr;   // 깊이 전용
-    desc.psSize = 0;
+    desc.psBytecode = psBlob.Data();
+    desc.psSize = psBlob.Size();
     desc.layout = root;
     desc.depthEnable = true;
-    // 컬링을 끈다. 앞면만 그리면 닫히지 않은 메시(평면·판때기)가 그림자를
-    // 아예 못 드리우고, 뒷면만 그리면 그런 메시가 그림자를 두 번 드리운다.
-    // 여드름은 편향으로 잡는 편이 씬 종류를 덜 탄다.
+    // Pixel coverage applies each instance's authored face policy.
     desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 0;
     desc.dsvFormat = kShadowFormat;
@@ -125,11 +123,13 @@ bool EnhancedShadowPass::CreatePipeline(const EnhancedFrameContext& context, std
                 modelVsBlob, outError)) return false;
         // Depth-only Shadow가 실제로 읽는 필드만 IA에 선언한다. 오프셋은 전체
         // layout mask에서 유도하므로 COLOR가 들어간 SU의 bone 64/68도 보존된다.
-        // Vulkan은 셰이더가 읽지 않는 NORMAL/UV/TANGENT/COLOR까지 선언하면
+        // Vulkan은 셰이더가 읽지 않는 NORMAL/TANGENT까지 선언하면
         // validation warning을 내므로 full mask와 consumed mask를 섞지 않는다.
         const uint32_t consumedMask =
             assets::Bit(assets::VertexAttribute::Position)
-            | (mask & assets::kSkinVertexAttributes);
+            | assets::Bit(assets::VertexAttribute::Uv0)
+            | (mask & assets::Bit(assets::VertexAttribute::Uv1))
+            | (mask & (assets::kSkinVertexAttributes | assets::kColorVertexAttributes));
         const auto* elements = ModelVertexInput::ResolveInputElements(
             mask, consumedMask, outError);
         if (nullptr == elements) return false;
@@ -154,7 +154,11 @@ bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::st
         return false;
     }
 
-    return CreatePipeline(context, outError);
+    if (!CreatePipeline(context, outError)) return false;
+    const auto sampler = RHISampler::Linear(RHIAddressMode::Wrap);
+    m_sampler = context.resources->CreateSamplers({&sampler, 1});
+    if (!m_sampler.IsValid()) { outError = "Shadow alpha sampler creation failed"; return false; }
+    return true;
 }
 
 void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
@@ -329,6 +333,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
 {
     m_drawGeometry.clear();
     m_sortedDraws.clear();
+    m_alphaTextures.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
     m_lastDrawCount.store(0, std::memory_order_relaxed);
@@ -339,6 +344,31 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     ComputeCascades(context);
 
     if (nullptr == context.draws || nullptr == context.meshCache) return true;
+
+    m_alphaTextures.resize(context.draws->size());
+    for (std::size_t i = 0; i < context.draws->size(); ++i)
+    {
+        const auto& draw = (*context.draws)[i];
+        const auto& coverage = draw.materialSnapshot ? draw.materialSnapshot->coverage : draw.coverage;
+        if (!coverage.IsValid()) { outError = "Invalid shadow coverage"; return false; }
+        if (!(coverage.flags & EnhancedMaterialCoverage::Masked)) continue;
+        if (!context.textureCache) { outError = "Masked shadow needs texture cache"; return false; }
+        Texture* texture = draw.baseColor;
+        if (draw.materialSnapshot)
+        {
+            const auto& bindings = draw.materialSnapshot->textureBindings;
+            const auto found = std::find_if(bindings.begin(), bindings.end(), [](const auto& binding) {
+                return binding.propertyName == standard_material::property::BaseColorMap;
+            });
+            if (found == bindings.end()) { outError = "Masked shadow lacks baseColorMap semantic"; return false; }
+            if (!found->coordinates.IsValid()
+                || !MaterialTextureTable::ValidateMeshCoordinates(*draw.materialSnapshot,
+                    draw.modelMeshView.vertexAttributeMask, outError)) return false;
+            texture = found->textureOwner.get();
+        }
+        m_alphaTextures[i] = context.textureCache->GetOrUpload(texture, outError);
+        if (!m_alphaTextures[i].IsValid()) return false;
+    }
 
     // GBuffer가 이미 올려 둔 것을 캐시 히트로 받는다 — 같은 메시를 두 번
     // 올리지 않는다는 것이 캐시의 요점이다.
@@ -401,7 +431,9 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     m_sortedDraws.reserve(context.draws->size());
     for (size_t index = 0; index < context.draws->size(); ++index)
     {
-        if (0 != enhanced_draw::GeometryKey((*context.draws)[index]))
+        const auto& draw = (*context.draws)[index];
+        const auto& coverage = draw.materialSnapshot ? draw.materialSnapshot->coverage : draw.coverage;
+        if (0 != enhanced_draw::GeometryKey(draw) && !(coverage.flags & EnhancedMaterialCoverage::Blended))
             m_sortedDraws.push_back(index);
     }
 
@@ -568,6 +600,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                 std::size_t batchGeometryKey = 0;
                 bool  batchSkinned = false;
+                RHITextureEntry batchTexture{};
 
                 // 지금 걸려 있는 PSO. 조각마다 상태를 새로 걸어야 하므로
                 // 처음에는 아무것도 안 걸린 것으로 둔다.
@@ -623,6 +656,13 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                                 boundPso = wanted;
                             }
 
+                            const auto srv = RHIBindingDesc::Srv2D(batchTexture.handle,
+                                batchTexture.IsValid() ? batchTexture.format : RHIFormat::RGBA8Unorm,
+                                0, batchTexture.IsValid() ? batchTexture.mipLevels : 1).OrNull();
+                            const auto binding = context.resources->CreateBindings({&srv, 1});
+                            if (!binding.IsValid()) return;
+                            encoder.SetBindings(RHIBindPoint::Graphics, 3, binding);
+                            encoder.SetSamplers(RHIBindPoint::Graphics, 4, m_sampler);
                             memcpy(instanceBuffer.cpuAddress, instances.data(),
                                 static_cast<size_t>(instanceBytes));
                             encoder.SetRootBuffer(RHIBindPoint::Graphics,
@@ -690,16 +730,29 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                     // 메시나 스킨드 여부가 바뀌면 지금까지 모은 것을 낸다.
                     // 정렬해 두었으므로 같은 것끼리는 이미 붙어 있다.
+                    const auto& alphaTexture = m_alphaTextures[m_sortedDraws[sortedIndex]];
                     if (enhanced_draw::GeometryKey(draw) != batchGeometryKey
-                        || skinned != batchSkinned)
+                        || skinned != batchSkinned || alphaTexture.handle != batchTexture.handle)
                     {
                         flushBatch();
                         batchGeometryKey = enhanced_draw::GeometryKey(draw);
                         batchSkinned = skinned;
+                        batchTexture = alphaTexture;
                     }
 
                     ShadowInstance instance{};
                     instance.world = math::transpose(draw.worldMatrix);
+                    const auto& coverage = draw.materialSnapshot ? draw.materialSnapshot->coverage : draw.coverage;
+                    instance.coverageFlags = coverage.flags;
+                    instance.cutoff = coverage.cutoff;
+                    instance.baseAlpha = draw.materialSnapshot ? coverage.baseAlpha : draw.baseColorFactor.a;
+                    if (draw.materialSnapshot)
+                        for (const auto& binding : draw.materialSnapshot->textureBindings)
+                            if (binding.propertyName == standard_material::property::BaseColorMap)
+                            {
+                                const auto uv = MaterialTextureTable::PackCoordinates(binding.coordinates);
+                                instance.uvU = uv.u; instance.uvV = uv.v;
+                            }
                     instance.boneOffset = kNoSkinning;
                     if (skinned)
                     {
@@ -764,4 +817,6 @@ void EnhancedShadowPass::Shutdown()
     m_pso = {};
     m_skinnedPso = {};
     m_modelPsos.clear();
+    m_alphaTextures.clear();
+    m_sampler = {};
 }

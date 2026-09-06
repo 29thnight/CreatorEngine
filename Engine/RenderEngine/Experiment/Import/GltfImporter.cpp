@@ -373,12 +373,6 @@ namespace experiment::importer
                     "이미지가 없는 texture 를 참조한다.");
                 return {};
             }
-            if (info.transform)
-            {
-                notes.Warn(ImportNoteCode::UnsupportedFeature, "textures",
-                    "KHR_texture_transform 은 아직 옮기지 않는다.");
-            }
-
             if (const auto found = cache.find(*texture.imageIndex);
                 found != cache.end())
             {
@@ -474,7 +468,8 @@ namespace experiment::importer
             | fastgltf::Options::LoadExternalBuffers
             | fastgltf::Options::GenerateMeshIndices;
 
-        fastgltf::Parser parser;
+        fastgltf::Parser parser(fastgltf::Extensions::KHR_texture_transform
+            | fastgltf::Extensions::KHR_materials_emissive_strength);
         GltfPersistentIds persistentIds;
         parser.setUserPointer(&persistentIds);
         parser.setExtrasParseCallback(&CaptureCreatorEngineId);
@@ -729,7 +724,17 @@ namespace experiment::importer
                 TextureSlot out;
                 out.texture = ResolveTexture(asset, info, colorSpace,
                     baseDirectory, scene, textureCache, persistentIds, notes);
-                out.uvSet = static_cast<std::uint32_t>(info.texCoordIndex);
+                const auto uvSet = info.transform
+                    ? info.transform->texCoordIndex.value_or(info.texCoordIndex) : info.texCoordIndex;
+                // Preserve unsupported sets as invalid instead of narrowing to UV0/UV1.
+                out.uvSet = uvSet <= 1 ? static_cast<std::uint32_t>(uvSet) : 2;
+                if (info.transform)
+                {
+                    const auto& uv = *info.transform;
+                    out.offset = {uv.uvOffset.x(), uv.uvOffset.y()};
+                    out.tiling = {uv.uvScale.x(), uv.uvScale.y()};
+                    out.rotation = uv.rotation;
+                }
                 return out;
             };
 

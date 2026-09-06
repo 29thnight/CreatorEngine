@@ -87,6 +87,9 @@
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\EditorModelPlacement.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\EditorImGuiTexture.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
@@ -255,6 +258,9 @@
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorModelPlacement.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp">

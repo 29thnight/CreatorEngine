@@ -22,6 +22,7 @@
 #include "EditorPlatform.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
+#include "EditorModelPlacement.h"
 #include "EditorSceneOverlayContributor.h"
 #include "UIManager.h"
 #include "Profiler.h"
@@ -241,6 +242,7 @@ void Editor::EditorMain::Initialize()
 	// CoreCLR 스크립트 계층. 렌더 스레드를 띄우기 전에 올려둔다.
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
 	ClrHost::Get().Initialize();
+	Editor::ModelPlacement::Get().Initialize();
 
 	PROFILE_FRAME();
 	StartPresentationThread();
@@ -408,6 +410,7 @@ void Editor::EditorMain::Finalize()
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
 	StopPresentationThread();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
+	Editor::ModelPlacement::Get().Shutdown();
 	EditorAssetPresentation::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetPresentation 반환\n");
 
@@ -540,6 +543,7 @@ void Editor::EditorMain::Update()
 	// 좁게 직렬화하고, 씬 전환과 파괴를 끝낸 뒤 호출자가 새 packet을 발행한다.
 	{
 		std::lock_guard<std::mutex> sceneLock(m_sceneStructureMutex);
+		Editor::ModelPlacement::Get().Tick();
 		SceneManagers->ApplyPendingSceneStructureChange();
 
 		// OnRender도 게임 상태를 진행시키는 코루틴 단계다. 다른 coroutine queue와
@@ -600,6 +604,7 @@ void Editor::EditorMain::OnGui()
 	m_gameViewWindow->RenderGameViewWindow();
 
 	m_gizmoRenderer->EditorView();
+	Editor::ModelPlacement::Get().DrawStatus();
 
 	m_editorRenderer->Render();
 	m_editorRenderer->EndRender();

@@ -2,6 +2,7 @@
 
 #include "Uuid.h"
 #include "VertexLayout.h"
+#include "../Assets/TextureCoordinates.h"
 
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
@@ -315,6 +316,7 @@ namespace experiment
 		std::string logicalName{};
 		std::filesystem::path fallbackPath{};
 		TextureColorSpace colorSpace{ TextureColorSpace::Linear };
+        assets::TextureCoordinates coordinates{};
 	};
 
 	using MaterialPropertyValue = std::variant<
@@ -338,6 +340,7 @@ namespace experiment
 	{
 		Opaque,
 		Transparent,
+        Masked,
 	};
 
 	// 고정 texture pointer 5개 대신 shader property 이름을 정본으로 삼는다.

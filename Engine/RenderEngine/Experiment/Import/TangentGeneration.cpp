@@ -21,6 +21,7 @@ namespace experiment::importer
         struct TangentWorkspace final
         {
             const ImportedMesh* mesh{};
+            const std::vector<math::vector2>* coordinates{};
             // 코너 c(= 면*3 + 정점) 의 결과. mikktspace 가 여기 채운다.
             std::vector<math::vector4> cornerTangents{};
 
@@ -71,7 +72,7 @@ namespace experiment::importer
             const int face, const int vert)
         {
             const TangentWorkspace& work = Workspace(context);
-            const math::vector2& uv = work.mesh->streams.uv0[work.VertexOf(face, vert)];
+            const math::vector2& uv = (*work.coordinates)[work.VertexOf(face, vert)];
             out[0] = uv.x; out[1] = uv.y;
         }
 
@@ -154,7 +155,7 @@ namespace experiment::importer
     }
 
     bool GenerateTangents(ImportedMesh& mesh, const std::string& context,
-        ImportNoteSink& notes, TangentGenerationStats& stats)
+        ImportNoteSink& notes, TangentGenerationStats& stats, std::uint32_t uvSet)
     {
         using Clock = std::chrono::steady_clock;
         const auto elapsedMs = [](Clock::time_point from) {
@@ -177,10 +178,11 @@ namespace experiment::importer
                 "법선이 없어 탄젠트를 생성할 수 없다 — 법선 생성이 먼저다.");
             return false;
         }
-        if (streams.uv0.size() != vertexCount)
+        const auto& coordinates = uvSet == 1 ? streams.uv1 : streams.uv0;
+        if (uvSet > 1 || coordinates.size() != vertexCount)
         {
             notes.Warn(ImportNoteCode::MissingVertexAttribute, context,
-                "UV0 가 없어 탄젠트를 생성할 수 없다 — 탄젠트는 UV 로 정의된다.");
+                "선택된 UV가 없어 탄젠트를 생성할 수 없다 — 탄젠트는 UV 로 정의된다.");
             return false;
         }
         if (mesh.indices.size() % 3 != 0)
@@ -192,6 +194,7 @@ namespace experiment::importer
 
         TangentWorkspace work;
         work.mesh = &mesh;
+        work.coordinates = &coordinates;
         work.cornerTangents.assign(mesh.indices.size(), math::vector4{});
 
         SMikkTSpaceInterface interface_{};
@@ -356,8 +359,10 @@ namespace experiment::importer
             ImportedMesh& mesh = scene.meshes[i];
             MeshOutcome& outcome = outcomes[i];
             outcome.before = mesh.streams.VertexCount();
+            const uint32_t uvSet = IsInRange(mesh.material, scene.materials.size())
+                ? scene.materials[mesh.material.Value()].normal.uvSet : 0;
             outcome.generated = GenerateTangents(mesh,
-                "meshes[" + std::to_string(i) + "]", outcome.notes, outcome.stats);
+                "meshes[" + std::to_string(i) + "]", outcome.notes, outcome.stats, uvSet);
             outcome.after = outcome.generated
                 ? mesh.streams.VertexCount() : outcome.before;
         };

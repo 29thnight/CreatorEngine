@@ -1464,6 +1464,12 @@ void Scene::AddRootEntity(std::string_view name)
 		transform->FlushPendingLocalWrite();
 }
 
+void Scene::OnBeforeSerialize() const
+{
+    if (m_incrementalConstructions != 0)
+        throw std::runtime_error("Model placement is still in progress. Save after it completes or cancel the load.");
+}
+
 Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::Index parentIndex)
 {
     if (name.empty())

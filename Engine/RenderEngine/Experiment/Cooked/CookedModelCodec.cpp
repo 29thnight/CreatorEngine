@@ -413,6 +413,10 @@ namespace experiment::cooked
                         materialBytes.Pod(strings.Add(value.logicalName));
                         materialBytes.Pod(strings.Add(PathToUtf8(value.fallbackPath)));
                         materialBytes.Pod(static_cast<std::uint8_t>(value.colorSpace));
+                        materialBytes.Pod(value.coordinates.set);
+                        materialBytes.Pod(value.coordinates.offset);
+                        materialBytes.Pod(value.coordinates.scale);
+                        materialBytes.Pod(value.coordinates.rotation);
                     }
                     else
                     {
@@ -861,6 +865,14 @@ namespace experiment::cooked
                 material.name = readString(cursor.Pod<StringRef>());
                 material.blendMode =
                     static_cast<MaterialBlendMode>(cursor.Pod<std::uint8_t>());
+                if (material.blendMode != MaterialBlendMode::Opaque
+                    && material.blendMode != MaterialBlendMode::Transparent
+                    && material.blendMode != MaterialBlendMode::Masked)
+                {
+                    Reject(issues, "materials", "Unknown material alpha mode.");
+                    return false;
+                }
+
 
                 const std::uint32_t propertyCount = cursor.Pod<std::uint32_t>();
                 if (!cursor.Ok()) break;
@@ -889,6 +901,10 @@ namespace experiment::cooked
                             Utf8ToPath(readString(cursor.Pod<StringRef>()));
                         reference.colorSpace =
                             static_cast<TextureColorSpace>(cursor.Pod<std::uint8_t>());
+                        reference.coordinates.set = cursor.Pod<std::uint32_t>();
+                        reference.coordinates.offset = cursor.Pod<std::array<float, 2>>();
+                        reference.coordinates.scale = cursor.Pod<std::array<float, 2>>();
+                        reference.coordinates.rotation = cursor.Pod<float>();
                         property.value = std::move(reference);
                         break;
                     }

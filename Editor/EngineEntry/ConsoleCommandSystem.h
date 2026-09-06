@@ -2,6 +2,7 @@
 #include <atomic>
 #include <deque>
 #include <future>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -79,6 +80,9 @@ public:
     /// wait N. 다음 명령을 N 프레임 뒤로 미룬다.
     void SetWaitFrames(int frames) noexcept;
 
+    // Keep publishing engine frames while an asynchronous diagnostic completes.
+    void WaitUntil(std::function<bool()> completed) { m_waitCondition = std::move(completed); }
+
     /// help.
     void PrintHelp() const;
 
@@ -118,6 +122,7 @@ private:
 
     // wait N : N 프레임 동안 다음 명령을 보류한다.
     int m_waitFrames{ 0 };
+    std::function<bool()> m_waitCondition;
 
     // --script가 파일을 못 열었는가. 명령이 하나도 없는 무인 실행은 종료시킨다.
     bool m_scriptLoadFailed{ false };

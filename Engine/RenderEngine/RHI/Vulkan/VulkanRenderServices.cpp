@@ -422,7 +422,8 @@ RHITextureEntry VulkanTextureCache::GetBlackTexture(std::string& outError)
 
 RHITextureEntry VulkanTextureCache::GetOrmNeutralTexture(std::string& outError)
 {
-    constexpr uint8_t orm[4] = { 255, 255, 0, 255 };
+    // Metallic/roughness samples multiply authored factors; an absent map is one.
+    constexpr uint8_t orm[4] = { 255, 255, 255, 255 };
     return m_impl->Solid(orm, L"VulkanTexture.OrmNeutral", m_impl->ormNeutral,
         m_impl->ormNeutralAllocation, outError);
 }

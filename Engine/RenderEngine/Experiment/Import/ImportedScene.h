@@ -262,6 +262,7 @@ namespace experiment::importer
         std::uint32_t uvSet{};
         math::vector2 offset{ 0.0f, 0.0f };
         math::vector2 tiling{ 1.0f, 1.0f };
+        float rotation{};
         TextureWrap wrapU{ TextureWrap::Repeat };
         TextureWrap wrapV{ TextureWrap::Repeat };
 

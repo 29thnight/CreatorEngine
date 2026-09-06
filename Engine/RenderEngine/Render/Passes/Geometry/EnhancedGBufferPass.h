@@ -10,6 +10,7 @@
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Scene/MaterialTextureTable.h"
 // ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
 //   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
 //   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
@@ -64,8 +65,8 @@ public:
         ShaderMetaHandle handle, const ShaderMeta& meta,
         RHICompletionPoint retireAfter, std::string& outError);
     /// frame packet이 소유한 ShaderMeta generation의 material keyword 변형을
-    /// candidate-first로 준비한다. primary와 다른 meta도 같은 pipeline layout을
-    /// 만족하면 게시하며, 실패해도 default/기존 variant는 유지한다.
+    /// candidate-first로 준비한다. material texture table 길이는 reflection을
+    /// 따르며, 실패해도 default/기존 variant는 유지한다.
     bool EnsureShaderMetaVariant(const EnhancedFrameContext& context,
         ShaderMetaHandle handle, const ShaderMeta& meta,
         std::span<const std::uint16_t> keywordSelections,
@@ -165,7 +166,8 @@ private:
     // 다르면 b2/PSO 상태가 다르므로 한 draw로 합치지 않는다.
     struct MaterialKey
     {
-        std::array<Texture*, 4> textures{};
+        std::vector<Texture*> textures{};
+        std::vector<assets::TextureCoordinates> coordinates{};
         std::shared_ptr<const EnhancedMaterialDrawSnapshot> snapshot{};
 
         bool operator==(const MaterialKey& other) const;
@@ -187,9 +189,15 @@ private:
         /// 팔레트를 인스턴스별 오프셋으로 두는 것이 DX11과 갈리는 지점이다 —
         /// 애니메이터가 달라도 같은 (메시·재질) 배치에 남는다.
         uint32_t      boneOffset{ kNoSkinning };
+        uint32_t      coverageFlags{};
+        float         coverageCutoff{ 0.5f };
+        uint32_t      usePropertyBlock{};
+        uint32_t      padding{};
     };
 
-    static_assert(sizeof(InstanceData) == 96u);
+    static_assert(sizeof(InstanceData) == 112u);
+    static_assert(offsetof(InstanceData, coverageFlags) == 96u);
+    static_assert(offsetof(InstanceData, usePropertyBlock) == 104u);
     static_assert(offsetof(InstanceData, baseColorFactor) == 64u);
     static_assert(std::is_same_v<decltype(InstanceData::baseColorFactor), math::color>);
     static_assert(std::is_trivially_copyable_v<InstanceData>);
@@ -229,15 +237,15 @@ private:
     struct ShaderVariant
     {
         RHIGraphicsPipelineRequest request;
-        // I5-D34a/b: 같은 permutation의 experiment 레이아웃 짝 둘(core / skin).
-        // variant 생성 시점에는 어떤 메시가 이 재질로 그려질지 모르므로 셋을
-        // 함께 만들고, 배치가 메시 바인딩의 마스크로 고른다.
-        RHIGraphicsPipelineRequest experimentRequest;
-        RHIGraphicsPipelineRequest experimentColorRequest;
-        RHIGraphicsPipelineRequest experimentSkinnedRequest;
-        RHIGraphicsPipelineRequest experimentColorSkinnedRequest;
+        std::map<uint32_t, RHIGraphicsPipelineRequest> modelRequests;
         std::shared_ptr<const ShaderMetaBindingLayout> layout{};
     };
+
+    bool BuildVariantCandidate(const EnhancedFrameContext& context, const ShaderMeta& meta,
+        std::span<const std::uint16_t> selections, ShaderVariant& candidate,
+        RHIShaderPermutationKey& key, std::string& error);
+    void RetireUnusedPipelines(const EnhancedFrameContext& context,
+        const std::vector<RHIPipelineHandle>& candidates, RHICompletionPoint retireAfter);
 
     // vertexAttributeMask는 RHIMeshBinding의 것이다 — 0이면 legacy 96B PSO,
     // 0이 아니면 experiment 레이아웃 PSO를 돌려준다.
@@ -248,9 +256,7 @@ private:
     // 드로우가 쓸 텍스처. PrepareFrame이 채우고 Record가 읽는다.
     struct DrawTextures
     {
-        RHITextureHandle resources[4]{};
-        RHIFormat       formats[4]{};
-        uint32_t        mipLevels[4]{};
+        MaterialTextureTable::Views views;
     };
 
     Outputs m_outputs;
@@ -266,13 +272,14 @@ private:
     // 두 번째가 첫 번째의 텍스처로 그려진다. 메시 중복 제거 블록 안에 재질
     // 업로드가 들어 있어서 두 번째는 통째로 건너뛰어졌다.
     //
-    // 키는 텍스처 포인터 넷이다. 여기서 포인터를 키로 쓰는 것은 옳다 —
+    // 키는 reflection 순서의 텍스처 포인터 목록이다. 여기서 포인터를 키로 쓰는 것은 옳다 —
     // 우리가 묻는 것이 '같은 텍스처 객체인가'(동일성)이기 때문이다. 루트
     // 시그니처·입력 레이아웃 때 겪은 함정은 '같은 내용인가'(동등성)를 물어야
     // 하는데 주소를 해시한 것이라 성격이 다르다.
     //
     // 해시맵 대신 정렬 맵을 쓴다. 재질 종류는 프레임당 많아야 수십이고,
     // 배열 키에 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다.
+    MaterialTextureTable::Schema m_legacyTextureSchema;
     std::map<MaterialKey, DrawTextures>             m_drawTextures;
 
     // PrepareFrame이 채우고 Record가 읽는다. 인스턴스 데이터는 배치 순서대로
@@ -299,16 +306,11 @@ private:
     // 리소스가 프레임마다 바뀔 수 있으므로 뷰를 캐시하지 않는다.
 
     // LivePipeline 하나에 GBuffer pass도 하나뿐이다. default request/layout은 frame
-    // 상수의 root layout 정본이며, primary의 material keyword와 같은 layout을 쓰는
-    // secondary ShaderMeta 조합은 아래 variant map에서 별도 PSO로 보관한다. 새 primary
+    // 상수의 root parameter 순서 정본이며, secondary ShaderMeta의 table 길이가 달라도
+    // 아래 variant map에서 별도 PSO로 보관한다. 새 primary
     // generation은 같은 slot만, frame commit은 빠진 secondary key만 retire한다.
     RHIGraphicsPipelineRequest m_pipelineRequest;
-    // I5-D34a/b: default request의 experiment 레이아웃 짝 둘(위 ShaderVariant와
-    // 같은 지위).
-    RHIGraphicsPipelineRequest m_experimentPipelineRequest;
-    RHIGraphicsPipelineRequest m_experimentColorPipelineRequest;
-    RHIGraphicsPipelineRequest m_experimentSkinnedPipelineRequest;
-    RHIGraphicsPipelineRequest m_experimentColorSkinnedPipelineRequest;
+    std::map<uint32_t, RHIGraphicsPipelineRequest> m_modelPipelineRequests;
     ShaderMetaHandle           m_shaderMetaHandle{};
     RHIShaderPermutationKey     m_defaultPermutationKey{};
     std::shared_ptr<const ShaderMetaBindingLayout> m_shaderBindingLayout{};

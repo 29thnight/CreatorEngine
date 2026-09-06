@@ -43,7 +43,7 @@ namespace experiment::importer
     // 성공하면 mesh.streams 와 mesh.indices 가 재용접된 것으로 교체된다.
     [[nodiscard]] bool GenerateTangents(ImportedMesh& mesh,
         const std::string& context, ImportNoteSink& notes,
-        TangentGenerationStats& stats);
+        TangentGenerationStats& stats, std::uint32_t uvSet = 0);
 
     // 씬 전체. options.generateMissingTangents 가 false 면 아무것도 하지 않는다.
     TangentGenerationStats GenerateMissingTangents(ImportedScene& scene,

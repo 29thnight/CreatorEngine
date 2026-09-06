@@ -1,6 +1,6 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
-**신설 2026-09-01 · 재분할 2026-09-03 · 활성 54행 267.5일 · 완료 4일 + 진행 기성 1.5일 · 잔여 262일**
+**신설 2026-09-01 · 재분할 2026-09-03 · 활성 54행 267.5일 · 완료 12.5일 + 진행 기성 3일 · 잔여 252일**
 
 기존 단일 PHASE 4에는 현재 PBR 배선 수정, Blender형 Material Graph, RenderGraph·라이트맵·
 일반 SRP·후처리·차세대 GPU 기능이 한데 섞여 있었다. 이 문서는 같은 총공수 267.5일을
@@ -8,13 +8,13 @@
 
 | 페이즈 | 단일 책임 | 활성 행 | 일 | 상태 |
 |---|---|---:|---:|---|
-| **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | 진행 기성 1.5일 |
+| **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | W2/W4/W5/W6 8.5일 완료 + 진행 기성 3일 |
 | **4.25** | Blender 5.1.1 Principled 기반 Material Graph와 artist workflow | 10 | 34 | 미착수 |
 | **4.75** | RenderGraph·라이트맵·일반 SRP·shadow/probe/post·GPU 기능 | 34 | 215.5 | 4일 완료 |
-| **합계** |  | **54** | **267.5** | **잔여 262** |
+| **합계** |  | **54** | **267.5** | **잔여 252** |
 
 모델 자산 신원·sidecar·loader·renderer/scene/animation 직접 소비·Assimp 은퇴는
-[`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md), **PHASE 3.75**가
+[`ModelAssetBigBangCutoverPlan.md`](archive/ModelAssetBigBangCutoverPlan.md), **PHASE 3.75**가
 소유한다. PHASE 4 계열은 UUIDv8 typed model/material/texture generation을 읽기 전용 입력으로
 받으며 legacy GUID, Assimp fallback, experiment on/off를 다시 만들지 않는다.
 
@@ -30,8 +30,8 @@
 | Pipeline Asset·일반 Pass Shader Graph·Custom Pass | [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) |
 | versioned resource·DAG·barrier·aliasing·async compute | [`RenderGraphDependencySchedulingPlan.md`](RenderGraphDependencySchedulingPlan.md) |
 | 라이트맵 UV1·BVH·직접/간접광·background bake | [`LightmapBakerPlan.md`](LightmapBakerPlan.md) |
-| ShaderMeta·material snapshot·Slang compiler 기반 완료 기록 | [`MaterialPipelinePlan.md`](MaterialPipelinePlan.md) |
-| 모델 자산·vertex schema·typed subasset generation | [`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md) |
+| ShaderMeta·material snapshot·Slang compiler 기반 완료 기록 | [`MaterialPipelinePlan.md`](archive/MaterialPipelinePlan.md) |
+| 모델 자산·vertex schema·typed subasset generation | [`ModelAssetBigBangCutoverPlan.md`](archive/ModelAssetBigBangCutoverPlan.md) |
 | 대시보드 표시 | 이 문서의 파생 |
 
 구 단일 PBR 직선 레인과 그 ID는 폐기한다. 해당 구조는 배선 결함, 재질 모델, 렌더러 기능과 후처리를 한
@@ -130,16 +130,27 @@ PHASE 4.75의 RG·L 내부 사전 연구는 제품 배선 없이 진행할 수 �
 |---|---|---|---|---:|
 | `PBR-W0` | 감사 정본·Gunner/primitive capture·strict gate | ◐ | PHASE 3.75 | 2 |
 | `PBR-W1` | normal-map 저작 유무 snapshot 단일화 | ◐ | — | 1 |
-| `PBR-W2` | native Slang 제품 진입점·공용 현행 평가 | · | W0 | 2.5 |
-| `PBR-W3` | backend neutral resource/binding/exit code | · | W0 | 1 |
-| `PBR-W4` | alpha mode/cutoff·double-sided/cull | · | W2 | 2 |
-| `PBR-W5` | AO·texture table·GBuffer packing | · | W2, W3 | 2.5 |
-| `PBR-W6` | emissive factor/strength·constant·색공간 | · | W2 | 1.5 |
-| `PBR-W7` | UV/sampler/mip·normal/tangent transform | · | W2 | 2 |
+| `PBR-W2` | native Slang 제품 진입점·공용 현행 평가 | ✓ | W0 | 2.5 |
+| `PBR-W3` | backend neutral resource/binding/exit code | ◐ | W0 | 1 |
+| `PBR-W4` | alpha mode/cutoff·double-sided/cull | ✓ | W2 | 2 |
+| `PBR-W5` | AO·texture table·GBuffer packing | ✓ | W2, W3 | 2.5 |
+| `PBR-W6` | emissive factor/strength·constant·색공간 | ✓ | W2 | 1.5 |
+| `PBR-W7` | UV/sampler/mip·normal/tangent transform | ◐ | W2 | 2 |
 | `PBR-W8` | generation 원자 밀봉·플리커 fail-closed | · | W3~W7 | 2 |
 | `PBR-W9` | DX12/Vulkan 실장면·장시간·재임포트 cutover | · | W8 | 1.5 |
 
 완료선은 [`PBRWiringStabilizationPlan.md`](PBRWiringStabilizationPlan.md) §4를 따른다.
+2026-09-06 W0/W3 첫 구현과 실장면 캡처 근거는 같은 문서 §6에 기록했다.
+W3 기성 0.5일을 추가했으며, W0/W1/W3 모두 최종 acceptance 전이라 진행 상태다.
+W2 native Slang 공용 평가는 같은 문서 §7의 양 backend 36-case HDR 비교와 기존 회귀를
+근거로 완료했다. Forward 조명 드리프트와 null LUT 직접광 과보상을 함께 수정했다.
+W4 alpha/양면 coverage는 같은 문서 §8의 양 backend 40-case·material 왕복·캐시 갱신 검증으로
+완료했다. CEMC6 모델 14개를 재게시했다. W5는 §9의 독립 AO·reflection table과
+양 backend 48-case로 완료했고 GBuffer 포맷은 검토 후 유지한다. W6는 §10의
+발광 색/강도·상수 발광·색공간과 양 backend 78-case를 완료했다. CEMC7 모델 14개 재게시와
+ID 보존을 확인했다. W7은 §11의 normal/tangent 변환·양 backend 128-case와
+§12의 UV0/UV1 선택·텍스처별 변환·양 backend 64-case를 합계 1일 기성으로 반영했다.
+CEMC8 모델 14개와 하위 ID 310개를 보존했으며 sampler/mip 전달이 다음 단위다.
 
 ---
 
@@ -238,14 +249,14 @@ renderer golden과 성능 gate를 사용한다.
 
 | 묶음 | 활성 행 | 총일 | 완료 | 진행 기성 | 잔여 |
 |---|---:|---:|---:|---:|---:|
-| PHASE 4 PBR 배선 | 10 | 18 | 0 | 1.5 | 16.5 |
+| PHASE 4 PBR 배선 | 10 | 18 | 8.5 | 3 | 6.5 |
 | PHASE 4.25 Material Graph | 10 | 34 | 0 | 0 | 34 |
 | PHASE 4.75 공통/GPU 설계 | 7 | 14.5 | 2 | 0 | 12.5 |
 | PHASE 4.75 RenderGraph/Q0 | 10 | 113 | 0 | 0 | 113 |
 | PHASE 4.75 라이트맵 | 8 | 35 | 2 | 0 | 33 |
 | PHASE 4.75 일반 SRP | 6 | 33 | 0 | 0 | 33 |
 | PHASE 4.75 renderer/post | 3 | 20 | 0 | 0 | 20 |
-| **합계** | **54** | **267.5** | **4** | **1.5** | **262** |
+| **합계** | **54** | **267.5** | **12.5** | **3** | **252** |
 
 `Q0`은 0일 표기가 완료가 아니라 미산정이다. `4-2~4-5`도 구상 공수만 포함하며 실제 GPU
 기능 구현 공수는 `4-6` 뒤 추가한다. 267.5일은 기존 계획의 총량을 재배분한 값이지 새
@@ -294,6 +305,12 @@ renderer golden과 성능 gate를 사용한다.
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-09-06 | W7 UV0/UV1·텍스처별 변환·양 backend 64-case와 변환된 UV1 MASK/Shadow 검사. CEMC8 모델 14개/하위 ID 310개 보존. W7 기성 1일, sampler/mip 미완료. 완료 12.5일 + 진행 기성 3일, 잔여 252일 |
+| 2026-09-06 | W7 normal/tangent 변환·양 backend 128-case 검증을 0.5일 기성 반영. UV/sampler/mip는 미완료. 완료 12.5일 + 진행 기성 2.5일, 잔여 252.5일 |
+| 2026-09-06 | W6 발광/색공간·양 backend 78-case 완료. CEMC7 모델 14개와 하위 ID 310개 보존. 완료 12.5일 + 진행 기성 2일, 잔여 253일 |
+| 2026-09-06 | W5 독립 AO·reflection texture table과 양 backend 48-case 완료. GBuffer 포맷 유지. 완료 11일 + 진행 기성 2일, 잔여 254.5일 |
+| 2026-09-06 | W4 alpha/cutoff/doubleSided·Shadow Slang 구현과 양 backend 40-case 검증 완료. CEMC6 모델 14개 재게시·ID 보존. 완료 8.5일 + 진행 기성 2일, 잔여 257일 |
+| 2026-09-06 | W0/W3 제품 캡처·neutral/strict exit 구현을 진행 기성에 반영. W2 native Slang 공용 평가와 양 backend 36-case HDR 검증 완료. 완료 6.5일 + 진행 기성 2일, 잔여 259일 |
 | 2026-09-03 | 단일 PHASE 4를 4/4.25/4.75로 분할. 현재 PBR 배선 감사를 PBR-W, Blender Principled Material Graph를 MAT, renderer 품질을 RND로 재편. 구 단일 PBR 직선 레인 폐기. 총공수 267.5일 보존 |
 | 2026-09-02 | 구 ModelImport I/V experiment 배선을 제거하고 PHASE 3.75로 분리 |
 | 2026-09-01 | 최초 통합. BASE-0, Q0, RG/L/SRP/PBR 공수와 순서 정리 |

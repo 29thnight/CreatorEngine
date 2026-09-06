@@ -1,5 +1,8 @@
 # 씬 그래프 재설계 — Entity·Component·Prefab (UE 로드맵 반영)
 
+> **보관 · 완료 (정리: 2026-09-06).** PHASE 8.5의 전체 트랙 종료. 조건부 S4는 PHASE 8.75 X8로 승계되어 완료됐다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 작성: 2026-08-16 · 계기: GameObject/Object 기반 설계 재평가 + "기존 보완계획을 제거하고
 Scene Graph·Entity·Component·Prefab에 대한 UE 로드맵의 내용을 반영한 신규 구조
 재설계안"을 세우라는 요구.

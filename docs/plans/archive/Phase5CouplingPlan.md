@@ -1,5 +1,8 @@
 # PHASE 5 구조적 커플링 제거 — 실행 설계 (5-1)
 
+> **보관 · 완료·선택 중단 (정리: 2026-09-06).** PHASE 5 종료. 5-5의 포괄적 폴더 재구성은 중단했고 후속 계층·빌드 작업은 각 활성 계획이 소유한다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 작성: 2026-08-06 · 근거: include 그래프 실측 (`scripts/check_include_boundary.py`)
 
 ## 1. 경계 원칙
@@ -64,7 +67,7 @@ ScriptBinder는 역방향(허용)으로 include한다.
    5-3(에디터 UI 분리)과 한 몸. 5-3에서 함께 해소.
    같은 5-3 묶음: `Utility_Framework/ReflectionImGuiHelper.h`(924줄, 에디터 전용인데 코어에 있으며
    `SceneManager.h`·`InputManager.h`를 역참조) → `EngineGUIWindow`로 이관.
-   근거·범위는 [ReflectionRetentionDecision.md](../design/ReflectionRetentionDecision.md) §4-R1.
+   근거·범위는 [ReflectionRetentionDecision.md](../../design/ReflectionRetentionDecision.md) §4-R1.
 5. **C5 ModelLoader 물리 부착** — MeshCollider/RigidBody 생성은 콜백/팩토리 역전으로 게임플레이
    측에 위임.
 6. **C6 기타** — `Camera.cpp`(InputManager: 에디터 카메라 조작 — 입력 인터페이스 추출),

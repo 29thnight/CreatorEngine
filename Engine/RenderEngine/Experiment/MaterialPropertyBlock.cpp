@@ -77,6 +77,10 @@ namespace experiment
                 std::get_if<TextureReference>(&property.value))
             {
                 outValue.m_textureGuid.m_guid = value->assetId.value;
+                outValue.m_textureUvSet = value->coordinates.set;
+                outValue.m_textureUvOffset = {value->coordinates.offset[0], value->coordinates.offset[1]};
+                outValue.m_textureUvScale = {value->coordinates.scale[0], value->coordinates.scale[1]};
+                outValue.m_textureUvRotation = value->coordinates.rotation;
                 return true;
             }
             break;

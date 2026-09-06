@@ -23,6 +23,7 @@
 #include "../../FrameCameraSnapshot.h"
 #include "../../ShaderMetaHandle.h"
 #include "../../ShaderMetaReflection.h"
+#include "../../Assets/TextureCoordinates.h"
 
 class Mesh;
 class Texture;
@@ -37,6 +38,7 @@ struct EnhancedMaterialTextureBinding
     std::uint32_t registerIndex{};
     std::uint32_t registerSpace{};
     std::shared_ptr<Texture> textureOwner{};
+    assets::TextureCoordinates coordinates{};
 };
 
 // M6-P2d-b: Material::m_flowInfo와 producer frame time을 같은 immutable
@@ -77,6 +79,25 @@ static_assert(std::is_trivially_copyable_v<EnhancedForwardMaterialFlowSnapshot>)
 // 임의 이름/개수를 owner vector로 보존하고, pass가 reflection register를 자기 물리
 // 슬롯에 투영한다. 기존 scalar는 legacy ShadeInstance 호환용이며 제품 material 값의
 // 정본은 propertyBytes(b2)다.
+// W4: immutable raster/coverage policy. Flags match PbrCoverage.slang.
+// Disabled is reserved for old isolated fixtures; product sealing enables it.
+struct EnhancedMaterialCoverage
+{
+    static constexpr uint32_t Enabled = 1u;
+    static constexpr uint32_t Masked = 2u;
+    static constexpr uint32_t Blended = 4u;
+    static constexpr uint32_t DoubleSided = 8u;
+    uint32_t flags{};
+    float cutoff{ 0.5f };
+    float baseAlpha{ 1.f };
+    bool IsValid() const noexcept
+    {
+        return (flags & ~15u) == 0u && (flags & 6u) != 6u
+            && std::isfinite(cutoff) && std::isfinite(baseAlpha)
+            && (!(flags & Masked) || (cutoff >= 0.f && cutoff <= 1.f));
+    }
+};
+
 struct EnhancedForwardMaterialDrawSnapshot
 {
     ShaderMetaHandle shaderMetaHandle{};
@@ -85,6 +106,7 @@ struct EnhancedForwardMaterialDrawSnapshot
     std::vector<std::uint16_t> keywordSelections{};
     std::vector<std::uint8_t> propertyBytes{};
     EnhancedForwardMaterialFlowSnapshot flow{};
+    EnhancedMaterialCoverage coverage{};
     math::color baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
     float metallic{ 0.f };
     float roughness{ 1.f };
@@ -93,7 +115,7 @@ struct EnhancedForwardMaterialDrawSnapshot
 
     bool IsValid() const noexcept
     {
-        return useNormalMap <= 1u
+        return coverage.IsValid() && useNormalMap <= 1u
             && flow.IsFinite()
             && shaderMetaHandle.IsValid()
             && !bindingLayout.constantBufferName.empty()
@@ -110,6 +132,7 @@ struct EnhancedForwardMaterialDrawSnapshot
 // 어느 논리 property/GUID/register의 generation인지 함께 고정한다.
 struct EnhancedMaterialDrawSnapshot
 {
+    EnhancedMaterialCoverage coverage{};
     ShaderMetaHandle shaderMetaHandle{};
     // M6-P1b2b1: 같은 ShaderMeta generation 안에서도 keyword 선택이 다르면
     // 다른 compile/PSO identity다. authored index 배열과 함께 정규화된 key를
@@ -126,7 +149,7 @@ struct EnhancedMaterialDrawSnapshot
 
     bool IsValid() const noexcept
     {
-        return useNormalMap <= 1u
+        return coverage.IsValid() && useNormalMap <= 1u
             && shaderMetaHandle.IsValid()
             && !bindingLayout.constantBufferName.empty()
             && bindingLayout.constantBufferByteSize == propertyBytes.size();
@@ -171,6 +194,7 @@ struct EnhancedMaterialDrawSnapshot
 // 프레임을 밀봉할 때 필요한 것만 복사해 온다.
 struct EnhancedDrawItem
 {
+    EnhancedMaterialCoverage coverage{}; // isolated fixtures only; product uses snapshot
     // I6-C — legacy 업로드 폴백의 **원본**으로만 남는다. 신원·정렬·지오메트리
     // 맵 키는 아래 geometryKey가 진다. 폴백(Assimp 모델·A/B off)이 죽는 I6-E에서
     // 이 필드도 사라진다.

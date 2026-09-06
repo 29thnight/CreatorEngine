@@ -7,12 +7,14 @@ properties:
   - { name: roughness, label: Roughness, type: float, default: 1.0 }
   - { name: normalScale, label: Normal Scale, type: float, default: 1.0 }
   - { name: occlusionStrength, label: Occlusion Strength, type: float, default: 1.0 }
-  - { name: emissive, label: Emissive, type: float3, default: [1.0, 1.0, 1.0] }
+  - { name: emissive, label: Emissive, type: float3, default: [0.0, 0.0, 0.0] }
   - { name: alphaCutoff, label: Alpha Cutoff, type: float, default: 0.5 }
+  - { name: emissiveStrength, label: Emissive Strength, type: float, default: 1.0 }
   - { name: baseColorMap, label: Base Color Map, type: texture2d }
   - { name: normalMap, label: Normal Map, type: texture2d }
   - { name: ormMap, label: ORM Map, type: texture2d }
   - { name: emissiveMap, label: Emissive Map, type: texture2d }
+  - { name: aoMap, label: Occlusion Map, type: texture2d }
 keywords:
   - { axis: SHADING_QUALITY, values: [full, reduced] }
 passes:

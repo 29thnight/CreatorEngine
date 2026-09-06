@@ -105,6 +105,10 @@ namespace ExperimentMaterialSealing
     // 같은 규칙)를 만든다. keyword 정규화는
     // experiment::NormalizeMaterialKeywordSelections를 직접 쓴다(EnsureShaderMeta
     // Variant 전에 필요해서 이 함수 밖이다).
+    [[nodiscard]] bool SealCoverage(const SealSource& source,
+        const ShaderMetaBindingLayout& layout, std::span<const std::uint8_t> bytes,
+        EnhancedMaterialCoverage& outCoverage, std::string& outError);
+
     [[nodiscard]] bool SealCore(const SealSource& source, const ShaderMeta& meta,
         const ShaderMetaBindingLayout& layout,
         std::vector<std::uint8_t>& outPropertyBytes,

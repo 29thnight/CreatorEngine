@@ -516,6 +516,8 @@ namespace experiment::importer
             TextureReference reference;
             reference.logicalName = texture.name;
             reference.colorSpace = colorSpace;
+            reference.coordinates = {slot.uvSet, {slot.offset.x, slot.offset.y},
+                {slot.tiling.x, slot.tiling.y}, slot.rotation};
             if (options.resolveTextureAsset)
             {
                 reference.assetId = options.resolveTextureAsset(texture);
@@ -563,7 +565,8 @@ namespace experiment::importer
                     ? options.resolveShaderAsset(source, i)
                     : options.shaderAssetId;
                 material.blendMode = source.alphaMode == AlphaMode::Blend
-                    ? MaterialBlendMode::Transparent : MaterialBlendMode::Opaque;
+                    ? MaterialBlendMode::Transparent : source.alphaMode == AlphaMode::Mask
+                    ? MaterialBlendMode::Masked : MaterialBlendMode::Opaque;
 
                 const auto addNumeric = [&](const std::string& name, auto value)
                 {
@@ -578,6 +581,7 @@ namespace experiment::importer
                 addNumeric(names.metallicFactor, source.metallicFactor);
                 addNumeric(names.roughnessFactor, source.roughnessFactor);
                 addNumeric(names.emissiveFactor, source.emissiveFactor);
+                addNumeric(names.emissiveStrength, source.emissiveStrength);
                 addNumeric(names.normalScale, source.normalScale);
                 addNumeric(names.occlusionStrength, source.occlusionStrength);
                 if (source.alphaMode == AlphaMode::Mask)
@@ -600,13 +604,7 @@ namespace experiment::importer
 
                 if (source.doubleSided)
                 {
-                    notes.Info(ImportNoteCode::MaterialSemanticUnmapped, context,
-                        "doubleSided 는 ModelDraft material 에 자리가 없어 버려졌다.");
-                }
-                if (source.emissiveStrength != 1.0f)
-                {
-                    notes.Info(ImportNoteCode::MaterialSemanticUnmapped, context,
-                        "emissiveStrength 를 옮길 property 이름이 없어 버려졌다.");
+                    addNumeric(std::string(standard_material::property::DoubleSided), true);
                 }
 
                 draft.materials.push_back(std::move(material));

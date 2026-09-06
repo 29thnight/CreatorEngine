@@ -1,5 +1,8 @@
 # 모델 자산 빅뱅 전환 — MBC0 기준선 (PHASE 3.75)
 
+> **보관 · 완료 계획의 기준선 (정리: 2026-09-06).** PHASE 3.75 MBC0/MBC11의 동결·재유도 근거. 기존 예산·회귀 스크립트의 참조 자료로 계속 보존한다.
+> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+
 **작성 2026-09-02 · HEAD `1474c3c6` · 장비 `LANCE`(개발기) · Release exe 2026-09-02 12:58:59**
 
 [`ModelAssetBigBangCutoverPlan.md`](ModelAssetBigBangCutoverPlan.md) §7 `MBC0`의 산출물이다.

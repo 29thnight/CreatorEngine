@@ -9,6 +9,7 @@
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Texture.h"
+#include "ModelSceneInstantiation.h"
 
 #include <cstdio>
 #include <map>
@@ -17,6 +18,39 @@
 
 namespace RenderTest
 {
+    bool RunIncrementalModelCancellationSelfTest(const std::string& guardPath)
+    {
+        Scene* scene = SceneManagers->GetActiveScene();
+        const auto generation = DataSystems->FindModelAssetGenerationByStem("Gunner_F_Mythic");
+        if (!scene || !generation) return false;
+        auto pending = ModelSceneInstantiation::PendingInstance::Prepare(generation, {});
+        if (!pending) return false;
+        const auto status = pending->Advance(*scene, 1, std::chrono::milliseconds(2), 0);
+        const auto handle = pending->Root();
+        const bool building = status == ModelSceneInstantiation::PendingInstance::Status::Building
+            && handle.IsValid() && scene->Resolve(handle);
+        const bool saveRejected = SceneManagers->SaveScene(guardPath) == nullptr;
+        pending->Cancel(*scene);
+        scene->EndFramePass();
+        const bool removed = scene->Resolve(handle) == nullptr;
+        bool guardReleased = true;
+        try { scene->OnBeforeSerialize(); }
+        catch (...) { guardReleased = false; }
+
+        Entity* replacement = scene->CreateEntity("AsyncCancellationSlotReuse");
+        const auto replacementHandle = scene->HandleOf(replacement->m_index);
+        pending->Cancel(*scene); // a stale cancellation must not destroy the reused slot
+        scene->EndFramePass();
+        const bool reusedSafely = handle.index == replacementHandle.index
+            && handle.generation != replacementHandle.generation && scene->Resolve(replacementHandle);
+        scene->DestroyEntity(replacementHandle.index);
+        scene->EndFramePass();
+        const bool passed = building && saveRejected && removed && guardReleased && reusedSafely;
+        std::printf("[model.async] cancellation-probe %s building=%d saveRejected=%d removed=%d guardReleased=%d reusedSafely=%d\n",
+            passed ? "pass" : "fail", building, saveRejected, removed, guardReleased, reusedSafely);
+        return passed;
+    }
+
     namespace
     {
         struct SceneModelTally final

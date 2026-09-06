@@ -70,9 +70,13 @@ namespace
 		if (const Authoring::ReadNode blend = materialNode["blendMode"];
 			blend && blend.IsScalar())
 		{
+            if (blend.AsString() != "opaque" && blend.AsString() != "masked"
+                && blend.AsString() != "transparent")
+            { outError = "Unknown material alpha mode"; return false; }
 			owned->m_renderingMode = blend.AsString() == "transparent"
 				? MaterialRenderingMode::Transparent
-				: MaterialRenderingMode::Opaque;
+                : blend.AsString() == "masked" ? MaterialRenderingMode::Masked
+                : MaterialRenderingMode::Opaque;
 		}
 		if (const Authoring::ReadNode selections = materialNode["keywordSelections"];
 			selections && selections.IsSequence())
@@ -245,7 +249,8 @@ namespace
 			result.Child("blendMode").SetScalar(
 				experiment::MaterialBlendMode::Transparent
 					== currentConverted.blendMode
-				? "transparent" : "opaque");
+				? "transparent" : experiment::MaterialBlendMode::Masked == currentConverted.blendMode
+                ? "masked" : "opaque");
 		}
 		if (currentConverted.keywordSelections
 			!= baseConverted.keywordSelections)

@@ -19,7 +19,7 @@ namespace experiment::importer
     //
     // 미구현(전부 ImportNote 로 계수한다 — 조용히 넘어가지 않는다):
     //   법선·탄젠트 생성(mikktspace), Draco, 모프 타깃, 카메라·라이트,
-    //   KHR_texture_transform, sparse accessor.
+    //   sparse accessor. KHR_texture_transform은 UV 참조에 보존한다.
     class GltfImporter final : public IAssetImporter
     {
     public:

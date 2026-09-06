@@ -1,6 +1,7 @@
 #include "ConsoleCommandSystem.h"
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
+#include "EditorModelPlacement.h"
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
@@ -734,6 +735,12 @@ void ConsoleCommandSystem::Pump()
     // 아래 조기 반환들보다 앞이어야 한다 — wait 중이거나 씬 로딩 중인 프레임도
     // 프레임이고, 그 사이에 일어난 Awake/OnDestroy가 어느 프레임 것인지 알아야 한다.
     Lifecycle::Trace::BeginFrame();
+
+    if (m_waitCondition)
+    {
+        if (!m_waitCondition()) return;
+        m_waitCondition = {};
+    }
 
     // wait 명령으로 보류 중이면 프레임만 소모한다.
     if (m_waitFrames > 0)
@@ -5498,6 +5505,36 @@ namespace ConsoleCmd
             generation ? "ok" : "fail", parts[1].c_str());
     }
 
+    static void Cmd_model_async(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() > 2 && ctx.parts[1] == "probe")
+        {
+            (void)RenderTest::RunIncrementalModelCancellationSelfTest(ctx.parts[2]);
+            return;
+        }
+        if (ctx.parts.size() > 1 && ctx.parts[1] == "wait")
+        {
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+            ctx.system.WaitUntil([deadline]
+            {
+                if (Editor::ModelPlacement::Get().IsIdle()) return true;
+                if (std::chrono::steady_clock::now() < deadline) return false;
+                std::printf("[model.async] wait timed out\n");
+                return true;
+            });
+            return;
+        }
+        if (ctx.parts.size() < 2 || ctx.parts[1] == "status")
+        {
+            Editor::ModelPlacement::Get().PrintStatus();
+            return;
+        }
+        if (Scene* scene = SceneManagers->GetActiveScene())
+        {
+            Editor::ModelPlacement::Get().Execute(scene->GetSceneId(), ctx.parts[1]);
+            std::printf("[model.async] queued %s\n", ctx.parts[1].c_str());
+        }
+    }
     static void Cmd_model_place(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -5508,7 +5545,7 @@ namespace ConsoleCmd
             return;
         }
 
-        // 콘텐츠 브라우저에서 씬으로 끌어다 놓는 것과 같은 경로.
+        // 회귀 검증용 동기 배치. UI와 같은 비동기 경로는 model.async가 사용한다.
         Scene* scene = SceneManagers->GetActiveScene();
         const auto generation = DataSystems->FindModelAssetGenerationByStem(parts[1]);
         if (!scene || !generation)
@@ -7682,6 +7719,7 @@ namespace ConsoleCmd
 
         std::string log;
         const bool passed = DX12Test::RunSelfTest(outputPath, 6, log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         for (const auto& line : { log })
         {
@@ -9429,7 +9467,7 @@ namespace ConsoleCmd
             while (!rootText.empty() && (rootText.front() == ' '
                 || rootText.front() == '	')) rootText.erase(0, 1);
             while (!rootText.empty() && (rootText.back() == ' '
-                || rootText.back() == '' || rootText.back() == '	'))
+                || rootText.back() == '\r' || rootText.back() == '	'))
             {
                 rootText.pop_back();
             }
@@ -9744,6 +9782,7 @@ namespace ConsoleCmd
 
         std::string log;
         const bool passed = RunVulkanSelfTest(outputPath, log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -9757,6 +9796,7 @@ namespace ConsoleCmd
         // ③(픽셀 대조)이 처음으로 0 을 벗어나는 검사다.
         std::string log;
         const bool passed = RunVulkanGridTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.grid] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -9767,6 +9807,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanParallelRecordingTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.parallel] ")
@@ -9780,6 +9821,7 @@ namespace ConsoleCmd
         // DX12 검사와 같은 면 색을 내는지 대조한다.
         std::string log;
         const bool passed = RunVulkanSkyBoxTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.skybox] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -9790,6 +9832,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanIBLTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.ibl] ") +
@@ -9801,6 +9844,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanGizmoIconTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.gizmoicon] ") +
@@ -9812,6 +9856,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanTextureCodecTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.texturecodec] ") +
@@ -9823,6 +9868,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanGizmoLineTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.gizmoline] ") +
@@ -9834,6 +9880,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanWireFrameTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.wireframe] ") +
@@ -9845,6 +9892,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanUITest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.ui] ") +
@@ -9856,6 +9904,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanShadowTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.shadow] ") +
@@ -9867,6 +9916,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = RunVulkanGBufferTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[vk.gbuffer] ") +
@@ -9878,16 +9928,72 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanForwardTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         std::printf("%s", result.c_str());
         Debug->LogWarning(std::string("[vk.forward] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.forward %s\n", passed ? "통과" : "실패");
     }
 
+    static void Cmd_render_pbr_parity(const ConsoleCommandContext& ctx)
+    {
+        std::string result;
+        const bool passed = RunPbrShaderParityTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
+        Debug->LogWarning(std::string("[render.pbr.parity] ") + result);
+        std::printf("%s[CLI] render.pbr.parity %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+    }
+
+    static void Cmd_render_pbr_coverage(const ConsoleCommandContext& ctx)
+    {
+        std::string result;
+        const bool passed = RunPbrCoverageTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
+        Debug->LogWarning(std::string("[render.pbr.coverage] ") + result);
+        std::printf("%s[CLI] render.pbr.coverage %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+    }
+
+    static void Cmd_render_pbr_occlusion(const ConsoleCommandContext& ctx)
+    {
+        std::string result;
+        const bool passed = RunPbrOcclusionTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
+        Debug->LogWarning(std::string("[render.pbr.occlusion] ") + result);
+        std::printf("%s[CLI] render.pbr.occlusion %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+    }
+
+    static void Cmd_render_pbr_emission(const ConsoleCommandContext& ctx)
+    {
+        std::string result;
+        const bool passed = RunPbrEmissionTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
+        Debug->LogWarning(std::string("[render.pbr.emission] ") + result);
+        std::printf("%s[CLI] render.pbr.emission %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+    }
+
+    static void Cmd_render_pbr_transform(const ConsoleCommandContext& ctx)
+    {
+        std::string result;
+        const bool passed = RunPbrTransformTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
+        Debug->LogWarning(std::string("[render.pbr.transform] ") + result);
+        std::printf("%s[CLI] render.pbr.transform %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+    }
+
+    static void Cmd_render_pbr_uv(const ConsoleCommandContext& ctx)
+    {
+        std::string result;
+        const bool passed = RunPbrUvTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
+        Debug->LogWarning(std::string("[render.pbr.uv] ") + result);
+        std::printf("%s[CLI] render.pbr.uv %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+    }
+
     static void Cmd_vk_deferred(const ConsoleCommandContext& ctx)
     {
         std::string result;
         const bool passed = RunVulkanDeferredTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         Debug->LogWarning(std::string("[vk.deferred] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.deferred %s\n", passed ? "통과" : "실패");
@@ -9897,6 +10003,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanDecalTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         Debug->LogWarning(std::string("[vk.decal] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.decal %s\n", passed ? "통과" : "실패");
@@ -9906,6 +10013,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanSSAOTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         Debug->LogWarning(std::string("[vk.ssao] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.ssao %s\n", passed ? "통과" : "실패");
@@ -9915,6 +10023,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanSSSTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         std::printf("%s", result.c_str());
         Debug->LogWarning(std::string("[vk.sss] ") +
             (passed ? "통과\n" : "실패\n") + result);
@@ -9925,6 +10034,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanSSRTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         std::printf("%s", result.c_str());
         Debug->LogWarning(std::string("[vk.ssr] ") +
             (passed ? "통과\n" : "실패\n") + result);
@@ -9935,6 +10045,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanVolumetricFogTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         std::printf("%s", result.c_str());
         Debug->LogWarning(std::string("[vk.fog] ") +
             (passed ? "통과\n" : "실패\n") + result);
@@ -9945,6 +10056,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanPostChainTest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         std::printf("%s", result.c_str());
         Debug->LogWarning(std::string("[vk.post] ") +
             (passed ? "통과\n" : "실패\n") + result);
@@ -9955,6 +10067,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanSSGITest(result);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         Debug->LogWarning(std::string("[vk.ssgi] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.ssgi %s\n", passed ? "통과" : "실패");
@@ -10002,6 +10115,7 @@ namespace ConsoleCmd
 
         std::string log;
         const bool passed = DX12Test::RunPsoCacheTest(cachePath, log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -10034,6 +10148,7 @@ namespace ConsoleCmd
         // 스레드와 충돌하지 않는다.
         std::string log;
         const bool passed = DX12Test::RunUploadSegmentTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.uploadring] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -10044,6 +10159,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunForwardPlusTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10055,6 +10171,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunForwardPlusShadeTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10066,6 +10183,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunForwardPlusScaleTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "완료" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10077,6 +10195,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunSSAOTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10088,6 +10207,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunSSAOScaleTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "완료" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10099,6 +10219,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunPostChainTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10110,6 +10231,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunPostChainScaleTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "완료" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10121,6 +10243,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunUITest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10133,6 +10256,7 @@ namespace ConsoleCmd
         // 그리드 패스 검증(PHASE 3-6, Gizmo 계열 첫 슬라이스).
         std::string log;
         const bool passed = DX12Test::RunGridTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10145,6 +10269,7 @@ namespace ConsoleCmd
         // 기즈모 라인 패스 검증(PHASE 3-6, Gizmo 계열 2차 슬라이스).
         std::string log;
         const bool passed = DX12Test::RunGizmoLineTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10157,6 +10282,7 @@ namespace ConsoleCmd
         // 기즈모 아이콘 패스 검증(PHASE 3-6, Gizmo 계열 3차 슬라이스).
         std::string log;
         const bool passed = DX12Test::RunGizmoIconTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10169,6 +10295,7 @@ namespace ConsoleCmd
         // 와이어프레임 패스 검증(PHASE 3-6, Gizmo 계열 4차 슬라이스).
         std::string log;
         const bool passed = DX12Test::RunWireFrameTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10181,6 +10308,7 @@ namespace ConsoleCmd
         // Gizmo 계열 씬 연결 검증(PHASE 3-6, Gizmo 계열 5차 슬라이스).
         std::string log;
         const bool passed = DX12Test::RunGizmoSceneTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10193,6 +10321,7 @@ namespace ConsoleCmd
         // 그림자 품질 검증(PHASE 3-6 — 경사 비례 편향·캐스케이드 경계 블렌딩).
         std::string log;
         const bool passed = DX12Test::RunShadowQualityTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10205,6 +10334,7 @@ namespace ConsoleCmd
         // 스카이박스 패스 검증(PHASE 3-6).
         std::string log;
         const bool passed = DX12Test::RunSkyBoxTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10217,6 +10347,7 @@ namespace ConsoleCmd
         // IBL 생성 체인 검증(PHASE 3-6).
         std::string log;
         const bool passed = DX12Test::RunIBLTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10229,6 +10360,7 @@ namespace ConsoleCmd
         // SSS 패스 검증(PHASE 3-6, 미구현 패스 이식 1차).
         std::string log;
         const bool passed = DX12Test::RunSSSTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10241,6 +10373,7 @@ namespace ConsoleCmd
         // 데칼 패스 검증(PHASE 3-6, 미구현 패스 이식 2차).
         std::string log;
         const bool passed = DX12Test::RunDecalTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10253,6 +10386,7 @@ namespace ConsoleCmd
         // SSR 패스 검증(PHASE 3-6, 미구현 패스 이식 3차).
         std::string log;
         const bool passed = DX12Test::RunSSRTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10265,6 +10399,7 @@ namespace ConsoleCmd
         // 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
         std::string log;
         const bool passed = DX12Test::RunVolumetricFogTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10277,6 +10412,7 @@ namespace ConsoleCmd
         // GBuffer 스키닝 검증(PHASE 3-6).
         std::string log;
         const bool passed = DX12Test::RunSkinningTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10289,6 +10425,7 @@ namespace ConsoleCmd
         // IBL 앰비언트 소비 검증(PHASE 3-6).
         std::string log;
         const bool passed = DX12Test::RunIBLShadeTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10300,6 +10437,7 @@ namespace ConsoleCmd
     {
         std::string log;
         const bool passed = DX12Test::RunSSGITest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10421,6 +10559,45 @@ namespace ConsoleCmd
         }
     }
 
+    static void Cmd_render_pbr_capture(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3
+            || (ctx.parts.size() == 3 && ctx.parts[2] != "game" && ctx.parts[2] != "editor"))
+        {
+            std::printf("[CLI] render.pbr.capture FAIL usage: <new-absolute-directory> [game|editor]\n");
+            EngineBootstrap::SetExitCode(7);
+            return;
+        }
+        std::string error;
+        const auto target = ctx.parts.size() == 3 && ctx.parts[2] == "editor"
+            ? EnhancedLiveDisplayTarget::Editor : EnhancedLiveDisplayTarget::Game;
+        if (!EnhancedSceneRenderer::RequestLivePbrCapture(ctx.parts[1], target, error))
+        {
+            std::printf("[CLI] render.pbr.capture FAIL %s\n", error.c_str());
+            EngineBootstrap::SetExitCode(7);
+            return;
+        }
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+        ctx.system.WaitUntil([deadline]()
+        {
+            auto capture = EnhancedSceneRenderer::GetLivePbrCaptureStatus();
+            if (capture.state == EnhancedPbrCaptureState::Pending
+                && std::chrono::steady_clock::now() >= deadline)
+            {
+                EnhancedSceneRenderer::CancelLivePbrCapture();
+                capture = EnhancedSceneRenderer::GetLivePbrCaptureStatus();
+            }
+            if (capture.state != EnhancedPbrCaptureState::Complete
+                && capture.state != EnhancedPbrCaptureState::Failed) return false;
+            const bool passed = capture.state == EnhancedPbrCaptureState::Complete;
+            if (!passed) EngineBootstrap::SetExitCode(7);
+            std::printf("[CLI] render.pbr.capture %s frame=%llu path=%s error=%s\n",
+                passed ? "PASS" : "FAIL", static_cast<unsigned long long>(capture.frameId),
+                capture.directory.c_str(), capture.error.c_str());
+            return true;
+        });
+    }
+
     static void Cmd_render_livecheck(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
@@ -10446,6 +10623,7 @@ namespace ConsoleCmd
         const bool displayPassed = EnhancedSceneRenderer::RunLiveDisplayRegression(
             expectedWidth, expectedHeight, log);
         const bool passed = backendMatch && displayPassed;
+        if (!passed) EngineBootstrap::SetExitCode(7);
         std::printf("[render.livecheck] backend configured=%s scene=%s imgui=%s — %s\n",
             RenderBackendName(configured),
             EnhancedLiveBackend::Vulkan == scene ? "vulkan" : "dx12",
@@ -10462,6 +10640,7 @@ namespace ConsoleCmd
         // 전용 디바이스 둘을 새로 세우므로 에디터 씬과 무관하게 언제든 돈다.
         std::string log;
         const bool passed = DX12Test::RunApiOverheadBench(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10476,6 +10655,7 @@ namespace ConsoleCmd
         // Release로 재야 의미가 있다(Debug는 검증 레이어가 vtable 비용을 덮는다).
         std::string log;
         const bool passed = DX12Test::RunEncoderOverheadBench(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "완료" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10488,6 +10668,7 @@ namespace ConsoleCmd
         // 씬 연결 검증(PHASE 3-6). 활성 씬의 카메라와 프록시를 DX12로 그린다.
         std::string log;
         const bool passed = DX12Test::RunSceneBindingTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10594,6 +10775,7 @@ namespace ConsoleCmd
         // 크기 추종 검증(해상도 슬라이스).
         std::string log;
         const bool passed = DX12Test::RunScreenResizeTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10606,6 +10788,7 @@ namespace ConsoleCmd
         // 커맨드 기록 병렬화 검증(PHASE 3-6).
         std::string log;
         const bool passed = DX12Test::RunParallelRecordTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10618,6 +10801,7 @@ namespace ConsoleCmd
         // GBuffer 패스 검증(PHASE 3-6).
         std::string log;
         const bool passed = DX12Test::RunGBufferTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
@@ -10630,6 +10814,7 @@ namespace ConsoleCmd
         // 렌더 그래프 자가 검증(PHASE 3-5).
         std::string log;
         const bool passed = DX12Test::RunRenderGraphTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -10641,6 +10826,7 @@ namespace ConsoleCmd
         // completion 기반 descriptor page recycler·샘플러 힙 자가 검증.
         std::string log;
         const bool passed = DX12Test::RunDescriptorHeapTest(log);
+        if (!passed) EngineBootstrap::SetExitCode(7);
 
         std::printf("%s", log.c_str());
         Debug->LogWarning(std::string("[dx12.descriptorheap] ") + (passed ? "통과" : "실패") + "\n" + log);
@@ -12042,6 +12228,7 @@ namespace ConsoleCmd
 			reg({ "inputmap.corpus.probe" }, &Cmd_inputmap_corpus_probe);
             reg({ "model.loadcached" }, &Cmd_model_loadcached);
             reg({ "model.place" }, &Cmd_model_place);
+            reg({ "model.async" }, &Cmd_model_async);
             reg({ "script.add" }, &Cmd_script_add);
             reg({ "scene.select" }, &Cmd_scene_select);
             reg({ "script.fields" }, &Cmd_script_fields);
@@ -12073,6 +12260,12 @@ namespace ConsoleCmd
             reg({ "vk.gbuffer" }, &Cmd_vk_gbuffer);
             reg({ "vk.forward" }, &Cmd_vk_forward);
             reg({ "vk.deferred" }, &Cmd_vk_deferred);
+            reg({ "render.pbr.parity" }, &Cmd_render_pbr_parity);
+            reg({ "render.pbr.coverage" }, &Cmd_render_pbr_coverage);
+            reg({ "render.pbr.occlusion" }, &Cmd_render_pbr_occlusion);
+            reg({ "render.pbr.emission" }, &Cmd_render_pbr_emission);
+            reg({ "render.pbr.transform" }, &Cmd_render_pbr_transform);
+            reg({ "render.pbr.uv" }, &Cmd_render_pbr_uv);
             reg({ "vk.decal" }, &Cmd_vk_decal);
             reg({ "vk.ssao" }, &Cmd_vk_ssao);
             reg({ "vk.sss" }, &Cmd_vk_sss);
@@ -12153,6 +12346,7 @@ namespace ConsoleCmd
             reg({ "render.backend" }, &Cmd_render_backend);
             reg({ "dx12.live" }, &Cmd_dx12_live);
             reg({ "render.livecheck" }, &Cmd_render_livecheck);
+            reg({ "render.pbr.capture" }, &Cmd_render_pbr_capture);
             reg({ "dx12.bench11" }, &Cmd_dx12_bench11);
             reg({ "dx12.encoderbench" }, &Cmd_dx12_encoderbench);
             reg({ "dx12.scene" }, &Cmd_dx12_scene);
@@ -12368,6 +12562,12 @@ void ConsoleCommandSystem::PrintHelp() const
         "  vk.gbuffer           GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조\n"
         "  vk.forward           Forward+ 공용 패스 — compute·buffer·blend·mesh DX12/Vulkan 대조\n"
         "  vk.deferred          Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조\n"
+        "  render.pbr.parity    PBR native Slang — Forward/Deferred HDR DX12/Vulkan 대조\n"
+        "  render.pbr.coverage  PBR alpha/face coverage GBuffer/Forward/Shadow DX12/Vulkan\n"
+        "  render.pbr.emission  Emissive factor/strength/color space HDR DX12/Vulkan\n"
+        "  render.pbr.transform Nonuniform normal/tangent, typed static/skin DX12/Vulkan\n"
+        "  render.pbr.uv        UV0/UV1 per-texture transforms DX12/Vulkan\n"
+        "  render.pbr.occlusion AO strength·독립 semantic·reflection texture table DX12/Vulkan\n"
         "  vk.decal             Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조\n"
         "  vk.ssao              SSAO 공용 패스 — depth/normal compute·filter DX12/Vulkan 대조\n"
         "  vk.sss               SSS 공용 패스 — 2축 blur·depth gate 전체 픽셀 대조\n"
