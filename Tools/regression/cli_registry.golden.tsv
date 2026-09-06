@@ -121,13 +121,13 @@ pipeline.nodes	-	immediate	editor	engine_service	live	no	no	-	라이브 파이�
 pix.capture	-	frames	editor	probe	live	no	no	begin|end|status	PIX 주입 실행의 명시적 GPU 캡처 경계
 play	stop	frames	editor	editor_operation	live	no	no	-	에디터의 재생·정지와 같은 동작
 play.state	-	immediate	editor	engine_service	live	no	yes	-	재생 상태(gameStart·paused·씬 로드)를 낸다
-prefab.corpus.digest	-	long	editor	probe	live	no	no	<라벨> <이름> ...	prefab identity/override 왕복 digest
-prefab.create	-	frames	editor	editor_operation	live	no	no	<오브젝트 이름> <프리팹 이름>	오브젝트로 프리팹을 만들어 저장한다
-prefab.instantiate	-	frames	editor	editor_operation	live	no	no	<프리팹 이름> [인스턴스 이름]	프리팹을 씬에 소환한다
-prefab.objectguid	-	immediate	editor	engine_service	live	no	no	<오브젝트 이름>	오브젝트의 프리팹 objectGuid를 낸다
-prefab.overrides	-	immediate	editor	engine_service	live	no	no	<오브젝트>	프리팹 인스턴스에 기록된 오버라이드를 나열한다
-prefab.status	-	immediate	editor	engine_service	live	no	no	-	프리팹 등록·캐시 상태를 낸다
-prefab.update	-	frames	editor	editor_operation	live	no	no	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
+prefab.corpus.digest	-	long	editor	probe	live	no	yes	<라벨> <이름> ...	prefab identity/override 왕복 digest
+prefab.create	-	frames	editor	editor_operation	live	no	yes	<오브젝트 이름> <프리팹 이름>	오브젝트로 프리팹을 만들어 저장한다
+prefab.instantiate	-	frames	editor	editor_operation	live	no	yes	<프리팹 이름> [인스턴스 이름]	프리팹을 씬에 소환한다
+prefab.objectguid	-	immediate	editor	engine_service	live	no	yes	<오브젝트 이름>	오브젝트의 프리팹 objectGuid를 낸다
+prefab.overrides	-	immediate	editor	engine_service	live	no	yes	<오브젝트>	프리팹 인스턴스에 기록된 오버라이드를 나열한다
+prefab.status	-	immediate	editor	engine_service	live	no	yes	-	프리팹 등록·캐시 상태를 낸다
+prefab.update	-	frames	editor	editor_operation	live	no	yes	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
 profile.selftest	-	frames	editor	probe	live	no	no	-	CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)
 profile.stats	-	immediate	editor	probe	live	no	no	-	프로파일러 자체 비용과 용량 소진(교란 없음)
 quit	exit	immediate	both	engine_service	terminates_process	no	yes	-	호스트를 종료한다

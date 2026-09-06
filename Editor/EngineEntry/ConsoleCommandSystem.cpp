@@ -1864,7 +1864,7 @@ namespace
     // MSVC의 블록 중첩 상한에 닿아 있어(C1061, 실측) 한 줄만 더해도 컴파일이
     // 깨진다. scene.dirtytraversal·scene.bonecache 등이 쓰는 것과 같은 관례로
     // 함수로 빼고 Execute 앞머리에서 return한다.
-    void HandlePrefabObjectGuid(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandlePrefabObjectGuid(const std::vector<std::string>& parts)
     {
         // 진단용(트랙 P · P4-a 게이트). prefab.status의 집계 수치(씬 인스턴스/
         // 등록 개수)만으로는 "그 값이 맞는 값인가"를 볼 수 없다 — 중첩 프리팹
@@ -1879,7 +1879,7 @@ namespace
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: prefab.objectguid <오브젝트 이름>\n");
-            return;
+            return CommandCore::InvalidArguments("prefab.objectguid: <오브젝트 이름> 이 필요하다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
@@ -1890,18 +1890,23 @@ namespace
             //   같은 커밋에 넣지 않는다 — 그 원칙이 없으면 "scene 이행" 커밋에
             //   prefab 거동 변경이 섞여 들어간다.
             std::printf("[CLI] 활성 씬 없음\n");
-            return;
+            return CommandCore::PreconditionFailed("prefab.objectguid.no_scene", "활성 씬이 없다");
         }
 
         auto object = scene->GetEntity(parts[1]);
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", parts[1].c_str());
-            return;
+            return CommandCore::Fail("prefab.objectguid.not_found", "오브젝트가 없다: " + parts[1]);
         }
 
         const std::string guidStr = object->m_prefabFileGuid.ToString();
         std::printf("[CLI] [prefab.objectguid] %s guid=%s\n", parts[1].c_str(), guidStr.c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("object", CommandCore::CommandData::String(parts[1]));
+        data.Set("guid", CommandCore::CommandData::String(guidStr));
+        return CommandCore::Ok("prefab.objectguid", std::move(data));
         }
 
     namespace
@@ -4234,7 +4239,7 @@ namespace ConsoleCmd
             reg({ "reflect.golden" }, [](const ConsoleCommandContext& c) { HandleReflectGolden(c.parts); });
             reg({ "perf.reflect" }, [](const ConsoleCommandContext& c) { HandlePerfReflect(c.parts); });
             regResult({ "scene.flag" }, [](const ConsoleCommandContext& c) { return HandleSceneFlag(c.parts); });
-            reg({ "prefab.objectguid" }, [](const ConsoleCommandContext& c) { HandlePrefabObjectGuid(c.parts); });
+            regResult({ "prefab.objectguid" }, [](const ConsoleCommandContext& c) { return HandlePrefabObjectGuid(c.parts); });
 			regResult({ "scene.transformstats" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformStats(c.parts); });
 			regResult({ "scene.transformwritestats" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformWriteStats(c.parts); });
 			regResult({ "scene.transformdomains" }, [](const ConsoleCommandContext& c) { return HandleSceneTransformDomains(c.parts); });

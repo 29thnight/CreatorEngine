@@ -1816,21 +1816,64 @@ direct exit write 1곳 · 소비자의 한국어 verdict regex 0 · §18 전부 
   찾으면 실패**로 만들었다. 지금은 라우트 6 개를 보고 전부 토큰 검사 뒤에 있음을
   단정한다. 아무것도 안 보는 검사는 없는 것만 못하다.
 
-▲ **남은 것: 핸들러 95 개의 서명 이행.**
+▲ **남은 것: 핸들러 88 개의 서명 이행.**
 
   §18 의 "모든 command 가 정확히 하나의 terminal `CommandResult` 를 만든다" 가
-  **199 중 104** 다(2026-09-06). 분모가 212 에서 199 로 준 것은 이행이 아니라
+  **199 중 111** 이다(2026-09-06). 분모가 212 에서 199 로 준 것은 이행이 아니라
   **명령이 준 것**이다 — 경위는 `docs/analysis/CommandRegistryAudit.md`.
 
   | 도메인 | 미이행 | | 도메인 | 미이행 |
   |---|---:|---|---|---:|
-  | `experiment.*` | 18 | | `prefab.*` | 7 |
-  | `assets.*` | 9 | | `mem.*` 등 4 씩 | 16 |
+  | `experiment.*` | 18 | | `assets.*` | 9 |
+  | `mem.*`·`lifecycle.*`·`animator.*`·`render.*` | 4 씩 | | 나머지 | 45 |
   | `mem.*`·`lifecycle.*`·`animator.*`·`render.*` | 4 씩 | | 나머지 | 41 |
 
   ~~`scene.*` 22~~ → **0 (2026-09-05 이행 완료, 아래)**
   ~~`ui.*` 5~~ → **0 (2026-09-06 이행 완료, 아래)**
   ~~`object.*` 7~~ → **0 (2026-09-06 이행 완료, 아래)**
+  ~~`prefab.*` 7~~ → **0 (2026-09-06 이행 완료, 아래)**
+
+#### prefab 도메인 서명 이행 (2026-09-06)
+
+일곱 전부를 결과형으로 옮겼다(`create` · `instantiate` · `update` · `status` ·
+`overrides` · `objectguid` · `corpus.digest`).
+
+★ **`prefab.objectguid` 는 scene 이행 때 되돌려 뒀던 자리다.** 그때 일괄 변환이
+  이 핸들러까지 넘어가 C2562 로 깨졌고, "도메인을 한 커밋에 섞지 않는다" 로
+  되돌리며 주석을 남겼다. 이번이 그 도메인의 차례라 함께 옮겼다. 이 핸들러만
+  `ConsoleCommandSystem.cpp` 에 있는데(MSVC C1061 우회로 조기 디스패치에 산다)
+  **파일은 옮기지 않았다** — §12.3.
+
+★★ **exit code 를 직접 쓰던 마지막 Editor 자리가 닫혔다.**
+
+  `prefab.corpus.digest` 가 `EngineBootstrap::SetExitCode(6)` 를 세 곳에서 불렀다.
+  `cli_exit_spine.ratchet.json` 의 주석이 그것을 "LC6 이 도메인 분리와 함께
+  옮긴다" 로 이미 적어 두었던 자리다. 이제 session 이 유일한 쓰기 주체이고
+  (§14.1), 값은 6 이 아니라 §5.4 의 4 로 온다.
+
+  **래칫이 16 → 13 으로 내려갔다.** 소비자(`verify-prefab-authoring-corpus.ps1`)는
+  `0 -eq ExitCode` 만 보므로 값 변화에 걸리지 않는다 — 고치기 전에 확인했다.
+
+★ 조회는 실패가 아니다. `prefab.overrides` 가 override 0 개를 찾는 것은 인스턴스가
+  원본과 같다는 뜻이고, `prefab.status` 는 등록 수를 답하는 조회다. 값으로 낸다.
+
+  "갱신할 프리팹이 없다(먼저 `prefab.create`)" 는 **precondition** 으로 냈다 —
+  인자가 틀린 것이 아니라 순서가 이른 것이고, 메시지가 이미 그렇게 말하고 있다.
+
+실측 — 한 배치에서 판정이 나간다:
+
+```
+prefab.status          succeeded  ok
+prefab.create          succeeded  ok
+prefab.objectguid      succeeded  ok
+prefab.instantiate     succeeded  ok
+prefab.overrides       failed     prefab.overrides.not_found
+prefab.update          failed     prefab.update.source_not_found
+exit=4
+```
+
+`verify-prefab-authoring-corpus`(프리팹 9 개 왕복) · `verify-prefab-roundtrip` ·
+`verify-cli-editor-operation`(Undo 특성화 불변) 통과.
 
 #### object 도메인 서명 이행 (2026-09-06)
 

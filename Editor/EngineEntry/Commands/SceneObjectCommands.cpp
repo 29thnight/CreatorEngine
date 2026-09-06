@@ -1246,7 +1246,7 @@ namespace ConsoleCmd
         std::printf("[CLI] 컴포넌트 추가: %s <- %s\n", objectName.c_str(), typeName.c_str());
     }
 
-    static void Cmd_prefab_instantiate(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_prefab_instantiate(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
 
@@ -1255,7 +1255,7 @@ namespace ConsoleCmd
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: prefab.instantiate <프리팹 이름> [인스턴스 이름]\n");
-            return;
+            return CommandCore::InvalidArguments("prefab.instantiate: 인자가 올바르지 않다");
         }
 
         Prefab* prefab = PrefabUtilitys->LoadPrefab(parts[1]);
@@ -1263,7 +1263,7 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 프리팹을 찾을 수 없음: " + parts[1]);
             std::printf("[CLI] 프리팹을 찾을 수 없음: %s\n", parts[1].c_str());
-            return;
+            return CommandCore::Fail("prefab.instantiate.prefab_not_found", "프리팹이 없다");
         }
 
         const std::string instanceName = (parts.size() > 2) ? parts[2] : parts[1];
@@ -1271,15 +1271,21 @@ namespace ConsoleCmd
         if (nullptr == instance)
         {
             std::printf("[CLI] 인스턴스 생성 실패: %s\n", parts[1].c_str());
-            return;
+            return CommandCore::Fail("prefab.instantiate.instantiate_failed", "인스턴스를 만들지 못했다");
         }
 
         Debug->LogWarning("[CLI] 프리팹 소환: " + parts[1] + " -> " + instanceName);
         std::printf("[CLI] 프리팹 소환: %s -> %s (index=%d)\n",
             parts[1].c_str(), instanceName.c_str(), static_cast<int>(instance->m_index));
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("prefab", CommandCore::CommandData::String(parts[1]));
+        data.Set("instance", CommandCore::CommandData::String(instanceName));
+        data.Set("index", CommandCore::CommandData::Int(static_cast<int64_t>(instance->m_index)));
+        return CommandCore::Ok("프리팹 소환: " + parts[1], std::move(data));
     }
 
-    static void Cmd_prefab_overrides(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_prefab_overrides(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -1301,11 +1307,15 @@ namespace ConsoleCmd
         if (parts.size() < 2)
         {
             std::printf("[CLI] 사용법: prefab.overrides <오브젝트>\n");
-            return;
+            return CommandCore::InvalidArguments("prefab.overrides: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("prefab.overrides.no_scene", "활성 씬이 없다");
+        }
 
         const std::string objectName = CommandCore::JoinFrom(parts, 1);
         auto object = scene->GetEntity(objectName);
@@ -1313,7 +1323,7 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + objectName);
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
-            return;
+            return CommandCore::Fail("prefab.overrides.not_found", "오브젝트가 없다");
         }
 
         static const FileGuid nullGuid{};
@@ -1337,9 +1347,15 @@ namespace ConsoleCmd
                 ov.m_propertyName.c_str(),
                 ov.m_valueYaml.c_str());
         }
+
+        // override 가 0 개인 것은 **실패가 아니다.** 프리팹 인스턴스가 원본과
+        // 같다는 뜻이고, 이 명령은 그 상태를 답하는 조회다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("object", CommandCore::CommandData::String(objectName));
+        return CommandCore::Ok("prefab.overrides", std::move(data));
     }
 
-    static void Cmd_prefab_update(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_prefab_update(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -1357,11 +1373,15 @@ namespace ConsoleCmd
         if (parts.size() < 3)
         {
             std::printf("[CLI] 사용법: prefab.update <소스 오브젝트> <프리팹 이름>\n");
-            return;
+            return CommandCore::InvalidArguments("prefab.update: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("prefab.update.no_scene", "활성 씬이 없다");
+        }
 
         // 이름 규칙은 prefab.create/object.rename과 같다 — 마지막 토큰이 프리팹
         // 이름이고 그 앞 전체가 오브젝트 이름이다(엔진이 공백 있는 이름을 만든다).
@@ -1374,7 +1394,7 @@ namespace ConsoleCmd
         {
             Debug->LogError("[CLI] 소스 오브젝트를 찾을 수 없음: " + objectName);
             std::printf("[CLI] 소스 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
-            return;
+            return CommandCore::Fail("prefab.update.source_not_found", "소스 오브젝트가 없다");
         }
 
         // ★ 정체성 승계. CreatePrefab 산출물은 FileGuid가 널이고(Prefab.cpp:25),
@@ -1386,7 +1406,7 @@ namespace ConsoleCmd
         if (!existing)
         {
             std::printf("[CLI] 기존 프리팹을 찾을 수 없음(먼저 prefab.create): %s\n", prefabName.c_str());
-            return;
+            return CommandCore::Fail("prefab.update.prefab_not_found", "프리팹이 없다");
         }
         const FileGuid identity = existing->GetFileGuid();
 
@@ -1407,14 +1427,15 @@ namespace ConsoleCmd
             Debug->LogError("[CLI] 프리팹 identity를 확인할 수 없어 갱신을 중단한다: " + prefabName);
             std::printf("[CLI] 프리팹 identity 없음(catalog 항목 부재) — 갱신 중단: %s\n",
                 prefabName.c_str());
-            return;
+            return CommandCore::Fail("prefab.update.identity_missing",
+                "프리팹 identity 를 확인할 수 없다(catalog 항목 부재)");
         }
 
 		Prefab* prefab = PrefabUtilitys->CreatePrefab(source, prefabName);
         if (!prefab)
         {
             std::printf("[CLI] 프리팹 정의 생성 실패: %s\n", prefabName.c_str());
-            return;
+            return CommandCore::Fail("prefab.update.define_failed", "프리팹 정의를 만들지 못했다");
         }
         prefab->SetFileGuid(identity);
 
@@ -1432,7 +1453,7 @@ namespace ConsoleCmd
         if (!PrefabUtilitys->SavePrefab(prefab, savePath.string()))
         {
             std::printf("[CLI] 프리팹 정의 저장 실패: %s\n", savePath.string().c_str());
-            return;
+            return CommandCore::Fail("prefab.update.save_failed", "프리팹 정의를 저장하지 못했다");
         }
 
         // ★ 등록 수와 **실제 적용 수**를 따로 찍는다 (2026-08-30).
@@ -1448,9 +1469,16 @@ namespace ConsoleCmd
         Debug->LogWarning("[CLI] 프리팹 갱신 적용: " + prefabName + " <- " + objectName);
         std::printf("[prefab.update] %s <- %s · 등록 인스턴스 %zu개 중 %zu개에 적용\n",
             prefabName.c_str(), objectName.c_str(), registered, applied);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("prefab", CommandCore::CommandData::String(prefabName));
+        data.Set("source", CommandCore::CommandData::String(objectName));
+        data.Set("registered", CommandCore::CommandData::Int(static_cast<int64_t>(registered)));
+        data.Set("applied", CommandCore::CommandData::Int(static_cast<int64_t>(applied)));
+        return CommandCore::Ok("프리팹 갱신: " + prefabName, std::move(data));
     }
 
-    static void Cmd_prefab_status(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_prefab_status(const ConsoleCommandContext& ctx)
     {
         // 프리팹 연결 진단(트랙 P).
         //
@@ -1483,9 +1511,16 @@ namespace ConsoleCmd
             PrefabUtilitys->OwnedPrefabCount());
         std::printf("[CLI] %s\n", line);
         Debug->LogWarning(line);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("owned", CommandCore::CommandData::Int(
+            static_cast<int64_t>(PrefabUtilitys->OwnedPrefabCount())));
+        data.Set("registered", CommandCore::CommandData::Int(
+            static_cast<int64_t>(PrefabUtilitys->RegisteredInstanceCount())));
+        return CommandCore::Ok("prefab.status", std::move(data));
     }
 
-	static void Cmd_prefab_corpus_digest(const ConsoleCommandContext& ctx)
+	static CommandCore::CommandResult Cmd_prefab_corpus_digest(const ConsoleCommandContext& ctx)
 	{
 		// D2-d: 호출자가 지정한 9개 프리팹의 인스턴스 루트 identity와 활성 씬의
 		// 전체 prefab identity/override multiset을 저장 전후 비교 가능한 digest로
@@ -1494,16 +1529,15 @@ namespace ConsoleCmd
 		if (ctx.parts.size() < 3)
 		{
 			std::printf("[CLI] 사용법: prefab.corpus.digest <라벨> <프리팹 이름>...\n");
-			EngineBootstrap::SetExitCode(6);
-			return;
+			return CommandCore::InvalidArguments("prefab.corpus.digest: 인자가 올바르지 않다");
 		}
 
 		Scene* scene = SceneManagers->GetActiveScene();
 		if (!scene)
 		{
 			std::printf("[CLI] 활성 씬 없음\n");
-			EngineBootstrap::SetExitCode(6);
-			return;
+			return CommandCore::PreconditionFailed("prefab.corpus.digest.no_scene",
+				"활성 씬이 없다");
 		}
 
 		const std::string& label = ctx.parts[1];
@@ -1565,7 +1599,26 @@ namespace ConsoleCmd
 			label.c_str(), passed ? "pass" : "fail", validRoots, expectedRoots,
 			entityCount, overrideCount, registered,
 			static_cast<unsigned long long>(digest));
-		if (!passed) EngineBootstrap::SetExitCode(6);
+
+		// ★ **exit code 를 직접 쓰던 마지막 자리다.** 이 명령은 `SetExitCode(6)` 를
+		//   세 곳에서 불렀고, `cli_exit_spine.ratchet.json` 의 주석이 그것을
+		//   "LC6 이 도메인 분리와 함께 옮긴다" 로 적어 두었다. 이제 session 이
+		//   유일한 쓰기 주체다(§14.1) — 값은 6 이 아니라 §5.4 의 4 가 된다.
+		//   소비자(`verify-prefab-authoring-corpus.ps1`)는 `0 -eq ExitCode` 만
+		//   보므로 그 값 변화에 걸리지 않는다.
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("label", CommandCore::CommandData::String(label));
+		data.Set("validRoots", CommandCore::CommandData::Int(static_cast<int64_t>(validRoots)));
+		data.Set("expectedRoots", CommandCore::CommandData::Int(static_cast<int64_t>(expectedRoots)));
+		data.Set("entities", CommandCore::CommandData::Int(static_cast<int64_t>(entityCount)));
+		data.Set("overrides", CommandCore::CommandData::Int(static_cast<int64_t>(overrideCount)));
+		data.Set("registered", CommandCore::CommandData::Int(static_cast<int64_t>(registered)));
+		if (!passed)
+		{
+			return CommandCore::Fail("prefab.corpus.digest.failed",
+				"프리팹 코퍼스 다이제스트 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("prefab.corpus.digest", std::move(data));
 	}
 
     static void Cmd_camera_editor(const ConsoleCommandContext& ctx)
@@ -1651,7 +1704,7 @@ namespace ConsoleCmd
         std::printf("[CLI] 컴포넌트 타입 %d개 기록\n", count);
     }
 
-    static void Cmd_prefab_create(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_prefab_create(const ConsoleCommandContext& ctx)
     {
         const std::vector<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
@@ -1659,11 +1712,15 @@ namespace ConsoleCmd
         if (parts.size() < 3)
         {
             std::printf("[CLI] 사용법: prefab.create <오브젝트 이름> <프리팹 이름>\n");
-            return;
+            return CommandCore::InvalidArguments("prefab.create: 인자가 올바르지 않다");
         }
 
         Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return; }
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("prefab.create.no_scene", "활성 씬이 없다");
+        }
 
         // 오브젝트 이름에 공백이 흔하므로 프리팹 이름을 마지막 토큰으로 본다.
         // LC2: 원문 재해석 제거.
@@ -1675,25 +1732,31 @@ namespace ConsoleCmd
         if (!object)
         {
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
-            return;
+            return CommandCore::Fail("prefab.create.not_found", "오브젝트가 없다");
         }
 
 		Prefab* prefab = PrefabUtilitys->CreatePrefab(object, prefabName);
         if (!prefab)
         {
             std::printf("[CLI] 프리팹 생성 실패\n");
-            return;
+            return CommandCore::Fail("prefab.create.create_failed", "프리팹을 만들지 못했다");
         }
 
         const file::path path = PathFinder::Relative("Prefabs\\") / (prefabName + ".prefab");
         if (!PrefabUtilitys->SavePrefab(prefab, path.string()))
         {
             std::printf("[CLI] 프리팹 저장 실패: %s\n", path.string().c_str());
-            return;
+            return CommandCore::Fail("prefab.create.save_failed", "프리팹을 저장하지 못했다");
         }
 
         Debug->LogWarning("[CLI] 프리팹 생성: " + prefabName + " <- " + objectName);
         std::printf("[CLI] 프리팹 생성: %s\n", path.string().c_str());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("object", CommandCore::CommandData::String(objectName));
+        data.Set("prefab", CommandCore::CommandData::String(prefabName));
+        data.Set("path", CommandCore::CommandData::String(path.string()));
+        return CommandCore::Ok("프리팹 생성: " + prefabName, std::move(data));
     }
 
     static void Cmd_play(const ConsoleCommandContext& ctx)
@@ -1888,14 +1951,14 @@ namespace ConsoleCmd
         reg.Result({ "object.property" }, &Cmd_object_property);
         reg.Result({ "scene.select" }, &Cmd_scene_select);
         reg.Legacy({ "component.add" }, &Cmd_component_add);
-        reg.Legacy({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
-        reg.Legacy({ "prefab.status" }, &Cmd_prefab_status);
-        reg.Legacy({ "prefab.corpus.digest" }, &Cmd_prefab_corpus_digest);
-        reg.Legacy({ "prefab.overrides" }, &Cmd_prefab_overrides);
-        reg.Legacy({ "prefab.update" }, &Cmd_prefab_update);
+        reg.Result({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
+        reg.Result({ "prefab.status" }, &Cmd_prefab_status);
+        reg.Result({ "prefab.corpus.digest" }, &Cmd_prefab_corpus_digest);
+        reg.Result({ "prefab.overrides" }, &Cmd_prefab_overrides);
+        reg.Result({ "prefab.update" }, &Cmd_prefab_update);
         reg.Legacy({ "camera.editor" }, &Cmd_camera_editor);
         reg.Legacy({ "component.list" }, &Cmd_component_list);
-        reg.Legacy({ "prefab.create" }, &Cmd_prefab_create);
+        reg.Result({ "prefab.create" }, &Cmd_prefab_create);
         reg.Legacy({ "play", "stop" }, &Cmd_play);
         reg.Result({ "play.state" }, &Cmd_play_state);
         reg.Result({ "undo.state" }, &Cmd_undo_state);
