@@ -978,6 +978,57 @@ probe 로 옮겨져 이미 없다** — 지금 돌리면 `command.unknown` 으�
 
 `scripts/skinned_pose_visual.txt` 는 **남긴다** — 갈래 B 의 게이트 재료다.
 
+### 6.11 `experiment.*` 18 개 — "필요한 것이 구현됐으면 나머지는 정리" 를 재 봤다 (2026-09-06)
+
+기준을 바꿔 다시 봤다. "자동화가 돌리는가" 가 아니라 **"검증하려던 것이 제품이
+되었는가"** 다. 결론부터: **지금 안전하게 지울 수 있는 것을 하나도 세우지 못했다.**
+
+**이관이 끝난 것은 사실이다.** 근거가 여럿이다:
+
+- `verify-model-typed-consumers.ps1` 머리말 — "MBC9로 legacy Model·Assimp·역브리지·
+  **experiment 병행 핸들·A/B 스위치가 전부 은퇴했다**"
+- `Animator::ResolveBoneIndex` 본문에 **legacy 폴백이 없다**(typed skeleton 만 본다)
+- `m_Skeleton->m_animations` 직소비가 제품에서 사라졌다(주석만 남음)
+- `Material::BuildShaderPropertyBlock` 의 **제품 호출자 0**(정의와 렌더 테스트뿐)
+
+**그런데 그것이 명령을 지울 근거가 되지 않았다.**
+
+★ **주석은 왜 만들었는지를 말하고, 게이트는 지금 무엇을 지키는지를 말한다.**
+
+  `boneresolve` · `editorsurface` · `animmask` · `animtick` 의 주석과 요약은 전부
+  "legacy 와 A/B 대조" 라고 적혀 있다. 그것을 읽고 "legacy 가 사라졌으니 할 일이
+  없다" 로 판단했는데, `verify-model-typed-consumers.ps1` 이 그 넷을 **typed 경로
+  단정**으로 쓰고 있었다:
+
+  | 게이트 항목 | 무엇을 단정하나 |
+  |---|---|
+  | 3 | `animtick pass poseDigest=8042DC1C path=generation` |
+  | 4 | `boneresolve pass bones=N generation=N unresolved=0 roundtrip=0` |
+  | 5 | `animmask pass viaGeneration=1 structure=ok` |
+  | 6 | `editorsurface pass animators=N clipGeneration=N guardMismatch=0` |
+
+  이것들은 legacy 와의 비교가 아니라 **"typed generation 이 유일한 제품 정본"**
+  이라는 계약의 계측이다 — MBC9 가 남긴 바로 그 계약이다. 지우면 그 계약을
+  재는 눈이 사라진다.
+
+  같은 이유로 `matmigrate` 도 남는다. legacy 재질 **변환**은 제품이 매 로드마다
+  부른다(`DataSystem` · `MeshRenderer` · `FoliageComponent` 가
+  `ConvertLegacyMaterial`/`ConvertToLegacyMaterial` 을 호출한다).
+
+▲ **오늘 세 번째로 같은 실수를 할 뻔했다.** 7번(별칭 넷)·9번(둘)에 이어 이번에도
+  **표면(소비자 수 · 요약 문구 · 주석의 의도)을 근거로 제거를 판단**했다. §1 의
+  한계 항목을 다시 적는다: 무엇을 지우려면 **그것을 소비하는 쪽이 무엇을 단정하는지**
+  까지 읽어야 한다.
+
+**그래서 남는 진짜 문제는 제거가 아니라 러너다.** `matresolve` · `matscript` ·
+`animevent` · `matruntime` 넷은 제품 거동을 단정하는데 **아무도 안 돌린다**(§6.10
+갈래 B). 그 넷의 처분은 "지운다" 가 아니라 "게이트에 건다" 이고, 재료
+(`scripts/skinned_pose_visual.txt`)는 이미 있다.
+
+`matparity` 하나만 애매하게 남는다 — legacy packer 의 제품 호출자는 0 인데,
+렌더 테스트 셋이 그 packer 로 기대값을 만든다. 그 테스트들이 제품 경로를 재고
+있는지가 먼저 정해져야 이 명령의 처분이 정해진다. **이 조사가 답하지 않는다.**
+
 ## 7. 이 조사가 **하지 않은** 것
 
 - 명령을 하나도 지우거나 고치지 않았다. 코드 변경 0.
