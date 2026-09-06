@@ -1816,22 +1816,55 @@ direct exit write 1곳 · 소비자의 한국어 verdict regex 0 · §18 전부 
   찾으면 실패**로 만들었다. 지금은 라우트 6 개를 보고 전부 토큰 검사 뒤에 있음을
   단정한다. 아무것도 안 보는 검사는 없는 것만 못하다.
 
-▲ **남은 것: 핸들러 88 개의 서명 이행.**
+▲ **남은 것: 핸들러 79 개의 서명 이행.**
 
   §18 의 "모든 command 가 정확히 하나의 terminal `CommandResult` 를 만든다" 가
-  **199 중 111** 이다(2026-09-06). 분모가 212 에서 199 로 준 것은 이행이 아니라
+  **199 중 120** 이다(2026-09-06). 분모가 212 에서 199 로 준 것은 이행이 아니라
   **명령이 준 것**이다 — 경위는 `docs/analysis/CommandRegistryAudit.md`.
 
   | 도메인 | 미이행 | | 도메인 | 미이행 |
   |---|---:|---|---|---:|
-  | `experiment.*` | 18 | | `assets.*` | 9 |
-  | `mem.*`·`lifecycle.*`·`animator.*`·`render.*` | 4 씩 | | 나머지 | 45 |
+  | `experiment.*` | 18 | | `mem.*`·`lifecycle.*`·`animator.*`·`render.*` | 4 씩 |
+  | `serialize.*`·`model.*` | 3 씩 | | 나머지 | 45 |
   | `mem.*`·`lifecycle.*`·`animator.*`·`render.*` | 4 씩 | | 나머지 | 41 |
 
   ~~`scene.*` 22~~ → **0 (2026-09-05 이행 완료, 아래)**
   ~~`ui.*` 5~~ → **0 (2026-09-06 이행 완료, 아래)**
   ~~`object.*` 7~~ → **0 (2026-09-06 이행 완료, 아래)**
   ~~`prefab.*` 7~~ → **0 (2026-09-06 이행 완료, 아래)**
+  ~~`assets.*` 9~~ → **0 (2026-09-06 이행 완료, 아래)**
+
+#### assets 도메인 서명 이행 (2026-09-06)
+
+아홉 전부를 결과형으로 옮겼다. 여섯(`identity` · `sidecar` · `generation` ·
+`generationcorpus` · `modelrender` · `scenemodel`)이 **`passed` 를 계산해 찍고
+그 값을 버리고 있었다.**
+
+★ **실측으로 대조했다.** `assets.scenemodel` 은 이 기계에서 실패한다(모델 코퍼스
+  결손). 같은 스크립트를 이행 전 바이너리와 이행 후에 태웠다:
+
+  | | stdout | exit |
+  |---|---|---:|
+  | 이행 전 | `[CLI] assets.scenemodel fail renderers=0 …` | **0** |
+  | 이행 후 | **같은 줄** + 판정 줄 | **4** |
+
+  `fail` 이라고 인쇄하면서 프로세스는 0 으로 끝나고 있었다. 이 도메인의 자가
+  검사 여섯이 전부 그 상태였다.
+
+★★ 판정이 없는 셋은 성격대로 갈랐다.
+
+  - `assets.modeldiag` — 계수 **조회**다. 판정하지 않고 값으로 낸다.
+  - `assets.unload` — 요청을 넣는 것이 일이고, 무엇이 얼마나 풀렸는지는 이 창구가
+    모른다. `Ok` 만 낸다.
+  - `assets.modelbench` — 벤치라 PASS/FAIL 이 없지만, **실패한 반복이 있으면**
+    수치를 믿을 수 없으므로 실패로 낸다. 잰 것이 0 건이면 `PreconditionFailed` 다 —
+    0 건을 재고 "빠르다" 고 보고하는 사고를 막는다.
+
+  `PreconditionFailed` 는 data 를 받지 않아 그 자리에서 수치를 함께 싣지 못한다.
+  의미(전제 미충족 대 판정 실패)를 지키는 쪽을 택했다.
+
+기존 소비자(`verify-asset-identity` · `verify-asset-sidecar-v2`)는 이행 전후로
+판정이 같다 — 둘 다 통과.
 
 #### prefab 도메인 서명 이행 (2026-09-06)
 

@@ -9,15 +9,15 @@ animator.param	-	frames	editor	engine_service	live	no	no	<오브젝트> <파라�
 animator.scene.probe	-	frames	editor	probe	live	no	no	-	Animator 컨트롤러 그래프를 scene reflection YAML로 왕복시킨다
 animator.state	-	frames	editor	engine_service	live	no	no	<오브젝트> <상태 이름> <스크립트 타입>	Animator 컨트롤러에 상태와 행동을 저작한다
 asset.guid.rename.probe	-	frames	editor	probe	live	no	no	-	자산 GUID가 이름 변경을 건너 보존되는지 본다(재질 왕복 포함)
-assets.generation	-	long	editor	engine_service	live	no	no	<project root>	UUIDv8 model generation closure·원자 cache publish/retire 검증
-assets.generationcorpus	-	long	editor	engine_service	live	no	no	<content root>	현재 MBC4 model corpus generation cold-load 검증
-assets.identity	-	long	editor	engine_service	live	no	no	-	자산 identity(UUID·epoch·프로필) 전수 계약을 판정한다
-assets.modelbench	-	long	editor	engine_service	live	no	no	<dir|-> <반복> [cooked|author]	모델 로드·저작 트랜잭션 시간과 peak working set을 잰다
-assets.modeldiag	-	immediate	editor	engine_service	live	no	no	-	모델 소비 계수를 읽는다(상태를 바꾸지 않는다)
-assets.modelrender	-	frames	editor	engine_service	live	no	no	-	모델 렌더 배선(mesh·재질 해석)을 판정한다
-assets.scenemodel	-	frames	editor	engine_service	live	no	no	[reload <모델 이름>]	활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다
-assets.sidecar	-	long	editor	engine_service	live	no	no	-	모델 sidecar v2 스키마를 전수로 판정한다
-assets.unload	-	frames	editor	engine_service	live	no	no	-	사용하지 않는 에셋 캐시 정리
+assets.generation	-	long	editor	engine_service	live	no	yes	<project root>	UUIDv8 model generation closure·원자 cache publish/retire 검증
+assets.generationcorpus	-	long	editor	engine_service	live	no	yes	<content root>	현재 MBC4 model corpus generation cold-load 검증
+assets.identity	-	long	editor	engine_service	live	no	yes	-	자산 identity(UUID·epoch·프로필) 전수 계약을 판정한다
+assets.modelbench	-	long	editor	engine_service	live	no	yes	<dir|-> <반복> [cooked|author]	모델 로드·저작 트랜잭션 시간과 peak working set을 잰다
+assets.modeldiag	-	immediate	editor	engine_service	live	no	yes	-	모델 소비 계수를 읽는다(상태를 바꾸지 않는다)
+assets.modelrender	-	frames	editor	engine_service	live	no	yes	-	모델 렌더 배선(mesh·재질 해석)을 판정한다
+assets.scenemodel	-	frames	editor	engine_service	live	no	yes	[reload <모델 이름>]	활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다
+assets.sidecar	-	long	editor	engine_service	live	no	yes	-	모델 sidecar v2 스키마를 전수로 판정한다
+assets.unload	-	frames	editor	engine_service	live	no	yes	-	사용하지 않는 에셋 캐시 정리
 blackboard.authoring.probe	-	frames	editor	raw_fixture	live	no	no	<이름> [empty|noname]	Blackboard 저장·재로드 왕복으로 키 값이 살아 돌아오는지 본다
 bt.status	bt.reset	immediate	editor	engine_service	live	no	no	-	행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)
 camera.editor	-	frames	editor	engine_service	live	no	no	match|follow on|off|status	에디터 카메라를 게임 카메라와 같은 시점으로
