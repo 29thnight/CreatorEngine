@@ -898,7 +898,7 @@ payload 파괴는 살아 있는 owner가 수행**한다.
 | parallel fast path | 8 worker/64 MiB, 범위 중복 0, worker growth | 동일 fixture와 판정 |
 | pressure trim | 강제 16 MiB soft budget, trim/retry/slot reuse/high-water/rollback | 동일 fixture와 판정 |
 | Abort | 제출 전/후 | 제출 전/후 |
-| 기존 회귀 | `dx12.uploadring`을 새 `rhi.uploadsegments`로 교체 | `vk.selftest`, `vk.gizmoicon`에 같은 검사 추가 |
+| 기존 회귀 | `dx12.uploadring`을 새 `rhi.uploadsegments`로 교체 **(2026-09-06 완료 — 구 명령 제거됨)** | `vk.selftest`, `vk.gizmoicon`에 같은 검사 추가 |
 
 ### 12.3 `scene.glb` 승인 조건
 

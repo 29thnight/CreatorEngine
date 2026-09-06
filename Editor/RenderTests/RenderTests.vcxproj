@@ -19,44 +19,33 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
-    <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
     <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h" />
     <ClInclude Include="AssetIdentity\AssetIdentityTestVectors.inl" />
     <ClInclude Include="AssetIdentity\AssetSidecarSchemaSelfTest.h" />
     <ClInclude Include="AssetIdentity\ModelAssetGenerationSelfTest.h" />
     <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h" />
-    <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentWeldSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentCacheOptSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentTextureCookSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentShaderMetaCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialCookSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentMaterialParitySelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialResolveSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentMaterialInstanceSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentMaterialSealSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentMaterialCodecSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialScriptSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentSceneCookSelfTest.h" />
-    <ClInclude Include="ExperimentParity\ExperimentResolverSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentCatalogSelfTest.h" />
     <ClInclude Include="RHI\ShaderReflectionSelfTest.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoIconTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoLineTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoSceneTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGridTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedWireFrameTest.cpp" />
-    <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp" />
     <!-- PHASE 3.75 selftest. unity 블롭이 COFF 섹션 한도(C1128)를 넘겼고, 익명
          네임스페이스 helper가 다른 selftest와 겹치므로 개별 TU로 컴파일한다. -->
     <ClCompile Include="AssetIdentity\AssetIdentitySelfTest.cpp">
@@ -71,40 +60,13 @@
     <ClCompile Include="AssetIdentity\SceneModelGenerationSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCookedSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentWeldSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentCacheOptSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentTextureCookSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentShaderMetaCookSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialCookSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialParitySelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialResolveSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialInstanceSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialSealSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialCodecSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.cpp">
@@ -116,30 +78,24 @@
     <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentResolverSelfTest.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp" />
     <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedShadowQualityTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLShadeTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSGITest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSRTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSSTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp" />
-    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainScaleTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp" />
     <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGeometryPassTest.cpp" />

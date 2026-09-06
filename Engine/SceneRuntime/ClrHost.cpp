@@ -2603,6 +2603,10 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"ReloadScripts", &fn))          return false;  m_fnReloadScripts = reinterpret_cast<ReloadFn>(fn);
 	if (!bind(L"IsPreviousContextAlive", &fn)) return false;  m_fnIsPreviousContextAlive = reinterpret_cast<ReloadFn>(fn);
 
+	// 표식된 static 메서드 호출(LC7). 선택 바인딩 — 이것이 없는 어셈블리에서는
+	// `script.invoke` 만 `NotBound` 로 실패하고 나머지는 그대로 돈다.
+	if (bind(L"InvokeCallable", &fn)) m_fnInvokeCallable = reinterpret_cast<InvokeCallableFn>(fn);
+
 	// 노출 필드 접근자 (소스 제너레이터 생성물로 연결된다)
 	if (!bind(L"GetFieldCount", &fn))  return false;  m_fnGetFieldCount = reinterpret_cast<FieldCountFn>(fn);
 	if (!bind(L"GetFieldName", &fn))   return false;  m_fnGetFieldName  = reinterpret_cast<FieldNameFn>(fn);
@@ -2714,6 +2718,99 @@ bool ClrHost::IsPreviousContextAlive()
 {
 	if (!m_ready || nullptr == m_fnIsPreviousContextAlive) return false;
 	return 0 != m_fnIsPreviousContextAlive();
+}
+
+// ── 표식된 static 메서드 호출 (L3-B · LC7 · 계획 §10.2) ──────────────────
+
+namespace
+{
+	// 사용자 코드 호출 허용 창. **게임 스레드 전용**이라 원자성이 필요 없다.
+	//
+	// 원자적으로 두면 "다른 스레드에서 열어도 된다"는 뜻이 되는데, 관리 코드
+	// 호출은 GC 때문에 게임 스레드로 한정돼 있어(ClrHost.h 머리말) 그 뜻이
+	// 성립하지 않는다. 잘못된 스레드에서 여는 것은 막을 것이 아니라 없어야 할 일이다.
+	bool g_userCodeAllowed = false;
+}
+
+ClrHost::UserCodeScope::UserCodeScope() noexcept
+	: m_previous(g_userCodeAllowed)
+{
+	g_userCodeAllowed = true;
+}
+
+ClrHost::UserCodeScope::~UserCodeScope() noexcept
+{
+	// 이전 값을 되돌린다. 중첩(사용자 코드가 명령을 다시 부르는 경로)을 대비한
+	// 것이지 오늘 그런 경로가 있는 것은 아니다 — 없앨 때 조용히 열린 채로 남는
+	// 쪽이 위험하므로 저장·복원으로 둔다.
+	g_userCodeAllowed = m_previous;
+}
+
+ClrHost::InvokeResult ClrHost::InvokeCallableStatic(const std::string& typeName,
+	const std::string& methodName, const std::vector<std::string>& args)
+{
+	InvokeResult result;
+
+	// ★ 창부터 본다. CLR 준비 여부보다 **먼저** 본다.
+	//
+	//   순서를 뒤집으면 CLR 이 없는 실행에서 권한 없는 호출이 "CLR 없음" 으로
+	//   보고되고, 경계가 새는 것을 그 실행에서는 못 본다.
+	if (!g_userCodeAllowed)
+	{
+		result.outcome = InvokeOutcome::NotPermitted;
+		result.reason  = "ExecutesUserCode 창 밖에서의 호출이다 — 이 명령은 사용자 코드를 "
+		                 "부를 수 있다고 표시돼 있지 않다";
+		return result;
+	}
+
+	if (!m_ready || nullptr == m_fnInvokeCallable)
+	{
+		result.outcome = InvokeOutcome::NotBound;
+		result.reason  = m_ready
+			? "이 ScriptCore 어셈블리에는 InvokeCallable 진입점이 없다"
+			: "CLR 이 준비되지 않았다";
+		return result;
+	}
+
+	// 인자는 US(\x1f)로 잇고 **개수를 따로** 넘긴다. 개수가 없으면 "인자 0 개" 와
+	// "빈 문자열 하나" 가 같은 전송이 되고, 그 둘은 다른 오버로드로 간다.
+	std::string joined;
+	for (std::size_t i = 0; i < args.size(); ++i)
+	{
+		if (0 != i) joined.push_back('\x1f');
+		joined += args[i];
+	}
+
+	// 사유가 한국어라 문자당 3 바이트다. 예외 메시지 한 줄이 들어갈 만큼 잡는다.
+	char payload[4096]{};
+	const int code = m_fnInvokeCallable(typeName.c_str(), methodName.c_str(),
+		joined.c_str(), static_cast<int>(args.size()), payload, static_cast<int>(sizeof(payload)));
+
+	result.outcome = static_cast<InvokeOutcome>(code);
+
+	// payload 는 관리 측이 NUL 로 끝낸다. 그래도 마지막 칸을 못 박아 둔다 —
+	// 경계 너머가 규약을 지킬 것이라는 믿음 위에 strlen 을 놓지 않는다.
+	payload[sizeof(payload) - 1] = '\0';
+	const std::string text(payload);
+
+	if (InvokeOutcome::Ok != result.outcome)
+	{
+		result.reason = text;
+		return result;
+	}
+
+	// 성공 payload 는 `반환타입 \x1f 반환값` 이다.
+	const std::size_t separator = text.find('\x1f');
+	if (std::string::npos == separator)
+	{
+		// 관리 측이 규약을 어겼다. 값을 지어내지 않고 내부 결함으로 낸다.
+		result.outcome = InvokeOutcome::Internal;
+		result.reason  = "관리 측 payload 형식이 어긋났다: " + text;
+		return result;
+	}
+	result.returnType  = text.substr(0, separator);
+	result.returnValue = text.substr(separator + 1);
+	return result;
 }
 
 void ClrHost::Shutdown()
@@ -2848,13 +2945,14 @@ void ClrHost::NotifySceneUnload()
 	ScriptObjectRegistry::Get().Clear();
 }
 
-void ClrHost::CollectManagedHeap()
+bool ClrHost::CollectManagedHeap()
 {
 	// 씬 경계 전용이다. 프레임 루프에서 부르면 그 프레임이 통째로 GC에 묶인다 —
 	// CoreCLR의 블로킹 수집은 관리 스레드를 전부 세운다.
-	if (!m_ready || nullptr == m_fnGcCollectNow) return;
+	if (!m_ready || nullptr == m_fnGcCollectNow) return false;
 
 	m_fnGcCollectNow();
+	return true;
 }
 
 void ClrHost::SetManagedLatencyMode(bool lowLatency)

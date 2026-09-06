@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300
@@ -57,7 +57,7 @@ $commands.Add("prefab.corpus.digest after $($names -join ' ')")
 $commands.Add('quit')
 $commands | Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario) `
+$process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', $scenario) `
     -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 $process.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -79,7 +79,8 @@ $unexpectedErrors = @($errorLines | Where-Object {
 })
 $lodWarnings = @($errorLines | Where-Object { $_ -eq $knownLodWarning }).Count
 
-$instantiates = ([regex]::Matches($text, '\[CLI\] 프리팹 소환:')).Count
+$terminal = @($text -split "`n" | Where-Object { $_.TrimStart().StartsWith('{"schemaVersion"') } | ForEach-Object { $_ | ConvertFrom-Json })
+$instantiates = @($terminal | Where-Object { $_.command -eq 'prefab.instantiate' -and $_.status -eq 'succeeded' }).Count
 $snapshots = [regex]::Matches($text,
     '\[prefab\.corpus:(before|after)\] pass roots=(\d+)/(\d+) entities=(\d+) overrides=(\d+) registered=(\d+) digest=([0-9a-f]{16})')
 $sourceMutations = [System.Collections.Generic.List[string]]::new()

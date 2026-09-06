@@ -6,6 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $run = Join-Path $Work ('creator-model-async-' + [guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($run) | Out-Null
@@ -37,10 +38,12 @@ $scenario = Join-Path $run 'commands.txt'
 [IO.File]::WriteAllText($scenario, ($commands -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
 $start = [Diagnostics.ProcessStartInfo]::new()
 $start.FileName = (Resolve-Path $Editor).Path
-$start.Arguments = '--script "' + $scenario + '"'
+$resultPath = Join-Path $run 'results.jsonl'
+$start.Arguments = '--commandlet-script "' + $scenario + '" --result-file "' + $resultPath + '"'
 $start.WorkingDirectory = $root
 $start.UseShellExecute = $false
 $start.CreateNoWindow = $true
+$start.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
 $start.RedirectStandardOutput = $true
 $start.RedirectStandardError = $true
 $process = [Diagnostics.Process]::new()
@@ -60,8 +63,11 @@ $stderr = $stderrTask.GetAwaiter().GetResult()
 $failures = [Collections.Generic.List[string]]::new()
 if ($process.ExitCode -ne 0) { $failures.Add("Exit code: $($process.ExitCode)") }
 if (-not [string]::IsNullOrWhiteSpace($stderr)) { $failures.Add('Nonempty stderr') }
-if ($stdout.Contains('[model.async] wait timed out')) { $failures.Add('Async wait timed out') }
-if ($stdout -notmatch '\[model\.async\] cancellation-probe pass') { $failures.Add('Cancellation/slot reuse probe failed') }
+$results = @(Read-CommandResults $resultPath)
+if ($results.Count -ne $commands.Count) { $failures.Add('Terminal result count mismatch') }
+if (@($results | Where-Object status -ne 'succeeded').Count) { $failures.Add('Unsuccessful command result') }
+$probes = @($results | Where-Object { $_.command -eq 'model.async' -and $null -ne $_.data -and $null -ne $_.data.PSObject.Properties['passed'] })
+if ($probes.Count -ne 1 -or -not $probes[0].data.passed) { $failures.Add('Cancellation/slot reuse probe failed') }
 if ([IO.File]::ReadAllText($guarded) -ne 'preserve-existing-scene') { $failures.Add('A blocked save changed the existing scene file') }
 $ready = [regex]::Matches($stdout, '\[model\.async\] ready path=.*? steps=(\d+) frames=(\d+) loadingFrames=(\d+) prepareMs=([\d.]+) maxApplyUs=(\d+)')
 if ($ready.Count -ne 2) { $failures.Add("Expected two successful placements, got $($ready.Count)") }
@@ -69,7 +75,7 @@ if ($ready.Count -gt 0) {
     if ([int]$ready[0].Groups[2].Value -le 1) { $failures.Add('Scene application did not span frames') }
     if ([int]$ready[0].Groups[3].Value -le 0) { $failures.Add('No engine frames observed while cold preparation ran') }
 }
-if ([regex]::Matches($stdout, '\[CLI\] assets.scenemodel pass').Count -ne 2) {
+if (@($results | Where-Object { $_.command -eq 'assets.scenemodel' -and $_.status -eq 'succeeded' }).Count -ne 2) {
     $failures.Add('Typed meshes/material/embedded texture closure did not pass twice')
 }
 $status = [regex]::Matches($stdout, '\[model\.async\] pending=(\d+) completed=(\d+) failed=(\d+) cancelled=(\d+)')

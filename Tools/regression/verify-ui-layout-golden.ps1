@@ -49,7 +49,7 @@ $goldenPath = Join-Path $PSScriptRoot "ui_layout_golden.expected"
 $outFile = Join-Path $Work "ui_layout_golden.out"
 $errFile = Join-Path $Work "ui_layout_golden.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $script) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $script) `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null

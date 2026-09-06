@@ -98,6 +98,7 @@ void ScriptComponent::RetryInstance()
 
 void ScriptComponent::OnInitialized()
 {
+	++m_initializationAttempts;
 	if (m_scriptType.empty())
 	{
 		return;

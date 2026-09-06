@@ -48,6 +48,18 @@ internal static class ScriptAssemblyLoader
     public static bool IsLoaded => _context is not null;
 
     /// <summary>
+    /// 지금 올라와 있는 게임 스크립트 어셈블리.
+    ///
+    /// ★ **결과를 붙들지 말 것.** 정적 필드에 <see cref="Assembly"/> 를 담으면 그것이
+    ///   컨텍스트를 붙들어 언로드가 영영 실패하고, 다음 리로드부터 같은 타입이 두 벌이
+    ///   된다. 컨텍스트에서 매번 새로 물어 오는 이유가 그것이다 — 여기에도 캐시가 없다.
+    ///
+    /// 호출자(<see cref="EngineCallableInvoker"/>)는 이것을 지역에 두었다 곧 버린다.
+    /// </summary>
+    public static Assembly[] LoadedAssemblies()
+        => _context is null ? [] : [.. _context.Assemblies];
+
+    /// <summary>
     /// 스크립트 어셈블리를 로드하고 등록을 수행한다.
     /// 파일을 잠그지 않도록 바이트로 읽어 올린다 — 잠그면 다음 빌드가 실패한다.
     /// </summary>
@@ -113,19 +125,32 @@ internal static class ScriptAssemblyLoader
     /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool InvokeRegistry(Assembly assembly)
+        => InvokeRegistry(assembly, ScriptFactory.Register,
+                          AniBehaviorFactory.Register, BTNodeFactory.Register);
+
+    /// <summary>
+    /// 생성기가 만든 등록 진입점을 찾아, 주어진 sink 로 등록을 흘린다.
+    ///
+    /// sink 를 인자로 받는 이유는 <see cref="Validate"/> 때문이다. 검증은 **실제
+    /// 등록 경로를 그대로 태우되** 살아 있는 표에는 아무것도 넣지 않아야 한다.
+    /// 경로가 다르면 검증이 통과한 것이 진짜 통과가 아니게 된다.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool InvokeRegistry(Assembly assembly,
+                                       Action<string, Func<Component>> register,
+                                       Action<string, Func<AniBehavior>> registerAni,
+                                       Action<string, int, Func<BTNode>> registerBT)
     {
         Type? registry = assembly.GetType("CreatorEngine.Generated.ScriptRegistry", throwOnError: false);
         MethodInfo? method = registry?.GetMethod("RegisterAll", BindingFlags.Public | BindingFlags.Static);
         if (method is null) return false;
 
-        Action<string, Func<Component>> register = ScriptFactory.Register;
         method.Invoke(null, [register]);
 
         // 애니메이션 상태 스크립트는 별도 목록이다. 없는 프로젝트도 있으므로 없으면 건너뛴다.
         MethodInfo? aniMethod = registry?.GetMethod("RegisterAllAni", BindingFlags.Public | BindingFlags.Static);
         if (aniMethod is not null)
         {
-            Action<string, Func<AniBehavior>> registerAni = AniBehaviorFactory.Register;
             aniMethod.Invoke(null, [registerAni]);
         }
 
@@ -133,11 +158,69 @@ internal static class ScriptAssemblyLoader
         MethodInfo? btMethod = registry?.GetMethod("RegisterAllBTNodes", BindingFlags.Public | BindingFlags.Static);
         if (btMethod is not null)
         {
-            Action<string, int, Func<BTNode>> registerBT = BTNodeFactory.Register;
             btMethod.Invoke(null, [registerBT]);
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 갈아 끼우기 전에 새 어셈블리가 실제로 올라가는지 **버리는 컨텍스트에서** 확인한다.
+    ///
+    /// ★ 왜 필요한가 — 실측된 결함이다(LC7).
+    ///
+    ///   <see cref="Reload"/> 는 `Unload(); Load();` 였다. 그래서 새 어셈블리가
+    ///   깨져 있으면 이전 것은 이미 사라진 뒤였고, 에디터에는 **스크립트가 하나도
+    ///   남지 않았다.** 실측으로 확인했다 — 리로드 전에는 붙던 `script.add Bobber`
+    ///   가 리로드 실패 뒤에는 "부착 실패(타입=Bobber)" 가 됐다. 복구 방법은
+    ///   성공적 리로드나 프로세스 재시작뿐이었다.
+    ///
+    ///   빌드가 깨진 채로 리로드를 부르는 것은 드문 일이 아니라 **가장 흔한 일**이다.
+    ///   그때마다 에디터가 못 쓰는 상태가 되면 라이브 코드 교체라고 부를 수 없다.
+    ///
+    /// ★ 무엇까지 잡는가 — 정직하게.
+    ///
+    ///   파일 부재·손상·아키텍처 불일치·등록 진입점 부재, 그리고 `RegisterAll` 이
+    ///   던지는 예외까지 잡는다. 검증이 실제 등록 경로를 그대로 태우기 때문이다.
+    ///   남는 창은 "검증에서는 성공했는데 본 적재에서 실패" 하는 비결정적 경우뿐이고,
+    ///   그때는 예전과 같은 상태가 된다 — 그 창을 0 으로 만들려면 세 팩토리에
+    ///   staging 을 넣어야 하고, 그것은 이 슬라이스의 크기가 아니다.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool Validate(string assemblyPath)
+    {
+        if (!File.Exists(assemblyPath))
+        {
+            Native.Log(2, $"[ScriptCore] 리로드 취소 — 어셈블리가 없습니다: {assemblyPath}");
+            return false;
+        }
+
+        var probe = new ScriptLoadContext("validate");
+        try
+        {
+            Assembly assembly;
+            using (var stream = new FileStream(assemblyPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                assembly = probe.LoadFromStream(stream);
+            }
+
+            // 등록을 **버린다.** 살아 있는 표는 이 호출로 한 항목도 바뀌지 않는다.
+            if (!InvokeRegistry(assembly, static (_, _) => { }, static (_, _) => { }, static (_, _, _) => { }))
+            {
+                Native.Log(2, "[ScriptCore] 리로드 취소 — ScriptRegistry 진입점이 없습니다.");
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Native.Log(3, $"[ScriptCore] 리로드 취소 — 새 어셈블리를 올릴 수 없습니다. 이전 것을 유지합니다.\n{ex}");
+            return false;
+        }
+        finally
+        {
+            probe.Unload();
+        }
     }
 
     /// <summary>
@@ -187,6 +270,13 @@ internal static class ScriptAssemblyLoader
             Native.Log(2, "[ScriptCore] 로드한 적이 없어 리로드할 수 없습니다.");
             return false;
         }
+
+        // ★ 갈아 끼우기 **전에** 새 것이 올라가는지 확인한다.
+        //
+        //   예전에는 `Unload(); Load();` 였다. 새 어셈블리가 깨져 있으면 이전
+        //   것은 이미 사라진 뒤라 에디터에 스크립트가 하나도 남지 않았다.
+        //   검증이 실패하면 여기서 멈추므로 이전 어셈블리는 그대로다.
+        if (!Validate(path)) return false;
 
         Unload();
         return Load(path);

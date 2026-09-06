@@ -21,7 +21,7 @@ namespace DX12Test
     //   1) 디바이스·큐·PSO 생성 성공   2) frameCount 프레임 제출·완료
     //   3) 리드백 픽셀이 기대 내용(배경 클리어 + 삼각형)   4) 검증 레이어 메시지 0건
     // 진행 로그는 outLog로 — 실패 지점이 어디인지가 곧 진단이다.
-    bool RunSelfTest(const std::string& outputPngPath, uint32_t frameCount, std::string& outLog);
+    bool RunSelfTest(const std::string& outputPngPath, uint32_t frameCount, const std::string& texturePath, std::string& outLog);
 
     // PSO 캐시 자가 검증(PHASE 3-4). 같은 프로세스에서 매니저를 두 번 세워
     // 캐시 파일이 실제로 컴파일을 없애는지 확인한다.
@@ -42,7 +42,7 @@ namespace DX12Test
     ///   ③ BeginFrame이 같은 구간을 되감는가(무한정 자라지 않는가)
     ///   ④ 구간을 넘기면 조용히 침범하지 않고 거절하는가
     ///   ⑤ 링을 거친 데이터가 실제로 GPU 텍스처에 도달하는가(리드백 대조)
-    bool RunUploadSegmentTest(std::string& outLog);
+    bool RunUploadSegmentTest(const std::string& modelPath, std::string& outLog);
 
     /// descriptor version recycler·샘플러 힙 자가 검증(Slice E-a).
     ///
@@ -98,7 +98,11 @@ namespace DX12Test
     ///
     /// 단정의 핵심은 '카메라 상수가 정말 셰이더에 닿는가'다. 같은 씬을 두 카메라로
     /// 그려 커버리지가 달라지는지 본다 — 상수가 안 닿으면 두 결과가 같다.
-    bool RunSceneBindingTest(std::string& outLog);
+    struct SceneBindingReport
+    {
+        uint64_t drawCandidates{}, lights{}, draws{}, meshUploads{}, generationUploads{}, uploadKB{}, coverage{}, pixels{}, texturedDraws{};
+    };
+    bool RunSceneBindingTest(std::string& outLog, SceneBindingReport* report = nullptr);
 
     // DX11과의 픽셀 대조(RunPixelCompareTest)는 DX11 SceneRenderer와 함께
     // 제거했다. 그 검증은 DX11 GBuffer 텍스처를 읽는 것이 본체라 기준이
@@ -166,15 +170,6 @@ namespace DX12Test
     /// 같아 통과한다 — 공짜 통과를 막는 것이 배치의 목적이다.
     bool RunForwardPlusShadeTest(std::string& outLog);
 
-    /// Forward+ 광원 수 스케일링 실측 (PHASE 3-6).
-    ///
-    /// "Forward+가 언제부터 이기는가"를 잰다. 광원이 적으면 컬링 디스패치가
-    /// 그대로 손해이므로, 그 경계를 짐작이 아니라 수로 적는다.
-    ///
-    /// 128x128 자가 검증에서 재지 않는 이유는 셰이딩 비용이 픽셀 수에
-    /// 비례하기 때문이다 — 픽셀이 적으면 광원을 아무리 늘려도 두 경로 다
-    /// 타임스탬프 분해능에 묻혀, 거기서 나온 수는 경계를 말해 주지 않는다.
-    bool RunForwardPlusScaleTest(std::string& outLog);
 
     /// SSAO 검증 (PHASE 3-6, 신규 SSAO).
     ///
@@ -191,13 +186,6 @@ namespace DX12Test
     /// 필터가 죽어 있어도 최종 그림만 봐서는 알 수 없기 때문이다.
     bool RunSSAOTest(std::string& outLog);
 
-    /// SSAO 신구 시간 비교 (PHASE 3-6).
-    ///
-    /// 실제 DX11 패스와 직접 재지 않는다. 그러면 API·드라이버·프레임 구조
-    /// 차이가 전부 수에 섞여, 빨라진 것이 알고리즘 덕인지 DX12 덕인지
-    /// 구분할 수 없다. 같은 디바이스·같은 입력 위에 옛 알고리즘(반구 커널
-    /// 64개)을 그대로 올려 두고 그것과 잰다 — 갈리는 것은 알고리즘 하나뿐이다.
-    bool RunSSAOScaleTest(std::string& outLog);
 
     /// 포스트 체인 검증 (PHASE 3-6, 신규 포스트 체인).
     ///
@@ -210,13 +198,6 @@ namespace DX12Test
     /// 빠져도 '어딘가 조금 다르다'로만 보인다.
     bool RunPostChainTest(std::string& outLog);
 
-    /// 포스트 체인 신구 시간 비교 (PHASE 3-6).
-    ///
-    /// 합친 패스(Uber) 하나와, 그것을 옛 방식대로 넷으로 나눈 것을 잰다.
-    /// 참조 경로는 같은 셰이더에 플래그만 하나씩 켜서 네 번 돌린다 —
-    /// 갈리는 것이 화면 왕복 횟수 하나뿐이라야 나온 수가 무엇을 뜻하는지
-    /// 분명해진다.
-    bool RunPostChainScaleTest(std::string& outLog);
 
     /// UI 패스 검증 (PHASE 3-6, 신규 UI).
     ///
@@ -324,28 +305,5 @@ namespace DX12Test
     /// 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
     bool RunVolumetricFogTest(std::string& outLog);
 
-    /// DX11 vs DX12 API 오버헤드 실측 — 마이그레이션 전제("DX12가 실제로
-    /// 빠른가")의 검증.
-    ///
-    /// Scale 테스트들의 "DX11과 직접 재지 않는다" 원칙과 정반대인 이유:
-    /// 거기서는 API 차이가 잡음이었지만, 여기서는 그것이 측정 대상이다.
-    /// 같은 어댑터·같은 기하·같은 셰이더·같은 드로우당 페이로드로 맞추고
-    /// 드로우당 상수 갱신 경로만 각 엔진의 실제 패턴(DX11 Map/DISCARD vs
-    /// DX12 업로드 링 + 루트 CBV)을 따른다. 드로우 수 스윕으로 기록 CPU ·
-    /// 제출 CPU · GPU 시간을 중앙값으로 내고, 커버리지 픽셀 수 대조로
-    /// '빨라진 것'과 '덜 그린 것'을 가른다. Release 전용 — Debug는 DX12만
-    /// 검증 레이어 비용을 내서 비교가 성립하지 않는다.
-    bool RunApiOverheadBench(std::string& outLog);
 
-    /// 인코더 오버헤드 실측 (R3 착수 조건 · RhiBoundaryPlan §5).
-    ///
-    /// 같은 커맨드 기록을 셋으로 돌려 CPU 기록 시간만 잰다: 직접 호출 ·
-    /// 가상 인터페이스 · 비가상 래퍼. R3가 드로우 루프 안쪽을 가상으로
-    /// 바꿔도 되는지를 재고 판단하기 위한 것이고, 재지 않으면 필요 없는
-    /// 최적화를 미리 하거나 비싼 것을 모른 채 17종을 다 옮기게 된다.
-    ///
-    /// ★ Release 전용이다. Debug에서는 commandList 호출 하나가 검증 레이어를
-    ///   지나 vtable 한 번의 비용을 통째로 덮는다 — "가상 호출은 공짜"라는
-    ///   거짓 음성이 나오고, 그 답을 믿으면 Release에서 비싼 것을 지나친다.
-    bool RunEncoderOverheadBench(std::string& outLog);
 }

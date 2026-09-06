@@ -1,0 +1,19 @@
+{
+  "schema": "lc9-consumer-ratchet/1",
+  "recorded": "2026-09-06",
+  "maxVerdictParsers": 0,
+  "note": "자동화 소비자가 사람용 판정 문자열(통과·실패·완료·어서션·무판정)을 매칭 문맥에서 읽는 파일의 상한. 주석은 세지 않는다 - 고칠 수 없는 것(설명)을 눈금에 넣으면 래칫이 0 에 닿지 못한다. 늘면 붉어지고, 소비자를 --result-format jsonl 로 옮길 때마다 -UpdateRatchet 으로 내린다. §18: '자동화 consumer 가 source/help/한국어 verdict 문자열을 파싱하지 않는다'.",
+  "files": [],
+  "history": [
+    {
+      "date": "2026-09-05",
+      "value": 15,
+      "why": "LC9 착수 직전. Invoke-Dx12Suite.ps1 이 '^[CLI] <검사> (통과|실패|완료)' 를 긁고 있었고, 그 방식이 같은 파일에서 세 번 오독을 냈다(help 로 35중 26 실행, 등록 형태 변경으로 35을 0으로 읽음, 계측 검사의 '완료'를 실패로 셈)."
+    },
+    {
+      "date": "2026-09-05",
+      "value": 14,
+      "why": "LC9 - Invoke-Dx12Suite.ps1 을 --result-format jsonl 로 옮겼다. 판정이 CommandStatus(succeeded/failed/...)로 오므로 어휘를 맞출 일이 없어졌다. text fallback 은 두지 않았다 - 이중 parser 는 새 drift 를 만든다. 남은 14 개는 각자 도메인의 stdout 마커를 읽으며, 도메인 단위로 옮긴다."
+    }
+  ]
+}

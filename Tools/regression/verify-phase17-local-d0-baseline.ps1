@@ -88,7 +88,7 @@ $commands.Add("serialize.bench prefab $Prefab $PrefabIterations")
 $commands.Add('quit')
 $commands | Set-Content -LiteralPath $scenario -Encoding utf8NoBOM
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario) `
+$process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', $scenario) `
     -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {

@@ -34,6 +34,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $run = Join-Path $Work ('creator-mbc11-budget-' + [guid]::NewGuid().ToString('N'))
@@ -93,7 +94,9 @@ function Invoke-Editor([string]$Label, [string[]]$Commands) {
     [IO.File]::WriteAllText($scenario, ($Commands -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $Exe
-    $start.Arguments = '--script "' + $scenario.Replace('"', '\"') + '"'
+    $start.Arguments = '--commandlet-script "' + $scenario.Replace('"', '\"') + '"'
+    $resultPath = Join-Path $run ($Label + '.results.jsonl')
+    $start.Arguments += ' --result-file "' + $resultPath + '"'
     $start.WorkingDirectory = $root
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -113,29 +116,17 @@ function Invoke-Editor([string]$Label, [string[]]$Commands) {
     [IO.File]::WriteAllText((Join-Path $run ($Label + '.stdout.txt')), $stdout, [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $run ($Label + '.stderr.txt')), $stderr, [Text.UTF8Encoding]::new($false))
     if ($process.ExitCode -ne 0) { Add-Failure "$Label 종료 코드 $($process.ExitCode)" }
-    return $stdout
+    $results = @(Read-CommandResults $resultPath)
+    if (@($results | Where-Object status -ne succeeded).Count -ne 0) { Add-Failure "$Label has failed command results" }
+    return ,$results
 }
 
-function Read-BenchRows([string]$Text, [string]$Key) {
+function Read-BenchRows($Results, [string]$Key) {
     $rows = @{}
-    # author 줄은 authorMinMs… 뒤에 cookedMinMs…가 오므로 키 앞의 토큰을 건너뛴다.
-    foreach ($m in [regex]::Matches($Text, '\[CLI\] assets\.modelbench model=(\S+) [^\r\n]*?' + $Key + 'MinMs=([\d.]+) ' + $Key + 'AvgMs=([\d.]+)')) {
-        $rows[$m.Groups[1].Value] = [double]$m.Groups[2].Value
+    foreach ($result in @($Results | Where-Object command -eq 'assets.modelbench')) {
+        foreach ($model in $result.data.models) { $rows[$model.model] = [double]$model.($Key + 'MinMs') }
     }
     return $rows
-}
-
-# `name:ms;name:ms;…` → 해시테이블. 단계 값은 총합의 **min 표본**과 같은 실행에서 온다
-# (modelbench가 min iteration의 timeline을 들고 있다) — 총합과 단계를 섞어 봐도 축이 같다.
-function Read-Phases([string]$Text) {
-    $map = @{}
-    if ([string]::IsNullOrWhiteSpace($Text) -or $Text -eq '-') { return $map }
-    foreach ($pair in ($Text -split ';')) {
-        $index = $pair.LastIndexOf(':')
-        if ($index -lt 1) { continue }
-        $map[$pair.Substring(0, $index)] = [double]$pair.Substring($index + 1)
-    }
-    return $map
 }
 
 function Sum-Phases([hashtable]$Phases, [string[]]$Keys) {
@@ -208,9 +199,8 @@ try {
         "assets.modelbench $($animationDir.Replace('\', '/')) $Iterations cooked",
         'quit')
     $workspaceRows = Read-BenchRows $cooked 'cooked'
-    $workspaceMeasured = [regex]::Match($cooked, 'assets\.modelbench done mode=cooked measured=(\d+) failed=(\d+)')
-    if ($workspaceMeasured.Success) {
-        $report.Add(('B2w 작업 트리 Library 재로드(참고) measured={0} failed={1}' -f $workspaceMeasured.Groups[1].Value, $workspaceMeasured.Groups[2].Value))
+    foreach ($sample in @($cooked | Where-Object command -eq 'assets.modelbench')) {
+        $report.Add("B2w measured=$($sample.data.measured) failed=$($sample.data.failed)")
     }
 
     # ── B1 (cold source import — 임시 프로젝트 사본에서 in-process authoring) ──
@@ -240,13 +230,13 @@ try {
     $cookedRows = Read-BenchRows $author 'cooked'
     $authorPhaseRows = @{}
     $cookedPhaseRows = @{}
-    $authorPhaseRaw = @{}
-    $cookedPhaseRaw = @{}
-    foreach ($m in [regex]::Matches($author, '\[CLI\] assets\.modelbench model=(\S+) [^\r\n]*?authorPhases=(\S+) cookedPhases=(\S+)')) {
-        $authorPhaseRows[$m.Groups[1].Value] = Read-Phases $m.Groups[2].Value
-        $cookedPhaseRows[$m.Groups[1].Value] = Read-Phases $m.Groups[3].Value
-        $authorPhaseRaw[$m.Groups[1].Value] = $m.Groups[2].Value
-        $cookedPhaseRaw[$m.Groups[1].Value] = $m.Groups[3].Value
+    foreach ($sample in @($author | Where-Object command -eq 'assets.modelbench')) {
+        foreach ($model in $sample.data.models) {
+            $authorPhaseRows[$model.model] = @{}
+            $cookedPhaseRows[$model.model] = @{}
+            foreach ($phase in $model.authorPhases) { $authorPhaseRows[$model.model][$phase.phase] = [double]$phase.milliseconds }
+            foreach ($phase in $model.cookedPhases) { $cookedPhaseRows[$model.model][$phase.phase] = [double]$phase.milliseconds }
+        }
     }
 
     # ── B1a 비교 예산 / B1b 비회귀 기준선 ──
@@ -305,16 +295,13 @@ try {
             Add-Failure "B2c $name 임베디드 텍스처 디코드 회귀: $([Math]::Round($texture,3)) ms > archive $archivedTexture × $archiveTimeFactor (PHASE 12 T1a가 내릴 칸이지 올릴 칸이 아니다)"
         }
     }
-    # 단계 분해 원문(참고) — 어느 단계가 어느 칸으로 갔는지 판정 근거로 남긴다.
-    # 축 재유도가 이 줄에서 유도되므로 요약만 남기고 지우지 않는다.
-    foreach ($name in ($authorPhaseRaw.Keys | Sort-Object)) {
-        $report.Add(('   phases {0,-16} author {1}' -f $name, $authorPhaseRaw[$name]))
-        $report.Add(('   phases {0,-16} cooked {1}' -f $name, $cookedPhaseRaw[$name]))
+    # 단계 분해(참고) — 어느 단계가 B1/B2 비용인지 판정 근거로 남긴다.
+    foreach ($sample in @($author | Where-Object command -eq 'assets.modelbench')) {
+        foreach ($model in $sample.data.models) {
+            $report.Add("phases $($model.model) author=$($model.authorPhases | ConvertTo-Json -Compress) cooked=$($model.cookedPhases | ConvertTo-Json -Compress)")
+        }
     }
-
-    # B5 — 사본 저작+로드 프로세스의 peak working set(MBC0 bench도 소스 디코드+cook을 포함했다).
-    $peak = [regex]::Matches($author, 'assets\.modelbench done .* peakWorkingSetMB=([\d.]+)')
-    $peakMb = if ($peak.Count -gt 0) { [double]$peak[$peak.Count - 1].Groups[1].Value } else { -1.0 }
+    $peakMb = [double](@($author | Where-Object command -eq 'assets.modelbench' | ForEach-Object { $_.data.peakWorkingSetMB }) | Measure-Object -Maximum).Maximum
     $report.Add(('B5 peak working set {0:N1} MB (≤ {1})' -f $peakMb, $budgetPeakWorkingSetMB))
     if ($peakMb -lt 0 -or $peakMb -gt $budgetPeakWorkingSetMB) { Add-Failure "B5 peak working set $peakMb MB > $budgetPeakWorkingSetMB" }
 
@@ -332,14 +319,11 @@ try {
         'dx12.scene',
         'assets.modelbench - 1 cooked',
         'quit')
-    $upload = [regex]::Match($frame, '메시 업로드\s+(\d+)\(generation\s+(\d+),\s+(\d+)KB\)')
-    $coverage = [regex]::Match($frame, '커버리지\s+(\d+)/65536')
-    $frameVram = [regex]::Matches($frame, 'assets\.modelbench done .* vramUsedMB=(\d+)')
+    $sceneData = Get-SucceededCommand $frame 'dx12.scene'
+    $frameMemory = Get-SucceededCommand $frame 'assets.modelbench'
     $current = [ordered]@{
-        meshUploads = if ($upload.Success) { [int]$upload.Groups[1].Value } else { -1 }
-        meshUploadKB = if ($upload.Success) { [int]$upload.Groups[3].Value } else { -1 }
-        coverage = if ($coverage.Success) { [int]$coverage.Groups[1].Value } else { -1 }
-        vramUsedMB = if ($frameVram.Count -gt 0) { [int]$frameVram[$frameVram.Count - 1].Groups[1].Value } else { -1 }
+        meshUploads = [int]$sceneData.meshUploads; meshUploadKB = [int]$sceneData.uploadKB
+        coverage = [int]$sceneData.coverage; vramUsedMB = [int]$frameMemory.vramUsedMB
         sceneTest1Ms = $test1Ms; sceneFtMs = $ftMs; bootMs = $bootMs; peakWorkingSetMB = $peakMb
         # legacy에 대응물이 없는 칸(§8.4 개정) — 비교가 아니라 비회귀로만 본다.
         authoringOverheadMs = $overheadNow
@@ -347,8 +331,7 @@ try {
         textureDecodeMs = $textureNow
         measuredAt = (Get-Date).ToString('yyyy-MM-dd HH:mm')
     }
-    if ($frame -notmatch '\[CLI\] dx12\.scene 통과') { Add-Failure 'B6 dx12.scene이 통과하지 않았다.' }
-    if ($current.meshUploads -lt 1 -or $current.meshUploads -ne [int]$upload.Groups[2].Value) { Add-Failure 'B6 dx12.scene 메시 업로드가 전량 generation이 아니거나 없다.' }
+    if ($current.meshUploads -lt 1 -or $current.meshUploads -ne $sceneData.generationUploads) { Add-Failure 'B6 typed generation uploads are missing or incomplete' }
     $report.Add(('B6 frame  메시 업로드 {0}개/{1} KB · 커버리지 {2} · VRAM {3} MB' -f $current.meshUploads, $current.meshUploadKB, $current.coverage, $current.vramUsedMB))
     if ($Archive -and $failures.Count -gt 0) {
         # 0 업로드·미통과 실행을 기준선으로 굳히면 이후 비회귀 판정이 눈먼다.

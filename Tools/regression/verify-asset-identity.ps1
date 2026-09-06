@@ -16,6 +16,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) { "실행 파일이 없다: $Exe"; exit 1 }
 $Exe = (Resolve-Path -LiteralPath $Exe).Path
@@ -97,42 +98,38 @@ New-Item -ItemType Directory -Path $run -Force | Out-Null
 $scenario = Join-Path $run 'commands.txt'
 $stdout = Join-Path $run 'stdout.txt'
 $stderr = Join-Path $run 'stderr.txt'
+$resultPath = Join-Path $run 'results.jsonl'
 @('assets.identity', 'quit') | Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario) `
+$process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) `
     -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 $process.WaitForExit($TimeoutSeconds * 1000) | Out-Null
 if (-not $process.HasExited) { $process.Kill(); "TIMEOUT output=$run"; exit 1 }
 
 $text = if (Test-Path -LiteralPath $stdout) { Get-Content -LiteralPath $stdout -Raw -Encoding UTF8 } else { '' }
-$cliPass = ([regex]::Matches($text, '\[CLI\] assets\.identity 통과')).Count
-$summary = [regex]::Match($text, '단정 (\d+)건 중 통과 (\d+) · 실패 (\d+)')
-$assertions = 0; $assertFailed = -1
-if ($summary.Success) { $assertions = [int]$summary.Groups[1].Value; $assertFailed = [int]$summary.Groups[3].Value }
-if ($cliPass -ne 1) { $failures.Add("[CLI] assets.identity 통과가 1회가 아니다: $cliPass") }
-if (-not $summary.Success) { $failures.Add('단정 요약 줄이 없다') }
-elseif ($assertFailed -ne 0) { $failures.Add("selftest 단정 실패 $assertFailed 건") }
-elseif ($assertions -lt 150) { $failures.Add("단정 수가 너무 적다($assertions) — 검사 범위가 줄었다") }
+$data = Get-SucceededCommand (Read-CommandResults $resultPath) 'assets.identity'
+$cliPass = 1
+$assertions = [int]$data.assertions; $assertFailed = [int]$data.failed
+if ($assertFailed -ne 0 -or $assertions -lt 150) { $failures.Add("Identity coverage failed: assertions=$assertions failed=$assertFailed") }
 
 # C++가 찍은 vector 값 ↔ .NET 유도값 대조(①↔③ 직접 대조).
 $cppVectors = @{}
-foreach ($m in [regex]::Matches($text, '(?m)^\s*vector (\S+) = ([0-9a-f-]{36})\s*$')) {
-    $cppVectors[$m.Groups[1].Value] = $m.Groups[2].Value
+foreach ($vector in $data.vectors) {
+    if ($cppVectors.ContainsKey($vector.name)) { throw "Duplicate computed vector: $($vector.name)" }
+    $cppVectors[$vector.name] = $vector.uuid
 }
 if ($cppVectors.Count -lt $vectorCount) { $failures.Add("C++가 찍은 vector 줄이 $($cppVectors.Count)건 — 벡터 $vectorCount 건") }
 foreach ($name in $dotnetUuids.Keys) {
-    if ($cppVectors.ContainsKey($name) -and $cppVectors[$name] -ne $dotnetUuids[$name]) {
+    if (-not $cppVectors.ContainsKey($name) -or $cppVectors[$name] -ne $dotnetUuids[$name]) {
         $failures.Add("C++ ≠ .NET: $name $($cppVectors[$name]) vs $($dotnetUuids[$name])")
     }
 }
-$bcrypt = [regex]::Match($text, 'bcrypt agreement: (\d+)/(\d+)')
-if (-not $bcrypt.Success -or $bcrypt.Groups[1].Value -ne $bcrypt.Groups[2].Value -or [int]$bcrypt.Groups[2].Value -lt 40) {
-    $failures.Add('BCrypt 대조 줄이 없거나 불일치')
-}
+$bcrypt = "$($data.bcryptMatched)/$($data.bcryptTotal)"
+if ($data.bcryptMatched -ne $data.bcryptTotal -or $data.bcryptTotal -lt 40) { $failures.Add('BCrypt coverage or agreement failed') }
 
 "asset-identity exit=$($process.ExitCode) output=$run"
-"vectors=$vectorCount cliPass=$cliPass assertions=$assertions assertFailed=$assertFailed cppVectorLines=$($cppVectors.Count) bcrypt=$($bcrypt.Value)"
+"vectors=$vectorCount cliPass=$cliPass assertions=$assertions assertFailed=$assertFailed cppVectorLines=$($cppVectors.Count) bcrypt=$bcrypt"
 if ($process.ExitCode -ne 0) { $failures.Add("종료 코드 $($process.ExitCode)") }
 
 if ($failures.Count -gt 0) { '실패:'; $failures | ForEach-Object { "  $_" }; exit 1 }

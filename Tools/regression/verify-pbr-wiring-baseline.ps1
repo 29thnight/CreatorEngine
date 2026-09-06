@@ -4,11 +4,13 @@ param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
     [ValidateSet('dx12', 'vulkan')][string[]]$Backend = @('dx12', 'vulkan'),
+    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [int]$TimeoutSeconds = 240
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $run = Join-Path ([IO.Path]::GetFullPath($Work)) ('creator-pbr-' + [guid]::NewGuid().ToString('N'))
 $settings = Join-Path $root 'Dynamic_CPP\ProjectSetting\EngineSettings.asset'
@@ -21,8 +23,11 @@ function Invoke-Editor([string]$Name, [string[]]$Commands, [int]$ExpectedExit = 
     [IO.File]::WriteAllText($scenario, ($Commands -join "`n") + "`n", $utf8)
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = (Resolve-Path -LiteralPath $Editor).Path
-    $start.ArgumentList.Add('--script')
+    $start.ArgumentList.Add('--commandlet-script')
     $start.ArgumentList.Add($scenario)
+    $resultPath = Join-Path $run "$Name.results.jsonl"
+    $start.ArgumentList.Add('--result-file')
+    $start.ArgumentList.Add($resultPath)
     $start.WorkingDirectory = $root
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -46,7 +51,17 @@ function Invoke-Editor([string]$Name, [string[]]$Commands, [int]$ExpectedExit = 
     if (-not $finished) { throw "$Name timed out; artifacts: $run" }
     if ($exitCode -ne $ExpectedExit) { throw "$Name exit=$exitCode expected=$ExpectedExit; artifacts: $run" }
     if (-not [string]::IsNullOrWhiteSpace($stderr)) { throw "$Name wrote stderr; artifacts: $run" }
-    return $stdout
+    $results = @(Read-CommandResults $resultPath)
+    if ($results.Count -ne $Commands.Count) { throw "$Name terminal result count mismatch; artifacts: $run" }
+    for ($i = 0; $i -lt $Commands.Count; $i++) {
+        if ($results[$i].command -ne ($Commands[$i] -split ' ', 2)[0]) {
+            throw "$Name terminal result order mismatch at $i"
+        }
+    }
+    if ($ExpectedExit -eq 0 -and @($results | Where-Object status -ne 'succeeded').Count) {
+        throw "$Name has unsuccessful command results; artifacts: $run"
+    }
+    return $results
 }
 
 function Assert-Capture([string]$Directory, [string]$ExpectedBackend, [string[]]$Models) {
@@ -109,10 +124,10 @@ try {
             'wait 30',
             "render.pbr.capture `"$gunner`" game",
             'quit')
-        $stdout = Invoke-Editor $api $commands
-        if ([regex]::Matches($stdout, '\[CLI\] render\.pbr\.capture PASS').Count -ne 2 -or
-            $stdout -match '\[CLI\].*(FAIL|실패)|live 검증|vulkan.live 실패') {
-            throw "$api capture/validation failed; artifacts: $run"
+        $results = @(Invoke-Editor $api $commands)
+        $captures = @($results | Where-Object command -eq 'render.pbr.capture')
+        if ($captures.Count -ne 2 -or @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
+            throw "$api capture did not return two completed frames; artifacts: $run"
         }
         Assert-Capture $primitive $api @('Prim_Cube', 'Prim_Sphere', 'Prim_Cylinder')
         Assert-Capture $gunner $api @('Gunner_F_Mythic')
@@ -121,53 +136,30 @@ try {
     # The paired harness owns both DX12 and Vulkan test devices; keep its Editor
     # host on DX12 independently of the final product-capture backend above.
     [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, '${1}dx12'), $utf8)
-    $stdout = Invoke-Editor 'defaults' @('vk.shadow', 'vk.gbuffer', 'vk.forward', 'vk.deferred', 'quit')
-    foreach ($command in @('vk.shadow', 'vk.gbuffer', 'vk.forward', 'vk.deferred')) {
-        if ([regex]::Matches($stdout, ('\[CLI\] ' + [regex]::Escape($command) + ' 통과')).Count -ne 1) {
-            throw "$command did not pass exactly once; artifacts: $run"
-        }
-    }
-    $stdout = Invoke-Editor 'forward-shade' @('dx12.forwardshade', 'quit')
-    if ([regex]::Matches($stdout, '\[CLI\] dx12\.forwardshade 통과').Count -ne 1) {
-        throw "Forward numeric-only/Water/Wind shading did not pass; artifacts: $run"
-    }
-    $stdout = Invoke-Editor 'parity' @('render.pbr.parity', 'quit')
-    if ([regex]::Matches($stdout, '\[CLI\] render\.pbr\.parity PASS').Count -ne 1) {
-        throw "PBR Forward/Deferred parity did not pass; artifacts: $run"
-    }
-    $contractCommands = @('experiment.matresolve', 'experiment.matseal', 'experiment.matcodec', 'experiment.matmigrate', 'experiment.cooked')
-    $stdout = Invoke-Editor 'material-contracts' ($contractCommands + 'quit')
-    foreach ($command in $contractCommands) {
-        if ([regex]::Matches($stdout, ('\[CLI\] ' + [regex]::Escape($command) + ' 통과')).Count -ne 1) {
-            throw "$command did not pass; artifacts: $run"
-        }
-    }
-    $stdout = Invoke-Editor 'coverage' @('render.pbr.coverage', 'quit')
-    if ([regex]::Matches($stdout, '\[CLI\] render\.pbr\.coverage PASS').Count -ne 1) {
-        throw "PBR alpha/face coverage did not pass; artifacts: $run"
-    }
-    $stdout = Invoke-Editor 'emission' @('render.pbr.emission', 'quit')
-    if ([regex]::Matches($stdout, '\[CLI\] render\.pbr\.emission PASS').Count -ne 1) {
-        throw "PBR emission/color-space contract did not pass; artifacts: $run"
-    }
-    $stdout = Invoke-Editor 'transform' @('render.pbr.transform', 'quit')
-    if ([regex]::Matches($stdout, '\[CLI\] render\.pbr\.transform PASS').Count -ne 1) {
-        throw "PBR transform/normal/tangent contract did not pass; artifacts: $run"
-    }
-    $stdout = Invoke-Editor 'uv' @('render.pbr.uv', 'quit')
-    if ([regex]::Matches($stdout, '\[CLI\] render\.pbr\.uv PASS').Count -ne 1) {
-        throw "PBR UV0/UV1 transforms contract did not pass; artifacts: $run"
-    }
-    $stdout = Invoke-Editor 'occlusion' @('render.pbr.occlusion', 'quit')
-    if ([regex]::Matches($stdout, '\[CLI\] render\.pbr\.occlusion PASS').Count -ne 1) {
-        throw "PBR AO/reflected texture tables did not pass; artifacts: $run"
+    $null = Invoke-Editor 'defaults' @('vk.shadow', 'vk.gbuffer', 'vk.forward', 'vk.deferred', 'quit')
+    $null = Invoke-Editor 'forward-shade' @('dx12.forwardshade', 'quit')
+    # Material codec/seal contracts moved out of the Editor registry in PHASE 14.5.
+    $contractLog = Join-Path $run 'experiment-contract.log'
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'verify-experiment-contract.ps1') -Configuration $Configuration *> $contractLog
+    if ($LASTEXITCODE -ne 0) { throw "Standalone material contracts failed; log: $contractLog" }
+    $contractCommands = @('experiment.matresolve', 'experiment.matmigrate', 'experiment.cooked')
+    $null = Invoke-Editor 'material-contracts' ($contractCommands + 'quit')
+    foreach ($name in @('parity', 'coverage', 'emission', 'transform', 'uv', 'occlusion')) {
+        $results = @(Invoke-Editor $name @("render.pbr.$name", 'quit'))
+        $data = Get-SucceededCommand $results "render.pbr.$name"
+        if (-not $data.passed) { throw "PBR $name did not execute its verification" }
     }
     # A later successful test must not erase an earlier failure exit code.
-    $stdout = Invoke-Editor 'negative-exit' @('render.livecheck 1 1', 'dx12.gbuffer', 'quit') 7
-    if ($stdout -notmatch '\[CLI\] render\.livecheck 실패' -or
-        $stdout -notmatch '\[CLI\] dx12\.gbuffer 통과') { throw 'Negative exit probe did not exercise both outcomes.' }
-    $stdout = Invoke-Editor 'negative-capture' @("render.pbr.capture `"$run`" game", 'quit') 7
-    if ($stdout -notmatch '\[CLI\] render\.pbr\.capture FAIL') { throw 'Capture did not reject an existing output directory.' }
+    $results = @(Invoke-Editor 'negative-exit' @('render.livecheck 1 1', 'dx12.gbuffer', 'quit') 4)
+    if ((Get-CommandResult $results 'render.livecheck').status -ne 'failed') {
+        throw 'Negative exit probe did not exercise failure.'
+    }
+    $null = Get-SucceededCommand $results 'dx12.gbuffer'
+    $results = @(Invoke-Editor 'negative-capture' @("render.pbr.capture `"$run`" game", 'quit') 4)
+    $capture = Get-CommandResult $results 'render.pbr.capture'
+    if ($capture.status -ne 'failed' -or $capture.code -ne 'render.pbr.capture.rejected') {
+        throw 'Capture did not reject an existing output directory.'
+    }
     Write-Output "PBR W0/W2/W3/W4/W5/W6/W7-normal/UV baseline PASS (W9 acceptance pending): $run"
 }
 finally {

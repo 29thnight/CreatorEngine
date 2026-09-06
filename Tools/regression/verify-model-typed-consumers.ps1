@@ -12,7 +12,7 @@
 #   1  배치·씬 로드가 typed다            — assets.modeldiag(읽기 전용 스냅샷, MBC10)
 #      instantiateGeneration=1(Gunner) · meshResolveGeneration ≥ 10 · 실패 0 · 제품
 #      stdout 토큰([mesh.resolve]/[model.instantiate]/[anim.tick]) 0
-#   2  재생 틱이 typed다                  — tickGeneration ≥ 1, tickNone 0; animlive는
+#   2  재생 틱이 typed다                  — tickGeneration ≥ 1, tickNone 0; animator.status는
 #      publish를 다시 부르지 않고 제품 barrier 스냅샷을 읽는다(source=product)
 #   3  ★ typed 샘플러 골든              — animtick pass poseDigest=8042DC1C path=generation
 #   4  본 해석·신원이 typed다           — boneresolve pass bones=N generation=N
@@ -28,7 +28,10 @@
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
-    [int]$TimeoutSeconds = 300
+    [int]$TimeoutSeconds = 300,
+    [string]$ModelPath = (Join-Path $PSScriptRoot '../../Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb'),
+    [string]$ScenePath = (Join-Path $PSScriptRoot '../../Dynamic_CPP/Assets/Scenes/FT_Primitives.creator'),
+    [string]$ExpectedPoseDigest = '8042DC1C'
 )
 
 Set-StrictMode -Version Latest
@@ -42,24 +45,27 @@ $foliageDir = Join-Path $root 'Dynamic_CPP\Assets\Foliage'
 
 try {
     if (-not (Test-Path -LiteralPath $Editor -PathType Leaf)) { throw "CreatorEditor 실행 파일이 없다: $Editor" }
-    $gunner = Join-Path $root 'Dynamic_CPP\Assets\Models\Gunner_F_Mythic.glb'
-    if (-not (Test-Path -LiteralPath $gunner -PathType Leaf)) { throw "스킨 모델이 없다: $gunner" }
-    $baseScene = Join-Path $root 'Dynamic_CPP\Assets\Scenes\FT_Primitives.creator'
+    $modelPathFull = [IO.Path]::GetFullPath($ModelPath)
+    $modelName = [IO.Path]::GetFileNameWithoutExtension($modelPathFull)
+    if (($PSBoundParameters.ContainsKey('ModelPath') -or $PSBoundParameters.ContainsKey('ScenePath')) -and -not $PSBoundParameters.ContainsKey('ExpectedPoseDigest')) { throw 'A custom model or scene requires its independent ExpectedPoseDigest.' }
+    if ($ExpectedPoseDigest -notmatch '^[0-9A-Fa-f]{8}$') { throw 'ExpectedPoseDigest must be eight hexadecimal digits.' }
+    if (-not (Test-Path -LiteralPath $modelPathFull -PathType Leaf)) { throw "스킨 모델이 없다: $modelPathFull" }
+    $baseScene = [IO.Path]::GetFullPath($ScenePath)
     if (-not (Test-Path -LiteralPath $baseScene -PathType Leaf)) { throw "기준 씬이 없다: $baseScene" }
     New-Item -ItemType Directory -Path $run -Force | Out-Null
     if ($run -match '\s') { throw "console 인자로 넘길 작업 경로에 공백이 있다: $run" }
     $savedScene = (Join-Path $run 'mbc9_typed.creator').Replace('\', '/')
 
     $commands = @(
-        "scene.switch $($baseScene.Replace('\', '/'))",
+        "scene.switch `"$($baseScene.Replace('\', '/'))`"",
         'wait 60',
-        "model.loadcached $($gunner.Replace('\', '/'))",
+        "model.loadcached `"$($modelPathFull.Replace('\', '/'))`"",
         'wait 60',
-        'model.place Gunner_F_Mythic',
+        "model.place `"$modelName`"",
         'wait 60',
-        'object.transform Gunner_F_Mythic 1.5 0 0 0 0 0 0.3 0.3 0.3',
+        "object.transform `"$modelName`" 1.5 0 0 0 0 0 0.3 0.3 0.3",
         'wait 10',
-        "experiment.foliage seed $($foliageDir.Replace('\', '/'))",
+        "experiment.foliage seed `"$($foliageDir.Replace('\', '/'))`" `"$($modelPathFull.Replace('\', '/'))`"",
         'wait 30',
         "scene.save $savedScene",
         'wait 30',
@@ -70,7 +76,7 @@ try {
         'experiment.animmask',
         'experiment.editorsurface',
         'experiment.foliage verify',
-        'experiment.animlive',
+        'animator.status',
         'assets.modeldiag',
         'quit')
     $scenario = Join-Path $run 'commands.txt'
@@ -78,7 +84,7 @@ try {
 
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $Editor
-    $start.Arguments = '--script "' + $scenario.Replace('"', '\"') + '"'
+    $start.Arguments = '--commandlet-script "' + $scenario.Replace('"', '\"') + '"'
     $start.WorkingDirectory = $root
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -104,7 +110,7 @@ try {
     $diag = [regex]::Match($stdout, '\[CLI\] assets\.modeldiag meshResolveGeneration=(\d+) meshResolveFailed=(\d+) instantiateGeneration=(\d+) instantiateRejected=(\d+) tickGeneration=(\d+) tickNone=(\d+) lastInstantiated=(\S+)')
     if (-not $diag.Success) { Add-Failure '1 assets.modeldiag 스냅샷이 없다.' }
     else {
-        if ([int]$diag.Groups[3].Value -ne 1 -or $diag.Groups[7].Value -ne 'Gunner_F_Mythic' -or [int]$diag.Groups[4].Value -ne 0) {
+        if ([int]$diag.Groups[3].Value -ne 1 -or $diag.Groups[7].Value -ne $modelName -or [int]$diag.Groups[4].Value -ne 0) {
             Add-Failure "1 배치가 typed generation 1회가 아니다: $($diag.Value)"
         }
         if ([int]$diag.Groups[1].Value -lt 10 -or [int]$diag.Groups[2].Value -ne 0) {
@@ -119,7 +125,7 @@ try {
         Add-Failure '1c 제품 경로가 무조건 진단 토큰을 다시 찍는다(MBC10 read-only 계약 위반).'
     }
     # 3
-    if ($stdout -notmatch '\[CLI\] experiment\.animtick pass animators=[1-9]\d* clips=[1-9]\d* samples=[1-9]\d* failedEval=0 poseDigest=8042DC1C path=generation') {
+    if ($stdout -notmatch ('\[CLI\] experiment\.animtick pass animators=[1-9]\d* clips=[1-9]\d* samples=[1-9]\d* failedEval=0 poseDigest=' + [regex]::Escape($ExpectedPoseDigest) + ' path=generation')) {
         $line = [regex]::Match($stdout, '\[CLI\] experiment\.animtick [^\r\n]*').Value
         Add-Failure "3 typed 샘플러 골든 불일치 또는 typed 경로가 아니다: $line"
     }
@@ -148,12 +154,12 @@ try {
         $line = [regex]::Match($stdout, '\[CLI\] experiment\.foliage verify [^\r\n]*').Value
         Add-Failure "7 Foliage typed 뷰가 전량이 아니다: $line"
     }
-    if ($stdout -notmatch '\[CLI\] experiment\.animlive \S+ path=generation') {
-        Add-Failure '2b animlive가 typed 경로를 보고하지 않는다.'
+    if ($stdout -notmatch '\[CLI\] animator\.status \S+ path=generation') {
+        Add-Failure '2b animator.status가 typed 경로를 보고하지 않는다.'
     }
-    # 2c — animlive는 읽기 전용이다: 제품 barrier가 남긴 publish 메트릭을 읽는다(source=product).
-    if ($stdout -notmatch '\[CLI\] experiment\.animlive publish \S+ source=product ') {
-        Add-Failure '2c animlive가 제품 publish 스냅샷을 읽지 못했다(source=product 없음).'
+    # 2c — animator.status는 읽기 전용이다: 제품 barrier가 남긴 publish 메트릭을 읽는다(source=product).
+    if ($stdout -notmatch '\[CLI\] animator\.status publish \S+ source=product ') {
+        Add-Failure '2c animator.status가 제품 publish 스냅샷을 읽지 못했다(source=product 없음).'
     }
 
     # 8 정적

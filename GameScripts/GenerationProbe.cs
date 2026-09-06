@@ -37,13 +37,18 @@ public sealed partial class GenerationProbe : Component
 {
     /// <summary>프로세스 수명 동안 만들어진 인스턴스 수. 재생을 건너 이어진다.</summary>
     private static int _created;
+    private static int _recordedHooks;
+    [EngineCallable] public static int RecordedHooks() => _recordedHooks;
 
     private readonly int _id;
 
     public GenerationProbe() => _id = ++_created;
 
     private void Mark(string point)
-        => Log($"[LC7] id={_id} point={point} frame={FrameCount}");
+    {
+        ++_recordedHooks;
+        Log($"[LC7] id={_id} point={point} frame={FrameCount}");
+    }
 
     public override void OnInitialized()       => Mark("init");
     public override void OnAddedToScene()      => Mark("added");

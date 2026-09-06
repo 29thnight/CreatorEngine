@@ -1,5 +1,0 @@
-# Phase 17 D3-b-3 — material writer codec and migration parity.
-wait 60
-experiment.matcodec
-experiment.matmigrate
-quit

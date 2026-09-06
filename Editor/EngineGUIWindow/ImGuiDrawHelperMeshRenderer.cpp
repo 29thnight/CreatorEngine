@@ -1,4 +1,5 @@
 #include "MeshRenderer.h"
+#include "EditorObjectOperations.h"
 #include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC8: typed 정본 read-only 표시
 #include "MaterialScriptBinding.h"
 #include "MaterialPropertyPacker.h"
@@ -152,7 +153,10 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			{
 				if (nullptr != meshRenderer->m_Material)
 				{
-					Meta::DrawEnumProperty((int*)&meshRenderer->m_Material->m_renderingMode, enumProp);
+					auto mode = meshRenderer->m_Material->m_renderingMode;
+                    Meta::DrawEnumProperty((int*)&mode, enumProp);
+                    if (mode != meshRenderer->m_Material->m_renderingMode)
+                        EditorObjectOperations::MaterialMode({meshRenderer->m_Material}, mode);
 				}
 				else
 				{

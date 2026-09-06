@@ -9,7 +9,8 @@
 
 | 디렉터리 | 성격 | 판별 기준 |
 |---|---|---|
-| [`plans/`](plans) | 계획 | 슬라이스와 완료 기준이 있고, 진행에 따라 갱신된다 |
+| [`plans/`](plans) | 활성·미래 계획 | 진행·대기·차단·미래 범위를 갱신한다 |
+| [`plans/archive/`](plans/archive/README.md) | 종료·대체 계획 | 완료·선택 중단·승계 근거와 검증 한계를 보존한다 |
 | [`design/`](design) | 설계 결정 | 무엇을 왜 그렇게 짓는가. 결정과 기각 근거가 본문이다 |
 | [`analysis/`](analysis) | 실측·분석 | 특정 시점의 측정 기록. 사후 갱신하지 않는다 |
 
@@ -28,7 +29,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.75 · RG — 리소스 의존성 스케줄링과 단계별 제품 전환. |
 | [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.75 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
 | [ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md) | PHASE 4.75 · SRP — Pipeline Asset·Custom Pass·Shader Graph 저작과 제품 배선. |
-| [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 6 · CLI — Editor 명령 결과·인자·등록·모듈·JSONL 정식화. MCP 보류. |
+| [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 종결 검증 잔여, MCP 보류. |
 | [ScriptSurfacePlan.md](plans/ScriptSurfacePlan.md) | PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계. |
 | [EnginePackagingPlan.md](plans/EnginePackagingPlan.md) | PHASE 10·11 등 — EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지. |
 | [ModelGeometryTextureImprovementPlan.md](plans/ModelGeometryTextureImprovementPlan.md) | 비동기 배치 완료 · 나머지 구조 개선은 제안 단계. 기존 PHASE의 완료·공수와 구분 |

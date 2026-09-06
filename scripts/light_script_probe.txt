@@ -64,5 +64,6 @@ wait 60
 light.proxy
 wait 5
 
+script.invoke LightScriptProbe Results
 log.flush
 quit

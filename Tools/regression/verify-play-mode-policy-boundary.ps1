@@ -30,7 +30,17 @@ if (-not (Test-Path -LiteralPath $controller)) {
 }
 $controllerText = Get-Content -LiteralPath $controller -Raw -Encoding UTF8
 # (E1-6 이관으로 inline 별칭 UndoCommandManager가 사라졌다 — GetInstance() 직접 호출)
-if ($controllerText -notmatch 'UndoManager::GetInstance\(\)->Clear\(\)') {
+#
+# ★ 철자 하나를 통째로 요구하지 않는다.
+#
+#   예전에는 `UndoManager::GetInstance()->Clear()` 라는 **한 줄 형태**를 찾았다.
+#   LC6이 컨트롤러에서 UndoManager를 지역 변수로 받아 네 번 쓰도록 정리하자
+#   (`auto* undo = ...GetInstance(); undo->Clear();`) 이 검사가 "정책이 사라졌다"로
+#   붉어졌다 — 정책은 그대로 있었고 철자만 바뀌었다.
+#
+#   지키려는 것은 "컨트롤러가 UndoManager의 Clear를 부른다"이지 "이렇게 적는다"가
+#   아니다. 둘을 따로 본다: UndoManager를 만지는가, 그리고 Clear를 부르는가.
+if ($controllerText -notmatch 'UndoManager' -or $controllerText -notmatch '->Clear\(\)') {
     $failures += "EditorPlayModeController가 Undo 이력을 비우지 않는다 — 정책이 어디로 갔는가?"
 }
 if ($controllerText -notmatch 'PlayModeEvent\.AddLambda') {

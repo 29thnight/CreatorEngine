@@ -1,4 +1,4 @@
-# Edit→Play→Stop 왕복에서 선택과 Undo가 어떻게 되는가 (E3-2+3 착수 전 필수 게이트)
+﻿# Edit→Play→Stop 왕복에서 선택과 Undo가 어떻게 되는가 (E3-2+3 착수 전 필수 게이트)
 #
 # 왜 필요한가
 # ───────────
@@ -54,9 +54,13 @@ try {
         "wait 5"
         "scene.selection edit_before"      # 기준선 — 비어 있어야 이후 단정이 의미를 갖는다
         "undo.state edit_pre"
-        "object.create.undoable $undoProbe"
+        # 2026-09-05: `object.create.undoable` 이 사라졌다 — `object.create` 가
+        # Undo 를 남기게 되면서 우회로일 이유가 없어졌다. 이 게이트가 필요로 하는
+        # 것은 "편집 스택에 항목 하나를 확실히 밀어 넣는 것" 이고, 아래 무의미성
+        # 방지 3 이 그것이 실제로 먹었는지를 여전히 단정한다.
+        "object.create $undoProbe"
         "undo.state edit_pushed"           # 무의미성 방지: push가 실제로 먹었는가
-        "scene.select $selectTarget"
+        "scene.select `"$selectTarget`""
         "scene.selection edit_selected"    # 무의미성 방지: select가 실제로 먹었는가
         "play"
         "wait 5"
@@ -70,7 +74,7 @@ try {
     ))
 
     $process = Start-Process -FilePath $Exe `
-        -ArgumentList "--console", "--script", $commandFile `
+        -ArgumentList "--commandlet-script", $commandFile `
         -WorkingDirectory (Split-Path $Exe -Parent) `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     if (-not $process.WaitForExit(180000)) {
@@ -143,7 +147,7 @@ try {
 
     # ── 무의미성 방지 3: undo push가 실제로 먹었는가 ──
     if ($undoPushed.EditUndo -ne ($undoPre.EditUndo + 1)) {
-        throw ("object.create.undoable did not push onto the edit stack: " +
+        throw ("object.create did not push onto the edit stack: " +
             "before=$($undoPre.EditUndo) after=$($undoPushed.EditUndo) — " +
             "the clear assertion below would be vacuous")
     }
@@ -165,14 +169,26 @@ try {
             "editUndo=$($undoPlaying.EditUndo) editRedo=$($undoPlaying.EditRedo)")
     }
 
-    # ── 판정 C: CLI 재생은 m_isGameMode를 켜지 않는다 (실측 고정) ──
-    # 이것은 결함이지 의도가 아니다. 지금 참인 것을 못 박아 두어, E3-2가 이 성질을
-    # 고치면(파생값으로 바꾸면) 이 줄이 붉어져 변경이 눈에 띄게 한다.
-    $gameModeNote = if ($undoPlaying.IsGameMode -eq 0) {
-        "cli-play-does-not-set-gamemode(known defect)"
-    } else {
-        "gamemode-now-tracks-play(CHANGED)"
+    # ── 판정 C: CLI 재생도 m_isGameMode를 켠다 (LC6 §9에서 고쳤다) ──
+    #
+    # 이 줄은 원래 그 반대를 못 박고 있었다 — "CLI 재생은 m_isGameMode를 켜지
+    # 않는다(known defect)". 대입이 MenuBarWindow의 Play 버튼 안에 인라인으로
+    # 있었고 저장소 전체에서 그 한 줄이 유일한 쓰기였기 때문이다. 그래서 같은
+    # 조작인데 사람이 버튼으로 하면 게임 스택에, 에이전트가 HTTP로 하면 편집
+    # 스택에 쌓였다.
+    #
+    # LC6이 그 대입을 Editor::PlayModeController로 옮겨 GUI·CLI가 같은 이벤트를
+    # 지나게 했다. 이제 **결함을 기록하는 줄이 아니라 계약을 단정하는 줄**이다 —
+    # 되돌아가면 붉어져야 한다. 기록만 하고 통과시키면 되돌아가도 조용하다.
+    if ($undoPlaying.IsGameMode -ne 1) {
+        throw ("CLI 재생이 m_isGameMode를 켜지 않았다(got $($undoPlaying.IsGameMode)) — " +
+            "GUI Play와 서비스 play가 다른 Undo 스택을 쓰게 된다(§9 동등성)")
     }
+    if ($undoStop.IsGameMode -ne 0) {
+        throw ("정지가 m_isGameMode를 끄지 않았다(got $($undoStop.IsGameMode)) — " +
+            "정지 뒤의 편집이 게임 스택에 쌓인다")
+    }
+    $gameModeNote = "gamemode=play(1)/stop(0)"
 
     # ── 판정 D: 정지는 선택을 해제한다 (복원이 아니다) ──
     if ($selRestored.Primary -ne "(none)") {

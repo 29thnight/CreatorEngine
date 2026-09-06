@@ -330,7 +330,7 @@ public:
 
 	// 씬 경계에서 확정 수집한다. 비싸다(수십 ms) — 씬 전환에서만 부른다.
 	// 프레임 루프에서 부르면 그 프레임이 통째로 GC에 묶인다.
-	void CollectManagedHeap();
+	bool CollectManagedHeap();
 
 	// 재생 중에는 gen2 블로킹 수집을 억제한다(요청이지 보장은 아니다).
 	void SetManagedLatencyMode(bool lowLatency);
@@ -356,6 +356,85 @@ public:
 
 	// 이전 컨텍스트가 아직 살아 있는가(참조 누수 진단).
 	bool IsPreviousContextAlive();
+
+	// ── 표식된 static 메서드 호출 (L3 등급 B · LC7 · 계획 §10.2) ──
+	//
+	// "코드를 라이브 메모리에서 즉시 실행한다"의 등급 B 다. 등급 A(등록된 명령)는
+	// 이미 있었고, 등급 C(임의 스니펫 컴파일)는 범위 밖이다(§10.3).
+	//
+	// 관리 측이 `[EngineCallable]` 표식을 확인하고, 표식 없는 메서드는 이름을
+	// 알아도 호출하지 않는다. 그 판정이 여기가 아니라 관리 측에 있는 이유는
+	// 표식이 관리 metadata 라 여기서는 볼 수 없기 때문이다.
+
+	/// 관리 측 `InvokeOutcome` 과 **값이 같아야 한다**(ScriptCore/EngineCallableInvoker.cs).
+	enum class InvokeOutcome : int
+	{
+		Ok               =  0,
+		NoAssembly       = -1,
+		TypeNotFound     = -2,
+		TypeAmbiguous    = -3,
+		MethodNotFound   = -4,
+		MethodAmbiguous  = -5,
+
+		/// 있지만 `[EngineCallable]` 이 없다. **이것이 등급 B 의 경계다.**
+		NotMarked        = -6,
+
+		ArgumentMismatch = -7,
+		Threw            = -8,
+		Internal         = -9,
+
+		// ── 여기부터는 네이티브에서만 난다. 관리 측에 대응 값이 없다 ──
+
+		/// CLR 이 없거나 이 진입점이 바인딩되지 않았다(구 ScriptCore 어셈블리).
+		NotBound         = -100,
+
+		/// `ExecutesUserCode` 창 밖에서 불렸다. `UserCodeScope` 주석 참고.
+		NotPermitted     = -101,
+	};
+
+	struct InvokeResult
+	{
+		InvokeOutcome outcome{ InvokeOutcome::NotBound };
+
+		/// 실패 사유(사람이 읽는 한 줄). 성공이면 비어 있다.
+		std::string   reason;
+
+		/// 성공했을 때의 반환 타입 이름과 값. `void` 면 값이 비어 있다.
+		std::string   returnType;
+		std::string   returnValue;
+
+		bool Succeeded() const noexcept { return InvokeOutcome::Ok == outcome; }
+	};
+
+	/// 사용자 코드를 부를 수 있는 창을 연다. **게임 스레드 전용**이다.
+	///
+	/// ★ 이 창이 없으면 `InvokeCallableStatic` 은 `NotPermitted` 로 거부한다.
+	///
+	///   LC7 의 완료 기준이 "`ExecutesUserCode` 없는 경로로는 B 에 도달 불가" 다.
+	///   그것을 규약으로만 두면 — 즉 "이 함수는 그 capability 를 가진 핸들러에서만
+	///   부르기로 한다" 로 두면 — 지키는지 확인할 방법이 소스를 눈으로 훑는 것뿐이고,
+	///   두 번째 호출자가 생기는 날 아무도 모른 채 경계가 사라진다.
+	///
+	///   창을 여는 곳은 `ConsoleCommandSystem::ExecuteParsed` 한 곳이고, descriptor 의
+	///   `executesUserCode` 가 참일 때만 연다. 그래서 표식 없는 명령이 이 문에 닿으면
+	///   **조용히 통과하지 않고 소리 내어 거부된다.**
+	class UserCodeScope
+	{
+	public:
+		UserCodeScope() noexcept;
+		~UserCodeScope() noexcept;
+
+		UserCodeScope(const UserCodeScope&)            = delete;
+		UserCodeScope& operator=(const UserCodeScope&) = delete;
+
+	private:
+		bool m_previous{ false };
+	};
+
+	/// 표식된 static 메서드 하나를 부른다. **게임 스레드 전용**이다(관리 호출 규약).
+	InvokeResult InvokeCallableStatic(const std::string& typeName,
+	                                  const std::string& methodName,
+	                                  const std::vector<std::string>& args);
 
 	int  GetFieldCount(int instanceId);
 	std::string GetFieldName(int instanceId, int index);
@@ -477,6 +556,11 @@ private:
 	LoadScriptsFn m_fnLoadScripts{ nullptr };
 	ReloadFn      m_fnReloadScripts{ nullptr };
 	ReloadFn      m_fnIsPreviousContextAlive{ nullptr };
+
+	// 표식된 static 메서드 호출(LC7). 선택 바인딩이라 구 ScriptCore 어셈블리에서는
+	// nullptr 로 남고, 그때는 `NotBound` 를 낸다 — 조용히 실패하지 않는다.
+	using InvokeCallableFn = int(__stdcall*)(const char*, const char*, const char*, int, char*, int);
+	InvokeCallableFn m_fnInvokeCallable{ nullptr };
 
 	FieldCountFn m_fnGetFieldCount{ nullptr };
 	FieldNameFn  m_fnGetFieldName{ nullptr };

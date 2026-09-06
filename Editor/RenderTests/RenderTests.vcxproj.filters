@@ -16,9 +16,6 @@
     <Filter Include="RHI\DX12\Tests">
       <UniqueIdentifier>{193615ce-a3a0-56cf-91bd-fff82ba3fac3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RHI\DX12\Tests\Benchmarks">
-      <UniqueIdentifier>{f2d3e82e-0532-5459-9465-47afdb8c9ffa}</UniqueIdentifier>
-    </Filter>
     <Filter Include="RHI\DX12\Tests\Editor">
       <UniqueIdentifier>{1bf3e9fe-3fbb-58d5-bfae-b30a49ed34fa}</UniqueIdentifier>
     </Filter>
@@ -42,12 +39,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedApiOverheadBench.cpp">
-      <Filter>RHI\DX12\Tests\Benchmarks</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Benchmarks\EnhancedEncoderBench.cpp">
-      <Filter>RHI\DX12\Tests\Benchmarks</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoIconTest.cpp">
       <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
@@ -66,40 +57,13 @@
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp">
       <Filter>RHI\DX12\Tests</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentSamplerSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCookedSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentWeldSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentCacheOptSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentTextureCookSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentShaderMetaCookSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialCookSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialParitySelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialResolveSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialInstanceSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialSealSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialCodecSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.cpp">
@@ -111,13 +75,7 @@
     <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentResolverSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
       <Filter>ExperimentParity</Filter>
     </ClCompile>
     <ClCompile Include="AssetIdentity\AssetIdentitySelfTest.cpp">
@@ -141,9 +99,6 @@
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardScaleTest.cpp">
-      <Filter>RHI\DX12\Tests\Geometry</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardShadeTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
@@ -162,9 +117,6 @@
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSkyBoxTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOScaleTest.cpp">
-      <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedSSAOTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
     </ClCompile>
@@ -179,9 +131,6 @@
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedVolumetricFogTest.cpp">
       <Filter>RHI\DX12\Tests\Lighting</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainScaleTest.cpp">
-      <Filter>RHI\DX12\Tests\PostProcess</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp">
       <Filter>RHI\DX12\Tests\PostProcess</Filter>
@@ -238,15 +187,6 @@
     </ClInclude>
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
       <Filter>RHI\DX12\Tests</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentPoseSampler.h">
-      <Filter>ExperimentParity</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentSamplerSelfTest.h">
-      <Filter>ExperimentParity</Filter>
-    </ClInclude>
-    <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h">
-      <Filter>ExperimentParity</Filter>
     </ClInclude>
     <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h">
       <Filter>AssetIdentity</Filter>

@@ -25,7 +25,7 @@ if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
 $failures = @()
 
 for ($i = 1; $i -le $Runs; $i++) {
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
+    $proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $script `
         -WorkingDirectory $exeDir `
         -RedirectStandardOutput (Join-Path $Work "shutdown_order_$i.out") `
         -RedirectStandardError (Join-Path $Work "shutdown_order_$i.err") -PassThru

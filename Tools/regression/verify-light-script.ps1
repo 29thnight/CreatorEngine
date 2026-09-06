@@ -51,6 +51,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$Work = [IO.Path]::GetFullPath($Work)
+. (Join-Path $PSScriptRoot "CommandResults.ps1")
+New-Item -ItemType Directory -Path $Work -Force | Out-Null
 
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -65,7 +68,9 @@ if (-not (Test-Path $scenario)) { "시나리오가 없다: $scenario"; exit 1 }
 $outPath = Join-Path $Work "light_script_probe.out"
 $errPath = Join-Path $Work "light_script_probe.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$resultPath = Join-Path $Work "light_script_probe.results.jsonl"
+if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--script', ('"'+$scenario+'"'), '--result-format', 'jsonl', '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru
@@ -80,41 +85,12 @@ if (-not $proc.HasExited) {
 if (-not (Test-Path $outPath)) { "표준 출력이 없다: $outPath"; exit 1 }
 $stdout = Get-Content -LiteralPath $outPath -Raw
 
-# ── ① 경계 왕복 — 프로브 자기 판정 ──
-#
-# Debug->Log/LogError는 stdout에 안 나가고 인메모리·HTML 싱크로만 간다
-# (verify-script-add-awake-once.ps1의 같은 주석 참고). 로그는 실행이
-# 끝난 뒤 가장 최근 것을 집는다 — 이 프로세스가 방금 만든 것이다.
-$logDir = Join-Path $exeDir "Saved\Log"
-$editorLog = Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
-             Where-Object { $_.LastWriteTime -ge $proc.StartTime } |
-             Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-if (-not $editorLog) {
-    "이 실행이 만든 에디터 로그를 찾지 못했다: $logDir\Editor_*.html"
-    exit 1
-}
-
-$logText = (Get-Content -LiteralPath $editorLog.FullName -Raw) -replace '<[^>]+>', ''
-
-$probeStarted = $logText -match '\[LightScriptProbe\] 시작'
-$probePassed  = $logText -match '\[LightScriptProbe\] 전체 통과 \((\d+)건\)'
-$probeCount   = if ($probePassed) { [int]$Matches[1] } else { 0 }
-$probeFailed  = $logText -match '\[LightScriptProbe\] (\d+)건 실패'
-
-"① 경계 왕복"
-if (-not $probeStarted) {
-    "  프로브가 시작조차 하지 않았다 — script.add가 실패했거나 대상이 없다"
-    "  (기본 씬에 'Directional Light'가 서 있어야 한다 — EditorMain.cpp)"
-    exit 1
-}
-
-if ($probeFailed) {
-    "  프로브 실패 — 로그의 [LightScriptProbe] 실패 줄을 볼 것"
-    ($logText -split "`n" | Where-Object { $_ -match '\[LightScriptProbe\] 실패' }) |
-        ForEach-Object { "    $($_.Trim())" }
-    exit 1
-}
+$results = @(Read-CommandResults $resultPath)
+if ($proc.ExitCode -ne 0 -or @($results | Where-Object status -ne 'succeeded').Count) { throw 'Scenario command failed' }
+$invocation = Get-SucceededCommand $results 'script.invoke'
+$probe = $invocation.returnValue | ConvertFrom-Json
+if ($probe.completed -ne 1 -or $probe.failed -ne 0) { throw "Probe incomplete or failed: $($invocation.returnValue)" }
+$probeCount = [int]$probe.passed
 
 # 건수를 정확히 못 박는다. "N건 이상"으로 두면 프로브에서 단정 하나가
 # 조용히 빠져도 통과한다 — 커버리지가 줄어드는 것을 보는 유일한 자리다.
@@ -134,34 +110,19 @@ if ($probeCount -ne $ExpectedAssertions) {
 
 # 시나리오는 light.proxy를 두 번 부른다 — 스크립트가 손대기 전(기준선)과 후.
 # 두 줄을 함께 봐야 "원래 그랬다"와 "스크립트가 냈다"가 갈린다.
-$statLines = @($stdout -split "`n" | Where-Object { $_ -match '\[light\.proxy\] count=\d+ publish=' })
-if ($statLines.Count -lt 2) {
-    "  누계 줄이 $($statLines.Count) 개 — 기준선과 이후 두 줄이 나와야 한다."
-    "  (light.proxy가 등록되지 않았거나 시나리오가 한 번만 부른다)"
-    exit 1
-}
-
-$statPattern = 'count=(\d+) publish=(\d+) committed=(\d+) pending=(\d+) queued=(\d+) applied=(\d+)'
-
-if ($statLines[0] -notmatch $statPattern) {
-    "  기준선 누계를 해석하지 못했다: $($statLines[0].Trim())"
-    exit 1
-}
-$baseCount     = [int]$Matches[1]
-$basePublish   = [int]$Matches[2]
-$baseCommitted = [int]$Matches[3]
-$baseQueued    = [int]$Matches[5]
-
-if ($statLines[-1] -notmatch $statPattern) {
-    "  이후 누계를 해석하지 못했다: $($statLines[-1].Trim())"
-    exit 1
-}
-$publish   = [int]$Matches[2]
-$committed = [int]$Matches[3]
-$queued    = [int]$Matches[5]
-
-"  기준선: $($statLines[0].Trim())"
-"  이후  : $($statLines[-1].Trim())"
+$snapshots = @($results | Where-Object command -eq 'light.proxy')
+if ($snapshots.Count -ne 2) { throw 'Expected two light proxy snapshots' }
+$before = $snapshots[0].data
+$after = $snapshots[1].data
+$baseCount = [int]$before.count
+$basePublish = [long]$before.publish
+$baseCommitted = [long]$before.committed
+$baseQueued = [long]$before.queued
+$publish = [long]$after.publish
+$committed = [long]$after.committed
+$queued = [long]$after.queued
+"  baseline: $($before | ConvertTo-Json -Compress -Depth 8)"
+"  after   : $($after | ConvertTo-Json -Compress -Depth 8)"
 
 if ($baseCount -lt 1) {
     "  기준선 프록시 0개 — 광원이 없거나 전부 꺼져 있다(스냅샷은 Disabled를 거른다)."

@@ -35,7 +35,7 @@ param(
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 $started = Get-Date
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $Script `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $Script `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput (Join-Path $Work "resolution_sweep.out") `
     -RedirectStandardError (Join-Path $Work "resolution_sweep.err") -PassThru

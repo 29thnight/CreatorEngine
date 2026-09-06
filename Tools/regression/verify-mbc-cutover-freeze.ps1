@@ -189,13 +189,16 @@ foreach ($name in $hardZeroSurfaces) {
         $hardFailures.Add("하드 0 표면에 접촉이 있다: $name = $($counts[$name]) [" + ($filesBySurface[$name] -join ' ') + ']')
     }
 }
-# ⑧ 상태를 바꾸는 진단 명령 0 — experiment.animlive는 제품 publish를 부르지 않는다
+# ⑧ 상태를 바꾸는 진단 명령 0 — animator.status는 제품 publish를 부르지 않는다
 #    (읽기 전용 스냅샷만 읽는다). scene.transformbulk probe는 합성 fixture라 예외.
-$consolePath = Join-Path $repoRoot 'Editor\EngineEntry\ConsoleCommandSystem.cpp'
-if (Test-Path -LiteralPath $consolePath) {
-    $console = Get-CodeText $consolePath
-    $animliveStart = $console.IndexOf('static void Cmd_experiment_animlive(')
-    if ($animliveStart -lt 0) { $hardFailures.Add('experiment.animlive 진단이 없다(시그니처 변경?)') }
+#
+# This static gate checks the implementation's read-only contract. Command presence is
+# checked through runtime discovery and owned result fields by verify-editor-command-surface.
+$diagnosticSource = Join-Path $repoRoot 'Editor/EngineEntry/EditorDiagnostics.cpp'
+if (Test-Path -LiteralPath $diagnosticSource) {
+    $console = Get-CodeText $diagnosticSource
+    $animliveStart = $console.IndexOf('CommandCore::CommandResult AnimatorStatus(')
+    if ($animliveStart -lt 0) { $hardFailures.Add('animator.status 진단이 없다(시그니처 변경?)') }
     else {
         $open = $console.IndexOf('{', $animliveStart); $depth = 0; $end = -1
         for ($i = $open; $i -lt $console.Length; $i++) {
@@ -203,12 +206,10 @@ if (Test-Path -LiteralPath $consolePath) {
         }
         $body = if ($end -gt 0) { $console.Substring($open, $end - $open + 1) } else { '' }
         if ($body -match 'PublishAnimatorPose\(' -or $body -notmatch 'TryGetLastAnimatorPoseMetrics\(') {
-            $hardFailures.Add('experiment.animlive가 상태를 바꾼다(PublishAnimatorPose) 또는 읽기 전용 스냅샷을 읽지 않는다')
+            $hardFailures.Add('animator.status가 상태를 바꾼다(PublishAnimatorPose) 또는 읽기 전용 스냅샷을 읽지 않는다')
         }
     }
-    if ($console -notmatch 'Cmd_assets_modeldiag') {
-        $hardFailures.Add('읽기 전용 모델 소비 스냅샷 명령(assets.modeldiag)이 없다')
-    }
+
 }
 
 # ── 출력·판정 ──────────────────────────────────────────────────────────────────

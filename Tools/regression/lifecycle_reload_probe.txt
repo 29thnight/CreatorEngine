@@ -41,6 +41,7 @@ wait 60
 #
 # 이 구간에서 픽스처 표지가 하나라도 나오면 훅이 새어 나간 것이다.
 script.reload
+script.invoke GenerationProbe RecordedHooks
 wait 60
 
 play

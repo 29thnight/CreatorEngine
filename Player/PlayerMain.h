@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 
 // 게임 플레이어의 메인 루프 (BuildPipelinePlan B0-2).
@@ -39,6 +40,29 @@ namespace Player
 	};
 
 	inline SmokeOptions g_smoke{};
+
+	// --command-service: 로컬 HTTP/JSON 명령 서비스를 켠다(PHASE 14.5 LC8 · §11.2).
+	//
+	// ★ **기본은 off 다.** 서비스는 실행 표면이라 "설정 파일에 켜져 있었다" 로
+	//   열리면 안 된다(§8). 켜는 것은 이 명시 플래그뿐이다.
+	//
+	// ★★ Shipping 빌드에는 플래그가 있어도 서비스가 **없다.** 그 격리는 이
+	//   구조체가 아니라 `Player.vcxproj` 의 구성 조건부 ProjectReference 가 한다 —
+	//   여기서 플래그를 무시하는 것은 격리가 아니라 예의다.
+	struct ServiceOptions
+	{
+		bool        enabled{ false };
+
+		/// `Library/CommandService/endpoint.json` 이 놓일 뿌리.
+		///
+		/// Player 는 프로세스마다 격리된 runtime 데이터 뿌리를 갖는다(PlayerApp 의
+		/// `runtimeDataRoot`). 그 안에 두면 Player 를 여럿 띄워도 endpoint 파일이
+		/// 서로를 덮지 않는다 — 에디터는 프로젝트 뿌리 하나를 쓰지만 그쪽은
+		/// 한 번에 하나만 뜬다는 전제가 있고, Player 에는 그 전제가 없다.
+		std::string endpointRoot;
+	};
+
+	inline ServiceOptions g_service{};
 
 	// ★ IDeviceNotify 상속이 여기 있었다 (2026-08-10, DeviceResources 은퇴).
 	//   OnDeviceLost는 비어 있었고 OnDeviceRestored는 리사이즈 경로를 한 번 더

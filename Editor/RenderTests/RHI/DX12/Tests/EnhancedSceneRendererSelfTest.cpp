@@ -588,7 +588,7 @@ passes:
 }
 
 bool DX12Test::RunSelfTest(const std::string& outputPngPath,
-    uint32_t frameCount, std::string& outLog)
+    uint32_t frameCount, const std::string& texturePath, std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
 
@@ -596,7 +596,7 @@ bool DX12Test::RunSelfTest(const std::string& outputPngPath,
 
     if (!ValidateShaderPermutation(outLog)) return false;
     if (!ValidateShaderMeta(outLog)) return false;
-    if (!RenderTest::RunShaderReflectionSelfTest(outLog)) return false;
+    if (!RenderTest::RunShaderReflectionSelfTest(texturePath, outLog)) return false;
 
     // 별도 진단 명령을 늘리지 않는다. 기존 DX12 종단 selftest의 가장 앞에서
     // backend-neutral 파이프라인 기술 계약을 GPU 없이 독립 검증한다.
@@ -1522,7 +1522,7 @@ bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& ou
     return true;
 }
 
-bool DX12Test::RunUploadSegmentTest(std::string& outLog)
+bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& outLog)
 {
     if (!ValidateCompletionRetireQueue())
     {
@@ -1949,7 +1949,7 @@ bool DX12Test::RunUploadSegmentTest(std::string& outLog)
             + " · rollback " + std::string(outputsUnchanged ? "보존" : "손상") + ")\n";
     }
 
-    // ── Slice D: 실제 scene.glb 메시 캐시 persistent heap ──
+    // ── Slice D: 입력 모델 메시 캐시 persistent heap ──
     // 버퍼 두 개를 모두 실제 copy queue에 제출한 뒤, 완료점 직전에는
     // placed resource를 보존하고 정확히 도달한 뒤에만 block을 병합한다.
     // 공통 policy 자가 검증과 adapter 자가 검증이 놓치는 실제 cache 소유권,
@@ -1963,7 +1963,7 @@ bool DX12Test::RunUploadSegmentTest(std::string& outLog)
         }
         else
         {
-            const file::path scenePath = PathFinder::ModelSourcePath() / L"scene.glb";
+            const file::path scenePath = file::path(modelPath);
             // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
             const std::shared_ptr<const assets::ModelAssetGeneration> sceneModel =
                 DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
@@ -1985,7 +1985,7 @@ bool DX12Test::RunUploadSegmentTest(std::string& outLog)
             RHIMeshBinding firstBinding{};
             if (!scenePassed)
             {
-                outLog += "[Slice D/DX12] scene.glb 유효 mesh 누적이 16MiB를 넘지 않음"
+                outLog += "[Slice D/DX12] 입력 모델 유효 mesh 누적이 16MiB를 넘지 않음"
                     " (mesh " + std::to_string(sceneMeshes.size()) + "개 · "
                     + std::to_string(sceneUploadBytes) + "B): " + scenePath.string() + "\n";
             }
@@ -2004,7 +2004,7 @@ bool DX12Test::RunUploadSegmentTest(std::string& outLog)
                     if (!binding.vertices.IsValid() || !binding.indices.IsValid())
                     {
                         scenePassed = false;
-                        outLog += "[Slice D/DX12] scene.glb mesh upload 실패: "
+                        outLog += "[Slice D/DX12] 입력 모델 mesh upload 실패: "
                             + uploadError + "\n";
                         break;
                     }
@@ -2072,7 +2072,7 @@ bool DX12Test::RunUploadSegmentTest(std::string& outLog)
                     releasedHeap.emptySegments == releasedHeap.activeSegments;
                 scenePassed = residentPassed && lifetimePassed;
 
-                outLog += "[Slice D/DX12] scene.glb persistent mesh "
+                outLog += "[Slice D/DX12] 입력 모델 persistent mesh "
                     + std::string(scenePassed ? "통과" : "실패")
                     + " (mesh " + std::to_string(sceneMeshes.size())
                     + "개 · 원본 " + std::to_string(sceneUploadBytes)
@@ -3021,8 +3021,9 @@ bool DX12Test::RunGBufferTest(std::string& outLog)
     return passed;
 }
 
-bool DX12Test::RunSceneBindingTest(std::string& outLog)
+bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* report)
 {
+    if (report) *report = {};
     using Microsoft::WRL::ComPtr;
 
     // ★ 단계마다 즉시 찍는다.
@@ -3133,7 +3134,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
                 item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
 
                 // I6-B4-pre 진단 — 하네스가 **실제로 받은** 팔레트의 digest.
-                // experiment.animlive가 Animator::m_FinalTransforms에서 뜬
+                // animator.status가 Animator::m_FinalTransforms에서 뜬
                 // 값과 같은 방식(1/4096 양자화 FNV)으로 접는다. 두 값이
                 // 같으면 운반은 옳고 결함은 그 뒤(셰이더/CB), 다르면 운반
                 // 구간이다. 앞 64개만 접는 축도 함께 낸다 — animlive는
@@ -3261,6 +3262,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
             flat.data(), flat.size(), uiRects);
     }
 
+    if (report) { report->drawCandidates = draws.size(); report->lights = lights.size(); }
     outLog += "[1/4] 씬 입력 확보 — 카메라 " + std::to_string(sceneCamera->GetInstanceID())
         + " · 드로우 후보 " + std::to_string(draws.size())
         + " · 포워드 " + std::to_string(forwardDraws.size())
@@ -3931,6 +3933,16 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog)
         + " · 메시 " + std::to_string(gbuffer.GetLastMeshCount())
         + " · 재질 " + std::to_string(gbuffer.GetLastMaterialCount())
         + " · 배치 " + std::to_string(gbuffer.GetLastBatchCount()) + "\n";
+    if (report)
+    {
+        report->draws = drawCountA;
+        report->meshUploads = meshStats.uploads;
+        report->generationUploads = meshStats.modelGenerationUploads;
+        report->uploadKB = meshStats.bytesUploaded / 1024;
+        report->coverage = coveredA;
+        report->pixels = kWidth * kHeight;
+        report->texturedDraws = materialsWithTexture;
+    }
     outLog += "[3/4] 씬 카메라 렌더 — 드로우 " + std::to_string(drawCountA)
         + " · 메시 업로드 " + std::to_string(meshStats.uploads)
         + "(generation " + std::to_string(meshStats.modelGenerationUploads) + ", "

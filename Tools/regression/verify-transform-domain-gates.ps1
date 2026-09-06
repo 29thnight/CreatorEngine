@@ -47,7 +47,7 @@ $errFile = Join-Path $Work "transform_domain_gate_$runId.err"
 ))
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir -WindowStyle Hidden `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null

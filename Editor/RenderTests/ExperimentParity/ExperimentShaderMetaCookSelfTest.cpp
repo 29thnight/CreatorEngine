@@ -261,8 +261,21 @@ namespace RenderTest
                 const ck::CookedAssetManifestEntry& entry = product.manifestEntry;
                 check.Check(entry.kind == ck::CookedAssetKind::ShaderMeta,
                     "manifest kind");
-                check.Check(entry.formatVersion == ShaderMeta::kSchemaVersion,
-                    "manifest formatVersion 이 schema 정본에서 나와야 한다");
+                // ★ 2026-09-06 교정. 이 줄은 `== ShaderMeta::kSchemaVersion` 이었고
+                //   **늘 실패하고 있었다.** 프로듀서는
+                //   `(kSchemaVersion << 16) | Authoring::kCookedDocumentVersion` 을
+                //   넣는다(`ShaderMetaCookProducer.cpp` — "schema 정본에서 유도한다.
+                //   손으로 올리는 숫자가 아니다").
+                //
+                //   같은 파일의 **실자산 절반이 이미 합성 값을 단정하고 있었다.**
+                //   즉 옳은 단정과 낡은 단정이 한 파일에 같이 있었고, 낡은 쪽만
+                //   돌고 있었다 — 실자산 절반은 CLI 인자 둘을 요구하는데 그것을
+                //   주는 스크립트가 없다. 아무도 안 도는 절반에 정답이 있으면
+                //   드리프트는 영원히 산다.
+                check.Check(entry.formatVersion
+                    == ((ShaderMeta::kSchemaVersion << 16u)
+                        | Authoring::kCookedDocumentVersion),
+                    "manifest formatVersion 이 schema/CEDO 정본에서 나와야 한다");
                 check.Check(entry.byteSize == product.artifactBytes.size(),
                     "manifest byteSize");
                 check.Check(entry.artifactPath == product.artifactPath,

@@ -5,13 +5,13 @@ param(
     [int]$TimeoutSeconds = 180
 )
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $failed = $false
 $markers = @(
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.h"; Pattern = "bool EnsureResolved(EntityHandle target);"; Label = "targeted pull API" },
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.cpp"; Pattern = "bool Scene::EnsureResolved(EntityHandle target)"; Label = "packed targeted pull" },
-    [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.cpp"; Pattern = "parentWorldEpoch"; Label = "parent propagation epoch" },
-    [pscustomobject]@{ Path = "Editor\EngineEntry\ConsoleCommandSystem.cpp"; Pattern = "scene.transformpull"; Label = "X6 runtime probe" }
+    [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.cpp"; Pattern = "parentWorldEpoch"; Label = "parent propagation epoch" }
 )
 
 foreach ($marker in $markers) {
@@ -47,12 +47,13 @@ $scenario = Join-Path $Work "transform_targeted_pull_$runId.txt"
 $outFile = Join-Path $Work "transform_targeted_pull_$runId.out"
 $errFile = Join-Path $Work "transform_targeted_pull_$runId.err"
 [System.IO.File]::WriteAllLines($scenario, @(
-    "scene.transformpull probe",
+    "scene.transformpull.check probe",
     "quit"
 ))
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$resultPath = $outFile + ".jsonl"
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) `
     -WorkingDirectory $exeDir -WindowStyle Hidden `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -62,6 +63,8 @@ if (-not $proc.HasExited) {
     exit 1
 }
 
+$commandResults = @(Read-CommandResults $resultPath)
+if (@($commandResults | Where-Object status -ne 'succeeded').Count -ne 0) { throw 'Runtime command failed or was unavailable' }
 $output = [System.IO.File]::ReadAllText($outFile)
 $immediate = 'immediate=PASS getters=PASS queue=1->1 signal=kept'
 $sibling = 'parent-pull=PASS sibling-before=stale sibling-global=updated requests=1 ranges=1 nodes=3'

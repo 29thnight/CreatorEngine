@@ -6,6 +6,7 @@
 #include "TypeTrait.h"
 #include "HashingString.h"
 
+namespace Meta { struct EditorObjectIdentity; }
 class RenderScene;
 class SceneManager;
 class Object : public IObject, public meta::polymorphic
@@ -20,6 +21,7 @@ class Object : public IObject, public meta::polymorphic
            meta::field<&Self::m_isEnabled>);
    }
 private:
+    friend struct Meta::EditorObjectIdentity;
     friend class SceneManager;
     friend class RenderScene;
     friend class Prefab;

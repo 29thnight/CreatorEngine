@@ -223,7 +223,7 @@ foreach ($scene in $scenes) {
     Write-Host ""
     Write-Host "[$($scene.Name)] $($scene.Why)"
 
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--script `"$cmdFile`"" `
+    $proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script `"$cmdFile`"" `
         -WorkingDirectory (Split-Path -Parent $Exe) -PassThru -NoNewWindow
     $exited = $proc.WaitForExit($TimeoutSec * 1000)
     if (-not $exited) {

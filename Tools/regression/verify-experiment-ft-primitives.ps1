@@ -6,6 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
     "실행 파일이 없다: $Exe"
@@ -24,6 +25,7 @@ New-Item -ItemType Directory -Path $run -Force | Out-Null
 $scenario = Join-Path $run 'commands.txt'
 $stdout = Join-Path $run 'stdout.txt'
 $stderr = Join-Path $run 'stderr.txt'
+$resultPath = Join-Path $run 'results.jsonl'
 @(
     "scene.switch $($scene.Replace('\', '/'))"
     'wait 120'
@@ -31,7 +33,7 @@ $stderr = Join-Path $run 'stderr.txt'
     'quit'
 ) | Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario) `
+$process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) `
     -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 $process.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -53,24 +55,16 @@ $unexpectedErrors = @($errorLines | Where-Object {
 })
 $lodWarnings = @($errorLines | Where-Object { $_ -eq $knownLodWarning }).Count
 
-$inputMatch = [regex]::Match($text,
-    '\[1/4\] 씬 입력 확보 .*?드로우 후보 (\d+) .*?광원 (\d+)')
-$drawMatch = [regex]::Match($text,
-    '\[3/4\] 씬 카메라 렌더 .*?드로우 (\d+) .*?메시 업로드 (\d+)')
-$verdict = $text -match '\[CLI\] dx12\.scene 통과'
-$drainTimeout = $text -match 'RenderThread drain 시간 초과'
-
-$drawCandidates = if ($inputMatch.Success) { [int]$inputMatch.Groups[1].Value } else { 0 }
-$lights = if ($inputMatch.Success) { [int]$inputMatch.Groups[2].Value } else { 0 }
-$draws = if ($drawMatch.Success) { [int]$drawMatch.Groups[1].Value } else { 0 }
-$meshUploads = if ($drawMatch.Success) { [int]$drawMatch.Groups[2].Value } else { 0 }
+$data = Get-SucceededCommand (Read-CommandResults $resultPath) 'dx12.scene'
+$drawCandidates = [int]$data.drawCandidates
+$lights = [int]$data.lights
+$draws = [int]$data.draws
+$meshUploads = [int]$data.meshUploads
 
 "experiment-ft-primitives exit=$($process.ExitCode) output=$run"
 "scene drawCandidates=$drawCandidates lights=$lights draws=$draws meshUploads=$meshUploads lodWarnings=$lodWarnings unexpectedStderr=$($unexpectedErrors.Count)"
 
-$passed = 0 -eq $process.ExitCode -and $verdict -and -not $drainTimeout -and
-    $inputMatch.Success -and $drawMatch.Success -and
-    $drawCandidates -gt 0 -and $lights -gt 0 -and
+$passed = 0 -eq $process.ExitCode -and $drawCandidates -gt 0 -and $lights -gt 0 -and
     $draws -gt 0 -and $meshUploads -gt 0 -and 0 -eq $unexpectedErrors.Count
 if (-not $passed) {
     if ($unexpectedErrors.Count -gt 0) {

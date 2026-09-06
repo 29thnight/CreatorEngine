@@ -2,17 +2,19 @@
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Release\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
-    [int]$TimeoutSeconds = 180
+    [int]$TimeoutSeconds = 180,
+    [string]$PoseModel = (Join-Path $PSScriptRoot '../../Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb'),
+    [string]$RebindModel = (Join-Path $PSScriptRoot '../../Dynamic_CPP/Assets/Models/SU_Mythic.glb')
 )
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $failed = $false
 $markers = @(
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.h"; Pattern = "AnimatorPoseUploadMetrics PublishAnimatorPose"; Label = "Animator pose bulk API" },
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.h"; Pattern = "ApplyWorldWriteBatch"; Label = "world write batch API" },
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.cpp"; Pattern = "animatorPoseBindings"; Label = "skeleton binding cache" },
-    [pscustomobject]@{ Path = "Engine\SceneRuntime\AnimationJob.cpp"; Pattern = "scene->PublishAnimatorPose(*animator)"; Label = "barrier pose commit" },
-    [pscustomobject]@{ Path = "Editor\EngineEntry\ConsoleCommandSystem.cpp"; Pattern = "scene.transformbulk"; Label = "X7 runtime probe" }
+    [pscustomobject]@{ Path = "Engine\SceneRuntime\AnimationJob.cpp"; Pattern = "scene->PublishAnimatorPose(*animator)"; Label = "barrier pose commit" }
 )
 foreach ($marker in $markers) {
     $path = Join-Path $repo $marker.Path
@@ -65,17 +67,25 @@ if ($physicsBatchCalls -ne 2) {
 if ($failed) { exit 1 }
 if (-not (Test-Path -LiteralPath $Exe)) { "FAIL: executable missing: $Exe"; exit 1 }
 
+foreach ($modelInput in @($PoseModel, $RebindModel)) {
+    if (-not (Test-Path -LiteralPath $modelInput -PathType Leaf)) {
+        "FAIL: required skeleton model missing: $modelInput"
+        exit 1
+    }
+}
+New-Item -ItemType Directory -Path $Work -Force | Out-Null
 $runId = [guid]::NewGuid().ToString('N')
 $scenario = Join-Path $Work "transform_bulk_$runId.txt"
 $outFile = Join-Path $Work "transform_bulk_$runId.out"
 $errFile = Join-Path $Work "transform_bulk_$runId.err"
 [System.IO.File]::WriteAllLines($scenario, @(
-    "scene.transformbulk probe",
+    "scene.transformbulk probe `"$([IO.Path]::GetFullPath($PoseModel))`" `"$([IO.Path]::GetFullPath($RebindModel))`"",
     "quit"
 ))
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$resultPath = $outFile + ".jsonl"
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) `
     -WorkingDirectory $exeDir -WindowStyle Hidden `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -85,6 +95,8 @@ if (-not $proc.HasExited) {
     exit 1
 }
 
+$commandResults = @(Read-CommandResults $resultPath)
+if (@($commandResults | Where-Object status -ne 'succeeded').Count -ne 0) { throw 'Runtime command failed or was unavailable' }
 $output = [System.IO.File]::ReadAllText($outFile)
 $animator = 'animator=PASS first-lookups=3 valid=2 invalid=1 steady-lookups=0 off=held on-lookups=0 reload-lookups=3'
 $physics = 'physics=PASS requested=2 accepted=2 epoch=1 immediate=PASS global=PASS socket=PASS'

@@ -21,8 +21,11 @@ public sealed partial class LightScriptProbe : Component
 {
     private const float Epsilon = 1e-4f;
 
-    private int _passed;
-    private int _failed;
+    private static int _completed;
+    [EngineCallable] public static string Results() => FormattableString.Invariant($"{{\"completed\":{_completed},\"passed\":{_passed},\"failed\":{_failed}}}");
+
+    private static int _passed;
+    private static int _failed;
 
     public override void OnInitialized()
     {
@@ -41,6 +44,7 @@ public sealed partial class LightScriptProbe : Component
         CheckEnumGuards(light);
         CheckAbsence();
 
+        ++_completed;
         if (_failed == 0) Log($"[LightScriptProbe] 전체 통과 ({_passed}건)");
         else LogError($"[LightScriptProbe] {_failed}건 실패 / {_passed}건 통과");
     }

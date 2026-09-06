@@ -49,7 +49,7 @@ $stderr = Join-Path $Work "skin_pose_integrity.err.log"
     Replace('__SKINNED_MODEL__', $model.Replace('\', '/')) |
     Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $scenario) `
     -WorkingDirectory $repoRoot -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 if (-not $proc.WaitForExit($TimeoutSec * 1000)) {

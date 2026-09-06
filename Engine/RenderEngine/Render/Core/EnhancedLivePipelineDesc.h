@@ -179,6 +179,13 @@ struct LivePassNode
     bool IsActive() const { return !active || active(); }
 };
 
+struct LivePassNodeSnapshot
+{
+    std::string name;
+    bool conditional{}, active{}, perView{};
+    std::vector<std::string> reads, writes, modifies;
+};
+
 class LivePipelineDesc
 {
 public:
@@ -227,6 +234,14 @@ public:
     /// 이 덤프가 없으면 "이 패스가 어디 끼는지"를 알려면 RenderOnce를 정독해야
     /// 한다. 기본 폰트가 라틴 전용인 디버그 창에서 읽히도록 출력 어휘는 영문이다.
     std::string Dump() const;
+    std::vector<LivePassNodeSnapshot> SnapshotNodes() const
+    {
+        std::vector<LivePassNodeSnapshot> result;
+        result.reserve(m_nodes.size());
+        for (const auto& node : m_nodes)
+            result.push_back({node.name, bool(node.active), node.IsActive(), node.perView, node.reads, node.writes, node.modifies});
+        return result;
+    }
 
     /// GPU·활성 scene 없이 Validate와 Dump의 계약을 독립 검증한다.
     /// 정상 기술, 이름 없음, 비활성 가능 노드의 새 슬롯 발행, 미발행

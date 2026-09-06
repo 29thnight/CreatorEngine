@@ -1,8 +1,14 @@
 #pragma once
+#include "CommandCore/CommandResult.h"
+
 #include <atomic>
+#include <cstdio>
+#include <chrono>
+#include <cstdint>
 #include <deque>
-#include <future>
 #include <functional>
+#include <future>
+#include <optional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -31,7 +37,14 @@ struct ConsoleCommandContext
     ConsoleCommandSystem&           system;
 };
 
-using ConsoleCommandHandler = void(*)(const ConsoleCommandContext&);
+// 이행 전 핸들러. 결과를 내지 않는다.
+//
+// LC1 이 이 서명을 한 번에 갈아엎지 않는 이유는 §15 의 위험 표에 있다 —
+// 205 개 등록을 동시에 바꾸는 patch 는 검토할 수 없고, 그 안에 섞인 거동 변경
+// 하나를 아무도 못 본다. 두 서명이 공존하고 domain 단위로 넘어간다.
+
+// LC1 이후의 핸들러. 정확히 하나의 terminal 결과를 만든다.
+using ConsoleCommandResultHandler = CommandCore::CommandResult(*)(const ConsoleCommandContext&);
 
 // 콘솔 명령 계층.
 //
@@ -68,6 +81,103 @@ public:
     // 외부에서 명령을 밀어 넣는다(스레드 안전).
     void Enqueue(std::string command);
 
+    /// 이미 갈라진 인자로 명령을 밀어 넣는다(스레드 안전).
+    ///
+    /// ★ **라인 문법을 거치지 않는다.** `arguments[0]` 이 명령 이름이고 나머지가
+    ///   인자다. 따옴표도 escape 도 개입하지 않는다 — 이미 갈라져 있으므로.
+    ///
+    ///   계획 §3.2 가 지적한 왕복 손실이 여기서 원천적으로 없어진다. JSON 이
+    ///   `{"args":["Big Boss","Main Characters"]}` 로 가져온 값을 라인으로 이어
+    ///   붙였다 다시 자르면 그 과정에서 따옴표가 새는데, 이 경로는 이을 일이 없다.
+    ///   LC4 의 수신 스레드가 쓸 진입점이고, 오늘은 `--exec-args` 가 같은 문을 쓴다.
+    void EnqueueStructured(std::vector<std::string> arguments);
+
+    /// 명령 하나의 실행이 끝났을 때 불린다. **게임 스레드에서 불린다.**
+    struct CommandTiming
+    {
+        double   queuedMs{ 0.0 };
+        uint32_t waitedFrames{ 0 };
+        double   executedMs{ 0.0 };
+    };
+    using CommandCompletion =
+        std::function<void(const CommandCore::CommandResult&, const CommandTiming&)>;
+
+    /// 결과를 받을 사람이 있는 구조화 주입(LC4 의 HTTP 수신 스레드).
+    ///
+    /// completion 은 GT 에서 불리므로 **짧아야 한다**. 수신 스레드는 그 안에서
+    /// 값을 넘겨받고 곧바로 깨어난다.
+    /// ★ **서비스 큐로 들어간다**(LC5). 배치 큐와 분리한 이유는 §7.2 다 —
+    ///   `scripts/scene_churn_benchmark.txt` 같은 기존 시나리오는 프레임 수로
+    ///   시간을 재고 `wait N` 이 정확히 N 프레임을 뜻한다는 전제 위에 있다.
+    ///   서비스 지연을 위해 드레인을 바꾸면서 그 전제를 같이 바꾸면 81 개
+    ///   소비자의 측정값이 조용히 이동한다.
+    /// 결과를 돌려받을 사람이 있는 적재(서비스 경로).
+    ///
+    /// `serviceQueueCap` 이 0 이 아니면 그 상한을 **적재와 같은 락 안에서**
+    /// 확인하고, 넘으면 넣지 않고 false 를 돌려준다. 검사와 적재를 떼어 놓으면
+    /// 동시 요청이 전부 검사를 통과한 뒤 차례로 들어와 상한을 넘긴다.
+    bool EnqueueStructured(std::vector<std::string> arguments, CommandCompletion completion,
+                           std::size_t serviceQueueCap = 0);
+
+    /// 서비스 큐의 깊이. 상한을 넘으면 수신 스레드가 429 를 낸다(§7.3).
+    std::size_t ServiceQueueDepth() const;
+    std::size_t BatchQueueDepth() const;
+
+    /// 명령 등록을 **지금** 끝낸다.
+    ///
+    /// ★ registry 는 `GetTable()` 의 function-local static 이 채운다. 그 함수는
+    ///   오늘 `ExecuteParsed` 에서만 불리므로, 명령이 하나도 안 돈 상태에서는
+    ///   표가 비어 있다. `--command-service` 만 준 실행이 정확히 그 상태로
+    ///   수신 스레드를 띄운다 — 그러면 ① 첫 요청의 `cost` 조회가 "없는 명령"이
+    ///   되어 `game.pak` 같은 Long 명령이 동기로 돌고(§6.2 가 무력화된다)
+    ///   ② 게임 스레드가 표를 채우는 도중 수신 스레드가 그것을 훑어 vector 에
+    ///   대한 read/write 경합이 난다. 서비스를 열기 전에 여기서 끝내 둔다.
+    static void EnsureRegistryPopulated();
+
+    /// 드레인 예산(§7.2). 0 으로 두면 서비스 큐가 돌지 않는다 —
+    /// SLO 게이트가 그 상태로 **자기 이빨을 확인한다**(§14.7).
+    struct DrainBudget
+    {
+        double      timeMs{ 2.0 };
+        std::size_t count{ 8 };
+    };
+    void        SetDrainBudget(DrainBudget budget) noexcept;
+    DrainBudget GetDrainBudget() const noexcept;
+
+    // ── 서비스가 GT 밖에서 읽는 상태 (LC4) ──────────────────────────────
+    //
+    // ★ **게임 스레드가 멈춰 있어도 답해야 한다.** LC0 실측이 그 근거다 —
+    //   `scene.load` 가 큐를 2.4초 막는 동안 `Pump()` 는 아예 돌지 않았고,
+    //   그 구간에 상태를 못 내면 §7.3 의 "멈춤은 지연이 아니라 상태다"가
+    //   성립하지 않는다. 그래서 이 값들은 `Pump()` 가 아니라 **명령 실행 전후**에
+    //   찍히고, 큐 뮤텍스는 실행 중에는 잡고 있지 않다.
+    struct ServiceStatus
+    {
+        uint64_t    frame{ 0 };
+
+        // ★ **두 큐를 따로 낸다(LC5).**
+        //
+        //   LC5 가 큐를 둘로 쪼갠 뒤에도 여기는 배치 큐만 보고 있었다. 그래서
+        //   `--command-service` 만으로 띄운 자동화 실행 — 배치 입력이 아예 없는
+        //   실행 — 에서는 `/health` 가 서비스 큐가 상한까지 차 있어도 **항상**
+        //   `queueDepth 0` 을 냈다. 클라이언트는 429 를 받기 직전까지 한가한
+        //   서버를 본다. "멈춤은 지연이 아니라 상태다"를 지키겠다고 만든 창구가
+        //   정작 LC5 가 새로 만든 줄에 대해서만 눈을 감고 있었다.
+        std::size_t serviceQueueDepth{ 0 };
+        double      oldestQueuedMs{ 0.0 };   ///< 서비스 큐 선두의 대기 시간
+        std::size_t batchQueueDepth{ 0 };
+
+        bool        executing{ false };
+        std::string currentCommand;
+
+        // 실행 중이 아니어도 큐가 안 도는 구간이 있다. `wait N` 과 씬 로딩은
+        // `Pump()` 를 조기 반환시키므로 `executing` 이 거짓인 채로 서비스 큐가
+        // 통째로 멈춘다. 그 구간을 "한가함"으로 내면 관측이 거짓말을 한다.
+        bool        sceneLoading{ false };
+        uint32_t    waitFramesRemaining{ 0 };
+    };
+    ServiceStatus SnapshotStatus() const;
+
     // ── 핸들러가 쓰는 표면 ───────────────────────────────────────────────
     //
     // 명령 본문이 독립 함수로 나가면서, 예전에 멤버를 직접 만지던 세 자리가
@@ -80,11 +190,19 @@ public:
     /// wait N. 다음 명령을 N 프레임 뒤로 미룬다.
     void SetWaitFrames(int frames) noexcept;
 
-    // Keep publishing engine frames while an asynchronous diagnostic completes.
-    void WaitUntil(std::function<bool()> completed) { m_waitCondition = std::move(completed); }
+    // Commandlet-only: emit its terminal result after the engine publishes more frames.
+    void WaitForResult(std::function<std::optional<CommandCore::CommandResult>()> poll);
 
     /// help.
     void PrintHelp() const;
+
+    /// PrintHelp가 찍는 바로 그 문자열.
+    ///
+    /// LC0(PHASE 14.5)이 "등록된 명령 중 몇 개가 help에 실려 있는가"를 재려면
+    /// help가 stdout으로만 존재해서는 안 된다 — 출력을 되읽는 것은 계획이
+    /// 끊겠다고 한 바로 그 습관이다. 그래서 문자열을 정본으로 두고 PrintHelp는
+    /// 그것을 찍기만 한다. LC3이 descriptor를 세우면 이 상수는 사라진다.
+    static const char* HelpText() noexcept;
 
     /// 에디터 카메라를 게임 카메라와 같은 자세로 맞춘다(camera.editor match).
     /// 두 뷰의 시점을 통일해야 성립하는 대조 실험이 있어서 명령으로 뺐다 —
@@ -96,16 +214,128 @@ public:
     /// 게임 스레드의 프레임 경계(App)에서만 읽는다.
     static bool IsEditorCameraFollowing() noexcept;
 
+    /// `camera.editor follow on|off` 이 쓴다.
+    ///
+    /// ★ 상태를 **파사드가 소유한다.** 읽는 쪽(`IsEditorCameraFollowing`)이
+    ///   App 프레임 경계에 있어서, 이 값을 도메인 TU 로 옮기면 파사드가 도메인을
+    ///   거꾸로 참조하게 된다(§12 의 의존 방향이 뒤집힌다). 대신 좁은 설정
+    ///   창구만 연다 — 게임 스레드 전용이라 원자성은 필요 없다.
+    static void SetEditorCameraFollowing(bool follow) noexcept;
+
 private:
+    bool m_commandletMode{false};
+    bool m_commandletDone{false};
+    std::string m_commandletScript;
+    std::string m_commandletError;
+    std::vector<std::string> m_commandletArguments;
+
     ConsoleCommandSystem() = default;
     ~ConsoleCommandSystem() = default;
 
     void StartStdinReader();
     void LoadScriptFile(const std::string& path);
-    void Execute(const std::string& line);
 
-    std::deque<std::string> m_pending;
-    std::mutex m_mutex;
+    /// 한 줄을 토큰으로 자른 뒤 실행한다. **라인 문법은 여기까지만 산다.**
+    ///
+    /// 반환값이 생긴 것이 LC1 이다. 예전에는 void 였고, 그래서 unknown command 가
+    /// printf 한 줄 뒤 그냥 return 했다 — 오타 하나가 조용히 exit 0 이었다.
+    CommandCore::CommandResult Execute(const std::string& line);
+
+    /// 이미 갈라진 토큰으로 실행한다. `parts[0]` 이 명령 이름이다.
+    ///
+    /// 라인 경로와 구조화 경로가 **정확히 여기서 만난다.** 두 입력이 같은
+    /// invocation 을 만든다는 §14.2 의 단정이 성립하는 이유다.
+    CommandCore::CommandResult ExecuteParsed(const std::vector<std::string>& parts,
+                                             const std::string&              diagnosticLine);
+
+    /// 결과를 session 에 넣고 사람이 읽는 줄을 찍는다.
+    void PublishResult(const std::string& commandId, const CommandCore::CommandResult& result);
+
+    /// LC9 — 배치 결과 한 줄을 schema v1 JSONL 로 쓴다.
+    ///
+    /// `--result-format jsonl` 이 아니면 아무 일도 하지 않는다. 목적지는
+    /// `--result-file` 이고, 없으면 stdout 이다.
+    ///
+    /// ★ **소비자는 `--result-file` 을 쓸 것.** stdout 에는 명령들이 찍는 사람용
+    ///   줄이 함께 흐른다. 파일로 받으면 소비자가 골라낼 일이 없다 — §18 의
+    ///   "자동화 consumer 가 source/help/한국어 verdict 문자열을 파싱하지 않는다"
+    ///   는 "다른 것을 파싱한다"가 아니라 **파싱하지 않는다**여야 한다.
+    void WriteResultLine(const std::string& commandId,
+                         const CommandCore::CommandResult& result,
+                         double queuedMs, uint32_t waitedFrames, double executedMs);
+
+    /// 큐에 남은 명령을 버린다(`--fail-fast`).
+    void DiscardPending();
+
+    // 큐에 든 명령 하나.
+    //
+    // 예전에는 그냥 std::string이었다. LC0이 "명령을 넣은 순간부터 실행될
+    // 때까지"를 재려면 넣은 시각이 명령과 함께 다녀야 한다 — 실행 시점에
+    // 되짚을 방법이 없기 때문이다. 이 두 필드가 §7.1 지연 예산의 바닥값이고,
+    // LC5가 서비스 응답의 timing.queuedMs / waitedFrames로 그대로 승계한다.
+    struct PendingCommand
+    {
+        /// 라인 입력의 원문. structured 입력에서는 진단용으로만 채운다.
+        std::string                           text;
+
+        /// 구조화 입력의 토큰(`[0]` 이 명령 이름). 비어 있으면 라인 입력이다.
+        std::vector<std::string>              arguments;
+
+        std::chrono::steady_clock::time_point enqueuedAt{};
+        uint64_t                              enqueuedFrame{};
+
+        /// 결과를 기다리는 사람이 있으면 채워진다(LC4).
+        CommandCompletion                     completion;
+
+        /// 서비스(HTTP)에서 왔는가.
+        ///
+        /// ★ 큐를 가르는 축이자 **session 을 가르는 축**이다. LC4 직후에는
+        ///   서비스 명령의 실패가 배치 session 에 누적돼 프로세스 종료 코드를
+        ///   바꿨다 — HTTP 로 부른 `scene.load` 하나가 에디터를 exit 3 으로
+        ///   끝내게 만들었다. 배치 session 은 배치 시나리오의 판정이어야 한다.
+        bool                                  fromService{ false };
+
+        bool IsStructured() const noexcept { return !arguments.empty(); }
+    };
+
+    // 배치 큐와 서비스 큐를 나눈다(§7.2).
+    //
+    // 나누는 것은 구현 편의가 아니라 **기존 측정 의미의 보존**이다. 배치 큐는
+    // 프레임당 정확히 하나를 유지하고, 서비스 큐만 예산만큼 드레인한다.
+    std::deque<PendingCommand> m_pending;         ///< 배치(--exec·--script·stdin)
+    std::deque<PendingCommand> m_servicePending;  ///< 서비스(HTTP)
+    mutable std::mutex m_mutex;
+
+    /// 서비스 큐 상한. 0 이면 무제한. 서비스가 `Start` 에서 밀어 넣는다.
+    std::atomic<size_t>   m_serviceQueueCap{ 0 };
+
+    /// `Pump()` 가 매 프레임 갱신하는 조기 반환 사유. GT 밖에서 읽는다.
+    std::atomic<bool>     m_sceneLoading{ false };
+    std::atomic<uint32_t> m_waitFramesRemaining{ 0 };
+
+    // Pump가 도는 횟수. 프레임 경계에서 정확히 한 번이라 프레임 수와 같다.
+    // Enqueue가 게임 스레드 밖에서 읽으므로 원자적이어야 한다.
+    std::atomic<uint64_t> m_frameIndex{ 0 };
+
+    // 서비스가 GT 밖에서 읽는 실행 상태. 짧게만 잡는다.
+    mutable std::mutex    m_statusMutex;
+    std::string           m_currentCommand;
+    std::atomic<bool>     m_executing{ false };
+
+    // 드레인 예산. 게이트가 0 으로 바꿔 SLO 회귀를 재현한다(§14.7).
+    std::atomic<double>      m_drainTimeMs{ 2.0 };
+    std::atomic<size_t>      m_drainCount{ 8 };
+
+    /// 지금 도는 명령이 서비스에서 왔나.
+    ///
+    /// 원자적이지 않아도 되는 이유: 쓰는 곳(`RunOne`)과 읽는 곳(`ExecuteParsed`)이
+    /// 같은 동기 호출 사슬(`Pump → RunOne → ExecuteParsed`) 안이라 **항상 게임
+    /// 스레드 하나**다. 그 전제가 깨지면(다른 스레드가 `RunOne` 을 부르면) 이
+    /// 변수는 조용히 경합한다 — `RunOne` 은 게임 스레드 전용이다.
+    bool                     m_executingFromService{ false };
+
+    /// 큐에서 하나를 꺼내 실행하고 계측·판정을 남긴다. 실행했으면 true.
+    bool RunOne(PendingCommand pending, uint64_t frameIndex);
 
     // 표준 입력 읽기 스레드.
     //
@@ -122,8 +352,18 @@ private:
 
     // wait N : N 프레임 동안 다음 명령을 보류한다.
     int m_waitFrames{ 0 };
-    std::function<bool()> m_waitCondition;
+    std::function<std::optional<CommandCore::CommandResult>()> m_waitResult;
+    std::function<void(const CommandCore::CommandResult&)> m_finishWait;
 
     // --script가 파일을 못 열었는가. 명령이 하나도 없는 무인 실행은 종료시킨다.
     bool m_scriptLoadFailed{ false };
+
+    // ── LC9: 배치 결과 JSONL ────────────────────────────────────────────
+    //
+    // 게임 스레드에서만 쓴다(`RunOne` 하나가 부른다). 파일은 첫 줄에서 열고
+    // 프로세스가 끝날 때까지 연 채로 둔다 — 명령마다 열고 닫으면 시나리오
+    // 하나에 파일 열기가 명령 수만큼 생긴다.
+    bool        m_resultJsonl{ false };
+    std::string m_resultFilePath;
+    std::FILE*  m_resultFile{ nullptr };
 };

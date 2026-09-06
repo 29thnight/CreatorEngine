@@ -1,5 +1,7 @@
 #pragma once
 #include <string_view>
+#include "RHI/IRHIDeviceResources.h"
+#include "EngineResourceCensus.h"
 
 // GPU 진단 장부 (DX11 DeviceResources에서 이관, 2026-08-10).
 //
@@ -18,6 +20,15 @@
 // 실제로 그런 구간이 있고, 진단이 없다고 해서 진행을 막을 이유는 없다.
 namespace GpuDiagnostics
 {
+    struct Snapshot
+    {
+        bool hasBaseline{};
+        RHIGpuObjectCensus current, baseline;
+        Diagnostics::ResourceSnapshot resources, baselineResources;
+    };
+    // Game-thread query. Live object enumeration stays disabled during rendering.
+    bool Capture(Snapshot& out, bool advanceBaseline = false);
+
     /// 현재 집계를 로그에 남긴다. label은 측정 시점을 식별하는 이름
     /// (예: "씬 로드 완료", "에디터 종료 시점").
     ///

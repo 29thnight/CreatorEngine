@@ -1,0 +1,104 @@
+# lc3-commands v1
+# commands	99
+# names	106
+# problems	0
+canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
+ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
+animator.param	-	frames	editor	editor_operation	live	no	yes	<오브젝트> <파라미터> <bool|float|int|trigger>	Animator 파라미터를 저작한다
+animator.status	-	frames	editor	engine_service	live	no	yes	-	Read live Animator palettes and product publication metrics
+assets.modeldiag	-	immediate	editor	engine_service	live	no	yes	-	모델 소비 계수를 읽는다(상태를 바꾸지 않는다)
+assets.unload	-	frames	editor	engine_service	live	no	yes	-	사용하지 않는 에셋 캐시 정리
+bt.status	bt.reset	immediate	editor	engine_service	live	no	yes	-	행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)
+camera.editor	-	frames	editor	engine_service	live	no	yes	match | follow [on|off] | status	에디터 카메라를 게임 카메라와 같은 시점으로
+cli.drain.budget	-	immediate	editor	engine_service	live	no	yes	[<시간ms> <개수>]	서비스 큐 드레인 예산을 읽거나 바꾼다(LC5 · SLO 게이트의 변이용)
+cli.echo.args	-	immediate	editor	engine_service	live	no	yes	<인자>	tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)
+commands.describe	-	immediate	editor	engine_service	live	no	yes	<이름>	명령 하나의 descriptor 상세를 낸다
+commands.list	-	immediate	editor	engine_service	live	no	yes	[경로]	등록 명령 snapshot 을 TSV 로 낸다(소스 스크래핑 대체)
+commands.selftest	-	immediate	editor	engine_service	live	no	yes	-	registry 무결성을 판정한다(이름 중복·요약 누락·descriptor 부재)
+component.add	-	frames	editor	editor_operation	live	no	yes	<오브젝트 이름> <컴포넌트 타입>	오브젝트에 컴포넌트를 붙인다
+component.list	-	immediate	editor	engine_service	live	no	yes	[filter]	등록된 컴포넌트 타입을 로그에 남긴다
+component.remove	-	frames	editor	editor_operation	live	no	yes	<target> <component>	Remove an optional component with Undo
+crash.status	-	immediate	editor	engine_service	live	no	yes	-	크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다
+dump.list	-	immediate	editor	engine_service	live	no	yes	[limit]	크래시 덤프 목록을 최대 limit개 조회한다
+dump.show	-	immediate	editor	engine_service	live	no	yes	[limit]	덤프 목록과 최신 덤프 요약을 조회한다
+dx12.live	-	immediate	editor	engine_service	live	no	yes	on|status	EnhancedRenderer 메인 런타임 상태
+game.pak	-	long	editor	engine_service	live	no	yes	-	Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다
+gc.collect	-	frames	editor	engine_service	live	no	yes	-	관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)
+gc.stats	gc.delta	immediate	editor	engine_service	live	no	yes	-	관리 힙 지표를 낸다(gc.delta는 직전 대비 증감)
+gpu.baseline	-	frames	editor	engine_service	live	no	yes	-	현재 상태를 기준선으로 삼는다
+gpu.census	gpu.delta	frames	editor	engine_service	live	no	yes	[라벨]	VRAM과 엔진 에셋 수를 로그에 기록
+help	-	immediate	both	engine_service	live	no	yes	[명령]	명령 목록 또는 명령 하나의 상세를 낸다
+lifecycle.dump	-	immediate	editor	engine_service	live	no	yes	[파일]	기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)
+lifecycle.registry	-	frames	editor	engine_service	live	no	yes	-	생명주기 등록 수와 대기 중인 초기화 수를 조회한다
+lifecycle.trace	-	frames	editor	engine_service	live	no	yes	on [틱프레임]|off|clear|status	생명주기 호출 순서를 받아 적는다
+light.proxy	-	frames	editor	engine_service	live	no	yes	-	Read live light proxy values and publication counters
+log.flush	-	immediate	editor	engine_service	live	no	yes	-	로그를 디스크에 즉시 반영
+mem.delta	-	immediate	editor	engine_service	live	no	yes	[라벨]	기준선 대비 CRT 블록·바이트 증감(기준선이 없으면 지금을 기준선으로 삼는다)
+mem.hook	-	immediate	editor	engine_service	live	no	yes	on|stack|off|top|status	CRT 할당 훅 — 호출 계수, stack 은 귀속까지(디버그 CRT 전용)
+mem.reset	-	immediate	editor	engine_service	live	no	yes	-	churn 누계와 기준선을 0으로 — 구간 측정용
+mem.stats	-	immediate	editor	engine_service	live	no	yes	[라벨]	CRT 현재 live 블록·바이트를 찍는다(누계는 mem.hook 이 따로 센다)
+model.load	-	long	editor	engine_service	live	no	yes	<경로>	모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)
+model.loadcached	-	long	editor	engine_service	live	no	yes	<모델 경로>	에디터 드롭 경로(LoadCachedModelShared)로 모델을 연다
+model.place	-	frames	editor	editor_operation	live	no	yes	<이름>	임포트한 모델을 활성 씬에 배치한다
+object.create	-	frames	editor	editor_operation	live	no	yes	<이름> [타입]	빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)
+object.delete	-	frames	editor	editor_operation	live	no	yes	<target>	Delete an object subtree with Undo
+object.describe	-	immediate	editor	engine_service	live	no	yes	<name-or-id>	Read object identity and name
+object.duplicate	-	frames	editor	editor_operation	live	no	yes	<오브젝트> [새 이름]	오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)
+object.parent	-	frames	editor	editor_operation	live	no	yes	<자식> <부모 | ->	오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)
+object.properties	-	immediate	editor	engine_service	live	no	yes	<target> <component>	Read reflected component fields and values
+object.property	-	frames	editor	editor_operation	live	no	yes	<오브젝트> <컴포넌트> <필드> <값>	리플렉션으로 프로퍼티를 설정한다
+object.rename	-	immediate	editor	editor_operation	live	no	yes	<name-or-id> <new-name>	Rename through the shared editor undo transaction
+object.transform	-	frames	editor	editor_operation	live	no	yes	<이름> <px py pz> [rx ry rz] [sx sy sz]	변환을 지정한다(회전은 도)
+pipeline.nodes	-	immediate	editor	engine_service	live	no	yes	-	라이브 파이프라인의 노드 조립 결과를 한 줄씩 낸다
+pix.capture	-	frames	editor	engine_service	live	no	yes	begin|end|status	PIX 주입 실행의 명시적 GPU 캡처 경계
+play	stop	frames	editor	editor_operation	live	no	yes	-	에디터의 재생·정지와 같은 동작
+play.state	-	immediate	editor	engine_service	live	no	yes	-	재생 상태(gameStart·paused·씬 로드)를 낸다
+prefab.create	-	frames	editor	engine_service	live	no	yes	<오브젝트 이름> <프리팹 이름>	오브젝트로 프리팹을 만들어 저장한다
+prefab.instantiate	-	frames	editor	editor_operation	live	no	yes	<프리팹 이름> [인스턴스 이름]	프리팹을 씬에 소환한다
+prefab.objectguid	-	immediate	editor	engine_service	live	no	yes	<오브젝트 이름>	오브젝트의 프리팹 objectGuid를 낸다
+prefab.overrides	-	immediate	editor	engine_service	live	no	yes	<오브젝트>	프리팹 인스턴스에 기록된 오버라이드를 나열한다
+prefab.status	-	immediate	editor	engine_service	live	no	yes	-	프리팹 등록·캐시 상태를 낸다
+prefab.update	-	frames	editor	engine_service	live	no	yes	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
+profile.stats	-	immediate	editor	engine_service	live	no	yes	-	프로파일러 자체 비용과 용량 소진(교란 없음)
+quit	exit	immediate	both	engine_service	terminates_process	no	yes	-	호스트를 종료한다
+render.backend	-	immediate	editor	engine_service	live	no	yes	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
+render.matmode	-	immediate	editor	editor_operation	live	no	yes	<오브젝트> <opaque|transparent>	오브젝트 재질의 렌더링 모드를 바꾼다
+render.rtinfo	-	immediate	editor	engine_service	live	no	yes	-	창·뷰포트·추종 텍스처 크기를 나란히 찍는다
+render.shadowinfo	-	immediate	editor	engine_service	live	no	yes	-	그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)
+scene.bonedump	-	frames	editor	engine_service	live	no	yes	[개수]	대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)
+scene.ddol	-	frames	editor	engine_service	live	no	yes	<이름>	오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용
+scene.dump	-	immediate	editor	engine_service	live	no	yes	[라벨]	활성 씬의 오브젝트 계층을 로그에 남긴다
+scene.flag	-	immediate	editor	engine_service	live	no	yes	[<dirtytraversal|bonecache> [0|1]]	씬 진단 플래그를 읽거나 바꾼다(인자 없으면 전부 조회)
+scene.hierarchycheck	-	frames	editor	engine_service	live	no	yes	-	씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)
+scene.load	scene.switch	long	editor	engine_service	live	no	yes	<경로>	씬을 로드한다(활성 씬은 그대로)
+scene.new	-	frames	editor	engine_service	live	no	yes	[이름]	빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)
+scene.save	-	frames	editor	engine_service	live	no	yes	<경로>	활성 씬을 .creator로 저장한다
+scene.select	-	immediate	editor	editor_operation	live	no	yes	<오브젝트 이름>	오브젝트를 에디터 선택으로 지정한다
+scene.selection	-	immediate	editor	engine_service	live	no	yes	<라벨>	단일 선택과 복수 선택을 따로 낸다(둘의 어긋남을 드러낸다)
+scene.sparseresolver	-	frames	editor	engine_service	live	no	yes	0|1|print	X5 dirty-root sparse resolve·A/B 검사
+scene.transformdigest	-	frames	editor	engine_service	live	no	yes	[라벨]	활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)
+scene.transformpull	-	frames	editor	engine_service	live	no	yes	[print]	X6 C# 즉시 pull 계측 스냅샷을 조회한다
+scene.transformstats	-	frames	editor	engine_service	live	no	yes	[0|1|print]	X0 UI/Spatial·단계·구성·프레임 topology 계측
+scene.transformwritestats	-	frames	editor	engine_service	live	no	yes	[0|1|print]	X1 로컬 쓰기 publish 출처 계측
+script.add	-	frames	editor	engine_service	live	no	yes	<오브젝트> <타입>	C# 스크립트를 오브젝트에 부착한다
+script.fields	-	frames	editor	engine_service	live	no	yes	<id>	스크립트의 노출 필드와 현재 값을 확인한다
+script.invoke	-	long	editor	engine_service	live	yes	yes	<타입> <메서드> [인자]...	표식된 static 메서드를 호출한다([EngineCallable] 없는 것은 거부)
+script.reload	-	frames	editor	engine_service	live	no	yes	-	게임 스크립트 어셈블리를 다시 로드한다(핫리로드)
+script.set	-	frames	editor	engine_service	live	no	yes	<id> <인덱스> <값>	노출 필드 값을 바꾼다
+script.status	-	immediate	editor	engine_service	live	no	yes	-	CLR 상태와 활성 스크립트 수를 확인한다
+tag.add	-	immediate	editor	editor_operation	live	no	yes	<name>	Add and persist a project tag with Undo
+tag.has	-	immediate	editor	engine_service	live	no	yes	<name>	Query a project tag
+tag.list	-	immediate	editor	engine_service	live	no	yes	-	Read project tags and layers
+tag.remove	-	immediate	editor	editor_operation	live	no	yes	<name>	Remove and persist a project tag with Undo
+ui.anchor	-	frames	editor	editor_operation	live	no	yes	<오브젝트> <minX> <minY> <maxX> <maxY>	앵커를 직접 지정한다
+ui.hitbox	-	frames	editor	engine_service	live	no	yes	-	버튼의 rect와 클릭 판정 상자를 나란히 출력한다
+ui.pos	-	frames	editor	editor_operation	live	no	yes	<target> <x> <y>	UI anchored position을 편집한다
+ui.rect	-	frames	editor	engine_service	live	no	yes	<오브젝트|*>	오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다
+ui.screenpos	-	frames	editor	editor_operation	live	no	yes	<target> <x> <y>	UI 화면 위치를 편집한다
+ui.size	-	frames	editor	editor_operation	live	no	yes	<target> <x> <y>	UI 크기를 편집한다
+ui.status	-	immediate	editor	engine_service	live	no	yes	-	UI 계층·캔버스 연결 상태를 낸다
+undo	redo	frames	editor	editor_operation	live	no	yes	-	에디터의 Ctrl+Z / Ctrl+Y와 같은 호출
+undo.state	-	immediate	editor	engine_service	live	no	yes	<라벨>	편집 스택과 게임 스택의 Undo 깊이를 따로 낸다
+wait	-	immediate	editor	engine_service	live	no	yes	<프레임>	지정 프레임만큼 다음 명령을 미룬다
+window.info	-	immediate	editor	engine_service	live	no	yes	-	엔진이 인식하는 클라이언트 크기를 출력한다
+window.resize	-	frames	editor	engine_service	live	no	yes	<너비> <높이>	창 클라이언트 크기를 바꾼다(해상도 검증용)

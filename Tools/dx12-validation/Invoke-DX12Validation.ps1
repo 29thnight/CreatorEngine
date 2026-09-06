@@ -7,6 +7,7 @@ param(
     [string]$Validation = "Gpu",
 
     [string]$ScenePath = "",
+    [string]$TexturePath = (Join-Path $PSScriptRoot "../../Dynamic_CPP/Assets/Materials/Cube_Mat_BaseColor.png"),
     [string]$CapturePath = "",
     [string]$OutputRoot = "",
     [int]$WaitFrames = 1800,
@@ -185,9 +186,12 @@ function Write-CommandFile([string]$Path, [string[]]$Commands) {
     [IO.File]::WriteAllText($Path, ($Commands -join "`r`n") + "`r`n", [Text.UTF8Encoding]::new($false))
 }
 
+. (Join-Path $PSScriptRoot '../regression/CommandResults.ps1')
+
 function Invoke-EngineScript([string]$CommandFile, [string]$RunDirectory) {
     if (-not (Test-File $exePath)) { throw "실행 파일이 없다. -Action Build를 먼저 실행한다: $exePath" }
 
+    $resultPath = Join-Path $RunDirectory "results.jsonl"
     $stdoutPath = Join-Path $RunDirectory "stdout.log"
     $stderrPath = Join-Path $RunDirectory "stderr.log"
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -199,8 +203,10 @@ function Invoke-EngineScript([string]$CommandFile, [string]$RunDirectory) {
     $startInfo.RedirectStandardError = $true
     $startInfo.StandardOutputEncoding = [Text.Encoding]::UTF8
     $startInfo.StandardErrorEncoding = [Text.Encoding]::UTF8
-    [void]$startInfo.ArgumentList.Add("--script")
+    [void]$startInfo.ArgumentList.Add("--commandlet-script")
     [void]$startInfo.ArgumentList.Add($CommandFile)
+    [void]$startInfo.ArgumentList.Add("--result-file")
+    [void]$startInfo.ArgumentList.Add($resultPath)
     $startInfo.Environment["CREATOR_DX12_VALIDATION"] = $Validation.ToLowerInvariant()
     $startInfo.Environment["CREATOR_DX12_DRED"] = "1"
     $startInfo.Environment["CREATOR_DX12_BREAK_ON_ERROR"] = "0"
@@ -223,6 +229,7 @@ function Invoke-EngineScript([string]$CommandFile, [string]$RunDirectory) {
     [IO.File]::WriteAllText($stderrPath, $stderr, [Text.UTF8Encoding]::new($false))
 
     return [pscustomobject]@{
+        Results = @(Read-CommandResults $resultPath)
         ExitCode = $process.ExitCode
         Stdout = $stdout
         Stderr = $stderr
@@ -236,14 +243,14 @@ function Invoke-SelfTest {
     $pngPath = Join-Path $runDirectory "dx12-selftest.png"
     $commandFile = Join-Path $runDirectory "commands.txt"
     Write-CommandFile $commandFile @(
-        "dx12.selftest $($pngPath.Replace('\', '/'))",
+        "dx12.selftest `"$([IO.Path]::GetFullPath($TexturePath))`" `"$($pngPath.Replace('\', '/'))`"",
         "wait 10",
         "quit"
     )
 
     $result = Invoke-EngineScript $commandFile $runDirectory
     $combined = $result.Stdout + "`n" + $result.Stderr
-    $passed = $result.ExitCode -eq 0 -and $combined -match "dx12\.selftest 통과"
+    $passed = $result.ExitCode -eq 0 -and (Get-CommandResult $result.Results 'dx12.selftest').status -eq 'succeeded'
     Write-Host "SelfTest exit=$($result.ExitCode) output=$runDirectory"
     if (-not $passed) { throw "DX12 self-test failed. 로그: $($result.StdoutPath), $($result.StderrPath)" }
     if (-not (Test-File $pngPath)) { throw "자가 검증은 통과했지만 PNG가 없다: $pngPath" }
@@ -304,7 +311,7 @@ function Invoke-PixCapture {
     # '=' 뒤에 있어야 한다. PowerShell native binder는 이 모양을 바꾸므로 raw
     # Arguments를 사용한다. 아래 경로는 모두 이 스크립트가 만든 절대 경로다.
     $pixArguments = 'launch "' + $exePath + '"' +
-        ' --command-line="--script ' + $commandFile + '"' +
+        ' --command-line="--commandlet-script ' + $commandFile + '"' +
         ' --working-directory="' + (Split-Path -Parent $exePath) + '"' +
         ' --setenv="CREATOR_DX12_VALIDATION=' + $Validation.ToLowerInvariant() + '"' +
         ' --setenv="CREATOR_DX12_DRED=1"' +
@@ -385,7 +392,7 @@ function Invoke-RenderDoc {
             --working-dir (Split-Path -Parent $exePath) `
             --capture-file $capturePrefix `
             --opt-api-validation --opt-capture-callstacks --opt-capture-callstacks-only-actions `
-            $exePath --script $commandFile
+            $exePath --commandlet-script $commandFile
         if ($LASTEXITCODE -ne 0) { throw "RenderDoc launch failed with exit code $LASTEXITCODE" }
     }
     finally {

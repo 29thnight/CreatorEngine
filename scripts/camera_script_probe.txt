@@ -34,5 +34,6 @@ wait 10
 play
 wait 20
 
+script.invoke CameraScriptProbe Results
 log.flush
 quit

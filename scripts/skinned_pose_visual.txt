@@ -50,12 +50,12 @@ wait 10
 # I5-D5a: 합성 Foliage 저작(같은 이유 — 코퍼스 Foliage 저작분 0). 타입 저작
 # 경로(AddFoliageType)와 자산 게시까지 심어, 재로드 verify가 postLoad 재해석
 # 바인딩과 프록시 DrawSource 핸들을 잰다.
-experiment.foliage seed __FOLIAGE_DIR__
+experiment.foliage seed __FOLIAGE_DIR__ "__SKINNED_MODEL__"
 wait 30
 # I5-D5c1: 합성 새 정본 재질 저작 — 코퍼스에 shaderAssetId/ref 표기가 0건이라
 # (실측) 저작 경로가 실자산에서 한 번도 돈 적이 없다. seed가 자산을 게시하고
 # renderer를 base에 링크해, 저장이 ref 표기를 내고 재로드가 병행 표현을 채운다.
-experiment.matruntime seed __MATERIAL_DIR__
+experiment.matruntime seed "__MATERIAL_DIR__" "__TEXTURE_PATH__"
 wait 30
 scene.save __SAVED_SCENE__
 wait 30

@@ -68,7 +68,7 @@ $script = Join-Path $Work "bt_smoke_resolved.txt"
 if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
 
 $outPath = Join-Path $Work "bt_smoke.out"
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $script `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError (Join-Path $Work "bt_smoke.err") -PassThru

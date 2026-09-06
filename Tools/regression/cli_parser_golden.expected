@@ -1,0 +1,117 @@
+[CLI] cli.echo.args count=3 line_len=24
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=5 <<<plain>>>
+[CLI] cli.echo.args count=4 line_len=30
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=5 <<<alpha>>>
+[CLI] cli.echo.args arg[2] len=4 <<<beta>>>
+[CLI] cli.echo.args arg[3] len=5 <<<gamma>>>
+[CLI] cli.echo.args count=3 line_len=30
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=11 <<<quoted-name>>>
+[CLI] cli.echo.args count=2 line_len=27
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=11 <<<Main Camera>>>
+[CLI] cli.echo.args count=3 line_len=35
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=16 <<<two-quoted-names>>>
+[CLI] cli.echo.args count=3 line_len=52
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=18 <<<Big Boss Character>>>
+[CLI] cli.echo.args arg[2] len=15 <<<Main Characters>>>
+[CLI] cli.echo.args count=3 line_len=31
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=12 <<<empty-quoted>>>
+[CLI] cli.echo.args count=2 line_len=16
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=0 <<<>>>
+[CLI] cli.echo.args count=3 line_len=35
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=16 <<<empty-then-value>>>
+[CLI] cli.echo.args count=3 line_len=22
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=0 <<<>>>
+[CLI] cli.echo.args arg[2] len=5 <<<value>>>
+[CLI] cli.echo.args count=3 line_len=31
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=12 <<<windows-path>>>
+[CLI] cli.echo.args count=2 line_len=51
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=37 <<<C:\Users\test\Assets\Scenes\A.creator>>>
+[CLI] cli.echo.args count=3 line_len=38
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=19 <<<windows-path-quoted>>>
+[CLI] cli.echo.args count=2 line_len=50
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=34 <<<C:\Program Files\Creator\A.creator>>>
+[CLI] cli.echo.args count=3 line_len=34
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=15 <<<backslash-quote>>>
+[CLI] cli.echo.args count=3 line_len=32
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=7 <<<C:\dir\>>>
+[CLI] cli.echo.args arg[2] len=8 <<<trailing>>>
+[CLI] cli.echo.args count=3 line_len=36
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=17 <<<escaped-quote-try>>>
+[CLI] cli.echo.args count=2 line_len=26
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=8 <<<say "hi">>>
+[CLI] cli.echo.args count=3 line_len=33
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=14 <<<unclosed-quote>>>
+[CLI] cli.echo.args invalid_arguments (parse.unclosed_quote) 닫히지 않은 따옴표: cli.echo.args "never closed
+[CLI] cli.echo.args count=3 line_len=33
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=14 <<<quote-midtoken>>>
+[CLI] cli.echo.args count=2 line_len=19
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=3 <<<abc>>>
+[CLI] cli.echo.args count=3 line_len=36
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=17 <<<inner-quote-split>>>
+[CLI] cli.echo.args count=2 line_len=31
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=15 <<<premid posttail>>>
+[CLI] cli.echo.args count=3 line_len=34
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=15 <<<tabs-and-spaces>>>
+[CLI] cli.echo.args count=4 line_len=32
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=5 <<<alpha>>>
+[CLI] cli.echo.args arg[2] len=4 <<<beta>>>
+[CLI] cli.echo.args arg[3] len=5 <<<gamma>>>
+[CLI] cli.echo.args count=3 line_len=30
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=11 <<<utf8-korean>>>
+[CLI] cli.echo.args count=3 line_len=45
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=16 <<<메인 카메라>>>
+[CLI] cli.echo.args arg[2] len=12 <<<오브젝트>>>
+[CLI] cli.echo.args count=3 line_len=33
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=14 <<<trailing-space>>>
+[CLI] cli.echo.args count=2 line_len=19
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=5 <<<alpha>>>
+[CLI] cli.echo.args count=3 line_len=30
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>
+[CLI] cli.echo.args arg[1] len=4 <<<CASE>>>
+[CLI] cli.echo.args arg[2] len=11 <<<only-spaces>>>
+[CLI] cli.echo.args count=1 line_len=13
+[CLI] cli.echo.args arg[0] len=13 <<<cli.echo.args>>>

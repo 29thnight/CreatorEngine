@@ -2,6 +2,8 @@
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
+#include "EditorObjectOperations.h"
+#include "Component.h"
 #include "ReflectionUndo.h" // MakeCustomChangeCommand — 에디터 층 Undo(E1-6 이관)
 // 인스펙터 typed Draw (PHASE 18 CT6-c).
 //
@@ -47,8 +49,20 @@ namespace Meta::TypedDraw
 
     // 멤버 변경을 언두 스택에 싣는다 — 레거시 MakePropChangeCommand 등가.
     template<class Owner, class MemberT, auto MP>
-    inline void CommitMemberChange(Owner* obj, const MemberT& prevValue, const MemberT& newValue)
+    inline void CommitMemberChange(Owner* obj, const MemberT& prevValue, const MemberT& newValue, const char* field)
     {
+        if constexpr (std::is_base_of_v<Component, Owner>)
+        {
+            const auto* type = Meta::Find(obj->GetTypeID().m_ID_Data);
+            if (obj->GetOwner() && type)
+            {
+                obj->*MP = prevValue;
+                auto before = Meta::SerializeDocument(obj, *type);
+                obj->*MP = newValue;
+                EditorObjectOperations::CommitProperty(*obj, field, std::move(before));
+                return;
+            }
+        }
         Meta::MakeCustomChangeCommand(
             [obj, prevValue]() { obj->*MP = prevValue; },
             [obj, newValue]() { obj->*MP = newValue; });
@@ -175,7 +189,7 @@ namespace Meta::TypedDraw
                 : ImGui::DragInt(label, &v);
             if (changed)
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -186,7 +200,7 @@ namespace Meta::TypedDraw
             ImGui::PushID(name);
             if (ImGui::DragScalar(label, ImGuiDataType_U32, &v))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -197,7 +211,7 @@ namespace Meta::TypedDraw
             ImGui::PushID(name);
             if (ImGui::DragScalar(label, ImGuiDataType_S64, &v))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -211,7 +225,7 @@ namespace Meta::TypedDraw
                 : ImGui::DragFloat(label, &v);
             if (changed)
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -222,7 +236,7 @@ namespace Meta::TypedDraw
             ImGui::PushID(name);
             if (ImGui::Checkbox(label, &v))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -237,7 +251,7 @@ namespace Meta::TypedDraw
             {
                 if (InputManagement->IsKeyPressed(VK_RETURN))
                 {
-                    CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                    CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                     value = v;
                 }
             }
@@ -266,7 +280,7 @@ namespace Meta::TypedDraw
                 if (InputManagement->IsKeyPressed(VK_RETURN) && !buffer.empty())
                 {
                     HashingString committed(std::string_view{ buffer });
-                    CommitMemberChange<Owner, MemberT, MP>(&obj, value, committed);
+                    CommitMemberChange<Owner, MemberT, MP>(&obj, value, committed, name);
                     value = committed;
                 }
             }
@@ -278,7 +292,7 @@ namespace Meta::TypedDraw
             ImGui::PushID(name);
             if (ImGui::DragFloat2(label, &v.x))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -289,7 +303,7 @@ namespace Meta::TypedDraw
             ImGui::PushID(name);
             if (ImGui::DragFloat3(label, &v.x))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -301,7 +315,7 @@ namespace Meta::TypedDraw
             ImGui::PushID(name);
             if (ImGui::DragFloat4(label, &v.x, 0.1f))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -312,7 +326,7 @@ namespace Meta::TypedDraw
             ImGui::PushID(name);
             if (ImGui::ColorEdit4(label, &v.r))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();
@@ -323,7 +337,7 @@ namespace Meta::TypedDraw
             ImGui::PushID(name);
             if (ImGui::DragFloat4(label, &v.x))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v);
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
             }
             ImGui::PopID();

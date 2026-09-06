@@ -6,9 +6,12 @@
 
 기준: HEAD `6b9c2b792860b5f8bb408956990789f3a2d2b1d2` + 현재 작업 트리의 비동기 배치 변경.
 
-> 기준 커밋과 작업 트리를 구분한다. 이번 비동기 배치 구현은 아직 커밋되지 않은 변경을 포함한다.
+> 기준 커밋과 작업 트리를 구분한다. 아래는 작성 당시의 기록이며, 비동기 배치 변경은 이후 `709eafe5`에 보존했다.
 > 아래 구현 상태는 현재 소스로 확인했고, 실행 결과는 같은 대화에서 수행한 검증을 기록했다.
 > 이 문서 작성 자체로 새 빌드·런타임 검증이나 후속 구조 개선이 완료되는 것은 아니다.
+
+원격 CLI 통합 후 `model.async` 검사는 `--commandlet-script`에서 실행한다.
+`wait`는 큐가 비워진 뒤 terminal 결과를 기록하며, 취소 검사의 성공 여부는 JSONL 결과로 판정한다.
 
 ## 1. 목표와 적용 원칙
 
@@ -26,9 +29,9 @@
 
 관련 계획:
 
-- [ModelAssetBigBangCutoverPlan.md](C:/Users/lance/source/CreatorEngine/docs/plans/archive/ModelAssetBigBangCutoverPlan.md): 보관된 모델 전환 계획. 모델 자산 정본·식별자·직접 소비 계약의 이력.
-- [TexturePipelinePlan.md](C:/Users/lance/source/CreatorEngine/docs/plans/TexturePipelinePlan.md): 임포트 정책, cook 트랜스코딩, 런타임 artifact 소비의 소유 문서.
-- [ModelImportPipelinePlan.md](C:/Users/lance/source/CreatorEngine/docs/plans/archive/ModelImportPipelinePlan.md): 보관된 모델 임포트 경계와 관련 작업의 이력.
+- [ModelAssetBigBangCutoverPlan.md](archive/ModelAssetBigBangCutoverPlan.md): 보관된 모델 전환 계획. 모델 자산 정본·식별자·직접 소비 계약의 이력.
+- [TexturePipelinePlan.md](TexturePipelinePlan.md): 임포트 정책, cook 트랜스코딩, 런타임 artifact 소비의 소유 문서.
+- [ModelImportPipelinePlan.md](archive/ModelImportPipelinePlan.md): 보관된 모델 임포트 경계와 관련 작업의 이력.
 
 이 문서는 위 계획의 전체 완료 상태를 판정하거나 새로운 PHASE 번호를 배정하지 않는다.
 

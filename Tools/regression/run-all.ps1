@@ -137,42 +137,146 @@ Run-Step "스크립트 진입점 결합" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "..\..\ScriptCore\check-entry-points.ps1")
 }
 
-Run-Step "UI 생성 순서 회귀" {
-    # 모델 경로를 저장소 루트 기준으로 채운다(2026-08-20). 예전에는 시나리오가
-    # 사용자 개인 폴더의 GLB를 절대 경로로 가리켜 그 기계에서만 돌았다.
-    $template = Join-Path $PSScriptRoot "ui_regression.txt"
-    $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-    $modelPath = Join-Path $repoRoot "Dynamic_CPP\Assets\Models\Prim_Suzanne.glb"
-    if (-not (Test-Path $modelPath)) {
-        "모델이 없다: $modelPath"; $global:LASTEXITCODE = 1; return
-    }
-    $script = Join-Path $Work "ui_regression_resolved.txt"
-    (Get-Content $template -Raw) -replace '\{\{MODEL_PATH\}\}', ($modelPath -replace '\\', '/') |
-        Set-Content $script -Encoding UTF8
+# Tokenizer 골든은 문자열 입력의 토큰 경계를 검증한다.
+Run-Step "CLI tokenizer 골든(LC0)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-parser-golden.ps1") -Exe $Exe -Work $Work
+}
 
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
+# 성공·인자 오류·검사 실패·실패 누적을 실제 종료 코드로 검증한다.
+Run-Step "CLI exit spine(LC1)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-exit-spine.ps1") -Exe $Exe
+}
+
+# PHASE 14.5 LC2 — 토큰이 실제 조작까지 온전히 닿는가.
+#
+# 골든은 tokenizer 의 형상만 본다. 예전 결함은 tokenizer 가 옳게 잘라 놓은 것을
+# 핸들러가 버리고 원문을 다시 자르는 데 있었으므로 형상만으로는 안 잡혔다 —
+# 따옴표 쓴 두 이름이 실제 씬 계층을 바꾸는 것까지 확인한다.
+Run-Step "CLI invocation(LC2)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-invocation.ps1") -Exe $Exe -Work $Work
+}
+
+# PHASE 14.5 LC3 — help 와 registry 가 같은 집합인가.
+#
+# 예전에는 손으로 쓴 help 와 registry 가 별도라 조용히 벌어졌다 — 등록 205개 중
+# help 게재 130개(63%)였고, 반대로 help 는 등록되지도 않은 이름 6개를 안내했다.
+# 문서가 없는 것보다 틀린 문서가 나쁘다. 이제 help 가 descriptor 에서 생성되고,
+# 이 게이트가 양방향(커버리지·고아)과 snapshot 결정성을 함께 본다.
+Run-Step "CLI discovery(LC3)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-discovery.ps1") -Exe $Exe -Work $Work
+}
+
+# PHASE 14.5 LC4 — 로컬 HTTP/JSON 서비스.
+#
+# 서비스는 실행 표면이다(§8). 그래서 이 게이트는 "동작하는가"보다 **"열리지
+# 말아야 할 것이 닫혀 있는가"**를 먼저 본다 — 기본 off · 토큰 없는 요청 401
+# (/health 포함) · Origin 거부 · 본문 413 · winsock 헤더가 이음매 밖으로 새지
+# 않음 · 비 loopback bind 0. 기능 검사만 있고 통제 검사가 없으면 통제가 조용히
+# 사라져도 초록이다.
+Run-Step "CLI command service(LC4)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-service.ps1") -Exe $Exe -Work $Work
+}
+
+# PHASE 14.5 LC5 — 드레인 예산·operation·지연 SLO.
+#
+# SLO 상한은 목표(§7.1 의 50/150/300ms)가 아니라 **실측 + 여유**다. 목표를 그대로
+# 게이트로 쓰면 바닥값의 20배라 20배 퇴행이 초록으로 통과한다. 그리고 이 게이트는
+# 드레인 예산을 0 으로 만들어 **자기 이빨을 확인한다**(§14.7) — 그 상태에서
+# 붉어지지 않으면 SLO 검사는 아무것도 지키고 있지 않은 것이다.
+Run-Step "CLI drain·operation·SLO(LC5)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-drain.ps1") -Exe $Exe -Work $Work
+}
+
+# PHASE 14.5 LC6 — 명령 표 보존.
+#
+# LC3 의 discovery 게이트는 registry 의 **자기 일관성**만 본다. 그래서 명령이
+# registry 와 help 양쪽에서 함께 사라지면 초록으로 남는다 — 실측으로 확인했다.
+# 의도한 하네스 제거/API 추가는 처분 기록과 골든을 함께 바꾼다. 과거 명령의
+# 영구 보존이 아니라, 검토되지 않은 제품 표면 변경을 검출한다.
+Run-Step "CLI 제품 표면 변경 검증" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-registry-golden.ps1") -Exe $Exe -Work $Work
+}
+
+# 편집 완료는 상태 복원으로 판정한다. 폐기한 스택 깊이 특성화의 false 표를 유지하지 않는다.
+Run-Step "Commandlet 격리 및 공통 편집 API" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-command-surface.ps1") -Exe $Exe -Work (Join-Path $Work 'command-surface')
+}
+
+# PHASE 14.5 LC7 §10.2 — 리로드 실패가 반쯤 교체된 상태를 남기지 않는다.
+#
+# 관리 쪽 Reload()가 `Unload(); Load();` 라, 새 어셈블리가 깨져 있으면 이전 것은
+# 이미 사라진 뒤였고 에디터에 스크립트가 하나도 남지 않았다(실측). 빌드가 깨진 채
+# 리로드를 부르는 것은 가장 흔한 일이라, 그때마다 에디터가 못 쓰게 되면 라이브
+# 코드 교체라고 부를 수 없다. 이 게이트가 그 시나리오를 그대로 태운다.
+Run-Step "CLI 스크립트 리로드 계약(LC7)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-script-reload.ps1") -Exe $Exe -Work $Work
+}
+
+# PHASE 14.5 LC7 §10.2 — L3 등급 B: 표식된 메서드 호출과 라이브 코드 교체.
+#
+# 리로드 게이트가 "실패해도 이전 것이 남는가" 를 본다면, 이쪽은 **성공했을 때
+# 새 코드가 실제로 도는가** 를 본다. 프로브의 반환값을 실행마다 다른 토큰으로
+# 바꿔 빌드·리로드하고 그 토큰이 나오는지 확인하므로, 리로드가 아무 일도 하지
+# 않으면 붉어진다. 표식 없는 메서드가 거부되는 것과 사용자 예외가 에디터를
+# 죽이지 않는 것도 같은 실행에서 본다.
+#
+# ★ 이 게이트는 `GameScripts/EngineCallableProbe.cs` 를 그 자리에서 고쳤다
+#   되돌리고, 되돌린 결과를 해시로 대조한다. 붉어지면 그 파일 상태를 먼저 볼 것.
+Run-Step "CLI script.invoke 계약(LC7)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-script-invoke.ps1") -Exe $Exe -Work $Work
+}
+
+# PHASE 14.5 LC8 §11.2·§12.1 — Shipping Player 에 서비스·소켓이 0 인가.
+#
+# 격리를 `#ifdef` 로 하면 lib 이 여전히 링크되고 소켓 심볼도 그대로 들어온다.
+# 실제 격리는 Player.vcxproj 의 구성 조건부 ProjectReference 가 하고, 이 게이트는
+# 두 구성을 나란히 지어 import 표를 맞대 본다 — Development 에 소켓이 **있는지**도
+# 함께 단정한다(없으면 "Shipping 에 0" 은 아무것도 확인하지 않은 것이다).
+# PHASE 14.5 LC9 §18 — 자동화 소비자가 사람용 문자열을 판정에 쓰지 않는가.
+#
+# 정적 검사 둘이다: ① 판정 어휘를 매칭 문맥에서 읽는 소비자 수(래칫 — 오늘 0 이
+# 아니고, 도메인 단위로 내려간다) ② 토큰 검사보다 앞서는 라우트 0(§8).
+# ②는 처음에 Yoda 비교를 못 찾아 **라우트를 하나도 못 본 채 통과**했다. 지금은
+# 하나도 못 찾으면 실패한다 — 아무것도 안 보는 검사는 없는 것만 못하다.
+Run-Step "CLI 소비자 계약(LC9)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-cli-consumer-contract.ps1")
+}
+
+Run-Step "Player Shipping 격리(LC8)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-player-shipping-isolation.ps1")
+}
+
+# PHASE 14.5 LC8 §11.2·§11.3 — 실행 중인 Development Player 에 붙는다.
+#
+# 상태를 읽고, player.move 로 옮긴 값을 되읽어 **재시작 없는 반영**을 판정하고,
+# Editor 전용 명령이 404(부재)인지 본다. Player 는 패키지된 호스트라 스테이지된
+# 번들이 필요하다 — 없으면 게이트가 그 사실을 말하고 멈춘다.
+Run-Step "Player 명령 서비스(LC8)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-player-command-service.ps1")
+}
+
+Run-Step "UI 생성 순서 회귀" {
+    $template = Join-Path $PSScriptRoot 'ui_regression.txt'
+    $script = Join-Path $Work 'ui_regression_resolved.txt'
+    Copy-Item -LiteralPath $template -Destination $script -Force
+    . (Join-Path $PSScriptRoot 'CommandResults.ps1')
+    $resultPath = Join-Path $Work 'ui_regression.results.jsonl'
+    if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+    $proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
         -WorkingDirectory $exeDir `
         -RedirectStandardOutput (Join-Path $Work "ui_regression.out") `
         -RedirectStandardError (Join-Path $Work "ui_regression.err") -PassThru
     $proc.WaitForExit(300000) | Out-Null
     if (-not $proc.HasExited) { $proc.Kill(); "TIMEOUT"; $global:LASTEXITCODE = 1; return }
 
-    # UiTextProbe가 로그에 통과/실패를 남긴다. 종료 코드만으로는 단정 실패를 알 수 없다.
-    $log = Get-ChildItem (Join-Path $exeDir "Saved\Log\Editor_*.html") |
-           Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    $text = (Get-Content $log.FullName -Raw) -replace '<[^>]+>', ''
-    $passes = ([regex]::Matches($text, 'UiTextProbe\] 전체 통과')).Count
-    $fails = ([regex]::Matches($text, 'UiTextProbe\] .*실패')).Count
-    $crash = $text -match '미처리 예외'
-
-    "통과 $passes 회 · 실패 $fails 회 · 종료 코드 $($proc.ExitCode)"
-    if ($crash) { "크래시가 기록됐다" }
-    # 종료 코드도 판정에 넣는다 — 프로브가 다 통과하고도 종료 시점 힙 손상
-    # (0xC0000374)으로 죽은 실행이 '전체 통과'로 지나간 적이 있다. 간헐 크래시는
-    # 검사를 흔들리게 만들지만, 숨겨지는 것보다 흔들리는 쪽이 낫다.
-    $exitOk = ($proc.ExitCode -eq 0)
-    if (-not $exitOk) { ("종료 코드 비정상: 0x{0:X8}" -f $proc.ExitCode) }
-    $global:LASTEXITCODE = if ($passes -ge 4 -and $fails -eq 0 -and -not $crash -and $exitOk) { 0 } else { 1 }
+    $results = @(Read-CommandResults $resultPath)
+    $invocations = @($results | Where-Object command -eq 'script.invoke')
+    if ($invocations.Count -ne 2 -or @($results | Where-Object status -ne 'succeeded').Count -ne 0) {
+        throw 'UI scenario contains missing or failed command results'
+    }
+    $probe = $invocations[1].data.returnValue | ConvertFrom-Json
+    "UI completed=$($probe.completed) passed=$($probe.passed) failed=$($probe.failed) exit=$($proc.ExitCode)"
+    $global:LASTEXITCODE = if ($probe.completed -ge 4 -and $probe.passed -ge 40 -and $probe.failed -eq 0 -and $proc.ExitCode -eq 0) { 0 } else { 1 }
 }
 
 # "저작 배치 재현"(verify-authored-rects)은 2026-08-21 은퇴했다. 그 검사는 저작

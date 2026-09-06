@@ -5,6 +5,10 @@ public sealed partial class UiTextProbe : Component
 {
     [SerializeField] private int _checkAfterFrames = 20;
 
+    private static int _completed, _totalPassed, _totalFailed;
+    [EngineCallable] public static void ResetResults() => (_completed, _totalPassed, _totalFailed) = (0, 0, 0);
+    [EngineCallable] public static string Results() => FormattableString.Invariant($"{{\"completed\":{_completed},\"passed\":{_totalPassed},\"failed\":{_totalFailed}}}");
+
     private int _frame;
     private bool _checked;
     private int _passed;
@@ -19,6 +23,9 @@ public sealed partial class UiTextProbe : Component
         CheckOrder();
         CheckCanvas();
 
+        ++_completed;
+        _totalPassed += _passed;
+        _totalFailed += _failed;
         if (_failed == 0) Log($"[UiTextProbe] 전체 통과 ({_passed}건)");
         else LogError($"[UiTextProbe] {_failed}건 실패 / {_passed}건 통과");
     }
@@ -26,7 +33,7 @@ public sealed partial class UiTextProbe : Component
     private void CheckText()
     {
         var text = GetComponent<TextComponent>();
-        if (text is null) { LogWarning("[UiTextProbe] TextComponent 없음 — 건너뜀"); return; }
+        if (text is null) { Assert("Text coverage", false, "TextComponent missing"); return; }
 
         Log($"[UiTextProbe] Text — '{text.Message}' 색={text.Color} 크기={text.FontSize} 위치={text.RelativePosition}");
 
@@ -91,7 +98,7 @@ public sealed partial class UiTextProbe : Component
     private void CheckCanvas()
     {
         var canvas = GetComponent<Canvas>();
-        if (canvas is null) { LogWarning("[UiTextProbe] Canvas 없음 — 건너뜀"); return; }
+        if (canvas is null) { Assert("Canvas coverage", false, "Canvas missing"); return; }
 
         Log($"[UiTextProbe] Canvas — '{canvas.Name}' 순서={canvas.Order}");
 

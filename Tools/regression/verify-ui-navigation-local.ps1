@@ -19,7 +19,7 @@ $scenario = Join-Path $PSScriptRoot "ui_navigation_local.txt"
 $outPath = Join-Path $Work "ui_navigation_local.out"
 $errPath = Join-Path $Work "ui_navigation_local.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @("--commandlet-script", $scenario) `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath -RedirectStandardError $errPath -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null

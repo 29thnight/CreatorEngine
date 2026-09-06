@@ -40,6 +40,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$Work = [IO.Path]::GetFullPath($Work)
+. (Join-Path $PSScriptRoot "CommandResults.ps1")
+New-Item -ItemType Directory -Path $Work -Force | Out-Null
 
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -51,7 +54,9 @@ if (-not (Test-Path $scenario)) { "시나리오가 없다: $scenario"; exit 1 }
 $outPath = Join-Path $Work "camera_script_probe.out"
 $errPath = Join-Path $Work "camera_script_probe.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$resultPath = Join-Path $Work "camera_script_probe.results.jsonl"
+if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--script', ('"'+$scenario+'"'), '--result-format', 'jsonl', '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru
@@ -65,39 +70,12 @@ if (-not $proc.HasExited) {
 
 if (-not (Test-Path $outPath)) { "표준 출력이 없다: $outPath"; exit 1 }
 
-# Debug->Log/LogError는 stdout에 안 나가고 인메모리·HTML 싱크로만 간다
-# (verify-script-add-awake-once.ps1의 같은 주석 참고). 이 프로세스가 만든
-# 로그만 집는다 — 잔존 로그를 집으면 옛 실행의 결과를 읽는다.
-$logDir = Join-Path $exeDir "Saved\Log"
-$editorLog = Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
-             Where-Object { $_.LastWriteTime -ge $proc.StartTime } |
-             Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-if (-not $editorLog) {
-    "이 실행이 만든 에디터 로그를 찾지 못했다: $logDir\Editor_*.html"
-    exit 1
-}
-
-$logText = (Get-Content -LiteralPath $editorLog.FullName -Raw) -replace '<[^>]+>', ''
-
-$probeStarted = $logText -match '\[CameraScriptProbe\] 시작'
-$probePassed  = $logText -match '\[CameraScriptProbe\] 전체 통과 \((\d+)건\)'
-$probeCount   = if ($probePassed) { [int]$Matches[1] } else { 0 }
-$probeFailed  = $logText -match '\[CameraScriptProbe\] (\d+)건 실패'
-
-"경계 왕복"
-if (-not $probeStarted) {
-    "  프로브가 시작조차 하지 않았다 — script.add가 실패했거나 대상이 없다"
-    "  (기본 씬에 'Main Camera'가 서 있어야 한다 — EditorMain.cpp)"
-    exit 1
-}
-
-if ($probeFailed) {
-    "  프로브 실패 — 로그의 [CameraScriptProbe] 실패 줄을 볼 것"
-    ($logText -split "`n" | Where-Object { $_ -match '\[CameraScriptProbe\] 실패' }) |
-        ForEach-Object { "    $($_.Trim())" }
-    exit 1
-}
+$results = @(Read-CommandResults $resultPath)
+if ($proc.ExitCode -ne 0 -or @($results | Where-Object status -ne 'succeeded').Count) { throw 'Scenario command failed' }
+$invocation = Get-SucceededCommand $results 'script.invoke'
+$probe = $invocation.returnValue | ConvertFrom-Json
+if ($probe.completed -ne 1 -or $probe.failed -ne 0) { throw "Probe incomplete or failed: $($invocation.returnValue)" }
+$probeCount = [int]$probe.passed
 
 # 건수를 정확히 못 박는다. "N건 이상"으로 두면 단정 하나가 조용히 빠져도
 # 통과한다 — 커버리지가 줄어드는 것을 보는 유일한 자리다.

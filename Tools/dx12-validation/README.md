@@ -98,7 +98,12 @@ pwsh -NoProfile -File .\Tools\dx12-validation\Invoke-Dx12Suite.ps1 -OutDir artif
 - 실패 `dx12.bench11` — `_DEBUG`에서 설계된 거부. Release로 재야 한다.
 - 무판정 `dx12.live` — 상태를 찍는 것이라 판정 줄을 내지 않는다.
 
-**⚠ `dx12.uploadring`은 비결정적이다 (2026-08-23 실측).** 같은 바이너리로 단독
+> **※ `dx12.uploadring`은 2026-09-06에 제거됐다.** 같은 검사(`RunUploadSegmentTest`)를
+> `rhi.uploadsegments`가 그대로 부르므로 검증은 하나도 잃지 않았다 — 그쪽은 Vulkan
+> 자가 검증까지 함께 돌린다. `Invoke-Dx12Suite`의 `dx12.*` 전수 스윕에서도 빠졌으니
+> 아래 제외 지침은 더 필요 없다. 아래 실측 기록은 **왜 뺐는지의 근거**로 남긴다.
+
+**⚠ `dx12.uploadring`은 비결정적이었다 (2026-08-23 실측).** 같은 바이너리로 단독
 실행 9회에 8통과·1실패였고, 전체 스위트 실행에서도 한 번 실패했다. 실패 줄은
 
     [7/7] 병렬 CAS·worker growth 실패 (무효 0 · 겹침 0 · CAS 재시도 6 · worker 생성 0)

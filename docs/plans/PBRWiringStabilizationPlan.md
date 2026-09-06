@@ -2,6 +2,10 @@
 
 **신설 2026-09-03 · 갱신 2026-09-06 · 10슬라이스 18일 · W2/W4/W5/W6 완료 · W0/W1/W3/W7 진행 · 실장면 기준 캡처 실행, W9 acceptance 미완료**
 
+> 2026-09-06 원격 CLI 통합: `render.pbr.*` 검사는 `--commandlet` 또는
+> `--commandlet-script`로 실행하고 JSONL terminal 결과로 판정한다. capture 결과는 실제
+> 프레임 캡처 완료 뒤에 기록한다. 현재 실패 종료 코드는 `4`이며, 아래의 `7`은 통합 전 실행 기록이다.
+
 이 계획은 현재 제품 렌더 경로의 `.slang`·머테리얼·렌더러 배선 결함만 닫는다.
 Blender형 Material Graph와 Principled 확장은
 [`BlenderMaterialGraphPlan.md`](BlenderMaterialGraphPlan.md), **PHASE 4.25**가 소유한다.

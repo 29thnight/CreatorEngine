@@ -131,9 +131,12 @@ public:
 
 	// 씬 로드/복제로 만들어진 컴포넌트가 아직 인스턴스를 갖지 않았을 때 쓴다.
 	bool HasInstance() const { return m_instanceId >= 0; }
+	// Native initialization entries, including rejected attempts; runtime diagnostics only.
+	std::uint64_t InitializationAttempts() const { return m_initializationAttempts; }
 
 private:
 	int m_instanceId{ -1 };
+	std::uint64_t m_initializationAttempts{};
 
 	// EnsureInstance가 한 번 실패했는가. 편집 모드에서는 드레인이 매 프레임
 	// 부르므로 이것이 없으면 실패 로그가 프레임마다 쌓인다.

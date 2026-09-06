@@ -1,4 +1,5 @@
 #include "EditorModelPlacement.h"
+#include "EditorObjectOperations.h"
 #include "HierarchyWindow.h"
 #include "ReflectionUndo.h"
 #include "SpriteRenderer.h"
@@ -98,11 +99,11 @@ HierarchyWindow::HierarchyWindow()
 				{
 					if (ImGui::MenuItem("		Undo", "		Ctrl + Z"))
 					{
-						Meta::UndoManager::GetInstance()->Undo();
+						EditorObjectOperations::UndoRedo(false);
 					}
 					if (ImGui::MenuItem("		Redo", "		Ctrl + Y"))
 					{
-						Meta::UndoManager::GetInstance()->Redo();
+						EditorObjectOperations::UndoRedo(true);
 					}
 					if (ImGui::MenuItem("       Copy", "       Ctrl + C", nullptr, !scene->m_selectedEntities.empty()))
 					{
@@ -118,7 +119,7 @@ HierarchyWindow::HierarchyWindow()
 					{
 						if (selectedSceneObject)
 						{
-							Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(scene, selectedSceneObject->m_index));
+							EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index));
 							scene->m_selectedEntity = nullptr;
 						}
 					}
@@ -126,41 +127,43 @@ HierarchyWindow::HierarchyWindow()
 
 					if (ImGui::MenuItem("		Create Empty", "		Ctrl + Shift + N"))
 					{
-						Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::CreateEntityCommand>(scene, "Entity", GameObjectType::Empty));
+						EditorObjectOperations::Create(scene, "Entity", GameObjectType::Empty);
 					}
 
 					if (ImGui::BeginMenu("		Light"))
 					{
 						if (ImGui::MenuItem("		Directional Light"))
 						{
-							auto obj = scene->CreateEntity("Directional Light", GameObjectType::Light);
-							auto comp = obj->AddComponent<LightComponent>();
-							comp->SetLightType(LightType::DirectionalLight);
-							comp->m_lightStatus = LightStatus::Enabled;
+							auto creation = EditorObjectOperations::Create(scene, "Directional Light", GameObjectType::Light);
+                            auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
+							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
+                            if (comp) { comp->SetLightType(LightType::DirectionalLight);
+							comp->m_lightStatus = LightStatus::Enabled; }
 						}
 						if (ImGui::MenuItem("		Point Light"))
 						{
-							auto obj = scene->CreateEntity("Point Light", GameObjectType::Light);
-							auto comp = obj->AddComponent<LightComponent>();
-							comp->SetLightType(LightType::PointLight);
-							comp->m_lightStatus = LightStatus::Enabled;
+							auto creation = EditorObjectOperations::Create(scene, "Point Light", GameObjectType::Light);
+                            auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
+							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
+                            if (comp) { comp->SetLightType(LightType::PointLight);
+							comp->m_lightStatus = LightStatus::Enabled; }
 						}
 						if (ImGui::MenuItem("		Spot Light"))
 						{
-							auto obj = scene->CreateEntity("Spot Light", GameObjectType::Light);
-	obj->Transform_().SetRotation(
+							auto creation = EditorObjectOperations::Create(scene, "Spot Light", GameObjectType::Light);
+                            auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
+	if (obj) obj->Transform_().SetRotation(
 		{ 0.7, 0, 0, 1 }, TransformWriteReason::Inspector);
-							auto comp = obj->AddComponent<LightComponent>();
-							comp->SetLightType(LightType::SpotLight);
-							comp->m_lightStatus = LightStatus::Enabled;
+							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
+                            if (comp) { comp->SetLightType(LightType::SpotLight);
+							comp->m_lightStatus = LightStatus::Enabled; }
 						}
 						ImGui::EndMenu();
 					}
 
 					if (ImGui::MenuItem("		Camera"))
 					{
-						auto obj = scene->CreateEntity("Camera", GameObjectType::Camera);
-						auto comp = obj->AddComponent<CameraComponent>();
+						EditorObjectOperations::Create(scene, "Camera", GameObjectType::Camera);
 					}
 
 					//TODO : 아직 처리가 안된듯
@@ -187,7 +190,7 @@ HierarchyWindow::HierarchyWindow()
 
 				if (selectedSceneObject && ImGui::IsKeyDown(ImGuiKey_Delete))
 				{
-					Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(scene, selectedSceneObject->m_index));
+					EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index));
 					scene->m_selectedEntity = nullptr;
 				}
 			}
@@ -341,16 +344,7 @@ HierarchyWindow::HierarchyWindow()
 						// 역참조 없이 포기한다.
 						if (sceneGameObject && draggedObj)
 						{
-							const ReparentResult result = scene->Reparent(
-								scene->HandleOf(draggedObj->m_index),
-								scene->HandleOf(sceneGameObject->m_index));
-							if (ReparentResult::Success == result)
-							{
-								if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
-								{
-									rect->SetParentKeepWorldPosition(sceneGameObject);
-								}
-							}
+							EditorObjectOperations::Parent(scene->HandleOf(draggedObj->m_index), scene->HandleOf(sceneGameObject->m_index));
 						}
 					}
 				}
@@ -496,35 +490,13 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
 		if (ImGui::IsItemHovered() && (ImGui::IsMouseReleased(ImGuiMouseButton_Right) || ImGui::IsMouseReleased(ImGuiMouseButton_Left)))
 		{
 			bool shift = InputManagement->IsKeyPressed((int)KeyBoard::LeftShift);
-			std::vector<Entity*> prevList = selectedObjects;
-			Entity* prevSelection = selectedSceneObject;
-
-			if (shift)
-			{
-				if (std::find(selectedObjects.begin(), selectedObjects.end(), obj) != selectedObjects.end())
-					scene->RemoveSelectedEntity(obj);
-				else
-					scene->AddSelectedEntity(obj);
-			}
-			else
-			{
-				scene->ClearSelectedEntities();
-				scene->AddSelectedEntity(obj);
-			}
-
-			auto newList = scene->m_selectedEntities;
-			Entity* newSelection = scene->m_selectedEntity;
-
-			Meta::MakeCustomChangeCommand(
-				[scene, prevList, prevSelection]() {
-					scene->m_selectedEntities = prevList;
-					scene->m_selectedEntity = prevSelection;
-				},
-				[scene, newList, newSelection]() {
-					scene->m_selectedEntities = newList;
-					scene->m_selectedEntity = newSelection;
-				}
-			);
+            auto newList = selectedObjects;
+            const auto found = std::find(newList.begin(), newList.end(), obj);
+            if (shift) { if (found != newList.end()) newList.erase(found); else newList.push_back(obj); }
+            else newList = {obj};
+            std::vector<EntityHandle> targets;
+            for (auto* object : newList) if (object) targets.push_back(scene->HandleOf(object->m_index));
+            EditorObjectOperations::Select(scene, targets);
 		}
 	}
 
@@ -548,16 +520,7 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
 				// 이미 파괴된 슬롯을 가리키면 draggedObj/oldParent가 nullptr일 수 있다.
 				if (draggedObj)
 				{
-					const ReparentResult result = scene->Reparent(
-						scene->HandleOf(draggedObj->m_index),
-						scene->HandleOf(obj->m_index));
-					if (ReparentResult::Success == result)
-					{
-						if (auto* rect = draggedObj->GetComponent<RectTransformComponent>())
-						{
-							rect->SetParentKeepWorldPosition(obj);
-						}
-					}
+					EditorObjectOperations::Parent(scene->HandleOf(draggedObj->m_index), scene->HandleOf(obj->m_index));
 				}
 			}
 		}

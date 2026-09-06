@@ -46,6 +46,7 @@ param(
 
 $ProbeType = "NoSuchScriptType_C2_2_Regression"
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 
@@ -58,7 +59,9 @@ $errPath = Join-Path $Work "script_add_awake_once.err"
 $producedTrace = Join-Path $PSScriptRoot "..\..\Artifacts\Tests\Editor\Traces\script_add_awake_once_trace.tsv"
 if (Test-Path $producedTrace) { Remove-Item $producedTrace -Force }
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $script `
+$resultPath = Join-Path $Work "script_add_awake_once.results.jsonl"
+if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru
@@ -72,25 +75,11 @@ if (-not $proc.HasExited) {
 
 if (-not (Test-Path $outPath)) { "표준 출력이 없다: $outPath"; exit 1 }
 
-# ── 로그 줄 수 — 주 판정 ──
-#
-# Debug->LogWarning/LogError는 stdout에 안 나간다(인메모리·HTML 로그 싱크뿐 —
-# verify-asan-lifecycle.ps1의 같은 주석 참고). Editor_*.html에서 읽는다.
-$logDir = Join-Path $exeDir "Saved\Log"
-$editorLog = Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
-             Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-if (-not $editorLog) {
-    "에디터 로그를 찾지 못했다: $logDir\Editor_*.html"
-    exit 1
-}
-
-$logText = (Get-Content -LiteralPath $editorLog.FullName -Raw) -replace '<[^>]+>', ''
-
-$escapedType = [regex]::Escape($ProbeType)
-$pattern = "(?:인스턴스 생성 실패 — 등록되지 않은 타입: $escapedType|CLR이 준비되지 않아 $escapedType 을 만들지 못했습니다)"
-$hits = [regex]::Matches($logText, $pattern)
-$callCount = $hits.Count
+$results = @(Read-CommandResults $resultPath)
+$status = Get-SucceededCommand $results 'script.status'
+$components = @($status.components | Where-Object { $_.type -eq $ProbeType -and $_.owner -eq 'ScriptAddRegressionTarget' })
+if ($components.Count -ne 1) { throw "Expected one rejected script component, found $($components.Count)" }
+$callCount = [int]$components[0].initializationAttempts
 
 # ── 보조 신호: lifecycle.trace ──
 #
@@ -106,13 +95,12 @@ if (Test-Path $producedTrace) {
     }).Count
 }
 
-$stdoutText = Get-Content -LiteralPath $outPath -Raw
-$attachFailedSeen = ($logText -match [regex]::Escape("부착 실패 — 타입=$ProbeType")) `
-    -or ($stdoutText -match [regex]::Escape("스크립트 부착 실패 (타입=$ProbeType)"))
+$attach = Get-CommandResult $results 'script.add'
+$attachFailedSeen = $attach.status -eq 'failed' -and $components[0].instanceId -lt 0
 
 "명령 실행 확인 — 부착 실패 로그 관측: $attachFailedSeen (프로브 타입은 항상 실패하므로 참이어야 한다)"
 "드레인 확인(보조) — OnInitialized 트레이스 $traceCount 건 (0이면 드레인 자체가 안 돈 것)"
-"OnInitialized 호출 흔적 — 로그 $callCount 줄 (기대: 1 — CreateComponent/CLR 실패 로그가 호출마다 한 줄씩 남는다)"
+"OnInitialized 호출 흔적 — 네이티브 진입 $callCount 회 (기대: 1)"
 ""
 
 $failed = @()
@@ -133,7 +121,23 @@ if ($callCount -eq 0) {
     $failed += "OnInitialized 호출 흔적이 $callCount 건이다 — 예상 밖의 추가 호출(별도 조사 대상)"
 }
 
-if ($proc.ExitCode -ne 0) { $failed += ("종료 코드 비정상: 0x{0:X8}" -f $proc.ExitCode) }
+# ── 종료 코드: 이 시나리오는 **일부러 실패한다** ──────────────────────────
+#
+# 이 검사는 존재하지 않는 프로브 타입을 붙여 "OnInitialized가 정확히 한 번"을 본다.
+# 부착은 반드시 실패하고, 그것이 시나리오의 전제다(위 attachFailedSeen 단정).
+#
+# 예전에는 `script.add`가 legacy void 핸들러라 실패해도 종료 코드가 0이었고, 그래서
+# 여기서 0을 기대했다. LC7이 그것을 결과형으로 옮기면서 실패가 session을 거쳐
+# 종료 코드에 닿는다(Failed → 4). 그것이 LC1이 세운 규약이다.
+#
+# 그래서 기대값을 4로 **올린다** — 느슨하게 "0이 아니어도 통과"로 두지 않는다.
+# 여기서 0이 돌아오면 `script.add`가 실패를 다시 삼키기 시작했다는 뜻이고,
+# 그것은 이 시나리오가 아니라 명령 계약이 깨진 것이다.
+$expectedExit = 4
+if ($proc.ExitCode -ne $expectedExit) {
+    $failed += ("종료 코드 {0} 을 기대했는데 0x{1:X8} 이다 — " -f $expectedExit, $proc.ExitCode) +
+               "0 이면 script.add 가 부착 실패를 보고하지 않는다는 뜻이다(LC1 규약 위반)"
+}
 
 if ($failed.Count -gt 0) {
     "실패 $($failed.Count)건:"

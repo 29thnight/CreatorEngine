@@ -89,7 +89,7 @@ $scenario = Join-Path $Work "hierarchy_convention_resolved.txt"
 $outPath = Join-Path $Work "hierarchy_convention.out"
 $errPath = Join-Path $Work "hierarchy_convention.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru

@@ -1,43 +1,4 @@
-# 리플렉션 골든 시나리오 (PHASE 18 CT0 — 컴파일타임 전환의 "출력 동등" 증명)
-#
-# reflect.golden은 **타입 레지스트리 전체**를 훑어 각 타입을 기본 생성해 직렬화한다
-# (HandleReflectGolden — Meta::Registry::GetAllTypeNames + type->create()).
-# 즉 골든 내용은 **씬에 무엇이 있든 바뀌지 않는다.** 씬의 인스턴스는 아래
-# perf.reflect의 재료일 뿐이다.
-#
-# ── CLI 저작으로 이전 (2026-08-20, 자산·게이트 CLI 이전 6/8) ──
-#
-# 예전에는 저작 자산 BTProbe를 소환했다. 이 검사는 **BT 그래프를 쓰지 않는다** —
-# 골든은 레지스트리 덤프이고 perf.reflect는 "프리팹 하나를 반복 인스턴스화"할 뿐이라
-# 컴포넌트가 있는 프리팹이면 무엇이든 된다. 자산은 폐기 대상이므로(§0.05) 옮긴다.
-#
-# ★ 골든 재기준선은 **따라오지 않는다** — 위 이유로 덤프가 씬과 무관하기 때문이다.
-#   (이전 전후로 "타입 77 · 직렬화 77 · diff 0"이 그대로여야 한다. 그것 자체가
-#   "골든이 정말 씬 무관인가"에 대한 확인이 된다.)
-
-wait 60
-scene.new ReflectGoldenAuthor
-wait 30
-
-# ── 픽스처 정의 ──
-object.create RGSrc Empty
-component.add RGSrc MeshRenderer
-wait 15
-prefab.create RGSrc ReflectGoldenProbe
-# AssetMetaWatcher의 200ms 잠복(다른 게이트 주석 참고).
-wait 90
-
-# ── 저작 원본을 버리고 깨끗한 씬에서 잰다 ──
-scene.new ReflectGolden
-wait 40
-
-prefab.instantiate ReflectGoldenProbe RG_ProbeA
-wait 20
-prefab.instantiate ReflectGoldenProbe RG_ProbeB
-wait 30
-
+# Registered type serialization is independent of scene content.
 reflect.golden {{OUT_PATH}}
-perf.reflect ReflectGoldenProbe 50
-
 log.flush
 quit

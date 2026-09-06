@@ -55,6 +55,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$Work = [IO.Path]::GetFullPath($Work)
+. (Join-Path $PSScriptRoot "CommandResults.ps1")
+New-Item -ItemType Directory -Path $Work -Force | Out-Null
 
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -71,7 +74,9 @@ else { "GameScripts.dll을 찾지 못했다: $dll" }
 # 옛 파일을 읽고 조용히 통과한다.
 $runStart = Get-Date
 
-$proc = Start-Process -FilePath $Exe -ArgumentList @("--script", $scenario) `
+$resultPath = Join-Path $Work 'lifecycle_reload.results.jsonl'
+if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--script', ('"'+$scenario+'"'), '--result-format', 'jsonl', '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput (Join-Path $Work "lifecycle_reload.out") `
     -RedirectStandardError  (Join-Path $Work "lifecycle_reload.err") -PassThru
@@ -108,8 +113,11 @@ if ($rows.Count -eq 0) {
 
 # 어셈블리 세대와 문맥 회수는 엔진 로그가 남긴다.
 $generations = @([regex]::Matches($logText, '\[ScriptCore\].*?\(세대 (\d+)\)') | ForEach-Object { [int]$_.Groups[1].Value })
-$statusStale = $logText -match '이전 어셈블리 잔존'
-$statusClean = $logText -match '이전 어셈블리 정리됨'
+$results = @(Read-CommandResults $resultPath)
+if ($proc.ExitCode -ne 0 -or @($results | Where-Object status -ne 'succeeded').Count) { throw 'Lifecycle reload command failed' }
+$status = Get-SucceededCommand $results 'script.status'
+$statusStale = [bool]$status.previousContextAlive
+$statusClean = -not $statusStale
 $dropped = [regex]::Match($logText, '리로드로 재개 (\d+) 건을 버렸다')
 
 ""
@@ -250,30 +258,15 @@ if (-not $statusClean) {
 #   R7(가드 제거)이 실제로 init·added·enable 셋을 흘렸는데도 그 판정은 초록이었다.
 #   축을 로그의 **복원 구간**으로 바꿔 다시 잡았다.
 #
-# 구간의 경계는 엔진 로그 두 줄이다. 앞은 관리 측의 "리로드 완료 — 스크립트 N종",
-# 뒤는 네이티브의 "리로드 완료 — 복원 n/m". 그 사이가 곧 복원 루프이고, 첫 리로드는
-# 시나리오가 재생 전에 두었으므로 편집 모드다.
-
-$reloadMark = [regex]::Match($logText, '리로드 완료 — 스크립트')
-$restoreMark = [regex]::Match($logText, '리로드 완료 — 복원')
-
-if (-not $reloadMark.Success -or -not $restoreMark.Success -or $restoreMark.Index -le $reloadMark.Index) {
-    "판정 SS 편집 모드 무음: 복원 구간을 찾지 못했다(리로드 표지 $($reloadMark.Success) · 복원 표지 $($restoreMark.Success))"
-    "  → 첫 리로드가 복원까지 가지 못했다. 이 축을 잴 수 없다."
-    $failed.Add('SS(구간없음)')
-}
-else {
-    $segment = $logText.Substring($reloadMark.Index, $restoreMark.Index - $reloadMark.Index)
-    $leakedHooks = @([regex]::Matches($segment, '\[LC7\]\s+id=\d+\s+point=(\w+)') | ForEach-Object { $_.Groups[1].Value })
-
-    "판정 SS 편집 모드 무음: 편집 모드 복원 구간의 훅 $($leakedHooks.Count) 건 (기대 0)"
-    if ($leakedHooks.Count -gt 0) {
-        "  샌 훅: $($leakedHooks -join ' · ')"
-        "  → 재생 전 리로드가 관리 훅을 흘렸다. 편집 모드에서는 인스턴스만 되살리고"
-        "     훅은 돌리지 않아야 한다(bd13620c의 규약) — 리로드 복원은 CLI가 직접"
-        "     부르므로 Scene 드레인의 가드를 지나지 않는다. 스스로 가려야 한다."
-        $failed.Add('SS')
-    }
+# Read the fresh assembly's hook counter immediately after edit-mode restoration.
+# The instance factory can run in edit mode; lifecycle hooks must remain silent.
+$observations = @($results | Where-Object command -eq 'script.invoke')
+if ($observations.Count -ne 1 -or $observations[0].status -ne 'succeeded') {
+    $failed.Add('SS(missing-observation)')
+} else {
+    $leakedHooks = [int]$observations[0].data.returnValue
+    "SS edit-mode hooks: $leakedHooks (expected 0)"
+    if ($leakedHooks -ne 0) { $failed.Add('SS') }
 }
 
 ""

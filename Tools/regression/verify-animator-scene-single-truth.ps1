@@ -36,7 +36,7 @@ $stderr = Join-Path $run 'stderr.txt'
 @('animator.scene.probe', 'quit') | Set-Content -LiteralPath $scenario -Encoding UTF8
 
 try {
-    $process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario) `
+    $process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', $scenario) `
         -WorkingDirectory $repoRoot -WindowStyle Hidden `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     $process.WaitForExit($TimeoutSeconds * 1000) | Out-Null

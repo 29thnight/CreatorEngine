@@ -62,7 +62,7 @@ $scenario = Join-Path $Work "prefab_override_write_resolved.txt"
 $outPath = Join-Path $Work "prefab_override_write.out"
 $errPath = Join-Path $Work "prefab_override_write.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru

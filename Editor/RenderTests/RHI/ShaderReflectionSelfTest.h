@@ -4,5 +4,5 @@
 
 namespace RenderTest
 {
-    bool RunShaderReflectionSelfTest(std::string& outLog);
+    bool RunShaderReflectionSelfTest(const std::string& texturePath, std::string& outLog);
 }

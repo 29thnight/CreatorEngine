@@ -20,6 +20,8 @@ public:
     void AddTag(std::string_view tag);
     void RemoveTag(std::string_view tag);
     bool HasTag(std::string_view tag) const;
+    // Restore ordered definitions without disturbing the object membership index.
+    void SetTagDefinitions(const std::vector<std::string>& tags);
 
     void AddLayer(std::string_view layer);
     void RemoveLayer(std::string_view layer);

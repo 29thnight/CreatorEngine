@@ -95,8 +95,9 @@ namespace RenderTest
         }
     }
 
-    bool RunAssetIdentitySelfTest(std::string& outLog)
+    bool RunAssetIdentitySelfTest(std::string& outLog, AssetIdentityReport* report)
     {
+        if (report) *report = {};
         IdentityChecker check{ outLog };
         outLog += "[assets.identity] ce.uuidv8.sha256.v1 프로필·충돌 registry 합성 검사\n";
 
@@ -150,6 +151,7 @@ namespace RenderTest
             check.Check(bcryptAvailable, "BCrypt 대조군 사용 가능 (" + bcryptError + ")");
             check.Check(total >= 43u && agreed == total,
                 "BCrypt 대조 " + std::to_string(agreed) + "/" + std::to_string(total));
+            if (report) { report->bcryptMatched = agreed; report->bcryptTotal = total; }
             outLog += "    bcrypt agreement: " + std::to_string(agreed) + "/"
                 + std::to_string(total) + "\n";
         }
@@ -207,6 +209,7 @@ namespace RenderTest
             check.Check(again.uuid == withProfile.uuid && third.uuid == withProfile.uuid,
                 std::string("결정성 ") + v.name);
 
+            if (report) report->vectors.push_back({v.name, Uuid::ToString(withProfile.uuid)});
             seenUuids.insert(v.uuid);
             seenInputs.insert(v.inputHex);
             outLog += std::string("    vector ") + v.name + " = " + v.uuid + "\n";
@@ -558,6 +561,7 @@ namespace RenderTest
 
         outLog += "  단정 " + std::to_string(check.passed + check.failed) + "건 중 통과 "
             + std::to_string(check.passed) + " · 실패 " + std::to_string(check.failed) + "\n";
+        if (report) { report->passed = check.passed; report->failed = check.failed; }
         return check.failed == 0;
     }
 }

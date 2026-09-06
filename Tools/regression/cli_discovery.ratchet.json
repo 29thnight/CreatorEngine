@@ -1,0 +1,23 @@
+{
+  "schema": "lc3-discovery-ratchet/1",
+  "recorded": "2026-09-06",
+  "maxSourceScrapers": 0,
+  "note": "명령 이름·존재를 확인하려고 ConsoleCommandSystem.cpp 를 데이터로 읽는 소비자의 상한. 주석에서 파일 이름을 언급만 하는 것은 세지 않는다(고칠 수 없는 것을 눈금에 넣으면 래칫이 0에 닿지 못한다). 늘면 붉어지고, 줄면 -UpdateRatchet 으로 낮춘다.",
+  "history": [
+    {
+      "date": "2026-09-04",
+      "value": 7,
+      "why": "LC3 착수 직전. Invoke-Dx12Suite.ps1 이 dx12.* 리터럴을 정규식으로 뽑았고, 나머지 6개는 transform/render 프로브 명령이 소스에 아직 있는지 확인하는 존재 래칫이다."
+    },
+    {
+      "date": "2026-09-04",
+      "value": 6,
+      "why": "LC3 — Invoke-Dx12Suite.ps1 을 commands.list 런타임 discovery 로 옮겼다. 그 스크립트는 같은 자리에서 두 번 틀린 이력이 있다(help 를 읽어 35중 26만 실행, 등록 형태가 바뀌어 35을 0으로 읽음). 남은 6개는 verify-mbc-cutover-freeze 와 verify-transform-*/render-proxy-dirty 의 존재 래칫이고, 명령 목록이 아니라 '이 프로브가 아직 있는가'를 본다 — LC9 의 소비자 이관에서 commands.list 로 옮긴다."
+    },
+    {
+      "date": "2026-09-06",
+      "value": 0,
+      "why": "5 runtime probe presence checks use terminal results; MBC freeze now examines only the diagnostic implementation invariant, while runtime discovery verifies command presence."
+    }
+  ]
+}

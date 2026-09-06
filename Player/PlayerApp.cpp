@@ -171,17 +171,31 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 			{
 				Player::g_smoke.frameLimit = wcstoull(argv[i + 1], nullptr, 10);
 			}
+			else if (0 == wcscmp(argv[i], L"--command-service"))
+			{
+				// PHASE 14.5 LC8 — 기본 off. 켜는 것은 이 플래그뿐이다(§8 · §11.2).
+				Player::g_service.enabled = true;
+			}
 		}
 		LocalFree(argv);
 	}
 
 	const EngineLaunchConfig launchConfig = MakePlayerLaunchConfig();
+
+	// endpoint 파일은 **이 프로세스의** runtime 데이터 뿌리에 놓는다.
+	// Player 를 여럿 띄우는 것이 정상 경로라(각자 격리된 runtimeProcessRoot),
+	// 에디터처럼 프로젝트 뿌리 하나를 쓰면 나중에 뜬 쪽이 앞선 쪽의 파일을 덮는다.
+	Player::g_service.endpointRoot = launchConfig.paths.runtimeDataRoot.string();
 	// Player is always a packaged Host. An invalid launch config must not bypass
 	// ownership preflight merely because its remaining capability fields are defaults.
 	if (!CleanupOwnedRuntime(launchConfig.paths, RuntimeCleanupScope::Process))
 	{
 		std::fputs("[Player] runtime root preparation failed\n", stderr);
-		return 2;
+		// ★ 2 → 5 (§5.4 · LC8). 런타임 뿌리를 준비하지 못한 것은 IO·infrastructure
+		//   이지 호출자의 인자 오류가 아니다. 바로 아래 cleanup 실패가 이미 5 를
+		//   쓰고 있었고(kRuntimeCleanupFailureExitCode), 같은 성격의 두 실패가
+		//   다른 값을 내고 있었다.
+		return kRuntimeCleanupFailureExitCode;
 	}
 
 	const int exitCode = EngineBootstrap::Run<Player::App>(hInstance, launchConfig);

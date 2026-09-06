@@ -26,7 +26,17 @@
     <!-- dotnet build의 기본 Platform은 AnyCPU다. 관리 어셈블리는 x64 Host 전용이다. -->
     <EnginePlatform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</EnginePlatform>
     <EnginePlatform Condition="'$(EnginePlatform)' == ''">$(Platform)</EnginePlatform>
-    <EngineBuildKey>$(EnginePlatform)-$(Configuration)</EngineBuildKey>
+
+    <!--
+      Development/Shipping 은 구성이 아니라 스위치다(Directory.Build.props 의
+      EngineShipping). 그 키가 산출물 경로에 들어와야 두 바이너리가 나란히 존재하고,
+      격리 게이트가 둘을 같은 실행에서 견줄 수 있다.
+
+      Directory.Build.props 가 먼저 임포트되므로 보통은 이미 채워져 있다. 비어 있는
+      경우(이 파일만 단독으로 임포트하는 경로)에는 예전과 같은 값으로 떨어진다.
+    -->
+    <EngineConfigKey Condition="'$(EngineConfigKey)' == ''">$(Configuration)</EngineConfigKey>
+    <EngineBuildKey>$(EnginePlatform)-$(EngineConfigKey)</EngineBuildKey>
     <EngineBinaryRoot>$(MSBuildThisFileDirectory)Bin\$(EngineBuildKey)\</EngineBinaryRoot>
     <EngineEditorOutDir>$(EngineBinaryRoot)Editor\</EngineEditorOutDir>
     <EnginePlayerOutDir>$(EngineBinaryRoot)Player\</EnginePlayerOutDir>

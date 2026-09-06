@@ -1354,6 +1354,7 @@ namespace
             outError.clear();
             pipelineDescriptionValid = desc.Validate(outError);
             pipelineDescription = desc.Dump();
+            debugSnapshot.pipelineNodes = desc.SnapshotNodes();
             if (!pipelineDescriptionValid)
             {
                 pipelineDescription += "Validate failed: " + outError + "\n";

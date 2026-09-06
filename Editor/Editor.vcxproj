@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
     에디터 통합 정적 라이브러리 (E7-d, 2026-08-24).
@@ -36,7 +36,21 @@
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.h" />
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.h" />
     <ClInclude Include="EngineEntry\BuildSettings.h" />
+    <ClInclude Include="EngineEntry\EditorCommandServiceHost.h" />
+    <ClInclude Include="EngineEntry\EditorObjectOperations.h" />
+    <ClInclude Include="EngineEntry\EditorProjectOperations.h" />
+    <ClInclude Include="EngineEntry\EditorDiagnostics.h" />
+    <ClInclude Include="EngineEntry\Commandlets\EditorCommandlets.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandParser.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandDescriptor.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandDescriptorSeeds.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandRegistry.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandResult.h" />
+    <ClInclude Include="EngineEntry\CommandCore\CommandSession.h" />
+    <ClInclude Include="EngineEntry\CommandResultJson.h" />
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
+    <ClInclude Include="EngineEntry\Commands\CommandRegistrar.h" />
+    <ClInclude Include="EngineEntry\Commands\CommandSupport.h" />
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
     <ClInclude Include="EngineEntry\EditorModelPlacement.h" />
@@ -95,7 +109,56 @@
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.cpp" />
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.cpp" />
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp" />
+    <ClCompile Include="EngineEntry\EditorCommandServiceHost.cpp" />
+    <ClCompile Include="EngineEntry\EditorObjectOperations.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorProjectOperations.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorDiagnostics.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\CommandCore\CommandParser.cpp" />
+    <ClCompile Include="EngineEntry\CommandCore\CommandDescriptorSeeds.cpp" />
+    <ClCompile Include="EngineEntry\CommandCore\CommandRegistry.cpp" />
+    <ClCompile Include="EngineEntry\CommandCore\CommandResult.cpp" />
+    <ClCompile Include="EngineEntry\CommandCore\CommandSession.cpp" />
+    <ClCompile Include="EngineEntry\CommandResultJson.cpp" />
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
+    <!-- LC6(PHASE 14.5): 도메인 명령 TU.
+         유니티에서 **일부러 뺀다.** §12 가 "include 는 각 TU 가 직접 소유한다"고
+         못 박았는데, 유니티에 넣으면 앞 파일이 들여온 헤더에 기대도 통과한다 —
+         그 규칙이 지켜지는지가 평상시 빌드에서 검사되지 않는다. 빼 두면 매
+         빌드가 검사다. (non-unity 전체 빌드는 오늘 SceneRuntime 에서 이미
+         깨져 있어 그쪽에 기댈 수 없다.) -->
+    <ClCompile Include="EngineEntry\Commandlets\EditorCommandlets.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\CommandSupport.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\RenderTestCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\RenderDebugCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\DiagnosticsCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\ScriptUiAnimatorCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\SceneObjectCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\AssetAuthoringCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\CoreCommands.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
     <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
     <ClCompile Include="EngineEntry\EditorModelPlacement.cpp" />
@@ -135,6 +198,9 @@
     <ClCompile Include="ImGuiHelper\widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Engine\CommandService\CommandService.vcxproj">
+      <Project>{3f7a1c62-8d94-4b05-a1e7-6c25d80f9b34}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
       <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>

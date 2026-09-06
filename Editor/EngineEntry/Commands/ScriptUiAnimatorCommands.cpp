@@ -1,0 +1,1216 @@
+﻿// Script runtime controls, UI authoring operations and isolated domain Commandlets.
+// UI authoring shares property transactions with Inspector and Scene View.
+
+#include "CommandRegistrar.h"
+#include "CommandSupport.h"
+#include "EditorObjectOperations.h"
+#include <cmath>
+
+#include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
+#include "CommandCore/CommandParser.h"
+#include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
+#include "Commands/CommandRegistrar.h"          // LC6: 도메인 TU 등록 창구
+#include "CommandCore/CommandDescriptorSeeds.h"
+#include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
+#include "EditorCameraRig.h"
+#include "EditorSessionState.h"
+#include "EngineBootstrap.h"
+#include "GameBuilderSystem.h"
+#include "EditorAssetDatabase.h"
+#include "Interfaces/AssetAuthoringPort.h"
+#include "Interfaces/FoliageInstance.h"
+#include <mathematics/color.hpp>
+#include "SceneManager.h"
+#include "Scene.h"
+#include "CameraComponent.h"
+#include "CameraSystem.h"
+#include "ClrHost.h"
+#include "ScriptComponent.h"
+#include "PrefabUtility.h"
+#include "ComponentFactory.h"
+#include "ModelSceneInstantiation.h" // MBC9: generation 씬 인스턴스화
+#include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 소비 스냅샷
+#include "Material.h"
+#include "Mesh.h"
+#include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelVertexLayout.h"    // MBC9: skinbounds typed 정점 디코드
+#include "Assets/ModelAnimationSampler.h" // MBC9: editorsurface frame 축(CountUniqueKeyTimes)
+#include "Assets/ModelAssetAuthoringTransaction.h" // MBC11: assets.modelbench author 모드
+#include "RHI/IRHIDeviceResources.h"                // MBC11: VRAM 계측
+#include "LifecycleTrace.h"
+#include "LifecycleRegistry.h"
+#include "Animator.h"
+#include "Socket.h" // X7 transform bulk probe
+#include "BoneRegion.h" // MAX_BONES
+#include "Experiment/Model.h" // I5-D4e-1: experiment.animtick 패리티
+#include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
+#include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
+#include "FoliageComponent.h"      // I5-D5a: experiment.foliage 게이트
+#include "Terrain.h"               // D4 Terrain YAML authoring round-trip
+#include "Experiment/MaterialInstance.h"      // I5-D5c1: experiment.matruntime
+#include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
+#include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
+#include "Experiment/Cooked/CookedAssetCatalog.h"  // I7-C1
+#include "ExperimentMaterialResolveBinding.h"       // I7-C1: 제품 resolver
+#include "StandardMaterialProperty.h"              // I7-C1: probe property
+#include "Experiment/MaterialPropertyBlock.h"  // I5-D5c2-1: packing 바이트 축
+#include "MaterialPropertyPacker.h"           // I5-D5c2-1: 합성 layout
+#include "PrimitiveRenderProxy.h"           // I5-D5c2-2: 프록시 축
+#include "MaterialScriptBinding.h"          // I5-D5c3: 실물 편집 창구
+#include "ProxyCommandQueue.h"             // I5-D5c3: 갱신 커맨드 소비
+#include "Render/Scene/ExperimentMaterialSealing.h" // I5-D5c3-2: texture 축
+#include "PrimitiveRenderProxy.h"  // I5-D5a: FoliageRenderProxy 실물 사슬
+#include "RHI/IRenderDeviceServices.h" // RHIModelMeshView·BuildRHIModelMeshView
+#include "ConditionParameter.h"
+#include "UIManager.h"
+#include "Canvas.h"
+#include "ImageComponent.h"
+#include "MeshRenderer.h" // X8 render proxy dirty probe
+#include "RectTransformComponent.h"
+#include "BoneComponent.h" // E7-b: scene.traversalbench 0 모드의 마커 보유 수 진단
+#include "UIButton.h"
+#include "TextComponent.h"
+#include "SpriteSheetComponent.h"
+#include "StateMachineComponent.h"
+#include "AIManager.h"
+#include "DataSystem.h"
+#include "GpuDiagnostics.h"
+#include "LogSystem.h"
+#include "PathFinder.h"
+#include "RuntimeSettings.h"
+#include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
+#include "AuthoringNodeViewAccess.h" // D3-a-5b
+#include "AuthoringParsedDocument.h"
+#include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
+#include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
+#include "CoreWindow.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/Tests/DX12SelfTest.h"
+#include "RHI/Vulkan/VulkanSelfTest.h"
+#include "RHI/IImGuiHost.h"
+#include "ProfilerSelfTest.h"
+#include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
+#include "AssetIdentity/AssetIdentitySelfTest.h"
+#include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
+#include "AssetIdentity/ModelAssetGenerationSelfTest.h"
+#include "AssetIdentity/SceneModelGenerationSelfTest.h"
+#include "ExperimentParity/ExperimentSamplerSelfTest.h"
+#include "ExperimentParity/ExperimentCookedSelfTest.h"
+#include "ExperimentParity/ExperimentWeldSelfTest.h"
+#include "ExperimentParity/ExperimentCacheOptSelfTest.h"
+#include "ExperimentParity/ExperimentTextureCookSelfTest.h"
+#include "ShaderMeta.h"
+#include "ExperimentParity/ExperimentShaderMetaCookSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialInstanceSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialSealSelfTest.h"
+#include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
+#include "ExperimentParity/ExperimentSceneCookSelfTest.h"
+#include "ExperimentParity/ExperimentResolverSelfTest.h"
+#include "ExperimentParity/ExperimentCatalogSelfTest.h"
+#include "RHI/ScreenSizedResource.h"
+#include "ReflectionYml.h"
+#include "ReflectionUndo.h"
+#include "GameObjectCommand.h"
+#include "StringHelper.h"
+#include "BlackBoard.h"
+#include "TagManager.h"
+#include <Windows.h>
+#include <psapi.h> // MBC11: assets.modelbench peak working set
+#include <crtdbg.h>
+#include <algorithm>
+#include <atomic>
+#include <cctype>
+#include <limits>
+#include <random>
+#include <stdexcept>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <DbgHelp.h>
+#include <DXProgrammableCapture.h>
+#include <chrono>
+#include <dxgidebug.h>
+#include <wrl/client.h>
+#include <algorithm>
+#include <cstring>
+#include <cstdio>
+#include <fstream>
+#include <functional>
+#include "../../Engine/SceneRuntime/MeshRenderer.h"
+#include "../../Engine/RenderEngine/Material.h"
+#include <unordered_set>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+
+namespace ConsoleCmd
+{
+    static CommandCore::CommandResult Cmd_animator_scene_probe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("animator.scene.probe");
+        Animator source;
+        source.AddParameter<float>("Speed", 1.5f, ValueType::Float);
+        const auto controller = source.CreateController_UINoAni();
+        controller->name = "Base Layer";
+        AnimationState* anyState =
+            controller->CreateState("Any State", -1, true);
+        controller->CreateState("Idle", 0);
+        controller->CreateState("Run", 1);
+        controller->SetCurState("Idle");
+
+        AniTransition* transition =
+            controller->CreateTransition("Idle", "Run");
+        if (transition)
+        {
+            transition->exitTime = 0.25f;
+            transition->blendTime = 0.15f;
+            transition->hasExitTime = true;
+            TransCondition condition{
+                0.5f, ConditionType::Greater, ValueType::Float };
+            condition.valueName = "Speed";
+            condition.valueParameter = source.Parameters.front();
+            condition.m_ownerController = controller.get();
+            transition->conditions.push_back(condition);
+        }
+
+        Authoring::WriteDocument first = Meta::SerializeDocument(&source);
+        const std::string yaml = first.Dump();
+        std::string parseError;
+        auto parsed = Authoring::WriteDocument::ParseText(yaml, &parseError);
+
+        bool stable = false;
+        bool links = false;
+        std::size_t states = 0;
+        std::size_t transitions = 0;
+        std::size_t conditions = 0;
+        if (parsed)
+        {
+            Animator roundTrip;
+            const Authoring::ReadNode roundTripNode = parsed->Root().Read();
+            Meta::Deserialize(&roundTrip, roundTripNode);
+            // ComponentFactory와 같은 순서: typed fields 뒤 component post-load.
+            roundTrip.OnDeserialized(
+                Authoring::NodeViewAccess::Make(roundTripNode));
+            Authoring::WriteDocument second = Meta::SerializeDocument(&roundTrip);
+            stable = Authoring::NodesEqual(
+                first.Root().Read(), second.Root().Read());
+
+            if (roundTrip.m_animationControllers.size() == 1
+                && roundTrip.Parameters.size() == 1)
+            {
+                const auto& restored = roundTrip.m_animationControllers.front();
+                states = restored->StateVec.size();
+                for (const auto& state : restored->StateVec)
+                {
+                    transitions += state->Transitions.size();
+                    for (const auto& restoredTransition : state->Transitions)
+                        conditions += restoredTransition->conditions.size();
+                }
+
+                AnimationState* idle = restored->FindState("Idle");
+                links = restored->m_owner == &roundTrip
+                    && restored->m_curState == idle
+                    && restored->m_anyState
+                    && restored->m_anyState->m_isAny
+                    && restored->m_anyState->m_name == "Any State"
+                    && idle && idle->Transitions.size() == 1
+                    && idle->Transitions.front()->curState == idle
+                    && idle->Transitions.front()->nextState == restored->FindState("Run")
+                    && idle->Transitions.front()->conditions.size() == 1
+                    && idle->Transitions.front()->conditions.front().valueParameter
+                        == roundTrip.Parameters.front();
+            }
+        }
+
+        const bool passed = parsed.has_value() && stable && links
+            && nullptr != anyState && controller->m_anyState.get() == anyState
+            && states == 3 && transitions == 1 && conditions == 1
+            && !yaml.empty();
+        std::printf(
+            "[animator.scene.probe] controllers=%zu parameters=%zu states=%zu "
+            "transitions=%zu conditions=%zu yamlBytes=%zu stable=%d links=%d "
+            "selfcheck=%s\n",
+            source.m_animationControllers.size(), source.Parameters.size(), states,
+            transitions, conditions, yaml.size(), stable ? 1 : 0, links ? 1 : 0,
+            passed ? "pass" : "fail");
+        auto data = CommandData::Object();
+        data.Set("controllers", CommandData::Int(source.m_animationControllers.size()));
+        data.Set("parameters", CommandData::Int(source.Parameters.size()));
+        data.Set("states", CommandData::Int(states));
+        data.Set("transitions", CommandData::Int(transitions));
+        data.Set("conditions", CommandData::Int(conditions));
+        data.Set("yamlBytes", CommandData::Int(yaml.size()));
+        data.Set("stable", CommandData::Bool(stable));
+        data.Set("links", CommandData::Bool(links));
+        return passed ? Ok({}, std::move(data)) : Fail("animator.scene.failed", "Commandlet verification failed", std::move(data));
+    }
+
+	// 입력 액션맵은 맵마다 YAML `.inputmap` 하나다. 이름에 '.'이 든 맵과 실제
+	// action/key payload가 저장·재기동 후 그대로 복원되는지를 함께 본다.
+	// LC1 대표 selftest.
+	//
+	// 이 핸들러 하나에 §5.4 의 네 결과가 전부 들어 있어 이행 본보기로 골랐다 —
+	// 사용법 오류(2) · 선행조건 불충족(3) · 판정 실패(4) · 성공(0). 예전에는
+	// 넷 중 셋이 `printf` 뒤 `return` 이었고 판정 실패만 `SetExitCode(5)` 로
+	// infrastructure 오류인 척했다.
+
+    // ★ LC7: 결과형. 게이트가 "리로드 실패 뒤에도 스크립트가 붙는가"를 stdout 이
+    //   아니라 값으로 물을 수 있어야 한다 — 서비스만 켠 실행에는 콘솔이 없다.
+    static CommandCore::CommandResult Cmd_script_add(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& cmd = ctx.cmd;
+
+        if (parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: script.add <오브젝트 이름> <스크립트 타입>\n");
+            return CommandCore::InvalidArguments(
+                "script.add: <오브젝트 이름> <스크립트 타입> 이 필요하다");
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+        }
+
+        // 오브젝트 이름에 공백이 흔하다("Main Camera"). 타입은 마지막 토큰으로 보고,
+        // 그 앞 전체를 이름으로 취급한다.
+        const auto names = CommandCore::SplitTrailingName(parts, 1);
+        const std::string& objectName = names.leading;
+        const std::string& typeName = names.trailing;
+
+        auto object = scene->GetEntity(objectName);
+        if (!object)
+        {
+            Debug->LogError("[스크립트] 오브젝트를 찾을 수 없음: " + objectName);
+            std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
+            return CommandCore::PreconditionFailed(
+                "object.not_found", "오브젝트를 찾을 수 없다: " + objectName);
+        }
+
+        // 한 오브젝트에 스크립트를 여럿 붙일 수 있어야 하므로 중복 허용 경로를 쓴다.
+        // ScriptComponent가 Awake에서 관리 인스턴스를 만든다.
+        const Meta::Type* scriptType = Meta::Find("ScriptComponent");
+        if (nullptr == scriptType)
+        {
+            std::printf("[CLI] ScriptComponent 타입을 찾을 수 없음\n");
+            return CommandCore::InternalError(
+                "script.component_type_missing", "ScriptComponent 타입을 찾을 수 없다");
+        }
+
+        // K2 스테이지 A: AddComponentAllowMultiple가 raw Component*를 돌려준다 —
+        // dynamic_pointer_cast(shared_ptr 전용) 대신 dynamic_cast.
+        auto* script = dynamic_cast<ScriptComponent*>(
+            object->AddComponentAllowMultiple(*scriptType));
+        if (!script)
+        {
+            std::printf("[CLI] ScriptComponent 추가 실패\n");
+            return CommandCore::InternalError(
+                "script.component_add_failed", "ScriptComponent 를 추가하지 못했다");
+        }
+
+        // m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
+        // CreateComponent를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
+        script->m_scriptType = typeName;
+
+        // (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다("씬의 초기화
+        // 단계는 이미 지나갔을 수 있으므로 여기서 직접 깨운다"). 하지만
+        // AddComponentAllowMultiple 안의 AttachComponentLifecycle이 이미 이 컴포넌트를
+        // PendingAwake 큐에 넣어 뒀고(State_AwakeCalled 비트는 아직 서지 않은 채),
+        // 직접 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::RegistryDrainAwakeAndStart가
+        // 큐에 남은 같은 컴포넌트를 또 한 번 깨운다 — OnInitialized 이중 호출.
+        // ScriptComponent::OnInitialized의 `if (HasInstance()) return;` 가드가 보통은
+        // 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다.
+        //
+        // Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
+        // 직후 scene->DrainPendingLifecycle()을 동기로 불러 정상 드레인 경로를 태운다.
+        // 이미 깨운 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
+        scene->DrainPendingLifecycle();
+
+        if (!script->HasInstance())
+        {
+            Debug->LogError("[스크립트] 부착 실패 — 타입=" + typeName);
+            std::printf("[CLI] 스크립트 부착 실패 (타입=%s)\n", typeName.c_str());
+            return CommandCore::Fail("script.attach_failed",
+                "스크립트 인스턴스를 만들지 못했다 — 타입=" + typeName
+                + " (어셈블리가 올라와 있는지 script.status 로 확인할 것)");
+        }
+
+        const int id = script->GetInstanceId();
+        Debug->LogWarning("[스크립트] " + objectName + " 에 " + typeName + " 부착 (id=" + std::to_string(id) + ")");
+        std::printf("[CLI] 부착 완료: %s <- %s (id=%d)\n", objectName.c_str(), typeName.c_str(), id);
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("object", CommandCore::CommandData::String(objectName));
+        data.Set("type",   CommandCore::CommandData::String(typeName));
+        data.Set("instanceId", CommandCore::CommandData::Int(id));
+        return CommandCore::Ok("부착 완료 " + objectName + " <- " + typeName,
+                               std::move(data));
+    }
+
+    static ScriptComponent* FindScriptInstance(int id)
+    {
+        if (id < 0 || !ClrHost::Get().IsReady()) return nullptr;
+        for (auto* scene : SceneManagers->GetScenes()) if (scene)
+            for (const auto& object : scene->m_Entities) if (object && !object->IsDestroyMark())
+                for (const auto& component : object->m_components)
+                    if (auto* script = dynamic_cast<ScriptComponent*>(component.get()); script && !script->IsDestroyMark() && script->GetInstanceId() == id)
+                        return script;
+        return nullptr;
+    }
+
+    static CommandCore::CommandResult Cmd_script_fields(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        int id{};
+        if (ctx.parts.size() != 2 || !ParseNumber(ctx.parts[1], id) || id < 0) return InvalidArguments("script.fields <non-negative instance id>");
+        auto* script = FindScriptInstance(id);
+        if (!script) return PreconditionFailed("script.instance_not_found", "Script instance is unavailable");
+        auto& clr = ClrHost::Get();
+        const int count = clr.GetFieldCount(id);
+        auto data = CommandData::Object(); auto fields = CommandData::Array();
+        for (int i = 0; i < count; ++i)
+        {
+            auto entry = CommandData::Object();
+            entry.Set("index", CommandData::Int(i)); entry.Set("name", CommandData::String(clr.GetFieldName(id, i)));
+            CommandData value; std::string type = "unsupported";
+            switch (clr.GetFieldType(id, i))
+            {
+            case ClrHost::ScriptFieldType::Float: type = "float"; value = CommandData::Double(clr.GetFieldFloat(id, i)); break;
+            case ClrHost::ScriptFieldType::Int32: type = "int"; value = CommandData::Int(clr.GetFieldInt32(id, i)); break;
+            case ClrHost::ScriptFieldType::Bool: type = "bool"; value = CommandData::Bool(clr.GetFieldBool(id, i)); break;
+            case ClrHost::ScriptFieldType::String: type = "string"; value = CommandData::String(clr.GetFieldString(id, i)); break;
+            case ClrHost::ScriptFieldType::Float2:
+            { type = "float2"; const auto v = clr.GetFieldFloat2(id, i); value = CommandData::Array(); value.Append(CommandData::Double(v.x)); value.Append(CommandData::Double(v.y)); break; }
+            case ClrHost::ScriptFieldType::Float3:
+            { type = "float3"; const auto v = clr.GetFieldFloat3(id, i); value = CommandData::Array(); value.Append(CommandData::Double(v.x)); value.Append(CommandData::Double(v.y)); value.Append(CommandData::Double(v.z)); break; }
+            case ClrHost::ScriptFieldType::Object:
+            { type = "object"; if (auto* object = clr.GetFieldObject(id, i); object && object->GetScene()) value = CommandData::String(EditorObjectOperations::ObjectId(object->GetScene()->HandleOf(object->m_index))); break; }
+            default: break;
+            }
+            entry.Set("type", CommandData::String(type)); entry.Set("value", std::move(value)); fields.Append(std::move(entry));
+        }
+        data.Set("instanceId", CommandData::Int(id)); data.Set("scriptType", CommandData::String(script->m_scriptType));
+        data.Set("fields", std::move(fields)); data.Set("count", CommandData::Int(count));
+        return Ok({}, std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_script_set(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const std::vector<std::string>& parts = ctx.parts;
+        const std::string& cmd = ctx.cmd;
+
+        if (parts.size() < 4)
+        {
+            std::printf("[CLI] 사용법: script.set <인스턴스 id> <필드 인덱스> <값>\n");
+            return InvalidArguments("script.set <instance id> <field index> <value>");
+        }
+
+        auto& clr = ClrHost::Get();
+        int id{}, index{};
+        if (!ParseNumber(parts[1], id) || id < 0 || !ParseNumber(parts[2], index) || index < 0)
+            return InvalidArguments("Instance id and field index must be non-negative integers");
+        auto* script = FindScriptInstance(id);
+        if (!script) return PreconditionFailed("script.instance_not_found", "Script instance is unavailable");
+        if (index >= clr.GetFieldCount(id)) return InvalidArguments("Field index is out of range");
+
+        // 값에 공백이 들어갈 수 있다(문자열·오브젝트 이름). 인덱스 뒤 전체를 값으로 본다.
+        const std::string rawValue = CommandCore::JoinFrom(parts, 3);
+        const auto parseVector = [](const std::string& raw, float* values, size_t count) {
+            size_t start = 0;
+            for (size_t i = 0; i < count; ++i) {
+                const auto comma = raw.find(',', start);
+                if ((i + 1 < count) != (comma != std::string::npos)) return false;
+                if (!ParseNumber(TrimLine(raw.substr(start, comma == std::string::npos ? comma : comma - start)), values[i])) return false;
+                start = comma == std::string::npos ? raw.size() : comma + 1;
+            }
+            return true;
+        };
+        switch (clr.GetFieldType(id, index))
+        {
+        case ClrHost::ScriptFieldType::Float:
+        {
+            float value{}; if (!ParseNumber(rawValue, value)) return InvalidArguments("Expected a finite float");
+            clr.SetFieldFloat(id, index, value); break;
+        }
+        case ClrHost::ScriptFieldType::Int32:
+        {
+            int value{}; if (!ParseNumber(rawValue, value)) return InvalidArguments("Expected a 32-bit integer");
+            clr.SetFieldInt32(id, index, value); break;
+        }
+        case ClrHost::ScriptFieldType::Bool:
+            if (rawValue != "true" && rawValue != "false" && rawValue != "1" && rawValue != "0") return InvalidArguments("Expected true or false");
+            clr.SetFieldBool(id, index, rawValue == "true" || rawValue == "1");
+            break;
+        case ClrHost::ScriptFieldType::String:
+            clr.SetFieldString(id, index, rawValue);
+            break;
+        case ClrHost::ScriptFieldType::Float2:
+        {
+            ClrHost::ScriptFloat2 v{};
+            float values[2]{}; if (!parseVector(rawValue, values, 2)) return InvalidArguments("Expected two finite comma-separated floats");
+            v.x = values[0]; v.y = values[1];
+            clr.SetFieldFloat2(id, index, v);
+            break;
+        }
+        case ClrHost::ScriptFieldType::Float3:
+        {
+            ClrHost::ScriptFloat3 v{};
+            float values[3]{}; if (!parseVector(rawValue, values, 3)) return InvalidArguments("Expected three finite comma-separated floats");
+            v.x = values[0]; v.y = values[1]; v.z = values[2];
+            clr.SetFieldFloat3(id, index, v);
+            break;
+        }
+        case ClrHost::ScriptFieldType::Object:
+        {
+            // 오브젝트 참조는 이름으로 지정한다("none"이면 비운다).
+            Entity* target = nullptr;
+            if (rawValue != "none" && !rawValue.empty())
+            {
+                if (Scene* activeScene = SceneManagers->GetActiveScene())
+                {
+                    auto found = activeScene->GetEntity(rawValue);
+					target = found;
+                }
+
+                if (nullptr == target)
+                {
+                    std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", rawValue.c_str());
+                    return PreconditionFailed("object.not_found", "Referenced object does not exist");
+                }
+            }
+            clr.SetFieldObject(id, index, target);
+            break;
+        }
+        default:
+            std::printf("[CLI] 설정할 수 없는 필드입니다\n");
+            return InvalidArguments("Unsupported script field type");
+        }
+
+        script->CaptureFields();
+
+        Debug->LogWarning("[스크립트] 필드 설정 — id=" + parts[1] + " [" + parts[2] + "] = " + parts[3]);
+        std::printf("[CLI] 필드 설정 완료\n");
+        auto data = CommandData::Object();
+        data.Set("instanceId", CommandData::Int(id)); data.Set("index", CommandData::Int(index));
+        data.Set("field", CommandData::String(clr.GetFieldName(id, index)));
+        return Ok("Script field applied", std::move(data));
+    }
+
+    // ★ LC9 — `ui.*` 다섯을 결과형으로 옮긴다(2026-09-06).
+    //
+    //   **핸들러가 찍는 줄은 한 글자도 바꾸지 않는다.** 이 도메인의 출력은
+    //   `verify-ui-layout-golden.ps1` 이 골든으로 대조하고 `resolution_sweep.txt` 가
+    //   해상도마다 읽는다. 서명을 바꾸면서 문안까지 손대면 그것들이 한꺼번에
+    //   붉어지고, 붉어진 이유가 "이행이 잘못됐다" 인지 "문안이 달라졌다" 인지
+    //   가릴 수 없다.
+    //
+    //   다만 stdout 이 통째로 불변인 것은 아니다 — 실패·precondition 결과에는
+    //   `PublishResult` 가 `[CLI] <명령> <status> (<code>) <메시지>` 를 **덧붙인다**.
+    //   덧붙는 줄이지 고쳐 쓰는 줄이 아니라 기존 정규식은 그대로 맞는다.
+    static CommandCore::CommandResult Cmd_ui_rect(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // 오브젝트 이하 전체의 worldRect를 재귀로 찍는다. 이름 대신 *를 주면 씬의
+        // 모든 RectTransform을 훑는다 — 해상도를 바꿔 가며, 또는 코드를 고치기
+        // 전후로 같은 명령을 돌려 레이아웃 결과를 통째로 대조하기 위한 것이다(PHASE 7).
+        if (parts.size() < 2)
+        {
+            std::printf("[CLI] 사용법: ui.rect <오브젝트 이름 | *>\n");
+            return CommandCore::InvalidArguments("ui.rect: <오브젝트 이름 | *> 가 필요하다");
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("ui.rect.no_scene", "활성 씬이 없다");
+        }
+
+        int reportedRects = 0;
+
+        // 재귀 깊이 상한 — 계층이 순환하더라도 CLI가 스택을 태우지 않게 한다.
+        constexpr int kMaxDepth = 32;
+
+        std::function<void(Entity*, int)> dump = [&](Entity* obj, int depth)
+        {
+            if (nullptr == obj || depth > kMaxDepth) return;
+
+            if (auto* rect = obj->GetComponent<RectTransformComponent>())
+            {
+                const auto& world = rect->GetWorldRect();
+                const auto& size = rect->GetSizeDelta();
+                const auto& anchored = rect->GetAnchoredPosition();
+                const auto screenPosition = rect->GetScreenPosition();
+                const std::string line =
+                    std::string(static_cast<size_t>(depth) * 2, ' ') + obj->m_name.ToString() +
+                    " world(" + std::to_string(static_cast<int>(world.x)) + ", " +
+                    std::to_string(static_cast<int>(world.y)) + ", " +
+                    std::to_string(static_cast<int>(world.width)) + ", " +
+                    std::to_string(static_cast<int>(world.height)) + ")" +
+                    " sizeDelta(" + std::to_string(static_cast<int>(size.x)) + ", " +
+                    std::to_string(static_cast<int>(size.y)) + ")" +
+                    " anchor(" + std::to_string(rect->GetAnchorMin().x).substr(0, 4) + "," +
+                    std::to_string(rect->GetAnchorMin().y).substr(0, 4) + "-" +
+                    std::to_string(rect->GetAnchorMax().x).substr(0, 4) + "," +
+                    std::to_string(rect->GetAnchorMax().y).substr(0, 4) + ")" +
+                    " pos(" + std::to_string(static_cast<int>(anchored.x)) + ", " +
+                    std::to_string(static_cast<int>(anchored.y)) + ")" +
+                    " screen(" + std::to_string(static_cast<int>(screenPosition.x)) + ", " +
+                    std::to_string(static_cast<int>(screenPosition.y)) + ")" +
+                    " scale(" + std::to_string(rect->GetLayoutScale()).substr(0, 5) + ")";
+
+                std::printf("[CLI] %s\n", line.c_str());
+                Debug->LogWarning("[ui.rect] " + line);
+                ++reportedRects;
+            }
+
+            for (auto childIndex : obj->GetChildrenIndices())
+            {
+                dump(obj->OwnerSceneFindIndex(childIndex), depth + 1);
+            }
+        };
+
+        if (parts[1] == "*")
+        {
+            // 최상위는 "아무의 자식도 아닌 오브젝트"로 가린다. m_parentIndex만 보고
+            // 판별했더니 프리팹 루트 밑의 캔버스가 최상위로도 잡혀 같은 서브트리가
+            // 두 번 찍혔다 — 대조에서 개수가 정확히 두 배가 되어 드러났다.
+            std::unordered_set<Entity::Index> childIndices;
+            for (const auto& obj : scene->m_Entities)
+            {
+                if (!obj || obj->IsDestroyMark()) continue;
+                for (auto childIndex : obj->GetChildrenIndices()) childIndices.insert(childIndex);
+            }
+
+            for (const auto& obj : scene->m_Entities)
+            {
+                if (!obj || obj->IsDestroyMark()) continue;
+                if (childIndices.count(obj->m_index)) continue;
+                dump(obj.get(), 0);
+            }
+        }
+        else
+        {
+			Entity* target = scene->GetEntity(parts[1]);
+            if (!target)
+            {
+                std::printf("[CLI] 오브젝트 없음: %s\n", parts[1].c_str());
+                return CommandCore::Fail("ui.rect.object_missing",
+                    "오브젝트가 없다: " + parts[1]);
+            }
+            dump(target, 0);
+        }
+
+        // ★ rect 가 0 개인 것은 **실패가 아니다.** UI 가 없는 씬에서 물어본 것일 수
+        //   있고, 이 명령은 "무엇이 있나" 를 답하는 조회다. 개수는 값으로 낸다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("target", CommandCore::CommandData::String(parts[1]));
+        data.Set("rects", CommandCore::CommandData::Int(reportedRects));
+        return CommandCore::Ok("ui.rect", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_ui_anchor(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& parts = ctx.parts;
+        const auto& cmd = ctx.cmd;
+        const size_t needed = cmd == "ui.anchor" ? 6 : 4;
+        if (parts.size() != needed) return InvalidArguments(cmd + ": incorrect argument count");
+        float values[4]{};
+        for (size_t i = 2; i < needed; ++i)
+        {
+            char* end = nullptr;
+            values[i - 2] = std::strtof(parts[i].c_str(), &end);
+            if (end == parts[i].c_str() || *end || !std::isfinite(values[i - 2]))
+                return InvalidArguments("UI layout requires finite numbers");
+        }
+        EntityHandle handle;
+        auto resolved = EditorObjectOperations::ResolveTarget(parts[1], handle);
+        if (resolved.status != CommandStatus::Succeeded) return resolved;
+        auto* target = SceneManagers->GetActiveScene()->Resolve(handle);
+        auto* rect = target->GetComponent<RectTransformComponent>();
+        if (!rect) return PreconditionFailed("ui.anchor.no_rect", "Object has no RectTransform");
+        std::vector<EditorObjectOperations::PropertyEdit> edits;
+        edits.push_back(EditorObjectOperations::CapturePropertyEdit(*rect,
+            {"m_anchorMin", "m_anchorMax", "m_anchoredPosition", "m_sizeDelta"}));
+        if (cmd == "ui.anchor") { rect->SetAnchorMin({values[0], values[1]}); rect->SetAnchorMax({values[2], values[3]}); }
+        else if (cmd == "ui.pos") rect->SetAnchoredPosition({values[0], values[1]});
+        else if (cmd == "ui.screenpos") rect->SetScreenPosition({values[0], values[1]});
+        else rect->SetSizeDelta({values[0], values[1]});
+        const bool changed = EditorObjectOperations::CommitPropertyEdits(std::move(edits));
+        auto result = EditorObjectOperations::Properties(handle, "RectTransformComponent");
+        result.data.Set("changed", CommandData::Bool(changed));
+        result.data.Set("verb", CommandData::String(cmd));
+        return result;
+    }
+
+    static CommandCore::CommandResult Cmd_ui_hitbox(const ConsoleCommandContext& ctx)
+    {
+
+        // 버튼의 클릭 판정 상자를 rect와 나란히 찍는다. 두 값이 같아야 보이는 곳과
+        // 눌리는 곳이 일치한다 — 해상도가 바뀌어도 유지되는지가 검증 대상이다(PHASE 7-7).
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("ui.hitbox.no_scene", "활성 씬이 없다");
+        }
+
+        int reported = 0;
+        for (const auto& owned : scene->m_Entities)
+        {
+            Entity* owner = owned.get();
+            if (nullptr == owner || owner->IsDestroyMark()) continue;
+
+            auto* button = owner->GetComponent<UIButton>();
+            if (nullptr == button) continue;
+
+            auto* rect = owner->GetComponent<RectTransformComponent>();
+            if (nullptr == rect) continue;
+
+            const auto& hitbox = button->GetHitbox();
+            const auto& world = rect->GetWorldRect();
+            const std::string line = owner->m_name.ToString() +
+                " rect(" + std::to_string(static_cast<int>(world.x)) + ", " +
+                std::to_string(static_cast<int>(world.y)) + ", " +
+                std::to_string(static_cast<int>(world.width)) + ", " +
+                std::to_string(static_cast<int>(world.height)) + ")" +
+                " hitbox(" + std::to_string(static_cast<int>(hitbox.x)) + ", " +
+                std::to_string(static_cast<int>(hitbox.y)) + ", " +
+                std::to_string(static_cast<int>(hitbox.width)) + ", " +
+                std::to_string(static_cast<int>(hitbox.height)) + ")";
+
+            std::printf("[CLI] %s\n", line.c_str());
+            Debug->LogWarning("[ui.hitbox] " + line);
+            ++reported;
+        }
+
+        // ★ 버튼 0 개는 **실패가 아니다.** 버튼이 없는 씬에서 물어본 것일 수 있고,
+        //   이 명령은 "무엇이 있나" 를 답하는 조회다. 개수를 값으로 낸다 —
+        //   0 을 실패로 내면 상태를 물어본 실행이 붉어진다.
+        if (0 == reported) std::printf("[CLI] 버튼 없음\n");
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("buttons", CommandCore::CommandData::Int(reported));
+        return CommandCore::Ok("ui.hitbox", std::move(data));
+    }
+
+	static CommandCore::CommandResult Cmd_ui_navprobe(const ConsoleCommandContext&)
+	{
+		// U7/E7-c 전용 무자산 회귀. 형제+손자 경로를 가진 UI 프리팹을 메모리에서
+		// 굽고 두 번 소환해, Navigation이 각 인스턴스 내부에서만 풀리는지와 UI도
+		// 매번 새 instanceID를 받는지 함께 본다. 이어서 같은 데이터를 구 navObject
+		// 형식으로 되돌려 인메모리 승격 경로도 태운다.
+		Scene* scene = SceneManagers->GetActiveScene();
+		if (!scene)
+		{
+			std::printf("[ui.navprobe] FAIL 활성 씬 없음\n");
+			return CommandCore::PreconditionFailed("ui.navprobe.no_scene", "활성 씬이 없다");
+		}
+
+		auto authorRoot = scene->CreateEntity("__NavAuthorRoot", GameObjectType::Canvas);
+		if (!authorRoot)
+		{
+			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
+			return CommandCore::PreconditionFailed("ui.navprobe.author_create", "저작 계층을 만들지 못했다");
+		}
+		auto source = scene->CreateEntity("__NavSource", GameObjectType::UI, authorRoot->m_index);
+		auto branch = scene->CreateEntity("__NavBranch", GameObjectType::UI, authorRoot->m_index);
+		if (!source || !branch)
+		{
+			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
+			return CommandCore::PreconditionFailed("ui.navprobe.author_create", "저작 계층을 만들지 못했다");
+		}
+		auto target = scene->CreateEntity("__NavTarget", GameObjectType::UI, branch->m_index);
+		if (!target)
+		{
+			std::printf("[ui.navprobe] FAIL 저작 계층 생성 실패\n");
+			return CommandCore::PreconditionFailed("ui.navprobe.author_create", "저작 계층을 만들지 못했다");
+		}
+
+		ImageComponent* sourceImage = source->AddComponent<ImageComponent>();
+		target->AddComponent<ImageComponent>();
+		if (!sourceImage)
+		{
+			std::printf("[ui.navprobe] FAIL ImageComponent 생성 실패\n");
+			return CommandCore::PreconditionFailed("ui.navprobe.image_create", "ImageComponent 를 만들지 못했다");
+		}
+		sourceImage->SetNavi(Direction::Right, target);
+
+		auto makeSequenceData = [](Prefab* prefab)
+		{
+			Authoring::WriteDocument data;
+			const Authoring::ReadNode authored = prefab->GetPrefabData();
+			if (authored.IsSequence())
+				data.Root().Assign(authored);
+			else
+				data.Root().Append().Assign(authored);
+			const Authoring::ReadNode dataView = data.Root().Read();
+			prefab->SetPrefabData(Authoring::NodeViewAccess::Make(dataView));
+		};
+
+		Prefab* prefab = PrefabUtilitys->CreatePrefab(authorRoot, "__NavProbePrefab");
+		if (!prefab)
+		{
+			std::printf("[ui.navprobe] FAIL 프리팹 생성 실패\n");
+			return CommandCore::PreconditionFailed("ui.navprobe.prefab_create",
+				"프리팹을 만들지 못했다");
+		}
+		makeSequenceData(prefab);
+
+		const std::string serialized = prefab->GetPrefabData().Dump();
+		const bool schemaOk = serialized.find("navObject") == std::string::npos
+			&& serialized.find("parentHops") != std::string::npos
+			&& serialized.find("childOrdinals") != std::string::npos
+			&& serialized.find("m_gameObjectType") == std::string::npos;
+
+		auto resolveInstance = [scene](Entity* root, Entity*& outSource, Entity*& outTarget,
+			ImageComponent*& outSourceImage) -> bool
+		{
+			outSource = nullptr;
+			outTarget = nullptr;
+			outSourceImage = nullptr;
+			if (!root || root->GetChildrenIndices().size() < 2) return false;
+
+			outSource = scene->TryGetEntity(root->GetChildrenIndices()[0]);
+			Entity* instanceBranch = scene->TryGetEntity(root->GetChildrenIndices()[1]);
+			if (!outSource || !instanceBranch || instanceBranch->GetChildrenIndices().empty()) return false;
+			outTarget = scene->TryGetEntity(instanceBranch->GetChildrenIndices()[0]);
+			outSourceImage = outSource ? outSource->GetComponent<ImageComponent>() : nullptr;
+			if (!outTarget || !outSourceImage) return false;
+			outSourceImage->DeserializeNavi();
+			return outSourceImage->GetNextNavi(Direction::Right) == outTarget;
+		};
+
+		Entity* instanceA = prefab->Instantiate(scene, "__NavInstanceA");
+		Entity* instanceB = prefab->Instantiate(scene, "__NavInstanceB");
+		Entity* sourceA = nullptr; Entity* targetA = nullptr; ImageComponent* imageA = nullptr;
+		Entity* sourceB = nullptr; Entity* targetB = nullptr; ImageComponent* imageB = nullptr;
+		const bool instanceAOk = resolveInstance(instanceA, sourceA, targetA, imageA);
+		const bool instanceBOk = resolveInstance(instanceB, sourceB, targetB, imageB);
+		const bool isolated = instanceAOk && instanceBOk
+			&& imageA->GetNextNavi(Direction::Right) == targetA
+			&& imageB->GetNextNavi(Direction::Right) == targetB
+			&& targetA != targetB;
+		const bool freshIds = sourceA && sourceB && targetA && targetB
+			&& sourceA->GetInstanceID() != sourceB->GetInstanceID()
+			&& targetA->GetInstanceID() != targetB->GetInstanceID();
+		const bool spatialComposition = instanceA
+			&& instanceA->GetComponent<Transform>()
+			&& instanceA->GetComponent<RectTransformComponent>()
+			&& sourceA && !sourceA->GetComponent<Transform>()
+			&& sourceA->GetComponent<RectTransformComponent>();
+
+		// 구 navObject 파일 승격: 새 경로 필드를 지우고 저작 대상의 옛 ID를 넣는다.
+		Authoring::WriteDocument legacyDocument;
+		legacyDocument.Root().Assign(prefab->GetPrefabData());
+		const Authoring::WriteNode sourceComponents = legacyDocument.Root().At(0)
+			.Child("children").At(0).Child("m_components");
+		bool legacyFixtureBuilt = false;
+		for (std::size_t componentIndex = 0;
+			componentIndex < sourceComponents.Size(); ++componentIndex)
+		{
+			const Authoring::WriteNode navs =
+				sourceComponents.At(componentIndex).Child("navigations");
+			if (!navs.Read().IsSequence() || navs.Size() == 0) continue;
+			const Authoring::WriteNode navigation = navs.At(0);
+			navigation.Child("navObject").SetScalar(target->GetInstanceID());
+			navigation.RemoveChild("parentHops");
+			navigation.RemoveChild("childOrdinals");
+			legacyFixtureBuilt = true;
+			break;
+		}
+
+		Prefab* legacyPrefab = PrefabUtilitys->CreatePrefab(authorRoot, "__NavLegacyProbePrefab");
+		const Authoring::ReadNode legacyView = legacyDocument.Root().Read();
+		if (legacyPrefab) legacyPrefab->SetPrefabData(
+			Authoring::NodeViewAccess::Make(legacyView));
+		Entity* legacyInstance = legacyPrefab ? legacyPrefab->Instantiate(scene, "__NavLegacyInstance") : nullptr;
+		Entity* legacySource = nullptr; Entity* legacyTarget = nullptr; ImageComponent* legacyImage = nullptr;
+		const bool legacyOk = legacyFixtureBuilt
+			&& resolveInstance(legacyInstance, legacySource, legacyTarget, legacyImage);
+
+		const bool passed = schemaOk && isolated && freshIds && spatialComposition && legacyOk;
+		std::printf("[ui.navprobe] %s schema=%s isolated=%s freshIds=%s spatial=%s legacy=%s\n",
+			passed ? "PASS" : "FAIL",
+			schemaOk ? "PASS" : "FAIL",
+			isolated ? "PASS" : "FAIL",
+			freshIds ? "PASS" : "FAIL",
+			spatialComposition ? "PASS" : "FAIL",
+			legacyOk ? "PASS" : "FAIL");
+
+		// ★ **이 명령은 스스로 PASS/FAIL 을 찍고도 그 판정을 버리고 있었다.**
+		//   probe 가 `FAIL` 을 인쇄해도 프로세스는 0 으로 끝났고, 자동화는 그
+		//   실행을 성공으로 읽었다 — `scene.transformbulk` 와 같은 모양이다.
+		//   이제 다섯 축을 값으로 함께 내고, 하나라도 어긋나면 실패다.
+		CommandCore::CommandData data = CommandCore::CommandData::Object();
+		data.Set("schema", CommandCore::CommandData::Bool(schemaOk));
+		data.Set("isolated", CommandCore::CommandData::Bool(isolated));
+		data.Set("freshIds", CommandCore::CommandData::Bool(freshIds));
+		data.Set("spatial", CommandCore::CommandData::Bool(spatialComposition));
+		data.Set("legacy", CommandCore::CommandData::Bool(legacyOk));
+		if (!passed)
+		{
+			return CommandCore::Fail("ui.navprobe.failed",
+				"UI 내비게이션 probe 판정 실패", std::move(data));
+		}
+		return CommandCore::Ok("ui.navprobe PASS", std::move(data));
+	}
+
+    static CommandCore::CommandResult Cmd_ui_status(const ConsoleCommandContext& ctx)
+    {
+        // 지연 연결 상태를 숫자로 본다. 레지스트리 등록 수와 그중 캔버스가 연결된 수,
+        // 그리고 씬의 캔버스 목록 — 검증에서 눈으로 대조할 기준선이다.
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene)
+        {
+            std::printf("[CLI] 활성 씬 없음\n");
+            return CommandCore::PreconditionFailed("ui.status.no_scene", "활성 씬이 없다");
+        }
+
+        int imageLinked = 0;
+        for (auto* image : UIManagers->Images) { if (image && image->GetOwnerCanvas()) ++imageLinked; }
+        int textLinked = 0;
+        for (auto* text : UIManagers->Texts) { if (text && text->GetOwnerCanvas()) ++textLinked; }
+        int spriteLinked = 0;
+        for (auto* sprite : UIManagers->SpriteSheets) { if (sprite && sprite->GetOwnerCanvas()) ++spriteLinked; }
+
+        // 캔버스별 소속 UI 수까지 보여 준다 — 오연결(엉뚱한 캔버스에 붙음)은
+        // 총합만 봐서는 안 보이고, 캔버스별 분포가 어긋나야 드러난다.
+        std::string canvasNames;
+        for (const auto& canvasHandle : scene->GetCanvases())
+        {
+            // 캔버스 캐시는 핸들이다(트랙 E5-R2) — 씬에서 떠난 것은 여기서 걸러진다.
+            if (Entity* canvas = scene->Resolve(canvasHandle))
+            {
+                if (!canvasNames.empty()) canvasNames += ", ";
+                canvasNames += canvas->m_name.ToString();
+
+                if (Canvas* canvasComponent = canvas->GetComponent<Canvas>())
+                {
+                    canvasNames += "(" + std::to_string(canvasComponent->UIObjs.size()) + ")";
+                }
+            }
+        }
+
+        char line[512]{};
+        std::snprintf(line, sizeof(line),
+            "[UI 상태] Image %d/%zu 연결 · Text %d/%zu 연결 · Sprite %d/%zu 연결 · 캔버스 %zu개 [%s]",
+            imageLinked, UIManagers->Images.size(),
+            textLinked, UIManagers->Texts.size(),
+            spriteLinked, UIManagers->SpriteSheets.size(),
+            scene->GetCanvases().size(), canvasNames.c_str());
+
+        Debug->LogWarning(line);
+        std::printf("%s\n", line);
+
+        // ★ 연결되지 않은 UI 가 있어도 **실패로 내지 않는다.** 이 명령은 지연 연결의
+        //   현재 분포를 답하는 조회이고, "아직 연결 전" 은 정상 상태다. 무엇이
+        //   어긋났는지는 값을 받은 쪽이 판정한다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("imageLinked", CommandCore::CommandData::Int(imageLinked));
+        data.Set("imageTotal", CommandCore::CommandData::Int(
+            static_cast<int64_t>(UIManagers->Images.size())));
+        data.Set("textLinked", CommandCore::CommandData::Int(textLinked));
+        data.Set("textTotal", CommandCore::CommandData::Int(
+            static_cast<int64_t>(UIManagers->Texts.size())));
+        data.Set("spriteLinked", CommandCore::CommandData::Int(spriteLinked));
+        data.Set("spriteTotal", CommandCore::CommandData::Int(
+            static_cast<int64_t>(UIManagers->SpriteSheets.size())));
+        data.Set("canvases", CommandCore::CommandData::Int(
+            static_cast<int64_t>(scene->GetCanvases().size())));
+        return CommandCore::Ok("ui.status", std::move(data));
+    }
+
+
+
+
+
+    static CommandCore::CommandResult Cmd_animator_param(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 4) return InvalidArguments("animator.param <object> <name> <bool|float|int|trigger>");
+        const std::string& type = ctx.parts[3];
+        if (type != "bool" && type != "float" && type != "int" && type != "trigger") return InvalidArguments("Invalid Animator parameter type");
+        EntityHandle target;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!result.IsSuccess()) return result;
+        return EditorObjectOperations::AnimatorParameter(target, ctx.parts[2], type == "bool" ? ValueType::Bool : type == "float" ? ValueType::Float : type == "int" ? ValueType::Int : ValueType::Trigger);
+    }
+
+    // ★ LC7: 결과를 값으로 낸다.
+    //
+    //   §10.2 가 요구하는 것은 "복원 수/전체, 실패 목록, 이전 컨텍스트 잔존" 이다.
+    //   지금까지는 printf 한 줄이라, 라이브 코드 교체를 자동화하는 쪽이 성공했는지
+    //   알려면 stdout 을 긁어야 했다 — 서비스만 켠 실행에는 콘솔이 없어 그마저도
+    //   불가능했다.
+    static CommandCore::CommandResult Cmd_script_reload(const ConsoleCommandContext& ctx)
+    {
+        auto& clr = ClrHost::Get();
+        if (!clr.IsReady())
+        {
+            std::printf("[CLI] CLR이 준비되지 않았습니다\n");
+            return CommandCore::PreconditionFailed(
+                "script.clr_not_ready", "CLR 이 준비되지 않았다");
+        }
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        std::vector<ScriptComponent*> scripts;
+
+        // 1) 값을 챙기고 인스턴스 참조를 끊는다. 하나라도 남으면 언로드가 실패한다.
+        if (scene)
+        {
+            for (const auto& object : scene->m_Entities)
+            {
+                if (!object) continue;
+
+                auto script = object->GetComponent<ScriptComponent>();
+                if (nullptr != script)
+                {
+                    script->PrepareForReload();
+                    scripts.push_back(script);
+                }
+            }
+        }
+
+        // 2) 어셈블리 교체
+        if (!clr.ReloadScripts())
+        {
+            Debug->LogError("[스크립트] 리로드 실패");
+            std::printf("[CLI] 리로드 실패\n");
+
+            // ★ 실패해도 **이전 어셈블리는 그대로다**(LC7).
+            //
+            //   관리 쪽 `Reload()` 가 갈아 끼우기 전에 새 것을 버리는 컨텍스트에서
+            //   검증한다. 예전에는 `Unload(); Load();` 라 실패하면 스크립트가 하나도
+            //   남지 않았고, 그 상태를 호출자가 알 방법도 없었다. 이제 실패는
+            //   실패로만 끝나고, 끊어 둔 인스턴스는 아래에서 되살린다.
+            int recovered = 0;
+            for (ScriptComponent* script : scripts)
+            {
+                script->RestoreAfterReload();
+                if (script->HasInstance()) ++recovered;
+            }
+
+            CommandCore::CommandData failData = CommandCore::CommandData::Object();
+            failData.Set("restored", CommandCore::CommandData::Int(recovered));
+            failData.Set("total", CommandCore::CommandData::Int(
+                static_cast<int64_t>(scripts.size())));
+            failData.Set("previousAssemblyKept", CommandCore::CommandData::Bool(true));
+            return CommandCore::Fail("script.reload_failed",
+                "새 어셈블리를 올리지 못했다 — 이전 어셈블리를 유지한다",
+                std::move(failData));
+        }
+
+        // 3) 인스턴스를 다시 만들고 챙겨 둔 값을 되돌린다
+        int restored = 0;
+        CommandCore::CommandData failedList = CommandCore::CommandData::Array();
+        for (ScriptComponent* script : scripts)
+        {
+            script->RestoreAfterReload();
+            if (script->HasInstance()) { ++restored; continue; }
+
+            // 복원되지 못한 것을 **이름으로** 낸다. 수만 내면 무엇이 빠졌는지
+            // 알 수 없고, 라이브 교체에서 알아야 할 것이 정확히 그것이다.
+            const Entity* owner = script->GetOwner();
+            failedList.Append(CommandCore::CommandData::String(
+                (nullptr != owner) ? owner->GetHashedName().ToString()
+                                   : std::string("(주인 없음)")));
+        }
+
+        // 언로드 완료 여부는 여기서 묻지 않는다. 리로드 호출 스택이 아직 살아 있어
+        // 항상 "잔존"으로 나온다. 몇 프레임 뒤 script.status로 확인할 것.
+        Debug->LogWarning("[스크립트] 리로드 완료 — 복원 " + std::to_string(restored) + "/" +
+            std::to_string(scripts.size()));
+        std::printf("[CLI] 리로드 완료: %d/%zu 복원 (언로드 확인은 script.status)\n",
+            restored, scripts.size());
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("restored", CommandCore::CommandData::Int(restored));
+        data.Set("total", CommandCore::CommandData::Int(
+            static_cast<int64_t>(scripts.size())));
+        data.Set("failed", std::move(failedList));
+
+        // ★ 이전 컨텍스트 잔존 여부는 **여기서 내지 않는다.**
+        //
+        //   §10.2 는 그것을 `data` 로 내라고 했지만, 이 시점의 값은 뜻이 없다 —
+        //   리로드를 부른 호출 스택이 아직 살아 있어 **항상 "잔존"** 이다. 뜻 없는
+        //   값을 필드로 내면 소비자가 그것을 믿고 판단한다. 몇 프레임 뒤에 물을 수
+        //   있게 `script.status` 가 그 값을 내고, 그쪽이 답할 수 있는 자리다.
+        const bool allRestored = (restored == static_cast<int>(scripts.size()));
+        if (!allRestored)
+        {
+            return CommandCore::Fail("script.reload_partial",
+                "리로드는 됐으나 인스턴스 복원이 " + std::to_string(restored) + "/"
+                + std::to_string(scripts.size()) + " 다", std::move(data));
+        }
+        return CommandCore::Ok("리로드 완료 " + std::to_string(restored) + "/"
+            + std::to_string(scripts.size()), std::move(data));
+    }
+
+    // ★ LC7: 이전 컨텍스트 잔존 여부가 **여기서** 뜻을 갖는다.
+    //
+    //   리로드 직후에는 호출 스택이 살아 있어 항상 "잔존" 이다. 몇 프레임 지난
+    //   뒤 이 명령으로 물어야 참이 판정된다. 그래서 §10.2 가 요구한 그 값을
+    //   `script.reload` 가 아니라 이쪽이 낸다.
+    static CommandCore::CommandResult Cmd_script_status(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("script.status");
+        auto& clr = ClrHost::Get();
+        const bool stale = clr.IsPreviousContextAlive();
+
+        Debug->LogWarning(std::string("[스크립트] CLR ") + (clr.IsReady() ? "준비됨" : "비활성") +
+            " · 활성 스크립트 " + std::to_string(clr.LastActiveCount()) + "개" +
+            " · 이전 어셈블리 " + (stale ? "잔존(참조 누수)" : "정리됨"));
+        std::printf("[CLI] CLR %s, 활성 스크립트 %d개, 이전 어셈블리 %s\n",
+            clr.IsReady() ? "준비됨" : "비활성", clr.LastActiveCount(),
+            stale ? "잔존(참조 누수)" : "정리됨");
+
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("ready", CommandCore::CommandData::Bool(clr.IsReady()));
+        data.Set("activeScripts", CommandCore::CommandData::Int(clr.LastActiveCount()));
+        data.Set("previousContextAlive", CommandCore::CommandData::Bool(stale));
+        auto components = CommandCore::CommandData::Array();
+        for (auto* scene : SceneManagers->GetScenes()) if (scene)
+            for (const auto& object : scene->m_Entities) if (object && !object->IsDestroyMark())
+                for (const auto& component : object->m_components)
+                    if (auto* script = dynamic_cast<ScriptComponent*>(component.get()); script && !script->IsDestroyMark())
+                    {
+                        auto item = CommandCore::CommandData::Object();
+                        item.Set("owner", CommandCore::CommandData::String(object->m_name.ToString()));
+                        item.Set("type", CommandCore::CommandData::String(script->m_scriptType));
+                        item.Set("instanceId", CommandCore::CommandData::Int(script->GetInstanceId()));
+                        item.Set("initializationAttempts", CommandCore::CommandData::Int(script->InitializationAttempts()));
+                        components.Append(std::move(item));
+                    }
+        data.Set("components", std::move(components));
+        return CommandCore::Ok("script status", std::move(data));
+    }
+
+    // ★ LC7: L3 등급 B — 표식된 static 메서드를 이름으로 부른다(§10.2).
+    //
+    // ── 무엇이 없었나 ───────────────────────────────────────────────────
+    //
+    //   `script.reload` 는 어셈블리를 갈아 끼우지만, 갈아 낀 코드를 **부를**
+    //   방법이 없었다. 새 코드가 도는 것을 보려면 씬 안의 인스턴스가 다음 틱을
+    //   맞을 때까지 기다려야 했고, 그러면 "C# 을 고쳐 반영됐는지" 를 확인하는
+    //   왕복이 프레임 루프의 부수 효과를 통해서만 닫혔다. 그것은 측정이 아니다.
+    //
+    // ── 왜 표식인가 ─────────────────────────────────────────────────────
+    //
+    //   이름만으로 부를 수 있으면 이 명령 하나가 곧 "로드된 어셈블리의 아무
+    //   static 메서드나 부르는 API" 다. 표식(`[EngineCallable]`)이 그 표면을
+    //   저자가 고르게 한다. 표식 없는 메서드는 **있다는 사실을 알려 주고**
+    //   거부한다 — "없다" 로 답하면 오타와 거부를 구분해 셀 수 없다.
+    //
+    // ── 도달 경계 ───────────────────────────────────────────────────────
+    //
+    //   이 핸들러가 `ClrHost::InvokeCallableStatic` 의 유일한 호출자다. 그리고
+    //   그 사실에 기대지 않는다 — seed 의 `executesUserCode` 가 참일 때만
+    //   `ExecuteParsed` 가 창을 열고, 창 밖의 호출은 `NotPermitted` 로 거부된다.
+    static CommandCore::CommandResult Cmd_script_invoke(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 3)
+        {
+            std::printf("[CLI] 사용법: script.invoke <타입> <메서드> [인자]...\n");
+            return CommandCore::InvalidArguments(
+                "script.invoke: <타입> <메서드> 가 필요하다");
+        }
+
+        const std::string& typeName   = ctx.parts[1];
+        const std::string& methodName = ctx.parts[2];
+        const std::vector<std::string> args(ctx.parts.begin() + 3, ctx.parts.end());
+
+        const ClrHost::InvokeResult invoked =
+            ClrHost::Get().InvokeCallableStatic(typeName, methodName, args);
+
+        // 요청한 것을 결과에 되싣는다. 비동기(202)로 돌면 호출자는 이 응답만
+        // 보게 되므로, 무엇을 부른 결과인지가 응답 안에 있어야 한다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("type",     CommandCore::CommandData::String(typeName));
+        data.Set("method",   CommandCore::CommandData::String(methodName));
+        data.Set("argCount", CommandCore::CommandData::Int(
+            static_cast<int64_t>(args.size())));
+
+        if (invoked.Succeeded())
+        {
+            data.Set("returnType",  CommandCore::CommandData::String(invoked.returnType));
+            data.Set("returnValue", CommandCore::CommandData::String(invoked.returnValue));
+
+            std::printf("[CLI] script.invoke %s.%s -> %s %s\n", typeName.c_str(),
+                methodName.c_str(), invoked.returnType.c_str(), invoked.returnValue.c_str());
+            return CommandCore::Ok(typeName + "." + methodName + " 호출 완료", std::move(data));
+        }
+
+        std::printf("[CLI] script.invoke 실패: %s\n", invoked.reason.c_str());
+
+        // ★ 갈래마다 **다른 코드**를 낸다.
+        //
+        //   전부 `script.invoke_failed` 로 내면 자동화가 "오타" 와 "표식 없음" 과
+        //   "사용자 코드가 던졌다" 를 구분할 수 없다. 그 셋은 호출자가 할 일이
+        //   각각 다르다 — 이름을 고치거나, 표식을 달거나, 스크립트를 고친다.
+        switch (invoked.outcome)
+        {
+        case ClrHost::InvokeOutcome::NotMarked:
+            // §10.2 의 "표식 없는 메서드 호출 0" 이 세어지는 자리다.
+            return CommandCore::Fail("script.invoke_not_callable", invoked.reason,
+                                     std::move(data));
+
+        case ClrHost::InvokeOutcome::TypeNotFound:
+        case ClrHost::InvokeOutcome::TypeAmbiguous:
+        case ClrHost::InvokeOutcome::MethodNotFound:
+        case ClrHost::InvokeOutcome::MethodAmbiguous:
+            return CommandCore::Fail("script.invoke_unresolved", invoked.reason,
+                                     std::move(data));
+
+        case ClrHost::InvokeOutcome::ArgumentMismatch:
+            return CommandCore::InvalidArguments(invoked.reason, "script.invoke_bad_arguments");
+
+        case ClrHost::InvokeOutcome::Threw:
+            // 사용자 코드가 던진 것은 **명령의 실패**이지 엔진의 내부 결함이 아니다.
+            // 500 으로 내면 호출자가 재시도해서는 안 될 것을 재시도한다.
+            return CommandCore::Fail("script.invoke_threw", invoked.reason, std::move(data));
+
+        case ClrHost::InvokeOutcome::NoAssembly:
+        case ClrHost::InvokeOutcome::NotBound:
+            return CommandCore::PreconditionFailed("script.invoke_unavailable", invoked.reason);
+
+        case ClrHost::InvokeOutcome::NotPermitted:
+            // 여기 오는 것은 배선 결함이다 — seed 가 `executesUserCode` 를 잃었거나
+            // 이 핸들러가 창 밖에서 불렸다. 조용히 "실패" 로 섞지 않는다.
+            return CommandCore::InternalError("script.invoke_not_permitted", invoked.reason);
+
+        case ClrHost::InvokeOutcome::Ok:
+        case ClrHost::InvokeOutcome::Internal:
+            break;
+        }
+        return CommandCore::InternalError("script.invoke_internal", invoked.reason);
+    }
+
+    void RegisterScriptUiAnimatorCommands(Registrar& reg)
+    {
+        reg.Result({ "animator.scene.probe" }, &Cmd_animator_scene_probe);
+        reg.Result({ "script.add" }, &Cmd_script_add);
+        reg.Result({ "script.fields" }, &Cmd_script_fields);
+        reg.Result({ "script.set" }, &Cmd_script_set);
+        reg.Result({ "ui.rect" }, &Cmd_ui_rect);
+        reg.Result({ "ui.anchor" }, &Cmd_ui_anchor);
+        reg.Result({ "ui.size" }, &Cmd_ui_anchor);
+        reg.Result({ "ui.pos" }, &Cmd_ui_anchor);
+        reg.Result({ "ui.screenpos" }, &Cmd_ui_anchor);
+        reg.Result({ "ui.hitbox" }, &Cmd_ui_hitbox);
+        reg.Result({ "ui.navprobe" }, &Cmd_ui_navprobe);
+        reg.Result({ "ui.status" }, &Cmd_ui_status);
+        reg.Result({ "animator.param" }, &Cmd_animator_param);
+        reg.Result({ "script.invoke" }, &Cmd_script_invoke);
+        reg.Result({ "script.reload" }, &Cmd_script_reload);
+        reg.Result({ "script.status" }, &Cmd_script_status);
+    }
+}

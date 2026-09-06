@@ -112,7 +112,7 @@ $scenario = Join-Path $Work "prefab_nested_update_probe_resolved.txt"
 $outPath = Join-Path $Work "prefab_nested_update_probe.out"
 $errPath = Join-Path $Work "prefab_nested_update_probe.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru

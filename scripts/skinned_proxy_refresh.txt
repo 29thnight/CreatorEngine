@@ -19,9 +19,9 @@ model.place __MODEL_NAME__
 wait 60
 play
 wait 60
-experiment.animlive
+animator.status
 wait 90
-experiment.animlive
+animator.status
 wait 10
 stop
 wait 20

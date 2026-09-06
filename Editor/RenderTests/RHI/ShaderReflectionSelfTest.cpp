@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <filesystem>
+#include <exception>
 #include <sstream>
 #include <vector>
 
@@ -26,7 +27,8 @@ namespace
     };
 }
 
-bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
+static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std::string& outLog,
+    const char*& stage)
 {
 	const FileGuid randomAssetGuidA = FileGuid::CreateRandomV4();
 	const FileGuid randomAssetGuidB = FileGuid::CreateRandomV4();
@@ -69,6 +71,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 		return false;
 	}
 
+    stage = "shader meta load";
     const std::filesystem::path metaPath = RHIShaderSource::Resolve(
         "SelfTest/ShaderMetaFixture.shadermeta");
     const FileGuid guid = DataSystems->GetFileGuid(metaPath);
@@ -115,6 +118,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     if (pass.pixel) requests.push_back({ pass.pixel->entry, "ps_5_0" });
     if (pass.compute) requests.push_back({ pass.compute->entry, "cs_5_0" });
 
+    stage = "DXIL and SPIR-V reflection";
     std::vector<RHIShaderReflection> dxilStages;
     std::vector<RHIShaderReflection> spirvStages;
     dxilStages.reserve(requests.size());
@@ -171,6 +175,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
+    stage = "material schema";
     Material material;
     if (!material.ConfigureShaderProperties(meta, layout, error, metaHandle))
     {
@@ -214,6 +219,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         return false;
     }
 
+    stage = "material authoring round trip";
     Authoring::WriteDocument serializedDocument;
     const bool serializedOk = DataSystems->SerializeMaterialPayload(
         material, serializedDocument.Root());
@@ -266,6 +272,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
             "MaterialProperties", "roughness", originalAfterCopyWrite)
         && 0.75f == originalAfterCopyWrite;
 
+    stage = "material binary round trip";
 	std::ostringstream binaryOutput(std::ios::out | std::ios::binary);
 	const bool binaryWritten = DataSystems->SerializeMaterialBinaryPayload(
 		restored, binaryOutput);
@@ -312,14 +319,15 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 	const bool truncatedRejected = !DataSystems->DeserializeMaterialBinaryPayload(
 		truncatedMaterial, truncatedInput);
 
+    stage = "texture mapping and ownership";
 	Material legacyTextures;
-	legacyTextures.m_baseColorTexName = "Cube_Mat_BaseColor.png";
-	legacyTextures.m_normalTexName = "Cube_Mat_BaseColor.png";
-	legacyTextures.m_ORM_TexName = "Cube_Mat_BaseColor.png";
-	legacyTextures.m_AO_TexName = "Cube_Mat_BaseColor.png";
-	legacyTextures.m_EmissiveTexName = "Cube_Mat_BaseColor.png";
+	legacyTextures.m_baseColorTexName = file::path(texturePath).filename().string();
+	legacyTextures.m_normalTexName = file::path(texturePath).filename().string();
+	legacyTextures.m_ORM_TexName = file::path(texturePath).filename().string();
+	legacyTextures.m_AO_TexName = file::path(texturePath).filename().string();
+	legacyTextures.m_EmissiveTexName = file::path(texturePath).filename().string();
 	const FileGuid legacyTextureGuid =
-		DataSystems->GetFilenameToGuid("Cube_Mat_BaseColor.png");
+		DataSystems->GetFileGuid(file::path(texturePath));
 	MaterialPropertyValue genericTexture;
 	genericTexture.m_name = "baseMap";
 	genericTexture.m_textureGuid = legacyTextureGuid;
@@ -385,6 +393,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 		"type 거부 · DataSystem YAML diff 0 · binary v1 · legacy texture GUID 5 · "
 		"generic baseMap owner vector 6/raw alias 0·copy 공동 소유 · property copy 독립 통과\n";
 
+    stage = "reflection negative cases";
     ShaderMeta mismatchedMeta = meta;
     mismatchedMeta.properties[1].type = ShaderPropertyType::Float4;
     ShaderMetaBindingLayout invalidLayout;
@@ -412,6 +421,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
     // M5-C3a: watcher thread의 게시만으로는 cache를 바꾸지 않는다. 같은 저장의
     // 중복 Modified는 하나로 합쳐지고 GT 프레임 경계 drain 뒤에만 generation을
     // 올려 이전 handle resolve를 거부해야 한다.
+    stage = "shader meta reload";
     DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
         RuntimeAssetType::ShaderMeta, guid, metaPath });
     DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
@@ -459,6 +469,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         auto material = std::make_shared<Material>();
         foliageMaterialLifetime = material;
 
+    stage = "foliage ownership and serialization";
         FoliageType foliage("C4LifetimeProbe", true);
         foliage.m_material = material;
         material.reset();
@@ -511,6 +522,7 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
 
     // Material cache에서 이전 generation을 분리해도 Foliage owner가 있는 동안만
     // 생존하고, 마지막 실제 consumer가 사라지면 전역 retired 목록 없이 파괴된다.
+    stage = "material cache lifetime";
     constexpr std::string_view lifetimeProbeName = "M5_C4_FoliageMaterialProbe";
     auto cacheMaterial = std::make_shared<Material>();
     cacheMaterial->m_name = lifetimeProbeName;
@@ -542,4 +554,19 @@ bool RenderTest::RunShaderReflectionSelfTest(std::string& outLog)
         "ShaderMeta queued reload/stale handle 거부 · Foliage owning copy/asset 왕복 · "
 		"D2 UUIDv4/collision fail-closed · Model/Material retired 축소 통과\n";
     return true;
+}
+
+bool RenderTest::RunShaderReflectionSelfTest(const std::string& texturePath, std::string& outLog)
+{
+    const char* stage = "asset identity";
+    try { return RunShaderReflectionSelfTestImpl(texturePath, outLog, stage); }
+    catch (const std::exception& exception)
+    {
+        outLog += std::string("[shader reflection] exception at ") + stage + ": " + exception.what() + "\n";
+    }
+    catch (...)
+    {
+        outLog += std::string("[shader reflection] unknown exception at ") + stage + "\n";
+    }
+    return false;
 }

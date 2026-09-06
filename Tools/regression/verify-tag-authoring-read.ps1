@@ -64,9 +64,10 @@ New-Item -ItemType Directory -Path $run -Force | Out-Null
 $scenario = Join-Path $run 'commands.txt'
 $stdout = Join-Path $run 'stdout.txt'
 $stderr = Join-Path $run 'stderr.txt'
-@('tag.authoring.probe list', 'quit') | Set-Content -LiteralPath $scenario -Encoding UTF8
+$resultPath = Join-Path $run 'results.jsonl'
+@('tag.list', 'quit') | Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario) `
+$process = Start-Process -FilePath $Exe -ArgumentList @('--script', $scenario, '--result-format', 'jsonl', '--result-file', $resultPath) `
     -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 $process.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -75,14 +76,15 @@ if (-not $process.HasExited) { $process.Kill(); "TIMEOUT output=$run"; exit 1 }
 $text = if (Test-Path -LiteralPath $stdout) { Get-Content -LiteralPath $stdout -Raw } else { '' }
 $failures = New-Object System.Collections.Generic.List[string]
 
-$summary = [regex]::Match($text, 'loaded tags=(\d+) layers=(\d+)')
-$actualTags = @([regex]::Matches($text, '(?m)^\[tag\.authoring\.probe\] tag=(.+)$') |
-    ForEach-Object { $_.Groups[1].Value.Trim() })
-$actualLayers = @([regex]::Matches($text, '(?m)^\[tag\.authoring\.probe\] layer=(.+)$') |
-    ForEach-Object { $_.Groups[1].Value.Trim() })
-
-if (-not $summary.Success) {
-    $failures.Add('요약 라인이 없다 — 명령 미등록/낡은 exe이거나 프로세스가 죽었다')
+$record = if (Test-Path -LiteralPath $resultPath) {
+    Get-Content -LiteralPath $resultPath | ConvertFrom-Json | Where-Object command -eq 'tag.list' | Select-Object -First 1
+} else { $null }
+$actualTags = @(); $actualLayers = @()
+if ($null -eq $record -or $record.status -ne 'succeeded' -or $process.ExitCode -ne 0) {
+    $failures.Add('tag.list did not return a successful JSON result')
+} else {
+    $actualTags = @($record.data.tags)
+    $actualLayers = @($record.data.layers)
 }
 # 0개를 읽고 "일치"로 읽지 않는다.
 #

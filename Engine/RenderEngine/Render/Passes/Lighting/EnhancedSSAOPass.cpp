@@ -15,8 +15,6 @@
 //
 // 자가 검증(dx12.ssao):
 //   평평한 곳 0.969 · 계단 안쪽 0.373 · 필터 이웃 차이 51.7% 감소
-// 시간 비교(dx12.ssaoscale, 1920x1080):
-//   신규 0.196 ms · 참조(커널 64) 0.810 ms — 4.1배
 // 실제 씬(dx12.scene, 256x256):
 //   SSAO.Compute 0.0133 ms · SSAO.Filter 0.0020 ms
 //
@@ -51,19 +49,6 @@ namespace
     constexpr const char* kAOShaderFile = "SsaoAO.hlsl";
 
 
-    // ── 참조 경로: 기존 반구 커널 ──
-    //
-    // 성능 비교의 기준선. 기존 DX11 SSAO가 하던 것을 그대로 옮겼다 —
-    // 커널 64개, 표본마다 클립 투영 한 번과 깊이 역투영 한 번.
-    //
-    // 실제 DX11 패스와 직접 재지 않는 이유는 그러면 API 차이가 수에 섞여
-    // '무엇 때문에 빠른가'를 알 수 없기 때문이다. 같은 디바이스·같은 입력
-    // 위에서 알고리즘만 갈아 끼운다.
-    //
-    // 커널은 셰이더 안에서 해시로 만든다. 상수 버퍼로 64개를 넘기던 원본과
-    // 표본 분포는 다르지만, 재는 것은 '표본 하나당 비용'이라 분포는 결과에
-    // 영향을 주지 않는다.
-    constexpr const char* kReferenceShaderFile = "SsaoReference.hlsl";
 
     // ── 디노이즈 ──
     //
@@ -152,17 +137,6 @@ bool EnhancedSSAOPass::CreatePipelines(const EnhancedFrameContext& context, std:
     m_aoPSO = context.psoManager->GetOrCreateCompute(aoDesc, outError);
     if (!m_aoPSO.IsValid()) return false;
 
-    RHIShaderBlob refBlob;
-    if (!RHIShaderCompiler::CompileFile(kReferenceShaderFile, "CSMain", "cs_5_0",
-            refBlob, outError)) return false;
-
-    RHIComputePipelineDesc refDesc{};
-    refDesc.csBytecode = refBlob.Data();
-    refDesc.csSize = refBlob.Size();
-    refDesc.layout = root;
-
-    m_referencePSO = context.psoManager->GetOrCreateCompute(refDesc, outError);
-    if (!m_referencePSO.IsValid()) return false;
 
     // 필터 반경 1(3x3). 반해상도에서 3x3이면 전 해상도 6x6에 해당하고,
     // 그보다 넓히면 접촉 그림자가 뭉개진다 — 실측으로 바꿀 근거가 생기면 바꾼다.
@@ -186,9 +160,7 @@ bool EnhancedSSAOPass::PrepareFrame(const EnhancedFrameContext& context, std::st
 {
     (void)outError;
 
-    // 참조 경로는 전 해상도로 돈다. 반해상도는 새 방식이 가져가는 이득의
-    // 일부라, 기준선에까지 적용하면 그 이득이 수에서 사라진다.
-    const uint32_t divisor = m_useReferencePath ? 1u : kResolutionDivisor;
+    constexpr uint32_t divisor = kResolutionDivisor;
     m_width = (context.width + divisor - 1) / divisor;
     m_height = (context.height + divisor - 1) / divisor;
     return true;
@@ -268,7 +240,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetPipeline(RHIBindPoint::Compute,
-                m_useReferencePath ? m_referencePSO : m_aoPSO);
+                m_aoPSO);
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
             encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
             encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
@@ -321,7 +293,6 @@ void EnhancedSSAOPass::Shutdown()
     m_height = 0;
     m_frameIndex = 0;
     m_aoPSO = {};
-    m_referencePSO = {};
     m_filterPSO = {};
 }
 

@@ -7,6 +7,7 @@ param(
     [int]$BenchSamples = 4
 )
 
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $failed = $false
 $markers = @(
@@ -16,8 +17,7 @@ $markers = @(
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.cpp"; Pattern = "std::vector<EntityHandle> execToEntity;"; Label = "Exec to Entity mapping" },
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.cpp"; Pattern = "std::vector<ExecIndex> subtreeEnd;"; Label = "preorder subtree range" },
     [pscustomobject]@{ Path = "Engine\SceneRuntime\Scene.cpp"; Pattern = "EnsureExecutionGraphsCompiled();"; Label = "sync compile gate" },
-    [pscustomobject]@{ Path = "Engine\SceneRuntime\Entity.cpp"; Pattern = "RecordExecutionGraphMembershipChanged();"; Label = "component membership publication" },
-    [pscustomobject]@{ Path = "Editor\EngineEntry\ConsoleCommandSystem.cpp"; Pattern = "scene.executiongraph"; Label = "X4 runtime probe" }
+    [pscustomobject]@{ Path = "Engine\SceneRuntime\Entity.cpp"; Pattern = "RecordExecutionGraphMembershipChanged();"; Label = "component membership publication" }
 )
 
 foreach ($marker in $markers) {
@@ -51,7 +51,8 @@ $errFile = Join-Path $Work "transform_execution_graph_$runId.err"
 ))
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
-$proc = Start-Process -FilePath $Exe -ArgumentList "--script", $scenario `
+$resultPath = $outFile + ".jsonl"
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) `
     -WorkingDirectory $exeDir -WindowStyle Hidden `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
@@ -61,6 +62,8 @@ if (-not $proc.HasExited) {
     exit 1
 }
 
+$commandResults = @(Read-CommandResults $resultPath)
+if (@($commandResults | Where-Object status -ne 'succeeded').Count -ne 0) { throw 'Runtime command failed or was unavailable' }
 $output = [System.IO.File]::ReadAllText($outFile)
 $zeroViolations = 'transformless=0 nonlayout=0 mapping=0 parent-order=0 range=0 hierarchy=0 unreachable=0 cycle=0'
 $relationLine = 'nearest-spatial=PASS nearest-layout=PASS canvas-both=PASS dynamic-layout=PASS identity=stable values=exact bulk-compile-delta=1 clean-compile-delta=0'

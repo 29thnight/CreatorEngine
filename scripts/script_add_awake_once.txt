@@ -77,6 +77,7 @@ wait 10
 play
 wait 60
 
+script.status
 lifecycle.trace status
 lifecycle.dump script_add_awake_once_trace.tsv
 log.flush
