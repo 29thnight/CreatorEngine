@@ -55,9 +55,17 @@ if (-not $proc.WaitForExit(300000)) {
     $proc.Kill()
     throw 'Editor did not exit within 300s while running the declaration gate.'
 }
-Assert ($proc.ExitCode -eq 0) "Declaration gate batch exited $($proc.ExitCode); see $stdoutPath"
-
-Assert (Test-Path -LiteralPath $resultPath) "No result file produced at $resultPath"
+# ★ 종료 코드 단정은 맨 뒤다. 배치 러너는 명령 하나가 실패하면 4로 나가는데, 그
+#   숫자만으로는 **어느 창이 어떻게 끊겼는지**를 알 수 없다. 변이 증명에서 실제로
+#   그것이 드러났다 — 본문 거는 이름에 오타를 하나 넣었을 때 게이트는 붉어졌지만
+#   사람이 읽은 것은 "exited 4" 한 줄이었고, 아래 열다섯 단정은 한 번도 돌지 않았다.
+#   그래서 결과 줄을 먼저 읽고 내용을 단정한 뒤에 종료 코드를 본다. 이 순서라야
+#   붉은 줄이 "orphan_bodies=1 [Hierarchy_typo]"처럼 고칠 곳을 가리킨다.
+#
+#   종료 코드 단정을 **없애지는 않는다.** 내용이 전부 초록인데 프로세스가 0이 아닌
+#   것은 그 자체로 결함이고(크래시·종료 경로 실패), 이 저장소는 종료 코드를 보지
+#   않는 게이트에 이미 한 번 데었다.
+Assert (Test-Path -LiteralPath $resultPath) "No result file produced at $resultPath (batch exited $($proc.ExitCode); see $stdoutPath)"
 $lines = @(Get-Content -LiteralPath $resultPath | Where-Object { $_.Trim().Length -gt 0 })
 $results = @{}
 foreach ($line in $lines) {
@@ -91,6 +99,9 @@ Assert ($windows.data.boundBodies -gt 0) 'No window bodies are bound; the gate w
 # 단정이 자동으로 통과한다.
 $table = Get-Content -LiteralPath $stdoutPath
 Assert (($table | Where-Object { $_ -match "`tcenter`t" }).Count -gt 0) 'No window declares the center dock slot'
+
+# 내용이 다 맞았으면 마지막으로 프로세스가 깨끗하게 나갔는지 본다.
+Assert ($proc.ExitCode -eq 0) "Declaration gate batch exited $($proc.ExitCode) though every declaration check passed; see $stdoutPath"
 
 "editor:: declaration wiring OK — declared=$($windows.data.declared) bound=$($windows.data.boundBodies) checks=$($script:checks)"
 exit 0
