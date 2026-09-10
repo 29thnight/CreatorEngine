@@ -816,10 +816,23 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
 
     RHISubmissionThread& submission = GetRHISubmissionThread();
     const RHISubmissionOwnerStats before = submission.GetOwnerStats(this);
+    // ★ SwapChainResize가 이 지름길에 있었다 (2026-09-10 제거).
+    //
+    //   "직전 명령이 같고 제출 큐가 비었으면 이미 드레인된 것"이라는 메모인데,
+    //   BackendShutdown에는 맞고 SwapChainResize에는 틀리다. 종료는 그 뒤로
+    //   프레임을 더 그리지 않지만, 리사이즈는 두 번 사이에 프레임이 계속
+    //   표시된다. 제출 큐가 비어 있다는 것은 '제출할 작업이 없다'는 뜻이지
+    //   '표시된 백버퍼 참조가 풀렸다'는 뜻이 아니다.
+    //
+    //   그래서 두 번째 리사이즈부터 fence 대기를 건너뛰었고, 백버퍼가 셋이라
+    //   링이 한 바퀴 도는 **세 번째 리사이즈**에서 ResizeBuffers가 D3D12
+    //   디버그 계층 예외(0x0000087D)로 프로세스를 죽였다. 확대만 세 번 해도,
+    //   축소를 섞어도 똑같이 세 번째에서 죽었다 — 크기 방향과 무관했다.
+    //
+    //   실측: 지름길을 끊자 확대·축소 일곱 번이 모두 살았다.
     if (before.IsIdle() &&
         ((before.lastCommand == command &&
-            (RHILifecycleCommand::BackendShutdown == command ||
-             RHILifecycleCommand::SwapChainResize == command)) ||
+            (RHILifecycleCommand::BackendShutdown == command)) ||
          (before.faulted && RHILifecycleCommand::UnrecoverableDeviceError ==
             before.lastCommand)))
     {
