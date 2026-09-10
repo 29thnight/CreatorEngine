@@ -1,4 +1,9 @@
 #include "MeshRenderer.h"
+// MeshRenderer.h는 Material을 전방 선언만 한다. 이 파일은 m_ORM_TexName 같은
+// 멤버를 직접 읽으므로 완전한 형이 필요하다. 그동안은 같은 유니티 블롭의
+// 앞선 파일이 대신 공급했고, 폴더에 파일 하나가 늘어 블롭 구성이 바뀌자
+// 드러났다 — 전이 include에 기대면 무관한 파일 추가가 빌드를 깬다.
+#include "Material.h"
 #include "EditorObjectOperations.h"
 #include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC8: typed 정본 read-only 표시
 #include "MaterialScriptBinding.h"
