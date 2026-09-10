@@ -840,6 +840,21 @@ if (Test-Path -LiteralPath $currentStagePointer -PathType Leaf) {
     ""
 }
 
+# D5-d(SerializationPlan §5 완료 기준 2): 같은 Release stage의 Player가 쿠킹 경로로
+# 시작 씬을 여는 단계 계측. 계약(SceneParse 0 · CEMF catalog · text-parser 0 · 분해
+# 합 ≤ 루트)만 단정하고 수치는 낸다 — D0 게이트처럼 문턱을 걸지 않는다(변동폭 안의
+# 문턱은 세트를 무작위로 빨갛게 만든다). 수용 판정은 계획서 D5-d 절에 3회 범위와 함께
+# 사람이 적었다.
+if (Test-Path -LiteralPath $currentStagePointer -PathType Leaf) {
+    Run-Step "Player 쿠킹 씬 로드 계측(D5-d)" {
+        & pwsh -NoProfile -File `
+            (Join-Path $PSScriptRoot "verify-player-cooked-scene-baseline.ps1")
+    }
+} else {
+    "=== Player 쿠킹 씬 로드 계측(D5-d) === 건너뜀 (Release stage 없음)"
+    ""
+}
+
 # E2: Editor import 완료 결과는 하나의 RuntimeAssetChange 계약으로만 Core에
 # 전달하고, reload는 이전 generation의 raw 참조 수명을 보존해야 한다.
 Run-Step "Runtime asset-change 경계" {

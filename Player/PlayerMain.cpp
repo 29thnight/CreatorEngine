@@ -27,6 +27,7 @@
 #include "UIManager.h"
 #include "RuntimeSettings.h"
 #include "AuthoringParseTelemetry.h"
+#include "SerializationProfiler.h"
 #include "imgui.h"
 
 #include <cstdio>
@@ -78,6 +79,34 @@ namespace
 			static_cast<unsigned long long>(parseTelemetry.calls));
 		for (const std::string& context : parseTelemetry.contexts)
 			std::printf("[runtime.text-parser.call] source=%s\n", context.c_str());
+
+		// ── 직렬화 단계 계측 (SerializationPlan D5-d · §5 완료 기준 2) ──
+		//
+		// D0 기준선은 Editor의 `serialize.bench`가 저작 경로에서 잰 값이다. §5 기준 2의
+		// "Player 씬 전환 SceneParse 호출 0 · SceneLoadTotal ≥35% 감소 · 부팅 catalog
+		// ≥80% 감소"는 **쿠킹 경로를 도는 Player**에서 같은 단계 이름으로 재야 D0과
+		// 맞댈 수 있는데, 그 출력이 Player에는 없었다. 그래서 text-parser 계수와 같은
+		// 자리에서, 같은 규칙(어느 종료 경로든 한 번)으로 찍는다.
+		//
+		// ★ 씬 단계는 `--smoke`에서만 켠다(Initialize 참조). 부팅 AssetCatalog 슬롯은
+		//   DataSystem이 켜짐 여부와 무관하게 기록하므로 항상 값이 있다. 게이트는
+		//   `calls`를 함께 단정해 "켜지지 않아 0"을 "빨라서 0"으로 읽지 않는다.
+		const SerializationProfile::Snapshot sceneStages = SerializationProfile::Take();
+		const SerializationProfile::Snapshot bootStages = SerializationProfile::TakeBoot();
+		std::printf("[runtime.serialization] enabled=%s\n",
+			SerializationProfile::IsEnabled() ? "yes" : "no");
+		for (uint32_t i = 0; i < SerializationProfile::kStageCount; ++i)
+		{
+			const auto stage = static_cast<SerializationProfile::Stage>(i);
+			const SerializationProfile::StageSample& sample =
+				(SerializationProfile::Stage::AssetCatalog == stage)
+				? bootStages[stage] : sceneStages[stage];
+			const std::string_view stageName = SerializationProfile::StageName(stage);
+			std::printf("[runtime.serialization] stage=%.*s totalUs=%.3f calls=%llu\n",
+				static_cast<int>(stageName.size()), stageName.data(),
+				static_cast<double>(sample.nanoseconds) / 1000.0,
+				static_cast<unsigned long long>(sample.calls));
+		}
 		std::fflush(stdout);
 	}
 }
@@ -207,6 +236,11 @@ void Player::PlayerMain::Initialize()
 	// 캐묻는 대신 정책을 가진 쪽이 런타임 primitive(SetGameStart)를 직접 부른다.
 	// 그래서 Core에서 마지막 Player mode 분기가 사라졌다.
 	{
+		// 스모크에서만 직렬화 단계 계측을 켠다 — 종료 시 `[runtime.serialization]`으로
+		// 찍힌다(EmitTextParseTelemetry). 평소 실행은 원자 플래그 읽기 하나만 남는다.
+		if (g_smoke.IsActive())
+			SerializationProfile::SetEnabled(true);
+
 		const std::wstring sceneName = RuntimeSettings::Get().GetStartupSceneName();
 		const file::path scenePath = PathFinder::Relative("Scenes").append(sceneName);
 		Scene* loadedScene = SceneManagers->LoadSceneImmediate(scenePath.string());

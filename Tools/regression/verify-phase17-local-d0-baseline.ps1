@@ -88,11 +88,18 @@ $commands.Add("serialize.bench prefab $Prefab $PrefabIterations")
 $commands.Add('quit')
 $commands | Set-Content -LiteralPath $scenario -Encoding utf8NoBOM
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', $scenario) `
-    -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
-    -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+# 파이프(-RedirectStandardOutput)가 아니라 파일 핸들로 받는다 — 정본 D0 게이트와 같은 이유
+# (무버퍼 stdout의 printf 한 줄이 파이프에서 ~10 ms 대기가 되어 계측 구간에 얹힌다, 2026-09-10).
+$launcher = Join-Path $run 'run.cmd'
+@(
+    '@echo off',
+    ('"{0}" --commandlet-script "{1}" > "{2}" 2> "{3}"' -f $Exe, $scenario, $stdout, $stderr),
+    'exit /b %ERRORLEVEL%'
+) | Set-Content -LiteralPath $launcher -Encoding ascii
+$process = Start-Process -FilePath $env:ComSpec -ArgumentList @('/d', '/c', ('"' + $launcher + '"')) `
+    -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru
 if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-    $process.Kill()
+    $process.Kill($true)
     Add-Failure "Release 계측 시간 초과: $run"
 } else {
     # Redirected streams can finish after the process handle is signaled.

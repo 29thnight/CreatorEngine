@@ -63,12 +63,28 @@ $commands.Add("serialize.bench prefab $prefab $PrefabIterations")
 $commands.Add('quit')
 $commands | Set-Content -LiteralPath $scenario -Encoding UTF8
 
-$process = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', $scenario) `
-    -WorkingDirectory $root -WindowStyle Hidden `
-    -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+# ★ `Start-Process -RedirectStandardOutput`로 띄우지 않는다 (2026-09-10 실측).
+#
+#   그 경로는 stdout을 **파이프**로 받고, CLI 모드의 Editor는 stdout을 무버퍼(_IONBF)로
+#   두므로 제품이 찍는 `[scene.document]`·`[prefab.document]` 한 줄이 곧 파이프 write
+#   한 번 = 약 8~18 ms의 대기가 된다. 그 대기가 SceneParse/PrefabParse 계측 구간 **안**에
+#   있어서, 909B 씬의 SceneParse가 36 ms, 1.7KB 프리팹의 PrefabParse가 9 ms로 읽혔다.
+#   같은 exe를 파일 핸들로 리다이렉트해 돌리면 각각 0.5 ms · 0.7 ms다. 즉 이 게이트는
+#   제품이 아니라 **하네스의 파이프 지연**을 재고 있었고, 그 수치가 계획서 표에 오를
+#   뻔했다. cmd의 리다이렉트는 자식에게 파일 핸들을 직접 넘기므로 그 대기가 없다.
+#   `cmd /c "<명령줄>"`이 아니라 **배치 파일**을 거친다 — cmd는 배치 안의 GUI exe만
+#   기다린다. 배치의 리다이렉트가 자식에게 파일 핸들을 직접 넘긴다.
+$launcher = Join-Path $run 'run.cmd'
+@(
+    '@echo off',
+    ('"{0}" --commandlet-script "{1}" > "{2}" 2> "{3}"' -f $Exe, $scenario, $stdout, $stderr),
+    'exit /b %ERRORLEVEL%'
+) | Set-Content -LiteralPath $launcher -Encoding ascii
+$process = Start-Process -FilePath $env:ComSpec -ArgumentList @('/d', '/c', ('"' + $launcher + '"')) `
+    -WorkingDirectory $root -WindowStyle Hidden -PassThru
 $process.WaitForExit($TimeoutSeconds * 1000) | Out-Null
 if (-not $process.HasExited) {
-    $process.Kill()
+    $process.Kill($true)
     "TIMEOUT output=$run"
     exit 1
 }

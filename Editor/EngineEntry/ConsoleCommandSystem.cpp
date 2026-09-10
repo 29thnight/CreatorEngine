@@ -181,39 +181,60 @@ namespace
 
 
 
-    // 콘솔을 확보한다(GUI 앱이라 기본적으로 없다).
-    //
-    // 터미널에서 실행한 경우에는 그 터미널에 그대로 붙는다. Windows Terminal에서
-    // 띄우면 별도 conhost 창이 뜨지 않고 그 탭에 출력된다.
-    // 부모 콘솔이 없을 때만(탐색기에서 더블클릭 등) 새 콘솔을 만드는데, 이때
-    // 어떤 터미널이 열리는지는 Windows 11의 "기본 터미널 앱" 설정을 따른다.
     void EnsureConsole()
     {
-        if (::GetConsoleWindow() != nullptr) return;
-
-        if (!::AttachConsole(ATTACH_PARENT_PROCESS))
-        {
-            if (!::AllocConsole()) return;
-        }
-
         // 이미 파일이나 파이프로 리다이렉트된 스트림은 건드리지 않는다.
         //
         // CONOUT$로 무조건 다시 여는 코드가 `Academy_4Q.exe --exec ... > out.txt`를
         // 조용히 무력화하고 있었다 — 명령은 돌고 출력은 콘솔 창으로만 가서
         // 파일에는 아무것도 남지 않았다. 자동 검증에서는 그 출력이 결과 전부라,
         // '통과했는지 알 수 없음'과 '실패'가 구분되지 않는 상태였다.
-        const auto redirected = [](DWORD stdHandle)
-        {
-            const HANDLE handle = ::GetStdHandle(stdHandle);
-            if (nullptr == handle || INVALID_HANDLE_VALUE == handle) return false;
-            const DWORD type = ::GetFileType(handle);
-            return FILE_TYPE_DISK == type || FILE_TYPE_PIPE == type;
+        //
+        // ★ 판정은 **콘솔을 붙이기 전에** 한다 (2026-09-10 실측).
+        //
+        //   `AttachConsole(ATTACH_PARENT_PROCESS)`가 성공하면 Windows가 표준 핸들 셋을
+        //   그 콘솔의 핸들로 **덮어쓴다** — 부모(cmd)가 `> out.txt`로 넘겨 준 파일 핸들
+        //   (FILE_TYPE_DISK)이 콘솔 핸들(FILE_TYPE_CHAR)로 바뀐다. 그 뒤에 판정하면
+        //   "리다이렉트 안 됨"으로 읽혀 `freopen(CONOUT$)`가 stdout을 콘솔로 보내고,
+        //   파일에는 붙이기 전에 찍힌 세 줄만 남았다. `AllocConsole` 경로(부모에 콘솔이
+        //   없는 bash·Start-Process)는 핸들을 보존해서 같은 명령이 거기서는 멀쩡했다 —
+        //   실행 환경에 따라 출력이 있다가 없어지는 형태였다. 그래서 붙이기 전 판정값을
+        //   쓰고, 덮어써진 핸들은 원래 것으로 되돌린다(CRT의 fd 1은 애초에 원래 핸들을
+        //   쥐고 있으므로 되돌리는 것은 Win32 표준 핸들 조회를 쓰는 쪽을 위해서다).
+        struct StandardStream { DWORD id; HANDLE handle; bool redirected; };
+        StandardStream streams[] = {
+            { STD_INPUT_HANDLE,  nullptr, false },
+            { STD_OUTPUT_HANDLE, nullptr, false },
+            { STD_ERROR_HANDLE,  nullptr, false },
         };
+        for (StandardStream& stream : streams)
+        {
+            stream.handle = ::GetStdHandle(stream.id);
+            if (nullptr == stream.handle || INVALID_HANDLE_VALUE == stream.handle) continue;
+            const DWORD type = ::GetFileType(stream.handle);
+            stream.redirected = FILE_TYPE_DISK == type || FILE_TYPE_PIPE == type;
+        }
 
+        // 콘솔을 확보한다(GUI 앱이라 기본적으로 없다). 터미널에서 실행한 경우에는
+        // 그 터미널에 그대로 붙고, 부모 콘솔이 없을 때만(탐색기에서 더블클릭 등) 새
+        // 콘솔을 만든다 — 이때 어떤 터미널이 열리는지는 Windows 11의 "기본 터미널 앱"
+        // 설정을 따른다.
+        if (nullptr == ::GetConsoleWindow())
+        {
+            if (::AttachConsole(ATTACH_PARENT_PROCESS) || ::AllocConsole())
+            {
+                for (const StandardStream& stream : streams)
+                    if (stream.redirected) ::SetStdHandle(stream.id, stream.handle);
+            }
+        }
+
+        // 콘솔을 끝내 못 얻었으면 CONOUT$ 열기가 실패하고, freopen_s는 실패해도 원래
+        // 스트림을 닫아 버린다 — 리다이렉트도 콘솔도 없는 스트림만 그대로 둔다.
+        const bool hasConsole = nullptr != ::GetConsoleWindow();
         FILE* dummy = nullptr;
-        if (!redirected(STD_INPUT_HANDLE))  freopen_s(&dummy, "CONIN$", "r", stdin);
-        if (!redirected(STD_OUTPUT_HANDLE)) freopen_s(&dummy, "CONOUT$", "w", stdout);
-        if (!redirected(STD_ERROR_HANDLE))  freopen_s(&dummy, "CONOUT$", "w", stderr);
+        if (hasConsole && !streams[0].redirected) freopen_s(&dummy, "CONIN$", "r", stdin);
+        if (hasConsole && !streams[1].redirected) freopen_s(&dummy, "CONOUT$", "w", stdout);
+        if (hasConsole && !streams[2].redirected) freopen_s(&dummy, "CONOUT$", "w", stderr);
         std::ios::sync_with_stdio(true);
 
         // ★ 버퍼링을 끈다.
@@ -223,6 +244,13 @@ namespace
         // 없었다 — 멈춘 자리를 찾는 일에 로그가 없는 것이 가장 나쁘다.
         //
         // 버퍼링을 끄면 느려지지만, 이 경로는 진단용 CLI라 그 대가가 싸다.
+        //
+        // ★★ 다만 그 "느려짐"은 stdout이 **파이프**일 때 심하다 — 무버퍼 printf 한 줄이
+        //   파이프 write 한 번이 되고, `Start-Process -RedirectStandardOutput` 아래에서는
+        //   그 한 번이 8~18 ms의 대기로 실측됐다(2026-09-10). 로드 경로 안에서 찍는
+        //   `[scene.document]` 같은 줄이 그대로 SceneParse 계측에 얹혀 909B 씬이 36 ms로
+        //   읽혔다. 시간을 재는 게이트는 파일 핸들로 리다이렉트해야 한다
+        //   (verify-serialization-baseline.ps1 참조).
         setvbuf(stdout, nullptr, _IONBF, 0);
         setvbuf(stderr, nullptr, _IONBF, 0);
 

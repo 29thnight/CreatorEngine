@@ -459,24 +459,32 @@ function Sort-EntriesOrdinal {
     return $ordered.ToArray()
 }
 
+# ★ 이 목록은 Player.exe의 실제 import와 맞아야 한다 (2026-09-10 재실측).
+#
+#   kubazip·minizip·poly2tri·pugixml·zlib은 Assimp의 의존이었고 PHASE 3.75 MBC9가 Assimp를
+#   은퇴시키며 함께 사라졌다. 목록이 그대로 남아 있어 stage 단계가 "package source file is
+#   missing: kubazip.dll"로 죽었다 — 위 generation root와 함께 MBC11 이후 패키징이 서지
+#   못한 이유의 하나다. meshoptimizer는 Debug Player만 DLL로 import한다(Release는 정적).
+#   PhysXDevice64/PhysXGpu_64는 import가 아니라 PhysX가 런타임에 여는 동반 DLL이라 유지한다.
+#   dxcompiler/dxil/slang-compiler는 Find-SlangRuntime이 고정 ThirdParty 번들에서 따로 싣는다.
 function Get-RuntimeDllNames {
     if ($Config -eq 'Debug') {
         return @(
             'DirectXTex.dll',
-            'fmodL.dll', 'fmtd.dll', 'kubazip.dll', 'meshoptimizer.dll',
-            'minizipd.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
+            'fmodL.dll', 'fmtd.dll', 'meshoptimizer.dll',
+            'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
             'PhysXDevice64.dll',
-            'PhysXCooking_64.dll', 'PhysXFoundation_64.dll', 'poly2tri.dll',
-            'pugixml.dll', 'vulkan-1.dll', 'zd.dll'
+            'PhysXCooking_64.dll', 'PhysXFoundation_64.dll',
+            'vulkan-1.dll'
         )
     }
     return @(
         'DirectXTex.dll',
-        'fmod.dll', 'fmt.dll', 'kubazip.dll', 'meshoptimizer.dll',
-        'minizip.dll', 'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
+        'fmod.dll', 'fmt.dll',
+        'nethost.dll', 'PhysX_64.dll', 'PhysXCommon_64.dll',
         'PhysXDevice64.dll',
-        'PhysXCooking_64.dll', 'PhysXFoundation_64.dll', 'poly2tri.dll',
-        'pugixml.dll', 'vulkan-1.dll', 'z.dll'
+        'PhysXCooking_64.dll', 'PhysXFoundation_64.dll',
+        'vulkan-1.dll'
     )
 }
 
@@ -642,6 +650,13 @@ function Assert-CookOutput {
     })
 
     $byFolder = @{}
+    # MBC11 — generation 디렉터리의 `model.cemc`·`sidecar.meta`는 manifest entry 경로가
+    # 아니라 `generation.asset`의 **동반 파일**이다. 쿠커의 artifactPaths는 entry 경로
+    # (generation.asset·textures/<id>.png·standalone 산출물)만 세므로 동반 파일을 같은
+    # 축에 넣으면 정확히 모델 수×2만큼 어긋난다(2026-09-10 실측: 289 != 261, 모델 14).
+    # 규약 검사는 전 파일에, 경로 계수는 entry 경로에만 건다.
+    $companions = [Collections.Generic.List[object]]::new()
+    $artifactPaths = [Collections.Generic.List[object]]::new()
     foreach ($artifact in $artifacts) {
         $relative = [IO.Path]::GetRelativePath($derivedRoot, $artifact.FullName).Replace('\', '/')
         $folder = ($relative -split '/')[0]
@@ -661,6 +676,11 @@ function Assert-CookOutput {
             $Matches[1] -ne $Matches[2].Substring(0, 2)) {
             throw "cook artifact 경로가 GUID-addressed 규약과 다르다: $relative"
         }
+        if ($isDirectoryRule -and ($relative -match '/(model\.cemc|sidecar\.meta)$')) {
+            $companions.Add($artifact)
+            continue
+        }
+        $artifactPaths.Add($artifact)
         if (-not $byFolder.ContainsKey($folder)) { $byFolder[$folder] = 0 }
         $byFolder[$folder] += 1
     }
@@ -668,13 +688,21 @@ function Assert-CookOutput {
     # 쿠커가 보고한 서로 다른 artifact 경로 수와 디스크가 맞아야 한다.
     # material 처럼 model artifact 를 공유하는 subasset 은 파일이 없으므로
     # entry 수가 아니라 **경로 수**로 맞춘다.
-    if ($artifacts.Count -ne $ExpectedArtifactPathCount) {
-        throw ("Derived artifact 파일 수가 쿠커 보고와 다르다: {0} != {1}" -f
-            $artifacts.Count, $ExpectedArtifactPathCount)
+    if ($artifactPaths.Count -ne $ExpectedArtifactPathCount) {
+        throw ("Derived artifact 경로 수가 쿠커 보고와 다르다: {0} != {1} (동반 파일 {2} 제외)" -f
+            $artifactPaths.Count, $ExpectedArtifactPathCount, $companions.Count)
+    }
+    # 동반 파일은 generation.asset 하나당 정확히 둘이어야 한다 — 하나라도 빠지면 그 generation은
+    # 로드되지 않는데, 경로 수만 맞추면 그 결손이 보이지 않는다.
+    $generationAssets = @($artifactPaths | Where-Object { $_.Name -eq 'generation.asset' }).Count
+    if ($companions.Count -ne 2 * $generationAssets) {
+        throw ("model generation 동반 파일 수가 어긋난다: {0} != 2 x {1}" -f
+            $companions.Count, $generationAssets)
     }
 
     return [pscustomobject][ordered]@{
-        ArtifactCount = $artifacts.Count
+        ArtifactCount = $artifactPaths.Count
+        CompanionCount = $companions.Count
         ArtifactBytes = ($artifacts | Measure-Object Length -Sum).Sum
         ManifestBytes = (Get-Item -LiteralPath $manifestPath).Length
         ManifestSha256 = Get-Sha256 -Path $manifestPath
@@ -692,11 +720,71 @@ $script:cookSourceRules = @(
     [pscustomobject]@{ Option = '--scene';      Extensions = @('.creator', '.prefab') }
 )
 
+# MBC11 뒤 `--model` cook은 **게시된 generation을 내보내는 것**이라 generation root가
+# 필요하다. 쿠커 기본값은 `<asset-root>/../Library/ModelAssetGenerations`인데 package
+# base(Base/)에는 Library가 없다 — Copy-ProjectInputs는 Assets·ProjectSetting만 복사한다.
+# 그래서 2026-09-03 MBC11 이후 패키징이 첫 모델에서 "게시된 generation이 없다"로 죽어
+# 있었고(2026-09-10 실측), run-all의 D6 게이트는 08-25 stage를 계속 재고 있었다.
+#
+# ★ generation root는 Base **밖**에 둔다. Merge-PackageInput이 Base 전체를 pak 입력으로
+#   합치므로 Base/Library에 두면 generation 디렉터리(모델당 수백 KB~수십 MB)가 pak에
+#   실린다. Derived 산출물만 콘텐츠다(§3.6.1).
+function Publish-PackageModelGenerations {
+    param(
+        [Parameter(Mandatory)][string]$AssetCooker,
+        [Parameter(Mandatory)][string]$PackageAssets,
+        [Parameter(Mandatory)][string]$GenerationRoot,
+        # Project/Workspace: 프로젝트 Library에 게시된 generation을 그대로 가져온다.
+        # Tracked: Library는 추적되지 않으므로 package base 위에서 새로 author한다.
+        [string]$ProjectLibrary = ''
+    )
+
+    New-Item -ItemType Directory -Force -Path $GenerationRoot | Out-Null
+    $models = @(Get-ModelCookSources -AssetsRoot $PackageAssets)
+    $copied = 0
+    $authored = 0
+    foreach ($model in $models) {
+        $sidecarPath = $model.FullName + '.meta'
+        if (-not (Test-Path -LiteralPath $sidecarPath -PathType Leaf)) {
+            throw "model sidecar가 없다: $sidecarPath"
+        }
+        if ([string]::IsNullOrWhiteSpace($ProjectLibrary)) {
+            # ★ author는 package base의 sidecar를 다시 쓴다(generation 상승). 그 뒤의
+            #   cook은 같은 base sidecar를 읽으므로 둘이 어긋나지 않는다.
+            Invoke-NativeChecked -FilePath $AssetCooker -Label "AssetCooker author $($model.Name)" `
+                -Arguments @('--author-model-asset', '--asset-root', $PackageAssets,
+                    '--output', $GenerationRoot, '--model', $model.FullName) | Out-Null
+            ++$authored
+            continue
+        }
+        $sidecar = Get-Content -LiteralPath $sidecarPath -Raw
+        if ($sidecar -notmatch '(?m)^assetId:\s*([0-9a-f-]{36})\s*$' ) {
+            throw "schema v2 sidecar의 assetId를 읽지 못했다: $sidecarPath"
+        }
+        $assetId = $Matches[1]
+        if ($sidecar -notmatch '(?m)^generation:\s*(\d+)\s*$') {
+            throw "schema v2 sidecar의 generation을 읽지 못했다: $sidecarPath"
+        }
+        $generation = $Matches[1]
+        $source = Join-Path $ProjectLibrary "$assetId\$generation"
+        if (-not (Test-Path -LiteralPath $source -PathType Container)) {
+            throw ("프로젝트 Library에 sidecar가 가리키는 generation이 없다: {0} (sidecar {1}) — " +
+                "Editor에서 모델을 다시 저작하거나 AssetCooker --author-model-asset을 먼저 실행한다") -f $source, $sidecarPath
+        }
+        $destination = Join-Path $GenerationRoot "$assetId\$generation"
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+        Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
+        ++$copied
+    }
+    return [pscustomobject]@{ Models = $models.Count; Copied = $copied; Authored = $authored }
+}
+
 function Invoke-AssetCook {
     param(
         [Parameter(Mandatory)][string]$AssetCooker,
         [Parameter(Mandatory)][string]$AssetsRoot,
-        [Parameter(Mandatory)][string]$OutputRoot
+        [Parameter(Mandatory)][string]$OutputRoot,
+        [Parameter(Mandatory)][string]$GenerationRoot
     )
 
     if (Test-Path -LiteralPath $OutputRoot) {
@@ -727,6 +815,8 @@ function Invoke-AssetCook {
     $arguments.Add($AssetsRoot)
     $arguments.Add('--output')
     $arguments.Add($OutputRoot)
+    $arguments.Add('--generation-root')
+    $arguments.Add($GenerationRoot)
 
     $sourceCounts = [ordered]@{}
     foreach ($rule in $script:cookSourceRules) {
@@ -1133,11 +1223,20 @@ function Invoke-PlayerSmoke {
     param(
         [Parameter(Mandatory)][string]$CandidateStage,
         [Parameter(Mandatory)][string]$ManifestPath,
-        [Parameter(Mandatory)][object]$Preflight
+        [Parameter(Mandatory)][object]$Preflight,
+        # ★ candidate 안(`<candidate>\.verify-temp`)이 아니라 stage root 바로 아래 짧은
+        #   경로여야 한다. Player는 `%TEMP%\CreatorEngine\Player\<pid>\RuntimeContent\` 아래에
+        #   pak을 풀고, MBC11 뒤 generation 항목은 `Assets\Derived\Models\xx\<id>\<gen>\
+        #   textures\<id>.png`(111자)라 candidate 경로(105자)+격리 TEMP(55자)와 합치면
+        #   MAX_PATH를 넘는다. 그러면 추출이 "Host runtime content preparation failed"로
+        #   exit 2 하고 로그도 안 남는다(2026-09-10 실측: TEMP 접두만 105자로 늘려 재현).
+        #   Player.exe에는 longPathAware 매니페스트가 없다.
+        [Parameter(Mandatory)][string]$VerifyTemp,
+        [Parameter(Mandatory)][string]$VerifyTempRoot
     )
 
-    $verifyTemp = Join-Path $CandidateStage '.verify-temp'
-    Assert-ScopedPath -Path $verifyTemp -Root $CandidateStage -Label 'verify temp'
+    $verifyTemp = $VerifyTemp
+    Assert-ScopedPath -Path $verifyTemp -Root $VerifyTempRoot -Label 'verify temp'
     if (Test-Path -LiteralPath $verifyTemp) {
         throw "verify temp must be unique and absent before launch: $verifyTemp"
     }
@@ -1300,9 +1399,15 @@ function Invoke-PlayerSmoke {
     if ($displayFrame -lt 2) { throw "Player display frame is too low: $displayFrame" }
     if ($promotions -lt 2) { throw "Player display promotion count is too low: $promotions" }
 
+    # MBC11 뒤 Player는 MeshRenderer마다 catalog의 generation 레코드를 검증해 읽는다.
+    # 그 검증이 거부되면 "그리지 않는다"로 조용히 넘어가 프레임은 정상으로 돌므로 smoke
+    # 마커만 보면 초록이다 — 2026-09-10 첫 MBC11 패키지에서 시작 씬의 모델 8/8이 전부
+    # 거부됐는데 verify가 통과했다. 모델을 하나도 못 그리는 패키지는 게시하지 않는다.
     $failurePatterns = @(
         '\[SMOKE\]\s*startup scene load FAILED',
         '\[SMOKE\]\s*render pipeline FAILED',
+        '\[model\.generation\]\s*게시 전 검증 실패',
+        'MeshRenderer 모델 generation 해석 실패',
         '\[CRASH\]',
         '\[CLR\].*실패',
         '\[RenderBackend\].*(실패|오류)',
@@ -1359,7 +1464,7 @@ function Invoke-PlayerSmoke {
         }
     }
 
-    Remove-ScopedTree -Path $verifyTemp -Root $CandidateStage -Label 'verify temp'
+    Remove-ScopedTree -Path $verifyTemp -Root $VerifyTempRoot -Label 'verify temp'
     return [pscustomobject]@{
         ExitCode = $exitCode
         GameThreadFrames = $gameThreadFrames
@@ -1575,8 +1680,24 @@ try {
     if (Test-Path -LiteralPath $authoredDerived) {
         throw "package source에 stale/authored Derived tree를 둘 수 없다: $authoredDerived"
     }
+    # ★ 짧은 경로에 둔다. `.package-input\Generations\...` 아래에 두면 authoring의
+    #   staging 디렉터리(`<gen>.staging-<pid>-<tick>\textures\<TextureId>.png`)가 MAX_PATH를
+    #   넘어 "파일을 열 수 없다"로 죽는다(Tracked 모드 2026-09-10 실측). stage root 바로
+    #   아래 `.<buildId 8자>.gen`이면 여유가 있고, 정상·실패 경로 모두에서 지운다.
+    $generationRoot = Join-Path $stageRootPath ('.' + $buildId.Substring(0, 8) + '.gen')
+    if (Test-Path -LiteralPath $generationRoot) {
+        throw "generation root must be absent before packaging: $generationRoot"
+    }
+    $projectLibrary = if ($InputMode -eq 'Tracked') { '' } else {
+        Join-Path $projectRoot 'Library\ModelAssetGenerations'
+    }
+    $generations = Publish-PackageModelGenerations -AssetCooker $cookerSource `
+        -PackageAssets $packageAssets -GenerationRoot $generationRoot -ProjectLibrary $projectLibrary
+    Write-Host ("  model generations: {0} (copied {1}, authored {2})" -f
+        $generations.Models, $generations.Copied, $generations.Authored)
     $modelCook = Invoke-AssetCook -AssetCooker $cookerSource `
-        -AssetsRoot $packageAssets -OutputRoot (Join-Path $generatedRoot 'Assets')
+        -AssetsRoot $packageAssets -OutputRoot (Join-Path $generatedRoot 'Assets') `
+        -GenerationRoot $generationRoot
     $folderSummary = ($script:derivedPathRules | ForEach-Object {
         $count = if ($modelCook.ByFolder.ContainsKey($_.Folder)) { $modelCook.ByFolder[$_.Folder] } else { 0 }
         '{0}={1}' -f $_.Folder, $count
@@ -1724,6 +1845,8 @@ try {
             sourceCounts = $modelCook.SourceCounts
             legacyTextureNameRefs = $modelCook.LegacyTextureNameRefs
             legacyModelCookCaches = $modelCook.LegacyModelCookCaches
+            modelGenerationsCopied = $generations.Copied
+            modelGenerationsAuthored = $generations.Authored
             runtimeDocumentCount = $runtimeDocumentCook.DocumentCount
             runtimeDocumentBytes = $runtimeDocumentCook.DocumentBytes
             runtimeDocumentFormat = $runtimeDocumentCook.Format
@@ -1772,8 +1895,12 @@ try {
         $manifest['verification'] = 'skipped'
         Write-Warning '-SkipVerify candidate는 publish하지 않는다.'
     } else {
+        # 실패하면 verify temp는 candidate와 함께 보존된다 — Player의 RuntimeData\Log가
+        # 그 안에 있어 "smoke failed with exit code N"의 원인을 거기서만 읽을 수 있다.
+        $verifyTemp = Join-Path $stageRootPath ('.' + $buildId.Substring(0, 8) + '.vt')
         $smoke = Invoke-PlayerSmoke -CandidateStage $candidateStage `
-            -ManifestPath $manifestPath -Preflight $preflight
+            -ManifestPath $manifestPath -Preflight $preflight `
+            -VerifyTemp $verifyTemp -VerifyTempRoot $stageRootPath
         $manifest['verification'] = 'passed'
         $manifest['smoke'] = [ordered]@{
             exitCode = $smoke.ExitCode
@@ -1795,6 +1922,7 @@ try {
         [Text.UTF8Encoding]::new($false))
 
     Remove-ScopedTree -Path $packageWorkRoot -Root $candidateStage -Label 'package input'
+    Remove-ScopedTree -Path $generationRoot -Root $stageRootPath -Label 'model generation root'
     Remove-ScopedTree -Path (Join-Path $candidateStage 'Log') `
         -Root $candidateStage -Label 'smoke log directory'
     foreach ($smokeArtifact in @('imgui.ini', 'verify.stdout.log', 'verify.stderr.log')) {
@@ -1840,6 +1968,15 @@ try {
     Write-Host "[BUILD] content digest: $($manifest.contentDigest)"
 } catch {
     if ($null -ne $buildLock) { $buildLock.Dispose() }
-    Write-Error "[BUILD] 실패; 기존 stage는 보존됨. candidate: $candidateStage`n$($_.Exception.Message)"
+    # generation root는 candidate 밖(stage root 바로 아래)이라 candidate 보존과 무관하게 지운다.
+    if (Test-Path variable:generationRoot -ErrorAction SilentlyContinue) {
+        try { Remove-ScopedTree -Path $generationRoot -Root $stageRootPath -Label 'model generation root' } catch {}
+    }
+    $verifyTempNote = ''
+    if ((Test-Path variable:verifyTemp -ErrorAction SilentlyContinue) -and
+        (Test-Path -LiteralPath $verifyTemp -PathType Container)) {
+        $verifyTempNote = "`nverify temp(Player 런타임 로그): $verifyTemp"
+    }
+    Write-Error "[BUILD] 실패; 기존 stage는 보존됨. candidate: $candidateStage$verifyTempNote`n$($_.Exception.Message)"
     exit 1
 }

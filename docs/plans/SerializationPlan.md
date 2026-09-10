@@ -30,7 +30,19 @@ UUIDv4 발급/보존/확장을 더 진행하지 않으며, 실제 226개 sidecar
 UUIDv8 재발급은 MBC3 원자 writer 뒤 MBC4가 소유한다. MBC2 완료는 규약·코덱·폐포
 검증 완료이며 현재 코퍼스 cutover 완료를 뜻하지 않는다.
 
-**현재 판정(2026-09-02 순차 구현 갱신):** D0·D1 제품 코드는 완료 상태다.
+**현재 판정(2026-09-10 폐쇄, §1.9):** D0~D6 완료, D7 종료. §1.8이 남긴 backlog 넷
+(정본 `Test1.creator` 복원·정본 D1 검증기·D3의 D0 동일 workload Release A/B·D5-d 정본
+Test1 대조와 scene 확장)을 전부 실측으로 닫았다 — Test1 SceneLoadTotal 32.239→7.295 ms
+(−77.4%), FT_Primitives 12.279→3.095 ms(−74.8%), parity scene 16·prefab 10·material 2 전수.
+§5 완료 기준 2(Player 쿠킹 경로)는 부팅 catalog 축만 닫았다(53.560→8.127 ms, −84.8%).
+씬 로드 축은 PHASE 3.75 MBC11의 catalog generation 로드가 실제 패키지에서 한 번도 돈 적이
+없어(CEDO로 쿠킹된 identity 헤더를 YAML로 읽고, `sidecar.meta`는 pak에서 빠진다) 시작 씬의
+모델 8/8이 거부되는 결함으로 **차단**됐다 — PHASE 17 밖 소유라 여기서 고치지 않았고,
+새 Player 게이트가 그 결함을 정확히 붉게 낸다. 함께 고친 것: D0 게이트가 제품이 아니라
+하네스 파이프 대기를 재던 결함, `AttachConsole` 표준 핸들 덮어쓰기, MBC11 이후 죽어 있던
+패키징(결함 4종), verify의 모델 해석 실패 눈멂.
+
+**이전 판정(2026-09-02 순차 구현 갱신):** D0·D1 제품 코드는 완료 상태다.
 D2의 로컬 old-v5 sidecar 61개는 당시의 transitional UUIDv4 transaction으로 재이주해
 `d2Ready=true`를 복구했다. D3는 읽기·쓰기·장기 Document를 모두 단일 ryml
 backend로 전환했고 yaml-cpp 소스·매니페스트·패키징·PE import를 0으로 만들었다.
@@ -266,14 +278,14 @@ YAML을 덤프한 **문자열**이다(`PrefabUtility.cpp:63`). 되먹일 때는 
 
 | 트랙 | 현재 소스/실행 증거 | 판정 |
 |---|---|---|
-| D0 | 정본 계측 코드와 Release 관문은 존재하지만 `Test1.creator`가 없어 `verify-serialization-baseline`은 진입 전 실패한다. 별도 로컬 관문 `verify-phase17-local-d0-baseline.ps1`은 현존 최대 두 scene의 파일 크기·SHA-256을 고정해 boot/scene/prefab Release 계측 **4/4 selfcheck**를 통과했다 | **코드 완료 유지 · 로컬 대체 기준선 초록 · 정본 수치 비교 불가** |
-| D1 | 제품 계약은 그대로 초록이다. 정본 스크립트는 PowerShell 7.6 scalar `.Count` 오류와 주석 `efsw` 1건 위양성이 남았다. 별도 로컬 관문 `verify-phase17-local-d1-runtime-hygiene.ps1`은 7.6.4에서 배열 정규화와 C++ 주석 제거를 적용해 코드 참조 0, 주석 전용 1, Player 바이너리/DLL 0, Editor 대조군 검출로 통과했다 | **제품 계약 완료 유지 · 로컬 7.6 관문 초록 · 정본 검증기 보수 별도** |
+| D0 | 정본 계측 코드와 Release 관문은 존재하지만 `Test1.creator`가 없어 `verify-serialization-baseline`은 진입 전 실패한다. 별도 로컬 관문 `verify-phase17-local-d0-baseline.ps1`은 현존 최대 두 scene의 파일 크기·SHA-256을 고정해 boot/scene/prefab Release 계측 **4/4 selfcheck**를 통과했다 | **완료(§1.9) — 정본 Test1 복구, 정본 게이트 통과. 09-02 로컬 수치(scene 51.261 ms 등)는 하네스 파이프 오염값이라 폐기** |
+| D1 | 제품 계약은 그대로 초록이다. 정본 스크립트는 PowerShell 7.6 scalar `.Count` 오류와 주석 `efsw` 1건 위양성이 남았다. 별도 로컬 관문 `verify-phase17-local-d1-runtime-hygiene.ps1`은 7.6.4에서 배열 정규화와 C++ 주석 제거를 적용해 코드 참조 0, 주석 전용 1, Player 바이너리/DLL 0, Editor 대조군 검출로 통과했다 | **완료(§1.9) — 정본 검증기가 pwsh 7.6.5에서 보수 없이 통과(위 `.Count`/주석 위양성은 낡은 기록)** |
 | D2 | schema v4 `non-canonical-only` manifest가 canonical 154개를 보존하고 old-v5 61개만 재발급했다. apply는 64파일/참조 76건이며 backup은 `%TEMP%/CE_D2Apply_c88550be8d0845b4aa5fcd5210fc2c29`. 당시 Strict 결과는 meta/parsed 215/215, UUIDv4 215, invalid/non-v4/missing/duplicate/policy violation 0, `d2Ready=true`. MBC4 입력 기준선은 sidecar 226/UUIDv4 226/subasset 54였고, MBC5 closure 보정 뒤에는 비모델 UUIDv4 212/model UUIDv8 14/subasset UUIDv8 310, `identityReady=true`다 | **PHASE 17 역사 완료 · model UUID authority는 PHASE 3.75 MBC4에서 UUIDv8로 전환 완료** |
-| D3 | D3-b-4까지 구현 완료했다. 장기 `Document::Impl`은 지연 생성 `WriteDocument`를 소유하고 `DocumentAccess`는 `ReadNode`/`WriteNode`만 노출한다. `ReadNode`·`NodeView`는 ryml `{Tree,id}` 단일 표현이며 migration probe/escape는 은퇴했다. DataSystem base64도 자체 strict RFC4648 codec으로 교체했다. 은퇴 게이트는 C++ 832파일에서 yaml-cpp include/symbol 0, manifest/runtime packaging 0, Editor PE import 0을 확인했다. Debug Editor build, Base64 Debug/Release, reflection 77/77, node equality 14/14, material 2/2, scene 8개 16/16, prefab 9/9·중첩·roundtrip, BT, asset ownership, LF 259/259이 초록이다 | **D3-b-4 구현 완료 · 정본 D0 동일 workload Release A/B만 보류** |
+| D3 | D3-b-4까지 구현 완료했다. 장기 `Document::Impl`은 지연 생성 `WriteDocument`를 소유하고 `DocumentAccess`는 `ReadNode`/`WriteNode`만 노출한다. `ReadNode`·`NodeView`는 ryml `{Tree,id}` 단일 표현이며 migration probe/escape는 은퇴했다. DataSystem base64도 자체 strict RFC4648 codec으로 교체했다. 은퇴 게이트는 C++ 832파일에서 yaml-cpp include/symbol 0, manifest/runtime packaging 0, Editor PE import 0을 확인했다. Debug Editor build, Base64 Debug/Release, reflection 77/77, node equality 14/14, material 2/2, scene 8개 16/16, prefab 9/9·중첩·roundtrip, BT, asset ownership, LF 259/259이 초록이다 | **완료(§1.9) — D0 동일 workload Release A/B: Test1 SceneLoadTotal 32.239→7.295 ms(−77.4%), FT_Primitives 12.279→3.095 ms(−74.8%)** |
 | D4 | Animator scene YAML을 유일한 상태 그래프 정본으로 확정하고 외부 JSON 저장/불러오기를 제거했다. InputMap 6개는 구버전 reader 없이 schemaVersion 1 `.inputmap` YAML로 직접 이주했으며 6 maps/26 actions/104 keys를 전수 재로드했다. Terrain `.terrain` 본문도 schemaVersion 1 YAML로 바꾸고 2×2 height/layer 왕복을 검증했다. `ISerializable`과 `ConditionParameter.cpp`를 삭제했고 nlohmann source/manifest/installed package는 모두 0이다. Animator graph/링크, InputMap corpus, Terrain transaction/roundtrip, asset ownership, nlohmann/yaml-cpp retirement, Debug Editor build가 초록이다 | **완료 · legacy JSON 호환 경로 없음** |
-| D5 | CEMF v2가 cooked entry와 별도로 GUID→source-path identity 215개를 결정적으로 게시한다. Editor는 기존 source catalog를 유지하고, packaged Player는 `LoadAssetCatalog`를 호출하지 않은 채 CEMF만으로 registry/catalog를 트랜잭션 구축하며 missing/corrupt/identity 0을 fail-closed한다. 현존 scene 8·prefab 9·material 2의 authoring↔cooked 구조 parity가 통과했고, Release Project package는 Player `catalog=cemf identities=215 metaParsed=0`, `cooked scene docs=1`, 120프레임·promotion 2·managed type 25로 통과했다 | **D5-d 현 로컬 corpus 완료 · 정본 Test1 성능 비교만 backlog** |
+| D5 | CEMF v2가 cooked entry와 별도로 GUID→source-path identity 215개를 결정적으로 게시한다. Editor는 기존 source catalog를 유지하고, packaged Player는 `LoadAssetCatalog`를 호출하지 않은 채 CEMF만으로 registry/catalog를 트랜잭션 구축하며 missing/corrupt/identity 0을 fail-closed한다. 현존 scene 8·prefab 9·material 2의 authoring↔cooked 구조 parity가 통과했고, Release Project package는 Player `catalog=cemf identities=215 metaParsed=0`, `cooked scene docs=1`, 120프레임·promotion 2·managed type 25로 통과했다 | **완료(§1.9) — parity scene 16·prefab 10·material 2 전수, Player CEMF 부팅 8.127 ms(−84.8%). Player 씬 로드 수치는 MBC11 결함으로 차단(§1.9)** |
 | D6 | CEDO1이 authoring tree를 versioned/bounded deterministic binary로 기록한다. 패키징은 ProjectSetting 3·InputMap 6·BT/BlackBoard 2·Volume 7 등 runtime document 18개와 scene/prefab/material/ShaderMeta Derived document 25개를 CEDO로 게시한다. Release Player는 `runtime.text-parser calls=0`, runtime module direct ryml reference 0, legacy JSON 0으로 통과했다 | **완료 · 구 YAML artifact/JSON 호환 reader 없음** |
-| D7 | 제품 정합성에 필수가 아닌 선택 최적화. D0~D6 이후 Editor open profile이 예산을 넘을 때만 재개 | **중단 유지** |
+| D7 | 제품 정합성에 필수가 아닌 선택 최적화. D0~D6 이후 Editor open profile이 예산을 넘을 때만 재개 | **종료(§1.9) — 최대 씬 저작 파싱 2.6 ms(로드의 36%), 병목 아님** |
 
 #### 로컬 수용 환경과 고부하 모델 코퍼스 복구 (2026-09-01~02)
 
@@ -327,22 +339,155 @@ Player project reference 6, Player 출력 폴더 1, Player 바이너리/DLL `efs
 Editor 바이너리 양성 대조군도 검출했다. 두 로컬 관문은 현재 머신의 수용 환경을
 복구한 것이며 정본 스크립트의 입력/호환성 결함을 은폐하거나 완료 처리하지 않는다.
 
-**최신 실행 순서:**
+**최신 실행 순서(2026-09-10 갱신):**
 
-1. 로컬 수용 환경, 고부하 모델, 별도 D0/D1 관문과 D2 selective 재이주는 완료했다.
-   정본 `Test1.creator` 복원/코퍼스 재정의, 정본 D1 스크립트 PowerShell 7.6 보수,
-   삭제된 정본 scene 14 입력은 별도 backlog로 유지한다.
-2. D3-b-4까지 구현해 yaml-cpp를 은퇴시켰다. 정본 `Test1.creator`가 복구되면
-   D0과 동일 workload의 Release 수치를 다시 채워 D3 수용 판정을 닫는다.
-3. D4는 완료했다. Animator는 scene YAML만 쓰고, InputMap/Terrain은 구 JSON
-   호환 reader 없이 canonical YAML로 직접 이주했다. `ISerializable`과 nlohmann은
-   source·manifest·설치 패키지에서 모두 제거했다.
-4. D5-d 현 로컬 corpus는 완료했다. scene 8·prefab 9·material 2 구조 parity와 실제
-   Release game package의 CEMF-only catalog/cooked scene 소비가 초록이다. 정본 Test1
-   성능 비교와 누락 scene 6개 확장은 입력 복구 backlog로 남긴다.
-5. D6도 완료했다. 최초 계측 12건(설정 3·InputMap 6·scene 1·memory payload 2)을
-   CEDO로 전환했고 Release package와 독립 관문에서 Player text parser 호출 0을
-   단정했다. D7은 재개 조건이 실측될 때까지 실행 순서에 넣지 않는다.
+1. D0~D6 완료, D7 종료(§1.9). PHASE 17 안에 남은 실행 항목은 없다.
+2. §5 완료 기준 2의 Player 씬 로드 축(SceneLoadTotal ≥35% 감소·text-parser 0)은 PHASE 3.75
+   MBC11 catalog generation 로드 결함(§1.9)이 닫힌 뒤 `verify-player-cooked-scene-baseline.ps1`
+   (run-all 배선)로 다시 잰다 — 게이트는 이미 그 결함을 붉게 낸다.
+3. `Test1.creator`/`Test2.creator`의 고아 GUID 8건은 자산 정리 몫이다. 정리되기 전에는 프로젝트
+   모드 패키징이 fail-closed로 거부하므로 Player 축 Test1 수치는 잴 수 없다(우회하지 않는다).
+
+### 1.9 2026-09-10 폐쇄 판정 — backlog 넷을 실측으로 닫고, 게이트가 하네스를 재고 있던 것을 고쳤다
+
+§1.8이 남긴 backlog는 넷이었다: 정본 `Test1.creator` 복원, 정본 D1 검증기 PowerShell 7.6
+보수, D3의 "D0 동일 workload Release A/B", D5-d의 "정본 Test1 성능 대조·누락 scene 확장".
+§5 완료 기준 2(Player 쿠킹 경로 수치)는 잴 수단 자체가 Player에 없었다. 이날 넷을 모두
+실측으로 닫았고, §5 기준 2는 부팅 축을 닫고 씬 로드 축은 PHASE 17 밖 결함으로 차단됐다.
+그 과정에서 **게이트·패키징·CLI 결함**을 여럿 고쳤다 — 아래 ①~④와 Player 절.
+
+**입력 복구.** `Dynamic_CPP/Assets/Scenes`는 gitignore 대상이라 "삭제된 정본 scene 14"는
+저장소 이력이 아니라 로컬 디스크의 문제였고, 09-02 이후 로컬에 `Test1.creator`(80,661B ·
+엔티티 68 · 컴포넌트 134 — D0 표의 68/134와 같은 workload)를 포함해 **scene 16 · prefab 10 ·
+material 2**가 돌아와 있었다. D1 정본 검증기는 pwsh 7.6.5에서 그대로 통과했다(§1.8이
+적은 `.Count`/주석 위양성은 이미 고쳐진 스크립트에 대한 낡은 기록이었다).
+
+**결함 ① — D5-d parity 게이트가 CLI 개편 뒤 요약을 두 번 세고 있었다.** PHASE 14.5 CLI가
+명령마다 JSON 봉투에 `log` 본문을 되풀이해 넣으면서 `실자산 parity 단정 N/N` 줄이 정확히
+두 번 매치돼(26 기대에 52) `sceneParity=False`로 붉었다. 제품은 멀쩡했고 게이트만 붉은
+형태라 봉투 줄을 판정 입력에서 뺐다. 결과: **scene 16/16 · prefab 10/10 · material 2/2 ·
+override CEDO 1/1 · source mutation 0 · stderr 0** — 원래 완료 기준의 "scene 14 전수"를
+넘는다.
+
+**결함 ② — D0 게이트가 제품이 아니라 하네스의 파이프 대기를 재고 있었다.** 현행 소스로
+Release Editor를 다시 지어 정본 D0 게이트를 돌리자 Test1 SceneLoadTotal이 17.7 ms로
+D0 대비 −45%였는데, FT_Primitives는 −4%(노이즈 안)이고 909B 씬의 SceneParse가 36 ms,
+1.7KB 프리팹의 PrefabParse가 9 ms로 읽혔다 — 크기와 무관한 고정 비용이다. 임시 계측으로
+`ParseFile` 안(open+read+parse)은 909B에 0.25 ms, 80KB에 2.2 ms였고 **호출부에서 잰 값과의
+차이 전부가 `[scene.document]`·`[prefab.document]` printf 한 줄**이었다. 원인은 조합이다:
+CLI 모드 Editor는 stdout을 무버퍼(`_IONBF`)로 두고, 게이트는 `Start-Process
+-RedirectStandardOutput`으로 stdout을 **파이프**로 받는다 — 그 조합에서 printf 한 줄이
+8~18 ms의 대기가 되고, 그 줄이 09-02(D5-c)부터 로드 경로 안에 있었다. 같은 exe를 파일
+핸들로 돌리면 909B 씬 0.5 ms, Test1 2.3 ms, 프리팹 0.7 ms다. 08-30 D0 표는 그 printf가
+생기기 전(09-02 도입)에 잰 값이라 오염되지 않았지만, **09-02 로컬 D0 게이트의 수치(scene
+51.261/13.261 ms)는 이 오염값**이었다(§1.8 표의 D0 행 참조). 정본 D0·로컬 D0·아래 D5-d
+Player 게이트 셋을 배치 파일 경유 파일 리다이렉트로 바꿨다.
+
+**결함 ③ — 콘솔이 있는 부모에서 리다이렉트 출력이 사라지는 CLI 결함.** 파일 리다이렉트로
+바꾸자 출력이 시작 3줄에서 끊겼다. `AttachConsole(ATTACH_PARENT_PROCESS)`가 성공하면
+Windows가 표준 핸들 셋을 콘솔 핸들로 덮어써(FILE_TYPE_DISK→CHAR) 그 뒤의 "리다이렉트
+됐는가" 판정이 거짓이 되고 `freopen(CONOUT$)`가 stdout을 콘솔로 보냈다. `AllocConsole`
+경로(콘솔 없는 부모)는 핸들을 보존해서 같은 명령이 bash·Start-Process에서는 멀쩡했다 —
+터미널에서 `CreatorEditor.exe --commandlet-script x > out.txt`를 치면 결과가 없는
+상태였다. `EnsureConsole`이 판정을 붙이기 전에 하고 덮어써진 핸들을 되돌리게 고쳤다.
+
+**결함 ④ — 패키징이 MBC11 뒤 첫 모델에서 죽어 있었다.** `--model` cook은 게시된 generation을
+내보내는 것인데 package base에 Library가 없어 cooker 기본 root가 비었다(2026-09-03
+7732d380 이후). run-all의 D6 게이트는 그동안 08-25 stage를 재고 있었다(gate-measures-
+stale-binary의 stage판). `build.ps1`이 stage root 아래 짧은 `.<buildId8>.gen`에 프로젝트
+Library의 해당 generation을 복사(Tracked 모드는 authoring)해 `--generation-root`로 넘기게
+했다. 짧은 경로인 이유: `.package-input` 아래에 두면 authoring staging 경로가 MAX_PATH를
+넘어 텍스처 게시가 죽는다(실측). 같은 자리에서 둘 더: `Assert-CookOutput`이 generation
+동반 파일(`model.cemc`·`sidecar.meta`)을 artifact 경로와 같은 축에 세어 모델×2만큼
+어긋났고(289≠261), 런타임 DLL 목록에 MBC9가 은퇴시킨 Assimp 의존 5종이 남아 stage가
+죽었다.
+
+**D3 수용 — D0 동일 workload Release A/B (2026-09-10 · 같은 D0 게이트 · 파일 핸들 기동 ·
+워밍업 1회 후 5회 평균 × 프로세스 3회):**
+
+| 단계 | Test1 08-30 (yaml-cpp) | Test1 09-10 (ryml) | 변화 | FT_Primitives 08-30 | FT_Primitives 09-10 | 변화 |
+|---|---:|---:|---:|---:|---:|---:|
+| **SceneLoadTotal** | 32.239 ms | **7.295 ms** (6.29–7.91) | **−77.4%** | 12.279 ms | **3.095 ms** (2.83–3.28) | **−74.8%** |
+| SceneParse | 19.351 ms | 2.607 ms (2.07–3.27) | −86.5% | 5.651 ms | 0.913 ms (0.82–1.05) | −83.8% |
+| EntityDeserialize | 0.994 ms | 0.426 ms | −57.1% | 0.215 ms | 0.080 ms | −62.8% |
+| ComponentLoad | 5.384 ms | 1.845 ms | −65.7% | 4.097 ms | 1.041 ms | −74.6% |
+| 미귀속 | 6.510 ms | 2.417 ms | −62.9% | 2.316 ms | 1.061 ms | −54.2% |
+
+호출 수는 D0와 같다(Test1 엔티티 68 · 컴포넌트 134, FT_Primitives 11 · 22). 부팅 catalog
+(Editor는 여전히 `.meta`를 파싱한다 — Player가 CEMF를 쓰는 것과 별개): 53.560 ms(240개) →
+**33.176 ms**(239개, 27.7–40.1, ±19%), 223 → 139 µs/개. 프리팹 `NestedProbeParent`:
+Instantiate 2.086 → **0.490 ms/회**(0.41–0.58, −76.5%), 정의 로드(캐시 미스 2건 합)
+1.41–2.82 → 0.83–1.16 ms. D3-b 판정 "D0과 동일 workload의 Release A/B 첨부"는 이 표로
+닫는다. 파싱이 씬 로드의 60%/46%였던 것이 36%/30%가 됐고, 이제 최대 항목은 ComponentLoad
+(25%/34%)와 미귀속(33%/34%)이다 — 다음 이득은 파서가 아니라 컴포넌트 로드 특례에 있다.
+
+**D5-d·§5 기준 2 — Player 쿠킹 경로 실측 (2026-09-10 · 새 게이트
+`verify-player-cooked-scene-baseline.ps1`(run-all 배선) · 복사 프로젝트 Release 패키지
+candidate `c27b6684` · cold load 1회 × 프로세스 3회 · 파일 핸들 기동).** Player에는 이
+계측을 내는 표면이 없어서 `--smoke`가 켜지면 `SerializationProfile`을 켜고 종료 시
+`[runtime.serialization] stage=… totalUs=… calls=…`를 찍게 했다. 측정 패키지는 프로젝트 모드
+cook이 `Test1`(존재하지 않는 자산 GUID 7건)·`Test2`(1건)에서 fail-closed로 거부해 그 둘을 뺀
+복사 프로젝트로 만들었다 — 정당한 거부라 우회하지 않았고, 그래서 시작 씬은 `FT_Primitives`다.
+
+| 항목 | D0 Editor 저작 경로(08-30) | Player 쿠킹 경로(09-10, 3회) | §5 문턱 | 판정 |
+|---|---:|---:|---|---|
+| 부팅 catalog(AssetCatalog) | 53.560 ms / 240 meta | **8.127 ms** / 237 identity (7.89–8.43; 두 번째 3회 8.449, 7.07–10.96) | ≤10.7 ms(−80%) | **통과(−84.8%)** — 변동 ±18%라 문턱은 평균으로 |
+| 씬 문서 획득(SceneParse 스코프) | 5.651 ms (ryml 텍스트) | **1.063 ms** (CEDO, 0.88–1.38) | 텍스트 파싱 0 | 문서는 cooked(`[scene.document] source=cooked`) |
+| EntityDeserialize | 0.215 ms / 11 | 0.116 ms / 11 | — | −46% |
+| ComponentLoad | 4.097 ms / 22 | 405.6 ms / 22 (389.8–426.6) | — | **차단** — 아래 결함 |
+| SceneLoadTotal | 12.279 ms | 411.6 ms (395.4–432.3) | ≤8.0 ms(−35%) | **미판정(차단)** |
+| `[runtime.text-parser]` | — | calls=**8**(`<memory>`×8) | 0 | **붉음** — 아래 결함 |
+
+(D0 계측의 SceneParse 스코프는 `ParseSceneDocument` 전체를 감싸므로 쿠킹 경로에서도 1회
+찍힌다 — §5의 "SceneParse 호출 0"은 텍스트 파싱 0을 뜻하고 그것은 text-parser 계수가 잰다.
+게이트 계약도 그렇게 적었다.)
+
+**§5 기준 2를 막는 결함 — MBC11 catalog generation 로드는 실제 패키지에서 한 번도 돈 적이
+없었다.** Player 런타임 로그에 시작 씬의 MeshRenderer 8/8이 `[model.generation] 게시 전 검증
+실패(catalog): …/generation.asset (identityHeader: map document여야 한다.)`로 거부됐고 실패
+하나당 ~46 ms(원인 미규명)가 ComponentLoad 405 ms의 실체다. 원인은 셋이다. ① 패키저는
+`ProjectSetting/*.asset`을 CEDO로 쿠킹하는데(D6) `LoadModelAssetGeneration`은 identity 헤더
+`AssetIdentity.asset`을 `ReadText`+YAML `ParseText`로 읽는다 — 그 파싱이 text-parser 8회다.
+② 헤더가 읽혀도 로더가 요구하는 generation `sidecar.meta`를 패키저가 `.meta`로 걸러낸다
+(D1/D5 계약 — verify가 `.meta` 유출 0을 단정한다). ③ `sidecar.meta`·`generation.asset` 자체가
+YAML 텍스트라 D6의 "Player 텍스트 파싱 0"과 구조적으로 충돌한다. 올바른 고침은 generation
+레코드 셋을 CEDO(또는 CEMF 항목)로 쿠킹하고 로더를 `ParseFile`(CEDO 감지) 경로로 옮기는
+것 — PHASE 3.75 MBC11 / PHASE 12 소유의 설계 작업이라 PHASE 17에서 하지 않았다. MBC11의
+게이트 6종이 cooker 출력 디렉터리와 Library를 재지 Player 패키지를 재지 않았고, 패키징이
+그때부터(결함 ④) 죽어 있어 아무도 보지 못했다.
+
+이 측정이 드러낸 하네스 결함 둘도 고쳤다. `build.ps1` Verify는 이 8건의 ERROR에도 스모크
+마커(프레임·promotion)만 보고 **통과**했다 — `[model.generation] 게시 전 검증 실패`·
+`MeshRenderer 모델 generation 해석 실패`를 실패 패턴에 넣어 모델을 하나도 못 그리는
+패키지는 게시되지 않는다. 그리고 candidate 안의 `.verify-temp`(105자 candidate + Player
+런타임 경로 55자 + MBC11 generation 항목 111자 = 273자)가 MAX_PATH를 넘겨 추출이 exit 2로
+죽고 로그도 안 남던 것을(TEMP 접두만 105자로 늘려 재현) stage root 아래 `.<buildId8>.vt`로
+옮겼다 — Player.exe에는 longPathAware 매니페스트가 없다.
+
+**§5 기준 2 판정:** 부팅 catalog **통과**(−84.8%, 3회 범위 7.89–8.43 ms). 씬 문서는 CEDO로
+열린다(SceneParse 스코프 1.06 ms). SceneLoadTotal ≥35%와 text-parser 0은 **PHASE 17 밖 결함으로
+차단** — 직렬화 축의 이득은 위 Editor A/B가 보여 주고, Player 수치는 MBC11 결함이 닫힌 뒤
+같은 게이트로 다시 잰다. 게이트는 그 결함을 정확히 붉게 낸다(text-parser 8 ·
+`[model.generation]` 실패 8 · 런타임 로그의 `Scene loaded:` 마커).
+
+**D7 — 종료.** 재개 조건은 "D0~D6 이후 Editor open profile에서 authoring parse가 예산을
+넘을 때"였다. 위 표에서 최대 씬의 저작 파싱은 2.6 ms(로드의 36%)이고 프로젝트 open의 최대
+항목은 부팅 catalog 33 ms다. 파싱은 병목이 아니므로 웜 캐시를 만들지 않는다(YAGNI). 부팅
+catalog는 D5-c가 Player에서 CEMF로 대체했고 Editor 쪽은 저작 identity 정본이라 남긴다.
+
+**닫지 않은 것(이 문서 밖으로).**
+- **MBC11 Player catalog generation 로드 결함(위)** — PHASE 3.75 / PHASE 12(BuildPipelinePlan)
+  소유. 닫히면 `verify-player-cooked-scene-baseline.ps1`로 §5 기준 2 씬 로드 축을 다시 잰다.
+- 로컬 복원본 `Test1.creator`는 존재하지 않는 자산 GUID 7건(텍스처·모델), `Test2.creator`는
+  1건(모델)을 참조한다. Editor는 폴백으로 열지만 package cook은 fail-closed로 거부한다 —
+  **정당한 거부**라 우회하지 않았고, 그래서 Player 축의 Test1 workload는 잴 수 없다.
+- `-InputMode Tracked`(clean checkout) 패키징은 저장소가 텍스처 sidecar를 추적하지 않아
+  (`Assets/Cloud/Cloud.png.meta` 등) cook에서 죽는다. 자산 추적 정책의 문제이지 PHASE 17이
+  아니다(BuildPipelinePlan B2 소유).
+- MBC11 `verify-model-cutover-budget.ps1`도 .NET 파이프로 stdout을 받는다. 그 archive는
+  같은 조건끼리 비교하므로 유효하지만 절대값에는 같은 파이프 대기가 섞여 있을 수 있다 —
+  절대값을 문서로 옮길 때 다시 잰다(PHASE 3.75 소유).
+- generation 검증 실패 하나당 ~46 ms의 출처는 재지 않았다(로그 flush인지 해석 경로인지).
 
 ---
 
@@ -2409,6 +2554,7 @@ D3의 정본 Release A/B와 D5 정본 성능
 ## 5. 완료 기준
 
 1. **Player/Server 실행 중 text parser 호출 0** — ryml은 Editor authoring의 것.
+   - 2026-09-10(§1.9): D6가 닫은 계약은 유지된다. 다만 현행 패키지의 Player는 MBC11 catalog generation 로드가 CEDO로 쿠킹된 `AssetIdentity.asset`을 YAML로 읽어 **8회**(`<memory>`)를 낸다 — PHASE 3.75/12 소유 결함이며 게이트가 붉게 낸다.
 2. **씬 전환 시간 D0 기준선 대비 수치 개선** — ~~목표치는 D0 후 확정.~~
    **08-30 D0 결과로 확정한 목표치**(모두 Release·같은 코퍼스·
    `verify-serialization-baseline.ps1` 판정):
@@ -2420,6 +2566,7 @@ D3의 정본 Release A/B와 D5 정본 성능
    - 부팅 catalog **≥80% 감소**(평균 53.560 ms → 10.7 ms 이하). manifest 1건 읽기가
      `.meta` 240개 파싱을 대체하는 것이 D5-c의 정의이므로 이 항목만 감축 폭이 크다.
      단 이 항목의 변동폭이 ±18%로 가장 크므로 **3회 이상 재고 범위를 함께 적어야** 한다.
+   - **2026-09-10 판정(§1.9):** Player 부팅 catalog **8.127 ms**(−84.8%, 3회 7.89–8.43) **통과**. 씬 문서는 CEDO로 열린다(`[scene.document] source=cooked`, SceneParse 스코프 1.06 ms — 텍스트 파싱이 아니라 문서 획득). `SceneLoadTotal` ≥35%와 text-parser 0은 위 MBC11 결함으로 **차단**(모델 8/8 거부, ComponentLoad 405 ms) — 직렬화 축의 이득은 Editor A/B(Test1 −77.4%, FT_Primitives −74.8%)가 보이고, 결함이 닫히면 `verify-player-cooked-scene-baseline.ps1`로 다시 잰다.
 3. **리네임/이동/동명 파일에서 참조 불변** — GUID 충돌 경고 0.
 4. **pak에 소스 파일·`.meta` 미포함**, 매니페스트로 해석.
 5. **저장 경로 수 감소**: 애니메이터 1경로 · 머테리얼 1경로(MaterialPipelinePlan

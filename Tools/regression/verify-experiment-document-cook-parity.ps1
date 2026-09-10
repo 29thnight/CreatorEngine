@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
     [int]$TimeoutSeconds = 300,
@@ -77,6 +77,13 @@ if (-not $process.HasExited) {
 $text = if (Test-Path -LiteralPath $stdout) {
     Get-Content -LiteralPath $stdout -Raw
 } else { '' }
+# ★ CLI 개편(PHASE 14.5) 뒤 명령마다 JSON 봉투가 `log` 필드에 본문을 되풀이한다.
+#   봉투를 걷어내지 않으면 같은 요약 줄이 정확히 두 번 세어져 parity 개수가 2배로
+#   어긋난다(실측: 26 기대에 52, material 2 기대에 4, override CEDO 2/1). 제품은
+#   멀쩡한데 게이트만 빨간 형태이므로 봉투 줄은 판정 입력에서 뺀다.
+$text = (($text -split "`n") | Where-Object {
+    -not $_.TrimStart().StartsWith('{"schemaVersion"')
+}) -join "`n"
 $errorLines = if (Test-Path -LiteralPath $stderr) {
     @(Get-Content -LiteralPath $stderr)
 } else { @() }
