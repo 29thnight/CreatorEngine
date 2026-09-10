@@ -1,5 +1,7 @@
 #include "../EngineEntry/EditorProjectOperations.h"
 #include "InspectorWindow.h"
+#include "EditorWindowNames.h"
+#include "Windows/EditorStandardWindows.h"
 #include "EditorObjectOperations.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
@@ -113,9 +115,9 @@ InspectorWindow::InspectorWindow()
 {
 	RegisterAllTypedDraws();
 
-	ImGui::ContextRegister(ICON_FA_CIRCLE_INFO "  Inspector", [&]()
+	// PHASE 21 M4 2단계: 프레임은 셸이 연다(stacking = display_back).
+	editor::windows::bind_window_body(EditorWindowName::kInspector, [&]()
 	{
-		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
 		static Entity* prevSelectedSceneObject = nullptr;
 		static bool wasMetaSelectedLastFrame = false;
@@ -517,7 +519,7 @@ InspectorWindow::InspectorWindow()
 		prevSelectedSceneObject = selectedSceneObject;
 		wasMetaSelectedLastFrame = isSelectedNode;
 
-	}, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoFocusOnAppearing);
+	});
 }
 
 void InspectorWindow::DrawManagedScripts(ScriptComponent* script)

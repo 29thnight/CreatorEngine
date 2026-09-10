@@ -56,6 +56,7 @@ namespace editor
 
         void (*draw)(){ nullptr };
         bool (*available)(){ nullptr };   // nullptr == 항상 존재
+        bool (*closable_when)(){ nullptr };   // nullptr == 위의 closable 고정값
 
         // ★ 표시 상태의 유일한 자리. 셸이 `Begin`에 넘기는 p_open이 이것을 가리킨다.
         bool             open{ true };
@@ -71,6 +72,15 @@ namespace editor
     /// 없는 것으로 답한다.**
     window_entry*       find_window(std::string_view stable_id);
     const window_entry* find_window_of(std::string_view stable_id);
+
+    /// 이름으로 표시 상태를 여닫는다. **없는 이름은 아무 일도 하지 않는다.**
+    /// 옛 `ImGui::GetContext(name)`는 `operator[]`라 오타가 유령 창을 영구
+    /// 삽입했고, 실제로 하나 살아 있다 — `MenuBarWindow.cpp:336`의 "EffectEdit"은
+    /// 등록된 적이 없는데 메뉴가 그것을 읽어 매 프레임 순회에 얹는다.
+    void open_window(std::string_view stable_id);
+    void close_window(std::string_view stable_id);
+    bool is_window_open(std::string_view stable_id);
+    bool window_declared(std::string_view stable_id);
 
     // ── 선언 → 표 ─────────────────────────────────────────────────────────
 
@@ -101,6 +111,7 @@ namespace editor
             // CT6-a가 걷어낸 타입소거가 되살아나지 않는다.
             entry.draw      = +[]() { Draw(); };
             entry.available = item.available_fn;
+            entry.closable_when = item.closable_fn;
             entry.open      = item.open_by_default_value;
 
             window_entries().push_back(entry);

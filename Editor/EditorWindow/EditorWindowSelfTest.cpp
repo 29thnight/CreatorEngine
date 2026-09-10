@@ -31,6 +31,9 @@ namespace editor
         bool g_inspector_available = true;
         bool selftest_inspector_available() { return g_inspector_available; }
 
+        bool g_loading_closable = false;
+        bool selftest_loading_closable() { return g_loading_closable; }
+
         // 선언 표기 그대로다. 실제 선언자와 다른 점은 EDITOR_WINDOW_LIST를
         // 거치지 않는다는 것뿐이고, 그것이 이 파일이 유일하게 허용된 예외다.
         struct selftest_windows
@@ -51,7 +54,8 @@ namespace editor
                            .order(3),
 
                     editor::transient<&selftest_draw_loading>("selftest.loading", "SelfTest Loading")
-                           .open_by_default(false));
+                           .open_by_default(false)
+                           .closable_when(&selftest_loading_closable));
             }
         };
 
@@ -81,6 +85,7 @@ namespace editor
         g_inspector_draws = 0;
         g_loading_draws = 0;
         g_inspector_available = true;
+        g_loading_closable = false;
 
         register_declarer_windows<selftest_windows>("selftest_windows");
 
@@ -221,7 +226,49 @@ namespace editor
             fail(report, "없는 식별자가 항목을 만들어 낸다 — 유령 삽입이 되살아났다");
         }
 
-        // ⑦ 집계가 역할과 중복을 세는가.
+        // ⑦ 닫기 술어가 실려 왔고 값을 보고 갈리는가.
+        if (nullptr == loading.closable_when)
+        {
+            fail(report, "closable_when 술어가 실리지 않았다");
+        }
+        else
+        {
+            g_loading_closable = true;
+            const bool opened_state = loading.closable_when();
+            g_loading_closable = false;
+            if (!opened_state || loading.closable_when())
+            {
+                fail(report, "closable_when 술어가 상태로 갈리지 않는다");
+            }
+        }
+        if (nullptr != scene.closable_when)
+        {
+            fail(report, "지정하지 않은 closable_when이 비어 있지 않다");
+        }
+
+        // ⑧ 이름으로 여닫는 창구가 도는가. 없는 이름은 아무 일도 하지 않는가.
+        close_window("selftest.inspector");
+        if (is_window_open("selftest.inspector"))
+        {
+            fail(report, "close_window가 표시 상태를 닫지 못했다");
+        }
+        open_window("selftest.inspector");
+        if (!is_window_open("selftest.inspector"))
+        {
+            fail(report, "open_window가 표시 상태를 열지 못했다");
+        }
+
+        // 등록된 적 없는 이름이다. 옛 GetContext는 여기서 유령을 만들어 넣었다.
+        const std::size_t before_phantom = window_entries_of().size();
+        open_window("selftest.effect_edit");
+        if (is_window_open("selftest.effect_edit") ||
+            window_declared("selftest.effect_edit") ||
+            window_entries_of().size() != before_phantom)
+        {
+            fail(report, "없는 이름을 열자 유령 항목이 생겼다");
+        }
+
+        // ⑨ 집계가 역할과 중복을 세는가.
         const window_registry_stats stats = collect_window_registry_stats();
         if (stats.total != 3 || stats.central != 1 || stats.panel != 1 || stats.transient != 1)
         {

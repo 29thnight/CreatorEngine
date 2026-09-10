@@ -55,7 +55,7 @@ namespace editor
 
     // ── 창 성질 (비트) ────────────────────────────────────────────────────
     //
-    // 전수 실측으로 나온 열둘이다. 셸이 ImGuiWindowFlags로 번역한다.
+    // 전수 실측으로 나온 열셋이다. 셸이 ImGuiWindowFlags로 번역한다.
     enum class window_trait : std::uint32_t
     {
         none                       = 0u,
@@ -71,6 +71,7 @@ namespace editor
         no_docking                 = 1u << 9,   // NoDocking
         menu_bar                   = 1u << 10,  // MenuBar
         no_title_bar               = 1u << 11,  // NoTitleBar
+        no_focus_on_appearing      = 1u << 12,  // NoFocusOnAppearing
     };
 
     constexpr window_trait operator|(window_trait left, window_trait right) noexcept
@@ -91,8 +92,8 @@ namespace editor
     enum class window_stacking
     {
         normal,
-        display_back,   // BringWindowToDisplayBack — Scene · Game
-        focus_front,    // BringWindowToFocusFront + BringWindowToDisplayFront
+        display_back,   // BringWindowToDisplayBack — Scene · Game · Hierarchy · Inspector
+        focus_front,    // BringWindowToFocusFront + BringWindowToDisplayFront — Frame Profiler
 
         count,
     };

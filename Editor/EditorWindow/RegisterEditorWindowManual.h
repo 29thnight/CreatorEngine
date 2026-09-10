@@ -15,21 +15,21 @@
 #include "EditorWindowRegistry.h"
 
 // 선언자 헤더는 여기에 include한다.
-// 예: #include "Windows/ViewportWindows.h"
+#include "Windows/EditorStandardWindows.h"
 
-// 목록 항목은 여기에 더한다. 예:
-//     X(viewport_windows) \
-//     X(inspector_windows) \
+// 목록 항목은 여기에 더한다.
 //
-// M4 1단계는 배선만 세운다 — 표가 비어 있으므로 셸은 아무것도 그리지 않고,
-// 기존 25개 창은 그대로 제 자리에서 돈다. 이관은 2단계(ContextRegister 10개)와
-// 3단계(직접 Begin 15개)가 맡는다.
+// 2단계까지 옛 `ContextRegister` 열 곳이 왔다. 남은 열다섯(직접 `ImGui::Begin`)은
+// 3단계가 옮긴다.
 #define EDITOR_WINDOW_LIST(X) \
-    /* 아직 없음 — M4 2단계가 채운다 */
+    X(editor_panel_windows) \
+    X(editor_tool_windows)
 
 namespace editor
 {
-    /// 부팅 때 한 번 부른다(2단계가 EditorMain 초기화에 잇는다).
+    /// 부팅 때 한 번 부른다. **창 객체들보다 먼저**여야 한다 — 생성자가 자기
+    /// 본문을 걸면서 `open_window`/`close_window`로 초기 표시 상태를 정하는데,
+    /// 그때 표에 항목이 있어야 그 호출이 닿는다.
     inline void register_editor_windows()
     {
 #define EDITOR_WINDOW_REGISTER_ONE(T) ::editor::register_declarer_windows<T>(#T);

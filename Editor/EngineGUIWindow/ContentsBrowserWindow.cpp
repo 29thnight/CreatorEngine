@@ -1,4 +1,7 @@
 #include "ContentsBrowserWindow.h"
+#include "EditorWindowNames.h"
+#include "EditorWindowRegistry.h"
+#include "Windows/EditorStandardWindows.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Entity.h"
@@ -105,10 +108,11 @@ namespace
 
 ContentsBrowserWindow::ContentsBrowserWindow()
 {
-	ImGui::ContextRegister(kBrowserTitle, true, [&]()
+	// PHASE 21 M4 2단계: 프레임은 셸이 연다. 본문 첫 줄에서 매 프레임
+	// SetPopup 으로 하던 판단은 선언의 closable_when 술어로 갔다 —
+	// 아래 content_browser_is_drawer 가 같은 값을 답한다.
+	editor::windows::bind_window_body(EditorWindowName::kContentBrowser, [&]()
 	{
-		ImGui::GetContext(kBrowserTitle).SetPopup(Style() == ContentsBrowserStyle::Tile);
-
 		static file::path DataDirectory = PathFinder::Relative();
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
 		ImGui::BeginDisabled();
@@ -163,17 +167,29 @@ ContentsBrowserWindow::ContentsBrowserWindow()
 		ImGui::PopStyleColor();
 		ImGui::EndChild();
 
-	}, ImGuiWindowFlags_None);
+	});
 
 	// 타일 스타일은 하단 서랍이라 접힌 채로, 트리 스타일은 도킹된 창이라
 	// 펼친 채로 시작한다. DataSystem::RenderForEditer 끝에 있던 판단이다.
 	if (Style() == ContentsBrowserStyle::Tile)
 	{
-		ImGui::GetContext(kBrowserTitle).Close();
+		editor::close_window(EditorWindowName::kContentBrowser);
 	}
 	else
 	{
-		ImGui::GetContext(kBrowserTitle).Open();
+		editor::open_window(EditorWindowName::kContentBrowser);
+	}
+}
+
+namespace editor::windows
+{
+	// 타일 스타일은 하단 서랍이라 닫을 수 있고, 트리 스타일은 도킹된
+	// 패널이라 닫히지 않는다. 판단이 이 파일에 남는 이유는 스타일이
+	// 이 창의 것이기 때문이다 — 선언 계층은 술어만 들고 간다.
+	bool content_browser_is_drawer()
+	{
+		return ContentsBrowserStyle::Tile ==
+			EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle();
 	}
 }
 

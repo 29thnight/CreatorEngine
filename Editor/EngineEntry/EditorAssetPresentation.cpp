@@ -1,4 +1,6 @@
 #include "EditorAssetPresentation.h"
+#include "EditorWindowRegistry.h"
+#include "Windows/EditorStandardWindows.h"
 
 #include "EditorAssetDatabase.h"
 #include "EditorImGuiTexture.h"
@@ -54,17 +56,17 @@ void EditorAssetPresentation::Initialize()
 	if (m_initialized) return;
 	LoadPresentationResources();
 
-	ImGui::ContextRegister(kTextureImportSelector, true, [this]()
+	// PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실도
+	// 선언이 든다(open_by_default(false)) — 여기서 다시 닫지 않는다.
+	editor::windows::bind_window_body(kTextureImportSelector, [this]()
 	{
 		RenderTextureImportSelector();
-	}, ImGuiWindowFlags_AlwaysAutoResize);
-	ImGui::GetContext(kTextureImportSelector).Close();
+	});
 
-	ImGui::ContextRegister(kMaterialPicker, true, [this]()
+	editor::windows::bind_window_body(kMaterialPicker, [this]()
 	{
 		RenderMaterialPicker();
-	}, ImGuiWindowFlags_NoScrollbar);
-	ImGui::GetContext(kMaterialPicker).Close();
+	});
 	m_initialized = true;
 }
 
@@ -72,8 +74,8 @@ void EditorAssetPresentation::Shutdown() noexcept
 {
 	if (!m_initialized) return;
 
-	ImGui::ContextUnregister(kMaterialPicker);
-	ImGui::ContextUnregister(kTextureImportSelector);
+	editor::windows::unbind_window_body(kMaterialPicker);
+	editor::windows::unbind_window_body(kTextureImportSelector);
 	m_pendingTexturePaths.clear();
 	file::path discarded;
 	while (m_textureImportQueue.try_pop(discarded)) {}
@@ -93,15 +95,15 @@ void EditorAssetPresentation::OpenPendingTextureImportSelector()
 	if (!m_initialized ||
 		(m_textureImportQueue.empty() && m_pendingTexturePaths.empty())) return;
 
-	auto& context = ImGui::GetContext(kTextureImportSelector);
-	if (!context.IsOpened()) context.Open();
+	if (!editor::is_window_open(kTextureImportSelector))
+		editor::open_window(kTextureImportSelector);
 }
 
 void EditorAssetPresentation::OpenMaterialPicker()
 {
 	if (!m_initialized) return;
 	m_previewedMaterial.reset();
-	ImGui::GetContext(kMaterialPicker).Open();
+	editor::open_window(kMaterialPicker);
 }
 
 std::shared_ptr<Material> EditorAssetPresentation::TakeSelectedMaterial() noexcept
@@ -162,7 +164,7 @@ void EditorAssetPresentation::RenderTextureImportSelector()
 			EditorAssetDatabase::Get().ImportSourceAsset(source, kind);
 
 		m_pendingTexturePaths.clear();
-		ImGui::GetContext(kTextureImportSelector).Close();
+		editor::close_window(kTextureImportSelector);
 	}
 }
 
@@ -206,7 +208,7 @@ void EditorAssetPresentation::RenderMaterialPicker()
 			{
 				m_previewedMaterial = material;
 				m_selectedMaterial = material;
-				ImGui::GetContext(kMaterialPicker).Close();
+				editor::close_window(kMaterialPicker);
 			}
 			++count;
 		}

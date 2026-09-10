@@ -1,6 +1,8 @@
 #include "EditorModelPlacement.h"
 #include "EditorObjectOperations.h"
 #include "HierarchyWindow.h"
+#include "EditorWindowNames.h"
+#include "Windows/EditorStandardWindows.h"
 #include "ReflectionUndo.h"
 #include "SpriteRenderer.h"
 #include "RenderScene.h"
@@ -26,9 +28,10 @@
 
 HierarchyWindow::HierarchyWindow()
 {
-	ImGui::ContextRegister(ICON_FA_BARS_STAGGERED "  Hierarchy", [&]()
+	// PHASE 21 M4 2단계: 프레임은 셸이 연다. 본문은 그대로 두고 건다.
+	// 맨 앞의 BringWindowToDisplayBack 은 선언의 stacking 으로 갔다.
+	editor::windows::bind_window_body(EditorWindowName::kHierarchy, [&]()
 		{
-			ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 
 			Scene* scene = nullptr;
 			RenderScene* renderScene = nullptr;
@@ -419,7 +422,7 @@ HierarchyWindow::HierarchyWindow()
 
 			isSceneObjectSelected = nullptr != selectedSceneObject ? true : false;
 
-		}, ImGuiWindowFlags_NoMove);
+		});
 }
 
 void HierarchyWindow::DrawSceneObject(Entity* obj)

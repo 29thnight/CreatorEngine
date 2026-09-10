@@ -34,6 +34,8 @@
 #include "EditorRenderer.h"
 #include "EditorWindowChrome.h"
 #include "EditorWindowNames.h"
+#include "EditorWindowRegistry.h"
+#include "Windows/EditorStandardWindows.h"
 #include "Core.Definition.h"
 #include <regex>
 
@@ -97,14 +99,15 @@ MenuBarWindow::MenuBarWindow()
     io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
     io.Fonts->Build();
 
-    ImGui::ContextRegister("LightMap", true, [&]() {
+    // PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실은
+    // 선언이 든다(open_by_default(false)) — 여기서 다시 닫지 않는다.
+    editor::windows::bind_window_body(EditorWindowName::kLightMap, [&]() {
         ImGui::TextUnformatted("Legacy DX11 LightMap editor is unavailable in Enhanced-only mode.");
         ImGui::TextUnformatted("A DX12 bake path must be wired before this tool is re-enabled.");
     });
 
-    ImGui::GetContext("LightMap").Close();
 
-    ImGui::ContextRegister("CollisionMatrixPopup", true, [&]() 
+    editor::windows::bind_window_body(EditorWindowName::kCollisionMatrix, [&]() 
     {
         const auto& layers = TagManager::GetInstance()->GetLayers();
         const int layerCount = static_cast<int>(layers.size());
@@ -202,7 +205,7 @@ MenuBarWindow::MenuBarWindow()
             PhysicsManagers->SetCollisionMatrix(collisionMatrix);
 			PhysicsManagers->SaveCollisionMatrix();
             m_bCollisionMatrixWindow = false;
-            ImGui::GetContext("CollisionMatrixPopup").Close();
+            editor::close_window(EditorWindowName::kCollisionMatrix);
         }
 		ImGui::SameLine();
         if (ImGui::Button("Load"))
@@ -210,12 +213,11 @@ MenuBarWindow::MenuBarWindow()
 			PhysicsManagers->LoadCollisionMatrix();
 			collisionMatrix = PhysicsManagers->GetCollisionMatrix();
             m_bCollisionMatrixWindow = false;
-            ImGui::GetContext("CollisionMatrixPopup").Close();
+            editor::close_window(EditorWindowName::kCollisionMatrix);
 		}
         
-    }, ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+    });
    
-	ImGui::GetContext("CollisionMatrixPopup").Close();
 }
 
 void MenuBarWindow::RenderMenuBar()
@@ -325,22 +327,26 @@ void MenuBarWindow::RenderMenuBar()
             {
                 if (ImGui::MenuItem("LightMap Window"))
                 {
-                    if (!ImGui::GetContext("LightMap").IsOpened())
+                    if (!editor::is_window_open(EditorWindowName::kLightMap))
                     {
-                        ImGui::GetContext("LightMap").Open();
+                        editor::open_window(EditorWindowName::kLightMap);
                     }
                 }
 
                 if (ImGui::MenuItem("Effect Editor"))
                 {
-                    auto& ctx = ImGui::GetContext("EffectEdit");
-                    if (ctx.IsOpened())
+                    // "EffectEdit" 은 이 저장소 어디에서도 등록된 적이 없다.
+                    // 옛 GetContext 는 operator[] 라 이 줄이 빈 창 하나를
+                    // 순회에 영구히 만들어 넣었다. 이제 없는 이름은 없는
+                    // 것으로 답하므로 이 메뉴 항목은 아무 일도 하지 않는다 —
+                    // 이펙트 편집기를 실제로 붙이는 것은 별건이다.
+                    if (editor::is_window_open("EffectEdit"))
                     {
-                        ctx.Close();
+                        editor::close_window("EffectEdit");
                     }
                     else
                     {
-                        ctx.Open();
+                        editor::open_window("EffectEdit");
                     }
                 }
 
@@ -365,9 +371,9 @@ void MenuBarWindow::RenderMenuBar()
             {
                 if (ImGui::MenuItem("Pipeline Setting"))
                 {
-                    if (!ImGui::GetContext("RenderPass").IsOpened())
+                    if (!editor::is_window_open(EditorWindowName::kRenderPass))
                     {
-                        ImGui::GetContext("RenderPass").Open();
+                        editor::open_window(EditorWindowName::kRenderPass);
                     }
                 }
 
@@ -388,9 +394,9 @@ void MenuBarWindow::RenderMenuBar()
 
                 if (ImGui::MenuItem("Resource Counter"))
                 {
-                    if (!ImGui::GetContext("Resource Counter").IsOpened())
+                    if (!editor::is_window_open(EditorWindowName::kResourceCounter))
                     {
-                        ImGui::GetContext("Resource Counter").Open();
+                        editor::open_window(EditorWindowName::kResourceCounter);
                     }
                 }
 
@@ -433,11 +439,10 @@ void MenuBarWindow::RenderMenuBar()
                 };
                 for (const char* const panel : panels)
                 {
-                    auto& context = ImGui::GetContext(panel);
-                    const bool opened = context.IsOpened();
+                    const bool opened = editor::is_window_open(panel);
                     if (!ImGui::MenuItem(panel, nullptr, opened)) continue;
-                    if (opened) context.Close();
-                    else        context.Open();
+                    if (opened) editor::close_window(panel);
+                    else        editor::open_window(panel);
                 }
 
                 ImGui::Separator();
@@ -475,14 +480,13 @@ void MenuBarWindow::RenderMenuBar()
             {
                 if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
                 {
-                    auto& contentDrawerContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
-                    if (!contentDrawerContext.IsOpened())
+                    if (!editor::is_window_open(EditorWindowName::kContentBrowser))
                     {
-                        contentDrawerContext.Open();
+                        editor::open_window(EditorWindowName::kContentBrowser);
                     }
                     else
                     {
-                        contentDrawerContext.Close();
+                        editor::close_window(EditorWindowName::kContentBrowser);
                     }
                 }
                 ImGui::SameLine();
@@ -654,7 +658,7 @@ void MenuBarWindow::RenderMenuBar()
 
     if (m_bCollisionMatrixWindow) 
     {
-        ImGui::GetContext("CollisionMatrixPopup").Open();
+        editor::open_window(EditorWindowName::kCollisionMatrix);
 		m_bCollisionMatrixWindow = false;
     }
 
@@ -812,9 +816,10 @@ void MenuBarWindow::RenderToolBar()
             contentsStyle = !contentsStyle;
             const auto newStyle = static_cast<ContentsBrowserStyle>(contentsStyle);
             preferences.SetContentsBrowserStyle(newStyle);
-            auto& browserContext = ImGui::GetContext(EditorWindowName::kContentBrowser);
-            if (ContentsBrowserStyle::Tree == newStyle) browserContext.Open();
-            else                                       browserContext.Close();
+            if (ContentsBrowserStyle::Tree == newStyle)
+                editor::open_window(EditorWindowName::kContentBrowser);
+            else
+                editor::close_window(EditorWindowName::kContentBrowser);
             EditorSettingsStore::Get().Save();
         }
 
@@ -1015,7 +1020,7 @@ void MenuBarWindow::ShowLogWindow()
 
 void MenuBarWindow::ShowLightMapWindow()
 {
-    ImGui::GetContext("LightMap").Open();
+    editor::open_window(EditorWindowName::kLightMap);
 }
 
 
@@ -2778,9 +2783,9 @@ void MenuBarWindow::ShowRenderDebugWindow()
         ImGui::Spacing();
         if (ImGui::Button("Open Pipeline Setting"))
         {
-            if (!ImGui::GetContext("RenderPass").IsOpened())
+            if (!editor::is_window_open(EditorWindowName::kRenderPass))
             {
-                ImGui::GetContext("RenderPass").Open();
+                editor::open_window(EditorWindowName::kRenderPass);
             }
             m_bShowRenderDebugWindow = false;
         }

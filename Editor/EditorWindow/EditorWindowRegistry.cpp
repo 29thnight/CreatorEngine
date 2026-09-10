@@ -57,6 +57,33 @@ namespace editor
         return nullptr;
     }
 
+    void open_window(std::string_view stable_id)
+    {
+        if (window_entry* entry = find_window(stable_id))
+        {
+            entry->open = true;
+        }
+    }
+
+    void close_window(std::string_view stable_id)
+    {
+        if (window_entry* entry = find_window(stable_id))
+        {
+            entry->open = false;
+        }
+    }
+
+    bool is_window_open(std::string_view stable_id)
+    {
+        const window_entry* entry = find_window_of(stable_id);
+        return nullptr != entry && entry->open;
+    }
+
+    bool window_declared(std::string_view stable_id)
+    {
+        return nullptr != find_window_of(stable_id);
+    }
+
     window_registry_stats collect_window_registry_stats()
     {
         window_registry_stats stats{};

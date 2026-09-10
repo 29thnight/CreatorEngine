@@ -23,6 +23,7 @@
 #include "EditorPlatform.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
+#include "RegisterEditorWindowManual.h"
 #include "EditorModelPlacement.h"
 #include "EditorSceneOverlayContributor.h"
 #include "EditorWindowChrome.h"
@@ -173,6 +174,11 @@ void Editor::EditorMain::Initialize()
 		EditorSessionState::Get().EditorCamera());
 	m_sceneViewWindow = std::make_unique<SceneViewWindow>(
 		EditorSessionState::Get().CameraRig(), m_gizmoRenderer.get());
+	// PHASE 21 M4 2단계: 창 객체보다 먼저 표를 세운다. 생성자가 자기 본문을
+	// 걸면서 open_window/close_window 로 초기 표시 상태를 정하는데,
+	// 그때 표에 항목이 있어야 그 호출이 닿는다.
+	::editor::register_editor_windows();
+
 	m_menuBarWindow = std::make_unique<MenuBarWindow>();
 	m_gameViewWindow = std::make_unique<GameViewWindow>();
 	m_hierarchyWindow = std::make_unique<HierarchyWindow>();

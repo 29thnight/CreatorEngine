@@ -61,6 +61,11 @@ namespace editor
         // 이것을 요구한다 — 선택이 풀리면 창 자체가 없어야 한다.
         bool (*available_fn)(){ nullptr };
 
+        // 닫기 단추가 뜰 조건. nullptr면 위의 고정값을 쓴다. 자산 브라우저가
+        // 이것을 요구한다 — 타일 스타일에서는 하단 서랍이라 닫히고, 트리
+        // 스타일에서는 도킹된 패널이라 닫히지 않는다(ContentsBrowserWindow.cpp:110).
+        bool (*closable_fn)(){ nullptr };
+
         consteval window_item label_text(std::string_view v) const
         {
             window_item copy = *this; copy.label = v; return copy;
@@ -123,6 +128,13 @@ namespace editor
         consteval window_item available(bool (*predicate)()) const
         {
             window_item copy = *this; copy.available_fn = predicate; return copy;
+        }
+        consteval window_item closable_when(bool (*predicate)()) const
+        {
+            window_item copy = *this;
+            copy.closable_value = true;   // 술어가 답하므로 고정값은 상한만 뜻한다
+            copy.closable_fn = predicate;
+            return copy;
         }
     };
 

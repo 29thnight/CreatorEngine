@@ -1,4 +1,6 @@
 #include "EnhancedRenderDebugWindow.h"
+#include "EditorWindowNames.h"
+#include "Windows/EditorStandardWindows.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -40,7 +42,8 @@ using namespace EnhancedRenderDebugUi;
 
 EnhancedRenderDebugWindow::EnhancedRenderDebugWindow()
 {
-	ImGui::ContextRegister("RenderPass", true, [&]()
+	// PHASE 21 M4 2단계: 프레임은 셸이 연다.
+	editor::windows::bind_window_body(EditorWindowName::kRenderPass, [&]()
 	{
 		static EnhancedLiveDebugSnapshot displayed{};
 		static double lastRefreshTime = -1.0;
@@ -248,9 +251,8 @@ EnhancedRenderDebugWindow::EnhancedRenderDebugWindow()
 			ImGui::TextColored(kErrorColor, ICON_FA_CIRCLE_EXCLAMATION " Last error");
 			ImGui::TextWrapped("%s", displayed.lastError.c_str());
 		}
-	}, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+	});
 
-	ImGui::GetContext("RenderPass").Close();
 }
 
 void EnhancedRenderDebugWindow::DrawPassSettings()

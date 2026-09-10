@@ -78,6 +78,7 @@
     <ClInclude Include="EditorWindow\EditorWindowHost.h" />
     <ClInclude Include="EditorWindow\EditorWindowSelfTest.h" />
     <ClInclude Include="EditorWindow\RegisterEditorWindowManual.h" />
+    <ClInclude Include="EditorWindow\Windows\EditorStandardWindows.h" />
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
     <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
@@ -191,6 +192,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorWindowSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\Windows\EditorStandardWindows.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />

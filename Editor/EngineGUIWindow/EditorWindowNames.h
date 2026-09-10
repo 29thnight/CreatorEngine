@@ -28,4 +28,12 @@ namespace EditorWindowName
     inline constexpr const char* kRenderPass = "RenderPass";
     inline constexpr const char* kBehaviorTree = "Behavior Tree Editor";
     inline constexpr const char* kBlackBoard = "BlackBoard Editor";
+
+    // 아래 넷은 도크되지 않는 도구 창이다. M4 2단계가 선언으로 옮기면서
+    // 흩어져 있던 리터럴을 여기로 모았다 — 이름이 곧 안정 식별자라
+    // 한 글자만 달라져도 배치와 여닫기가 조용히 다른 창을 가리킨다.
+    inline constexpr const char* kLightMap = "LightMap";
+    inline constexpr const char* kCollisionMatrix = "CollisionMatrixPopup";
+    inline constexpr const char* kTextureImportSelector = "TextureType Selector";
+    inline constexpr const char* kMaterialPicker = "SelectMaterial";
 }

@@ -1,4 +1,6 @@
 #include "ResourceCounterWindow.h"
+#include "EditorWindowNames.h"
+#include "Windows/EditorStandardWindows.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
 #include "DataSystem.h"
@@ -20,7 +22,8 @@ namespace
 
 ResourceCounterWindow::ResourceCounterWindow()
 {
-	ImGui::ContextRegister("Resource Counter", true, [&]()
+	// PHASE 21 M4 2단계: 프레임은 셸이 연다.
+	editor::windows::bind_window_body(EditorWindowName::kResourceCounter, [&]()
 	{
 		static Snapshot displayed{};
 		static double lastRefreshTime = -1.0;
@@ -196,9 +199,8 @@ ResourceCounterWindow::ResourceCounterWindow()
 					"씬을 오간 뒤 힙 크기가 기준선으로 돌아와야 한다. 계속 자라면 관리 측 참조가 남은 것이다.");
 			}
 		}
-	}, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+	});
 
-	ImGui::GetContext("Resource Counter").Close();
 }
 
 void ResourceCounterWindow::DrawCountRow(const char* label, size_t current, size_t baseline) const

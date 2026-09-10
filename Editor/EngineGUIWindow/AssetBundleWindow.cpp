@@ -1,4 +1,6 @@
 #include "AssetBundleWindow.h"
+#include "EditorWindowNames.h"
+#include "Windows/EditorStandardWindows.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
 #include "Scene.h"
@@ -48,7 +50,8 @@ inline std::filesystem::path PathFromUTF8(const char* utf8)
 
 AssetBundleWindow::AssetBundleWindow()
 {
-    ImGui::ContextRegister(ICON_FA_DIAGRAM_PROJECT "  AssetBundle", [&]()
+    // PHASE 21 M4 2 stage: the shell owns the frame now.
+    editor::windows::bind_window_body(EditorWindowName::kAssetBundle, [&]()
     {
         auto* activeScene = SceneManagers->GetActiveScene();
         if (!activeScene)

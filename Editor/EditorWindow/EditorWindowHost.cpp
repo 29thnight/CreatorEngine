@@ -49,6 +49,8 @@ namespace editor
                 flags |= ImGuiWindowFlags_MenuBar;
             if (has_trait(traits, window_trait::no_title_bar))
                 flags |= ImGuiWindowFlags_NoTitleBar;
+            if (has_trait(traits, window_trait::no_focus_on_appearing))
+                flags |= ImGuiWindowFlags_NoFocusOnAppearing;
 
             return flags;
         }
@@ -67,10 +69,11 @@ namespace editor
             window_trait::no_collapse |
             window_trait::no_docking |
             window_trait::menu_bar |
-            window_trait::no_title_bar;
+            window_trait::no_title_bar |
+            window_trait::no_focus_on_appearing;
 
         static_assert(static_cast<std::uint32_t>(all_translated_traits) ==
-                          (1u << 12) - 1u,
+                          (1u << 13) - 1u,
             "window_trait 열거자가 늘었는데 to_imgui_flags 번역이 따라오지 않았다");
 
         // ── 제목 ──────────────────────────────────────────────────────────
@@ -149,7 +152,13 @@ namespace editor
             }
 
             const std::string title = compose_title(entry);
-            bool* open_flag = entry.closable ? &entry.open : nullptr;
+
+            // 닫기 술어가 있으면 그것이 답한다. 자산 브라우저는 스타일에 따라
+            // 서랍이 되었다 패널이 되었다 하므로 매 프레임 갈린다.
+            const bool closable = (nullptr != entry.closable_when)
+                                      ? entry.closable_when()
+                                      : entry.closable;
+            bool* open_flag = closable ? &entry.open : nullptr;
 
             // `Begin`이 거짓이어도 `End`는 반드시 부른다. 조건부 `End`가
             // 스택을 흘리던 두 곳(§1.3)을 셸이 소유하며 없앤다.
