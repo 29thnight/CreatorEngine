@@ -128,7 +128,7 @@
       <_EnginePhysXDeviceRuntime Condition="'$(Configuration)' != 'Debug'">$(_ZVcpkgCurrentInstalledDir)bin\PhysXDevice64.dll</_EnginePhysXDeviceRuntime>
     </PropertyGroup>
     <ItemGroup>
-      <_EngineHostRuntime Include="$(DotNetHostPackDir)nethost.dll" />
+      <_EngineHostRuntime Include="$(DotNetHostBinDir)nethost.dll" />
       <_EngineHostRuntime Include="$(_EngineFmodRuntime)" />
       <_EngineHostRuntime Include="$(SolutionDir)ThirdParty\Slang\bin\slang-compiler.dll" />
       <_EngineHostRuntime Include="$(SolutionDir)ThirdParty\Slang\bin\dxcompiler.dll" />

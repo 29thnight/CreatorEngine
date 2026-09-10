@@ -134,7 +134,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;dxguid.lib;fmodL_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(DotNetHostPackDir);$(SolutionDir)ThirdParty\Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(DotNetHostLibDir);$(SolutionDir)ThirdParty\Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>false</Profile>
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
     </Link>
@@ -166,7 +166,7 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Shell32.lib;d3d11.lib;dxgi.lib;windowscodecs.lib;dwrite.lib;D3DCompiler.lib;dxguid.lib;fmod_vc.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(DotNetHostPackDir);$(SolutionDir)ThirdParty\Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(DotNetHostLibDir);$(SolutionDir)ThirdParty\Fmod\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>false</Profile>
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
     </Link>

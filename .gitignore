@@ -581,3 +581,10 @@ Dynamic_CPP/Assets/Prefabs/BTSmokeProbe.prefab
 !ThirdParty/Slang/bin/slang-compiler.dll
 !ThirdParty/Slang/bin/dxcompiler.dll
 !ThirdParty/Slang/bin/dxil.dll
+
+# 저장소가 고정하는 .NET nethost 사본. SDK 팩 버전 고정이 SDK 갱신마다 깨져서
+# 옮겨 왔다(ThirdParty/DotNetHost/README.md). import lib와 DLL 하나씩만 다시 포함한다.
+!ThirdParty/DotNetHost/lib/
+!ThirdParty/DotNetHost/lib/nethost.lib
+!ThirdParty/DotNetHost/bin/
+!ThirdParty/DotNetHost/bin/nethost.dll

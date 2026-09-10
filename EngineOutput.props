@@ -11,14 +11,21 @@
   EXE와 암시적으로 로드되는 네이티브 DLL은 Windows 로더 계약상 각 실행 번들
   안에 함께 둔다. 캐시·로그·덤프·테스트 결과는 이 트리에 두지 않는다.
 
-  ── nethost.dll ──
+  ── nethost ──
 
   hostfxr를 찾아 주는 얇은 DLL이다. 이것이 없으면 스크립트 계층이 통째로
   죽는데, 그동안 저장소에 없는 파일이 x64\Debug\에 손으로 놓여 있었다.
   즉 새로 받은 사람은 Debug조차 스크립트 없이 돌았고, 아무도 그것을 알리는
   장치가 없었다. 빌드가 직접 배치하게 한다.
 
-  헤더·링크·DLL 배치가 모두 이 속성을 참조한다. 버전을 여러 파일에 직접
+  한동안 SDK가 설치한 팩(packs\Microsoft.NETCore.App.Host.win-x64\<버전>)을
+  버전 고정으로 가리켰는데, SDK가 갱신될 때마다 옛 패치 폴더가 삭제되어
+  헤더 해석부터 깨졌다(10.0.8→10.0.10→10.0.11→10.0.12, 네 번). nethost가
+  쓰는 API는 .NET Core 3.0 이후 바뀐 적이 없고 DLL은 설치된 hostfxr를 찾는
+  탐색기일 뿐이라 SDK 버전과 묶일 이유가 없다. 이제 ThirdParty\DotNetHost\에
+  고정한 사본을 쓴다(판본·출처·hash는 그 README).
+
+  헤더·링크·DLL 배치가 모두 아래 속성을 참조한다. 경로를 여러 파일에 직접
   박아 두면 한쪽만 갱신되어 링크 또는 실행 단계에서 뒤늦게 실패한다.
 -->
 <Project>
@@ -47,7 +54,9 @@
     <!-- 구 소비자가 이 값을 읽어도 더는 Editor/Player/Tool을 한 폴더에 합치지 않는다. -->
     <EngineOutDir>$(EngineBinaryRoot)</EngineOutDir>
 
-    <DotNetHostPackVersion>10.0.11</DotNetHostPackVersion>
-    <DotNetHostPackDir>C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Host.win-x64\$(DotNetHostPackVersion)\runtimes\win-x64\native\</DotNetHostPackDir>
+    <DotNetHostDir>$(MSBuildThisFileDirectory)ThirdParty\DotNetHost\</DotNetHostDir>
+    <DotNetHostIncludeDir>$(DotNetHostDir)include\</DotNetHostIncludeDir>
+    <DotNetHostLibDir>$(DotNetHostDir)lib\</DotNetHostLibDir>
+    <DotNetHostBinDir>$(DotNetHostDir)bin\</DotNetHostBinDir>
   </PropertyGroup>
 </Project>

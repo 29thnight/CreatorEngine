@@ -50,7 +50,7 @@ DX11은 현재 Scene Renderer 백엔드가 아닙니다. 런타임 렌더 백엔
   - Windows 10 SDK
   - x64 MSBuild
 - .NET 10 SDK와 x64 Runtime
-  - 네이티브 호스트 팩 버전은 [`EngineOutput.props`](EngineOutput.props)의 `DotNetHostPackVersion`과 일치해야 합니다. 현재 값은 `10.0.11`입니다.
+  - 네이티브 호스트(nethost) 헤더·lib·DLL은 [`ThirdParty/DotNetHost`](ThirdParty/DotNetHost/README.md)에 고정되어 있어 SDK 패치 버전과 맞출 필요가 없습니다. 런타임은 `ScriptCore.runtimeconfig.json`이 요구하는 .NET 10 이상이면 됩니다.
 - vcpkg
   - 포트와 버전은 [`vcpkg.json`](vcpkg.json)의 manifest와 `builtin-baseline`이 고정합니다.
 - FMOD Core API 2.02.26 x64 개발 파일

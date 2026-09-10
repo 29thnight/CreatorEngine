@@ -35,7 +35,8 @@
 #include <cstring>
 
 // nethost.lib는 get_hostfxr_path 하나만 제공하는 얇은 import 라이브러리다.
-// 실제 팩 경로는 EngineOutput.props의 DotNetHostPackDir 한 곳에서 관리한다.
+// 헤더·lib·DLL은 ThirdParty\DotNetHost\에 고정한 사본이고, 경로는 EngineOutput.props의
+// DotNetHost*Dir 한 곳에서 관리한다. SDK가 설치한 팩 버전과는 더 이상 묶이지 않는다.
 #pragma comment(lib, "nethost.lib")
 
 namespace

@@ -101,15 +101,11 @@ function Find-CudaRoot {
 }
 
 function Find-DotNetHostPack {
-    [xml]$props = Get-Content -LiteralPath (Join-Path $repoRoot "EngineOutput.props")
-    $version = [string]$props.Project.PropertyGroup.DotNetHostPackVersion
-    if ([string]::IsNullOrWhiteSpace($version)) { return "" }
-
-    $native = Join-Path $env:ProgramFiles `
-        "dotnet\packs\Microsoft.NETCore.App.Host.win-x64\$version\runtimes\win-x64\native"
-    if ((Test-File (Join-Path $native "nethost.h")) -and
-        (Test-File (Join-Path $native "nethost.lib")) -and
-        (Test-File (Join-Path $native "nethost.dll"))) { return $native }
+    # nethost는 SDK 팩이 아니라 저장소가 고정한 사본이다(ThirdParty/DotNetHost/README.md).
+    $root = Join-Path $repoRoot "ThirdParty\DotNetHost"
+    if ((Test-File (Join-Path $root "include\nethost.h")) -and
+        (Test-File (Join-Path $root "lib\nethost.lib")) -and
+        (Test-File (Join-Path $root "bin\nethost.dll"))) { return $root }
     return ""
 }
 
@@ -153,7 +149,7 @@ function Invoke-Preflight {
         [pscustomobject]@{ Item = "vcpkg baseline"; OK = ($vcpkgHead -eq $requiredVcpkgBaseline); Value = $vcpkgHead },
         [pscustomobject]@{ Item = "vcpkg VS18 patch"; OK = $vcpkgVs18Patched; Value = $vcpkgVs18File },
         [pscustomobject]@{ Item = "CUDA 12.8"; OK = (Test-File (Join-Path $toolPaths.CUDA "bin\nvcc.exe")); Value = $toolPaths.CUDA },
-        [pscustomobject]@{ Item = ".NET host pack"; OK = -not [string]::IsNullOrWhiteSpace($toolPaths.DotNetHost); Value = $toolPaths.DotNetHost },
+        [pscustomobject]@{ Item = ".NET host (vendored)"; OK = -not [string]::IsNullOrWhiteSpace($toolPaths.DotNetHost); Value = $toolPaths.DotNetHost },
         [pscustomobject]@{ Item = "PIX"; OK = (Test-File $toolPaths.PIX); Value = $toolPaths.PIX },
         [pscustomobject]@{ Item = "PIX Developer Mode"; OK = (Test-PixDeveloperMode); Value = "PIX replay/export에 필요" },
         [pscustomobject]@{ Item = "RenderDoc"; OK = (Test-File $toolPaths.RenderDoc); Value = $toolPaths.RenderDoc },
