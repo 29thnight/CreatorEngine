@@ -72,6 +72,12 @@
     <ClInclude Include="EditorMenu\EditorMenuRegistry.h" />
     <ClInclude Include="EditorMenu\EditorMenuSelfTest.h" />
     <ClInclude Include="EditorMenu\RegisterEditorMenuManual.h" />
+    <ClInclude Include="EditorWindow\EditorWindowSurface.h" />
+    <ClInclude Include="EditorWindow\EditorWindowSchema.h" />
+    <ClInclude Include="EditorWindow\EditorWindowRegistry.h" />
+    <ClInclude Include="EditorWindow\EditorWindowHost.h" />
+    <ClInclude Include="EditorWindow\EditorWindowSelfTest.h" />
+    <ClInclude Include="EditorWindow\RegisterEditorWindowManual.h" />
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
     <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
@@ -173,6 +179,18 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EditorMenu\EditorMenuSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <!-- PHASE 21 M4(부록 B): 창 선언 배선.
+         같은 이유로 유니티에서 뺀다. Host 는 ImGui 를 아는 유일한 TU 라
+         블롭에 넣으면 앞 파일의 imgui include 에 기대 통과한다. -->
+    <ClCompile Include="EditorWindow\EditorWindowRegistry.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\EditorWindowHost.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\EditorWindowSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
@@ -288,7 +306,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)EditorWindow\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
@@ -314,7 +332,7 @@
       <!-- SceneRuntime와 같은 v145 C++23-preview + /GL CodeView 손상 회피.
            Release LTCG는 유지하고 Editor 정적 라이브러리의 타입 정보만 뺀다. -->
       <DebugInformationFormat>None</DebugInformationFormat>
-      <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)EditorWindow\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>

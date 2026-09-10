@@ -1,4 +1,5 @@
 #include "EditorRenderer.h"
+#include "EditorWindowHost.h"
 #include "RHI/IImGuiHost.h"
 #include "ImGUiRegisterClass.h"
 #include "IconsFontAwesome6.h"
@@ -304,6 +305,17 @@ void EditorRenderer::Render()
     {
         context.Render();
     }
+
+    // PHASE 21 M4 1단계(부록 B.3): 선언된 창의 프레임은 셸이 소유한다.
+    // 지금 표는 비어 있어 아무것도 그리지 않는다 — 위 루프가 여전히 25개를
+    // 전부 그린다. 이관은 2단계(ContextRegister 10개)와 3단계(직접 Begin 15개)가
+    // 창을 하나씩 이 표로 옮기며 위 루프를 줄인다.
+    //
+    // 순서가 뒤가 아니라 여기인 이유: 도크스페이스는 BeginRender가 이미 세웠고,
+    // 옮겨 온 창은 옛 루프가 그린 창과 같은 프레임 안에서 같은 도크 노드를
+    // 봐야 한다. 이관 도중 두 경로가 공존하는 구간이 있고, 그 구간에서
+    // 배치가 흔들리지 않아야 한다.
+    ::editor::draw_declared_windows();
 }
 
 void EditorRenderer::EndRender()
