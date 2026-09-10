@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 
 namespace Editor
@@ -85,6 +86,10 @@ namespace Editor
 		void UpdateTitleBar();
 		void OnGui();
 		void HandleWindowResize();
+
+		// SetWindowText는 값이 바뀔 때만 부른다. 매 프레임 같은 문자열을
+		// 밀어 넣던 자리였다.
+		std::wstring                               m_appliedWindowTitle;
 
 		std::shared_ptr<GizmoRenderer>             m_gizmoRenderer;
 		std::unique_ptr<EditorRenderer>            m_editorRenderer;

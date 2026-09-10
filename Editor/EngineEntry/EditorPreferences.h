@@ -1,7 +1,5 @@
 #pragma once
 
-#include "RenderBackend.h"
-
 enum class ContentsBrowserStyle
 {
     Tile,
@@ -22,15 +20,9 @@ struct EditorPreferences
     float GetImGuiScale() const noexcept { return imguiScale; }
     void SetImGuiScale(float value) noexcept { imguiScale = value; }
 
-    RenderBackend GetRenderBackend() const noexcept { return renderBackend; }
-    void SetRenderBackend(RenderBackend value) noexcept { renderBackend = value; }
-    bool IsRenderBackendRestartRequired(RenderBackend activeBackend) const noexcept
-    {
-        return renderBackend != activeBackend;
-    }
-
+// 에디터 렌더 백엔드는 여기 없다. 에디터 호스트는 DX12 고정이고, 사람이 고르는
+// 백엔드는 BuildSettings::renderBackend(=build.render.backend) 하나뿐이다.
 private:
     ContentsBrowserStyle contentsBrowserStyle{ ContentsBrowserStyle::Tile };
     float imguiScale{ 0.8f };
-    RenderBackend renderBackend{ RenderBackend::DX12 };
 };

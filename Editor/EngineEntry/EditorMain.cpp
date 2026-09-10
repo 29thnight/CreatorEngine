@@ -25,6 +25,7 @@
 #include "EditorAssetPresentation.h"
 #include "EditorModelPlacement.h"
 #include "EditorSceneOverlayContributor.h"
+#include "EditorWindowChrome.h"
 #include "UIManager.h"
 #include "Profiler.h"
 #include "WinProcProxy.h"
@@ -574,19 +575,15 @@ void Editor::EditorMain::PresentFrame()
 
 void Editor::EditorMain::UpdateTitleBar()
 {
-	const wchar_t* rendererBackend =
-		RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
-		? L"Vulkan" : L"DX12";
-	std::wostringstream woss;
-	woss.precision(6);
-	woss << L"Creator Editor - Windows"
-		<< L"Width: " << ScreenResizeBus::Get().GetWidth()
-		<< L" Height: " << ScreenResizeBus::Get().GetHeight()
-		<< L" FPS: " << Time->GetFramesPerSecond()
-		<< L" FrameCount: " << Time->GetFrameCount()
-		<< L"<EnhancedRenderer/" << rendererBackend << L">";
+	// 제목은 프로젝트 신원만 든다. 해상도·FPS·프레임 수·백엔드가 여기 있었다
+	// (2026-09-10 이전). 그 값들은 매 프레임 SetWindowText를 때리면서도 정작
+	// 작업 표시줄에서는 잘려 읽히지 않았다. FPS와 해상도는 씬뷰 우상단
+	// 오버레이로, 백엔드와 버전은 Help > About으로 옮겼다.
+	std::wstring title = ComposeEditorWindowTitle();
+	if (title == m_appliedWindowTitle) return;
 
-	SetWindowText(EditorWindowHandle(), woss.str().c_str());
+	m_appliedWindowTitle = std::move(title);
+	SetWindowText(EditorWindowHandle(), m_appliedWindowTitle.c_str());
 }
 
 void Editor::EditorMain::OnGui()

@@ -40,6 +40,29 @@ namespace
         }
     }
 
+    // build.ps1의 (Split-Path -Leaf $projectRoot) 정화 규칙과 같은 문자 집합이다.
+    // 패키징이 스테이지 폴더 이름을 그렇게 만들므로 두 곳이 갈리면 안 된다.
+    std::string SanitizeProjectName(std::string value)
+    {
+        for (char& character : value)
+        {
+            const unsigned char raw = static_cast<unsigned char>(character);
+            const bool forbidden = raw < 0x20 ||
+                '<' == character || '>' == character || ':' == character ||
+                '"' == character || '/' == character || '\\' == character ||
+                '|' == character || '?' == character || '*' == character;
+            if (forbidden) character = '_';
+        }
+        return value;
+    }
+
+    std::string ProjectNameFromProjectRoot()
+    {
+        const std::filesystem::path projectRoot = PathFinder::BaseProjectPath();
+        if (projectRoot.empty()) return {};
+        return SanitizeProjectName(projectRoot.filename().string());
+    }
+
     bool ReportSettingsError(const std::string& message) noexcept
     {
         std::fprintf(stderr, "[EditorSettings] %s\n", message.c_str());
@@ -58,7 +81,8 @@ bool EditorSettingsStore::Initialize() noexcept
 {
     EditorPreferences preferences{};
     BuildSettings buildSettings{};
-    preferences.SetRenderBackend(RuntimeSettings::Get().GetRenderBackend());
+    // 에디터 프로세스의 백엔드는 사람이 고르는 값이 아니다 (DX12 고정).
+    // 사람이 고르는 유일한 노브는 build.render.backend — Player만 받는다.
     buildSettings.SetRenderBackend(RuntimeSettings::Get().GetRenderBackend());
     buildSettings.SetStartupSceneName(RuntimeSettings::Get().GetStartupSceneName());
 
@@ -76,6 +100,15 @@ bool EditorSettingsStore::Initialize() noexcept
 				return ReportSettingsError(
 					"Unable to load Editor settings: " + parseError);
 			const Authoring::ReadNode root = document.Root();
+
+			if (root["projectName"])
+			{
+				const Authoring::ReadNode projectNameNode = root["projectName"];
+				if (!projectNameNode.IsScalar())
+					return ReportSettingsError("projectName must be a scalar.");
+				buildSettings.SetProjectName(
+					SanitizeProjectName(projectNameNode.AsString()));
+			}
 
 			if (root["m_contentsBrowserStyle"])
 			{
@@ -135,6 +168,9 @@ bool EditorSettingsStore::Initialize() noexcept
                 }
             }
         }
+
+        if (buildSettings.GetProjectName().empty())
+            buildSettings.SetProjectName(ProjectNameFromProjectRoot());
 
         m_preferences = std::move(preferences);
         m_buildSettings = std::move(buildSettings);
@@ -211,8 +247,15 @@ bool EditorSettingsStore::Save() noexcept
             std::filesystem::path(
                 m_buildSettings.GetStartupSceneName()).string());
         root.Child("imguiScale").SetScalar(m_preferences.GetImGuiScale());
+        root.Child("projectName").SetScalar(m_buildSettings.GetProjectName());
+        // render.backend에는 사람이 고른 값이 아니라 **지금 돌고 있는** 백엔드를
+        // 적는다. 에디터 호스트는 DX12 고정이라 이 키는 GUI에 노브가 없고,
+        // verify-pbr-wiring-baseline.ps1이 에디터를 Vulkan으로 몰 때 쓰는
+        // 하네스 전용 재정의로만 남는다. 돌고 있는 값을 되쓰면 그 재정의가
+        // 그대로 왕복하면서, 키가 없는 새 프로젝트에서도 한 번은 씨앗이 선다
+        // (그 게이트는 이 키가 정확히 한 번 나타날 것을 단정한다).
         root.Child("render").Child("backend").SetScalar(
-            RenderBackendName(m_preferences.GetRenderBackend()));
+            RenderBackendName(RuntimeSettings::Get().GetRenderBackend()));
         root.Child("build").Child("render").Child("backend").SetScalar(
             RenderBackendName(m_buildSettings.GetRenderBackend()));
         root.RemoveChild("renderBackendDx12");

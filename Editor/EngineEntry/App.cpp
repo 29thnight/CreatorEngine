@@ -17,6 +17,7 @@
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
 #include "EditorPlatform.h"
+#include "EditorWindowChrome.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "GpuDiagnostics.h"
@@ -108,6 +109,16 @@ namespace
 			[](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				-> std::optional<LRESULT>
 		{
+			// 셸 크롬이 먼저 본다. 캡션 제거(WM_NCCALCSIZE)는 창 생성 도중
+			// 이미 발화하므로 Attach보다 앞서 돌아야 한다 — 그래서 크롬은
+			// 저장된 핸들이 아니라 인자로 온 hWnd로 프레임을 계산한다.
+			if (const std::optional<LRESULT> handled =
+					EditorWindowChrome::Get().HandleWindowMessage(
+						hWnd, message, wParam, lParam))
+			{
+				return handled;
+			}
+
 			if (WM_SETCURSOR == message)
 			{
 				if (HTCLIENT == LOWORD(lParam))
@@ -154,6 +165,7 @@ void Core::App::Initialize(CoreWindow& coreWindow)
 	// 여기서 또 부르면 등록 로그가 두 번 찍히고, 무엇보다 '여기가 등록 지점'이라는
 	// 오해를 남긴다 — 그 오해 때문에 부팅 전반이 덤프 사각지대였다.
     m_hWnd = coreWindow.GetHandle();
+    EditorWindowChrome::Get().Attach(m_hWnd);
 
 	// "Initializing Dx11 Device..." 단계가 여기 있었다 (2026-08-10).
 	// DX11 디바이스는 더 이상 만들어지지 않는다 — 씬은 EnhancedSceneRenderer가,

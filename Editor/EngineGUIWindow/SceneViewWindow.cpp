@@ -21,6 +21,16 @@
 #include "RectTransformComponent.h"
 #include "LightComponent.h"
 #include "Entity.h"
+#include <cstdio>
+
+namespace
+{
+    // ImGuizmo 뷰 큐브는 씬뷰 우상단 128px 정사각을 차지한다. 프레임 정보
+    // 오버레이가 그 아래로 내려가야 해서 두 소비자가 같은 값을 본다 —
+    // 숫자를 각자 적었더니 오버레이가 큐브에 덮여 읽히지 않았다.
+    constexpr float kViewCubeSize = 128.f;
+    constexpr float kViewCubeTopMargin = 16.f;
+}
 #include <unordered_map>
 #include "DataSystem.h"
 #include "RenderState.h"
@@ -328,6 +338,47 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		ImGui::PopStyleVar(1);
 
+		// ── 프레임 정보 오버레이 ──
+		//
+		// 이 값들은 OS 창 제목에 문자열로 붙어 있었다(2026-09-10 이전).
+		// 매 프레임 SetWindowText를 때리는데 정작 작업 표시줄에서는 잘려
+		// 읽히지 않았고, 창 제목이 프로젝트 신원을 말하지도 못했다.
+		// 재는 대상 위에 겹쳐 두는 것이 읽는 자리로도 맞다.
+		//
+		// 위젯이 아니라 드로 리스트로 그린다 — 뷰포트 위 어떤 입력도
+		// 가로채면 안 되고, 기즈모 조작이 바로 이 자리에서 일어난다.
+		{
+			const int framesPerSecond = Time->GetFramesPerSecond();
+			const float milliseconds = framesPerSecond > 0
+				? 1000.f / static_cast<float>(framesPerSecond) : 0.f;
+
+			char overlay[96]{};
+			std::snprintf(overlay, sizeof(overlay), "%d FPS  %.2f ms\n%u x %u",
+				framesPerSecond, milliseconds,
+				ScreenResizeBus::Get().GetWidth(),
+				ScreenResizeBus::Get().GetHeight());
+
+			const ImVec2 textSize = ImGui::CalcTextSize(overlay);
+			const ImVec2 padding{ 8.f, 5.f };
+			// 뷰 큐브 아래로 내린다. 큐브는 창 상단을 기준으로 놓이므로
+			// 이미지 상단이 아니라 창 상단에서 잰다.
+			const float overlayTop =
+				windowTopLeftY + kViewCubeTopMargin + kViewCubeSize + 8.f;
+			const ImVec2 boxMin{
+				imageMax.x - 10.f - textSize.x - padding.x * 2.f, overlayTop };
+			const ImVec2 boxMax{ imageMax.x - 10.f,
+				overlayTop + textSize.y + padding.y * 2.f };
+
+			ImDrawList* const overlayDrawList = ImGui::GetWindowDrawList();
+			overlayDrawList->AddRectFilled(boxMin, boxMax,
+				IM_COL32(18, 18, 20, 190), 4.f);
+			overlayDrawList->AddRect(boxMin, boxMax,
+				IM_COL32(61, 61, 66, 255), 4.f);
+			overlayDrawList->AddText(
+				ImVec2(boxMin.x + padding.x, boxMin.y + padding.y),
+				IM_COL32(214, 214, 217, 255), overlay);
+		}
+
 
 		if (editTransformDecomposition)
 		{
@@ -558,7 +609,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
     }
 
-	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop + 16), ImVec2(128, 128), IM_COL32(0, 0, 0, 0));
+	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - kViewCubeSize, viewManipulateTop + kViewCubeTopMargin),
+		ImVec2(kViewCubeSize, kViewCubeSize), IM_COL32(0, 0, 0, 0));
 
 	{
 		auto scene = SceneManagers->GetActiveScene();

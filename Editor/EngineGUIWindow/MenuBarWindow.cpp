@@ -31,6 +31,10 @@
 #include "EnhancedGizmoSceneBinding.h"
 #include "ToggleUI.h"
 #include "GameBuilderSystem.h"
+#include "EditorRenderer.h"
+#include "EditorWindowChrome.h"
+#include "EditorWindowNames.h"
+#include "Core.Definition.h"
 #include <regex>
 
 constexpr int MAX_LAYER_SIZE = 32;
@@ -224,10 +228,8 @@ void MenuBarWindow::RenderMenuBar()
     {
         if (ImGui::BeginMainMenuBar())
         {
-            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
             if (ImGui::BeginMenu("File"))
             {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
                 if (ImGui::MenuItem("New Scene"))
                 {
                     m_bShowNewScenePopup = true;
@@ -317,14 +319,10 @@ void MenuBarWindow::RenderMenuBar()
 						PostMessage(window->GetHandle(), WM_CLOSE, 0, 0);
 					}
                 }
-                ImGui::PopStyleColor();
                 ImGui::EndMenu();
             }
-            ImGui::PopStyleColor();
-            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
             if (ImGui::BeginMenu("Edit"))
             {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
                 if (ImGui::MenuItem("LightMap Window"))
                 {
                     if (!ImGui::GetContext("LightMap").IsOpened())
@@ -360,48 +358,17 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     m_bShowInputActionMapWindow = true;
                 }
-                ImGui::PopStyleColor();
 
                 ImGui::EndMenu();
             }
-            ImGui::PopStyleColor();
-            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
             if (ImGui::BeginMenu("Settings"))
             {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
                 if (ImGui::MenuItem("Pipeline Setting"))
                 {
                     if (!ImGui::GetContext("RenderPass").IsOpened())
                     {
                         ImGui::GetContext("RenderPass").Open();
                     }
-                }
-
-                if (ImGui::BeginMenu("Editor Render Backend"))
-                {
-                    EditorPreferences& preferences =
-                        EditorSettingsStore::Get().Preferences();
-                    const RenderBackend configured =
-                        preferences.GetRenderBackend();
-                    if (ImGui::MenuItem("DX12", nullptr,
-                        RenderBackend::DX12 == configured))
-                    {
-                        preferences.SetRenderBackend(RenderBackend::DX12);
-                        EditorSettingsStore::Get().Save();
-                    }
-                    if (ImGui::MenuItem("Vulkan", nullptr,
-                        RenderBackend::Vulkan == configured))
-                    {
-                        preferences.SetRenderBackend(RenderBackend::Vulkan);
-                        EditorSettingsStore::Get().Save();
-                    }
-                    ImGui::Separator();
-                    ImGui::Text("Active: %s",
-                        RenderBackendName(RuntimeSettings::Get().GetRenderBackend()));
-                    if (preferences.IsRenderBackendRestartRequired(
-                        RuntimeSettings::Get().GetRenderBackend()))
-                        ImGui::TextDisabled("Saved. Restart the Editor to apply.");
-                    ImGui::EndMenu();
                 }
 
                 if (ImGui::MenuItem("Collision Matrix"))
@@ -427,23 +394,9 @@ void MenuBarWindow::RenderMenuBar()
                     }
                 }
 
-                ImVec4 colFrameBg = ImVec4(0.93f, 0.93f, 0.94f, 1.00f);
-                ImVec4 colFrameBgHovered = ImVec4(0.89f, 0.90f, 0.92f, 1.00f);
-                ImVec4 colFrameBgActive = ImVec4(0.85f, 0.86f, 0.89f, 1.00f);
-
-                ImVec4 colGrab = ImVec4(0.27f, 0.45f, 0.87f, 0.95f); // 은은한 블루
-                ImVec4 colGrabActive = ImVec4(0.20f, 0.38f, 0.80f, 1.00f); // 살짝 진하게
-
-                ImVec4 colText = ImVec4(0.12f, 0.12f, 0.13f, 1.00f); // 다크 그레이(가독성)
-                ImVec4 colBorder = ImVec4(0.10f, 0.10f, 0.12f, 0.20f); // 낮은 투명도의 미세한 윤곽
-
-                ImGui::PushStyleColor(ImGuiCol_Text, colText);
-                ImGui::PushStyleColor(ImGuiCol_FrameBg, colFrameBg);
-                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, colFrameBgHovered);
-                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, colFrameBgActive);
-                ImGui::PushStyleColor(ImGuiCol_SliderGrab, colGrab);
-                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, colGrabActive);
-                ImGui::PushStyleColor(ImGuiCol_Border, colBorder);
+                // 밝은 팝업 배경(0.95 회색) 위에서 읽히게 하려고 항목마다
+                // 검은 글씨와 밝은 입력란 색을 눌러 담던 자리였다. 팝업이
+                // 다크 스킨을 따라가므로 그 우회로가 전부 필요 없어졌다.
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
                 ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
@@ -455,75 +408,64 @@ void MenuBarWindow::RenderMenuBar()
                     EditorSettingsStore::Get().Save();
                 }
                 ImGui::PopStyleVar(2);
-                ImGui::PopStyleColor(8);
                 ImGui::EndMenu();
             }
-            ImGui::PopStyleColor();
-            float availRegion = ImGui::GetContentRegionAvail().x;
 
-            ImGui::SetCursorPos(ImVec2((availRegion * 0.5f) + 100.f, 1));
-
-            const bool isGameRunning = SceneManagers->IsGameStart();
-            if (ImGui::Button(isGameRunning ? ICON_FA_STOP : ICON_FA_PLAY))
+            if (ImGui::BeginMenu("Window"))
             {
-                // ★ LC6(§9): Undo 정책은 `Editor::PlayModeController` 가 소유한다.
-                //
-                //   예전에는 이 버튼이 `ClearGameMode()` 와 `m_isGameMode` 대입을
-                //   직접 했다. 그래서 그 둘이 **버튼을 누른 경우에만** 일어났고,
-                //   CLI·서비스로 재생하면 일어나지 않았다 — 같은 조작인데 기록되는
-                //   스택이 달랐다. 이제 `SetGameStart` 가 던지는 PlayModeEvent 를
-                //   컨트롤러가 받아 양쪽에 똑같이 적용한다.
-                SceneManagers->SetGameStart(!isGameRunning);
+                if (ImGui::MenuItem("Reset Layout"))
+                {
+                    // imgui.ini에 재생성 경로가 없어서 배치가 한 번 어긋나면
+                    // 파일을 손으로 지우는 것이 유일한 복구였다.
+                    EditorRenderer::RequestDockLayoutReset();
+                }
+                ImGui::Separator();
+
+                // 이름은 EditorWindowName이 정본이다. GetContext는 operator[]라
+                // 오타 하나가 그려지지 않는 유령 창을 표에 영구히 꽂는다.
+                const char* const panels[] = {
+                    EditorWindowName::kHierarchy,
+                    EditorWindowName::kInspector,
+                    EditorWindowName::kContentBrowser,
+                    EditorWindowName::kAssetBundle,
+                    EditorWindowName::kResourceCounter,
+                    EditorWindowName::kRenderPass,
+                };
+                for (const char* const panel : panels)
+                {
+                    auto& context = ImGui::GetContext(panel);
+                    const bool opened = context.IsOpened();
+                    if (!ImGui::MenuItem(panel, nullptr, opened)) continue;
+                    if (opened) context.Close();
+                    else        context.Open();
+                }
+
+                ImGui::Separator();
+                ImGui::MenuItem(ICON_FA_TERMINAL " Output Log", nullptr, &m_bShowLogWindow);
+                ImGui::MenuItem(ICON_FA_CHART_GANTT " Frame Profiler", nullptr, &m_bShowProfileWindow);
+                ImGui::EndMenu();
             }
 
-            ImVec2 curPos = ImGui::GetCursorPos();
-            ImGui::SetCursorPos(ImVec2(curPos.x, 1));
-
-            const bool canPause = SceneManagers->IsGameStart();
-            ImGui::BeginDisabled(!canPause);
-            const bool isPaused = SceneManagers->IsGamePaused();
-            if (canPause && isPaused)
+            if (ImGui::BeginMenu("Help"))
             {
-                const ImVec4 active = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
-                ImGui::PushStyleColor(ImGuiCol_Button, active);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, active);
+                if (ImGui::MenuItem("About Creator Engine"))
+                {
+                    m_bShowAboutWindow = true;
+                }
+                ImGui::EndMenu();
             }
 
-            const char* pauseIcon = isPaused ? ICON_FA_PLAY : ICON_FA_PAUSE;
-            if (ImGui::Button(pauseIcon))
-            {
-                SceneManagers->ToggleGamePaused();
-            }
-
-            if (canPause && isPaused)
-            {
-                ImGui::PopStyleColor(3);
-            }
-            ImGui::EndDisabled();
-
-            ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
-            // 스타일 정본은 EditorPreferences 하나다. DataSystem이 들고 있던
-            // 사본은 여기서 함께 갱신하던 이중 상태여서 걷었다 (PHASE 4-3).
-            EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
-            bool style = static_cast<bool>(preferences.GetContentsBrowserStyle());
-            if (ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, style))
-            {
-                style = !style;
-                auto newStyle = static_cast<ContentsBrowserStyle>(style);
-                preferences.SetContentsBrowserStyle(newStyle);
-                auto& browserContext = ImGui::GetContext(ICON_FA_HARD_DRIVE " Content Browser");
-                if (newStyle == ContentsBrowserStyle::Tree)
-                    browserContext.Open();
-                else
-                    browserContext.Close();
-                EditorSettingsStore::Get().Save();
-            }
+            // 재생 컨트롤과 스타일 토글이 여기 있었다. s&box 배치에서 이 행은
+            // 제목표시줄이고 가운데는 창 제목이 쓴다 — 조작 버튼은 RenderToolBar로
+            // 내렸다. 그러지 않으면 제목과 버튼이 같은 자리를 다툰다.
+            EditorWindowChrome::Get().DrawTitleBarTail();
 
             ImGui::EndMainMenuBar();
         }
         ImGui::End();
     }
+
+    RenderToolBar();
 
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
@@ -668,6 +610,7 @@ void MenuBarWindow::RenderMenuBar()
     SHowInputActionMap();
 	ShowBuildSceneSettingWindow();
     ShowRenderDebugWindow();
+    ShowAboutWindow();
 
     if (m_bShowProfileWindow)
     {
@@ -798,6 +741,140 @@ void MenuBarWindow::RenderMenuBar()
             }
         }
     }
+}
+
+void MenuBarWindow::RenderToolBar()
+{
+    // 제목표시줄 바로 아래 한 줄. 재생 컨트롤이 메뉴 행에 있었을 때는
+    // 가운데 위치를 availRegion * 0.5 + 100 이라는 고정 오프셋으로 잡았고,
+    // 창 폭이나 메뉴 개수가 바뀌면 그대로 어긋났다. 여기서는 버튼 묶음의
+    // 실제 폭을 재서 가운데를 잡는다.
+    ImGuiViewportP* viewport = (ImGuiViewportP*)(void*)ImGui::GetMainViewport();
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
+    const float height = ImGui::GetFrameHeight();
+
+    if (!ImGui::BeginViewportSideBar("##MainToolBar", viewport, ImGuiDir_Up, height, flags))
+        return;
+
+    if (ImGui::BeginMenuBar())
+    {
+        const bool isGameRunning = SceneManagers->IsGameStart();
+        const bool canPause = isGameRunning;
+        const bool isPaused = SceneManagers->IsGamePaused();
+
+        const char* const playIcon = isGameRunning ? ICON_FA_STOP : ICON_FA_PLAY;
+        const char* const pauseIcon = isPaused ? ICON_FA_PLAY : ICON_FA_PAUSE;
+
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const float playWidth =
+            ImGui::CalcTextSize(playIcon).x + style.FramePadding.x * 2.0f;
+        const float pauseWidth =
+            ImGui::CalcTextSize(pauseIcon).x + style.FramePadding.x * 2.0f;
+        const float groupWidth = playWidth + pauseWidth + style.ItemSpacing.x;
+
+        const float rowWidth = ImGui::GetWindowWidth();
+        ImGui::SetCursorPosX((rowWidth - groupWidth) * 0.5f);
+
+        if (ImGui::Button(playIcon))
+        {
+            // ★ LC6(§9): Undo 정책은 Editor::PlayModeController 가 소유한다.
+            //   이 버튼이 ClearGameMode 와 m_isGameMode 대입을 직접 하던 시절에는
+            //   그 둘이 버튼을 누른 경우에만 일어나 CLI 재생과 스택이 갈렸다.
+            SceneManagers->SetGameStart(!isGameRunning);
+        }
+
+        ImGui::BeginDisabled(!canPause);
+        if (canPause && isPaused)
+        {
+            const ImVec4 active = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
+            ImGui::PushStyleColor(ImGuiCol_Button, active);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, active);
+        }
+        if (ImGui::Button(pauseIcon))
+        {
+            SceneManagers->ToggleGamePaused();
+        }
+        if (canPause && isPaused)
+        {
+            ImGui::PopStyleColor(3);
+        }
+        ImGui::EndDisabled();
+
+        // 스타일 정본은 EditorPreferences 하나다. DataSystem이 들고 있던
+        // 사본은 여기서 함께 갱신하던 이중 상태여서 걷었다 (PHASE 4-3).
+        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
+        EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
+        bool contentsStyle = static_cast<bool>(preferences.GetContentsBrowserStyle());
+        if (ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, contentsStyle))
+        {
+            contentsStyle = !contentsStyle;
+            const auto newStyle = static_cast<ContentsBrowserStyle>(contentsStyle);
+            preferences.SetContentsBrowserStyle(newStyle);
+            auto& browserContext = ImGui::GetContext(EditorWindowName::kContentBrowser);
+            if (ContentsBrowserStyle::Tree == newStyle) browserContext.Open();
+            else                                       browserContext.Close();
+            EditorSettingsStore::Get().Save();
+        }
+
+        ImGui::EndMenuBar();
+    }
+    ImGui::End();
+}
+
+void MenuBarWindow::ShowAboutWindow()
+{
+    if (!m_bShowAboutWindow) return;
+
+    // 버전과 실행 중인 백엔드가 제목표시줄에 문자열로 붙어 있었다. 초당
+    // 몇 번씩 갱신되는 자리에 두면 정작 읽을 때 잘려 있어서, 읽고 싶을 때
+    // 여는 이 창으로 옮겼다.
+    ImGui::SetNextWindowSize(ImVec2(440.f, 0.f), ImGuiCond_Appearing);
+    if (!ImGui::Begin("About Creator Engine", &m_bShowAboutWindow,
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::End();
+        return;
+    }
+
+    const BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
+
+    ImGui::TextUnformatted("Creator Engine");
+    ImGui::Separator();
+
+    const auto row = [](const char* label, const char* value)
+    {
+        ImGui::TextDisabled("%-24s", label);
+        ImGui::SameLine();
+        ImGui::TextUnformatted(value);
+    };
+
+    row("Engine version", ENGINE_VERSION);
+    row("Project", buildSettings.GetProjectName().c_str());
+    row("Dear ImGui", IMGUI_VERSION);
+#if defined(_DEBUG)
+    row("Editor configuration", "Debug");
+#else
+    row("Editor configuration", "Release");
+#endif
+
+    ImGui::Separator();
+    // 에디터가 실제로 돌고 있는 백엔드와 Player가 받을 백엔드를 나란히 둔다.
+    // 하나만 보이면 "설정을 바꿨는데 왜 그대로냐"를 가릴 수 없다.
+    row("Editor render backend",
+        RenderBackendName(RuntimeSettings::Get().GetRenderBackend()));
+    row("Player build backend",
+        RenderBackendName(buildSettings.GetRenderBackend()));
+    ImGui::TextDisabled(
+        "The Editor host is fixed; only the Player build backend is configurable\n"
+        "(Settings > Build Settings).");
+
+    ImGui::Separator();
+    if (ImGui::Button("Close")) m_bShowAboutWindow = false;
+
+    ImGui::End();
 }
 
 void MenuBarWindow::ShowLogWindow()

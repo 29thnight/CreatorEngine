@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 class IImGuiHost;
 
 // 에디터 ImGui 오케스트레이터 (구 ImGuiRenderer 재작성, 2026-08-10).
@@ -31,6 +33,11 @@ public:
     void Render();
     void EndRender();
 
+    /// 다음 BeginRender가 기본 도크 레이아웃을 다시 세운다. imgui.ini에는
+    /// 재생성 경로가 없어서 한 번 어긋난 배치를 되돌릴 방법이 없었다.
+    /// 어느 스레드에서 불러도 된다 — 적용은 표시 스레드가 한다.
+    static void RequestDockLayoutReset() noexcept;
+
 private:
     void AddEditorFonts();
     void ApplyEditorScale(float newScale, bool rebuildFonts);
@@ -41,4 +48,6 @@ private:
     float m_lastAppliedScale{ 0.8f };
     float m_lastRequestedScale{ -1.f };
     bool m_firstLoop{ true };
+
+    static std::atomic_bool s_dockLayoutResetRequested;
 };

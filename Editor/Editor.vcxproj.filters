@@ -198,6 +198,12 @@
     <ClInclude Include="EngineGUIWindow\EditorRenderer.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorWindowChrome.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorWindowNames.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
@@ -384,6 +390,9 @@
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorWindowChrome.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
