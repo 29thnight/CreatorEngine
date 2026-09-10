@@ -60,6 +60,17 @@ namespace editor::windows
         }
     }
 
+    std::vector<std::string_view> bound_window_bodies()
+    {
+        std::vector<std::string_view> names;
+        names.reserve(bindings().size());
+        for (const binding& one : bindings())
+        {
+            names.push_back(one.first);
+        }
+        return names;
+    }
+
     namespace detail
     {
         void run_window_body(std::string_view stable_id)

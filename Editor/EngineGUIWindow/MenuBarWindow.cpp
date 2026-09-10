@@ -222,7 +222,6 @@ MenuBarWindow::MenuBarWindow()
             //적용된 충돌 매스릭스 저장
             PhysicsManagers->SetCollisionMatrix(collisionMatrix);
 			PhysicsManagers->SaveCollisionMatrix();
-            m_bCollisionMatrixWindow = false;
             editor::close_window(EditorWindowName::kCollisionMatrix);
         }
 		ImGui::SameLine();
@@ -230,7 +229,6 @@ MenuBarWindow::MenuBarWindow()
         {
 			PhysicsManagers->LoadCollisionMatrix();
 			collisionMatrix = PhysicsManagers->GetCollisionMatrix();
-            m_bCollisionMatrixWindow = false;
             editor::close_window(EditorWindowName::kCollisionMatrix);
 		}
         
@@ -397,7 +395,7 @@ void MenuBarWindow::RenderMenuBar()
 
                 if (ImGui::MenuItem("Collision Matrix"))
                 {
-                    m_bCollisionMatrixWindow = true;
+                    editor::open_window(EditorWindowName::kCollisionMatrix);
                 }
 
                 if (ImGui::MenuItem("Build Settings"))
@@ -652,12 +650,6 @@ void MenuBarWindow::RenderMenuBar()
         ImGui::OpenPopup("NewScenePopup");
         m_bShowNewScenePopup = false;
 	}
-
-    if (m_bCollisionMatrixWindow) 
-    {
-        editor::open_window(EditorWindowName::kCollisionMatrix);
-		m_bCollisionMatrixWindow = false;
-    }
 
     if (ImGui::BeginPopup("NewScenePopup"))
     {
@@ -999,12 +991,6 @@ void MenuBarWindow::ShowLogWindow()
     ImGui::EndChild();
     ImGui::PopFont();
 }
-
-void MenuBarWindow::ShowLightMapWindow()
-{
-    editor::open_window(EditorWindowName::kLightMap);
-}
-
 
 ed::EditorContext* s_MenuBarBTEditorContext{ nullptr };
 

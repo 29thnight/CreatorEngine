@@ -21,6 +21,10 @@
 // include 는 이 TU 가 직접 소유한다(유니티에서 빠져 있다).
 
 #include "CommandRegistrar.h"
+#include "EditorWindowHost.h"       // PHASE 21 M4: editor.windows 덤프
+#include "EditorWindowAudit.h"
+#include "EditorWindowSelfTest.h"
+#include "EditorMenuSelfTest.h"
 #include "CommandSupport.h"
 
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
@@ -787,6 +791,71 @@ namespace ConsoleCmd
     }
 
 
+    // ── editor:: 선언 배선 관측과 게이트 ────────────────────────────────
+    //
+    // 계획서 부록 B.3이 요구한 `editor.windows` 덤프다. 출력 형식은 이 가족의
+    // 관례대로 TSV이고, 뒤에 감사 요약이 붙는다. 배선이 더러우면 실패로 낸다 —
+    // 관측만 하고 판정하지 않으면 도는 세트에 넣어도 초록만 쌓인다.
+    static CommandCore::CommandResult Cmd_editor_windows(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+
+        const std::string table = ::editor::dump_declared_windows();
+        const ::editor::window_audit audit = ::editor::audit_declared_windows();
+        const std::string summary = ::editor::dump_window_audit();
+
+        std::printf("%s%s", table.c_str(), summary.c_str());
+
+        auto data = CommandData::Object();
+        data.Set("declared", CommandData::Int(static_cast<int>(audit.declared)));
+        data.Set("boundBodies", CommandData::Int(static_cast<int>(audit.bound)));
+        data.Set("orphanBodies", CommandData::Int(static_cast<int>(audit.orphan_bodies.size())));
+        data.Set("bodylessWindows", CommandData::Int(static_cast<int>(audit.bodyless_windows.size())));
+        data.Set("duplicateIds", CommandData::Int(static_cast<int>(audit.duplicate_ids.size())));
+        data.Set("emptyDockSlots", CommandData::Int(static_cast<int>(audit.empty_dock_slots.size())));
+        data.Set("clean", CommandData::Bool(audit.clean()));
+
+        if (!audit.clean())
+        {
+            return Fail("editor.windows.dirty", "창 배선 감사 실패: " + summary, std::move(data));
+        }
+        return Ok("창 " + std::to_string(audit.declared) + "개 배선 이상 없음", std::move(data));
+    }
+
+    // 선언 배선 자가 검사 둘을 한 번에 돈다. 둘 다 자기 표를 옆으로 치우고
+    // 합성 선언 위에서 돌므로 살아 있는 에디터에서 불러도 된다.
+    static CommandCore::CommandResult Cmd_editor_selftest(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+
+        std::string windowReport;
+        const bool windowsOk = ::editor::run_editor_window_selftest(windowReport);
+        std::printf("[CLI] editor.windows selftest: %s %s\n",
+            windowsOk ? "PASS" : "FAIL", windowReport.c_str());
+
+        std::string menuReport;
+        const bool menusOk = ::editor::run_editor_menu_selftest(menuReport);
+        std::printf("[CLI] editor.menu selftest: %s %s\n",
+            menusOk ? "PASS" : "FAIL", menuReport.c_str());
+
+        auto data = CommandData::Object();
+        data.Set("windows", CommandData::Bool(windowsOk));
+        data.Set("menus", CommandData::Bool(menusOk));
+        data.Set("windowReport", CommandData::String(windowReport));
+        data.Set("menuReport", CommandData::String(menuReport));
+
+        if (!windowsOk || !menusOk)
+        {
+            return Fail("editor.selftest.failed",
+                        "editor:: 선언 자가 검사 실패 — 창: " + windowReport +
+                        " / 메뉴: " + menuReport, std::move(data));
+        }
+        return Ok("editor:: 선언 자가 검사 통과", std::move(data));
+    }
+
+
     void RegisterCoreCommands(Registrar& reg)
     {
         reg.Result({ "help" }, &Cmd_help);
@@ -805,5 +874,7 @@ namespace ConsoleCmd
         reg.Result({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
         reg.Result({ "lifecycle.stress" }, &Cmd_lifecycle_stress);
         reg.Result({ "log.flush" }, &Cmd_log_flush);
+        reg.Result({ "editor.windows" }, &Cmd_editor_windows);
+        reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);
     }
 }

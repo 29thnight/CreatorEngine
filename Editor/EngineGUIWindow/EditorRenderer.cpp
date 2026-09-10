@@ -1,7 +1,7 @@
 #include "EditorRenderer.h"
 #include "EditorWindowHost.h"
+#include "EditorWindowRegistry.h"
 #include "RHI/IImGuiHost.h"
-#include "ImGUiRegisterClass.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 #include "EditorAssetPresentation.h"
@@ -182,8 +182,10 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     // 탭으로 공유한다. 예전 배치는 왼쪽 절반을 Scene과 Game이 위아래로
     // 나눠 써서 뷰포트가 화면의 4분의 1이었다.
     //
-    // 이름 리터럴을 직접 적지 않는다 — EditorWindowName이 정본이다.
-    // 여기서 공백 하나가 달라 Content Browser가 도크되지 않았다.
+    // 어느 창이 어느 자리에 가는지는 **선언이 답한다.** 여기 이름 목록을
+    // 따로 적으면 그 목록과 `Begin` 이름이 갈릴 수 있고, 실제로 갈렸다 —
+    // 공백 하나가 달라 Content Browser가 도크되지 않은 적이 있다. 표를 훑으면
+    // 두 이름이 같은 출처라서 갈릴 자리 자체가 없다(부록 B.3의 "고아 0").
     ImGuiID id = dockspaceId;
     const ImVec2 size{ width, height };
     const ImVec2 nodePos{ posX, posY };
@@ -207,21 +209,39 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
         id, ImGuiDir_Down, 0.28f, nullptr, &id);
     const ImGuiID centerViewport = id;
 
-    ImGui::DockBuilderDockWindow(EditorWindowName::kScene, centerViewport);
-    ImGui::DockBuilderDockWindow(EditorWindowName::kGame, centerViewport);
-    ImGui::DockBuilderDockWindow(EditorWindowName::kBehaviorTree, centerViewport);
-    ImGui::DockBuilderDockWindow(EditorWindowName::kBlackBoard, centerViewport);
+    // 자리 이름을 노드로 옮기는 표. `dock_slot` 열거자 순서와 같은 순서이고,
+    // 완전성은 static_assert가 지킨다 — 자리를 하나 더 만들면 여기가 컴파일에서
+    // 걸린다.
+    using ::editor::dock_slot;
+    const ImGuiID slotNode[]
+    {
+        centerViewport,   // center
+        rightColumn,      // right_upper
+        inspectorNode,    // right_lower
+        bottomPanel,      // bottom
+        0,                // floating — 도크하지 않는다
+    };
+    static_assert(std::size(slotNode) == static_cast<std::size_t>(dock_slot::count),
+        "dock_slot 열거자가 늘었는데 도크 빌더의 노드 표가 따라오지 않았다");
 
-    ImGui::DockBuilderDockWindow(EditorWindowName::kHierarchy, rightColumn);
-    ImGui::DockBuilderDockWindow(EditorWindowName::kInspector, inspectorNode);
+    for (const ::editor::window_entry& entry : ::editor::window_entries_of())
+    {
+        if (dock_slot::floating == entry.dock) continue;
 
-    ImGui::DockBuilderDockWindow(EditorWindowName::kAssetBundle, bottomPanel);
-    ImGui::DockBuilderDockWindow(EditorWindowName::kResourceCounter, bottomPanel);
-    // Tile 스타일에서 Content Browser는 팝업 드로어라 도크할 자리가 없다
-    // (ContentsBrowserWindow가 SetPopup으로 그렇게 만든다). 도크해 두면
-    // 드로어가 열릴 때 빈 탭이 남는다.
-    if (!contentBrowserIsDrawer)
-        ImGui::DockBuilderDockWindow(EditorWindowName::kContentBrowser, bottomPanel);
+        // 유일한 예외다. Tile 스타일에서 Content Browser는 팝업 드로어라
+        // 도크할 자리가 없다(ContentsBrowserWindow가 SetPopup으로 그렇게
+        // 만든다). 도크해 두면 드로어가 열릴 때 빈 탭이 남는다. 조건이 매
+        // 프레임 갈리는 값이라 선언의 정적 자리로는 적을 수 없다.
+        if (contentBrowserIsDrawer &&
+            EditorWindowName::kContentBrowser == entry.stable_id)
+        {
+            continue;
+        }
+
+        // stable_id는 전부 문자열 리터럴에서 왔으므로 data()가 널로 끝난다.
+        ImGui::DockBuilderDockWindow(entry.stable_id.data(),
+            slotNode[static_cast<std::size_t>(entry.dock)]);
+    }
 
     ImGui::DockBuilderFinish(id);
 }
@@ -300,21 +320,15 @@ void EditorRenderer::Render()
 {
     EditorAssetPresentation::Get().OpenPendingTextureImportSelector();
 
-    auto& container = ImGuiRegister::GetInstance()->m_contexts;
-    for (auto& [name, context] : container)
-    {
-        context.Render();
-    }
-
-    // PHASE 21 M4 1단계(부록 B.3): 선언된 창의 프레임은 셸이 소유한다.
-    // 지금 표는 비어 있어 아무것도 그리지 않는다 — 위 루프가 여전히 25개를
-    // 전부 그린다. 이관은 2단계(ContextRegister 10개)와 3단계(직접 Begin 15개)가
-    // 창을 하나씩 이 표로 옮기며 위 루프를 줄인다.
+    // PHASE 21 M4(부록 B.3): 창 프레임을 여는 곳은 여기 하나다.
     //
-    // 순서가 뒤가 아니라 여기인 이유: 도크스페이스는 BeginRender가 이미 세웠고,
-    // 옮겨 온 창은 옛 루프가 그린 창과 같은 프레임 안에서 같은 도크 노드를
-    // 봐야 한다. 이관 도중 두 경로가 공존하는 구간이 있고, 그 구간에서
-    // 배치가 흔들리지 않아야 한다.
+    // 여기 있던 옛 펌프 — `ImGuiRegister`의 `unordered_map`을 훑어 항목마다
+    // `Render()`를 부르던 네 줄 — 는 4단계에서 걷었다. 마지막까지 그것이
+    // 그리던 창이 0개가 된 뒤였고, 그 사실은 표에 스물다섯이 다 실린 것과
+    // 짝을 이룬다. 순회 순서가 `unordered_map`이라 비결정적이던 것도 함께 갔다.
+    //
+    // 자리가 BeginRender 뒤인 이유는 그대로다 — 도크스페이스가 이미 서 있어야
+    // 창이 자기 도크 노드를 찾는다.
     ::editor::draw_declared_windows();
 }
 

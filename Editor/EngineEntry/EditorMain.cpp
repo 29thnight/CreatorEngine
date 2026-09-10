@@ -8,7 +8,7 @@
 #include "RHI/ImGuiHostPresentationSink.h"
 #include "RHI/ScreenSizedResource.h"
 #include "InputManager.h"
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 #include "Physx.h"
 #include "SoundManager.h"
 #include "TimeSystem.h"

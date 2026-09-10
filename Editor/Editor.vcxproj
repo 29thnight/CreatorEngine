@@ -77,6 +77,7 @@
     <ClInclude Include="EditorWindow\EditorWindowRegistry.h" />
     <ClInclude Include="EditorWindow\EditorWindowHost.h" />
     <ClInclude Include="EditorWindow\EditorWindowSelfTest.h" />
+    <ClInclude Include="EditorWindow\EditorWindowAudit.h" />
     <ClInclude Include="EditorWindow\RegisterEditorWindowManual.h" />
     <ClInclude Include="EditorWindow\Windows\EditorStandardWindows.h" />
     <ClInclude Include="EditorWindow\Windows\EditorWindowBody.h" />
@@ -113,9 +114,6 @@
     <ClInclude Include="ImGuiHelper\IconsFontAwesome4.h" />
     <ClInclude Include="ImGuiHelper\IconsFontAwesome6.h" />
     <ClInclude Include="ImGuiHelper\ImGui.h" />
-    <ClInclude Include="ImGuiHelper\ImGuiContext.h" />
-    <ClInclude Include="ImGuiHelper\ImGuiRegister.h" />
-    <ClInclude Include="ImGuiHelper\ImGuiRegisterClass.h" />
     <ClInclude Include="ImGuiHelper\NodeEditor.h" />
     <ClInclude Include="ImGuiHelper\PinHelper.h" />
     <ClInclude Include="ImGuiHelper\ProfilerHUD.h" />
@@ -197,6 +195,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorWindowSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\EditorWindowAudit.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EditorWindow\Windows\EditorStandardWindows.cpp">

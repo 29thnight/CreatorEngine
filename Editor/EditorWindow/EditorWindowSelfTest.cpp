@@ -75,13 +75,14 @@ namespace editor
     {
         report.clear();
 
-        const window_registry_stats before = collect_window_registry_stats();
-        if (before.total != 0)
-        {
-            report = "표가 비어 있지 않다 — 자가 검사는 제품 등록보다 먼저 돌아야 한다 "
-                     "(total=" + std::to_string(before.total) + ")";
-            return false;
-        }
+        // 제품 표를 옆으로 치우고 빈 표 위에서 돈다. 끝나면 그대로 되돌린다.
+        //
+        // 처음에는 "표가 비어 있지 않으면 실패"였다. 그러면 이 검사는 부팅
+        // 전 한순간에만 돌 수 있고, 그 말은 도는 세트에 넣을 수 없다는 뜻이다 —
+        // 이 저장소는 "게이트가 도는 세트에 없으면 없는 것"으로 두 번 데었다.
+        // 치우고 되돌리면 살아 있는 에디터에서도 언제든 부를 수 있다.
+        std::vector<window_entry> saved;
+        saved.swap(window_entries());
 
         g_scene_draws = 0;
         g_inspector_draws = 0;
@@ -97,6 +98,7 @@ namespace editor
         {
             report = "창 3개가 실리지 않았다 (size=" + std::to_string(entries.size()) + ")";
             clear_window_registry();
+            saved.swap(window_entries());
             return false;
         }
         if (entries[0].stable_id != std::string_view{ "selftest.scene" } ||
@@ -316,6 +318,10 @@ namespace editor
         {
             fail(report, "clear_window_registry가 표를 비우지 않았다");
         }
+
+        // 치워 뒀던 제품 표를 되돌린다. 실패 경로에서도 반드시 돌아와야 하므로
+        // 위쪽의 조기 반환은 하나뿐이고 그것은 표를 치우기 전에 있다.
+        saved.swap(window_entries());
 
         return report.empty();
     }

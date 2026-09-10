@@ -1,5 +1,5 @@
 #pragma once
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 
 class GameViewWindow
 {

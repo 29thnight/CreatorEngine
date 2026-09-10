@@ -18,7 +18,8 @@ class IImGuiHost;
 //   · 에디터 폰트(Verdana + FontAwesome 아이콘)와 스타일
 //   · UI 스케일 추적(EditorPreferences) — 재빌드는 경계의 RebuildFontAtlas로
 //   · 메인 독스페이스와 최초 도크 레이아웃(imgui.ini가 없을 때)
-//   · ImGuiRegister 창 펌프
+//   · 선언된 창의 프레임(editor::draw_declared_windows) — 옛 ImGuiRegister
+//     펌프가 있던 자리다(M4 4단계에서 걷었다)
 //
 // 소속도 계보와 다르다: RenderEngine이 아니라 Academy_4Q(Editor 필터)다.
 // 에디터 코드는 에디터 exe에 산다 — Player는 이 파일을 링크하지 않는다.

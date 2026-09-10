@@ -202,6 +202,15 @@ Run-Step "Commandlet 격리 및 공통 편집 API" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-command-surface.ps1") -Exe $Exe -Work (Join-Path $Work 'command-surface')
 }
 
+# PHASE 21 M4 — editor:: 선언 배선.
+#
+# 두 자가 검사(창 표·메뉴 표)와 창 배선 감사를 한 번에 태운다. 둘 다 오래
+# scratchpad 하네스에서만 돌았고, 그 말은 없는 게이트였다는 뜻이다. 자가 검사가
+# 자기 표를 옆으로 치우고 합성 선언 위에서 돌게 고친 뒤에야 도는 세트에 들어왔다.
+Run-Step "editor:: 선언 배선(창 표·메뉴 표·고아 0)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-declaration-wiring.ps1") -Exe $Exe -Work (Join-Path $Work 'editor-declaration')
+}
+
 # PHASE 14.5 LC7 §10.2 — 리로드 실패가 반쯤 교체된 상태를 남기지 않는다.
 #
 # 관리 쪽 Reload()가 `Unload(); Load();` 라, 새 어셈블리가 깨져 있으면 이전 것은

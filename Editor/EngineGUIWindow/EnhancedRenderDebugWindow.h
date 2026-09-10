@@ -1,5 +1,5 @@
 #pragma once
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 
 // EnhancedRenderer(DX12) 렌더 디버그 창.

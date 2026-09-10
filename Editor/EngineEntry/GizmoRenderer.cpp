@@ -1,7 +1,7 @@
 #include "GizmoRenderer.h"
 // 그리드 설정 창 본문이 ImGui를 부른다. 전에는 Core.Minimal.h가 Reflection
 // 사슬로 대신 끌어와 줬다 — 그 사슬을 걷으면서 직접 든다.
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorToolboxWindows.h"
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 
 class MenuBarWindow
 {
@@ -18,7 +18,6 @@ public:
 	void DrawBehaviorTreeWindow();
 	void DrawBlackBoardWindow();
     void ShowLogWindow();
-	void ShowLightMapWindow();
 	void ShowBehaviorTreeWindow();
 	void ShowBlackBoardWindow();
 	void SHowInputActionMap();
@@ -32,7 +31,5 @@ private:
     ImFont* m_koreanFont{ nullptr };
     int  m_selectedLogIndex{};
 	bool m_bShowNewScenePopup{ false };
-	bool m_bShowLightMapWindow{ false };
-	bool m_bCollisionMatrixWindow{ false };
 	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
 };

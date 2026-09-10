@@ -10,7 +10,7 @@
 #include "Material.h"
 #include "PathFinder.h"
 #include "Texture.h"
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 

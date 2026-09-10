@@ -19,6 +19,7 @@
 
 #include <functional>
 #include <string_view>
+#include <vector>
 
 namespace editor::windows
 {
@@ -28,6 +29,13 @@ namespace editor::windows
 
     /// 소멸자가 부른다. 걸지 않은 이름을 풀어도 아무 일도 일어나지 않는다.
     void unbind_window_body(std::string_view stable_id);
+
+    /// 지금 걸려 있는 이름 전부. 건 순서 그대로다.
+    ///
+    /// 고아 검사가 이것을 읽는다 — 표에 없는 이름에 본문이 걸려 있으면 그
+    /// 본문은 영영 불리지 않는다. 오타 하나가 조용히 죽은 창을 만들던 옛
+    /// `GetContext` 결함의 반대편이고, 그래서 반대 방향도 봐야 한다.
+    std::vector<std::string_view> bound_window_bodies();
 
     namespace detail
     {

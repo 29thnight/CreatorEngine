@@ -1,6 +1,6 @@
 #include "EditorCameraRig.h"
 #include "InputManager.h"
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 
 #include <algorithm>
 #include <cmath>

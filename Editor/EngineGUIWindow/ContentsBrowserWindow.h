@@ -1,6 +1,6 @@
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 #include "EditorAssetPresentation.h"
 #include "EditorSettingsStore.h"
 #include "AuthoringWriteNode.h"

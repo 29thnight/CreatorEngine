@@ -198,6 +198,9 @@
     <ClInclude Include="EditorWindow\EditorWindowSelfTest.h">
       <Filter>EditorWindow</Filter>
     </ClInclude>
+    <ClInclude Include="EditorWindow\EditorWindowAudit.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
     <ClInclude Include="EditorWindow\RegisterEditorWindowManual.h">
       <Filter>EditorWindow</Filter>
     </ClInclude>
@@ -229,6 +232,9 @@
       <Filter>EditorWindow</Filter>
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorWindowSelfTest.cpp">
+      <Filter>EditorWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\EditorWindowAudit.cpp">
       <Filter>EditorWindow</Filter>
     </ClCompile>
     <ClCompile Include="EditorWindow\Windows\EditorStandardWindows.cpp">
@@ -332,15 +338,6 @@
     </ClInclude>
     <ClInclude Include="ImGuiHelper\ImGui.h">
       <Filter>ImGuiHelper\소스 파일\ImGuiHeader</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\ImGuiContext.h">
-      <Filter>ImGuiHelper\소스 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\ImGuiRegister.h">
-      <Filter>ImGuiHelper\소스 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\ImGuiRegisterClass.h">
-      <Filter>ImGuiHelper\소스 파일</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\NodeEditor.h">
       <Filter>ImGuiHelper\소스 파일\NodeEditior</Filter>

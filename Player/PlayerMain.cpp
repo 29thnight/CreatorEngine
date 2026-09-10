@@ -634,7 +634,8 @@ void Player::PlayerMain::OnGui()
 	ImGui::End();
 	ImGui::PopStyleVar(2);
 
-	// 창 펌프(ImGuiRegister 순회)는 부르지 않는다 — 그것은 에디터 몫이고,
+	// 선언된 창의 프레임(editor::draw_declared_windows)은 부르지 않는다 — 그것은
+	// 에디터 몫이고, 애초에 Player는 그 계통을 링크하지 않는다. 또한
 	// EditorAssetPresentation이 등록하는 material/texture selector는
 	// 플레이어에 설치되지 않으므로 플레이어 화면에 섞일 수 없다.
 	//

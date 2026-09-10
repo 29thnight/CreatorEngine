@@ -1,5 +1,5 @@
 #pragma once
-#include "ImGuiRegister.h"
+#include "ImGui.h"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CurvePoint.h"
