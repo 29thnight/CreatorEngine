@@ -2,6 +2,9 @@
 
 - 수립일: 2026-08-24
 - 사전 정찰 갱신: 2026-08-30 (§1 기준선 전수 재실측 · §3.2/§7.1/§8.3/§9/§11/§12 정정)
+- 재정찰: 2026-09-10 — §1 17항 재대조(15 그대로 · 2 정정) · 신규 발견 9건 · 메뉴 표면 감사.
+  전문은 [EditorMenuSurfaceAndPhase21Preflight.md](../analysis/EditorMenuSurfaceAndPhase21Preflight.md).
+  이 문서에는 W0/W1/W3/W5의 정정 지점과 **부록 A(메뉴 등록 배선 계약 `editor::`)**를 반영했다.
 - 상태: 계획 수립 · 구현 미착수
 - 방향: **Dear ImGui 유지 · S&Box 테마 토큰 이식 · 소수 전용 위젯만 custom draw**
 범위: Editor chrome, theme, tool window, docking, workspace, ViewportHost, Play 표시·입력 전환, 회귀 검증
@@ -310,6 +313,11 @@ editor.dock          central node 존재·rect·유일성
 editor.theme         token sample(hex)과 적용 style 값
 editor.viewport      현재 mode·display target·input owner·cursor state
 ```
+
+여섯째로 `editor.menu`가 붙는다 — 조립된 상단·팝업 메뉴 트리의 TSV 덤프다. 이것은 부록 A의 M2가
+자기 게이트를 위해 만드는 것이라 **W0이 따로 짜지 않는다.** 대신 W0의 window inventory 단정이
+`editor.windows`와 `editor.menu` 둘을 같이 읽어 "열 수 있는 창"과 "실제 등록된 창"의 차집합을
+드러내야 한다. 지금 AssetBundle 창이 어느 메뉴에도 없어 열 수단이 없는 것이 그 차집합의 실물이다.
 
 이 다섯이 없으면 `verify-editor-workspace.ps1`은 "창이 떴다"밖에 단정하지 못한다. §9의 W0
 추정은 이 몫을 포함해 재산출했다.
@@ -711,6 +719,8 @@ CreatorEngine editor다.
 
 모든 상태는 최초 `todo`다. 문서 작성은 구현 진행으로 세지 않는다. 총 초기 추정은 23일이었고,
 정찰 뒤 **25일**로 조정했다(W0 +1, W5 +1. 근거는 각 슬라이스에 적었다).
+2026-09-10 재정찰에서 **부록 A의 메뉴 등록 배선 M0~M2(3.5일)**를 범위에 넣어 총 **28.5일**이 됐다.
+착수 순서는 §10의 권장 순서 표를 따른다.
 
 ### W0 — 관측 표면 · 기준선 · 실패 게이트 (P0, 2일 · 정찰 뒤 1일→2일)
 
@@ -719,6 +729,10 @@ CreatorEngine editor다.
 
 - `editor.layout` / `editor.windows` / `editor.dock` / `editor.theme` / `editor.viewport` 관측
   커맨드를 신설한다(§1.9). 이번 슬라이스에서는 **관측만** 하고 설정·저작은 W3/W6에 둔다.
+  **(9-10 재정찰)** `editor.viewport`는 `ScenePhase`를 실어야 한다 — 현행 `play.state`는
+  gameStart·paused·pending만 내서 스냅샷 실패 뒤의 상태가 성공과 구분되지 않는다
+  (`SceneObjectCommands.cpp:1034-1057`). 관측 대상 상태의 정본은 재정찰 문서 §1.4의
+  "GUI에만 있는 동작" 표다. screenshot은 기존 `Tools/regression/capture-window.ps1`을 재사용한다.
 - `ImGuiRegister`의 창 순회를 결정적 순서로 바꾼다(§1.3-4). golden을 뜨기 **전에** 한다.
 - 현재 `imgui.ini` 4벌을 fixture로 고정한다(§1.4) — 정본 2, 유물 2. Content Browser 이중 entry가
   들어 있는 실물을 그대로 쓴다.
@@ -729,7 +743,11 @@ CreatorEngine editor다.
 - Editor UI CPU, ImGui vertices/indices/draw commands, target별 GPU ms를 기록한다.
 - `verify-editor-workspace.ps1` canary를 만든다.
 
-**판정:** 빈 측정·빈 screenshot으로 통과하지 않는다. canary는 **변이로 이빨을 증명한다** —
+**판정:** 빈 측정·빈 screenshot으로 통과하지 않는다. **canary는 불변식을 단정하고 현재 개수를 단정하지
+않는다** — "상단 메뉴가 셋"처럼 착수 전 상태를 지키는 단정은 부록 A의 M1이 Tools/Window를 세우는 순간
+정당하게 빨개져 게이트가 제 일을 못 한다. 대신 "등록됐는데 그려지지 않는 고아 0", "DockBuilder 이름과
+`Begin` 이름 불일치 0"처럼 **어느 시점에도 참이어야 하는 것**을 단정한다.
+canary는 **변이로 이빨을 증명한다** —
 Content Browser 이름을 한 글자 바꾸거나 central node를 지운 fixture를 넣었을 때 정확히 그 단정만
 빨개져야 하고, 첫 실행부터 전부 초록이면 통과로 세지 않는다. legacy layout과 performance
 baseline이 이 문서 또는 별도 analysis 산출물에 기록된다.
@@ -745,6 +763,13 @@ baseline이 이 문서 또는 별도 analysis 산출물에 기록된다.
   `ScaleAllSizes`는 geometry에만 적용해 현재의 이중 적용을 끊는다.
 - Win32 DPI awareness와 `io.ConfigDpiScaleFonts` 채택 여부를 판정하고, 채택하면
   `DisplayFramebufferScale` 하드코딩 `(1,1)`을 함께 걷는다.
+  **(9-10 재정찰 정정)** 프로세스는 매니페스트로 이미 `permonitorv2`를 선언한다
+  (`Editor/EngineEntry/Academy_4Q.exe.manifest:26`). 따라서 문제는 "인식을 켤 것인가"가 아니라
+  **"이미 인식 중인데 보정이 0"**이다 — OS 가상화 없이 150% 모니터에서 물리 픽셀 1:1로 그린다.
+  최소 경로는 `WM_DPICHANGED` 처리 + `style.FontScaleDpi`/`io.ConfigDpiScaleFonts` 채택이며,
+  "채택하지 않는다"는 선택은 그 1:1 렌더를 유지한다는 뜻임을 판정문에 명시한다. ImGui 1.92.8은
+  ThirdParty가 아니라 vcpkg에서 온다. `Fonts->Build()`(`EditorRenderer.cpp:84`)도 1.92 동적
+  아틀라스 기준 legacy라 함께 걷는다.
 
 **판정:** token sample은 기준 hex와 일치하고, font file 부재로 editor가 뜨지 않는 경로가 없다.
 `IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 켠 상태로 Editor가 빌드·기동된다(obsolete 잔존 0의 증명).
@@ -773,7 +798,17 @@ user scale 100↔150% 왕복과 **실제 DPI 100↔150% 왕복**을 따로 판�
   static flag 누적(§1.3-1)을 함께 지운다.
 - 일반 panel close/open과 Window 메뉴 재열기를 연결한다. Content Browser의 popup 우회(§1.3-2)를
   role 계약으로 흡수한다.
-- `BuildInitialDockLayout`의 `Tile` 분기 누락(§1.2)을 청산한다.
+  **(9-10 재정찰)** Window 메뉴 자체가 없고(상단 메뉴는 File·Edit·Settings 셋), 메뉴를 표로 그리는
+  기구도 0이다. 하드코딩 메뉴를 하나 더 만들지 않으려면 **메뉴 등록 배선이 W3의 선행 부품**이다.
+  설계는 **부록 A**에 있다(`editor::` 별도 계통 · `for_editor()` 선언 · 표면을 닫힌 집합으로 ·
+  M0~M2 3.5일. 그중 **M1이 이 슬라이스의 선행**). 창 표시 상태 저장소도 둘로 갈라져 있다
+  (`MenuBarWindow` bool 10개 vs `ImGuiRenderContext::m_opened`)라 같은 슬라이스에서 하나로 합친다.
+  `GetContext(name)`의 `operator[]`(`ImGuiRegisterClass.h:95-98`)는 오타 이름을 유령 창으로
+  영구 삽입하므로 `find`로 바꾼다.
+- `BuildInitialDockLayout`의 `Tile` 분기 누락(§1.2)을 청산한다. **(9-10)** Tile이 기본값이라 새
+  설치에서 Content Browser·AssetBundle은 항상 떠 있고, dock 지정에 없는 창이 15개 이상이다. ini는
+  부재 시에만 생성되고 재생성 경로가 없으므로(`EditorRenderer.cpp:238-246`) Reset Layout과 layout
+  version 키가 선택이 아니라 필수다.
 - `ImGuiRegister.h`의 자기 `#define EDITOR`와 죽은 else 분기를 정리한다.
 - `EditorWorkspaceStore`, legacy migration, backup, Reset Layout을 구현한다.
 
@@ -806,6 +841,11 @@ controller를 짜기 전에 그 둘을 먼저 만들어야 한다.
 - **선행 1 — committed 신호:** 씬 수준 play state 정본이 `m_isGameStart` `atomic_bool` 하나뿐이고
   스냅샷 실패 시 되돌지 않는다(§1.6). requested/pending/committed를 구분할 수 있는 신호를 만들고,
   실패 경로에서 상태가 되돌아오는지부터 단정한다.
+  **(9-10 재정찰)** 파급이 더 넓다. `PlayModeEvent.Broadcast(true)`가 `CaptureSceneSnapshot()`
+  **앞**에서 발화해(`SceneManager.cpp:1538-1548`) 구독자(`EditorPlayModeController.cpp:25-52`)가
+  Undo 스택을 비우고 game mode로 바꾼 뒤에야 스냅샷이 실패한다. 순서를 **Snapshot → Phase →
+  Broadcast**로 바꾸지 않으면 committed 신호를 만들어도 Undo는 먼저 죽는다.
+  `m_isEditorSceneLoaded`도 실패 여부와 무관하게 true가 된다(`:347-357`).
 - **선행 2 — 입력 소유권 신호:** `ImGuiHost::BeginFrame`의 `WantCapture*` 매 프레임 강제(§1.8)를
   걷는다. 걷는 순간 game input 라우팅 동작이 바뀔 수 있으므로 **계측 → 지혈 순서**를 지킨다.
 - `Entering/PlayingPossessed/PlayingEjected/Exiting`을 Editor controller에 둔다.
@@ -863,7 +903,27 @@ W0 → W3 → W4 → W5
           W4 → W6
 H3 + W0 ─────→ W7
 W2 + W5 + W6 + W7 → W8
+
+M0 → M1 → M2          (부록 A. W0과 파일을 공유하지 않아 병행 가능)
+M1 ──────→ W3         (Window 메뉴 재열기 계약의 선행)
+M2 ──────→ W0 canary  (여섯째 관측 커맨드 editor.menu를 승계한다)
 ```
+
+**권장 착수 순서(2026-09-10).** 의존만 보면 여러 배열이 가능하지만, 아래 순서가 같은 파일을 두 번
+헤집지 않고 golden을 한 번만 뜬다.
+
+| 순 | 슬라이스 | 이 자리인 이유 |
+|---|---|---|
+| 1 | **W0 전반** — 관측 커맨드 5종 · 창 순회 결정화 | `editor.*` 가족의 **출력 형식을 여기서 정한다.** M2의 여섯째가 그 관례를 따르게 하려면 다섯이 먼저다. 순회 결정화는 모든 golden의 선행 |
+| 2 | **M0** — 선언 어휘와 목록 배관 | 새 폴더뿐이라 동작 변화 0. 1과 파일을 공유하지 않아 **병행 가능** |
+| 3 | **M1** — registry와 그리기 배선 | 메뉴 구조를 바꾸는 마지막 슬라이스. 빈 뿌리를 그리지 않으므로(부록 A.6) 픽셀 중립이고, **W1보다 먼저** 두어야 `MenuBarWindow.cpp` 2,716줄을 구조와 토큰으로 두 번 헤집지 않는다 |
+| 4 | **M2** — 게이트와 `editor.menu` | M1의 표가 있어야 덤프할 것이 생긴다. W0 canary가 쓸 여섯째 커맨드를 여기서 낸다 |
+| 5 | **W0 후반** — ini fixture 4벌 · inventory · screenshot · 성능 기준선 · canary | chrome이 최종 구조가 된 뒤 **golden을 한 번만 뜬다.** canary가 dock 불변식과 메뉴 불변식을 함께 단정할 수 있다 |
+| 6~ | W1 → W2, W3 → W4 → W5·W6, W7, W8 | §9·§10의 기존 의존 그대로. W3의 선행인 M1은 이미 끝나 있다 |
+
+두 가지를 주의한다. `CommandDescriptorSeeds.cpp`는 1과 4가 모두 건드리는 유일한 공유 파일이고 지금
+**다른 세션이 수정 중**이다. 그리고 3은 기존 19개 상단 항목을 이관하지 않는다 — 배선만 세우고 신규만
+태운다(부록 A.7).
 
 - PHASE 20 Network와 독립 병행 가능하다.
 - **W0 안에 순서 제약이 둘 있다.** 관측 커맨드 5종(§1.9)과 창 순회 결정화(§1.3-4)는
@@ -942,6 +1002,9 @@ W2 + W5 + W6 + W7 → W8
 | **custom widget이 기존 ImGuiHelper 자산과 이중화** | W2 착수 전 §7.1 승계 결정표 확정, 소비자를 끊어 본 뒤 은퇴 |
 | **비-UTF8 소스 편집이 무관한 주석을 깨뜨림** | 대상 9개는 내용 수정 전에 인코딩부터 정리(§1.10) |
 | **창 순회 비결정성으로 visual golden이 흔들림** | golden을 뜨기 전에 `m_contexts` 순회를 결정적 순서로(§1.3-4) |
+| **메뉴 동작을 선언했는데 조용히 사라짐** | Editor는 StaticLibrary이고 `/WHOLEARCHIVE`가 없어 참조 없는 TU가 탈락한다. 중앙 `EDITOR_MENU_LIST` 하나 + 기동 누락 게이트(부록 A.2·A.5) |
+| **팝업 문맥 타입을 혼동해 엉뚱한 대상에 동작을 붙임** | 표면을 닫힌 열거형으로, 문맥 타입을 호스트 특성으로 못 박아 **컴파일 오류**로 만든다(부록 A.3·A.4) |
+| **메뉴 동작이 Presentation 스레드에서 씬을 직접 만짐** | `EnqueueStructured`로 게임 스레드에 넘기고 completion을 반드시 넘겨 배치 종료 코드 오염을 막는다(부록 A.6) |
 
 rollback 단위는 W1 theme, W3 workspace, W4 ViewportHost, W5 mode controller를 각각 feature
 flag로 분리한다. 단, 완료 뒤 영구 이중 경로를 유지하지 않고 W8에서 legacy 강제 배치를 제거한다.
@@ -967,4 +1030,265 @@ flag로 분리한다. 단, 완료 뒤 영구 이중 경로를 유지하지 않�
     꺼진 채로 남아 있음을 게이트가 단정한다(§3.2, §1.7).
 13. `editor.*` 관측 커맨드 5종이 서 있고, 에디터 chrome 회귀 3종이 **변이로 이빨을 증명한**
     상태로 CI에 있다(§1.9, §11).
-14. PHASE 21 완료 표시는 위 구현·runtime gate 뒤에만 갱신한다. 이 문서 작성만으로는 0%다.
+14. 메뉴 등록 배선이 서 있다 — 동작 하나를 상단·팝업의 원하는 카테고리에 붙이는 데 필요한 편집이
+    **선언 한 줄**이고, 표면 오타와 문맥 타입 불일치가 컴파일 오류이며, 목록 누락은 기동 게이트가
+    잡는다(부록 A). `editor.menu` 덤프가 골든과 함께 CI에 있다.
+15. PHASE 21 완료 표시는 위 구현·runtime gate 뒤에만 갱신한다. 이 문서 작성만으로는 0%다.
+---
+
+## 부록 A. 메뉴 등록 배선 계약 (`editor::`)
+
+- 추가: 2026-09-10. W3의 "Window 메뉴 재열기"와 §1.3의 표시 상태 이원화를 풀기 위한 선행 부품.
+- 실측 근거는 [EditorMenuSurfaceAndPhase21Preflight.md](../analysis/EditorMenuSurfaceAndPhase21Preflight.md) §2.
+  이 부록은 그 실측 위에 세운 **계약**이다. 구현 미착수.
+
+### A.1 `meta::`에 얹지 않는다
+
+리플렉션의 `meta::method`에 메뉴 속성을 더하는 안을 검토했고 **기각한다.**
+
+| 근거 | 실측 |
+|---|---|
+| 계층 오염 | `meta::`는 `Engine/Utility_Framework`에 있고 `Reflection.hpp`를 타고 런타임 전역에 퍼진다. Player도 같은 것을 링크한다. 에디터 전용 어휘를 `method_info`·`Meta::Method`에 넣으면 CT3이 끊은 전파를 되돌린다 |
+| 골든 사정권 | `verify-reflection-golden.ps1`이 76타입 diff 0을 단정한다. `Meta::Method`(`ReflectionType.h:69-73`)를 건드리면 메뉴 작업이 이유 없이 그 게이트 안에 들어간다 |
+| 인스턴스 제약 | `Meta::MakeMethod`는 `Ret(ClassT::*)(Args...)` **포인터 투 멤버만** 받는다(`ReflectionFunction.h:277`). 전역 동작을 원리적으로 표현할 수 없다 |
+
+따라서 `editor::`는 **별도 계통**이다. `meta::`를 읽지도, 확장하지도 않는다.
+
+단 두 관례는 그대로 물려받는다. **파일명은 PascalCase, 네임스페이스 안 식별자는 snake_case**다
+(`MetaSchema.h`가 `meta::field`·`schema_of`·`field_info`를 담는 것과 같은 분리). 선언 함수 이름은
+리플렉션의 `static consteval auto reflect()`(`SoundComponent.h:15`)에 대응해 **`for_editor()`**로 둔다.
+
+### A.2 형태를 결정하는 링크 제약 (실측)
+
+| 항목 | 값 |
+|---|---|
+| `Editor.vcxproj` ConfigurationType | StaticLibrary, 네 구성 전부(`:226,232,239,247`) |
+| `CreatorEditor.vcxproj` ConfigurationType | Application(`:32,38,45,53`) |
+| `WholeArchive` / `/WHOLEARCHIVE` | Editor·Engine 전 vcxproj에 **0건** |
+
+정적 라이브러리의 오브젝트 파일은 외부에서 심볼을 참조할 때만 링커가 끌어온다. 따라서 독립 `.cpp`에
+네임스페이스 스코프 자기 등록자를 두면 **조용히 사라진다.** 이 저장소가 흩어진 정적 등록자를 은퇴시키고
+명시 등록 진입점으로 간 이유가 그것이며, 등록 한 줄이 빠지면 명령이 말없이 없어진다는 경고가
+`Commands/CommandRegistrar.h:14-18`·`:58`에 이미 적혀 있다.
+
+리플렉션이 이 문제를 푼 형태를 그대로 쓴다. 선언은 지역에 두고,
+[RegisterReflectManual.h](../../Engine/SceneRuntime/RegisterReflectManual.h)가 타입 헤더 전부를
+include하면서 `REFLECT_TYPE_LIST(X)`로 열거한다(`:86`, 소비 `:169`). **include가 인스턴스화를 링크되는
+TU 안으로 끌어오고, 열거가 등록을 돌린다.** 목록 하나가 두 일을 한다. 누락은 기동 검사가 잡는다.
+
+`editor::`도 같은 계약이다. **선언은 지역, 목록은 중앙 하나, 누락은 게이트.** "선언만 하면 알아서
+나타난다"는 형태는 이 링크 조건에서 성립하지 않으므로 채택하지 않는다.
+
+### A.3 표면을 문자열이 아니라 닫힌 집합으로 둔다
+
+상단 메뉴와 팝업 메뉴는 **경로 문자열의 뿌리가 서로 다른 집합**이다. 상단은 카테고리
+(File·Edit·Settings·Tools·Window·Help)이고, 팝업은 그리는 자리(Hierarchy·Content Browser·Inspector 등)다.
+둘을 한 문자열 필드에 담으면 뿌리 오타가 **그려지지 않는 고아 항목**을 만든다. 이 저장소가 반복해서
+겪은 조용한 소멸이다. 그래서 표면은 열거형이고, 뿌리 뒤의 하위 경로만 문자열이다.
+
+```cpp
+namespace editor
+{
+    enum class top_menu_root { file, edit, settings, tools, window, help };
+
+    enum class popup_host {
+        hierarchy, content_browser_folder, content_browser_asset,
+        inspector_component, scene_view, behavior_tree_node, animator_node,
+    };
+}
+```
+
+**팝업 호스트가 동작의 인자 타입을 결정한다.** Hierarchy 팝업의 문맥은 클릭된 엔티티고, Content Browser
+자산 팝업의 문맥은 파일 경로다. 이 차이를 `void*`나 `std::any`로 뭉개면 CT6-a가 걷어낸 이중 타입소거를
+새 소비자로 되살린다. 그래서 호스트별 문맥 타입을 특성으로 못 박고, 표기 단계에서 검사한다.
+
+```cpp
+namespace editor
+{
+    struct entity_target    { std::string identity; };            // @scene:index:generation
+    struct asset_target     { std::filesystem::path path; };
+    struct folder_target    { std::filesystem::path path; };
+    struct component_target { std::string entity_identity; std::string component; };
+
+    template<popup_host H> struct popup_context;
+    template<> struct popup_context<popup_host::hierarchy>             { using type = entity_target; };
+    template<> struct popup_context<popup_host::content_browser_asset> { using type = asset_target; };
+    template<> struct popup_context<popup_host::inspector_component>   { using type = component_target; };
+    // ...
+
+    template<popup_host H> using popup_context_t = typename popup_context<H>::type;
+}
+```
+
+대상 타입이 원시 포인터가 아니라 **신원을 든 값**인 것이 요점이다. `entity_target`이
+`@scene:index:generation`을 들기 때문에(§A.6의 스레드 규약) 큐를 한 번 거쳐도 핸들이 죽지 않는다.
+
+### A.4 선언 표기 — 서명이 결속을 선언한다
+
+별도 `target(...)` 어휘를 두지 않는다. **함수 서명이 대상 결속을 말한다.**
+
+| 서명 | 뜻 |
+|---|---|
+| `void f()` | 전역 동작. 항상 활성 |
+| `void f(editor::entity_target)` | 선택 대상. 선택이 없으면 registry가 자동 비활성 |
+| 팝업의 `void f(popup_context_t<H>)` | 그 호스트의 문맥. 타입이 어긋나면 **컴파일 오류** |
+
+표기는 표면이 이름에 드러나는 짧은 별칭을 정본으로 쓴다. 뿌리를 값으로 넘기는 두 원형
+(`top_menu_item<Root, Fn>` · `popup_item<Host, Fn>`)은 그 아래 원시 표기로 남긴다.
+`meta::field<&Self::x>`가 `field_info` 위의 짧은 표기인 것과 같은 층 구성이다.
+
+```cpp
+struct asset_menus
+{
+    static consteval auto for_editor()
+    {
+        return editor::menu_set(
+            editor::in_tools<&reimport_all>("Assets/Reimport all")
+                   .shortcut("Ctrl+R"),
+
+            editor::in_content_asset<&reimport_one>("Reimport")
+                   .enabled(&is_model_asset),
+
+            editor::in_hierarchy<&make_prefab>("Create/Prefab"),
+
+            editor::in_content_asset<&delete_asset>("Delete")
+                   .confirm("이 자산을 지운다. 되돌릴 수 없다."));
+    }
+};
+```
+
+수정자는 `field_info::with`와 같은 연쇄 형태로 둔다. `enabled`는 대상 있는 동작이면 같은 문맥 타입을 받고,
+`shortcut`은 단축키 registry가 서기 전까지 **표시 전용**이며, `order`는 같은 하위 메뉴 안 안정 정렬,
+`confirm`은 파괴적 동작 전용이다. `confirm`을 어휘에 넣는 근거는 실측이다. 지금 Content Browser의
+Delete 두 곳이 확인도 Undo도 없이 `file::remove`를 부른다(`ContentsBrowserWindow.cpp:458,:531`).
+
+동작 이름은 약칭을 쓰지 않는다. `content_browser_asset`이고 `cb_asset`이 아니다.
+
+### A.5 중앙 목록과 누락 게이트
+
+```cpp
+// Editor/EditorMenu/RegisterEditorMenuManual.h — RegisterReflectManual.h와 같은 모양
+#include "AssetMenus.h"
+#include "SceneMenus.h"
+
+#define EDITOR_MENU_LIST(X) \
+    X(asset_menus) \
+    X(scene_menus) \
+
+inline void register_editor_menus()
+{
+#define EDITOR_MENU_REGISTER_ONE(T) editor::register_declarer<T>();
+    EDITOR_MENU_LIST(EDITOR_MENU_REGISTER_ONE)
+#undef EDITOR_MENU_REGISTER_ONE
+}
+```
+
+- 이미 목록에 있는 선언자에 동작을 더하는 것은 **그 헤더 한 줄**이다. 중앙 파일을 건드리지 않는다.
+- 새 선언자는 include 한 줄과 목록 한 줄. 리플렉션의 규약과 동일하다.
+- `editor.menu` 관측 명령이 조립된 메뉴 트리를 TSV로 낸다(표면·뿌리·경로·동작 id·enabled 유무·단축키).
+  `commands.list`와 같은 골든 형태다. **이 명령 자체가 §1.9가 요구하는 `editor.*` 관측 다섯 중 하나다.**
+- 게이트는 셋을 단정한다. ① 목록에서 선언자를 빼면 그 항목만 사라진 것을 잡는다. ② `popup_host`
+  열거자마다 그리는 자리가 하나 이상 있고 그 역도 성립한다(배선 안 된 표면 0). ③ 같은 표면 안 경로 충돌 0.
+- 변이로 이빨을 증명한다. 문맥 타입 불일치는 **컴파일 오류**이므로 런타임 게이트가 아니라 빌드 게이트로
+  세고, 그 사실을 게이트 파일 머리에 적는다. 정책을 assert로만 적으면 Release에서 강제력이 0이 된다.
+
+### A.6 그리기 배선과 스레드 규약
+
+그리는 자리는 표면으로 물어본다. 상단 여섯, 팝업 일곱이다.
+
+| 자리 | 위치 |
+|---|---|
+| 상단 File·Edit·Settings의 `EndMenu` 직전 | `MenuBarWindow.cpp:321,365,459` |
+| 상단 Tools·Window·Help(신설, registry 전용) | `MenuBarWindow.cpp:523` `EndMainMenuBar` 앞 |
+| Hierarchy 팝업 | `HierarchyWindow.cpp:186` `EndPopup` 앞 |
+| Content Browser 팝업 네 곳 | `ContentsBrowserWindow.cpp:266,340,473,553` |
+
+Content Browser는 같은 이름 `"Context Menu"` 팝업이 세 벌이라(`:252,:447,:527`) 폴더 호스트와 자산 호스트로
+가르는 작업을 같은 슬라이스에서 한다. 기존 인라인 항목은 지우지 않고 **덧붙이기만** 하므로 이 단계의
+회귀 위험은 낮다.
+
+**빈 뿌리는 그리지 않는다.** 등록된 항목이 0인 `top_menu_root`는 `BeginMenu` 자체를 호출하지 않는다.
+그래서 M1이 착지해도 항목을 태우기 전까지 **shell 픽셀이 움직이지 않고**, W0의 visual golden을
+무효화하지 않는다. 팝업도 같다 — 항목 0인 호스트는 구분선조차 추가하지 않는다. 이 규칙이 M1과 W0의
+순서 제약을 없앤다.
+
+스레드 규약이 하나 있다. 메뉴 콜백은 PresentationThread에서 `m_sceneStructureMutex` 아래 돈다
+(`EditorMain.cpp:320-372`의 `PresentFrame`·`OnGui`·`RenderMenuBar` 사슬). 지금 File>Save가 그 스레드에서
+`SceneManagers`를 직접 만진다(`MenuBarWindow.cpp:243`). `editor::` 동작은 씬을 직접 만지지 않고
+`ConsoleCommandSystem::EnqueueStructured`로 게임 스레드에 넘긴다. **이때 completion을 반드시 넘긴다.**
+넘기지 않으면 배치 큐로 가서 `CommandSession::Batch()`에 누적되고 에디터 프로세스의 종료 코드를 오염시킨다
+(`ConsoleCommandSystem.cpp:638,856,872`. LC5가 HTTP에서 고친 그 결함이다).
+
+### A.7 이번 범위에서 하지 않는 것
+
+- **단축키 바인딩.** `shortcut`은 표시 문자열이다. 지금도 `MenuItem`의 `"Ctrl+S"`는 표시일 뿐이고 실제
+  핸들러가 `MenuBarWindow.cpp:747-800`에 본문째 복제돼 있다. 동작 id를 가진 이 registry는 단축키 registry의
+  **선행조건**이지 그 자체가 아니다.
+- **게임 코드의 메뉴 기여.** `editor::`는 `Editor/`에 산다. Dynamic_CPP 타입이 `for_editor()`를 선언하면
+  런타임 헤더가 에디터 헤더를 보게 되어 L0~L4 분리를 깬다. 기여를 허용할지는
+  [EngineLayerSeparationPlan.md](EngineLayerSeparationPlan.md)가 판정할 별건이다.
+- **기존 19개 상단 항목·68개 팝업 항목의 이관.** 이 슬라이스는 배선을 세우고 신규만 태운다. 이관은
+  W3 이후 별도 정리다.
+
+### A.8 슬라이스와 공수
+
+새 폴더 `Editor/EditorMenu/`에 둔다. 유니티 청크가 같은 폴더끼리만 묶이므로
+(`CombineFilesOnlyFromTheSameFolder`) 기존 청크 재편을 피한다. 레지스트리 구현부는 `Commands/` 전례대로
+`IncludeInUnityFile=false`로 두어 각 TU가 자기 include를 소유하는지 매 빌드가 검증하게 한다.
+
+| 슬라이스 | 내용 | 공수 |
+|---|---|---|
+| M0 | `editor::` 선언 어휘(표면 열거·문맥 특성·짧은 별칭·수정자)와 중앙 목록 배관 | 1일 |
+| M1 | registry와 그리기 배선 13곳, Content Browser 팝업 세 벌 통합 | 1.5일 |
+| M2 | 부팅 등록, 누락·충돌·미배선 게이트, `editor.menu` 덤프와 골든, 변이 증명 | 1일 |
+| | 합계 | **3.5일** |
+
+M0은 W0과 병행 가능하고, **M1은 W3의 선행**이다. W3의 close/reopen 계약은 이 표가 서기 전에는
+하드코딩 메뉴를 하나 더 만드는 것으로 끝난다.
+
+### A.9 M0 착지 기록 (2026-09-10)
+
+`Editor/EditorMenu/`에 `EditorMenuSurface.h`(표면·대상·문맥 특성),
+`EditorMenuSchema.h`(선언 어휘), `EditorMenuRegistry.{h,cpp}`(표와 낮추기),
+`RegisterEditorMenuManual.h`(중앙 목록), `EditorMenuSelfTest.{h,cpp}`가 섰다. 두 `.cpp`는
+`IncludeInUnityFile=false`이고 `$(ProjectDir)EditorMenu\`를 include 경로에 더했다.
+
+**설계와 달라진 것 넷.** 구현하며 드러난 제약이라 계약 쪽을 고쳤다.
+
+1. **상단 저장소가 하나가 아니라 둘이다** — `global_items`와 `selection_items`. A.4는 두 서명을
+   한 목록으로 접는 것처럼 읽혔는데, 접으려면 사용자 술어를 람다가 붙잡아야 한다. 항목은
+   `std::string_view`를 품어 **구조적 타입이 아니라** NTTP로 넘길 수 없고, 붙잡으려면
+   `std::function`이 필요해져 CT6-a가 걷어낸 타입소거가 되돌아온다. 그래서 접지 않고 나눠 든다.
+   선택 해석은 그리는 자리가 프레임당 한 번 한다(M1). 서명이 결속을 선언한다는 계약은 그대로다.
+2. **`action_id`는 경로가 아니라 함수 이름이다.** `__FUNCSIG__`에서 뽑는다. 메뉴 라벨을 바꿔도
+   id가 살아남아야 뒷날 단축키 바인딩이 그 위에 설 수 있다. 표기 변화는 `EditorMenuRegistry.cpp`의
+   카나리아 `static_assert` 둘이 잡는다(자유 함수 경로·정적 멤버 경로). MetaSchema.h가 같은 이유로
+   같은 장치를 둔 것을 복제했다 — 계층 경계 때문에 공유하지 않는다.
+3. **선언자 이름은 X매크로의 `#T`가 준다.** 타입 이름을 또 `__FUNCSIG__`로 뽑지 않는다. 등록 경로가
+   중앙 목록 하나뿐이므로 이름의 출처도 하나면 된다.
+4. **자가 검사가 표를 비운다.** `run_editor_menu_selftest`는 표가 비어 있을 때만 돌고 끝에서
+   비운다. 그래서 부팅 순서는 **자가 검사 → `register_editor_menus()`**이고, 비어 있지 않으면
+   거짓과 사유를 돌려준다. M2가 이것을 게이트에 이을 때 순서를 지켜야 한다.
+
+**M0이 증명한 것과 못 한 것.** 컴파일 타임으로는 표면 열거 완전성, 호스트별 문맥 타입 일치,
+이름 추출 표기를 단정한다. 런타임으로는 자가 검사가 선언이 표가 되는 전 구간을 본다 — 표면대로
+갈라졌는가, `action_id`가 함수 이름을 물었는가, `invoke` 포인터가 그 함수로 이어졌는가, 문맥이
+전달되는가, 수정자와 술어가 실렸는가. **아직 없는 것은 그리기다** — 표에 든 항목이 화면에 나오는지는
+M1이 배선한 뒤에야 증명된다. 그때까지 이 배선은 제품 동작을 하나도 바꾸지 않는다(중앙 목록이 비어 있다).
+
+**변이 증명 (2026-09-10).** 첫 실행부터 초록인 검사는 통과로 세지 않는다. 저장소 원본을 건드리지
+않고 사본에 한 곳씩 변이를 넣어 컴파일·실행했다. 여섯 전부 **의도한 단정 자리에서** 붉어졌다.
+
+| 변이 | 결과 | 붉어진 자리 |
+|---|---|---|
+| 대조군(변이 없음) | RUN_PASS | 잔여 top 0 · popup 0 |
+| asset 함수를 hierarchy 호스트에 붙임 | COMPILE_FAIL | `EditorMenuSchema.h:183` 문맥 불일치 단정 |
+| `action_name_raw` 오프셋 `+2`를 `+1`로 | COMPILE_FAIL | `EditorMenuRegistry.cpp:31,36` 이름 카나리아 둘 |
+| 선언에서 `.order(7)` 제거 | RUN_FAIL | "order 수정자가 실리지 않았다" |
+| 상단 전역 항목의 `invoke` 람다 본문 비움 | RUN_FAIL | "invoke 포인터가 선언한 함수로 이어지지 않았다" |
+| `popup_host` 열거자만 더함 | COMPILE_FAIL | `EditorMenuSurface.h:87` 배열 완전성 단정 |
+| `top_context_t`의 전역·선택 판정 뒤집음 | COMPILE_FAIL | `EditorMenuRegistry.h:118,127` 낮추기 자리 |
+
+★ 하네스가 먼저 자기 증명을 하게 만든 것이 결정적이었다. 첫 시도에서 컴파일러가 **아예 실행되지
+않았는데**(경로 인용 파손) 결과는 전부 `COMPILE_FAIL`로 나왔다 — 대조군이 없었으면 "여섯 변이를 다
+잡았다"는 정반대 결론을 낼 뻔했다. 변이 하네스에는 변이 없는 대조군이 반드시 함께 있어야 한다.

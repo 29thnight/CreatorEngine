@@ -1,6 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="EditorMenu">
+      <UniqueIdentifier>{3108037e-6e41-505a-b509-fe59ed743d0c}</UniqueIdentifier>
+    </Filter>
     <Filter Include="EditorRender">
       <UniqueIdentifier>{0716e95a-74d8-595f-9a85-4b234424d045}</UniqueIdentifier>
     </Filter>
@@ -159,6 +162,27 @@
     <ClInclude Include="EngineEntry\WinProcProxy.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuSurface.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuSchema.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuRegistry.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuSelfTest.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\RegisterEditorMenuManual.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClCompile Include="EditorMenu\EditorMenuRegistry.cpp">
+      <Filter>EditorMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuSelfTest.cpp">
+      <Filter>EditorMenu</Filter>
+    </ClCompile>
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
