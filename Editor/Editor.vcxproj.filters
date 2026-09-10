@@ -204,6 +204,15 @@
     <ClInclude Include="EditorWindow\Windows\EditorStandardWindows.h">
       <Filter>EditorWindow\Windows</Filter>
     </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorWindowBody.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorViewportWindows.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorToolboxWindows.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
     <ClCompile Include="EditorMenu\EditorMenuRegistry.cpp">
       <Filter>EditorMenu</Filter>
     </ClCompile>
@@ -220,6 +229,15 @@
       <Filter>EditorWindow</Filter>
     </ClCompile>
     <ClCompile Include="EditorWindow\Windows\EditorStandardWindows.cpp">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\Windows\EditorWindowBody.cpp">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\Windows\EditorViewportWindows.cpp">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\Windows\EditorToolboxWindows.cpp">
       <Filter>EditorWindow\Windows</Filter>
     </ClCompile>
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">

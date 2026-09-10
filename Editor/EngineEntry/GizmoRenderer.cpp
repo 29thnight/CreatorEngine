@@ -1,7 +1,9 @@
 #include "GizmoRenderer.h"
-// ShowGridSettings가 ImGui를 부른다. 전에는 Core.Minimal.h가 Reflection 사슬로
-// 대신 끌어와 줬다 — 그 사슬을 걷으면서 직접 든다.
+// 그리드 설정 창 본문이 ImGui를 부른다. 전에는 Core.Minimal.h가 Reflection
+// 사슬로 대신 끌어와 줬다 — 그 사슬을 걷으면서 직접 든다.
 #include "ImGuiRegister.h"
+#include "EditorWindowNames.h"
+#include "Windows/EditorToolboxWindows.h"
 
 GizmoRenderer* GizmoRenderer::s_active = nullptr;
 
@@ -10,31 +12,23 @@ GizmoRenderer::GizmoRenderer(RenderScene* renderScene, Camera* editorCamera) :
 	m_pEditorCamera(editorCamera)
 {
 	s_active = this;
+
+	// PHASE 21 M4 3단계: 창 프레임은 셸이 연다. 여기서는 본문만 건다 —
+	// 그리드가 이 객체의 것이라 본문의 자리도 여기다.
+	editor::windows::bind_window_body(EditorWindowName::kGridSettings, []()
+	{
+		ImGui::TextUnformatted("GridPass is owned by EnhancedRenderer (DX12).");
+	});
 }
 
 GizmoRenderer::~GizmoRenderer()
 {
 	if (this == s_active) s_active = nullptr;
 
+	editor::windows::unbind_window_body(EditorWindowName::kGridSettings);
+
 	m_pEditorCamera = nullptr;
 	m_renderScene = nullptr;
-}
-
-void GizmoRenderer::EditorView()
-{
-    if (m_bShowGridSettings)
-    {
-        ShowGridSettings();
-    }
-}
-
-// 옛 #ifndef BUILD_FLAG 가드는 걷었다 — 이 파일은 이제 Editor exe만 컴파일하므로
-// 게임 빌드 배제를 매크로가 아니라 프로젝트 편입이 보장한다.
-void GizmoRenderer::ShowGridSettings()
-{
-    ImGui::Begin("Grid Settings", &m_bShowGridSettings, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::TextUnformatted("GridPass is owned by EnhancedRenderer (DX12).");
-    ImGui::End();
 }
 
 void GizmoRenderer::OnDrawGizmos()

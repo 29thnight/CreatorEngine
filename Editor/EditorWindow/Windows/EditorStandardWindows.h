@@ -27,24 +27,11 @@
 
 #include "EditorWindowSchema.h"
 #include "EditorWindowNames.h"
-
-#include <functional>
-#include <string_view>
+#include "EditorWindowBody.h"
 
 namespace editor::windows
 {
-    /// 창 클래스의 생성자가 자기 본문을 건다. 옛 `ContextRegister` 자리를
-    /// 그대로 대신하고, 이름도 그때 쓰던 것을 그대로 쓴다.
-    void bind_window_body(std::string_view stable_id, std::function<void()> body);
-
-    /// 소멸자가 부른다. 걸지 않은 이름을 풀어도 아무 일도 일어나지 않는다.
-    void unbind_window_body(std::string_view stable_id);
-
     // ── 진입점 ────────────────────────────────────────────────────────────
-    //
-    // 셸이 부르는 것은 함수 포인터다. 안정 식별자를 비타입 템플릿 인자로
-    // 넘길 수 없어서(문자열은 구조적 타입이 아니다) 창마다 한 쌍을 적는다.
-    // 부록 A가 상단 저장소를 둘로 나눌 수밖에 없었던 것과 같은 제약이다.
 
     void draw_hierarchy();                bool has_hierarchy();
     void draw_inspector();                bool has_inspector();

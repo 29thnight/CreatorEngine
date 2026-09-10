@@ -4,8 +4,8 @@
 class GameViewWindow
 {
 public:
-	GameViewWindow() = default;
-	~GameViewWindow() = default;
+	GameViewWindow();
+	~GameViewWindow();
 	
 	void RenderGameViewWindow();
 };

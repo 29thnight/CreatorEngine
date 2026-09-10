@@ -51,10 +51,12 @@ namespace editor
                            .add_traits(window_trait::no_scrollbar)
                            .available(&selftest_inspector_available)
                            .min_size(120.f, 64.f)
+                           .initial_size(800.f, 600.f)
                            .order(3),
 
                     editor::transient<&selftest_draw_loading>("selftest.loading", "SelfTest Loading")
                            .open_by_default(false)
+                           .initial_size(440.f, 0.f, size_policy::on_appearing)
                            .closable_when(&selftest_loading_closable));
             }
         };
@@ -283,6 +285,28 @@ namespace editor
         {
             fail(report, "빈 도킹 자리 집계가 어긋난다 (=" +
                          std::to_string(stats.empty_dock_slots) + ")");
+        }
+
+        // ⑩ 첫 크기가 조건까지 실려 오는가. 최소 크기 제약과 다른 축이다 —
+        // 이쪽은 `Begin` 앞에 한 번 부르는 호출이고 저쪽은 계속 강제된다.
+        if (inspector.sizing != size_policy::first_use_ever ||
+            inspector.initial_width != 800.f || inspector.initial_height != 600.f)
+        {
+            fail(report, "initial_size 기본 조건(first_use_ever)이 실리지 않았다");
+        }
+        if (loading.sizing != size_policy::on_appearing ||
+            loading.initial_width != 440.f || loading.initial_height != 0.f)
+        {
+            fail(report, "initial_size의 조건 인자가 실리지 않았다");
+        }
+        if (scene.sizing != size_policy::none ||
+            scene.initial_width != 0.f || scene.initial_height != 0.f)
+        {
+            fail(report, "지정하지 않은 첫 크기가 비어 있지 않다");
+        }
+        if (inspector.min_width == inspector.initial_width)
+        {
+            fail(report, "첫 크기와 최소 크기가 같은 칸을 쓰고 있다");
         }
 
         clear_window_registry();

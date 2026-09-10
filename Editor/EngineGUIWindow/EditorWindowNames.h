@@ -36,4 +36,19 @@ namespace EditorWindowName
     inline constexpr const char* kCollisionMatrix = "CollisionMatrixPopup";
     inline constexpr const char* kTextureImportSelector = "TextureType Selector";
     inline constexpr const char* kMaterialPicker = "SelectMaterial";
+
+    // M4 3단계가 직접 `ImGui::Begin`을 부르던 열다섯을 옮기며 모은 이름들이다.
+    // 값은 그때 `Begin`에 넘기던 리터럴 그대로다 — 한 글자라도 바꾸면 기존
+    // imgui.ini의 도크·위치 항목이 어긋난다.
+    inline constexpr const char* kFrameProfiler = ICON_FA_CHART_BAR " FrameProfiler";
+    inline constexpr const char* kOutputLog = ICON_FA_TERMINAL " Log";
+    inline constexpr const char* kAbout = "About Creator Engine";
+    inline constexpr const char* kInputActionMaps = "InputActionMaps";
+    inline constexpr const char* kBuildSceneSetting = "Build Scene Setting";
+    inline constexpr const char* kRenderPassDebug = "RenderPass Debug";
+    inline constexpr const char* kGridSettings = "Grid Settings";
+    inline constexpr const char* kModelLoading = "Model loading";
+    inline constexpr const char* kAnimatorEvent = "Event";
+    inline constexpr const char* kAnimationControllers = "Animation Controllers";
+    inline constexpr const char* kAvatarMask = "AvatarMask";
 }

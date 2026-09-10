@@ -49,6 +49,10 @@ namespace editor
         float            min_height{ 0.f };
         int              order{ 0 };
 
+        size_policy      sizing{ size_policy::none };
+        float            initial_width{ 0.f };
+        float            initial_height{ 0.f };
+
         bool             has_background{ false };
         float            background_rgba[4]{};
         bool             has_padding{ false };
@@ -103,6 +107,9 @@ namespace editor
             entry.min_width    = item.min_width_value;
             entry.min_height   = item.min_height_value;
             entry.order        = item.order_value;
+            entry.sizing         = item.size_policy_value;
+            entry.initial_width  = item.initial_width_value;
+            entry.initial_height = item.initial_height_value;
             entry.has_background = item.has_background;
             entry.has_padding    = item.has_padding;
             for (int i = 0; i < 4; ++i) entry.background_rgba[i] = item.background_rgba[i];

@@ -41,13 +41,14 @@ namespace
 #include "EditorAssetPresentation.h"
 #include "RuntimeSettings.h"
 #include "Mathematics.Intersect.h"
+#include "EditorWindowNames.h"
+#include "EditorWindowRegistry.h"
+#include "Windows/EditorViewportWindows.h"
 
 #include <cmath>
 #include <cstring>
 #include <mathematics/transform.hpp>
 
-bool useWindow = true;
-bool editWindow = true;
 int gizmoCount = 1;
 float camDistance = 8.f;
 static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
@@ -90,6 +91,13 @@ SceneViewWindow::SceneViewWindow(EditorCameraRig* editorCameraRig, GizmoRenderer
 	m_editorCameraRig(editorCameraRig),
 	m_gizmoRenderer(gizmo_ptr)
 {
+	editor::windows::bind_window_body(EditorWindowName::kScene,
+		[this]() { RenderSceneViewWindow(); });
+}
+
+SceneViewWindow::~SceneViewWindow()
+{
+	editor::windows::unbind_window_body(EditorWindowName::kScene);
 }
 
 void SceneViewWindow::RenderSceneViewWindow()
@@ -201,15 +209,16 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	float windowWidth = 0;
 	float windowHeight = 0;
 
-	static ImGuiWindowFlags gizmoWindowFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
-	if (useWindow)
+	// PHASE 21 M4 3단계: 프레임은 셸이 연다. 창 성질(NoMove 넷)과 창 배경·
+	// 창 여백, 표시 순서(BringWindowToDisplayBack)는 선언으로 갔다
+	// (EditorViewportWindows.h). 여기 남은 둘은 `Begin`이 소비하지 않고
+	// 본문 항목에 걸리는 것이라 본문의 것이다.
+	//
+	// `useWindow` 전역과 `gizmoWindowFlags |= NoMove` 누적은 함께 지웠다 —
+	// 전자는 항상 참이었고 후자는 초기값에 이미 같은 비트가 있었다.
 	{
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, (ImVec4)ImColor(0.f, 0.f, 0.f, 1.f));
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
-		ImGui::Begin(ICON_FA_USERS_VIEWFINDER "  Scene      ", 0, gizmoWindowFlags);
-		ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 		ImGuizmo::SetDrawlist();
 
 		windowWidth = (float)ImGui::GetWindowWidth();
@@ -220,8 +229,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGuizmo::SetRect(windowTopLeftX, windowTopLeftY + titleBarHeight, windowWidth, windowHeight);
 		viewManipulateRight = ImGui::GetWindowPos().x + windowWidth;
 		viewManipulateTop = ImGui::GetWindowPos().y;
-		ImGuiWindow* window = ImGui::GetCurrentWindow();
-		gizmoWindowFlags |= ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(window->InnerRect.Min, window->InnerRect.Max) ? ImGuiWindowFlags_NoMove : 0;
 
 		float x = windowWidth;
 		float y = windowHeight;
@@ -267,7 +274,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 		if (ImGui::Button(ICON_FA_BARS " Grid"))
 		{
-			m_gizmoRenderer->m_bShowGridSettings = true;
+			editor::open_window(EditorWindowName::kGridSettings);
 		}
 
 		ImGui::SameLine();
@@ -404,7 +411,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			}
 		}
 
-		ImGui::PopStyleVar(2);
+		ImGui::PopStyleVar(1);   // ItemSpacing — WindowPadding은 셸이 든다
 
 		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.f);
 		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.1f, 0.1f, 0.1f, 0.8f));
@@ -462,10 +469,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::PopFont();
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
-	}
-	else
-	{
-		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 	}
 
     if (obj && !selectMode)
@@ -665,11 +668,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	if (ImGuizmo::IsUsing())
 	{
 		useGizmo = true;
-		if (useWindow)
-		{
-			ImGui::End();
-			ImGui::PopStyleColor(2);
-		}
+		ImGui::PopStyleColor(1);   // Button — WindowBg는 셸이 든다
 		return;
 	}
 
@@ -872,11 +871,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	//=========================
 
-	if (useWindow)
-	{
-		ImGui::End();
-		ImGui::PopStyleColor(2);
-	}
+	ImGui::PopStyleColor(1);   // Button — WindowBg는 셸이 든다
 }
 
 math::vector3 SceneViewWindow::ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, const ImVec2& imagePos, const ImVec2& imageSize, float depth)

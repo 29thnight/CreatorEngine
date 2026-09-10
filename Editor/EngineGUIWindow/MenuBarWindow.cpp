@@ -36,6 +36,7 @@
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
 #include "Windows/EditorStandardWindows.h"
+#include "Windows/EditorToolboxWindows.h"
 #include "Core.Definition.h"
 #include <regex>
 
@@ -106,6 +107,23 @@ MenuBarWindow::MenuBarWindow()
         ImGui::TextUnformatted("A DX12 bake path must be wired before this tool is re-enabled.");
     });
 
+
+    editor::windows::bind_window_body(EditorWindowName::kFrameProfiler,
+        [this]() { ShowProfilerWindow(); });
+    editor::windows::bind_window_body(EditorWindowName::kOutputLog,
+        [this]() { ShowLogWindow(); });
+    editor::windows::bind_window_body(EditorWindowName::kAbout,
+        [this]() { ShowAboutWindow(); });
+    editor::windows::bind_window_body(EditorWindowName::kBehaviorTree,
+        [this]() { DrawBehaviorTreeWindow(); });
+    editor::windows::bind_window_body(EditorWindowName::kBlackBoard,
+        [this]() { DrawBlackBoardWindow(); });
+    editor::windows::bind_window_body(EditorWindowName::kInputActionMaps,
+        [this]() { SHowInputActionMap(); });
+    editor::windows::bind_window_body(EditorWindowName::kBuildSceneSetting,
+        [this]() { ShowBuildSceneSettingWindow(); });
+    editor::windows::bind_window_body(EditorWindowName::kRenderPassDebug,
+        [this]() { ShowRenderDebugWindow(); });
 
     editor::windows::bind_window_body(EditorWindowName::kCollisionMatrix, [&]() 
     {
@@ -352,17 +370,17 @@ void MenuBarWindow::RenderMenuBar()
 
                 if( ImGui::MenuItem("Behavior Tree Editor"))
                 {
-                    m_bShowBehaviorTreeWindow = true;
+                    editor::open_window(EditorWindowName::kBehaviorTree);
 				}
 
                 if (ImGui::MenuItem("Blackboard Editor"))
                 {
-					m_bShowBlackBoardWindow = true;
+					editor::open_window(EditorWindowName::kBlackBoard);
 				}
 
                 if (ImGui::MenuItem("InputAction Maps"))
                 {
-                    m_bShowInputActionMapWindow = true;
+                    editor::open_window(EditorWindowName::kInputActionMaps);
                 }
 
                 ImGui::EndMenu();
@@ -384,12 +402,12 @@ void MenuBarWindow::RenderMenuBar()
 
                 if (ImGui::MenuItem("Build Settings"))
                 {
-                    m_bShowBuildSceneSettingWindow = true;
+                    editor::open_window(EditorWindowName::kBuildSceneSetting);
 				}
 
                 if (ImGui::MenuItem("Render Debug"))
                 {
-                    m_bShowRenderDebugWindow = true;
+                    editor::open_window(EditorWindowName::kRenderPassDebug);
 				}
 
                 if (ImGui::MenuItem("Resource Counter"))
@@ -446,8 +464,20 @@ void MenuBarWindow::RenderMenuBar()
                 }
 
                 ImGui::Separator();
-                ImGui::MenuItem(ICON_FA_TERMINAL " Output Log", nullptr, &m_bShowLogWindow);
-                ImGui::MenuItem(ICON_FA_CHART_GANTT " Frame Profiler", nullptr, &m_bShowProfileWindow);
+                // 표시 상태는 이제 표 항목이 든다. bool 주소를 넘기던 자리는
+                // 값을 읽어 넘기고, 눌리면 표를 고친다. 메뉴 문구는 바꾸지
+                // 않았다 — 이관은 프레임만 옮긴다.
+                const struct { const char* label; const char* window; } toggles[] = {
+                    { ICON_FA_TERMINAL " Output Log",     EditorWindowName::kOutputLog },
+                    { ICON_FA_CHART_GANTT " Frame Profiler", EditorWindowName::kFrameProfiler },
+                };
+                for (const auto& toggle : toggles)
+                {
+                    const bool opened = editor::is_window_open(toggle.window);
+                    if (!ImGui::MenuItem(toggle.label, nullptr, opened)) continue;
+                    if (opened) editor::close_window(toggle.window);
+                    else        editor::open_window(toggle.window);
+                }
                 ImGui::EndMenu();
             }
 
@@ -455,7 +485,7 @@ void MenuBarWindow::RenderMenuBar()
             {
                 if (ImGui::MenuItem("About Creator Engine"))
                 {
-                    m_bShowAboutWindow = true;
+                    editor::open_window(EditorWindowName::kAbout);
                 }
                 ImGui::EndMenu();
             }
@@ -494,13 +524,19 @@ void MenuBarWindow::RenderMenuBar()
 
             if (ImGui::Button(ICON_FA_TERMINAL " Output Log "))
             {
-                m_bShowLogWindow = !m_bShowLogWindow;
+                if (editor::is_window_open(EditorWindowName::kOutputLog))
+                    editor::close_window(EditorWindowName::kOutputLog);
+                else
+                    editor::open_window(EditorWindowName::kOutputLog);
             }
 
             ImGui::SameLine();
             if (ImGui::Button(ICON_FA_CHART_GANTT " ProfileFrame "))
             {
-                m_bShowProfileWindow = !m_bShowProfileWindow;
+                if (editor::is_window_open(EditorWindowName::kFrameProfiler))
+                    editor::close_window(EditorWindowName::kFrameProfiler);
+                else
+                    editor::open_window(EditorWindowName::kFrameProfiler);
             }
 
             {
@@ -604,51 +640,12 @@ void MenuBarWindow::RenderMenuBar()
         ImGui::End();
     }
 
-    if (m_bShowLogWindow)
-    {
-        ShowLogWindow();
-    }
-
+    // PHASE 21 M4 3단계: 여덟 창의 프레임은 셸이 연다. 여기서 그것들을
+    // 부르던 여덟 줄이 사라졌다. 아래 둘만 남는데, 창이 **닫혀 있을 때**
+    // 돌아야 하는 정리 경로라서다 — 편집 문맥 파괴와 상태 비우기는 본문이
+    // 아니므로 셸이 프레임을 열지 않는 프레임에도 돌아야 한다.
     ShowBehaviorTreeWindow();
     ShowBlackBoardWindow();
-    SHowInputActionMap();
-	ShowBuildSceneSettingWindow();
-    ShowRenderDebugWindow();
-    ShowAboutWindow();
-
-    if (m_bShowProfileWindow)
-    {
-        ImGui::Begin(ICON_FA_CHART_BAR " FrameProfiler", &m_bShowProfileWindow);
-        {
-            ImGui::BringWindowToFocusFront(ImGui::GetCurrentWindow());
-            ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
-
-            const float vramPanelHeight = 50.0f; // VRAM 그래프 높이
-            const float contentWidth = ImGui::GetContentRegionAvail().x;
-            const float contentHeight = ImGui::GetContentRegionAvail().y;
-
-            // 위쪽: HUD
-            ImGui::BeginChild("Profiler HUD", ImVec2(contentWidth, contentHeight - vramPanelHeight), false);
-            {
-                DrawProfilerHUD();
-            }
-            ImGui::EndChild();
-
-            // 아래쪽: VRAM 그래프
-            ImGui::BeginChild("VRAM Panel", ImVec2(contentWidth, vramPanelHeight), false);
-            {
-                if (auto* resources = GetDiagnosticsDeviceResources())
-                {
-                    // 그래프는 바이트를 받는다 — 계약이 MB로 주므로 되돌린다.
-                    constexpr uint64_t megabyte = 1024ull * 1024ull;
-                    const RHIVideoMemoryInfo info = resources->QueryVideoMemory();
-                    ShowVRAMBarGraph(info.usedMB * megabyte, info.budgetMB * megabyte);
-                }
-            }
-            ImGui::EndChild();
-        }
-        ImGui::End();
-    }
 
     if (m_bShowNewScenePopup)
     {
@@ -830,20 +827,9 @@ void MenuBarWindow::RenderToolBar()
 
 void MenuBarWindow::ShowAboutWindow()
 {
-    if (!m_bShowAboutWindow) return;
-
     // 버전과 실행 중인 백엔드가 제목표시줄에 문자열로 붙어 있었다. 초당
     // 몇 번씩 갱신되는 자리에 두면 정작 읽을 때 잘려 있어서, 읽고 싶을 때
     // 여는 이 창으로 옮겼다.
-    ImGui::SetNextWindowSize(ImVec2(440.f, 0.f), ImGuiCond_Appearing);
-    if (!ImGui::Begin("About Creator Engine", &m_bShowAboutWindow,
-        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse |
-        ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::End();
-        return;
-    }
-
     const BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
 
     ImGui::TextUnformatted("Creator Engine");
@@ -877,9 +863,7 @@ void MenuBarWindow::ShowAboutWindow()
         "(Settings > Build Settings).");
 
     ImGui::Separator();
-    if (ImGui::Button("Close")) m_bShowAboutWindow = false;
-
-    ImGui::End();
+    if (ImGui::Button("Close")) editor::close_window(EditorWindowName::kAbout);
 }
 
 void MenuBarWindow::ShowLogWindow()
@@ -888,8 +872,9 @@ void MenuBarWindow::ShowLogWindow()
     static bool autoScroll = true;
     bool isClear = Debug->IsClear();
 
+    // 폰트 밀기는 본문에 남는다. 옛 코드는 `Begin` 앞에서 밀어 제목표시줄까지
+    // 덮었지만 제목이 ASCII 라 보이는 차이가 없다.
     ImGui::PushFont(m_koreanFont);
-    ImGui::Begin(ICON_FA_TERMINAL " Log", &m_bShowLogWindow);
 
     // == 상단 고정 헤더 영역 ==
     ImGui::BeginChild("LogHeader", ImVec2(0, 0),
@@ -917,7 +902,6 @@ void MenuBarWindow::ShowLogWindow()
         {
             Debug->toggleClear();
             ImGui::EndChild();
-            ImGui::End();
             ImGui::PopFont();
             return;
         }
@@ -1013,8 +997,6 @@ void MenuBarWindow::ShowLogWindow()
 		}
     }
     ImGui::EndChild();
-
-    ImGui::End();
     ImGui::PopFont();
 }
 
@@ -1026,7 +1008,24 @@ void MenuBarWindow::ShowLightMapWindow()
 
 ed::EditorContext* s_MenuBarBTEditorContext{ nullptr };
 
+// 창이 닫혀 있을 때 돌아야 하는 정리 경로다. 프레임 루프가 매 프레임 부른다.
 void MenuBarWindow::ShowBehaviorTreeWindow()
+{
+    if (!editor::is_window_open(EditorWindowName::kBehaviorTree))
+    {
+        BehaviorTreeWindow(false);
+    }
+}
+
+// 셸이 창 본문으로 부른다.
+void MenuBarWindow::DrawBehaviorTreeWindow()
+{
+    BehaviorTreeWindow(true);
+}
+
+// 두 경로가 같은 함수 지역 static 을 나눠 쓰므로 하나로 둔다 — 쪼개면
+// 그래프와 편집기 문맥이 서로 다른 저장소가 된다.
+void MenuBarWindow::BehaviorTreeWindow(bool drawing)
 {
     static BTBuildGraph graph;
     // 편집기 화면 좌표 — 저작 데이터(BTBuildNode) 밖의 편집기 세션 상태다(E3-5).
@@ -1034,10 +1033,8 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
     static bool isfirstLoad = false;
 	static std::string BTName;
 
-    if (m_bShowBehaviorTreeWindow)
+    if (drawing)
     {
-        ImGui::Begin("Behavior Tree Editor", &m_bShowBehaviorTreeWindow);
-
         if (ImGui::Button("Create"))
         {
             isfirstLoad = true;
@@ -1795,8 +1792,6 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
 
         ed::End();
         ed::SetCurrentEditor(nullptr);
-
-        ImGui::End();
     }
     else
     {
@@ -1835,7 +1830,7 @@ void MenuBarWindow::ShowBehaviorTreeWindow()
             graph.Clear();
             s_nodeScreenPos.clear();
 			BTName.clear();
-			m_bShowBehaviorTreeWindow = false;
+			editor::close_window(EditorWindowName::kBehaviorTree);
         }
     }
 }
@@ -1858,15 +1853,29 @@ static ImVec4 GetColorForType(BlackBoardType type)
     }
 }
 
+// 창이 닫혀 있을 때 돌아야 하는 정리 경로다.
 void MenuBarWindow::ShowBlackBoardWindow()
+{
+    if (!editor::is_window_open(EditorWindowName::kBlackBoard))
+    {
+        BlackBoardWindow(false);
+    }
+}
+
+// 셸이 창 본문으로 부른다.
+void MenuBarWindow::DrawBlackBoardWindow()
+{
+    BlackBoardWindow(true);
+}
+
+void MenuBarWindow::BlackBoardWindow(bool drawing)
 {
     static BlackBoard editorBlackBoard;
     static std::string blackBoardName;
     static std::string selectedKey;
 
-    if (m_bShowBlackBoardWindow)
+    if (drawing)
     {
-        ImGui::Begin("BlackBoard Editor", &m_bShowBlackBoardWindow);
         // --- Toolbar Buttons ---
         if (ImGui::Button("Create"))
         {
@@ -2187,7 +2196,6 @@ void MenuBarWindow::ShowBlackBoardWindow()
         ImGui::EndChild();
 
         ImGui::Columns(1); // Reset columns
-        ImGui::End();
     }
     else
     {
@@ -2209,13 +2217,13 @@ void MenuBarWindow::SHowInputActionMap()
     static int seletedActionIndex = -1;
     static int editingActionIndex = -1;
     static int index = 0;
-    if (m_bShowInputActionMapWindow)
     {
-        ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
-
-        bool open = ImGui::Begin("InputActionMaps", &m_bShowInputActionMapWindow);
-
-        if (open && ImGui::IsWindowAppearing())
+        // 옛 표시 가드가 있던 자리다. 범위만 남긴다 — 본문을 통째로
+        // 들여쓰기 바꾸면 진짜 변경이 공백에 묻힌다.
+        //
+        // 첫 크기는 선언이 든다. `open` 은 `Begin` 의 반환이었는데 셸이
+        // 그것을 보고 본문을 부를지 정하므로 여기서는 항상 참이다.
+        if (ImGui::IsWindowAppearing())
         {
             preseletedActionMapIndex = -1;
             seletedActionMapIndex = -1;
@@ -2712,17 +2720,13 @@ void MenuBarWindow::SHowInputActionMap()
         }
 
         ImGui::EndChild();
-
-
-        ImGui::End();
     }
 }
 void MenuBarWindow::ShowBuildSceneSettingWindow()
 {
-    if (m_bShowBuildSceneSettingWindow)
     {
-        ImGui::SetNextWindowSize(ImVec2(460, 340), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Build Scene Setting", &m_bShowBuildSceneSettingWindow);
+        // 옛 표시 가드가 있던 자리다. 범위만 남긴다 — 본문을 통째로
+        // 들여쓰기 바꾸면 진짜 변경이 공백에 묻힌다.
 		BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
 		const std::wstring& startupSceneName = buildSettings.GetStartupSceneName();
 		ImGui::Text("Startup Scene: %s",
@@ -2743,7 +2747,7 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
                 EditorSettingsStore::Get().Save();
 				memset(sceneName, 0, sizeof(sceneName)); // Clear the input field
                 sceneFileName.clear();
-                m_bShowBuildSceneSettingWindow = false;
+                editor::close_window(EditorWindowName::kBuildSceneSetting);
             }
         }
 
@@ -2760,16 +2764,13 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
 		}
 		ImGui::TextDisabled("Packaging projects this value into runtime render.backend.");
 		ImGui::TextDisabled("The Player reads only runtime render.backend at process startup.");
-        ImGui::End();
 	}
 }
 void MenuBarWindow::ShowRenderDebugWindow()
 {
-    if (m_bShowRenderDebugWindow)
     {
-        ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-        ImGui::Begin("RenderPass Debug", &m_bShowRenderDebugWindow);
-
+        // 옛 표시 가드가 있던 자리다. 범위만 남긴다 — 본문을 통째로
+        // 들여쓰기 바꾸면 진짜 변경이 공백에 묻힌다.
         // RenderDebugManager는 ID3D11DeviceContext로 패스 결과를 복사해 두는
         // DX11 전용 장치이고, 그것을 채우던 GBuffer/Deferred/Forward 패스는
         // SceneRenderer와 함께 메인 배선에서 빠졌다. 그래서 이 창은 열려도
@@ -2787,12 +2788,40 @@ void MenuBarWindow::ShowRenderDebugWindow()
             {
                 editor::open_window(EditorWindowName::kRenderPass);
             }
-            m_bShowRenderDebugWindow = false;
+            editor::close_window(EditorWindowName::kRenderPassDebug);
         }
         ImGui::Spacing();
         ImGui::TextUnformatted("For per-pass resource contents, take a PIX capture:");
         ImGui::TextUnformatted("  Tools\\dx12-validation\\Invoke-DX12Validation.ps1 -Action PixCapture");
-
-        ImGui::End();
 	}
+}
+
+// PHASE 21 M4 3단계: 프레임 루프 안에 인라인으로 있던 본문이다. 셸이 프레임을
+// 소유하려면 본문이 부를 수 있는 것이어야 해서 메서드로 냈다. 맨 앞의
+// BringWindowToFocusFront/DisplayFront 둘은 선언의 stacking 으로 갔다.
+void MenuBarWindow::ShowProfilerWindow()
+{
+    const float vramPanelHeight = 50.0f; // VRAM 그래프 높이
+    const float contentWidth = ImGui::GetContentRegionAvail().x;
+    const float contentHeight = ImGui::GetContentRegionAvail().y;
+
+    // 위쪽: HUD
+    ImGui::BeginChild("Profiler HUD", ImVec2(contentWidth, contentHeight - vramPanelHeight), false);
+    {
+        DrawProfilerHUD();
+    }
+    ImGui::EndChild();
+
+    // 아래쪽: VRAM 그래프
+    ImGui::BeginChild("VRAM Panel", ImVec2(contentWidth, vramPanelHeight), false);
+    {
+        if (auto* resources = GetDiagnosticsDeviceResources())
+        {
+            // 그래프는 바이트를 받는다 — 계약이 MB로 주므로 되돌린다.
+            constexpr uint64_t megabyte = 1024ull * 1024ull;
+            const RHIVideoMemoryInfo info = resources->QueryVideoMemory();
+            ShowVRAMBarGraph(info.usedMB * megabyte, info.budgetMB * megabyte);
+        }
+    }
+    ImGui::EndChild();
 }

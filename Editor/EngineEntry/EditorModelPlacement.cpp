@@ -6,6 +6,8 @@
 #include "Scene.h"
 #include "SceneManager.h"
 #include "imgui.h"
+#include "EditorWindowNames.h"
+#include "Windows/EditorToolboxWindows.h"
 
 #include <atomic>
 #include <chrono>
@@ -84,6 +86,10 @@ namespace Editor
 
     void ModelPlacement::Initialize()
     {
+        // 창 본문을 이름에 건다. 표시 여부는 선언의 존재 술어가 정한다.
+        editor::windows::bind_window_body(EditorWindowName::kModelLoading,
+            []() { ModelPlacement::Get().DrawStatus(); });
+
         auto& state = *m_impl;
         std::lock_guard lock(state.mutex);
         if (!state.stopping) return;
@@ -278,29 +284,35 @@ namespace Editor
         std::erase_if(state.visible, [](const auto& request) { return request->finished.load(std::memory_order_acquire); });
     }
 
+    // PHASE 21 M4 3단계: 프레임은 셸이 연다. 큐가 비면 창 자체가 존재하지
+    // 않으므로(existence predicate), 여기 첫 두 줄이 하던 조기 반환은
+    // HasVisible이 대신 답한다.
     void ModelPlacement::DrawStatus()
     {
         std::vector<std::shared_ptr<Request>> visible;
         { std::lock_guard lock(m_impl->mutex); visible = m_impl->visible; }
-        if (visible.empty()) return;
-        if (ImGui::Begin("Model loading", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+        for (const auto& request : visible)
         {
-            for (const auto& request : visible)
-            {
-                ImGui::PushID(request.get());
-                ImGui::TextUnformatted(file::path(request->path).filename().string().c_str());
-                const auto total = request->totalSteps.load(std::memory_order_relaxed);
-                if (total) ImGui::ProgressBar(static_cast<float>(request->completedSteps.load(std::memory_order_relaxed)) / total);
-                else ImGui::TextUnformatted("Preparing model...");
-                if (ImGui::Button("Cancel")) Cancel(request);
-                ImGui::PopID();
-            }
+            ImGui::PushID(request.get());
+            ImGui::TextUnformatted(file::path(request->path).filename().string().c_str());
+            const auto total = request->totalSteps.load(std::memory_order_relaxed);
+            if (total) ImGui::ProgressBar(static_cast<float>(request->completedSteps.load(std::memory_order_relaxed)) / total);
+            else ImGui::TextUnformatted("Preparing model...");
+            if (ImGui::Button("Cancel")) Cancel(request);
+            ImGui::PopID();
         }
-        ImGui::End();
+    }
+
+    bool ModelPlacement::HasVisible() const
+    {
+        std::lock_guard lock(m_impl->mutex);
+        return !m_impl->visible.empty();
     }
 
     void ModelPlacement::Shutdown()
     {
+        editor::windows::unbind_window_body(EditorWindowName::kModelLoading);
+
         auto& state = *m_impl;
         {
             std::lock_guard lock(state.mutex);
@@ -330,5 +342,15 @@ namespace Editor
     {
         std::lock_guard lock(m_impl->mutex);
         return m_impl->visible.empty();
+    }
+}
+
+namespace editor::windows
+{
+    /// 큐가 비어 있지 않은가. 창이 존재할 조건이고, 큐를 든 것이 이 TU라
+    /// 답도 여기서 한다.
+    bool model_loading_has_visible()
+    {
+        return Editor::ModelPlacement::Get().HasVisible();
     }
 }

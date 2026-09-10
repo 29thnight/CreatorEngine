@@ -603,12 +603,6 @@ void Editor::EditorMain::OnGui()
 
 	m_menuBarWindow->RenderMenuBar();
 
-	m_sceneViewWindow->RenderSceneViewWindow();
-
-	m_gameViewWindow->RenderGameViewWindow();
-
-	m_gizmoRenderer->EditorView();
-	Editor::ModelPlacement::Get().DrawStatus();
 
 	m_editorRenderer->Render();
 	m_editorRenderer->EndRender();

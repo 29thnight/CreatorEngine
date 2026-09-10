@@ -3,12 +3,24 @@
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
+#include "EditorWindowNames.h"
+#include "Windows/EditorViewportWindows.h"
 
+GameViewWindow::GameViewWindow()
+{
+	editor::windows::bind_window_body(EditorWindowName::kGame,
+		[this]() { RenderGameViewWindow(); });
+}
+
+GameViewWindow::~GameViewWindow()
+{
+	editor::windows::unbind_window_body(EditorWindowName::kGame);
+}
+
+// PHASE 21 M4 3단계: 프레임은 셸이 연다. 창 여백·창 성질 둘·표시 순서가
+// 선언으로 갔다(EditorViewportWindows.h). 여기에는 그림 하나만 남는다.
 void GameViewWindow::RenderGameViewWindow()
 {
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	ImGui::Begin(ICON_FA_GAMEPAD "  Game        ", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
-	ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
 	{
 		ImVec2 availRegion = ImGui::GetContentRegionAvail();
 
@@ -68,6 +80,4 @@ void GameViewWindow::RenderGameViewWindow()
 			}
 		}
 	}
-	ImGui::End();
-	ImGui::PopStyleVar();
 }

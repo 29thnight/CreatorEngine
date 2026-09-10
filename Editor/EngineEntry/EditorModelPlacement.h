@@ -19,7 +19,10 @@ namespace Editor
         void Execute(std::uint32_t sceneId, std::string path,
             std::optional<math::vector3> position = std::nullopt);
         void Tick();
+        /// 진행 중인 적재 목록 본문. 셸이 창 프레임 안에서 부른다.
         void DrawStatus();
+        /// 표시할 요청이 하나라도 있는가. 창의 존재 조건이다.
+        bool HasVisible() const;
         void PrintStatus() const;
         bool IsIdle() const;
 

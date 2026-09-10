@@ -1464,7 +1464,7 @@ AvatarMask)은 선택 종속이라 의존 선언을 요구하고, `EditorModelPl
 | 슬라이스 | 내용 | 공수 |
 |---|---|---|
 | M3 | 셸 크롬 — 제목표시줄·배치·스킨·창 제목·프레임 오버레이·버전 메뉴·백엔드 노브 | 1.5일 **(착지)** |
-| M4 | 창 선언 어휘와 셸의 프레임 소유 · 창 25개 이관 · 게이트와 `editor.windows` 덤프 · 변이 증명 | 3일 (1·2단계 착지) |
+| M4 | 창 선언 어휘와 셸의 프레임 소유 · 창 25개 이관 · 게이트와 `editor.windows` 덤프 · 변이 증명 | 3일 (1·2·3단계 착지) |
 | | 합계 | **4.5일** |
 
 M4의 3일은 내역이 있다. 선언 어휘와 셸의 프레임 소유가 1일, 창 25개 이관이 1.5일, 게이트와
@@ -1514,3 +1514,53 @@ std만 의존하고 ImGui를 아는 파일은 셸(`EditorWindowHost`) 하나다.
 
 **남은 것.** 3단계(직접 `ImGui::Begin` 15개 이관)와 4단계(표시 상태 저장소 통합 ·
 `ImGuiRegister` 렌더 루프 은퇴 · `editor.windows` 덤프 · 고아 0 게이트).
+
+---
+
+### B.6 M4 3단계 착지 기록 — 직접 `Begin` 열둘 (2026-09-11)
+
+**옮긴 것 열둘.** 뷰포트 둘(Scene · Game), 저작 셋(Behavior Tree · BlackBoard ·
+InputActionMaps), 진단 셋(FrameProfiler · Log · RenderPass Debug), 대화 넷(About ·
+Build Scene Setting · Grid Settings · Model loading). 선언자는 넷으로 나눴다 —
+표면이 다르면 `editor.windows` 덤프가 갈래로 읽힌다. 부팅 덤프에서 표에 22개가 실렸고
+전부 `draw=1`, 여는 상태는 이관 전과 같은 6열림 / 16닫힘이었다.
+
+**어휘 하나가 늘었다.** `initial_size(너비, 높이, 조건)` 이다. 열다섯을 전수로 세어 보니
+`Begin` **앞에** `SetNextWindowSize`를 부르는 것이 일곱이었고 조건은 둘뿐이라
+(`FirstUseEver` 여섯, About 하나가 `Appearing`) 닫힌 열거 `size_policy` 로 들어왔다.
+최소 크기 제약과 다른 축이다 — 이쪽은 한 번 정하고 사용자가 옮기면 그만이고,
+저쪽은 계속 강제된다. 자가 검사 ⑩ 이 그 둘이 같은 칸을 쓰지 않는지까지 본다.
+변이 여섯을 먹여 전부 붉게 만들었고 무변이·복원 대조는 초록이었다.
+
+| 변이 | 무엇을 망가뜨렸나 |
+|---|---|
+| `i_drop_size_policy` | 조건이 표기에서 표로 오지 않는다 |
+| `j_width_from_min` | 너비가 최소 크기 칸에서 온다 |
+| `k_drop_height` | 높이가 실리지 않는다 |
+| `l_flip_default_policy` | 기본 조건이 `Appearing` 으로 뒤바뀐다 |
+| `m_ignore_policy_arg` | 수정자가 조건 인자를 무시한다 |
+| `n_swap_wh` | 너비와 높이가 뒤집힌다 |
+
+**프레임을 셸에 넘기며 갈라야 했던 것 둘.** Behavior Tree와 BlackBoard는 `if (열림)` 의
+`else` 가지에 **창이 닫힐 때 한 번 돌아야 하는 정리**를 달고 있었다 — 전자는 편집기 문맥을
+파괴하고 `.bt` 파일을 쓰며, 후자는 편집 중이던 블랙보드를 비운다. 셸은 닫힌 창의 프레임을
+열지 않으므로 그 가지는 본문이 될 수 없다. 그래서 각각 매 프레임 도는 정리 함수와 셸이 부르는
+본문으로 쪼개되, 몸통은 하나로 두었다 — 두 경로가 같은 함수 지역 `static` 을 나눠 쓰므로
+쪼개면 그래프와 편집기 문맥이 서로 다른 저장소가 된다.
+
+**죽은 코드 넷이 드러났다.** `useWindow`(항상 참인 전역, `else` 가지가 죽어 있었다),
+`editWindow`(소비자 0), `gizmoWindowFlags |= NoMove`(초기값에 이미 같은 비트),
+`GizmoRenderer::EditorView`(본문이 그리드 설정 창 하나뿐이라 창이 선언으로 가자 빈 함수).
+넷 다 지웠다.
+
+**스타일 밀기는 `Begin`이 소비하는 것만 갔다.** Scene 뷰는 프레임 앞에 넷을 밀고 있었는데
+창 배경과 창 여백 둘만 선언이 들고, 항목 간격과 버튼 색은 본문 항목에 걸리므로 본문에 남았다.
+그래서 본문의 `PopStyleVar(2)` 는 1로, `PopStyleColor(2)` 는 1로 줄었다.
+
+**남은 셋과 그 이유.** 애니메이터 창 셋(Event · Animation Controllers · AvatarMask)은 본문이
+`ImGuiDrawHelperAnimator(Animator*)` 안에 중첩돼 호출자 지역 변수(`animator`, `animationIndex`,
+`clipOverride`)에 매달려 있다. 셸이 부를 수 있으려면 그 상태가 먼저 게시된 편집 문맥이어야
+하므로 3b로 분리한다.
+
+**남은 것.** 3b(애니메이터 셋)와 4단계(표시 상태 저장소 통합 · `ImGuiRegister` 렌더 루프
+은퇴 · `editor.windows` 덤프 · 고아 0 게이트).

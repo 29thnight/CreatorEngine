@@ -144,6 +144,24 @@ namespace editor
                 ++pushed_vars;
             }
 
+            // 첫 크기는 `Begin` 앞에서만 뜻이 있다. 조건을 선언이 들고
+            // 오므로 창 본문에 `SetNextWindowSize`가 남지 않는다.
+            switch (entry.sizing)
+            {
+            case size_policy::first_use_ever:
+                ImGui::SetNextWindowSize(
+                    ImVec2(entry.initial_width, entry.initial_height),
+                    ImGuiCond_FirstUseEver);
+                break;
+            case size_policy::on_appearing:
+                ImGui::SetNextWindowSize(
+                    ImVec2(entry.initial_width, entry.initial_height),
+                    ImGuiCond_Appearing);
+                break;
+            default:
+                break;
+            }
+
             if (entry.min_width > 0.f || entry.min_height > 0.f)
             {
                 ImGui::SetNextWindowSizeConstraints(

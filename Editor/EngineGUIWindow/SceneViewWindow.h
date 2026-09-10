@@ -19,7 +19,7 @@ class SceneViewWindow
 {
 public:
 	SceneViewWindow(EditorCameraRig* editorCameraRig, GizmoRenderer* gizmo_ptr);
-	~SceneViewWindow() = default;
+	~SceneViewWindow();
 
 	void RenderSceneViewWindow();
 private:

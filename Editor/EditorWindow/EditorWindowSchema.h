@@ -49,6 +49,12 @@ namespace editor
         float            min_height_value{ 0.f };
         int              order_value{ 0 };
 
+        // 첫 크기. `Begin` 앞에 한 번 부르는 호출이라 최소 크기 제약과 다르다 —
+        // 이쪽은 사용자가 옮기면 그만이고, 저쪽은 계속 강제된다.
+        size_policy      size_policy_value{ size_policy::none };
+        float            initial_width_value{ 0.f };
+        float            initial_height_value{ 0.f };
+
         // 프레임 스타일 재정의. `Begin` **앞에** 눌러야 하는 둘만 받는다 —
         // Scene이 창 배경과 창 여백을 그렇게 쓰고 있다(SceneViewWindow.cpp:206).
         // 항목 간격이나 버튼 색처럼 본문에 걸리는 것은 본문에 남긴다.
@@ -109,6 +115,15 @@ namespace editor
         consteval window_item order(int v) const
         {
             window_item copy = *this; copy.order_value = v; return copy;
+        }
+        consteval window_item initial_size(float width, float height,
+                                           size_policy policy = size_policy::first_use_ever) const
+        {
+            window_item copy = *this;
+            copy.size_policy_value = policy;
+            copy.initial_width_value = width;
+            copy.initial_height_value = height;
+            return copy;
         }
         consteval window_item background(float r, float g, float b, float a) const
         {

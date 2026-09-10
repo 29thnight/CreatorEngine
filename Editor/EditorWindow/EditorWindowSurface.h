@@ -98,6 +98,20 @@ namespace editor
         count,
     };
 
+    // ── 첫 크기를 정하는 방식 ─────────────────────────────────────────────
+    //
+    // 성질이 아니라 `Begin` **앞에** 부르는 호출이라 따로 든다. 열다섯 개를
+    // 전수로 세어 나온 둘이다 — 여덟은 아무것도 부르지 않고, 여섯이
+    // `FirstUseEver`, About 하나가 `Appearing` 이다.
+    enum class size_policy
+    {
+        none,            // SetNextWindowSize를 부르지 않는다
+        first_use_ever,  // ImGuiCond_FirstUseEver
+        on_appearing,    // ImGuiCond_Appearing
+
+        count,
+    };
+
     inline constexpr std::array all_window_roles{
         window_role::central,
         window_role::panel,
@@ -118,6 +132,12 @@ namespace editor
         window_stacking::focus_front,
     };
 
+    inline constexpr std::array all_size_policies{
+        size_policy::none,
+        size_policy::first_use_ever,
+        size_policy::on_appearing,
+    };
+
     // 열거자를 늘리고 배열을 안 늘리면 여기서 멈춘다. `editor.windows` 덤프와
     // "배선 안 된 자리 0" 게이트가 이 배열을 열거 원본으로 쓰므로, 누락은
     // 게이트의 눈을 멀게 한다.
@@ -127,6 +147,8 @@ namespace editor
         "all_dock_slots가 dock_slot 전부를 담지 않는다");
     static_assert(all_window_stackings.size() == static_cast<std::size_t>(window_stacking::count),
         "all_window_stackings가 window_stacking 전부를 담지 않는다");
+    static_assert(all_size_policies.size() == static_cast<std::size_t>(size_policy::count),
+        "all_size_policies가 size_policy 전부를 담지 않는다");
 
     constexpr const char* to_string(window_role role) noexcept
     {
@@ -160,6 +182,17 @@ namespace editor
         case window_stacking::display_back: return "display_back";
         case window_stacking::focus_front:  return "focus_front";
         default:                            return "?";
+        }
+    }
+
+    constexpr const char* to_string(size_policy policy) noexcept
+    {
+        switch (policy)
+        {
+        case size_policy::none:           return "none";
+        case size_policy::first_use_ever: return "first_use_ever";
+        case size_policy::on_appearing:   return "on_appearing";
+        default:                          return "?";
         }
     }
 

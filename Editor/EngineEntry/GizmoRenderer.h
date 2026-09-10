@@ -14,8 +14,6 @@ public:
 	~GizmoRenderer();
 	void OnDrawGizmos();
 
-    void EditorView();
-
 	void SetWireFrame() { m_buseWireFrame = !m_buseWireFrame; }
 
 	/// 와이어프레임 모드인가. DX12 상시 러너가 같은 조건으로 그리기 위해
@@ -28,10 +26,6 @@ public:
 
 	RenderScene* m_renderScene{};
 	Camera* m_pEditorCamera{};
-    bool m_bShowGridSettings{ false };
-
-private:
-    void ShowGridSettings();
 
 private:
 	static GizmoRenderer* s_active;
