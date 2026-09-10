@@ -18,19 +18,20 @@
 #include "Windows/EditorStandardWindows.h"
 #include "Windows/EditorViewportWindows.h"
 #include "Windows/EditorToolboxWindows.h"
+#include "Windows/EditorAnimatorWindows.h"
 
 // 목록 항목은 여기에 더한다.
 //
 // 2단계까지 옛 `ContextRegister` 열 곳이 왔고, 3단계가 직접 `ImGui::Begin`을
-// 부르던 것 중 열둘을 옮겼다. 남은 셋(애니메이터 Event · Animation Controllers ·
-// AvatarMask)은 본문이 호출자 지역 변수에 매달려 있어 편집 문맥이 먼저 필요하다.
+// 부르던 열다섯을 모두 옮겼다. 이제 에디터의 창 스물다섯이 전부 여기 있다.
 #define EDITOR_WINDOW_LIST(X) \
     X(editor_panel_windows) \
     X(editor_tool_windows) \
     X(editor_viewport_windows) \
     X(editor_authoring_windows) \
     X(editor_diagnostic_windows) \
-    X(editor_dialog_windows)
+    X(editor_dialog_windows) \
+    X(editor_animator_windows)
 
 namespace editor
 {

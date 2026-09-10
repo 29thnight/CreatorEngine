@@ -213,6 +213,9 @@
     <ClInclude Include="EditorWindow\Windows\EditorToolboxWindows.h">
       <Filter>EditorWindow\Windows</Filter>
     </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorAnimatorWindows.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
     <ClCompile Include="EditorMenu\EditorMenuRegistry.cpp">
       <Filter>EditorMenu</Filter>
     </ClCompile>
@@ -259,6 +262,9 @@
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\EditorWindowNames.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\AnimatorEditorWindows.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
@@ -462,6 +468,9 @@
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\AnimatorEditorWindows.cpp">
       <Filter>EditorUI\DrawHelper</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">

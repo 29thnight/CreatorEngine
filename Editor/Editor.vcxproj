@@ -82,6 +82,7 @@
     <ClInclude Include="EditorWindow\Windows\EditorWindowBody.h" />
     <ClInclude Include="EditorWindow\Windows\EditorViewportWindows.h" />
     <ClInclude Include="EditorWindow\Windows\EditorToolboxWindows.h" />
+    <ClInclude Include="EditorWindow\Windows\EditorAnimatorWindows.h" />
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
     <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
@@ -89,6 +90,7 @@
     <ClInclude Include="EngineGUIWindow\EditorRenderer.h" />
     <ClInclude Include="EngineGUIWindow\EditorWindowChrome.h" />
     <ClInclude Include="EngineGUIWindow\EditorWindowNames.h" />
+    <ClInclude Include="EngineGUIWindow\AnimatorEditorWindows.h" />
     <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h" />
     <ClInclude Include="EngineGUIWindow\ExternUI.h" />
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h" />
@@ -234,6 +236,10 @@
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp" />
+    <!-- 애니메이터 창 셋의 본문. 자기 include를 모두 들고 있으므로 유니티 블롭에 넣지 않는다 -->
+    <ClCompile Include="EngineGUIWindow\AnimatorEditorWindows.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp" />
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp" />
     <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp" />
