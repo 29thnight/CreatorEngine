@@ -2,17 +2,46 @@
 
 #include "EditorTheme.h"
 #include "EditorSectionHeader.h"
+#include "EditorPropertyRow.h"
+#include "EditorAxisField3.h"
+#include "EditorModeButton.h"
 #include "ImGui.h"
 
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <string_view>
 
 namespace editor
 {
     namespace
     {
+        // WCAG 상대 휘도로 두 색의 대비를 잰다. 축 badge 위의 글자가 읽히는지를
+        // 눈이 아니라 숫자로 판정하기 위해서다.
+        float channel_luminance(std::uint32_t byte) noexcept
+        {
+            const float value = static_cast<float>(byte) / 255.f;
+            return value <= 0.03928f ? value / 12.92f
+                                     : std::pow((value + 0.055f) / 1.055f, 2.4f);
+        }
+
+        float relative_luminance(std::uint32_t rgb) noexcept
+        {
+            return 0.2126f * channel_luminance((rgb >> 16) & 255) +
+                   0.7152f * channel_luminance((rgb >> 8) & 255) +
+                   0.0722f * channel_luminance(rgb & 255);
+        }
+
+        float contrast_ratio(std::uint32_t left, std::uint32_t right) noexcept
+        {
+            const float a = relative_luminance(left);
+            const float b = relative_luminance(right);
+            const float bright = a > b ? a : b;
+            const float dark = a > b ? b : a;
+            return (bright + 0.05f) / (dark + 0.05f);
+        }
+
         struct ThemeContractChecks
         {
             std::string& report;
@@ -242,6 +271,117 @@ namespace editor
                         "states differ");
                 }
             }
+        }
+
+
+        // 속성 줄의 필드 ID (PHASE 21 W2).
+        //
+        // 원본(`TableAPIHelper.h::DrawVec2Row`)은 `"##x"`·`"##y"` 두 개가 몸통에
+        // 박혀 있었다. 열 개수를 인자로 올리면서 표로 바뀌었는데, 그 표에 같은
+        // 이름이 두 번 들어가면 두 칸이 한 ImGui ID 를 나눠 갖는다 — 한 칸을
+        // 드래그하면 다른 칸이 함께 움직이고, 빌드도 다른 검사도 붉어지지 않는다.
+        {
+            const int limit = widgets::property_row_field_limit();
+            checks.expect(limit >= 3, "property row", "holds at least a vec3");
+            for (int index = 0; index < limit; ++index)
+            {
+                const char* const id = widgets::property_row_field_id(index);
+                checks.expect(nullptr != id && '#' == id[0] && '#' == id[1],
+                              "property row", "field id stays hidden");
+                for (int other = index + 1; other < limit; ++other)
+                {
+                    const char* const rival = widgets::property_row_field_id(other);
+                    checks.expect(nullptr != id && nullptr != rival &&
+                                  0 != std::strcmp(id, rival),
+                                  "property row", "field ids differ");
+                }
+            }
+            checks.expect(nullptr == widgets::property_row_field_id(-1) &&
+                          nullptr == widgets::property_row_field_id(limit),
+                          "property row", "field id refuses out of range");
+        }
+
+        // 축 badge 의 색 (PHASE 21 W2).
+        //
+        // 단정 셋이 서로 다른 것을 지킨다. ① 세 축이 서로 다를 것. ② 축 색이
+        // 팔레트의 의미 색(Error·Positive·Primary)과 다를 것 — 같아지면 이 줄에
+        // error 상태를 넣는 순간 X 축과 색이 겹쳐 상태 표시가 사라진다.
+        // ③ badge 위 흰 글자가 읽힐 것. 밝은 초록(`Positive`)을 그대로 쓰면
+        // 대비가 2.1:1 이라 글자가 배경에 묻는다.
+        {
+            using axis = widgets::axis;
+            constexpr std::array<axis, 3> axes{ axis::X, axis::Y, axis::Z };
+            constexpr std::array<const char*, 3> axis_names{ "axis x", "axis y", "axis z" };
+            constexpr std::array<std::uint32_t, 3> axis_expected{
+                0xC0392B, 0x4F7A28, 0x2D6FA8 };
+            constexpr std::array<ThemeColor, 3> meaning{
+                ThemeColor::Error, ThemeColor::Positive, ThemeColor::Primary };
+
+            for (std::size_t index = 0; index < axes.size(); ++index)
+            {
+                const std::uint32_t badge = widgets::axis_badge_hex(axes[index]);
+                checks.expect(badge == axis_expected[index], axis_names[index], "badge color");
+                checks.expect(nullptr != widgets::axis_badge_label(axes[index]),
+                              axis_names[index], "badge carries a letter");
+                for (const ThemeColor token : meaning)
+                {
+                    checks.expect(badge != ThemeColorHex(token),
+                                  axis_names[index], "badge is not a meaning color");
+                }
+                checks.expect(
+                    contrast_ratio(badge, widgets::axis_badge_text_hex()) >= 3.f,
+                    axis_names[index], "badge letter stays readable");
+            }
+            for (std::size_t left = 0; left < axes.size(); ++left)
+            {
+                for (std::size_t right = left + 1; right < axes.size(); ++right)
+                {
+                    checks.expect(widgets::axis_badge_hex(axes[left]) !=
+                                  widgets::axis_badge_hex(axes[right]),
+                                  "axis badge", "axes differ");
+                }
+            }
+            checks.expect(0u == widgets::axis_badge_hex(axis::Count) &&
+                          nullptr == widgets::axis_badge_label(axis::Count),
+                          "axis badge", "refuses out of range");
+        }
+
+        // 모드 버튼의 표면과 marker (PHASE 21 W2).
+        //
+        // 켜짐은 배경이 아니라 아래 marker 가 든다. marker 가 배경 셋 중 하나와
+        // 같은 값이 되면 켜짐 표시가 조용히 사라진다 — 원본이 세 style 칸을 모두
+        // 같은 색으로 덮어 hover 와 press 를 잃었던 것과 같은 충돌이다.
+        {
+            using surface = widgets::mode_button_surface;
+            constexpr std::array<surface, 3> surfaces{
+                surface::Idle, surface::Hovered, surface::Held };
+            constexpr std::array<const char*, 3> names{ "idle", "hovered", "held" };
+            constexpr std::array<std::uint32_t, 3> expected{
+                0x2A2A2A, 0x484848, 0x525252 };
+
+            for (std::size_t index = 0; index < surfaces.size(); ++index)
+            {
+                checks.expect(
+                    widgets::mode_button_surface_hex(surfaces[index]) == expected[index],
+                    "mode button", names[index]);
+            }
+            for (std::size_t left = 0; left < surfaces.size(); ++left)
+            {
+                for (std::size_t right = left + 1; right < surfaces.size(); ++right)
+                {
+                    checks.expect(
+                        widgets::mode_button_surface_hex(surfaces[left]) !=
+                        widgets::mode_button_surface_hex(surfaces[right]),
+                        "mode button", "surfaces differ");
+                }
+                checks.expect(
+                    widgets::mode_button_surface_hex(surfaces[left]) !=
+                    widgets::mode_button_marker_hex(),
+                    "mode button", "marker stands out from every surface");
+            }
+            checks.expect(widgets::mode_button_text_hex(true) !=
+                          widgets::mode_button_text_hex(false),
+                          "mode button", "disabled icon reads differently");
         }
 
         report += "[";

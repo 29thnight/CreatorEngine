@@ -129,6 +129,43 @@ vec2·앵커 행이다.
 정리한 뒤 내용을 고친다" 고 정했으므로 인코딩만 바꾸는 커밋을 먼저 넣었다(`63e87c78`,
 Editor 트리의 CP949 소스 여덟을 함께). 내용 이관은 그 위에 선다.
 
+#### 이관 결과 — 착지 (2026-09-11)
+
+`Editor/ImGuiHelper/EditorPropertyRow.{h,cpp}` 로 옮기고 `TableAPIHelper.h` 를 지웠다.
+
+승계하며 셋을 바꿨다.
+
+| 원본의 것 | 바꾼 것 |
+|---|---|
+| X·Y 두 열이 몸통에 박힘 | 열 개수를 인자로. `math::vector2` 가 `float x, y;` 연속 멤버라 원본도 사실상 float 배열을 쓰고 있었고, 열 수만 올리면 vec3·vec4 가 같은 규약에 든다 |
+| 오버로드 둘 (`DrawVec2Row` / `DrawVec2RowAbs`) | 하나로. 차이가 `min`/`max` 뿐이었고 Abs 는 `0,0` 을 넘겨 제한을 껐다. 기본값을 `0,0` 으로 두면 같은 뜻이다 |
+| 필드 ID `"##x"`·`"##y"` | 열 인덱스로 고정한 표. 세 번째 열을 더할 때 이름을 새로 짓지 않아도 되고, 매 프레임 문자열을 만들지 않는다 |
+
+**파일이 통째로 사라진 이유.** 행 함수 둘을 걷어내고 남는 것은 `NearEq`·`VecEq`·
+`DrawAnchorIconButton`·`DrawAnchorIconVisual` 넷인데 전부 RectTransform 앵커 전용이고
+소비자도 그 한 파일이다. 범용 헤더가 아닌 것을 범용 이름으로 남겨 둘 이유가 없어
+소비자 파일의 익명 이름공간으로 내렸다. 그러면서 §2.7 이 센 죽은 include 둘
+(`InspectorWindow.cpp`, `ImGuiDrawHelperTerrainComponent.cpp`)도 함께 없어졌다.
+
+**내리면서 결함 하나가 드러났다 — 뒤집힌 Y 축.** 같은 그림을 그리는 함수가 두 벌이었고
+세로 축이 서로 **반대**였다.
+
+| 함수 | 세로 축 | 판정 |
+|---|---|---|
+| `DrawAnchorIconButton` | `ImLerp(Min.y, Max.y, ny)` — ny=0 이 화면 위 | 맞다 |
+| `DrawAnchorIconVisual` | `ImLerp(Max.y, Min.y, ny)` — ny=0 이 화면 아래 | **틀렸다** |
+
+앵커 표는 y-down 이다 — `TopLeft={0,0}`, `BottomLeft={0,1}`
+(`RectTransformComponent.h:16`). 즉 인스펙터의 "현재 프리셋" 버튼은 고른 것과 위아래가
+뒤집힌 그림을 보이고 있었다. 팝업 안의 3x3 은 버튼 쪽 함수를 쓰므로 멀쩡했고, 그래서
+눈에 띄기 어려웠다 — 고른 칸과 보이는 그림을 나란히 볼 일이 없다. 고친 방식은 그림
+함수를 하나로 만든 것이다. 축이 한 자리에만 있으면 두 벌이 갈라질 수 없다.
+
+**상태는 표준 위젯의 것을 쓴다.** 이 줄은 배경을 그리지 않으므로 hover·active 는
+`DragFloat` 자신이 든다. disabled 는 넣지 않았다 — 다섯 소비자 중 쓰는 자리가 없어
+한 번도 돌지 않는 경로가 된다. §4 가 "disabled 만 지금 뚫을 값이 있다" 고 한 것은
+저장소 전체를 센 것이고, 이 줄의 소비자로 좁히면 공집합이다.
+
 ### 2.3 `HorizontalLayout.h` → 범위 밖 (정정)
 
 `BeginHorizontal`·`EndHorizontal`·`BeginVertical`·`EndVertical`·`Spring` 을 내보낸다.
@@ -160,6 +197,39 @@ X/Y/Z 색 badge 는 저장소에 한 자리도 없다. vec3 를 그리는 자리
 이관 대상 넷 중 `ReflectionTypedDraw.h:304` 가 가장 넓다 — 리플렉션이 그리는 모든 vector3 가
 그 한 줄을 지난다. 대표 지점을 고른다면 여기다.
 
+#### 이관 결과 — 착지 (2026-09-11)
+
+`Editor/ImGuiHelper/EditorAxisField3.{h,cpp}` 를 새로 세우고 네 자리를 모두 옮겼다 —
+`ReflectionTypedDraw.h` 의 vector3 분기와 `InspectorWindow.cpp` 의 Position·Rotation·Scale.
+
+**라벨은 ImGui 규약을 그대로 쓴다.** 라벨을 왼쪽으로 옮기는 규약을 새로 세우지 않았다.
+가장 넓은 소비자가 `ReflectionTypedDraw.h` 이고 그곳의 다른 열두 타입이 모두 ImGui
+기본(라벨 오른쪽)이라, vector3 만 왼쪽이 되면 리플렉션 인스펙터 안에서 그 줄만 어긋난다.
+라벨을 앞에 두고 싶은 호출자는 지금처럼 `Text` + `SameLine` 뒤에 `##` 이름을 넘긴다.
+
+**축 색은 의미 색을 쓰지 않는다.** 팔레트의 `Error`(빨강)·`Positive`(초록)·
+`Primary`(파랑)가 크기도 색상도 딱 맞지만 그대로 쓰면 세 축이 곧 오류·성공·강조가 된다.
+그러면 이 줄에 error 상태를 넣는 순간 X 축과 색이 겹쳐 상태 표시가 사라진다 —
+`EditorSectionHeader` 가 hover 를 잃었던 것과 같은 충돌이다. 그래서 따로 두었다.
+
+| 축 | 값 | 흰 글자 대비 |
+|---|---|---|
+| X | `0xC0392B` | 5.4:1 |
+| Y | `0x4F7A28` | 5.1:1 |
+| Z | `0x2D6FA8` | 5.3:1 |
+
+대비를 재 둔 이유가 있다. 밝은 `Positive`(`0x5AEB5C`)를 그대로 쓰면 흰 글자 대비가
+**2.1:1** 이라 badge 의 글자가 배경에 묻는다. 색만으로 축을 알리면 색을 구별하지 못하는
+눈에는 세 칸이 같은 칸이 되므로 글자는 장식이 아니다. 그래서 이 표는 주석이 아니라
+단정이다 — `EditorThemeSelfTest` 가 구현이 내보내는 두 색으로 대비를 다시 재고 3:1
+미만이면 붉어진다.
+
+**화면을 찍어 보고 하나를 적어 두었다.** badge 뒤의 입력칸은 손대기 전에 경계가 보이지
+않는다. `EditorTheme.cpp` 가 `ImGuiCol_FrameBg` 를 `Canvas` 로 두는데 인스펙터 바탕도
+`Canvas` 라 두 색이 같기 때문이다(hover 하면 `FrameBgHovered` 가 떠올라 드러난다).
+이 위젯이 만든 성질이 아니라 테마가 두 칸을 같은 값으로 둔 결과이고, 이번에도 같은
+충돌 양식이다. W1 이 아직 `progress` 라 여기서 값을 바꾸지 않고 기록만 했다.
+
 ### 2.5 `ToggleUI.h` → 은퇴 (소비자 0)
 
 `ImGui::ToggleSwitch(const char*, bool)` 하나를 내보내고 **소비자가 0** 이다. 계획서는
@@ -177,6 +247,24 @@ marker" 와 다른 물건이다. 승계하면 두 벌이 남는다.
 에디터의 이름공간이고, 소비자는 `Editor/ImGuiHelper/PinHelper.h` 하나뿐이다(핀 아이콘).
 `widgets.cpp` 는 `drawing.{h,cpp}` 의 `DrawIcon` 을 부른다 — 계획서가 이미 범위 밖으로 둔
 쌍이다. `EditorModeButton` 의 입력이 아니다.
+
+#### `EditorModeButton` 이관 결과 — 착지 (2026-09-11)
+
+`Editor/ImGuiHelper/EditorModeButton.{h,cpp}` 를 세우고 툴바의 Play·Pause 둘을 옮긴 뒤
+`ToggleUI.h` 를 지웠다. 빌드가 섰으므로 소비자가 없었다는 것이 그 자리에서 증명된다.
+
+**원본 자리에 결함이 있었다.** `MenuBarWindow::RenderToolBar` 는 일시정지 중일 때
+`ImGuiCol_Button`·`ButtonHovered`·`ButtonActive` **세 칸을 모두** `ButtonActive` 색으로
+덮었다. 그러면 켜진 버튼은 마우스를 올려도 눌러도 색이 그대로다 — 켜짐과 눌림이 같은
+축을 다투었기 때문이다. 여기서는 켜짐을 **아래 marker** 가 들고 배경은 hover/press 를
+그대로 든다. 두 축이 갈라지므로 겹치지 않는다.
+
+marker 두께는 활성 탭과 같은 토큰(`TabActiveMarker`)을 쓴다. 같은 뜻("이것이 지금 켜진
+것")을 에디터 안에서 두 가지 두께로 그리면 규칙이 보이지 않는다.
+
+**disabled 는 여기서 실제로 돈다.** 재생 중이 아닐 때 일시정지 버튼이 그 상태다.
+`BeginDisabled` 로 감싸지 않고 위젯이 직접 든 이유는 그것이 전체 알파를 내려 marker 까지
+흐리기 때문이다 — 켜져 있는데 손댈 수 없는 상태에서 켜짐 표시를 잃을 이유가 없다.
 
 ### 2.7 곁가지 — 죽은 include 하나
 
@@ -201,11 +289,14 @@ include 다 — `ToggleSwitch` 를 부르지 않는다. §2.5 의 은퇴는 이 
 1. ~~**`EditorSectionHeader`** — 승계. 기존 138줄을 토큰화·개명하고 소비자 3을 옮긴다.~~
    **착지했다 (2026-09-11, §2.1 의 "이관 결과").** 죽은 코드 셋을 함께 고쳤고 색은 Header 칸
    대신 토큰을 직접 읽는다.
-2. **`EditorPropertyRow`** — 승계. `TableAPIHelper.h` 를 UTF-8 로 바꾸는 커밋이 먼저,
-   그 다음 행 규약을 일반화한다(vec2 전용 → 열 개수 인자).
-3. **`EditorAxisField3`** — 신설. §2.4 의 네 자리 중 `ReflectionTypedDraw.h:304` 를 대표
-   지점으로 잡는다.
-4. **`EditorModeButton`** — 신설. 착지 뒤 `ToggleUI.h` 를 지운다.
+2. ~~**`EditorPropertyRow`** — 승계. 행 규약을 일반화한다(vec2 전용 → 열 개수 인자).~~
+   **착지했다 (2026-09-11, §2.2 의 "이관 결과").** `TableAPIHelper.h` 가 통째로 사라졌고
+   앵커 아이콘의 뒤집힌 Y 축을 함께 고쳤다.
+3. ~~**`EditorAxisField3`** — 신설.~~ **착지했다 (2026-09-11, §2.4 의 "이관 결과").**
+   네 자리를 모두 옮겼고 축 색은 의미 색과 구별되게 따로 두었다.
+4. ~~**`EditorModeButton`** — 신설. 착지 뒤 `ToggleUI.h` 를 지운다.~~
+   **착지했다 (2026-09-11, §2.6 뒤의 "이관 결과").** 켜짐을 marker 로 옮겨 원본이 잃었던
+   hover/press 를 되살렸고 `ToggleUI.h` 를 지웠다.
 
 은퇴 대상은 `ToggleUI.h` 하나다. `HorizontalLayout.h`·`widgets.{h,cpp}` 는 은퇴가 아니라
 **범위 밖**이다 — 노드 에디터가 쓰고 있으므로 건드리지 않는다.
@@ -246,6 +337,33 @@ include 다 — `ToggleSwitch` 를 부르지 않는다. §2.5 의 은퇴는 이 
 
 정리하면 **처음 구현에 넣을 상태는 hover·active·disabled 셋**이고, focus·nav·mixed·error 는
 소비자가 생길 때 더한다. 그 판단의 근거가 위 표다.
+
+## 4.1 검사가 붙은 자리와 그 이빨 (2026-09-11 추가)
+
+네 family 가 모두 착지하면서 `EditorThemeSelfTest` 의 검사가 **193 → 237** 로 늘었다.
+늘어난 44 는 세 위젯이 고르는 값을 읽어 단정한다.
+
+| 위젯 | 단정 |
+|---|---|
+| `EditorPropertyRow` | 필드 ID 가 `##` 로 숨겨질 것, 서로 다를 것, 범위 밖은 `nullptr` 일 것 |
+| `EditorAxisField3` | 축 색 셋의 기대 hex, 셋이 서로 다를 것, **의미 색 셋과 다를 것**, 흰 글자 대비 3:1 이상일 것 |
+| `EditorModeButton` | 표면 셋의 기대 hex, 서로 다를 것, **marker 가 표면 셋 어느 것과도 다를 것**, 꺼진 글자색이 다를 것 |
+
+**변이로 이빨을 쟀다.** 셋을 한 번에 넣고 어느 검사가 붉어지는지 이름으로 확인했다.
+
+| 변이 | 붉어진 검사 |
+|---|---|
+| 필드 ID 표에서 `"##f2"` → `"##f1"` (중복) | `property row: field ids differ` |
+| X 축 색 → `Positive`(`0x5AEB5C`) | `axis x: badge color` · `axis x: badge is not a meaning color` · `axis x: badge letter stays readable` |
+| marker → `Selection` (Held 와 충돌) | `mode button: marker stands out from every surface` |
+
+237 중 **5 실패**이고, 붉은 다섯이 모두 그 변이가 깨뜨린 계약의 이름이다. 나머지 232 는
+하나도 건드리지 않았다. 대비 단정이 세 번째 줄에서 혼자 붉어진 것이 특히 값이 있다 —
+색을 바꿔도 대비가 충분하면 그 검사는 조용하고, 실제로 묻는 색을 골랐을 때만 운다.
+
+되돌린 뒤 Debug·Release 빌드가 서고 `verify-editor-theme.ps1` 이 DX12·Vulkan 6기동
+103검사로 통과한다. 이웃 게이트 넷(obsolete surface · declaration wiring · workspace ·
+icon resources)도 초록이다.
 
 ## 5. 계획서 항목 하나는 이미 끝나 있다
 

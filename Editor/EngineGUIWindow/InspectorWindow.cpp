@@ -29,6 +29,7 @@
 #include "ReflectionTypedDraw.h"   // CT6-c typed Draw 썽크
 #include "RegisterReflectManual.h" // REFLECT_TYPE_LIST 공유 목록 + 전 타입 헤더
 #include "EditorSectionHeader.h"
+#include "EditorAxisField3.h"
 #include "Terrain.h"
 #include "FileDialog.h"
 #include "TagManager.h"
@@ -50,7 +51,6 @@
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
-#include "TableAPIHelper.h"
 #include "NodeEditor.h"
 #include <algorithm>
 #include "imgui_stdlib.h"
@@ -499,6 +499,21 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	}
 }
 
+// 트랜스폼 세 줄이 쓰는 축 필드. 라벨은 위의 `Text` + `SameLine` 이 이미
+// 그렸으므로 `##` 이름을 넘겨 위젯 쪽 라벨을 끈다 — `DragFloat3` 에 넘기던
+// 것과 같은 규약이다.
+static bool DrawTransformAxes(const char* label, float* values,
+    float speed, float min, float max)
+{
+    editor::widgets::axis_field3_request axes{};
+    axes.label = label;
+    axes.values = values;
+    axes.speed = speed;
+    axes.min = min;
+    axes.max = max;
+    return editor::widgets::draw_axis_field3(axes);
+}
+
 void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 {
 	// 현재 트랜스폼 값
@@ -529,7 +544,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 	{
 		ImGui::Text("Position ");
 		ImGui::SameLine();
-		if (ImGui::DragFloat3("##Position", &position.x, 0.08f, -1000, 1000))
+		if (DrawTransformAxes("##Position", &position.x, 0.08f, -1000.f, 1000.f))
 		{
 			if (!editingPosition)
 			{
@@ -568,7 +583,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 
 		ImGui::Text("Rotation ");
 		ImGui::SameLine();
-		if (ImGui::DragFloat3("##Rotation", pyr, 0.1f))
+		if (DrawTransformAxes("##Rotation", pyr, 0.1f, 0.f, 0.f))
 		{
 			if (!editingRotation)
 			{
@@ -614,7 +629,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 
 		ImGui::Text("Scale     ");
 		ImGui::SameLine();
-		if (ImGui::DragFloat3("##Scale", &scale.x, 0.1f, 0.001f, 1000.f))
+		if (DrawTransformAxes("##Scale", &scale.x, 0.1f, 0.001f, 1000.f))
 		{
 			if (!editingScale)
 			{

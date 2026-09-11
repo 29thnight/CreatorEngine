@@ -21,6 +21,7 @@
 // 언두: 레거시는 Property 기반 PropertyChangeCommand — typed는 멤버 포인터를
 // 캡처한 CustomChangeCommand로 동일 의미(변경 즉시 적용 + Undo/Redo 왕복).
 #include "ReflectionImGuiHelper.h"
+#include "EditorAxisField3.h"
 #include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf 재사용
 #include <cstddef>
 
@@ -301,7 +302,10 @@ namespace Meta::TypedDraw
         {
             MemberT v = value;
             ImGui::PushID(name);
-            if (ImGui::DragFloat3(label, &v.x))
+            editor::widgets::axis_field3_request axes{};
+            axes.label = label;
+            axes.values = &v.x;
+            if (editor::widgets::draw_axis_field3(axes))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;

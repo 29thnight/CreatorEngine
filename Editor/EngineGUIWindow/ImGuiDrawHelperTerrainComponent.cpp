@@ -4,7 +4,6 @@
 #include "Assets/ModelAssetGeneration.h" // MBC9
 #include "EditorImGuiTexture.h"
 #include "Terrain.h"
-#include "TableAPIHelper.h"
 #include "FileDialog.h"
 #include "FoliageComponent.h"
 #include "IconsFontAwesome6.h"

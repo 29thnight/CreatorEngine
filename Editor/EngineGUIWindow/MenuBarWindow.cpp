@@ -32,7 +32,7 @@
 #include "EditorPlatform.h"
 #include "RuntimeSettings.h"
 #include "EnhancedGizmoSceneBinding.h"
-#include "ToggleUI.h"
+#include "EditorModeButton.h"
 #include "GameBuilderSystem.h"
 #include "EditorRenderer.h"
 #include "EditorWindowChrome.h"
@@ -785,16 +785,17 @@ void MenuBarWindow::RenderToolBar()
         const char* const pauseIcon = isPaused ? ICON_FA_PLAY : ICON_FA_PAUSE;
 
         const ImGuiStyle& style = ImGui::GetStyle();
-        const float playWidth =
-            ImGui::CalcTextSize(playIcon).x + style.FramePadding.x * 2.0f;
-        const float pauseWidth =
-            ImGui::CalcTextSize(pauseIcon).x + style.FramePadding.x * 2.0f;
-        const float groupWidth = playWidth + pauseWidth + style.ItemSpacing.x;
+        const float groupWidth = editor::widgets::mode_button_width(playIcon) +
+            editor::widgets::mode_button_width(pauseIcon) + style.ItemSpacing.x;
 
         const float rowWidth = ImGui::GetWindowWidth();
         ImGui::SetCursorPosX((rowWidth - groupWidth) * 0.5f);
 
-        if (ImGui::Button(playIcon))
+        editor::widgets::mode_button_request play{};
+        play.icon = playIcon;
+        play.active = isGameRunning;
+        play.tooltip = isGameRunning ? "Stop" : "Play";
+        if (editor::widgets::draw_mode_button(play))
         {
             // ★ LC6(§9): Undo 정책은 Editor::PlayModeController 가 소유한다.
             //   이 버튼이 ClearGameMode 와 m_isGameMode 대입을 직접 하던 시절에는
@@ -802,23 +803,21 @@ void MenuBarWindow::RenderToolBar()
             SceneManagers->SetGameStart(!isGameRunning);
         }
 
-        ImGui::BeginDisabled(!canPause);
-        if (canPause && isPaused)
-        {
-            const ImVec4 active = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
-            ImGui::PushStyleColor(ImGuiCol_Button, active);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, active);
-        }
-        if (ImGui::Button(pauseIcon))
+        ImGui::SameLine();
+
+        // 일시정지 중이라는 표시를 버튼 세 칸(Button·Hovered·Active)을 모두
+        // 같은 색으로 덮어 알리던 자리다. 그러면 켜진 버튼은 hover 도 press 도
+        // 반응하지 않는다 — 켜짐과 눌림이 같은 축을 다투었기 때문이다.
+        // 이제 켜짐은 아래 marker 가 든다.
+        editor::widgets::mode_button_request pause{};
+        pause.icon = pauseIcon;
+        pause.active = canPause && isPaused;
+        pause.enabled = canPause;
+        pause.tooltip = isPaused ? "Resume" : "Pause";
+        if (editor::widgets::draw_mode_button(pause))
         {
             SceneManagers->ToggleGamePaused();
         }
-        if (canPause && isPaused)
-        {
-            ImGui::PopStyleColor(3);
-        }
-        ImGui::EndDisabled();
 
         // Content Browser 표시 스타일을 가르던 ToggleSwitch 가 여기 있었다.
         // 스타일이 하나가 되면서 스위치도 걷혔다.

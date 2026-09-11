@@ -70,7 +70,7 @@
     <Filter Include="ImGuiHelper\소스 파일\Profiler">
       <UniqueIdentifier>{39734524-566a-5506-b33b-c907a4579ed6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\TableAPIHelper">
+    <Filter Include="ImGuiHelper\소스 파일\PropertyRow">
       <UniqueIdentifier>{99444752-80d8-5f07-a9ed-a9bb0d7cbe32}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -390,11 +390,14 @@
     <ClInclude Include="ImGuiHelper\ProfilerHUD.h">
       <Filter>ImGuiHelper\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ImGuiHelper\TableAPIHelper.h">
-      <Filter>ImGuiHelper\소스 파일\TableAPIHelper</Filter>
+    <ClInclude Include="ImGuiHelper\EditorPropertyRow.h">
+      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
     </ClInclude>
-    <ClInclude Include="ImGuiHelper\ToggleUI.h">
-      <Filter>ImGuiHelper\소스 파일</Filter>
+    <ClInclude Include="ImGuiHelper\EditorAxisField3.h">
+      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorModeButton.h">
+      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\widgets.h">
       <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
@@ -553,6 +556,15 @@
     </ClCompile>
     <ClCompile Include="ImGuiHelper\EditorSectionHeader.cpp">
       <Filter>ImGuiHelper\소스 파일\CollapsingHeader</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorPropertyRow.cpp">
+      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorAxisField3.cpp">
+      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorModeButton.cpp">
+      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp">
       <Filter>ImGuiHelper\소스 파일\NodeEditior</Filter>
