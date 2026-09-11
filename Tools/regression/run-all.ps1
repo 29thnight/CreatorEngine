@@ -211,6 +211,17 @@ Run-Step "editor:: 선언 배선(창 표·메뉴 표·고아 0)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-declaration-wiring.ps1") -Exe $Exe -Work (Join-Path $Work 'editor-declaration')
 }
 
+# PHASE 21 W0 전반 — 에디터 크롬을 밖에서 본다.
+#
+# 선언 게이트와 파일을 나눈 이유는 뜨는 상태가 다르기 때문이다. 이쪽은 W0 후반에
+# imgui.ini fixture 네 벌과 재시작·손상 ini 를 태우게 되므로 준비된 상태로 에디터를
+# 여러 번 띄운다. 살아 있는 ImGui 상태는 그리는 쪽이 프레임 끝에 게시한 스냅샷으로
+# 읽는다 — 명령은 게임 스레드에서 돌고 ImGui 프레임은 PresentationThread 것이라
+# 직접 읽으면 경합이다.
+Run-Step "에디터 크롬 관측(도크·스타일·ini)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-workspace.ps1") -Exe $Exe -Work (Join-Path $Work 'editor-workspace')
+}
+
 # PHASE 14.5 LC7 §10.2 — 리로드 실패가 반쯤 교체된 상태를 남기지 않는다.
 #
 # 관리 쪽 Reload()가 `Unload(); Load();` 라, 새 어셈블리가 깨져 있으면 이전 것은

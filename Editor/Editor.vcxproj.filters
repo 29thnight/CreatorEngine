@@ -216,6 +216,12 @@
     <ClInclude Include="EditorWindow\EditorWindowAudit.h">
       <Filter>EditorWindow</Filter>
     </ClInclude>
+    <ClInclude Include="EditorWindow\EditorChromeSnapshot.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorChromeProbe.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
     <ClInclude Include="EditorWindow\RegisterEditorWindowManual.h">
       <Filter>EditorWindow</Filter>
     </ClInclude>
@@ -263,6 +269,12 @@
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorWindowAudit.cpp">
       <Filter>EditorWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\EditorChromeSnapshot.cpp">
+      <Filter>EditorWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorChromeProbe.cpp">
+      <Filter>EngineGUIWindow</Filter>
     </ClCompile>
     <ClCompile Include="EditorWindow\Windows\EditorStandardWindows.cpp">
       <Filter>EditorWindow\Windows</Filter>

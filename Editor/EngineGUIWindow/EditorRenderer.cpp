@@ -1,6 +1,7 @@
 #include "EditorRenderer.h"
 #include "EditorWindowHost.h"
 #include "EditorWindowRegistry.h"
+#include "EditorChromeProbe.h"
 #include "RHI/IImGuiHost.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
@@ -334,5 +335,17 @@ void EditorRenderer::Render()
 
 void EditorRenderer::EndRender()
 {
+    // PHASE 21 W0 전반(계획서 §1.9): 밖에서 배치를 볼 수단.
+    //
+    // 자리가 `EndFrame` **앞**인 이유는 둘이다 — 이번 프레임의 모든
+    // `Begin`/`End` 가 끝나 도크 노드 rect 와 창의 도크 소속이 확정돼 있고,
+    // 아직 ImGui 문맥이 살아 있어 읽을 수 있다.
+    //
+    // 여기서 게시하고 CLI 가 사본을 읽는다. 명령 핸들러는 게임 스레드의
+    // `Pump()` 에서 도는데(`App.cpp`) ImGui 프레임은 이 스레드(Presentation)
+    // 것이라, 명령이 `ImGui::` 를 직접 부르면 `NewFrame`~`Render` 한복판의
+    // 전역 문맥을 읽는 경합이 된다.
+    ::editor::capture_chrome_snapshot();
+
     m_host->EndFrame();
 }

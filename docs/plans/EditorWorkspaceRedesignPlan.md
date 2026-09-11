@@ -100,6 +100,12 @@ Main editor OS window
 - 배율의 출처는 `EditorPreferences::GetImGuiScale()` **사용자 설정 하나**뿐이고 DPI 항이 없다(§3.2).
 - `io.FontGlobalScale`은 vcpkg가 물린 **ImGui 1.92.8에서 obsolete**다
   (`imgui.h:2726`, `#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS` 블록. 1.92부터 `style.FontScaleMain`).
+  **(2026-09-11 재확인 — 헤더가 둘이다.)** W0에서 런타임이 보고한 `IMGUI_VERSION_NUM`이 19280이라
+  이 문장이 맞다. 그런데 기계에 imgui 설치본이 **둘** 있다 — 전역 classic vcpkg의
+  `installed/x64-windows`는 1.91.7이고 그 판에는 `style.FontScaleMain`이 아예 없다. 컴파일에
+  쓰이는 것은 저장소 매니페스트의 `vcpkg_installed/x64-windows/x64-windows`(1.92.8)다. 앞쪽을
+  읽고 "계획서가 틀렸다"고 판단했다가 런타임 값에 뒤집혔다. **헤더를 눈으로 읽어 판을 정하지
+  말고 `editor.theme`이 찍는 값을 보라.**
 
 즉 W1은 “새 스케일 함수를 만든다”가 아니라 **obsolete API에서 1.92의 정식 경로로 이주한다**가 맞다.
 
@@ -166,6 +172,9 @@ Main editor OS window
 4. `ImGuiRegister::m_contexts`가 `unordered_map`이라 **창 렌더 순서가 비결정적**이다. ImGui의
    Begin/End 자체는 순서에 관대하지만 focus 획득과 draw list 순서는 영향을 받으므로, W0의 visual
    golden을 뜨기 전에 순회를 결정적 컨테이너로 바꾼다(빈 골든보다 흔들리는 골든이 더 나쁘다).
+   **(2026-09-11 해소 — M4가 먼저 했다.)** 그 펌프 자체가 은퇴했다. 지금 순회는
+   `editor::window_entries_of()`의 `std::vector`이고 **선언 순서 그대로**다. `ImGuiRegister`는
+   트리에서 사라졌고 남은 등장은 전부 은퇴 이력 주석이다. W0가 따로 할 일은 없다.
 
 **(2026-09-10 정정)** 창 표시 상태 저장소는 둘이 아니라 **셋**이다. 8-30 정찰과 9-10 재정찰이
 모두 둘로 셌다.
@@ -363,6 +372,32 @@ editor.viewport      현재 mode·display target·input owner·cursor state
 먼저 난 셈이고, 그래서 TSV 관례를 **이 둘이 정했다** — 남은 다섯은 그 형식을 따른다. 차집합
 단정은 아직 없다. 두 덤프가 다 있으므로 W0이 그것을 세우는 데 남은 것은 단정 한 줄이다.
 
+**(2026-09-11 W0 전반 착지)** `editor.dock` · `editor.theme` · `editor.layout` 셋이 섰다. 같은
+TSV 관례를 따르고, 감사가 더러우면 실패로 낸다. `editor.viewport`는 **짓지 않았다** — 근거는
+아래에 적었다. 여섯 중 다섯이 선 것이고, 게이트는 `verify-editor-workspace.ps1`로 따로 세워
+`run-all`에 물렸다(단정 29).
+
+**★ 읽는 쪽과 그리는 쪽이 다른 스레드다.** `editor.windows`는 **선언 표**를 읽는다 — 부팅 때 한 번
+쓰이고 그 뒤 읽기만 하므로 어느 스레드에서 읽어도 된다. 그런데 배치·스타일은 **살아 있는 ImGui
+상태**이고, ImGui 프레임은 PresentationThread에서 돌고(`EditorMain::PresentFrame`) CLI 명령은
+게임 스레드의 `Pump()`에서 돈다(`App.cpp:274`). 둘은 `m_sceneStructureMutex`로만 겹친다. 명령
+핸들러가 `ImGui::`를 직접 부르면 `NewFrame`~`Render` 한복판의 전역 문맥을 읽는 **경합**이다.
+그래서 그리는 쪽이 프레임 끝에 스냅샷을 게시하고 읽는 쪽은 사본을 본다. 뮤텍스를 들고 ImGui를
+읽는 대안보다 나은 점이 하나 더 있다 — 게이트가 **한 프레임 안에서 일관된 그림**을 본다.
+
+**★ 계측은 매 프레임 돌지 않는다.** Debug 실측으로 한 번에 0.47 ms였다(스타일 색 63개와 스칼라
+28개의 이름을 문자열로 만드는 값). 진단 장치가 진단 대상보다 비싸지면 안 되므로 30프레임마다
+한 번 뜨고, 명령이 읽은 뒤 다음 한 번을 요청한다. 묵은 정도는 숨기지 않는다 — 덤프가 `frame=`을
+찍으므로 읽는 쪽이 언제 뜬 값인지 본다.
+
+**★ `editor.viewport`는 W5로 넘긴다.** 그것이 실어야 할 값 셋 중 둘이 **아직 존재하지 않는다.**
+committed play state는 §1.6대로 `atomic_bool` 하나뿐이고, input owner는 §1.8대로
+`ImGuiHost::BeginFrame`이 `WantCapture*`를 매 프레임 true로 덮어써 밖에서 물어볼 수단이 없다.
+지금 이 커맨드를 지으면 **언제나 같은 상수를 찍는 관측**이 되고, 그것은 관측이 아니라 관측
+흉내다 — 이 저장소가 "저작 표면은 저작해 봐야 증명된다"로 이미 데었던 자리와 같은 모양이다.
+두 신호를 만드는 것은 W5의 첫 작업으로 계획서에 이미 적혀 있다. `ScenePhase`를 싣는 일도 같이
+간다.
+
 이 다섯이 없으면 `verify-editor-workspace.ps1`은 "창이 떴다"밖에 단정하지 못한다. §9의 W0
 추정은 이 몫을 포함해 재산출했다.
 
@@ -378,8 +413,9 @@ editor.viewport      현재 mode·display target·input owner·cursor state
   `NodeEditor.{h,cpp}`, `TableAPIHelper.h`, `ToggleUI.h`. 텍스트 편집으로 한 줄만 고쳐도 무관한
   주석이 깨진 이력이 있으므로, 이 파일들은 편집 전에 인코딩을 먼저 정리한다.
 - `ImGuiContext.h`가 은퇴한 `imgui_impl_dx11.h`를 아직 include한다. W2에서 함께 걷는다.
-- `ImGuiRegister.h`는 헤더 스스로 `#define EDITOR`를 하고 `#if defined(EDITOR)`로 갈라 놓아
-  else 분기 전체가 죽은 코드다. W3에서 정리한다.
+- ~~`ImGuiRegister.h`는 헤더 스스로 `#define EDITOR`를 하고 `#if defined(EDITOR)`로 갈라 놓아
+  else 분기 전체가 죽은 코드다. W3에서 정리한다.~~ **(2026-09-11 해소)** M4 4단계가 그 헤더를
+  걷었다. `EDITOR` 매크로가 하던 구분은 프로젝트 경계가 한다.
 
 ---
 
@@ -779,13 +815,17 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 **추정 정정 근거:** §1.9대로 에디터 chrome을 밖에서 볼 CLI 표면이 0이다. 관측 커맨드를 만들지
 않으면 canary가 "창이 떴다"밖에 단정하지 못한다. 원래의 1일은 측정·캡처만 센 값이다.
 
-- `editor.layout` / `editor.windows` / `editor.dock` / `editor.theme` / `editor.viewport` 관측
-  커맨드를 신설한다(§1.9). 이번 슬라이스에서는 **관측만** 하고 설정·저작은 W3/W6에 둔다.
+- ~~`editor.layout` / `editor.windows` / `editor.dock` / `editor.theme` / `editor.viewport` 관측
+  커맨드를 신설한다(§1.9).~~ **(2026-09-11 착지 — 다섯.)** `editor.windows`(M4) ·
+  `editor.menu`(M2) · `editor.dock` · `editor.theme` · `editor.layout`. `editor.viewport`는 읽을
+  신호가 없어 W5로 넘겼다(§1.9). 이번 슬라이스에서는 **관측만** 하고 설정·저작은 W3/W6에 둔다.
   **(9-10 재정찰)** `editor.viewport`는 `ScenePhase`를 실어야 한다 — 현행 `play.state`는
   gameStart·paused·pending만 내서 스냅샷 실패 뒤의 상태가 성공과 구분되지 않는다
   (`SceneObjectCommands.cpp:1034-1057`). 관측 대상 상태의 정본은 재정찰 문서 §1.4의
   "GUI에만 있는 동작" 표다. screenshot은 기존 `Tools/regression/capture-window.ps1`을 재사용한다.
-- `ImGuiRegister`의 창 순회를 결정적 순서로 바꾼다(§1.3-4). golden을 뜨기 **전에** 한다.
+- ~~`ImGuiRegister`의 창 순회를 결정적 순서로 바꾼다(§1.3-4).~~ **(M4가 먼저 했다.)** 펌프가
+  은퇴하고 순회가 선언 순서의 `std::vector`가 됐다. 도크 노드 순회도 결정적이다 — `ImGuiStorage`가
+  키로 정렬돼 있어 뿌리에서 재귀로 내려가지 않고 그 맵을 훑는다(떠 있는 노드도 놓치지 않는다).
 - 현재 `imgui.ini` 4벌을 fixture로 고정한다(§1.4) — 정본 2, 유물 2. Content Browser 이중 entry가
   들어 있는 실물을 그대로 쓴다.
 - 핵심 window title/flags, open state inventory를 고정한다. `PushStyleColor/Var` 91건의 위치
@@ -793,7 +833,12 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 - 1920×1080/2560×1440, user scale 100%/150%의 shell screenshot을 캡처한다. **DPI 경로가 없으므로
   (§3.2) 이 캡처는 "user scale"임을 명시하고, 진짜 DPI 캡처는 W1 이후로 미룬다.**
 - Editor UI CPU, ImGui vertices/indices/draw commands, target별 GPU ms를 기록한다.
-- `verify-editor-workspace.ps1` canary를 만든다.
+- ~~`verify-editor-workspace.ps1` canary를 만든다.~~ **(2026-09-11 착지.)** 선언 게이트와 **파일을
+  나눴다** — 뜨는 상태가 다르기 때문이다. 선언 게이트는 개발자의 평소 상태에서 한 번 띄워 표를
+  보고, 이쪽은 W0 후반에 ini fixture 네 벌과 재시작·손상 ini를 태우므로 준비된 상태로 여러 번
+  띄운다. 한 파일에 섞으면 선언 검사가 남의 이유로 에디터를 다시 띄운다. `imgui.ini`가 없는
+  기계에서는 항목 단정이 잴 것이 없으므로 **조용히 건너뛰지 않고** 에디터를 한 번 더 돌려
+  만든다(빈 집합을 성공으로 읽지 않는다).
 
 **판정:** 빈 측정·빈 screenshot으로 통과하지 않는다. **canary는 불변식을 단정하고 현재 개수를 단정하지
 않는다** — "상단 메뉴가 셋"처럼 착수 전 상태를 지키는 단정은 부록 A의 M1이 Tools/Window를 세우는 순간
@@ -803,6 +848,46 @@ canary는 **변이로 이빨을 증명한다** —
 Content Browser 이름을 한 글자 바꾸거나 central node를 지운 fixture를 넣었을 때 정확히 그 단정만
 빨개져야 하고, 첫 실행부터 전부 초록이면 통과로 세지 않는다. legacy layout과 performance
 baseline이 이 문서 또는 별도 analysis 산출물에 기록된다.
+
+**(2026-09-11 전반 변이 증명)** 결함을 **하나씩만** 심고 에디터를 통째로 다시 빌드해 게이트를
+태웠다. 무변이 대조군을 앞뒤에 두었고 둘 다 초록이었다.
+
+| 변이 | 게이트가 내놓은 줄 |
+|---|---|
+| 선언 host 를 거치지 않고 직접 `Begin` 한 창을 기존 노드에 붙임 | `ghost=1` |
+| 창 하나의 **안정 id** 를 바꿈(ini 의 도크 항목을 잃는다) | `docked=5 undocked=1` |
+| 에디터 스킨 적용이 돌지 않음 | `applied=0` · `에디터 스킨이 적용되지 않았다` |
+| 배율 적용 경로가 설정값과 어긋남 | `scaleMatch=0` · `배율 출처가 갈렸다` |
+| 모든 고정 id 에 접미사가 붙음 | `Only 0 windows are docked; the gate would be vacuous` |
+| ImGui 판을 19170 으로 되돌림 | `versionKnown=0` · 내부 구조체 읽기 재검증 지시 |
+
+대조군은 `dock nodes=7 leaf=4 docked=6 central=0, style colors=63 differing=53 scale=0.8,
+ini entries=16 matched=14, imgui=19280, checks=29`이다.
+
+**★ 첫 변이 셋이 제 단정을 못 건드렸고, 그 이유가 전부 달랐다.** 변이가 초록이면 멈추지 말고
+**왜**를 봐야 한다는 것이 여기서 세 번 값을 했다.
+
+1. **`panel(stable_id, label)` 의 첫 인자가 안정 id 다.** 둘째(라벨)를 바꿨더니 게이트가
+   초록이었는데, 그것은 **의도된 동작**이다 — `###` 규칙의 요점이 "라벨이 바뀌어도 도크가
+   살아남는다" 이므로 초록이 맞다. 첫 인자를 바꾸자 `undocked=1` 이 나왔다.
+2. **초기 배율 대입은 값이 살아남지 않는다.** `m_lastRequestedScale{-1.f}` 이라 첫 프레임에
+   `ApplyEditorScale` 이 무조건 돌아 `io.FontGlobalScale` 을 다시 쓴다. 그래서
+   `EditorRenderer.cpp` 의 초기 대입을 변이해도 관측되지 않는다. 살아 있는 경로를 변이하자
+   `scaleMatch=0` 이 나왔다. 이 단정의 사정권은 **값을 실제로 정하는 경로**다.
+3. **모든 id 에 접미사를 붙이는 변이는 유령 탭을 건드리지 못한다.** id 가 전부 바뀌면 ImGui 가
+   어느 창도 모르게 되어 도크 노드의 탭 목록 자체가 빈다 — `ghost=0` 이고 대신 양성 확인
+   (`dockedWindows >= 2`)이 잡았다. **빈 집합 위에서 도는 부재 단정**의 교과서적 사례이고,
+   양성 확인을 함께 둔 것이 그것을 건졌다. 유령 탭의 실제 결함 모양(직접 `Begin` + 기존 노드에
+   붙이기)으로 다시 심어 `ghost=1` 을 얻었다.
+
+**★ 못 잡는 변이 하나를 지우지 않고 적어 둔다.** `duplicate_entries`(같은 창 이름이 ini 에 두
+번)는 **제품 경로로 발화시킬 수 없다.** 이유 둘 — ① 에디터가 도는 동안 자기 ini 를 다시 쓴다
+(Debug 45프레임이 약 9초이고 `io.IniSavingRate` 가 5초라, 명령이 파일을 읽을 때 심은 중복은 이미
+지워져 있다). ② ImGui 는 `###` 오른쪽만 ini 키로 적으므로 같은 키가 둘이 되려면 선언에 같은 안정
+id 가 둘이어야 하는데, 그것은 `editor.windows` 의 `duplicateIds` 가 선언 단계에서 먼저 잡는다.
+그래서 이 단정은 손으로 고친 ini·파일 손상을 거르는 값싼 방어로만 남기고 **이빨이 증명됐다고
+적지 않는다.** §1.4 가 기록한 실물 사고(Content Browser 항목이 둘로 갈림)는 이름이 **서로 다른**
+두 키였고, 그 모양은 `###` 규칙(M4)이 구조적으로 막았다.
 
 ### W1 — Theme token · font/icon · DPI 정본 (P1, 2일)
 
@@ -959,6 +1044,8 @@ W2 + W5 + W6 + W7 → W8
 M0 → M1 → M2          (부록 A. 2026-09-11 셋 다 착지)
 M1 ──────→ W3         (Window 메뉴 재열기 계약의 선행. 선행 충족)
 M2 ──────→ W0 canary  (여섯째 관측 커맨드 editor.menu를 승계한다. 그 커맨드는 섰다)
+W0 전반 ─→ W1·W3      (2026-09-11 착지. 관측 다섯과 크롬 게이트가 섰다)
+W5 ──────→ editor.viewport  (읽을 committed·input owner 신호를 W5가 만든다. §1.9)
 
 M3 ──────→ M4 → W3    (부록 B. M3 착지 완료. M4가 창 선언을 세우고 W3이 그 위에 ID를 얹는다)
 M3 ──────→ W0 golden  (기준선을 새 chrome으로 뜬다 — 옛 배치의 골든은 뜨자마자 폐기된다)
@@ -971,13 +1058,18 @@ M3 ──────→ W1 재계수  (창별 예외 91건에서 메뉴 행 몫
 | 순 | 슬라이스 | 이 자리인 이유 |
 |---|---|---|
 | 0 | **M3 — 셸 크롬 (착지 완료)** | 제목표시줄·배치·스킨이 서로를 전제한다. 제목을 가운데 두려면 재생 컨트롤이 그 행을 비워야 하고, 그러려면 툴바 행이 생겨야 하고, 그러면 독스페이스의 '행이 둘' 상수가 깨진다. 셋을 따로 하면 같은 파일을 세 번 헤집는다. 창 본문은 건드리지 않아 W3의 대상 수는 줄지 않는다 |
-| 1 | **W0 전반** — 관측 커맨드 5종 · 창 순회 결정화 | `editor.*` 가족의 **출력 형식을 여기서 정한다.** M2의 여섯째가 그 관례를 따르게 하려면 다섯이 먼저다. 순회 결정화는 모든 golden의 선행 |
+| 1 | **W0 전반 — 관측 커맨드 · 크롬 게이트 (착지 완료)** | 순서가 실제로는 거꾸로 돌았다 — `editor.windows`·`editor.menu`가 먼저 나서 TSV 관례를 **그 둘이 정했고**, 여기서 선 셋이 그 형식을 따랐다. 결과는 같다(형식이 하나). 순회 결정화는 M4가 펌프를 은퇴시키며 먼저 해소했다. `editor.viewport`는 읽을 신호가 없어 W5로 갔다 |
 | 2 | **M0 — 선언 어휘와 목록 배관 (착지 완료)** | 새 폴더뿐이라 동작 변화 0. 1과 파일을 공유하지 않아 **병행 가능** |
 | 3 | **M1 — registry와 그리기 배선 (착지 완료)** | 메뉴 구조를 바꾸는 마지막 슬라이스. 빈 뿌리를 그리지 않으므로(부록 A.6) 픽셀 중립이고, **W1보다 먼저** 두어야 `MenuBarWindow.cpp` 2,716줄을 구조와 토큰으로 두 번 헤집지 않는다 |
 | 4 | **M2 — 게이트와 `editor.menu` (착지 완료)** | M1의 표가 있어야 덤프할 것이 생긴다. W0 canary가 쓸 여섯째 커맨드를 여기서 낸다 |
 | 5 | **W0 후반** — ini fixture 4벌 · inventory · screenshot · 성능 기준선 · canary | chrome이 최종 구조가 된 뒤 **golden을 한 번만 뜬다.** canary가 dock 불변식과 메뉴 불변식을 함께 단정할 수 있다 |
 | 5.5 | **M4** — 창 선언(부록 B.3) | M3이 셸에 프레임 소유를 준 뒤라야 선언에 담을 것이 정해진다. W3보다 **먼저**여야 한다 — W3의 안정 ID는 선언의 한 필드가 되고, 표시 상태 저장소 셋을 합치는 자리도 여기다. W0 후반 골든 뒤에 두어 골든을 두 번 뜨지 않는다 |
 | 6~ | W1 → W2, W3 → W4 → W5·W6, W7, W8 | §9·§10의 기존 의존 그대로. W3의 선행인 M1·M4는 이미 끝나 있다 |
+
+**(2026-09-11)** 1~5.5가 모두 착지했다. 남은 것은 **W0 후반**(ini fixture 네 벌 · inventory ·
+screenshot · 성능 기준선 · canary 보강)과 그 뒤의 W1 → W2 → W3 → … 이다. W0 후반의 자리는
+`verify-editor-workspace.ps1`이고 그 파일은 이미 서 있다 — fixture를 넣을 틀(`Invoke-EditorBatch`)과
+ini 워밍업이 그 안에 있다.
 
 두 가지를 주의한다. `CommandDescriptorSeeds.cpp`는 1과 4가 모두 건드리는 유일한 공유 파일이고 지금
 **다른 세션이 수정 중**이다. 그리고 3은 기존 19개 상단 항목을 이관하지 않는다 — 배선만 세우고 신규만

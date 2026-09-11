@@ -26,6 +26,7 @@
 #include "EditorWindowSelfTest.h"
 #include "EditorMenuSelfTest.h"
 #include "EditorMenuAudit.h"
+#include "EditorChromeSnapshot.h"   // PHASE 21 W0: editor.dock/theme/layout
 
 #include <span>
 #include "RegisterEditorMenuManual.h"
@@ -868,6 +869,130 @@ namespace ConsoleCmd
     }
 
 
+    // ── 크롬 관측 셋 (PHASE 21 W0 전반 · 계획서 §1.9) ─────────────────────
+    //
+    // `editor.windows`·`editor.menu` 는 **선언 표**를 읽는다. 이 셋은 살아 있는
+    // ImGui 상태를 읽으므로 그리는 쪽이 프레임 끝에 게시한 스냅샷을 본다 —
+    // 명령은 게임 스레드에서 돌고 ImGui 프레임은 PresentationThread 것이라
+    // 직접 읽으면 경합이다(`EditorChromeSnapshot.h` 서두).
+    //
+    // 스냅샷이 없으면 **실패로 낸다.** 프레임이 한 번도 안 돌았다는 뜻이고,
+    // 그것을 "항목 0" 으로 내면 빈 집합이 성공으로 읽힌다.
+    static CommandCore::CommandResult Cmd_editor_dock(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+
+        const ::editor::chrome_snapshot snapshot = ::editor::read_chrome_snapshot();
+        // 읽은 뒤 다음 한 번을 요청한다 — 살아 있는 에디터에서 같은 명령을
+        // 연달아 불러 값이 바뀌는지 볼 수 있어야 한다.
+        ::editor::request_chrome_snapshot();
+        if (!snapshot.valid)
+        {
+            return Fail("editor.dock.no_frame",
+                "크롬 스냅샷이 없다 — 표시 프레임이 아직 한 번도 돌지 않았다");
+        }
+
+        const ::editor::dock_audit audit = ::editor::audit_dock_tree(snapshot);
+        const std::string summary = ::editor::dump_dock_audit(snapshot);
+        std::printf("%s%s", ::editor::dump_dock_tree(snapshot).c_str(), summary.c_str());
+
+        auto data = CommandData::Object();
+        data.Set("nodes", CommandData::Int(static_cast<int>(audit.nodes)));
+        data.Set("leafNodes", CommandData::Int(static_cast<int>(audit.leaf_nodes)));
+        data.Set("centralNodes", CommandData::Int(static_cast<int>(audit.central_nodes)));
+        data.Set("dockedWindows", CommandData::Int(static_cast<int>(audit.docked_windows)));
+        data.Set("undockedSlots", CommandData::Int(static_cast<int>(audit.undocked_slots.size())));
+        data.Set("ghostTabs", CommandData::Int(static_cast<int>(audit.ghost_tabs.size())));
+        data.Set("imguiVersionNum", CommandData::Int(audit.imgui_version_num));
+        data.Set("versionKnown", CommandData::Bool(audit.internal_api_version_known));
+        data.Set("clean", CommandData::Bool(audit.clean()));
+
+        if (!audit.clean())
+        {
+            return Fail("editor.dock.dirty", "도크 배치 감사 실패: " + summary, std::move(data));
+        }
+        return Ok("도크 노드 " + std::to_string(audit.nodes) + "개, 배치 이상 없음",
+                  std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_editor_theme(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+
+        const ::editor::chrome_snapshot snapshot = ::editor::read_chrome_snapshot();
+        // 읽은 뒤 다음 한 번을 요청한다 — 살아 있는 에디터에서 같은 명령을
+        // 연달아 불러 값이 바뀌는지 볼 수 있어야 한다.
+        ::editor::request_chrome_snapshot();
+        if (!snapshot.valid)
+        {
+            return Fail("editor.theme.no_frame",
+                "크롬 스냅샷이 없다 — 표시 프레임이 아직 한 번도 돌지 않았다");
+        }
+
+        const ::editor::theme_audit audit = ::editor::audit_theme(snapshot);
+        const std::string summary = ::editor::dump_theme_audit(snapshot);
+        std::printf("%s%s", ::editor::dump_theme(snapshot).c_str(), summary.c_str());
+
+        auto data = CommandData::Object();
+        data.Set("colors", CommandData::Int(static_cast<int>(audit.colors)));
+        data.Set("scalars", CommandData::Int(static_cast<int>(audit.scalars)));
+        data.Set("differing",
+                 CommandData::Int(static_cast<int>(audit.colors_differing_from_default)));
+        data.Set("fontGlobalScale", CommandData::Double(audit.font_global_scale));
+        data.Set("preferenceScale", CommandData::Double(audit.preference_scale));
+        data.Set("styleApplied", CommandData::Bool(audit.style_applied));
+        data.Set("scaleMatches", CommandData::Bool(audit.scale_matches));
+        data.Set("clean", CommandData::Bool(audit.clean()));
+
+        if (!audit.clean())
+        {
+            return Fail("editor.theme.dirty", "스타일 감사 실패: " + summary, std::move(data));
+        }
+        return Ok("스타일 색 " + std::to_string(audit.colors) + "개 관측, 이상 없음",
+                  std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_editor_layout(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+
+        const ::editor::chrome_snapshot snapshot = ::editor::read_chrome_snapshot();
+        // 읽은 뒤 다음 한 번을 요청한다 — 살아 있는 에디터에서 같은 명령을
+        // 연달아 불러 값이 바뀌는지 볼 수 있어야 한다.
+        ::editor::request_chrome_snapshot();
+        if (!snapshot.valid)
+        {
+            return Fail("editor.layout.no_frame",
+                "크롬 스냅샷이 없다 — 표시 프레임이 아직 한 번도 돌지 않았다");
+        }
+
+        const ::editor::layout_audit audit = ::editor::audit_layout(snapshot);
+        const std::string summary = ::editor::dump_layout_audit(snapshot);
+        std::printf("%s%s", ::editor::dump_layout(snapshot).c_str(), summary.c_str());
+
+        auto data = CommandData::Object();
+        data.Set("iniPath", CommandData::String(audit.ini_path));
+        data.Set("iniExists", CommandData::Bool(audit.ini_exists));
+        data.Set("iniEntries", CommandData::Int(static_cast<int>(audit.ini_entries)));
+        data.Set("matched", CommandData::Int(static_cast<int>(audit.matched)));
+        data.Set("duplicateEntries",
+                 CommandData::Int(static_cast<int>(audit.duplicate_entries.size())));
+        data.Set("orphanEntries",
+                 CommandData::Int(static_cast<int>(audit.orphan_entries.size())));
+        data.Set("clean", CommandData::Bool(audit.clean()));
+
+        if (!audit.clean())
+        {
+            return Fail("editor.layout.dirty", "레이아웃 감사 실패: " + summary, std::move(data));
+        }
+        return Ok("ini 항목 " + std::to_string(audit.ini_entries) + "개 관측, 이상 없음",
+                  std::move(data));
+    }
+
+
     // 선언 배선 자가 검사 둘을 한 번에 돈다. 둘 다 자기 표를 옆으로 치우고
     // 합성 선언 위에서 돌므로 살아 있는 에디터에서 불러도 된다.
     static CommandCore::CommandResult Cmd_editor_selftest(const ConsoleCommandContext& ctx)
@@ -921,6 +1046,9 @@ namespace ConsoleCmd
         reg.Result({ "log.flush" }, &Cmd_log_flush);
         reg.Result({ "editor.menu" }, &Cmd_editor_menu);
         reg.Result({ "editor.windows" }, &Cmd_editor_windows);
+        reg.Result({ "editor.dock" }, &Cmd_editor_dock);
+        reg.Result({ "editor.layout" }, &Cmd_editor_layout);
+        reg.Result({ "editor.theme" }, &Cmd_editor_theme);
         reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);
     }
 }

@@ -58,9 +58,12 @@ struct editor_panel_windows
     {
         using namespace editor;
         return window_set(
-            // 도크 자리는 지금 `BuildInitialDockLayout`이 손으로 적는다.
-            // 여기 적는 값은 그 배치를 그대로 옮겨 적은 것이고, 도크 빌더가
-            // 이 값을 읽게 만드는 것은 W3·W6의 몫이다.
+            // 도크 자리의 정본은 **여기**다. `BuildInitialDockLayout`이 이 표를
+            // 훑어 `slotNode[entry.dock]`에 도크한다 — 이름 목록을 두 벌로 들지
+            // 않으므로 갈릴 자리가 없다(M4 4단계). 이 주석은 "빌더가 손으로
+            // 적고 W3·W6이 표를 읽게 만든다"고 적혀 있었는데 그 일은 끝났다.
+            // 남은 것은 자리 **이름**을 `dock_slot` 열거자가 아니라 workspace
+            // 선언에서 받는 일이고 그것이 W3·W6이다.
             panel<&windows::draw_hierarchy>(
                 EditorWindowName::kHierarchy, EditorWindowName::kHierarchy)
                 .dock(dock_slot::right_upper)
