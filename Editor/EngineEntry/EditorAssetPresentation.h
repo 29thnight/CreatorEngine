@@ -2,6 +2,7 @@
 
 #include "Core.Minimal.h"
 #include "concurrent_queue.h"
+#include "Windows/EditorWindowBody.h"
 
 #include <array>
 #include <memory>
@@ -82,4 +83,9 @@ private:
 	ImFont* m_smallFont{};
 	ImFont* m_extraSmallFont{};
 	bool m_initialized{};
+
+	// 두 창 본문의 수명(PHASE 21 W3). 둘 다 `this` 를 캡처하므로
+	// 이 객체보다 오래 살면 안 된다 — 그 규약을 타입이 든다.
+	::editor::windows::window_body_binding m_textureImportBody;
+	::editor::windows::window_body_binding m_materialPickerBody;
 };

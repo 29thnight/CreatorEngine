@@ -112,30 +112,30 @@ MenuBarWindow::MenuBarWindow()
 
     // PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실은
     // 선언이 든다(open_by_default(false)) — 여기서 다시 닫지 않는다.
-    editor::windows::bind_window_body(EditorWindowName::kLightMap, [&]() {
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kLightMap, [&]() {
         ImGui::TextUnformatted("Legacy DX11 LightMap editor is unavailable in Enhanced-only mode.");
         ImGui::TextUnformatted("A DX12 bake path must be wired before this tool is re-enabled.");
-    });
+    }));
 
 
-    editor::windows::bind_window_body(EditorWindowName::kFrameProfiler,
-        [this]() { ShowProfilerWindow(); });
-    editor::windows::bind_window_body(EditorWindowName::kOutputLog,
-        [this]() { ShowLogWindow(); });
-    editor::windows::bind_window_body(EditorWindowName::kAbout,
-        [this]() { ShowAboutWindow(); });
-    editor::windows::bind_window_body(EditorWindowName::kBehaviorTree,
-        [this]() { DrawBehaviorTreeWindow(); });
-    editor::windows::bind_window_body(EditorWindowName::kBlackBoard,
-        [this]() { DrawBlackBoardWindow(); });
-    editor::windows::bind_window_body(EditorWindowName::kInputActionMaps,
-        [this]() { SHowInputActionMap(); });
-    editor::windows::bind_window_body(EditorWindowName::kBuildSceneSetting,
-        [this]() { ShowBuildSceneSettingWindow(); });
-    editor::windows::bind_window_body(EditorWindowName::kRenderPassDebug,
-        [this]() { ShowRenderDebugWindow(); });
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kFrameProfiler,
+        [this]() { ShowProfilerWindow(); }));
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kOutputLog,
+        [this]() { ShowLogWindow(); }));
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kAbout,
+        [this]() { ShowAboutWindow(); }));
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kBehaviorTree,
+        [this]() { DrawBehaviorTreeWindow(); }));
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kBlackBoard,
+        [this]() { DrawBlackBoardWindow(); }));
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kInputActionMaps,
+        [this]() { SHowInputActionMap(); }));
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kBuildSceneSetting,
+        [this]() { ShowBuildSceneSettingWindow(); }));
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kRenderPassDebug,
+        [this]() { ShowRenderDebugWindow(); }));
 
-    editor::windows::bind_window_body(EditorWindowName::kCollisionMatrix, [&]() 
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kCollisionMatrix, [&]() 
     {
         const auto& layers = TagManager::GetInstance()->GetLayers();
         const int layerCount = static_cast<int>(layers.size());
@@ -242,7 +242,7 @@ MenuBarWindow::MenuBarWindow()
             editor::close_window(EditorWindowName::kCollisionMatrix);
 		}
         
-    });
+    }));
    
 }
 

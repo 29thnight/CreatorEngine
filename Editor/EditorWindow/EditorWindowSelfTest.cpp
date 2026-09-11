@@ -10,8 +10,10 @@
 #include "EditorWindowRegistry.h"
 #include "EditorWindowSchema.h"
 #include "EditorWindowSurface.h"
+#include "Windows/EditorWindowBody.h"
 
 #include <string>
+#include <utility>
 #include <string_view>
 #include <vector>
 
@@ -30,6 +32,9 @@ namespace editor
 
         bool g_inspector_available = true;
         bool selftest_inspector_available() { return g_inspector_available; }
+
+        int g_body_runs = 0;
+        int g_other_body_runs = 0;
 
         bool g_loading_closable = false;
         bool selftest_loading_closable() { return g_loading_closable; }
@@ -365,6 +370,111 @@ namespace editor
         if (after.total != 0)
         {
             fail(report, "clear_window_registry가 표를 비우지 않았다");
+        }
+
+        // ⑪ 본문 바인딩의 수명이 핸들에 실렸는가(PHASE 21 W3 S3).
+        //
+        // 여기도 **지역 보관소**를 쓴다. 제품 보관소를 건드리면 방금 창 표에서
+        // 없앤 것과 같은 경합이 되살아난다 — 본문을 부르는 것은
+        // PresentationThread 이고 이 검사는 CLI 가 도는 게임 스레드다.
+        {
+            namespace bodies_ns = ::editor::windows;
+            bodies_ns::body_table bodies;
+            const std::size_t product_bodies_before =
+                bodies_ns::process_window_bodies().entries.size();
+            for (std::string_view bound : bodies_ns::bound_window_bodies())
+            {
+                if (bound.starts_with(kSelfTestPrefix))
+                {
+                    fail(report, "제품 본문이 검사 전용 접두어를 쓰고 있다");
+                }
+            }
+
+            g_body_runs = 0;
+            {
+                const bodies_ns::window_body_binding held =
+                    bodies_ns::bind_window_body(bodies, "selftest.body",
+                        []() { ++g_body_runs; });
+                if (!held.bound() ||
+                    held.stable_id() != std::string_view{ "selftest.body" })
+                {
+                    fail(report, "핸들이 건 이름을 들고 있지 않다");
+                }
+                if (!bodies_ns::detail::window_body_bound(bodies, "selftest.body"))
+                {
+                    fail(report, "걸었는데 보관소가 걸렸다고 답하지 않는다");
+                }
+                bodies_ns::detail::run_window_body(bodies, "selftest.body");
+                if (g_body_runs != 1)
+                {
+                    fail(report, "걸린 본문이 불리지 않았다");
+                }
+            }
+            // 핸들이 죽었다. 이것이 이 슬라이스의 전부다 — 전에는 이름으로
+            // 푸는 한 줄을 손으로 적어야 했고 `MenuBarWindow` 는 그 줄이 없었다.
+            if (bodies_ns::detail::window_body_bound(bodies, "selftest.body") ||
+                !bodies.entries.empty())
+            {
+                fail(report, "핸들이 죽었는데 바인딩이 남았다");
+            }
+            bodies_ns::detail::run_window_body(bodies, "selftest.body");
+            if (g_body_runs != 1)
+            {
+                fail(report, "풀린 이름을 불렀는데 본문이 돌았다");
+            }
+
+            // 같은 이름을 다시 걸면 옛 핸들은 아무것도 지우지 않아야 한다.
+            // 토큰을 함께 들지 않으면 옛 핸들의 소멸자가 **남의 바인딩**을
+            // 지운다. 걸기가 덮어쓰기라 실제로 일어날 수 있는 순서다.
+            g_body_runs = 0;
+            g_other_body_runs = 0;
+            {
+                bodies_ns::window_body_binding second;
+                {
+                    const bodies_ns::window_body_binding first =
+                        bodies_ns::bind_window_body(bodies, "selftest.body",
+                            []() { ++g_body_runs; });
+                    second = bodies_ns::bind_window_body(bodies, "selftest.body",
+                        []() { ++g_other_body_runs; });
+                }
+                if (!bodies_ns::detail::window_body_bound(bodies, "selftest.body"))
+                {
+                    fail(report, "먼저 걸린 핸들이 죽으며 나중 바인딩을 지웠다");
+                }
+                bodies_ns::detail::run_window_body(bodies, "selftest.body");
+                if (g_other_body_runs != 1 || g_body_runs != 0)
+                {
+                    fail(report, "덮어쓴 본문이 아니라 옛 본문이 불린다");
+                }
+                if (bodies.entries.size() != 1)
+                {
+                    fail(report, "같은 이름을 두 번 걸자 항목이 둘이 되었다");
+                }
+
+                // 이동하고 난 쪽은 아무것도 들지 않아야 한다.
+                bodies_ns::window_body_binding moved = std::move(second);
+                if (second.bound() || !moved.bound())
+                {
+                    fail(report, "이동이 바인딩을 옮기지 않았다");
+                }
+                moved.reset();
+                if (moved.bound() ||
+                    bodies_ns::detail::window_body_bound(bodies, "selftest.body"))
+                {
+                    fail(report, "reset이 바인딩을 내리지 않았다");
+                }
+            }
+            if (!bodies.entries.empty())
+            {
+                fail(report, "이동하고 난 핸들이 죽으며 무언가를 남겼다");
+            }
+
+            if (bodies_ns::process_window_bodies().entries.size() !=
+                product_bodies_before)
+            {
+                fail(report,
+                    "검사가 제품 본문 보관소를 건드렸다 — 보관소 인자를 빠뜨린 호출이 있다");
+            }
         }
 
         check_product_untouched(report, product_before);

@@ -351,7 +351,11 @@
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)EditorWindow\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <!-- /we4834: [[nodiscard]] 무시를 오류로 올린다(PHASE 21 W3).
+           이 프로젝트는 TurnOffAllWarnings 이라 경고로는 아무 힘이
+           없다 — 변이로 쟀더니 핸들을 버려도 빌드가 exit 0 이었다.
+           /we 는 /W 를 덮으므로 이 번호만 되살아난다. -->
+      <AdditionalOptions>/utf-8 /bigobj /we4834 %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
       <MaxFilesInUnityFile>15</MaxFilesInUnityFile>
@@ -377,7 +381,11 @@
       <DebugInformationFormat>None</DebugInformationFormat>
       <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)EditorWindow\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <!-- /we4834: [[nodiscard]] 무시를 오류로 올린다(PHASE 21 W3).
+           이 프로젝트는 TurnOffAllWarnings 이라 경고로는 아무 힘이
+           없다 — 변이로 쟀더니 핸들을 버려도 빌드가 exit 0 이었다.
+           /we 는 /W 를 덮으므로 이 번호만 되살아난다. -->
+      <AdditionalOptions>/utf-8 /bigobj /we4834 %(AdditionalOptions)</AdditionalOptions>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
       <MinFilesInUnityFile>10</MinFilesInUnityFile>
       <MaxFilesInUnityFile>15</MaxFilesInUnityFile>

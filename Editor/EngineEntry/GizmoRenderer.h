@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.Minimal.h"
+#include "Windows/EditorWindowBody.h"
 
 // 에디터 셸의 기즈모 상태 소유자(E4-4). 와이어프레임 토글과 그리드 설정 창을
 // 들고, 상시 러너의 기여 노드(EditorSceneOverlayContributor의 WireFrame 술어)가
@@ -29,6 +30,11 @@ public:
 
 private:
 	static GizmoRenderer* s_active;
+
+	// 그리드 설정 창 본문의 수명(PHASE 21 W3). 이 객체가 죽으면 바인딩도
+	// 죽는다 — 전에는 소멸자가 이름으로 풀었고, 그 한 줄을 빠뜨려도
+	// 아무도 알려 주지 않았다.
+	::editor::windows::window_body_binding m_gridSettingsBody;
 
 	bool m_buseWireFrame{ false };
 };

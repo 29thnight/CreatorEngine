@@ -1,5 +1,8 @@
 #pragma once
 #include "ImGui.h"
+#include "Windows/EditorWindowBody.h"
+
+#include <vector>
 
 class MenuBarWindow
 {
@@ -32,4 +35,13 @@ private:
     int  m_selectedLogIndex{};
 	bool m_bShowNewScenePopup{ false };
 	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
+
+	// 이 창이 건 본문 열 개의 수명(PHASE 21 W3).
+	//
+	// 전에는 푸는 자리가 **하나도 없었다** — 소멸자가 `= default` 였고
+	// 열 개의 본문은 모두 `this` 를 물고 있다. 이 객체가 죽으면 보관소에
+	// 죽은 `this` 를 부르는 함수 열 개가 남는 구조였다. 지금 그 수명은
+	// 이 벡터가 들고, 소멸자는 그대로 `= default` 로 둔다 — 할 일이
+	// 없어서가 아니라 멤버가 하기 때문이다.
+	std::vector<::editor::windows::window_body_binding> m_windowBodies;
 };

@@ -87,7 +87,8 @@ namespace Editor
     void ModelPlacement::Initialize()
     {
         // 창 본문을 이름에 건다. 표시 여부는 선언의 존재 술어가 정한다.
-        editor::windows::bind_window_body(EditorWindowName::kModelLoading,
+        m_statusBody = editor::windows::bind_window_body(
+            EditorWindowName::kModelLoading,
             []() { ModelPlacement::Get().DrawStatus(); });
 
         auto& state = *m_impl;
@@ -311,7 +312,8 @@ namespace Editor
 
     void ModelPlacement::Shutdown()
     {
-        editor::windows::unbind_window_body(EditorWindowName::kModelLoading);
+        // 이 싱글톤도 `Shutdown` 뒤 `Initialize` 가 다시 온다(PHASE 21 W3).
+        m_statusBody.reset();
 
         auto& state = *m_impl;
         {

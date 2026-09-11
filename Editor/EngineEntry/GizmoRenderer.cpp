@@ -15,17 +15,16 @@ GizmoRenderer::GizmoRenderer(RenderScene* renderScene, Camera* editorCamera) :
 
 	// PHASE 21 M4 3단계: 창 프레임은 셸이 연다. 여기서는 본문만 건다 —
 	// 그리드가 이 객체의 것이라 본문의 자리도 여기다.
-	editor::windows::bind_window_body(EditorWindowName::kGridSettings, []()
-	{
-		ImGui::TextUnformatted("GridPass is owned by EnhancedRenderer (DX12).");
-	});
+	m_gridSettingsBody = editor::windows::bind_window_body(
+		EditorWindowName::kGridSettings, []()
+		{
+			ImGui::TextUnformatted("GridPass is owned by EnhancedRenderer (DX12).");
+		});
 }
 
 GizmoRenderer::~GizmoRenderer()
 {
 	if (this == s_active) s_active = nullptr;
-
-	editor::windows::unbind_window_body(EditorWindowName::kGridSettings);
 
 	m_pEditorCamera = nullptr;
 	m_renderScene = nullptr;

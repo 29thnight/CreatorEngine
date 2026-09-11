@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "Windows/EditorWindowBody.h"
 #include <memory>
 #include <optional>
 #include <string>
@@ -36,5 +37,10 @@ namespace Editor
             const std::optional<math::vector3>& position, bool gameMode);
         void Cancel(const std::shared_ptr<Request>& request);
         std::unique_ptr<Impl> m_impl;
+
+        // 진행 창 본문의 수명(PHASE 21 W3). 본문은 `Get()` 으로 다시
+        // 들어오므로 `this` 를 물지 않지만, 수명을 타입이 드는 것은
+        // 같다 — `Shutdown` 에서 이름을 풀던 한 줄을 대신한다.
+        ::editor::windows::window_body_binding m_statusBody;
     };
 }

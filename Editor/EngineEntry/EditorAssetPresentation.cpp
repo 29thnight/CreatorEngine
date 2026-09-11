@@ -58,15 +58,11 @@ void EditorAssetPresentation::Initialize()
 
 	// PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실도
 	// 선언이 든다(open_by_default(false)) — 여기서 다시 닫지 않는다.
-	editor::windows::bind_window_body(kTextureImportSelector, [this]()
-	{
-		RenderTextureImportSelector();
-	});
+	m_textureImportBody = editor::windows::bind_window_body(
+		kTextureImportSelector, [this]() { RenderTextureImportSelector(); });
 
-	editor::windows::bind_window_body(kMaterialPicker, [this]()
-	{
-		RenderMaterialPicker();
-	});
+	m_materialPickerBody = editor::windows::bind_window_body(
+		kMaterialPicker, [this]() { RenderMaterialPicker(); });
 	m_initialized = true;
 }
 
@@ -74,8 +70,10 @@ void EditorAssetPresentation::Shutdown() noexcept
 {
 	if (!m_initialized) return;
 
-	editor::windows::unbind_window_body(kMaterialPicker);
-	editor::windows::unbind_window_body(kTextureImportSelector);
+	// `Shutdown` 뒤에 `Initialize` 가 다시 올 수 있는 싱글톤이라 객체는
+	// 남고 본문만 내린다. 핸들을 비우는 것이 그 일이다(PHASE 21 W3).
+	m_materialPickerBody.reset();
+	m_textureImportBody.reset();
 	m_pendingTexturePaths.clear();
 	file::path discarded;
 	while (m_textureImportQueue.try_pop(discarded)) {}
