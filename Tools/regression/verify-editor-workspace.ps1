@@ -118,6 +118,20 @@ Assert ($dock.data.nodes -ge 3) "Only $($dock.data.nodes) dock nodes; the probe 
 Assert ($dock.data.leafNodes -ge 2) "Only $($dock.data.leafNodes) leaf dock nodes; the layout did not split"
 Assert ($dock.data.dockedWindows -ge 2) "Only $($dock.data.dockedWindows) windows are docked; the gate would be vacuous"
 
+# W0 후반 성능 기준선이 실제로 실렸는가. 이 값들은 `ImGui::Render()` 뒤에 따로
+# 얹히므로(`capture_chrome_draw_totals`) 그 호출이 빠지면 -1 인 채로 남는다.
+# 숫자 자체는 단정하지 않는다 — 창을 하나 더 그리면 정당하게 바뀐다.
+#
+# ★ `uiCpuMs` 의 크기는 여기서 보지 않는다. 이 게이트는 Debug 로 도는데
+#   Debug 시간은 Release 와 방향까지 다를 수 있어 성능 판정에 쓸 수 없다.
+#   기준선 수치는 Release 실행으로 따로 기록한다.
+Assert ($dock.data.imguiVertices -gt 0) `
+    "ImGui draw totals were never amended onto the snapshot (vertices=$($dock.data.imguiVertices)); capture_chrome_draw_totals is not running after ImGui::Render()"
+Assert ($dock.data.imguiDrawCommands -gt 0) `
+    "ImGui draw command count is $($dock.data.imguiDrawCommands); the UI drew nothing this frame"
+Assert ($dock.data.uiCpuMs -gt 0) `
+    "uiCpuMs is $($dock.data.uiCpuMs); the editor UI frame timer is not running"
+
 # 트리가 한 뿌리에서 내려오는가. 부모가 0 인 노드가 둘이면 도크스페이스가 갈렸다.
 $dump = @(Get-Content -LiteralPath $run.Stdout)
 $rootRows = @($dump | Where-Object { $_ -match '^\d+\t0\t' })

@@ -908,6 +908,13 @@ namespace ConsoleCmd
         data.Set("versionKnown", CommandData::Bool(audit.internal_api_version_known));
         data.Set("clean", CommandData::Bool(audit.clean()));
 
+        // W0 후반 성능 기준선. 타깃별 GPU ms 는 잴 수단이 없어 빠졌다 —
+        // 이유는 덤프의 [NOTE] 에 적혀 있다.
+        data.Set("uiCpuMs", CommandData::Double(snapshot.ui_cpu_ms));
+        data.Set("imguiVertices", CommandData::Int(snapshot.imgui_vertices));
+        data.Set("imguiIndices", CommandData::Int(snapshot.imgui_indices));
+        data.Set("imguiDrawCommands", CommandData::Int(snapshot.imgui_draw_commands));
+
         if (!audit.clean())
         {
             return Fail("editor.dock.dirty", "도크 배치 감사 실패: " + summary, std::move(data));

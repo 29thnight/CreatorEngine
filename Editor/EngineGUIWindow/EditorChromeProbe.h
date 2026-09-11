@@ -10,5 +10,12 @@
 
 namespace editor
 {
-    void capture_chrome_snapshot();
+    /// 이번 프레임에 실제로 떴으면 참. 주기(`kCaptureIntervalFrames`)와 요청이
+    /// 정하므로 대부분의 프레임에서 거짓이다.
+    bool capture_chrome_snapshot();
+
+    /// 방금 뜬 스냅샷에 draw data 계측을 얹는다. **`ImGui::Render()` 뒤에서만**
+    /// 불러야 한다 — 그 앞에서는 `ImDrawData` 가 유효하지 않다. 바로 앞의
+    /// `capture_chrome_snapshot()` 이 참을 돌려준 프레임에만 부른다.
+    void capture_chrome_draw_totals(double ui_cpu_ms);
 }

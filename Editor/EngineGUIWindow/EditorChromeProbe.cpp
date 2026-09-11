@@ -80,19 +80,37 @@ namespace
 
 namespace editor
 {
-    void capture_chrome_snapshot()
+    void capture_chrome_draw_totals(double ui_cpu_ms)
+    {
+        const ImDrawData* const drawData = ImGui::GetDrawData();
+        // `Render()` 앞이거나 이 프레임이 그려지지 않았으면 유효하지 않다.
+        // 그때 0 을 얹으면 "UI 가 아무것도 안 그렸다" 로 읽히므로 얹지 않는다.
+        if ((nullptr == drawData) || (!drawData->Valid)) return;
+
+        std::int64_t commands = 0;
+        for (int index = 0; index < drawData->CmdListsCount; ++index)
+        {
+            commands += drawData->CmdLists[index]->CmdBuffer.Size;
+        }
+        amend_chrome_draw_totals(drawData->TotalVtxCount,
+                                 drawData->TotalIdxCount,
+                                 commands,
+                                 ui_cpu_ms);
+    }
+
+    bool capture_chrome_snapshot()
     {
         const std::chrono::steady_clock::time_point began =
             std::chrono::steady_clock::now();
 
         ImGuiContext* const context = ImGui::GetCurrentContext();
-        if (nullptr == context) return;
+        if (nullptr == context) return false;
 
         // 주기 + 요청. 매 프레임 뜨면 진단 장치가 0.47 ms(Debug 실측)를 물고
         // 가므로 간격을 둔다. 요청이 있으면 간격을 기다리지 않는다.
         static int framesSinceCapture = kCaptureIntervalFrames;
         const bool onRequest = consume_chrome_snapshot_request();
-        if (!onRequest && (++framesSinceCapture < kCaptureIntervalFrames)) return;
+        if (!onRequest && (++framesSinceCapture < kCaptureIntervalFrames)) return false;
         framesSinceCapture = 0;
 
         chrome_snapshot snapshot{};
@@ -247,5 +265,6 @@ namespace editor
             std::chrono::duration<double, std::milli>(ended - began).count();
 
         publish_chrome_snapshot(std::move(snapshot));
+        return true;
     }
 }

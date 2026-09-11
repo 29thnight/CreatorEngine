@@ -239,6 +239,7 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
 
 void EditorRenderer::BeginRender()
 {
+    m_uiFrameBegan = std::chrono::steady_clock::now();
     m_host->BeginFrame();
 
     // 스케일 변경 추적. 재빌드 없이 스타일·폰트 배율만 즉시 적용한다 —
@@ -335,7 +336,20 @@ void EditorRenderer::EndRender()
     // `Pump()` 에서 도는데(`App.cpp`) ImGui 프레임은 이 스레드(Presentation)
     // 것이라, 명령이 `ImGui::` 를 직접 부르면 `NewFrame`~`Render` 한복판의
     // 전역 문맥을 읽는 경합이 된다.
-    ::editor::capture_chrome_snapshot();
+    const bool captured = ::editor::capture_chrome_snapshot();
+
+    const std::chrono::steady_clock::time_point uiFrameEnded =
+        std::chrono::steady_clock::now();
 
     m_host->EndFrame();
+
+    // draw data 는 `EndFrame` 안의 `ImGui::Render()` 뒤라야 유효하다
+    // (`ImDrawData::Valid`). 그래서 배치·스타일과 자리가 다르고, 뜬 프레임에만
+    // 얹어 값 넷이 **같은 프레임**의 것이 되게 한다.
+    if (captured)
+    {
+        const double uiCpuMs =
+            std::chrono::duration<double, std::milli>(uiFrameEnded - m_uiFrameBegan).count();
+        ::editor::capture_chrome_draw_totals(uiCpuMs);
+    }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 
 class IImGuiHost;
 
@@ -48,6 +49,11 @@ private:
     IImGuiHost* m_host{ nullptr };
     float m_lastAppliedScale{ 0.8f };
     float m_lastRequestedScale{ -1.f };
+
+    // 에디터 UI 한 프레임의 CPU 시간을 재는 시작점(PHASE 21 W0 후반).
+    // `BeginRender` 에서 찍고 `EndRender` 에서 뺀다 — GPU 제출과 Present 는
+    // `EndFrame` 안이라 빠진다.
+    std::chrono::steady_clock::time_point m_uiFrameBegan{};
     bool m_firstLoop{ true };
 
     static std::atomic_bool s_dockLayoutResetRequested;

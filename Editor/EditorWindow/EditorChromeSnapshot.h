@@ -124,12 +124,41 @@ namespace editor
         /// 이 스냅샷을 뜨는 데 걸린 시간. W0 의 성능 기준선이 읽는다 —
         /// 매 프레임 도는 계측이 자기 비용을 숨기면 기준선이 거짓이 된다.
         double        capture_ms{ 0.0 };
+
+        // ── 이 프레임의 UI 비용 (PHASE 21 W0 후반, 계획서 §11) ────────────
+        //
+        // W7·W8 의 성능 판정이 "W0 기준선과 비교" 를 전제한다. 그 기준선을
+        // 밖에서 읽을 수단이 없으면 판정문이 추정치가 된다.
+        //
+        // 정점·인덱스·커맨드 수는 `ImGui::Render()` **뒤**라야 유효하다
+        // (`ImDrawData::Valid`). 배치·스타일을 뜨는 자리는 `EndFrame` 앞이라야
+        // 하므로 두 계측의 자리가 다르고, 그래서 이 셋만 뒤에서 채운다.
+        std::int64_t  imgui_vertices{ -1 };
+        std::int64_t  imgui_indices{ -1 };
+        std::int64_t  imgui_draw_commands{ -1 };
+
+        /// 에디터 UI 한 프레임을 만드는 데 든 CPU 시간. `BeginRender` 부터
+        /// `EndRender` 까지이고 GPU 제출·Present 는 빠진다.
+        double        ui_cpu_ms{ -1.0 };
     };
 
     // ── 게시와 읽기 ───────────────────────────────────────────────────────
 
     /// PresentationThread 가 프레임 끝에 부른다.
     void publish_chrome_snapshot(chrome_snapshot&& snapshot);
+
+    /// 방금 게시한 스냅샷에 draw data 계측만 얹는다.
+    ///
+    /// 따로 있는 이유는 **유효한 자리가 다르기 때문**이다. 배치와 스타일은
+    /// `EndFrame` 앞에서 떠야 하고(창의 도크 소속이 확정된 자리), draw data 는
+    /// `ImGui::Render()` 뒤라야 유효하다. 게시를 두 번 하지 않고 뒤엣것만
+    /// 얹는다 — 값 셋이 **같은 프레임**의 것이어야 표가 거짓말을 하지 않는다.
+    ///
+    /// 게시된 스냅샷이 없으면 아무 일도 하지 않는다.
+    void amend_chrome_draw_totals(std::int64_t vertices,
+                                  std::int64_t indices,
+                                  std::int64_t draw_commands,
+                                  double ui_cpu_ms);
 
     /// 게임 스레드(CLI)가 부른다. **사본을 돌려준다** — 호출자가 들고 있는 동안
     /// 다음 프레임이 게시해도 안전해야 한다.

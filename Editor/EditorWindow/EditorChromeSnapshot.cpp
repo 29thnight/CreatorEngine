@@ -91,6 +91,22 @@ namespace editor
         snapshot_storage() = std::move(snapshot);
     }
 
+    void amend_chrome_draw_totals(std::int64_t vertices,
+                                  std::int64_t indices,
+                                  std::int64_t draw_commands,
+                                  double ui_cpu_ms)
+    {
+        std::lock_guard<std::mutex> guard(snapshot_mutex());
+        chrome_snapshot& stored = snapshot_storage();
+        // 게시된 것이 없으면 얹을 곳이 없다. 빈 스냅샷에 숫자만 채워 두면
+        // `valid` 가 거짓인 채로 값이 있는 모순된 상태가 된다.
+        if (!stored.valid) return;
+        stored.imgui_vertices      = vertices;
+        stored.imgui_indices       = indices;
+        stored.imgui_draw_commands = draw_commands;
+        stored.ui_cpu_ms           = ui_cpu_ms;
+    }
+
     chrome_snapshot read_chrome_snapshot()
     {
         std::lock_guard<std::mutex> guard(snapshot_mutex());
@@ -359,6 +375,23 @@ namespace editor
         std::snprintf(buffer, sizeof(buffer),
             "[AUDIT] captureMs=%.4f\n", snapshot.capture_ms);
         out += buffer;
+
+        // W0 후반 성능 기준선. W7·W8 의 판정이 "W0 과 비교" 를 전제한다.
+        std::snprintf(buffer, sizeof(buffer),
+            "[AUDIT] uiCpuMs=%.3f imguiVertices=%lld imguiIndices=%lld"
+            " imguiDrawCommands=%lld\n",
+            snapshot.ui_cpu_ms,
+            static_cast<long long>(snapshot.imgui_vertices),
+            static_cast<long long>(snapshot.imgui_indices),
+            static_cast<long long>(snapshot.imgui_draw_commands));
+        out += buffer;
+
+        // 타깃별 GPU ms 는 계획서 §11 이 함께 요구했지만 **잴 수단이 저장소에
+        // 없다.** GPU 타임스탬프 질의 표면이 0 이고, 그것을 세우는 것은 이
+        // 슬라이스의 범위를 넘는다. 추정치로 채우지 않고 비워 둔다 —
+        // W4 의 view demand 판정이 그 수를 필요로 하므로 거기서 세운다.
+        out += "[NOTE] 타깃별 GPU ms 는 없다 — GPU 타임스탬프 질의 표면이"
+               " 저장소에 0 이다. W4 가 view demand 를 판정하려면 그것을 먼저 세워야 한다\n";
 
         if (!audit.undocked_slots.empty())
         {
