@@ -1006,6 +1006,14 @@ user scale 100↔150% 왕복과 **실제 DPI 100↔150% 왕복**을 따로 판�
 - `ImGuiRegister.h`의 자기 `#define EDITOR`와 죽은 else 분기를 정리한다.
 - `EditorWorkspaceStore`, legacy migration, backup, Reset Layout을 구현한다.
 
+**(2026-09-11 소유권 정리 S1~S3 착지.)** ID 이주에 앞서 창의 소유 구조를 먼저 세웠다. 계획서에 없던 선행이고, 넣은 이유는 §1.3의 "표시 상태 저장소가 둘" 을 하나로 합치려면 그 상태를 **누가 드는지**가 먼저 정해져야 하기 때문이다.
+
+- **S1 — 창 클래스 여덟을 자유 함수로.** 여덟 개를 열어 보니 소유하는 자원이 **0** 이다 (멤버는 전부 UI 지역 상태이거나 빌린 포인터다). `EditorMain` 이 들고 있던 창 멤버 여덟이 사라졌고, 상태는 각 TU 의 지역 접근자 하나가 든다. `EditorViewportWindows.cpp` 는 매크로 둘만 남아 삭제했다. Inspector 생성자의 typed Draw 등록은 **부팅의 일**이라 부팅으로 올렸다 — 소유자가 사라지면 그 등록이 "인스펙터를 처음 열 때" 로 늦어지고, 그 표를 읽는 것은 인스펙터만이 아니다(애니메이터 창·메시 렌더러 헬퍼가 같은 `Meta::TypedDraw` 를 읽는다).
+- **S2 — 표를 주입으로.** `window_table` 을 세우고 렌더러가 그것을 참조로 받는다. 자가 검사가 제품 표를 `swap` 으로 치우던 자리가 없어졌다 — 그 치우기는 CLI 가 도는 게임 스레드였고 표를 순회하는 `draw_windows` 는 PresentationThread 였다. 잠금이 없었으므로 순회 도중 버퍼가 바뀔 수 있는 자리였다. 막은 것이 아니라 없앴다.
+- **S3 — 본문 바인딩을 RAII 핸들로.** `MenuBarWindow` 가 본문 **열 개**를 걸고 푸는 자리가 하나도 없었다(소멸자가 `= default`, 본문은 모두 `this` 캡처). `bind_window_body` 가 `[[nodiscard]]` 핸들을 돌려주도록 바꿔 컴파일러가 강제한다. 본문 보관소도 주입 가능해졌다. 강제력은 변이가 검증했다 — 처음에는 핸들을 버려도 빌드가 exit 0 이었다(이 프로젝트는 `TurnOffAllWarnings` 라 C4834 가 나오지 않는다). `/we4834` 로 그 한 번호만 오류로 올렸다.
+
+남은 W3 는 위 목록 그대로다 — stable ID 이주, Tile 분기, workspace 저장/복구, legacy ini 이주. 소유권 정리가 그 대상 수를 줄이지는 않았고, 상태를 한 자리로 모아 둔 것이 이득이다.
+
 **판정:** title/icon을 바꿔도 dock 위치가 유지되고, save→restart→load가 동일하며, 손상된 layout은
 사용자 파일을 잃지 않고 기본 preset으로 복구된다. migration canary는 §1.4의 실물 ini 4벌 —
 Content Browser 이중 entry가 든 것 포함 — 을 fixture로 통과해야 한다.
