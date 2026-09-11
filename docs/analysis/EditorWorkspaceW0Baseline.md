@@ -55,6 +55,17 @@ W1의 입력이다. 계획서 본문은 **91건**이라고 적고 있는데 그�
 `PushStyleColor` 31 + `PushStyleVar` 26 = **57**. (`Editor/ImGuiHelper/`는 제외했다. 그쪽은
 위젯 구현이라 W2의 대상이지 토큰 이주의 대상이 아니다.)
 
+**(2026-09-11 W1 착수 시 재계수 — 살아 있는 것은 51이다.)** 위 57은 `wc -l`로 센 수라
+**주석 처리된 줄 여섯을 함께 셌다**(`ImGuiDrawHelperRectTransformComponent.cpp` 3 ·
+`MenuBarWindow.cpp` 3). 주석을 걷고 호출마다 세면 `PushStyleColor` 26 + `PushStyleVar` 25 =
+**51**이고, `MenuBarWindow.cpp`의 몫은 20이 아니라 **17**이다.
+
+같은 계수에서 하나 더 갈라야 할 것이 나왔다. `MenuBarWindow.cpp`에는
+`ed::PushStyleColor`/`ed::PushStyleVar`가 **15건** 있는데 이것은 imgui-node-editor의
+**별도 스타일 스택**(`ed::StyleColor_*` / `ed::StyleVar_*`)이다. ImGui의 스타일과 같은 이름을
+쓸 뿐 같은 것이 아니므로 토큰 이주의 대상이 아니다. 기준선의 `ImGui::` 접두어 요구가 이것들을
+이미 걸러 내고 있었고, 그 요구는 옳았다 — 재계수도 같은 기준을 지킨다.
+
 | 파일 | Color | Var | 합 |
 |---|---:|---:|---:|
 | `EngineGUIWindow/MenuBarWindow.cpp` | 13 | 7 | **20** |

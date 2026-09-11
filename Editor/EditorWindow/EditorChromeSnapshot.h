@@ -97,6 +97,23 @@ namespace editor
     ///   1.92.8 이다. 앞쪽을 읽고 판단했다가 결론이 뒤집혔다.
     inline constexpr int expected_imgui_version_num = 19280;
 
+    /// 이번 실행에서 적재한 폰트 하나. `editor::fonts` 의 기록을 그대로 옮긴다.
+    ///
+    /// 감사가 이것을 드는 이유는 폰트가 **스타일의 일부**이고, 파일이 없을 때
+    /// 죽던 자리가 여기였기 때문이다(2026-09-11 ACCESS_VIOLATION 실측).
+    /// 경로를 보고하면 어느 후보가 이겼는지, 기본 폰트로 내려갔는지가 밖에서
+    /// 보인다 — 내려간 채 도는 것은 틀린 것이 아니지만 조용하면 안 된다.
+    struct font_view
+    {
+        std::string role;
+        std::string resolved_path;      ///< 빈 것이면 후보가 하나도 없었다
+        float       size_pixels{ 0.f };
+        int         candidates_tried{ 0 };
+        bool        used_fallback{ false };
+        bool        icon_merged{ false };
+        bool        present{ false };   ///< ImFont 가 실제로 섰는가
+    };
+
     struct chrome_snapshot
     {
         bool          valid{ false };
@@ -117,6 +134,13 @@ namespace editor
         /// 글자 배율의 **정식 경로**. 1.92 에서 `io.FontGlobalScale` 이
         /// obsolete 가 됐고 W1 이 여기로 옮겼다.
         float         font_scale_main{ 0.f };
+        /// 적재한 폰트 전부(PHASE 21 W1).
+        std::vector<font_view> fonts;
+        /// 후보가 하나도 없을 때 해상이 빈 것을 돌려주는가. 살아 있는
+        /// 에디터에서 negative 경로를 재는 자리다 — 실제 시스템 폰트를
+        /// 지울 수 없으므로 해상 함수만 태운다.
+        bool          font_fallback_probe_ok{ false };
+
         float         preference_scale{ 0.f };
 
         std::string   ini_path;
@@ -237,6 +261,18 @@ namespace editor
         /// 한쪽만 고치면 여기서 갈린다.
         bool  scale_matches{ false };
 
+        /// 본문 폰트가 섰는가. 이것이 거짓이면 글자가 아예 안 그려진다.
+        bool  body_font_present{ false };
+        /// 본문 폰트가 ImGui 기본 폰트로 내려갔는가. 틀린 것은 아니지만
+        /// 조용히 내려가 있으면 안 된다 — 그래서 센다.
+        bool  body_font_used_fallback{ false };
+        /// 아이콘이 본문 폰트에 병합됐는가.
+        bool  icon_font_merged{ false };
+        /// 해상의 negative 경로가 성립하는가.
+        bool  font_fallback_probe_ok{ false };
+        /// 적재한 폰트 수.
+        std::size_t fonts{ 0 };
+
         /// 글리프가 빠진 라벨들. `<창 안정 id>:<빠진 수>` 로 적는다.
         ///
         /// 감사가 이것을 드는 이유는 아이콘이 **스타일의 일부**여서다. 폰트
@@ -247,7 +283,8 @@ namespace editor
 
         bool clean() const noexcept
         {
-            return style_applied && scale_matches && labels_missing_glyphs.empty();
+            return style_applied && scale_matches && labels_missing_glyphs.empty()
+                && body_font_present && icon_font_merged && font_fallback_probe_ok;
         }
     };
 
@@ -289,6 +326,7 @@ namespace editor
 
     std::string dump_dock_tree(const chrome_snapshot& snapshot);
     std::string dump_theme(const chrome_snapshot& snapshot);
+    std::string dump_fonts(const chrome_snapshot& snapshot);
     std::string dump_layout(const chrome_snapshot& snapshot);
 
     std::string dump_dock_audit(const chrome_snapshot& snapshot);

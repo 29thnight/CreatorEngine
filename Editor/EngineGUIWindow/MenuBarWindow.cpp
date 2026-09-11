@@ -14,7 +14,7 @@
 #include "ProfilerHUD.h"
 #include "CoreWindow.h"
 #include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorFontResources.h"
 #include "Prefab.h"
 #include "PrefabUtility.h"
 #include "AIManager.h"
@@ -91,24 +91,30 @@ std::string WordWrapText(const std::string& input, size_t maxLineLength)
     return oss.str();
 }
 
+namespace
+{
+    // 메뉴바 한글 폰트의 기준 크기. 본문 폰트와 같은 값이어야 같은 줄에서
+    // 키가 맞는다.
+    constexpr float kMenuBarFontSizePixels = 16.0f;
+}
+
 MenuBarWindow::MenuBarWindow()
 {
-    ImGuiIO& io = ImGui::GetIO();
-    // 범위가 FA6 의 것인지 컴파일 시점에 못 박는다 — 이유는
-    // `EditorRenderer::AddEditorFonts` 의 같은 단정에 적혀 있다.
-    static_assert(0xe005 == ICON_MIN_FA && 0xf8ff == ICON_MAX_FA,
-        "아이콘 범위가 FA6 의 값이 아니다. 같은 유니티 blob 안의 TU 가 "
-        "IconsFontAwesome4.h 를 들였을 가능성이 높다");
-
-    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-    ImFontConfig icons_config;
-    ImFontConfig font_config;
-    icons_config.MergeMode = true; // Merge icon font to the previous font if you want to have both icons and text
-    // 1.92 의 아틀라스는 동적이다 — 글리프는 그릴 때 구워지므로 한글 범위를
-    // 미리 못 박을 필요도, `Build()` 를 부를 필요도 없다. 범위를 못 박던 옛
-    // 코드는 그 밖의 글자를 네모로 만들었다.
-    m_koreanFont = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\malgun.ttf", 16.0f);
-    io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
+    // 한글 폰트는 **선택**이다(PHASE 21 W1). 맑은 고딕은 언어 기능으로
+    // 빠질 수 있고, 없으면 `PushFont(nullptr, 0.0f)` 이 "지금 폰트를 그대로"
+    // 라서(imgui.h:516) 부르는 자리가 분기하지 않아도 된다.
+    //
+    // 아이콘 병합은 **한글 폰트가 실제로 섰을 때만** 한다. 안 그러면
+    // 본문 폰트에 FA 가 두 번 병합된다. 1.92 의 아틀라스는 동적이라
+    // 한글 범위를 미리 못 박을 필요도, `Build()` 를 부를 필요도 없다.
+    const ::editor::fonts::loaded_font korean =
+        ::editor::fonts::add_optional_font(
+            "korean", ::editor::fonts::korean_candidates(), kMenuBarFontSizePixels);
+    m_koreanFont = korean.font;
+    if (nullptr != m_koreanFont)
+    {
+        ::editor::fonts::merge_icon_font(kMenuBarFontSizePixels);
+    }
 
     // PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실은
     // 선언이 든다(open_by_default(false)) — 여기서 다시 닫지 않는다.

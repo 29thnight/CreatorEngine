@@ -154,6 +154,32 @@ Assert ($theme.data.scaleMatches -eq $true) `
 Assert ($theme.data.missingGlyphLabels -eq 0) `
     "$($theme.data.missingGlyphLabels) window label(s) reference a glyph missing from the icon font; they draw as boxes. See the [AUDIT] lines for which window, and pick an ICON_FA_* constant that is already used elsewhere in the editor"
 
+# ── 폰트 (PHASE 21 W1) ───────────────────────────────────────────────────
+#
+# 폰트 파일이 없으면 에디터가 죽었다. 죽은 자리는 본문 폰트가 아니라 그 다음의
+# 아이콘 폰트였다 — `MergeMode` 가 빈 폰트 목록의 끝을 읽었다(2026-09-11
+# ACCESS_VIOLATION 실측, `EditorFontResources.h` 머리에 역추적 전체가 있다).
+#
+# 그래서 여기서 셋을 본다. ① 본문 폰트가 실제로 섰는가 ② 아이콘이 그 폰트에
+# 병합됐는가 ③ 후보가 하나도 없을 때 해상이 빈 것을 돌려주는가.
+#
+# ③ 이 필요한 이유: 실제 시스템 폰트를 지울 수 없어 fallback 경로 전체를 도는
+# 세트에서 재현할 수 없다. 해상 함수의 negative 경로만이라도 살아 있는 에디터에서
+# 태운다 — 이 저장소는 "게이트가 도는 세트에 없으면 없는 것" 으로 두 번 데었다.
+Assert ($theme.data.fonts -ge 1) `
+    "No font load was reported; the probe or editor::fonts bookkeeping is unwired"
+Assert ($theme.data.bodyFontPresent -eq $true) `
+    "The body font did not stand up. Text renders with nothing; see the fontRole table above"
+Assert ($theme.data.iconFontMerged -eq $true) `
+    "The icon font was not merged into the body font; every ICON_FA_* label draws as a box"
+Assert ($theme.data.fontFallbackProbeOk -eq $true) `
+    "resolve_font_path returned a path for candidates that do not exist; the fallback chain is broken"
+if ($theme.data.bodyFontUsedFallback -eq $true) {
+    # 틀린 것이 아니다 — 후보가 다 없어 ImGui 기본 폰트로 내려간 것이다.
+    # 붉히지 않고 적는다. 이 기계에서 이 줄이 보이면 후보 목록을 늘려야 한다.
+    Write-Host "  [NOTE] 본문 폰트가 ImGui 기본 폰트로 내려갔다 — 후보가 하나도 없다"
+}
+
 Assert ($theme.data.colors -ge 40) "Only $($theme.data.colors) style colors captured; the probe likely read nothing"
 Assert ($theme.data.scalars -ge 10) "Only $($theme.data.scalars) style scalars captured; the probe likely read nothing"
 Assert ($theme.data.differing -ge 10) "Only $($theme.data.differing) colors differ from the ImGui default"

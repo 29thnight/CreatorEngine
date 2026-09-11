@@ -197,6 +197,19 @@ namespace editor
         const float difference = snapshot.font_scale_main - snapshot.preference_scale;
         audit.scale_matches = (difference > -0.0001f) && (difference < 0.0001f);
 
+        // 폰트가 섰는가(PHASE 21 W1). 본문 폰트가 비면 글자가 아예 안
+        // 그려지고, 아이콘 병합이 빠지면 아이콘만 네모가 된다. 기본 폰트로
+        // 내려간 것은 틀린 것이 아니지만 조용하면 안 되므로 따로 센다.
+        audit.fonts = snapshot.fonts.size();
+        audit.font_fallback_probe_ok = snapshot.font_fallback_probe_ok;
+        for (const font_view& font : snapshot.fonts)
+        {
+            if ("body" != font.role) continue;
+            audit.body_font_present = font.present;
+            audit.body_font_used_fallback = font.used_fallback;
+            audit.icon_font_merged = font.icon_merged;
+        }
+
         // 라벨의 아이콘이 폰트에 실제로 있는가. `IconsFontAwesome6.h` 에 정의가
         // 있다는 것과 폰트 블롭에 글리프가 있다는 것은 다른 이야기이고, 없으면
         // 네모 한 칸이 조용히 그려진다.
@@ -321,6 +334,24 @@ namespace editor
             out += scalar.first;
             std::snprintf(buffer, sizeof(buffer), "\t%.3f\n", scalar.second);
             out += buffer;
+        }
+        return out;
+    }
+
+    std::string dump_fonts(const chrome_snapshot& snapshot)
+    {
+        std::string out{ "fontRole\tsize\ttried\tfallback\ticonMerged\tpath\n" };
+        char buffer[64]{};
+        for (const font_view& font : snapshot.fonts)
+        {
+            out += font.role;
+            std::snprintf(buffer, sizeof(buffer), "\t%.1f\t%d\t%s\t%s\t",
+                font.size_pixels, font.candidates_tried,
+                font.used_fallback ? "yes" : "no",
+                font.icon_merged ? "yes" : "no");
+            out += buffer;
+            out += font.resolved_path.empty() ? "(없음)" : font.resolved_path;
+            out += '\n';
         }
         return out;
     }

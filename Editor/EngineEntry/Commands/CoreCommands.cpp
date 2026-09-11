@@ -940,7 +940,8 @@ namespace ConsoleCmd
 
         const ::editor::theme_audit audit = ::editor::audit_theme(snapshot);
         const std::string summary = ::editor::dump_theme_audit(snapshot);
-        std::printf("%s%s", ::editor::dump_theme(snapshot).c_str(), summary.c_str());
+        std::printf("%s%s%s", ::editor::dump_theme(snapshot).c_str(),
+                    ::editor::dump_fonts(snapshot).c_str(), summary.c_str());
 
         auto data = CommandData::Object();
         data.Set("colors", CommandData::Int(static_cast<int>(audit.colors)));
@@ -953,6 +954,14 @@ namespace ConsoleCmd
         data.Set("scaleMatches", CommandData::Bool(audit.scale_matches));
         data.Set("missingGlyphLabels",
                  CommandData::Int(static_cast<int>(audit.labels_missing_glyphs.size())));
+        // 폰트 (PHASE 21 W1). 파일이 없을 때 죽던 자리라 밖에서 보여야 한다.
+        data.Set("fonts", CommandData::Int(static_cast<int>(audit.fonts)));
+        data.Set("bodyFontPresent", CommandData::Bool(audit.body_font_present));
+        data.Set("bodyFontUsedFallback",
+                 CommandData::Bool(audit.body_font_used_fallback));
+        data.Set("iconFontMerged", CommandData::Bool(audit.icon_font_merged));
+        data.Set("fontFallbackProbeOk",
+                 CommandData::Bool(audit.font_fallback_probe_ok));
         data.Set("clean", CommandData::Bool(audit.clean()));
 
         if (!audit.clean())

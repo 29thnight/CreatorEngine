@@ -94,6 +94,7 @@
     <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
     <ClInclude Include="EngineGUIWindow\EditorCameraRig.h" />
+    <ClInclude Include="EngineGUIWindow\EditorFontResources.h" />
     <ClInclude Include="EngineGUIWindow\EditorRenderer.h" />
     <ClInclude Include="EngineGUIWindow\EditorWindowChrome.h" />
     <ClInclude Include="EngineGUIWindow\EditorWindowNames.h" />
@@ -248,6 +249,7 @@
     <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
     <ClCompile Include="EngineGUIWindow\EditorCameraRig.cpp" />
+    <ClCompile Include="EngineGUIWindow\EditorFontResources.cpp" />
     <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp" />
     <ClCompile Include="EngineGUIWindow\EditorWindowChrome.cpp" />
     <!-- 유니티에 넣으면 청크 재편으로 Scene.h 전방선언이 깨진다 (E6-1 승계) -->

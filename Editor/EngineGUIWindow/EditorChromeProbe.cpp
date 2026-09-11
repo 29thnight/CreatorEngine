@@ -23,6 +23,7 @@
 #include "EditorWindowRegistry.h"
 #include "EditorWindowNames.h"
 #include "EditorSettingsStore.h"
+#include "EditorFontResources.h"
 
 #include "ImGui.h"
 
@@ -30,6 +31,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <system_error>
+#include <utility>
 
 namespace
 {
@@ -240,6 +242,25 @@ namespace editor
         snapshot.font_scale_main = style.FontScaleMain;
         snapshot.preference_scale  =
             EditorSettingsStore::Get().Preferences().GetImGuiScale();
+
+        // ── 폰트 (PHASE 21 W1) ────────────────────────────────────────────
+        //
+        // 적재 기록을 **적재한 자리에서** 가져온다. 아틀라스를 다시 훑어
+        // 유도하면 어느 후보가 이겼는지를 알 수 없다 — `ImFont` 는 자기
+        // 파일 경로를 들지 않는다.
+        for (const ::editor::fonts::loaded_font& loaded : ::editor::fonts::loaded_fonts())
+        {
+            ::editor::font_view view{};
+            view.role = loaded.role;
+            view.resolved_path = loaded.resolved_path;
+            view.size_pixels = loaded.size_pixels;
+            view.candidates_tried = loaded.candidates_tried;
+            view.used_fallback = loaded.used_fallback;
+            view.icon_merged = loaded.icon_merged;
+            view.present = (nullptr != loaded.font);
+            snapshot.fonts.push_back(std::move(view));
+        }
+        snapshot.font_fallback_probe_ok = ::editor::fonts::fallback_probe_ok();
 
         // ── ini ───────────────────────────────────────────────────────────
         //

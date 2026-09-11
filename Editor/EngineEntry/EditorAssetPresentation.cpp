@@ -12,6 +12,7 @@
 #include "Texture.h"
 #include "ImGui.h"
 #include "IconsFontAwesome6.h"
+#include "EditorFontResources.h"
 #include "fa.h"
 
 #include <imgui.h>
@@ -285,10 +286,12 @@ void EditorAssetPresentation::LoadPresentationResources()
 	m_gizmoIconTextures = std::move(gizmoIcons);
 	EnhancedSceneRenderer::SetGizmoIconTextures(m_gizmoIconTextures);
 
-	m_smallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF(
-		"C:\\Windows\\Fonts\\Verdana.ttf", 12.0f);
-	m_extraSmallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF(
-		"C:\\Windows\\Fonts\\Verdana.ttf", 10.0f);
+	// 작은 글씨용 둘은 **선택**이다(PHASE 21 W1). 비어도 쓰는 자리가
+	// `PushFont(nullptr, 0.0f)` 으로 받으므로 글자 크기만 기본으로 간다.
+	m_smallFont = ::editor::fonts::add_optional_font(
+		"small", ::editor::fonts::body_candidates(), 12.0f).font;
+	m_extraSmallFont = ::editor::fonts::add_optional_font(
+		"extra_small", ::editor::fonts::body_candidates(), 10.0f).font;
 }
 
 void EditorAssetPresentation::ReleasePresentationResources() noexcept

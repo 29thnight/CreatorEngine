@@ -3,7 +3,7 @@
 #include "EditorWindowRegistry.h"
 #include "EditorChromeProbe.h"
 #include "RHI/IImGuiHost.h"
-#include "IconsFontAwesome6.h"
+#include "EditorFontResources.h"
 #include "fa.h"
 #include "EditorAssetPresentation.h"
 #include "EditorSettingsStore.h"
@@ -17,6 +17,9 @@
 
 namespace
 {
+    // 에디터 본문·아이콘의 기준 글자 크기. 배율은 `FontScaleMain` 이 든다.
+    constexpr float kEditorFontSizePixels = 16.0f;
+
     // 에디터 위젯 스타일. 구 ImGuiRenderer의 ImGuiBootstrap::ApplyStyle 그대로다.
     // s&box 에디터 계열 다크 스킨. 이전 스킨은 둥근 모서리 5px에 항목 간격
     // 12x8이라 패널 하나에 담기는 행이 적었고, 창 배경(0.22)이 프레임
@@ -148,29 +151,16 @@ EditorRenderer::~EditorRenderer()
 
 void EditorRenderer::AddEditorFonts()
 {
-    ImGuiIO& io = ImGui::GetIO();
-    // ★ 아이콘 범위는 **적재하는 블롭과 같은 판**이어야 한다.
+    // 폰트 자원은 `editor::fonts` 한 자리가 든다(PHASE 21 W1). 경로를 손으로
+    // 적던 넷을 거기로 모았고, 파일이 없을 때 죽던 자리도 거기서 막는다.
+    // 왜 죽었는지는 `EditorFontResources.h` 머리에 실측과 함께 적었다 —
+    // 아이콘 폰트의 `MergeMode` 가 빈 폰트 목록의 끝을 읽었다.
     //
-    // `IconsFontAwesome4.h` 와 `6.h` 가 `ICON_MIN_FA`/`ICON_MAX_FA` 를 서로 다른
-    // 값으로 정의한다(FA4 0xf000~0xf2e0 · FA6 0xe005~0xf8ff). 이 프로젝트는
-    // 유니티 빌드라 같은 blob 안의 다른 TU 가 FA4 를 들이면 여기 값이 조용히
-    // 좁아지고, 그러면 0xf000 아래의 FA6 아이콘(예: Hierarchy 의
-    // `ICON_FA_BARS_STAGGERED` U+e0d7)이 아틀라스에 실리지 않아 **네모로
-    // 그려진다.** 실행해도 예외가 나지 않으므로 컴파일 시점에 막는다.
-    //
-    // FA4 헤더는 은퇴시켰다(2026-09-11, W1). 이 단정은 그것이 되돌아오는 것을
-    // 막는 자물쇠다 — `static_assert` 라서 Release 에서도 사라지지 않는다.
-    static_assert(0xe005 == ICON_MIN_FA && 0xf8ff == ICON_MAX_FA,
-        "아이콘 범위가 FA6 의 값이 아니다. 같은 유니티 blob 안의 TU 가 "
-        "IconsFontAwesome4.h 를 들였을 가능성이 높다 — 폰트 블롭은 FA6 하나뿐이므로 "
-        "헤더도 IconsFontAwesome6.h 하나로 맞춰라");
-
-    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-    ImFontConfig icons_config;
-    icons_config.MergeMode = true; // 아이콘 폰트를 본문 폰트에 병합
-    io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 16.0f);
-    io.Fonts->AddFontFromMemoryCompressedTTF(
-        FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
+    // FA6 범위 단정도 그 파일로 옮겼다. 여기에 두면 `fa.h` 와
+    // `IconsFontAwesome6.h` 를 이 TU 가 계속 들어야 한다.
+    ::editor::fonts::add_required_font(
+        "body", ::editor::fonts::body_candidates(), kEditorFontSizePixels);
+    ::editor::fonts::merge_icon_font(kEditorFontSizePixels);
 }
 
 void EditorRenderer::ApplyEditorScale(float newScale, bool rebuildFonts)
@@ -187,6 +177,9 @@ void EditorRenderer::ApplyEditorScale(float newScale, bool rebuildFonts)
     if (rebuildFonts)
     {
         io.Fonts->Clear();
+        // 아틀라스를 비웠으니 적재 기록도 비운다 — 안 비우면 보고가
+        // 배율을 바꿀 때마다 늘어난다.
+        ::editor::fonts::clear_loaded_fonts();
         AddEditorFonts();
         // 폰트 텍스처는 백엔드 소유물이라 재생성은 경계 너머의 일이다.
         m_host->RebuildFontAtlas();
