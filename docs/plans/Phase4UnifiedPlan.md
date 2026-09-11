@@ -1,6 +1,6 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
-**신설 2026-09-01 · 재분할 2026-09-03 · 활성 54행 267.5일 · 완료 12.5일 + 진행 기성 3일 · 잔여 252일**
+**신설 2026-09-01 · 재분할 2026-09-03 · 활성 54행 267.5일 · 완료 12.5일 + 진행 기성 3.5일 · 잔여 251.5일**
 
 기존 단일 PHASE 4에는 현재 PBR 배선 수정, Blender형 Material Graph, RenderGraph·라이트맵·
 일반 SRP·후처리·차세대 GPU 기능이 한데 섞여 있었다. 이 문서는 같은 총공수 267.5일을
@@ -8,10 +8,10 @@
 
 | 페이즈 | 단일 책임 | 활성 행 | 일 | 상태 |
 |---|---|---:|---:|---|
-| **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | W2/W4/W5/W6 8.5일 완료 + 진행 기성 3일 |
+| **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | W2/W4/W5/W6 8.5일 완료 + 진행 기성 3.5일 |
 | **4.25** | Blender 5.1.1 Principled 기반 Material Graph와 artist workflow | 10 | 34 | 미착수 |
 | **4.75** | RenderGraph·라이트맵·일반 SRP·shadow/probe/post·GPU 기능 | 34 | 215.5 | 4일 완료 |
-| **합계** |  | **54** | **267.5** | **잔여 252** |
+| **합계** |  | **54** | **267.5** | **잔여 251.5** |
 
 모델 자산 신원·sidecar·loader·renderer/scene/animation 직접 소비·Assimp 은퇴는
 [`ModelAssetBigBangCutoverPlan.md`](archive/ModelAssetBigBangCutoverPlan.md), **PHASE 3.75**가
@@ -149,8 +149,10 @@ W4 alpha/양면 coverage는 같은 문서 §8의 양 backend 40-case·material �
 양 backend 48-case로 완료했고 GBuffer 포맷은 검토 후 유지한다. W6는 §10의
 발광 색/강도·상수 발광·색공간과 양 backend 78-case를 완료했다. CEMC7 모델 14개 재게시와
 ID 보존을 확인했다. W7은 §11의 normal/tangent 변환·양 backend 128-case와
-§12의 UV0/UV1 선택·텍스처별 변환·양 backend 64-case를 합계 1일 기성으로 반영했다.
-CEMC8 모델 14개와 하위 ID 310개를 보존했으며 sampler/mip 전달이 다음 단위다.
+§12의 UV0/UV1 선택·텍스처별 변환·양 backend 64-case, §13의 mip 생성·소비 30-case를
+합계 1.5일 기성으로 반영했다. 축소 MASK를 포함한 coverage 48-case도 통과했다.
+CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단위다. strict GUID의 기존
+`ImmProbe.prefab.meta` 추적 정책 위반 1개와 W9 acceptance는 별도 미해결로 남긴다.
 
 ---
 
@@ -249,14 +251,14 @@ renderer golden과 성능 gate를 사용한다.
 
 | 묶음 | 활성 행 | 총일 | 완료 | 진행 기성 | 잔여 |
 |---|---:|---:|---:|---:|---:|
-| PHASE 4 PBR 배선 | 10 | 18 | 8.5 | 3 | 6.5 |
+| PHASE 4 PBR 배선 | 10 | 18 | 8.5 | 3.5 | 6 |
 | PHASE 4.25 Material Graph | 10 | 34 | 0 | 0 | 34 |
 | PHASE 4.75 공통/GPU 설계 | 7 | 14.5 | 2 | 0 | 12.5 |
 | PHASE 4.75 RenderGraph/Q0 | 10 | 113 | 0 | 0 | 113 |
 | PHASE 4.75 라이트맵 | 8 | 35 | 2 | 0 | 33 |
 | PHASE 4.75 일반 SRP | 6 | 33 | 0 | 0 | 33 |
 | PHASE 4.75 renderer/post | 3 | 20 | 0 | 0 | 20 |
-| **합계** | **54** | **267.5** | **12.5** | **3** | **252** |
+| **합계** | **54** | **267.5** | **12.5** | **3.5** | **251.5** |
 
 `Q0`은 0일 표기가 완료가 아니라 미산정이다. `4-2~4-5`도 구상 공수만 포함하며 실제 GPU
 기능 구현 공수는 `4-6` 뒤 추가한다. 267.5일은 기존 계획의 총량을 재배분한 값이지 새
@@ -305,6 +307,7 @@ renderer golden과 성능 gate를 사용한다.
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-09-06 | W7 mip 생성/보존·10개 포맷·양 backend 30-case, 축소 MASK를 포함한 coverage 48-case 통과. CEMC8 유지. W7 기성 1.5일, sampler 미완료. 기존 strict GUID 추적 정책 위반 1개 별도 기록. 완료 12.5일 + 진행 기성 3.5일, 잔여 251.5일 |
 | 2026-09-06 | W7 UV0/UV1·텍스처별 변환·양 backend 64-case와 변환된 UV1 MASK/Shadow 검사. CEMC8 모델 14개/하위 ID 310개 보존. W7 기성 1일, sampler/mip 미완료. 완료 12.5일 + 진행 기성 3일, 잔여 252일 |
 | 2026-09-06 | W7 normal/tangent 변환·양 backend 128-case 검증을 0.5일 기성 반영. UV/sampler/mip는 미완료. 완료 12.5일 + 진행 기성 2.5일, 잔여 252.5일 |
 | 2026-09-06 | W6 발광/색공간·양 backend 78-case 완료. CEMC7 모델 14개와 하위 ID 310개 보존. 완료 12.5일 + 진행 기성 2일, 잔여 253일 |

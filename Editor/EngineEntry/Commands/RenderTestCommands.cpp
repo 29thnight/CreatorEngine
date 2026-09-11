@@ -1530,6 +1530,20 @@ namespace ConsoleCmd
             : CommandCore::Fail("render.pbr.uv.failed", "PBR verification failed", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_render_pbr_mip(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
+        std::string result;
+        const bool passed = RunPbrMipTest(result);
+        Debug->LogWarning(std::string("[render.pbr.mip] ") + result);
+        std::printf("%s[CLI] render.pbr.mip %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+        auto data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(result));
+        return passed ? CommandCore::Ok({}, std::move(data))
+            : CommandCore::Fail("render.pbr.mip.failed", "PBR verification failed", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_render_pbr_capture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1587,6 +1601,7 @@ namespace ConsoleCmd
         reg.Result({ "render.pbr.emission" }, &Cmd_render_pbr_emission);
         reg.Result({ "render.pbr.transform" }, &Cmd_render_pbr_transform);
         reg.Result({ "render.pbr.uv" }, &Cmd_render_pbr_uv);
+        reg.Result({ "render.pbr.mip" }, &Cmd_render_pbr_mip);
         reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture);
         reg.Result({ "vk.decal" }, &Cmd_vk_decal);
         reg.Result({ "vk.ssao" }, &Cmd_vk_ssao);

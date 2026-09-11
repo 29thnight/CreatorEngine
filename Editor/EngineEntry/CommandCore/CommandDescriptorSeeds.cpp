@@ -195,6 +195,7 @@ namespace CommandCore
             { "render.pbr.capture", CommandCost::Long, "<new-absolute-directory> [game|editor]", "PBR capture verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.coverage", CommandCost::Long, "", "PBR coverage verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.emission", CommandCost::Long, "", "PBR emission verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "render.pbr.mip", CommandCost::Long, "", "PBR mip verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.occlusion", CommandCost::Long, "", "PBR occlusion verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.parity", CommandCost::Long, "", "PBR parity verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.transform", CommandCost::Long, "", "PBR transform verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

@@ -1,4 +1,4 @@
-# PHASE 4 W0/W2/W3/W4/W5/W6/W7-normal/UV: product-frame capture, shared PBR and backend defaults.
+# PHASE 4 W0/W2/W3/W4/W5/W6/W7-normal/UV/mip: product-frame capture, shared PBR and backend defaults.
 # Captures are observations, not W9 visual acceptance or cross-backend goldens.
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
@@ -144,7 +144,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Standalone material contracts failed; log: $contractLog" }
     $contractCommands = @('experiment.matresolve', 'experiment.matmigrate', 'experiment.cooked')
     $null = Invoke-Editor 'material-contracts' ($contractCommands + 'quit')
-    foreach ($name in @('parity', 'coverage', 'emission', 'transform', 'uv', 'occlusion')) {
+    foreach ($name in @('parity', 'coverage', 'emission', 'transform', 'uv', 'mip', 'occlusion')) {
         $results = @(Invoke-Editor $name @("render.pbr.$name", 'quit'))
         $data = Get-SucceededCommand $results "render.pbr.$name"
         if (-not $data.passed) { throw "PBR $name did not execute its verification" }
@@ -160,7 +160,7 @@ try {
     if ($capture.status -ne 'failed' -or $capture.code -ne 'render.pbr.capture.rejected') {
         throw 'Capture did not reject an existing output directory.'
     }
-    Write-Output "PBR W0/W2/W3/W4/W5/W6/W7-normal/UV baseline PASS (W9 acceptance pending): $run"
+    Write-Output "PBR W0/W2/W3/W4/W5/W6/W7-normal/UV/mip baseline PASS (W9 acceptance pending): $run"
 }
 finally {
     if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }

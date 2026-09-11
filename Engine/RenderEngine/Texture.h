@@ -79,6 +79,12 @@ public:
     static std::shared_ptr<Texture> WithColorSpace(
         const std::shared_ptr<Texture>& source, bool srgb);
 
+    // Call after choosing the material color space. Retains authored chains and
+    // 1x1 owners; otherwise generates a full chain with linear-light RGB filtering
+    // for sRGB formats and independent linear alpha. Preserves mip 0 exactly.
+    static std::shared_ptr<Texture> WithMipChain(
+        const std::shared_ptr<Texture>& source, std::string& outFailure);
+
 	static std::shared_ptr<Texture> LoadSharedFromPath(
 		const file::path& path, bool isCompress = false);
 

@@ -272,8 +272,13 @@ namespace assets
             //   는 규약과 그것이 생긴 사연(43% 탈색)도 그 함수의 주석에 함께
             //   있다. cook 경로가 필요한 것은 "바이트 -> 중립 RGBA8" 하나였고,
             //   그것 때문에 디코더를 아는 파일이 둘이었다.
-            TextureImage image;
-            if (!Texture::DecodeToRgba8(encoded, image, failure)) return false;
+            TextureImage decoded;
+            if (!Texture::DecodeToRgba8(encoded, decoded, failure)) return false;
+            auto owner = Texture::CreateSharedFromImage("Model.embedded", std::move(decoded));
+            owner = Texture::WithColorSpace(owner, colorSpace == ModelTextureColorSpace::Srgb);
+            owner = Texture::WithMipChain(owner, failure);
+            if (!owner) return false;
+            const auto image = owner->GetImageView();
 
             out.colorSpace = colorSpace;
             out.format = colorSpace == ModelTextureColorSpace::Srgb

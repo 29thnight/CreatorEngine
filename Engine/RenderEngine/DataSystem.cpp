@@ -1327,7 +1327,17 @@ std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view 
 
 	// 로드 (락 없이 I/O)
 	auto loaded = Texture::LoadSharedFromPath(destination.string(), isCompress);
-    if (loaded && srgb.has_value()) loaded = Texture::WithColorSpace(loaded, *srgb);
+    if (loaded && srgb.has_value())
+    {
+        loaded = Texture::WithColorSpace(loaded, *srgb);
+        std::string mipFailure;
+        loaded = Texture::WithMipChain(loaded, mipFailure);
+        if (!loaded)
+        {
+            Debug->LogError("Material texture mip preparation failed: " + destination.string() + ": " + mipFailure);
+            return nullptr;
+        }
+    }
 	if (!loaded)
 	{
 		Debug->LogError("TextureLoader::LoadTexture : file not found");

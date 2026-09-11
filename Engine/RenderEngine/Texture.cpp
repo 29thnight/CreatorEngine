@@ -72,6 +72,24 @@ namespace
 		}
 	}
 
+    DXGI_FORMAT TextureMipFormatFromRHI(RHIFormat format)
+    {
+        switch (format)
+        {
+        case RHIFormat::RGBA8Unorm: return DXGI_FORMAT_R8G8B8A8_UNORM;
+        case RHIFormat::RGBA8UnormSrgb: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        case RHIFormat::BGRA8Unorm: return DXGI_FORMAT_B8G8R8A8_UNORM;
+        case RHIFormat::BGRA8UnormSrgb: return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+        case RHIFormat::RGBA16Float: return DXGI_FORMAT_R16G16B16A16_FLOAT;
+        case RHIFormat::RGBA32Float: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+        case RHIFormat::BC1Unorm: return DXGI_FORMAT_BC1_UNORM;
+        case RHIFormat::BC1UnormSrgb: return DXGI_FORMAT_BC1_UNORM_SRGB;
+        case RHIFormat::BC3Unorm: return DXGI_FORMAT_BC3_UNORM;
+        case RHIFormat::BC3UnormSrgb: return DXGI_FORMAT_BC3_UNORM_SRGB;
+        default: return DXGI_FORMAT_UNKNOWN;
+        }
+    }
+
 	/// 2D 밉·배열 체인으로 다룰 수 있는 이미지인지.
 	bool TextureIsUploadableShape(const TexMetadata& metadata)
 	{
@@ -325,6 +343,93 @@ std::shared_ptr<Texture> Texture::WithColorSpace(
 }
 
 //static functions
+std::shared_ptr<Texture> Texture::WithMipChain(
+    const std::shared_ptr<Texture>& source, std::string& outFailure)
+{
+    outFailure.clear();
+    const auto fail = [&](std::string_view message) -> std::shared_ptr<Texture> {
+        outFailure = message; return nullptr;
+    };
+    if (!source || source->GetImageView().IsEmpty()) return fail("Mip source is empty");
+    const auto view = source->GetImageView();
+    // An authored partial chain is intentional too. Never replace it.
+    if (view.MipLevels() > 1 || (view.Width() == 1 && view.Height() == 1)) return source;
+    const DXGI_FORMAT format = TextureMipFormatFromRHI(view.Format());
+    if (format == DXGI_FORMAT_UNKNOWN) return fail("Unsupported material mip format");
+    TexMetadata metadata{};
+    metadata.width = view.Width(); metadata.height = view.Height(); metadata.depth = 1;
+    metadata.arraySize = view.ArraySize(); metadata.mipLevels = 1;
+    metadata.dimension = TEX_DIMENSION_TEXTURE2D; metadata.format = format;
+    if (view.IsCube()) metadata.miscFlags = TEX_MISC_TEXTURECUBE;
+    std::vector<Image> images;
+    for (uint32_t item = 0; item < view.ArraySize(); ++item)
+    {
+        const auto* base = view.Find(0, item);
+        if (!base || !base->pixels) return fail("Mip source subresource is empty");
+        images.push_back({base->width, base->height, format, base->rowPitch,
+            base->slicePitch, const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(base->pixels))});
+    }
+    ScratchImage decoded;
+    const Image* input = images.data();
+    size_t count = images.size();
+    if (IsCompressed(format))
+    {
+        // Keep the encoded transfer function while unpacking BC blocks.
+        const auto rgba = IsSRGB(format) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+        if (FAILED(Decompress(input, count, metadata, rgba, decoded)))
+            return fail("Mip source decompression failed");
+        input = decoded.GetImages(); count = decoded.GetImageCount(); metadata = decoded.GetMetadata();
+    }
+    ScratchImage chain;
+    // Non-WIC keeps alpha independent and HDR unclamped. DirectXTex chooses box
+    // for power-of-two sizes and linear for NPOT; sRGB formats imply RGB decode/encode.
+    if (FAILED(GenerateMipMaps(input, count, metadata, TEX_FILTER_FORCE_NON_WIC, 0, chain)))
+        return fail("Material mip generation failed");
+    if (IsCompressed(format))
+    {
+        ScratchImage compressed;
+        auto targetMetadata = chain.GetMetadata();
+        targetMetadata.format = format;
+        if (FAILED(compressed.Initialize(targetMetadata))) return fail("Material mip allocation failed");
+        // Recompress only the added levels. Reprocessing mip 0 would spend most
+        // of the compression time on blocks that must be copied back unchanged.
+        for (uint32_t item = 0; item < view.ArraySize(); ++item)
+        for (size_t mip = 1; mip < targetMetadata.mipLevels; ++mip)
+        {
+            ScratchImage level;
+            const auto* inputLevel = chain.GetImage(mip, item, 0);
+            if (!inputLevel || FAILED(Compress(*inputLevel, format, TEX_COMPRESS_DEFAULT,
+                    TEX_THRESHOLD_DEFAULT, level))) return fail("Material mip compression failed");
+            const auto* from = level.GetImage(0, 0, 0);
+            const auto* to = compressed.GetImage(mip, item, 0);
+            if (!from || !to) return fail("Compressed mip level is missing");
+            CopyImageRows(reinterpret_cast<std::byte*>(to->pixels), to->rowPitch,
+                reinterpret_cast<const std::byte*>(from->pixels), from->rowPitch,
+                RHIFormatRowCount(view.Format(), static_cast<uint32_t>(to->height)), to->rowPitch);
+        }
+        chain = std::move(compressed);
+    }
+    // Compression may choose different endpoints even for the same input. Restore
+    // the original base bytes; only the added levels may have new BC blocks.
+    for (uint32_t item = 0; item < view.ArraySize(); ++item)
+    {
+        const auto* base = view.Find(0, item);
+        const auto* target = chain.GetImage(0, item, 0);
+        if (!target) return fail("Generated mip base is missing");
+        CopyImageRows(reinterpret_cast<std::byte*>(target->pixels), target->rowPitch,
+            base->pixels, base->rowPitch, RHIFormatRowCount(view.Format(), base->height),
+            static_cast<size_t>(RHIFormatRowPitch(view.Format(), base->width)));
+    }
+    auto codec = TextureMakeCodecImage(std::move(chain));
+    if (!codec) return fail("Generated mip chain is invalid");
+    auto texture = std::make_shared<Texture>();
+    texture->m_codecImage = std::move(codec);
+    texture->m_textureType = source->m_textureType;
+    texture->m_name = source->m_name; texture->m_extension = source->m_extension;
+    texture->m_size = source->m_size; texture->m_isTextureAlpha = source->m_isTextureAlpha;
+    return texture;
+}
+
 Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 	_In_ std::string_view name, _In_ RHIFormat textureFormat,
 	_In_reads_bytes_(rowPitch* height) const void* pixels, _In_opt_ size_t rowPitch)

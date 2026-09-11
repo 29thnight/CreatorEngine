@@ -71,7 +71,7 @@ if (-not $SkipCommandlets) {
             if ($case.Name -eq 'list' -and $case.Exit -eq 0) {
                 Assert ($results[0].data.names -contains 'experiment.matresolve' -and $results[0].data.names -contains 'scene.hierarchymutation' -and $results[0].data.names -contains 'dx12.selftest') 'Commandlet discovery is missing a domain'
                 Assert (-not ($results[0].data.names -contains 'object.rename')) 'Product editing leaked into Commandlet discovery'
-                foreach ($name in @('model.async', 'render.pbr.capture', 'render.pbr.parity', 'render.pbr.coverage', 'render.pbr.occlusion', 'render.pbr.emission', 'render.pbr.transform', 'render.pbr.uv')) {
+                foreach ($name in @('model.async', 'render.pbr.capture', 'render.pbr.parity', 'render.pbr.coverage', 'render.pbr.occlusion', 'render.pbr.emission', 'render.pbr.transform', 'render.pbr.uv', 'render.pbr.mip')) {
                     Assert ($results[0].data.names -contains $name) "Integrated Commandlet missing: $name"
                 }
             }

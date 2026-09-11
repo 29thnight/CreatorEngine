@@ -227,6 +227,10 @@ namespace RenderTest
                 && texture.format != RHIFormat::Unknown && !texture.pixels.empty()
                 && !texture.subresources.empty(),
                 "texture decode/upload descriptor " + texture.name);
+            check.Check(texture.mipLevels > 1u || (texture.width == 1u && texture.height == 1u),
+                "embedded texture has generated mips " + texture.name);
+            check.Check(texture.subresources.size() == texture.mipLevels * texture.arraySize,
+                "embedded mip/array closure " + texture.name);
         }
         if (const assets::ModelSkeletonAsset* skeleton = second->Skeleton())
         {
@@ -455,6 +459,13 @@ namespace RenderTest
 
             meshCount += generation->Meshes().size();
             materialCount += generation->Materials().size();
+            for (const auto& texture : generation->Textures())
+            {
+                check.Check(texture.mipLevels > 1u || (texture.width == 1u && texture.height == 1u),
+                    "corpus embedded mip chain " + source.filename().string() + ":" + texture.name);
+                check.Check(texture.subresources.size() == texture.mipLevels * texture.arraySize,
+                    "corpus embedded mip/array closure " + texture.name);
+            }
             textureCount += generation->Textures().size();
             skeletonCount += generation->Skeleton() ? 1u : 0u;
             animationCount += generation->Animations().size();

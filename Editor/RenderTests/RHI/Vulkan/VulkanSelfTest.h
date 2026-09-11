@@ -58,6 +58,7 @@ bool RunPbrOcclusionTest(std::string& outLog);
 bool RunPbrEmissionTest(std::string& outLog);
 bool RunPbrTransformTest(std::string& outLog);
 bool RunPbrUvTest(std::string& outLog);
+bool RunPbrMipTest(std::string& outLog);
 bool RunVulkanDecalTest(std::string& outLog);
 bool RunVulkanSSAOTest(std::string& outLog);
 bool RunVulkanSSGITest(std::string& outLog);

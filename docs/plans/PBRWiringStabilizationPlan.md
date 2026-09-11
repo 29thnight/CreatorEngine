@@ -18,7 +18,7 @@ sampler/mip, tangent basis와 non-uniform scale normal transform은 이 페이�
 
 ## 1. 2026-09-03 소스 감사 결과
 
-아래는 착수 전 감사 기록이다. 2026-09-06 구현·검증으로 해소한 항목은 §6~§12에 구분한다.
+아래는 착수 전 감사 기록이다. 2026-09-06 구현·검증으로 해소한 항목은 §6~§13에 구분한다.
 
 | 우선 | 확인한 현재 상태 | 제품 위험 | 소유 슬라이스 |
 |---|---|---|---|
@@ -78,8 +78,8 @@ typed Material generation
 
 `PBR-W0`은 정적 감사 절반, `PBR-W1`은 코드·빌드 절반을 기성으로 센다. 둘 다 `PBR-W9`의
 실장면 acceptance 전에는 완료가 아니다. W3는 neutral resource와 strict exit 구현을 0.5일
-기성으로 반영한다. W7의 normal/tangent와 UV 선택·변환 구현·GPU 검증은 합계 1일 기성이다.
-W2/W4/W5/W6 완료 8.5일 + 진행 기성 3일이며 잔여는 6.5일이다.
+기성으로 반영한다. W7의 normal/tangent·UV 선택/변환·mip 구현과 검증은 합계 1.5일 기성이다.
+W2/W4/W5/W6 완료 8.5일 + 진행 기성 3.5일이며 잔여는 6일이다. W7 sampler는 미완료다.
 
 ---
 
@@ -558,3 +558,67 @@ W7은 진행 상태다. §11의 normal/tangent와 이번 UV 전달을 합쳐 기
 `republish-w7uv.log`, `w7uv-guid.log`, `w7uv-cook-all.log`, `w7uv-model-wiring.log`,
 `creator-pbr-69abb4570ba04ada944c8bfe8310a521/`(최종 baseline 전체 stdout·capture),
 `w7uv-doc-check.log`.
+
+---
+
+## 13. W7 세 번째 단위 — mip 생성·소비, 2026-09-06
+
+재질별 wrap/filter sampler 전달은 다음 단위다. 이번 단위는 mip 체인이 없는 재질 텍스처의
+생성과 기존 체인의 보존·업로드·샘플링을 다룬다. CEMC8과 자산 ID는 변경하지 않는다.
+
+### 구현
+
+- `Texture::WithMipChain`은 이미 mip이 있는 이미지(부분 체인 포함)와 1×1 owner를 재사용한다.
+  그 외에는 1×1까지 체인을 생성하고 별도 GPU cache 신원을 부여한다. 원본 owner를 변경하지
+  않으며 mip 0의 픽셀과 BC 블록을 그대로 복사한다. BC1/BC3는 추가 레벨만 다시 압축한다.
+- 외부 Standard/typed 재질은 색공간을 선택한 뒤 체인을 만들고 경로·압축·색공간별 캐시에
+  보관한다. source와 cooked artifact 경로 모두 이 창구를 사용한다. 내장 텍스처는
+  `ModelAssetGeneration` 적재 중 같은 순서로 생성해 immutable generation과 upload descriptor에 담는다.
+  색공간을 지정하지 않는 generic legacy texture 로드는 기존 계약을 유지한다.
+- sRGB RGB는 선형 공간에서 축소한 뒤 다시 인코딩하고 alpha는 독립적으로 평균한다.
+  non-color data와 HDR은 선형으로 처리한다. DirectXTex의 non-WIC 경로를 사용하며,
+  기본 필터는 2의 거듭제곱 크기에 box, 그 외 크기에 linear다.
+  [공식 필터 규약](https://github.com/microsoft/DirectXTex/wiki/Filter-Flags)과
+  [mip 생성 API](https://github.com/microsoft/DirectXTex/wiki/GenerateMipMaps)를 기준으로 확인했다.
+- DX12/Vulkan texture cache와 GBuffer/Forward/Shadow SRV는 이미 전체 mip 범위를 전달한다.
+  이 경로를 유지하고 실제 픽셀 검사로 소비를 검증한다. 재질 숫자 bytes·vertex schema·
+  모델 저장 형식을 바꾸지 않으므로 모델 재게시와 ID 재생성은 필요하지 않다.
+- `render.pbr.mip`을 Commandlet 검사로 등록하고 PBR 회귀에 포함했다. 저작 mip의 서로 다른
+  색으로 LOD 0~4 및 중간 0.5 단계 선택을 검사한다. 5/8/5 texture table과 RGB/alpha가 다른
+  RGBA/BGRA·sRGB·half/float HDR·BC1/BC3 등 10개 포맷을 함께 확인한다.
+
+### 검증
+
+- VS18/v145 CreatorEditor와 AssetCooker Debug x64 빌드 통과.
+- `render.pbr.mip`: 양 backend 각각 30-case 통과. baseColor/MR/AO/emission을 CPU 예상값과
+  비교하고 Forward/Deferred pre-tone HDR을 비교했다. 최대 경로 편차는 양 backend 모두
+  0.00390625로 기존 half 정밀도 비교 허용식 안이며, backend 편차 0·validation 0이다.
+- CPU에서 sRGB/linear RGB 평균·독립 alpha·HDR 비클램프, mip 0 bytes와 BC 블록 보존,
+  1×1/저작 부분 체인 재사용, NPOT·세로 1×8·배열·큐브의 단계 수와 원소 순서를 검사했다.
+  동명 파일을 두 절대 경로에 두고 실제 `DataSystem`의 색공간별 생성 순서·cache 재사용/분리도 확인했다.
+- `render.pbr.coverage`: 양 backend 각각 48-case 통과. 추가 8개 조건에서 생성한 마지막
+  mip의 alpha를 사용해 MASK 임계값 양쪽을 검사한다. legacy/owned·static/skin의
+  GBuffer/Forward/Shadow 판정과 CPU 예상값 편차 0·backend 편차 0·validation 0이다.
+- `verify-experiment-model-cook-all.ps1`: 모델 14개·generation 14개·하위 ID 310개의 폐포,
+  authoring 실패 주입 5개·충돌 1개 통과.
+- **별도 기존 실패:** strict GUID는 `ImmProbe.prefab.meta`의 tracked-meta-policy 위반 1개로
+  실패했다. 해당 파일은 이번 작업 전 `709eafe5`에서 이미 추적됐고 `.gitignore` 예외가 없다.
+  GUID 자체 invalid/duplicate/missing은 0(meta 239·하위 ID 310). W0 strict gate는 미통과다.
+- GBuffer emissive sampling을 mip 0으로 강제하면 첫 case의 중간 band가 0.023438 대신
+  0.015625로 나와 `render.pbr.mip.failed`·exit 4로 실패한다. 검사 후 셰이더 원본 bytes를 복원했다.
+- 전체 `verify-pbr-wiring-baseline.ps1` 통과: 양 backend primitive/Gunner 제품 캡처 네 개,
+  기본 패스와 Water/Wind, 독립 계약 12개 묶음, 재질 해석/이행/cooked,
+  PBR 36·coverage 48·emission 78·normal 128·UV 64·mip 30·AO 48-case 및 실패 종료/캡처 충돌이다.
+  이 실행의 normal backend 편차는 0.0000305176으로 허용 범위이며 나머지 수치 검사의
+  backend 편차는 0이다. validation 오류는 없고 W9 golden·장시간 acceptance는 미실시다.
+- `verify-model-render-wiring.ps1` 통과: 모델 14개의 generation corpus에 내장 texture mip
+  존재·mip/array subresource 폐포 단정을 추가해 실행했다. 8개 vertex mask·SU 84B/64/68,
+  typed upload 1/1·DX12/Vulkan pass 연결·Vulkan validation 0을 확인했다.
+- Editor 설정과 오류 주입 셰이더를 원본 bytes로 복원했다. 이번 변경 파일의
+  `git diff --check`와 dashboard JavaScript/활성 행·공수 합계 검사를 통과했다.
+  PHASE 4는 10행·18일·완료 8.5·기성 3.5·잔여 6, 통합은 54행·267.5일·잔여 251.5다.
+
+근거: `%TEMP%/creator-pbr-phase4/build-w7mip-coverage.log`, `build-w7mip-cooker-final.log`,
+`w7mip-fixed/`, `w7mip-coverage/`, `w7mip-negative.log`, `w7mip-baseline.log`,
+`w7mip-cook-all.log`, `w7mip-guid.log`(기존 정책 위반), `w7mip-model-wiring.log`,
+`w7mip-doc-check.log`, `%TEMP%/creator-pbr-9bf1769aa7b644338d9a712087f83678/`(전체 회귀).

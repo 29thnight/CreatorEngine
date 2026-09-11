@@ -14,6 +14,7 @@
 #include "FrameCameraSnapshot.h"
 #include "Mesh.h"
 #include "Texture.h"
+#include "DataSystem.h"
 #include "Experiment/Import/GltfImporter.h"
 #include "Experiment/Import/SceneToModelDraft.h"
 #include "Render/Scene/ExperimentMaterialSealing.h"
@@ -554,6 +555,186 @@ namespace
         }
     };
 
+    struct PbrMipFixture
+    {
+        static constexpr uint32_t kCases = 15; // five authored LODs + ten generated formats
+        std::array<std::shared_ptr<Texture>, 11> textures;
+        experiment::VertexBuffer vertices;
+        const std::array<uint32_t, 6> indices{0, 1, 2, 0, 2, 3};
+        static constexpr RHIFormat formats[] = {RHIFormat::RGBA8Unorm, RHIFormat::RGBA8UnormSrgb,
+            RHIFormat::BGRA8Unorm, RHIFormat::BGRA8UnormSrgb, RHIFormat::RGBA16Float,
+            RHIFormat::RGBA32Float, RHIFormat::BC1Unorm, RHIFormat::BC1UnormSrgb,
+            RHIFormat::BC3Unorm, RHIFormat::BC3UnormSrgb};
+        bool Initialize(std::string& error)
+        {
+            auto authored = TextureImage::Allocate(RHIFormat::RGBA32Float, 32, 32, 1, 6);
+            for (uint32_t mip = 0; mip < 6; ++mip)
+            {
+                const auto* sub = authored.Find(mip, 0);
+                auto* dst = reinterpret_cast<float*>(authored.MutablePixelsAt(*sub));
+                for (uint32_t p = 0; p < sub->width * sub->height; ++p)
+                { dst[p*4] = .125f * (mip+1); dst[p*4+1] = .25f; dst[p*4+2] = .5f; dst[p*4+3] = 1; }
+            }
+            textures[0] = Texture::CreateSharedFromImage("Mip.authored", std::move(authored));
+            if (Texture::WithMipChain(textures[0], error) != textures[0])
+            { error = "Authored mip owner replaced"; return false; }
+            for (uint32_t f = 0; f < std::size(formats); ++f)
+            {
+                auto image = TextureImage::Allocate(formats[f], 32, 32, 1, 1);
+                const auto* sub = image.Find(0, 0);
+                auto* dst = image.MutablePixelsAt(*sub);
+                if (f >= 6)
+                {
+                    // Red BC blocks, deliberately unusual duplicate endpoints.
+                    const uint8_t block[] = {255,255,0,0,0,0,0,0,0,248,0,248,0,0,0,0};
+                    for (size_t p = 0; p < sub->slicePitch; p += f < 8 ? 8 : 16)
+                        std::memcpy(dst+p, block+(f<8 ? 8 : 0), f<8 ? 8 : 16);
+                }
+                else for (uint32_t y = 0; y < 32; ++y)
+                for (uint32_t x = 0; x < 32; ++x)
+                {
+                    const uint32_t p = y*32+x; const bool white = (x+y)%2 != 0;
+                    if (f < 4)
+                    {
+                        const uint8_t pixel[] = {uint8_t(f>=2 ? 128 : white ? 255 : 0),64,
+                            uint8_t(f>=2 ? white ? 255 : 0 : 128),uint8_t(white ? 255 : 0)};
+                        std::memcpy(dst+p*4, pixel, 4);
+                    }
+                    else if (f == 4)
+                    {
+                        const uint16_t pixel[] = {uint16_t(white ? 0x4800 : 0),0x4000,uint16_t(white ? 0x4000 : 0),uint16_t(white ? 0x3c00 : 0)};
+                        std::memcpy(dst+p*8, pixel, 8); // half: (0/8, 2, 0/2, 0/1)
+                    }
+                    else
+                    {
+                        const float pixel[] = {white ? 8.f : 0.f,2.f,white ? 2.f : 0.f,white ? 1.f : 0.f};
+                        std::memcpy(dst+p*16, pixel, 16);
+                    }
+                }
+                auto source = Texture::CreateSharedFromImage("Mip.generated", std::move(image));
+                textures[f+1] = Texture::WithMipChain(source, error);
+                if (!textures[f+1]) return false;
+                const auto before = source->GetImageView(), after = textures[f+1]->GetImageView();
+                if (before.MipLevels() != 1 || after.MipLevels() != 6 || after.Format() != formats[f]
+                    || textures[f+1]->m_assetId == source->m_assetId
+                    || std::memcmp(before.At(0)->pixels, after.At(0)->pixels, before.At(0)->slicePitch)
+                    || Texture::WithMipChain(textures[f+1], error) != textures[f+1])
+                { error = "Mip base/format/owner preservation failed"; return false; }
+                const auto* last = after.Find(5, 0);
+                if (f < 4)
+                {
+                    const auto* p = reinterpret_cast<const uint8_t*>(last->pixels);
+                    const int mean = f%2 ? 188 : 128;
+                    if (std::abs(int(p[f>=2 ? 2 : 0])-mean) > 1 || p[1] != 64 || p[f>=2 ? 0 : 2]!=128 || std::abs(int(p[3])-128)>1)
+                    { error = "sRGB/data mip averaging or independent alpha failed"; return false; }
+                }
+                else if (f == 4)
+                {
+                    const uint16_t expected[] = {0x4400,0x4000,0x3c00,0x3800}; // 4,2,1,.5
+                    if (std::memcmp(last->pixels, expected, sizeof(expected)))
+                    { error = "Half HDR mip was clamped"; return false; }
+                }
+                else if (f == 5)
+                {
+                    const float expected[] = {4,2,1,.5f};
+                    if (std::memcmp(last->pixels, expected, sizeof(expected)))
+                    { error = "Float HDR mip was clamped"; return false; }
+                }
+            }
+            if (!vertices.SetLayout(assets::kCoreVertexAttributes)) return false;
+            for (uint32_t v = 0; v < 4; ++v)
+            {
+                experiment::Vertex vertex;
+                vertex.position = {v<2 ? -.75f : .75f,v==0 || v==3 ? -.75f : .75f,.5f};
+                vertex.normal = {0,0,1}; vertex.tangent = {1,0,0,1};
+                vertex.uv0 = {v<2 ? 0.f : 1.f,v==0 || v==3 ? 0.f : 1.f};
+                if (!vertices.Append(vertex)) return false;
+            }
+            return true;
+        }
+        bool Prepare(PbrAoFixture& fixture, uint32_t test,
+            std::vector<EnhancedDrawItem>& draws, std::string& error)
+        {
+            if (!fixture.Prepare(0, draws, error)) return false;
+            const auto texture = textures[test<5 ? 0 : test-4];
+            for (uint32_t band = 0; band < 3; ++band)
+            {
+                auto& draw = draws[band]; auto& view = draw.modelMeshView;
+                draw.geometryKey = 0x57574d49ull;
+                view.handle.modelId = Uuid::Parse("10000000-0000-8000-8000-000000000921");
+                view.handle.meshId = Uuid::Parse("10000000-0000-8000-8000-000000000922"); view.handle.generation = 1;
+                view.vertexData = vertices.Bytes().data(); view.vertexBytes = vertices.ByteSize();
+                view.vertexAttributeMask = vertices.AttributeMask(); view.vertexStride = vertices.Stride();
+                view.vertexLayoutHash = assets::VertexLayoutHash(view.vertexAttributeMask);
+                view.indexData = indices.data(); view.indexCount = indices.size();
+                draw.bonePalette = nullptr; draw.boneCount = 0; draw.animatorKey = 0;
+                ExperimentMaterialSealing::SealSource source;
+                source.material.properties = {{"baseColor",math::vector4{.25f,.5f,.75f,1}},
+                    {"metallic",.5f},{"roughness",.5f},{"emissive",math::vector3{.125f,.125f,.125f}}};
+                // Each band is 8 pixels wide, with a 32-texel image: LOD = 2 + log2(scale).
+                // A half-level offset on the middle band also checks trilinear sampling.
+                const float lod = test<5 ? float(test)+(band==1 ? .5f : 0.f) : 2.f;
+                for (const auto role : {"baseColorMap","ormMap","aoMap","emissiveMap"})
+                {
+                    experiment::TextureReference reference;
+                    reference.coordinates.scale = {std::exp2(lod-2.f),std::exp2(lod-2.f)};
+                    source.material.properties.push_back({role,reference});
+                    // HDR radiance is meaningful for emission; keep the other roles bounded.
+                    source.textures.push_back({role, test==9 || test==10
+                        ? (std::string_view(role)=="emissiveMap" ? texture : fixture.textures[0]) : texture});
+                }
+                source.textures.push_back({"aoDetailMap",fixture.textures[0]});
+                auto gb = std::make_shared<EnhancedMaterialDrawSnapshot>(*draw.materialSnapshot);
+                auto fw = std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*draw.forwardMaterialSnapshot);
+                const uint32_t first = band==1 ? 2 : 0;
+                const auto seal = [&](auto& packet,uint32_t route) {
+                    packet.useNormalMap = 0;
+                    return ExperimentMaterialSealing::SealCore(source,fixture.metas[route],*fixture.layouts[route],
+                        packet.propertyBytes,packet.textureBindings,error)
+                        && ExperimentMaterialSealing::SealCoverage(source,*fixture.layouts[route],
+                            packet.propertyBytes,packet.coverage,error) && packet.IsValid();
+                };
+                if (!seal(*gb,first) || !seal(*fw,first+1)) return false;
+                draw.materialSnapshot = gb; draw.forwardMaterialSnapshot = fw;
+            }
+            return true;
+        }
+        bool Check(uint32_t test, const std::array<RHIReadbackImage,6>& images, std::string& error) const
+        {
+            for (uint32_t y=8; y<24; ++y)
+            for (uint32_t x=8; x<24; ++x)
+            {
+                const bool middle = x>=12 && x<20;
+                float sampled[] = {.125f*(float(test)+1.f+(middle ? .5f : 0.f)),.25f,.5f};
+                if (test>=5 && test<=8)
+                {
+                    const bool srgb = test%2==0;
+                    const auto decode = [](float v) { return v<=.04045f ? v/12.92f : std::pow((v+.055f)/1.055f,2.4f); };
+                    sampled[0]=srgb ? decode(188.f/255.f) : 128.f/255.f;
+                    sampled[2]=srgb ? decode(128.f/255.f) : 128.f/255.f;
+                    sampled[1]=srgb ? decode(64.f/255.f) : 64.f/255.f;
+                }
+                const bool hdr = test==9 || test==10;
+                if (hdr) { sampled[0]=4; sampled[1]=2; sampled[2]=1; }
+                if (test>=11) { sampled[0]=1; sampled[1]=sampled[2]=0; }
+                const float factors[] = {.25f,.5f,.75f};
+                for (uint32_t c=0; c<3; ++c)
+                {
+                    const float expected[] = {(hdr ? 1.f : sampled[c])*(c==0 ? 1.f : .5f),
+                        sampled[c]*.125f,(hdr ? 1.f : sampled[c])*factors[c]};
+                    const uint32_t attachments[] = {2,3,5};
+                    for (uint32_t a=0; a<3; ++a)
+                        if (!std::isfinite(images[attachments[a]].At(x,y,c))
+                            || std::fabs(images[attachments[a]].At(x,y,c)-expected[a])>.003f)
+                        { error="Mip sample mismatch test="+std::to_string(test)+" attachment="+std::to_string(attachments[a])
+                            +" pixel="+std::to_string(x)+","+std::to_string(y)+" channel="+std::to_string(c)
+                            +" actual="+std::to_string(images[attachments[a]].At(x,y,c))+" expected="+std::to_string(expected[a]); return false; }
+                }
+            }
+            return true;
+        }
+    };
+
     // Compare actual pre-tone outputs with identical lighting. Semantic tests
     // additionally check attachment values against independent CPU expectations.
     template <typename TResources>
@@ -562,7 +743,7 @@ namespace
         IRenderTextureCache& textures, const std::function<void()>& beginCaches,
         PbrParityCapture& capture, std::string& error, uint32_t mode)
     {
-        const bool aoTest = mode == 1, emissionTest = mode == 2, transformTest = mode == 3, uvTest = mode == 4;
+        const bool aoTest = mode == 1, emissionTest = mode == 2, transformTest = mode == 3, uvTest = mode == 4, mipTest = mode == 5;
         std::array<std::unique_ptr<Mesh>, 2> quads;
         for (uint32_t variant = 0; variant < quads.size(); ++variant)
         {
@@ -612,6 +793,7 @@ namespace
         PbrEmissionFixture emission;
         PbrTransformFixture transform;
         PbrUvFixture uv;
+        PbrMipFixture mip;
         std::array<RHITextureHandle, 3> ibl{};
         bool frameOpen = false;
         const auto cleanup = [&] {
@@ -627,10 +809,11 @@ namespace
         if (!gbuffer.Initialize(context, error) || !deferred.Initialize(context, error)
             || !forward.Initialize(context, error)) return fail(error);
         forward.SetUseReferencePath(true);
-        if ((aoTest || emissionTest || uvTest) && !ao.Initialize(gbuffer, forward, context, error)) return fail(error);
+        if ((aoTest || emissionTest || uvTest || mipTest) && !ao.Initialize(gbuffer, forward, context, error)) return fail(error);
         if (emissionTest && !emission.Initialize(error)) return fail(error);
         if (transformTest && !transform.Initialize(error)) return fail(error);
         if (uvTest && !uv.Initialize(error)) return fail(error);
+        if (mipTest && !mip.Initialize(error)) return fail(error);
         for (auto& readback : readbacks)
             if (!resources.CreateReadback(kPbrSize, kPbrSize, RHIFormat::RGBA16Float,
                     1, readback, error)) return fail(error);
@@ -684,10 +867,10 @@ namespace
 
         constexpr float materials[6][2] = {
             {0.f, 0.f}, {0.f, 1.f}, {1.f, 0.f}, {1.f, 1.f}, {0.5f, 0.5f}, {0.5f, 0.5f} };
-        for (uint32_t lightCase = 0; lightCase < (transformTest || uvTest ? 2u : 6u); ++lightCase)
-        for (uint32_t material = 0; material < (uvTest ? PbrUvFixture::kCases : transformTest ? PbrTransformFixture::kCases : emissionTest ? 13u : aoTest ? 8u : 6u); ++material)
+        for (uint32_t lightCase = 0; lightCase < (transformTest || uvTest || mipTest ? 2u : 6u); ++lightCase)
+        for (uint32_t material = 0; material < (mipTest ? PbrMipFixture::kCases : uvTest ? PbrUvFixture::kCases : transformTest ? PbrTransformFixture::kCases : emissionTest ? 13u : aoTest ? 8u : 6u); ++material)
         {
-            const uint32_t lighting = transformTest || uvTest ? (lightCase == 0 ? 1u : 5u) : lightCase;
+            const uint32_t lighting = transformTest || uvTest || mipTest ? (lightCase == 0 ? 1u : 5u) : lightCase;
             // 0 unlit, 1 sun, 2 point, 3 spot, 4 IBL, 5 sun+IBL.
             lights.clear();
             if (lighting != 0 && lighting != 4)
@@ -704,7 +887,9 @@ namespace
             deferred.SetIBL(hasIbl ? ibl[0] : RHITextureHandle{}, ibl[1], 1, ibl[2]);
             forward.SetIBL(hasIbl ? ibl[0] : RHITextureHandle{}, ibl[1], 1, ibl[2]);
             draws[0].mesh = quads[mode == 0 && material == 5 ? 1 : 0].get();
-            if (uvTest)
+            if (mipTest)
+            { if (!mip.Prepare(ao, material, draws, error)) return fail(error); }
+            else if (uvTest)
             { if (!uv.Prepare(ao, material, draws, error)) return fail(error); }
             else if (emissionTest)
             {
@@ -767,6 +952,7 @@ namespace
             for (uint32_t i = 0; i < images.size(); ++i)
                 if (!resources.MapReadback(readbacks[i], images[i], error)) return fail(error);
             if (uvTest && !uv.Check(material, images, error)) return fail(error);
+            if (mipTest && !mip.Check(material, images, error)) return fail(error);
             if (transformTest)
             {
                 if (gbuffer.GetLastSkinnedCount() != (draws[0].boneCount ? 1u : 0u))
@@ -923,7 +1109,7 @@ static bool RunPbrMaterialTest(std::string& outLog, uint32_t mode)
         if (!captured || problems != 0 || stubs != 0)
         { outLog += "Vulkan: " + error + validation; return false; }
     }
-    const uint32_t expectedCases = mode == 4 ? PbrUvFixture::kCases * 2 : mode == 3 ? PbrTransformFixture::kCases * 2 : mode == 2 ? 78 : mode == 1 ? 48 : 36;
+    const uint32_t expectedCases = mode == 5 ? PbrMipFixture::kCases * 2 : mode == 4 ? PbrUvFixture::kCases * 2 : mode == 3 ? PbrTransformFixture::kCases * 2 : mode == 2 ? 78 : mode == 1 ? 48 : 36;
     if (captures[0].cases != expectedCases || captures[1].cases != expectedCases
         || captures[0].rgb.size() != captures[1].rgb.size()) return false;
     float maxBackendDelta = 0.f;
@@ -938,11 +1124,102 @@ static bool RunPbrMaterialTest(std::string& outLog, uint32_t mode)
     char line[320]{};
     std::snprintf(line, sizeof(line),
         "PBR %s: %u cases/backend, route max delta DX12=%g Vulkan=%g, backend=%g; validation=0\n",
-        mode == 4 ? "UV0/UV1 transforms, 5/8-slot tables" : mode == 3 ? "normal transform, typed static/skin" : mode == 2 ? "emission/color space/HDR" : mode == 1 ? "AO, 5/8-slot alternating tables" : "native Slang", expectedCases, captures[0].maxRouteDelta, captures[1].maxRouteDelta, maxBackendDelta);
+        mode == 5 ? "authored/generated mips, linear/sRGB/HDR/BC" : mode == 4 ? "UV0/UV1 transforms, 5/8-slot tables" : mode == 3 ? "normal transform, typed static/skin" : mode == 2 ? "emission/color space/HDR" : mode == 1 ? "AO, 5/8-slot alternating tables" : "native Slang", expectedCases, captures[0].maxRouteDelta, captures[1].maxRouteDelta, maxBackendDelta);
     outLog += line;
     return true;
 }
 
+
+namespace
+{
+    bool CheckPbrMipCpu(std::string& error)
+    {
+        struct Shape { uint32_t w,h,items,mips; bool cube; };
+        for (const auto shape : {Shape{7,3,2,1,false},Shape{1,8,1,1,false},Shape{4,4,6,1,true},
+                Shape{1,1,1,1,false},Shape{8,8,1,2,false}})
+        {
+            auto image=TextureImage::Allocate(RHIFormat::RGBA8Unorm,shape.w,shape.h,shape.items,shape.mips,shape.cube);
+            for (uint32_t item=0; item<shape.items; ++item)
+            for (uint32_t mip=0; mip<shape.mips; ++mip)
+            {
+                const auto* sub=image.Find(mip,item);
+                std::memset(image.MutablePixelsAt(*sub),32+item*32+mip,sub->slicePitch);
+            }
+            auto source=Texture::CreateSharedFromImage("Mip.shape",std::move(image));
+            auto result=Texture::WithMipChain(source,error);
+            if (!result) return false;
+            const auto view=result->GetImageView();
+            uint32_t levels=1;
+            for (uint32_t size=(std::max)(shape.w,shape.h); size>1; size>>=1) ++levels;
+            if (shape.mips>1) levels=shape.mips;
+            if (view.MipLevels()!=levels || view.ArraySize()!=shape.items || view.IsCube()!=shape.cube
+                || view.SubresourceCount()!=levels*shape.items
+                || ((shape.mips>1 || levels==1) && result!=source))
+            { error="NPOT/array/cube/partial mip shape failed"; return false; }
+            for (uint32_t item=0; item<shape.items; ++item)
+            {
+                const auto* last=view.Find(levels-1,item);
+                const auto value=uint8_t(last->pixels[0]);
+                if (value!=32+item*32+(shape.mips>1 ? levels-1 : 0))
+                { error="Mip array item order/pixels changed"; return false; }
+            }
+        }
+        if (Texture::WithMipChain({},error) || error.empty()) return false;
+        const uint32_t unsupportedPixels[4]{};
+        auto unsupported=std::shared_ptr<Texture>(Texture::CreateFromPixels(2,2,"Mip.invalid",
+            RHIFormat::R32Uint,unsupportedPixels,8));
+        if (!unsupported || Texture::WithMipChain(unsupported,error) || error.empty()) return false;
+        error.clear();
+
+        // Exercise the real source/cooked-path cache after semantic color-space
+        // selection. Identical files in different directories must retain distinct owners.
+        struct Files
+        {
+            std::filesystem::path root=std::filesystem::temp_directory_path()/
+                ("Creator.PbrMip."+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+            ~Files() { std::error_code ignored; std::filesystem::remove_all(root,ignored); }
+        } files;
+        std::vector<uint8_t> tga(18+8*8*4);
+        tga[2]=2; tga[12]=8; tga[14]=8; tga[16]=32; tga[17]=0x28;
+        for (uint32_t y=0; y<8; ++y)
+        for (uint32_t x=0; x<8; ++x)
+        {
+            const uint8_t pixel[]={uint8_t((x+y)%2 ? 255 : 0),64,uint8_t((x+y)%2 ? 255 : 0),255};
+            std::memcpy(tga.data()+18+(y*8+x)*4,pixel,4);
+        }
+        std::shared_ptr<Texture> previous;
+        for (const auto folder : {"source","Derived"})
+        {
+            const auto path=files.root/folder/"same.tga";
+            std::filesystem::create_directories(path.parent_path());
+            std::ofstream out(path,std::ios::binary);
+            out.write(reinterpret_cast<const char*>(tga.data()),tga.size()); out.close();
+            if (!out) { error="Mip fixture write failed"; return false; }
+            auto color=DataSystems->LoadSharedMaterialTexture(path.string(),false,true);
+            auto data=DataSystems->LoadSharedMaterialTexture(path.string(),false,false);
+            if (!color || !data || color==data || color==previous
+                || color!=DataSystems->LoadSharedMaterialTexture(path.string(),false,true)
+                || data!=DataSystems->LoadSharedMaterialTexture(path.string(),false,false))
+            { error="Material mip cache reuse/isolation failed"; return false; }
+            const auto c=color->GetImageView(), d=data->GetImageView();
+            if (c.MipLevels()!=4 || d.MipLevels()!=4 || c.Format()!=RHIFormat::RGBA8UnormSrgb
+                || d.Format()!=RHIFormat::RGBA8Unorm
+                || std::abs(int(uint8_t(c.Find(3,0)->pixels[0]))-188)>1
+                || std::abs(int(uint8_t(d.Find(3,0)->pixels[0]))-128)>1)
+            { error="Material path mip generation ran before color-space selection"; return false; }
+            previous=color;
+        }
+        return true;
+    }
+}
+
+bool RunPbrMipTest(std::string& outLog)
+{
+    std::string error;
+    if (!CheckPbrMipCpu(error)) { outLog+=error; return false; }
+    outLog+="Mip CPU shapes/authored preservation/cache isolation PASS\n";
+    return RunPbrMaterialTest(outLog,5);
+}
 
 bool RunPbrShaderParityTest(std::string& outLog) { return RunPbrMaterialTest(outLog, 0); }
 bool RunPbrOcclusionTest(std::string& outLog) { return RunPbrMaterialTest(outLog, 1); }
@@ -971,7 +1248,7 @@ namespace
         using Coverage = EnhancedMaterialCoverage;
         constexpr uint32_t opaque = Coverage::Enabled | Coverage::DoubleSided;
         constexpr uint32_t masked = opaque | Coverage::Masked;
-        struct Case { uint32_t flags; float alpha, cutoff; bool holes, back; float visible; };
+        struct Case { uint32_t flags; float alpha, cutoff; bool holes, back; float visible; bool minified{}; };
         const Case cases[] = {
             {opaque, 0.f, .5f, false, false, 1.f},
             {masked, .49f, .5f, false, false, 0.f},
@@ -983,12 +1260,14 @@ namespace
             {opaque, 1.f, .5f, false, true, 1.f},
             {opaque | Coverage::Blended, .25f, .5f, false, false, 1.f},
             {masked, 0.f, 0.f, false, false, 1.f},
+            {masked, 1.f, .6f, true, false, 0.f, true},
+            {masked, 1.f, .4f, true, false, 1.f, true},
         };
-        std::array<std::unique_ptr<Mesh>, 2> quads;
-        std::array<experiment::VertexBuffer, 2> uvMeshes;
+        std::array<std::unique_ptr<Mesh>, 3> quads;
+        std::array<experiment::VertexBuffer, 3> uvMeshes;
         const std::array<std::array<uint32_t, 6>, 2> uvIndices{{{0,1,2,0,2,3}, {0,2,1,0,3,2}}};
         const assets::TextureCoordinates maskUv{1, {.25f, .1f}, {.5f, .75f}};
-        for (uint32_t back = 0; back < 2; ++back)
+        for (uint32_t back = 0; back < quads.size(); ++back)
         {
             std::vector<Vertex> vertices(4);
             if (!uvMeshes[back].SetLayout(assets::kCoreVertexAttributes | assets::kSkinVertexAttributes
@@ -999,7 +1278,7 @@ namespace
             const math::vector2 uv[] = {{0, 1}, {0, 0}, {1, 0}, {1, 1}};
             for (uint32_t i = 0; i < 4; ++i)
             {
-                vertices[i].position = positions[i]; vertices[i].uv0 = uv[i];
+                vertices[i].position = positions[i]; vertices[i].uv0 = uv[i] * (back==2 ? 4096.f : 1.f);
                 vertices[i].normal = {0, 0, 1}; vertices[i].tangent = {1, 0, 0};
                 vertices[i].bitangent = {0, 1, 0};
                 vertices[i].boneIndices = {0, 0, 0, 0};
@@ -1008,11 +1287,11 @@ namespace
                 typed.position = positions[i]; typed.normal = {0,0,1}; typed.tangent = {1,0,0,1};
                 typed.uv0 = {.125f, .125f}; // Poison UV0; only transformed UV1 reconstructs the mask.
                 typed.boneIndices = {0,0,0,0}; typed.boneWeights = {1,0,0,0};
-                const math::vector2 uv1{(uv[i].x - .25f) / .5f, (uv[i].y - .1f) / .75f};
+                const math::vector2 uv1{(vertices[i].uv0.x - .25f) / .5f, (vertices[i].uv0.y - .1f) / .75f};
                 if (!uvMeshes[back].Append(typed, &uv1)) return false;
             }
             quads[back] = std::make_unique<Mesh>("PbrCoverage." + std::to_string(back),
-                std::move(vertices), back ? std::vector<uint32>{0, 2, 1, 0, 3, 2}
+                std::move(vertices), back==1 ? std::vector<uint32>{0, 2, 1, 0, 3, 2}
                     : std::vector<uint32>{0, 1, 2, 0, 2, 3});
         }
         std::array<uint8_t, 8 * 8 * 4> pixels;
@@ -1021,6 +1300,8 @@ namespace
             for (uint32_t x = 0; x < 4; ++x) pixels[(y * 8 + x) * 4 + 3] = 0;
         std::shared_ptr<Texture> holes(Texture::CreateFromPixels(8, 8, "PbrCoverage.Holes",
             RHIFormat::RGBA8Unorm, pixels.data(), 8 * 4));
+        auto minifiedHoles = Texture::WithMipChain(holes, error);
+        if (!minifiedHoles || minifiedHoles->GetImageView().MipLevels()!=4) return false;
         const uint8_t whitePixel[] = {255, 255, 255, 255};
         std::shared_ptr<Texture> white(Texture::CreateFromPixels(1, 1, "PbrCoverage.Emission",
             RHIFormat::RGBA8Unorm, whitePixel, 4));
@@ -1092,11 +1373,11 @@ namespace
             const auto& test = cases[index];
             const bool blend = 0 != (test.flags & Coverage::Blended);
             auto& draw = draws[0];
-            draw.mesh = quads[test.back ? 1 : 0].get();
+            draw.mesh = quads[test.minified ? 2 : test.back ? 1 : 0].get();
             draw.worldMatrix = math::matrix4x4::identity();
             draw.baseColorFactor = math::color(1, 1, 1, test.alpha);
             draw.coverage = {test.flags, test.cutoff, test.alpha};
-            draw.baseColor = test.holes ? holes.get() : nullptr;
+            draw.baseColor = test.holes ? (test.minified ? minifiedHoles : holes).get() : nullptr;
             draw.emissive = white.get();
             draw.bonePalette = skin ? &bone : nullptr;
             draw.animatorKey = skin ? 123 : 0; draw.boneCount = skin;
@@ -1104,7 +1385,7 @@ namespace
             draw.modelMeshView = {}; draw.geometryKey = 0;
             if (owned)
             {
-                const uint32_t back = test.back ? 1 : 0;
+                const uint32_t back = test.minified ? 2 : test.back ? 1 : 0;
                 const auto& mesh = uvMeshes[back];
                 auto& view = draw.modelMeshView;
                 view.handle.modelId = Uuid::Parse("10000000-0000-8000-8000-000000000927");
@@ -1113,7 +1394,7 @@ namespace
                 view.vertexData = mesh.Bytes().data(); view.vertexBytes = mesh.ByteSize();
                 view.vertexAttributeMask = mesh.AttributeMask(); view.vertexStride = mesh.Stride();
                 view.vertexLayoutHash = assets::VertexLayoutHash(mesh.AttributeMask());
-                view.indexData = uvIndices[back].data(); view.indexCount = 6;
+                view.indexData = uvIndices[test.back ? 1 : 0].data(); view.indexCount = 6;
                 draw.geometryKey = 0x57570100ull + back;
                 ExperimentMaterialSealing::SealSource source;
                 source.material.blendMode = blend ? experiment::MaterialBlendMode::Transparent
@@ -1124,7 +1405,7 @@ namespace
                     {"doubleSided", bool(test.flags & Coverage::DoubleSided)}};
                 experiment::TextureReference maskReference; maskReference.coordinates = maskUv;
                 source.material.properties.push_back({"baseColorMap", maskReference});
-                source.textures = {{"baseColorMap", test.holes ? holes : nullptr}, {"emissiveMap", white}};
+                source.textures = {{"baseColorMap", test.holes ? (test.minified ? minifiedHoles : holes) : nullptr}, {"emissiveMap", white}};
                 auto gbPacket = std::make_shared<EnhancedMaterialDrawSnapshot>();
                 auto fwPacket = std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
                 const auto seal = [&](auto& packet, uint32_t route) {
@@ -1264,7 +1545,7 @@ bool RunPbrCoverageTest(std::string& outLog)
         if (!captured || problems != 0 || stubs != 0)
         { outLog += "Vulkan: " + error + validation; return false; }
     }
-    if (captures[0].cases != 40 || captures[1].cases != 40
+    if (captures[0].cases != 48 || captures[1].cases != 48
         || captures[0].rgb.size() != captures[1].rgb.size()) return false;
     float maxBackendDelta = 0.f;
     for (std::size_t i = 0; i < captures[0].rgb.size(); ++i)
@@ -1277,7 +1558,7 @@ bool RunPbrCoverageTest(std::string& outLog)
     }
     char line[320]{};
     std::snprintf(line, sizeof(line),
-        "PBR coverage: 40 cases/backend (legacy/owned, static/skin), expected max error DX12=%g Vulkan=%g, backend=%g; validation=0\n",
+        "PBR coverage: 48 cases/backend (legacy/owned, static/skin, minified MASK), expected max error DX12=%g Vulkan=%g, backend=%g; validation=0\n",
         captures[0].maxRouteDelta, captures[1].maxRouteDelta, maxBackendDelta);
     outLog += line;
     return true;
