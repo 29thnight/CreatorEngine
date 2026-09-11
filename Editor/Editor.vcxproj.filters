@@ -10,6 +10,9 @@
     <Filter Include="EditorMenu">
       <UniqueIdentifier>{3108037e-6e41-505a-b509-fe59ed743d0c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="EditorMenu\Menus">
+      <UniqueIdentifier>{b5a91f04-21d5-4d7e-9a6c-2f1b84c7e301}</UniqueIdentifier>
+    </Filter>
     <Filter Include="EditorRender">
       <UniqueIdentifier>{0716e95a-74d8-595f-9a85-4b234424d045}</UniqueIdentifier>
     </Filter>
@@ -180,6 +183,18 @@
     <ClInclude Include="EditorMenu\EditorMenuSelfTest.h">
       <Filter>EditorMenu</Filter>
     </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuDraw.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuAudit.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuTargets.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\Menus\EditorCoreMenus.h">
+      <Filter>EditorMenu\Menus</Filter>
+    </ClInclude>
     <ClInclude Include="EditorMenu\RegisterEditorMenuManual.h">
       <Filter>EditorMenu</Filter>
     </ClInclude>
@@ -224,6 +239,18 @@
     </ClCompile>
     <ClCompile Include="EditorMenu\EditorMenuSelfTest.cpp">
       <Filter>EditorMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuDraw.cpp">
+      <Filter>EditorMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuAudit.cpp">
+      <Filter>EditorMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuTargets.cpp">
+      <Filter>EditorMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\Menus\EditorCoreMenus.cpp">
+      <Filter>EditorMenu\Menus</Filter>
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorWindowRegistry.cpp">
       <Filter>EditorWindow</Filter>

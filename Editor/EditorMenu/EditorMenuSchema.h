@@ -224,9 +224,6 @@ namespace editor
     template<auto Fn> consteval auto in_inspector_component(std::string_view p)
     { return detail::make_popup_menu_item<popup_host::inspector_component, Fn>(p); }
 
-    template<auto Fn> consteval auto in_scene_view(std::string_view p)
-    { return detail::make_popup_menu_item<popup_host::scene_view, Fn>(p); }
-
     template<auto Fn> consteval auto in_behavior_tree_node(std::string_view p)
     { return detail::make_popup_menu_item<popup_host::behavior_tree_node, Fn>(p); }
 

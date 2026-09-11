@@ -3,6 +3,8 @@
 #include "HierarchyWindow.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
+#include "EditorMenuDraw.h"
+#include "EditorMenuTargets.h"
 #include "ReflectionUndo.h"
 #include "SpriteRenderer.h"
 #include "RenderScene.h"
@@ -185,6 +187,19 @@ HierarchyWindow::HierarchyWindow()
 
 						}
 						ImGui::EndMenu();
+					}
+
+					// 선언된 Hierarchy 팝업 항목(PHASE 21 M1). 문맥은 선택 엔티티의 신원이다.
+					// 항목 0 이면 구분선조차 넣지 않는다(A.6) — 그래서 배선 착지만으로는 이
+					// 팝업의 픽셀이 달라지지 않는다.
+					if (::editor::popup_host_has_items(::editor::popup_host::hierarchy))
+					{
+						if (const std::optional<::editor::entity_target> target =
+							::editor::targets::selected_entity())
+						{
+							ImGui::Separator();
+							::editor::draw_popup_menu_items<::editor::popup_host::hierarchy>(*target);
+						}
 					}
 					ImGui::EndPopup();
 				}

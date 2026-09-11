@@ -30,6 +30,8 @@
 #include "Windows/EditorAnimatorWindows.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
+#include "EditorMenuDraw.h"
+#include "EditorMenuTargets.h"
 #include "Scene.h"
 #include "SceneManager.h"
 
@@ -549,6 +551,19 @@ if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animat
 					GetControllerNodeEditor(controller)->seletedCurNodeIndex = -1;
 				}
 				ClickNodeIndex = -1;
+			}
+
+			// 선언된 애니메이터 노드 항목(PHASE 21 M1). 문맥은 컨트롤러를 가진
+			// 엔티티의 신원이다 — 상태 노드 자체는 신원이 없고, CLI 도
+			// 애니메이터를 소유 엔티티로 가리킨다. 항목 0 이면 구분선도 없다(A.6).
+			if (::editor::popup_host_has_items(::editor::popup_host::animator_node))
+			{
+				if (const std::optional<::editor::entity_target> owner =
+					::editor::targets::selected_entity())
+				{
+					ImGui::Separator();
+					::editor::draw_popup_menu_items<::editor::popup_host::animator_node>(*owner);
+				}
 			}
 			ImGui::EndPopup();
 		}

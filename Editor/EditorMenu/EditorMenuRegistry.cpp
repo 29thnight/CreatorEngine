@@ -43,6 +43,37 @@ namespace editor
             static std::array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)> storage;
             return storage;
         }
+
+        // ── 치워 두는 자리 ────────────────────────────────────────────────
+        //
+        // 자가 검사가 살아 있는 에디터에서 돌기 위한 장치다(헤더의 stash 주석).
+        // 제품 표와 **같은 모양**으로 하나 더 두고 통째로 맞바꾼다 — 복사가 아니라
+        // swap 이라 항목 수에 무관하게 싸고, 되돌릴 때 원본이 그대로 돌아온다.
+
+        std::array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)>& top_stash()
+        {
+            static std::array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)> storage;
+            return storage;
+        }
+
+        template<popup_host Host>
+        std::vector<menu_entry<popup_context_t<Host>>>& popup_stash()
+        {
+            static std::vector<menu_entry<popup_context_t<Host>>> storage;
+            return storage;
+        }
+
+        bool g_stashed = false;
+
+        void swap_registry_with_stash()
+        {
+            top_storage().swap(top_stash());
+            for_each_popup_host(
+                []<popup_host Host>()
+                {
+                    popup_menu_entries<Host>().swap(popup_stash<Host>());
+                });
+        }
     }
 
     top_menu_storage& top_menu_entries(top_menu_root root)
@@ -81,6 +112,34 @@ namespace editor
             });
 
         return stats;
+    }
+
+    bool stash_menu_registry()
+    {
+        if (g_stashed) return false;
+
+        // 치우는 자리를 먼저 비운다 — 맞바꾼 뒤 제품 표가 **빈 표**가 되어야 한다.
+        for (top_menu_storage& one : top_stash())
+        {
+            one.global_items.clear();
+            one.selection_items.clear();
+        }
+        for_each_popup_host([]<popup_host Host>() { popup_stash<Host>().clear(); });
+
+        swap_registry_with_stash();
+        g_stashed = true;
+        return true;
+    }
+
+    bool unstash_menu_registry()
+    {
+        if (!g_stashed) return false;
+
+        // 합성 선언이 남아 있을 수 있으니 먼저 비우고 맞바꾼다.
+        clear_menu_registry();
+        swap_registry_with_stash();
+        g_stashed = false;
+        return true;
     }
 
     void clear_menu_registry()

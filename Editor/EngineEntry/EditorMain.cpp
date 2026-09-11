@@ -24,6 +24,7 @@
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
 #include "RegisterEditorWindowManual.h"
+#include "RegisterEditorMenuManual.h"
 #include "EditorModelPlacement.h"
 #include "EditorSceneOverlayContributor.h"
 #include "EditorWindowChrome.h"
@@ -178,6 +179,12 @@ void Editor::EditorMain::Initialize()
 	// 걸면서 open_window/close_window 로 초기 표시 상태를 정하는데,
 	// 그때 표에 항목이 있어야 그 호출이 닿는다.
 	::editor::register_editor_windows();
+
+	// PHASE 21 M1: 메뉴 표도 여기서 선다. 창 표보다 뒤여도 되는 까닭은 메뉴
+	// 동작이 창을 여는 것이 아니라 명령을 넘기거나 클립보드를 만지기 때문이고,
+	// 그리는 자리는 어차피 첫 프레임부터다. 자가 검사는 더 이상 이 호출보다
+	// 먼저일 필요가 없다 — 제품 표를 옆으로 치우고 돌게 고쳤다(M1).
+	::editor::register_editor_menus();
 
 	m_menuBarWindow = std::make_unique<MenuBarWindow>();
 	m_gameViewWindow = std::make_unique<GameViewWindow>();

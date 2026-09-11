@@ -1,6 +1,18 @@
-// 에디터 메뉴 배선 자가 검사 (PHASE 21 M0).
+// 에디터 메뉴 배선 자가 검사 (PHASE 21 M0 · M1에서 살아 있는 에디터용으로 고침).
 //
 // 이 TU도 유니티에서 뺀다 — EditorMenuRegistry.cpp와 같은 이유.
+//
+// ── 제품 표를 옆으로 치우고 돈다 ──────────────────────────────────────────
+//
+// M0은 "표가 비어 있을 때만" 돌았다. 합성 선언이 "tools 뿌리에 항목 1개"를
+// 단정하므로 제품 등록이 끝난 뒤에는 성립하지 않기 때문이다. 그런데 그 말은
+// **부팅 전 한순간에만** 돌 수 있다는 뜻이고, 곧 도는 회귀 세트에 넣을 수 없다는
+// 뜻이었다 — 이 저장소가 "게이트가 도는 세트에 없으면 없는 것"으로 두 번 데었다.
+//
+// M0의 착지 기록은 이 조건을 M1에 넘겼고, M1이 EDITOR_MENU_LIST를 채우는 순간
+// 전제가 깨질 것이라고 미리 적어 두었다. 그대로 됐다. 그래서 여기서 제품 표를
+// 치우고(stash) 합성 선언 위에서 돌고 되돌린다 — 창 쪽 자가 검사가 M4 4단계에서
+// 쓴 것과 같은 장치다. **조기 반환 경로에도 되돌리기가 달려 있어야 한다.**
 
 #include "EditorMenuSelfTest.h"
 
@@ -77,12 +89,20 @@ namespace editor
     {
         report.clear();
 
+        // 제품 표를 옆으로 치운다. 겹쳐 치우는 것은 결함이므로 그대로 실패로 낸다.
+        if (!stash_menu_registry())
+        {
+            report = "표를 치울 수 없다 — 이미 치워져 있다(자가 검사가 겹쳐 돈다)";
+            return false;
+        }
+
         const menu_registry_stats before = collect_menu_registry_stats();
         if (before.top_menu_items != 0 || before.popup_items != 0)
         {
-            report = "표가 비어 있지 않다 — 자가 검사는 제품 등록보다 먼저 돌아야 한다 "
+            report = "치운 뒤에도 표가 비어 있지 않다 "
                      "(top=" + std::to_string(before.top_menu_items) +
                      " popup=" + std::to_string(before.popup_items) + ")";
+            unstash_menu_registry();
             return false;
         }
 
@@ -114,7 +134,7 @@ namespace editor
 
         if (!report.empty())
         {
-            clear_menu_registry();
+            unstash_menu_registry();
             return false;
         }
 
@@ -202,6 +222,13 @@ namespace editor
         if (after.top_menu_items != 0 || after.popup_items != 0)
         {
             fail(report, "clear_menu_registry가 표를 비우지 않았다");
+        }
+
+        // ⑥ 되돌리기. 이것이 실패하면 제품 메뉴가 사라진 채 에디터가 돈다 —
+        //    자가 검사가 제품을 망가뜨리는 것이라 반드시 판정에 넣는다.
+        if (!unstash_menu_registry())
+        {
+            fail(report, "치워 둔 제품 표를 되돌리지 못했다");
         }
 
         return report.empty();

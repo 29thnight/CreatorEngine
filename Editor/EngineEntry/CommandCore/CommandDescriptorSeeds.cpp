@@ -93,6 +93,7 @@ namespace CommandCore
             { "dx12.sss", CommandCost::Frames, "", "SSS 패스 검증(번짐·축 분리·표면 추종·에너지)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "dx12.ui", CommandCost::Frames, "", "DX12 UI 패스를 리드백으로 판정한다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "dx12.wireframe", CommandCost::Frames, "", "와이어프레임 패스 검증(변·내부 비채움·인스턴싱·메시 캐시)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "editor.menu", CommandCost::Immediate, "", "선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.selftest", CommandCost::Immediate, "", "editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.windows", CommandCost::Immediate, "", "선언된 에디터 창 표를 TSV로 내고 배선 고아를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "experiment.animevent", CommandCost::Frames, "seed|verify", "애니메이션 이벤트·루프 오버라이드의 소유 이관을 판정한다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

@@ -71,6 +71,10 @@
     <ClInclude Include="EditorMenu\EditorMenuSchema.h" />
     <ClInclude Include="EditorMenu\EditorMenuRegistry.h" />
     <ClInclude Include="EditorMenu\EditorMenuSelfTest.h" />
+    <ClInclude Include="EditorMenu\EditorMenuDraw.h" />
+    <ClInclude Include="EditorMenu\EditorMenuAudit.h" />
+    <ClInclude Include="EditorMenu\EditorMenuTargets.h" />
+    <ClInclude Include="EditorMenu\Menus\EditorCoreMenus.h" />
     <ClInclude Include="EditorMenu\RegisterEditorMenuManual.h" />
     <ClInclude Include="EditorWindow\EditorWindowSurface.h" />
     <ClInclude Include="EditorWindow\EditorWindowSchema.h" />
@@ -183,6 +187,18 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EditorMenu\EditorMenuSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuDraw.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuAudit.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuTargets.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\Menus\EditorCoreMenus.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <!-- PHASE 21 M4(부록 B): 창 선언 배선.

@@ -48,13 +48,23 @@ namespace editor
     };
 
     // 팝업 호스트 = 팝업을 그리는 자리. 하나가 draw 지점 하나에 대응한다.
+    //
+    // ★ M1 에서 `scene_view` 를 뺐다. 계약(A.3)은 씬 뷰 팝업을 예정했는데, 배선하러
+    //   가 보니 **그 자리가 없다.** 씬 뷰의 오른쪽 버튼은 카메라 시점 조작이다
+    //   (`SceneViewWindow.cpp` 의 `IsMouseDown(Right)` → `EditorCameraRig::HandleMovement`,
+    //   같은 버튼이 기즈모 단축키를 막는 변별자로도 쓰인다). 오른쪽 클릭 컨텍스트
+    //   메뉴를 끼우면 카메라 조작과 다툰다.
+    //
+    //   게이트를 통과시키려고 UI 를 새로 만드는 것은 순서가 거꾸로다 — 열거자가
+    //   먼저 있고 자리를 짜 맞추는 것이 아니라, 자리가 있어서 열거자가 있는 것이다.
+    //   씬 뷰 컨텍스트 메뉴가 필요해지면 그것은 ViewportHost(W4·W5)가 입력 소유권을
+    //   정리하며 할 결정이고, 그때 열거자 한 줄과 그리는 자리 한 곳을 더하면 된다.
     enum class popup_host
     {
         hierarchy,
         content_browser_folder,
         content_browser_asset,
         inspector_component,
-        scene_view,
         behavior_tree_node,
         animator_node,
 
@@ -75,7 +85,6 @@ namespace editor
         popup_host::content_browser_folder,
         popup_host::content_browser_asset,
         popup_host::inspector_component,
-        popup_host::scene_view,
         popup_host::behavior_tree_node,
         popup_host::animator_node,
     };
@@ -109,7 +118,6 @@ namespace editor
         case popup_host::content_browser_folder: return "content_browser_folder";
         case popup_host::content_browser_asset:  return "content_browser_asset";
         case popup_host::inspector_component:    return "inspector_component";
-        case popup_host::scene_view:             return "scene_view";
         case popup_host::behavior_tree_node:     return "behavior_tree_node";
         case popup_host::animator_node:          return "animator_node";
         default:                                 return "?";
@@ -177,7 +185,6 @@ namespace editor
     template<> struct popup_context<popup_host::content_browser_folder> { using type = folder_target; };
     template<> struct popup_context<popup_host::content_browser_asset>  { using type = asset_target; };
     template<> struct popup_context<popup_host::inspector_component>    { using type = component_target; };
-    template<> struct popup_context<popup_host::scene_view>             { using type = entity_target; };
     template<> struct popup_context<popup_host::behavior_tree_node>     { using type = entity_target; };
     template<> struct popup_context<popup_host::animator_node>          { using type = entity_target; };
 

@@ -25,6 +25,10 @@
 #include "EditorWindowAudit.h"
 #include "EditorWindowSelfTest.h"
 #include "EditorMenuSelfTest.h"
+#include "EditorMenuAudit.h"
+
+#include <span>
+#include "RegisterEditorMenuManual.h"
 #include "CommandSupport.h"
 
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
@@ -823,6 +827,47 @@ namespace ConsoleCmd
         return Ok("창 " + std::to_string(audit.declared) + "개 배선 이상 없음", std::move(data));
     }
 
+    // 계획서 부록 A.5 가 요구한 `editor.menu` 덤프다. `editor.windows` 와 같은
+    // 모양이다 — TSV 뒤에 감사 요약, 더러우면 실패. 관측만 하고 판정하지 않으면
+    // 도는 세트에 넣어도 초록만 쌓인다.
+    //
+    // 기대 선언자 이름은 중앙 목록이 내놓는 배열에서 온다(EDITOR_MENU_LIST 를
+    // 두 번째로 소비한 것). 등록과 감사가 같은 출처를 쓰므로 이름이 두 벌이 되지
+    // 않는다.
+    static CommandCore::CommandResult Cmd_editor_menu(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+
+        const std::span<const std::string_view> expected{
+            ::editor::editor_menu_declarer_names.data(),
+            ::editor::editor_menu_declarer_names.size() };
+
+        const std::string table = ::editor::dump_menu_table();
+        const ::editor::menu_audit audit = ::editor::audit_declared_menus(expected);
+        const std::string summary = ::editor::dump_menu_audit(expected);
+
+        std::printf("%s%s", table.c_str(), summary.c_str());
+
+        auto data = CommandData::Object();
+        data.Set("topItems", CommandData::Int(static_cast<int>(audit.top_items)));
+        data.Set("popupItems", CommandData::Int(static_cast<int>(audit.popup_items)));
+        data.Set("declarersSeen", CommandData::Int(static_cast<int>(audit.declarers_seen)));
+        data.Set("declarersExpected", CommandData::Int(static_cast<int>(audit.declarers_expected)));
+        data.Set("pathConflicts", CommandData::Int(static_cast<int>(audit.path_conflicts.size())));
+        data.Set("unnamedItems", CommandData::Int(static_cast<int>(audit.unnamed_items.size())));
+        data.Set("silentDeclarers", CommandData::Int(static_cast<int>(audit.silent_declarers.size())));
+        data.Set("clean", CommandData::Bool(audit.clean()));
+
+        if (!audit.clean())
+        {
+            return Fail("editor.menu.dirty", "메뉴 배선 감사 실패: " + summary, std::move(data));
+        }
+        return Ok("메뉴 항목 " + std::to_string(audit.top_items + audit.popup_items) +
+            "개 배선 이상 없음", std::move(data));
+    }
+
+
     // 선언 배선 자가 검사 둘을 한 번에 돈다. 둘 다 자기 표를 옆으로 치우고
     // 합성 선언 위에서 돌므로 살아 있는 에디터에서 불러도 된다.
     static CommandCore::CommandResult Cmd_editor_selftest(const ConsoleCommandContext& ctx)
@@ -874,6 +919,7 @@ namespace ConsoleCmd
         reg.Result({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
         reg.Result({ "lifecycle.stress" }, &Cmd_lifecycle_stress);
         reg.Result({ "log.flush" }, &Cmd_log_flush);
+        reg.Result({ "editor.menu" }, &Cmd_editor_menu);
         reg.Result({ "editor.windows" }, &Cmd_editor_windows);
         reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);
     }

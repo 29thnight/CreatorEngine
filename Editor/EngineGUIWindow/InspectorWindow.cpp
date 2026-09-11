@@ -2,6 +2,7 @@
 #include "InspectorWindow.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
+#include "EditorMenuDraw.h"
 #include "EditorObjectOperations.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
@@ -472,6 +473,21 @@ InspectorWindow::InspectorWindow()
 					}
 					ImGui::CloseCurrentPopup();
 					selectedComponent = nullptr;
+				}
+
+				// 선언된 컴포넌트 팝업 항목(PHASE 21 M1). 문맥은 (엔티티 신원, 컴포넌트
+				// 선택자) 둘이다. 선택자는 위 Remove Component 가 쓰는 것과 **같은** 형태인
+				// "#<instanceID>" 다 — CLI 가 컴포넌트를 가리킬 때 쓰는 그 표기여서, 복사한
+				// 값을 그대로 명령에 붙일 수 있다. 항목 0 이면 구분선조차 넣지 않는다(A.6).
+				if (::editor::popup_host_has_items(::editor::popup_host::inspector_component) &&
+					nullptr != selectedComponent && nullptr != selectedSceneObject)
+				{
+					ImGui::Separator();
+					::editor::draw_popup_menu_items<::editor::popup_host::inspector_component>(
+						::editor::component_target{
+							EditorObjectOperations::ObjectId(
+								selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index)),
+							"#" + std::to_string(selectedComponent->GetInstanceID()) });
 				}
 				ImGui::EndPopup();
 			}

@@ -123,7 +123,7 @@
       <PreprocessorDefinitions>_DEBUG;EDITOR;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Editor\EditorWindow\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\SceneRuntime\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Editor\EditorWindow\;$(SolutionDir)Editor\EditorMenu\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\SceneRuntime\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
@@ -153,7 +153,7 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
       <PreprocessorDefinitions>NDEBUG;GAME;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Editor\EditorWindow\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\SceneRuntime\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Editor\EditorWindow\;$(SolutionDir)Editor\EditorMenu\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\SceneRuntime\;%(AdditionalIncludeDirectories);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineGUIWindow\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>

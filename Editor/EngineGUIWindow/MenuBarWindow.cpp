@@ -25,6 +25,8 @@
 #include "BlackBoard.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
+#include "EditorMenuDraw.h"
+#include "EditorMenuTargets.h"
 #include "EditorSettingsStore.h"
 #include "EditorPlatform.h"
 #include "RuntimeSettings.h"
@@ -238,6 +240,12 @@ MenuBarWindow::MenuBarWindow()
 
 void MenuBarWindow::RenderMenuBar()
 {
+    // 선택 문맥은 프레임당 한 번 유도한다. 선언 항목 중 선택 대상 서명을 가진
+    // 것들이 이것으로 활성·비활성이 갈린다(서명이 결속을 선언한다 — A.4).
+    const std::optional<::editor::entity_target> selection =
+        ::editor::targets::selected_entity();
+    const ::editor::entity_target* selectionPtr = selection ? &*selection : nullptr;
+
     ImGuiViewportP* viewport = (ImGuiViewportP*)(void*)ImGui::GetMainViewport();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
     float height = ImGui::GetFrameHeight();
@@ -337,6 +345,7 @@ void MenuBarWindow::RenderMenuBar()
 						PostMessage(window->GetHandle(), WM_CLOSE, 0, 0);
 					}
                 }
+                ::editor::append_top_menu_items(::editor::top_menu_root::file, selectionPtr);
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Edit"))
@@ -381,6 +390,7 @@ void MenuBarWindow::RenderMenuBar()
                     editor::open_window(EditorWindowName::kInputActionMaps);
                 }
 
+                ::editor::append_top_menu_items(::editor::top_menu_root::edit, selectionPtr);
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Settings"))
@@ -430,8 +440,13 @@ void MenuBarWindow::RenderMenuBar()
                     EditorSettingsStore::Get().Save();
                 }
                 ImGui::PopStyleVar(2);
+                ::editor::append_top_menu_items(::editor::top_menu_root::settings, selectionPtr);
                 ImGui::EndMenu();
             }
+
+            // Tools — 인라인 메뉴가 없는 새 뿌리다. 선언 항목이 0 이면 BeginMenu
+            // 자체를 부르지 않으므로 이 줄만으로는 화면이 달라지지 않는다(A.6).
+            ::editor::draw_top_menu_root(::editor::top_menu_root::tools, selectionPtr);
 
             if (ImGui::BeginMenu("Window"))
             {
@@ -476,6 +491,7 @@ void MenuBarWindow::RenderMenuBar()
                     if (opened) editor::close_window(toggle.window);
                     else        editor::open_window(toggle.window);
                 }
+                ::editor::append_top_menu_items(::editor::top_menu_root::window, selectionPtr);
                 ImGui::EndMenu();
             }
 
@@ -485,6 +501,7 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     editor::open_window(EditorWindowName::kAbout);
                 }
+                ::editor::append_top_menu_items(::editor::top_menu_root::help, selectionPtr);
                 ImGui::EndMenu();
             }
 
@@ -1748,6 +1765,20 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
                         graph.DeleteNode(selectNode->ID);
                         selectNode = nullptr;
                     }
+                }
+            }
+
+            // 선언된 행동 트리 노드 항목(PHASE 21 M1). 문맥은 트리를 가진 엔티티의
+            // 신원이다 — 노드 자체는 신원이 없고, CLI 도 트리를 소유 엔티티로
+            // 가리킨다. 항목 0 이면 구분선조차 넣지 않는다(A.6).
+            if (::editor::popup_host_has_items(::editor::popup_host::behavior_tree_node))
+            {
+                if (const std::optional<::editor::entity_target> owner =
+                        ::editor::targets::selected_entity())
+                {
+                    ImGui::Separator();
+                    ::editor::draw_popup_menu_items<
+                        ::editor::popup_host::behavior_tree_node>(*owner);
                 }
             }
             ImGui::EndPopup();

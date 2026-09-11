@@ -1,6 +1,7 @@
 #include "ContentsBrowserWindow.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
+#include "EditorMenuDraw.h"
 #include "Windows/EditorStandardWindows.h"
 #include "SceneManager.h"
 #include "Scene.h"
@@ -261,11 +262,11 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
 
 	if (isRightClicked)
 	{
-		ImGui::OpenPopup("Context Menu");
+		ImGui::OpenPopup("ContentFolderTreeMenu");
 		isRightClicked = false;
 	}
 
-	if (ImGui::BeginPopup("Context Menu"))
+	if (ImGui::BeginPopup("ContentFolderTreeMenu"))
 	{
 		if (MenuDirectory.empty() && std::filesystem::equivalent(MenuDirectory, PathFinder::VolumeProfilePath()))
 		{
@@ -278,6 +279,14 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
 		{
 			EditorPlatform::Get().RevealInFileExplorer(MenuDirectory);
 			MenuDirectory.clear();
+		}
+
+		// 선언된 폴더 팝업 항목(PHASE 21 M1). 항목 0 이면 구분선도 없다(A.6).
+		if (::editor::popup_host_has_items(::editor::popup_host::content_browser_folder))
+		{
+			ImGui::Separator();
+			::editor::draw_popup_menu_items<::editor::popup_host::content_browser_folder>(
+				::editor::folder_target{ MenuDirectory });
 		}
 		ImGui::EndPopup();
 	}
@@ -340,10 +349,10 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTile()
 
 	if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 	{
-		ImGui::OpenPopup("Directory Context");
+		ImGui::OpenPopup("ContentFolderAreaMenu");
 	}
 
-	if (ImGui::BeginPopup("Directory Context"))
+	if (ImGui::BeginPopup("ContentFolderAreaMenu"))
 	{
 		if (!m_currentDirectory.empty() &&
 			std::filesystem::equivalent(m_currentDirectory, PathFinder::VolumeProfilePath()))
@@ -352,6 +361,15 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTile()
 			{
 				EditorAssetDatabase::Get().CreateVolumeProfile(m_currentDirectory);
 			}
+		}
+
+		// 선언된 폴더 팝업 항목(PHASE 21 M1) — 타일 빈 영역 쪽. 문맥은 지금 보고
+		// 있는 폴더다. 항목 0 이면 구분선조차 넣지 않는다(A.6).
+		if (::editor::popup_host_has_items(::editor::popup_host::content_browser_folder))
+		{
+			ImGui::Separator();
+			::editor::draw_popup_menu_items<::editor::popup_host::content_browser_folder>(
+				::editor::folder_target{ m_currentDirectory });
 		}
 		ImGui::EndPopup();
 	}
@@ -456,11 +474,14 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& dire
 
 	if (isRightClicked)
 	{
-		ImGui::OpenPopup("Context Menu");
+		ImGui::OpenPopup("ContentAssetTreeMenu");
 		isRightClicked = false;
 	}
 
-	if (ImGui::BeginPopup("Context Menu"))
+	// 팝업 이름이 "Context Menu" 였다 — 이 창 안에서 **같은 이름이 세 벌**이라
+	// 타일 쪽에서 연 팝업이 트리 쪽 BeginPopup 에 먼저 걸릴 수 있었다. 호스트별로
+	// 이름을 갈랐다(PHASE 21 M1 · A.6 이 지목한 "팝업 세 벌 통합").
+	if (ImGui::BeginPopup("ContentAssetTreeMenu"))
 	{
 		if (!currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
 		{
@@ -469,22 +490,21 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& dire
 				EditorAssetDatabase::Get().CreateVolumeProfile(currentDirectory);
 			}
 		}
-		if (ImGui::MenuItem("Delete"))
-		{
-			file::remove(currentDirectory);
-			if (currentDirectory.extension() == ".cpp")
-			{
-				file::path headerPath = currentDirectory;
-				headerPath.replace_extension(".h");
-				if (file::exists(headerPath))
-				{
-					file::remove(headerPath);
-				}
-			}
-		}
+		// Delete 인라인 구현이 여기 있었다. 확인도 Undo 도 없이 file::remove 를
+		// 부르고 있었고, **같은 코드가 DrawFileTile 에도 복제**돼 있었다.
+		// 선언 하나(editor_core_menus 의 delete_asset, confirm 붙음)가 둘을
+		// 대체한다 — 아래 선언 항목 블록이 그것을 그린다.
 		if (ImGui::MenuItem("Open Save Directory"))
 		{
 			EditorPlatform::Get().RevealInFileExplorer(currentDirectory);
+		}
+
+		// 선언된 자산 팝업 항목(PHASE 21 M1). 문맥은 파일 경로다.
+		if (::editor::popup_host_has_items(::editor::popup_host::content_browser_asset))
+		{
+			ImGui::Separator();
+			::editor::draw_popup_menu_items<::editor::popup_host::content_browser_asset>(
+				::editor::asset_target{ currentDirectory });
 		}
 		ImGui::EndPopup();
 	}
@@ -537,24 +557,16 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 	}
 	else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 	{
-		ImGui::OpenPopup("Context Menu");
+		ImGui::OpenPopup("ContentAssetTileMenu");
 	}
 
-	if (ImGui::BeginPopup("Context Menu"))
+	// 이름이 "Context Menu" 였다 — 트리 쪽과 같은 이름이라 둘이 서로의 팝업을
+	// 집을 수 있었다. 호스트별로 갈랐다(PHASE 21 M1).
+	if (ImGui::BeginPopup("ContentAssetTileMenu"))
 	{
-		if (ImGui::MenuItem("Delete"))
-		{
-			file::remove(directory);
-			if (directory.extension() == ".cpp")
-			{
-				file::path headerPath = directory;
-				headerPath.replace_extension(".h");
-				if (file::exists(headerPath))
-				{
-					file::remove(headerPath);
-				}
-			}
-		}
+		// Delete 인라인 구현이 여기 있었다 — 트리 쪽과 **같은 코드의 복제**였고,
+		// 둘 다 확인도 Undo 도 없이 file::remove 를 불렀다. 선언 하나
+		// (editor_core_menus 의 delete_asset, confirm 붙음)가 둘을 대체한다.
 		if (ImGui::MenuItem("Open Save Directory"))
 		{
 			EditorPlatform::Get().RevealInFileExplorer(directory);
@@ -565,6 +577,14 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 			{
 				EditorAssetDatabase::Get().CreateVolumeProfile(m_currentDirectory);
 			}
+		}
+
+		// 선언된 자산 팝업 항목(PHASE 21 M1). 문맥은 이 타일이 가리키는 파일이다.
+		if (::editor::popup_host_has_items(::editor::popup_host::content_browser_asset))
+		{
+			ImGui::Separator();
+			::editor::draw_popup_menu_items<::editor::popup_host::content_browser_asset>(
+				::editor::asset_target{ directory });
 		}
 		ImGui::EndPopup();
 	}

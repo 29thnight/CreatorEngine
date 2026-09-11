@@ -16,17 +16,16 @@
 
 #include "EditorMenuRegistry.h"
 
-// 선언자 헤더는 여기에 include한다.
-// 예: #include "Menus/AssetMenus.h"
+#include <array>
+#include <string_view>
 
-// 목록 항목은 여기에 더한다. 예:
-//     X(asset_menus) \
-//     X(scene_menus) \
-//
-// M0은 배선만 세운다 — 실제 동작은 M1이 그리기 배선과 함께 태운다(부록 A.7:
-// 기존 상단 19항목·팝업 68항목의 이관은 W3 이후 별도 정리다).
+// 선언자 헤더는 여기에 include한다.
+#include "Menus/EditorCoreMenus.h"
+
+// 목록 항목은 여기에 더한다. 선언자 하나가 한 줄이다.
 #define EDITOR_MENU_LIST(X) \
-    /* 아직 없음 — M1이 채운다 */
+    X(editor_core_menus) \
+
 
 namespace editor
 {
@@ -37,4 +36,19 @@ namespace editor
         EDITOR_MENU_LIST(EDITOR_MENU_REGISTER_ONE)
 #undef EDITOR_MENU_REGISTER_ONE
     }
+
+    /// 목록이 내놓는 선언자 이름. **감사의 기대치**가 여기서 나온다.
+    ///
+    /// ★ 같은 매크로를 두 번째로 소비하는 것이 요점이다. 등록이 쓰는 출처와
+    ///   감사가 쓰는 출처가 같으므로, 이름을 손으로 두 번 적을 자리가 없다 —
+    ///   두 벌이 되면 한쪽이 낡아도 아무도 모른다.
+    ///
+    ///   반대로 **목록에서 줄을 지우는 것은 이 배열도 같이 줄인다.** 프로그램 안에
+    ///   기준이 없다는 뜻이고, 그래서 게이트가 "선언자 0 이면 붉다"를 따로 단정한다
+    ///   (빈 집합을 성공으로 읽지 않는다 — 이 저장소에서 두 번 나온 실패 양식).
+#define EDITOR_MENU_NAME_ONE(T) std::string_view{ #T },
+    inline constexpr std::array editor_menu_declarer_names{
+        EDITOR_MENU_LIST(EDITOR_MENU_NAME_ONE)
+    };
+#undef EDITOR_MENU_NAME_ONE
 }
