@@ -48,242 +48,254 @@ inline std::filesystem::path PathFromUTF8(const char* utf8)
 #endif
 }
 
-AssetBundleWindow::AssetBundleWindow()
+namespace
 {
-    // PHASE 21 M4 2 stage: the shell owns the frame now.
-    editor::windows::bind_window_body(EditorWindowName::kAssetBundle, [&]()
-    {
-        auto* activeScene = SceneManagers->GetActiveScene();
-        if (!activeScene)
-        {
-            ImGui::TextUnformatted("No active scene");
-            return;
-        }
+	// 창 상태의 유일한 자리(PHASE 21 W3). 멤버가 entry 하나뿐이다.
+	AssetBundleWindow& asset_bundle_state()
+	{
+		static AssetBundleWindow value;
+		return value;
+	}
+}
 
-        auto& bundle = activeScene->m_requiredLoadAssetsBundle;
+void editor::windows::draw_asset_bundle()
+{
+	asset_bundle_state().Draw();
+}
 
-        ImGui::Text("Loaded Assets");
-        ImGui::Separator();
-        static ImGuiTextFilter filter;
-        filter.Draw("Assets Search", ImGui::GetContentRegionAvail().x - 90);
+// PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
+void AssetBundleWindow::Draw()
+{
+	auto* activeScene = SceneManagers->GetActiveScene();
+	if (!activeScene)
+	{
+	    ImGui::TextUnformatted("No active scene");
+	    return;
+	}
 
-        AssetEntryPayload entry{};
+	auto& bundle = activeScene->m_requiredLoadAssetsBundle;
 
-        // 드래그-소스에 사용할 임시 엔트리 변수 (ImGui가 payload를 복사하므로 지역변수로 충분)
-        if (ImGui::CollapsingHeader("Models"))
-        {
-            // MBC9: loaded models = generation cache current set
-            const auto models = DataSystems->SnapshotCurrentModelAssetGenerations();
-            for (const auto& generation : models)
-            {
-                const std::string name = generation->SourcePath().stem().string();
-                // 경로 일관성: 프로젝트 상대/절대 등 엔진 규약에 맞춰 사용
-                // 필요하면 .filename() 으로 바꿔도 됨
-                std::filesystem::path filePath = generation->SourcePath().filename();
+	ImGui::Text("Loaded Assets");
+	ImGui::Separator();
+	static ImGuiTextFilter filter;
+	filter.Draw("Assets Search", ImGui::GetContentRegionAvail().x - 90);
 
-                AssetEntry containTest{ ManagedAssetType::Model ,filePath };
-                if (bundle.ContainsAsset(containTest))
-                {
-                    continue;
-                }
+	AssetEntryPayload entry{};
 
-                const std::string label = name;
+	// 드래그-소스에 사용할 임시 엔트리 변수 (ImGui가 payload를 복사하므로 지역변수로 충분)
+	if (ImGui::CollapsingHeader("Models"))
+	{
+	    // MBC9: loaded models = generation cache current set
+	    const auto models = DataSystems->SnapshotCurrentModelAssetGenerations();
+	    for (const auto& generation : models)
+	    {
+	        const std::string name = generation->SourcePath().stem().string();
+	        // 경로 일관성: 프로젝트 상대/절대 등 엔진 규약에 맞춰 사용
+	        // 필요하면 .filename() 으로 바꿔도 됨
+	        std::filesystem::path filePath = generation->SourcePath().filename();
 
-                if (filter.IsActive() && !(filter.PassFilter(label.c_str())))
-                {
-                    continue;
-                }
+	        AssetEntry containTest{ ManagedAssetType::Model ,filePath };
+	        if (bundle.ContainsAsset(containTest))
+	        {
+	            continue;
+	        }
 
-                entry.type = (uint32_t)ManagedAssetType::Model;
-                PackPathUTF8(filePath, entry.path, sizeof(entry.path));
+	        const std::string label = name;
 
-                ImGui::Selectable(label.c_str());
-                if (ImGui::BeginDragDropSource())
-                {
-                    ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
-                    ImGui::TextUnformatted(label.c_str());
-                    ImGui::EndDragDropSource();
-                }
-            }
-        }
+	        if (filter.IsActive() && !(filter.PassFilter(label.c_str())))
+	        {
+	            continue;
+	        }
 
-        if (ImGui::CollapsingHeader("Materials"))
-        {
-            const auto materials = DataSystems->SnapshotMaterials();
-            for (const auto& [name, ptr] : materials)
-            {
-                AssetEntry containTest{ ManagedAssetType::Material ,name };
-                if (bundle.ContainsAsset(containTest))
-                {
-                    continue;
-                }
+	        entry.type = (uint32_t)ManagedAssetType::Model;
+	        PackPathUTF8(filePath, entry.path, sizeof(entry.path));
 
-                entry.type = (uint32_t)ManagedAssetType::Material;
-                PackPathUTF8(name, entry.path, sizeof(entry.path));
+	        ImGui::Selectable(label.c_str());
+	        if (ImGui::BeginDragDropSource())
+	        {
+	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
+	            ImGui::TextUnformatted(label.c_str());
+	            ImGui::EndDragDropSource();
+	        }
+	    }
+	}
 
-                const std::string label = name;
+	if (ImGui::CollapsingHeader("Materials"))
+	{
+	    const auto materials = DataSystems->SnapshotMaterials();
+	    for (const auto& [name, ptr] : materials)
+	    {
+	        AssetEntry containTest{ ManagedAssetType::Material ,name };
+	        if (bundle.ContainsAsset(containTest))
+	        {
+	            continue;
+	        }
 
-                if (filter.IsActive() && !(filter.PassFilter(label.c_str())))
-                {
-                    continue;
-                }
+	        entry.type = (uint32_t)ManagedAssetType::Material;
+	        PackPathUTF8(name, entry.path, sizeof(entry.path));
 
-                ImGui::Selectable(label.c_str());
-                if (ImGui::BeginDragDropSource())
-                {
-                    ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
-                    ImGui::TextUnformatted(label.c_str());
-                    ImGui::EndDragDropSource();
-                }
-            }
-        }
+	        const std::string label = name;
 
-        if (ImGui::CollapsingHeader("Textures"))
-        {
-            const auto textures = DataSystems->SnapshotTextures();
-            for (const auto& [name, ptr] : textures)
-            {
-                AssetEntry containTest{ ManagedAssetType::Texture ,name };
-                if (bundle.ContainsAsset(containTest))
-                {
-                    continue;
-                }
+	        if (filter.IsActive() && !(filter.PassFilter(label.c_str())))
+	        {
+	            continue;
+	        }
 
-                entry.type = (uint32_t)ManagedAssetType::Texture;
-                PackPathUTF8(name, entry.path, sizeof(entry.path));
+	        ImGui::Selectable(label.c_str());
+	        if (ImGui::BeginDragDropSource())
+	        {
+	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
+	            ImGui::TextUnformatted(label.c_str());
+	            ImGui::EndDragDropSource();
+	        }
+	    }
+	}
 
-                const std::string label = name;
+	if (ImGui::CollapsingHeader("Textures"))
+	{
+	    const auto textures = DataSystems->SnapshotTextures();
+	    for (const auto& [name, ptr] : textures)
+	    {
+	        AssetEntry containTest{ ManagedAssetType::Texture ,name };
+	        if (bundle.ContainsAsset(containTest))
+	        {
+	            continue;
+	        }
 
-                if (filter.IsActive() && !(filter.PassFilter(label.c_str())))
-                {
-                    continue;
-                }
+	        entry.type = (uint32_t)ManagedAssetType::Texture;
+	        PackPathUTF8(name, entry.path, sizeof(entry.path));
 
-                ImGui::Selectable(label.c_str());
-                if (ImGui::BeginDragDropSource())
-                {
-                    ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
-                    ImGui::TextUnformatted(label.c_str());
-                    ImGui::EndDragDropSource();
-                }
-            }
-        }
+	        const std::string label = name;
 
-        // ★ SpriteFonts 섹션을 걷었다 (D4). 폰트 자산 컨테이너가 DX11
-        //   SpriteFont였고 그것이 사라졌다 - SDF 계통이 서면 다시 붙인다.
+	        if (filter.IsActive() && !(filter.PassFilter(label.c_str())))
+	        {
+	            continue;
+	        }
 
-        ImGui::Separator();
-        ImGui::Text("Asset Bundle");
+	        ImGui::Selectable(label.c_str());
+	        if (ImGui::BeginDragDropSource())
+	        {
+	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
+	            ImGui::TextUnformatted(label.c_str());
+	            ImGui::EndDragDropSource();
+	        }
+	    }
+	}
 
-        // 번들 이름 입력: 임시 문자열 대신 bundle.name을 직접 바인딩 (기존 CallbackResize 유지)
-        {
-            // capacity 기반 버퍼 접근을 위해 최소 1바이트 이상 확보
-            if (bundle.name.capacity() == 0) bundle.name.reserve(32);
+	// ★ SpriteFonts 섹션을 걷었다 (D4). 폰트 자산 컨테이너가 DX11
+	//   SpriteFont였고 그것이 사라졌다 - SDF 계통이 서면 다시 붙인다.
 
-            // ImGui::InputText with std::string 콜백 패턴 (이미 프로젝트에서 사용 중인 Meta::InputTextCallback 활용)
-            // - &bundle.name[0] 접근 전에 size를 capacity에 맞춰 충분히 확장할 필요가 있어 콜백에서 처리.
-            std::string& nameRef = bundle.name;
-            if (ImGui::InputText(
-                "Name",
-                &nameRef[0],
-                nameRef.capacity() + 1,
-                ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
-                Meta::InputTextCallback,
-                static_cast<void*>(&nameRef)))
-            {
-                // Enter 입력 시 등 필요 시 추가 로직 가능
-            }
-        }
+	ImGui::Separator();
+	ImGui::Text("Asset Bundle");
 
-        // 번들 자산 리스트
-        ImGui::BeginChild("##BundleAssets", ImVec2(0, 150), true);
-        for (std::size_t i = 0; i < bundle.assets.size();)
-        {
-            const auto& _entry = bundle.assets[i]; // <-- 이 값을 라벨로 사용해야 함 (entry 아님)
+	// 번들 이름 입력: 임시 문자열 대신 bundle.name을 직접 바인딩 (기존 CallbackResize 유지)
+	{
+	    // capacity 기반 버퍼 접근을 위해 최소 1바이트 이상 확보
+	    if (bundle.name.capacity() == 0) bundle.name.reserve(32);
 
-            std::string label;
-            try
-            {
-                label = _entry.assetName;
-            }
-            catch (const std::exception&)
-            {
-                label = "(Invalid path)";
-            }
+	    // ImGui::InputText with std::string 콜백 패턴 (이미 프로젝트에서 사용 중인 Meta::InputTextCallback 활용)
+	    // - &bundle.name[0] 접근 전에 size를 capacity에 맞춰 충분히 확장할 필요가 있어 콜백에서 처리.
+	    std::string& nameRef = bundle.name;
+	    if (ImGui::InputText(
+	        "Name",
+	        &nameRef[0],
+	        nameRef.capacity() + 1,
+	        ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
+	        Meta::InputTextCallback,
+	        static_cast<void*>(&nameRef)))
+	    {
+	        // Enter 입력 시 등 필요 시 추가 로직 가능
+	    }
+	}
 
-            ImGui::Selectable(label.c_str());
-            if (ImGui::BeginPopupContextItem())
-            {
-                if (ImGui::MenuItem("Remove"))
-                {
-                    // 안전한 삭제: 인덱스 기반 erase (반복자/참조 무효화 이슈 회피)
-                    bundle.assets.erase(bundle.assets.begin() + static_cast<std::ptrdiff_t>(i));
-                    ImGui::EndPopup();
-                    continue; // i 증가 없이 다음 아이템(삭제 후 당겨진 현재 인덱스) 검사
-                }
-                ImGui::EndPopup();
-            }
-            ++i;
-        }
+	// 번들 자산 리스트
+	ImGui::BeginChild("##BundleAssets", ImVec2(0, 150), true);
+	for (std::size_t i = 0; i < bundle.assets.size();)
+	{
+	    const auto& _entry = bundle.assets[i]; // <-- 이 값을 라벨로 사용해야 함 (entry 아님)
 
-        // --- 기존 ---
-        ImGui::Separator();
-        ImGui::TextUnformatted("Asset Bundle");
+	    std::string label;
+	    try
+	    {
+	        label = _entry.assetName;
+	    }
+	    catch (const std::exception&)
+	    {
+	        label = "(Invalid path)";
+	    }
 
-        // ▼ 여기부터 드롭 타깃(텍스트 아이템)을 붙입니다
-        {
-            // 텍스트 아이템의 사각형 (하이라이트 용)
-            ImVec2 p0 = ImGui::GetItemRectMin();
-            ImVec2 p1 = ImGui::GetItemRectMax();
+	    ImGui::Selectable(label.c_str());
+	    if (ImGui::BeginPopupContextItem())
+	    {
+	        if (ImGui::MenuItem("Remove"))
+	        {
+	            // 안전한 삭제: 인덱스 기반 erase (반복자/참조 무효화 이슈 회피)
+	            bundle.assets.erase(bundle.assets.begin() + static_cast<std::ptrdiff_t>(i));
+	            ImGui::EndPopup();
+	            continue; // i 증가 없이 다음 아이템(삭제 후 당겨진 현재 인덱스) 검사
+	        }
+	        ImGui::EndPopup();
+	    }
+	    ++i;
+	}
 
-            // 드래그가 텍스트 위에 올라오면 테두리/툴팁 표시(옵션)
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
-            {
-                ImGui::GetWindowDrawList()->AddRect(p0, p1, IM_COL32(255, 255, 0, 255));
-                ImGui::SetTooltip("Drop assets here");
-            }
+	// --- 기존 ---
+	ImGui::Separator();
+	ImGui::TextUnformatted("Asset Bundle");
 
-            // 텍스트 아이템을 드롭 타깃으로 사용
-            if (ImGui::BeginDragDropTarget())
-            {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ENTRY"))
-                {
-                    if (payload && payload->IsDelivery())
-                    {
-                        // 당신의 POD 페이로드 구조체
-                        const auto* p = static_cast<const AssetEntryPayload*>(payload->Data);
+	// ▼ 여기부터 드롭 타깃(텍스트 아이템)을 붙입니다
+	{
+	    // 텍스트 아이템의 사각형 (하이라이트 용)
+	    ImVec2 p0 = ImGui::GetItemRectMin();
+	    ImVec2 p1 = ImGui::GetItemRectMax();
 
-                        // UTF-8 -> path 복원
-                        std::filesystem::path dropPath = PathFromUTF8(p->path);
+	    // 드래그가 텍스트 위에 올라오면 테두리/툴팁 표시(옵션)
+	    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+	    {
+	        ImGui::GetWindowDrawList()->AddRect(p0, p1, IM_COL32(255, 255, 0, 255));
+	        ImGui::SetTooltip("Drop assets here");
+	    }
 
-                        // 엔진 엔트리로 변환
-                        AssetEntry dropEntry{
-                            static_cast<ManagedAssetType>(p->type),
-                            dropPath
-                        };
+	    // 텍스트 아이템을 드롭 타깃으로 사용
+	    if (ImGui::BeginDragDropTarget())
+	    {
+	        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ENTRY"))
+	        {
+	            if (payload && payload->IsDelivery())
+	            {
+	                // 당신의 POD 페이로드 구조체
+	                const auto* p = static_cast<const AssetEntryPayload*>(payload->Data);
 
-                        if (!bundle.ContainsAsset(dropEntry))
-                            bundle.AddAsset(dropEntry);
-                    }
-                }
-                ImGui::EndDragDropTarget();
-            }
-        }
-        ImGui::EndChild();
+	                // UTF-8 -> path 복원
+	                std::filesystem::path dropPath = PathFromUTF8(p->path);
 
-        if (ImGui::Button("Load"))
-        {
-            DataSystems->LoadAssetBundle(bundle);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Retain"))
-        {
-            DataSystems->RetainAssets(bundle);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Clear"))
-        {
-            bundle.ClearAssets();
-        }
-    });
+	                // 엔진 엔트리로 변환
+	                AssetEntry dropEntry{
+	                    static_cast<ManagedAssetType>(p->type),
+	                    dropPath
+	                };
+
+	                if (!bundle.ContainsAsset(dropEntry))
+	                    bundle.AddAsset(dropEntry);
+	            }
+	        }
+	        ImGui::EndDragDropTarget();
+	    }
+	}
+	ImGui::EndChild();
+
+	if (ImGui::Button("Load"))
+	{
+	    DataSystems->LoadAssetBundle(bundle);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Retain"))
+	{
+	    DataSystems->RetainAssets(bundle);
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Clear"))
+	{
+	    bundle.ClearAssets();
+	}
 }

@@ -188,11 +188,13 @@ void Editor::EditorMain::Initialize()
 	::editor::register_editor_menus();
 
 	m_menuBarWindow = std::make_unique<MenuBarWindow>();
-	m_hierarchyWindow = std::make_unique<HierarchyWindow>();
-	m_inspectorWindow = std::make_unique<InspectorWindow>();
-	m_projectWindow = std::make_unique<AssetBundleWindow>();
-	m_resourceCounterWindow = std::make_unique<ResourceCounterWindow>();
-	m_renderDebugWindow = std::make_unique<EnhancedRenderDebugWindow>();
+
+	// 나머지 여섯은 자유 함수라 만들 객체가 없다(PHASE 21 W3). 표가
+	// 본문을 직접 부르고, UI 지역 상태는 각 창의 TU 가 든다.
+	//
+	// typed Draw 등록만 여기 남는다. 인스펙터 생성자에 있던 것인데
+	// 그 표를 읽는 것이 인스펙터만이 아니라서 부팅의 일로 올렸다.
+	::editor::windows::register_inspector_typed_draws();
 
 	BootProgress::Step(L"Initializing SoundManager...");
 	Sound->initialize(128);
@@ -215,8 +217,10 @@ void Editor::EditorMain::Initialize()
 		throw std::runtime_error("Editor asset database initialization failed");
 	EditorAssetPresentation::Get().Initialize();
 
-	// 콘텐츠 브라우저는 presentation이 아이콘·폰트를 올린 뒤 만든다.
-	m_contentsBrowserWindow = std::make_unique<ContentsBrowserWindow>();
+	// 콘텐츠 브라우저는 여기서 만들지 않는다(PHASE 21 W3). "presentation 이
+	// 아이콘·폰트를 올린 뒤" 라는 순서 제약은 실재하지 않았다 — 생성자가
+	// 하던 일은 본문을 걸고 창을 여는 것뿐이었고, 아이콘 표는 본문 안에서만
+	// 읽는다. 본문은 첫 프레임에야 도므로 부팅 순서와 무관하다.
 
 	// ★ 태그·레이어 저작은 asset database가 authoring handler를 설치한 뒤에만
 	//   가능하다. 예전에는 이 호출이 부팅 훨씬 앞(렌더러 초기화 직전)에 있었는데,

@@ -28,13 +28,167 @@
 #include "MetaStateCommand.h"
 #include "ReflectionRegister.h"
 
-HierarchyWindow::HierarchyWindow()
+namespace
 {
-	// PHASE 21 M4 2단계: 프레임은 셸이 연다. 본문은 그대로 두고 건다.
-	// 맨 앞의 BringWindowToDisplayBack 은 선언의 stacking 으로 갔다.
-	editor::windows::bind_window_body(EditorWindowName::kHierarchy, [&]()
-		{
+	// 창 상태의 유일한 자리(PHASE 21 W3). 검색어·클립보드·스크롤 요청 셋뿐이다.
+	HierarchyWindow& hierarchy_state()
+	{
+		static HierarchyWindow value;
+		return value;
+	}
+}
 
+void editor::windows::draw_hierarchy()
+{
+	hierarchy_state().Draw();
+}
+
+void HierarchyWindow::DrawSceneObject(Entity* obj)
+{
+	auto scene = SceneManagers->GetActiveScene();
+	auto& selectedSceneObject = scene->m_selectedEntity;
+	auto& selectedObjects = scene->m_selectedEntities;
+
+	// 🔍 검색 필터가 활성화된 경우, 자기 자신 + 자식들까지 재귀 검사
+	if (m_searchFilter.IsActive())
+	{
+		// 자식에 검색 결과가 있는 경우까지 보여주고 싶다면
+		// 여기서 바로 return하지 말고,
+		// "자식 중 하나라도 필터를 통과하면 이 노드도 그려준다"
+		// 같은 재귀 체크 로직이 더 필요.
+		if (!IsMatchedRecursive(obj))
+		{
+			// 자기 자신과 모든 자식이 필터에 안 걸리면 아예 그리지 않음
+			return;
+		}
+
+		// 검색 중에는 매치되는 애들은 기본적으로 열어두면 편함
+		ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+	}
+
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
+	bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj) != selectedObjects.end() || scene->m_selectedEntity == obj;
+	if (isSelected)
+	{
+		flags |= ImGuiTreeNodeFlags_Selected;
+	}
+	else if (0 == obj->GetParentIndex())
+	{
+		flags |= ImGuiTreeNodeFlags_DefaultOpen;
+	}
+
+	if (obj->GetChildrenIndices().empty())
+	{
+		flags |= ImGuiTreeNodeFlags_Leaf;
+	}
+
+	if (!obj->IsEnabled())
+	{
+		// 회색으로 텍스트 색상 변경
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+	}
+
+	std::string icon{};
+
+	if (obj->m_prefab)
+	{
+		icon = ICON_FA_BOX_OPEN + std::string(" ") + obj->m_name.ToString();
+	}
+	else
+	{
+		icon = ICON_FA_CUBE + std::string(" ") + obj->m_name.ToString();
+	}
+	bool opened = ImGui::TreeNodeEx(icon.c_str(), flags);
+
+
+	if (!obj->IsEnabled())
+	{
+		ImGui::PopStyleColor();
+	}
+
+	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+	{
+		if (ImGui::IsItemHovered() && (ImGui::IsMouseReleased(ImGuiMouseButton_Right) || ImGui::IsMouseReleased(ImGuiMouseButton_Left)))
+		{
+			bool shift = InputManagement->IsKeyPressed((int)KeyBoard::LeftShift);
+            auto newList = selectedObjects;
+            const auto found = std::find(newList.begin(), newList.end(), obj);
+            if (shift) { if (found != newList.end()) newList.erase(found); else newList.push_back(obj); }
+            else newList = {obj};
+            std::vector<EntityHandle> targets;
+            for (auto* object : newList) if (object) targets.push_back(scene->HandleOf(object->m_index));
+            EditorObjectOperations::Select(scene, targets);
+		}
+	}
+
+	if (ImGui::BeginDragDropSource())
+	{
+		ImGui::SetDragDropPayload("SCENE_OBJECT", &obj->m_index, sizeof(Entity::Index));
+		ImGui::Text("Moving %s", obj->m_name.ToString().c_str());
+		ImGui::EndDragDropSource();
+	}
+
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+		{
+			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
+			// 부모 변경 로직
+			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
+			{
+				const auto& draggedObj = scene->GetEntity(draggedIndex);
+				// E1 후속 배선: 위 드롭 타겟(씬 루트)과 동일한 사유 — 페이로드 인덱스가
+				// 이미 파괴된 슬롯을 가리키면 draggedObj/oldParent가 nullptr일 수 있다.
+				if (draggedObj)
+				{
+					EditorObjectOperations::Parent(scene->HandleOf(draggedObj->m_index), scene->HandleOf(obj->m_index));
+				}
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+	if (opened)
+	{
+		// 자식 노드를 재귀적으로 그리기
+		for (auto childIndex : obj->GetChildrenIndices())
+		{
+			auto child = scene->GetEntity(childIndex);
+			// E1 후속 배선: 루트 폴백 제거로 무효 인덱스가 nullptr을 돌려줄 수
+			// 있다 — DrawSceneObject는 obj를 무가드로 역참조하므로 여기서 거른다.
+			if (!child) continue;
+			DrawSceneObject(child);
+		}
+		ImGui::TreePop();
+	}
+}
+
+bool HierarchyWindow::IsMatchedRecursive(Entity* obj)
+{
+	if (!obj) return false;
+
+	auto scene = SceneManagers->GetActiveScene();
+	if (!scene) return false;
+
+	// 1) 자기 자신 이름으로 필터 체크
+	const std::string name = obj->m_name.ToString();
+	if (m_searchFilter.PassFilter(name.c_str()))
+		return true;
+
+	// 2) 자식들 재귀 체크
+	for (auto childIndex : obj->GetChildrenIndices())
+	{
+		auto child = scene->GetEntity(childIndex);
+		if (child && IsMatchedRecursive(child))
+			return true;
+	}
+
+	return false;
+}
+
+// PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
+void HierarchyWindow::Draw()
+{
 			Scene* scene = nullptr;
 			RenderScene* renderScene = nullptr;
 			Entity* selectedSceneObject = nullptr;
@@ -140,27 +294,27 @@ HierarchyWindow::HierarchyWindow()
 						if (ImGui::MenuItem("		Directional Light"))
 						{
 							auto creation = EditorObjectOperations::Create(scene, "Directional Light", GameObjectType::Light);
-                            auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
+	                        auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
 							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
-                            if (comp) { comp->SetLightType(LightType::DirectionalLight);
+	                        if (comp) { comp->SetLightType(LightType::DirectionalLight);
 							comp->m_lightStatus = LightStatus::Enabled; }
 						}
 						if (ImGui::MenuItem("		Point Light"))
 						{
 							auto creation = EditorObjectOperations::Create(scene, "Point Light", GameObjectType::Light);
-                            auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
+	                        auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
 							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
-                            if (comp) { comp->SetLightType(LightType::PointLight);
+	                        if (comp) { comp->SetLightType(LightType::PointLight);
 							comp->m_lightStatus = LightStatus::Enabled; }
 						}
 						if (ImGui::MenuItem("		Spot Light"))
 						{
 							auto creation = EditorObjectOperations::Create(scene, "Spot Light", GameObjectType::Light);
-                            auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
+	                        auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
 	if (obj) obj->Transform_().SetRotation(
 		{ 0.7, 0, 0, 1 }, TransformWriteReason::Inspector);
 							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
-                            if (comp) { comp->SetLightType(LightType::SpotLight);
+	                        if (comp) { comp->SetLightType(LightType::SpotLight);
 							comp->m_lightStatus = LightStatus::Enabled; }
 						}
 						ImGui::EndMenu();
@@ -227,7 +381,7 @@ HierarchyWindow::HierarchyWindow()
 
 					if (scene)
 					{
-                        Editor::ModelPlacement::Get().Execute(scene->GetSceneId(), filepath.string());
+	                    Editor::ModelPlacement::Get().Execute(scene->GetSceneId(), filepath.string());
 					}
 				}
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
@@ -436,150 +590,4 @@ HierarchyWindow::HierarchyWindow()
 			}
 
 			isSceneObjectSelected = nullptr != selectedSceneObject ? true : false;
-
-		});
 }
-
-void HierarchyWindow::DrawSceneObject(Entity* obj)
-{
-	auto scene = SceneManagers->GetActiveScene();
-	auto& selectedSceneObject = scene->m_selectedEntity;
-	auto& selectedObjects = scene->m_selectedEntities;
-
-	// 🔍 검색 필터가 활성화된 경우, 자기 자신 + 자식들까지 재귀 검사
-	if (m_searchFilter.IsActive())
-	{
-		// 자식에 검색 결과가 있는 경우까지 보여주고 싶다면
-		// 여기서 바로 return하지 말고,
-		// "자식 중 하나라도 필터를 통과하면 이 노드도 그려준다"
-		// 같은 재귀 체크 로직이 더 필요.
-		if (!IsMatchedRecursive(obj))
-		{
-			// 자기 자신과 모든 자식이 필터에 안 걸리면 아예 그리지 않음
-			return;
-		}
-
-		// 검색 중에는 매치되는 애들은 기본적으로 열어두면 편함
-		ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-	}
-
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
-	bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj) != selectedObjects.end() || scene->m_selectedEntity == obj;
-	if (isSelected)
-	{
-		flags |= ImGuiTreeNodeFlags_Selected;
-	}
-	else if (0 == obj->GetParentIndex())
-	{
-		flags |= ImGuiTreeNodeFlags_DefaultOpen;
-	}
-
-	if (obj->GetChildrenIndices().empty())
-	{
-		flags |= ImGuiTreeNodeFlags_Leaf;
-	}
-
-	if (!obj->IsEnabled())
-	{
-		// 회색으로 텍스트 색상 변경
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-	}
-
-	std::string icon{};
-
-	if (obj->m_prefab)
-	{
-		icon = ICON_FA_BOX_OPEN + std::string(" ") + obj->m_name.ToString();
-	}
-	else
-	{
-		icon = ICON_FA_CUBE + std::string(" ") + obj->m_name.ToString();
-	}
-	bool opened = ImGui::TreeNodeEx(icon.c_str(), flags);
-
-
-	if (!obj->IsEnabled())
-	{
-		ImGui::PopStyleColor();
-	}
-
-	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
-	{
-		if (ImGui::IsItemHovered() && (ImGui::IsMouseReleased(ImGuiMouseButton_Right) || ImGui::IsMouseReleased(ImGuiMouseButton_Left)))
-		{
-			bool shift = InputManagement->IsKeyPressed((int)KeyBoard::LeftShift);
-            auto newList = selectedObjects;
-            const auto found = std::find(newList.begin(), newList.end(), obj);
-            if (shift) { if (found != newList.end()) newList.erase(found); else newList.push_back(obj); }
-            else newList = {obj};
-            std::vector<EntityHandle> targets;
-            for (auto* object : newList) if (object) targets.push_back(scene->HandleOf(object->m_index));
-            EditorObjectOperations::Select(scene, targets);
-		}
-	}
-
-	if (ImGui::BeginDragDropSource())
-	{
-		ImGui::SetDragDropPayload("SCENE_OBJECT", &obj->m_index, sizeof(Entity::Index));
-		ImGui::Text("Moving %s", obj->m_name.ToString().c_str());
-		ImGui::EndDragDropSource();
-	}
-
-	if (ImGui::BeginDragDropTarget())
-	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-		{
-			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
-			// 부모 변경 로직
-			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
-			{
-				const auto& draggedObj = scene->GetEntity(draggedIndex);
-				// E1 후속 배선: 위 드롭 타겟(씬 루트)과 동일한 사유 — 페이로드 인덱스가
-				// 이미 파괴된 슬롯을 가리키면 draggedObj/oldParent가 nullptr일 수 있다.
-				if (draggedObj)
-				{
-					EditorObjectOperations::Parent(scene->HandleOf(draggedObj->m_index), scene->HandleOf(obj->m_index));
-				}
-			}
-		}
-		ImGui::EndDragDropTarget();
-	}
-
-	if (opened)
-	{
-		// 자식 노드를 재귀적으로 그리기
-		for (auto childIndex : obj->GetChildrenIndices())
-		{
-			auto child = scene->GetEntity(childIndex);
-			// E1 후속 배선: 루트 폴백 제거로 무효 인덱스가 nullptr을 돌려줄 수
-			// 있다 — DrawSceneObject는 obj를 무가드로 역참조하므로 여기서 거른다.
-			if (!child) continue;
-			DrawSceneObject(child);
-		}
-		ImGui::TreePop();
-	}
-}
-
-bool HierarchyWindow::IsMatchedRecursive(Entity* obj)
-{
-	if (!obj) return false;
-
-	auto scene = SceneManagers->GetActiveScene();
-	if (!scene) return false;
-
-	// 1) 자기 자신 이름으로 필터 체크
-	const std::string name = obj->m_name.ToString();
-	if (m_searchFilter.PassFilter(name.c_str()))
-		return true;
-
-	// 2) 자식들 재귀 체크
-	for (auto childIndex : obj->GetChildrenIndices())
-	{
-		auto child = scene->GetEntity(childIndex);
-		if (child && IsMatchedRecursive(child))
-			return true;
-	}
-
-	return false;
-}
-

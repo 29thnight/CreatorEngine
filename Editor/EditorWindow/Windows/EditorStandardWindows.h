@@ -33,13 +33,17 @@ namespace editor::windows
 {
     // ── 진입점 ────────────────────────────────────────────────────────────
 
-    void draw_hierarchy();                bool has_hierarchy();
-    void draw_inspector();                bool has_inspector();
-    void draw_asset_bundle();             bool has_asset_bundle();
-    void draw_content_browser();          bool has_content_browser();
-    void draw_resource_counter();         bool has_resource_counter();
+    void draw_hierarchy();          // 아래 여섯은 자유 함수다(PHASE 21 W3).
+    void draw_inspector();          // 본문이 객체의 것이 아니게 되면서
+    void draw_asset_bundle();       // 보관소에 걸 일이 없어졌고, 그러면
+    void draw_content_browser();   // 자유 함수. 정의는 ContentsBrowserWindow.cpp
+    void draw_resource_counter();   // "본문이 걸렸는가" 를 묻던 has_* 도
 
-    void draw_render_pass();              bool has_render_pass();
+    void draw_render_pass();        // 뜻이 없다. 정의는 EngineGUIWindow 짝.
+
+    /// typed Draw 등록. 창이 아니라 부팅이 부른다 — 이유는
+    /// `InspectorWindow.cpp` 의 정의 자리에 적혀 있다.
+    void register_inspector_typed_draws();
     void draw_light_map();                bool has_light_map();
     void draw_collision_matrix();         bool has_collision_matrix();
     void draw_texture_import_selector();  bool has_texture_import_selector();
@@ -65,8 +69,7 @@ struct editor_panel_windows
                 .dock(dock_slot::right_upper)
                 .traits(window_trait::no_move)
                 .stacking(window_stacking::display_back)
-                .closable(false)
-                .available(&windows::has_hierarchy),
+                .closable(false),
 
             panel<&windows::draw_inspector>(
                 EditorWindowName::kInspector, EditorWindowName::kInspector)
@@ -75,15 +78,13 @@ struct editor_panel_windows
                         window_trait::no_bring_to_front_on_focus |
                         window_trait::no_focus_on_appearing)
                 .stacking(window_stacking::display_back)
-                .closable(false)
-                .available(&windows::has_inspector),
+                .closable(false),
 
             panel<&windows::draw_asset_bundle>(
                 EditorWindowName::kAssetBundle, EditorWindowName::kAssetBundle)
                 .dock(dock_slot::bottom)
                 .traits(window_trait::auto_resize)
-                .closable(false)
-                .available(&windows::has_asset_bundle),
+                .closable(false),
 
             // 표시 이름과 안정 식별자가 **갈린 유일한 창**이다. 왼쪽이 ini의
             // 도크 항목을 붙잡는 옛 문자열이고 오른쪽이 사람이 보는 라벨이다
@@ -94,16 +95,14 @@ struct editor_panel_windows
                 EditorWindowName::kContentBrowserLabel)
                 .dock(dock_slot::bottom)
                 .traits(window_trait::no_collapse)
-                .closable(false)
-                .available(&windows::has_content_browser),
+                .closable(false),
 
             panel<&windows::draw_resource_counter>(
                 EditorWindowName::kResourceCounter, EditorWindowName::kResourceCounter)
                 .dock(dock_slot::bottom)
                 .traits(window_trait::always_vertical_scrollbar |
                         window_trait::no_collapse)
-                .open_by_default(false)
-                .available(&windows::has_resource_counter));
+                .open_by_default(false));
     }
 };
 
@@ -121,8 +120,7 @@ struct editor_tool_windows
                 EditorWindowName::kRenderPass, EditorWindowName::kRenderPass)
                 .traits(window_trait::always_vertical_scrollbar |
                         window_trait::no_collapse)
-                .open_by_default(false)
-                .available(&windows::has_render_pass),
+                .open_by_default(false),
 
             // 아래 넷도 생성자가 곧바로 닫던 것들이다. 열 곳 중 여섯이
             // 그랬고, 그 판단이 전부 선언으로 왔다.

@@ -106,73 +106,24 @@ namespace
 
 }
 
-ContentsBrowserWindow::ContentsBrowserWindow()
+namespace
 {
-	// PHASE 21 M4 2단계: 프레임은 셸이 연다. 본문 첫 줄에서 매 프레임
-	// `SetPopup` 으로 하던 판단은 선언의 `closable_when` 술어로 갔다가, 서랍
-	// 스타일이 사라지면서 술어 자체가 없어졌다 — 이 창은 이제 닫히지 않는
-	// 도킹 패널 하나다.
-	editor::windows::bind_window_body(EditorWindowName::kContentBrowser, [&]()
+	// 창 상태의 유일한 자리(PHASE 21 W3). 이 창이 드는 것은 필터·현재 폴더·
+	// 오버레이 좌표 셋뿐이라 소유자를 둘 이유가 없었다.
+	ContentsBrowserWindow& content_browser_state()
 	{
-		static file::path DataDirectory = PathFinder::Relative();
-				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
-		ImGui::BeginDisabled();
-		ImGui::Button(ICON_FA_MAGNIFYING_GLASS);
-		ImGui::EndDisabled();
-		ImGui::SameLine();
-		m_filter.Draw("##Assets Search", ImGui::GetContentRegionAvail().x - 90);
-		ImGui::PopStyleVar();
+		static ContentsBrowserWindow state;
+		return state;
+	}
+}
 
-		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-
-		// 왼쪽 디렉터리 트리와 오른쪽 자산 격자. 참조로 삼은 S&Box Asset
-		// Browser와 같은 배치이고, 예전에는 이 둘이 스타일 설정에 따라
-		// 켜지고 꺼졌다 — 그 분기를 걷었다.
-		ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), false);
-		ImGuiTreeNodeFlags rootFlags =
-			ImGuiTreeNodeFlags_OpenOnArrow |
-			ImGuiTreeNodeFlags_SpanFullWidth |
-			ImGuiTreeNodeFlags_DefaultOpen;
-
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 1));
-		if (ImGui::TreeNodeEx(ICON_FA_FOLDER " Assets", rootFlags))
-		{
-			ShowDirectoryTree(DataDirectory);
-			ImGui::TreePop();
-		}
-		ImGui::PopStyleVar();
-		ImGui::EndChild();
-
-		ImGui::SameLine();
-
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
-		ImGui::BeginChild("FileList", ImVec2(0, 0), false);
-		ImGui::PopStyleVar();
-		ImGui::Dummy(ImGui::GetContentRegionAvail());
-		m_overlayPos = ImGui::GetItemRectMin();
-		if (!m_currentDirectory.empty() &&
-			std::filesystem::equivalent(m_currentDirectory, PathFinder::RelativeToPrefab("")))
-		{
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-				{
-					HandleSceneObjectDrop(payload->Data);
-				}
-				ImGui::EndDragDropTarget();
-			}
-		}
-		ImGui::SetCursorScreenPos(m_overlayPos);
-
-		ShowCurrentDirectoryFiles();
-		ImGui::PopStyleColor();
-		ImGui::EndChild();
-
-	});
-
-	// 도킹된 패널이라 펼친 채로 시작한다. 예전에는 스타일 설정이 하단 서랍
-	// (접힌 채 시작)과 도킹 패널 둘로 갈랐는데, 서랍 쪽을 걷었다.
-	editor::open_window(EditorWindowName::kContentBrowser);
+// 생성자가 하던 `open_window` 는 걷었다 — 선언의 `open_by_default` 가 같은
+// 일을 하고(entry.open = open_by_default_value), 그쪽이 정본이다. 상태를
+// 처음 그릴 때 만드는 지금 구조에서 생성자가 표시 상태를 정하면 순서가
+// 거꾸로 돈다 — 열려 있어야 그려지는데 그려져야 열리기 때문이다.
+void editor::windows::draw_content_browser()
+{
+	content_browser_state().Draw();
 }
 
 void ContentsBrowserWindow::HandleSceneObjectDrop(const void* payload)
@@ -476,4 +427,64 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 	}
 
 	ImGui::PopID();
+}
+
+
+// PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기 한 단뿐이다.
+void ContentsBrowserWindow::Draw()
+{
+static file::path DataDirectory = PathFinder::Relative();
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
+ImGui::BeginDisabled();
+ImGui::Button(ICON_FA_MAGNIFYING_GLASS);
+ImGui::EndDisabled();
+ImGui::SameLine();
+m_filter.Draw("##Assets Search", ImGui::GetContentRegionAvail().x - 90);
+ImGui::PopStyleVar();
+
+ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+
+// 왼쪽 디렉터리 트리와 오른쪽 자산 격자. 참조로 삼은 S&Box Asset
+// Browser와 같은 배치이고, 예전에는 이 둘이 스타일 설정에 따라
+// 켜지고 꺼졌다 — 그 분기를 걷었다.
+ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), false);
+ImGuiTreeNodeFlags rootFlags =
+	ImGuiTreeNodeFlags_OpenOnArrow |
+	ImGuiTreeNodeFlags_SpanFullWidth |
+	ImGuiTreeNodeFlags_DefaultOpen;
+
+ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 1));
+if (ImGui::TreeNodeEx(ICON_FA_FOLDER " Assets", rootFlags))
+{
+	ShowDirectoryTree(DataDirectory);
+	ImGui::TreePop();
+}
+ImGui::PopStyleVar();
+ImGui::EndChild();
+
+ImGui::SameLine();
+
+ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
+ImGui::BeginChild("FileList", ImVec2(0, 0), false);
+ImGui::PopStyleVar();
+ImGui::Dummy(ImGui::GetContentRegionAvail());
+m_overlayPos = ImGui::GetItemRectMin();
+if (!m_currentDirectory.empty() &&
+	std::filesystem::equivalent(m_currentDirectory, PathFinder::RelativeToPrefab("")))
+{
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+		{
+			HandleSceneObjectDrop(payload->Data);
+		}
+		ImGui::EndDragDropTarget();
+	}
+}
+ImGui::SetCursorScreenPos(m_overlayPos);
+
+ShowCurrentDirectoryFiles();
+ImGui::PopStyleColor();
+ImGui::EndChild();
+
 }

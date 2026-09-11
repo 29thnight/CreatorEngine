@@ -5,7 +5,7 @@
 class AssetBundleWindow
 {
 public:
-    AssetBundleWindow();
+    void Draw();
     ~AssetBundleWindow() = default;
 
     AssetEntry entry{};

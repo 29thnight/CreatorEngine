@@ -12,7 +12,7 @@
 class ResourceCounterWindow
 {
 public:
-	ResourceCounterWindow();
+	void Draw();
 	~ResourceCounterWindow() = default;
 
 private:

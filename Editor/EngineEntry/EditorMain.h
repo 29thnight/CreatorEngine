@@ -10,13 +10,6 @@
 #include "Delegate.h"
 
 #include "MenuBarWindow.h"
-#include "HierarchyWindow.h"
-#include "InspectorWindow.h"
-#include "ProgressWindow.h"
-#include "AssetBundleWindow.h"
-#include "ContentsBrowserWindow.h"
-#include "ResourceCounterWindow.h"
-#include "EnhancedRenderDebugWindow.h"
 #include "EditorPlayModeController.h"
 
 #include <atomic>
@@ -99,17 +92,6 @@ namespace Editor
 		// UI 지역 상태뿐이면 수명을 여기서 관리할 이유가 없어서, 그런 창은
 		// 자유 함수와 TU 지역 상태로 옮긴다. Scene 과 Game 이 먼저 갔다.
 		std::unique_ptr<MenuBarWindow>             m_menuBarWindow;
-		std::unique_ptr<HierarchyWindow>           m_hierarchyWindow;
-		std::unique_ptr<InspectorWindow>           m_inspectorWindow;
-		std::unique_ptr<AssetBundleWindow>         m_projectWindow;
-		std::unique_ptr<ResourceCounterWindow>     m_resourceCounterWindow;
-		// DataSystem::Initialize가 아이콘·폰트를 올린 뒤에 만든다 — 창이
-		// 그리는 확장자→아이콘 표가 거기서 채워지기 때문이다.
-		std::unique_ptr<ContentsBrowserWindow>     m_contentsBrowserWindow;
-		// "RenderPass" 컨텍스트의 소유자. 이 객체가 없으면 Settings >
-		// Pipeline Setting이 등록되지 않은 이름을 열어 아무 창도 뜨지 않는다.
-		std::unique_ptr<EnhancedRenderDebugWindow> m_renderDebugWindow;
-
 		// 재생 전환에서 Editor만 하는 일(Undo 이력 폐기)의 소유자. Core의
 		// SceneManager는 통지만 하고 무엇이 일어나는지 모른다 — 헤더 주석 참고.
 		Editor::PlayModeController                 m_playModeController;

@@ -38,6 +38,12 @@ namespace editor
             // W3 에서 옮긴 것들.
             EditorWindowName::kScene,
             EditorWindowName::kGame,
+            EditorWindowName::kContentBrowser,
+            EditorWindowName::kHierarchy,
+            EditorWindowName::kInspector,
+            EditorWindowName::kAssetBundle,
+            EditorWindowName::kResourceCounter,
+            EditorWindowName::kRenderPass,
         };
 
         bool draws_without_store(std::string_view stable_id)

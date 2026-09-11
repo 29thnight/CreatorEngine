@@ -5,7 +5,7 @@ class Entity;
 class HierarchyWindow
 {
 public:
-	HierarchyWindow();
+	void Draw();
 	void DrawSceneObject(Entity* obj);
 	~HierarchyWindow() = default;
 

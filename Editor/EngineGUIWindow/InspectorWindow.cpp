@@ -112,430 +112,31 @@ static void RegisterAllTypedDraws()
 #undef REFLECT_DRAW_ONE
 }
 
-InspectorWindow::InspectorWindow()
+namespace
+{
+	// 창 상태의 유일한 자리(PHASE 21 W3). 팝업 깃발 넷·피커 대상·검색어·캐시 여덟뿐이다.
+	InspectorWindow& inspector_state()
+	{
+		static InspectorWindow value;
+		return value;
+	}
+}
+
+void editor::windows::draw_inspector()
+{
+	inspector_state().Draw();
+}
+
+// typed Draw 등록은 창의 일이 아니라 부팅의 일이다(PHASE 21 W3).
+//
+// 옛 자리는 이 창의 생성자였고 `EditorMain` 이 부팅에서 창을 만들었기에
+// 우연히 이르게 돌았다. 소유자가 사라지면 상태는 **처음 그릴 때** 서므로,
+// 그대로 두면 인스펙터를 열기 전에는 표가 비어 있다. 그 표를 읽는 것은
+// 인스펙터만이 아니다 — 애니메이터 창과 메시 렌더러 헬퍼가 같은
+// `Meta::TypedDraw` 를 읽는다. 그래서 부팅 자리로 올린다.
+void editor::windows::register_inspector_typed_draws()
 {
 	RegisterAllTypedDraws();
-
-	// PHASE 21 M4 2단계: 프레임은 셸이 연다(stacking = display_back).
-	editor::windows::bind_window_body(EditorWindowName::kInspector, [&]()
-	{
-
-		static Entity* prevSelectedSceneObject = nullptr;
-		static bool wasMetaSelectedLastFrame = false;
-
-		Scene* scene = nullptr;
-		RenderScene* renderScene = nullptr;
-		Entity* selectedSceneObject = nullptr;
-		std::optional<Authoring::WriteDocument>& selectedNode{
-			ContentsBrowserWindow::selectedFileMetaNode };
-		bool isSelectedNode = selectedNode.has_value();
-		file::path selectedFileName{ ContentsBrowserWindow::selectedFileName };
-		file::path selectedMetaFilePath{ ContentsBrowserWindow::selectedMetaFilePath };
-
-		if (SceneManagers->IsSceneLoading())
-		{
-			ImGui::Text("Not Init InspectorWindow");
-			//ImGui::End();
-			return;
-		}
-
-		scene = SceneManagers->GetActiveScene();
-		renderScene = SceneManagers->GetRenderScene();
-		if (scene && renderScene)
-		{
-			selectedSceneObject = scene->m_selectedEntity;
-
-			if (!scene && !renderScene)
-			{
-				ImGui::Text("Not Init InspectorWindow");
-				//ImGui::End();
-				return;
-			}
-		}
-
-		bool sceneObjectJustSelected = (selectedSceneObject != nullptr && selectedSceneObject != prevSelectedSceneObject);
-
-		bool metaNodeJustSelected = (isSelectedNode && !wasMetaSelectedLastFrame);
-
-		// 3. 우선순위 결정
-		if (sceneObjectJustSelected)
-		{
-			// 게임 오브젝트 선택 시 YAML 선택 해제
-			selectedNode = std::nullopt;
-			isSelectedNode = false;
-			wasMetaSelectedLastFrame = false;
-		}
-
-		if (metaNodeJustSelected)
-		{
-			// 메타 파일 선택 시 게임 오브젝트 해제
-			selectedSceneObject = nullptr;
-			prevSelectedSceneObject = nullptr;
-			wasMetaSelectedLastFrame = true;
-		}
-
-		TerrainBrush* terrainBrush = EditorSessionState::Get().FindTerrainBrush();
-		if (!selectedSceneObject && terrainBrush)
-		{
-			terrainBrush->m_isEditMode = false;
-		}
-
-		if (scene && selectedSceneObject)
-		{
-			ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
-			if (RectTransformComponent* rectTransform = selectedSceneObject->GetComponent<RectTransformComponent>())
-			{
-				ImGuiDrawHelperRectTransformComponent(rectTransform);
-			}
-			else
-			{
-				ImGuiDrawHelperTransformComponent(selectedSceneObject);
-			}
-
-			static bool isOpen = false;
-			static Component* selectedComponent = nullptr;
-
-			if (!selectedSceneObject->HasComponent<TerrainComponent>() &&
-				terrainBrush)
-			{
-				terrainBrush->m_isEditMode = false;
-			}
-
-			// ★ range-for가 아니라 인덱스 순회인 이유 (트랙 C · C2)
-			//
-			// 이 루프 안에서 그리는 드로어가 **같은 오브젝트에 컴포넌트를 붙인다**.
-			// 확정된 실사례: ImGuiDrawHelperTerrainComponent가 "Paint Foliage"를 열 때
-			// FoliageComponent가 없으면 그 자리에서 owner->AddComponent<FoliageComponent>()를
-			// 부른다(ImGuiDrawHelperTerrainComponent.cpp). AddComponent는 m_components에
-			// push_back하므로 커패시티를 넘기는 순간 벡터가 재할당되고, range-for가 쥐고
-			// 있던 반복자와 component 참조가 그 자리에서 무효해진다 — 드로어가 반환된 뒤
-			// 반복자를 증가시키는 것만으로 UB다(이 반복에서는 그 뒤로 component를 더 쓰지
-			// 않아 증상이 늦게 나타날 뿐이다).
-			//
-			// 인덱스는 재할당을 건너도 유효하고, size()를 매 반복 다시 읽으므로 방금 붙은
-			// 컴포넌트도 같은 프레임에 자연스럽게 그려진다. 무한 증식은 드로어 쪽 "없을
-			// 때만 만든다" 가드가 막는다. 저장소에 이미 있는 관용구다 —
-			// Entity::FindComponentSlot이 같은 이유로 인덱스 선형 탐색을 쓴다.
-			//
-			// 부착을 커맨드 버퍼로 미루는 쪽은 택하지 않았다: 드로어가 반환값을 바로 다음
-			// 줄에서 역참조한다(foliage->GetFoliageTypes()). 지연시키면 그 참조가 깨진다.
-			for (size_t componentIndex = 0; componentIndex < selectedSceneObject->m_components.size(); ++componentIndex)
-			{
-				auto& component = selectedSceneObject->m_components[componentIndex];
-				if(nullptr == component || component->GetTypeID() == type_guid(RectTransformComponent))
-					continue;
-
-				// CT1: 종전 Meta::Find(component->ToString())는 매 프레임 컴포넌트마다
-				// 문자열 생성 + 문자열 해시 조회였다 — m_name이 타입명과 일치한다는
-				// GENERATED_BODY 관행에 기댄 우회이기도 했다. typeID 조회는 항등이다
-				// (Registry가 등록 시 이름 맵·해시 맵에 같은 Type을 넣는다).
-				const auto& type = Meta::Find(component->GetTypeID().m_ID_Data);
-
-				std::string componentBaseName = component->ToString();
-				if (!type) continue;
-
-				// 체크박스에 m_isEnabled를 직접 물리면 SetEnabled를 건너뛰어
-				// OnEnable/OnDisable이 영영 호출되지 않는다. 지역 값으로 받아
-				// 전이가 생긴 프레임에만 컴포넌트에 알린다.
-				bool isEnabled = component->IsEnabled();
-				const bool isHeaderOpen = ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen, &isEnabled);
-				if (isEnabled != component->IsEnabled())
-				{
-					component->SetEnabled(isEnabled);
-				}
-
-				if (isHeaderOpen)
-				{
-					if(isOpen && nullptr == selectedComponent)
-					{
-						selectedComponent = component.get();
-					}
-					auto componentTypeID = component->GetTypeID();
-					if(componentTypeID == type_guid(MeshRenderer))
-					{
-						MeshRenderer* meshRenderer = dynamic_cast<MeshRenderer*>(component.get());
-						if (nullptr != meshRenderer)
-						{
-							ImGuiDrawHelperMeshRenderer(meshRenderer);
-						}
-					}
-					else if (componentTypeID == type_guid(TerrainComponent)) {
-
-						TerrainComponent* terrain = dynamic_cast<TerrainComponent*>(component.get());
-						if (nullptr != terrain)
-						{
-							ImGuiDrawHelperTerrainComponent(terrain);
-						}
-					}
-					else if (componentTypeID == type_guid(ScriptComponent))
-					{
-						ScriptComponent* script = dynamic_cast<ScriptComponent*>(component.get());
-						if (nullptr != script)
-						{
-							DrawManagedScripts(script);
-						}
-					}
-					else if (componentTypeID == type_guid(Animator))
-					{
-						Animator* animator = dynamic_cast<Animator*> (component.get());
-						if (nullptr != animator)
-						{
-							ImGuiDrawHelperAnimator(animator);
-						}
-					}
-					else if (componentTypeID == type_guid(StateMachineComponent))
-					{
-						StateMachineComponent* fsm = dynamic_cast<StateMachineComponent*>(component.get());
-						if (nullptr != fsm)
-						{
-							ImGuiDrawHelperFSM(fsm);
-						}
-					}
-					else if (componentTypeID == type_guid(BehaviorTreeComponent))
-					{
-						BehaviorTreeComponent* bt = dynamic_cast<BehaviorTreeComponent*>(component.get());
-						if (nullptr != bt)
-						{
-							ImGuiDrawHelperBT(bt);
-						}
-					}
-					else if (componentTypeID == type_guid(PlayerInputComponent))
-					{
-						PlayerInputComponent* input = dynamic_cast<PlayerInputComponent*>(component.get());
-						if (nullptr != input)
-						{
-							ImGuiDrawHelperPlayerInput(input);
-						}
-					}
-					else if (componentTypeID == type_guid(VolumeComponent))
-					{
-						VolumeComponent* input = dynamic_cast<VolumeComponent*>(component.get());
-						if (nullptr != input)
-						{
-							ImGuiDrawHelperVolume(input);
-						}
-					}
-					else if (componentTypeID == type_guid(DecalComponent)) 
-					{
-						DecalComponent* input = dynamic_cast<DecalComponent*>(component.get());
-						if (nullptr != input) 
-						{
-							ImGuiDrawHelperDecal(input);
-						}
-					}
-					else if (componentTypeID == type_guid(ImageComponent))
-					{
-						ImageComponent* image = dynamic_cast<ImageComponent*>(component.get());
-						if (nullptr != image)
-						{
-							ImGuiDrawHelperImageComponent(image);
-						}
-					}
-					else if (componentTypeID == type_guid(SpriteRenderer))
-					{
-						SpriteRenderer* sprite = dynamic_cast<SpriteRenderer*>(component.get());
-						if (nullptr != sprite)
-						{
-							//이건 뭔 버그죠?
-							ImGuiDrawHelperSpriteRenderer(sprite);
-						}
-					}
-					else if (componentTypeID == type_guid(Canvas))
-					{
-						Canvas* canvas = dynamic_cast<Canvas*>(component.get());
-						if (nullptr != canvas)
-						{
-							ImGuiDrawHelperCanvas(canvas);
-						}
-					}
-					else if (componentTypeID == type_guid(SoundComponent))
-					{
-						SoundComponent* snd = dynamic_cast<SoundComponent*>(component.get());
-						if (snd) ImGuiDrawHelperSoundComponent(snd);   // 커스텀 인스펙터 호출
-					}
-					else if (type)
-					{
-						// K2 스테이지 A: m_components 순회 변수(component)가 이제
-						// std::unique_ptr<Component> — dynamic_pointer_cast(shared_ptr
-						// 전용) 대신 dynamic_cast로 raw 포인터를 얻는다.
-						auto* customInspector = dynamic_cast<ICustomEditor*>(component.get());
-						if (customInspector)
-						{
-							customInspector->OnInspectorGUI();
-						}
-						else
-						{
-							Meta::DrawObject(component.get(), *type);
-						}
-					}
-				}
-			}
-			
-			ImGui::Separator();
-			ImVec2 windowSize = ImGui::GetWindowSize();      // 현재 윈도우의 전체 크기
-			ImVec2 buttonSize = ImVec2(180, 0);              // 버튼 가로 크기 (세로는 자동 계산됨)
-
-			static ImGuiTextFilter searchFilter;
-
-			ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // 수평 중앙 정렬
-
-			if (ImGui::Button("Add Component", buttonSize))
-			{
-				ImGui::OpenPopup("AddComponent");
-			}
-
-			ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
-			if (ImGui::BeginPopup("AddComponent"))
-			{
-				ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // 노란색 텍스트
-				ImGui::Separator(); // 구분선
-
-				float availableWidth = ImGui::GetContentRegionAvail().x;
-				searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-
-				for (const auto& [type_name, type] : ComponentFactorys->m_componentTypes)
-				{
-					if (!searchFilter.PassFilter(type_name.c_str()))
-						continue;
-
-					if (type_name.empty())
-					{
-						const_cast<std::string&>(type_name) = "None";
-					}
-
-					// ScriptComponent는 아래 C# Scripts 섹션이 담당한다 —
-					// 여기(단일 부착 경로)로 붙이면 두 번째 스크립트부터 기존 것이 반환된다.
-					if (type->typeID == type_guid(ScriptComponent))
-						continue;
-
-					if (ImGui::MenuItem(type_name.c_str()))
-					{
-						// K2 스테이지 A: AddComponent가 raw Component*를 돌려준다.
-						EditorObjectOperations::AddComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), type_name);
-					}
-				}
-
-				// ── C# Scripts ──
-				// ClrHost가 스크립트 어셈블리에 등록된 타입 이름을 내준다.
-				// 스크립트는 한 오브젝트에 여럿 붙으므로 AddComponentAllowMultiple 경로를 탄다.
-				ImGui::Separator();
-				ImGui::TextColored(ImVec4(0.6f, 0.85f, 1.f, 1.f), "C# Scripts");
-
-				const auto managedTypeNames = ClrHost::Get().GetComponentTypeNames();
-				if (managedTypeNames.empty())
-				{
-					ImGui::TextDisabled(ClrHost::Get().IsReady()
-						? "등록된 C# 스크립트가 없습니다"
-						: "CLR이 준비되지 않았습니다");
-				}
-				for (const auto& managedName : managedTypeNames)
-				{
-					if (!searchFilter.PassFilter(managedName.c_str()))
-						continue;
-
-					if (ImGui::MenuItem((managedName + " (C#)").c_str()))
-					{
-						AttachManagedScript(selectedSceneObject, managedName);
-					}
-				}
-
-				ImGui::EndPopup();
-			}
-
-			// 다음 프레임에서 열기
-
-
-
-
-
-			if (m_openClipPicker) 
-			{
-				DrawSoundClipPicker();
-			}
-
-			if (isOpen)
-			{
-				ImGui::OpenPopup("ComponentMenu");
-				isOpen = false;
-			}
-
-
-
-			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-			ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
-			if (ImGui::BeginPopup("ComponentMenu"))
-			{
-				if (ImGui::MenuItem("		Remove Component"))
-				{
-					if (selectedComponent) {
-						EditorObjectOperations::RemoveComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), "#" + std::to_string(selectedComponent->GetInstanceID()));
-					}
-					ImGui::CloseCurrentPopup();
-					selectedComponent = nullptr;
-				}
-
-				// 선언된 컴포넌트 팝업 항목(PHASE 21 M1). 문맥은 (엔티티 신원, 컴포넌트
-				// 선택자) 둘이다. 선택자는 위 Remove Component 가 쓰는 것과 **같은** 형태인
-				// "#<instanceID>" 다 — CLI 가 컴포넌트를 가리킬 때 쓰는 그 표기여서, 복사한
-				// 값을 그대로 명령에 붙일 수 있다. 항목 0 이면 구분선조차 넣지 않는다(A.6).
-				if (::editor::popup_host_has_items(::editor::popup_host::inspector_component) &&
-					nullptr != selectedComponent && nullptr != selectedSceneObject)
-				{
-					ImGui::Separator();
-					::editor::draw_popup_menu_items<::editor::popup_host::inspector_component>(
-						::editor::component_target{
-							EditorObjectOperations::ObjectId(
-								selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index)),
-							"#" + std::to_string(selectedComponent->GetInstanceID()) });
-				}
-				ImGui::EndPopup();
-			}
-			ImGui::PopStyleVar();
-			ImGui::PopStyleColor(2);
-		}
-		else if (isSelectedNode)
-		{
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
-			ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
-			
-			std::string stem = selectedFileName.stem().string();
-
-			stem += " Import Settings";
-
-			if (ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				DrawYamlNodeEditor(selectedNode->Root());
-
-				ImGui::Spacing();
-				if (ImGui::Button("Save"))
-				{
-					try
-					{
-						std::ofstream fout(selectedMetaFilePath, std::ios::binary | std::ios::trunc);
-						if (fout.is_open())
-						{
-							fout << selectedNode->Dump();
-							fout.close();
-						}
-						else
-						{
-							Debug->LogError("Failed to open file for writing: " + selectedMetaFilePath.string());
-						}
-					}
-					catch (const std::exception& e)
-					{
-						Debug->LogError("Failed to save YAML: " + std::string(e.what()));
-					}
-				}
-			}
-			ImGui::PopStyleVar(2);
-		}
-
-		prevSelectedSceneObject = selectedSceneObject;
-		wasMetaSelectedLastFrame = isSelectedNode;
-
-	});
 }
 
 void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
@@ -2035,5 +1636,421 @@ void InspectorWindow::DrawSoundClipPicker()
 	End();
 }
 
+// PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
+void InspectorWindow::Draw()
+{
+	static Entity* prevSelectedSceneObject = nullptr;
+	static bool wasMetaSelectedLastFrame = false;
+
+	Scene* scene = nullptr;
+	RenderScene* renderScene = nullptr;
+	Entity* selectedSceneObject = nullptr;
+	std::optional<Authoring::WriteDocument>& selectedNode{
+		ContentsBrowserWindow::selectedFileMetaNode };
+	bool isSelectedNode = selectedNode.has_value();
+	file::path selectedFileName{ ContentsBrowserWindow::selectedFileName };
+	file::path selectedMetaFilePath{ ContentsBrowserWindow::selectedMetaFilePath };
+
+	if (SceneManagers->IsSceneLoading())
+	{
+		ImGui::Text("Not Init InspectorWindow");
+		//ImGui::End();
+		return;
+	}
+
+	scene = SceneManagers->GetActiveScene();
+	renderScene = SceneManagers->GetRenderScene();
+	if (scene && renderScene)
+	{
+		selectedSceneObject = scene->m_selectedEntity;
+
+		if (!scene && !renderScene)
+		{
+			ImGui::Text("Not Init InspectorWindow");
+			//ImGui::End();
+			return;
+		}
+	}
+
+	bool sceneObjectJustSelected = (selectedSceneObject != nullptr && selectedSceneObject != prevSelectedSceneObject);
+
+	bool metaNodeJustSelected = (isSelectedNode && !wasMetaSelectedLastFrame);
+
+	// 3. 우선순위 결정
+	if (sceneObjectJustSelected)
+	{
+		// 게임 오브젝트 선택 시 YAML 선택 해제
+		selectedNode = std::nullopt;
+		isSelectedNode = false;
+		wasMetaSelectedLastFrame = false;
+	}
+
+	if (metaNodeJustSelected)
+	{
+		// 메타 파일 선택 시 게임 오브젝트 해제
+		selectedSceneObject = nullptr;
+		prevSelectedSceneObject = nullptr;
+		wasMetaSelectedLastFrame = true;
+	}
+
+	TerrainBrush* terrainBrush = EditorSessionState::Get().FindTerrainBrush();
+	if (!selectedSceneObject && terrainBrush)
+	{
+		terrainBrush->m_isEditMode = false;
+	}
+
+	if (scene && selectedSceneObject)
+	{
+		ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
+		if (RectTransformComponent* rectTransform = selectedSceneObject->GetComponent<RectTransformComponent>())
+		{
+			ImGuiDrawHelperRectTransformComponent(rectTransform);
+		}
+		else
+		{
+			ImGuiDrawHelperTransformComponent(selectedSceneObject);
+		}
+
+		static bool isOpen = false;
+		static Component* selectedComponent = nullptr;
+
+		if (!selectedSceneObject->HasComponent<TerrainComponent>() &&
+			terrainBrush)
+		{
+			terrainBrush->m_isEditMode = false;
+		}
+
+		// ★ range-for가 아니라 인덱스 순회인 이유 (트랙 C · C2)
+		//
+		// 이 루프 안에서 그리는 드로어가 **같은 오브젝트에 컴포넌트를 붙인다**.
+		// 확정된 실사례: ImGuiDrawHelperTerrainComponent가 "Paint Foliage"를 열 때
+		// FoliageComponent가 없으면 그 자리에서 owner->AddComponent<FoliageComponent>()를
+		// 부른다(ImGuiDrawHelperTerrainComponent.cpp). AddComponent는 m_components에
+		// push_back하므로 커패시티를 넘기는 순간 벡터가 재할당되고, range-for가 쥐고
+		// 있던 반복자와 component 참조가 그 자리에서 무효해진다 — 드로어가 반환된 뒤
+		// 반복자를 증가시키는 것만으로 UB다(이 반복에서는 그 뒤로 component를 더 쓰지
+		// 않아 증상이 늦게 나타날 뿐이다).
+		//
+		// 인덱스는 재할당을 건너도 유효하고, size()를 매 반복 다시 읽으므로 방금 붙은
+		// 컴포넌트도 같은 프레임에 자연스럽게 그려진다. 무한 증식은 드로어 쪽 "없을
+		// 때만 만든다" 가드가 막는다. 저장소에 이미 있는 관용구다 —
+		// Entity::FindComponentSlot이 같은 이유로 인덱스 선형 탐색을 쓴다.
+		//
+		// 부착을 커맨드 버퍼로 미루는 쪽은 택하지 않았다: 드로어가 반환값을 바로 다음
+		// 줄에서 역참조한다(foliage->GetFoliageTypes()). 지연시키면 그 참조가 깨진다.
+		for (size_t componentIndex = 0; componentIndex < selectedSceneObject->m_components.size(); ++componentIndex)
+		{
+			auto& component = selectedSceneObject->m_components[componentIndex];
+			if(nullptr == component || component->GetTypeID() == type_guid(RectTransformComponent))
+				continue;
+
+			// CT1: 종전 Meta::Find(component->ToString())는 매 프레임 컴포넌트마다
+			// 문자열 생성 + 문자열 해시 조회였다 — m_name이 타입명과 일치한다는
+			// GENERATED_BODY 관행에 기댄 우회이기도 했다. typeID 조회는 항등이다
+			// (Registry가 등록 시 이름 맵·해시 맵에 같은 Type을 넣는다).
+			const auto& type = Meta::Find(component->GetTypeID().m_ID_Data);
+
+			std::string componentBaseName = component->ToString();
+			if (!type) continue;
+
+			// 체크박스에 m_isEnabled를 직접 물리면 SetEnabled를 건너뛰어
+			// OnEnable/OnDisable이 영영 호출되지 않는다. 지역 값으로 받아
+			// 전이가 생긴 프레임에만 컴포넌트에 알린다.
+			bool isEnabled = component->IsEnabled();
+			const bool isHeaderOpen = ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen, &isEnabled);
+			if (isEnabled != component->IsEnabled())
+			{
+				component->SetEnabled(isEnabled);
+			}
+
+			if (isHeaderOpen)
+			{
+				if(isOpen && nullptr == selectedComponent)
+				{
+					selectedComponent = component.get();
+				}
+				auto componentTypeID = component->GetTypeID();
+				if(componentTypeID == type_guid(MeshRenderer))
+				{
+					MeshRenderer* meshRenderer = dynamic_cast<MeshRenderer*>(component.get());
+					if (nullptr != meshRenderer)
+					{
+						ImGuiDrawHelperMeshRenderer(meshRenderer);
+					}
+				}
+				else if (componentTypeID == type_guid(TerrainComponent)) {
+
+					TerrainComponent* terrain = dynamic_cast<TerrainComponent*>(component.get());
+					if (nullptr != terrain)
+					{
+						ImGuiDrawHelperTerrainComponent(terrain);
+					}
+				}
+				else if (componentTypeID == type_guid(ScriptComponent))
+				{
+					ScriptComponent* script = dynamic_cast<ScriptComponent*>(component.get());
+					if (nullptr != script)
+					{
+						DrawManagedScripts(script);
+					}
+				}
+				else if (componentTypeID == type_guid(Animator))
+				{
+					Animator* animator = dynamic_cast<Animator*> (component.get());
+					if (nullptr != animator)
+					{
+						ImGuiDrawHelperAnimator(animator);
+					}
+				}
+				else if (componentTypeID == type_guid(StateMachineComponent))
+				{
+					StateMachineComponent* fsm = dynamic_cast<StateMachineComponent*>(component.get());
+					if (nullptr != fsm)
+					{
+						ImGuiDrawHelperFSM(fsm);
+					}
+				}
+				else if (componentTypeID == type_guid(BehaviorTreeComponent))
+				{
+					BehaviorTreeComponent* bt = dynamic_cast<BehaviorTreeComponent*>(component.get());
+					if (nullptr != bt)
+					{
+						ImGuiDrawHelperBT(bt);
+					}
+				}
+				else if (componentTypeID == type_guid(PlayerInputComponent))
+				{
+					PlayerInputComponent* input = dynamic_cast<PlayerInputComponent*>(component.get());
+					if (nullptr != input)
+					{
+						ImGuiDrawHelperPlayerInput(input);
+					}
+				}
+				else if (componentTypeID == type_guid(VolumeComponent))
+				{
+					VolumeComponent* input = dynamic_cast<VolumeComponent*>(component.get());
+					if (nullptr != input)
+					{
+						ImGuiDrawHelperVolume(input);
+					}
+				}
+				else if (componentTypeID == type_guid(DecalComponent)) 
+				{
+					DecalComponent* input = dynamic_cast<DecalComponent*>(component.get());
+					if (nullptr != input) 
+					{
+						ImGuiDrawHelperDecal(input);
+					}
+				}
+				else if (componentTypeID == type_guid(ImageComponent))
+				{
+					ImageComponent* image = dynamic_cast<ImageComponent*>(component.get());
+					if (nullptr != image)
+					{
+						ImGuiDrawHelperImageComponent(image);
+					}
+				}
+				else if (componentTypeID == type_guid(SpriteRenderer))
+				{
+					SpriteRenderer* sprite = dynamic_cast<SpriteRenderer*>(component.get());
+					if (nullptr != sprite)
+					{
+						//이건 뭔 버그죠?
+						ImGuiDrawHelperSpriteRenderer(sprite);
+					}
+				}
+				else if (componentTypeID == type_guid(Canvas))
+				{
+					Canvas* canvas = dynamic_cast<Canvas*>(component.get());
+					if (nullptr != canvas)
+					{
+						ImGuiDrawHelperCanvas(canvas);
+					}
+				}
+				else if (componentTypeID == type_guid(SoundComponent))
+				{
+					SoundComponent* snd = dynamic_cast<SoundComponent*>(component.get());
+					if (snd) ImGuiDrawHelperSoundComponent(snd);   // 커스텀 인스펙터 호출
+				}
+				else if (type)
+				{
+					// K2 스테이지 A: m_components 순회 변수(component)가 이제
+					// std::unique_ptr<Component> — dynamic_pointer_cast(shared_ptr
+					// 전용) 대신 dynamic_cast로 raw 포인터를 얻는다.
+					auto* customInspector = dynamic_cast<ICustomEditor*>(component.get());
+					if (customInspector)
+					{
+						customInspector->OnInspectorGUI();
+					}
+					else
+					{
+						Meta::DrawObject(component.get(), *type);
+					}
+				}
+			}
+		}
+
+		ImGui::Separator();
+		ImVec2 windowSize = ImGui::GetWindowSize();      // 현재 윈도우의 전체 크기
+		ImVec2 buttonSize = ImVec2(180, 0);              // 버튼 가로 크기 (세로는 자동 계산됨)
+
+		static ImGuiTextFilter searchFilter;
+
+		ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // 수평 중앙 정렬
+
+		if (ImGui::Button("Add Component", buttonSize))
+		{
+			ImGui::OpenPopup("AddComponent");
+		}
+
+		ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
+		if (ImGui::BeginPopup("AddComponent"))
+		{
+			ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // 노란색 텍스트
+			ImGui::Separator(); // 구분선
+
+			float availableWidth = ImGui::GetContentRegionAvail().x;
+			searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+
+			for (const auto& [type_name, type] : ComponentFactorys->m_componentTypes)
+			{
+				if (!searchFilter.PassFilter(type_name.c_str()))
+					continue;
+
+				if (type_name.empty())
+				{
+					const_cast<std::string&>(type_name) = "None";
+				}
+
+				// ScriptComponent는 아래 C# Scripts 섹션이 담당한다 —
+				// 여기(단일 부착 경로)로 붙이면 두 번째 스크립트부터 기존 것이 반환된다.
+				if (type->typeID == type_guid(ScriptComponent))
+					continue;
+
+				if (ImGui::MenuItem(type_name.c_str()))
+				{
+					// K2 스테이지 A: AddComponent가 raw Component*를 돌려준다.
+					EditorObjectOperations::AddComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), type_name);
+				}
+			}
+
+			// ── C# Scripts ──
+			// ClrHost가 스크립트 어셈블리에 등록된 타입 이름을 내준다.
+			// 스크립트는 한 오브젝트에 여럿 붙으므로 AddComponentAllowMultiple 경로를 탄다.
+			ImGui::Separator();
+			ImGui::TextColored(ImVec4(0.6f, 0.85f, 1.f, 1.f), "C# Scripts");
+
+			const auto managedTypeNames = ClrHost::Get().GetComponentTypeNames();
+			if (managedTypeNames.empty())
+			{
+				ImGui::TextDisabled(ClrHost::Get().IsReady()
+					? "등록된 C# 스크립트가 없습니다"
+					: "CLR이 준비되지 않았습니다");
+			}
+			for (const auto& managedName : managedTypeNames)
+			{
+				if (!searchFilter.PassFilter(managedName.c_str()))
+					continue;
+
+				if (ImGui::MenuItem((managedName + " (C#)").c_str()))
+				{
+					AttachManagedScript(selectedSceneObject, managedName);
+				}
+			}
+
+			ImGui::EndPopup();
+		}
+
+		// 다음 프레임에서 열기
 
 
+
+
+
+		if (m_openClipPicker) 
+		{
+			DrawSoundClipPicker();
+		}
+
+		if (isOpen)
+		{
+			ImGui::OpenPopup("ComponentMenu");
+			isOpen = false;
+		}
+
+
+
+		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
+		if (ImGui::BeginPopup("ComponentMenu"))
+		{
+			if (ImGui::MenuItem("		Remove Component"))
+			{
+				if (selectedComponent) {
+					EditorObjectOperations::RemoveComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), "#" + std::to_string(selectedComponent->GetInstanceID()));
+				}
+				ImGui::CloseCurrentPopup();
+				selectedComponent = nullptr;
+			}
+
+			// 선언된 컴포넌트 팝업 항목(PHASE 21 M1). 문맥은 (엔티티 신원, 컴포넌트
+			// 선택자) 둘이다. 선택자는 위 Remove Component 가 쓰는 것과 **같은** 형태인
+			// "#<instanceID>" 다 — CLI 가 컴포넌트를 가리킬 때 쓰는 그 표기여서, 복사한
+			// 값을 그대로 명령에 붙일 수 있다. 항목 0 이면 구분선조차 넣지 않는다(A.6).
+			if (::editor::popup_host_has_items(::editor::popup_host::inspector_component) &&
+				nullptr != selectedComponent && nullptr != selectedSceneObject)
+			{
+				ImGui::Separator();
+				::editor::draw_popup_menu_items<::editor::popup_host::inspector_component>(
+					::editor::component_target{
+						EditorObjectOperations::ObjectId(
+							selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index)),
+						"#" + std::to_string(selectedComponent->GetInstanceID()) });
+			}
+			ImGui::EndPopup();
+		}
+		ImGui::PopStyleVar();
+		ImGui::PopStyleColor(2);
+	}
+	else if (isSelectedNode)
+	{
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
+		ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+
+		std::string stem = selectedFileName.stem().string();
+
+		stem += " Import Settings";
+
+		if (ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			DrawYamlNodeEditor(selectedNode->Root());
+
+			ImGui::Spacing();
+			if (ImGui::Button("Save"))
+			{
+				try
+				{
+					std::ofstream fout(selectedMetaFilePath, std::ios::binary | std::ios::trunc);
+					if (fout.is_open())
+					{
+						fout << selectedNode->Dump();
+						fout.close();
+					}
+					else
+					{
+						Debug->LogError("Failed to open file for writing: " + selectedMetaFilePath.string());
+					}
+				}
+				catch (const std::exception& e)
+				{
+					Debug->LogError("Failed to save YAML: " + std::string(e.what()));
+				}
+			}
+		}
+		ImGui::PopStyleVar(2);
+	}
+
+	prevSelectedSceneObject = selectedSceneObject;
+	wasMetaSelectedLastFrame = isSelectedNode;
+}

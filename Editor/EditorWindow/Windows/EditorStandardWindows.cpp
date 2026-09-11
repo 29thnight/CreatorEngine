@@ -9,13 +9,7 @@
 
 namespace editor::windows
 {
-    EDITOR_DEFINE_WINDOW_ENTRY(hierarchy,               EditorWindowName::kHierarchy)
-    EDITOR_DEFINE_WINDOW_ENTRY(inspector,               EditorWindowName::kInspector)
-    EDITOR_DEFINE_WINDOW_ENTRY(asset_bundle,            EditorWindowName::kAssetBundle)
-    EDITOR_DEFINE_WINDOW_ENTRY(content_browser,         EditorWindowName::kContentBrowser)
-    EDITOR_DEFINE_WINDOW_ENTRY(resource_counter,        EditorWindowName::kResourceCounter)
 
-    EDITOR_DEFINE_WINDOW_ENTRY(render_pass,             EditorWindowName::kRenderPass)
     EDITOR_DEFINE_WINDOW_ENTRY(light_map,               EditorWindowName::kLightMap)
     EDITOR_DEFINE_WINDOW_ENTRY(collision_matrix,        EditorWindowName::kCollisionMatrix)
     EDITOR_DEFINE_WINDOW_ENTRY(texture_import_selector, EditorWindowName::kTextureImportSelector)

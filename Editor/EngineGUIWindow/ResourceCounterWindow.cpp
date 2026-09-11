@@ -20,187 +20,19 @@ namespace
 	constexpr ImVec4 kDimColor{ 0.55f, 0.58f, 0.65f, 1.0f };
 }
 
-ResourceCounterWindow::ResourceCounterWindow()
+namespace
 {
-	// PHASE 21 M4 2단계: 프레임은 셸이 연다.
-	editor::windows::bind_window_body(EditorWindowName::kResourceCounter, [&]()
+	// 창 상태의 유일한 자리(PHASE 21 W3). 기준선과 GPU 집계 스냅샷 둘뿐이다.
+	ResourceCounterWindow& resource_counter_state()
 	{
-		static Snapshot displayed{};
-		static double lastRefreshTime = -1.0;
+		static ResourceCounterWindow value;
+		return value;
+	}
+}
 
-		const double now = ImGui::GetTime();
-		if (!displayed.valid || (now - lastRefreshTime) >= kRefreshIntervalSeconds)
-		{
-			displayed = Capture(false);
-			lastRefreshTime = now;
-		}
-
-		// 무거운 GPU 객체 집계는 별도 보관값을 재사용한다.
-		displayed.liveGpuObjects = m_lastGpuCensus.liveGpuObjects;
-		displayed.liveGpuValid = m_lastGpuCensus.liveGpuValid;
-
-		// --- 기준선 조작 ---
-		if (ImGui::Button(ICON_FA_FLAG " 현재를 기준선으로"))
-		{
-			m_baseline = displayed;
-			m_baseline.valid = true;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_XMARK " 기준선 해제"))
-		{
-			m_baseline = Snapshot{};
-		}
-
-		if (m_baseline.valid)
-		{
-			ImGui::TextColored(kDimColor, "기준선 대비 증감을 표시합니다. 붉은 값은 회수되지 않은 항목입니다.");
-		}
-		else
-		{
-			ImGui::TextColored(kDimColor, "기준선을 찍은 뒤 씬을 오가면 무엇이 남는지 드러납니다.");
-		}
-
-		ImGui::Separator();
-
-		// --- 에셋 캐시 ---
-		if (ImGui::CollapsingHeader("에셋 캐시 (DataSystem)", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			if (ImGui::BeginTable("##assetCounts", 3, ImGuiTableFlags_SizingFixedFit))
-			{
-				DrawCountRow("Models", displayed.models, m_baseline.models);
-				DrawCountRow("Materials", displayed.materials, m_baseline.materials);
-				DrawCountRow("Textures", displayed.textures, m_baseline.textures);
-				DrawCountRow("UITextures", displayed.uiTextures, m_baseline.uiTextures);
-				DrawCountRow("SpriteSheets", displayed.spriteSheets, m_baseline.spriteSheets);
-				DrawCountRow("SpriteFonts", displayed.spriteFonts, m_baseline.spriteFonts);
-				DrawCountRow("Retained(보존 표시)", displayed.retainedAssets, m_baseline.retainedAssets);
-				ImGui::EndTable();
-			}
-			ImGui::TextColored(kDimColor,
-				"참고: 현재 UnloadUnusedAssets는 호출되지 않아 캐시는 증가만 합니다.");
-		}
-
-		// --- 렌더 프록시 ---
-		if (ImGui::CollapsingHeader("렌더 프록시 (RenderScene)", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			if (ImGui::BeginTable("##proxyCounts", 3, ImGuiTableFlags_SizingFixedFit))
-			{
-				DrawCountRow("Proxies", displayed.proxies, m_baseline.proxies);
-				DrawCountRow("UI Proxies", displayed.uiProxies, m_baseline.uiProxies);
-				DrawCountRow("Animators", displayed.animators, m_baseline.animators);
-				DrawCountRow("Animation Palettes", displayed.animationPalettes, m_baseline.animationPalettes);
-				ImGui::EndTable();
-			}
-			if (displayed.animators != displayed.animationPalettes)
-			{
-				// 두 맵은 항상 짝을 이뤄야 한다. 어긋나면 팔레트 버퍼가 새거나 조기 해제된 것이다.
-				ImGui::TextColored(kIncreaseColor,
-					ICON_FA_TRIANGLE_EXCLAMATION " Animator와 Palette 수가 다릅니다 (%zu vs %zu)",
-					displayed.animators, displayed.animationPalettes);
-			}
-		}
-
-		// --- GPU ---
-		if (ImGui::CollapsingHeader("GPU", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			ImGui::Text("VRAM  %llu MB / %llu MB",
-				static_cast<unsigned long long>(displayed.vramUsedMB),
-				static_cast<unsigned long long>(displayed.vramBudgetMB));
-
-			if (m_baseline.valid)
-			{
-				const int64_t delta =
-					static_cast<int64_t>(displayed.vramUsedMB) - static_cast<int64_t>(m_baseline.vramUsedMB);
-				if (delta != 0)
-				{
-					ImGui::SameLine();
-					ImGui::TextColored(delta > 0 ? kIncreaseColor : kDecreaseColor, "(%+lld MB)",
-						static_cast<long long>(delta));
-				}
-			}
-
-			if (displayed.vramBudgetMB > 0)
-			{
-				const float ratio = static_cast<float>(displayed.vramUsedMB) /
-					static_cast<float>(displayed.vramBudgetMB);
-				ImGui::ProgressBar(ratio, ImVec2(-1.0f, 0.0f));
-			}
-
-			ImGui::Separator();
-
-			// 엔진이 직접 센 에셋 인스턴스. 디버그 레이어의 전수 열거는 실행 중에
-			// 부르면 이후 렌더가 죽으므로(IRHIDeviceResources.h 참고) 쓰지 않는다.
-			// 대신 이 수치가 씬을 오갔을 때 제자리로 돌아오는지를 본다.
-			ImGui::Text("엔진 에셋");
-			for (size_t i = 0; i < displayed.engineResources.counts.size(); ++i)
-			{
-				const int64_t current = displayed.engineResources.counts[i];
-				if (current == 0 && !m_baseline.valid) continue;
-
-				ImGui::Text("  %-10s %lld",
-					std::string(Diagnostics::kEngineResourceNames[i]).c_str(),
-					static_cast<long long>(current));
-
-				if (m_baseline.valid)
-				{
-					const int64_t delta = current - m_baseline.engineResources.counts[i];
-					if (delta != 0)
-					{
-						ImGui::SameLine();
-						ImGui::TextColored(delta > 0 ? kIncreaseColor : kDecreaseColor, "(%+lld)",
-							static_cast<long long>(delta));
-					}
-				}
-			}
-
-			ImGui::TextColored(kDimColor, "D3D 객체 전수 집계는 종료 리포트(로그)에서 확인");
-		}
-
-		// --- 관리 힙 (.NET GC) --- PHASE 9-7
-		//
-		// 네이티브 카운터만 보면 평탄성의 절반만 보는 것이다. 스크립트가 C#으로 간
-		// 뒤로는 씬이 잡고 있던 것의 상당수가 관리 힙에 있고, 그쪽이 자라면
-		// 네이티브 수치가 아무리 제자리여도 프로세스는 커진다.
-		if (ImGui::CollapsingHeader("관리 힙 (.NET GC)", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			if (!displayed.gcValid)
-			{
-				ImGui::TextColored(kDimColor, "스크립트 계층 비활성 — 관리 힙 지표 없음");
-			}
-			else
-			{
-				auto drawDelta = [&](int64_t current, int64_t baseline, const char* suffix)
-				{
-					if (!m_baseline.valid || !m_baseline.gcValid) return;
-					const int64_t delta = current - baseline;
-					if (0 == delta) return;
-					ImGui::SameLine();
-					ImGui::TextColored(delta > 0 ? kIncreaseColor : kDecreaseColor,
-						"(%+lld%s)", static_cast<long long>(delta), suffix);
-				};
-
-				// 수집 횟수는 단조 증가라 증감의 뜻이 다르다 — 여기서는 '기준선 이후
-				// 몇 번 돌았나'이고, 씬 전환마다 gen2가 정확히 늘어나는지가 9-6의 확인점이다.
-				ImGui::Text("수집 횟수  gen0 %d", displayed.gcGen0);
-				drawDelta(displayed.gcGen0, m_baseline.gcGen0, "");
-				ImGui::SameLine(); ImGui::Text(" · gen1 %d", displayed.gcGen1);
-				drawDelta(displayed.gcGen1, m_baseline.gcGen1, "");
-				ImGui::SameLine(); ImGui::Text(" · gen2 %d", displayed.gcGen2);
-				drawDelta(displayed.gcGen2, m_baseline.gcGen2, "");
-
-				constexpr double kBytesPerMB = 1024.0 * 1024.0;
-				ImGui::Text("힙 크기    %.1f MB", displayed.gcHeapBytes / kBytesPerMB);
-				drawDelta((displayed.gcHeapBytes - m_baseline.gcHeapBytes) / 1048576, 0, " MB");
-
-				ImGui::Text("단편화     %.1f MB", displayed.gcFragmentedBytes / kBytesPerMB);
-				ImGui::Text("GC 점유    %.2f %%", displayed.gcPausePercentX100 / 100.0);
-
-				ImGui::TextColored(kDimColor,
-					"씬을 오간 뒤 힙 크기가 기준선으로 돌아와야 한다. 계속 자라면 관리 측 참조가 남은 것이다.");
-			}
-		}
-	});
-
+void editor::windows::draw_resource_counter()
+{
+	resource_counter_state().Draw();
 }
 
 void ResourceCounterWindow::DrawCountRow(const char* label, size_t current, size_t baseline) const
@@ -318,4 +150,183 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 	}
 
 	return snapshot;
+}
+
+// PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
+void ResourceCounterWindow::Draw()
+{
+	static Snapshot displayed{};
+	static double lastRefreshTime = -1.0;
+
+	const double now = ImGui::GetTime();
+	if (!displayed.valid || (now - lastRefreshTime) >= kRefreshIntervalSeconds)
+	{
+		displayed = Capture(false);
+		lastRefreshTime = now;
+	}
+
+	// 무거운 GPU 객체 집계는 별도 보관값을 재사용한다.
+	displayed.liveGpuObjects = m_lastGpuCensus.liveGpuObjects;
+	displayed.liveGpuValid = m_lastGpuCensus.liveGpuValid;
+
+	// --- 기준선 조작 ---
+	if (ImGui::Button(ICON_FA_FLAG " 현재를 기준선으로"))
+	{
+		m_baseline = displayed;
+		m_baseline.valid = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button(ICON_FA_XMARK " 기준선 해제"))
+	{
+		m_baseline = Snapshot{};
+	}
+
+	if (m_baseline.valid)
+	{
+		ImGui::TextColored(kDimColor, "기준선 대비 증감을 표시합니다. 붉은 값은 회수되지 않은 항목입니다.");
+	}
+	else
+	{
+		ImGui::TextColored(kDimColor, "기준선을 찍은 뒤 씬을 오가면 무엇이 남는지 드러납니다.");
+	}
+
+	ImGui::Separator();
+
+	// --- 에셋 캐시 ---
+	if (ImGui::CollapsingHeader("에셋 캐시 (DataSystem)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (ImGui::BeginTable("##assetCounts", 3, ImGuiTableFlags_SizingFixedFit))
+		{
+			DrawCountRow("Models", displayed.models, m_baseline.models);
+			DrawCountRow("Materials", displayed.materials, m_baseline.materials);
+			DrawCountRow("Textures", displayed.textures, m_baseline.textures);
+			DrawCountRow("UITextures", displayed.uiTextures, m_baseline.uiTextures);
+			DrawCountRow("SpriteSheets", displayed.spriteSheets, m_baseline.spriteSheets);
+			DrawCountRow("SpriteFonts", displayed.spriteFonts, m_baseline.spriteFonts);
+			DrawCountRow("Retained(보존 표시)", displayed.retainedAssets, m_baseline.retainedAssets);
+			ImGui::EndTable();
+		}
+		ImGui::TextColored(kDimColor,
+			"참고: 현재 UnloadUnusedAssets는 호출되지 않아 캐시는 증가만 합니다.");
+	}
+
+	// --- 렌더 프록시 ---
+	if (ImGui::CollapsingHeader("렌더 프록시 (RenderScene)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (ImGui::BeginTable("##proxyCounts", 3, ImGuiTableFlags_SizingFixedFit))
+		{
+			DrawCountRow("Proxies", displayed.proxies, m_baseline.proxies);
+			DrawCountRow("UI Proxies", displayed.uiProxies, m_baseline.uiProxies);
+			DrawCountRow("Animators", displayed.animators, m_baseline.animators);
+			DrawCountRow("Animation Palettes", displayed.animationPalettes, m_baseline.animationPalettes);
+			ImGui::EndTable();
+		}
+		if (displayed.animators != displayed.animationPalettes)
+		{
+			// 두 맵은 항상 짝을 이뤄야 한다. 어긋나면 팔레트 버퍼가 새거나 조기 해제된 것이다.
+			ImGui::TextColored(kIncreaseColor,
+				ICON_FA_TRIANGLE_EXCLAMATION " Animator와 Palette 수가 다릅니다 (%zu vs %zu)",
+				displayed.animators, displayed.animationPalettes);
+		}
+	}
+
+	// --- GPU ---
+	if (ImGui::CollapsingHeader("GPU", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::Text("VRAM  %llu MB / %llu MB",
+			static_cast<unsigned long long>(displayed.vramUsedMB),
+			static_cast<unsigned long long>(displayed.vramBudgetMB));
+
+		if (m_baseline.valid)
+		{
+			const int64_t delta =
+				static_cast<int64_t>(displayed.vramUsedMB) - static_cast<int64_t>(m_baseline.vramUsedMB);
+			if (delta != 0)
+			{
+				ImGui::SameLine();
+				ImGui::TextColored(delta > 0 ? kIncreaseColor : kDecreaseColor, "(%+lld MB)",
+					static_cast<long long>(delta));
+			}
+		}
+
+		if (displayed.vramBudgetMB > 0)
+		{
+			const float ratio = static_cast<float>(displayed.vramUsedMB) /
+				static_cast<float>(displayed.vramBudgetMB);
+			ImGui::ProgressBar(ratio, ImVec2(-1.0f, 0.0f));
+		}
+
+		ImGui::Separator();
+
+		// 엔진이 직접 센 에셋 인스턴스. 디버그 레이어의 전수 열거는 실행 중에
+		// 부르면 이후 렌더가 죽으므로(IRHIDeviceResources.h 참고) 쓰지 않는다.
+		// 대신 이 수치가 씬을 오갔을 때 제자리로 돌아오는지를 본다.
+		ImGui::Text("엔진 에셋");
+		for (size_t i = 0; i < displayed.engineResources.counts.size(); ++i)
+		{
+			const int64_t current = displayed.engineResources.counts[i];
+			if (current == 0 && !m_baseline.valid) continue;
+
+			ImGui::Text("  %-10s %lld",
+				std::string(Diagnostics::kEngineResourceNames[i]).c_str(),
+				static_cast<long long>(current));
+
+			if (m_baseline.valid)
+			{
+				const int64_t delta = current - m_baseline.engineResources.counts[i];
+				if (delta != 0)
+				{
+					ImGui::SameLine();
+					ImGui::TextColored(delta > 0 ? kIncreaseColor : kDecreaseColor, "(%+lld)",
+						static_cast<long long>(delta));
+				}
+			}
+		}
+
+		ImGui::TextColored(kDimColor, "D3D 객체 전수 집계는 종료 리포트(로그)에서 확인");
+	}
+
+	// --- 관리 힙 (.NET GC) --- PHASE 9-7
+	//
+	// 네이티브 카운터만 보면 평탄성의 절반만 보는 것이다. 스크립트가 C#으로 간
+	// 뒤로는 씬이 잡고 있던 것의 상당수가 관리 힙에 있고, 그쪽이 자라면
+	// 네이티브 수치가 아무리 제자리여도 프로세스는 커진다.
+	if (ImGui::CollapsingHeader("관리 힙 (.NET GC)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (!displayed.gcValid)
+		{
+			ImGui::TextColored(kDimColor, "스크립트 계층 비활성 — 관리 힙 지표 없음");
+		}
+		else
+		{
+			auto drawDelta = [&](int64_t current, int64_t baseline, const char* suffix)
+			{
+				if (!m_baseline.valid || !m_baseline.gcValid) return;
+				const int64_t delta = current - baseline;
+				if (0 == delta) return;
+				ImGui::SameLine();
+				ImGui::TextColored(delta > 0 ? kIncreaseColor : kDecreaseColor,
+					"(%+lld%s)", static_cast<long long>(delta), suffix);
+			};
+
+			// 수집 횟수는 단조 증가라 증감의 뜻이 다르다 — 여기서는 '기준선 이후
+			// 몇 번 돌았나'이고, 씬 전환마다 gen2가 정확히 늘어나는지가 9-6의 확인점이다.
+			ImGui::Text("수집 횟수  gen0 %d", displayed.gcGen0);
+			drawDelta(displayed.gcGen0, m_baseline.gcGen0, "");
+			ImGui::SameLine(); ImGui::Text(" · gen1 %d", displayed.gcGen1);
+			drawDelta(displayed.gcGen1, m_baseline.gcGen1, "");
+			ImGui::SameLine(); ImGui::Text(" · gen2 %d", displayed.gcGen2);
+			drawDelta(displayed.gcGen2, m_baseline.gcGen2, "");
+
+			constexpr double kBytesPerMB = 1024.0 * 1024.0;
+			ImGui::Text("힙 크기    %.1f MB", displayed.gcHeapBytes / kBytesPerMB);
+			drawDelta((displayed.gcHeapBytes - m_baseline.gcHeapBytes) / 1048576, 0, " MB");
+
+			ImGui::Text("단편화     %.1f MB", displayed.gcFragmentedBytes / kBytesPerMB);
+			ImGui::Text("GC 점유    %.2f %%", displayed.gcPausePercentX100 / 100.0);
+
+			ImGui::TextColored(kDimColor,
+				"씬을 오간 뒤 힙 크기가 기준선으로 돌아와야 한다. 계속 자라면 관리 측 참조가 남은 것이다.");
+		}
+	}
 }

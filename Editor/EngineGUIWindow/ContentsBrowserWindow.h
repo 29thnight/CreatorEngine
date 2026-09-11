@@ -19,7 +19,7 @@
 class ContentsBrowserWindow
 {
 public:
-	ContentsBrowserWindow();
+	void Draw();
 	~ContentsBrowserWindow() = default;
 
 	// 인스펙터가 읽는 '지금 고른 자산'.

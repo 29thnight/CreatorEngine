@@ -8,7 +8,7 @@ class Entity;
 class InspectorWindow
 {
 public:
-	InspectorWindow();
+	void Draw();
 	~InspectorWindow() = default;
 
 private:

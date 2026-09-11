@@ -19,7 +19,7 @@
 class EnhancedRenderDebugWindow
 {
 public:
-	EnhancedRenderDebugWindow();
+	void Draw();
 	~EnhancedRenderDebugWindow() = default;
 
 private:
