@@ -28,7 +28,7 @@
 #include "ReflectionImGuiHelper.h"
 #include "ReflectionTypedDraw.h"   // CT6-c typed Draw 썽크
 #include "RegisterReflectManual.h" // REFLECT_TYPE_LIST 공유 목록 + 전 타입 헤더
-#include "CustomCollapsingHeader.h"
+#include "EditorSectionHeader.h"
 #include "Terrain.h"
 #include "FileDialog.h"
 #include "TagManager.h"
@@ -50,7 +50,6 @@
 
 #include "IconsFontAwesome6.h"
 #include "fa.h"
-#include "PinHelper.h"
 #include "TableAPIHelper.h"
 #include "NodeEditor.h"
 #include <algorithm>
@@ -520,8 +519,13 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		i *= math::rad_to_deg;
 	}
 
-	bool menuClicked = false;
-	if (ImGui::DrawCollapsingHeaderWithButton("Transform", ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &menuClicked))
+	editor::widgets::section_header_request transformHeader{};
+	transformHeader.label = "Transform";
+	transformHeader.menu_icon = ICON_FA_BARS;
+	const editor::widgets::section_header_result transformHeaderState =
+		editor::widgets::draw_section_header(transformHeader);
+	bool menuClicked = transformHeaderState.menu_clicked;
+	if (transformHeaderState.open)
 	{
 		ImGui::Text("Position ");
 		ImGui::SameLine();
@@ -1753,8 +1757,22 @@ void InspectorWindow::Draw()
 			// OnEnable/OnDisable이 영영 호출되지 않는다. 지역 값으로 받아
 			// 전이가 생긴 프레임에만 컴포넌트에 알린다.
 			bool isEnabled = component->IsEnabled();
-			const bool isHeaderOpen = ImGui::DrawCollapsingHeaderWithButton(componentBaseName.c_str(), ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &isOpen, &isEnabled);
-			if (isEnabled != component->IsEnabled())
+			editor::widgets::section_header_request componentHeader{};
+			componentHeader.label = componentBaseName.c_str();
+			componentHeader.menu_icon = ICON_FA_BARS;
+			componentHeader.enabled = &isEnabled;
+			const editor::widgets::section_header_result componentHeaderState =
+				editor::widgets::draw_section_header(componentHeader);
+			// isOpen은 프레임을 건너 사는 정적 변수라, 아래에서 ComponentMenu를
+			// 열고 스스로 끌 때까지 살아 있어야 한다. 원본도 눌린 프레임에만
+			// true를 써 넣었다 — 안 눌렸다고 false로 덮으면 팝업이 뜨기 전에
+			// 꺼진다.
+			if (componentHeaderState.menu_clicked)
+			{
+				isOpen = true;
+			}
+			const bool isHeaderOpen = componentHeaderState.open;
+			if (componentHeaderState.enabled_changed)
 			{
 				component->SetEnabled(isEnabled);
 			}

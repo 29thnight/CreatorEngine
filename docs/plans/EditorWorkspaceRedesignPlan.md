@@ -780,7 +780,7 @@ widget을 그대로 쓴다. custom widget은 ImGui ID, nav, focus, disabled, cli
 
 | 신규 family | 기존 자산 | 초기 판정 |
 |---|---|---|
-| `EditorSectionHeader` | `CustomCollapsingHeader.h` | **승계** — 기존 구현을 토큰화해 개명. 신규 작성 아님 |
+| `EditorSectionHeader` | `CustomCollapsingHeader.h` | **승계** — 기존 구현을 토큰화해 개명. 신규 작성 아님 · **착지** (2026-09-11) |
 | `EditorPropertyRow` | `TableAPIHelper.h`, `HorizontalLayout.h` | **부분 승계** — label column 규약만 흡수, 나머지는 존치 판정 후 결정 |
 | `EditorAxisField3` | `ImGuiDrawHelperRectTransformComponent.cpp`의 축 필드 | **승격** — 창 안에 흩어진 구현을 정본으로 끌어올린다 |
 | `EditorModeButton` | `ToggleUI.h`, `widgets.{h,cpp}` | **판정 필요** — `ToggleUI`의 소비자를 세고 겹치면 승계, 아니면 신설 후 은퇴 |

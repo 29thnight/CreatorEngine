@@ -47,6 +47,66 @@
 context menu" 중 enable toggle 과 context menu 버튼을 이미 든다. 토큰화해서 개명하면 된다.
 138줄.
 
+#### 이관 결과 — 착지 (2026-09-11)
+
+`Editor/ImGuiHelper/EditorSectionHeader.{h,cpp}` 로 옮기고 `CustomCollapsingHeader.h` 를
+지웠다. 소비자 3 을 모두 옮겼고, 자산 참조는 0 이다.
+
+승계하며 **죽은 코드 셋**이 드러났다. 개명만으로는 안 되는 것들이다.
+
+| 원본의 것 | 실상 |
+|---|---|
+| `ImGuiCol_HeaderHovered` 분기 | `bool hovered = false;` 선언 **직후** 그 값으로 배경색을 골랐고, 진짜 hover 는 20여 줄 **뒤**에 대입했다. hover 색이 한 번도 그려지지 않았다. |
+| `bool held` | `IsItemActive()` 로 읽었지만 맨 `ItemAdd` 는 ActiveId 를 세우지 않는다. 읽히지 않은 것이 아니라 **참이 될 수 없었다.** |
+| `ImGuiTreeNodeFlags flags` 인자 | 세 호출자가 모두 `ImGuiTreeNodeFlags_DefaultOpen` 을 넘기는데 본문이 한 번도 보지 않았다. |
+
+고친 방식은 순서를 바꾼 것이다. 자리를 먼저 잡고(`ItemAdd` → `ButtonBehavior`) 상태를 읽은
+**뒤에** 배경을 그린다. 클릭 영역이 양옆 컨트롤을 비켜서 잡히므로 버튼·체크박스의 클릭을
+빼앗지 않는다.
+
+**색은 Header 칸을 쓰지 않는다.** `EditorTheme.cpp` 가 `ImGuiCol_HeaderHovered` 와
+`ImGuiCol_HeaderActive` 를 **같은 값**(`Selection`)으로 설정한다. 그래서 원본 구조대로 hover 를
+살려도 눈에 보이는 차이가 없다 — 닫힌 머리줄이 hover 되면 열린 것과 똑같이 보인다. 토큰을
+직접 읽어 넷을 가른다.
+
+| 상태 | 토큰 | 값 |
+|---|---|---|
+| 닫힘 | `Panel` | `0x343434` |
+| 열림 | `PanelRaised` | `0x484848` |
+| hover | `Selection` | `0x525252` |
+| 누름 | `Primary` | `0x2E70EA` |
+
+넷 다 불투명이다. 처음에는 hover 를 `Selection` 45% 로 썼다가 버렸다 — 알파는 깔린 색에 따라
+결과가 달라진다. 계산해 보니 `Panel`(`0x34`) 위에서 0x41 이 되어 열림(`0x48`)과 6/255 밖에
+벌어지지 않았고, 같은 머리줄이 Inspector(`ChildBg`=`Panel`)와 창 바닥(`Canvas`)에서 서로 다른
+색이 되는 문제도 있었다. 누름을 `Primary` 로 둔 것은 테마가 `ImGuiCol_ButtonActive` 에 쓰는
+강조색과 같아서다.
+
+**이 표는 단정이다, 주석이 아니다.** 머리줄은 열림/닫힘을 배경색으로만 알린다. 누가
+`Panel` 과 `PanelRaised` 를 같은 값으로 만들면 상태 표시가 통째로 사라지는데 빌드도 다른
+검사도 붉어지지 않는다. 원본이 hover 를 잃은 원인 자체가 테마가 `HeaderHovered` 와
+`HeaderActive` 를 같은 값으로 둔 것이었으니 같은 충돌이 재발할 수 있다. 그래서 구현이 고르는
+값을 `section_header_surface_hex` 로 내보내고, `EditorThemeSelfTest` 가 넷의 기대 hex 와 여섯
+쌍의 상이함을 단정한다(`verify-editor-theme.ps1` 이 도는 세트에 있다).
+
+**변이로 이빨을 쟀다.**
+
+| 변이 | 결과 |
+|---|---|
+| 제품에서 `Hovered` 토큰을 `Selection` → `PanelRaised` (열림과 충돌) | 빌드 exit 0, 게이트 **붉음** — 193 중 2 실패. 붉은 것은 `section header: hovered` 와 `section header: states differ` 둘뿐이고 다른 검사는 하나도 건드리지 않았다. |
+| 위 변이를 유지한 채 검사의 기대 hex 만 새 값으로 완화 | 빌드 exit 0, 게이트 **붉음** — 193 중 1 실패, `states differ` 단독. 상이성 단정 혼자서도 잡는다. |
+
+치수 둘도 매직 넘버였다. 버튼 너비 `24.0f` 는 `GetFrameHeight()` 로, 아래 여백 `3.0f` 는
+`EditorThemeTokens::CompactGap` 으로 바꿨다. 너비를 `ThemePixels(ControlHeight)` 로 재지
+않은 이유가 있다 — ImGui 1.92 의 `FontScaleMain`/`FontScaleDpi` 는 폰트만 키우고 `ImGuiStyle`
+의 여백은 그대로 둔다(`imgui.h:2536` 주석). 토큰을 직접 배율하면 DPI 2 에서 이 버튼만 홀로
+커진다. `GetFrameHeight()` 는 같은 줄의 `ImGui::Button` 과 같은 자를 쓴다.
+
+오버로드 둘은 하나로 합쳤다. 차이가 체크박스뿐이라 `enabled` 가 비면 그리지 않는다. 출력도
+구조체 하나로 돌려준다 — 원본은 "눌렸을 때만 true 를 써 넣는" 출력 인자라 호출자가 매 프레임
+스스로 초기화해야 했다. 옛 규약에 기대는 소비자가 하나 있어(`InspectorWindow.cpp` 의
+`static bool isOpen`) 그 자리는 `menu_clicked` 일 때만 쓰는 것으로 옮겼다.
+
 ### 2.2 `TableAPIHelper.h` → `EditorPropertyRow` 승계 (초기 판정 "부분 승계" 보다 강함)
 
 이 파일은 이름이 가리키는 범용 표 헬퍼가 아니다. 내보내는 다섯이 전부 RectTransform 의
@@ -128,11 +188,19 @@ marker" 와 다른 물건이다. 승계하면 두 벌이 남는다.
 같은 이유로 `EngineGUIWindow/MenuBarWindow.cpp:35` 의 `#include "ToggleUI.h"` 도 죽은
 include 다 — `ToggleSwitch` 를 부르지 않는다. §2.5 의 은퇴는 이 한 줄을 걷는 것으로 끝난다.
 
+**정정 (2026-09-11 이관 중 발견).** 이 절의 목록이 하나 모자랐다. 위 표는 **심볼 호출**을 센
+것이라 `#include` 만 있고 부르지 않는 파일을 놓쳤다. `EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp:9`
+가 `CustomCollapsingHeader.h` 를 들이면서 `DrawCollapsingHeaderWithButton` 을 한 번도 부르지
+않았다. 즉 이 자산의 include 는 4 이고 소비자는 3 이었다. `EditorSectionHeader` 이관에서
+그 한 줄을 함께 걷었다. 호출 건수와 include 건수는 다른 자다.
+
 ---
 
 ## 3. 이 표가 W2 구현 순서에 주는 것
 
-1. **`EditorSectionHeader`** — 승계. 기존 138줄을 토큰화·개명하고 소비자 3을 옮긴다.
+1. ~~**`EditorSectionHeader`** — 승계. 기존 138줄을 토큰화·개명하고 소비자 3을 옮긴다.~~
+   **착지했다 (2026-09-11, §2.1 의 "이관 결과").** 죽은 코드 셋을 함께 고쳤고 색은 Header 칸
+   대신 토큰을 직접 읽는다.
 2. **`EditorPropertyRow`** — 승계. `TableAPIHelper.h` 를 UTF-8 로 바꾸는 커밋이 먼저,
    그 다음 행 규약을 일반화한다(vec2 전용 → 열 개수 인자).
 3. **`EditorAxisField3`** — 신설. §2.4 의 네 자리 중 `ReflectionTypedDraw.h:304` 를 대표

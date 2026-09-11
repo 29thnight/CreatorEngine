@@ -360,7 +360,7 @@
     <ClInclude Include="ImGuiHelper\BlueprintBuilder.h">
       <Filter>ImGuiHelper\소스 파일\Blueprint</Filter>
     </ClInclude>
-    <ClInclude Include="ImGuiHelper\CustomCollapsingHeader.h">
+    <ClInclude Include="ImGuiHelper\EditorSectionHeader.h">
       <Filter>ImGuiHelper\소스 파일\CollapsingHeader</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\drawing.h">
@@ -550,6 +550,9 @@
     </ClCompile>
     <ClCompile Include="ImGuiHelper\drawing.cpp">
       <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorSectionHeader.cpp">
+      <Filter>ImGuiHelper\소스 파일\CollapsingHeader</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp">
       <Filter>ImGuiHelper\소스 파일\NodeEditior</Filter>

@@ -6,7 +6,6 @@
 #include "Terrain.h"
 #include "TableAPIHelper.h"
 #include "FileDialog.h"
-#include "CustomCollapsingHeader.h"
 #include "FoliageComponent.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"

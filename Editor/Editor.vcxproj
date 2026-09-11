@@ -115,8 +115,8 @@
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\SettingsWindow.h" />
     <ClInclude Include="ImGuiHelper\BlueprintBuilder.h" />
-    <ClInclude Include="ImGuiHelper\CustomCollapsingHeader.h" />
     <ClInclude Include="ImGuiHelper\drawing.h" />
+    <ClInclude Include="ImGuiHelper\EditorSectionHeader.h" />
     <ClInclude Include="ImGuiHelper\fa.h" />
     <ClInclude Include="ImGuiHelper\GlobalImGuiContext.h" />
     <ClInclude Include="ImGuiHelper\HorizontalLayout.h" />
@@ -277,6 +277,7 @@
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
     <ClCompile Include="ImGuiHelper\BlueprintBuilder.cpp" />
     <ClCompile Include="ImGuiHelper\drawing.cpp" />
+    <ClCompile Include="ImGuiHelper\EditorSectionHeader.cpp" />
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp" />
     <ClCompile Include="ImGuiHelper\widgets.cpp" />

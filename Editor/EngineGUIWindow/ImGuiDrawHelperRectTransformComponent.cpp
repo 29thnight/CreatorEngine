@@ -1,7 +1,7 @@
 #include "ExternUI.h"
 #include "RectTransformComponent.h"
 #include "TableAPIHelper.h"
-#include "CustomCollapsingHeader.h"
+#include "EditorSectionHeader.h"
 #include "IconsFontAwesome6.h"
 #include "fa.h"
 
@@ -80,8 +80,13 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 {
 	if (!rectTransformComponent) return;
 
-	bool menuClicked = false;
-	if (ImGui::DrawCollapsingHeaderWithButton("RectTransform", ImGuiTreeNodeFlags_DefaultOpen, ICON_FA_BARS, &menuClicked))
+	// 메뉴 버튼은 그대로 그린다 — 모습을 바꾸지 않기 위해서다. 누른 결과를
+	// 받는 쪽은 이 함수 끝의 주석 처리된 TransformMenu 블록이라, 이 변경
+	// 전에도 소비자가 없었다.
+	editor::widgets::section_header_request header{};
+	header.label = "RectTransform";
+	header.menu_icon = ICON_FA_BARS;
+	if (editor::widgets::draw_section_header(header).open)
 	{
 		auto anchorMin = rectTransformComponent->GetAnchorMin();
 		auto anchorMax = rectTransformComponent->GetAnchorMax();

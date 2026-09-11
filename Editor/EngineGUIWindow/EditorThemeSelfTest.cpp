@@ -1,8 +1,10 @@
 #include "EditorThemeSelfTest.h"
 
 #include "EditorTheme.h"
+#include "EditorSectionHeader.h"
 #include "ImGui.h"
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <string_view>
@@ -205,6 +207,42 @@ namespace editor
         checks.number(style.FontSizeBase, 19.f, "recovery", "font owner keeps base size");
         checks.color(style.Colors[ImGuiCol_ButtonActive], 0x2E70EA, 1.f,
                      "recovery", "active button palette");
+
+        // 섹션 머리줄의 상태 색 넷 (PHASE 21 W2).
+        //
+        // 이 단정이 없으면 누가 `Panel` 과 `PanelRaised` 를 같은 값으로 만들어도
+        // 조용히 지나간다 — 머리줄은 열림/닫힘을 배경색으로만 알리므로 상태
+        // 표시가 통째로 사라지는데 빌드도 다른 검사도 붉어지지 않는다. 그리고
+        // 그 값을 Header 계열 style 칸에서 읽지 않는 이유가 바로 테마가
+        // `HeaderHovered` 와 `HeaderActive` 를 같은 값으로 두었기 때문이라,
+        // 같은 충돌이 다시 생기는 것을 막아야 한다.
+        {
+            using surface = widgets::section_header_surface;
+            constexpr std::array<surface, 4> surfaces{
+                surface::Closed, surface::Open, surface::Hovered, surface::Held };
+            constexpr std::array<const char*, 4> names{
+                "closed", "open", "hovered", "held" };
+            constexpr std::array<std::uint32_t, 4> expected{
+                0x343434, 0x484848, 0x525252, 0x2E70EA };
+
+            for (std::size_t index = 0; index < surfaces.size(); ++index)
+            {
+                checks.expect(
+                    widgets::section_header_surface_hex(surfaces[index]) == expected[index],
+                    "section header", names[index]);
+            }
+            for (std::size_t left = 0; left < surfaces.size(); ++left)
+            {
+                for (std::size_t right = left + 1; right < surfaces.size(); ++right)
+                {
+                    checks.expect(
+                        widgets::section_header_surface_hex(surfaces[left]) !=
+                        widgets::section_header_surface_hex(surfaces[right]),
+                        "section header",
+                        "states differ");
+                }
+            }
+        }
 
         report += "[";
         report += checks.failed == 0 ? "OK" : "FAIL";
