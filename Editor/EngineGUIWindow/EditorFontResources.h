@@ -32,7 +32,9 @@
 // "지금 폰트를 그대로" 라서(imgui.h:516) 호출자가 분기하지 않아도 안전하다.
 
 #include <span>
+#include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct ImFont;
@@ -51,15 +53,15 @@ namespace editor::fonts
         ImFont*     font{ nullptr };
     };
 
-    /// 본문 폰트 후보. 앞에서부터 **실재하는** 첫 것을 쓴다.
+    /// 본문과 heading의 공통 후보. bundled Inter, 시스템 폰트 순으로 쓴다.
     std::span<const char* const> body_candidates();
 
     /// 한글 폰트 후보. 맑은 고딕이 없는 설치본(언어 기능 제거)이 있다.
     std::span<const char* const> korean_candidates();
 
-    /// 후보 하나를 절대 경로로 펼친다. `%SystemRoot%` 를 읽어 쓰므로
-    /// `C:\Windows` 가 아닌 설치본에서도 맞는다.
-    std::string expand_font_candidate(const char* candidate);
+    /// 하위 경로가 있는 후보는 EngineResourcePath 기준, 파일 이름만 있으면
+    /// OS가 알려 준 Windows Fonts 기준이다. 실행 작업 디렉터리에 의존하지 않는다.
+    std::filesystem::path expand_font_candidate(const char* candidate);
 
     /// 후보 중 실재하는 첫 절대 경로. 하나도 없으면 빈 문자열.
     std::string resolve_font_path(std::span<const char* const> candidates);
@@ -74,8 +76,9 @@ namespace editor::fonts
                                   std::span<const char* const> candidates,
                                   float size_pixels);
 
-    /// 아이콘 폰트를 직전 폰트에 병합한다(②). 병합할 폰트가 없으면 거짓.
-    bool merge_icon_font(float size_pixels);
+    /// 아이콘 폰트를 직전 폰트에 병합한다(②). 크기와 기준선 보정은 별도 logical px.
+    /// 병합할 폰트가 없으면 거짓.
+    bool merge_icon_font(float size_pixels, float baseline_offset_pixels = 0.0f);
 
     /// 이번 실행에서 적재한 폰트 전부. 보고 표면이 읽는다.
     const std::vector<loaded_font>& loaded_fonts();

@@ -1,4 +1,5 @@
 #include "EditorWindowChrome.h"
+#include "EditorTheme.h"
 
 #include "EditorSettingsStore.h"
 
@@ -66,6 +67,17 @@ std::optional<LRESULT> EditorWindowChrome::HandleWindowMessage(
 {
     switch (message)
     {
+    case WM_DPICHANGED:
+    {
+        // lParam의 RECT는 WndProc 호출 동안만 유효하다. 표시 스레드 큐에
+        // 넘기지 않고 창 소유 스레드에서 OS가 제안한 사각을 바로 적용한다.
+        const RECT* const suggested = reinterpret_cast<const RECT*>(lParam);
+        if (suggested)
+            SetWindowPos(windowHandle, nullptr, suggested->left, suggested->top,
+                suggested->right - suggested->left, suggested->bottom - suggested->top,
+                SWP_NOZORDER | SWP_NOACTIVATE);
+        return 0;
+    }
     case WM_NCCALCSIZE:
         return HandleNonClientCalcSize(windowHandle, wParam, lParam);
     case WM_NCHITTEST:
@@ -102,7 +114,8 @@ std::optional<LRESULT> EditorWindowChrome::HandleNonClientCalcSize(
     if (IsZoomed(windowHandle))
     {
         client.top = requested.top +
-            GetSystemMetrics(SM_CYSIZEFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+            GetSystemMetricsForDpi(SM_CYSIZEFRAME, GetDpiForWindow(windowHandle)) +
+            GetSystemMetricsForDpi(SM_CXPADDEDBORDER, GetDpiForWindow(windowHandle));
     }
 
     parameters->rgrc[0] = client;
@@ -131,9 +144,10 @@ std::optional<LRESULT> EditorWindowChrome::HandleNonClientHitTest(
     // 최대화 상태에는 늘릴 방향이 없으므로 건너뛴다.
     if (!IsZoomed(windowHandle))
     {
-        const int padded = GetSystemMetrics(SM_CXPADDEDBORDER);
-        const int verticalBorder = GetSystemMetrics(SM_CYSIZEFRAME) + padded;
-        const int horizontalBorder = GetSystemMetrics(SM_CXSIZEFRAME) + padded;
+        const UINT dpi = GetDpiForWindow(windowHandle);
+        const int padded = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+        const int verticalBorder = GetSystemMetricsForDpi(SM_CYSIZEFRAME, dpi) + padded;
+        const int horizontalBorder = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi) + padded;
         if (point.y >= 0 && point.y < verticalBorder)
         {
             // 코너도 함께 돌려준다. 상단만 HTTOP으로 답하면 위쪽 두 코너가
@@ -210,7 +224,7 @@ void EditorWindowChrome::DrawTitleBarTail()
         {
             // 닫기만 붉게. 되돌릴 수 없는 버튼과 나머지를 색으로 가른다.
             const ImU32 hoverColor = 2 == index
-                ? IM_COL32(196, 43, 28, 255)
+                ? ImGui::GetColorU32(editor::ThemeColorValue(editor::ThemeColor::Error))
                 : ImGui::GetColorU32(ImGuiCol_ButtonHovered);
             drawList->AddRectFilled(ImVec2(left, rowMin.y),
                 ImVec2(left + buttonWidth, rowMin.y + rowHeight), hoverColor);

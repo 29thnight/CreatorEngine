@@ -1,4 +1,5 @@
 #include "ImGui.h"
+#include "EditorTheme.h"
 #include "ClrHost.h"
 #include "EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
@@ -95,7 +96,7 @@ namespace
 {
     // 메뉴바 한글 폰트의 기준 크기. 본문 폰트와 같은 값이어야 같은 줄에서
     // 키가 맞는다.
-    constexpr float kMenuBarFontSizePixels = 16.0f;
+    constexpr float kMenuBarFontSizePixels = ::editor::EditorThemeTokens::BodyFontSize;
 }
 
 MenuBarWindow::MenuBarWindow()
@@ -113,7 +114,8 @@ MenuBarWindow::MenuBarWindow()
     m_koreanFont = korean.font;
     if (nullptr != m_koreanFont)
     {
-        ::editor::fonts::merge_icon_font(kMenuBarFontSizePixels);
+        ::editor::fonts::merge_icon_font(::editor::EditorThemeTokens::IconFontSize,
+            ::editor::EditorThemeTokens::IconBaselineOffset);
     }
 
     // PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실은
@@ -157,10 +159,11 @@ MenuBarWindow::MenuBarWindow()
         }
         if (ImGui::BeginChild("CollisionMatrix", ImVec2(0, 0), ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize))
         {
-            ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(2, 2));
-            ImGui::PushStyleVar(ImGuiStyleVar_TableAngledHeadersAngle, 0.5f); // 기울기 설정
-            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(1, 1, 1, 0));
-            ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(1, 1, 1, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(editor::ThemePixels(editor::EditorThemeTokens::CompactGap), editor::ThemePixels(editor::EditorThemeTokens::CompactGap)));
+            // 행렬 축 이름은 기울이고 셀 경계는 숨긴다. 각도는 배율 대상이 아니다.
+            ImGui::PushStyleVar(ImGuiStyleVar_TableAngledHeadersAngle, 0.5f);
+            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, editor::ThemeColorValue(editor::ThemeColor::Border, 0.f));
+            ImGui::PushStyleColor(ImGuiCol_TableBorderLight, editor::ThemeColorValue(editor::ThemeColor::Border, 0.f));
 
             const ImGuiTableFlags tableFlags =
                 ImGuiTableFlags_SizingFixedFit |
@@ -443,8 +446,6 @@ void MenuBarWindow::RenderMenuBar()
                 // 밝은 팝업 배경(0.95 회색) 위에서 읽히게 하려고 항목마다
                 // 검은 글씨와 밝은 입력란 색을 눌러 담던 자리였다. 팝업이
                 // 다크 스킨을 따라가므로 그 우회로가 전부 필요 없어졌다.
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
                 EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
                 float imguiScale = preferences.GetImGuiScale();
@@ -453,7 +454,6 @@ void MenuBarWindow::RenderMenuBar()
                     preferences.SetImGuiScale(imguiScale);
                     EditorSettingsStore::Get().Save();
                 }
-                ImGui::PopStyleVar(2);
                 ::editor::append_top_menu_items(::editor::top_menu_root::settings, selectionPtr);
                 ImGui::EndMenu();
             }
@@ -927,15 +927,15 @@ void MenuBarWindow::ShowLogWindow()
             ImVec4 color;
             switch (entry.level)
             {
-            case spdlog::level::info:       color = ImVec4(1,    1,    1,    1); break;
-            case spdlog::level::warn:       color = ImVec4(1,    1,    0,    1); break;
-            case spdlog::level::err:        color = ImVec4(1,    0.4f, 0.4f, 1); break;
-            case spdlog::level::critical:   color = ImVec4(1,    0,    0,    1); break;
-            default:                        color = ImVec4(0.7f, 0.7f, 0.7f, 1); break;
+            case spdlog::level::info:       color = editor::ThemeColorValue(editor::ThemeColor::Text); break;
+            case spdlog::level::warn:       color = editor::ThemeColorValue(editor::ThemeColor::Warning); break;
+            case spdlog::level::err:        color = editor::ThemeColorValue(editor::ThemeColor::Error); break;
+            case spdlog::level::critical:   color = editor::ThemeColorValue(editor::ThemeColor::Error); break;
+            default:                        color = editor::ThemeColorValue(editor::ThemeColor::TextMuted); break;
             }
 
             if (is_selected)
-                ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(100, 100, 255, 100));
+                ImGui::PushStyleColor(ImGuiCol_Header, editor::ThemeColorValue(editor::ThemeColor::Selection));
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
 
             std::string wrapped = WordWrapText(entry.message, 120);
@@ -1213,6 +1213,8 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
             const ImVec4 pinBackground = ed::GetStyle().Colors[ed::StyleColor_NodeBg];
             ImColor nodeBgColor = pinBackground + ImColor(15, 15, 15, 0);
 
+            // 노드 색은 behavior 종류를 구분하는 데이터 시각화다.
+            // 노드/핀 geometry는 node-editor canvas 좌표와 zoom을 따른다.
             ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(nodeBgColor));
             ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(32, 32, 32, 200));
             ed::PushStyleColor(ed::StyleColor_PinRect, ImColor(60, 180, 255, 150));
@@ -1226,6 +1228,7 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
             ed::PushStyleVar(ed::StyleVar_PinBorderWidth, 1.0f);
             ed::PushStyleVar(ed::StyleVar_PinRadius, 5.0f);
 
+            // 노드의 핀 사각형은 틈 없이 이어져야 한다.
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
             ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));

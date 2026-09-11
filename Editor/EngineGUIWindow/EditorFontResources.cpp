@@ -10,6 +10,7 @@
 
 #include "ImGui.h"
 #include "IconsFontAwesome6.h"
+#include "PathFinder.h"
 #include "fa.h"
 
 #include <filesystem>
@@ -21,10 +22,11 @@ namespace editor::fonts
 {
     namespace
     {
-        // 폰트 디렉터리 아래의 **파일 이름만** 적는다. 절대 경로를 적으면
-        // Windows 가 C: 가 아닌 설치본에서 틀린다.
+        // 하위 경로는 배포된 엔진 자원, 파일 이름은 Windows Fonts의 후보다.
+        // Inter가 빠진 배포에서도 시스템 폰트와 ImGui 기본 폰트로 이어진다.
         constexpr const char* kBodyCandidates[] = {
-            "Verdana.ttf",   // 지금까지 쓰던 것 — 판정이 바뀌지 않도록 맨 앞에 둔다
+            "Fonts/Inter-Regular.ttf",
+            "Verdana.ttf",
             "segoeui.ttf",
             "tahoma.ttf",
             "arial.ttf",
@@ -62,8 +64,7 @@ namespace editor::fonts
             const UINT written = ::GetWindowsDirectoryW(buffer, MAX_PATH);
             if (0 == written || MAX_PATH <= written)
             {
-                // 여기서 예외를 던지면 폰트 하나 때문에 부팅이 죽는다.
-                return std::filesystem::path(L"C:/Windows") / L"Fonts";
+                return {};
             }
             return std::filesystem::path(buffer, buffer + written) / L"Fonts";
         }
@@ -76,14 +77,28 @@ namespace editor::fonts
             loaded_font result;
             result.role.assign(role);
             result.size_pixels = size_pixels;
-            result.candidates_tried = static_cast<int>(candidates.size());
-            result.resolved_path = resolve_font_path(candidates);
-
             ImGuiIO& io = ImGui::GetIO();
-            if (!result.resolved_path.empty())
+            for (const char* candidate : candidates)
             {
+                ++result.candidates_tried;
+                const std::filesystem::path path = expand_font_candidate(candidate);
+                std::error_code error;
+                if (path.empty() || !std::filesystem::is_regular_file(path, error))
+                {
+                    continue;
+                }
+                // filesystem 검사는 native 경로, ImGui 파일 API는 UTF-8이다.
+                const std::u8string utf8 = path.u8string();
+                const std::string filename(utf8.begin(), utf8.end());
+                ImFontConfig config;
+                config.Flags |= ImFontFlags_NoLoadError;
                 result.font = io.Fonts->AddFontFromFileTTF(
-                    result.resolved_path.c_str(), size_pixels);
+                    filename.c_str(), size_pixels, &config);
+                if (nullptr != result.font)
+                {
+                    result.resolved_path = filename;
+                    break;
+                }
             }
 
             // 경로를 미리 확인하고도 적재가 실패할 수 있다(깨진 파일·권한).
@@ -113,13 +128,19 @@ namespace editor::fonts
         return std::span<const char* const>(kKoreanCandidates);
     }
 
-    std::string expand_font_candidate(const char* candidate)
+    std::filesystem::path expand_font_candidate(const char* candidate)
     {
         if (nullptr == candidate || '\0' == *candidate)
         {
-            return std::string{};
+            return {};
         }
-        return (fonts_directory() / candidate).string();
+        const std::filesystem::path relative{ candidate };
+        if (relative.has_parent_path())
+        {
+            return PathFinder::EngineResourcePath(candidate);
+        }
+        const std::filesystem::path system_fonts = fonts_directory();
+        return system_fonts.empty() ? std::filesystem::path{} : system_fonts / relative;
     }
 
     std::string resolve_font_path(std::span<const char* const> candidates)
@@ -127,14 +148,15 @@ namespace editor::fonts
         std::error_code ignored;
         for (const char* candidate : candidates)
         {
-            const std::string path = expand_font_candidate(candidate);
+            const std::filesystem::path path = expand_font_candidate(candidate);
             if (path.empty())
             {
                 continue;
             }
-            if (std::filesystem::exists(path, ignored))
+            if (std::filesystem::is_regular_file(path, ignored))
             {
-                return path;
+                const std::u8string utf8 = path.u8string();
+                return std::string(utf8.begin(), utf8.end());
             }
         }
         return std::string{};
@@ -154,7 +176,7 @@ namespace editor::fonts
         return add_font(role, candidates, size_pixels, false);
     }
 
-    bool merge_icon_font(float size_pixels)
+    bool merge_icon_font(float size_pixels, float baseline_offset_pixels)
     {
         // ★ 아이콘 범위는 **적재하는 블롭과 같은 판**이어야 한다.
         //
@@ -207,6 +229,7 @@ namespace editor::fonts
         static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
         ImFontConfig icons_config;
         icons_config.MergeMode = true;
+        icons_config.GlyphOffset.y = baseline_offset_pixels;
         const bool merged = nullptr != io.Fonts->AddFontFromMemoryCompressedTTF(
             FA_compressed_data, FA_compressed_size, merge_size,
             &icons_config, icons_ranges);

@@ -160,11 +160,13 @@
           Condition="'$(MSBuildProjectName)' == 'CreatorEditor'">
     <PropertyGroup>
       <_EngineIconSourceRoot>$(SolutionDir)Resources\Editor\Icons\</_EngineIconSourceRoot>
+      <_EngineFontSourceRoot>$(SolutionDir)Resources\Editor\Fonts\</_EngineFontSourceRoot>
     </PropertyGroup>
     <Error Condition="!Exists('$(_EngineIconSourceRoot)')"
            Text="Editor icon source root is missing: $(_EngineIconSourceRoot)" />
     <ItemGroup>
       <_EngineIconResource Include="$(_EngineIconSourceRoot)**\*" />
+      <_EngineFontResource Include="$(_EngineFontSourceRoot)**\*" />
     </ItemGroup>
     <Error Condition="'@(_EngineIconResource)' == ''"
            Text="Editor icon source root is empty: $(_EngineIconSourceRoot)" />
@@ -172,6 +174,11 @@
           DestinationFolder="$(EngineResourceOutDir)Icons\%(RecursiveDir)"
           SkipUnchangedFiles="true" />
     <Message Text="Editor resources 배치 -> $(EngineResourceOutDir)" Importance="high" />
+    <Error Condition="!Exists('$(_EngineFontSourceRoot)Inter-Regular.ttf') Or !Exists('$(_EngineFontSourceRoot)LICENSE-Inter.txt')"
+           Text="Editor Inter font or license is missing: $(_EngineFontSourceRoot)" />
+    <Copy SourceFiles="@(_EngineFontResource)"
+          DestinationFolder="$(EngineResourceOutDir)Fonts\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

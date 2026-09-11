@@ -232,6 +232,11 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
     <Image Include="EngineEntry\Academy_4Q.ico" />
     <Image Include="EngineEntry\small.ico" />
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <Manifest>
+      <AdditionalManifestFiles>$(ProjectDir)EngineEntry\CreatorEditor.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
+    </Manifest>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

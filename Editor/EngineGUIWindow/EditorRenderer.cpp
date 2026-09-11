@@ -4,7 +4,7 @@
 #include "EditorChromeProbe.h"
 #include "RHI/IImGuiHost.h"
 #include "EditorFontResources.h"
-#include "fa.h"
+#include "EditorTheme.h"
 #include "EditorAssetPresentation.h"
 #include "EditorSettingsStore.h"
 #include "PathFinder.h"
@@ -14,107 +14,6 @@
 #include <imgui_internal.h>
 #include <stdexcept>
 #include <string>
-
-namespace
-{
-    // 에디터 본문·아이콘의 기준 글자 크기. 배율은 `FontScaleMain` 이 든다.
-    constexpr float kEditorFontSizePixels = 16.0f;
-
-    // 에디터 위젯 스타일. 구 ImGuiRenderer의 ImGuiBootstrap::ApplyStyle 그대로다.
-    // s&box 에디터 계열 다크 스킨. 이전 스킨은 둥근 모서리 5px에 항목 간격
-    // 12x8이라 패널 하나에 담기는 행이 적었고, 창 배경(0.22)이 프레임
-    // 배경(0.157)보다 밝아 입력란이 배경에 잠겼다. 여기서는 면을 어둡게
-    // 깔고 강조를 파랑 하나로 몰아 계층을 밝기가 아니라 색으로 만든다.
-    //
-    // 팔레트를 상수로 뽑지 않고 각 항목에 직접 적는다 — 색 하나가 여러
-    // 역할을 겸하는 순간 한쪽을 고치려다 다른 쪽이 따라 바뀐다.
-    void ApplyEditorStyle(ImGuiStyle* _style)
-    {
-        _style->WindowPadding = ImVec2(8, 6);
-        _style->WindowRounding = 0.0f;
-        _style->WindowBorderSize = 1.0f;
-        _style->WindowTitleAlign = ImVec2(0.0f, 0.5f);
-        // 창 제목 왼쪽에 붙던 접기 화살표를 없앤다. 도킹 셸에서는 누를 일이
-        // 없는데 제목 문자열을 밀어내기만 했다.
-        _style->WindowMenuButtonPosition = ImGuiDir_None;
-        _style->ChildRounding = 3.0f;
-        _style->PopupRounding = 4.0f;
-        _style->PopupBorderSize = 1.0f;
-        _style->FramePadding = ImVec2(7, 5);
-        _style->FrameRounding = 3.0f;
-        _style->FrameBorderSize = 0.0f;
-        _style->ItemSpacing = ImVec2(8, 5);
-        _style->ItemInnerSpacing = ImVec2(6, 4);
-        _style->CellPadding = ImVec2(6, 3);
-        _style->IndentSpacing = 18.0f;
-        _style->ScrollbarSize = 12.0f;
-        _style->ScrollbarRounding = 6.0f;
-        _style->GrabMinSize = 8.0f;
-        _style->GrabRounding = 3.0f;
-        _style->TabRounding = 3.0f;
-        _style->TabBarBorderSize = 1.0f;
-        _style->TabBarOverlineSize = 2.0f;
-        _style->SeparatorTextBorderSize = 1.0f;
-        _style->DockingSeparatorSize = 2.0f;
-
-        _style->Colors[ImGuiCol_Text] = ImVec4(0.839f, 0.839f, 0.851f, 1.00f);
-        _style->Colors[ImGuiCol_TextDisabled] = ImVec4(0.439f, 0.439f, 0.459f, 1.00f);
-        _style->Colors[ImGuiCol_WindowBg] = ImVec4(0.141f, 0.141f, 0.149f, 1.00f);
-        _style->Colors[ImGuiCol_ChildBg] = ImVec4(0.000f, 0.000f, 0.000f, 0.00f);
-        _style->Colors[ImGuiCol_PopupBg] = ImVec4(0.106f, 0.106f, 0.114f, 0.98f);
-        _style->Colors[ImGuiCol_Border] = ImVec4(0.239f, 0.239f, 0.259f, 1.00f);
-        _style->Colors[ImGuiCol_BorderShadow] = ImVec4(0.000f, 0.000f, 0.000f, 0.00f);
-        _style->Colors[ImGuiCol_FrameBg] = ImVec4(0.098f, 0.098f, 0.106f, 1.00f);
-        _style->Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.180f, 0.180f, 0.196f, 1.00f);
-        _style->Colors[ImGuiCol_FrameBgActive] = ImVec4(0.220f, 0.220f, 0.239f, 1.00f);
-        _style->Colors[ImGuiCol_TitleBg] = ImVec4(0.086f, 0.086f, 0.094f, 1.00f);
-        _style->Colors[ImGuiCol_TitleBgActive] = ImVec4(0.106f, 0.106f, 0.114f, 1.00f);
-        _style->Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.086f, 0.086f, 0.094f, 1.00f);
-        _style->Colors[ImGuiCol_MenuBarBg] = ImVec4(0.086f, 0.086f, 0.094f, 1.00f);
-        _style->Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.086f, 0.086f, 0.094f, 0.00f);
-        _style->Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.278f, 0.278f, 0.298f, 1.00f);
-        _style->Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.353f, 0.353f, 0.376f, 1.00f);
-        _style->Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.427f, 0.427f, 0.451f, 1.00f);
-        _style->Colors[ImGuiCol_CheckMark] = ImVec4(0.290f, 0.522f, 0.910f, 1.00f);
-        _style->Colors[ImGuiCol_SliderGrab] = ImVec4(0.290f, 0.522f, 0.910f, 1.00f);
-        _style->Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.361f, 0.588f, 0.945f, 1.00f);
-        _style->Colors[ImGuiCol_Button] = ImVec4(0.180f, 0.180f, 0.196f, 1.00f);
-        _style->Colors[ImGuiCol_ButtonHovered] = ImVec4(0.239f, 0.239f, 0.259f, 1.00f);
-        _style->Colors[ImGuiCol_ButtonActive] = ImVec4(0.290f, 0.522f, 0.910f, 1.00f);
-        _style->Colors[ImGuiCol_Header] = ImVec4(0.180f, 0.180f, 0.196f, 1.00f);
-        _style->Colors[ImGuiCol_HeaderHovered] = ImVec4(0.239f, 0.239f, 0.259f, 1.00f);
-        _style->Colors[ImGuiCol_HeaderActive] = ImVec4(0.290f, 0.522f, 0.910f, 0.85f);
-        _style->Colors[ImGuiCol_Separator] = ImVec4(0.212f, 0.212f, 0.231f, 1.00f);
-        _style->Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.290f, 0.522f, 0.910f, 0.78f);
-        _style->Colors[ImGuiCol_SeparatorActive] = ImVec4(0.290f, 0.522f, 0.910f, 1.00f);
-        _style->Colors[ImGuiCol_ResizeGrip] = ImVec4(0.000f, 0.000f, 0.000f, 0.00f);
-        _style->Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.290f, 0.522f, 0.910f, 0.55f);
-        _style->Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.290f, 0.522f, 0.910f, 0.90f);
-        _style->Colors[ImGuiCol_Tab] = ImVec4(0.118f, 0.118f, 0.126f, 1.00f);
-        _style->Colors[ImGuiCol_TabHovered] = ImVec4(0.220f, 0.220f, 0.239f, 1.00f);
-        _style->Colors[ImGuiCol_TabSelected] = ImVec4(0.180f, 0.180f, 0.196f, 1.00f);
-        _style->Colors[ImGuiCol_TabSelectedOverline] = ImVec4(0.290f, 0.522f, 0.910f, 1.00f);
-        _style->Colors[ImGuiCol_TabDimmed] = ImVec4(0.098f, 0.098f, 0.106f, 1.00f);
-        _style->Colors[ImGuiCol_TabDimmedSelected] = ImVec4(0.141f, 0.141f, 0.149f, 1.00f);
-        _style->Colors[ImGuiCol_TabDimmedSelectedOverline] = ImVec4(0.000f, 0.000f, 0.000f, 0.00f);
-        _style->Colors[ImGuiCol_DockingPreview] = ImVec4(0.290f, 0.522f, 0.910f, 0.45f);
-        _style->Colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.086f, 0.086f, 0.094f, 1.00f);
-        _style->Colors[ImGuiCol_PlotLines] = ImVec4(0.600f, 0.600f, 0.620f, 1.00f);
-        _style->Colors[ImGuiCol_PlotLinesHovered] = ImVec4(0.290f, 0.522f, 0.910f, 1.00f);
-        _style->Colors[ImGuiCol_PlotHistogram] = ImVec4(0.290f, 0.522f, 0.910f, 0.85f);
-        _style->Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.361f, 0.588f, 0.945f, 1.00f);
-        _style->Colors[ImGuiCol_TableHeaderBg] = ImVec4(0.141f, 0.141f, 0.149f, 1.00f);
-        _style->Colors[ImGuiCol_TableBorderStrong] = ImVec4(0.212f, 0.212f, 0.231f, 1.00f);
-        _style->Colors[ImGuiCol_TableBorderLight] = ImVec4(0.169f, 0.169f, 0.184f, 1.00f);
-        _style->Colors[ImGuiCol_TableRowBg] = ImVec4(0.000f, 0.000f, 0.000f, 0.00f);
-        _style->Colors[ImGuiCol_TableRowBgAlt] = ImVec4(1.000f, 1.000f, 1.000f, 0.025f);
-        _style->Colors[ImGuiCol_TextLink] = ImVec4(0.361f, 0.588f, 0.945f, 1.00f);
-        _style->Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.290f, 0.522f, 0.910f, 0.35f);
-        _style->Colors[ImGuiCol_DragDropTarget] = ImVec4(0.290f, 0.522f, 0.910f, 0.90f);
-        _style->Colors[ImGuiCol_NavCursor] = ImVec4(0.290f, 0.522f, 0.910f, 1.00f);
-        _style->Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.000f, 0.000f, 0.000f, 0.55f);
-    }
-}
 
 EditorRenderer::EditorRenderer(void* windowHandle, ::editor::window_table& windows)
     : m_windows(&windows)
@@ -133,15 +32,8 @@ EditorRenderer::EditorRenderer(void* windowHandle, ::editor::window_table& windo
     // 1.92 의 아틀라스는 동적이라 `Build()` 를 부르지 않는다.
     AddEditorFonts();
 
-    m_lastAppliedScale = EditorSettingsStore::Get().Preferences().GetImGuiScale();
-
-    ImGuiStyle* style = &ImGui::GetStyle();
-    ApplyEditorStyle(style);
-    // 글자 배율과 geometry 배율의 담당이 갈린다 — `FontScaleMain` 이 글자,
-    // `ScaleAllSizes` 가 여백·모서리다. obsolete 인 `io.FontGlobalScale` 은
-    // 걷었다(계획서 §3.2).
-    style->FontScaleMain = m_lastAppliedScale;
-    style->ScaleAllSizes(m_lastAppliedScale);
+    ApplyEditorScale(EditorSettingsStore::Get().Preferences().GetImGuiScale(),
+                     m_host->GetWindowDpiScale());
 }
 
 EditorRenderer::~EditorRenderer()
@@ -159,31 +51,16 @@ void EditorRenderer::AddEditorFonts()
     // FA6 범위 단정도 그 파일로 옮겼다. 여기에 두면 `fa.h` 와
     // `IconsFontAwesome6.h` 를 이 TU 가 계속 들어야 한다.
     ::editor::fonts::add_required_font(
-        "body", ::editor::fonts::body_candidates(), kEditorFontSizePixels);
-    ::editor::fonts::merge_icon_font(kEditorFontSizePixels);
+        "body", ::editor::fonts::body_candidates(), ::editor::EditorThemeTokens::BodyFontSize);
+    ::editor::fonts::merge_icon_font(::editor::EditorThemeTokens::IconFontSize,
+        ::editor::EditorThemeTokens::IconBaselineOffset);
 }
 
-void EditorRenderer::ApplyEditorScale(float newScale, bool rebuildFonts)
+void EditorRenderer::ApplyEditorScale(float userScale, float dpiScale)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    ImGuiStyle& style = ImGui::GetStyle();
-
-    // 스타일을 기준값에서 다시 세운 뒤 스케일한다(누적 방지).
-    ApplyEditorStyle(&style);
-    style.ScaleAllSizes(newScale);
-    style.FontScaleMain = newScale;
-    m_lastAppliedScale = newScale;
-
-    if (rebuildFonts)
-    {
-        io.Fonts->Clear();
-        // 아틀라스를 비웠으니 적재 기록도 비운다 — 안 비우면 보고가
-        // 배율을 바꿀 때마다 늘어난다.
-        ::editor::fonts::clear_loaded_fonts();
-        AddEditorFonts();
-        // 폰트 텍스처는 백엔드 소유물이라 재생성은 경계 너머의 일이다.
-        m_host->RebuildFontAtlas();
-    }
+    ::editor::ApplyEditorTheme(ImGui::GetStyle(), userScale, dpiScale);
+    m_lastRequestedScale = userScale;
+    m_lastDpiScale = dpiScale;
 }
 
 void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float width, float height,
@@ -251,17 +128,12 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
 void EditorRenderer::BeginRender()
 {
     m_uiFrameBegan = std::chrono::steady_clock::now();
-    m_host->BeginFrame();
-
-    // 스케일 변경 추적. 재빌드 없이 스타일·폰트 배율만 즉시 적용한다 —
-    // 더 선명하게 필요해지면 ApplyEditorScale의 rebuildFonts를 켠다.
+    // NewFrame가 현재 폰트 크기를 계산하므로 글자/geometry 배율을 먼저 적용한다.
     const float targetScale = EditorSettingsStore::Get().Preferences().GetImGuiScale();
-    if (m_lastRequestedScale != targetScale)
-    {
-        ApplyEditorScale(targetScale, /*rebuildFonts=*/false);
-        m_lastRequestedScale = targetScale;
-    }
-
+    const float dpiScale = m_host->GetWindowDpiScale();
+    if (m_lastRequestedScale != targetScale || m_lastDpiScale != dpiScale)
+        ApplyEditorScale(targetScale, dpiScale);
+    m_host->BeginFrame();
     // ── 메인 독스페이스 ──
     // 구 ImGuiRenderer에서는 #ifndef BUILD_FLAG 안이었다. 지금은 이 파일
     // 자체가 에디터 exe에만 링크되므로 조건이 필요 없다 — 매크로가 하던

@@ -1,4 +1,5 @@
 #include "ContentsBrowserWindow.h"
+#include "EditorTheme.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
 #include "EditorMenuDraw.h"
@@ -434,7 +435,8 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 void ContentsBrowserWindow::Draw()
 {
 static file::path DataDirectory = PathFinder::Relative();
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
+		// 검색 아이콘과 입력란은 맞닿고, 세로 간격만 theme을 따른다.
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, editor::ThemePixels(editor::EditorThemeTokens::ItemGapY)));
 ImGui::BeginDisabled();
 ImGui::Button(ICON_FA_MAGNIFYING_GLASS);
 ImGui::EndDisabled();
@@ -442,7 +444,6 @@ ImGui::SameLine();
 m_filter.Draw("##Assets Search", ImGui::GetContentRegionAvail().x - 90);
 ImGui::PopStyleVar();
 
-ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
 // 왼쪽 디렉터리 트리와 오른쪽 자산 격자. 참조로 삼은 S&Box Asset
 // Browser와 같은 배치이고, 예전에는 이 둘이 스타일 설정에 따라
@@ -453,7 +454,8 @@ ImGuiTreeNodeFlags rootFlags =
 	ImGuiTreeNodeFlags_SpanFullWidth |
 	ImGuiTreeNodeFlags_DefaultOpen;
 
-ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 1));
+// 트리는 조밀한 간격을 쓰되 user/DPI 배율은 theme과 공유한다.
+ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(editor::ThemePixels(editor::EditorThemeTokens::CompactGap), editor::ThemePixels(editor::EditorThemeTokens::PanelGap)));
 if (ImGui::TreeNodeEx(ICON_FA_FOLDER " Assets", rootFlags))
 {
 	ShowDirectoryTree(DataDirectory);
@@ -464,7 +466,7 @@ ImGui::EndChild();
 
 ImGui::SameLine();
 
-ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
+ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(editor::ThemePixels(editor::EditorThemeTokens::CompactGap), editor::ThemePixels(editor::EditorThemeTokens::CompactGap)));
 ImGui::BeginChild("FileList", ImVec2(0, 0), false);
 ImGui::PopStyleVar();
 ImGui::Dummy(ImGui::GetContentRegionAvail());
@@ -484,7 +486,6 @@ if (!m_currentDirectory.empty() &&
 ImGui::SetCursorScreenPos(m_overlayPos);
 
 ShowCurrentDirectoryFiles();
-ImGui::PopStyleColor();
 ImGui::EndChild();
 
 }

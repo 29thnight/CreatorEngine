@@ -49,14 +49,14 @@ public:
 
 private:
     void AddEditorFonts();
-    void ApplyEditorScale(float newScale, bool rebuildFonts);
+    void ApplyEditorScale(float userScale, float dpiScale);
     void BuildInitialDockLayout(unsigned int dockspaceId, float width, float height,
         float posX, float posY);
 
     IImGuiHost* m_host{ nullptr };
     ::editor::window_table* m_windows{ nullptr };
-    float m_lastAppliedScale{ 0.8f };
     float m_lastRequestedScale{ -1.f };
+    float m_lastDpiScale{ -1.f };
 
     // 에디터 UI 한 프레임의 CPU 시간을 재는 시작점(PHASE 21 W0 후반).
     // `BeginRender` 에서 찍고 `EndRender` 에서 뺀다 — GPU 제출과 Present 는

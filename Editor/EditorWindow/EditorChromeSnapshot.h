@@ -134,6 +134,16 @@ namespace editor
         /// 글자 배율의 **정식 경로**. 1.92 에서 `io.FontGlobalScale` 이
         /// obsolete 가 됐고 W1 이 여기로 옮겼다.
         float         font_scale_main{ 0.f };
+        float         font_scale_dpi{ 0.f };
+        float         window_dpi_scale{ 0.f };
+        float         viewport_dpi_scale{ 0.f };
+        float         rendered_font_size{ 0.f };
+        bool          dpi_scaling_enabled{ false };
+        bool          per_monitor_dpi_aware{ false };
+        bool          os_viewports_enabled{ false };
+        bool          theme_mapping_matches{ false };
+        bool          geometry_matches{ false };
+        std::vector<std::pair<std::string, std::uint32_t>> theme_tokens;
         /// 적재한 폰트 전부(PHASE 21 W1).
         std::vector<font_view> fonts;
         /// 후보가 하나도 없을 때 해상이 빈 것을 돌려주는가. 살아 있는
@@ -253,6 +263,12 @@ namespace editor
 
         float font_scale_main{ 0.f };
         float preference_scale{ 0.f };
+        float font_scale_dpi{ 0.f };
+        float window_dpi_scale{ 0.f };
+        float viewport_dpi_scale{ 0.f };
+        bool dpi_matches{ false };
+        bool theme_mapping_matches{ false };
+        bool geometry_matches{ false };
 
         /// 에디터 스타일이 실제로 적용됐는가. ImGui 기본값과 다른 색이 하나도
         /// 없으면 `ApplyEditorStyle` 이 돌지 않았다는 뜻이다.
@@ -283,7 +299,8 @@ namespace editor
 
         bool clean() const noexcept
         {
-            return style_applied && scale_matches && labels_missing_glyphs.empty()
+            return style_applied && scale_matches && dpi_matches
+                && theme_mapping_matches && geometry_matches && labels_missing_glyphs.empty()
                 && body_font_present && icon_font_merged && font_fallback_probe_ok;
         }
     };

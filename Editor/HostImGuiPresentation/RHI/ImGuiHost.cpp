@@ -33,6 +33,7 @@ namespace
                 &GlobalImGuiContext::GetInstance()->p_user_data);
 
             io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+            io.ConfigDpiScaleFonts = true;
             static const std::string kIniPath =
                 PathFinder::ConfigPath("imgui.ini").string();
             io.IniFilename = kIniPath.c_str();
@@ -88,6 +89,19 @@ namespace
             return m_renderer ? m_renderer->GetName() : "none";
         }
 
+        float GetWindowDpiScale() const override
+        {
+            const UINT dpi = ::GetDpiForWindow(static_cast<HWND>(m_windowHandle));
+            return dpi ? static_cast<float>(dpi) / 96.f : 1.f;
+        }
+
+        bool IsPerMonitorDpiAware() const override
+        {
+            return ::AreDpiAwarenessContextsEqual(
+                ::GetWindowDpiAwarenessContext(static_cast<HWND>(m_windowHandle)),
+                DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) != FALSE;
+        }
+
         void BeginFrame() override
         {
             if (!m_renderer) return;
@@ -99,12 +113,9 @@ namespace
             const ImVec2 newSize(static_cast<float>(rect.right - rect.left),
                 static_cast<float>(rect.bottom - rect.top));
 
-            if (io.DisplaySize != newSize && newSize != ImVec2(0, 0) &&
-                io.DisplaySize != ImVec2(0, 0))
-            {
-                io.DisplaySize = newSize;
-                io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
-            }
+            // Win32 backend가 클라이언트 픽셀 크기와 framebuffer 배율을 소유한다.
+            // PMv2의 client/mouse/render 좌표는 물리 픽셀이므로 DPI를 framebuffer
+            // 배율로 다시 곱하지 않는다. DPI는 FontScaleDpi와 UI geometry에 적용한다.
 
             m_renderer->Resize(static_cast<uint32_t>((std::max)(0.0f, newSize.x)),
                 static_cast<uint32_t>((std::max)(0.0f, newSize.y)));

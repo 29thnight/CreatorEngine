@@ -1,4 +1,5 @@
 #include "EditorModelPlacement.h"
+#include "EditorTheme.h"
 #include "EditorObjectOperations.h"
 #include "SceneViewWindow.h"
 #include "ReflectionUndo.h"
@@ -225,8 +226,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	// `useWindow` 전역과 `gizmoWindowFlags |= NoMove` 누적은 함께 지웠다 —
 	// 전자는 항상 참이었고 후자는 초기값에 이미 같은 비트가 있었다.
 	{
+		// 뷰포트 영상/기즈모는 빈틈 없이 겹친다. 배경 영상이 보이도록 alpha만 낮춘다.
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
+		ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::PanelRaised, 0.8f));
 		ImGuizmo::SetDrawlist();
 
 		windowWidth = (float)ImGui::GetWindowWidth();
@@ -270,12 +272,10 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImVec2 imagePos = ImGui::GetItemRectMin();
 		ImGui::SetCursorScreenPos(ImVec2(imagePos.x + 5, imagePos.y + 5));
 
-		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
 		if (ImGui::Button(ICON_FA_CHART_BAR))
 		{
 			ImGui::OpenPopup("RenderStatistics");
 		}
-		ImGui::PopStyleVar();
 
 		ImGui::SameLine();
 		ImVec2 currentPos = ImGui::GetCursorScreenPos();
@@ -309,16 +309,15 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::SameLine();
 		currentPos = ImGui::GetCursorScreenPos();
 		ImGui::SetCursorScreenPos(ImVec2(windowWidth - 270.f, currentPos.y));
-		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
 		for (int i = 0; i < buttonCount; i++)
 		{
 			if (i == (int)selectGizmoMode)
 			{
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.1f, 0.9f, 0.8f));
+				ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::Primary, 0.8f));
 			}
 			else
 			{
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
+				ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::PanelRaised, 0.8f));
 			}
 
 			if (ImGui::Button(buttons[i]))
@@ -337,11 +336,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
 		if (useSnap)
 		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.1f, 0.9f, 0.8f));
+			ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::Primary, 0.8f));
 		}
 		else
 		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 0.8f));
+			ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::PanelRaised, 0.8f));
 		}
 
 		if (ImGui::Button(ICON_FA_BORDER_ALL " Snap"))
@@ -350,8 +349,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
 		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
 		ImGui::PopStyleColor();
-
-		ImGui::PopStyleVar(1);
 
 		// ── 프레임 정보 오버레이 ──
 		//
@@ -421,8 +418,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		ImGui::PopStyleVar(1);   // ItemSpacing — WindowPadding은 셸이 든다
 
-		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.f);
-		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.1f, 0.1f, 0.1f, 0.8f));
+		// 카메라/통계 팝업은 영상 위에서 같은 반투명 overlay를 쓴다.
+		ImGui::PushStyleColor(ImGuiCol_PopupBg, editor::ThemeColorValue(editor::ThemeColor::Panel, 0.8f));
 		ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), 0.0f);
 		if (ImGui::BeginPopup("CameraSettings"))
 		{
@@ -476,7 +473,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
 		ImGui::PopFont();
 		ImGui::PopStyleColor();
-		ImGui::PopStyleVar();
 	}
 
     if (obj && !selectMode)

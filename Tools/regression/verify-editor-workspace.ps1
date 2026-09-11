@@ -148,6 +148,10 @@ Assert ($theme.data.clean -eq $true) "Theme audit is dirty: $($theme.message)"
 Assert ($theme.data.styleApplied -eq $true) 'The editor skin was not applied; the style equals the ImGui default'
 Assert ($theme.data.scaleMatches -eq $true) `
     "Scale source diverged: style.FontScaleMain=$($theme.data.fontScaleMain) preference=$($theme.data.preferenceScale)"
+Assert ($theme.data.dpiMatches -eq $true) `
+    "DPI source diverged: OS=$($theme.data.windowDpiScale) viewport=$($theme.data.viewportDpiScale) font=$($theme.data.fontScaleDpi)"
+Assert ($theme.data.geometryMatches -eq $true) 'Theme geometry differs from user scale times OS DPI'
+Assert ($theme.data.themeMappingMatches -eq $true) 'Applied ImGui colors differ from semantic theme tokens'
 
 # 선언된 창 라벨의 아이콘이 폰트 블롭에 실제로 있는가. IconsFontAwesome6.h 에
 # 정의만 있고 블롭에 글리프가 없으면 네모 한 칸이 조용히 그려진다.

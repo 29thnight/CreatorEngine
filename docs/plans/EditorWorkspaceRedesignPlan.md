@@ -8,7 +8,7 @@
 - 셸 크롬 착지: 2026-09-10 — s&box 배치·ImGui 제목표시줄·다크 스킨이 W3보다 앞서 섰다.
   기록과 남은 창 선언 계약은 **부록 B**. 이 착지가 §1.1·§1.2·§1.4의 일부를 닫았고
   §1.3의 표시 상태 저장소 수를 정정했다.
-- 상태: 부록 A M0~M2 착지(done) · 부록 B M3~M4 착지(done) · **W0 착지(done)** · W1~W8 미착수
+- 상태: 부록 A M0~M2·부록 B M3~M4·W0 착지(done) · **W1 구현·자동 회귀 통과, 실제 DPI 왕복 검증 대기** · 후속 단계는 §9 참조
 - 방향: **Dear ImGui 유지 · S&Box 테마 토큰 이식 · 소수 전용 위젯만 custom draw**
 범위: Editor chrome, theme, tool window, docking, workspace, ViewportHost, Play 표시·입력 전환, 회귀 검증
 
@@ -73,9 +73,9 @@ Main editor OS window
 
 ## 1. 현재 소스 기준선 (2026-08-30 실측)
 
-수립 당시의 기준선을 2026-08-30에 소스로 전수 대조했다. **이 절에서 "이미"라고 적은 것은
-가설이 아니라 현재 트리에서 확인된 사실이고, 파일:행을 붙였다.** 정찰이 뒤집은 항목은
-§1.4·§1.6·§3.2·§1.9 넷이다.
+수립 당시의 기준선을 2026-08-30에 소스로 전수 대조했다. 이 절의 날짜가 붙은 기준선은
+**그 당시 상태**이며 현재 구현 판정은 후속 정정과 §9를 함께 읽는다. 정찰이 뒤집은 항목은
+§1.4·§1.6·§3.2·§1.9 넷이고, DPI 매니페스트의 잘못된 단정은 §3.2·부록 B.5에서 정정했다.
 
 ### 1.1 스타일은 한 함수에 있으나 semantic token이 아니다
 
@@ -116,6 +116,11 @@ Main editor OS window
 **W1이 하려던 일은 줄지 않았다.** 값이 바뀌었을 뿐 여전히 semantic token이 아니고, 창별 예외
 91건 중 메뉴 행 몫만 빠졌다. 스케일 경로와 폰트 하드코딩도 그대로다 — W1의 inventory 기준값을
 **다시 세어야 한다.**
+
+**(2026-09-11 W1 구현 반영.)** 위 스타일·폰트·배율 설명은 W1 이전 기준선이다.
+현재는 semantic token, 번들 Inter/시스템 폰트 대비, `FontScaleMain`/`FontScaleDpi` 경로를
+구현했다. 최종 Debug/Release 빌드와 런타임 재검증은 진행 중이며, 결과는 §9 W1과
+[EditorThemeW1Validation.md](../analysis/EditorThemeW1Validation.md)에 기록한다.
 
 ### 1.2 기본 배치가 표시 방식과 결합돼 있다
 
@@ -506,22 +511,32 @@ geometry token:
 
 - 기본/heading은 Inter를 Editor resource에 license와 함께 포함하는 것을 1순위로 한다.
 - Font Awesome 병합은 유지하되 text font와 icon glyph의 baseline/size token을 분리한다.
-- monospace는 Consolas를 1순위로 하되 시스템 font 부재 시 bundled fallback을 쓴다.
+- monospace 소비자가 생기면 Consolas를 1순위로 하되 시스템 font 부재 시 bundled fallback을 쓴다.
+  W1 시점에는 ImGui monospace 소비자가 없어 이 체인을 추가하지 않는다.
 - 현재의 절대 Windows font path를 제거한다.
 - 모든 geometry는 logical px 하나로 정의하고 `main viewport DPI × user scale`을 한 번만 적용한다.
-- font atlas rebuild와 style scaling의 책임을 한 함수로 모아 double scaling을 금지한다.
+- 폰트 크기와 geometry scaling의 출처를 통일해 double scaling을 금지한다.
+  W1은 ImGui 1.92 동적 atlas를 사용하므로 배율 변경 시 atlas를 비우거나 직접 rebuild하지 않는다.
 
 **정찰 정정 (2026-08-30).** 위 마지막 두 줄은 자체 구현을 지시하지만, 실측 결과 전제가 둘 다
 어긋난다.
 
-1. **DPI 항이 지금 0이다.** `EnableDpiAwareness`·`GetDpiForWindow`·`SetProcessDpi*` 호출이
+1. **당시 DPI 항이 0이었다.** `EnableDpiAwareness`·`GetDpiForWindow`·`SetProcessDpi*` 호출이
    코드베이스 전체에 없고, `ImGuiHost::BeginFrame`은 `io.DisplayFramebufferScale`을 `(1,1)`로
    하드코딩한다. 유일한 배율은 `EditorPreferences::GetImGuiScale()`이며 UI 슬라이더 범위가
-   **0.8~1.5**다(`MenuBarWindow.cpp:451`). 즉 "150% DPI"는 지금 사용자 배율로 흉내만 낼 수 있고
+   **0.8~1.5**였다(`MenuBarWindow.cpp:451`). 즉 당시 "150% DPI"는 사용자 배율로 흉내만 낼 수 있고
    진짜 DPI 경로를 탄 적이 없다 — W1의 판정에서 이 둘을 구분해 적는다.
 2. **ImGui 1.92.8이 이미 정식 경로를 제공한다.** `style.FontScaleMain`(사용자 배율),
    `style.FontScaleDpi`(모니터 contents scale), `io.ConfigDpiScaleFonts`(DPI 변화 시 `FontScaleDpi`
-   자동 갱신), `style.FontSizeBase`가 그것이다. 현 코드가 쓰는 `io.FontGlobalScale`은 obsolete다.
+   자동 갱신), `style.FontSizeBase`가 그것이다. 당시 코드가 쓰던 `io.FontGlobalScale`은 obsolete다.
+
+**매니페스트 정정 (2026-09-11 W1).** "에디터가 이미 per-monitor v2를 선언했다"는 이전 판정은
+잘못이었다. `Academy_4Q.exe.manifest`는 빌드에 배선되지 않은 파일이며, 실제 기존 EXE의
+리소스 `#1`에서 추출한 manifest에는 DPI 선언이 없었다. 이번 W1에서 최소
+`EngineEntry/CreatorEditor.manifest`의 `SMI/2016/WindowsSettings`·`PerMonitorV2` 선언을
+`CreatorEditor.vcxproj`의 `AdditionalManifestFiles`로 연결했다. 파일 존재 확인에 그치지 않도록
+실행 HWND가 `DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2`인지 확인하는 게이트도 추가했다.
+최종 Debug/Release 빌드와 런타임 재검증 결과는 W1 검증 기록에 추가한다.
 
 따라서 W1의 DPI 항목은 다음으로 대체한다.
 
@@ -529,8 +544,9 @@ geometry token:
   자체 곱셈 경로를 새로 만들지 않는다.
 - `io.FontGlobalScale` 사용을 제거하고, `ScaleAllSizes`는 **geometry에만** 적용한다
   (`ScaleAllSizes` 주석대로 폰트는 스케일하지 않는다 — 지금의 이중 적용이 double scaling의 원인이다).
-- Win32 DPI awareness와 `ConfigDpiScaleFonts` 채택 여부를 W1에서 판정하고, 채택하면
-  "`FontScaleDpi`는 ImGui가 쓴다"를 불변식으로 적는다.
+- W1은 PerMonitorV2와 `ConfigDpiScaleFonts`를 채택한다. 셸이 실제 HWND DPI를 읽어
+  `NewFrame` 전에 `FontScaleDpi`를 설정하고 ImGui의 main viewport 갱신과 일치시킨다.
+  geometry만 사용자 배율×DPI를 곱하고, 폰트에는 두 축을 각각 전달한다.
 - ~~**`IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 켜는 것을 W1의 종료 조건에 넣는다.**~~
   **(2026-09-11 실측 정정 — 이 매크로는 제품 구성에 켤 수 없다.)** 함수만 걷는 매크로가
   아니라 **`ImGuiIO`의 레이아웃을 바꾼다**(`imgui.h`의 `struct ImGuiIO` 안 obsolete 블록에
@@ -943,32 +959,37 @@ id 가 둘이어야 하는데, 그것은 `editor.windows` 의 `duplicateIds` 가
 
 ### W1 — Theme token · font/icon · DPI 정본 (P1, 2일)
 
-- `EditorThemeTokens`와 `ApplyEditorTheme`를 추가한다.
-- Inter/font fallback과 Font Awesome atlas build를 editor resource로 옮긴다.
-  `IconsFontAwesome4.h`/`6.h` 공존을 정리한다(§1.10).
-- literal `PushStyleColor/Var` inventory를 semantic token 또는 명시적 exception으로 정리한다.
-  **(2026-09-11 재계수 — 91건이 아니라 57건이다.)** M3이 메뉴 행을 표로 옮기며 창별 예외가
-  줄었다. Color 31 + Var 26이고 `MenuBarWindow.cpp`의 몫은 48이 아니라 **20**이다 — 여전히
-  최대지만 전체의 35%다. 파일별 표는 `docs/analysis/EditorWorkspaceW0Baseline.md` §2에 있다.
-- **`io.FontGlobalScale`을 걷고 `style.FontScaleMain` / `FontScaleDpi`로 이주한다**(§3.2).
-  `ScaleAllSizes`는 geometry에만 적용해 현재의 이중 적용을 끊는다.
-- Win32 DPI awareness와 `io.ConfigDpiScaleFonts` 채택 여부를 판정하고, 채택하면
-  `DisplayFramebufferScale` 하드코딩 `(1,1)`을 함께 걷는다.
-  **(9-10 재정찰 정정)** 프로세스는 매니페스트로 이미 `permonitorv2`를 선언한다
-  (`Editor/EngineEntry/Academy_4Q.exe.manifest:26`). 따라서 문제는 "인식을 켤 것인가"가 아니라
-  **"이미 인식 중인데 보정이 0"**이다 — OS 가상화 없이 150% 모니터에서 물리 픽셀 1:1로 그린다.
-  최소 경로는 `WM_DPICHANGED` 처리 + `style.FontScaleDpi`/`io.ConfigDpiScaleFonts` 채택이며,
-  "채택하지 않는다"는 선택은 그 1:1 렌더를 유지한다는 뜻임을 판정문에 명시한다. ImGui 1.92.8은
-  ThirdParty가 아니라 vcpkg에서 온다. `Fonts->Build()`(`EditorRenderer.cpp:84`)도 1.92 동적
-  아틀라스 기준 legacy라 함께 걷는다.
+**2026-09-11 구현 반영, Debug/Release 자동 회귀 통과.** 상세 증거와 남은 검증은
+[EditorThemeW1Validation.md](../analysis/EditorThemeW1Validation.md)에 둔다.
 
-**판정:** token sample은 기준 hex와 일치하고, font file 부재로 editor가 뜨지 않는 경로가 없다.
-~~`IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 켠 상태로 Editor가 빌드·기동된다~~ **(§3.2 정정 — 이 매크로는
-`ImGuiIO` 레이아웃을 바꿔 제품 구성에 켤 수 없다. 실측은 §3.2에 있다.)** obsolete 잔존 0은
-`verify-imgui-obsolete-surface.ps1`이 소스로 판정한다. 매크로를 켠 전체 rebuild가 **오류 0**으로
-선 것이 일회성 증거로 남는다(2026-09-11, 22자리를 고친 뒤).
-user scale 100↔150% 왕복과 **실제 DPI 100↔150% 왕복**을 따로 판정하며, 후자는 DPI 경로를
-채택했을 때만 통과 조건에 넣는다 — 채택하지 않으면 "이번 범위에서 하지 않았다"를 명시한다.
+- `EditorThemeTokens` / `ApplyEditorTheme`가 §3.1의 14색과 logical geometry를 소유한다.
+  `EditorRenderer`와 창별 공통 색·간격 override가 같은 토큰을 소비한다.
+- Inter 4.1 static regular와 OFL 라이선스를 Editor resource로 포함·배포한다.
+  번들 → 시스템 후보 → ImGui 기본 폰트의 대비 경로와 FA6 병합을 유지하며,
+  본문·heading은 같은 Inter를 쓴다. 본문 크기와 icon 크기·baseline 보정은 별도 토큰이다.
+  기존 한글 폰트는 별도 후보를 유지한다.
+  monospace ImGui 소비자는 현재 없으므로 그 체인은 소비자가 생길 때 추가한다.
+- 사용자 배율은 `FontScaleMain`, 모니터 배율은 `FontScaleDpi`다.
+  매 프레임 OS 창 DPI를 확인하고 **NewFrame 전에** 두 축을 적용한다.
+  geometry는 기준 style에서 `ScaleAllSizes(user × DPI)`를 한 번만 수행해 누적 절삭을 막는다.
+- `ConfigDpiScaleFonts`를 채택했다. `WM_DPICHANGED`의 제안 RECT는 창 소유 스레드에서
+  즉시 적용하고 포인터를 표시 스레드 메시지 큐로 넘기지 않는다.
+  `DisplaySize`/framebuffer 좌표는 Win32 backend에 맡기며 OS multi-viewport는 꺼 둔다.
+- 기존 EXE에 없던 PerMonitorV2 선언을 `CreatorEditor.manifest`와 `AdditionalManifestFiles`로
+  연결했다(§3.2 정정). `editor.theme`와 회귀 게이트는 실행 HWND의 PMv2 상태도 확인한다.
+- `editor.theme`는 14색 토큰, 실제 style 연결, geometry, OS/viewport/font DPI와 폰트 출처를 보고한다.
+  `editor.selftest`는 지역 style 위에서 고정 hex·mapping·독립/결합 배율·왕복·오염 복구를 검사한다.
+- `verify-editor-theme.ps1`은 DX12/Vulkan의 시작 배율 100→150→100%를 검사하며
+  설정과 ini를 원본 바이트로 복원한다. 선언·크롬·obsolete 게이트와 함께 run-all에 연결한다.
+
+**판정:** Debug/Release Build와 양쪽 DX12/Vulkan 테마 6기동·103검사씩 통과했다.
+지역 style 183검사, Debug 선언 배선 33검사, workspace ini 6종·108검사, obsolete surface도 통과했다.
+실행 중 사용자 배율 100→150→100%는 Debug UI에서도 확대·복귀를 확인했다.
+활성 ImGui style push는 Editor 전체 51→36건이다(범위·주석 차이는 검증 기록 참조).
+현재 두 모니터가 모두 150%라 **실제 OS DPI 100↔150% 왕복은 남아 있다**.
+합성 style 시험이나 150% 기동 통과로 이 항목을 닫지 않으며 W1은 `progress`로 유지한다.
+`IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 제품에 켜는 옛 판정은 §3.2의 ABI 문제로 폐기했고,
+`verify-imgui-obsolete-surface.ps1`로 구식 호출 회귀를 검사한다.
 
 ### W2 — 공통 styled primitive와 custom draw 4종 (P1, 3일)
 
@@ -1132,10 +1153,9 @@ M3 ──────→ W1 재계수  (2026-09-11 다시 셌다. 91 → 57. W1 
 | 5.5 | **M4** — 창 선언(부록 B.3) | M3이 셸에 프레임 소유를 준 뒤라야 선언에 담을 것이 정해진다. W3보다 **먼저**여야 한다 — W3의 안정 ID는 선언의 한 필드가 되고, 표시 상태 저장소 셋을 합치는 자리도 여기다. W0 후반 골든 뒤에 두어 골든을 두 번 뜨지 않는다 |
 | 6~ | W1 → W2, W3 → W4 → W5·W6, W7, W8 | §9·§10의 기존 의존 그대로. W3의 선행인 M1·M4는 이미 끝나 있다 |
 
-**(2026-09-11)** 1~5.5가 모두 착지했다. 남은 것은 **W0 후반**(ini fixture 네 벌 · inventory ·
-screenshot · 성능 기준선 · canary 보강)과 그 뒤의 W1 → W2 → W3 → … 이다. W0 후반의 자리는
-`verify-editor-workspace.ps1`이고 그 파일은 이미 서 있다 — fixture를 넣을 틀(`Invoke-EditorBatch`)과
-ini 워밍업이 그 안에 있다.
+**(2026-09-11 갱신)** 1~5.5와 W0 후반이 착지했고, W1 구현·자동 회귀와 실행 중 사용자 배율
+왕복을 확인했다. W1은 실제 OS DPI 100↔150% 왕복 검증을 남겨 `progress`로 유지한다.
+그 뒤 구현 순서는 W2 → W3 → … 이며 단계별 범위와 검증은 §9를 따른다.
 
 두 가지를 주의한다. `CommandDescriptorSeeds.cpp`는 1과 4가 모두 건드리는 유일한 공유 파일이고 지금
 **다른 세션이 수정 중**이다. 그리고 3은 기존 19개 상단 항목을 이관하지 않는다 — 배선만 세우고 신규만
@@ -1212,7 +1232,7 @@ ini 워밍업이 그 안에 있다.
 | Hierarchy cache가 두 번째 정본이 됨 | handle/depth 파생 cache만 허용, H3 source gate |
 | OS multi-viewport를 flag 하나로 켬 | 이번 범위 제외, renderer swapchain/DPI 계약 선행 |
 | **관측 표면이 없어 게이트가 “창이 떴다”만 단정** | W0에서 `editor.*` 관측 커맨드 5종 선행(§1.9), 변이로 이빨 증명 |
-| **DPI 자체 구현이 ImGui 1.92 경로와 이중화** | `FontScaleMain/FontScaleDpi` 채택, `IMGUI_DISABLE_OBSOLETE_FUNCTIONS`로 잔존 0 증명(§3.2) |
+| **DPI 자체 구현이 ImGui 1.92 경로와 이중화** | `FontScaleMain/FontScaleDpi` 채택, obsolete 소스 게이트와 실행 HWND PMv2·DPI 일치 검사(§3.2) |
 | **`WantCapture*` 강제를 걷자 입력 라우팅이 바뀜** | W5에서 계측 먼저, 지혈은 그 뒤. 라우팅 근거를 문서화한 뒤 걷는다(§1.8) |
 | **커서 해제 누락을 복구할 주체가 없음** | `NoMouseCursorChange`가 서 있어 ImGui가 되돌리지 않는다. 해제 경로 4종을 각각 단정(§1.8) |
 | **custom widget이 기존 ImGuiHelper 자산과 이중화** | W2 착수 전 §7.1 승계 결정표 확정, 소비자를 끊어 본 뒤 은퇴 |
@@ -1242,7 +1262,7 @@ flag로 분리한다. 단, 완료 뒤 영구 이중 경로를 유지하지 않�
 9. optional Game Preview는 기존 두 표시 타깃을 재사용하고 두 번째 카메라 정본을 만들지 않는다.
 10. theme/docking CPU 회귀가 §8 gate 안이며, single-view/clipping 이득은 실제 수치로 기록된다.
 11. DX12/Vulkan, DPI, Play 왕복, visual golden, large-data 성능 gate가 모두 통과한다.
-12. `IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 켠 상태로 Editor가 빌드·기동되고, `ViewportsEnable`은
+12. `verify-imgui-obsolete-surface.ps1`이 통과하고(§3.2의 ABI 정정), `ViewportsEnable`은
     꺼진 채로 남아 있음을 게이트가 단정한다(§3.2, §1.7).
 13. `editor.*` 관측 커맨드 5종이 서 있고, 에디터 chrome 회귀 3종이 **변이로 이빨을 증명한**
     상태로 CI에 있다(§1.9, §11).
@@ -1869,7 +1889,11 @@ std만 의존하고 ImGui를 아는 파일은 셸(`EditorWindowHost`) 하나다.
 오른쪽 열과 하단 패널이 통째로 잘렸다. 대조군 빌드까지 돌렸지만 같은 크롭을 두 번 본 것이라
 아무것도 가리지 못했다. DPI를 선언하고 `SM_XVIRTUALSCREEN`~`SM_CYVIRTUALSCREEN`으로 다시 찍자
 열 창이 전부 제자리에 있었다. **관측 도구의 좌표계를 먼저 검산하지 않으면 제품 결함으로 오독한다.**
-에디터 자체는 이미 per-monitor v2 매니페스트를 켜고 있어 손댈 것이 없었다.
+**(2026-09-11 W1 정정.)** 이 자리에 있던 "에디터 자체는 이미 per-monitor v2 매니페스트를
+켜고 있어 손댈 것이 없었다"는 단정은 틀렸다. 당시 본 `Academy_4Q.exe.manifest`는 제품 빌드에
+연결되지 않았고 실제 EXE의 `#1` manifest에는 DPI 선언이 없었다. 이번 W1이
+`CreatorEditor.manifest`를 빌드에 연결하고 실행 HWND PMv2 게이트를 추가했다(§3.2).
+화면 캡처 도구의 크롭 원인 판정은 유지하되, 그것으로 제품 DPI awareness까지 증명하지 않는다.
 
 **남은 것.** 3단계(직접 `ImGui::Begin` 15개 이관)와 4단계(표시 상태 저장소 통합 ·
 `ImGuiRegister` 렌더 루프 은퇴 · `editor.windows` 덤프 · 고아 0 게이트).

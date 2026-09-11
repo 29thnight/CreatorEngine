@@ -1,4 +1,5 @@
 #include "MeshRenderer.h"
+#include "EditorTheme.h"
 // MeshRenderer.h는 Material을 전방 선언만 한다. 이 파일은 m_ORM_TexName 같은
 // 멤버를 직접 읽으므로 완전한 형이 필요하다. 그동안은 같은 유니티 블롭의
 // 앞선 파일이 대신 공급했고, 폴더에 파일 하나가 늘어 블롭 구성이 바뀌자
@@ -63,7 +64,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 	{
 		ImGui::Text("Element ");
 		ImGui::SameLine();
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(editor::ThemePixels(editor::EditorThemeTokens::PropertyGapX), editor::ThemePixels(editor::EditorThemeTokens::ItemGapY)));
+		// 자산 이름은 왼쪽 정렬한다. 정렬 비율은 pixel 배율 대상이 아니다.
 		ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 
 		if (meshRenderer->m_Material && !meshRenderer->m_Material->m_name.empty())

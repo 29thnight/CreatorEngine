@@ -27,6 +27,7 @@
 #include "EditorMenuSelfTest.h"
 #include "EditorMenuAudit.h"
 #include "EditorChromeSnapshot.h"   // PHASE 21 W0: editor.dock/theme/layout
+#include "EditorThemeSelfTest.h"
 
 #include <span>
 #include "RegisterEditorMenuManual.h"
@@ -952,6 +953,14 @@ namespace ConsoleCmd
         data.Set("preferenceScale", CommandData::Double(audit.preference_scale));
         data.Set("styleApplied", CommandData::Bool(audit.style_applied));
         data.Set("scaleMatches", CommandData::Bool(audit.scale_matches));
+        data.Set("fontScaleDpi", CommandData::Double(audit.font_scale_dpi));
+        data.Set("windowDpiScale", CommandData::Double(audit.window_dpi_scale));
+        data.Set("viewportDpiScale", CommandData::Double(audit.viewport_dpi_scale));
+        data.Set("renderedFontSize", CommandData::Double(snapshot.rendered_font_size));
+        data.Set("dpiMatches", CommandData::Bool(audit.dpi_matches));
+        data.Set("perMonitorDpiAware", CommandData::Bool(snapshot.per_monitor_dpi_aware));
+        data.Set("themeMappingMatches", CommandData::Bool(audit.theme_mapping_matches));
+        data.Set("geometryMatches", CommandData::Bool(audit.geometry_matches));
         data.Set("missingGlyphLabels",
                  CommandData::Int(static_cast<int>(audit.labels_missing_glyphs.size())));
         // 폰트 (PHASE 21 W1). 파일이 없을 때 죽던 자리라 밖에서 보여야 한다.
@@ -1028,17 +1037,24 @@ namespace ConsoleCmd
         std::printf("[CLI] editor.menu selftest: %s %s\n",
             menusOk ? "PASS" : "FAIL", menuReport.c_str());
 
+        std::string themeReport;
+        const bool themeOk = ::editor::RunEditorThemeSelfTest(themeReport);
+        std::printf("[CLI] editor.theme selftest: %s %s\n",
+            themeOk ? "PASS" : "FAIL", themeReport.c_str());
+
         auto data = CommandData::Object();
         data.Set("windows", CommandData::Bool(windowsOk));
         data.Set("menus", CommandData::Bool(menusOk));
+        data.Set("theme", CommandData::Bool(themeOk));
+        data.Set("themeReport", CommandData::String(themeReport));
         data.Set("windowReport", CommandData::String(windowReport));
         data.Set("menuReport", CommandData::String(menuReport));
 
-        if (!windowsOk || !menusOk)
+        if (!windowsOk || !menusOk || !themeOk)
         {
             return Fail("editor.selftest.failed",
                         "editor:: 선언 자가 검사 실패 — 창: " + windowReport +
-                        " / 메뉴: " + menuReport, std::move(data));
+                        " / 메뉴: " + menuReport + " / 테마: " + themeReport, std::move(data));
         }
         return Ok("editor:: 선언 자가 검사 통과", std::move(data));
     }

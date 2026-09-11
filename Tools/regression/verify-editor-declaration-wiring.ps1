@@ -90,6 +90,7 @@ $selftest = $results['editor.selftest']
 Assert ($selftest.status -eq 'succeeded') "editor.selftest failed: $($selftest.message)"
 Assert ($selftest.data.windows -eq $true) "Window declaration selftest failed: $($selftest.data.windowReport)"
 Assert ($selftest.data.menus -eq $true) "Menu declaration selftest failed: $($selftest.data.menuReport)"
+Assert ($selftest.data.theme -eq $true) "Theme token/scale selftest failed: $($selftest.data.themeReport)"
 
 # ── ② 창 배선 감사 ──────────────────────────────────────────────────────
 Assert ($results.ContainsKey('editor.windows')) 'editor.windows produced no result line'

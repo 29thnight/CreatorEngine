@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -196,6 +197,17 @@ namespace editor
         // 배율 출처가 하나인가. 적용 경로가 둘이라 한쪽만 고치면 갈린다.
         const float difference = snapshot.font_scale_main - snapshot.preference_scale;
         audit.scale_matches = (difference > -0.0001f) && (difference < 0.0001f);
+        audit.font_scale_dpi = snapshot.font_scale_dpi;
+        audit.window_dpi_scale = snapshot.window_dpi_scale;
+        audit.viewport_dpi_scale = snapshot.viewport_dpi_scale;
+        const auto near = [](float a, float b) { return std::abs(a - b) < 0.0001f; };
+        audit.dpi_matches = snapshot.dpi_scaling_enabled && snapshot.per_monitor_dpi_aware &&
+            !snapshot.os_viewports_enabled &&
+            snapshot.window_dpi_scale > 0.f &&
+            near(snapshot.font_scale_dpi, snapshot.window_dpi_scale) &&
+            near(snapshot.viewport_dpi_scale, snapshot.window_dpi_scale);
+        audit.theme_mapping_matches = snapshot.theme_mapping_matches && !snapshot.theme_tokens.empty();
+        audit.geometry_matches = snapshot.geometry_matches;
 
         // 폰트가 섰는가(PHASE 21 W1). 본문 폰트가 비면 글자가 아예 안
         // 그려지고, 아이콘 병합이 빠지면 아이콘만 네모가 된다. 기본 폰트로
@@ -318,7 +330,10 @@ namespace editor
 
     std::string dump_theme(const chrome_snapshot& snapshot)
     {
-        std::string out{ "styleColor\tvalue\n" };
+        std::string out{ "themeToken\tvalue\n" };
+        for (const auto& [name, color] : snapshot.theme_tokens)
+            out += name + '\t' + hex_color(color) + '\n';
+        out += "\nstyleColor\tvalue\n";
         for (const std::pair<std::string, std::uint32_t>& color : snapshot.style_colors)
         {
             out += color.first;
@@ -484,9 +499,15 @@ namespace editor
         // 막는다 — `IMGUI_DISABLE_OBSOLETE_FUNCTIONS` 는 `ImGuiIO` 의 레이아웃을
         // 바꾸는 매크로라 제품 구성에 켤 수 없다(계획서 §3.2 의 실측). 판 번호를
         // 같은 줄에 적는다 — 어느 API 가 정식인지가 판에 달린 판단이라 근거를 떼어 두지 않는다.
+        char scaleBuffer[256]{};
+        std::snprintf(scaleBuffer, sizeof(scaleBuffer),
+            "[AUDIT] dpi window=%.3f viewport=%.3f font=%.3f matched=%d geometry=%d tokens=%d\n",
+            audit.window_dpi_scale, audit.viewport_dpi_scale, audit.font_scale_dpi,
+            audit.dpi_matches ? 1 : 0, audit.geometry_matches ? 1 : 0,
+            audit.theme_mapping_matches ? 1 : 0);
+        out += scaleBuffer;
         out += "[NOTE] imgui " + snapshot.imgui_version +
-               " · 배율은 정식 경로 style.FontScaleMain 에서만 온다"
-               " (obsolete API 는 컴파일 단계에서 꺼 두었다)\n";
+               " · FontScaleMain(user) × FontScaleDpi(monitor), geometry는 같은 곱을 한 번 적용\n";
         return out;
     }
 

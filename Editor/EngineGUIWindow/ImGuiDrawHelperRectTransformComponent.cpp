@@ -205,9 +205,6 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 	//	menuClicked = false;
 	//}
 
-	//ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
-	//ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-	//ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
 	//if (ImGui::BeginPopup("TransformMenu"))
 	//{
 	//	if (ImGui::MenuItem("Reset Transform"))

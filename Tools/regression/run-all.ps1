@@ -232,6 +232,11 @@ Run-Step "ImGui obsolete 잔존(소스 대조)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-imgui-obsolete-surface.ps1")
 }
 
+Run-Step "에디터 테마·폰트·배율(DX12/Vulkan)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-theme.ps1") `
+        -Exe $Exe -Work (Join-Path $Work 'editor-theme')
+}
+
 # PHASE 14.5 LC7 §10.2 — 리로드 실패가 반쯤 교체된 상태를 남기지 않는다.
 #
 # 관리 쪽 Reload()가 `Unload(); Load();` 라, 새 어셈블리가 깨져 있으면 이전 것은

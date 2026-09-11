@@ -24,10 +24,13 @@
 #include "EditorWindowNames.h"
 #include "EditorSettingsStore.h"
 #include "EditorFontResources.h"
+#include "EditorTheme.h"
+#include "RHI/IImGuiHost.h"
 
 #include "ImGui.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <system_error>
@@ -242,6 +245,50 @@ namespace editor
         snapshot.font_scale_main = style.FontScaleMain;
         snapshot.preference_scale  =
             EditorSettingsStore::Get().Preferences().GetImGuiScale();
+        snapshot.font_scale_dpi = style.FontScaleDpi;
+        snapshot.window_dpi_scale = GetImGuiHost().GetWindowDpiScale();
+        snapshot.viewport_dpi_scale = ImGui::GetMainViewport()->DpiScale;
+        snapshot.rendered_font_size = ImGui::GetFontSize();
+        snapshot.dpi_scaling_enabled = io.ConfigDpiScaleFonts;
+        snapshot.per_monitor_dpi_aware = GetImGuiHost().IsPerMonitorDpiAware();
+        snapshot.os_viewports_enabled = (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0;
+        scalar("FontScaleMain", style.FontScaleMain);
+        scalar("FontScaleDpi", style.FontScaleDpi);
+        scalar("WindowDpiScale", snapshot.window_dpi_scale);
+        scalar("ViewportDpiScale", snapshot.viewport_dpi_scale);
+        scalar("RenderedFontSize", snapshot.rendered_font_size);
+        scalar("FramebufferScale.x", io.DisplayFramebufferScale.x);
+        scalar("FramebufferScale.y", io.DisplayFramebufferScale.y);
+
+        for (int index = 0; index < static_cast<int>(ThemeColor::Count); ++index)
+        {
+            const auto token = static_cast<ThemeColor>(index);
+            snapshot.theme_tokens.emplace_back(ThemeColorName(token), pack_rgba(ThemeColorValue(token)));
+        }
+        const std::pair<ImGuiCol, ThemeColor> mappings[] = {
+            { ImGuiCol_WindowBg, ThemeColor::Canvas }, { ImGuiCol_ChildBg, ThemeColor::Panel },
+            { ImGuiCol_PopupBg, ThemeColor::Panel }, { ImGuiCol_MenuBarBg, ThemeColor::Chrome },
+            { ImGuiCol_FrameBg, ThemeColor::Canvas }, { ImGuiCol_FrameBgHovered, ThemeColor::PanelRaised },
+            { ImGuiCol_FrameBgActive, ThemeColor::Selection }, { ImGuiCol_Header, ThemeColor::Panel },
+            { ImGuiCol_HeaderHovered, ThemeColor::Selection }, { ImGuiCol_Tab, ThemeColor::Chrome },
+            { ImGuiCol_TabSelected, ThemeColor::Panel }, { ImGuiCol_Text, ThemeColor::Text },
+            { ImGuiCol_TextDisabled, ThemeColor::TextDisabled }, { ImGuiCol_NavCursor, ThemeColor::Primary },
+            { ImGuiCol_ScrollbarGrab, ThemeColor::BorderStrong }, { ImGuiCol_ScrollbarGrabActive, ThemeColor::Primary }
+        };
+        snapshot.theme_mapping_matches = true;
+        for (const auto& [slot, token] : mappings)
+            snapshot.theme_mapping_matches &= same_color(style.Colors[slot], ThemeColorValue(token));
+
+        // ScaleAllSizes는 픽셀 경계를 절삭한다. OS DPI와 설정에서 기대 geometry를
+        // 유도해 글자만 커진 경우와 같은 배율이 두 번 적용된 경우를 함께 잡는다.
+        const float scale = snapshot.preference_scale * snapshot.window_dpi_scale;
+        const auto scaled = [scale](float value) { return std::floor(value * scale); };
+        snapshot.geometry_matches =
+            style.IndentSpacing == scaled(EditorThemeTokens::TreeIndent) &&
+            style.ScrollbarSize == scaled(EditorThemeTokens::ScrollbarWidth) &&
+            style.FrameRounding == scaled(EditorThemeTokens::ControlRadius) &&
+            style.WindowPadding.x == scaled(EditorThemeTokens::PanelPaddingX) &&
+            style.WindowPadding.y == scaled(EditorThemeTokens::PanelPaddingY);
 
         // ── 폰트 (PHASE 21 W1) ────────────────────────────────────────────
         //

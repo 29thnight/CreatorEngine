@@ -1,4 +1,5 @@
 #include "../EngineEntry/EditorProjectOperations.h"
+#include "EditorTheme.h"
 #include "InspectorWindow.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
@@ -639,9 +640,6 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		menuClicked = false;
 	}
 
-	ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
-	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-	ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
 	if (ImGui::BeginPopup("TransformMenu")) 
 	{
 		if (ImGui::MenuItem("Reset Transform"))
@@ -657,8 +655,6 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		}
 		ImGui::EndPopup();
 	}
-	ImGui::PopStyleVar();
-	ImGui::PopStyleColor(2);
 }
 
 void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
@@ -1980,9 +1976,6 @@ void InspectorWindow::Draw()
 
 
 
-		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
 		if (ImGui::BeginPopup("ComponentMenu"))
 		{
 			if (ImGui::MenuItem("		Remove Component"))
@@ -2010,12 +2003,11 @@ void InspectorWindow::Draw()
 			}
 			ImGui::EndPopup();
 		}
-		ImGui::PopStyleVar();
-		ImGui::PopStyleColor(2);
 	}
 	else if (isSelectedNode)
 	{
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1.1f, 5.1f));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(editor::ThemePixels(editor::EditorThemeTokens::PropertyGapX), editor::ThemePixels(editor::EditorThemeTokens::ItemGapY)));
+		// 자산 이름은 왼쪽 정렬한다. 정렬 비율은 pixel 배율 대상이 아니다.
 		ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 
 		std::string stem = selectedFileName.stem().string();

@@ -13,6 +13,7 @@
 #include "ImGui.h"
 #include "IconsFontAwesome6.h"
 #include "EditorFontResources.h"
+#include "EditorTheme.h"
 #include "fa.h"
 
 #include <imgui.h>
@@ -175,7 +176,7 @@ void EditorAssetPresentation::RenderMaterialPicker()
 
 	const ImTextureID modelIcon = (ImTextureID)EditorImGuiTexture::From(
 		m_fileIcons[FileTypeIndex(FileType::Model)].get());
-	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, ::editor::ThemeColorValue(::editor::ThemeColor::Canvas));
 	if (ImGui::BeginChild("MaterialTiles", ImVec2(0, 300),
 		ImGuiChildFlags_AlwaysUseWindowPadding, 0))
 	{
@@ -183,7 +184,8 @@ void EditorAssetPresentation::RenderMaterialPicker()
 		int columns = static_cast<int>(ImGui::GetContentRegionAvail().x / tileSize);
 		columns = (std::max)(columns, 1);
 
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 10));
+		const float assetGap = ::editor::ThemePixels(::editor::EditorThemeTokens::ItemGapX);
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(assetGap, assetGap));
 		int count = 0;
 		for (const auto& [name, material] : DataSystems->SnapshotMaterials())
 		{
@@ -289,9 +291,9 @@ void EditorAssetPresentation::LoadPresentationResources()
 	// 작은 글씨용 둘은 **선택**이다(PHASE 21 W1). 비어도 쓰는 자리가
 	// `PushFont(nullptr, 0.0f)` 으로 받으므로 글자 크기만 기본으로 간다.
 	m_smallFont = ::editor::fonts::add_optional_font(
-		"small", ::editor::fonts::body_candidates(), 12.0f).font;
+		"small", ::editor::fonts::body_candidates(), ::editor::EditorThemeTokens::SmallFontSize).font;
 	m_extraSmallFont = ::editor::fonts::add_optional_font(
-		"extra_small", ::editor::fonts::body_candidates(), 10.0f).font;
+		"extra_small", ::editor::fonts::body_candidates(), ::editor::EditorThemeTokens::ExtraSmallFontSize).font;
 }
 
 void EditorAssetPresentation::ReleasePresentationResources() noexcept

@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <filesystem>
+#include <string_view>
 #include <Windows.h>
 #include <iostream>
 #include "ClassProperty.h"
@@ -214,6 +215,11 @@ public:
     {
         return InternalPath::GetInstance()->ShaderSourcePath;
     }
+
+	static inline file::path EngineResourcePath(std::string_view path = {})
+	{
+		return InternalPath::GetInstance()->EngineResourceRoot / path;
+	}
 
 	static inline file::path IconPath()
 	{

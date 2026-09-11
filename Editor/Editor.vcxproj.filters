@@ -300,6 +300,12 @@
     <ClInclude Include="EngineGUIWindow\EditorFontResources.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorTheme.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorThemeSelfTest.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\EditorRenderer.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
@@ -486,6 +492,12 @@
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\EditorFontResources.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorTheme.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorThemeSelfTest.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp">

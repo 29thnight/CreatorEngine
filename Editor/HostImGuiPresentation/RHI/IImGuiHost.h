@@ -38,6 +38,10 @@ public:
     virtual ImGuiRendererBackendKind GetBackendKind() const = 0;
     virtual const char* GetBackendName() const = 0;
 
+    /// OS 창의 contents scale. UI 배율을 NewFrame의 폰트 계산 전에 적용한다.
+    virtual float GetWindowDpiScale() const = 0;
+    virtual bool IsPerMonitorDpiAware() const = 0;
+
     /// 창 크기 추적 → 백엔드 리사이즈 → 백엔드/플랫폼 NewFrame → ImGui::NewFrame.
     virtual void BeginFrame() = 0;
 

@@ -1,4 +1,5 @@
 #include "EditorModelPlacement.h"
+#include "EditorTheme.h"
 #include "EditorObjectOperations.h"
 #include "HierarchyWindow.h"
 #include "EditorWindowNames.h"
@@ -85,7 +86,7 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
 	if (!obj->IsEnabled())
 	{
 		// 회색으로 텍스트 색상 변경
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(editor::ThemeColor::TextDisabled));
 	}
 
 	std::string icon{};
@@ -194,7 +195,7 @@ void HierarchyWindow::Draw()
 			Entity* selectedSceneObject = nullptr;
 			static bool isSceneObjectSelected = false;
 
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, editor::ThemePixels(editor::EditorThemeTokens::ItemGapY)));
 			ImGui::BeginDisabled();
 			ImGui::Button(ICON_FA_MAGNIFYING_GLASS " Search");
 			ImGui::EndDisabled();
@@ -251,9 +252,6 @@ void HierarchyWindow::Draw()
 					}
 				}
 
-				ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.95f, 0.95f, 0.95f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-				ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.0f);
 				if (ImGui::BeginPopup("HierarchyMenu"))
 				{
 					if (ImGui::MenuItem("		Undo", "		Ctrl + Z"))
@@ -357,8 +355,6 @@ void HierarchyWindow::Draw()
 					}
 					ImGui::EndPopup();
 				}
-				ImGui::PopStyleVar();
-				ImGui::PopStyleColor(2);
 
 				if (selectedSceneObject && ImGui::IsKeyDown(ImGuiKey_Delete))
 				{
