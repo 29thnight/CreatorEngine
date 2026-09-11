@@ -107,3 +107,15 @@ Dynamic_CPP/ProjectSetting/*.asset       text eol=lf
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# 채집한 imgui.ini fixture — 이진으로 둔다 (PHASE 21 W0 후반)
+#
+# 위의 `* text=auto` 는 커밋할 때 CRLF 를 LF 로 정규화한다. 이 파일들은
+# **캡처한 산출물이지 소스가 아니다** — 아이콘이 비ASCII 바이트로 들어 있고
+# 줄바꿈이 CRLF 이며, 그 바이트 그대로가 fixture 의 값어치다. 정규화하면
+# "실물을 그대로 쓴다" 는 전제가 깨진다.
+#
+# 출처: Tools/regression/fixtures/imgui-ini/README.md
+###############################################################################
+Tools/regression/fixtures/imgui-ini/*.ini -text

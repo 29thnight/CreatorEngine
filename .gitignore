@@ -509,6 +509,16 @@ FodyWeavers.xsd
 /Dynamic_CPP/Assets/VolumeticFog/
 /Dynamic_CPP/Assets/imgui.ini
 *.ini
+
+# 채집한 imgui.ini fixture 는 예외다 (PHASE 21 W0 후반).
+#
+# 위의 전면 `*.ini` 때문에 계획서 §1.4 가 W3 의 이주 코퍼스로 지목한 실물 넷이
+# 전부 추적 밖이었다 — 한 기계의 디스크에만 있었다는 뜻이다. 손으로는 못 만드는
+# 분열이 실려 있어 합성으로 대신할 수 없다.
+#
+# 출처: Tools/regression/fixtures/imgui-ini/README.md
+!Tools/regression/fixtures/imgui-ini/*.ini
+
 /Build/
 GEMINI.md
 gemini_worker/

@@ -162,5 +162,99 @@ Assert ($layout.data.matched -ge 3) "Only $($layout.data.matched) ini entries ma
 # 내용이 다 맞았으면 마지막으로 프로세스가 깨끗하게 나갔는지 본다.
 Assert ($run.ExitCode -eq 0) "Workspace gate batch exited $($run.ExitCode) though every check passed; see $($run.Stdout)"
 
-"editor chrome observation OK — dock nodes=$($dock.data.nodes) leaf=$($dock.data.leafNodes) docked=$($dock.data.dockedWindows) central=$($dock.data.centralNodes), style colors=$($theme.data.colors) differing=$($theme.data.differing) scale=$($theme.data.fontGlobalScale), ini entries=$($layout.data.iniEntries) matched=$($layout.data.matched), imgui=$($dock.data.imguiVersionNum), checks=$($script:checks)"
+# ── imgui.ini fixture 통과 (PHASE 21 W0 후반, 계획서 §1.4) ──────────────
+#
+# 실물 넷과 합성 손상본 하나를 차례로 정본 자리에 놓고 에디터를 띄운다. 출처는
+# `fixtures/imgui-ini/README.md` 에 있다.
+#
+# ★ **여기서 단정하는 것과 기록만 하는 것이 갈린다.** legacy ini 는 §1.4 가
+#   기록한 분열(Content Browser 항목이 공백 2·1 로 두 줄)을 실제로 싣고 있고,
+#   ini 가 있으면 도크 빌더가 돌지 않으므로 배치는 그 파일이 정한다. 그래서
+#   `undocked`·`ghost` 는 legacy 에서 붉을 수 있고 **그것을 초록으로 만드는 것이
+#   W3 의 이주다.** 지금 단정으로 적으면 W3 착수 전까지 이 게이트가 내내 붉어
+#   도는 세트에 들어갈 수 없다 — 대신 표로 찍어 기준선으로 남긴다.
+#
+#   단정하는 것은 **어느 ini 를 물려도 참이어야 하는 것**뿐이다: 에디터가 뜨고,
+#   프레임이 돌고, 내부 API 판이 맞고, 스킨과 배율이 서고, 라벨 글리프가 있다.
+#   손상본에서도 같다 — 사용자 파일이 깨졌다고 에디터가 못 뜨면 안 된다.
+$fixtureDir = Join-Path $PSScriptRoot 'fixtures/imgui-ini'
+Assert (Test-Path -LiteralPath $fixtureDir) "ini fixture directory is missing: $fixtureDir"
+
+$fixtures = @(Get-ChildItem -LiteralPath $fixtureDir -Filter '*.ini' | Sort-Object Name)
+Assert ($fixtures.Count -ge 6) `
+    "Expected at least 6 imgui.ini fixtures (4 real + 2 damaged), found $($fixtures.Count) in $fixtureDir"
+
+# 개발자의 ini 를 잃지 않는다. 이 게이트는 남의 상태를 빌려 쓰는 것뿐이다.
+$iniBackup = Join-Path $Work 'imgui.ini.developer-backup'
+if (Test-Path -LiteralPath $iniPath) { Copy-Item -LiteralPath $iniPath -Destination $iniBackup -Force }
+
+$fixtureRows = @()
+try {
+    foreach ($fixture in $fixtures) {
+        $tag = 'fixture-' + [IO.Path]::GetFileNameWithoutExtension($fixture.Name)
+        Copy-Item -LiteralPath $fixture.FullName -Destination $iniPath -Force
+
+        $fxRun = Invoke-EditorBatch @('wait 45', 'editor.dock', 'editor.layout', 'editor.theme', 'quit') $tag
+        Assert (Test-Path -LiteralPath $fxRun.Result) `
+            "Fixture $($fixture.Name): the editor produced no result file (exited $($fxRun.ExitCode)); it likely failed to start on this ini. See $($fxRun.Stdout)"
+
+        $fxResults = @{}
+        foreach ($line in @(Get-Content -LiteralPath $fxRun.Result | Where-Object { $_.Trim().Length -gt 0 })) {
+            $parsed = $line | ConvertFrom-Json
+            $fxResults[$parsed.command] = $parsed
+        }
+
+        foreach ($name in @('editor.dock', 'editor.layout', 'editor.theme')) {
+            Assert ($fxResults.ContainsKey($name)) "Fixture $($fixture.Name): $name produced no result line"
+        }
+        $fxDock = $fxResults['editor.dock']
+        $fxTheme = $fxResults['editor.theme']
+        $fxLayout = $fxResults['editor.layout']
+
+        # 프레임이 돌지 않았으면 아래 값이 전부 0 이라 표가 거짓말을 한다.
+        Assert ($fxDock.code -ne 'editor.dock.no_frame') `
+            "Fixture $($fixture.Name): no display frame ran, so the chrome snapshot is empty. The editor started but never presented."
+
+        # ini 와 무관하게 참이어야 하는 것들.
+        Assert ($fxDock.data.versionKnown -eq $true) `
+            "Fixture $($fixture.Name): ImGui version is not the pinned one (num=$($fxDock.data.imguiVersionNum))"
+        Assert ($fxDock.data.centralNodes -le 1) `
+            "Fixture $($fixture.Name): more than one central dock node ($($fxDock.data.centralNodes))"
+        Assert ($fxTheme.data.styleApplied -eq $true) `
+            "Fixture $($fixture.Name): the editor skin was not applied"
+        Assert ($fxTheme.data.scaleMatches -eq $true) `
+            "Fixture $($fixture.Name): scale source diverged (io.FontGlobalScale=$($fxTheme.data.fontGlobalScale) preference=$($fxTheme.data.preferenceScale))"
+        Assert ($fxTheme.data.missingGlyphLabels -eq 0) `
+            "Fixture $($fixture.Name): $($fxTheme.data.missingGlyphLabels) window label(s) draw as boxes"
+        Assert ($fxLayout.data.iniEntries -ge 1) `
+            "Fixture $($fixture.Name): the ini parsed to zero window entries; the fixture or the parser is broken"
+
+        $fixtureRows += [pscustomobject]@{
+            fixture  = $fixture.Name
+            entries  = $fxLayout.data.iniEntries
+            matched  = $fxLayout.data.matched
+            docked   = $fxDock.data.dockedWindows
+            undocked = $fxDock.data.undockedSlots
+            ghost    = $fxDock.data.ghostTabs
+            nodes    = $fxDock.data.nodes
+        }
+    }
+}
+finally {
+    # 손상본을 개발자 자리에 남겨 두고 나가지 않는다.
+    if (Test-Path -LiteralPath $iniBackup) { Copy-Item -LiteralPath $iniBackup -Destination $iniPath -Force }
+    elseif (Test-Path -LiteralPath $iniPath) { Remove-Item -LiteralPath $iniPath -Force }
+}
+
+Write-Host ''
+Write-Host 'imgui.ini fixture baseline (W0 후반 — undocked/ghost 를 0 으로 만드는 것이 W3 의 이주다):'
+# ★ entries/matched 는 **fixture 파일의 값이 아니라 에디터가 그것을 읽고 다시 쓴
+#   뒤의 값**이다. Debug 45프레임이 약 9초이고 `io.IniSavingRate` 가 5초라, 명령이
+#   파일을 읽을 때는 이미 ImGui 가 덮어쓴 뒤다. 이주 관점에서는 오히려 이쪽이
+#   묻고 싶은 값이다 — "이 낡은 파일을 물리면 무엇으로 바뀌는가".
+#   반대로 docked/undocked/ghost/nodes 는 **fixture 가 정한 배치**를 본다. 배치는
+#   적재 시점에 정해지고 그 뒤 다시 쓰기가 바꾸지 않기 때문이다.
+$fixtureRows | Format-Table -AutoSize | Out-String | Write-Host
+
+"editor chrome observation OK — fixtures=$($fixtures.Count), dock nodes=$($dock.data.nodes) leaf=$($dock.data.leafNodes) docked=$($dock.data.dockedWindows) central=$($dock.data.centralNodes), style colors=$($theme.data.colors) differing=$($theme.data.differing) scale=$($theme.data.fontGlobalScale), ini entries=$($layout.data.iniEntries) matched=$($layout.data.matched), imgui=$($dock.data.imguiVersionNum), checks=$($script:checks)"
 exit 0
