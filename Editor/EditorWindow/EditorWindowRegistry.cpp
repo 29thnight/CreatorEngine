@@ -14,28 +14,15 @@
 
 namespace editor
 {
-    namespace
+    window_table& process_windows()
     {
-        std::vector<window_entry>& storage()
-        {
-            static std::vector<window_entry> entries;
-            return entries;
-        }
+        static window_table table;
+        return table;
     }
 
-    std::vector<window_entry>& window_entries()
+    window_entry* find_window(window_table& table, std::string_view stable_id)
     {
-        return storage();
-    }
-
-    const std::vector<window_entry>& window_entries_of()
-    {
-        return storage();
-    }
-
-    window_entry* find_window(std::string_view stable_id)
-    {
-        for (window_entry& entry : storage())
+        for (window_entry& entry : table.entries)
         {
             if (entry.stable_id == stable_id)
             {
@@ -45,9 +32,9 @@ namespace editor
         return nullptr;
     }
 
-    const window_entry* find_window_of(std::string_view stable_id)
+    const window_entry* find_window_of(const window_table& table, std::string_view stable_id)
     {
-        for (const window_entry& entry : storage())
+        for (const window_entry& entry : table.entries)
         {
             if (entry.stable_id == stable_id)
             {
@@ -57,38 +44,38 @@ namespace editor
         return nullptr;
     }
 
-    void open_window(std::string_view stable_id)
+    void open_window(window_table& table, std::string_view stable_id)
     {
-        if (window_entry* entry = find_window(stable_id))
+        if (window_entry* entry = find_window(table, stable_id))
         {
             entry->open = true;
         }
     }
 
-    void close_window(std::string_view stable_id)
+    void close_window(window_table& table, std::string_view stable_id)
     {
-        if (window_entry* entry = find_window(stable_id))
+        if (window_entry* entry = find_window(table, stable_id))
         {
             entry->open = false;
         }
     }
 
-    bool is_window_open(std::string_view stable_id)
+    bool is_window_open(const window_table& table, std::string_view stable_id)
     {
-        const window_entry* entry = find_window_of(stable_id);
+        const window_entry* entry = find_window_of(table, stable_id);
         return nullptr != entry && entry->open;
     }
 
-    bool window_declared(std::string_view stable_id)
+    bool window_declared(const window_table& table, std::string_view stable_id)
     {
-        return nullptr != find_window_of(stable_id);
+        return nullptr != find_window_of(table, stable_id);
     }
 
-    window_registry_stats collect_window_registry_stats()
+    window_registry_stats collect_window_registry_stats(const window_table& table)
     {
         window_registry_stats stats{};
 
-        const std::vector<window_entry>& entries = storage();
+        const std::vector<window_entry>& entries = table.entries;
         stats.total = entries.size();
 
         for (const window_entry& entry : entries)
@@ -137,8 +124,8 @@ namespace editor
         return stats;
     }
 
-    void clear_window_registry()
+    void clear_window_registry(window_table& table)
     {
-        storage().clear();
+        table.entries.clear();
     }
 }

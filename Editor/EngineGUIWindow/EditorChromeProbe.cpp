@@ -158,7 +158,7 @@ namespace editor
         // (`EditorRenderer::BuildInitialDockLayout`). 조건이 갈리면 감사가
         // 정상을 결함으로 보고한다. 지금 그 조건은 "떠 있는 창" 하나뿐이다 —
         // Content Browser 의 서랍 예외가 스타일 분기와 함께 사라졌다.
-        const std::vector<window_entry>& entries = window_entries_of();
+        const std::vector<window_entry>& entries = process_windows().entries;
         snapshot.placements.reserve(entries.size());
         for (const window_entry& entry : entries)
         {

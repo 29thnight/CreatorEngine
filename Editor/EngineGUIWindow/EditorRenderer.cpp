@@ -113,7 +113,8 @@ namespace
     }
 }
 
-EditorRenderer::EditorRenderer(void* windowHandle)
+EditorRenderer::EditorRenderer(void* windowHandle, ::editor::window_table& windows)
+    : m_windows(&windows)
 {
     m_host = &GetImGuiHost();
 
@@ -238,7 +239,7 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     static_assert(std::size(slotNode) == static_cast<std::size_t>(dock_slot::count),
         "dock_slot 열거자가 늘었는데 도크 빌더의 노드 표가 따라오지 않았다");
 
-    for (const ::editor::window_entry& entry : ::editor::window_entries_of())
+    for (const ::editor::window_entry& entry : m_windows->entries)
     {
         if (dock_slot::floating == entry.dock) continue;
 
@@ -338,7 +339,7 @@ void EditorRenderer::Render()
     //
     // 자리가 BeginRender 뒤인 이유는 그대로다 — 도크스페이스가 이미 서 있어야
     // 창이 자기 도크 노드를 찾는다.
-    ::editor::draw_declared_windows();
+    ::editor::draw_windows(*m_windows);
 }
 
 void EditorRenderer::EndRender()

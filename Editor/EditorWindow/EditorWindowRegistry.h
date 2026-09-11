@@ -66,32 +66,63 @@ namespace editor
         bool             open{ true };
     };
 
-    /// 선언 순서 그대로다. `unordered_map` 순회가 비결정적이라 골든이 흔들리던
-    /// 문제(계획서 §1.3-4)를 이 순서가 대체한다.
-    std::vector<window_entry>&       window_entries();
-    const std::vector<window_entry>& window_entries_of();
+    // ── 표 ────────────────────────────────────────────────────────────────
+    //
+    // 표를 값으로 만든다(PHASE 21 W3). 프로세스에 하나뿐이던 시절에는 모든
+    // 소비자가 전역 접근자를 직접 집었고, 그래서 자가 검사가 제품 표를
+    // `swap` 으로 옆에 치웠다 가져오는 수밖에 없었다. 그 치우기는 CLI 명령이
+    // 도는 **게임 스레드**에서 일어나는데 표를 순회하는 것은
+    // **PresentationThread** 라, 잠금 없이 두 스레드가 같은 벡터를 만지는
+    // 자리였다. 표가 값이면 검사는 자기 표를 만들어 쓰고 제품 표를 건드릴
+    // 이유가 사라진다 — 경합을 막는 것이 아니라 없앤다.
+    struct window_table
+    {
+        /// 선언 순서 그대로다. `unordered_map` 순회가 비결정적이라 골든이
+        /// 흔들리던 문제(계획서 §1.3-4)를 이 순서가 대체한다.
+        std::vector<window_entry> entries;
+    };
+
+    /// 제품이 쓰는 표. 이름이 "프로세스에 하나" 임을 드러낸다 — 그 사실을
+    /// 감추지 않는 것이 요점이다.
+    window_table& process_windows();
 
     /// 안정 식별자로 찾는다. 없으면 nullptr — `GetContext`가 `operator[]`라
     /// 오타가 유령 창을 영구 삽입하던 것(§1.3)과 다르게, 여기서는 **없는 것이
     /// 없는 것으로 답한다.**
-    window_entry*       find_window(std::string_view stable_id);
-    const window_entry* find_window_of(std::string_view stable_id);
+    window_entry*       find_window(window_table& table, std::string_view stable_id);
+    const window_entry* find_window_of(const window_table& table, std::string_view stable_id);
 
     /// 이름으로 표시 상태를 여닫는다. **없는 이름은 아무 일도 하지 않는다.**
     /// 옛 `ImGui::GetContext(name)`는 `operator[]`라 오타가 유령 창을 영구
     /// 삽입했고, 실제로 하나 살아 있다 — `MenuBarWindow.cpp:336`의 "EffectEdit"은
     /// 등록된 적이 없는데 메뉴가 그것을 읽어 매 프레임 순회에 얹는다.
-    void open_window(std::string_view stable_id);
-    void close_window(std::string_view stable_id);
-    bool is_window_open(std::string_view stable_id);
-    bool window_declared(std::string_view stable_id);
+    void open_window(window_table& table, std::string_view stable_id);
+    void close_window(window_table& table, std::string_view stable_id);
+    bool is_window_open(const window_table& table, std::string_view stable_id);
+    bool window_declared(const window_table& table, std::string_view stable_id);
+
+    // 제품 표에 거는 짧은 표기. 창을 여닫는 자리가 쉰여덟 곳이라 그쪽은
+    // 표를 적지 않는다 — 적어야 하는 것은 **표가 둘 이상일 수 있는 자리**뿐이다.
+    inline window_entry* find_window(std::string_view stable_id)
+    { return find_window(process_windows(), stable_id); }
+    inline const window_entry* find_window_of(std::string_view stable_id)
+    { return find_window_of(process_windows(), stable_id); }
+    inline void open_window(std::string_view stable_id)
+    { open_window(process_windows(), stable_id); }
+    inline void close_window(std::string_view stable_id)
+    { close_window(process_windows(), stable_id); }
+    inline bool is_window_open(std::string_view stable_id)
+    { return is_window_open(process_windows(), stable_id); }
+    inline bool window_declared(std::string_view stable_id)
+    { return window_declared(process_windows(), stable_id); }
 
     // ── 선언 → 표 ─────────────────────────────────────────────────────────
 
     namespace detail
     {
         template<window_role Role, auto Draw>
-        void add_declared_window(const window_item<Role, Draw>& item,
+        void add_declared_window(window_table& table,
+                                 const window_item<Role, Draw>& item,
                                  std::string_view declarer)
         {
             window_entry entry{};
@@ -121,25 +152,32 @@ namespace editor
             entry.closable_when = item.closable_fn;
             entry.open      = item.open_by_default_value;
 
-            window_entries().push_back(entry);
+            table.entries.push_back(entry);
         }
     }
 
     /// 선언자 하나를 표에 붓는다. **직접 부르지 않는다** — EDITOR_WINDOW_LIST를
     /// 거치는 것만이 등록 경로이고, 그래야 누락을 기동 게이트가 잡는다.
     template<class Declarer>
-    void register_declarer_windows(std::string_view declarer_name)
+    void register_declarer_windows(window_table& table, std::string_view declarer_name)
     {
         static_assert(detail::declares_editor_window<Declarer>,
             "선언자에 static consteval auto for_editor()가 없다");
 
         constexpr auto declaration = Declarer::for_editor();
         std::apply(
-            [declarer_name](const auto&... items)
+            [&table, declarer_name](const auto&... items)
             {
-                (detail::add_declared_window(items, declarer_name), ...);
+                (detail::add_declared_window(table, items, declarer_name), ...);
             },
             declaration.items);
+    }
+
+    /// 제품 표에 붓는 짧은 표기.
+    template<class Declarer>
+    void register_declarer_windows(std::string_view declarer_name)
+    {
+        register_declarer_windows<Declarer>(process_windows(), declarer_name);
     }
 
     // ── 게이트·시험용 ─────────────────────────────────────────────────────
@@ -154,8 +192,11 @@ namespace editor
         std::size_t empty_dock_slots{ 0 };
     };
 
-    window_registry_stats collect_window_registry_stats();
+    window_registry_stats collect_window_registry_stats(const window_table& table);
+    inline window_registry_stats collect_window_registry_stats()
+    { return collect_window_registry_stats(process_windows()); }
 
     /// 표를 비운다. 시험이 등록을 되풀이할 때만 쓴다.
-    void clear_window_registry();
+    void clear_window_registry(window_table& table);
+    inline void clear_window_registry() { clear_window_registry(process_windows()); }
 }

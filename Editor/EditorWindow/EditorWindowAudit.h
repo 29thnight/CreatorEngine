@@ -12,6 +12,8 @@
 //
 // 이 파일은 ImGui를 부르지 않는다 — 감사는 프레임 밖에서 돈다.
 
+#include "EditorWindowRegistry.h"
+
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -46,8 +48,10 @@ namespace editor
         }
     };
 
-    /// 지금 표와 보관소를 맞대 본다. 표가 비어 있으면 전부 0이다.
-    window_audit audit_declared_windows();
+    /// 받은 표와 보관소를 맞대 본다. 표가 비어 있으면 전부 0이다.
+    window_audit audit_declared_windows(const window_table& table);
+    inline window_audit audit_declared_windows()
+    { return audit_declared_windows(process_windows()); }
 
     /// 감사 결과를 사람이 읽는 한 덩어리로 만든다. TSV 표 뒤에 요약이 붙는다.
     std::string dump_window_audit();

@@ -61,11 +61,11 @@ namespace editor
         }
     }
 
-    window_audit audit_declared_windows()
+    window_audit audit_declared_windows(const window_table& table)
     {
         window_audit audit;
 
-        const std::vector<window_entry>& entries = window_entries_of();
+        const std::vector<window_entry>& entries = table.entries;
         const std::vector<std::string_view> bodies = windows::bound_window_bodies();
 
         audit.declared = entries.size();

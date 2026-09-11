@@ -1,5 +1,8 @@
 #pragma once
 
+// 그릴 창의 표를 생성자로 받으므로 타입을 안다(PHASE 21 W3).
+#include "EditorWindowRegistry.h"
+
 #include <atomic>
 #include <chrono>
 
@@ -28,7 +31,11 @@ class EditorRenderer
 {
 public:
     /// windowHandle은 Win32 HWND. 호스트 가동 + 에디터 폰트·스타일까지 세운다.
-    explicit EditorRenderer(void* windowHandle);
+    ///
+    /// 그릴 창의 표를 **인자로 받는다**(PHASE 21 W3). 전에는 프레임 안에서
+    /// 전역 접근자를 직접 집었고, 그래서 무엇을 그리는지가 서명에 없었다.
+    /// 표를 받으면 다른 표 위에서 돌려 보는 것도 가능해진다.
+    EditorRenderer(void* windowHandle, ::editor::window_table& windows);
     ~EditorRenderer();
 
     void BeginRender();
@@ -47,6 +54,7 @@ private:
         float posX, float posY);
 
     IImGuiHost* m_host{ nullptr };
+    ::editor::window_table* m_windows{ nullptr };
     float m_lastAppliedScale{ 0.8f };
     float m_lastRequestedScale{ -1.f };
 

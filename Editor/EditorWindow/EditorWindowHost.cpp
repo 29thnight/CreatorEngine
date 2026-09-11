@@ -108,9 +108,9 @@ namespace editor
         }
     }
 
-    void draw_declared_windows()
+    void draw_windows(window_table& table)
     {
-        for (window_entry& entry : window_entries())
+        for (window_entry& entry : table.entries)
         {
             // 존재 조건이 거짓이면 프레임 자체를 열지 않는다. 애니메이터 창 셋이
             // 선택이 풀렸을 때 빈 창을 남기던 것과 다르다.
@@ -203,7 +203,7 @@ namespace editor
         std::string out;
         out += "id\trole\tdock\tstacking\tclosable\tpersist\topen\torder\tdeclarer\n";
 
-        for (const window_entry& entry : window_entries_of())
+        for (const window_entry& entry : process_windows().entries)
         {
             out.append(entry.stable_id);
             out += '\t';

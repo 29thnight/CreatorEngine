@@ -160,7 +160,11 @@ void Editor::EditorMain::Initialize()
 
 	// 호스트(IImGuiHost → DX12/Vulkan backend)가 여기서 선다. 구 ImGuiRenderer는 HWND
 	// 하나 때문에 DX11 DeviceResources를 통째로 들었다 — 이제 핸들만 넘긴다.
-	m_editorRenderer = std::make_unique<EditorRenderer>(EditorWindowHandle());
+	// 그릴 표를 넘긴다(PHASE 21 W3). 표는 아래 `register_editor_windows` 가
+	// 채우는데, 셸은 참조만 들므로 순서가 무관하다 — 첫 프레임 전에만
+	// 차 있으면 된다.
+	m_editorRenderer = std::make_unique<EditorRenderer>(
+		EditorWindowHandle(), ::editor::process_windows());
 	const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan ==
 		GetImGuiHost().GetBackendKind();
 	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
