@@ -144,26 +144,33 @@
     <Message Text="Host runtime 배치: $(MSBuildProjectName) -> $(OutDir)" Importance="high" />
   </Target>
 
-  <!-- Editor 전용 아이콘과 구 DX 셰이더 산출물도 실행 파일과 분리한다. -->
+  <!--
+    Editor 전용 아이콘은 저작 원본이 저장소의 Resources\Editor\Icons 하나다.
+
+    예전에는 원본이 x64 디렉터리 아래에 있었다. 그 이름은 VS 출력 관례라
+    .gitignore 의 `x64/` 가 통째로 덮었고, 그때 이미 들어 있던 13개만 강제
+    추가된 채 살아 있었다. 새 아이콘을 넣으면 git add 가 조용히 거부한다.
+    구 DX 셰이더(.cso) 복사도 여기 있었다. 원본 자리가 구성별로 갈려
+    Debug 는 없는 디렉터리를 가리켰고 Release 는 추적 밖의 Bin\Assets 를
+    가리켰는데, PrecompiledShaderPath 를 읽는 코드는 한 줄도 없었다.
+    소비자 0인 복사였으므로 PathFinder 항목과 함께 걷었다.
+  -->
   <Target Name="DeployEditorResources"
           AfterTargets="Build"
           Condition="'$(MSBuildProjectName)' == 'CreatorEditor'">
     <PropertyGroup>
-      <_EngineLegacyShaderRoot Condition="'$(Configuration)' == 'Debug'">$(SolutionDir)x64\Assets\Shaders\</_EngineLegacyShaderRoot>
-      <_EngineLegacyShaderRoot Condition="'$(Configuration)' != 'Debug'">$(SolutionDir)Bin\Assets\Shaders\</_EngineLegacyShaderRoot>
+      <_EngineIconSourceRoot>$(SolutionDir)Resources\Editor\Icons\</_EngineIconSourceRoot>
     </PropertyGroup>
+    <Error Condition="!Exists('$(_EngineIconSourceRoot)')"
+           Text="Editor icon source root is missing: $(_EngineIconSourceRoot)" />
     <ItemGroup>
-      <_EngineIconResource Include="$(SolutionDir)x64\Icons\**\*" />
-      <_EngineShaderResource Include="$(_EngineLegacyShaderRoot)**\*"
-                             Condition="Exists('$(_EngineLegacyShaderRoot)')" />
+      <_EngineIconResource Include="$(_EngineIconSourceRoot)**\*" />
     </ItemGroup>
+    <Error Condition="'@(_EngineIconResource)' == ''"
+           Text="Editor icon source root is empty: $(_EngineIconSourceRoot)" />
     <Copy SourceFiles="@(_EngineIconResource)"
           DestinationFolder="$(EngineResourceOutDir)Icons\%(RecursiveDir)"
           SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(_EngineShaderResource)"
-          DestinationFolder="$(EngineResourceOutDir)Shaders\%(RecursiveDir)"
-          SkipUnchangedFiles="true"
-          Condition="'@(_EngineShaderResource)' != ''" />
     <Message Text="Editor resources 배치 -> $(EngineResourceOutDir)" Importance="high" />
   </Target>
 

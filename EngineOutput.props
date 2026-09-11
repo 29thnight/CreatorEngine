@@ -11,6 +11,19 @@
   EXE와 암시적으로 로드되는 네이티브 DLL은 Windows 로더 계약상 각 실행 번들
   안에 함께 둔다. 캐시·로그·덤프·테스트 결과는 이 트리에 두지 않는다.
 
+  ── 리소스의 저작 원본 ──
+
+  Bin\<플랫폼>-<구성>\Resources\ 는 **복사본**이다. 저작 원본은 저장소의
+
+    Resources\Editor\Icons\                에디터 아이콘·이미지
+
+  하나이고, Directory.Build.targets 의 DeployEditorResources 가 구성과 무관하게
+  그 한 자리에서 읽는다. 구성별로 원본이 갈리면 Debug 와 Release 배포본의
+  내용이 조용히 달라진다 — 실제로 구 DX 셰이더 복사가 그 꼴이었다.
+  원본을 Bin\ 이나 x64\ 같은 빌드 출력 이름 아래에 두지 않는다. 그 이름은
+  .gitignore 가 통째로 덮어 새로 넣은 파일이 추적되지 않는다.
+  Tools\regression\verify-editor-icon-resources.ps1 이 이 계약을 지킨다.
+
   ── nethost ──
 
   hostfxr를 찾아 주는 얇은 DLL이다. 이것이 없으면 스크립트 계층이 통째로

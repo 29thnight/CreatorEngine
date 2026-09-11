@@ -924,6 +924,16 @@ Run-Step "헤더 인라인 싱글턴 금지" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-header-inline-singleton.ps1")
 }
 
+# 에디터 아이콘 자원의 저작 원본. 옮기기 전 원본은 `x64` 아래에 있었고, 그
+# 디렉터리는 .gitignore 가 통째로 덮는 자리라 **추적 중이면서 동시에 무시되는**
+# 13개만 우연히 살아 있었다. 그 상태에서는 빌드도 런타임도 전부 초록이고,
+# 아이콘을 하나 더 넣는 다음 사람에게만 결함이 나타난다. 관측할 런타임이 없으므로
+# 정적으로 본다. 구성별 분기 금지도 같은 자리에서 본다 — 분기가 들어오면 Debug 와
+# Release 배포본의 그림이 갈린다. exe가 필요 없어 앞쪽 정적 구간에 둔다.
+Run-Step "에디터 아이콘 자원" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-icon-resources.ps1")
+}
+
 # E3-2: Undo 폐기가 Editor 소유로 옮겨간 뒤, Player에서 "아무 일도 안 일어남"은
 # 런타임으로 재기 어렵다(정상이 곧 무동작이다). 정적으로 못 박는다. 선택 해제가
 # 파괴 이전에 남아 있는지도 함께 본다 — 그 순서가 댕글링 방지 안전 속성이다.

@@ -24,7 +24,6 @@ public:
 	file::path UISourcePath{};
 	file::path PrefabSourcePath{};
 	file::path MaterialSourcePath{};
-	file::path PrecompiledShaderPath{};
     file::path DynamicSolutionDir{};
 	file::path BaseProjectPath{};
 	file::path RuntimeContentRoot{};
@@ -101,7 +100,6 @@ public:
 		ProjectSettingsPath =
 			(runtimeContentRoot / L"ProjectSetting").lexically_normal();
 
-		PrecompiledShaderPath = (EngineResourceRoot / L"Shaders").lexically_normal();
 		IconPath = (EngineResourceRoot / L"Icons").lexically_normal();
 		TerrainSourcePath = assetsRoot / "Terrain";
 		NodeEditorPath = assetsRoot / "NodeEditor";
@@ -135,7 +133,6 @@ public:
 			PrefabSourcePath,
 			IconPath,
 			DynamicSolutionDir,
-			PrecompiledShaderPath,
 			ProjectSettingsPath,
 			TerrainSourcePath,
 			volumeProfilePath,
@@ -201,11 +198,6 @@ public:
 	static inline file::path RelativeToShader(std::string_view path)
 	{
 		return file::path(InternalPath::GetInstance()->ShaderSourcePath) / path;
-	}
-
-	static inline file::path RelativeToPrecompiledShader()
-	{
-		return file::path(InternalPath::GetInstance()->PrecompiledShaderPath);
 	}
 
     static inline file::path RelativeToExecutable(std::string_view path)
