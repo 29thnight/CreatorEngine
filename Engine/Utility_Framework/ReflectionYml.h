@@ -91,11 +91,10 @@ namespace Meta::Typed
 		void (*postLoad)(void* instance, const Authoring::ReadNode& node);
 	};
 
-	inline std::unordered_map<size_t, TypeOps>& OpsRegistry()
-	{
-		static std::unordered_map<size_t, TypeOps> s_map;
-		return s_map;
-	}
+	// 정의는 ReflectionYml.cpp — 직렬화 훅 표는 프로세스에 하나여야 한다.
+	// 사본이 갈리면 등록한 쪽과 조회하는 쪽이 다른 표를 보고, 훅이 조용히
+	// 없는 것처럼 동작한다(ComponentFactory가 이 표로 디스패치한다).
+	std::unordered_map<size_t, TypeOps>& OpsRegistry();
 
 	inline const TypeOps* FindTypeOps(size_t typeID)
 	{

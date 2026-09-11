@@ -1,6 +1,6 @@
 # Player 모듈 경계(DLL화) 판단 자료 (E7 잔여 결정)
 
-- 작성일: 2026-08-26
+- 작성일: 2026-08-26 (재정찰 갱신: 2026-09-06 — §10)
 - 목적: EngineLayerSeparationPlan E7의 미착수 항목 — "Player thin exe +
   game module DLL 구조 또는 Player DLL export 구조 검토" — 의 결정 자료.
 - 방법: 링크 구조·관리 계층·DLL 제거 이력·계획 문서·전역 상태를 병렬 실측한
@@ -47,6 +47,9 @@ provenance가 없는 상태에서 DLL만 떼면 비용만 내고 이득은 못 �
 
 exe 안의 조립 코드는 이미 최소다. 얇지 않은 것은 **exe라는 배포 단위**다 —
 엔진 12만 줄이 그 안에 정적으로 박혀 있다.
+
+⚠ 위 수치는 8-26 실측이다. **9-06 재측값은 §10.2** — lib 7종·156,165줄·
+exe 1,748줄. 결론(exe는 얇고 배포 단위가 두껍다)은 그대로다.
 
 ### 2.2 유일한 진짜 DLL 경계는 관리 계층뿐
 
@@ -115,6 +118,11 @@ AndLauncherPlan.md:412,417`도 "C#/native plugin/build hook"을 **병렬 항목*
 사본**이고, 그러면 `nameIndex`/`idIndex`가 DLL 단위로 갈라진다. 직렬화·프리팹
 해석이 모듈 경계마다 다른 타입 표를 보게 된다.
 
+⚠ 갱신(2026-09-06): ① 이 위험은 그 뒤 **악화됐다** — 인덱스가 `string_view`+
+포인터를 들게 되어 갈라짐이 아니라 댕글링이 된다(§10.3). ② `EngineMode::s_mode`는
+소비가 exe 두 곳뿐이라 경계를 넘지 않는다 — **위 표에서 과대 계상이었다**(§10.5).
+③ `Singleton<T>` 파생은 37로 갱신.
+
 ### 4.2 즉시 터지는 고위험 지점 2곳
 
 `ScreenSizedResource.h`의 헤더 인라인 Meyers 싱글턴:
@@ -132,6 +140,11 @@ DLL로 떼는 순간 한쪽에서 등록한 리사이즈 구독자가 다른 쪽
 
 ⚠ **계획서가 이 지뢰를 아직 모른다** — EngineLayerSeparationPlan §2.2·2.3의
 결합 인벤토리에 `ScreenSizedResource.h`가 등재돼 있지 않다.
+→ **해소(2026-08-26)**: 같은 날 EngineLayerSeparationPlan §2.3 항목 5로 등재됐다.
+
+⚠ 갱신(2026-09-06): 지뢰는 **2곳이 아니라 3곳**이고(`ProgressSink::GetSink` 추가),
+파일 경로가 `Engine/RenderEngine/RHI/ScreenSizedResource.h`로 바뀌었으며 소비
+반경도 7폴더 → 13파일/10폴더로 넓어졌다. 전량은 §10.4.
 
 ### 4.3 반면 준비된 것도 있다
 
@@ -450,3 +463,277 @@ COM의 복잡도를 나중에 통째로 수입하게 된다.
 따라서 **DLL화(Step 3)에 필요한 provenance는 Step 1에서 이미 서 있다.**
 순서를 뒤집으면 안 되는 이유가 여기 있다 — provenance 없이 DLL만 떼면
 §4의 비용을 전부 내면서 §3.1의 이득은 못 받는다.
+
+---
+
+## 10. 2026-09-06 재정찰 — 실측 갱신과 정정
+
+축 B 착수 전 사전정찰. 이 문서의 수치는 전부 8-26 값이고 그 사이 10일간
+저장소가 움직였다. **판정(§7)과 착수 순서(§9.8)는 그대로 유효하다** — 바뀐
+것은 비용 추정의 근거값, 지뢰 목록, 그리고 Step 1의 난이도다.
+
+### 10.1 착수 순서 진척 — 0
+
+| Step | 2026-09-06 실측 |
+|---|---|
+| 0 — 지뢰 정리 | **완료(2026-09-06)** — §10.12 |
+| 1 — provenance | **미착수** — 저장소 전체에 `BuildProvenance` 심볼 0건 |
+| 2 — `-BuildNative` 제거 | **미착수** — `GameBuilderSystem.cpp:121`이 20개 고정 인자 중 하나로 여전히 무조건 전달 |
+| 3·4 — DLL·플러그인 ABI | 미착수(선행 대기) |
+
+§4.4의 "export 관례 0건"도 그대로다 — `__declspec(dllexport)` **0건**,
+`dllimport` 3건은 전부 yaml-cpp 소비다. `WholeProgramOptimization`은 10개
+vcxproj 전부 유지.
+
+⚠ 파일 위치가 하나 바뀌었다: `ScreenSizedResource.h`는 이제
+`Engine/RenderEngine/RHI/` 아래다. §4.2·§9.4의 경로 표기를 이 항으로 갱신한다.
+
+### 10.2 기준선 수치 갱신
+
+| 항목 | 8-26 | 9-06 |
+|---|---:|---:|
+| Player가 정적 링크하는 static lib | 6종 | **7종** |
+| 그 lib들의 소스 합계 | 128,258줄 | **156,165줄** (+21.8%) |
+| Player exe 자체 코드(.cpp) | 856줄 | **1,748줄** (헤더 포함 2,067) |
+| `Singleton<T>` 파생 | 36 | **37** |
+| vcxproj 총수 | 11 | **13** |
+| `DynamicLibrary` 프로젝트 | 0 | **0** |
+
+늘어난 lib 2종은 `Engine/CommandService`(2,830줄)와
+`Engine/EngineDiagnostics`(1,441줄)다. Player exe가 2배가 된 것도 같은
+뿌리 — `PlayerCommands.cpp`(427)·`PlayerCommandService.cpp`(343)가 신설됐다.
+**§2.1의 "exe 안의 조립 코드는 이미 최소다"는 여전히 참이지만 여유가
+줄었다**(게임 로직은 여전히 0).
+
+⚠ **새로 확인해야 할 경계**: Player가 `Editor/HostImGuiPresentation`
+(1,909줄, StaticLibrary)을 링크한다. Editor 트리의 lib을 Player가 소비하는
+형태이므로, 호스트셸 경계를 긋기 전에 이 방향이 의도된 것인지 먼저 정해야
+한다. 8-26 조사 시점에는 없던 링크다.
+
+### 10.3 새 사실 ① — 리플렉션 위험이 커졌다 (§4.1·§9.5 보강)
+
+§9.5는 "DLL마다 다른 `Meta::Type` 객체를 얻어 인덱스가 갈린다"까지 적었다.
+그 사이 CT11-b가 인덱스 자료형을 바꿨다 — `Registry`(여전히
+`Singleton<Registry>` 파생, `ReflectionRegister.h:20`)의 `nameIndex`가
+이제 `std::string_view` 키와 `const Type*` 값을 들고, 그 정본은
+`adapt<T>()`의 함수-로컬 static이다(`ReflectionRegister.h:41` 주석의 수명
+계약: "등록된 Type은 이동/파괴되지 않는다").
+
+즉 **DLL 분열의 결과가 "표가 갈라진다"에서 "댕글링"으로 악화됐다.** 한쪽
+모듈이 언로드되면 다른 쪽 인덱스가 죽은 `Type::name`을 가리킨다. §9.5의
+요구사항 2건(조회를 export 함수 하나로 라우팅 · 엔진 DLL 밖 `adapt<T>()`
+인스턴스화 금지를 정적 게이트로 강제)은 이제 **선택이 아니라 필수**다.
+
+### 10.4 새 사실 ② — 지뢰가 2곳이 아니라 3곳이고, 반경이 넓어졌다
+
+| 지뢰 | 형태 | 소비 반경(9-06 실측) |
+|---|---|---|
+| `ScreenSizedRegistry::Get` (`RHI/ScreenSizedResource.h:83`) | 헤더 인라인 Meyers | **13파일 / 10폴더** (8-26엔 7폴더) |
+| `ScreenResizeBus::Get` (〃`:137`) | 〃 | 〃 (위와 합산) |
+| **`ProgressSink::GetSink`** (`Utility_Framework/ProgressSink.h:24`) | **inline 함수 안 static** | `Editor/EngineEntry` ↔ `Utility_Framework` 교차 |
+
+세 번째는 이 문서와 EngineLayerSeparationPlan §2.3 둘 다 놓치고 있던
+같은 유형이다. `inline Sink& GetSink() { static Sink s_sink; return s_sink; }`
+이고, `Launch`/`SetTitle`/`SetProgress`/`Close` 전부가 그것을 통과한다 —
+exe가 설치한 진행률 싱크를 DLL 쪽 호출이 못 보는 조용한 결함이 된다.
+
+ScreenSized 2종의 호출자 전량(13파일): `Editor/EngineEntry/EditorMain.cpp`,
+`Commands/{CoreCommands,RenderDebugCommands,RenderTestCommands}.cpp`,
+`Editor/EngineGUIWindow/{GameViewWindow,SceneViewWindow}.cpp`,
+`Engine/RenderEngine/{Camera.cpp, RHI/DX12/DX12DeviceResources.cpp,
+Render/Scene/EnhancedSceneRenderer.cpp}`,
+`Engine/SceneRuntime/{RectTransformComponent,UIButton,UIManager}.cpp`,
+`Player/PlayerMain.cpp`. **exe(Editor·Player) ↔ 엔진 lib 교차가 확정적**이다.
+
+⚠ 저위험으로 판별된 유사 패턴도 기록한다 — `Profiler.h:358`
+`GetTLSUnsafe()`(inline 안 `static thread_local`)는 `EngineDiagnostics`
+내부 private 소비뿐이라 엔진 DLL 1개(§9.4) 안에 갇힌다.
+
+### 10.5 정정 — `EngineMode::s_mode`는 과대 계상이었다
+
+§4.1 표의 "mutable inline 전역 2"에 `EngineMode::s_mode`를 위험으로
+올렸는데, 소비를 전수하니 `Editor/EngineEntry`와 `Player` — **exe 두 곳
+뿐**이고 엔진 lib 안에는 0건이다. 엔진 DLL 1개 안(§9.4)에는 들어가지
+않으므로 경계를 넘지 않는다. 지뢰 목록에서 뺀다.
+
+같은 확인에서 `Scene.h:968~974`의 `static inline` 진단 스위치 5종도
+소비가 `Scene.h` 내부뿐이어서 exe 교차가 없음을 확인했다 — 다만 앞으로
+CLI 커맨드가 이 스위치를 exe 쪽에서 켜면 즉시 지뢰가 된다. **"엔진 lib
+밖에서 헤더 인라인 mutable 전역을 쓰지 않는다"를 규약으로 세울 자리다.**
+
+### 10.6 부수 발견 — `g_guids`는 DLL 이전에 이미 결함이다
+
+`Utility_Framework/TypeTrait.h:241`이 헤더 파일 스코프에
+`static std::set<HashedGuid> g_guids;`를 둔다. **`static`이므로 TU마다
+사본**이고, `InsertGUID`/`EraseGUID`가 `Engine/SceneRuntime`
+(`Object.h:42`·`Object.cpp:32`·`Entity.cpp:137`)과
+`Editor/EngineEntry/GameObjectCommand.h:26` 양쪽에서 매 오브젝트
+생성·파괴마다 불린다.
+
+⚠ **정정(2026-09-06, Step 0 착수 중)** — 이 항의 초판은 "이 표를 읽는 유일한
+소비자 `MakeGUID()`는 호출자가 **0건**이므로 죽은 파이프라인"이라고 적었다.
+**틀렸다.** `TypeTrait.h:417`에 `#define make_guid() TypeTrait::GUIDCreator::MakeGUID()`
+가 있고, 그 매크로가 **10곳에서 불린다** — `Object.h:67`(모든 Object의
+`m_instanceID`)·`Object.h:47`(`MakeInstanceID`)·`Entity`·`Prefab.cpp:416`,
+그리고 `Material.h:204`·`Mesh.h:145`·`Texture.h:176`(자산 ID)·
+`BTBuildGraph.h` 3곳. 나는 `MakeGUID(` 철자로만 찾아 매크로 우회를 놓쳤다
+(메모리 `substring-match-false-results`가 경고한 바로 그 종류의 실수다).
+
+따라서 판정이 뒤집힌다. 이 표는 **살아 있는 유일성 검사**이고, TU마다 사본이라는
+사실이 그래서 더 나쁘다:
+
+- 유일성 검사가 **갈린 표 위에서 돈다** — 다른 TU가 만든 GUID와의 충돌을
+  원리적으로 못 잡는다. 검사가 있는데 검사가 아니다.
+- `EraseGUID`가 insert한 TU와 다른 사본에서 지우면 아무것도 안 지워진다 —
+  그 사본은 계속 자란다.
+
+처리 방향도 **삭제가 아니라 단일화**로 바뀐다(접근자를 out-of-line 정의로).
+다만 단일화하면 지금 TU 사본으로 흩어져 있던 접근이 한 컨테이너에 모이므로
+**스레드 경합이 새로 노출된다** — 현재 `g_guids`는 뮤텍스 없이 접근되고,
+Object·Texture·Material 생성은 비동기 로딩 경로에서도 일어난다. 그래서 이
+항목은 Step 0의 지뢰 3종과 달리 **동작 변경을 수반한다**. 별도 슬라이스로
+떼어 락 비용을 재고(Release 기준) 진행할 것.
+
+### 10.7 유리해진 조건 — Step 1의 절반이 이미 서 있다
+
+§9.2가 "신설"로 잡은 사이드카 배관이 실은 상당 부분 존재한다.
+`Tools/build.ps1:1663`이 `package-manifest.json`을 `schemaVersion = 2`로
+발행하며 이미 담는 것:
+
+- `workspaceHead`(git rev-parse HEAD) · `workspaceDirty`(git status porcelain)
+  — `build.ps1:1462-1469`, 코드가 그 블록을 스스로 "package provenance"라
+  부른다
+- `contentDigest`·`runtimeDigest`·`pakFileSha256`·항목별 `sha256`
+  (`Get-Sha256` 유틸 존재)
+- `nativeBuildRequested`(현재 `-BuildNative` 여부)·`config`·`inputMode`
+
+**빠진 것은 바이너리 축뿐이다** — `coreAbi`/`pluginAbi`, 컴파일러·CRT·
+`_ITERATOR_DEBUG_LEVEL`(§9.3), 그리고 스테이지 바이너리 자신의 sha256과
+그것을 물어보는 `--provenance` 질의. 게다가 `nativeSource`가 지금
+`'WORKSPACE'` 문자열로 고정돼 있어, 선빌드 Player를 받아들이려면 어차피
+이 필드가 실값을 가져야 한다.
+
+즉 **Step 1의 비용 추정(§7 표의 "중")은 상향된 것이 아니라 하향해도 된다.**
+스키마 확장(`schemaVersion` 2→3)과 exe 쪽 `--provenance` 출력, 대조 게이트
+하나가 남는 일이다.
+
+### 10.8 계획 위임 — 여전히 끊겨 있다(형태만 바뀌었다)
+
+§6이 "PHASE 23에 `provenance` 문자열 0건"이라 적었는데, 지금은 4건이다.
+그러나 **전부 다른 축이다**:
+
+| 위치 | 내용 | 축 B인가 |
+|---|---|---|
+| `DL5` 제목 — "버전별 불변 엔진 distribution layout·provenance" | `engine.manifest.json`, file digest, build ID, ABI/schema **범위** | ✗ 배포 layout |
+| `DL5` 본문 | PHASE 22 miniaudio source hash·license를 provenance에 포함 | ✗ 서드파티 라이선스 |
+| `§(signing)` | symbol/provenance 보존, signing key 운영 | ✗ 서명 |
+| `§(audio)` | pinned miniaudio provenance 재사용 | ✗ 서드파티 |
+
+`Player.dll`·`Core DLL`·`Core ABI`·`BuildNative`는 여전히 **0건**이다.
+DL5가 다루는 것은 "배포 트리에 무엇이 들어 있는가"이고, 축 B가 필요로 하는
+것은 "이 바이너리가 저 바이너리와 같은 계약으로 컴파일됐는가"다. 이름이
+겹치므로 **한쪽이 다른 쪽을 덮었다고 오독하기 쉽다** — 이 항을 그 방지용
+으로 남긴다. 다만 DL5가 `engine.manifest.json`을 세우므로, Step 1의
+바이너리 provenance는 **DL5의 매니페스트에 편입될 자연스러운 자리**가 있다.
+소유권은 이 문서가 계속 갖되 산출물 위치는 DL5와 합의해야 한다.
+
+### 10.9 착수 조건 ③(수학 이주) — 거의 닫혔다
+
+`MathematicsMigrationPlan.md:4` 현재 상태: "S7-A/B3 구조 완료 · source/direct
+dependency root 0 · pixel/Physics runtime gate 남음". §7의 착수 조건 3이
+요구한 "RenderEngine 폴더 점유 해제"는 root 0으로 달성됐고 남은 것은 런타임
+게이트다. **Step 0·1을 막지 않는다.**
+
+### 10.10 게이트 공백 — 있어도 도는 세트에 없다
+
+Player 관련 게이트 7종 중 `run-all.ps1` 배선은 4종뿐이다.
+
+| 게이트 | run-all 배선 |
+|---|:---:|
+| `verify-player-shipping-isolation` | ✅ |
+| `verify-player-command-service` | ✅ |
+| `verify-player-runtime-text-parser` | ✅ |
+| `verify-player-runtime-hygiene` | ✅ |
+| **`verify-player-runtime-boundary`** | **0건** |
+| **`verify-player-missing-pak`** | **0건** |
+| **`verify-player-normal-exit`** | **0건** |
+
+축 B는 Player 기동 경로를 바꾸는 작업이므로, 착수 전에 이 3종을 세트에
+배선하거나 최소한 수동 실행 대상으로 명시해야 한다. 안 그러면 회귀를
+잡을 자가 없다(메모리 `gate-exists-but-unwired`와 같은 형태).
+
+### 10.11 이 재정찰이 바꾼 것 / 안 바꾼 것
+
+- **안 바뀜**: §7 판정표(안 1 선행 필수 · 안 2는 그 이후 · 안 3·4 기각),
+  §9.4 엔진 DLL 1개, §9.8 착수 순서.
+- **바뀜**: 지뢰 2곳 → 3곳(§10.4), `EngineMode::s_mode` 제외(§10.5),
+  Step 1 비용 하향(§10.7), 리플렉션 대책의 필수화(§10.3).
+- **새 선행 항목**: Player↔`HostImGuiPresentation` 링크 방향 확정(§10.2),
+  Player 게이트 3종 배선(§10.10).
+
+### 10.12 Step 0 실행 결과 (2026-09-06)
+
+**착수해 보니 지뢰가 3곳이 아니라 8곳이었다.** §10.4의 3곳은 `static T& Get()`
+철자로만 찾은 값이고, `inline T& f()` 형태의 자유 함수를 놓쳤다. 게이트를 먼저
+세워 기계적으로 훑자 8건이 나왔다 — 정찰의 수치는 두 번(§10.4, 여기) 연속으로
+과소 계상됐다.
+
+| 심볼 | 위치 | 처리 |
+|---|---|---|
+| `ScreenSizedRegistry::Get` | `RenderEngine/RHI/ScreenSizedResource.h:83` | **out-of-line** |
+| `ScreenResizeBus::Get` | 〃`:137` | **out-of-line** |
+| `Progress::GetSink` | `Utility_Framework/ProgressSink.h:24` | **out-of-line** |
+| `Meta::Typed::OpsRegistry` | `Utility_Framework/ReflectionYml.h:94` | **out-of-line** — 직렬화 훅 표. 등록은 `ReflectionTypedYml.h`의 썽크, 조회는 SceneRuntime의 `ComponentFactory`가 한다 |
+| `ComponentTypeIndex::Table` | `Utility_Framework/TypeTrait.h:353` | **out-of-line** — 컴포넌트 타입 인덱스/비트마스크 |
+| `ComponentUUIDRegistry::Entries` | 〃`:408` | **out-of-line** — 영속 UUID 이름 대응표 |
+| `Profiler::GetTLSUnsafe` | `EngineDiagnostics/Profiler.h:358` | 허용 — 모듈 내부 private 소비 |
+| `EditorSessionState::Get` | `Editor/EngineEntry/EditorSessionState.h:12` | 허용 — Editor 트리 전용, Player 미소비 |
+| `TypedDraw::Registry` | `Editor/EngineGUIWindow/ReflectionImGuiHelper.h:54` | 허용 — 〃 |
+
+뒤의 셋은 축 B에서 호스트셸(exe) 안에 남거나 엔진 DLL 안에 갇히므로 경계를
+넘지 않는다. 허용 목록에 **근거를 적어** 게이트에 등재했고, 그 파일이 사라지거나
+이미 고쳐지면 게이트가 "죽은 예외"라고 알린다.
+
+새 `.cpp` 4개(`ScreenSizedResource`·`ProgressSink`·`ReflectionYml`·`TypeTrait`)를
+신설하고 vcxproj·filters에 등록했다.
+
+#### 게이트
+
+`Tools/regression/verify-header-inline-singleton.ps1` 신설, `run-all.ps1`에 배선.
+RED(8건 검출) → 수정 → GREEN(헤더 541개·위반 0·허용 3)으로 전환을 확인했다.
+게이트 자신도 양성 표본 3·음성 표본 3으로 자기 검사를 하고, 검사 대상 헤더가
+300개 미만이면 "범위가 무너졌다"고 실패한다(빈 집합 위에서 도는 부재 단정 방지).
+
+#### 검증
+
+| 항목 | 결과 |
+|---|---|
+| Debug 전체 빌드 | **EXIT=0** |
+| 링커 심볼 (`dumpbin /SYMBOLS`) | 6종 전부 out-of-line External. `ScreenResizeBus::Get`이 다른 obj에서 **UNDEF 외부 참조**로 잡힌다 — 사본을 만들지 않고 호출만 한다는 증거 |
+| `dx12.resize` | **통과** (ScreenResizeBus 직결) |
+| `dx12.forward`·`dx12.gbuffer`·`dx12.skinning`·`dx12.gizmoscene` | **통과** |
+| `reflect.golden`·`serialize.nodeequal`·`assets.identity` | **통과** (타입 표·직렬화 훅 직결) |
+| `dx12.scene` | 실패 — **단, HEAD도 같다**(아래) |
+
+#### `dx12.scene`은 HEAD부터 붉다
+
+Step 0 변경만 되돌린 빌드(A)와 적용한 빌드(B)를 각각 3회씩 돌려 갈랐다.
+**둘 다 3/3 동일하게** `[1/4] RenderThread drain 시간 초과 — pending 2 · active 1`
+로 실패한다. 이 검사는 Step 0과 무관하게 이미 실패하고 있었다.
+
+⚠ 이 검사는 **실행 조합에 따라 실패 지점이 달라진다** — 다른 검사와 묶어 돌린
+첫 회차에서는 `[1/4]`를 통과하고 `[4/4] 드로우 0`으로 실패했다. 단독 실행에서는
+6회 내내 `[1/4]` drain 시간 초과다. 원인 규명은 Step 0의 범위 밖이지만,
+**축 B가 Player 기동 경로를 건드리는 작업이므로 그 전에 이 검사가 안정화돼야
+한다**(§10.10의 게이트 배선 문제와 같은 자리).
+
+#### 이 과정에서 밟은 함정 둘
+
+- **`shutil.copy2`가 mtime을 보존해 증분 빌드가 헤더 변경을 놓쳤다.** A/B의 B를
+  복원했더니 `RenderTests`가 옛 obj(인라인 정의 포함)를 그대로 써서 `LNK2005`
+  중복 정의가 났다. 파일 내용은 맞는데 타임스탬프가 과거라 재컴파일되지 않은
+  것 — `touch` 후 재빌드로 풀렸다. **A/B 도구가 만든 거짓 실패였다.**
+- **부분 진행된 되돌리기가 백업을 덮어쓸 뻔했다.** GitHub Desktop이 상주하며
+  `.git/index.lock`을 잡아 `git checkout`이 중간에 실패했는데, 스크립트를 그대로
+  재실행하면 이미 HEAD로 돌아간 파일을 백업에 덮어써 내 변경을 잃는다. 백업은
+  한 번만 뜨도록 고쳤다.

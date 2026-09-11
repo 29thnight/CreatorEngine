@@ -411,6 +411,9 @@
     <ClCompile Include="RHI\ModelVertexInputLayout.cpp">
       <Filter>RHI</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\ScreenSizedResource.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\ModelLoader.cpp">
       <Filter>Resources\Model\Experiment</Filter>
     </ClCompile>

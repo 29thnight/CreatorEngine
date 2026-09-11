@@ -80,11 +80,9 @@ public:
         std::function<std::pair<uint32_t, uint32_t>()> querySize;
     };
 
-    static ScreenSizedRegistry& Get()
-    {
-        static ScreenSizedRegistry instance;
-        return instance;
-    }
+    // 정의는 ScreenSizedResource.cpp — 헤더에 두면 include한 TU마다 사본이
+    // 생기고, 그것을 하나로 접는 COMDAT folding은 PE 하나 안에서만 일어난다.
+    static ScreenSizedRegistry& Get();
 
     void Register(const void* owner, std::string name,
         std::function<std::pair<uint32_t, uint32_t>()> querySize)
@@ -134,11 +132,8 @@ public:
     using ReleaseCallback = std::function<void()>;
     using ResizeCallback = std::function<void(uint32_t width, uint32_t height)>;
 
-    static ScreenResizeBus& Get()
-    {
-        static ScreenResizeBus instance;
-        return instance;
-    }
+    // 정의는 ScreenSizedResource.cpp — 위 ScreenSizedRegistry::Get과 같은 이유.
+    static ScreenResizeBus& Get();
 
     Handle Subscribe(ReleaseCallback onRelease, ResizeCallback onResize)
     {

@@ -69,6 +69,15 @@
     <ClCompile Include="AuthoringRymlErrorPolicy.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>
+    <ClCompile Include="ProgressSink.cpp">
+      <Filter>Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="ReflectionYml.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="TypeTrait.cpp">
+      <Filter>Core.Reflection</Filter>
+    </ClCompile>
     <ClCompile Include="AuthoringScalarConvert.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>

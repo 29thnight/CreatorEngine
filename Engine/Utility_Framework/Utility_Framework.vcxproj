@@ -102,6 +102,9 @@
     <ClCompile Include="RuntimeSettings.cpp" />
     <ClCompile Include="LogSystem.cpp" />
     <ClCompile Include="TimeSystem.cpp" />
+    <ClCompile Include="ProgressSink.cpp" />
+    <ClCompile Include="ReflectionYml.cpp" />
+    <ClCompile Include="TypeTrait.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Delegate.inl" />

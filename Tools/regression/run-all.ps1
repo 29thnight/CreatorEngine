@@ -916,6 +916,14 @@ Run-Step "재생 선택·Undo" {
         (Join-Path $PSScriptRoot "verify-play-selection-undo.ps1") -Exe $Exe
 }
 
+# 축 B Step 0: 헤더 인라인 Meyers 싱글턴 금지. 정적 링크에서는 COMDAT folding이
+# 사본을 하나로 접어 주므로 이 결함은 런타임으로 관측되지 않는다 — 모듈 경계를
+# 로드 단위로 바꾸는 순간에만 터지고, 그때는 크래시도 로그도 없다. 그래서 정적으로
+# 못 박는다. exe가 필요 없는 검사라 앞쪽 정적 구간에 둔다.
+Run-Step "헤더 인라인 싱글턴 금지" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-header-inline-singleton.ps1")
+}
+
 # E3-2: Undo 폐기가 Editor 소유로 옮겨간 뒤, Player에서 "아무 일도 안 일어남"은
 # 런타임으로 재기 어렵다(정상이 곧 무동작이다). 정적으로 못 박는다. 선택 해제가
 # 파괴 이전에 남아 있는지도 함께 본다 — 그 순서가 댕글링 방지 안전 속성이다.

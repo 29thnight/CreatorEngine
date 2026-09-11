@@ -105,16 +105,42 @@ Core 4프로젝트는 현재 `Utility_Framework`, `RenderEngine`, `Physics`,
    내려보내던 결합은 E1에서 절단 중이다. window/path와 설정 저장 책임은 이미
    Host·Editor 쪽으로 이동했고, 남은 판정은 새 배선의 빌드·제품 회귀와 E3/E6의
    공통 bootstrap·물리 프로젝트 경계다.
-5. **`ScreenSizedResource.h`의 헤더 인라인 Meyers 싱글턴 2종**
-   (`ScreenSizedRegistry::Get`:83·`ScreenResizeBus::Get`:137) — 2026-08-26
-   추가 등재. 이 인벤토리가 **6개 페이즈 동안 놓치고 있던 결합**이다.
-   `static T& Get() { static T instance; return instance; }`가 헤더에 있어
-   7개 폴더 트리(Editor 2·RenderEngine 3계층·SceneRuntime·Player)에서
-   인라인 인스턴스화되고, 지금은 정적 링크의 COMDAT folding이 하나로
-   합쳐 주고 있을 뿐이다. **모듈 경계를 로드 단위로 바꾸는 어떤 작업
-   (Player DLL화 등)도 이 둘을 먼저 out-of-line 정의로 내려야 한다** —
-   안 그러면 한쪽이 등록한 리사이즈 구독자가 다른 쪽 브로드캐스트를 못 받는
-   조용한 결함이 된다. 상세는 docs/analysis/PlayerModuleBoundaryAnalysis.md §4.2.
+5. **헤더 인라인 Meyers 싱글턴 — 해소 완료(2026-09-06, 축 B Step 0)**.
+   2026-08-26 등재 → 09-06 갱신 → 같은 날 정리했다. 실제로 세어 보니 **3종이
+   아니라 8종**이었고(아래 표는 그 중 넘는 것만), 그중 6종을 out-of-line 정의로
+   내렸다. 나머지 2종과 `Profiler::GetTLSUnsafe`는 소비가 한 PE 안이라
+   허용 목록에 근거와 함께 등재했다. 재발은
+   `Tools/regression/verify-header-inline-singleton.ps1`이 막는다(run-all 배선
+   완료, RED 8건 → GREEN 0건 전환 확인). 상세는
+   docs/analysis/PlayerModuleBoundaryAnalysis.md §10.12.
+
+   이 인벤토리가 **6개 페이즈 동안 놓치고 있던 결합**이다. `static T& Get() { static T instance; return instance; }`가
+   헤더에 있어 소비 TU마다 인라인 인스턴스화되고, 지금은 정적 링크의 COMDAT
+   folding이 하나로 합쳐 주고 있을 뿐이다.
+
+   | 심볼 | 위치 | 소비 반경(2026-09-06) |
+   |---|---|---|
+   | `ScreenSizedRegistry::Get` | `Engine/RenderEngine/RHI/ScreenSizedResource.h:83` | 13파일 / 10폴더 |
+   | `ScreenResizeBus::Get` | 〃`:137` | (위와 합산) |
+   | `ProgressSink::GetSink` | `Engine/Utility_Framework/ProgressSink.h:24` | `Editor/EngineEntry` ↔ `Utility_Framework` |
+
+   ⚠ 경로가 바뀌었다 — `ScreenSizedResource.h`는 이제 `RenderEngine/RHI/`
+   아래다. 반경도 8-26의 7개 폴더에서 늘었고(RenderTests 포함), 셋 다
+   **exe(Editor·Player) ↔ 엔진 lib 교차가 확정적**이다. `ProgressSink`는
+   8-26 조사와 이 인벤토리가 함께 놓쳤던 같은 유형으로, `Launch`/`SetTitle`/
+   `SetProgress`/`Close` 전부가 그 static을 통과한다.
+
+   **모듈 경계를 로드 단위로 바꾸는 어떤 작업(Player DLL화 등)도 이 셋을
+   먼저 out-of-line 정의로 내려야 한다** — 안 그러면 한쪽이 등록한 리사이즈
+   구독자(또는 진행률 싱크)가 다른 쪽 브로드캐스트를 못 받는 조용한 결함이
+   된다. 상세는 docs/analysis/PlayerModuleBoundaryAnalysis.md §4.2·§10.4.
+
+   ⚠ 저위험으로 판별된 인접 패턴도 함께 적는다 — `EngineDiagnostics/
+   Profiler.h:358` `GetTLSUnsafe()`는 자기 모듈 내부 private 소비뿐이고,
+   `SceneRuntime/Scene.h:968~974`의 `static inline` 진단 스위치 5종은 소비가
+   헤더 내부뿐이라 지금은 교차가 없다. **다만 CLI 커맨드가 이 스위치를 exe
+   쪽에서 켜는 순간 즉시 같은 지뢰가 된다** — "엔진 lib 밖에서 헤더 인라인
+   mutable 전역을 쓰지 않는다"를 규약으로 둘 자리다.
 
 ---
 
@@ -1957,10 +1983,23 @@ E6-3 — ICustomEditor.h 이동 (2026-08-23, 85d53583):
   없음"도 틀렸다** — `GameBuilderSystem.cpp:121`이 `-BuildNative`를 조건 없이
   항상 넘겨 오늘도 매 게임 빌드가 네이티브를 재컴파일하며, 그 주석(:171)이
   해법을 `Core DLL/version provenance`라 명명한다. 착수 조건: ① Core ABI/
-  version provenance 설계(어느 계획도 소유하지 않은 공백) ② §4.2 지뢰 2곳
-  (`ScreenSizedRegistry`·`ScreenResizeBus`의 헤더 인라인 Meyers 싱글턴 —
-  아래 인벤토리 누락분) 정리 ③ 수학 이주 WIP 착지. provenance 없이 DLL만
-  떼면 비용만 내고 이득은 못 받는다.
+  version provenance 설계(어느 계획도 소유하지 않은 공백) ② §4.2 지뢰 정리
+  ③ 수학 이주 WIP 착지. provenance 없이 DLL만 떼면 비용만 내고 이득은 못
+  받는다.
+  **재정찰 갱신(2026-09-06, 같은 문서 §10)**: 착수 순서 Step 0~4 진척 **0**
+  (`BuildProvenance` 심볼 0건, `GameBuilderSystem.cpp:121`의 `-BuildNative`
+  무조건 전달 그대로, `dllexport` 0건). 조건 ②의 지뢰는 **2곳이 아니라
+  3곳**이었고(게이트로 훑자 실제로는 8곳), **2026-09-06에 6곳을 out-of-line
+  정의로 내려 조건 ②를 닫았다** — 나머지 2곳은 exe 내부 소비라 허용 등재.
+  재발 방지 게이트 `verify-header-inline-singleton.ps1`을 run-all에 배선했다
+  (§2.3 항목 5 · 분석 문서 §10.12). 조건 ③은 거의 닫혔다(수학 이주
+  source/direct dependency root 0, 런타임 게이트만 잔여). 조건 ①은 **비용이
+  하향**됐다 — `package-manifest.json`이 이미 `schemaVersion 2`로 git
+  commit/dirty·digest·sha256 배관을 갖고 있어 바이너리 축(ABI·컴파일러·IDL·
+  exe sha256)과 `--provenance` 질의만 얹으면 된다. 새로 생긴 선행 항목 둘:
+  Player가 `Editor/HostImGuiPresentation`을 링크하게 된 방향의 확정, 그리고
+  `verify-player-{runtime-boundary,missing-pak,normal-exit}` 3종의 run-all
+  미배선 해소.
 
 이 단계는 E0~E6의 가치를 만들기 위한 선행 조건이 아니다.
 

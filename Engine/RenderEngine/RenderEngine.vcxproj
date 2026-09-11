@@ -162,6 +162,7 @@
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
+    <ClCompile Include="RHI\ScreenSizedResource.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
     <ClCompile Include="RHI\RHIShaderPermutation.cpp" />
     <ClCompile Include="RHI\RHIShaderReflection.cpp" />

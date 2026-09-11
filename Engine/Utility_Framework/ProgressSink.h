@@ -21,11 +21,9 @@ namespace Progress
         std::function<void()> close;
     };
 
-    inline Sink& GetSink()
-    {
-        static Sink s_sink;
-        return s_sink;
-    }
+    // 정의는 ProgressSink.cpp — 헤더 인라인 static은 PE마다 사본이 되어,
+    // 최상층이 설치한 싱크를 아래층 호출이 못 보는 결함을 만든다.
+    Sink& GetSink();
 
     inline void Launch()                            { if (GetSink().launch) GetSink().launch(); }
     inline void SetTitle(const std::wstring& text)  { if (GetSink().setTitle) GetSink().setTitle(text); }

@@ -475,6 +475,27 @@ channel metadata (signed)
 **판정:** repo checkout과 vcpkg 없이 staged engine으로 외부 project를 열고, 누락/변조 파일은 catalog
 등록 전에 실패한다.
 
+⚠ **이 문서의 `provenance`는 배포 layout 축이다 — 엔진코어↔호스트셸(축 B)의
+Core ABI provenance가 아니다.** 이름이 겹쳐 한쪽이 다른 쪽을 덮었다고
+오독하기 쉬워 명시해 둔다(2026-09-06 재정찰).
+
+- DL5가 답하는 질문: **배포 트리에 무엇이 들어 있는가** — file digest,
+  라이선스·서드파티 해시, ABI/schema 범위 표기, catalog 등록 가부.
+- 축 B가 답해야 하는 질문: **이 바이너리가 저 바이너리와 같은 계약으로
+  컴파일됐는가** — `coreAbi`/`pluginAbi`, 컴파일러·CRT·`_ITERATOR_DEBUG_LEVEL`
+  실값, 바이너리 sha256, 그리고 그것을 물어보는 `--provenance` 질의.
+
+EngineLayerSeparationPlan E7이 이 질문을 "배포·Launcher 계획과 함께 결정"으로
+PHASE 23에 위임했으나 **그 위임은 죽은 포인터였다** — 이 경고 문단을 적기
+전까지, 위임받은 질문의 어휘(`Player.dll`·`Core DLL`·`Core ABI`·`BuildNative`)가
+이 문서에 단 한 번도 등장한 적이 없다. DL5~DL8 어디에도 그 질문을 이행하는
+작업 항목은 여전히 없으며, 소유권은
+`docs/analysis/PlayerModuleBoundaryAnalysis.md`(§9~§10)가 갖는다.
+
+다만 **산출물 위치는 합의가 필요하다**: DL5가 `engine.manifest.json`을 세우고
+축 B Step 1이 바이너리 provenance 사이드카를 세우므로, 후자를 전자에 편입할
+자연스러운 자리가 있다. 어느 쪽을 먼저 세우든 스키마를 서로 모르게 두지 말 것.
+
 ### DL6 — WiX MSI 설치·복구·제거·side-by-side (P0, 5일)
 
 - Launcher MSI와 versioned engine MSI를 빌드 파이프라인에 추가한다.
