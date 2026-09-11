@@ -18,7 +18,7 @@ namespace ImGui
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         ImRect headerRect(cursorPos, cursorPos + fullSize);
 
-        // 1. πË∞Ê ∑ª¥ı∏µ (Ω√∞¢øÎ)
+        // 1. Î∞∞Í≤Ω Î†åÎçîÎßÅ (ÏãúÍ∞ÅÏö©)
         bool open = ImGui::GetStateStorage()->GetBool(id, true);
         bool hovered = false, held = false;
         ImU32 bgColor = open
@@ -26,17 +26,17 @@ namespace ImGui
             : (hovered ? ImGui::GetColorU32(ImGuiCol_HeaderHovered) : ImGui::GetColorU32(ImGuiCol_Header));
         ImGui::RenderFrame(headerRect.Min, headerRect.Max, bgColor, true, ImGui::GetStyle().FrameRounding);
 
-        // 2. ø¿∏•¬  πˆ∆∞ ∏’¿˙ πËƒ° (±◊∑°æﬂ æ∆∑°ø°º≠ ≈¨∏Ø √Êµπ æ» ≥≤)
+        // 2. Ïò§Î•∏Ï™Ω Î≤ÑÌäº Î®ºÏ†Ä Î∞∞Ïπò (Í∑∏ÎûòÏïº ÏïÑÎûòÏóêÏÑú ÌÅ¥Î¶≠ Ï∂©Îèå Ïïà ÎÇ®)
         ImVec2 buttonPos = ImVec2(cursorPos.x + fullSize.x - buttonWidth, cursorPos.y);
         ImGui::SetCursorScreenPos(buttonPos);
         bool buttonPressed = ImGui::Button(buttonLabel, ImVec2(buttonWidth, 0));
         if (buttonPressed && outButtonClicked)
             *outButtonClicked = true;
 
-        // 3. øﬁ¬  øµø™ø° ≈¨∏Ø øµø™ º≥¡§
+        // 3. ÏôºÏ™Ω ÏòÅÏó≠Ïóê ÌÅ¥Î¶≠ ÏòÅÏó≠ ÏÑ§Ï†ï
         ImVec2 clickZoneSize = ImVec2(fullSize.x - buttonWidth - spacing, fullSize.y);
         ImRect clickZone(cursorPos, cursorPos + clickZoneSize);
-        ImGui::SetCursorScreenPos(cursorPos); // ≈¨∏Ø øµø™ ¿ßƒ° ∫πø¯
+        ImGui::SetCursorScreenPos(cursorPos); // ÌÅ¥Î¶≠ ÏòÅÏó≠ ÏúÑÏπò Î≥µÏõê
 
         ImGui::ItemSize(clickZone);
         if (ImGui::ItemAdd(clickZone, id))
@@ -50,13 +50,13 @@ namespace ImGui
             }
         }
 
-        // 4. ≈ÿΩ∫∆Æ ºˆµø √‚∑¬
+        // 4. ÌÖçÏä§Ìä∏ ÏàòÎèô Ï∂úÎ†•
         ImVec2 labelSize = ImGui::CalcTextSize(label);
         ImVec2 textPos = ImVec2(cursorPos.x + ImGui::GetStyle().FramePadding.x,
             cursorPos.y + (clickZoneSize.y - labelSize.y) * 0.5f);
         ImGui::RenderText(textPos, label);
 
-        // 5. ¥Ÿ¿Ω ¡Ÿ∑Œ
+        // 5. Îã§Ïùå Ï§ÑÎ°ú
         ImGui::SetCursorScreenPos(ImVec2(cursorPos.x, cursorPos.y + fullSize.y));
         ImGui::PopID();
 		ImGui::Dummy(ImVec2(0, 3));
@@ -73,7 +73,7 @@ namespace ImGui
         ImGui::PushID(label);
         ImGuiID id = ImGui::GetID("##Header");
 
-        const float checkboxWidth = ImGui::GetFrameHeight(); // ¡§ªÁ∞¢«¸ √º≈©π⁄Ω∫
+        const float checkboxWidth = ImGui::GetFrameHeight(); // Ï†ïÏÇ¨Í∞ÅÌòï Ï≤¥ÌÅ¨Î∞ïÏä§
         const float buttonWidth = 24.0f;
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
 
@@ -81,7 +81,7 @@ namespace ImGui
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         ImRect headerRect(cursorPos, cursorPos + fullSize);
 
-        // 1. πË∞Ê ∑ª¥ı∏µ
+        // 1. Î∞∞Í≤Ω Î†åÎçîÎßÅ
         bool open = ImGui::GetStateStorage()->GetBool(id, true);
         bool hovered = false, held = false;
         ImU32 bgColor = open
@@ -90,20 +90,20 @@ namespace ImGui
                 : ImGui::GetColorU32(ImGuiCol_Header));
         ImGui::RenderFrame(headerRect.Min, headerRect.Max, bgColor, true, ImGui::GetStyle().FrameRounding);
 
-        // 2. √º≈©π⁄Ω∫ ¿ßƒ°
+        // 2. Ï≤¥ÌÅ¨Î∞ïÏä§ ÏúÑÏπò
         ImVec2 checkboxPos = cursorPos;
         ImGui::SetCursorScreenPos(checkboxPos);
         ImGui::PushID("CheckBox");
         ImGui::Checkbox("##Enable", pChecked);
         ImGui::PopID();
 
-        // 3. øÏ√¯ πˆ∆∞
+        // 3. Ïö∞Ï∏° Î≤ÑÌäº
         ImVec2 buttonPos = ImVec2(cursorPos.x + fullSize.x - buttonWidth, cursorPos.y);
         ImGui::SetCursorScreenPos(buttonPos);
         if (ImGui::Button(buttonLabel, ImVec2(buttonWidth, 0)) && outButtonClicked)
             *outButtonClicked = true;
 
-        // 4. ≈¨∏Ø øµø™ (≈ÿΩ∫∆Æ π◊ ≈‰±€)
+        // 4. ÌÅ¥Î¶≠ ÏòÅÏó≠ (ÌÖçÏä§Ìä∏ Î∞è ÌÜ†Í∏Ä)
         float leftOffset = checkboxWidth + spacing;
         ImVec2 clickZoneStart = ImVec2(cursorPos.x + leftOffset, cursorPos.y);
         ImVec2 clickZoneEnd = ImVec2(cursorPos.x + fullSize.x - buttonWidth - spacing, cursorPos.y + fullSize.y);
@@ -122,13 +122,13 @@ namespace ImGui
             }
         }
 
-        // 5. ≈ÿΩ∫∆Æ
+        // 5. ÌÖçÏä§Ìä∏
         ImVec2 labelSize = ImGui::CalcTextSize(label);
         ImVec2 textPos = ImVec2(clickZoneStart.x + ImGui::GetStyle().FramePadding.x,
             cursorPos.y + (fullSize.y - labelSize.y) * 0.5f);
         ImGui::RenderText(textPos, label);
 
-        // 6. ¥Ÿ¿Ω ¡Ÿ∑Œ
+        // 6. Îã§Ïùå Ï§ÑÎ°ú
         ImGui::SetCursorScreenPos(ImVec2(cursorPos.x, cursorPos.y + fullSize.y));
         ImGui::Dummy(ImVec2(0, 3));
         ImGui::PopID();

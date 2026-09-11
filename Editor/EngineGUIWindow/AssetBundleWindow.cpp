@@ -15,8 +15,8 @@
 
 struct AssetEntryPayload
 {
-    uint32_t type;            // ManagedAssetType (int·Î Àü¼Û)
-    char     path[1024];      // UTF-8 NUL-terminated (ÇÊ¿äÇÏ¸é ´õ Å°¿öµµ µÊ)
+    uint32_t type;            // ManagedAssetType (intë¡œ ì „ì†¡)
+    char     path[1024];      // UTF-8 NUL-terminated (í•„ìš”í•˜ë©´ ë” í‚¤ì›Œë„ ë¨)
 };
 
 inline void PackPathUTF8(const std::filesystem::path& p, char* out, size_t outCap)
@@ -30,7 +30,7 @@ inline void PackPathUTF8(const std::filesystem::path& p, char* out, size_t outCa
     std::memcpy(out, src, n);
     out[n] = '\0';
 #else
-    std::string s = p.string(); // ÀÏ¹İÀûÀ¸·Î UTF-8
+    std::string s = p.string(); // ì¼ë°˜ì ìœ¼ë¡œ UTF-8
     size_t n = std::min(s.size(), outCap - 1);
     std::memcpy(out, s.data(), n);
     out[n] = '\0';
@@ -40,7 +40,7 @@ inline void PackPathUTF8(const std::filesystem::path& p, char* out, size_t outCa
 inline std::filesystem::path PathFromUTF8(const char* utf8)
 {
 #if defined(_WIN32)
-    // C++20: path(u8string) »ı¼ºÀÚ
+    // C++20: path(u8string) ìƒì„±ì
     auto as_u8 = reinterpret_cast<const char8_t*>(utf8 ? utf8 : "");
     return std::filesystem::path(std::u8string(as_u8));
 #else
@@ -50,7 +50,7 @@ inline std::filesystem::path PathFromUTF8(const char* utf8)
 
 namespace
 {
-	// Ã¢ »óÅÂÀÇ À¯ÀÏÇÑ ÀÚ¸®(PHASE 21 W3). ¸â¹ö°¡ entry ÇÏ³ª»ÓÀÌ´Ù.
+	// ì°½ ìƒíƒœì˜ ìœ ì¼í•œ ìë¦¬(PHASE 21 W3). ë©¤ë²„ê°€ entry í•˜ë‚˜ë¿ì´ë‹¤.
 	AssetBundleWindow& asset_bundle_state()
 	{
 		static AssetBundleWindow value;
@@ -63,7 +63,7 @@ void editor::windows::draw_asset_bundle()
 	asset_bundle_state().Draw();
 }
 
-// PHASE 21 W3: »ı¼ºÀÚ ¾È ¶÷´Ù¿´´ø º»¹®. ¿Å±ä °ÍÀº µé¿©¾²±â»ÓÀÌ´Ù.
+// PHASE 21 W3: ìƒì„±ì ì•ˆ ëŒë‹¤ì˜€ë˜ ë³¸ë¬¸. ì˜®ê¸´ ê²ƒì€ ë“¤ì—¬ì“°ê¸°ë¿ì´ë‹¤.
 void AssetBundleWindow::Draw()
 {
 	auto* activeScene = SceneManagers->GetActiveScene();
@@ -82,7 +82,7 @@ void AssetBundleWindow::Draw()
 
 	AssetEntryPayload entry{};
 
-	// µå·¡±×-¼Ò½º¿¡ »ç¿ëÇÒ ÀÓ½Ã ¿£Æ®¸® º¯¼ö (ImGui°¡ payload¸¦ º¹»çÇÏ¹Ç·Î Áö¿ªº¯¼ö·Î ÃæºĞ)
+	// ë“œë˜ê·¸-ì†ŒìŠ¤ì— ì‚¬ìš©í•  ì„ì‹œ ì—”íŠ¸ë¦¬ ë³€ìˆ˜ (ImGuiê°€ payloadë¥¼ ë³µì‚¬í•˜ë¯€ë¡œ ì§€ì—­ë³€ìˆ˜ë¡œ ì¶©ë¶„)
 	if (ImGui::CollapsingHeader("Models"))
 	{
 	    // MBC9: loaded models = generation cache current set
@@ -90,8 +90,8 @@ void AssetBundleWindow::Draw()
 	    for (const auto& generation : models)
 	    {
 	        const std::string name = generation->SourcePath().stem().string();
-	        // °æ·Î ÀÏ°ü¼º: ÇÁ·ÎÁ§Æ® »ó´ë/Àı´ë µî ¿£Áø ±Ô¾à¿¡ ¸ÂÃç »ç¿ë
-	        // ÇÊ¿äÇÏ¸é .filename() À¸·Î ¹Ù²ãµµ µÊ
+	        // ê²½ë¡œ ì¼ê´€ì„±: í”„ë¡œì íŠ¸ ìƒëŒ€/ì ˆëŒ€ ë“± ì—”ì§„ ê·œì•½ì— ë§ì¶° ì‚¬ìš©
+	        // í•„ìš”í•˜ë©´ .filename() ìœ¼ë¡œ ë°”ê¿”ë„ ë¨
 	        std::filesystem::path filePath = generation->SourcePath().filename();
 
 	        AssetEntry containTest{ ManagedAssetType::Model ,filePath };
@@ -182,19 +182,19 @@ void AssetBundleWindow::Draw()
 	    }
 	}
 
-	// ¡Ú SpriteFonts ¼½¼ÇÀ» °È¾ú´Ù (D4). ÆùÆ® ÀÚ»ê ÄÁÅ×ÀÌ³Ê°¡ DX11
-	//   SpriteFont¿´°í ±×°ÍÀÌ »ç¶óÁ³´Ù - SDF °èÅëÀÌ ¼­¸é ´Ù½Ã ºÙÀÎ´Ù.
+	// â˜… SpriteFonts ì„¹ì…˜ì„ ê±·ì—ˆë‹¤ (D4). í°íŠ¸ ìì‚° ì»¨í…Œì´ë„ˆê°€ DX11
+	//   SpriteFontì˜€ê³  ê·¸ê²ƒì´ ì‚¬ë¼ì¡Œë‹¤ - SDF ê³„í†µì´ ì„œë©´ ë‹¤ì‹œ ë¶™ì¸ë‹¤.
 
 	ImGui::Separator();
 	ImGui::Text("Asset Bundle");
 
-	// ¹øµé ÀÌ¸§ ÀÔ·Â: ÀÓ½Ã ¹®ÀÚ¿­ ´ë½Å bundle.nameÀ» Á÷Á¢ ¹ÙÀÎµù (±âÁ¸ CallbackResize À¯Áö)
+	// ë²ˆë“¤ ì´ë¦„ ì…ë ¥: ì„ì‹œ ë¬¸ìì—´ ëŒ€ì‹  bundle.nameì„ ì§ì ‘ ë°”ì¸ë”© (ê¸°ì¡´ CallbackResize ìœ ì§€)
 	{
-	    // capacity ±â¹İ ¹öÆÛ Á¢±ÙÀ» À§ÇØ ÃÖ¼Ò 1¹ÙÀÌÆ® ÀÌ»ó È®º¸
+	    // capacity ê¸°ë°˜ ë²„í¼ ì ‘ê·¼ì„ ìœ„í•´ ìµœì†Œ 1ë°”ì´íŠ¸ ì´ìƒ í™•ë³´
 	    if (bundle.name.capacity() == 0) bundle.name.reserve(32);
 
-	    // ImGui::InputText with std::string Äİ¹é ÆĞÅÏ (ÀÌ¹Ì ÇÁ·ÎÁ§Æ®¿¡¼­ »ç¿ë ÁßÀÎ Meta::InputTextCallback È°¿ë)
-	    // - &bundle.name[0] Á¢±Ù Àü¿¡ size¸¦ capacity¿¡ ¸ÂÃç ÃæºĞÈ÷ È®ÀåÇÒ ÇÊ¿ä°¡ ÀÖ¾î Äİ¹é¿¡¼­ Ã³¸®.
+	    // ImGui::InputText with std::string ì½œë°± íŒ¨í„´ (ì´ë¯¸ í”„ë¡œì íŠ¸ì—ì„œ ì‚¬ìš© ì¤‘ì¸ Meta::InputTextCallback í™œìš©)
+	    // - &bundle.name[0] ì ‘ê·¼ ì „ì— sizeë¥¼ capacityì— ë§ì¶° ì¶©ë¶„íˆ í™•ì¥í•  í•„ìš”ê°€ ìˆì–´ ì½œë°±ì—ì„œ ì²˜ë¦¬.
 	    std::string& nameRef = bundle.name;
 	    if (ImGui::InputText(
 	        "Name",
@@ -204,15 +204,15 @@ void AssetBundleWindow::Draw()
 	        Meta::InputTextCallback,
 	        static_cast<void*>(&nameRef)))
 	    {
-	        // Enter ÀÔ·Â ½Ã µî ÇÊ¿ä ½Ã Ãß°¡ ·ÎÁ÷ °¡´É
+	        // Enter ì…ë ¥ ì‹œ ë“± í•„ìš” ì‹œ ì¶”ê°€ ë¡œì§ ê°€ëŠ¥
 	    }
 	}
 
-	// ¹øµé ÀÚ»ê ¸®½ºÆ®
+	// ë²ˆë“¤ ìì‚° ë¦¬ìŠ¤íŠ¸
 	ImGui::BeginChild("##BundleAssets", ImVec2(0, 150), true);
 	for (std::size_t i = 0; i < bundle.assets.size();)
 	{
-	    const auto& _entry = bundle.assets[i]; // <-- ÀÌ °ªÀ» ¶óº§·Î »ç¿ëÇØ¾ß ÇÔ (entry ¾Æ´Ô)
+	    const auto& _entry = bundle.assets[i]; // <-- ì´ ê°’ì„ ë¼ë²¨ë¡œ ì‚¬ìš©í•´ì•¼ í•¨ (entry ì•„ë‹˜)
 
 	    std::string label;
 	    try
@@ -229,47 +229,47 @@ void AssetBundleWindow::Draw()
 	    {
 	        if (ImGui::MenuItem("Remove"))
 	        {
-	            // ¾ÈÀüÇÑ »èÁ¦: ÀÎµ¦½º ±â¹İ erase (¹İº¹ÀÚ/ÂüÁ¶ ¹«È¿È­ ÀÌ½´ È¸ÇÇ)
+	            // ì•ˆì „í•œ ì‚­ì œ: ì¸ë±ìŠ¤ ê¸°ë°˜ erase (ë°˜ë³µì/ì°¸ì¡° ë¬´íš¨í™” ì´ìŠˆ íšŒí”¼)
 	            bundle.assets.erase(bundle.assets.begin() + static_cast<std::ptrdiff_t>(i));
 	            ImGui::EndPopup();
-	            continue; // i Áõ°¡ ¾øÀÌ ´ÙÀ½ ¾ÆÀÌÅÛ(»èÁ¦ ÈÄ ´ç°ÜÁø ÇöÀç ÀÎµ¦½º) °Ë»ç
+	            continue; // i ì¦ê°€ ì—†ì´ ë‹¤ìŒ ì•„ì´í…œ(ì‚­ì œ í›„ ë‹¹ê²¨ì§„ í˜„ì¬ ì¸ë±ìŠ¤) ê²€ì‚¬
 	        }
 	        ImGui::EndPopup();
 	    }
 	    ++i;
 	}
 
-	// --- ±âÁ¸ ---
+	// --- ê¸°ì¡´ ---
 	ImGui::Separator();
 	ImGui::TextUnformatted("Asset Bundle");
 
-	// ¡å ¿©±âºÎÅÍ µå·Ó Å¸±ê(ÅØ½ºÆ® ¾ÆÀÌÅÛ)À» ºÙÀÔ´Ï´Ù
+	// â–¼ ì—¬ê¸°ë¶€í„° ë“œë¡­ íƒ€ê¹ƒ(í…ìŠ¤íŠ¸ ì•„ì´í…œ)ì„ ë¶™ì…ë‹ˆë‹¤
 	{
-	    // ÅØ½ºÆ® ¾ÆÀÌÅÛÀÇ »ç°¢Çü (ÇÏÀÌ¶óÀÌÆ® ¿ë)
+	    // í…ìŠ¤íŠ¸ ì•„ì´í…œì˜ ì‚¬ê°í˜• (í•˜ì´ë¼ì´íŠ¸ ìš©)
 	    ImVec2 p0 = ImGui::GetItemRectMin();
 	    ImVec2 p1 = ImGui::GetItemRectMax();
 
-	    // µå·¡±×°¡ ÅØ½ºÆ® À§¿¡ ¿Ã¶ó¿À¸é Å×µÎ¸®/ÅøÆÁ Ç¥½Ã(¿É¼Ç)
+	    // ë“œë˜ê·¸ê°€ í…ìŠ¤íŠ¸ ìœ„ì— ì˜¬ë¼ì˜¤ë©´ í…Œë‘ë¦¬/íˆ´íŒ í‘œì‹œ(ì˜µì…˜)
 	    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
 	    {
 	        ImGui::GetWindowDrawList()->AddRect(p0, p1, IM_COL32(255, 255, 0, 255));
 	        ImGui::SetTooltip("Drop assets here");
 	    }
 
-	    // ÅØ½ºÆ® ¾ÆÀÌÅÛÀ» µå·Ó Å¸±êÀ¸·Î »ç¿ë
+	    // í…ìŠ¤íŠ¸ ì•„ì´í…œì„ ë“œë¡­ íƒ€ê¹ƒìœ¼ë¡œ ì‚¬ìš©
 	    if (ImGui::BeginDragDropTarget())
 	    {
 	        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ENTRY"))
 	        {
 	            if (payload && payload->IsDelivery())
 	            {
-	                // ´ç½ÅÀÇ POD ÆäÀÌ·Îµå ±¸Á¶Ã¼
+	                // ë‹¹ì‹ ì˜ POD í˜ì´ë¡œë“œ êµ¬ì¡°ì²´
 	                const auto* p = static_cast<const AssetEntryPayload*>(payload->Data);
 
-	                // UTF-8 -> path º¹¿ø
+	                // UTF-8 -> path ë³µì›
 	                std::filesystem::path dropPath = PathFromUTF8(p->path);
 
-	                // ¿£Áø ¿£Æ®¸®·Î º¯È¯
+	                // ì—”ì§„ ì—”íŠ¸ë¦¬ë¡œ ë³€í™˜
 	                AssetEntry dropEntry{
 	                    static_cast<ManagedAssetType>(p->type),
 	                    dropPath

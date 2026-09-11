@@ -92,7 +92,7 @@ void NodeEditor::DrawNode(int* selectedNodeIndex)
         {
             if (selectedNodeIndex)
             {
-                *selectedNodeIndex = i;  // ¼±ÅÃÇÑ ¸µÅ© ÀÎµ¦½º ±â·Ï
+                *selectedNodeIndex = i;  // ì„ íƒí•œ ë§í¬ ì¸ë±ìŠ¤ ê¸°ë¡
             }
             seletedCurNodeIndex = i;
             m_selectedType = SelectedType::Node;
@@ -135,13 +135,13 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
         float offsetAmount = 5.0f;
         ImVec2 offset = perpendicular * offsetAmount;
 
-        // Bezier Á¦¾îÁ¡
+        // Bezier ì œì–´ì 
         ImVec2 p1_offset = p1 + offset;
         ImVec2 p2_offset = p2 + offset;
         ImVec2 cp1 = p1_offset + normDir * (length * 0.3f);
         ImVec2 cp2 = p2_offset - normDir * (length * 0.3f);
 
-        // ±×¸®±â
+        // ê·¸ë¦¬ê¸°
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         //ImU32 color = link->haveReverse ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
         ImU32 color = IM_COL32(255, 255, 255, 255);
@@ -161,9 +161,9 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
         if (tangentLength > 0.0001f)
             tangent = ImVec2(tangent.x / tangentLength, tangent.y / tangentLength);
         float triSize = 10.0f;
-        ImVec2 triP1 = midPos + tangent * triSize; // ¾ÕÂÊ ²ÀÁşÁ¡
-        ImVec2 triP2 = midPos - tangent * triSize * 0.5f + ImVec2(-tangent.y, tangent.x) * triSize * 0.5f; // ÁÂÃø µÚÂÊ
-        ImVec2 triP3 = midPos - tangent * triSize * 0.5f + ImVec2(tangent.y, -tangent.x) * triSize * 0.5f; // ¿ìÃø µÚÂÊ
+        ImVec2 triP1 = midPos + tangent * triSize; // ì•ìª½ ê¼­ì§“ì 
+        ImVec2 triP2 = midPos - tangent * triSize * 0.5f + ImVec2(-tangent.y, tangent.x) * triSize * 0.5f; // ì¢Œì¸¡ ë’¤ìª½
+        ImVec2 triP3 = midPos - tangent * triSize * 0.5f + ImVec2(tangent.y, -tangent.x) * triSize * 0.5f; // ìš°ì¸¡ ë’¤ìª½
         ImVec2 windowPos = ImGui::GetWindowPos();
         ImVec2 triP1_screen = triP1 + windowPos;
         ImVec2 triP2_screen = triP2 + windowPos;
@@ -233,7 +233,7 @@ void NodeEditor::Update()
             }
             else
             {
-                // ¾î¶² ³ëµå¿¡µµ ¸¶¿ì½º°¡ ¿Ã¶ó°¡ ÀÖÁö ¾ÊÀ½
+                // ì–´ë–¤ ë…¸ë“œì—ë„ ë§ˆìš°ìŠ¤ê°€ ì˜¬ë¼ê°€ ìˆì§€ ì•ŠìŒ
                 needMakeLink = false;
                 m_retrunIndex = nullptr;
             }
@@ -266,17 +266,17 @@ void NodeEditor::ReNameJson(std::string filepath)
     std::string  _filepath = __filepath.string();
    // std::string _filepath = "NodeEditor\\" + filepath;
 
-    // ÀÌÀü ÆÄÀÏÀÌ Á¸ÀçÇÏ¸é »õ °æ·Î·Î º¹»ç or ÀÌµ¿
+    // ì´ì „ íŒŒì¼ì´ ì¡´ì¬í•˜ë©´ ìƒˆ ê²½ë¡œë¡œ ë³µì‚¬ or ì´ë™
     if (std::filesystem::exists(m_filePath))
     {
         std::filesystem::rename(m_filePath, _filepath);
         m_filePath = _filepath;
     }
 
-    // ÆÄÀÏ °æ·Î ¾÷µ¥ÀÌÆ®
+    // íŒŒì¼ ê²½ë¡œ ì—…ë°ì´íŠ¸
     //m_filePath = newFilePath;
 
-    // NodeEditor°¡ ÀÌ¹Ì ¿­·ÁÀÖ´Ù¸é »õ ÆÄÀÏ °æ·Î·Î ÀúÀå ¼³Á¤ º¯°æ
+    // NodeEditorê°€ ì´ë¯¸ ì—´ë ¤ìˆë‹¤ë©´ ìƒˆ íŒŒì¼ ê²½ë¡œë¡œ ì €ì¥ ì„¤ì • ë³€ê²½
    /* if (m_nodeContext)
     {
         ed::Config config = ed::GetConfig(m_nodeContext);
@@ -293,7 +293,7 @@ bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVe
     for (int i = 1; i <= segments; ++i)
     {
         float t = (float)i / segments;
-        // º£Áö¾î °î¼± Á¡ °è»ê
+        // ë² ì§€ì–´ ê³¡ì„  ì  ê³„ì‚°
         ImVec2 a = ImLerp(p1, cp1, t);
         ImVec2 b = ImLerp(cp1, cp2, t);
         ImVec2 c = ImLerp(cp2, p2, t);
@@ -301,7 +301,7 @@ bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVe
         ImVec2 e = ImLerp(b, c, t);
         ImVec2 point = ImLerp(d, e, t);
 
-        // ¸¶¿ì½º¿¡¼­ ÇöÀç ±¸°£±îÁö °Å¸® °è»ê
+        // ë§ˆìš°ìŠ¤ì—ì„œ í˜„ì¬ êµ¬ê°„ê¹Œì§€ ê±°ë¦¬ ê³„ì‚°
         float dx = mousePos.x - point.x;
         float dy = mousePos.y - point.y;
         float distSq = dx * dx + dy * dy;

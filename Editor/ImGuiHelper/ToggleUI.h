@@ -1,7 +1,7 @@
 #pragma once
 #include <imgui.h>
 
-// ´­·ÈÀ» ¶§ true ¹İÈ¯, »óÅÂ´Â ÂüÁ¶·Î Àü´Ş¹Ş¾Æ¼­ ¿ÜºÎ¿¡¼­ ¹Ù²Ü ¼ö ÀÖ°Ô ÇÔ
+// ëˆŒë ¸ì„ ë•Œ true ë°˜í™˜, ìƒíƒœëŠ” ì°¸ì¡°ë¡œ ì „ë‹¬ë°›ì•„ì„œ ì™¸ë¶€ì—ì„œ ë°”ê¿€ ìˆ˜ ìˆê²Œ í•¨
 namespace ImGui
 {
     inline bool ToggleSwitch(const char* str_id, bool v)
@@ -16,21 +16,21 @@ namespace ImGui
         bool hovered = ImGui::IsItemHovered();
         bool clicked = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
-        // »ö»ó
+        // ìƒ‰ìƒ
         ImU32 col_bg;
         if (hovered)
             col_bg = v ? IM_COL32(0, 180, 0, 255) : IM_COL32(180, 0, 0, 255);
         else
             col_bg = v ? IM_COL32(0, 150, 0, 255) : IM_COL32(120, 120, 120, 255);
 
-        // ¹è°æ
+        // ë°°ê²½
         draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height), col_bg, height * 0.5f);
 
-        // ÇÚµé
+        // í•¸ë“¤
         float circleX = v ? (p.x + width - radius) : (p.x + radius);
         draw_list->AddCircleFilled(ImVec2(circleX, p.y + radius), radius - 1.5f, IM_COL32(255, 255, 255, 255));
 
-        // ¿©±â¼­´Â ´Ü¼øÈ÷ Å¬¸¯ ÀÌº¥Æ®¸¸ ¹İÈ¯
+        // ì—¬ê¸°ì„œëŠ” ë‹¨ìˆœíˆ í´ë¦­ ì´ë²¤íŠ¸ë§Œ ë°˜í™˜
         return clicked;
     }
 }

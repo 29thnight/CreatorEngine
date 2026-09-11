@@ -32,7 +32,7 @@ class NodeEditor
 public:
 	NodeEditor() = default;
 	~NodeEditor() = default;
-	void MakeEdit(std::string filePath);//ÀúÀåÇÒ  or ºÒ·¯¿Ã jsonÀÌ¸§ ¾øÀ¸¸é ¸¸µé¾îÁü
+	void MakeEdit(std::string filePath);//ì €ì¥í•   or ë¶ˆëŸ¬ì˜¬ jsonì´ë¦„ ì—†ìœ¼ë©´ ë§Œë“¤ì–´ì§
 	void EndEdit();
 	void MakeNode(std::string nodeName);
 	void MakeLink(std::string fromNodeName, std::string toNodeName, std::string LineName);

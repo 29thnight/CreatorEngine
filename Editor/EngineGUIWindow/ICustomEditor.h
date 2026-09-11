@@ -4,6 +4,6 @@
 interface ICustomEditor
 {
     virtual ~ICustomEditor() = default;
-// Begin, End Á¦¿ÜÇÑ ³ª¸ÓÁö ImGui ÇÔ¼ö´Â ÀÌ ÇÔ¼ö ¾È¿¡¼­¸¸ È£ÃâÇØ¾ß ÇÕ´Ï´Ù.
+// Begin, End ì œì™¸í•œ ë‚˜ë¨¸ì§€ ImGui í•¨ìˆ˜ëŠ” ì´ í•¨ìˆ˜ ì•ˆì—ì„œë§Œ í˜¸ì¶œí•´ì•¼ í•©ë‹ˆë‹¤.
     virtual void OnInspectorGUI() = 0;
 };

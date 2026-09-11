@@ -8,7 +8,7 @@ static inline bool VecEq(const math::vector2& a, const math::vector2& b) {
 	return NearEq(a.x, b.x) && NearEq(a.y, b.y);
 }
 
-// ÀÛÀº ¾ÆÀÌÄÜ ÇÑ Ä­ ±×¸®±â (ÇÁ¸®¼Â ½Ã°¢È­)
+// ìž‘ì€ ì•„ì´ì½˜ í•œ ì¹¸ ê·¸ë¦¬ê¸° (í”„ë¦¬ì…‹ ì‹œê°í™”)
 static inline bool DrawAnchorIconButton(const char* id, const math::vector2& aMin, const math::vector2& aMax,
 	bool selected, ImVec2 size = ImVec2(28, 28))
 {
@@ -22,9 +22,9 @@ static inline bool DrawAnchorIconButton(const char* id, const math::vector2& aMi
 	const ImU32 colSel = IM_COL32(255, 200, 80, 255);
 	dl->AddRect(r.Min, r.Max, selected ? colSel : colBase, 5.f, selected ? 2.f : 1.f, 0);
 
-	// ÁÂ»ó(0,1)~¿ìÇÏ(1,0) ÁÂÇ¥ º¯È¯
+	// ì¢Œìƒ(0,1)~ìš°í•˜(1,0) ì¢Œí‘œ ë³€í™˜
 	auto X = [&](float nx) { return ImLerp(r.Min.x + 4, r.Max.x - 4, nx); };
-	//auto Y = [&](float ny) { return ImLerp(r.Max.y - 4, r.Min.y + 4, ny); }; // y´Â À§°¡ 1, ¾Æ·¡°¡ 0
+	//auto Y = [&](float ny) { return ImLerp(r.Max.y - 4, r.Min.y + 4, ny); }; // yëŠ” ìœ„ê°€ 1, ì•„ëž˜ê°€ 0
 	auto Y = [&](float ny) { return ImLerp(r.Min.y + 4, r.Max.y - 4, ny); }; // y: 0 top, 1 bottom
 
 	bool stretchX = !NearEq(aMin.x, aMax.x);
@@ -40,7 +40,7 @@ static inline bool DrawAnchorIconButton(const char* id, const math::vector2& aMi
 		dl->AddLine(ImVec2(r.Min.x + 6, y1), ImVec2(r.Max.x - 6, y1), colBase, 1.0f);
 		dl->AddLine(ImVec2(r.Min.x + 6, y2), ImVec2(r.Max.x - 6, y2), colBase, 1.0f);
 	}
-	// Á¡ ÇÁ¸®¼Â(= aMin==aMax) Ç¥½Ã
+	// ì  í”„ë¦¬ì…‹(= aMin==aMax) í‘œì‹œ
 	if (!stretchX && !stretchY) {
 		float x = X(aMin.x), y = Y(aMin.y);
 		dl->AddLine(ImVec2(x, y - 5), ImVec2(x, y + 5), colBase, 1.0f);
@@ -51,7 +51,7 @@ static inline bool DrawAnchorIconButton(const char* id, const math::vector2& aMi
 	return pressed;
 }
 
-// Table ÇÑ ÁÙ À¯Æ¿
+// Table í•œ ì¤„ ìœ í‹¸
 static inline bool DrawVec2Row(const char* label, math::vector2& v,
 	float spd, float min, float max, const char* fmt = "%.3f")
 {
@@ -60,7 +60,7 @@ static inline bool DrawVec2Row(const char* label, math::vector2& v,
 
 	// Label column
 	ImGui::TableSetColumnIndex(0);
-	ImGui::AlignTextToFramePadding(); // ÀÔ·Â À§Á¬°ú ¼öÁ÷ Á¤·Ä
+	ImGui::AlignTextToFramePadding(); // ìž…ë ¥ ìœ„ì ¯ê³¼ ìˆ˜ì§ ì •ë ¬
 	ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + ImGui::GetContentRegionAvail().x);
 	ImGui::TextUnformatted(label);
 	ImGui::PopTextWrapPos();
@@ -69,12 +69,12 @@ static inline bool DrawVec2Row(const char* label, math::vector2& v,
 
 	// X column
 	ImGui::TableSetColumnIndex(1);
-	ImGui::SetNextItemWidth(-FLT_MIN); // ¼¿ °¡¿ëÆø ÀüºÎ
+	ImGui::SetNextItemWidth(-FLT_MIN); // ì…€ ê°€ìš©í­ ì „ë¶€
 	changed |= ImGui::DragFloat("##x", &v.x, spd, min, max, fmt);
 
 	// Y column
 	ImGui::TableSetColumnIndex(2);
-	ImGui::SetNextItemWidth(-FLT_MIN); // ¼¿ °¡¿ëÆø ÀüºÎ
+	ImGui::SetNextItemWidth(-FLT_MIN); // ì…€ ê°€ìš©í­ ì „ë¶€
 	changed |= ImGui::DragFloat("##y", &v.y, spd, min, max, fmt);
 
 	ImGui::PopID();
@@ -99,7 +99,7 @@ static inline bool DrawVec2RowAbs(const char* label, math::vector2& v,
 	// X column
 	ImGui::TableSetColumnIndex(1);
 	ImGui::SetNextItemWidth(-FLT_MIN);
-	changed |= ImGui::DragFloat("##x", &v.x, spd, 0.0f, 0.0f, fmt); // min/max ¹Ì»ç¿ë
+	changed |= ImGui::DragFloat("##x", &v.x, spd, 0.0f, 0.0f, fmt); // min/max ë¯¸ì‚¬ìš©
 
 	// Y column
 	ImGui::TableSetColumnIndex(2);
@@ -110,7 +110,7 @@ static inline bool DrawVec2RowAbs(const char* label, math::vector2& v,
 	return changed;
 }
 
-// ¹öÆ°/À§Á¬ »ý¼º ¾øÀÌ, rect À§¿¡¸¸ ±×¸®´Â ¹öÀü
+// ë²„íŠ¼/ìœ„ì ¯ ìƒì„± ì—†ì´, rect ìœ„ì—ë§Œ ê·¸ë¦¬ëŠ” ë²„ì „
 static inline void DrawAnchorIconVisual(ImDrawList* dl, const ImRect& r,
 	const math::vector2& aMin, const math::vector2& aMax,
 	bool selected)
@@ -121,7 +121,7 @@ static inline void DrawAnchorIconVisual(ImDrawList* dl, const ImRect& r,
 	dl->AddRect(r.Min, r.Max, selected ? colSel : colBase, 5.f, selected ? 2.f : 1.f, 0);
 
 	auto X = [&](float nx) { return ImLerp(r.Min.x + 4, r.Max.x - 4, nx); };
-	auto Y = [&](float ny) { return ImLerp(r.Max.y - 4, r.Min.y + 4, ny); }; // y: À§°¡ 1, ¾Æ·¡°¡ 0
+	auto Y = [&](float ny) { return ImLerp(r.Max.y - 4, r.Min.y + 4, ny); }; // y: ìœ„ê°€ 1, ì•„ëž˜ê°€ 0
 
 	bool stretchX = fabsf(aMin.x - aMax.x) > 1e-4f;
 	bool stretchY = fabsf(aMin.y - aMax.y) > 1e-4f;

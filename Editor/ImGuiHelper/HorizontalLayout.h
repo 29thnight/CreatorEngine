@@ -6,7 +6,7 @@
 
 namespace ImGui
 {
-// ³»ºÎ ½ºÅÃ °ü¸®¿ë
+// ë‚´ë¶€ ìŠ¤íƒ ê´€ë¦¬ìš©
 namespace InternalLayout
 {
     struct LayoutState
@@ -21,7 +21,7 @@ namespace InternalLayout
     static std::vector<LayoutState> layoutStack;
 }
 
-// BeginHorizontal: °¡·Î Á¤·Ä ½ÃÀÛ
+// BeginHorizontal: ê°€ë¡œ ì •ë ¬ ì‹œì‘
 inline void BeginHorizontal(const char* id)
 {
     ImGui::PushID(id);
@@ -31,7 +31,7 @@ inline void BeginHorizontal(const char* id)
     InternalLayout::layoutStack.push_back(state);
 }
 
-// EndHorizontal: °¡·Î Á¤·Ä Á¾·á ¹× ¿ä¼Ò ¹èÄ¡
+// EndHorizontal: ê°€ë¡œ ì •ë ¬ ì¢…ë£Œ ë° ìš”ì†Œ ë°°ì¹˜
 inline void EndHorizontal()
 {
     auto& state = InternalLayout::layoutStack.back();
@@ -60,7 +60,7 @@ inline void EndHorizontal()
     InternalLayout::layoutStack.pop_back();
 }
 
-// BeginVertical: ¼¼·Î Á¤·Ä ½ÃÀÛ
+// BeginVertical: ì„¸ë¡œ ì •ë ¬ ì‹œì‘
 inline void BeginVertical(const char* id)
 {
     ImGui::PushID(id);
@@ -70,7 +70,7 @@ inline void BeginVertical(const char* id)
     InternalLayout::layoutStack.push_back(state);
 }
 
-// EndVertical: ¼¼·Î Á¤·Ä Á¾·á ¹× ¿ä¼Ò ¹èÄ¡
+// EndVertical: ì„¸ë¡œ ì •ë ¬ ì¢…ë£Œ ë° ìš”ì†Œ ë°°ì¹˜
 inline void EndVertical()
 {
     auto& state = InternalLayout::layoutStack.back();
@@ -95,7 +95,7 @@ inline void EndVertical()
     InternalLayout::layoutStack.pop_back();
 }
 
-// Spring: ³²Àº °ø°£ Áß ÀÏºÎ¸¦ Â÷ÁöÇÏ´Â °¡Â¥ ¿ä¼Ò »ğÀÔ
+// Spring: ë‚¨ì€ ê³µê°„ ì¤‘ ì¼ë¶€ë¥¼ ì°¨ì§€í•˜ëŠ” ê°€ì§œ ìš”ì†Œ ì‚½ì…
 inline void Spring(float weight = 1.0f, float spacing = -1.0f)
 {
     if (InternalLayout::layoutStack.empty())
@@ -106,7 +106,7 @@ inline void Spring(float weight = 1.0f, float spacing = -1.0f)
     state.elements.emplace_back(true, weight);
 }
 
-// Fixed: °íÁ¤µÈ Å©±âÀÇ ¿ä¼Ò »ğÀÔ (·¹ÀÌ¾Æ¿ô Å©±â ÃøÁ¤¿ë)
+// Fixed: ê³ ì •ëœ í¬ê¸°ì˜ ìš”ì†Œ ì‚½ì… (ë ˆì´ì•„ì›ƒ í¬ê¸° ì¸¡ì •ìš©)
 inline void Fixed(float size)
 {
     if (InternalLayout::layoutStack.empty())
