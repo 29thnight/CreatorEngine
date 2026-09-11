@@ -65,8 +65,9 @@ vec2·앵커 행이다.
 `SetNextItemWidth(-FLT_MIN)` 로 셀 가용폭 전부. **label column 규약의 정본이 이미 여기 있다.**
 "부분 승계" 가 아니라 승계다.
 
-이 파일은 CP949 다. 계획서 §1.10 이 "편집 대상에 비-UTF8 파일이 있으면 인코딩을 먼저 정리한
-뒤 내용을 고친다" 고 정했으므로, 이관 슬라이스의 첫 커밋은 **인코딩만** 바꾸는 것이어야 한다.
+이 파일은 CP949 였다. 계획서 §1.10 이 "편집 대상에 비-UTF8 파일이 있으면 인코딩을 먼저
+정리한 뒤 내용을 고친다" 고 정했으므로 인코딩만 바꾸는 커밋을 먼저 넣었다(`63e87c78`,
+Editor 트리의 CP949 소스 여덟을 함께). 내용 이관은 그 위에 선다.
 
 ### 2.3 `HorizontalLayout.h` → 범위 밖 (정정)
 
@@ -120,8 +121,12 @@ marker" 와 다른 물건이다. 승계하면 두 벌이 남는다.
 ### 2.7 곁가지 — 죽은 include 하나
 
 `EngineGUIWindow/InspectorWindow.cpp:53` 이 `PinHelper.h` 를 들이는데 `DrawPinIcon` 을
-**한 번도 부르지 않는다.** 계획서 W2 가 이미 목록에 둔 `ImGuiContext.h` 의 죽은
-`imgui_impl_dx11.h` include 와 같은 종류다. 같은 슬라이스에서 함께 걷는다.
+**한 번도 부르지 않는다.** 계획서 W2 가 목록에 둔 `ImGuiContext.h` 의 죽은
+`imgui_impl_dx11.h` include 와 같은 종류인데, 그쪽은 이미 없어졌다(§5). 남은 것은 이
+하나이므로 이관 슬라이스에서 함께 걷는다.
+
+같은 이유로 `EngineGUIWindow/MenuBarWindow.cpp:35` 의 `#include "ToggleUI.h"` 도 죽은
+include 다 — `ToggleSwitch` 를 부르지 않는다. §2.5 의 은퇴는 이 한 줄을 걷는 것으로 끝난다.
 
 ---
 
@@ -137,8 +142,52 @@ marker" 와 다른 물건이다. 승계하면 두 벌이 남는다.
 은퇴 대상은 `ToggleUI.h` 하나다. `HorizontalLayout.h`·`widgets.{h,cpp}` 는 은퇴가 아니라
 **범위 밖**이다 — 노드 에디터가 쓰고 있으므로 건드리지 않는다.
 
-## 4. 이 표가 답하지 않는 것
+## 4. 상태 matrix — 실측 (2026-09-11 추가)
 
-`EditorPropertyRow` 의 "mixed/disabled/error 상태"(계획서 §7.1)를 지금 저장소에서 쓰는 자리는
-세지 않았다. 상태 matrix 는 W2 의 별도 항목이고, 승계 여부를 가르는 데는 필요하지 않아서
-범위에서 뺐다. 구현 착수 전에 따로 세야 한다.
+계획서 §7.1 은 `EditorPropertyRow` 에 "mixed/disabled/error 상태" 를, W2 본문은
+"hover/active/focus/nav/disabled/mixed/error 상태 matrix 를 고정한다" 를 요구한다. 그 일곱이
+지금 저장소에서 **실제로 쓰이는 자리**를 셌다(`Editor/`, `ImGuiHelper/`·`RenderTests/` 제외,
+주석 제거 후).
+
+| 상태 | 표현 | 건수 | 판정 |
+|---|---|---:|---|
+| hover | `IsItemHovered` | 15 | 실재 |
+| active | `IsItemActive` | 1 | 거의 없음 |
+| focus | `IsItemFocused` | **0** | **소비자 0** |
+| nav | `ImGuiCol_Nav*` | 3 | 전부 테마·탐침. 위젯 코드는 묻지 않는다 |
+| disabled | `BeginDisabled` 6 + `TextDisabled` 14 | 20 | 실재. 다만 **기구가 둘** |
+| mixed | `CheckboxFlags` (tristate) | **0** | **소비자 0** |
+| error | 빨강 `PushStyleColor(ImGuiCol_Text)` | **2** | 사실상 없음 |
+
+읽는 법 셋.
+
+**① `mixed` 와 `focus` 는 소비자가 0 이다.** 계획서가 요구한 상태 중 둘이 저장소에 한 자리도
+없다. 이 저장소는 "계획서가 지목한 대상이 이미 죽어 있을 수 있다" 로 한 번 데었다. 쓰는 데가
+없는 상태를 위젯 API 에 미리 뚫으면 첫 소비자가 생길 때 모양이 맞을 확률이 낮다.
+**두 상태는 첫 소비자가 생길 때 뚫는다.**
+
+**② `error` 는 2건뿐이고 그나마 위젯 상태가 아니다.** `TextColored` 35건은 렌더 디버그와
+리소스 카운터의 **데이터 색칠**이지 오류 표시가 아니다(`EnhancedRenderDebugWindow.cpp` 20 ·
+`ResourceCounterWindow.cpp` 12). 문자열에 error/failed/invalid 가 든 661건은 거의 전부 CLI
+명령의 메시지다. `EditorPropertyRow` 의 error 상태도 소비자가 생길 때 뚫는다.
+
+**③ `disabled` 만 지금 뚫을 값이 있고, 기구가 둘로 갈려 있다.** `BeginDisabled/EndDisabled`
+6건은 상호작용을 막고, `TextDisabled` 14건은 **색만** 바꾼다. 후자는 비활성이 아니라 "덜
+중요함" 을 뜻하는 자리가 섞여 있을 수 있다. `EditorPropertyRow` 가 `disabled` 를 하나로
+받으려면 그 14건을 먼저 두 뜻으로 갈라야 한다 — 그것은 이관 슬라이스의 일이다.
+
+정리하면 **처음 구현에 넣을 상태는 hover·active·disabled 셋**이고, focus·nav·mixed·error 는
+소비자가 생길 때 더한다. 그 판단의 근거가 위 표다.
+
+## 5. 계획서 항목 하나는 이미 끝나 있다
+
+W2 목록의 "`ImGuiContext.h` 의 죽은 `imgui_impl_dx11.h` include 를 걷는다" 는 할 일이 없다.
+`ImGuiContext.h` 가 저장소에 없고, `imgui_impl_dx11` 이라는 이름이 남은 곳은
+`EngineEntry/EditorMain.h:39` 의 **주석 한 줄**뿐이다(무엇을 걷었는지 적어 둔 기록).
+
+## 6. 이 표가 답하지 않는 것
+
+`EditorSectionHeader` 와 `EditorPropertyRow` 의 토큰화는 `EditorTheme.h` 의
+`EditorThemeTokens`(RowHeight·ControlRadius 등)를 읽어야 하는데, 이 글을 쓰는 시점에 그 파일은
+다른 세션이 미커밋으로 들고 있다. 치수를 `ImGuiStyle` 에서만 뽑으면 두 번 고치게 되므로
+구현은 그 커밋 뒤로 미뤘다.
