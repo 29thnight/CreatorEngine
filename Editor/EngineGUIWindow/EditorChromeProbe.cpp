@@ -33,6 +33,34 @@
 
 namespace
 {
+    /// 라벨의 코드포인트 중 현재 폰트에 **없는** 것의 수.
+    ///
+    /// 1.92 의 폰트는 동적이라 아직 래스터되지 않은 글리프가 흔하다. 그래서
+    /// `FindGlyphNoFallback` 이 아니라 `IsGlyphInFont` 를 묻는다 — 앞의 것은
+    /// "아직 안 구웠다"와 "폰트에 없다"를 구분하지 못해 멀쩡한 아이콘을
+    /// 누락으로 셀 수 있다.
+    int count_missing_glyphs(const std::string& label)
+    {
+        ImFont* const font = ImGui::GetFont();
+        if (nullptr == font) return 0;
+
+        int missing = 0;
+        const char* cursor = label.c_str();
+        const char* const end = cursor + label.size();
+        while (cursor < end)
+        {
+            unsigned int codepoint = 0;
+            const int bytes = ImTextCharFromUtf8(&codepoint, cursor, end);
+            if (0 == bytes) break;
+            cursor += bytes;
+
+            // 공백은 폰트에 글리프가 없어도 정상으로 그려진다.
+            if ((0 == codepoint) || (' ' == codepoint)) continue;
+            if (!font->IsGlyphInFont(static_cast<ImWchar>(codepoint))) ++missing;
+        }
+        return missing;
+    }
+
     std::uint32_t pack_rgba(const ImVec4& color) noexcept
     {
         const auto channel = [](float value) -> std::uint32_t
@@ -110,20 +138,17 @@ namespace editor
         //
         // 도크 빌더가 건너뛰는 조건과 **같은 조건**을 여기서 쓴다
         // (`EditorRenderer::BuildInitialDockLayout`). 조건이 갈리면 감사가
-        // 정상을 결함으로 보고한다.
-        const bool contentBrowserIsDrawer =
-            ContentsBrowserStyle::Tile ==
-            EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle();
-
+        // 정상을 결함으로 보고한다. 지금 그 조건은 "떠 있는 창" 하나뿐이다 —
+        // Content Browser 의 서랍 예외가 스타일 분기와 함께 사라졌다.
         const std::vector<window_entry>& entries = window_entries_of();
         snapshot.placements.reserve(entries.size());
         for (const window_entry& entry : entries)
         {
             window_placement_view view{};
             view.stable_id = std::string{ entry.stable_id };
-            view.dock_exempt = (dock_slot::floating == entry.dock) ||
-                (contentBrowserIsDrawer &&
-                 (EditorWindowName::kContentBrowser == entry.stable_id));
+            view.label = std::string{ entry.label };
+            view.dock_exempt = (dock_slot::floating == entry.dock);
+            view.missing_glyphs = count_missing_glyphs(view.label);
 
             if (ImGuiWindow* const window = ImGui::FindWindowByName(view.stable_id.c_str()))
             {

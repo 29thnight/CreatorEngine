@@ -104,14 +104,14 @@ namespace
 		{ ".spritefont", ICON_FA_FONT " " }
 	};
 
-	constexpr const char* kBrowserTitle = ICON_FA_HARD_DRIVE " Content Browser";
 }
 
 ContentsBrowserWindow::ContentsBrowserWindow()
 {
 	// PHASE 21 M4 2단계: 프레임은 셸이 연다. 본문 첫 줄에서 매 프레임
-	// SetPopup 으로 하던 판단은 선언의 closable_when 술어로 갔다 —
-	// 아래 content_browser_is_drawer 가 같은 값을 답한다.
+	// `SetPopup` 으로 하던 판단은 선언의 `closable_when` 술어로 갔다가, 서랍
+	// 스타일이 사라지면서 술어 자체가 없어졌다 — 이 창은 이제 닫히지 않는
+	// 도킹 패널 하나다.
 	editor::windows::bind_window_body(EditorWindowName::kContentBrowser, [&]()
 	{
 		static file::path DataDirectory = PathFinder::Relative();
@@ -125,25 +125,25 @@ ContentsBrowserWindow::ContentsBrowserWindow()
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
 
-		if (Style() == ContentsBrowserStyle::Tile)
+		// 왼쪽 디렉터리 트리와 오른쪽 자산 격자. 참조로 삼은 S&Box Asset
+		// Browser와 같은 배치이고, 예전에는 이 둘이 스타일 설정에 따라
+		// 켜지고 꺼졌다 — 그 분기를 걷었다.
+		ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), false);
+		ImGuiTreeNodeFlags rootFlags =
+			ImGuiTreeNodeFlags_OpenOnArrow |
+			ImGuiTreeNodeFlags_SpanFullWidth |
+			ImGuiTreeNodeFlags_DefaultOpen;
+
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 1));
+		if (ImGui::TreeNodeEx(ICON_FA_FOLDER " Assets", rootFlags))
 		{
-			ImGui::BeginChild("DirectoryHierarchy", ImVec2(200, 0), false);
-			ImGuiTreeNodeFlags rootFlags =
-				ImGuiTreeNodeFlags_OpenOnArrow |
-				ImGuiTreeNodeFlags_SpanFullWidth |
-				ImGuiTreeNodeFlags_DefaultOpen;
-
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 1));
-			if (ImGui::TreeNodeEx(ICON_FA_FOLDER " Assets", rootFlags))
-			{
-				ShowDirectoryTree(DataDirectory);
-				ImGui::TreePop();
-			}
-			ImGui::PopStyleVar();
-			ImGui::EndChild();
-
-			ImGui::SameLine();
+			ShowDirectoryTree(DataDirectory);
+			ImGui::TreePop();
 		}
+		ImGui::PopStyleVar();
+		ImGui::EndChild();
+
+		ImGui::SameLine();
 
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
 		ImGui::BeginChild("FileList", ImVec2(0, 0), false);
@@ -170,28 +170,9 @@ ContentsBrowserWindow::ContentsBrowserWindow()
 
 	});
 
-	// 타일 스타일은 하단 서랍이라 접힌 채로, 트리 스타일은 도킹된 창이라
-	// 펼친 채로 시작한다. DataSystem::RenderForEditer 끝에 있던 판단이다.
-	if (Style() == ContentsBrowserStyle::Tile)
-	{
-		editor::close_window(EditorWindowName::kContentBrowser);
-	}
-	else
-	{
-		editor::open_window(EditorWindowName::kContentBrowser);
-	}
-}
-
-namespace editor::windows
-{
-	// 타일 스타일은 하단 서랍이라 닫을 수 있고, 트리 스타일은 도킹된
-	// 패널이라 닫히지 않는다. 판단이 이 파일에 남는 이유는 스타일이
-	// 이 창의 것이기 때문이다 — 선언 계층은 술어만 들고 간다.
-	bool content_browser_is_drawer()
-	{
-		return ContentsBrowserStyle::Tile ==
-			EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle();
-	}
+	// 도킹된 패널이라 펼친 채로 시작한다. 예전에는 스타일 설정이 하단 서랍
+	// (접힌 채 시작)과 도킹 패널 둘로 갈랐는데, 서랍 쪽을 걷었다.
+	editor::open_window(EditorWindowName::kContentBrowser);
 }
 
 void ContentsBrowserWindow::HandleSceneObjectDrop(const void* payload)
@@ -294,20 +275,6 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
 
 void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
 {
-	if (Style() == ContentsBrowserStyle::Tile)
-	{
-		ShowCurrentDirectoryFilesTile();
-	}
-	else
-	{
-		m_currentDirectory = PathFinder::Relative();
-
-		ShowCurrentDirectoryFilesTree(m_currentDirectory);
-	}
-}
-
-void ContentsBrowserWindow::ShowCurrentDirectoryFilesTile()
-{
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 
 	const float tileWidth = 200.0f;
@@ -372,157 +339,6 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFilesTile()
 				::editor::folder_target{ m_currentDirectory });
 		}
 		ImGui::EndPopup();
-	}
-}
-
-void ContentsBrowserWindow::ShowCurrentDirectoryFilesTree(const file::path& directory)
-{
-	static file::path currentDirectory;
-	static FileType selectedFileType = FileType::Unknown;
-	static std::string draggedFileType{};
-	static bool isRightClicked = false;
-	static bool isHoverAndClicked = false;
-
-	for (const auto& entry : file::directory_iterator(directory))
-	{
-		if (entry.is_directory())
-		{
-			std::string name = entry.path().filename().string();
-			std::string label = std::string(ICON_FA_FOLDER " ") + name;
-
-			if (ImGui::TreeNode(label.c_str()))
-			{
-				if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1))
-				{
-					currentDirectory = entry.path();
-					selectedFileType = DeduceFileType(entry.path());
-					isRightClicked = true;
-				}
-				if (!entry.path().empty() &&
-					std::filesystem::equivalent(entry.path(), PathFinder::RelativeToPrefab("")))
-				{
-					if (ImGui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-						{
-							HandleSceneObjectDrop(payload->Data);
-						}
-						ImGui::EndDragDropTarget();
-					}
-				}
-				ShowCurrentDirectoryFilesTree(entry.path());
-				ImGui::TreePop();
-			}
-		}
-		else if (entry.is_regular_file())
-		{
-			if (m_filter.IsActive() && !m_filter.PassFilter(entry.path().filename().string().c_str()))
-				continue;
-
-			std::string extension = entry.path().extension().string();
-			if (EditorAssetDatabase::Get().IsSupportExtension(extension))
-			{
-				std::string label = entry.path().filename().string();
-				std::string apliedIcon;
-
-				if (auto it = kExtensionToIcon.find(extension); it != kExtensionToIcon.end())
-				{
-					apliedIcon = it->second;
-				}
-
-				label = apliedIcon + label;
-
-				ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
-				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
-				{
-					EditorPlatform::Get().OpenFile(entry.path());
-				}
-				else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0))
-				{
-					currentDirectory = entry.path();
-					selectedFileType = DeduceFileType(entry.path());
-					isHoverAndClicked = true;
-				}
-				else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1))
-				{
-					currentDirectory = entry.path();
-					selectedFileType = DeduceFileType(entry.path());
-					isRightClicked = true;
-				}
-
-				if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-				{
-					auto find = entry.path().parent_path();
-					if (find == PathFinder::Relative("SpriteSheets"))
-					{
-						ImGui::SetDragDropPayload("SPRITESHEET", entry.path().string().c_str(), entry.path().string().size() + 1);
-					}
-					else if (find == PathFinder::Relative("UI"))
-					{
-						ImGui::SetDragDropPayload("UI_TEXTURE", entry.path().string().c_str(), entry.path().string().size() + 1);
-					}
-					else
-					{
-						ImGui::SetDragDropPayload(FileTypeToString(selectedFileType), entry.path().string().c_str(), entry.path().string().size() + 1);
-					}
-					ImGui::Text("Dragging %s", entry.path().filename().string().c_str());
-					ImGui::EndDragDropSource();
-				}
-			}
-		}
-	}
-
-	if (isRightClicked)
-	{
-		ImGui::OpenPopup("ContentAssetTreeMenu");
-		isRightClicked = false;
-	}
-
-	// 팝업 이름이 "Context Menu" 였다 — 이 창 안에서 **같은 이름이 세 벌**이라
-	// 타일 쪽에서 연 팝업이 트리 쪽 BeginPopup 에 먼저 걸릴 수 있었다. 호스트별로
-	// 이름을 갈랐다(PHASE 21 M1 · A.6 이 지목한 "팝업 세 벌 통합").
-	if (ImGui::BeginPopup("ContentAssetTreeMenu"))
-	{
-		if (!currentDirectory.empty() && std::filesystem::equivalent(currentDirectory, PathFinder::VolumeProfilePath()))
-		{
-			if (ImGui::MenuItem("Create Volume Profile"))
-			{
-				EditorAssetDatabase::Get().CreateVolumeProfile(currentDirectory);
-			}
-		}
-		// Delete 인라인 구현이 여기 있었다. 확인도 Undo 도 없이 file::remove 를
-		// 부르고 있었고, **같은 코드가 DrawFileTile 에도 복제**돼 있었다.
-		// 선언 하나(editor_core_menus 의 delete_asset, confirm 붙음)가 둘을
-		// 대체한다 — 아래 선언 항목 블록이 그것을 그린다.
-		if (ImGui::MenuItem("Open Save Directory"))
-		{
-			EditorPlatform::Get().RevealInFileExplorer(currentDirectory);
-		}
-
-		// 선언된 자산 팝업 항목(PHASE 21 M1). 문맥은 파일 경로다.
-		if (::editor::popup_host_has_items(::editor::popup_host::content_browser_asset))
-		{
-			ImGui::Separator();
-			::editor::draw_popup_menu_items<::editor::popup_host::content_browser_asset>(
-				::editor::asset_target{ currentDirectory });
-		}
-		ImGui::EndPopup();
-	}
-
-	if (isHoverAndClicked && !currentDirectory.empty())
-	{
-		selectedMetaFilePath = currentDirectory.string() + ".meta";
-		selectedFileName = currentDirectory.filename().string();
-		draggedFileType = FileTypeToString(selectedFileType);
-		std::string parseError;
-		selectedFileMetaNode = Authoring::WriteDocument::ParseFile(
-			selectedMetaFilePath, &parseError);
-		if (!selectedFileMetaNode)
-		{
-			Debug->LogError(parseError);
-		}
-
-		isHoverAndClicked = false;
 	}
 }
 

@@ -191,10 +191,6 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     const ImVec2 size{ width, height };
     const ImVec2 nodePos{ posX, posY };
 
-    const bool contentBrowserIsDrawer =
-        ContentsBrowserStyle::Tile ==
-        EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle();
-
     ImGui::DockBuilderRemoveNode(id);
     ImGui::DockBuilderAddNode(id);
     ImGui::DockBuilderSetNodeSize(id, size);
@@ -229,15 +225,9 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     {
         if (dock_slot::floating == entry.dock) continue;
 
-        // 유일한 예외다. Tile 스타일에서 Content Browser는 팝업 드로어라
-        // 도크할 자리가 없다(ContentsBrowserWindow가 SetPopup으로 그렇게
-        // 만든다). 도크해 두면 드로어가 열릴 때 빈 탭이 남는다. 조건이 매
-        // 프레임 갈리는 값이라 선언의 정적 자리로는 적을 수 없다.
-        if (contentBrowserIsDrawer &&
-            EditorWindowName::kContentBrowser == entry.stable_id)
-        {
-            continue;
-        }
+        // 예전에는 여기 예외가 하나 있었다 — Tile 스타일의 Content Browser는
+        // 팝업 드로어라 도크할 자리가 없었다. 스타일 분기를 걷으면서 예외도
+        // 사라졌고, 이제 이 순회에 **자리 없는 창이 없다.**
 
         // stable_id는 전부 문자열 리터럴에서 왔으므로 data()가 널로 끝난다.
         ImGui::DockBuilderDockWindow(entry.stable_id.data(),

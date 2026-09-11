@@ -51,6 +51,16 @@ namespace editor
     struct window_placement_view
     {
         std::string   stable_id;
+
+        /// 사람이 보는 라벨. 대개 `stable_id` 와 같은 값이고, 갈린 창은 아직
+        /// Content Browser 하나다(W3 이 나머지를 가른다).
+        std::string   label;
+
+        /// 라벨에서 **폰트에 없는 코드포인트**의 수. 없는 글리프는 네모 한
+        /// 칸으로 그려지고 아무도 그것을 실패로 읽지 않는다 — 아이콘을 바꿀
+        /// 때마다 사람이 눈으로 확인하는 대신 이 수를 센다.
+        int           missing_glyphs{ 0 };
+
         std::uint32_t dock_node{ 0 };       ///< 0 == 도크되지 않음
         float         rect[4]{};
         bool          known_to_imgui{ false };  ///< ImGui 가 이 이름의 창을 아는가
@@ -196,7 +206,18 @@ namespace editor
         /// 한쪽만 고치면 여기서 갈린다.
         bool  scale_matches{ false };
 
-        bool clean() const noexcept { return style_applied && scale_matches; }
+        /// 글리프가 빠진 라벨들. `<창 안정 id>:<빠진 수>` 로 적는다.
+        ///
+        /// 감사가 이것을 드는 이유는 아이콘이 **스타일의 일부**여서다. 폰트
+        /// 블롭은 서브셋이라 `IconsFontAwesome6.h` 에 정의돼 있다고 해서 실제로
+        /// 들어 있는 것은 아니고, 없으면 조용히 네모가 그려진다. W1 이 토큰을
+        /// 갈아엎을 때 이 수가 곧바로 답한다.
+        std::vector<std::string> labels_missing_glyphs;
+
+        bool clean() const noexcept
+        {
+            return style_applied && scale_matches && labels_missing_glyphs.empty();
+        }
     };
 
     struct layout_audit

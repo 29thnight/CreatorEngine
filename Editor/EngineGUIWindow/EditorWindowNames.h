@@ -24,6 +24,25 @@ namespace EditorWindowName
     inline constexpr const char* kInspector = ICON_FA_CIRCLE_INFO "  Inspector";
     inline constexpr const char* kAssetBundle = ICON_FA_DIAGRAM_PROJECT "  AssetBundle";
     inline constexpr const char* kContentBrowser = ICON_FA_HARD_DRIVE " Content Browser";
+
+    // ── 표시 이름이 안정 식별자와 갈린 첫 창 ──────────────────────────────
+    //
+    // 위의 `kContentBrowser`는 **화면에 나오지 않는다.** `###` 오른쪽에만 실려
+    // 기존 `imgui.ini`의 도크 항목을 붙잡는 값이고, 사람이 보는 것은 아래
+    // 라벨이다. 셸이 `라벨###안정식별자`로 `Begin`을 부르고 `ImHashStr`이
+    // `###` 앞을 버리므로, 라벨을 바꿔도 창 id가 한 비트도 달라지지 않는다.
+    //
+    // 하드디스크 글리프는 자산 브라우저의 뜻과 맞지 않았다. 참조로 삼은
+    // S&Box Asset Browser의 탭이 폴더이고(계획서 §3), 왼쪽 트리와 자산 격자
+    // 양쪽이 폴더 계열 글리프로 서 있다. `ICON_FA_FOLDER`를 고른 이유는 뜻만이
+    // 아니라 **폰트 블롭에 실제로 있는 것이 확인된 글리프**여서다 — 없는
+    // 글리프를 고르면 네모 한 칸이 그려지고 아무도 실패로 읽지 못한다.
+    // 그 확인을 사람 눈에 맡기지 않으려고 `editor.theme`가 선언된 라벨 전체의
+    // 글리프 누락을 센다(W0 후반).
+    //
+    // 나머지 창들의 라벨은 아직 안정 식별자와 같은 값이라 따로 두지 않는다.
+    // W3이 안정 식별자를 `Editor.*`로 옮길 때 이 갈림이 전부에게 생긴다.
+    inline constexpr const char* kContentBrowserLabel = ICON_FA_FOLDER " Content Browser";
     inline constexpr const char* kResourceCounter = "Resource Counter";
     inline constexpr const char* kRenderPass = "RenderPass";
     inline constexpr const char* kBehaviorTree = "Behavior Tree Editor";

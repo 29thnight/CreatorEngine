@@ -944,6 +944,8 @@ namespace ConsoleCmd
         data.Set("preferenceScale", CommandData::Double(audit.preference_scale));
         data.Set("styleApplied", CommandData::Bool(audit.style_applied));
         data.Set("scaleMatches", CommandData::Bool(audit.scale_matches));
+        data.Set("missingGlyphLabels",
+                 CommandData::Int(static_cast<int>(audit.labels_missing_glyphs.size())));
         data.Set("clean", CommandData::Bool(audit.clean()));
 
         if (!audit.clean())

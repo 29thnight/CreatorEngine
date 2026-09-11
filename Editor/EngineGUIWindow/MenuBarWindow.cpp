@@ -468,10 +468,21 @@ void MenuBarWindow::RenderMenuBar()
                     EditorWindowName::kResourceCounter,
                     EditorWindowName::kRenderPass,
                 };
+                // 여닫기는 **안정 식별자**로 하고 그리기는 **선언의 라벨**로
+                // 한다. 둘이 갈린 창이 생겼기 때문이다(Content Browser). 라벨을
+                // 여기서 다시 적으면 선언과 메뉴가 따로 놀 자리가 생기므로
+                // 표에서 읽는다 — 선언되지 않은 이름이면 식별자를 그려 그
+                // 사실이 화면에 드러나게 둔다.
                 for (const char* const panel : panels)
                 {
+                    const ::editor::window_entry* const entry =
+                        ::editor::find_window_of(panel);
+                    const std::string label =
+                        (entry && !entry->label.empty()) ? std::string{ entry->label }
+                                                         : std::string{ panel };
+
                     const bool opened = editor::is_window_open(panel);
-                    if (!ImGui::MenuItem(panel, nullptr, opened)) continue;
+                    if (!ImGui::MenuItem(label.c_str(), nullptr, opened)) continue;
                     if (opened) editor::close_window(panel);
                     else        editor::open_window(panel);
                 }
@@ -520,23 +531,6 @@ void MenuBarWindow::RenderMenuBar()
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-            if (EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle() ==
-                ContentsBrowserStyle::Tile)
-            {
-                if (ImGui::Button(ICON_FA_HARD_DRIVE " Content Drawer"))
-                {
-                    if (!editor::is_window_open(EditorWindowName::kContentBrowser))
-                    {
-                        editor::open_window(EditorWindowName::kContentBrowser);
-                    }
-                    else
-                    {
-                        editor::close_window(EditorWindowName::kContentBrowser);
-                    }
-                }
-                ImGui::SameLine();
-            }
-
             if (ImGui::Button(ICON_FA_TERMINAL " Output Log "))
             {
                 if (editor::is_window_open(EditorWindowName::kOutputLog))
@@ -812,22 +806,8 @@ void MenuBarWindow::RenderToolBar()
         }
         ImGui::EndDisabled();
 
-        // 스타일 정본은 EditorPreferences 하나다. DataSystem이 들고 있던
-        // 사본은 여기서 함께 갱신하던 이중 상태여서 걷었다 (PHASE 4-3).
-        ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 40.0f);
-        EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
-        bool contentsStyle = static_cast<bool>(preferences.GetContentsBrowserStyle());
-        if (ImGui::ToggleSwitch(ICON_FA_BARS_STAGGERED, contentsStyle))
-        {
-            contentsStyle = !contentsStyle;
-            const auto newStyle = static_cast<ContentsBrowserStyle>(contentsStyle);
-            preferences.SetContentsBrowserStyle(newStyle);
-            if (ContentsBrowserStyle::Tree == newStyle)
-                editor::open_window(EditorWindowName::kContentBrowser);
-            else
-                editor::close_window(EditorWindowName::kContentBrowser);
-            EditorSettingsStore::Get().Save();
-        }
+        // Content Browser 표시 스타일을 가르던 ToggleSwitch 가 여기 있었다.
+        // 스타일이 하나가 되면서 스위치도 걷혔다.
 
         ImGui::EndMenuBar();
     }

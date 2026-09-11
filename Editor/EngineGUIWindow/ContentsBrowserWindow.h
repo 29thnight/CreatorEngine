@@ -34,8 +34,6 @@ public:
 private:
 	void ShowDirectoryTree(const file::path& directory);
 	void ShowCurrentDirectoryFiles();
-	void ShowCurrentDirectoryFilesTile();
-	void ShowCurrentDirectoryFilesTree(const file::path& directory);
 	void DrawFileTile(ImTextureID iconTexture,
 					  const file::path& directory,
 					  const std::string& fileName,
@@ -45,13 +43,6 @@ private:
 	// 씬 오브젝트를 프리팹 폴더에 떨어뜨렸을 때. payload는 ImGui가
 	// 실어 온 Entity::Index의 주소다.
 	void HandleSceneObjectDrop(const void* payload);
-
-	// 현재 스타일은 설정이 정본이다. DataSystem이 들고 있던 사본은
-	// MenuBarWindow가 설정과 함께 갱신하던 이중 상태였다 — 걷었다.
-	ContentsBrowserStyle Style() const
-	{
-		return EditorSettingsStore::Get().Preferences().GetContentsBrowserStyle();
-	}
 
 	ImGuiTextFilter m_filter{};
 	file::path		m_currentDirectory{};

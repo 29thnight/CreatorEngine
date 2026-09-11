@@ -181,6 +181,16 @@ namespace editor
         const float difference = snapshot.font_global_scale - snapshot.preference_scale;
         audit.scale_matches = (difference > -0.0001f) && (difference < 0.0001f);
 
+        // 라벨의 아이콘이 폰트에 실제로 있는가. `IconsFontAwesome6.h` 에 정의가
+        // 있다는 것과 폰트 블롭에 글리프가 있다는 것은 다른 이야기이고, 없으면
+        // 네모 한 칸이 조용히 그려진다.
+        for (const window_placement_view& placement : snapshot.placements)
+        {
+            if (0 == placement.missing_glyphs) continue;
+            audit.labels_missing_glyphs.push_back(
+                placement.stable_id + ":" + std::to_string(placement.missing_glyphs));
+        }
+
         return audit;
     }
 
@@ -254,19 +264,25 @@ namespace editor
             out += '\n';
         }
 
-        out += "\nwindow\tnode\tx0\ty0\tx1\ty1\tknown\tdockActive\tdockExempt\n";
+        out += "\nwindow\tnode\tx0\ty0\tx1\ty1\tknown\tdockActive\tdockExempt"
+               "\tmissingGlyphs\tlabel\n";
         for (const window_placement_view& placement : snapshot.placements)
         {
             out += placement.stable_id;
             std::snprintf(buffer, sizeof(buffer),
-                "\t%u\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%d\t%d\n",
+                "\t%u\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%d\t%d\t%d\t",
                 placement.dock_node,
                 placement.rect[0], placement.rect[1],
                 placement.rect[2], placement.rect[3],
                 placement.known_to_imgui ? 1 : 0,
                 placement.dock_active ? 1 : 0,
-                placement.dock_exempt ? 1 : 0);
+                placement.dock_exempt ? 1 : 0,
+                placement.missing_glyphs);
             out += buffer;
+            // 라벨을 맨 뒤에 둔다 — 아이콘이 비ASCII 라 폭이 들쭉날쭉하고,
+            // 뒤에 있으면 열 정렬이 무너져도 앞의 숫자들을 읽을 수 있다.
+            out += placement.label;
+            out += "\n";
         }
         return out;
     }
@@ -376,11 +392,19 @@ namespace editor
         char buffer[320]{};
         std::snprintf(buffer, sizeof(buffer),
             "\n[AUDIT] theme colors=%zu scalars=%zu differing=%zu"
-            " fontGlobalScale=%.3f preferenceScale=%.3f applied=%d scaleMatch=%d\n",
+            " fontGlobalScale=%.3f preferenceScale=%.3f applied=%d scaleMatch=%d"
+            " missingGlyphLabels=%zu\n",
             audit.colors, audit.scalars, audit.colors_differing_from_default,
             audit.font_global_scale, audit.preference_scale,
-            audit.style_applied ? 1 : 0, audit.scale_matches ? 1 : 0);
+            audit.style_applied ? 1 : 0, audit.scale_matches ? 1 : 0,
+            audit.labels_missing_glyphs.size());
         std::string out{ buffer };
+
+        for (const std::string& label : audit.labels_missing_glyphs)
+        {
+            out += "[AUDIT] 라벨의 글리프가 폰트에 없다 — " + label +
+                   " (네모로 그려진다. 아이콘 상수를 폰트 블롭에 있는 것으로 바꿔라)\n";
+        }
 
         if (!audit.style_applied)
         {

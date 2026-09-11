@@ -45,10 +45,6 @@ namespace editor::windows
     void draw_texture_import_selector();  bool has_texture_import_selector();
     void draw_material_picker();          bool has_material_picker();
 
-    /// 자산 브라우저가 하단 서랍인가. 타일 스타일에서만 참이고, 그때만
-    /// 닫기 단추가 뜬다 — 옛 코드가 본문 첫 줄에서 매 프레임 `SetPopup`으로
-    /// 하던 판단이다(ContentsBrowserWindow.cpp:110). 판단은 그 파일에 남는다.
-    bool content_browser_is_drawer();
 }
 
 // ── 도킹되는 패널 다섯 ────────────────────────────────────────────────────
@@ -89,13 +85,16 @@ struct editor_panel_windows
                 .closable(false)
                 .available(&windows::has_asset_bundle),
 
-            // 등록이 `ImGuiWindowFlags_None`을 명시한 유일한 창이다. isPopup이
-            // 참이라 NoCollapse만 얹혔다.
+            // 표시 이름과 안정 식별자가 **갈린 유일한 창**이다. 왼쪽이 ini의
+            // 도크 항목을 붙잡는 옛 문자열이고 오른쪽이 사람이 보는 라벨이다
+            // (`EditorWindowNames.h` 참조). 서랍 스타일이 사라져 `closable_when`
+            // 술어도 없어졌다 — 다른 도킹 패널과 같이 닫히지 않는다.
             panel<&windows::draw_content_browser>(
-                EditorWindowName::kContentBrowser, EditorWindowName::kContentBrowser)
+                EditorWindowName::kContentBrowser,
+                EditorWindowName::kContentBrowserLabel)
                 .dock(dock_slot::bottom)
                 .traits(window_trait::no_collapse)
-                .closable_when(&windows::content_browser_is_drawer)
+                .closable(false)
                 .available(&windows::has_content_browser),
 
             panel<&windows::draw_resource_counter>(

@@ -132,6 +132,11 @@ Assert ($theme.data.styleApplied -eq $true) 'The editor skin was not applied; th
 Assert ($theme.data.scaleMatches -eq $true) `
     "Scale source diverged: io.FontGlobalScale=$($theme.data.fontGlobalScale) preference=$($theme.data.preferenceScale)"
 
+# 선언된 창 라벨의 아이콘이 폰트 블롭에 실제로 있는가. IconsFontAwesome6.h 에
+# 정의만 있고 블롭에 글리프가 없으면 네모 한 칸이 조용히 그려진다.
+Assert ($theme.data.missingGlyphLabels -eq 0) `
+    "$($theme.data.missingGlyphLabels) window label(s) reference a glyph missing from the icon font; they draw as boxes. See the [AUDIT] lines for which window, and pick an ICON_FA_* constant that is already used elsewhere in the editor"
+
 Assert ($theme.data.colors -ge 40) "Only $($theme.data.colors) style colors captured; the probe likely read nothing"
 Assert ($theme.data.scalars -ge 10) "Only $($theme.data.scalars) style scalars captured; the probe likely read nothing"
 Assert ($theme.data.differing -ge 10) "Only $($theme.data.differing) colors differ from the ImGui default"

@@ -110,17 +110,6 @@ bool EditorSettingsStore::Initialize() noexcept
 					SanitizeProjectName(projectNameNode.AsString()));
 			}
 
-			if (root["m_contentsBrowserStyle"])
-			{
-				const int style = root["m_contentsBrowserStyle"].As<int>();
-                if (style < static_cast<int>(ContentsBrowserStyle::Tile) ||
-                    style > static_cast<int>(ContentsBrowserStyle::Tree))
-                {
-                    return ReportSettingsError("m_contentsBrowserStyle is outside the supported range.");
-                }
-                preferences.SetContentsBrowserStyle(static_cast<ContentsBrowserStyle>(style));
-            }
-
             if (root["imguiScale"])
             {
 				const float scale = root["imguiScale"].As<float>();
@@ -241,8 +230,6 @@ bool EditorSettingsStore::Save() noexcept
             OverlayKnownMap(storedRenderPassSettings, serializedRenderPassSettings);
         else
             storedRenderPassSettings.Assign(serializedRenderPassSettings);
-        root.Child("m_contentsBrowserStyle").SetScalar(
-            static_cast<int>(m_preferences.GetContentsBrowserStyle()));
         root.Child("startupSceneName").SetScalar(
             std::filesystem::path(
                 m_buildSettings.GetStartupSceneName()).string());
