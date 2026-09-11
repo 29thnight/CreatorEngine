@@ -173,8 +173,9 @@ void Editor::EditorMain::Initialize()
 	m_gizmoRenderer = std::make_shared<GizmoRenderer>(
 		EnhancedSceneRenderer::GetRenderScene(),
 		EditorSessionState::Get().EditorCamera());
-	m_sceneViewWindow = std::make_unique<SceneViewWindow>(
-		EditorSessionState::Get().CameraRig(), m_gizmoRenderer.get());
+	// Scene 과 Game 은 여기서 만들지 않는다(PHASE 21 W3). 본문이 자유
+	// 함수라 선언 표가 직접 부르고, 카메라 리그와 기즈모는 본문이 매
+	// 프레임 정본에서 다시 유도한다.
 	// PHASE 21 M4 2단계: 창 객체보다 먼저 표를 세운다. 생성자가 자기 본문을
 	// 걸면서 open_window/close_window 로 초기 표시 상태를 정하는데,
 	// 그때 표에 항목이 있어야 그 호출이 닿는다.
@@ -187,7 +188,6 @@ void Editor::EditorMain::Initialize()
 	::editor::register_editor_menus();
 
 	m_menuBarWindow = std::make_unique<MenuBarWindow>();
-	m_gameViewWindow = std::make_unique<GameViewWindow>();
 	m_hierarchyWindow = std::make_unique<HierarchyWindow>();
 	m_inspectorWindow = std::make_unique<InspectorWindow>();
 	m_projectWindow = std::make_unique<AssetBundleWindow>();

@@ -229,9 +229,6 @@
     <ClCompile Include="EditorWindow\Windows\EditorWindowBody.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="EditorWindow\Windows\EditorViewportWindows.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
     <ClCompile Include="EditorWindow\Windows\EditorToolboxWindows.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>

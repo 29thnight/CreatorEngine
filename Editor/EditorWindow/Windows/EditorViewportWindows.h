@@ -10,12 +10,20 @@
 
 #include "EditorWindowSchema.h"
 #include "EditorWindowNames.h"
-#include "EditorWindowBody.h"
 
+// ── 본문 저장소를 거치지 않는다 (PHASE 21 W3) ────────────────────────────
+//
+// 옛 배선은 진입점이 `run_window_body(이름)` 로 저장소를 뒤지는 트램펄린이었고,
+// `has_*` 는 "본문이 걸렸는가" 를 답했다. 두 창 다 소유자가 사라지면서 저장소에
+// 걸 일이 없어졌으므로 선언이 본문을 직접 가리킨다. 존재 술어도 뗐다 — 이 둘은
+// 언제나 있다. 애니메이터 창 셋이 먼저 간 길과 같은 모양이다.
+//
+// 정의는 `EngineGUIWindow/SceneViewWindow.cpp` 와 `GameViewWindow.cpp` 에 있다.
+// 선언은 여기가 하고 구현은 저기가 한다 — 의존 방향이 한쪽이다.
 namespace editor::windows
 {
-    void draw_scene_view();  bool has_scene_view();
-    void draw_game_view();   bool has_game_view();
+    void draw_scene_view();
+    void draw_game_view();
 }
 
 struct editor_viewport_windows
@@ -35,13 +43,11 @@ struct editor_viewport_windows
                         window_trait::no_scroll_with_mouse)
                 .stacking(window_stacking::display_back)
                 .background(0.f, 0.f, 0.f, 1.f)
-                .padding(0.f, 0.f)
-                .available(&windows::has_scene_view),
+                .padding(0.f, 0.f),
 
             central<&windows::draw_game_view>(
                 EditorWindowName::kGame, EditorWindowName::kGame)
                 .padding(0.f, 0.f)
-                .stacking(window_stacking::display_back)
-                .available(&windows::has_game_view));
+                .stacking(window_stacking::display_back));
     }
 };

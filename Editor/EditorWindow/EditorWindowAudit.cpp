@@ -25,11 +25,19 @@ namespace editor
         //   창을 새로 만들고 여기 적지 않으면 감사가 붉어지고, 고치는 방법은
         //   "의도를 적는 것"이다. 자동으로 알아내면 오타로 죽은 창과 구분이
         //   되지 않는다 — 둘 다 "보관소에 없다"로 똑같이 보이기 때문이다.
+        // PHASE 21 W3 이 이 목록을 늘린다. 창이 드는 것이 UI 지역 상태뿐이면
+        // 소유자를 둘 이유가 없어 자유 함수와 TU 지역 상태로 옮기고, 그러면
+        // 보관소에 걸 일이 없어진다. 여덟이 다 옮겨 가면 보관소에 남는 것은
+        // 남의 객체 안에 사는 본문 열넷뿐이고, 그때 이 검사는 방향이 뒤집힌다 —
+        // "목록에 없는 것이 예외" 가 된다. 그 전환은 열넷이 정리된 뒤에 한다.
         constexpr std::string_view kSelfDrawingWindows[]
         {
             EditorWindowName::kAnimatorEvent,
             EditorWindowName::kAnimationControllers,
             EditorWindowName::kAvatarMask,
+            // W3 에서 옮긴 것들.
+            EditorWindowName::kScene,
+            EditorWindowName::kGame,
         };
 
         bool draws_without_store(std::string_view stable_id)

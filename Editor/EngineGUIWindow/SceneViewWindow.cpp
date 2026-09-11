@@ -86,22 +86,30 @@ bool RayIntersectsPlane(const Ray& ray, const math::vector3& planeNormal, const 
 	return true;
 }
 
-SceneViewWindow::SceneViewWindow(EditorCameraRig* editorCameraRig, GizmoRenderer* gizmo_ptr) :
-	m_editorCamera(editorCameraRig ? &editorCameraRig->GetCamera() : nullptr),
-	m_editorCameraRig(editorCameraRig),
-	m_gizmoRenderer(gizmo_ptr)
+namespace
 {
-	editor::windows::bind_window_body(EditorWindowName::kScene,
-		[this]() { RenderSceneViewWindow(); });
+	// 창 상태의 유일한 자리. 표가 아니라 이 TU 가 든다 — 표에 타입 소거를
+	// 들이지 않으려는 선택이고, 같은 창을 두 벌 띄울 요구가 생기면 그때
+	// 표로 올린다. 구조체가 이미 하나로 모여 있어 그 이사는 기계적이다.
+	SceneViewWindow& scene_view_state()
+	{
+		static SceneViewWindow state;
+		return state;
+	}
 }
 
-SceneViewWindow::~SceneViewWindow()
+void editor::windows::draw_scene_view()
 {
-	editor::windows::unbind_window_body(EditorWindowName::kScene);
+	scene_view_state().RenderSceneViewWindow();
 }
 
 void SceneViewWindow::RenderSceneViewWindow()
 {
+	// 빌린 것들은 매 프레임 정본에서 다시 유도한다(헤더 주석 참고).
+	m_editorCameraRig = EditorSessionState::Get().CameraRig();
+	m_editorCamera = m_editorCameraRig ? &m_editorCameraRig->GetCamera() : nullptr;
+	m_gizmoRenderer = GizmoRenderer::GetActive();
+
 	auto scene = SceneManagers->GetActiveScene();
 	auto obj = scene->GetSelectedEntity();
 	if (obj)

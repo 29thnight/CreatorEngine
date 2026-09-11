@@ -282,9 +282,6 @@
     <ClCompile Include="EditorWindow\Windows\EditorWindowBody.cpp">
       <Filter>EditorWindow\Windows</Filter>
     </ClCompile>
-    <ClCompile Include="EditorWindow\Windows\EditorViewportWindows.cpp">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClCompile>
     <ClCompile Include="EditorWindow\Windows\EditorToolboxWindows.cpp">
       <Filter>EditorWindow\Windows</Filter>
     </ClCompile>

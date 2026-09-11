@@ -9,8 +9,6 @@
 // I5-D5a: 죽은 include 청산 — Model 타입 사용 0건(착수 정찰 실측)
 #include "Delegate.h"
 
-#include "SceneViewWindow.h"
-#include "GameViewWindow.h"
 #include "MenuBarWindow.h"
 #include "HierarchyWindow.h"
 #include "InspectorWindow.h"
@@ -94,9 +92,12 @@ namespace Editor
 		std::shared_ptr<GizmoRenderer>             m_gizmoRenderer;
 		std::unique_ptr<EditorRenderer>            m_editorRenderer;
 
-		// 에디터 창들
-		std::unique_ptr<SceneViewWindow>           m_sceneViewWindow;
-		std::unique_ptr<GameViewWindow>            m_gameViewWindow;
+		// 에디터 창들.
+		//
+		// PHASE 21 W3 에서 하나씩 줄어든다. 이 포인터들은 그리지 않는다 —
+		// 수명만 붙들고, 그리는 것은 선언 표를 도는 셸이다. 창이 드는 것이
+		// UI 지역 상태뿐이면 수명을 여기서 관리할 이유가 없어서, 그런 창은
+		// 자유 함수와 TU 지역 상태로 옮긴다. Scene 과 Game 이 먼저 갔다.
 		std::unique_ptr<MenuBarWindow>             m_menuBarWindow;
 		std::unique_ptr<HierarchyWindow>           m_hierarchyWindow;
 		std::unique_ptr<InspectorWindow>           m_inspectorWindow;

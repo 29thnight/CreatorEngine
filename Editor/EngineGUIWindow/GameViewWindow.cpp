@@ -6,20 +6,9 @@
 #include "EditorWindowNames.h"
 #include "Windows/EditorViewportWindows.h"
 
-GameViewWindow::GameViewWindow()
-{
-	editor::windows::bind_window_body(EditorWindowName::kGame,
-		[this]() { RenderGameViewWindow(); });
-}
-
-GameViewWindow::~GameViewWindow()
-{
-	editor::windows::unbind_window_body(EditorWindowName::kGame);
-}
-
 // PHASE 21 M4 3단계: 프레임은 셸이 연다. 창 여백·창 성질 둘·표시 순서가
 // 선언으로 갔다(EditorViewportWindows.h). 여기에는 그림 하나만 남는다.
-void GameViewWindow::RenderGameViewWindow()
+void editor::windows::draw_game_view()
 {
 	{
 		ImVec2 availRegion = ImGui::GetContentRegionAvail();
