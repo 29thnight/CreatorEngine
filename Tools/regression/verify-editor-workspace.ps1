@@ -30,8 +30,11 @@ param(
 #   `ViewportHost` 노드를 세우는 것은 W4 의 일이다. 존재를 여기 적으면 W4 착수
 #   전까지 이 게이트가 내내 붉어 도는 세트에 들어갈 수 없다. 유일성만 본다.
 #
-# ★ 배율이 obsolete `io.FontGlobalScale` 경로인 것도 단정하지 않는다 — 정식
-#   경로(`style.FontScaleMain`)로의 이주는 W1 의 몫이다. 관측은 덤프에 남는다.
+# ★ 배율의 출처는 단정한다. W1 이 obsolete `io.FontGlobalScale` 을 걷었으므로
+#   `scaleMatches` 는 정식 경로 `style.FontScaleMain` 과 설정값의 일치를 본다.
+#   되돌아가는 길은 `verify-imgui-obsolete-surface.ps1` 이 소스에서 막는다 —
+#   `IMGUI_DISABLE_OBSOLETE_FUNCTIONS` 는 `ImGuiIO` 레이아웃을 바꾸는 매크로라
+#   제품 구성에 켤 수 없다(계획서 §3.2 의 실측).
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Exe = [IO.Path]::GetFullPath($Exe)
@@ -144,7 +147,7 @@ Assert ($theme.status -eq 'succeeded') "editor.theme failed: $($theme.message)"
 Assert ($theme.data.clean -eq $true) "Theme audit is dirty: $($theme.message)"
 Assert ($theme.data.styleApplied -eq $true) 'The editor skin was not applied; the style equals the ImGui default'
 Assert ($theme.data.scaleMatches -eq $true) `
-    "Scale source diverged: io.FontGlobalScale=$($theme.data.fontGlobalScale) preference=$($theme.data.preferenceScale)"
+    "Scale source diverged: style.FontScaleMain=$($theme.data.fontScaleMain) preference=$($theme.data.preferenceScale)"
 
 # 선언된 창 라벨의 아이콘이 폰트 블롭에 실제로 있는가. IconsFontAwesome6.h 에
 # 정의만 있고 블롭에 글리프가 없으면 네모 한 칸이 조용히 그려진다.
@@ -237,7 +240,7 @@ try {
         Assert ($fxTheme.data.styleApplied -eq $true) `
             "Fixture $($fixture.Name): the editor skin was not applied"
         Assert ($fxTheme.data.scaleMatches -eq $true) `
-            "Fixture $($fixture.Name): scale source diverged (io.FontGlobalScale=$($fxTheme.data.fontGlobalScale) preference=$($fxTheme.data.preferenceScale))"
+            "Fixture $($fixture.Name): scale source diverged (style.FontScaleMain=$($fxTheme.data.fontScaleMain) preference=$($fxTheme.data.preferenceScale))"
         Assert ($fxTheme.data.missingGlyphLabels -eq 0) `
             "Fixture $($fixture.Name): $($fxTheme.data.missingGlyphLabels) window label(s) draw as boxes"
         Assert ($fxLayout.data.iniEntries -ge 1) `
@@ -270,5 +273,5 @@ Write-Host 'imgui.ini fixture baseline (W0 후반 — undocked/ghost 를 0 으�
 #   적재 시점에 정해지고 그 뒤 다시 쓰기가 바꾸지 않기 때문이다.
 $fixtureRows | Format-Table -AutoSize | Out-String | Write-Host
 
-"editor chrome observation OK — fixtures=$($fixtures.Count), dock nodes=$($dock.data.nodes) leaf=$($dock.data.leafNodes) docked=$($dock.data.dockedWindows) central=$($dock.data.centralNodes), style colors=$($theme.data.colors) differing=$($theme.data.differing) scale=$($theme.data.fontGlobalScale), ini entries=$($layout.data.iniEntries) matched=$($layout.data.matched), imgui=$($dock.data.imguiVersionNum), checks=$($script:checks)"
+"editor chrome observation OK — fixtures=$($fixtures.Count), dock nodes=$($dock.data.nodes) leaf=$($dock.data.leafNodes) docked=$($dock.data.dockedWindows) central=$($dock.data.centralNodes), style colors=$($theme.data.colors) differing=$($theme.data.differing) scale=$($theme.data.fontScaleMain), ini entries=$($layout.data.iniEntries) matched=$($layout.data.matched), imgui=$($dock.data.imguiVersionNum), checks=$($script:checks)"
 exit 0

@@ -126,14 +126,17 @@ EditorRenderer::EditorRenderer(void* windowHandle)
         throw std::runtime_error("Editor ImGui backend 초기화 실패: " + hostError);
     }
 
+    // 1.92 의 아틀라스는 동적이라 `Build()` 를 부르지 않는다.
     AddEditorFonts();
-    ImGui::GetIO().Fonts->Build();
 
     m_lastAppliedScale = EditorSettingsStore::Get().Preferences().GetImGuiScale();
-    ImGui::GetIO().FontGlobalScale = m_lastAppliedScale;
 
     ImGuiStyle* style = &ImGui::GetStyle();
     ApplyEditorStyle(style);
+    // 글자 배율과 geometry 배율의 담당이 갈린다 — `FontScaleMain` 이 글자,
+    // `ScaleAllSizes` 가 여백·모서리다. obsolete 인 `io.FontGlobalScale` 은
+    // 걷었다(계획서 §3.2).
+    style->FontScaleMain = m_lastAppliedScale;
     style->ScaleAllSizes(m_lastAppliedScale);
 }
 
@@ -177,15 +180,13 @@ void EditorRenderer::ApplyEditorScale(float newScale, bool rebuildFonts)
     // 스타일을 기준값에서 다시 세운 뒤 스케일한다(누적 방지).
     ApplyEditorStyle(&style);
     style.ScaleAllSizes(newScale);
-
-    io.FontGlobalScale = newScale;
+    style.FontScaleMain = newScale;
     m_lastAppliedScale = newScale;
 
     if (rebuildFonts)
     {
         io.Fonts->Clear();
         AddEditorFonts();
-        io.Fonts->Build();
         // 폰트 텍스처는 백엔드 소유물이라 재생성은 경계 너머의 일이다.
         m_host->RebuildFontAtlas();
     }

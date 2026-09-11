@@ -531,8 +531,21 @@ geometry token:
   (`ScaleAllSizes` 주석대로 폰트는 스케일하지 않는다 — 지금의 이중 적용이 double scaling의 원인이다).
 - Win32 DPI awareness와 `ConfigDpiScaleFonts` 채택 여부를 W1에서 판정하고, 채택하면
   "`FontScaleDpi`는 ImGui가 쓴다"를 불변식으로 적는다.
-- **`IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 켜는 것을 W1의 종료 조건에 넣는다.** 켜서 빌드가 서면
-  obsolete 잔존이 0이라는 증명이 되고, 이후 ImGui 업그레이드에서 조용히 깨지지 않는다.
+- ~~**`IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 켜는 것을 W1의 종료 조건에 넣는다.**~~
+  **(2026-09-11 실측 정정 — 이 매크로는 제품 구성에 켤 수 없다.)** 함수만 걷는 매크로가
+  아니라 **`ImGuiIO`의 레이아웃을 바꾼다**(`imgui.h`의 `struct ImGuiIO` 안 obsolete 블록에
+  `FontGlobalScale`이 있다). imgui는 vcpkg가 미리 빌드한 `.lib`로 오므로 소비자 TU에만 켜면
+  `sizeof(ImGuiIO)`가 갈리고 `ImGui::DebugCheckVersionAndDataLayout`(imgui.cpp:11499)의
+  "Mismatched struct layout!"에서 기동이 죽는다. `Editor.vcxproj`·`HostImGuiPresentation.vcxproj`에
+  켜서 **빌드 exit 0 · 기동 0x80000003**으로 실측했다. Release는 어서션이 사라져 레이아웃이
+  어긋난 채 도는 쪽이라 더 나쁘다. 켜려면 imgui 자체를 같은 매크로로 다시 빌드하는
+  overlay port가 필요하고 그 매크로는 Player를 포함한 **모든 소비자**에 걸려야 한다 —
+  W1의 값어치에 비해 큰 변경이라 하지 않는다.
+- 대신 **그 매크로가 막아 주었을 호출을 소스로 센다**:
+  `Tools/regression/verify-imgui-obsolete-surface.ps1`(run-all 소속). 패턴 목록의 출처는
+  매크로를 켜고 한 번 컴파일해 컴파일러에게 받은 22자리다. 인자 순서가 문제인 세 API
+  (`AddRect`·`AddPolyline`·`PathStroke`)는 인자를 갈라 "flags가 마지막이 아닌" 경우만 잡으며,
+  `flags` 자리에 맨 정수 리터럴을 쓴 호출은 **잡지 못한다**(게이트 머리에 적었다).
 
 ### 3.3 ImGui style mapping
 
@@ -950,7 +963,10 @@ id 가 둘이어야 하는데, 그것은 `editor.windows` 의 `duplicateIds` 가
   아틀라스 기준 legacy라 함께 걷는다.
 
 **판정:** token sample은 기준 hex와 일치하고, font file 부재로 editor가 뜨지 않는 경로가 없다.
-`IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 켠 상태로 Editor가 빌드·기동된다(obsolete 잔존 0의 증명).
+~~`IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 켠 상태로 Editor가 빌드·기동된다~~ **(§3.2 정정 — 이 매크로는
+`ImGuiIO` 레이아웃을 바꿔 제품 구성에 켤 수 없다. 실측은 §3.2에 있다.)** obsolete 잔존 0은
+`verify-imgui-obsolete-surface.ps1`이 소스로 판정한다. 매크로를 켠 전체 rebuild가 **오류 0**으로
+선 것이 일회성 증거로 남는다(2026-09-11, 22자리를 고친 뒤).
 user scale 100↔150% 왕복과 **실제 DPI 100↔150% 왕복**을 따로 판정하며, 후자는 DPI 경로를
 채택했을 때만 통과 조건에 넣는다 — 채택하지 않으면 "이번 범위에서 하지 않았다"를 명시한다.
 

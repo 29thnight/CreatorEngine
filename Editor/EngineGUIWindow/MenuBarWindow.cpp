@@ -104,9 +104,11 @@ MenuBarWindow::MenuBarWindow()
     ImFontConfig icons_config;
     ImFontConfig font_config;
     icons_config.MergeMode = true; // Merge icon font to the previous font if you want to have both icons and text
-    m_koreanFont = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\malgun.ttf", 16.0f, nullptr, io.Fonts->GetGlyphRangesKorean());
+    // 1.92 의 아틀라스는 동적이다 — 글리프는 그릴 때 구워지므로 한글 범위를
+    // 미리 못 박을 필요도, `Build()` 를 부를 필요도 없다. 범위를 못 박던 옛
+    // 코드는 그 밖의 글자를 네모로 만들었다.
+    m_koreanFont = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\malgun.ttf", 16.0f);
     io.Fonts->AddFontFromMemoryCompressedTTF(FA_compressed_data, FA_compressed_size, 16.0f, &icons_config, icons_ranges);
-    io.Fonts->Build();
 
     // PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실은
     // 선언이 든다(open_by_default(false)) — 여기서 다시 닫지 않는다.
@@ -869,7 +871,7 @@ void MenuBarWindow::ShowLogWindow()
 
     // 폰트 밀기는 본문에 남는다. 옛 코드는 `Begin` 앞에서 밀어 제목표시줄까지
     // 덮었지만 제목이 ASCII 라 보이는 차이가 없다.
-    ImGui::PushFont(m_koreanFont);
+    ImGui::PushFont(m_koreanFont, 0.0f);
 
     // == 상단 고정 헤더 영역 ==
     ImGui::BeginChild("LogHeader", ImVec2(0, 0),

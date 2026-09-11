@@ -222,6 +222,16 @@ Run-Step "에디터 크롬 관측(도크·스타일·ini)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-workspace.ps1") -Exe $Exe -Work (Join-Path $Work 'editor-workspace')
 }
 
+# PHASE 21 W1 — ImGui 1.92 obsolete API 잔존 0.
+#
+# 소스 대조다. `IMGUI_DISABLE_OBSOLETE_FUNCTIONS` 를 제품 구성에 켤 수 없기
+# 때문이다 — 그 매크로는 `ImGuiIO` 의 레이아웃을 바꾸는데 imgui 는 vcpkg 가 미리
+# 빌드한 .lib 로 오므로, 소비자 TU 에만 켜면 빌드는 서고 기동이 어서션에서 죽는다
+# (2026-09-11 실측). 근거와 잡지 못하는 경우는 게이트 머리에 적혀 있다.
+Run-Step "ImGui obsolete 잔존(소스 대조)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-imgui-obsolete-surface.ps1")
+}
+
 # PHASE 14.5 LC7 §10.2 — 리로드 실패가 반쯤 교체된 상태를 남기지 않는다.
 #
 # 관리 쪽 Reload()가 `Unload(); Load();` 라, 새 어셈블리가 깨져 있으면 이전 것은

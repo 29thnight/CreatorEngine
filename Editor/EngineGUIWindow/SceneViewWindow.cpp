@@ -415,7 +415,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 		ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5.f);
 		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.1f, 0.1f, 0.1f, 0.8f));
-		ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont());
+		ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), 0.0f);
 		if (ImGui::BeginPopup("CameraSettings"))
 		{
 			ImGui::Text("Camera Settings");

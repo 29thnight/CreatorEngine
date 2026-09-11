@@ -184,7 +184,7 @@ namespace editor
         audit.colors  = snapshot.style_colors.size();
         audit.scalars = snapshot.style_scalars.size();
         audit.colors_differing_from_default = snapshot.colors_differing_from_default;
-        audit.font_global_scale = snapshot.font_global_scale;
+        audit.font_scale_main = snapshot.font_scale_main;
         audit.preference_scale  = snapshot.preference_scale;
 
         // 에디터 스킨이 실제로 적용됐는가. `ApplyEditorStyle` 이 40 항목 넘게
@@ -194,7 +194,7 @@ namespace editor
         audit.style_applied = (10 <= snapshot.colors_differing_from_default);
 
         // 배율 출처가 하나인가. 적용 경로가 둘이라 한쪽만 고치면 갈린다.
-        const float difference = snapshot.font_global_scale - snapshot.preference_scale;
+        const float difference = snapshot.font_scale_main - snapshot.preference_scale;
         audit.scale_matches = (difference > -0.0001f) && (difference < 0.0001f);
 
         // 라벨의 아이콘이 폰트에 실제로 있는가. `IconsFontAwesome6.h` 에 정의가
@@ -425,10 +425,10 @@ namespace editor
         char buffer[320]{};
         std::snprintf(buffer, sizeof(buffer),
             "\n[AUDIT] theme colors=%zu scalars=%zu differing=%zu"
-            " fontGlobalScale=%.3f preferenceScale=%.3f applied=%d scaleMatch=%d"
+            " fontScaleMain=%.3f preferenceScale=%.3f applied=%d scaleMatch=%d"
             " missingGlyphLabels=%zu\n",
             audit.colors, audit.scalars, audit.colors_differing_from_default,
-            audit.font_global_scale, audit.preference_scale,
+            audit.font_scale_main, audit.preference_scale,
             audit.style_applied ? 1 : 0, audit.scale_matches ? 1 : 0,
             audit.labels_missing_glyphs.size());
         std::string out{ buffer };
@@ -445,17 +445,17 @@ namespace editor
         }
         if (!audit.scale_matches)
         {
-            out += "[AUDIT] 배율 출처가 갈렸다 — io.FontGlobalScale 과 설정값이 다르다\n";
+            out += "[AUDIT] 배율 출처가 갈렸다 — style.FontScaleMain 과 설정값이 다르다\n";
         }
 
-        // 판정에 넣지 않고 적어 두는 것. `io.FontGlobalScale` 은 1.92 에서
-        // obsolete 이고 정식 경로는 `style.FontScaleMain` 이다(계획서 §1.1).
-        // 그 이주는 W1 의 몫이므로 여기서 붉게 만들면 W1 착수 전까지 게이트가
-        // 내내 붉어 도는 세트에 들어갈 수 없다. 판 번호를 같은 줄에 적는다 —
-        // obsolete 여부가 판에 달린 판단이라 근거를 떼어 두지 않는다.
+        // W1 이 obsolete 경로를 걷었다. 배율은 `style.FontScaleMain` 한 군데서만
+        // 나온다. 되돌아가는 길은 `verify-imgui-obsolete-surface.ps1` 이 소스에서
+        // 막는다 — `IMGUI_DISABLE_OBSOLETE_FUNCTIONS` 는 `ImGuiIO` 의 레이아웃을
+        // 바꾸는 매크로라 제품 구성에 켤 수 없다(계획서 §3.2 의 실측). 판 번호를
+        // 같은 줄에 적는다 — 어느 API 가 정식인지가 판에 달린 판단이라 근거를 떼어 두지 않는다.
         out += "[NOTE] imgui " + snapshot.imgui_version +
-               " · 배율이 obsolete io.FontGlobalScale 경로다 — W1 이 "
-               "style.FontScaleMain 으로 이주한다\n";
+               " · 배율은 정식 경로 style.FontScaleMain 에서만 온다"
+               " (obsolete API 는 컴파일 단계에서 꺼 두었다)\n";
         return out;
     }
 

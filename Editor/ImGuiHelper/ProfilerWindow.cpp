@@ -257,7 +257,7 @@ static void DrawProfilerTimeline(const ImVec2& size = ImVec2(0, 0))
 							color.Value = color.Value * ImVec4(1.2f, 1.2f, 1.2f, 1.0f);
 							colorBottom.Value = colorBottom.Value * ImVec4(1.2f, 1.2f, 1.2f, 1.0f);
 							pDraw->AddRectFilledMultiColor(itemRect.Min + padding, itemRect.Max - padding, color, color, colorBottom, colorBottom);
-							pDraw->AddRect(itemRect.Min, itemRect.Max, highlightColor, 0.0f, ImDrawFlags_None, 3.0f);
+							pDraw->AddRect(itemRect.Min, itemRect.Max, highlightColor, 0.0f, 3.0f, ImDrawFlags_None);
 						}
 						else
 						{
@@ -481,8 +481,8 @@ static void DrawProfilerTimeline(const ImVec2& size = ImVec2(0, 0))
 		if (style.DebugMode)
 		{
 			pDraw->PushClipRectFullScreen();
-			pDraw->AddRect(cursorStart, cursorStart + ImVec2(timelineWidth, timelineHeight), ImColor(1.0f, 0.0f, 0.0f), 0.0f, ImDrawFlags_None, 3.0f);
-			pDraw->AddRect(timelineRect.Min, timelineRect.Max, ImColor(0.0f, 1.0f, 0.0f), 0.0f, ImDrawFlags_None, 2.0f);
+			pDraw->AddRect(cursorStart, cursorStart + ImVec2(timelineWidth, timelineHeight), ImColor(1.0f, 0.0f, 0.0f), 0.0f, 3.0f, ImDrawFlags_None);
+			pDraw->AddRect(timelineRect.Min, timelineRect.Max, ImColor(0.0f, 1.0f, 0.0f), 0.0f, 2.0f, ImDrawFlags_None);
 			pDraw->PopClipRect();
 		}
 

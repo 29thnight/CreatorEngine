@@ -114,7 +114,9 @@ namespace editor
         std::vector<std::pair<std::string, float>>         style_scalars;
         std::size_t   colors_differing_from_default{ 0 };
 
-        float         font_global_scale{ 0.f };
+        /// 글자 배율의 **정식 경로**. 1.92 에서 `io.FontGlobalScale` 이
+        /// obsolete 가 됐고 W1 이 여기로 옮겼다.
+        float         font_scale_main{ 0.f };
         float         preference_scale{ 0.f };
 
         std::string   ini_path;
@@ -225,7 +227,7 @@ namespace editor
         std::size_t scalars{ 0 };
         std::size_t colors_differing_from_default{ 0 };
 
-        float font_global_scale{ 0.f };
+        float font_scale_main{ 0.f };
         float preference_scale{ 0.f };
 
         /// 에디터 스타일이 실제로 적용됐는가. ImGui 기본값과 다른 색이 하나도

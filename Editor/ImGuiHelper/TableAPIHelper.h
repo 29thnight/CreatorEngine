@@ -20,7 +20,7 @@ static inline bool DrawAnchorIconButton(const char* id, const math::vector2& aMi
 	ImDrawList* dl = ImGui::GetWindowDrawList();
 	const ImU32 colBase = IM_COL32(170, 170, 170, 255);
 	const ImU32 colSel = IM_COL32(255, 200, 80, 255);
-	dl->AddRect(r.Min, r.Max, selected ? colSel : colBase, 5.f, 0, selected ? 2.f : 1.f);
+	dl->AddRect(r.Min, r.Max, selected ? colSel : colBase, 5.f, selected ? 2.f : 1.f, 0);
 
 	// 좌상(0,1)~우하(1,0) 좌표 변환
 	auto X = [&](float nx) { return ImLerp(r.Min.x + 4, r.Max.x - 4, nx); };
@@ -118,7 +118,7 @@ static inline void DrawAnchorIconVisual(ImDrawList* dl, const ImRect& r,
 	const ImU32 colBase = IM_COL32(170, 170, 170, 255);
 	const ImU32 colSel = IM_COL32(255, 200, 80, 255);
 
-	dl->AddRect(r.Min, r.Max, selected ? colSel : colBase, 5.f, 0, selected ? 2.f : 1.f);
+	dl->AddRect(r.Min, r.Max, selected ? colSel : colBase, 5.f, selected ? 2.f : 1.f, 0);
 
 	auto X = [&](float nx) { return ImLerp(r.Min.x + 4, r.Max.x - 4, nx); };
 	auto Y = [&](float ny) { return ImLerp(r.Max.y - 4, r.Min.y + 4, ny); }; // y: 위가 1, 아래가 0

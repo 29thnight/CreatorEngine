@@ -947,7 +947,7 @@ namespace ConsoleCmd
         data.Set("scalars", CommandData::Int(static_cast<int>(audit.scalars)));
         data.Set("differing",
                  CommandData::Int(static_cast<int>(audit.colors_differing_from_default)));
-        data.Set("fontGlobalScale", CommandData::Double(audit.font_global_scale));
+        data.Set("fontScaleMain", CommandData::Double(audit.font_scale_main));
         data.Set("preferenceScale", CommandData::Double(audit.preference_scale));
         data.Set("styleApplied", CommandData::Bool(audit.style_applied));
         data.Set("scaleMatches", CommandData::Bool(audit.scale_matches));

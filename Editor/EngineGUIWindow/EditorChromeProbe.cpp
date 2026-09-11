@@ -237,7 +237,7 @@ namespace editor
         scalar("WindowTitleAlign.y", style.WindowTitleAlign.y);
 
         const ImGuiIO& io = ImGui::GetIO();
-        snapshot.font_global_scale = io.FontGlobalScale;
+        snapshot.font_scale_main = style.FontScaleMain;
         snapshot.preference_scale  =
             EditorSettingsStore::Get().Preferences().GetImGuiScale();
 

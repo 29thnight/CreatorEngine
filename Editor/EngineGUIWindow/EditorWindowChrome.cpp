@@ -229,16 +229,16 @@ void EditorWindowChrome::DrawTitleBarTail()
                 // 복원 — 겹친 사각 둘로 "원래 크기로"를 표시한다.
                 drawList->AddRect(ImVec2(center.x - glyph, center.y - glyph * 0.6f),
                     ImVec2(center.x + glyph * 0.6f, center.y + glyph),
-                    glyphColor, 0.f, 0, 1.f);
+                    glyphColor, 0.f, 1.f, 0);
                 drawList->AddRect(ImVec2(center.x - glyph * 0.6f, center.y - glyph),
                     ImVec2(center.x + glyph, center.y + glyph * 0.6f),
-                    glyphColor, 0.f, 0, 1.f);
+                    glyphColor, 0.f, 1.f, 0);
             }
             else
             {
                 drawList->AddRect(ImVec2(center.x - glyph, center.y - glyph),
                     ImVec2(center.x + glyph, center.y + glyph),
-                    glyphColor, 0.f, 0, 1.f);
+                    glyphColor, 0.f, 1.f, 0);
             }
             break;
         default:

@@ -447,11 +447,11 @@ void ContentsBrowserWindow::DrawFileTile(ImTextureID iconTexture,
 
 	ImGui::Dummy(ImVec2(0, 8));
 
-	ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont());
+	ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), 0.0f);
 	ImGui::TextWrapped("%s", fileName.c_str());
 	ImGui::PopFont();
 	ImGui::Dummy(ImVec2(0, 2));
-	ImGui::PushFont(EditorAssetPresentation::Get().GetExtraSmallFont());
+	ImGui::PushFont(EditorAssetPresentation::Get().GetExtraSmallFont(), 0.0f);
 	ImGui::TextWrapped("%s", FileTypeToString(fileType));
 	ImGui::PopFont();
 
