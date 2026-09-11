@@ -3,13 +3,23 @@
 #include <vector>
 #include <atomic>
 #include <memory>
+#include <mutex>
+#include <condition_variable>
 #include <windows.h>
 #include <concurrent_queue.h>
 #include "Core.Thread.h"
 #include "Core.CountingSemaphore.h"
 
 // WinAPI 기반 ThreadPool
-// CountingSemaphore + 이벤트 기반 WaitAll() 대기 방식
+// CountingSemaphore + 완료 카운터·조건변수 기반 WaitAll() 대기 방식
+//
+// ★ 배리어 규약: NotifyAllAndWait은 m_taskCounts가 0이 될 때까지 반환하지 않는다.
+//   옛 manual-reset Event 판은 이것을 지키지 못했다. 워커의 SetEvent(카운터가
+//   0이 된 뒤)와 생산자의 ResetEvent(0->1 전이를 본 뒤)가 엇갈리면 직전
+//   배치의 늦은 신호가 새 배치의 리셋을 덮어, 잡이 남았는데도 대기가
+//   즉시 풀렸다(독립 벤치 실측 2.5~5.8%, 배치당 태스크 8개 이상).
+//   AnimationJob의 포즈 커밋 순서와 raw Animator* 수명이 이 불변식 위에 서 있다.
+//   근거: docs/analysis/JobSystemFeasibilityAnalysis.md 10.1절
 
 template<typename TaskType = std::function<void()>>
 class ThreadPool
@@ -24,8 +34,6 @@ public:
         m_taskCounts.store(0);
         m_tasks = std::make_shared<ConcurrentQueue>();
         m_semaphore = std::make_shared<CountingSemaphore>(0);
-
-        m_waitEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr); // manual-reset, non-signaled
 
         m_threads.reserve(m_numThreads);
         for (int i = 0; i < m_numThreads; ++i)
@@ -54,22 +62,12 @@ public:
             if (t)
                 t->Join();
         }
-
-        if (m_waitEvent)
-        {
-            CloseHandle(m_waitEvent);
-            m_waitEvent = nullptr;
-        }
     }
 
     template <class F>
     void Enqueue(F&& f)
     {
-        int prev = m_taskCounts.fetch_add(1, std::memory_order_relaxed);
-
-        // 이전에 작업이 하나도 없었다면(0 -> 1 전이)만 Event 리셋
-        if (prev == 0)
-            ResetEvent(m_waitEvent);
+        m_taskCounts.fetch_add(1, std::memory_order_relaxed);
 
         TaskType task(std::forward<F>(f));
         m_tasks->push(std::move(task));
@@ -79,10 +77,11 @@ public:
 
     void NotifyAllAndWait()
     {
-        if (m_taskCounts.load(std::memory_order_acquire) == 0)
-            return;
-
-        WaitForSingleObject(m_waitEvent, INFINITE);
+        std::unique_lock<std::mutex> lock(m_doneMutex);
+        m_doneCondition.wait(lock, [this]
+        {
+            return m_taskCounts.load(std::memory_order_acquire) == 0;
+        });
     }
 
     int GetThreadCount() const { return m_numThreads; }
@@ -122,10 +121,13 @@ private:
             {
                 task();
 
-                int remaining = m_taskCounts.fetch_sub(1, std::memory_order_release) - 1;
+                int remaining = m_taskCounts.fetch_sub(1, std::memory_order_acq_rel) - 1;
                 if (remaining == 0)
                 {
-                    SetEvent(m_waitEvent); // 모든 작업 완료 시 이벤트 트리거
+                    // 락을 잡고 통지한다. 대기자가 술어를 확인한 뒤 wait에
+                    // 들어가기 전에 여기 도달해도 통지를 놓치지 않는다.
+                    std::lock_guard<std::mutex> lock(m_doneMutex);
+                    m_doneCondition.notify_all();
                 }
             }
         }
@@ -146,7 +148,9 @@ private:
     std::shared_ptr<ConcurrentQueue> m_tasks;
     std::shared_ptr<CountingSemaphore> m_semaphore;
 
-    HANDLE m_waitEvent = nullptr;
+    std::mutex m_doneMutex;
+    std::condition_variable m_doneCondition;
+
     DWORD_PTR m_affinityMask = 0;
     int m_threadPriority = THREAD_PRIORITY_NORMAL;
 
