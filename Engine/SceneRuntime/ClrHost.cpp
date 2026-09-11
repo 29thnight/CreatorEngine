@@ -2709,10 +2709,17 @@ bool ClrHost::Initialize()
 	return true;
 }
 
-bool ClrHost::ReloadScripts()
+ClrHost::ReloadOutcome ClrHost::ReloadScripts()
 {
-	if (!m_ready || nullptr == m_fnReloadScripts) return false;
-	return 0 == m_fnReloadScripts();
+	if (!m_ready || nullptr == m_fnReloadScripts) return ReloadOutcome::Faulted;
+
+	switch (m_fnReloadScripts())
+	{
+	case 0:  return ReloadOutcome::Reloaded;
+	case 1:  return ReloadOutcome::PreviousKept;
+	case 2:  return ReloadOutcome::PreviousLost;
+	default: return ReloadOutcome::Faulted;   // -2: 관리 측 예외(Bootstrap.Report 가 기록)
+	}
 }
 
 bool ClrHost::IsPreviousContextAlive()

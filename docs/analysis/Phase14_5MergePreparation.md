@@ -37,6 +37,9 @@
 충돌 표시 없이 자동 합쳐졌지만 수정이 필요했던 부분도 반영했다.
 `script.reload`의 성공·실패 복구 모두 `RestoreAfterReload()`를 사용하며, 초기화 횟수는
 반복적인 `EnsureInstance()` 호출이 아니라 실제 `OnInitialized()` 진입에서 센다.
+(2026-09-06 정정: 검증 실패로 이전 어셈블리가 **유지**된 경우는 복구를 부르지 않는다 —
+인스턴스가 살아 있는데 복구를 부르면 옆에 두 벌째가 섰다. `ClrHost::ReloadOutcome`이
+유지/소실을 가르고, `PrepareForReload`는 더 이상 id를 끊지 않는다.)
 CLI 생명주기 지표와 Player smoke는 master의 `pendingInitialize`·`pendingSimulation`·`GetComponentTypeNames()`를 사용한다.
 
 ## 통합 후 명령 계약

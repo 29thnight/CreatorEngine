@@ -361,18 +361,27 @@ public static class Bootstrap
 
     /// <summary>
     /// 스크립트 어셈블리를 내렸다 다시 올린다.
-    /// 살아 있던 인스턴스는 전부 사라지므로, 네이티브가 ScriptComponent들을 다시 깨워
-    /// 인스턴스를 만들고 저장해 둔 필드 값을 되돌려야 한다.
+    ///
+    /// 반환값은 <see cref="ScriptAssemblyLoader.ReloadOutcome"/> 의 정수값이다 —
+    /// 0 교체됨 · 1 이전 유지(검증 실패, 인스턴스 그대로) · 2 이전 소실(내린 뒤 실패).
+    /// 예외는 -2. 네이티브 ClrHost::ReloadOutcome 과 **값이 같아야 한다** — 경계를
+    /// 넘는 것은 int 하나라 컴파일러가 불일치를 잡아 주지 않는다.
+    ///
+    /// 교체됐을 때만 인스턴스가 사라진다. 그때 네이티브가 ScriptComponent 들을 다시
+    /// 깨워 인스턴스를 만들고 저장해 둔 필드 값을 되돌린다. 이전을 유지했을 때는
+    /// 아무것도 사라지지 않았으므로 되살릴 것도 없다.
     /// </summary>
     [UnmanagedCallersOnly]
     public static int ReloadScripts()
     {
         try
         {
-            if (!ScriptAssemblyLoader.Reload()) return -1;
-
-            Native.Log(1, $"[ScriptCore] 리로드 완료 — 스크립트 {ScriptFactory.RegisteredCount}종 (세대 {ScriptAssemblyLoader.Generation})");
-            return 0;
+            var outcome = ScriptAssemblyLoader.Reload();
+            if (outcome == ScriptAssemblyLoader.ReloadOutcome.Reloaded)
+            {
+                Native.Log(1, $"[ScriptCore] 리로드 완료 — 스크립트 {ScriptFactory.RegisteredCount}종 (세대 {ScriptAssemblyLoader.Generation})");
+            }
+            return (int)outcome;
         }
         catch (Exception ex) { Report(ex, nameof(ReloadScripts)); return -2; }
     }

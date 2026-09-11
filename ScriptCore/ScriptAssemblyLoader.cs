@@ -261,14 +261,37 @@ internal static class ScriptAssemblyLoader
         GC.WaitForPendingFinalizers();
     }
 
+    /// <summary>
+    /// <see cref="Reload"/> 의 결과. 실패를 둘로 가른다 — 호출자가 그 뒤에 할 일이
+    /// 정반대이기 때문이다.
+    ///
+    /// <list type="bullet">
+    /// <item><see cref="PreviousKept"/> — 검증에서 떨어져 **아무것도 바뀌지 않았다**.
+    /// 살아 있던 인스턴스는 그대로 살아 있다. 호출자는 손대면 안 된다 — 여기서
+    /// 인스턴스를 다시 만들면 옛 것 옆에 두 벌째가 선다(2026-09-06 실측).</item>
+    /// <item><see cref="PreviousLost"/> — 이전 컨텍스트를 내린 뒤 새 것이 올라가지
+    /// 못했다. 인스턴스는 전부 사라졌고 어셈블리도 없다. 호출자가 되살릴 수 있는
+    /// 것은 없지만, 적어도 죽은 id 를 쥐고 있으면 안 된다.</item>
+    /// </list>
+    ///
+    /// 네이티브 ClrHost::ReloadOutcome 과 **값이 같아야 한다** — 경계를 넘는 것은
+    /// int 하나라 컴파일러가 불일치를 잡아 주지 않는다.
+    /// </summary>
+    public enum ReloadOutcome
+    {
+        Reloaded = 0,
+        PreviousKept = 1,
+        PreviousLost = 2,
+    }
+
     /// <summary>내렸다가 다시 올린다. 경로는 마지막에 쓴 것을 재사용한다.</summary>
-    public static bool Reload()
+    public static ReloadOutcome Reload()
     {
         string? path = _assemblyPath;
         if (path is null)
         {
             Native.Log(2, "[ScriptCore] 로드한 적이 없어 리로드할 수 없습니다.");
-            return false;
+            return ReloadOutcome.PreviousKept;   // 손댄 것이 없다
         }
 
         // ★ 갈아 끼우기 **전에** 새 것이 올라가는지 확인한다.
@@ -276,10 +299,13 @@ internal static class ScriptAssemblyLoader
         //   예전에는 `Unload(); Load();` 였다. 새 어셈블리가 깨져 있으면 이전
         //   것은 이미 사라진 뒤라 에디터에 스크립트가 하나도 남지 않았다.
         //   검증이 실패하면 여기서 멈추므로 이전 어셈블리는 그대로다.
-        if (!Validate(path)) return false;
+        //
+        //   그것을 결과로도 낸다. `false` 하나로 뭉개면 호출자는 "내려갔는지"를
+        //   알 수 없고, 모르면 되살리려 든다 — 살아 있는 것 옆에.
+        if (!Validate(path)) return ReloadOutcome.PreviousKept;
 
         Unload();
-        return Load(path);
+        return Load(path) ? ReloadOutcome.Reloaded : ReloadOutcome.PreviousLost;
     }
 
     /// <summary>

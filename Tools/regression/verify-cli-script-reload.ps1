@@ -25,6 +25,28 @@ param(
 #
 # LC7 이 갈아 끼우기 **전에** 버리는 컨텍스트에서 새 어셈블리를 검증하도록 고쳤다.
 #
+# ── 둘째 결함 (2026-09-06 실측) — 실패가 인스턴스를 두 벌로 만든다 ─────────
+#
+# 위 고침이 "이전 어셈블리를 지킨다"를 세운 뒤, CLI 쪽이 그 전제를 따라가지
+# 않았다. Cmd_script_reload 는 리로드 **전에** 전 스크립트의 인스턴스 id 를 끊어
+# 두는데(PrepareForReload — "관리 측이 통째로 내려가므로"), 검증 실패로 관리 측이
+# 내려가지 **않으면** 옛 인스턴스는 그대로 살아 있고, 복원이 그 옆에 새 것을 하나
+# 더 만들었다. 재생 중이면 그때부터 틱이 두 벌 돈다 — 입력이 두 번 처리되고
+# 코루틴이 두 벌 돈다. 옛 것은 아무도 거두지 않는다(소유자가 살아 있어
+# SweepOrphans 도 못 잡는다).
+#
+# 이 게이트가 그것을 못 본 이유: "실패했는가 · 이전 어셈블리를 지켰다고 보고하는가
+# · 실패 뒤에도 붙는가"만 보고, **붙어 있던 것이 몇 벌인지**는 세지 않았다.
+# 관측은 이미 있었다 — script.status 가 컴포넌트마다 instanceId 를 내고 재생 중에는
+# activeScripts(관리 측 _active.Count)를 낸다. 쓰지 않았을 뿐이다.
+#
+# 그래서 두 축을 더한다:
+#   identity-after-failure   편집 모드 — 실패 뒤 같은 컴포넌트의 instanceId 가 그대로다
+#   single-after-failure     재생 중   — 실패 뒤 activeScripts 와 identity 가 그대로다
+#
+# 편집 모드에서는 activeScripts 가 갱신되지 않는다(FlushRegistrations 가
+# TickSimulationFrame 안에 있다). 그래서 편집 축은 identity 로, 재생 축은 둘 다로 잰다.
+#
 # ── 이 게이트가 스스로를 검사한다 ───────────────────────────────────────
 #
 # 핵심 단정은 "리로드 실패 뒤에도 스크립트가 붙는다" 이고, 그것이 뜻을 가지려면
@@ -91,6 +113,29 @@ try {
         return Send ('{"command":"script.add","args":["' + $ObjectName + '","Bobber"],"mode":"sync"}')
     }
 
+    # ── 0) 프레임 루프가 살아 있는지 먼저 확인한다 ──────────────────────
+    #
+    #   endpoint.json 이 생긴 것은 서비스 스레드가 떴다는 뜻이지 게임 스레드가
+    #   프레임을 돌린다는 뜻이 아니다. Debug 에디터는 첫 프레임까지 몇 초가
+    #   걸리고(셰이더·자산 로드), 그 사이의 sync 명령은 waitedFrames=0 으로
+    #   5000ms 타임아웃을 낸다 — 2026-09-06 실측: object.create 와 script.add 가
+    #   그렇게 죽고 script.status 는 3프레임 뒤 성공했다. 그러면 baseline-attach 는
+    #   "붙지 않았다"가 아니라 "묻기 전에 물었다"인데, 아래 판정은 그 둘을 못 가른다.
+    #
+    #   그래서 첫 명령 전에 값싼 명령이 succeeded 로 돌아올 때까지 기다린다.
+    $ready = $false
+    $readyDeadline = (Get-Date).AddSeconds($BootTimeoutSec)
+    while ((Get-Date) -lt $readyDeadline) {
+        $probe = Send '{"command":"script.status","mode":"sync","timeoutMs":5000}'
+        if ($probe.status -eq 'succeeded') { $ready = $true; break }
+        Start-Sleep -Milliseconds 500
+    }
+    "{0,-26} ready={1}" -f 'frame-loop', $ready
+    if (-not $ready) {
+        $failures.Add("frame-loop : $BootTimeoutSec 초 안에 게임 스레드가 명령을 실행하지 못했다 — 아래 검사가 전부 무의미하다")
+        throw "프레임 루프가 서지 않았다"
+    }
+
     # ── 1) 기준: 손대기 전에는 붙는다 ───────────────────────────────────
     $before = Attach 'ReloadProbeBefore'
     "{0,-26} status={1} id={2}" -f 'baseline-attach', $before.status, $before.data.instanceId
@@ -116,6 +161,24 @@ try {
         $failures.Add('reload-fails : previousAssemblyKept 가 참이 아니다 — 이전 어셈블리를 지켰다고 보고하지 않는다')
     }
 
+    # ── 2b) 실패가 살아 있던 인스턴스를 건드리지 않는다 (identity) ─────────
+    #
+    #   가르는 축은 identity 다. 실패 뒤 같은 컴포넌트의 instanceId 가 리로드 전과
+    #   같아야 한다. 달라졌다면 새 인스턴스가 만들어진 것이고 — 이전 어셈블리는
+    #   그대로인데 — 옛 것은 관리 측에 산 채로 남는다.
+    $st1 = Send '{"command":"script.status","mode":"sync"}'
+    $probe1 = @($st1.data.components | Where-Object owner -eq 'ReloadProbeBefore')
+    $probe1Id = if ($probe1.Count -ge 1) { $probe1[0].instanceId } else { '(없음)' }
+    "{0,-26} count={1} id={2} (before={3})" -f 'identity-after-failure', $probe1.Count, $probe1Id, $before.data.instanceId
+    if ($probe1.Count -ne 1) {
+        $failures.Add("identity-after-failure : ReloadProbeBefore 의 ScriptComponent 가 $($probe1.Count) 개다(기대 1)")
+    }
+    elseif ($probe1[0].instanceId -ne $before.data.instanceId) {
+        $failures.Add(("identity-after-failure : 실패한 리로드가 인스턴스를 바꿨다 " +
+            "(before=$($before.data.instanceId) after=$($probe1[0].instanceId)) — 이전 어셈블리는 그대로인데 " +
+            "새 인스턴스를 만들었고, 옛 것은 관리 측에 산 채로 남는다"))
+    }
+
     # ── 3) 핵심: 실패 뒤에도 이전 어셈블리로 스크립트가 붙는다 ──────────
     $after = Attach 'ReloadProbeAfter'
     "{0,-26} status={1} id={2}" -f 'attach-after-failure', $after.status, $after.data.instanceId
@@ -131,6 +194,63 @@ try {
         'reload-recovers', $good.status, $good.data.restored, $good.data.total
     if ($good.status -ne 'succeeded') {
         $failures.Add("reload-recovers : 정상 어셈블리로도 리로드가 안 된다(status=$($good.status) code=$($good.code))")
+    }
+
+    # ── 4b) 재생 중 실패 — 틱 목록이 두 벌이 되지 않는다 ────────────────
+    #
+    #   편집 모드의 identity 판정은 "새 인스턴스가 섰다"까지만 본다. 재생 중이면
+    #   그 새 인스턴스가 진입 단계를 다 받고 틱 목록에 오르므로 **활성 스크립트
+    #   수가 곧 벌 수**다 — activeScripts 는 관리 측 _active.Count 이고 Pre/Post
+    #   틱이 그 목록을 돈다. 두 벌이면 입력이 두 번 처리되고 코루틴이 두 벌 돈다.
+    #
+    #   activeScripts 는 재생 중에만 갱신된다. 그래서 이 판정은 재생 안에서만 뜻이
+    #   있고, 편집 모드는 위 2b 의 identity 축이 맡는다.
+    $playResult = Send '{"command":"play","mode":"sync","timeoutMs":60000}' 60
+    "{0,-26} status={1}" -f 'play', $playResult.status
+    if ($playResult.status -ne 'succeeded') {
+        $failures.Add("play : 재생에 들어가지 못했다(status=$($playResult.status) code=$($playResult.code)) — 4b 전체가 무의미하다")
+    }
+    else {
+        Start-Sleep -Milliseconds 1500
+        $st2 = Send '{"command":"script.status","mode":"sync"}'
+        $activeBefore = [int]$st2.data.activeScripts
+        $idsBefore = @($st2.data.components | ForEach-Object { "$($_.owner)=$($_.instanceId)" } | Sort-Object)
+        "{0,-26} active={1} ids={2}" -f 'play-baseline', $activeBefore, ($idsBefore -join ',')
+        if ($activeBefore -lt 1) {
+            $failures.Add("play-baseline : 재생 중인데 활성 스크립트가 $activeBefore 개다 — 아래 판정이 무의미하다")
+        }
+
+        Set-Content -LiteralPath $scriptDll -Value 'not a managed assembly' -Encoding ASCII
+        $reload2 = Send '{"command":"script.reload","mode":"sync","timeoutMs":50000}'
+        "{0,-26} status={1} code={2} kept={3}" -f 'reload-fails-in-play', $reload2.status, $reload2.code, $reload2.data.previousAssemblyKept
+        if ($reload2.status -eq 'succeeded') {
+            $failures.Add('reload-fails-in-play : 깨진 어셈블리로 리로드가 성공했다 — 손상이 먹히지 않았고 아래 판정은 무의미하다')
+        }
+
+        Start-Sleep -Milliseconds 1500
+        $st3 = Send '{"command":"script.status","mode":"sync"}'
+        $activeAfter = [int]$st3.data.activeScripts
+        $idsAfter = @($st3.data.components | ForEach-Object { "$($_.owner)=$($_.instanceId)" } | Sort-Object)
+        "{0,-26} active={1} ids={2}" -f 'single-after-failure', $activeAfter, ($idsAfter -join ',')
+        if ($activeAfter -ne $activeBefore) {
+            $failures.Add(("single-after-failure : 실패한 리로드 뒤 활성 스크립트가 $activeBefore -> $activeAfter 다 — " +
+                "옛 인스턴스가 살아 있는 채로 새 인스턴스가 틱 목록에 올랐다. 스크립트가 두 벌 돈다"))
+        }
+        if (($idsAfter -join ',') -ne ($idsBefore -join ',')) {
+            $failures.Add("single-after-failure : 재생 중 실패한 리로드가 인스턴스 identity 를 바꿨다 ($($idsBefore -join ',') -> $($idsAfter -join ','))")
+        }
+
+        # 되돌리면 재생 중에도 정상 리로드가 된다(진입 단계 복원은 verify-lifecycle-reload 의 QQ 가 잰다).
+        Copy-Item -LiteralPath $backup -Destination $scriptDll -Force
+        $good2 = Send '{"command":"script.reload","mode":"sync","timeoutMs":50000}'
+        "{0,-26} status={1} restored={2}/{3}" -f 'reload-recovers-in-play', $good2.status, $good2.data.restored, $good2.data.total
+        if ($good2.status -ne 'succeeded') {
+            $failures.Add("reload-recovers-in-play : 재생 중 정상 어셈블리로도 리로드가 안 된다(status=$($good2.status) code=$($good2.code))")
+        }
+        $stopResult = Send '{"command":"stop","mode":"sync","timeoutMs":60000}' 60
+        if ($stopResult.status -ne 'succeeded') {
+            $failures.Add("stop : 재생을 끝내지 못했다(status=$($stopResult.status))")
+        }
     }
 
     # ── 5) 이전 컨텍스트 잔존은 script.status 가 답한다 ─────────────────
@@ -173,5 +293,5 @@ if ($failures.Count -gt 0) {
     $failures | ForEach-Object { "  - $_" }
     exit 1
 }
-"스크립트 리로드 계약 통과 — 실패가 이전 어셈블리를 지우지 않는다"
+"스크립트 리로드 계약 통과 — 실패가 이전 어셈블리를 지우지 않고, 살아 있던 인스턴스를 두 벌로 만들지도 않는다"
 exit 0

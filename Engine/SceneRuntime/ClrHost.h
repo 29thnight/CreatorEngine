@@ -349,10 +349,19 @@ public:
 
 	// ── 스크립트 어셈블리 핫리로드 ──
 	//
-	// 게임 스크립트만 언로드 가능한 컨텍스트에 올라간다. 리로드하면 살아 있던 인스턴스가
+	// 게임 스크립트만 언로드 가능한 컨텍스트에 올라간다. 교체되면 살아 있던 인스턴스가
 	// 전부 사라지므로, 호출자가 ScriptComponent들을 다시 깨워 인스턴스를 만들고
-	// 저장해 둔 필드 값을 되돌려야 한다(ScriptComponent::Awake가 그 일을 한다).
-	bool ReloadScripts();
+	// 저장해 둔 필드 값을 되돌려야 한다(ScriptComponent::RestoreAfterReload).
+	//
+	// 실패를 둘로 가른다 — 호출자가 그 뒤에 할 일이 정반대이기 때문이다.
+	//   PreviousKept  검증에서 떨어져 아무것도 바뀌지 않았다. 인스턴스는 그대로
+	//                 살아 있다. **손대면 안 된다** — 여기서 되살리면 옛 것 옆에
+	//                 두 벌째가 서고, 재생 중이면 틱이 두 벌 돈다(2026-09-06 실측).
+	//   PreviousLost  내린 뒤 새 것이 올라가지 못했다. 인스턴스도 어셈블리도 없다.
+	//   Faulted       호스트가 준비되지 않았거나 관리 측이 던졌다.
+	// 관리 Bootstrap.ReloadScripts 의 반환값(0·1·2)과 **값이 같아야 한다**.
+	enum class ReloadOutcome { Reloaded = 0, PreviousKept = 1, PreviousLost = 2, Faulted = 3 };
+	ReloadOutcome ReloadScripts();
 
 	// 이전 컨텍스트가 아직 살아 있는가(참조 누수 진단).
 	bool IsPreviousContextAlive();

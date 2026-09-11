@@ -964,7 +964,9 @@ namespace ConsoleCmd
         Scene* scene = SceneManagers->GetActiveScene();
         std::vector<ScriptComponent*> scripts;
 
-        // 1) 값을 챙기고 인스턴스 참조를 끊는다. 하나라도 남으면 언로드가 실패한다.
+        // 1) 값을 챙긴다. 인스턴스 id 는 여기서 끊지 않는다 — 리로드가 검증에서
+        //    떨어져 아무것도 바꾸지 않고 돌아올 수 있고, 그때 옛 인스턴스는 살아 있다
+        //    (ScriptComponent::PrepareForReload 주석). 끊는 것은 결과를 안 뒤다.
         if (scene)
         {
             for (const auto& object : scene->m_Entities)
@@ -981,17 +983,71 @@ namespace ConsoleCmd
         }
 
         // 2) 어셈블리 교체
-        if (!clr.ReloadScripts())
-        {
-            Debug->LogError("[스크립트] 리로드 실패");
-            std::printf("[CLI] 리로드 실패\n");
+        //
+        //   결과가 셋이다 — 교체됨 · 이전 유지 · 이전 소실. 실패 둘을 가르는 이유는
+        //   그 뒤에 할 일이 정반대여서다. 이전이 **유지**됐으면 인스턴스가 살아
+        //   있으니 손대면 안 되고, **소실**됐으면 죽은 id 라도 정리해야 한다.
+        const ClrHost::ReloadOutcome outcome = clr.ReloadScripts();
 
-            // ★ 실패해도 **이전 어셈블리는 그대로다**(LC7).
+        if (ClrHost::ReloadOutcome::PreviousKept == outcome)
+        {
+            Debug->LogError("[스크립트] 리로드 실패 — 이전 어셈블리를 유지한다");
+            std::printf("[CLI] 리로드 실패 (이전 어셈블리 유지)\n");
+
+            // ★ 실패해도 **이전 어셈블리는 그대로다**(LC7) — 그리고 **인스턴스도**.
             //
             //   관리 쪽 `Reload()` 가 갈아 끼우기 전에 새 것을 버리는 컨텍스트에서
-            //   검증한다. 예전에는 `Unload(); Load();` 라 실패하면 스크립트가 하나도
-            //   남지 않았고, 그 상태를 호출자가 알 방법도 없었다. 이제 실패는
-            //   실패로만 끝나고, 끊어 둔 인스턴스는 아래에서 되살린다.
+            //   검증한다. 검증에서 떨어지면 관리 측은 아무것도 내리지 않았고, 살아
+            //   있던 인스턴스는 살아 있다. 여기서 되살리면 안 된다 — 예전에는 이
+            //   자리에서 RestoreAfterReload 를 돌렸고, 그것이 옛 인스턴스 옆에
+            //   **두 벌째**를 세웠다(2026-09-06 실측 · verify-cli-script-reload 의
+            //   identity-after-failure · single-after-failure). PrepareForReload 는
+            //   이제 id 를 끊지 않으므로 되돌릴 것도 없다.
+            //
+            //   `restored` 를 내지 않는다. 되살린 것이 없는데 "복원 N/N" 을 내면
+            //   그것이 곧 거짓 보고다 — 대신 손대지 않은 수를 `intact` 로 낸다.
+            CommandCore::CommandData failData = CommandCore::CommandData::Object();
+            failData.Set("intact", CommandCore::CommandData::Int(
+                static_cast<int64_t>(scripts.size())));
+            failData.Set("total", CommandCore::CommandData::Int(
+                static_cast<int64_t>(scripts.size())));
+            failData.Set("previousAssemblyKept", CommandCore::CommandData::Bool(true));
+            return CommandCore::Fail("script.reload_failed",
+                "새 어셈블리를 올리지 못했다 — 이전 어셈블리를 유지한다",
+                std::move(failData));
+        }
+
+        if (ClrHost::ReloadOutcome::Faulted == outcome)
+        {
+            // 관리 측이 던졌다 — 어디서 던졌는지에 따라 인스턴스가 살아 있을 수도
+            // 사라졌을 수도 있다. **모르면 손대지 않는다.** 살아 있는데 되살리면
+            // 두 벌이 되고(이 고침이 닫은 바로 그 결함), 사라졌는데 안 되살리면
+            // 다음 성공 리로드가 RestoreAfterReload 로 죽은 id 를 버리고 다시 만든다.
+            // 앞은 성공 리로드 전까지 틱이 두 벌 돌고, 뒤는 스크립트가 죽어 있다 —
+            // 둘 다 나쁘지만 뒤는 로그가 소리를 내고 앞은 내지 않는다.
+            Debug->LogError("[스크립트] 리로드 실패 — 관리 측 예외(Bootstrap.Report 참고). 인스턴스는 손대지 않았다");
+            std::printf("[CLI] 리로드 실패 (관리 측 예외 — 인스턴스 미변경)\n");
+
+            CommandCore::CommandData failData = CommandCore::CommandData::Object();
+            failData.Set("total", CommandCore::CommandData::Int(
+                static_cast<int64_t>(scripts.size())));
+            failData.Set("instancesTouched", CommandCore::CommandData::Bool(false));
+            return CommandCore::Fail("script.reload_faulted",
+                "리로드 중 관리 측이 예외를 던졌다 — 인스턴스는 손대지 않았다. 다시 리로드하라",
+                std::move(failData));
+        }
+
+        if (ClrHost::ReloadOutcome::PreviousLost == outcome)
+        {
+            // 이전 컨텍스트를 내린 뒤 새 것이 올라가지 못했다. 인스턴스는 전부
+            // 사라졌고 어셈블리도 없다. 되살릴 수 있는 것은 없지만 죽은 id 를 쥐고
+            // 있으면 안 된다 — 그러면 HasInstance 가 참이라 다음 리로드의
+            // EnsureInstance 가 조용히 건너뛰고 스크립트가 영구히 죽는다.
+            // RestoreAfterReload 가 id 를 버리고 다시 만들어 보되, 어셈블리가 없으니
+            // 여기서 되는 것은 0 이 정상이다.
+            Debug->LogError("[스크립트] 리로드 실패 — 이전 어셈블리를 내린 뒤 새 것을 올리지 못했다");
+            std::printf("[CLI] 리로드 실패 (이전 어셈블리 소실)\n");
+
             int recovered = 0;
             for (ScriptComponent* script : scripts)
             {
@@ -1003,9 +1059,9 @@ namespace ConsoleCmd
             failData.Set("restored", CommandCore::CommandData::Int(recovered));
             failData.Set("total", CommandCore::CommandData::Int(
                 static_cast<int64_t>(scripts.size())));
-            failData.Set("previousAssemblyKept", CommandCore::CommandData::Bool(true));
+            failData.Set("previousAssemblyKept", CommandCore::CommandData::Bool(false));
             return CommandCore::Fail("script.reload_failed",
-                "새 어셈블리를 올리지 못했다 — 이전 어셈블리를 유지한다",
+                "새 어셈블리를 올리지 못했고 이전 어셈블리도 이미 내렸다",
                 std::move(failData));
         }
 
