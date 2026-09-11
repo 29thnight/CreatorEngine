@@ -8,7 +8,7 @@
 - 셸 크롬 착지: 2026-09-10 — s&box 배치·ImGui 제목표시줄·다크 스킨이 W3보다 앞서 섰다.
   기록과 남은 창 선언 계약은 **부록 B**. 이 착지가 §1.1·§1.2·§1.4의 일부를 닫았고
   §1.3의 표시 상태 저장소 수를 정정했다.
-- 상태: 부록 A M0~M2 착지(done) · 부록 B M3~M4 착지(done) · W0~W8 구현 미착수
+- 상태: 부록 A M0~M2 착지(done) · 부록 B M3~M4 착지(done) · **W0 착지(done)** · W1~W8 미착수
 - 방향: **Dear ImGui 유지 · S&Box 테마 토큰 이식 · 소수 전용 위젯만 custom draw**
 범위: Editor chrome, theme, tool window, docking, workspace, ViewportHost, Play 표시·입력 전환, 회귀 검증
 
@@ -845,13 +845,26 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 - ~~`ImGuiRegister`의 창 순회를 결정적 순서로 바꾼다(§1.3-4).~~ **(M4가 먼저 했다.)** 펌프가
   은퇴하고 순회가 선언 순서의 `std::vector`가 됐다. 도크 노드 순회도 결정적이다 — `ImGuiStorage`가
   키로 정렬돼 있어 뿌리에서 재귀로 내려가지 않고 그 맵을 훑는다(떠 있는 노드도 놓치지 않는다).
-- 현재 `imgui.ini` 4벌을 fixture로 고정한다(§1.4) — 정본 2, 유물 2. Content Browser 이중 entry가
-  들어 있는 실물을 그대로 쓴다.
-- 핵심 window title/flags, open state inventory를 고정한다. `PushStyleColor/Var` 91건의 위치
-  목록을 W1 입력으로 남긴다.
-- 1920×1080/2560×1440, user scale 100%/150%의 shell screenshot을 캡처한다. **DPI 경로가 없으므로
-  (§3.2) 이 캡처는 "user scale"임을 명시하고, 진짜 DPI 캡처는 W1 이후로 미룬다.**
-- Editor UI CPU, ImGui vertices/indices/draw commands, target별 GPU ms를 기록한다.
+- ~~현재 `imgui.ini` 4벌을 fixture로 고정한다(§1.4).~~ **(2026-09-11 착지 — 여섯.)**
+  `Tools/regression/fixtures/imgui-ini/`. 막고 있던 것은 `Bin/`이 아니라 **전면 `*.ini`**
+  (`.gitignore:511`)였고, 그래서 실물 넷이 전부 한 기계의 디스크에만 있었다. 손상본을 둘로
+  나눴다 — 처음 만든 절단본이 아무것도 부수지 못했기 때문이다(ImGui가 각 `[Window]`에
+  `DockId=`를 따로 적어 트리가 잘려도 소속을 복원한다). 게이트가 여섯을 태운다.
+- ~~핵심 window title/flags, open state inventory를 고정한다. `PushStyleColor/Var` 91건의 위치
+  목록을 W1 입력으로 남긴다.~~ **(2026-09-11 착지.)** `docs/analysis/EditorWorkspaceW0Baseline.md`.
+  **91건은 M3 이전 수이고 지금은 57건이다**(아래 W1에 반영했다).
+- ~~1920×1080/2560×1440, user scale 100%/150%의 shell screenshot을 캡처한다.~~
+  **(2026-09-11 착지.)** `docs/analysis/images/w0-shell/`. 예고한 대로 user scale 캡처이고 진짜
+  DPI 캡처는 W1 뒤다. **캡처가 미결 건 둘을 드러냈다** — ⑴ 시작 창 크기를 고를 수 없다
+  (`App.cpp:100-101` 하드코딩, 설정의 `lastWindowSize`는 **읽는 코드가 없는 죽은 키**),
+  ⑵ 런타임 리사이즈가 배치를 재배열하고 뷰포트를 검게 만든다. 그래서 **이 넷은 visual
+  golden이 아니다** — W8이 golden을 뜰 때 위 둘이 먼저 닫혀 있어야 한다.
+- ~~Editor UI CPU, ImGui vertices/indices/draw commands, target별 GPU ms를 기록한다.~~
+  **(2026-09-11 부분 착지.)** 앞의 둘은 `editor.dock`이 낸다(Release 표본 열둘: 정점 2,978 ·
+  인덱스 7,071 · draw command 13, UI CPU 중앙값 1.90 ms). **target별 GPU ms는 잴 수단이
+  저장소에 없다** — GPU 타임스탬프 질의 표면이 0이고 `profile.stats`는 프로파일러의 건강
+  상태이지 구간 시간이 아니다. 추정치로 채우지 않고 **W4로 넘겼다**(그 수를 실제로 쓰는
+  판정이 거기 있다).
 - ~~`verify-editor-workspace.ps1` canary를 만든다.~~ **(2026-09-11 착지.)** 선언 게이트와 **파일을
   나눴다** — 뜨는 상태가 다르기 때문이다. 선언 게이트는 개발자의 평소 상태에서 한 번 띄워 표를
   보고, 이쪽은 W0 후반에 ini fixture 네 벌과 재시작·손상 ini를 태우므로 준비된 상태로 여러 번
@@ -913,8 +926,10 @@ id 가 둘이어야 하는데, 그것은 `editor.windows` 의 `duplicateIds` 가
 - `EditorThemeTokens`와 `ApplyEditorTheme`를 추가한다.
 - Inter/font fallback과 Font Awesome atlas build를 editor resource로 옮긴다.
   `IconsFontAwesome4.h`/`6.h` 공존을 정리한다(§1.10).
-- literal `PushStyleColor/Var` inventory **91건**을 semantic token 또는 명시적 exception으로
-  정리한다. 48건이 `MenuBarWindow.cpp`에 몰려 있으므로 그 파일을 먼저 친다.
+- literal `PushStyleColor/Var` inventory를 semantic token 또는 명시적 exception으로 정리한다.
+  **(2026-09-11 재계수 — 91건이 아니라 57건이다.)** M3이 메뉴 행을 표로 옮기며 창별 예외가
+  줄었다. Color 31 + Var 26이고 `MenuBarWindow.cpp`의 몫은 48이 아니라 **20**이다 — 여전히
+  최대지만 전체의 35%다. 파일별 표는 `docs/analysis/EditorWorkspaceW0Baseline.md` §2에 있다.
 - **`io.FontGlobalScale`을 걷고 `style.FontScaleMain` / `FontScaleDpi`로 이주한다**(§3.2).
   `ScaleAllSizes`는 geometry에만 적용해 현재의 이중 적용을 끊는다.
 - Win32 DPI awareness와 `io.ConfigDpiScaleFonts` 채택 여부를 판정하고, 채택하면
@@ -1063,12 +1078,13 @@ W2 + W5 + W6 + W7 → W8
 M0 → M1 → M2          (부록 A. 2026-09-11 셋 다 착지)
 M1 ──────→ W3         (Window 메뉴 재열기 계약의 선행. 선행 충족)
 M2 ──────→ W0 canary  (여섯째 관측 커맨드 editor.menu를 승계한다. 그 커맨드는 섰다)
-W0 전반 ─→ W1·W3      (2026-09-11 착지. 관측 다섯과 크롬 게이트가 섰다)
+W0 ──────→ W1·W3      (2026-09-11 전량 착지. 관측 다섯 · 크롬 게이트 · fixture 여섯 · 기준선)
 W5 ──────→ editor.viewport  (읽을 committed·input owner 신호를 W5가 만든다. §1.9)
 
 M3 ──────→ M4 → W3    (부록 B. M3 착지 완료. M4가 창 선언을 세우고 W3이 그 위에 ID를 얹는다)
-M3 ──────→ W0 golden  (기준선을 새 chrome으로 뜬다 — 옛 배치의 골든은 뜨자마자 폐기된다)
-M3 ──────→ W1 재계수  (창별 예외 91건에서 메뉴 행 몫이 빠졌다. 기준값을 다시 센다)
+M3 ──────→ W0 기준선  (2026-09-11 떴다. 다만 **골든은 아니다** — 시작 크기와 리사이즈가
+                       닫히기 전의 그림이라 W8이 다시 뜬다)
+M3 ──────→ W1 재계수  (2026-09-11 다시 셌다. 91 → 57. W1 항목에 반영)
 ```
 
 **권장 착수 순서(2026-09-10).** 의존만 보면 여러 배열이 가능하지만, 아래 순서가 같은 파일을 두 번
@@ -1081,7 +1097,7 @@ M3 ──────→ W1 재계수  (창별 예외 91건에서 메뉴 행 몫
 | 2 | **M0 — 선언 어휘와 목록 배관 (착지 완료)** | 새 폴더뿐이라 동작 변화 0. 1과 파일을 공유하지 않아 **병행 가능** |
 | 3 | **M1 — registry와 그리기 배선 (착지 완료)** | 메뉴 구조를 바꾸는 마지막 슬라이스. 빈 뿌리를 그리지 않으므로(부록 A.6) 픽셀 중립이고, **W1보다 먼저** 두어야 `MenuBarWindow.cpp` 2,716줄을 구조와 토큰으로 두 번 헤집지 않는다 |
 | 4 | **M2 — 게이트와 `editor.menu` (착지 완료)** | M1의 표가 있어야 덤프할 것이 생긴다. W0 canary가 쓸 여섯째 커맨드를 여기서 낸다 |
-| 5 | **W0 후반** — ini fixture 4벌 · inventory · screenshot · 성능 기준선 · canary | chrome이 최종 구조가 된 뒤 **golden을 한 번만 뜬다.** canary가 dock 불변식과 메뉴 불변식을 함께 단정할 수 있다 |
+| 5 | **W0 후반 — fixture · inventory · screenshot · 성능 기준선 (착지 완료)** | "golden을 한 번만 뜬다"는 전제가 **틀렸다.** 시작 창 크기를 고를 수 없고(`App.cpp` 하드코딩) 런타임 리사이즈가 배치를 재배열하므로, 여기서 뜬 캡처는 골든이 될 수 없다. 기준선으로만 남기고 golden은 W8이 뜬다. fixture는 예상대로 여섯 벌 다 게이트에 물렸다 |
 | 5.5 | **M4** — 창 선언(부록 B.3) | M3이 셸에 프레임 소유를 준 뒤라야 선언에 담을 것이 정해진다. W3보다 **먼저**여야 한다 — W3의 안정 ID는 선언의 한 필드가 되고, 표시 상태 저장소 셋을 합치는 자리도 여기다. W0 후반 골든 뒤에 두어 골든을 두 번 뜨지 않는다 |
 | 6~ | W1 → W2, W3 → W4 → W5·W6, W7, W8 | §9·§10의 기존 의존 그대로. W3의 선행인 M1·M4는 이미 끝나 있다 |
 
