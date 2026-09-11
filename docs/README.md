@@ -77,6 +77,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [RectTransformAnalysis.html](analysis/RectTransformAnalysis.html) | RectTransform |
 | [RendererPortingLog.html](analysis/RendererPortingLog.html) | 렌더러 포팅 이력 |
 | [EditorMenuSurfaceAndPhase21Preflight.md](analysis/EditorMenuSurfaceAndPhase21Preflight.md) | 에디터 메뉴 표면 CLI↔GUI 대조 · 메뉴 확장성 · PHASE 21 재정찰(2026-09-10) |
+| [EditorWidgetInheritanceW2.md](analysis/EditorWidgetInheritanceW2.md) | PHASE 21 W2 승계 결정표 확정 — ImGuiHelper 자산의 소비자 실측(2026-09-11) |
 
 ## 문서를 추가할 때
 
