@@ -369,9 +369,6 @@
     <ClInclude Include="ImGuiHelper\HorizontalLayout.h">
       <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
     </ClInclude>
-    <ClInclude Include="ImGuiHelper\IconsFontAwesome4.h">
-      <Filter>ImGuiHelper\소스 파일\fonts</Filter>
-    </ClInclude>
     <ClInclude Include="ImGuiHelper\IconsFontAwesome6.h">
       <Filter>ImGuiHelper\소스 파일\fonts</Filter>
     </ClInclude>

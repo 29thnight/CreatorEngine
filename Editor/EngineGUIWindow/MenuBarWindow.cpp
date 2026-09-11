@@ -94,6 +94,12 @@ std::string WordWrapText(const std::string& input, size_t maxLineLength)
 MenuBarWindow::MenuBarWindow()
 {
     ImGuiIO& io = ImGui::GetIO();
+    // 범위가 FA6 의 것인지 컴파일 시점에 못 박는다 — 이유는
+    // `EditorRenderer::AddEditorFonts` 의 같은 단정에 적혀 있다.
+    static_assert(0xe005 == ICON_MIN_FA && 0xf8ff == ICON_MAX_FA,
+        "아이콘 범위가 FA6 의 값이 아니다. 같은 유니티 blob 안의 TU 가 "
+        "IconsFontAwesome4.h 를 들였을 가능성이 높다");
+
     static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
     ImFontConfig icons_config;
     ImFontConfig font_config;

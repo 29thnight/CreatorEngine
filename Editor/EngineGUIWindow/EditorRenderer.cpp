@@ -145,6 +145,22 @@ EditorRenderer::~EditorRenderer()
 void EditorRenderer::AddEditorFonts()
 {
     ImGuiIO& io = ImGui::GetIO();
+    // ★ 아이콘 범위는 **적재하는 블롭과 같은 판**이어야 한다.
+    //
+    // `IconsFontAwesome4.h` 와 `6.h` 가 `ICON_MIN_FA`/`ICON_MAX_FA` 를 서로 다른
+    // 값으로 정의한다(FA4 0xf000~0xf2e0 · FA6 0xe005~0xf8ff). 이 프로젝트는
+    // 유니티 빌드라 같은 blob 안의 다른 TU 가 FA4 를 들이면 여기 값이 조용히
+    // 좁아지고, 그러면 0xf000 아래의 FA6 아이콘(예: Hierarchy 의
+    // `ICON_FA_BARS_STAGGERED` U+e0d7)이 아틀라스에 실리지 않아 **네모로
+    // 그려진다.** 실행해도 예외가 나지 않으므로 컴파일 시점에 막는다.
+    //
+    // FA4 헤더는 은퇴시켰다(2026-09-11, W1). 이 단정은 그것이 되돌아오는 것을
+    // 막는 자물쇠다 — `static_assert` 라서 Release 에서도 사라지지 않는다.
+    static_assert(0xe005 == ICON_MIN_FA && 0xf8ff == ICON_MAX_FA,
+        "아이콘 범위가 FA6 의 값이 아니다. 같은 유니티 blob 안의 TU 가 "
+        "IconsFontAwesome4.h 를 들였을 가능성이 높다 — 폰트 블롭은 FA6 하나뿐이므로 "
+        "헤더도 IconsFontAwesome6.h 하나로 맞춰라");
+
     static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
     ImFontConfig icons_config;
     icons_config.MergeMode = true; // 아이콘 폰트를 본문 폰트에 병합

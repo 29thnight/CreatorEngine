@@ -7,7 +7,15 @@
 #include <Windows.h>
 
 #include "ImGui.h"
-#include "IconsFontAwesome4.h"
+// Font Awesome 6. 예전에는 FA4 헤더를 여기서만 들였는데, 두 헤더가
+// `ICON_MIN_FA`/`ICON_MAX_FA` 를 **다른 값으로** 정의하고 이 프로젝트는
+// 유니티 빌드라, 같은 blob 안의 다른 TU 가 만드는 아틀라스 범위가 include
+// 순서에 따라 갈릴 수 있었다(FA4 는 0xf000~0xf2e0, FA6 은 0xe005~0xf8ff).
+// 적재하는 폰트 블롭은 FA6 하나이므로 헤더도 하나로 맞춘다.
+//
+// 이름 둘이 FA6 에서 바뀌었다 — TIMES → XMARK(U+f00d), PAINT_BRUSH →
+// PAINTBRUSH(U+f1fc). 코드포인트는 같아서 그려지는 그림은 달라지지 않는다.
+#include "IconsFontAwesome6.h"
 
 struct StyleOptions
 {
@@ -532,10 +540,10 @@ void DrawProfilerHUD()
 	ImGui::SameLine();
 	ImGui::InputText("##Search", context.SearchString, ARRAYSIZE(context.SearchString));
 	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_TIMES "##clearfilter"))
+	if (ImGui::Button(ICON_FA_XMARK "##clearfilter"))
 		context.SearchString[0] = 0;
 	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_PAINT_BRUSH "##styleeditor"))
+	if (ImGui::Button(ICON_FA_PAINTBRUSH "##styleeditor"))
 		ImGui::OpenPopup("Style Editor");
 
 	if (ImGui::BeginPopup("Style Editor"))
