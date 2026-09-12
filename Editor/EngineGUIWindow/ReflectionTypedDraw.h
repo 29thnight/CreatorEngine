@@ -21,7 +21,7 @@
 // 언두: 레거시는 Property 기반 PropertyChangeCommand — typed는 멤버 포인터를
 // 캡처한 CustomChangeCommand로 동일 의미(변경 즉시 적용 + Undo/Redo 왕복).
 #include "ReflectionImGuiHelper.h"
-#include "EditorAxisField3.h"
+#include "InspectorDrawerList.h" // InspectorDrawer<T> 특수화 모음 — 분기보다 먼저 본다
 #include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf 재사용
 #include <cstddef>
 
@@ -43,6 +43,14 @@ static_assert(offsetof(math::vector4, y) == sizeof(float));
 static_assert(offsetof(math::vector4, z) == sizeof(float) * 2);
 static_assert(offsetof(math::vector4, w) == sizeof(float) * 3);
 static_assert(offsetof(math::color, a) == sizeof(float) * 3);
+
+// 확장점이 이 번역 단위에서 실제로 보이는지 단정한다 (W2-I).
+// 특수화는 쓰는 자리에서 보여야 효력이 있고, 안 보이면 아래 `if constexpr`
+// 사슬이 vector3 를 그릴 분기 없이 끝까지 떨어진다 — 빌드도 검사도 붉어지지
+// 않고 화면에서만 칸이 사라진다. `InspectorDrawerList.h` 의 include 가 끊기면
+// 여기서 컴파일이 멈춘다.
+static_assert(editor::inspector::HasInspectorDrawer<math::vector3>,
+    "InspectorDrawerList.h 가 기본 드로어를 싣지 못했다");
 
 namespace Meta::TypedDraw
 {
@@ -181,7 +189,25 @@ namespace Meta::TypedDraw
 
         MemberT& value = obj.*MP;
 
-        if constexpr (std::is_same_v<MemberT, int>)
+        // ── 값 타입 커스텀 드로어가 먼저다 (W2-I) ──────────────────────────
+        //
+        // `InspectorDrawer<MemberT>` 특수화가 있으면 아래 분기 사슬을 전부
+        // 건너뛴다. 엔진 분기를 고치지 않고 타입을 더할 수 있는 자리이며,
+        // 엔진이 싣는 기본 드로어도 같은 문으로 들어온다
+        // (`InspectorDrawerList.h`). 특수화가 없으면 이 `if` 는 컴파일에서
+        // 통째로 사라지므로 런타임 비용도 간접 호출도 없다.
+        if constexpr (editor::inspector::HasInspectorDrawer<MemberT>)
+        {
+            MemberT v = value;
+            ImGui::PushID(name);
+            if (editor::inspector::InspectorDrawer<MemberT>::Draw(label, v))
+            {
+                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
+                value = v;
+            }
+            ImGui::PopID();
+        }
+        else if constexpr (std::is_same_v<MemberT, int>)
         {
             int v = value;
             ImGui::PushID(name);
@@ -292,20 +318,6 @@ namespace Meta::TypedDraw
             MemberT v = value;
             ImGui::PushID(name);
             if (ImGui::DragFloat2(label, &v.x))
-            {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
-            }
-            ImGui::PopID();
-        }
-        else if constexpr (std::is_same_v<MemberT, math::vector3>)
-        {
-            MemberT v = value;
-            ImGui::PushID(name);
-            editor::widgets::axis_field3_request axes{};
-            axes.label = label;
-            axes.values = &v.x;
-            if (editor::widgets::draw_axis_field3(axes))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
