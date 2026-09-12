@@ -540,6 +540,54 @@ namespace editor
             }
         }
 
+        // ── 표시 이름 유도 (W2-I3) ───────────────────────────────────
+        //
+        // 저장소의 필드 416개 중 `meta::displayName` 선언은 0건이었다. 손으로
+        // 붙이는 길은 안 붙인 필드가 조용히 원시 이름으로 나오는 것을 막을
+        // 수단이 없어서, 규칙을 기본으로 두고 속성을 예외 표기로 돌렸다.
+        // 규칙이 기본이면 규칙 자체가 검사 대상이다.
+        {
+            struct labelCase { const char* identifier; const char* expected; };
+            constexpr std::array<labelCase, 9> cases{{
+                { "m_nearPlane",  "Near Plane" },
+                { "m_isPrimary",  "Is Primary" },
+                { "position",     "Position" },
+                { "Position",     "Position" },   // 이미 제대로면 그대로 둔다
+                { "mPosition",    "Position" },   // m 하나 + 대문자도 접두다
+                { "m_useHDR",     "Use HDR" },    // 연속 대문자는 쪼개지 않는다
+                { "m_fov",        "Fov" },
+                { "m_layer2Mask", "Layer2 Mask" },// 숫자 뒤 대문자도 경계다
+                { "m_a",          "A" },
+            }};
+
+            for (const labelCase& item : cases)
+            {
+                const char* const got = widgets::display_label(item.identifier);
+                checks.expect(nullptr != got && 0 == std::strcmp(got, item.expected),
+                    "display label", item.identifier);
+            }
+
+            // 전부 떨어져 나가는 입력은 원시 이름을 돌려준다. 빈 라벨은 ImGui
+            // 에서 ID 가 비는 것과 같아 같은 프레임의 다른 위젯과 충돌한다.
+            checks.expect(0 == std::strcmp(widgets::display_label("m_"), "m_"),
+                "display label", "an empty derivation falls back to the identifier");
+
+            // 버퍼가 고리다. 바깥 필드의 라벨이 아직 쓰이는 중에 안쪽 필드가
+            // 같은 칸을 덮으면 중첩 구조체에서 라벨이 뒤바뀐다.
+            {
+                const char* const first = widgets::display_label("m_alpha");
+                const char* const second = widgets::display_label("m_beta");
+                checks.expect(first != second,
+                    "display label", "consecutive labels use different storage");
+                checks.expect(0 == std::strcmp(first, "Alpha") &&
+                              0 == std::strcmp(second, "Beta"),
+                    "display label", "the earlier label survives the later call");
+            }
+
+            checks.expect(widgets::display_label_capacity() > 0,
+                "display label", "the buffer has a declared capacity");
+        }
+
         report += "[";
         report += checks.failed == 0 ? "OK" : "FAIL";
         report += "] editor theme contracts: " + std::to_string(checks.checked) +

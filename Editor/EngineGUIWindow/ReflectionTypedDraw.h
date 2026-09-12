@@ -22,6 +22,7 @@
 // 캡처한 CustomChangeCommand로 동일 의미(변경 즉시 적용 + Undo/Redo 왕복).
 #include "ReflectionImGuiHelper.h"
 #include "InspectorDrawerList.h" // InspectorDrawer<T> 특수화 모음 — 분기보다 먼저 본다
+#include "EditorPropertyRow.h"   // 공통 배치 계약 (W2-I2)
 #include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf 재사용
 #include <cstddef>
 
@@ -51,6 +52,31 @@ static_assert(offsetof(math::color, a) == sizeof(float) * 3);
 // 여기서 컴파일이 멈춘다.
 static_assert(editor::inspector::HasInspectorDrawer<math::vector3>,
     "InspectorDrawerList.h 가 기본 드로어를 싣지 못했다");
+
+// `m_isEnabled` 가 숨김으로 남아 있는지 단정한다 (W2-I3).
+//
+// 이 필드는 전용 체크박스가 담당한다 — 그쪽만 `SetEnabled` 를 거쳐
+// `OnEnable`/`OnDisable` 을 보존한다. 속성이 떨어지면 리플렉션이 같은 값을 또
+// 그리고, 그 칸으로 끄면 훅이 영영 불리지 않는다. 화면에는 체크박스가 하나 더
+// 생길 뿐이라 눈으로는 결함으로 읽히지 않는다.
+//
+// 예전에는 이 규칙이 드로어 안의 문자열 비교였다. 그때는 선언 쪽에 단정을 걸
+// 자리가 없었다.
+namespace Meta::TypedDraw
+{
+    consteval bool ObjectHidesEnabledFlag()
+    {
+        return std::apply([](const auto&... ms)
+        {
+            return ((std::remove_cvref_t<decltype(ms)>::identifier ==
+                        std::string_view{ "m_isEnabled" } &&
+                     std::remove_cvref_t<decltype(ms)>::template
+                        has_attribute<meta::hidden_attr>()) || ...);
+        }, meta::schema_of<Object>.fields);
+    }
+}
+static_assert(Meta::TypedDraw::ObjectHidesEnabledFlag(),
+    "Object::m_isEnabled 에서 meta::hidden() 이 떨어졌다 — 인스펙터가 활성 플래그를 두 번 그린다");
 
 namespace Meta::TypedDraw
 {
@@ -154,6 +180,87 @@ namespace Meta::TypedDraw
     template<meta::reflectable T>
     void DrawTypedObject(T& obj);
 
+    // 값 위젯이 쓰는 숨은 ID. 라벨은 공통 배치 계층이 이미 그렸으므로 위젯
+    // 자신은 이름을 내지 않는다. `PushID(name)` 안이라 같은 문자열이 여러 줄에
+    // 쓰여도 ID 가 겹치지 않는다.
+    inline constexpr const char* kValueId = "##v";
+
+    // 이 멤버의 표시 이름. `meta::displayName` 이 붙어 있으면 그것이고,
+    // 없으면 식별자에서 유도한다(W2-I3).
+    //
+    // 유도를 기본으로 둔 이유는 실측이다 — 저장소의 필드 416개 중
+    // `displayName` 선언은 0건이었다. 손으로 붙이는 길은 안 붙인 필드가 조용히
+    // `m_nearPlane` 인 채로 나오는 것을 막을 수단이 없다.
+    template<class MI>
+    inline const char* MemberLabel(const MI& mi)
+    {
+        if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::display_name_attr>())
+        {
+            return mi.template attribute<meta::display_name_attr>().value.data();
+        }
+        else
+        {
+            return editor::widgets::display_label(
+                std::remove_cvref_t<MI>::identifier.data());
+        }
+    }
+
+    // 이 타입의 고정 라벨 중 가장 넓은 폭. 라벨 열이 필요 이상 넓어지지 않게
+    // 한다. 식별자에서 유도한 이름은 컴파일 시 정해진 문자열에서만 나오므로
+    // 프레임마다 달라지지 않는다 — 계획서가 금지한 "라벨 최대값 변화로 열이
+    // 흔들리는" 상태가 되지 않는다.
+    // 상속 체인을 `DrawFrame` 과 같은 모양으로 거슬러 오른다.
+    //
+    // 처음에는 `meta::fields<T>()` 로 체인 전체를 한 번에 받으려 했는데
+    // MSVC 가 "이니셜라이저가 너무 많이 중첩되었습니다" 로 막았다 — 그 질의가
+    // 체인을 `tuple_cat` 으로 물질화하기 때문이다. 그리는 쪽이 이미 재귀로
+    // 내려가므로 힌트도 같은 모양으로 맞춘다.
+    template<meta::reflectable T>
+    inline float LabelHintOf()
+    {
+        using Desc = std::remove_cvref_t<decltype(meta::schema_of<T>)>;
+
+        float widest = 0.f;
+        if constexpr (Desc::has_base)
+        {
+            widest = LabelHintOf<typename Desc::base_type>();
+        }
+        std::apply([&](const auto&... ms)
+        {
+            ((widest = ImMax(widest,
+                ImGui::CalcTextSize(MemberLabel(ms)).x)), ...);
+        }, meta::schema_of<T>.fields);
+        return widest;
+    }
+
+    // 리플렉션 한 프레임의 배치를 세우고 나갈 때 되돌린다.
+    //
+    // 중첩 구조체는 들여쓰기로 가용 폭이 달라지므로 진입할 때 다시 잰다.
+    // 되돌리지 않으면 안쪽에서 잰 좁은 열이 바깥 줄에 그대로 남는다.
+    struct LayoutScope
+    {
+        editor::widgets::property_layout_metrics saved{};
+
+        explicit LayoutScope(float labelHint)
+        {
+            // 폭 전환의 직전 모드. 리플렉션 경로 전체가 한 판정을 쓴다 —
+            // 줄마다 따로 두면 같은 프레임 안에서 어떤 줄은 inline, 어떤 줄은
+            // stacked 가 된다.
+            static editor::widgets::property_layout_state state{};
+            saved = editor::widgets::push_property_layout(
+                editor::widgets::measure_property_layout(
+                    editor::widgets::property_layout_inputs_now(0, labelHint), state));
+        }
+
+        ~LayoutScope()
+        {
+            editor::widgets::push_property_layout(saved);
+        }
+
+        LayoutScope(const LayoutScope&) = delete;
+        LayoutScope& operator=(const LayoutScope&) = delete;
+    };
+
     // 멤버 하나 — 컴파일타임 카테고리 디스패치.
     template<class Owner, class MI>
     inline void DrawOneMember(Owner& obj, const MI& mi)
@@ -163,22 +270,22 @@ namespace Meta::TypedDraw
 
         const char* name = std::remove_cvref_t<MI>::identifier.data();
 
-        // 레거시 스킵 규칙 파리티: m_isEnabled는 전용 체크박스가 담당
-        // (SetEnabled 경유 — OnEnable/OnDisable 훅 보존).
-        if (std::strcmp(name, "m_isEnabled") == 0)
+        // 숨김은 속성이 정한다 (W2-I3).
+        //
+        // 예전에는 여기서 필드 이름을 문자열로 비교해 `m_isEnabled` 를 걸렀다.
+        // 필드를 옮기거나 이름을 바꾸면 그 규칙이 조용히 풀리는 자리였고,
+        // 다른 내부 필드를 숨길 길도 없었다. 규칙을 선언 쪽으로 옮긴다 —
+        // `Object.h` 의 `meta::hidden()` 이 그 자리다.
+        if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::hidden_attr>())
         {
             return;
         }
 
         // CT6-b 속성 소비
-        const char* label = name;
+        const char* label = MemberLabel(mi);
         bool hasRange = false;
         float rangeMin = 0.0f;
         float rangeMax = 0.0f;
-        if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::display_name_attr>())
-        {
-            label = mi.template attribute<meta::display_name_attr>().value.data();
-        }
         if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::range_attr<float>>())
         {
             const auto r = mi.template attribute<meta::range_attr<float>>();
@@ -188,6 +295,10 @@ namespace Meta::TypedDraw
         }
 
         MemberT& value = obj.*MP;
+
+        // 이 줄의 배치. 라벨 열·값 폭·줄 전환은 진입점이 이미 정했다.
+        const editor::widgets::property_layout_metrics& layout =
+            editor::widgets::current_property_layout();
 
         // ── 값 타입 커스텀 드로어가 먼저다 (W2-I) ──────────────────────────
         //
@@ -200,7 +311,8 @@ namespace Meta::TypedDraw
         {
             MemberT v = value;
             ImGui::PushID(name);
-            if (editor::inspector::InspectorDrawer<MemberT>::Draw(label, v))
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (editor::inspector::InspectorDrawer<MemberT>::Draw(kValueId, v))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -211,9 +323,10 @@ namespace Meta::TypedDraw
         {
             int v = value;
             ImGui::PushID(name);
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             const bool changed = hasRange
-                ? ImGui::SliderInt(label, &v, static_cast<int>(rangeMin), static_cast<int>(rangeMax))
-                : ImGui::DragInt(label, &v);
+                ? ImGui::SliderInt(kValueId, &v, static_cast<int>(rangeMin), static_cast<int>(rangeMax))
+                : ImGui::DragInt(kValueId, &v);
             if (changed)
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
@@ -225,7 +338,8 @@ namespace Meta::TypedDraw
         {
             unsigned int v = value;
             ImGui::PushID(name);
-            if (ImGui::DragScalar(label, ImGuiDataType_U32, &v))
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (ImGui::DragScalar(kValueId, ImGuiDataType_U32, &v))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -236,7 +350,8 @@ namespace Meta::TypedDraw
         {
             long long v = value;
             ImGui::PushID(name);
-            if (ImGui::DragScalar(label, ImGuiDataType_S64, &v))
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (ImGui::DragScalar(kValueId, ImGuiDataType_S64, &v))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -247,9 +362,10 @@ namespace Meta::TypedDraw
         {
             float v = value;
             ImGui::PushID(name);
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             const bool changed = hasRange
-                ? ImGui::SliderFloat(label, &v, rangeMin, rangeMax)
-                : ImGui::DragFloat(label, &v);
+                ? ImGui::SliderFloat(kValueId, &v, rangeMin, rangeMax)
+                : ImGui::DragFloat(kValueId, &v);
             if (changed)
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
@@ -261,7 +377,8 @@ namespace Meta::TypedDraw
         {
             bool v = value;
             ImGui::PushID(name);
-            if (ImGui::Checkbox(label, &v))
+            editor::widgets::begin_property_line(label, layout);
+            if (ImGui::Checkbox(kValueId, &v))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -272,7 +389,8 @@ namespace Meta::TypedDraw
         {
             std::string v = value;
             ImGui::PushID(name);
-            if (ImGui::InputText(label, v.data(), v.size() + 1,
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (ImGui::InputText(kValueId, v.data(), v.size() + 1,
                 ImGuiInputTextFlags_CallbackResize, Meta::InputTextCallback,
                 static_cast<void*>(&v)))
             {
@@ -297,7 +415,8 @@ namespace Meta::TypedDraw
             // 그래야 해시가 다시 계산된다.
             std::string buffer = value.ToString();
             ImGui::PushID(name);
-            if (ImGui::InputText(label, buffer.data(), buffer.size() + 1,
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (ImGui::InputText(kValueId, buffer.data(), buffer.size() + 1,
                 ImGuiInputTextFlags_CallbackResize, Meta::InputTextCallback,
                 static_cast<void*>(&buffer)))
             {
@@ -317,7 +436,8 @@ namespace Meta::TypedDraw
         {
             MemberT v = value;
             ImGui::PushID(name);
-            if (ImGui::DragFloat2(label, &v.x))
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (ImGui::DragFloat2(kValueId, &v.x))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -329,7 +449,8 @@ namespace Meta::TypedDraw
         {
             MemberT v = value;
             ImGui::PushID(name);
-            if (ImGui::DragFloat4(label, &v.x, 0.1f))
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (ImGui::DragFloat4(kValueId, &v.x, 0.1f))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -340,7 +461,8 @@ namespace Meta::TypedDraw
         {
             math::color v = value;
             ImGui::PushID(name);
-            if (ImGui::ColorEdit4(label, &v.r))
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (ImGui::ColorEdit4(kValueId, &v.r))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -351,7 +473,8 @@ namespace Meta::TypedDraw
         {
             math::rect v = value;
             ImGui::PushID(name);
-            if (ImGui::DragFloat4(label, &v.x))
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            if (ImGui::DragFloat4(kValueId, &v.x))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -360,7 +483,8 @@ namespace Meta::TypedDraw
         }
         else if constexpr (std::is_enum_v<MemberT>)
         {
-            DrawEnumCombo(label, name, value);
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            DrawEnumCombo(kValueId, name, value);
         }
         else if constexpr (std::is_same_v<MemberT, std::vector<std::string>>)
         {
@@ -479,9 +603,26 @@ namespace Meta::TypedDraw
         ImGui::PopID();
     }
 
+    // 자기 프레임 필드만 보는 힌트. `DrawOwnMembers` 가 부모를 그리지 않으므로
+    // 그쪽은 이 값을 쓴다.
+    template<meta::reflectable T>
+    inline float OwnLabelHintOf()
+    {
+        float widest = 0.f;
+        std::apply([&](const auto&... ms)
+        {
+            ((widest = ImMax(widest,
+                ImGui::CalcTextSize(MemberLabel(ms)).x)), ...);
+        }, meta::schema_of<T>.fields);
+        return widest;
+    }
+
     template<meta::reflectable T>
     void DrawTypedObject(T& obj)
     {
+        // 배치는 프레임 하나에 한 번 잰다. 상속 체인 전체가 같은 라벨 열에
+        // 서야 하므로 힌트도 체인 전체에서 뽑는다.
+        const LayoutScope scope{ LabelHintOf<T>() };
         DrawFrame<T>(obj);
     }
 
@@ -491,6 +632,7 @@ namespace Meta::TypedDraw
     template<meta::reflectable T>
     void DrawOwnMembers(T& obj)
     {
+        const LayoutScope scope{ OwnLabelHintOf<T>() };
         std::apply([&](const auto&... ms)
         {
             (DrawOneMember(obj, ms), ...);

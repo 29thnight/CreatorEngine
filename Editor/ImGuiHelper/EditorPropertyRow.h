@@ -171,6 +171,25 @@ namespace editor::widgets
         float aux_reserve{ 0.f };
     };
 
+    /// 필드 식별자에서 표시 이름을 유도한다 (PHASE 21 W2-I3).
+    ///
+    /// `m_nearPlane` → `Near Plane`, `m_isPrimary` → `Is Primary`,
+    /// `position` → `Position`. 규칙은 셋뿐이다 — `m_` 접두 제거, 소문자 뒤에
+    /// 오는 대문자 앞에서 끊기, 첫 글자 대문자.
+    ///
+    /// **속성이 아니라 규칙으로 유도하는 이유.** 저장소의 필드는 416개이고
+    /// `meta::displayName` 선언은 **0건**이었다. 손으로 붙이는 길은 분량도
+    /// 분량이지만, 안 붙인 필드가 조용히 원시 이름으로 나오는 것을 막을 수단이
+    /// 없다. 규칙을 기본으로 두면 안 붙인 필드가 제대로 나오고,
+    /// `meta::displayName` 은 유도가 틀리는 자리의 **예외 표기**가 된다.
+    ///
+    /// 돌려주는 포인터는 다음 호출까지만 유효하다. 호출 즉시 그리는 자리에서
+    /// 쓴다. 고정 버퍼라 프레임당 할당이 없다(§8.2).
+    const char* display_label(const char* identifier) noexcept;
+
+    /// 유도 결과를 담는 버퍼의 크기. 이보다 긴 이름은 잘린다.
+    int display_label_capacity() noexcept;
+
     /// 라벨 열 상한의 논리 픽셀 값. 검사가 읽는 정본이다.
     float property_layout_label_max_logical() noexcept;
 
@@ -196,6 +215,21 @@ namespace editor::widgets
     /// ImGui 를 부르지 않으므로 검사가 그대로 부를 수 있다.
     property_layout_metrics measure_property_layout(const property_layout_inputs& inputs,
         property_layout_state& state) noexcept;
+
+    /// 지금 그리는 줄의 배치 (PHASE 21 W2-I3).
+    ///
+    /// 리플렉션 드로어는 타입마다 분기가 갈리고 커스텀 드로어는 아예 다른
+    /// 번역 단위에 있다. 그 전부에 배치를 인자로 꿰면 서명 하나 바뀔 때마다
+    /// 사슬 전체가 따라 바뀐다. 그리는 쪽이 한 번 세우고 아래쪽이 읽는다.
+    ///
+    /// ImGui 는 한 스레드에서만 도는 즉시 모드라 "지금 그리는 줄" 은 언제나
+    /// 하나다. 그래도 중첩이 있으므로 `push_` 가 직전 값을 돌려주고 호출자가
+    /// 되돌린다.
+    const property_layout_metrics& current_property_layout() noexcept;
+
+    /// 지금 배치를 바꾸고 직전 값을 돌려준다. 돌려받은 값을 다시 넣어 되돌린다.
+    property_layout_metrics push_property_layout(
+        const property_layout_metrics& metrics) noexcept;
 
     /// 한 줄의 라벨을 놓고 값 커서를 세운다. 값 영역 폭을 돌려주므로 호출자는
     /// `ImGui::SetNextItemWidth` 에 그대로 넘기면 된다.

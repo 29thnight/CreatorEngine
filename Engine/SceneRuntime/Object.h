@@ -18,7 +18,10 @@ class Object : public IObject, public meta::polymorphic
        return meta::schema<Self>(
            meta::field<&Self::m_name>,
            meta::field<&Self::m_instanceID>,
-           meta::field<&Self::m_isEnabled>);
+           // 전용 체크박스가 담당한다 — 인스펙터는 `SetEnabled` 를 거쳐야
+           // `OnEnable`/`OnDisable` 이 보존된다. 리플렉션이 직접 그리면 그 훅을
+           // 건너뛴다.
+           meta::field<&Self::m_isEnabled>.with(meta::hidden()));
    }
 private:
     friend struct Meta::EditorObjectIdentity;

@@ -104,6 +104,101 @@ namespace editor::widgets
         // 셋이 한 줄을 나눠 쓰므로 같은 잣대를 대면 넉넉한 폭에서도 세로로
         // 떨어진다. `%.3f` 한 칸이 보이는 만큼이 기준이다.
         constexpr const char* kAxisSample = "-0.000";
+
+        // 유도한 표시 이름을 담는 버퍼. 매 프레임 필드마다 도는 자리라
+        // std::string 을 새로 만들지 않는다(§8.2 의 "정적 경로 frame 당 heap
+        // 할당 0").
+        //
+        // 한 칸이 아니라 **고리**인 이유: 중첩 구조체를 그릴 때 바깥 필드의
+        // 라벨이 아직 쓰이는 중에 안쪽 필드가 같은 버퍼를 덮을 수 있다. 고리를
+        // 두면 가까운 몇 개가 동시에 살아 있어 그 덮어쓰기가 일어나지 않는다.
+        // 돌려준 포인터의 수명이 "다음 몇 번의 호출까지" 라는 뜻이기도 하다.
+        constexpr int kLabelCapacity = 128;
+        constexpr int kLabelSlots = 4;
+        char g_labelRing[kLabelSlots][kLabelCapacity]{};
+        int g_labelSlot = 0;
+
+        bool is_upper(char c) noexcept { return c >= 'A' && c <= 'Z'; }
+        bool is_lower(char c) noexcept { return c >= 'a' && c <= 'z'; }
+        bool is_digit(char c) noexcept { return c >= '0' && c <= '9'; }
+    }
+
+    int display_label_capacity() noexcept
+    {
+        return kLabelCapacity;
+    }
+
+    const char* display_label(const char* identifier) noexcept
+    {
+        g_labelSlot = (g_labelSlot + 1) % kLabelSlots;
+        char* const buffer = g_labelRing[g_labelSlot];
+
+        if (nullptr == identifier)
+        {
+            buffer[0] = '\0';
+            return buffer;
+        }
+
+        // `m_` 접두를 뗀다. `m` 하나만 있고 뒤가 대문자인 경우(`mPosition`)도
+        // 같은 뜻이라 함께 뗀다.
+        const char* source = identifier;
+        if ('m' == source[0] && '_' == source[1])
+        {
+            source += 2;
+        }
+        else if ('m' == source[0] && is_upper(source[1]))
+        {
+            source += 1;
+        }
+
+        int out = 0;
+        char previous = '\0';
+        for (int index = 0; '\0' != source[index] && out < kLabelCapacity - 1; ++index)
+        {
+            const char current = source[index];
+
+            if ('_' == current)
+            {
+                // 남은 밑줄은 칸으로 바꾼다. 연달아 나오면 한 칸만 넣는다.
+                if (out > 0 && ' ' != buffer[out - 1])
+                {
+                    buffer[out++] = ' ';
+                }
+                previous = current;
+                continue;
+            }
+
+            // 소문자·숫자 뒤의 대문자 앞에서 끊는다. 연속 대문자는 끊지 않아
+            // 약어가 쪼개지지 않는다 — `m_fovDegrees` 는 "Fov Degrees" 지만
+            // `m_useHDR` 은 "Use HDR" 로 남는다.
+            const bool boundary = out > 0 && is_upper(current) &&
+                (is_lower(previous) || is_digit(previous));
+            if (boundary && ' ' != buffer[out - 1] && out < kLabelCapacity - 1)
+            {
+                buffer[out++] = ' ';
+            }
+
+            if (out < kLabelCapacity - 1)
+            {
+                // 첫 글자는 대문자로 올린다. 그 밖은 원문 그대로다.
+                buffer[out] = (0 == out && is_lower(current))
+                    ? static_cast<char>(current - 'a' + 'A')
+                    : current;
+                ++out;
+            }
+            previous = current;
+        }
+
+        // 꼬리 공백을 턴다. `m_foo_` 처럼 밑줄로 끝나는 이름이 남기는 것이다.
+        while (out > 0 && ' ' == buffer[out - 1])
+        {
+            --out;
+        }
+        buffer[out] = '\0';
+
+        // 전부 떨어져 나갔으면 원시 이름을 돌려준다. 빈 라벨은 ImGui 에서
+        // ID 가 비는 것과 같아 같은 프레임의 다른 위젯과 충돌한다.
+        return 0 == out ? identifier : buffer;
     }
 
     float property_layout_label_max_logical() noexcept
@@ -251,6 +346,26 @@ namespace editor::widgets
         metrics.axis_stacked = state.axis_stacked;
 
         return metrics;
+    }
+
+    namespace
+    {
+        // 지금 그리는 줄의 배치. 즉시 모드 한 스레드라 한 칸이면 되고,
+        // 중첩은 호출자가 직전 값을 되돌려 감당한다.
+        property_layout_metrics g_currentLayout{};
+    }
+
+    const property_layout_metrics& current_property_layout() noexcept
+    {
+        return g_currentLayout;
+    }
+
+    property_layout_metrics push_property_layout(
+        const property_layout_metrics& metrics) noexcept
+    {
+        const property_layout_metrics previous = g_currentLayout;
+        g_currentLayout = metrics;
+        return previous;
     }
 
     float begin_property_line(const char* label, const property_layout_metrics& metrics)
