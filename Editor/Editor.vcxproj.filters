@@ -333,6 +333,15 @@
     <ClInclude Include="EngineGUIWindow\ICustomEditor.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorDrawer.h">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorDrawerList.h">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorDrawerMath.h">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>

@@ -106,6 +106,9 @@
     <ClInclude Include="EngineGUIWindow\GameViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\HierarchyWindow.h" />
     <ClInclude Include="EngineGUIWindow\ICustomEditor.h" />
+    <ClInclude Include="EngineGUIWindow\InspectorDrawer.h" />
+    <ClInclude Include="EngineGUIWindow\InspectorDrawerList.h" />
+    <ClInclude Include="EngineGUIWindow\InspectorDrawerMath.h" />
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h" />
