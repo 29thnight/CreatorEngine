@@ -68,6 +68,12 @@ namespace editor::widgets
 
         /// 숫자 표기.
         const char* format{ "%.3f" };
+
+        /// 축 셋을 세로로 놓는다 (W2-I2). 가용 폭을 셋으로 나눈 슬롯이
+        /// badge 와 숫자의 최소 폭을 못 담을 때 호출자가 켠다. 판정은
+        /// `EditorPropertyRow` 의 `measure_property_layout` 이 한다 — 이 위젯이
+        /// 스스로 정하면 같은 인스펙터 안에서 줄마다 다른 답이 나온다.
+        bool stacked{ false };
     };
 
     /// 세 축을 한 줄에 그린다. 이번 프레임에 값이 바뀌면 참.

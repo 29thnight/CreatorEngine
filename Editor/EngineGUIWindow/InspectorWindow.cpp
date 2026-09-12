@@ -308,6 +308,21 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 	ImGui::PopID();
 }
 
+// 인스펙터 상단 구간 — 기본 정보와 공간 컴포넌트 — 이 **함께** 쓰는 라벨 열의
+// 기준이다. 한 목록에서 폭을 뽑아 두 구간이 같은 열에 선다(계획서 계약 2 의
+// "같은 깊이의 속성은 같은 열에 맞춘다").
+//
+// 목록에 든 것은 전부 컴파일 시 정해진 문자열이다. 매 프레임 바뀌는 값으로
+// 재면 계획서가 금지한 "라벨 최대값 변화로 열이 흔들리는" 상태가 된다.
+static const char* const kInspectorTopLabels[]{
+    "Tag", "Layer", "Position", "Rotation", "Scale" };
+
+static float InspectorTopLabelHint()
+{
+    return editor::widgets::property_layout_label_hint(
+        kInspectorTopLabels, IM_ARRAYSIZE(kInspectorTopLabels));
+}
+
 void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 {
 	std::string name = gameObject->m_name.ToString();
@@ -316,6 +331,18 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	ImGui::SameLine();
 
 	gameObject->SetEnabled(isEnabled);
+
+	// 이름 칸이 Static 체크박스를 창 밖으로 밀지 않게 폭을 먼저 예약한다
+	// (계획서 계약 5 · §4.5). 예전에는 폭을 정하지 않아 ImGui 기본값이 쓰였고,
+	// 인스펙터가 좁아지면 Static 이 잘려 나갔다.
+	{
+		const ImGuiStyle& baseStyle = ImGui::GetStyle();
+		const float staticWidth = ImGui::GetFrameHeight() +
+			baseStyle.ItemInnerSpacing.x + ImGui::CalcTextSize("Static").x;
+		const float nameWidth = ImGui::GetContentRegionAvail().x -
+			staticWidth - baseStyle.ItemSpacing.x;
+		ImGui::SetNextItemWidth(ImMax(nameWidth, ImGui::GetFrameHeight()));
+	}
 
 	if (ImGui::InputText("##name",
 		&name[0],
@@ -366,10 +393,19 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	{
 		selectedTagIndex = 0; // 기본값으로 첫 번째 태그 선택
 	}
-	// Tag 콤보박스
-	ImGui::Text("Tag");
-	ImGui::SameLine();
-	ImGui::SetNextItemWidth(90.0f); // 픽셀 단위로 너비 설정
+	// Tag·Layer 콤보박스.
+	//
+	// 예전에는 둘이 한 줄에 있었고 각각 90px 고정이었다. 고정 폭은 좁을 때
+	// 잘리고 넓을 때 남는 폭을 라벨 쪽에 버린다. 줄을 나눠 같은 라벨 열에
+	// 세운다 — 계획서 계약 2 의 "같은 깊이의 속성은 같은 열에 맞춘다" 이고,
+	// 계약 4 가 "모든 컴포넌트를 자동으로 두 열에 재배열하지 않는다" 고
+	// 한 자리이기도 하다.
+	const editor::widgets::property_layout_metrics baseLayout =
+		editor::widgets::measure_property_layout(
+			editor::widgets::property_layout_inputs_now(0, InspectorTopLabelHint()),
+			m_layout);
+
+	ImGui::SetNextItemWidth(editor::widgets::begin_property_line("Tag", baseLayout));
 	if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
 	{
 		for (int i = 0; i <= tagCount; ++i)
@@ -399,10 +435,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 		}
 		ImGui::EndCombo();
 	}
-	ImGui::SameLine();
-	ImGui::Text("Layer");
-	ImGui::SameLine();
-	ImGui::SetNextItemWidth(90.0f); // 픽셀 단위로 너비 설정
+	ImGui::SetNextItemWidth(editor::widgets::begin_property_line("Layer", baseLayout));
 	if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
 	{
 		for (int i = 0; i <= layerCount; ++i)
@@ -499,18 +532,25 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	}
 }
 
-// 트랜스폼 세 줄이 쓰는 축 필드. 라벨은 위의 `Text` + `SameLine` 이 이미
-// 그렸으므로 `##` 이름을 넘겨 위젯 쪽 라벨을 끈다 — `DragFloat3` 에 넘기던
-// 것과 같은 규약이다.
+// 트랜스폼 세 줄. 라벨과 값 열은 공통 배치 계층이 놓고(W2-I2) 이 함수는 값만
+// 그린다 — 그래서 `##` 이름을 넘겨 위젯 쪽 라벨을 끈다.
+//
+// 예전에는 호출자가 `Text("Position ")` 처럼 **공백으로 자리를 맞췄다.**
+// "Scale" 뒤에 공백 다섯을 붙여 "Position" 과 폭을 맞추는 식이었고, 폰트나
+// 배율이 바뀌면 그대로 어긋난다. 그 자리를 계산된 라벨 열이 대신한다.
 static bool DrawTransformAxes(const char* label, float* values,
-    float speed, float min, float max)
+    float speed, float min, float max,
+    const editor::widgets::property_layout_metrics& metrics)
 {
+    ImGui::SetNextItemWidth(metrics.value_col);
+
     editor::widgets::axis_field3_request axes{};
     axes.label = label;
     axes.values = values;
     axes.speed = speed;
     axes.min = min;
     axes.max = max;
+    axes.stacked = metrics.axis_stacked;
     return editor::widgets::draw_axis_field3(axes);
 }
 
@@ -542,9 +582,15 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 	bool menuClicked = transformHeaderState.menu_clicked;
 	if (transformHeaderState.open)
 	{
-		ImGui::Text("Position ");
-		ImGui::SameLine();
-		if (DrawTransformAxes("##Position", &position.x, 0.08f, -1000.f, 1000.f))
+		// 이 컴포넌트의 세 줄이 같은 배치를 쓴다. 줄마다 다시 재면 라벨 길이가
+		// 다른 줄끼리 값 열이 어긋난다.
+		const editor::widgets::property_layout_metrics layout =
+			editor::widgets::measure_property_layout(
+				editor::widgets::property_layout_inputs_now(0, InspectorTopLabelHint()),
+				m_layout);
+
+		editor::widgets::begin_property_line("Position", layout);
+		if (DrawTransformAxes("##Position", &position.x, 0.08f, -1000.f, 1000.f), layout)
 		{
 			if (!editingPosition)
 			{
@@ -581,9 +627,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		prevPYR[1] = pyr[1];
 		prevPYR[2] = pyr[2];
 
-		ImGui::Text("Rotation ");
-		ImGui::SameLine();
-		if (DrawTransformAxes("##Rotation", pyr, 0.1f, 0.f, 0.f))
+		editor::widgets::begin_property_line("Rotation", layout);
+		if (DrawTransformAxes("##Rotation", pyr, 0.1f, 0.f, 0.f), layout)
 		{
 			if (!editingRotation)
 			{
@@ -627,9 +672,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		static bool editingScale = false;
 		static math::vector4 prevScale{};
 
-		ImGui::Text("Scale     ");
-		ImGui::SameLine();
-		if (DrawTransformAxes("##Scale", &scale.x, 0.1f, 0.001f, 1000.f))
+		editor::widgets::begin_property_line("Scale", layout);
+		if (DrawTransformAxes("##Scale", &scale.x, 0.1f, 0.001f, 1000.f), layout)
 		{
 			if (!editingScale)
 			{

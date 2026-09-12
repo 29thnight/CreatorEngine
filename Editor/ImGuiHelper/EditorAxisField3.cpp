@@ -122,8 +122,12 @@ namespace editor::widgets
         // 존중하므로 호출자가 폭을 정해 둔 자리에서도 어긋나지 않는다.
         const float total = ImGui::CalcItemWidth();
         const float gap = style.ItemInnerSpacing.x;
-        const float slot = (total - gap * static_cast<float>(kAxisCount - 1)) /
-            static_cast<float>(kAxisCount);
+
+        // 세로로 놓으면 축마다 한 줄을 다 쓴다. 가로일 때만 셋으로 나눈다.
+        const float slot = request.stacked
+            ? total
+            : (total - gap * static_cast<float>(kAxisCount - 1)) /
+                static_cast<float>(kAxisCount);
         const float field_width = ImMax(slot - badge_width, 1.f);
 
         bool changed = false;
@@ -137,7 +141,8 @@ namespace editor::widgets
 
         for (std::size_t index = 0; index < kAxisCount; ++index)
         {
-            if (index > 0)
+            // 가로일 때만 옆으로 붙인다. 세로면 그냥 다음 줄로 떨어진다.
+            if (index > 0 && !request.stacked)
             {
                 ImGui::SameLine(0.f, gap);
             }
@@ -154,8 +159,11 @@ namespace editor::widgets
 
         // 라벨. `DragFloat3` 와 같은 자리에 같은 규약으로 그린다 — `##` 뒤는
         // ID 이므로 표시하지 않고, 숨은 라벨이면 아무것도 그리지 않는다.
+        //
+        // 세로 배치에서는 라벨을 옆에 붙이지 않는다 — 마지막 축 줄 오른쪽에만
+        // 붙어 셋 전체의 이름으로 읽히지 않는다.
         const char* const visible = request.label;
-        if ('#' != visible[0] || '#' != visible[1])
+        if (!request.stacked && ('#' != visible[0] || '#' != visible[1]))
         {
             ImGui::SameLine(0.f, style.ItemInnerSpacing.x);
             ImGui::AlignTextToFramePadding();

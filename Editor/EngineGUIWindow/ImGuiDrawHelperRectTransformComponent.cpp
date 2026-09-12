@@ -254,12 +254,35 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 		ImGui::SameLine();
 
 		// 우: 값 편집 테이블 (라벨 | X | Y)
+		//
+		// 예전에는 X·Y 가 각각 90px 고정이고 라벨이 stretch 였다(W2-I2 가 고친
+		// 자리). 좁아지면 값 칸 180px 가 그대로 버텨 라벨이 먼저 죽고, 넓어지면
+		// 남는 폭이 전부 라벨 열로 갔다. 반대로 둔다 — 라벨에 상한을 주고 X·Y 가
+		// 남는 폭을 나눠 갖는다.
+		//
+		// 상태가 함수 지역 정적인 이유: 이 드로어는 자유 함수라 창 객체가 없다.
+		// 인스펙터가 하나뿐이라 성립하고, 둘이 되면 호출자가 소유해야 한다
+		// (`EditorPropertyRow.h` 의 `property_layout_state` 주석).
+		// 이 표의 라벨은 다섯으로 고정이다. 그 폭을 넘겨 라벨 열이 필요 이상
+		// 넓어지지 않게 한다. 이 표는 앵커 아이콘 오른쪽의 좁은 영역에 서므로
+		// 상단 구간과 같은 열을 쓸 수 없다 — 가용 폭 자체가 다르다.
+		static const char* const rectLabels[]{
+			"Anchor Min", "Anchor Max", "Pos", "Width/Height", "Pivot" };
+
+		static editor::widgets::property_layout_state rectLayoutState{};
+		const editor::widgets::property_layout_metrics rectLayout =
+			editor::widgets::measure_property_layout(
+				editor::widgets::property_layout_inputs_now(0,
+					editor::widgets::property_layout_label_hint(
+						rectLabels, IM_ARRAYSIZE(rectLabels))),
+				rectLayoutState);
+
 		if (ImGui::BeginTable("RectTransformTable", 3,
-			ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit, ImVec2(-1, 0)))
+			ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchSame, ImVec2(-1, 0)))
 		{
-			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed, 90.f);
-			ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthFixed, 90.f);
+			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, rectLayout.label_col);
+			ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthStretch);
 			ImGui::TableHeadersRow();
 
 			bool anchorsChanged = false;

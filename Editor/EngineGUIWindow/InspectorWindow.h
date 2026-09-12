@@ -3,6 +3,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CurvePoint.h"
+#include "EditorPropertyRow.h" // 배치 계약 (W2-I2)
 
 class Entity;
 class InspectorWindow
@@ -12,6 +13,11 @@ public:
 	~InspectorWindow() = default;
 
 private:
+	// 폭 전환의 직전 모드. 완충 폭과 편집 중 보류가 이것을 본다. 숨은 전역이
+	// 아니라 창이 들고 있어야 인스펙터가 둘 열렸을 때 서로의 모드를 흔들지
+	// 않는다(`EditorPropertyRow.h` 의 `property_layout_state` 주석).
+	editor::widgets::property_layout_state m_layout{};
+
 	bool m_openNewTagPopup{ false };
 	bool m_openNewLayerPopup{ false };
 	bool m_openFSMPopup{ false };

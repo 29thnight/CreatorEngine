@@ -384,6 +384,162 @@ namespace editor
                           "mode button", "disabled icon reads differently");
         }
 
+        // ── 배치 계약 (W2-I2) ────────────────────────────────────────
+        //
+        // `measure_property_layout` 은 ImGui 를 부르지 않는 순수 함수라 여기서
+        // 합성 폭으로 직접 몰 수 있다. 화면 캡처로는 경계 왕복과 편집 중 보류를
+        // 잴 수 없어서 그렇게 뗐다.
+        {
+            using widgets::property_layout_inputs;
+            using widgets::property_layout_mode;
+            using widgets::property_layout_state;
+
+            // 계획서 §7 의 검증 폭 넷과 같은 단위다. 치수는 100% 배율 기준의
+            // 대표값을 손으로 넣는다 — 폰트에서 재면 검사가 폰트에 묶인다.
+            const auto make = [](float available) {
+                property_layout_inputs in{};
+                in.available = available;
+                in.label_max = 160.f;
+                in.label_ratio = widgets::property_layout_label_ratio();
+                in.value_min = 60.f;
+                in.axis_value_min = 40.f;
+                in.badge_width = 12.f;
+                in.gap = 8.f;
+                in.axis_gap = 4.f;
+                in.hysteresis = 8.f;
+                return in;
+            };
+
+            // ① 라벨 열은 상한을 넘지 않는다. 720px 의 40% 는 288 이다.
+            {
+                property_layout_state state{};
+                const auto metrics = widgets::measure_property_layout(make(720.f), state);
+                checks.expect(metrics.label_col <= 160.f + 0.01f,
+                    "property layout", "label column honours its cap");
+                checks.expect(metrics.value_col > 480.f,
+                    "property layout", "surplus width goes to the value column");
+            }
+
+            // ② 좁으면 값이 라벨 아래로 내려간다.
+            {
+                property_layout_state state{};
+                const auto wide = widgets::measure_property_layout(make(480.f), state);
+                checks.expect(property_layout_mode::inline_row == wide.mode,
+                    "property layout", "480px stays inline");
+
+                const auto narrow = widgets::measure_property_layout(make(100.f), state);
+                checks.expect(property_layout_mode::stacked == narrow.mode,
+                    "property layout", "100px stacks the value under the label");
+                checks.expect(narrow.label_col >= narrow.value_col - 0.01f,
+                    "property layout", "stacked label spans the row");
+            }
+
+            // ③ 완충 폭이 경계 왕복을 막는다. stacked 로 넘어간 임계값으로
+            //    되돌려도 inline 으로 돌아오지 않아야 한다 — 이것이 없으면
+            //    한 픽셀 흔들림에 열 위치가 매 프레임 바뀐다.
+            {
+                property_layout_state state{};
+                // inline → stacked 로 넘어가는 경계를 찾는다.
+                float boundary = 0.f;
+                for (float w = 400.f; w > 20.f; w -= 1.f)
+                {
+                    const auto m = widgets::measure_property_layout(make(w), state);
+                    if (property_layout_mode::stacked == m.mode) { boundary = w; break; }
+                }
+                checks.expect(boundary > 0.f,
+                    "property layout", "a stacking boundary exists");
+
+                // 경계 바로 위로 되돌린다. 완충 폭만큼 더 넓어지기 전에는
+                // stacked 를 유지해야 한다.
+                const auto back = widgets::measure_property_layout(make(boundary + 1.f), state);
+                checks.expect(property_layout_mode::stacked == back.mode,
+                    "property layout", "hysteresis holds the stacked mode at the boundary");
+
+                const auto recovered =
+                    widgets::measure_property_layout(make(boundary + 40.f), state);
+                checks.expect(property_layout_mode::inline_row == recovered.mode,
+                    "property layout", "enough extra width returns to inline");
+            }
+
+            // ④ 편집 중에는 모드를 붙든다. 드래그 중 값 칸이 다른 줄로 옮겨
+            //    가면 드래그가 끊긴다.
+            {
+                property_layout_state state{};
+                widgets::measure_property_layout(make(480.f), state);
+                property_layout_inputs editing = make(60.f);
+                editing.editing = true;
+                const auto held = widgets::measure_property_layout(editing, state);
+                checks.expect(property_layout_mode::inline_row == held.mode,
+                    "property layout", "editing holds the previous mode");
+                checks.expect(!held.axis_stacked,
+                    "property layout", "editing holds the previous axis mode");
+            }
+
+            // ⑤ 축은 값 열을 셋으로 나눈 뒤에 판정한다. 슬롯이 badge + 숫자
+            //    최소 폭을 못 담으면 세로로 간다.
+            {
+                property_layout_state state{};
+                const auto wide = widgets::measure_property_layout(make(720.f), state);
+                checks.expect(!wide.axis_stacked,
+                    "property layout", "720px keeps the three axes on one line");
+
+                const auto narrow = widgets::measure_property_layout(make(240.f), state);
+                checks.expect(narrow.axis_stacked,
+                    "property layout", "240px stacks the axes vertically");
+            }
+
+            // ⑥ 라벨 힌트가 열의 위를 한 번 더 막는다. 힌트가 없으면 짧은
+            //    이름만 있는 구간도 가용 폭의 40% 를 통째로 가져가고, 그만큼
+            //    값 열이 줄어 축이 불필요하게 세로로 떨어진다.
+            {
+                property_layout_state state{};
+                property_layout_inputs hinted = make(720.f);
+                hinted.label_hint = 40.f;
+                const auto metrics = widgets::measure_property_layout(hinted, state);
+                checks.expect(metrics.label_col <= 40.01f,
+                    "property layout", "label hint caps the column");
+                checks.expect(metrics.value_col > 660.f,
+                    "property layout", "the width the hint saves goes to the value column");
+                checks.expect(!metrics.axis_stacked,
+                    "property layout", "the saved width keeps the axes inline");
+            }
+
+            // ⑦ 축 최소 폭은 행 전체의 것과 다른 값이다. 같은 잣대를 대면
+            //    셋이 한 줄을 나눠 쓰는 축은 넉넉한 폭에서도 세로로 떨어진다.
+            //    실제로 처음 판이 그랬다.
+            {
+                property_layout_state state{};
+                // 두 잣대 사이에 슬롯이 떨어지는 폭을 고른다. 그래야 잣대가
+                // 갈리는 것만으로 판정이 뒤집히는 것을 보인다.
+                property_layout_inputs coarse = make(330.f);
+                coarse.axis_value_min = coarse.value_min; // 행 전체의 잣대를 축에 댄다
+                const auto wrong = widgets::measure_property_layout(coarse, state);
+
+                property_layout_state fresh{};
+                const auto right = widgets::measure_property_layout(make(330.f), fresh);
+                checks.expect(wrong.axis_stacked && !right.axis_stacked,
+                    "property layout", "axis minimum is not the row minimum");
+
+                const char* axisSample = widgets::property_layout_axis_sample();
+                checks.expect(nullptr != axisSample &&
+                    0 != std::strcmp(axisSample, widgets::property_layout_value_sample()),
+                    "property layout", "axis sample differs from the row sample");
+            }
+
+            // ⑧ 값 최소 폭은 현재 숫자가 아니라 고정 대표 문자열로 잰다.
+            //    이것이 흔들리면 값이 바뀔 때마다 열이 움직인다.
+            {
+                const char* sample = widgets::property_layout_value_sample();
+                checks.expect(nullptr != sample && '\0' != sample[0],
+                    "property layout", "value sample is a fixed string");
+                checks.expect(widgets::property_layout_label_max_logical() > 0.f,
+                    "property layout", "label cap is a positive logical pixel value");
+                checks.expect(widgets::property_layout_label_ratio() > 0.f &&
+                    widgets::property_layout_label_ratio() < 1.f,
+                    "property layout", "label ratio is a proper fraction");
+            }
+        }
+
         report += "[";
         report += checks.failed == 0 ? "OK" : "FAIL";
         report += "] editor theme contracts: " + std::to_string(checks.checked) +
