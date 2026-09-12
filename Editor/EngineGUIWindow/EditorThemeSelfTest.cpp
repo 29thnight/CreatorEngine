@@ -5,6 +5,8 @@
 #include "EditorPropertyRow.h"
 #include "EditorAxisField3.h"
 #include "EditorModeButton.h"
+#include "EditorInspectorPanel.h"
+#include "WindowDesc.h"
 #include "ImGui.h"
 
 #include <array>
@@ -665,6 +667,146 @@ namespace editor
                     "property layout", "value sample is a fixed string");
                 checks.expect(widgets::property_layout_label_min_logical() > 0.f,
                     "property layout", "label minimum is a positive logical pixel value");
+            }
+        }
+
+        // ── 인스펙터 패널 (W2-I4) ────────────────────────────────────
+        //
+        // 최상위 타입 하나가 패널 하나다. 치수는 s&box `InspectorHeader.BuildUI`
+        // 의 칸 폭을 옮긴 것이고, 여기서는 그 칸들이 서로 어긋나지 않는지만
+        // 본다 — 화면 캡처로는 "이름이 1px 밀렸다" 를 판정할 수 없다.
+        {
+            using widgets::inspector_panel_inputs;
+
+            const auto make = [](float available, float scale) {
+                inspector_panel_inputs in{};
+                in.available = available;
+                in.row_height = 20.f * scale;
+                in.scale = scale;
+                in.button_count = 1;
+                return in;
+            };
+
+            // ① 체크박스가 있든 없든 이름은 같은 x 에 선다.
+            //
+            // s&box 가 체크박스 없는 타입에도 `AddSpacingCell( 24 + 8 )` 로
+            // 같은 폭을 비우는 자리다. 비우지 않으면 Transform 만 이름이
+            // 왼쪽으로 밀려 목록의 세로선이 깨진다. 우리 치수는 체크박스
+            // 유무를 입력으로 받지도 않는다 — 받으면 갈릴 수 있다.
+            {
+                const auto metrics = widgets::measure_inspector_panel(make(400.f, 1.f));
+                const float expected = 4.f + 16.f + 22.f + 4.f + 24.f + 8.f;
+                checks.expect(std::fabs(metrics.title_x - expected) < 0.01f,
+                    "inspector panel", "the title starts past a always-reserved toggle cell");
+                checks.expect(metrics.title_x > metrics.lead + metrics.expander + metrics.icon,
+                    "inspector panel", "the title clears the chevron and the icon");
+            }
+
+            // ② 이름 칸은 오른쪽 버튼과 꼬리 여백을 비켜 간다. 겹치면 글자와
+            //    아이콘이 포개져 둘 다 안 읽힌다.
+            {
+                const auto metrics = widgets::measure_inspector_panel(make(400.f, 1.f));
+                const float right_edge = metrics.title_x + metrics.title_w;
+                checks.expect(right_edge <= 400.f - 20.f - 16.f + 0.01f,
+                    "inspector panel", "the title stops before the menu button");
+            }
+
+            // ③ 칸은 DPI 배수를 탄다. 폰트만 커지고 칸이 그대로면 200% 에서
+            //    아이콘이 제 칸을 넘어 이름을 밀어낸다.
+            {
+                const auto one = widgets::measure_inspector_panel(make(400.f, 1.f));
+                const auto two = widgets::measure_inspector_panel(make(800.f, 2.f));
+                checks.expect(std::fabs(two.title_x - one.title_x * 2.f) < 0.01f,
+                    "inspector panel", "the cells scale with dpi");
+                checks.expect(two.height > one.height,
+                    "inspector panel", "the header grows with dpi");
+            }
+
+            // ④ 접힘·비활성이 불투명도를 낮춘다. s&box `OnPaint` 의 두 값이다 —
+            //    목록을 훑을 때 "켜져 있고 열려 있는 것" 이 먼저 눈에 들어야
+            //    한다. 둘 다면 낮은 쪽이다.
+            {
+                const float open_on = widgets::inspector_panel_opacity(true, false);
+                const float closed = widgets::inspector_panel_opacity(false, false);
+                const float off = widgets::inspector_panel_opacity(true, true);
+                const float both = widgets::inspector_panel_opacity(false, true);
+
+                checks.expect(open_on > closed,
+                    "inspector panel", "a collapsed panel reads dimmer than an open one");
+                checks.expect(open_on > off,
+                    "inspector panel", "a disabled component reads dimmer than an enabled one");
+                checks.expect(both <= off + 0.001f && both <= closed + 0.001f,
+                    "inspector panel", "collapsed and disabled takes the lower of the two");
+                checks.expect(std::fabs(open_on - 1.f) < 0.001f,
+                    "inspector panel", "an open enabled panel is drawn at full strength");
+            }
+        }
+
+        // ── 창 크기의 DPI 배수 (W2-I4) ───────────────────────────────
+        //
+        // 경계값을 화면으로는 못 본다. 200% 모니터에서 1920 논리는 3840 물리인데
+        // 그 모니터가 3840 이면 작업 표시줄만큼 넘친다. 순수 함수라 합성 DPI 로
+        // 직접 몬다.
+        {
+            // ⑤ 배수가 곱해진다. 곱하지 않으면 200% 에서 쓸 수 있는 자리가
+            //    논리 960 이 되어 도크 넷을 펼칠 수 없다.
+            {
+                ScaledClientSizeRequest request{};
+                request.logicalWidth = 1920;
+                request.logicalHeight = 1080;
+                request.dpi = 192;
+                const ScaledClientSize size = ScaleClientSizeToDpi(request);
+                checks.expect(3840 == size.width && 2160 == size.height,
+                    "window dpi", "200 percent doubles the client size");
+            }
+
+            // ⑥ 96 DPI 에서는 적힌 값 그대로다.
+            {
+                ScaledClientSizeRequest request{};
+                request.logicalWidth = 1920;
+                request.logicalHeight = 1080;
+                request.dpi = 96;
+                const ScaledClientSize size = ScaleClientSizeToDpi(request);
+                checks.expect(1920 == size.width && 1080 == size.height,
+                    "window dpi", "96 dpi leaves the written size alone");
+            }
+
+            // ⑦ 125% 가 잘려 나가지 않는다. 96 으로 먼저 나누면 정수 나눗셈이
+            //    배수를 1 로 만들어 아무것도 안 커진다.
+            {
+                ScaledClientSizeRequest request{};
+                request.logicalWidth = 1920;
+                request.logicalHeight = 1080;
+                request.dpi = 120;
+                const ScaledClientSize size = ScaleClientSizeToDpi(request);
+                checks.expect(size.width > 1920 && size.height > 1080,
+                    "window dpi", "125 percent is not truncated away");
+            }
+
+            // ⑧ 작업 영역을 넘지 않는다. 자르지 않으면 창이 화면보다 커져
+            //    오른쪽과 아래가 잘린 채 열린다.
+            {
+                ScaledClientSizeRequest request{};
+                request.logicalWidth = 1920;
+                request.logicalHeight = 1080;
+                request.dpi = 192;
+                request.maxWidth = 3000;
+                request.maxHeight = 1600;
+                const ScaledClientSize size = ScaleClientSizeToDpi(request);
+                checks.expect(3000 == size.width && 1600 == size.height,
+                    "window dpi", "the work area clamps the scaled size");
+            }
+
+            // ⑨ DPI 를 못 읽으면 키우지 않는다. 모르는 값으로 키운 창은 화면
+            //    밖으로 나간다 — 모를 때는 가만히 있는 쪽이 덜 나쁘다.
+            {
+                ScaledClientSizeRequest request{};
+                request.logicalWidth = 1280;
+                request.logicalHeight = 720;
+                request.dpi = 0;
+                const ScaledClientSize size = ScaleClientSizeToDpi(request);
+                checks.expect(1280 == size.width && 720 == size.height,
+                    "window dpi", "an unreadable dpi leaves the size alone");
             }
         }
 

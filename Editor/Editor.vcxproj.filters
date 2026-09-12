@@ -339,6 +339,12 @@
     <ClInclude Include="EngineGUIWindow\InspectorDrawerList.h">
       <Filter>EditorUI\DrawHelper</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorIconList.h">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorIcon.h">
+      <Filter>EditorUI\DrawHelper</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\InspectorDrawerMath.h">
       <Filter>EditorUI\DrawHelper</Filter>
     </ClInclude>
@@ -400,6 +406,9 @@
       <Filter>ImGuiHelper\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\EditorPropertyRow.h">
+      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorInspectorPanel.h">
       <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\EditorAxisField3.h">
@@ -567,6 +576,9 @@
       <Filter>ImGuiHelper\소스 파일\CollapsingHeader</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\EditorPropertyRow.cpp">
+      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorInspectorPanel.cpp">
       <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\EditorAxisField3.cpp">

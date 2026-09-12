@@ -102,6 +102,9 @@ namespace
 		config.window.iconResourceId = IDI_ACADEMY4Q;
 		config.window.style = WS_OVERLAPPEDWINDOW;
 		config.window.centerOnDesktop = true;
+		// 1920x1080 은 이제 **논리** 크기다. 200% 모니터에서는 창도 두 배로
+		// 열려야 UI 배율과 아귀가 맞는다.
+		config.window.scaleClientToDpi = true;
 		config.window.fitNearestMonitor = false;
 		config.window.showOnCreate = false;
 		config.window.acceptFileDrops = true;

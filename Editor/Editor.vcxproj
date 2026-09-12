@@ -108,6 +108,8 @@
     <ClInclude Include="EngineGUIWindow\ICustomEditor.h" />
     <ClInclude Include="EngineGUIWindow\InspectorDrawer.h" />
     <ClInclude Include="EngineGUIWindow\InspectorDrawerList.h" />
+    <ClInclude Include="EngineGUIWindow\InspectorIcon.h" />
+    <ClInclude Include="EngineGUIWindow\InspectorIconList.h" />
     <ClInclude Include="EngineGUIWindow\InspectorDrawerMath.h" />
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
@@ -128,6 +130,7 @@
     <ClInclude Include="ImGuiHelper\NodeEditor.h" />
     <ClInclude Include="ImGuiHelper\PinHelper.h" />
     <ClInclude Include="ImGuiHelper\ProfilerHUD.h" />
+    <ClInclude Include="ImGuiHelper\EditorInspectorPanel.h" />
     <ClInclude Include="ImGuiHelper\EditorPropertyRow.h" />
     <ClInclude Include="ImGuiHelper\EditorAxisField3.h" />
     <ClInclude Include="ImGuiHelper\EditorModeButton.h" />
@@ -282,6 +285,7 @@
     <ClCompile Include="ImGuiHelper\BlueprintBuilder.cpp" />
     <ClCompile Include="ImGuiHelper\drawing.cpp" />
     <ClCompile Include="ImGuiHelper\EditorSectionHeader.cpp" />
+    <ClCompile Include="ImGuiHelper\EditorInspectorPanel.cpp" />
     <ClCompile Include="ImGuiHelper\EditorPropertyRow.cpp" />
     <ClCompile Include="ImGuiHelper\EditorAxisField3.cpp" />
     <ClCompile Include="ImGuiHelper\EditorModeButton.cpp" />

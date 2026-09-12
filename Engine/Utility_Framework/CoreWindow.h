@@ -218,6 +218,74 @@ private:
         RegisterClass(&wc);
     }
 
+    // 논리 크기로 만든 창을 대상 모니터의 DPI 배수로 키운다.
+    //
+    // 이 함수가 없던 동안 에디터는 200% 모니터에서 물리 1920 으로 열렸다.
+    // ImGui 는 폰트와 여백을 DPI 배수로 키우므로(`FontScaleDpi`) 그 창의
+    // 쓸모는 논리 960 짜리였다 — 씬·하이어라키·인스펙터·콘텐츠를 한 번에
+    // 펼칠 수 없는 폭이다. 창만 안 커진 것이 문제였다.
+    void ApplyDpiClientSize()
+    {
+        if (!m_desc.scaleClientToDpi || nullptr == m_hWnd)
+        {
+            return;
+        }
+
+        const UINT dpi = GetDpiForWindow(m_hWnd);
+        if (0 == dpi || USER_DEFAULT_SCREEN_DPI == dpi)
+        {
+            return;
+        }
+
+        MONITORINFO monitorInfo{};
+        monitorInfo.cbSize = sizeof(MONITORINFO);
+        const HMONITOR monitor = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
+        if (!GetMonitorInfoW(monitor, &monitorInfo))
+        {
+            return;
+        }
+
+        // 창틀도 DPI 를 탄다. DPI 를 모르는 `AdjustWindowRectEx` 로 재면
+        // 200% 에서 테두리가 절반 폭으로 계산되어 클라이언트가 그만큼 넘친다.
+        RECT frame{ 0, 0, 0, 0 };
+        AdjustWindowRectExForDpi(&frame, m_desc.style, FALSE,
+            m_desc.extendedStyle, dpi);
+        const int frameWidth  = (frame.right - frame.left);
+        const int frameHeight = (frame.bottom - frame.top);
+
+        // `rcWork` 다. `rcMonitor` 를 쓰면 작업 표시줄 아래로 창이 깔린다.
+        const int workWidth  = monitorInfo.rcWork.right - monitorInfo.rcWork.left;
+        const int workHeight = monitorInfo.rcWork.bottom - monitorInfo.rcWork.top;
+
+        ScaledClientSizeRequest request{};
+        request.logicalWidth  = m_desc.clientWidth;
+        request.logicalHeight = m_desc.clientHeight;
+        request.dpi           = static_cast<int>(dpi);
+        request.maxWidth      = workWidth - frameWidth;
+        request.maxHeight     = workHeight - frameHeight;
+
+        const ScaledClientSize size = ScaleClientSizeToDpi(request);
+        if (size.width <= 0 || size.height <= 0)
+        {
+            return;
+        }
+
+        m_width  = size.width;
+        m_height = size.height;
+
+        const int windowWidth  = m_width + frameWidth;
+        const int windowHeight = m_height + frameHeight;
+
+        // 다시 가운데로 놓는다. 만들 때의 가운데는 논리 크기 기준이라 커진
+        // 창이 오른쪽·아래로 밀려 있다. 기준도 `GetDesktopWindow` 가 아니라
+        // **이 창이 뜬 모니터**의 작업 영역이다 — 그쪽은 주 모니터만 본다.
+        const int x = monitorInfo.rcWork.left + (workWidth - windowWidth) / 2;
+        const int y = monitorInfo.rcWork.top + (workHeight - windowHeight) / 2;
+
+        SetWindowPos(m_hWnd, nullptr, x, y, windowWidth, windowHeight,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
     void CreateAppWindow()
     {
         RECT windowRect{ 0, 0, m_width, m_height };
@@ -256,6 +324,11 @@ private:
         {
             DragAcceptFiles(m_hWnd, TRUE);
         }
+
+        // 창을 만든 **뒤에** DPI 를 묻는다. 만들기 전에는 어느 모니터에 뜰지
+        // 모르고, 모니터마다 DPI 가 다르다. `GetDpiForWindow` 는 user32 라
+        // shcore 를 새로 걸지 않아도 된다.
+        ApplyDpiClientSize();
 
         if (m_desc.fitNearestMonitor)
         {

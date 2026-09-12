@@ -1,6 +1,9 @@
 #include "../EngineEntry/EditorProjectOperations.h"
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
+
+#include "EditorInspectorPanel.h"
+#include "InspectorIconList.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
 #include "EditorMenuDraw.h"
@@ -137,6 +140,11 @@ void editor::windows::draw_inspector()
 void editor::windows::register_inspector_typed_draws()
 {
 	RegisterAllTypedDraws();
+
+	// 아이콘 표도 같은 자리에서 채운다. 그리는 쪽은 런타임 타입 ID 만 들고
+	// 있으므로 표가 미리 서 있어야 한다 — 첫 프레임에 채우면 그 프레임의
+	// 컴포넌트 머리줄이 전부 아이콘 없이 그려진다.
+	editor::inspector::register_inspector_icons();
 }
 
 void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
@@ -574,11 +582,15 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		i *= math::rad_to_deg;
 	}
 
-	editor::widgets::section_header_request transformHeader{};
-	transformHeader.label = "Transform";
-	transformHeader.menu_icon = ICON_FA_BARS;
-	const editor::widgets::section_header_result transformHeaderState =
-		editor::widgets::draw_section_header(transformHeader);
+	// Transform 은 끌 수 없는 컴포넌트라 체크박스를 넘기지 않는다. 그래도
+	// 패널이 체크박스 칸을 비워 두므로 이름은 다른 컴포넌트와 같은 x 에 선다.
+	editor::widgets::inspector_panel_request transformPanel{};
+	transformPanel.label = "Transform";
+	transformPanel.icon = editor::inspector::inspector_icon(
+		type_guid(Transform).m_ID_Data);
+	transformPanel.menu_icon = ICON_FA_BARS;
+	const editor::widgets::inspector_panel_result transformHeaderState =
+		editor::widgets::begin_inspector_panel(transformPanel);
 	bool menuClicked = transformHeaderState.menu_clicked;
 	if (transformHeaderState.open)
 	{
@@ -697,6 +709,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 			gameObject->Transform_().UpdateLocalMatrix();
 		}
 	}
+
+	editor::widgets::end_inspector_panel();
 
 	if (menuClicked) {
 		ImGui::OpenPopup("TransformMenu");
@@ -1835,12 +1849,14 @@ void InspectorWindow::Draw()
 			// OnEnable/OnDisable이 영영 호출되지 않는다. 지역 값으로 받아
 			// 전이가 생긴 프레임에만 컴포넌트에 알린다.
 			bool isEnabled = component->IsEnabled();
-			editor::widgets::section_header_request componentHeader{};
-			componentHeader.label = componentBaseName.c_str();
-			componentHeader.menu_icon = ICON_FA_BARS;
-			componentHeader.enabled = &isEnabled;
-			const editor::widgets::section_header_result componentHeaderState =
-				editor::widgets::draw_section_header(componentHeader);
+			editor::widgets::inspector_panel_request componentPanel{};
+			componentPanel.label = componentBaseName.c_str();
+			componentPanel.icon = editor::inspector::inspector_icon(
+				component->GetTypeID().m_ID_Data);
+			componentPanel.menu_icon = ICON_FA_BARS;
+			componentPanel.enabled = &isEnabled;
+			const editor::widgets::inspector_panel_result componentHeaderState =
+				editor::widgets::begin_inspector_panel(componentPanel);
 			// isOpen은 프레임을 건너 사는 정적 변수라, 아래에서 ComponentMenu를
 			// 열고 스스로 끌 때까지 살아 있어야 한다. 원본도 눌린 프레임에만
 			// true를 써 넣었다 — 안 눌렸다고 false로 덮으면 팝업이 뜨기 전에
@@ -1980,6 +1996,10 @@ void InspectorWindow::Draw()
 					}
 				}
 			}
+
+			// 접혀 있어도 부른다. 여는 쪽이 ID 와 들여쓰기를 밀어 두기 때문에
+			// 건너뛰면 그 뒤의 모든 줄이 한 칸씩 밀린 채 프레임이 끝난다.
+			editor::widgets::end_inspector_panel();
 		}
 
 		ImGui::Separator();
