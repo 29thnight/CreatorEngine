@@ -32,21 +32,14 @@ pwsh Tools/regression/run-all.ps1
 | `verify-shutdown-order.ps1` | 첫 프레임이 만들어지기 전에 종료를 걸어, `Dx11Main::Finalize`가 렌더 스레드(CB/CE)를 완전히 세운 뒤에야 렌더 씬을 해체하는지. 순서가 뒤집히면 커맨드를 만드는 중에 발밑에서 자료구조가 사라진다. 확률적이라 6회 반복한다. |
 | `verify-crash-dump.ps1` | `crash.test`로 일부러 죽여 크래시 경로(AV·abort·미처리 예외)가 실제로 `.dmp`와 심볼 붙은 스택을 남기는지. 덤프 코드는 크래시가 나야만 실행돼서 평소엔 아무도 확인하지 않고, 그래서 조용히 망가져 있었다 — 로그에 CRASH 줄만 남고 덤프가 통째로 없는 크래시가 실제로 있었다. |
 | `verify-lifecycle-baseline.ps1` | 생명주기가 누구를 어떤 순서로 부르는지(PHASE 9-0). 지금 순서는 델리게이트의 우선순위 정렬과 등록 시점이 만드는 창발적 결과라 코드로는 알 수 없고, PHASE 9가 그 기구를 통째로 바꾼다. 교체 전에 기준선을 떠 두어야 교체 후 "동작이 같다"를 주장할 수 있다. 기준선 파일이 없으면 `run-all`이 이 항목을 건너뛴다. |
-| `verify-reflection-golden.ps1` | 리플렉션 직렬화 출력이 변하지 않았는지(PHASE 18 CT0). `reflect.golden`이 등록 전 타입을 기본 생성해 직렬화한 덤프를 골든과 diff 0으로 대조한다 — 컴파일타임 전환(CT4~CT5) 구간에서 "필드가 조용히 빠지는" 회귀를 잡는 유일한 자다. 씬·프리팹 콘텐츠에 기대지 않으므로 GUID 같은 실행마다 다른 값이 안 섞인다. `perf.reflect` 수치(씬 Serialize·InstantiatePrefab)는 기록만 하고 판정하지 않는다 — 시간에 문턱을 걸면 머신 편차로 거짓 실패가 나 검사가 신뢰를 잃는다. 골든이 없으면 `run-all`이 건너뛴다(`-Baseline`으로 생성). |
 | `verify-bt-smoke.ps1` | 행동 트리가 **실제로 도는지**(PHASE 9-8). 이 세트의 나머지는 BT를 한 줄도 실행하지 않는다 — BT 컴포넌트는 프리팹에만 붙어 있고 다른 시나리오가 여는 씬에는 없다. 게다가 트리 생성·틱은 실패할 때만 로그를 남겨(성공은 무음) "트리가 안 서서 AI가 가만히 있다"와 "정상"이 로그에서 같아 보인다. 그래서 `bt.status`로 수를 센다: 소환 전 0개 → 소환 후 3개 → 재생 중 틱 증가 → 씬 교체 후 0개. 경계 불변식(프레임당 크로싱 ≤ 1회, 크로싱당 전달 틱 > 1)도 여기서 수치로 못 박는다. **게임 콘텐츠에 기대지 않는다** — 전용 노드(`GameScripts/BTProbeNodes.cs`)와 전용 그래프(`BTProbe.bt`/`.blackboard`/`.prefab`)를 쓴다. 게임 프리팹을 쓰면 콘텐츠가 바뀔 때마다 흔들리고, 엔진 경로를 재는 검사가 콘텐츠 회귀로 오해되기 시작하면 아무도 믿지 않게 된다. |
 | `verify-asset-authoring-ownership.ps1` | E2의 asset writer 경계를 정적·동적으로 함께 고정한다. `ModelLoader`/`Terrain`에 filesystem writer가 재유입되지 않았는지 검사하고, 고유 GLB를 두 번 import해 Editor가 model cache와 embedded PNG를 처음 한 번만 게시하는지 확인한다. Terrain은 height/splat/texture를 임시 세대에 완성한 뒤 descriptor를 마지막에 게시하며, 실패 요청이 기존 descriptor·세대를 바꾸지 않는지도 검사한다. 같은 Editor 세션의 model reimport, Player writer 부재, `.tmp`·probe 잔여 검사도 함께 수행한다. |
 | `verify-asset-runtime-change-boundary.ps1` | E2의 Editor→Runtime asset 변경 계약을 고정한다. `DataSystem`의 public catalog mutation primitive 재노출을 막고 `CatalogUpsert`/`ContentReload`/`Removed` 단일 계약, 이전 cache generation pin, Editor 게시 완료 후 발행, Player 생산자 부재를 검사한다. |
 | `verify-asset-presentation-boundary.ps1` | E2의 picker/icon/font 경계를 고정한다. `DataSystem`에 ImGui·파일/gizmo 아이콘·폰트·material 전달 상태가 재유입되지 않는지, `EditorAssetPresentation`이 두 selector와 표시 리소스를 소유하는지, gizmo texture가 `ScriptBinder`의 Editor 역참조가 아니라 프레임 packet의 공유 수명 입력으로 전달되는지, Player가 presentation을 설치하지 않는지 검사한다. |
 | `verify-mbc-cutover-freeze.ps1` | PHASE 3.75(모델 자산 빅뱅 전환) **변경 동결 래칫**(정적). `ModelAssetBigBangCutoverPlan §5.2`가 제품에서 제거하기로 한 표면 — 역브리지(`BuildLegacyModelFromExperiment`·`ModelSceneBridge`), A/B 스위치(`CREATOR_EXPERIMENT_VERTEX`), 병행 상태(`m_experimentMeshBindings`·`m_hashingMesh`), Assimp include·vcpkg port, pseudo-v5(`DeterministicSubAssetId`·`Uuid::FromName`), 무조건 진단 출력 — 의 코드 접촉 수(주석 제거 뒤)를 `mbc_cutover_freeze.baseline.tsv`와 대조해 **증가만 막는다**(MBC9 이후 제거 표면은 전부 0 — 기준선이 곧 "재유입 0")(감소는 그 슬라이스가 `-Baseline`으로 내려 고정). MBC10부터 제거 표면 12종(역브리지·A/B·병행 바인딩·Assimp include·pseudo-v5·ModelSceneBridge·LoadModelViaExperiment·무조건 진단 출력 4종)은 **하드 0**이고 vcpkg assimp 0, `m_hashingMesh`는 절차 지오메트리 허용목록 10파일 밖 0, 제품 소비자(SceneRuntime·Render·PrimitiveRenderProxy·EngineGUIWindow)의 `experiment::Model`/`TryGetMesh` 0, generation 게시 진입점(`m_modelAssetGenerations.Publish`)은 DataSystem 하나, `experiment.animlive`는 `PublishAnimatorPose`를 부르지 않고 읽기 전용 스냅샷을 읽으며 `assets.modeldiag`가 존재해야 한다. 그 밖의 하드 계약 셋도 래칫이 아니다: model sidecar writer는 허용목록(EditorAssetDatabase·ModelIdentityRefresher) 밖에 생기면 즉시 실패, 검사 전용 seam(`DeriveIdentityWithProfile`·`InsertUncheckedForTest`)은 `Assets/` 정의 밖 0건, 새 `Assets/` 계층 안에 legacy 신원 API(`FromName`·`IsAssetIdV4`·`CreateRandomV4`) 0건. 동결의 위반은 그림을 바꾸지 않으므로(폴백을 한 겹 더 붙이면 오히려 "고쳐진" 것처럼 보인다 — 2026-09-02 MeshRenderer 순서 해킹이 그랬다) 축은 픽셀이 아니라 접촉 수다. |
-| `verify-asset-identity.ps1` | PHASE 3.75 MBC1 자산 신원 프로필 `ce.uuidv8.sha256.v1`. **세 갈래 독립 유도**가 같은 값을 내야 통과한다: ① 제품 C++(`assets.identity` selftest — FIPS 180-4 KAT 5종, BCrypt `ComputeSha256`과 44개 버퍼 대조, 벡터 15건의 입력 바이트열·SHA·UUID, fail-closed 4+6+2종, legacy v4/v5/pseudo-v5 표기 거부, registry Registered/DuplicateTuple/UuidCollision/RecomputeMismatch), ② Python hashlib(`Generate-AssetIdentityVectors.py`가 낸 `asset_identity_vectors.json`), ③ .NET SHA256(이 스크립트가 §2.2 바이트 계약을 **다시 조립**해 계산). ①=②만 보면 같은 (틀린) 규약을 공유한 눈먼 초록이 가능해(experiment.anim D4e-1) ③을 둔다. 변이는 벡터 안에 있다 — 프로필 문자열 한 글자(`v0`) 변이 벡터가 원본과 달라야 하고, 길이 접두 없이 같은 바이트열이 되는 `ab\|c` vs `a\|bc` 쌍이 달라야 한다. 단정 수 150 미만이면 검사 범위 축소로 실패. |
-| `verify-asset-sidecar-v2.ps1` | PHASE 3.75 MBC2 — identity epoch header(`ProjectSetting/AssetIdentity.asset`, CSPRNG 256-bit seed)·stable key 규칙 엔진·model sidecar schema v2. `assets.sidecar <assetRoot>`가 합성 단정([1] header 왕복·변조 거부, [2] key 문법 — `exporter:`/`name:`/`authoring:` 접두만, ordinal `gltf/material/0` 거부, [3] 규칙 — 이름 유일=semantic, 중복/무명=authoring, 재임포트는 콘텐츠 지문으로 재결합(순서 무관), 삭제=경고, 내용 변경+무명=**오류**(증명 불가), exporter id 중복=오류, [4] v2 코덱 — 왕복·다른 최상위 키 보존·legacy `guid` 제거·v1/ordinal/generation 0/대문자 id 거부·1비트 변조 RecomputeMismatch·epoch 불일치)을 돌린 뒤 실자산 corpus 전 모델을 임포트→배정→v2 생성→폐포 재유도하고 한 registry에서 충돌 0을 확인한다. 게이트가 더하는 실자산 단정: Gunner 재질 2·임베디드 6 전부 semantic, scene.glb 무명 재질 25 전부 authoring(authoring 경로가 실자산에서 실제로 돈다), 모델 ≥ 11, **원본·sidecar 해시 전후 동일**(이 슬라이스는 쓰지 않는다 — 쓰기는 MBC3). |
-| `verify-model-typed-consumers.ps1` | PHASE 3.75 MBC8/MBC9 — Animator·Foliage·Editor 창구의 typed generation 직접 소비. MBC9로 legacy Model·Assimp·역브리지·experiment 병행 핸들·A/B 스위치가 은퇴해 프로세스 하나(FT_Primitives+Gunner, 배치 후 저장·재로드)로 `[anim.tick] generation`(다른 경로 0), `experiment.animtick pass … poseDigest=8042DC1C path=generation`(typed 샘플러 골든), `boneresolve pass bones=N generation=N unresolved=0 serialGeneration=N roundtrip=0`(name→index→name 독립 유도), `animmask … viaGeneration=1 structure=ok`(스켈레톤 원자료 자기 대조), `editorsurface … clipGeneration=animators guardMismatch=0`, `foliage verify … generationTypes=N generationViews=N authoredMat=N`(합성 seed), MBC10부터 배치·해석·틱 관측은 읽기 전용 스냅샷 `assets.modeldiag`(instantiateGeneration=1·meshResolveGeneration ≥ 10·meshResolveFailed 0·tickGeneration ≥ 1·tickNone 0)로 잰고 제품 stdout 토큰(`[mesh.resolve]`·`[model.instantiate]`·`[anim.tick]`) 재유입과 `experiment.animlive`의 publish 호출(source=product 스냅샷이어야 한다)을 단정한다. 정적으로 `Animator::m_modelGeneration`·`GenerationPoseSource`·`FoliageType::m_modelGeneration`·`ModelAnimationSampler`·cook 참조 스캔의 UUIDv8 수용, legacy 파일 부재(Model.h·Skeleton.h·AnimatorData.h·ModelSceneBridge·ExperimentModelMigration)·Assimp include 0·vcpkg port 0을 요구한다. |
 | `verify-model-scene-consumption.ps1` | PHASE 3.75 MBC7 — Scene/MeshRenderer/material 직접 소비 + Gunner cold-load closure(§6.2). 두 프로세스로 잰다: A(저작) 빈 씬에 Gunner를 cache 로드·배치(`model.loadcached`·`model.place` — import를 타지 않아 tracked sidecar 불변)→`assets.scenemodel`(씬 전수: renderer가 `ModelAssetGeneration` handle을 붙들고 `RHIModelMeshView`가 완비되며 영속 `m_meshAssetId`가 채워졌고, 재질의 embedded texture owner 6/6이 **generation closure**(`DataSystem::ResolveModelGenerationTexture`)에서 왔는가 — 전역 임베디드 등록부 출처 0, 누락 0)→저장. B(콜드) 저장 씬 로드→같은 폐포 단정(같은 프로세스의 이전 로드·등록부 없이 6/6 — 순서 해킹 없이 성립하는 것을 증명하는 축)→`assets.scenemodel reload`(ContentReload 뒤 이전 texture generation owner 재사용 0·retire 6)→`dx12.scene`(실GPU 업로드 전량 typed generation — 총계 == generation, 커버리지 > 0). 정적으로 순서 해킹 토큰(`modelGuidHint`) 0과 typed 배선 심볼을 요구한다. MBC10부터 배치·콜드 해석 관측은 `assets.modeldiag` 스냅샷(instantiateGeneration=1·meshResolveGeneration ≥ 10·실패 0)이고 제품 stdout 토큰 재유입을 단정하며, dx12.scene의 `generation` 업로드 계수를 함께 센다. MBC9에서 legacy 축(legacyOnly/legacyParity/registryTextures)은 은퇴했고 `unbound`(UUIDv8인데 generation 없음) 0을 요구한다. |
 | `Export-MbcCorpusBaseline.ps1` | (게이트가 아니라 **기준선 export**) PHASE 3.75 MBC0. 모델 corpus 14건의 source SHA-256·sidecar GUID·subasset closure와 `.creator/.prefab/.asset` 28건의 GUID 참조를 키별로 분류(model / model-subasset / other-meta / type-or-instance / nil / unresolved)해 `mbc0_corpus_baseline.json`에 굳힌다. MBC4의 참조 rewrite와 MBC11의 "old GUID 0건" 판정이 이 파일을 입력으로 쓴다. `Dynamic_CPP/Assets` 대부분이 gitignore라 이 파일은 로컬 상태의 archive다 — 한 번 떠서 커밋하고 다시 뜨지 않는다. |
 | `verify-prefab-identity-injection.ps1` | 프리팹 identity가 **워처 스레드와의 경합**을 견디는지. `verify-prefab-duplicate`가 2026-08-30에 한 번 실패하고 재현되지 않았는데, 원인은 초기 상태가 아니라 efsw 워처였다 — 원자적 게시(`.tmp` → replace)를 목적지 경로의 Delete로 오독한 `HandleDeleted`가 본문이 멀쩡한데도 catalog 항목과 sidecar를 떨어뜨렸다(정상 실행 한 판에 두 번, 각 ~26ms 실측). 그 창에 `prefab.update`가 걸리면 `LoadPrefab`이 살아 있는 identity를 널로 덮고 → `SavePrefab`이 새 GUID를 발급하고 → `UpdateInstances`가 그 키로 조회해 **조용히 0건 적용**한다. 에러도 로그도 없고 판정 1~4는 전부 통과해서, 우연에 맡기면 원인을 못 가른다. 그래서 창을 열어 놓고 sidecar를 **밖에서 확정적으로** 떨어뜨린다. **교란이 실제로 먹었는지를 먼저 단정한다**(창 진입·삭제·삭제 직후 부재) — 그게 없으면 "교란을 넣지 못한 실행"이 통과로 나와 대조군을 검사로 착각한다. 판정은 원인(인스턴스 guid == sidecar guid)과 결과(`m_shadowCast`가 false)를 함께 본다. 고치기 전 RED, 고친 뒤 GREEN을 확인하고 편입했다. |
-| `verify-experiment-document-cook-parity.ps1` | D5-d 현재 corpus의 scene 8·prefab 9·standalone material 2를 실제 producer로 굽고 authoring/cooked 문서를 구조 비교한다. CLI 성공만 보지 않고 parity 요약, source/meta 무변경, stderr 0을 함께 단정한다. |
-| `verify-experiment-cooked-catalog.ps1` | 실제 package와 같은 전체 producer closure를 임시 CEMF에 굽는다. MBC11부터 모델 artifact는 게시된 generation 디렉터리(`Derived/Models/xx/<id>/<gen>/`)의 내보내기이고 제품은 마운트되면 그 generation 레코드로 읽는다(읽기 전용 스냅샷 `assets.modeldiag`의 `generationFromCatalog/FromLibrary`로 계수 — mounted는 Library 폴백 0, stale leg는 낡은 하나만 Library, unmounted 대조군은 catalog 0). texture·scene 문서는 종전대로 cooked 사용을 단정한다. |
-| `verify-model-cutover-budget.ps1` | PHASE 3.75 MBC11 §8.4 성능 예산(Release 전용). B1 cold source import(임시 프로젝트 사본에서 `assets.modelbench … author`의 in-process 저작 트랜잭션 min ≤ MBC0 legacy Assimp 추정), B2 cooked generation load(같은 사본의 generation을 런타임 리더로 재로드한 cookedMinMs ≤ MBC0 legacy `.asset` 읽기 × 1.25; 단계 분해 `authorPhases/cookedPhases`를 참고로 남긴다), B3 씬 로드(FT_Primitives·Test1 SceneLoadTotal ≤ 기준 × 1.10), B4 부팅 catalog ≤ 기준 × 1.10, B5 bench peak working set ≤ 1,351 MB, B6 frame/GPU/VRAM은 `mbc11_perf_archive.json`(`-Archive`로 뜬다) 대비 비회귀(archive 없으면 기록만). 수치가 흔들리는 축(B3/B4 ±7~18%)은 여유 계수가 흡수한다 — 붉으면 cutover를 연기하지 legacy를 되살리지 않는다. |
 
 ## 생명주기 기준선 뜨기 (PHASE 9-0)
 
@@ -124,45 +117,14 @@ stage를 게시한다.
 efsw 문자열 0"만 보면 빈 파일을 읽어도 통과하므로, 같은 방법으로 CreatorEditor.exe를 재서
 거기서는 반드시 검출되어야 한다고 함께 단정한다.
 
-## 직렬화 기준선 (SerializationPlan D0) — 이 검사만 Release를 쓴다
+## 은퇴한 기준선·parity 관문 (2026-09-12)
 
-```powershell
-pwsh Tools/regression/verify-serialization-baseline.ps1 -Baseline
-```
-
-`verify-serialization-baseline.ps1`은 세트에서 **유일하게 Release exe를 요구**한다.
-Debug는 같은 워크로드에서 단계별로 4~16배 느린 데다 **비중까지 뒤집는다** — 실측
-배율이 SceneParse 15.9배, ComponentLoad 5.5배라 Debug로 보면 파싱의 몫을 67%로,
-Release로 보면 58%로 읽게 된다. 그래서 Release가 없을 때 Debug로 **대체하지 않고**
-실패하며, `run-all.ps1`은 Release 부재 시 이 항목만 건너뛰고 그 사실을 출력한다.
-
-측정은 벤치가 재현한 모형이 아니라 제품 로드 경로 안에서 이뤄진다
-(`Engine/Utility_Framework/SerializationProfiler.h`의 Scope가 `SceneManager`·
-`ComponentFactory`·`PrefabUtility`·`DataSystem` 본체에 들어 있다). 계측 플래그는
-기본 꺼짐이고 `serialize.bench`가 켰다가 되돌린다.
-
-`-Baseline`을 주면 계획서에 옮길 표 형식으로 전체 수치를 찍는다.
-
-정본 `Test1.creator`가 없는 로컬 checkout에서는 역사 기준선을 덮어쓰지 말고
-`verify-phase17-local-d0-baseline.ps1`을 쓴다. 현재 가장 큰 scene 2개의 경로·크기·
-SHA-256을 출력하고 boot/scene 2/prefab Release selfcheck를 수행하므로 같은 해시의
-로컬 전후 비교에는 쓸 수 있지만 Test1 수치와 직접 비교할 수는 없다.
-
-## Cooked document parity와 제품 소비 (SerializationPlan D5-d)
-
-```powershell
-pwsh Tools/regression/verify-experiment-document-cook-parity.ps1
-pwsh Tools/regression/verify-experiment-cooked-catalog.ps1
-pwsh Tools/build.ps1 -Config Release -InputMode Project -BuildNative
-```
-
-첫 관문은 현존 scene 8·prefab 9·material 2의 authoring/cooked 구조 parity를 닫는다.
-둘째 관문은 모델만이 아니라 texture·ShaderMeta·material·scene/prefab producer closure를
-전부 넘겨 CEMF 의존성을 닫고 mounted/stale/unmounted 소비 경로를 대조한다. Release
-Project 검증은 pak에서 다시 열어 실제 Player가 CEMF identity만으로 부팅하고 cooked
-scene 문서를 여는지 확인한다. D6 이후 scene/prefab/material/ShaderMeta 산출물은
-CEDO 바이너리 tree payload이며, PrefabOverride 중첩 값도 `CEDO1:<base64>` envelope다.
-packaged Player에는 이 값의 YAML fallback과 구버전 YAML artifact 호환 reader가 없다.
+직렬화 기준선(D0) · cooked document parity(D5-d) · ryml 에러 정책(D3-b-1) 관문은
+PHASE 17 폐쇄와 함께 은퇴했다. 그것들이 부르던 `serialize.bench` ·
+`serialize.rymlerror` · `experiment.matcook` · `experiment.scenecook` · `experiment.catalog` 이
+함께 사라졌다 — 경위는 [은퇴 기록](../../docs/analysis/ClosedPlanCommandletRetirement.md).
+패키지 경로 자체는 `pwsh Tools/build.ps1 -Config Release -InputMode Project -BuildNative`
+로 그대로 돌린다.
 
 ## Player text parser 은퇴 (SerializationPlan D6)
 
@@ -176,24 +138,6 @@ scene 8·prefab 9·material 2·ShaderMeta 6의 GUID-addressed artifact 25개도 
 Player 스모크는 실제 text parser 진입 카운터가 정확히 0인지 강제하고, 위 독립 관문은
 runtime 모듈 direct ryml include/symbol 0, CEDO magic 43/43, legacy JSON 0을 다시 확인한다.
 구 Animator/NodeEditor JSON 31개는 reader를 되살리지 않고 pak 필터에서 제외한다.
-
-## ryml 에러 정책 (SerializationPlan D3-b-1)
-
-`verify-ryml-error-policy.ps1` — ryml의 기본 에러 처리는 예외도 반환값도 아니라
-**프로세스 abort**다. 파서를 제품 경로에 넣기 전에 그 abort를 예외로 바꾸는 정책이
-설치돼 있어야 한다.
-
-**이 검사의 이빨은 종료 코드가 아니라 크래시다.** ryml 0.16은 에러 콜백을
-`m_error_basic`/`m_error_parse`/`m_error_visit` 셋으로 나눈다. 하나만 빠져도 이
-명령은 "fail"을 찍는 것이 아니라 프로세스가 그 자리에서 죽는다 — 변이 2회로
-확인했다(basic 제거 → exit 3, parse 제거 → exit 3, 둘 다 게이트가 잡음).
-그래서 검사는 요약 라인의 **존재**와 종료 코드를 함께 본다.
-
-트리거는 지어내지 말고 재야 한다. 처음 쓴 재현("CRLF", "멀티라인 스칼라 키")을
-**ryml이 둘 다 조용히 받아들였다** — 게이트가 초록인데 아무것도 증명하지 않는
-상태였다. 14종을 태워 확인한 실제 트리거는 **홀로 선 CR**(basic)과
-**탭 들여쓰기**(parse)다. **CRLF는 정상 파싱되므로 오히려 통과해야 하는 대조군**이고,
-이것이 깨지면 파싱 전 정규화 사본이 다시 필요해져 D3-b의 성능 계산이 바뀐다.
 
 ## yaml-cpp 은퇴 + Base64 계약 (SerializationPlan D3-b-4)
 
@@ -210,11 +154,8 @@ runtime 모듈 direct ryml include/symbol 0, CEDO magic 43/43, legacy JSON 0을 
 ## JSON 트랙 은퇴 (SerializationPlan D4)
 
 구버전 JSON 호환은 제품 계약이 아니다. 현재 자산을 canonical YAML로 직접 이주했고
-제품 loader에는 migration reader나 dual-read를 두지 않는다. 정본 관문은 세 개다.
+제품 loader에는 migration reader나 dual-read를 두지 않는다. 정본 관문은 두 개다.
 
-- `verify-animator-scene-single-truth.ps1` — 실제 controller/parameter/Any State/
-  transition/condition graph를 scene YAML로 왕복하고 구조 안정성과 owner/parameter
-  포인터 재연결을 확인한다.
 - `verify-inputmap-yaml-corpus.ps1` — `.inputmap` 6개를 strict schemaVersion 1 YAML로
   전수 로드해 26 actions/104 keys와 키보드·게임패드 분류를 확인한다.
 - `verify-nlohmann-retirement.ps1` — Engine/Editor/Player source, vcpkg manifest와

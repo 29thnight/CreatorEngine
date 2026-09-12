@@ -270,7 +270,7 @@ try {
     foreach ($name in @('scene.load','object.create','object.describe','object.rename','object.delete','undo')) {
         if ($json.commands.name -notcontains $name) { $failures.Add("discovery : product command missing: $name") }
     }
-    foreach ($name in @('selftest','dx12.selftest','scene.hierarchymutation','experiment.matparity')) {
+    foreach ($name in @('selftest','dx12.selftest','experiment.cooked','experiment.matparity')) {
         if ($json.commands.name -contains $name) { $failures.Add("discovery : harness leaked into product commands: $name") }
     }
 

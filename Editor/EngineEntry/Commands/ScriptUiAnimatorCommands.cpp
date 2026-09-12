@@ -35,19 +35,19 @@
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelVertexLayout.h"    // MBC9: skinbounds typed 정점 디코드
 #include "Assets/ModelAnimationSampler.h" // MBC9: editorsurface frame 축(CountUniqueKeyTimes)
-#include "Assets/ModelAssetAuthoringTransaction.h" // MBC11: assets.modelbench author 모드
+#include "Assets/ModelAssetAuthoringTransaction.h" // MBC11: 모델 저작 트랜잭션
 #include "RHI/IRHIDeviceResources.h"                // MBC11: VRAM 계측
 #include "LifecycleTrace.h"
 #include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "Socket.h" // X7 transform bulk probe
 #include "BoneRegion.h" // MAX_BONES
-#include "Experiment/Model.h" // I5-D4e-1: experiment.animtick 패리티
+#include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
-#include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
-#include "FoliageComponent.h"      // I5-D5a: experiment.foliage 게이트
+#include "AvatarMask.h"       // I5: AvatarMask A/B 대조
+#include "FoliageComponent.h"      // I5: Foliage 게이트
 #include "Terrain.h"               // D4 Terrain YAML authoring round-trip
-#include "Experiment/MaterialInstance.h"      // I5-D5c1: experiment.matruntime
+#include "Experiment/MaterialInstance.h"      // I5: Experiment MaterialInstance
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
 #include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
 #include "Experiment/Cooked/CookedAssetCatalog.h"  // I7-C1
@@ -67,7 +67,7 @@
 #include "ImageComponent.h"
 #include "MeshRenderer.h" // X8 render proxy dirty probe
 #include "RectTransformComponent.h"
-#include "BoneComponent.h" // E7-b: scene.traversalbench 0 모드의 마커 보유 수 진단
+#include "BoneComponent.h" // E7-b: 본 마커 보유 수 진단
 #include "UIButton.h"
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
@@ -116,7 +116,7 @@
 #include "BlackBoard.h"
 #include "TagManager.h"
 #include <Windows.h>
-#include <psapi.h> // MBC11: assets.modelbench peak working set
+#include <psapi.h> // MBC11: peak working set
 #include <crtdbg.h>
 #include <algorithm>
 #include <atomic>
@@ -146,107 +146,6 @@
 
 namespace ConsoleCmd
 {
-    static CommandCore::CommandResult Cmd_animator_scene_probe(const ConsoleCommandContext& ctx)
-    {
-        using namespace CommandCore;
-        if (ctx.parts.size() != 1) return InvalidArguments("animator.scene.probe");
-        Animator source;
-        source.AddParameter<float>("Speed", 1.5f, ValueType::Float);
-        const auto controller = source.CreateController_UINoAni();
-        controller->name = "Base Layer";
-        AnimationState* anyState =
-            controller->CreateState("Any State", -1, true);
-        controller->CreateState("Idle", 0);
-        controller->CreateState("Run", 1);
-        controller->SetCurState("Idle");
-
-        AniTransition* transition =
-            controller->CreateTransition("Idle", "Run");
-        if (transition)
-        {
-            transition->exitTime = 0.25f;
-            transition->blendTime = 0.15f;
-            transition->hasExitTime = true;
-            TransCondition condition{
-                0.5f, ConditionType::Greater, ValueType::Float };
-            condition.valueName = "Speed";
-            condition.valueParameter = source.Parameters.front();
-            condition.m_ownerController = controller.get();
-            transition->conditions.push_back(condition);
-        }
-
-        Authoring::WriteDocument first = Meta::SerializeDocument(&source);
-        const std::string yaml = first.Dump();
-        std::string parseError;
-        auto parsed = Authoring::WriteDocument::ParseText(yaml, &parseError);
-
-        bool stable = false;
-        bool links = false;
-        std::size_t states = 0;
-        std::size_t transitions = 0;
-        std::size_t conditions = 0;
-        if (parsed)
-        {
-            Animator roundTrip;
-            const Authoring::ReadNode roundTripNode = parsed->Root().Read();
-            Meta::Deserialize(&roundTrip, roundTripNode);
-            // ComponentFactory와 같은 순서: typed fields 뒤 component post-load.
-            roundTrip.OnDeserialized(
-                Authoring::NodeViewAccess::Make(roundTripNode));
-            Authoring::WriteDocument second = Meta::SerializeDocument(&roundTrip);
-            stable = Authoring::NodesEqual(
-                first.Root().Read(), second.Root().Read());
-
-            if (roundTrip.m_animationControllers.size() == 1
-                && roundTrip.Parameters.size() == 1)
-            {
-                const auto& restored = roundTrip.m_animationControllers.front();
-                states = restored->StateVec.size();
-                for (const auto& state : restored->StateVec)
-                {
-                    transitions += state->Transitions.size();
-                    for (const auto& restoredTransition : state->Transitions)
-                        conditions += restoredTransition->conditions.size();
-                }
-
-                AnimationState* idle = restored->FindState("Idle");
-                links = restored->m_owner == &roundTrip
-                    && restored->m_curState == idle
-                    && restored->m_anyState
-                    && restored->m_anyState->m_isAny
-                    && restored->m_anyState->m_name == "Any State"
-                    && idle && idle->Transitions.size() == 1
-                    && idle->Transitions.front()->curState == idle
-                    && idle->Transitions.front()->nextState == restored->FindState("Run")
-                    && idle->Transitions.front()->conditions.size() == 1
-                    && idle->Transitions.front()->conditions.front().valueParameter
-                        == roundTrip.Parameters.front();
-            }
-        }
-
-        const bool passed = parsed.has_value() && stable && links
-            && nullptr != anyState && controller->m_anyState.get() == anyState
-            && states == 3 && transitions == 1 && conditions == 1
-            && !yaml.empty();
-        std::printf(
-            "[animator.scene.probe] controllers=%zu parameters=%zu states=%zu "
-            "transitions=%zu conditions=%zu yamlBytes=%zu stable=%d links=%d "
-            "selfcheck=%s\n",
-            source.m_animationControllers.size(), source.Parameters.size(), states,
-            transitions, conditions, yaml.size(), stable ? 1 : 0, links ? 1 : 0,
-            passed ? "pass" : "fail");
-        auto data = CommandData::Object();
-        data.Set("controllers", CommandData::Int(source.m_animationControllers.size()));
-        data.Set("parameters", CommandData::Int(source.Parameters.size()));
-        data.Set("states", CommandData::Int(states));
-        data.Set("transitions", CommandData::Int(transitions));
-        data.Set("conditions", CommandData::Int(conditions));
-        data.Set("yamlBytes", CommandData::Int(yaml.size()));
-        data.Set("stable", CommandData::Bool(stable));
-        data.Set("links", CommandData::Bool(links));
-        return passed ? Ok({}, std::move(data)) : Fail("animator.scene.failed", "Commandlet verification failed", std::move(data));
-    }
-
 	// 입력 액션맵은 맵마다 YAML `.inputmap` 하나다. 이름에 '.'이 든 맵과 실제
 	// action/key payload가 저장·재기동 후 그대로 복원되는지를 함께 본다.
 	// LC1 대표 selftest.
@@ -1252,7 +1151,6 @@ namespace ConsoleCmd
 
     void RegisterScriptUiAnimatorCommands(Registrar& reg)
     {
-        reg.Result({ "animator.scene.probe" }, &Cmd_animator_scene_probe);
         reg.Result({ "script.add" }, &Cmd_script_add);
         reg.Result({ "script.fields" }, &Cmd_script_fields);
         reg.Result({ "script.set" }, &Cmd_script_set);

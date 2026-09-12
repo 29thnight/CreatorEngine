@@ -62,19 +62,19 @@
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelVertexLayout.h"    // MBC9: skinbounds typed 정점 디코드
 #include "Assets/ModelAnimationSampler.h" // MBC9: editorsurface frame 축(CountUniqueKeyTimes)
-#include "Assets/ModelAssetAuthoringTransaction.h" // MBC11: assets.modelbench author 모드
+#include "Assets/ModelAssetAuthoringTransaction.h" // MBC11: 모델 저작 트랜잭션
 #include "RHI/IRHIDeviceResources.h"                // MBC11: VRAM 계측
 #include "LifecycleTrace.h"
 #include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "Socket.h" // X7 transform bulk probe
 #include "BoneRegion.h" // MAX_BONES
-#include "Experiment/Model.h" // I5-D4e-1: experiment.animtick 패리티
+#include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
-#include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
-#include "FoliageComponent.h"      // I5-D5a: experiment.foliage 게이트
+#include "AvatarMask.h"       // I5: AvatarMask A/B 대조
+#include "FoliageComponent.h"      // I5: Foliage 게이트
 #include "Terrain.h"               // D4 Terrain YAML authoring round-trip
-#include "Experiment/MaterialInstance.h"      // I5-D5c1: experiment.matruntime
+#include "Experiment/MaterialInstance.h"      // I5: Experiment MaterialInstance
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
 #include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
 #include "Experiment/Cooked/CookedAssetCatalog.h"  // I7-C1
@@ -94,7 +94,7 @@
 #include "ImageComponent.h"
 #include "MeshRenderer.h" // X8 render proxy dirty probe
 #include "RectTransformComponent.h"
-#include "BoneComponent.h" // E7-b: scene.traversalbench 0 모드의 마커 보유 수 진단
+#include "BoneComponent.h" // E7-b: 본 마커 보유 수 진단
 #include "UIButton.h"
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
@@ -143,7 +143,7 @@
 #include "BlackBoard.h"
 #include "TagManager.h"
 #include <Windows.h>
-#include <psapi.h> // MBC11: assets.modelbench peak working set
+#include <psapi.h> // MBC11: peak working set
 #include <crtdbg.h>
 #include <algorithm>
 #include <atomic>
@@ -716,77 +716,6 @@ namespace ConsoleCmd
         return Fail("lifecycle.dump_failed", "Unable to write trace: " + path);
     }
 
-    static CommandCore::CommandResult Cmd_lifecycle_stress(const ConsoleCommandContext& ctx)
-    {
-        using namespace CommandCore;
-        if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return InvalidArguments("lifecycle.stress <mode> [count]");
-        const std::vector<std::string>& parts = ctx.parts;
-
-        // 파괴·생성을 몰아쳐 수명 경로를 흔든다(PHASE 9-0의 ASan 재현용).
-        //
-        // 지금은 프레임 경계에서 파괴가 일어나는 경로만 흔든다. "순회 도중 파괴"와
-        // "Update 안에서 AddComponent" 같은 재진입 재현은 9-1의 레지스트리가 선
-        // 뒤에 붙인다 — 지금 구조에는 그 지점을 안전하게 잡을 자리가 없다.
-        const std::string mode = (parts.size() >= 2) ? parts[1] : "";
-        int count = 8;
-        if (parts.size() == 3 && (!ParseNumber(parts[2], count) || count < 1 || count > 100000)) return InvalidArguments("count must be 1..100000");
-        if (mode != "destroy" && mode != "churn" && mode != "reentrant" && mode != "reentrant-destroy" && mode != "reentrant-add") return InvalidArguments("Unknown lifecycle stress mode");
-        auto data = CommandData::Object(); data.Set("mode", CommandData::String(mode)); data.Set("requested", CommandData::Int(count));
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return PreconditionFailed("scene.not_found", "No active scene"); }
-
-        if (mode == "destroy")
-        {
-            int marked = 0;
-            // 루트(0번)는 건드리지 않는다. 씬 구조가 무너지면 이후 명령이 전부 의미를 잃는다.
-            for (size_t i = 1; i < scene->m_Entities.size() && marked < count; ++i)
-            {
-                const auto& owned = scene->m_Entities[i];
-                if (!owned || owned->IsDestroyMark()) continue;
-                scene->DestroyEntity(owned.get());
-                ++marked;
-            }
-            data.Set("marked", CommandData::Int(marked));
-            std::printf("[CLI] lifecycle.stress destroy — %d개 파괴 표시\n", marked);
-        }
-        else if (mode == "churn")
-        {
-            // 파괴와 생성을 같은 프레임에 섞는다. 인덱스 재사용 경로가 여기서 드러난다.
-            int marked = 0;
-            for (size_t i = 1; i < scene->m_Entities.size() && marked < count; ++i)
-            {
-                const auto& owned = scene->m_Entities[i];
-                if (!owned || owned->IsDestroyMark()) continue;
-                scene->DestroyEntity(owned.get());
-                ++marked;
-            }
-            for (int i = 0; i < count; ++i)
-            {
-                scene->CreateEntity("StressChurn_" + std::to_string(i));
-            }
-            data.Set("marked", CommandData::Int(marked)); data.Set("created", CommandData::Int(count));
-            std::printf("[CLI] lifecycle.stress churn — 파괴 %d · 생성 %d\n", marked, count);
-        }
-        else if (mode == "reentrant" || mode == "reentrant-destroy" || mode == "reentrant-add")
-        {
-            // 순회 한복판에서 터뜨린다(PHASE 9-9).
-            //
-            // 위 destroy/churn은 프레임 경계에서 일어나므로 R1·R2를 시험하지 못한다 —
-            // 그 둘은 "순회하는 도중에 대상이 죽으면?"이라는 질문이고, 답하려면
-            // 실제로 순회 중이어야 한다.
-            const auto kind =
-                (mode == "reentrant-destroy") ? Scene::StressKind::Destroy :
-                (mode == "reentrant-add")     ? Scene::StressKind::AddComponent :
-                                                Scene::StressKind::Both;
-            scene->ArmReentrancyStress(kind, count);
-            data.Set("armed", CommandData::Bool(true));
-            std::printf("[CLI] lifecycle.stress %s — 다음 Update 순회 한복판에서 %d건 발화\n",
-                mode.c_str(), count);
-        }
-        return Ok("Lifecycle stress operation applied or armed", std::move(data));
-    }
-
     static CommandCore::CommandResult Cmd_log_flush(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -969,6 +898,9 @@ namespace ConsoleCmd
         data.Set("bodyFontUsedFallback",
                  CommandData::Bool(audit.body_font_used_fallback));
         data.Set("iconFontMerged", CommandData::Bool(audit.icon_font_merged));
+        data.Set("iconRoles", CommandData::Int(static_cast<int>(audit.icon_role_count)));
+        data.Set("iconSourcePolicyValid", CommandData::Bool(audit.icon_source_policy_valid));
+        data.Set("missingIconRoles", CommandData::Int(static_cast<int>(audit.missing_icon_roles.size())));
         data.Set("fontFallbackProbeOk",
                  CommandData::Bool(audit.font_fallback_probe_ok));
         data.Set("clean", CommandData::Bool(audit.clean()));
@@ -1076,7 +1008,6 @@ namespace ConsoleCmd
         reg.Result({ "lifecycle.trace" }, &Cmd_lifecycle_trace);
         reg.Result({ "lifecycle.registry" }, &Cmd_lifecycle_registry);
         reg.Result({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
-        reg.Result({ "lifecycle.stress" }, &Cmd_lifecycle_stress);
         reg.Result({ "log.flush" }, &Cmd_log_flush);
         reg.Result({ "editor.menu" }, &Cmd_editor_menu);
         reg.Result({ "editor.windows" }, &Cmd_editor_windows);

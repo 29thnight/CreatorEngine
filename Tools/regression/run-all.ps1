@@ -674,11 +674,6 @@ Run-Step "Asset GUID 전역 strict 계약" {
         (Join-Path $PSScriptRoot "verify-asset-guid-contract.ps1") -Strict
 }
 
-Run-Step "Asset GUID rename 불변식" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-asset-guid-rename.ps1") -Exe $Exe -Work $Work
-}
-
 # D2-c: 실제 experiment 이행 fixture가 catalog GUID로 모델/재질을 되찾고,
 # RenderThread의 새 씬 proxy delta를 적용한 뒤 DX12 draw까지 만드는지 확인한다.
 Run-Step "Experiment FT_Primitives 실제 draw" {
@@ -725,14 +720,6 @@ Run-Step "Experiment AssetCooker 실제 산출물 게시" {
         (Join-Path $PSScriptRoot "verify-experiment-asset-cooker.ps1") -Work $Work
 }
 
-# D5-d: 현재 source corpus의 scene/prefab/material을 전부 실제 producer로 굽고,
-# authoring과 cooked payload를 같은 ReadNode 구조로 파싱해 값 동등을 단정한다.
-# 파일 바이트만 비교하면 parser/decoder가 다른 값을 내도 놓치므로 구조 parity도 본다.
-Run-Step "Experiment document 전수 cook parity" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-experiment-document-cook-parity.ps1") -Exe $Exe -Work $Work
-}
-
 # D5-b2b1: tracked model 전부와 현재 checkout의 선택적 local model이 strict
 # subasset UUIDv4 sidecar를 가지며,
 # 두 번의 전수 Cook이 같은 14 CEMC + CEMF를 만들고 source를 수정하지 않아야 한다.
@@ -769,22 +756,6 @@ Run-Step "MBC cutover 변경 동결" {
         (Join-Path $PSScriptRoot "verify-mbc-cutover-freeze.ps1")
 }
 
-# PHASE 3.75 MBC1: 자산 신원 프로필 ce.uuidv8.sha256.v1. C++(제품)·Python(생성기)·
-# .NET(이 게이트) 세 독립 유도가 벡터 15건에서 같고, selftest가 FIPS KAT·BCrypt
-# 대조·fail-closed·registry 네 판정을 통과한다.
-Run-Step "자산 신원 프로필 UUIDv8" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-asset-identity.ps1") -Exe $Exe -Work $Work
-}
-
-# PHASE 3.75 MBC2: epoch header·stable key 규칙 엔진·sidecar schema v2. 합성 단정 위에
-# 실자산 corpus 14를 임포트해 폐포를 재유도하고 전 모델을 한 registry에 넣는다.
-# 디스크에 쓰지 않는다(원본 해시 전후 동일) — 쓰기는 MBC3 transaction의 몫.
-Run-Step "model sidecar schema v2" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-asset-sidecar-v2.ps1") -Exe $Exe -Work $Work
-}
-
 # PHASE 3.75 MBC3~MBC5: 원자 authoring transaction(실패 주입 5단계·collision 거부),
 # 전 corpus UUIDv8 cutover(rollback·참조 rewrite·old 참조 0), runtime
 # ModelAssetGeneration closure/cache(변조 4종 게시 전 거부·generation 1→2 교체).
@@ -802,50 +773,10 @@ Run-Step "model corpus cutover rollback/rewrite(MBC4)" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-model-corpus-v8-cutover.ps1") -Work $Work
 }
-Run-Step "model asset generation cache(MBC5)" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-model-asset-generation.ps1") -Work $Work
-}
-# PHASE 3.75 MBC6: RHI/GBuffer/Forward/Shadow의 typed generation 직접 소비와 SU 전체
-# mask 조합(실GPU DX12/Vulkan). MBC7: Scene/MeshRenderer가 그 typed 뷰를 실제로
-# 채우고 Gunner 콜드 로드가 등록부·순서 없이 closure에서 텍스처를 푼다.
-Run-Step "model render wiring(MBC6)" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-model-render-wiring.ps1") -Work $Work
-}
 Run-Step "scene model consumption + Gunner cold-load(MBC7)" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-model-scene-consumption.ps1") -Work $Work
 }
-# PHASE 3.75 MBC8: Animator·Foliage·Editor 창구가 typed generation을 스위치와 무관하게
-# 소비한다 — A/B 스위치를 끈 프로세스에서 typed 재생 골든·본 해석·마스크·클립 열거·
-# Foliage typed 뷰가 전량 generation 축이어야 한다.
-Run-Step "typed consumers Animator/Foliage/Editor(MBC8)" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-model-typed-consumers.ps1") -Work $Work
-}
-
-# 본 팔레트가 렌더에 도달하는가. X8의 dirty 게이팅에 "팔레트가 바뀌었다"
-# 축이 없어 스킨 메시가 첫 포즈에서 굳었다 — 그림을 못 재는 헤드리스에서
-# 프록시 커밋 누계로 잰다.
-Run-Step "스킨 프록시 갱신" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-skinned-proxy-refresh.ps1") -Work $Work
-}
-
-# I6-B4-pre: 그림의 입력을 잰다 — 유한성·본 인덱스 범위·크기 상한·포즈별 digest.
-Run-Step "스킨 포즈 무결성" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-skin-pose-integrity.ps1") -Work $Work
-}
-
-# I6-B4b 선행: 살아 있는 애니메이터의 그림을 dx12.scene으로 잰다(bind·place·drop
-# 세 팔). B4b가 두 번 되돌려진 자리 — 이 축이 없으면 틱 폐기가 화면을 깨도 초록.
-Run-Step "라이브 스키닝 시각 축" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-skin-pose-visual.ps1") -Work $Work
-}
-
 # I6-B4b 후속: 콘텐츠 브라우저 드롭 경로(LoadCachedModelShared)의 재생
 # 바인딩. 라이브 게이트는 model.load 쪽만 태워서 이 경로가 구멍이었고,
 # legacy 재귀 틱을 걷자 "드롭한 애니메이션 모델이 안 그려진다"로 나왔다.
@@ -853,11 +784,6 @@ Run-Step "라이브 스키닝 시각 축" {
 Run-Step "에디터 드롭 재생 바인딩" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-editor-drop-animation.ps1") -Work $Work
-}
-
-Run-Step "Experiment cooked catalog 기동" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-experiment-cooked-catalog.ps1") -Exe $Exe -Work $Work
 }
 
 # D6: package-time zero assertion과 별도로 현재 Release stage를 다시 실행해
@@ -1050,94 +976,6 @@ Run-Step "트랜스폼 값 왕복" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-roundtrip.ps1") -Exe $Exe -Work $Work
 }
 
-# TransformUpdatePlan X1 — C++/C#/reflection/prefab/Animator/Physics/Socket 등
-# known writer가 PublishLocalWrite로 합류하는지 정적 inventory와 runtime reason으로
-# 확인하고, 각 writer marker 제거 mutation이 실제 RED인지 고정한다.
-Run-Step "Transform 쓰기 publication 단일화" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-write-publication.ps1") -Exe $Exe -Work $Work
-}
-
-# TransformUpdatePlan X2 — 정지 queue-empty와 UI/Spatial 독립 publication,
-# paused UI-only 소비 및 LayoutUISubtree 즉시 의미를 한 probe에서 고정한다.
-Run-Step "트랜스폼 UI/Spatial 도메인 게이트" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-domain-gates.ps1") -Exe $Exe -Work $Work
-}
-
-# TransformUpdatePlan X3 — runtime 계층 변경을 handle 기반 Scene::Reparent로
-# 단일화하고, loader bulk-build의 topology version을 transaction당 한 번만 올린다.
-Run-Step "계층 mutation transaction" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hierarchy-mutation.ps1") -Exe $Exe -Work $Work
-}
-
-# TransformUpdatePlan X4 — stable Entity identity와 실행 위치를 분리한 두 packed
-# projection의 mapping/nearest-parent/preorder range를 검증하고, 10k topology
-# transaction compile이 60 Hz 프레임 예산 안인지 Release에서 4회 잰다.
-# ★ 이 게이트는 **Release로만** 잰다(2026-09-05 정정).
-#
-# 게이트 자체의 기본 -Exe는 Release인데 세트가 `-Exe $Exe`(Debug)로 덮고 있었다.
-# 10k 노드 벤치의 예산 16,666µs는 한 프레임이고 Release 기준으로 잡은 값이다.
-# 같은 기계에서 나란히 쟀다:
-#
-#     Release  median   5,872 µs  → PASS
-#     Debug    median 168,833 µs  → FAIL   (28.7배)
-#
-# 즉 이 칸의 빨강은 제품 회귀가 아니라 축 불일치였다 — 성능 판정은 Release로만
-# 한다는 규칙이 세트 배선에서 깨져 있었다.
-# 다른 Release 전용 게이트들과 같은 관례로 옮긴다 — Release가 없으면 건너뛰고
-# Debug로 대체하지 않는다.
-#
-# 아래 X5·X6도 같은 `-Exe $Exe` 덮어쓰기를 받는다. 그쪽 성능 단정은 절대 예산이
-# 아니라 A/B 상대 비교라 Debug에서도 통과하므로 지금 옮기지 않는다 — 옮긴다면
-# 그것은 별도 슬라이스이고, 낡은 Release exe를 재게 되는 쪽이 더 큰 위험이다.
-$x4ReleaseExe = Join-Path $PSScriptRoot "..\..\Bin\x64-Release\Editor\CreatorEditor.exe"
-if (Test-Path -LiteralPath $x4ReleaseExe -PathType Leaf) {
-    Run-Step "Transform sparse execution graph" {
-        & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-execution-graphs.ps1") -Work $Work
-    }
-} else {
-    "=== Transform sparse execution graph === 건너뜀 (Release 미빌드 — Debug로 대체하지 않는다)"
-    ""
-}
-
-# TransformUpdatePlan X5 — setter publish를 node epoch로 dedupe하고 canonical preorder
-# subtree range로 병합한 뒤 affected packed range만 resolve한다. recursive fallback과
-# 10k full-movement A/B 성능 상한도 같은 Release probe에서 고정한다.
-Run-Step "Transform dirty-root sparse resolver" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-sparse-resolver.ps1") -Exe $Exe -Work $Work
-}
-
-# TransformUpdatePlan X6 — C# world getter/setter 앞의 즉시 pull을 packed parent chain에
-# 연결하되 X5 global queue와 sibling propagation epoch를 소비하지 않는다.
-Run-Step "Transform targeted immediate pull" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-targeted-pull.ps1") -Exe $Exe -Work $Work
-}
-
-# TransformUpdatePlan X7 — skeleton binding 때 bone index를 한 번만 해석하고,
-# worker barrier 뒤 Animator pose·Socket 및 Physics world write를 bulk publish한다.
-Run-Step "Transform Animator/Physics bulk writers" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-transform-bulk-writers.ps1") -Exe $Exe -Work $Work
-}
-
-# TransformUpdatePlan X8 — all render writers OR semantic bits into a frame-persistent
-# queue; the final render stage drains once and rejects stale registration generations.
-Run-Step "Render proxy dirty-mask final commit" {
-    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-render-proxy-dirty.ps1") -Exe $Exe -Work $Work
-}
-
-# 리플렉션 골든 대조(PHASE 18 CT0)는 골든 파일이 있을 때만 돈다.
-# 골든을 뜨려면 컴파일타임 전환 착수 전에 한 번:
-#   .\verify-reflection-golden.ps1 -Baseline
-# 이 diff 0이 CT4~CT5(메타 전환) 구간의 "출력 동등" 증명이다 — 생명주기
-# 기준선이 PHASE 9에 대해 했던 역할을 리플렉션에 대해 한다.
-if (Test-Path (Join-Path $PSScriptRoot "reflect_golden.yaml")) {
-    Run-Step "리플렉션 골든" {
-        & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-reflection-golden.ps1") -Exe $Exe -Work $Work
-    }
-} else {
-    "=== 리플렉션 골든 === 건너뜀 (골든 없음 — verify-reflection-golden.ps1 -Baseline)"
-    ""
-}
-
 # 생명주기 순서 대조(PHASE 9-0)는 기준선 파일이 있을 때만 돈다.
 # 기준선을 뜨려면 PHASE 9 교체 전에 한 번:
 #   .\verify-lifecycle-baseline.ps1 -Baseline
@@ -1156,15 +994,6 @@ if (Test-Path (Join-Path $PSScriptRoot "lifecycle_baseline.tsv")) {
 Run-Step "저작 개행 LF 고정(D3-b)" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-authoring-line-endings.ps1")
-}
-
-# D3-b-1(SerializationPlan): ryml 에러가 프로세스 abort가 아니라 예외로 오는가.
-# ★ 이 검사의 이빨은 종료 코드가 아니라 크래시다 — 채널 하나만 빼도 실패가 아니라
-#   프로세스가 죽는다(변이 2회로 확인: 둘 다 exit 3). ryml을 제품 경로에 넣기 전에
-#   반드시 초록이어야 하는 선결 조건이다.
-Run-Step "ryml 에러 정책(D3-b-1)" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-ryml-error-policy.ps1") -Exe $Exe -Work $Work
 }
 
 # D3-b-L(SerializationPlan): TagManager 읽기 경로. `Load`를 ryml로 옮긴 뒤 변이를
@@ -1201,13 +1030,6 @@ Run-Step "저작 base64 계약(D3-b-4)" {
         (Join-Path $PSScriptRoot "verify-authoring-base64.ps1")
 }
 
-# D4(SerializationPlan): Animator controller graph은 별도 JSON 없이 씬 reflection
-# YAML 하나로만 왕복하고 owner/current/Any/transition/condition 링크를 복원한다.
-Run-Step "Animator 씬 YAML 단일 정본(D4)" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-animator-scene-single-truth.ps1") -Exe $Exe -Work $Work
-}
-
 # D4: 실제 InputMap 6개를 canonical `.inputmap` YAML로 읽어 의미 수치와
 # source 무변이를 고정한다.
 Run-Step "InputMap YAML 코퍼스(D4)" {
@@ -1220,13 +1042,6 @@ Run-Step "InputMap YAML 코퍼스(D4)" {
 Run-Step "nlohmann 은퇴(D4)" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-nlohmann-retirement.ps1")
-}
-
-# D3-a-1(SerializationPlan Y-6): 오버라이드 시딩의 값 동등 판정이 Dump 문자열 비교에서
-# 구조 비교로 바뀌었다. 판정 규칙 14종과 "Dump와 갈리는 지점이 예상한 3건뿐"임을 본다.
-Run-Step "저작 노드 구조 비교(D3-a-1)" {
-    & pwsh -NoProfile -File `
-        (Join-Path $PSScriptRoot "verify-authoring-node-equality.ps1") -Exe $Exe -Work $Work
 }
 
 # D1(SerializationPlan Y-3): Player가 파일 워처·`.meta` 생성 스캔을 끌고 들어가지
@@ -1247,38 +1062,6 @@ if (Test-Path -LiteralPath $assetPackerExe -PathType Leaf) {
     }
 } else {
     "=== pak 소스 배제(D1) === 건너뜀 (AssetPacker Release 미빌드)"
-    ""
-}
-
-# D0(SerializationPlan): 직렬화 기준선. 이 항목만 Release exe를 요구한다 —
-# Debug는 단계별로 4~16배 느리고 **단계 간 비중까지 뒤집어**(SceneParse 15.9배 vs
-# ComponentLoad 5.5배) 성능 기준선으로 쓸 수 없다. 그래서 $Exe를 넘기지 않고
-# 스크립트 기본값(Release)을 그대로 쓴다.
-#
-# Release가 없으면 건너뛴다. 위 리플렉션 골든·생명주기 기준선과 같은 이유다 —
-# 아직 Release를 빌드하지 않은 사람에게 세트가 통째로 빨갛게 보이면 세트 전체가
-# 무시되기 시작한다. 대신 건너뛴 사실을 조용히 넘기지 않고 한 줄로 남긴다.
-$releaseExe = Join-Path $PSScriptRoot "..\..\Bin\x64-Release\Editor\CreatorEditor.exe"
-if (Test-Path -LiteralPath $releaseExe -PathType Leaf) {
-    Run-Step "직렬화 기준선(D0, Release)" {
-        & pwsh -NoProfile -File `
-            (Join-Path $PSScriptRoot "verify-serialization-baseline.ps1") -Work $Work
-    }
-} else {
-    "=== 직렬화 기준선(D0, Release) === 건너뜀 (Release 미빌드 — Debug로 대체하지 않는다)"
-    ""
-}
-
-# PHASE 3.75 MBC11 §8.4: 모델 cutover 성능 예산. 위와 같은 이유로 Release exe만 쓴다 —
-# B1/B2는 임시 프로젝트 사본에서 저작·재로드를 재고, B6는 archive가 있을 때만 비회귀를
-# 판정한다(archive는 `-Archive`로 사람이 뜬다 — 세트는 기록하지 않는다).
-if (Test-Path -LiteralPath $releaseExe -PathType Leaf) {
-    Run-Step "모델 cutover 성능 예산(MBC11 §8.4, Release)" {
-        & pwsh -NoProfile -File `
-            (Join-Path $PSScriptRoot "verify-model-cutover-budget.ps1") -Work $Work
-    }
-} else {
-    "=== 모델 cutover 성능 예산(MBC11 §8.4, Release) === 건너뜀 (Release 미빌드 — Debug로 대체하지 않는다)"
     ""
 }
 

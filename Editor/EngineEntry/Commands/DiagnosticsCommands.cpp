@@ -60,19 +60,19 @@
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelVertexLayout.h"    // MBC9: skinbounds typed 정점 디코드
 #include "Assets/ModelAnimationSampler.h" // MBC9: editorsurface frame 축(CountUniqueKeyTimes)
-#include "Assets/ModelAssetAuthoringTransaction.h" // MBC11: assets.modelbench author 모드
+#include "Assets/ModelAssetAuthoringTransaction.h" // MBC11: 모델 저작 트랜잭션
 #include "RHI/IRHIDeviceResources.h"                // MBC11: VRAM 계측
 #include "LifecycleTrace.h"
 #include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "Socket.h" // X7 transform bulk probe
 #include "BoneRegion.h" // MAX_BONES
-#include "Experiment/Model.h" // I5-D4e-1: experiment.animtick 패리티
+#include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
-#include "AvatarMask.h"       // I5-D4e-3: experiment.animmask A/B 대조
-#include "FoliageComponent.h"      // I5-D5a: experiment.foliage 게이트
+#include "AvatarMask.h"       // I5: AvatarMask A/B 대조
+#include "FoliageComponent.h"      // I5: Foliage 게이트
 #include "Terrain.h"               // D4 Terrain YAML authoring round-trip
-#include "Experiment/MaterialInstance.h"      // I5-D5c1: experiment.matruntime
+#include "Experiment/MaterialInstance.h"      // I5: Experiment MaterialInstance
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
 #include "ExperimentMaterialMigration.h"      // I5-D5c1: legacy 왕복 축
 #include "Experiment/Cooked/CookedAssetCatalog.h"  // I7-C1
@@ -92,7 +92,7 @@
 #include "ImageComponent.h"
 #include "MeshRenderer.h" // X8 render proxy dirty probe
 #include "RectTransformComponent.h"
-#include "BoneComponent.h" // E7-b: scene.traversalbench 0 모드의 마커 보유 수 진단
+#include "BoneComponent.h" // E7-b: 본 마커 보유 수 진단
 #include "UIButton.h"
 #include "TextComponent.h"
 #include "SpriteSheetComponent.h"
@@ -142,7 +142,7 @@
 #include "BlackBoard.h"
 #include "TagManager.h"
 #include <Windows.h>
-#include <psapi.h> // MBC11: assets.modelbench peak working set
+#include <psapi.h> // MBC11: peak working set
 #include <crtdbg.h>
 #include <algorithm>
 #include <atomic>

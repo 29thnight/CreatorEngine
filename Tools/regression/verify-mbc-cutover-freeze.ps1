@@ -190,7 +190,7 @@ foreach ($name in $hardZeroSurfaces) {
     }
 }
 # ⑧ 상태를 바꾸는 진단 명령 0 — animator.status는 제품 publish를 부르지 않는다
-#    (읽기 전용 스냅샷만 읽는다). scene.transformbulk probe는 합성 fixture라 예외.
+#    (읽기 전용 스냅샷만 읽는다). 합성 fixture를 쓰는 probe 계열은 예외였고 그 계열은 은퇴했다.
 #
 # This static gate checks the implementation's read-only contract. Command presence is
 # checked through runtime discovery and owned result fields by verify-editor-command-surface.

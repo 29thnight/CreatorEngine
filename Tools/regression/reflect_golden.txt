@@ -1,4 +1,0 @@
-# Registered type serialization is independent of scene content.
-reflect.golden {{OUT_PATH}}
-log.flush
-quit

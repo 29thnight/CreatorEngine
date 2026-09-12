@@ -91,8 +91,7 @@ if (-not $proc.HasExited) {
 if (-not (Test-Path $outPath)) { "표준 출력이 없다: $outPath"; exit 1 }
 $out = Get-Content -LiteralPath $outPath
 
-# ui.status는 std::printf로 stdout에 나간다(Debug->LogWarning은 stdout에 안 간다 —
-# verify-asan-lifecycle.ps1의 같은 주석 참고).
+# ui.status는 std::printf로 stdout에 나간다(Debug->LogWarning은 stdout에 안 간다).
 $statusLines = @($out | Where-Object { $_ -match '\[UI 상태\]' })
 $ddolLine = @($out | Where-Object { $_ -match 'scene\.ddol 지정' }) | Select-Object -First 1
 

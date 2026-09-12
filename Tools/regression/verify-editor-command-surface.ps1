@@ -46,10 +46,6 @@ if (-not $SkipCommandlets) {
         @{ Name='experiment.animlive'; Exit=2 },
         @{ Name='tag.authoring.probe'; Exit=2 },
         @{ Name='dx12.selftest'; Exit=2 },
-        @{ Name='vk.selftest'; Exit=2 },
-        @{ Name='rhi.uploadsegments'; Exit=2 },
-        @{ Name='scene.transformbulk'; Exit=2 },
-        @{ Name='experiment.foliage'; Exit=2 },
         @{ Name='missing'; Exit=2 },
         @{ Name='experiment.matparity'; Exit=2 },
         @{ Name='list'; Exit=2; Conflict=$true }
@@ -69,7 +65,7 @@ if (-not $SkipCommandlets) {
             $results = @(Get-Content -LiteralPath $resultPath | ForEach-Object { $_ | ConvertFrom-Json })
             Assert ($results.Count -eq 1) 'Commandlet must emit exactly one terminal result'
             if ($case.Name -eq 'list' -and $case.Exit -eq 0) {
-                Assert ($results[0].data.names -contains 'experiment.matresolve' -and $results[0].data.names -contains 'scene.hierarchymutation' -and $results[0].data.names -contains 'dx12.selftest') 'Commandlet discovery is missing a domain'
+                Assert ($results[0].data.names -contains 'experiment.cooked' -and $results[0].data.names -contains 'dx12.gbuffer' -and $results[0].data.names -contains 'dx12.selftest') 'Commandlet discovery is missing a domain'
                 Assert (-not ($results[0].data.names -contains 'object.rename')) 'Product editing leaked into Commandlet discovery'
                 foreach ($name in @('model.async', 'render.pbr.capture', 'render.pbr.parity', 'render.pbr.coverage', 'render.pbr.occlusion', 'render.pbr.emission', 'render.pbr.transform', 'render.pbr.uv', 'render.pbr.mip')) {
                     Assert ($results[0].data.names -contains $name) "Integrated Commandlet missing: $name"
@@ -85,7 +81,7 @@ if (-not $SkipCommandlets) {
 if (-not $SkipCommandlets) {
     $scenario = Join-Path $Work 'commandlet-scenario.txt'
     $output = Join-Path $Work 'commandlet-scenario.jsonl'
-    @('scene.new CommandletScenario', 'object.create ScenarioObject', 'scene.hierarchycheck', 'scene.transformwritestats.check probe') | Set-Content -LiteralPath $scenario -Encoding utf8
+    @('scene.new CommandletScenario', 'object.create ScenarioObject', 'scene.hierarchycheck', 'inputmap.corpus.probe') | Set-Content -LiteralPath $scenario -Encoding utf8
     if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output }
     $proc = Start-GateEditor @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$output+'"')) 'scenario'
     try {
@@ -96,7 +92,7 @@ if (-not $SkipCommandlets) {
     } finally { if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit() } }
     $ordinary = Join-Path $Work 'ordinary-batch.txt'
     $ordinaryResults = Join-Path $Work 'ordinary-batch.jsonl'
-    @('scene.hierarchymutation probe','model.async status','render.pbr.parity','render.pbr.capture','quit') | Set-Content -LiteralPath $ordinary -Encoding utf8
+    @('model.async status','render.pbr.parity','render.pbr.capture','quit') | Set-Content -LiteralPath $ordinary -Encoding utf8
     if (Test-Path -LiteralPath $ordinaryResults) { Remove-Item -LiteralPath $ordinaryResults }
     $proc = Start-GateEditor @('--script', ('"'+$ordinary+'"'), '--result-format', 'jsonl', '--result-file', ('"'+$ordinaryResults+'"')) 'ordinary-batch'
     try {
@@ -326,7 +322,7 @@ try {
         Assert (-not ($discovery.commands.name -contains $name)) "Harness leaked into live discovery: $name"
         Assert ((Invoke-Cmd $name).code -eq 'command.unknown') "Harness reachable through HTTP: $name"
     }
-    Assert ((Invoke-Cmd 'scene.transformpull' @('probe')).code -eq 'commandlet.required') 'Mixed diagnostic still runs a fixture through HTTP'
+    Assert ((Invoke-Cmd 'scene.transformpull' @('probe')).code -eq 'arguments.invalid') 'Diagnostic must reject a retired fixture argument'
     Expect-Ok (Invoke-Cmd 'scene.new' @('OtherScene'))
     Assert ((Read-Object $id).code -eq 'object.stale') 'Old scene id resolved into a new scene'
     Expect-Ok (Invoke-Body @{command='scene.hierarchycheck';parameters=@{}})

@@ -1086,7 +1086,7 @@
   <h2 class="sec"><span class="no">PHASE 14.5</span>라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어) <span class="phase-pct" data-phase-pct="14.5"></span></h2>
   <div class="phase-meta">갱신: 2026-09-06 · <a href="plans/EditorAutomationCLIPlan.md">계획</a> · <a href="analysis/CommandSurfaceTable.md">현재 명령 도표</a> · <a href="analysis/Phase14_5Closure.md">종결 검토와 실행 증거</a></div>
   <div class="phase-goal"><b>목표:</b> 개발자용 편집·진단은 공통 엔진 API와 HTTP/JSON 제품 명령으로 제공하고, 검증은 프로세스 범위 Commandlet으로 분리한다. 닫힌 일회성 하네스는 제거한다. 향후 MCP는 discovery·schema·result를 연결하는 어댑터로 추가하며 이번 페이즈의 구현 대상은 아니다.</div>
-  <div class="note">현재 Editor 제품 99개(106이름), Player 7개, Commandlet 115개. 로컬 PBR·비동기 모델 검사 8개를 Commandlet으로 통합했다. 제품 명령 전부 결과 반환, named JSON 입력 59개, Undo 선언 21개. 자동 계약 게이트는 통과했다. 전체 페이즈 종결은 GUI 수동 확인과 canonical 성능 회귀 확인 전까지 보류한다. 도메인 코퍼스 미검증은 종결 검토에서 구분한다.</div>
+  <div class="note">현재 Editor 제품 99개(106이름), Player 7개, Commandlet 48개(2026-09-12 닫힌·완료 계획 소속 68개 은퇴 — analysis/ClosedPlanCommandletRetirement.md). 로컬 PBR·비동기 모델 검사 8개를 Commandlet으로 통합했다. 제품 명령 전부 결과 반환, named JSON 입력 59개, Undo 선언 21개. 자동 계약 게이트는 통과했다. 전체 페이즈 종결은 GUI 수동 확인과 canonical 성능 회귀 확인 전까지 보류한다. 도메인 코퍼스 미검증은 종결 검토에서 구분한다.</div>
   <div class="table-wrap"><table class="tasks" data-phase="14.5"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준 (EditorAutomationCLIPlan.md §18)</div>
@@ -2129,7 +2129,7 @@ const TASKS = [
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 2, status: "done",
     note: "parser golden 117줄/16케이스, invocation 회귀 통과. 정수 스키마에서 분수·범위 초과를 거부한다." },
   { phase: 14.5, id: "LC3", title: "제품·검증 registry와 discovery",
-    detail: "Editor 제품 99개/106이름, Player 7개, Commandlet 104+3개를 별도 표면으로 제공한다.",
+    detail: "Editor 제품 99개/106이름, Player 7개, Commandlet 45+3개를 별도 표면으로 제공한다.",
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 2.5, status: "done",
     note: "named JSON 입력 59개, Undo 선언 21개. Commandlet은 HTTP·일반 batch에 부재. 명령 도표는 docs/analysis/CommandSurfaceTable.md." },
   { phase: 14.5, id: "LC4", title: "로컬 HTTP/JSON 서비스",
