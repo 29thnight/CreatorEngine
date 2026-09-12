@@ -1717,11 +1717,26 @@ void InspectorWindow::Draw()
 	if (scene && selectedSceneObject)
 	{
 		ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
+
+		// ★ 공간 컴포넌트는 여기서만 그린다 (W2-I1)
+		//
+		// 예전에는 이 블록이 배타 분기(if/else)였고, 아래 일반 순회는
+		// RectTransformComponent 만 건너뛰었다. 그래서 RectTransform 이 없는
+		// 보통 오브젝트는 Transform 이 **두 번** 나왔다 — 위에는 전용 드로어가
+		// 그린 오일러 각·색 축 필드가, 아래에는 리플렉션이 그린 쿼터니언 네 칸과
+		// 내부 필드가. 화면에서 확인한 증상이고, 아래 건너뛰기 목록에 Transform 이
+		// 빠져 있던 것이 원인이다.
+		//
+		// 배타 분기를 푼 이유는 캔버스다. 캔버스는 둘을 함께 갖는다
+		// (Entity::AttachSpatialComponent — rect 는 자식 레이아웃 기준,
+		// Transform 은 월드 배치). 예전 else 는 캔버스의 Transform 을 건너뛰었고,
+		// 그 결과 캔버스만 Transform 이 일반 순회에서 리플렉션으로 그려졌다.
+		// 각각 묻도록 바꿔 셋(보통·UI·캔버스)이 모두 전용 드로어를 쓴다.
 		if (RectTransformComponent* rectTransform = selectedSceneObject->GetComponent<RectTransformComponent>())
 		{
 			ImGuiDrawHelperRectTransformComponent(rectTransform);
 		}
-		else
+		if (selectedSceneObject->GetComponent<Transform>())
 		{
 			ImGuiDrawHelperTransformComponent(selectedSceneObject);
 		}
@@ -1756,7 +1771,11 @@ void InspectorWindow::Draw()
 		for (size_t componentIndex = 0; componentIndex < selectedSceneObject->m_components.size(); ++componentIndex)
 		{
 			auto& component = selectedSceneObject->m_components[componentIndex];
-			if(nullptr == component || component->GetTypeID() == type_guid(RectTransformComponent))
+			// 공간 컴포넌트 둘은 위에서 전용 드로어가 이미 그렸다. 한쪽만
+			// 건너뛰면 다른 쪽이 두 번 나온다 — 그것이 W2-I1 이 고친 결함이다.
+			if (nullptr == component
+				|| component->GetTypeID() == type_guid(RectTransformComponent)
+				|| component->GetTypeID() == type_guid(Transform))
 				continue;
 
 			// CT1: 종전 Meta::Find(component->ToString())는 매 프레임 컴포넌트마다
