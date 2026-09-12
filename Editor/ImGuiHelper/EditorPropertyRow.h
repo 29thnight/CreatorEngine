@@ -174,6 +174,14 @@ namespace editor::widgets
 
         float gap{ 0.f };
         float aux_reserve{ 0.f };
+
+        /// 축 한 칸이 필요로 하는 최소 폭(badge + 숫자). 넓은 줄로 바꿀 때
+        /// 축 판정을 다시 하려고 싣는다 — 폭이 늘었는데 축이 세로로 남으면
+        /// 넓힌 뜻이 없다.
+        float axis_need{ 0.f };
+
+        /// 축 사이 간격. 위와 같은 이유로 싣는다.
+        float axis_gap{ 0.f };
     };
 
     /// 필드 식별자에서 표시 이름을 유도한다 (PHASE 21 W2-I3).
@@ -232,6 +240,36 @@ namespace editor::widgets
     /// 지금 배치를 바꾸고 직전 값을 돌려준다. 돌려받은 값을 다시 넣어 되돌린다.
     property_layout_metrics push_property_layout(
         const property_layout_metrics& metrics) noexcept;
+
+    /// 한 줄을 **넓은 줄**로 바꾼 사본 (s&box 의 wide mode).
+    ///
+    /// s&box 의 `ControlSheetRow.Rebuild` 는 wide 일 때 라벨에 `xSpan: 2` 를
+    /// 주어 두 열을 덮게 하고 컨트롤을 다음 그리드 행으로 내린다. 여기서는
+    /// 이미 `stacked` 가 같은 모양을 그리므로, 모드를 그것으로 바꾸고 라벨·값
+    /// 열을 줄 전체 폭으로 넓히면 된다.
+    ///
+    /// 좁아서 내려가는 `stacked` 와 **결과는 같고 이유가 다르다.** 그쪽은 폭을
+    /// 재서 정하므로 창을 넓히면 되돌아오고, 이쪽은 선언이라 폭과 무관하다.
+    /// 이미 `stacked` 인 줄은 그대로 돌려준다 — 두 번 넓히면 열이 가용 폭을
+    /// 넘는다.
+    property_layout_metrics widen_property_line(
+        const property_layout_metrics& metrics) noexcept;
+
+    /// 인스펙터 디버그 모드. `meta::debugOnly()` 로 표시한 항목은 이때만 그린다.
+    ///
+    /// 값을 여기 두는 이유는 읽는 쪽이 리플렉션 드로어이고 켜는 쪽이 인스펙터
+    /// 창이라 둘 사이에 공통 자리가 필요해서다. 창이 여럿 열려도 모드는 하나다 —
+    /// "지금 디버그를 하고 있다" 는 사람의 상태이지 창의 상태가 아니다.
+    bool property_debug_mode() noexcept;
+    void set_property_debug_mode(bool enabled) noexcept;
+
+    /// 디버그 모드의 **기본값**. 검사가 읽는 정본이다.
+    ///
+    /// 살아 있는 값과 따로 두는 이유. 자가 검사는 CLI 명령이라 아무 때나 돌 수
+    /// 있고, 사람이 모드를 켜 둔 뒤에도 돈다. 그때 살아 있는 값을 읽어
+    /// "기본은 꺼짐" 이라고 재면 사람이 켠 것 때문에 검사가 붉어진다. 반대로
+    /// 검사가 먼저 끄고 나서 재면 세터를 재는 것이지 기본값을 재는 것이 아니다.
+    bool property_debug_mode_default() noexcept;
 
     /// 한 줄의 라벨을 놓고 값 커서를 세운다. 값 영역 폭을 돌려주므로 호출자는
     /// `ImGui::SetNextItemWidth` 에 그대로 넘기면 된다.

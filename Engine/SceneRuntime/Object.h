@@ -16,8 +16,21 @@ class Object : public IObject, public meta::polymorphic
    {
        using Self = Object;
        return meta::schema<Self>(
-           meta::field<&Self::m_name>,
-           meta::field<&Self::m_instanceID>,
+           // 컴포넌트에서 이 값은 **타입 이름 사본**이다. 씬 파일이
+           // `m_name: CameraComponent` 로 적어 두고 로드가 되읽는다. 타입을
+           // 확정하는 것은 노드 키와 `m_typeUUID` 라 이 값을 고쳐도 로드는
+           // 깨지지 않지만, 유일하게 옳은 값이 하나뿐인 필드가 편집 가능한
+           // 글상자로 나와 있었다 — 고치면 그대로 디스크에 적혔다.
+           //
+           // 엔티티의 이름은 여전히 편집 대상이다. 다만 그 경로는 리플렉션이
+           // 아니라 인스펙터 상단의 이름 칸이고, 그쪽은
+           // `EditorObjectOperations::Rename` 을 거쳐 씬의 이름 유일성까지
+           // 맞춘다. 리플렉션 경로에서 직접 쓰면 그 단계를 건너뛴다.
+           meta::field<&Self::m_name>.with(meta::readonly(), meta::debugOnly()),
+           // 인스턴스 식별자. `GUIDCreator` 의 전역 집합과 시스템 레지스트리
+           // (`AnimationJob::m_animators` 등)의 키다. 손으로 고치면 등록은 옛
+           // 키로 남고 해제는 새 키로 가서 레지스트리에 죽은 항목이 남는다.
+           meta::field<&Self::m_instanceID>.with(meta::readonly(), meta::debugOnly()),
            // 전용 체크박스가 담당한다 — 인스펙터는 `SetEnabled` 를 거쳐야
            // `OnEnable`/`OnDisable` 이 보존된다. 리플렉션이 직접 그리면 그 훅을
            // 건너뛴다.

@@ -324,6 +324,8 @@ namespace editor::widgets
         // `ItemInnerSpacing` 이고, 최소 폭도 축 전용 대표 문자열이다.
         const float slot = (metrics.value_col - inputs.axis_gap * 2.f) / 3.f;
         const float axis_need = inputs.badge_width + inputs.axis_value_min;
+        metrics.axis_need = axis_need;
+        metrics.axis_gap = inputs.axis_gap;
         if (!inputs.editing)
         {
             if (state.axis_stacked)
@@ -341,6 +343,61 @@ namespace editor::widgets
         metrics.axis_stacked = state.axis_stacked;
 
         return metrics;
+    }
+
+    property_layout_metrics widen_property_line(
+        const property_layout_metrics& metrics) noexcept
+    {
+        // 이미 내려간 줄은 그대로다. 한 번 더 넓히면 `label_col` 이 가용 폭에
+        // `gap + value_col` 을 더한 값이 되어 값 칸이 창 밖으로 나간다.
+        if (property_layout_mode::stacked == metrics.mode)
+        {
+            return metrics;
+        }
+
+        property_layout_metrics widened = metrics;
+        const float full = metrics.label_col + metrics.gap + metrics.value_col;
+        widened.mode = property_layout_mode::stacked;
+        widened.label_col = full;
+        widened.value_col = full;
+
+        // 축 판정을 다시 한다. 넓힌 값 열은 언제나 원래보다 넓으므로 이 재판정은
+        // 세로 → 가로 한 방향으로만 간다 — 넓혔는데 축이 세로로 남는 것만
+        // 막고, 반대로 뒤집지는 않는다. 완충 폭을 여기 다시 걸지 않는 이유다.
+        if (widened.axis_need > 0.f)
+        {
+            const float slot = (widened.value_col - widened.axis_gap * 2.f) / 3.f;
+            if (slot >= widened.axis_need)
+            {
+                widened.axis_stacked = false;
+            }
+        }
+        return widened;
+    }
+
+    namespace
+    {
+        // 기본은 꺼짐이다. 켜 두면 `meta::debugOnly()` 로 표시한 내부 식별자가
+        // 기본 인스펙터에 샌다 — 표시 속성을 붙인 뜻이 사라진다.
+        constexpr bool kDebugModeDefault = false;
+
+        // 인스펙터 디버그 모드. 창이 아니라 사람의 상태라 한 칸이다.
+        bool g_debugMode = kDebugModeDefault;
+    }
+
+    bool property_debug_mode() noexcept
+    {
+        return g_debugMode;
+    }
+
+    bool property_debug_mode_default() noexcept
+    {
+        return kDebugModeDefault;
+    }
+
+    void set_property_debug_mode(bool enabled) noexcept
+    {
+        g_debugMode = enabled;
     }
 
     namespace

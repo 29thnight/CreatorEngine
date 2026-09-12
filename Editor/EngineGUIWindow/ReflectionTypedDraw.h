@@ -78,6 +78,38 @@ namespace Meta::TypedDraw
 static_assert(Meta::TypedDraw::ObjectHidesEnabledFlag(),
     "Object::m_isEnabled 에서 meta::hidden() 이 떨어졌다 — 인스펙터가 활성 플래그를 두 번 그린다");
 
+// `Object` 의 정체성 필드 둘이 손에 닿지 않는지 단정한다 (W2-I).
+//
+// `m_name` 은 컴포넌트에서 타입 이름 사본이고 `m_instanceID` 는 레지스트리
+// 키다. 둘 다 유일하게 옳은 값이 이미 정해져 있는데, 표시 속성이 붙기 전에는
+// `m_name` 이 편집 가능한 글상자로 나와 있었다 — 고치면 씬 파일에 그대로
+// 적혔다.
+//
+// 검사가 아니라 `static_assert` 인 이유. 속성이 떨어져도 화면은 멀쩡해 보인다.
+// 글상자가 하나 생길 뿐이고, 그것이 잘못이라는 것은 값의 뜻을 알아야 보인다.
+// 런타임 검사는 그 프레임을 그려 봐야 알지만 이쪽은 빌드가 선다.
+namespace Meta::TypedDraw
+{
+    template<class Attr>
+    consteval bool ObjectFieldMarked(std::string_view field)
+    {
+        return std::apply([field](const auto&... ms)
+        {
+            return ((std::remove_cvref_t<decltype(ms)>::identifier == field &&
+                     std::remove_cvref_t<decltype(ms)>::template
+                        has_attribute<Attr>()) || ...);
+        }, meta::schema_of<Object>.fields);
+    }
+}
+static_assert(Meta::TypedDraw::ObjectFieldMarked<meta::readonly_attr>("m_name"),
+    "Object::m_name 에서 meta::readonly() 가 떨어졌다 — 컴포넌트의 타입 이름 사본이 다시 편집 가능해진다");
+static_assert(Meta::TypedDraw::ObjectFieldMarked<meta::debug_only_attr>("m_name"),
+    "Object::m_name 에서 meta::debugOnly() 가 떨어졌다 — 컴포넌트 머리글과 같은 이름이 줄마다 겹쳐 나온다");
+static_assert(Meta::TypedDraw::ObjectFieldMarked<meta::readonly_attr>("m_instanceID"),
+    "Object::m_instanceID 에서 meta::readonly() 가 떨어졌다 — 레지스트리 키를 손으로 고칠 수 있게 된다");
+static_assert(Meta::TypedDraw::ObjectFieldMarked<meta::debug_only_attr>("m_instanceID"),
+    "Object::m_instanceID 에서 meta::debugOnly() 가 떨어졌다 — 내부 식별자가 기본 인스펙터에 샌다");
+
 namespace Meta::TypedDraw
 {
     // DrawFn·Registry·FindDraw는 ReflectionImGuiHelper.h(디스패치 지점)에 있다.
@@ -215,6 +247,32 @@ namespace Meta::TypedDraw
     // MSVC 가 "이니셜라이저가 너무 많이 중첩되었습니다" 로 막았다 — 그 질의가
     // 체인을 `tuple_cat` 으로 물질화하기 때문이다. 그리는 쪽이 이미 재귀로
     // 내려가므로 힌트도 같은 모양으로 맞춘다.
+    // 읽기 전용 구간. 그리는 분기가 20 갈래라 각 분기가 스스로 짝을 맞추면
+    // 하나만 빠져도 ImGui 의 비활성 스택이 어긋난 채 프레임이 끝난다.
+    struct DisabledScope
+    {
+        bool active{ false };
+
+        explicit DisabledScope(bool on) : active(on)
+        {
+            if (active)
+            {
+                ImGui::BeginDisabled();
+            }
+        }
+
+        ~DisabledScope()
+        {
+            if (active)
+            {
+                ImGui::EndDisabled();
+            }
+        }
+
+        DisabledScope(const DisabledScope&) = delete;
+        DisabledScope& operator=(const DisabledScope&) = delete;
+    };
+
     template<meta::reflectable T>
     inline float LabelHintOf()
     {
@@ -281,6 +339,24 @@ namespace Meta::TypedDraw
             return;
         }
 
+        // 디버그 전용은 모드가 켜졌을 때만 그린다.
+        //
+        // `hidden` 과 달리 판정이 런타임이다. 속성이 붙었는지는 컴파일 시에
+        // 정해지므로 `if constexpr` 로 감싼다 — 붙지 않은 필드에는 이 검사
+        // 코드가 아예 생성되지 않는다.
+        if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::debug_only_attr>())
+        {
+            if (!editor::widgets::property_debug_mode())
+            {
+                return;
+            }
+        }
+
+        // 읽기 전용이면 그리되 손이 닿지 않는다. 비활성 위젯은 언제나 거짓을
+        // 돌려주므로 아래 `changed` 경로와 언두는 저절로 닫힌다.
+        const DisabledScope disabled{
+            std::remove_cvref_t<MI>::template has_attribute<meta::readonly_attr>() };
+
         // CT6-b 속성 소비
         const char* label = MemberLabel(mi);
         bool hasRange = false;
@@ -296,9 +372,26 @@ namespace Meta::TypedDraw
 
         MemberT& value = obj.*MP;
 
-        // 이 줄의 배치. 라벨 열·값 폭·줄 전환은 진입점이 이미 정했다.
-        const editor::widgets::property_layout_metrics& layout =
-            editor::widgets::current_property_layout();
+        // 넓은 줄은 두 갈래로 정해진다 — 필드에 붙은 `meta::wide()` 와 값
+        // 타입의 드로어가 선언한 `kWideMode`. s&box 의 `[WideMode]` 와
+        // `ControlWidget.IsWideMode` 가 같은 짝이다. 둘 다 컴파일 시에
+        // 정해지므로 넓히지 않는 줄은 사본조차 만들지 않는다.
+        constexpr bool kWideRow =
+            std::remove_cvref_t<MI>::template has_attribute<meta::wide_attr>() ||
+            editor::inspector::DrawerWantsWideRow<MemberT>;
+
+        const editor::widgets::property_layout_metrics layout = []
+        {
+            const auto& section = editor::widgets::current_property_layout();
+            if constexpr (kWideRow)
+            {
+                return editor::widgets::widen_property_line(section);
+            }
+            else
+            {
+                return section;
+            }
+        }();
 
         // ── 값 타입 커스텀 드로어가 먼저다 (W2-I) ──────────────────────────
         //
@@ -617,12 +710,42 @@ namespace Meta::TypedDraw
         return widest;
     }
 
+    // 타입 이름을 리플렉션에서 직접 읽어 한 줄로 놓는다 (디버그 모드 전용).
+    //
+    // 컴포넌트의 `Object::m_name` 은 타입 이름 **사본**이다. 씬 파일이
+    // `m_name: CameraComponent` 로 적어 두고 로드가 되읽는 값이라, 사람이
+    // 고치면 그대로 디스크에 남는다. 사본을 읽기 전용으로 돌린 것과 별개로,
+    // 디버그 모드에서 보는 이름은 사본이 아니라 **정본**이어야 한다.
+    //
+    // 여기 있는 값은 `meta::schema_of<T>` 의 식별자다. 컴파일 시 상수이고
+    // 직렬화되지 않으므로 고칠 자리 자체가 없다 — 읽기 전용으로 "막은" 것이
+    // 아니라 쓸 수 있는 저장소가 없는 것이다.
+    template<meta::reflectable T>
+    inline void DrawTypeIdentityRow()
+    {
+        if (!editor::widgets::property_debug_mode())
+        {
+            return;
+        }
+
+        using Desc = std::remove_cvref_t<decltype(meta::schema_of<T>)>;
+
+        const DisabledScope disabled{ true };
+        const auto& layout = editor::widgets::current_property_layout();
+        (void)editor::widgets::begin_property_line("Type", layout);
+
+        // 길이를 함께 넘긴다. 식별자는 `string_view` 라 널로 끝난다는 보장이 없다.
+        ImGui::TextUnformatted(Desc::identifier.data(),
+            Desc::identifier.data() + Desc::identifier.size());
+    }
+
     template<meta::reflectable T>
     void DrawTypedObject(T& obj)
     {
         // 배치는 프레임 하나에 한 번 잰다. 상속 체인 전체가 같은 라벨 열에
         // 서야 하므로 힌트도 체인 전체에서 뽑는다.
         const LayoutScope scope{ LabelHintOf<T>() };
+        DrawTypeIdentityRow<T>();
         DrawFrame<T>(obj);
     }
 

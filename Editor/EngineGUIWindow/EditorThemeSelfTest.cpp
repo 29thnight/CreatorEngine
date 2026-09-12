@@ -581,6 +581,82 @@ namespace editor
                     "property layout", "axis sample differs from the row sample");
             }
 
+            // ⑨ 넓은 줄 (s&box 의 wide mode). 라벨이 줄을 통째로 쓰고 값이
+            //    다음 줄에 온다. 좁아서 내려가는 것과 **결과는 같고 이유가
+            //    다르다** — 그쪽은 폭을 재서 정하고 이쪽은 선언이다.
+            {
+                property_layout_state state{};
+                const auto row = widgets::measure_property_layout(make(720.f), state);
+                const auto wide = widgets::widen_property_line(row);
+
+                checks.expect(property_layout_mode::stacked == wide.mode,
+                    "wide row", "a declared wide row puts the value on its own line");
+
+                const float full = row.label_col + row.gap + row.value_col;
+                checks.expect(std::fabs(wide.value_col - full) < 0.01f,
+                    "wide row", "the value takes the whole row width");
+                checks.expect(std::fabs(wide.label_col - full) < 0.01f,
+                    "wide row", "the label spans the whole row width");
+
+                // 좁아서 내려간 줄과 달리 원래 줄은 그대로다. 한 줄을 넓혔다고
+                // 구간 전체가 내려가면 나머지 줄까지 모양이 바뀐다.
+                checks.expect(property_layout_mode::inline_row == row.mode,
+                    "wide row", "widening one row does not restack the section");
+            }
+
+            // ⑩ 이미 내려간 줄을 또 넓히지 않는다. 두 번 넓히면 라벨 열이
+            //    가용 폭에 `gap + value_col` 을 더한 값이 되어 값 칸이 창
+            //    밖으로 나간다.
+            {
+                property_layout_state state{};
+                const auto narrow = widgets::measure_property_layout(make(100.f), state);
+                checks.expect(property_layout_mode::stacked == narrow.mode,
+                    "wide row", "100px is already stacked");
+
+                const auto wide = widgets::widen_property_line(narrow);
+                checks.expect(std::fabs(wide.value_col - narrow.value_col) < 0.01f,
+                    "wide row", "widening an already stacked row changes nothing");
+                checks.expect(std::fabs(wide.label_col - narrow.label_col) < 0.01f,
+                    "wide row", "a stacked row is not widened twice");
+            }
+
+            // ⑪ 넓힌 줄은 축 판정을 다시 한다. 폭이 늘었는데 축이 세로로
+            //    남으면 넓힌 뜻이 없다. 재판정은 세로 → 가로 한 방향이다 —
+            //    넓힌 값 열은 언제나 원래보다 넓으므로 반대로 뒤집힐 일이 없다.
+            {
+                property_layout_state state{};
+                // 인라인은 유지되지만 축 슬롯은 못 버티는 폭을 고른다.
+                const auto row = widgets::measure_property_layout(make(240.f), state);
+                checks.expect(property_layout_mode::inline_row == row.mode &&
+                    row.axis_stacked,
+                    "wide row", "240px keeps the row inline but stacks the axes");
+
+                const auto wide = widgets::widen_property_line(row);
+                checks.expect(!wide.axis_stacked,
+                    "wide row", "the widened row brings the axes back onto one line");
+            }
+
+            // ⑫ 디버그 모드는 켜고 끌 수 있고 기본은 꺼짐이다. 기본을 뒤집으면
+            //    `meta::debugOnly()` 로 표시한 내부 식별자가 기본 인스펙터에
+            //    샌다.
+            {
+                // 기본값은 **정본 상수**에서 읽는다. 살아 있는 값을 읽으면
+                // 사람이 켜 둔 뒤에 이 명령을 돌렸을 때 붉어지고, 검사가 먼저
+                // 끄고 나서 읽으면 세터를 재는 것이지 기본값을 재는 것이
+                // 아니다. 실제로 처음 판이 뒤쪽이라 기본값 변이를 못 잡았다.
+                checks.expect(!widgets::property_debug_mode_default(),
+                    "debug mode", "defaults to off");
+
+                const bool restore = widgets::property_debug_mode();
+                widgets::set_property_debug_mode(true);
+                checks.expect(widgets::property_debug_mode(),
+                    "debug mode", "turns on when asked");
+                widgets::set_property_debug_mode(false);
+                checks.expect(!widgets::property_debug_mode(),
+                    "debug mode", "turns back off");
+                widgets::set_property_debug_mode(restore);
+            }
+
             // ⑧ 값 최소 폭은 현재 숫자가 아니라 고정 대표 문자열로 잰다.
             //    이것이 흔들리면 값이 바뀔 때마다 열이 움직인다.
             {

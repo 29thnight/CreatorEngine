@@ -54,4 +54,33 @@ namespace editor::inspector
     {
         { InspectorDrawer<T>::Draw(label, value) } -> std::same_as<bool>;
     };
+
+    // ── 드로어가 스스로 선언하는 넓은 줄 ──────────────────────────────────
+    //
+    // s&box 의 `ControlWidget` 은 `virtual bool IsWideMode => false` 를 두고
+    // 곡선·그러데이션처럼 가로 폭을 다 받아야 하는 위젯이 그것을 참으로
+    // 덮어쓴다. 필드 쪽에서 강제하는 `[WideMode]` 와 짝이다.
+    //
+    // 여기서는 드로어에 `static constexpr bool kWideMode = true;` 한 줄이다.
+    // 선언하지 않은 드로어는 종전대로 한 줄에 선다 — 기본이 "좁은 줄" 인 것은
+    // s&box 와 같고, 기본을 뒤집으면 기존 드로어 전부의 모양이 조용히 바뀐다.
+    template<class T>
+    concept DeclaresWideMode = requires
+    {
+        { InspectorDrawer<T>::kWideMode } -> std::convertible_to<bool>;
+    };
+
+    // 값 타입 하나가 넓은 줄을 요구하는가. 드로어가 없거나 선언이 없으면 거짓.
+    template<class T>
+    inline constexpr bool DrawerWantsWideRow = []
+    {
+        if constexpr (DeclaresWideMode<T>)
+        {
+            return static_cast<bool>(InspectorDrawer<T>::kWideMode);
+        }
+        else
+        {
+            return false;
+        }
+    }();
 }

@@ -2139,6 +2139,30 @@ void InspectorWindow::Draw()
 		ImGui::PopStyleVar(2);
 	}
 
+
+	// 디버그 모드 토글 (PHASE 21 W2-I).
+	//
+	// `meta::debugOnly()` 로 표시한 항목은 이 모드에서만 그려진다. 내부
+	// 식별자처럼 평소엔 잡음이지만 문제를 쫓을 때는 봐야 하는 것들이다.
+	//
+	// 빈 자리 오른쪽 클릭으로 연다 — 줄을 하나도 쓰지 않는다. 항목 위에서는
+	// 열리지 않게 막아 컴포넌트의 제 문맥 메뉴와 겹치지 않는다.
+	//
+	// ★ 창의 **끝**에서 부른다. 앞에서 부르면 `NoOpenOverItems` 가 보는
+	//    `IsAnyItemHovered` 가 이번 프레임의 항목을 아직 하나도 못 본 상태라
+	//    직전 프레임의 값으로 판정한다 — 스크롤바를 만졌다가 빈 자리를
+	//    눌렀더니 메뉴가 안 열렸다. 항목을 다 낸 뒤에 물어야 맞는 답이 온다.
+	if (ImGui::BeginPopupContextWindow("##InspectorOptions",
+		ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+	{
+		bool debugMode = editor::widgets::property_debug_mode();
+		if (ImGui::MenuItem("Debug Mode", nullptr, &debugMode))
+		{
+			editor::widgets::set_property_debug_mode(debugMode);
+		}
+		ImGui::EndPopup();
+	}
+
 	prevSelectedSceneObject = selectedSceneObject;
 	wasMetaSelectedLastFrame = isSelectedNode;
 }
