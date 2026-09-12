@@ -102,7 +102,20 @@ namespace editor
         set(ImGuiCol_PopupBg, C::Panel);
         set(ImGuiCol_Border, C::Border);
         set(ImGuiCol_BorderShadow, C::Canvas, 0.f);
-        set(ImGuiCol_FrameBg, C::Canvas);
+        // 입력칸은 창 바탕과 **다른 단**에 선다 (PHASE 21).
+        //
+        // 예전에는 이 칸도 `Canvas` 였다. `ImGuiCol_WindowBg` 와 같은 값이라
+        // 손대기 전에는 칸의 경계가 아예 보이지 않았고, hover 해야
+        // `FrameBgHovered` 가 떠올라 드러났다. 화면에서 확인한 결함이다.
+        //
+        // s&box 는 반대 방향으로 같은 일을 한다 — 패널 `#242424` 위에 입력칸
+        // `#181818` 로 한 단 **어둡게** 둔다(`Sandbox.Tools/Theme.cs` 의
+        // `WidgetBackground`·`ControlBackground`). 우리 팔레트에서는 `Canvas`
+        // 가 이미 가장 어두워 더 내려갈 자리가 없으므로 같은 크기의 단을 위로
+        // 둔다. 대비는 1.24:1 로 s&box 의 1.19:1 보다 조금 넓다.
+        //
+        // 이 값이 다시 `Canvas` 로 돌아가면 자가 검사가 붉어진다.
+        set(ImGuiCol_FrameBg, C::Chrome);
         set(ImGuiCol_FrameBgHovered, C::PanelRaised);
         set(ImGuiCol_FrameBgActive, C::Selection);
         set(ImGuiCol_TitleBg, C::Chrome);

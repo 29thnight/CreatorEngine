@@ -159,6 +159,8 @@ namespace editor
             { ImGuiCol_Button, "idle button", 0x343434, 1.f },
             { ImGuiCol_ButtonHovered, "hover button", 0x484848, 1.f },
             { ImGuiCol_ButtonActive, "pressed button", 0x2E70EA, 1.f },
+            { ImGuiCol_FrameBg, "idle input field", 0x2A2A2A, 1.f },
+            { ImGuiCol_FrameBgHovered, "hover input field", 0x484848, 1.f },
             { ImGuiCol_FrameBgActive, "active field selection", 0x525252, 1.f },
             { ImGuiCol_Border, "panel border", 0x3E3E3E, 1.f },
             { ImGuiCol_TableBorderStrong, "strong border", 0x484848, 1.f },
@@ -175,6 +177,45 @@ namespace editor
         for (const ExpectedSlot& expected : slots)
             checks.color(style.Colors[expected.slot], expected.rgb, expected.alpha,
                          "ImGui slot", expected.name);
+
+        // ── 입력칸이 바탕에서 떨어져 보이는가 ────────────────────────
+        //
+        // 값 표만으로는 부족하다. 두 칸의 값을 **함께** 바꾸면 표는 초록인 채로
+        // 입력칸이 다시 사라진다. 이 저장소가 이미 두 번 겪은 양식이다 —
+        // `EditorSectionHeader` 가 `HeaderHovered` 와 `HeaderActive` 를 같은
+        // 값으로 두어 hover 를 잃었고, 축 필드는 `FrameBg` 가 `WindowBg` 와
+        // 같아 손대기 전 칸이 보이지 않았다. 그래서 관계를 직접 단정한다.
+        {
+            const auto rgb = [](const ImVec4& c)
+            {
+                const auto byte = [](float v)
+                {
+                    const float clamped = v < 0.f ? 0.f : (v > 1.f ? 1.f : v);
+                    return static_cast<std::uint32_t>(clamped * 255.f + 0.5f);
+                };
+                return (byte(c.x) << 16) | (byte(c.y) << 8) | byte(c.z);
+            };
+
+            const std::uint32_t field = rgb(style.Colors[ImGuiCol_FrameBg]);
+            const std::uint32_t window = rgb(style.Colors[ImGuiCol_WindowBg]);
+            const std::uint32_t child = rgb(style.Colors[ImGuiCol_ChildBg]);
+
+            checks.expect(field != window,
+                "input field", "does not vanish into the window background");
+            checks.expect(field != child,
+                "input field", "does not vanish into a child background");
+
+            // 1.15:1 은 s&box 가 실제로 쓰는 단(1.19:1)보다 조금 낮게 잡은
+            // 하한이다. 두 색이 같으면 1.00 이 되어 반드시 붉어진다.
+            checks.expect(contrast_ratio(field, window) >= 1.15f,
+                "input field", "keeps a visible step from the window background");
+
+            // 세 상태가 서로 달라야 손댄 것과 안 댄 것이 구별된다.
+            const std::uint32_t hovered = rgb(style.Colors[ImGuiCol_FrameBgHovered]);
+            const std::uint32_t active = rgb(style.Colors[ImGuiCol_FrameBgActive]);
+            checks.expect(field != hovered && hovered != active && field != active,
+                "input field", "idle, hover and active read differently");
+        }
 
         // Expected pixel values include ImGui's geometry truncation (7*1.5=10,
         // 6*2.25=13). The same object traverses both axes and repeated scales.
