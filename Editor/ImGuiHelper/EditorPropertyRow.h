@@ -102,11 +102,15 @@ namespace editor::widgets
         /// `ImGui::GetContentRegionAvail().x`. 창 전체 폭이 아니다(§4.1).
         float available{ 0.f };
 
-        /// 라벨 열의 상한. 남는 폭은 값 열이 가져간다.
-        float label_max{ 0.f };
-
-        /// 상한에 닿기 전까지 라벨 열이 가져가는 가용 폭의 비율.
-        float label_ratio{ 0.40f };
+        /// 라벨 열의 **최소** 폭.
+        ///
+        /// 처음 판은 "가용 폭의 40%, 상한 160" 이었다. 비율이 두 방향으로
+        /// 어긋났다 — 짧은 이름만 있는 구간이 그 폭을 통째로 버렸고, 창을
+        /// 넓히면 라벨 열이 같이 자라 남는 폭이 값에 가지 않았다. s&box 는
+        /// 라벨 열에 비율을 주지 않는다. 최소 폭만 두고(`ControlSheetLabel`
+        /// 의 `MinimumWidth = 140f`) 늘어나는 열은 값 쪽 하나다
+        /// (`ControlSheetRow.Rebuild` 의 `SetColumnStretch(0, 0, 0, 1)`).
+        float label_min{ 0.f };
 
         /// 값 칸 하나의 최소 판독 폭. **고정 대표 문자열**로 잰 값이다 —
         /// 현재 숫자로 재면 값이 바뀔 때마다 열이 흔들린다.
@@ -127,11 +131,12 @@ namespace editor::widgets
         /// 붙이므로 여기서 다른 값을 쓰면 판정과 실제 배치가 어긋난다.
         float axis_gap{ 0.f };
 
-        /// 이 구간이 그릴 **고정 라벨** 중 가장 넓은 폭. 0 이면 비율·상한만 쓴다.
+        /// 이 구간이 그릴 **고정 라벨** 중 가장 넓은 폭. 라벨 열의 자연 폭이다.
         ///
-        /// 없으면 라벨 열이 언제나 가용 폭의 `label_ratio` 를 차지한다. 짧은
-        /// 이름만 있는 구간에서는 그 폭이 통째로 버려지고, 그만큼 값 열이
-        /// 줄어 축이 불필요하게 세로로 떨어진다.
+        /// `label_min` 보다 넓으면 열이 그만큼 넓어지고, 좁으면 최소 폭이
+        /// 이긴다 — 상한이 아니라 내용 폭이다. s&box 의 라벨 위젯이
+        /// `SizeMode.Flexible` 로 자기 내용만큼 차지하되 최소 폭 아래로는
+        /// 안 내려가는 것과 같다.
         ///
         /// **컴파일 시 정해진 문자열로만 잰다.** 매 프레임 바뀌는 값으로 재면
         /// 계획서가 금지한 "라벨 최대값 변화로 열이 흔들리는" 상태가 된다.
@@ -190,11 +195,8 @@ namespace editor::widgets
     /// 유도 결과를 담는 버퍼의 크기. 이보다 긴 이름은 잘린다.
     int display_label_capacity() noexcept;
 
-    /// 라벨 열 상한의 논리 픽셀 값. 검사가 읽는 정본이다.
-    float property_layout_label_max_logical() noexcept;
-
-    /// 라벨 열 비율의 정본.
-    float property_layout_label_ratio() noexcept;
+    /// 라벨 열 최소 폭의 논리 픽셀 값. 검사가 읽는 정본이다.
+    float property_layout_label_min_logical() noexcept;
 
     /// 값 최소 폭을 재는 대표 문자열. 현재 값이 아니라 이것으로 잰다.
     const char* property_layout_value_sample() noexcept;
@@ -207,7 +209,7 @@ namespace editor::widgets
     float property_layout_label_hint(const char* const* labels, int count);
 
     /// 지금 프레임의 ImGui·테마 상태에서 입력을 채운다. 그리는 자리에서 쓴다.
-    /// `label_hint` 는 0 이면 비율·상한만 쓴다.
+    /// `label_hint` 가 0 이면 라벨 열은 최소 폭 그대로다.
     property_layout_inputs property_layout_inputs_now(int aux_button_count,
         float label_hint = 0.f);
 

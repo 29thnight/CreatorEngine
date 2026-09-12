@@ -440,8 +440,7 @@ namespace editor
             const auto make = [](float available) {
                 property_layout_inputs in{};
                 in.available = available;
-                in.label_max = 160.f;
-                in.label_ratio = widgets::property_layout_label_ratio();
+                in.label_min = 140.f;
                 in.value_min = 60.f;
                 in.axis_value_min = 40.f;
                 in.badge_width = 12.f;
@@ -451,14 +450,23 @@ namespace editor
                 return in;
             };
 
-            // ① 라벨 열은 상한을 넘지 않는다. 720px 의 40% 는 288 이다.
+            // ① 라벨 열은 **늘어나지 않는다**. s&box 의 규약이 그렇다 —
+            //    최소 폭만 있고 stretch 는 값 열에만 붙는다. 비율이던 시절에는
+            //    창을 넓히면 라벨 열이 같이 자라 넓힌 폭의 40% 가 빈 라벨
+            //    칸으로 사라졌다.
             {
-                property_layout_state state{};
-                const auto metrics = widgets::measure_property_layout(make(720.f), state);
-                checks.expect(metrics.label_col <= 160.f + 0.01f,
-                    "property layout", "label column honours its cap");
-                checks.expect(metrics.value_col > 480.f,
-                    "property layout", "surplus width goes to the value column");
+                property_layout_state narrowState{};
+                const auto narrow = widgets::measure_property_layout(make(720.f), narrowState);
+
+                property_layout_state wideState{};
+                const auto wide = widgets::measure_property_layout(make(1200.f), wideState);
+
+                checks.expect(std::fabs(wide.label_col - narrow.label_col) < 0.01f,
+                    "property layout", "label column does not stretch with the window");
+                checks.expect(std::fabs((wide.value_col - narrow.value_col) - 480.f) < 0.01f,
+                    "property layout", "every pixel of the surplus goes to the value column");
+                checks.expect(narrow.label_col >= 140.f - 0.01f,
+                    "property layout", "label column holds its minimum width");
             }
 
             // ② 좁으면 값이 라벨 아래로 내려간다.
@@ -529,20 +537,26 @@ namespace editor
                     "property layout", "240px stacks the axes vertically");
             }
 
-            // ⑥ 라벨 힌트가 열의 위를 한 번 더 막는다. 힌트가 없으면 짧은
-            //    이름만 있는 구간도 가용 폭의 40% 를 통째로 가져가고, 그만큼
-            //    값 열이 줄어 축이 불필요하게 세로로 떨어진다.
+            // ⑥ 라벨 힌트는 **상한이 아니라 내용 폭**이다. 최소 폭보다 넓은
+            //    이름이 있는 구간은 열이 그만큼 넓어져야 잘리지 않고, 짧은
+            //    이름만 있는 구간은 최소 폭이 이겨야 열이 줄줄이 어긋나지
+            //    않는다. 앞 판은 힌트를 상한으로 써서 뒤쪽을 못 지켰다.
             {
-                property_layout_state state{};
-                property_layout_inputs hinted = make(720.f);
-                hinted.label_hint = 40.f;
-                const auto metrics = widgets::measure_property_layout(hinted, state);
-                checks.expect(metrics.label_col <= 40.01f,
-                    "property layout", "label hint caps the column");
-                checks.expect(metrics.value_col > 660.f,
-                    "property layout", "the width the hint saves goes to the value column");
-                checks.expect(!metrics.axis_stacked,
-                    "property layout", "the saved width keeps the axes inline");
+                property_layout_state wideState{};
+                property_layout_inputs longLabels = make(720.f);
+                longLabels.label_hint = 200.f;
+                const auto grown = widgets::measure_property_layout(longLabels, wideState);
+                checks.expect(std::fabs(grown.label_col - 200.f) < 0.01f,
+                    "property layout", "a hint wider than the minimum widens the column");
+
+                property_layout_state shortState{};
+                property_layout_inputs shortLabels = make(720.f);
+                shortLabels.label_hint = 40.f;
+                const auto floored = widgets::measure_property_layout(shortLabels, shortState);
+                checks.expect(std::fabs(floored.label_col - 140.f) < 0.01f,
+                    "property layout", "a hint narrower than the minimum loses to it");
+                checks.expect(!floored.axis_stacked,
+                    "property layout", "the minimum column still leaves the axes inline");
             }
 
             // ⑦ 축 최소 폭은 행 전체의 것과 다른 값이다. 같은 잣대를 대면
@@ -573,11 +587,8 @@ namespace editor
                 const char* sample = widgets::property_layout_value_sample();
                 checks.expect(nullptr != sample && '\0' != sample[0],
                     "property layout", "value sample is a fixed string");
-                checks.expect(widgets::property_layout_label_max_logical() > 0.f,
-                    "property layout", "label cap is a positive logical pixel value");
-                checks.expect(widgets::property_layout_label_ratio() > 0.f &&
-                    widgets::property_layout_label_ratio() < 1.f,
-                    "property layout", "label ratio is a proper fraction");
+                checks.expect(widgets::property_layout_label_min_logical() > 0.f,
+                    "property layout", "label minimum is a positive logical pixel value");
             }
         }
 

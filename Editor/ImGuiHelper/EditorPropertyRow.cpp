@@ -89,10 +89,7 @@ namespace editor::widgets
         // 이 값보다 긴 라벨은 잘리고 tooltip 이 전체 이름을 준다 — 라벨이
         // 길다고 값 열을 먹게 두면 긴 이름 하나가 그 컴포넌트 전체의 열을
         // 밀어낸다.
-        constexpr float kLabelMaxLogical = 160.f;
-
-        // 가용 폭 중 라벨이 가져가는 비율. 상한에 닿기 전까지만 쓴다.
-        constexpr float kLabelRatio = 0.40f;
+        constexpr float kLabelMinLogical = 140.f;
 
         // 값 최소 폭을 재는 대표 문자열. **현재 값으로 재지 않는다.**
         // 현재 숫자로 재면 0 에서 -1234.567 로 바뀌는 순간 열이 움직이고,
@@ -201,14 +198,9 @@ namespace editor::widgets
         return 0 == out ? identifier : buffer;
     }
 
-    float property_layout_label_max_logical() noexcept
+    float property_layout_label_min_logical() noexcept
     {
-        return kLabelMaxLogical;
-    }
-
-    float property_layout_label_ratio() noexcept
-    {
-        return kLabelRatio;
+        return kLabelMinLogical;
     }
 
     const char* property_layout_value_sample() noexcept
@@ -249,8 +241,7 @@ namespace editor::widgets
 
         property_layout_inputs inputs{};
         inputs.available = ImGui::GetContentRegionAvail().x;
-        inputs.label_max = ThemePixels(kLabelMaxLogical);
-        inputs.label_ratio = kLabelRatio;
+        inputs.label_min = ThemePixels(kLabelMinLogical);
 
         // 폰트에서 잰 값은 이미 배율이 반영돼 있다. `ThemePixels` 를 다시
         // 곱하면 DPI 2 에서 두 번 커진다.
@@ -276,14 +267,18 @@ namespace editor::widgets
     property_layout_metrics measure_property_layout(const property_layout_inputs& inputs,
         property_layout_state& state) noexcept
     {
-        // 비율과 상한이 위를 막고, 힌트가 있으면 거기까지만 쓴다. 힌트는
-        // 이 구간의 고정 라벨이 실제로 필요한 폭이라, 짧은 이름만 있는 구간이
-        // 가용 폭의 40% 를 통째로 버리는 것을 막는다.
-        float label_col = ImMin(inputs.available * inputs.label_ratio, inputs.label_max);
-        if (inputs.label_hint > 0.f)
-        {
-            label_col = ImMin(label_col, inputs.label_hint);
-        }
+        // ── 라벨 열 (s&box 규약) ─────────────────────────────────────────
+        //
+        // 비율이 없다. 최소 폭과 이 구간이 실제로 그릴 라벨 폭 중 **큰 쪽**을
+        // 쓰고, 늘어나는 열은 값 쪽 하나다. 가용 폭이 인자로 들어오지 않는
+        // 것이 요점이다 — 창을 넓혀도 라벨 열은 그대로고 넓어진 만큼이 전부
+        // 값으로 간다.
+        float label_col = ImMax(inputs.label_min, inputs.label_hint);
+
+        // 편집 중 보류가 inline 을 붙들고 있는 동안 창이 라벨 열보다 좁아질
+        // 수 있다. 그때 열을 그대로 두면 값 칸이 가용 폭 밖으로 나간다.
+        label_col = ImMin(label_col,
+            ImMax(inputs.available - inputs.gap - inputs.aux_reserve, 1.f));
 
         // inline 일 때 값이 받게 될 폭.
         const float inline_value = inputs.available - label_col - inputs.gap - inputs.aux_reserve;
