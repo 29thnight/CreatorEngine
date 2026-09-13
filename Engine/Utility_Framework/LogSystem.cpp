@@ -319,7 +319,8 @@ void DebugClass::Initialize(std::string_view sessionName)
     const file::path logFile = logDirectory / BuildLogFileName(sessionName);
     m_logFilePath = logFile.string();
 
-    logSink = std::make_shared<LogSink>(500);
+    m_logStore->Clear();
+    logSink = std::make_shared<LogSink>(m_logStore);
     htmlSink = std::make_shared<HtmlFileSink>(m_logFilePath, false);
 
     std::vector<spdlog::sink_ptr> sinks{ logSink, htmlSink };

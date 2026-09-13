@@ -8,6 +8,7 @@
 #include <mathematics/vector3.hpp>
 #include <mathematics/quaternion.hpp>
 class Scene;
+class Entity;
 class Component;
 class Prefab;
 class Material;
@@ -24,6 +25,11 @@ namespace EditorObjectOperations
     CommandCore::CommandResult Describe(EntityHandle target);
     CommandCore::CommandResult Properties(EntityHandle target, const std::string& component);
     CommandCore::CommandResult Rename(EntityHandle target, const std::string& name);
+    CommandCore::CommandResult SetIcon(EntityHandle target, const std::string& preset);
+    CommandCore::CommandResult SetEditLocked(EntityHandle target, bool locked);
+    // Ancestor locks protect descendants; subtree checks also protect locked
+    // children from indirect edits such as moving/deleting their parent.
+    bool IsEditLocked(const Entity* target, bool includeDescendants = false);
     CommandCore::CommandResult Create(Scene* scene, const std::string& name, GameObjectType type, uint32_t parent = 0);
     CommandCore::CommandResult Delete(EntityHandle target);
     CommandCore::CommandResult Duplicate(EntityHandle target, const std::string& name = {});
@@ -43,8 +49,10 @@ namespace EditorObjectOperations
     bool CommitProperty(Component& component, const std::string& field, Authoring::WriteDocument before);
     CommandCore::CommandResult Property(EntityHandle target, const std::string& component, const std::string& field, const std::string& value);
     CommandCore::CommandResult AddComponent(EntityHandle target, const std::string& type);
+    CommandCore::CommandResult AddManagedScript(EntityHandle target, const std::string& type);
     CommandCore::CommandResult RemoveComponent(EntityHandle target, const std::string& component);
     CommandCore::CommandResult Select(Scene* scene, const std::vector<EntityHandle>& targets);
+    CommandCore::CommandResult NavigateSelection(Scene* scene, int direction);
     CommandCore::CommandResult InstantiatePrefab(const std::string& prefab, const std::string& name);
     CommandCore::CommandResult InstantiatePrefab(Prefab* prefab, const std::string& name);
     CommandCore::CommandResult MaterialMode(const std::vector<std::shared_ptr<Material>>& materials, MaterialRenderingMode mode);

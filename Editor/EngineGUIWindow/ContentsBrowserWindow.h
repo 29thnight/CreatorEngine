@@ -4,6 +4,7 @@
 #include "EditorAssetPresentation.h"
 #include "EditorSettingsStore.h"
 #include "AuthoringWriteNode.h"
+#include <vector>
 
 // ── 콘텐츠 브라우저 (PHASE 4-3 슬라이스 2) ──
 //
@@ -34,10 +35,16 @@ public:
 private:
 	void ShowDirectoryTree(const file::path& directory);
 	void ShowCurrentDirectoryFiles();
-	void DrawFileTile(ImTextureID iconTexture,
+    void Navigate(const file::path& directory, bool addHistory = true);
+    void DrawToolbar(bool collapsedTree);
+    void DrawBreadcrumb(float width);
+    void DrawDirectoryPanel();
+    void DrawFolderMenu(const file::path& directory);
+    void DrawFolderDialog();
+    void DrawSearch(float width);
+	void DrawFileTile(const EditorAssetPresentation::FilePresentation& presentation,
 					  const file::path& directory,
 					  const std::string& fileName,
-					  EditorAssetPresentation::FileType& fileType,
 					  const ImVec2& tileSize = ImVec2(160, 160));
 
 	// 씬 오브젝트를 프리팹 폴더에 떨어뜨렸을 때. payload는 ImGui가
@@ -45,6 +52,20 @@ private:
 	void HandleSceneObjectDrop(const void* payload);
 
 	ImGuiTextFilter m_filter{};
+	file::path m_rootDirectory{};
 	file::path		m_currentDirectory{};
-	ImVec2			m_overlayPos{};
+    std::vector<file::path> m_history;
+    size_t m_historyIndex{};
+    bool m_revealDirectory{ true };
+    bool m_showTree{ true };
+    bool m_listView{};
+    float m_tileSize{ 88.f };
+    float m_treeDragStart{ 220.f };
+    int m_typeFilter{ -1 };
+    bool m_sortDescending{};
+    std::string m_error;
+    file::path m_folderTarget;
+    bool m_openFolderDialog{};
+    char m_folderName[256]{};
+    char m_pathInput[1024]{};
 };

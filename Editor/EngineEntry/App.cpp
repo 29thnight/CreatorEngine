@@ -18,6 +18,8 @@
 #include "EditorAssetPresentation.h"
 #include "EditorPlatform.h"
 #include "EditorWindowChrome.h"
+#include "ViewportHostWindow.h"
+#include "RHI/ImGuiWin32Cursor.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "GpuDiagnostics.h"
@@ -33,6 +35,7 @@
 #include "WinProcProxy.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
+#include <shellapi.h>
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -40,6 +43,18 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 namespace
 {
+	std::filesystem::path EditorPathArgument(const wchar_t* option)
+	{
+		int count{};
+		wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+		std::filesystem::path result;
+		if (!arguments) return result;
+		for (int i = 1; i + 1 < count; ++i)
+			if (wcscmp(arguments[i], option) == 0) { result = std::filesystem::absolute(arguments[i + 1]).lexically_normal(); break; }
+		LocalFree(arguments);
+		return result;
+	}
+
 	std::filesystem::path ResolveEditorWorkspaceRoot(
 		const std::filesystem::path& executableRoot) noexcept
 	{
@@ -80,7 +95,12 @@ namespace
 		const std::filesystem::path workspaceRoot =
 			ResolveEditorWorkspaceRoot(executableRoot);
 		const std::filesystem::path binaryRoot = executableRoot.parent_path();
-		const std::filesystem::path projectRoot = workspaceRoot.empty()
+		// Directory-based authoring is an explicit development adapter. The product
+		// --project contract is reserved for validated .creatorproject descriptors (DL1).
+		if (!EditorPathArgument(L"--project").empty())
+			throw std::runtime_error("Product descriptor startup is not implemented; use --development-project for the development adapter.");
+		const auto explicitProject = EditorPathArgument(L"--development-project");
+		const std::filesystem::path projectRoot = !explicitProject.empty() ? explicitProject : workspaceRoot.empty()
 			? std::filesystem::path{}
 			: (workspaceRoot / L"Dynamic_CPP").lexically_normal();
 		config.paths.executableRoot = executableRoot;
@@ -89,6 +109,9 @@ namespace
 		config.paths.runtimeDataRoot = (executableRoot / L"Saved").lexically_normal();
 		config.paths.assetsRoot = (projectRoot / L"Assets").lexically_normal();
 		config.paths.managedRoot = (binaryRoot / L"Managed").lexically_normal();
+		const auto explicitManaged = EditorPathArgument(L"--managed-root");
+		if (!explicitManaged.empty()) config.paths.managedRoot = explicitManaged;
+		if (!explicitProject.empty()) config.paths.runtimeDataRoot = projectRoot / L"Saved" / L"Editor";
 		config.paths.engineResourceRoot = (binaryRoot / L"Resources").lexically_normal();
 		config.paths.testArtifactRoot = workspaceRoot.empty()
 			? (executableRoot / L"Saved" / L"Tests").lexically_normal()
@@ -122,14 +145,10 @@ namespace
 				return handled;
 			}
 
-			if (WM_SETCURSOR == message)
+			if (const std::optional<LRESULT> handled =
+					ImGuiWin32Cursor::HandleWindowMessage(hWnd, message, wParam, lParam))
 			{
-				if (HTCLIENT == LOWORD(lParam))
-				{
-					SetCursor(LoadCursor(nullptr, IDC_ARROW));
-					return TRUE;
-				}
-				return FALSE;
+				return handled;
 			}
 
 			// ImGui Win32 handling belongs to the presentation thread. Preserve the
@@ -279,8 +298,11 @@ void Core::App::Run()
 		// 유일한 씬 렌더러. Update가 GT의 구조 변경과 EndOfFrame을 끝낸 뒤
 		// 카메라와 delta batch를 밀봉해 전용 RenderThread에 발행한다.
 		//
-		// 재생 여부와 무관하게 에디터·게임 카메라를 둘 다 넘긴다 — 그래야
-		// 재생 전에도 게임뷰가 그려지고, 재생 중에도 씬뷰가 죽지 않는다.
+		// 넘기는 뷰는 **화면에 있는 것만**이다(PHASE 21 W4). 예전에는 재생
+		// 여부와 무관하게 둘 다 넘겼는데, 그때는 "지금 무엇이 보이는가" 에
+		// 답할 자리가 없었다 — Scene 과 Game 이 창 둘이라 어느 쪽이 앞 탭인지
+		// 제작자가 알 수 없었기 때문이다. 가운데 Host 가 모드를 들고부터는
+		// 그 물음에 답이 있으므로, 보이지 않는 타깃의 그림을 만들지 않는다.
 		// 카메라별 표시 슬롯은 TickLive 쪽이 관리한다(MultiCameraRenderPlan.md).
 		// camera.editor follow on — 두 뷰의 시점을 통일해 두는 대조 실험용.
 		// 카메라 목록을 만들기 전에 적용해야 이번 프레임 밀봉에 반영된다.
@@ -293,7 +315,19 @@ void Core::App::Run()
 		// Editor 세션이 소유하고, Core는 뷰 요청에 실린 값만 안다.
 		EnhancedLiveViewRequest views[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
 		uint32_t viewCount = 0;
-		if (Camera* editorCamera = EditorSessionState::Get().EditorCamera())
+		// UI 가 한 번도 게시하지 않았으면(첫 프레임, 헤드리스) 둘 다 만든다 —
+		// 수요를 모르는 것과 수요가 없는 것은 다르다.
+		const ::editor::windows::viewport_demand demand =
+			::editor::windows::read_viewport_demand();
+		const bool editorDemanded = !demand.hostPresent || demand.editorTarget;
+		const bool gameDemanded = !demand.hostPresent || demand.gameTarget;
+
+		// 카메라를 **먼저** 집는다. 누계가 재야 하는 것은 "만들 수 있었는데
+		// 수요가 없어 만들지 않았다" 이지 "못 만들었다" 가 아니다. 둘을 섞으면
+		// 게임 카메라가 없는 씬에서 수요 문을 통째로 걷어도 수가 그대로여서,
+		// 그 수를 읽는 게이트가 씬이 무엇을 담고 있느냐에 기대게 된다.
+		Camera* const editorCamera = EditorSessionState::Get().EditorCamera();
+		if (editorDemanded && nullptr != editorCamera)
 		{
 			views[viewCount++] = {
 				{ kEnhancedEditorViewId, 1 },
@@ -303,8 +337,9 @@ void Core::App::Run()
 					EnhancedLiveViewFlags::CanvasPreview };
 		}
 		Scene* activeScene = SceneManagers->GetActiveScene();
-		if (CameraComponent* gameCamera = nullptr != activeScene
-			? activeScene->Cameras().GetPrimaryCamera() : nullptr)
+		CameraComponent* const gameCamera = (nullptr != activeScene)
+			? activeScene->Cameras().GetPrimaryCamera() : nullptr;
+		if (gameDemanded && nullptr != gameCamera)
 		{
 			views[viewCount++] = {
 				{ kEnhancedGameViewId,
@@ -317,6 +352,9 @@ void Core::App::Run()
 		// ShaderMeta GUID를 선언한다. DataSystem cache에 없는 복제/런타임
 		// Material도 이 owner snapshot에 포함되며 RenderEngine은 Water/Wind
 		// 같은 대표 파일 이름을 알 필요가 없다.
+		::editor::windows::note_view_submission(
+			!editorDemanded && nullptr != editorCamera,
+			!gameDemanded && nullptr != gameCamera);
 		const std::vector<std::shared_ptr<Material>> requiredMaterials =
 			SceneManagers->CaptureRequiredRenderMaterials();
 		const EnhancedRequiredAssetPacket requiredAssets =

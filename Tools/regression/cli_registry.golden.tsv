@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	99
-# names	106
+# commands	113
+# names	120
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -22,6 +22,15 @@ crash.status	-	immediate	editor	engine_service	live	no	yes	-	크래시 덤프 �
 dump.list	-	immediate	editor	engine_service	live	no	yes	[limit]	크래시 덤프 목록을 최대 limit개 조회한다
 dump.show	-	immediate	editor	engine_service	live	no	yes	[limit]	덤프 목록과 최신 덤프 요약을 조회한다
 dx12.live	-	immediate	editor	engine_service	live	no	yes	on|status	EnhancedRenderer 메인 런타임 상태
+editor.dock	-	immediate	editor	engine_service	live	no	yes	-	살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다
+editor.layout	-	immediate	editor	engine_service	live	no	yes	-	활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다
+editor.menu	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다
+editor.sceneview	-	immediate	editor	engine_service	live	no	yes	-	씬 뷰 오버레이 배치와 카메라 상태를 읽는다
+editor.selftest	-	immediate	editor	engine_service	live	no	yes	-	editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다
+editor.theme	-	immediate	editor	engine_service	live	no	yes	-	적용된 ImGui 스타일 값을 TSV로 내고 배율 출처를 판정한다
+editor.viewport	-	immediate	editor	engine_service	live	no	yes	[scene|game]	중앙 ViewportHost 의 표시 모드와 뷰 수요
+editor.windows	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 창 표를 TSV로 내고 배선 고아를 판정한다
+editor.workspace	-	immediate	editor	engine_service	live	no	yes	[save|load|reset|open <panelId>|close <panelId>]	워크스페이스 저장/복원과 창 열림 상태
 game.pak	-	long	editor	engine_service	live	no	yes	-	Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다
 gc.collect	-	frames	editor	engine_service	live	no	yes	-	관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)
 gc.stats	gc.delta	immediate	editor	engine_service	live	no	yes	-	관리 힙 지표를 낸다(gc.delta는 직전 대비 증감)
@@ -44,6 +53,8 @@ object.create	-	frames	editor	editor_operation	live	no	yes	<이름> [타입]	빈
 object.delete	-	frames	editor	editor_operation	live	no	yes	<target>	Delete an object subtree with Undo
 object.describe	-	immediate	editor	engine_service	live	no	yes	<name-or-id>	Read object identity and name
 object.duplicate	-	frames	editor	editor_operation	live	no	yes	<오브젝트> [새 이름]	오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)
+object.icon	-	immediate	editor	editor_operation	live	no	yes	<target> <preset|default>	Set entity image preset with Undo
+object.lock	-	immediate	editor	editor_operation	live	no	yes	<target> <true|false>	Lock or unlock entity authoring with Undo
 object.parent	-	frames	editor	editor_operation	live	no	yes	<자식> <부모 | ->	오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)
 object.properties	-	immediate	editor	engine_service	live	no	yes	<target> <component>	Read reflected component fields and values
 object.property	-	frames	editor	editor_operation	live	no	yes	<오브젝트> <컴포넌트> <필드> <값>	리플렉션으로 프로퍼티를 설정한다
@@ -71,6 +82,7 @@ scene.dump	-	immediate	editor	engine_service	live	no	yes	[라벨]	활성 씬의 
 scene.flag	-	immediate	editor	engine_service	live	no	yes	[<dirtytraversal|bonecache> [0|1]]	씬 진단 플래그를 읽거나 바꾼다(인자 없으면 전부 조회)
 scene.hierarchycheck	-	frames	editor	engine_service	live	no	yes	-	씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)
 scene.load	scene.switch	long	editor	engine_service	live	no	yes	<경로>	씬을 로드한다(활성 씬은 그대로)
+scene.navigate	-	immediate	editor	editor_operation	live	no	yes	<back|forward>	Navigate entity selection history
 scene.new	-	frames	editor	engine_service	live	no	yes	[이름]	빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)
 scene.save	-	frames	editor	engine_service	live	no	yes	<경로>	활성 씬을 .creator로 저장한다
 scene.select	-	immediate	editor	editor_operation	live	no	yes	<오브젝트 이름>	오브젝트를 에디터 선택으로 지정한다
@@ -81,6 +93,8 @@ scene.transformpull	-	frames	editor	engine_service	live	no	yes	[print]	X6 C# 즉
 scene.transformstats	-	frames	editor	engine_service	live	no	yes	[0|1|print]	X0 UI/Spatial·단계·구성·프레임 topology 계측
 scene.transformwritestats	-	frames	editor	engine_service	live	no	yes	[0|1|print]	X1 로컬 쓰기 publish 출처 계측
 script.add	-	frames	editor	engine_service	live	no	yes	<오브젝트> <타입>	C# 스크립트를 오브젝트에 부착한다
+script.create	-	frames	editor	engine_service	live	no	yes	<오브젝트> <클래스 이름> | --retry | --cancel	C# 소스를 생성하고 비동기 컴파일 후 원래 오브젝트에 부착한다
+script.creation	-	immediate	editor	engine_service	live	no	yes	-	스크립트 생성·컴파일·부착의 진행 상태를 조회한다
 script.fields	-	frames	editor	engine_service	live	no	yes	<id>	스크립트의 노출 필드와 현재 값을 확인한다
 script.invoke	-	long	editor	engine_service	live	yes	yes	<타입> <메서드> [인자]...	표식된 static 메서드를 호출한다([EngineCallable] 없는 것은 거부)
 script.reload	-	frames	editor	engine_service	live	no	yes	-	게임 스크립트 어셈블리를 다시 로드한다(핫리로드)

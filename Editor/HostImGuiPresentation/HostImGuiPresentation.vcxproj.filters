@@ -18,6 +18,9 @@
     <ClCompile Include="RHI\ImGuiHost.cpp">
       <Filter>RHI</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\ImGuiWin32Cursor.cpp">
+      <Filter>RHI</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp">
       <Filter>RHI\Vulkan</Filter>
     </ClCompile>
@@ -27,6 +30,9 @@
       <Filter>RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IImGuiHost.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\ImGuiWin32Cursor.h">
       <Filter>RHI</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IImGuiRendererBackend.h">

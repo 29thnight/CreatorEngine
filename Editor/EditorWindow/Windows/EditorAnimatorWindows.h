@@ -43,18 +43,18 @@ struct editor_animator_windows
             // 첫 크기는 옛 `SetNextWindowSize` 그대로다. 나머지 둘은
             // 아무것도 부르지 않았으므로 조건이 없다.
             panel<&windows::draw_animator_event>(
-                EditorWindowName::kAnimatorEvent, EditorWindowName::kAnimatorEvent)
+                EditorWindowName::kAnimatorEvent, EditorWindowName::kAnimatorEventLabel)
                 .initial_size(1100.f, 400.f)
                 .open_by_default(false)
                 .available(&windows::animator_selected),
 
             panel<&windows::draw_animation_controllers>(
-                EditorWindowName::kAnimationControllers, EditorWindowName::kAnimationControllers)
+                EditorWindowName::kAnimationControllers, EditorWindowName::kAnimationControllersLabel)
                 .open_by_default(false)
                 .available(&windows::animator_selected),
 
             panel<&windows::draw_avatar_mask>(
-                EditorWindowName::kAvatarMask, EditorWindowName::kAvatarMask)
+                EditorWindowName::kAvatarMask, EditorWindowName::kAvatarMaskLabel)
                 .open_by_default(false)
                 .available(&windows::avatar_mask_target_valid));
     }

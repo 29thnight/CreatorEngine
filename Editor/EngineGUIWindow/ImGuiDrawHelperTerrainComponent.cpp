@@ -6,12 +6,18 @@
 #include "Terrain.h"
 #include "FileDialog.h"
 #include "FoliageComponent.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
+#include "EditorObjectOperations.h"
 
 
 void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 {
+    if (EditorObjectOperations::IsEditLocked(terrainComponent->GetOwner(), true))
+    {
+        if (auto* brush = EditorSessionState::Get().FindTerrainBrush()) brush->m_isEditMode = false;
+        ImGui::TextDisabled("Terrain editing is locked.");
+        return;
+    }
 	TerrainBrush* g_CurrentBrush = terrainComponent->GetCurrentBrush();
 	TerrainBrush* sessionBrush = EditorSessionState::Get().FindTerrainBrush();
 
@@ -102,7 +108,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					ImGui::SeparatorText("Layers");
 
 					// --- 추가/삭제 버튼 ---
-					if (ImGui::Button(ICON_FA_PLUS " Add"))
+					if (ImGui::Button(EditorIcon::Label<EditorIcon::Add, " Add">))
 					{
 						file::path diffuseFile = ShowOpenFileDialog(L"");
 						if (!diffuseFile.empty())
@@ -119,7 +125,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 					{
 						ImGui::BeginDisabled();
 					}
-					if (ImGui::Button(ICON_FA_TRASH_CAN " Remove"))
+					if (ImGui::Button(EditorIcon::Label<EditorIcon::Delete, " Remove">))
 					{
 						if (isLayerSelected)
 						{
@@ -271,7 +277,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 
 				ImGui::SeparatorText("Foliage Mesh");
 				ImGui::Text("Drag Model Here");
-				if (ImGui::BeginDragDropTarget())
+				if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 				{
 					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
 					{

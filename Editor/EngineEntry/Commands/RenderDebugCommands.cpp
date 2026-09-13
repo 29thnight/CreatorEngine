@@ -315,6 +315,33 @@ namespace ConsoleCmd
         data.Set("ready", CommandData::Bool(snapshot.pipelineReady));
         data.Set("backend", CommandData::String(snapshot.backend == EnhancedLiveBackend::Vulkan ? "vulkan" : "dx12"));
         data.Set("status", CommandData::String(EnhancedSceneRenderer::GetLiveStatus()));
+        const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+        auto displayData = CommandData::Object();
+        displayData.Set("iblGenerationCount", CommandData::Int(display.iblGenerationCount));
+        displayData.Set("sourceFrame", CommandData::Int(display.sourceFrameId));
+        displayData.Set("resizeGeneration", CommandData::Int(display.resizeGeneration));
+        displayData.Set("width", CommandData::Int(display.width));
+        displayData.Set("height", CommandData::Int(display.height));
+        for (uint32_t i = 0; i < kEnhancedLiveDisplayTargetCount; ++i)
+        {
+            const auto& entry = display.targets[i];
+            auto target = CommandData::Object();
+            target.Set("active", CommandData::Bool(entry.active));
+            target.Set("ready", CommandData::Bool(entry.ready));
+            target.Set("completedFrame", CommandData::Int(entry.completedFrameId));
+            target.Set("completedResizeGeneration", CommandData::Int(entry.completedResizeGeneration));
+            target.Set("textureQueries", CommandData::Int(entry.textureQueries));
+            target.Set("missingTextureQueries", CommandData::Int(entry.missingTextureQueries));
+            target.Set("lastTextureAvailable", CommandData::Bool(entry.lastTextureAvailable));
+            target.Set("lastTextureFrame", CommandData::Int(entry.lastTextureFrameId));
+            target.Set("lastTextureResizeGeneration", CommandData::Int(entry.lastTextureResizeGeneration));
+            target.Set("lastMissingResizeGeneration", CommandData::Int(entry.lastMissingResizeGeneration));
+            target.Set("lastMissingTextureMs", CommandData::Double(entry.lastMissingTextureMs));
+            target.Set("maxMissingTextureMs", CommandData::Double(entry.maxMissingTextureMs));
+            displayData.Set(i == static_cast<uint32_t>(EnhancedLiveDisplayTarget::Editor)
+                ? "scene" : "game", std::move(target));
+        }
+        data.Set("display", std::move(displayData));
         return Ok(mode == "on" ? "Renderer enable requested" : "", std::move(data));
     }
 
@@ -332,10 +359,11 @@ namespace ConsoleCmd
         //   없다 - 비교 대신 아래 명부(따라가야 하는데 안 따라간 텍스처)가
         //   같은 질문에 답한다.
         std::string report;
+        const auto screenSize = ScreenResizeBus::Get().GetSizeSnapshot();
         {
             char line[224]{};
             std::snprintf(line, sizeof(line), "화면 %ux%u\n",
-                ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
+                screenSize.width, screenSize.height);
             report += line;
         }
 
@@ -348,8 +376,8 @@ namespace ConsoleCmd
         // 화면 추종을 선언한 텍스처 전부. 카메라 렌더 타깃만 보면 GBuffer나
         // 포스트 체인이 어긋난 것을 놓친다 — 그것들은 중간 결과라 화면에
         // 직접 보이지 않는다.
-        const uint32_t screenWidth = ScreenResizeBus::Get().GetWidth();
-        const uint32_t screenHeight = ScreenResizeBus::Get().GetHeight();
+        const uint32_t screenWidth = screenSize.width;
+        const uint32_t screenHeight = screenSize.height;
 
         const auto entries = ScreenSizedRegistry::Get().Snapshot();
         auto textures = CommandData::Array();

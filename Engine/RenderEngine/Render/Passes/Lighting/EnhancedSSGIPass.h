@@ -115,6 +115,9 @@ public:
     /// 이어지지 않게 한다.
     void ResetHistory();
 
+    /// GPU가 이 뷰의 그래프를 모두 완료한 뒤 크기 의존 히스토리만 해제한다.
+    void ReleaseHistory(const EnhancedFrameContext& context);
+
     /// 조율 가능한 상수.
     ///
     /// 헤더에 박아 두지 않고 밖에서 바꿀 수 있게 한다. 값을 정하려면

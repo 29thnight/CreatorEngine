@@ -129,6 +129,13 @@ public:
     using Handle = uint64_t;
     static constexpr Handle kInvalidHandle = 0;
 
+    struct SizeSnapshot
+    {
+        uint32_t width{ 0 };
+        uint32_t height{ 0 };
+        uint64_t generation{ 0 };
+    };
+
     using ReleaseCallback = std::function<void()>;
     using ResizeCallback = std::function<void(uint32_t width, uint32_t height)>;
 
@@ -162,20 +169,30 @@ public:
     // 크기'와 '지금 크기'가 갈릴 일이 없다.
     void SetSize(uint32_t width, uint32_t height)
     {
-        m_width = width;
-        m_height = height;
+        std::lock_guard<std::mutex> guard(m_sizeMutex);
+        if (m_size.width == width && m_size.height == height) return;
+        m_size.width = width;
+        m_size.height = height;
+        ++m_size.generation;
     }
 
-    uint32_t GetWidth() const { return m_width; }
-    uint32_t GetHeight() const { return m_height; }
+    SizeSnapshot GetSizeSnapshot() const
+    {
+        std::lock_guard<std::mutex> guard(m_sizeMutex);
+        return m_size;
+    }
+
+    uint32_t GetWidth() const { return GetSizeSnapshot().width; }
+    uint32_t GetHeight() const { return GetSizeSnapshot().height; }
 
     /// 종횡비. 예전에는 DX11 전역(g_aspectRatio)이 이 값을 따로 들고 있었는데,
     /// 크기와 비율이 서로 다른 자리에 있으면 리사이즈 도중 어긋난다 - 같은
     /// 출처에서 계산하면 그럴 수가 없다(D4).
     float GetAspectRatio() const
     {
-        return (0 == m_height) ? 1.f
-            : static_cast<float>(m_width) / static_cast<float>(m_height);
+        const SizeSnapshot size = GetSizeSnapshot();
+        return (0 == size.height) ? 1.f
+            : static_cast<float>(size.width) / static_cast<float>(size.height);
     }
 
     void BroadcastRelease()
@@ -214,7 +231,7 @@ private:
     mutable std::mutex      m_mutex;
     std::vector<Subscriber> m_subscribers;
     Handle                  m_nextHandle{ kInvalidHandle };
-    uint32_t                m_width{ 0 };
-    uint32_t                m_height{ 0 };
+    mutable std::mutex      m_sizeMutex;
+    SizeSnapshot            m_size;
 };
 

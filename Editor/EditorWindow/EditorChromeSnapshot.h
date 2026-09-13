@@ -150,6 +150,9 @@ namespace editor
         /// 에디터에서 negative 경로를 재는 자리다 — 실제 시스템 폰트를
         /// 지울 수 없으므로 해상 함수만 태운다.
         bool          font_fallback_probe_ok{ false };
+        std::size_t   icon_role_count{ 0 };
+        std::vector<std::string> missing_icon_roles;
+        bool icon_source_policy_valid{ false };
 
         float         preference_scale{ 0.f };
 
@@ -250,7 +253,12 @@ namespace editor
 
         bool clean() const noexcept
         {
-            return (2 > central_nodes) && undocked_slots.empty() &&
+            // W4 부터 central 노드의 **존재도** 프로그램이 책임진다. 가운데를
+            // 차지하는 Host 가 매 프레임 자기 노드를 central 로 표시하므로
+            // (`EditorRenderer::BeginRender`), 어떤 ini 를 물려도 정확히 하나다.
+            // 유일성만 보던 때에는 0 이 조용히 통과했고 그 0 이 중앙을 특별히
+            // 다루는 것들을 전부 닿지 않게 만들고 있었다.
+            return (1 == central_nodes) && undocked_slots.empty() &&
                    ghost_tabs.empty() && internal_api_version_known;
         }
     };
@@ -288,11 +296,14 @@ namespace editor
         bool  font_fallback_probe_ok{ false };
         /// 적재한 폰트 수.
         std::size_t fonts{ 0 };
+        std::size_t icon_role_count{ 0 };
+        std::vector<std::string> missing_icon_roles;
+        bool icon_source_policy_valid{ false };
 
         /// 글리프가 빠진 라벨들. `<창 안정 id>:<빠진 수>` 로 적는다.
         ///
         /// 감사가 이것을 드는 이유는 아이콘이 **스타일의 일부**여서다. 폰트
-        /// 블롭은 서브셋이라 `IconsFontAwesome6.h` 에 정의돼 있다고 해서 실제로
+        /// 블롭은 서브셋이라 `EditorIcons.h` 에 정의돼 있다고 해서 실제로
         /// 들어 있는 것은 아니고, 없으면 조용히 네모가 그려진다. W1 이 토큰을
         /// 갈아엎을 때 이 수가 곧바로 답한다.
         std::vector<std::string> labels_missing_glyphs;
@@ -301,7 +312,8 @@ namespace editor
         {
             return style_applied && scale_matches && dpi_matches
                 && theme_mapping_matches && geometry_matches && labels_missing_glyphs.empty()
-                && body_font_present && icon_font_merged && font_fallback_probe_ok;
+                && body_font_present && icon_font_merged && font_fallback_probe_ok
+                && icon_role_count > 0 && missing_icon_roles.empty() && icon_source_policy_valid;
         }
     };
 
@@ -318,8 +330,12 @@ namespace editor
         /// 대가가 실제로 나타나는 모양이다(계획서 §1.4 — 공백 하나가 달라
         /// Content Browser 항목이 둘로 갈린 이력이 있다).
         std::vector<std::string> duplicate_entries;
-        /// ini 에 있으나 선언에 없는 항목. 옛 빌드의 흔적일 수 있어 **판정에
-        /// 넣지 않는다.** W3 이주가 읽을 값이다.
+        /// ini 에 있으나 선언에 없는 항목. 옛 빌드의 흔적일 수 있어 `clean()`
+        /// **판정에는 넣지 않는다** — 개발자 기계에는 지난 빌드의 창 이름이
+        /// 남아 있을 수 있다. 대신 W3 이 격리된 시나리오 폴더에서 이 값을
+        /// 단정한다(`verify-editor-workspace.ps1`). 이주가 옛 이름을 한 줄
+        /// 남겼을 때 붉어지는 자리는 거기 하나뿐이다 — 살아 있는 도크 탭이
+        /// 아니라 아무도 만들지 않는 항목이라 ghost 로도 undocked 로도 안 잡힌다.
         std::vector<std::string> orphan_entries;
 
         bool clean() const noexcept

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
     에디터 통합 정적 라이브러리 (E7-d, 2026-08-24).
@@ -31,6 +31,16 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h" />
+    <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp" />
+    <ClInclude Include="EngineGUIWindow\EditorWorkspaceStore.h" />
+    <ClCompile Include="EngineGUIWindow\EditorWorkspaceStore.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClInclude Include="EngineGUIWindow\EditorWorkspaceFile.h" />
+    <ClCompile Include="EngineGUIWindow\EditorWorkspaceFile.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.h" />
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.h" />
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.h" />
@@ -38,6 +48,8 @@
     <ClInclude Include="EngineEntry\BuildSettings.h" />
     <ClInclude Include="EngineEntry\EditorCommandServiceHost.h" />
     <ClInclude Include="EngineEntry\EditorObjectOperations.h" />
+    <ClInclude Include="EngineEntry\EditorScriptAuthoring.h" />
+    <ClInclude Include="EngineEntry\EditorComponentCatalog.h" />
     <ClInclude Include="EngineEntry\EditorProjectOperations.h" />
     <ClInclude Include="EngineEntry\EditorDiagnostics.h" />
     <ClInclude Include="EngineEntry\Commandlets\EditorCommandlets.h" />
@@ -59,6 +71,8 @@
     <ClInclude Include="EngineEntry\EditorPlayModeController.h" />
     <ClInclude Include="EngineEntry\EditorPreferences.h" />
     <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h" />
+    <ClInclude Include="EngineEntry\EditorEntityIcons.h" />
+    <ClInclude Include="EngineEntry\EditorSelectionHistory.h" />
     <ClInclude Include="EngineEntry\EditorSessionState.h" />
     <ClInclude Include="EngineEntry\EditorSettingsStore.h" />
     <ClInclude Include="EngineEntry\GameBuilderSystem.h" />
@@ -95,6 +109,8 @@
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
     <ClInclude Include="EngineGUIWindow\EditorCameraRig.h" />
     <ClInclude Include="EngineGUIWindow\EditorFontResources.h" />
+    <ClInclude Include="ImGuiHelper\EditorIconAlignment.h" />
+    <ClInclude Include="ImGuiHelper\EditorTextFallback.h" />
     <ClInclude Include="EngineGUIWindow\EditorTheme.h" />
     <ClInclude Include="EngineGUIWindow\EditorThemeSelfTest.h" />
     <ClInclude Include="EngineGUIWindow\EditorRenderer.h" />
@@ -113,19 +129,21 @@
     <ClInclude Include="EngineGUIWindow\InspectorDrawerMath.h" />
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
+    <ClInclude Include="EngineGUIWindow\OutputLogText.h" />
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h" />
     <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h" />
     <ClInclude Include="EngineGUIWindow\ReflectionTypedDraw.h" />
     <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h" />
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
+    <ClInclude Include="EngineGUIWindow\SceneViewportOverlay.h" />
+    <ClInclude Include="EngineGUIWindow\EditorViewportCanvas.h" />
     <ClInclude Include="EngineGUIWindow\SettingsWindow.h" />
     <ClInclude Include="ImGuiHelper\BlueprintBuilder.h" />
     <ClInclude Include="ImGuiHelper\drawing.h" />
+    <ClInclude Include="ImGuiHelper\EditorIcons.h" />
     <ClInclude Include="ImGuiHelper\EditorSectionHeader.h" />
-    <ClInclude Include="ImGuiHelper\fa.h" />
     <ClInclude Include="ImGuiHelper\GlobalImGuiContext.h" />
     <ClInclude Include="ImGuiHelper\HorizontalLayout.h" />
-    <ClInclude Include="ImGuiHelper\IconsFontAwesome6.h" />
     <ClInclude Include="ImGuiHelper\ImGui.h" />
     <ClInclude Include="ImGuiHelper\NodeEditor.h" />
     <ClInclude Include="ImGuiHelper\PinHelper.h" />
@@ -143,6 +161,9 @@
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp" />
     <ClCompile Include="EngineEntry\EditorCommandServiceHost.cpp" />
     <ClCompile Include="EngineEntry\EditorObjectOperations.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorScriptAuthoring.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EngineEntry\EditorProjectOperations.cpp">
@@ -282,6 +303,7 @@
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\SceneViewportOverlay.cpp" />
     <ClCompile Include="ImGuiHelper\BlueprintBuilder.cpp" />
     <ClCompile Include="ImGuiHelper\drawing.cpp" />
     <ClCompile Include="ImGuiHelper\EditorSectionHeader.cpp" />

@@ -133,6 +133,7 @@ namespace editor
             copy.background_rgba[2] = b; copy.background_rgba[3] = a;
             return copy;
         }
+        // Logical pixels; the host applies user and monitor scale once.
         consteval window_item padding(float x, float y) const
         {
             window_item copy = *this;

@@ -1,9 +1,10 @@
-﻿// Script runtime controls, UI authoring operations and isolated domain Commandlets.
+// Script runtime controls, UI authoring operations and isolated domain Commandlets.
 // UI authoring shares property transactions with Inspector and Scene View.
 
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
 #include "EditorObjectOperations.h"
+#include "EditorScriptAuthoring.h"
 #include <cmath>
 
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
@@ -191,64 +192,33 @@ namespace ConsoleCmd
                 "object.not_found", "오브젝트를 찾을 수 없다: " + objectName);
         }
 
-        // 한 오브젝트에 스크립트를 여럿 붙일 수 있어야 하므로 중복 허용 경로를 쓴다.
-        // ScriptComponent가 Awake에서 관리 인스턴스를 만든다.
-        const Meta::Type* scriptType = Meta::Find("ScriptComponent");
-        if (nullptr == scriptType)
+        return EditorObjectOperations::AddManagedScript(scene->HandleOf(object->m_index), typeName);
+    }
+
+    static CommandCore::CommandResult Cmd_script_create(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() == 2 && ctx.parts[1] == "--retry") return EditorScriptAuthoring::Retry();
+        if (ctx.parts.size() == 2 && ctx.parts[1] == "--cancel")
         {
-            std::printf("[CLI] ScriptComponent 타입을 찾을 수 없음\n");
-            return CommandCore::InternalError(
-                "script.component_type_missing", "ScriptComponent 타입을 찾을 수 없다");
+            EditorScriptAuthoring::Cancel();
+            return CommandCore::Ok("Script compilation cancelled");
         }
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("script.create <object> <class name>");
+        EntityHandle target;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        return result.IsSuccess() ? EditorScriptAuthoring::CreateAndAttach(target, ctx.parts[2]) : result;
+    }
 
-        // K2 스테이지 A: AddComponentAllowMultiple가 raw Component*를 돌려준다 —
-        // dynamic_pointer_cast(shared_ptr 전용) 대신 dynamic_cast.
-        auto* script = dynamic_cast<ScriptComponent*>(
-            object->AddComponentAllowMultiple(*scriptType));
-        if (!script)
-        {
-            std::printf("[CLI] ScriptComponent 추가 실패\n");
-            return CommandCore::InternalError(
-                "script.component_add_failed", "ScriptComponent 를 추가하지 못했다");
-        }
-
-        // m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
-        // CreateComponent를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
-        script->m_scriptType = typeName;
-
-        // (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다("씬의 초기화
-        // 단계는 이미 지나갔을 수 있으므로 여기서 직접 깨운다"). 하지만
-        // AddComponentAllowMultiple 안의 AttachComponentLifecycle이 이미 이 컴포넌트를
-        // PendingAwake 큐에 넣어 뒀고(State_AwakeCalled 비트는 아직 서지 않은 채),
-        // 직접 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::RegistryDrainAwakeAndStart가
-        // 큐에 남은 같은 컴포넌트를 또 한 번 깨운다 — OnInitialized 이중 호출.
-        // ScriptComponent::OnInitialized의 `if (HasInstance()) return;` 가드가 보통은
-        // 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다.
-        //
-        // Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
-        // 직후 scene->DrainPendingLifecycle()을 동기로 불러 정상 드레인 경로를 태운다.
-        // 이미 깨운 컴포넌트는 State_AwakeCalled로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
-        scene->DrainPendingLifecycle();
-
-        if (!script->HasInstance())
-        {
-            Debug->LogError("[스크립트] 부착 실패 — 타입=" + typeName);
-            std::printf("[CLI] 스크립트 부착 실패 (타입=%s)\n", typeName.c_str());
-            return CommandCore::Fail("script.attach_failed",
-                "스크립트 인스턴스를 만들지 못했다 — 타입=" + typeName
-                + " (어셈블리가 올라와 있는지 script.status 로 확인할 것)");
-        }
-
-        const int id = script->GetInstanceId();
-        Debug->LogWarning("[스크립트] " + objectName + " 에 " + typeName + " 부착 (id=" + std::to_string(id) + ")");
-        std::printf("[CLI] 부착 완료: %s <- %s (id=%d)\n", objectName.c_str(), typeName.c_str(), id);
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("object", CommandCore::CommandData::String(objectName));
-        data.Set("type",   CommandCore::CommandData::String(typeName));
-        data.Set("instanceId", CommandCore::CommandData::Int(id));
-        return CommandCore::Ok("부착 완료 " + objectName + " <- " + typeName,
-                               std::move(data));
+    static CommandCore::CommandResult Cmd_script_creation(const ConsoleCommandContext&)
+    {
+        const auto status = EditorScriptAuthoring::GetStatus();
+        auto data = CommandCore::CommandData::Object();
+        data.Set("busy", CommandCore::CommandData::Bool(status.busy));
+        data.Set("succeeded", CommandCore::CommandData::Bool(status.succeeded));
+        data.Set("source", CommandCore::CommandData::String(status.source));
+        data.Set("log", CommandCore::CommandData::String(status.log));
+        data.Set("type", CommandCore::CommandData::String(status.type));
+        return CommandCore::Ok(status.message, std::move(data));
     }
 
     static ScriptComponent* FindScriptInstance(int id)
@@ -850,164 +820,9 @@ namespace ConsoleCmd
     //   지금까지는 printf 한 줄이라, 라이브 코드 교체를 자동화하는 쪽이 성공했는지
     //   알려면 stdout 을 긁어야 했다 — 서비스만 켠 실행에는 콘솔이 없어 그마저도
     //   불가능했다.
-    static CommandCore::CommandResult Cmd_script_reload(const ConsoleCommandContext& ctx)
+    static CommandCore::CommandResult Cmd_script_reload(const ConsoleCommandContext&)
     {
-        auto& clr = ClrHost::Get();
-        if (!clr.IsReady())
-        {
-            std::printf("[CLI] CLR이 준비되지 않았습니다\n");
-            return CommandCore::PreconditionFailed(
-                "script.clr_not_ready", "CLR 이 준비되지 않았다");
-        }
-
-        Scene* scene = SceneManagers->GetActiveScene();
-        std::vector<ScriptComponent*> scripts;
-
-        // 1) 값을 챙긴다. 인스턴스 id 는 여기서 끊지 않는다 — 리로드가 검증에서
-        //    떨어져 아무것도 바꾸지 않고 돌아올 수 있고, 그때 옛 인스턴스는 살아 있다
-        //    (ScriptComponent::PrepareForReload 주석). 끊는 것은 결과를 안 뒤다.
-        if (scene)
-        {
-            for (const auto& object : scene->m_Entities)
-            {
-                if (!object) continue;
-
-                auto script = object->GetComponent<ScriptComponent>();
-                if (nullptr != script)
-                {
-                    script->PrepareForReload();
-                    scripts.push_back(script);
-                }
-            }
-        }
-
-        // 2) 어셈블리 교체
-        //
-        //   결과가 셋이다 — 교체됨 · 이전 유지 · 이전 소실. 실패 둘을 가르는 이유는
-        //   그 뒤에 할 일이 정반대여서다. 이전이 **유지**됐으면 인스턴스가 살아
-        //   있으니 손대면 안 되고, **소실**됐으면 죽은 id 라도 정리해야 한다.
-        const ClrHost::ReloadOutcome outcome = clr.ReloadScripts();
-
-        if (ClrHost::ReloadOutcome::PreviousKept == outcome)
-        {
-            Debug->LogError("[스크립트] 리로드 실패 — 이전 어셈블리를 유지한다");
-            std::printf("[CLI] 리로드 실패 (이전 어셈블리 유지)\n");
-
-            // ★ 실패해도 **이전 어셈블리는 그대로다**(LC7) — 그리고 **인스턴스도**.
-            //
-            //   관리 쪽 `Reload()` 가 갈아 끼우기 전에 새 것을 버리는 컨텍스트에서
-            //   검증한다. 검증에서 떨어지면 관리 측은 아무것도 내리지 않았고, 살아
-            //   있던 인스턴스는 살아 있다. 여기서 되살리면 안 된다 — 예전에는 이
-            //   자리에서 RestoreAfterReload 를 돌렸고, 그것이 옛 인스턴스 옆에
-            //   **두 벌째**를 세웠다(2026-09-06 실측 · verify-cli-script-reload 의
-            //   identity-after-failure · single-after-failure). PrepareForReload 는
-            //   이제 id 를 끊지 않으므로 되돌릴 것도 없다.
-            //
-            //   `restored` 를 내지 않는다. 되살린 것이 없는데 "복원 N/N" 을 내면
-            //   그것이 곧 거짓 보고다 — 대신 손대지 않은 수를 `intact` 로 낸다.
-            CommandCore::CommandData failData = CommandCore::CommandData::Object();
-            failData.Set("intact", CommandCore::CommandData::Int(
-                static_cast<int64_t>(scripts.size())));
-            failData.Set("total", CommandCore::CommandData::Int(
-                static_cast<int64_t>(scripts.size())));
-            failData.Set("previousAssemblyKept", CommandCore::CommandData::Bool(true));
-            return CommandCore::Fail("script.reload_failed",
-                "새 어셈블리를 올리지 못했다 — 이전 어셈블리를 유지한다",
-                std::move(failData));
-        }
-
-        if (ClrHost::ReloadOutcome::Faulted == outcome)
-        {
-            // 관리 측이 던졌다 — 어디서 던졌는지에 따라 인스턴스가 살아 있을 수도
-            // 사라졌을 수도 있다. **모르면 손대지 않는다.** 살아 있는데 되살리면
-            // 두 벌이 되고(이 고침이 닫은 바로 그 결함), 사라졌는데 안 되살리면
-            // 다음 성공 리로드가 RestoreAfterReload 로 죽은 id 를 버리고 다시 만든다.
-            // 앞은 성공 리로드 전까지 틱이 두 벌 돌고, 뒤는 스크립트가 죽어 있다 —
-            // 둘 다 나쁘지만 뒤는 로그가 소리를 내고 앞은 내지 않는다.
-            Debug->LogError("[스크립트] 리로드 실패 — 관리 측 예외(Bootstrap.Report 참고). 인스턴스는 손대지 않았다");
-            std::printf("[CLI] 리로드 실패 (관리 측 예외 — 인스턴스 미변경)\n");
-
-            CommandCore::CommandData failData = CommandCore::CommandData::Object();
-            failData.Set("total", CommandCore::CommandData::Int(
-                static_cast<int64_t>(scripts.size())));
-            failData.Set("instancesTouched", CommandCore::CommandData::Bool(false));
-            return CommandCore::Fail("script.reload_faulted",
-                "리로드 중 관리 측이 예외를 던졌다 — 인스턴스는 손대지 않았다. 다시 리로드하라",
-                std::move(failData));
-        }
-
-        if (ClrHost::ReloadOutcome::PreviousLost == outcome)
-        {
-            // 이전 컨텍스트를 내린 뒤 새 것이 올라가지 못했다. 인스턴스는 전부
-            // 사라졌고 어셈블리도 없다. 되살릴 수 있는 것은 없지만 죽은 id 를 쥐고
-            // 있으면 안 된다 — 그러면 HasInstance 가 참이라 다음 리로드의
-            // EnsureInstance 가 조용히 건너뛰고 스크립트가 영구히 죽는다.
-            // RestoreAfterReload 가 id 를 버리고 다시 만들어 보되, 어셈블리가 없으니
-            // 여기서 되는 것은 0 이 정상이다.
-            Debug->LogError("[스크립트] 리로드 실패 — 이전 어셈블리를 내린 뒤 새 것을 올리지 못했다");
-            std::printf("[CLI] 리로드 실패 (이전 어셈블리 소실)\n");
-
-            int recovered = 0;
-            for (ScriptComponent* script : scripts)
-            {
-                script->RestoreAfterReload();
-                if (script->HasInstance()) ++recovered;
-            }
-
-            CommandCore::CommandData failData = CommandCore::CommandData::Object();
-            failData.Set("restored", CommandCore::CommandData::Int(recovered));
-            failData.Set("total", CommandCore::CommandData::Int(
-                static_cast<int64_t>(scripts.size())));
-            failData.Set("previousAssemblyKept", CommandCore::CommandData::Bool(false));
-            return CommandCore::Fail("script.reload_failed",
-                "새 어셈블리를 올리지 못했고 이전 어셈블리도 이미 내렸다",
-                std::move(failData));
-        }
-
-        // 3) 인스턴스를 다시 만들고 챙겨 둔 값을 되돌린다
-        int restored = 0;
-        CommandCore::CommandData failedList = CommandCore::CommandData::Array();
-        for (ScriptComponent* script : scripts)
-        {
-            script->RestoreAfterReload();
-            if (script->HasInstance()) { ++restored; continue; }
-
-            // 복원되지 못한 것을 **이름으로** 낸다. 수만 내면 무엇이 빠졌는지
-            // 알 수 없고, 라이브 교체에서 알아야 할 것이 정확히 그것이다.
-            const Entity* owner = script->GetOwner();
-            failedList.Append(CommandCore::CommandData::String(
-                (nullptr != owner) ? owner->GetHashedName().ToString()
-                                   : std::string("(주인 없음)")));
-        }
-
-        // 언로드 완료 여부는 여기서 묻지 않는다. 리로드 호출 스택이 아직 살아 있어
-        // 항상 "잔존"으로 나온다. 몇 프레임 뒤 script.status로 확인할 것.
-        Debug->LogWarning("[스크립트] 리로드 완료 — 복원 " + std::to_string(restored) + "/" +
-            std::to_string(scripts.size()));
-        std::printf("[CLI] 리로드 완료: %d/%zu 복원 (언로드 확인은 script.status)\n",
-            restored, scripts.size());
-
-        CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("restored", CommandCore::CommandData::Int(restored));
-        data.Set("total", CommandCore::CommandData::Int(
-            static_cast<int64_t>(scripts.size())));
-        data.Set("failed", std::move(failedList));
-
-        // ★ 이전 컨텍스트 잔존 여부는 **여기서 내지 않는다.**
-        //
-        //   §10.2 는 그것을 `data` 로 내라고 했지만, 이 시점의 값은 뜻이 없다 —
-        //   리로드를 부른 호출 스택이 아직 살아 있어 **항상 "잔존"** 이다. 뜻 없는
-        //   값을 필드로 내면 소비자가 그것을 믿고 판단한다. 몇 프레임 뒤에 물을 수
-        //   있게 `script.status` 가 그 값을 내고, 그쪽이 답할 수 있는 자리다.
-        const bool allRestored = (restored == static_cast<int>(scripts.size()));
-        if (!allRestored)
-        {
-            return CommandCore::Fail("script.reload_partial",
-                "리로드는 됐으나 인스턴스 복원이 " + std::to_string(restored) + "/"
-                + std::to_string(scripts.size()) + " 다", std::move(data));
-        }
-        return CommandCore::Ok("리로드 완료 " + std::to_string(restored) + "/"
-            + std::to_string(scripts.size()), std::move(data));
+        return EditorScriptAuthoring::Reload();
     }
 
     // ★ LC7: 이전 컨텍스트 잔존 여부가 **여기서** 뜻을 갖는다.
@@ -1165,6 +980,8 @@ namespace ConsoleCmd
         reg.Result({ "animator.param" }, &Cmd_animator_param);
         reg.Result({ "script.invoke" }, &Cmd_script_invoke);
         reg.Result({ "script.reload" }, &Cmd_script_reload);
+        reg.Result({ "script.create" }, &Cmd_script_create);
+        reg.Result({ "script.creation" }, &Cmd_script_creation);
         reg.Result({ "script.status" }, &Cmd_script_status);
     }
 }

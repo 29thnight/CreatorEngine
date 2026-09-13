@@ -11,8 +11,7 @@
 #include "Animator.h"
 #include "NodeEditor.h"
 #include "AnimationController.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
 #include "ExternUI.h"
 // DataSystems가 여기 있다. 유니티 빌드에서는 앞선 파일이 공급했다.
 #include "DataSystem.h"
@@ -61,7 +60,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 				}
 				ImGui::Text("KeyFrameEvent");
 				ImGui::SameLine();
-				if (ImGui::Button(ICON_FA_BOX))
+				if (ImGui::Button(EditorIcon::AssetPicker))
 				{
 					ImGui::PopID();
 					::editor::animator_editing::select_clip(i);
@@ -80,7 +79,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 		{
 			ImGui::Text("Controllers ");
 			ImGui::SameLine();
-			if (ImGui::Button(ICON_FA_BOX))
+			if (ImGui::Button(EditorIcon::AssetPicker))
 			{
 				ToggleAnimatorWindow(EditorWindowName::kAnimationControllers);
 			}

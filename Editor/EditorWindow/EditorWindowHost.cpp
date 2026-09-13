@@ -6,6 +6,7 @@
 
 #include "EditorWindowRegistry.h"
 #include "EditorWindowSurface.h"
+#include "EditorTheme.h"
 
 #include "ImGui.h"
 
@@ -86,7 +87,7 @@ namespace editor
             std::string title;
             title.reserve(entry.label.size() + entry.stable_id.size() + 3);
             title.append(entry.label);
-            title.append("###");
+            if (!entry.stable_id.starts_with("###")) title.append("###");
             title.append(entry.stable_id);
             return title;
         }
@@ -140,7 +141,7 @@ namespace editor
             if (entry.has_padding)
             {
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
-                    ImVec2(entry.padding_xy[0], entry.padding_xy[1]));
+                    ImVec2(ThemePixels(entry.padding_xy[0]), ThemePixels(entry.padding_xy[1])));
                 ++pushed_vars;
             }
 
@@ -165,8 +166,25 @@ namespace editor
             if (entry.min_width > 0.f || entry.min_height > 0.f)
             {
                 ImGui::SetNextWindowSizeConstraints(
-                    ImVec2(entry.min_width, entry.min_height),
+                    ImVec2(ThemePixels(entry.min_width), ThemePixels(entry.min_height)),
                     ImVec2(FLT_MAX, FLT_MAX));
+            }
+
+            if (entry.role == window_role::panel)
+            {
+                if (auto* window = ImGui::FindWindowByName(entry.stable_id.data()); window && !window->DockId)
+                {
+                    const auto* viewport=ImGui::GetMainViewport();
+                    const auto min=viewport->WorkPos, size=viewport->WorkSize;
+                    if(size.x>0.f && size.y>0.f)
+                    {
+                        const ImVec2 extent{ImMin(window->Size.x,size.x),ImMin(window->Size.y,size.y)};
+                        const ImVec2 pos{ImClamp(window->Pos.x,min.x,min.x+size.x-extent.x),
+                            ImClamp(window->Pos.y,min.y,min.y+size.y-extent.y)};
+                        if(pos.x!=window->Pos.x || pos.y!=window->Pos.y) ImGui::SetNextWindowPos(pos);
+                        if(extent.x!=window->Size.x || extent.y!=window->Size.y) ImGui::SetNextWindowSize(extent);
+                    }
+                }
             }
 
             const std::string title = compose_title(entry);
@@ -180,8 +198,12 @@ namespace editor
 
             // `Begin`이 거짓이어도 `End`는 반드시 부른다. 조건부 `End`가
             // 스택을 흘리던 두 곳(§1.3)을 셸이 소유하며 없앤다.
-            const bool visible = ImGui::Begin(title.c_str(), open_flag,
-                                              to_imgui_flags(entry.traits));
+            bool visible;
+            {
+                const TabStyleScope tabs;
+                visible = ImGui::Begin(title.c_str(), open_flag,
+                                      to_imgui_flags(entry.traits));
+            }
 
             // 스타일은 `Begin`이 소비하고 나면 바로 되돌린다. 본문이 누른 것은
             // 본문이 되돌린다 — 셸은 자기가 누른 것만 센다.

@@ -96,9 +96,13 @@ try {
                 -and [Math]::Abs($theme.viewportDpiScale - $theme.windowDpiScale) -lt 0.001) "$case window/viewport/font DPI differ."
             Assert ($theme.geometryMatches -and $theme.themeMappingMatches) "$case geometry or theme mapping differs."
             Assert ($theme.bodyFontPresent -and $theme.iconFontMerged -and $theme.fontFallbackProbeOk) "$case font or fallback contract failed."
+            $iconSpec = Get-Content -LiteralPath (Join-Path $repoRoot 'Resources/Editor/Fonts/MaterialSymbols.json') -Raw | ConvertFrom-Json
+            Assert ($theme.iconRoles -eq @($iconSpec.roles.PSObject.Properties).Count -and $theme.missingIconRoles -eq 0) "$case semantic icon coverage failed."
+            Assert ($theme.iconSourcePolicyValid) "$case text fonts can override Material Symbols codepoints."
             $stdout = [IO.File]::ReadAllText($stdoutPath)
             Assert ($stdout -match "\[RenderBackend\].*active=$backend scene=$backend imgui=$backend") "$case did not run the requested scene/ImGui backend."
             Assert ($stdout -match '(?m)^body\t[^\r\n]*Fonts[\\/]Inter-Regular\.ttf\s*$') "$case bundled Inter was not consumed; see $stdoutPath"
+            Assert ($stdout -match '(?m)^icons\t[^\r\n]*Fonts[\\/]MaterialSymbolsOutlined-Editor\.ttf\s*$') "$case Material Symbols subset was not consumed."
             Assert ($exitCode -eq 0) "$case exited $exitCode despite successful command data."
             $summary.Add([pscustomobject]@{ Backend=$backend; StartupUserScale=$userScale;
                 ObservedWindowDpi=$theme.windowDpiScale; FontDpi=$theme.fontScaleDpi;

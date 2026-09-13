@@ -3,7 +3,6 @@
 #include "LogSink.h"
 #include "HtmlFileSink.h"
 #include "ClassProperty.h"
-#include "ClassProperty.h"
 #include <spdlog/spdlog.h>
 #include <atomic>
 #include <string>
@@ -16,6 +15,9 @@ private:
     DebugClass() = default;
 	~DebugClass() = default;
 
+    // Stable for this DebugClass lifetime; sink shutdown does not invalidate
+    // snapshots or make UI reads race with resetting the sink pointer.
+    const std::shared_ptr<LogStore> m_logStore{ std::make_shared<LogStore>() };
     std::shared_ptr<LogSink> logSink{};
 	std::shared_ptr<HtmlFileSink> htmlSink{};
 	std::string m_logFilePath{};
@@ -78,32 +80,17 @@ public:
 
 	void Clear()
 	{
-		if (logSink) logSink->ringBuffer_.clear();
+		m_logStore->Clear();
 	}
 
-	bool IsClear() const
+	LogSnapshot GetLogSnapshot() const
 	{
-		return logSink ? logSink->ringBuffer_.IsClear() : true;
+		return m_logStore->ReadSnapshot();
 	}
 
-	void toggleClear()
+	std::optional<LogSnapshot> GetLogSnapshotIfChanged(std::uint64_t revision) const
 	{
-		if (logSink) logSink->ringBuffer_.toggleClear();
-	}
-
-	std::string GetBackLogMessage() const
-	{
-		return logSink ? logSink->m_backLogMessage : std::string{};
-	}
-
-	std::string& WriteBackLogMessage()
-	{
-		return logSink->m_backLogMessage;
-	}
-
-	std::vector<LogEntry> get_entries()
-	{
-		return logSink ? logSink->ringBuffer_.get_all() : std::vector<LogEntry>{};
+		return m_logStore->ReadSnapshotIfChanged(revision);
 	}
 };
 

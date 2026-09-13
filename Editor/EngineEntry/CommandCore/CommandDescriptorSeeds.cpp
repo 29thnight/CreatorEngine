@@ -1,4 +1,4 @@
-﻿#include "CommandDescriptorSeeds.h"
+#include "CommandDescriptorSeeds.h"
 
 #include <algorithm>
 #include <iterator>
@@ -70,9 +70,12 @@ namespace CommandCore
             { "editor.dock", CommandCost::Immediate, "", "살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.layout", CommandCost::Immediate, "", "활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.menu", CommandCost::Immediate, "", "선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "editor.sceneview", CommandCost::Immediate, "", "씬 뷰 오버레이 배치와 카메라 상태를 읽는다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.selftest", CommandCost::Immediate, "", "editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.theme", CommandCost::Immediate, "", "적용된 ImGui 스타일 값을 TSV로 내고 배율 출처를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "editor.viewport", CommandCost::Immediate, "[scene|game]", "중앙 ViewportHost 의 표시 모드와 뷰 수요", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.windows", CommandCost::Immediate, "", "선언된 에디터 창 표를 TSV로 내고 배선 고아를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "editor.workspace", CommandCost::Immediate, "[save|load|reset|open <panelId>|close <panelId>]", "워크스페이스 저장/복원과 창 열림 상태", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "experiment.cooked", CommandCost::Long, "[경로]", "쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "foliage.authoring.probe", CommandCost::Frames, "<이름> [escape]", "Foliage 저작 트랜잭션 왕복과 루트 이탈 거부를 본다", CommandClass::RawFixture, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "game.pak", CommandCost::Long, "", "Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다", CommandClass::EngineService, CommandLiveness::Live },
@@ -102,6 +105,8 @@ namespace CommandCore
             { "object.delete", CommandCost::Frames, "<target>", "Delete an object subtree with Undo", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target", true },
             { "object.describe", CommandCost::Immediate, "<name-or-id>", "Read object identity and name", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "target", false },
             { "object.duplicate", CommandCost::Frames, "<오브젝트> [새 이름]", "오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,name=", true },
+            { "object.icon", CommandCost::Immediate, "<target> <preset|default>", "Set entity image preset with Undo", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,preset", true },
+            { "object.lock", CommandCost::Immediate, "<target> <true|false>", "Lock or unlock entity authoring with Undo", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,locked", true },
             { "object.parent", CommandCost::Frames, "<자식> <부모 | ->", "오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,parent", true },
             { "object.properties", CommandCost::Immediate, "<target> <component>", "Read reflected component fields and values", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "target,component", false },
             { "object.property", CommandCost::Frames, "<오브젝트> <컴포넌트> <필드> <값>", "리플렉션으로 프로퍼티를 설정한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,component,field,value:value", true },
@@ -168,6 +173,7 @@ namespace CommandCore
             { "scene.flag", CommandCost::Immediate, "[<dirtytraversal|bonecache> [0|1]]", "씬 진단 플래그를 읽거나 바꾼다(인자 없으면 전부 조회)", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.hierarchycheck", CommandCost::Frames, "", "씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "scene.load", CommandCost::Long, "<경로>", "씬을 로드한다(활성 씬은 그대로)", CommandClass::EngineService, CommandLiveness::Live },
+            { "scene.navigate", CommandCost::Immediate, "<back|forward>", "Navigate entity selection history", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "direction", true },
             { "scene.new", CommandCost::Frames, "[이름]", "빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.save", CommandCost::Frames, "<경로>", "활성 씬을 .creator로 저장한다", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.select", CommandCost::Immediate, "<오브젝트 이름>", "오브젝트를 에디터 선택으로 지정한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target", true },
@@ -178,6 +184,8 @@ namespace CommandCore
             { "scene.transformstats", CommandCost::Frames, "[0|1|print]", "X0 UI/Spatial·단계·구성·프레임 topology 계측", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.transformwritestats", CommandCost::Frames, "[0|1|print]", "X1 로컬 쓰기 publish 출처 계측", CommandClass::EngineService, CommandLiveness::Live },
             { "script.add", CommandCost::Frames, "<오브젝트> <타입>", "C# 스크립트를 오브젝트에 부착한다", CommandClass::EngineService, CommandLiveness::Live },
+            { "script.create", CommandCost::Frames, "<오브젝트> <클래스 이름> | --retry | --cancel", "C# 소스를 생성하고 비동기 컴파일 후 원래 오브젝트에 부착한다", CommandClass::EngineService, CommandLiveness::Live },
+            { "script.creation", CommandCost::Immediate, "", "스크립트 생성·컴파일·부착의 진행 상태를 조회한다", CommandClass::EngineService, CommandLiveness::Live },
             { "script.fields", CommandCost::Frames, "<id>", "스크립트의 노출 필드와 현재 값을 확인한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "instance:integer" },
             // ★ 이 표에서 `executesUserCode` 가 참인 **유일한 줄**이다(LC7 · §10.2).
             //

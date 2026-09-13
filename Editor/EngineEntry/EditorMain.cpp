@@ -1,4 +1,5 @@
 #include "EditorObjectOperations.h"
+#include "EditorScriptAuthoring.h"
 #include "EditorMain.h"
 #include "ReflectionUndo.h"
 #include "CoreWindow.h"
@@ -158,11 +159,21 @@ void Editor::EditorMain::Initialize()
 		EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
 	});
 
+	// PHASE 21 M4 2단계: 창 객체보다 먼저 표를 세운다. 생성자가 자기 본문을
+	// 걸면서 open_window/close_window 로 초기 표시 상태를 정하는데,
+	// 그때 표에 항목이 있어야 그 호출이 닿는다.
+	//
+	// ★ 자리가 렌더러 **앞**인 이유는 W3 이 더했다. `EditorWorkspaceStore` 가
+	//   생성자에서 표를 읽어 기본 표시 상태를 기억하고, 저장된 workspace 의
+	//   패널 상태를 그 표에 되돌린다. 등록이 뒤에 있던 동안은 그 순회가 빈
+	//   표를 돌아 **닫아 둔 패널이 재시작마다 다시 열렸다** — 파일에는 0 이
+	//   적혀 있는데 아무도 읽지 않았다.
+	::editor::register_editor_windows();
+
 	// 호스트(IImGuiHost → DX12/Vulkan backend)가 여기서 선다. 구 ImGuiRenderer는 HWND
 	// 하나 때문에 DX11 DeviceResources를 통째로 들었다 — 이제 핸들만 넘긴다.
-	// 그릴 표를 넘긴다(PHASE 21 W3). 표는 아래 `register_editor_windows` 가
-	// 채우는데, 셸은 참조만 들므로 순서가 무관하다 — 첫 프레임 전에만
-	// 차 있으면 된다.
+	// 그릴 표를 넘긴다(PHASE 21 W3). 표는 위 `register_editor_windows` 가
+	// 이미 채워 두었다.
 	m_editorRenderer = std::make_unique<EditorRenderer>(
 		EditorWindowHandle(), ::editor::process_windows());
 	const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan ==
@@ -180,11 +191,6 @@ void Editor::EditorMain::Initialize()
 	// Scene 과 Game 은 여기서 만들지 않는다(PHASE 21 W3). 본문이 자유
 	// 함수라 선언 표가 직접 부르고, 카메라 리그와 기즈모는 본문이 매
 	// 프레임 정본에서 다시 유도한다.
-	// PHASE 21 M4 2단계: 창 객체보다 먼저 표를 세운다. 생성자가 자기 본문을
-	// 걸면서 open_window/close_window 로 초기 표시 상태를 정하는데,
-	// 그때 표에 항목이 있어야 그 호출이 닿는다.
-	::editor::register_editor_windows();
-
 	// PHASE 21 M1: 메뉴 표도 여기서 선다. 창 표보다 뒤여도 되는 까닭은 메뉴
 	// 동작이 창을 여는 것이 아니라 명령을 넘기거나 클립보드를 만지기 때문이고,
 	// 그리는 자리는 어차피 첫 프레임부터다. 자가 검사는 더 이상 이 호출보다
@@ -434,6 +440,7 @@ void Editor::EditorMain::Finalize()
 	StopPresentationThread();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
 	Editor::ModelPlacement::Get().Shutdown();
+	EditorScriptAuthoring::Shutdown();
 	EditorAssetPresentation::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetPresentation 반환\n");
 
@@ -567,6 +574,7 @@ void Editor::EditorMain::Update()
 	{
 		std::lock_guard<std::mutex> sceneLock(m_sceneStructureMutex);
 		Editor::ModelPlacement::Get().Tick();
+		EditorScriptAuthoring::Tick();
 		SceneManagers->ApplyPendingSceneStructureChange();
 
 		// OnRender도 게임 상태를 진행시키는 코루틴 단계다. 다른 coroutine queue와

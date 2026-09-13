@@ -47,7 +47,7 @@ if ((Get-Content -LiteralPath $buildScript -Raw) -match 'yaml-cppd?\.dll') {
     $violations.Add('runtime packaging: Tools\build.ps1')
 }
 
-$debugBinary = Join-Path $repoRoot 'Bin\x64-Debug\Editor\CreatorEditor.exe'
+$debugBinary = Join-Path $repoRoot 'Bin\x64-Debug\Editor\CreatorEditor.runtime.dll'
 $importEvidence = 'not-built'
 if (Test-Path -LiteralPath $debugBinary -PathType Leaf) {
     $dumpbin = Get-ChildItem -Path ${env:ProgramFiles},${env:ProgramFiles(x86)} `
@@ -56,7 +56,7 @@ if (Test-Path -LiteralPath $debugBinary -PathType Leaf) {
     if ($dumpbin) {
         $imports = (& $dumpbin.FullName /dependents $debugBinary 2>&1 | Out-String)
         if ($imports -match 'yaml-cppd?\.dll') {
-            $violations.Add('PE import: Bin\x64-Debug\Editor\CreatorEditor.exe')
+            $violations.Add('PE import: Bin\x64-Debug\Editor\CreatorEditor.runtime.dll')
         }
         $importEvidence = 'checked'
     } else {

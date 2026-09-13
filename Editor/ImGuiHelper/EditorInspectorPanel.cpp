@@ -12,8 +12,8 @@ namespace editor::widgets
         constexpr float kExpanderLogical  = 16.f;
         constexpr float kIconLogical      = 22.f;
         constexpr float kIconGapLogical   = 4.f;
-        constexpr float kToggleLogical    = 24.f;
-        constexpr float kToggleGapLogical = 8.f;
+        constexpr float kToggleLogical    = 16.f;
+        constexpr float kToggleGapLogical = 6.f;
         constexpr float kButtonLogical    = 20.f;
         constexpr float kButtonGapLogical = 2.f;
         constexpr float kTrailLogical     = 16.f;
@@ -150,10 +150,14 @@ namespace editor::widgets
         bool hovered = false;
         bool held    = false;
 
+        const float toggleLeft = origin.x + metrics.lead + metrics.expander + metrics.icon + metrics.icon_gap;
+        const float toggleTop = origin.y + (metrics.height - metrics.toggle) * .5f;
+        const bool overToggle = request.enabled && ImGui::IsMouseHoveringRect(
+            {toggleLeft, toggleTop}, {toggleLeft + metrics.toggle, toggleTop + metrics.toggle});
         ImGui::ItemSize(header_rect);
         if (ImGui::ItemAdd(click_zone, id))
         {
-            if (ImGui::ButtonBehavior(click_zone, id, &hovered, &held,
+            if (!overToggle && ImGui::ButtonBehavior(click_zone, id, &hovered, &held,
                     ImGuiButtonFlags_PressedOnClick))
             {
                 if (request.collapsible)
@@ -182,7 +186,8 @@ namespace editor::widgets
                 token_color(ThemeColor::Primary, kHoverAlpha));
         }
 
-        const ImU32 tint = token_color(ThemeColor::Primary, opacity);
+        const ImU32 tint = request.enabled ? token_color(ThemeColor::Primary, opacity) :
+            ImGui::GetColorU32(ImGuiCol_TextDisabled, opacity);
         const float center_y = origin.y + metrics.height * 0.5f;
 
         // ── 쉐브론 ───────────────────────────────────────────────────────
@@ -192,12 +197,13 @@ namespace editor::widgets
         // 접힘 표시만은 폰트에 기대지 않는다.
         if (request.collapsible)
         {
-            const float arrow_size = ImGui::GetFontSize();
+            const float arrow_size = ImGui::GetFontSize() * 0.65f;
             ImGui::RenderArrow(ImGui::GetWindowDrawList(),
                 ImVec2(origin.x + metrics.lead +
                            (metrics.expander - arrow_size) * 0.5f,
                        center_y - arrow_size * 0.5f),
-                tint, open ? ImGuiDir_Down : ImGuiDir_Right, 1.f);
+                ImGui::GetColorU32(ImGuiCol_TextDisabled, opacity),
+                open ? ImGuiDir_Down : ImGuiDir_Right, 0.65f);
         }
 
         // ── 아이콘 ───────────────────────────────────────────────────────
@@ -215,6 +221,9 @@ namespace editor::widgets
         if (nullptr != request.enabled)
         {
             const bool before = *request.enabled;
+            // Checkbox uses GetFrameHeight for its square. Remove only its
+            // vertical padding so the square follows the 16px body font.
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 0.f));
             const float box = ImGui::GetFrameHeight();
             ImGui::SetCursorScreenPos(ImVec2(
                 origin.x + metrics.lead + metrics.expander + metrics.icon +
@@ -223,6 +232,7 @@ namespace editor::widgets
             ImGui::PushID("enabled");
             ImGui::Checkbox("##enabled", request.enabled);
             ImGui::PopID();
+            ImGui::PopStyleVar();
             result.enabled_changed = (before != *request.enabled);
         }
 
@@ -249,12 +259,14 @@ namespace editor::widgets
                 origin.x + inputs.available - metrics.trail - metrics.button,
                 center_y - metrics.button * 0.5f));
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ThemeColorValue(ThemeColor::Primary, opacity));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
             ImGui::PushID("menu");
             result.menu_clicked = ImGui::Button(request.menu_icon,
                 ImVec2(metrics.button, metrics.button));
             ImGui::PopID();
             ImGui::PopStyleColor(2);
+            ImGui::PopStyleVar();
         }
 
         // 머리줄 다음 줄로 커서를 내린다. 위에서 `ItemSize` 로 높이를 이미

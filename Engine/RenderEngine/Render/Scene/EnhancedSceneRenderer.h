@@ -260,13 +260,24 @@ enum class EnhancedLiveBackend : uint8_t
 inline constexpr uint32_t kEnhancedLiveDisplayTargetCount =
     static_cast<uint32_t>(EnhancedLiveDisplayTarget::Count);
 
-/// RenderThread가 GPU 완료 뒤 발행한 논리 표시 대상 하나의 값 스냅샷.
-/// presentation handle은 구현 안에 숨고 CE/UI에는 완료·회전 진단만 보인다.
+/// GPU 완료 결과와 UI의 텍스처 조회 관측. 둘 다 표시 수명 락으로 보호한다.
+/// presentation handle은 구현 안에 숨으며 조회 성공은 GPU present 성공과 구분한다.
 struct EnhancedLiveDisplayEntrySnapshot
 {
     EnhancedLiveViewKey key{};
     uint64_t completedFrameId{ 0 };
     uint64_t promotionCount{ 0 };
+    uint64_t completedResizeGeneration{ 0 };
+    uint32_t completedWidth{ 0 };
+    uint32_t completedHeight{ 0 };
+    uint64_t textureQueries{ 0 };
+    uint64_t missingTextureQueries{ 0 };
+    uint64_t lastTextureFrameId{ 0 };
+    uint64_t lastTextureResizeGeneration{ 0 };
+    uint64_t lastMissingResizeGeneration{ 0 };
+    double lastMissingTextureMs{ 0.0 };
+    double maxMissingTextureMs{ 0.0 };
+    bool lastTextureAvailable{ false };
     uint32_t promotedSlotMask{ 0 };
     bool active{ false };
     bool ready{ false };
@@ -277,6 +288,7 @@ struct EnhancedLiveDisplayEntrySnapshot
 struct EnhancedLiveDisplaySnapshot
 {
     EnhancedLiveBackend backend{ EnhancedLiveBackend::DX12 };
+    uint64_t iblGenerationCount{ 0 };
     uint64_t revision{ 0 };
     uint64_t sourceFrameId{ 0 };
     uint64_t resizeGeneration{ 0 };
@@ -290,6 +302,14 @@ struct EnhancedLiveDisplaySnapshot
     {
         return targets[static_cast<uint32_t>(target)];
     }
+};
+
+// Texture identity and its completed extent are read under the same lifetime
+// lock. The latest submitted frame may already belong to a different resize.
+struct EnhancedLiveDisplayTexture
+{
+    uint64_t textureId{ 0 };
+    uint32_t width{ 0 }, height{ 0 };
 };
 
 /// 패스 하나의 GPU 시간. DX12GpuProfiler::PassTiming을 에디터로 옮기는 값
@@ -594,6 +614,7 @@ namespace EnhancedSceneRenderer
     /// 핸들과 Vulkan CPU upload key는 구현 안의 불투명 presentation key다.
     /// 셸이 없거나 해당 대상의 첫 GPU 완료 전이면 0.
     uint64_t GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget target);
+    EnhancedLiveDisplayTexture GetLiveDisplayTexture(EnhancedLiveDisplayTarget target);
 
     /// 상태 한 줄 요약(render.backend status / dx12.live 호환 명령).
     std::string GetLiveStatus();

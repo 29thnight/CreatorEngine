@@ -39,12 +39,11 @@ namespace editor::widgets
         Count
     };
 
-    /// 축 badge 의 배경색. `0xRRGGBB`. 구현이 고르는 값의 정본이므로 검사가
-    /// 이것을 읽어 셋의 상이함과 의미 색과의 구별, 글자 대비를 단정한다.
+    /// Axis letter color, 0xRRGGBB. Also used by contrast validation.
     std::uint32_t axis_badge_hex(axis which) noexcept;
 
-    /// badge 위 글자색. `0xRRGGBB`. 대비 단정의 다른 한쪽이다.
-    std::uint32_t axis_badge_text_hex() noexcept;
+    /// Shared neutral badge background, 0xRRGGBB.
+    std::uint32_t axis_badge_background_hex() noexcept;
 
     /// badge 에 찍히는 한 글자. 색만으로 축을 알리면 색을 구별하지 못하는
     /// 눈에는 세 칸이 같은 칸이 된다.

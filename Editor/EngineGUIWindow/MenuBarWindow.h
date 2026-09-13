@@ -1,8 +1,11 @@
 #pragma once
 #include "ImGui.h"
 #include "Windows/EditorWindowBody.h"
+#include "LogStore.h"
 
 #include <vector>
+
+struct EditorTitleBarLayout;
 
 class MenuBarWindow
 {
@@ -10,9 +13,6 @@ public:
 	MenuBarWindow();
 	~MenuBarWindow() = default;
 	void RenderMenuBar();
-	/// 제목표시줄 아래 한 줄. s&box 배치에서 재생 컨트롤은 메뉴 행이 아니라
-	/// 이 툴바에 있다 — 메뉴 행 가운데는 창 제목이 쓴다.
-	void RenderToolBar();
 	void ShowAboutWindow();
 	/// 프레임 루프 안에 인라인으로 있던 본문. 셸이 창 본문으로 부른다.
 	void ShowProfilerWindow();
@@ -28,11 +28,14 @@ public:
 	void ShowRenderDebugWindow();
 
 private:
+    void RenderPlayControls(const EditorTitleBarLayout& layout);
 	void BehaviorTreeWindow(bool drawing);
 	void BlackBoardWindow(bool drawing);
 
     ImFont* m_koreanFont{ nullptr };
-    int  m_selectedLogIndex{};
+    std::uint64_t m_selectedLogSequence{};
+    LogSnapshot m_logSnapshot;
+    std::vector<std::string> m_logDisplayText;
 	bool m_bShowNewScenePopup{ false };
 	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
 

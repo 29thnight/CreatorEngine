@@ -2,6 +2,7 @@
 
 #include "TerrainBuffers.h"
 #include "EditorCameraRig.h"
+#include "EditorSelectionHistory.h"
 
 #include <atomic>
 #include <memory>
@@ -43,10 +44,13 @@ public:
         m_cameraRig = std::move(rig);
     }
 
+    editor::SelectionHistory& SelectionHistory() noexcept { return m_selectionHistory; }
+
 private:
     EditorSessionState() = default;
 
     std::atomic_bool m_gameViewHidden{ false };
     std::unique_ptr<TerrainBrush> m_terrainBrush;
     std::unique_ptr<EditorCameraRig> m_cameraRig;
+    editor::SelectionHistory m_selectionHistory;
 };

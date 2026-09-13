@@ -177,6 +177,7 @@ namespace
     //   길이었다. 검증된 수명 패턴을 그대로 쓰는 것이 맞다.
     struct LivePipeline
     {
+        uint64_t resizeGeneration{ 0 };
         uint32_t width{ 0 };
         uint32_t height{ 0 };
         double lastNativeRecordMs{ 0.0 };
@@ -912,6 +913,8 @@ namespace
         EnhancedLiveDisplaySnapshot displaySnapshot{};
         std::array<uint64_t, kEnhancedLiveDisplayTargetCount>
             displayPresentationKeys{};
+        std::array<std::chrono::steady_clock::time_point,
+            kEnhancedLiveDisplayTargetCount> displayMissingSince{};
 
         static uint32_t DisplayTargetIndex(EnhancedLiveDisplayTarget target)
         {
@@ -941,6 +944,7 @@ namespace
                 {
                     entry = {};
                     displayPresentationKeys[targetIndex] = 0;
+                    displayMissingSince[targetIndex] = {};
                 }
                 entry.key = view.key;
                 entry.active = true;
@@ -948,7 +952,11 @@ namespace
             for (uint32_t i = 0; i < kEnhancedLiveDisplayTargetCount; ++i)
             {
                 if (active[i]) continue;
-                displaySnapshot.targets[i] = {};
+                if (displaySnapshot.targets[i].active)
+                {
+                    displaySnapshot.targets[i] = {};
+                    displayMissingSince[i] = {};
+                }
                 displayPresentationKeys[i] = 0;
             }
             ++displaySnapshot.revision;
@@ -961,6 +969,8 @@ namespace
                 EnhancedLiveDisplayEntrySnapshot& entry = displaySnapshot.targets[i];
                 entry.ready = false;
                 entry.completedFrameId = 0;
+                entry.completedResizeGeneration = 0;
+                entry.completedWidth = entry.completedHeight = 0;
                 entry.promotionCount = 0;
                 entry.promotedSlotMask = 0;
                 displayPresentationKeys[i] = 0;
@@ -976,12 +986,14 @@ namespace
             displaySnapshot.backend = backend;
             displaySnapshot.revision = nextRevision;
             displayPresentationKeys.fill(0);
+            displayMissingSince.fill({});
         }
 
         void PublishDisplayResultLocked(EnhancedLiveDisplayTarget displayTarget,
             const EnhancedLiveViewKey& key, uint64_t presentationKey,
             uint64_t completedFrameId, uint64_t promotionCount,
-            uint32_t promotedSlotMask)
+            uint32_t promotedSlotMask, uint32_t width, uint32_t height,
+            uint64_t resultResizeGeneration = 0)
         {
             const uint32_t targetIndex = DisplayTargetIndex(displayTarget);
             EnhancedLiveDisplayEntrySnapshot& entry =
@@ -989,6 +1001,10 @@ namespace
             if (!entry.active || entry.key != key) return;
             entry.ready = 0 != presentationKey;
             entry.completedFrameId = completedFrameId;
+            entry.completedWidth = width;
+            entry.completedHeight = height;
+            entry.completedResizeGeneration = resultResizeGeneration != 0
+                ? resultResizeGeneration : displaySnapshot.resizeGeneration;
             entry.promotionCount = promotionCount;
             entry.promotedSlotMask = promotedSlotMask;
             displayPresentationKeys[targetIndex] = presentationKey;
@@ -1007,7 +1023,7 @@ namespace
                 PublishDisplayResultLocked(view.displayTarget, view.key,
                     VulkanLivePipeline::kDisplayKeyBase + i + 1u,
                     view.completedFrameId, view.promotionCount,
-                    view.promotedSlotMask);
+                    view.promotedSlotMask, vulkanPipeline->width, vulkanPipeline->height);
             }
         }
 
@@ -1447,6 +1463,7 @@ namespace
             InvalidateDisplayResultsLocked();
             pipeline = std::make_unique<LivePipeline>();
             LivePipeline& p = *pipeline;
+            p.resizeGeneration = displaySnapshot.resizeGeneration;
 
             // ★ 어댑터를 DX11에 맞추던 것을 걷었다 (D4, 2026-08-08).
             //
@@ -1557,6 +1574,11 @@ namespace
                 p.postChain.SetTuning(tuning);
             }
 
+            return CreateDisplaySlots(p, outError);
+        }
+
+        bool CreateDisplaySlots(LivePipeline& p, std::string& outError)
+        {
             // ── 공유 텍스처 (뷰마다 슬롯 셋) ──
             //
             // 포스트 체인의 LDR 출력과 같은 RGBA8이라야 CopyTextureRegion이
@@ -1571,6 +1593,63 @@ namespace
                     slot.rhiTexture, slot.interopToken, outError)) return false;
             }
 
+            return true;
+        }
+
+        // Caller holds displayLifetimeMutex after draining the live GPU queue.
+        void ReleaseSizeResources(LivePipeline& p)
+        {
+            for (LivePipeline::CameraView& view : p.views)
+            {
+                // Graph destruction returns its transient textures to the pool.
+                for (LivePipeline::DisplaySlot& slot : view.slots) slot.graph.reset();
+                view.pendingQueue.clear();
+                view.displaySlot = -1;
+                view.promotionCount = 0;
+                view.promotedSlotMask = 0;
+                for (LivePipeline::DisplaySlot& slot : view.slots)
+                {
+                    if (slot.rhiTexture.IsValid())
+                        dx12.Resources().ReleaseTexture(slot.rhiTexture);
+                    // The shell may still reference an imported shared texture.
+                    dx12.RetireDisplayTexture(slot.interopToken);
+                    slot = {};
+                }
+                view.ssgi.ReleaseHistory(p.frameContext);
+            }
+            for (auto& [key, entries] : p.transientPool.freeList)
+            {
+                (void)key;
+                for (const RGTransientPool::Entry& entry : entries)
+                {
+                    if (entry.handle.IsValid())
+                        dx12.Resources().ReleaseTexture(entry.handle);
+                }
+            }
+            p.transientPool.freeList.clear();
+        }
+
+        bool ResizePipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
+        {
+            LiveStopwatch timer;
+            timer.Start();
+            // Resize drains submitted live work before any graph/history is released.
+            if (!dx12.Resize(newWidth, newHeight, outError)) return false;
+            std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
+            InvalidateDisplayResultsLocked();
+            LivePipeline& p = *pipeline;
+            ReleaseSizeResources(p);
+            p.width = newWidth;
+            p.height = newHeight;
+            p.resizeGeneration = displaySnapshot.resizeGeneration;
+            p.frameContext.width = newWidth;
+            p.frameContext.height = newHeight;
+            // Passes derive their extent in PrepareFrame/Declare. SSGI resizes its
+            // history there; PSOs, ShaderMeta variants, IBL and fixed fog volumes stay.
+            if (!CreateDisplaySlots(p, outError)) return false;
+            std::printf("[LiveResize] backend=dx12 generation=%llu size=%ux%u ms=%.3f\n",
+                static_cast<unsigned long long>(p.resizeGeneration), newWidth, newHeight,
+                timer.ElapsedMs());
             return true;
         }
 
@@ -1622,8 +1701,7 @@ namespace
         }
 
         /// 파이프라인 해체. DX11에 보이는 것은 묘지로 보낸다(수명 규약).
-        void TeardownPipeline(bool preserveBackend = false,
-            bool gpuAlreadyDrained = false)
+        void TeardownPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (nullptr == pipeline)
@@ -1634,13 +1712,9 @@ namespace
             InvalidateDisplayResultsLocked();
             LivePipeline& p = *pipeline;
 
-            if (!gpuAlreadyDrained)
             {
                 std::string lifecycleError;
-                const RHILifecycleCommand command = preserveBackend
-                    ? RHILifecycleCommand::SwapChainResize
-                    : RHILifecycleCommand::BackendShutdown;
-                if (!dx12.DrainForLifecycle(command, lifecycleError))
+                if (!dx12.DrainForLifecycle(RHILifecycleCommand::BackendShutdown, lifecycleError))
                 {
                     lastError = "DX12 lifecycle drain 실패: " + lifecycleError;
                     std::string abandonError;
@@ -1649,32 +1723,7 @@ namespace
                         abandonError);
                 }
             }
-            for (LivePipeline::CameraView& view : p.views)
-            {
-                for (LivePipeline::DisplaySlot& slot : view.slots) slot.graph.reset();
-                view.pendingQueue.clear();
-                view.displaySlot = -1;
-                view.key = {};
-                view.displayTarget = EnhancedLiveDisplayTarget::Game;
-                view.viewFlags = EnhancedLiveViewFlags::ScreenSpaceUI;
-                view.promotionCount = 0;
-                view.promotedSlotMask = 0;
-
-                for (LivePipeline::DisplaySlot& slot : view.slots)
-                {
-                    // WaitForGpu 뒤다. 그래프/인코더가 이 핸들을 더 이상 풀지
-                    // 않으므로 이제 백엔드 표의 등록을 안전하게 해제할 수 있다.
-                    if (slot.rhiTexture.IsValid())
-                    {
-                        dx12.Resources().ReleaseTexture(slot.rhiTexture);
-                        slot.rhiTexture = {};
-                    }
-                    dx12.RetireDisplayTexture(slot.interopToken);
-                    slot.interopToken =
-                        EnhancedSceneRendererLiveDX12Adapter::kInvalidDisplayToken;
-                    slot.key = {};
-                }
-            }
+            ReleaseSizeResources(p);
 
             // 패스 해제는 노드 목록의 역순이다(슬라이스 2). 예전에는 그 역순을
             // 사람이 두 곳에 나눠 적었고(ssr·sss 자리와 decal 자리가 달랐다),
@@ -1682,7 +1731,6 @@ namespace
             p.desc.ShutdownAll(static_cast<uint32_t>(LivePipeline::kMaxCameraViews));
             p.desc.Clear();
 
-            // IBL은 노드가 아니므로 따로 푼다(초기화도 따로 했다).
             p.ibl.Shutdown();
 
             // 포그 입력은 파이프라인 수명에 묶인다(텍스처 캐시가 함께 죽는다).
@@ -1698,23 +1746,7 @@ namespace
             fogTeardownPending = false;
             fogRetireFence = 0;
 
-            // 그래프들이 GPU 완료 뒤 반납한 transient 핸들은 파이프라인 소유다.
-            // backend를 유지하는 resize에서는 리소스 표도 유지되므로 여기서
-            // 명시적으로 해제해야 옛 해상도 풀이 영구 상주하지 않는다.
-            for (auto& [key, entries] : p.transientPool.freeList)
-            {
-                (void)key;
-                for (const RGTransientPool::Entry& entry : entries)
-                {
-                    if (entry.handle.IsValid())
-                    {
-                        dx12.Resources().ReleaseTexture(entry.handle);
-                    }
-                }
-            }
-            p.transientPool.freeList.clear();
-
-            if (!preserveBackend) dx12.ShutdownPipeline();
+            dx12.ShutdownPipeline();
 
             pipeline.reset();
             ReleaseForwardShaderMetaOwnerIfUnused();
@@ -3489,15 +3521,18 @@ namespace
                     return false;
                 }
 
-                p.skyBox.SetCubeMap(
-                    p.ibl.GetCubeMap(), EnhancedIBLGenerator::kFormat, 1);
-                p.deferred.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
-                    EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
-                p.forward.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
-                    EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
                 p.iblGenerated = true;
                 skyBoxDirty = false;
+                std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
+                ++displaySnapshot.iblGenerationCount;
             }
+
+            // Bind the retained environment maps for this frame's consumers.
+            p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), EnhancedIBLGenerator::kFormat, 1);
+            p.deferred.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
+                EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
+            p.forward.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
+                EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
 
             // 기즈모 데이터(gizmoData)의 프레임별 feed는 기여 노드의 prepare가
             // 한다 — RenderFeatureContext가 안정 주소를 넘겼다(E4-2).
@@ -4416,8 +4451,9 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     state.publishedTotalSeconds += deltaSeconds;
     frame.totalSeconds = state.publishedTotalSeconds;
     frame.sceneLoading = sceneLoading;
-    frame.width = ScreenResizeBus::Get().GetWidth();
-    frame.height = ScreenResizeBus::Get().GetHeight();
+    const auto screenSize = ScreenResizeBus::Get().GetSizeSnapshot();
+    frame.width = screenSize.width;
+    frame.height = screenSize.height;
     frame.requiredAssets = requiredAssets;
     frame.requiredAssets.Canonicalize();
 
@@ -4955,7 +4991,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                     state.PublishDisplayResultLocked(view.displayTarget, view.key,
                         view.slots[slotIndex].interopToken,
                         view.slots[slotIndex].frameId, view.promotionCount,
-                        view.promotedSlotMask);
+                        view.promotedSlotMask, p.width, p.height, p.resizeGeneration);
                 }
                 view.pendingQueue.erase(view.pendingQueue.begin());
                 view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
@@ -5003,10 +5039,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
 
     // 해상도는 밀봉이 카메라가 아니라 화면 크기 버스에서 가져오므로
     // 모든 뷰가 공유한다 — 재구축 판정도 프레임당 한 번이면 된다.
-    // 크기가 바뀌면 크기 의존 파이프라인만 다시 세운다. 패스들은 Initialize에서
-    // 화면 크기 리소스를 잡지만 backend 디바이스·PSO/루트 시그니처·자산 캐시는
-    // 해상도와 무관하다. 그것까지 재부팅하면 두 번째 PSO 초기화가 장시간 CPU를
-    // 점유하므로 GPU 완료 뒤 유지한 backend 위에 패스와 표시 슬롯만 다시 만든다.
+    // 패스는 PrepareFrame/Declare에서 새 크기를 반영한다. 전체 재초기화는
+    // 셰이더 소스 준비와 ShaderMeta/IBL 생성까지 반복하므로 표시 슬롯과
+    // transient 풀만 GPU 완료 뒤 교체한다.
     const uint32_t rtWidth = frame.width;
     const uint32_t rtHeight = frame.height;
     if (0 == rtWidth || 0 == rtHeight)
@@ -5019,7 +5054,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         (rtWidth != state.pipeline->width || rtHeight != state.pipeline->height))
     {
         std::string resizeError;
-        if (!state.dx12.Resize(rtWidth, rtHeight, resizeError))
+        if (!state.ResizePipeline(rtWidth, rtHeight, resizeError))
         {
             state.lastError = "DX12 resize lifecycle 실패: " + resizeError;
             Debug->LogError("[EnhancedRenderer] " + state.lastError);
@@ -5027,7 +5062,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             state.enabled = false;
             return;
         }
-        state.TeardownPipeline(true, true);
     }
 
     if (nullptr == state.pipeline)
@@ -5257,28 +5291,76 @@ EnhancedLiveDisplaySnapshot EnhancedSceneRenderer::GetLiveDisplaySnapshot()
 uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(
     EnhancedLiveDisplayTarget target)
 {
+    return GetLiveDisplayTexture(target).textureId;
+}
+
+EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
+    EnhancedLiveDisplayTarget target)
+{
     // CE는 Camera/backend view를 조회하지 않는다. RT가 발행한 논리 대상의
     // 불투명 key만 열고, resize/teardown과 공유 핸들 수명은 같은 락으로 막는다.
-    const LiveState& state = GetLiveState();
+    LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> displayLock(state.displayLifetimeMutex);
+    const uint32_t targetIndex = static_cast<uint32_t>(target);
+    if (targetIndex >= kEnhancedLiveDisplayTargetCount) return {};
+    auto& entry = state.displaySnapshot.targets[targetIndex];
+    const auto observe = [&](uint64_t textureId, const char* reason)
+    {
+        ++entry.textureQueries;
+        entry.lastTextureAvailable = textureId != 0;
+        auto& missingSince = state.displayMissingSince[targetIndex];
+        const auto now = std::chrono::steady_clock::now();
+        if (!textureId)
+        {
+            ++entry.missingTextureQueries;
+            if (missingSince == std::chrono::steady_clock::time_point{})
+            {
+                missingSince = now;
+                entry.lastMissingResizeGeneration = state.displaySnapshot.resizeGeneration;
+                std::printf("[LiveDisplay] target=%u resize=%llu unavailable=%s\n",
+                    targetIndex, static_cast<unsigned long long>(
+                        state.displaySnapshot.resizeGeneration), reason);
+            }
+        }
+        if (missingSince != std::chrono::steady_clock::time_point{})
+        {
+            const double elapsed = std::chrono::duration<double, std::milli>(
+                now - missingSince).count();
+            entry.maxMissingTextureMs = (std::max)(entry.maxMissingTextureMs, elapsed);
+            if (textureId)
+            {
+                entry.lastMissingTextureMs = elapsed;
+                std::printf("[LiveDisplay] target=%u resize=%llu recovered=%.3fms frame=%llu\n",
+                    targetIndex, static_cast<unsigned long long>(
+                        state.displaySnapshot.resizeGeneration), elapsed,
+                    static_cast<unsigned long long>(entry.completedFrameId));
+                missingSince = {};
+            }
+        }
+        if (textureId)
+        {
+            entry.lastTextureFrameId = entry.completedFrameId;
+            entry.lastTextureResizeGeneration = entry.completedResizeGeneration;
+        }
+        return EnhancedLiveDisplayTexture{textureId, textureId ? entry.completedWidth : 0,
+            textureId ? entry.completedHeight : 0};
+    };
     // Host가 설치한 표시 sink가 ID를 해석한다(E4-6a). Core는 표시 수명 락만
     // 소유하고 ImGui 셸을 모른다 — 미설치·비활성이면 표시할 수단이 없다.
     const std::shared_ptr<IDisplayPresentationSink> sink =
         state.CopyPresentationSink();
-    if (!sink || !sink->IsActive()) return 0;
-    if (!state.enabled) return 0;
-    const uint32_t targetIndex = static_cast<uint32_t>(target);
-    if (targetIndex >= kEnhancedLiveDisplayTargetCount) return 0;
-    const EnhancedLiveDisplayEntrySnapshot& entry =
-        state.displaySnapshot.targets[targetIndex];
+    if (!sink || !sink->IsActive()) return observe(0, "sink_inactive");
+    if (!state.enabled) return observe(0, "renderer_disabled");
     const uint64_t presentationKey = state.displayPresentationKeys[targetIndex];
-    if (!entry.active || !entry.ready || 0 == presentationKey) return 0;
+    if (!entry.active) return observe(0, "view_inactive");
+    if (!entry.ready) return observe(0, "result_pending");
+    if (0 == presentationKey) return observe(0, "key_missing");
 
     if (EnhancedLiveBackend::Vulkan == state.displaySnapshot.backend)
     {
-        return sink->GetCpuFrameTextureId(presentationKey);
+        return observe(sink->GetCpuFrameTextureId(presentationKey), "cpu_frame_missing");
     }
-    return state.dx12.OpenDisplayTexture(*sink, presentationKey);
+    return observe(state.dx12.OpenDisplayTexture(*sink, presentationKey), "display_token_missing");
 }
 
 bool EnhancedSceneRenderer::RunLiveDisplayRegression(uint32_t expectedWidth,

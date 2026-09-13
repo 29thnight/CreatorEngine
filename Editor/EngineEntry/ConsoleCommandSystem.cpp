@@ -540,7 +540,7 @@ void ConsoleCommandSystem::StartStdinReader()
 
 void ConsoleCommandSystem::LoadScriptFile(const std::string& path)
 {
-    std::ifstream file(path);
+    std::ifstream file(std::filesystem::path(std::u8string(path.begin(), path.end())));
     if (!file)
     {
         // 로그에만 남기면 아무도 못 본다. 실행 인자를 준 쪽은 대개 자동화라
@@ -2590,7 +2590,8 @@ void ConsoleCommandSystem::WriteResultLine(const std::string& commandId,
     // 읽는다 — 실제로는 아무것도 돌지 않은 것이다.
     if (!m_resultFilePath.empty() && nullptr == m_resultFile)
     {
-        if (0 != fopen_s(&m_resultFile, m_resultFilePath.c_str(), "wb") || nullptr == m_resultFile)
+        const std::filesystem::path resultPath(std::u8string(m_resultFilePath.begin(), m_resultFilePath.end()));
+        if (0 != _wfopen_s(&m_resultFile, resultPath.c_str(), L"wb") || nullptr == m_resultFile)
         {
             // ★ 조용히 stdout 으로 흘리지 않는다. 소비자는 파일을 읽으려고
             //   기다리고 있고, 그 파일이 영영 안 생기면 원인이 여기라는 것을

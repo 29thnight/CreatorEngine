@@ -18,6 +18,7 @@ public:
 
 	void HandleMovement(float deltaTime);
 	void ApplySnapshot(const FrameCameraSnapshot& snapshot) noexcept;
+	void SetPose(const math::vector3& position, const math::quaternion& rotation) noexcept;
 
 	float* SpeedPtr() noexcept { return &m_speed; }
 

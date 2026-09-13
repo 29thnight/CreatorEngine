@@ -421,6 +421,32 @@ namespace ConsoleCmd
         return EditorObjectOperations::Rename(target, ctx.parts[2]);
     }
 
+    static CommandCore::CommandResult Cmd_object_icon(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("object.icon <target> <preset|default>");
+        EntityHandle target;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!result.IsSuccess()) return result;
+        return EditorObjectOperations::SetIcon(target, ctx.parts[2] == "default" ? "" : ctx.parts[2]);
+    }
+
+    static CommandCore::CommandResult Cmd_object_lock(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3 || (ctx.parts[2] != "true" && ctx.parts[2] != "false"))
+            return CommandCore::InvalidArguments("object.lock <target> <true|false>");
+        EntityHandle target;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!result.IsSuccess()) return result;
+        return EditorObjectOperations::SetEditLocked(target, ctx.parts[2] == "true");
+    }
+
+    static CommandCore::CommandResult Cmd_scene_navigate(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2 || (ctx.parts[1] != "back" && ctx.parts[1] != "forward"))
+            return CommandCore::InvalidArguments("scene.navigate <back|forward>");
+        return EditorObjectOperations::NavigateSelection(SceneManagers->GetActiveScene(), ctx.parts[1] == "back" ? -1 : 1);
+    }
+
     static CommandCore::CommandResult Cmd_object_describe(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("object.describe <name-or-id>");
@@ -1204,6 +1230,9 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "component.remove" }, &Cmd_component_remove);
         reg.Result({ "object.describe" }, &Cmd_object_describe);
         reg.Result({ "object.rename" }, &Cmd_object_rename);
+        reg.Result({ "object.icon" }, &Cmd_object_icon);
+        reg.Result({ "object.lock" }, &Cmd_object_lock);
+        reg.Result({ "scene.navigate" }, &Cmd_scene_navigate);
         reg.Result({ "object.transform" }, &Cmd_object_transform);
         reg.Result({ "object.parent" }, &Cmd_object_parent);
         reg.Result({ "object.rootref" }, &Cmd_object_rootref);

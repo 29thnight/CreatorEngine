@@ -4,6 +4,8 @@
 #include <imgui_internal.h>
 #include "CurvePoint.h"
 #include "EditorPropertyRow.h" // 배치 계약 (W2-I2)
+#include "EntityHandle.h"
+#include "EditorComponentCatalog.h"
 
 class Entity;
 class InspectorWindow
@@ -13,6 +15,20 @@ public:
 	~InspectorWindow() = default;
 
 private:
+    void DrawAddComponent(Entity* entity);
+    EntityHandle m_addComponentTarget{};
+    std::vector<editor::components::Entry> m_componentCatalog;
+    std::string m_componentSearch;
+    std::string m_componentCategory;
+    std::string m_componentError;
+    int m_componentSelection{};
+    bool m_newScriptPage{};
+    bool m_focusNewScriptName{};
+    std::string m_newScriptName;
+    Entity* DrawNavigation(class Scene* scene, Entity* selected);
+    void DrawEntityIcon(Entity* entity);
+    EntityHandle m_previousEntity{};
+    bool m_wasMetaSelected{ false };
 	// 폭 전환의 직전 모드. 완충 폭과 편집 중 보류가 이것을 본다. 숨은 전역이
 	// 아니라 창이 들고 있어야 인스펙터가 둘 열렸을 때 서로의 모드를 흔들지
 	// 않는다(`EditorPropertyRow.h` 의 `property_layout_state` 주석).

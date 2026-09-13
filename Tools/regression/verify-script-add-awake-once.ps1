@@ -1,149 +1,50 @@
-# script.add 이중 초기화 게이트 (트랙 C · C2-2).
-#
-# ── 무엇을 잡는가 ──
-#
-# Editor/EngineGUIWindow/InspectorWindow.cpp의 AttachManagedScript와
-# Editor/EngineEntry/ConsoleCommandSystem.cpp의 script.add는 예전에 같은 결함을 갖고
-# 있었다 — AddComponentAllowMultiple 직후 script->OnInitialized()를 수동으로
-# 불렀는데, AttachComponentLifecycle이 이미 그 컴포넌트를 PendingAwake 큐에
-# 넣어 둔 뒤라(State_AwakeCalled 비트는 서지 않은 채) 다음 프레임의
-# Scene::RegistryDrainAwakeAndStart가 같은 컴포넌트를 또 한 번 깨웠다 —
-# OnInitialized 이중 호출.
-#
-# ── 왜 lifecycle.trace 건수가 아니라 로그 줄 수를 세는가 ──
-#
-# OnInitialized 단계 LIFECYCLE_TRACE 호출은 Scene.cpp의 자동 드레인 지점
-# (RegistryDrainAwakeAndStart) 한 곳에만 있다. script.add/AttachManagedScript의
-# (예전) 수동 호출부에는 트레이스 매크로가 없었다 — 그래서 결함이 있던 옛
-# 코드에서도 트레이스에는 자동 드레인 쪽 호출 단 한 번만 찍히고 수동 호출은
-# 아예 기록되지 않는다. 트레이스 건수만으로는 수정 전/후가 똑같이 1건으로
-# 나와 이중 호출을 구분하지 못한다.
-#
-# 그리고 ScriptComponent::OnInitialized의 `if (HasInstance()) return;` 가드가
-# 정상 스크립트 타입에서는 두 번째 호출을 조용히 삼킨다 — 그래서 정상 타입으로
-# 시험하면 이중 호출이 있어도 관측 가능한 부작용이 아예 없다(우연히 멱등).
-#
-# 그래서 시나리오(script_add_awake_once.txt)는 **등록되지 않은 스크립트
-# 타입**을 붙인다. CreateComponent가 항상 실패해 HasInstance()가 절대
-# true가 되지 않으므로 그 가드가 절대 두 번째 호출을 막지 못하고, 호출될
-# 때마다 로그 한 줄을 남긴다 — 그 줄 수가 곧 OnInitialized 호출 횟수다.
-#
-#   0회 = 명령 자체가 실행되지 않았다(오브젝트/씬 문제 등) — 판정 불가로 실패
-#   1회 = 정상(수정 후 — scene->DrainPendingLifecycle() 동기 호출 경로)
-#   2회 = 결함 재현(수정 전 — 수동 호출 + 다음 프레임 자동 드레인)
-#   3회+ = 예상 밖의 추가 호출 — 그 자체로 조사 대상
-#
-# PROBE_TYPE은 시나리오 파일과 이 스크립트가 공유하는 리터럴 상수다.
-# 바꾸려면 두 파일 모두 고칠 것.
-#
-# 사용법:
-#   pwsh Tools\regression\verify-script-add-awake-once.ps1
+[CmdletBinding()]
 param(
-    [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
-    [string]$Work = $env:TEMP,
+    [string]$Exe = (Join-Path $PSScriptRoot '../../Bin/x64-Debug/Editor/CreatorEditor.exe'),
+    [string]$Work = (Join-Path $env:TEMP 'script-add-once'),
     [int]$TimeoutSeconds = 300
 )
-
-$ProbeType = "NoSuchScriptType_C2_2_Regression"
-
+# The shared authoring path now rejects unregistered types before attachment.
+# Count native initialization attempts on a valid component (including rejected
+# duplicate lifecycle entries), and separately verify the invalid type leaves none.
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) { throw 'Close the editor before this isolated gate.' }
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
-$exeDir = [System.IO.Path]::GetDirectoryName($Exe)
-if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
-
-$script = Join-Path $PSScriptRoot "..\..\scripts\script_add_awake_once.txt"
-$script = [System.IO.Path]::GetFullPath($script)
-if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
-
-$outPath = Join-Path $Work "script_add_awake_once.out"
-$errPath = Join-Path $Work "script_add_awake_once.err"
-$producedTrace = Join-Path $PSScriptRoot "..\..\Artifacts\Tests\Editor\Traces\script_add_awake_once_trace.tsv"
-if (Test-Path $producedTrace) { Remove-Item $producedTrace -Force }
-
-$resultPath = Join-Path $Work "script_add_awake_once.results.jsonl"
+$Exe = [IO.Path]::GetFullPath($Exe)
+$Work = [IO.Path]::GetFullPath($Work)
+New-Item -ItemType Directory -Force -Path $Work | Out-Null
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$settings = Join-Path $repo 'Dynamic_CPP/ProjectSetting/EngineSettings.asset'
+$ini = Join-Path (Split-Path $Exe) 'Saved/Config/imgui.ini'
+$settingsBytes = [IO.File]::ReadAllBytes($settings)
+$hadIni = Test-Path -LiteralPath $ini
+$iniBytes = if ($hadIni) { [IO.File]::ReadAllBytes($ini) } else { [byte[]]@() }
+$resultPath = Join-Path $Work 'script_add_awake_once.results.jsonl'
 if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
-$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
-    -WorkingDirectory $exeDir `
-    -RedirectStandardOutput $outPath `
-    -RedirectStandardError $errPath -PassThru
-
-$proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
-if (-not $proc.HasExited) {
-    $proc.Kill()
-    "타임아웃 ($TimeoutSeconds 초). 시나리오가 끝나지 않았다."
-    exit 1
+$owned = $null
+try {
+    $scenario = Join-Path $repo 'scripts/script_add_awake_once.txt'
+    $owned = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-file', ('"'+$resultPath+'"')) -WindowStyle Hidden `
+        -WorkingDirectory (Split-Path $Exe) -RedirectStandardOutput (Join-Path $Work 'editor.out') -RedirectStandardError (Join-Path $Work 'editor.err') -PassThru
+    if (-not $owned.WaitForExit($TimeoutSeconds * 1000)) { throw 'Script lifecycle probe timed out' }
+    $results = @(Read-CommandResults $resultPath)
+    $adds = @($results | Where-Object command -eq 'script.add')
+    if ($adds.Count -ne 2 -or $adds[0].code -ne 'script.type_not_found' -or $adds[0].status -ne 'invalid_arguments' -or $adds[1].status -ne 'succeeded') {
+        throw 'Expected an invalid-type rejection followed by a successful valid attachment'
+    }
+    $status = Get-SucceededCommand $results 'script.status'
+    $components = @($status.components | Where-Object owner -eq 'ScriptAddRegressionTarget')
+    if (@($components | Where-Object type -eq 'NoSuchScriptType_C2_2_Regression').Count) { throw 'Invalid script left an empty component' }
+    $valid = @($components | Where-Object type -eq 'Bobber')
+    if (-not $valid.Count -or @($valid | Where-Object instanceId -lt 0).Count) { throw 'Valid script instance is missing' }
+    if (@($valid | Where-Object initializationAttempts -gt 1).Count -or -not @($valid | Where-Object initializationAttempts -eq 1).Count) {
+        throw 'Expected exactly one native initialization attempt in Play'
+    }
+    if ($owned.ExitCode -ne 2) { throw "Expected invalid-argument session exit 2, got $($owned.ExitCode)" }
+    Write-Output 'SCRIPT_ADD_ONCE_OK valid initialization exactly once; invalid type creates no component'
+} finally {
+    if ($null -ne $owned -and -not $owned.HasExited) { $owned.Kill(); $owned.WaitForExit() }
+    [IO.File]::WriteAllBytes($settings,$settingsBytes)
+    if ($hadIni) { [IO.File]::WriteAllBytes($ini,$iniBytes) }
 }
-
-if (-not (Test-Path $outPath)) { "표준 출력이 없다: $outPath"; exit 1 }
-
-$results = @(Read-CommandResults $resultPath)
-$status = Get-SucceededCommand $results 'script.status'
-$components = @($status.components | Where-Object { $_.type -eq $ProbeType -and $_.owner -eq 'ScriptAddRegressionTarget' })
-if ($components.Count -ne 1) { throw "Expected one rejected script component, found $($components.Count)" }
-$callCount = [int]$components[0].initializationAttempts
-
-# ── 보조 신호: lifecycle.trace ──
-#
-# 위에서 설명한 이유로 이 신호 하나로는 이중 호출을 구분할 수 없다 — 드레인이
-# 실제로 한 번은 돌았다는 것만 확인한다(트레이스는 자동 드레인 경로에서만
-# 기록되므로, 이 값은 결함 유무와 무관하게 1이면 정상이다).
-$traceCount = 0
-if (Test-Path $producedTrace) {
-    $traceLines = Get-Content -LiteralPath $producedTrace |
-        Where-Object { $_ -notmatch '^\s*#' -and $_.Trim() -ne '' }
-    $traceCount = @($traceLines | Where-Object {
-        $_ -match "^\d+\tOnInitialized\tScriptComponent\tScriptAddRegressionTarget\t"
-    }).Count
-}
-
-$attach = Get-CommandResult $results 'script.add'
-$attachFailedSeen = $attach.status -eq 'failed' -and $components[0].instanceId -lt 0
-
-"명령 실행 확인 — 부착 실패 로그 관측: $attachFailedSeen (프로브 타입은 항상 실패하므로 참이어야 한다)"
-"드레인 확인(보조) — OnInitialized 트레이스 $traceCount 건 (0이면 드레인 자체가 안 돈 것)"
-"OnInitialized 호출 흔적 — 네이티브 진입 $callCount 회 (기대: 1)"
-""
-
-$failed = @()
-
-if (-not $attachFailedSeen) {
-    $failed += "부착 실패 로그를 못 찾았다 — script.add 명령 자체가 실행되지 않았을 수 있다(오브젝트 생성 확인)"
-}
-
-if ($traceCount -eq 0) {
-    $failed += "OnInitialized 트레이스가 0건이다 — 드레인 경로 자체가 안 돌았다(scene->DrainPendingLifecycle 호출 여부를 의심할 것)"
-}
-
-if ($callCount -eq 0) {
-    $failed += "OnInitialized 호출 흔적이 0건이다 — 판정 불가(로그 파싱 또는 명령 실행 자체를 의심할 것)"
-} elseif ($callCount -eq 2) {
-    $failed += "OnInitialized가 2회 호출됐다 — 이중 초기화 결함이 재현됐다(수동 OnInitialized() 호출이 남아 있는지 확인할 것)"
-} elseif ($callCount -gt 2) {
-    $failed += "OnInitialized 호출 흔적이 $callCount 건이다 — 예상 밖의 추가 호출(별도 조사 대상)"
-}
-
-# ── 종료 코드: 이 시나리오는 **일부러 실패한다** ──────────────────────────
-#
-# 이 검사는 존재하지 않는 프로브 타입을 붙여 "OnInitialized가 정확히 한 번"을 본다.
-# 부착은 반드시 실패하고, 그것이 시나리오의 전제다(위 attachFailedSeen 단정).
-#
-# 예전에는 `script.add`가 legacy void 핸들러라 실패해도 종료 코드가 0이었고, 그래서
-# 여기서 0을 기대했다. LC7이 그것을 결과형으로 옮기면서 실패가 session을 거쳐
-# 종료 코드에 닿는다(Failed → 4). 그것이 LC1이 세운 규약이다.
-#
-# 그래서 기대값을 4로 **올린다** — 느슨하게 "0이 아니어도 통과"로 두지 않는다.
-# 여기서 0이 돌아오면 `script.add`가 실패를 다시 삼키기 시작했다는 뜻이고,
-# 그것은 이 시나리오가 아니라 명령 계약이 깨진 것이다.
-$expectedExit = 4
-if ($proc.ExitCode -ne $expectedExit) {
-    $failed += ("종료 코드 {0} 을 기대했는데 0x{1:X8} 이다 — " -f $expectedExit, $proc.ExitCode) +
-               "0 이면 script.add 가 부착 실패를 보고하지 않는다는 뜻이다(LC1 규약 위반)"
-}
-
-if ($failed.Count -gt 0) {
-    "실패 $($failed.Count)건:"
-    $failed | ForEach-Object { "  $_" }
-    exit 1
-}
-
-"전체 통과 — OnInitialized 정확히 1회"
-exit 0

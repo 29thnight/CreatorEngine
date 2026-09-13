@@ -1,4 +1,6 @@
 #include "EditorRenderer.h"
+#include "EditorWorkspaceStore.h"
+#include "ViewportHostWindow.h"
 #include "EditorWindowHost.h"
 #include "EditorWindowRegistry.h"
 #include "EditorChromeProbe.h"
@@ -9,6 +11,9 @@
 #include "EditorSettingsStore.h"
 #include "PathFinder.h"
 #include "EditorWindowNames.h"
+#include "EditorSessionState.h"
+#include "SceneManager.h"
+#include "Scene.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -34,10 +39,13 @@ EditorRenderer::EditorRenderer(void* windowHandle, ::editor::window_table& windo
 
     ApplyEditorScale(EditorSettingsStore::Get().Preferences().GetImGuiScale(),
                      m_host->GetWindowDpiScale());
+    m_workspace = std::make_unique<::editor::EditorWorkspaceStore>(windows);
 }
 
 EditorRenderer::~EditorRenderer()
 {
+    if (m_workspace) m_workspace->SaveOnShutdown();
+    m_workspace.reset();
     m_host->Shutdown();
 }
 
@@ -48,8 +56,6 @@ void EditorRenderer::AddEditorFonts()
     // 왜 죽었는지는 `EditorFontResources.h` 머리에 실측과 함께 적었다 —
     // 아이콘 폰트의 `MergeMode` 가 빈 폰트 목록의 끝을 읽었다.
     //
-    // FA6 범위 단정도 그 파일로 옮겼다. 여기에 두면 `fa.h` 와
-    // `IconsFontAwesome6.h` 를 이 TU 가 계속 들어야 한다.
     ::editor::fonts::add_required_font(
         "body", ::editor::fonts::body_candidates(), ::editor::EditorThemeTokens::BodyFontSize);
     ::editor::fonts::merge_icon_font(::editor::EditorThemeTokens::IconFontSize,
@@ -94,6 +100,15 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
         id, ImGuiDir_Down, 0.28f, nullptr, &id);
     const ImGuiID centerViewport = id;
 
+    // W4: 가운데를 central 노드로 **표시한다**. 이 표시가 없으면
+    // `DockBuilderGetCentralNode` 가 널이고(실측 centralNodes=0), 중앙을
+    // 특별하게 다루는 것들이 전부 조용히 닿지 않는다 — 탭 바 억제와
+    // PassthruCentralNode 의 투명 배경이 그렇다.
+    if (ImGuiDockNode* centralNode = ImGui::DockBuilderGetNode(centerViewport))
+    {
+        centralNode->LocalFlags |= ImGuiDockNodeFlags_CentralNode;
+    }
+
     // 자리 이름을 노드로 옮기는 표. `dock_slot` 열거자 순서와 같은 순서이고,
     // 완전성은 static_assert가 지킨다 — 자리를 하나 더 만들면 여기가 컴파일에서
     // 걸린다.
@@ -128,12 +143,16 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
 void EditorRenderer::BeginRender()
 {
     m_uiFrameBegan = std::chrono::steady_clock::now();
+    const bool workspaceReset = m_workspace->BeforeFrame();
     // NewFrame가 현재 폰트 크기를 계산하므로 글자/geometry 배율을 먼저 적용한다.
     const float targetScale = EditorSettingsStore::Get().Preferences().GetImGuiScale();
     const float dpiScale = m_host->GetWindowDpiScale();
     if (m_lastRequestedScale != targetScale || m_lastDpiScale != dpiScale)
         ApplyEditorScale(targetScale, dpiScale);
-    m_host->BeginFrame();
+    {
+        const ::editor::TabStyleScope tabs;
+        m_host->BeginFrame();
+    }
     // ── 메인 독스페이스 ──
     // 구 ImGuiRenderer에서는 #ifndef BUILD_FLAG 안이었다. 지금은 이 파일
     // 자체가 에디터 exe에만 링크되므로 조건이 필요 없다 — 매크로가 하던
@@ -152,6 +171,7 @@ void EditorRenderer::BeginRender()
     ImGui::SetNextWindowPos(nodePos);
     ImGui::SetNextWindowSize(size);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 
     ImGui::Begin("Main DockSpace Window", nullptr,
         ImGuiWindowFlags_NoTitleBar |
@@ -161,38 +181,62 @@ void EditorRenderer::BeginRender()
         ImGuiWindowFlags_NoBringToFrontOnFocus |
         ImGuiWindowFlags_NoNavFocus);
 
-    ImGui::DockSpace(id, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
+    {
+        const ::editor::TabStyleScope tabs;
+        ImGui::DockSpace(id, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
+    }
 
-    ImGui::PopStyleVar(); // 반드시 Begin 이후에 Pop!
+    // W4: 가운데 노드를 **매 프레임 다시 세운다.** 세우는 것은 둘이다 — central
+    // 표시와 탭 바 억제. 탭 바를 끄는 이유는 Host 가 창 하나라 ImGui 가 그 위에 탭
+    // 한 칸짜리 막대를 그리고, Host 본문이 같은 스타일의 모드 막대를 그리므로 두
+    // 줄이 겹치기 때문이다.
+    //
+    // ★ 둘 다 ini 에 저장되는 local flag 이다(`SavedFlagsMask_`). 그래서 도크
+    //   빌더가 돈 프레임에만 세우면 **W4 전에 쓰인 파일을 물린 세션에는 영원히
+    //   central 이 없다** — 배치가 있으면 도크 빌더는 아예 돌지 않고(§W0), 이주는
+    //   없는 비트를 지어낼 수 없다. 게이트의 legacy fixture 넷이 정확히 이것으로
+    //   붉었다. Host 가 들어앉은 노드가 정의상 가운데다 — 그 창은 `no_move` 라 자기
+    //   노드를 떠나지 않으므로 둘이 갈라질 수도 없다.
+    ImGuiDockNode* central = ImGui::DockBuilderGetCentralNode(id);
+    if (nullptr == central)
+    {
+        if (const ImGuiWindow* hostWindow =
+                ImGui::FindWindowByName(EditorWindowName::kViewport))
+        {
+            central = hostWindow->DockNode;
+        }
+    }
+    if (nullptr != central)
+    {
+        central->LocalFlags |= ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar;
+    }
+
+    ImGui::PopStyleVar(2); // 반드시 Begin 이후에 Pop!
 
     ImGui::End();
 
-    // 최초 실행(imgui.ini 없음)에만 기본 도크 레이아웃을 세운다.
-    // ini에는 재생성 경로가 없었다 — 한 번 어긋나면 파일을 손으로 지우는
-    // 것이 유일한 복구여서 Window > Reset Layout이 같은 빌더를 다시
-    // 부를 수 있게 열어 뒀다.
-    const bool resetRequested =
-        s_dockLayoutResetRequested.exchange(false, std::memory_order_acq_rel);
-    if (m_firstLoop || resetRequested)
-    {
-        file::path iniPath = PathFinder::ConfigPath("imgui.ini");
-        if (resetRequested || !file::exists(iniPath))
-        {
-            BuildInitialDockLayout(id, size.x, size.y, nodePos.x, nodePos.y);
-        }
-        m_firstLoop = false;
-    }
+    if (workspaceReset)
+        BuildInitialDockLayout(id, size.x, size.y, nodePos.x, nodePos.y);
+    m_firstLoop = false;
+
 }
 
 std::atomic_bool EditorRenderer::s_dockLayoutResetRequested{ false };
 
 void EditorRenderer::RequestDockLayoutReset() noexcept
 {
-    s_dockLayoutResetRequested.store(true, std::memory_order_release);
+    ::editor::request_workspace_action(::editor::workspace_action::reset);
 }
 
 void EditorRenderer::Render()
 {
+    if (!SceneManagers->IsSceneLoading())
+    {
+        auto* scene = SceneManagers->GetActiveScene();
+        auto* selected = scene ? scene->m_selectedEntity : nullptr;
+        EditorSessionState::Get().SelectionHistory().Observe(scene ? scene->GetSceneId() : 0,
+            selected && !selected->IsDestroyMark() ? scene->HandleOf(selected->m_index) : EntityHandle{});
+    }
     EditorAssetPresentation::Get().OpenPendingTextureImportSelector();
 
     // PHASE 21 M4(부록 B.3): 창 프레임을 여는 곳은 여기 하나다.
@@ -205,6 +249,18 @@ void EditorRenderer::Render()
     // 자리가 BeginRender 뒤인 이유는 그대로다 — 도크스페이스가 이미 서 있어야
     // 창이 자기 도크 노드를 찾는다.
     ::editor::draw_windows(*m_windows);
+    ::editor::draw_workspace_dialog();
+
+    // Select after all Begin calls: both restored and newly built dock tabs now
+    // exist. Applying this once also avoids Game's first-appearance focus winning.
+    if (m_selectSceneOnStartup)
+    {
+        if (ImGuiWindow* scene = ImGui::FindWindowByName(EditorWindowName::kViewport))
+        {
+            ImGui::FocusWindow(scene);
+            m_selectSceneOnStartup = false;
+        }
+    }
 }
 
 void EditorRenderer::EndRender()
@@ -219,6 +275,8 @@ void EditorRenderer::EndRender()
     // `Pump()` 에서 도는데(`App.cpp`) ImGui 프레임은 이 스레드(Presentation)
     // 것이라, 명령이 `ImGui::` 를 직접 부르면 `NewFrame`~`Render` 한복판의
     // 전역 문맥을 읽는 경합이 된다.
+    ::editor::windows::publish_viewport_demand();
+    m_workspace->EndFrame();
     const bool captured = ::editor::capture_chrome_snapshot();
 
     const std::chrono::steady_clock::time_point uiFrameEnded =

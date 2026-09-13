@@ -41,10 +41,14 @@ undocked 0 · 노드 7). 이유를 실측했다 — ImGui는 각 `[Window]` 항�
 
 `damaged-halfwritten.ini`는 같은 파일을 **250바이트에서** 잘랐다. 창 항목이 셋만 남고 DockId도
 셋뿐이며 `[Docking]` 섹션이 통째로 없다. Hierarchy·Inspector·AssetBundle·Content Browser는
-ini에 **아예 없다.** ini가 존재하면 도크 빌더가 돌지 않으므로(`EditorRenderer.cpp`) 그 창들은
-붙을 자리를 못 찾는다 — 이것이 "손상된 layout은 사용자 파일을 잃지 않고 기본 preset으로
-복구된다"는 W3 판정이 실제로 상대할 상태다. 지금은 복구 경로가 없어 게이트가 값을 **기록만**
-한다.
+ini에 **아예 없다.** 이것이 "손상된 layout은 사용자 파일을 잃지 않고 기본 preset으로 복구된다"는
+W3 판정이 실제로 상대할 상태다.
+
+**(2026-09-13 W3 착지.)** 둘 다 `validate_ini`가 거부하고 `EditorWorkspaceStore`가 복구 경로로
+내려간다 — 원본은 손대지 않고 `legacy.ini.pre-workspace-v1`로 한 벌 남긴 뒤 기본 배치를 세운다.
+게이트는 이제 기록이 아니라 **단정**한다(`recovered=true` · 원본 바이트 동일 · 백업 존재 ·
+`undocked=0 ghost=0` · 대체 workspace 생성). 거부 사유는 둘이 다르다 — `truncated`는 창이
+없어진 노드를 가리켜서, `halfwritten`은 `[Docking]` 섹션이 통째로 없어 뿌리가 0이라서다.
 
 ## 이진으로 두는 이유
 
@@ -59,4 +63,5 @@ ini에 **아예 없다.** ini가 존재하면 도크 빌더가 돌지 않으므�
 둔다 — 낡은 파일을 만났을 때 무슨 일이 벌어지는지가 재는 대상이기 때문이다. 새 상태를 재고
 싶으면 새 파일을 채집해 표에 줄을 더하라.
 
-게이트: `Tools/regression/verify-editor-workspace.ps1`
+게이트 둘이 이 폴더를 읽는다 — `Tools/regression/verify-editor-workspace-storage.ps1`(형식만, 에디터
+없이) 과 `Tools/regression/verify-editor-workspace.ps1`(살아 있는 에디터에 물려 본다).

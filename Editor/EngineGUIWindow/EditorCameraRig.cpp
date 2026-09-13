@@ -6,6 +6,17 @@
 #include <cmath>
 #include <mathematics/transform.hpp>
 
+void EditorCameraRig::SetPose(const math::vector3& position, const math::quaternion& rotation) noexcept
+{
+	m_camera.m_eyePosition = position;
+	m_camera.rotate = math::normalize(rotation);
+	m_camera.m_forward = math::normalize(math::rotate(Camera::FORWARD, m_camera.rotate));
+	m_camera.m_up = math::normalize(math::rotate(Camera::UP, m_camera.rotate));
+	m_camera.m_right = math::normalize(math::rotate(Camera::RIGHT, m_camera.rotate));
+	SetOrientation(std::atan2(m_camera.m_forward.x, m_camera.m_forward.z),
+		-std::asin(std::clamp(m_camera.m_forward.y, -1.f, 1.f)));
+}
+
 void EditorCameraRig::HandleMovement(float deltaTime)
 {
 	float x = 0.f, y = 0.f, z = 0.f;

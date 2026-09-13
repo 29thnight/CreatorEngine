@@ -17,8 +17,7 @@
 #include "DataSystem.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
 #include "ExternUI.h"
 #include <d3d11shader.h>
 #include <algorithm>
@@ -77,12 +76,12 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			ImGui::Button("No Material", ImVec2(250, 0));
 		}
 		ImGui::SameLine();
-        if (ImGui::Button(ICON_FA_BOX))
+        if (ImGui::Button(EditorIcon::AssetPicker))
         {
             EditorAssetPresentation::Get().OpenMaterialPicker();
         }
         ImGui::SameLine();
-        if (ImGui::Button(ICON_FA_ELLIPSIS))
+        if (ImGui::Button(EditorIcon::More))
         {
                 ImGui::OpenPopup("MaterialMenu");
         }
@@ -413,7 +412,7 @@ namespace
 		}
 
 		ImRect bb(minRect, maxRect);
-		if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget")))
+		if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget")))
 		{
 			if (const ImGuiPayload* payload =
 				ImGui::AcceptDragDropPayload("Texture"))

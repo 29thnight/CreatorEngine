@@ -9,9 +9,10 @@
 #include <Windows.h>
 
 #include "ImGui.h"
-#include "IconsFontAwesome6.h"
+#include "EditorIcons.h"
+#include "EditorIconAlignment.h"
+#include "EditorTextFallback.h"
 #include "PathFinder.h"
-#include "fa.h"
 
 #include <filesystem>
 #include <string>
@@ -41,6 +42,11 @@ namespace editor::fonts
             "batang.ttc",
             "segoeui.ttf",
         };
+
+        // UI private-use slots belong to icons, including Inter's PUA alternates.
+        // ImGui 1.92 caps GlyphExcludeRanges at 64 values; use one persistent range.
+        constexpr ImWchar kIconExclusions[]{ 0xe000, 0xf8ff, 0 };
+        static_assert(std::size(kIconExclusions) <= 64);
 
         std::vector<loaded_font>& store()
         {
@@ -92,6 +98,7 @@ namespace editor::fonts
                 const std::string filename(utf8.begin(), utf8.end());
                 ImFontConfig config;
                 config.Flags |= ImFontFlags_NoLoadError;
+                config.GlyphExcludeRanges = kIconExclusions;
                 result.font = io.Fonts->AddFontFromFileTTF(
                     filename.c_str(), size_pixels, &config);
                 if (nullptr != result.font)
@@ -108,11 +115,36 @@ namespace editor::fonts
                 result.resolved_path.clear();
                 if (required)
                 {
-                    result.font = io.Fonts->AddFontDefault();
+                    ImFontConfig config;
+                    config.SizePixels = size_pixels;
+                    config.GlyphExcludeRanges = kIconExclusions;
+                    result.font = io.Fonts->AddFontDefault(&config);
                     result.used_fallback = true;
                 }
             }
 
+            // A separate Korean font used by menus does not cover the body's
+            // SerializeField labels. Each text face needs its own fallback source.
+            if (result.font && !result.font->IsGlyphInFont(0xAC00))
+            {
+                loaded_font fallback;
+                fallback.role = std::string(role) + "-korean-fallback";
+                fallback.size_pixels = size_pixels;
+                for (const char* candidate : kKoreanCandidates)
+                {
+                    ++fallback.candidates_tried;
+                    const auto path = expand_font_candidate(candidate);
+                    std::error_code error;
+                    if (!std::filesystem::is_regular_file(path, error)) continue;
+                    const auto utf8 = path.u8string();
+                    const std::string filename(utf8.begin(), utf8.end());
+                    if (!merge_korean_fallback(*io.Fonts, filename.c_str(), size_pixels)) continue;
+                    fallback.resolved_path = filename;
+                    fallback.font = result.font;
+                    break;
+                }
+                store().push_back(std::move(fallback));
+            }
             store().push_back(result);
             return result;
         }
@@ -173,27 +205,13 @@ namespace editor::fonts
                                   std::span<const char* const> candidates,
                                   float size_pixels)
     {
-        return add_font(role, candidates, size_pixels, false);
+        auto result = add_font(role, candidates, size_pixels, false);
+        if (result.font) result.icon_merged = merge_icon_font(size_pixels);
+        return result;
     }
 
     bool merge_icon_font(float size_pixels, float baseline_offset_pixels)
     {
-        // ★ 아이콘 범위는 **적재하는 블롭과 같은 판**이어야 한다.
-        //
-        // `IconsFontAwesome4.h` 와 `6.h` 가 `ICON_MIN_FA`/`ICON_MAX_FA` 를 서로
-        // 다른 값으로 정의한다(FA4 0xf000~0xf2e0 · FA6 0xe005~0xf8ff). 이
-        // 프로젝트는 유니티 빌드라 같은 blob 안의 다른 TU 가 FA4 를 들이면 여기
-        // 값이 조용히 좁아지고, 그러면 0xf000 아래의 FA6 아이콘(예: Hierarchy 의
-        // `ICON_FA_BARS_STAGGERED` U+e0d7)이 아틀라스에 실리지 않아 **네모로
-        // 그려진다.** 실행해도 예외가 나지 않으므로 컴파일 시점에 막는다.
-        //
-        // FA4 헤더는 은퇴시켰다(2026-09-11, W1). 이 단정은 그것이 되돌아오는 것을
-        // 막는 자물쇠다 — `static_assert` 라서 Release 에서도 사라지지 않는다.
-        static_assert(0xe005 == ICON_MIN_FA && 0xf8ff == ICON_MAX_FA,
-            "아이콘 범위가 FA6 의 값이 아니다. 같은 유니티 blob 안의 TU 가 "
-            "IconsFontAwesome4.h 를 들였을 가능성이 높다 — 폰트 블롭은 FA6 하나뿐이므로 "
-            "헤더도 IconsFontAwesome6.h 하나로 맞춰라");
-
         ImGuiIO& io = ImGui::GetIO();
 
         // ★ 이 한 줄이 빈 폰트 목록에 병합하다 나는 ACCESS_VIOLATION 을 막는다.
@@ -207,36 +225,28 @@ namespace editor::fonts
             return false;
         }
 
-        // ★ 대상이 **암묵 참조 크기**면 크기를 넘기면 안 된다.
-        //
-        // 1.92.8 의 표(imgui_draw.cpp:3111):
-        //
-        //                 | 대상 암묵 | 대상 명시 |
-        //   더하기 암묵   | OK        | OK        |
-        //   더하기 명시   | **KO**    | OK        |
-        //
-        // 암묵 크기를 세우는 것은 `AddFontDefault` 뿐이다. 즉 이 조합은 본문
-        // 폰트가 후보를 다 놓쳐 기본 폰트로 내려갔을 때 정확히 일어난다 —
-        // **대비 경로로 내려가는 순간 어서션에서 죽는 대비**였다. 2026-09-11 에
-        // 실측으로 걸렸다(imgui_draw.cpp:3115). 대비가 서려면 이 분기가 있어야
-        // 한다.
         ImFont* const destination = io.Fonts->Fonts.back();
-        const bool destination_is_implicit =
-            (nullptr != destination) &&
-            (0 != (destination->Flags & ImFontFlags_ImplicitRefSize));
-        const float merge_size = destination_is_implicit ? 0.0f : size_pixels;
 
-        static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-        ImFontConfig icons_config;
-        icons_config.MergeMode = true;
-        icons_config.GlyphOffset.y = baseline_offset_pixels;
-        const bool merged = nullptr != io.Fonts->AddFontFromMemoryCompressedTTF(
-            FA_compressed_data, FA_compressed_size, merge_size,
-            &icons_config, icons_ranges);
-
-        if (merged && !store().empty())
+        const std::filesystem::path path = expand_font_candidate(EditorIcon::FontPath);
+        std::error_code error;
+        if (!std::filesystem::is_regular_file(path, error)) return false;
+        const std::u8string utf8 = path.u8string();
+        const std::string filename(utf8.begin(), utf8.end());
+        // This static subset contains only the selected PUA codepoints, no text/ligatures.
+        // FA is not merged: the two families assign different symbols to the same codepoints.
+        const bool merged = nullptr != merge_aligned_icons(*io.Fonts,
+            filename.c_str(), size_pixels, baseline_offset_pixels);
+        if (merged)
         {
-            store().back().icon_merged = true;
+            for (auto& loaded : store()) if (loaded.font == destination) loaded.icon_merged = true;
+            loaded_font icon;
+            icon.role = "icons";
+            icon.resolved_path = filename;
+            icon.size_pixels = size_pixels;
+            icon.candidates_tried = 1;
+            icon.icon_merged = true;
+            icon.font = destination;
+            store().push_back(std::move(icon));
         }
         return merged;
     }

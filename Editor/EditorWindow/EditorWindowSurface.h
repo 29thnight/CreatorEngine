@@ -92,7 +92,11 @@ namespace editor
     enum class window_stacking
     {
         normal,
-        display_back,   // BringWindowToDisplayBack — Scene · Game · Hierarchy · Inspector
+        // BringWindowToDisplayBack. W4 가 마지막 소비자(Scene · Game)를 걷었다 —
+        // 매 프레임 강제로 맨 뒤로 보내는 것은 자유 도킹과 충돌하고, 가운데
+        // 노드가 서면 필요도 없다(§1.5). 기구는 남긴다: 자가 검사가 이 값을
+        // 태우고 있고, 지우면 "쓰는 곳이 없다" 와 "지워서 못 쓴다" 가 섞인다.
+        display_back,
         focus_front,    // BringWindowToFocusFront + BringWindowToDisplayFront — Frame Profiler
 
         count,

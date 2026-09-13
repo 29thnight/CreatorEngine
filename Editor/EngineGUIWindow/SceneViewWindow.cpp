@@ -12,8 +12,7 @@
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "GizmoRenderer.h"
 #include "ImGuizmo.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
 #include "Scene.h"
 #include "Camera.h"
 #include "GameObjectCommand.h"
@@ -24,17 +23,8 @@
 #include "Entity.h"
 #include <cstdio>
 
-namespace
-{
-    // ImGuizmo 뷰 큐브는 씬뷰 우상단 128px 정사각을 차지한다. 프레임 정보
-    // 오버레이가 그 아래로 내려가야 해서 두 소비자가 같은 값을 본다 —
-    // 숫자를 각자 적었더니 오버레이가 큐브에 덮여 읽히지 않았다.
-    constexpr float kViewCubeSize = 128.f;
-    constexpr float kViewCubeTopMargin = 16.f;
-}
 #include <unordered_map>
 #include "DataSystem.h"
-#include "RenderState.h"
 #include "PrefabUtility.h"
 #include "InputManager.h"
 #include "Terrain.h"
@@ -49,26 +39,6 @@ namespace
 #include <cmath>
 #include <cstring>
 #include <mathematics/transform.hpp>
-
-int gizmoCount = 1;
-float camDistance = 8.f;
-static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
-
-
-static const float identityMatrix[16] = {
-	1.f, 0.f, 0.f, 0.f,
-	0.f, 1.f, 0.f, 0.f,
-	0.f, 0.f, 1.f, 0.f,
-	0.f, 0.f, 0.f, 1.f
-};
-
-enum class SelectGuizmoMode
-{
-	Select,
-	Translate,
-	Rotate,
-	Scale
-};
 
 bool RayIntersectsPlane(const Ray& ray, const math::vector3& planeNormal, const math::vector3& planePoint, float& outDistance)
 {
@@ -112,6 +82,7 @@ void SceneViewWindow::RenderSceneViewWindow()
 	m_gizmoRenderer = GizmoRenderer::GetActive();
 
 	auto scene = SceneManagers->GetActiveScene();
+	if (!scene || !m_editorCamera) return;
 	auto obj = scene->GetSelectedEntity();
 	if (obj)
 	{
@@ -170,312 +141,68 @@ static math::matrix4x4 ResolveParentWorldMatrix(const Entity* obj)
 
 void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, Entity* obj, Camera* cam)
 {
-	static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
-	static bool useSnap = false;
-	static float snap[3] = { 1.f, 1.f, 1.f };
-	static float bounds[] = { -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f };
-	static float boundsSnap[] = { 0.1f, 0.1f, 0.1f };
-	static bool boundSizing = false;
-	static bool boundSizingSnap = false;
-	static bool selectMode = false;
-	static Entity* selected = nullptr;
-	static enum class SelectGuizmoMode selectGizmoMode = SelectGuizmoMode::Translate;
-	static const char* buttons[] = {
-		ICON_FA_EYE,
-		ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT,
-		ICON_FA_ARROWS_ROTATE,
-		ICON_FA_GROUP_ARROWS_ROTATE,
-	};
-	static const int buttonCount = sizeof(buttons) / sizeof(buttons[0]);
+    const ImVec2 imageMin = ImGui::GetCursorScreenPos();
+    const ImVec2 imageSize = ImGui::GetContentRegionAvail();
+    if (imageSize.x <= 0.f || imageSize.y <= 0.f) return;
+    const ImVec2 imageMax{imageMin.x + imageSize.x, imageMin.y + imageSize.y};
+    const auto displayed = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Editor);
+    m_canvas = editor::LayoutViewportCanvas(editor::viewport_fit::crop, imageMin, imageSize,
+        {static_cast<float>(displayed.width), static_cast<float>(displayed.height)}, ImGui::GetIO().DisplayFramebufferScale);
+    // Reserve the canvas without taking ImGui's active/hovered item: transform
+    // gizmos must be able to acquire the mouse over the rendered image.
+    ImGui::Dummy(imageSize);
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(imageMin, imageMax, IM_COL32(20, 20, 23, 255));
+    // W4: 표시 신호를 Game 쪽과 같은 2단으로 읽는다. `active` 는 "그릴 카메라가
+    // 있는가", 텍스처 ID 는 "그림이 준비됐는가" 이고 둘은 다른 프레임에 참이 된다.
+    // 예전에는 씬 쪽이 둘째만 보아서, 카메라가 없는 것과 첫 프레임을 기다리는 것이
+    // 똑같이 빈 검정으로 보였다 — 모드가 하나로 합쳐진 뒤에는 그 구분이 더 필요하다.
+    // 스냅샷을 값으로 받는다 — `Get` 이 돌려주는 참조를 임시 객체에서 바로 묶으면
+    // 그 임시가 문장 끝에 죽어 매달린 참조가 된다.
+    const EnhancedLiveDisplaySnapshot displaySnapshot =
+        EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+    if (!displaySnapshot.Get(EnhancedLiveDisplayTarget::Editor).active)
+    {
+        const char* noCamera = "No editor camera";
+        const ImVec2 textSize = ImGui::CalcTextSize(noCamera);
+        draw->AddText({ imageMin.x + (imageSize.x - textSize.x) * .5f,
+                        imageMin.y + (imageSize.y - textSize.y) * .5f },
+            ImGui::GetColorU32(ImVec4(1.f, 0.f, 0.f, 1.f)), noCamera);
+    }
+    else if (displayed.textureId && m_canvas.valid)
+    {
+        draw->AddImage(displayed.textureId, m_canvas.clipMin, m_canvas.clipMax,
+            m_canvas.uvMin, m_canvas.uvMax);
+    }
+    ImGuizmo::BeginFrame();
+    ImGuizmo::SetDrawlist();
+    m_overlay.Draw(imageMin, imageMax, *m_editorCameraRig, m_gizmoRenderer, m_canvas);
+    if (!m_canvas.valid) return;
+    // 기즈모는 image 사각형을 받는다 — 잘린 부분까지 포함한 소스 전체의 자리라야
+    // 화면 밖으로 밀려난 조작점의 투영이 맞는다. 제목표시줄 보정은 없다(원점이 content).
+    const ImVec2 imageExtent = m_canvas.ImageExtent();
+    ImGuizmo::SetRect(m_canvas.imageMin.x, m_canvas.imageMin.y, imageExtent.x, imageExtent.y);
+    ImGuizmo::SetOrthographic(cam->m_isOrthographic);
+    const auto view = cam->CalculateView();
+    const auto projection = cam->CalculateProjectionForAspect(m_canvas.sourceAspect);
+    std::memcpy(cameraView, &view.m[0][0], sizeof(view));
+    std::memcpy(cameraProjection, &projection.m[0][0], sizeof(projection));
+    const bool selectMode = m_overlay.operation == 0;
+    const ImGuizmo::OPERATION operations[]{ImGuizmo::TRANSLATE, ImGuizmo::TRANSLATE, ImGuizmo::ROTATE, ImGuizmo::SCALE};
+    const auto mCurrentGizmoOperation = operations[m_overlay.operation];
+    const auto mCurrentGizmoMode = m_overlay.local ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+    float* activeSnap = m_overlay.ActiveSnap();
+    float snap[3]{activeSnap ? *activeSnap : 1.f, activeSnap ? *activeSnap : 1.f, activeSnap ? *activeSnap : 1.f};
+    const bool useSnap = activeSnap != nullptr;
+    const bool pointerInCanvas = ImGui::IsMouseHoveringRect(m_canvas.clipMin, m_canvas.clipMax) &&
+        ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    const bool canvasInput = pointerInCanvas && !m_overlay.blocksPointer;
 
-
-	ImGuizmo::SetOrthographic(m_editorCamera->m_isOrthographic);
-	ImGuizmo::BeginFrame();
-	bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
-	bool rightMouse = InputManagement->IsMouseButtonPressed(MouseKey::RIGHT) || ImGui::IsMouseDown(ImGuiMouseButton_Right);
-
-	if(!ctrl && !rightMouse)
-	{
-		if (ImGui::IsKeyPressed(ImGuiKey_W))
-			selectGizmoMode = SelectGuizmoMode::Translate;
-		if (ImGui::IsKeyPressed(ImGuiKey_E))
-			selectGizmoMode = SelectGuizmoMode::Rotate;
-		if (ImGui::IsKeyPressed(ImGuiKey_R)) // r Key
-			selectGizmoMode = SelectGuizmoMode::Scale;
-		if (ImGui::IsKeyPressed(ImGuiKey_T))
-			useSnap = !useSnap;
-		if (ImGui::IsKeyPressed(ImGuiKey_Q))
-			selectGizmoMode = SelectGuizmoMode::Select;
-	}
-
-	ImGuiIO& io = ImGui::GetIO();
-	float viewManipulateRight = io.DisplaySize.x;
-	float viewManipulateTop = 0;
-	float windowTopLeftX = 0;
-	float windowTopLeftY = 0;
-	ImVec2 imageMin{};
-	ImVec2 imageMax{};
-	float windowWidth = 0;
-	float windowHeight = 0;
-
-	// PHASE 21 M4 3단계: 프레임은 셸이 연다. 창 성질(NoMove 넷)과 창 배경·
-	// 창 여백, 표시 순서(BringWindowToDisplayBack)는 선언으로 갔다
-	// (EditorViewportWindows.h). 여기 남은 둘은 `Begin`이 소비하지 않고
-	// 본문 항목에 걸리는 것이라 본문의 것이다.
-	//
-	// `useWindow` 전역과 `gizmoWindowFlags |= NoMove` 누적은 함께 지웠다 —
-	// 전자는 항상 참이었고 후자는 초기값에 이미 같은 비트가 있었다.
-	{
-		// 뷰포트 영상/기즈모는 빈틈 없이 겹친다. 배경 영상이 보이도록 alpha만 낮춘다.
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-		ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::PanelRaised, 0.8f));
-		ImGuizmo::SetDrawlist();
-
-		windowWidth = (float)ImGui::GetWindowWidth();
-		windowHeight = (float)ImGui::GetWindowHeight();
-		windowTopLeftX = ImGui::GetWindowPos().x;
-		windowTopLeftY = ImGui::GetWindowPos().y;
-		float titleBarHeight = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2;
-		ImGuizmo::SetRect(windowTopLeftX, windowTopLeftY + titleBarHeight, windowWidth, windowHeight);
-		viewManipulateRight = ImGui::GetWindowPos().x + windowWidth;
-		viewManipulateTop = ImGui::GetWindowPos().y;
-
-		float x = windowWidth;
-		float y = windowHeight;
-
-		auto scene = SceneManagers->GetRenderScene();
-
-		// EnhancedRenderer가 유일한 표시 공급자다. 첫 GPU 프레임 전에는
-		// 명시적인 준비 배경을 그리며 DX11 RenderPassData로 폴백하지 않는다.
-		ImTextureID displayed = 0;
-		if (const uint64_t liveTextureId =
-			EnhancedSceneRenderer::GetLiveDisplayImTextureId(
-				EnhancedLiveDisplayTarget::Editor))
-		{
-			displayed = (ImTextureID)liveTextureId;   // DX12 셸 — 공유 텍스처 직결
-		}
-		if (displayed != 0)
-		{
-			ImGui::Image(displayed, ImVec2(x, y));
-		}
-		else
-		{
-			const ImVec2 min = ImGui::GetCursorScreenPos();
-			const ImVec2 max{ min.x + x, min.y + y };
-			ImGui::InvisibleButton("##EnhancedRendererPending", ImVec2(x, y));
-			ImGui::GetWindowDrawList()->AddRectFilled(min, max,
-				ImGui::GetColorU32(ImVec4(0.08f, 0.08f, 0.09f, 1.f)));
-		}
-		imageMin = ImGui::GetItemRectMin();
-		imageMax = ImGui::GetItemRectMax();
-
-		ImVec2 imagePos = ImGui::GetItemRectMin();
-		ImGui::SetCursorScreenPos(ImVec2(imagePos.x + 5, imagePos.y + 5));
-
-		if (ImGui::Button(ICON_FA_CHART_BAR))
-		{
-			ImGui::OpenPopup("RenderStatistics");
-		}
-
-		ImGui::SameLine();
-		ImVec2 currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
-		if (ImGui::Button(ICON_FA_BARS " Grid"))
-		{
-			editor::open_window(EditorWindowName::kGridSettings);
-		}
-
-		ImGui::SameLine();
-
-		currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
-
-		if (ImGui::Button(m_editorCamera->m_isOrthographic ? ICON_FA_EYE_LOW_VISION " Orthographic" : ICON_FA_ARROWS_TO_EYE " Perspective"))
-		{
-			m_editorCamera->m_isOrthographic = !m_editorCamera->m_isOrthographic;
-		}
-
-		ImGui::SameLine();
-		currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
-
-		if (ImGui::Button(ICON_FA_CAMERA " Camera"))
-		{
-			ImGui::OpenPopup("CameraSettings");
-		}
-
-
-
-		ImGui::SameLine();
-		currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(windowWidth - 270.f, currentPos.y));
-		for (int i = 0; i < buttonCount; i++)
-		{
-			if (i == (int)selectGizmoMode)
-			{
-				ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::Primary, 0.8f));
-			}
-			else
-			{
-				ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::PanelRaised, 0.8f));
-			}
-
-			if (ImGui::Button(buttons[i]))
-			{
-				selectGizmoMode = (SelectGuizmoMode)i;
-			}
-
-			ImGui::SameLine();
-			currentPos = ImGui::GetCursorScreenPos();
-			ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
-			ImGui::PopStyleColor();
-		}
-
-		ImGui::SameLine();
-		currentPos = ImGui::GetCursorScreenPos();
-		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 5, currentPos.y));
-		if (useSnap)
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::Primary, 0.8f));
-		}
-		else
-		{
-			ImGui::PushStyleColor(ImGuiCol_Button, editor::ThemeColorValue(editor::ThemeColor::PanelRaised, 0.8f));
-		}
-
-		if (ImGui::Button(ICON_FA_BORDER_ALL " Snap"))
-		{
-			useSnap = !useSnap;
-		}
-		ImGui::SetCursorScreenPos(ImVec2(currentPos.x + 1, currentPos.y));
-		ImGui::PopStyleColor();
-
-		// ── 프레임 정보 오버레이 ──
-		//
-		// 이 값들은 OS 창 제목에 문자열로 붙어 있었다(2026-09-10 이전).
-		// 매 프레임 SetWindowText를 때리는데 정작 작업 표시줄에서는 잘려
-		// 읽히지 않았고, 창 제목이 프로젝트 신원을 말하지도 못했다.
-		// 재는 대상 위에 겹쳐 두는 것이 읽는 자리로도 맞다.
-		//
-		// 위젯이 아니라 드로 리스트로 그린다 — 뷰포트 위 어떤 입력도
-		// 가로채면 안 되고, 기즈모 조작이 바로 이 자리에서 일어난다.
-		{
-			const int framesPerSecond = Time->GetFramesPerSecond();
-			const float milliseconds = framesPerSecond > 0
-				? 1000.f / static_cast<float>(framesPerSecond) : 0.f;
-
-			char overlay[96]{};
-			std::snprintf(overlay, sizeof(overlay), "%d FPS  %.2f ms\n%u x %u",
-				framesPerSecond, milliseconds,
-				ScreenResizeBus::Get().GetWidth(),
-				ScreenResizeBus::Get().GetHeight());
-
-			const ImVec2 textSize = ImGui::CalcTextSize(overlay);
-			const ImVec2 padding{ 8.f, 5.f };
-			// 뷰 큐브 아래로 내린다. 큐브는 창 상단을 기준으로 놓이므로
-			// 이미지 상단이 아니라 창 상단에서 잰다.
-			const float overlayTop =
-				windowTopLeftY + kViewCubeTopMargin + kViewCubeSize + 8.f;
-			const ImVec2 boxMin{
-				imageMax.x - 10.f - textSize.x - padding.x * 2.f, overlayTop };
-			const ImVec2 boxMax{ imageMax.x - 10.f,
-				overlayTop + textSize.y + padding.y * 2.f };
-
-			ImDrawList* const overlayDrawList = ImGui::GetWindowDrawList();
-			overlayDrawList->AddRectFilled(boxMin, boxMax,
-				IM_COL32(18, 18, 20, 190), 4.f);
-			overlayDrawList->AddRect(boxMin, boxMax,
-				IM_COL32(61, 61, 66, 255), 4.f);
-			overlayDrawList->AddText(
-				ImVec2(boxMin.x + padding.x, boxMin.y + padding.y),
-				IM_COL32(214, 214, 217, 255), overlay);
-		}
-
-
-		if (editTransformDecomposition)
-		{
-			switch (selectGizmoMode)
-			{
-			case SelectGuizmoMode::Select:
-				selectMode = true;
-				break;
-			case SelectGuizmoMode::Translate:
-				mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-				selectMode = false;
-				break;
-			case SelectGuizmoMode::Rotate:
-				mCurrentGizmoOperation = ImGuizmo::ROTATE;
-				selectMode = false;
-				break;
-			case SelectGuizmoMode::Scale:
-				mCurrentGizmoOperation = ImGuizmo::SCALE;
-				selectMode = false;
-				break;
-			default:
-				break;
-			}
-		}
-
-		ImGui::PopStyleVar(1);   // ItemSpacing — WindowPadding은 셸이 든다
-
-		// 카메라/통계 팝업은 영상 위에서 같은 반투명 overlay를 쓴다.
-		ImGui::PushStyleColor(ImGuiCol_PopupBg, editor::ThemeColorValue(editor::ThemeColor::Panel, 0.8f));
-		ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), 0.0f);
-		if (ImGui::BeginPopup("CameraSettings"))
-		{
-			ImGui::Text("Camera Settings");
-			ImGui::Separator();
-			ImGui::InputFloat("FOV  ", &cam->m_fov);
-			if (0 == cam->m_fov)
-			{
-				cam->m_fov = 1.f;
-			}
-			ImGui::InputFloat("Near Plane  ", &cam->m_nearPlane);
-			ImGui::InputFloat("Far Plane  ", &cam->m_farPlane);
-			ImGui::DragFloat("Width", &cam->m_viewWidth);
-			ImGui::DragFloat("Hight", &cam->m_viewHeight);
-			ImGui::DragFloat("Camera Speed", m_editorCameraRig->SpeedPtr(), 0.1f, 0.f, 200.f);
-			ImGui::EndPopup();
-		}
-
-		if (ImGui::BeginPopup("RenderStatistics"))
-		{
-			ImGui::Text("Render Statistics");
-			ImGui::Separator();
-			ImGui::Text("FPS: %d", Time->GetFramesPerSecond());
-			ImGui::Text("Screen Size: %u x %u", ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
-			// ★ DX11 드로우콜 카운터를 걷었다 (D4). DX11 드로우가 사라진 뒤로
-			//   이 값은 늘 0이었다 - 0은 "안 그렸다"와 "셀 수 없다"를 구분해
-			//   주지 않는다. DX12 패스별 통계는 Settings > Pipeline Setting에 있다.
-			ImGui::Separator();
-			ImGui::Text("ShadowMapPass: %.5f ms", RenderStatistics->GetRenderState("ShadowMapPass"));
-			ImGui::Text("GBufferPass: %.5f ms", RenderStatistics->GetRenderState("GBufferPass"));
-			ImGui::Text("SSAOPass: %.5f ms", RenderStatistics->GetRenderState("SSAOPass"));
-			ImGui::Text("DeferredPass: %.5f ms", RenderStatistics->GetRenderState("DeferredPass"));
-			ImGui::Text("SSGIPass: %.5f ms", RenderStatistics->GetRenderState("SSGIPass"));
-			ImGui::Text("ForwardPass: %.5f ms", RenderStatistics->GetRenderState("ForwardPass"));
-			ImGui::Text("LightMapPass: %.5f ms", RenderStatistics->GetRenderState("LightMapPass"));
-			ImGui::Text("WireFramePass: %.5f ms", RenderStatistics->GetRenderState("WireFramePass"));
-			ImGui::Text("SkyBoxPass: %.5f ms", RenderStatistics->GetRenderState("SkyBoxPass"));
-			ImGui::Text("BloomPass: %.5f ms", RenderStatistics->GetRenderState("PostProcessPass"));
-			ImGui::Text("AAPass: %.5f ms", RenderStatistics->GetRenderState("AAPass"));
-			ImGui::Text("ToneMapPass: %.5f ms", RenderStatistics->GetRenderState("ToneMapPass"));
-			ImGui::Text("SpritePass: %.5f ms", RenderStatistics->GetRenderState("SpritePass"));
-			ImGui::Text("UIPass: %.5f ms", RenderStatistics->GetRenderState("UIPass"));
-			ImGui::Text("BlitPass: %.5f ms", RenderStatistics->GetRenderState("BlitPass"));
-
-			ImGui::Text("SSR: %.5f ms", RenderStatistics->GetRenderState("ScreenSpaceReflectionPass"));
-			ImGui::Text("SSS: %.5f ms", RenderStatistics->GetRenderState("SubsurfaceScatteringPass"));
-			ImGui::Text("Vignette: %.5f ms", RenderStatistics->GetRenderState("VignettePass"));
-			ImGui::Text("ColorGrading: %.5f ms", RenderStatistics->GetRenderState("ColorGradingPass"));
-			ImGui::Text("VolumetricFog: %.5f ms", RenderStatistics->GetRenderState("VolumetricFogPass"));
-			ImGui::EndPopup();
-		}
-		ImGui::PopFont();
-		ImGui::PopStyleColor();
-	}
-
-    if (obj && !selectMode)
+    auto* editScene = SceneManagers->GetActiveScene();
+    const bool selectionEditable = !EditorObjectOperations::IsEditLocked(obj, true) &&
+        std::all_of(editScene->m_selectedEntities.begin(), editScene->m_selectedEntities.end(),
+            [](Entity* entity) { return entity && !EditorObjectOperations::IsEditLocked(entity, true); });
+    if (obj && selectionEditable && !selectMode && (!m_overlay.blocksPointer || ImGuizmo::IsUsing()))
     {
 		auto scene = SceneManagers->GetActiveScene();
 		auto& selectedObjects = scene->m_selectedEntities;
@@ -509,8 +236,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			math::matrix4x4 deltaMat = math::matrix4x4::identity();
 			ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 				&deltaMat.m[0][0], useSnap ? &snap[0] : nullptr,
-				boundSizing ? bounds : nullptr,
-				boundSizingSnap ? boundsSnap : nullptr);
+				nullptr, nullptr);
 
 			const bool matrixChanged =
 				!(deltaMat == math::matrix4x4::identity());
@@ -569,8 +295,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			math::matrix4x4 deltaMat = math::matrix4x4::identity();
 			ImGuizmo::Manipulate(cameraView, cameraProjection, mCurrentGizmoOperation, mCurrentGizmoMode, matrix,
 				&deltaMat.m[0][0], useSnap ? &snap[0] : nullptr,
-				boundSizing ? bounds : nullptr,
-				boundSizingSnap ? boundsSnap : nullptr);
+				nullptr, nullptr);
 
 			math::matrix4x4 manipulatedWorld{};
 			std::memcpy(&manipulatedWorld.m[0][0], matrix, sizeof(manipulatedWorld));
@@ -616,31 +341,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
     }
 
-	ImGuizmo::ViewManipulate(cameraView, camDistance, ImVec2(viewManipulateRight - kViewCubeSize, viewManipulateTop + kViewCubeTopMargin),
-		ImVec2(kViewCubeSize, kViewCubeSize), IM_COL32(0, 0, 0, 0));
-
-	{
-		auto scene = SceneManagers->GetActiveScene();
-        auto& selectedObjects = scene->m_selectedEntities;
-		// 기즈모로 변환된 카메라 위치, 회전 적용
-		math::matrix4x4 viewMatrix{};
-		std::memcpy(&viewMatrix.m[0][0], cameraView, sizeof(viewMatrix));
-		if (const auto cameraTransform = math::decompose(math::inverse(viewMatrix)))
-		{
-			cam->m_eyePosition = cameraTransform->translation;
-			cam->rotate = math::normalize(cameraTransform->rotation);
-			cam->m_forward = math::normalize(math::rotate(cam->FORWARD, cam->rotate));
-			cam->m_up = math::normalize(math::rotate(cam->UP, cam->rotate));
-			cam->m_right = math::normalize(math::rotate(cam->RIGHT, cam->rotate));
-		}
-	}
-
-	if (ImGui::IsWindowHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
+	if (canvasInput && ImGui::IsMouseDown(ImGuiMouseButton_Right))
 	{
 		m_editorCameraRig->HandleMovement(Time->GetElapsedSeconds());
 	}
 
-	if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_G, false)) {
+	if (selectionEditable && ImGui::IsWindowFocused() && !m_overlay.blocksShortcuts && ImGui::IsKeyPressed(ImGuiKey_G, false)) {
 		auto scene = SceneManagers->GetActiveScene();
 		auto selectedObjects = scene->m_selectedEntities;
         std::vector<EditorObjectOperations::PropertyEdit> edits;
@@ -652,7 +358,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
         }
         EditorObjectOperations::CommitPropertyEdits(std::move(edits));
 	}
-	else if (ImGui::IsWindowFocused() && ImGui::IsKeyDown(ImGuiKey_F)) {
+	else if (ImGui::IsWindowFocused() && !m_overlay.blocksShortcuts && ImGui::IsKeyDown(ImGuiKey_F)) {
 		auto scene = SceneManagers->GetActiveScene();
 		auto selectedObjects = scene->m_selectedEntities;
 		for (auto* target : selectedObjects)
@@ -672,7 +378,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 	if (ImGuizmo::IsUsing())
 	{
 		useGizmo = true;
-		ImGui::PopStyleColor(1);   // Button — WindowBg는 셸이 든다
 		return;
 	}
 
@@ -692,18 +397,17 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	
 	TerrainBrush* editorTerrainBrush = EditorSessionState::Get().FindTerrainBrush();
+    if (editorTerrainBrush && EditorObjectOperations::IsEditLocked(sceneSelectedObj, true))
+        editorTerrainBrush->m_isEditMode = false;
 	if(nullptr == editorTerrainBrush || false == editorTerrainBrush->m_isEditMode)
 	{
 		if (!useGizmo &&
-			ImGui::IsWindowHovered() &&
+			canvasInput &&
 			ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 		{
 			float closest = FLT_MAX;
 			ImVec2 mousePos = ImGui::GetMousePos();
-			ImVec2 imagePos = imageMin; // 이미지 좌상단 위치
-			ImVec2 imageSize = imageMax;
-
-			Ray ray = CreateRayFromCamera(cam, mousePos, imagePos, imageSize);
+			Ray ray = CreateRayFromCamera(cam, mousePos);
 
 			const auto& sceneObjects = SceneManagers->GetActiveScene()->m_Entities;
 			auto hits = PickObjectsFromRay(ray, sceneObjects);
@@ -736,12 +440,12 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
 
 		ImRect dropRect = ImRect(imageMin, imageMax);
-        if (ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
+        if (canvasInput && ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
         {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model", ImGuiDragDropFlags_AcceptBeforeDelivery))
             {
                 const ImVec2 mouse = ImGui::GetMousePos();
-                const Ray ray = CreateRayFromCamera(cam, mouse, imageMin, imageMax);
+                const Ray ray = CreateRayFromCamera(cam, mouse);
                 float distance = 0;
                 std::optional<math::vector3> position;
                 if (RayIntersectsPlane(ray, { 0, 1, 0 }, { 0, 0, 0 }, distance))
@@ -803,10 +507,10 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			if (editorTerrainBrush->m_isEditMode)
 			{
 				terrainComponent->SetTerrainBrush(editorTerrainBrush);
-				if (ImGui::IsWindowHovered())
+				if (canvasInput)
 				{
 					ImVec2 mousePos = ImGui::GetMousePos();
-					Ray ray = CreateRayFromCamera(cam, mousePos, imageMin, imageMax);
+					Ray ray = CreateRayFromCamera(cam, mousePos);
 					//    TerrainComponent 내부에서는 Y=0 평면 위에 heightMap이 있다고 가정
 					const math::vector3 origin = ray.origin;
 					const math::vector3 direction = ray.direction;
@@ -875,19 +579,19 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	//=========================
 
-	ImGui::PopStyleColor(1);   // Button — WindowBg는 셸이 든다
 }
 
-math::vector3 SceneViewWindow::ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, const ImVec2& imagePos, const ImVec2& imageSize, float depth)
+math::vector3 SceneViewWindow::ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, float depth)
 {
-	const float normX = (mouseScreenPos.x - imagePos.x) / imageSize.x;
-	const float normY = (mouseScreenPos.y - imagePos.y) / imageSize.y;
+	const auto uv = m_canvas.SourceUV(mouseScreenPos);
+	const float normX = uv.x;
+	const float normY = uv.y;
 
 	const float ndcX = normX * 2.0f - 1.0f;
 	const float ndcY = (1.0f - normY) * 2.0f - 1.0f;
 	const math::vector4 clipPosition{ ndcX, ndcY, depth, 1.0f };
 	const math::matrix4x4 inverseViewProjection =
-		math::inverse(cam->CalculateView() * cam->CalculateProjection());
+		math::inverse(cam->CalculateView() * cam->CalculateProjectionForAspect(m_canvas.sourceAspect));
 	const math::vector4 worldPosition = clipPosition * inverseViewProjection;
 
 	if (std::fabs(worldPosition.w) <= 1.0e-6f)
@@ -901,12 +605,12 @@ math::vector3 SceneViewWindow::ConvertMouseToWorldPosition(Camera* cam, const Im
 		worldPosition.z * inverseW };
 }
 
-Ray SceneViewWindow::CreateRayFromCamera(Camera* cam, const ImVec2& mousePos, const ImVec2& imagePos, const ImVec2& imageSize)
+Ray SceneViewWindow::CreateRayFromCamera(Camera* cam, const ImVec2& mousePos)
 {
 	const math::vector3 nearPoint = ConvertMouseToWorldPosition(
-		cam, mousePos, imagePos, imageSize, 0.0f);
+		cam, mousePos, 0.0f);
 	const math::vector3 farPoint = ConvertMouseToWorldPosition(
-		cam, mousePos, imagePos, imageSize, 1.0f);
+		cam, mousePos, 1.0f);
 	return Ray{ nearPoint, math::normalize(farPoint - nearPoint) };
 }
 

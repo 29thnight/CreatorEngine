@@ -3,6 +3,7 @@
 #include "Core.Minimal.h"
 #include "concurrent_queue.h"
 #include "Windows/EditorWindowBody.h"
+#include "EditorEntityIcons.h"
 
 #include <array>
 #include <memory>
@@ -42,9 +43,8 @@ public:
 	struct FilePresentation
 	{
 		FileType type{ FileType::Unknown };
-		// ImTextureID는 backend descriptor라 캐시하지 않는다. 그리는 프레임에
-		// EditorImGuiTexture가 이 안정 Texture 신원을 해석한다.
-		Texture* icon{};
+		const char* type_icon{};
+		Texture* type_image{}; // Borrowed from this presentation service.
 	};
 
 	static EditorAssetPresentation& Get() noexcept;
@@ -60,6 +60,17 @@ public:
 	FilePresentation ResolveFilePresentation(std::string_view extension) const;
 	ImFont* GetSmallFont() const noexcept { return m_smallFont; }
 	ImFont* GetExtraSmallFont() const noexcept { return m_extraSmallFont; }
+    Texture* GetDirectoryIcon(bool expanded) const noexcept
+    { return m_directoryIcons[expanded ? 1 : 0].get(); }
+    Texture* GetEngineIcon() const noexcept { return m_engineIcon.get(); }
+    Texture* GetEntityIcon(std::string_view preset) const noexcept
+    { return m_entityIcons[editor::EntityIconIndex(preset)].get(); }
+    Texture* GetProjectIcon() const noexcept { return m_projectIcon.get(); }
+    Texture* GetFileIcon(FileType type) const noexcept
+    {
+        const auto index = static_cast<size_t>(type);
+        return m_fileIcons[index < m_fileIcons.size() ? index : 0].get();
+    }
 
 private:
 	EditorAssetPresentation() = default;
@@ -75,9 +86,13 @@ private:
 	std::vector<file::path> m_pendingTexturePaths;
 	int m_selectedTextureKind{};
 
-	std::array<std::shared_ptr<Texture>, static_cast<size_t>(FileType::End)> m_fileIcons{};
 	std::unordered_map<std::string, FileType> m_extensionTypes;
 	std::shared_ptr<const EnhancedGizmoIconTextures> m_gizmoIconTextures;
+    std::array<std::shared_ptr<Texture>, 2> m_directoryIcons;
+    std::shared_ptr<Texture> m_engineIcon;
+    std::array<std::shared_ptr<Texture>, editor::EntityIconPresets.size()> m_entityIcons;
+    std::shared_ptr<Texture> m_projectIcon;
+    std::array<std::shared_ptr<Texture>, static_cast<size_t>(FileType::End)> m_fileIcons;
 	std::shared_ptr<Material> m_previewedMaterial;
 	std::shared_ptr<Material> m_selectedMaterial;
 	ImFont* m_smallFont{};

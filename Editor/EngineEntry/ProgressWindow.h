@@ -191,6 +191,7 @@ private:
     {
         const int width = 512;
         const int height = 300;
+        constexpr int progressBarHeight = 12;
         int x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
         int y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
 
@@ -217,7 +218,7 @@ private:
 
         m_hProgress = CreateWindowEx(0, PROGRESS_CLASS, nullptr,
             WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-            0, height - 5, width, 5,
+            0, height - progressBarHeight, width, progressBarHeight,
             m_hWnd, nullptr, GetModuleHandle(nullptr), nullptr);
 
         SendMessage(m_hProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));

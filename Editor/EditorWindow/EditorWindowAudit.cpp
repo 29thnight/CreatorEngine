@@ -36,8 +36,8 @@ namespace editor
             EditorWindowName::kAnimationControllers,
             EditorWindowName::kAvatarMask,
             // W3 에서 옮긴 것들.
-            EditorWindowName::kScene,
-            EditorWindowName::kGame,
+            EditorWindowName::kViewport,
+            EditorWindowName::kGamePreview,
             EditorWindowName::kContentBrowser,
             EditorWindowName::kHierarchy,
             EditorWindowName::kInspector,

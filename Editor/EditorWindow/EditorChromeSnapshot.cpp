@@ -67,11 +67,16 @@ namespace editor
         /// `ImGuiWindow::Name` 에는 그 전체가 들어 있다. 선언 표가 든 것은 오른쪽
         /// 이므로 전체를 그대로 맞대면 그려지는 창이 전부 유령으로 보고된다 —
         /// 첫 실측에서 실제로 여섯이 그렇게 나왔다.
+        ///
+        /// ★ 자르는 자리는 `###` **앞**이다. W3 이 안정 ID 를 `###Editor.*` 로
+        ///   옮기면서 선언 표가 든 값 자체에 그 세 글자가 들어갔다
+        ///   (`EditorWindowNames.h`). 표식을 떼고 맞대면 여섯이 다시 유령이 된다 —
+        ///   실제로 이주 직후 `ghost=6` 으로 한 번 그렇게 나왔다.
         std::string_view stable_part(std::string_view name) noexcept
         {
             const std::size_t marker = name.rfind("###");
             if (std::string_view::npos == marker) return name;
-            return name.substr(marker + 3);
+            return name.substr(marker);
         }
 
         /// `[Window][NAME]` 줄에서 NAME 을 뽑는다. 없으면 빈 값이다.
@@ -214,6 +219,9 @@ namespace editor
         // 내려간 것은 틀린 것이 아니지만 조용하면 안 되므로 따로 센다.
         audit.fonts = snapshot.fonts.size();
         audit.font_fallback_probe_ok = snapshot.font_fallback_probe_ok;
+        audit.icon_role_count = snapshot.icon_role_count;
+        audit.missing_icon_roles = snapshot.missing_icon_roles;
+        audit.icon_source_policy_valid = snapshot.icon_source_policy_valid;
         for (const font_view& font : snapshot.fonts)
         {
             if ("body" != font.role) continue;
@@ -222,7 +230,7 @@ namespace editor
             audit.icon_font_merged = font.icon_merged;
         }
 
-        // 라벨의 아이콘이 폰트에 실제로 있는가. `IconsFontAwesome6.h` 에 정의가
+        // 라벨의 아이콘이 폰트에 실제로 있는가. `EditorIcons.h` 에 정의가
         // 있다는 것과 폰트 블롭에 글리프가 있다는 것은 다른 이야기이고, 없으면
         // 네모 한 칸이 조용히 그려진다.
         for (const window_placement_view& placement : snapshot.placements)
@@ -455,7 +463,8 @@ namespace editor
         }
         if (0 == audit.central_nodes)
         {
-            out += "[NOTE] central node 가 없다 — 중앙 ViewportHost 노드는 W4 가 세운다\n";
+            out += "[AUDIT] central node 가 없다 — 가운데 Host 가 자기 노드를 "
+                   "central 로 표시하지 못했다\n";
         }
         if (!audit.internal_api_version_known)
         {
@@ -478,6 +487,12 @@ namespace editor
             audit.style_applied ? 1 : 0, audit.scale_matches ? 1 : 0,
             audit.labels_missing_glyphs.size());
         std::string out{ buffer };
+
+        out += "[AUDIT] Material Symbols roles=" + std::to_string(audit.icon_role_count)
+            + " missing=" + std::to_string(audit.missing_icon_roles.size())
+            + " sourcePolicy=" + (audit.icon_source_policy_valid ? "valid" : "invalid") + "\n";
+        for (const auto& role : audit.missing_icon_roles)
+            out += "[AUDIT] missing icon: " + role + "\n";
 
         for (const std::string& label : audit.labels_missing_glyphs)
         {

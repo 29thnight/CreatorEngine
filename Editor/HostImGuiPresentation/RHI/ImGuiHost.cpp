@@ -1,4 +1,5 @@
 #include "IImGuiHost.h"
+#include "ImGuiWin32Cursor.h"
 #include "DX12/ImGuiDx12Shell.h"
 #include "Vulkan/ImGuiVulkanShell.h"
 #include "GlobalImGuiContext.h"
@@ -23,6 +24,7 @@ namespace
             if (nullptr != m_windowHandle) return IsActive();
             m_windowHandle = windowHandle;
             HWND hwnd = static_cast<HWND>(windowHandle);
+            ImGuiWin32Cursor::Reset(hwnd);
 
             IMGUI_CHECKVERSION();
             GlobalImGuiContext::GetInstance()->SetContext(ImGui::CreateContext());
@@ -32,6 +34,8 @@ namespace
                 &GlobalImGuiContext::GetInstance()->p_free_func,
                 &GlobalImGuiContext::GetInstance()->p_user_data);
 
+            // 커서 모양은 ImGui가 결정하지만 SetCursor는 HWND 소유 스레드에서
+            // 적용한다. Win32 backend의 PresentationThread 직접 호출을 막는다.
             io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
             io.ConfigDpiScaleFonts = true;
             static const std::string kIniPath =
@@ -134,6 +138,7 @@ namespace
         {
             if (!m_renderer) return;
             ImGui::Render();
+            ImGuiWin32Cursor::PublishFrameCursor(static_cast<HWND>(m_windowHandle));
 
             std::string presentError;
             if (!m_renderer->RenderAndPresent(presentError))
@@ -185,6 +190,7 @@ namespace
         void Shutdown() override
         {
             if (nullptr == m_windowHandle) return;
+            ImGuiWin32Cursor::Reset(static_cast<HWND>(m_windowHandle));
             if (m_renderer) m_renderer->Shutdown();
             m_renderer.reset();
             ImGui_ImplWin32_Shutdown();

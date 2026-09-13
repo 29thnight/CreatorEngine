@@ -52,6 +52,87 @@ namespace editor
         return logicalPixels * style.FontScaleMain * style.FontScaleDpi;
     }
 
+    TabStyleScope::TabStyleScope()
+        : m_paddingY(ImGui::GetStyle().FramePadding.y)
+    {
+        // Do not carry an ImGui style-stack entry across NewFrame.
+        ImGui::GetStyle().FramePadding.y = std::trunc(ThemePixels(
+            (EditorThemeTokens::TabHeight - EditorThemeTokens::BodyFontSize) * 0.5f));
+    }
+
+    TabStyleScope::~TabStyleScope()
+    {
+        ImGui::GetStyle().FramePadding.y = m_paddingY;
+    }
+
+    namespace
+    {
+        int inspectorStyleDepth = 0;
+        ImVec4 theme_rgb(std::uint32_t rgb)
+        {
+            return ImVec4(((rgb >> 16) & 255) / 255.f,
+                ((rgb >> 8) & 255) / 255.f, (rgb & 255) / 255.f, 1.f);
+        }
+    }
+
+    bool InspectorStyleActive() noexcept { return inspectorStyleDepth > 0; }
+
+    InspectorStyleScope::InspectorStyleScope()
+    {
+        ++inspectorStyleDepth;
+        using T = InspectorThemeTokens;
+        ImGui::PushStyleColor(ImGuiCol_Text, theme_rgb(0xF1F3F2));
+        ImGui::PushStyleColor(ImGuiCol_TextDisabled, theme_rgb(T::Label));
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, theme_rgb(T::Field));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, theme_rgb(0x252B29));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, theme_rgb(0x28384B));
+        ImGui::PushStyleColor(ImGuiCol_CheckboxSelectedBg, theme_rgb(0x23344E));
+        ImGui::PushStyleColor(ImGuiCol_Border, theme_rgb(0x242827));
+        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, theme_rgb(0x3D4441));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, theme_rgb(0x384657));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+            ImVec2(ThemePixels(6.f), ThemePixels(T::RowGap)));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing,
+            ImVec2(ThemePixels(T::AxisGap), ThemePixels(T::RowGap)));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ThemePixels(3.f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+    }
+
+    InspectorStyleScope::~InspectorStyleScope()
+    {
+        ImGui::PopStyleVar(4);
+        ImGui::PopStyleColor(10);
+        --inspectorStyleDepth;
+    }
+
+    HierarchyStyleScope::HierarchyStyleScope()
+    {
+        using T = HierarchyThemeTokens;
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, theme_rgb(T::Row));
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, theme_rgb(T::Row));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, theme_rgb(0x252B29));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, theme_rgb(0x28384B));
+        ImGui::PushStyleColor(ImGuiCol_Header, theme_rgb(T::SelectedRow));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, theme_rgb(0x2A302D));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, theme_rgb(T::SelectedRow));
+        ImGui::PushStyleColor(ImGuiCol_Button, theme_rgb(T::Row));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme_rgb(0x293A4F));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme_rgb(0x334864));
+        ImGui::PushStyleColor(ImGuiCol_Border, theme_rgb(0x3E4340));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+            ImVec2(ThemePixels(T::ToolbarGap), ThemePixels(T::ToolbarGap)));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ThemePixels(3.f));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, ThemePixels(3.f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f);
+    }
+
+    HierarchyStyleScope::~HierarchyStyleScope()
+    {
+        ImGui::PopStyleVar(4);
+        ImGui::PopStyleColor(11);
+    }
+
     void ApplyEditorTheme(ImGuiStyle& style, float userScale, float dpiScale) noexcept
     {
         const float fontSizeBase = style.FontSizeBase;
@@ -61,8 +142,8 @@ namespace editor
         style.FontScaleDpi = valid_scale(dpiScale);
 
         using T = EditorThemeTokens;
-        // ImGui tab과 control은 FramePadding을 공유한다.
-        static_assert(T::TabHeight == T::ControlHeight);
+        // Body controls use compact padding; TabStyleScope restores tab padding
+        // only while ImGui lays out window titles and tab handles.
         style.WindowPadding = ImVec2(T::PanelPaddingX, T::PanelPaddingY);
         style.WindowRounding = 0.f;
         style.WindowBorderSize = T::PanelGap;
@@ -77,8 +158,8 @@ namespace editor
         style.FrameRounding = T::ControlRadius;
         style.FrameBorderSize = 0.f;
         style.ItemSpacing = ImVec2(T::ItemGapX, T::RowHeight - T::BodyFontSize);
-        style.ItemInnerSpacing = ImVec2(T::PanelPaddingY, T::ItemGapY);
-        style.CellPadding = ImVec2(T::PanelPaddingY, T::CompactGap);
+        style.ItemInnerSpacing = ImVec2(T::ItemInnerGapX, T::ItemGapY);
+        style.CellPadding = ImVec2(T::CellPaddingX, T::CompactGap);
         style.IndentSpacing = T::TreeIndent;
         style.ScrollbarSize = T::ScrollbarWidth;
         style.ScrollbarRounding = T::ControlRadius;

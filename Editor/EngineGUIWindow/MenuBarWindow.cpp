@@ -1,8 +1,14 @@
 #include "ImGui.h"
+#include "EngineDistributionIdentity.h"
+#include "ScriptApiVersion.h"
 #include "EditorTheme.h"
 #include "ClrHost.h"
 #include "EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
+#include "EditorWorkspaceStore.h"
+#include "OutputLogText.h"
+#include "LogSystem.h"
+#include <spdlog/pattern_formatter.h>
 #include "RHI/IRHIDeviceResources.h"
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 m_sceneName을 읽으므로
@@ -14,8 +20,9 @@
 #include "FileDialog.h"
 #include "ProfilerHUD.h"
 #include "CoreWindow.h"
-#include "IconsFontAwesome6.h"
+#include "EditorIcons.h"
 #include "EditorFontResources.h"
+#include "EditorAssetPresentation.h"
 #include "Prefab.h"
 #include "PrefabUtility.h"
 #include "AIManager.h"
@@ -32,7 +39,6 @@
 #include "EditorPlatform.h"
 #include "RuntimeSettings.h"
 #include "EnhancedGizmoSceneBinding.h"
-#include "EditorModeButton.h"
 #include "GameBuilderSystem.h"
 #include "EditorRenderer.h"
 #include "EditorWindowChrome.h"
@@ -105,18 +111,11 @@ MenuBarWindow::MenuBarWindow()
     // 빠질 수 있고, 없으면 `PushFont(nullptr, 0.0f)` 이 "지금 폰트를 그대로"
     // 라서(imgui.h:516) 부르는 자리가 분기하지 않아도 된다.
     //
-    // 아이콘 병합은 **한글 폰트가 실제로 섰을 때만** 한다. 안 그러면
-    // 본문 폰트에 FA 가 두 번 병합된다. 1.92 의 아틀라스는 동적이라
-    // 한글 범위를 미리 못 박을 필요도, `Build()` 를 부를 필요도 없다.
+    // Optional fonts merge the same icon subset only after a text face was loaded.
     const ::editor::fonts::loaded_font korean =
         ::editor::fonts::add_optional_font(
             "korean", ::editor::fonts::korean_candidates(), kMenuBarFontSizePixels);
     m_koreanFont = korean.font;
-    if (nullptr != m_koreanFont)
-    {
-        ::editor::fonts::merge_icon_font(::editor::EditorThemeTokens::IconFontSize,
-            ::editor::EditorThemeTokens::IconBaselineOffset);
-    }
 
     // PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실은
     // 선언이 든다(open_by_default(false)) — 여기서 다시 닫지 않는다.
@@ -267,9 +266,45 @@ void MenuBarWindow::RenderMenuBar()
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
     float height = ImGui::GetFrameHeight();
 
-    if (ImGui::BeginViewportSideBar("##MainMenuBar", viewport, ImGuiDir_Up, height, window_flags))
+    // Only the app chrome uses the compact font. The docked panels retain their
+    // body scale, and the main menu reserves the viewport work area exactly once.
+    const float scale = editor::ThemePixels(1.f);
+    ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), editor::EditorThemeTokens::TitleBarFontSize);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.f * scale,
+        (editor::EditorThemeTokens::TitleBarHeight - editor::EditorThemeTokens::TitleBarFontSize) * .5f * scale));
+    // Popup menus inherit this scope too. A zero vertical gap compresses their
+    // selectable rows to the text height, even though the title row looks fine.
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+        ImVec2(editor::ThemePixels(editor::EditorThemeTokens::MenuGapX),
+            editor::ThemePixels(editor::EditorThemeTokens::MenuGapY)));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+        ImVec2(editor::ThemePixels(editor::EditorThemeTokens::MenuPaddingX),
+            editor::ThemePixels(editor::EditorThemeTokens::MenuPaddingY)));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, editor::ThemeColorValue(editor::ThemeColor::Canvas));
+    if (ImGui::BeginMainMenuBar())
     {
-        if (ImGui::BeginMainMenuBar())
+        const auto layout = LayoutEditorTitleBar(ImGui::GetWindowWidth(), ImGui::GetFrameHeight(), scale);
+        const ImVec2 rowMin = ImGui::GetWindowPos();
+        const float iconSize = 14.f * scale;
+        const ImVec2 iconMin{rowMin.x + 5.f * scale, rowMin.y + (layout.height - iconSize) * .5f};
+        if (const auto icon = EditorImGuiTexture::From(EditorAssetPresentation::Get().GetEngineIcon()))
+            ImGui::GetWindowDrawList()->AddImage(static_cast<ImTextureID>(icon), iconMin,
+                {iconMin.x + iconSize, iconMin.y + iconSize});
+        else
+            ImGui::GetWindowDrawList()->AddText(iconMin, ImGui::GetColorU32(ImGuiCol_Text), EditorIcon::Scene);
+        // Position from the logo, without adding the menu's inter-item gap
+        // through a Dummy before the first menu as well.
+        ImGui::SetCursorPosX(24.f * scale);
+
+        // Keep the right-side controls reachable in narrow windows. Root menus
+        // retain standard ImGui menu navigation inside one overflow menu.
+        float menuWidth = 0.f;
+        for (const char* label : {"File", "Edit", "Settings", "Tools", "Window", "Help"})
+            menuWidth += ImGui::CalcTextSize(label).x + 2.f * ImGui::GetStyle().ItemSpacing.x;
+        const bool compact = ImGui::GetCursorScreenPos().x + menuWidth + 24.f * scale > rowMin.x + layout.playLeft;
+        if (!compact || ImGui::BeginMenu(EditorIcon::Menu))
         {
             if (ImGui::BeginMenu("File"))
             {
@@ -464,17 +499,13 @@ void MenuBarWindow::RenderMenuBar()
 
             if (ImGui::BeginMenu("Window"))
             {
-                if (ImGui::MenuItem("Reset Layout"))
-                {
-                    // imgui.ini에 재생성 경로가 없어서 배치가 한 번 어긋나면
-                    // 파일을 손으로 지우는 것이 유일한 복구였다.
-                    EditorRenderer::RequestDockLayoutReset();
-                }
+                ::editor::draw_workspace_menu();
                 ImGui::Separator();
 
                 // 이름은 EditorWindowName이 정본이다. GetContext는 operator[]라
                 // 오타 하나가 그려지지 않는 유령 창을 표에 영구히 꽂는다.
                 const char* const panels[] = {
+                    EditorWindowName::kGamePreview,
                     EditorWindowName::kHierarchy,
                     EditorWindowName::kInspector,
                     EditorWindowName::kContentBrowser,
@@ -506,8 +537,8 @@ void MenuBarWindow::RenderMenuBar()
                 // 값을 읽어 넘기고, 눌리면 표를 고친다. 메뉴 문구는 바꾸지
                 // 않았다 — 이관은 프레임만 옮긴다.
                 const struct { const char* label; const char* window; } toggles[] = {
-                    { ICON_FA_TERMINAL " Output Log",     EditorWindowName::kOutputLog },
-                    { ICON_FA_CHART_GANTT " Frame Profiler", EditorWindowName::kFrameProfiler },
+                    { EditorIcon::Label<EditorIcon::Console, " Output Log">,     EditorWindowName::kOutputLog },
+                    { EditorIcon::Label<EditorIcon::Profiler, " Frame Profiler">, EditorWindowName::kFrameProfiler },
                 };
                 for (const auto& toggle : toggles)
                 {
@@ -530,22 +561,21 @@ void MenuBarWindow::RenderMenuBar()
                 ImGui::EndMenu();
             }
 
-            // 재생 컨트롤과 스타일 토글이 여기 있었다. s&box 배치에서 이 행은
-            // 제목표시줄이고 가운데는 창 제목이 쓴다 — 조작 버튼은 RenderToolBar로
-            // 내렸다. 그러지 않으면 제목과 버튼이 같은 자리를 다툰다.
-            EditorWindowChrome::Get().DrawTitleBarTail();
-
-            ImGui::EndMainMenuBar();
+            if (compact) ImGui::EndMenu();
         }
-        ImGui::End();
+        const float menuEnd = ImGui::GetCursorScreenPos().x;
+        RenderPlayControls(layout);
+        EditorWindowChrome::Get().DrawTitleBarTail(layout, menuEnd);
+        ImGui::EndMainMenuBar();
     }
-
-    RenderToolBar();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(5);
+    ImGui::PopFont();
 
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
         if (ImGui::BeginMenuBar())
         {
-            if (ImGui::Button(ICON_FA_TERMINAL " Output Log "))
+            if (ImGui::Button(EditorIcon::Label<EditorIcon::Console, " Output Log ">))
             {
                 if (editor::is_window_open(EditorWindowName::kOutputLog))
                     editor::close_window(EditorWindowName::kOutputLog);
@@ -554,7 +584,7 @@ void MenuBarWindow::RenderMenuBar()
             }
 
             ImGui::SameLine();
-            if (ImGui::Button(ICON_FA_CHART_GANTT " ProfileFrame "))
+            if (ImGui::Button(EditorIcon::Label<EditorIcon::Profiler, " ProfileFrame ">))
             {
                 if (editor::is_window_open(EditorWindowName::kFrameProfiler))
                     editor::close_window(EditorWindowName::kFrameProfiler);
@@ -563,99 +593,27 @@ void MenuBarWindow::RenderMenuBar()
             }
 
             {
-                const char* kIconBtn = ICON_FA_CUBES_STACKED " LiveCode ";   // 새로 추가할 앞쪽 아이콘 버튼
-                const char* kMainLbl = ICON_FA_BUG;   // 기존 디버그 버튼
-
+                // The retired manual Live Code placeholder is removed; automatic detection belongs to CoreCLR.
                 const ImGuiStyle& style = ImGui::GetStyle();
-
-                // 아이콘 전용 버튼은 정사각 사이즈로: 텍스트(아이콘) + 패딩*2
-                ImVec2 iconTxt = ImGui::CalcTextSize(kIconBtn);
-                ImVec2 iconBtn = { iconTxt.x + style.FramePadding.x * 2.0f,
-                                   iconTxt.y + style.FramePadding.y * 2.0f };
-
-                // 메인 버튼
-                ImVec2 mainTxt = ImGui::CalcTextSize(kMainLbl);
-                ImVec2 mainBtn = { mainTxt.x + style.FramePadding.x * 2.0f,
-                                   mainTxt.y + style.FramePadding.y * 2.0f };
-
-                // 두 버튼 사이 간격
-                float gap = style.ItemInnerSpacing.x;
-
-                // 두 버튼을 합친 총 너비
-                float groupWidth = iconBtn.x + gap + mainBtn.x;
-
-                // 그룹을 오른쪽 정렬
-                float avail = ImGui::GetContentRegionAvail().x;
-                if (avail > groupWidth) {
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - groupWidth));
-                }
-                else {
+                const ImVec2 textSize = ImGui::CalcTextSize(EditorIcon::Debug);
+                const ImVec2 buttonSize(textSize.x + style.FramePadding.x * 2.0f,
+                                        textSize.y + style.FramePadding.y * 2.0f);
+                const float available = ImGui::GetContentRegionAvail().x;
+                if (available > buttonSize.x)
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + available - buttonSize.x);
+                else
                     ImGui::SameLine();
-                }
 
-                bool isGameRunning = SceneManagers->IsGameStart();
-                if (isGameRunning)
-                {
-                    ImGui::BeginDisabled(true);
-                }
-
-                // 1) 아이콘 전용 버튼
-                // C++ 핫리로드 은퇴(9-4): 컴파일 버튼은 자리만 유지한다(비활성 동작 없음).
-                ImGui::BeginDisabled(true);
-                ImGui::Button(kIconBtn, iconBtn);
-                ImGui::EndDisabled();
-
-                if (isGameRunning)
-                {
-                    ImGui::EndDisabled();
-                }
-
-                // 같은 라인에 메인 버튼 배치
-                ImGui::SameLine(0.0f, gap);
-
-                // 2) 메인 디버그 버튼 (기존 로직)
-                bool wasDebug = ShouldCollectGizmoColliders();
+                const bool wasDebug = ShouldCollectGizmoColliders();
                 if (wasDebug) {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
                 }
-
-                if (ImGui::Button(kMainLbl, mainBtn)) {
+                if (ImGui::Button(EditorIcon::Debug, buttonSize))
                     SetCollectGizmoColliders(!wasDebug);
-                }
-
                 if (wasDebug) ImGui::PopStyleColor(3);
-
-                //const char* kDebugLabel = ICON_FA_BUG;
-                //ImVec2 text = ImGui::CalcTextSize(kDebugLabel);
-                //const ImGuiStyle& style = ImGui::GetStyle();
-                //ImVec2 btn = { text.x + style.FramePadding.x * 2.0f,
-                //               text.y + style.FramePadding.y * 2.0f };
-
-                //// 남은 폭(avail)만큼 오른쪽으로 이동하되, 버튼 너비만큼 빼서 오른쪽 끝에 정렬
-                //float avail = ImGui::GetContentRegionAvail().x;
-                //if (avail > btn.x) {
-                //    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - btn.x));
-                //}
-                //else {
-                //    ImGui::SameLine(); // 공간이 없으면 같은 라인에라도 붙이기
-                //}
-
-                //bool wasDebug = ShouldCollectGizmoColliders();
-
-                //// 활성화 색상 토글(선택)
-                //if (wasDebug) {
-                //    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
-                //    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-                //    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-                //}
-
-                //if (ImGui::Button(kDebugLabel, btn)) {
-                //    SetCollectGizmoColliders(!wasDebug);
-                //}
-
-                //if (wasDebug) ImGui::PopStyleColor(3);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Collider debug gizmos");
             }
 
             ImGui::EndMenuBar();
@@ -761,70 +719,65 @@ void MenuBarWindow::RenderMenuBar()
     }
 }
 
-void MenuBarWindow::RenderToolBar()
+void MenuBarWindow::RenderPlayControls(const EditorTitleBarLayout& layout)
 {
-    // 제목표시줄 바로 아래 한 줄. 재생 컨트롤이 메뉴 행에 있었을 때는
-    // 가운데 위치를 availRegion * 0.5 + 100 이라는 고정 오프셋으로 잡았고,
-    // 창 폭이나 메뉴 개수가 바뀌면 그대로 어긋났다. 여기서는 버튼 묶음의
-    // 실제 폭을 재서 가운데를 잡는다.
-    ImGuiViewportP* viewport = (ImGuiViewportP*)(void*)ImGui::GetMainViewport();
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
-    const float height = ImGui::GetFrameHeight();
+    using editor::ThemeColor;
+    const float scale = editor::ThemePixels(1.f);
+    const ImVec2 row = ImGui::GetWindowPos();
+    const ImVec2 boxMin{row.x + layout.playLeft, row.y + layout.playInset};
+    const ImVec2 boxMax{boxMin.x + layout.playWidth, row.y + layout.height - layout.playInset};
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(boxMin, boxMax, ImGui::GetColorU32(editor::ThemeColorValue(ThemeColor::Chrome)), 3.f * scale);
+    draw->AddRect(boxMin, boxMax, ImGui::GetColorU32(editor::ThemeColorValue(ThemeColor::Border)), 3.f * scale);
 
-    if (!ImGui::BeginViewportSideBar("##MainToolBar", viewport, ImGuiDir_Up, height, flags))
-        return;
-
-    if (ImGui::BeginMenuBar())
+    const bool running = SceneManagers->IsGameStart();
+    const bool paused = SceneManagers->IsGamePaused();
+    ImGui::PushFont(nullptr, editor::EditorThemeTokens::IconFontSize);
+    ImGui::PushID("TitleBarPlayControls");
+    bool playPressed = false, pausePressed = false;
+    for (int index = 0; index < 2; ++index)
     {
-        const bool isGameRunning = SceneManagers->IsGameStart();
-        const bool canPause = isGameRunning;
-        const bool isPaused = SceneManagers->IsGamePaused();
-
-        const char* const playIcon = isGameRunning ? ICON_FA_STOP : ICON_FA_PLAY;
-        const char* const pauseIcon = isPaused ? ICON_FA_PLAY : ICON_FA_PAUSE;
-
-        const ImGuiStyle& style = ImGui::GetStyle();
-        const float groupWidth = editor::widgets::mode_button_width(playIcon) +
-            editor::widgets::mode_button_width(pauseIcon) + style.ItemSpacing.x;
-
-        const float rowWidth = ImGui::GetWindowWidth();
-        ImGui::SetCursorPosX((rowWidth - groupWidth) * 0.5f);
-
-        editor::widgets::mode_button_request play{};
-        play.icon = playIcon;
-        play.active = isGameRunning;
-        play.tooltip = isGameRunning ? "Stop" : "Play";
-        if (editor::widgets::draw_mode_button(play))
-        {
-            // ★ LC6(§9): Undo 정책은 Editor::PlayModeController 가 소유한다.
-            //   이 버튼이 ClearGameMode 와 m_isGameMode 대입을 직접 하던 시절에는
-            //   그 둘이 버튼을 누른 경우에만 일어나 CLI 재생과 스택이 갈렸다.
-            SceneManagers->SetGameStart(!isGameRunning);
-        }
-
-        ImGui::SameLine();
-
-        // 일시정지 중이라는 표시를 버튼 세 칸(Button·Hovered·Active)을 모두
-        // 같은 색으로 덮어 알리던 자리다. 그러면 켜진 버튼은 hover 도 press 도
-        // 반응하지 않는다 — 켜짐과 눌림이 같은 축을 다투었기 때문이다.
-        // 이제 켜짐은 아래 marker 가 든다.
-        editor::widgets::mode_button_request pause{};
-        pause.icon = pauseIcon;
-        pause.active = canPause && isPaused;
-        pause.enabled = canPause;
-        pause.tooltip = isPaused ? "Resume" : "Pause";
-        if (editor::widgets::draw_mode_button(pause))
-        {
-            SceneManagers->ToggleGamePaused();
-        }
-
-        // Content Browser 표시 스타일을 가르던 ToggleSwitch 가 여기 있었다.
-        // 스타일이 하나가 되면서 스위치도 걷혔다.
-
-        ImGui::EndMenuBar();
+        const bool enabled = index == 0 || running;
+        const bool active = index == 0 ? running : running && paused;
+        const char* icon = index == 0 ? (running ? EditorIcon::Stop : EditorIcon::Play)
+            : (paused ? EditorIcon::Play : EditorIcon::Pause);
+        const char* tip = index == 0 ? (running ? "Stop" : "Play") : (paused ? "Resume" : "Pause");
+        const float width = layout.playWidth * .5f - 2.f * scale;
+        const float height = boxMax.y - boxMin.y - 2.f * scale;
+        const ImVec2 p{boxMin.x + scale + index * layout.playWidth * .5f, boxMin.y + scale};
+        ImGui::SetCursorScreenPos(p);
+        ImGui::BeginDisabled(!enabled);
+        const bool pressed = ImGui::InvisibleButton(index == 0 ? "PlayStop" : "PauseResume",
+            {width, height}, ImGuiButtonFlags_EnableNav);
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered || ImGui::IsItemActive())
+            draw->AddRectFilled(p, {p.x + width, p.y + height}, ImGui::GetColorU32(
+                editor::ThemeColorValue(ImGui::IsItemActive() ? ThemeColor::Selection : ThemeColor::PanelRaised)), 2.f * scale);
+        if (ImGui::IsItemFocused())
+            draw->AddRect(p, {p.x + width, p.y + height}, ImGui::GetColorU32(ImGuiCol_NavCursor), 2.f * scale);
+        const ThemeColor color = !enabled ? ThemeColor::TextDisabled : index == 0
+            ? (running ? ThemeColor::Error : ThemeColor::Positive) : paused ? ThemeColor::Primary : ThemeColor::Text;
+        // Standalone symbols are centered by visible glyph bounds, not the text
+        // line box. Their merged-font bearings otherwise lift Play above Pause.
+        unsigned int codepoint{};
+        ImTextCharFromUtf8(&codepoint, icon, nullptr);
+        const auto* glyph = ImGui::GetFontBaked()->FindGlyph(static_cast<ImWchar>(codepoint));
+        const ImVec2 textPos{p.x + width * .5f - (glyph->X0 + glyph->X1) * .5f,
+            p.y + height * .5f - (glyph->Y0 + glyph->Y1) * .5f};
+        draw->AddText(textPos, ImGui::GetColorU32(editor::ThemeColorValue(color)), icon);
+        if (active)
+            draw->AddRectFilled({p.x + 5.f * scale, p.y + height - scale},
+                {p.x + width - 5.f * scale, p.y + height}, ImGui::GetColorU32(editor::ThemeColorValue(ThemeColor::Primary)));
+        if (hovered) ImGui::SetTooltip("%s", tip);
+        ImGui::EndDisabled();
+        if (index == 0) playPressed = pressed;
+        else pausePressed = pressed;
     }
-    ImGui::End();
+    ImGui::PopID();
+    ImGui::PopFont();
+    // SceneManager/PlayModeController still own the transaction and Undo policy.
+    if (playPressed) SceneManagers->SetGameStart(!running);
+    else if (pausePressed) SceneManagers->ToggleGamePaused();
 }
 
 void MenuBarWindow::ShowAboutWindow()
@@ -834,7 +787,7 @@ void MenuBarWindow::ShowAboutWindow()
     // 여는 이 창으로 옮겼다.
     const BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
 
-    ImGui::TextUnformatted("Creator Engine");
+    ImGui::TextUnformatted(CreatorEngineVersion::ProductName);
     ImGui::Separator();
 
     const auto row = [](const char* label, const char* value)
@@ -844,7 +797,13 @@ void MenuBarWindow::ShowAboutWindow()
         ImGui::TextUnformatted(value);
     };
 
-    row("Engine version", ENGINE_VERSION);
+    row("Feature release", CreatorEngineVersion::FeatureRelease[0] ? CreatorEngineVersion::FeatureRelease : "Unassigned (local development)");
+    row("Engine build", CreatorEngineVersion::Build);
+    const auto& identity = CurrentEngineDistributionIdentity();
+    row("Channel", identity.channel == "stable" ? "Stable" : "Preview");
+    row("Distribution", CreatorEngineVersion::LocalDevelopment ? "Local development" : "Published");
+    row("Build ID", identity.buildId.c_str());
+    row("Script API", std::to_string(CreatorScriptApiVersion).c_str());
     row("Project", buildSettings.GetProjectName().c_str());
     row("Dear ImGui", IMGUI_VERSION);
 #if defined(_DEBUG)
@@ -872,7 +831,6 @@ void MenuBarWindow::ShowLogWindow()
 {
     static int levelFilter = spdlog::level::trace;
     static bool autoScroll = true;
-    bool isClear = Debug->IsClear();
 
     // 폰트 밀기는 본문에 남는다. 옛 코드는 `Begin` 앞에서 밀어 제목표시줄까지
     // 덮었지만 제목이 ASCII 라 보이는 차이가 없다.
@@ -886,6 +844,7 @@ void MenuBarWindow::ShowLogWindow()
         if (ImGui::Button("Clear"))
         {
             Debug->Clear();
+            m_selectedLogSequence = 0;
         }
         ImGui::SameLine();
         ImGui::Combo("Log Filter", &levelFilter,
@@ -900,20 +859,39 @@ void MenuBarWindow::ShowLogWindow()
     // == 스크롤 가능한 로그 영역 ==
     ImGui::BeginChild("LogScrollRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
     {
-        if (isClear)
+        if (auto snapshot = Debug->GetLogSnapshotIfChanged(m_logSnapshot.revision))
         {
-            Debug->toggleClear();
-            ImGui::EndChild();
-            ImGui::PopFont();
-            return;
+            // The copy is complete and the store lock is released before any
+            // formatting or ImGui work. Unchanged history is reused next frame.
+            std::vector<std::string> displayText;
+            displayText.reserve(snapshot->entries.size());
+            spdlog::pattern_formatter formatter;
+            bool selectionRetained = false;
+            for (const auto& entry : snapshot->entries)
+            {
+                displayText.push_back(editor::FormatOutputLogEntry(entry, formatter));
+                selectionRetained |= entry.sequence == m_selectedLogSequence;
+            }
+            if (!selectionRetained) m_selectedLogSequence = 0;
+            m_logSnapshot = std::move(*snapshot);
+            m_logDisplayText = std::move(displayText);
         }
 
-        auto entries = Debug->get_entries();
+        const auto& entries = m_logSnapshot.entries;
         float sizeX = ImGui::GetContentRegionAvail().x;
 		static bool isCopyPopupOpen = false;
 		static std::string copiedText;
         // 현재 스크롤 상태 감지
         bool shouldScroll = autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 10.0f;
+
+        if (m_logSnapshot.evictedEntries != 0 || m_logSnapshot.rejectedEntries != 0)
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(editor::ThemeColor::TextMuted));
+            ImGui::TextWrapped("History limit: %llu expired, %llu oversized. See log file for full history.",
+                static_cast<unsigned long long>(m_logSnapshot.evictedEntries),
+                static_cast<unsigned long long>(m_logSnapshot.rejectedEntries));
+            ImGui::PopStyleColor();
+        }
 
         for (size_t i = 0; i < entries.size(); ++i)
         {
@@ -921,7 +899,7 @@ void MenuBarWindow::ShowLogWindow()
             if (entry.level != spdlog::level::trace && entry.level < levelFilter)
                 continue;
 
-            bool is_selected = (i == m_selectedLogIndex);
+            bool is_selected = (entry.sequence == m_selectedLogSequence);
 
             ImVec4 color;
             switch (entry.level)
@@ -937,15 +915,16 @@ void MenuBarWindow::ShowLogWindow()
                 ImGui::PushStyleColor(ImGuiCol_Header, editor::ThemeColorValue(editor::ThemeColor::Selection));
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
 
-            std::string wrapped = WordWrapText(entry.message, 120);
+            std::string wrapped = WordWrapText(m_logDisplayText[i], 120);
             int stringLine = std::count(wrapped.begin(), wrapped.end(), '\n');
 
-            ImGui::PushID(i);
-            if (ImGui::Selectable((ICON_FA_CIRCLE_INFO + std::string(" ") + wrapped).c_str(),
+            const auto rowId = std::to_string(entry.sequence);
+            ImGui::PushID(rowId.c_str());
+            if (ImGui::Selectable((EditorIcon::Info + std::string(" ") + wrapped).c_str(),
                 is_selected, ImGuiSelectableFlags_AllowDoubleClick,
                 ImVec2(sizeX, float(35 * stringLine))))
             {
-                m_selectedLogIndex = i;
+                m_selectedLogSequence = entry.sequence;
 
                 std::regex pattern(R"(([A-Za-z]:\\.*))");
                 std::istringstream iss(wrapped);
@@ -964,7 +943,7 @@ void MenuBarWindow::ShowLogWindow()
             if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
             {
                 isCopyPopupOpen = true;
-                copiedText = entry.message;
+                copiedText = m_logDisplayText[i];
             }
             ImGui::PopID();
             ImGui::PopStyleColor();

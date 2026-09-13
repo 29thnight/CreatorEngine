@@ -1,5 +1,7 @@
 #pragma once
 #include "ImGui.h"
+#include "SceneViewportOverlay.h"
+#include "EditorViewportCanvas.h"
 #include <mathematics/vector3.hpp>
 #include <memory>
 #include <vector>
@@ -30,8 +32,8 @@ public:
 	void RenderSceneViewWindow();
 private:
 	void RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, Entity* obj, Camera* cam);
-	math::vector3 ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, const ImVec2& imagePos, const ImVec2& imageSize, float depth = 0.0f);
-	Ray CreateRayFromCamera(Camera* cam, const ImVec2& mousePos, const ImVec2& imagePos, const ImVec2& imageSize);
+	math::vector3 ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, float depth);
+	Ray CreateRayFromCamera(Camera* cam, const ImVec2& mousePos);
 	//[[deprecated("Soon Deleted")]]
 	Entity* PickObjectFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects);
 	
@@ -39,6 +41,8 @@ private:
 	
 private:
 	Camera* m_editorCamera{ nullptr };
+	editor::SceneViewportOverlay m_overlay;
+    editor::ViewportCanvas m_canvas;
 	EditorCameraRig* m_editorCameraRig{ nullptr };
 	GizmoRenderer* m_gizmoRenderer{ nullptr };
 

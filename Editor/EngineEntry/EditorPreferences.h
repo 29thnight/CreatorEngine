@@ -8,9 +8,12 @@ struct EditorPreferences
 {
     float GetImGuiScale() const noexcept { return imguiScale; }
     void SetImGuiScale(float value) noexcept { imguiScale = value; }
+    float GetContentTreeWidth() const noexcept { return contentTreeWidth; }
+    void SetContentTreeWidth(float value) noexcept { contentTreeWidth = value; }
 
 // 에디터 렌더 백엔드는 여기 없다. 에디터 호스트는 DX12 고정이고, 사람이 고르는
 // 백엔드는 BuildSettings::renderBackend(=build.render.backend) 하나뿐이다.
 private:
     float imguiScale{ 0.8f };
+    float contentTreeWidth{ 220.f }; // logical pixels; resize clamping is transient
 };

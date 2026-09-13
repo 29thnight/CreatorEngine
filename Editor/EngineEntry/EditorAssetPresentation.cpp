@@ -11,10 +11,10 @@
 #include "PathFinder.h"
 #include "Texture.h"
 #include "ImGui.h"
-#include "IconsFontAwesome6.h"
+#include "EditorIcons.h"
 #include "EditorFontResources.h"
 #include "EditorTheme.h"
-#include "fa.h"
+#include "EditorWindowNames.h"
 
 #include <imgui.h>
 #include <algorithm>
@@ -23,13 +23,33 @@
 
 namespace
 {
-	constexpr const char* kTextureImportSelector = "TextureType Selector";
-	constexpr const char* kMaterialPicker = "SelectMaterial";
+	// W3 이 안정 식별자를 `###Editor.*` 로 옮기면서 여기 두 줄이 남았다. 값이
+	// 옛 표시 이름이라 `bind_window_body` 는 고아 본문 둘을, 선언 표는 본문
+	// 없는 창 둘을 들고 있었고 `open_window`/`close_window` 는 아무 창도 찾지
+	// 못한 채 조용히 돌았다. 이름은 한 곳에서만 든다.
+	constexpr const char* kTextureImportSelector = EditorWindowName::kTextureImportSelector;
+	constexpr const char* kMaterialPicker = EditorWindowName::kMaterialPicker;
 
-	constexpr size_t FileTypeIndex(EditorAssetPresentation::FileType type) noexcept
-	{
-		return static_cast<size_t>(type);
-	}
+    const char* TypeIcon(EditorAssetPresentation::FileType type) noexcept
+    {
+        using Type = EditorAssetPresentation::FileType;
+        switch (type)
+        {
+        case Type::Model: return EditorIcon::Model;
+        case Type::Texture: return EditorIcon::Texture;
+        case Type::MaterialTexture: return EditorIcon::Material;
+        case Type::TerrainTexture: return EditorIcon::Terrain;
+        case Type::Shader: return EditorIcon::Shader;
+        case Type::CppScript:
+        case Type::CSharpScript: return EditorIcon::Script;
+        case Type::Prefab: return EditorIcon::Prefab;
+        case Type::Sound: return EditorIcon::Audio;
+        case Type::HDR: return EditorIcon::HDR;
+        case Type::VolumeProfile: return EditorIcon::Volume;
+        case Type::Font: return EditorIcon::Font;
+        default: return EditorIcon::Unknown;
+        }
+    }
 
 	EditorAssetDatabase::ImportKind ToImportKind(int selected) noexcept
 	{
@@ -124,7 +144,7 @@ EditorAssetPresentation::ResolveFilePresentation(std::string_view extension) con
 		type = it->second;
 	}
 
-	return { type, m_fileIcons[FileTypeIndex(type)].get() };
+	return { type, TypeIcon(type), GetFileIcon(type) };
 }
 
 void EditorAssetPresentation::RenderTextureImportSelector()
@@ -172,15 +192,13 @@ void EditorAssetPresentation::RenderMaterialPicker()
 {
 	static ImGuiTextFilter searchFilter;
 	const float availableWidth = ImGui::GetContentRegionAvail().x;
-	searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+	searchFilter.Draw(EditorIcon::Label<EditorIcon::Search, " Search">, availableWidth);
 
-	const ImTextureID modelIcon = (ImTextureID)EditorImGuiTexture::From(
-		m_fileIcons[FileTypeIndex(FileType::Model)].get());
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, ::editor::ThemeColorValue(::editor::ThemeColor::Canvas));
 	if (ImGui::BeginChild("MaterialTiles", ImVec2(0, 300),
 		ImGuiChildFlags_AlwaysUseWindowPadding, 0))
 	{
-		constexpr float tileSize = 100.0f;
+		const float tileSize = editor::ThemePixels(100.0f);
 		int columns = static_cast<int>(ImGui::GetContentRegionAvail().x / tileSize);
 		columns = (std::max)(columns, 1);
 
@@ -194,14 +212,16 @@ void EditorAssetPresentation::RenderMaterialPicker()
 
 			ImGui::BeginGroup();
 			const char* displayName = name.empty() ? "None" : name.c_str();
-			const bool clicked = ImGui::ImageButton(
-				displayName, modelIcon, ImVec2(70, 70));
+            ImGui::PushID(displayName);
+            const bool clicked = ImGui::Button(EditorIcon::Material,
+                ImVec2(editor::ThemePixels(70.0f), editor::ThemePixels(70.0f)));
+            ImGui::PopID();
 			const bool doubleClicked = ImGui::IsItemHovered() &&
 				ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
 			if (clicked) m_previewedMaterial = material;
 
 			ImGui::PushID(displayName);
-			ImGui::Button(displayName, ImVec2(80, 30));
+			ImGui::Button(displayName, ImVec2(editor::ThemePixels(80.0f), editor::ThemePixels(30.0f)));
 			ImGui::PopID();
 			ImGui::EndGroup();
 
@@ -238,41 +258,17 @@ void EditorAssetPresentation::LoadPresentationResources()
 	{
 		return Texture::LoadSharedFromPath(iconPath / filename);
 	};
-	const auto setFileIcon = [this, &loadIcon](FileType type, const wchar_t* filename)
-	{
-		m_fileIcons[FileTypeIndex(type)] = loadIcon(filename);
-	};
-
-	setFileIcon(FileType::Unknown, L"Unknown.png");
-	setFileIcon(FileType::Model, L"Model.png");
-	setFileIcon(FileType::Texture, L"Texture.png");
-	setFileIcon(FileType::Shader, L"Shader.png");
-	setFileIcon(FileType::CppScript, L"Code.png");
-	setFileIcon(FileType::Prefab, L"Assets.png");
-	// 같은 그림을 쓰는 분류는 Texture를 다시 읽지 않고 안정 신원을 공유한다.
-	m_fileIcons[FileTypeIndex(FileType::MaterialTexture)] =
-		m_fileIcons[FileTypeIndex(FileType::Texture)];
-	m_fileIcons[FileTypeIndex(FileType::TerrainTexture)] =
-		m_fileIcons[FileTypeIndex(FileType::Texture)];
-	m_fileIcons[FileTypeIndex(FileType::HDR)] =
-		m_fileIcons[FileTypeIndex(FileType::Texture)];
-	m_fileIcons[FileTypeIndex(FileType::CSharpScript)] =
-		m_fileIcons[FileTypeIndex(FileType::CppScript)];
-	m_fileIcons[FileTypeIndex(FileType::VolumeProfile)] =
-		m_fileIcons[FileTypeIndex(FileType::Prefab)];
-	m_fileIcons[FileTypeIndex(FileType::Font)] =
-		m_fileIcons[FileTypeIndex(FileType::Prefab)];
-	m_fileIcons[FileTypeIndex(FileType::Sound)] =
-		m_fileIcons[FileTypeIndex(FileType::Unknown)];
 
 	m_extensionTypes = {
 		{ ".fbx", FileType::Model }, { ".gltf", FileType::Model },
 		{ ".obj", FileType::Model }, { ".glb", FileType::Model },
 		{ ".png", FileType::Texture }, { ".dds", FileType::Texture },
+		{ ".jpg", FileType::Texture }, { ".jpeg", FileType::Texture },
+		{ ".mat", FileType::MaterialTexture }, { ".fx", FileType::Shader },
 		{ ".hdr", FileType::HDR }, { ".hlsl", FileType::Shader },
 		{ ".slang", FileType::Shader },
 		{ ".shadermeta", FileType::Shader }, { ".shader", FileType::Shader },
-		{ ".cpp", FileType::CppScript },
+		{ ".cpp", FileType::CppScript }, { ".h", FileType::CppScript },
 		{ ".cs", FileType::CSharpScript }, { ".wav", FileType::Sound },
 		{ ".mp3", FileType::Sound }, { ".terrain", FileType::TerrainTexture },
 		{ ".prefab", FileType::Prefab }, { ".volume", FileType::VolumeProfile },
@@ -288,6 +284,23 @@ void EditorAssetPresentation::LoadPresentationResources()
 	m_gizmoIconTextures = std::move(gizmoIcons);
 	EnhancedSceneRenderer::SetGizmoIconTextures(m_gizmoIconTextures);
 
+    // Fixed editor artwork, independent of the planned asynchronous asset previews.
+    m_directoryIcons[0] = loadIcon(L"DirectoryClosed.png");
+    m_directoryIcons[1] = loadIcon(L"DirectoryOpen.png");
+    m_engineIcon = loadIcon(L"Engine.png");
+    for (size_t i = 0; i < editor::EntityIconPresets.size(); ++i)
+        m_entityIcons[i] = loadIcon(editor::EntityIconPresets[i].filename);
+    m_projectIcon = loadIcon(L"Assets.png");
+    // FileType order; one cached texture per type, never loaded during tile drawing.
+    constexpr std::array fileIconNames{
+        L"Unknown.png", L"Model.png", L"Texture.png", L"Material.png", L"Terrain.png",
+        L"Shader.png", L"Code.png", L"Code.png", L"EntityPrefab.png", L"Audio.png",
+        L"HDR.png", L"VolumeProfile.png", L"Font.png"
+    };
+    static_assert(fileIconNames.size() == static_cast<size_t>(FileType::End));
+    for (size_t i = 0; i < fileIconNames.size(); ++i)
+        m_fileIcons[i] = loadIcon(fileIconNames[i]);
+
 	// 작은 글씨용 둘은 **선택**이다(PHASE 21 W1). 비어도 쓰는 자리가
 	// `PushFont(nullptr, 0.0f)` 으로 받으므로 글자 크기만 기본으로 간다.
 	m_smallFont = ::editor::fonts::add_optional_font(
@@ -302,8 +315,12 @@ void EditorAssetPresentation::ReleasePresentationResources() noexcept
 	// 들고 있어 RenderThread가 소비를 끝낼 때까지 CPU 픽셀이 살아 있다.
 	EnhancedSceneRenderer::SetGizmoIconTextures({});
 	m_gizmoIconTextures.reset();
+    for (auto& icon : m_directoryIcons) icon.reset();
+    m_engineIcon.reset();
+    for (auto& icon : m_entityIcons) icon.reset();
+    m_projectIcon.reset();
+    for (auto& icon : m_fileIcons) icon.reset();
 	m_extensionTypes.clear();
-	for (auto& icon : m_fileIcons) icon.reset();
 	m_smallFont = nullptr;
 	m_extraSmallFont = nullptr;
 }

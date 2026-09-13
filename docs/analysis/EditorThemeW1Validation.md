@@ -57,7 +57,11 @@ Selection 2.74:1이다. 이는 토큰 RGB의 계산값이며 ImGui disabled alph
 증거는 `Artifacts/phase21-w1-live-user100.png`, `phase21-w1-live-user150.png`,
 `phase21-w1-live-user100-return.png`다. 두 배율 축의 독립·결합 계약은 지역 style selftest도 확인한다.
 
-실제 모니터 둘은 모두 144 DPI(150%)다. OS 설정을 변경하지 않았으므로 실제 DPI 100↔150% 왕복은 미검증이다.
+초기 검증 당시 실제 모니터 둘은 모두 144 DPI(150%)였고 OS 설정을 변경하지 않아 실제 DPI 왕복은 미검증이었다.
+이후 실제 OS 배율과 모니터 경계 검증을 수행했다. 폰트·DPI 값은 통과했지만 표시 오류가 발견돼
+당시 W1은 완료 보류였다. 이후 DX12 수정·실기 검증이 통과했고, 2026-09-12 사용자 결정으로
+Vulkan 대응을 별도 보류해 **현재 W1은 DX12 기준 완료**다.
+[DX12 수정 검증](EditorW1Dx12ResizeValidation.md)이 최신 판정이며 Vulkan 해결을 뜻하지 않는다.
 지역 style의 합성 DPI 검사와 실제 모니터 왕복을 같은 증거로 취급하지 않는다.
 
 최종 검증 결과:

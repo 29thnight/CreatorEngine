@@ -1,3 +1,4 @@
+#include "EngineRuntimePaths.h"
 #include "RHIShaderCompiler.h"
 
 #include "RHIShaderSource.h"
@@ -223,7 +224,7 @@ namespace
         // 배포 호스트는 실행 파일 옆의 고정 번들만 허용한다. 에디터/테스트 같은
         // authoring 호스트만 저장소의 동일 번들을 직접 참조할 수 있다.
         TryLoadSlangPath(runtime,
-            PathFinder::RelativeToExecutable("slang-compiler.dll"));
+            ResolveEngineRuntimeDirectory() / L"Common" / L"slang-compiler.dll");
 
         if (nullptr == runtime.module && !PathFinder::IsAssetAuthoringEnabled())
         {

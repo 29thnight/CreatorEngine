@@ -1,4 +1,4 @@
-﻿// LC6 (PHASE 14.5) — Core 도메인 명령.
+// LC6 (PHASE 14.5) — Core 도메인 명령.
 //
 // `help` · `quit` · `wait` · `commands.*` · `cli.*` · `log.*` · `lifecycle.*` ·
 // `window.*` · `game.*`. 명령 계층 자신에 대한 것과 실행 수명에 관한 것.
@@ -21,6 +21,8 @@
 // include 는 이 TU 가 직접 소유한다(유니티에서 빠져 있다).
 
 #include "CommandRegistrar.h"
+#include "EditorWorkspaceStore.h"
+#include "ViewportHostWindow.h"
 #include "EditorWindowHost.h"       // PHASE 21 M4: editor.windows 덤프
 #include "EditorWindowAudit.h"
 #include "EditorWindowSelfTest.h"
@@ -40,6 +42,7 @@
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
+#include "SceneViewportOverlay.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
@@ -591,8 +594,9 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
         // 엔진이 실제로 인식하는 클라이언트 크기. window.resize가 리사이즈 경로까지
         // 도달했는지를 UI 계산과 같은 출처(화면 크기 버스)로 확인한다.
-        const uint32_t clientW = ScreenResizeBus::Get().GetWidth();
-        const uint32_t clientH = ScreenResizeBus::Get().GetHeight();
+        const auto client = ScreenResizeBus::Get().GetSizeSnapshot();
+        const uint32_t clientW = client.width;
+        const uint32_t clientH = client.height;
         std::printf("[CLI] 클라이언트 영역: %ux%u\n", clientW, clientH);
         Debug->LogWarning("[CLI] 클라이언트 영역: " +
             std::to_string(clientW) + "x" + std::to_string(clientH));
@@ -853,6 +857,82 @@ namespace ConsoleCmd
                   std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_editor_sceneview(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+        const auto s = editor::ReadSceneOverlaySnapshot();
+        if (!s.valid) return Fail("editor.sceneview.no_frame", "Scene view has not published a frame");
+        auto data = CommandData::Object();
+        const auto vec2 = [](ImVec2 v) { auto a = CommandData::Array(); a.Append(CommandData::Double(v.x)); a.Append(CommandData::Double(v.y)); return a; };
+        const auto vec3 = [](math::vector3 v) { auto a = CommandData::Array(); a.Append(CommandData::Double(v.x)); a.Append(CommandData::Double(v.y)); a.Append(CommandData::Double(v.z)); return a; };
+        data.Set("mode", CommandData::Int(static_cast<int>(s.mode)));
+        data.Set("imageMin", vec2(s.imageMin)); data.Set("imageMax", vec2(s.imageMax));
+        data.Set("left", vec2(s.left)); data.Set("right", vec2(s.right));
+        data.Set("leftWidth", CommandData::Double(s.leftWidth)); data.Set("rightWidth", CommandData::Double(s.rightWidth));
+        data.Set("toolbarHeight", CommandData::Double(s.toolbarHeight));
+        data.Set("gizmoCenter", vec2(s.gizmoCenter)); data.Set("gizmoRadius", CommandData::Double(s.gizmoRadius));
+        data.Set("gizmoVisible", CommandData::Bool(s.gizmoVisible)); data.Set("gizmoUsing", CommandData::Bool(s.gizmoUsing));
+        data.Set("pointerBlocked", CommandData::Bool(s.blocked)); data.Set("operation", CommandData::Int(s.operation));
+        data.Set("orthographic", CommandData::Bool(s.orthographic)); data.Set("local", CommandData::Bool(s.local));
+        data.Set("cameraPosition", vec3(s.cameraPosition)); data.Set("cameraForward", vec3(s.cameraForward));
+        // W4: 캔버스 사각형 셋을 그대로 낸다. 크기는 내지 않는다 — 소비자가
+        // `max - min` 으로 구하게 두어야 크기와 사각형이 어긋날 자리가 없다.
+        data.Set("imageMode", CommandData::String(
+            editor::viewport_fit::crop == s.canvas.fit ? "crop" : "letterbox"));
+        data.Set("imageReady", CommandData::Bool(s.canvas.valid));
+        data.Set("contentMin", vec2(s.canvas.contentMin)); data.Set("contentMax", vec2(s.canvas.contentMax));
+        data.Set("canvasImageMin", vec2(s.canvas.imageMin)); data.Set("canvasImageMax", vec2(s.canvas.imageMax));
+        data.Set("clipMin", vec2(s.canvas.clipMin)); data.Set("clipMax", vec2(s.canvas.clipMax));
+        data.Set("uvMin", vec2(s.canvas.uvMin)); data.Set("uvMax", vec2(s.canvas.uvMax));
+        data.Set("sourceAspect", CommandData::Double(s.canvas.sourceAspect));
+        return Ok("Scene viewport overlay", std::move(data));
+    }
+    // PHASE 21 W4 — 중앙 Host 의 표시 모드와 뷰 수요.
+    //
+    // W0 에서 이 이름을 한 번 보류했다. 그때 실어야 할 값 셋 중 둘(확정된 play
+    // state, 입력 소유권)이 없어서 지으면 상수만 찍는 "관측 흉내" 가 되기
+    // 때문이었다. W4 가 그중 하나를 실제로 만들었다 — 모드와 그로부터 나오는 뷰
+    // 수요는 지금 존재하는 값이다. 나머지 둘은 W5 가 여기에 더한다.
+    static CommandCore::CommandResult Cmd_editor_viewport(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        if (args.size() > 2) return InvalidArguments("editor.viewport [scene|game]");
+        if (2 == args.size())
+        {
+            // 모드를 밖에서 바꿀 수 있어야 모드가 재시작을 넘는지 **살아 있는**
+            // 에디터로 잴 수 있다. 클릭만이 모드를 바꿀 수 있으면 그 왕복은
+            // 사람 손으로만 증명되고, 게이트는 기본값을 두 번 읽을 뿐이다.
+            if ("scene" == args[1]) ::editor::windows::request_viewport_mode(
+                ::editor::windows::viewport_mode::scene);
+            else if ("game" == args[1]) ::editor::windows::request_viewport_mode(
+                ::editor::windows::viewport_mode::game);
+            else return InvalidArguments("editor.viewport [scene|game]");
+        }
+        const auto demand = ::editor::windows::read_viewport_demand();
+        auto data = CommandData::Object();
+        data.Set("hostPresent", CommandData::Bool(demand.hostPresent));
+        // 게시본의 모드다. 인자로 바꾼 직후라면 아직 옛 모드가 나온다 —
+        // 요청은 다음 Host 본문이 소비한다. 게이트는 그래서 `wait` 를 끼운다.
+        data.Set("mode", CommandData::String(
+            ::editor::windows::viewport_mode::game == demand.mode ? "game" : "scene"));
+        data.Set("editorTarget", CommandData::Bool(demand.editorTarget));
+        data.Set("gameTarget", CommandData::Bool(demand.gameTarget));
+        data.Set("publishedFrames", CommandData::Int(static_cast<int64_t>(demand.publishedFrames)));
+        data.Set("sceneModeFrames", CommandData::Int(static_cast<int64_t>(demand.sceneModeFrames)));
+        data.Set("gameModeFrames", CommandData::Int(static_cast<int64_t>(demand.gameModeFrames)));
+        data.Set("gamePreviewFrames", CommandData::Int(static_cast<int64_t>(demand.gamePreviewFrames)));
+        data.Set("suppressedGameViews", CommandData::Int(static_cast<int64_t>(demand.suppressedGameViews)));
+        data.Set("suppressedEditorViews", CommandData::Int(static_cast<int64_t>(demand.suppressedEditorViews)));
+        if (!demand.hostPresent)
+        {
+            return Fail("editor.viewport.no_host",
+                "중앙 ViewportHost 본문이 아직 한 프레임도 돌지 않았다", std::move(data));
+        }
+        return Ok("Viewport host", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_editor_theme(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -911,6 +991,39 @@ namespace ConsoleCmd
         }
         return Ok("스타일 색 " + std::to_string(audit.colors) + "개 관측, 이상 없음",
                   std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_editor_workspace(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args=ctx.parts;
+        if(args.size()>1)
+        {
+            editor::workspace_action action{};
+            if(args[1]=="save") action=editor::workspace_action::save;
+            else if(args[1]=="load") action=editor::workspace_action::load;
+            else if(args[1]=="reset") action=editor::workspace_action::reset;
+            else if(args[1]=="open") action=editor::workspace_action::open_panel;
+            else if(args[1]=="close") action=editor::workspace_action::close_panel;
+            else return InvalidArguments("editor.workspace [save|load|reset|open <panelId>|close <panelId>]");
+            const bool panel=action==editor::workspace_action::open_panel || action==editor::workspace_action::close_panel;
+            if(args.size()!=(panel?3u:2u)) return InvalidArguments("Wrong workspace argument count");
+            if(!editor::request_workspace_action(action,panel?args[2]:std::string{}))
+                return PreconditionFailed("editor.workspace.busy","A workspace operation is pending");
+        }
+        const auto status=editor::get_workspace_status();
+        auto data=CommandData::Object();
+        data.Set("ready",CommandData::Bool(status.ready));
+        data.Set("pending",CommandData::Bool(status.pending));
+        data.Set("recovered",CommandData::Bool(status.recovered));
+        data.Set("migrated",CommandData::Bool(status.migrated));
+        data.Set("path",CommandData::String(status.path));
+        data.Set("error",CommandData::String(status.error));
+        data.Set("revision",CommandData::Int(static_cast<int64_t>(status.revision)));
+        auto panels=CommandData::Object();
+        for(const auto& [id,open]:status.panels) panels.Set(id,CommandData::Bool(open));
+        data.Set("panels",std::move(panels));
+        return Ok(status.pending?"Workspace operation queued":status.message,std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_editor_layout(const ConsoleCommandContext& ctx)
@@ -1013,7 +1126,10 @@ namespace ConsoleCmd
         reg.Result({ "editor.windows" }, &Cmd_editor_windows);
         reg.Result({ "editor.dock" }, &Cmd_editor_dock);
         reg.Result({ "editor.layout" }, &Cmd_editor_layout);
+        reg.Result({ "editor.workspace" }, &Cmd_editor_workspace);
         reg.Result({ "editor.theme" }, &Cmd_editor_theme);
+        reg.Result({ "editor.sceneview" }, &Cmd_editor_sceneview);
+        reg.Result({ "editor.viewport" }, &Cmd_editor_viewport);
         reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);
     }
 }

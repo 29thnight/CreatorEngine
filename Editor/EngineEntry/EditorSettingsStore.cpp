@@ -118,6 +118,13 @@ bool EditorSettingsStore::Initialize() noexcept
                 preferences.SetImGuiScale(scale);
             }
 
+            if (root["contentTreeWidth"])
+            {
+                const float width = root["contentTreeWidth"].As<float>();
+                if (std::isfinite(width) && width >= 140.f && width <= 600.f)
+                    preferences.SetContentTreeWidth(width);
+            }
+
             if (root["startupSceneName"])
             {
 				const std::filesystem::path startupScene =
@@ -234,6 +241,7 @@ bool EditorSettingsStore::Save() noexcept
             std::filesystem::path(
                 m_buildSettings.GetStartupSceneName()).string());
         root.Child("imguiScale").SetScalar(m_preferences.GetImGuiScale());
+        // W3: read the legacy personal width for migration only; workspace owns future writes.
         root.Child("projectName").SetScalar(m_buildSettings.GetProjectName());
         // render.backend에는 사람이 고른 값이 아니라 **지금 돌고 있는** 백엔드를
         // 적는다. 에디터 호스트는 DX12 고정이라 이 키는 GUI에 노브가 없고,

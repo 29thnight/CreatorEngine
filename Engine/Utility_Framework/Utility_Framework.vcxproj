@@ -64,6 +64,7 @@
     <ClInclude Include="LogEntry.h" />
     <ClInclude Include="HtmlFileSink.h" />
     <ClInclude Include="LogSink.h" />
+    <ClInclude Include="LogStore.h" />
     <ClInclude Include="LogSystem.h" />
     <ClInclude Include="Mathematics.Intersect.h" />
     <ClInclude Include="MemoryPool.h" />

@@ -1,6 +1,7 @@
-﻿#include "GameBuilderSystem.h"
+#include "GameBuilderSystem.h"
 #include "EditorSettingsStore.h"
 #include "PathFinder.h"
+#include "EditorEngineDistribution.h"
 
 #include <Windows.h>
 #include <array>
@@ -11,24 +12,6 @@
 
 namespace
 {
-	file::path ResolvePowerShellExecutable()
-	{
-		constexpr std::array<const wchar_t*, 2> roots{ L"ProgramW6432", L"ProgramFiles" };
-		for (const wchar_t* variable : roots)
-		{
-			const DWORD required = GetEnvironmentVariableW(variable, nullptr, 0);
-			if (required <= 1) continue;
-			std::vector<wchar_t> value(required);
-			if (GetEnvironmentVariableW(variable, value.data(), required) == 0) continue;
-
-			const file::path candidate = file::path(value.data()) /
-				L"PowerShell" / L"7" / L"pwsh.exe";
-			std::error_code ec{};
-			if (file::is_regular_file(candidate, ec) && !ec) return candidate;
-		}
-		return {};
-	}
-
 	std::wstring QuoteWindowsArgument(std::wstring_view argument)
 	{
 		if (!argument.empty() &&
@@ -84,46 +67,41 @@ namespace
 			return false;
 		}
 
-		const file::path repositoryRoot = projectRoot.parent_path();
-		const file::path scriptPath = repositoryRoot / L"Tools" / L"build.ps1";
-		pathError.clear();
-		if (!file::is_regular_file(scriptPath, pathError) || pathError)
+		const auto distribution = ResolveEditorEngineDistribution(true);
+		if (distribution.root.empty())
 		{
-			Debug->LogError("게임 패키지 오케스트레이터를 찾을 수 없습니다: Tools/build.ps1");
+			Debug->LogError("선택 가능한 엔진 배포본이 없습니다. CreatorBuildTool publish-engine으로 배포본을 생성하세요.");
 			return false;
 		}
-
-		const file::path pwshPath = ResolvePowerShellExecutable();
-		if (pwshPath.empty())
+		const file::path repositoryRoot = distribution.root;
+		const file::path buildToolPath = repositoryRoot / L"Bin" / (L"x64-" + distribution.configuration) /
+			L"Tools" / L"CreatorBuildTool" / L"CreatorBuildTool.exe";
+		pathError.clear();
+		if (!file::is_regular_file(buildToolPath, pathError) || pathError)
 		{
-			Debug->LogError("게임 패키지 빌드에는 Program Files의 PowerShell 7(pwsh.exe)이 필요합니다.");
+			Debug->LogError("선택한 엔진 배포본에 CreatorBuildTool.exe가 없습니다.");
 			return false;
 		}
 
 		const std::wstring backendName =
 			backend == RenderBackend::Vulkan ? L"vulkan" : L"dx12";
-		const std::array<std::wstring, 20> arguments{
-			pwshPath.wstring(),
-			L"-NoProfile",
-			L"-NonInteractive",
-			L"-ExecutionPolicy",
-			L"Bypass",
-			L"-File",
-			scriptPath.wstring(),
-			L"-Target",
-			L"Game",
+		std::vector<std::wstring> arguments{
+			buildToolPath.wstring(),
+			L"package-game",
 			L"-Config",
-			L"Release",
+			distribution.configuration,
 			L"-InputMode",
 			L"Project",
 			L"-Project",
 			projectRoot.wstring(),
-			L"-BuildNative",
+			L"-EngineDistribution",
+			distribution.root.wstring(),
 			L"-StartupScene",
 			startupScene,
 			L"-RenderBackend",
 			backendName,
 		};
+		if (distribution.shipping) arguments.push_back(L"-Shipping");
 
 		std::wstring commandLine;
 		for (const auto& argument : arguments)
@@ -137,7 +115,7 @@ namespace
 		STARTUPINFOW startupInfo{};
 		startupInfo.cb = sizeof(startupInfo);
 		PROCESS_INFORMATION processInfo{};
-		if (!CreateProcessW(pwshPath.c_str(), mutableCommand.data(), nullptr, nullptr,
+		if (!CreateProcessW(buildToolPath.c_str(), mutableCommand.data(), nullptr, nullptr,
 			FALSE, CREATE_NO_WINDOW, nullptr, repositoryRoot.c_str(),
 			&startupInfo, &processInfo))
 		{
@@ -166,10 +144,10 @@ namespace
 //
 //   예전에는 여기서 GameBuild.sln을 /t:Rebuild로 다시 컴파일했다 — 게임
 //   빌드가 엔진을 게임용 구성으로 재컴파일하던 언리얼식 모델의 잔재다.
-//   이제 Editor와 CLI는 Tools/build.ps1 하나를 호출하고, 그 오케스트레이터가
-//   Player/AssetPacker의 Release 빌드부터 Stage/Pak/Verify/Publish까지 소유한다.
-//   Core DLL/version provenance가 생기기 전에는 stale Player 배포를 막기 위해
-//   제품 경로도 -BuildNative를 명시한다.
+//   Editor와 CLI는 CreatorBuildTool.exe를 호출하고, 그 도구가
+//   BuildManaged/Cook/Stage/Pak/Verify/Publish를 소유한다.
+//   제품 경로는 해시로 고정된 엔진 배포본을 선택한다. C++/ScriptCore는
+//   다시 빌드하지 않고, 프로젝트의 게임 스크립트와 콘텐츠만 패키징한다.
 
 void GameBuilderSystem::Initialize()
 {
@@ -191,7 +169,7 @@ bool GameBuilderSystem::BuildGame()
 		return false;
 	}
 
-	Debug->LogDebug("Release Player 패키지 빌드·검증·게시 완료 (Build/Staging/*.current.json).");
+	Debug->LogDebug("선택한 엔진의 Player 패키지 빌드·검증·게시 완료 (Build/Staging/*.current.json).");
 	return true;
 }
 

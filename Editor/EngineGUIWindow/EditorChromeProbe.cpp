@@ -18,12 +18,14 @@
 // include 는 이 TU 가 직접 소유한다(유니티에서 빠져 있다).
 
 #include "EditorChromeProbe.h"
+#include "EditorWorkspaceStore.h"
 
 #include "EditorChromeSnapshot.h"
 #include "EditorWindowRegistry.h"
 #include "EditorWindowNames.h"
 #include "EditorSettingsStore.h"
 #include "EditorFontResources.h"
+#include "EditorIcons.h"
 #include "EditorTheme.h"
 #include "RHI/IImGuiHost.h"
 
@@ -163,6 +165,12 @@ namespace editor
         // (`EditorRenderer::BuildInitialDockLayout`). 조건이 갈리면 감사가
         // 정상을 결함으로 보고한다. 지금 그 조건은 "떠 있는 창" 하나뿐이다 —
         // Content Browser 의 서랍 예외가 스타일 분기와 함께 사라졌다.
+        //
+        // ★ W4 까지 여기는 `window_role::panel` 도 함께 면제했고, 그래서 두
+        //   조건이 실제로는 갈려 있었다. 빌더는 패널을 도크한다(Hierarchy 는
+        //   right_upper 다). 면제한 탓에 `undocked` 는 중앙 창만 셌고,
+        //   §1.4 가 기록한 "그려지는데 자리를 잃은 패널" 은 이 감사가
+        //   구조적으로 볼 수 없었다 — 바로 그 사고를 잡으려고 만든 수인데도.
         const std::vector<window_entry>& entries = process_windows().entries;
         snapshot.placements.reserve(entries.size());
         for (const window_entry& entry : entries)
@@ -268,7 +276,7 @@ namespace editor
         const std::pair<ImGuiCol, ThemeColor> mappings[] = {
             { ImGuiCol_WindowBg, ThemeColor::Canvas }, { ImGuiCol_ChildBg, ThemeColor::Panel },
             { ImGuiCol_PopupBg, ThemeColor::Panel }, { ImGuiCol_MenuBarBg, ThemeColor::Chrome },
-            { ImGuiCol_FrameBg, ThemeColor::Canvas }, { ImGuiCol_FrameBgHovered, ThemeColor::PanelRaised },
+            { ImGuiCol_FrameBg, ThemeColor::Chrome }, { ImGuiCol_FrameBgHovered, ThemeColor::PanelRaised },
             { ImGuiCol_FrameBgActive, ThemeColor::Selection }, { ImGuiCol_Header, ThemeColor::Panel },
             { ImGuiCol_HeaderHovered, ThemeColor::Selection }, { ImGuiCol_Tab, ThemeColor::Chrome },
             { ImGuiCol_TabSelected, ThemeColor::Panel }, { ImGuiCol_Text, ThemeColor::Text },
@@ -308,15 +316,39 @@ namespace editor
             snapshot.fonts.push_back(std::move(view));
         }
         snapshot.font_fallback_probe_ok = ::editor::fonts::fallback_probe_ok();
+        snapshot.icon_role_count = std::size(EditorIcon::Roles);
+        snapshot.icon_source_policy_valid = true;
+        // All semantic roles, including icons outside the initially visible panels.
+        for (const auto& loaded : ::editor::fonts::loaded_fonts())
+        {
+            if (!loaded.font || loaded.role == "icons") continue;
+            // Presence alone misses PUA collisions: text sources must yield these slots.
+            for (const ImFontConfig* source : loaded.font->Sources)
+            {
+                if (source->MergeMode) continue;
+                for (const auto& role : EditorIcon::Roles)
+                {
+                    bool excluded = false;
+                    if (const ImWchar* ranges = source->GlyphExcludeRanges)
+                        for (; ranges[0]; ranges += 2)
+                            excluded |= role.codepoint >= ranges[0] && role.codepoint <= ranges[1];
+                    snapshot.icon_source_policy_valid &= excluded;
+                }
+            }
+            for (const auto& role : EditorIcon::Roles)
+                if (!loaded.font->IsGlyphInFont(static_cast<ImWchar>(role.codepoint)))
+                    snapshot.missing_icon_roles.push_back(loaded.role + ":" + role.name);
+        }
 
         // ── ini ───────────────────────────────────────────────────────────
         //
         // `PathFinder::ConfigPath` 를 다시 조립하지 않고 **ImGui 가 실제로 쓰는
         // 값**을 싣는다. 둘이 같다는 것은 계획서 §1.2 의 주장이고, 주장을
         // 베끼면 어긋난 순간을 못 본다.
-        if (nullptr != io.IniFilename)
+        const auto workspace = get_workspace_status();
+        if (!workspace.path.empty())
         {
-            snapshot.ini_path = io.IniFilename;
+            snapshot.ini_path = workspace.path;
             std::error_code error{};
             const std::filesystem::path path{ snapshot.ini_path };
             snapshot.ini_exists = std::filesystem::exists(path, error) && !error;

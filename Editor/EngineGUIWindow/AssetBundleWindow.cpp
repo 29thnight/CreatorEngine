@@ -5,11 +5,10 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "ReflectionImGuiHelper.h"
-#include "IconsFontAwesome6.h"
+#include "EditorIcons.h"
 #include "Assets/ModelAssetGeneration.h" // MBC9
 #include "Material.h"
 #include "Texture.h"
-#include "fa.h"
 #include "imgui_stdlib.h"
 #include <algorithm>
 

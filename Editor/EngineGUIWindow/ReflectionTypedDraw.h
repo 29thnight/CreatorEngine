@@ -458,7 +458,7 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             const bool changed = hasRange
                 ? ImGui::SliderFloat(kValueId, &v, rangeMin, rangeMax)
-                : ImGui::DragFloat(kValueId, &v);
+                : editor::widgets::drag_property_float(kValueId, &v);
             if (changed)
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
@@ -530,7 +530,7 @@ namespace Meta::TypedDraw
             MemberT v = value;
             ImGui::PushID(name);
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
-            if (ImGui::DragFloat2(kValueId, &v.x))
+            if (editor::widgets::drag_property_floats(kValueId, &v.x, 2))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -543,7 +543,7 @@ namespace Meta::TypedDraw
             MemberT v = value;
             ImGui::PushID(name);
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
-            if (ImGui::DragFloat4(kValueId, &v.x, 0.1f))
+            if (editor::widgets::drag_property_floats(kValueId, &v.x, 4, 0.1f))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -567,7 +567,7 @@ namespace Meta::TypedDraw
             math::rect v = value;
             ImGui::PushID(name);
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
-            if (ImGui::DragFloat4(kValueId, &v.x))
+            if (editor::widgets::drag_property_floats(kValueId, &v.x, 4))
             {
                 CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 value = v;
@@ -635,7 +635,7 @@ namespace Meta::TypedDraw
                 if constexpr (meta::reflectable<U>)
                 {
                     ImGui::PushID(name);
-                    if (ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen))
+                    if (editor::widgets::property_group_header(label))
                     {
                         DrawTypedObject(*p);
                     }
@@ -654,7 +654,7 @@ namespace Meta::TypedDraw
         else if constexpr (meta::reflectable<MemberT>)
         {
             ImGui::PushID(name);
-            if (ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen))
+            if (editor::widgets::property_group_header(label))
             {
                 DrawTypedObject(value);
             }

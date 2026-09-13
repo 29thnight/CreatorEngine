@@ -6,8 +6,7 @@
 #include "DataSystem.h"
 #include "RHI/IRHIDeviceResources.h"
 #include "ClrHost.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
 
 namespace
 {
@@ -170,13 +169,13 @@ void ResourceCounterWindow::Draw()
 	displayed.liveGpuValid = m_lastGpuCensus.liveGpuValid;
 
 	// --- 기준선 조작 ---
-	if (ImGui::Button(ICON_FA_FLAG " 현재를 기준선으로"))
+	if (ImGui::Button(EditorIcon::Label<EditorIcon::Baseline, " 현재를 기준선으로">))
 	{
 		m_baseline = displayed;
 		m_baseline.valid = true;
 	}
 	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_XMARK " 기준선 해제"))
+	if (ImGui::Button(EditorIcon::Label<EditorIcon::Close, " 기준선 해제">))
 	{
 		m_baseline = Snapshot{};
 	}
@@ -225,7 +224,7 @@ void ResourceCounterWindow::Draw()
 		{
 			// 두 맵은 항상 짝을 이뤄야 한다. 어긋나면 팔레트 버퍼가 새거나 조기 해제된 것이다.
 			ImGui::TextColored(kIncreaseColor,
-				ICON_FA_TRIANGLE_EXCLAMATION " Animator와 Palette 수가 다릅니다 (%zu vs %zu)",
+				EditorIcon::Label<EditorIcon::Warning, " Animator와 Palette 수가 다릅니다 (%zu vs %zu)">,
 				displayed.animators, displayed.animationPalettes);
 		}
 	}

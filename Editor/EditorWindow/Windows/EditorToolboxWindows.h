@@ -46,19 +46,19 @@ struct editor_authoring_windows
         return window_set(
             // 도크 빌더가 이 둘을 가운데 노드에 넣는다(BuildInitialDockLayout).
             panel<&windows::draw_behavior_tree>(
-                EditorWindowName::kBehaviorTree, EditorWindowName::kBehaviorTree)
+                EditorWindowName::kBehaviorTree, EditorWindowName::kBehaviorTreeLabel)
                 .dock(dock_slot::center)
                 .open_by_default(false)
                 .available(&windows::has_behavior_tree),
 
             panel<&windows::draw_black_board>(
-                EditorWindowName::kBlackBoard, EditorWindowName::kBlackBoard)
+                EditorWindowName::kBlackBoard, EditorWindowName::kBlackBoardLabel)
                 .dock(dock_slot::center)
                 .open_by_default(false)
                 .available(&windows::has_black_board),
 
             panel<&windows::draw_input_action_maps>(
-                EditorWindowName::kInputActionMaps, EditorWindowName::kInputActionMaps)
+                EditorWindowName::kInputActionMaps, EditorWindowName::kInputActionMapsLabel)
                 .initial_size(800.f, 600.f)
                 .open_by_default(false)
                 .available(&windows::has_input_action_maps));
@@ -76,18 +76,18 @@ struct editor_diagnostic_windows
             // BringWindowToFocusFront + BringWindowToDisplayFront 를 부르던 것이
             // 표시 순서 선언으로 왔다.
             panel<&windows::draw_frame_profiler>(
-                EditorWindowName::kFrameProfiler, EditorWindowName::kFrameProfiler)
+                EditorWindowName::kFrameProfiler, EditorWindowName::kFrameProfilerLabel)
                 .stacking(window_stacking::focus_front)
                 .open_by_default(false)
                 .available(&windows::has_frame_profiler),
 
             panel<&windows::draw_output_log>(
-                EditorWindowName::kOutputLog, EditorWindowName::kOutputLog)
+                EditorWindowName::kOutputLog, EditorWindowName::kOutputLogLabel)
                 .open_by_default(false)
                 .available(&windows::has_output_log),
 
             panel<&windows::draw_render_pass_debug>(
-                EditorWindowName::kRenderPassDebug, EditorWindowName::kRenderPassDebug)
+                EditorWindowName::kRenderPassDebug, EditorWindowName::kRenderPassDebugLabel)
                 .initial_size(400.f, 300.f)
                 .open_by_default(false)
                 .available(&windows::has_render_pass_debug));
@@ -104,7 +104,7 @@ struct editor_dialog_windows
             // 높이 0은 `AlwaysAutoResize` 와 짝이다 — 너비만 정하고 높이는
             // 내용이 정한다. 조건이 `Appearing` 인 유일한 창이다.
             panel<&windows::draw_about>(
-                EditorWindowName::kAbout, EditorWindowName::kAbout)
+                EditorWindowName::kAbout, EditorWindowName::kAboutLabel)
                 .traits(window_trait::no_docking |
                         window_trait::no_collapse |
                         window_trait::auto_resize)
@@ -113,13 +113,13 @@ struct editor_dialog_windows
                 .available(&windows::has_about),
 
             panel<&windows::draw_build_scene_setting>(
-                EditorWindowName::kBuildSceneSetting, EditorWindowName::kBuildSceneSetting)
+                EditorWindowName::kBuildSceneSetting, EditorWindowName::kBuildSceneSettingLabel)
                 .initial_size(460.f, 340.f)
                 .open_by_default(false)
                 .available(&windows::has_build_scene_setting),
 
             panel<&windows::draw_grid_settings>(
-                EditorWindowName::kGridSettings, EditorWindowName::kGridSettings)
+                EditorWindowName::kGridSettings, EditorWindowName::kGridSettingsLabel)
                 .traits(window_trait::auto_resize)
                 .open_by_default(false)
                 .available(&windows::has_grid_settings),
@@ -128,7 +128,7 @@ struct editor_dialog_windows
             // 없고 배치를 남기지 않는다. 성질은 옛 `Begin` 인자 그대로라
             // 역할 기본값의 `no_docking` 은 빼고 적었다.
             transient<&windows::draw_model_loading>(
-                EditorWindowName::kModelLoading, EditorWindowName::kModelLoading)
+                EditorWindowName::kModelLoading, EditorWindowName::kModelLoadingLabel)
                 .traits(window_trait::auto_resize | window_trait::no_saved_layout)
                 .available(&windows::model_loading_in_progress));
     }

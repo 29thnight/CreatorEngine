@@ -4,6 +4,8 @@
 #include "EditorWindowRegistry.h"
 
 #include <atomic>
+#include <memory>
+namespace editor { class EditorWorkspaceStore; }
 #include <chrono>
 
 class IImGuiHost;
@@ -53,6 +55,7 @@ private:
     void BuildInitialDockLayout(unsigned int dockspaceId, float width, float height,
         float posX, float posY);
 
+    std::unique_ptr<::editor::EditorWorkspaceStore> m_workspace;
     IImGuiHost* m_host{ nullptr };
     ::editor::window_table* m_windows{ nullptr };
     float m_lastRequestedScale{ -1.f };
@@ -63,6 +66,7 @@ private:
     // `EndFrame` 안이라 빠진다.
     std::chrono::steady_clock::time_point m_uiFrameBegan{};
     bool m_firstLoop{ true };
+    bool m_selectSceneOnStartup{ true };
 
     static std::atomic_bool s_dockLayoutResetRequested;
 };

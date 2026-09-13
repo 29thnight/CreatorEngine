@@ -31,8 +31,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$devExe   = Join-Path $repoRoot "Bin\x64-$Config\Player\Player.exe"
-$shipExe  = Join-Path $repoRoot "Bin\x64-$Config-Shipping\Player\Player.exe"
+# The EXE configures loading only. Service code and imports live in the host DLL.
+$devExe   = Join-Path $repoRoot "Bin\x64-$Config\Player\Player.runtime.dll"
+$shipExe  = Join-Path $repoRoot "Bin\x64-$Config-Shipping\Player\Player.runtime.dll"
 
 function Find-Tool([string]$Name) {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"

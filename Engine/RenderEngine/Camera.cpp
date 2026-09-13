@@ -75,9 +75,8 @@ math::matrix4x4 Camera::CalculateInverseProjection() const
 
 Core::Sizef Camera::GetScreenSize() const
 {
-	Core::Sizef size;
-	size = { static_cast<float>(ScreenResizeBus::Get().GetWidth()), static_cast<float>(ScreenResizeBus::Get().GetHeight()) };
-	return size;
+	const auto size = ScreenResizeBus::Get().GetSizeSnapshot();
+	return { static_cast<float>(size.width), static_cast<float>(size.height) };
 }
 
 FrameCameraSnapshot Camera::CaptureFrameSnapshot(float aspectRatio) const

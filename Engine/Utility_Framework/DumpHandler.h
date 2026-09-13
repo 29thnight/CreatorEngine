@@ -1,5 +1,7 @@
 #pragma once
 #include "Core.Definition.h"
+#include "EngineDistributionIdentity.h"
+#include "ScriptApiVersion.h"
 #include "PathFinder.h"
 #include "LogSystem.h"
 #include <DbgHelp.h>
@@ -365,7 +367,15 @@ inline void WriteCrashReportArtifacts(const file::path& dumpPath, const std::str
 
         if (std::ofstream out(reportPath, std::ios::binary); out)
         {
-            out << "EngineVersion: " << ENGINE_VERSION << "\n\n" << report;
+            const auto& identity = CurrentEngineDistributionIdentity();
+            out << "Product: " << CreatorEngineVersion::ProductName
+                << "\nFeatureRelease: " << CreatorEngineVersion::FeatureRelease
+                << "\nEngineBuild: " << CreatorEngineVersion::Build
+                << "\nLocalDevelopment: " << CreatorEngineVersion::LocalDevelopment
+                << "\nChannel: " << identity.channel
+                << "\nBuildId: " << identity.buildId
+                << "\nPayloadDigest: " << identity.payloadDigest
+                << "\nScriptApi: " << CreatorScriptApiVersion << "\n\n" << report;
         }
 
         std::printf("[크래시] 요약: %ls\n", reportPath.c_str());

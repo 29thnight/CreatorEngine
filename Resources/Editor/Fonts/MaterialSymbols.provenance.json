@@ -1,0 +1,19 @@
+{
+  "source_url": "https://raw.githubusercontent.com/google/material-design-icons/40a7a292a79d9394157e1ea24f83d52d5e17c556/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.ttf",
+  "source_sha256": "bf4c94b08c06c6b17e9d1a2d54a68c3f2c3435454761d487768df137a81f851d",
+  "codepoints_url": "https://raw.githubusercontent.com/google/material-design-icons/40a7a292a79d9394157e1ea24f83d52d5e17c556/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.codepoints",
+  "codepoints_sha256": "c18564f64d7d92dd3a6895a2c59ea69adfb56d6f553bcbbc88811c328159d715",
+  "license_url": "https://raw.githubusercontent.com/google/material-design-icons/40a7a292a79d9394157e1ea24f83d52d5e17c556/LICENSE",
+  "license_sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+  "font_sha256": "b999e1541478fd095d1498fa8be811aa0469f57e25310e1711e390eb6a7db7b1",
+  "font_bytes": 9100,
+  "axes": {
+    "opsz": 20,
+    "wght": 400,
+    "FILL": 0,
+    "GRAD": 0
+  },
+  "fonttools_version": "4.59.0",
+  "role_count": 66,
+  "glyph_count": 61
+}

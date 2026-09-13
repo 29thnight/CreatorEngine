@@ -65,7 +65,7 @@ namespace editor::widgets
         /// 표시 이름이자 ImGui ID 의 씨앗. 비울 수 없다.
         const char* label{ nullptr };
 
-        /// 오른쪽 끝 버튼의 라벨(보통 `ICON_FA_BARS`). 비면 버튼을 그리지 않는다.
+        /// 오른쪽 끝 버튼의 라벨(보통 `EditorIcon::More`). 비면 버튼을 그리지 않는다.
         const char* menu_icon{ nullptr };
 
         /// 왼쪽 체크박스가 읽고 쓰는 값. 비면 체크박스를 그리지 않는다.

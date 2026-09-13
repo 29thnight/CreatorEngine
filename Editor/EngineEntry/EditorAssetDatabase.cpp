@@ -385,12 +385,14 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		ScanAndRegisterMeta();
 
 		m_watcher = std::make_unique<efsw::FileWatcher>();
+		const auto rootUtf8 = m_root.u8string();
+		const std::string watcherRoot(rootUtf8.begin(), rootUtf8.end());
 		const efsw::WatchID watchId =
-			m_watcher->addWatch(m_root.string(), this, true);
+			m_watcher->addWatch(watcherRoot, this, true);
 		if (watchId < 0)
 		{
 			Debug->LogError("Editor asset watcher registration failed: " +
-				m_root.string());
+				watcherRoot);
 			m_watcher.reset();
 			return false;
 		}
@@ -978,8 +980,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 	{
 		try
 		{
-			const file::path directoryPath(directory);
-			const file::path filepath = directoryPath / filename;
+			const file::path directoryPath(std::u8string(directory.begin(), directory.end()));
+			const file::path filepath = directoryPath / std::u8string(filename.begin(), filename.end());
 			if (ContainsTemporaryPath(filepath)) return;
 
 			switch (action)
@@ -1430,8 +1432,8 @@ private:
 	void HandleMoved(const file::path& directory, const std::string& oldName,
 		const std::string& newName)
 	{
-		const file::path oldPath = directory / oldName;
-		const file::path newPath = directory / newName;
+		const file::path oldPath = directory / std::u8string(oldName.begin(), oldName.end());
+		const file::path newPath = directory / std::u8string(newName.begin(), newName.end());
 		if (newPath.extension() == ".meta")
 		{
 			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
@@ -1727,6 +1729,40 @@ bool EditorAssetDatabase::SaveMaterial(Material* material)
 		return false;
 	return WriteTextAssetWithMeta(savePath, document.Dump(), material->m_fileGuid)
 		== material->m_fileGuid;
+}
+
+bool EditorAssetDatabase::CreateFolder(const file::path& parent, std::string_view name,
+    file::path& createdPath, std::string& error)
+{
+    createdPath.clear();
+    error.clear();
+    if (!m_impl || name.empty() || name == "." || name == ".."
+        || name.find_first_of("<>:\"/\\|?*") != std::string_view::npos
+        || name.back() == '.' || name.back() == ' '
+        || std::any_of(name.begin(), name.end(), [](unsigned char c) { return c < 32; }))
+    {
+        error = "Enter a valid folder name.";
+        return false;
+    }
+    std::error_code ec;
+    const auto root = file::weakly_canonical(PathFinder::Relative(), ec);
+    if (ec) { error = ec.message(); return false; }
+    const auto target = file::canonical(parent, ec);
+    if (ec) { error = ec.message(); return false; }
+    const auto relative = target.lexically_relative(root);
+    if (relative.empty() || *relative.begin() == "..")
+    {
+        error = "Choose a folder inside the project Assets directory.";
+        return false;
+    }
+    const auto candidate = target / file::u8path(name.begin(), name.end());
+    if (!file::create_directory(candidate, ec))
+    {
+        error = ec ? ec.message() : "A file or folder with that name already exists.";
+        return false;
+    }
+    createdPath = candidate;
+    return true;
 }
 
 bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory)

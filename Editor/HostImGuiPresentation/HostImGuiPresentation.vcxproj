@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RHI\IImGuiHost.h" />
+    <ClInclude Include="RHI\ImGuiWin32Cursor.h" />
     <ClInclude Include="RHI\ImGuiHostPresentationSink.h" />
     <ClInclude Include="RHI\IImGuiRendererBackend.h" />
     <ClInclude Include="RHI\DX12\ImGuiDx12Shell.h" />
@@ -27,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RHI\ImGuiHost.cpp" />
+    <ClCompile Include="RHI\ImGuiWin32Cursor.cpp" />
     <ClCompile Include="RHI\DX12\ImGuiDx12Shell.cpp" />
     <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp" />
   </ItemGroup>

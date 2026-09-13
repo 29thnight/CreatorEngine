@@ -74,10 +74,27 @@ seed 표를 거치지 않고 `EditorCommandlets.cpp` 의 손표에 박혀 있는
   골든 갱신은 그 세션 몫이므로 건드리지 않았다.
 - `--commandlet list` 로 살아 있는 48개를 실물 확인했다.
 - ratchet 셋(discovery·exit spine·consumer)은 상한이라 명령이 줄면 초록을 유지한다.
-- **run-all 전체는 돌리지 않았다.** HEAD 부터 초록 기준선이 없고
-  (`verify-editor-command-surface.ps1` 은 이미 없는 `experiment.matresolve` 를 Exit=0 으로
-  기대하는 등 여러 칸이 붉다), 이 변경 전후를 가를 기준이 없다. 남은 칸이 초록이라고
-  주장하지 않는다.
+- **run-all 전체는 돌리지 않았다.** HEAD 부터 초록 기준선이 없어 이 변경 전후를 가를
+  기준이 없다. 남은 칸이 초록이라고 주장하지 않는다.
+
+### 5.1 뒤에 실측한 것 (2026-09-13)
+
+위에서 "여러 칸이 붉다" 며 든 예 둘을 실제로 재 봤다. **둘 다 이 변경이 남긴 것이었고,
+둘 다 고쳤다.**
+
+- `verify-editor-command-surface.ps1` — `experiment.matresolve` 는 은퇴하지 않았다(그 줄은
+  지금도 Exit=0 으로 통과한다). 실제로 붉던 자리는 **하나**였고 이 문서 §4 표가 적은 바로 그
+  수술이 원인이다: 일반 배치에서 은퇴한 `scene.hierarchymutation probe` 를 뺐는데 그 아래
+  개수 단정 둘(`results.Count -eq 5` · `$results[0..3]`)을 따라 고치지 않았다. 이름 셋 +
+  `quit` 이라 결과가 넷인데 다섯을 요구하고 있었다. 수를 배치 목록에서 유도하게 바꿨다
+  (`$commandletNames`) — 손으로 박아 두면 이름이 빠질 때마다 같은 자리에서 다시 어긋난다.
+  마지막 줄이 `quit` 인지도 함께 단정한다(색인 구간이 조용히 짧아지는 것을 막는다).
+  **결과: 293 checks 통과.**
+- `verify-cli-registry-golden.ps1` — 이 문서가 "`editor.*` 6개 때문에 이미 붉고 갱신은 그
+  세션 몫" 이라고 적어 둔 그 칸이다. 실측은 **추가 14 · 삭제 0**(`editor.*` 아홉 +
+  `object.icon` · `object.lock` · `scene.navigate` · `script.create` · `script.creation`).
+  사라진 제품 명령이 없으므로 골든이 뒤처진 것뿐이라 `-Update` 로 다시 기록했다
+  (113 commands · 120 names). **결과: 초록.**
 
 ## 6. 남은 일 — C++ 자가검사 구현 41개
 

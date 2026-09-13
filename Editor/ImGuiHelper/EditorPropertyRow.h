@@ -32,6 +32,16 @@
 
 namespace editor::widgets
 {
+    // Display-only normalization. Units, exponents and non-numbers stay intact.
+    void compact_property_number(char* text) noexcept;
+    bool drag_property_float(const char* label, float* value, float speed = 1.f,
+        float min = 0.f, float max = 0.f, const char* format = "%.3f",
+        int flags = 0, bool joined_left = false);
+    bool drag_property_floats(const char* label, float* values, int count,
+        float speed = 1.f, float min = 0.f, float max = 0.f,
+        const char* format = "%.3f", int flags = 0);
+    bool property_group_header(const char* label);
+
     /// 한 줄이 들 수 있는 값 열의 최대 수. 필드 ID 표의 크기이자 단정 대상이다.
     /// 이보다 많은 열을 요구하면 그리지 않고 거짓을 돌려준다 — 표 밖 ID 를
     /// 지어내면 같은 프레임의 다른 위젯과 ID 가 겹친다.
@@ -121,10 +131,8 @@ namespace editor::widgets
 
         /// 축 칸 하나의 최소 판독 폭. `value_min` 과 **다른 값**이다.
         ///
-        /// 한 줄에 값이 하나면 `-0000.000` 이 다 보여야 하지만, 축은 셋이
-        /// 한 줄을 나눠 쓰므로 같은 잣대를 대면 셋이 절대 한 줄에 서지 못한다.
-        /// 실제로 처음 판을 그렇게 짰다가 넉넉한 폭에서도 X·Y·Z 가 세로로
-        /// 떨어졌다. 축은 `%.3f` 한 칸이 보이는 폭을 기준으로 잰다.
+        /// 셋이 한 줄을 나눠 쓰므로 compact 표시의 고정 대표 문자열로 잰다.
+        /// 편집 포맷·저장 정밀도와는 별개이며 현재 숫자 값으로 폭을 바꾸지 않는다.
         float axis_value_min{ 0.f };
 
         /// 축 사이 간격. `gap` 과 다르다 — 축 위젯은 `ItemInnerSpacing` 으로
@@ -149,7 +157,8 @@ namespace editor::widgets
         float aux_reserve{ 0.f };
 
         /// 완충 폭. 전환한 모드에서 되돌아오려면 임계값보다 이만큼 더 넓어야
-        /// 한다. 0 이면 경계에서 한 픽셀 왕복이 모드를 진동시킨다.
+        /// 한다. 행 전체에 한 번 적용하며 축별로 중복하지 않는다.
+        /// 0 이면 경계에서 한 픽셀 왕복이 모드를 진동시킨다.
         float hysteresis{ 0.f };
 
         /// 편집 중인가(`ImGui::IsAnyItemActive`). 참이면 직전 모드를 붙든다 —

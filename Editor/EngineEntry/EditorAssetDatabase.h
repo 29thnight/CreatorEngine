@@ -63,6 +63,8 @@ public:
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);
 	bool CreateVolumeProfile(const file::path& directory);
+    bool CreateFolder(const file::path& parent, std::string_view name,
+        file::path& createdPath, std::string& error);
 	bool SaveExistingVolumeProfile(FileGuid guid, VolumeProfile* volume);
 
 private:

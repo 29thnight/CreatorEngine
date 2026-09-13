@@ -15,6 +15,7 @@
 | `mikktspace/` | 탄젠트 공간 생성 정본 | 원저자가 "stand-alone 두 파일로 유지하라"고 못박은 코드다. 패키지가 아니라 복사해 쓰는 것이 설계 의도이며, 임포트 계층 의존을 한곳에 모으는 위 정책과도 맞는다. 통합 규약(코너 단위 → 재용접)은 [mikktspace/README.md](mikktspace/README.md) |
 | `DotNetHost/` | .NET nethost 헤더·import lib·DLL | SDK가 설치하는 팩(`packs\Microsoft.NETCore.App.Host.win-x64\<버전>`)은 SDK 갱신마다 옛 패치 폴더가 지워져 버전 고정이 네 번 깨졌다. nethost는 hostfxr를 찾는 탐색기일 뿐 API가 .NET Core 3.0 이후 불변이라 SDK 버전과 묶일 이유가 없다. 판본·hash는 [DotNetHost/README.md](DotNetHost/README.md) |
 | `Mathematics/` | CreatorEngine의 DirectX 계열 수학 타입·연산을 대체할 C++20/23 헤더 온리 라이브러리 | vcpkg 포트가 없고 빌드 중 네트워크 fetch를 허용하지 않는다. `v0.1.0` pre-release의 존재와 별개로 검토한 upstream HEAD `1f43e080f180db1afbf6e18cb3849b758858a496`을 고정한다. 출처·갱신 절차는 [Mathematics/PROVENANCE.md](Mathematics/PROVENANCE.md) |
+| `ImViewGuizmo/` | 축 형태의 에디터 카메라 방향 위젯 | 사용자 요청에 따라 Mathematics와 +Z 전방 좌표계, Blender 참조 표시에 맞춘 소스를 고정한다. 출처·수정 범위는 [ImViewGuizmo/PROVENANCE.md](ImViewGuizmo/PROVENANCE.md) |
 
 ## ★ Vulkan 헤더를 왜 벤더링하는가
 

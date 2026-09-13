@@ -2,6 +2,12 @@
 #include "ImGui.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 
+namespace editor
+{
+	void DrawRenderRuntime(const EnhancedLiveDebugSnapshot& snapshot);
+	void DrawSceneRenderStatistics();
+}
+
 // EnhancedRenderer(DX12) 렌더 디버그 창.
 //
 // 왜 새 창인가: 예전 "RenderPass" 창(RenderPassWindow)은 DX11 SceneRenderer의

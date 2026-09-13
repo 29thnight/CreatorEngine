@@ -12,9 +12,6 @@
 
 namespace
 {
-    // 제목표시줄 오른쪽 버튼 셋. 폭은 프레임 높이에 비례해 스케일을 따라간다.
-    constexpr float kWindowButtonWidthRatio = 1.6f;
-
     std::wstring WidenUtf8(const std::string& value)
     {
         if (value.empty()) return {};
@@ -172,21 +169,21 @@ std::optional<LRESULT> EditorWindowChrome::HandleNonClientHitTest(
     return HTCAPTION;
 }
 
-void EditorWindowChrome::DrawTitleBarTail()
+void EditorWindowChrome::DrawTitleBarTail(const EditorTitleBarLayout& layout, float menuEndX)
 {
     ImGuiWindow* const window = ImGui::GetCurrentWindow();
     if (nullptr == window) return;
 
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
     const ImVec2 rowMin = window->Pos;
-    const float rowHeight = ImGui::GetFrameHeight();
-    const float rowRight = rowMin.x + window->Size.x;
+    const float rowHeight = layout.height;
 
     // 메뉴가 끝난 자리가 끌기 영역의 시작이다.
-    const float dragLeft = ImGui::GetCursorScreenPos().x;
+    const float dragLeft = menuEndX;
 
-    const float buttonWidth = rowHeight * kWindowButtonWidthRatio;
-    const float buttonsLeft = rowRight - buttonWidth * 3.f;
+    const float buttonWidth = layout.systemButtonWidth;
+    const float buttonsLeft = rowMin.x + layout.systemButtonsLeft;
+    const float playLeft = rowMin.x + layout.playLeft;
 
     // ── 가운데 제목 ──
     const std::wstring wideTitle = ComposeEditorWindowTitle();
@@ -199,7 +196,7 @@ void EditorWindowChrome::DrawTitleBarTail()
     const ImVec2 titleSize = ImGui::CalcTextSize(title);
     const float titleLeft = rowMin.x + (window->Size.x - titleSize.x) * 0.5f;
     // 메뉴나 버튼과 겹치면 제목을 그리지 않는다. 겹쳐 그리면 어느 쪽도 못 읽는다.
-    if (titleLeft > dragLeft && titleLeft + titleSize.x < buttonsLeft)
+    if (titleLeft > dragLeft && titleLeft + titleSize.x < playLeft - editor::ThemePixels(8.f))
     {
         drawList->AddText(
             ImVec2(titleLeft, rowMin.y + (rowHeight - titleSize.y) * 0.5f),
@@ -286,5 +283,5 @@ void EditorWindowChrome::DrawTitleBarTail()
     m_dragRegionLeft.store(
         std::max(0.f, dragLeft - viewport->Pos.x), std::memory_order_relaxed);
     m_dragRegionRight.store(
-        std::max(0.f, buttonsLeft - viewport->Pos.x), std::memory_order_relaxed);
+        std::max(0.f, playLeft - viewport->Pos.x), std::memory_order_relaxed);
 }

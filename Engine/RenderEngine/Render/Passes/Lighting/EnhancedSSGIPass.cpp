@@ -359,6 +359,22 @@ void EnhancedSSGIPass::ResetHistory()
     m_previousViewProjection = {};
 }
 
+void EnhancedSSGIPass::ReleaseHistory(const EnhancedFrameContext& context)
+{
+    for (uint32_t i = 0; i < kHistoryCount; ++i)
+    {
+        if (m_history[i].IsValid()) context.resources->ReleaseTexture(m_history[i]);
+        if (m_historyDepth[i].IsValid()) context.resources->ReleaseTexture(m_historyDepth[i]);
+    }
+    m_history.fill({});
+    m_historyDepth.fill({});
+    m_historyHandle.fill({});
+    m_historyDepthHandle.fill({});
+    m_historyState.fill(RHIResourceState::ShaderResource);
+    m_historyDepthState.fill(RHIResourceState::ShaderResource);
+    ResetHistory();
+}
+
 void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
     if (!m_inputs.depth.IsValid() || !m_tracePSO.IsValid())

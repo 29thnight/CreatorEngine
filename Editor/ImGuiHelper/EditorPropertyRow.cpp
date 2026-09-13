@@ -1,12 +1,178 @@
+// Numeric activation is adapted from Dear ImGui 1.92.8 (MIT).
+// Copyright (c) 2014-2026 Omar Cornut
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
 #include "EditorPropertyRow.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
 
 #include <array>
+#include <cstring>
 
 namespace editor::widgets
 {
+    void compact_property_number(char* text) noexcept
+    {
+        if (!text || !*text) return;
+        char* dot = nullptr;
+        char* end = text + (*text == '-' || *text == '+');
+        bool digits = false;
+        for (; *end; ++end)
+        {
+            if (*end == '.' && !dot) dot = end;
+            else if (*end >= '0' && *end <= '9') digits = true;
+            else return;
+        }
+        if (!dot || !digits) return;
+        while (end > dot + 1 && end[-1] == '0') --end;
+        if (end == dot + 1) --end;
+        *end = '\0';
+        if (std::strcmp(text, "-0") == 0 || std::strcmp(text, "+0") == 0)
+        {
+            text[0] = '0';
+            text[1] = '\0';
+        }
+    }
+
+    bool drag_property_float(const char* label, float* value, float speed,
+        float min, float max, const char* format, int flags, bool joined_left)
+    {
+        if (!InspectorStyleActive())
+            return ImGui::DragFloat(label, value, speed, min, max, format, flags);
+
+        // Layout/activation follows Dear ImGui 1.92.8 DragScalar. DragBehavior
+        // and TempInputScalar still own editing, rounding, navigation and input.
+        // Only the idle/drag value renderer differs: compact and left aligned.
+        // Dear ImGui: Copyright (c) 2014-2026 Omar Cornut, MIT license
+        // (vcpkg_installed/.../share/imgui/copyright).
+        using namespace ImGui;
+        ImGuiWindow* window = GetCurrentWindow();
+        if (window->SkipItems) return false;
+        ImGuiContext& g = *GImGui;
+        const ImGuiStyle& style = g.Style;
+        const ImGuiID id = window->GetID(label);
+        const char* label_end = FindRenderedTextEnd(label);
+        const ImVec2 label_size = CalcTextSize(label, label_end);
+        const ImRect frame(window->DC.CursorPos,
+            window->DC.CursorPos + ImVec2(CalcItemWidth(), GetFrameHeight()));
+        const ImRect total(frame.Min, frame.Max + ImVec2(
+            label_size.x > 0.f ? style.ItemInnerSpacing.x + label_size.x : 0.f, 0.f));
+        const bool input_allowed = !(flags & ImGuiSliderFlags_NoInput);
+        ItemSize(total, style.FramePadding.y);
+        if (!ItemAdd(total, id, &frame, input_allowed ? ImGuiItemFlags_Inputable : 0))
+            return false;
+        if (!format) format = "%.3f";
+        const bool hovered = ItemHoverable(frame, id, g.LastItemData.ItemFlags);
+        bool input = input_allowed && TempInputIsActive(id);
+        if (!input)
+        {
+            const bool clicked = hovered && IsMouseClicked(0, ImGuiInputFlags_None, id);
+            const bool twice = hovered && g.IO.MouseClickedCount[0] == 2 &&
+                TestKeyOwner(ImGuiKey_MouseLeft, id);
+            const bool activate = clicked || twice || g.NavActivateId == id;
+            if (activate && (clicked || twice)) SetKeyOwner(ImGuiKey_MouseLeft, id);
+            if (activate && input_allowed)
+                input = (clicked && g.IO.KeyCtrl) || twice ||
+                    (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_PreferInput));
+            if (g.IO.ConfigDragClickToInputText && input_allowed && !input &&
+                g.ActiveId == id && hovered && g.IO.MouseReleased[0] &&
+                !IsMouseDragPastThreshold(0, g.IO.MouseDragThreshold * 0.5f))
+            {
+                g.NavActivateId = id;
+                g.NavActivateFlags = ImGuiActivateFlags_PreferInput;
+                input = true;
+            }
+            if (activate) std::memcpy(&g.ActiveIdValueOnActivation, value, sizeof(float));
+            if (activate && !input)
+            {
+                SetActiveID(id, window);
+                SetFocusID(id, window);
+                FocusWindow(window);
+                g.ActiveIdUsingNavDirMask = (1 << ImGuiDir_Left) | (1 << ImGuiDir_Right);
+            }
+        }
+        if (input)
+        {
+            const bool clamp = (flags & ImGuiSliderFlags_ClampOnInput) &&
+                (min < max || (min == max && (min != 0.f || (flags & ImGuiSliderFlags_ClampZeroRange))));
+            return TempInputScalar(frame, id, label, ImGuiDataType_Float, value,
+                format, clamp ? &min : nullptr, clamp ? &max : nullptr);
+        }
+        const ImU32 background = GetColorU32(g.ActiveId == id ? ImGuiCol_FrameBgActive :
+            hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+        window->DrawList->AddRectFilled(frame.Min, frame.Max, background,
+            style.FrameRounding, joined_left ? ImDrawFlags_RoundCornersRight : ImDrawFlags_RoundCornersAll);
+        RenderFrameBorder(frame.Min, frame.Max, style.FrameRounding);
+        RenderNavCursor(frame, id);
+        const bool changed = DragBehavior(id, ImGuiDataType_Float, value,
+            speed, &min, &max, format, flags);
+        if (changed) MarkItemEdited(id);
+        char buffer[64];
+        DataTypeFormatString(buffer, IM_COUNTOF(buffer), ImGuiDataType_Float, value, format);
+        compact_property_number(buffer);
+        if (g.LogEnabled) LogSetNextTextDecoration("{", "}");
+        RenderTextClipped(frame.Min + ImVec2(style.FramePadding.x, 0.f),
+            frame.Max - ImVec2(style.FramePadding.x, 0.f), buffer, nullptr,
+            nullptr, ImVec2(0.f, 0.5f), &frame);
+        if (label_size.x > 0.f)
+            RenderText(ImVec2(frame.Max.x + style.ItemInnerSpacing.x,
+                frame.Min.y + style.FramePadding.y), label, label_end, false);
+        IMGUI_TEST_ENGINE_ITEM_INFO(id, label, g.LastItemData.StatusFlags |
+            (input_allowed ? ImGuiItemStatusFlags_Inputable : 0));
+        return changed;
+    }
+
+    bool drag_property_floats(const char* label, float* values, int count,
+        float speed, float min, float max, const char* format, int flags)
+    {
+        if (ImGui::GetCurrentWindow()->SkipItems) return false;
+        bool changed = false;
+        ImGui::BeginGroup();
+        ImGui::PushID(label);
+        ImGui::PushMultiItemsWidths(count, ImGui::CalcItemWidth());
+        for (int i = 0; i < count; ++i)
+        {
+            ImGui::PushID(i);
+            if (i) ImGui::SameLine(0.f, ImGui::GetStyle().ItemInnerSpacing.x);
+            changed |= drag_property_float("", values + i, speed, min, max, format, flags);
+            ImGui::PopID();
+            ImGui::PopItemWidth();
+        }
+        ImGui::PopID();
+        const char* end = ImGui::FindRenderedTextEnd(label);
+        if (label != end)
+        {
+            ImGui::SameLine(0.f, ImGui::GetStyle().ItemInnerSpacing.x);
+            ImGui::TextEx(label, end);
+        }
+        ImGui::EndGroup();
+        return changed;
+    }
+
+    bool property_group_header(const char* label)
+    {
+        if (!InspectorStyleActive())
+            return ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
+        // No extra ID push: child field IDs remain the same as CollapsingHeader.
+        return ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen |
+            ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth |
+            ImGuiTreeNodeFlags_FramePadding);
+    }
+
     namespace
     {
         // 값 열의 ImGui ID. 원본은 `"##x"`·`"##y"` 였고 열이 둘로 고정이라
@@ -72,7 +238,7 @@ namespace editor::widgets
                 continue;
             }
             ImGui::SetNextItemWidth(-FLT_MIN); // 셀 가용폭 전부
-            changed |= ImGui::DragFloat(kPropertyFieldIds[static_cast<std::size_t>(index)],
+            changed |= drag_property_float(kPropertyFieldIds[static_cast<std::size_t>(index)],
                 request.values + index, request.speed,
                 request.min, request.max, request.format);
         }
@@ -97,10 +263,9 @@ namespace editor::widgets
         // 프레임 라벨 최대값 변화로 열과 모드가 흔들리지 않게 한다" 고 한 자리다.
         constexpr const char* kValueSample = "-0000.000";
 
-        // 축 칸 하나의 최소 폭을 재는 문자열. 행 전체의 것보다 짧다 — 축은
-        // 셋이 한 줄을 나눠 쓰므로 같은 잣대를 대면 넉넉한 폭에서도 세로로
-        // 떨어진다. `%.3f` 한 칸이 보이는 만큼이 기준이다.
-        constexpr const char* kAxisSample = "-0.000";
+        // Minimum readable width for compact axis values, not the edit format.
+        // Keep this fixed so changing a value cannot rearrange the three axes.
+        constexpr const char* kAxisSample = "-0.00";
 
         // 유도한 표시 이름을 담는 버퍼. 매 프레임 필드마다 도는 자리라
         // std::string 을 새로 만들지 않는다(§8.2 의 "정적 경로 frame 당 heap
@@ -330,7 +495,8 @@ namespace editor::widgets
         {
             if (state.axis_stacked)
             {
-                if (slot >= axis_need + inputs.hysteresis)
+                // Hysteresis is a row-width margin, not a margin per axis.
+                if (slot >= axis_need + inputs.hysteresis / 3.f)
                 {
                     state.axis_stacked = false;
                 }
@@ -438,6 +604,8 @@ namespace editor::widgets
         const bool clipped = text_width > metrics.label_col;
 
         ImGui::AlignTextToFramePadding();
+        if (InspectorStyleActive())
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         if (clipped)
         {
             // 자른다. 잘린 줄은 그 자리에 tooltip 으로 전체 이름을 준다.
@@ -451,6 +619,7 @@ namespace editor::widgets
         {
             ImGui::TextUnformatted(label, end);
         }
+        if (InspectorStyleActive()) ImGui::PopStyleColor();
 
         if (property_layout_mode::stacked == metrics.mode)
         {

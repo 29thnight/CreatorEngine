@@ -15,7 +15,7 @@
 //
 // 이름 둘이 FA6 에서 바뀌었다 — TIMES → XMARK(U+f00d), PAINT_BRUSH →
 // PAINTBRUSH(U+f1fc). 코드포인트는 같아서 그려지는 그림은 달라지지 않는다.
-#include "IconsFontAwesome6.h"
+#include "EditorIcons.h"
 
 struct StyleOptions
 {
@@ -318,7 +318,7 @@ static void DrawProfilerTimeline(const ImVec2& size = ImVec2(0, 0))
 				{
 					if (ImGui::IsItemHovered())
 						pDraw->AddRect(ImGui::GetItemRectMin() + ImVec2(2, 2), ImGui::GetItemRectMax() - ImVec2(2, 2), ImColor(style.BGTextColor), 3.0f);
-					pDraw->AddText(ImGui::GetItemRectMin() + ImVec2(2, 2), ImColor(style.BGTextColor), isOpen ? ICON_FA_CARET_DOWN : ICON_FA_CARET_RIGHT);
+					pDraw->AddText(ImGui::GetItemRectMin() + ImVec2(2, 2), ImColor(style.BGTextColor), isOpen ? EditorIcon::Expand : EditorIcon::Collapse);
 					if (ImGui::ButtonBehavior(ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()), id, nullptr, nullptr, ImGuiButtonFlags_MouseButtonLeft))
 					{
 						isOpen = !isOpen;
@@ -503,17 +503,17 @@ void DrawProfilerHUD()
 	HUDContext& context = Context();
 	StyleOptions& style = context.Style;
 	static const char* fmt = "Paused";
-	static const char* buttonFmt = ICON_FA_PAUSE;
+	static const char* buttonFmt = EditorIcon::Pause;
 	static bool isPaused{ false };
 
 	if (gCPUProfiler.IsPaused())
 	{
-		buttonFmt = ICON_FA_PAUSE;
+		buttonFmt = EditorIcon::Pause;
 		fmt = "Paused - [Press Space to record]";
 	}
 	else
 	{
-		buttonFmt = ICON_FA_PLAY;
+		buttonFmt = EditorIcon::Play;
 		fmt = "Recording - [Press Space to pause]";
 	}
 
@@ -540,10 +540,10 @@ void DrawProfilerHUD()
 	ImGui::SameLine();
 	ImGui::InputText("##Search", context.SearchString, ARRAYSIZE(context.SearchString));
 	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_XMARK "##clearfilter"))
+	if (ImGui::Button(EditorIcon::Label<EditorIcon::Close, "##clearfilter">))
 		context.SearchString[0] = 0;
 	ImGui::SameLine();
-	if (ImGui::Button(ICON_FA_PAINTBRUSH "##styleeditor"))
+	if (ImGui::Button(EditorIcon::Label<EditorIcon::Appearance, "##styleeditor">))
 		ImGui::OpenPopup("Style Editor");
 
 	if (ImGui::BeginPopup("Style Editor"))

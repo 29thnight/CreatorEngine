@@ -2,8 +2,10 @@
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
+#include "EditorTheme.h"
+#include "TimeSystem.h"
+#include "RHI/ScreenSizedResource.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -28,7 +30,7 @@ namespace EnhancedRenderDebugUi
 	void LabeledValue(const char* label, const char* value, const ImVec4& color)
 	{
 		ImGui::TextColored(kDimColor, "%s", label);
-		ImGui::SameLine(180.0f);
+		ImGui::SameLine(editor::ThemePixels(125.f));
 		ImGui::TextColored(color, "%s", value);
 	}
 
@@ -63,7 +65,7 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 		m_editingLoaded = true;
 	}
 
-	if (!ImGui::CollapsingHeader(ICON_FA_SLIDERS " Pass settings", ImGuiTreeNodeFlags_DefaultOpen))
+	if (!ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Inspector, " Pass settings">, ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		return;
 	}
@@ -222,7 +224,7 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 		EnhancedSceneRenderer::SetLiveTuning(m_editing);
 	}
 
-	if (ImGui::Button(ICON_FA_ROTATE_LEFT " Revert to live values"))
+	if (ImGui::Button(EditorIcon::Label<EditorIcon::Revert, " Revert to live values">))
 	{
 		m_editing = EnhancedSceneRenderer::GetLiveTuning();
 	}
@@ -239,34 +241,8 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 		"so there is nothing to drive from here.");
 }
 
-// PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
-void EnhancedRenderDebugWindow::Draw()
+void editor::DrawRenderRuntime(const EnhancedLiveDebugSnapshot& displayed)
 {
-	static EnhancedLiveDebugSnapshot displayed{};
-	static double lastRefreshTime = -1.0;
-
-	const double now = ImGui::GetTime();
-	if (lastRefreshTime < 0.0 || (now - lastRefreshTime) >= kRefreshIntervalSeconds)
-	{
-		displayed = EnhancedSceneRenderer::GetLiveDebugSnapshot();
-		lastRefreshTime = now;
-	}
-
-	// ── 패스 세부 설정 ──
-	//
-	// 이 창의 본래 이름이 Pipeline Setting이다. 계측만 있고 설정이 없으면
-	// 이름이 거짓말이 된다.
-	DrawPassSettings();
-
-	// ── 러너 상태 ──
-	//
-	// 화면이 비었을 때 원인이 여기서 갈린다: 러너가 꺼졌는가,
-	// 파이프라인이 못 섰는가, 서긴 했는데 드로우가 0인가.
-	if (ImGui::CollapsingHeader(ICON_FA_MICROCHIP " Runtime", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		// UI 문자열은 영문으로 쓴다. 기본 폰트가 Verdana(라틴 전용)이고
-		// 한글 글리프는 MenuBarWindow가 두 번째 폰트로 올려 둔 malgun을
-		// PushFont로 꺼내 써야만 나온다 — 그 폰트는 그 창의 private 멤버다.
 		const char* backendName = EnhancedLiveBackend::Vulkan == displayed.backend
 			? "Vulkan" : "DX12";
 		char backendLabel[64]{};
@@ -308,12 +284,75 @@ void EnhancedRenderDebugWindow::Draw()
 		std::snprintf(buffer, sizeof(buffer), "%zu", displayed.graveyardCount);
 		LabeledValue("Graveyard", buffer,
 			0u == displayed.graveyardCount ? kDimColor : kWarnColor);
+}
+
+void editor::DrawSceneRenderStatistics()
+{
+    static EnhancedLiveDebugSnapshot displayed;
+    static double refreshed = -1.0;
+    if (refreshed < 0 || ImGui::GetTime() - refreshed >= 0.25)
+    {
+        displayed = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+        refreshed = ImGui::GetTime();
+    }
+    ImGui::TextUnformatted("Render Statistics");
+    ImGui::Separator();
+    ImGui::Text("FPS: %d", Time->GetFramesPerSecond());
+    ImGui::Text("Screen Size: %u x %u", ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
+    ImGui::SeparatorText("Runtime");
+    DrawRenderRuntime(displayed);
+    ImGui::SeparatorText("Frame cost");
+    ImGui::Text("CPU (record + submit): %.3f ms", displayed.cpuMs);
+    ImGui::Text("GPU (queue total): %.3f ms", displayed.gpuMs);
+    ImGui::SeparatorText("GPU pass timings");
+    if (displayed.passTimings.empty()) ImGui::TextDisabled("No completed GPU sample");
+    else if (ImGui::BeginTable("ScenePassTimings", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+    {
+        ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch, 3.f);
+        ImGui::TableSetupColumn("ms", ImGuiTableColumnFlags_WidthStretch, 1.f);
+        ImGui::TableHeadersRow();
+        for (const auto& pass : displayed.passTimings)
+        {
+            ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::TextUnformatted(pass.name.c_str());
+            ImGui::TableNextColumn(); ImGui::Text("%.3f", pass.milliseconds);
+        }
+        ImGui::EndTable();
+    }
+    if (!displayed.lastError.empty()) ImGui::TextWrapped("%s", displayed.lastError.c_str());
+}
+
+// PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
+void EnhancedRenderDebugWindow::Draw()
+{
+	static EnhancedLiveDebugSnapshot displayed{};
+	static double lastRefreshTime = -1.0;
+
+	const double now = ImGui::GetTime();
+	if (lastRefreshTime < 0.0 || (now - lastRefreshTime) >= kRefreshIntervalSeconds)
+	{
+		displayed = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+		lastRefreshTime = now;
+	}
+
+	// ── 패스 세부 설정 ──
+	//
+	// 이 창의 본래 이름이 Pipeline Setting이다. 계측만 있고 설정이 없으면
+	// 이름이 거짓말이 된다.
+	DrawPassSettings();
+
+	// ── 러너 상태 ──
+	//
+	// 화면이 비었을 때 원인이 여기서 갈린다: 러너가 꺼졌는가,
+	// 파이프라인이 못 섰는가, 서긴 했는데 드로우가 0인가.
+	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Runtime, " Runtime">, ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		editor::DrawRenderRuntime(displayed);
 	}
 
 	// LivePipelineDesc의 단일 목록을 그대로 보여 준다. 별도 CLI 덤프를
 	// 늘리지 않고도 실제 활성 backend가 쓰는 순서·활성 상태·슬롯 흐름을
 	// 확인할 수 있으며, 문자열은 파이프라인 변경 때만 다시 만들어진다.
-	if (ImGui::CollapsingHeader(ICON_FA_LAYER_GROUP " Pipeline topology"))
+	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Layers, " Pipeline topology">))
 	{
 		LabeledValue("Descriptor",
 			displayed.pipelineDescriptionValid ? "valid" : "invalid",
@@ -333,7 +372,7 @@ void EnhancedRenderDebugWindow::Draw()
 	}
 
 	// ── 프레임 비용 ──
-	if (ImGui::CollapsingHeader(ICON_FA_STOPWATCH " Frame cost", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Timing, " Frame cost">, ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		char buffer[64]{};
 		std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.cpuMs);
@@ -343,7 +382,7 @@ void EnhancedRenderDebugWindow::Draw()
 	}
 
 	// ── 패스별 GPU 시간 ──
-	if (ImGui::CollapsingHeader(ICON_FA_LAYER_GROUP " Pass timings", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Layers, " Pass timings">, ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		ImGui::Checkbox("Sort by duration", &m_sortByDuration);
 		ImGui::SameLine();
@@ -420,7 +459,7 @@ void EnhancedRenderDebugWindow::Draw()
 		EnhancedLiveBackend::Vulkan == displayed.backend ? "Vulkan" : "D3D12";
 	char validationHeader[64]{};
 	std::snprintf(validationHeader, sizeof(validationHeader),
-		ICON_FA_TRIANGLE_EXCLAMATION " %s validation", validationBackendName);
+		EditorIcon::Label<EditorIcon::Warning, " %s validation">, validationBackendName);
 	if (ImGui::CollapsingHeader(validationHeader,
 		ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -445,7 +484,7 @@ void EnhancedRenderDebugWindow::Draw()
 	if (!displayed.lastError.empty())
 	{
 		ImGui::Separator();
-		ImGui::TextColored(kErrorColor, ICON_FA_CIRCLE_EXCLAMATION " Last error");
+		ImGui::TextColored(kErrorColor, EditorIcon::Label<EditorIcon::Error, " Last error">);
 		ImGui::TextWrapped("%s", displayed.lastError.c_str());
 	}
 }

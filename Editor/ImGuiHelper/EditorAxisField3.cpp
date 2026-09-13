@@ -2,6 +2,7 @@
 
 #include "ImGui.h"
 #include "EditorTheme.h"
+#include "EditorPropertyRow.h"
 
 #include <array>
 
@@ -9,18 +10,11 @@ namespace editor::widgets
 {
     namespace
     {
-        // 축 색. 팔레트의 의미 색(Error 0xFB5A5A · Positive 0x5AEB5C ·
-        // Primary 0x2E70EA)보다 어둡고 채도가 낮다. 두 가지를 동시에 만족해야
-        // 했다 — 의미 색과 눈에 띄게 다를 것, 그리고 흰 글자가 그 위에서 읽힐 것.
-        //
-        // 흰 글자 대비(WCAG 상대 휘도 기준)는 X 5.4:1 · Y 5.1:1 · Z 5.3:1 이다.
-        // 밝은 초록(Positive)을 그대로 쓰면 2.1:1 이라 badge 의 글자가 사라진다.
-        // 그 계산은 주석이 아니라 단정이다 — `EditorThemeSelfTest` 가 여기서
-        // 내보내는 두 값으로 대비를 다시 재고 3:1 미만이면 붉어진다.
+        // Muted axis letters on a shared dark badge; color is not the only cue.
         constexpr std::array<std::uint32_t, static_cast<std::size_t>(axis::Count)> kAxisColors{
-            0xC0392B, // X
-            0x4F7A28, // Y
-            0x2D6FA8, // Z
+            0xD68C83, // X
+            0xA6C779, // Y
+            0x83A9DC, // Z
         };
 
         constexpr std::array<const char*, static_cast<std::size_t>(axis::Count)> kAxisLabels{
@@ -47,9 +41,9 @@ namespace editor::widgets
         return in_range(which) ? kAxisColors[static_cast<std::size_t>(which)] : 0u;
     }
 
-    std::uint32_t axis_badge_text_hex() noexcept
+    std::uint32_t axis_badge_background_hex() noexcept
     {
-        return ThemeColorHex(ThemeColor::Text);
+        return InspectorThemeTokens::AxisBackground;
     }
 
     const char* axis_badge_label(axis which) noexcept
@@ -61,20 +55,13 @@ namespace editor::widgets
     {
         ImU32 packed(std::uint32_t rgb) noexcept
         {
-            return IM_COL32((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
+            return ImGui::GetColorU32(ImVec4(((rgb >> 16) & 255) / 255.f,
+                ((rgb >> 8) & 255) / 255.f, (rgb & 255) / 255.f, 1.f));
         }
 
         // badge 하나. 자리를 잡고 그 위에 칠한다. 오른쪽 모서리를 각지게 두는
         // 것은 바로 뒤에 붙는 입력칸과 한 덩어리로 읽히게 하려는 것이다.
         //
-        // 다만 지금 테마에서는 그 덩어리의 절반이 보이지 않는다. 실제 화면을
-        // 찍어 보니 손대기 전의 입력칸에 경계가 없고 badge 만 떠 있다 —
-        // `EditorTheme.cpp` 가 `ImGuiCol_FrameBg` 를 `Canvas` 로 두는데
-        // 인스펙터 바탕도 `Canvas` 라 두 색이 같기 때문이다. hover 하면
-        // `FrameBgHovered`(`PanelRaised`)가 떠올라 칸이 드러난다. 이 위젯이
-        // 만든 성질이 아니라 테마가 두 칸을 같은 값으로 둔 결과이고, 같은
-        // 충돌이 `EditorSectionHeader` 의 hover 를 죽였던 것과 같은 양식이다.
-        // W1 이 아직 `progress` 인 자리라 여기서 값을 바꾸지 않고 적어 둔다.
         void draw_badge(axis which, float width, float height)
         {
             const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -82,14 +69,14 @@ namespace editor::widgets
 
             ImDrawList* const list = ImGui::GetWindowDrawList();
             const ImVec2 corner(origin.x + width, origin.y + height);
-            list->AddRectFilled(origin, corner, packed(axis_badge_hex(which)),
+            list->AddRectFilled(origin, corner, packed(axis_badge_background_hex()),
                 ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersLeft);
 
             const char* const text = axis_badge_label(which);
             const ImVec2 text_size = ImGui::CalcTextSize(text);
             const ImVec2 text_pos(origin.x + (width - text_size.x) * 0.5f,
                 origin.y + (height - text_size.y) * 0.5f);
-            list->AddText(text_pos, packed(axis_badge_text_hex()), text);
+            list->AddText(text_pos, packed(axis_badge_hex(which)), text);
         }
     }
 
@@ -151,8 +138,8 @@ namespace editor::widgets
             ImGui::SameLine();
 
             ImGui::SetNextItemWidth(field_width);
-            changed |= ImGui::DragFloat(kAxisFieldIds[index], request.values + index,
-                request.speed, request.min, request.max, request.format);
+            changed |= drag_property_float(kAxisFieldIds[index], request.values + index,
+                request.speed, request.min, request.max, request.format, 0, true);
         }
 
         ImGui::PopStyleVar();

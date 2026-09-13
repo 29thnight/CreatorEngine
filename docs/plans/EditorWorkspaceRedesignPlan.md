@@ -8,8 +8,18 @@
 - 셸 크롬 착지: 2026-09-10 — s&box 배치·ImGui 제목표시줄·다크 스킨이 W3보다 앞서 섰다.
   기록과 남은 창 선언 계약은 **부록 B**. 이 착지가 §1.1·§1.2·§1.4의 일부를 닫았고
   §1.3의 표시 상태 저장소 수를 정정했다.
-- 상태: 부록 A M0~M2·부록 B M3~M4·W0 착지(done) · **W1 구현·자동 회귀 통과, 실제 DPI 왕복 검증 대기** · 후속 단계는 §9 참조
+- 셸 크롬 후속: 2026-09-12 — 제목 행을 20 logical px / 글꼴 12px로 줄이고 File 왼쪽에 실행 파일의 엔진 아이콘을 표시한다.
+  Play/Stop·Pause/Resume은 최소화 버튼 앞의 공통 박스에 배치하며 별도 재생 행을 제거했다. 검증: [EditorTitleBarValidation.md](../analysis/EditorTitleBarValidation.md).
+- 최신 상태: **2026-09-13 현재 외관 사용자 승인·고정**. M0~M4·W0·W1(DX12)·**W3·W4**는 `done`, W2·W2-I·W2-V·W2-B는 부분 구현 `progress`다. 완료 부분과 남은 범위는 [§9.0](#phase21-current-status)을 정본으로 한다. Vulkan 대응·표시 오류는 사용자 결정으로 별도 보류한다.
 - 방향: **Dear ImGui 유지 · S&Box 테마 토큰 이식 · 소수 전용 위젯만 custom draw**
+- 인스펙터 후속 결정: 2026-09-11 — **W2-I 공통 속성 배치 규칙 추가 · Transform 2안 채택**.
+  컴포넌트 렌더 경로 통합·상단 우선 배치·개별 비활성화 불가. 상세는 [W2-I](#w2-inspector-layout).
+  2026-09-12 Inspector 스타일 슬라이스 구현·DX12 검증으로 `progress`이며 전체 완료는 아니다.
+- 씬뷰 후속 계획: 2026-09-11 — **W2-V 툴바·오버레이 반응형 배치 추가**.
+  동일 canvas 좌표·실측 정렬·아이콘/더보기 전환·방향 기즈모/HUD 공간 예약·입력 분리를 다룬다.
+  상세는 [W2-V](#w2-viewport-overlay). 현재 툴바·기즈모·통계·crop은 구현됐고 입력/최소 높이/통합 회귀가 남아 `progress`다.
+- 컨텐츠 브라우저 후속 계획: 2026-09-11 — **W2-B 내부 분할·경로/이력 탐색·New·검색/표시 도구 추가**.
+  고정 디렉토리 폭과 탐색 기능의 공백을 해소한다. 상세는 [W2-B](#w2-content-browser), 2026-09-12 내부 배치·탐색 구현을 시작했다.
 범위: Editor chrome, theme, tool window, docking, workspace, ViewportHost, Play 표시·입력 전환, 회귀 검증
 
 관련 정본:
@@ -362,10 +372,12 @@ flag 두 줄도 초기화가 아니라 매 프레임 OR이라 **런타임에 끌
 분기가 서 있다(`ImGuiHost.cpp:135`) — 죽은 분기이므로 이번 범위에서 켜지 않되, W8의 canary가
 "켜지지 않았음"을 단정한다.
 
-커서 쪽은 `ImGuiConfigFlags_NoMouseCursorChange`와 `ImGuiBackendFlags_HasMouseCursors`가 동시에
-서 있다. ImGui가 OS 커서를 바꾸지 않는다는 뜻이므로, §6.2의 "cursor lock/clip/visibility는
-ViewportHost가 소유한다"는 **경쟁자가 없다**는 점에서 유리하고, 동시에 **아무도 복구해 주지
-않는다**는 점에서 해제 누락이 그대로 남는다.
+**2026-09-11 소스 갱신:** `ImGuiConfigFlags_NoMouseCursorChange` 설정과 `App.cpp`의
+`WM_SETCURSOR` 화살표 강제를 제거했다. `ImGuiBackendFlags_HasMouseCursors`는 유지하므로
+에디터 UI의 커서 모양은 ImGui backend가 갱신하는 경로를 사용한다. 빌드·실행 검증은 별도다.
+이 변경으로 게임 입력의 lock/clip/visibility 복구까지 해결되는 것은 아니다. W5는 §6.2의
+입력 소유권에 따라 UI 커서 갱신과 게임 캡처를 조정하고, focus loss·Eject·Stop·비정상 종료의
+해제를 각각 검증한다.
 
 ### 1.9 에디터 chrome을 밖에서 볼 수단이 없다
 
@@ -498,14 +510,49 @@ geometry token:
 
 | token | 기준값(logical px) | 적용 |
 |---|---:|---|
-| `RowHeight` | 24 | Tree/목록/Property row |
-| `ControlHeight` | 24 | input/button/combobox |
+| `RowHeight` | 20 | Tree/목록/Property row (2026-09-12 밀도 보정) |
+| `ControlHeight` | 20 | input/button/combobox |
 | `ControlRadius` | 4 | frame/button |
-| `TabHeight` | 24 | document/tool tab |
+| `TabHeight` | 24 | document/tool tab (기존 높이 유지) |
 | `TabActiveMarker` | 2 | active/focused 표식 |
 | `TreeIndent` | 20 | Hierarchy/Tree |
 | `ScrollbarWidth` | 8 | panel scrollbar |
 | `PanelGap` | 1 | dock splitter/border 시각 간격 |
+
+2026-09-12 후속: 기본 글꼴 16px는 유지하면서 입력의 상하 padding을 4→2px로 줄였다.
+탭 핸들은 기존 24px를 유지하며, 도킹/창 프레임/명시적 탭을 그릴 때만 4px padding을 적용한다.
+컴포넌트 헤더 체크박스는 16px이며 접기 클릭 영역과 분리한다. Add Component는 실제 글꼴로 폭을 측정하고,
+좁은 패널에서는 두 줄로 표시한다. 상단 메뉴의 간격은 x=10/y=6px, 팝업 여백은 8×6px로 둔다.
+검증 기록: [EditorControlDensityValidation.md](../analysis/EditorControlDensityValidation.md).
+
+추가 조정: 엔티티 태그는 이름 입력칸 끝의 Material Symbols `sell` 아이콘에서 고른다.
+기존 Layer는 Physics Layer로 표시하며 드롭다운을 유지한다. Inspector의 수평 창 여백은
+10 logical px로 두고, 계층 생성 버튼은 높이를 유지하면서 가로 padding만 제거한다.
+제목 줄의 로고와 File 간격은 메뉴 사이 간격과 독립적으로 줄이며, Content Browser 분할선은
+1px로 표시하고 8px 드래그 영역을 유지한다. 세부 검증은
+[EditorEntityHeaderPolishValidation.md](../analysis/EditorEntityHeaderPolishValidation.md)에 기록한다.
+
+2026-09-13 엔티티 헤더 후속: Microsoft Fluent Emoji 3D 이미지 9개 프리셋을 Inspector와
+Hierarchy에 공통 적용했다(MIT 고지문 배포). 기본 엔티티는 Package(상자)다.
+Inspector 상단 화살표는 선택 이력 탐색,
+잠금 버튼은 엔티티 저작 편집을 잠근다. 아이콘·잠금은 씬 저장/복제와 Undo/Redo를 지원한다.
+DX12 빌드·실제 UI 및 저작 상태 회귀 163 checks를 통과했다.
+[EditorEntityNavigationValidation.md](../analysis/EditorEntityNavigationValidation.md) 참조.
+Fluent Emoji 교체 및 Content Browser 이미지 검증은
+[EditorFluentEmojiValidation.md](../analysis/EditorFluentEmojiValidation.md)에 따로 기록한다.
+전체 W2-I 상태와 추정 공수는 유지한다.
+2026-09-13 Add Component 후속: 검색·카테고리 탐색, 이미 추가된 컴포넌트 비활성화,
+C# 스크립트별 Inspector와 다중 부착, 새 스크립트 생성→비동기 컴파일→원래 엔티티 자동 부착을
+연결했다. 컴파일 실패 시 소스 유지/재시도, 완료 시 대상 삭제·잠금 확인, 부착 Undo/Redo를 지원한다.
+검색·분류 33 checks, DX12 생성/실패/재시도/잠금/취소/삭제 회귀 415 checks와 기존 재로드·초기화
+계약을 검증했다. 상세 범위·UI 증거는
+[EditorAddComponentBrowserValidation.md](../analysis/EditorAddComponentBrowserValidation.md)에 둔다.
+동일 후속에서 Add Component의 Fluent 이미지 아이콘, 본문 한글 fallback, SerializeField의 공통
+라벨/값 열과 Float3 가로/세로 배치를 적용했다. Debug 빌드, 폰트 병합 366 checks, DX12 테마
+64 checks 및 실제 한글·필드 편집·창 확대/복원 UI를 확인했다. 전체 W2-I 상태·공수는 유지한다.
+Float3 후속: 축의 최소 판독 폭은 compact 표시를 기준으로 재고, 가로 복귀의 완충 폭은
+각 축에 중복하지 않고 행 전체에 한 번 적용한다. 편집 정밀도와 좁은 폭의 세로 배치는 유지한다.
+전체 W2-I 완료 및 전역 C# 소스 변경 감시 완료로 계산하지 않는다.
 
 ### 3.2 typography와 DPI
 
@@ -766,24 +813,29 @@ target 크기를 central rect에 직접 묶지 않는다.
 초기 custom draw surface는 네 family로 제한한다.
 
 1. `EditorSectionHeader` — Inspector component header, enable toggle, fold, context menu
-2. `EditorPropertyRow` — 고정 label column, mixed/disabled/error 상태
+2. `EditorPropertyRow` — 공통 label column, mixed/disabled/error 상태. 열 폭 상한·좁은 폭 줄 전환은 [W2-I](#w2-inspector-layout)를 따른다.
 3. `EditorAxisField3` — X/Y/Z 색 badge와 compact numeric input
 4. `EditorModeButton` — viewport toolbar와 Play/Pause/Eject의 flat icon/active marker
+
+씬뷰의 버튼 묶음·폭별 표시 전환·오버레이 공간 예약은 [W2-V](#w2-viewport-overlay)의 공통
+배치 계층이 담당한다. 기존 `EditorModeButton`과 표준 Popup/Menu를 조합하며 custom draw family를 늘리지 않는다.
+브라우저 내부 분할선·경로/검색 도구는 [W2-B](#w2-content-browser)를 따른다. 표준 ImGui의
+resize·Table·Input·Menu 조합을 우선하고, 내부 API가 필요하면 기존 adapter 경계에 한정한다.
 
 표준 Button, Checkbox, TreeNode, InputText, Combo, Menu, Tooltip, Popup은 theme token을 입힌 ImGui
 widget을 그대로 쓴다. custom widget은 ImGui ID, nav, focus, disabled, clipping, tooltip, testability를
 보존해야 하며 별도 input framework를 만들지 않는다.
 
-**정찰 정정 — 넷은 백지 신설이 아니다.** `Editor/ImGuiHelper/`에 기존 자산이 있고(§1.10), 그
-관계를 먼저 정하지 않으면 같은 역할의 위젯이 두 벌 남는다. W2의 첫 산출물은 이 표를 확정하는
-것이다.
+**정찰 정정 — 넷은 백지 신설이 아니다.** 아래 승계 결정과 이관은 완료됐다.
+근거는 [EditorWidgetInheritanceW2.md](../analysis/EditorWidgetInheritanceW2.md)의 실제 소비자 조사이며,
+현재 외관 적용 완료와 남은 상호작용/성능 검증은 §9.0을 따른다.
 
-| 신규 family | 기존 자산 | 초기 판정 |
+| family | 기존 자산 | 확정 및 현재 상태 |
 |---|---|---|
 | `EditorSectionHeader` | `CustomCollapsingHeader.h` | **승계** — 기존 구현을 토큰화해 개명. 신규 작성 아님 · **착지** (2026-09-11) |
-| `EditorPropertyRow` | `TableAPIHelper.h`, `HorizontalLayout.h` | **부분 승계** — label column 규약만 흡수, 나머지는 존치 판정 후 결정 |
-| `EditorAxisField3` | `ImGuiDrawHelperRectTransformComponent.cpp`의 축 필드 | **승격** — 창 안에 흩어진 구현을 정본으로 끌어올린다 |
-| `EditorModeButton` | `ToggleUI.h`, `widgets.{h,cpp}` | **판정 필요** — `ToggleUI`의 소비자를 세고 겹치면 승계, 아니면 신설 후 은퇴 |
+| `EditorPropertyRow` | `TableAPIHelper.h` | **승계 완료** — 원본 은퇴. `HorizontalLayout.h`는 노드 에디터 소비자 때문에 범위 밖 |
+| `EditorAxisField3` | 기존 승격 대상 없음 | **신설·소비자 이관 완료** — 공통 축 색/ID·숫자 배치 |
+| `EditorModeButton` | `ToggleUI.h` | **신설·ToggleUI 은퇴 완료**. `widgets.{h,cpp}`는 노드 아이콘으로 범위 밖 |
 | — | `drawing.{h,cpp}`, `BlueprintBuilder`, `NodeEditor` | **범위 밖** — node editor 전용. 건드리지 않는다 |
 
 판정의 근거는 소비자 수다. 소비자를 셀 때 파일 이름 부분 문자열로 세지 않는다 — 경계 없는
@@ -849,14 +901,92 @@ CreatorEngine editor다.
 정찰 뒤 **25일**로 조정했다(W0 +1, W5 +1. 근거는 각 슬라이스에 적었다).
 2026-09-10 재정찰에서 **부록 A의 메뉴 등록 배선 M0~M2(3.5일)**를 범위에 넣어 총 **28.5일**이 됐다.
 같은 날 **부록 B의 셸 크롬 M3(1.5일)**가 먼저 착지했고 **창 선언 M4(3일)**를 범위에 더해
-총 **33일**이 됐다. 착수 순서는 §10의 권장 순서 표를 따른다.
+총 **33일**이 됐다. 2026-09-11 인스펙터 후속 **W2-I 6일(초기 추정)**로 39일,
+씬뷰 후속 **W2-V 4일(초기 추정)**로 43일, 브라우저 후속 **W2-B 7일(초기 추정)**을 추가해
+산정된 전체 범위는 **50일**이다.
+W7 비동기 썸네일의 미산정 추가 공수는 이 합계에 포함하지 않는다.
+착수 순서는 §10의 권장 순서 표를 따른다.
 
 **(2026-09-11)** 부록 A·B의 다섯 슬라이스가 모두 착지했다 — M0~M2(3.5일) · M3(1.5일) ·
-M4(3일), 합 8일. 남은 것은 W0~W8의 25일이고, W3의 선행이던 M1·M4가 끝나 있다.
+M4(3일), 합 8일. 당시 W0~W8의 산정 범위는 25일이었고, W3의 선행이던 M1·M4가 끝났다.
+추가 W2-I·W2-V·W2-B는 그 25일과 별도인 6일·4일·7일이며, 이 수치는 현재 잔여 공수나 완료 실적을 뜻하지 않는다.
 
 M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — 요약하면, 제목표시줄과 배치와 스킨은
 서로를 전제하므로 한 번에 세우는 편이 같은 파일을 세 번 헤집는 것보다 싸고, 창 본문을 건드리지
 않아 W3의 대상이 줄지 않는다.
+
+<a id="phase21-current-status"></a>
+
+### 9.0 현재 완료·잔여 정본 (2026-09-13)
+
+**사용자 결정: 외관은 현재 상태로 고정한다.** 색·폰트·이미지 아이콘·컨트롤 밀도·탭 크기·여백·
+제목표시줄과 패널 내부 배치를 다시 시안 작업으로 돌리지 않는다. 이후 기능 이관도 이 외관을 유지한다.
+잘림·입력 불능·상태 유실 같은 결함 수정과 아래에 명시된 기능 추가는 남은 범위다.
+이전 날짜의 착수 전 설명보다 이 절을 우선한다. 사용자 화면 승인은 전체 타입/입력/DPI/성능 검사의 대체 증거가 아니다.
+
+#### 완료한 적용 범위
+
+| 범위 | 현재 완료 내용 | 근거 |
+|---|---|---|
+| W1 테마·아이콘·폰트 | semantic token/DPI, Material Symbols UI 아이콘, 본문 한글 fallback, 아이콘/문자 정렬, 수동 Live Code 버튼 제거 | [W1](../analysis/EditorThemeW1Validation.md), [DX12 resize](../analysis/EditorW1Dx12ResizeValidation.md), [정렬](../analysis/EditorIconAlignmentValidation.md), [한글](../analysis/EditorAddComponentBrowserValidation.md) |
+| 셸·공통 외관 | 엔진 아이콘과 File 간격, 낮은 제목 행, 최소화 앞 Play/Pause 박스, 재생 전용 행 제거, 작은 입력칸·본문 여백, 원래 탭 높이 복원 | [제목표시줄](../analysis/EditorTitleBarValidation.md), [컨트롤](../analysis/EditorControlDensityValidation.md) |
+| W2 공통 위젯·Hierarchy | section/property/axis/mode 4종과 기존 위젯 승계, 교차 행·선택·검색·생성 버튼·정렬 | [승계](../analysis/EditorWidgetInheritanceW2.md), [Hierarchy](../analysis/EditorHierarchyStyleValidation.md) |
+| W2-I Inspector | 헤더·공통 라벨/값 열·XYZ와 Float3 복귀 기준, 태그 팝업/선택 체크, Physics Layer, 오른쪽 여백 | [Inspector 및 사용자 Float3 확인](../analysis/EditorInspectorStyleValidation.md), [엔티티 헤더](../analysis/EditorEntityHeaderPolishValidation.md) |
+| 엔티티 편집 기능 | Fluent Emoji 3D 프리셋과 기본 Package 상자, 선택 이력 뒤/앞, Inspector·씬 기즈모·계층 수정/삭제 잠금, 저장·복제·Undo/Redo | [탐색·잠금 163 checks](../analysis/EditorEntityNavigationValidation.md), [Fluent Emoji](../analysis/EditorFluentEmojiValidation.md) |
+| 컴포넌트·스크립트 | 검색/카테고리/아이콘, 기존 C# 부착·이름별 Inspector, 새 소스 생성→비동기 컴파일→원래 엔티티 자동 부착·실패/재시도, SerializeField 공통 배치·한글 표시 | [catalog 33 / authoring 415 / font 366 checks](../analysis/EditorAddComponentBrowserValidation.md) |
+| W2-V 씬뷰 | Unreal 참조 반응형 툴바, Mathematics 기반 ImViewGuizmo의 Blender 참조 표시, Render Statistics Runtime/GPU 연결, FPS 박스 제거, 카메라를 늘이지 않는 중앙 crop·좌표 통일 | [툴바·축 조작](../analysis/EditorSceneViewportOverlayValidation.md), [crop 815 checks](../analysis/EditorSceneCropValidation.md) |
+| W2-B Browser | 얇은 내부 분할선·선호 폭 저장·좁은 창 폴더 팝업, 경로/뒤·앞·상위 이동, 통합 검색/지우기, 유형/정렬/타일·목록, 새 폴더, Fluent 폴더·파일 이미지, 시작 Scene 선택 | [Browser](../analysis/EditorContentBrowserLayoutValidation.md), [Fluent Emoji](../analysis/EditorFluentEmojiValidation.md) |
+
+완료 기능을 다시 구현 대상으로 세지 않는다. 단, 정적 유형 이미지 교체는 **비동기 에셋 썸네일 완료가 아니며**,
+새 스크립트 생성 작업의 컴파일/부착은 **전역 소스 자동 감지 완료가 아니다**. 전역 감시는 별도 CoreCLR 작업이다.
+
+#### 단계 상태와 남은 목록
+
+| 단계 | 상태 | 남은 작업 |
+|---|---|---|
+| M0~M4, W0, W1 | **done** | 현재 DX12 기준 완료. 외관 추가 시안 없음. Vulkan은 별도 보류 |
+| W2 | progress | 4종 구현은 완료. 최종 상태/키보드 탐색/clipping 회귀, 시각 기준선과 성능 gate |
+| W2-I | progress | Transform·RectTransform 공통 컴포넌트 경로 통합, RectTransform 최소 폭 대응, 중첩/배열·전용 드로어·Import Settings 전수 이관, 활성 정책·중복 호출·편집/저장 회귀 |
+| W2-V | progress | 기즈모가 숨겨지는 낮은 높이의 방향 선택 메뉴, resize 중 조작 취소·release/포커스 소유권, drop/terrain 입력 관통, W4/W5 연결·연속 resize 및 DPI/성능 회귀 |
+| W2-B | progress | 최근/전체 검색, 방문별 검색·선택 복원, Volume Profile 생성 대상 경로/취소/실패 정리, W3 저장·W7 목록 연결, 실제 마우스 분할선/동명 자산 drop 회귀 |
+| W3 | **done** | ID·legacy 이주, 자유 dock/close/reopen, versioned save/load/reset/backup·손상 복구가 게이트 둘(169+212 checks)로 선다. Scene `no_move` 해제는 W4 단일 Host, `dock_slot` 선언화는 W6 preset 소속 |
+| W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize는 두 backend generation/retire 검증 뒤 |
+| W5 | todo | Play 요청/진행/확정 상태, Snapshot 성공 후 전이, Pause/Eject/Stop 입력·커서·focus 복원, 실패/Undo 정책과 `editor.viewport` 관측 |
+| W6 | todo | 현재 외관을 유지하는 5종 배치 preset, Save As/Rename/Delete/Reset·작은 창 복원 |
+| W7 | todo | Hierarchy/Browser 목록 snapshot·flatten/cache/clipping, 1k/10k/50k 실측, **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
+| W8 | todo | DX12 통합 빌드·DPI/재시작/손상 ini/Play/preset/성능 회귀, 현재 승인 외관의 자동 golden·CI, legacy 잔재 전수 확인 |
+
+현재 소스에서 확인한 잔여 경계:
+
+- `InspectorWindow::Render`는 공간 컴포넌트를 앞에서 그린 뒤 일반 순회에서 제외한다. 중복 표시는 막았지만
+  W2-I1이 요구한 **공통 순회/헤더 + 전용 본문** 통합과 인스턴스별 호출 수 검증은 아직 별개다.
+- `RectTransformTable`은 고정 90px를 없앴지만 좁은 폭에도 앵커 옆 3열 표를 유지한다.
+  일반 필드의 공통 열 적용만으로 RectTransform·중첩 배열·Import Settings 완료를 판정하지 않는다.
+- `SceneViewportOverlay`는 공간이 부족하면 `showGizmo=false`로 숨긴다. 여섯 축 클릭은 검증됐지만
+  그 상황의 방향 선택 대체 메뉴는 없다. Scene crop은 W4 기여로 기록하고 V0에서 중복 실적을 세지 않는다.
+- Browser 이력은 `vector<path>`이며 `Navigate`가 검색·선택을 초기화한다. 썸네일 자리에는 현재 유형 이미지를 쓴다.
+- `EditorRenderer::BuildInitialDockLayout`은 선언의 `dock_slot`을 쓰고 Tile 분기를 이미 제거했다.
+  `EditorWindowNames`의 ID 이주는 W3에서 끝났고 옛 이름은 `legacy_names` 이주 표로만 남는다.
+  Scene/Game을 한 Host의 표시 모드로 합치는 일은 **W4가 닫았다**(§W4 착지와 결함).
+  Scene의 `no_move`는 그 Host가 가운데 노드를 떠나지 않으므로 그대로 둔다 — 걷을 이유가 사라졌다.
+- `ImGuiHost::BeginFrame`의 `WantCapture*` 강제와 SceneManager의 Snapshot 이전 Play 이벤트 발행은 남아 있다.
+  제목표시줄 Play/Pause 버튼 완료를 W5 완료로 세지 않는다.
+
+#### 산정·검증 범위
+
+- 산정 범위는 **50일** 유지. 닫힌 상위 단계 M0~M4·W0·W1·**W3·W4**는 **19일**이다(W3 3일 · W4 4일).
+  세부 완료는 **W2-I0 0.5일**, **W2-V1 1일**만 추가 인정해 대시보드 완료 공수는 **20.5/50일(41%)**이다.
+  W2의 자동 50% 가중치는 명시적 `earnedDays=0`으로 대체한다. 나머지 부분 구현에 임의의 실적을 배분하지 않는다.
+  29.5일은 미획득 초기 추정분이며 **현재 남은 일정 견적이 아니다**. W7 썸네일 추가 견적도 아직 제외다.
+- W2-I 실측 문서의 9일안은 추가 의미 정책 등을 포함한 제안이다. 현재 정본의 6일을 이번 상태 갱신에서
+  자동 증액하지 않는다. 전용 드로어 및 썸네일 착수 전 남은 실작업을 재산정한다.
+- DX12 테마의 대표 100→150→100%/64 checks, UI 조작, 각 기능별 게이트 기록을 근거로 한다.
+  전체 폭/DPI 조합, 실제 모니터 이동, 연속 resize·모든 drop/terrain 소비자·성능은 미완료다.
+- 최신 Float3은 라이브러리 빌드/링크와 사용자 화면 확인이 있고 추가 selftest는 실행 통과로 세지 않는다.
+  당시 공유 런타임 배포 변경 때문에 전체 빌드가 중단된 기록도 보존한다. 이번 문서 갱신에서는 재빌드하지 않았으며
+  최신 공유 작업 트리의 통합 성공은 W8에서 별도 확인한다.
+- **현재 완료 판정은 DX12 범위다.** 아래 원래 행렬의 Vulkan 항목은 삭제하거나 통과 처리하지 않고 별도 보류한다.
+  실제 모니터 DPI와 사용자 배율도 구분한다. 사용자 승인 화면을 자동 golden 전수 검증으로 세지 않는다.
 
 ### W0 — 관측 표면 · 기준선 · 실패 게이트 (P0, 2일 · 정찰 뒤 1일→2일)
 
@@ -959,13 +1089,44 @@ id 가 둘이어야 하는데, 그것은 `editor.windows` 의 `duplicateIds` 가
 
 ### W1 — Theme token · font/icon · DPI 정본 (P1, 2일)
 
-**2026-09-11 구현 반영, Debug/Release 자동 회귀 통과.** 상세 증거와 남은 검증은
+**2026-09-11 기존 테마·폰트·DPI 구현 반영, Debug/Release 자동 회귀 통과.** 상세 증거와 남은 검증은
 [EditorThemeW1Validation.md](../analysis/EditorThemeW1Validation.md)에 둔다.
+
+**같은 날 아이콘 방향 확정:** 공통 UI·유형 아이콘은 **Google Material Symbols**로 교체한다.
+Outlined의 59역할/54글리프 static TTF(7,920바이트), 역할 매핑·버전·codepoint·라이선스를 적용했다.
+본문 Inter는 별도 역할이다. FA6 헤더·압축 블롭을 제거했고 기존 창 8개의 저장 ID 바이트는 유지한다.
+Inter와의 PUA 충돌은 UI 사설 문자 영역의 3값 제외 범위로 처리한다(64값 상한 준수).
+수정 후 Debug/Release 빌드와 각 구성의 DX12·Vulkan 6기동·121검사가 통과했다.
+전체 59역할의 누락은 0이며 본문 폰트가 아이콘을 덮어쓰지 않는지도 검사한다.
+실제 에디터 화면과 OS DPI 왕복도 검증했다. 폰트·DPI 값은 통과했지만
+DX12 Scene 표시 복구 지연과 Vulkan 모니터 경계 리사이즈 후 device loss로 완료 판정을 보류했다.
+재현·복원 기록은 [EditorW1InteractiveValidation.md](../analysis/EditorW1InteractiveValidation.md)에 둔다.
+2026-09-12 원인 분석·수정 순서는 [EditorW1DpiResizeRootCauseAndFixPlan.md](../analysis/EditorW1DpiResizeRootCauseAndFixPlan.md)에 둔다.
+사용자 요청으로 DX12를 우선 수정했다. 공통 크기 snapshot을 동기화하고, DX12의 전체 패스 재구축을
+표시 슬롯·transient 풀·SSGI 히스토리 교체로 바꿨다. 패스·ShaderMeta·IBL은 유지한다.
+Debug/Release 빌드와 각 10회 resize·실제 DPI 왕복이 통과했으며 DPI 축소 시 표시 공백은
+기존 8.58초에서 Debug 118ms / Release 63ms로 줄었다.
+[EditorW1Dx12ResizeValidation.md](../analysis/EditorW1Dx12ResizeValidation.md)에 증거와 범위를 둔다.
+**2026-09-12 후속 사용자 결정:** Vulkan의 DX12 대응과 표시 오류 처리는 우선 보류하고,
+W1을 DX12 기준 `done`으로 판정한다. 이 범위에서 남은 W1 구현·필수 검증은 없다.
+Vulkan 모니터 경계 resize 후 device loss는 미수정·미재검증이며 해결된 것으로 세지 않는다.
+Vulkan 작업을 재개할 때 [기존 원인 분석](../analysis/EditorW1DpiResizeRootCauseAndFixPlan.md)의
+실제 extent·실패 상태·DPI/resize 검증 항목을 이어간다.
+CoreCLR 자동 변경 감지 방향에 따라 Live Code 비활성 자리표시자 **버튼을 제거했다**.
+자동 변경 감지 기능 자체의 구현은 이번 범위가 아니다. 메시·텍스처 등 Browser 타일은 유형 아이콘을 먼저 표시하고,
+비동기 썸네일이 GPU에서 표시 가능해지면 다음 프레임부터 교체한다. 유형 아이콘 정리는 W1,
+요청·생성·캐시·완료 게시와 타일 연결은 W7 Browser 추가 범위다.
+상세 선정표와 상태·수명 계약은 [EditorIconSelectionStudy.md](../analysis/EditorIconSelectionStudy.md),
+제품 적용과 추가 검증은 [EditorMaterialSymbolsW1Validation.md](../analysis/EditorMaterialSymbolsW1Validation.md)에 둔다.
+
+2026-09-12 아이콘/본문 정렬 후속: 폰트 병합에서 실제 가시 영역 중심을 측정해 공통 기준선을 보정했다.
+Scene/Game 탭·툴바 및 본문/한글/작은 글씨에 같은 보정을 적용한다.
+검증 범위는 [EditorIconAlignmentValidation.md](../analysis/EditorIconAlignmentValidation.md)에 둔다.
 
 - `EditorThemeTokens` / `ApplyEditorTheme`가 §3.1의 14색과 logical geometry를 소유한다.
   `EditorRenderer`와 창별 공통 색·간격 override가 같은 토큰을 소비한다.
 - Inter 4.1 static regular와 OFL 라이선스를 Editor resource로 포함·배포한다.
-  번들 → 시스템 후보 → ImGui 기본 폰트의 대비 경로와 FA6 병합을 유지하며,
+  번들 → 시스템 후보 → ImGui 기본 폰트의 대비 경로를 유지하고 Material Symbols를 병합하며,
   본문·heading은 같은 Inter를 쓴다. 본문 크기와 icon 크기·baseline 보정은 별도 토큰이다.
   기존 한글 폰트는 별도 후보를 유지한다.
   monospace ImGui 소비자는 현재 없으므로 그 체인은 소비자가 생길 때 추가한다.
@@ -986,12 +1147,29 @@ id 가 둘이어야 하는데, 그것은 `editor.windows` 의 `duplicateIds` 가
 지역 style 183검사, Debug 선언 배선 33검사, workspace ini 6종·108검사, obsolete surface도 통과했다.
 실행 중 사용자 배율 100→150→100%는 Debug UI에서도 확대·복귀를 확인했다.
 활성 ImGui style push는 Editor 전체 51→36건이다(범위·주석 차이는 검증 기록 참조).
-현재 두 모니터가 모두 150%라 **실제 OS DPI 100↔150% 왕복은 남아 있다**.
-합성 style 시험이나 150% 기동 통과로 이 항목을 닫지 않으며 W1은 `progress`로 유지한다.
+후속 실기에서 Windows 배율을 실제로 150→100→150%로 변경했고 모니터 경계도 시험했다.
+본문은 사용자 100%에서 24→16→24px, 사용자 150%에서 36→24→36px로 복귀했다.
+다만 DX12 표시 복구 지연과 Vulkan 경계 리사이즈의 `VK_ERROR_DEVICE_LOST`를 발견했다.
+`editor.theme clean`은 GPU 표시 성공까지 검사하지 않으므로 당시에는 두 오류를 남겨 `progress`로 유지했다.
+이후 DX12 수정·실기 재검증과 Vulkan 보류 결정으로 현재 판정은 위의 **DX12 기준 `done`**이다.
+Material Symbols 제품 적용과 Live Code 제거는 이후 W1 후속 작업에서 착지했다.
+추가된 전체 의미 아이콘 coverage·저장 ID/레이아웃 검증 결과는 위 Material Symbols 검증 기록을 따른다.
+Browser는 유형 아이콘까지 적용됐으며 비동기 썸네일 Ready 교체는 W7 미구현 범위다.
 `IMGUI_DISABLE_OBSOLETE_FUNCTIONS`를 제품에 켜는 옛 판정은 §3.2의 ABI 문제로 폐기했고,
 `verify-imgui-obsolete-surface.ps1`로 구식 호출 회귀를 검사한다.
 
 ### W2 — 공통 styled primitive와 custom draw 4종 (P1, 3일)
+
+**2026-09-13: 네 family 구현·승계와 현재 외관 적용 완료, 상태/입력/성능 전수 gate는 남아 `progress`다.**
+승계 결정은 [확정표](../analysis/EditorWidgetInheritanceW2.md)를 따른다. 아래는 적용 이력이다.
+
+**2026-09-12 진행 기록:** 기존 공통 위젯 위에 Inspector 범위 팔레트·간격,
+XYZ 배지와 숫자 표시, 가벼운 컴포넌트/내부 그룹 헤더를 적용했다.
+대표 DX12 실행 및 편집 검증은 [EditorInspectorStyleValidation.md](../analysis/EditorInspectorStyleValidation.md)에 둔다.
+이어 Hierarchy의 회색 외곽/선택 행, 어두운 교차 행, 파란 아이콘·이름과 고정 `+`/Search 도구를 적용했다.
+기존 생성 메뉴를 공유하며 DX12에서 생성·검색·검색 중 Delete·drag-drop/Undo·스크롤을 확인했다.
+배율 재기동 3회/64개 검사와 자세한 범위는 [EditorHierarchyStyleValidation.md](../analysis/EditorHierarchyStyleValidation.md)에 둔다.
+전체 family/state/performance gate 완료로 세지 않으며 `progress`다.
 
 - **§7.1의 승계 결정표를 먼저 확정한다.** 기존 `ImGuiHelper` 자산과의 관계를 정하지 않고
   구현을 시작하면 같은 역할의 위젯이 두 벌 남는다.
@@ -1003,7 +1181,363 @@ id 가 둘이어야 하는데, 그것은 `editor.windows` 의 `duplicateIds` 가
 
 **판정:** keyboard navigation과 clipping이 유지되고, visual golden 및 §8 성능 gate를 통과한다.
 
+<a id="w2-inspector-layout"></a>
+
+### W2-I — 인스펙터 공통 속성 배치 규칙 · Transform 컴포넌트 렌더 통합 (P1, 6일 · 초기 추정)
+
+**2026-09-13 현재 외관 승인·고정. W2-I0 `done`(0.5일), I1~I5 잔여로 전체는 `progress`다.**
+W2의 공통 위젯을 모든 인스펙터 경로가 같은 배치 규칙으로 소비하도록 확장한다.
+W2 기존 3일에 흡수하지 않으며, 아래 여섯 단계의 초기 추정 합계가 6일이다.
+초기 설계 근거와 이번 구현/검증을 구분한다. 기존 배치 기반 위에 적용한 스타일,
+Transform Undo 수정, 대표 폭 DX12 실행 기록은
+[EditorInspectorStyleValidation.md](../analysis/EditorInspectorStyleValidation.md)를 따른다.
+아래 전체 타입·폭·배율·백엔드 매트릭스가 완료됐다는 의미는 아니다.
+
+#### 착수 전 문제와 이관 경계 (현재 상태는 §9.0 참조)
+
+- `InspectorWindow.cpp`의 Transform은 `Text`·공백·`SameLine`으로 라벨을 배치하지만,
+  `ReflectionTypedDraw.h`의 일반 필드는 입력칸 오른쪽에 라벨을 붙인다.
+- `ImGuiDrawHelperRectTransformComponent.cpp`는 X·Y를 각각 90px로 고정하고 라벨 열을 늘린다.
+  좁을 때 앵커 프리셋과 값 표가 한 줄에 남고, 넓을 때 여유 폭이 라벨 열에 몰린다.
+- `EditorAxisField3`는 XYZ를 항상 한 줄에 그리며 숫자 입력칸 폭을 1px까지 줄인다.
+  `EditorPropertyRow`는 현재 float 배열을 호출자가 만든 표에 그리는 기능이라 전체 배치 정책은 없다.
+- 기본 정보·Sound 등 전용 드로어의 고정 폭과 자산의 `DrawYamlNodeEditor`도 대상이다.
+  일반 리플렉션만 바꾸고 전용 드로어·Import Settings를 남겨 두면 전체 이관 완료로 세지 않는다.
+
+#### 공통 배치 계약
+
+1. **배치와 값 편집을 분리한다.** 공통 계층이 가용 content rect, 라벨 열, 값 영역,
+   보조 버튼 공간과 행 전환을 계산하고 기존 표준 ImGui 위젯이 값을 편집한다.
+   `EditorPropertyRow`의 배치 책임을 확장하되 새 입력 체계나 매크로 기반 선언을 만들지 않는다.
+2. **같은 깊이의 속성은 같은 열에 맞춘다.** 라벨은 왼쪽, 값과 체크박스는 공통 값 열,
+   선택·초기화 같은 보조 버튼은 예약한 공간에 둔다. 중첩 그룹은 명시적인 들여쓰기만 더한다.
+   라벨 폭에는 상한을 두고 나머지는 값 영역에 배분한다. 공백 문자열과 창 전체 폭 기반 좌표 보정은 제거한다.
+3. **최소 가독성 이하로 줄이지 않는다.** 실제 content 폭에서 라벨·간격·값·버튼의 최소 폭을
+   확보하지 못하면 라벨 위/값 아래로 전환한다. XYZ도 축 badge와 숫자 표시 형식에 필요한 폭을
+   확보할 수 없으면 축별 세로 배치로 전환한다. 기준은 폰트 측정·W1 geometry 배율을 사용하며
+   현재 숫자 값이나 매 프레임 라벨 최대값 변화로 열과 모드가 흔들리지 않게 한다.
+4. **넓은 폭은 값과 관련 묶음이 사용한다.** 우선 값 영역을 확장하고, 각 묶음의 최소 폭이
+   충족되면 Sound의 Bus/Params·Spatial 같은 허용된 하위 묶음만 두 열로 배치한다.
+   컴포넌트 순서와 묶음 내부 필드 순서는 유지한다. 모든 컴포넌트를 자동으로 두 열에 재배열하지 않는다.
+5. **정보 종류에 맞게 넘침을 처리한다.** 긴 라벨·설명·읽기 전용 경로는 줄바꿈한다.
+   편집 문자열은 표준 입력칸의 탐색·스크롤을 유지하고 보조 버튼이 밖으로 밀리지 않게 한다.
+   세로 부족은 스크롤로 처리하고, 높이가 늘어도 행 간격을 늘려 빈 공간을 채우지 않는다.
+6. **배치 전환은 편집 상태를 보존한다.** ID는 엔티티·컴포넌트 인스턴스·필드·축의 안정 신원을
+   사용하며 열 위치·표시 라벨·줄 전환을 ID로 사용하지 않는다. 드래그 중 모드 전환은 편집 종료까지
+   보류하고 경계 왕복에 완충 폭을 둔다. Tab 이동, 포커스, 팝업, drag-drop, Undo 단위를 보존한다.
+
+#### Transform 계통 결정 — 2안 채택
+
+**별도 기본 렌더 호출을 없애고 실제 컴포넌트 렌더 경로로 통합한다. Transform·RectTransform은
+상단 우선 배치하며 개별 비활성화와 개별 제거를 허용하지 않는다.**
+1안(기본 렌더 + 일반 순회 제외)은 최종 구조로 채택하지 않고, 3안(개별 비활성화 허용)도 채택하지 않는다.
+
+- **인스턴스당 한 번:** 현재 기본 렌더 뒤의 컴포넌트 순회는 RectTransform만 제외해 Transform이
+  다시 일반 리플렉션으로 내려갈 수 있다. 공통 처리가 헤더와 정책을 소유하고 전용 드로어는 본문만 그려,
+  표시 대상 컴포넌트 인스턴스마다 헤더는 1회, 펼친 본문도 1회만 호출되게 한다.
+- **전용 편집 의미 보존:** Transform의 각도 편집·변경 게시·Undo와 RectTransform의 앵커 프리셋·
+  레이아웃 변경 처리를 유지한다. 일반 리플렉션의 quaternion/내부 필드 편집으로 대체하지 않는다.
+- **실제 보유 구성이 정본:** 일반 엔티티는 Transform, UI는 RectTransform, Canvas는 둘 다 가진다.
+  Canvas에서는 UI 배치와 월드 공간 배치가 서로 다른 정보이므로 각각 한 번 표시한다.
+  `RectTransform이 있으면 Transform 숨김`을 공통 규칙으로 만들지 않는다.
+- **정책을 분리:** 표시 순서, 개별 활성화 허용, 개별 제거 허용을 별도 항목으로 둔다.
+  공간 컴포넌트는 활성 체크박스와 제거 동작을 제공하지 않는다. `EditorSectionHeader`의
+  `enabled == nullptr` 계약과 `EditorObjectOperations::RemoveComponent`의 기존 거부를 활용한다.
+- **엔티티 전체 활성 전이 보존:** 비활성화 불가는 컴포넌트 단독 조작에 관한 결정이다.
+  현재 `Entity::SetEnabled`는 모든 컴포넌트와 자식에게 상태를 전달하므로 공용
+  `SetEnabled(false)`를 무조건 거부하는 구현은 금지한다. 개별 조작과 엔티티 전이를 구분해
+  UI·개별 활성 변경 진입점에 같은 정책을 적용한다. 기존 저장값은 강제로 true로 덮어쓰지 않는다.
+  RectTransform의 비활성 UI 레이아웃 갱신과 공간 계산 규칙도 유지한다.
+- **논리 엔티티는 별도 범위:** 현재 Empty에도 Transform이 붙는다. 게임 매니저처럼 위치가 불필요한
+  엔티티에서 공간 컴포넌트를 아예 생략하는 생성·저장·조회 계약은 후속 아키텍처 검토로 남긴다.
+  이 항목을 Transform 비활성화 허용으로 대신하지 않는다.
+
+#### 이관 순서와 초기 공수
+
+| 단계 | 작업 | 초기 추정 | 완료 기준 | 2026-09-13 상태 |
+|---|---|---:|---|---|
+| W2-I0 | content 폭·공통 열·줄 전환과 표시 정책 정의 | 0.5일 | 폭 계산·정책이 한 정본을 소비하고 전환 조건이 고정됨 | done — 공통 계약·측정 함수 및 소비 경로 확인 |
+| W2-I1 | Transform 2안·공통 헤더/전용 본문 분리 | 1일 | 일반 엔티티·UI·Canvas에서 중복 0, 개별 조작 제한과 엔티티 활성 전이 보존 | progress — 중복 제외·상단 표시 적용, 공통 순회 통합/정책 회귀 남음 |
+| W2-I2 | 기본 정보·Transform·RectTransform 반응형 배치 | 1일 | 공백 정렬·고정 숫자 열 폭 제거, 축별 최소 가독성·기존 편집 의미 보존 | progress — 기본/XYZ 적용·사용자 확인, RectTransform 최소 폭 남음 |
+| W2-I3 | 일반 리플렉션·중첩 필드·공유 드로어 이관 | 1일 | 수치·문자열·bool·enum·벡터가 같은 규칙을 사용하고 Inspector 밖 소비자도 회귀 없음 | progress — 일반 필드·SerializeField 적용, 중첩/배열·공유 소비자 전수 남음 |
+| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — 일부 전용 드로어 적용, Sound·Import Settings 등 전수 남음 |
+| W2-I5 | 폭·배율·편집·중복 렌더 회귀와 잔재 점검 | 1일 | 아래 검증 행렬 및 §8 성능 gate 충족, 미이관 표면 0 | progress — 대표 UI/편집 검증, 전체 행렬·호출 수/성능 남음 |
+
+전용 드로어 전수 이관량과 개별 활성 변경 진입점의 실제 범위는 I0에서 재계수한다.
+초기 추정이 달라지면 본문과 대시보드의 공수를 함께 갱신하며, 추가 범위를 완료 실적으로 계산하지 않는다.
+
+#### 검증과 완료 판정
+
+- 가용 content 폭 기준 240/320/480/720 logical px와 실제 줄 전환 경계 양쪽을 검사한다.
+  사용자 배율과 OS DPI 100/125/150/200%를 구분하고 확대·축소 왕복을 확인한다.
+  합성 geometry 검사와 실제 모니터 DPI 이동 결과를 따로 기록한다.
+- 같은 깊이의 라벨·값 열 정렬, 숫자 최소 폭, 긴 이름·경로, 보조 버튼 도달성,
+  세로 스크롤을 단정한다. 가로 잘림·겹침·0-size 입력칸은 실패다.
+- 일반 엔티티·Empty·UI·Canvas(ScreenSpace/WorldSpace)별 기대 컴포넌트 신원을 기준으로
+  헤더/펼친 본문 호출 수를 센다. 타입 수만 세거나 동일 함수의 호출문 수로 대체하지 않는다.
+- 드래그/텍스트 편집 중 폭 변경, Tab·팝업·drag-drop, Undo/Redo, 선택 변경과 접기/펼치기,
+  엔티티 활성 왕복, 씬·프리팹 저장/재로드에서 값과 필드 신원이 보존돼야 한다.
+- UI 체크박스 생략만으로 개별 비활성화 제한을 통과 처리하지 않는다. 개별 변경 경로의 거부와
+  엔티티 전체 비활성화·재활성화를 각각 확인한다. Transform 없는 엔티티에 더미 편집을 만들지 않는다.
+- DX12/Vulkan 캡처와 §8 성능 검증을 수행한다. W2의 필드 ID·축 색 검사 통과는 배치 검증을 대신하지 않는다.
+  중복 호출·고정 폭 회귀·전환 시 ID 변경·개별 활성화 허용을 주입해 해당 단정의 실패도 확인한다.
+
+**선행:** W2 공통 위젯과 W1 폰트·geometry 계약. **후행:** W8 통합 회귀에 필수 포함.
+W3 docking 완료를 구현 착수의 조건으로 삼지 않는다. W3와 공유하는 Inspector/창 선언 파일의 편집은
+조정하고, 최종 dock/float·workspace 왕복 검증은 W3 이후 W8에서 수행한다.
+
+<a id="w2-viewport-overlay"></a>
+
+### W2-V — 씬뷰 툴바·오버레이 반응형 배치 규칙 (P1, 4일 · 초기 추정)
+
+**2026-09-13 현재 외관 승인·고정. W2-V1 `done`(1일), V0/V2~V4 잔여로 전체는 `progress`다.**
+언리얼 참조 툴바 묶음과 폭에 따른 전체/축약/도구/메뉴 전환, 같은 프레임의 이미지 영역 기반 배치,
+Mathematics를 사용하는 ImViewGuizmo 및 Blender 참조 표시를 적용했다.
+FPS 상시 박스를 제거하고 Render Statistics에 Render Pass 창과 같은 Runtime 표시 함수 및 실제 GPU 패스 시간을 연결했다.
+진행·검증 범위는 [EditorSceneViewportOverlayValidation.md](../analysis/EditorSceneViewportOverlayValidation.md)에 기록한다.
+후속으로 Scene 표시를 원본 픽셀 기준 중앙 crop으로 변경했고, 기즈모·picking 좌표도 같은 이미지 사각형에 맞췄다.
+공통 창 본문 여백은 8×6→3×2 logical px로 줄인다. 검증은 [EditorSceneCropValidation.md](../analysis/EditorSceneCropValidation.md)에 기록한다.
+W4의 중앙 Host/렌더 타깃 크기 소유권 및 W5의 전체 입력 상태 머신까지 완료한 것으로 세지 않는다.
+
+2026-09-11에 수립한 범위는 다음과 같다.
+빈번한 창 이동·리사이즈에도 버튼의 정렬과 도달성을 유지하고, 방향 기즈모·HUD와 입력 영역이
+겹치지 않게 한다. W2-I와 별도 후속이며 W4의 canvas 정본을 소비한다. 아래 다섯 단계는 4일 초기 추정이다.
+스크린샷은 우측 도구의 밀집·잘림 증거로 사용하며, 원본 창 좌표·DPI나 원인별 기여도를 실측한 것으로 세지 않는다.
+
+#### 착수 시점 문제와 W4/W5의 책임 경계
+
+- `SceneViewWindow.cpp`의 좌측 Stats/Grid/Perspective/Camera는 이미지 좌상단에 5px씩 더하지만,
+  우측 도구는 `SetCursorScreenPos(ImVec2(windowWidth - 270.f, currentPos.y))`로 놓는다.
+  화면 좌표를 받는 함수에 창 원점을 더하지 않은 폭을 넣고, 실제 버튼 묶음 폭도 측정하지 않는다.
+  따라서 같은 너비여도 창의 위치·폰트·라벨에 따라 상대 배치가 달라질 수 있다.
+- 방향 기즈모는 창 원점과 고정 128px 크기, HUD는 이미지 오른쪽 끝과 창 기준 높이를 섞어 쓴다.
+  HUD가 기즈모 아래에 놓이는 보정은 있지만 툴바와 기즈모가 차지하는 영역은 함께 계산하지 않는다.
+- 이미지 크기와 `ImGuizmo::SetRect`는 창 전체 크기를 사용한다. picking·모델 배치의
+  `CreateRayFromCamera`에는 크기 인자 대신 `imageMax`가 전달되고, 내부 계산은 이를 폭·높이로 나눈다.
+  이 canvas 원점·extent 교정은 기존 **W4 범위**에서 해결하며 W2-V 공수에 중복 산정하지 않는다.
+- 카메라 이동·picking·terrain 편집은 창 hover를 주로 보고, 모델 drop target은 이미지 전체다.
+  이 함수에는 툴바·방향 기즈모·열린 팝업의 점유 영역을 함께 제외하는 계약이 없다.
+  클릭 관통의 실제 재현 여부는 별도 검증하며, W2-V는 씬 내부 입력 분리, W5는 Edit/Play 소유권을 담당한다.
+
+#### 공통 배치·입력 계약
+
+1. **좌표의 정본은 같은 프레임의 canvas다.** W4가 content rect, 실제 image rect, clip rect와
+   `extent = max - min`을 제공한다. letterbox 여백과 실제 이미지를 구분하고 오버레이는 이미지와 clip의
+   교집합 안에 둔다. 창 원점·title bar를 소비자마다 더하지 않는다. ImGui 화면 좌표를 사용하며
+   logical 간격은 W1 geometry 배율로 한 번만 변환한다. GPU target의 이전 크기를 UI 배치 기준으로 쓰지 않는다.
+2. **버튼 묶음을 먼저 측정하고 같은 행에 정렬한다.** 실제 폰트·아이콘·라벨·padding·gap으로
+   좌우 묶음의 폭과 공통 높이를 계산한 뒤 여백을 예약한다. 버튼 높이·아이콘 중심·텍스트 기준선을 맞추고,
+   `-270`과 개별 `SameLine` 좌표 보정은 없앤다. 넓은 창에서도 묶음 내부 간격은 일정하게 유지한다.
+   측정은 동작을 실행하지 않는 계산이며, 측정용으로 위젯을 한 번 더 그리지 않는다.
+3. **한 줄 툴바 안에서 표시 밀도를 바꾼다.** 전체 라벨 → 아이콘 중심 → 더보기 메뉴 순서로
+   전환한다. Select/Move/Rotate/Scale과 Snap을 우선하고 Stats/Grid/카메라 세부 설정부터 메뉴로 옮긴다.
+   도구 아이콘조차 모두 들어가지 않으면 현재 도구 선택 버튼 + Snap + 더보기로 줄인다.
+   모든 명령은 이름·현재 상태가 보이는 메뉴/tooltip으로 접근 가능해야 한다. 버튼·글자를 가독성 이하로
+   줄이거나 잘라 숨기지 않는다. 최소 조작 행도 담지 못하는 크기는 호스트 최소 content 크기로 제한하며,
+   일시적인 0-size/최소화에서는 그리기·입력만 중단한다. 자동 줄바꿈으로 툴바 높이와 render extent가
+   서로 바뀌는 순환을 만들지 않는다. 모드 경계는 실측 폭과 복귀 완충 폭으로 정한다.
+4. **방향 기즈모와 HUD의 자리를 함께 예약한다.** 방향 기즈모는 툴바 아래 우측에 놓고,
+   FPS/해상도와 Runtime/GPU 정보는 사용자 결정에 따라 **Render Statistics 팝업**에 모으고 상시 HUD는 두지 않는다.
+   폭뿐 아니라 높이도 검사한다. 기즈모를 표시할 수 없는 높이에서는 방향 선택 메뉴로 접근할 수 있어야 한다.
+   현재는 숨김까지만 구현됐고 대체 방향 메뉴는 V2 잔여다. 보이는 항목끼리 겹치지 않아야 한다.
+5. **보이는 영역과 입력 판정은 같은 배치 결과를 쓴다.** 버튼·방향 기즈모·열린 팝업의
+   hit rect와 활성 조작이 소비한 입력을 씬 카메라·선택·월드 기즈모·모델 drop·terrain 편집에 전달하지 않는다.
+   빈 간격과 읽기 전용 HUD 뒤의 씬은 계속 조작할 수 있다. 창 hover나 전역 `WantCaptureMouse` 하나만으로
+   판정하지 않고 기존 ImGui/기즈모 상호작용 결과와 합친다. 누른 곳의 소유권은 release까지 유지하고,
+   숨김·포커스 상실로 취소된 조작의 release도 씬으로 넘기지 않는다. Q/W/E/R/T는 텍스트 편집·팝업·
+   다른 창 포커스를 존중한다. W5의 PlayingPossessed에서는 편집 도구가 게임 입력을 가져가지 않는다.
+6. **리사이즈는 표시만 바꾸고 명령 신원은 유지한다.** ID는 창·명령의 안정 신원을 사용하며
+   아이콘·Perspective/Orthographic 라벨·메뉴 이동 여부에 의존하지 않는다. 현재 도구·Snap·Grid·투영 상태,
+   keyboard nav·팝업·Undo 의미를 보존한다. 누른 버튼이 이동하거나 overflow로 옮겨져도 다른 명령이
+   release를 받지 않는다. 조작 중 표시 모드 전환은 가능한 동안 보류하되 영역 안에 유지할 수 없으면
+   조작을 명시적으로 취소한다. 원점·가용 크기는 매 프레임 갱신하고 폰트·배율·라벨·가시성 변화는 측정
+   캐시를 무효화한다. 표시 모드 전환만으로 렌더 타깃을 재생성하거나 한 프레임 늦은 hit rect를 사용하지 않는다.
+
+`EditorModeButton`과 표준 ImGui Menu/Popup/Tooltip을 사용한다. 별도 입력 프레임워크나 새로운
+게임 모드 정본을 만들지 않는다. 인스펙터와는 W1 치수·W2 위젯·안정 ID 원칙을 공유하되,
+속성 편집의 세로 reflow와 씬뷰 툴바의 한 줄/overflow 정책은 각 표면에 맞게 유지한다.
+
+#### 이관 순서와 초기 공수
+
+| 단계 | 작업 | 초기 추정 | 완료 기준 | 2026-09-13 상태 |
+|---|---|---:|---|---|
+| W2-V0 | canvas 소비 계약·묶음 측정·표시 모드 계산 | 0.5일 | 같은 크기에서 창 원점이 달라도 상대 배치 동일, W4 정본 외 좌표식 없음 | progress — Scene 좌표·측정 적용, W4 Host canvas 통합 남음 |
+| W2-V1 | 좌우 툴바 공통 정렬·아이콘/더보기 전환 | 1일 | 최소 크기부터 넓은 창까지 도구·설정 도달 가능, 명령 ID·상태 유지 | done — 4개 폭 모드·도구/상태 조작 검증 |
+| W2-V2 | 방향 기즈모·HUD의 공간 예약과 작은 높이 대응 | 0.5일 | 툴바/기즈모/HUD 겹침·잘림 0, 방향 선택·Stats 대체 접근 가능 | progress — 기즈모/통계 적용, 낮은 높이의 방향 메뉴 남음 |
+| W2-V3 | 씬 입력의 오버레이 제외·조작 취소/소유권 연결 | 1일 | 클릭·카메라·drop·terrain 입력 관통 0, W5와 소유권 연결 지점 확정 | progress — 포인터 차단 구현, drop/terrain·취소/소유권 전수 남음 |
+| W2-V4 | 연속 리사이즈·DPI·입력 회귀 및 관측 확장 | 1일 | 아래 행렬·성능 gate 충족, 위치/ID/입력 변이를 실패로 검출 | progress — 관측·대표 폭 검사, 연속 resize/DPI/성능 남음 |
+
+W4의 첫 작업으로 canvas rect 생산·기존 소비자 교정을 먼저 제공한다. W2-V0의 측정 정책은
+그 계약을 기준으로 준비할 수 있고, 제품 연결은 이 선행 작업 뒤에 수행한다. W4 전체의 view demand
+완료까지 기다릴 필요는 없다. W2-I와는 순차 의존이 없으며 `SceneViewWindow.cpp`를 공유하는 W4/W5와
+편집을 조정한다. W3 docking·W5 모드 전환을 포함한 최종 판정은 W8에 연결한다.
+
+#### 검증과 완료 판정
+
+- 가용 canvas 폭 320/480/720/1024 logical px, 높이 180/320/640, 실제 전환 경계 양쪽을 검사한다.
+  최소 조작 폭 미만·0-size에서는 정의된 제한/중단 동작을 확인한다. OS DPI 100/125/150/200%와
+  사용자 배율을 구분하고 실제 DPI 왕복과 합성 geometry 결과를 따로 기록한다.
+- 원점 0·이동한 창·음수 화면 좌표, 도킹 분할·최대화·복원·workspace 재로드를 포함한다.
+  같은 크기에서 원점만 이동하면 각 항목의 상대 위치는 같아야 한다. 폭·높이와 경계를 100회 이상
+  왕복해 겹침·버튼 유실·표시 모드 진동·이전 프레임 위치로 입력되는 현상을 검사한다.
+- 버튼을 누른 채 리사이즈, 팝업/텍스트 편집 중 단축키, 방향/월드 기즈모 drag, 모델 drop,
+  terrain brush, 카메라 회전, focus loss를 확인한다. UI 조작으로 씬 선택·변형이 발생하거나 같은
+  입력을 둘이 소비하면 실패다. 빈 canvas 조작과 읽기 전용 HUD 뒤 조작은 유지돼야 한다.
+- 각 명령이 버튼/메뉴 중 어디에 있는지, 활성 명령·rect·입력 소비 결과, 방향 기즈모/HUD rect와
+  표시 모드를 같은 프레임 스냅샷에 게시한다. 기존 창/dock rect 관측만으로 버튼 정렬을 통과 처리하지 않는다.
+  창 원점 누락·기즈모 영역 미예약·전환 시 ID 변경·입력 제외 누락을 각각 주입해 검출도 확인한다.
+- DX12/Vulkan에서 첫 target 대기·resize·Edit/Play/Eject/Stop을 검증하고 §8 성능 gate를 적용한다.
+  검은 뷰포트·target generation 문제는 W4와 별도로 판정하며 툴바 정렬 성공으로 해결됐다고 세지 않는다.
+  이번 계획 반영은 빌드·실행·위 회귀 검증의 완료 실적이 아니다.
+
+<a id="w2-content-browser"></a>
+
+### W2-B — 컨텐츠 브라우저 내부 분할·탐색·생성·검색 도구 (P1, 7일 · 초기 추정)
+
+**2026-09-13 현재 외관 승인·고정. 배치·탐색·검색·새 폴더는 구현, 최근/전체·상태 복원·생성/검증 잔여로 `progress`다.**
+왼쪽 폴더와 오른쪽 자산의 배치뿐 아니라 폴더 폭 조절, 현재 위치 확인, 이동, 생성과 검색까지
+한 브라우저 안에서 수행할 수 있게 한다. W2의 공통 위젯을 소비하고 W3의 외부 docking,
+W7의 목록/썸네일 최적화와 담당 범위를 구분한다. 아래 여섯 단계의 초기 추정 합계는 7일이다.
+
+#### 2026-09-12~13 적용 완료 부분
+
+- 고정 200px 트리를 logical 선호 폭·드래그 분할선·좁은 창 폴더 팝업으로 교체했다.
+  선호 폭은 기존 `EditorSettingsStore`에 저장하며, 창 크기에 따른 제한 폭과 분리한다.
+- 오른쪽 상단 New / 뒤로·앞으로·상위 / breadcrumb / 통합 검색 / 유형·보기 도구를 연결했다.
+  가용 폭에 따라 탐색·검색이 두 줄로 나뉘고, 긴 경로는 조상 메뉴로 접는다.
+- 폴더와 지원 자산을 함께 표시한다. 루트·트리·폴더 타일·경로 바의 이동은 같은 상태를 사용한다.
+  New와 폴더 우클릭은 새 폴더 및 기존 Volume Profile 생성 경로를 공유한다.
+- Scene 탭은 저장된 도킹 배치를 불러온 후 시작 시 한 번 선택한다. 이후 Game 선택을 유지한다.
+- 디렉토리 트리는 프로젝트 머리행, 14 logical px 들여쓰기와 16px 투명 PNG 폴더 아이콘을 사용한다.
+  분할선 뒤 10px 여백을 두고, 화살표·아이콘·이름을 행 중앙에 맞춘다.
+  목록·트리 안쪽 여백은 후속 요청으로 6→2px로 줄였다.
+  고정 UI 이미지의 수명은 EditorAssetPresentation이 소유하며 W7 자산 썸네일과 구분한다.
+  2026-09-13 트리·프로젝트·폴더 타일/목록·파일 유형 이미지를 Microsoft Fluent Emoji 3D로
+  통일했다. 유형 분류를 표시 서비스에 모아 필터와 이미지의 확장자 판정을 일치시킨다.
+- W2-B 전체 완료는 아니다. 최근/전체 범위, 이력별 검색·선택 복원, W3 workspace 저장 이관,
+  W7 snapshot/cache/clipping/비동기 썸네일 및 전체 회귀 행렬은 후속 범위다.
+  실행 검증 결과는 [Content Browser 검증](../analysis/EditorContentBrowserLayoutValidation.md)에 기록한다.
+
+#### 스크린샷과 착수 전 코드 대조
+
+기준 소스는 `Editor/EngineGUIWindow/ContentsBrowserWindow.{cpp,h}`다. S&Box 기능의 세부 동작이나
+열지 않은 New/필터 메뉴 내용은 스크린샷만으로 확정하지 않는다. 아래는 보이는 표면과 CreatorEngine 호출 경로의 비교다.
+
+| 표면 | 현재 확인한 구현 | W2-B에서 처리할 내용 |
+|---|---|---|
+| 디렉토리 영역 | `BeginChild("DirectoryHierarchy", ImVec2(200, 0), false)`로 고정. 폭 저장값·resize flag·splitter 없음 | 내부 드래그 분할선, 배율 반영, 폭 저장/복원, 좁을 때 폴더 패널 접기 |
+| 폴더 이름/루트 | 긴 이름은 child 경계에서 잘리고, 루트 Assets는 펼침만 처리하며 현재 폴더로 이동하지 않음 | 말줄임/전체 이름·경로 tooltip, 루트 선택, 탐색과 펼침의 입력 구분 |
+| 경로 바·뒤로/앞으로·상위 이동 | `m_currentDirectory`에 직접 대입하며 breadcrumb·history·Up 동작 없음 | 공통 탐색 함수와 위치/이력 상태, 경로 바와 탐색 버튼 |
+| 오른쪽 자산 영역 | `is_regular_file()`과 지원 확장자만 표시. 하위 폴더는 표시하지 않음 | 폴더와 자산을 함께 표시하고 폴더 더블클릭/Enter 탐색. 파일 없이 하위 폴더만 있는 위치도 도달 가능 |
+| 검색 | `ImGuiTextFilter`는 존재. 검색 아이콘은 비활성 장식 버튼이고 입력 폭은 `avail - 90`, 현재 폴더 파일명만 필터 | 실제 입력 영역/최소 폭 확보, 지우기, 검색 범위 표시, 유형 필터·정렬 |
+| New | 상단 버튼 없음. VolumeProfile 폴더 빈 영역 우클릭에 생성 동작은 있음 | New와 폴더 우클릭이 같은 생성 명령을 소비, 생성 대상 폴더/결과 선택 일치 |
+| 생성 메뉴 조건 | 폴더/타일 팝업 두 곳의 `empty() && equivalent(...)` 조건은 정상 비어 있지 않은 경로에서 생성 메뉴를 막음 | 빈 경로·허용 위치·쓰기 가능 여부를 공통 술어로 판정. 경로 오류를 예외 없이 표시 |
+| Recents / Everything | 해당 가상 위치와 방문 이력 상태 없음 | 최근 사용 자산 / 프로젝트 전체 자산을 명시적인 탐색 범위로 제공 |
+| 표시 도구 | 오른쪽 목록은 항상 타일이며 타일 본문은 160 logical px. `ContentsBrowserStyle` 분기는 현재 본문에서 제거됨 | 브라우저 내부 타일/목록 전환·타일 크기·보기 옵션. 외부 dock tree와 독립 |
+| 썸네일 | 현재 유형 아이콘 사용. Ready 썸네일 교체는 기존 W7 계획 | W7 소비 연결. W2-B에서 별도 썸네일 생성기/캐시를 만들지 않음 |
+
+오른쪽이 빈 화면인 원인을 하나로 단정하지 않는다. 현재 루트에 지원되는 직접 자식 파일이 없으면
+하위 폴더가 있어도 빈 화면이 될 수 있다. 검색 결과 0, 실제 빈 폴더, 미지원 파일만 존재,
+읽기 실패는 각각 구분해 표시한다. 스크린샷의 클라우드 등 추가 아이콘은 기능 계약이 확인되지 않아
+온라인 자산 서비스 연동으로 확대하지 않으며, 프로젝트 로컬 자산 탐색을 이번 범위로 고정한다.
+
+#### 배치·탐색 계약
+
+1. **내부 분할과 창 docking은 별개다.** 왼쪽 폴더 트리와 오른쪽 본문 사이에 보이는 드래그
+   분할선을 둔다. 기본 폭은 W1 logical 치수로 정하고, 트리와 본문의 최소 조작 폭을 실측해 제한한다.
+   hover 때 resize 커서를 표시하고 드래그·키보드 조정·기본 폭 복원을 제공한다. 사용자가 정한 선호 폭과
+   현재 창에 맞춘 제한 폭을 분리해 작은 창을 거친 뒤에도 선호 폭을 복원한다. 폭은 logical 값으로 저장한다.
+   두 영역의 최소 폭을 담지 못하면 트리를 접고 폴더 버튼/팝업으로 접근하게 한다. 자산 본문을 0폭으로 밀지 않는다.
+   긴 폴더 이름은 명시적으로 말줄임하고 전체 이름/경로를 tooltip과 경로 바에서 확인할 수 있게 한다.
+2. **상단 도구도 가용 폭을 나눈다.** 오른쪽 본문 위에 `New`, 뒤로/앞으로/이력, 상위 이동,
+   경로 바, 검색·유형 필터·표시 옵션을 배치한다. 충분히 넓으면 한 줄, 좁으면 탐색/검색 두 줄로 전환하고
+   부가 옵션은 더보기로 옮긴다. 행 높이·간격·버튼 중심을 맞추며 `avail - 90` 같은 보정은 제거한다.
+   현재 폴더명과 검색 입력의 최소 가독성을 확보하고 경로의 중간 구간은 조상 메뉴로 접는다.
+   New·이동·검색을 모두 사라지게 만드는 압축은 허용하지 않는다. 브라우저는 세로 스크롤을 사용하므로
+   씬뷰 W2-V의 한 줄 고정 정책을 그대로 강제하지 않는다.
+3. **모든 폴더 이동은 하나의 탐색 경로를 사용한다.** 트리 클릭·루트·폴더 타일/목록·breadcrumb·
+   경로 입력·Up·뒤로/앞으로가 같은 상태 전이를 호출한다. 폴더 펼침만 바꾸면 탐색 이력이 늘지 않는다.
+   경로 바는 클릭 가능한 프로젝트/Assets/하위 경로를 표시하고 직접 경로 입력·복사를 지원한다.
+   실제 탐색 루트는 `PathFinder`가 제공하는 프로젝트 자산 루트이며 상위 이동은 그 경계에서 멈춘다.
+   임의 절대 경로를 두 번째 자산 루트로 등록하지 않는다. 존재하지 않는 경로 입력은 현재 위치를 유지하고 오류를 표시한다.
+4. **이력·검색·선택의 의미를 고정한다.** 뒤로/앞으로와 이력 메뉴는 유효한 이동만 기록하고
+   같은 위치 중복과 검색 타이핑 한 글자마다의 이력 생성을 억제한다. 뒤로 간 뒤 새로 이동하면 앞으로 이력을 버린다.
+   정상 폴더 이동은 검색어를 비워 내용이 숨지 않게 하고, 뒤로/앞으로는 해당 방문의 검색어·스크롤·선택을 복원한다.
+   유형/정렬/보기 설정은 유지한다. 삭제된 위치는 현재 프로젝트 루트 안의 유효한 상위 위치로 복구하며
+   접근 실패·없는 이력은 상태를 알린다. 트리에서 현재 폴더의 조상을 펼쳐 같은 위치를 보여 준다.
+5. **최근 항목과 전체 자산은 검색 범위다.** 기본은 현재 폴더, `전체 자산`은 현재 프로젝트 루트 아래,
+   `최근 항목`은 실제 열기/편집에 성공한 자산을 중복 없이 최근 순으로 보여 준다. 단순 hover로 최근 목록을 채우지 않는다.
+   범위·검색어·유형 필터를 화면에 표시하고 지우기를 제공한다. 전체/최근 결과에는 원래 폴더와
+   해당 위치 열기를 제공한다. 가상 위치에서는 New를 비활성화하고 생성할 실제 폴더를 선택하도록 안내한다.
+   초기 정렬은 폴더 우선·이름순이며 이름/유형/수정일 정렬과 타일/목록 전환·타일 크기를 제공한다.
+   전체 검색·정렬·필터는 W7의 같은 목록 스냅샷에서 적용하고, 그 결과에 clipping을 적용한다.
+6. **신원과 표시 상태를 분리한다.** 자산은 GUID, 폴더는 프로젝트 신원 + 정규화한 루트 상대 경로로
+   선택·펼침·이력을 식별한다. 같은 파일명, 아이콘/썸네일 교체, 타일/목록 전환이 ID를 바꾸지 않아야 한다.
+   이름·경로는 한글·공백·긴 Unicode 경로를 보존한다. 폴더 이동은 이전 목록의 자산 선택을 정리하고
+   Inspector와 일치시킨다. 뒤로 복원하는 자산은 현재도 존재할 때만 선택한다.
+   W3의 버전 있는 workspace 저장 경계에 선호 폭·접힘·보기 설정·마지막 위치를 연결하고,
+   최근 항목은 프로젝트별 제한된 목록으로 저장한다. 앞뒤 탐색 이력은 세션 상태로 둔다.
+   프로젝트 변경 때 정적 `DataDirectory`와 이전 프로젝트의 이력/선택을 재사용하지 않는다.
+
+#### New와 기존 자산 동작 연결
+
+- **최소 생성 범위는 새 폴더와 기존 Volume Profile 생성이다.** 머티리얼·스크립트·씬 등은
+  B0에서 실제 생성 진입점·허용 위치·저장/GUID 계약을 계수하고, 재사용 가능 여부와 별도 확장이 필요한 항목을
+  명시한다. 스크린샷에 New가 있다는 이유로 지원되지 않는 생성기를 완료 범위에 포함하지 않는다.
+- New와 폴더 우클릭은 부록 A의 같은 명령/활성 조건을 소비한다. 대상은 마지막 우클릭한 폴더가 아니라
+  각 버튼/메뉴가 명시적으로 전달한 폴더다. 팝업을 연 뒤 탐색해도 생성 요청의 대상이 바뀌지 않게 하고,
+  표시한 대상·실제 저장 경로·완료 결과의 경로가 일치해야 한다. 현재 Volume Profile은 저장 대화상자 경로와
+  전달한 directory가 따로 쓰이므로 이를 함께 정리한다.
+- 파일/폴더 쓰기는 `EditorAssetDatabase`와 기존 authoring/command 소유 경로를 사용하고 UI에서
+  별도 파일 생성기를 만들지 않는다. 새 폴더의 쓰기 진입점이 필요하면 같은 소유 경계에 추가한다.
+  유효한 이름·충돌·쓰기 실패·취소를 처리하고 덮어쓰지 않는다. 파일 생성은 GUID/sidecar·catalog 반영까지
+  성공해야 완료로 게시한다. 인식 전이나 실패한 항목을 성공한 선택으로 표시하지 않는다.
+- 생성 완료 시 대상 폴더의 목록을 갱신하고 새 항목을 선택/표시한다. 요청 중 사용자가 다른 폴더나
+  프로젝트로 이동했다면 늦은 완료가 현재 위치/선택을 강제로 바꾸지 않는다.
+  기존 자산 Inspector 선택·파일 열기·경로 복사·삭제 확인·씬/프리팹 drag-drop은 유지한다.
+  현재 파일명만 담는 일부 drag payload는 전체/최근 목록의 동명 자산을 구분할 수 없으므로 소비자까지
+  기존 GUID/경로 계약을 대조해 교정한다. 새 목록 표면에서만 신원을 바꾸어 소비자를 남겨 두지 않는다.
+
+#### 이관 순서와 초기 공수
+
+| 단계 | 작업 | 초기 추정 | 완료 기준 | 2026-09-13 상태 |
+|---|---|---:|---|---|
+| W2-B0 | 화면/상태 계약·생성/drag 소비자 계수 | 0.5일 | 기존 기능·신규 범위·W3/W7 경계와 지원 생성 종류 확정 | progress — 화면 계약 적용, 생성/drag 소비자 전수 확인 남음 |
+| W2-B1 | 내부 분할선·긴 이름·좁은 창 대응 | 1일 | 폭 조절/복원·접기·tooltip 도달 가능, DPI/resize에서 본문 최소 폭 유지 | progress — 분할/저장/접기 적용, 실제 마우스·전체 DPI 회귀 남음 |
+| W2-B2 | 경로 바·루트/Up·뒤로/앞으로·이력 | 1.5일 | 모든 폴더 진입점 통합, 삭제/실패 복구·프로젝트 경계·선택 복원 일치 | progress — 경로/뒤·앞/상위 적용, 방문별 상태 복원 남음 |
+| W2-B3 | 폴더+자산 목록·검색 범위·최근/전체·표시 옵션 | 1.5일 | 유형/정렬/목록·타일이 같은 결과/ID를 소비하고 W7 스냅샷과 연결 | progress — 현재 폴더 검색/유형/정렬/보기 적용, 최근/전체·W7 남음 |
+| W2-B4 | New·폴더 우클릭 공통 생성 및 결과 반영 | 1.5일 | 새 폴더·Volume Profile 생성/취소/실패, 경로·GUID·선택 일치와 늦은 완료 처리 | progress — 새 폴더 적용, Volume Profile 경로/실패/완료 처리 남음 |
+| W2-B5 | 배치·탐색·생성·검색·기존 자산 동작 회귀 | 1일 | 아래 행렬·관측·W8 연결 완료, 새 목록의 동명 자산 drag 소비자까지 검증 | progress — 대표 UI/fixture 검증, 전체 행렬·drop 소비자 남음 |
+
+W1/W2와 이미 착지한 M1 메뉴 배선을 선행으로 한다. W2-I·W2-V 완료와 순차 의존은 없다.
+W7의 폴더/자산 스냅샷 계약을 먼저 공유해 B3가 같은 정본을 소비하게 하고, 검색을 위해 매 프레임
+재귀 파일 순회나 별도 자산 DB를 만들지 않는다. 파일 감지·목록 cache·clipping·썸네일 생산 비용은
+기존 W7 범위이며 W2-B에는 탐색/검색 상태·조건·표시와 소비자 연결을 산정한다.
+W3 저장/복원 연결과 W7 통합 결과는 W8에서 함께 판정한다. 추가 생성 종류와 W7 썸네일의
+미산정 공수는 위 7일에 포함되지 않으며 B0에서 확장할 경우 계획/대시보드를 함께 갱신한다.
+
+#### 검증과 완료 판정
+
+- content 폭 320/480/720/1024/1440 logical px와 낮은 높이 180/320, OS DPI/사용자 배율
+  100/125/150/200%를 구분해 검사한다. 분할선 drag·키보드 조정·폭 복원·패널 접기·100회 이상 resize,
+  dock/float·workspace 재로드에서 버튼/검색/경로 도달성과 저장한 선호 폭을 확인한다.
+- 긴 한글 이름·깊은 경로·동명 파일, 폴더만 있는 루트, 빈 폴더, 검색 결과 0, 미지원 파일,
+  접근 거부·탐색 중 삭제/rename·프로젝트 변경을 포함한다. 경로 바·트리 선택·오른쪽 목록의 위치가 달라지면 실패다.
+- 트리/타일/목록/경로/Up의 모든 진입점, A→B→뒤로→C 뒤 앞으로 이력 제거, 무효 경로 유지,
+  검색 중 뒤로 복원, 전체/최근 결과의 원래 위치 열기, 삭제된 최근 항목 정리를 검증한다.
+- New/우클릭의 대상 일치, 생성 성공·충돌·권한 실패·취소, 요청 뒤 다른 폴더/프로젝트 이동,
+  파일 GUID/sidecar와 Inspector 선택을 검사한다. 빈 메뉴·잘못된 위치의 생성·실패를 성공처럼 표시하면 실패다.
+- 검색·정렬·타일/목록·타일 크기·썸네일 교체 전후 결과 신원과 선택/drag payload를 비교한다.
+  1k/10k/50k 목록의 비용·clipping·가시 썸네일 요청 검증은 W7과 공동 fixture로 수행하고 DX12/Vulkan은 W8에 포함한다.
+- 같은 프레임의 트리/분할선/본문/도구 rect, 선호/적용 폭, 현재 위치·검색 범위·이력 버튼 상태,
+  결과 신원·선택·생성 완료 상태를 관측한다. 고정 폭·이력 분기 누락·생성 대상 혼동·동명 payload를
+  각각 변이로 주입해 실패를 확인한다. 기존 창/dock 관측이나 유형 아이콘 완료만으로 이 항목을 통과 처리하지 않는다.
+
 ### W3 — stable ID · 자유 docking · workspace 저장/복구 (P0, 3일)
+
+**현재 `todo`: M4의 창 선언·표시 이름 분리·Window 메뉴와 선언 기반 기본 배치는 선행 완료다.**
+`###Editor.*` ID 이주, 자유 도킹 및 versioned workspace/legacy 복구는 남아 있다.
+아래 Tile 분기·창 등록 설명은 착수 전 이력이며 이미 제거한 분기를 다시 구현하지 않는다.
 
 - **선행 지혈: Content Browser 이름 불일치(§1.4)를 먼저 고친다.** stable ID 이주 전에 고쳐 두면
   "고친 것"과 "ID 체계가 세운 것"을 구분해 판정할 수 있다.
@@ -1033,19 +1567,78 @@ id 가 둘이어야 하는데, 그것은 `editor.windows` 의 `duplicateIds` 가
 - **S2 — 표를 주입으로.** `window_table` 을 세우고 렌더러가 그것을 참조로 받는다. 자가 검사가 제품 표를 `swap` 으로 치우던 자리가 없어졌다 — 그 치우기는 CLI 가 도는 게임 스레드였고 표를 순회하는 `draw_windows` 는 PresentationThread 였다. 잠금이 없었으므로 순회 도중 버퍼가 바뀔 수 있는 자리였다. 막은 것이 아니라 없앴다.
 - **S3 — 본문 바인딩을 RAII 핸들로.** `MenuBarWindow` 가 본문 **열 개**를 걸고 푸는 자리가 하나도 없었다(소멸자가 `= default`, 본문은 모두 `this` 캡처). `bind_window_body` 가 `[[nodiscard]]` 핸들을 돌려주도록 바꿔 컴파일러가 강제한다. 본문 보관소도 주입 가능해졌다. 강제력은 변이가 검증했다 — 처음에는 핸들을 버려도 빌드가 exit 0 이었다(이 프로젝트는 `TurnOffAllWarnings` 라 C4834 가 나오지 않는다). `/we4834` 로 그 한 번호만 오류로 올렸다.
 
-남은 W3 는 위 목록 그대로다 — stable ID 이주, Tile 분기, workspace 저장/복구, legacy ini 이주. 소유권 정리가 그 대상 수를 줄이지는 않았고, 상태를 한 자리로 모아 둔 것이 이득이다.
+**(2026-09-13 W3 착지.)** stable ID 이주·자유 도킹·versioned workspace 저장/복구·legacy ini
+이주가 전부 섰다. 파일 계층은 `EditorWorkspaceFile`(이주·검증·원자 쓰기·백업), 세션 계층은
+`EditorWorkspaceStore`(적재·적용·주기 저장·Reset·복구)이고, 밖에서 보는 문은 `editor.workspace`
+명령과 Window 메뉴의 Save/Reload/Reset 셋이다. 게이트는 둘로 나눴다 — 형식만 보는
+`verify-editor-workspace-storage.ps1`(169 checks, 실물 ini 6벌)과 살아 있는 에디터를 열여섯 번
+띄우는 `verify-editor-workspace.ps1`(212 checks). 둘 다 run-all 에 넣었다.
+W4 가 두 수를 153→169·181→212 로 올렸다 — 늘어난 몫이 §W4 의 W4-①②③ 구역이다.
 
-**판정:** title/icon을 바꿔도 dock 위치가 유지되고, save→restart→load가 동일하며, 손상된 layout은
-사용자 파일을 잃지 않고 기본 preset으로 복구된다. migration canary는 §1.4의 실물 ini 4벌 —
-Content Browser 이중 entry가 든 것 포함 — 을 fixture로 통과해야 한다.
+착지하면서 **다섯 가지가 실제로 틀려 있었고, 그 다섯은 전부 새 게이트가 붉어져 드러났다.**
+계획서에는 하나도 적혀 있지 않았다.
 
-### W4 — 중앙 ViewportHost · canvas 분리 · view demand (P0, 4일)
+1. **`###` 표식을 떼고 선언 표와 맞대고 있었다.** `stable_part` 가 `rfind("###")+3` 을 돌려주는데
+   W3 이 안정 ID 자체를 `###Editor.*` 로 옮겨 표가 든 값에 그 세 글자가 들어갔다. 이주 직후
+   `ghost=6` — 그려지고 있는 창 여섯이 전부 유령으로 보고됐다.
+2. **ImGui 는 `Begin` 이 받은 이름을 저장하지 않는다.** `CreateNewWindowSettings` 가 `###` 를
+   건너뛰고 **표식까지 버린 뒤**의 글자만 든다. 그래서 에디터가 스스로 쓴 파일은 창을
+   `Editor.Scene` 으로 적는데 검증기는 `[Window][###Editor.` 를 요구했다. 결과는 조용했다 —
+   **깨끗한 첫 실행에서 배치가 한 번도 저장되지 않았다.** 이주 표를 legacy 목록이 아니라
+   **살아 있는 선언 표**에서 함께 유도하게 고쳤다(W3 뒤에 늘어난 창도 덮는다).
+3. **검증기가 도크 뿌리를 하나로 못 박고 `DockSpace` 철자를 요구했다.** 빌더가 막 세운 노드는
+   다음 프레임에 `DockSpace()` 가 다시 표시하기 전까지 평범한 `DockNode` 로 적히고, **자유
+   도킹은 패널을 떼어 낼 때마다 뿌리를 하나 더 만든다.** 둘 다 정당한 파일을 거부하던 규칙이라
+   "뿌리 ≥ 1 · 주 도크스페이스 ≤ 1" 로 바꿨다. 손상본 둘은 여전히 거부된다.
+4. **창 표가 렌더러보다 늦게 서 있었다.** `register_editor_windows()` 가
+   `make_unique<EditorRenderer>` **뒤**였고, 스토어는 생성자에서 그 표를 읽는다. 그래서 저장된
+   패널 상태를 되돌리는 순회가 **빈 표**를 돌았다 — 파일에는 `panel "###Editor.Hierarchy" 0`
+   이 적혀 있는데 아무도 읽지 않아 닫아 둔 패널이 재시작마다 다시 열렸다. 등록을 앞으로
+   옮기고, 스토어 생성자가 빈 표를 받으면 던지게 했다(조용히 잃는 것보다 낫다).
+5. **W3 ID 이주가 두 자리를 빠뜨렸다.** `EditorAssetPresentation` 이 옛 표시 이름
+   `"TextureType Selector"`·`"SelectMaterial"` 을 자기 상수로 들고 있어 본문 둘은 고아,
+   선언된 창 둘은 본문 없음이었고 `open_window`/`close_window` 는 아무것도 못 찾은 채 돌았다.
+   `verify-editor-declaration-wiring.ps1` 이 이것을 들고 있었다.
+
+**이빨은 변이로 쟀다.** alias 표를 통째로 비우면 이주 자체가 거부돼 붉고, **alias 하나만**
+빼면 `ghost`·`undocked`·`duplicate` 셋이 전부 통과했다 — 살아남은 옛 이름이 살아 있는 도크
+탭이 아니라 아무도 만들지 않는 ini 항목으로 남기 때문이다. 그 하나를 잡는 것은
+`orphanEntries` 뿐이어서 게이트에 그 단정을 더했다. `layout_audit::clean()` 에는 넣지 않았다 —
+개발자 기계에는 지난 빌드의 창 이름이 정당하게 남아 있을 수 있어, 격리된 시나리오 폴더에서만
+0 을 요구한다.
+
+게이트가 개발자의 `Saved/Config/imgui.ini` 를 빌려 쓰던 것도 여기서 끝냈다. 스토어가
+`CREATOR_EDITOR_WORKSPACE_DIR`·`CREATOR_EDITOR_LEGACY_INI` 를 읽으므로 시나리오마다 빈 폴더를
+준다. 이전 판은 개발자 파일을 백업했다 되돌리는 식이어서 게이트가 중간에 죽으면 손상본이
+개발자 자리에 남았다.
+
+**판정 — 모두 게이트로 선다:** title/icon을 바꿔도 dock 위치가 유지되고(저장 파일이 라벨을
+버리고 안정 ID만 든다), save→restart→load가 **바이트까지 동일**하며, 닫아 둔 패널이 재시작을
+넘고, Reset 은 되돌리기 전에 백업을 남기고, 손상된 layout은 사용자 파일을 잃지 않고 기본
+preset으로 복구된다(legacy ini 는 `.pre-workspace-v1`, v1 파일은 `.rejected` 로 남는다).
+migration canary는 §1.4의 실물 ini 4벌 — Content Browser 이중 entry가 든 것 포함 — 이고 넷 다
+`undocked=0 · ghost=0 · duplicate=0 · orphan=0` 으로 통과한다.
+
+**W3 이 남긴 것 둘.** Scene 의 `no_move` 는 걷지 않았다 — 중앙 뷰포트라 W4 의 단일 Host 가
+그 자리를 가져간다. `dock_slot` 열거자를 workspace 선언에서 받는 일도 W6 의 preset 과 함께
+간다(W3 은 열거자를 그대로 쓴다).
+
+### W4 — 중앙 ViewportHost · canvas 분리 · view demand (P0, 4일) — `done`
+
+**2026-09-13 `done`.** 가운데는 이제 **닫을 수 없는 창 하나**이고 Scene·Game 은 그 Host 의 표시
+모드다. canvas 규약도 하나가 됐다. 판정 둘은 `verify-editor-workspace.ps1` 의 W4-①②③ 구역이
+살아 있는 에디터 네 번으로 센다(아래 *착지와 결함*). extent 기반 resize 는 이 계획서가 두
+backend 의 generation/retire 검증 뒤로 미뤄 둔 항목이라 여기 포함하지 않는다.
 
 - central non-closable Host를 만든다.
 - **canvas 규약을 하나로 정한다(§1.5).** letterbox냐 stretch냐, rect 원점이 창이냐 content냐를
   먼저 확정하고 ImGuizmo·picking이 같은 출처를 읽게 한다. 지금은 Scene이 창 전체 + titleBar
   수동 보정, Game이 content + letterbox로 갈려 있다.
+  content/image/clip rect를 같은 프레임의 화면 좌표로 생산하고 extent는 `max - min`으로 구한다.
+  picking·모델 배치의 `imageMax` 크기 인자 오용을 함께 교정한다. 이 정본과 기존 소비자 이관을
+  W4 초기에 제공해 W2-V가 소비하게 하며, 오버레이 배치용 canvas 좌표식을 별도로 만들지 않는다.
 - Scene image, scene interaction, overlay, game input surface를 분리한다.
+  툴바·방향 기즈모·HUD의 정렬/overflow와 씬 내부 입력 제외는 W2-V가 담당한다.
 - 기존 Editor/Game presentation key를 mode별로 소비한다. Game의 `active`/`ready` 2단 신호는
   이미 있으므로 Scene 쪽과 통일해 재사용한다.
 - Scene/Game 두 곳의 `BringWindowToDisplayBack` 강제 호출을 제거한다.
@@ -1055,6 +1648,78 @@ Content Browser 이중 entry가 든 것 포함 — 을 fixture로 통과해야 �
 
 **판정:** central Host를 닫거나 ToolPanel로 대체할 수 없고, Game Preview가 닫힌 single-view 상태에서
 불필요 target 생산 여부가 계측된다.
+
+#### W4 착지와 결함 (2026-09-13)
+
+**구조.** `ViewportHostWindow.{h,cpp}` 가 Host 본문·모드·view demand 를 들고,
+`EditorViewportCanvas.h` 가 좌표 규약을 든다(`SceneViewportImage.h` 는 지웠다). 선언은
+`Windows/EditorViewportWindows.h` 에 `central<&draw_viewport_host>` 하나와 기본 닫힘
+`panel<&draw_game_preview>` 하나다. 모드 막대는 Host 본문이 `TabStyleScope` 아래
+`BeginTabBar` 로 그린다 — 창을 둘에서 하나로 합치는 것이 화면의 모양까지 바꿀 이유는 없어서
+가운데 노드의 탭 바(`ImGuiDockNodeFlags_NoTabBar` 로 끈 것)와 같은 스타일을 쓴다. 관측은
+`editor.viewport [scene|game]` 이다.
+
+**찾아 고친 결함 다섯.**
+
+1. **가운데 노드가 central 이 아니었다.** `DockBuilderSplitNode` 가 남긴 중앙을 아무도
+   `ImGuiDockNodeFlags_CentralNode` 로 표시하지 않아 실측 `centralNodes=0` 이었다. 그래서
+   `DockBuilderGetCentralNode` 가 널이고, **중앙을 특별히 다루는 것들이 전부 조용히 닿지
+   않았다** — 탭 바 억제와 `PassthruCentralNode` 의 투명 배경이 그렇다. W3 게이트가 이 수를
+   `-le 1` 로만 봐서 0 을 통과시키고 있었다. 이제 `-eq 1` 이다.
+2. **dock 감사가 §1.4 의 사고를 구조적으로 볼 수 없었다.** `EditorChromeProbe` 가 "도크
+   빌더가 건너뛰는 조건과 같은 조건을 쓴다" 고 적어 놓고 실제로는 `window_role::panel`
+   **전체**를 면제했다. 빌더는 패널을 도크한다(Hierarchy 는 `right_upper` 다). 면제한 탓에
+   `undocked` 는 중앙 창만 셌고, 그리는데 자리를 잃은 패널 — 바로 그 감사를 만든 이유 —
+   은 영원히 0 으로 보고됐다. 조건을 `floating` 하나로 줄였더니 `dockedWindows` 가 2→5 가 됐다.
+3. **Game 이 창의 종횡비로 letterbox 하고 있었다.** `ScreenResizeBus::GetAspectRatio()` 는
+   창 비율이지 게임 타깃 프레임버퍼의 비율이 아니다. 둘이 갈리면 비율을 "지켜" 맞춰도 그림이
+   늘어난다. 캔버스 규약 ②대로 소스 픽셀에서 낸다.
+4. **모드가 스레드 경계를 넘어 평문으로 읽혔다.** 모드를 쓰는 쪽은 UI 스레드(모드 막대)인데
+   `editor.viewport` 는 게임 스레드에서 돈다. 게시본(`viewport_demand::mode`)과 요청함을 둘 다
+   `demandMutex` 아래로 넣었다 — workspace 상태를 가른 것과 같은 이유다.
+5. **옛 배치를 물리면 central 이 영원히 없었다.** ①의 표시는 도크 빌더 안에 있었는데
+   빌더는 **ini 가 없을 때만** 돈다(§W0). `CentralNode` 는 ini 에 저장되는 local flag 라
+   W4 전에 쓰인 파일에는 그 비트가 없고, 이주는 없는 비트를 지어낼 수 없다. 그래서 W4 이전
+   워크스페이스나 legacy ini 를 물린 세션은 중앙 노드가 없는 채로 돌았다 — ① 과 같은 증상이
+   같은 이유로 되살아나는 자리다. 표시를 매 프레임 `BeginRender` 로 옮기고, central 이 없으면
+   Host 가 들어앉은 노드를 central 로 세운다(그 창은 `no_move` 라 자기 노드를 떠나지 않는다).
+   **이것을 잡은 것은 게이트의 legacy fixture 넷이다** — 본 배치만 보던 단정은 초록이었다.
+   `dock_audit::clean()` 도 "둘 이상이 아니다" 에서 "정확히 하나다" 로 조였다.
+
+**거둔 것과 거두지 않은 것.** 게임 타깃은 Scene 모드이고 Game Preview 가 닫혀 있으면 만들지
+않는다(실측: 61 프레임 중 60 프레임 미제출, Preview 를 열면 `gameTarget=true`). **에디터 타깃은
+대칭으로 끄지 않았다** — Game 모드에서 씬 뷰가 보이지 않는 것은 맞지만 그 타깃을 프레임마다
+세웠다 무너뜨리는 것은 생성·회수를 두 backend 에서 검증한 뒤에야 안전하고, 그것은 이 계획서가
+extent 기반 resize 를 미뤄 둔 것과 같은 이유다. 지금 거두는 것은 비싼 쪽 하나 — 게임 카메라의
+전체 씬이다. 게이트가 `editorTarget=true`·`suppressedEditorViews=0` 을 단정하므로 나중에
+대칭으로 거두면 그 줄이 붉어지고, 그때 결정이 바뀐 것을 적으면 된다.
+
+**이빨은 변이 셋으로 쟀다.** 결함을 하나씩만 심고 에디터를 통째로 다시 빌드해 태웠다.
+셋 다 **맞는 자리에서 맞는 이유로** 붉었고, 앞에 선 단정이 뒤를 가리지 않았다.
+
+| 심은 결함 | 붉어진 자리 |
+|---|---|
+| `close` 가 `central`·`closable` 검사를 건너뛴다 | W4-① — "Closing the central viewport host was accepted; it must be refused" |
+| 뷰 수요를 무시하고 게임 뷰를 늘 만든다 | W4-② — "The game view was sealed on every frame … (suppressed=0)" |
+| `Save` 가 모드를 언제나 Scene 으로 적는다 | W4-③ — "The workspace file did not record the game mode" |
+
+**변이가 단정 하나의 뜻을 조이게 했다.** `suppressedGameViews` 는 원래 "게임 뷰를 만들지
+않은 프레임" 을 셌는데, 그 안에는 **만들 수 없었던 것**(주 카메라가 없음)이 섞여 있었다.
+지금 게이트 시나리오에는 게임 카메라가 있어서 변이가 잡혔지만, 카메라 없는 씬을 물리는
+순간 수요 문을 통째로 걷어도 그 수가 그대로여서 단정이 아무것도 재지 않게 된다 — 게이트가
+씬이 무엇을 담고 있느냐에 기대는 모양이다. 카메라를 먼저 집어 "만들 수 있었는데 수요가
+없어 만들지 않았다" 만 세도록 바꿨다(`App.cpp` · `note_view_submission`). 조인 뒤에도
+실측은 그대로다 — Scene 모드 46 프레임 중 45 미제출.
+
+**못 잡는 것 하나를 적어 둔다.** ①의 central 표시를 `BeginRender` 에서 걷는 변이는 **본
+배치 시나리오에서 초록이다** — 도크 빌더가 여전히 세우기 때문이다. 그것을 잡는 것은 legacy
+fixture 넷뿐이고, 결함 ⑤ 가 실제로 그렇게 드러났다. 값싼 단정 하나가 아니라 **fixture 를
+물린 채 도는 것**이 이 축의 이빨이라는 뜻이다.
+
+**`display_back` 의 마지막 소비자가 사라졌다.** 매 프레임 강제로 맨 뒤로 보내는 것은 자유
+도킹과 충돌하고, 가운데 노드가 서면 필요도 없다 — Host 는 자기 노드를 떠나지 않는다. 열거자와
+기구는 남겼다: 자가 검사가 그 값을 태우고 있고, 지우면 "쓰는 곳이 없다" 와 "지워서 못 쓴다" 가
+섞인다.
 
 ### W5 — Play/Pause/Eject 표시·입력 상태 머신 (P0, 4일 · 정찰 뒤 3일→4일)
 
@@ -1073,9 +1738,10 @@ controller를 짜기 전에 그 둘을 먼저 만들어야 한다.
   걷는다. 걷는 순간 game input 라우팅 동작이 바뀔 수 있으므로 **계측 → 지혈 순서**를 지킨다.
 - `Entering/PlayingPossessed/PlayingEjected/Exiting`을 Editor controller에 둔다.
 - pending transaction, Game target not-ready, snapshot failure를 명시적으로 처리한다.
-- gizmo/picking/game input/cursor/focus의 단일 owner를 만든다. 커서는 ImGui가 손대지 않으므로
-  (§1.8) 경쟁자는 없지만 **해제 누락을 복구해 줄 주체도 없다** — focus loss·Eject·Stop·비정상
-  종료에서 해제를 각각 단정한다.
+- gizmo/picking/game input/cursor/focus의 단일 owner를 만든다. UI 커서 모양은 ImGui backend,
+  게임 lock/clip/visibility는 ViewportHost의 소유권 정책으로 조정한다(§1.8).
+  focus loss·Eject·Stop·비정상 종료에서 해제를 각각 단정한다.
+  W2-V가 제공하는 오버레이 입력 소비 결과를 연결하고, PlayingPossessed에서 편집 도구 입력을 차단한다.
 - Undo Clear 이중 경로(§1.6)를 controller 단일 소유로 정리한다.
 - Stop 뒤 prior document/focus/selection 정책을 복원한다.
 
@@ -1084,7 +1750,7 @@ controller를 짜기 전에 그 둘을 먼저 만들어야 한다.
 UI가 Playing으로 보이지 않는 것**을 명시적으로 단정한다. Play 실패·Alt-Tab·Eject·Pause·Stop
 반복에서 cursor/gizmo가 잘못 남지 않는다.
 
-### W6 — preset 4종과 layout UX (P2, 2일)
+### W6 — preset 5종과 layout UX (P2, 2일)
 
 - `S&Box Compact`, `Level Editing`, `UI Editing`, `Rendering & Debug`, `Legacy Unity`를 제공한다.
 - Save As/Rename/Delete/Reset와 active workspace 표시를 만든다.
@@ -1099,33 +1765,53 @@ UI가 Playing으로 보이지 않는 것**을 명시적으로 단정한다. Play
 - **flatten presentation cache를 먼저 만들고**, 그 위에 visible-row clipping을 얹는다(§8.3의
   순서 제약). 재귀 `TreeNodeEx` 위에 clipper를 바로 끼울 자리는 없다.
 - lowercase/search cache, icon/label formatting cache를 측정 기반으로 적용한다.
+  Browser 폴더/자산 목록 스냅샷을 W2-B와 공유한다. W2-B는 탐색·범위·검색/정렬 조건을 소유하고
+  W7은 변경 반영·파생 목록·clipping을 소유한다. 폴더만 있는 위치와 전체/최근 범위도 같은 신원을 사용한다.
+- **2026-09-11 추가 확정 — 비동기 에셋 썸네일:** 메시·텍스처 등은 대기·로딩 중 유형 아이콘을
+  표시하고 Ready 결과가 게시된 다음 프레임부터 같은 타일에 썸네일을 적용한다. 실패·미지원은
+  유형 아이콘을 유지한다. UI에서 파일 읽기·생성·GPU 완료를 기다리지 않는다.
+  가시 타일 우선 큐·중복 요청 억제·자산/의존성 변경 무효화·메모리 예산과 퇴출을 구현한다.
+  CPU 작업과 렌더/GPU 자원 소유 경로를 지키며, 오래된 요청의 늦은 완료는 폐기한다.
+  캐시는 안정 Texture 신원을 소유하고 backend `ImTextureID`를 보관하지 않는다.
+  세부 계약은 [EditorIconSelectionStudy.md](../analysis/EditorIconSelectionStudy.md)를 따른다.
+  이 추가 범위는 아직 미구현이며 위 3일의 기존 clipping 견적에 포함되지 않는다. 착수 시 별도 산정한다.
 - `HierarchyStore` 단독 정본 불변식을 source gate로 고정한다. 현재 Hierarchy 창이
   `scene->m_Entities`를 직접 인덱스 순회하는 경로가 이 정본과 어긋나지 않는지 착수 시 확인한다.
 
 **선행:** SceneGraph H3(현재 완료).
 **판정:** 결과/선택/drag-drop 의미가 동일하고 p95 CPU·allocation 개선 수치를 기록한다. 캐시만
 추가하고 실측 이득이 없으면 제거한다.
+썸네일은 로딩 중 입력·스크롤 유지, Ready 직후 교체, 타일 ID/선택/drag-drop 보존,
+실패·변경·삭제·늦은 완료와 DX12/Vulkan 자원 수명을 별도로 검증한다.
 
 ### W8 — 통합 회귀와 legacy 강제 배치 은퇴 (P0, 2일)
 
-- DX12/Vulkan, DPI, restart, damaged ini, Play 왕복, Game Preview, preset matrix를 자동화한다.
-- viewport를 제외한 chrome crop visual golden을 만든다.
-- 구 `BuildInitialDockLayout`의 ContentsBrowserStyle 분기와 핵심 ToolPanel `NoMove`를 제거한다.
+**2026-09-13 외관 기준은 현재 승인 상태로 고정한다. DX12가 현재 완료 gate이며 Vulkan은 별도 보류다.**
+새 시안 제작 대신 현 상태의 자동 golden·회귀를 만든다. 완료된 개별 검증은 유지하되 전체 통합과 구분한다.
+
+- DX12, DPI, restart, damaged ini, Play 왕복, Game Preview, preset matrix를 자동화한다. Vulkan은 보류 후속 행렬로 유지한다.
+  W2-I의 인스펙터 배치·Transform 2안, W2-V의 연속 resize·오버레이 입력 분리,
+  W2-B의 내부 분할·탐색/검색·New·자산 선택/drag-drop을 함께 판정한다.
+- 3D 씬 렌더 영역을 제외한 chrome crop visual golden을 만든다. 씬뷰 전체를 제외하지 않고
+  W2-V의 툴바·방향 기즈모·HUD를 포함한다. FPS 등 변동 숫자는 마스킹하되 표시 영역의 경계·배치는 검사한다.
+- 이미 제거된 `BuildInitialDockLayout`의 ContentsBrowserStyle 분기가 재유입되지 않는지 확인하고, 핵심 ToolPanel `NoMove` 잔재를 정리한다.
 - ImGui internal adapter version canary를 CI에 넣는다.
 
-**판정:** 양 backend에서 검증 레이어 오류/비정상 종료 0, layout·Play·시각·성능 gate 통과 후에만
-PHASE 21을 완료로 표시한다.
+**판정:** 현재 범위인 DX12에서 검증 레이어 오류/비정상 종료 0, layout·Play·시각·성능 gate 통과 후에만
+PHASE 21(DX12 범위)을 완료로 표시한다. Vulkan 대응은 별도 보류 이력으로 남기며 통과로 표시하지 않는다.
 
 ---
 
 ## 10. 의존성과 병행
 
 ```text
-W0 → W1 → W2
+W0 → W1 → W2 → W2-I
+          W2 + W4 canvas 정본 → W2-V
+          W2 + M1 → W2-B  (B3 목록 연결은 W7 스냅샷 계약을 선행)
 W0 → W3 → W4 → W5
           W4 → W6
 H3 + W0 ─────→ W7
-W2 + W5 + W6 + W7 → W8
+W2 + W2-I + W2-V + W2-B + W5 + W6 + W7 → W8
 
 M0 → M1 → M2          (부록 A. 2026-09-11 셋 다 착지)
 M1 ──────→ W3         (Window 메뉴 재열기 계약의 선행. 선행 충족)
@@ -1144,18 +1830,19 @@ M3 ──────→ W1 재계수  (2026-09-11 다시 셌다. 91 → 57. W1 
 
 | 순 | 슬라이스 | 이 자리인 이유 |
 |---|---|---|
-| 0 | **M3 — 셸 크롬 (착지 완료)** | 제목표시줄·배치·스킨이 서로를 전제한다. 제목을 가운데 두려면 재생 컨트롤이 그 행을 비워야 하고, 그러려면 툴바 행이 생겨야 하고, 그러면 독스페이스의 '행이 둘' 상수가 깨진다. 셋을 따로 하면 같은 파일을 세 번 헤집는다. 창 본문은 건드리지 않아 W3의 대상 수는 줄지 않는다 |
+| 0 | **M3 — 셸 크롬 (착지 완료)** | 제목표시줄·배치·스킨을 함께 정리한다. 최초에는 별도 재생 행을 뒀으며, 2026-09-12 사용자 결정으로 재생 버튼을 최소화 버튼 앞의 박스로 옮기고 해당 행을 제거했다. 독스페이스는 작업 영역 크기를 사용한다. 창 본문은 건드리지 않아 W3의 대상 수는 줄지 않는다 |
 | 1 | **W0 전반 — 관측 커맨드 · 크롬 게이트 (착지 완료)** | 순서가 실제로는 거꾸로 돌았다 — `editor.windows`·`editor.menu`가 먼저 나서 TSV 관례를 **그 둘이 정했고**, 여기서 선 셋이 그 형식을 따랐다. 결과는 같다(형식이 하나). 순회 결정화는 M4가 펌프를 은퇴시키며 먼저 해소했다. `editor.viewport`는 읽을 신호가 없어 W5로 갔다 |
 | 2 | **M0 — 선언 어휘와 목록 배관 (착지 완료)** | 새 폴더뿐이라 동작 변화 0. 1과 파일을 공유하지 않아 **병행 가능** |
 | 3 | **M1 — registry와 그리기 배선 (착지 완료)** | 메뉴 구조를 바꾸는 마지막 슬라이스. 빈 뿌리를 그리지 않으므로(부록 A.6) 픽셀 중립이고, **W1보다 먼저** 두어야 `MenuBarWindow.cpp` 2,716줄을 구조와 토큰으로 두 번 헤집지 않는다 |
 | 4 | **M2 — 게이트와 `editor.menu` (착지 완료)** | M1의 표가 있어야 덤프할 것이 생긴다. W0 canary가 쓸 여섯째 커맨드를 여기서 낸다 |
 | 5 | **W0 후반 — fixture · inventory · screenshot · 성능 기준선 (착지 완료)** | "golden을 한 번만 뜬다"는 전제가 **틀렸다.** 시작 창 크기를 고를 수 없고(`App.cpp` 하드코딩) 런타임 리사이즈가 배치를 재배열하므로, 여기서 뜬 캡처는 골든이 될 수 없다. 기준선으로만 남기고 golden은 W8이 뜬다. fixture는 예상대로 여섯 벌 다 게이트에 물렸다 |
 | 5.5 | **M4** — 창 선언(부록 B.3) | M3이 셸에 프레임 소유를 준 뒤라야 선언에 담을 것이 정해진다. W3보다 **먼저**여야 한다 — W3의 안정 ID는 선언의 한 필드가 되고, 표시 상태 저장소 셋을 합치는 자리도 여기다. W0 후반 골든 뒤에 두어 골든을 두 번 뜨지 않는다 |
-| 6~ | W1 → W2, W3 → W4 → W5·W6, W7, W8 | §9·§10의 기존 의존 그대로. W3의 선행인 M1·M4는 이미 끝나 있다 |
+| 6~ | W1 → W2 → W2-I·W2-B, W3 → W4 → W5·W6, W2 + W4 canvas → W2-V, W7, W8 | W2-I는 인스펙터, W2-V는 씬뷰 배치, W2-B는 브라우저 탐색/생성을 담당한다. W4 canvas와 W7 목록 계약을 먼저 공유한다. W3의 선행 M1·M4는 이미 끝났으며 공유 파일 편집을 조정한다 |
 
 **(2026-09-11 갱신)** 1~5.5와 W0 후반이 착지했고, W1 구현·자동 회귀와 실행 중 사용자 배율
-왕복을 확인했다. W1은 실제 OS DPI 100↔150% 왕복 검증을 남겨 `progress`로 유지한다.
-그 뒤 구현 순서는 W2 → W3 → … 이며 단계별 범위와 검증은 §9를 따른다.
+왕복을 확인했다. W1의 Material Symbols 적용·Live Code 자리표시자 제거는 착지했고 실제 OS DPI
+100↔150% 왕복 검증을 남겨 `progress`로 유지한다. W7에는 비동기 Browser 썸네일 범위를 추가했다.
+W2 후속에는 W2-I·W2-V·W2-B를 추가했다. W3 이후 작업과의 의존·공유 파일 조정은 위 그래프와 §9를 따른다.
 
 두 가지를 주의한다. `CommandDescriptorSeeds.cpp`는 1과 4가 모두 건드리는 유일한 공유 파일이고 지금
 **다른 세션이 수정 중**이다. 그리고 3은 기존 19개 상단 항목을 이관하지 않는다 — 배선만 세우고 신규만
@@ -1182,17 +1869,25 @@ M3 ──────→ W1 재계수  (2026-09-11 다시 셌다. 91 → 57. W1 
 |---|---|---|
 | layout | clean, legacy, custom, corrupt, missing | central 부재, panel 유실, silent overwrite |
 | DPI | 100%, 125%, 150%, resize 왕복 | double scale, clipped text, 0-size |
-| backend | DX12, Vulkan | presentation key 오류, validation error, crash |
+| backend | DX12 필수, Vulkan 별도 보류 | presentation key 오류, validation error, crash |
 | mode | Edit, Entering, Play, Pause, Eject, Stop | wrong target, gizmo/game input 동시 활성 |
 | focus | click panel, Alt-Tab, modal, Game Preview | cursor lock 잔존, focus stealing |
 | scale | Hierarchy/Browser 1k/10k/50k | 빈 측정, semantic mismatch, p95 회귀 |
 | style | normal/hover/active/focus/disabled/error | token drift, nav/focus 정보 소실 |
+| Inspector 배치 (W2-I) | content 폭 240/320/480/720 logical px, 전환 경계, 배율 100/125/150/200%, 긴 필드·중첩·Import Settings | 가로 잘림, 열 불일치, 읽을 수 없는 숫자 폭, 보조 버튼 유실, 편집 중 ID/Undo 손실 |
+| 공간 컴포넌트 (W2-I, 2안) | 일반·Empty·UI·Canvas 두 모드, 개별 조작·엔티티 활성 왕복, 저장/재로드 | 인스턴스당 중복 헤더/본문, Canvas 공간 정보 누락, 개별 비활성화 허용, 엔티티 활성 전이 훼손 |
+| 씬뷰 배치 (W2-V) | 폭 320/480/720/1024·높이 180/320/640 logical px, 배율 100/125/150/200%, 원점 이동·100회 이상 연속 리사이즈 | 좌우 정렬 불일치, 잘림·기즈모/HUD 겹침, 도구 유실, 전환 진동, 표시/hit rect 불일치 |
+| 씬뷰 입력 (W2-V/W5) | 누른 채 resize, 팝업·텍스트·기즈모·drop·terrain·카메라, focus loss, Play/Eject | 클릭 관통, UI/씬 중복 소비, 다른 명령으로 release 전달, 게임 입력 침범 |
+| Browser 배치/탐색 (W2-B) | 폭 320~1440 logical px·배율 100~200%, 내부 splitter·접기·긴 경로·루트/Up·뒤로/앞으로·workspace 복원 | 고정 폭/잘림, 검색/경로 유실, 트리와 목록의 위치 불일치, 다른 프로젝트 이력 재사용 |
+| Browser 생성/검색 (W2-B/W7) | New/우클릭·취소/실패·늦은 완료, 폴더만 있는 위치, 최근/전체·유형·정렬·목록/타일·동명 자산 drag | 생성 경로/GUID 오류, 빈 결과 원인 은폐, 선택/신원 손실, 중복 탐색 cache·매 프레임 전체 순회 |
 
 필수 자동화 후보:
 
-- `Tools/regression/verify-editor-workspace.ps1` — **신규. 선행으로 §1.9의 관측 커맨드가 필요하다.**
+- `Tools/regression/verify-editor-workspace.ps1` — **구현됨**. W3 migration·저장/복구 계약까지 실어 6 fixtures/212 checks다(에디터 16회 기동). 형식만 보는 `verify-editor-workspace-storage.ps1`(169 checks)을 앞에 두어 형식 결함을 에디터를 띄우기 전에 거른다. 둘 다 run-all에 있다. W4 central 계약(Host 비폐쇄·모드 재시작 왕복·보이지 않는 타깃 미생산)은 W4-①②③ 구역으로 들어갔다.
 - `Tools/regression/verify-editor-theme-golden.ps1` — 신규
 - `Tools/regression/verify-editor-viewport-mode.ps1` — 신규
+- `Tools/regression/verify-editor-viewport-overlay.ps1` — W2-V 신규 후보. 명령별 배치·표시 모드·입력 소비 관측과 실제 입력/리사이즈 주입을 선행한다.
+- `Tools/regression/verify-editor-content-browser.ps1` — W2-B 신규 후보. 내부 rect·탐색/검색 상태·결과 신원·생성 완료 관측과 조작 주입을 선행한다.
 - 기존 `verify-play-roundtrip.ps1`
 - 기존 `verify-play-selection-undo.ps1`
 - 기존 `verify-play-mode-policy-boundary.ps1`
@@ -1234,7 +1929,9 @@ M3 ──────→ W1 재계수  (2026-09-11 다시 셌다. 91 → 57. W1 
 | **관측 표면이 없어 게이트가 “창이 떴다”만 단정** | W0에서 `editor.*` 관측 커맨드 5종 선행(§1.9), 변이로 이빨 증명 |
 | **DPI 자체 구현이 ImGui 1.92 경로와 이중화** | `FontScaleMain/FontScaleDpi` 채택, obsolete 소스 게이트와 실행 HWND PMv2·DPI 일치 검사(§3.2) |
 | **`WantCapture*` 강제를 걷자 입력 라우팅이 바뀜** | W5에서 계측 먼저, 지혈은 그 뒤. 라우팅 근거를 문서화한 뒤 걷는다(§1.8) |
-| **커서 해제 누락을 복구할 주체가 없음** | `NoMouseCursorChange`가 서 있어 ImGui가 되돌리지 않는다. 해제 경로 4종을 각각 단정(§1.8) |
+| **UI 커서 모양 복원을 게임 캡처 해제로 오인** | 모양 변경 제한은 제거됐지만 lock/clip/visibility는 W5 소유권에 남는다. 해제 경로 4종을 각각 단정(§1.8) |
+| **씬뷰 resize 때 도구가 겹치거나 클릭이 씬으로 관통** | W2-V의 실측/overflow·기즈모/HUD 공간 예약과 동일 프레임 hit rect, press/release 소유권·연속 resize 검증 |
+| **Browser 외부 docking만 고치고 내부 고정 폭/탐색 부재를 남김** | W2-B 내부 splitter·경로/이력·New·검색 범위의 별도 완료 기준, W3/W7와 공동 검증 |
 | **custom widget이 기존 ImGuiHelper 자산과 이중화** | W2 착수 전 §7.1 승계 결정표 확정, 소비자를 끊어 본 뒤 은퇴 |
 | **비-UTF8 소스 편집이 무관한 주석을 깨뜨림** | 대상 9개는 내용 수정 전에 인코딩부터 정리(§1.10) |
 | **창 순회 비결정성으로 visual golden이 흔들림** | golden을 뜨기 전에 `m_contexts` 순회를 결정적 순서로(§1.3-4) |
@@ -1252,8 +1949,14 @@ flag로 분리한다. 단, 완료 뒤 영구 이중 경로를 유지하지 않�
 1. Editor는 Dear ImGui와 기존 DX12/Vulkan ImGui presentation backend를 유지한다.
 2. S&Box 참고 색·geometry·typography가 `EditorThemeTokens` 한 정본에서 적용된다.
 3. custom draw는 승인된 소수 family에 한정되고 표준 ImGui interaction을 보존한다.
+   인스펙터 전 경로는 W2-I의 공통 열·폭별 줄 전환 규칙을 사용한다. Transform 계통은 2안에 따라
+   실제 컴포넌트별로 상단에 한 번만 표시하며 개별 비활성화·제거 제한과 엔티티 전체 활성 전이를 보존한다.
 4. `ViewportHost`는 central에 항상 존재하며 닫거나 ToolPanel로 대체할 수 없다.
+   씬뷰 툴바·방향 기즈모·HUD는 W2-V의 공통 canvas 배치를 사용하며 창 이동·연속 resize에도
+   정렬·도달성·입력 분리를 유지한다. W4의 이미지/기즈모/picking과 좌표 정본이 같아야 한다.
 5. Hierarchy/Inspector/Browser/Console/Profiler/Game Preview는 자유롭게 dock/close/reopen된다.
+   Browser는 W2-B의 내부 폭 조절·경로/이력 이동·New·검색 범위/필터·보기 도구를 제공하며,
+   W7 목록/썸네일을 소비해도 자산 선택·생성 대상·drag-drop 신원을 보존한다.
 6. title/icon/번역 변화가 workspace identity를 깨뜨리지 않는다. **DockBuilder 지정 이름과 실제
    `Begin` 이름의 불일치가 0이며, 게이트가 이를 직접 단정한다**(§1.4의 현존 결함 청산).
 7. clean/legacy/custom/corrupt layout의 save/load/reset/migration이 자동 검증된다.
@@ -1261,7 +1964,7 @@ flag로 분리한다. 단, 완료 뒤 영구 이중 경로를 유지하지 않�
    owner가 겹치지 않는다. **스냅샷 실패 시 UI가 Playing으로 보이지 않는다**(§1.6).
 9. optional Game Preview는 기존 두 표시 타깃을 재사용하고 두 번째 카메라 정본을 만들지 않는다.
 10. theme/docking CPU 회귀가 §8 gate 안이며, single-view/clipping 이득은 실제 수치로 기록된다.
-11. DX12/Vulkan, DPI, Play 왕복, visual golden, large-data 성능 gate가 모두 통과한다.
+11. 현재 DX12 범위에서 DPI, Play 왕복, visual golden, large-data 성능 gate가 모두 통과한다. Vulkan 검증은 별도 보류로 명시한다.
 12. `verify-imgui-obsolete-surface.ps1`이 통과하고(§3.2의 ABI 정정), `ViewportsEnable`은
     꺼진 채로 남아 있음을 게이트가 단정한다(§3.2, §1.7).
 13. `editor.*` 관측 커맨드 5종이 서 있고, 에디터 chrome 회귀 3종이 **변이로 이빨을 증명한**
@@ -1732,6 +2435,13 @@ Content Browser 의 Delete 가 확인도 Undo 도 없이 `file::remove` 를 부�
 - B.1~B.2는 **착지 기록**이고 B.3~B.4는 아직 서지 않은 **계약**이다.
 
 ### B.1 M3 착지 기록 — 셸이 프레임을 소유한다 (2026-09-10)
+
+**2026-09-12 후속 변경.** 상단은 `엔진 아이콘 → 메뉴 → 가운데 제목 → [Play/Stop · Pause/Resume] → 최소화/최대화/닫기` 순서다.
+제목 행 20px·글꼴 12px·아이콘 14px·재생 박스 56×16px는 사용자 배율과 모니터 DPI를 적용하기 전 기준값이다.
+창이 좁으면 여섯 메뉴 뿌리를 한 메뉴 안에 넣고, 제목이 겹칠 때는 제목만 생략한다.
+메뉴 행과 도크 호스트의 테두리 선을 제거하고, 재생 박스 왼쪽에서 caption hit 영역을 끝낸다.
+Play 트랜잭션·Undo 정책은 기존 SceneManager/PlayModeController가 소유한다.
+아래는 최초 착지 기록이며, 후속 화면·검증 결과는 [EditorTitleBarValidation.md](../analysis/EditorTitleBarValidation.md)에 둔다.
 
 **결정한 원칙 하나.** 셸이 `Begin`/`End`와 식별자와 플래그와 표시 상태를 소유하고, 창 본문은
 지금처럼 ImGui를 직접 부른다. 본문을 추상 레이어 뒤로 밀지 않는다.

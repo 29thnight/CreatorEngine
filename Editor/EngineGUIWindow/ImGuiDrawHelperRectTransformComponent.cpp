@@ -2,8 +2,7 @@
 #include "RectTransformComponent.h"
 #include "EditorPropertyRow.h"
 #include "EditorSectionHeader.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
 
 #include <cmath>
 
@@ -185,7 +184,7 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 	// 전에도 소비자가 없었다.
 	editor::widgets::section_header_request header{};
 	header.label = "RectTransform";
-	header.menu_icon = ICON_FA_BARS;
+	header.menu_icon = EditorIcon::More;
 	if (editor::widgets::draw_section_header(header).open)
 	{
 		auto anchorMin = rectTransformComponent->GetAnchorMin();

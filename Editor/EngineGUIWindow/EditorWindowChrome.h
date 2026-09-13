@@ -6,6 +6,26 @@
 #include <optional>
 #include <string>
 
+// Client-space geometry shared by menu rendering and native caption hit testing.
+struct EditorTitleBarLayout
+{
+    float height{};
+    float systemButtonWidth{};
+    float systemButtonsLeft{};
+    float playLeft{};
+    float playWidth{};
+    float playInset{};
+};
+
+inline EditorTitleBarLayout LayoutEditorTitleBar(float width, float height, float scale) noexcept
+{
+    const float systemWidth = 32.f * scale;
+    const float playWidth = 56.f * scale;
+    const float systemLeft = width - systemWidth * 3.f;
+    return {height, systemWidth, systemLeft,
+        systemLeft - 8.f * scale - playWidth, playWidth, 2.f * scale};
+}
+
 // 에디터 셸 크롬 — OS 캡션을 지우고 제목표시줄을 ImGui가 그린다.
 //
 // ── 왜 에디터 계층인가 ──
@@ -42,7 +62,7 @@ public:
 
     /// 표시 스레드 전용. 메뉴가 끝난 자리에서 이어 그린다 —
     /// 가운데 제목과 오른쪽 창 버튼 셋을 놓고 끌기 영역을 게시한다.
-    void DrawTitleBarTail();
+    void DrawTitleBarTail(const EditorTitleBarLayout& layout, float menuEndX);
 
     /// 제목표시줄 한 줄의 높이(클라이언트 좌표). 표시 스레드가 게시한다.
     float GetTitleBarHeight() const noexcept

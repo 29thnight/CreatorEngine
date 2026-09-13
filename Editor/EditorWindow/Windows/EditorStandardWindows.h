@@ -1,4 +1,5 @@
 #pragma once
+#include "EditorTheme.h"
 // 표준 에디터 창 선언 (PHASE 21 M4 2단계 · 계획서 부록 B.3).
 //
 // 옛 `ImGui::ContextRegister` 열 곳이 여기로 온다. 계획서가 정한 대로
@@ -65,40 +66,40 @@ struct editor_panel_windows
             // 남은 것은 자리 **이름**을 `dock_slot` 열거자가 아니라 workspace
             // 선언에서 받는 일이고 그것이 W3·W6이다.
             panel<&windows::draw_hierarchy>(
-                EditorWindowName::kHierarchy, EditorWindowName::kHierarchy)
+                EditorWindowName::kHierarchy, EditorWindowName::kHierarchyLabel)
+                .background(HierarchyThemeTokens::BackgroundR,
+                    HierarchyThemeTokens::BackgroundG, HierarchyThemeTokens::BackgroundB, 1.f)
                 .dock(dock_slot::right_upper)
-                .traits(window_trait::no_move)
-                .stacking(window_stacking::display_back)
-                .closable(false),
+                .closable(true),
 
             panel<&windows::draw_inspector>(
-                EditorWindowName::kInspector, EditorWindowName::kInspector)
+                EditorWindowName::kInspector, EditorWindowName::kInspectorLabel)
+                .padding(InspectorThemeTokens::PanelPaddingX, EditorThemeTokens::PanelPaddingY)
+                .background(InspectorThemeTokens::BackgroundR,
+                    InspectorThemeTokens::BackgroundG, InspectorThemeTokens::BackgroundB, 1.f)
                 .dock(dock_slot::right_lower)
-                .traits(window_trait::no_move |
-                        window_trait::no_bring_to_front_on_focus |
-                        window_trait::no_focus_on_appearing)
-                .stacking(window_stacking::display_back)
-                .closable(false),
+                .traits(window_trait::no_focus_on_appearing)
+                .closable(true),
 
             panel<&windows::draw_asset_bundle>(
-                EditorWindowName::kAssetBundle, EditorWindowName::kAssetBundle)
+                EditorWindowName::kAssetBundle, EditorWindowName::kAssetBundleLabel)
                 .dock(dock_slot::bottom)
-                .traits(window_trait::auto_resize)
-                .closable(false),
+                .closable(true),
 
-            // 표시 이름과 안정 식별자가 **갈린 유일한 창**이다. 왼쪽이 ini의
+            // 표시 이름과 안정 식별자는 분리한다. 왼쪽이 ini의
             // 도크 항목을 붙잡는 옛 문자열이고 오른쪽이 사람이 보는 라벨이다
             // (`EditorWindowNames.h` 참조). 서랍 스타일이 사라져 `closable_when`
             // 술어도 없어졌다 — 다른 도킹 패널과 같이 닫히지 않는다.
             panel<&windows::draw_content_browser>(
                 EditorWindowName::kContentBrowser,
                 EditorWindowName::kContentBrowserLabel)
+                .background(50.f / 255.f, 53.f / 255.f, 52.f / 255.f, 1.f)
                 .dock(dock_slot::bottom)
                 .traits(window_trait::no_collapse)
-                .closable(false),
+                .closable(true),
 
             panel<&windows::draw_resource_counter>(
-                EditorWindowName::kResourceCounter, EditorWindowName::kResourceCounter)
+                EditorWindowName::kResourceCounter, EditorWindowName::kResourceCounterLabel)
                 .dock(dock_slot::bottom)
                 .traits(window_trait::always_vertical_scrollbar |
                         window_trait::no_collapse)
@@ -117,7 +118,7 @@ struct editor_tool_windows
         using namespace editor;
         return window_set(
             panel<&windows::draw_render_pass>(
-                EditorWindowName::kRenderPass, EditorWindowName::kRenderPass)
+                EditorWindowName::kRenderPass, EditorWindowName::kRenderPassLabel)
                 .traits(window_trait::always_vertical_scrollbar |
                         window_trait::no_collapse)
                 .open_by_default(false),
@@ -125,13 +126,13 @@ struct editor_tool_windows
             // 아래 넷도 생성자가 곧바로 닫던 것들이다. 열 곳 중 여섯이
             // 그랬고, 그 판단이 전부 선언으로 왔다.
             panel<&windows::draw_light_map>(
-                EditorWindowName::kLightMap, EditorWindowName::kLightMap)
+                EditorWindowName::kLightMap, EditorWindowName::kLightMapLabel)
                 .traits(window_trait::auto_resize | window_trait::no_collapse)
                 .open_by_default(false)
                 .available(&windows::has_light_map),
 
             panel<&windows::draw_collision_matrix>(
-                EditorWindowName::kCollisionMatrix, EditorWindowName::kCollisionMatrix)
+                EditorWindowName::kCollisionMatrix, EditorWindowName::kCollisionMatrixLabel)
                 .traits(window_trait::always_vertical_scrollbar |
                         window_trait::always_horizontal_scrollbar |
                         window_trait::no_collapse)
@@ -140,13 +141,13 @@ struct editor_tool_windows
 
             panel<&windows::draw_texture_import_selector>(
                 EditorWindowName::kTextureImportSelector,
-                EditorWindowName::kTextureImportSelector)
+                EditorWindowName::kTextureImportSelectorLabel)
                 .traits(window_trait::auto_resize | window_trait::no_collapse)
                 .open_by_default(false)
                 .available(&windows::has_texture_import_selector),
 
             panel<&windows::draw_material_picker>(
-                EditorWindowName::kMaterialPicker, EditorWindowName::kMaterialPicker)
+                EditorWindowName::kMaterialPicker, EditorWindowName::kMaterialPickerLabel)
                 .traits(window_trait::no_scrollbar | window_trait::no_collapse)
                 .open_by_default(false)
                 .available(&windows::has_material_picker));

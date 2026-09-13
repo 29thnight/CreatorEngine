@@ -1,6 +1,8 @@
 #include "EditorModelPlacement.h"
 #include "EditorTheme.h"
 #include "EditorObjectOperations.h"
+#include "EditorAssetPresentation.h"
+#include "EditorImGuiTexture.h"
 #include "HierarchyWindow.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
@@ -23,8 +25,7 @@
 #include "SpriteSheetComponent.h"
 #include "GameObjectCommand.h"
 #include "PrefabEditor.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
 #include "InputManager.h"
 #include "MetaStateCommand.h"
 #include "ReflectionRegister.h"
@@ -36,6 +37,116 @@ namespace
 	{
 		static HierarchyWindow value;
 		return value;
+	}
+
+	// S&Box Hierarchy의 줄 규칙(PHASE 21). 한 줄은 theme의 RowHeight 한 칸을
+	// 통째로 차지하고, 줄끼리 맞닿으며, 홀짝으로 바탕이 갈린다.
+	//
+	// FramePadding 표지가 없으면 ImGui는 트리 노드의 높이를 글자 높이(16px)로
+	// 잡는다 — 줄 간격 8px은 줄 사이의 빈틈으로 남아 띠가 끊긴다. 이 표지를
+	// 붙여야 한 줄의 상자가 RowHeight(24px)가 되고, Draw가 구간에 거는
+	// ItemSpacing.y = 0과 맞물려 줄이 서로 맞닿는다.
+	constexpr ImGuiTreeNodeFlags kRowFlags =
+		ImGuiTreeNodeFlags_SpanFullWidth |
+		ImGuiTreeNodeFlags_FramePadding |
+		ImGuiTreeNodeFlags_OpenOnArrow |
+		ImGuiTreeNodeFlags_OpenOnDoubleClick;
+
+	ImVec4 hierarchy_color(std::uint32_t rgb) noexcept
+	{
+		return ImVec4(((rgb >> 16) & 255) / 255.f,
+			((rgb >> 8) & 255) / 255.f, (rgb & 255) / 255.f, 1.f);
+	}
+
+	// 한 줄의 가로 범위는 SpanFullWidth가 쓰는 것과 같은 WorkRect다 — 띠와
+	// 선택 하이라이트의 양 끝이 어긋나지 않는다.
+	bool row_rect(ImVec2& rowMin, ImVec2& rowMax) noexcept
+	{
+		ImGuiWindow* window = ImGui::GetCurrentWindow();
+		if (!window || window->SkipItems) return false;
+
+		const float top = window->DC.CursorPos.y;
+		rowMin = ImVec2(window->WorkRect.Min.x, top);
+		rowMax = ImVec2(window->WorkRect.Max.x, top + ImGui::GetFrameHeight());
+		return true;
+	}
+
+	// 줄 바탕은 노드보다 **먼저** 칠한다. 선택·hover 하이라이트는 ImGui가
+	// 그 위에 그리므로 다시 덮이지 않는다.
+	void draw_row_band(int rowIndex)
+	{
+		ImVec2 rowMin{}, rowMax{};
+		if (0 == (rowIndex & 1) || !row_rect(rowMin, rowMax)) return;
+
+		ImGui::GetWindowDrawList()->AddRectFilled(rowMin, rowMax,
+			ImGui::GetColorU32(hierarchy_color(editor::HierarchyThemeTokens::AlternateRow)));
+	}
+
+	// 씬 이름과 [ Dont Destroy On Load ]는 묶음의 머리다 — 홀짝 띠 대신 한 단
+	// 위의 바탕으로 칠해 아래 엔티티 줄과 갈라 둔다.
+	bool group_tree_node(const char* label)
+	{
+		ImVec2 rowMin{}, rowMax{};
+		if (row_rect(rowMin, rowMax))
+		{
+			ImGui::GetWindowDrawList()->AddRectFilled(rowMin, rowMax,
+				ImGui::GetColorU32(editor::ThemeColorValue(editor::ThemeColor::Panel)));
+		}
+		return ImGui::TreeNodeEx(label, kRowFlags | ImGuiTreeNodeFlags_DefaultOpen);
+	}
+
+	// Neutral selection keeps the blue object label readable; hover stays selected.
+	int push_selected_row_colors(bool isSelected)
+	{
+		if (!isSelected) return 0;
+
+		using T = editor::HierarchyThemeTokens;
+		ImGui::PushStyleColor(ImGuiCol_Header, hierarchy_color(T::SelectedRow));
+		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, hierarchy_color(T::SelectedHoveredRow));
+		ImGui::PushStyleColor(ImGuiCol_HeaderActive, hierarchy_color(T::SelectedRow));
+		return 3;
+	}
+
+	// The toolbar and context menu use the same creation operations and Undo path.
+	void draw_creation_menu(Scene* scene)
+	{
+		if (ImGui::MenuItem("Create Empty", "Ctrl + Shift + N"))
+			EditorObjectOperations::Create(scene, "Entity", GameObjectType::Empty);
+
+		const auto create_light = [scene](const char* name, LightType type)
+		{
+			auto creation = EditorObjectOperations::Create(scene, name, GameObjectType::Light);
+			auto* obj = creation.IsSuccess()
+				? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt()))
+				: nullptr;
+			if (!obj) return;
+			if (type == LightType::SpotLight)
+				obj->Transform_().SetRotation({ 0.7, 0, 0, 1 }, TransformWriteReason::Inspector);
+			if (auto* light = obj->GetComponent<LightComponent>())
+			{
+				light->SetLightType(type);
+				light->m_lightStatus = LightStatus::Enabled;
+			}
+		};
+		if (ImGui::BeginMenu("Light"))
+		{
+			if (ImGui::MenuItem("Directional Light"))
+				create_light("Directional Light", LightType::DirectionalLight);
+			if (ImGui::MenuItem("Point Light"))
+				create_light("Point Light", LightType::PointLight);
+			if (ImGui::MenuItem("Spot Light"))
+				create_light("Spot Light", LightType::SpotLight);
+			ImGui::EndMenu();
+		}
+		if (ImGui::MenuItem("Camera"))
+			EditorObjectOperations::Create(scene, "Camera", GameObjectType::Camera);
+		if (ImGui::BeginMenu("UI"))
+		{
+			if (ImGui::MenuItem("Image")) UIManagers->MakeImage("NoneImage", nullptr);
+			if (ImGui::MenuItem("Text")) UIManagers->MakeText("Text", "null", nullptr);
+			ImGui::MenuItem("Button", nullptr, false, false);
+			ImGui::EndMenu();
+		}
 	}
 }
 
@@ -67,7 +178,7 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
 		ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 	}
 
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
+	ImGuiTreeNodeFlags flags = kRowFlags;
 	bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj) != selectedObjects.end() || scene->m_selectedEntity == obj;
 	if (isSelected)
 	{
@@ -83,29 +194,37 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
 		flags |= ImGuiTreeNodeFlags_Leaf;
 	}
 
-	if (!obj->IsEnabled())
-	{
-		// 회색으로 텍스트 색상 변경
-		ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(editor::ThemeColor::TextDisabled));
-	}
+	const bool isDisabled = !obj->IsEnabled();
+	ImGui::PushStyleColor(ImGuiCol_Text, isDisabled
+		? editor::ThemeColorValue(editor::ThemeColor::TextDisabled)
+		: hierarchy_color(isSelected ? editor::HierarchyThemeTokens::SelectedText
+			: editor::HierarchyThemeTokens::EntityText));
 
-	std::string icon{};
+    const std::string id = "##entity" + std::to_string(obj->m_index);
+    const ImVec2 rowStart = ImGui::GetCursorScreenPos();
+    const float iconSize = ImGui::GetFontSize();
+    const ImVec2 imageMin{rowStart.x + ImGui::GetTreeNodeToLabelSpacing(),
+        rowStart.y + (ImGui::GetFrameHeight() - iconSize) * .5f};
+    draw_row_band(m_rowIndex++);
+    const int rowColors = push_selected_row_colors(isSelected);
+    const bool opened = ImGui::TreeNodeEx(id.c_str(), flags);
+    ImGui::PopStyleColor(rowColors);
 
-	if (obj->m_prefab)
-	{
-		icon = ICON_FA_BOX_OPEN + std::string(" ") + obj->m_name.ToString();
-	}
-	else
-	{
-		icon = ICON_FA_CUBE + std::string(" ") + obj->m_name.ToString();
-	}
-	bool opened = ImGui::TreeNodeEx(icon.c_str(), flags);
-
-
-	if (!obj->IsEnabled())
-	{
-		ImGui::PopStyleColor();
-	}
+    auto* draw = ImGui::GetWindowDrawList();
+    const auto* window = ImGui::GetCurrentWindow();
+    const bool locked = EditorObjectOperations::IsEditLocked(obj);
+    const float textRight = window->WorkRect.Max.x - (locked ? iconSize + editor::ThemePixels(4.f) : 0.f);
+    draw->PushClipRect(window->WorkRect.Min, ImVec2(textRight, window->WorkRect.Max.y), true);
+    if (auto* image = EditorAssetPresentation::Get().GetEntityIcon(obj->m_editorIcon))
+        draw->AddImage(EditorImGuiTexture::From(image), imageMin,
+            ImVec2(imageMin.x+iconSize,imageMin.y+iconSize), ImVec2(0,0), ImVec2(1,1),
+            IM_COL32(255,255,255,isDisabled ? 100 : 255));
+    draw->AddText(ImVec2(imageMin.x+iconSize+editor::ThemePixels(4.f), imageMin.y),
+        ImGui::GetColorU32(ImGuiCol_Text), obj->m_name.ToString().c_str());
+    draw->PopClipRect();
+    if (locked)
+        draw->AddText(ImVec2(textRight, imageMin.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), EditorIcon::Lock);
+    ImGui::PopStyleColor();
 
 	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
 	{
@@ -122,14 +241,14 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
 		}
 	}
 
-	if (ImGui::BeginDragDropSource())
+	if (!EditorObjectOperations::IsEditLocked(obj, true) && ImGui::BeginDragDropSource())
 	{
 		ImGui::SetDragDropPayload("SCENE_OBJECT", &obj->m_index, sizeof(Entity::Index));
 		ImGui::Text("Moving %s", obj->m_name.ToString().c_str());
 		ImGui::EndDragDropSource();
 	}
 
-	if (ImGui::BeginDragDropTarget())
+	if (!EditorObjectOperations::IsEditLocked(obj) && ImGui::BeginDragDropTarget())
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
@@ -190,33 +309,61 @@ bool HierarchyWindow::IsMatchedRecursive(Entity* obj)
 // PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
 void HierarchyWindow::Draw()
 {
-			Scene* scene = nullptr;
-			RenderScene* renderScene = nullptr;
+			const editor::HierarchyStyleScope hierarchyStyle;
+			// 홀짝 띠는 창 한 판 안에서만 뜻이 있다 — 매 프레임 0부터 센다.
+			m_rowIndex = 0;
+
+			Scene* scene = SceneManagers->GetActiveScene();
+			RenderScene* renderScene = SceneManagers->GetRenderScene();
 			Entity* selectedSceneObject = nullptr;
 			static bool isSceneObjectSelected = false;
+			const bool sceneReady = !SceneManagers->IsSceneLoading() && scene && renderScene;
 
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, editor::ThemePixels(editor::EditorThemeTokens::ItemGapY)));
-			ImGui::BeginDisabled();
-			ImGui::Button(ICON_FA_MAGNIFYING_GLASS " Search");
+			ImGui::BeginDisabled(!sceneReady);
+			ImGui::PushStyleColor(ImGuiCol_Text, hierarchy_color(editor::HierarchyThemeTokens::EntityText));
+			// A square icon button cannot fit the normal 7px horizontal padding
+			// on both sides. Keep its height and center the full icon line box.
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, ImGui::GetStyle().FramePadding.y));
+			if (ImGui::Button(EditorIcon::Label<EditorIcon::Add, "##HierarchyCreate">,
+				ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight())))
+				ImGui::OpenPopup("HierarchyCreateMenu");
+			ImGui::PopStyleVar();
+			ImGui::PopStyleColor();
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Create object");
 			ImGui::EndDisabled();
 			ImGui::SameLine();
-			m_searchFilter.Draw("##HierarchyWindow Search", ImGui::GetContentRegionAvail().x);
-			ImGui::PopStyleVar();
+			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+			if (ImGui::InputTextWithHint("##HierarchyWindow Search",
+				EditorIcon::Label<EditorIcon::Search, "  Search">,
+				m_searchFilter.InputBuf, IM_COUNTOF(m_searchFilter.InputBuf)))
+				m_searchFilter.Build();
 
-			if (SceneManagers->IsSceneLoading())
+			if (ImGui::BeginPopup("HierarchyCreateMenu"))
 			{
-				ImGui::Text("Not Init HierarchyWindow");
-				//ImGui::End();
+				if (sceneReady) draw_creation_menu(scene);
+				ImGui::EndPopup();
+			}
+			if (!sceneReady)
+			{
+				ImGui::TextDisabled(SceneManagers->IsSceneLoading() ? "Loading scene..." : "No active scene");
 				return;
 			}
 
-			scene = SceneManagers->GetActiveScene();
-			renderScene = SceneManagers->GetRenderScene();
+			// Only the tree scrolls. Search/create stay outside the list and retain focus.
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+			const bool treeVisible = ImGui::BeginChild("##HierarchyTree", ImVec2(0.f, 0.f),
+				ImGuiChildFlags_Borders);
+			ImGui::PopStyleVar();
+			if (!treeVisible)
+			{
+				ImGui::EndChild();
+				return;
+			}
 			if (scene && renderScene)
 			{
 				selectedSceneObject = scene->m_selectedEntity;
 
-				if (ImGui::IsWindowFocused())
+				if (ImGui::IsWindowFocused() && !ImGui::GetIO().WantTextInput)
 				{
 					bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
 					if (ctrl && ImGui::IsKeyPressed(ImGuiKey_C))
@@ -229,13 +376,6 @@ void HierarchyWindow::Draw()
 						Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
 							scene, std::span<Entity* const>(m_clipboard.data(), m_clipboard.size())));
 					}
-				}
-
-				if (!scene && !renderScene)
-				{
-					ImGui::Text("Not Init HierarchyWindow");
-					//ImGui::End();
-					return;
 				}
 
 				if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
@@ -272,74 +412,17 @@ void HierarchyWindow::Draw()
 						Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DuplicateGameObjectsCommand>(
 							scene, std::span<Entity* const>(m_clipboard.data(), m_clipboard.size())));
 					}
-					if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected))
+					if (ImGui::MenuItem("		Delete", "		Del", nullptr, isSceneObjectSelected && !EditorObjectOperations::IsEditLocked(selectedSceneObject, true)))
 					{
 						if (selectedSceneObject)
 						{
-							EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index));
-							scene->m_selectedEntity = nullptr;
+							if (EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index)).IsSuccess())
+                                scene->m_selectedEntity = nullptr;
 						}
 					}
 					ImGui::Separator();
 
-					if (ImGui::MenuItem("		Create Empty", "		Ctrl + Shift + N"))
-					{
-						EditorObjectOperations::Create(scene, "Entity", GameObjectType::Empty);
-					}
-
-					if (ImGui::BeginMenu("		Light"))
-					{
-						if (ImGui::MenuItem("		Directional Light"))
-						{
-							auto creation = EditorObjectOperations::Create(scene, "Directional Light", GameObjectType::Light);
-	                        auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
-							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
-	                        if (comp) { comp->SetLightType(LightType::DirectionalLight);
-							comp->m_lightStatus = LightStatus::Enabled; }
-						}
-						if (ImGui::MenuItem("		Point Light"))
-						{
-							auto creation = EditorObjectOperations::Create(scene, "Point Light", GameObjectType::Light);
-	                        auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
-							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
-	                        if (comp) { comp->SetLightType(LightType::PointLight);
-							comp->m_lightStatus = LightStatus::Enabled; }
-						}
-						if (ImGui::MenuItem("		Spot Light"))
-						{
-							auto creation = EditorObjectOperations::Create(scene, "Spot Light", GameObjectType::Light);
-	                        auto* obj = creation.IsSuccess() ? scene->TryGetEntity(static_cast<Entity::Index>(creation.data.Find("index")->AsInt())) : nullptr;
-	if (obj) obj->Transform_().SetRotation(
-		{ 0.7, 0, 0, 1 }, TransformWriteReason::Inspector);
-							auto comp = obj ? obj->GetComponent<LightComponent>() : nullptr;
-	                        if (comp) { comp->SetLightType(LightType::SpotLight);
-							comp->m_lightStatus = LightStatus::Enabled; }
-						}
-						ImGui::EndMenu();
-					}
-
-					if (ImGui::MenuItem("		Camera"))
-					{
-						EditorObjectOperations::Create(scene, "Camera", GameObjectType::Camera);
-					}
-
-					//TODO : 아직 처리가 안된듯
-					if (ImGui::BeginMenu("		UI"))
-					{
-						if (ImGui::MenuItem("		Image"))
-						{
-							UIManagers->MakeImage("NoneImage", nullptr);
-						}
-						if (ImGui::MenuItem("		Text"))
-						{
-							UIManagers->MakeText("Text", "null", nullptr);
-						}
-						if (ImGui::MenuItem("		Button"))
-						{
-
-						}
-						ImGui::EndMenu();
-					}
+					draw_creation_menu(scene);
 
 					// 선언된 Hierarchy 팝업 항목(PHASE 21 M1). 문맥은 선택 엔티티의 신원이다.
 					// 항목 0 이면 구분선조차 넣지 않는다(A.6) — 그래서 배선 착지만으로는 이
@@ -356,10 +439,11 @@ void HierarchyWindow::Draw()
 					ImGui::EndPopup();
 				}
 
-				if (selectedSceneObject && ImGui::IsKeyDown(ImGuiKey_Delete))
+				if (selectedSceneObject && ImGui::IsWindowFocused() &&
+					!ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false))
 				{
-					EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index));
-					scene->m_selectedEntity = nullptr;
+					if (EditorObjectOperations::Delete(scene->HandleOf(selectedSceneObject->m_index)).IsSuccess())
+                        scene->m_selectedEntity = nullptr;
 				}
 			}
 
@@ -521,17 +605,22 @@ void HierarchyWindow::Draw()
 
 			if (scene && renderScene)
 			{
+				// 줄과 줄은 맞닿는다 — 한 줄의 높이는 kRowFlags의 FramePadding이
+				// 세우고, 줄 사이의 빈틈은 여기서 0으로 지운다.
+				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+					ImVec2(editor::ThemePixels(editor::EditorThemeTokens::ItemGapX), 0.f));
+
 				std::string SceneIcon{};
 				if (0 != scene->m_Entities.size())
 				{
-					SceneIcon = ICON_FA_BOLT + std::string(" ") + scene->m_Entities[0]->m_name.ToString();
+					SceneIcon = EditorIcon::Scene + std::string(" ") + scene->m_Entities[0]->m_name.ToString();
 				}
 				ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 				if (0 == scene->m_Entities.size())
 				{
 					ImGui::Text("No Entity in Scene");
 				}
-				else if (ImGui::TreeNodeEx(SceneIcon.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+				else if (group_tree_node(SceneIcon.c_str()))
 				{
 					bool isPrefabEditor = scene->m_Entities[0]->m_name.ToString() == "PrefabEditor";
 					if (isPrefabEditor &&
@@ -569,7 +658,7 @@ void HierarchyWindow::Draw()
 					if (!ddolObjects.empty())
 					{
 						ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-						if (ImGui::TreeNodeEx("[ Dont Destroy On Load ]", ImGuiTreeNodeFlags_DefaultOpen))
+						if (group_tree_node("[ Dont Destroy On Load ]"))
 						{
 							for (const auto& obj : ddolObjects)
 							{
@@ -583,7 +672,10 @@ void HierarchyWindow::Draw()
 
 					ImGui::TreePop();
 				}
+
+				ImGui::PopStyleVar();
 			}
 
 			isSceneObjectSelected = nullptr != selectedSceneObject ? true : false;
+			ImGui::EndChild();
 }

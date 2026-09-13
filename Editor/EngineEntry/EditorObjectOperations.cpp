@@ -1,4 +1,6 @@
 #include "EditorObjectOperations.h"
+#include "EditorEntityIcons.h"
+#include "EditorSessionState.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Entity.h"
@@ -8,6 +10,8 @@
 #include "Material.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
+#include "ScriptComponent.h"
+#include "ClrHost.h"
 #include <unordered_set>
 #include "RectTransformComponent.h"
 #include "AuthoringNodeEquality.h"
@@ -17,6 +21,7 @@
 #include <mathematics/color.hpp>
 #include <charconv>
 #include <memory>
+#include <utility>
 
 namespace EditorObjectOperations
 {
@@ -119,6 +124,9 @@ namespace EditorObjectOperations
             D data = D::Object();
             data.Set("id", D::String(ObjectId(handle)));
             data.Set("name", D::String(object.m_name.ToString()));
+            data.Set("editorIcon", D::String(object.m_editorIcon));
+            data.Set("editorLocked", D::Bool(object.m_editorLocked));
+            data.Set("editBlocked", D::Bool(IsEditLocked(&object, true)));
             data.Set("sceneId", D::Int(handle.sceneId));
             data.Set("index", D::Int(handle.index));
             data.Set("generation", D::Int(handle.generation));
@@ -148,6 +156,40 @@ namespace EditorObjectOperations
             data.Set("components", std::move(components));
             return data;
         }
+    }
+
+    bool IsEditLocked(const Entity* target, bool includeDescendants)
+    {
+        if (!target) return false;
+        auto* scene = const_cast<Entity*>(target)->GetScene();
+        for (auto* ancestor = target; ancestor;)
+        {
+            if (ancestor->m_editorLocked) return true;
+            if (!scene || ancestor->m_index == 0) break;
+            ancestor = scene->TryGetEntity(ancestor->GetParentIndex());
+        }
+        if (includeDescendants && scene)
+            for (auto child : target->GetChildrenIndices())
+                if (IsEditLocked(scene->TryGetEntity(child), true)) return true;
+        return false;
+    }
+
+    CommandCore::CommandResult SetEditLocked(EntityHandle target, bool locked)
+    {
+        using namespace CommandCore;
+        auto* object = Resolve(target);
+        if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object->GetScene()->TryGetEntity(object->GetParentIndex())))
+            return PreconditionFailed("object.locked", "Unlock the parent first");
+        const bool before = object->m_editorLocked;
+        if (before != locked)
+        {
+            const Meta::EntityReference reference(object);
+            Meta::MakeCustomChangeCommand(
+                [reference, before] { if (auto* entity = reference.Resolve()) entity->m_editorLocked = before; },
+                [reference, locked] { if (auto* entity = reference.Resolve()) entity->m_editorLocked = locked; });
+        }
+        return Describe(target);
     }
 
     std::string ObjectId(EntityHandle target)
@@ -241,6 +283,7 @@ namespace EditorObjectOperations
             return InvalidArguments("Name must be non-empty and contain no NUL", "object.name_invalid");
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         const std::string before = object->m_name.ToString();
         const bool changed = before != name;
         if (changed) Meta::UndoManager::GetInstance()->Execute(std::make_unique<RenameCommand>(target, before, name));
@@ -251,11 +294,32 @@ namespace EditorObjectOperations
         return Ok("object.rename", std::move(data));
     }
 
+    CommandCore::CommandResult SetIcon(EntityHandle target, const std::string& preset)
+    {
+        using namespace CommandCore;
+        if (editor::EntityIconPresets[editor::EntityIconIndex(preset)].id != preset)
+            return InvalidArguments("Unknown entity icon preset");
+        auto* object = Resolve(target);
+        if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
+        const std::string before = object->m_editorIcon;
+        if (before != preset)
+        {
+            const Meta::EntityReference reference(object);
+            Meta::MakeCustomChangeCommand(
+                [reference, before] { if (auto* entity = reference.Resolve()) entity->m_editorIcon = before; },
+                [reference, preset] { if (auto* entity = reference.Resolve()) entity->m_editorIcon = preset; });
+        }
+        return Describe(target);
+    }
+
     CommandCore::CommandResult Create(Scene* scene, const std::string& name, GameObjectType type, uint32_t parent)
     {
         using namespace CommandCore;
         if (!scene) return PreconditionFailed("scene.none", "No active scene");
         if (name.empty() || name.find('\0') != std::string::npos) return InvalidArguments("Invalid object name");
+        if (IsEditLocked(scene->TryGetEntity(parent)))
+            return PreconditionFailed("object.locked", "Cannot create inside a locked hierarchy");
         auto command = std::make_unique<Meta::CreateEntityCommand>(scene, name, type, parent);
         auto* created = command.get();
         Meta::UndoManager::GetInstance()->Execute(std::move(command));
@@ -267,6 +331,7 @@ namespace EditorObjectOperations
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object || object->IsDestroyMark()) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         if (target.index == 0) return InvalidArguments("Cannot delete the scene root");
         auto data = Snapshot(target, *object);
         Meta::UndoManager::GetInstance()->Execute(std::make_unique<Meta::DeleteGameObjectCommand>(object->GetScene(), target.index));
@@ -292,6 +357,8 @@ namespace EditorObjectOperations
         Entity* object = Resolve(target);
         Entity* destination = Resolve(parent);
         if (!object || !destination || target.sceneId != parent.sceneId) return PreconditionFailed("object.stale", "Both objects must belong to the same scene");
+        if (IsEditLocked(object, true) || IsEditLocked(destination))
+            return PreconditionFailed("object.locked", "Unlock the entity hierarchy before reparenting");
         if (!target.index) return InvalidArguments("Cannot reparent the scene root");
         for (Entity* ancestor = destination; ancestor; ancestor = ancestor->GetScene()->TryGetEntity(ancestor->GetParentIndex()))
         {
@@ -336,6 +403,7 @@ namespace EditorObjectOperations
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object || !object->GetComponent<::Transform>()) return PreconditionFailed("object.transform.missing", "Object has no Transform");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         for (float value : {position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, rotation.w, scale.x, scale.y, scale.z})
             if (!std::isfinite(value)) return InvalidArguments("Transform requires finite numbers");
         std::vector<PropertyEdit> edits;
@@ -384,6 +452,7 @@ namespace EditorObjectOperations
                         Meta::Deserialize(component, *type, current.Root().Read());
                     }
             };
+            if (IsEditLocked(object, true)) { apply(*before); continue; }
             actions.push_back({[=] {
                 apply(*before); if (auto* object = reference.Resolve()) object->m_prefabOverrides = beforeOverrides;
             }, [=] {
@@ -412,6 +481,7 @@ namespace EditorObjectOperations
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         auto* component = FindComponent(object, componentName);
         if (!component) return InvalidArguments("Missing or ambiguous component; use its #id", "component.not_found");
         const auto* type = Meta::Find(component->GetTypeID().m_ID_Data);
@@ -427,6 +497,25 @@ namespace EditorObjectOperations
         auto data = Snapshot(target, *object); data.Set("changed", CommandData::Bool(changed));
         data.Set("field", CommandData::String(field)); data.Set("value", CommandData::String(raw));
         return Ok("object.property", std::move(data));
+    }
+
+    CommandCore::CommandResult NavigateSelection(Scene* scene, int direction)
+    {
+        using namespace CommandCore;
+        if (!scene) return PreconditionFailed("scene.none", "No active scene");
+        if (direction != -1 && direction != 1) return InvalidArguments("Direction must be -1 or 1");
+        auto& history = EditorSessionState::Get().SelectionHistory();
+        const auto handle = history.Move(direction, [scene](EntityHandle handle) {
+            auto* entity = scene->Resolve(handle);
+            return entity && !entity->IsDestroyMark();
+        });
+        if (!handle.IsValid()) return PreconditionFailed("selection.history.end", "No selection in that direction");
+        Meta::SelectionSnapshot snapshot;
+        snapshot.sceneId = scene->GetSceneId();
+        snapshot.primary = Meta::EntityReference(scene->Resolve(handle));
+        snapshot.selected.push_back(snapshot.primary);
+        snapshot.Apply();
+        return Describe(handle);
     }
 
     CommandCore::CommandResult Select(Scene* scene, const std::vector<EntityHandle>& targets)
@@ -447,6 +536,9 @@ namespace EditorObjectOperations
         bool changed = before.selected.size() != after.selected.size() || before.primary.guid != after.primary.guid;
         for (size_t i = 0; !changed && i < before.selected.size(); ++i) changed = before.selected[i].guid != after.selected[i].guid;
         if (changed) Meta::MakeCustomChangeCommand([before] { before.Apply(); }, [after] { after.Apply(); });
+        auto* selected = scene->m_selectedEntity;
+        EditorSessionState::Get().SelectionHistory().Observe(scene->GetSceneId(),
+            selected ? scene->HandleOf(selected->m_index) : EntityHandle{});
         auto data = CommandData::Object(); data.Set("changed", CommandData::Bool(changed));
         data.Set("count", CommandData::Int(after.selected.size()));
         return Ok("scene.select", std::move(data));
@@ -457,6 +549,7 @@ namespace EditorObjectOperations
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         const auto found = ComponentFactorys->m_componentTypes.find(typeName);
         if (found == ComponentFactorys->m_componentTypes.end() || !found->second) return InvalidArguments("Unknown component type");
         const auto* type = found->second;
@@ -487,11 +580,67 @@ namespace EditorObjectOperations
         return Describe(target);
     }
 
+    CommandCore::CommandResult AddManagedScript(EntityHandle target, const std::string& typeName)
+    {
+        using namespace CommandCore;
+        auto* object = Resolve(target);
+        if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
+        auto& clr = ClrHost::Get();
+        if (!clr.IsReady()) return PreconditionFailed("script.not_ready", "The script runtime is not ready");
+        const auto names = clr.GetComponentTypeNames();
+        if (std::ranges::find(names, typeName) == names.end())
+            return InvalidArguments("The script is not compiled or is not an attachable component", "script.type_not_found");
+        const auto* type = Meta::Find(type_guid(ScriptComponent));
+        if (!type) return InternalError("script.component_type_missing", "Script component type is unavailable");
+
+        // Create before publishing an undo record: failure must leave neither an empty
+        // component nor an undo entry. The standard lifecycle drain owns initialization.
+        auto* script = dynamic_cast<ScriptComponent*>(object->AddComponentAllowMultiple(*type));
+        if (!script) return InternalError("script.attach_failed", "Cannot create the script component");
+        script->m_scriptType = typeName;
+        object->GetScene()->DrainPendingLifecycle();
+        if (!script->HasInstance())
+        {
+            object->RemoveComponent(script);
+            return Fail("script.attach_failed", "Cannot create the script instance; see Output Log");
+        }
+        script->CaptureFields();
+        auto snapshot = std::make_shared<Authoring::WriteDocument>(Meta::SerializeDocument(script, *type));
+        const auto id = "#" + std::to_string(script->GetInstanceID());
+        const auto instanceId = script->GetInstanceId();
+        Meta::EntityReference reference(object);
+        auto firstExecution = std::make_shared<bool>(true);
+        Meta::MakeCustomChangeCommand([=] {
+            if (auto* owner = reference.Resolve()) if (auto* component = FindComponent(owner, id))
+            {
+                if (auto* managed = dynamic_cast<ScriptComponent*>(component)) managed->CaptureFields();
+                *snapshot = Meta::SerializeDocument(component, *type);
+                owner->RemoveComponent(component);
+            }
+        }, [=] {
+            if (std::exchange(*firstExecution, false)) return;
+            if (auto* owner = reference.Resolve())
+            {
+                const auto node = snapshot->Root().Read();
+                ComponentFactorys->LoadComponent(owner, Authoring::NodeViewAccess::Make(node), false);
+                owner->GetScene()->DrainPendingLifecycle();
+            }
+        });
+        auto data = CommandData::Object();
+        data.Set("object", CommandData::String(object->m_name.ToString()));
+        data.Set("type", CommandData::String(typeName));
+        data.Set("component", CommandData::String(id));
+        data.Set("instanceId", CommandData::Int(instanceId));
+        return Ok("Script attached", std::move(data));
+    }
+
     CommandCore::CommandResult RemoveComponent(EntityHandle target, const std::string& name)
     {
         using namespace CommandCore;
         auto* object = Resolve(target);
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         auto* component = FindComponent(object, name);
         if (!component) return InvalidArguments("Missing or ambiguous component");
         if (dynamic_cast<::Transform*>(component) || dynamic_cast<RectTransformComponent*>(component)) return InvalidArguments("Spatial component is required by the object type");
@@ -558,6 +707,7 @@ namespace EditorObjectOperations
     {
         auto* object = Resolve(target);
         if (!object) return CommandCore::PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return CommandCore::PreconditionFailed("object.locked", "Unlock the entity hierarchy before editing");
         std::vector<std::shared_ptr<Material>> materials;
         std::function<void(Entity*)> collect = [&](Entity* node) {
             if (!node || node->IsDestroyMark()) return;
@@ -578,6 +728,7 @@ namespace EditorObjectOperations
         auto* object = Resolve(target);
         auto* animator = object ? object->GetComponent<Animator>() : nullptr;
         if (!animator) return PreconditionFailed("animator.not_found", "Animator is unavailable");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity before editing");
         if (name.empty() || (type != ValueType::Bool && type != ValueType::Float && type != ValueType::Int && type != ValueType::Trigger))
             return InvalidArguments("Animator parameter requires a name and a supported type");
         auto* existing = animator->FindParameter(name);

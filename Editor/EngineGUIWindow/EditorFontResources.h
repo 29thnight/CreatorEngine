@@ -71,12 +71,13 @@ namespace editor::fonts
                                   std::span<const char* const> candidates,
                                   float size_pixels);
 
-    /// 있으면 쓰고 없으면 비워 둔다. 비어도 호출자가 분기할 필요가 없다.
+    /// 있으면 아이콘과 함께 적재하고 없으면 비워 둔다. 비어도 호출자가 분기할 필요가 없다.
     loaded_font add_optional_font(std::string_view role,
                                   std::span<const char* const> candidates,
                                   float size_pixels);
 
-    /// 아이콘 폰트를 직전 폰트에 병합한다(②). 크기와 기준선 보정은 별도 logical px.
+    /// 아이콘을 직전 폰트의 대문자 가시 영역 중심에 맞춰 병합한다(②).
+    /// 크기와 추가 광학 보정은 logical px이며 현재 본문 크기/DPI에 비례한다.
     /// 병합할 폰트가 없으면 거짓.
     bool merge_icon_font(float size_pixels, float baseline_offset_pixels = 0.0f);
 

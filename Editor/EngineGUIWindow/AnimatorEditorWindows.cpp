@@ -21,8 +21,8 @@
 #include "Animator.h"
 #include "NodeEditor.h"
 #include "AnimationController.h"
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
+#include "EditorTheme.h"
 #include "ExternUI.h"
 // DataSystems가 여기 있다. 유니티 빌드에서는 앞선 파일이 공급했다.
 #include "DataSystem.h"
@@ -272,9 +272,19 @@ if (ImGui::IsWindowAppearing())
 
 auto& controllers = animator->m_animationControllers;
 ImGui::BeginChild("Leftpanel", ImVec2(200, 500), false);
-if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
+bool showControllerTabs;
 {
-	if (ImGui::BeginTabItem("Layers"))
+	const editor::TabStyleScope tabs;
+	showControllerTabs = ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None);
+}
+if (showControllerTabs)
+{
+	bool showLayers;
+	{
+		const editor::TabStyleScope tabs;
+		showLayers = ImGui::BeginTabItem("Layers");
+	}
+	if (showLayers)
 	{
 		ImGui::Separator();
 		for (int index = 0; index < controllers.size(); ++index)
@@ -313,7 +323,7 @@ if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
 				ImGui::EndPopup();
 			}
 			ImGui::SameLine();
-			if (ImGui::SmallButton(ICON_FA_CHESS_ROOK))
+			if (ImGui::SmallButton(EditorIcon::Settings))
 			{
 				ImGui::OpenPopup("ControllerDetailPopup");
 			}
@@ -339,7 +349,7 @@ if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
 				ImGui::SameLine();
 				if (controller->useMask)
 				{
-					if (ImGui::SmallButton(ICON_FA_PUZZLE_PIECE))
+					if (ImGui::SmallButton(EditorIcon::AvatarMask))
 					{
 						animator_editing::select_avatar_controller(index);
 						toggle_window(EditorWindowName::kAvatarMask);
@@ -372,14 +382,19 @@ if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
 
 		ImGui::EndTabItem();
 	}
-	if (ImGui::BeginTabItem("Parameters"))
+	bool showParameters;
+	{
+		const editor::TabStyleScope tabs;
+		showParameters = ImGui::BeginTabItem("Parameters");
+	}
+	if (showParameters)
 	{
 		ImGui::Separator();
 
 		auto& parameters = animator->Parameters;
 		ImGui::Text("parameter");
 		ImGui::SameLine();
-		if (ImGui::SmallButton(ICON_FA_PLUS))
+		if (ImGui::SmallButton(EditorIcon::Add))
 		{
 			ImGui::OpenPopup("AddParameterPopup");
 		}
@@ -433,7 +448,7 @@ if (ImGui::BeginTabBar("ControllerTabs", ImGuiTabBarFlags_None))
 				parameter->name = buffer;
 			}
 			ImGui::SameLine();
-			if (ImGui::SmallButton(ICON_FA_MINUS))
+			if (ImGui::SmallButton(EditorIcon::Remove))
 			{
 				animator->DeleteParameter(index);
 			}
@@ -1092,7 +1107,7 @@ if(ImGui::BeginPopup("AniBehaviorSelect"))
 	ImGui::Separator();
 
 	float availableWidth = ImGui::GetContentRegionAvail().x;
-	searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
+	searchFilter.Draw(EditorIcon::Label<EditorIcon::Search, "Search">, availableWidth);
 
 	// C# 애니메이션 상태 스크립트 목록. 등록된 타입 이름은 ClrHost가 내준다
 	// (구 C++ 팩토리 목록을 대체한다 — 9-4).

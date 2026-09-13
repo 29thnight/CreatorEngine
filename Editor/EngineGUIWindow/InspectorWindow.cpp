@@ -8,6 +8,10 @@
 #include "Windows/EditorStandardWindows.h"
 #include "EditorMenuDraw.h"
 #include "EditorObjectOperations.h"
+#include "EditorScriptAuthoring.h"
+#include "EditorPlatform.h"
+#include "EditorAssetPresentation.h"
+#include "GameObjectCommand.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
 #include "EditorImGuiTexture.h"
@@ -52,51 +56,12 @@
 #include "SoundComponent.h"
 //----------------------------
 
-#include "IconsFontAwesome6.h"
-#include "fa.h"
+#include "EditorIcons.h"
 #include "NodeEditor.h"
 #include <algorithm>
 #include "imgui_stdlib.h"
 
 namespace ed = ax::NodeEditor;
-
-// C# 스크립트 부착: ScriptComponent(다중 허용 경로)를 붙이고 타입을 지정한 뒤
-// 정상 드레인 경로(Scene::Awake)를 동기로 한 번 태워 관리 인스턴스를 만든다.
-//
-// (C2-2) 예전에는 여기서 script->OnInitialized()를 직접 불렀다. 하지만
-// AddComponentAllowMultiple 안의 AttachComponentLifecycle이 이미 이 컴포넌트를
-// PendingInitialize 큐에 넣어 뒀고(State_Initialized 비트는 아직 서지 않은 채), 직접
-// 부르면 그 비트를 세우지 않으므로 다음 프레임 Scene::DrainPendingPhases가
-// 큐에 남은 같은 컴포넌트를 또 한 번 깨운다 — OnInitialized 이중 호출.
-// ScriptComponent::OnInitialized의 `if (HasInstance()) return;` 가드가 보통은
-// 이걸 조용히 삼키지만, 그건 설계가 아니라 우연이다(ScriptComponent.cpp).
-//
-// Api_Prefab_Instantiate(ClrHost.cpp)가 쓰는 것과 같은 관용구로 고친다 — 부착
-// 직후 scene->DrainPendingLifecycle()을 동기로 불러 정상 드레인 경로를 태운다. 이미 깨운
-// 컴포넌트는 State_Initialized로 건너뛰므로 씬 전체를 다시 돌아도 안전하다.
-static void AttachManagedScript(Entity* obj, const std::string& typeName)
-{
-	const Meta::Type* scriptType = Meta::Find(type_guid(ScriptComponent));
-	if (nullptr == obj || nullptr == scriptType) return;
-
-	// K2 스테이지 A: AddComponentAllowMultiple가 raw Component*를 돌려준다.
-	auto* component = obj->AddComponentAllowMultiple(*scriptType);
-	auto* script = dynamic_cast<ScriptComponent*>(component);
-	if (nullptr == script)
-	{
-		Debug->LogError("[스크립트] ScriptComponent 생성 실패");
-		return;
-	}
-
-	// m_scriptType은 드레인보다 먼저 세워야 한다 — OnInitialized가 이 값을 보고
-	// CreateComponent를 부른다(비어 있으면 그냥 돌아간다. ScriptComponent.cpp).
-	script->m_scriptType = typeName;
-
-	if (Scene* scene = obj->GetScene())
-	{
-		scene->DrainPendingLifecycle();
-	}
-}
 
 ed::EditorContext* m_fsmEditorContext{ nullptr };
 bool			   s_CreatingLink = false;
@@ -117,6 +82,60 @@ static void RegisterAllTypedDraws()
 
 namespace
 {
+	struct ComponentMenuVisual { Texture* image{}; const char* fallback{}; };
+
+	ComponentMenuVisual component_category_visual(std::string_view category)
+	{
+		auto& images = EditorAssetPresentation::Get();
+		using FileType = EditorAssetPresentation::FileType;
+		if (category == "Rendering") return {images.GetFileIcon(FileType::Model), EditorIcon::Model};
+		if (category == "Physics") return {images.GetEntityIcon("trigger"), EditorIcon::Layers};
+		if (category == "Animation") return {images.GetEntityIcon("player"), EditorIcon::AvatarMask};
+		if (category == "Audio") return {images.GetEntityIcon("audio"), EditorIcon::Audio};
+		if (category == "AI") return {images.GetEntityIcon("game-manager"), EditorIcon::Hierarchy};
+		if (category == "Input") return {images.GetProjectIcon(), EditorIcon::Game};
+		if (category == "UI") return {images.GetFileIcon(FileType::Texture), EditorIcon::Texture};
+		if (category == "Scripts") return {images.GetEntityIcon("script"), EditorIcon::Script};
+		return {images.GetEntityIcon("prefab"), EditorIcon::GameObject};
+	}
+
+	ComponentMenuVisual component_entry_visual(const editor::components::Entry& entry)
+	{
+		auto& images = EditorAssetPresentation::Get();
+		using FileType = EditorAssetPresentation::FileType;
+		if (entry.managed) return component_category_visual("Scripts");
+		if (entry.type == "CameraComponent") return {images.GetEntityIcon("camera"), EditorIcon::Camera};
+		if (entry.type == "LightComponent") return {images.GetEntityIcon("light"), EditorIcon::Lit};
+		if (entry.type == "SpriteRenderer" || entry.type == "SpriteSheetComponent" || entry.type == "ImageComponent")
+			return {images.GetFileIcon(FileType::Texture), EditorIcon::Texture};
+		if (entry.type == "TerrainComponent" || entry.type == "FoliageComponent")
+			return {images.GetFileIcon(FileType::TerrainTexture), EditorIcon::Terrain};
+		if (entry.type == "DecalComponent") return {images.GetFileIcon(FileType::MaterialTexture), EditorIcon::Material};
+		if (entry.type == "VolumeComponent") return {images.GetFileIcon(FileType::VolumeProfile), EditorIcon::Volume};
+		if (entry.type == "TextComponent") return {images.GetFileIcon(FileType::Font), EditorIcon::Font};
+		return component_category_visual(entry.category);
+	}
+
+	void draw_component_menu_row(const ComponentMenuVisual& visual, const char* label, bool category)
+	{
+		const auto min = ImGui::GetItemRectMin();
+		const auto max = ImGui::GetItemRectMax();
+		const float size = ImGui::GetFontSize();
+		const float gap = editor::ThemePixels(7.f);
+		const float y = min.y + (max.y - min.y - size) * .5f;
+		auto* draw = ImGui::GetWindowDrawList();
+		draw->PushClipRect(min, max, true);
+		const auto image = visual.image ? EditorImGuiTexture::From(visual.image) : 0;
+		if (image) draw->AddImage(image, {min.x, y}, {min.x + size, y + size}, {0,0}, {1,1}, ImGui::GetColorU32(ImVec4(1,1,1,1)));
+		else draw->AddText({min.x,y}, ImGui::GetColorU32(ImGuiCol_Text), visual.fallback);
+		const float endX = category ? max.x - size - gap : max.x;
+		draw->PushClipRect({min.x + size + gap, min.y}, {endX, max.y}, true);
+		draw->AddText({min.x + size + gap,y}, ImGui::GetColorU32(ImGuiCol_Text), label);
+		draw->PopClipRect();
+		if (category) draw->AddText({max.x-size,y}, ImGui::GetColorU32(ImGuiCol_TextDisabled), EditorIcon::Collapse);
+		draw->PopClipRect();
+	}
+
 	// 창 상태의 유일한 자리(PHASE 21 W3). 팝업 깃발 넷·피커 대상·검색어·캐시 여덟뿐이다.
 	InspectorWindow& inspector_state()
 	{
@@ -147,11 +166,223 @@ void editor::windows::register_inspector_typed_draws()
 	editor::inspector::register_inspector_icons();
 }
 
+void InspectorWindow::DrawAddComponent(Entity* entity)
+{
+    using namespace editor::components;
+    const auto target = entity->GetScene()->HandleOf(entity->m_index);
+    const float available = ImMax(ImGui::GetContentRegionAvail().x, 1.f);
+    const float naturalWidth = ImGui::CalcTextSize("Add Component").x + ImGui::GetStyle().FramePadding.x * 2.f;
+    const char* label = available >= naturalWidth ? "Add Component###AddComponentButton" : "Add\nComponent###AddComponentButton";
+    const float width = ImMin(available, ImMax(editor::ThemePixels(160.f), naturalWidth));
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) * .5f);
+    if (ImGui::Button(label, {width, 0}))
+    {
+        m_addComponentTarget = target;
+        m_componentSearch.clear();
+        m_componentCategory.clear();
+        m_componentError.clear();
+        m_componentSelection = 0;
+        m_newScriptPage = false;
+        m_componentCatalog.clear();
+        for (const auto& [name, type] : ComponentFactorys->m_componentTypes)
+            if (type && !name.empty() && type->typeID != type_guid(ScriptComponent))
+                m_componentCatalog.push_back(Native(name));
+        for (auto& name : ClrHost::Get().GetComponentTypeNames()) m_componentCatalog.push_back(Script(name));
+        Sort(m_componentCatalog);
+        ImGui::OpenPopup("AddComponent");
+    }
+
+    const auto status = EditorScriptAuthoring::GetStatus();
+    if (!status.message.empty())
+    {
+        ImGui::TextWrapped("%s", status.message.c_str());
+        if (status.busy)
+        {
+            if (ImGui::SmallButton("Cancel compilation")) EditorScriptAuthoring::Cancel();
+        }
+        else if (!status.succeeded && !status.source.empty())
+        {
+            if (ImGui::SmallButton("Retry compilation")) EditorScriptAuthoring::Retry();
+        }
+        if (!status.source.empty())
+        {
+            if (ImGui::SmallButton("Open script")) EditorPlatform::Get().OpenFile(file::u8path(status.source));
+            if (!status.log.empty())
+            {
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Build log")) EditorPlatform::Get().OpenFile(file::u8path(status.log));
+            }
+        }
+    }
+
+    const auto* viewport = ImGui::GetWindowViewport();
+    ImGui::SetNextWindowSize({ImMin(editor::ThemePixels(340.f), viewport->WorkSize.x - editor::ThemePixels(16.f)),
+        ImMin(editor::ThemePixels(400.f), viewport->WorkSize.y * .8f)});
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(editor::ThemePixels(8.f), editor::ThemePixels(6.f)));
+    const bool popupOpen = ImGui::BeginPopup("AddComponent");
+    ImGui::PopStyleVar();
+    if (!popupOpen) return;
+    if (target != m_addComponentTarget || EditorObjectOperations::IsEditLocked(entity, true))
+    {
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+    bool resetResultsScroll = ImGui::IsWindowAppearing();
+    if (m_newScriptPage || !m_componentCategory.empty())
+    {
+        if (ImGui::SmallButton(EditorIcon::Back))
+        {
+            m_newScriptPage = false;
+            m_componentCategory.clear();
+            m_componentSelection = 0;
+            m_componentError.clear();
+            resetResultsScroll = true;
+        }
+        ImGui::SameLine();
+    }
+    ImGui::TextUnformatted(m_newScriptPage ? "New Script" : !SearchKey(m_componentSearch).empty() ? "Search Results"
+        : m_componentCategory.empty() ? "Add Component" : m_componentCategory.c_str());
+    ImGui::Separator();
+    if (m_newScriptPage)
+    {
+        ImGui::TextUnformatted("Name");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (m_focusNewScriptName) { ImGui::SetKeyboardFocusHere(); m_focusNewScriptName = false; }
+        ImGui::InputTextWithHint("##NewScriptName", "PlayerController", &m_newScriptName);
+        ImGui::TextDisabled("C# component");
+        ImGui::TextWrapped("Assets/Script/%s.cs", m_newScriptName.empty() ? "<Name>" : m_newScriptName.c_str());
+        ImGui::TextWrapped("Create the script, compile it, then add it to this entity.");
+        ImGui::BeginDisabled(status.busy || SceneManagers->IsGameStart());
+        if (ImGui::Button("Create and Add", {-FLT_MIN, 0}))
+        {
+            const auto result = EditorScriptAuthoring::CreateAndAttach(target, m_newScriptName);
+            if (result.IsSuccess()) ImGui::CloseCurrentPopup();
+            else m_componentError = result.message;
+        }
+        ImGui::EndDisabled();
+        if (SceneManagers->IsGameStart()) ImGui::TextWrapped("Stop Play to create a script.");
+        if (!m_componentError.empty()) ImGui::TextWrapped("%s", m_componentError.c_str());
+        ImGui::EndPopup();
+        return;
+    }
+
+    if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::InputTextWithHint("##ComponentSearch", "Search components and scripts...", &m_componentSearch))
+    {
+        m_componentSelection = 0;
+        resetResultsScroll = true;
+    }
+    // Browse results while keeping the search field ready for further typing.
+    ImGui::SetItemKeyOwner(ImGuiKey_UpArrow);
+    ImGui::SetItemKeyOwner(ImGuiKey_DownArrow);
+    const bool searching = !SearchKey(m_componentSearch).empty();
+    const bool categoryPage = !searching && m_componentCategory.empty();
+    struct Row { std::string title; const Entry* entry{}; };
+    std::vector<Row> rows;
+    if (categoryPage)
+    {
+        for (const auto& entry : m_componentCatalog)
+            if (std::ranges::none_of(rows, [&](const Row& row) { return row.title == entry.category; }))
+                rows.push_back({entry.category, nullptr});
+        if (std::ranges::none_of(rows, [](const Row& row) { return row.title == "Scripts"; })) rows.push_back({"Scripts", nullptr});
+        std::ranges::sort(rows, {}, &Row::title);
+    }
+    else
+        for (const auto& entry : m_componentCatalog)
+            if ((searching && Matches(entry, m_componentSearch)) || (!searching && entry.category == m_componentCategory))
+                rows.push_back({entry.label, &entry});
+    m_componentSelection = std::clamp(m_componentSelection, 0, ImMax(0, static_cast<int>(rows.size()) - 1));
+    const bool focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    bool moveSelection = false;
+    if (focused && !rows.empty())
+    {
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) { m_componentSelection = (m_componentSelection + 1) % rows.size(); moveSelection = true; }
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) { m_componentSelection = (m_componentSelection + rows.size() - 1) % rows.size(); moveSelection = true; }
+    }
+    const bool enter = focused && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter));
+    std::string openCategory;
+    const Entry* chosen = nullptr;
+    const float spacing = ImGui::GetStyle().ItemSpacing.y;
+    const float errorHeight = m_componentError.empty() ? 0.f :
+        ImGui::CalcTextSize(m_componentError.c_str(), nullptr, false, ImGui::GetContentRegionAvail().x).y + spacing;
+    // Reserve the child end gap, separator gap and button without overflowing the popup.
+    const float footer = ImGui::GetFrameHeightWithSpacing() + 2.f * spacing + errorHeight;
+    ImGui::PushStyleColor(ImGuiCol_Header, editor::ThemeColorValue(editor::ThemeColor::Selection));
+    if (ImGui::BeginChild("ComponentResults", {0, ImMax(ImGui::GetFrameHeight(), ImGui::GetContentRegionAvail().y - footer)},
+        ImGuiChildFlags_None))
+    {
+        if (resetResultsScroll) ImGui::SetScrollY(0.f);
+        if (rows.empty()) ImGui::TextWrapped("%s", m_componentCategory == "Scripts" && !searching
+            ? "No compiled C# components. Create a script below or resolve compilation errors." : "No matching components.");
+        for (int i = 0; i < static_cast<int>(rows.size()); ++i)
+        {
+            const auto& row = rows[i];
+            bool attached = false;
+            if (row.entry && !row.entry->managed)
+            {
+                const auto found = ComponentFactorys->m_componentTypes.find(row.entry->type);
+                if (found != ComponentFactorys->m_componentTypes.end())
+                    for (const auto& component : entity->m_components)
+                        if (component && !component->IsDestroyMark() && component->GetTypeID() == found->second->typeID) attached = true;
+            }
+            ImGui::PushID(i);
+            ImGui::BeginDisabled(attached);
+            const auto rowLabel = row.entry ? row.title + (row.entry->managed ? " (Script)" : attached ? " (Added)" : "")
+                : row.title;
+            const bool clicked = ImGui::Selectable("##ComponentRow", i == m_componentSelection, ImGuiSelectableFlags_DontClosePopups,
+                {0, ImGui::GetFrameHeight()});
+            draw_component_menu_row(row.entry ? component_entry_visual(*row.entry) : component_category_visual(row.title),
+                rowLabel.c_str(), row.entry == nullptr);
+            if (clicked || (!attached && enter && i == m_componentSelection))
+            {
+                if (row.entry) chosen = row.entry;
+                else openCategory = row.title;
+            }
+            ImGui::EndDisabled();
+            if (moveSelection && i == m_componentSelection) ImGui::SetScrollHereY();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && row.entry)
+                ImGui::SetTooltip("%s\n%s%s", row.entry->type.c_str(), row.entry->category.c_str(), attached ? " - already added" : "");
+            ImGui::PopID();
+        }
+        if (!openCategory.empty()) ImGui::SetScrollY(0.f);
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    if (!openCategory.empty()) { m_componentCategory = openCategory; m_componentSelection = 0; }
+    if (chosen)
+    {
+        const auto result = chosen->managed ? EditorObjectOperations::AddManagedScript(target, chosen->type)
+            : EditorObjectOperations::AddComponent(target, chosen->type);
+        if (result.IsSuccess()) ImGui::CloseCurrentPopup();
+        else m_componentError = result.message;
+    }
+    ImGui::Separator();
+    if (ImGui::Button(EditorIcon::Label<EditorIcon::Script, " New Script...">, {-FLT_MIN, 0}))
+    {
+        m_newScriptPage = true;
+        m_focusNewScriptName = true;
+        m_newScriptName = m_componentSearch;
+        m_componentError.clear();
+    }
+    if (!m_componentError.empty()) ImGui::TextWrapped("%s", m_componentError.c_str());
+    ImGui::EndPopup();
+}
+
 void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 {
 	if (nullptr == script) return;
 
 	auto& clr = ClrHost::Get();
+	using namespace editor::widgets;
+	// Script metadata changes only on reload. Use the same fixed label column and
+	// narrow-width policy as native properties, independent of current field values.
+	const auto layout = measure_property_layout(property_layout_inputs_now(0), m_layout);
+	ImGui::SetNextItemWidth(begin_property_line("Script", layout));
+	std::string scriptName = script->m_scriptType.empty() ? "Missing (Script)" : script->m_scriptType;
+	ImGui::InputText("##ScriptReference", &scriptName, ImGuiInputTextFlags_ReadOnly);
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", scriptName.c_str());
 
 	// 타입 미지정 상태(구 씬에서 온 빈 컴포넌트 등)에서도 여기서 바로 고를 수 있게 한다.
 	if (script->m_scriptType.empty())
@@ -204,7 +435,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 	const int fieldCount = clr.GetFieldCount(instanceId);
 	if (0 == fieldCount)
 	{
-		ImGui::TextDisabled("노출된 필드 없음");
+		ImGui::TextDisabled("No exposed fields.");
 		return;
 	}
 
@@ -215,13 +446,15 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 	{
 		const std::string name = clr.GetFieldName(instanceId, i);
 		ImGui::PushID(i);
+		const float valueWidth = begin_property_line(name.c_str(), layout);
+		ImGui::SetNextItemWidth(valueWidth);
 
 		switch (clr.GetFieldType(instanceId, i))
 		{
 		case ClrHost::ScriptFieldType::Float:
 		{
 			float value = clr.GetFieldFloat(instanceId, i);
-			if (ImGui::DragFloat(name.c_str(), &value, 0.01f))
+			if (drag_property_float("##Value", &value, 0.01f))
 			{
 				clr.SetFieldFloat(instanceId, i, value);
 				script->CaptureFields();
@@ -231,7 +464,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		case ClrHost::ScriptFieldType::Int32:
 		{
 			int value = clr.GetFieldInt32(instanceId, i);
-			if (ImGui::DragInt(name.c_str(), &value))
+			if (ImGui::DragInt("##Value", &value))
 			{
 				clr.SetFieldInt32(instanceId, i, value);
 				script->CaptureFields();
@@ -241,7 +474,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		case ClrHost::ScriptFieldType::Bool:
 		{
 			bool value = clr.GetFieldBool(instanceId, i);
-			if (ImGui::Checkbox(name.c_str(), &value))
+			if (ImGui::Checkbox("##Value", &value))
 			{
 				clr.SetFieldBool(instanceId, i, value);
 				script->CaptureFields();
@@ -251,7 +484,12 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		case ClrHost::ScriptFieldType::Float3:
 		{
 			ClrHost::ScriptFloat3 value = clr.GetFieldFloat3(instanceId, i);
-			if (ImGui::DragFloat3(name.c_str(), &value.x, 0.01f))
+			axis_field3_request axes{};
+			axes.label = "##Value";
+			axes.values = &value.x;
+			axes.speed = .01f;
+			axes.stacked = layout.axis_stacked;
+			if (draw_axis_field3(axes))
 			{
 				clr.SetFieldFloat3(instanceId, i, value);
 				script->CaptureFields();
@@ -262,13 +500,9 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		{
 			std::string value = clr.GetFieldString(instanceId, i);
 
-			char buffer[256]{};
-			const size_t length = std::min(value.size(), sizeof(buffer) - 1);
-			std::memcpy(buffer, value.data(), length);
-
-			if (ImGui::InputText(name.c_str(), buffer, sizeof(buffer)))
+			if (ImGui::InputText("##Value", &value))
 			{
-				clr.SetFieldString(instanceId, i, buffer);
+				clr.SetFieldString(instanceId, i, value.c_str());
 				script->CaptureFields();
 			}
 			break;
@@ -276,14 +510,14 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		case ClrHost::ScriptFieldType::Object:
 		{
 			Entity* target = clr.GetFieldObject(instanceId, i);
-			const std::string label = (nullptr != target) ? target->m_name.ToString() : std::string("(없음)");
-
-			ImGui::Text("%s", name.c_str());
-			ImGui::SameLine();
-			ImGui::Button(label.c_str(), ImVec2(-40.f, 0.f));
+			const std::string label = (nullptr != target) ? target->m_name.ToString() : std::string("None (Entity)");
+			const float clearWidth = ImGui::GetFrameHeight();
+			const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+			ImGui::Button((label + "###ObjectValue").c_str(), ImVec2(ImMax(1.f, valueWidth - clearWidth - gap), 0.f));
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s\nDrag an entity from Hierarchy", label.c_str());
 
 			// 계층 창에서 끌어다 놓는 것을 받는다. 페이로드 이름은 기존 드래그 소스와 맞춘다.
-			if (ImGui::BeginDragDropTarget())
+			if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Entity"))
 				{
@@ -297,16 +531,18 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 				ImGui::EndDragDropTarget();
 			}
 
-			ImGui::SameLine();
-			if (ImGui::SmallButton("X"))
+			ImGui::SameLine(0.f, gap);
+			ImGui::BeginDisabled(target == nullptr);
+			if (ImGui::Button(EditorIcon::Label<EditorIcon::Close, "##ClearReference">, {clearWidth,clearWidth}))
 			{
 				clr.SetFieldObject(instanceId, i, nullptr);
 				script->CaptureFields();
 			}
+			ImGui::EndDisabled();
 			break;
 		}
 		default:
-			ImGui::TextDisabled("%s (지원하지 않는 타입)", name.c_str());
+			ImGui::TextDisabled("Unsupported field type");
 			break;
 		}
 
@@ -323,7 +559,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 // 목록에 든 것은 전부 컴파일 시 정해진 문자열이다. 매 프레임 바뀌는 값으로
 // 재면 계획서가 금지한 "라벨 최대값 변화로 열이 흔들리는" 상태가 된다.
 static const char* const kInspectorTopLabels[]{
-    "Tag", "Layer", "Position", "Rotation", "Scale" };
+    "Physics Layer", "Position", "Rotation", "Scale" };
 
 static float InspectorTopLabelHint()
 {
@@ -331,26 +567,151 @@ static float InspectorTopLabelHint()
         kInspectorTopLabels, IM_ARRAYSIZE(kInspectorTopLabels));
 }
 
+Entity* InspectorWindow::DrawNavigation(Scene* scene, Entity* selected)
+{
+    auto& history = EditorSessionState::Get().SelectionHistory();
+    history.Observe(scene ? scene->GetSceneId() : 0,
+        selected ? scene->HandleOf(selected->m_index) : EntityHandle{});
+    const auto alive = [scene](EntityHandle handle) {
+        auto* entity = scene ? scene->Resolve(handle) : nullptr;
+        return entity && !entity->IsDestroyMark();
+    };
+    const float buttonSize = ImGui::GetFrameHeight();
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, ImGui::GetStyle().FramePadding.y));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0,0,0,0));
+    for (int direction : {-1, 1})
+    {
+        if (direction == 1) ImGui::SameLine();
+        const auto target = history.Peek(direction, alive);
+        ImGui::BeginDisabled(!target.IsValid());
+        if (ImGui::Button(direction < 0 ? EditorIcon::Label<EditorIcon::Back, "##SelectionBack">
+            : EditorIcon::Label<EditorIcon::Forward, "##SelectionForward">, ImVec2(buttonSize, buttonSize)))
+        {
+            // Navigation is UI history, not an authoring Undo transaction.
+            EditorObjectOperations::NavigateSelection(scene, direction);
+            selected = scene->m_selectedEntity;
+            ContentsBrowserWindow::selectedFileMetaNode.reset();
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            auto* entry = scene ? scene->Resolve(target) : nullptr;
+            ImGui::SetTooltip("%s%s%s", direction < 0 ? "Previous selection" : "Next selection",
+                entry ? ": " : "", entry ? entry->m_name.ToString().c_str() : "");
+        }
+    }
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImMax(0.f, ImGui::GetContentRegionAvail().x - buttonSize));
+    const bool inherited = selected && EditorObjectOperations::IsEditLocked(
+        scene->TryGetEntity(selected->GetParentIndex()));
+    const bool descendantsLocked = selected && !selected->m_editorLocked && !inherited &&
+        EditorObjectOperations::IsEditLocked(selected, true);
+    const bool locked = selected && (selected->m_editorLocked || inherited || descendantsLocked);
+    ImGui::BeginDisabled(!selected || inherited || descendantsLocked);
+    if (locked) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.91f,.72f,.38f,1));
+    if (ImGui::Button(locked ? EditorIcon::Label<EditorIcon::Lock, "##EditLock">
+        : EditorIcon::Label<EditorIcon::Unlock, "##EditLock">, ImVec2(buttonSize,buttonSize)))
+        EditorObjectOperations::SetEditLocked(scene->HandleOf(selected->m_index), !selected->m_editorLocked);
+    if (locked) ImGui::PopStyleColor();
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip(inherited ? "Locked by parent. Unlock the parent first."
+            : descendantsLocked ? "Contains a locked child. Unlock the child first."
+            : locked ? "Unlock entity editing" : "Lock entity editing (Inspector, gizmo and hierarchy)");
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
+    ImGui::Separator();
+    return selected;
+}
+
+void InspectorWindow::DrawEntityIcon(Entity* entity)
+{
+    auto& images = EditorAssetPresentation::Get();
+    const float size = editor::ThemePixels(40.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0,0,0,0));
+    auto* texture = images.GetEntityIcon(entity->m_editorIcon);
+    const bool clicked = texture ? ImGui::ImageButton("##EntityIcon", EditorImGuiTexture::From(texture), ImVec2(size,size))
+        : ImGui::Button(EditorIcon::Label<EditorIcon::GameObject,"##EntityIcon">, ImVec2(size,size));
+    if (clicked) ImGui::OpenPopup("##EntityIconPresets");
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Choose entity icon");
+    if (ImGui::BeginPopup("##EntityIconPresets"))
+    {
+        ImGui::TextDisabled("Entity icon");
+        ImGui::Separator();
+        const size_t current = editor::EntityIconIndex(entity->m_editorIcon);
+        for (size_t i = 0; i < editor::EntityIconPresets.size(); ++i)
+        {
+            const auto& preset = editor::EntityIconPresets[i];
+            ImGui::PushID(static_cast<int>(i));
+            const auto start = ImGui::GetCursorScreenPos();
+            const float rowHeight = ImGui::GetFrameHeight();
+            const float imageSize = ImGui::GetFontSize();
+            ImGui::Dummy(ImVec2(imageSize, rowHeight));
+            if (auto* icon = images.GetEntityIcon(preset.id))
+            {
+                const ImVec2 min{start.x, start.y + (rowHeight-imageSize)*.5f};
+                ImGui::GetWindowDrawList()->AddImage(EditorImGuiTexture::From(icon), min, ImVec2(min.x+imageSize,min.y+imageSize));
+            }
+            ImGui::SameLine();
+            if (ImGui::MenuItem(preset.label, nullptr, i == current))
+                EditorObjectOperations::SetIcon(entity->GetScene()->HandleOf(entity->m_index), std::string(preset.id));
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+}
+
 void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 {
+	if (!ImGui::BeginTable("##EntityHeader", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoPadOuterX)) return;
+	ImGui::TableSetupColumn("Icon", ImGuiTableColumnFlags_WidthFixed, editor::ThemePixels(46.f));
+	ImGui::TableSetupColumn("Properties", ImGuiTableColumnFlags_WidthStretch);
+	ImGui::TableNextColumn();
+	DrawEntityIcon(gameObject);
+	ImGui::TableNextColumn();
 	std::string name = gameObject->m_name.ToString();
 	bool isEnabled = gameObject->IsEnabled();
-	ImGui::Checkbox("##Enabled", &isEnabled);
+	ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.65f, 0.78f, 0.47f, 1.f));
+	ImGui::PushStyleColor(ImGuiCol_CheckboxSelectedBg, ImVec4(0.23f, 0.29f, 0.16f, 1.f));
+	if (ImGui::Checkbox("##Enabled", &isEnabled)) gameObject->SetEnabled(isEnabled);
+	ImGui::PopStyleColor(2);
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Object enabled");
 	ImGui::SameLine();
 
-	gameObject->SetEnabled(isEnabled);
-
-	// 이름 칸이 Static 체크박스를 창 밖으로 밀지 않게 폭을 먼저 예약한다
-	// (계획서 계약 5 · §4.5). 예전에는 폭을 정하지 않아 ImGui 기본값이 쓰였고,
-	// 인스펙터가 좁아지면 Static 이 잘려 나갔다.
+	auto& tags = TagManagers->GetTags();
+	auto& layers = TagManagers->GetLayers();
+	auto& selectedTag = gameObject->m_tag;
+	auto& selectedLayer = gameObject->m_layer;
+	const auto assignTag = [&](const std::string& tag)
 	{
-		const ImGuiStyle& baseStyle = ImGui::GetStyle();
-		const float staticWidth = ImGui::GetFrameHeight() +
-			baseStyle.ItemInnerSpacing.x + ImGui::CalcTextSize("Static").x;
-		const float nameWidth = ImGui::GetContentRegionAvail().x -
-			staticWidth - baseStyle.ItemSpacing.x;
-		ImGui::SetNextItemWidth(ImMax(nameWidth, ImGui::GetFrameHeight()));
-	}
+		TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
+		selectedTag = tag;
+		TagManagers->AddTagToObject(selectedTag.ToString(), gameObject);
+	};
+
+	// The tag button occupies the trailing part of the name field. Reserve that
+	// space outside InputText so long names cannot draw underneath the icon.
+	const ImGuiStyle& baseStyle = ImGui::GetStyle();
+	const float fieldHeight = ImGui::GetFrameHeight();
+	const float staticWidth = fieldHeight + baseStyle.ItemInnerSpacing.x + ImGui::CalcTextSize("Static").x;
+	const float available = ImGui::GetContentRegionAvail().x;
+	const bool staticInline = available >= editor::ThemePixels(90.f) + fieldHeight +
+		staticWidth + baseStyle.ItemSpacing.x;
+	const float nameWidth = ImMax(available - (staticInline ? staticWidth + baseStyle.ItemSpacing.x : 0.f),
+		fieldHeight + 1.f);
+	const ImVec2 nameMin = ImGui::GetCursorScreenPos();
+	const ImVec2 nameMax{nameMin.x + nameWidth, nameMin.y + fieldHeight};
+	ImGui::GetWindowDrawList()->AddRectFilled(nameMin, nameMax, ImGui::GetColorU32(ImGuiCol_FrameBg),
+		baseStyle.FrameRounding);
+	ImGui::GetWindowDrawList()->AddRect(nameMin, nameMax, ImGui::GetColorU32(ImGuiCol_Border),
+		baseStyle.FrameRounding);
+	ImGui::BeginGroup();
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+	ImGui::SetNextItemWidth(nameWidth - fieldHeight);
 
 	if (ImGui::InputText("##name",
 		&name[0],
@@ -361,111 +722,63 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	{
 		EditorObjectOperations::Rename(gameObject->GetScene()->HandleOf(gameObject->m_index), name);
 	}
+	ImGui::PopStyleColor();
+	ImGui::SameLine(0.f, 0.f);
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.f, baseStyle.FramePadding.y));
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+	ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(editor::ThemeColor::Primary));
+	if (ImGui::Button(EditorIcon::Label<EditorIcon::Tag, "##EntityTag">, ImVec2(fieldHeight, fieldHeight)))
+		ImGui::OpenPopup("##EntityTagPicker");
+	ImGui::PopStyleColor(2);
+	ImGui::PopStyleVar();
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tag: %s", selectedTag.ToString().c_str());
+	ImGui::PopStyleVar();
+	ImGui::EndGroup();
 
-	ImGui::SameLine();
+	if (staticInline) ImGui::SameLine();
 	ImGui::Checkbox("Static", &gameObject->m_isStatic);
 
-	auto& tags = TagManagers->GetTags();
-	auto& layers = TagManagers->GetLayers();
-	int tagCount = static_cast<int>(tags.size());
-	int layerCount = static_cast<int>(layers.size());
-	static int prevTagCount = 0;
-	static int prevLayerCount = 0;
-	static int selectedTagIndex = 0;
-	static int selectedLayerIndex = 0;
-
-	static const char* tagNames[64]{};
-	if (0 == prevTagCount || tagCount != prevTagCount)
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(editor::ThemePixels(8.f), editor::ThemePixels(6.f)));
+	if (ImGui::BeginPopup("##EntityTagPicker"))
 	{
-		memset(tagNames, 0, sizeof(tagNames));
-		for (int i = 0; i < tagCount; ++i) {
-			tagNames[i] = tags[i].c_str(); // Assuming TagManager::GetTags() returns a vector of strings
+		for (const auto& tag : tags)
+		{
+			const bool isSelected = (selectedTag == tag);
+			if (ImGui::MenuItem(tag.c_str(), nullptr, isSelected)) assignTag(tag);
+			if (isSelected) ImGui::SetItemDefaultFocus();
 		}
+		ImGui::Separator();
+		if (ImGui::MenuItem("Add Tag")) m_openNewTagPopup = true;
+		ImGui::EndPopup();
 	}
+	ImGui::PopStyleVar();
 
-	static const char* layerNames[64]{};
-	if (0 == prevLayerCount || layerCount != prevLayerCount)
-	{
-		memset(layerNames, 0, sizeof(layerNames));
-		for (int i = 0; i < layerCount; ++i) {
-			layerNames[i] = layers[i].c_str(); // Assuming TagManager::GetLayers() returns a vector of strings
-		}
-	}
-
-	auto& selectedTag = gameObject->m_tag;
-	auto& selectedLayer = gameObject->m_layer;
-
-	selectedTagIndex = TagManagers->GetTagIndex(selectedTag.ToString());
-	selectedLayerIndex = TagManagers->GetLayerIndex(selectedLayer.ToString());
-	if (selectedTagIndex < 0 || selectedTagIndex >= tagCount)
-	{
-		selectedTagIndex = 0; // 기본값으로 첫 번째 태그 선택
-	}
-	// Tag·Layer 콤보박스.
-	//
-	// 예전에는 둘이 한 줄에 있었고 각각 90px 고정이었다. 고정 폭은 좁을 때
-	// 잘리고 넓을 때 남는 폭을 라벨 쪽에 버린다. 줄을 나눠 같은 라벨 열에
-	// 세운다 — 계획서 계약 2 의 "같은 깊이의 속성은 같은 열에 맞춘다" 이고,
-	// 계약 4 가 "모든 컴포넌트를 자동으로 두 열에 재배열하지 않는다" 고
-	// 한 자리이기도 하다.
 	const editor::widgets::property_layout_metrics baseLayout =
 		editor::widgets::measure_property_layout(
-			editor::widgets::property_layout_inputs_now(0, InspectorTopLabelHint()),
-			m_layout);
-
-	ImGui::SetNextItemWidth(editor::widgets::begin_property_line("Tag", baseLayout));
-	if (ImGui::BeginCombo("##TagCombo", tagNames[selectedTagIndex]))
+			editor::widgets::property_layout_inputs_now(0, InspectorTopLabelHint()), m_layout);
+	ImGui::SetNextItemWidth(editor::widgets::begin_property_line("Physics Layer", baseLayout));
+	if (ImGui::BeginCombo("##LayerCombo", selectedLayer.ToString().c_str()))
 	{
-		for (int i = 0; i <= tagCount; ++i)
-		{
-			bool isSelected = false;
-			if (i == tagCount) // "Add Tag" 항목
-			{
-				if (ImGui::Selectable("Add Tag"))
-				{
-					m_openNewTagPopup = true; // 팝업 열기 플래그 설정
-				}
-			}
-			else
-			{
-				isSelected = (selectedTag == tagNames[i]);
-				if (ImGui::Selectable(tagNames[i], isSelected))
-				{
-					TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
-					selectedTag = tagNames[i];
-					TagManagers->AddTagToObject(selectedTag.ToString(), gameObject);
-					selectedTagIndex = i; // 선택된 인덱스 업데이트
-				}
-			}
-
-			if (isSelected)
-				ImGui::SetItemDefaultFocus();
-		}
-		ImGui::EndCombo();
-	}
-	ImGui::SetNextItemWidth(editor::widgets::begin_property_line("Layer", baseLayout));
-	if (ImGui::BeginCombo("##LayerCombo", layerNames[selectedLayerIndex]))
-	{
+		const int layerCount = static_cast<int>(layers.size());
 		for (int i = 0; i <= layerCount; ++i)
 		{
 			bool isSelected = false;
 			if (i == layerCount) // "Add Layer" 항목
 			{
-				if (ImGui::Selectable("Add Layer"))
+				if (ImGui::Selectable("Add Physics Layer"))
 				{
 					m_openNewLayerPopup = true; // 팝업 열기 플래그 설정
 				}
 			}
 			else
 			{
-				isSelected = (selectedLayer == layerNames[i]);
-				if (ImGui::Selectable(layerNames[i], isSelected))
+				isSelected = (selectedLayer == layers[i]);
+				if (ImGui::Selectable(layers[i].c_str(), isSelected))
 				{
 					TagManagers->RemoveObjectFromLayer(selectedLayer.ToString(), gameObject);
-					selectedLayer = layerNames[i];
+					selectedLayer = layers[i];
 					gameObject->SetCollisionType(); // 충돌 타입 업데이트
 					TagManagers->AddObjectToLayer(selectedLayer.ToString(), gameObject);
-					selectedLayerIndex = i; // 선택된 인덱스 업데이트
 				}
 			}
 
@@ -474,9 +787,6 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 		}
 		ImGui::EndCombo();
 	}
-
-	prevTagCount = tagCount;
-	prevLayerCount = layerCount;
 
 	if (m_openNewTagPopup)
 	{
@@ -486,7 +796,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 
 	if (m_openNewLayerPopup)
 	{
-		ImGui::OpenPopup("New Layer");
+		ImGui::OpenPopup("New Physics Layer");
 		m_openNewLayerPopup = false; // 팝업 열기 플래그 초기화
 	}
 
@@ -500,10 +810,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 			if (strlen(newTagName) > 0)
 			{
 				const auto tagResult = EditorProjectOperations::AddTag(newTagName);
-                        if (!tagResult.IsSuccess()) Debug->LogError(tagResult.message);
-				selectedTag = newTagName;
-				selectedTagIndex = tagCount; // 새로 추가된 태그 인덱스
-				tagCount = TagManagers->GetTags().size(); // 태그 개수 업데이트
+				if (tagResult.IsSuccess()) assignTag(std::string(newTagName));
+				else Debug->LogError(tagResult.message);
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -516,18 +824,16 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	}
 
 	// New Layer 팝업
-	if (ImGui::BeginPopup("New Layer"))
+	if (ImGui::BeginPopup("New Physics Layer"))
 	{
 		static char newLayerName[64] = "";
-		ImGui::InputText("Layer Name", newLayerName, sizeof(newLayerName));
+		ImGui::InputText("Physics Layer Name", newLayerName, sizeof(newLayerName));
 		if (ImGui::Button("Add"))
 		{
 			if (strlen(newLayerName) > 0)
 			{
 				TagManagers->AddLayer(newLayerName);
 				selectedLayer = newLayerName;
-				selectedLayerIndex = layerCount; // 새로 추가된 레이어 인덱스
-				layerCount = TagManagers->GetLayers().size(); // 레이어 개수 업데이트
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -538,6 +844,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 		}
 		ImGui::EndPopup();
 	}
+	ImGui::EndTable();
 }
 
 // 트랜스폼 세 줄. 라벨과 값 열은 공통 배치 계층이 놓고(W2-I2) 이 함수는 값만
@@ -588,7 +895,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 	transformPanel.label = "Transform";
 	transformPanel.icon = editor::inspector::inspector_icon(
 		type_guid(Transform).m_ID_Data);
-	transformPanel.menu_icon = ICON_FA_BARS;
+	transformPanel.menu_icon = EditorIcon::More;
 	const editor::widgets::inspector_panel_result transformHeaderState =
 		editor::widgets::begin_inspector_panel(transformPanel);
 	bool menuClicked = transformHeaderState.menu_clicked;
@@ -602,11 +909,12 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 				m_layout);
 
 		editor::widgets::begin_property_line("Position", layout);
-		if (DrawTransformAxes("##Position", &position.x, 0.08f, -1000.f, 1000.f), layout)
+		const math::vector4 positionBeforeEdit = position;
+		if (DrawTransformAxes("##Position", &position.x, 0.08f, -1000.f, 1000.f, layout))
 		{
 			if (!editingPosition)
 			{
-				prevPosition = position;
+				prevPosition = positionBeforeEdit;
 				editingPosition = true;
 			}
 			gameObject->Transform_().SetPositionValue(
@@ -624,7 +932,6 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 
 		static bool editingRotation = false;
 		static math::vector4 prevRotation{};
-		static float prevEuler[3] = {};
 
 		const math::vector3 currentEuler = math::to_euler(math::quaternion{
 			rotation.x, rotation.y, rotation.z, rotation.w });
@@ -632,7 +939,6 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		float deltaEuler[3] = { 0, 0, 0 };
 
 		float prevPYR[3];
-		prevRotation = rotation;
 
 		for (float& i : pyr) i *= math::rad_to_deg;
 		prevPYR[0] = pyr[0];
@@ -640,14 +946,11 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		prevPYR[2] = pyr[2];
 
 		editor::widgets::begin_property_line("Rotation", layout);
-		if (DrawTransformAxes("##Rotation", pyr, 0.1f, 0.f, 0.f), layout)
+		if (DrawTransformAxes("##Rotation", pyr, 0.1f, 0.f, 0.f, layout))
 		{
 			if (!editingRotation)
 			{
 				prevRotation = rotation;
-				prevEuler[0] = pyr[0];
-				prevEuler[1] = pyr[1];
-				prevEuler[2] = pyr[2];
 				editingRotation = true;
 			}
 			const math::vector3 radianEuler{
@@ -666,14 +969,7 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		}
 		if (editingRotation && ImGui::IsItemDeactivatedAfterEdit())
 		{
-			const math::quaternion compareQuaternion =
-				math::quaternion_from_pitch_yaw_roll(
-					math::radians(prevEuler[0]), math::radians(prevEuler[1]),
-					math::radians(prevEuler[2]));
-			const math::vector4 compare{
-				compareQuaternion.x, compareQuaternion.y,
-				compareQuaternion.z, compareQuaternion.w };
-			if (compare != rotation)
+			if (prevRotation != rotation)
 			{
 				gameObject->Transform_().SetRotationValue(prevRotation, TransformWriteReason::Inspector);
                 EditorObjectOperations::Transform(gameObject->GetScene()->HandleOf(gameObject->m_index), gameObject->Transform_().GetPosition(), math::quaternion{rotation.x, rotation.y, rotation.z, rotation.w}, gameObject->Transform_().GetScale());
@@ -685,11 +981,12 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		static math::vector4 prevScale{};
 
 		editor::widgets::begin_property_line("Scale", layout);
-		if (DrawTransformAxes("##Scale", &scale.x, 0.1f, 0.001f, 1000.f), layout)
+		const math::vector4 scaleBeforeEdit = scale;
+		if (DrawTransformAxes("##Scale", &scale.x, 0.1f, 0.001f, 1000.f, layout))
 		{
 			if (!editingScale)
 			{
-				prevScale = scale;
+				prevScale = scaleBeforeEdit;
 				editingScale = true;
 			}
 			gameObject->Transform_().SetScaleValue(
@@ -827,7 +1124,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 
 	ImGui::SeparatorText("VolumeProfile");
 	ImGui::Text("Drag VolumeProfile Here");
-	if (ImGui::BeginDragDropTarget())
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VolumeProfile"))
 		{
@@ -911,7 +1208,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			{
 				ImGui::Text("Loaded HDR: %s", profile.settings.skyboxTextureName.c_str());
 			}
-			if (ImGui::BeginDragDropTarget())
+			if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HDR"))
 				{
@@ -1045,7 +1342,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	ImVec2 minRect = ImGui::GetItemRectMin();
 	ImVec2 maxRect = ImGui::GetItemRectMax();
 	ImRect bb(minRect, maxRect);
-	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 		{
 			const char* droppedFilePath = (const char*)payload->Data;
@@ -1068,7 +1365,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	minRect = ImGui::GetItemRectMin();
 	maxRect = ImGui::GetItemRectMax();
 	bb = { minRect, maxRect };
-	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 		{
 			const char* droppedFilePath = (const char*)payload->Data;
@@ -1091,7 +1388,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	minRect = ImGui::GetItemRectMin();
 	maxRect = ImGui::GetItemRectMax();
 	bb = { minRect, maxRect };
-	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 		{
 			const char* droppedFilePath = (const char*)payload->Data;
@@ -1147,7 +1444,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	}
 
 	ImGui::Text("Drag Texture Here");
-	if (ImGui::BeginDragDropTarget())
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
 		{
@@ -1197,8 +1494,8 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			ImGui::Text("-> None");
 	};
 
-	ImGui::Button(ICON_FA_ARROW_LEFT "##Left", ImVec2(30, 20));
-	if (ImGui::BeginDragDropTarget())
+	ImGui::Button(EditorIcon::Label<EditorIcon::Back, "##Left">, ImVec2(30, 20));
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
@@ -1213,8 +1510,8 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::SameLine();
 	drawNavigationTarget(Direction::Left);
 
-	ImGui::Button(ICON_FA_ARROW_RIGHT "##Right", ImVec2(30, 20));
-	if (ImGui::BeginDragDropTarget())
+	ImGui::Button(EditorIcon::Label<EditorIcon::Forward, "##Right">, ImVec2(30, 20));
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
@@ -1229,8 +1526,8 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	ImGui::SameLine();
 	drawNavigationTarget(Direction::Right);
 
-	ImGui::Button(ICON_FA_ARROW_UP "##Up", ImVec2(30, 20));
-	if (ImGui::BeginDragDropTarget())
+	ImGui::Button(EditorIcon::Label<EditorIcon::Up, "##Up">, ImVec2(30, 20));
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
@@ -1244,8 +1541,8 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	}
 	ImGui::SameLine();
 	drawNavigationTarget(Direction::Up);
-	ImGui::Button(ICON_FA_ARROW_DOWN "##Down", ImVec2(30, 20));
-	if (ImGui::BeginDragDropTarget())
+	ImGui::Button(EditorIcon::Label<EditorIcon::Down, "##Down">, ImVec2(30, 20));
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
 		{
@@ -1270,7 +1567,7 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 	ImVec2 minRect = ImGui::GetItemRectMin();
 	ImVec2 maxRect = ImGui::GetItemRectMax();
 	ImRect bb(minRect, maxRect);
-	if (ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget")))
+	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget")))
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 		{
@@ -1314,7 +1611,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 	SetNextItemWidth(240);
 	InputText("##ClipKeyRO", &sc->clipKey, ImGuiInputTextFlags_ReadOnly);
 	ImGui::SameLine();
-	if (Button(ICON_FA_FILE_AUDIO))
+	if (Button(EditorIcon::Audio))
 	{
 		m_clipKeyCache = Sound->getAllClipKeys();
 		m_clipSearch.clear();
@@ -1487,9 +1784,13 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 	applyBasic(sc->Get3DChannel());
 }
 
-bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& curve, float maxDist, ImVec2 size, int* outSelected, bool readOnly)
+bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& sourceCurve, float maxDist, ImVec2 size, int* outSelected, bool readOnly)
 {
 	using namespace ImGui;
+    readOnly |= (GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
+    std::vector<CurvePoint> preview;
+    if (readOnly) preview = sourceCurve;
+    auto& curve = readOnly ? preview : sourceCurve;
 	if (curve.size() < 2) {
 		curve = { {0.f, 1.f}, {std::max(0.1f, maxDist), 0.f} };
 	}
@@ -1662,7 +1963,7 @@ void InspectorWindow::DrawSoundClipPicker()
 				break;
 			}
 			SameLine();
-			if (SmallButton((ICON_FA_PLAY "##prev" + std::to_string(i)).c_str())) 
+			if (SmallButton((EditorIcon::Label<EditorIcon::Play, "##prev"> + std::to_string(i)).c_str()))
 			{
 				if (m_clipPickerTarget) 
 				{
@@ -1712,8 +2013,8 @@ void InspectorWindow::DrawSoundClipPicker()
 // PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
 void InspectorWindow::Draw()
 {
-	static Entity* prevSelectedSceneObject = nullptr;
-	static bool wasMetaSelectedLastFrame = false;
+	const editor::InspectorStyleScope inspectorStyle;
+
 
 	Scene* scene = nullptr;
 	RenderScene* renderScene = nullptr;
@@ -1745,9 +2046,10 @@ void InspectorWindow::Draw()
 		}
 	}
 
-	bool sceneObjectJustSelected = (selectedSceneObject != nullptr && selectedSceneObject != prevSelectedSceneObject);
+	const EntityHandle current = selectedSceneObject ? scene->HandleOf(selectedSceneObject->m_index) : EntityHandle{};
+    bool sceneObjectJustSelected = current.IsValid() && current != m_previousEntity;
 
-	bool metaNodeJustSelected = (isSelectedNode && !wasMetaSelectedLastFrame);
+	bool metaNodeJustSelected = (isSelectedNode && !m_wasMetaSelected);
 
 	// 3. 우선순위 결정
 	if (sceneObjectJustSelected)
@@ -1755,23 +2057,35 @@ void InspectorWindow::Draw()
 		// 게임 오브젝트 선택 시 YAML 선택 해제
 		selectedNode = std::nullopt;
 		isSelectedNode = false;
-		wasMetaSelectedLastFrame = false;
+		m_wasMetaSelected = false;
 	}
 
 	if (metaNodeJustSelected)
 	{
 		// 메타 파일 선택 시 게임 오브젝트 해제
 		selectedSceneObject = nullptr;
-		prevSelectedSceneObject = nullptr;
-		wasMetaSelectedLastFrame = true;
+		m_previousEntity = {};
+		m_wasMetaSelected = true;
 	}
 
+    selectedSceneObject = DrawNavigation(scene, selectedSceneObject);
+    isSelectedNode = selectedNode.has_value();
+    const EntityHandle inspected = selectedSceneObject ? scene->HandleOf(selectedSceneObject->m_index) : EntityHandle{};
+    const bool changedTarget = inspected != m_previousEntity;
+    const bool editLocked = EditorObjectOperations::IsEditLocked(selectedSceneObject, true);
+    if (changedTarget || editLocked)
+    {
+        m_openClipPicker = false;
+        m_clipPickerTarget = nullptr;
+        m_openNewTagPopup = m_openNewLayerPopup = false;
+    }
 	TerrainBrush* terrainBrush = EditorSessionState::Get().FindTerrainBrush();
-	if (!selectedSceneObject && terrainBrush)
+	if ((!selectedSceneObject || editLocked) && terrainBrush)
 	{
 		terrainBrush->m_isEditMode = false;
 	}
 
+    ImGui::BeginDisabled(editLocked);
 	if (scene && selectedSceneObject)
 	{
 		ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
@@ -1801,6 +2115,7 @@ void InspectorWindow::Draw()
 
 		static bool isOpen = false;
 		static Component* selectedComponent = nullptr;
+        if (changedTarget || editLocked) { isOpen = false; selectedComponent = nullptr; }
 
 		if (!selectedSceneObject->HasComponent<TerrainComponent>() &&
 			terrainBrush)
@@ -1831,7 +2146,7 @@ void InspectorWindow::Draw()
 			auto& component = selectedSceneObject->m_components[componentIndex];
 			// 공간 컴포넌트 둘은 위에서 전용 드로어가 이미 그렸다. 한쪽만
 			// 건너뛰면 다른 쪽이 두 번 나온다 — 그것이 W2-I1 이 고친 결함이다.
-			if (nullptr == component
+			if (nullptr == component || component->IsDestroyMark()
 				|| component->GetTypeID() == type_guid(RectTransformComponent)
 				|| component->GetTypeID() == type_guid(Transform))
 				continue;
@@ -1844,6 +2159,11 @@ void InspectorWindow::Draw()
 
 			std::string componentBaseName = component->ToString();
 			if (!type) continue;
+			if (auto* script = dynamic_cast<ScriptComponent*>(component.get()))
+				componentBaseName = script->m_scriptType.empty() ? "Missing (Script)"
+					: editor::components::DisplayName(script->m_scriptType, true) + " (Script)";
+			// Repeated script classes have independent foldouts, fields and context menus.
+			ImGui::PushID(static_cast<int>(component->GetInstanceID()));
 
 			// 체크박스에 m_isEnabled를 직접 물리면 SetEnabled를 건너뛰어
 			// OnEnable/OnDisable이 영영 호출되지 않는다. 지역 값으로 받아
@@ -1853,7 +2173,7 @@ void InspectorWindow::Draw()
 			componentPanel.label = componentBaseName.c_str();
 			componentPanel.icon = editor::inspector::inspector_icon(
 				component->GetTypeID().m_ID_Data);
-			componentPanel.menu_icon = ICON_FA_BARS;
+			componentPanel.menu_icon = EditorIcon::More;
 			componentPanel.enabled = &isEnabled;
 			const editor::widgets::inspector_panel_result componentHeaderState =
 				editor::widgets::begin_inspector_panel(componentPanel);
@@ -1864,6 +2184,7 @@ void InspectorWindow::Draw()
 			if (componentHeaderState.menu_clicked)
 			{
 				isOpen = true;
+				selectedComponent = component.get();
 			}
 			const bool isHeaderOpen = componentHeaderState.open;
 			if (componentHeaderState.enabled_changed)
@@ -2000,78 +2321,11 @@ void InspectorWindow::Draw()
 			// 접혀 있어도 부른다. 여는 쪽이 ID 와 들여쓰기를 밀어 두기 때문에
 			// 건너뛰면 그 뒤의 모든 줄이 한 칸씩 밀린 채 프레임이 끝난다.
 			editor::widgets::end_inspector_panel();
+			ImGui::PopID();
 		}
 
 		ImGui::Separator();
-		ImVec2 windowSize = ImGui::GetWindowSize();      // 현재 윈도우의 전체 크기
-		ImVec2 buttonSize = ImVec2(180, 0);              // 버튼 가로 크기 (세로는 자동 계산됨)
-
-		static ImGuiTextFilter searchFilter;
-
-		ImGui::SetCursorPosX((windowSize.x - buttonSize.x) * 0.5f);  // 수평 중앙 정렬
-
-		if (ImGui::Button("Add Component", buttonSize))
-		{
-			ImGui::OpenPopup("AddComponent");
-		}
-
-		ImGui::SetNextWindowSize(ImVec2(windowSize.x, 0)); // 원하는 사이즈 지정
-		if (ImGui::BeginPopup("AddComponent"))
-		{
-			ImGui::TextColored(ImVec4(1, 1, 1, 1), "Add Component"); // 노란색 텍스트
-			ImGui::Separator(); // 구분선
-
-			float availableWidth = ImGui::GetContentRegionAvail().x;
-			searchFilter.Draw(ICON_FA_MARKER "Search", availableWidth);
-
-			for (const auto& [type_name, type] : ComponentFactorys->m_componentTypes)
-			{
-				if (!searchFilter.PassFilter(type_name.c_str()))
-					continue;
-
-				if (type_name.empty())
-				{
-					const_cast<std::string&>(type_name) = "None";
-				}
-
-				// ScriptComponent는 아래 C# Scripts 섹션이 담당한다 —
-				// 여기(단일 부착 경로)로 붙이면 두 번째 스크립트부터 기존 것이 반환된다.
-				if (type->typeID == type_guid(ScriptComponent))
-					continue;
-
-				if (ImGui::MenuItem(type_name.c_str()))
-				{
-					// K2 스테이지 A: AddComponent가 raw Component*를 돌려준다.
-					EditorObjectOperations::AddComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), type_name);
-				}
-			}
-
-			// ── C# Scripts ──
-			// ClrHost가 스크립트 어셈블리에 등록된 타입 이름을 내준다.
-			// 스크립트는 한 오브젝트에 여럿 붙으므로 AddComponentAllowMultiple 경로를 탄다.
-			ImGui::Separator();
-			ImGui::TextColored(ImVec4(0.6f, 0.85f, 1.f, 1.f), "C# Scripts");
-
-			const auto managedTypeNames = ClrHost::Get().GetComponentTypeNames();
-			if (managedTypeNames.empty())
-			{
-				ImGui::TextDisabled(ClrHost::Get().IsReady()
-					? "등록된 C# 스크립트가 없습니다"
-					: "CLR이 준비되지 않았습니다");
-			}
-			for (const auto& managedName : managedTypeNames)
-			{
-				if (!searchFilter.PassFilter(managedName.c_str()))
-					continue;
-
-				if (ImGui::MenuItem((managedName + " (C#)").c_str()))
-				{
-					AttachManagedScript(selectedSceneObject, managedName);
-				}
-			}
-
-			ImGui::EndPopup();
-		}
+		DrawAddComponent(selectedSceneObject);
 
 		// 다음 프레임에서 열기
 
@@ -2160,6 +2414,7 @@ void InspectorWindow::Draw()
 	}
 
 
+    ImGui::EndDisabled();
 	// 디버그 모드 토글 (PHASE 21 W2-I).
 	//
 	// `meta::debugOnly()` 로 표시한 항목은 이 모드에서만 그려진다. 내부
@@ -2183,6 +2438,6 @@ void InspectorWindow::Draw()
 		ImGui::EndPopup();
 	}
 
-	prevSelectedSceneObject = selectedSceneObject;
-	wasMetaSelectedLastFrame = isSelectedNode;
+	m_previousEntity = inspected;
+	m_wasMetaSelected = isSelectedNode;
 }

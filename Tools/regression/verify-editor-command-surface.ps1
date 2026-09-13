@@ -92,15 +92,26 @@ if (-not $SkipCommandlets) {
     } finally { if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit() } }
     $ordinary = Join-Path $Work 'ordinary-batch.txt'
     $ordinaryResults = Join-Path $Work 'ordinary-batch.jsonl'
-    @('model.async status','render.pbr.parity','render.pbr.capture','quit') | Set-Content -LiteralPath $ordinary -Encoding utf8
+    # 이름은 한 곳에서만 적는다. 아래 단정이 이 목록에서 개수를 유도하므로,
+    # Commandlet 이 은퇴해 이름이 빠져도 단정이 저절로 따라온다 — 수를 손으로
+    # 박아 두었던 탓에 0ec60573(68개 은퇴)이 이름 하나를 빼고 간 뒤로 붉었다.
+    $commandletNames = @('model.async status', 'render.pbr.parity', 'render.pbr.capture')
+    @($commandletNames + 'quit') | Set-Content -LiteralPath $ordinary -Encoding utf8
     if (Test-Path -LiteralPath $ordinaryResults) { Remove-Item -LiteralPath $ordinaryResults }
     $proc = Start-GateEditor @('--script', ('"'+$ordinary+'"'), '--result-format', 'jsonl', '--result-file', ('"'+$ordinaryResults+'"')) 'ordinary-batch'
     try {
         Assert ($proc.WaitForExit(180000)) 'Ordinary batch did not terminate'
         Assert ($proc.ExitCode -eq 2) 'Ordinary batch must reject a Commandlet name'
         $results = @(Get-Content -LiteralPath $ordinaryResults | ConvertFrom-Json)
-        Assert ($results[0].code -eq 'command.unknown') 'Commandlet leaked into ordinary batch execution'
-        Assert ($results.Count -eq 5 -and @($results[0..3] | Where-Object code -ne 'command.unknown').Count -eq 0) 'Integrated Commandlets leaked into ordinary batch execution'
+        # 이름 하나당 결과 하나 + 마지막 `quit` 하나. 개수를 먼저 단정하지 않으면
+        # 뒤의 색인 구간이 조용히 짧아져 통과하는 자리가 생긴다.
+        Assert ($results.Count -eq ($commandletNames.Count + 1)) `
+            "Ordinary batch produced $($results.Count) result(s) for $($commandletNames.Count) Commandlet name(s) plus quit"
+        $rejected = @($results[0..($commandletNames.Count - 1)])
+        Assert (@($rejected | Where-Object code -ne 'command.unknown').Count -eq 0) `
+            'Integrated Commandlets leaked into ordinary batch execution'
+        Assert ($results[-1].command -eq 'quit' -and $results[-1].status -eq 'succeeded') `
+            'The batch did not end with a successful quit; the rejection count above is measuring the wrong lines'
     } finally { if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit() } }
     $output = Join-Path $Work 'commandlet-missing-script.jsonl'
     if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output }

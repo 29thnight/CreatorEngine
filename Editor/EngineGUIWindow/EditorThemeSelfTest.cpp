@@ -1,6 +1,9 @@
 #include "EditorThemeSelfTest.h"
+#include "EditorSelectionHistory.h"
+#include "EditorEntityIcons.h"
 
 #include "EditorTheme.h"
+#include "EditorWindowChrome.h"
 #include "EditorSectionHeader.h"
 #include "EditorPropertyRow.h"
 #include "EditorAxisField3.h"
@@ -8,6 +11,8 @@
 #include "EditorInspectorPanel.h"
 #include "WindowDesc.h"
 #include "ImGui.h"
+#include "SceneViewportOverlay.h"
+#include "../../ThirdParty/ImViewGuizmo/MathematicsAdapter.h"
 
 #include <array>
 #include <cmath>
@@ -111,6 +116,22 @@ namespace editor
     {
         ThemeContractChecks checks{ report };
 
+        // The native drag region must end before transport controls, including
+        // at high DPI and in the compact-menu window widths.
+        for (const float scale : {1.f, 1.25f, 1.5f, 2.25f, 3.f})
+        for (const float width : {320.f, 480.f, 800.f, 1280.f, 1920.f})
+        {
+            const auto chrome = LayoutEditorTitleBar(width * scale,
+                EditorThemeTokens::TitleBarHeight * scale, scale);
+            checks.expect(chrome.playLeft > 32.f * scale, "title bar", "logo and compact menu fit before Play");
+            checks.expect(chrome.playLeft + chrome.playWidth < chrome.systemButtonsLeft,
+                "title bar", "Play box does not overlap native window controls");
+            checks.number(chrome.systemButtonsLeft + chrome.systemButtonWidth * 3.f, width * scale,
+                "title bar", "window controls remain right aligned");
+            checks.expect(chrome.height - 2.f * chrome.playInset >= 16.f * scale,
+                "title bar", "Play icons fit within the title row");
+        }
+
         // Plan §3.1 values are fixed independently of the product token table.
         struct ExpectedColor { ThemeColor token; const char* name; std::uint32_t rgb; };
         constexpr ExpectedColor palette[] = {
@@ -147,10 +168,31 @@ namespace editor
         style.FontSizeBase = 16.f;
         ApplyEditorTheme(style, 1.f, 1.f);
         const ImGuiStyle baseline = style;
-        checks.number(style.FontSizeBase + style.ItemSpacing.y, 24.f,
+        checks.number(style.FontSizeBase + style.ItemSpacing.y, 20.f,
                       "logical metrics", "row height");
-        checks.number(style.FontSizeBase + 2.f * style.FramePadding.y, 24.f,
-                      "logical metrics", "control and tab height");
+        checks.number(style.FontSizeBase + 2.f * style.FramePadding.y, 20.f,
+                      "logical metrics", "control height");
+        checks.number(EditorThemeTokens::TabHeight, 24.f,
+                      "logical metrics", "tab handle keeps original height");
+
+        // Compact display must leave exponent/unit formats and significant digits intact.
+        struct NumberCase { const char* input; const char* expected; };
+        constexpr NumberCase numbers[] = {
+            {"0.000", "0"}, {"-0.000", "0"}, {"1.000", "1"},
+            {"-2197.997", "-2197.997"}, {"0.010", "0.01"},
+            {"1000.100", "1000.1"}, {"1.000e+03", "1.000e+03"},
+            {"12.000 ms", "12.000 ms"}, {"nan", "nan"}
+        };
+        for (const auto& number : numbers)
+        {
+            char buffer[64];
+            std::strcpy(buffer, number.input);
+            widgets::compact_property_number(buffer);
+            checks.expect(std::strcmp(buffer, number.expected) == 0,
+                "compact number", number.input);
+        }
+        // The command runs on the game thread. Live style restoration is checked
+        // by EditorChromeProbe after drawing on the presentation thread.
 
         // Verify colors reach interaction states, not only the read-only token API.
         struct ExpectedSlot { ImGuiCol slot; const char* name; std::uint32_t rgb; float alpha; };
@@ -222,14 +264,14 @@ namespace editor
         // Expected pixel values include ImGui's geometry truncation (7*1.5=10,
         // 6*2.25=13). The same object traverses both axes and repeated scales.
         constexpr ThemeGeometryExpectation transitions[] = {
-            { "initial 100/100", 1.f, 1.f, 8.f, 20.f, 8.f, 6.f, 7.f, 4.f, 4.f, 2.f },
-            { "user 150/100", 1.5f, 1.f, 12.f, 30.f, 12.f, 9.f, 10.f, 6.f, 6.f, 3.f },
-            { "user return 100/100", 1.f, 1.f, 8.f, 20.f, 8.f, 6.f, 7.f, 4.f, 4.f, 2.f },
-            { "dpi 100/150", 1.f, 1.5f, 12.f, 30.f, 12.f, 9.f, 10.f, 6.f, 6.f, 3.f },
-            { "dpi return 100/100", 1.f, 1.f, 8.f, 20.f, 8.f, 6.f, 7.f, 4.f, 4.f, 2.f },
-            { "combined 150/150", 1.5f, 1.5f, 18.f, 45.f, 18.f, 13.f, 15.f, 9.f, 9.f, 4.f },
-            { "repeat combined 150/150", 1.5f, 1.5f, 18.f, 45.f, 18.f, 13.f, 15.f, 9.f, 9.f, 4.f },
-            { "combined return 100/100", 1.f, 1.f, 8.f, 20.f, 8.f, 6.f, 7.f, 4.f, 4.f, 2.f },
+            { "initial 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 4.f, 2.f },
+            { "user 150/100", 1.5f, 1.f, 12.f, 30.f, 4.f, 3.f, 10.f, 3.f, 6.f, 3.f },
+            { "user return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 4.f, 2.f },
+            { "dpi 100/150", 1.f, 1.5f, 12.f, 30.f, 4.f, 3.f, 10.f, 3.f, 6.f, 3.f },
+            { "dpi return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 4.f, 2.f },
+            { "combined 150/150", 1.5f, 1.5f, 18.f, 45.f, 6.f, 4.f, 15.f, 4.f, 9.f, 4.f },
+            { "repeat combined 150/150", 1.5f, 1.5f, 18.f, 45.f, 6.f, 4.f, 15.f, 4.f, 9.f, 4.f },
+            { "combined return 100/100", 1.f, 1.f, 8.f, 20.f, 3.f, 2.f, 7.f, 2.f, 4.f, 2.f },
         };
         for (const ThemeGeometryExpectation& expected : transitions)
         {
@@ -269,8 +311,8 @@ namespace editor
         style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.1f, 0.2f, 0.3f, 0.4f);
         ApplyEditorTheme(style, 1.f, 1.f);
         checks.number(style.Alpha, 1.f, "recovery", "default opacity");
-        checks.number(style.WindowPadding.x, 8.f, "recovery", "panel padding x");
-        checks.number(style.WindowPadding.y, 6.f, "recovery", "panel padding y");
+        checks.number(style.WindowPadding.x, 3.f, "recovery", "panel padding x");
+        checks.number(style.WindowPadding.y, 2.f, "recovery", "panel padding y");
         checks.number(style.WindowRounding, 0.f, "recovery", "square window");
         checks.number(style.ScrollbarSize, 8.f, "recovery", "scrollbar width");
         checks.number(style.IndentSpacing, 20.f, "recovery", "tree indentation");
@@ -356,7 +398,7 @@ namespace editor
             constexpr std::array<axis, 3> axes{ axis::X, axis::Y, axis::Z };
             constexpr std::array<const char*, 3> axis_names{ "axis x", "axis y", "axis z" };
             constexpr std::array<std::uint32_t, 3> axis_expected{
-                0xC0392B, 0x4F7A28, 0x2D6FA8 };
+                0xD68C83, 0xA6C779, 0x83A9DC };
             constexpr std::array<ThemeColor, 3> meaning{
                 ThemeColor::Error, ThemeColor::Positive, ThemeColor::Primary };
 
@@ -372,7 +414,7 @@ namespace editor
                                   axis_names[index], "badge is not a meaning color");
                 }
                 checks.expect(
-                    contrast_ratio(badge, widgets::axis_badge_text_hex()) >= 3.f,
+                    contrast_ratio(badge, widgets::axis_badge_background_hex()) >= 4.5f,
                     axis_names[index], "badge letter stays readable");
             }
             for (std::size_t left = 0; left < axes.size(); ++left)
@@ -537,6 +579,13 @@ namespace editor
                 const auto narrow = widgets::measure_property_layout(make(240.f), state);
                 checks.expect(narrow.axis_stacked,
                     "property layout", "240px stacks the axes vertically");
+
+                const auto edge = widgets::measure_property_layout(make(313.f), state);
+                checks.expect(edge.axis_stacked,
+                    "property layout", "axis hysteresis prevents oscillation at the boundary");
+                const auto recovered = widgets::measure_property_layout(make(330.f), state);
+                checks.expect(!recovered.axis_stacked,
+                    "property layout", "axis recovery reserves one row margin, not three");
             }
 
             // ⑥ 라벨 힌트는 **상한이 아니라 내용 폭**이다. 최소 폭보다 넓은
@@ -695,7 +744,7 @@ namespace editor
             // 유무를 입력으로 받지도 않는다 — 받으면 갈릴 수 있다.
             {
                 const auto metrics = widgets::measure_inspector_panel(make(400.f, 1.f));
-                const float expected = 4.f + 16.f + 22.f + 4.f + 24.f + 8.f;
+                const float expected = 4.f + 16.f + 22.f + 4.f + 16.f + 6.f;
                 checks.expect(std::fabs(metrics.title_x - expected) < 0.01f,
                     "inspector panel", "the title starts past a always-reserved toggle cell");
                 checks.expect(metrics.title_x > metrics.lead + metrics.expander + metrics.icon,
@@ -858,6 +907,144 @@ namespace editor
                 "display label", "the buffer has a declared capacity");
         }
 
+        // Native image crop: panel width/height must never change the size of a
+        // projected object or the world point selected under its visible pixel.
+        for (const float framebufferScale : {1.f, 1.5f, 2.f})
+        for (const bool orthographic : {false, true})
+        {
+            const auto projection = orthographic
+                ? math::orthographic_lh(16.f, 9.f, .1f, 100.f)
+                : math::perspective_fov_lh(math::radians(60.f), 1920.f / 1080.f, .1f, 100.f);
+            const auto inverseProjection = math::inverse(projection);
+            const math::vector4 point{.7f, .3f, 8.f, 1.f};
+            const auto clip = point * projection;
+            const ImVec2 projectedUV{(clip.x / clip.w + 1.f) * .5f, (1.f - clip.y / clip.w) * .5f};
+            ImVec2 referenceOffset{};
+            bool first = true;
+            for (const ImVec2 size : {ImVec2{1200,700}, {900,700}, {1200,400}, {480,300}})
+            {
+                const ImVec2 origin{-370.f, 195.f}, center{origin.x + size.x * .5f, origin.y + size.y * .5f};
+                const auto crop = LayoutViewportCanvas(viewport_fit::crop, origin, size, {1920,1080}, {framebufferScale,framebufferScale});
+                checks.expect(crop.valid, "scene crop", "valid source and canvas");
+                const auto centerUV = crop.SourceUV(center);
+                checks.number(centerUV.x, .5f, "scene crop", "optical center x");
+                checks.number(centerUV.y, .5f, "scene crop", "optical center y");
+                checks.expect(crop.clipMin.x >= origin.x && crop.clipMin.y >= origin.y &&
+                    crop.clipMax.x <= origin.x + size.x && crop.clipMax.y <= origin.y + size.y,
+                    "scene crop", "draw is clipped to canvas");
+                checks.expect(std::fabs((crop.uvMax.x - crop.uvMin.x) * 1920.f -
+                    (crop.clipMax.x - crop.clipMin.x) * framebufferScale) < .001f &&
+                    std::fabs((crop.uvMax.y - crop.uvMin.y) * 1080.f -
+                    (crop.clipMax.y - crop.clipMin.y) * framebufferScale) < .001f,
+                    "scene crop", "one source pixel per framebuffer pixel on both axes");
+                const ImVec2 screen{crop.imageMin.x + projectedUV.x * crop.ImageExtent().x,
+                    crop.imageMin.y + projectedUV.y * crop.ImageExtent().y};
+                const ImVec2 offset{screen.x - center.x, screen.y - center.y};
+                if (first) { referenceOffset = offset; first = false; }
+                checks.expect(std::fabs(offset.x - referenceOffset.x) < .001f &&
+                    std::fabs(offset.y - referenceOffset.y) < .001f,
+                    "scene crop", "resize preserves projected object scale");
+                const auto hitUV = crop.SourceUV(screen);
+                const auto hit = math::vector4{hitUV.x * 2.f - 1.f, 1.f - hitUV.y * 2.f,
+                    clip.z / clip.w, 1.f} * inverseProjection;
+                checks.expect(std::fabs(hit.x / hit.w - point.x) < .001f &&
+                    std::fabs(hit.y / hit.w - point.y) < .001f && std::fabs(hit.z / hit.w - point.z) < .001f,
+                    "scene crop", "picking round trip agrees with displayed projection");
+            }
+        }
+        {
+            const auto crop = LayoutViewportCanvas(viewport_fit::crop, {0,0}, {960,540}, {1920,1080}, {1,1});
+            checks.number(crop.uvMin.x, .25f, "scene crop", "half-size left edge");
+            checks.number(crop.uvMin.y, .25f, "scene crop", "half-size top edge");
+            checks.number(crop.uvMax.x, .75f, "scene crop", "half-size right edge");
+            checks.number(crop.uvMax.y, .75f, "scene crop", "half-size bottom edge");
+            const auto wide = LayoutViewportCanvas(viewport_fit::crop, {0,0}, {1920,1080}, {1280,720}, {1,1});
+            checks.number(wide.clipMin.x, 320.f, "scene crop", "oversized panel does not stretch width");
+            checks.number(wide.clipMin.y, 180.f, "scene crop", "oversized panel does not stretch height");
+            // W4: 같은 함수가 letterbox 정책도 낸다. Game 은 프레임버퍼의 종횡비가
+            // 곧 출력 계약이라 crop 하면 화면 밖으로 잘려 나간다.
+            const auto tall = LayoutViewportCanvas(viewport_fit::letterbox, {0,0}, {800,600}, {1920,1080}, {1,1});
+            checks.number(tall.ImageExtent().x, 800.f, "viewport letterbox", "fits the wider axis");
+            checks.number(tall.ImageExtent().y, 450.f, "viewport letterbox", "keeps the source aspect");
+            checks.number(tall.imageMin.y, 75.f, "viewport letterbox", "centres the bars");
+            const auto wideBox = LayoutViewportCanvas(viewport_fit::letterbox, {0,0}, {1600,450}, {1920,1080}, {1,1});
+            checks.number(wideBox.ImageExtent().y, 450.f, "viewport letterbox", "fits the taller axis");
+            checks.number(wideBox.ImageExtent().x, 800.f, "viewport letterbox", "keeps the source aspect when limited by height");
+            checks.expect(tall.clipMin.x == tall.imageMin.x && tall.clipMax.y == tall.imageMax.y &&
+                tall.uvMin.x == 0.f && tall.uvMin.y == 0.f && tall.uvMax.x == 1.f && tall.uvMax.y == 1.f,
+                "viewport letterbox", "the whole source is on screen, so clip equals image");
+            checks.expect(!LayoutViewportCanvas(viewport_fit::letterbox, {0,0}, {0,540}, {1920,1080}, {1,1}).valid,
+                "viewport letterbox", "a collapsed panel is rejected under both policies");
+            checks.expect(!LayoutViewportCanvas(viewport_fit::crop, {0,0}, {0,540}, {1920,1080}, {1,1}).valid &&
+                !LayoutViewportCanvas(viewport_fit::crop, {0,0}, {960,540}, {0,0}, {1,1}).valid &&
+                !LayoutViewportCanvas(viewport_fit::crop, {0,0}, {960,540}, {1920,1080}, {0,1}).valid,
+                "scene crop", "collapsed, pending and invalid framebuffer extents are rejected");
+        }
+
+        for (const float scale : {1.f, 1.25f, 1.5f, 2.f, 3.f})
+        for (const float width : {120.f, 240.f, 320.f, 480.f, 720.f, 1024.f, 1440.f})
+        for (const float height : {80.f, 180.f, 640.f})
+        {
+            const ImVec2 origin{-370.f, 195.f};
+            const ImVec2 max{origin.x + width * scale, origin.y + height * scale};
+            const auto r = LayoutSceneToolbar(origin, max, scale, 295.f * scale, 505.f * scale, 245.f * scale);
+            checks.expect(r.left.x >= origin.x && r.left.x + r.leftWidth <= max.x + 0.01f,
+                "scene toolbar", "left group is inside canvas");
+            checks.expect(r.right.x >= r.left.x + r.leftWidth && r.right.x + r.rightWidth <= max.x + 0.01f,
+                "scene toolbar", "right group does not overlap left controls");
+            checks.expect(!r.showGizmo || (r.gizmoCenter.x + r.radius <= max.x && r.gizmoCenter.y + r.radius <= max.y &&
+                r.gizmoCenter.y - r.radius >= r.left.y + r.height), "view gizmo", "disc fits below toolbar");
+        }
+        {
+            using namespace ImViewGuizmo;
+            const auto a = GizmoMath::angleAxis(0.63f, {0, 1, 0});
+            const auto b = GizmoMath::angleAxis(-0.28f, {1, 0, 0});
+            const math::vector3 v{0.2f, 0.4f, 0.8f};
+            checks.expect(math::length(GizmoMath::multiply_qv(GizmoMath::multiply_qq(a, b), v) -
+                math::rotate(math::rotate(v, b), a)) < 0.0001f, "view gizmo math", "quaternion composition order");
+            const auto r = GizmoMath::mat4_cast(a);
+            const math::vector4 v4{v.x, v.y, v.z, 0};
+            const auto transformed = GizmoMath::multiply_mv4(r, v4);
+            const auto rotated = math::rotate(v, a);
+            checks.expect(math::length(math::vector3{transformed.x, transformed.y, transformed.z} - rotated) < 0.0001f,
+                "view gizmo math", "matrix and quaternion rotation agree");
+            for (const math::vector3 direction : {math::vector3{1,0,0}, {-1,0,0}, {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}})
+            {
+                const math::vector3 up = std::fabs(direction.y) > 0.99f ? math::vector3{0,0,1} : math::vector3{0,1,0};
+                const auto q = GizmoMath::quatLookAt(direction, up);
+                checks.expect(math::length(math::rotate(math::vector3{0,0,1}, q) - direction) < 0.0001f,
+                    "view gizmo math", "all six view snaps use engine +Z forward");
+                const auto middle = math::slerp(math::quaternion{}, q, 0.5f);
+                checks.expect(std::isfinite(middle.w) && std::fabs(math::dot(middle, middle) - 1.f) < 0.0001f,
+                    "view gizmo math", "opposite snap interpolation stays finite and normalized");
+            }
+        }
+        {
+            SelectionHistory history;
+            const EntityHandle a{1,1,1}, b{1,2,1}, c{1,3,1}, replacement{1,2,2};
+            const auto allAlive = [](EntityHandle) { return true; };
+            checks.expect(!history.Move(-1, allAlive).IsValid(), "selection history", "empty history");
+            history.Observe(1,a); history.Observe(1,a); history.Observe(1,b); history.Observe(1,c);
+            checks.expect(history.Size()==3, "selection history", "same-frame observations are coalesced");
+            checks.expect(history.Move(-1,allAlive)==b && history.Move(-1,allAlive)==a,
+                "selection history", "backward order");
+            checks.expect(!history.Move(-1,allAlive).IsValid(), "selection history", "begin boundary");
+            checks.expect(history.Move(1,allAlive)==b, "selection history", "forward order");
+            history.Observe(1,replacement);
+            checks.expect(!history.Peek(1,allAlive).IsValid(), "selection history", "new selection discards forward branch");
+            const auto oldSlotDeleted = [b](EntityHandle handle) { return handle != b; };
+            checks.expect(history.Move(-1,oldSlotDeleted)==a, "selection history", "skip deleted slot generation");
+            checks.expect(history.Move(1,oldSlotDeleted)==replacement, "selection history", "replacement is distinct");
+            history.Observe(2,{2,1,1});
+            checks.expect(history.Size()==1 && !history.Peek(-1,allAlive).IsValid(),
+                "selection history", "scene replacement clears history");
+            for (uint32_t i=1;i<=200;++i) history.Observe(2,{2,i,1});
+            checks.expect(history.Size()==SelectionHistory::Capacity, "selection history", "bounded memory");
+            checks.expect(!history.Move(0,allAlive).IsValid(), "selection history", "invalid direction");
+            checks.expect(EntityIconIndex("unknown-preset")==0, "entity icon", "unknown ID falls back");
+            for (size_t i=0;i<EntityIconPresets.size();++i)
+                checks.expect(EntityIconIndex(EntityIconPresets[i].id)==i, "entity icon", "unique stable IDs");
+        }
         report += "[";
         report += checks.failed == 0 ? "OK" : "FAIL";
         report += "] editor theme contracts: " + std::to_string(checks.checked) +

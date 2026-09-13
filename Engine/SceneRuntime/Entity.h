@@ -33,6 +33,8 @@ class Entity : public Object
             meta::field<&Self::m_prefabOverrides>,
             meta::field<&Self::m_tag>,
             meta::field<&Self::m_layer>,
+            meta::field<&Self::m_editorIcon>.with(meta::hidden()),
+            meta::field<&Self::m_editorLocked>.with(meta::hidden()),
             meta::field<&Self::m_components>,
             meta::field<&Self::m_isStatic>);
     }
@@ -302,6 +304,10 @@ public:
 public:
     HashingString m_tag{ "Untagged" };
     HashingString m_layer{ "Default" };
+    // Authoring presentation only. Stable preset ID; empty keeps the default.
+    // Stored with the entity so scene/prefab round trips and duplication retain it.
+    std::string m_editorIcon{};
+    bool m_editorLocked{ false }; // Authoring lock; runtime simulation ignores it.
 
 	// K2: m_componentIds(unordered_map<HashedGuid,size_t>) 소멸 — 이중 구조의
 	// 절반이었다. 정본은 m_components 하나, 타입 조회는 FindComponentSlot(마스크

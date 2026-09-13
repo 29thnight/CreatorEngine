@@ -1,6 +1,22 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClCompile Include="EngineGUIWindow\EditorWorkspaceStore.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+
+    <ClInclude Include="EngineGUIWindow\EditorWorkspaceStore.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+
+    <ClCompile Include="EngineGUIWindow\EditorWorkspaceFile.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+
+    <ClInclude Include="EngineGUIWindow\EditorWorkspaceFile.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+
     <Filter Include="EditorWindow\Windows">
       <UniqueIdentifier>{2b90ce17-45da-4f3a-9c6e-8d114a7be602}</UniqueIdentifier>
     </Filter>
@@ -78,6 +94,12 @@
     <ClInclude Include="EngineEntry\EditorObjectOperations.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\EditorScriptAuthoring.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\EditorComponentCatalog.h">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="EngineEntry\EditorProjectOperations.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
@@ -147,6 +169,8 @@
     <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\EditorEntityIcons.h"><Filter>EditorRuntime\Runtime</Filter></ClInclude>
+    <ClInclude Include="EngineEntry\EditorSelectionHistory.h"><Filter>EditorRuntime\Runtime</Filter></ClInclude>
     <ClInclude Include="EngineEntry\EditorSessionState.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
@@ -300,6 +324,12 @@
     <ClInclude Include="EngineGUIWindow\EditorFontResources.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorIconAlignment.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorTextFallback.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\EditorTheme.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
@@ -354,6 +384,9 @@
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\OutputLogText.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
@@ -369,11 +402,23 @@
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SceneViewportOverlay.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorViewportCanvas.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\BlueprintBuilder.h">
       <Filter>ImGuiHelper\소스 파일\Blueprint</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorIcons.h">
+      <Filter>ImGuiHelper</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\EditorSectionHeader.h">
       <Filter>ImGuiHelper\소스 파일\CollapsingHeader</Filter>
@@ -381,17 +426,11 @@
     <ClInclude Include="ImGuiHelper\drawing.h">
       <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
     </ClInclude>
-    <ClInclude Include="ImGuiHelper\fa.h">
-      <Filter>ImGuiHelper\소스 파일\fonts</Filter>
-    </ClInclude>
     <ClInclude Include="ImGuiHelper\GlobalImGuiContext.h">
       <Filter>ImGuiHelper\소스 파일\ImGuiHeader</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\HorizontalLayout.h">
       <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\IconsFontAwesome6.h">
-      <Filter>ImGuiHelper\소스 파일\fonts</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiHelper\ImGui.h">
       <Filter>ImGuiHelper\소스 파일\ImGuiHeader</Filter>
@@ -423,6 +462,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineEntry\EditorObjectOperations.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\EditorScriptAuthoring.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\EditorProjectOperations.cpp">
@@ -533,6 +575,9 @@
     <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
     <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
@@ -564,6 +609,9 @@
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\SceneViewportOverlay.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\BlueprintBuilder.cpp">
