@@ -28,7 +28,10 @@
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
+#include "EditorPlayModeController.h"
 #include "EditorSessionState.h"
+#include "ViewportHostWindow.h"
+#include "InputManager.h"
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
@@ -1068,10 +1071,18 @@ namespace ConsoleCmd
         const bool        pending     = SceneManagers->HasPendingSceneStructureChange();
         const std::size_t entities    = scene ? scene->m_Entities.size() : 0u;
 
+        // W5: 확정·상태 머신·입력 소유자·표시 타깃까지 낸다. 앞의 다섯 필드와
+        // 그 순서는 verify-play-roundtrip.ps1 이 정규식으로 읽으므로 그대로 두고
+        // 뒤에 덧붙인다.
+        const Editor::PlayModeStatus status = Editor::PlayModeController::Status();
         std::printf("[play.state] gameStart=%d paused=%d editorSceneLoaded=%d "
-            "pending=%d entities=%zu\n",
+            "pending=%d entities=%zu committed=%d state=%s owner=%s target=%s "
+            "foreground=%d failures=%u\n",
             gameStart ? 1 : 0, paused ? 1 : 0, editorReady ? 1 : 0,
-            pending ? 1 : 0, entities);
+            pending ? 1 : 0, entities, status.committed ? 1 : 0,
+            Editor::PlayStateName(status.state), Editor::InputOwnerName(status.owner),
+            status.viewportGame ? "game" : "scene", status.foreground ? 1 : 0,
+            static_cast<unsigned>(status.failureCount));
 
         CommandCore::CommandData data = CommandCore::CommandData::Object();
         data.Set("gameStart",         CommandCore::CommandData::Bool(gameStart));
@@ -1079,7 +1090,108 @@ namespace ConsoleCmd
         data.Set("editorSceneLoaded", CommandCore::CommandData::Bool(editorReady));
         data.Set("pending",           CommandCore::CommandData::Bool(pending));
         data.Set("entities",          CommandCore::CommandData::Int(static_cast<int64_t>(entities)));
+        data.Set("committed",         CommandCore::CommandData::Bool(status.committed));
+        data.Set("state",             CommandCore::CommandData::String(Editor::PlayStateName(status.state)));
+        data.Set("inputOwner",        CommandCore::CommandData::String(Editor::InputOwnerName(status.owner)));
+        data.Set("viewportTarget",    CommandCore::CommandData::String(status.viewportGame ? "game" : "scene"));
+        data.Set("gameTargetReady",   CommandCore::CommandData::Bool(status.gameTargetReady));
+        data.Set("foreground",        CommandCore::CommandData::Bool(status.foreground));
+        data.Set("foregroundOverride", CommandCore::CommandData::Int(status.foregroundOverride));
+        data.Set("uiTextInput",       CommandCore::CommandData::Bool(status.uiTextInput));
+        data.Set("cursorHidden",      CommandCore::CommandData::Bool(status.cursorHidden));
+        data.Set("cursorHideRequested", CommandCore::CommandData::Bool(status.cursorHideRequested));
+        data.Set("failureCount",      CommandCore::CommandData::Int(static_cast<int64_t>(status.failureCount)));
+        data.Set("lastFailure",       CommandCore::CommandData::String(status.lastFailure));
+        data.Set("controllerTicks",   CommandCore::CommandData::Int(static_cast<int64_t>(status.ticks)));
         return CommandCore::Ok("play state", std::move(data));
+    }
+
+    // ── W5 재생 상태 머신 조작 ──
+    //
+    // pause/resume · eject/possess 는 GUI 가 하는 것과 같은 요청이다 — 일시정지는
+    // SceneManager 의 값, eject/possess 는 Host 의 표시 모드다. 컨트롤러가 그 둘을
+    // 관찰해 상태를 유도하므로 여기서 상태를 직접 쓰지 않는다.
+
+    static CommandCore::CommandResult Cmd_play_pause(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("play.pause | play.resume takes no arguments");
+        if (!SceneManagers->IsPlayCommitted())
+            return PreconditionFailed("play.not_committed", "Play is not committed; nothing to pause");
+        const bool pause = ctx.cmd == "play.pause";
+        SceneManagers->SetGamePaused(pause);
+        auto data = CommandData::Object();
+        data.Set("paused", CommandData::Bool(SceneManagers->IsGamePaused()));
+        return Ok(pause ? "paused" : "resumed", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_play_possess(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("play.possess | play.eject takes no arguments");
+        if (!SceneManagers->IsPlayCommitted())
+            return PreconditionFailed("play.not_committed", "Play is not committed; there is nothing to possess or eject from");
+        const bool possess = ctx.cmd == "play.possess";
+        ::editor::windows::request_viewport_mode(possess
+            ? ::editor::windows::viewport_mode::game : ::editor::windows::viewport_mode::scene);
+        auto data = CommandData::Object();
+        data.Set("requestedTarget", CommandData::String(possess ? "game" : "scene"));
+        return Ok("Viewport target change requested; the controller follows it next frame", std::move(data));
+    }
+
+    // 검증 손잡이 셋. 게이트가 실패 경로·전경 조건·커서 정책을 재는 데 쓴다 —
+    // 살아 있는 에디터에서 그 셋을 자연스럽게 만들 손이 없기 때문이다(주입 이유는
+    // SceneManager::InjectPlaySnapshotFailure 의 주석).
+
+    static CommandCore::CommandResult Cmd_play_inject_snapshot_failure(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2) return InvalidArguments("play.inject_snapshot_failure [count=1]");
+        std::uint32_t count = 1;
+        if (2 == ctx.parts.size())
+        {
+            std::size_t consumed = 0;
+            long long parsed = 0;
+            try { parsed = std::stoll(ctx.parts[1], &consumed); }
+            catch (const std::exception&) { consumed = 0; }
+            if (0 == consumed || consumed != ctx.parts[1].size() || parsed < 0 || parsed > 1000)
+                return InvalidArguments("play.inject_snapshot_failure [count=1] — count must be 0..1000");
+            count = static_cast<std::uint32_t>(parsed);
+        }
+        SceneManagers->InjectPlaySnapshotFailure(count);
+        auto data = CommandData::Object();
+        data.Set("count", CommandData::Int(static_cast<int64_t>(count)));
+        return Ok("Next play transactions will fail at the snapshot", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_play_foreground_override(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2) return InvalidArguments("play.foreground_override auto|on|off");
+        const std::string& mode = ctx.parts[1];
+        int value = -1;
+        if ("on" == mode) value = 1;
+        else if ("off" == mode) value = 0;
+        else if ("auto" != mode) return InvalidArguments("play.foreground_override auto|on|off");
+        Editor::PlayModeController::SetForegroundOverride(value);
+        auto data = CommandData::Object();
+        data.Set("foregroundOverride", CommandData::Int(value));
+        return Ok("foreground override set; the controller applies it next tick", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_play_cursor(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2) return InvalidArguments("play.cursor hide|show");
+        // 스크립트의 Api_Input_SetCursorVisible 과 같은 경로다 — 의사는 남고
+        // 적용은 소유권이 정한다(InputManager.cpp).
+        if ("hide" == ctx.parts[1]) InputManagement->HideCursor();
+        else if ("show" == ctx.parts[1]) InputManagement->ShowCursor();
+        else return InvalidArguments("play.cursor hide|show");
+        auto data = CommandData::Object();
+        data.Set("cursorHidden", CommandData::Bool(InputManagement->IsCursorHidden()));
+        data.Set("cursorHideRequested", CommandData::Bool(InputManagement->IsCursorHideRequested()));
+        return Ok("cursor request applied through the ownership gate", std::move(data));
     }
 
     // ── 파이프라인 구성 프로브 (E4 게이트용) ──
@@ -1251,6 +1363,11 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "prefab.create" }, &Cmd_prefab_create);
         reg.Result({ "play", "stop" }, &Cmd_play);
         reg.Result({ "play.state" }, &Cmd_play_state);
+        reg.Result({ "play.pause", "play.resume" }, &Cmd_play_pause);
+        reg.Result({ "play.possess", "play.eject" }, &Cmd_play_possess);
+        reg.Result({ "play.inject_snapshot_failure" }, &Cmd_play_inject_snapshot_failure);
+        reg.Result({ "play.foreground_override" }, &Cmd_play_foreground_override);
+        reg.Result({ "play.cursor" }, &Cmd_play_cursor);
         reg.Result({ "undo.state" }, &Cmd_undo_state);
         reg.Result({ "undo", "redo" }, &Cmd_undo_redo);
         reg.Result({ "scene.selection" }, &Cmd_scene_selection);

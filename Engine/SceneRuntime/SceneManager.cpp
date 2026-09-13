@@ -349,12 +349,24 @@ void SceneManager::ApplyPendingSceneStructureChange()
         auto activeScenePtr = m_activeScene.load();
         if (!activeScenePtr) return;
         PROFILE_CPU_BEGIN("BeginPlayTransaction");
-        BeginPlayTransaction();
+        const bool committed = BeginPlayTransaction();
         PROFILE_CPU_END();
+        if (!committed)
+        {
+            // 요청을 되돌린다(W5 선행 1). 예전에는 스냅샷이 실패해도 여기까지
+            // 내려와 m_isEditorSceneLoaded 를 세웠고, 그러면 "재생 중" 인데
+            // 되돌릴 백업이 없는 상태가 됐다 — 정지가 편집 씬을 잃는 자리다.
+            // SetGameStart(false) 는 pause 와 CLR 지연 모드까지 함께 내린다.
+            SetGameStart(false);
+            return;
+        }
         PROFILE_CPU_BEGIN("Reset");
         activeScenePtr->Reset();
         PROFILE_CPU_END();
 		m_isEditorSceneLoaded = true;
+        // 확정은 맨 끝이다. 이 줄이 참이면 위의 전부가 끝났다는 뜻이라야
+        // 읽는 쪽이 하나만 보고 판단할 수 있다.
+        m_isPlayCommitted = true;
     }
     else if (!m_isGameStart && m_isEditorSceneLoaded)
     {
@@ -1384,6 +1396,16 @@ bool SceneManager::CaptureSceneSnapshot()
         return false;
     }
 
+    if (m_injectedSnapshotFailures > 0)
+    {
+        // 검증용 주입(선언부 주석 참고). 실제 실패와 같은 자리에서 같은 모양으로
+        // 빠진다 — 백업을 비우고 거부를 로그에 남긴다.
+        --m_injectedSnapshotFailures;
+        Debug->LogError("[PIE] 주입된 스냅샷 실패 — 재생에 들어가지 않는다");
+        DiscardSceneSnapshot();
+        return false;
+    }
+
     try
     {
         PROFILE_CPU_BEGIN("Serialize");
@@ -1515,7 +1537,7 @@ void SceneManager::SetSimulationPhase(ScenePhase phase)
     }
 }
 
-void SceneManager::BeginPlayTransaction()
+bool SceneManager::BeginPlayTransaction()
 {
     // 재생 시작. 씬을 복제하지 않고 지금 씬을 그대로 플레이한다.
     //
@@ -1530,38 +1552,57 @@ void SceneManager::BeginPlayTransaction()
     // 반복될 여지가 사라진다. (언리얼은 반대로 PIE 월드를 복제하되 월드마다
     // FScene을 따로 두는 쪽이다. 어느 한쪽을 온전히 따라야 하고, 지금 구조는
     // 렌더 씬이 하나이므로 이쪽이 맞다.)
+    // ★ 순서가 계약이다(PHASE 21 W5 선행 1): **스냅샷 → phase → 통지.**
+    //
+    //   예전에는 통지가 맨 앞이었다. 그러면 구독자(EditorPlayModeController)가
+    //   Undo 스택을 비우고 게임 모드로 바꾼 **뒤에야** 스냅샷이 실패했고, 실패한
+    //   전이가 편집 이력을 먼저 죽였다. 통지는 "들어갔다" 의 뜻이라야 하므로
+    //   들어간 뒤에 던진다. Player 는 구독자가 없어 순서가 보이지 않는다.
     try
     {
-        // Editor 정책을 걸 자리. 예전에는 여기서 Undo 스택을 직접 비웠는데, 이
-        // 함수는 Player도 타므로(Player의 유일한 재생 진입 경로다) 출하 게임이
-        // 매번 Undo를 비우고 있었다. 지금은 통지만 하고, EditorPlayModeController가
-        // 구독해 그 일을 한다. Player는 구독자가 없어 아무 일도 일어나지 않는다.
-        PROFILE_CPU_BEGIN("PlayModeEvent(enter)");
-        PlayModeEvent.Broadcast(true);
-        PROFILE_CPU_END();
-
         // 직렬화가 실패하면 phase를 올리지 않는다 — 되돌릴 기준이 없는 채로
-        // 재생에 들어가면 정지할 때 씬을 잃는다.
+        // 재생에 들어가면 정지할 때 씬을 잃는다. 호출자가 요청을 되돌린다.
         if (!CaptureSceneSnapshot())
         {
-            return;
+            NotePlayFailure("scene snapshot was not captured");
+            return false;
         }
         resourceTrimEvent.Broadcast();
     }
     catch (const std::exception& e)
     {
         Debug->LogError(e.what());
-        return;
+        NotePlayFailure(e.what());
+        return false;
     }
 
     // Simulating 전이(SceneGraphRedesignPlan §4 트랙 L1) — 씬을 복제하지 않으므로
     // 이 시점의 오브젝트 전원이 곧 플레이 인스턴스다.
     SetSimulationPhase(ScenePhase::Simulating);
+
+    // Editor 정책을 걸 자리. 예전에는 여기서 Undo 스택을 직접 비웠는데, 이
+    // 함수는 Player도 타므로(Player의 유일한 재생 진입 경로다) 출하 게임이
+    // 매번 Undo를 비우고 있었다. 지금은 통지만 하고, EditorPlayModeController가
+    // 구독해 그 일을 한다. Player는 구독자가 없어 아무 일도 일어나지 않는다.
+    PROFILE_CPU_BEGIN("PlayModeEvent(enter)");
+    PlayModeEvent.Broadcast(true);
+    PROFILE_CPU_END();
+    return true;
+}
+
+void SceneManager::NotePlayFailure(std::string reason)
+{
+    m_lastPlayFailure = std::move(reason);
+    ++m_playFailureCount;
 }
 
 void SceneManager::EndPlayTransaction()
 {
     // 재생 정지. 같은 Scene 객체를 비우고 백업으로 되채운다.
+    //
+    // 확정은 맨 앞에서 내린다 — 아래의 어느 조기 반환도 "아직 재생 중" 을
+    // 남기면 안 된다. 진입이 확정을 맨 끝에 세우는 것과 대칭이다.
+    m_isPlayCommitted = false;
     Scene* scene = m_activeScene.load();
     if (nullptr == scene)
     {

@@ -7,16 +7,18 @@
 # 검사가 없었다 — verify-play-roundtrip.ps1도 씬 내용만 본다. 옮기기 전에
 # "지금 동작"을 못 박아야 옮긴 뒤에 "동작이 같다"를 주장할 수 있다.
 #
-# ⚠ 계획서의 판정 문구를 그대로 따르지 않는다
-# ─────────────────────────────────────────
-# 계획서는 "재생 후 selection이 **복원된다**"고 적었지만 코드는 복원하지 않는다.
-# EndPlayTransaction이 resetSelectedObjectEvent를 던지고, 그 유일한 구독자인
-# Scene::ResetSelectedEntity가 포인터를 널로 만들 뿐이다(해제). 애초에 선택은
-# 씬 YAML에 실리지 않아 스냅샷에 담기지도 않으므로 복원될 경로 자체가 없다.
-# 선택이 Entity* 원시 포인터인데 정지가 엔티티를 전부 파괴하는 것을 생각하면
-# 해제가 안전한 동작이고, "복원"은 리팩터가 아니라 기능이다.
+# ⚠ 판정 D 는 두 번 바뀌었다
+# ────────────────────────
+# 처음에는 계획서가 "재생 후 selection이 **복원된다**"고 적었는데 코드는 해제만
+# 했다 — EndPlayTransaction이 resetSelectedObjectEvent를 던지고 그 유일한 구독자인
+# Scene::ResetSelectedEntity가 포인터를 널로 만들 뿐이었다. 선택은 씬 YAML에
+# 실리지 않아 스냅샷에도 없었고, "복원"은 리팩터가 아니라 기능이라 이 게이트는
+# 그때 참인 **해제**를 단정했다.
 #
-# 그래서 이 게이트는 **해제**를 단정한다. 이것이 지금 참인 것이다.
+# PHASE 21 W5 가 그 기능을 만들었다. 해제(안전장치)는 그대로 Core 에 남고, Editor 의
+# PlayModeController 가 재생 전 선택을 instanceID 로 기억했다가 Stopped 에 닿는
+# 프레임에 되찾는다 — 백업 YAML 이 m_instanceID 를 싣고 복원이 그것을 그대로
+# 쓰므로 논리 신원이 살아 있다. 그래서 이제 **복원**을 단정한다.
 #
 # ⚠ 편집 스택과 게임 스택을 따로 본다
 # ──────────────────────────────────
@@ -40,6 +42,13 @@ if ([string]::IsNullOrWhiteSpace($Work)) {
     $Work = Join-Path ([IO.Path]::GetTempPath()) ("CE_SelUndo_" + [guid]::NewGuid().ToString("N"))
 }
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
+
+# workspace 격리 — 개발자의 active.workspace 를 빌리지 않는다(verify-play-roundtrip.ps1 의 ★).
+$priorWorkspaceDir = $env:CREATOR_EDITOR_WORKSPACE_DIR
+$priorLegacyIni = $env:CREATOR_EDITOR_LEGACY_INI
+$env:CREATOR_EDITOR_WORKSPACE_DIR = (Join-Path $Work "workspace")
+$env:CREATOR_EDITOR_LEGACY_INI = (Join-Path $Work "workspace\legacy.ini")
+New-Item -ItemType Directory -Force -Path $env:CREATOR_EDITOR_WORKSPACE_DIR | Out-Null
 
 try {
     $commandFile = Join-Path $Work "commands.txt"
@@ -190,14 +199,15 @@ try {
     }
     $gameModeNote = "gamemode=play(1)/stop(0)"
 
-    # ── 판정 D: 정지는 선택을 해제한다 (복원이 아니다) ──
-    if ($selRestored.Primary -ne "(none)") {
-        throw ("stop did not clear the selection: primary='$($selRestored.Primary)' — " +
-            "resetSelectedObjectEvent must fire before AllDestroyMark, otherwise the " +
-            "selection points at a destroyed entity")
+    # ── 판정 D: 정지는 선택을 **복원**한다 (W5) ──
+    # 안전장치의 해제는 그대로 돈다(빼면 ACCESS_VIOLATION, 헤더 주석). 그 뒤에
+    # 컨트롤러가 되찾은 것이 재생 전 선택과 같아야 한다.
+    if ($selRestored.Primary -ne $selectTarget) {
+        throw ("stop did not restore the selection: expected '$selectTarget' got '$($selRestored.Primary)' — " +
+            "PlayModeController::RestorePrior did not run or the instanceID did not survive the backup")
     }
-    if ($selRestored.Multi -ne 0) {
-        throw "stop did not clear the multi-selection: multi=$($selRestored.Multi)"
+    if ($selRestored.Multi -ne 1) {
+        throw "stop did not restore the multi-selection: multi=$($selRestored.Multi) (expected 1)"
     }
 
     # ── 판정 E: 정지 후에도 편집 이력은 돌아오지 않는다 ──
@@ -207,11 +217,13 @@ try {
             "editUndo=$($undoStop.EditUndo)")
     }
 
-    ("play selection/undo: PASS (select=cleared-on-stop, editUndo={0}->0 on play, " +
+    ("play selection/undo: PASS (select=restored-on-stop, editUndo={0}->0 on play, " +
         "gameStack={1}/{2}, {3})") -f `
         $undoPushed.EditUndo, $undoPlaying.GameUndo, $undoPlaying.GameRedo, $gameModeNote
 }
 finally {
+    $env:CREATOR_EDITOR_WORKSPACE_DIR = $priorWorkspaceDir
+    $env:CREATOR_EDITOR_LEGACY_INI = $priorLegacyIni
     if (Test-Path -LiteralPath $Work) {
         $verified = [IO.Path]::GetFullPath($Work)
         $tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())

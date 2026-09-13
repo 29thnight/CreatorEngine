@@ -126,7 +126,13 @@ namespace
             m_renderer->NewFrame();
 
             ImGui_ImplWin32_NewFrame();
-            io.WantCaptureKeyboard = io.WantCaptureMouse = io.WantTextInput = true;
+            // `WantCapture*`/`WantTextInput` 을 여기서 true 로 덮어쓰던 줄이 있었다
+            // (PHASE 21 W5 선행 2 에서 걷음). 그 셋은 ImGui 가 **출력**하는 값이고
+            // 바로 아래 `ImGui::NewFrame` 이 무조건 다시 계산하므로 대입은 죽은
+            // 줄이었다 — 걷기 전후로 게시본(`editor.viewport`)이 같은 값을 냈다
+            // (mouse=false · keyboard=true(NavActive) · text=false). 계획서 §1.8 은
+            // 이 줄이 입력 소유 신호를 지운다고 봤는데, 지운 것이 아니라 아무
+            // 일도 하지 않고 있었다. 신호를 읽는 자리는 ViewportHost 의 게시본이다.
             io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
             io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports |

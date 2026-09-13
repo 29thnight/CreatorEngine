@@ -52,8 +52,31 @@ namespace editor::windows
         std::uint64_t suppressedGameViews{};
         std::uint64_t suppressedEditorViews{};
         bool hostPresent{};                ///< Host 본문이 한 번이라도 돌았는가
+
+        // ── UI 입력 상태 (PHASE 21 W5 선행 2 · 계획서 §1.8) ──
+        //
+        // ImGui 가 **출력**하는 값이다 — "이번 프레임 UI 가 마우스/키보드/글자를
+        // 가져갔는가". 게임 스레드의 PlayModeController 가 입력 소유자를 정할 때
+        // 읽고, `editor.viewport` 가 밖으로 낸다. 옛 `ImGuiHost::BeginFrame` 은
+        // 이 셋을 프레임마다 true 로 덮어썼는데, 그 대입은 `ImGui::NewFrame` 이
+        // 곧바로 다시 계산하므로 **죽은 줄**이었다 — 게시본이 프레임마다 다른
+        // 값을 보이는 것이 그 증명이다(W5 착지 기록).
+        bool uiWantCaptureMouse{};
+        bool uiWantCaptureKeyboard{};
+        bool uiWantTextInput{};
+        bool hostFocused{};                ///< Host 창(자식 포함)이 ImGui 포커스인가
+        bool hostHovered{};
+        /// 게임 캔버스(Host Game 모드 · Game Preview)가 클릭된 누계. possess 요청.
+        std::uint64_t gameCanvasClicks{};
     };
     viewport_demand read_viewport_demand();
+
+    /// 다음 프레임에 Host 창에 ImGui 포커스를 준다. Stop 이 재생 전 포커스를
+    /// 되돌릴 때 게임 스레드가 부른다(요청함, 잠금 아래).
+    void request_viewport_focus();
+
+    /// 게임 캔버스가 클릭됐다. UI 스레드가 부른다.
+    void note_game_canvas_clicked();
 
     /// 프레임 끝에 한 번. 이번 프레임에 실제로 돈 본문을 수요로 굳힌다.
     void publish_viewport_demand();

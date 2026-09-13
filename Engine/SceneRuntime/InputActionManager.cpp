@@ -13,6 +13,8 @@ InputActionManager* InputActionManagers = nullptr;
 void InputActionManager::Update(float tick)
 {
 	if (SceneManagers->m_isGameStart == false) return;
+	// 게임이 입력의 주인이 아닌 프레임에는 액션을 평가하지 않는다(W5 관문).
+	if (!InputManagement->IsGameInputOwned()) return;
 	if (!m_actionMaps.empty())
 	{
 		for (auto& actionMap : m_actionMaps)

@@ -407,6 +407,8 @@ void UIManager::CheckInput()
 	}
 
 	Canvas* curCanvas = curCanvasObj->GetComponent<Canvas>();
+	// 게임 UI 는 게임 입력이다 — 소유가 아니면 클릭도 패드 탐색도 받지 않는다(W5 관문).
+	if (!InputManagement->IsGameInputOwned()) return;
 	if (InputManagement->IsMouseButtonReleased(MouseKey::LEFT))
 	{
 		Scene* scene = curCanvasObj->GetScene();

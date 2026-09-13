@@ -23,6 +23,7 @@
 #include "CommandRegistrar.h"
 #include "EditorWorkspaceStore.h"
 #include "ViewportHostWindow.h"
+#include "EditorPlayModeController.h"
 #include "EditorWindowHost.h"       // PHASE 21 M4: editor.windows 덤프
 #include "EditorWindowAudit.h"
 #include "EditorWindowSelfTest.h"
@@ -925,6 +926,19 @@ namespace ConsoleCmd
         data.Set("gamePreviewFrames", CommandData::Int(static_cast<int64_t>(demand.gamePreviewFrames)));
         data.Set("suppressedGameViews", CommandData::Int(static_cast<int64_t>(demand.suppressedGameViews)));
         data.Set("suppressedEditorViews", CommandData::Int(static_cast<int64_t>(demand.suppressedEditorViews)));
+        // W5(계획서 §1.9): 이 커맨드가 실어야 할 값 셋 중 둘 — committed 와 input
+        // owner — 이 이제 있다. 둘 다 컨트롤러가 유도한 값이고 UI 입력 상태는 Host
+        // 게시본이다.
+        const Editor::PlayModeStatus play = Editor::PlayModeController::Status();
+        data.Set("playState", CommandData::String(Editor::PlayStateName(play.state)));
+        data.Set("playCommitted", CommandData::Bool(play.committed));
+        data.Set("inputOwner", CommandData::String(Editor::InputOwnerName(play.owner)));
+        data.Set("uiWantCaptureMouse", CommandData::Bool(demand.uiWantCaptureMouse));
+        data.Set("uiWantCaptureKeyboard", CommandData::Bool(demand.uiWantCaptureKeyboard));
+        data.Set("uiWantTextInput", CommandData::Bool(demand.uiWantTextInput));
+        data.Set("hostFocused", CommandData::Bool(demand.hostFocused));
+        data.Set("hostHovered", CommandData::Bool(demand.hostHovered));
+        data.Set("gameCanvasClicks", CommandData::Int(static_cast<int64_t>(demand.gameCanvasClicks)));
         if (!demand.hostPresent)
         {
             return Fail("editor.viewport.no_host",

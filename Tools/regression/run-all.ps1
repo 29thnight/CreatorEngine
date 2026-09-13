@@ -851,15 +851,18 @@ Run-Step "Editor asset-presentation 소유권" {
 # E3-0: 재생 왕복 구조 대조. E3는 play-mode 소유권을 SceneManager에서 Editor로
 # 옮기는데, 그 전까지 이 세트에는 재생 왕복이 씬을 보존하는지 재는 검사가 없었다.
 # 옮기기 전에 "지금 동작"을 못 박아야 옮긴 뒤 "동작이 같다"를 주장할 수 있다.
-Run-Step "재생 왕복 구조" {
+#
+# PHASE 21 W5 가 두 번째 실행을 얹었다 — committed 신호·상태 머신·입력 소유자·
+# 커서 정책·스냅샷 실패 주입(요청이 되돌아오고 Undo 이력이 산다). 총 2 launches.
+Run-Step "재생 왕복 구조 · W5 상태 머신" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-play-roundtrip.ps1") -Exe $Exe
 }
 
 # 같은 왕복의 다른 관심사. E3-2+3이 play-mode transaction을 EditorPlayModeController로
 # 옮기고 Undo를 SceneManager에서 들어내는데, 그 전까지 세트에는 selection/undo를
-# 구동·단정하는 검사가 0건이었다. 계획서 문구는 "selection이 복원된다"지만 코드는
-# 해제할 뿐이라, 이 게이트는 실측대로 해제를 단정한다(스크립트 머리말 참고).
+# 구동·단정하는 검사가 0건이었다. 해제만 하던 때는 해제를 단정했고, W5 가 복원을
+# 만든 뒤로는 **복원**을 단정한다(스크립트 머리말 참고).
 Run-Step "재생 선택·Undo" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-play-selection-undo.ps1") -Exe $Exe

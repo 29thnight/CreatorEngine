@@ -62,6 +62,19 @@ public:
 	void ResetMouseDelta();
 	int16 GetWheelDelta() const;
 
+	// -- Game input ownership gate (PHASE 21 W5, see InputManager.cpp) --
+	// Written only by the Editor play-mode controller; the Player never calls it,
+	// so the default (owned) keeps shipped input untouched. Only *game* consumers
+	// consult it (ActionMap, UIManager, C# Api_Input_*); editor shortcuts and the
+	// scene camera keep reading the raw device state.
+	void SetGameInputOwned(bool owned);
+	bool IsGameInputOwned() const noexcept { return m_gameInputOwned; }
+	// The game asked to hide the cursor (intent, independent of ownership).
+	bool IsCursorHideRequested() const noexcept { return m_wantCursorHidden; }
+	// The OS cursor is actually hidden right now.
+	bool IsCursorHidden() const noexcept { return m_isCursorHidden; }
+	HWND WindowHandle() const noexcept { return hwnd; }
+
 public:
 	//이 아래는 패드 컨트롤러
 	void PadUpdate();
@@ -110,6 +123,9 @@ private:
 	int16							m_prevMouseWheelDelta{};
 	//커서 숨기기
 	bool							m_isCursorHidden{ false };
+	bool							m_wantCursorHidden{ false };
+	bool							m_gameInputOwned{ true };
+	void ApplyCursorHidden(bool hidden);
 
 public:
 	GameInputGamepadState			m_GameInputPadState[MAX_CONTROLLER]{};

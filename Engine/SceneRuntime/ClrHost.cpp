@@ -1532,15 +1532,25 @@ namespace
 	// Pressed가 첫 프레임을 포함하지 않는 것이 함정이라, 상태를 그대로 넘겨
 	// "눌려 있는가"를 C#에서 Down|Pressed로 정확히 조합하게 한다.
 
+	// 스크립트는 게임 소비처다 — 소유가 아닌 프레임에는 장치가 조용한 것처럼
+	// 보인다(W5 관문, InputManager.h). 위치는 그대로 준다: 위치는 상태가 아니라
+	// 사실이고, 그것으로 무엇을 할지는 버튼 상태가 정한다.
+	static bool GameInputOwned()
+	{
+		return InputManagement->IsGameInputOwned();
+	}
+
 	int __stdcall Api_Input_GetKeyState(int key)
 	{
 		if (key < 0 || key >= KEYBOARD_COUNT) return static_cast<int>(KeyState::Idle);
+		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
 		return static_cast<int>(InputManagement->m_keyboardState.GetKeyState(static_cast<size_t>(key)));
 	}
 
 	int __stdcall Api_Input_GetMouseButtonState(int button)
 	{
 		if (button < 0 || button >= static_cast<int>(MouseKey::MAX)) return static_cast<int>(KeyState::Idle);
+		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
 
 		// 마우스 상태는 private이라 술어 셋으로 되짚는다.
 		const MouseKey key = static_cast<MouseKey>(button);
@@ -1560,6 +1570,7 @@ namespace
 		const DWORD pad = static_cast<DWORD>(index);
 		const ControllerButton btn = static_cast<ControllerButton>(button);
 
+		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
 		if (InputManagement->IsControllerButtonDown(pad, btn))     return static_cast<int>(KeyState::Down);
 		if (InputManagement->IsControllerButtonPressed(pad, btn))  return static_cast<int>(KeyState::Pressed);
 		if (InputManagement->IsControllerButtonReleased(pad, btn)) return static_cast<int>(KeyState::Released);
@@ -1568,6 +1579,7 @@ namespace
 
 	int __stdcall Api_Input_IsAnyKeyPressed()
 	{
+		if (!GameInputOwned()) return 0;
 		return InputManagement->IsAnyKeyPressed() ? 1 : 0;
 	}
 
@@ -1579,12 +1591,14 @@ namespace
 
 	Float2 __stdcall Api_Input_GetMouseDelta()
 	{
+		if (!GameInputOwned()) return {};
 		const auto d = InputManagement->GetMouseDelta();
 		return { d.x, d.y };
 	}
 
 	int __stdcall Api_Input_GetWheelDelta()
 	{
+		if (!GameInputOwned()) return 0;
 		return static_cast<int>(InputManagement->GetWheelDelta());
 	}
 
@@ -1602,26 +1616,26 @@ namespace
 
 	int __stdcall Api_Input_IsControllerTriggerL(int index)
 	{
-		if (index < 0) return 0;
+		if (index < 0 || !GameInputOwned()) return 0;
 		return InputManagement->IsControllerTriggerL(static_cast<DWORD>(index)) ? 1 : 0;
 	}
 
 	int __stdcall Api_Input_IsControllerTriggerR(int index)
 	{
-		if (index < 0) return 0;
+		if (index < 0 || !GameInputOwned()) return 0;
 		return InputManagement->IsControllerTriggerR(static_cast<DWORD>(index)) ? 1 : 0;
 	}
 
 	Float2 __stdcall Api_Input_GetControllerThumbL(int index)
 	{
-		if (index < 0) return {};
+		if (index < 0 || !GameInputOwned()) return {};
 		const auto v = InputManagement->GetControllerThumbL(static_cast<DWORD>(index));
 		return { v.x, v.y };
 	}
 
 	Float2 __stdcall Api_Input_GetControllerThumbR(int index)
 	{
-		if (index < 0) return {};
+		if (index < 0 || !GameInputOwned()) return {};
 		const auto v = InputManagement->GetControllerThumbR(static_cast<DWORD>(index));
 		return { v.x, v.y };
 	}

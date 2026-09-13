@@ -116,7 +116,14 @@ namespace CommandCore
             { "pipeline.nodes", CommandCost::Immediate, "", "라이브 파이프라인의 노드 조립 결과를 한 줄씩 낸다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "pix.capture", CommandCost::Frames, "begin|end|status", "PIX 주입 실행의 명시적 GPU 캡처 경계", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
             { "play", CommandCost::Frames, "", "에디터의 재생·정지와 같은 동작", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
-            { "play.state", CommandCost::Immediate, "", "재생 상태(gameStart·paused·씬 로드)를 낸다", CommandClass::EngineService, CommandLiveness::Live },
+            { "play.cursor", CommandCost::Immediate, "hide|show", "게임 스크립트와 같은 경로로 커서 숨김을 요청한다(검증 손잡이)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "action" },
+            { "play.eject", CommandCost::Frames, "", "재생 중 편집 도구로 돌아온다(Host 를 Scene 모드로)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "play.foreground_override", CommandCost::Immediate, "auto|on|off", "입력 소유권의 전경 조건을 강제한다(검증 손잡이)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "mode" },
+            { "play.inject_snapshot_failure", CommandCost::Immediate, "[count=1]", "다음 재생 전이의 씬 스냅샷을 실패시킨다(검증 손잡이)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "count:int=1" },
+            { "play.pause", CommandCost::Frames, "", "확정된 재생을 일시정지한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "play.possess", CommandCost::Frames, "", "재생 중 게임에 입력을 넘긴다(Host 를 Game 모드로)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "play.resume", CommandCost::Frames, "", "일시정지를 푼다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "play.state", CommandCost::Immediate, "", "재생 상태(요청·확정·상태 머신·입력 소유자·표시 타깃)를 낸다", CommandClass::EngineService, CommandLiveness::Live },
             // ── Player registry (PHASE 14.5 LC8 · §11.2) ────────────────────
             //
             // ★ 이 다섯은 **Editor 에 등록되지 않는다.** `roles` 가 `Player` 뿐이라

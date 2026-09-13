@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	113
-# names	120
+# commands	118
+# names	127
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -63,7 +63,12 @@ object.transform	-	frames	editor	editor_operation	live	no	yes	<이름> <px py pz
 pipeline.nodes	-	immediate	editor	engine_service	live	no	yes	-	라이브 파이프라인의 노드 조립 결과를 한 줄씩 낸다
 pix.capture	-	frames	editor	engine_service	live	no	yes	begin|end|status	PIX 주입 실행의 명시적 GPU 캡처 경계
 play	stop	frames	editor	editor_operation	live	no	yes	-	에디터의 재생·정지와 같은 동작
-play.state	-	immediate	editor	engine_service	live	no	yes	-	재생 상태(gameStart·paused·씬 로드)를 낸다
+play.cursor	-	immediate	editor	probe	live	no	yes	hide|show	게임 스크립트와 같은 경로로 커서 숨김을 요청한다(검증 손잡이)
+play.foreground_override	-	immediate	editor	probe	live	no	yes	auto|on|off	입력 소유권의 전경 조건을 강제한다(검증 손잡이)
+play.inject_snapshot_failure	-	immediate	editor	probe	live	no	yes	[count=1]	다음 재생 전이의 씬 스냅샷을 실패시킨다(검증 손잡이)
+play.pause	play.resume	frames	editor	editor_operation	live	no	yes	-	확정된 재생을 일시정지한다
+play.possess	play.eject	frames	editor	editor_operation	live	no	yes	-	재생 중 게임에 입력을 넘긴다(Host 를 Game 모드로)
+play.state	-	immediate	editor	engine_service	live	no	yes	-	재생 상태(요청·확정·상태 머신·입력 소유자·표시 타깃)를 낸다
 prefab.create	-	frames	editor	engine_service	live	no	yes	<오브젝트 이름> <프리팹 이름>	오브젝트로 프리팹을 만들어 저장한다
 prefab.instantiate	-	frames	editor	editor_operation	live	no	yes	<프리팹 이름> [인스턴스 이름]	프리팹을 씬에 소환한다
 prefab.objectguid	-	immediate	editor	engine_service	live	no	yes	<오브젝트 이름>	오브젝트의 프리팹 objectGuid를 낸다

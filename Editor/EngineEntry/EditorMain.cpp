@@ -250,6 +250,9 @@ void Editor::EditorMain::Initialize()
 
 	m_inputEventHandle = InputEvent.AddLambda([](float)
 	{
+		// W5: 게임이 입력의 주인인 프레임에는 편집 단축키를 받지 않는다 — 같은
+		// Ctrl+Z 가 게임과 Undo 스택에 동시에 닿으면 소유자가 둘이다.
+		if (Editor::InputOwner::Game == Editor::PlayModeController::CurrentOwner()) return;
 		const bool isPressedCtrl =
 			InputManagement->IsKeyPressed((uint32)KeyBoard::LeftControl);
 		if (isPressedCtrl && InputManagement->IsKeyDown('Z'))
@@ -528,7 +531,16 @@ void Editor::EditorMain::Update()
 		UpdateTitleBar();
 		InputManagement->Update(m_frameDeltaTime);
 
-		if (!SceneManagers->IsGameStart())
+		// W5: 입력 갱신 뒤, 씬 틱 앞. 상태를 유도하고 이번 프레임의 입력
+		// 소유자를 정한다 — 그래야 아래 스크립트가 같은 프레임의 소유권을 본다.
+		m_playModeController.Tick();
+
+		// ★ 요청(IsGameStart)이 아니라 **확정**(IsPlayCommitted)으로 가른다(W5).
+		//   요청으로 가르면 Play 를 누른 프레임에 스냅샷이 뜨기 **전**에 Physics 와
+		//   GameLogic 이 한 틱 돌고, 그 결과가 백업에 섞여 정지 뒤 편집 씬이
+		//   한 프레임 어긋난 채 돌아온다. 확정은 ApplyPendingSceneStructureChange
+		//   가 스냅샷을 뜬 뒤에만 참이다.
+		if (!SceneManagers->IsPlayCommitted())
 		{
 			// 편집 모드 — 런타임에는 없는 상태라 Runtime primitive에도 없다.
 			SceneManagers->Editor();

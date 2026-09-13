@@ -24,6 +24,22 @@ namespace editor::windows
         // 있어도 본문을 부르지 않는다. "그렸는가" 가 곧 "보이는가" 다.
         bool hostDrewThisFrame{};
         bool previewDrewThisFrame{};
+        bool hostFocusedThisFrame{};
+        bool hostHoveredThisFrame{};
+        bool focusRequested{};
+        std::uint64_t canvasClicks{};
+    }
+
+    void request_viewport_focus()
+    {
+        std::lock_guard lock(demandMutex);
+        focusRequested = true;
+    }
+
+    void note_game_canvas_clicked()
+    {
+        std::lock_guard lock(demandMutex);
+        ++canvasClicks;
     }
 
     viewport_mode get_viewport_mode()
@@ -75,8 +91,21 @@ namespace editor::windows
         if (viewport_mode::game == currentMode) ++published.gameModeFrames;
         else                                    ++published.sceneModeFrames;
         if (previewDrewThisFrame) ++published.gamePreviewFrames;
+
+        // W5: UI 입력 상태. `EndRender` 가 `ImGui::Render` **앞**에서 부르므로
+        // 문맥이 살아 있고, 이 셋은 `NewFrame` 이 정한 뒤 프레임 내내 같은 값이다.
+        const ImGuiIO& io = ImGui::GetIO();
+        published.uiWantCaptureMouse = io.WantCaptureMouse;
+        published.uiWantCaptureKeyboard = io.WantCaptureKeyboard;
+        published.uiWantTextInput = io.WantTextInput;
+        published.hostFocused = hostFocusedThisFrame;
+        published.hostHovered = hostHoveredThisFrame;
+        published.gameCanvasClicks = canvasClicks;
+
         hostDrewThisFrame = false;
         previewDrewThisFrame = false;
+        hostFocusedThisFrame = false;
+        hostHoveredThisFrame = false;
     }
 
     void draw_viewport_host()
@@ -87,13 +116,19 @@ namespace editor::windows
         // 둘에서 하나로 합치는 것이 화면의 모양까지 바꿀 이유는 없다 — 가운데
         // 노드의 탭 바는 `EditorRenderer` 가 끈다(`ImGuiDockNodeFlags_NoTabBar`).
         bool applyRequest{};
+        bool applyFocus{};
         viewport_mode requested{ viewport_mode::scene };
         {
             std::lock_guard lock(demandMutex);
             applyRequest = modeRequested;
             requested = requestedMode;
             modeRequested = false;
+            applyFocus = focusRequested;
+            focusRequested = false;
         }
+        if (applyFocus) ImGui::SetWindowFocus();
+        hostFocusedThisFrame = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+        hostHoveredThisFrame = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
 
         {
             const ::editor::TabStyleScope tabs;

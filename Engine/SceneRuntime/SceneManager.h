@@ -112,6 +112,35 @@ public:
 	bool IsGameStart() const { return m_isGameStart; }
 	void SetGameStart(bool isStart);
 
+	// ── 재생 상태 신호 셋 (PHASE 21 W5 선행 1) ──
+	//
+	// `IsGameStart` 는 **요청**이다 — 버튼·CLI 가 세우고 그 자리에서 참이 된다.
+	// 실제 전이는 프레임 경계의 ApplyPendingSceneStructureChange 가 하고, 그 안의
+	// 스냅샷이 실패하면 전이는 없다. 요청 하나만 읽는 UI 는 그때 "Stop 아이콘이
+	// 뜬 채 시뮬레이션은 없는" 상태를 보인다(계획서 §1.6 실측). 그래서 셋이다:
+	//
+	//   요청   IsGameStart()                       버튼을 눌렀는가
+	//   진행   HasPendingSceneStructureChange()    요청은 섰고 전이는 아직인가
+	//   확정   IsPlayCommitted()                   스냅샷·phase·통지까지 끝났는가
+	//
+	// 확정은 스냅샷이 뜬 **뒤**에만 참이 되고, 실패하면 요청까지 되돌린다 —
+	// 되돌리지 않으면 정지할 때 "백업이 없어 복원하지 못했다" 로 편집 씬을 잃는다.
+	bool IsPlayCommitted() const { return m_isPlayCommitted; }
+
+	/// 전이가 거부된 횟수와 마지막 사유. 게이트가 "실패했는데 재생으로 보이지
+	/// 않는다" 를 단정하려면 실패 자체가 밖에서 보여야 한다. 사유 문자열은 전이가
+	/// 도는 게임 스레드에서만 쓰고 읽는다(CLI 도 같은 스레드).
+	std::uint32_t PlayFailureCount() const { return m_playFailureCount; }
+	const std::string& LastPlayFailure() const { return m_lastPlayFailure; }
+
+	/// 다음 `count` 번의 스냅샷을 실패시킨다 — 검증용 주입 자리.
+	///
+	/// 실제 실패(직렬화 예외·빈 엔티티 목록)는 살아 있는 에디터에서 재현할 손잡이가
+	/// 없다. 새 씬은 루트 엔티티를 하나 갖고 나서 "비어 있음" 에 닿지 않고, 예외는
+	/// 자산을 망가뜨려야 난다. 실패 경로가 한 번도 돌지 않는 게이트는 그 경로를
+	/// 재지 않으므로 주입을 둔다. 제품 코드는 이것을 부르지 않는다.
+	void InjectPlaySnapshotFailure(std::uint32_t count) { m_injectedSnapshotFailures = count; }
+
 	bool IsGamePaused() const { return m_isGamePaused; }
 	void SetGamePaused(bool isPaused);
 	void ToggleGamePaused();
@@ -165,16 +194,24 @@ public:
     std::atomic_bool                    m_isGameStart{ false };
     std::atomic_bool                    m_isGamePaused{ false };
 	std::atomic_bool			        m_isEditorSceneLoaded{ false };
+	std::atomic_bool                    m_isPlayCommitted{ false };
+	std::atomic_uint32_t                m_playFailureCount{ 0 };
+	std::string                         m_lastPlayFailure{};
+	std::uint32_t                       m_injectedSnapshotFailures{ 0 };
 	std::atomic_bool                    m_isInitialized{ false };
 	size_t 					            m_EditorSceneIndex{ 0 };
 
     std::future<Scene*>                 m_loadingSceneFuture;
     InputActionManager*                 m_inputActionManager{ nullptr };
 private:
-    // Edit→Play→Stop transaction. 위의 primitive들을 조립하고, 아직 Editor 정책
-    // (Undo·선택 해제)을 품고 있다 — E3-2가 EditorPlayModeController로 들어낸다.
-    void BeginPlayTransaction();
+    // Edit→Play→Stop transaction. 위의 primitive들을 조립한다. Editor 정책(Undo)은
+    // E3-2 가 EditorPlayModeController 로 들어냈고, 선택 해제는 안전장치라 남는다.
+    //
+    // 진입은 **스냅샷 → phase → 통지** 순이고, 스냅샷이 실패하면 아무것도 바꾸지
+    // 않은 채 false 를 돌려준다(PHASE 21 W5 선행 1). 호출자가 요청을 되돌린다.
+    bool BeginPlayTransaction();
 	void EndPlayTransaction();
+    void NotePlayFailure(std::string reason);
 
     // ── 배치 단위 인덱스 리매핑 (SceneLoaderBatchRemapPlan) ──
     //

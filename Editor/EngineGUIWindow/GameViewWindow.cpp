@@ -4,6 +4,7 @@
 #include "EditorIcons.h"
 #include "EditorViewportCanvas.h"
 #include "EditorWindowNames.h"
+#include "ViewportHostWindow.h"
 #include "Windows/EditorViewportWindows.h"
 
 // PHASE 21 M4 3단계: 프레임은 셸이 연다. 창 여백·창 성질 둘·표시 순서가
@@ -30,9 +31,12 @@ void editor::windows::draw_game_view()
 		{ static_cast<float>(displayed.width), static_cast<float>(displayed.height) },
 		ImGui::GetIO().DisplayFramebufferScale);
 
-	// 캔버스를 자리만 잡고 ImGui 의 활성/호버 항목은 가져가지 않는다 — Scene 이
-	// 기즈모를 위해 그렇게 하고, Game 도 W5 가 입력 소유권을 붙일 자리다.
-	ImGui::Dummy(contentSize);
+	// W5: 캔버스는 **항목**이다. 클릭이 곧 possess 요청이라(Ejected 에서 Game
+	// Preview 를 누르거나, 글자를 치다 캔버스로 돌아올 때) ImGui 가 이 자리를
+	// 활성 항목으로 잡아야 글자 입력이 끊기고 소유권이 게임으로 넘어간다.
+	// Scene 은 기즈모를 위해 Dummy 로 두지만 Game 은 그럴 이유가 없다.
+	ImGui::InvisibleButton("##Editor.GameCanvas", contentSize);
+	if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) note_game_canvas_clicked();
 	auto* draw = ImGui::GetWindowDrawList();
 
 	// 2단 신호를 그대로 쓴다(계획서 W4). `active` 는 "그릴 카메라가 있는가",

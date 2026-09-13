@@ -179,22 +179,52 @@ bool InputManager::IsMouseButtonReleased(MouseKey button)
     return m_mouseState.GetKeyState(static_cast<size_t>(button)) == KeyState::Released;
 }
 
+// ── 게임 입력 소유 관문 (PHASE 21 W5 선행 2) ──
+//
+// GameInput 은 창 포커스도 ImGui 도 보지 않는다 — 장치 상태를 그대로 읽는다.
+// 그래서 에디터에서는 "지금 게임이 입력을 받아도 되는가" 를 아무도 답하지
+// 않았다: Alt-Tab 으로 나가도, 인스펙터에 글자를 치는 중에도, 정지 상태에서도
+// 게임 스크립트는 같은 키를 봤다. 이 관문이 그 답이다.
+//
+//   · 주인은 Editor 의 PlayModeController 하나다. Player 는 부르지 않으므로
+//     기본값 true 그대로 — 출하 게임의 입력은 이 줄이 생기기 전과 같다.
+//   · 관문은 **게임 소비처**만 본다(ActionMap · UIManager · C# Api_Input_*).
+//     에디터 자신의 단축키·씬 카메라는 같은 장치 상태를 계속 읽는다 — 둘을
+//     한 상태로 갈라 두면 게임에 넘긴 프레임에 에디터 단축키가 죽는다.
+//   · 커서 숨김은 소유권에 묶인다. 게임이 숨기기를 **원한다**는 사실은 기억하되
+//     소유가 아닐 때는 적용하지 않고, 소유가 돌아오면 다시 적용한다. 그래서
+//     Eject·Pause·포커스 상실에서 커서가 사라진 채 남지 않는다.
+//
+// (헤더가 옛 CP949 이중 인코딩 잔재라 한글을 넣을 수 없어 설명이 여기 있다.)
 void InputManager::HideCursor()
 {
-    if (!m_isCursorHidden)
-    {
-        while (::ShowCursor(FALSE) >= 0);  // Keep hiding cursor until it's fully hidden
-        m_isCursorHidden = true;
-    }
+    // 의사와 적용을 가른다. 게임이 숨기기를 원한 사실은 소유가 아닐 때도 남고,
+    // 소유가 돌아올 때 그대로 적용된다.
+    m_wantCursorHidden = true;
+    if (m_gameInputOwned) ApplyCursorHidden(true);
 }
 
 void InputManager::ShowCursor()
 {
-    if (m_isCursorHidden)
-    {
-        while (::ShowCursor(TRUE) < 0);  // Keep showing cursor until it's fully shown
-        m_isCursorHidden = false;
-    }
+    m_wantCursorHidden = false;
+    ApplyCursorHidden(false);
+}
+
+void InputManager::SetGameInputOwned(bool owned)
+{
+    if (m_gameInputOwned == owned) return;
+    m_gameInputOwned = owned;
+    ApplyCursorHidden(owned && m_wantCursorHidden);
+}
+
+void InputManager::ApplyCursorHidden(bool hidden)
+{
+    if (hidden == m_isCursorHidden) return;
+    // ShowCursor 는 프로세스 전역 카운터라 한 번으로는 안 바뀔 수 있다 —
+    // 원하는 쪽으로 넘어갈 때까지 돌린다.
+    if (hidden) { while (::ShowCursor(FALSE) >= 0); }
+    else        { while (::ShowCursor(TRUE) < 0); }
+    m_isCursorHidden = hidden;
 }
 
 void InputManager::ResetMouseDelta()

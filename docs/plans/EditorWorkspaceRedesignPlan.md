@@ -342,6 +342,15 @@ play state의 정본은 이 `atomic_bool` 하나뿐이다 — `ScenePhase`는 *�
   (`EditorPlayModeController.cpp:22`), Play 버튼도 클릭 자리에서 `ClearGameMode()`를 직접 부른다
   (`MenuBarWindow.cpp:467`). W5에서 UI 쪽 호출을 걷어 controller 단일 소유로 만든다.
 
+**2026-09-14 W5 착지.** 신호 셋이 섰다 — 요청 `IsGameStart()` · 진행 `HasPendingSceneStructureChange()` ·
+확정 `IsPlayCommitted()`. `BeginPlayTransaction`은 **스냅샷 → phase → 통지** 순이고 `bool`을 돌려주며,
+실패하면 `ApplyPendingSceneStructureChange`가 `SetGameStart(false)`로 요청을 되돌린다(`m_isEditorSceneLoaded`도
+세우지 않는다). 확정은 `Reset()`까지 끝난 뒤 맨 끝에 서고 `EndPlayTransaction`은 맨 앞에서 내린다.
+실패는 `PlayFailureCount()/LastPlayFailure()`로 밖에 보이고, 실패 경로를 살아 있는 에디터에서 만들 손이
+없어 `InjectPlaySnapshotFailure(n)`(CLI `play.inject_snapshot_failure`)을 검증 손잡이로 두었다.
+**Undo 이중 경로는 이미 없었다** — LC6이 `MenuBarWindow`의 직접 호출을 컨트롤러로 옮겨 둔 뒤라 위 줄 번호는
+낡은 인용이다. 남아 있던 것은 순서뿐이었고, 실패 주입 구간이 "실패하면 편집 이력이 산다"를 단정한다.
+
 ### 1.7 OS multi-viewport는 아직 지원 계약이 없다
 
 현재 ImGui는 Docking과 keyboard navigation을 켜지만 `ImGuiConfigFlags_ViewportsEnable`은 켜지
@@ -366,6 +375,16 @@ io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_Ha
 가져갔는가"를 밖에서 물어볼 수단이 사라진다. W5가 세울 input owner 불변식은 이 신호를 읽어야
 하므로, **W5의 선행 작업으로 이 세 줄을 걷고** game input 라우팅이 무엇을 근거로 판단하는지
 먼저 확정한다(강제를 걷는 순간 라우팅 동작이 바뀔 수 있으므로 지혈이 아니라 계측이 먼저다).
+
+**2026-09-14 W5 착지 — 이 세 줄은 죽은 줄이었다.** 계획서대로 계측을 먼저 했다: Host 게시본
+(`viewport_demand`)에 `io.WantCaptureMouse/Keyboard/TextInput`을 싣고 `editor.viewport`로 내게 한 뒤, 강제 줄을
+걷기 **전**과 **후**에 같은 배치(재생·eject·possess·정지)를 태웠다. 열 표본이 전부 같았다 —
+`mouse=false · keyboard=true · text=false`(keyboard는 `NavEnableKeyboard`의 `NavActive` 몫). 대입 바로 아래의
+`ImGui::NewFrame()`이 `UpdateHoveredWindowAndCaptureFlags`에서 셋을 무조건 다시 계산하므로 강제는 아무것도
+지우지 않고 있었다. 걷었고, 그 자리에 왜 걷었는지를 적었다. **진짜 구멍은 여기 적히지 않은 자리였다** —
+`GameInput`은 창 포커스도 ImGui도 보지 않아 Alt-Tab·글자 입력·일시정지 중에도 게임 스크립트가 같은 키를
+봤다. 입력 소유자는 읽을 신호가 아니라 **없던 관문**이었고, `InputManager::SetGameInputOwned`가 그 관문이다
+(§W5 착지).
 
 flag 두 줄도 초기화가 아니라 매 프레임 OR이라 **런타임에 끌 수 없다.** `ViewportsEnable`은
 §1.7대로 꺼져 있지만 `EndFrame`에는 이미 `UpdatePlatformWindows/RenderPlatformWindowsDefault`
@@ -432,7 +451,9 @@ committed play state는 §1.6대로 `atomic_bool` 하나뿐이고, input owner�
 지금 이 커맨드를 지으면 **언제나 같은 상수를 찍는 관측**이 되고, 그것은 관측이 아니라 관측
 흉내다 — 이 저장소가 "저작 표면은 저작해 봐야 증명된다"로 이미 데었던 자리와 같은 모양이다.
 두 신호를 만드는 것은 W5의 첫 작업으로 계획서에 이미 적혀 있다. `ScenePhase`를 싣는 일도 같이
-간다.
+간다. **(2026-09-14)** W4가 모드·수요를, W5가 `playState`·`playCommitted`·`inputOwner`와 UI 입력 상태
+(`uiWantCapture*`·`hostFocused`·`gameCanvasClicks`)를 실었다. `ScenePhase`는 싣지 않았다 — 엔티티 단위 값이라
+씬 수준 상태의 대용이 못 되고(§1.6), 확정 신호가 그 자리를 대신한다.
 
 이 다섯이 없으면 `verify-editor-workspace.ps1`은 "창이 떴다"밖에 단정하지 못한다. §9의 W0
 추정은 이 몫을 포함해 재산출했다.
@@ -951,7 +972,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W2-B | progress | 최근/전체 검색, 방문별 검색·선택 복원, Volume Profile 생성 대상 경로/취소/실패 정리, W3 저장·W7 목록 연결, 실제 마우스 분할선/동명 자산 drop 회귀 |
 | W3 | **done** | ID·legacy 이주, 자유 dock/close/reopen, versioned save/load/reset/backup·손상 복구가 게이트 둘(169+212 checks)로 선다. Scene `no_move` 해제는 W4 단일 Host, `dock_slot` 선언화는 W6 preset 소속 |
 | W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize는 두 backend generation/retire 검증 뒤 |
-| W5 | todo | Play 요청/진행/확정 상태, Snapshot 성공 후 전이, Pause/Eject/Stop 입력·커서·focus 복원, 실패/Undo 정책과 `editor.viewport` 관측 |
+| W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
 | W6 | todo | 현재 외관을 유지하는 5종 배치 preset, Save As/Rename/Delete/Reset·작은 창 복원 |
 | W7 | todo | Hierarchy/Browser 목록 snapshot·flatten/cache/clipping, 1k/10k/50k 실측, **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
 | W8 | todo | DX12 통합 빌드·DPI/재시작/손상 ini/Play/preset/성능 회귀, 현재 승인 외관의 자동 golden·CI, legacy 잔재 전수 확인 |
@@ -969,13 +990,14 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
   `EditorWindowNames`의 ID 이주는 W3에서 끝났고 옛 이름은 `legacy_names` 이주 표로만 남는다.
   Scene/Game을 한 Host의 표시 모드로 합치는 일은 **W4가 닫았다**(§W4 착지와 결함).
   Scene의 `no_move`는 그 Host가 가운데 노드를 떠나지 않으므로 그대로 둔다 — 걷을 이유가 사라졌다.
-- `ImGuiHost::BeginFrame`의 `WantCapture*` 강제와 SceneManager의 Snapshot 이전 Play 이벤트 발행은 남아 있다.
-  제목표시줄 Play/Pause 버튼 완료를 W5 완료로 세지 않는다.
+- `ImGuiHost::BeginFrame`의 `WantCapture*` 강제(죽은 줄)와 SceneManager의 Snapshot 이전 Play 이벤트 발행은
+  **W5가 걷었다**(§W5 착지와 결함). 제목표시줄 Play/Pause 버튼은 이제 컨트롤러가 유도한 상태를 그린다.
 
 #### 산정·검증 범위
 
 - 산정 범위는 **50일** 유지. 닫힌 상위 단계 M0~M4·W0·W1·**W3·W4**는 **19일**이다(W3 3일 · W4 4일).
-  세부 완료는 **W2-I0 0.5일**, **W2-V1 1일**만 추가 인정해 대시보드 완료 공수는 **20.5/50일(41%)**이다.
+  세부 완료는 **W2-I0 0.5일**, **W2-V1 1일**만 추가 인정해 대시보드 완료 공수는 **24.5/50일(49%)**이다
+  (2026-09-14 W5 4일 추가).
   W2의 자동 50% 가중치는 명시적 `earnedDays=0`으로 대체한다. 나머지 부분 구현에 임의의 실적을 배분하지 않는다.
   29.5일은 미획득 초기 추정분이며 **현재 남은 일정 견적이 아니다**. W7 썸네일 추가 견적도 아직 제외다.
 - W2-I 실측 문서의 9일안은 추가 의미 정책 등을 포함한 제안이다. 현재 정본의 6일을 이번 상태 갱신에서
@@ -1750,6 +1772,71 @@ controller를 짜기 전에 그 둘을 먼저 만들어야 한다.
 UI가 Playing으로 보이지 않는 것**을 명시적으로 단정한다. Play 실패·Alt-Tab·Eject·Pause·Stop
 반복에서 cursor/gizmo가 잘못 남지 않는다.
 
+#### W5 착지와 결함 (2026-09-14)
+
+**착지.** Core는 신호만 늘었다 — `SceneManager::IsPlayCommitted()`·`PlayFailureCount()`·`LastPlayFailure()`·
+`InjectPlaySnapshotFailure()`, 그리고 `InputManager::SetGameInputOwned()`(커서 의사 `IsCursorHideRequested()`와
+적용 `IsCursorHidden()`을 가른다). Editor는 `Editor::PlayModeController`가 상태 머신이다: 게임 스레드에서
+입력 갱신 **뒤**, 씬 틱 **앞**에 `Tick()`이 돌아 신호 셋과 Host 게시본(모드·UI 입력 상태·캔버스 클릭)만 읽고
+상태를 **유도**한다. 클릭이나 진입 통지 하나로 확정하지 않는다.
+
+- Possess/Eject는 **Host의 표시 모드**다 — Game 모드가 possess, Scene 모드가 eject. 별도 버튼을 만들지
+  않은 이유는 모드 막대가 이미 그 뜻이고 승인된 외관을 바꾸지 않기 위해서다. CLI는 `play.possess`/`play.eject`.
+  게임 캔버스(Host Game 모드·Game Preview)는 `InvisibleButton`이 되어 클릭이 possess 요청이다 — Ejected에서
+  Preview를 누르거나, 글자를 치다 캔버스로 돌아올 때 활성 항목이 바뀌며 소유권이 게임으로 넘어온다.
+- 입력 소유자는 프레임마다 하나다: `game ⇔ PlayingPossessed ∧ ¬paused ∧ 창이 전경 ∧ ¬uiWantTextInput`.
+  관문은 게임 소비처 셋만 본다(`InputActionManager`·`UIManager`·C# `Api_Input_*`). 에디터 단축키와 씬 카메라는
+  같은 장치 상태를 계속 읽되, `EditorMain`의 Ctrl+Z/Y는 게임이 주인인 프레임에 받지 않는다. Player는 관문을
+  부르지 않으므로 기본값(소유)이 출하 게임의 입력을 그대로 둔다.
+- Stop은 prior를 되돌린다 — Host 모드(요청함), Host 포커스(`request_viewport_focus`), 선택(instanceID —
+  백업 YAML이 `m_instanceID`를 싣고 복원이 그것을 쓰므로 논리 신원이 산다). Core의 해제 안전장치는 그대로
+  돌고 그 **뒤**에 컨트롤러가 되찾는다. Undo 항목은 만들지 않는다 — 정지는 편집이 아니다.
+- Game 타깃 not-ready(게임 카메라 없음)는 `gameTargetReady`로 **보고**하고 막지 않는다 — 카메라를 키 입력으로
+  스폰하는 게임이 있다. 캔버스는 W4의 자리 표시(“No Camera rendering”)를 그대로 그린다.
+- 검증 손잡이 셋: `play.inject_snapshot_failure`(실패 경로), `play.foreground_override`(게이트는 창을 숨겨
+  띄우므로 OS 전경을 만들 수 없다), `play.cursor hide|show`(스크립트의 `SetCursorVisible`과 같은 경로).
+  손잡이 없이 재는 것도 하나 있다 — 숨긴 창의 Possessed는 `owner=editor`다(전경 조건이 실제로 걸린다).
+
+**결함.** 계획서가 지목한 것과 실제가 갈렸다(§1.6·§1.8에도 적었다).
+
+1. 통지가 스냅샷 앞이라 실패한 전이가 편집 이력부터 죽였고, 실패해도 요청이 서 있어 Stop 아이콘이 뜬 채
+   시뮬레이션이 없었다 → 순서·되돌림·확정 신호.
+2. `EditorMain::Update`가 **요청**으로 시뮬레이션 분기를 골라 Play를 누른 프레임에 스냅샷이 뜨기 전 Physics·GameLogic이
+   한 틱 돌았다(`Update` → `ApplyPending` 순서). 그 결과가 백업에 섞여 정지 뒤 편집 씬이 한 프레임 어긋난 채
+   돌아온다 → **확정**으로 가른다. `IsManagedScriptSimulationActive`(Scene.cpp)는 이미 `요청 ∧ ¬진행`으로 같은
+   창을 피하고 있었다 — 손대지 않았다.
+3. `WantCapture*` 강제는 죽은 줄이었다(§1.8 실측). 걷었다.
+4. 게임 입력에 관문이 없었다 — 계획서에 없던 결함이고 W5의 실체다.
+5. 커서 숨김에 주인이 없었다 — `ShowCursor` 카운터가 정지·Eject·Alt-Tab 너머로 남는다 → 의사/적용 분리,
+   소유가 아닐 때 적용하지 않고 돌아오면 다시 적용, Stop이 의사를 지운다.
+6. 선택은 해제만 됐다(그때의 게이트가 그것을 단정했다) → 복원. `verify-play-selection-undo.ps1` 판정 D가
+   “해제”에서 “복원”으로 뒤집혔고 머리말에 두 번 바뀐 이유를 적었다.
+7. Undo 이중 경로는 이미 LC6이 닫은 뒤였다 — 고친 것이 아니라 발견이다.
+8. 재생 게이트 둘이 개발자의 `active.workspace`를 빌려 띄우고 있었다. 그 파일이 Host 모드를 싣게 된 것이 W4인데
+   (W3까지는 실을 값이 없었다), 어떤 실행이 Game 모드로 끝나면 다음 실행의 “재생 전 모드”가 game이 되어 복원
+   단정이 엉뚱한 이유로 붉는다 — 변이 ⑧이 그렇게 끝났고 그 뒤의 깨끗한 실행이 붉었다. 두 게이트 모두
+   `CREATOR_EDITOR_WORKSPACE_DIR`로 빈 폴더를 받게 했고, 복원 단정의 기준은 상수 `scene`이 아니라
+   **재생 전 표본**이다(그 표본이 scene인 것도 함께 단정한다).
+
+**변이.** 다섯을 심어 각각 맞는 자리에서 맞는 이유로 붉는지 봤다.
+
+| 변이 | 붉은 자리(실측) |
+|---|---|
+| ④ 통지를 스냅샷 앞으로 | 실패 주입 구간 “a failed play transaction cleared the edit undo history (editUndo 1 -> 0)” |
+| ⑤ 실패해도 요청을 안 되돌림 | 실패 주입 구간 “state expected 'Stopped' got 'PlayingPossessed'” — 요청이 서 있어 다음 프레임에 다시 들어갔다 |
+| ⑥ 소유자가 pause 무시 | `paused` 표본 “cursorHidden expected 'False' got 'True' (owner=game)” — 일시정지에도 게임이 주인이라 커서가 숨은 채다 |
+| ⑦ 소유자가 전경 무시 | 첫 실행의 숨긴 창 단정 “a hidden editor window claimed game input: foreground=0 owner=game” |
+| ⑧ Stop이 아무것도 안 되돌림 | 첫 실행 “stop did not return … target=game” + 판정 D “stop did not restore the selection” |
+
+변이 러너 자체가 한 번 틀렸다 — ⑤의 역치환이 `return;` 아홉 곳에 걸려 실패했는데 러너가 넘어가 ⑥이
+⑤를 품은 채 돌았고, ⑤의 이유로 붉었다. 쌍을 앞 주석 줄까지 넣어 고유하게 만든 뒤 ⑥만 다시 쟀다.
+
+**못 잡는 것.** 기즈모 잔류(`ImGuizmo::IsUsing`이 Eject·Stop 뒤에 남는가)는 CLI로 몰 수 없어 단정이 없다 —
+Possessed에서는 Scene 뷰가 그려지지 않아 구조적으로 막히고, Ejected는 W2-V의 오버레이 소유권이 그대로다.
+W2-V의 “오버레이 입력 소비 결과 연결”은 그래서 별도 배선이 아니라 모드 하나로 닫혔다. OS 커서 **모양**은
+ImGui backend 몫 그대로이고, lock/clip은 구현이 없어 소유권 정책에 걸 것이 visibility뿐이었다. Player의
+죽은 스냅샷(E3-6 소속)은 손대지 않았다 — 되돌림은 Player도 타지만 Player는 정지하지 않는다.
+
 ### W6 — preset 5종과 layout UX (P2, 2일)
 
 - `S&Box Compact`, `Level Editing`, `UI Editing`, `Rendering & Debug`, `Legacy Unity`를 제공한다.
@@ -1888,7 +1975,9 @@ W2 후속에는 W2-I·W2-V·W2-B를 추가했다. W3 이후 작업과의 의존�
 - `Tools/regression/verify-editor-viewport-mode.ps1` — 신규
 - `Tools/regression/verify-editor-viewport-overlay.ps1` — W2-V 신규 후보. 명령별 배치·표시 모드·입력 소비 관측과 실제 입력/리사이즈 주입을 선행한다.
 - `Tools/regression/verify-editor-content-browser.ps1` — W2-B 신규 후보. 내부 rect·탐색/검색 상태·결과 신원·생성 완료 관측과 조작 주입을 선행한다.
-- 기존 `verify-play-roundtrip.ps1`
+- 기존 `verify-play-roundtrip.ps1` — **W5 확장**. 첫 실행(stdout 정규식)에 committed·state·owner·target·foreground
+  단정을 얹고, 두 번째 실행(jsonl, 순서 목록)이 실패 주입·소유자 9표본·커서·타깃 복원·확정 전 거부를 잰다.
+  `verify-play-selection-undo.ps1` 판정 D는 복원을 단정한다. `cli_registry.golden.tsv` 113→118.
 - 기존 `verify-play-selection-undo.ps1`
 - 기존 `verify-play-mode-policy-boundary.ps1`
 - backend별 feature-test screenshot/capture 도구

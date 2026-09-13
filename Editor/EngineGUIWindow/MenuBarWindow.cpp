@@ -30,6 +30,7 @@
 #include "BTEditorBridge.h"
 #include "AuthoringParsedDocument.h"
 #include "ReflectionUndo.h"
+#include "EditorPlayModeController.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
@@ -730,7 +731,13 @@ void MenuBarWindow::RenderPlayControls(const EditorTitleBarLayout& layout)
     draw->AddRectFilled(boxMin, boxMax, ImGui::GetColorU32(editor::ThemeColorValue(ThemeColor::Chrome)), 3.f * scale);
     draw->AddRect(boxMin, boxMax, ImGui::GetColorU32(editor::ThemeColorValue(ThemeColor::Border)), 3.f * scale);
 
-    const bool running = SceneManagers->IsGameStart();
+    // W5: 버튼은 **요청**이 아니라 컨트롤러가 유도한 상태를 그린다. 요청 하나만
+    // 읽으면 스냅샷이 실패한 뒤에도 Stop 아이콘이 서 있다(계획서 §1.6 실측).
+    // Entering 은 아직 Play 로 보이고, 확정된 뒤에야 Stop 으로 바뀐다.
+    const Editor::PlayState playState = Editor::PlayModeController::CurrentState();
+    const bool running = Editor::PlayState::PlayingPossessed == playState ||
+                         Editor::PlayState::PlayingEjected == playState ||
+                         Editor::PlayState::Exiting == playState;
     const bool paused = SceneManagers->IsGamePaused();
     ImGui::PushFont(nullptr, editor::EditorThemeTokens::IconFontSize);
     ImGui::PushID("TitleBarPlayControls");
