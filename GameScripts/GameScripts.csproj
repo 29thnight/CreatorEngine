@@ -15,9 +15,11 @@
 
     <!-- 리로드마다 파일을 덮어써야 하므로 참조 어셈블리는 복사하지 않는다. -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <CreatorScriptSourceRoot Condition="'$(CreatorScriptSourceRoot)' == ''">$(MSBuildThisFileDirectory)..\Dynamic_CPP\Assets\Script</CreatorScriptSourceRoot>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="$(CreatorScriptSourceRoot)\**\*.cs" />
     <!-- ScriptCore는 기본 컨텍스트에 상주하는 고정 어셈블리다.
          여기서는 참조만 하고 출력 폴더로 복사하지 않는다 — 복사하면 리로드 때
          같은 타입이 두 컨텍스트에 각각 로드되어 캐스팅이 깨진다. -->

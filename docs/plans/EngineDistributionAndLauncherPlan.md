@@ -2,7 +2,8 @@
 
 - 수립일: 2026-08-24
 - 재검토일: 2026-08-27 — efsw 유지 결정 반영
-- 상태: **계획 수립 · 통합 구현 미착수**
+- 정책 갱신일: 2026-09-13 — Windows OS/API식 버전 정책 확정 및 개발 배포 경로 적용
+- 상태: **DL5 개발 배포 경로 부분 구현 · Launcher/MSI 통합 구현 미착수**
 - 배치: 전체 리팩터링 대시보드의 마지막 릴리스 페이즈
 - 초기 추정: **43 인일**. DL0 실측과 설치 토폴로지 판정 뒤 갱신
 - 제품 방향: **서명된 MSI 설치 · 버전별 불변 엔진 · Launcher가 프로젝트와 엔진 버전을 연결**
@@ -10,6 +11,7 @@
 관련 정본:
 
 - [RefactoringPlanDashboard.html](../RefactoringPlanDashboard.html) — PHASE 23 진행 상태
+- [EngineVersionPolicy.md](../design/EngineVersionPolicy.md) — 제품 세대·기능 릴리스·엔진 빌드·API 계약·채널의 확정 규칙
 - [BuildPipelinePlan.md](BuildPipelinePlan.md) — 빌드·Cook·Stage·Pak·Verify 파이프라인
 - [EngineLayerSeparationPlan.md](EngineLayerSeparationPlan.md) — Engine / Editor / Player 경계
 - [EnginePackagingPlan.md](EnginePackagingPlan.md) — 엔진 내부 프로젝트 의존 방향. 설치 제품 계획과는 별개
@@ -51,6 +53,9 @@
 9. Player는 프로젝트 감시, Launcher 상태, efsw를 링크하지 않는다. Cooked content만 읽는다.
 10. Launcher는 빌드 로직을 재구현하지 않는다. PHASE 12.5의 동일 orchestrator를 별도 프로세스로
     실행하고 진행률·취소·로그만 중계한다.
+11. 버전은 [EngineVersionPolicy.md](../design/EngineVersionPolicy.md)를 따른다. `CreatorEngine 2`,
+    기능 릴리스(`26H2`), 네 자리 엔진 빌드(`2.0.1000.0`), API 계약, Preview/Stable 채널을 분리한다.
+    괄호 안 릴리스·빌드 번호는 예시이며 실제 발행 번호는 릴리스 시 부여한다. 정책 확정과 DL 구현 완료는 구분한다.
 
 이 페이즈의 핵심은 설치 UI가 아니다. 다음 네 정본이 한 줄로 이어지는 것이 완료 상태다.
 
@@ -78,7 +83,7 @@ signed MSI product
 따라서 런타임 전체에 Launcher를 알리는 새 전역 서비스를 만들 필요가 없다. Launcher가 descriptor를
 고르고 Editor Host가 검증된 `EnginePaths`를 조립하는 경계를 확장하면 된다.
 
-`Tools/build.ps1`도 이미 `-Project`, `-InputMode Project|Workspace|Tracked`를 받고 canonical path,
+`CreatorBuildTool.exe package-game`은 `--project`, `--input-mode Project|Workspace|Tracked`를 받고 canonical path,
 reparse point, stage 범위를 검사한다. PHASE 23은 이 검증을 버리지 않고 descriptor 입력을 받는 얇은
 adapter를 추가한다.
 
@@ -91,7 +96,7 @@ adapter를 추가한다.
 ```
 
 제품 설치 뒤 `%ProgramFiles%\CreatorEngine\...\CreatorEditor.exe`와 사용자 프로젝트는 나란히 있지
-않으므로 이 계약은 성립하지 않는다. 또한 `Tools/build.ps1`의 Workspace/Tracked 모드는 현재 저장소의
+않으므로 이 계약은 성립하지 않는다. 또한 `CreatorBuildTool`의 Workspace/Tracked 모드는 현재 저장소의
 `Dynamic_CPP`만 허용하고, `ProjectSetting` 단수 디렉터리와 프로젝트 폴더 leaf name에 의존한다.
 이들은 DL1/DL8에서 명시적으로 이관할 대상이며 현재 완료된 기능으로 세지 않는다.
 
@@ -226,7 +231,7 @@ Player/Game package
 ## 5. 프로젝트 descriptor 정본
 
 기본 파일명은 `<display-name>.creatorproject`, 내용은 UTF-8 JSON으로 한다. 파일명과 폴더명은 표시 편의일
-뿐 identity가 아니다. schema v1의 최소 필드는 다음과 같다.
+뿐 identity가 아니다. schema v1의 최소 필드 예시는 다음과 같다. 버전과 build ID는 실제 발행본을 뜻하지 않는다.
 
 ```json
 {
@@ -234,8 +239,8 @@ Player/Game package
   "projectId": "3f7f4ab5-5a8a-4fd8-a16f-a3a9f44f2189",
   "displayName": "My Game",
   "engine": {
-    "version": "1.0.0",
-    "buildId": "ce-1.0.0+20260824.1",
+    "version": "2.0.1000.0",
+    "buildId": "example-distribution-id",
     "channel": "stable"
   },
   "roots": {
@@ -250,6 +255,7 @@ Player/Game package
 ```
 
 - `projectId`는 UUID이며 복사본 생성 명령 외에는 바꾸지 않는다.
+- `engine.version`은 네 자리 전체 엔진 빌드다. 제품 세대·기능 릴리스·API 계약은 이 값과 독립적이다.
 - `engine.version + engine.buildId`가 exact distribution을 고른다. `engine.version`은 자동으로
   “latest”를 따라가지 않는다. Launcher가 호환 버전을 제안할 수는 있지만 descriptor 변경은 사용자의
   명시적 migration transaction이다. 같은 version 문자열로 다른 payload를 재발행하지 않는다.
@@ -400,7 +406,7 @@ channel metadata (signed)
 ```
 
 - transport TLS만 믿지 않고 metadata signature, SHA-256, Authenticode/MSI signature를 검증한다.
-- stable/beta 같은 channel은 available version 선택 정책이지 project의 exact pin을 대체하지 않는다.
+- `preview` / `stable` channel은 available version 선택 정책이지 project의 exact pin을 대체하지 않는다.
 - install 실패 또는 취소 시 기존 엔진과 project descriptor는 그대로 남는다.
 - engine rollback은 구버전 side-by-side 재선택이고, project migration rollback은 별도 backup transaction이다.
 
@@ -418,7 +424,7 @@ channel metadata (signed)
 
 ## 9. 실행 계획
 
-모든 상태는 최초 `todo`다. 문서 작성과 미배선 watcher 초안은 구현 진행으로 세지 않는다. 합계 **43 인일**은
+최초 상태는 `todo`이며 현재 DL5의 개발 배포 경로는 `progress`다. 문서 작성과 미배선 watcher 초안은 구현 진행으로 세지 않는다. 합계 **43 인일**은
 작업량이며 병렬화 전 달력 기간이 아니다.
 
 ### DL0 — 제품·설치·프로젝트 기준선과 실패 게이트 (P0, 2일)
@@ -467,13 +473,27 @@ channel metadata (signed)
 
 ### DL5 — 버전별 불변 엔진 distribution layout·provenance (P0, 4일)
 
+2026-09-13 구현 진행: 공용 native DLL/Editor 전용 DLL 배치, 사전 빌드 host·C# 컴파일 도구·private
+.NET 배포, `EngineVersion.json` 정본과 네 자리 파일 버전, UUID 배포 ID/파일 digest 검증을 추가했다.
+개발 adapter 사용법은 [Tools/distribution/README.md](../../Tools/distribution/README.md)를 따른다.
+배포본 생성·C# 컴파일·게임 패키징 구현은 [별도 BuildTool 프로젝트](../../BuildTool/README.md)로 옮겼다.
+Editor는 `CreatorBuildTool.exe`를 직접 실행한다. 배포본에 PowerShell을 포함하거나 호출하지 않으며,
+기존 스크립트는 소스 checkout의 호환 진입점으로만 남는다. 이 전환은 Launcher/MSI 완료와 별개다.
+EXE 빌드·47개 회귀·private runtime·제한된 Debug/DX12 게임 게시 결과와 기존 모델 씬 실패는
+[CreatorBuildToolValidation](../analysis/CreatorBuildToolValidation.md)에 기록했다.
+[공용 런타임·외부 프로젝트 검증](../analysis/SharedRuntimeDistributionValidation.md)에 Debug·Release 빌드와
+최신 배포 검사, 경로 처리 수정 및 남은 모델 런타임 문제를 구분해 기록한다. 개발용 설정별 pin은
+정식 descriptor/Launcher 구현이 아니다. DL1, MSI, 공식 발행·채널 승격, FMOD-free 선행 조건이
+남아 있으므로 DL5 전체 완료로 판정하지 않는다.
+
 - Editor, 도구, template, runtime dependency를 version stage에 닫는다.
 - `engine.manifest.json`, file digest, build ID, ABI/schema 범위를 생성한다.
+- 확정 버전 정책에 따라 제품 세대·기능 릴리스·네 자리 빌드·채널을 구분하고 About·진단·파일 속성·manifest의 동일 배포 값을 일치시킨다.
 - PHASE 12.5 산출물을 Launcher/installer가 소비하는 하나의 distribution contract로 만든다.
 - PHASE 22의 pinned miniaudio source hash/license와 FMOD-free dependency audit 결과를 provenance에 포함한다.
 
 **판정:** repo checkout과 vcpkg 없이 staged engine으로 외부 project를 열고, 누락/변조 파일은 catalog
-등록 전에 실패한다.
+등록 전에 실패한다. 버전 표시가 일치하고 descriptor의 네 자리 빌드와 build ID가 정확한 배포를 선택한다.
 
 ⚠ **이 문서의 `provenance`는 배포 layout 축이다 — 엔진코어↔호스트셸(축 B)의
 Core ABI provenance가 아니다.** 이름이 겹쳐 한쪽이 다른 쪽을 덮었다고
@@ -501,9 +521,10 @@ PHASE 23에 위임했으나 **그 위임은 죽은 포인터였다** — 이 경
 - Launcher MSI와 versioned engine MSI를 빌드 파이프라인에 추가한다.
 - install/repair/uninstall, upgrade policy, file association, Start Menu entry를 구현한다.
 - project와 사용자 index/cache를 MSI component 밖에 유지한다.
+- MSI의 세 자리 `ProductVersion` 비교와 엔진의 네 자리 버전 사이 매핑을 확정한다. Revision 수정판을 구별하는 installer identity를 검증한다.
 
 **판정:** clean VM에서 silent/passive/UI 설치, repair, 두 engine side-by-side, 개별 uninstall을 통과하고
-프로젝트 hash가 전 과정에서 같다.
+프로젝트 hash가 전 과정에서 같다. Revision만 다른 두 배포도 설치·선택·복구·개별 제거 시 충돌하지 않는다.
 
 ### DL7 — 서명 update·migration·rollback·trust (P0, 4일)
 
@@ -536,6 +557,7 @@ digest로 복원된다.
 - projectId/engine build ID가 포함된 crash/log/support bundle과 개인정보 제외 규칙을 만든다.
 - license/EULA, third-party notices, SBOM, symbol/provenance 보존, signing key 운영 절차를 닫는다.
 - Player/Editor/Launcher/MSI dependency와 설치 결과를 최종 감사한다.
+- 버전 번호 발행·Preview/Stable 승격·불변 payload 규칙을 릴리스 절차에 넣고, Stable 지정에 지원 환경의 빌드·프로젝트 열기/저장·스크립트·패키징/실행 회귀 근거를 요구한다.
 
 **판정:** release checklist와 rollback runbook이 다른 clean VM에서 재현되고, Editor의 pinned efsw
 버전/license가 SBOM과 일치한다. Player/Launcher의 efsw, 전체 제품의 FMOD dependency와

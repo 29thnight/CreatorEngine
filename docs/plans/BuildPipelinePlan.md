@@ -294,11 +294,11 @@ C#(GameScripts.dll)뿐이고 ClrHost가 실행 시 로드한다 — 게임마다
 ### 2.3 파이프라인 — 여섯 단계와 한 오케스트레이터
 
 ```
-Tools/build.ps1 -Config Release -InputMode <Project|Workspace|Tracked>
-                [-Project <경로>] [-BuildNative]
-                [-StartupScene <name.creator>] [-RenderBackend <dx12|vulkan>]
-  1 BuildNative    선택적으로 Player·AssetPacker·AssetCooker를 현재 solution에서 빌드
-  2 BuildManaged   dotnet build ScriptCore → GameScripts
+CreatorBuildTool.exe package-game --config Release --input-mode <Project|Workspace|Tracked>
+                    --project <경로> --engine-distribution <배포본>
+                    [--startup-scene <name.creator>] [--render-backend <dx12|vulkan>]
+  1 Engine         선택한 불변 엔진의 구성·pin·파일 해시 검증
+  2 BuildManaged   배포본의 Roslyn·참조 어셈블리로 게임 C# 컴파일
   3 Cook           package-base model→CEMC/CEMF; shader는 B3 전까지 source를 유지
   4 Stage          미게시 candidate에 Player.exe·명시 DLL·Managed 배치
   5 Pak            정본 입력 + runtime settings overlay → GameAssets.pak/manifest
@@ -314,23 +314,26 @@ SkipVerify         검증·publish 없이 candidate만 진단용으로 남김
   GT frame, display frame/promotion, failure marker, unpack entry 수·SHA-256을 본다.
   `FT_Primitives.creator`일 때는 scene-resident `PackageSmokeProbe`의
   `OnInitialized → OnBeginSimulation`을 각각 정확히 한 번 요구한다.
-- `GameBuilderSystem::BuildGame()`과 `game.pak`은 같은 script를 `Release/Project`
-  모드로 호출하며 Build Settings의 시작 씬/backend를 전달한다. 현재는 stale native
-  배포를 막기 위해 제품 경로도 `-BuildNative`를 쓴다. GameBuilder가 MSBuild 경로나
-  명령을 직접 조립하지 않는 것이 현재의 단일화 계약이다. build 직전에 live 설정 전체를
+- 2026-09-13부터 구현 정본은 별도 프로젝트 `BuildTool/CreatorBuildTool.csproj`다.
+  배포본 생성(`publish-engine`)과 게임 컴파일(`compile-game`)도 같은 EXE가 소유한다.
+  기존 PowerShell 진입점은 소스 checkout용 인자 전달 adapter로만 남는다.
+- `GameBuilderSystem::BuildGame()`과 `game.pak`은 같은 EXE를 선택된 엔진 구성의 `Project`
+  모드로 호출하며 Build Settings의 시작 씬/backend를 전달한다. 제품 경로는 C++ 엔진을
+  재빌드하지 않는다. `--build-native`는 엔진 유지보수자의 명시적 선택이다.
+  GameBuilder가 MSBuild 경로나 명령을 직접 조립하지 않는다. build 직전에 live 설정 전체를
   다시 저장하지도 않는다. UI 변경 시 `EditorSettingsStore`가 live YAML을 원자 저장하고,
   build 경로는 메모리의 `BuildSettings` 값만 명시적 CLI 인자로 넘긴다.
-- Editor 호출은 아직 UI thread에서 동기 대기한다. timeout/cancel/progress 중계는
-  B2 운영성 잔여이며, 기능적 산출물 정본과 분리해 후속 처리한다.
-- Release 산출물은 현재 .NET 10 x64 runtime과 Microsoft Visual C++ Redistributable
-  x64를 외부 prerequisite로 둔다. Debug package는 debug CRT를 요구하므로 개발용이다.
+- Editor 게임 빌드 호출은 아직 UI thread에서 동기 대기한다. BuildTool의 Ctrl+C·하위 프로세스
+  timeout·Windows Job 정리는 구현했으며 Editor progress/cancel UI 연결은 B2 운영성 잔여다.
+- 배포본은 사설 .NET 10 x64 runtime과 native runtime closure를 포함한다. 게임 제작자는
+  PowerShell·Visual Studio·.NET SDK 없이 배포본으로 패키징한다. Debug package는 개발용이다.
 - `contentDigest`는 pak logical entry/hash, `runtimeDigest`는 실행 payload,
   `distributionDigest`는 둘을 합친 논리 배포물 정체성이다. Pak 파일 자체는 포맷의
   random salt 때문에 빌드마다 SHA가 달라도 세 논리 digest가 같으면 재현된 입력이다.
 
 ### 2.4 산성 테스트 — 모든 슬라이스의 심판
 
-> **에디터를 한 번도 띄우지 않은 체크아웃에서 `build.ps1 -Target Game`이
+> **에디터를 한 번도 띄우지 않고 `CreatorBuildTool.exe package-game`이
 > 패키지를 내고, 그 패키지가 첫 씬을 그리고 C#
 > `OnInitialized → OnBeginSimulation` marker를 남기고 정상
 > 종료한다.**
@@ -420,15 +423,18 @@ OutDir 규약)를 Directory.Build.props로 승격 · EngineOutput.props 흡수
 링크로 디버거 아래서 뜬다.
 
 **B2 — 오케스트레이터 ◐ Workspace·Editor Project gate 통과, Tracked/CI/운영성
-잔여 (2026-08-21, model Cook 개정 2026-08-29).** `Tools/build.ps1`이 BuildNative→BuildManaged→Cook→
-Stage→Pak→Verify와 원자적 publish를 소유한다. `Project`, `Workspace`, `Tracked`
+잔여 (2026-09-13 EXE 전환).** `CreatorBuildTool.exe`가 Engine→BuildManaged→Cook→
+Stage→Pak→Verify와 원자적 publish를 소유한다. [명령과 배포 계약](../../BuildTool/README.md)을 따른다.
+Debug/Release 도구 빌드, 47개 회귀, private runtime을 사용한 Debug/DX12 검증 씬의 패키징·실행·게시를
+통과했다. 기존 모델 씬 실패와 검증 한계는 [EXE 검증 기록](../analysis/CreatorBuildToolValidation.md)에 있다.
+2026-08의 기존 검증 이력과 이번 EXE의 검증 결과는 구분한다. `Project`, `Workspace`, `Tracked`
 입력은 live `EngineSettings.asset`을 제외하고 runtime settings overlay를 사용한다.
 Verify는 startup scene, 렌더 진행, exact unpack hash, C#
 `OnInitialized → OnBeginSimulation`, Stage 불변을 함께 판정한다.
 
-`GameBuilderSystem::BuildGame()`과 `game.pak`은 시작 씬/backend를 전달해 같은 script를
+`GameBuilderSystem::BuildGame()`과 `game.pak`은 시작 씬/backend를 전달해 같은 EXE를
 호출한다. Editor가 vswhere/MSBuild 경로나 명령을 직접 구성하는 제품 경로는 0이며,
-legacy Test Pack/Unpack UI도 제거했다. 현재 `-BuildNative`의 구성은 오케스트레이터만
+legacy Test Pack/Unpack UI도 제거했다. 유지보수자용 `--build-native`의 구성은 오케스트레이터만
 소유한다. `MSBuildHelper`와 소비자 없는 VS/MSVC 탐색 상태도 제거했으며 별도
 `EditorToolchainSettings`를 만들지 않는다. live 설정은 Editor의 단일
 `EditorSettingsStore`만 unknown key를 보존해 candidate→atomic replace로 기록한다.
@@ -444,8 +450,8 @@ AssetPacker reopen/index 검증을 통과했다. 이 실행은 publish/runtime s
 패키징 copy list의 `DirectXTK12.dll` 재유입도 거부한다.
 `Release|x64`의 host compiler/linker도 `PreferredToolArchitecture=x64`로 고정한다. 이전에는
 x86·x64 MSBuild 진입점이 같은 `IntDir`의 LTCG `.ipdb/.iobj`를 교대로 갱신해, x86 host로
-전환할 때 7만여 함수 중 90% 이상을 재생성했다. `build.ps1`은 PATH의 x86 MSBuild를 같은
-설치의 amd64 실행 파일로 승격하고 CI도 x64 MSBuild를 선택하며,
+전환할 때 7만여 함수 중 90% 이상을 재생성했다. `CreatorBuildTool`의 명시적 native 빌드는
+vswhere로 찾은 설치의 amd64 MSBuild를 사용하고 CI도 x64 MSBuild를 선택하며,
 `verify-msbuild-tool-architecture.ps1`이 effective property를 회귀 검사한다.
 다음 명령이 overlap/reparse/path alias, StageRoot/runtime junction, pak 누락의
 exit 2·부분 PID root 정리, Player 정상 실행의 exact-root 정리와 sibling 보존을 한 번에

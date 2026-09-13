@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\EngineVersion.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>CreatorBuildTool</AssemblyName>
+    <Version>$(CreatorEngineBuildVersion)</Version>
+    <AssemblyVersion>$(CreatorEngineBuildVersion)</AssemblyVersion>
+    <FileVersion>$(CreatorEngineBuildVersion)</FileVersion>
+    <InformationalVersion>$(CreatorEngineBuildVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Product>$(CreatorEngineProductDisplay)</Product>
+    <RootNamespace>CreatorBuildTool</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <SelfContained>false</SelfContained>
+    <UseAppHost>true</UseAppHost>
+    <AppHostDotNetSearch>AppRelative;Global</AppHostDotNetSearch>
+    <AppHostRelativeDotNet>../../Runtime/DotNet</AppHostRelativeDotNet>
+    <OutputPath>$(MSBuildThisFileDirectory)..\Bin\x64-$(Configuration)\Tools\CreatorBuildTool\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
+    <InternalsVisibleTo Include="CreatorBuildTool.Tests" />
+  </ItemGroup>
+  <!-- The SDK applies AppHostDotNetSearch only during Publish. Our Build output is already
+       the engine's final tool layout, so configure that apphost before it is copied to Bin. -->
+  <Target Name="ConfigureCreatorBuildToolAppHost" AfterTargets="_CreateAppHost"
+          Inputs="@(IntermediateAssembly);$(AppHostSourcePath);$(MSBuildProjectFullPath);$(AppHostIntermediatePath)"
+          Outputs="$(AppHostIntermediatePath).configured"
+          Condition="'$(DesignTimeBuild)' != 'true' and Exists('$(AppHostSourcePath)') and Exists('@(IntermediateAssembly)')">
+    <CreateAppHost AppHostSourcePath="$(AppHostSourcePath)"
+                   AppHostDestinationPath="$(AppHostIntermediatePath)"
+                   AppBinaryName="$(AssemblyName)$(TargetExt)"
+                   IntermediateAssembly="@(IntermediateAssembly->'%(FullPath)')"
+                   DotNetSearchLocations="$(AppHostDotNetSearch)"
+                   AppRelativeDotNet="$(AppHostRelativeDotNet)" />
+    <Touch Files="$(AppHostIntermediatePath).configured" AlwaysCreate="true" />
+    <ItemGroup><FileWrites Include="$(AppHostIntermediatePath).configured" /></ItemGroup>
+  </Target>
+</Project>

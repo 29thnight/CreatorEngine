@@ -249,7 +249,7 @@ namespace
     bool IsExcludedSourceExtension(const fs::path& path)
     {
         static const std::wstring_view kExcluded[] = {
-            L".cpp", L".h", L".hpp", L".meta", L".json"
+            L".cpp", L".h", L".hpp", L".cs", L".meta", L".json"
         };
 
         std::wstring extension = path.extension().native();

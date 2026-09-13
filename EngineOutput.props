@@ -8,8 +8,9 @@
     Bin\<플랫폼>-<구성>\Managed\             공통 관리 어셈블리
     Bin\<플랫폼>-<구성>\Resources\           엔진 리소스
 
-  EXE와 암시적으로 로드되는 네이티브 DLL은 Windows 로더 계약상 각 실행 번들
-  안에 함께 둔다. 캐시·로그·덤프·테스트 결과는 이 트리에 두지 않는다.
+  각 실행 폴더에는 작은 EXE와 해당 host runtime DLL을 둔다. EXE가 검색 경로를
+  설정한 뒤 host를 로드하며 공용 종속성은 Runtime\Common, Editor 전용은
+  Runtime\Editor에 한 번만 배치한다. 캐시·로그·덤프·테스트 결과는 이 트리에 두지 않는다.
 
   ── 리소스의 저작 원본 ──
 

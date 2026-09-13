@@ -1,3 +1,5 @@
+#include "EngineRuntimePaths.h"
+#include "ScriptApiVersion.h"
 #include "ClrHost.h"
 #include "MaterialScriptBinding.h"
 #include "PathFinder.h"
@@ -46,7 +48,7 @@ namespace
 	// C# ScriptApiTable과 필드 순서·타입이 정확히 같아야 한다.
 	// 어긋나면 엉뚱한 함수를 호출하게 되므로 버전과 크기를 함께 넘겨 초기화 때 검사한다.
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
-	constexpr int kApiVersion = 24;
+	constexpr int kApiVersion = CreatorScriptApiVersion;
 
 	struct Float3 { float x, y, z; };
 
@@ -2505,7 +2507,11 @@ bool ClrHost::LoadHostfxr()
 	wchar_t path[MAX_PATH]{};
 	size_t size = MAX_PATH;
 
-	if (0 != get_hostfxr_path(path, &size, nullptr))
+	const auto privateRoot = ResolveEngineRuntimeDirectory() / L"DotNet";
+    const std::wstring privateRootText = privateRoot.wstring();
+    get_hostfxr_parameters parameters{ sizeof(get_hostfxr_parameters), nullptr, privateRootText.c_str() };
+    const bool hasPrivateRuntime = file::is_directory(privateRoot / L"host" / L"fxr");
+    if (0 != get_hostfxr_path(path, &size, hasPrivateRuntime ? &parameters : nullptr))
 	{
 		Debug->LogWarning("[CLR] hostfxr를 찾을 수 없습니다. 스크립트 계층이 비활성화됩니다.");
 		return false;
@@ -2693,7 +2699,8 @@ bool ClrHost::Initialize()
 	const file::path scriptsPath = baseDir / L"Scripts" / L"GameScripts.dll";
 	if (file::exists(scriptsPath))
 	{
-		const std::string utf8 = scriptsPath.string();
+		const auto pathUtf8 = scriptsPath.u8string();
+		const std::string utf8(pathUtf8.begin(), pathUtf8.end());
 		if (0 != m_fnLoadScripts(utf8.c_str()))
 		{
 			Debug->LogWarning("[CLR] 게임 스크립트 어셈블리 로드 실패");

@@ -74,7 +74,52 @@ namespace
             << "       AssetCooker --issue-model-identity-epoch "
                "--asset-root <Assets> --identity-epoch <name>\n"
             << "       AssetCooker --compile-runtime-documents "
-               "--runtime-root <package-input-root>\n";
+               "--runtime-root <package-input-root>\n"
+            << "       AssetCooker --arguments-file <UTF-8 file; one argument per line>\n";
+    }
+
+    // Keep large projects below CreateProcessW's command-line limit. This is a
+    // token file, not shell syntax: spaces and backslashes are preserved verbatim.
+    [[nodiscard]] bool ReadArgumentsFile(const std::filesystem::path& path,
+        std::vector<std::wstring>& tokens, std::string& failure)
+    {
+        std::error_code error;
+        const auto size = std::filesystem::file_size(path, error);
+        if (error || size == 0 || size > 64u * 1024u * 1024u)
+        {
+            failure = "arguments file must contain 1 to 67108864 bytes.";
+            return false;
+        }
+        std::ifstream input(path, std::ios::binary);
+        std::string bytes(static_cast<size_t>(size), '\0');
+        if (!input.read(bytes.data(), static_cast<std::streamsize>(bytes.size())))
+        {
+            failure = "cannot read arguments file.";
+            return false;
+        }
+        if (bytes.starts_with("\xEF\xBB\xBF")) bytes.erase(0, 3);
+        std::istringstream lines(bytes);
+        std::string line;
+        while (std::getline(lines, line))
+        {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            const auto length = static_cast<int>(line.size());
+            const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, line.data(), length, nullptr, 0);
+            if (count <= 0 || line.find('\0') != std::string::npos || tokens.size() >= 1000000u)
+            {
+                failure = "invalid UTF-8 argument, empty argument, or too many arguments.";
+                return false;
+            }
+            std::wstring token(static_cast<size_t>(count), L'\0');
+            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, line.data(), length, token.data(), count);
+            if (token == L"--arguments-file")
+            {
+                failure = "nested arguments files are not supported.";
+                return false;
+            }
+            tokens.push_back(std::move(token));
+        }
+        return tokens.size() > 1;
     }
 
     [[nodiscard]] bool ParseArguments(int argc, wchar_t** argv,
@@ -1356,6 +1401,20 @@ int wmain(int argc, wchar_t** argv)
     struct ComScope { HRESULT hr; ~ComScope() { if (SUCCEEDED(hr)) CoUninitialize(); } } comScope{ comInit };
     Arguments arguments;
     std::string failure;
+    std::vector<std::wstring> tokens;
+    std::vector<wchar_t*> tokenPointers;
+    if (argc > 1 && std::wstring_view(argv[1]) == L"--arguments-file")
+    {
+        tokens.emplace_back(argv[0]);
+        if (argc != 3 || !ReadArgumentsFile(argv[2], tokens, failure))
+        {
+            std::cerr << "asset-cooker error: " << (failure.empty() ? "invalid arguments file invocation." : failure) << '\n';
+            return 2;
+        }
+        for (auto& token : tokens) tokenPointers.push_back(token.data());
+        argc = static_cast<int>(tokenPointers.size());
+        argv = tokenPointers.data();
+    }
     if (!ParseArguments(argc, argv, arguments, failure))
     {
         if (failure.empty()) return 0;

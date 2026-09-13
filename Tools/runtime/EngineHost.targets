@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <EngineHostedApplication Condition="'$(MSBuildProjectName)' == 'CreatorEditor' or '$(MSBuildProjectName)' == 'Player' or '$(MSBuildProjectName)' == 'AssetCooker' or '$(MSBuildProjectName)' == 'AssetPacker'">true</EngineHostedApplication>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(EngineHostedApplication)' == 'true'">
+    <TargetName>$(MSBuildProjectName).runtime</TargetName>
+    <VcpkgApplocalDeps>false</VcpkgApplocalDeps>
+    <LocalDebuggerCommand>$(OutDir)$(MSBuildProjectName).exe</LocalDebuggerCommand>
+    <_EngineLauncherSubsystem>Windows</_EngineLauncherSubsystem>
+    <_EngineLauncherSubsystem Condition="'$(MSBuildProjectName)' == 'AssetCooker' or '$(MSBuildProjectName)' == 'AssetPacker'">Console</_EngineLauncherSubsystem>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(EngineHostedApplication)' == 'true'">
+    <Link><ImportLibrary>$(IntDir)$(MSBuildProjectName).host.lib</ImportLibrary></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(EngineHostedApplication)' == 'true'">
+    <ResourceCompile Include="$(SolutionDir)Tools\runtime\EngineVersion.rc">
+      <PreprocessorDefinitions>CREATOR_ENGINE_RUNTIME_HOST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+    <ClCompile Include="$(SolutionDir)Tools\runtime\HostInfo.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(SolutionDir)Tools\runtime\HostGuiEntry.cpp" Condition="'$(_EngineLauncherSubsystem)' == 'Windows'"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(SolutionDir)Tools\runtime\HostConsoleEntry.cpp" Condition="'$(_EngineLauncherSubsystem)' == 'Console'"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+  </ItemGroup>
+  <Target Name="CheckEngineVersionSource" BeforeTargets="PrepareForBuild" Condition="'$(EngineHostedApplication)' == 'true' or '$(MSBuildProjectName)' == 'RuntimeLauncher'">
+    <Exec Command="pwsh -NoProfile -File &quot;$(SolutionDir)Tools\distribution\update-engine-version.ps1&quot; -Repository &quot;$(SolutionDir).&quot; -Check" />
+  </Target>
+  <Target Name="DeploySharedEngineRuntime" AfterTargets="Build" Condition="'$(EngineHostedApplication)' == 'true'">
+    <MSBuild Projects="$(SolutionDir)Tools\runtime\RuntimeLauncher.vcxproj" Targets="Build"
+      Properties="Configuration=$(Configuration);Platform=$(Platform);SolutionDir=$(SolutionDir);LauncherName=$(MSBuildProjectName);LauncherOutputDir=$(OutDir);LauncherSubsystem=$(_EngineLauncherSubsystem);EngineShipping=$(EngineShipping);EngineAsan=false" />
+    <Exec Command="pwsh -NoProfile -File &quot;$(SolutionDir)Tools\runtime\deploy-runtime.ps1&quot; -Repository &quot;$(SolutionDir).&quot; -BinaryRoot &quot;$(EngineBinaryRoot).&quot; -HostPath &quot;$(TargetPath)&quot; -HostName &quot;$(MSBuildProjectName)&quot; -Config &quot;$(Configuration)&quot; -VcpkgDirectory &quot;$(_ZVcpkgCurrentInstalledDir).&quot; -VcToolsDirectory &quot;$(VCToolsInstallDir).&quot; -VcRedistDirectory &quot;$(VCToolsRedistDir).&quot;" />
+  </Target>
+</Project>

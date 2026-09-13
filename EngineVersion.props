@@ -1,0 +1,7 @@
+<Project>
+  <!-- Generated from EngineVersion.json; channel and build ID remain manifest metadata. -->
+  <PropertyGroup>
+    <CreatorEngineBuildVersion>0.0.0.0</CreatorEngineBuildVersion>
+    <CreatorEngineProductDisplay>CreatorEngine 2 - Local development (unassigned)</CreatorEngineProductDisplay>
+  </PropertyGroup>
+</Project>

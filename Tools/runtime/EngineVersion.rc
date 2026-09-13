@@ -1,0 +1,30 @@
+// Generated from EngineVersion.json. Channel and distribution ID are manifest metadata.
+#include <windows.h>
+1 VERSIONINFO
+ FILEVERSION 0,0,0,0
+ PRODUCTVERSION 0,0,0,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEFLAGS 0
+ FILEOS VOS_NT_WINDOWS32
+#ifdef CREATOR_ENGINE_RUNTIME_HOST
+ FILETYPE VFT_DLL
+#else
+ FILETYPE VFT_APP
+#endif
+ FILESUBTYPE 0
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "ProductName", "CreatorEngine 2 - Local development (unassigned)\0"
+            VALUE "ProductVersion", "0.0.0.0\0"
+            VALUE "FileVersion", "0.0.0.0\0"
+            VALUE "FileDescription", "CreatorEngine 2 - Local development (unassigned)\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
