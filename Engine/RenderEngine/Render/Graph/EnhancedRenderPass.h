@@ -15,6 +15,7 @@
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
 
+#include "EnhancedMaterialSealIdentity.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/IRenderPipelineCache.h"
@@ -100,6 +101,9 @@ struct EnhancedMaterialCoverage
 
 struct EnhancedForwardMaterialDrawSnapshot
 {
+    // W8: 이 packet이 어느 저작 값·어느 프레임의 것인지. 값 검증(IsValid)과는
+    // 축이 다르다 — 값이 멀쩡해도 지난 프레임 것이면 섞인 것이다.
+    EnhancedMaterialSealIdentity seal{};
     ShaderMetaHandle shaderMetaHandle{};
     RHIShaderPermutationKey permutationKey{};
     ShaderMetaBindingLayout bindingLayout{};
@@ -132,6 +136,8 @@ struct EnhancedForwardMaterialDrawSnapshot
 // 어느 논리 property/GUID/register의 generation인지 함께 고정한다.
 struct EnhancedMaterialDrawSnapshot
 {
+    // W8: 위 Forward packet과 같은 뜻이다. 밀봉한 쪽이 적고 패스가 대조한다.
+    EnhancedMaterialSealIdentity seal{};
     EnhancedMaterialCoverage coverage{};
     ShaderMetaHandle shaderMetaHandle{};
     // M6-P1b2b1: 같은 ShaderMeta generation 안에서도 keyword 선택이 다르면
@@ -337,6 +343,13 @@ struct EnhancedFrameContext
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };
+
+    // W8: 이 프레임의 신원. 패스가 draw snapshot의 seal과 대조해 지난 프레임의
+    // 밀봉이 섞여 들어왔는지 판정한다. 0은 "제품 프레임이 아니다"(격리 fixture)
+    // 이며 그때는 staleness 축을 재지 않는다 — 잴 것이 없는데 붉히면 게이트가
+    // 도는 세트에서 빠진다.
+    uint64_t frameId{ 0 };
+    uint64_t sceneEpoch{ 0 };
 
     // 프레임 밀봉된 카메라(3-2). 살아 있는 Camera를 읽지 않는다.
     const FrameCameraSnapshot* camera{ nullptr };

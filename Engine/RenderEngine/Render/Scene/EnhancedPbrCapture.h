@@ -3,6 +3,7 @@
 #include "EnhancedSceneRenderer.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Passes/Geometry/EnhancedGBufferPass.h"
+#include "../Graph/EnhancedDrawSealLedger.h"
 #include "../../Texture.h"
 #include <AuthoringRymlErrorPolicy.h>
 #include <ryml/ryml.hpp>
@@ -81,6 +82,16 @@ struct EnhancedPbrCapture
             item["modelGeneration"] << draw.modelMeshView.handle.generation;
             if (material)
             {
+                // W8: 이 packet이 어느 저작 값·어느 프레임의 밀봉인지.
+                auto seal = item["seal"];
+                seal |= ryml::MAP;
+                seal["hash"] << material->seal.sealHash;
+                seal["authoredDigest"] << material->seal.authoredDigest;
+                seal["authoredRevision"] << material->seal.authoredRevision;
+                seal["modelGeneration"] << material->seal.modelGeneration;
+                seal["sceneEpoch"] << material->seal.sceneEpoch;
+                seal["frameId"] << material->seal.frameId;
+                seal["stamped"] << material->seal.IsStamped();
                 item["shaderMetaSlot"] << material->shaderMetaHandle.slot;
                 item["shaderMetaGeneration"] << material->shaderMetaHandle.generation;
                 item["permutation"] << material->permutationKey.Hex();
@@ -108,10 +119,64 @@ struct EnhancedPbrCapture
         };
         for (const auto& draw : opaque) append(draw, draw.materialSnapshot, "gbuffer");
         for (const auto& draw : transparent) append(draw, draw.forwardMaterialSnapshot, "forward");
-        // These contracts are not represented by the current draw snapshot.
-        root["missing"] |= ryml::SEQ;
-        for (const char* missing : { "sampler identity", "descriptor generation", "resolved PSO key" })
-            root["missing"].append_child() << missing;
+        // W8 이전에는 여기서 sampler identity·descriptor generation·resolved PSO
+        // key를 "없다"고 적었다. 이제 그 셋은 패스가 배치를 확정한 뒤에 알 수
+        // 있으므로 Save 직전 RecordSealLedger가 채운다. 기록이 없는 채로 저장되면
+        // 그것 자체가 배선 결함이므로 기본값을 "미기록"으로 둔다.
+        root["sealLedger"] |= ryml::MAP;
+        root["sealLedger"]["recorded"] << false;
+    }
+
+    // 패스가 이번 프레임의 배치를 확정한 뒤에 부른다. draw snapshot만으로는
+    // 알 수 없는 축(어느 PSO로 그렸는가, 어떤 sampler를 걸었는가, descriptor
+    // 배치가 갈리지 않았는가)을 여기서 적는다.
+    void RecordSealLedger(const EnhancedDrawSealLedger& gbuffer,
+        std::uint64_t gbufferSampler,
+        const EnhancedDrawSealLedger& forward, std::uint64_t forwardSampler,
+        std::uint64_t encoderDrops, const std::string& lastEncoderDrop,
+        std::uint32_t textureUploadFailures)
+    {
+        auto root = manifest.rootref();
+        auto ledger = root["sealLedger"];
+        ledger |= ryml::MAP;
+        ledger["recorded"] << true;
+        ledger["encoderDrops"] << encoderDrops;
+        ledger["lastEncoderDrop"] << lastEncoderDrop;
+        // W9 — 업로드 실패를 흰색으로 덮은 횟수. 저작으로 없는 슬롯의 중립값은
+        // 여기 들어가지 않는다. 0이 아니면 화면의 흰색을 재질로 읽으면 안 된다.
+        ledger["textureUploadFailures"] << textureUploadFailures;
+        const auto appendPass = [&](const char* name,
+            const EnhancedDrawSealLedger& source, std::uint64_t samplerIdentity)
+        {
+            auto node = ledger[ryml::to_csubstr(name)];
+            node |= ryml::MAP;
+            node["frameId"] << source.frameId;
+            node["sceneEpoch"] << source.sceneEpoch;
+            node["samplerIdentity"] << samplerIdentity;
+            node["stamped"] << source.counters.stamped;
+            node["unstamped"] << source.counters.unstamped;
+            node["staleFrame"] << source.counters.staleFrame;
+            node["valueMismatch"] << source.counters.valueMismatch;
+            node["pipelineConflict"] << source.counters.pipelineConflict;
+            node["bindingConflict"] << source.counters.bindingConflict;
+            node["skipped"] << source.counters.skipped;
+            node["dropped"] << source.recordDrops.Total();
+            node["violations"] << source.Violations();
+            node["lastReason"] << source.lastReason;
+            auto bindings = node["bindings"];
+            bindings |= ryml::SEQ;
+            for (const auto& [sealHash, binding] : source.bindings)
+            {
+                auto entry = bindings.append_child();
+                entry |= ryml::MAP;
+                entry["sealHash"] << sealHash;
+                entry["pipelineId"] << binding.pipelineId;
+                entry["textureDigest"] << binding.textureDigest;
+                entry["samplerIdentity"] << binding.samplerIdentity;
+            }
+        };
+        appendPass("gbuffer", gbuffer, gbufferSampler);
+        appendPass("forward", forward, forwardSampler);
     }
 
     bool Declare(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,

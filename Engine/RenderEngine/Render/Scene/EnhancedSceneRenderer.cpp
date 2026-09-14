@@ -4,6 +4,8 @@
 
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../Graph/EnhancedRenderPass.h"
+#include "../Graph/EnhancedMaterialSealHash.h"
+#include "AuthoredMaterialDigest.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Passes/Geometry/EnhancedGBufferPass.h"
 #include "../Passes/Geometry/EnhancedShadowPass.h"
@@ -322,6 +324,12 @@ namespace
         VulkanMeshCache meshCache;
         VulkanTextureCache textureCache;
         VulkanCommandBufferPool commandPool;
+
+        // W8 — capture 프레임은 Render 안에서 인코더 drop을 비워 manifest에
+        // 싣는다. 그렇게 비운 수를 여기 맡겨 두어야 TickLive의 프레임 집계가
+        // 그 프레임만 0으로 세지 않는다.
+        uint64_t    stashedEncoderDrops{ 0 };
+        std::string stashedLastEncoderDrop;
 
         EnhancedShadowPass shadow;
         EnhancedGBufferPass gbuffer;
@@ -747,6 +755,15 @@ namespace
                 resources.WaitForGpu();
                 std::string validation;
                 const uint32_t validationCount = resources.DrainDebugMessages(validation);
+                // W8: 패스가 배치를 확정한 뒤라야 알 수 있는 축을 여기서 싣는다.
+                std::string lastDrop;
+                const uint32_t drops = commandPool.DrainEncoderDrops(lastDrop);
+                stashedEncoderDrops += drops;
+                if (!lastDrop.empty()) stashedLastEncoderDrop = lastDrop;
+                capture->RecordSealLedger(gbuffer.GetSealLedger(),
+                    gbuffer.GetSamplerIdentity(), forward.GetSealLedger(),
+                    forward.GetSamplerIdentity(), stashedEncoderDrops,
+                    stashedLastEncoderDrop, textureCache.GetUploadFailureCount());
                 if (!capture->Save(resources, graph.GetStats(), outError,
                         validationCount, validation)) return false;
             }
@@ -1050,6 +1067,10 @@ namespace
             // I5-D5c2-2 — 재질 저작 정본의 값 스냅샷. 있으면 sealing이
             // properties·keywords·blendMode를 이것으로 덮는다(부속은 legacy).
             std::shared_ptr<const experiment::Material> authoredMaterialSource{};
+            // W8 — 그 값 스냅샷을 만든 MaterialInstance의 Revision. 프록시까지만
+            // 오고 렌더 스냅샷에는 없어서, 인스턴스 편집이 화면에 닿았는지를
+            // 밖에서 물을 수 없었다. seal 신원의 일부로 운반한다.
+            std::uint64_t        authoredRevision{};
             math::aabb           worldBounds{};
             bool                 hasBounds{ false };
             bool                 isTransparent{ false };
@@ -1113,6 +1134,11 @@ namespace
         // 반복되므로 처음 본 것만 찍는다 — 안 그러면 콘솔이 도배돼 정작
         // 첫 원인을 못 본다.
         std::unordered_set<std::string> reportedValidation;
+
+        // W8 — 인코더가 조용히 버린 명령. 놓인 PSO 핸들·만료된 descriptor
+        // 버전·주소 0이 여기 모인다. 0이 아니면 그 프레임의 그림을 믿으면 안 된다.
+        uint64_t encoderDrops{ 0 };
+        std::string lastEncoderDrop;
 
         uint32_t lastDrawCount{ 0 };    // 이번 프레임 GBuffer 드로우(0이면 빈 화면이다)
         uint32_t lastBatchCount{ 0 };
@@ -2793,6 +2819,7 @@ namespace
                 {
                     pooled.materialSource = proxy->m_Material;
                     pooled.authoredMaterialSource = proxy->m_authoredMaterial;
+                    pooled.authoredRevision = proxy->m_authoredRevision;
                     pooled.isTransparent =
                         (MaterialRenderingMode::Transparent == material->m_renderingMode);
                 }
@@ -2939,7 +2966,8 @@ namespace
             // pass 안에 남은 variant와 immutable Meta value로 다시 밀봉하고,
             // Commit 뒤 이번 frame에서 안 쓴 secondary owner만 놓는다.
             std::vector<EnhancedShaderMetaFrameSnapshot> nextActiveMaterialOwners;
-            std::unordered_map<const Material*,
+            // W8: GBuffer와 같은 이유로 주소가 아니라 값으로 합친다.
+            std::unordered_map<std::uint64_t,
                 std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>> sealed;
             sealed.reserve(drawPool.size());
             RHIShaderCompiler::ScopedOutput outputScope(output);
@@ -2954,7 +2982,18 @@ namespace
                 }
 
                 const Material* source = pooled.materialSource.get();
-                const auto found = sealed.find(source);
+                const std::uint64_t authoredDigest = pooled.authoredMaterialSource
+                    ? EnhancedAuthoredMaterialDigest::Compute(
+                        *pooled.authoredMaterialSource) : 0ull;
+                const std::uint64_t modelGeneration = pooled.generationSource
+                    ? pooled.generationSource->Identity().generation : 0ull;
+                EnhancedSealDigest keyDigest;
+                keyDigest.U64(reinterpret_cast<std::uintptr_t>(source));
+                keyDigest.U64(authoredDigest);
+                keyDigest.U64(modelGeneration);
+                const std::uint64_t sealKey = keyDigest.Value();
+
+                const auto found = sealed.find(sealKey);
                 if (found != sealed.end())
                 {
                     pooled.item.forwardMaterialSnapshot = found->second;
@@ -3099,6 +3138,10 @@ namespace
                         error = "Forward material snapshot sealing 결과가 invalid다";
                         return false;
                     }
+                    // W8: immutable로 넘기기 직전에 값 digest와 프레임 도장.
+                    EnhancedMaterialSeal::Stamp(*snapshot, authoredDigest,
+                        pooled.authoredRevision, modelGeneration,
+                        context.sceneEpoch, context.frameId);
 
                     outSnapshot = std::move(snapshot);
                     return true;
@@ -3145,7 +3188,7 @@ namespace
                         nextActiveMaterialOwners.push_back(*selectedShader);
                 }
 
-                sealed.emplace(source, immutable);
+                sealed.emplace(sealKey, immutable);
                 pooled.item.forwardMaterialSnapshot = std::move(immutable);
                 pooled.materialSource.reset();
             }
@@ -3169,7 +3212,11 @@ namespace
             const EnhancedShaderMetaFrameSnapshot& primary = shaders.front();
             std::vector<ShaderMetaHandle> activeHandles{ primary.handle };
             Material defaultMaterial;
-            std::unordered_map<const Material*,
+            // W8: 중복 제거 키가 legacy `Material*` 하나였다. DataSystem이 이름으로
+            // 캐시한 같은 객체를 여러 MeshRenderer가 공유하는데 인스턴스 override는
+            // 렌더러마다 다르므로, 주소가 같다는 이유로 먼저 밀봉된 스냅샷을 뒤의
+            // draw가 받아 override가 통째로 사라졌다. 키를 값으로 바꾼다.
+            std::unordered_map<std::uint64_t,
                 std::shared_ptr<const EnhancedMaterialDrawSnapshot>> sealed;
             sealed.reserve(drawPool.size());
             RHIShaderCompiler::ScopedOutput outputScope(output);
@@ -3208,7 +3255,23 @@ namespace
                         materialShader.handle) == activeHandles.end())
                     activeHandles.push_back(materialShader.handle);
 
-                const auto found = sealed.find(source);
+                // 저작 정본이 있으면 그 값이 신원이고, 없으면 legacy 객체가
+                // 값의 출처이므로 주소를 쓴다. 둘을 한 키에 함께 접어 어느
+                // 쪽이든 다른 값이 같은 스냅샷을 받지 않게 한다.
+                const std::uint64_t authoredDigest = pooled.authoredMaterialSource
+                    ? EnhancedAuthoredMaterialDigest::Compute(
+                        *pooled.authoredMaterialSource) : 0ull;
+                const std::uint64_t modelGeneration = pooled.generationSource
+                    ? pooled.generationSource->Identity().generation : 0ull;
+                EnhancedSealDigest keyDigest;
+                keyDigest.U64(reinterpret_cast<std::uintptr_t>(source));
+                keyDigest.U64(authoredDigest);
+                keyDigest.U64(modelGeneration);
+                keyDigest.U32(materialShader.handle.slot);
+                keyDigest.U32(materialShader.handle.generation);
+                const std::uint64_t sealKey = keyDigest.Value();
+
+                const auto found = sealed.find(sealKey);
                 if (found != sealed.end())
                 {
                     pooled.item.materialSnapshot = found->second;
@@ -3290,9 +3353,14 @@ namespace
                     outError = "GBuffer material snapshot sealing 결과가 invalid다";
                     return false;
                 }
+                // W8: 값 digest와 프레임 도장은 immutable로 넘기기 직전에 찍는다.
+                // 이 뒤로는 아무도 값을 바꾸지 않으므로 digest가 계약이 된다.
+                EnhancedMaterialSeal::Stamp(*snapshot, authoredDigest,
+                    pooled.authoredRevision, modelGeneration,
+                    context.sceneEpoch, context.frameId);
 
                 std::shared_ptr<const EnhancedMaterialDrawSnapshot> immutable = snapshot;
-                sealed.emplace(source, immutable);
+                sealed.emplace(sealKey, immutable);
                 pooled.item.materialSnapshot = std::move(immutable);
                 pooled.materialSource.reset();
             }
@@ -3689,12 +3757,29 @@ namespace
             slot.frameId = sourceFrameId;
             slot.key = view.key;
 
+            // W8: 기록이 끝난 자리에서 인코더가 버린 명령을 비우며 모은다.
+            // Vulkan 경로와 같은 뜻이고 같은 수를 센다.
+            {
+                std::string lastDrop;
+                const uint32_t drops = dx12.CommandPool().DrainEncoderDrops(lastDrop);
+                if (0 != drops)
+                {
+                    encoderDrops += drops;
+                    if (!lastDrop.empty()) lastEncoderDrop = lastDrop;
+                }
+            }
+
             view.pendingQueue.push_back(slotIndex);
             if (capture)
             {
                 dx12.WaitForGpu();
                 std::string validation;
                 const uint32_t validationCount = dx12.DrainDebugMessages(validation);
+                // W8: Vulkan 경로와 같은 자리에 같은 기록을 남긴다.
+                capture->RecordSealLedger(p.gbuffer.GetSealLedger(),
+                    p.gbuffer.GetSamplerIdentity(), p.forward.GetSealLedger(),
+                    p.forward.GetSamplerIdentity(), encoderDrops, lastEncoderDrop,
+                    dx12.TextureCache().GetUploadFailureCount());
                 if (!capture->Save(dx12.Resources(), graph.GetStats(), outError,
                         validationCount, validation)) return false;
             }
@@ -4827,6 +4912,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
 
         VulkanLivePipeline& p = *state.vulkanPipeline;
         {
+            // W8: DX12 경로와 같은 자리에 같은 도장을 찍는다. 한쪽만 찍으면
+            // backend마다 신원 축이 달라진다.
+            p.frameContext.frameId = frame.frameId;
+            p.frameContext.sceneEpoch = frame.sceneEpoch;
             std::string shaderError;
             if (!state.ApplyGBufferShaderMeta(frame.gbufferShaderMetas, p.gbuffer,
                     p.frameContext,
@@ -4937,6 +5026,23 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             }
 
             state.consecutiveFrameFailures = 0;
+            // W8: 인코더가 버린 명령을 프레임마다 비우며 모은다. 성공한 프레임에
+            // 쌓이는 것이 특히 중요하다 — 실패 경로는 이미 소리를 내지만 이쪽은
+            // "그려졌다"고 보고되면서 물체가 빠진 경우다.
+            {
+                std::string lastDrop;
+                uint64_t drops = p.commandPool.DrainEncoderDrops(lastDrop);
+                // capture 프레임이 먼저 비워 맡겨 둔 몫을 합친다.
+                drops += p.stashedEncoderDrops;
+                if (lastDrop.empty()) lastDrop = p.stashedLastEncoderDrop;
+                p.stashedEncoderDrops = 0;
+                p.stashedLastEncoderDrop.clear();
+                if (0 != drops)
+                {
+                    state.encoderDrops += drops;
+                    if (!lastDrop.empty()) state.lastEncoderDrop = lastDrop;
+                }
+            }
             state.lastDrawCount = p.gbuffer.GetLastDrawCount();
             state.lastBatchCount = p.gbuffer.GetLastBatchCount();
             state.lastDecalCount = p.decal.GetLastDecalCount();
@@ -5101,6 +5207,12 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
 
     LivePipeline& p = *state.pipeline;
     {
+        // W8: 이 프레임의 신원을 패스가 볼 수 있는 자리에 둔다. sealing이 도장을
+        // 찍고 패스가 대조하는데, 둘 다 frameContext만 받으므로 여기가 유일한
+        // 공통 자리다. 초기화/리사이즈에서 한 번 채우면 늘 같은 수가 되어
+        // staleness를 못 잰다.
+        p.frameContext.frameId = frame.frameId;
+        p.frameContext.sceneEpoch = frame.sceneEpoch;
         std::string shaderError;
         if (!state.ApplyGBufferShaderMeta(frame.gbufferShaderMetas, p.gbuffer,
                 p.frameContext,
@@ -5549,6 +5661,50 @@ bool EnhancedSceneRenderer::RunLiveDisplayRegression(uint32_t expectedWidth,
 		threadHealthy && pipelineDescriptionReady;
 	outLog += std::string("[8-c] verdict=") + (passed ? "pass\n" : "fail\n");
     return passed;
+}
+
+EnhancedSceneRenderer::LiveSealDiagnostics
+EnhancedSceneRenderer::GetLiveSealDiagnostics()
+{
+    // ★ const 로 잡으면 컴파일되지 않는다 — `TextureCache()` 접근자가 const
+    //   한정되어 있지 않다(어댑터 쪽 모양이고 이 슬라이스가 고칠 것이 아니다).
+    //   읽기만 하는 함수지만 참조는 비const 로 든다.
+    LiveState& state = GetLiveState();
+    std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
+
+    LiveSealDiagnostics out;
+    out.enabled = state.enabled;
+    out.framesRendered = state.framesRendered;
+    out.encoderDrops = state.encoderDrops;
+    out.lastDrawCount = state.lastDrawCount;
+    out.lastBatchCount = state.lastBatchCount;
+
+    const auto read = [&out](const EnhancedGBufferPass& gbuffer,
+        const EnhancedForwardPass& forward, uint32_t textureFailures)
+    {
+        const EnhancedDrawSealLedger& gb = gbuffer.GetSealLedger();
+        const EnhancedDrawSealLedger& fw = forward.GetSealLedger();
+        out.frameId = gb.frameId;
+        out.gbufferStamped = gb.counters.stamped;
+        out.gbufferUnstamped = gb.counters.unstamped;
+        out.gbufferViolations = gb.Violations();
+        out.forwardStamped = fw.counters.stamped;
+        out.forwardUnstamped = fw.counters.unstamped;
+        out.forwardViolations = fw.Violations();
+        out.textureUploadFailures = textureFailures;
+    };
+    if (EnhancedLiveBackend::Vulkan == state.backend)
+    {
+        if (const VulkanLivePipeline* pipeline = state.vulkanPipeline.get())
+            read(pipeline->gbuffer, pipeline->forward,
+                pipeline->textureCache.GetUploadFailureCount());
+    }
+    else if (const LivePipeline* pipeline = state.pipeline.get())
+    {
+        read(pipeline->gbuffer, pipeline->forward,
+            state.dx12.TextureCache().GetUploadFailureCount());
+    }
+    return out;
 }
 
 std::string EnhancedSceneRenderer::GetLiveStatus()

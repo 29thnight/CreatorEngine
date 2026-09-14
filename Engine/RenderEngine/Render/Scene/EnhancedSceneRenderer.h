@@ -619,6 +619,29 @@ namespace EnhancedSceneRenderer
     /// 상태 한 줄 요약(render.backend status / dx12.live 호환 명령).
     std::string GetLiveStatus();
 
+    /// W8/W9 — 세대 밀봉 진단. 사람이 읽는 한 줄이 아니라 **판정에 쓰는 수**다.
+    ///
+    /// ★ GetLiveStatus의 문장을 게이트가 파싱하게 두면, 문장을 다듬는 순간
+    ///   게이트가 조용히 아무것도 재지 않게 된다. 장시간 검사가 폴링할 값은
+    ///   따로 낸다.
+    struct LiveSealDiagnostics
+    {
+        uint64_t framesRendered{ 0 };
+        uint64_t frameId{ 0 };
+        uint64_t encoderDrops{ 0 };
+        uint32_t lastDrawCount{ 0 };
+        uint32_t lastBatchCount{ 0 };
+        uint32_t gbufferStamped{ 0 };
+        uint32_t gbufferUnstamped{ 0 };
+        uint32_t gbufferViolations{ 0 };
+        uint32_t forwardStamped{ 0 };
+        uint32_t forwardUnstamped{ 0 };
+        uint32_t forwardViolations{ 0 };
+        uint32_t textureUploadFailures{ 0 };
+        bool     enabled{ false };
+    };
+    LiveSealDiagnostics GetLiveSealDiagnostics();
+
     /// Editor TickLive 표시 경로의 Slice 8-c 회귀 판정. 현재 파이프라인이
     /// 기대 크기로 재구축됐고, 씬뷰·게임뷰가 각각 준비됐으며, 각 뷰가 GPU
     /// 완료 뒤 서로 다른 표시/리드백 슬롯을 둘 이상 승격했는지 확인한다.

@@ -8,10 +8,12 @@
 #include <span>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Graph/EnhancedDrawSealLedger.h"
 #include "../../Scene/MaterialTextureTable.h"
 #include "../../../RHI/RHIGraphicsPipelineRequest.h"
 
@@ -159,6 +161,10 @@ public:
     uint32_t GetLastMaterialCount() const { return m_lastMaterialCount; }
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
+    /// W8 — 이번 프레임 draw의 세대 신원 장부. GBuffer와 같은 뜻이다.
+    const EnhancedDrawSealLedger& GetSealLedger() const { return m_sealLedger; }
+    std::uint64_t GetSamplerIdentity() const { return m_samplerIdentity; }
+
     /// 타일 버퍼. 소유는 패스이고(프레임을 넘겨 산다), 상태는 그래프가
     /// 관리한다 — Declare가 매 프레임 Import하고 writeback으로 끝 상태를
     /// 돌려받는다(R4-2b).
@@ -305,6 +311,11 @@ private:
     uint32_t m_lastDrawCount{ 0 };
     uint32_t m_lastMaterialCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };
+
+    // W8 — 세대 신원 장부와 재질 sampler 신원.
+    EnhancedDrawSealLedger m_sealLedger{};
+    std::uint64_t          m_samplerIdentity{ 0 };
+    std::unordered_set<const EnhancedForwardMaterialDrawSnapshot*> m_rejectedSnapshots;
     bool     m_useReferencePath{ false };
 
     RHIPipelineHandle m_cullPSO;

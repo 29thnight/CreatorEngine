@@ -649,6 +649,68 @@ namespace ConsoleCmd
             : CommandCore::Fail("render.pbr.parity.failed", "PBR verification failed", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_render_pbr_sealstatus(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This command accepts no arguments");
+        const auto seal = EnhancedSceneRenderer::GetLiveSealDiagnostics();
+        auto data = CommandCore::CommandData::Object();
+        data.Set("enabled", CommandCore::CommandData::Bool(seal.enabled));
+        const auto count = [](auto value)
+        {
+            return CommandCore::CommandData::Int(static_cast<int64_t>(value));
+        };
+        data.Set("framesRendered", count(seal.framesRendered));
+        data.Set("frameId", count(seal.frameId));
+        data.Set("encoderDrops", count(seal.encoderDrops));
+        data.Set("drawCount", count(seal.lastDrawCount));
+        data.Set("batchCount", count(seal.lastBatchCount));
+        data.Set("gbufferStamped", count(seal.gbufferStamped));
+        data.Set("gbufferUnstamped", count(seal.gbufferUnstamped));
+        data.Set("gbufferViolations", count(seal.gbufferViolations));
+        data.Set("forwardStamped", count(seal.forwardStamped));
+        data.Set("forwardUnstamped", count(seal.forwardUnstamped));
+        data.Set("forwardViolations", count(seal.forwardViolations));
+        data.Set("textureUploadFailures", count(seal.textureUploadFailures));
+        // ★ 여기서 판정하지 않는다. 이 명령은 재는 자이고, 판정은 장시간
+        //   검사가 표본 전체를 보고 한다 — 한 표본만 보고 실패로 끝내면
+        //   나머지 표본을 못 모은다.
+        return CommandCore::Ok({}, std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_render_pbr_compare(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 3 || ctx.parts.size() > 4)
+        {
+            return CommandCore::InvalidArguments(
+                "render.pbr.compare <left-capture-dir> <right-capture-dir> [output-json]");
+        }
+        const std::string output = ctx.parts.size() == 4 ? ctx.parts[3] : std::string{};
+        std::string result;
+        const bool passed = RunPbrCaptureCompare(ctx.parts[1], ctx.parts[2], output, result);
+        Debug->LogWarning(std::string("[render.pbr.compare] ") + result);
+        std::printf("%s[CLI] render.pbr.compare %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+        auto data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(result));
+        return passed ? CommandCore::Ok({}, std::move(data))
+            : CommandCore::Fail("render.pbr.compare.failed",
+                "PBR capture comparison failed", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_render_pbr_seal(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
+        std::string result;
+        const bool passed = RunPbrSealTest(result);
+        Debug->LogWarning(std::string("[render.pbr.seal] ") + result);
+        std::printf("%s[CLI] render.pbr.seal %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+        auto data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(result));
+        return passed ? CommandCore::Ok({}, std::move(data))
+            : CommandCore::Fail("render.pbr.seal.failed", "PBR seal verification failed", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_render_pbr_coverage(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
@@ -767,6 +829,462 @@ namespace ConsoleCmd
         return Ok();
     }
 
+
+    // ── 은퇴한 렌더 게이트 18종을 되살린다 (2026-09-14) ────────────────────
+    //
+    // 이 핸들러들은 `0ec60573`(2026-09-12, "닫힌·완료 계획 소속 Commandlet 68개
+    // 은퇴")이 지운 것이다. 그 판정은 둘을 함께 요구했다 — ① 소속 계획이
+    // 보관함에 있거나 폐쇄를 선언했고, ② **활성 계획 문서가 그 이름을 더 이상
+    // 부르지 않는다.**
+    //
+    // ★ 되살리는 근거는 ②가 다시 참이 아니게 되었다는 것뿐이다. 셰이더 로직
+    //   최적화는 픽셀로 판정하지 않으면 할 수 없는 작업이고, 그 픽셀을 재는
+    //   자가 바로 이 열여덟이다. ①은 그대로다 — 계획은 여전히 닫혀 있다.
+    //   그러니 이 되살림은 "은퇴가 틀렸다"가 아니라 "부르는 자가 새로 생겼다"
+    //   이며, 셰이더 최적화가 끝나 부르는 자가 다시 없어지면 같은 기준으로
+    //   다시 은퇴시키는 것이 맞다.
+    //
+    // ★ 본문은 한 글자도 새로 쓰지 않았다. `0ec60573^` 의 것을 그대로 옮겼다 —
+    //   새로 쓰면 그것이 은퇴 전 검사와 같은 것인지 아무도 보증할 수 없고,
+    //   그 순간 "되살린 게이트가 붉다"와 "내가 잘못 옮겼다"를 가를 수 없게 된다.
+    //
+    // 되살리지 않은 것: `rhi.uploadsegments`. 그것은 DX12/Vulkan 을 함께 부르는
+    // 교차 백엔드 명령이고 인자 둘(<model-path> <texture-path>)을 요구해서
+    // 인자 없이 도는 dx12 스윕의 일원이 될 수 없다. 셰이더 게이트도 아니다.
+
+    static CommandCore::CommandResult Cmd_dx12_ssao(const ConsoleCommandContext& ctx)
+    {
+        std::string log;
+        const bool passed = DX12Test::RunSSAOTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.ssao] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.ssao %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.ssao 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.ssao 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_ssgi(const ConsoleCommandContext& ctx)
+    {
+        std::string log;
+        const bool passed = DX12Test::RunSSGITest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.ssgi] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.ssgi %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.ssgi 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.ssgi 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_ssr(const ConsoleCommandContext& ctx)
+    {
+        // SSR 패스 검증(PHASE 3-6, 미구현 패스 이식 3차).
+        std::string log;
+        const bool passed = DX12Test::RunSSRTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.ssr] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.ssr %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.ssr 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.ssr 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_sss(const ConsoleCommandContext& ctx)
+    {
+        // SSS 패스 검증(PHASE 3-6, 미구현 패스 이식 1차).
+        std::string log;
+        const bool passed = DX12Test::RunSSSTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.sss] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.sss %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.sss 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.sss 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_fog(const ConsoleCommandContext& ctx)
+    {
+        // 볼류메트릭 포그 패스 검증(PHASE 3-6, 미구현 패스 이식 4차).
+        std::string log;
+        const bool passed = DX12Test::RunVolumetricFogTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.fog] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.fog %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.fog 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.fog 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_skybox(const ConsoleCommandContext& ctx)
+    {
+        // 스카이박스 패스 검증(PHASE 3-6).
+        std::string log;
+        const bool passed = DX12Test::RunSkyBoxTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.skybox] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.skybox %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.skybox 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.skybox 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_grid(const ConsoleCommandContext& ctx)
+    {
+        // 그리드 패스 검증(PHASE 3-6, Gizmo 계열 첫 슬라이스).
+        std::string log;
+        const bool passed = DX12Test::RunGridTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.grid] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.grid %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.grid 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.grid 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_wireframe(const ConsoleCommandContext& ctx)
+    {
+        // 와이어프레임 패스 검증(PHASE 3-6, Gizmo 계열 4차 슬라이스).
+        std::string log;
+        const bool passed = DX12Test::RunWireFrameTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.wireframe] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.wireframe %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.wireframe 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.wireframe 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_gizmoicon(const ConsoleCommandContext& ctx)
+    {
+        // 기즈모 아이콘 패스 검증(PHASE 3-6, Gizmo 계열 3차 슬라이스).
+        std::string log;
+        const bool passed = DX12Test::RunGizmoIconTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.gizmoicon] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.gizmoicon %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.gizmoicon 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.gizmoicon 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_gizmoline(const ConsoleCommandContext& ctx)
+    {
+        // 기즈모 라인 패스 검증(PHASE 3-6, Gizmo 계열 2차 슬라이스).
+        std::string log;
+        const bool passed = DX12Test::RunGizmoLineTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.gizmoline] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.gizmoline %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.gizmoline 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.gizmoline 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_decal(const ConsoleCommandContext& ctx)
+    {
+        // 데칼 패스 검증(PHASE 3-6, 미구현 패스 이식 2차).
+        std::string log;
+        const bool passed = DX12Test::RunDecalTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.decal] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.decal %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.decal 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.decal 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_ibl(const ConsoleCommandContext& ctx)
+    {
+        // IBL 생성 체인 검증(PHASE 3-6).
+        std::string log;
+        const bool passed = DX12Test::RunIBLTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.ibl] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.ibl %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.ibl 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.ibl 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_iblshade(const ConsoleCommandContext& ctx)
+    {
+        // IBL 앰비언트 소비 검증(PHASE 3-6).
+        std::string log;
+        const bool passed = DX12Test::RunIBLShadeTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.iblshade] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.iblshade %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.iblshade 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.iblshade 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
+    {
+        // 렌더 그래프 자가 검증(PHASE 3-5).
+        std::string log;
+        const bool passed = DX12Test::RunRenderGraphTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] dx12.rendergraph %s\n", passed ? "통과" : "실패");
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.rendergraph 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.rendergraph 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_parallel(const ConsoleCommandContext& ctx)
+    {
+        // 커맨드 기록 병렬화 검증(PHASE 3-6).
+        std::string log;
+        const bool passed = DX12Test::RunParallelRecordTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.parallel] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.parallel %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.parallel 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.parallel 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_descriptorheap(const ConsoleCommandContext& ctx)
+    {
+        // completion 기반 descriptor page recycler·샘플러 힙 자가 검증.
+        std::string log;
+        const bool passed = DX12Test::RunDescriptorHeapTest(log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[dx12.descriptorheap] ") + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] dx12.descriptorheap %s\n", passed ? "통과" : "실패");
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.descriptorheap 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.descriptorheap 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_resize(const ConsoleCommandContext& ctx)
+    {
+        // 크기 추종 검증(해상도 슬라이스).
+        std::string log;
+        const bool passed = DX12Test::RunScreenResizeTest(log);
+        const std::string verdict = passed ? "통과" : "실패";
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning("[dx12.resize] " + verdict + "\n" + log);
+        std::printf("[CLI] dx12.resize %s\n", verdict.c_str());
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.resize 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.resize 통과", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_dx12_psocache(const ConsoleCommandContext& ctx)
+    {
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // PSO 캐시 자가 검증(PHASE 3-4) — 매니저를 두 번 세워 캐시가 컴파일을
+        // 실제로 없애는지 확인한다.
+        const std::string cachePath = ResolveTestArtifactPath("DX12/Cache",
+            (parts.size() > 1) ? parts[1] : std::string("dx12_pso.cache"));
+
+        std::string log;
+        const bool passed = DX12Test::RunPsoCacheTest(cachePath, log);
+
+        std::printf("%s", log.c_str());
+        Debug->LogWarning(std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
+        std::printf("[CLI] dx12.psocache %s\n", passed ? "통과" : "실패");
+
+        // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
+        // 기존 하네스가 stdout 을 읽고 있고, 그 이주까지 같은 변경에 넣으면
+        // 무엇이 깨졌는지 가를 수 없게 된다.
+        CommandCore::CommandData data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(log));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        if (!passed)
+        {
+            return CommandCore::Fail("rendertest.failed", "dx12.psocache 실패", std::move(data));
+        }
+        return CommandCore::Ok("dx12.psocache 통과", std::move(data));
+    }
+
     void RegisterRenderTestCommands(Registrar& reg)
     {
         reg.Result({ "dx12.selftest" }, &Cmd_dx12_selftest);
@@ -777,6 +1295,9 @@ namespace ConsoleCmd
         reg.Result({ "vk.forward" }, &Cmd_vk_forward);
         reg.Result({ "vk.deferred" }, &Cmd_vk_deferred);
         reg.Result({ "render.pbr.parity" }, &Cmd_render_pbr_parity);
+        reg.Result({ "render.pbr.seal" }, &Cmd_render_pbr_seal);
+        reg.Result({ "render.pbr.compare" }, &Cmd_render_pbr_compare);
+        reg.Result({ "render.pbr.sealstatus" }, &Cmd_render_pbr_sealstatus);
         reg.Result({ "render.pbr.coverage" }, &Cmd_render_pbr_coverage);
         reg.Result({ "render.pbr.occlusion" }, &Cmd_render_pbr_occlusion);
         reg.Result({ "render.pbr.emission" }, &Cmd_render_pbr_emission);
@@ -795,5 +1316,23 @@ namespace ConsoleCmd
         reg.Result({ "render.livecheck" }, &Cmd_render_livecheck);
         reg.Result({ "dx12.scene" }, &Cmd_dx12_scene);
         reg.Result({ "dx12.gbuffer" }, &Cmd_dx12_gbuffer);
+        reg.Result({ "dx12.ssao" }, &Cmd_dx12_ssao);
+        reg.Result({ "dx12.ssgi" }, &Cmd_dx12_ssgi);
+        reg.Result({ "dx12.ssr" }, &Cmd_dx12_ssr);
+        reg.Result({ "dx12.sss" }, &Cmd_dx12_sss);
+        reg.Result({ "dx12.fog" }, &Cmd_dx12_fog);
+        reg.Result({ "dx12.skybox" }, &Cmd_dx12_skybox);
+        reg.Result({ "dx12.grid" }, &Cmd_dx12_grid);
+        reg.Result({ "dx12.wireframe" }, &Cmd_dx12_wireframe);
+        reg.Result({ "dx12.gizmoicon" }, &Cmd_dx12_gizmoicon);
+        reg.Result({ "dx12.gizmoline" }, &Cmd_dx12_gizmoline);
+        reg.Result({ "dx12.decal" }, &Cmd_dx12_decal);
+        reg.Result({ "dx12.ibl" }, &Cmd_dx12_ibl);
+        reg.Result({ "dx12.iblshade" }, &Cmd_dx12_iblshade);
+        reg.Result({ "dx12.rendergraph" }, &Cmd_dx12_rendergraph);
+        reg.Result({ "dx12.parallel" }, &Cmd_dx12_parallel);
+        reg.Result({ "dx12.descriptorheap" }, &Cmd_dx12_descriptorheap);
+        reg.Result({ "dx12.resize" }, &Cmd_dx12_resize);
+        reg.Result({ "dx12.psocache" }, &Cmd_dx12_psocache);
     }
 }

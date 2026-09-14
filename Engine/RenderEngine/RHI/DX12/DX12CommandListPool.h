@@ -68,6 +68,7 @@ public:
     /// 이번 프레임에 연 리스트를 전부 닫는다. 닫힌 순서가 아니라 워커 번호
     /// 순서로 돌려주지 않는다 — 제출 순서는 호출부(그래프)가 정한다.
     bool CloseAll(std::string& outError) override;
+    uint32_t DrainEncoderDrops(std::string& outLast) override;
 
     /// 워커가 이번 프레임에 실제로 기록했는가.
     bool HasRecorded(uint32_t worker) const override;

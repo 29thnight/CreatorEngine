@@ -1,4 +1,5 @@
 #include "EnhancedForwardPass.h"
+#include "../../Graph/EnhancedMaterialSealHash.h" // W8
 #include "../../Graph/EnhancedDrawIdentity.h" // I6-C
 #include "../../../Assets/ModelVertexLayout.h"
 #include "../../../RHI/ModelVertexInputLayout.h"
@@ -66,7 +67,7 @@ namespace
     //
     // 하늘만 있는 타일은 광원을 받지 않는다 — min/max가 비어 있으면 어떤
     // 표면도 없다는 뜻이고, 그 타일의 픽셀 셰이더는 어차피 그릴 것이 없다.
-    constexpr const char* kCullShaderFile = "ForwardCull.hlsl";
+    constexpr const char* kCullShaderFile = "ForwardCull.slang";
 
     // ── 포워드 셰이딩 ──
     //
@@ -533,6 +534,11 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
             RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border,
                 RHIBorderColor::OpaqueWhite),
         };
+
+        // W8: 재질 텍스처가 쓰는 것은 첫 번째(선형 Wrap)다. 그 하나의 신원만
+        // 장부에 싣는다 — IBL/그림자 샘플러는 재질 축이 아니다.
+        m_samplerIdentity =
+            EnhancedMaterialSeal::ComputeSamplerIdentity(samplers[0]);
 
         m_sampler = context.resources->CreateSamplers(samplers);
         if (!m_sampler.IsValid())
@@ -1175,6 +1181,9 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_batches.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
+    // W8: GBuffer와 같은 장부를 같은 자리에서 연다.
+    m_sealLedger.Begin(context.frameId, context.sceneEpoch);
+    m_rejectedSnapshots.clear();
 
     if (nullptr != context.forwardDraws)
     {
@@ -1196,6 +1205,13 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 {
                     outError = "Forward draw material permutation/layout이 준비된 variant와 다르다";
                     return false;
+                }
+                // W8: 값 계약이 맞아도 이번 프레임 밀봉이 아니면 그리지 않는다.
+                if (!m_sealLedger.Accept(material.snapshot->seal,
+                        EnhancedMaterialSeal::ComputeHash(*material.snapshot)))
+                {
+                    m_rejectedSnapshots.insert(material.snapshot.get());
+                    continue;
                 }
             }
             if (nullptr != draw.bonePalette && 0 != draw.boneCount
@@ -1248,6 +1264,10 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
         {
             MaterialView material{};
             if (!ResolveMaterialView(draw, material, outError)) return false;
+            // W8: 거부한 draw의 텍스처는 올리지 않는다. 올리다 실패하면 그리지도
+            // 않을 draw 때문에 프레임 전체가 실패한다.
+            if (material.snapshot
+                && m_rejectedSnapshots.contains(material.snapshot.get())) continue;
             const MaterialKey key = MakeMaterialKey(draw);
             if (m_materialTextures.find(key) != m_materialTextures.end()) continue;
 
@@ -1281,6 +1301,13 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
         const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
         if (geometry == m_drawGeometry.end() || !geometry->second.IsValid()) continue;
 
+        // W8: 세대 위반으로 거부한 snapshot은 배치에 넣지 않는다.
+        if (draw.forwardMaterialSnapshot
+            && m_rejectedSnapshots.contains(draw.forwardMaterialSnapshot.get()))
+        {
+            continue;
+        }
+
         const MaterialKey key = MakeMaterialKey(draw);
         // I5-D34c: 메시 바인딩의 마스크가 레이아웃 축이다 — 병합 조건에 PSO가
         // 이미 들어 있으므로 마스크가 다른 메시는 배치가 저절로 갈린다.
@@ -1300,6 +1327,22 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
             if (!ResolveShaderVariant(*key.snapshot, vertexMask, shadePipeline,
                     referencePipeline, ignoredLayout))
             {
+                continue;
+            }
+        }
+
+        // W8: 이 draw가 무엇으로 그려질지 확정된 자리. 같은 값 신원이 다른
+        // PSO나 다른 texture 묶음으로 갈리면 세대가 섞인 것이다.
+        if (key.snapshot)
+        {
+            EnhancedDrawSealLedger::Binding binding{};
+            binding.textureDigest = EnhancedMaterialSeal::ComputeTextureDigest(
+                key.snapshot->textureBindings);
+            binding.samplerIdentity = m_samplerIdentity;
+            binding.pipelineId = shadePipeline.id;
+            if (!m_sealLedger.Observe(key.snapshot->seal.sealHash, binding))
+            {
+                m_rejectedSnapshots.insert(key.snapshot.get());
                 continue;
             }
         }
@@ -1755,10 +1798,18 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
             : sizeof(kForwardLegacyMaterialConstants);
         const auto materialConstants = context.resources->UploadConstants(
             materialData, materialSize);
-        if (!materialConstants.IsValid()) continue;
+        if (!materialConstants.IsValid())
+        {
+            m_sealLedger.NoteDrop(EnhancedDrawDropReason::MaterialConstants);
+            continue;
+        }
         encoder.SetConstantBuffer(RHIBindPoint::Graphics, 8, materialConstants);
         const auto coordinates = MaterialTextureTable::UploadCoordinates(*context.resources, batch.material.coordinates);
-        if (!coordinates.IsValid()) continue;
+        if (!coordinates.IsValid())
+        {
+            m_sealLedger.NoteDrop(EnhancedDrawDropReason::Coordinates);
+            continue;
+        }
         encoder.SetConstantBuffer(RHIBindPoint::Graphics, 10, coordinates);
 
         const auto found = m_materialTextures.find(batch.material);

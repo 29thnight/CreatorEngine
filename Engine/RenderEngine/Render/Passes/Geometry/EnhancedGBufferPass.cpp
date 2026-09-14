@@ -1,5 +1,6 @@
 #include "EnhancedGBufferPass.h"
 #include "../../Graph/EnhancedDrawIdentity.h" // I6-C
+#include "../../Graph/EnhancedMaterialSealHash.h" // W8
 #include "../../../Assets/ModelVertexLayout.h"
 #include "../../../RHI/ModelVertexInputLayout.h"
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -187,6 +188,10 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_boneOffsets.clear();
     m_lastDrawCount = 0;
     m_lastSkinnedCount = 0;
+    // W8: 장부는 프레임마다 비운다. 비우지 않으면 지난 프레임의 배치가 이번
+    // 프레임의 충돌로 보고된다.
+    m_sealLedger.Begin(context.frameId, context.sceneEpoch);
+    m_rejectedSnapshots.clear();
 
     // 프레임 밀봉된 카메라에서 뷰·투영을 만든다. 스냅샷이 없으면 항등으로 두는데,
     // 그러면 클립 공간에 바로 그리게 되므로 '카메라가 안 붙었다'가 화면에 드러난다.
@@ -228,6 +233,16 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
             }
             if (!MaterialTextureTable::ValidateSnapshot(material, outError)) return false;
             if (!MaterialTextureTable::ValidateMeshCoordinates(material, draw.modelMeshView.vertexAttributeMask, outError)) return false;
+
+            // W8: 값 계약이 맞아도 **이번 프레임 것이 아니면** 섞인 것이다.
+            // 프레임 전체를 실패시키지 않는 이유는 계획의 처방 그대로다 —
+            // 일부만 새 세대로 섞이면 그 draw를 생략하고 원인을 남긴다.
+            if (!m_sealLedger.Accept(material.seal,
+                    EnhancedMaterialSeal::ComputeHash(material)))
+            {
+                m_rejectedSnapshots.insert(draw.materialSnapshot.get());
+                continue;
+            }
         }
 
         if (m_drawGeometry.find(enhanced_draw::GeometryKey(draw)) == m_drawGeometry.end())
@@ -339,6 +354,11 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
         if (geometry == m_drawGeometry.end() || !geometry->second.IsValid()) continue;
 
+        // W8: PrepareFrame이 세대 위반으로 거부한 snapshot은 그리지 않는다.
+        // 거부를 PrepareFrame에만 두면 이 순회가 그대로 그려 버린다.
+        if (draw.materialSnapshot
+            && m_rejectedSnapshots.contains(draw.materialSnapshot.get())) continue;
+
         sorted.push_back(&draw);
     }
 
@@ -356,6 +376,11 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
     for (const auto* drawPtr : sorted)
     {
         const auto& draw = *drawPtr;
+
+        // W8: 이 순회 도중에 거부된 snapshot(아래 Observe)도 다시 만나면
+        // 건너뛴다. 같은 위반을 여러 번 세면 장부의 수가 사건 수가 아니게 된다.
+        if (draw.materialSnapshot
+            && m_rejectedSnapshots.contains(draw.materialSnapshot.get())) continue;
 
         const MaterialKey key = MakeMaterialKey(draw);
 
@@ -383,6 +408,22 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
                     batch.pipeline = m_pipelineRequest.GetHandle();
                 else if (const auto model = m_modelPipelineRequests.find(vertexMask);
                     model != m_modelPipelineRequests.end()) batch.pipeline = model->second.GetHandle();
+            }
+            // W8: 이 배치가 무엇으로 그려질지 확정된 자리다. 같은 값 신원이
+            // 한 프레임 안에서 다른 PSO나 다른 texture 묶음으로 갈리면 그것이
+            // 곧 세대 혼합이다 — 그 자리에서 배치를 버린다.
+            if (key.snapshot)
+            {
+                EnhancedDrawSealLedger::Binding binding{};
+                binding.textureDigest = EnhancedMaterialSeal::ComputeTextureDigest(
+                    key.snapshot->textureBindings);
+                binding.samplerIdentity = m_samplerIdentity;
+                binding.pipelineId = batch.pipeline.id;
+                if (!m_sealLedger.Observe(key.snapshot->seal.sealHash, binding))
+                {
+                    m_rejectedSnapshots.insert(key.snapshot.get());
+                    continue;
+                }
             }
             batch.firstInstance = static_cast<uint32_t>(m_instances.size());
             batch.instanceCount = 0;
@@ -855,6 +896,9 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
     if (!CreatePipeline(context, outError)) return false;
 
     const RHISamplerDesc sampler = RHISampler::Linear(RHIAddressMode::Wrap);
+    // W8: 무엇을 걸었는지를 값으로 남긴다. 재질별 sampler(W7 잔여)가 들어오면
+    // 이 자리가 그대로 재질 축이 된다.
+    m_samplerIdentity = EnhancedMaterialSeal::ComputeSamplerIdentity(sampler);
 
     m_sampler = context.resources->CreateSamplers({ &sampler, 1 });
     if (!m_sampler.IsValid())
@@ -1041,17 +1085,33 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const auto instanceBlock = context.resources->AllocateUpload(
                 RHIUploadRequest{ sliceInstanceBytes, RHIUploadUsage::BufferCopy,
                     sizeof(InstanceData) });
-            if (!instanceBlock.IsValid()) return;   // 구간이 찼다 — 이 조각은 다음 프레임
+            if (!instanceBlock.IsValid())
+            {
+                // W8: 조각 전체가 빠진다. 조용히 돌아가면 그 프레임은 물체
+                // 여럿이 없는 채로 성공으로 보고된다.
+                m_sealLedger.NoteDrop(EnhancedDrawDropReason::Instances,
+                    static_cast<std::uint32_t>(sliceEnd - sliceBegin));
+                return;
+            }
             memcpy(instanceBlock.cpuAddress, &m_instances[sliceFirstInstance],
                 static_cast<size_t>(sliceInstanceBytes));
 
             for (size_t batchIndex = sliceBegin; batchIndex < sliceEnd; ++batchIndex)
             {
                 const DrawBatch& batch = m_batches[batchIndex];
-                if (0 == batch.instanceCount || !batch.pipeline.IsValid()) continue;
+                if (0 == batch.instanceCount) continue;
+                if (!batch.pipeline.IsValid())
+                {
+                    m_sealLedger.NoteDrop(EnhancedDrawDropReason::Pipeline);
+                    continue;
+                }
 
                 const auto mesh = m_drawGeometry.find(batch.geometryKey);
-                if (mesh == m_drawGeometry.end() || !mesh->second.IsValid()) continue;
+                if (mesh == m_drawGeometry.end() || !mesh->second.IsValid())
+                {
+                    m_sealLedger.NoteDrop(EnhancedDrawDropReason::Geometry);
+                    continue;
+                }
 
                 // M6-P1b2b1: PSO는 pass 전역 한 번이 아니라 material batch 직전에
                 // 고른다. 같은 texture/property라도 keyword permutation이 다르면
@@ -1077,10 +1137,18 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                     : batch.material.snapshot->propertyBytes.size();
                 const auto materialConstants = context.resources->UploadConstants(
                     materialData, materialSize);
-                if (!materialConstants.IsValid()) continue;
+                if (!materialConstants.IsValid())
+                {
+                    m_sealLedger.NoteDrop(EnhancedDrawDropReason::MaterialConstants);
+                    continue;
+                }
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 5, materialConstants);
                 const auto coordinates = MaterialTextureTable::UploadCoordinates(*context.resources, batch.material.coordinates);
-                if (!coordinates.IsValid()) continue;
+                if (!coordinates.IsValid())
+                {
+                    m_sealLedger.NoteDrop(EnhancedDrawDropReason::Coordinates);
+                    continue;
+                }
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 6, coordinates);
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
@@ -1090,9 +1158,19 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                         sizeof(InstanceData) * batch.instanceCount));
 
                 const auto textures = m_drawTextures.find(batch.material);
-                if (textures == m_drawTextures.end()) continue;
+                if (textures == m_drawTextures.end())
+                {
+                    m_sealLedger.NoteDrop(EnhancedDrawDropReason::TextureTable);
+                    continue;
+                }
                 const auto srvTable = context.resources->CreateBindings(textures->second.views);
-                if (!srvTable.IsValid()) continue;
+                if (!srvTable.IsValid())
+                {
+                    // descriptor 버전이 만료됐거나 구간이 찼다. 인코더는 이 표를
+                    // 걸어도 조용히 돌아가므로 여기서 세지 않으면 증거가 없다.
+                    m_sealLedger.NoteDrop(EnhancedDrawDropReason::Bindings);
+                    continue;
+                }
                 encoder.SetBindings(RHIBindPoint::Graphics, 2, srvTable);
 
                 encoder.SetVertexBuffer(mesh->second.vertices, mesh->second.vertexStride);

@@ -39,7 +39,12 @@ void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline
     //   "파이프라인 P 를 레이아웃 L' 로 걸었다"가 표현 가능했다 — 표가 짝을
     //   들면서 그 조합이 만들어질 자리가 없어졌다.
     const DX12PipelineEntry entry = m_resources->Resolve(pipeline);
-    if (!entry.IsValid()) return;   // 이미 놓인 핸들이거나 발급된 적이 없다
+    if (!entry.IsValid())
+    {
+        // 이미 놓인 핸들이거나 발급된 적이 없다. 이 draw는 화면에서 사라진다.
+        NoteDropped("SetPipeline(stale handle)");
+        return;
+    }
 
     // ★ 루트 시그니처를 먼저 건다. 순서가 뒤집히면 드라이버가 이전 레이아웃으로
     //   PSO를 검증하고, 그 어긋남은 드로우 시점에야 드러난다.
@@ -83,6 +88,9 @@ void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
     if (nullptr == m_commandList || nullptr == m_resources || !table.IsValid() ||
         0 == table.version || !m_resources->IsDescriptorVersionCurrent(table.version))
     {
+        // 만료된 descriptor 버전으로 그리면 GPU가 읽는 중인 자리를 덮는다.
+        // 막는 것이 옳지만, 막았다는 사실은 남겨야 한다.
+        if (nullptr != m_commandList) NoteDropped("SetBindings(expired version)");
         return;
     }
 
@@ -99,7 +107,11 @@ void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
 void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
     const RHISamplerTable& table)
 {
-    if (nullptr == m_commandList || !table.IsValid()) return;
+    if (nullptr == m_commandList || !table.IsValid())
+    {
+        if (nullptr != m_commandList) NoteDropped("SetSamplers(invalid table)");
+        return;
+    }
 
     EnsureDescriptorHeaps();
 
@@ -127,7 +139,11 @@ void DX12Encoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
     const RHIBufferSlice& slice)
 {
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
-    if (nullptr == m_commandList || 0 == address) return;
+    if (nullptr == m_commandList || 0 == address)
+    {
+        if (nullptr != m_commandList) NoteDropped("SetConstantBuffer(null address)");
+        return;
+    }
 
     if (RHIBindPoint::Compute == bindPoint)
         m_commandList->SetComputeRootConstantBufferView(slot, address);
@@ -139,7 +155,11 @@ void DX12Encoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
     const RHIBufferSlice& slice)
 {
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
-    if (nullptr == m_commandList || 0 == address) return;
+    if (nullptr == m_commandList || 0 == address)
+    {
+        if (nullptr != m_commandList) NoteDropped("SetRootBuffer(null address)");
+        return;
+    }
 
     if (RHIBindPoint::Compute == bindPoint)
         m_commandList->SetComputeRootShaderResourceView(slot, address);
@@ -150,7 +170,11 @@ void DX12Encoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
 void DX12Encoder::SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride)
 {
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
-    if (nullptr == m_commandList || 0 == address) return;
+    if (nullptr == m_commandList || 0 == address)
+    {
+        if (nullptr != m_commandList) NoteDropped("SetVertexBuffer(null address)");
+        return;
+    }
 
     D3D12_VERTEX_BUFFER_VIEW view{};
     view.BufferLocation = address;
@@ -162,7 +186,11 @@ void DX12Encoder::SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride)
 void DX12Encoder::SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format)
 {
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
-    if (nullptr == m_commandList || 0 == address) return;
+    if (nullptr == m_commandList || 0 == address)
+    {
+        if (nullptr != m_commandList) NoteDropped("SetIndexBuffer(null address)");
+        return;
+    }
 
     D3D12_INDEX_BUFFER_VIEW view{};
     view.BufferLocation = address;

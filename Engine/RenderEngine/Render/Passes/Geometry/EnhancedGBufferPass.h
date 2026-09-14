@@ -7,9 +7,11 @@
 #include <span>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Graph/EnhancedDrawSealLedger.h"
 #include "../../Scene/MaterialTextureTable.h"
 // ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
 //   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
@@ -104,6 +106,11 @@ public:
     {
         return static_cast<uint32_t>(m_boneOffsets.size());
     }
+
+    /// W8 — 이번 프레임 draw의 세대 신원 장부. 위반 수가 0이 아니면 그림을
+    /// 믿으면 안 된다. 밖에서 판정할 수 있어야 게이트가 선다.
+    const EnhancedDrawSealLedger& GetSealLedger() const { return m_sealLedger; }
+    std::uint64_t GetSamplerIdentity() const { return m_samplerIdentity; }
 
     /// 이 패스를 컬링 뿌리로 표시할지.
     ///
@@ -301,6 +308,12 @@ private:
     uint32_t m_lastBatchCount{ 0 };
     uint32_t m_lastSkinnedCount{ 0 };
     bool     m_keepAlive{ true };
+
+    // W8 — 세대 신원 장부와 이번 패스가 거는 sampler의 신원. PrepareFrame이
+    // 프레임마다 비우고, 거부한 snapshot은 BuildBatches도 건너뛴다.
+    EnhancedDrawSealLedger m_sealLedger{};
+    std::uint64_t          m_samplerIdentity{ 0 };
+    std::unordered_set<const EnhancedMaterialDrawSnapshot*> m_rejectedSnapshots;
 
     // 타깃별 RTV와 깊이 DSV. 그래프가 만든 transient에 매 프레임 뷰를 만든다 —
     // 리소스가 프레임마다 바뀔 수 있으므로 뷰를 캐시하지 않는다.

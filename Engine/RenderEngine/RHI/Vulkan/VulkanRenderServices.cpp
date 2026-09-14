@@ -428,6 +428,12 @@ RHITextureEntry VulkanTextureCache::GetOrmNeutralTexture(std::string& outError)
         m_impl->ormNeutralAllocation, outError);
 }
 
+uint32_t VulkanTextureCache::GetUploadFailureCount() const
+{
+    // W9 — 업로드 실패로 흰색을 대신 내준 횟수. DX12 쪽과 같은 수를 센다.
+    return m_impl->stats.failures;
+}
+
 VulkanTextureCache::Stats VulkanTextureCache::GetStats() const
 {
     Stats result = m_impl->stats;

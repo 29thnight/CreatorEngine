@@ -115,7 +115,25 @@ public:
     ///   된다. 그 이행 기간에만 쓰는 문이고, R3가 끝나면 사라진다.
     ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList; }
 
+    /// W8 — 조용히 버린 명령의 수.
+    ///
+    /// ★ 이 인코더는 걸 수 없는 것을 만나면 그냥 돌아간다. 놓인 PSO 핸들,
+    ///   만료된 descriptor 버전, 주소가 0인 버퍼가 그렇다. 그 셋은 전부
+    ///   "이 draw가 화면에서 사라진다"인데 지금까지 아무 데도 세지 않아서
+    ///   증상만 있고 증거가 없었다(검은 화면·간헐 플리커). Vulkan 쪽
+    ///   `GetUnimplementedCount()`와 같은 자리다.
+    uint32_t GetDroppedCount() const { return m_dropped; }
+    const char* GetLastDropped() const { return m_lastDropped; }
+    void ClearDropped() { m_dropped = 0; m_lastDropped = nullptr; }
+
 private:
+    /// 버린 명령을 센다. 이름은 리터럴이라 수명 걱정이 없다.
+    void NoteDropped(const char* name)
+    {
+        ++m_dropped;
+        m_lastDropped = name;
+    }
+
     /// 테이블을 처음 걸 때 디스크립터 힙을 건다. 한 번만 건다.
     ///
     /// ★ 셰이더 가시 힙과 샘플러 힙을 **늘 함께** 건다. 나눠 걸면 "테이블만
@@ -135,5 +153,8 @@ private:
     ID3D12RootSignature*       m_boundRootSignature[2]{ nullptr, nullptr };
 
     bool                       m_heapsBound{ false };
+
+    uint32_t                   m_dropped{ 0 };
+    const char*                m_lastDropped{ nullptr };
 };
 

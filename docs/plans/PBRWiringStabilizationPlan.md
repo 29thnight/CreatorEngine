@@ -1,10 +1,28 @@
 # PBR 배선 안정화 계획 (PHASE 4)
 
-**신설 2026-09-03 · 갱신 2026-09-06 · 10슬라이스 18일 · W2/W4/W5/W6 완료 · W0/W1/W3/W7 진행 · 실장면 기준 캡처 실행, W9 acceptance 미완료**
+**신설 2026-09-03 · 갱신 2026-09-14 · 10슬라이스 18일 · W2/W4/W5/W6 완료 · W0/W1/W3/W7 진행 · W8/W9 구현 착지·부분 실측(§14·§15)**
+
+> **W8/W9 현재 상태 한 줄.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
+> 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: 배선 게이트가
+> 끝까지 간 적이 없고(§15 — `verify-experiment-contract.ps1` 링크 부패, W9 이전부터),
+> 교차 백엔드 픽셀 판정은 GBuffer 다섯 장으로 좁혔으며(시각 고정 불가),
+> **W8 핵심 수정을 자극하는 fixture가 없어 그 수정은 아직 증명되지 않았다.**
 
 > 2026-09-06 원격 CLI 통합: `render.pbr.*` 검사는 `--commandlet` 또는
 > `--commandlet-script`로 실행하고 JSONL terminal 결과로 판정한다. capture 결과는 실제
 > 프레임 캡처 완료 뒤에 기록한다. 현재 실패 종료 코드는 `4`이며, 아래의 `7`은 통합 전 실행 기록이다.
+
+> **2026-09-14 인용 정정 (W8 착수 전 실측).** 아래 §6~§13은 그때의 실행 기록이고 지금도
+> 그대로 재현되지 않는다. 읽는 사람이 헛돌지 않도록 두 가지를 여기 적는다.
+>
+> - **`verify-model-render-wiring.ps1`은 더 이상 없다.** `0ec60573`(2026-09-12,
+>   "닫힌·완료 계획 소속 Commandlet 68개 은퇴")에서 삭제됐다. §6·§8~§13이 이 게이트의
+>   통과를 근거로 들지만 지금 그 이름으로 돌 것은 없다. 제품 `GBuffer.slang` 정적 검사가
+>   다시 필요하면 새로 세워야 한다.
+> - **실패 종료 코드는 `4`다.** `CommandSession.cpp`의 표가 `Failed`를 4로 옮기며,
+>   게이트 스크립트도 4를 기대한다. 저장소의 어느 `.ps1`에도 `ExpectedExit 7`은 없다.
+> - **RMSE 수치(§6)는 게이트가 아니었다.** 그 값을 계산하는 코드가 저장소에 없었다 —
+>   손으로 한 번 잰 값이다. W9에서 `render.pbr.compare`가 그 자리를 대신한다.
 
 이 계획은 현재 제품 렌더 경로의 `.slang`·머테리얼·렌더러 배선 결함만 닫는다.
 Blender형 Material Graph와 Principled 확장은
@@ -623,3 +641,183 @@ W7은 진행 상태다. §11의 normal/tangent와 이번 UV 전달을 합쳐 기
 `w7mip-fixed/`, `w7mip-coverage/`, `w7mip-negative.log`, `w7mip-baseline.log`,
 `w7mip-cook-all.log`, `w7mip-guid.log`(기존 정책 위반), `w7mip-model-wiring.log`,
 `w7mip-doc-check.log`, `%TEMP%/creator-pbr-9bf1769aa7b644338d9a712087f83678/`(전체 회귀).
+
+---
+
+## 14. W8 — material/descriptor/PSO generation 원자 밀봉, 2026-09-14
+
+### 착수 전 실측이 뒤집은 것
+
+계획서 §1은 W8을 "flat property/고정 texture table과 descriptor batch가 material
+generation보다 약한 신원으로 재사용될 **여지**"라고 적었다. 소스를 다시 읽으니 여지가
+아니라 **실재하는 결함 둘**이었고, 둘 다 "가끔 재질이 틀리다 / 가끔 검다"의 모양을 가진다.
+
+1. **밀봉 중복 제거 키가 legacy `Material*` 주소 하나였다.**
+   `SealGBufferMaterials`/`SealForwardMaterials`가 `unordered_map<const Material*, ...>`로
+   같은 주소의 draw를 합쳤다. 그런데 `DataSystem::Materials`는 이름으로 캐시한 **같은
+   객체**를 여러 MeshRenderer에 돌려주고, 인스턴스 override(`MaterialInstance`)는 렌더러마다
+   다르다. 주소가 같다는 이유로 먼저 밀봉된 스냅샷을 뒤의 draw가 그대로 받았고, 그 순간
+   override가 통째로 사라진다. 값이 아니라 주소를 신원으로 쓴 것이 원인이다.
+   또 `materialSource`가 없는 draw는 전부 `&defaultMaterial` 한 주소로 합쳐졌다.
+
+2. **인코더가 버린 명령이 어디에도 세어지지 않았다.**
+   DX12 인코더는 놓인 PSO 핸들(`Resolve`가 무효), 만료된 descriptor 버전, 주소 0인 버퍼를
+   만나면 **조용히 `return`** 한다. Vulkan은 `NoteUnimplemented` 하나로 뭉뚱그린다. 그
+   사건은 곧 "이 draw가 화면에서 사라진다"인데 수가 0이라 증상만 있고 증거가 없었다.
+   GBuffer의 `Record` 루프도 실패마다 `continue`라 머테리얼 하나가 통째로 빠져도 프레임은
+   성공으로 보고됐다(Forward는 `return false`로 fail-closed — 두 패스가 비대칭이었다).
+
+### 구현
+
+- **값 신원을 만들었다.** `EnhancedMaterialSealIdentity`(sealHash·authoredDigest·
+  authoredRevision·modelGeneration·sceneEpoch·frameId)를 두 draw snapshot에 싣는다.
+  `sealHash`는 스냅샷 값 전체의 FNV-1a digest이고 **프레임과 무관하다** — 값이 같은가와
+  이번 프레임 것인가를 나눠 물을 수 있어야 하므로 frameId를 digest에 섞지 않는다.
+  `-0.0`/`+0.0`과 NaN은 정규화한다.
+- **중복 제거 키를 값으로 바꿨다.** `digest(주소, 저작 값 digest, model generation,
+  ShaderMeta handle)`. 저작 값이 같으면 여전히 합쳐지고, override가 다르면 갈린다.
+  `MaterialInstance::Revision`을 프록시에서 `PooledDraw`까지 날라 seal 신원에 싣는다 —
+  전에는 프록시까지만 오고 렌더 스냅샷에는 없었다.
+- **패스에 장부를 뒀다.** `EnhancedDrawSealLedger`가 프레임마다 ① 이 snapshot이 이번
+  프레임 것인가(`Accept`) ② 같은 값이 같은 PSO·같은 texture/sampler 묶음으로 그려졌는가
+  (`Observe`)를 판정한다. 위반이면 **그 draw를 생략하고 이유를 남긴다** — 계획 §2의
+  처방 그대로이며, 부분 게시보다 빠진 그림이 낫다(빠진 것은 셀 수 있고 섞인 것은 못 센다).
+  도장이 없는 snapshot(격리 fixture)은 staleness 축을 재지 않고 `unstamped`로만 센다.
+- **Record 단계의 조용한 누락 일곱 자리에 이유를 붙였다.** pipeline·geometry·
+  materialConstants·coordinates·textureTable·bindings·instances. 병렬 기록이라 문자열이
+  아니라 원자 계수만 한다.
+- **DX12 인코더에 drop 계수를 넣었다.** Vulkan의 `NoteUnimplemented`와 같은 자리이며,
+  두 backend의 수를 `IRHIParallelCommandPool::DrainEncoderDrops` 한 이름으로 모은다.
+- **capture manifest의 `missing` 셋을 실제 값으로 바꿨다.** W0이 "sampler identity·
+  descriptor generation·resolved PSO key는 draw snapshot에 없다"고 적어 두었던 자리다.
+  이제 draw마다 seal을, 프레임마다 `sealLedger`(패스별 counters·bindings·sampler 신원·
+  encoder drop)를 싣는다.
+
+### 검증
+
+- `render.pbr.seal` — 값 digest 9종 변이, 저작 digest 6종(override·keyword·blend·값 타입·
+  texture 색공간), 장부 14종(프레임 신원·값 변경·PSO 혼합·배치 혼합·누락 계수·Begin 초기화),
+  sampler 신원 4종. GPU를 켜지 않는다 — W8이 닫는 것은 픽셀이 아니라 신원이다.
+- `verify-pbr-wiring-baseline.ps1`이 실장면 캡처마다 ① 모든 draw가 이번 프레임 도장을
+  받았는지 ② 패스별 위반 0 ③ encoder drop 0 ④ 업로드 실패로 흰색을 대신 낸 횟수 0을
+  단정한다.
+
+### 남은 것
+
+- 재질별 wrap/filter sampler 전달은 여전히 W7의 남은 단위다. 지금은 패스가 고정 sampler
+  하나를 걸며, 장부는 **무엇을 걸었는지**를 값으로 남긴다. 재질별 sampler가 들어오면
+  이 자리가 그대로 재질 축이 된다.
+- 장부의 이빨은 변이로 증명해야 한다(빌드 뒤 실행). 아래 §15의 변이 목록에 함께 적었다.
+
+---
+
+## 15. W9 — 실장면·장시간·재임포트 회귀와 cutover, 2026-09-14
+
+### 착수 전 실측이 뒤집은 것
+
+- **`verify-pbr-wiring-baseline.ps1`은 `run-all.ps1`에 물려 있지 않았다.** 저장소 전체에서
+  이 게이트를 부르는 것은 계획 문서뿐이었다. PBR 픽셀·캡처 축 전체가 도는 세트 밖이었다.
+- **캡처의 float32 원본을 읽는 코드가 하나도 없었다.** 게이트는 파일 **크기**만 쟀다.
+  §6의 RMSE는 손으로 한 번 잰 값이고 회귀를 잡을 수 없다. 생산만 있고 소비가 0이었다.
+- **golden 자산도 비교 코드도 없다.** 저장소의 `*golden*`은 전부 텍스트(CLI 파서·레지스트리·
+  UI 레이아웃)다. 이미지 golden은 존재한 적이 없다.
+- **장시간 하네스가 없다.** `soak`/`장시간` 계열 검색 결과 0건. 재임포트 축은 있었지만
+  PBR 픽셀과 연결돼 있지 않았다.
+
+### 구현
+
+- **`render.pbr.compare <left> <right> [out.json]`** — 두 제품 캡처의 attachment 7장을
+  열어 최대 절대 편차·RMSE·허용치 초과 표본 수를 낸다. 허용식은 기존 parity와 같다
+  (절대 0.002 + 상대 0.5%) — 새 자를 만들면 두 검사가 다른 말을 한다. 두 캡처의 backend가
+  같으면 거부한다(대조군은 독립 유도를 가져야 한다). 결과는 통과해도 JSON으로 남긴다.
+- **`render.pbr.sealstatus`** — 라이브 프레임의 세대 진단을 **수**로 낸다. 사람이 읽는
+  상태 문장을 게이트가 파싱하게 두면 문장을 다듬는 순간 게이트가 조용히 아무것도 재지
+  않게 된다. 이 명령은 재기만 하고 판정하지 않는다.
+- **`verify-pbr-soak.ps1`** — 회전·이동·주기적 재임포트를 섞어 표본을 모으고, 매 표본에서
+  seal 위반 0 · encoder drop 0 · 업로드 실패 0 · `drawCount > 0` · frameId 전진을 단정한다.
+  기본 1분(게이트), acceptance는 `-Minutes 10`.
+  이 검사가 재는 것은 "10분간 검은 프레임이 없었다"가 아니라 **검은 프레임을 만드는
+  기계장치가 한 번도 돌지 않았다**이다. 매 프레임 픽셀을 읽는 것은 감당할 수 없고, 눈으로
+  보는 것은 게이트가 아니다.
+- **`run-all.ps1`에 두 스텝을 넣었다** — "PBR 제품 배선·세대 밀봉"과 "PBR 장시간 세대 밀봉".
+  `$Exe` 경로에서 구성을 뽑는다(Release exe로 돌릴 때 조용히 Debug 산출물을 찾지 않도록).
+- **silent neutral substitution 축을 열었다.** 두 texture cache에 `GetUploadFailureCount()`를
+  두고 캡처 manifest에 싣는다. 저작으로 없는 슬롯의 중립값(AO 미저작 등)은 세지 않는다 —
+  세는 것은 **업로드가 실패해서 흰색으로 덮은** 횟수다.
+
+### 실행 결과 (2026-09-14, Debug x64)
+
+빌드 exit 0(오류 0). 아래는 전부 실제로 돈 수다.
+
+- **`render.pbr.seal`** — 42 케이스, 실패 0.
+- **제품 캡처 W8 단정** — dx12·vulkan 양쪽 PASS. 매 draw가 도장을 갖고 이 프레임·이 epoch
+  것이며, 패스별 위반 0 · unstamped 0 · samplerIdentity 유효 · encoder drop 0 ·
+  업로드 실패 0.
+- **`verify-pbr-soak.ps1 -Backend dx12`** — 109 표본, 109 전부 프레임 전진, 위반 0.
+
+### 교차 백엔드 픽셀 — 게이트의 질문을 좁혔다
+
+두 백엔드 캡처를 실제로 맞대자 **GBuffer 다섯 장은 초과 0**이었다(`normal`만 max 0.000244,
+초과 0). 조명 합성 이후 두 장은 넘었다. 그런데 대조를 잡아 보니 **같은 백엔드끼리도**
+시각만 벌어지면 넘었다.
+
+| 비교 | Δt | `preToneHdr` 초과 | max | rmse |
+|---|---|---|---|---|
+| dx12 vs dx12 | 0.27s | 19,490 / 3,916,416 | 0.043 | 0.00072 |
+| dx12 vs dx12 | 3.11s | 57,977 / 3,916,416 | 0.039 | 0.00127 |
+| dx12 vs vulkan | 5.68s | 241,936 / 3,916,416 | 0.119 | 0.00421 |
+
+원인은 켜져 있는 시간 구동·시간축 누적 효과다 — 움직이는 구름 그림자
+(`shadow.cloudMoveSpeed`), 볼류메트릭 포그의 직전 프레임 혼합
+(`mPreviousFrameBlendFactor`), SSGI 누적. 그리고 **캡처는 시뮬레이션 시각을 고정할 수단이
+없다**(`time.*` 명령이 존재하지 않는다). 두 캡처는 다른 시각의 서로 다른 그림이고, 그것을
+픽셀로 맞대는 것은 애초에 성립하지 않는 질문이었다.
+
+그래서 **허용치를 늘려 초록으로 만들지 않았다.** 그러면 이 두 장에 대해 게이트가 아무것도
+재지 않으면서 재는 척하게 된다. `preToneHdr`·`display`는 판정에서 빼되 수는 매 실행
+남긴다(`gated:false`, 로그에 `[측정만 · 시각 고정 불가]`). 시각을 고정할 수 있게 되면 이
+자리를 판정으로 되돌리는 것이 **W9의 남은 단위**다.
+
+시간차 3.11s가 58k인데 5.68s 교차가 242k이므로 **시간만으로 다 설명되지 않는 잔차**가
+있다. 다만 이 하네스로는 그 잔차를 분리할 수 없다 — 분리하려면 시각 고정이 먼저다.
+
+### 변이 증명 — 둘은 섰고, 하나는 설 자리가 없었다
+
+- **② `Stamp` 호출 제거 → 잡았다.** 게이트가 `verify-pbr-wiring-baseline.ps1:114`
+  "Draw seal missing or from another frame"으로 붉었다. 붉은 이유까지 맞다.
+- **⑤ attachment 픽셀 교란 → 잡았다.** `baseColor` 1,000 표본을 +0.05 밀자 정확히
+  `exceeded 1000/3916416 · max 0.050000`, 종료 코드 4. 심은 것만 정확히 잡았고 측정 전용
+  두 장은 실패시키지 않았다.
+- **① 주소 키 복원 → 게이트는 통과했다. 그런데 이것은 "눈멀었다"가 아니다.**
+  변이 뒤에도 `dx12-gunner`는 draw 10 / distinct sealHash 10 / bindings 10 으로 기준과
+  같았다 — 10개 draw가 각자 다른 `Material*`이라 **주소 키만으로도 갈린다**. 즉
+  **이 fixture는 그 결함을 자극하지 못한다.** W8이 고친 결함(하나의 `Material`을 공유하는
+  두 renderer가 서로 다른 `MaterialInstance` override를 갖는 경우)을 재현하는 fixture가
+  저장소에 없다. **W8의 핵심 수정은 아직 증명되지 않았고**, 그것을 증명하려면 그 fixture를
+  먼저 만들어야 한다 — 이것이 남은 단위다.
+- **③ `Accept` 강제 true · ④ `NoteDropped` 제거는 돌리지 않았다.** ④는 애초에 게이트가
+  못 잡는 변이로 적어 두었고(잡는 것은 소스 대조뿐), ③은 ②가 같은 경로의 이빨을 이미
+  보였다.
+
+### 실측이 드러낸 것 (계획에 없던 것)
+
+- **저작 digest 축이 fixture마다 비어 있다.** `FT_Primitives`는 8 draw 전부
+  `authoredDigest = 0`(= `proxy->m_authoredMaterial`이 null). `Gunner_F_Mythic`은 distinct 3종
+  중 2종이 non-zero라 축이 살아 있고, 그 값은 **두 백엔드에서 동일**했다.
+  `authoredRevision`은 두 fixture 모두 전부 0 — 이 축은 아직 아무것도 나르지 않는다.
+- **`sealHash`는 프로세스 지역값이다.** 같은 씬·같은 코드인데 실행마다 전부 달라진다
+  (texture owner의 `m_assetId`가 런타임 발급 GUID라 digest에 섞인다). 프레임 안 신원으로는
+  옳지만 **실행 간 golden으로 쓰면 안 된다.** 반대로 `authoredDigest`는 실행 간 안정적이었다.
+- **이 게이트는 W9 이전부터 붉었다.** `verify-pbr-wiring-baseline.ps1:218`이 부르는
+  `verify-experiment-contract.ps1`이 링크 단계에서 죽는다 — 독립 probe의 라이브러리 목록이
+  `SceneRuntime`의 실제 의존과 어긋나 있다. 이 호출은 HEAD에 이미 있었고 W9가 건드리지
+  않았다. 즉 **PBR 배선 게이트가 끝까지 간 적이 없다.** 세 층(`nethost` · `EngineDiagnostics`
+  · FMOD)을 채워 미해결 90 → 49로 줄였고 나머지(`PhysicX::*` · `GameInputInitialize`)는
+  별건으로 남겼다.
+
+### 아직 하지 않은 것 (정직하게)
+
+- **10분 acceptance를 돌리지 않았다.** 위 soak은 게이트용 1분이다.
+- **`vulkan` soak을 돌리지 않았다.** dx12만 쟀다.
+- **Release 구성으로 돌리지 않았다.** 위 수는 전부 Debug다.
+- **cutover는 하지 않았다.** 게이트가 끝까지 초록인 적이 없으므로 판단할 근거가 없다.

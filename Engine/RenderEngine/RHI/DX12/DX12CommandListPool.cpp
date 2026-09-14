@@ -254,6 +254,25 @@ ID3D12GraphicsCommandList* DX12CommandListPool::Open(uint32_t worker, std::strin
     return slot.list.Get();
 }
 
+uint32_t DX12CommandListPool::DrainEncoderDrops(std::string& outLast)
+{
+    // DX12는 인코더가 워커별로 살아 있으므로 여기서 훑어 모은다. 읽으면서
+    // 비운다 — 누적을 남기면 프레임별 판정이 성립하지 않는다.
+    uint32_t total = 0;
+    const char* last = nullptr;
+    for (std::unique_ptr<DX12Encoder>& encoder : m_encoders)
+    {
+        if (!encoder) continue;
+        const uint32_t count = encoder->GetDroppedCount();
+        if (0 == count) continue;
+        total += count;
+        last = encoder->GetLastDropped();
+        encoder->ClearDropped();
+    }
+    outLast = nullptr != last ? last : std::string{};
+    return total;
+}
+
 bool DX12CommandListPool::CloseAll(std::string& outError)
 {
     if (m_slots.empty()) return true;

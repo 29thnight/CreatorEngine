@@ -59,6 +59,13 @@ bool RunPbrEmissionTest(std::string& outLog);
 bool RunPbrTransformTest(std::string& outLog);
 bool RunPbrUvTest(std::string& outLog);
 bool RunPbrMipTest(std::string& outLog);
+/// PBR-W8 — 세대 원자 밀봉의 값 신원·저작 digest·draw 장부. GPU를 켜지 않는다.
+bool RunPbrSealTest(std::string& outLog);
+/// PBR-W9 — 두 제품 캡처(보통 DX12/Vulkan)의 float32 readback을 실제로 맞댄다.
+/// 허용식은 기존 parity와 같다(절대 0.002 + 상대 0.5%).
+bool RunPbrCaptureCompare(const std::string& leftDirectory,
+    const std::string& rightDirectory, const std::string& outputPath,
+    std::string& outLog);
 bool RunVulkanDecalTest(std::string& outLog);
 bool RunVulkanSSAOTest(std::string& outLog);
 bool RunVulkanSSGITest(std::string& outLog);

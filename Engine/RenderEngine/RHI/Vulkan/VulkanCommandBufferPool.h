@@ -31,6 +31,7 @@ public:
     bool OpenWorker(uint32_t worker, std::string& outError) override;
     RHIEncoder& AcquireEncoder(uint32_t worker) override;
     bool CloseAll(std::string& outError) override;
+    uint32_t DrainEncoderDrops(std::string& outLast) override;
     bool HasRecorded(uint32_t worker) const override;
     void RunParallel(const std::function<void(uint32_t)>& job,
         uint32_t workerCount) override;

@@ -769,6 +769,37 @@ Run-Step "렌더 지오메트리 신원 경계" {
         (Join-Path $PSScriptRoot "verify-render-geometry-identity.ps1")
 }
 
+# 이 게이트만 구성(Debug/Release)을 따로 받는다. $Exe 가 어느 구성의 것인지는
+# 경로가 말하므로 거기서 뽑는다 — 기본값을 박으면 Release exe 로 돌릴 때
+# 조용히 Debug 산출물을 찾는다.
+$pbrConfiguration = if ($Exe -match 'x64-Release') { 'Release' } else { 'Debug' }
+
+# PHASE 4 W9 — PBR 제품 배선 게이트를 도는 세트에 넣는다.
+#
+# ★ 이 게이트는 W0부터 있었지만 run-all 이 부른 적이 없다. 저장소 전체에서
+#   이 파일을 부르는 것은 계획 문서뿐이었고, 그래서 "PBR 회귀가 있다"는 말과
+#   "PBR 회귀가 돈다"는 말이 열흘 넘게 다른 뜻이었다. 세트에 없으면 없는 것이다.
+#
+# ★ Editor 를 여러 번 띄우고 실장면 캡처를 찍으므로 비싸다(수 분). 그래도
+#   여기 두는 이유는 이 게이트만이 제품 프레임의 세대 신원(W8)과 backend
+#   동등성을 재기 때문이다 — 다른 스텝은 전부 정적이거나 격리 fixture다.
+Run-Step "PBR 제품 배선·세대 밀봉" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-pbr-wiring-baseline.ps1") `
+        -Editor $Exe -Configuration $pbrConfiguration -Work $Work
+}
+
+# PHASE 4 W9 — 장시간 축. 기본 1분이며 acceptance 는 -Minutes 10 으로 따로 돈다.
+#
+# ★ 짧게 도는 것을 "10분을 쟀다"고 적지 않는다. 여기서 재는 것은 회전·이동·
+#   재임포트가 섞인 수십 표본에서 세대 밀봉이 한 번도 깨지지 않는가이고,
+#   10분 판정은 W9 acceptance 실행의 몫이다.
+Run-Step "PBR 장시간 세대 밀봉" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-pbr-soak.ps1") `
+        -Editor $Exe -Configuration $pbrConfiguration -Work $Work -Minutes 1
+}
+
 # I6-B: legacy Skeleton 은퇴 래칫(정적). 은퇴 슬라이스는 자기 A/B 대조군을
 # 없애므로(타입이 죽으면 off 팔이 지을 것이 없다) 축은 "소비 0"과 "빌드가
 # 막는다"다. 접촉 수가 늘어나는 방향만 막는다.

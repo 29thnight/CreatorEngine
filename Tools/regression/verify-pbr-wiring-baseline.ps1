@@ -1,4 +1,4 @@
-# PHASE 4 W0/W2/W3/W4/W5/W6/W7-normal/UV/mip: product-frame capture, shared PBR and backend defaults.
+# PHASE 4 W0/W2~W8: product-frame capture, shared PBR, backend defaults and seal identity.
 # Captures are observations, not W9 visual acceptance or cross-backend goldens.
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
@@ -99,6 +99,42 @@ function Assert-Capture([string]$Directory, [string]$ExpectedBackend, [string[]]
     if ($depth.min -ge 1 -or $depth.min -eq $depth.max -or $hdr.rgbMax -le 0) {
         throw "Empty depth/HDR capture: $Directory"
     }
+
+    # W8 — 세대 원자 밀봉. 이 세 단정이 전부 실장면 프레임에서만 성립한다.
+    #   ① 제품 draw는 전부 도장을 받는다(도장 없는 draw = 밀봉 경로를 안 탄 것)
+    #   ② 한 프레임 안에서 세대가 섞이지 않는다(위반 0)
+    #   ③ 인코더가 조용히 버린 명령이 없다(검은 화면·플리커의 직접 경로)
+    if (-not $manifest.PSObject.Properties['sealLedger'] -or -not $manifest.sealLedger.recorded) {
+        throw "Capture has no seal ledger (W8 배선이 끊겼다): $Directory"
+    }
+    foreach ($draw in $manifest.draws) {
+        if (-not $draw.PSObject.Properties['seal'] -or -not $draw.seal.stamped -or
+            $draw.seal.hash -le 0 -or $draw.seal.frameId -ne $manifest.frameId -or
+            $draw.seal.sceneEpoch -ne $manifest.sceneEpoch) {
+            throw "Draw seal missing or from another frame: $Directory"
+        }
+    }
+    foreach ($pass in @('gbuffer', 'forward')) {
+        $ledger = $manifest.sealLedger.$pass
+        if ($ledger.violations -ne 0) {
+            throw "Seal violations in $pass ($($ledger.lastReason)): $Directory"
+        }
+        if ($ledger.unstamped -ne 0) {
+            throw "Unstamped product draws in $pass : $Directory"
+        }
+        if ($ledger.frameId -ne $manifest.frameId) {
+            throw "Seal ledger frame mismatch in $pass : $Directory"
+        }
+        if ($ledger.samplerIdentity -le 0 -and $ledger.stamped -gt 0) {
+            throw "Sampler identity was never recorded in $pass : $Directory"
+        }
+    }
+    if ($manifest.sealLedger.encoderDrops -ne 0) {
+        throw "Encoder dropped commands ($($manifest.sealLedger.lastEncoderDrop)): $Directory"
+    }
+    if ($manifest.sealLedger.textureUploadFailures -ne 0) {
+        throw "Silent neutral substitution after upload failure: $Directory"
+    }
 }
 
 try {
@@ -110,6 +146,7 @@ try {
     $text = $utf8.GetString($original)
     $backendPattern = '(?m)(^render:\r?\n\s{2}backend: )\w+'
     if ([regex]::Matches($text, $backendPattern).Count -ne 1) { throw 'Runtime backend setting is ambiguous.' }
+    $captureDirs = @{}
     foreach ($api in $Backend) {
         [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, "`${1}$api"), $utf8)
         $primitive = Join-Path $run "$api-primitives"
@@ -142,8 +179,34 @@ try {
         }
         Assert-Capture $primitive $api @('Prim_Cube', 'Prim_Sphere', 'Prim_Cylinder')
         Assert-Capture $gunner $api @('Gunner_F_Mythic')
+        $captureDirs[$api] = @{ primitives = $primitive; gunner = $gunner }
         Write-Output "$api product capture PASS: $primitive; $gunner"
     }
+    # W9 — 두 backend 캡처의 float32 readback을 실제로 맞댄다.
+    #
+    # ★ W0부터 이 .f32 들을 읽는 코드가 저장소에 하나도 없었다. 게이트는 파일
+    #   크기만 재고 있었고 계획서의 RMSE 는 손으로 한 번 잰 값이었다. 여기서
+    #   비로소 "같은 그림인가"가 게이트의 질문이 된다. 한 backend 만 돌린
+    #   실행에서는 맞댈 짝이 없으므로 건너뛴다(그 사실을 출력한다).
+    if ($captureDirs.Count -eq 2) {
+        $left = $captureDirs['dx12']
+        $right = $captureDirs['vulkan']
+        foreach ($fixture in @('primitives', 'gunner')) {
+            $outputJson = Join-Path $run "compare-$fixture.json"
+            $results = @(Invoke-Editor "compare-$fixture" @(
+                "render.pbr.compare `"$($left[$fixture])`" `"$($right[$fixture])`" `"$outputJson`"",
+                'quit'))
+            $data = Get-SucceededCommand $results 'render.pbr.compare'
+            if (-not $data.passed) { throw "Cross-backend pixel comparison failed: $fixture" }
+            if (-not (Test-Path -LiteralPath $outputJson)) {
+                throw "Comparison result was not written: $outputJson"
+            }
+        }
+        Write-Output "cross-backend capture compare PASS"
+    } else {
+        Write-Output "cross-backend capture compare SKIPPED (backend 하나만 실행됨)"
+    }
+
     # The paired harness owns both DX12 and Vulkan test devices; keep its Editor
     # host on DX12 independently of the final product-capture backend above.
     [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, '${1}dx12'), $utf8)
@@ -155,7 +218,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Standalone material contracts failed; log: $contractLog" }
     $contractCommands = @('experiment.matresolve', 'experiment.matmigrate', 'experiment.cooked')
     $null = Invoke-Editor 'material-contracts' ($contractCommands + 'quit')
-    foreach ($name in @('parity', 'coverage', 'emission', 'transform', 'uv', 'mip', 'occlusion')) {
+    foreach ($name in @('seal', 'parity', 'coverage', 'emission', 'transform', 'uv', 'mip', 'occlusion')) {
         $results = @(Invoke-Editor $name @("render.pbr.$name", 'quit'))
         $data = Get-SucceededCommand $results "render.pbr.$name"
         if (-not $data.passed) { throw "PBR $name did not execute its verification" }

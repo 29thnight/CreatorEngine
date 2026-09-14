@@ -232,6 +232,16 @@ RHIEncoder& VulkanCommandBufferPool::AcquireEncoder(uint32_t worker)
     return *slot.encoder;
 }
 
+uint32_t VulkanCommandBufferPool::DrainEncoderDrops(std::string& outLast)
+{
+    // 이 풀은 slot 회수 때 이미 인코더별 수를 모아 두었다. 여기서는 비우면서
+    // 돌려주기만 한다 — 한 번 읽은 사건을 다음 프레임에 또 세면 안 된다.
+    const uint32_t count = m_encoderUnimplemented.exchange(0, std::memory_order_relaxed);
+    const char* last = m_lastUnimplemented.load(std::memory_order_relaxed);
+    outLast = (0 != count && nullptr != last) ? last : std::string{};
+    return count;
+}
+
 bool VulkanCommandBufferPool::CloseAll(std::string& outError)
 {
     for (Slot& slot : m_slots[m_frameIndex])

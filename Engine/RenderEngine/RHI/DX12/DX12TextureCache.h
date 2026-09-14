@@ -128,6 +128,7 @@ public:
     /// '끔=검정' 대조군으로 잡았다). 프레임이 열려 있어야 한다(첫 호출 생성).
     Entry GetBlackTexture(std::string& outError) override;
     Entry GetOrmNeutralTexture(std::string& outError) override;   // Multiplicative identity (1, 1, 1).
+    uint32_t GetUploadFailureCount() const override { return m_stats.failures; }
 
     // ── 미사용 기반 은퇴 (자산 상주 관리 ③) ──
     //

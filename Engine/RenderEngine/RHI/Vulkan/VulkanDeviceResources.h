@@ -491,6 +491,7 @@ public:
     RHITextureEntry GetOrUpload(Texture* texture, std::string& outError) override;
     RHITextureEntry GetBlackTexture(std::string& outError) override;
     RHITextureEntry GetOrmNeutralTexture(std::string& outError) override;
+    uint32_t GetUploadFailureCount() const override;
     void OnUploadSubmitted(uint64_t recordingId,
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;

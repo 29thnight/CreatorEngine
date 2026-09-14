@@ -40,6 +40,14 @@ public:
 
     /// 열린 target을 모두 닫는다. Vulkan은 열린 dynamic rendering도 여기서 닫는다.
     virtual bool CloseAll(std::string& outError) = 0;
+
+    /// W8 — 인코더가 조용히 버린 명령의 수를 비우고 돌려준다.
+    ///
+    /// ★ 두 백엔드 모두 걸 수 없는 것을 만나면 그냥 돌아간다(놓인 PSO 핸들,
+    ///   만료된 descriptor 버전, 주소 0). 그 사건은 화면에서 draw가 사라지는
+    ///   것과 같은 뜻인데 밖에서 물을 창구가 없었다. Vulkan의 unimplemented
+    ///   계수와 DX12의 drop 계수를 여기 한 이름으로 모은다.
+    virtual uint32_t DrainEncoderDrops(std::string& outLast) = 0;
     virtual bool HasRecorded(uint32_t worker) const = 0;
 
     /// 지속 worker thread에서 job을 병렬 실행하고 join 지점까지 기다린다.

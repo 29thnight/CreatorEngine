@@ -170,8 +170,8 @@ PHASE 4.5는 PHASE 4.75의 `RG6`·`Q0`를 선행으로 받지 않는다. 자체 
 | `PBR-W5` | AO·texture table·GBuffer packing | ✓ | W2, W3 | 2.5 |
 | `PBR-W6` | emissive factor/strength·constant·색공간 | ✓ | W2 | 1.5 |
 | `PBR-W7` | UV/sampler/mip·normal/tangent transform | ◐ | W2 | 2 |
-| `PBR-W8` | generation 원자 밀봉·플리커 fail-closed | · | W3~W7 | 2 |
-| `PBR-W9` | DX12/Vulkan 실장면·장시간·재임포트 cutover | · | W8 | 1.5 |
+| `PBR-W8` | generation 원자 밀봉·플리커 fail-closed | ◐ | W3~W7 | 2 |
+| `PBR-W9` | DX12/Vulkan 실장면·장시간·재임포트 cutover | ◐ | W8 | 1.5 |
 
 완료선은 [`PBRWiringStabilizationPlan.md`](PBRWiringStabilizationPlan.md) §4를 따른다.
 2026-09-06 W0/W3 첫 구현과 실장면 캡처 근거는 같은 문서 §6에 기록했다.
@@ -187,6 +187,14 @@ ID 보존을 확인했다. W7은 §11의 normal/tangent 변환·양 backend 128-
 합계 1.5일 기성으로 반영했다. 축소 MASK를 포함한 coverage 48-case도 통과했다.
 CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단위다. strict GUID의 기존
 `ImmProbe.prefab.meta` 추적 정책 위반 1개와 W9 acceptance는 별도 미해결로 남긴다.
+
+2026-09-14 W8/W9 구현이 착지했다(같은 문서 §14·§15). **기성으로 세지 않는다** — 빌드와
+실행을 하지 않았고, 새 검사의 이빨을 변이로 증명하지 않았다. 착수 전 실측이 계획서의
+전제 둘을 뒤집었다: ① W8이 말한 "약한 신원으로 재사용될 여지"는 여지가 아니라 실재하는
+결함이었다(밀봉 중복 제거 키가 legacy `Material*` 주소라, 같은 재질 자산을 공유하는
+렌더러들의 인스턴스 override가 서로 덮였다). ② `verify-pbr-wiring-baseline.ps1`은 W0부터
+`run-all.ps1`에 물려 있지 않았고, 캡처의 float32 원본을 읽는 코드도 없었다 — PBR 픽셀 축
+전체가 도는 세트 밖이었다. 두 결함과 두 공백이 W8/W9의 실제 작업이 됐다.
 
 ---
 
