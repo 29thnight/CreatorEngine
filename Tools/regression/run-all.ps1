@@ -240,6 +240,18 @@ Run-Step "에디터 워크스페이스(도크·스타일·저장·이주·복구
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-workspace.ps1") -Exe $Exe -Work (Join-Path $Work 'editor-workspace')
 }
 
+# PHASE 21 W6 — 배치 preset 다섯의 런타임 판정.
+#
+# 계획서 W6 의 판정을 그대로 잰다: 각 preset 을 연속 적용해도 orphan dock node 와
+# off-screen floating panel 이 없고, 사용자가 수정한 workspace 를 preset update 가
+# 덮어쓰지 않는다. 여기에 minimum central area 보존을 더했다 — 그리고 게이트를
+# 처음 돌렸을 때 900x620 에서 오른쪽 열이 폭 0 으로 접히는 결함이 여기서 나왔다
+# (고아도 유령도 아니라서 기존 감사가 통째로 못 보던 자리다). 변이 6 종으로 이빨을
+# 확인했다.
+Run-Step "에디터 배치 preset(런타임)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-layout-preset.ps1") -Exe $Exe -Work (Join-Path $Work 'layout-preset')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

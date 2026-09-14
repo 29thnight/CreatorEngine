@@ -45,6 +45,7 @@ namespace editor
     enum class dock_slot
     {
         center,        // 뷰포트 탭
+        left,          // 왼쪽 열 전체 높이. `legacy_unity` preset 의 Hierarchy 자리
         right_upper,   // Hierarchy 자리
         right_lower,   // Inspector 자리
         bottom,        // 자산 브라우저 계열
@@ -124,6 +125,7 @@ namespace editor
 
     inline constexpr std::array all_dock_slots{
         dock_slot::center,
+        dock_slot::left,
         dock_slot::right_upper,
         dock_slot::right_lower,
         dock_slot::bottom,
@@ -170,6 +172,7 @@ namespace editor
         switch (slot)
         {
         case dock_slot::center:      return "center";
+        case dock_slot::left:        return "left";
         case dock_slot::right_upper: return "right_upper";
         case dock_slot::right_lower: return "right_lower";
         case dock_slot::bottom:      return "bottom";

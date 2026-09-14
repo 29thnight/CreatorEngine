@@ -885,6 +885,82 @@ namespace ConsoleCmd
         data.Set("versionKnown", CommandData::Bool(audit.internal_api_version_known));
         data.Set("clean", CommandData::Bool(audit.clean()));
 
+        // PHASE 21 W6 — preset 이 지켜야 하는 두 축을 밖으로 낸다.
+        //
+        // ① **가운데의 크기.** 비율만 쓰면 창이 작아질수록 가운데가 먼저
+        //    사라진다. 빌더가 최소치를 지키는지는 노드의 실제 사각형으로만
+        //    확인할 수 있다.
+        // ② **화면 밖 떠 있는 패널.** 자리를 바꾸면 도킹돼 있던 창이 떠 버릴
+        //    수 있고, 그 창이 화면 밖에 놓이면 사람이 되찾을 방법이 없다.
+        //    "밖" 의 기준은 뿌리 도크 노드의 사각형이다 — 그것이 이 프레임의
+        //    작업 영역이고, 같은 스냅샷에서 나온 값이라 두 벌이 되지 않는다.
+        float centralWidth = 0.f, centralHeight = 0.f;
+        float rootRect[4]{};
+        bool haveRoot = false;
+        for (const ::editor::dock_node_view& node : snapshot.nodes)
+        {
+            if (node.is_central)
+            {
+                centralWidth = node.rect[2] - node.rect[0];
+                centralHeight = node.rect[3] - node.rect[1];
+            }
+            if (0 == node.parent && !haveRoot)
+            {
+                haveRoot = true;
+                for (int i = 0; i < 4; ++i) rootRect[i] = node.rect[i];
+            }
+        }
+        // ③ **접혀 버린 노드.** 폭이나 높이가 0 인 잎은 트리에는 멀쩡히 있고
+        //    창도 붙어 있지만 사람에게는 패널이 사라진 것으로 보인다. 고아도
+        //    유령도 아니라서 기존 감사가 통째로 못 보던 자리다.
+        int degenerateNodes = 0;
+        for (const ::editor::dock_node_view& node : snapshot.nodes)
+        {
+            if (!node.is_leaf || !node.is_visible) continue;
+            if (node.rect[2] - node.rect[0] <= 1.f || node.rect[3] - node.rect[1] <= 1.f)
+                ++degenerateNodes;
+        }
+        // ④ **아무도 안 사는 노드.** 자리를 갈라 놓고 그 자리에 들어올 창이
+        //    없으면 빈 잎이 남는다 — 계획서가 금지한 orphan dock node 가 이것이다.
+        //    ③ 과는 다른 축이다: 크기는 멀쩡하고 **탭이 0** 이다. 가운데 노드는
+        //    빌더가 늘 비워 두었다가 Scene 이 들어오므로 여기서 세지 않는다
+        //    (가운데가 비는 것은 `central` 단정이 따로 본다).
+        //
+        //    **`is_visible` 을 요구하면 안 된다.** 창이 하나도 없는 노드를 ImGui 는
+        //    보이지 않는 것으로 표시하므로, 그 조건을 걸면 잡으려던 바로 그 경우가
+        //    필터에서 빠진다. 변이로 확인했다 — `right_lower` 를 쓰지 않는 preset 에서
+        //    그 자리를 억지로 가르면 노드가 7→9 · 잎이 4→5 로 늘어나는데 `is_visible`
+        //    을 요구한 판은 0 을 냈다.
+        int emptyLeafNodes = 0;
+        for (const ::editor::dock_node_view& node : snapshot.nodes)
+        {
+            if (!node.is_leaf || node.is_central) continue;
+            if (0 == node.tab_count) ++emptyLeafNodes;
+        }
+        int offscreenFloating = 0;
+        if (haveRoot)
+        {
+            for (const ::editor::window_placement_view& placement : snapshot.placements)
+            {
+                if (0 != placement.dock_node || !placement.known_to_imgui) continue;
+                if (placement.rect[2] <= placement.rect[0]) continue;   // 아직 크기가 없다
+                const bool overlaps =
+                    placement.rect[0] < rootRect[2] && placement.rect[2] > rootRect[0] &&
+                    placement.rect[1] < rootRect[3] && placement.rect[3] > rootRect[1];
+                if (!overlaps) ++offscreenFloating;
+            }
+        }
+        data.Set("centralWidth", CommandData::Double(centralWidth));
+        data.Set("centralHeight", CommandData::Double(centralHeight));
+        data.Set("offscreenFloating", CommandData::Int(offscreenFloating));
+        data.Set("degenerateNodes", CommandData::Int(degenerateNodes));
+        data.Set("emptyLeafNodes", CommandData::Int(emptyLeafNodes));
+        data.Set("rootWidth", CommandData::Double(haveRoot ? rootRect[2] - rootRect[0] : 0.0));
+        data.Set("rootHeight", CommandData::Double(haveRoot ? rootRect[3] - rootRect[1] : 0.0));
+        data.Set("uiScale", CommandData::Double(snapshot.ui_scale));
+        data.Set("minCentralWidth", CommandData::Double(snapshot.min_central_width));
+        data.Set("minCentralHeight", CommandData::Double(snapshot.min_central_height));
+
         // W0 후반 성능 기준선. 타깃별 GPU ms 는 잴 수단이 없어 빠졌다 —
         // 이유는 덤프의 [NOTE] 에 적혀 있다.
         data.Set("uiCpuMs", CommandData::Double(snapshot.ui_cpu_ms));
@@ -1169,14 +1245,39 @@ namespace ConsoleCmd
         if(args.size()>1)
         {
             editor::workspace_action action{};
+            // `presets` 는 대기열에 넣을 일이 없다 — 표를 읽기만 한다.
+            if(args[1]=="presets")
+            {
+                if(args.size()!=2) return InvalidArguments("editor.workspace presets");
+                auto list=CommandData::Array();
+                for(const auto& preset:editor::layout_presets())
+                {
+                    auto one=CommandData::Object();
+                    one.Set("id",CommandData::String(std::string(preset.id)));
+                    one.Set("label",CommandData::String(std::string(preset.label)));
+                    one.Set("overrides",CommandData::Int(static_cast<int64_t>(preset.overrides.size())));
+                    list.Append(std::move(one));
+                }
+                auto presetData=CommandData::Object();
+                presetData.Set("presets",std::move(list));
+                presetData.Set("active",CommandData::String(editor::get_workspace_status().preset));
+                return Ok("Layout presets",std::move(presetData));
+            }
             if(args[1]=="save") action=editor::workspace_action::save;
             else if(args[1]=="load") action=editor::workspace_action::load;
             else if(args[1]=="reset") action=editor::workspace_action::reset;
             else if(args[1]=="open") action=editor::workspace_action::open_panel;
             else if(args[1]=="close") action=editor::workspace_action::close_panel;
-            else return InvalidArguments("editor.workspace [save|load|reset|open <panelId>|close <panelId>]");
-            const bool panel=action==editor::workspace_action::open_panel || action==editor::workspace_action::close_panel;
+            else if(args[1]=="preset") action=editor::workspace_action::apply_preset;
+            else return InvalidArguments("editor.workspace [save|load|reset|presets|preset <id>|open <panelId>|close <panelId>]");
+            const bool panel=action==editor::workspace_action::open_panel ||
+                action==editor::workspace_action::close_panel ||
+                action==editor::workspace_action::apply_preset;
             if(args.size()!=(panel?3u:2u)) return InvalidArguments("Wrong workspace argument count");
+            // 없는 preset 이름은 **여기서** 튕긴다. 대기열에 넣으면 실패가 다음
+            // 프레임의 status.error 로만 남아 명령의 종료 코드가 초록이 된다.
+            if(action==editor::workspace_action::apply_preset && !editor::find_layout_preset(args[2]))
+                return InvalidArguments("Unknown layout preset: "+args[2]);
             if(!editor::request_workspace_action(action,panel?args[2]:std::string{}))
                 return PreconditionFailed("editor.workspace.busy","A workspace operation is pending");
         }
@@ -1187,6 +1288,9 @@ namespace ConsoleCmd
         data.Set("recovered",CommandData::Bool(status.recovered));
         data.Set("migrated",CommandData::Bool(status.migrated));
         data.Set("path",CommandData::String(status.path));
+        data.Set("preset",CommandData::String(status.preset));
+        data.Set("presetLabel",CommandData::String(status.preset_label));
+        data.Set("name",CommandData::String(status.name));
         data.Set("error",CommandData::String(status.error));
         data.Set("revision",CommandData::Int(static_cast<int64_t>(status.revision)));
         auto panels=CommandData::Object();

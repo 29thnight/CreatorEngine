@@ -18,6 +18,7 @@
 // include 는 이 TU 가 직접 소유한다(유니티에서 빠져 있다).
 
 #include "EditorChromeProbe.h"
+#include "../EditorWindow/EditorLayoutPreset.h"
 #include "EditorWorkspaceStore.h"
 
 #include "EditorChromeSnapshot.h"
@@ -213,6 +214,12 @@ namespace editor
                 ++snapshot.colors_differing_from_default;
             }
         }
+
+        snapshot.ui_scale = style.FontScaleMain * style.FontScaleDpi;
+        snapshot.min_central_width =
+            ::editor::layout_minimums::central_width * snapshot.ui_scale;
+        snapshot.min_central_height =
+            ::editor::layout_minimums::central_height * snapshot.ui_scale;
 
         // 스칼라는 손으로 고른 목록이다. 개수를 단정하지 않으므로 늘려도
         // 게이트가 깨지지 않는다 — 덤프가 한 줄 늘어날 뿐이다.

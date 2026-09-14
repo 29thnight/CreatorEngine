@@ -102,6 +102,7 @@
     <ClInclude Include="EditorWindow\EditorWindowHost.h" />
     <ClInclude Include="EditorWindow\EditorWindowSelfTest.h" />
     <ClInclude Include="EditorWindow\EditorWindowAudit.h" />
+    <ClInclude Include="EditorWindow\EditorLayoutPreset.h" />
     <ClInclude Include="EditorWindow\EditorChromeSnapshot.h" />
     <ClInclude Include="EngineGUIWindow\EditorChromeProbe.h" />
     <ClInclude Include="EditorWindow\RegisterEditorWindowManual.h" />
@@ -252,6 +253,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorWindowAudit.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\EditorLayoutPreset.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorChromeSnapshot.cpp">

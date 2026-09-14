@@ -122,6 +122,13 @@ namespace editor
         std::string   imgui_version;
         int           imgui_version_num{ 0 };
 
+        /// ImGui 스타일 배율(`FontScaleMain * FontScaleDpi`)과 그것을 곱한
+        /// **실효** 하한. 게이트가 논리 픽셀 상수를 제 파일에 베껴 적지 않고
+        /// 제품이 실제로 쓴 수를 그대로 읽게 하려고 싣는다.
+        float         ui_scale{ 1.f };
+        float         min_central_width{ 0.f };
+        float         min_central_height{ 0.f };
+
         std::vector<dock_node_view>        nodes;
         std::vector<dock_tab_view>         tabs;
         std::vector<window_placement_view> placements;

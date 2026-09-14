@@ -240,6 +240,9 @@
     <ClInclude Include="EditorWindow\EditorWindowAudit.h">
       <Filter>EditorWindow</Filter>
     </ClInclude>
+    <ClInclude Include="EditorWindow\EditorLayoutPreset.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
     <ClInclude Include="EditorWindow\EditorChromeSnapshot.h">
       <Filter>EditorWindow</Filter>
     </ClInclude>
@@ -292,6 +295,9 @@
       <Filter>EditorWindow</Filter>
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorWindowAudit.cpp">
+      <Filter>EditorWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorWindow\EditorLayoutPreset.cpp">
       <Filter>EditorWindow</Filter>
     </ClCompile>
     <ClCompile Include="EditorWindow\EditorChromeSnapshot.cpp">

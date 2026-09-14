@@ -60,7 +60,21 @@ namespace editor
     void draw_workspace_menu()
     {
         const auto status=get_workspace_status();
+        // 지금 무엇이 서 있는지 먼저 보인다. 계획서 W6 의 "active workspace 표시" 다 —
+        // preset 을 고르는 자리와 지금 고른 것이 떨어져 있으면 무엇을 되돌리는지 모른다.
+        ImGui::TextDisabled("Layout: %s",status.preset_label.empty()?"(none)":status.preset_label.c_str());
+        ImGui::Separator();
         ImGui::BeginDisabled(status.pending);
+        if(ImGui::BeginMenu("Layout Preset"))
+        {
+            for(const auto& preset:layout_presets())
+            {
+                const std::string label(preset.label);
+                if(ImGui::MenuItem(label.c_str(),nullptr,status.preset==preset.id))
+                    request_workspace_action(workspace_action::apply_preset,std::string(preset.id));
+            }
+            ImGui::EndMenu();
+        }
         if(ImGui::MenuItem("Save Workspace")) request_workspace_action(workspace_action::save);
         if(ImGui::MenuItem("Reload Workspace")) request_workspace_action(workspace_action::load);
         if(ImGui::MenuItem("Reset Layout...")) resetDialog=true;
@@ -72,7 +86,9 @@ namespace editor
         if(resetDialog) { ImGui::OpenPopup("Reset Workspace"); resetDialog=false; }
         if(ImGui::BeginPopupModal("Reset Workspace",nullptr,ImGuiWindowFlags_AlwaysAutoResize))
         {
-            ImGui::TextUnformatted("Restore the default S&Box Compact layout?");
+            const auto status=get_workspace_status();
+            ImGui::Text("Restore the default %s layout?",
+                status.preset_label.empty()?"S&Box Compact":status.preset_label.c_str());
             ImGui::TextUnformatted("The current workspace will be backed up first.");
             if(ImGui::Button("Restore default"))
             { request_workspace_action(workspace_action::reset); ImGui::CloseCurrentPopup(); }
@@ -102,6 +118,10 @@ namespace editor
         ImGui::ClearIniSettings();
         ImGui::LoadIniSettingsFromMemory(document.ini.data(),document.ini.size());
         m_document=document;
+        // 파일이 든 preset 이 없는 이름이면(손으로 고쳤거나 옛 판) 기본으로 돌린다.
+        // 배치 자체는 ini 가 들고 있으므로 이름 하나 때문에 배치를 버리지 않는다.
+        if(const layout_preset* named=find_layout_preset(document.preset)) m_preset=named;
+        else { m_preset=&default_layout_preset(); m_document.preset=std::string(m_preset->id); }
         // W4: `viewport` 는 이제 창 이름이 아니라 Host 의 표시 모드 토큰이다.
         // 옛 파일이 든 값이 그대로 모드 이름이라 스키마를 올리지 않아도 읽힌다.
         windows::request_viewport_mode(document.viewport==EditorWindowName::kGame
@@ -127,6 +147,32 @@ namespace editor
             }
         }
         m_buildDefault=false; m_saveRequested=true; m_writable=true;
+    }
+    void EditorWorkspaceStore::ApplyPreset(const layout_preset& preset)
+    {
+        // 사람이 만진 배치를 덮어쓰지 않는다 — 계획서 W6 의 판정 뒷절이다.
+        // 먼저 지금 것을 파일로 굳히고, 그 파일을 백업한 뒤에야 새 배치를 세운다.
+        // 순서가 반대면 백업에 **이전 실행의 배치**가 담긴다.
+        Save();
+        workspace::backup(m_path,"before-preset");
+        m_preset=&preset;
+        ImGui::ClearIniSettings();
+        m_buildDefault=true; m_saveRequested=true;
+        for(auto& entry:m_windows.entries)
+        {
+            if(!entry.persist_open) continue;
+            switch(visibility_of(entry,preset))
+            {
+            case preset_visibility::opened: entry.open=true; break;
+            case preset_visibility::closed: entry.open=false; break;
+            // 지정이 없으면 **사람이 둔 대로** 둔다. preset 은 자리를 말하는 것이지
+            // 열려 있던 창을 임의로 닫는 것이 아니다.
+            case preset_visibility::inherit: break;
+            }
+        }
+        m_document.preset=std::string(preset.id);
+        m_document.name=std::string(preset.label);
+        m_status.message="Layout preset applied: "+std::string(preset.label)+"; backup preserved";
     }
     void EditorWorkspaceStore::Load(bool startup)
     {
@@ -190,7 +236,18 @@ namespace editor
                     EditorSettingsStore::Get().Preferences().SetContentTreeWidth(220.f);
                     windows::request_viewport_mode(windows::viewport_mode::scene);
                     m_focusViewport=EditorWindowName::kViewport;
-                    m_document.name="S&Box Compact"; m_status.message="Default layout restored; backup preserved";
+                    // 되돌리는 대상은 "기본 preset" 이 아니라 **지금 preset** 이다.
+                    // Legacy Unity 를 쓰던 사람이 Reset 을 눌러 S&Box 로 튀면
+                    // 그것은 복원이 아니라 다른 배치다.
+                    m_document.preset=std::string(m_preset->id);
+                    m_document.name=std::string(m_preset->label);
+                    m_status.message="Default "+std::string(m_preset->label)+" layout restored; backup preserved";
+                }
+                else if(action==workspace_action::apply_preset)
+                {
+                    const layout_preset* target=find_layout_preset(panel);
+                    if(!target) throw std::runtime_error("Unknown layout preset");
+                    ApplyPreset(*target);
                 }
                 else if(action==workspace_action::save) m_saveRequested=true;
                 else
@@ -256,6 +313,9 @@ namespace editor
     void EditorWorkspaceStore::Publish()
     {
         const auto path=m_path.u8string(); m_status.path.assign(path.begin(),path.end());
+        m_status.preset=std::string(m_preset->id);
+        m_status.preset_label=std::string(m_preset->label);
+        m_status.name=m_document.name;
         m_status.panels.clear();
         for(const auto& entry:m_windows.entries) if(entry.persist_open) m_status.panels.emplace(entry.stable_id,entry.open);
         std::lock_guard lock(mailboxMutex);

@@ -96,7 +96,7 @@ namespace CommandCore
             { "editor.viewport", CommandCost::Immediate, "[scene|game]", "중앙 ViewportHost 의 표시 모드와 뷰 수요", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.window", CommandCost::Immediate, "<안정식별자> <open|close|focus>", "창 하나를 열고 닫고 앞으로 세운다(탭으로 겹친 창은 선택돼야 본문이 돈다)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.windows", CommandCost::Immediate, "", "선언된 에디터 창 표를 TSV로 내고 배선 고아를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
-            { "editor.workspace", CommandCost::Immediate, "[save|load|reset|open <panelId>|close <panelId>]", "워크스페이스 저장/복원과 창 열림 상태", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
+            { "editor.workspace", CommandCost::Immediate, "[save|load|reset|presets|preset <id>|open <panelId>|close <panelId>]", "워크스페이스 저장/복원, 배치 preset, 창 열림 상태", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "experiment.cooked", CommandCost::Long, "[경로]", "쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "foliage.authoring.probe", CommandCost::Frames, "<이름> [escape]", "Foliage 저작 트랜잭션 왕복과 루트 이탈 거부를 본다", CommandClass::RawFixture, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "game.pak", CommandCost::Long, "", "Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다", CommandClass::EngineService, CommandLiveness::Live },

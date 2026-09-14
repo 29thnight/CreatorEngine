@@ -3,6 +3,7 @@
 #include "ViewportHostWindow.h"
 #include "EditorWindowHost.h"
 #include "EditorWindowRegistry.h"
+#include "EditorLayoutPreset.h"
 #include "EditorChromeProbe.h"
 #include "RHI/IImGuiHost.h"
 #include "EditorFontResources.h"
@@ -17,8 +18,39 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <algorithm>
 #include <stdexcept>
 #include <string>
+
+namespace
+{
+    // 가운데가 이보다 좁아지면 옆과 아래를 줄인다(PHASE 21 W6). 논리 픽셀이라
+    // DPI 와 사용자 배율이 바뀌어도 같은 크기로 보인다 — 계획서가 "small window
+    // 와 DPI 변화에서 minimum central area 를 보존한다" 고 적은 축이다.
+    //
+    // 값의 근거는 뷰포트가 **뷰포트로 보이는 최소**다. 이보다 작으면 씬 툴바가
+    // 접히고 기즈모가 화면 밖으로 밀린다(W2-V 가 툴바 폭 모드를 넷으로 나눈 그
+    // 하한과 같은 자리다).
+    constexpr float kMinCentralWidth = ::editor::layout_minimums::central_width;
+    constexpr float kMinCentralHeight = ::editor::layout_minimums::central_height;
+
+    // 그리고 패널 쪽에도 바닥이 있다. 가운데만 지키면 창이 작아질 때 옆 열이
+    // **폭 0** 으로 접히는데, 그러면 도크 트리는 멀쩡하고(노드도 있고 창도
+    // 붙어 있다) 사람에게는 패널이 통째로 사라진 것으로 보인다. 실제로 이
+    // 게이트를 처음 돌렸을 때 900x620 에서 오른쪽 열이 x 900..900 이었다.
+    constexpr float kMinSideWidth = ::editor::layout_minimums::side_width;
+    constexpr float kMinBottomHeight = ::editor::layout_minimums::bottom_height;
+
+    /// 두 바닥이 함께 설 수 없으면 **규칙을 버리고 비율을 그대로 쓴다.**
+    /// 가운데를 지키려다 패널을 0 으로 만드는 것이 더 나쁘고, 그 크기의 창은
+    /// 어차피 무엇을 해도 좁다 — 적어도 모든 칸이 보이기는 한다.
+    float fit_side(float want, float room, float floorSize)
+    {
+        if (want <= room) return want;
+        if (room < floorSize) return want;   // 담을 수 없다. 비율을 남긴다
+        return std::max(floorSize, room);
+    }
+}
 
 EditorRenderer::EditorRenderer(void* windowHandle, ::editor::window_table& windows)
     : m_windows(&windows)
@@ -81,6 +113,12 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     // 따로 적으면 그 목록과 `Begin` 이름이 갈릴 수 있고, 실제로 갈렸다 —
     // 공백 하나가 달라 Content Browser가 도크되지 않은 적이 있다. 표를 훑으면
     // 두 이름이 같은 출처라서 갈릴 자리 자체가 없다(부록 B.3의 "고아 0").
+    //
+    // W6: 그 "선언" 위에 preset 이 얹힌다. 기본 preset 은 재정의가 0 이라 위
+    // 문장이 그대로 서고, 다른 preset 만 자리를 옮긴다(EditorLayoutPreset.h).
+    const ::editor::layout_preset& preset = m_workspace->ActivePreset();
+    const ::editor::layout_split& split = preset.split;
+
     ImGuiID id = dockspaceId;
     const ImVec2 size{ width, height };
     const ImVec2 nodePos{ posX, posY };
@@ -90,14 +128,84 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     ImGui::DockBuilderSetNodeSize(id, size);
     ImGui::DockBuilderSetNodePos(id, nodePos);
 
+    // ── 쓰이는 자리만 가른다 ──────────────────────────────────────────────
+    //
+    // `legacy_unity` 는 오른쪽 열을 위아래로 가르지 않고, `sbox_compact` 는
+    // 왼쪽 열을 쓰지 않는다. 안 쓰는 자리를 그래도 갈라 두면 **아무도 안
+    // 들어오는 빈 노드**가 남고, 그것이 계획서 W6 이 금지한 orphan dock node 다.
+    using ::editor::dock_slot;
+    const bool useLeft   = ::editor::slot_occupied(*m_windows, preset, dock_slot::left);
+    const bool useRight  = ::editor::slot_occupied(*m_windows, preset, dock_slot::right_upper);
+    const bool useLower  = ::editor::slot_occupied(*m_windows, preset, dock_slot::right_lower);
+    const bool useBottom = ::editor::slot_occupied(*m_windows, preset, dock_slot::bottom);
+
+    // ── 가운데의 최소 영역을 먼저 확보한다 ────────────────────────────────
+    //
+    // 비율만 쓰면 창이 작아질수록 **가운데가 먼저 사라진다** — 옆과 아래는
+    // 비율만큼 계속 가져가기 때문이다. 그래서 비율을 픽셀로 풀고, 남는
+    // 가운데가 최소치보다 작으면 옆과 아래를 같은 비로 줄인다. 최소치는
+    // 논리 픽셀이라 DPI·사용자 배율이 바뀌어도 같은 크기로 보인다.
+    const float minCenterW = ::editor::ThemePixels(kMinCentralWidth);
+    const float minCenterH = ::editor::ThemePixels(kMinCentralHeight);
+
+    const float minSide = ::editor::ThemePixels(kMinSideWidth);
+    const float minBottom = ::editor::ThemePixels(kMinBottomHeight);
+
+    float leftW  = useLeft   ? size.x * split.left  : 0.f;
+    float rightW = useRight  ? size.x * split.right : 0.f;
+    const float sideW = leftW + rightW;
+    if (sideW > 0.f)
+    {
+        const float floorSum = (useLeft ? minSide : 0.f) + (useRight ? minSide : 0.f);
+        const float allowed = fit_side(sideW, std::max(0.f, size.x - minCenterW), floorSum);
+        const float shrink = allowed / sideW;
+        leftW *= shrink; rightW *= shrink;
+        // 비율대로 줄이면 한쪽이 바닥 아래로 내려갈 수 있다. 그때는 그쪽을
+        // 바닥에 올리고 남은 것을 다른 쪽이 갖는다.
+        if (useLeft && useRight && allowed >= floorSum)
+        {
+            if (leftW < minSide)  { leftW = minSide;  rightW = allowed - leftW; }
+            if (rightW < minSide) { rightW = minSide; leftW = allowed - rightW; }
+        }
+    }
+    float bottomH = useBottom ? size.y * split.bottom : 0.f;
+    if (bottomH > 0.f)
+    {
+        bottomH = fit_side(bottomH, std::max(0.f, size.y - minCenterH), minBottom);
+    }
+
+    // 가르는 순간의 노드 크기에 대한 비율로 되돌린다. 오른쪽을 먼저 떼므로
+    // 왼쪽 비율의 분모는 그만큼 좁아진 폭이다.
+    const auto ratio = [](float part, float whole)
+    { return whole > 0.f ? std::clamp(part / whole, 0.f, 0.9f) : 0.f; };
+
     // 오른쪽 열을 먼저 떼어 전체 높이를 차지하게 한다. 아래 패널을 먼저
     // 가르면 오른쪽 열이 그 위에서 잘린다.
-    ImGuiID rightColumn = ImGui::DockBuilderSplitNode(
-        id, ImGuiDir_Right, 0.22f, nullptr, &id);
-    const ImGuiID inspectorNode = ImGui::DockBuilderSplitNode(
-        rightColumn, ImGuiDir_Down, 0.45f, nullptr, &rightColumn);
-    const ImGuiID bottomPanel = ImGui::DockBuilderSplitNode(
-        id, ImGuiDir_Down, 0.28f, nullptr, &id);
+    ImGuiID rightColumn = 0;
+    if (useRight)
+    {
+        rightColumn = ImGui::DockBuilderSplitNode(
+            id, ImGuiDir_Right, ratio(rightW, size.x), nullptr, &id);
+    }
+    ImGuiID leftColumn = 0;
+    if (useLeft)
+    {
+        leftColumn = ImGui::DockBuilderSplitNode(
+            id, ImGuiDir_Left, ratio(leftW, size.x - rightW), nullptr, &id);
+    }
+    ImGuiID inspectorNode = 0;
+    if (useLower && useRight)
+    {
+        inspectorNode = ImGui::DockBuilderSplitNode(
+            rightColumn, ImGuiDir_Down, std::clamp(split.right_lower, 0.05f, 0.95f),
+            nullptr, &rightColumn);
+    }
+    ImGuiID bottomPanel = 0;
+    if (useBottom)
+    {
+        bottomPanel = ImGui::DockBuilderSplitNode(
+            id, ImGuiDir_Down, ratio(bottomH, size.y), nullptr, &id);
+    }
     const ImGuiID centerViewport = id;
 
     // W4: 가운데를 central 노드로 **표시한다**. 이 표시가 없으면
@@ -112,10 +220,10 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     // 자리 이름을 노드로 옮기는 표. `dock_slot` 열거자 순서와 같은 순서이고,
     // 완전성은 static_assert가 지킨다 — 자리를 하나 더 만들면 여기가 컴파일에서
     // 걸린다.
-    using ::editor::dock_slot;
     const ImGuiID slotNode[]
     {
         centerViewport,   // center
+        leftColumn,       // left
         rightColumn,      // right_upper
         inspectorNode,    // right_lower
         bottomPanel,      // bottom
@@ -126,7 +234,11 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
 
     for (const ::editor::window_entry& entry : m_windows->entries)
     {
-        if (dock_slot::floating == entry.dock) continue;
+        const dock_slot slot = ::editor::slot_of(entry, preset);
+        if (dock_slot::floating == slot) continue;
+        // 그 preset 이 안 가른 자리는 노드가 0 이다. 여기서 걸러야 `DockBuilder`
+        // 가 없는 노드에 창을 밀어 넣지 않는다.
+        if (0 == slotNode[static_cast<std::size_t>(slot)]) continue;
 
         // 예전에는 여기 예외가 하나 있었다 — Tile 스타일의 Content Browser는
         // 팝업 드로어라 도크할 자리가 없었다. 스타일 분기를 걷으면서 예외도
@@ -134,7 +246,7 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
 
         // stable_id는 전부 문자열 리터럴에서 왔으므로 data()가 널로 끝난다.
         ImGui::DockBuilderDockWindow(entry.stable_id.data(),
-            slotNode[static_cast<std::size_t>(entry.dock)]);
+            slotNode[static_cast<std::size_t>(slot)]);
     }
 
     ImGui::DockBuilderFinish(id);

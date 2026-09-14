@@ -170,6 +170,7 @@ namespace editor::workspace
     {
         std::ostringstream out;
         out << "CreatorWorkspace " << schema_version << '\n' << "name " << std::quoted(d.name)
+            << "\npreset " << std::quoted(d.preset)
             << "\nviewport " << std::quoted(d.viewport) << "\nversions " << d.theme_version << ' ' << d.imgui_version
             << "\ngeometry " << d.dpi << ' ' << d.width << ' ' << d.height << ' ' << d.tree_width << '\n';
         for(const auto& [id,open]:d.panels) out << "panel " << std::quoted(id) << ' ' << (open?1:0) << '\n';
@@ -181,12 +182,14 @@ namespace editor::workspace
         const auto split=bytes.find("--ini--\n"); require(split!=std::string::npos, "Workspace is truncated");
         std::istringstream in{std::string(bytes.substr(0,split))}; document d; std::string keyName; int version{};
         in >> keyName >> version;
-        require(keyName=="CreatorWorkspace" && version==schema_version, "Unsupported workspace schema");
+        require(keyName=="CreatorWorkspace" && version>=oldest_readable_schema && version<=schema_version,
+            "Unsupported workspace schema");
         std::set<std::string> fields;
         while(in >> keyName)
         {
             if(keyName!="panel") require(fields.insert(keyName).second, "Duplicate workspace field");
             if(keyName=="name") in >> std::quoted(d.name);
+            else if(keyName=="preset") in >> std::quoted(d.preset);
             else if(keyName=="viewport") in >> std::quoted(d.viewport);
             else if(keyName=="versions") in >> d.theme_version >> d.imgui_version;
             else if(keyName=="geometry") in >> d.dpi >> d.width >> d.height >> d.tree_width;
@@ -198,7 +201,11 @@ namespace editor::workspace
             else throw std::runtime_error("Unknown workspace field");
             require(!in.fail(), "Malformed workspace metadata");
         }
-        require(fields.size()==4 && !d.name.empty() && d.name.size()<=128, "Missing workspace metadata");
+        // v1 에는 `preset` 이 없다. 그 하나만큼 적게 요구하고 기본값을 남긴다 — 버전을
+        // 하나 올렸다고 쓰던 배치를 "복구했습니다" 한 줄과 함께 버리지 않는다.
+        require(fields.size()==static_cast<std::size_t>(version>=2?5:4) &&
+            !d.name.empty() && d.name.size()<=128 &&
+            !d.preset.empty() && d.preset.size()<=64, "Missing workspace metadata");
         require(std::isfinite(d.dpi) && d.dpi>=0.5f && d.dpi<=8.f && std::isfinite(d.width) && d.width>0.f && d.width<=65536.f &&
             std::isfinite(d.height) && d.height>0.f && d.height<=65536.f && std::isfinite(d.tree_width) && d.tree_width>=140.f && d.tree_width<=600.f,
             "Invalid workspace geometry");

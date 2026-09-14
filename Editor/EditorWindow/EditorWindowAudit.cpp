@@ -4,6 +4,7 @@
 
 #include "EditorWindowAudit.h"
 
+#include "EditorLayoutPreset.h"
 #include "EditorWindowRegistry.h"
 #include "EditorWindowSurface.h"
 #include "Windows/EditorWindowBody.h"
@@ -104,14 +105,19 @@ namespace editor
             }
         }
 
-        // ④ 아무 창도 가지 않는 도킹 자리. 배치가 빈 노드를 만든다.
+        // ④ 아무도 쓰지 않는 도킹 자리 = **죽은 어휘**.
+        //
+        // W6 전에는 "선언한 창이 없으면 빈 노드가 생긴다" 였다. 이제 자리의
+        // 정본이 preset 이라 그 문장이 둘로 갈린다. 빈 노드 쪽은 빌더가
+        // 책임진다 — 그 preset 에서 실제로 쓰이는 자리만 가르므로 비어 있는
+        // 노드가 생길 수 없고, 그것은 `editor.dock` 의 고아 판정이 런타임에서
+        // 확인한다. 여기 남는 것은 어휘 쪽이다: **어느 preset 도 쓰지 않는**
+        // 자리는 열거자에만 있고 아무 일도 하지 않는다.
         for (dock_slot slot : all_dock_slots)
         {
             if (dock_slot::floating == slot) continue;
 
-            const bool filled = entries.end() != std::find_if(entries.begin(), entries.end(),
-                [slot](const window_entry& entry) { return entry.dock == slot; });
-            if (!filled)
+            if (!slot_used_by_any_preset(table, slot))
             {
                 audit.empty_dock_slots.push_back(to_string(slot));
             }

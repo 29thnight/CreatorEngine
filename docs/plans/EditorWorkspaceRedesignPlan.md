@@ -973,7 +973,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W3 | **done** | ID·legacy 이주, 자유 dock/close/reopen, versioned save/load/reset/backup·손상 복구가 게이트 둘(169+212 checks)로 선다. Scene `no_move` 해제는 W4 단일 Host, `dock_slot` 선언화는 W6 preset 소속 |
 | W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize와 렌더 배율은 **2026-09-14 착지**(§W4 후속) — 미뤄 둔 근거였던 generation/retire 수렴을 게이트 단정으로 옮겼다 |
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
-| W6 | todo | 현재 외관을 유지하는 5종 배치 preset, Save As/Rename/Delete/Reset·작은 창 복원 |
+| W6 | progress | **preset 5종 착지(2026-09-15)** — 자리의 정본이 선언에서 preset 으로 옮겨 갔고(`EditorLayoutPreset.h`), 기본 preset 은 재정의 0 이라 현재 외관이 값이 아니라 **출처**로 유지된다(픽셀 392,888 중 0 차이). `dock_slot::left` 신설, 안 쓰는 자리는 노드를 만들지 않음, 패널 바닥 보존, 파일 스키마 2(v1 계속 읽음), Reset 은 **지금** preset 으로. 런타임 게이트 197 단정·변이 7 종·run-all 배선. **재지 못한 축 하나** — 최소 중앙 보존은 이 기계의 배율 2.25 에서 하한(1080x675)이 창보다 커서 제품이 늘 탈출 가지로 간다. 게이트가 그 사실을 건너뜀으로 찍는다. 남은 것은 **Save As/Rename/Delete**(이름 붙인 workspace 여럿) |
 | W7 | progress | **W7-0~W7-3 착지(2026-09-14·15)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0), Browser 스냅샷(§W7-1)으로 매 프레임 디렉터리 스캔 24 → 0, 그리고 평탄 목록+clipping(§W7-2·W7-3)으로 `hierarchy.units` 50,000 → **14** · p95 30.4 → **0.041 ms**. 실측이 두 번 판을 고쳤다: ① 브라우저가 clipping 보다 먼저였고(엔티티 1,000 에서 Hierarchy 의 5.8 배), ② W7-2 는 홀로는 이득 0 이라 W7-3 과 한 조각으로 묶어야 했다. W7-4 로 그 계약을 게이트에 걸었다(72 단정 · 변이 12 종 · run-all 배선). 남은 것은 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리뿐이다 |
 | W8 | todo | DX12 통합 빌드·DPI/재시작/손상 ini/Play/preset/성능 회귀, 현재 승인 외관의 자동 golden·CI, legacy 잔재 전수 확인 |
 
@@ -1989,6 +1989,72 @@ ImGui backend 몫 그대로이고, lock/clip은 구현이 없어 소유권 정�
 
 **판정:** 각 preset을 연속 적용해도 orphan dock node와 off-screen floating panel이 없고, 사용자가
 수정한 workspace를 preset update가 덮어쓰지 않는다.
+
+#### W6 착지 — preset 다섯과 자리의 정본 이동 (2026-09-15)
+
+W3 이 남겨 둔 한 줄이 이 조각의 전부다: *"남은 것은 자리 **이름**을 `dock_slot` 열거자가
+아니라 workspace 선언에서 받는 일이고 그것이 W3·W6이다"*
+(`Windows/EditorStandardWindows.h`). 창 선언의 `.dock(...)` 은 이제 **기본 preset 에서의
+자리**이고, 다른 preset 이 그 위에 재정의를 얹는다(`Editor/EditorWindow/EditorLayoutPreset.h`).
+
+**기본 preset 은 재정의가 0 이다.** 계획서가 "**현재 외관을 유지하는** 5종" 이라고 적었는데,
+기본 배치를 값으로 베껴 적으면 선언과 두 벌이 되고 언젠가 한쪽만 고쳐져 "현재 외관" 이
+조용히 갈린다. `sbox_compact` 가 재정의를 하나도 갖지 않는 것은 그래서다 — 오늘의 모습과
+같다는 것이 값의 일치가 아니라 **출처의 동일성**으로 선다. 픽셀로 확인했다: 착지 전후
+창을 같은 fixture 로 찍어 **392,888 픽셀 중 다른 픽셀 0.**
+
+| preset | 무엇이 달라지는가 |
+|---|---|
+| `sbox_compact` | 오늘 그대로. 재정의 0 |
+| `level_editing` | 뷰포트를 넓힌다. 아래 탭은 Content Browser 하나만 |
+| `ui_editing` | 오른쪽 열을 넓히고 Inspector 가 대부분을 갖는다. 입력 맵을 오른쪽 아래로 |
+| `rendering_debug` | 떠 있던 관측 창 넷(RenderPass·Debug·Profiler·Log)을 아래 탭으로 모아 연다 |
+| `legacy_unity` | Hierarchy 를 **왼쪽 전체 높이**로. 그래서 `dock_slot::left` 를 새로 세웠다 |
+
+**안 쓰는 자리는 만들지 않는다.** `legacy_unity` 는 오른쪽 열을 위아래로 가르지 않고
+`sbox_compact` 는 왼쪽을 쓰지 않는다. 그 자리를 그래도 갈라 두면 아무도 안 들어오는 빈
+노드가 남고, 그것이 계획서가 금지한 orphan dock node 다. 빌더는 **그 preset 에서 실제로
+쓰이는 자리만** 가른다. 같은 이유로 창 감사의 "빈 도킹 자리" 도 뜻이 갈렸다 — 빈 노드는
+빌더가 책임지므로 감사에 남는 것은 **어느 preset 도 쓰지 않는 죽은 어휘** 쪽이다.
+
+**게이트가 자기 코드의 결함을 잡았다.** `verify-editor-layout-preset.ps1`(197 단정, run-all
+배선)을 처음 돌렸을 때 900x620 에서 오른쪽 열이 `x 900..900` — **폭 0** 이었다. 최소 중앙
+영역을 지키느라 옆을 끝까지 줄인 것이다. 도크 트리는 멀쩡하고(노드도 있고 창도 붙어 있다)
+고아도 유령도 아니라서 기존 감사가 통째로 못 보던 자리다. 고친 것 둘: ① 패널에도 바닥을
+두고(옆 200 · 아래 120 논리 px), 둘이 함께 설 수 없을 만큼 창이 작으면 **규칙을 버리고
+비율을 그대로 쓴다**(가운데를 지키려다 패널을 0 으로 만드는 것이 더 나쁘다). ② `editor.dock`
+이 `degenerateNodes` 를 센다 — 폭이나 높이가 0 인 보이는 잎의 수.
+
+**파일 스키마 2.** `preset` 을 담는다. **v1 도 계속 읽는다** — 버전을 하나 올렸다고 쓰던
+배치를 "복구했습니다" 한 줄과 함께 버리지 않는다. v1 에는 그 필드가 없으므로 기본 preset
+으로 읽는다. Reset 은 "기본 preset" 이 아니라 **지금 preset** 의 기본 배치로 돌린다 —
+Legacy Unity 를 쓰던 사람이 Reset 을 눌러 S&Box 로 튀면 그것은 복원이 아니라 다른 배치다.
+
+**preset 은 자리를 말하지 열림을 빼앗지 않는다.** 재정의가 열림을 말하지 않으면(`inherit`)
+사람이 둔 대로 둔다. 그리고 적용 전에 `before-preset` 백업을 먼저 남긴다 — 계획서 판정의
+뒷절(*"사용자가 수정한 workspace를 preset update가 덮어쓰지 않는다"*)이 그것이다.
+
+**재지 못한 축을 적어 둔다.** 변이 일곱 중 여섯은 게이트를 붉게 만들었고, 하나는
+**자극조차 못 했다** — 최소 중앙 보존을 걷어도 결과가 한 픽셀도 안 달라진다. 이 기계는
+`FontScaleMain × FontScaleDpi = 2.25` 라 하한이 480·2.25 = 1080 · 300·2.25 = 675 이고,
+게이트가 쓰는 가장 큰 창(도크 뿌리 1600x955)도 그것을 담지 못한다. 담지 못하면 제품은
+규칙을 버리고 비율을 그대로 쓴다(그 판단이 `fit_side` 의 탈출 가지다). 그래서 그 줄은
+이 배율에서 실행될 수 없다.
+
+이것을 "게이트가 못 잡았다" 로 적으면 게이트를 억울하게 깎고, 덮어 두면 구멍이 된다.
+그래서 게이트가 **건너뛴 회차를 센다** — `[건너뜀] 최소 중앙 보존 축은 이번 실행에서
+한 번도 재지 못했다 — 배율 2.25 에서 하한이 창보다 크다(회차 12 건 전부 탈출 가지)`.
+배율 1 인 기계에서는 같은 단정이 실제로 서고 같은 변이가 붉어진다. W8 의 DPI 축이
+모니터 배율을 바꿔 가며 도는 자리를 만들면 그때 닫힌다.
+
+같은 이유로 **게이트에서 480/300 을 지웠다.** 전에는 그 수를 게이트가 제 파일에 베껴
+두고 배율을 1.0 으로 가정했는데, 그러면 제품 상수와 두 벌이 되는 데다(이 조각이 없애려던
+바로 그 문제다) 단정이 제품 규칙보다 **낮은 자리**에 서서 위반을 통과시킨다. 이제 상수는
+`layout_minimums` 하나뿐이고 `editor.dock` 이 배율을 곱한 실효 하한과 `uiScale` ·
+도크 뿌리 크기를 함께 실어 게이트가 그것을 읽는다.
+
+**남은 것.** Save As / Rename / Delete(이름 붙인 workspace 여럿)는 이 조각에 없다. 지금
+있는 것은 preset 다섯과 active 표시, Reset 이다.
 
 ### W7 — Hierarchy/Browser clipping과 presentation cache (P1, 3일)
 

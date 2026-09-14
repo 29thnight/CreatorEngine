@@ -8,11 +8,16 @@
 
 namespace editor::workspace
 {
-    inline constexpr int schema_version = 1;
+    // 2 = W6 이 `preset` 을 더했다. **v1 도 계속 읽는다** — 쓰던 사람의 배치를
+    // 버전 하나 올렸다고 버리면 "복구했습니다" 한 줄과 함께 배치가 사라진다.
+    // v1 에는 preset 이 없으므로 기본 preset 으로 읽는다.
+    inline constexpr int schema_version = 2;
+    inline constexpr int oldest_readable_schema = 1;
     inline constexpr std::size_t max_file_size = 4 * 1024 * 1024;
     struct document
     {
         std::string name{ "S&Box Compact" };
+        std::string preset{ "sbox_compact" };   ///< layout_preset::id
         std::string viewport{ "###Editor.Scene" };
         int imgui_version{ 19280 }, theme_version{ 1 };
         float dpi{ 1.f }, width{ 1920.f }, height{ 1080.f }, tree_width{ 220.f };

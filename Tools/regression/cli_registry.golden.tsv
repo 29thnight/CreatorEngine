@@ -33,7 +33,7 @@ editor.theme	-	immediate	editor	engine_service	live	no	yes	-	적용된 ImGui 스
 editor.viewport	-	immediate	editor	engine_service	live	no	yes	[scene|game]	중앙 ViewportHost 의 표시 모드와 뷰 수요
 editor.window	-	immediate	editor	editor_operation	live	no	yes	<안정식별자> <open|close|focus>	창 하나를 열고 닫고 앞으로 세운다(탭으로 겹친 창은 선택돼야 본문이 돈다)
 editor.windows	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 창 표를 TSV로 내고 배선 고아를 판정한다
-editor.workspace	-	immediate	editor	engine_service	live	no	yes	[save|load|reset|open <panelId>|close <panelId>]	워크스페이스 저장/복원과 창 열림 상태
+editor.workspace	-	immediate	editor	engine_service	live	no	yes	[save|load|reset|presets|preset <id>|open <panelId>|close <panelId>]	워크스페이스 저장/복원, 배치 preset, 창 열림 상태
 game.pak	-	long	editor	engine_service	live	no	yes	-	Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다
 gc.collect	-	frames	editor	engine_service	live	no	yes	-	관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)
 gc.stats	gc.delta	immediate	editor	engine_service	live	no	yes	-	관리 힙 지표를 낸다(gc.delta는 직전 대비 증감)

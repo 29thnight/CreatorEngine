@@ -335,8 +335,10 @@ namespace editor
         {
             fail(report, "중복 없는 표에서 중복이 세어졌다");
         }
-        // center와 right_lower 둘이 차고 right_upper·bottom 둘이 비었다.
-        if (stats.empty_dock_slots != 2)
+        // center와 right_lower 둘이 차고 left·right_upper·bottom 셋이 비었다.
+        // (W6 이 `left` 를 더했다. 이 집계는 표만 보는 자이고, preset 을 함께
+        //  보는 쪽은 `audit_windows` 의 ④ 다.)
+        if (stats.empty_dock_slots != 3)
         {
             fail(report, "빈 도킹 자리 집계가 어긋난다 (=" +
                          std::to_string(stats.empty_dock_slots) + ")");
