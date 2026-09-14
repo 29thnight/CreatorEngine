@@ -252,6 +252,17 @@ Run-Step "에디터 배치 preset(런타임)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-layout-preset.ps1") -Exe $Exe -Work (Join-Path $Work 'layout-preset')
 }
 
+# PHASE 21 W6-2 — 이름 붙인 workspace 여럿.
+#
+# 계획서 W6 의 남은 절(Save As/Rename/Delete)이다. 만들기·다시 열기·이름 바꾸기·
+# 지우기를 한 세션 안에서 왕복시키고, 되돌릴 것(`before-*` 백업)이 남는지와
+# 파일 이름으로 쓸 수 없는 이름이 **만들 때** 거절되는지를 본다. 왕복 판정은
+# 이름이 아니라 그 배치를 만든 preset 으로 한다 — 이름만 보면 이름을 바꿔 적기만
+# 해도 통과한다.
+Run-Step "이름 붙인 workspace(런타임)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-workspace-named.ps1") -Exe $Exe -Work (Join-Path $Work 'workspace-named')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

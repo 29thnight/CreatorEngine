@@ -24,6 +24,20 @@ namespace editor::workspace
         std::map<std::string, bool> panels;
         std::string ini;
     };
+    /// 이름 붙인 workspace 의 **파일 이름은 그 이름 자체**다(PHASE 21 W6-2).
+    ///
+    /// 표시 이름과 파일 이름을 따로 두면 둘을 잇는 표가 생기고, 그 표가 파일과
+    /// 어긋나는 순간 "있다고 적힌 배치를 못 여는" 상태가 된다. 대신 이름 쪽을
+    /// 좁힌다 — 파일 이름으로 쓸 수 없는 것을 **만들 때** 거절한다.
+    ///
+    /// 거절하는 것: 빈 이름 · 64 자 초과 · 경로 구분자와 Windows 예약 문자
+    /// (`<>:"/\|?*`) · 제어 문자 · 앞뒤의 공백이나 점(탐색기가 조용히 떼어 낸다)
+    /// · 장치 이름(CON·PRN·AUX·NUL·COM1~9·LPT1~9, 대소문자 무관) · `active`
+    /// (활성 파일과 같은 자리를 차지한다).
+    ///
+    /// 통과하면 `<이름>.workspace` 가 바로 그 파일이다.
+    bool valid_name(std::string_view name, std::string& error);
+
     struct alias { std::string old_name, stable_id; std::uint32_t old_hash{}, new_hash{}; };
     // A migration never writes the input file. The caller backs it up before publication.
     std::string migrate_ini(std::string_view ini, const std::vector<alias>& aliases);

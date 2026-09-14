@@ -124,6 +124,22 @@ function Get-Panel($Status, [string]$Id) {
 }
 
 $workspaceFileName = 'active.workspace'
+
+# 헤더의 판 번호를 **여기 적지 않는다.** 전에는 'CreatorWorkspace 1' 을 이 파일에
+# 베껴 두었는데, W6 이 스키마를 2 로 올리자 그 줄 하나 때문에 게이트가 붉어졌다 —
+# 제품이 옳게 움직였는데 게이트가 낡은 것이다. 제품 헤더에서 뽑아 쓴다.
+$schemaHeaderPath = Join-Path $PSScriptRoot '../../Editor/EngineGUIWindow/EditorWorkspaceFile.h'
+$schemaHeaderPath = [IO.Path]::GetFullPath($schemaHeaderPath)
+if (-not (Test-Path -LiteralPath $schemaHeaderPath)) {
+    throw "워크스페이스 스키마 헤더를 못 찾았다: $schemaHeaderPath"
+}
+$schemaMatch = [regex]::Match(
+    [IO.File]::ReadAllText($schemaHeaderPath),
+    'inline\s+constexpr\s+int\s+schema_version\s*=\s*(?<v>\d+)\s*;')
+if (-not $schemaMatch.Success) {
+    throw "schema_version 을 헤더에서 못 읽었다: $schemaHeaderPath"
+}
+$workspaceHeader = 'CreatorWorkspace ' + $schemaMatch.Groups['v'].Value
 $fixtureDir = Join-Path $PSScriptRoot 'fixtures/imgui-ini'
 Assert (Test-Path -LiteralPath $fixtureDir) "ini fixture directory is missing: $fixtureDir"
 
@@ -269,7 +285,8 @@ Assert ($workspace.data.recovered -eq $false) 'A clean scenario folder reported 
 $homeFile = Join-Path $home1 $workspaceFileName
 Assert (Test-Path -LiteralPath $homeFile) "No workspace file was written at $homeFile"
 $homeBytes = [IO.File]::ReadAllText($homeFile)
-Assert ($homeBytes.StartsWith('CreatorWorkspace 1')) 'The workspace file does not carry the versioned header'
+Assert ($homeBytes.StartsWith($workspaceHeader)) `
+    "The workspace file does not carry the versioned header ($workspaceHeader)"
 Assert ($homeBytes.Contains('--ini--')) 'The workspace file carries no layout section'
 
 # 종료 코드는 여기서 본다 — 위의 단정이 전부 돌고 난 뒤다.
@@ -563,8 +580,8 @@ Assert ($rejected.Count -ge 1) "Recovery discarded the corrupt workspace without
 Assert ([IO.File]::ReadAllText($rejected[0].FullName) -eq $corruptBytes) `
     'The preserved copy does not hold the rejected bytes'
 Assert ([IO.File]::ReadAllText($corruptFile) -ne $corruptBytes) 'Recovery never replaced the corrupt workspace file'
-Assert ([IO.File]::ReadAllText($corruptFile).StartsWith('CreatorWorkspace 1')) `
-    'The replacement workspace is not a valid versioned file'
+Assert ([IO.File]::ReadAllText($corruptFile).StartsWith($workspaceHeader)) `
+    "The replacement workspace is not a valid versioned file ($workspaceHeader)"
 $corruptDock = $corrupt.Data['editor.dock']
 Assert ($corruptDock.data.nodes -ge 3) "Recovery produced only $($corruptDock.data.nodes) dock nodes"
 Assert ($corruptDock.data.undockedSlots -eq 0) "Recovery left $($corruptDock.data.undockedSlots) undocked window(s)"

@@ -1263,22 +1263,84 @@ namespace ConsoleCmd
                 presetData.Set("active",CommandData::String(editor::get_workspace_status().preset));
                 return Ok("Layout presets",std::move(presetData));
             }
+            // `list` 도 대기열에 넣을 일이 없다 — 게시된 목록을 읽기만 한다.
+            if(args[1]=="list")
+            {
+                if(args.size()!=2) return InvalidArguments("editor.workspace list");
+                const auto listed=editor::get_workspace_status();
+                auto names=CommandData::Array();
+                for(const auto& name:listed.workspaces) names.Append(CommandData::String(name));
+                auto listData=CommandData::Object();
+                listData.Set("workspaces",std::move(names));
+                listData.Set("active",CommandData::String(listed.name));
+                listData.Set("named",CommandData::Bool(listed.named));
+                return Ok("Named workspaces",std::move(listData));
+            }
             if(args[1]=="save") action=editor::workspace_action::save;
             else if(args[1]=="load") action=editor::workspace_action::load;
             else if(args[1]=="reset") action=editor::workspace_action::reset;
             else if(args[1]=="open") action=editor::workspace_action::open_panel;
             else if(args[1]=="close") action=editor::workspace_action::close_panel;
             else if(args[1]=="preset") action=editor::workspace_action::apply_preset;
-            else return InvalidArguments("editor.workspace [save|load|reset|presets|preset <id>|open <panelId>|close <panelId>]");
+            else if(args[1]=="saveas") action=editor::workspace_action::save_as;
+            else if(args[1]=="rename") action=editor::workspace_action::rename;
+            else if(args[1]=="delete") action=editor::workspace_action::delete_named;
+            else return InvalidArguments("editor.workspace [save|load [name]|reset|presets|preset <id>|list|saveas <name>|rename <name>|delete <name>|open <panelId>|close <panelId>]");
+            // `load` 는 인자 없이 활성 파일을 다시 읽고, 이름을 주면 그 배치를 연다.
+            if(action==editor::workspace_action::load && args.size()>=3)
+                action=editor::workspace_action::load_named;
+            const bool named=action==editor::workspace_action::save_as ||
+                action==editor::workspace_action::rename ||
+                action==editor::workspace_action::delete_named ||
+                action==editor::workspace_action::load_named;
             const bool panel=action==editor::workspace_action::open_panel ||
                 action==editor::workspace_action::close_panel ||
                 action==editor::workspace_action::apply_preset;
-            if(args.size()!=(panel?3u:2u)) return InvalidArguments("Wrong workspace argument count");
+            std::string argument;
+            if(named)
+            {
+                if(args.size()<3) return InvalidArguments("Wrong workspace argument count");
+                // 이름에는 공백이 들어간다. 파서가 공백으로 자른 조각을 도로 붙인다 —
+                // 그러지 않으면 "My Layout" 을 GUI 로는 만들 수 있고 CLI 로는 못 만드는
+                // 상태가 되어 같은 표면이 둘로 갈린다. 연속된 공백은 한 칸이 된다.
+                argument=args[2];
+                for(std::size_t part=3;part<args.size();++part) argument+=" "+args[part];
+                // 쓸 수 없는 이름은 **여기서** 튕긴다. preset 과 같은 이유다 — 대기열에
+                // 넣으면 실패가 다음 프레임의 status.error 로만 남아 명령이 초록이 된다.
+                std::string nameError;
+                if(!editor::workspace::valid_name(argument,nameError))
+                    return InvalidArguments(nameError);
+            }
+            else
+            {
+                if(args.size()!=(panel?3u:2u)) return InvalidArguments("Wrong workspace argument count");
+                if(panel) argument=args[2];
+            }
             // 없는 preset 이름은 **여기서** 튕긴다. 대기열에 넣으면 실패가 다음
             // 프레임의 status.error 로만 남아 명령의 종료 코드가 초록이 된다.
-            if(action==editor::workspace_action::apply_preset && !editor::find_layout_preset(args[2]))
-                return InvalidArguments("Unknown layout preset: "+args[2]);
-            if(!editor::request_workspace_action(action,panel?args[2]:std::string{}))
+            if(action==editor::workspace_action::apply_preset && !editor::find_layout_preset(argument))
+                return InvalidArguments("Unknown layout preset: "+argument);
+            // 이름 붙인 배치도 같다. 게시된 목록으로 먼저 거른다 — 여기서 막지 않으면
+            // `delete 없는것` 이 "queued" 한 줄과 함께 **초록으로** 끝난다. 파일이
+            // 에디터 밖에서 사라지는 경우가 남으므로 스토어 쪽 검사는 그대로 둔다.
+            if(named)
+            {
+                const auto listed=editor::get_workspace_status();
+                const bool exists=std::find(listed.workspaces.begin(),listed.workspaces.end(),argument)
+                    !=listed.workspaces.end();
+                if((action==editor::workspace_action::load_named ||
+                    action==editor::workspace_action::delete_named) && !exists)
+                    return InvalidArguments("No workspace named "+argument);
+                if(action==editor::workspace_action::rename)
+                {
+                    if(!listed.named)
+                        return PreconditionFailed("editor.workspace.unnamed",
+                            "The current layout has no saved name; save it first");
+                    if(exists && argument!=listed.name)
+                        return InvalidArguments("A workspace named "+argument+" already exists");
+                }
+            }
+            if(!editor::request_workspace_action(action,argument))
                 return PreconditionFailed("editor.workspace.busy","A workspace operation is pending");
         }
         const auto status=editor::get_workspace_status();
@@ -1291,6 +1353,10 @@ namespace ConsoleCmd
         data.Set("preset",CommandData::String(status.preset));
         data.Set("presetLabel",CommandData::String(status.preset_label));
         data.Set("name",CommandData::String(status.name));
+        data.Set("named",CommandData::Bool(status.named));
+        auto workspaces=CommandData::Array();
+        for(const auto& name:status.workspaces) workspaces.Append(CommandData::String(name));
+        data.Set("workspaces",std::move(workspaces));
         data.Set("error",CommandData::String(status.error));
         data.Set("revision",CommandData::Int(static_cast<int64_t>(status.revision)));
         auto panels=CommandData::Object();

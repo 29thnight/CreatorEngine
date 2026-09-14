@@ -6,7 +6,10 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <Windows.h>
+#include "EditorTheme.h"
 #include <algorithm>
+#include <cstring>
+#include <system_error>
 #include <mutex>
 #include <stdexcept>
 
@@ -20,6 +23,12 @@ namespace editor
         std::string pendingPanel;
         workspace_status published;
         bool resetDialog{};
+        // 이름을 받는 대화 상자 셋. `nameBuffer` 를 셋이 함께 쓰고, 여는 쪽이
+        // 채워 넣는다 — 동시에 둘이 열리지 않으므로 버퍼를 나눌 이유가 없다.
+        enum class name_dialog { none, save_as, rename };
+        name_dialog nameDialog{ name_dialog::none };
+        char nameBuffer[128]{};
+        std::string deleteTarget;
         std::filesystem::path override_path(const wchar_t* name, std::filesystem::path fallback)
         {
             wchar_t value[32768]{};
@@ -75,6 +84,33 @@ namespace editor
             }
             ImGui::EndMenu();
         }
+        // 이름 붙인 배치 여럿(PHASE 21 W6-2). preset 은 **출발점**이고 이쪽은
+        // 사람이 만든 것이라, 같은 메뉴라도 층을 나눈다.
+        if(ImGui::BeginMenu("Workspaces",!status.workspaces.empty()))
+        {
+            for(const auto& name:status.workspaces)
+                if(ImGui::MenuItem(name.c_str(),nullptr,status.named && name==status.name))
+                    request_workspace_action(workspace_action::load_named,name);
+            ImGui::EndMenu();
+        }
+        if(ImGui::MenuItem("Save Workspace As..."))
+        {
+            const auto source=status.name.substr(0,sizeof(nameBuffer)-1);
+            std::memcpy(nameBuffer,source.c_str(),source.size()+1);
+            nameDialog=name_dialog::save_as;
+        }
+        // 이름이 파일로 서 있지 않으면 바꿀 것도 지울 것도 없다. 눌리지 않게
+        // 두는 편이 눌렀다가 "이름이 없다" 를 읽는 것보다 정직하다.
+        ImGui::BeginDisabled(!status.named);
+        if(ImGui::MenuItem("Rename Workspace..."))
+        {
+            const auto source=status.name.substr(0,sizeof(nameBuffer)-1);
+            std::memcpy(nameBuffer,source.c_str(),source.size()+1);
+            nameDialog=name_dialog::rename;
+        }
+        if(ImGui::MenuItem("Delete Workspace...")) deleteTarget=status.name;
+        ImGui::EndDisabled();
+        ImGui::Separator();
         if(ImGui::MenuItem("Save Workspace")) request_workspace_action(workspace_action::save);
         if(ImGui::MenuItem("Reload Workspace")) request_workspace_action(workspace_action::load);
         if(ImGui::MenuItem("Reset Layout...")) resetDialog=true;
@@ -95,6 +131,43 @@ namespace editor
             ImGui::SameLine(); if(ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
             ImGui::EndPopup();
         }
+        if(nameDialog!=name_dialog::none) { ImGui::OpenPopup("Workspace Name"); }
+        if(ImGui::BeginPopupModal("Workspace Name",nullptr,ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            const bool renaming=nameDialog==name_dialog::rename;
+            ImGui::TextUnformatted(renaming?"Rename the current workspace:":"Save the current layout as:");
+            ImGui::SetNextItemWidth(ThemePixels(280.f));
+            ImGui::InputText("##workspace-name",nameBuffer,sizeof(nameBuffer));
+            // 만들기 전에 거절한다. 파일 이름으로 못 쓰는 이름을 받아 두고
+            // 저장할 때 실패하면, 사람은 무엇이 문제인지 모른 채 배치를 잃는다.
+            std::string error;
+            const bool ok=workspace::valid_name(nameBuffer,error);
+            if(!ok) ImGui::TextWrapped("%s",error.c_str());
+            ImGui::BeginDisabled(!ok);
+            if(ImGui::Button(renaming?"Rename":"Save"))
+            {
+                request_workspace_action(renaming?workspace_action::rename:workspace_action::save_as,nameBuffer);
+                nameDialog=name_dialog::none; ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel")) { nameDialog=name_dialog::none; ImGui::CloseCurrentPopup(); }
+            ImGui::EndPopup();
+        }
+        if(!deleteTarget.empty()) ImGui::OpenPopup("Delete Workspace");
+        if(ImGui::BeginPopupModal("Delete Workspace",nullptr,ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::Text("Delete the workspace \"%s\"?",deleteTarget.c_str());
+            ImGui::TextUnformatted("A backup is kept next to it; the layout on screen stays.");
+            if(ImGui::Button("Delete"))
+            {
+                request_workspace_action(workspace_action::delete_named,deleteTarget);
+                deleteTarget.clear(); ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel")) { deleteTarget.clear(); ImGui::CloseCurrentPopup(); }
+            ImGui::EndPopup();
+        }
     }
     EditorWorkspaceStore::EditorWorkspaceStore(window_table& windows):m_windows(windows)
     {
@@ -109,7 +182,7 @@ namespace editor
         for(const auto& entry:windows.entries) if(entry.persist_open) m_defaults.emplace(entry.stable_id,entry.open);
         // Own the ini blob together with panel state; the backend must not write a second copy.
         ImGui::GetIO().IniFilename=nullptr;
-        Load(true); Publish();
+        Load(true); RefreshNames(); Publish();
     }
     void EditorWorkspaceStore::Apply(const workspace::document& document,bool startup)
     {
@@ -173,6 +246,114 @@ namespace editor
         m_document.preset=std::string(preset.id);
         m_document.name=std::string(preset.label);
         m_status.message="Layout preset applied: "+std::string(preset.label)+"; backup preserved";
+    }
+    std::filesystem::path EditorWorkspaceStore::NamedPath(const std::string& name) const
+    {
+        // `std::filesystem::path` 를 좁은 문자열로 만들면 Windows 의 ANSI 코드
+        // 페이지로 읽는다. 한글 이름이 그 자리에서 깨지므로 u8 로 건넨다.
+        const auto file=name+".workspace";
+        const std::u8string wide(file.begin(),file.end());
+        return (m_path.parent_path()/std::filesystem::path(wide)).lexically_normal().make_preferred();
+    }
+    void EditorWorkspaceStore::RefreshNames()
+    {
+        m_names.clear();
+        std::error_code ec;
+        std::filesystem::directory_iterator it(m_path.parent_path(),ec);
+        if(!ec)
+        {
+            for(const auto& entry:it)
+            {
+                if(!entry.is_regular_file(ec)||ec) { ec.clear(); continue; }
+                const auto& file=entry.path();
+                // 백업은 `active.workspace.before-reset` 처럼 확장자가 이유 쪽이라
+                // 여기서 저절로 빠진다. `.invalid` 덤프도 마찬가지다.
+                if(file.extension()!=".workspace") continue;
+                const auto stem=file.stem().u8string();
+                std::string name(stem.begin(),stem.end());
+                if(name=="active") continue;
+                m_names.push_back(std::move(name));
+            }
+        }
+        std::sort(m_names.begin(),m_names.end());
+        m_named=!m_document.name.empty() &&
+            std::find(m_names.begin(),m_names.end(),m_document.name)!=m_names.end();
+    }
+    void EditorWorkspaceStore::SaveAs(const std::string& name)
+    {
+        std::string error;
+        if(!workspace::valid_name(name,error)) throw std::runtime_error(error);
+        // 이름을 문서에 **먼저** 적고 굳힌다. 활성 파일과 이름 붙인 파일이 같은
+        // 바이트여야 다음 기동이 "지금 어느 배치를 쓰는 중인가" 를 그대로 읽는다.
+        const auto previous=m_document.name;
+        m_document.name=name;
+        try { Save(); }
+        catch(...) { m_document.name=previous; throw; }
+        const auto target=NamedPath(name);
+        // 같은 이름으로 다시 저장하는 것은 흔한 일이다. 그때 이전 배치가 조용히
+        // 사라지면 되돌릴 것이 없으므로 덮기 전에 남긴다.
+        if(std::filesystem::exists(target)) workspace::backup(target,"before-overwrite");
+        workspace::atomic_write(target,workspace::encode(m_document));
+        RefreshNames();
+        m_status.message="Workspace saved as "+name;
+    }
+    void EditorWorkspaceStore::LoadNamed(const std::string& name)
+    {
+        std::string error;
+        if(!workspace::valid_name(name,error)) throw std::runtime_error(error);
+        const auto source=NamedPath(name);
+        if(!std::filesystem::exists(source)) throw std::runtime_error("No workspace named "+name);
+        // 이름 붙인 것을 여는 것도 지금 배치를 덮는 일이다. preset 적용과 같은
+        // 순서로 먼저 굳히고 백업한다.
+        Save();
+        workspace::backup(m_path,"before-load");
+        auto document=workspace::decode(workspace::read_file(source));
+        // 파일 안의 이름보다 **파일 이름**이 정본이다. 파일을 복사해 둔 사람이
+        // 있으면 안쪽 이름은 남의 것을 가리킨다.
+        document.name=name;
+        Apply(document,false);
+        RefreshNames();
+        m_status.message="Workspace loaded: "+name;
+    }
+    void EditorWorkspaceStore::Rename(const std::string& name)
+    {
+        std::string error;
+        if(!workspace::valid_name(name,error)) throw std::runtime_error(error);
+        RefreshNames();
+        if(!m_named) throw std::runtime_error("The current layout has no saved name; save it first");
+        if(name==m_document.name) return;
+        const auto from=NamedPath(m_document.name), to=NamedPath(name);
+        // 덮어쓰기로 바꾸지 않는다. 이름을 바꾸다 남의 배치를 지우는 것은
+        // 이름 바꾸기가 요구한 일이 아니다.
+        if(std::filesystem::exists(to)) throw std::runtime_error("A workspace named "+name+" already exists");
+        std::error_code ec;
+        std::filesystem::rename(from,to,ec);
+        if(ec) throw std::system_error(ec,"Cannot rename workspace");
+        m_document.name=name;
+        Save();
+        RefreshNames();
+        m_status.message="Workspace renamed to "+name;
+    }
+    void EditorWorkspaceStore::DeleteNamed(const std::string& name)
+    {
+        std::string error;
+        if(!workspace::valid_name(name,error)) throw std::runtime_error(error);
+        const auto target=NamedPath(name);
+        if(!std::filesystem::exists(target)) throw std::runtime_error("No workspace named "+name);
+        // 지운 것을 되돌릴 다른 방법이 없다.
+        workspace::backup(target,"before-delete");
+        std::error_code ec;
+        std::filesystem::remove(target,ec);
+        if(ec) throw std::system_error(ec,"Cannot delete workspace");
+        // 지금 쓰는 배치를 지웠다면 **화면은 그대로 두고 이름만 놓는다.**
+        // 배치를 갈아엎는 것은 지우기가 요구한 일이 아니다.
+        if(name==m_document.name)
+        {
+            m_document.name=std::string(m_preset->label);
+            m_saveRequested=true;
+        }
+        RefreshNames();
+        m_status.message="Workspace deleted: "+name+"; backup preserved";
     }
     void EditorWorkspaceStore::Load(bool startup)
     {
@@ -250,6 +431,10 @@ namespace editor
                     ApplyPreset(*target);
                 }
                 else if(action==workspace_action::save) m_saveRequested=true;
+                else if(action==workspace_action::save_as) SaveAs(panel);
+                else if(action==workspace_action::load_named) LoadNamed(panel);
+                else if(action==workspace_action::rename) Rename(panel);
+                else if(action==workspace_action::delete_named) DeleteNamed(panel);
                 else
                 {
                     auto* entry=find_window(m_windows,panel);
@@ -316,6 +501,8 @@ namespace editor
         m_status.preset=std::string(m_preset->id);
         m_status.preset_label=std::string(m_preset->label);
         m_status.name=m_document.name;
+        m_status.named=m_named;
+        m_status.workspaces=m_names;
         m_status.panels.clear();
         for(const auto& entry:m_windows.entries) if(entry.persist_open) m_status.panels.emplace(entry.stable_id,entry.open);
         std::lock_guard lock(mailboxMutex);

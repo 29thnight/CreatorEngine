@@ -1,6 +1,7 @@
 #include "EditorWorkspaceFile.h"
 #include <Windows.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -233,6 +234,35 @@ namespace editor::workspace
         if(!MoveFileExW(temp.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
         { DeleteFileW(temp.c_str()); throw std::runtime_error("Workspace atomic replacement failed"); }
     }
+    bool valid_name(std::string_view name, std::string& error)
+    {
+        error.clear();
+        if(name.empty()) { error="Workspace name is empty"; return false; }
+        if(name.size()>64) { error="Workspace name is longer than 64 bytes"; return false; }
+        for(const char c : name)
+        {
+            const unsigned char u=static_cast<unsigned char>(c);
+            if(u<0x20 || u==0x7f) { error="Workspace name contains a control character"; return false; }
+            if(std::string_view("<>:\"/\\|?*").find(c)!=std::string_view::npos)
+            { error=std::string("Workspace name contains a reserved character: ")+c; return false; }
+        }
+        // 탐색기와 Win32 는 앞뒤의 공백·점을 조용히 떼어 낸다. 그러면 사람이 지은
+        // 이름과 실제 파일 이름이 갈려 목록에 없는 파일이 생긴다.
+        if(name.front()==' ' || name.back()==' ' || name.front()=='.' || name.back()=='.')
+        { error="Workspace name begins or ends with a space or a dot"; return false; }
+        std::string upper(name);
+        for(char& c : upper) c=static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        static const std::set<std::string> devices{
+            "CON","PRN","AUX","NUL",
+            "COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9",
+            "LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9" };
+        if(devices.count(upper)) { error="Workspace name is a reserved device name"; return false; }
+        // 활성 파일이 쓰는 자리다. 같은 이름을 허용하면 이름 붙인 배치를 저장하는
+        // 순간 지금 쓰는 배치를 덮는다.
+        if(upper=="ACTIVE") { error="Workspace name 'active' is reserved"; return false; }
+        return true;
+    }
+
     std::filesystem::path backup(const std::filesystem::path& path, std::string_view reason)
     {
         if(!std::filesystem::exists(path)) return {};
