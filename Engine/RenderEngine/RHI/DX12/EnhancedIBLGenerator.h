@@ -7,23 +7,26 @@
 // IBL 생성 체인 (PHASE 3-6 — DX11 SkyBoxPass의 생성 절반).
 //
 // equirect HDR 한 장에서 넷을 만든다:
-//   ① 큐브맵            rect→cube 투영 (스카이박스가 그린다)
+//   ① 큐브맵            rect→cube 투영 + 밉 체인 (스카이박스가 밉 0을 그린다)
 //   ② 조도 맵           코사인 가중 반구 적분 (디퓨즈 앰비언트)
 //   ③ 프리필터 스페큘러  GGX 중요도 샘플링, 밉마다 거칠기 0~1 (정반사 앰비언트)
 //   ④ BRDF LUT          split-sum의 (scale, bias) 사전 적분
+//
+// ①의 밉 체인은 ②③이 쓴다. 표본이 성길수록 흐린 밉을 읽어 잡음을 사전
+// 필터가 맡게 하는 것이 Karis 2013의 방식이고, 그래야 적분이 에너지를
+// 잃지 않는다 — 자세한 사연은 Includes/Ibl.slang의 SelectEnvironmentMip에.
 //
 // 프레임 패스가 아니다 — 씬 로드 때 한 번 도는 생성 작업이라
 // EnhancedRenderPass/그래프를 태우지 않고, 열린 프레임의 중립 즉시 인코더에
 // 커맨드를 기록한다(Generate는 BeginFrame과 EndFrame 사이에서 부른다).
 //
-// ── 이식 원칙 ──
+// ── 이식 이력 ──
 //
-//   셰이더 수식은 DX11(RectToCubeMap·IrradianceMap·SpecularPreFilter·
-//   IntegrateBRDF)을 그대로 옮긴다 — 하드 클램프·휘도 폐기·로그 공간
-//   평균 같은 톤 정책과, 조도 적분의 NoL 이중 가중(코사인 샘플링의 pdf에
-//   이미 든 cosθ를 다시 곱한다 — 수학적으로는 cos² 가중 편향)까지
-//   유지한다. 그림의 기준선이 그 결과물이다. 발견 내역은 이식 검수
-//   기록에 남겼고, 고치는 것은 별도 결정이다.
+//   출발은 DX11(RectToCubeMap·IrradianceMap·SpecularPreFilter·IntegrateBRDF)
+//   의 이식이었고 한동안 그쪽 quirk를 그대로 뒀다 — 하드 클램프·휘도 폐기,
+//   조도 적분의 NoL 이중 가중(cos² 편향). 셋 다 그 뒤 바로잡았다. 마지막까지
+//   남아 있던 것이 누적값을 눌러 잡음을 잡는 방식이었는데, 형태를 바꿔도
+//   에너지를 깎는다는 것이 실측으로 드러나 밉 기반 사전 필터로 갈아탔다.
 //
 //   큐브 메시 + 면별 직교 카메라(DX11 방식)는 두지 않는다 — 면 기저를
 //   상수로 넘겨 풀스크린 삼각형의 uv에서 방향을 만든다. 만들어지는
@@ -35,6 +38,30 @@ public:
 
     /// 프리필터 밉 수. DX11은 거칠기 i/5로 여섯 단계를 만든다.
     static constexpr uint32_t kPrefilterMips = 6;
+
+    /// 환경 큐브의 최대 밉 수.
+    ///
+    /// 1024 표본·512 큐브에서 SelectEnvironmentMip이 고르는 밉은 6을 넘지
+    /// 않는다(가장 성긴 조도 표본이 ~6.0). 체인을 거기서 끊는 이유는 값이
+    /// 아니라 비용이다 — 밉 m은 소스에서 2^m x 2^m을 표집하므로 밉 7이면
+    /// 텍셀 하나에 16384 표본이 되고, 그 위는 TDR 사정권이다.
+    static constexpr uint32_t kMaxEnvironmentMips = 7;
+
+    /// 환경 큐브의 밉 수를 큐브 한 변에서 구한다.
+    ///
+    /// 조도·프리필터가 표본의 입체각에 맞는 밉을 골라 읽으려면(Karis 2013)
+    /// 큐브에 밉 체인이 있어야 한다. 없으면 잡음을 누적값 억제로 눌러야 하고,
+    /// 그 억제는 대비가 있는 환경에서 에너지를 깎는다.
+    static constexpr uint32_t CubeMipCount(uint32_t cubeSize)
+    {
+        uint32_t mips = 1;
+        while (cubeSize > 1 && mips < kMaxEnvironmentMips)
+        {
+            cubeSize >>= 1;
+            ++mips;
+        }
+        return mips;
+    }
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError);
     void Shutdown();
@@ -71,11 +98,16 @@ private:
     class IRenderDeviceServices* m_resources{ nullptr };
 
     RHITextureHandle m_cubeMapHandle;
+    // rect→cube의 착지점. 밉 체인은 여기서 읽어 최종 큐브에 굽는다 —
+    // RHITransition이 텍스처 전체만 전이해서, 한 리소스 안에서 밉을 읽으며
+    // 다른 밉에 쓸 수가 없다.
+    RHITextureHandle m_cubeSourceHandle;
     RHITextureHandle m_irradianceHandle;
     RHITextureHandle m_prefilteredHandle;
     RHITextureHandle m_brdfLutHandle;
 
     RHIPipelineHandle m_rectToCubePso;
+    RHIPipelineHandle m_cubeDownsamplePso;
     RHIPipelineHandle m_irradiancePso;
     RHIPipelineHandle m_prefilterPso;
     RHIPipelineHandle m_brdfPso;

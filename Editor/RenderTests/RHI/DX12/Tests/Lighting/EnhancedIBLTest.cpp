@@ -11,12 +11,13 @@
 
 // IBL 생성 체인 자가 검증 (PHASE 3-6).
 //
-// 반구가 갈리는 equirect(위 빨강 · 아래 초록)를 넣고 넷을 따로 단정한다:
+// 반구가 갈리는 equirect(위 빨강 16 · 아래 초록 1)를 넣고 넷을 따로 단정한다:
 //
 //   ① rect→cube — +Y 면이 빨강, -Y 면이 초록인가(구면 매핑의 방향)
-//   ② 조도       — +Y 법선은 빨강 우세, -Y는 초록 우세, ±X는 반반인가.
-//      절대값은 원본의 톤 정책(로그 평균·NoL 이중 가중)에 묶여 있어
-//      비율·우세만 본다 — 수식을 고치면 절대값 단정이 같이 흔들린다.
+//   ② 조도       — 방향(우세)과 **에너지**(절대값). 반구가 각각 균일하므로
+//      참값이 해석적으로 나온다: +Y (16, 0) · -Y (0, 1) · +X (8, 0.5).
+//      위/아래를 16:1 로 벌린 것이 이 게이트의 이빨이다 — 균일 픽스처에서는
+//      적분이 에너지를 흘려도 우세·대칭이 그대로라 내내 초록이었다.
 //   ③ 프리필터   — 거칠기 0(밉0)은 면 색이 또렷하고, 거칠기 1(밉5)은
 //      반구가 섞여 색 차가 줄어드는가(수렴)
 //   ④ BRDF LUT  — (NdotV≈1, 거칠기≈0) 모서리에서 A≈1·B≈0, 가운데는
@@ -33,6 +34,18 @@ namespace
     constexpr uint32_t kIblEquirectHeight = 8;
 
     constexpr uint16_t kIblHalfOne = 0x3C00;
+
+    // ★ 위 반구를 16배 밝게 둔다 — 적분이 에너지를 지키는지 보려면 픽스처에
+    //   **대비**가 있어야 한다.
+    //
+    //   예전 픽스처는 위/아래가 같은 밝기였고, 그 균일한 표본 집합에서는
+    //   누적값을 눌러 잡음을 잡는 억제(톤맵 공간 평균)가 정확히 항등이다.
+    //   그래서 그 억제가 태양 있는 HDRI 에서 조도를 참값의 0.53 배까지
+    //   깎는 동안에도 이 게이트는 내내 초록이었다. 16:1 로 벌리면 같은
+    //   억제가 +X 조도를 8.0 대신 4.49 로 만들어 단정에 걸린다.
+    constexpr uint16_t kIblHalfSixteen = 0x4C00;
+    constexpr float    kIblUpperRadiance = 16.f;
+    constexpr float    kIblLowerRadiance = 1.f;
 
     // 구획 열의 자리(장 번호). 배치는 등차라 장 하나가 곧 구획 하나다.
     //   0 큐브+Y · 1 큐브-Y · 2 조도+Y · 3 조도-Y · 4 조도+X
@@ -142,7 +155,7 @@ bool DX12Test::RunIBLTest(std::string& outLog)
             const bool top = y < kIblEquirectHeight / 2;
             for (uint32_t x = 0; x < kIblEquirectWidth; ++x)
             {
-                row[x * 4 + 0] = top ? kIblHalfOne : 0;
+                row[x * 4 + 0] = top ? kIblHalfSixteen : 0;
                 row[x * 4 + 1] = top ? 0 : kIblHalfOne;
                 row[x * 4 + 2] = 0;
                 row[x * 4 + 3] = kIblHalfOne;
@@ -247,9 +260,14 @@ bool DX12Test::RunIBLTest(std::string& outLog)
         };
 
         // 면 인덱스: +X 0 · -X 1 · +Y 2 · -Y 3. 서브리소스 = 밉 + 면 x 밉수.
+        //
+        // ★ 환경 큐브도 밉 체인을 갖는다(조도·프리필터가 표본 입체각에 맞는
+        //   밉을 읽는다). 면 인덱스를 그대로 서브리소스로 쓰면 엉뚱한 밉을
+        //   뜬다 — 밉수를 곱해야 한다.
         constexpr uint32_t kMips = EnhancedIBLGenerator::kPrefilterMips;
-        copyRegion(generator.GetCubeMap(), 2, 0);
-        copyRegion(generator.GetCubeMap(), 3, 1);
+        constexpr uint32_t kCubeMips = EnhancedIBLGenerator::CubeMipCount(kIblCubeSize);
+        copyRegion(generator.GetCubeMap(), 0 + 2 * kCubeMips, 0);
+        copyRegion(generator.GetCubeMap(), 0 + 3 * kCubeMips, 1);
         copyRegion(generator.GetIrradianceMap(), 2, 2);
         copyRegion(generator.GetIrradianceMap(), 3, 3);
         copyRegion(generator.GetIrradianceMap(), 0, 4);
@@ -301,7 +319,8 @@ bool DX12Test::RunIBLTest(std::string& outLog)
             upR, upG, downR, downG);
         outLog += line;
 
-        if (upR < 0.9f || upG > 0.1f || downG < 0.9f || downR > 0.1f)
+        if (upR < kIblUpperRadiance * 0.9f || upG > 0.1f ||
+            downG < kIblLowerRadiance * 0.9f || downR > 0.1f)
         {
             outLog += "천정/바닥 면 색이 틀렸다 — 구면 매핑의 v 방향이 뒤집혔다\n";
             passed = false;
@@ -324,7 +343,7 @@ bool DX12Test::RunIBLTest(std::string& outLog)
             irrUpR, irrUpG, irrDownR, irrDownG, irrSideR, irrSideG);
         outLog += line;
 
-        // 절대값은 원본 톤 정책의 몫 — 우세와 대칭만 본다.
+        // ── 방향 ──
         if (irrUpR < irrUpG * 2.f)
         {
             outLog += "+Y 조도가 빨강 우세가 아니다 — 반구 적분 방향이 틀렸다\n";
@@ -335,10 +354,35 @@ bool DX12Test::RunIBLTest(std::string& outLog)
             outLog += "-Y 조도가 초록 우세가 아니다 — 반구 적분 방향이 틀렸다\n";
             passed = false;
         }
-        const float sideRatio = irrSideR / (std::max)(irrSideG, 1e-4f);
-        if (sideRatio < 0.5f || sideRatio > 2.f)
+
+        // ── 에너지 ──
+        //
+        // 픽스처가 위/아래 반구 각각 균일하므로 참값이 해석적으로 나온다.
+        // 조도는 E/PI, 즉 코사인 가중 표본의 산술 평균이다:
+        //   +Y 는 위 반구만 보므로 (16, 0) · -Y 는 아래만 보므로 (0, 1)
+        //   +X 는 반반이라 (8, 0.5)
+        //
+        // ★ 이 단정이 이 게이트의 이빨이다. 절대값을 보지 않던 시절에는
+        //   적분이 에너지를 절반 가까이 흘려도 우세·대칭만으로 초록이었다.
+        //   누적값을 눌러 잡음을 잡는 억제가 돌아오면 +X 의 R 이 8.0 이
+        //   아니라 4.49 로 내려앉아 여기서 잡힌다.
+        const auto nearValue = [&](float measured, float expected, float tolerance)
         {
-            outLog += "+X 조도가 반반이 아니다 — 접선 기저가 기울었다\n";
+            return std::fabs(measured - expected) <= expected * tolerance;
+        };
+        constexpr float kEnergyTolerance = 0.12f;
+
+        if (!nearValue(irrUpR, kIblUpperRadiance, kEnergyTolerance) ||
+            !nearValue(irrDownG, kIblLowerRadiance, kEnergyTolerance))
+        {
+            outLog += "극 조도가 반구 라디언스와 다르다 — 적분이 에너지를 잃거나 더한다\n";
+            passed = false;
+        }
+        if (!nearValue(irrSideR, kIblUpperRadiance * 0.5f, kEnergyTolerance) ||
+            !nearValue(irrSideG, kIblLowerRadiance * 0.5f, kEnergyTolerance))
+        {
+            outLog += "+X 조도가 두 반구의 반반이 아니다 — 접선 기저가 기울었거나"
+                      " 적분이 밝은 쪽 에너지를 흘린다\n";
             passed = false;
         }
 

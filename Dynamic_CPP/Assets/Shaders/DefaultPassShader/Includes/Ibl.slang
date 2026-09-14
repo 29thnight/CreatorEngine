@@ -17,6 +17,12 @@
 // 다. 예전 코드는 cos 를 pdf 와 별도로 **한 번 더** 곱하고 PI/N 을 곱해
 // 실제로는 integral(L * cos^2) 을 구웠고, 소비 쪽도 1/PI 를 빠뜨려 두
 // 규약이 서로 맞지 않았다. 굽기와 소비를 같이 고쳐야 하는 이유다.
+//
+// ── 잡음 규약 ────────────────────────────────────────────────────────
+//
+// 표본 잡음은 **환경 큐브의 밉**이 맡는다(SelectEnvironmentMip). 적분기는
+// 라디언스를 그대로 평균낸다 ― 누적값에 손을 대는 억제는 전부 에너지를
+// 깎기 때문이다. 자세한 사연은 그 함수 주석에 있다.
 
 float RadicalInverseVdC(uint bits)
 {
@@ -69,6 +75,26 @@ float3 SampleHemisphereCosine(float2 xi, float3 n)
     const float3 local = float3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
     const float3x3 frame = BuildSampleFrame(n);
     return normalize(local.x * frame[0] + local.y * frame[1] + local.z * frame[2]);
+}
+
+// 표본 하나가 덮는 입체각에 맞는 환경 밉을 고른다(Karis 2013).
+//
+// 표본이 성기면 한 표본이 넓은 입체각을 대표해야 하고, 그 폭을 사전 필터된
+// 밉이 대신 덮어 준다. 잡음을 이렇게 잡아야 적분이 에너지를 잃지 않는다 ―
+// 누적값을 톤맵 공간에서 평균내는 억제는 대비가 있는 환경에서 결과를 어두운
+// 쪽으로 크게 편향시킨다(같은 HDRI 에서 조도가 참값의 0.53 배까지 떨어졌다).
+//
+// pdf         : 그 방향을 뽑은 표본 분포의 밀도
+// sampleCount : 적분에 쓰는 표본 수
+// cubeSize    : 환경 큐브 밉 0 의 한 변
+// mipCount    : 환경 큐브의 밉 수
+float SelectEnvironmentMip(float pdf, uint sampleCount, float cubeSize, float mipCount)
+{
+    // 큐브 텍셀 하나의 입체각과 표본 하나가 맡은 입체각의 비를 밉으로 옮긴다.
+    const float saTexel  = 4.0 * PI / (6.0 * cubeSize * cubeSize);
+    const float saSample = 1.0 / (float(sampleCount) * max(pdf, 1e-4));
+
+    return clamp(0.5 * log2(saSample / saTexel), 0.0, max(mipCount - 1.0, 0.0));
 }
 
 // split-sum 의 둘째 합을 (scale, bias) 로. 런타임 스페큘러는

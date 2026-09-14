@@ -167,9 +167,11 @@ bool RunVulkanIBLTest(std::string& outLog)
         encoder.CopyToReadback(readback, source, region, subresource);
     };
 
+    // 환경 큐브도 밉 체인을 갖는다 — 면 인덱스에 밉수를 곱해야 밉 0이 잡힌다.
     constexpr uint32_t kMips = EnhancedIBLGenerator::kPrefilterMips;
-    copyRegion(generator.GetCubeMap(), 2, 0);
-    copyRegion(generator.GetCubeMap(), 3, 1);
+    constexpr uint32_t kCubeMips = EnhancedIBLGenerator::CubeMipCount(kVkIblCubeSize);
+    copyRegion(generator.GetCubeMap(), 0 + 2 * kCubeMips, 0);
+    copyRegion(generator.GetCubeMap(), 0 + 3 * kCubeMips, 1);
     copyRegion(generator.GetIrradianceMap(), 2, 2);
     copyRegion(generator.GetIrradianceMap(), 3, 3);
     copyRegion(generator.GetIrradianceMap(), 0, 4);

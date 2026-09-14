@@ -8,9 +8,15 @@
 //   하늘이 통째로 상수판이 되고 밝은 곳에는 구멍이 뚫렸다. 그 환경으로 구운
 //   프리필터를 금속이 반사하면 금이 회색 플라스틱으로 보인다.
 //
-//   여기 있는 FireflyTonemap/Untonemap 은 **가역**이다. 표본 하나짜리
-//   (거울 반사) 에서는 정확히 항등이고, 여러 표본을 평균낼 때만 밝은 이상치의
-//   지분을 낮춘다 ─ Karis 의 tone-map-then-average.
+//   그 뒤로 한동안 **가역**을 자처한 FireflyTonemap/Untonemap 을 썼는데,
+//   그것도 답이 아니었다. 톤맵 공간에서 누적해 평균낸 뒤 되돌리는 연산은
+//   균일 환경에서만 항등이고, 대비가 있으면 어두운 쪽으로 크게 편향된다 ─
+//   태양이 있는 HDRI 로 재니 조도가 참값의 0.53 배까지 떨어졌다. 누적값에
+//   손대는 억제는 형태를 바꿔도 에너지를 깎는다.
+//
+//   지금은 잡음을 환경 큐브의 **밉**이 맡는다(Includes/Ibl.slang 의
+//   SelectEnvironmentMip). 적분기는 라디언스를 그대로 평균낸다. 여기 남은
+//   것은 Inf/NaN 을 걷어내는 정제뿐이다 ─ 그건 가역이 아니어도 된다.
 
 static const float PI     = 3.14159265359;
 static const float INV_PI = 0.31830988618;
@@ -38,16 +44,3 @@ float3 SanitizeRadiance(float3 color)
                   SanitizeRadianceChannel(color.b));
 }
 
-// 가역 파이어플라이 억제. 누적은 톤맵 공간에서 하고 평균을 낸 뒤 되돌린다.
-//
-// 표본이 하나면 Untonemap(Tonemap(c)) == c 다(부동소수 오차 제외). 그래서
-// 거칠기 0 의 거울 반사는 손대지 않고, 거친 다중 표본 수집만 부드러워진다.
-float3 FireflyTonemap(float3 color)
-{
-    return color / (1.0 + Luminance(color));
-}
-
-float3 FireflyUntonemap(float3 color)
-{
-    return color / max(1.0 - Luminance(color), 1e-4);
-}

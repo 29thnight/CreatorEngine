@@ -32,34 +32,33 @@ namespace
         float forward[4];
         float right[4];
         float up[4];
-        float params[4];   // x = roughness
+        // x = roughness · y = 읽을 소스 밉 · z = 환경 큐브 한 변 ·
+        // w = 환경 큐브 밉 수. 밉 다운샘플만 z를 "그리는 밉의 한 변"으로 쓴다.
+        float params[4];
     };
 
     // ── 면 방향 VS — 풀스크린 삼각형의 uv에서 면 방향을 만든다 ──
-    constexpr const char* kIblFaceVSFile = "IblFace.hlsl";
+    constexpr const char* kIblFaceVSFile = "IblFace.slang";
 
     // ── BRDF LUT용 풀스크린 VS — uv가 곧 (NdotV, roughness)다 ──
-    constexpr const char* kIblFullscreenVSFile = "IblFullscreen.hlsl";
+    constexpr const char* kIblFullscreenVSFile = "IblFullscreen.slang";
 
     // ── rect→cube (DX11 RectToCubeMap.ps의 이식) ──
-    constexpr const char* kIblRectToCubePSFile = "IblRectToCube.hlsl";
+    constexpr const char* kIblRectToCubePSFile = "IblRectToCube.slang";
 
-    // ── 조도 맵 (DX11 IrradianceMap.ps의 이식) ──
+    // ── 환경 큐브 밉 다운샘플 ──
     //
-    // ★ 원본의 수식·quirk를 그대로 둔다(이식 검수에서 발견·기록):
-    //   · color * NoL — 코사인 샘플링의 pdf(cosθ/π)에 이미 cosθ가 있어
-    //     수학적으로는 이중 가중(cos² 편향, 전체적으로 어둡다)이다.
-    //   · SampleLevel(…, 7) — 소스 큐브맵이 밉 1장이라 밉0으로 클램프되어
-    //     의도한 사전 블러가 무동작이다.
-    //   · 휘도 상한 초과 샘플의 전량 폐기, 로그 공간 평균 — 톤 정책.
-    // 그림의 기준선이 이 결과물이라 여기서 고치면 대조가 성립하지 않는다.
+    // 조도·프리필터가 표본의 입체각에 맞는 밉을 읽을 수 있게 큐브에 밉
+    // 체인을 깐다. 이 패스가 없으면 잡음을 누적값 억제로 눌러야 하고, 그
+    // 억제는 대비가 있는 환경에서 조도를 크게 깎는다.
+    constexpr const char* kIblCubeDownsamplePSFile = "IblCubeDownsample.slang";
+
+    // ── 조도 맵 (코사인 가중 반구 적분) ──
+    //
+    // 굽는 값은 E가 아니라 E/PI다(Includes/Ibl.slang의 조도 규약).
     constexpr const char* kIblIrradiancePSFile = "IblIrradiance.slang";
 
-    // ── 프리필터 스페큘러 (DX11 SpecularPreFilter.ps의 이식) ──
-    //
-    // ★ Sample(자동 LOD)을 그대로 둔다 — 발산하는 중요도 샘플 방향에 화면
-    //   미분 기반 LOD는 관행(SampleLevel 0)에서 벗어나지만 원본이 그렇다.
-    //   휘도 폐기·로그 공간도 조도 맵과 같은 정책.
+    // ── 프리필터 스페큘러 (Karis 2013 split-sum의 첫째 합) ──
     constexpr const char* kIblPrefilterPSFile = "IblPrefilter.slang";
 
     // ── BRDF LUT (DX11 IntegrateBRDF.ps의 이식) ──
@@ -119,12 +118,14 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     RHIShaderBlob faceVs;
     RHIShaderBlob fullscreenVs;
     RHIShaderBlob rectPs;
+    RHIShaderBlob downsamplePs;
     RHIShaderBlob irradiancePs;
     RHIShaderBlob prefilterPs;
     RHIShaderBlob brdfPs;
     if (!CompileIblShader(kIblFaceVSFile, "VSMain", "vs_5_0", faceVs, outError) ||
         !CompileIblShader(kIblFullscreenVSFile, "VSMain", "vs_5_0", fullscreenVs, outError) ||
         !CompileIblShader(kIblRectToCubePSFile, "PSMain", "ps_5_0", rectPs, outError) ||
+        !CompileIblShader(kIblCubeDownsamplePSFile, "PSMain", "ps_5_0", downsamplePs, outError) ||
         !CompileIblShader(kIblIrradiancePSFile, "PSMain", "ps_5_0", irradiancePs, outError) ||
         !CompileIblShader(kIblPrefilterPSFile, "PSMain", "ps_5_0", prefilterPs, outError) ||
         !CompileIblShader(kIblBrdfPSFile, "PSMain", "ps_5_0", brdfPs, outError, true))
@@ -154,6 +155,8 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
 
     m_rectToCubePso = makePso(faceVs, rectPs);
     if (!m_rectToCubePso.IsValid()) return false;
+    m_cubeDownsamplePso = makePso(faceVs, downsamplePs);
+    if (!m_cubeDownsamplePso.IsValid()) return false;
     m_irradiancePso = makePso(faceVs, irradiancePs);
     if (!m_irradiancePso.IsValid()) return false;
     m_prefilterPso = makePso(faceVs, prefilterPs);
@@ -174,10 +177,12 @@ bool EnhancedIBLGenerator::CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
     }
 
     m_resources->ReleaseTexture(m_cubeMapHandle);
+    m_resources->ReleaseTexture(m_cubeSourceHandle);
     m_resources->ReleaseTexture(m_irradianceHandle);
     m_resources->ReleaseTexture(m_prefilteredHandle);
     m_resources->ReleaseTexture(m_brdfLutHandle);
     m_cubeMapHandle = {};
+    m_cubeSourceHandle = {};
     m_irradianceHandle = {};
     m_prefilteredHandle = {};
     m_brdfLutHandle = {};
@@ -197,16 +202,20 @@ bool EnhancedIBLGenerator::CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
         return m_resources->CreateTexture(desc, out, outError);
     };
 
-    if (!makeTarget(cubeSize, 6, 1, L"IBL.CubeMap", m_cubeMapHandle) ||
+    // 큐브는 밉 체인을 갖는다 — 조도·프리필터가 표본 입체각에 맞는 밉을 읽는다.
+    if (!makeTarget(cubeSize, 6, CubeMipCount(cubeSize), L"IBL.CubeMap", m_cubeMapHandle) ||
+        !makeTarget(cubeSize, 6, 1, L"IBL.CubeSource", m_cubeSourceHandle) ||
         !makeTarget(cubeSize, 6, 1, L"IBL.Irradiance", m_irradianceHandle) ||
         !makeTarget(cubeSize, 6, kPrefilterMips, L"IBL.Prefiltered", m_prefilteredHandle) ||
         !makeTarget(brdfSize, 1, 1, L"IBL.BrdfLut", m_brdfLutHandle))
     {
         m_resources->ReleaseTexture(m_cubeMapHandle);
+        m_resources->ReleaseTexture(m_cubeSourceHandle);
         m_resources->ReleaseTexture(m_irradianceHandle);
         m_resources->ReleaseTexture(m_prefilteredHandle);
         m_resources->ReleaseTexture(m_brdfLutHandle);
         m_cubeMapHandle = {};
+        m_cubeSourceHandle = {};
         m_irradianceHandle = {};
         m_prefilteredHandle = {};
         m_brdfLutHandle = {};
@@ -241,9 +250,11 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     RHIEncoder& encoder = m_resources->GetImmediateEncoder();
     encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
+    const uint32_t cubeMips = CubeMipCount(cubeSize);
+
     const auto drawFaces = [&](RHIPipelineHandle pso, RHITextureHandle target,
         uint32_t mip, uint32_t size, const RHIBindingTable& source,
-        float roughness) -> bool
+        const float (&params)[4]) -> bool
     {
         encoder.SetViewportAndScissor(size, size);
         encoder.SetPipeline(RHIBindPoint::Graphics, pso);
@@ -260,7 +271,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
             memcpy(constants.forward, kIblFaces[face].forward, sizeof(float) * 3);
             memcpy(constants.right, kIblFaces[face].right, sizeof(float) * 3);
             memcpy(constants.up, kIblFaces[face].up, sizeof(float) * 3);
-            constants.params[0] = roughness;
+            memcpy(constants.params, params, sizeof(float) * 4);
 
             const RHIBufferSlice cb = m_resources->UploadConstants(
                 &constants, sizeof(IblDrawConstants));
@@ -281,34 +292,77 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         m_resources->TransitionResources(one);
     };
 
-    // ── ① rect → cube ──
+    // ── ① rect → cube (밉 체인의 소스) ──
     const RHIBindingDesc equirectView = RHIBindingDesc::Srv2D(
         equirect, equirectFormat, 0, 1);
     const RHIBindingTable equirectTable = m_resources->CreateBindings(
         std::span<const RHIBindingDesc>{ &equirectView, 1 });
     if (!equirectTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
-    if (!drawFaces(m_rectToCubePso, m_cubeMapHandle, 0,
-        cubeSize, equirectTable, 0.f))
     {
-        outError = "IBL rect→cube 기록 실패(타깃/업로드)";
-        return false;
+        const float params[4]{ 0.f, 0.f, 0.f, 0.f };
+        if (!drawFaces(m_rectToCubePso, m_cubeSourceHandle, 0,
+            cubeSize, equirectTable, params))
+        {
+            outError = "IBL rect→cube 기록 실패(타깃/업로드)";
+            return false;
+        }
+    }
+
+    transition(m_cubeSourceHandle,
+        RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
+
+    const RHIBindingDesc sourceView = RHIBindingDesc::SrvCube(
+        m_cubeSourceHandle, kFormat, 1);
+    const RHIBindingTable sourceTable = m_resources->CreateBindings(
+        std::span<const RHIBindingDesc>{ &sourceView, 1 });
+    if (!sourceTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
+
+    // ── ①b 환경 큐브의 밉 체인 ──
+    //
+    // 밉 m은 소스의 2^m x 2^m 텍셀을 평균한다. 밉 m-1이 아니라 소스에서
+    // 직접 뜨는 이유는 RHITransition이 텍스처 전체만 전이하기 때문이다 —
+    // 한 리소스 안에서 밉을 읽으며 다른 밉에 쓸 수가 없다.
+    {
+        uint32_t mipSize = cubeSize;
+        for (uint32_t mip = 0; mip < cubeMips; ++mip)
+        {
+            const float params[4]{
+                0.f,
+                static_cast<float>(1u << mip),      // 이 밉이 덮는 소스 텍셀 폭
+                static_cast<float>(mipSize),        // 그리는 밉의 한 변
+                0.f };
+            if (!drawFaces(m_cubeDownsamplePso, m_cubeMapHandle, mip,
+                mipSize, sourceTable, params))
+            {
+                outError = "IBL 큐브 밉 기록 실패(타깃/업로드)";
+                return false;
+            }
+            mipSize = (mipSize > 1) ? mipSize / 2 : 1;
+        }
     }
 
     transition(m_cubeMapHandle,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
     const RHIBindingDesc cubeView = RHIBindingDesc::SrvCube(
-        m_cubeMapHandle, kFormat, 1);
+        m_cubeMapHandle, kFormat, cubeMips);
     const RHIBindingTable cubeTable = m_resources->CreateBindings(
         std::span<const RHIBindingDesc>{ &cubeView, 1 });
     if (!cubeTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
 
+    // 적분기 둘은 표본의 입체각으로 밉을 고른다 — 큐브의 크기와 밉 수를 안다.
+    const float environmentSize = static_cast<float>(cubeSize);
+    const float environmentMips = static_cast<float>(cubeMips);
+
     // ── ② 조도 맵 ──
-    if (!drawFaces(m_irradiancePso, m_irradianceHandle, 0,
-        cubeSize, cubeTable, 0.f))
     {
-        outError = "IBL 조도 기록 실패(타깃/업로드)";
-        return false;
+        const float params[4]{ 0.f, 0.f, environmentSize, environmentMips };
+        if (!drawFaces(m_irradiancePso, m_irradianceHandle, 0,
+            cubeSize, cubeTable, params))
+        {
+            outError = "IBL 조도 기록 실패(타깃/업로드)";
+            return false;
+        }
     }
     transition(m_irradianceHandle,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
@@ -320,8 +374,10 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         {
             const float roughness =
                 static_cast<float>(mip) / static_cast<float>(kPrefilterMips - 1);
+            const float params[4]{
+                roughness, 0.f, environmentSize, environmentMips };
             if (!drawFaces(m_prefilterPso, m_prefilteredHandle, mip,
-                mipSize, cubeTable, roughness))
+                mipSize, cubeTable, params))
             {
                 outError = "IBL 프리필터 기록 실패(타깃/업로드)";
                 return false;
@@ -364,17 +420,20 @@ void EnhancedIBLGenerator::Shutdown()
     if (nullptr != m_resources)
     {
         m_resources->ReleaseTexture(m_cubeMapHandle);
+        m_resources->ReleaseTexture(m_cubeSourceHandle);
         m_resources->ReleaseTexture(m_irradianceHandle);
         m_resources->ReleaseTexture(m_prefilteredHandle);
         m_resources->ReleaseTexture(m_brdfLutHandle);
         m_resources = nullptr;
     }
     m_cubeMapHandle = {};
+    m_cubeSourceHandle = {};
     m_irradianceHandle = {};
     m_prefilteredHandle = {};
     m_brdfLutHandle = {};
 
     m_rectToCubePso = {};
+    m_cubeDownsamplePso = {};
     m_irradiancePso = {};
     m_prefilterPso = {};
     m_brdfPso = {};
