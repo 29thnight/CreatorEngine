@@ -1,17 +1,22 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
-**신설 2026-09-01 · 재분할 2026-09-03 · 활성 54행 267.5일 · 완료 12.5일 + 진행 기성 3.5일 · 잔여 251.5일**
+**신설 2026-09-01 · 재분할 2026-09-03 · PHASE 4.5 분리 2026-09-14 · 활성 69행 352.5일 · 완료 12.5일 + 진행 기성 3.5일 · 잔여 336.5일**
 
 기존 단일 PHASE 4에는 현재 PBR 배선 수정, Blender형 Material Graph, RenderGraph·라이트맵·
-일반 SRP·후처리·차세대 GPU 기능이 한데 섞여 있었다. 이 문서는 같은 총공수 267.5일을
-다음 세 완료선으로 분리한다.
+일반 SRP·후처리·차세대 GPU 기능이 한데 섞여 있었다. 이 문서는 그것을 네 완료선으로
+분리한다.
+
+2026-09-14에 **PHASE 4.5 시간축 재구성 계층**이 신설되며 총공수가 267.5일에서 352.5일로
+늘었다. 이것은 재배분이 아니라 **신규 산정**이다 — 기존 `4-5 DLSS 구상` 1일이 모션 벡터가
+없는 엔진에 업스케일과 프레임 생성을 동시에 얹는 비용을 재지 않고 있었다.
 
 | 페이즈 | 단일 책임 | 활성 행 | 일 | 상태 |
 |---|---|---:|---:|---|
 | **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | W2/W4/W5/W6 8.5일 완료 + 진행 기성 3.5일 |
 | **4.25** | Blender 5.1.1 Principled 기반 Material Graph와 artist workflow | 10 | 34 | 미착수 |
-| **4.75** | RenderGraph·라이트맵·일반 SRP·shadow/probe/post·GPU 기능 | 34 | 215.5 | 4일 완료 |
-| **합계** |  | **54** | **267.5** | **잔여 251.5** |
+| **4.5** | 모션 벡터·jitter·히스토리와 Temporal Upscaling·Frame Generation | 17 | 92 | 미착수 |
+| **4.75** | RenderGraph·라이트맵·일반 SRP·shadow/probe/post·GPU 기능 | 32 | 208.5 | 4일 완료 |
+| **합계** |  | **69** | **352.5** | **잔여 336.5** |
 
 모델 자산 신원·sidecar·loader·renderer/scene/animation 직접 소비·Assimp 은퇴는
 [`ModelAssetBigBangCutoverPlan.md`](archive/ModelAssetBigBangCutoverPlan.md), **PHASE 3.75**가
@@ -24,9 +29,10 @@
 
 | 범위 | 정본 |
 |---|---|
-| PHASE 4/4.25/4.75 순서·공수·완료선 | 이 문서 |
+| PHASE 4/4.25/4.5/4.75 순서·공수·완료선 | 이 문서 |
 | 현재 PBR Slang/Material/Renderer 결함과 수정 순서 | [`PBRWiringStabilizationPlan.md`](PBRWiringStabilizationPlan.md) |
 | Blender Principled·Material Graph·성능 tier·artist UX | [`BlenderMaterialGraphPlan.md`](BlenderMaterialGraphPlan.md) |
+| 모션 벡터·jitter·업스케일·프레임 생성·present 소유권 | [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md) |
 | Pipeline Asset·일반 Pass Shader Graph·Custom Pass | [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) |
 | versioned resource·DAG·barrier·aliasing·async compute | [`RenderGraphDependencySchedulingPlan.md`](RenderGraphDependencySchedulingPlan.md) |
 | 라이트맵 UV1·BVH·직접/간접광·background bake | [`LightmapBakerPlan.md`](LightmapBakerPlan.md) |
@@ -68,11 +74,29 @@ Blender 5.1.1 Material Preview/EEVEE의 Principled 재질 의미와 pre-tone lin
 좌표계, 그림자, AO, reflection probe, AgX/auto exposure/bloom은 Blender material parity에서
 제외한다. 이 항목으로 재질 오차를 덮지 않는다.
 
-### 1.3 PHASE 4.75 — 남은 renderer/SRP/GPU 기능
+### 1.3 PHASE 4.5 — 시간축 재구성 계층
+
+모션 벡터·jitter·히스토리라는 시간축 입력을 생산하고, 그 위에 벤더 중립 업스케일러와
+프레임 생성을 얹는다. 정본은 [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md)다.
+
+- `BASE-0` 공통 밀봉 하네스 — PHASE 4.75 공통·GPU 설계 게이트(현 §7.1)에서 이관.
+- 트랙 `TR` — 모션 벡터, jitter, 히스토리, 렌더 해상도 ≠ 표시 해상도 계약.
+- 트랙 `TU` — 벤더 중립 Upscaler 인터페이스와 FSR/DLSS/XeSS 백엔드.
+- 트랙 `FG` — present 소유권·pacing·지연 마커와 Frame Generation 백엔드.
+
+이 페이즈가 4.75보다 앞에 서는 이유는 두 가지다. 첫째, `BASE-0` 계측 하네스가 여기서
+**계측 무해화 계약**까지 확정돼야 이후 모든 렌더 게이트가 해상도와 프레임 종류를 선언한다.
+둘째, 모션 벡터는 RenderGraph 재작성과 독립이며 TAA·모션 블러·SSGI 품질 개선의 공통 입력이라
+`RG`를 기다릴 이유가 없다.
+
+**벤더 이름을 기능 이름으로 쓰지 않는다.** 구 `4-5 DLSS 구상`은 이 페이즈로 흡수되며 DLSS는
+`TU3`/`FG3` 백엔드 하나의 이름으로만 남는다.
+
+### 1.4 PHASE 4.75 — 남은 renderer/SRP/GPU 기능
 
 기존 PHASE 4에서 위 두 범위가 아닌 항목을 모두 이곳으로 이동한다.
 
-- `BASE-0`, GPU-driven/Stochastic Lighting/DXR/DLSS 설계 게이트.
+- GPU-driven/Stochastic Lighting/DXR 설계 게이트 (`BASE-0`은 PHASE 4.5가 소유한다).
 - RenderGraph RG/Q와 라이트맵 L.
 - Pipeline Asset, general Custom Pass, `.shadergraph(domain=pass)`, Slang Code mode.
 - local reflection probe/specular AO, shadow atlas, display/post.
@@ -107,18 +131,28 @@ PHASE 4     PBR-W0 → W2/W3 → W4~W7 → W8 → W9
 PHASE 4.25  MAT-0 → MAT-1 → MAT-2/MAT-3 → MAT-4~MAT-6
                                    → MAT-7 → MAT-8 → MAT-9
     ↓
-PHASE 4.75  BASE-0
+PHASE 4.5   BASE-0
+              ├─ TR0 (계측 무해화)
+              └─ TR1 → TR2 → TR3 → TU0 → TU1 ∥ TU2 → TU3 ∥ TU4 ∥ TU5
+                                                          └─ FG0 → FG1 ∥ FG2 → FG3 ∥ FG4
+                                                                              → TFG9
+    ↓
+PHASE 4.75  (BASE-0을 PHASE 4.5에서 입력으로 받는다)
               ├─ RG1 → RG2 → RG3 → RG4 → RG5 → RG6 → RG7 → Q0 → RG8 → RG9
               ├─ L1 ∥ L2 → L3 → Q0 → L4 → L5/L6 → L7
               ├─ SRP-0 → SRP-1 → SRP-2 → SRP-4 → SRP-5 → SRP-6
               ├─ RND-1 → RND-2/RND-3
-              └─ 4-2~4-5 → 4-6
+              └─ 4-2~4-4 → 4-6
 ```
 
 PHASE 4.25는 PHASE 4 실장면 gate를 통과한 제품 배선 위에서만 시작한다. PHASE 4.75는
 PHASE 4.25의 compiled material generation/feature mask/route를 입력으로 받는다. 다만
 PHASE 4.75의 RG·L 내부 사전 연구는 제품 배선 없이 진행할 수 있어도 완료/cutover는 앞선
 완료선을 우회할 수 없다.
+
+PHASE 4.5는 PHASE 4.75의 `RG6`·`Q0`를 선행으로 받지 않는다. 자체 보간기를 만들지 않으므로
+프레임 생성 SDK가 자기 큐와 present 타이밍을 소유하기 때문이다. 이 전제가 뒤집히면
+[`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md) §3.3과 `FG0` 공수를 다시 산정한다.
 
 ---
 
@@ -176,21 +210,73 @@ CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단
 
 ---
 
-## 6. PHASE 4.75 — 남은 렌더 파이프라인, 215.5일
+## 6. PHASE 4.5 — 시간축 재구성 계층, 92일
 
-### 6.1 공통·GPU 설계 게이트 — 14.5일
+정본은 [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md)이며 이 절은 공수와
+선후만 싣는다.
+
+### 6.1 공통 기준선 — 6일
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
 | `BASE-0` | 공통 밀봉 frame/PNG/HDR/timing/graph stats | · | PHASE 4.25 | 6 |
+
+PHASE 4.75 공통·GPU 설계 게이트(현 §7.1)에서 이관했다. PHASE 4.75는 이것을 입력으로 받는다.
+
+### 6.2 트랙 TR — 시간축 기반, 25일
+
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
+| `TR0` | 계측 무해화 계약 — 측정 표면의 해상도·프레임 종류 선언 | · | BASE-0 | 4 |
+| `TR1` | 모션 벡터 생산 — static/skinned/instanced/decal/알파 | · | BASE-0 | 10 |
+| `TR2` | 렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스 | · | TR1 | 6 |
+| `TR3` | 히스토리·이전 프레임 행렬 공용 계약 | · | TR2 | 5 |
+
+### 6.3 트랙 TU — 업스케일, 24일
+
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
+| `TU0` | 벤더 중립 Upscaler 인터페이스·기능 질의·폴백 사슬 | · | TR3 | 4 |
+| `TU1` | 무-upscale 기준 경로·A/B 대조군 | · | TU0 | 3 |
+| `TU2` | FSR 백엔드 — 벤더 중립 베이스라인 | · | TU0 | 6 |
+| `TU3` | DLSS Super Resolution 백엔드 | · | TU2 | 4 |
+| `TU4` | XeSS 백엔드 | · | TU2 | 3 |
+| `TU5` | PostChain 앞 삽입·슬롯 schema 크기 유도 | · | TU2 | 4 |
+
+### 6.4 트랙 FG — 프레임 생성, 32일
+
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
+| `FG0` | present 소유권·proxy swapchain·frame pacing 계약 | · | TU5 | 10 |
+| `FG1` | 지연 마커 — Reflex·Anti-Lag 2, 게임 루프 경유 | · | FG0 | 5 |
+| `FG2` | FSR 3 Frame Generation 백엔드 | · | FG0 | 8 |
+| `FG3` | DLSS Frame Generation 백엔드 | · | FG2 | 5 |
+| `FG4` | HUD-less 백버퍼·UI 합성·에디터 금지 강제 | · | FG2 | 4 |
+
+### 6.5 통합 게이트 — 5일
+
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
+| `TFG9` | 지원 행렬 전수·폴백 사슬·계측 단정·성능/지연 판정 | · | TU3, TU4, FG3, FG4 | 5 |
+
+---
+
+## 7. PHASE 4.75 — 남은 렌더 파이프라인, 208.5일
+
+### 7.1 공통·GPU 설계 게이트 — 7.5일
+
+| ID | 내용 | 상태 | 선행 | 일 |
+|---|---|---|---|---:|
 | `4-1` | Scriptable Render Pipeline·Custom Pass 확장 계약 | ✅ | — | 2 |
 | `4-2` | GPU-driven rendering 아키텍처 구상 | · | BASE-0 | 2 |
 | `4-3` | Stochastic Tile-Based Lighting 구상 | · | BASE-0 | 1.5 |
 | `4-4` | DXR 구상 | · | BASE-0 | 1.5 |
-| `4-5` | DLSS 구상 | · | BASE-0 | 1 |
-| `4-6` | 공통 의존 그래프·수직 슬라이스·구현 페이즈 | · | 4-2~4-5 | 0.5 |
+| `4-6` | 공통 의존 그래프·수직 슬라이스·구현 페이즈 | · | 4-2~4-4 | 0.5 |
 
-### 6.2 RenderGraph·queue — 113일 + Q0 미산정
+구 `4-5 DLSS 구상`은 PHASE 4.5로 분리됐다. `4-6`의 의존 그래프는 PHASE 4.5가 확정한
+시간축 입력과 업스케일 계약을 **읽기 전용 입력**으로 받는다.
+
+### 7.2 RenderGraph·queue — 113일 + Q0 미산정
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
@@ -206,7 +292,7 @@ CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단
 | `RG8` | multi-queue·async compute | · | RG7, Q0 | 25 |
 | `RG9` | subresource·split barrier·Resource Inspector | · | RG8 | 15 |
 
-### 6.3 라이트맵 — 35일
+### 7.3 라이트맵 — 35일
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
@@ -219,7 +305,7 @@ CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단
 | `L6` | dilate·seam·padding 원인 수정 | · | L3 | 3 |
 | `L7` | 병렬화 실측 판정 | 차단 | L5, L6 | 3 |
 
-### 6.4 일반 SRP — 33일
+### 7.4 일반 SRP — 33일
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
@@ -234,7 +320,7 @@ CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단
 `.shadergraph(domain=pass)`의 출력 계약과 ResourceSchema는 이 트랙이 소유한다. graph editor,
 typed node/pin, serialization/codegen 기반은 PHASE 4.25를 재사용한다.
 
-### 6.5 renderer 품질·후처리 — 20일
+### 7.5 renderer 품질·후처리 — 20일
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
@@ -247,26 +333,35 @@ renderer golden과 성능 gate를 사용한다.
 
 ---
 
-## 7. 공수와 진행률 규칙
+## 8. 공수와 진행률 규칙
 
 | 묶음 | 활성 행 | 총일 | 완료 | 진행 기성 | 잔여 |
 |---|---:|---:|---:|---:|---:|
 | PHASE 4 PBR 배선 | 10 | 18 | 8.5 | 3.5 | 6 |
 | PHASE 4.25 Material Graph | 10 | 34 | 0 | 0 | 34 |
-| PHASE 4.75 공통/GPU 설계 | 7 | 14.5 | 2 | 0 | 12.5 |
+| PHASE 4.5 공통 기준선 | 1 | 6 | 0 | 0 | 6 |
+| PHASE 4.5 트랙 TR | 4 | 25 | 0 | 0 | 25 |
+| PHASE 4.5 트랙 TU | 6 | 24 | 0 | 0 | 24 |
+| PHASE 4.5 트랙 FG | 5 | 32 | 0 | 0 | 32 |
+| PHASE 4.5 통합 게이트 | 1 | 5 | 0 | 0 | 5 |
+| PHASE 4.75 공통/GPU 설계 | 5 | 7.5 | 2 | 0 | 5.5 |
 | PHASE 4.75 RenderGraph/Q0 | 10 | 113 | 0 | 0 | 113 |
 | PHASE 4.75 라이트맵 | 8 | 35 | 2 | 0 | 33 |
 | PHASE 4.75 일반 SRP | 6 | 33 | 0 | 0 | 33 |
 | PHASE 4.75 renderer/post | 3 | 20 | 0 | 0 | 20 |
-| **합계** | **54** | **267.5** | **12.5** | **3.5** | **251.5** |
+| **합계** | **69** | **352.5** | **12.5** | **3.5** | **336.5** |
 
-`Q0`은 0일 표기가 완료가 아니라 미산정이다. `4-2~4-5`도 구상 공수만 포함하며 실제 GPU
-기능 구현 공수는 `4-6` 뒤 추가한다. 267.5일은 기존 계획의 총량을 재배분한 값이지 새
-기능 전체 완료를 보증하는 상한이 아니다.
+`Q0`은 0일 표기가 완료가 아니라 미산정이다. `4-2~4-4`도 구상 공수만 포함하며 실제 GPU
+기능 구현 공수는 `4-6` 뒤 추가한다. 352.5일은 새 기능 전체 완료를 보증하는 상한이 아니다.
+
+267.5일에서 352.5일로 늘어난 85일은 PHASE 4.5 92일에서 구 `BASE-0` 6일과 구 `4-5` 1일을
+뺀 값이다. **이 증가분의 대부분은 벤더 SDK 통합이 아니라 모션 벡터·해상도 계약·계측
+무해화다** — 업스케일과 프레임 생성을 둘 다 취소해도 `TR` 25일은 TAA·모션 블러·SSGI
+품질의 공통 선행으로 남는다.
 
 ---
 
-## 8. 공통 완료 기준
+## 9. 공통 완료 기준
 
 ### PHASE 4
 
@@ -282,17 +377,27 @@ renderer golden과 성능 gate를 사용한다.
 - Standard tier 현행 성능 상한 유지, 사용하지 않는 lobe/sample/variant 제거.
 - artist가 RHI/register/pass를 만지지 않고 비용과 fallback 이유를 이해할 수 있다.
 
+### PHASE 4.5
+
+- 모션 벡터가 static·skinned·instanced·decal·알파 경로 전부에서 생산되고 독립 검증된다.
+- `renderScale = 1.0`에서 기존 픽셀과 동등하다.
+- 지원 행렬의 모든 칸이 성공 경로 또는 명시적 invalid 사유를 갖고, 어떤 하드웨어에서도
+  폴백 사슬이 "기능 없음"이 아니라 FSR 또는 무-upscale에 착지한다.
+- 벤더 ID 기반 분기가 소스에 0건이다.
+- 모든 측정 표면이 해상도와 프레임 종류를 선언하고, 선언 누락 변이가 게이트를 붉게 만든다.
+- 프레임 생성이 셸 swapchain에서만 활성화되고 에디터 뷰포트에서 fail-closed한다.
+
 ### PHASE 4.75
 
 - Pipeline Asset authored order와 resource dependency compiled order가 분리된다.
 - RG6 단일 제품 cutover 뒤에만 aliasing/async compute를 연다.
 - generic Pass Graph가 Material Graph의 Principled 의미를 재정의하지 않는다.
 - shadow/probe/post는 material parity와 독립 golden/성능 gate를 가진다.
-- GPU-driven/Stochastic/DXR/DLSS의 지원 행렬, fallback, 수직 슬라이스와 공수를 확정한다.
+- GPU-driven/Stochastic/DXR의 지원 행렬, fallback, 수직 슬라이스와 공수를 확정한다.
 
 ---
 
-## 9. 금지하는 재혼합
+## 10. 금지하는 재혼합
 
 - PBR 배선 결함을 새 Principled lobe 추가로 덮지 않는다.
 - Blender material parity를 tone map/bloom/shadow 결과로 판정하지 않는다.
@@ -300,13 +405,16 @@ renderer golden과 성능 gate를 사용한다.
 - generic Pass Shader Graph가 `PrincipledSurface` 의미나 artist material tier를 재정의하지 않는다.
 - PHASE 3.75 모델 identity 빈틈을 legacy adapter로 메우지 않는다.
 - HLSL과 Slang 제품 PBR을 장기 병행하지 않는다.
+- 벤더 이름을 기능 이름·Pass 이름·설정 키에 쓰지 않는다. DLSS는 백엔드 하나의 이름이다.
+- 업스케일·프레임 생성의 성능 이득으로 렌더 성능 회귀를 가리지 않는다.
 
 ---
 
-## 10. 변경 이력
+## 11. 변경 이력
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-09-14 | PHASE 4.5 시간축 재구성 계층 신설. 구 `4-5 DLSS 구상` 1일을 TR/TU/FG 17행 92일로 재산정하고 `BASE-0` 6일을 PHASE 4.75 공통·GPU 설계 게이트에서 이관. PHASE 4.75가 §6에서 §7로 이동, 215.5일 → 208.5일. 총공수 267.5일 → 352.5일, 잔여 336.5일 |
 | 2026-09-06 | W7 mip 생성/보존·10개 포맷·양 backend 30-case, 축소 MASK를 포함한 coverage 48-case 통과. CEMC8 유지. W7 기성 1.5일, sampler 미완료. 기존 strict GUID 추적 정책 위반 1개 별도 기록. 완료 12.5일 + 진행 기성 3.5일, 잔여 251.5일 |
 | 2026-09-06 | W7 UV0/UV1·텍스처별 변환·양 backend 64-case와 변환된 UV1 MASK/Shadow 검사. CEMC8 모델 14개/하위 ID 310개 보존. W7 기성 1일, sampler/mip 미완료. 완료 12.5일 + 진행 기성 3일, 잔여 252일 |
 | 2026-09-06 | W7 normal/tangent 변환·양 backend 128-case 검증을 0.5일 기성 반영. UV/sampler/mip는 미완료. 완료 12.5일 + 진행 기성 2.5일, 잔여 252.5일 |

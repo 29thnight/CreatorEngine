@@ -279,8 +279,9 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 | `LivePipelineDescPlan.md` | 현재 nodes/reads/writes/modifies를 RG5의 첫 native compiler 입력으로 사용한다 |
 | `RhiBoundaryPlan.md` | RG7 heap/alias 계약과 RG8 queue/fence 계약을 backend-neutral RHI에만 추가한다 |
 | `ModelAssetBigBangCutoverPlan.md` PHASE 3.75 | MBC6의 vertex attribute mask→input layout/PSO/VSIn 계약과 model generation handle이 RG5의 Asset-first 제품 이관 전에 필요하다 |
-| 트랙 L4 | `RG8`이 아니라 **`Q0`**(queue/fence RHI 계약)의 소비자다. `Q0`은 RHI 계층 공용 기반이며 어느 트랙도 별도 queue 계층을 만들지 않는다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.2~§6.3 |
-| GPU-driven/DXR/DLSS/Stochastic Lighting | RG6 단일 큐 제품 cutover 뒤 새 resource/pass를 추가하고, RG7~RG9 기능을 필요에 따라 소비한다 |
+| 트랙 L4 | `RG8`이 아니라 **`Q0`**(queue/fence RHI 계약)의 소비자다. `Q0`은 RHI 계층 공용 기반이며 어느 트랙도 별도 queue 계층을 만들지 않는다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §7.2~§7.3 |
+| GPU-driven/DXR/Stochastic Lighting | RG6 단일 큐 제품 cutover 뒤 새 resource/pass를 추가하고, RG7~RG9 기능을 필요에 따라 소비한다 |
+| PHASE 4.5 TU/FG | **이 트랙을 선행으로 받지 않는다.** 모션 벡터·업스케일은 RG 재작성과 독립이고, 프레임 생성은 SDK가 자기 큐를 소유하므로 `Q0`도 받지 않는다 — [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md) §3.3 |
 
 권장 임계 경로는 다음으로 고정한다.
 

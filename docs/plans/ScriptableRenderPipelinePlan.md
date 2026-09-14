@@ -29,7 +29,7 @@ CreatorEngine의 공개 렌더 확장 모델은 다음으로 고정한다.
    schema, render state, GPU 실행은 소유하지 않으며 Render/CommandBuild/RHI 제출
    스레드는 CLR에 진입하지 않는다.
 5. **고급 네이티브 Pass는 소스 수준 확장으로 남긴다.**
-   DXR·DLSS·GPU-driven처럼 특수 RHI/SDK가 필요한 기능은 현재의
+   DXR·업스케일러·GPU-driven처럼 특수 RHI/SDK가 필요한 기능은 현재의
    `EnhancedRenderPass`를 C++ 소스에 추가하고 엔진을 다시 빌드한다.
 6. **외부 Native DLL Pass ABI는 만들지 않는다.**
    이 저장소는 오픈소스이고 전체 엔진을 재빌드할 수 있다. ABI 버전·DLL hot
@@ -51,7 +51,9 @@ PHASE 4.75의 네 기능은 단독 효과가 아니다.
 - GPU-driven rendering은 가시성·인스턴스·간접 명령과 material/PSO 분류를 바꾼다.
 - Stochastic Tile-Based Lighting은 깊이·노멀·모션·히스토리와 조명 후보 버퍼를 쓴다.
 - DXR은 BLAS/TLAS·셰이더 테이블·래스터 폴백을 파이프라인에 끼운다.
-- DLSS는 color/depth/motion/jitter/exposure/reactive mask와 UI 합성 위치를 요구한다.
+- 시간축 재구성(업스케일·프레임 생성)은 color/depth/motion/jitter/exposure/reactive mask와
+  UI 합성 위치를 요구한다. **이 축은 2026-09-14에 PHASE 4.5로 분리됐다** —
+  [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md).
 
 이 네 기능을 지금처럼 C++의 고정 목록에 각각 직접 배선하면, 프로젝트마다 다른
 품질 조합과 백엔드 폴백을 넣을 때 `BuildPipelineDesc`가 다시 거대한 조건문이 된다.
@@ -71,7 +73,7 @@ PHASE 4.25 Principled Material Graph·feature route 완료
     ↓
 Scriptable Pipeline·Custom Pass 계약
     ↓
-GPU-driven / Stochastic Lighting / DXR / DLSS 구상
+GPU-driven / Stochastic Lighting / DXR 구상
     ↓
 공통 의존 그래프·수직 슬라이스·구현 페이즈 확정
 ```
@@ -214,7 +216,8 @@ M1~M7의 산출물을 소비한다. 별도 셰이더 컴파일 경로를 만들�
 - 리소스 의존성과 무관한 비용 휴리스틱으로 Pass를 비결정적으로 재배치하지 않는다.
   의존성으로 선후가 정해지지 않은 Pass는 저작 목록 순서를 안정 tie-break로 사용한다.
 - Native DLL Pass ABI, DLL hot reload, 외부 바이너리 Pass 마켓을 만들지 않는다.
-- PHASE 4.75에서 실제 DXR·DLSS SDK나 Custom Pass 런타임을 설계 게이트보다 먼저 구현하지 않는다.
+- PHASE 4.75에서 실제 DXR SDK나 Custom Pass 런타임을 설계 게이트보다 먼저 구현하지 않는다.
+- 업스케일·프레임 생성 SDK는 이 문서가 아니라 PHASE 4.5가 소유한다.
 
 ---
 
@@ -344,7 +347,7 @@ C++ 엔진 소스 확장이 필요하다.
 
 - 엔진 자체가 새 well-known 슬롯을 생산·소비해야 할 때
 - 새 RHI resource/command 종류나 플랫폼 interop가 필요할 때
-- DXR·DLSS 같은 외부 SDK·특수 수명·callback을 다룰 때
+- DXR·업스케일러 같은 외부 SDK·특수 수명·callback을 다룰 때
 - 공개 Template로 표현할 수 없는 엔진 소유 producer를 추가할 때
 
 ### 6.2 일반 Pass는 네이티브 Template로 실행한다
@@ -456,7 +459,7 @@ variant 선택은 Asset에 미리 선언·검증된 key 안에서만 허용한�
 다음 기능은 C++ `EnhancedRenderPass`로 구현한다.
 
 - DXR acceleration structure·shader table
-- DLSS/Streamline 등 벤더 SDK 수명과 callback
+- 업스케일러·프레임 생성 등 벤더 SDK 수명과 callback (PHASE 4.5 소유)
 - GPU-driven visibility·indirect command 생성의 특수 RHI 경로
 - readback·외부 공유 자원·플랫폼 전용 interop
 - 공개 PassBuilder로 표현할 수 없는 새 RHI 기능의 첫 수직 슬라이스
@@ -620,8 +623,9 @@ Slang `ParameterBlock` 기반 auto-binding은 Material M6 실제 소비가 닫�
 
 ### 10.4 capability와 폴백
 
-- DXR/DLSS 같은 조건부 Pass는 모든 지원 행렬에 fallback 또는 명시적 pipeline
-  invalid 사유를 가져야 한다.
+- DXR·업스케일러 같은 조건부 Pass는 모든 지원 행렬에 fallback 또는 명시적 pipeline
+  invalid 사유를 가져야 한다. 벤더 ID가 아니라 런타임 기능 질의로 고른다.
+- 폴백 사슬의 끝은 "기능 없음"이 아니라 벤더 중립 경로여야 한다.
 - DX12 전용 Pass를 Vulkan variant가 조용히 건너뛰지 않는다.
 - fallback 전후 출력 슬롯 schema가 같아야 한다.
 
@@ -843,7 +847,7 @@ Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 
 
 - 정적 `NativePassRegistry`
 - settings schema/version
-- DXR 또는 DLSS 최소 native fixture 하나를 Pipeline Asset에서 선택
+- DXR 또는 업스케일러 최소 native fixture 하나를 Pipeline Asset에서 선택
 - DLL loader 없이 소스 빌드만으로 확장됨을 문서화
 
 ### 분리된 PBR·Material 후속
@@ -979,7 +983,8 @@ Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 
 | PHASE 3-15 | RHI 제출 스레드와 compiled generation fence retirement가 충돌하지 않아야 함 |
 | PHASE 4.75 GPU-driven | Native Pass + Asset feature/variant 조립의 첫 대형 소비자 |
 | PHASE 4.75 Stochastic Lighting | Compute/history/resource schema의 첫 대형 소비자 |
-| PHASE 4.75 DXR·DLSS | capability/fallback + source Native Pass registry의 첫 소비자 |
+| PHASE 4.75 DXR | capability/fallback + source Native Pass registry의 첫 소비자 |
+| PHASE 4.5 TU·FG | 벤더 중립 capability/fallback 사슬의 첫 소비자. 이 계약보다 먼저 착지하므로 여기서 설계하지 않는다 — [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md) |
 | `BuildPipelinePlan.md` | Pipeline/Shader Asset·generated cache·shader permutation·선택적 C# assembly·native source module의 Player 패키징 담당 |
 
 ---

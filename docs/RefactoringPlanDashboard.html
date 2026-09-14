@@ -236,10 +236,16 @@
       <div class="rm-d">PrincipledSurface · typed graph · artist 비용 tier</div>
     </div>
     <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--accent)">
+      <div class="rm-p" style="color:var(--accent)">PHASE 4.5</div>
+      <div class="rm-t">시간축 재구성 계층</div>
+      <div class="rm-d">모션 벡터 · jitter · 업스케일 · 프레임 생성</div>
+    </div>
+    <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--purple)">
       <div class="rm-p" style="color:var(--purple)">PHASE 4.75</div>
       <div class="rm-t">차세대 렌더 파이프라인</div>
-      <div class="rm-d">RenderGraph · SRP · Lightmap · GPU-driven · DXR · DLSS</div>
+      <div class="rm-d">RenderGraph · SRP · Lightmap · GPU-driven · DXR</div>
     </div>
     <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--purple)">
@@ -290,7 +296,7 @@
       <div class="rm-d">DX12 재설계 · 패키지화 (최후순위)</div>
     </div>
   </div>
-  <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3.5가 머테리얼·셰이더 기반을 닫은 뒤 Phase 3.75에서 모델 자산 신원·로딩·소비를 단방향으로 교체한다. Phase 4는 현재 PBR 제품 배선을 안정화하고, Phase 4.25는 Blender형 Material Graph와 artist 성능 계약을 세우며, Phase 4.75가 그 결과를 입력으로 RenderGraph·SRP·라이트맵·차세대 GPU 기능을 진행한다.
+  <div class="rm-note">Phase 0 → 1 → 2는 엄격한 순차 의존. Phase 3.5가 머테리얼·셰이더 기반을 닫은 뒤 Phase 3.75에서 모델 자산 신원·로딩·소비를 단방향으로 교체한다. Phase 4는 현재 PBR 제품 배선을 안정화하고, Phase 4.25는 Blender형 Material Graph와 artist 성능 계약을 세운다. Phase 4.5는 모션 벡터·jitter·해상도 계약이라는 시간축 기반을 깔고 그 위에 벤더 중립 업스케일·프레임 생성을 얹으며, Phase 4.75가 그 결과를 입력으로 RenderGraph·SRP·라이트맵·차세대 GPU 기능을 진행한다.
   Phase 5는 Phase 3과 병행 가능하고, Phase 6은 각 페이즈 종료마다 부분 수행한다. Phase 7은 Phase 1 이후 병행 가능하며 Phase 8의 선행 조건이다.
   Phase 8.5(씬 그래프 재설계)는 2026-08-16 착수·완결분을 대시보드에 뒤늦게 편입한 것이고(2026-08-25), Phase 8.75는 그 트랙 S가 남긴 성능 축을 승계한다 — 8.75는 8.5 완료가 전제다.</div>
 </details>
@@ -323,7 +329,9 @@
     <div class="doc"><a href="plans/BlenderMaterialGraphPlan.md">BlenderMaterialGraphPlan.md</a><span class="tie">PHASE 4.25 · 미착수</span>
       <div class="why">Principled 기반 Material Graph와 artist workflow.</div></div>
     <div class="doc"><a href="plans/Phase4UnifiedPlan.md">Phase4UnifiedPlan.md</a><span class="tie">PHASE 4 계열 · 정본</span>
-      <div class="why">PHASE 4·4.25·4.75의 책임·순서·공수 통합 기준.</div></div>
+      <div class="why">PHASE 4·4.25·4.5·4.75의 책임·순서·공수 통합 기준.</div></div>
+    <div class="doc"><a href="plans/TemporalReconstructionPlan.md">TemporalReconstructionPlan.md</a><span class="tie">PHASE 4.5 · 미착수</span>
+      <div class="why">모션 벡터·jitter·히스토리와 벤더 중립 Temporal Upscaling·Frame Generation.</div></div>
     <div class="doc"><a href="plans/RenderGraphDependencySchedulingPlan.md">RenderGraphDependencySchedulingPlan.md</a><span class="tie">PHASE 4.75 · RG</span>
       <div class="why">리소스 의존성 스케줄링과 단계별 제품 전환.</div></div>
     <div class="doc"><a href="plans/LightmapBakerPlan.md">LightmapBakerPlan.md</a><span class="tie">PHASE 4.75 · L</span>
@@ -479,7 +487,7 @@
   <div class="phase-goal"><b>목표:</b> RHI 계층 위에 DX12 렌더러 <code>EnhancedSceneRenderer</code>를 별도로 세우고 검증 후 기존
   <code>SceneRenderer</code>(DX11)를 교체한다. <b>패스는 이식하지 않고 새로 쓴다</b> — 기존 패스는 결과를 대조할 정답지이지 코드의 출처가 아니다.
   DX11 패스는 드라이버가 대신 해 주던 것을 전제로 짜여 있어서, 그대로 옮기면 배리어를 손으로 붙인 DX11 코드가 되고 DX12로 옮긴 이유가 사라진다. PSO 중앙 관리·디스크 캐시, <code>RenderGraphBuilder</code> 완성(배리어 자동 유도·리소스 수명),
-  게임/렌더/RHI 제출을 비동기 경계로 재편한다. DXR·DLSS와 GPU-driven·Stochastic Tile-Based Lighting은 기반 전환과 분리해 PHASE 4.75에서 함께 구상한다.
+  게임/렌더/RHI 제출을 비동기 경계로 재편한다. DXR과 GPU-driven·Stochastic Tile-Based Lighting은 기반 전환과 분리해 PHASE 4.75에서 함께 구상하고, 업스케일·프레임 생성은 PHASE 4.5가 소유한다.
   구 계획(3-1~3-7 DX11 개선)은 이 전략에 흡수 — 각 항목의 계승 관계를 detail에 남겼다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="3"><!-- JS 생성 --></table></div>
   <div class="verify">
@@ -595,11 +603,34 @@
   </div>
 </section>
 
+<!-- ===== PHASE 4.5 ===== -->
+<section class="phase" id="phase-4.5">
+  <h2 class="sec"><span class="no">PHASE 4.5</span>시간축 재구성 · Temporal Upscaling · Frame Generation <span class="phase-pct" data-phase-pct="4.5"></span></h2>
+  <div class="phase-meta"><b>정본: <a href="plans/TemporalReconstructionPlan.md" style="color:var(--accent)">TemporalReconstructionPlan.md</a></b> · 2026-09-14 신설 · <b>활성 17행 92일 · 미착수</b> · 선행 PHASE 4.25. 구 <code>4-5 DLSS 구상</code> 1일을 대체한다.</div>
+  <div class="phase-goal"><b>목표:</b> 모션 벡터·jitter·히스토리라는 시간축 입력을 생산하고, 렌더 해상도와 표시 해상도를 분리한 뒤, 그 위에 <b>벤더 중립</b> Temporal Upscaler와 Frame Generation을 얹는다. 벤더 이름은 기능 이름이 아니라 백엔드 이름으로만 쓴다 — FSR을 베이스라인으로 깔고 DLSS·XeSS를 런타임 기능 질의로 그 위에 덮는다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="4.5"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">페이즈 완료 기준</div>
+    <ul>
+      <li>모션 벡터가 static·skinned·instanced·decal·알파 경로 전부에서 생산되고 합성 fixture로 독립 검증</li>
+      <li><code>renderScale = 1.0</code>에서 기존 픽셀과 동등, 폴백 전후 출력 슬롯의 포맷·의미 동일</li>
+      <li>지원 행렬의 모든 칸이 성공 경로 또는 명시적 invalid 사유를 갖고, 어느 하드웨어에서도 폴백 사슬이 FSR 또는 무-upscale에 착지</li>
+      <li>벤더 ID 기반 분기 소스 0건 — 선택은 런타임 기능 질의 결과로만</li>
+      <li>모든 측정 표면이 해상도·프레임 종류를 선언하고, 선언 누락 변이가 게이트를 붉게 만듦</li>
+      <li>프레임 생성이 셸 swapchain에서만 활성화되고 에디터 뷰포트에서 fail-closed</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">가장 큰 위험 — 계측이 통째로 눈먼다</div>
+    업스케일은 저해상도 렌더를 원해상도로 읽게 만들고, 프레임 생성은 <b>생성 프레임을 세어 FPS를 두 배로 보이게</b> 한다. golden 이미지·성능 예산·pass GPU timing이 동시에 거짓말을 시작한다. 그래서 이 페이즈의 <b>첫 항목은 코드가 아니라 계약</b>이다(<code>TR0</code>) — 모든 측정 표면이 해상도와 프레임 종류를 선언하고, golden 게이트는 TU/FG를 강제로 끈 상태에서만 유효하며, 그 계약 자체를 변이로 증명한다.
+  </div>
+</section>
+
 <!-- ===== PHASE 4.75 ===== -->
 <section class="phase" id="phase-4.75">
   <h2 class="sec"><span class="no">PHASE 4.75</span>차세대 렌더 파이프라인 · GPU 기능 <span class="phase-pct" data-phase-pct="4.75"></span></h2>
-  <div class="phase-meta"><b>정본: <a href="plans/Phase4UnifiedPlan.md" style="color:var(--accent)">Phase4UnifiedPlan.md</a></b> · 2026-09-03 분리 · <b>활성 34행 215.5일 · 완료 4일 · 잔여 211.5일</b> · <code>Q0</code>과 실제 GPU 기능 구현 공수는 별도 미산정.</div>
-  <div class="phase-goal"><b>목표:</b> PHASE 4.25의 compiled material generation·feature mask·route를 읽기 전용으로 받아 RenderGraph, 라이트맵, Pipeline Asset·일반 Custom Pass, shadow/probe/post와 GPU-driven·Stochastic Lighting·DXR·DLSS를 진행한다. <code>.shadergraph(domain=pass)</code>는 공용 graph 기반을 재사용하되 Principled 재질 의미를 소유하지 않는다.</div>
+  <div class="phase-meta"><b>정본: <a href="plans/Phase4UnifiedPlan.md" style="color:var(--accent)">Phase4UnifiedPlan.md</a></b> · 2026-09-03 분리 · 2026-09-14 PHASE 4.5 분리 · <b>활성 32행 208.5일 · 완료 4일 · 잔여 204.5일</b> · <code>Q0</code>과 실제 GPU 기능 구현 공수는 별도 미산정. <code>BASE-0</code>은 PHASE 4.5가 소유하며 여기서는 입력으로 받는다.</div>
+  <div class="phase-goal"><b>목표:</b> PHASE 4.25의 compiled material generation·feature mask·route를 읽기 전용으로 받아 RenderGraph, 라이트맵, Pipeline Asset·일반 Custom Pass, shadow/probe/post와 GPU-driven·Stochastic Lighting·DXR을 진행한다. 업스케일·프레임 생성은 PHASE 4.5가 소유한다. <code>.shadergraph(domain=pass)</code>는 공용 graph 기반을 재사용하되 Principled 재질 의미를 소유하지 않는다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="4.75"><!-- JS 생성 --></table></div>
   <div class="verify">
     <div class="vt">페이즈 완료 기준</div>
@@ -607,7 +638,7 @@
       <li>RG6 단일 제품 cutover 뒤에만 aliasing·async compute를 열고 양 backend live frame 동등성 통과</li>
       <li>Pipeline Asset authored order와 resource dependency compiled order 분리, generic Pass Graph domain 검증</li>
       <li>shadow/probe/post는 Material Graph parity와 독립 golden·성능 gate 사용</li>
-      <li>GPU-driven·Stochastic Lighting·DXR·DLSS 지원 행렬·fallback·최소 수직 슬라이스·공수 확정</li>
+      <li>GPU-driven·Stochastic Lighting·DXR 지원 행렬·fallback·최소 수직 슬라이스·공수 확정</li>
     </ul>
   </div>
   <div class="risknote">
@@ -1397,7 +1428,8 @@ const TASKS = [
   // DX12 렌더러를 별도로 세우고 검증 후 교체한다. 신규 렌더러 클래스명은
   // EnhancedSceneRenderer(기존 SceneRenderer와 병존하다가 교체). 목표 피처:
   // PSO 중앙 관리·캐시, RenderGraphBuilder 실사용, 게임/렌더/RHI 제출 비동기화.
-  // DXR·DLSS는 GPU-driven·Stochastic Lighting과 함께 PHASE 4.75로 분리했다.
+  // DXR은 GPU-driven·Stochastic Lighting과 함께 PHASE 4.75로 분리했고,
+  // 업스케일·프레임 생성은 2026-09-14에 PHASE 4.5로 다시 갈랐다.
   // 기존 3-1~3-7(DX11 개선)은 이 전략으로
   // 대체·흡수됐고, 흡수 내역은 각 항목 detail과 3-10에 남겼다.
   //
@@ -1562,11 +1594,62 @@ const TASKS = [
     refs: "ModelAssetBigBangCutoverPlan §8 · §9", priority: "P0", days: 7, status: "done",
     note: "완료(2026-09-04). 2026-09-03 검증에서 B1 10/14·B2 12/14가 붉어 cutover를 보류했었고, 그 붉음의 원인이 성능 회귀가 아니라 <b>축 불일치</b>였다는 것이 단계 분해로 드러나 <b>축을 재유도하고 닫았다</b>(사용자 결정). 기준값이 잰 일과 새 경로가 재는 일이 다르다 — B1 기준은 프로토타입의 소스 <b>디코드</b>였고(신원·staging·검증·원자 게시가 없다), B2 기준인 legacy <code>.asset</code> 읽기는 <b>텍스처도 신원 검증도 SHA 검증도 하지 않았다</b>. 그래서 같은 일끼리만 비교 예산으로 판정하고(B1a 디코드·B2a CEMC 읽기/디코드/조립), legacy에 대응물이 없는 칸은 archive 비회귀로 보며(B1b 저작 트랜잭션·B2b 신원·해시 검증), 임베디드 텍스처 디코드(B2c)는 <b>PHASE 12 T1a/T2로 이관</b>했다 — cook artifact가 디코드 완료 형식이 되면 사라지는 비용이고 그 포맷은 그 페이즈의 소유라, 여기서 하면 T1a가 다시 정의할 포맷이 하나 더 생긴다. ★ 이관은 면제가 아니다: 모델별 값이 archive에 남아 회귀하면 이 게이트가 붉어진다. ★ <b>판정 전에 3.75가 소유한 낭비를 먼저 걷었다</b> — archive는 '지금 값'을 정답으로 굳히므로 낭비를 굳히면 안 된다. ① 저작마다 asset root 345파일을 재순회하며 v2 sidecar 14개를 재파싱하던 corpus collision 검사에 (크기, mtime) 지문 캐시를 넣었고(순회와 폐포 재검증은 남긴다 — epoch header가 인자라 캐시가 판정을 대신하면 안 된다), ② 게시 직전 source 전체를 다시 읽어 SHA-256을 다시 계산하던 race 검사를 (크기, mtime) 대조 우선으로 바꿨다(다르면 옛 방식대로 재해시 — touch만 된 파일을 거짓 거부하지 않는다). 실측: <code>corpus-collision-scan</code> 평균 6.93 → 3.92 ms, <code>publish</code> 14모델 합계 302.6 → 48.1 ms(scene 212.9 → 2.8 · Gunner 19.5 → 3.1). ★ <b>①의 착수 가정이 절반 틀렸다</b> — &quot;6.6 ms는 파싱이 지배한다&quot;고 봤는데 절감이 3 ms뿐이었다. 남은 4 ms는 파싱이 아니라 <b>asset root 전체 순회</b>이고, 모델 sidecar가 어디에나 있을 수 있어 범위를 좁힐 근거가 없으며 순회를 캐시하면 새 sidecar를 놓쳐 충돌 검사가 눈먼다 — 그래서 남겼다. ★ 후보 ④(SHA 가속)는 <b>이 장비에서 답이 아니다</b> — Xeon W-2223(Cascade Lake-W)에 SHA-NI가 없어 SHA-NI 경로도 CNG도 스칼라로 떨어진다(scene CEMC 12.4 MB SHA 63 ms ≈ 180 MB/s). 다음 사람이 다시 재지 않도록 기준선 §4.4a에 적었다. 결과(Release, 2026-09-04 archive 실행): <b>B1a 14/14 · B2a 14/14</b> 통과, B3 Test1 15.2 / FT 12.1 ms, B4 30.5 ms, B5 833 MB, B6 메시 업로드 10개/1,075 KB·커버리지 49,684·VRAM 1,144 MB 비회귀. 모델 게이트 8종 전부 초록. ★ B1b 축은 <b>흔들림이 커서 판별력이 낮다</b> — 같은 바이너리로 20분 안에 두 번 잰 Prim_Cone이 27.4와 42.1 ms다(작은 파일 4~5개를 만들고 다시 읽는 NTFS 비용이 지배). archive는 상단 근처를 들고 있고 큰 회귀만 잡는다. 게이트는 <b>어느 칸이라도 붉은 실행</b>을 archive로 굳히지 않는다. cutover 뒤 legacy GUID 복원·runtime mapping·Assimp fallback·experiment on/off를 되살리지 않는다." },
 
-  // ---------- PHASE 4.75: 차세대 렌더 파이프라인·GPU 기능 ----------
-  // 구현 항목이 아니라 Scriptable Pipeline 계약과 네 기능의 공통 데이터·폴백·검증·순서를 확정하는 설계 게이트다.
-  { phase: 4.75, id: "BASE-0", title: "통합 기준선 하네스 — 4-0·SRP-G0·RG0 통합",
+  // ---------- PHASE 4.5: 시간축 재구성 — TR/TU/FG ----------
+  // 구 4-5 "DLSS 구상" 1일을 대체한다. 벤더 이름이 아니라 계층으로 가른다:
+  // TR(모션 벡터·jitter·히스토리·해상도) → TU(업스케일) → FG(프레임 생성).
+  // BASE-0은 PHASE 4.75 공통·GPU 설계 게이트(현 §7.1)에서 이곳으로 이관했다 —
+  // TR0 계측 무해화가 직접 소비하고, PHASE 4.75는 결과를 입력으로 받는다.
+  { phase: 4.5, id: "BASE-0", title: "통합 기준선 하네스 — 4-0·SRP-G0·RG0 통합",
     detail: "GPU/드라이버·DX12/Vulkan 지원 범위, 대표 씬, GPU frame time·VRAM 기준선, 기능별 품질 모드와 미지원 환경의 래스터 폴백을 먼저 고정한다. backend는 부팅 고정이므로 같은 밀봉 frame packet·카메라·해상도·tuning을 별도 DX12/Vulkan 프로세스에 재생하고 final PNG·선형 색공간 오차·차영상·CPU record·pass별 GPU timing·RenderGraph stats를 한 artifact로 남긴다. 기존 pass fixture와 전체 live frame은 별도 gate로 판정한다.",
-    refs: "Phase4UnifiedPlan §6.1 · 4-0 + SRP-G0 + RG0", priority: "P0", days: 6, status: "todo", note: "4-0·SRP-G0·RG0의 공통 하네스는 한 벌만 만든다. PHASE 4 PBR capture는 별도 완료선이며 여기로 재혼합하지 않는다. RG6의 하드 선행이고 pass fixture와 전체 live frame은 별도 판정한다." },
+    refs: "Phase4UnifiedPlan §6.1 · TemporalReconstructionPlan §5.1 · 4-0 + SRP-G0 + RG0", priority: "P0", days: 6, status: "todo", note: "4-0·SRP-G0·RG0의 공통 하네스는 한 벌만 만든다. PHASE 4 PBR capture는 별도 완료선이며 여기로 재혼합하지 않는다. RG6의 하드 선행이고 pass fixture와 전체 live frame은 별도 판정한다. 2026-09-14 PHASE 4.75에서 PHASE 4.5로 이관 — <code>TR0</code> 계측 무해화가 이 하네스를 직접 소비하고, PHASE 4.75는 결과를 입력으로 받는다." },
+  { phase: 4.5, id: "TR0", title: "계측 무해화 계약 — 측정 표면의 해상도·프레임 종류 선언",
+    detail: "업스케일은 저해상도 렌더를 원해상도로 읽게 만들고 프레임 생성은 생성 프레임을 세어 FPS를 두 배로 보이게 한다. 모든 측정 표면이 <b>렌더 해상도·표시 해상도·프레임 종류(실/생성)</b>를 산출물에 적게 하고, 적지 않는 표면은 게이트에서 실패시킨다. golden·픽셀 비교 게이트는 TU/FG를 게이트가 강제로 끈 상태에서만 유효하고, 성능 게이트는 실프레임 frame time을 1급 지표로 삼는다.",
+    refs: "TemporalReconstructionPlan §7 · BASE-0", priority: "P0", days: 4, status: "todo", note: "이 페이즈의 첫 항목이 코드가 아니라 계약인 것은 의도다. 계약 자체를 <b>변이로 증명</b>한다 — 해상도 표기를 지운 산출물과 생성 프레임을 실프레임으로 센 산출물 각각에 게이트가 붉어져야 하고, 붉어지지 않으면 완료가 아니다." },
+  { phase: 4.5, id: "TR1", title: "모션 벡터 생산 — static·skinned·instanced·decal·알파",
+    detail: "2026-09-14 실측으로 Render/Passes 전수에 모션 벡터 생산 패스가 0건, TAA·jitter도 0건임을 확인했다. 시간축 히스토리를 가진 유일한 패스인 SSGI는 이전 view-projection으로 depth를 재투영하는 정적 장면 전용 근사라 움직이는 오브젝트의 자기 운동이 담기지 않는다. G-buffer velocity 채널과 생산 경로를 새로 세운다.",
+    refs: "EnhancedGBufferPass · EnhancedSSGIPass · TemporalReconstructionPlan §2.1", priority: "P0", days: 10, status: "todo", note: "이 페이즈 공수의 본체다. 벤더 SDK를 붙이는 일이 아니라 <b>모션 벡터를 만드는 일</b>이며 NVIDIA든 AMD든 같은 비용을 낸다. TU/FG를 둘 다 취소해도 TAA·모션 블러·SSGI 품질의 공통 선행으로 남는다. SSGI의 depth 재투영을 모션 벡터 대용으로 쓰지 않는다." },
+  { phase: 4.5, id: "TR2", title: "렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스",
+    detail: "renderScale을 도입해 씬 렌더 해상도와 표시 해상도를 분리하고, 슬롯 schema는 포맷·의미만 고정하고 크기는 renderScale에서 유도하게 만든다. jitter 시퀀스는 결정적이어야 하며 같은 시드에서 같은 프레임열을 낸다.",
+    refs: "ScriptableRenderPipelinePlan §10.4 · TemporalReconstructionPlan §2.4", priority: "P0", days: 6, status: "todo", note: "2026-09-14 세션에서 라이브 렌더러가 씬 렌더 전에 해상도를 바꿔 FPS가 반토막 난 일이 있었다. <b>해상도 이원화는 이 엔진이 아직 안전하게 다루지 못하는 축</b>이라 업스케일러보다 먼저 갚는다. 기존 \"fallback 전후 출력 슬롯 schema가 같아야 한다\" 규칙과 정면으로 부딪치므로 크기 유도 규약을 명시적으로 결정하고 간다." },
+  { phase: 4.5, id: "TR3", title: "히스토리·이전 프레임 행렬 공용 계약",
+    detail: "패스마다 따로 들고 있는 히스토리 텍스처와 이전 프레임 행렬을 공용 계약으로 올린다. SSGI의 자체 history·historyDepth·previousViewProjection을 이 계약으로 흡수할지 판정한다. 멀티카메라에서 시간축 상태는 CameraView마다 따로다.",
+    refs: "EnhancedSSGIPass · RenderSceneViewPlan", priority: "P0", days: 5, status: "todo", note: "SSGI·Fog·TAA처럼 시간축을 쓰는 패스는 뷰마다 상태를 따로 가져야 한다 — 한 벌로 공유하면 에디터 뷰포트 둘 사이에서 히스토리가 섞인다." },
+  { phase: 4.5, id: "TU0", title: "벤더 중립 Upscaler 인터페이스·기능 질의·폴백 사슬",
+    detail: "DLSS·FSR·XeSS가 요구하는 입력(color/depth/motion/jitter/exposure/reactive mask)이 사실상 같다는 점을 이용해 추상 Pass 하나와 벤더 백엔드 N개로 가른다. 선택은 <b>런타임 기능 질의</b>로만 하고 벤더 ID 분기를 금지한다. DirectSR을 DX12 백엔드 구현 수단으로 쓸지 여기서 판정한다.",
+    refs: "ScriptableRenderPipelinePlan §10.4 · TemporalReconstructionPlan §4", priority: "P0", days: 4, status: "todo", note: "0x10DE/0x1002/0x8086 분기를 금지한다 — 드라이버 버전·노트북 MUX·가상화 어댑터에서 벤더 ID는 거짓말을 한다. DirectSR은 2026-09-14 기준 preview이고 Vulkan에 대응물이 없어 우리 추상 계층은 어차피 필요하다." },
+  { phase: 4.5, id: "TU1", title: "무-upscale 기준 경로·A/B 대조군",
+    detail: "폴백 사슬의 마지막 칸이자 모든 업스케일러 판정의 대조군이다. 자체 TSR은 만들지 않는다 — FSR이 이미 벤더 중립이라 벤더 중립 경로가 공짜로 생기기 때문이다.",
+    refs: "TemporalReconstructionPlan §3.2", priority: "P0", days: 3, status: "todo", note: "대조군은 독립 유도를 가져야 한다. 업스케일러 코드 경로 안의 스위치가 아니라 별도 경로로 세워야 같은 출처를 두 번 재는 일을 피한다." },
+  { phase: 4.5, id: "TU2", title: "FSR 백엔드 — 벤더 중립 베이스라인",
+    detail: "FSR 2/3 업스케일러는 순수 컴퓨트 셰이더이고 하드웨어 잠금이 없으며 MIT 소스다. AMD뿐 아니라 NVIDIA·Intel·통합 GPU에서도 돈다. 소스 벤더링과 FidelityFX SDK 바이너리 중 무엇을 쓸지 여기서 판정한다.",
+    refs: "TemporalReconstructionPlan §4.1", priority: "P0", days: 6, status: "todo", note: "<b>AMD 대응을 위한 별도 분기를 만들지 않는 근거가 이 항목이다.</b> FSR을 베이스라인으로 깔면 폴백 사슬의 끝이 \"기능 없음\"이 아니라 FSR이 되어 지원 행렬의 빈칸이 사라진다. 벤더 백엔드보다 먼저 서야 벤더 경로가 \"추가\"가 되고 폴백이 2등 시민이 되지 않는다." },
+  { phase: 4.5, id: "TU3", title: "DLSS Super Resolution 백엔드 (NGX)",
+    detail: "NGX capability 질의로 가용성을 확인하고 실패하면 사슬의 다음 후보로 내려간다. RTX 전용이며 SDK 재배포 조건이 이 저장소 라이선스와 양립하는지 확인한다.",
+    refs: "TemporalReconstructionPlan §4.1 · §10", priority: "P1", days: 4, status: "todo", note: "구 <code>4-5 DLSS 구상</code>이 이 한 칸으로 축소됐다. DLSS는 기능 이름이 아니라 백엔드 하나의 이름이다." },
+  { phase: 4.5, id: "TU4", title: "XeSS 백엔드",
+    detail: "DP4a 경로는 범용이고 XMX 경로는 Arc 전용이다. 바이너리 SDK 재배포 조건을 확인한다.",
+    refs: "TemporalReconstructionPlan §4.1", priority: "P2", days: 3, status: "todo", note: "라이선스가 저장소와 양립하지 않으면 선택적 빌드로 격리하고 폴백 사슬에서 빼는 것이 정답이다 — 사슬은 FSR에서 이미 닫혀 있다." },
+  { phase: 4.5, id: "TU5", title: "PostChain 앞 삽입·슬롯 schema 크기 유도",
+    detail: "업스케일러는 tone map 이전 HDR linear color를 요구하므로 재구성 Pass는 PostChain <b>앞</b>에 들어간다. 그 결과 PostChain 이후는 표시 해상도로 돈다. 화면 UI는 이미 PostChain 뒤 LDR에 합성되므로 구조를 바꾸지 않아도 \"UI는 재구성 이후\"가 만족된다.",
+    refs: "EnhancedPostChainPass · EnhancedUIPass · EnhancedSceneRenderer:1523", priority: "P0", days: 4, status: "todo", note: "이 페이즈에서 가장 운이 좋은 지점이다 — <code>EnhancedUIPass</code>가 이미 독립 패스로 포스트 체인 뒤에 있어 TU와 FG 양쪽 요구가 구조적으로 이미 만족돼 있다." },
+  { phase: 4.5, id: "FG0", title: "present 소유권·proxy swapchain·frame pacing 계약",
+    detail: "프레임 생성은 렌더 그래프의 Pass가 아니라 <b>swapchain/present 계층을 가져간다</b>. FidelityFX의 frame interpolation swapchain도 NGX도 Present를 가로채고, 생성 프레임은 커맨드 리스트 없이 자기 타이밍으로 끼어든다. 셸의 <code>Present()</code>·<code>m_swapChain</code> 소유권을 SDK에 넘기는 경계와 pacing 창을 정한다.",
+    refs: "DX12DeviceResources.h:156 · TemporalReconstructionPlan §2.3 · §3.3", priority: "P1", days: 10, status: "todo", note: "<b><code>Q0</code>를 선행으로 받지 않는다</b> — 자체 보간기를 만들지 않으므로 SDK가 자기 큐와 present 타이밍을 소유한다. 이 전제가 뒤집히면 Q0가 선행으로 들어오고 공수를 재산정한다. Vulkan에서 proxy swapchain이 성립하는지도 여기서 판정한다." },
+  { phase: 4.5, id: "FG1", title: "지연 마커 — Reflex·Anti-Lag 2, 게임 루프 경유",
+    detail: "프레임 생성은 정의상 다음 프레임을 쥐고 있다가 보간하므로 입력 지연이 늘어난다. 지연 마커는 렌더러가 아니라 <b>시뮬레이션 루프</b>에 박혀야 한다.",
+    refs: "3계층 분리 L0~L4 · TemporalReconstructionPlan §5.4", priority: "P1", days: 5, status: "todo", note: "이 항목만 렌더 트랙 밖의 계층을 건드린다 — 3계층 분리 경계를 가로지르므로 해당 계층의 승인을 받는다." },
+  { phase: 4.5, id: "FG2", title: "FSR 3 Frame Generation 백엔드 — 벤더 중립 베이스라인",
+    detail: "FSR 3 FG는 하드웨어 잠금이 없어 NVIDIA·Intel에서도 돈다. FSR 3.1부터 FG 모듈이 업스케일러에서 분리됐으므로 <b>업스케일 선택과 FG 선택은 독립</b>이어야 한다 — DLSS 업스케일 + FSR 3 FG 조합을 구조가 막으면 안 된다.",
+    refs: "TemporalReconstructionPlan §4.2 · §4.3", priority: "P1", days: 8, status: "todo", note: "업스케일 축과 같은 결론이다 — AMD 기술이 벤더 중립이라 오히려 베이스라인이 된다." },
+  { phase: 4.5, id: "FG3", title: "DLSS Frame Generation 백엔드",
+    detail: "Ada(RTX 40) 이상에서만 동작하고 Multi Frame Generation은 Blackwell(RTX 50) 전용이다. 기능 질의로 확인하고 실패하면 FSR 3 FG로 내려간다.",
+    refs: "TemporalReconstructionPlan §4.2", priority: "P2", days: 5, status: "todo", note: "드라이버 수준의 AMD AFMF·NVIDIA Smooth Motion은 엔진 통합 대상이 아니다 — 우리가 할 일이 없다." },
+  { phase: 4.5, id: "FG4", title: "HUD-less 백버퍼·UI 합성·에디터 금지 강제",
+    detail: "생성 프레임에 UI가 보간되면 텍스트가 녹는다. HUD 없는 백버퍼 또는 UI 마스크 경로를 세우고 보간 후 UI를 합성한다. 에디터 뷰포트의 <code>live_present</code>는 swapchain present가 아니라 공유 텍스처 복사라 FG가 구조적으로 성립하지 않으므로 활성화 시도를 fail-closed한다.",
+    refs: "EnhancedUIPass · EnhancedSceneRenderer:2432", priority: "P1", days: 4, status: "todo", note: "에디터 금지는 정책이 아니라 구조다 — ImGui가 같은 swapchain에 그려지고 뷰포트가 텍스처로 합성되는 구조에서 FG는 의미도 없고 안전하지도 않다." },
+  { phase: 4.5, id: "TFG9", title: "지원 행렬 전수·폴백 사슬·계측 단정·성능/지연 판정",
+    detail: "NVIDIA·AMD·Intel·통합 GPU 각각에서 폴백 사슬이 끝까지 도달하는지, 어느 하드웨어에서도 \"기능 없음\"이 아니라 FSR 또는 무-upscale에 착지하는지 전수 확인한다. DX12·Vulkan 양 backend에 같은 단정을 건다.",
+    refs: "TemporalReconstructionPlan §8", priority: "P0", days: 5, status: "todo", note: "DX12 전용 경로를 Vulkan variant가 조용히 건너뛰지 않아야 한다 — 기존 조건부 Pass 규칙과 같다. 새 검사가 초록이면 변이로 이빨을 증명한다." },
   { phase: 4.75, id: "4-1", title: "Scriptable Render Pipeline·Custom Pass 확장 계약",
     detail: "Pipeline Asset Inspector가 authored Pass Stack, read/write/modify slot, ResourceSchema, condition, fallback과 property override를 기술한다. 리소스 version edge가 compiled 실행 순서를 만들고 독립 Pass만 authored index를 tie-break로 쓴다. 일반 Pass는 native Template와 domain=pass Shader Graph 또는 authored Slang을 조합한다. C#은 stable handle의 Game-thread 값·variant 제어만 허용하고 EnhancedRenderGraph/RHIEncoder는 유일한 실행 경로로 유지한다.",
     refs: "ScriptableRenderPipelinePlan.md · LivePipelineDescPlan.md · MaterialPipelinePlan.md", priority: "P0", days: 2, status: "done",
@@ -1580,17 +1663,14 @@ const TASKS = [
   { phase: 4.75, id: "4-4", title: "DXR 신규 피처 구상",
     detail: "그림자·반사·AO 중 첫 적용 대상을 실측으로 선정하고 BLAS/TLAS 갱신 정책, 셰이더 테이블, RenderGraph/RHI ray tracing 계약, Vulkan RT 대응 여부와 래스터 폴백을 설계한다. 모든 효과를 한 번에 넣지 않고 최소 수직 슬라이스 하나를 고른다.",
     refs: "RHI 경계 · RenderGraph", priority: "P1", days: 1.5, status: "todo", note: "" },
-  { phase: 4.75, id: "4-5", title: "DLSS 신규 피처 구상",
-    detail: "Streamline과 직접 SDK 연동을 비교하고 color·depth·motion vectors·jitter·exposure·reactive mask 계약, 동적 해상도와 UI 합성 위치, 품질 모드 전환, 미지원 GPU의 네이티브/TAA 폴백을 정한다.",
-    refs: "PostChain · 프레젠트 경계", priority: "P1", days: 1, status: "todo", note: "" },
   { phase: 4.75, id: "4-6", title: "통합 의존 그래프·수직 슬라이스·구현 페이즈 확정",
-    detail: "Scriptable Pipeline 계약과 GPU-driven·Stochastic Lighting·DXR·DLSS의 공통 자원·선후 관계를 하나의 의존 그래프로 합치고 최소 수직 슬라이스·회귀 기준·실행 순서·구현 공수를 정한다. PHASE 4/4.25의 PBR·Material 계약은 입력으로만 받는다.",
-    refs: "4-0~4-5 설계 게이트 · ScriptableRenderPipelinePlan §12", priority: "P0", days: 0.5, status: "todo", note: "" },
+    detail: "Scriptable Pipeline 계약과 GPU-driven·Stochastic Lighting·DXR의 공통 자원·선후 관계를 하나의 의존 그래프로 합치고 최소 수직 슬라이스·회귀 기준·실행 순서·구현 공수를 정한다. PHASE 4/4.25의 PBR·Material 계약과 PHASE 4.5의 시간축 입력·업스케일 계약은 입력으로만 받는다.",
+    refs: "4-1~4-4 설계 게이트 · ScriptableRenderPipelinePlan §12", priority: "P0", days: 0.5, status: "todo", note: "2026-09-14 구 <code>4-5 DLSS 구상</code>이 PHASE 4.5로 분리되며 선행이 <code>4-2~4-5</code>에서 <code>4-2~4-4</code>로 줄었다." },
 
   // ---------- PHASE 4.75 트랙 RG: 리소스 의존성 RenderGraph ----------
   { phase: 4.75, id: "RG0", title: "현행 graph·픽셀 기준선과 변이 fixture",
     detail: "현재 declaration-order BuildOrder, read-before-write, culling, barrier, lifetime, sequential/parallel recording의 정답지를 먼저 고정한다. 독립 Pass·RAW 연쇄·두 writer·read-modify-write·culled branch·imported history를 DX12/Vulkan 공용 fixture로 만들고 잘못된 producer/version/order 변이가 실제로 실패하는지 증명한다.",
-    refs: "Phase4UnifiedPlan §6.2 — BASE-0에 흡수", priority: "P0", days: 0, status: "stopped",
+    refs: "Phase4UnifiedPlan §7.2 — BASE-0에 흡수", priority: "P0", days: 0, status: "stopped",
     note: "4-0·SRP-G0와 같은 하네스였다. graph dump와 변이 fixture는 BASE-0의 소비 항목으로 남고 이 행은 중복 계상을 막는 포인터다." },
   { phase: 4.75, id: "RG1", title: "명시적 접근 모드·versioned resource API",
     detail: "RGPassUsage의 state 기반 쓰기 추론을 Read/Write/ReadWrite와 요구 RHI state의 분리로 바꾼다. RGHandle을 resourceId/version/kind로 확장하고 Write·Modify가 새 버전을 반환하게 하며 transient buffer 생성도 texture와 대칭으로 닫는다. import v0, missing producer, stale handle, forked write를 fail-closed로 검증한다.",
@@ -1622,7 +1702,7 @@ const TASKS = [
     note: "선행: RG6. alias off/on 픽셀 동일, poison/강제 lifetime 변이 오류 0, peak committed/resident byte 감소를 모두 만족해야 한다." },
   { phase: 4.75, id: "Q0", title: "큐·펜스 RHI 계약 — RG8과 L4-a의 공유 기반",
     detail: "queue-neutral 큐 생성과 cross-queue 펜스(signal/wait), 큐를 넘나드는 리소스의 상태 전이(COMMON 경유) 규칙, graphics/compute capability 질의를 backend-neutral RHI에만 추가한다. 현재 CreateCommandQueue는 TYPE_DIRECT 하나뿐이고 AsyncCompute 코드는 0건이다. 스케줄링 정책은 여기 들어가지 않는다 — RG8은 RenderGraph 쪽 multi-queue 스케줄링을, L4-a는 베이크 워커의 큐 사용을 각각 이 계약 위에 얹는다.",
-    refs: "Phase4UnifiedPlan §6.2 Q0 · RenderGraphDependencySchedulingPlan RG8 · LightmapBakerPlan L4-a", priority: "P1", days: 0, status: "todo",
+    refs: "Phase4UnifiedPlan §7.2 Q0 · RenderGraphDependencySchedulingPlan RG8 · LightmapBakerPlan L4-a", priority: "P1", days: 0, status: "todo",
     note: "★ 2026-09-01 신설(Phase4UnifiedPlan C2). 세 계획서가 이 계약의 소유자를 서로 다르게 적고 있었다 — LightmapBakerPlan과 ScriptableRenderPipelinePlan은 '먼저 세우는 쪽이 소유'(순서를 정하지 않는 문장), RenderGraphDependencySchedulingPlan §7은 'L4의 async compute는 RG8을 기다린다'(P0인 L4를 P1 뒤 임계 경로 142일째에 묶는다). 소유를 트랙에서 떼어 RHI 계층에 두면 협상이 사라진다. RG8·L4 중 먼저 필요해지는 쪽의 착수 시점에 세우고 다른 쪽은 소비만 한다 — 큐 계층을 두 번 만들지 않는다. ★ days:0은 RG8 25일에서 분리할 몫이 아직 산정되지 않았다는 뜻이다. 재산정 대상." },
   { phase: 4.75, id: "RG8", title: "multi-queue·async compute",
     detail: "RHI에 graphics/compute capability, queue-neutral encoder pool, signal/wait fence와 ownership transfer를 추가한다. 후보 Pass는 비용·capability가 허용할 때만 compute queue로 보내고 미지원 환경은 같은 DAG의 single-queue fallback을 사용한다.",
@@ -2647,18 +2727,18 @@ const TASKS = [
 
   // ---------- PHASE 4.75 일반 SRP ----------
   // Material Graph 공용 기반은 PHASE 4.25 MAT-2/MAT-6이 소유하고 pass domain만 여기서 확장한다.
-  // 표면 실측과 산정 근거: ScriptableRenderPipelinePlan.md §12-E · Phase4UnifiedPlan.md §6.4
+  // 표면 실측과 산정 근거: ScriptableRenderPipelinePlan.md §12-E · Phase4UnifiedPlan.md §7.4
   { phase: 4.75, id: "SRP-0", title: "Blueprint schema와 순수 검증기",
     detail: "Pipeline Asset·Pass Template·slot·ResourceSchema의 안정 ID와 직렬화 schema를 정하고, Asset을 PipelineBlueprint로 컴파일해 dump하는 비렌더 selftest를 세운다. 잘못된 슬롯·fallback·capability fixture를 함께 만든다.",
-    refs: "ScriptableRenderPipelinePlan §12-E SRP-0 · Phase4UnifiedPlan §6.4", priority: "P1", days: 4, status: "todo",
+    refs: "ScriptableRenderPipelinePlan §12-E SRP-0 · Phase4UnifiedPlan §7.4", priority: "P1", days: 4, status: "todo",
     note: "선행 BASE-0. 표면 실측: EnhancedLivePipelineDesc 574줄(h+cpp)이 nodes/reads/writes/modifies를 이미 든다. 안정 ID·직렬화는 SerializationPlan D2/D5 계약을 재사용한다. 렌더 없이 닫히는 순수 슬라이스라 위험이 낮다." },
   { phase: 4.75, id: "SRP-1", title: "19 node authored Pass Stack·픽셀 동등 컴파일",
     detail: "현재 C++ 기본 파이프라인 19개 노드를 authored Pass Stack Inspector로 기술하고 CompiledPipelineDesc→LivePipelineDesc adapter를 붙인다. 기존 pipeline.nodes dump와 이름·순서·슬롯이 일치하고 기존 C++ builder와 A/B 픽셀이 같아야 한다.",
-    refs: "ScriptableRenderPipelinePlan §12-E SRP-1 · Phase4UnifiedPlan §6.4", priority: "P1", days: 8, status: "todo",
+    refs: "ScriptableRenderPipelinePlan §12-E SRP-1 · Phase4UnifiedPlan §7.4", priority: "P1", days: 8, status: "todo",
     note: "표면 실측: AddNode 총 33곳(전량 제품). RG5는 접근 선언, SRP-1은 노드 조립이라 병합하지 않고 RG5 → SRP-1 순서 의존만 유지한다. 판정 전문: ScriptableRenderPipelinePlan §12-E." },
   { phase: 4.75, id: "SRP-2", title: "Slang Code 모드 + Fullscreen Custom Pass",
     detail: "요청·cache identity에 언어를 명시하고 실제 Slang source/module/import/entry/dependency를 컴파일한다. stable module search root와 import dependency invalidation, .slang의 Editor/Asset/Player packaging 분류, Fullscreen Template, Inspector의 프로젝트 전용 output 슬롯과 Outline/Grayscale fixture를 닫는다.",
-    refs: "ScriptableRenderPipelinePlan §12-E SRP-2 · Phase4UnifiedPlan §6.4", priority: "P1", days: 7, status: "todo",
+    refs: "ScriptableRenderPipelinePlan §12-E SRP-2 · Phase4UnifiedPlan §7.4", priority: "P1", days: 7, status: "todo",
     note: "표면 실측: 컴파일러 기반이 이미 있다 — RHIShaderCompiler.cpp 1,299줄에 Slang global session·reflection이 M1B/M7로 붙어 있다(slang:: 94회). 그린필드가 아니다. 남는 것은 source/module/import 계약·cache identity·packaging 분류이며 packaging은 BuildPipelinePlan과 물린다." },
   { phase: 4.75, id: "SRP-3", title: "공용 Graph IR 기반 — PHASE 4.25 흡수",
     detail: "typed graph IR·round-trip·generated Slang 공용 기반은 MAT-2/MAT-6이 소유한다. 이 행은 중복 구현과 공수 계상을 막는 history pointer다.",
@@ -2666,15 +2746,15 @@ const TASKS = [
     note: "pass-domain Fullscreen/Compute output과 ResourceSchema 연결은 SRP-4가 맡는다." },
   { phase: 4.75, id: "SRP-4", title: "Pass-domain Fullscreen·Compute·RendererList·history",
     detail: "PHASE 4.25 graph 기반에 domain=pass output을 추가하고 Code/Visual 픽셀 동등을 닫는다. Compute/RendererList Template과 프레임 history 슬롯을 연다.",
-    refs: "ScriptableRenderPipelinePlan §12-E SRP-4 · Phase4UnifiedPlan §6.4", priority: "P1", days: 5, status: "todo",
+    refs: "ScriptableRenderPipelinePlan §12-E SRP-4 · Phase4UnifiedPlan §7.4", priority: "P1", days: 5, status: "todo",
     note: "표면 실측: Compute PSO 지원은 PHASE 3-4가 이미 넣었고, 뷰별 history 인스턴스 결정은 MultiCameraRenderPlan이 SSGI·VolumetricFog로 이미 냈다(카메라마다 인스턴스를 둔다). 그 결정을 슬롯 계약으로 올리는 몫이다." },
   { phase: 4.75, id: "SRP-5", title: "variant·hot reload·preview·선택적 C# 값",
     detail: "미리 선언한 variant 선택, 셰이더 hot reload, Inspector preview, 그리고 안정 핸들을 통한 Game-thread C# 값 제어를 연다. Render/CommandBuild/RHI 스레드에서 CLR을 호출하지 않는다.",
-    refs: "ScriptableRenderPipelinePlan §12-E SRP-5 · Phase4UnifiedPlan §6.4", priority: "P1", days: 6, status: "todo",
+    refs: "ScriptableRenderPipelinePlan §12-E SRP-5 · Phase4UnifiedPlan §7.4", priority: "P1", days: 6, status: "todo",
     note: "표면 실측: 셰이더 리로드는 PHASE 3-4가 연결했고 generation/fence retirement는 M5-C가 닫았다. variant 축은 .shadermeta 키 체계가 정본이다. C# 모델 값 경계는 PHASE 3.75 MBC8의 typed handle/round-trip 뒤에 얹는다." },
   { phase: 4.75, id: "SRP-6", title: "소스 Native Pass 연결",
     detail: "EnhancedRenderPass를 소스 수준으로 추가하고 정적 NativePassRegistry에 연결해 Pipeline Asset이 선택할 수 있게 한다. 외부 Native DLL ABI는 만들지 않는다.",
-    refs: "ScriptableRenderPipelinePlan §12-E SRP-6 · Phase4UnifiedPlan §6.4", priority: "P1", days: 3, status: "todo",
+    refs: "ScriptableRenderPipelinePlan §12-E SRP-6 · Phase4UnifiedPlan §7.4", priority: "P1", days: 3, status: "todo",
     note: "표면 실측: 정적 registry 하나와 확장점 하나다. 외부 ABI가 비목표라 경계가 좁다 — 이 레인에서 가장 작은 슬라이스다." },
   // ---------- PHASE 4: 현재 PBR Slang·Material·Renderer 배선 안정화 ----------
   { phase: 4, id: "PBR-W0", title: "PBR 감사 정본·Gunner/primitive capture·strict gate",
@@ -2745,13 +2825,13 @@ const TASKS = [
   // ---------- PHASE 4.75: Material 밖 renderer 품질·후처리 ----------
   { phase: 4.75, id: "RND-1", title: "local reflection probe·specular AO",
     detail: "probe 자산·캡처·바인딩과 specular AO를 renderer integration으로 구현하고 Material Graph golden과 분리한다.",
-    refs: "Phase4UnifiedPlan §6.5 RND-1", priority: "P1", days: 4, status: "todo", note: "PHASE 4.25 MAT-9 뒤에 연다." },
+    refs: "Phase4UnifiedPlan §7.5 RND-1", priority: "P1", days: 4, status: "todo", note: "PHASE 4.25 MAT-9 뒤에 연다." },
   { phase: 4.75, id: "RND-2", title: "shadow module·point/spot atlas·quality tier",
     detail: "공용 sampling, normal-offset, cascade blend/far fade, 3/4 cascade, point/spot atlas와 Low/Medium/High 품질 단계를 구현한다.",
-    refs: "Phase4UnifiedPlan §6.5 RND-2", priority: "P1", days: 10, status: "todo", note: "shadow 결과를 Blender Material parity의 일부로 세지 않는다." },
+    refs: "Phase4UnifiedPlan §7.5 RND-2", priority: "P1", days: 10, status: "todo", note: "shadow 결과를 Blender Material parity의 일부로 세지 않는다." },
   { phase: 4.75, id: "RND-3", title: "display OETF·AgX·auto exposure·bloom",
     detail: "display 변환과 post 순서를 고정하고 AgX·auto exposure·bloom을 각각 독립 renderer golden과 성능 gate로 연다.",
-    refs: "Phase4UnifiedPlan §6.5 RND-3", priority: "P1", days: 6, status: "todo", note: "pre-tone material golden 뒤에만 적용한다." },
+    refs: "Phase4UnifiedPlan §7.5 RND-3", priority: "P1", days: 6, status: "todo", note: "pre-tone material golden 뒤에만 적용한다." },
 ];
 
 // ============================================================
@@ -2760,7 +2840,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 9.5: "스크립트 표면 재설계 (C# 계층 기준 재수립)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "텍스처 파이프라인 (임포트·cook·런타임 소비)", 12.5: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 14.5: "라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어)", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.5: "시간축 재구성 (Temporal Upscaling·Frame Generation)", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 9.5: "스크립트 표면 재설계 (C# 계층 기준 재수립)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "텍스처 파이프라인 (임포트·cook·런타임 소비)", 12.5: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 14.5: "라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어)", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨", stopped: "중단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked", stopped: "st-stopped" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0, stopped: 0 };

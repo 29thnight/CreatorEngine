@@ -125,7 +125,8 @@ W2/W4/W5/W6 완료 8.5일 + 진행 기성 3.5일이며 잔여는 6일이다. W7 
 
 - Blender Principled/OpenPBR, Material Graph, coat/sheen/transmission/SSS는 PHASE 4.25.
 - local reflection probe, shadow atlas, AgX/auto exposure/bloom은 PHASE 4.75.
-- RenderGraph scheduling, generic Pipeline/Pass Shader Graph, GPU-driven/DXR/DLSS는 PHASE 4.75.
+- RenderGraph scheduling, generic Pipeline/Pass Shader Graph, GPU-driven/DXR는 PHASE 4.75.
+- 모션 벡터, Temporal Upscaling, Frame Generation은 PHASE 4.5.
 - 모델 GUID/sidecar/importer identity를 다시 해석하지 않는다. PHASE 3.75의 typed generation만
   입력으로 받는다.
 
