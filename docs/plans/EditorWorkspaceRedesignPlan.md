@@ -974,7 +974,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize와 렌더 배율은 **2026-09-14 착지**(§W4 후속) — 미뤄 둔 근거였던 generation/retire 수렴을 게이트 단정으로 옮겼다 |
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
 | W6 | todo | 현재 외관을 유지하는 5종 배치 preset, Save As/Rename/Delete/Reset·작은 창 복원 |
-| W7 | todo | Hierarchy/Browser 목록 snapshot·flatten/cache/clipping, 1k/10k/50k 실측, **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
+| W7 | progress | **W7-0 착지(2026-09-14)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0). 실측이 순서를 바꿨다: Browser 스냅샷이 clipping 보다 먼저다(엔티티 1,000 에서 브라우저가 Hierarchy 의 5.8 배, 매 프레임 디렉터리 스캔 24). 남은 것은 W7-1 Browser 스냅샷 · W7-2 flatten cache · W7-3 clipping · 정본 불변식 source gate, 그리고 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
 | W8 | todo | DX12 통합 빌드·DPI/재시작/손상 ini/Play/preset/성능 회귀, 현재 승인 외관의 자동 golden·CI, legacy 잔재 전수 확인 |
 
 현재 소스에서 확인한 잔여 경계:
@@ -2014,6 +2014,52 @@ ImGui backend 몫 그대로이고, lock/clip은 구현이 없어 소유권 정�
 추가하고 실측 이득이 없으면 제거한다.
 썸네일은 로딩 중 입력·스크롤 유지, Ready 직후 교체, 타일 ID/선택/drag-drop 보존,
 실패·변경·삭제·늦은 완료와 DX12/Vulkan 자원 수명을 별도로 검증한다.
+
+#### W7-0 착지 — 재는 법과 fixture, 그리고 기준선 (2026-09-14)
+
+계획서가 W7 의 판정으로 적은 *"p95 CPU·allocation 개선 수치를 기록한다. 캐시만 추가하고
+실측 이득이 없으면 제거한다"* 는, 그 수치를 낼 창구가 없으면 성립하지 않는다. `profile.stats`
+는 프로파일러 **자체** 비용과 용량만 낸다. 그래서 W7 의 첫 조각은 캐시가 아니라 **자**다.
+
+**세운 것.** `EditorPanelCost` 가 슬롯 셋(hierarchy · browser_tree · browser_files)마다 프레임
+누적 시간과 **그 프레임에 한 일의 수**(`units` 행/항목, `scans` 디렉터리 스캔)를 센다. 시간만
+재면 기계가 빠른 날 캐시가 없는 것이 안 보인다 — 캐시의 목적은 "프레임마다 하던 일을 안 하는
+것" 이므로 그 일의 수를 직접 센다. 관측은 `editor.panelcost`, fixture 는
+`scene.populate <개수> [fanout]`(저작 `.creator` 가 아니라 `Scene::CreateEntity` 로 만든다),
+측정은 `Tools/regression/measure-panel-cost.ps1` 이다. 측정 도구는 **게이트가 아니라서 run-all
+에 넣지 않는다** — 판정이 아니라 수치를 남기는 자다.
+
+**곁다리로 하나 더 세웠다.** `editor.window <안정식별자> <open|close|focus>`. Content Browser 가
+`AssetBundle`·`ResourceCounter` 와 같은 `dock_slot::bottom` 이라 탭으로 겹치는데, 열려 있어도
+선택되지 않으면 ImGui 가 본문을 돌리지 않아 브라우저 비용이 181 프레임 중 **1 프레임**만
+잡혔다. `editor.windows` 는 표를 읽기만 하고 여닫는 자리는 메뉴뿐이라 CLI 로 도달할 길이
+없었다. 요청만 걸고 UI 스레드가 `draw_windows` 머리에서 소비한다 — 표를 읽는 스레드가 그쪽
+하나라 적용도 그쪽이어야 읽기와 쓰기가 갈리지 않는다.
+
+**기준선 (Release · 창 2400x1400 · 평평한 목록 · 512 표본).** 전문은
+[EditorPanelCostBaselineW7.md](../analysis/EditorPanelCostBaselineW7.md).
+
+| 엔티티 | hierarchy p95 | hierarchy units | browser_tree p95 | browser_tree scans |
+|---:|---:|---:|---:|---:|
+| 1,000 | 1.21 ms | 1,000 | 7.56 ms | 24 |
+| 10,000 | 10.33 ms | 10,000 | 6.83 ms | 24 |
+| 50,000 | 33.27 ms | 50,000 | 4.36 ms | 24 |
+
+**두 가지가 확정됐다.**
+
+① Hierarchy 의 `units` 가 엔티티 수와 **정확히 같다.** 화면에 50 줄쯤 보이는데 50,000 줄을
+그린다. 행당 약 0.52 µs 로 선형이고 50k 의 p95 33.3 ms 는 이 패널 하나가 에디터를 30 fps 로
+묶는다는 뜻이다 — clipping 이 겨냥할 자리가 숫자로 섰다.
+
+② **계획서에 없던 것이 더 크다.** 브라우저의 폴더 트리가 씬과 무관하게 **매 프레임 24 번**
+`directory_iterator` 를 돌린다(열린 폴더 하나당 한 번). 엔티티 1,000 — 즉 실제 프로젝트 규모 —
+에서 **브라우저가 Hierarchy 의 5.8 배**이고, 그 비용은 사용자가 아무것도 하지 않아도 나간다.
+그래서 착수 순서를 Browser 스냅샷(W7-1) → flatten cache(W7-2) → clipping(W7-3) 으로 둔다.
+계획서가 W7 을 "clipping" 으로 적은 것은 2026-08-30 정찰에 이 사실이 없었기 때문이다.
+
+**시간이 아니라 `scans` 를 본다.** `browser_tree` 의 p95 가 7.56 → 6.83 → 4.36 으로 흔들리는데,
+씬이 커져서 빨라진 것이 아니라 OS 파일 캐시 온도다. 파일시스템을 재는 시간은 이렇게 흔들리고,
+그래서 스캔 수를 따로 센다 — 캐시가 그것을 0 으로 만들었는지는 그 수로만 명확히 판정된다.
 
 ### W8 — 통합 회귀와 legacy 강제 배치 은퇴 (P0, 2일)
 
