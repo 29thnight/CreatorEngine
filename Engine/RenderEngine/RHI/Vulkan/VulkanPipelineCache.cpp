@@ -42,10 +42,14 @@ namespace
     ///   남았을 것이다.
     VkSamplerAddressMode VkAddressFromDesc(RHIAddressMode mode)
     {
+        static_assert(kRHIAddressModeCount == 4,
+            "RHIAddressMode 가 늘었다 — 이 표를 함께 채워라. default: 가 있어 "
+            "빠뜨려도 경고가 뜨지 않는다(/W0).");
         switch (mode)
         {
         case RHIAddressMode::Wrap:   return VK_SAMPLER_ADDRESS_MODE_REPEAT;
         case RHIAddressMode::Border: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        case RHIAddressMode::Mirror: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
         case RHIAddressMode::Clamp:
         default:                     return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         }

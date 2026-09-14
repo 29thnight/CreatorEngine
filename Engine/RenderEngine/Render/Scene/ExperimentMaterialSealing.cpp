@@ -328,6 +328,7 @@ namespace ExperimentMaterialSealing
                 {
                     binding.textureGuid.m_guid = reference->assetId.value;
                     binding.coordinates = reference->coordinates;
+                    binding.sampler = reference->sampler;
                     if (!binding.coordinates.IsValid())
                     { outError = "Invalid texture UV set/transform: " + property.name; return false; }
                 }

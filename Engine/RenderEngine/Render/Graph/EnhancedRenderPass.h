@@ -25,6 +25,7 @@
 #include "../../ShaderMetaHandle.h"
 #include "../../ShaderMetaReflection.h"
 #include "../../Assets/TextureCoordinates.h"
+#include "../../Assets/TextureSampler.h"
 
 class Mesh;
 class Texture;
@@ -40,6 +41,10 @@ struct EnhancedMaterialTextureBinding
     std::uint32_t registerSpace{};
     std::shared_ptr<Texture> textureOwner{};
     assets::TextureCoordinates coordinates{};
+    // W7 — coordinates 와 같은 출처(저작 TextureReference)에서 온다. 이 값이
+    // 여기 없던 동안 패스는 Initialize 에서 만든 샘플러 하나를 모든 재질에
+    // 걸었고, 장부의 samplerIdentity 는 draw 마다 같은 값이었다.
+    assets::TextureSampler sampler{};
 };
 
 // M6-P2d-b: Material::m_flowInfo와 producer frame time을 같은 immutable

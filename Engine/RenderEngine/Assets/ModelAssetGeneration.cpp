@@ -702,7 +702,8 @@ namespace assets
                         }
                     }
                     target.value = ModelMaterialTexture{{ value->assetId.value,
-                        embedded ? sidecar.generation : 0u }, value->coordinates };
+                        embedded ? sidecar.generation : 0u }, value->coordinates,
+                        value->sampler };
                 }
                 material.properties.push_back(std::move(target));
             }

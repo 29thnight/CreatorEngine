@@ -21,7 +21,8 @@ $process = $null
 # 게이트가 자산 트리에 잔해를 남기면 다음 실행의 전제가 달라진다.
 $importedFixtures = @(
     (Join-Path $root 'Dynamic_CPP\Assets\Models\NormalPair'),
-    (Join-Path $root 'Dynamic_CPP\Assets\Models\AlphaModes'))
+    (Join-Path $root 'Dynamic_CPP\Assets\Models\AlphaModes'),
+    (Join-Path $root 'Dynamic_CPP\Assets\Models\SamplerModes'))
 
 # ── 축 회계 ─────────────────────────────────────────────────────────────
 #
@@ -104,6 +105,50 @@ function Assert-AlphaModes([string]$Directory) {
     $forward = @($manifest.draws | Where-Object route -EQ 'forward')
     if (0 -eq $forward.Count) {
         throw "Alpha fixture produced no forward-route draw (라우트 축이 비었다): $Directory"
+    }
+}
+
+function Assert-SamplerModes([string]$Directory) {
+    $manifest = Get-Content -LiteralPath (Join-Path $Directory 'manifest.json') -Raw | ConvertFrom-Json
+    # ★ 여기서 묻는 것은 "샘플러가 재질마다 갈리는가" 다. W7 이전에는 패스가
+    #   Initialize 에서 만든 하나를 프레임 내내 모든 draw 에 걸었고, 그래서 이
+    #   수가 어느 캡처에서든 **항상 1** 이었다. 게이트는 그 수를 세기만 하고
+    #   판정하지 않았다(§18) — 변이를 만들 슬라이스가 W7 이었기 때문이다.
+    #
+    # ★ 기대값을 3 으로 못 박지 않고 '재질 수와 같다' 로도 적지 않는다. fixture 의
+    #   재질 셋이 서로 다른 sampler 를 쓰므로 **2 이상**이면 축이 살아 있고,
+    #   정확히 몇인지는 배치 병합 규칙이 정할 몫이다. 다만 1 이면 배선이 끊긴
+    #   것이라 그때만 붉어진다.
+    $ledger = $manifest.sealLedger
+    $identities = @()
+    foreach ($route in @('gbuffer', 'forward')) {
+        if ($null -ne $ledger.$route -and $null -ne $ledger.$route.bindings) {
+            $identities += @($ledger.$route.bindings.samplerIdentity)
+        }
+    }
+    $distinct = @($identities | Where-Object { $_ -ne 0 } | Sort-Object -Unique)
+    if ($distinct.Count -lt 2) {
+        throw "Sampler fixture produced $($distinct.Count) distinct samplerIdentity — 재질별 sampler 배선이 끊겼다: $Directory"
+    }
+    # ★ 0 이 섞이면 안 된다. ComputeSamplerIdentity 는 절대 0 을 내지 않으므로
+    #   0 은 '적지 않았다'는 뜻이고, 위의 distinct 계산이 그것을 걸러내므로
+    #   여기서 따로 물어야 한다 — 안 그러면 일부가 비어도 통과한다.
+    if (@($identities | Where-Object { $_ -eq 0 }).Count) {
+        throw "Sampler fixture has unstamped samplerIdentity(0) bindings: $Directory"
+    }
+    # ★ distinct 만 세면 부족하다. 실측이 그것을 가르쳤다 — sampler 가 패스까지
+    #   흐르기는 했는데 sealHash 가 sampler 를 안 접어서, 재질 셋이 같은 seal 을
+    #   갖고 W8 불변식("같은 seal 은 같은 바인딩")이 옳게 발동해 draw 둘이
+    #   버려졌다. 살아남은 하나만 남으니 distinct 는 1 로 보였다. 버려진 수를
+    #   함께 물어야 "축이 살았다" 와 "축이 충돌해 죽었다" 가 갈린다.
+    foreach ($route in @('gbuffer', 'forward')) {
+        $node = $ledger.$route
+        if ($null -eq $node) { continue }
+        if ($node.bindingConflict -ne 0 -or $node.skipped -ne 0) {
+            throw ("Sampler fixture dropped draws (route=$route" +
+                " bindingConflict=$($node.bindingConflict) skipped=$($node.skipped)" +
+                " reason='$($node.lastReason)'): $Directory")
+        }
     }
 }
 
@@ -238,6 +283,7 @@ try {
         $gunner = Join-Path $run "$api-gunner"
         $normalPair = Join-Path $run "$api-normalpair"
         $alphaModes = Join-Path $run "$api-alphamodes"
+        $samplerModes = Join-Path $run "$api-samplermodes"
         # W1 fixture 는 자산 트리 밖에 있어 model.load 가 트리 안으로 복사한다.
         # backend 둘이 같은 조건에서 돌도록 매 회차 앞에서 지운다 — 남겨 두면
         # 두 번째 회차만 "제자리 열기" 경로를 타서 두 실행이 같은 것을 재지 않는다.
@@ -292,9 +338,17 @@ try {
             'object.transform AlphaModes 0 0 2 0 180 0 1.7 0.6 1.0',
             'wait 30',
             "render.pbr.capture `"$alphaModes`" game",
+            # ★ W7 — 같은 이미지 하나를 sampler 3 종으로 참조하는 자산. UV 가
+            #   0..2 라 wrap 이 그림에 드러나고, 그 중 하나가 MIRRORED_REPEAT 라
+            #   새 RHIAddressMode::Mirror 열거자의 유일한 소비자다.
+            "model.load `"$root/Tools/regression/fixtures/pbr-sampler/SamplerModes.gltf`"",
+            'model.place SamplerModes',
+            'object.transform SamplerModes 0 0 2 0 180 0 1 1 1',
+            'wait 30',
+            "render.pbr.capture `"$samplerModes`" game",
             'quit')
         $results = @(Invoke-Editor $api $commands)
-        $expectedCaptures = if ($hasGunner) { 4 } else { 3 }
+        $expectedCaptures = if ($hasGunner) { 5 } else { 4 }
         $captures = @($results | Where-Object command -eq 'render.pbr.capture')
         if ($captures.Count -ne $expectedCaptures -or
             @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
@@ -323,10 +377,13 @@ try {
         Assert-Capture $alphaModes $api @()
         Assert-AlphaModes $alphaModes
         Set-AxisRan "$api/alpha-modes+nonuniform-scale"
+        Assert-Capture $samplerModes $api @()
+        Assert-SamplerModes $samplerModes
+        Set-AxisRan "$api/sampler"
         $captureDirs[$api] = @{ primitives = $primitive }
         if ($hasGunner) { $captureDirs[$api]['gunner'] = $gunner }
         $ranHere = @("primitives", $(if ($hasGunner) { 'gunner' }), 'normal-pair',
-            'alpha-modes+nonuniform-scale') | Where-Object { $_ }
+            'alpha-modes+nonuniform-scale', 'sampler') | Where-Object { $_ }
         Write-Output "$api product capture PASS ($($ranHere -join ', ')): $run"
     }
     # W9 — 두 backend 캡처의 float32 readback을 실제로 맞댄다.
@@ -399,8 +456,13 @@ finally {
     # ★ 축 회계는 **실패해도 찍는다**. 처음에는 성공 경로에만 두었는데, 이 게이트는
     #   지금 뒤쪽(experiment contract)에서 기존 결함으로 멈추기 때문에 회계가 영영
     #   보이지 않았다. 무엇을 쟀는지는 실패했을 때야말로 알아야 한다.
+    # ★ 0 건일 때도 찍는다. 처음에는 Count 로 감쌌는데, 첫 축을 재기도 전에
+    #   죽으면 표가 통째로 사라져 "회계가 없다" 와 "잰 축이 0" 이 구분되지 않았다.
+    Write-Output '── 축 회계 ──'
+    if (0 -eq $axisReport.Count) {
+        Write-Output '  (잰 축 0 — 첫 축에 닿기 전에 멈췄다)'
+    }
     if ($axisReport.Count) {
-        Write-Output '── 축 회계 ──'
         foreach ($name in $axisReport.Keys) {
             Write-Output ("  {0,-24} {1}" -f $name, $axisReport[$name])
         }

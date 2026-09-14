@@ -148,6 +148,28 @@ namespace MaterialTextureTable
             result[binding.registerIndex - FirstRegister] = binding.coordinates;
         return result;
     }
+    // 재질이 실제로 걸 샘플러 하나.
+    //
+    // ★ 셰이더에 `gSampler : register(s0)` 하나뿐이라 재질 안에서 슬롯마다
+    //   다른 샘플러를 걸 수 없다. 그래서 **가장 낮은 레지스터**의 것을 택한다
+    //   — 규칙을 못 박아 두지 않으면 순회 순서가 결과를 정하게 된다.
+    //
+    // ★ 이 축(재질 안 슬롯별 분기)은 저장소 자산 어디에도 없다(.gltf 3종 ·
+    //   텍스처 둘 이상인 재질 2건 · 분기 0건). 자극할 fixture 가 없으므로
+    //   **덮었다고 주장하지 않는다** — 셰이더가 샘플러를 슬롯마다 받게 되는
+    //   날 이 함수가 사라지는 것이 맞다.
+    template <typename Snapshot>
+    assets::TextureSampler EffectiveSampler(const Snapshot& snapshot)
+    {
+        const EnhancedMaterialTextureBinding* lowest = nullptr;
+        for (const auto& binding : snapshot.textureBindings)
+        {
+            if (nullptr == lowest || binding.registerIndex < lowest->registerIndex)
+                lowest = &binding;
+        }
+        return nullptr != lowest ? lowest->sampler : assets::TextureSampler{};
+    }
+
     template <typename Snapshot>
     bool ValidateMeshCoordinates(const Snapshot& snapshot, uint32_t mask, std::string& error)
     {

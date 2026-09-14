@@ -52,6 +52,62 @@ namespace experiment
             return true;
         }
 
+        // ── W7 sampler 어휘 ─────────────────────────────────────────────
+        //
+        // ★ 저작 파일에는 **이름**을 적는다. 열거자 수를 적으면 어휘가 늘거나
+        //   순서가 바뀔 때 옛 파일이 조용히 다른 뜻이 된다 — colorSpace 가
+        //   "srgb"/"linear" 인 것과 같은 이유다.
+        [[nodiscard]] const char* FilterText(RHIFilterMode mode)
+        {
+            return RHIFilterMode::Point == mode ? "point" : "linear";
+        }
+
+        [[nodiscard]] const char* AddressText(RHIAddressMode mode)
+        {
+            switch (mode)
+            {
+            case RHIAddressMode::Clamp:  return "clamp";
+            case RHIAddressMode::Border: return "border";
+            case RHIAddressMode::Mirror: return "mirror";
+            case RHIAddressMode::Wrap:
+            default:                     return "wrap";
+            }
+        }
+
+        [[nodiscard]] bool ParseFilter(const Authoring::ReadNode& node,
+            const char* context, RHIFilterMode& out, std::string& outError)
+        {
+            if (!node.IsScalar())
+            {
+                outError = std::string(context) + " 값이 스칼라가 아니다";
+                return false;
+            }
+            const std::string text = node.AsString();
+            if (text == "point") { out = RHIFilterMode::Point; return true; }
+            if (text == "linear") { out = RHIFilterMode::Linear; return true; }
+            outError = std::string(context) + " 의 미지 필터다: " + text;
+            return false;
+        }
+
+        [[nodiscard]] bool ParseAddress(const Authoring::ReadNode& node,
+            const char* context, RHIAddressMode& out, std::string& outError)
+        {
+            if (!node.IsScalar())
+            {
+                outError = std::string(context) + " 값이 스칼라가 아니다";
+                return false;
+            }
+            const std::string text = node.AsString();
+            if (text == "wrap") { out = RHIAddressMode::Wrap; return true; }
+            if (text == "clamp") { out = RHIAddressMode::Clamp; return true; }
+            if (text == "border") { out = RHIAddressMode::Border; return true; }
+            if (text == "mirror") { out = RHIAddressMode::Mirror; return true; }
+            static_assert(kRHIAddressModeCount == 4,
+                "RHIAddressMode 가 늘었다 — 저작 어휘도 함께 늘려라.");
+            outError = std::string(context) + " 의 미지 주소 모드다: " + text;
+            return false;
+        }
+
         template <std::size_t Count>
         [[nodiscard]] bool ParseFloats(const Authoring::ReadNode& node,
             const char* context, std::array<float, Count>& out,
@@ -140,6 +196,19 @@ namespace experiment
                 WriteFloats(texture.Child("uvOffset"), {uv.offset[0], uv.offset[1]});
                 WriteFloats(texture.Child("uvScale"), {uv.scale[0], uv.scale[1]});
                 texture.Child("uvRotation").SetScalar(uv.rotation);
+                // ★ W7 — sampler 는 **기본값이 아닐 때만** 적는다. 무조건 적으면
+                //   기존 .material 전부가 다음 저장에서 키 네 개를 얻고, 이 코덱은
+                //   미지 키를 fail-closed 로 거부하므로 옛 리더가 새 파일을 못 읽는다.
+                //   기본값(선형/선형/wrap/wrap)은 패스가 걸던 값과 같아 생략이 곧
+                //   같은 뜻이다.
+                if (assets::TextureSampler{} != value->sampler)
+                {
+                    const auto& sampler = value->sampler;
+                    texture.Child("samplerFilter").SetScalar(FilterText(sampler.minMag));
+                    texture.Child("samplerMip").SetScalar(FilterText(sampler.mip));
+                    texture.Child("samplerWrapU").SetScalar(AddressText(sampler.addressU));
+                    texture.Child("samplerWrapV").SetScalar(AddressText(sampler.addressV));
+                }
             }
             else
             {
@@ -233,13 +302,20 @@ namespace experiment
                     if (value["uvScale"] && !ParseFloats(value["uvScale"], "uvScale", uv.scale, outError)) return false;
                     if (value["uvRotation"]) uv.rotation = value["uvRotation"].As<float>();
                     if (!uv.IsValid()) { outError = "Invalid texture UV coordinates"; return false; }
+                    auto& sampler = reference.sampler;
+                    if (value["samplerFilter"] && !ParseFilter(value["samplerFilter"], "samplerFilter", sampler.minMag, outError)) return false;
+                    if (value["samplerMip"] && !ParseFilter(value["samplerMip"], "samplerMip", sampler.mip, outError)) return false;
+                    if (value["samplerWrapU"] && !ParseAddress(value["samplerWrapU"], "samplerWrapU", sampler.addressU, outError)) return false;
+                    if (value["samplerWrapV"] && !ParseAddress(value["samplerWrapV"], "samplerWrapV", sampler.addressV, outError)) return false;
                     for (const Authoring::MapEntry texturePair : value.Map())
                     {
                         const std::string textureKey =
                             texturePair.key.AsString();
                         if (textureKey != "guid" && textureKey != "colorSpace"
                             && textureKey != "uvSet" && textureKey != "uvOffset"
-                            && textureKey != "uvScale" && textureKey != "uvRotation")
+                            && textureKey != "uvScale" && textureKey != "uvRotation"
+                            && textureKey != "samplerFilter" && textureKey != "samplerMip"
+                            && textureKey != "samplerWrapU" && textureKey != "samplerWrapV")
                         {
                             outError = "texture의 미지 키다: " + textureKey;
                             return false;

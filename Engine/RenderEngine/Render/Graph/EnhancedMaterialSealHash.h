@@ -45,6 +45,15 @@ namespace EnhancedMaterialSeal
             ? static_cast<std::uint64_t>(binding.textureOwner->m_assetId.m_ID_Data)
             : 0ull);
         AppendCoordinates(digest, binding.coordinates);
+        // ★ W7 — sampler 도 값 신원이다. 이 줄이 없으면 wrap 만 다른 재질 셋이
+        //   **같은 sealHash** 를 갖고, W8 의 불변식("같은 seal 은 같은 바인딩")이
+        //   옳게 발동해 draw 둘을 버린다. 실제로 그랬다 — bindingConflict 2 ·
+        //   skipped 2 · "같은 seal에 서로 다른 texture/sampler 배치가 그려졌다".
+        //   장부가 결함을 지어낸 것이 아니라 **이 줄이 없는 것**이 결함이었다.
+        digest.U32(static_cast<std::uint32_t>(binding.sampler.minMag));
+        digest.U32(static_cast<std::uint32_t>(binding.sampler.mip));
+        digest.U32(static_cast<std::uint32_t>(binding.sampler.addressU));
+        digest.U32(static_cast<std::uint32_t>(binding.sampler.addressV));
     }
 
     inline void AppendTextureBindings(EnhancedSealDigest& digest,

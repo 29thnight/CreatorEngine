@@ -74,7 +74,9 @@ namespace RenderTest
                 const auto& other = std::get<experiment::TextureReference>(right);
                 return value->assetId == other.assetId
                     && value->colorSpace == other.colorSpace
-                    && value->coordinates == other.coordinates;
+                    && value->coordinates == other.coordinates
+                    // W7 — 같은 이유로 sampler 도 보존 대상이다.
+                    && value->sampler == other.sampler;
             }
             return false;
         }
@@ -153,6 +155,8 @@ namespace RenderTest
             experiment::TextureReference srgbTexture{ textureId, "unstored" };
             srgbTexture.colorSpace = experiment::TextureColorSpace::Srgb;
             srgbTexture.coordinates = {1, {.25f, -.5f}, {-2.f, .75f}, .4f};
+            srgbTexture.sampler = { RHIFilterMode::Point, RHIFilterMode::Point,
+                RHIAddressMode::Mirror, RHIAddressMode::Clamp };
             experiment::TextureReference nilTexture{};
             material.properties = {
                 { "flag", true },

@@ -1,6 +1,6 @@
 # PBR 배선 안정화 계획 (PHASE 4)
 
-**신설 2026-09-03 · 갱신 2026-09-14 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행 · W8/W9 구현 착지·부분 실측(§14·§15)**
+**신설 2026-09-03 · 갱신 2026-09-14 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행(W7 sampler는 §19) · W8/W9 구현 착지·부분 실측(§14·§15)**
 
 > **W8/W9 현재 상태 한 줄.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
 > 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: 배선 게이트가
@@ -97,9 +97,10 @@ typed Material generation
 `PBR-W0`은 정적 감사와 2026-09-14 manifest 축(§18)을 기성으로 센다 — fixture 여덟 중
 셋만 서 있어 완료가 아니다. W3는 중립 상수 단일 출처화와 양 팔 변이 증명으로 닫았고
 (§16), W1은 유도를 한 함수로 접고 저장소 소유 fixture로 실장면 판정을 세워 닫았다
-(§17). W7의 normal/tangent·UV 선택/변환·mip 구현과 검증은 합계 1.5일 기성이다.
-W1/W2/W3/W4/W5/W6 완료 10.5일 + 진행 기성 3일이며 잔여는 4.5일이다. W7 sampler는
-미완료다.
+(§17). W7의 normal/tangent·UV 선택/변환·mip 구현과 검증은 합계 1.5일 기성이었고,
+sampler 단위가 §19로 착지해 2일 기성이 됐다. W1/W2/W3/W4/W5/W6 완료 10.5일 +
+진행 기성 3.5일이며 잔여는 4일이다. W7에서 **주장하지 않는 축**은 재질 안 슬롯별
+sampler 분기와 Anisotropic 둘이다(§19).
 
 ---
 
@@ -1279,3 +1280,189 @@ coverageFlags 는 셋으로 갈린다(`1` · `11` · `5`), PSO 도 셋이다.
 ★ AO 와 emissive 는 "건너뜀" 이 아니라 **"아직 없음"** 이다. 둘은 다르다 — 건너뛴
 축은 게이트가 알고 이유를 적지만, 없는 축은 게이트가 모른다. 지금 축 회계에 그
 둘은 나타나지 않으며, 이 표가 그 자리를 대신한다.
+
+## 19. W7 네 번째 단위 — sampler 가 재질을 따른다, 2026-09-14
+
+W7의 남은 단위다(normal/tangent는 §11, UV는 §12, mip 생성·소비는 §13에서 닫혔다).
+6단 수직 슬라이스라 착수 전에 각 단이 어디까지 있는지 먼저 쟀다.
+
+### 착수 전 실측 — 6단
+
+| 단 | 실측 |
+|---|---|
+| 임포트 IR `TextureSlot` | `wrapU`/`wrapV`가 **이미 있다** — 그런데 **쓰는 자 0** |
+| glTF 임포터 | `texture.samplerIndex`를 안 읽는다. `slot()`이 wrap을 안 채운다 |
+| 저작 IR `TextureReference` | 샘플러 필드 없음 |
+| 쿠킹 `CookedModelCodec` | `coordinates` 4필드만 직렬화 |
+| 스냅샷 `EnhancedMaterialTextureBinding` | 자리 없음 |
+| 패스 | `Initialize`에서 하나 만들어 root table(3/7)에 고정 |
+| 장부 | `binding.samplerIdentity = m_samplerIdentity`(패스 전역) |
+| `.shadermeta` | 샘플러 개념 **전무**(`ShaderPropertyType::Texture2D`만) |
+
+### 발견 둘
+
+**① `wrapU`/`wrapV`는 쓰는 자가 없는데 stable key에 들어 있었다.**
+읽는 자가 딱 하나 — `ModelStableKeys.cpp:104`가 모델 지문에 넣는다. 쓰는 자가
+0이니 **항상 기본값**이고 지문 기여 엔트로피가 0이었다. W0의 `descriptorVersion`과
+같은 모양이되 더 나쁘다 — **신원에 참여하는 것처럼 보이는** 필드였다.
+
+**② 임포터의 텍스처 캐시 키가 축을 통째로 지운다.**
+`GltfImporter.cpp`의 `ResolveTexture`가 `imageIndex` 단독으로 캐싱한다. glTF에서
+`texture = { source, sampler }`라 같은 이미지를 sampler만 달리해 참조하는 것이
+정상인데(Khronos `TextureSettingsTest`는 image 3개를 texture 9개가 나눠 쓴다),
+이미지 키로 접으면 9가 3이 된다.
+
+★ **그러나 이 캐시를 고치는 것이 답이 아니다.** 샘플러는 *참조*의 성질이지
+*이미지*의 성질이 아니므로, 샘플러를 `ImportedTexture`가 아니라 `TextureSlot`에
+실으면 캐시는 그대로 두어도 옳다. 그리고 그 자리는 `coordinates`가 이미 쓰고 있는
+자리다 — 실측이 설계를 정했다.
+
+### RHI 어휘 구멍 둘 — 하나만 메운다
+
+```
+RHIFilterMode  : Point, Linear         ← Anisotropic 없음
+RHIAddressMode : Wrap, Clamp, Border   ← Mirror 없음
+```
+
+`MIRRORED_REPEAT`(33648)에는 대체할 값이 없어 `RHIAddressMode::Mirror`를 더했다.
+`Anisotropic`은 자극할 fixture가 없어 **더하지 않고 구멍으로만 기록한다**.
+
+★ **변환표 셋이 모두 `default:` 낙하였다.** 열거자를 더해도 경고 없이 DX12는
+`WRAP`, Vulkan은 `CLAMP_TO_EDGE`로 **서로 다르게** 접혔을 것이다. Editor는 /W0라
+C4061/C4062에 기댈 수 없으므로(`nodiscard`가 힘을 잃는 것과 같은 이유), 표마다
+`static_assert(kRHIAddressModeCount == 4)`를 두어 다음 추가가 컴파일에서 걸리게 했다.
+
+### 설계가 기계적인 이유 — `coordinates`가 완주 레일이다
+
+```
+GltfImporter.slot()  →  TextureSlot.uvSet/offset/tiling/rotation
+  → SceneToModelDraft:519  →  TextureReference.coordinates
+    → CookedModelCodec(쓰기/읽기)  →  ExperimentMaterialSealing:330
+      → binding.coordinates  →  MaterialKey.coordinates  →  패스
+```
+
+`coordinates`가 나오는 자리마다 옆에 `sampler`를 놓았다. `MaterialKey`에 들어가니
+**배치가 샘플러별로 저절로 갈리고**, 그래서 draw마다 자기 테이블을 걸 수 있다 —
+셰이더도 루트 시그니처도 `.shadermeta`도 건드리지 않는다.
+
+★ **`.shadermeta` 스키마 결정: 더하지 않는다.** shadermeta는 셰이더가 *선언*하는
+것을 적고, 샘플러는 재질이 *참조*와 함께 나르는 것이다. 여기 넣으면 같은 사실을
+두 곳에 적게 된다.
+
+### 착지
+
+| 자리 | 무엇을 했나 |
+|---|---|
+| `RHIPipelineLayout.h` | `RHIAddressMode::Mirror` + `kRHIAddressModeCount` |
+| 변환표 3곳 | Mirror 케이스 + 수 static_assert |
+| `ImportedScene.h` | `TextureFilter` + `TextureSlot.filter`/`mipFilter` |
+| `GltfImporter.cpp` | `ApplyGltfSampler` — samplerIndex를 읽어 slot에 싣는다 |
+| `Assets/TextureSampler.h` | `assets::TextureSampler`(신설) |
+| `ModelData.h` | `TextureReference.sampler` |
+| `SceneToModelDraft.cpp` | import 어휘 → RHI 어휘 변환 **단일 지점** |
+| `CookedModelFormat.h` | `kFormatVersion` 8 → 9 |
+| `AuthoredMaterialDigest.h` | 샘플러만 다른 재질이 같은 지문을 갖지 않게 |
+| `EnhancedRenderPass.h` | `binding.sampler` |
+| `MaterialTextureTable.h` | `EffectiveSampler` |
+| 두 패스 | `MaterialKey.sampler` · `SamplerTableFor` 캐시 · 배치별 `SetSamplers` |
+| 장부 | `samplerIdentity`를 **이 배치가 걸 것**에서 |
+
+`GetSamplerIdentity()`는 이제 **패스의 폴백** 신원이다 — 이름이 그 뜻을 담지 못해
+양쪽 선언에 그 사실을 적어 두었다. 프레임이 실제로 건 것들은 장부 바인딩에 있다.
+
+### fixture — `Tools/regression/fixtures/pbr-sampler/`
+
+손으로 만들었다(6.5K). Khronos `TextureSettingsTest`가 이 축의 정본 자산이지만
+83K·CC-BY(표시 의무)·`Dynamic_CPP/Assets/Models/*`가 ignore라, §18의 판단대로
+**게이트 fixture는 직접 만들고** Khronos 것은 눈으로 보는 용도로 추적 밖에 둔다.
+
+이미지 **하나**를 texture 3개가 sampler 3종(REPEAT / CLAMP_S / MIRROR+Point)으로
+참조한다. UV를 **0..2**로 둔 이유는 `[0,1]` 안에서는 wrap이 무엇이든 결과가 같아
+**wrap을 아예 읽지 않는 회귀가 통과하기** 때문이고, 이미지를 사분면마다 다른 색으로
+그린 이유는 좌우 대칭이면 **MIRROR와 REPEAT가 같은 그림이 되기** 때문이다.
+
+### 자극하지 못하는 축 — 주장하지 않는다
+
+- **재질 안 슬롯별 분기.** 셰이더에 `gSampler : register(s0)` 하나뿐이라 표현할 수
+  없고, `EffectiveSampler`가 "가장 낮은 레지스터가 이긴다"로 못 박았다. 저장소
+  자산에 이 분기가 **0건**이다(`.gltf` 3종 · 텍스처 둘 이상인 재질 2건 · 분기 0).
+- **Anisotropic.** 위 참조.
+
+### 게이트
+
+`Assert-SamplerModes`가 캡처의 `sealLedger.*.bindings[].samplerIdentity`에서
+**서로 다른 값이 2 이상**인지, 그리고 **0이 섞이지 않았는지**를 묻는다. W7 이전에는
+이 수가 어느 캡처에서든 항상 1이었고, §18의 게이트는 그 수를 **세기만 하고 판정하지
+않았다** — 변이를 만들 슬라이스가 바로 여기였기 때문이다. 축 회계에 `<api>/sampler`가
+추가된다.
+
+### 배선을 다 잇고도 축이 죽어 있었다 — 그리고 장부가 옳았다
+
+첫 실행에서 `distinct samplerIdentity` 가 **1** 이었다. 홉을 셋 더 찾아 채웠는데도
+1이었다. 빠진 홉은 실재했다:
+
+| 놓친 홉 | 무엇이 없었나 |
+|---|---|
+| `assets::ModelMaterialTexture` | 필드 자체가 없어 저작→모델자산 경계에서 소실 |
+| `ExperimentMaterialMigration` (모델자산→스냅샷) | 복귀에서 소실 |
+| `MaterialAuthoringCodec` | `.material` 저작 저장/읽기에서 소실 |
+
+★ 저작 코덱은 **기본값이 아닐 때만** 키를 적는다. 이 코덱은 미지 키를 fail-closed 로
+거부하므로, 무조건 적으면 기존 `.material` 전부가 다음 저장에서 키 넷을 얻고 옛 리더가
+새 파일을 못 읽는다.
+
+그런데 셋을 다 채우고도 여전히 1이었다. **진짜 원인은 배선이 아니었다.**
+`EnhancedMaterialSealHash.h` 의 `AppendTextureBinding` 이 `coordinates` 는 접고
+`sampler` 는 안 접었다. 그래서 wrap 만 다른 재질 셋이 **같은 `sealHash`** 를 갖고,
+W8 의 불변식("같은 seal 은 같은 바인딩")이 **옳게 발동해** draw 둘을 버렸다 —
+`bindingConflict 2 · skipped 2 · lastReason "같은 seal에 서로 다른 texture/sampler
+배치가 그려졌다"`. 살아남은 하나만 장부에 남으니 distinct 가 1로 보인 것이다.
+
+★ 그래서 게이트가 distinct 만 세면 부족하다. `Assert-SamplerModes` 는
+`bindingConflict`·`skipped` 를 함께 묻는다 — 그 둘이 "축이 살았다"와 "축이 충돌해
+죽었다"를 가른다. 이번에 그 숫자가 원인을 한 번에 가리켰다.
+
+### 실측 (2026-09-14)
+
+빌드 exit 0 · 오류 0. dx12 **축 다섯 전부 PASS**:
+
+```
+draw identity: distinct pso=1 sampler=1 descriptorVersion=1 (dx12-primitives)
+draw identity: distinct pso=2 sampler=1 descriptorVersion=1 (dx12-gunner)
+draw identity: distinct pso=2 sampler=1 descriptorVersion=1 (dx12-normalpair)
+draw identity: distinct pso=3 sampler=1 descriptorVersion=1 (dx12-alphamodes)
+draw identity: distinct pso=3 sampler=3 descriptorVersion=1 (dx12-samplermodes)
+dx12 product capture PASS (primitives, gunner, normal-pair,
+                            alpha-modes+nonuniform-scale, sampler)
+```
+
+vulkan 도 같다 — `vulkan-samplermodes` 가 `draws 18 · bindings 18 · distinct 3 ·
+validation 0 · 충돌/생략 0` 이고, **세 신원 값이 dx12 와 같다**
+(`2677747970098898095` · `2987389514037885135` · `13823872880576982764`).
+
+### 쿠킹 버전 올림의 후속 — 재임포트와 쐐기 하나
+
+`kFormatVersion` 8→9 로 기존 캐시가 전부 fail-closed 거부된다(설계된 동작). 모델 17종을
+재임포트했고, 이는 선례가 있는 정규 절차다(`4106b5c7` "Prim 코퍼스 재임포트로
+generation 을 갱신한다").
+
+★ 그 과정에서 **`Prim_Cube` 하나만 결정적으로 임포트에 실패**했다. 내용은 다른
+primitive 와 구조가 같았고 다른 것은 **상태**였다 — sidecar 는 `generation: 7` 인데
+Library 에 8~15 가 남아 있어, `prior+1 = 8` 을 요구하는 `publish.preflight` 가 영구히
+거부했다. `.meta` 는 추적되고 `Library/` 는 ignore 라, sidecar 가 git 으로 되돌려지는
+동안 파생 Library 가 앞서 나가면 그 자산은 다시는 임포트되지 않는다. 코드는 옳게
+fail-closed 고 상태만 쐐기로 박힌 것이다. sidecar 보다 큰 고아 디렉터리 여덟을 지워
+풀었다(파생물이라 재임포트로 복구된다). 전수 점검 결과 쐐기는 17종 중 이 1건뿐이었다.
+
+### 게이트가 끝까지 못 가는 이유 둘 (W7 밖)
+
+1. **vulkan 스카이박스 기동 창.** `vulkan-primitives` 가 GPU 검증으로 실패한다 —
+   `gCubeMap`(Set 0, Binding 100)이 기록되지 않은 셋으로 그려진다. 경고는 앞쪽
+   구간에만 몰리고 그 뒤로 멎어, 캡처 1(frame 2040)만 그 창 안이고 캡처 2~5
+   (2076 이후)는 전부 통과한다. 기제는 `VulkanEncoder::SetBindings` 가 이미지 뷰
+   생성에 실패하면 pending 을 넣지 않고 돌아가는데 `Draw` 는 그대로 진행하는 것이다.
+   **sampler 와 무관하다** — 경고는 sampler fixture 적재 전에 나고, sampler 축이
+   갈리는 캡처들은 모두 통과한다. 별건으로 넘겼다.
+2. **`verify-experiment-contract.ps1` 링크 부패** — §15 가 적어 둔 기존 결함이다.
+
+게이트의 `wait` 를 늘려 1번의 창을 피하지 않았다. 그러면 재는 척만 하게 된다.

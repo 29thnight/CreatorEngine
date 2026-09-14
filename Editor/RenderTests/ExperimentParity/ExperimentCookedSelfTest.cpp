@@ -120,7 +120,10 @@ namespace RenderTest
                         && left.logicalName == right.logicalName
                         && left.fallbackPath == right.fallbackPath
                         && left.colorSpace == right.colorSpace
-                        && left.coordinates == right.coordinates;
+                        && left.coordinates == right.coordinates
+                        // W7 — 이 줄이 없으면 코덱이 sampler 를 통째로 떨궈도
+                        // 라운드트립이 초록이다.
+                        && left.sampler == right.sampler;
                 }
                 else return left == right;
             }, a);
@@ -369,6 +372,11 @@ namespace RenderTest
             texture.fallbackPath = u8"C:/자산/텍스처 이름.png";
             texture.colorSpace = ex::TextureColorSpace::Srgb;
             texture.coordinates = {1, {.25f, -.5f}, {-2.f, .75f}, .4f};
+            // 네 필드를 **전부 기본값이 아닌 값**으로 둔다. 하나라도 기본값이면
+            // 그 필드를 안 쓰는 코덱이 통과한다. Mirror 는 W7 이 새로 더한
+            // 열거자라 특히 그렇다.
+            texture.sampler = { RHIFilterMode::Point, RHIFilterMode::Point,
+                RHIAddressMode::Mirror, RHIAddressMode::Clamp };
 
             material.properties.push_back(property("b", true));
             material.properties.push_back(property("i", std::int32_t{ -7 }));

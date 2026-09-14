@@ -505,6 +505,36 @@ namespace experiment::importer
         }
 
         // ── 머테리얼 ────────────────────────────────────────────────────
+        // import IR 의 RHI-free 어휘 → 저작 IR 의 RHI 어휘. **이 변환은 여기
+        // 하나뿐이어야 한다** — 두 벌이 되면 한쪽만 Mirror 를 배우고 다른 쪽은
+        // Wrap 으로 접는 비대칭이 조용히 생긴다.
+        [[nodiscard]] RHIAddressMode ToAddressMode(TextureWrap wrap) noexcept
+        {
+            switch (wrap)
+            {
+            case TextureWrap::ClampToEdge:    return RHIAddressMode::Clamp;
+            case TextureWrap::MirroredRepeat: return RHIAddressMode::Mirror;
+            case TextureWrap::Repeat:
+            default:                          return RHIAddressMode::Wrap;
+            }
+        }
+
+        [[nodiscard]] RHIFilterMode ToFilterMode(TextureFilter filter) noexcept
+        {
+            return filter == TextureFilter::Nearest
+                ? RHIFilterMode::Point : RHIFilterMode::Linear;
+        }
+
+        [[nodiscard]] assets::TextureSampler ToAssetSampler(const TextureSlot& slot) noexcept
+        {
+            assets::TextureSampler sampler{};
+            sampler.minMag = ToFilterMode(slot.filter);
+            sampler.mip = ToFilterMode(slot.mipFilter);
+            sampler.addressU = ToAddressMode(slot.wrapU);
+            sampler.addressV = ToAddressMode(slot.wrapV);
+            return sampler;
+        }
+
         void AddTextureProperty(const ImportedScene& scene, const TextureSlot& slot,
             const std::string& propertyName, TextureColorSpace colorSpace,
             const ConversionOptions& options, const std::string& context,
@@ -518,6 +548,7 @@ namespace experiment::importer
             reference.colorSpace = colorSpace;
             reference.coordinates = {slot.uvSet, {slot.offset.x, slot.offset.y},
                 {slot.tiling.x, slot.tiling.y}, slot.rotation};
+            reference.sampler = ToAssetSampler(slot);
             if (options.resolveTextureAsset)
             {
                 reference.assetId = options.resolveTextureAsset(texture);

@@ -3,6 +3,7 @@
 #include "Uuid.h"
 #include "VertexLayout.h"
 #include "../Assets/TextureCoordinates.h"
+#include "../Assets/TextureSampler.h"
 
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
@@ -317,6 +318,10 @@ namespace experiment
 		std::filesystem::path fallbackPath{};
 		TextureColorSpace colorSpace{ TextureColorSpace::Linear };
         assets::TextureCoordinates coordinates{};
+        // W7 — coordinates 와 같은 범주다(참조의 성질, 이미지 신원과 무관).
+        // 값이 여기까지 오기 전에는 패스가 Initialize 에서 만든 하나가 프레임
+        // 내내 모든 재질에 걸렸다.
+        assets::TextureSampler sampler{};
 	};
 
 	using MaterialPropertyValue = std::variant<

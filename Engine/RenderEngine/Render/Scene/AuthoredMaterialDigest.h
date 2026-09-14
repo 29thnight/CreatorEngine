@@ -64,6 +64,13 @@ namespace EnhancedAuthoredMaterialDigest
                 digest.F32(held.coordinates.scale[0]);
                 digest.F32(held.coordinates.scale[1]);
                 digest.F32(held.coordinates.rotation);
+                // W7 — sampler 만 다른 재질 둘이 같은 저작 지문을 갖지 않게 한다.
+                // TextureSettingsTest 의 재질 열은 baseColor GUID·UV 가 모두 같고
+                // wrap 만 다르다 — 이 네 줄이 없으면 전부 한 지문이 된다.
+                digest.U32(static_cast<std::uint32_t>(held.sampler.minMag));
+                digest.U32(static_cast<std::uint32_t>(held.sampler.mip));
+                digest.U32(static_cast<std::uint32_t>(held.sampler.addressU));
+                digest.U32(static_cast<std::uint32_t>(held.sampler.addressV));
             }
         }, value);
     }

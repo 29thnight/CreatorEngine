@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -354,6 +355,104 @@ namespace experiment::importer
             for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3)
             {
                 std::swap(mesh.indices[i], mesh.indices[i + 2]);
+            }
+        }
+
+        // ── 샘플러 ──────────────────────────────────────────────────────
+        //
+        // ★ 샘플러는 **참조의 성질**이지 이미지의 성질이 아니다. glTF 의
+        //   texture = { source, sampler } 라 같은 이미지를 wrap 만 달리해 여러 번
+        //   참조하는 것이 정상이다(TextureSettingsTest 는 image 3 개를 texture
+        //   9 개가 나눠 쓴다). 그래서 이 값들은 ImportedTexture 가 아니라
+        //   TextureSlot 에 싣는다 — ResolveTexture 의 imageIndex 캐시는 그대로
+        //   두어야 하고, 두면 된다.
+        [[nodiscard]] TextureWrap ToTextureWrap(fastgltf::Wrap wrap)
+        {
+            switch (wrap)
+            {
+            case fastgltf::Wrap::ClampToEdge:    return TextureWrap::ClampToEdge;
+            case fastgltf::Wrap::MirroredRepeat: return TextureWrap::MirroredRepeat;
+            case fastgltf::Wrap::Repeat:
+            default:                             return TextureWrap::Repeat;
+            }
+        }
+
+        // glTF 의 minFilter 는 min 과 mip 을 한 값에 접어 넣는다. 펴서 돌려준다.
+        // second 가 없다는 것은 **밉을 쓰지 않겠다**는 뜻인데 RHISamplerDesc 에
+        // 그 표현이 없다 — 호출부가 적고 Linear 로 간다.
+        struct SplitMinFilter final
+        {
+            TextureFilter min{ TextureFilter::Linear };
+            std::optional<TextureFilter> mip{};
+        };
+
+        [[nodiscard]] SplitMinFilter SplitGltfMinFilter(fastgltf::Filter filter)
+        {
+            using F = fastgltf::Filter;
+            switch (filter)
+            {
+            case F::Nearest:              return { TextureFilter::Nearest, std::nullopt };
+            case F::Linear:               return { TextureFilter::Linear,  std::nullopt };
+            case F::NearestMipMapNearest: return { TextureFilter::Nearest, TextureFilter::Nearest };
+            case F::LinearMipMapNearest:  return { TextureFilter::Linear,  TextureFilter::Nearest };
+            case F::NearestMipMapLinear:  return { TextureFilter::Nearest, TextureFilter::Linear };
+            case F::LinearMipMapLinear:
+            default:                      return { TextureFilter::Linear,  TextureFilter::Linear };
+            }
+        }
+
+        void ApplyGltfSampler(const fastgltf::Asset& asset,
+            const fastgltf::TextureInfo& info, TextureSlot& out, ImportNoteSink& notes)
+        {
+            if (info.textureIndex >= asset.textures.size()) return;
+            const fastgltf::Texture& texture = asset.textures[info.textureIndex];
+            // sampler 가 없으면 glTF 규약상 "repeat + auto filter" 이고, 그것이
+            // TextureSlot 의 기본값이다 — 손대지 않는 것이 정답이다.
+            if (!texture.samplerIndex.has_value()
+                || *texture.samplerIndex >= asset.samplers.size())
+            {
+                return;
+            }
+
+            const fastgltf::Sampler& sampler = asset.samplers[*texture.samplerIndex];
+            out.wrapU = ToTextureWrap(sampler.wrapS);
+            out.wrapV = ToTextureWrap(sampler.wrapT);
+
+            if (sampler.minFilter.has_value())
+            {
+                const SplitMinFilter split = SplitGltfMinFilter(*sampler.minFilter);
+                out.filter = split.min;
+                if (split.mip.has_value())
+                {
+                    out.mipFilter = *split.mip;
+                }
+                else
+                {
+                    notes.Warn(ImportNoteCode::UnsupportedFeature, "samplers",
+                        "밉을 쓰지 않는 minFilter 다 — RHI 에 '밉 없음' 표현이 "
+                        "없어 밉 선형으로 간다.");
+                }
+            }
+
+            // ★ min≠mag 는 조용히 버리지 않는다. RHISamplerDesc 가 minMag 를
+            //   하나로 들어(D3D12_FILTER 사정) 표현할 수 없으므로, 적고 min 을
+            //   택한다. 축소가 일어난 사실이 남아야 나중에 어휘를 넓힐지 정할
+            //   근거가 된다.
+            if (sampler.magFilter.has_value())
+            {
+                const TextureFilter mag =
+                    (*sampler.magFilter == fastgltf::Filter::Nearest)
+                    ? TextureFilter::Nearest : TextureFilter::Linear;
+                if (sampler.minFilter.has_value() && mag != out.filter)
+                {
+                    notes.Warn(ImportNoteCode::UnsupportedFeature, "samplers",
+                        "magFilter 와 minFilter 가 다르다 — RHI 는 둘을 한 값으로 "
+                        "들어 min 을 택한다.");
+                }
+                else if (!sampler.minFilter.has_value())
+                {
+                    out.filter = mag;
+                }
             }
         }
 
@@ -735,6 +834,7 @@ namespace experiment::importer
                     out.tiling = {uv.uvScale.x(), uv.uvScale.y()};
                     out.rotation = uv.rotation;
                 }
+                ApplyGltfSampler(asset, info, out, notes);
                 return out;
             };
 

@@ -74,7 +74,11 @@ namespace experiment::cooked
     // material conversion. Older cached values already lost these semantics.
     // 7: preserve emissiveStrength; old caches discarded non-unit strengths.
     // 8: texture references preserve UV selection and affine transform.
-    inline constexpr std::uint32_t kFormatVersion = 8u;
+    // 9 (2026-09-14): texture reference 가 자기 sampler 를 나른다. 임포터가
+    //   glTF 의 texture.samplerIndex 를 읽은 적이 없어 구 캐시는 wrap/filter 를
+    //   전부 기본값으로 담고 있다 — 레이아웃이 아니라 값이 비어 있는 쪽이라
+    //   재임포트해야 채워진다.
+    inline constexpr std::uint32_t kFormatVersion = 9u;
 
     // V3부터 헤더는 특정 mesh mask가 아니라 전체 기술표의 지문을 기록한다.
     // 각 mesh의 실제 배치는 CookedMesh의 mask에서 같은 표로 유도한다.

@@ -9,6 +9,7 @@
 #include "ModelAssetPhaseTiming.h"
 #include "ModelVertexLayout.h"
 #include "TextureCoordinates.h"
+#include "TextureSampler.h"
 #include "../RHI/RHIFormat.h"
 
 #include <mathematics/bounds.hpp>
@@ -91,6 +92,11 @@ namespace assets
     {
         ModelTextureHandle handle{};
         TextureCoordinates coordinates{};
+        // ★ W7 — coordinates 와 반드시 **함께** 다닌다. 이 구조체가 저작
+        //   TextureReference 와 별개라, 한쪽에만 필드를 더하면 그 값은 모델
+        //   자산을 지나며 조용히 사라진다(실제로 sampler 가 그렇게 사라져
+        //   장부의 samplerIdentity 가 계속 하나였다).
+        TextureSampler sampler{};
     };
 
     using ModelMaterialPropertyValue = std::variant<

@@ -308,7 +308,8 @@ namespace
 
 bool EnhancedForwardPass::MaterialKey::operator==(const MaterialKey& other) const
 {
-    if (coordinates != other.coordinates || textures != other.textures
+    if (coordinates != other.coordinates || sampler != other.sampler
+        || textures != other.textures
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -344,8 +345,32 @@ bool EnhancedForwardPass::MaterialKey::operator<(const MaterialKey& other) const
             return snapshot->flow.Values() < other.snapshot->flow.Values();
     }
     if (coordinates != other.coordinates) return coordinates < other.coordinates;
+    if (sampler != other.sampler) return sampler < other.sampler;
     return std::lexicographical_compare(textures.begin(), textures.end(),
         other.textures.begin(), other.textures.end(), std::less<Texture*>{});
+}
+
+RHISamplerTable EnhancedForwardPass::SamplerTableFor(
+    const EnhancedFrameContext& context, const assets::TextureSampler& sampler)
+{
+    if (const auto found = m_samplerTables.find(sampler);
+        found != m_samplerTables.end())
+    {
+        return found->second;
+    }
+    if (nullptr == context.resources) return m_sampler;
+    // 첫 칸만 재질 것으로 갈고 IBL·그림자는 Initialize 와 같은 값을 다시 쓴다 —
+    // 여기서 값을 달리 적으면 불투명과 투명이 같은 자리에서 다른 그늘을 낸다.
+    const RHISamplerDesc samplers[] = {
+        sampler.ToDesc(),
+        RHISampler::Linear(RHIAddressMode::Clamp),
+        RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border,
+            RHIBorderColor::OpaqueWhite),
+    };
+    const RHISamplerTable table = context.resources->CreateSamplers(samplers);
+    if (!table.IsValid()) return m_sampler;
+    m_samplerTables.emplace(sampler, table);
+    return table;
 }
 
 bool EnhancedForwardPass::ResolveMaterialView(const EnhancedDrawItem& draw,
@@ -385,6 +410,7 @@ EnhancedForwardPass::MaterialKey EnhancedForwardPass::MakeMaterialKey(
     {
         key.textures = MaterialTextureTable::Owners(*draw.forwardMaterialSnapshot);
         key.coordinates = MaterialTextureTable::Coordinates(*draw.forwardMaterialSnapshot);
+        key.sampler = MaterialTextureTable::EffectiveSampler(*draw.forwardMaterialSnapshot);
         key.snapshot = draw.forwardMaterialSnapshot;
     }
     else
@@ -546,6 +572,9 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
             outError = "Forward+ 샘플러 생성 실패";
             return false;
         }
+        // 기본값 샘플러는 여기 첫 칸과 같다 — 선언 없는 자산이 그 값으로 온다.
+        m_samplerTables.clear();
+        m_samplerTables.emplace(assets::TextureSampler{}, m_sampler);
     }
 
     // GBuffer와 같은 정점 레이아웃을 쓰므로 같은 단정을 건다.
@@ -1338,7 +1367,9 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
             EnhancedDrawSealLedger::Binding binding{};
             binding.textureDigest = EnhancedMaterialSeal::ComputeTextureDigest(
                 key.snapshot->textureBindings);
-            binding.samplerIdentity = m_samplerIdentity;
+            // W7 — 패스 전역이 아니라 이 배치가 걸 것의 신원이다.
+            binding.samplerIdentity = EnhancedMaterialSeal::ComputeSamplerIdentity(
+                key.sampler.ToDesc());
             binding.pipelineId = shadePipeline.id;
             // W0 — GBuffer 쪽과 같은 값을 같은 규칙으로 적는다.
             binding.descriptorVersion = nullptr != context.resources
@@ -1788,7 +1819,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(m_tileCountBuffer));
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, RHIBufferSlice::Whole(m_tileListBuffer));
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 9, paletteBuffer);
-        encoder.SetSamplers(RHIBindPoint::Graphics, 7, m_sampler);
+        encoder.SetSamplers(RHIBindPoint::Graphics, 7,
+            SamplerTableFor(context, batch.material.sampler));
         encoder.SetBindings(RHIBindPoint::Graphics, 6, frameTable);
 
         const bool hasSnapshot = batch.material.snapshot

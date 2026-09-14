@@ -52,7 +52,16 @@ enum class RHIAddressMode
     Wrap,
     Clamp,
     Border,
+    // W7 이 더했다 — glTF 의 MIRRORED_REPEAT(33648) 에는 대체할 값이 없다.
+    // Wrap 으로 접으면 경계 너머가 뒤집히지 않고, Clamp 로 접으면 아예 늘어난다.
+    Mirror,
 };
+
+// ★ 백엔드 변환표가 셋인데 모두 `default:` 낙하였다 — 열거자를 하나 더해도
+//   경고 없이 DX12 는 WRAP, Vulkan 은 CLAMP_TO_EDGE 로 **서로 다르게** 접혔다.
+//   Editor 는 /W0 라 C4061/C4062 에 기댈 수 없으므로, 표마다 이 수를 static_assert
+//   해 다음 추가가 컴파일에서 걸리게 한다.
+inline constexpr std::uint32_t kRHIAddressModeCount = 4;
 
 // None 이 "비교 샘플러가 아니다"를 뜻한다.
 //

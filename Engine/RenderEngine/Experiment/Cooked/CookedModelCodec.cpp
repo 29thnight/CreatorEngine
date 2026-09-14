@@ -417,6 +417,10 @@ namespace experiment::cooked
                         materialBytes.Pod(value.coordinates.offset);
                         materialBytes.Pod(value.coordinates.scale);
                         materialBytes.Pod(value.coordinates.rotation);
+                        materialBytes.Pod(static_cast<std::uint8_t>(value.sampler.minMag));
+                        materialBytes.Pod(static_cast<std::uint8_t>(value.sampler.mip));
+                        materialBytes.Pod(static_cast<std::uint8_t>(value.sampler.addressU));
+                        materialBytes.Pod(static_cast<std::uint8_t>(value.sampler.addressV));
                     }
                     else
                     {
@@ -905,6 +909,14 @@ namespace experiment::cooked
                         reference.coordinates.offset = cursor.Pod<std::array<float, 2>>();
                         reference.coordinates.scale = cursor.Pod<std::array<float, 2>>();
                         reference.coordinates.rotation = cursor.Pod<float>();
+                        reference.sampler.minMag =
+                            static_cast<RHIFilterMode>(cursor.Pod<std::uint8_t>());
+                        reference.sampler.mip =
+                            static_cast<RHIFilterMode>(cursor.Pod<std::uint8_t>());
+                        reference.sampler.addressU =
+                            static_cast<RHIAddressMode>(cursor.Pod<std::uint8_t>());
+                        reference.sampler.addressV =
+                            static_cast<RHIAddressMode>(cursor.Pod<std::uint8_t>());
                         property.value = std::move(reference);
                         break;
                     }

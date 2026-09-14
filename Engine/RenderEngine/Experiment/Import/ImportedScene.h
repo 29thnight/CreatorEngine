@@ -256,6 +256,18 @@ namespace experiment::importer
         MirroredRepeat,
     };
 
+    // ★ min 과 mag 를 가르지 않는다. glTF 는 magFilter 와 minFilter 를 따로
+    //   주지만 RHISamplerDesc 는 minMag 하나로 든다(D3D12_FILTER 가 셋을 한 값에
+    //   접어 넣기 때문이다 — RHIPipelineLayout.h 가 그 이유를 적어 두었다).
+    //   여기서 셋으로 들었다가 아래에서 둘로 줄이면 **줄이는 자리가 두 곳**이
+    //   되므로, 표현할 수 있는 모양 그대로 든다. glTF 가 min≠mag 를 주면
+    //   임포터가 UnsupportedFeature 로 적고 min 을 택한다 — 조용히 버리지 않는다.
+    enum class TextureFilter : std::uint8_t
+    {
+        Nearest,
+        Linear,
+    };
+
     struct TextureSlot final
     {
         ImportTextureIndex texture{};
@@ -265,6 +277,11 @@ namespace experiment::importer
         float rotation{};
         TextureWrap wrapU{ TextureWrap::Repeat };
         TextureWrap wrapV{ TextureWrap::Repeat };
+        // 기본값은 glTF 가 sampler 를 안 줄 때의 관행(선형 + 밉 선형)이자
+        // 패스가 지금 걸고 있는 값이다 — 배선이 붙어도 기존 자산의 그림은
+        // 그대로다.
+        TextureFilter filter{ TextureFilter::Linear };
+        TextureFilter mipFilter{ TextureFilter::Linear };
 
         [[nodiscard]] bool IsValid() const noexcept { return texture.IsValid(); }
     };

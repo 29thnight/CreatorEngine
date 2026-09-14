@@ -101,10 +101,22 @@ namespace assets
             fp.U32(slot.uvSet);
             fp.F32(slot.offset.x); fp.F32(slot.offset.y);
             fp.F32(slot.tiling.x); fp.F32(slot.tiling.y);
+            // W7 이전에 이 둘은 **쓰는 자가 없어 항상 기본값**이었다 — 지문에
+            // 들어 있으면서 엔트로피 기여가 0 이었다. 이제 임포터가 채우므로,
+            // sampler 를 선언한 자산만 지문이 달라진다(= 내용이 실제로 달랐던
+            // 자산만 재임포트된다).
             fp.U32(static_cast<std::uint32_t>(slot.wrapU));
             fp.U32(static_cast<std::uint32_t>(slot.wrapV));
             // Preserve existing fingerprints for identity/default rotations.
             if (slot.rotation != 0.f) { fp.Tag("uv.rotation"); fp.F32(slot.rotation); }
+            // 같은 이유로 필터도 기본값(선형/선형)일 때는 적지 않는다.
+            if (slot.filter != im::TextureFilter::Linear
+                || slot.mipFilter != im::TextureFilter::Linear)
+            {
+                fp.Tag("sampler.filter");
+                fp.U32(static_cast<std::uint32_t>(slot.filter));
+                fp.U32(static_cast<std::uint32_t>(slot.mipFilter));
+            }
         }
 
         [[nodiscard]] std::string TextureFingerprint(const im::ImportedTexture& texture)

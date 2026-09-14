@@ -110,6 +110,9 @@ public:
     /// W8 — 이번 프레임 draw의 세대 신원 장부. 위반 수가 0이 아니면 그림을
     /// 믿으면 안 된다. 밖에서 판정할 수 있어야 게이트가 선다.
     const EnhancedDrawSealLedger& GetSealLedger() const { return m_sealLedger; }
+    // ★ W7 이후 이것은 **패스의 기본(폴백) 샘플러** 신원이지 프레임이 실제로
+    //   건 것들의 전부가 아니다. draw 마다의 값은 장부 바인딩의
+    //   samplerIdentity 에 있다 — 캡처에서 그쪽을 읽어라.
     std::uint64_t GetSamplerIdentity() const { return m_samplerIdentity; }
 
     /// 이 패스를 컬링 뿌리로 표시할지.
@@ -175,6 +178,8 @@ private:
     {
         std::vector<Texture*> textures{};
         std::vector<assets::TextureCoordinates> coordinates{};
+        // W7 — 배치가 샘플러로도 갈려야 draw 마다 자기 것을 걸 수 있다.
+        assets::TextureSampler sampler{};
         std::shared_ptr<const EnhancedMaterialDrawSnapshot> snapshot{};
 
         bool operator==(const MaterialKey& other) const;
@@ -299,6 +304,12 @@ private:
     std::vector<math::matrix4x4>          m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;   // 애니메이터 키 → 오프셋
     RHISamplerTable                                 m_sampler{};
+    // W7 — 재질이 선언한 샘플러마다 테이블 하나. 배치 키가 샘플러로 갈리므로
+    // 실제 개수는 프레임의 **서로 다른 샘플러 수**이지 draw 수가 아니다
+    // (TextureSettingsTest 는 재질 10 개에 샘플러 5 종이다).
+    std::map<assets::TextureSampler, RHISamplerTable> m_samplerTables{};
+    [[nodiscard]] RHISamplerTable SamplerTableFor(
+        const EnhancedFrameContext& context, const assets::TextureSampler& sampler);
 
     // 프레임 밀봉된 뷰·투영을 곱해 둔 것. Record에서 스냅샷을 다시 읽지 않는다.
     math::matrix4x4 m_frameViewProjection{ math::matrix4x4::identity() };

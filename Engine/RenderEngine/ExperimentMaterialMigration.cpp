@@ -420,6 +420,7 @@ namespace ExperimentMaterialMigration
                     experiment::TextureReference reference;
                     reference.assetId.value = value.handle.textureId;
                     reference.coordinates = value.coordinates;
+                    reference.sampler = value.sampler;
                     reference.logicalName = property.name;
                     // External handles have no generation texture record; their
                     // Standard semantic still determines the sampling color space.

@@ -68,7 +68,8 @@ namespace
 
 bool EnhancedGBufferPass::MaterialKey::operator==(const MaterialKey& other) const
 {
-    if (coordinates != other.coordinates || textures != other.textures
+    if (coordinates != other.coordinates || sampler != other.sampler
+        || textures != other.textures
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -102,6 +103,7 @@ bool EnhancedGBufferPass::MaterialKey::operator<(const MaterialKey& other) const
             return snapshot->propertyBytes < other.snapshot->propertyBytes;
     }
     if (coordinates != other.coordinates) return coordinates < other.coordinates;
+    if (sampler != other.sampler) return sampler < other.sampler;
     return std::lexicographical_compare(textures.begin(), textures.end(),
         other.textures.begin(), other.textures.end(), std::less<Texture*>{});
 }
@@ -114,6 +116,7 @@ EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
     {
         key.textures = MaterialTextureTable::Owners(*draw.materialSnapshot);
         key.coordinates = MaterialTextureTable::Coordinates(*draw.materialSnapshot);
+        key.sampler = MaterialTextureTable::EffectiveSampler(*draw.materialSnapshot);
         key.snapshot = draw.materialSnapshot;
     }
     else
@@ -417,7 +420,11 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
                 EnhancedDrawSealLedger::Binding binding{};
                 binding.textureDigest = EnhancedMaterialSeal::ComputeTextureDigest(
                     key.snapshot->textureBindings);
-                binding.samplerIdentity = m_samplerIdentity;
+                // W7 — 패스 전역 하나가 아니라 **이 배치가 걸 것**의 신원이다.
+                // 배치 키가 샘플러로 갈리므로 이 값과 아래 SetSamplers 의 테이블은
+                // 같은 key.sampler 에서 나온다.
+                binding.samplerIdentity = EnhancedMaterialSeal::ComputeSamplerIdentity(
+                    key.sampler.ToDesc());
                 binding.pipelineId = batch.pipeline.id;
                 // W0 — 이 배치의 descriptor 가 어느 버전에서 잘렸는지. 기록만 하고
                 // 신원(operator==)에는 넣지 않는다(장부 주석 참조).
@@ -911,7 +918,31 @@ bool EnhancedGBufferPass::Initialize(const EnhancedFrameContext& context, std::s
         return false;
     }
 
+    // 기본값 샘플러를 캐시에 심어 둔다 — 샘플러를 선언하지 않은 자산은
+    // assets::TextureSampler{} 로 오고, 그 값이 여기 있는 desc 와 같다.
+    m_samplerTables.clear();
+    m_samplerTables.emplace(assets::TextureSampler{}, m_sampler);
     return true;
+}
+
+RHISamplerTable EnhancedGBufferPass::SamplerTableFor(
+    const EnhancedFrameContext& context, const assets::TextureSampler& sampler)
+{
+    if (const auto found = m_samplerTables.find(sampler);
+        found != m_samplerTables.end())
+    {
+        return found->second;
+    }
+    // ★ 만들지 못하면 기본 테이블로 간다. 샘플러 하나 때문에 draw 를 버리면
+    //   화면에서 물체가 사라지는데, 그 손실은 wrap 이 틀린 것보다 크다 —
+    //   대신 장부의 samplerIdentity 는 **걸려던 것**을 적으므로 어긋남이
+    //   게이트에 남는다.
+    if (nullptr == context.resources) return m_sampler;
+    const RHISamplerDesc desc = sampler.ToDesc();
+    const RHISamplerTable table = context.resources->CreateSamplers({ &desc, 1 });
+    if (!table.IsValid()) return m_sampler;
+    m_samplerTables.emplace(sampler, table);
+    return table;
 }
 
 void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
@@ -1123,7 +1154,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 encoder.SetPipeline(RHIBindPoint::Graphics, batch.pipeline);
                 // A material may change the reflected table length/root layout.
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameConstants);
-                encoder.SetSamplers(RHIBindPoint::Graphics, 3, m_sampler);
+                encoder.SetSamplers(RHIBindPoint::Graphics, 3,
+                    SamplerTableFor(context, batch.material.sampler));
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer);
 
                 // M6-P1a: property bytes는 batch key의 일부다. 같은 texture/mesh라도

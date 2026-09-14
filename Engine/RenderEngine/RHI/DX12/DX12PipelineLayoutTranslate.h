@@ -54,10 +54,14 @@ namespace DX12Translate
 
     inline D3D12_TEXTURE_ADDRESS_MODE ToD3D12(RHIAddressMode address)
     {
+        static_assert(kRHIAddressModeCount == 4,
+            "RHIAddressMode 가 늘었다 — 이 표를 함께 채워라. default: 가 있어 "
+            "빠뜨려도 경고가 뜨지 않는다(/W0).");
         switch (address)
         {
         case RHIAddressMode::Clamp:  return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
         case RHIAddressMode::Border: return D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        case RHIAddressMode::Mirror: return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
         case RHIAddressMode::Wrap:
         default:                     return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         }

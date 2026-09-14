@@ -163,6 +163,9 @@ public:
 
     /// W8 — 이번 프레임 draw의 세대 신원 장부. GBuffer와 같은 뜻이다.
     const EnhancedDrawSealLedger& GetSealLedger() const { return m_sealLedger; }
+    // ★ W7 이후 이것은 **패스의 기본(폴백) 샘플러** 신원이지 프레임이 실제로
+    //   건 것들의 전부가 아니다. draw 마다의 값은 장부 바인딩의
+    //   samplerIdentity 에 있다 — 캡처에서 그쪽을 읽어라.
     std::uint64_t GetSamplerIdentity() const { return m_samplerIdentity; }
 
     /// 타일 버퍼. 소유는 패스이고(프레임을 넘겨 산다), 상태는 그래프가
@@ -373,6 +376,12 @@ private:
     // 재질 텍스처 샘플러. 샘플러 힙이 중복을 걸러 주므로 GBuffer와 같은
     // 설정이면 같은 핸들이 온다.
     RHISamplerTable             m_sampler{};
+    // W7 — 재질 샘플러마다 **테이블 셋**을 새로 만든다. 첫 칸만 재질 것이고
+    // IBL·그림자 둘은 프레임 내내 같지만, 테이블이 연속이어야 해서 셋을 함께
+    // 만들 수밖에 없다(Initialize 주석이 같은 이유를 적어 두었다).
+    std::map<assets::TextureSampler, RHISamplerTable> m_samplerTables{};
+    [[nodiscard]] RHISamplerTable SamplerTableFor(
+        const EnhancedFrameContext& context, const assets::TextureSampler& sampler);
 
     // 이번 프레임에 올려 둔 베이스 컬러. PrepareFrame이 채우고 기록은
     // 조회만 한다 — GetOrUpload는 업로드 링과 커맨드 리스트를 쓰므로
@@ -386,6 +395,8 @@ private:
     {
         std::vector<Texture*> textures{};
         std::vector<assets::TextureCoordinates> coordinates{}; // reflected register order
+        // W7 — 배치가 샘플러로도 갈려야 draw 마다 자기 것을 걸 수 있다.
+        assets::TextureSampler sampler{};
         std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> snapshot{};
 
         Texture* operator[](std::size_t i) const { return textures[i]; }
