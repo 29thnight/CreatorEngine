@@ -1229,3 +1229,53 @@ dx12 product capture PASS (primitives, normal-pair): ...
 ```
 
 PASS 줄이 Gunner 를 부르지 않고, 이유가 남고, 캡처 수 기대도 따라 줄었다.
+
+### fixture 둘을 더 채웠다 — 외부 자산 없이
+
+`Tools/regression/fixtures/pbr-alpha-mask/` (504바이트 + 생성기). 쿼드 셋 · 재질 셋
+(`OPAQUE` · `MASK` cutoff 0.5 · `BLEND`)이 **같은 baseColor 텍스처**를 쓰고, 그 알파가
+사분면마다 0 / 0.25 / 0.75 / 1.0 이다.
+
+★ 알파를 0/1 로만 두지 않은 이유: 그러면 cutoff 가 0.1 이든 0.9 든 결과가 같아
+**cutoff 를 아예 읽지 않는 회귀가 통과한다.** 0.25 와 0.75 로 0.5 를 사이에 둔다.
+
+**비균등 스케일 축은 자산이 아니라 씬 변환이라 공짜다** — 같은 캡처에
+`object.transform ... 1.7 0.6 1.0` 로 겸한다. fixture 를 따로 만들 일이 아니었다.
+
+### 이 fixture 가 예상 밖으로 연 것 — forward 라우트
+
+실측: draw 11 중 **forward 1 · gbuffer 10**. `BLEND` 재질이 forward 로 간다.
+coverageFlags 는 셋으로 갈린다(`1` · `11` · `5`), PSO 도 셋이다.
+
+이것이 중요한 이유는 alpha 가 아니다. §18 의 draw↔바인딩 조인은 **라우트별로**
+찾도록 짰는데, 여기 전까지 모든 fixture 의 draw 가 gbuffer 라 **forward 장부가 늘
+비어 있었다** — 그 분기는 실행된 적이 없는 죽은 코드였고, §18 은 그 사실을
+"자극된 적 없다" 로 적어 두었다.
+
+변이로 확인했다. 조인을 라우트 무시(늘 `gbuffer` 장부에서 찾기)로 바꾸고 돌리니:
+
+```
+  draw identity: ... (dx12-primitives)     ← 통과
+  draw identity: ... (dx12-gunner)         ← 통과
+  draw identity: ... (dx12-normalpair)     ← 통과
+  Draw seal 1046041037998211809 has no forward binding (신원 없는 draw)  ← dx12-alphamodes
+```
+
+앞의 셋은 전부 gbuffer 라 라우트를 무시해도 **구별되지 않는다**. 네 번째가 잡았다.
+이 fixture 가 없었다면 그 변이는 조용히 통과했을 것이다.
+
+### W0 의 fixture 축 현황
+
+| fixture | 상태 |
+|---|---|
+| primitives | 섰다(저장소 소유) |
+| Gunner helmet/armor | 섰다 — 단 **추적 밖 자산**이라 선언된 선택 축이다 |
+| normal 대조쌍 | 섰다(저장소 소유 · §17) |
+| alpha mask | 섰다(저장소 소유) |
+| 비균등 스케일 | 섰다(씬 변환, 자산 아님) |
+| AO | **없다** — 원본이 추적 밖 폴더에 있고 아직 배선하지 않았다 |
+| emissive-only | **없다** — 위와 같다 |
+
+★ AO 와 emissive 는 "건너뜀" 이 아니라 **"아직 없음"** 이다. 둘은 다르다 — 건너뛴
+축은 게이트가 알고 이유를 적지만, 없는 축은 게이트가 모른다. 지금 축 회계에 그
+둘은 나타나지 않으며, 이 표가 그 자리를 대신한다.

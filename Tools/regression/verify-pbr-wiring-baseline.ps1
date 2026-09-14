@@ -19,7 +19,9 @@ $original = $null
 $process = $null
 # W1 fixture 가 model.load 로 복사되어 앉는 자리. finally 가 반드시 치운다 —
 # 게이트가 자산 트리에 잔해를 남기면 다음 실행의 전제가 달라진다.
-$importedNormalPair = Join-Path $root 'Dynamic_CPP\Assets\Models\NormalPair'
+$importedFixtures = @(
+    (Join-Path $root 'Dynamic_CPP\Assets\Models\NormalPair'),
+    (Join-Path $root 'Dynamic_CPP\Assets\Models\AlphaModes'))
 
 # ── 축 회계 ─────────────────────────────────────────────────────────────
 #
@@ -85,6 +87,24 @@ function Invoke-Editor([string]$Name, [string[]]$Commands, [int]$ExpectedExit = 
         throw "$Name has unsuccessful command results; artifacts: $run"
     }
     return $results
+}
+
+function Assert-AlphaModes([string]$Directory) {
+    $manifest = Get-Content -LiteralPath (Join-Path $Directory 'manifest.json') -Raw | ConvertFrom-Json
+    # ★ OPAQUE / MASK / BLEND 가 서로 다른 coverage 로 나와야 한다. 셋이 같은 값이면
+    #   blend mode 를 읽지 않는 회귀이고, 그때 cutoff 단정만 있으면 조용히 통과한다.
+    $flags = @($manifest.draws.coverageFlags | Sort-Object -Unique)
+    if ($flags.Count -lt 3) {
+        throw "Alpha modes did not produce distinct coverage (flags: $($flags -join ', ')): $Directory"
+    }
+    # ★ BLEND 는 forward 로 간다. 이 단정이 있는 진짜 이유는 alpha 가 아니라 **라우트**다 —
+    #   §18 의 draw↔바인딩 조인은 라우트별로 찾는데, 여기 전까지 모든 fixture 의 draw 가
+    #   gbuffer 라 forward 장부가 늘 비어 있었다. 두 장부를 합쳐 찾는 잘못된 구현도
+    #   통과했을 상태였다. 이 캡처가 그 축을 처음 자극한다.
+    $forward = @($manifest.draws | Where-Object route -EQ 'forward')
+    if (0 -eq $forward.Count) {
+        throw "Alpha fixture produced no forward-route draw (라우트 축이 비었다): $Directory"
+    }
 }
 
 function Assert-Capture([string]$Directory, [string]$ExpectedBackend, [string[]]$Models) {
@@ -217,11 +237,14 @@ try {
         $primitive = Join-Path $run "$api-primitives"
         $gunner = Join-Path $run "$api-gunner"
         $normalPair = Join-Path $run "$api-normalpair"
+        $alphaModes = Join-Path $run "$api-alphamodes"
         # W1 fixture 는 자산 트리 밖에 있어 model.load 가 트리 안으로 복사한다.
         # backend 둘이 같은 조건에서 돌도록 매 회차 앞에서 지운다 — 남겨 두면
         # 두 번째 회차만 "제자리 열기" 경로를 타서 두 실행이 같은 것을 재지 않는다.
-        if (Test-Path -LiteralPath $importedNormalPair) {
-            Remove-Item -Recurse -Force -LiteralPath $importedNormalPair
+        foreach ($imported in $importedFixtures) {
+            if (Test-Path -LiteralPath $imported) {
+                Remove-Item -Recurse -Force -LiteralPath $imported
+            }
         }
         # Gunner 는 추적 밖 자산이다. 있으면 재고, 없으면 **건너뛰었다고 적는다**.
         $gunnerAsset = Join-Path $root 'Dynamic_CPP\Assets\Models\Gunner_F_Mythic.glb'
@@ -261,9 +284,17 @@ try {
             'wait 30',
             "render.pbr.capture `"$normalPair`" game",
             "render.pbr.normalpair `"$normalPair`"",
+            # ★ W0 — alpha mode 삼종과 **비균등 스케일**을 한 캡처에서 겸한다.
+            #   비균등 스케일은 자산이 아니라 씬 변환이라 공짜다(1.7/0.6/1.0).
+            #   BLEND 재질이 forward 로 가므로 이 캡처가 forward 장부를 처음 채운다.
+            "model.load `"$root/Tools/regression/fixtures/pbr-alpha-mask/AlphaModes.gltf`"",
+            'model.place AlphaModes',
+            'object.transform AlphaModes 0 0 2 0 180 0 1.7 0.6 1.0',
+            'wait 30',
+            "render.pbr.capture `"$alphaModes`" game",
             'quit')
         $results = @(Invoke-Editor $api $commands)
-        $expectedCaptures = if ($hasGunner) { 3 } else { 2 }
+        $expectedCaptures = if ($hasGunner) { 4 } else { 3 }
         $captures = @($results | Where-Object command -eq 'render.pbr.capture')
         if ($captures.Count -ne $expectedCaptures -or
             @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
@@ -289,10 +320,13 @@ try {
             throw "$api normal-map pair verification failed; artifacts: $run"
         }
         Set-AxisRan "$api/normal-pair"
+        Assert-Capture $alphaModes $api @()
+        Assert-AlphaModes $alphaModes
+        Set-AxisRan "$api/alpha-modes+nonuniform-scale"
         $captureDirs[$api] = @{ primitives = $primitive }
         if ($hasGunner) { $captureDirs[$api]['gunner'] = $gunner }
-        $ranHere = @("primitives", $(if ($hasGunner) { 'gunner' }), 'normal-pair') |
-            Where-Object { $_ }
+        $ranHere = @("primitives", $(if ($hasGunner) { 'gunner' }), 'normal-pair',
+            'alpha-modes+nonuniform-scale') | Where-Object { $_ }
         Write-Output "$api product capture PASS ($($ranHere -join ', ')): $run"
     }
     # W9 — 두 backend 캡처의 float32 readback을 실제로 맞댄다.
@@ -373,7 +407,9 @@ finally {
     }
     if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
     if ($null -ne $original) { [IO.File]::WriteAllBytes($settings, $original) }
-    if (Test-Path -LiteralPath $importedNormalPair) {
-        Remove-Item -Recurse -Force -LiteralPath $importedNormalPair -ErrorAction SilentlyContinue
+    foreach ($imported in $importedFixtures) {
+        if (Test-Path -LiteralPath $imported) {
+            Remove-Item -Recurse -Force -LiteralPath $imported -ErrorAction SilentlyContinue
+        }
     }
 }
