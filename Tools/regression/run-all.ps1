@@ -251,6 +251,18 @@ Run-Step "뷰포트 extent·렌더 배율" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-viewport-extent.ps1") -Exe $Exe -Work (Join-Path $Work 'viewport-extent')
 }
 
+# PHASE 21 W4 후속 — 씬 뷰 기즈모의 그림·입력 경계(소스 대조).
+#
+# `ImGuizmo::Manipulate` 는 한 호출로 그림과 입력을 함께 한다. 그래서 포인터가
+# 오버레이에 막혔다는 이유로 호출을 건너뛰면 입력만이 아니라 기즈모가 통째로
+# 사라진다 — 상단 툴바에 마우스를 올리면 꺼지고 빼면 켜지던 결함(2026-09-14).
+# 런타임이 못 보는 축이다. 기즈모는 드로 리스트에 직접 그려져 CLI 표에 흔적이
+# 없고, 물어볼 창구를 새로 만들어도 같은 조건을 다시 적는 두 벌이 된다. 그래서
+# 관문 이름과 감싸는 조건을 **양쪽 다 소스에서 유도해** 맞댄다.
+Run-Step "씬 기즈모 그림·입력 경계(소스 대조)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-scene-gizmo-input-boundary.ps1")
+}
+
 # PHASE 21 W1 — ImGui 1.92 obsolete API 잔존 0.
 #
 # 소스 대조다. `IMGUI_DISABLE_OBSOLETE_FUNCTIONS` 를 제품 구성에 켤 수 없기
