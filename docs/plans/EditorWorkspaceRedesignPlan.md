@@ -974,7 +974,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize와 렌더 배율은 **2026-09-14 착지**(§W4 후속) — 미뤄 둔 근거였던 generation/retire 수렴을 게이트 단정으로 옮겼다 |
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
 | W6 | todo | 현재 외관을 유지하는 5종 배치 preset, Save As/Rename/Delete/Reset·작은 창 복원 |
-| W7 | progress | **W7-0·W7-1 착지(2026-09-14·15)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0), 그리고 Browser 스냅샷(§W7-1)으로 매 프레임 디렉터리 스캔 24 → 0. 실측이 순서를 바꿨다: 브라우저가 clipping 보다 먼저였다(엔티티 1,000 에서 Hierarchy 의 5.8 배). 남은 것은 W7-2 flatten cache · W7-3 clipping · 정본 불변식 source gate, 그리고 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
+| W7 | progress | **W7-0~W7-3 착지(2026-09-14·15)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0), Browser 스냅샷(§W7-1)으로 매 프레임 디렉터리 스캔 24 → 0, 그리고 평탄 목록+clipping(§W7-2·W7-3)으로 `hierarchy.units` 50,000 → **14** · p95 30.4 → **0.041 ms**. 실측이 두 번 판을 고쳤다: ① 브라우저가 clipping 보다 먼저였고(엔티티 1,000 에서 Hierarchy 의 5.8 배), ② W7-2 는 홀로는 이득 0 이라 W7-3 과 한 조각으로 묶어야 했다. 남은 것은 정본 불변식 source gate(W7-4)와 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
 | W8 | todo | DX12 통합 빌드·DPI/재시작/손상 ini/Play/preset/성능 회귀, 현재 승인 외관의 자동 golden·CI, legacy 잔재 전수 확인 |
 
 현재 소스에서 확인한 잔여 경계:
@@ -2099,6 +2099,50 @@ Hierarchy 의 `units` 가 그대로인 것도 함께 본다 — 움직였다면 
 
 **남은 비용의 성격이 바뀌었다.** after 의 browser_tree 는 스캔 0 인데도 p95 2.0 ms 이고, 이제
 그것은 syscall 이 아니라 노드 24 개의 ImGui 그리기다. 줄이려면 W7-3 의 clipping 이 필요하다.
+
+#### W7-2·W7-3 착지 — 평탄 목록과 clipping (2026-09-15)
+
+**둘을 함께 착지시킨 이유부터 적는다.** W7-2 만 얹고 재면 이득이 **0** 이다 — 1,000 에서
+p95 0.751 → 0.718 ms, 50,000 에서 28.506 → 28.606 ms, `units` 는 양쪽 다 그대로. W7 의
+완료 기준이 *"캐시만 추가하고 실측 이득이 없으면 제거한다"* 이므로 이 표만으로는 W7-2 는
+지워야 할 것이다. 평탄 목록은 캐시가 아니라 **clipping 이 설 자리**이고, 자리의 값은 그
+위에 무엇이 서는지로만 매겨진다. 그래서 하나의 조각으로 묶었다.
+
+**결과.** `hierarchy.units` 50,000 → **14**, p95 30.427 → **0.041 ms**. 1,000 에서도 14 다 —
+씬이 50 배가 되어도 그리는 행 수가 같다는 것, 즉 그리는 일이 씬 크기에서 떨어져 나와
+패널 높이에만 매인다는 뜻이다. 전문은
+[EditorPanelCostBaselineW7.md](../analysis/EditorPanelCostBaselineW7.md).
+
+**없던 값을 먼저 세웠다 — `HierarchyStore::Revision()`.** §8.3 은 *"HierarchyStore
+mutation/revision 또는 명시적 scene event로 cache를 무효화한다"* 고 적으며 이 값을
+전제했는데 실물에는 없었다. 계층을 바꾸는 모든 자리(`GrowOne`·`Clear`·`ResetSlot`·
+`OccupySlot`·`SetParent`·`SetRoot`·`AttachChild`·`DetachChild`·`ClearChildren`·
+`SetChildren`)에서 오르는 수를 두고, 파생 목록은 **이 수가 달라졌을 때만** 다시 만든다.
+정본을 복제하지 않는다는 규약은 그대로다 — 목록이 담는 것은 슬롯 인덱스·깊이·자식
+유무·접힘·띠 번호뿐이고, 이름·아이콘·잠금·활성·선택은 그리는 순간에 정본에서 읽는다.
+
+**근거가 없는 축은 정직하게 fail-safe 로 두었다.** 이름에는 revision 이 없으므로 검색이
+켜져 있는 동안에는 매 프레임 다시 만든다. 그래도 옛 경로보다 싸다 — 옛
+`IsMatchedRecursive` 는 **행마다** 자기 서브트리를 통째로 다시 훑어 O(n·깊이) 였고, 지금은
+한 번의 전위 순회를 거꾸로 훑어 끝난다. DDOL 은 `Object::SetDontDestroyOnLoad` 가 Entity
+플래그만 바꿔 revision 이 못 잡는 축이라, O(1) 로 세어 근거에 함께 넣었다.
+
+**접힘의 소유가 ImGui 에서 창으로 넘어왔다.** clipping 을 끼우면 화면 밖 노드는
+`TreeNodeEx` 가 호출되지 않으므로 ImGui 는 그 노드가 열렸는지 말할 기회가 없다 —
+*"보이는 행만 그린다"* 와 *"열린 노드를 ImGui 가 기억한다"* 는 함께 설 수 없다. 그래서
+접힘을 창이 갖고 매 프레임 `SetNextItemOpen` 으로 알려 준 뒤 `IsItemToggledOpen()` 으로
+되받는다. 담는 것은 **기본값에서 벗어난 슬롯**뿐이라 새로 생긴 노드는 옛 기본값
+(`parentIndex == 0` 만 펼침 = 옛 `DefaultOpen` 조건)을 그대로 따른다. 대가는 한 프레임 —
+펼침/접힘이 목록에 반영되는 것은 다음 프레임이다.
+
+**그림이 달라지지 않았다는 것은 픽셀로 받았다.** 깊이 있는 fixture(`scene.populate 60 3`)
+로 before/after 창을 각각 찍어 맞댄 결과 **392,888 픽셀 중 다른 픽셀 0.** 들여쓰기를
+`TreePush` 에서 `Indent` 로 옮기고 홀짝 띠 번호를 "그린 순서" 가 아니라 목록이 주게 바꾼
+것이 이 확인을 받기 위해서다 — clipper 가 앞줄을 건너뛰어도 띠가 어긋나지 않는다.
+
+**덤으로 사라진 것 둘.** ① 재귀가 사라져 계층 깊이가 더는 호출 스택 깊이가 아니다.
+② 옛 경로는 DDOL 묶음을 부모와 무관하게 다시 모아 그려, 일반 루트의 자손인 DDOL
+엔티티가 두 번 그려질 수 있었다 — 평탄 목록에서는 처음 닿은 자리 하나만 남는다.
 
 ### W8 — 통합 회귀와 legacy 강제 배치 은퇴 (P0, 2일)
 

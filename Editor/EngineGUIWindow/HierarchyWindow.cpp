@@ -93,7 +93,10 @@ namespace
 			ImGui::GetWindowDrawList()->AddRectFilled(rowMin, rowMax,
 				ImGui::GetColorU32(editor::ThemeColorValue(editor::ThemeColor::Panel)));
 		}
-		return ImGui::TreeNodeEx(label, kRowFlags | ImGuiTreeNodeFlags_DefaultOpen);
+		// NoTreePushOnOpen: 들여쓰기는 평탄 목록의 depth 가 준다(W7-2). ImGui 의
+		// TreePush 로 깊이를 쌓으면 목록을 인덱스로 끊어 그릴 수 없다.
+		return ImGui::TreeNodeEx(label,
+			kRowFlags | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_NoTreePushOnOpen);
 	}
 
 	// Neutral selection keeps the blue object label readable; hover stays selected.
@@ -159,44 +162,27 @@ void editor::windows::draw_hierarchy()
 	hierarchy_state().Draw();
 }
 
-void HierarchyWindow::DrawSceneObject(Entity* obj)
+void HierarchyWindow::DrawSceneObjectRow(Entity* obj, const editor::hierarchy_flat_row& row)
 {
 	auto scene = SceneManagers->GetActiveScene();
-	auto& selectedSceneObject = scene->m_selectedEntity;
 	auto& selectedObjects = scene->m_selectedEntities;
 
-	// 🔍 검색 필터가 활성화된 경우, 자기 자신 + 자식들까지 재귀 검사
-	if (m_searchFilter.IsActive())
-	{
-		// 자식에 검색 결과가 있는 경우까지 보여주고 싶다면
-		// 여기서 바로 return하지 말고,
-		// "자식 중 하나라도 필터를 통과하면 이 노드도 그려준다"
-		// 같은 재귀 체크 로직이 더 필요.
-		if (!IsMatchedRecursive(obj))
-		{
-			// 자기 자신과 모든 자식이 필터에 안 걸리면 아예 그리지 않음
-			return;
-		}
-
-		// 검색 중에는 매치되는 애들은 기본적으로 열어두면 편함
-		ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-	}
-
-	ImGuiTreeNodeFlags flags = kRowFlags;
+	// 걸러내기(검색)와 펼침은 목록이 이미 정했다 — 여기서는 한 줄만 그린다.
+	ImGuiTreeNodeFlags flags = kRowFlags | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 	bool isSelected = std::find(selectedObjects.begin(), selectedObjects.end(), obj) != selectedObjects.end() || scene->m_selectedEntity == obj;
 	if (isSelected)
 	{
 		flags |= ImGuiTreeNodeFlags_Selected;
 	}
-	else if (0 == obj->GetParentIndex())
-	{
-		flags |= ImGuiTreeNodeFlags_DefaultOpen;
-	}
 
-	if (obj->GetChildrenIndices().empty())
+	if (!row.hasChildren)
 	{
 		flags |= ImGuiTreeNodeFlags_Leaf;
 	}
+
+	// 펼침의 정본은 목록이다(HierarchyFlatten.h). ImGui 에게 기억을 맡기면
+	// clipping 이 건너뛴 노드의 상태를 잃는다.
+	ImGui::SetNextItemOpen(row.expanded, ImGuiCond_Always);
 
 	const bool isDisabled = !obj->IsEnabled();
 	ImGui::PushStyleColor(ImGuiCol_Text, isDisabled
@@ -209,10 +195,17 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
     const float iconSize = ImGui::GetFontSize();
     const ImVec2 imageMin{rowStart.x + ImGui::GetTreeNodeToLabelSpacing(),
         rowStart.y + (ImGui::GetFrameHeight() - iconSize) * .5f};
-    draw_row_band(m_rowIndex++);
+    draw_row_band(row.bandIndex);
+    ++m_rowIndex;
     const int rowColors = push_selected_row_colors(isSelected);
-    const bool opened = ImGui::TreeNodeEx(id.c_str(), flags);
+    ImGui::TreeNodeEx(id.c_str(), flags);
     ImGui::PopStyleColor(rowColors);
+
+    // 화살표를 눌렀다면 목록을 다시 세울 근거가 생긴 것이다. 검색 중에는 걸린
+    // 것을 전부 펼쳐 두므로(옛 동작) 누름을 적지 않는다 — 검색을 끈 뒤에 엉뚱한
+    // 가지가 접혀 있는 일이 없도록.
+    if (!m_searchFilter.IsActive() && ImGui::IsItemToggledOpen())
+        m_flat.Toggle(row.index);
 
     auto* draw = ImGui::GetWindowDrawList();
     const auto* window = ImGui::GetCurrentWindow();
@@ -272,42 +265,6 @@ void HierarchyWindow::DrawSceneObject(Entity* obj)
 		ImGui::EndDragDropTarget();
 	}
 
-	if (opened)
-	{
-		// 자식 노드를 재귀적으로 그리기
-		for (auto childIndex : obj->GetChildrenIndices())
-		{
-			auto child = scene->GetEntity(childIndex);
-			// E1 후속 배선: 루트 폴백 제거로 무효 인덱스가 nullptr을 돌려줄 수
-			// 있다 — DrawSceneObject는 obj를 무가드로 역참조하므로 여기서 거른다.
-			if (!child) continue;
-			DrawSceneObject(child);
-		}
-		ImGui::TreePop();
-	}
-}
-
-bool HierarchyWindow::IsMatchedRecursive(Entity* obj)
-{
-	if (!obj) return false;
-
-	auto scene = SceneManagers->GetActiveScene();
-	if (!scene) return false;
-
-	// 1) 자기 자신 이름으로 필터 체크
-	const std::string name = obj->m_name.ToString();
-	if (m_searchFilter.PassFilter(name.c_str()))
-		return true;
-
-	// 2) 자식들 재귀 체크
-	for (auto childIndex : obj->GetChildrenIndices())
-	{
-		auto child = scene->GetEntity(childIndex);
-		if (child && IsMatchedRecursive(child))
-			return true;
-	}
-
-	return false;
 }
 
 // PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
@@ -614,67 +571,88 @@ void HierarchyWindow::Draw()
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
 					ImVec2(editor::ThemePixels(editor::EditorThemeTokens::ItemGapX), 0.f));
 
-				std::string SceneIcon{};
-				if (0 != scene->m_Entities.size())
-				{
-					SceneIcon = EditorIcon::Scene + std::string(" ") + scene->m_Entities[0]->m_name.ToString();
-				}
-				ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-				if (0 == scene->m_Entities.size())
+				// W7-2: 루트를 두 번 훑고 재귀로 내려가던 자리다. 이제 목록은
+				// 한 번 세워 두고, 계층이 그대로면 다시 세우지 않는다. 무효화
+				// 근거를 여기서 모아 넘긴다 — 무엇이 근거인지 한자리에서 보이도록.
+				const editor::hierarchy_flat_key flatKey{
+					scene->GetHierarchyStore().Revision(),
+					scene->m_Entities.size(),
+					SceneManagers->GetDontDestroyOnLoadObjects().size(),
+					m_searchFilter.IsActive() };
+				const auto& flatRows = m_flat.Rows(scene, flatKey, m_searchFilter);
+
+				if (flatRows.empty())
 				{
 					ImGui::Text("No Entity in Scene");
 				}
-				else if (group_tree_node(SceneIcon.c_str()))
+				else
 				{
-					bool isPrefabEditor = scene->m_Entities[0]->m_name.ToString() == "PrefabEditor";
-					if (isPrefabEditor &&
-						ImGui::IsItemClicked(ImGuiMouseButton_Left) &&
-						ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+					// 들여쓰기는 TreePush 대신 여기서 준다. 줄마다 독립이라
+					// 어느 줄부터 그려도 같은 그림이 나온다 — clipping 의 전제다.
+					const float indentStep = ImGui::GetStyle().IndentSpacing;
+
+					// W7-3: 화면 밖의 줄은 그리지 않는다. 한 줄의 높이는 kRowFlags 의
+					// FramePadding 이 세운 GetFrameHeight() 이고, 바로 위에서 ItemSpacing.y 를
+					// 0 으로 눌렀으므로 줄 간격이 곧 그 높이다 — clipper 에게 그 값을 그대로
+					// 준다. 목록이 평탄하지 않았다면 인덱스로 끊을 수 없으니 이 자리 자체가
+					// 없었다(W7-2).
+					const float rowHeight = ImGui::GetFrameHeight();
+					ImGuiListClipper rowClipper;
+					rowClipper.Begin(static_cast<int>(flatRows.size()), rowHeight);
+					while (rowClipper.Step())
 					{
-						// PrefabEditor가 열려있다면 닫기
-						if (PrefabEditors->IsOpened())
+						for (int rowAt = rowClipper.DisplayStart; rowAt < rowClipper.DisplayEnd; ++rowAt)
 						{
-							PrefabEditors->Close();
-						}
-					}
+							const auto& flatRow = flatRows[static_cast<std::size_t>(rowAt)];
+							const float indent = indentStep * static_cast<float>(flatRow.depth);
+							if (indent > 0.f) ImGui::Indent(indent);
 
-					auto& sceneObjects = scene->m_Entities;
-					for (int i = 1; i < sceneObjects.size(); ++i)
-					{
-						auto& obj = sceneObjects[i];
-						if (!obj || obj->GetParentIndex() > 0 || obj->IsDontDestroyOnLoad()) continue;
-
-						ImGui::PushID(obj.get());
-						DrawSceneObject(obj.get());
-						ImGui::PopID();
-					}
-
-					std::vector<Entity*> ddolObjects;
-					for (int i = 1; i < sceneObjects.size(); ++i)
-					{
-						auto& obj = sceneObjects[i];
-						if (obj && obj->IsDontDestroyOnLoad())
-						{
-							ddolObjects.push_back(obj.get());
-						}
-					}
-
-					if (!ddolObjects.empty())
-					{
-						ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-						if (group_tree_node("[ Dont Destroy On Load ]"))
-						{
-							for (const auto& obj : ddolObjects)
+							switch (flatRow.kind)
 							{
-								ImGui::PushID(obj);
-								DrawSceneObject(obj);
-								ImGui::PopID();
+							case editor::hierarchy_row_kind::scene_group:
+							{
+								const std::string sceneName = scene->m_Entities[0]->m_name.ToString();
+								const std::string sceneIcon = EditorIcon::Scene + std::string(" ") + sceneName;
+								ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+								group_tree_node(sceneIcon.c_str());
+								if (sceneName == "PrefabEditor" &&
+									ImGui::IsItemClicked(ImGuiMouseButton_Left) &&
+									ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+								{
+									// PrefabEditor가 열려있다면 닫기
+									if (PrefabEditors->IsOpened())
+									{
+										PrefabEditors->Close();
+									}
+								}
+								break;
 							}
-							ImGui::TreePop();
+							case editor::hierarchy_row_kind::ddol_group:
+								ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+								group_tree_node("[ Dont Destroy On Load ]");
+								break;
+							case editor::hierarchy_row_kind::entity:
+								// E1 후속 배선: 무효 인덱스는 nullptr 을 돌려줄 수 있다 —
+								// 한 줄 그리기는 obj 를 무가드로 역참조하므로 여기서 거른다.
+								if (Entity* rowEntity = scene->GetEntity(flatRow.index))
+								{
+									ImGui::PushID(flatRow.index);
+									DrawSceneObjectRow(rowEntity, flatRow);
+									ImGui::PopID();
+								}
+								else
+								{
+									// clipper 는 한 줄을 건너뛴 것을 모른다 — 자리를 비워
+									// 두지 않으면 아래 줄이 통째로 밀린다.
+									ImGui::Dummy(ImVec2(0.f, rowHeight));
+								}
+								break;
+							}
+
+							if (indent > 0.f) ImGui::Unindent(indent);
 						}
 					}
-
-					ImGui::TreePop();
+					rowClipper.End();
 				}
 
 				ImGui::PopStyleVar();
