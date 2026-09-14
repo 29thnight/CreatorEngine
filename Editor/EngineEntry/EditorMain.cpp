@@ -8,6 +8,7 @@
 #include "RHI/IImGuiHost.h"
 #include "RHI/ImGuiHostPresentationSink.h"
 #include "RHI/ScreenSizedResource.h"
+#include "ViewportHostWindow.h"
 #include "InputManager.h"
 #include "ImGui.h"
 #include "Physx.h"
@@ -411,6 +412,11 @@ void Editor::EditorMain::PresentationThreadMain()
 		if (m_isInvokeResize.exchange(false, std::memory_order_acq_rel))
 			HandleWindowResize();
 
+		// 프레임 **사이**에서 적용한다. 라이브 타깃을 놓았다 다시 만드는 일이라
+		// ImGui 프레임 한복판에서 하면 이번 프레임이 이미 잡아 둔 텍스처 ID 가
+		// 그 자리에서 무효가 된다.
+		ApplyViewportRenderExtent();
+
 		if (0 != m_presentationThreadTestDelayMs)
 		{
 			std::this_thread::sleep_for(
@@ -530,17 +536,79 @@ void Editor::EditorMain::HandleWindowResize()
 	//   했다. 그 스왑체인은 D2에서 셸로 넘어갔고 DeviceResources는 오늘
 	//   사라졌지만, 두 단계 구조는 남는다 — 화면 크기를 따라가는 DX12
 	//   텍스처들이 같은 규약을 쓴다.
-	OnResizeReleaseEvent();
-	ScreenResizeBus::Get().BroadcastRelease();
+	// ★ 창 크기는 더 이상 이 버스의 정본이 아니다 (extent 기반 resize).
+	//
+	//   버스가 정하는 것은 **라이브 뷰의 렌더 해상도**이고, 그것은 창이 아니라
+	//   가운데 ViewportHost 의 캔버스다. 창을 DPI 배수로 키운 뒤 창 크기를
+	//   그대로 쓰자 보이는 것보다 2.2 배를 그리고 잘라 버렸다 — Release 실측으로
+	//   839fps 가 522fps 였다. Godot 은 SubViewport 를 컨테이너 크기로 두고
+	//   Unreal 은 Slate 뷰포트 위젯 크기로 둔다. 둘 다 창 크기가 아니다.
+	//
+	//   스왈체인은 여기에 걸려 있지 않다. ImGui 셀이 프레임마다 자기
+	//   `GetClientRect` 로 잡으므로(`ImGuiHost::BeginFrame`) 창 크기 변경은
+	//   그쪽에서 이미 처리된다.
+	//
+	//   Host 가 아직 한 번도 안 돌 구간(부팅·헤드리스)에서는 창 크기가 유일한
+	//   답이므로 그대로 쓴다.
+	if (::editor::windows::read_viewport_demand().hostPresent) return;
 
 	RECT rect{};
 	GetClientRect(EditorWindowHandle(), &rect);
-	const float width = static_cast<float>(rect.right - rect.left);
-	const float height = static_cast<float>(rect.bottom - rect.top);
+	ApplyScreenSize(static_cast<uint32_t>(rect.right - rect.left),
+		static_cast<uint32_t>(rect.bottom - rect.top));
+}
 
-	OnResizeEvent(width, height);
-	ScreenResizeBus::Get().BroadcastResize(
-		static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+void Editor::EditorMain::ApplyScreenSize(std::uint32_t width, std::uint32_t height)
+{
+	if (0 == width || 0 == height) return;
+	// 해제 → 통지 두 단계. 화면 크기를 따라가는 DX12 텍스처들이 이 규약을 쓴다.
+	OnResizeReleaseEvent();
+	ScreenResizeBus::Get().BroadcastRelease();
+	OnResizeEvent(static_cast<float>(width), static_cast<float>(height));
+	ScreenResizeBus::Get().BroadcastResize(width, height);
+}
+
+void Editor::EditorMain::ApplyViewportRenderExtent()
+{
+	const ::editor::windows::viewport_demand demand =
+		::editor::windows::read_viewport_demand();
+	if (!demand.hostPresent) return;
+	if (0 == demand.canvasWidth || 0 == demand.canvasHeight) return;
+
+	const auto quantize = [](float pixels)
+	{
+		const float clamped = (std::max)(pixels, static_cast<float>(kRenderExtentMin));
+		// 가장 가까운 격자로 붙인다. 올림이 아니다 — 올림은 두 축을 같은 비율로
+		// 밀지 않아 종횡비를 떼어 놓는다.
+		const std::uint32_t rounded = static_cast<std::uint32_t>(clamped + 0.5f);
+		const std::uint32_t snapped =
+			((rounded + kRenderExtentQuantum / 2) / kRenderExtentQuantum) * kRenderExtentQuantum;
+		return (std::min)(snapped, kRenderExtentMax);
+	};
+	const float scale = demand.renderScale > 0.f ? demand.renderScale : 1.f;
+	const std::uint32_t targetWidth = quantize(demand.canvasWidth * scale);
+	const std::uint32_t targetHeight = quantize(demand.canvasHeight * scale);
+
+	const auto current = ScreenResizeBus::Get().GetSizeSnapshot();
+	if (targetWidth == current.width && targetHeight == current.height)
+	{
+		m_pendingExtentFrames = 0;
+		return;
+	}
+
+	// 후보가 바뀌면 시계를 되감는다. 끌기는 동안에는 매 프레임 값이 달라지므로
+	// 여기서 멈춰 있고, 손을 놓아 값이 굳은 뒤에야 아래로 내려간다.
+	if (targetWidth != m_pendingExtentWidth || targetHeight != m_pendingExtentHeight)
+	{
+		m_pendingExtentWidth = targetWidth;
+		m_pendingExtentHeight = targetHeight;
+		m_pendingExtentFrames = 0;
+		return;
+	}
+	if (++m_pendingExtentFrames < kRenderExtentStableFrames) return;
+
+	m_pendingExtentFrames = 0;
+	ApplyScreenSize(targetWidth, targetHeight);
 }
 
 void Editor::EditorMain::Update()

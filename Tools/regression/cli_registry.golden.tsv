@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	118
-# names	127
+# commands	119
+# names	128
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -25,6 +25,7 @@ dx12.live	-	immediate	editor	engine_service	live	no	yes	on|status	EnhancedRender
 editor.dock	-	immediate	editor	engine_service	live	no	yes	-	살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다
 editor.layout	-	immediate	editor	engine_service	live	no	yes	-	활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다
 editor.menu	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다
+editor.renderscale	-	immediate	editor	engine_service	live	no	yes	[auto|off|<0.25-1.0>]	뷰포트 렌더 배율 — 표시 크기보다 낮게 그린다(기본 auto = 1/DPI)
 editor.sceneview	-	immediate	editor	engine_service	live	no	yes	-	씬 뷰 오버레이 배치와 카메라 상태를 읽는다
 editor.selftest	-	immediate	editor	engine_service	live	no	yes	-	editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다
 editor.theme	-	immediate	editor	engine_service	live	no	yes	-	적용된 ImGui 스타일 값을 TSV로 내고 배율 출처를 판정한다

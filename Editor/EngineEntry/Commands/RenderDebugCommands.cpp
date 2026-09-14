@@ -315,6 +315,12 @@ namespace ConsoleCmd
         data.Set("ready", CommandData::Bool(snapshot.pipelineReady));
         data.Set("backend", CommandData::String(snapshot.backend == EnhancedLiveBackend::Vulkan ? "vulkan" : "dx12"));
         data.Set("status", CommandData::String(EnhancedSceneRenderer::GetLiveStatus()));
+        // 렌더 스레드가 실제로 그린 프레임 수. `sourceFrame`/`consumedFrameId` 는
+        // 게임 스레드가 매긴 **id** 라 latest-wins 로 버려진 프레임이 있어도 증가분이
+        // 같다 — 그 둘로는 렌더 처리량을 잴 수 없다. 누계 셋을 함께 낸다.
+        data.Set("framesRendered", CommandData::Int(snapshot.framesRendered));
+        data.Set("framesIdle", CommandData::Int(snapshot.framesIdle));
+        data.Set("framesInFlight", CommandData::Int(snapshot.framesInFlight));
         const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
         auto displayData = CommandData::Object();
         displayData.Set("iblGenerationCount", CommandData::Int(display.iblGenerationCount));

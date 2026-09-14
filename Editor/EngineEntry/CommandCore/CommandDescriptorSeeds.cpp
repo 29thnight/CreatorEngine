@@ -70,6 +70,7 @@ namespace CommandCore
             { "editor.dock", CommandCost::Immediate, "", "살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.layout", CommandCost::Immediate, "", "활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.menu", CommandCost::Immediate, "", "선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "editor.renderscale", CommandCost::Immediate, "[auto|off|<0.25-1.0>]", "뷰포트 렌더 배율 — 표시 크기보다 낮게 그린다(기본 auto = 1/DPI)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.sceneview", CommandCost::Immediate, "", "씬 뷰 오버레이 배치와 카메라 상태를 읽는다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.selftest", CommandCost::Immediate, "", "editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.theme", CommandCost::Immediate, "", "적용된 ImGui 스타일 값을 TSV로 내고 배율 출처를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },

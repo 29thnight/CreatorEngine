@@ -240,6 +240,17 @@ Run-Step "에디터 워크스페이스(도크·스타일·저장·이주·복구
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-workspace.ps1") -Exe $Exe -Work (Join-Path $Work 'editor-workspace')
 }
 
+# PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
+#
+# 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로
+# 보이는 것보다 큰 그림을 그려 잘라 버렸고, 창을 DPI 배수로 키운 뒤에는 그 낭비가
+# 픽셀 기준 5 배였다(실측). Godot 은 SubViewport 를 컨테이너 크기로, Unreal 은
+# Slate 위젯 크기로 둔다 — 둘 다 창이 아니다. 이 게이트가 그 계약과, 계획서가
+# extent 기반 resize 를 미뤄 둔 이유였던 generation/retire 수렴을 함께 잰다.
+Run-Step "뷰포트 extent·렌더 배율" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-viewport-extent.ps1") -Exe $Exe -Work (Join-Path $Work 'viewport-extent')
+}
+
 # PHASE 21 W1 — ImGui 1.92 obsolete API 잔존 0.
 #
 # 소스 대조다. `IMGUI_DISABLE_OBSOLETE_FUNCTIONS` 를 제품 구성에 켤 수 없기

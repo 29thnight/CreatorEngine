@@ -68,8 +68,55 @@ namespace editor::windows
         bool hostHovered{};
         /// 게임 캔버스(Host Game 모드 · Game Preview)가 클릭된 누계. possess 요청.
         std::uint64_t gameCanvasClicks{};
+
+        // ── 뷰포트 extent (PHASE 21 W4 후속 — 계획서가 미뤄 둔 extent 기반 resize) ──
+        //
+        // Host 본문이 이번 프레임에 받은 content region 을 **물리 픽셀**로 낸 값.
+        // 라이브 뷰의 렌더 해상도가 여기서 나온다 — 예전에는 창 클라이언트 크기가
+        // 곧 렌더 해상도였고, 창을 DPI 배수로 키우자 보이는 것보다 2.2 배를 그리고
+        // 잘라 버리고 있었다(W4 착지 뒤 실측). Godot 의 `SubViewportContainer`
+        // (stretch: 컨테이너 크기가 곧 SubViewport 해상도)와 Unreal 의 Slate
+        // 뷰포트가 쓰는 계약이 이것이다.
+        std::uint32_t canvasWidth{};
+        std::uint32_t canvasHeight{};
+        float dpiScale{ 1.f };       ///< 창의 DPI 배수(96 기준)
+        float renderScale{ 1.f };    ///< 이번 프레임에 적용된 렌더 배율
     };
     viewport_demand read_viewport_demand();
+
+    // ── 렌더 배율 (PHASE 21 W4 후속 · Unreal 의 secondary screen percentage) ──
+    //
+    // 표시 크기보다 **낮게 그리는** 손잡이다. Unreal 에디터의 기본값이
+    // `SecondaryScreenPercentage = 100 / OS's DPI Scale` 이고 그 이유를 문서가
+    // 둘로 적는다 — 고밀도 디스플레이에서 성능을 일정하게 유지하는 것과, GPU 가
+    // 감당 못 할 만큼 큰 중간 렌더 타깃을 만들지 않는 것이다. 끄는 선택지
+    // (`Disable DPI Based Editor Viewport Scaling`)도 함께 둔다.
+    //
+    // Godot 은 같은 일을 `SubViewportContainer::stretch_shrink` 로 한다 —
+    // "Divides the sub-viewport's effective resolution by this value while
+    // preserving its scale". 화면에서 차지하는 자리는 그대로고 해상도만 내려간다.
+    enum class render_scale_mode : std::uint8_t
+    {
+        dpi_auto = 0,  ///< 1 / DPI 배수. 창을 DPI 로 키운 몫을 정확히 상쇄한다.
+        off      = 1,  ///< 언제나 1.0 — 표시 해상도 그대로 그린다.
+        fixed    = 2,  ///< 사용자가 못 박은 값.
+    };
+
+    struct viewport_render_scale
+    {
+        render_scale_mode mode{ render_scale_mode::dpi_auto };
+        float fixedValue{ 1.f };   ///< `fixed` 일 때만 뜻이 있다.
+        float applied{ 1.f };      ///< 마지막 프레임에 실제로 쓴 값.
+        float dpiScale{ 1.f };
+    };
+
+    /// 최소·최대는 규약이다. 0 에 가까운 배율은 렌더 타깃을 0 으로 만들고,
+    /// 1 을 넘는 배율은 이 작업이 없애려던 바로 그 낭비를 되살린다.
+    inline constexpr float kMinViewportRenderScale = 0.25f;
+    inline constexpr float kMaxViewportRenderScale = 1.f;
+
+    void set_viewport_render_scale(render_scale_mode mode, float fixedValue = 1.f);
+    viewport_render_scale get_viewport_render_scale();
 
     /// 다음 프레임에 Host 창에 ImGui 포커스를 준다. Stop 이 재생 전 포커스를
     /// 되돌릴 때 게임 스레드가 부른다(요청함, 잠금 아래).

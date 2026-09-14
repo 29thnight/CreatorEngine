@@ -13,9 +13,14 @@
 //   ② 사각형은 전부 같은 프레임의 **화면 좌표** min/max 쌍이다. 크기는 언제나
 //      `max - min` 으로 구한다 — 크기를 따로 들고 다니면 둘이 어긋난다.
 //   ③ "늘림이냐 letterbox 냐" 는 캔버스가 아니라 **모드가 고르는 정책**이다.
-//      Scene 은 crop(소스 픽셀 1:1, 패널이 가장자리를 드러내거나 자른다), Game 은
-//      letterbox(게임 프레임버퍼의 종횡비가 곧 출력 계약이라 지켜야 한다).
+//      Game 은 letterbox(게임 프레임버퍼의 종횡비가 곧 출력 계약이라 지켜야 한다).
 //      둘을 한 정책으로 억지로 합치면 한쪽이 반드시 틀린다.
+//
+//      Scene 은 처음에 crop 이었다 — 렌더 타깃이 **창** 크기라 캔버스보다 크고,
+//      확대 없이 잘라 보여주는 것이 맞았기 때문이다. extent 기반 resize 뒤에는
+//      타깃이 이 캔버스를 위해 만들어지므로(캔버스 × 렌더 배율) `fill` 이다.
+//      배율을 내리면 소스가 캔버스보다 작아지는데, 그때 crop 은 그림을 작게
+//      그리고 가장자리를 검게 남긴다.
 #include "imgui.h"
 #include <algorithm>
 #include <cmath>
@@ -26,6 +31,7 @@ namespace editor
     {
         crop,       // 소스 픽셀 하나가 프레임버퍼 픽셀 하나. 확대하지 않는다.
         letterbox,  // 종횡비를 지켜 맞춘다. 남는 자리는 빈다.
+        fill,       // 소스를 content 전체에 편다. 아래 설명 참고.
     };
 
     // 사각형 셋이 전부 화면 좌표다.
@@ -83,7 +89,17 @@ namespace editor
         canvas.sourceAspect = sourcePixels.x / sourcePixels.y;
 
         ImVec2 imageSize{};
-        if (viewport_fit::crop == fit)
+        if (viewport_fit::fill == fit)
+        {
+            // 소스가 **이 캔버스를 위해** 만들어진 경우다(extent 기반 resize).
+            // 렌더 타깃 크기 = 캔버스 × 렌더 배율이므로 종횡비는 이미 같고,
+            // 배율이 1 보다 작으면 소스가 캔버스보다 작다 — 그래도 자리는 캔버스
+            // 전체다. Godot 의 `stretch_shrink` 가 적은 그대로 "divides the
+            // effective resolution while preserving its scale" 이다. crop 으로
+            // 두면 배율을 내린 만큼 그림이 작아지고 가장자리가 검게 남는다.
+            imageSize = contentSize;
+        }
+        else if (viewport_fit::crop == fit)
         {
             // 논리 픽셀로 환산한 소스 크기 그대로. 패널이 크면 가장자리가 드러나고
             // 작으면 광학 중심을 기준으로 잘린다 — 확대는 하지 않는다.

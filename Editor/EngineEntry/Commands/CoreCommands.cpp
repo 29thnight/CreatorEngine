@@ -165,6 +165,7 @@
 #include <wrl/client.h>
 #include <algorithm>
 #include <cstring>
+#include <cstdlib>
 #include <cstdio>
 #include <fstream>
 #include <functional>
@@ -939,12 +940,75 @@ namespace ConsoleCmd
         data.Set("hostFocused", CommandData::Bool(demand.hostFocused));
         data.Set("hostHovered", CommandData::Bool(demand.hostHovered));
         data.Set("gameCanvasClicks", CommandData::Int(static_cast<int64_t>(demand.gameCanvasClicks)));
+
+        // extent 기반 resize. 캔버스 · 배율 · 그 둘이 정한 렌더 해상도를 나란히
+        // 낸다 — 밖에서 "보이는 것보다 크게 그리고 있지 않은가" 를 셀 수 있어야
+        // 한다. `renderWidth/Height` 는 버스가 실제로 든 값이다(파이프라인이
+        // 따라오는 데 프레임이 걸리므로 `dx12.live` 의 width/height 와 잠깐
+        // 다를 수 있다).
+        const auto scale = ::editor::windows::get_viewport_render_scale();
+        const auto busSize = ScreenResizeBus::Get().GetSizeSnapshot();
+        data.Set("canvasWidth", CommandData::Int(static_cast<int64_t>(demand.canvasWidth)));
+        data.Set("canvasHeight", CommandData::Int(static_cast<int64_t>(demand.canvasHeight)));
+        data.Set("renderWidth", CommandData::Int(static_cast<int64_t>(busSize.width)));
+        data.Set("renderHeight", CommandData::Int(static_cast<int64_t>(busSize.height)));
+        data.Set("dpiScale", CommandData::Double(demand.dpiScale));
+        data.Set("renderScale", CommandData::Double(scale.applied));
+        data.Set("renderScaleMode", CommandData::String(
+            ::editor::windows::render_scale_mode::off == scale.mode ? "off" :
+            ::editor::windows::render_scale_mode::fixed == scale.mode ? "fixed" : "auto"));
         if (!demand.hostPresent)
         {
             return Fail("editor.viewport.no_host",
                 "중앙 ViewportHost 본문이 아직 한 프레임도 돌지 않았다", std::move(data));
         }
         return Ok("Viewport host", std::move(data));
+    }
+
+    /// 표시 크기보다 낮게 그리는 손잡이. Unreal 의 `Disable DPI Based Editor
+    /// Viewport Scaling` 에 해당하는 자리이고 기본값은 그쪽과 같은 auto(1/DPI)다.
+    static CommandCore::CommandResult Cmd_editor_renderscale(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        if (args.size() > 2) return InvalidArguments("editor.renderscale [auto|off|<0.25-1.0>]");
+        if (2 == args.size())
+        {
+            if ("auto" == args[1])
+            {
+                ::editor::windows::set_viewport_render_scale(
+                    ::editor::windows::render_scale_mode::dpi_auto);
+            }
+            else if ("off" == args[1])
+            {
+                ::editor::windows::set_viewport_render_scale(
+                    ::editor::windows::render_scale_mode::off);
+            }
+            else
+            {
+                char* end = nullptr;
+                const double parsed = std::strtod(args[1].c_str(), &end);
+                if (nullptr == end || *end != '\0' || !(parsed > 0.0))
+                    return InvalidArguments("editor.renderscale [auto|off|<0.25-1.0>]");
+                if (parsed < ::editor::windows::kMinViewportRenderScale ||
+                    parsed > ::editor::windows::kMaxViewportRenderScale)
+                {
+                    return Fail("editor.renderscale.out_of_range",
+                        "렌더 배율은 0.25~1.0 이다. 1 을 넘기면 보이는 것보다 크게 그린다");
+                }
+                ::editor::windows::set_viewport_render_scale(
+                    ::editor::windows::render_scale_mode::fixed, static_cast<float>(parsed));
+            }
+        }
+        const auto scale = ::editor::windows::get_viewport_render_scale();
+        auto data = CommandData::Object();
+        data.Set("mode", CommandData::String(
+            ::editor::windows::render_scale_mode::off == scale.mode ? "off" :
+            ::editor::windows::render_scale_mode::fixed == scale.mode ? "fixed" : "auto"));
+        data.Set("applied", CommandData::Double(scale.applied));
+        data.Set("fixedValue", CommandData::Double(scale.fixedValue));
+        data.Set("dpiScale", CommandData::Double(scale.dpiScale));
+        return Ok("Viewport render scale", std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_editor_theme(const ConsoleCommandContext& ctx)
@@ -1144,6 +1208,7 @@ namespace ConsoleCmd
         reg.Result({ "editor.theme" }, &Cmd_editor_theme);
         reg.Result({ "editor.sceneview" }, &Cmd_editor_sceneview);
         reg.Result({ "editor.viewport" }, &Cmd_editor_viewport);
+        reg.Result({ "editor.renderscale" }, &Cmd_editor_renderscale);
         reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);
     }
 }

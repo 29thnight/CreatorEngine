@@ -971,7 +971,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W2-V | progress | 기즈모가 숨겨지는 낮은 높이의 방향 선택 메뉴, resize 중 조작 취소·release/포커스 소유권, drop/terrain 입력 관통, W4/W5 연결·연속 resize 및 DPI/성능 회귀 |
 | W2-B | progress | 최근/전체 검색, 방문별 검색·선택 복원, Volume Profile 생성 대상 경로/취소/실패 정리, W3 저장·W7 목록 연결, 실제 마우스 분할선/동명 자산 drop 회귀 |
 | W3 | **done** | ID·legacy 이주, 자유 dock/close/reopen, versioned save/load/reset/backup·손상 복구가 게이트 둘(169+212 checks)로 선다. Scene `no_move` 해제는 W4 단일 Host, `dock_slot` 선언화는 W6 preset 소속 |
-| W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize는 두 backend generation/retire 검증 뒤 |
+| W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize와 렌더 배율은 **2026-09-14 착지**(§W4 후속) — 미뤄 둔 근거였던 generation/retire 수렴을 게이트 단정으로 옮겼다 |
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
 | W6 | todo | 현재 외관을 유지하는 5종 배치 preset, Save As/Rename/Delete/Reset·작은 창 복원 |
 | W7 | todo | Hierarchy/Browser 목록 snapshot·flatten/cache/clipping, 1k/10k/50k 실측, **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
@@ -1742,6 +1742,116 @@ fixture 넷뿐이고, 결함 ⑤ 가 실제로 그렇게 드러났다. 값싼 �
 도킹과 충돌하고, 가운데 노드가 서면 필요도 없다 — Host 는 자기 노드를 떠나지 않는다. 열거자와
 기구는 남겼다: 자가 검사가 그 값을 태우고 있고, 지우면 "쓰는 곳이 없다" 와 "지워서 못 쓴다" 가
 섞인다.
+
+**착지 뒤 드러난 결함 둘 (2026-09-14, 사용자 보고).** W5 를 닫고 나서 카메라를 돌려 선택
+객체가 캔버스를 벗어나게 하니 넷이 보였다 — 기즈모가 계층·인스펙터 위, Scene/Game 탭 줄 위,
+Content Browser 위로 그려지고, 탭 줄과 그림 사이에 검은 띠가 남았다. 앞의 셋은 원인이 하나이고
+넷째는 다른 하나다. **둘 다 W4 가 낸 회귀**이지 뒤 단계가 닫을 것이 아니었다.
+
+6. **ImGuizmo 는 `SetRect` 사각형을 창 클립과 교차하지 않고 클립으로 민다.** `Manipulate`
+   첫 줄이 `mDrawList->PushClipRect(rect, false)` 다(ImGuizmo 1.10 `ImGuizmo.cpp:2682`). W4 가
+   좌표 규약을 세우며 `SetRect` 를 창 사각형에서 **crop 의 image 사각형**으로 바꿨는데(화면
+   밖으로 밀린 조작점의 투영이 맞으려면 잘린 부분까지 포함한 소스 전체의 자리라야 한다) 그
+   사각형은 캔버스 밖까지 뻗는다. 옛 코드는 창 사각형이라 우연히 안 보였다. 더해 W4 가
+   `display_back` 을 걷었으므로 Host 의 draw list 는 패널 뒤가 아니라 등록 순서대로 **패널
+   뒤에 그려지고**, 그래서 새어 나간 픽셀이 패널 위에 얹혔다. 처방은 ImGuizmo 안을 만지지
+   않고 `RenderSceneView` 가 끝날 때 그 뒤에 쌓인 draw 명령의 클립을 캔버스 가시 사각형으로
+   되잡는 RAII(`GizmoClipScope`)다 — 조기 반환이 여럿이라 소멸자에 건다.
+7. **`EndTabBar` 가 남기는 `ItemSpacing.y`.** 모드 막대를 도크 탭 바에서 Host 본문의
+   `BeginTabBar` 로 옮기자 탭 바가 항목이 되어 다음 항목 앞 간격을 내린다. 캔버스는 항목이
+   아니라 화면이라 그 간격이 창 배경(검정) 띠로 보였다. 옛 도크 탭 바에는 이 간격이 없다.
+   커서를 그만큼 되돌린다.
+
+**게이트가 못 본 이유.** 씬 뷰의 픽셀을 재는 단정이 run-all 에 없다 — 도크 감사는 창의 자리를
+세고 캔버스 규약은 좌표를 세지, 어느 draw 명령이 어느 클립으로 나가는지는 아무도 세지 않는다.
+둘 다 캡처로 확인했다(격리 워크스페이스 · `object.transform` 으로 프로브를 캔버스 가장자리에
+놓고 찍은 것 · 파란 축이 캔버스 아랫변에서 잘린다). draw 명령의 클립을 캔버스 사각형과
+맞대는 단정은 W8 의 visual golden 몫으로 넘긴다.
+
+#### W4 후속 — extent 기반 resize · 렌더 배율 (2026-09-14)
+
+계획서가 W4 에서 "두 backend 의 generation/retire 검증 뒤" 로 미뤄 둔 항목이다. 미루는 동안
+비용이 실제로 청구됐다 — 사용자가 같은 SampleScene 에서 FPS 반토막을 보고했고, 원인이 이
+항목이었다.
+
+**무엇이 틀려 있었나.** 라이브 뷰의 렌더 해상도가 `ScreenResizeBus`, 즉 **창 클라이언트
+크기**였다(`EditorMain.cpp` 가 `GetClientRect` 로 채우고 `EnhancedSceneRenderer.cpp:4477` 이
+그대로 렌더 타깃 크기로 쓴다). 가운데 Host 의 캔버스는 좌우·아래 패널이 자리를 가져가므로 창
+보다 늘 작다. 거기에 `ebd27f3a` 가 에디터 창을 DPI 배수로 키웠다. 그 커밋은 "게임 창에서
+클라이언트 크기는 곧 렌더 해상도라 말없이 키우면 픽셀이 네 배가 된다" 고 적고 게임 창만
+제외했는데, 에디터도 같은 버스를 통해 똑같이 렌더 해상도였다. 실측: 창 2560x1485 에 캔버스
+1924x873 — **픽셀 5.09 배**를 그려서 잘라 버리고 있었다.
+
+**두 엔진이 쓰는 계약.** Godot 은 에디터 3D 뷰를 `SubViewportContainer` 안의 `SubViewport` 로
+두고 stretch 가 "the sub-viewport will be automatically resized to the control's size" 를
+한다. 표시보다 낮게 그리는 손잡이는 `stretch_shrink` 이고 "divides the sub-viewport's
+effective resolution by this value while preserving its scale" 다. Unreal 은 렌더 타깃을
+Slate 뷰포트 위젯 크기로 잡고, 에디터의 secondary screen percentage 기본값을
+`100 / OS's DPI Scale` 로 둔다 — 문서가 이유를 둘로 적는다(고밀도에서 성능을 일정하게, 그리고
+GPU 가 감당 못 할 중간 렌더 타깃을 만들지 않기 위해). 끄는 선택지는
+`Disable DPI Based Editor Viewport Scaling` 이고 기본은 꺼짐, 즉 **기본이 보정하는 쪽**이다.
+
+**바꾼 것.**
+
+- **버스의 뜻을 바꿨다.** 에디터에서 `ScreenResizeBus` 는 이제 창이 아니라 **뷰포트 렌더
+  해상도**다. Host 가 프레임마다 자기 content region 을 물리 픽셀로 게시하고
+  (`viewport_demand::canvasWidth/Height`), `EditorMain::ApplyViewportRenderExtent` 가
+  캔버스 × 배율을 버스에 반영한다. 스왑체인은 여기 걸려 있지 않다 — ImGui 셸이 프레임마다
+  자기 `GetClientRect` 로 잡는다(`ImGuiHost::BeginFrame`). 버스 하나를 바꾸니 카메라 종횡비 ·
+  화면 크기를 따라가는 텍스처 · 게임 UI 배치가 **배선 없이** 함께 따라왔다.
+- **렌더 배율을 뒀다.** `render_scale_mode` 셋 — `dpi_auto`(1/DPI, 기본) · `off` · `fixed`.
+  범위는 0.25~1.0 이고 1 을 넘기는 값은 거부한다(이 작업이 없애려던 낭비를 되살리므로).
+  CLI 는 `editor.renderscale [auto|off|<값>]`.
+- **캔버스 정책이 `fill` 이 됐다.** Scene 의 crop 은 타깃이 창 크기였을 때 맞는 정책이었다.
+  타깃이 캔버스를 위해 만들어지면 image 사각형 = content 사각형이고, 배율이 1 보다 작을 때
+  crop 은 그림을 작게 그리고 가장자리를 검게 남긴다. **덤으로 W4 후속 결함 ⑥(ImGuizmo 가
+  SetRect 를 창 클립과 교차하지 않아 기즈모가 패널 위로 새던 것)이 구조적으로 닫혔다** —
+  image 가 content 를 넘지 않으므로 넘어갈 픽셀이 없다. `GizmoClipScope` 는 방어로 남긴다.
+- **진정과 격자.** extent 는 연속 8 프레임 같을 때만 적용한다(스플리터를 끄는 동안 매 프레임
+  파이프라인을 다시 만들지 않기 위해). 격자는 **2** 다 — 처음 8 로 두었다가 되돌렸다. 올림
+  격자는 두 축을 다른 비율로 밀어 렌더 종횡비를 캔버스에서 떼어 놓고, 그림은 캔버스 전체에
+  펴지므로(fill) 그 어긋남이 그대로 기즈모와 그림 사이의 밀림이 된다(2244x1098 에서 0.5%).
+
+**실측 (Release · SampleScene · 창 2880x1665 · 렌더 스레드가 실제로 그린 프레임).**
+
+| 상태 | 렌더 해상도 | 픽셀 | fps |
+|---|---|---|---|
+| 이전(창 크기) | 2880x1710 | 4.92 Mpx | 522 |
+| extent 만(`off`) | 2244x1098 | 2.46 Mpx | 721 |
+| extent + `auto` | 1496x732 | 1.10 Mpx | 903~935 |
+
+**관측을 먼저 고쳐야 했다.** 처음 두 번의 측정이 둘 다 틀렸고 이유가 달랐다. ① `wait` 는
+게임 스레드 프레임이라 렌더 스레드와 분리돼 있어 해상도에 반응하지 않는다. ②
+`display.sourceFrame` 과 `consumedFrameId` 는 게임 스레드가 매긴 **id** 라 latest-wins 로
+버려진 프레임이 있어도 증가분이 같다 — 둘 다 처리량을 못 잰다. 렌더 프레임 **수**는
+`framesRendered` 인데 GUI 창에만 있었다. `dx12.live status` 에 `framesRendered` ·
+`framesIdle` · `framesInFlight` 를 냈고 그제야 축이 섰다. ③ 그리고 Debug 로 재면 해상도
+효과가 **0 으로 보인다** — 프레임당 CPU 5ms 가 GPU 픽셀 비용을 통째로 덮는다. 같은 A/B 가
+Release 에서 1.61 배였다.
+
+**판정.** `verify-editor-viewport-extent.ps1` 단정 50 개, run-all 에 이었다. 판정 항목은
+캔버스가 창보다 작다 · 렌더 해상도 = 캔버스 × 배율(배율 셋 모두) · 배율 계약(off=1 ·
+auto=1/DPI · fixed=준 값) · 파이프라인 수렴 · 범위 밖 배율 거부 · **리사이즈 연타 뒤
+generation 수렴**(계획서가 미룬 이유였던 축을 미루는 대신 여기서 잰다) · 정상 종료다.
+파이프라인 수렴은 한 번 재지 않고 표본 여섯을 찍어 그 중 하나가 맞으면 통과하고 몇 번째에
+맞았는지를 낸다 — 한 번만 재면 게이트가 "얼마나 기다리면 되는가" 를 기계 속도에 달린
+상수로 박게 된다.
+
+| 심은 결함 | 붉어진 자리 |
+|---|---|
+| extent 를 버스에 반영하지 않는다(창 크기로 되돌림) | 렌더 해상도 단정 8 건 + "리사이즈 세대가 늘지 않았다" |
+| 렌더 배율을 언제나 1 로 | auto·fixed 배율 단정 3 건 (off 는 그대로 초록 — 맞다) |
+| 배율 범위 검사를 걷는다 | "범위 밖 배율이 통과했다" 2 건 |
+
+**게이트가 만든 결함 둘을 적어 둔다.** 처음 판에서 `maxMissingTextureMs` 를 문턱으로 리사이즈
+건강을 쟀는데 그 값은 **부팅까지 포함하는 누계 최댓값**이라 18 초가 나왔다 — 첫 라이브 프레임이
+그만큼 걸린다는 사실을 잰 것이지 리사이즈를 잰 것이 아니다. 세대 수렴으로 바꿨다. 그리고 범위
+밖 배율 거부를 본 실행에 섞었더니 session 이 그 거부를 종료 코드에 적어 "정상 종료" 단정이
+남의 이유로 붉었다 — 거부는 따로 띄운다.
+
+**못 잡는 것.** 캔버스 정책을 `fill` 에서 `crop` 으로 되돌리는 변이는 이 게이트가 못 잡는다
+(픽셀을 세는 단정이 없다 — W8 visual golden 몫이다). Vulkan 경로는 같은 버스를 쓰므로 함께
+따라오지만 실행으로 확인하지 않았다(저장소 규약대로 Vulkan 은 보류).
 
 ### W5 — Play/Pause/Eject 표시·입력 상태 머신 (P0, 4일 · 정찰 뒤 3일→4일)
 

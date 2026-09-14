@@ -78,6 +78,16 @@ namespace Editor
 		void OnGui();
 		void HandleWindowResize();
 
+		/// 화면 크기 버스에 한 번 알린다(해제 → 통지 두 단계). 에디터에서 이 크기는
+		/// **뷰포트 렌더 해상도**다. 창 클라이언트 크기가 아니다 — 스왑체인은
+		/// ImGui 셸이 자기 `GetClientRect` 로 따로 잡는다(`ImGuiHost::BeginFrame`).
+		void ApplyScreenSize(std::uint32_t width, std::uint32_t height);
+
+		/// Host 가 게시한 캔버스 extent × 렌더 배율을 버스에 반영한다. 프레임마다
+		/// 부르되 실제 적용은 값이 **안정된 뒤**다 — 스플리터를 끄는 동안 매 프레임
+		/// 파이프라인을 다시 만들면 그 자체가 병목이 된다.
+		void ApplyViewportRenderExtent();
+
 		// SetWindowText는 값이 바뀔 때만 부른다. 매 프레임 같은 문자열을
 		// 밀어 넣던 자리였다.
 		std::wstring                               m_appliedWindowTitle;
@@ -119,5 +129,22 @@ namespace Editor
 		std::mutex m_sceneStructureMutex;
 
 		std::atomic_bool m_isInvokeResize{ false };
+
+		// 뷰포트 extent 적용의 진정 상태. 후보가 연속 kStableFrames 프레임 같아야
+		// 적용한다.
+		//
+		// ★ 격자는 **2** 다. 처음에 8 로 두었다가 되돌렸다 — 올림 격자는 두 축을
+		//   서로 다른 비율로 밀어 렌더 종횡비를 캔버스 종횡비에서 떼어 놓는다.
+		//   2244x1098 을 0.667 배로 줄이면 1496x732 인데 8 격자는 1496x736 으로
+		//   올려 0.5% 를 어긋내고, 그림은 캔버스 전체에 펴지므로(fill) 그 0.5% 가
+		//   그대로 기즈모와 그림 사이의 어긋남이 된다. 흔들림은 격자가 아니라
+		//   아래 진정 프레임 수가 막는다.
+		static constexpr std::uint32_t kRenderExtentQuantum = 2;
+		static constexpr std::uint32_t kRenderExtentStableFrames = 8;
+		static constexpr std::uint32_t kRenderExtentMin = 64;
+		static constexpr std::uint32_t kRenderExtentMax = 8192;
+		std::uint32_t m_pendingExtentWidth{ 0 };
+		std::uint32_t m_pendingExtentHeight{ 0 };
+		std::uint32_t m_pendingExtentFrames{ 0 };
 	};
 }

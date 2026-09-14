@@ -2,7 +2,10 @@
 #include "EditorTheme.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorViewportWindows.h"
+#include "RHI/IImGuiHost.h"
 #include <imgui.h>
+#include <algorithm>
+#include <cmath>
 #include <mutex>
 
 namespace editor::windows
@@ -28,6 +31,33 @@ namespace editor::windows
         bool hostHoveredThisFrame{};
         bool focusRequested{};
         std::uint64_t canvasClicks{};
+
+        // 이번 프레임에 Host 본문이 받은 content region(물리 픽셀). 0 이면 이번
+        // 프레임에 Host 가 돌지 않았다는 뜻이고, 그때는 게시본이 옛 값을 지킨다 —
+        // 접힌 도크나 숨은 탭에서 0 을 게시하면 렌더 타깃이 0 으로 무너진다.
+        std::uint32_t hostCanvasWidth{};
+        std::uint32_t hostCanvasHeight{};
+
+        render_scale_mode scaleMode{ render_scale_mode::dpi_auto };
+        float scaleFixedValue{ 1.f };
+        float scaleApplied{ 1.f };
+        float scaleDpi{ 1.f };
+
+        /// 규약대로 자른 배율. `dpi_auto` 는 Unreal 의 공식 그대로 1/DPI 다.
+        float ResolveRenderScaleLocked(float dpiScale) noexcept
+        {
+            float value = 1.f;
+            switch (scaleMode)
+            {
+            case render_scale_mode::dpi_auto:
+                value = (dpiScale > 0.f) ? (1.f / dpiScale) : 1.f;
+                break;
+            case render_scale_mode::off:   value = 1.f; break;
+            case render_scale_mode::fixed: value = scaleFixedValue; break;
+            }
+            if (!std::isfinite(value)) value = 1.f;
+            return std::clamp(value, kMinViewportRenderScale, kMaxViewportRenderScale);
+        }
     }
 
     void request_viewport_focus()
@@ -64,6 +94,24 @@ namespace editor::windows
         return published;
     }
 
+    void set_viewport_render_scale(render_scale_mode mode, float fixedValue)
+    {
+        std::lock_guard lock(demandMutex);
+        scaleMode = mode;
+        if (render_scale_mode::fixed == mode)
+        {
+            scaleFixedValue = std::isfinite(fixedValue)
+                ? std::clamp(fixedValue, kMinViewportRenderScale, kMaxViewportRenderScale)
+                : 1.f;
+        }
+    }
+
+    viewport_render_scale get_viewport_render_scale()
+    {
+        std::lock_guard lock(demandMutex);
+        return { scaleMode, scaleFixedValue, scaleApplied, scaleDpi };
+    }
+
     void note_view_submission(bool editorSkippedByDemand, bool gameSkippedByDemand)
     {
         std::lock_guard lock(demandMutex);
@@ -98,6 +146,22 @@ namespace editor::windows
         published.uiWantCaptureMouse = io.WantCaptureMouse;
         published.uiWantCaptureKeyboard = io.WantCaptureKeyboard;
         published.uiWantTextInput = io.WantTextInput;
+
+        // 캔버스 extent 와 배율. **0 은 게시하지 않는다** — Host 가 이번 프레임에
+        // 돌지 않은 것(접힌 도크·숨은 탭)과 캔버스가 0 인 것은 다르고, 앞쪽을
+        // 0 으로 게시하면 렌더 타깃이 그 프레임에 무너진다. 옛 값을 지킨다.
+        scaleDpi = GetImGuiHost().GetWindowDpiScale();
+        if (!(scaleDpi > 0.f)) scaleDpi = 1.f;
+        scaleApplied = ResolveRenderScaleLocked(scaleDpi);
+        published.dpiScale = scaleDpi;
+        published.renderScale = scaleApplied;
+        if (0 != hostCanvasWidth && 0 != hostCanvasHeight)
+        {
+            published.canvasWidth = hostCanvasWidth;
+            published.canvasHeight = hostCanvasHeight;
+        }
+        hostCanvasWidth = 0;
+        hostCanvasHeight = 0;
         published.hostFocused = hostFocusedThisFrame;
         published.hostHovered = hostHoveredThisFrame;
         published.gameCanvasClicks = canvasClicks;
@@ -153,6 +217,29 @@ namespace editor::windows
             }
         }
         if (applyRequest) currentMode = requested;
+
+        // `EndTabBar` 는 다음 항목을 위해 ItemSpacing.y 만큼 커서를 내린다. 캔버스는
+        // 항목이 아니라 화면이므로 그 간격을 되돌린다 — 두면 창 배경(검정)이 탭과
+        // 그림 사이에 띠로 남는다. 옛 도크 탭 바에는 이 간격이 없었다.
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y);
+
+        // ★ 캔버스 extent 는 **여기서** 잰다. 모드 본문이 곧 받을 자리와 같은
+        //   값이고(둘 다 `GetContentRegionAvail`), 여기서 한 번만 재면 모드가
+        //   둘이어도 출처가 하나다. 물리 픽셀로 바꾸는 것은 렌더 타깃이 논리
+        //   단위를 모르기 때문이다 — PMv2 에서는 배율이 1 이라 같은 수가 되지만
+        //   그것은 이 창의 사정이지 규약이 아니다.
+        {
+            const ImVec2 avail = ImGui::GetContentRegionAvail();
+            const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+            const float pixelsX = avail.x * (fbScale.x > 0.f ? fbScale.x : 1.f);
+            const float pixelsY = avail.y * (fbScale.y > 0.f ? fbScale.y : 1.f);
+            if (pixelsX >= 1.f && pixelsY >= 1.f)
+            {
+                std::lock_guard lock(demandMutex);
+                hostCanvasWidth = static_cast<std::uint32_t>(pixelsX);
+                hostCanvasHeight = static_cast<std::uint32_t>(pixelsY);
+            }
+        }
 
         if (viewport_mode::game == currentMode) draw_game_view();
         else                                    draw_scene_view();

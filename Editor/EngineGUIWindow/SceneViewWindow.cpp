@@ -146,7 +146,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     if (imageSize.x <= 0.f || imageSize.y <= 0.f) return;
     const ImVec2 imageMax{imageMin.x + imageSize.x, imageMin.y + imageSize.y};
     const auto displayed = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Editor);
-    m_canvas = editor::LayoutViewportCanvas(editor::viewport_fit::crop, imageMin, imageSize,
+    m_canvas = editor::LayoutViewportCanvas(editor::viewport_fit::fill, imageMin, imageSize,
         {static_cast<float>(displayed.width), static_cast<float>(displayed.height)}, ImGui::GetIO().DisplayFramebufferScale);
     // Reserve the canvas without taking ImGui's active/hovered item: transform
     // gizmos must be able to acquire the mouse over the rendered image.
@@ -180,6 +180,29 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     if (!m_canvas.valid) return;
     // 기즈모는 image 사각형을 받는다 — 잘린 부분까지 포함한 소스 전체의 자리라야
     // 화면 밖으로 밀려난 조작점의 투영이 맞는다. 제목표시줄 보정은 없다(원점이 content).
+    //
+    // ★ 그런데 ImGuizmo 는 `Manipulate` 첫 줄에서 그 사각형을 **창 클립과 교차하지
+    //   않고** 클립으로 민다(`PushClipRect(rect, false)`, ImGuizmo.cpp). crop 의 image
+    //   사각형은 캔버스 밖까지 뻗으므로 그대로 두면 기즈모가 계층·인스펙터·탭 줄·
+    //   브라우저 위로 그려진다 — W4 가 SetRect 를 창 사각형에서 image 사각형으로
+    //   바꾸며 낸 결함이고, 카메라를 돌려 객체가 캔버스를 벗어날 때 드러났다.
+    //   ImGuizmo 안을 못 만지므로, 이 함수가 끝날 때 그 뒤에 쌓인 draw 명령의 클립을
+    //   캔버스 가시 사각형으로 되잡는다. 조기 반환이 여럿이라 RAII 로 건다.
+    struct GizmoClipScope
+    {
+        ImDrawList* draw; int firstCommand; ImVec2 clipMin, clipMax;
+        ~GizmoClipScope()
+        {
+            for (int i = firstCommand; i < draw->CmdBuffer.Size; ++i)
+            {
+                ImVec4& clip = draw->CmdBuffer[i].ClipRect;
+                clip.x = ImMax(clip.x, clipMin.x); clip.y = ImMax(clip.y, clipMin.y);
+                clip.z = ImMin(clip.z, clipMax.x); clip.w = ImMin(clip.w, clipMax.y);
+                if (clip.z < clip.x) clip.z = clip.x;
+                if (clip.w < clip.y) clip.w = clip.y;
+            }
+        }
+    } gizmoClip{ draw, draw->CmdBuffer.Size, m_canvas.clipMin, m_canvas.clipMax };
     const ImVec2 imageExtent = m_canvas.ImageExtent();
     ImGuizmo::SetRect(m_canvas.imageMin.x, m_canvas.imageMin.y, imageExtent.x, imageExtent.y);
     ImGuizmo::SetOrthographic(cam->m_isOrthographic);
