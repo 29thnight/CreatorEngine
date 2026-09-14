@@ -446,36 +446,21 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			Ray ray = CreateRayFromCamera(cam, mousePos);
 
 			const auto& sceneObjects = SceneManagers->GetActiveScene()->m_Entities;
-			auto hits = PickObjectsFromRay(ray, sceneObjects);
+			auto hits = editor::picking::GatherRayHits(ray, sceneObjects);
 
 			if (!hits.empty())
 			{
-				// 겹친 것들 사이의 순환은 **같은 더미를 다시 찍었을 때만** 다음
-				// 것으로 넘어간다. 리셋 조건이 "아무것도 못 맞혔을 때"뿐이라
-				// 지점을 옮겨 찍어도 인덱스가 계속 올라갔고, 바닥 위의 모델을
-				// 두 번째로 클릭하면 index 1 → 바닥이 잡혔다. 인스펙터는 그
-				// 선택을 그대로 그리므로 사용자는 모델을 편집한다고 믿으면서
-				// 바닥의 Scale 을 고쳤다(2026-09-14 사고).
-				//
-				// 신원은 포인터가 아니라 핸들로 잰다 — 파괴된 슬롯 자리에 새
-				// 엔티티가 같은 주소로 들어오면 포인터 비교는 ABA 로 같다고
-				// 답한다. 세대가 실린 EntityHandle 은 그 자리에서 갈린다.
+				// 이번 클릭이 맞힌 더미의 신원. 순환을 이것으로 가르는 이유와
+				// 포인터가 아니라 핸들인 이유는 AdvanceCycleIndex 주석 참고.
 				std::vector<EntityHandle> cycleIdentity;
 				cycleIdentity.reserve(hits.size());
 				for (const RayHitResult& hit : hits)
 					cycleIdentity.push_back(scene->HandleOf(hit.object->m_index));
 
-				if (cycleIdentity != m_hitCycleIdentity)
-				{
-					m_hitCycleIdentity = std::move(cycleIdentity);
-					m_currentHitIndex = 0;
-				}
-
 				m_hitResults = hits;
-
-				m_currentHitIndex = m_currentHitIndex % m_hitResults.size();
-				Entity* selected = m_hitResults[m_currentHitIndex].object;
-				m_currentHitIndex++;
+				const std::size_t chosen = editor::picking::AdvanceCycleIndex(
+					cycleIdentity, m_hitCycleIdentity, m_currentHitIndex);
+				Entity* selected = m_hitResults[chosen].object;
 
 				bool shift = ImGui::GetIO().KeyShift;
                 auto desired = selectedObjects;
@@ -672,60 +657,41 @@ Ray SceneViewWindow::CreateRayFromCamera(Camera* cam, const ImVec2& mousePos)
 	return Ray{ nearPoint, math::normalize(farPoint - nearPoint) };
 }
 
-Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects)
+namespace editor::picking
 {
-	Entity* selected = nullptr;
-	float closestDistance = FLT_MAX;
-	const math::ray pickRay{ ray.origin, ray.direction };
 
-	for (auto& obj : sceneObjects)
+std::vector<Entity*> CollectOccupants(
+	const std::vector<std::unique_ptr<Entity>>& slots)
+{
+	std::vector<Entity*> occupants;
+	occupants.reserve(slots.size());
+	for (const std::unique_ptr<Entity>& slot : slots)
 	{
-		// m_Entities 는 구멍이 있는 슬롯맵이다 — AllocateSlot 이 nullptr 로 늘리고
-		// ReleaseSlot 이 파괴된 슬롯을 비운 채 재사용 전까지 남긴다(Scene.cpp
-		// AllocateSlot/ReleaseSlot). 저장소의 다른 순회 열넷은 전부 이 검사를
-		// 갖고 있었고 피킹 둘만 없었다 — 엔티티를 하나라도 파괴한 뒤 씬뷰를
-		// 한 번 클릭하면 널 역참조로 죽었다(2026-09-14 덤프, 읽기 주소 0x150).
-		if (!obj) continue;
-
-		auto* meshComp = obj->GetComponent<MeshRenderer>();
-		// I5-D5b — "그릴 메시가 있는가"는 창구가 판정한다. legacy m_Mesh를
-		// 직접 가드로 쓰면 D4f의 은퇴가 이 조건을 통째로 거짓으로 만들어
-		// 피킹이 조용히 죽는다(선택 불가는 렌더 회귀로 안 잡힌다).
-		if (!meshComp || !meshComp->HasRenderableMesh())
-			continue;
-
-		const math::aabb worldAABB = meshComp->GetBoundingBox();
-		if (worldAABB.is_empty()) continue;
-
-		float hitDistance;
-		if (math::raycast(pickRay, worldAABB, hitDistance))
-		{
-			if (hitDistance < closestDistance)
-			{
-				closestDistance = hitDistance;
-				selected = obj.get();
-			}
-		}
-
+		// 구멍은 여기서만 걷어낸다. 이 한 줄이 없어서 2026-09-14 에 씬뷰
+		// 클릭 한 번이 프로세스를 죽였다(덤프: 읽기 주소 0x150 — null this
+		// + Entity::m_componentTypeMask 오프셋). 저장소의 다른 슬롯맵 순회
+		// 열넷은 전부 같은 검사를 갖고 있었고 피킹만 없었다.
+		if (nullptr == slot) continue;
+		occupants.push_back(slot.get());
 	}
-
-	return selected;
+	return occupants;
 }
 
-std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, const std::vector<std::unique_ptr<Entity>>& sceneObjects)
+std::vector<RayHitResult> GatherRayHits(
+	const Ray& ray, const std::vector<std::unique_ptr<Entity>>& slots)
 {
 	std::vector<RayHitResult> hits;
 	const math::ray pickRay{ ray.origin, ray.direction };
 
-	for (auto& obj : sceneObjects)
+	for (Entity* obj : CollectOccupants(slots))
 	{
-		// 빈 슬롯 건너뛰기 — 사유는 위 PickObjectFromRay 주석 참고.
-		if (!obj) continue;
-
 		auto* meshComp = obj->GetComponent<MeshRenderer>();
 		auto* cameraComp = obj->GetComponent<CameraComponent>();
 		auto* lightComp = obj->GetComponent<LightComponent>();
-		if (meshComp && meshComp->HasRenderableMesh()) // I5-D5b — 위와 같은 창구
+		// I5-D5b — "그릴 메시가 있는가"는 창구가 판정한다. legacy m_Mesh를
+		// 직접 가드로 쓰면 D4f의 은퇴가 이 조건을 통째로 거짓으로 만들어
+		// 피킹이 조용히 죽는다(선택 불가는 렌더 회귀로 안 잡힌다).
+		if (meshComp && meshComp->HasRenderableMesh())
 		{
 			const math::aabb worldAABB = meshComp->GetBoundingBox();
 			if (worldAABB.is_empty()) continue;
@@ -733,7 +699,7 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 			float hitDistance;
 			if (math::raycast(pickRay, worldAABB, hitDistance))
 			{
-				hits.push_back({ obj.get(), hitDistance });
+				hits.push_back({ obj, hitDistance });
 			}
 		}
 		else if (cameraComp)
@@ -743,7 +709,7 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 			float hitDistance;
 			if (math::raycast(pickRay, worldAABB, hitDistance))
 			{
-				hits.push_back({ obj.get(), hitDistance });
+				hits.push_back({ obj, hitDistance });
 			}
 		}
 		else if (lightComp)
@@ -753,16 +719,50 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 			float hitDistance;
 			if (math::raycast(pickRay, worldAABB, hitDistance))
 			{
-				hits.push_back({ obj.get(), hitDistance });
+				hits.push_back({ obj, hitDistance });
 			}
 		}
 	}
 
 	// 거리순 정렬 (가까운 오브젝트가 먼저)
-	std::sort(hits.begin(), hits.end(), [](const RayHitResult& a, const RayHitResult& b) 
+	std::sort(hits.begin(), hits.end(), [](const RayHitResult& a, const RayHitResult& b)
 	{
 		return a.distance < b.distance;
 	});
 
 	return hits;
+}
+
+std::size_t AdvanceCycleIndex(
+	const std::vector<EntityHandle>& identity,
+	std::vector<EntityHandle>& lastIdentity,
+	std::size_t& cursor)
+{
+	if (identity.empty())
+	{
+		lastIdentity.clear();
+		cursor = 0;
+		return 0;
+	}
+
+	// 순환은 **같은 더미를 다시 찍었을 때만** 다음 것으로 넘어간다. 예전에는
+	// 리셋 조건이 "아무것도 못 맞혔을 때" 하나뿐이라, 지점을 옮겨 찍어도
+	// 커서가 계속 올라갔다 — 바닥 위의 모델을 두 번째로 클릭하면 index 1 →
+	// 바닥이 잡혔고, 인스펙터는 그 선택을 그대로 그리므로 사용자는 모델을
+	// 편집한다고 믿으면서 바닥의 Scale 을 고쳤다(2026-09-14 사고).
+	//
+	// 신원을 Entity* 가 아니라 EntityHandle 로 재는 이유는 세대다. 파괴된
+	// 슬롯 자리에 새 엔티티가 같은 힙 주소로 들어오면 포인터 비교는 ABA 로
+	// "같다" 고 답하고, 그러면 이 리셋이 다시 조용히 안 걸린다.
+	if (identity != lastIdentity)
+	{
+		lastIdentity = identity;
+		cursor = 0;
+	}
+
+	const std::size_t chosen = cursor % identity.size();
+	cursor = chosen + 1;
+	return chosen;
+}
+
 }

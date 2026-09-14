@@ -12,10 +12,15 @@
 #include "WindowDesc.h"
 #include "ImGui.h"
 #include "SceneViewportOverlay.h"
+#include "SceneViewWindow.h"
+#include "Entity.h"
 #include "../../ThirdParty/ImViewGuizmo/MathematicsAdapter.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <memory>
+#include <vector>
 #include <cstdint>
 #include <cstring>
 #include <string_view>
@@ -1044,6 +1049,123 @@ namespace editor
             checks.expect(EntityIconIndex("unknown-preset")==0, "entity icon", "unknown ID falls back");
             for (size_t i=0;i<EntityIconPresets.size();++i)
                 checks.expect(EntityIconIndex(EntityIconPresets[i].id)==i, "entity icon", "unique stable IDs");
+        }
+        // ── 씬뷰 피킹 (2026-09-14 사고 둘) ──
+        //
+        // 이 두 묶음이 없어서 사고가 났다. 피킹은 프레임 루프 안의 멤버 함수라
+        // 잴 수가 없었고, 그래서 두 결함 모두 게이트를 통과한 채 살아 있었다.
+        // 순수 부분을 editor::picking 으로 끌어낸 것이 여기 서기 위해서다.
+        //
+        // ★ 변이로 이빨을 확인할 때의 발현 관측값:
+        //   - CollectOccupants 의 `if (nullptr == slot) continue` 를 빼면 →
+        //     "tombstoned slots are dropped" 외 둘이 붉어진다(죽지 않는다.
+        //     그 줄을 순회 안의 continue 가 아니라 목록 반환으로 만든 이유다).
+        //   - AdvanceCycleIndex 의 `if (identity != lastIdentity)` 리셋을 빼면 →
+        //     "a different stack resets to the front" 가 1 을 돌려주며 붉어진다.
+        {
+            using editor::picking::CollectOccupants;
+            using editor::picking::GatherRayHits;
+
+            std::vector<std::unique_ptr<Entity>> slots;
+            slots.emplace_back(nullptr);
+            auto front = std::make_unique<Entity>();
+            Entity* const frontRaw = front.get();
+            slots.push_back(std::move(front));
+            slots.emplace_back(nullptr);
+            auto back = std::make_unique<Entity>();
+            Entity* const backRaw = back.get();
+            slots.push_back(std::move(back));
+            slots.emplace_back(nullptr);
+
+            const std::vector<Entity*> occupants = CollectOccupants(slots);
+            const bool nullFree = std::none_of(occupants.begin(), occupants.end(),
+                [](Entity* entity) { return nullptr == entity; });
+            checks.expect(occupants.size() == 2, "scene pick", "tombstoned slots are dropped");
+            checks.expect(nullFree, "scene pick", "no null reaches the traversal");
+            checks.expect(occupants.size() == 2 &&
+                occupants[0] == frontRaw && occupants[1] == backRaw,
+                "scene pick", "occupants keep slot order");
+
+            std::vector<std::unique_ptr<Entity>> allHoles;
+            allHoles.emplace_back(nullptr);
+            allHoles.emplace_back(nullptr);
+            checks.expect(CollectOccupants(allHoles).empty(), "scene pick", "all-hole slot map");
+            checks.expect(CollectOccupants({}).empty(), "scene pick", "empty slot map");
+
+            // GatherRayHits 는 "목록에 널이 없다" 를 전제로 곧바로 역참조한다.
+            // 그 전제가 깨진 채 부르면 프로세스가 죽고, 그러면 바로 위의 실패
+            // 보고까지 함께 잃는다 — 변이가 무엇을 깼는지 남기려면 전제를 먼저
+            // 확인하고 들어가야 한다.
+            if (occupants.size() == 2 && nullFree)
+            {
+                checks.expect(GatherRayHits(Ray{ {0.f,0.f,-10.f}, {0.f,0.f,1.f} }, slots).empty(),
+                    "scene pick", "component-less occupants yield no hit");
+            }
+            else
+            {
+                checks.expect(false, "scene pick",
+                    "traversal skipped - CollectOccupants let a hole through");
+            }
+        }
+        {
+            using editor::picking::AdvanceCycleIndex;
+
+            // 바닥 위에 놓인 모델. 레이가 둘 다 맞고 모델이 앞이다.
+            const std::vector<EntityHandle> stack{ {1,7,1}, {1,3,1} };
+            const std::vector<EntityHandle> other{ {1,9,1}, {1,3,1} };
+            // 같은 슬롯을 새 엔티티가 물려받은 경우. 포인터로 재면 ABA 로 같다.
+            const std::vector<EntityHandle> reborn{ {1,7,2}, {1,3,1} };
+
+            // 시나리오마다 상태를 손으로 세운다. 앞 단정의 결과를 뒤가 물려받게
+            // 이어 붙였더니, 리셋을 걷어낸 변이에서 커서가 마침 짝수라
+            // `2 % 2 == 0` 으로 **우연히 통과하는** 단정이 생겼다 — 잡지 못한
+            // 것이 아니라 자극조차 못 한 것이다. 커서 1(더미 중간)이 이 결함을
+            // 드러내는 자리이므로 그 값을 단정마다 명시한다.
+            {
+                std::vector<EntityHandle> last;
+                std::size_t cursor = 0;
+                checks.expect(AdvanceCycleIndex(stack, last, cursor) == 0,
+                    "scene pick cycle", "first click takes the front");
+                checks.expect(AdvanceCycleIndex(stack, last, cursor) == 1,
+                    "scene pick cycle", "same stack cycles behind");
+                checks.expect(AdvanceCycleIndex(stack, last, cursor) == 0,
+                    "scene pick cycle", "cycle wraps");
+            }
+            {
+                // 사고의 자리. 모델을 두 번 찍어 커서가 1 인 채로 다른 더미를
+                // 찍으면, 리셋이 없는 코드는 그 더미의 **뒤엣것**을 고른다.
+                std::vector<EntityHandle> last = stack;
+                std::size_t cursor = 1;
+                checks.expect(AdvanceCycleIndex(other, last, cursor) == 0,
+                    "scene pick cycle", "a different stack resets to the front");
+            }
+            {
+                std::vector<EntityHandle> last = other;
+                std::size_t cursor = 1;
+                checks.expect(AdvanceCycleIndex(stack, last, cursor) == 0,
+                    "scene pick cycle", "returning to an earlier stack also resets");
+            }
+            {
+                std::vector<EntityHandle> last = stack;
+                std::size_t cursor = 1;
+                checks.expect(AdvanceCycleIndex(reborn, last, cursor) == 0,
+                    "scene pick cycle", "generation change is a different stack");
+            }
+            {
+                // 반대쪽 단정. 리셋이 지나치게 세면(늘 0 으로 되돌리면) 겹침
+                // 순환 자체가 죽는데, 위 넷만으로는 그 변이가 전부 초록이다.
+                std::vector<EntityHandle> last = stack;
+                std::size_t cursor = 1;
+                checks.expect(AdvanceCycleIndex(stack, last, cursor) == 1,
+                    "scene pick cycle", "same stack keeps the cursor");
+            }
+            {
+                std::vector<EntityHandle> last = stack;
+                std::size_t cursor = 3;
+                const bool cleared = AdvanceCycleIndex({}, last, cursor) == 0 &&
+                    last.empty() && cursor == 0;
+                checks.expect(cleared, "scene pick cycle", "empty hit clears the cycle");
+            }
         }
         report += "[";
         report += checks.failed == 0 ? "OK" : "FAIL";
