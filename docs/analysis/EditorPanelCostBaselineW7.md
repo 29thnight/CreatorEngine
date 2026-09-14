@@ -218,7 +218,7 @@ clipping 이 하겠다고 한 일의 전부다. p95 30.427 → 0.041 ms(742 배)
 | ~~W7-1 Browser 스냅샷~~ | **착지(2026-09-15)** — `browser_tree.scans` 24 → 0, `browser_files.scans` 1 → 0 |
 | ~~W7-2 flatten cache~~ | **착지(2026-09-15)** — 홀로는 이득 0. W7-3 과 함께만 뜻이 있다 |
 | ~~W7-3 clipping~~ | **착지(2026-09-15)** — `hierarchy.units` 50,000 → 14, p95 30.4 → 0.041 ms |
-| W7-4 정본 불변식 source gate | 평탄 목록이 parent/children 을 복제하지 않는다는 것을 소스에서 맞댄다 |
+| ~~W7-4 정본 불변식 source gate~~ | **착지(2026-09-15)** — `verify-hierarchy-flatten-contract.ps1`, 72 단정 · 변이 12 종 |
 | W7 비동기 썸네일 | 별도 산정. 아이콘 → 썸네일, 무효화/예산/퇴출/늦은 완료 |
 
 남은 비용의 성격도 다시 바뀌었다. 이제 Hierarchy 의 0.04 ms 는 **보이는 14 줄**의

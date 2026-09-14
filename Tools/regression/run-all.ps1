@@ -263,6 +263,18 @@ Run-Step "씬 기즈모 그림·입력 경계(소스 대조)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-scene-gizmo-input-boundary.ps1")
 }
 
+# PHASE 21 W7-4 — Hierarchy 평탄 표시 목록의 정본 계약(소스 대조).
+#
+# 두 축 다 런타임이 못 본다. ① `HierarchyStore` 의 변경 자리 하나가 revision 을
+# 안 올리면 **그 종류의 편집 뒤에만** 트리가 낡는다 — 어느 자리가 빠졌는지 모르니
+# CLI 로 무엇을 재현할지도 모른다. ② clipper 에 준 줄 높이가 띠 높이와 갈리면
+# **스크롤해야만** 어긋난다. W7-3 착지 때 392,888 픽셀 대조로 0 을 받았지만 그것은
+# 스크롤 0 의 그림이고, 스크롤을 CLI 로 몰 창구가 없다. 그래서 양쪽을 다 소스에서
+# 유도해 맞댄다. 변이 12 종이 각각 의도한 단정에서 붉어지는 것을 확인했다.
+Run-Step "Hierarchy 평탄 목록 정본 계약(소스 대조)" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hierarchy-flatten-contract.ps1")
+}
+
 # PHASE 21 W1 — ImGui 1.92 obsolete API 잔존 0.
 #
 # 소스 대조다. `IMGUI_DISABLE_OBSOLETE_FUNCTIONS` 를 제품 구성에 켤 수 없기
