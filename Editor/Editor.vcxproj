@@ -35,6 +35,8 @@
     <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp" />
     <ClInclude Include="EngineGUIWindow\EditorPanelCost.h" />
     <ClCompile Include="EngineGUIWindow\EditorPanelCost.cpp" />
+    <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h" />
+    <ClCompile Include="EngineGUIWindow\BrowserDirectorySnapshot.cpp" />
     <ClInclude Include="EngineGUIWindow\EditorWorkspaceStore.h" />
     <ClCompile Include="EngineGUIWindow\EditorWorkspaceStore.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>

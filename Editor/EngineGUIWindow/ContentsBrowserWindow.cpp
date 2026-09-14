@@ -1,5 +1,6 @@
 #include "ContentsBrowserWindow.h"
 #include "EditorPanelCost.h"
+#include "BrowserDirectorySnapshot.h"
 #include "EditorTheme.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
@@ -87,6 +88,8 @@ void editor::windows::draw_content_browser()
 
 void ContentsBrowserWindow::HandleSceneObjectDrop(const void* payload)
 {
+	// W7-1: 프리팹 파일이 생긴다. 스냅샷을 버려 다음 프레임에 보이게 한다.
+	struct invalidate_on_exit { ~invalidate_on_exit() { editor::browser_cache_invalidate(); } } invalidateScope;
 	Scene* scene = SceneManagers->GetActiveScene();
 	if (!scene) return;
 
@@ -246,6 +249,7 @@ void ContentsBrowserWindow::DrawFolderMenu(const file::path& directory)
     if (browser_same_path(directory, PathFinder::VolumeProfilePath())
         && ImGui::MenuItem("Create Volume Profile..."))
         EditorAssetDatabase::Get().CreateVolumeProfile(directory);
+        editor::browser_cache_invalidate();   // W7-1: 방금 만든 것은 즉시 보여야 한다
     if (ImGui::MenuItem("Open in File Explorer"))
         EditorPlatform::Get().RevealInFileExplorer(directory);
     if (::editor::popup_host_has_items(::editor::popup_host::content_browser_folder))
@@ -273,6 +277,7 @@ void ContentsBrowserWindow::DrawFolderDialog()
         if (ImGui::Button("Create") || enter)
         {
             file::path created;
+            editor::browser_cache_invalidate();   // W7-1: 성공·실패 어느 쪽이든 디스크가 움직였을 수 있다
             if (EditorAssetDatabase::Get().CreateFolder(m_folderTarget, m_folderName, created, m_error))
             {
                 Navigate(created);
@@ -288,19 +293,21 @@ void ContentsBrowserWindow::DrawFolderDialog()
 void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
 {
     // W7-0: 이 함수는 재귀한다. 시간 구간은 바깥(DrawDirectoryPanel)이 잡고
-    // 여기서는 **일의 수**만 센다 — 노드 하나와 디렉터리 스캔 한 번.
+    // 여기서는 **일의 수**만 센다. 스캔은 캐시가 실제로 디스크를 만졌을
+    // 때만 늘어야 하므로 바깥에서 캐시 계수의 차이로 센다(W7-1).
     editor::windows::add_panel_units(editor::windows::panel_cost_slot::browser_tree, 1);
-    editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_tree, 1);
     const std::string id = browser_utf8(directory);
     const std::string name = directory == m_rootDirectory ? "Assets" : browser_utf8(directory.filename());
-    std::error_code ec;
+    // W7-1: 프레임마다 directory_iterator 를 돌리지 않는다. 목록은 스냅샷이
+    // 주고, 정렬도 스캔할 때 한 번 해 둔 것이다.
+    const editor::browser_directory_listing& listing = editor::browser_cache_listing(directory);
     std::vector<file::path> children;
-    for (file::directory_iterator it(directory, file::directory_options::skip_permission_denied, ec), end;
-         !ec && it != end; it.increment(ec))
+    children.reserve(listing.entries.size());
+    for (const auto& entry : listing.entries)
     {
-        if (it->is_directory(ec) && !it->is_symlink(ec)) children.push_back(it->path());
+        // 심볼릭 링크를 타지 않는 것은 옛 동작 그대로다 — 순환을 막는다.
+        if (entry.isDirectory && !entry.isSymlink) children.push_back(entry.path);
     }
-    std::sort(children.begin(), children.end());
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth
         | ImGuiTreeNodeFlags_FramePadding;
     if (m_currentDirectory == directory) flags |= ImGuiTreeNodeFlags_Selected;
@@ -333,6 +340,9 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
 void ContentsBrowserWindow::DrawDirectoryPanel()
 {
     const editor::windows::panel_cost_scope cost{ editor::windows::panel_cost_slot::browser_tree };
+    // W7-1: **실제로 디스크를 만진 횟수**만 센다. 이 수가 0 에 수렴하는 것이
+    // 캐시가 섰다는 증거이고, 시간은 OS 파일 캐시 온도로 흔들려 증거가 못 된다.
+    const std::uint64_t scansBefore = editor::browser_cache_get_stats().scans;
     ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, editor::ThemePixels(14.f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0.f, editor::ThemePixels(3.f) });
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { editor::ThemePixels(3.f), editor::ThemePixels(1.f) });
@@ -350,33 +360,49 @@ void ContentsBrowserWindow::DrawDirectoryPanel()
     }
     ImGui::PopStyleVar(3);
     m_revealDirectory = false;
+    editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_tree,
+        editor::browser_cache_get_stats().scans - scansBefore);
 }
 
 void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
 {
     const editor::windows::panel_cost_scope cost{ editor::windows::panel_cost_slot::browser_files };
-    editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_files, 1);
-    std::error_code ec;
-    std::vector<file::directory_entry> entries;
-    size_t supported = 0;
-    for (file::directory_iterator it(m_currentDirectory, ec), end; !ec && it != end; it.increment(ec))
+    const std::uint64_t scansBefore = editor::browser_cache_get_stats().scans;
+    // W7-1: 목록은 스냅샷이 준다. 프레임마다 하던 것 셋이 여기서 사라졌다 —
+    // directory_iterator · 항목마다의 is_directory(stat) · 비교마다 stat 하던
+    // 정렬. 남은 것은 **정책**뿐이다(지원 확장자·검색·유형 필터·정렬 방향).
+    // 그 정책은 W2-B 의 소유라 캐시로 내리지 않는다.
+    const editor::browser_directory_listing& listing = editor::browser_cache_listing(m_currentDirectory);
+    editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_files,
+        editor::browser_cache_get_stats().scans - scansBefore);
+    if (!listing.valid)
     {
-        const bool folder = it->is_directory(ec);
-        if (!folder && !EditorAssetDatabase::Get().IsSupportExtension(it->path().extension().string())) continue;
-        ++supported;
-        const auto name = browser_utf8(it->path().filename());
-        if (!m_filter.PassFilter(name.c_str())) continue;
-        if (!folder && m_typeFilter >= 0 && static_cast<int>(DeduceFileType(it->path())) != m_typeFilter) continue;
-        entries.push_back(*it);
+        ImGui::TextWrapped("Unable to read folder: %s", listing.error.message().c_str());
+        return;
     }
-    if (ec) { ImGui::TextWrapped("Unable to read folder: %s", ec.message().c_str()); return; }
-    std::sort(entries.begin(), entries.end(), [this](const auto& a, const auto& b)
+    std::vector<const editor::browser_directory_entry*> entries;
+    entries.reserve(listing.entries.size());
+    size_t supported = 0;
+    for (const auto& entry : listing.entries)
     {
-        std::error_code aError, bError;
-        const bool aFolder = a.is_directory(aError), bFolder = b.is_directory(bError);
-        if (aFolder != bFolder) return aFolder;
-        return m_sortDescending ? a.path().filename() > b.path().filename() : a.path().filename() < b.path().filename();
-    });
+        if (!entry.isDirectory && !EditorAssetDatabase::Get().IsSupportExtension(entry.extension)) continue;
+        ++supported;
+        if (!m_filter.PassFilter(entry.nameUtf8.c_str())) continue;
+        if (!entry.isDirectory && m_typeFilter >= 0 &&
+            static_cast<int>(DeduceFileType(entry.path)) != m_typeFilter) continue;
+        entries.push_back(&entry);
+    }
+    // 스냅샷은 이미 폴더 먼저·이름 오름차순으로 정렬돼 있다. 내림차순은
+    // 이름 축만 뒤집는 것이라 비교자가 stat 을 부를 이유가 없다.
+    if (m_sortDescending)
+    {
+        std::stable_sort(entries.begin(), entries.end(),
+            [](const editor::browser_directory_entry* a, const editor::browser_directory_entry* b)
+            {
+                if (a->isDirectory != b->isDirectory) return a->isDirectory;
+                return a->path.filename() > b->path.filename();
+            });
+    }
     if (entries.empty()) ImGui::TextDisabled(supported == 0 ? "No supported assets or folders." : "No matching assets or folders.");
     editor::windows::add_panel_units(editor::windows::panel_cost_slot::browser_files,
         static_cast<std::uint64_t>(entries.size()));
@@ -384,13 +410,13 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
     const int columns = m_listView ? 1 : std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / cell));
     if (ImGui::BeginTable("AssetGrid", columns, ImGuiTableFlags_SizingStretchSame))
     {
-        for (const auto& entry : entries)
+        for (const editor::browser_directory_entry* entry : entries)
         {
             ImGui::TableNextColumn();
-            const auto name = browser_utf8(entry.path().filename());
-            const auto pathId = browser_utf8(entry.path());
+            const std::string& name = entry->nameUtf8;
+            const std::string& pathId = entry->pathUtf8;
             ImGui::PushID(pathId.c_str());
-            if (entry.is_directory(ec))
+            if (entry->isDirectory)
             {
                 const ImVec2 size = m_listView ? ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight())
                     : ImVec2(editor::ThemePixels(m_tileSize), editor::ThemePixels(m_tileSize));
@@ -398,8 +424,8 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
                 browser_item_artwork(EditorAssetPresentation::Get().GetDirectoryIcon(false), EditorIcon::Folder, name, m_listView);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", pathId.c_str());
                 if ((ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
-                    || (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter))) Navigate(entry.path());
-                if (ImGui::BeginPopupContextItem()) { DrawFolderMenu(entry.path()); ImGui::EndPopup(); }
+                    || (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter))) Navigate(entry->path);
+                if (ImGui::BeginPopupContextItem()) { DrawFolderMenu(entry->path); ImGui::EndPopup(); }
                 if (!m_listView)
                 {
                     ImGui::TextUnformatted(browser_ellipsis(name, size.x).c_str());
@@ -408,8 +434,8 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
             }
             else
             {
-                auto presentation = EditorAssetPresentation::Get().ResolveFilePresentation(entry.path().extension().string());
-                DrawFileTile(presentation, entry.path(), name,
+                auto presentation = EditorAssetPresentation::Get().ResolveFilePresentation(entry->extension);
+                DrawFileTile(presentation, entry->path, name,
                     { editor::ThemePixels(m_tileSize), editor::ThemePixels(m_tileSize) });
             }
             ImGui::PopID();
@@ -497,6 +523,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 			if (ImGui::MenuItem("Create Volume Profile"))
 			{
 				EditorAssetDatabase::Get().CreateVolumeProfile(m_currentDirectory);
+				editor::browser_cache_invalidate();   // W7-1
 			}
 		}
 
@@ -763,6 +790,9 @@ void ContentsBrowserWindow::DrawToolbar(bool collapsedTree)
 
 void ContentsBrowserWindow::Draw()
 {
+    // W7-1: 이 프레임에 다시 훑을 수 있는 폴더 수를 되돌린다. 낡은 것을
+    // 한꺼번에 훑지 않게 막는 자리다.
+    editor::browser_cache_begin_frame();
     std::error_code ec;
     const auto root = file::weakly_canonical(PathFinder::Relative(), ec);
     if (ec || !file::is_directory(root, ec)) { ImGui::TextDisabled("Assets folder is unavailable."); return; }

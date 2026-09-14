@@ -974,7 +974,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize와 렌더 배율은 **2026-09-14 착지**(§W4 후속) — 미뤄 둔 근거였던 generation/retire 수렴을 게이트 단정으로 옮겼다 |
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
 | W6 | todo | 현재 외관을 유지하는 5종 배치 preset, Save As/Rename/Delete/Reset·작은 창 복원 |
-| W7 | progress | **W7-0 착지(2026-09-14)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0). 실측이 순서를 바꿨다: Browser 스냅샷이 clipping 보다 먼저다(엔티티 1,000 에서 브라우저가 Hierarchy 의 5.8 배, 매 프레임 디렉터리 스캔 24). 남은 것은 W7-1 Browser 스냅샷 · W7-2 flatten cache · W7-3 clipping · 정본 불변식 source gate, 그리고 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
+| W7 | progress | **W7-0·W7-1 착지(2026-09-14·15)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0), 그리고 Browser 스냅샷(§W7-1)으로 매 프레임 디렉터리 스캔 24 → 0. 실측이 순서를 바꿨다: 브라우저가 clipping 보다 먼저였다(엔티티 1,000 에서 Hierarchy 의 5.8 배). 남은 것은 W7-2 flatten cache · W7-3 clipping · 정본 불변식 source gate, 그리고 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리 |
 | W8 | todo | DX12 통합 빌드·DPI/재시작/손상 ini/Play/preset/성능 회귀, 현재 승인 외관의 자동 golden·CI, legacy 잔재 전수 확인 |
 
 현재 소스에서 확인한 잔여 경계:
@@ -2060,6 +2060,45 @@ ImGui backend 몫 그대로이고, lock/clip은 구현이 없어 소유권 정�
 **시간이 아니라 `scans` 를 본다.** `browser_tree` 의 p95 가 7.56 → 6.83 → 4.36 으로 흔들리는데,
 씬이 커져서 빨라진 것이 아니라 OS 파일 캐시 온도다. 파일시스템을 재는 시간은 이렇게 흔들리고,
 그래서 스캔 수를 따로 센다 — 캐시가 그것을 0 으로 만들었는지는 그 수로만 명확히 판정된다.
+
+#### W7-1 착지 — Browser 스냅샷 (2026-09-15)
+
+브라우저가 **프레임마다 파일시스템을 훑고 있었다.** `ShowDirectoryTree` 가 열린 폴더 하나마다
+`directory_iterator` 를 돌리고 재귀했고, `ShowCurrentDirectoryFiles` 가 또 한 번 훑은 뒤 항목마다
+`is_directory`(stat)를 부르며 **비교마다 stat 하는 비교자**로 정렬했다. 캐시가 하나도 없었다.
+계획서 W7 이 브라우저를 "스냅샷을 W2-B 와 공유한다" 한 줄로만 적어 이 사실이 기록돼 있지 않았다.
+
+**무효화 근거 셋.** §8.3 의 *"invalidation 근거가 없으면 매 frame 전체 cache를 믿지 말고 fail-safe
+rebuild한다"* 를 이렇게 읽었다. ① **자기 변경** — 새 폴더·Volume Profile·프리팹 드롭 뒤 즉시
+무효화하고 다음 프레임은 예산을 푼다(사람이 방금 만든 폴더가 1 초 뒤에 나타나면 버그로 보인다).
+② **나이** — 1 초. 밖에서 파일이 바뀌는 것을 이 경로가 알 방법이 지금은 없다. ③ **프레임 예산 1**
+— 낡았다고 한 프레임에 24 개를 몰아 훑지 않는다. 그러면 초당 몇 번씩 스파이크가 생겨 *비용을
+줄이려다 p95 를 악화시킨다.* 정상 상태는 프레임당 스캔 ≤1 이고, 폴더 24 개면 각각 1 초에 한 번쯤
+갱신된다. 감시자(`EditorDirectoryWatcher`)를 붙이면 ②가 필요 없어져 idle 스캔이 0 이 되는데,
+그것은 별도 조각으로 남긴다.
+
+**캐시는 정책을 모른다.** 지원 확장자·검색·유형 필터·정렬 방향은 창이 소유한다(W2-B 의 몫).
+캐시가 주는 것은 디스크를 만지지 않고 얻는 목록뿐이다 — 그래서 W2-B3 이 기다리던 "같은 목록
+신원" 이 여기서 선다.
+
+**전후 (Release · 같은 경로에서 연달아).** 전문은
+[EditorPanelCostBaselineW7.md](../analysis/EditorPanelCostBaselineW7.md).
+
+| 슬롯 | | p95Ms | **scans** |
+|---|---|---:|---:|
+| browser_tree (1k) | before | 5.132 | **24** |
+| browser_tree (1k) | after | 2.000 | **0** |
+| browser_files (1k) | before | 0.385 | **1** |
+| browser_files (1k) | after | 0.141 | **0** |
+| hierarchy (대조군) | before / after | 0.925 / 0.865 | units 1,000 그대로 |
+
+**판정은 `scans` 다.** 시간의 2.6 배는 부차적인 증거다 — 파일시스템을 재는 시간은 같은 날 같은
+자로 연달아 재도 OS 캐시 온도로 흔들리고, 흔들리지 않는 것은 "디스크를 몇 번 만졌는가" 다.
+50k 표본에서 1 로 나온 것은 나이 1 초가 지난 폴더 하나를 예산대로 다시 훑은 것이고 설계 그대로다.
+Hierarchy 의 `units` 가 그대로인 것도 함께 본다 — 움직였다면 측정이 다른 것을 재고 있다는 뜻이다.
+
+**남은 비용의 성격이 바뀌었다.** after 의 browser_tree 는 스캔 0 인데도 p95 2.0 ms 이고, 이제
+그것은 syscall 이 아니라 노드 24 개의 ImGui 그리기다. 줄이려면 W7-3 의 clipping 이 필요하다.
 
 ### W8 — 통합 회귀와 legacy 강제 배치 은퇴 (P0, 2일)
 
