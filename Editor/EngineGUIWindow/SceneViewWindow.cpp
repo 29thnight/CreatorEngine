@@ -225,8 +225,21 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     const bool selectionEditable = !EditorObjectOperations::IsEditLocked(obj, true) &&
         std::all_of(editScene->m_selectedEntities.begin(), editScene->m_selectedEntities.end(),
             [](Entity* entity) { return entity && !EditorObjectOperations::IsEditLocked(entity, true); });
-    if (obj && selectionEditable && !selectMode && (!m_overlay.blocksPointer || ImGuizmo::IsUsing()))
+    if (obj && selectionEditable && !selectMode)
     {
+        // ImGuizmo 는 Manipulate 한 번으로 그림과 입력을 함께 한다. 그래서 오버레이 위에
+        // 포인터가 있다는 이유로 이 블록을 건너뛰면 입력만이 아니라 기즈모 자체가 사라진다 —
+        // 툴바에 마우스를 올리면 기즈모가 꺼지고 빼면 켜지던 증상이 이것이었다. 그림은 언제나
+        // 그리고 입력만 막는다. 다만 Enable(false) 는 ComputeColors 를 inactiveColor 로 덮어
+        // 기즈모를 회색으로 만들므로 hover 내내 끄지 않고, 실제로 붙잡을 수 있는 프레임 —
+        // 즉 새 클릭이 들어오는 프레임 — 에만 끈다(ImGuizmo::CanActivate 는 IsMouseClicked(0)
+        // 없이는 잡지 않으므로 그 한 프레임만 막으면 충분하다). Enable 은 전역 상태라 되돌린다.
+        struct GizmoInputScope
+        {
+            explicit GizmoInputScope(bool enable) noexcept { ImGuizmo::Enable(enable); }
+            ~GizmoInputScope() { ImGuizmo::Enable(true); }
+        } gizmoInputScope{ canvasInput || ImGuizmo::IsUsing() ||
+            !ImGui::IsMouseClicked(ImGuiMouseButton_Left) };
 		auto scene = SceneManagers->GetActiveScene();
 		auto& selectedObjects = scene->m_selectedEntities;
 
