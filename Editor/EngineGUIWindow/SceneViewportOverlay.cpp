@@ -242,7 +242,8 @@ void editor::SceneViewportOverlay::Draw(ImVec2 imageMin, ImVec2 imageMax,
         if (!canUse && !ImViewGuizmo::IsUsing()) context.hoveredAxisID = -1;
         if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
         { context.activeTool = ImViewGuizmo::TOOL_NONE; context.isAnimating = false; }
-        if (!ImViewGuizmo::IsUsing()) orbitPivot = cam.m_eyePosition + cam.m_forward * 8.f;
+        if (!ImViewGuizmo::IsUsing())
+            orbitPivot = cam.m_eyePosition + cam.m_forward * EditorCameraRig::kDefaultOrbitDistance;
         ImGuiIO& io = ImGui::GetIO();
         const ImGuiConfigFlags flags = io.ConfigFlags;
         if (!canUse && !ImViewGuizmo::IsUsing()) io.ConfigFlags |= ImGuiConfigFlags_NoMouse;

@@ -307,13 +307,18 @@ namespace ImViewGuizmo {
             // Even ids are the positive axis (+X/+Y/+Z); only that side gets a
             // spoke and an always-visible label, mirroring the reference gizmo.
             const bool isPrimary = (axis.id % 2) == 0;
+            // The negative side stays a hollow handle until the pointer reaches
+            // it; hovering fills it and prints its own -X/-Y/-Z label.
+            const bool isHovered = ctx.hoveredAxisID == axis.id;
             const float colorFactor = mix(style.fadeFactor, 1.0f, (axis.depth + 1.0f) * 0.5f);
             const ImVec4 axisColor = ImGui::ColorConvertU32ToFloat4(style.axisColors[axis.axisIndex]);
 
             const ImVec2 handlePos = worldToScreen(GizmoMath::multiply_vf(axis.direction, style.lineLength));
 
             ImVec4 fillColorF = axisColor;
-            if (isPrimary) {
+            if (isPrimary || isHovered) {
+                // A hovered negative handle takes the full axis color so the
+                // label drawn on top of it keeps the same contrast as +X/+Y/+Z.
                 fillColorF.w *= colorFactor;
             } else {
                 // Darkened/desaturated so the negative handle reads as secondary
@@ -339,22 +344,35 @@ namespace ImViewGuizmo {
                 outlineColorF.w *= colorFactor * 0.95f;
                 const ImU32 outlineColor = ImGui::ColorConvertFloat4ToU32(outlineColorF);
 
+                if (isHovered)
+                    drawList->AddCircleFilled(handlePos, scaledCircleRadius, fillColor);
                 drawList->AddCircle(handlePos, scaledCircleRadius, outlineColor, 0, scaledLineWidth * 0.5f);
             }
 
-            if (ctx.hoveredAxisID == axis.id)
+            if (isHovered)
                 drawList->AddCircle(handlePos, scaledHighlightRadius, style.highlightColor, 0, scaledHighlightWidth);
 
-            // Positive labels remain legible on either side of the view.
-            if (isPrimary) {
-                const float textFactor = colorFactor;
+            // Positive labels remain legible on either side of the view; the
+            // negative handles print theirs only while the pointer is over them.
+            if (isPrimary || isHovered) {
+                // A hovered handle is the one the pointer is asking about, so its
+                // label is drawn at full strength no matter which side it is on.
+                const float textFactor = isHovered ? 1.0f : colorFactor;
                 if (textFactor > 0.01f) {
                     ImVec4 textColor = ImGui::ColorConvertU32ToFloat4(style.labelColor);
                     if (axis.axisIndex == 0) textColor = ImVec4(1.f, 1.f, 1.f, textColor.w);
                     textColor.w *= textFactor;
                     const char* label = style.axisLabels[axis.id];
-                    ImVec2 textSize = font->CalcTextSizeA(scaledFontSize, FLT_MAX, 0.f, label);
-                    drawList->AddText(font, scaledFontSize, {handlePos.x - textSize.x * 0.5f, handlePos.y - textSize.y * 0.5f}, ImGui::ColorConvertFloat4ToU32(textColor), label);
+                    // "-X" is roughly twice the width of "X"; shrink the two-glyph
+                    // negative labels so they stay inside the handle circle.
+                    float labelFontSize = scaledFontSize;
+                    ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.f, label);
+                    const float maxTextWidth = scaledCircleRadius * 1.7f;
+                    if (textSize.x > maxTextWidth && textSize.x > 0.f) {
+                        labelFontSize *= maxTextWidth / textSize.x;
+                        textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.f, label);
+                    }
+                    drawList->AddText(font, labelFontSize, {handlePos.x - textSize.x * 0.5f, handlePos.y - textSize.y * 0.5f}, ImGui::ColorConvertFloat4ToU32(textColor), label);
                 }
             }
         }

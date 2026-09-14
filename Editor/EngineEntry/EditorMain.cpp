@@ -145,14 +145,36 @@ void Editor::EditorMain::Initialize()
 
 		EnhancedSceneRenderer::SetActiveScene(scene);
 
-		auto* mainCamera = scene->CreateEntity("Main Camera", GameObjectType::Camera)
-			->AddComponent<CameraComponent>();
+		// Unity 의 새 씬과 같은 기본 배치: 원점보다 살짝 위에서 -Z 쪽에 서서
+		// 수평으로 +Z 를 본다. CameraComponent 는 자기 위치를 들지 않고 owner
+		// Transform 에서 매번 푼다 — 카메라를 옮기는 자리는 여기 하나다.
+		auto* mainCameraObject = scene->CreateEntity("Main Camera", GameObjectType::Camera);
+		mainCameraObject->Transform_().SetPosition(math::vector3{ 0.f, 1.f, -10.f });
+		// "MainCamera" 태그는 카메라의 것이다. 예전에는 이 호출이 아래 광원에
+		// 붙어 있어 인스펙터에서 해가 자신을 카메라라고 말했다. 해는 Unity 와
+		// 같이 Untagged 로 둔다(Entity 의 기본값이 이미 그것이다).
+		mainCameraObject->SetTag("MainCamera");
+		auto* mainCamera = mainCameraObject->AddComponent<CameraComponent>();
 		mainCamera->SetPrimary(true);
+
+		// 해도 Unity 의 기본 각으로 세운다 — Euler(50, -30, 0). 무회전은 방향을
+		// +Z 수평으로 두는데, LightRenderProxy 가 방향을 owner 회전에서 뽑으므로
+		// (rotate(unit_z, worldQuaternion)) 그 자리에서는 해가 지평선과 나란해
+		// 그림자가 바닥에 눕는다. quaternion_from_euler 는 roll·pitch·yaw 순으로
+		// 쌓아 Unity 의 Quaternion.Euler 와 같은 자세를 준다. 방향광의 위치는
+		// 조명 계산에 쓰이지 않고 씬 뷰 기즈모의 자리만 정한다.
+		constexpr float sunPitchDegrees = 50.f;
+		constexpr float sunYawDegrees = -30.f;
 		auto lightObject =
 			scene->CreateEntity("Directional Light", GameObjectType::Light);
-		lightObject->SetTag("MainCamera");
+		lightObject->Transform_().SetPosition(math::vector3{ 0.f, 3.f, 0.f });
+		lightObject->Transform_().SetRotation(math::quaternion_from_euler(math::vector3{
+			math::radians(sunPitchDegrees), math::radians(sunYawDegrees), 0.f }));
 		auto light = lightObject->AddComponent<LightComponent>();
-		light->m_lightStatus = LightStatus::StaticShadows;
+		// 필드에 바로 넣으면 프록시가 기본 status 를 든 채 남는다 —
+		// AddComponent 가 프록시를 먼저 세우고, Scene 의 commit 은 dirty 큐만
+		// 훑기 때문이다. writer 를 거쳐 dirty 를 발행한다.
+		light->SetLightStatus(LightStatus::StaticShadows);
 	});
 	m_activeSceneChangedHandle = activeSceneChangedEvent.AddLambda([]()
 	{

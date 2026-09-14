@@ -16,6 +16,10 @@
 - Blender reference styling: persistent translucent disc, colored positive axis handles and
   labels, hollow negative handles. Axis colors and positive labels remain readable on light
   scene backgrounds. Sizes are configured by the Scene overlay's DPI scale.
+- Hovering a negative handle fills it with the full axis color and prints its `-X`/`-Y`/`-Z`
+  label at full strength; the two-glyph label is shrunk to fit inside the handle circle.
+  Upstream never draws the negative labels, so the pointer had no way to tell which of the
+  three hollow handles it was over.
 - All visible handles accept clicks, including the far side; depth order resolves overlaps.
 - Fixed `BeginFrame` reset braces. Axis snapping requires the press to start on that axis;
   dragging from another control and releasing over an axis cannot rotate the camera.

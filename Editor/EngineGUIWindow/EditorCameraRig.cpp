@@ -17,6 +17,21 @@ void EditorCameraRig::SetPose(const math::vector3& position, const math::quatern
 		-std::asin(std::clamp(m_camera.m_forward.y, -1.f, 1.f)));
 }
 
+void EditorCameraRig::ResetToDefaultPose() noexcept
+{
+	// HandleMovement 와 같은 순서로 쌓는다(yaw 먼저, 그 다음 yaw 가 돌린 right
+	// 축의 pitch). 순서가 다르면 SetPose 가 되돌려 놓는 m_deltaYaw/m_deltaPitch
+	// 와 실제 자세가 어긋나, 우클릭 첫 프레임에 카메라가 튄다.
+	const math::quaternion yawRotation = math::quaternion_from_axis_angle(
+		Camera::UP, math::radians(kDefaultYawDegrees));
+	const math::quaternion pitchRotation = math::quaternion_from_axis_angle(
+		math::rotate(Camera::RIGHT, yawRotation), math::radians(kDefaultPitchDegrees));
+	const math::quaternion rotation = math::normalize(yawRotation * pitchRotation);
+	const math::vector3 forward =
+		math::normalize(math::rotate(Camera::FORWARD, rotation));
+	SetPose(kDefaultPivot - forward * kDefaultOrbitDistance, rotation);
+}
+
 void EditorCameraRig::HandleMovement(float deltaTime)
 {
 	float x = 0.f, y = 0.f, z = 0.f;
