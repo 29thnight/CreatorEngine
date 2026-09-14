@@ -1,9 +1,47 @@
 #include "InputManager.h"
 #include <wrl.h>
 #include <iostream>
+#include <cstdio>
+#include "LogSystem.h"
 
 #pragma comment(lib, "GameInput.lib")
 using namespace Microsoft::WRL;
+
+// GameInput 은 장치를 **비동기로** 열거한다. GameInputCreate 가 S_OK 로 돌아온
+// 뒤에도 열거가 끝나기 전까지 GetCurrentReading 은 GAMEINPUT_E_READING_NOT_FOUND
+// 를 낸다 — 실측으로 기동 후 약 690ms, 프레임으로는 스물두 번이었다. 그건 오류가
+// 아니라 "아직 장치가 안 붙었다"는 정상 상태다. 패드를 꽂지 않은 기계도 같은
+// 코드를 계속 낸다 — 미연결 역시 오류가 아니다.
+//
+// 예전에는 마우스 경로만 그것을 실패로 읽고 매 프레임 찍어, 기동 로그가 같은 줄
+// 서른여덟 개로 덮였다. 키보드·패드는 같은 창에서 똑같이 실패하면서 조용히
+// 돌아갔을 뿐이다 — 비대칭은 장치가 아니라 로그에 있었다.
+//
+// 그래서 넷을 한 규칙으로 맞춘다: READING_NOT_FOUND 는 조용히 넘기고, 그 밖의
+// HRESULT 만 값과 함께 남기되 같은 코드가 이어지는 동안은 한 번만 남긴다.
+// 판독이 한 번이라도 성공하면 표지를 지운다 — 뒤에 같은 코드가 다시 나면 그건
+// 새 사건이지 이어지는 같은 사건이 아니다.
+namespace
+{
+    bool AcceptReading(const char* kindName, HRESULT hr, HRESULT& lastReportedFailure)
+    {
+        if (SUCCEEDED(hr))
+        {
+            lastReportedFailure = S_OK;
+            return true;
+        }
+
+        if (GAMEINPUT_E_READING_NOT_FOUND != hr && hr != lastReportedFailure)
+        {
+            lastReportedFailure = hr;
+            char message[128]{};
+            std::snprintf(message, sizeof(message), "[GameInput] %s 판독 실패: 0x%08lX",
+                kindName, static_cast<unsigned long>(hr));
+            Debug->LogWarning(message);
+        }
+        return false;
+    }
+}
 
 
 bool InputManager::Initialize(HWND _hwnd)
@@ -45,12 +83,14 @@ void InputManager::Update(float deltaTime)
 
 void InputManager::KeyBoardUpdate()
 {
+    static HRESULT lastReportedFailure = S_OK;
+
     m_curKeyStates.Reset();
 
     ComPtr<IGameInputReading> reading;
     HRESULT hr = gameInput->GetCurrentReading(GameInputKindKeyboard, nullptr, &reading);
 
-    if (FAILED(hr) || !reading)
+    if (!AcceptReading("키보드", hr, lastReportedFailure) || !reading)
         return;
 
     // 현재 눌러진 키만 가져오기
@@ -86,6 +126,8 @@ bool InputManager::IsAnyKeyPressed()
 
 void InputManager::MouseUpdate()
 {
+    static HRESULT lastReportedFailure = S_OK;
+
     ComPtr<IGameInputReading> reading;
     //memset(curmouseState, 0, sizeof(bool) * MOUSE_COUNT);
     m_curMouseState.Reset();
@@ -93,9 +135,10 @@ void InputManager::MouseUpdate()
     m_prevMouseWheelDelta = m_mouseWheelDelta;
     // 🔹 현재 마우스 입력 읽기
     HRESULT hr = gameInput->GetCurrentReading(GameInputKindMouse, nullptr, &reading);
-    if (FAILED(hr)) 
+    // 판독을 못 받은 프레임은 조용히 넘긴다. !reading 도 함께 막는다 — 예전에는
+    // 성공 코드에 널 포인터가 오면 바로 아래에서 역참조했다.
+    if (!AcceptReading("마우스", hr, lastReportedFailure) || !reading)
     {
-        std::cout << "마우스 GetCurrentReading 실패!" << std::endl;
         return;
     }
 
@@ -236,9 +279,11 @@ void InputManager::ResetMouseDelta()
 
 void InputManager::PadUpdate()
 {
+    static HRESULT lastReportedFailure = S_OK;
+
     ComPtr<IGameInputReading> reading;
     HRESULT hr = gameInput->GetCurrentReading(GameInputKindGamepad, nullptr, &reading);
-    if (FAILED(hr))
+    if (!AcceptReading("게임패드", hr, lastReportedFailure))
     {
         return;
     }
@@ -275,6 +320,9 @@ void InputManager::PadUpdate()
 
 void InputManager::GamePadUpdate()
 {
+    // 장치별로 갈라 두지 않는다 — 이 표지는 로그 중복만 막는다.
+    static HRESULT lastReportedFailure = S_OK;
+
     for (int i = 0; i < MAX_CONTROLLER; ++i)
     {
         m_curPadState[i].Reset();
@@ -284,7 +332,7 @@ void InputManager::GamePadUpdate()
 
         ComPtr<IGameInputReading> reading;
         HRESULT hr = gameInput->GetCurrentReading(GameInputKindGamepad, device[i], &reading);
-        if (FAILED(hr) || !reading)
+        if (!AcceptReading("게임패드", hr, lastReportedFailure) || !reading)
             continue;
 
         reading->GetGamepadState(&m_GameInputPadState[i]);
