@@ -116,6 +116,17 @@ try {
         $gunner = Join-Path $run "$api-gunner"
         $commands = @(
             "scene.switch `"$root/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator`"",
+            # ★ 첫 대기가 렌더 예열을 겸한다 (2026-09-14). 라이브 렌더러의 첫
+            #   프레임은 파이프라인 구축과 ShaderMeta 적용으로 Debug 에서
+            #   13~28초가 걸린다. 예전에는 30 프레임으로도 통했는데, 그것은
+            #   BuildPipeline 이 표시 락을 구축 내내 쥐어 게임 스레드까지
+            #   멈춰 세운 덕이었다 — 프레임이 느려서 수가 곧 시간이었다.
+            #   뒤의 `wait 30` 들은 그대로 둔다: 예열은 프로세스당 한 번이다.
+            'wait 2000',
+            # ★ 게임 타깃은 **수요가 있어야** 그려진다 (PHASE 21 W4). 중앙
+            #   ViewportHost 가 Scene 모드이면 게임 뷰를 아예 만들지 않으므로
+            #   `game` 캡처가 영원히 완료되지 않는다 — 모드를 먼저 세운다.
+            'editor.viewport game',
             'wait 30',
             "render.pbr.capture `"$primitive`" game",
             "model.loadcached `"$root/Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb`"",

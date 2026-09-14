@@ -39,6 +39,15 @@
     검사 앞에 돌릴 프레임 수. 0 이면 워밍업 없음.
     ★ 기준선(§7.4 의 28 통과)은 워밍업을 갖춘 값이다. 0 으로 재면 27 이 나오고
       그것은 회귀가 아니라 다른 자다.
+    ★ 240 → 2000 (2026-09-14). 이 수가 재야 하는 것은 프레임 수가 아니라
+      **렌더러가 준비되기까지의 시간**이다. 라이브 렌더러의 첫 프레임은
+      파이프라인 구축과 ShaderMeta 적용 때문에 Debug 에서 13~28초가 걸린다.
+      240 이 그동안 통했던 이유는 BuildPipeline 이 표시 락을 구축 내내 쥐어
+      게임 스레드까지 멈춰 세웠기 때문이다 — 240 프레임이 11.8초 걸렸다.
+      그 정지를 걷어내자(같은 날 락 축소) 240 프레임이 3.7초에 지나가고
+      dx12.scene 이 RenderThread drain 시간 초과로 넘어졌다. 2000 프레임은
+      28초로, 첫 프레임을 덮는다. 프레임 수가 시간의 대리 지표라는 사실이
+      여기 적혀 있어야 다음에 또 짧게 잡지 않는다.
 
 .PARAMETER Baseline
     이전 실행의 verdicts.csv 경로. 주면 판정 줄을 대조해 차이만 출력한다.
@@ -58,7 +67,7 @@ param(
 
     [string]$Exe = "",
     [string]$TexturePath = (Join-Path $PSScriptRoot "../../Dynamic_CPP/Assets/Materials/Cube_Mat_BaseColor.png"),
-    [int]$WarmupFrames = 240,
+    [int]$WarmupFrames = 2000,
     [int]$TimeoutSec = 300,
     [string[]]$Only = @(),
     [string]$Baseline = ""

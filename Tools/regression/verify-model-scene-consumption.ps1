@@ -109,7 +109,8 @@ try {
     # ── A: 저작 프로세스 — 배치·폐포·저장 ──
     $author = Invoke-Editor 'author' @(
         "scene.switch $($baseScene.Replace('\', '/'))",
-        'wait 60',
+        # 첫 대기가 렌더 예열을 겸한다 — 아래 주석 참고.
+        'wait 2000',
         "model.loadcached $($gunner.Replace('\', '/'))",
         'wait 60',
         'model.place Gunner_F_Mythic',
@@ -149,7 +150,8 @@ try {
     # ── B: 콜드 프로세스 — 로드·폐포·reimport·렌더 ──
     $cold = Invoke-Editor 'cold' @(
         "scene.switch $savedScene",
-        'wait 120',
+        # B 도 별도 프로세스라 렌더 예열을 처음부터 다시 치른다.
+        'wait 2000',
         'assets.modeldiag',
         'assets.scenemodel',
         'assets.scenemodel reload Gunner_F_Mythic',

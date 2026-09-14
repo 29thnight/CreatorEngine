@@ -1459,11 +1459,28 @@ namespace
 
         bool BuildPipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
         {
-            std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
-            InvalidateDisplayResultsLocked();
-            pipeline = std::make_unique<LivePipeline>();
+            // ★ 락은 **구축 전체가 아니라 무효화에만** 잡는다 (2026-09-14 실측).
+            //
+            //   예전에는 이 함수가 반환할 때까지 displayLifetimeMutex를 쥐고
+            //   있었다. 그런데 구축의 대부분은 패스 초기화(desc.InitializeAll)이고
+            //   그것이 셰이더 모듈 161개를 훑어 **6.6초**가 걸린다. 그동안 UI
+            //   스레드는 씬뷰 본문의 GetLiveDisplayTexture에서 같은 락을 기다리고,
+            //   PresentFrame이 m_sceneStructureMutex 안에서 도는 탓에 게임
+            //   스레드까지 따라 멈춘다 — 메시지 펌프가 죽어 창이 '응답 없음'이
+            //   되는 구간이 부팅마다 6.8초였다(실측 boot_timeline).
+            //
+            //   락이 실제로 지키는 것은 '표시 결과와 그 텍스처의 수명'이다.
+            //   여기서 만드는 슬롯은 RT가 PublishDisplayResultLocked로 게시하기
+            //   전까지 아무도 볼 수 없으므로 구축 자체는 락 밖이어도 된다.
+            //   무효화만 락 아래서 끝내 두면, 구축 중에 조회하는 UI는 옛 텍스처가
+            //   아니라 '아직 그림 없음'(textureId=0)을 보고 준비 중 화면을 그린다.
+            {
+                std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
+                InvalidateDisplayResultsLocked();
+                pipeline = std::make_unique<LivePipeline>();
+                pipeline->resizeGeneration = displaySnapshot.resizeGeneration;
+            }
             LivePipeline& p = *pipeline;
-            p.resizeGeneration = displaySnapshot.resizeGeneration;
 
             // ★ 어댑터를 DX11에 맞추던 것을 걷었다 (D4, 2026-08-08).
             //
@@ -1656,8 +1673,13 @@ namespace
         bool BuildVulkanPipeline(uint32_t newWidth, uint32_t newHeight,
             std::string& outError)
         {
-            std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
-            InvalidateDisplayResultsLocked();
+            // 락 범위는 DX12 쪽 BuildPipeline과 같은 규약이다 — 무효화만 잡고
+            // 구축은 밖에서 한다. 두 백엔드에 같은 규약을 적어 두지 않으면
+            // 한쪽만 고쳐진 채로 남는다.
+            {
+                std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
+                InvalidateDisplayResultsLocked();
+            }
             vulkanPipeline = std::make_unique<VulkanLivePipeline>();
             if (!BuildPipelineDesc(*vulkanPipeline, true, outError))
             {

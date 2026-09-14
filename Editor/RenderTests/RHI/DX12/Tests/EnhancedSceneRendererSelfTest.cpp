@@ -3069,6 +3069,14 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
     // create delta를 적용하기 전일 수 있다. 그 상태의 0개는 씬/모델 실패가 아니라
     // producer-consumer 진행도 차이이므로, 호출 시점까지 발행된 packet만 drain한다.
     // 일반 프레임 경로에는 동기 대기를 넣지 않는다.
+    // 상한은 10초 그대로다. 이 대기는 '이미 발행된 것을 RT가 소화했는가'만
+    // 재고, RT의 첫 프레임(파이프라인 구축·ShaderMeta 적용)은 여기서 기다려도
+    // 끝나지 않는다 — 게임 스레드가 이 함수에 묶여 새 프레임을 발행하지
+    // 못하는 동안에는 RT도 진행하지 못하기 때문이다(2026-09-14 실측: 상한을
+    // 60초로 올려도 pending 2 · active 1 그대로였고, 앞의 wait 를 2000 프레임
+    // 으로 늘리자 즉시 통과했다). 그러므로 예열은 **이 대기가 아니라 앞선
+    // wait 프레임 수**가 책임진다 — 하네스의 워밍업 값이 첫 프레임 시간을
+    // 덮어야 한다(Invoke-Dx12Suite 의 WarmupFrames 주석 참고).
     constexpr uint32_t kRenderThreadDrainTimeoutMs = 10000;
     if (!EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(
             kRenderThreadDrainTimeoutMs))

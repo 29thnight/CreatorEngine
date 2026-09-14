@@ -36,6 +36,8 @@
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
 #include <shellapi.h>
+#include <chrono>
+#include <thread>
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -53,6 +55,29 @@ namespace
 			if (wcscmp(arguments[i], option) == 0) { result = std::filesystem::absolute(arguments[i + 1]).lexically_normal(); break; }
 		LocalFree(arguments);
 		return result;
+	}
+
+	/// 이 실행이 사람을 위한 것인가, 하네스를 위한 것인가.
+	///
+	/// `CoreWindow::IsUnattended()`는 답이 될 수 없다 — 그 값을 세우는
+	/// `ConsoleCommandSystem::InitializeFromCommandLine`이 창을 띄운 **뒤**에
+	/// 돌기 때문이다. 부팅 예열은 그보다 앞에서 판정해야 하므로 명령줄을
+	/// 직접 본다. 목록은 ConsoleCommandSystem의 인자 해석과 같은 다섯이다.
+	bool EditorHasAutomationArgument()
+	{
+		int count{};
+		wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+		if (!arguments) return false;
+		bool automation = false;
+		for (int i = 1; i < count && !automation; ++i)
+		{
+			const std::wstring_view argument{ arguments[i] };
+			automation = argument == L"--script" || argument == L"--exec"
+				|| argument == L"--console" || argument == L"--commandlet"
+				|| argument == L"--commandlet-script";
+		}
+		LocalFree(arguments);
+		return automation;
 	}
 
 	std::filesystem::path ResolveEditorWorkspaceRoot(
@@ -263,6 +288,123 @@ void Core::App::Load()
 	}
 }
 
+/// 이번 상태를 밀봉해 전용 RenderThread에 발행한다. 돌려주는 것은 이번에
+/// 넘긴 뷰의 수다 — 부팅 예열이 "만들 것이 있는가"를 이 수로 판정한다.
+uint32_t Core::App::PublishRenderFrame()
+{
+	// 유일한 씬 렌더러. Update가 GT의 구조 변경과 EndOfFrame을 끝낸 뒤
+	// 카메라와 delta batch를 밀봉해 전용 RenderThread에 발행한다.
+	//
+	// 넘기는 뷰는 **화면에 있는 것만**이다(PHASE 21 W4). 예전에는 재생
+	// 여부와 무관하게 둘 다 넘겼는데, 그때는 "지금 무엇이 보이는가" 에
+	// 답할 자리가 없었다 — Scene 과 Game 이 창 둘이라 어느 쪽이 앞 탭인지
+	// 제작자가 알 수 없었기 때문이다. 가운데 Host 가 모드를 들고부터는
+	// 그 물음에 답이 있으므로, 보이지 않는 타깃의 그림을 만들지 않는다.
+	// 카메라별 표시 슬롯은 TickLive 쪽이 관리한다(MultiCameraRenderPlan.md).
+	// camera.editor follow on — 두 뷰의 시점을 통일해 두는 대조 실험용.
+	// 카메라 목록을 만들기 전에 적용해야 이번 프레임 밀봉에 반영된다.
+	if (ConsoleCommandSystem::IsEditorCameraFollowing())
+	{
+		ConsoleCommandSystem::MatchEditorCameraToGameCamera();
+	}
+
+	// 씬 오버레이(저작 보조) 뷰 선언은 Host 몫이다(E4-5) — 에디터 카메라는
+	// Editor 세션이 소유하고, Core는 뷰 요청에 실린 값만 안다.
+	EnhancedLiveViewRequest views[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
+	uint32_t viewCount = 0;
+	// UI 가 한 번도 게시하지 않았으면(첫 프레임, 헤드리스) 둘 다 만든다 —
+	// 수요를 모르는 것과 수요가 없는 것은 다르다.
+	const ::editor::windows::viewport_demand demand =
+		::editor::windows::read_viewport_demand();
+	const bool editorDemanded = !demand.hostPresent || demand.editorTarget;
+	const bool gameDemanded = !demand.hostPresent || demand.gameTarget;
+
+	// 카메라를 **먼저** 집는다. 누계가 재야 하는 것은 "만들 수 있었는데
+	// 수요가 없어 만들지 않았다" 이지 "못 만들었다" 가 아니다. 둘을 섞으면
+	// 게임 카메라가 없는 씬에서 수요 문을 통째로 걷어도 수가 그대로여서,
+	// 그 수를 읽는 게이트가 씬이 무엇을 담고 있느냐에 기대게 된다.
+	Camera* const editorCamera = EditorSessionState::Get().EditorCamera();
+	if (editorDemanded && nullptr != editorCamera)
+	{
+		views[viewCount++] = {
+			{ kEnhancedEditorViewId, 1 },
+			editorCamera->CaptureFrameSnapshot(),
+			EnhancedLiveDisplayTarget::Editor,
+			EnhancedLiveViewFlags::SceneOverlay |
+				EnhancedLiveViewFlags::CanvasPreview };
+	}
+	Scene* activeScene = SceneManagers->GetActiveScene();
+	CameraComponent* const gameCamera = (nullptr != activeScene)
+		? activeScene->Cameras().GetPrimaryCamera() : nullptr;
+	if (gameDemanded && nullptr != gameCamera)
+	{
+		views[viewCount++] = {
+			{ kEnhancedGameViewId,
+				static_cast<uint64_t>(gameCamera->GetInstanceID()) },
+			gameCamera->CaptureFrameSnapshot(),
+			EnhancedLiveDisplayTarget::Game,
+			EnhancedLiveViewFlags::ScreenSpaceUI };
+	}
+	// M6-P2d-d: 실제 Scene component가 소유한 Material에서 pass별
+	// ShaderMeta GUID를 선언한다. DataSystem cache에 없는 복제/런타임
+	// Material도 이 owner snapshot에 포함되며 RenderEngine은 Water/Wind
+	// 같은 대표 파일 이름을 알 필요가 없다.
+	::editor::windows::note_view_submission(
+		!editorDemanded && nullptr != editorCamera,
+		!gameDemanded && nullptr != gameCamera);
+	const std::vector<std::shared_ptr<Material>> requiredMaterials =
+		SceneManagers->CaptureRequiredRenderMaterials();
+	const EnhancedRequiredAssetPacket requiredAssets =
+		EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
+	EnhancedLiveFramePacket renderFrame =
+		EnhancedSceneRenderer::BuildLiveFramePacket(
+		static_cast<float>(m_main->GetFrameDeltaTime()),
+		views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
+	const uint64_t publishedFrameId = renderFrame.frameId;
+	if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
+	{
+		m_main->NotifyRenderFramePublished(publishedFrameId);
+	}
+
+	return viewCount;
+}
+
+/// 첫 그림이 설 때까지 프레임을 돌린다. 창을 보여주기 전에만 부른다.
+void Core::App::WarmUpFirstRenderedFrame()
+{
+	if (EditorHasAutomationArgument()) return;
+
+	BootProgress::Step(L"Preparing renderer...");
+
+	// 상한은 '예열이 실패해도 에디터는 뜬다'를 지키는 자다. 넘기면 예열
+	// 없이 예전과 같은 상태로 창을 띄운다 — 검정 씬뷰가 잠시 보일 뿐
+	// 부팅이 막히지는 않는다.
+	constexpr auto kWarmUpLimit = std::chrono::seconds(60);
+	const auto deadline = std::chrono::steady_clock::now() + kWarmUpLimit;
+
+	while (std::chrono::steady_clock::now() < deadline)
+	{
+		DataSystems->DrainQueuedAssetChanges();
+		m_main->Update();
+
+		// 넘길 뷰가 없으면 만들 그림도 없다. 여기서 기다리면 상한까지
+		// 헛돈다 — 카메라 없는 씬을 여는 실행이 그렇다.
+		if (0 == PublishRenderFrame()) return;
+
+		if (0 != EnhancedSceneRenderer::GetLiveDisplayTexture(
+				EnhancedLiveDisplayTarget::Editor).textureId)
+		{
+			return;
+		}
+
+		// RT가 완료한 슬롯을 표시로 승격하는 것은 다음 TickLive다. 잠깐
+		// 물러나 그 진행을 기다린다 — 붙어서 발행하면 큐만 덮어쓴다.
+		std::this_thread::sleep_for(std::chrono::milliseconds(4));
+	}
+
+	Debug->LogWarning("[Boot] 렌더러 예열이 상한을 넘었다 — 예열 없이 창을 띄운다");
+}
+
 void Core::App::Run()
 {
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
@@ -271,6 +413,22 @@ void Core::App::Run()
 		BootProgress::Step(L"Initializing Input...");
         InputManagement->Initialize(m_hWnd);
 		//InputActionManagers->LoadManager();
+		// ★ 첫 라이브 프레임은 로딩 화면 **뒤**에서 돌린다 (2026-09-14).
+		//
+		//   렌더 파이프라인은 GT가 첫 frame packet을 발행해야 서고, 그
+		//   구축(패스 초기화·ShaderMeta 적용·재질 밀봉)이 실측 16.5초다.
+		//   프레임 루프는 Show() 뒤에 시작하므로 그 16.5초가 통째로 '창은
+		//   떴는데 씬뷰가 검정'인 구간이었다 — 부팅이 짧아질수록 이 구간이
+		//   길게 드러난다(PHASE 21 W3이 창 생성을 첫 프레임으로 옮긴 뒤의
+		//   체감이 그것이다).
+		//
+		//   여기서 미리 돌린다. 기다리는 조건은 '첫 그림이 실제로 섰는가'
+		//   (표시 텍스처 != 0)이고, 만들 뷰가 없으면(에디터 카메라 없음)
+		//   기다릴 것도 없으므로 즉시 빠진다. 하네스 실행은 예열하지
+		//   않는다 — 명령 하나 돌리고 끝내는 실행에 16초를 물리면 게이트
+		//   타임아웃이 통째로 흔들린다.
+		WarmUpFirstRenderedFrame();
+
 		BootProgress::Complete();
 
 		// 로딩창을 완전히 닫은 뒤(스레드 join까지) 에디터 창을 보여준다.
@@ -295,79 +453,7 @@ void Core::App::Run()
 		auto& cli = ConsoleCommandSystem::Get();
 		cli.Pump();
 
-		// 유일한 씬 렌더러. Update가 GT의 구조 변경과 EndOfFrame을 끝낸 뒤
-		// 카메라와 delta batch를 밀봉해 전용 RenderThread에 발행한다.
-		//
-		// 넘기는 뷰는 **화면에 있는 것만**이다(PHASE 21 W4). 예전에는 재생
-		// 여부와 무관하게 둘 다 넘겼는데, 그때는 "지금 무엇이 보이는가" 에
-		// 답할 자리가 없었다 — Scene 과 Game 이 창 둘이라 어느 쪽이 앞 탭인지
-		// 제작자가 알 수 없었기 때문이다. 가운데 Host 가 모드를 들고부터는
-		// 그 물음에 답이 있으므로, 보이지 않는 타깃의 그림을 만들지 않는다.
-		// 카메라별 표시 슬롯은 TickLive 쪽이 관리한다(MultiCameraRenderPlan.md).
-		// camera.editor follow on — 두 뷰의 시점을 통일해 두는 대조 실험용.
-		// 카메라 목록을 만들기 전에 적용해야 이번 프레임 밀봉에 반영된다.
-		if (ConsoleCommandSystem::IsEditorCameraFollowing())
-		{
-			ConsoleCommandSystem::MatchEditorCameraToGameCamera();
-		}
-
-		// 씬 오버레이(저작 보조) 뷰 선언은 Host 몫이다(E4-5) — 에디터 카메라는
-		// Editor 세션이 소유하고, Core는 뷰 요청에 실린 값만 안다.
-		EnhancedLiveViewRequest views[EnhancedSceneRenderer::kMaxLiveCameraViews]{};
-		uint32_t viewCount = 0;
-		// UI 가 한 번도 게시하지 않았으면(첫 프레임, 헤드리스) 둘 다 만든다 —
-		// 수요를 모르는 것과 수요가 없는 것은 다르다.
-		const ::editor::windows::viewport_demand demand =
-			::editor::windows::read_viewport_demand();
-		const bool editorDemanded = !demand.hostPresent || demand.editorTarget;
-		const bool gameDemanded = !demand.hostPresent || demand.gameTarget;
-
-		// 카메라를 **먼저** 집는다. 누계가 재야 하는 것은 "만들 수 있었는데
-		// 수요가 없어 만들지 않았다" 이지 "못 만들었다" 가 아니다. 둘을 섞으면
-		// 게임 카메라가 없는 씬에서 수요 문을 통째로 걷어도 수가 그대로여서,
-		// 그 수를 읽는 게이트가 씬이 무엇을 담고 있느냐에 기대게 된다.
-		Camera* const editorCamera = EditorSessionState::Get().EditorCamera();
-		if (editorDemanded && nullptr != editorCamera)
-		{
-			views[viewCount++] = {
-				{ kEnhancedEditorViewId, 1 },
-				editorCamera->CaptureFrameSnapshot(),
-				EnhancedLiveDisplayTarget::Editor,
-				EnhancedLiveViewFlags::SceneOverlay |
-					EnhancedLiveViewFlags::CanvasPreview };
-		}
-		Scene* activeScene = SceneManagers->GetActiveScene();
-		CameraComponent* const gameCamera = (nullptr != activeScene)
-			? activeScene->Cameras().GetPrimaryCamera() : nullptr;
-		if (gameDemanded && nullptr != gameCamera)
-		{
-			views[viewCount++] = {
-				{ kEnhancedGameViewId,
-					static_cast<uint64_t>(gameCamera->GetInstanceID()) },
-				gameCamera->CaptureFrameSnapshot(),
-				EnhancedLiveDisplayTarget::Game,
-				EnhancedLiveViewFlags::ScreenSpaceUI };
-		}
-		// M6-P2d-d: 실제 Scene component가 소유한 Material에서 pass별
-		// ShaderMeta GUID를 선언한다. DataSystem cache에 없는 복제/런타임
-		// Material도 이 owner snapshot에 포함되며 RenderEngine은 Water/Wind
-		// 같은 대표 파일 이름을 알 필요가 없다.
-		::editor::windows::note_view_submission(
-			!editorDemanded && nullptr != editorCamera,
-			!gameDemanded && nullptr != gameCamera);
-		const std::vector<std::shared_ptr<Material>> requiredMaterials =
-			SceneManagers->CaptureRequiredRenderMaterials();
-		const EnhancedRequiredAssetPacket requiredAssets =
-			EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
-		EnhancedLiveFramePacket renderFrame =
-			EnhancedSceneRenderer::BuildLiveFramePacket(
-			static_cast<float>(m_main->GetFrameDeltaTime()),
-			views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
-		const uint64_t publishedFrameId = renderFrame.frameId;
-		if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
-		{
-			m_main->NotifyRenderFramePublished(publishedFrameId);
-		}
+		PublishRenderFrame();
 
 		if (cli.IsQuitRequested())
 		{

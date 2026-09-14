@@ -21,6 +21,13 @@ if (-not (Test-Path -LiteralPath $scene -PathType Leaf)) {
 }
 
 $run = Join-Path $Work ("CE_D2FTPrimitives_" + [guid]::NewGuid().ToString('N'))
+# ★ 렌더 예열은 프레임 수가 아니라 **시간**을 재야 한다 (2026-09-14).
+#   라이브 렌더러의 첫 프레임은 파이프라인 구축과 ShaderMeta 적용으로
+#   Debug 에서 13~28초가 걸린다. 예전에는 짧은 wait 로도 통했는데, 그것은
+#   BuildPipeline 이 표시 락을 구축 내내 쥐어 게임 스레드까지 멈춰 세운
+#   덕이었다 — 프레임이 느려서 수가 곧 시간이었다. 그 정지를 걷어낸 뒤
+#   (BuildPipeline 락 축소) 프레임이 제 속도로 돌아 같은 수가 몇 초에
+#   지나간다. 그래서 첫 대기만 첫 프레임을 덮는 수로 올린다.
 New-Item -ItemType Directory -Path $run -Force | Out-Null
 $scenario = Join-Path $run 'commands.txt'
 $stdout = Join-Path $run 'stdout.txt'
@@ -28,7 +35,8 @@ $stderr = Join-Path $run 'stderr.txt'
 $resultPath = Join-Path $run 'results.jsonl'
 @(
     "scene.switch $($scene.Replace('\', '/'))"
-    'wait 120'
+    # 렌더 예열 — 아래 주석 참고.
+    'wait 2000'
     'dx12.scene'
     'quit'
 ) | Set-Content -LiteralPath $scenario -Encoding UTF8
