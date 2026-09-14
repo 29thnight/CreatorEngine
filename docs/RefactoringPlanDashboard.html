@@ -569,7 +569,7 @@
 <!-- ===== PHASE 4 ===== -->
 <section class="phase" id="phase-4">
   <h2 class="sec"><span class="no">PHASE 4</span>PBR 제품 배선 안정화 <span class="phase-pct" data-phase-pct="4"></span></h2>
-  <div class="phase-meta"><b>정본: <a href="plans/PBRWiringStabilizationPlan.md" style="color:var(--accent)">PBRWiringStabilizationPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 18일 · 완료 8.5일 + 진행 기성 3일 · 잔여 6.5일</b> · 선행 PHASE 3.75.</div>
+  <div class="phase-meta"><b>정본: <a href="plans/PBRWiringStabilizationPlan.md" style="color:var(--accent)">PBRWiringStabilizationPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 18일 · 완료 9.5일 + 진행 기성 3일 · 잔여 5.5일</b> · 선행 PHASE 3.75.</div>
   <div class="phase-goal"><b>목표:</b> 현재 제품의 GBuffer/Deferred/Forward를 native Slang 한 계통과 immutable material generation으로 묶고, alpha/AO/emissive/UV/sampler/normal 의미 손실 및 backend 기본값 차이, 검정·변색 플리커를 먼저 제거한다. Blender Principled와 Material Graph, 그림자·probe·후처리는 이 완료선에 섞지 않는다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
   <div class="verify">
@@ -2775,7 +2775,7 @@ const TASKS = [
     refs: "PBRWiringStabilizationPlan §7", priority: "P0", days: 2.5, status: "done", note: "2026-09-06 Forward/Water/Wind native Slang 전환·공용 material/GGX/IBL 평가. Forward 보상 누락·null LUT 직접광 과보상 수정. DX12/Vulkan 36-case HDR 경로/백엔드 편차 0, 기존 ShaderMeta·제품 캡처 회귀 통과. W9 golden/장시간 acceptance 별도." },
   { phase: 4, id: "PBR-W3", title: "backend neutral resource·binding·exit code",
     detail: "DX12/Vulkan neutral base/normal/ORM/emissive/AO 값과 binding을 숫자로 고정하고, 회귀 실패가 프로세스 실패로 전파되게 한다.",
-    refs: "PBRWiringStabilizationPlan PBR-W3·§6", priority: "P0", days: 1, status: "progress", earnedDays: 0.5, note: "2026-09-06 Vulkan ORM neutral 1,1,1,1·white/ORM/black 실GPU 수치 검사·56개 strict exit 판정 구현. AO 미저작 기대값 1로 수정. fixture와 제품 live 및 W9 acceptance를 구분한다." },
+    refs: "PBRWiringStabilizationPlan PBR-W3·§6·§16", priority: "P0", days: 1, status: "done", earnedDays: 1, note: "2026-09-06 Vulkan ORM neutral 1,1,1,1·white/ORM/black 실GPU 수치 검사·56개 strict exit 판정 구현. 2026-09-14 완료: 중립 텍셀 리터럴 7자리(DX12 3·Vulkan 4)를 RHINeutralTexel 단일 상수로 접어 두 백엔드 .cpp에 숫자 0자리. normal 축만 텍셀이 아니라 useNormalMap 분기다(흰색은 tangent-space 중립이 아니다). 값 검사 ValidatePbrTextureDefaults는 이름과 달리 vk.gbuffer가 DX12·Vulkan을 각각 부팅해 돌린다 — dx12.gbuffer는 중립값을 보지 않는다. 변이 둘로 양 팔 증명: 공유 상수 B→0은 [1/4] DX12에서 texture 1 channel 2, Vulkan 호출만 kBlack으로 바꾸면 [1/4] 통과 뒤 channel 0, 둘 다 exit 4. Fog.CloudNeutral은 숫자만 같고 뜻이 달라 일부러 합치지 않았다." },
   { phase: 4, id: "PBR-W4", title: "alpha mode/cutoff·double-sided/cull",
     detail: "OPAQUE/MASK/BLEND를 분리하고 color/depth/shadow가 같은 cutoff를 쓰며 doubleSided가 cull과 뒷면 normal을 함께 결정하게 한다.",
     refs: "PBRWiringStabilizationPlan §8", priority: "P0", days: 2, status: "done", note: "2026-09-06 MASK/양면 소유 snapshot·공용 color/depth/shadow coverage·Shadow Slang 완료. alphaCutoff sentinel 제거. 두 backend 각 40-case·material 왕복·CEMC6 모델 14개/하위 자산 310 ID 보존 검증. cull=None+픽셀 면 판정이며 W7 UV/sampler와 W9 golden/장시간 acceptance는 별도." },

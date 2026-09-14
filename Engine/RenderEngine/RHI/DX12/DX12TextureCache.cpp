@@ -243,8 +243,9 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
 
 bool DX12TextureCache::CreateWhiteTexture(std::string& outError)
 {
-    const uint8_t white[4] = { 255, 255, 255, 255 };
-    return CreateSolidTexture(white, L"DX12DefaultWhite", m_whiteResource, m_white, outError);
+    // 값은 `RHINeutralTexel`이 정본이다(W3) — 여기에 숫자를 다시 적지 않는다.
+    return CreateSolidTexture(RHINeutralTexel::kWhite.data(), L"DX12DefaultWhite",
+        m_whiteResource, m_white, outError);
 }
 
 DX12TextureCache::Entry DX12TextureCache::GetBlackTexture(std::string& outError)
@@ -252,8 +253,7 @@ DX12TextureCache::Entry DX12TextureCache::GetBlackTexture(std::string& outError)
     if (nullptr == m_resources) return Entry{};
     if (!m_black.IsValid())
     {
-        const uint8_t black[4] = { 0, 0, 0, 255 };
-        if (!CreateSolidTexture(black, L"DX12DefaultBlack",
+        if (!CreateSolidTexture(RHINeutralTexel::kBlack.data(), L"DX12DefaultBlack",
             m_blackResource, m_black, outError))
         {
             return Entry{};
@@ -267,22 +267,14 @@ DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outE
     if (nullptr == m_resources) return Entry{};
     if (!m_ormNeutral.IsValid())
     {
-        // R 오클루전 1 · G 거칠기 1 · B 금속 1 — 세 채널 모두 팩터가 곱해지는
-        // 슬롯이므로 중립은 1 이다. 그래야 ORM 텍스처가 없는 재질에서
-        // metallic = orm.b * factor 가 저작한 factor 그대로 남는다(glTF 규격도
-        // "MR 텍스처가 없으면 metallic = metallicFactor" 다).
+        // 값과 그 값인 이유(B 가 0 이었다가 a2e5ecdc 로 뒤집힌 경위 포함)는
+        // `RHINeutralTexel::kOrmNeutral` 선언부에 있다. 여기에 숫자를 다시 적으면
+        // 바로 그 드리프트가 되풀이된다.
         //
-        // ★ B 가 0 이었던 이유와 그것이 낡은 경위 ─ 예전 셰이더는 금속을
-        //   `orm.b + metallic` 으로 **더했다**. 그때는 B=1 이면 metallic 이 1 을
-        //   넘겨 확산이 통째로 죽었고, 그래서 0 이 중립이었다. a2e5ecdc 가
-        //   결합을 곱셈으로 바꾸면서 그 전제가 뒤집혔는데 이 상수가 따라가지
-        //   않았다 — 그 뒤로 ORM 텍스처가 없는 재질은 저작한 metallic 과
-        //   무관하게 전부 비금속으로 그려졌다.
-        //
-        //   dx12.gbuffer 자가 검증이 이것을 계속 붉게 알리고 있었다
-        //   (MetalRough 기대 (1, 0.75, 0.25) vs 실측 (1, 0.75, 0.000)).
-        const uint8_t ormNeutral[4] = { 255, 255, 255, 255 };
-        if (!CreateSolidTexture(ormNeutral, L"DX12DefaultOrmNeutral",
+        // ★ 이 백엔드 쪽 증상만 덧붙인다 — B 가 0 이던 동안 dx12.gbuffer 자가
+        //   검증이 계속 붉게 알리고 있었다(MetalRough 기대 (1, 0.75, 0.25) vs
+        //   실측 (1, 0.75, 0.000)).
+        if (!CreateSolidTexture(RHINeutralTexel::kOrmNeutral.data(), L"DX12DefaultOrmNeutral",
             m_ormNeutralResource, m_ormNeutral, outError))
         {
             return Entry{};

@@ -361,6 +361,11 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateFogCloudNeutral(
         outError = "포그 중립 구름 업로드 링 할당 실패";
         return false;
     }
+    // ★ 이것은 `RHINeutralTexel::kWhite` 와 숫자가 같지만 **다른 값**이다. 여기의
+    //   흰색은 "구름 그림자 없음"(포그 셰이더가 곱하는 가시도 1)이고, 저쪽은 PBR
+    //   재질 슬롯의 중립이다. 두 뜻이 한 상수를 공유하면 한쪽 규약이 바뀔 때
+    //   다른 쪽이 조용히 따라간다 — W3 는 이 자리를 일부러 합치지 않았다.
+    //   또한 이 경로는 DX12 전용이라 백엔드 사이에 갈릴 짝 자체가 없다.
     const uint8_t white[4]{ 255, 255, 255, 255 };
     std::memcpy(staging.cpuAddress, white, sizeof(white));
 

@@ -366,9 +366,10 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
 {
     if (nullptr == texture)
     {
-        constexpr uint8_t white[4] = { 255, 255, 255, 255 };
-        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white,
-            m_impl->whiteAllocation, outError);
+        // 중립 픽셀 값은 `RHINeutralTexel` 이 정본이다(W3). 이 파일에는 숫자를
+        // 적지 않는다 — DX12 쪽과 두 벌이 되면 갈린다.
+        return m_impl->Solid(RHINeutralTexel::kWhite.data(), L"VulkanTexture.White",
+            m_impl->white, m_impl->whiteAllocation, outError);
     }
 
     const auto found = m_impl->entries.find(texture->m_assetId);
@@ -384,9 +385,8 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
     {
         ++m_impl->stats.failures;
         outError = "Texture에 CPU 픽셀이 없다";
-        constexpr uint8_t white[4] = { 255, 255, 255, 255 };
-        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white,
-            m_impl->whiteAllocation, outError);
+        return m_impl->Solid(RHINeutralTexel::kWhite.data(), L"VulkanTexture.White",
+            m_impl->white, m_impl->whiteAllocation, outError);
     }
 
     RHITextureEntry entry;
@@ -396,9 +396,8 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
         allocation, entry, bytes, outError))
     {
         ++m_impl->stats.failures;
-        constexpr uint8_t white[4] = { 255, 255, 255, 255 };
-        return m_impl->Solid(white, L"VulkanTexture.White", m_impl->white,
-            m_impl->whiteAllocation, outError);
+        return m_impl->Solid(RHINeutralTexel::kWhite.data(), L"VulkanTexture.White",
+            m_impl->white, m_impl->whiteAllocation, outError);
     }
     const uint64_t residentBytes = allocation.allocationBytes;
 
@@ -415,17 +414,16 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& o
 
 RHITextureEntry VulkanTextureCache::GetBlackTexture(std::string& outError)
 {
-    constexpr uint8_t black[4] = { 0, 0, 0, 255 };
-    return m_impl->Solid(black, L"VulkanTexture.Black", m_impl->black,
-        m_impl->blackAllocation, outError);
+    return m_impl->Solid(RHINeutralTexel::kBlack.data(), L"VulkanTexture.Black",
+        m_impl->black, m_impl->blackAllocation, outError);
 }
 
 RHITextureEntry VulkanTextureCache::GetOrmNeutralTexture(std::string& outError)
 {
-    // Metallic/roughness samples multiply authored factors; an absent map is one.
-    constexpr uint8_t orm[4] = { 255, 255, 255, 255 };
-    return m_impl->Solid(orm, L"VulkanTexture.OrmNeutral", m_impl->ormNeutral,
-        m_impl->ormNeutralAllocation, outError);
+    // 값이 1 인 이유는 `RHINeutralTexel::kOrmNeutral` 선언부에 있다(DX12 와 같은
+    // 숫자를 여기에 따로 적어 두었던 것이 W3 가 걷어낸 드리프트의 씨앗이다).
+    return m_impl->Solid(RHINeutralTexel::kOrmNeutral.data(), L"VulkanTexture.OrmNeutral",
+        m_impl->ormNeutral, m_impl->ormNeutralAllocation, outError);
 }
 
 uint32_t VulkanTextureCache::GetUploadFailureCount() const

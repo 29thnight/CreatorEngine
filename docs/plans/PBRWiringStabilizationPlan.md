@@ -1,6 +1,6 @@
 # PBR 배선 안정화 계획 (PHASE 4)
 
-**신설 2026-09-03 · 갱신 2026-09-14 · 10슬라이스 18일 · W2/W4/W5/W6 완료 · W0/W1/W3/W7 진행 · W8/W9 구현 착지·부분 실측(§14·§15)**
+**신설 2026-09-03 · 갱신 2026-09-14 · 10슬라이스 18일 · W2/W3/W4/W5/W6 완료(W3는 §16) · W0/W1/W7 진행 · W8/W9 구현 착지·부분 실측(§14·§15)**
 
 > **W8/W9 현재 상태 한 줄.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
 > 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: 배선 게이트가
@@ -85,7 +85,7 @@ typed Material generation
 | `PBR-W0` | 감사 정본·Gunner/primitive capture·strict gate | ◐ | PHASE 3.75 | 2 |
 | `PBR-W1` | normal-map 저작 유무 snapshot 단일화 | ◐ | — | 1 |
 | `PBR-W2` | GBuffer/Deferred/Forward native Slang 제품 진입점·공용 현행 평가 | ✓ | W0 | 2.5 |
-| `PBR-W3` | backend neutral resource·binding·종료 코드 동등성 | ◐ | W0 | 1 |
+| `PBR-W3` | backend neutral resource·binding·종료 코드 동등성 | ✓ | W0 | 1 |
 | `PBR-W4` | OPAQUE/MASK/BLEND·alpha cutoff·double-sided/cull | ✓ | W2 | 2 |
 | `PBR-W5` | AO 소비·고정 4 texture slot 제거·GBuffer packing 검토 | ✓ | W2, W3 | 2.5 |
 | `PBR-W6` | emissive factor/strength·constant-only emission·색공간 | ✓ | W2 | 1.5 |
@@ -95,9 +95,10 @@ typed Material generation
 | **합계** |  |  |  | **18** |
 
 `PBR-W0`은 정적 감사 절반, `PBR-W1`은 코드·빌드 절반을 기성으로 센다. 둘 다 `PBR-W9`의
-실장면 acceptance 전에는 완료가 아니다. W3는 neutral resource와 strict exit 구현을 0.5일
-기성으로 반영한다. W7의 normal/tangent·UV 선택/변환·mip 구현과 검증은 합계 1.5일 기성이다.
-W2/W4/W5/W6 완료 8.5일 + 진행 기성 3.5일이며 잔여는 6일이다. W7 sampler는 미완료다.
+실장면 acceptance 전에는 완료가 아니다. W3는 2026-09-14 중립 상수 단일 출처화와 양 팔
+변이 증명으로 닫았다(§16). W7의 normal/tangent·UV 선택/변환·mip 구현과 검증은 합계
+1.5일 기성이다. W2/W3/W4/W5/W6 완료 9.5일 + 진행 기성 3일이며 잔여는 5.5일이다.
+W7 sampler는 미완료다.
 
 ---
 
@@ -821,3 +822,141 @@ generation보다 약한 신원으로 재사용될 **여지**"라고 적었다. �
 - **`vulkan` soak을 돌리지 않았다.** dx12만 쟀다.
 - **Release 구성으로 돌리지 않았다.** 위 수는 전부 Debug다.
 - **cutover는 하지 않았다.** 게이트가 끝까지 초록인 적이 없으므로 판단할 근거가 없다.
+
+---
+
+## 16. W3 — neutral 의 단일 출처화, 2026-09-14
+
+### 착수 전 실측이 뒤집은 것
+
+W3 는 `◐` 로 서 있었고 남은 것이 "neutral 값 맞추기"인 줄 알았다. 실제로 재 보니
+**값은 이미 양 백엔드가 같았다**. §6 이 Vulkan ORM 을 `(1,1,1,1)` 로 고친 뒤로 두
+숫자는 어긋난 적이 없다.
+
+그런데도 조건이 닫히지 않는 이유는 값이 아니라 **숫자가 두 벌이라는 구조**였다.
+착수 시점의 리터럴은 7 자리였다.
+
+| 파일 | 자리 | 값 |
+|---|---:|---|
+| `DX12TextureCache.cpp` | 3 (`CreateWhiteTexture` · `GetBlackTexture` · `GetOrmNeutralTexture`) | 흰·검정·ORM |
+| `VulkanRenderServices.cpp` | 4 (`GetOrUpload` 안 **흰색 3 회** · `GetBlackTexture` · `GetOrmNeutralTexture`) | 흰·검정·ORM |
+
+이 구조가 실제로 한 번 갈렸다. 예전 셰이더는 금속을 `orm.b + metallic` 으로 **더했고**
+그때는 B=0 이 중립이었다. `a2e5ecdc` 가 결합을 곱셈으로 바꾸면서 전제가 뒤집혔는데
+상수가 따라가지 않았고, 그 뒤로 ORM 텍스처가 없는 재질은 저작한 metallic 과 무관하게
+전부 비금속으로 그려졌다. **두 벌이면 언젠가 갈린다**는 것이 W3 의 진짜 조건이다.
+
+### 구현
+
+- `IRenderTextureCache.h` 에 `RHINeutralTexel::kWhite`/`kBlack`/`kOrmNeutral` 을
+  `inline constexpr` 로 두어 **정본을 하나로** 만들었다. 값이 그 값인 이유(ORM 드리프트
+  경위 포함)도 선언부에 같이 적었다 — 값과 이유가 떨어져 있으면 다음 사람이 또 옮긴다.
+- 위 7 자리를 전부 그 상수 참조로 바꿨다. 두 백엔드 `.cpp` 에 중립 숫자가 **0 자리** 남았다.
+
+### 여덟 번째 자리 — 일부러 합치지 않았다
+
+전수 grep 이 처음 센 7 자리 밖에서 하나를 더 찾아냈다.
+`EnhancedSceneRendererLiveDX12Adapter.cpp:364` 의 `Fog.CloudNeutral` 이다.
+
+숫자는 `kWhite` 와 같지만 **뜻이 다르다** — 여기의 흰색은 "구름 그림자 없음"(포그가
+곱하는 가시도 1)이고 저쪽은 PBR 재질 슬롯의 중립이다. 한 상수를 공유시키면 한쪽
+규약이 바뀔 때 다른 쪽이 조용히 따라간다. 게다가 이 경로는 DX12 전용이라 백엔드
+사이에 갈릴 짝 자체가 없다. 합치지 않은 이유를 그 자리에 주석으로 남겼다.
+
+### 다섯 축이 실제로 어떻게 닫히는가
+
+§4 의 W3 조건은 중립을 **다섯 축**(base color·normal·ORM·emissive·AO)으로 적어 두었는데
+fixture 는 텍셀 셋만 읽는다. 나머지가 빠진 것이 아니라 **축마다 닫히는 기제가 다르다**.
+
+| 축 | 미저작일 때 | 무엇이 백엔드 무관을 보장하는가 |
+|---|---|---|
+| base color | 흰 텍셀 | `RHINeutralTexel::kWhite` 단일 상수 + fixture 가 GPU readback 으로 검사 |
+| ORM | `(1,1,1,1)` | `kOrmNeutral` 단일 상수 + fixture readback |
+| emissive | 현행 흰 텍셀 · legacy 검정 | `kWhite`/`kBlack` 단일 상수 + fixture 가 검정 readback |
+| AO | 흰 텍셀 | 같은 `kWhite` 경로(`MaterialTextureTable.h:205` 의 else 분기) |
+| **normal** | **샘플되지 않는다** | 텍셀이 아니라 **분기**다 — 아래 |
+
+normal 만 성질이 다르다. 흰색은 tangent-space 중립이 아니다(`(1,1,1)` 을 풀면
+`(0.577, 0.577, 0.577)` 이지 표면 법선이 아니다). 그래서 셰이더가 값으로 때우지 않고
+플래그로 가른다 — `GBuffer.slang:238`·`ForwardShade.slang:419` 의 `useNormalMap` 이
+거짓이면 `normalSample` 을 **읽지 않고** 기하 법선을 그대로 쓴다. 바인딩된 흰 텍셀은
+그 프레임에 아무 뜻도 갖지 않는다.
+
+이 분기가 백엔드와 무관한 근거는 두 겹이다. 플래그를 세우는 코드가
+`Material.cpp:269` → snapshot → `MaterialTextureTable.h` 로 **백엔드 중립 계층에만**
+있고(`RHI/DX12`·`RHI/Vulkan` 어디에도 사본이 없다), 소비하는 셰이더가 W2 이후
+양 백엔드 공용 `.slang` 정본 하나다.
+
+슬롯별 대체 정책 자체도 `MaterialTextureTable.h:183-208` 의 `Upload` **한 함수**에만
+있다. 값이 하나이고 정책이 하나이므로, 이 조건은 "두 구현의 숫자가 같다"가 아니라
+"구현이 하나다"로 닫힌다.
+
+### 검증
+
+```powershell
+pwsh Tools/regression/verify-pbr-wiring-baseline.ps1
+```
+
+값 축을 재는 것은 `ValidatePbrTextureDefaults`(`VulkanGeometryPassTest.cpp:490`)다. 흰·ORM·
+검정 1×1 을 실제로 GPU 에 올려 readback 으로 되읽고 채널마다 `1e-6` 안에서 기댓값과
+맞춘다. 기댓값은 상수를 참조하지 않고 테스트가 **따로 적은 숫자**다 — 상수를 읽어 오면
+동어반복이 되어 "중립이 0 으로 바뀌었다" 같은 회귀를 못 잡는다.
+
+★ 이 검사가 **두 백엔드를 다 돈다**는 사실이 이름에 안 드러나 있다. `RunVulkanGBufferTest`
+(= `vk.gbuffer`)가 DX12 와 Vulkan 을 각각 부팅해 같은 `CaptureGBufferBackend` 에 넣고
+(`VulkanGeometryPassTest.cpp:2280`·`2342`), 그 함수의 첫 줄이 `ValidatePbrTextureDefaults`
+다. 반대로 `dx12.gbuffer` 는 중립값을 보지 않는다 — 이름으로 고르면 틀린다.
+게이트에는 `verify-pbr-wiring-baseline.ps1:213` 이 `vk.gbuffer` 로 물려 있다.
+
+종료 코드 동등성 축은 §6 에서 이미 닫혔다(실패 수 ≥ 1 이면 종료 코드 7).
+
+### 변이 증명 — 두 팔을 따로 쳤다
+
+초록인 검사는 이빨이 있는지 알 수 없다. 변이를 심기 전에 **발현 관측값을 먼저 적었다**.
+
+**변이 A — 공유 상수를 건드린다.** `kOrmNeutral` 의 B 를 255 → 0 으로 되돌렸다
+(`a2e5ecdc` 이전 상태의 재현이다). 예고한 관측값은 "texture 1 channel 2 가 expected 1,
+actual 0 으로 붉는다".
+
+```
+[1/4] DX12 기준 캡처 실패: PBR default texture 1 channel 2: expected 1.000000, actual 0.000000
+EXIT=4 · vk.gbuffer -> failed
+```
+
+예고한 자리에서 예고한 문장으로 붉었다. 이 이빨의 출처는 **기댓값이 상수를 참조하지
+않는다**는 점이다 — `ValidatePbrTextureDefaults` 는 `i == 2 && channel != 3 ? 0.f : 1.f` 로
+숫자를 따로 적는다. 상수를 읽어 왔다면 동어반복이 되어 이 변이를 그대로 통과시켰을 것이다.
+
+**변이 A 만으로는 절반이다.** 검사가 DX12 를 먼저 돌기 때문에 `[1/4]` 에서 멈췄고,
+Vulkan 팔은 **자극조차 되지 않았다**. 여기서 멈추고 "양 백엔드 증명"이라고 적으면
+③(자극 못 함)을 ①(잡았다)로 적는 것이다.
+
+**변이 B — Vulkan 호출 자리만 어긋낸다.** `GetOrmNeutralTexture` 의 Vulkan 구현이
+`kOrmNeutral` 대신 `kBlack` 을 넘기게 했다. DX12 는 건드리지 않았다. 예고한 관측값은
+"`[1/4]` 은 통과하고, ORM 의 R 이 0 으로 붉는다".
+
+```
+[1/4] DX12 기준 Material property→reflection b2→PSO→5 MRT · targeted next-use 통과
+PBR default texture 1 channel 0: expected 1.000000, actual 0.000000
+EXIT=4 · vk.gbuffer -> failed
+```
+
+둘 다 맞았다. DX12 팔이 초록인 채로 Vulkan 팔만 붉었으므로, 이 검사가 두 백엔드를
+각각 본다는 것이 실행으로 증명됐다.
+
+(변이 B 실행에서 `[3/4]` 비교 줄이 편차 100% 로 찍힌다. 실패한 Vulkan 캡처를 비교가
+계속 읽어서인데, 판정 자체는 `passed = captured && ...` 로 `captured` 를 곱하므로
+거짓 초록이 아니다. 진단 출력일 뿐이다.)
+
+### 실측이 드러낸 것 (계획에 없던 것)
+
+- **동시 세션이 같은 트리를 빌드하면 다섯 가지로 깨진다.** 이번에 전부 겪었다 —
+  `LNK1168`/`LNK1104`(에디터나 상대 링크가 `CreatorEditor.runtime.dll` 점유),
+  `C1041`(두 CL 이 같은 `Editor.pdb`), `LNK1181`(상대가 추가 중인 obj 부재),
+  `LNK4076`(`.ilk` 가 남의 손에). 프로세스를 죽이지 않고 **dll 잠금이 풀리는 순간을
+  노려 직렬화**하면 지나간다. 주의: MSBuild 프로세스 수는 대기 신호로 쓸 수 없다 —
+  node reuse 로 유휴 노드가 15 분 남아 "MSBuild 없음"은 거의 오지 않는다.
+- **변이 원복은 mtime 을 올려야 한다.** 바이트를 되돌려 놓아도 mtime 이 그대로면
+  재빌드가 일어나지 않아, 소스는 옳은데 게이트가 변이 바이너리를 잰다.
+- 소스 왕복은 **Latin-1 바이트 치환**으로 했다. 이 트리에 CP949 파일이 섞여 있어
+  텍스트로 읽고 쓰면 한글 주석이 깨진다.
