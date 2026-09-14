@@ -56,6 +56,8 @@
   .ring-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .ring-label .pct { font-size: 34px; font-weight: 800; color: var(--accent-2); }
   .ring-label .cap { font-size: 12px; color: var(--text-dim); }
+  .ring-label .cap-sub { margin-top: 3px; font-size: 11px; }
+  .ring-label .cap-sub b { color: var(--text); font-weight: 700; }
   .overall-side h2 { font-size: 18px; margin-bottom: 10px; }
   .counts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
   .count-chip { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 13px; }
@@ -159,14 +161,17 @@
       </svg>
       <div class="ring-label">
         <div class="pct" id="overall-pct">0%</div>
-        <div class="cap">열린 페이즈 진행률</div>
+        <div class="cap">전체 진행률</div>
+        <div class="cap cap-sub">열린 페이즈 <b id="open-pct">0%</b></div>
       </div>
     </div>
     <div class="overall-side">
-      <h2>열린 페이즈 진행 현황</h2>
+      <h2>진행 현황</h2>
       <p style="color:var(--text-dim);font-size:14px">
-        열린 <b id="open-phase-count" style="color:#fff">0</b>개 페이즈의 <b id="total-count" style="color:#fff">0</b>개 작업 항목.
-        가중치는 예상 공수(일) 기준으로 계산됩니다. 중단 항목을 제외한 활성 공수: <b id="total-days" style="color:#fff">0</b>일 (1인 기준, 순수 작업일).
+        전체 <b id="all-phase-count" style="color:#fff">0</b>개 페이즈 <b id="all-days" style="color:#fff">0</b>일 중 <b id="all-done-days" style="color:#fff">0</b>일 완료 — 링의 숫자입니다.
+        그중 종료 <b id="closed-phase-count-inline" style="color:#fff">0</b>개를 뺀 열린 <b id="open-phase-count" style="color:#fff">0</b>개 페이즈에
+        <b id="total-count" style="color:#fff">0</b>개 작업 항목 · 활성 공수 <b id="total-days" style="color:#fff">0</b>일이 남아 있습니다.
+        가중치는 예상 공수(일) 기준이며 1인 순수 작업일입니다.
       </p>
       <div class="counts">
         <div class="count-chip c-done"><b id="cnt-done">0</b>완료</div>
@@ -176,7 +181,7 @@
         <div class="count-chip c-stopped"><b id="cnt-stopped">0</b>중단됨</div>
       </div>
       <p style="color:var(--text-dim);font-size:12px;margin-top:10px">
-        종료 페이즈는 이 요약에서 제외하고 <a href="#closed-phases">접힌 이력</a>에 보존합니다. 중단됨은 후속 페이즈 승계·기준선 시효 만료·제품 요구 부재로 원 계획을 더 진행하지 않는 항목입니다. 재개 조건은 각 메모에 남기며 진행률 분모에서는 제외합니다.
+        아래 상태 칩과 활성 공수는 열린 페이즈만 셉니다 — 종료 페이즈는 <a href="#closed-phases">접힌 이력</a>에 보존합니다. 링은 종료분을 포함한 전체라서 페이즈가 닫혀도 내려가지 않습니다. 중단됨은 후속 페이즈 승계·기준선 시효 만료·제품 요구 부재로 원 계획을 더 진행하지 않는 항목입니다. 재개 조건은 각 메모에 남기며 진행률 분모에서는 제외합니다.
       </p>
     </div>
   </div>
@@ -2785,10 +2790,10 @@ const TASKS = [
     refs: "PBRWiringStabilizationPlan §11~§13", priority: "P1", days: 2, status: "progress", earnedDays: 1.5, note: "2026-09-06 normal/tangent 변환 128-case와 UV0/UV1·텍스처별 affine 변환 64-case를 양 backend에서 검증. 변환된 UV1 MASK/Shadow와 오류 주입 통과, validation 0. CEMC8 모델 14개/하위 ID 310개 보존. mip 생성/보존·10개 포맷·30-case와 축소 MASK를 포함한 coverage 48-case 통과, backend 편차/validation 0. sampler 전달과 W9 acceptance는 남아 있다." },
   { phase: 4, id: "PBR-W8", title: "material/descriptor/PSO generation 원자 밀봉",
     detail: "frame 안에서 material·texture·sampler·descriptor·PSO generation이 섞이지 않게 하고 reload/재임포트 실패는 마지막 정상 세대를 유지한다.",
-    refs: "PBRWiringStabilizationPlan PBR-W8", priority: "P0", days: 2, status: "todo", note: "검정/변색 플리커는 추측 하나로 닫지 않고 generation 불변식과 fail-closed gate로 판정한다." },
+    refs: "PBRWiringStabilizationPlan §14", priority: "P0", days: 2, status: "progress", earnedDays: 0, note: "검정/변색 플리커는 추측 하나로 닫지 않고 generation 불변식과 fail-closed gate로 판정한다. ★ 2026-09-14 구현 착지 — 빌드·실행 전이라 기성 0이다. ★ 착수 전 실측이 '여지'를 '실재하는 결함 둘'로 바꿨다. ① 밀봉 중복 제거 키가 legacy Material* 주소 하나였다. DataSystem::Materials 는 이름으로 캐시한 같은 객체를 여러 MeshRenderer 에 돌려주는데 인스턴스 override 는 렌더러마다 다르다 — 주소가 같다는 이유로 먼저 밀봉된 스냅샷을 뒤의 draw 가 받아 override 가 통째로 사라졌다. materialSource 가 없는 draw 는 전부 &defaultMaterial 한 주소로 합쳐졌다. ② 인코더가 버린 명령이 어디에도 세어지지 않았다 — DX12 는 놓인 PSO 핸들·만료 descriptor·주소 0 을 만나면 조용히 return 하고, GBuffer Record 는 실패마다 continue 라 머테리얼 하나가 통째로 빠져도 프레임이 성공으로 보고됐다(Forward 는 return false 로 fail-closed — 두 패스가 비대칭). ★ 값 신원(sealHash)에 frameId 를 섞지 않는다 — '값이 같은가'와 '이번 프레임 것인가'는 다른 질문이고, 섞으면 앞을 못 묻는다. ★ 위반이면 프레임을 실패시키지 않고 그 draw 를 생략한다(계획 §2 처방) — 빠진 것은 셀 수 있고 섞인 것은 못 센다. ★ 도장 없는 snapshot(격리 fixture)은 staleness 를 재지 않는다. 잴 것이 없는데 붉히면 게이트가 도는 세트에서 빠진다. ★ 2026-09-14 실행: 빌드 exit 0, render.pbr.seal 42/42, 제품 캡처 W8 단정이 dx12·vulkan 양쪽 PASS(매 draw 도장·이 프레임·위반 0·unstamped 0·encoder drop 0·업로드 실패 0), soak 109/109. ★ 이빨 증명은 절반이다. Stamp 제거 변이는 게이트가 붉은 이유까지 맞게 잡았다(baseline:114 'Draw seal missing or from another frame'). 그러나 주소 키 복원 변이는 통과했고 — 이것이 눈먼 것이 아니라 fixture 문제다: 변이 뒤에도 gunner 는 draw 10/distinct sealHash 10 으로 기준과 같았다. 10 개 draw 가 각자 다른 Material* 이라 주소 키만으로도 갈린다. 즉 하나의 Material 을 공유하는 두 renderer 가 서로 다른 override 를 갖는 경우를 재현하는 fixture 가 저장소에 없고, **W8 이 고쳤다는 그 결함은 아직 증명되지 않았다**. 그 fixture 를 만드는 것이 남은 단위다. ★ 실측이 덤으로 드러낸 것: FT_Primitives 는 8 draw 전부 authoredDigest=0(proxy->m_authoredMaterial 이 null)이고 Gunner 만 축이 살아 있다(3 종 중 2 종 non-zero, 두 backend 동일). authoredRevision 은 두 fixture 모두 0 — 아직 아무것도 나르지 않는 축이다. sealHash 는 실행마다 달라진다(texture owner 의 m_assetId 가 런타임 GUID) — 프레임 안 신원으로는 옳지만 실행 간 golden 으로 쓰면 안 된다. ★ 남은 것: 재질별 sampler 전달은 여전히 W7 몫." },
   { phase: 4, id: "PBR-W9", title: "DX12/Vulkan 실장면·장시간·재임포트 cutover",
     detail: "Gunner/primitive를 회전·카메라 이동·재임포트하며 10분 검정/변색 frame 0, validation 0과 backend golden을 통과한다.",
-    refs: "PBRWiringStabilizationPlan PBR-W9", priority: "P0", days: 1.5, status: "todo", note: "이 gate 전에는 W0/W1 진행분도 완료로 승격하지 않는다." },
+    refs: "PBRWiringStabilizationPlan §15", priority: "P0", days: 1.5, status: "progress", earnedDays: 0, note: "이 gate 전에는 W0/W1 진행분도 완료로 승격하지 않는다. ★ 2026-09-14 판정 장치 착지 — 빌드·실행 전이라 기성 0이고, 10분 acceptance 와 backend golden 실측값은 아직 없다. 그 수를 미리 적으면 측정이 아니라 소원이다. ★ 착수 전 실측이 드러낸 공백 둘. ① verify-pbr-wiring-baseline.ps1 은 W0 부터 run-all.ps1 에 물려 있지 않았다 — 이 게이트를 부르는 것은 계획 문서뿐이었고 PBR 픽셀 축 전체가 도는 세트 밖이었다. ② 캡처가 남긴 float32 원본 7 장을 읽는 코드가 저장소에 하나도 없었다. 게이트는 파일 크기만 쟀고, 계획서 §6 의 RMSE 는 손으로 한 번 잰 값이라 회귀를 못 잡는다 — 생산만 있고 소비가 0 인 파이프라인이었다. ③ golden 자산도 비교 코드도 없다(저장소의 golden 은 전부 텍스트). ④ soak/장시간 하네스 0 건. ★ 신설: render.pbr.compare(두 캡처의 실제 픽셀을 맞댄다, 허용식은 기존 parity 와 같은 절대 0.002+상대 0.5%, 같은 backend 끼리는 거부 — 대조군은 독립 유도를 가져야 한다), render.pbr.sealstatus(재기만 하고 판정하지 않는다 — 상태 문장을 게이트가 파싱하면 문장을 다듬는 순간 눈이 먼다), verify-pbr-soak.ps1(회전·이동·주기 재임포트, 기본 1분·acceptance 10분). ★ soak 가 재는 것은 '검은 프레임이 없었다'가 아니라 검은 프레임을 만드는 기계장치가 한 번도 돌지 않았다이다 — 매 프레임 픽셀 읽기는 감당 불가이고 눈으로 보는 것은 게이트가 아니다. ★ silent neutral substitution 축을 열었다: 업로드 실패로 흰색을 덮은 횟수만 세고, 저작으로 없는 슬롯의 중립값은 세지 않는다. ★ 2026-09-14 실행이 게이트의 질문을 좁혔다. 두 backend 캡처를 실제로 맞대자 GBuffer 다섯 장은 초과 0(normal 만 max 0.000244, 초과 0)인데 조명 합성 이후 두 장이 넘었다. 대조를 잡아 보니 같은 backend 끼리도 시각만 벌어지면 넘는다 — dx12 vs dx12 Δt 0.27s → 19,490 초과, Δt 3.11s → 57,977, dx12 vs vulkan Δt 5.68s → 241,936. 원인은 켜져 있는 시간 구동·시간축 누적 효과(움직이는 구름 그림자·포그의 직전 프레임 혼합·SSGI 누적)이고 캡처는 시뮬레이션 시각을 고정할 수단이 없다(time.* 명령 부재). 두 캡처는 다른 시각의 서로 다른 그림이라 픽셀 대조가 성립하지 않는 질문이었다. **허용치를 늘려 초록으로 만들지 않았다** — 그러면 재는 척만 하게 된다. preToneHdr·display 는 판정에서 빼되 수는 매 실행 남긴다(gated:false). 시각 고정이 되면 판정으로 되돌리는 것이 W9 의 남은 단위다. 시간차만으로 다 설명되지 않는 잔차도 있으나 이 하네스로는 분리할 수 없다. ★ 픽셀 교란 변이는 정확히 잡혔다(baseColor 1,000 표본 +0.05 → exceeded 1000/3916416, max 0.050000, exit 4) — 측정 전용 두 장은 실패시키지 않았다. ★ 그리고 이 게이트는 W9 이전부터 끝까지 간 적이 없다: baseline:218 이 부르는 verify-experiment-contract.ps1 이 링크 단계에서 죽는다(독립 probe 의 lib 목록이 SceneRuntime 의 실제 의존과 어긋남). 이 호출은 HEAD 에 이미 있었고 W9 가 건드리지 않았다. nethost·EngineDiagnostics·FMOD 세 층을 채워 미해결 90→49 로 줄였고 나머지(PhysicX::*·GameInputInitialize)는 별건으로 남겼다. ★ 미실시: 10 분 acceptance, vulkan soak, Release 구성, cutover." },
 
   // ---------- PHASE 4.25: Blender형 Principled PBR·Material Graph ----------
   { phase: 4.25, id: "MAT-0", title: "Blender 5.1.1 reference·pre-tone HDR golden",
@@ -2878,6 +2883,8 @@ for (const p of CLOSED_PHASES) {
 }
 document.getElementById("open-phase-count").textContent = PHASE_IDS.length - CLOSED_PHASES.size;
 document.getElementById("closed-phase-count").textContent = CLOSED_PHASES.size;
+document.getElementById("closed-phase-count-inline").textContent = CLOSED_PHASES.size;
+document.getElementById("all-phase-count").textContent = PHASE_IDS.length;
 
 // 페이즈별 테이블 렌더
 document.querySelectorAll("table.tasks").forEach(table => {
@@ -2912,10 +2919,24 @@ const VISIBLE_TASKS = TASKS.filter(t => Number.isFinite(t.phase) && !CLOSED_PHAS
 const activeTasks = VISIBLE_TASKS.filter(t => t.status !== "stopped");
 const totalDays = activeTasks.reduce((s, t) => s + t.days, 0);
 const doneDays = activeTasks.reduce((s, t) => s + earnedDays(t), 0);
-const overallPct = totalDays ? Math.round(doneDays / totalDays * 100) : 0;
+const openPct = totalDays ? Math.round(doneDays / totalDays * 100) : 0;
+
+// ★ 링은 전체 진행률이다(2026-09-14). 열린 페이즈만 분모로 쓰던 옛 링은 방향이
+//   뒤집힌 지표였다: 100%인 페이즈가 닫히면 분자·분모에서 같이 빠져 숫자가
+//   내려간다. 실제로 PHASE 18의 마지막 항목이 진행 중이던 시점 14%, 그 항목을
+//   끝내 페이즈가 닫히자 13%였다 — 일을 더 하고 링이 떨어졌다.
+//   열린 페이즈 비율은 '남은 일의 진척'이라 버리지 않고 링 안 보조 숫자로 남긴다.
+const ALL_TASKS = TASKS.filter(t => Number.isFinite(t.phase) && t.status !== "stopped");
+const allDays = ALL_TASKS.reduce((s, t) => s + t.days, 0);
+const allDoneDays = ALL_TASKS.reduce((s, t) => s + earnedDays(t), 0);
+const overallPct = allDays ? Math.round(allDoneDays / allDays * 100) : 0;
+const fmtDays = d => Number.isInteger(d) ? String(d) : d.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 
 // 전체 링
 document.getElementById("overall-pct").textContent = overallPct + "%";
+document.getElementById("open-pct").textContent = openPct + "%";
+document.getElementById("all-days").textContent = fmtDays(allDays);
+document.getElementById("all-done-days").textContent = fmtDays(allDoneDays);
 const ring = document.getElementById("ring");
 const CIRC = 2 * Math.PI * 78;
 ring.setAttribute("stroke-dasharray", CIRC);
@@ -2923,7 +2944,7 @@ ring.setAttribute("stroke-dashoffset", CIRC * (1 - overallPct / 100));
 
 // 카운트
 document.getElementById("total-count").textContent = VISIBLE_TASKS.length;
-document.getElementById("total-days").textContent = totalDays;
+document.getElementById("total-days").textContent = fmtDays(totalDays);
 for (const st of ["done", "progress", "todo", "blocked", "stopped"]) {
   document.getElementById("cnt-" + st).textContent = VISIBLE_TASKS.filter(t => t.status === st).length;
 }
