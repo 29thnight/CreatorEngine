@@ -883,6 +883,9 @@ namespace ConsoleCmd
         data.Set("ghostTabs", CommandData::Int(static_cast<int>(audit.ghost_tabs.size())));
         data.Set("imguiVersionNum", CommandData::Int(audit.imgui_version_num));
         data.Set("versionKnown", CommandData::Bool(audit.internal_api_version_known));
+        data.Set("imguiHeaderVersion", CommandData::String(snapshot.imgui_version));
+        data.Set("imguiRuntimeVersion", CommandData::String(snapshot.imgui_runtime_version));
+        data.Set("binaryMatchesHeader", CommandData::Bool(audit.imgui_binary_matches_header));
         data.Set("clean", CommandData::Bool(audit.clean()));
 
         // PHASE 21 W6 — preset 이 지켜야 하는 두 축을 밖으로 낸다.

@@ -180,6 +180,11 @@ namespace editor
         audit.imgui_version_num = snapshot.imgui_version_num;
         audit.internal_api_version_known =
             (expected_imgui_version_num == snapshot.imgui_version_num);
+        // 빈 문자열을 "같다" 로 읽지 않는다 — 스냅샷이 아직 안 떴을 때의 기본값이
+        // 통과로 보이면 이 축은 눈먼 초록이 된다.
+        audit.imgui_binary_matches_header =
+            !snapshot.imgui_runtime_version.empty() &&
+            snapshot.imgui_runtime_version == snapshot.imgui_version;
 
         return audit;
     }
@@ -465,6 +470,12 @@ namespace editor
         {
             out += "[AUDIT] central node 가 없다 — 가운데 Host 가 자기 노드를 "
                    "central 로 표시하지 못했다\n";
+        }
+        if (!audit.imgui_binary_matches_header)
+        {
+            out += "[AUDIT] 헤더가 말한 ImGui 판과 라이브러리가 말한 판이 다르다: "
+                      "header=" + snapshot.imgui_version +
+                      " runtime=" + snapshot.imgui_runtime_version + "\n";
         }
         if (!audit.internal_api_version_known)
         {

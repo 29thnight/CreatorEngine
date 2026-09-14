@@ -119,8 +119,15 @@ namespace editor
         bool          valid{ false };
         std::uint64_t frame{ 0 };
 
+        /// 컴파일할 때 본 헤더의 판(`IMGUI_VERSION` 매크로).
         std::string   imgui_version;
         int           imgui_version_num{ 0 };
+
+        /// **링크된 라이브러리**가 말하는 판(`ImGui::GetVersion()`). 위의 둘은
+        /// 전처리기가 박은 값이라 헤더만 증언하고, 이것은 실제로 도는 코드가
+        /// 증언한다. 둘이 갈리는 일이 이 기계에서 실제로 가능하다 — 설치본이
+        /// 둘이고 판이 다르다.
+        std::string   imgui_runtime_version;
 
         /// ImGui 스타일 배율(`FontScaleMain * FontScaleDpi`)과 그것을 곱한
         /// **실효** 하한. 게이트가 논리 픽셀 상수를 제 파일에 베껴 적지 않고
@@ -256,6 +263,8 @@ namespace editor
         /// "ImGui internal adapter version canary" 의 씨앗이다. 여기 두는 이유는
         /// 이 감사가 `imgui_internal.h` 구조체를 가장 깊이 읽기 때문이다.
         bool internal_api_version_known{ false };
+        /// 헤더가 말한 판과 라이브러리가 말한 판이 같은가.
+        bool imgui_binary_matches_header{ false };
         int  imgui_version_num{ 0 };
 
         bool clean() const noexcept
@@ -266,7 +275,8 @@ namespace editor
             // 유일성만 보던 때에는 0 이 조용히 통과했고 그 0 이 중앙을 특별히
             // 다루는 것들을 전부 닿지 않게 만들고 있었다.
             return (1 == central_nodes) && undocked_slots.empty() &&
-                   ghost_tabs.empty() && internal_api_version_known;
+                   ghost_tabs.empty() && internal_api_version_known &&
+                   imgui_binary_matches_header;
         }
     };
 

@@ -26,7 +26,21 @@ namespace
             HWND hwnd = static_cast<HWND>(windowHandle);
             ImGuiWin32Cursor::Reset(hwnd);
 
-            IMGUI_CHECKVERSION();
+            // `IMGUI_CHECKVERSION()` 은 **출하 구성에서 힘이 0 이다.** 그 안은
+            // `IM_ASSERT` 로만 말하는데 그것이 `assert()` 이고 Release 는 NDEBUG 라
+            // 통째로 사라진다. 게다가 매크로는 bool 을 돌려주므로 값을 버리면
+            // 거짓을 받아도 아무도 보지 않는다([[assert-as-policy-has-no-force]]).
+            //
+            // 이 검사가 막는 것은 추상적인 사고가 아니다 — 이 기계에는 imgui
+            // 설치본이 둘이고 판이 서로 다르다. 헤더를 A 에서, 라이브러리를 B
+            // 에서 가져오면 `ImGuiIO` 의 배치가 갈린 채로 컴파일이 통과하고
+            // 기동에서야 엉뚱하게 죽는다([[two-vcpkg-installs-wrong-header]]).
+            if (!IMGUI_CHECKVERSION())
+            {
+                throw std::runtime_error(
+                    "ImGui header/library mismatch: compiled against " IMGUI_VERSION
+                    ", linked library reports a different version or data layout");
+            }
             GlobalImGuiContext::GetInstance()->SetContext(ImGui::CreateContext());
             ImGuiIO& io = ImGui::GetIO();
             ImGui::GetAllocatorFunctions(

@@ -975,7 +975,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
 | W6 | **done** | **preset 5종 + 이름 붙인 배치 착지(2026-09-15)** — 자리의 정본이 선언에서 preset 으로 옮겨 갔고(`EditorLayoutPreset.h`), 기본 preset 은 재정의 0 이라 현재 외관이 값이 아니라 **출처**로 유지된다(픽셀 392,888 중 0 차이). `dock_slot::left` 신설, 안 쓰는 자리는 노드를 만들지 않음, 패널 바닥 보존, 파일 스키마 2(v1 계속 읽음), Reset 은 **지금** preset 으로. 런타임 게이트 197 단정·변이 7 종·run-all 배선. **재지 못한 축 하나** — 최소 중앙 보존은 이 기계의 배율 2.25 에서 하한(1080x675)이 창보다 커서 제품이 늘 탈출 가지로 간다. 게이트가 그 사실을 건너뜀으로 찍는다. **W6-2(2026-09-15)** 로 Save As/Rename/Delete/목록까지 닫았다 — 이름 붙인 배치는 `<이름>.workspace` 이고 **파일 이름이 곧 이름**이다. 덮어쓰기·열기·지우기가 전부 `before-*` 백업을 남기고, 쓸 수 없는 이름은 만들 때 거절한다. 게이트 91 단정·변이 9 종 |
 | W7 | progress | **W7-0~W7-3 착지(2026-09-14·15)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0), Browser 스냅샷(§W7-1)으로 매 프레임 디렉터리 스캔 24 → 0, 그리고 평탄 목록+clipping(§W7-2·W7-3)으로 `hierarchy.units` 50,000 → **14** · p95 30.4 → **0.041 ms**. 실측이 두 번 판을 고쳤다: ① 브라우저가 clipping 보다 먼저였고(엔티티 1,000 에서 Hierarchy 의 5.8 배), ② W7-2 는 홀로는 이득 0 이라 W7-3 과 한 조각으로 묶어야 했다. W7-4 로 그 계약을 게이트에 걸었다(72 단정 · 변이 12 종 · run-all 배선). 남은 것은 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리뿐이다 |
-| W8 | todo | DX12 통합 빌드·DPI/재시작/손상 ini/Play/preset/성능 회귀, 현재 승인 외관의 자동 golden·CI, legacy 잔재 전수 확인 |
+| W8 | progress | **W8-1 착지(2026-09-15)** — 어댑터 판 canary와 legacy 잔재 재유입 차단. 계획서가 지목한 legacy 둘(`ContentsBrowserStyle`·ToolPanel `NoMove`)은 **이미 죽어 있었고** 남은 일은 게이트였다. 진짜 구멍은 `IMGUI_CHECKVERSION()` 이 Release 에서 힘이 0 이던 것(`IM_ASSERT`=`assert()`, NDEBUG 로 소멸, 반환값도 버림) — 이 기계엔 imgui 설치본이 둘이라 실재하는 위험이다. 반환값을 받아 던지고 `ImGui::GetVersion()`(도는 코드가 말하는 판)을 `editor.dock` 이 헤더 매크로와 함께 내보낸다. 게이트 `verify-imgui-adapter-canary.ps1` 29 단정·변이 7 종·run-all 배선. 남은 것은 **통합 행렬**과 **chrome crop visual golden**(스크롤한 Hierarchy 상태 필수) |
 
 현재 소스에서 확인한 잔여 경계:
 
@@ -2316,6 +2316,53 @@ mutation/revision 또는 명시적 scene event로 cache를 무효화한다"* 고
 
 **판정:** 현재 범위인 DX12에서 검증 레이어 오류/비정상 종료 0, layout·Play·시각·성능 gate 통과 후에만
 PHASE 21(DX12 범위)을 완료로 표시한다. Vulkan 대응은 별도 보류 이력으로 남기며 통과로 표시하지 않는다.
+
+#### W8-1 착지 — 어댑터 판 canary와 legacy 잔재 (2026-09-15)
+
+W8 의 네 줄 중 둘을 닫는다. 나머지 둘(통합 행렬, chrome crop visual golden)은 W2 계열이
+아직 `progress` 라 그 뒤에 선다.
+
+**계획서가 지목한 legacy 둘은 이미 죽어 있었다.** `ContentsBrowserStyle` 은 소스 전체에서
+0 건이고, `NoMove` 는 중앙 뷰포트 선언 하나뿐이며 그것은 의도된 것이다(끌어 옮기면 중앙
+노드가 빈다 — 창 자가 검증이 이미 그 성질을 단정한다). 남은 일은 **다시 들어오지 못하게
+막는 것**이었고, 그래서 이 조각의 legacy 축은 삭제가 아니라 게이트다
+(`plan-target-may-be-already-dead` 가 말하는 그 자리다).
+
+**진짜 구멍은 다른 데 있었다.** `IMGUI_CHECKVERSION()` 은 **출하 구성에서 힘이 0**이다.
+그 안은 `IM_ASSERT` 로만 말하는데 그것이 `assert()` 이고 Release 는 `NDEBUG` 라 통째로
+사라진다. 게다가 매크로는 `bool` 을 돌려주는데 호출부가 값을 버리고 있었다. 즉 헤더와
+라이브러리가 갈려도 아무 일도 일어나지 않는다.
+
+이것이 추상적인 위험이 아닌 이유: 이 기계에는 **imgui 설치본이 둘이고 판이 다르다**
+(전역 classic 1.91.7 · 매니페스트 1.92.8). 헤더를 한쪽에서 라이브러리를 다른 쪽에서
+가져오면 `ImGuiIO` 배치가 갈린 채 컴파일이 통과하고 기동에서야 엉뚱하게 죽는다.
+
+고친 것 둘:
+- 반환값을 받아서 **던진다.** 배치가 갈린 채로 에디터가 뜨는 일이 없다.
+- `ImGui::GetVersion()` — **도는 코드가 말하는 판** — 을 스냅샷에 싣고 `editor.dock` 이
+  헤더 매크로와 함께 내보낸다. 전처리기가 박은 값은 헤더만 증언하므로, 링크된 것이
+  무엇인지는 실행해서 물어야 안다.
+
+**게이트.** `verify-imgui-adapter-canary.ps1` — 29 단정, run-all 배선.
+- 소스에 흩어진 판 상수를 **전부** 뽑아 맞댄다(`static_assert(IMGUI_VERSION_NUM == N)` 과
+  `expected_imgui_version_num`). 한쪽을 게이트 파일에 적어 두면 제품이 판을 올릴 때
+  게이트가 조용히 낡는다 — W6-2 에서 `CreatorWorkspace 1` 이 실제로 그랬다.
+- 유도한 집합의 **이름을 전부 찍는다.** 대조가 맞았다고 대상이 온전한 것은 아니다.
+- `static_assert` 가 **컴파일되는 `.cpp`** 에 있고 그 파일이 `Editor.vcxproj` 에 실려
+  있는지 본다. 헤더에만 있고 아무도 포함하지 않으면 빌드를 못 멈춘다.
+- 판 문자열 `1.92.8` 에서 번호 `19280` 을 **따로 유도해** 검산한다.
+- legacy: `ContentsBrowserStyle` 0 건, `no_move` 를 실은 선언은 전부 `central`,
+  `default_traits` 도 중앙 아닌 역할에 그 성질을 흘리지 않는다.
+
+**재지 못한 축 하나.** 감사가 빈 값을 "같다" 로 읽게 만드는 변이는 초록이다. 게이트가
+감사 플래그만 보는 것이 아니라 헤더·런타임 문자열을 **직접** 맞대기 때문이고, 진짜 판
+불일치를 만들려면 설치본을 섞어 빌드해야 하는데 하네스가 할 수 없다. 이 초록은 게이트의
+구멍이 아니라 게이트가 감사보다 앞에 서 있다는 뜻이다.
+
+**남은 W8.** DX12·DPI·restart·damaged ini·Play 왕복·Game Preview·preset 행렬의 통합
+자동화와, 3D 렌더 영역을 제외한 chrome crop visual golden이다. 후자는 **스크롤한
+Hierarchy 상태를 반드시 포함해야 한다** — W7 의 clipper 보폭 불일치는 스크롤해야만
+드러나고 스크롤 0 픽셀 대조는 그것을 통째로 못 본다.
 
 ---
 

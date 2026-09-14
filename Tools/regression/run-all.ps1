@@ -263,6 +263,18 @@ Run-Step "이름 붙인 workspace(런타임)" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-workspace-named.ps1") -Exe $Exe -Work (Join-Path $Work 'workspace-named')
 }
 
+# PHASE 21 W8 — ImGui 내부 API 어댑터의 판 canary와 legacy 잔재 재유입.
+#
+# 도크 노드와 창의 도크 소속은 `imgui.h` 공개 면에 없어 `imgui_internal.h` 를
+# 직접 읽는다. 그 구조체는 판마다 바뀌고, 바뀐 판에서도 **컴파일은 통과하고 읽는
+# 값만 어긋나는** 것이 이 어댑터의 고유 위험이다. 소스에 흩어진 판 상수를 전부
+# 맞대고, 헤더가 말한 판과 **라이브러리가 말한 판**이 같은지 런타임에서 본다 —
+# 이 기계에는 imgui 설치본이 둘이고 판이 다르다. IMGUI_CHECKVERSION() 만으로는
+# 못 막는다: 그 안은 IM_ASSERT 로만 말하는데 Release 는 NDEBUG 라 사라진다.
+Run-Step "ImGui 어댑터 판 canary" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-imgui-adapter-canary.ps1") -Exe $Exe -Work (Join-Path $Work 'imgui-canary')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

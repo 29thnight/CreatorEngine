@@ -126,6 +126,8 @@ namespace editor
         snapshot.frame            = static_cast<std::uint64_t>(ImGui::GetFrameCount());
         snapshot.imgui_version    = IMGUI_VERSION;
         snapshot.imgui_version_num = IMGUI_VERSION_NUM;
+        // 전처리기가 아니라 **도는 코드**에게 묻는다.
+        snapshot.imgui_runtime_version = ImGui::GetVersion();
 
         // ── 도크 노드 ─────────────────────────────────────────────────────
         const ImVector<ImGuiStoragePair>& nodeMap = context->DockContext.Nodes.Data;
