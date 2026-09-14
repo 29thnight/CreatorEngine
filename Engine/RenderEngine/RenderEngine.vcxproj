@@ -369,6 +369,11 @@
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
       <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <ClCompile Include="Experiment\Import\GltfSourceDependencies.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(SolutionDir)ThirdParty\fastgltf\deps\simdjson\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="Experiment\Model.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Experiment_%(Filename).obj</ObjectFileName>
@@ -538,6 +543,7 @@
     <ClInclude Include="Experiment\Import\FbxImporter.h" />
     <ClInclude Include="Experiment\Import\ImporterModelDecoder.h" />
     <ClInclude Include="Experiment\Import\GltfImporter.h" />
+    <ClInclude Include="Experiment\Import\GltfSourceDependencies.h" />
     <ClInclude Include="Experiment\AssetIdentity.h" />
     <ClInclude Include="Assets\AssetIdentityProfile.h" />
     <ClInclude Include="Assets\AssetIdentityRegistry.h" />

@@ -849,6 +849,13 @@ Run-Step "scene model consumption + Gunner cold-load(MBC7)" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-model-scene-consumption.ps1") -Work $Work
 }
+# 다중 파일 `.gltf` 임포트. `model.load` 가 `.bin`·이미지를 두고 `.gltf` 하나만
+# 복사해 상대 URI 를 깨뜨리던 구멍(2026-09-14)을 못 박는다. 탈출·원격·누락
+# 참조 거부와 실패 시 잔해 0 도 같은 게이트가 잰다.
+Run-Step "다중 파일 glTF 임포트" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-multifile-import.ps1") -Work $Work
+}
 # I6-B4b 후속: 콘텐츠 브라우저 드롭 경로(LoadCachedModelShared)의 재생
 # 바인딩. 라이브 게이트는 model.load 쪽만 태워서 이 경로가 구멍이었고,
 # legacy 재귀 틱을 걷자 "드롭한 애니메이션 모델이 안 그려진다"로 나왔다.

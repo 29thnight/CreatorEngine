@@ -2,6 +2,7 @@
 
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Assets/ModelAssetAuthoringTransaction.h"
+#include "Experiment/Import/GltfSourceDependencies.h"
 #include "DataSystem.h"
 #include "FileDialog.h"
 #include "Material.h"
@@ -340,6 +341,154 @@ namespace
 
 		const file::path path(name);
 		return path == path.filename() && !path.has_root_path();
+	}
+
+	// ── 다중 파일 임포트 원본 ──
+	//
+	// `.gltf` 는 `.bin` 과 이미지를 **상대 URI** 로 끌고 온다. 그 상대 경로는
+	// 복사한 뒤의 위치에서 다시 풀리므로, 파일 하나만 옮기면 하위 폴더가
+	// 평탄화되어 링크가 전부 끊긴다. 임포터(GltfImporter)는 제자리에서 열기
+	// 때문에 멀쩡하다 — 깨지는 것은 복사 단계뿐이다.
+	struct ImportPlan final
+	{
+		file::path destinationDirectory{};
+		file::path destination{};
+		// 상대 경로다. 원본 폴더와 destinationDirectory 양쪽에 **같은 모양으로**
+		// 붙는다 — 그 동일함이 곧 상대 URI 가 새 자리에서 풀리는 이유다.
+		std::vector<file::path> sidecars{};
+		// 사이드카가 있어 전용 폴더를 쓰는 임포트인가.
+		bool isBundle{ false };
+	};
+
+	// 상대 경로의 모든 구성요소가 자산 트리에 그대로 쓸 수 있는 이름인지 본다.
+	// glTF 훑기는 "원본 폴더를 벗어나지 않는다"까지만 답한다 — NTFS 대체 데이터
+	// 스트림(`Foo:hidden`)·예약 장치 이름은 쓰는 쪽인 여기서 막는다.
+	bool IsSafeRelativeAssetPath(const file::path& relative)
+	{
+		if (relative.empty() || relative.is_absolute()) return false;
+		if (relative.has_root_name() || relative.has_root_directory()) return false;
+		for (const file::path& part : relative)
+		{
+			if (!IsSafeAssetName(part.wstring())) return false;
+		}
+		return true;
+	}
+
+	// 복사를 시작하기 전에 "어디에 무엇을 놓을지"를 전부 정한다. 풀리지 않거나
+	// 안전하지 않은 참조는 여기서 거부한다 — 임포트 원본은 신뢰 경계 밖이다.
+	bool PlanImport(const file::path& source, const file::path& importRoot,
+		ImportPlan& plan)
+	{
+		const experiment::importer::GltfSourceDependencies dependencies =
+			experiment::importer::ScanGltfSourceDependencies(source);
+		if (!dependencies.Succeeded())
+		{
+			Debug->LogError(std::string("Editor asset import rejected a glTF reference (")
+				+ experiment::importer::ToString(dependencies.rejection) + "): "
+				+ source.string() + " — " + dependencies.rejectionDetail);
+			return false;
+		}
+
+		plan = ImportPlan{};
+		plan.destinationDirectory = importRoot;
+		plan.isBundle = !dependencies.relativePaths.empty();
+		if (plan.isBundle)
+		{
+			// 사이드카를 자산 루트에 흩뿌리면 다른 모델의 같은 이름과 충돌한다
+			// (`texture.png` 는 흔하다). 다중 파일 자산은 묶음이므로 자기 폴더를
+			// 갖는다. 단일 파일 `.glb`·embedded `.gltf` 는 지금 자리 그대로다.
+			const std::wstring bundleName = source.stem().wstring();
+			if (!IsSafeAssetName(bundleName))
+			{
+				Debug->LogError("Editor asset import bundle name is unsafe: "
+					+ source.string());
+				return false;
+			}
+			plan.destinationDirectory /= bundleName;
+			for (const file::path& relative : dependencies.relativePaths)
+			{
+				if (!IsSafeRelativeAssetPath(relative))
+				{
+					Debug->LogError("Editor asset import rejected an unsafe sidecar path: "
+						+ source.string() + " — " + relative.generic_string());
+					return false;
+				}
+				plan.sidecars.push_back(relative);
+			}
+		}
+		plan.destination = plan.destinationDirectory / source.filename();
+		return true;
+	}
+
+	// 이미 같은 파일이면 복사하지 않는다. 원본이 이미 자산 트리 안에 있는
+	// 제자리 임포트가 정확히 그 경우이고, copy_file 은 자기 자신 위에 복사하면
+	// 실패한다. 새로 생긴 파일만 created 에 담는다(되돌리기 대상).
+	bool CopyImportedFile(const file::path& source, const file::path& destination,
+		std::vector<file::path>& created)
+	{
+		std::error_code error;
+		const bool existed = file::exists(destination, error) && !error;
+		if (existed)
+		{
+			std::error_code equivalentError;
+			if (file::equivalent(source, destination, equivalentError)
+				&& !equivalentError)
+			{
+				return true;
+			}
+		}
+
+		error.clear();
+		file::create_directories(destination.parent_path(), error);
+		if (error)
+		{
+			Debug->LogError("Editor asset import directory creation failed: "
+				+ destination.parent_path().string() + " (" + error.message() + ")");
+			return false;
+		}
+
+		error.clear();
+		file::copy_file(source, destination,
+			file::copy_options::overwrite_existing, error);
+		if (error)
+		{
+			Debug->LogError("Editor asset import copy failed: " + source.string()
+				+ " -> " + destination.string() + " (" + error.message() + ")");
+			return false;
+		}
+		if (!existed) created.push_back(destination);
+		return true;
+	}
+
+	// 임포트가 실패했을 때 이번 호출이 새로 만든 것만 거둔다. 원래 있던 파일은
+	// 건드리지 않는다 — 덮어쓴 자산을 지우면 실패가 자료 손실이 된다.
+	file::path RollbackImport(const std::vector<file::path>& created,
+		const ImportPlan& plan)
+	{
+		for (const file::path& path : created)
+		{
+			std::error_code error;
+			file::remove(path, error);
+		}
+		if (!plan.isBundle) return {};
+
+		// 사이드카가 하위 폴더에 있었다면 그 폴더도 이번 임포트가 만든 것이다.
+		// remove 는 빈 폴더에서만 성공하므로 남의 파일이 들어 있으면 그대로 둔다.
+		// 제자리 임포트(원본이 이미 자산 트리 안)는 복사한 것이 없어 created 가
+		// 비고, 아래 remove 도 전부 실패한다 — 원본은 건드려지지 않는다.
+		for (const file::path& relative : plan.sidecars)
+		{
+			file::path parent = relative.parent_path();
+			while (!parent.empty())
+			{
+				std::error_code error;
+				if (!file::remove(plan.destinationDirectory / parent, error)) break;
+				parent = parent.parent_path();
+			}
+		}
+		std::error_code error;
+		file::remove(plan.destinationDirectory, error);
+		return {};
 	}
 
 	bool IsPathInside(const file::path& path, const file::path& root)
@@ -936,42 +1085,67 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		const char* directory = ImportDirectory(kind);
 		if (nullptr == directory) return {};
 
-		const file::path destinationDirectory = m_root / directory;
-		file::create_directories(destinationDirectory, error);
+		ImportPlan plan;
+		if (!PlanImport(source, m_root / directory, plan)) return {};
+
+		error.clear();
+		file::create_directories(plan.destinationDirectory, error);
 		if (error)
 		{
 			Debug->LogError("Editor asset import directory creation failed: " +
-				destinationDirectory.string() + " (" + error.message() + ")");
+				plan.destinationDirectory.string() + " (" + error.message() + ")");
 			return {};
 		}
 
-		const file::path destination = destinationDirectory / source.filename();
-		error.clear();
-		const bool sameFile = file::exists(destination, error) && !error &&
-			file::equivalent(source, destination, error) && !error;
-		if (!sameFile)
+		// 실패하면 이번 임포트가 새로 만든 것만 지운다. 반쯤 실린 자산을 트리에
+		// 남기면 다음 임포트·watcher 가 그것을 정상 자산으로 본다.
+		std::vector<file::path> created;
+		const file::path sourceDirectory = source.parent_path();
+		if (!CopyImportedFile(source, plan.destination, created))
+			return RollbackImport(created, plan);
+		for (const file::path& relative : plan.sidecars)
 		{
-			error.clear();
-			file::copy_file(source, destination,
-				file::copy_options::overwrite_existing, error);
-			if (error)
+			if (!CopyImportedFile(sourceDirectory / relative,
+				plan.destinationDirectory / relative, created))
+				return RollbackImport(created, plan);
+		}
+
+		// 복사해 온 사이드카 중 자산으로 등록되는 것(텍스처 등)은 **여기서**
+		// .meta 를 만든다. 모델 저작은 외부 texture 의 신원을 그 .meta 에서 읽으므로
+		// (Mbc3ReadExternalAssetId), watcher 가 비동기로 만들어 주기를 기다리면
+		// 방금 임포트한 모델이 자기 텍스처를 못 찾고 저작 단계에서 실패한다.
+		// `.bin` 처럼 등록 확장자가 아닌 것은 watcher 도 만들지 않으므로 건너뛴다.
+		for (const file::path& relative : plan.sidecars)
+		{
+			const file::path sidecar = plan.destinationDirectory / relative;
+			if (!IsTargetFile(sidecar)) continue;
+			const file::path sidecarMeta = sidecar.string() + ".meta";
+			std::error_code metaError;
+			const bool hadMeta = file::exists(sidecarMeta, metaError) && !metaError;
+			const FileGuid sidecarGuid = CreateMetaLocked(sidecar);
+			if (!hadMeta) created.push_back(sidecarMeta);
+			if (sidecarGuid == FileGuid{})
 			{
-				Debug->LogError("Editor asset import copy failed: " + source.string() +
-					" -> " + destination.string() + " (" + error.message() + ")");
-				return {};
+				Debug->LogError("Editor asset import sidecar meta creation failed: "
+					+ sidecar.string());
+				return RollbackImport(created, plan);
 			}
 		}
 
-		const FileGuid guid = CreateMetaLocked(destination);
+		const file::path destinationMeta = plan.destination.string() + ".meta";
+		error.clear();
+		const bool hadDestinationMeta = file::exists(destinationMeta, error) && !error;
+		const FileGuid guid = CreateMetaLocked(plan.destination);
 		if (guid == FileGuid{})
 		{
 			Debug->LogError("Editor asset import meta creation failed: " +
-				destination.string());
-			return {};
+				plan.destination.string());
+			if (!hadDestinationMeta) created.push_back(destinationMeta);
+			return RollbackImport(created, plan);
 		}
 		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
-			ToRuntimeAssetType(kind), guid, destination });
-		return destination;
+			ToRuntimeAssetType(kind), guid, plan.destination });
+		return plan.destination;
 	}
 
 	void handleFileAction(efsw::WatchID, const std::string& directory,
