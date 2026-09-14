@@ -9,7 +9,10 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <mutex>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace editor
@@ -18,6 +21,57 @@ namespace editor
     {
         static window_table table;
         return table;
+    }
+
+    namespace
+    {
+        std::mutex& request_mutex()
+        {
+            static std::mutex mutex;
+            return mutex;
+        }
+
+        std::vector<std::pair<std::string, window_request>>& pending_requests()
+        {
+            static std::vector<std::pair<std::string, window_request>> requests;
+            return requests;
+        }
+    }
+
+    bool queue_window_request(std::string_view stable_id, window_request request)
+    {
+        // 선언 여부는 여기서 본다. 없는 이름을 큐에 넣으면 UI 스레드가
+        // 조용히 버리고, 오타가 "아무 일도 일어나지 않음" 으로 보인다 —
+        // §1.3 의 유령 창과 정확히 반대쪽 실패다.
+        if (!window_declared(process_windows(), stable_id)) return false;
+        std::lock_guard lock(request_mutex());
+        pending_requests().emplace_back(std::string(stable_id), request);
+        return true;
+    }
+
+    std::string apply_pending_window_requests(window_table& table)
+    {
+        std::vector<std::pair<std::string, window_request>> requests;
+        {
+            std::lock_guard lock(request_mutex());
+            requests.swap(pending_requests());
+        }
+        std::string focusId;
+        for (const auto& [id, request] : requests)
+        {
+            switch (request)
+            {
+            case window_request::open:  open_window(table, id); break;
+            case window_request::close: close_window(table, id); break;
+            case window_request::focus:
+                // 포커스는 열려 있어야 뜻이 있다. 닫힌 창에 포커스를 주면
+                // 아무 일도 일어나지 않으므로 함께 연다.
+                open_window(table, id);
+                focusId = id;
+                break;
+            }
+        }
+        return focusId;
     }
 
     window_entry* find_window(window_table& table, std::string_view stable_id)

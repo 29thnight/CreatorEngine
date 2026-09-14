@@ -411,6 +411,9 @@
     <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorPanelCost.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
@@ -576,6 +579,9 @@
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorPanelCost.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">

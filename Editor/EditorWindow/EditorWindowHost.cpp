@@ -111,6 +111,9 @@ namespace editor
 
     void draw_windows(window_table& table)
     {
+        // W7-0: CLI 가 건 표시 요청을 **여기서** 적용한다. 이 스레드가 표를
+        // 읽는 유일한 곳이라, 적용도 여기서 해야 읽기와 쓰기가 갈리지 않는다.
+        const std::string focusId = apply_pending_window_requests(table);
         for (window_entry& entry : table.entries)
         {
             // 존재 조건이 거짓이면 프레임 자체를 열지 않는다. 애니메이터 창 셋이
@@ -194,6 +197,9 @@ namespace editor
             const bool closable = (nullptr != entry.closable_when)
                                       ? entry.closable_when()
                                       : entry.closable;
+            // 도크 노드에 탭으로 겹친 창은 선택돼야 본문이 돈다. 요청이
+            // 있으면 이 프레임에 그 탭을 앞으로 세운다.
+            if (!focusId.empty() && entry.stable_id == focusId) ImGui::SetNextWindowFocus();
             bool* open_flag = closable ? &entry.open : nullptr;
 
             // `Begin`이 거짓이어도 `End`는 반드시 부른다. 조건부 `End`가

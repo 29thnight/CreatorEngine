@@ -25,6 +25,8 @@
 #include "EditorWindowSurface.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -115,6 +117,27 @@ namespace editor
     { return is_window_open(process_windows(), stable_id); }
     inline bool window_declared(std::string_view stable_id)
     { return window_declared(process_windows(), stable_id); }
+
+    // ── 스레드를 건너는 표시 요청 (PHASE 21 W7-0) ─────────────────────────
+    //
+    // 위의 `open_window`/`close_window` 는 **UI 스레드 전용**이다. 표를 그리는
+    // 것도 그 스레드이므로 메뉴에서 부르는 한 경합이 없다. CLI 는 게임
+    // 스레드에서 도니(`App.cpp` 의 Pump) 같은 함수를 부르면 `entry.open` 을
+    // 읽는 쪽과 쓰는 쪽이 갈린다 — `editor.viewport` 의 모드가 `demandMutex`
+    // 아래로 들어간 것과 같은 이유다.
+    //
+    // 그래서 요청만 적고 UI 스레드가 프레임 머리에서 소비한다. focus 는
+    // 표시 상태가 아니라 ImGui 호출이라 애초에 이 길밖에 없다 — 도크 노드에
+    // 탭으로 겹친 창은 열려 있어도 **선택되지 않으면 본문이 돌지 않는다**
+    // (Content Browser 가 AssetBundle 과 같은 자리라 실제로 그랬다).
+    enum class window_request : std::uint8_t { open = 0, close = 1, focus = 2 };
+
+    /// 게임 스레드(CLI)에서 부른다. 없는 이름이면 false 를 돌려준다.
+    bool queue_window_request(std::string_view stable_id, window_request request);
+
+    /// UI 스레드가 프레임 머리에서 부른다. 쌓인 요청을 표에 적용하고,
+    /// 이번 프레임에 포커스를 줄 창의 안정 식별자를 돌려준다(없으면 빈 문자열).
+    std::string apply_pending_window_requests(window_table& table);
 
     // ── 선언 → 표 ─────────────────────────────────────────────────────────
 

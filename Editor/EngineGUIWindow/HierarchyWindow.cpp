@@ -4,6 +4,7 @@
 #include "EditorAssetPresentation.h"
 #include "EditorImGuiTexture.h"
 #include "HierarchyWindow.h"
+#include "EditorPanelCost.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
 #include "EditorMenuDraw.h"
@@ -152,6 +153,9 @@ namespace
 
 void editor::windows::draw_hierarchy()
 {
+	// W7-0: 이 패널이 프레임에서 쓰는 시간과 그린 행 수를 센다. 캐시의 이득은
+	// 시간만이 아니라 **안 하게 된 일의 수**로도 보여야 한다.
+	const panel_cost_scope cost{ panel_cost_slot::hierarchy };
 	hierarchy_state().Draw();
 }
 
@@ -676,6 +680,10 @@ void HierarchyWindow::Draw()
 				ImGui::PopStyleVar();
 			}
 
+			// W7-0: m_rowIndex 는 DrawSceneObject 가 그린 행의 수다(띠 색을 매기는
+			// 그 수). clipping 이 서면 이 값이 "보이는 행" 으로 줄어야 한다.
+			editor::windows::add_panel_units(editor::windows::panel_cost_slot::hierarchy,
+				static_cast<std::uint64_t>(m_rowIndex < 0 ? 0 : m_rowIndex));
 			isSceneObjectSelected = nullptr != selectedSceneObject ? true : false;
 			ImGui::EndChild();
 }

@@ -276,6 +276,9 @@ void EditorRenderer::EndRender()
     // 것이라, 명령이 `ImGui::` 를 직접 부르면 `NewFrame`~`Render` 한복판의
     // 전역 문맥을 읽는 경합이 된다.
     ::editor::windows::publish_viewport_demand();
+    // W7-0: 패널 비용도 같은 자리에서 게시한다 — 이번 프레임의 모든 본문이
+    // 끝났고, 읽는 쪽(CLI)은 게임 스레드다.
+    ::editor::windows::publish_panel_costs();
     m_workspace->EndFrame();
     const bool captured = ::editor::capture_chrome_snapshot();
 

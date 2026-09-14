@@ -23,9 +23,11 @@
 #include "CommandRegistrar.h"
 #include "EditorWorkspaceStore.h"
 #include "ViewportHostWindow.h"
+#include "EditorPanelCost.h"
 #include "EditorPlayModeController.h"
 #include "EditorWindowHost.h"       // PHASE 21 M4: editor.windows 덤프
 #include "EditorWindowAudit.h"
+#include "EditorWindowRegistry.h"   // W7-0: editor.window 요청 창구
 #include "EditorWindowSelfTest.h"
 #include "EditorMenuSelfTest.h"
 #include "EditorMenuAudit.h"
@@ -737,6 +739,45 @@ namespace ConsoleCmd
     // 계획서 부록 B.3이 요구한 `editor.windows` 덤프다. 출력 형식은 이 가족의
     // 관례대로 TSV이고, 뒤에 감사 요약이 붙는다. 배선이 더러우면 실패로 낸다 —
     // 관측만 하고 판정하지 않으면 도는 세트에 넣어도 초록만 쌓인다.
+    // PHASE 21 W7-0 — 창 하나를 열고 닫고 **앞으로 세운다**.
+    //
+    // `editor.windows` 는 표를 읽기만 한다. 여닫는 자리는 메뉴뿐이었고, 그래서
+    // 도크 노드에 탭으로 겹친 창은 CLI 로 도달할 수 없었다 — 열려 있어도
+    // 선택되지 않으면 본문이 돌지 않는다. Content Browser 가 AssetBundle 과 같은
+    // `dock_slot::bottom` 이라 실제로 그랬고, W7 의 브라우저 비용이 181 프레임 중
+    // **1 프레임**만 잡혔다.
+    //
+    // 요청만 걸고 UI 스레드가 프레임 머리에서 소비한다(`draw_windows`). 표를
+    // 읽는 스레드가 그쪽 하나라, 적용도 그쪽이어야 읽기와 쓰기가 갈리지 않는다.
+    static CommandCore::CommandResult Cmd_editor_window(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        if (3 != args.size()) return InvalidArguments("editor.window <stable-id> <open|close|focus>");
+
+        ::editor::window_request request{};
+        if ("open" == args[2])       request = ::editor::window_request::open;
+        else if ("close" == args[2]) request = ::editor::window_request::close;
+        else if ("focus" == args[2]) request = ::editor::window_request::focus;
+        else return InvalidArguments("editor.window <stable-id> <open|close|focus>");
+
+        auto data = CommandData::Object();
+        data.Set("stableId", CommandData::String(args[1]));
+        data.Set("request", CommandData::String(args[2]));
+        if (!::editor::queue_window_request(args[1], request))
+        {
+            // 오타가 "아무 일도 일어나지 않음" 으로 보이지 않게 붉힌다.
+            data.Set("declared", CommandData::Bool(false));
+            return Fail("editor.window.undeclared",
+                "선언되지 않은 창이다: " + args[1] + " (editor.windows 로 표를 보라)",
+                std::move(data));
+        }
+        data.Set("declared", CommandData::Bool(true));
+        // 적용은 **다음 UI 프레임**이다. 지금 상태를 돌려주면 거짓말이 된다.
+        data.Set("queued", CommandData::Bool(true));
+        return Ok("요청을 걸었다(다음 UI 프레임에 적용): " + args[1] + " " + args[2], std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_editor_windows(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -967,6 +1008,56 @@ namespace ConsoleCmd
 
     /// 표시 크기보다 낮게 그리는 손잡이. Unreal 의 `Disable DPI Based Editor
     /// Viewport Scaling` 에 해당하는 자리이고 기본값은 그쪽과 같은 auto(1/DPI)다.
+    // PHASE 21 W7-0 — 패널별 draw 비용.
+    //
+    // 재는 법이 없으면 캐시가 이득인지 증명할 수 없다. `profile.stats` 는
+    // 프로파일러 **자체** 비용과 용량만 낸다. 여기서 내는 것은 패널이 프레임에서
+    // 쓴 시간과 **그 프레임에 한 일의 수**다 — 캐시의 목적은 "프레임마다 하던
+    // 일을 안 하는 것" 이므로 시간만으로는 기계가 빠른 날 결함이 안 보인다.
+    //
+    // 게시는 UI 프레임 끝(`EditorRenderer::EndRender`)이고 여기는 게임 스레드다.
+    // 사본을 읽는다.
+    static CommandCore::CommandResult Cmd_editor_panelcost(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        if (args.size() > 2 || (2 == args.size() && "reset" != args[1]))
+            return InvalidArguments("editor.panelcost [reset]");
+        if (2 == args.size()) ::editor::windows::reset_panel_costs();
+
+        const auto snapshot = ::editor::windows::read_panel_costs();
+        auto data = CommandData::Object();
+        data.Set("publishedFrames", CommandData::Int(static_cast<long long>(snapshot.publishedFrames)));
+        auto panels = CommandData::Array();
+        for (std::size_t i = 0; i < ::editor::windows::kPanelCostSlotCount; ++i)
+        {
+            const auto slot = static_cast<::editor::windows::panel_cost_slot>(i);
+            const auto& sample = snapshot.slots[i];
+            auto entry = CommandData::Object();
+            entry.Set("slot", CommandData::String(::editor::windows::panel_cost_slot_name(slot)));
+            entry.Set("frames", CommandData::Int(static_cast<long long>(sample.frames)));
+            entry.Set("samples", CommandData::Int(static_cast<long long>(sample.samples)));
+            entry.Set("lastMs", CommandData::Double(sample.lastMs));
+            entry.Set("avgMs", CommandData::Double(sample.avgMs));
+            entry.Set("p95Ms", CommandData::Double(sample.p95Ms));
+            entry.Set("maxMs", CommandData::Double(sample.maxMs));
+            entry.Set("lastUnits", CommandData::Int(static_cast<long long>(sample.lastUnits)));
+            entry.Set("lastScans", CommandData::Int(static_cast<long long>(sample.lastScans)));
+            entry.Set("totalUnits", CommandData::Int(static_cast<long long>(sample.totalUnits)));
+            entry.Set("totalScans", CommandData::Int(static_cast<long long>(sample.totalScans)));
+            panels.Append(std::move(entry));
+            Debug->Log("[editor.panelcost] " + std::string(::editor::windows::panel_cost_slot_name(slot)) +
+                " frames=" + std::to_string(sample.frames) +
+                " lastMs=" + std::to_string(sample.lastMs) +
+                " avgMs=" + std::to_string(sample.avgMs) +
+                " p95Ms=" + std::to_string(sample.p95Ms) +
+                " units=" + std::to_string(sample.lastUnits) +
+                " scans=" + std::to_string(sample.lastScans));
+        }
+        data.Set("panels", std::move(panels));
+        return Ok({}, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_editor_renderscale(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1201,6 +1292,7 @@ namespace ConsoleCmd
         reg.Result({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
         reg.Result({ "log.flush" }, &Cmd_log_flush);
         reg.Result({ "editor.menu" }, &Cmd_editor_menu);
+        reg.Result({ "editor.window" }, &Cmd_editor_window);
         reg.Result({ "editor.windows" }, &Cmd_editor_windows);
         reg.Result({ "editor.dock" }, &Cmd_editor_dock);
         reg.Result({ "editor.layout" }, &Cmd_editor_layout);
@@ -1208,6 +1300,7 @@ namespace ConsoleCmd
         reg.Result({ "editor.theme" }, &Cmd_editor_theme);
         reg.Result({ "editor.sceneview" }, &Cmd_editor_sceneview);
         reg.Result({ "editor.viewport" }, &Cmd_editor_viewport);
+        reg.Result({ "editor.panelcost" }, &Cmd_editor_panelcost);
         reg.Result({ "editor.renderscale" }, &Cmd_editor_renderscale);
         reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);
     }

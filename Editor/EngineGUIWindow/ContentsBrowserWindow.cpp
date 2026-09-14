@@ -1,4 +1,5 @@
 #include "ContentsBrowserWindow.h"
+#include "EditorPanelCost.h"
 #include "EditorTheme.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
@@ -286,6 +287,10 @@ void ContentsBrowserWindow::DrawFolderDialog()
 
 void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
 {
+    // W7-0: 이 함수는 재귀한다. 시간 구간은 바깥(DrawDirectoryPanel)이 잡고
+    // 여기서는 **일의 수**만 센다 — 노드 하나와 디렉터리 스캔 한 번.
+    editor::windows::add_panel_units(editor::windows::panel_cost_slot::browser_tree, 1);
+    editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_tree, 1);
     const std::string id = browser_utf8(directory);
     const std::string name = directory == m_rootDirectory ? "Assets" : browser_utf8(directory.filename());
     std::error_code ec;
@@ -327,6 +332,7 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
 
 void ContentsBrowserWindow::DrawDirectoryPanel()
 {
+    const editor::windows::panel_cost_scope cost{ editor::windows::panel_cost_slot::browser_tree };
     ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, editor::ThemePixels(14.f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0.f, editor::ThemePixels(3.f) });
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { editor::ThemePixels(3.f), editor::ThemePixels(1.f) });
@@ -348,6 +354,8 @@ void ContentsBrowserWindow::DrawDirectoryPanel()
 
 void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
 {
+    const editor::windows::panel_cost_scope cost{ editor::windows::panel_cost_slot::browser_files };
+    editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_files, 1);
     std::error_code ec;
     std::vector<file::directory_entry> entries;
     size_t supported = 0;
@@ -370,6 +378,8 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
         return m_sortDescending ? a.path().filename() > b.path().filename() : a.path().filename() < b.path().filename();
     });
     if (entries.empty()) ImGui::TextDisabled(supported == 0 ? "No supported assets or folders." : "No matching assets or folders.");
+    editor::windows::add_panel_units(editor::windows::panel_cost_slot::browser_files,
+        static_cast<std::uint64_t>(entries.size()));
     const float cell = editor::ThemePixels(m_tileSize + 12.f);
     const int columns = m_listView ? 1 : std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / cell));
     if (ImGui::BeginTable("AssetGrid", columns, ImGuiTableFlags_SizingStretchSame))

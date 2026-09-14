@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	119
-# names	128
+# commands	122
+# names	131
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -25,11 +25,13 @@ dx12.live	-	immediate	editor	engine_service	live	no	yes	on|status	EnhancedRender
 editor.dock	-	immediate	editor	engine_service	live	no	yes	-	살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다
 editor.layout	-	immediate	editor	engine_service	live	no	yes	-	활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다
 editor.menu	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다
+editor.panelcost	-	immediate	editor	engine_service	live	no	yes	[reset]	패널별 draw 비용과 그 프레임에 한 일의 수(행·디렉터리 스캔)
 editor.renderscale	-	immediate	editor	engine_service	live	no	yes	[auto|off|<0.25-1.0>]	뷰포트 렌더 배율 — 표시 크기보다 낮게 그린다(기본 auto = 1/DPI)
 editor.sceneview	-	immediate	editor	engine_service	live	no	yes	-	씬 뷰 오버레이 배치와 카메라 상태를 읽는다
 editor.selftest	-	immediate	editor	engine_service	live	no	yes	-	editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다
 editor.theme	-	immediate	editor	engine_service	live	no	yes	-	적용된 ImGui 스타일 값을 TSV로 내고 배율 출처를 판정한다
 editor.viewport	-	immediate	editor	engine_service	live	no	yes	[scene|game]	중앙 ViewportHost 의 표시 모드와 뷰 수요
+editor.window	-	immediate	editor	editor_operation	live	no	yes	<안정식별자> <open|close|focus>	창 하나를 열고 닫고 앞으로 세운다(탭으로 겹친 창은 선택돼야 본문이 돈다)
 editor.windows	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 창 표를 TSV로 내고 배선 고아를 판정한다
 editor.workspace	-	immediate	editor	engine_service	live	no	yes	[save|load|reset|open <panelId>|close <panelId>]	워크스페이스 저장/복원과 창 열림 상태
 game.pak	-	long	editor	engine_service	live	no	yes	-	Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다
@@ -90,6 +92,7 @@ scene.hierarchycheck	-	frames	editor	engine_service	live	no	yes	-	씬 계층의 
 scene.load	scene.switch	long	editor	engine_service	live	no	yes	<경로>	씬을 로드한다(활성 씬은 그대로)
 scene.navigate	-	immediate	editor	editor_operation	live	no	yes	<back|forward>	Navigate entity selection history
 scene.new	-	frames	editor	engine_service	live	no	yes	[이름]	빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)
+scene.populate	-	frames	editor	engine_service	live	no	yes	<개수> [fanout]	W7 fixture — 제품 경로로 엔티티 N개를 만든다(fanout 0/1이면 평평, 2+면 균형 트리)
 scene.save	-	frames	editor	engine_service	live	no	yes	<경로>	활성 씬을 .creator로 저장한다
 scene.select	-	immediate	editor	editor_operation	live	no	yes	<오브젝트 이름>	오브젝트를 에디터 선택으로 지정한다
 scene.selection	-	immediate	editor	engine_service	live	no	yes	<라벨>	단일 선택과 복수 선택을 따로 낸다(둘의 어긋남을 드러낸다)

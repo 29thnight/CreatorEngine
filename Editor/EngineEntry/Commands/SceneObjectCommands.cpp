@@ -155,6 +155,8 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>   // W7-0: scene.populate 의 strtoll
+#include <vector>
 #include <fstream>
 #include <functional>
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
@@ -457,6 +459,115 @@ namespace ConsoleCmd
         auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
         if (result.status != CommandCore::CommandStatus::Succeeded) return result;
         return EditorObjectOperations::Describe(target);
+    }
+
+    // PHASE 21 W7-0 — 1k/10k/50k fixture 를 **제품 경로로** 만든다.
+    //
+    // 저작 `.creator` 를 손으로 써서 넣지 않는다. 이 저장소는 "저작 자산은 생성
+    // 경로 결함을 가린다" 로 이미 데었고, 손으로 쓴 YAML 은 무엇이 옳은 모양인지
+    // 를 사람이 정해 버린다. 여기서는 `Scene::CreateEntity` — `object.create` 가
+    // 타는 그 함수 — 를 그대로 부른다. 만든 뒤 `scene.hierarchycheck` 가 고아·
+    // 쌍불일치·순회미도달 0 을 내면 fixture 자체가 검증된다.
+    //
+    // Undo 는 남기지 않는다. `EditorObjectOperations::Create` 는 건마다
+    // `CreateEntityCommand` 를 쌓는데, 5 만 건이면 그 스택이 측정 대상인 메모리
+    // 거동을 통째로 덮는다. fixture 의 주제는 "행이 많은 씬" 이지 "되돌릴 수 있는
+    // 5 만 건" 이 아니다.
+    //
+    //   scene.populate <개수> [fanout]
+    //
+    // fanout 이 0 이나 1 이면 루트 아래 평평한 목록이고(= 최악의 clipping 대상),
+    // 2 이상이면 그 갈래의 균형 트리다(= 접힘/펼침이 뜻을 갖는 대상).
+    static CommandCore::CommandResult Cmd_scene_populate(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        if (args.size() < 2 || args.size() > 3)
+            return InvalidArguments("scene.populate <count> [fanout]");
+
+        auto parsePositive = [](const std::string& text, long long& out) -> bool
+        {
+            char* end = nullptr;
+            const long long value = std::strtoll(text.c_str(), &end, 10);
+            if (nullptr == end || *end != '\0' || value < 0) return false;
+            out = value;
+            return true;
+        };
+
+        long long count = 0;
+        long long fanout = 0;
+        if (!parsePositive(args[1], count) || count <= 0)
+            return InvalidArguments("scene.populate <count> [fanout]");
+        if (3 == args.size() && !parsePositive(args[2], fanout))
+            return InvalidArguments("scene.populate <count> [fanout]");
+
+        // 상한을 둔다. 이 명령은 fixture 용이고, 잘못 친 0 하나가 에디터를
+        // 몇 분 세우는 것을 막는다.
+        constexpr long long kMaxPopulate = 200000;
+        if (count > kMaxPopulate)
+            return Fail("scene.populate.too_many",
+                "fixture 상한은 200000 이다");
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) return PreconditionFailed("scene.none", "No active scene");
+
+        const auto started = std::chrono::steady_clock::now();
+        std::vector<Entity::Index> created;
+        created.reserve(static_cast<size_t>(count));
+        long long failed = 0;
+        for (long long i = 0; i < count; ++i)
+        {
+            // 부모: fanout 이 2 이상이면 이미 만든 것 중 (i / fanout) 번째,
+            // 아니면 씬 루트(0). 균형 트리가 되고 깊이는 log_fanout(count) 다.
+            Entity::Index parent = 0;
+            if (fanout >= 2)
+            {
+                const long long parentSlot = (i / fanout) - 1;
+                if (parentSlot >= 0 && parentSlot < static_cast<long long>(created.size()))
+                    parent = created[static_cast<size_t>(parentSlot)];
+            }
+            Entity* object = scene->CreateEntity(
+                "W7_" + std::to_string(i), GameObjectType::Empty, parent);
+            if (!object) { ++failed; continue; }
+            created.push_back(object->m_index);
+        }
+        const double elapsedMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - started).count();
+
+        // 실제 깊이는 만든 것에서 되읽는다 — 계산식을 다시 적으면 두 벌이 된다.
+        int maxDepth = 0;
+        for (Entity::Index index : created)
+        {
+            int depth = 0;
+            Entity* walker = scene->TryGetEntity(index);
+            while (walker && walker->m_index != 0 && depth < 4096)
+            {
+                const Entity::Index parentIndex = walker->GetParentIndex();
+                if (parentIndex == walker->m_index) break;
+                walker = scene->TryGetEntity(parentIndex);
+                ++depth;
+            }
+            maxDepth = (std::max)(maxDepth, depth);
+        }
+
+        auto data = CommandData::Object();
+        data.Set("requested", CommandData::Int(count));
+        data.Set("created", CommandData::Int(static_cast<long long>(created.size())));
+        data.Set("failed", CommandData::Int(failed));
+        data.Set("fanout", CommandData::Int(fanout));
+        data.Set("maxDepth", CommandData::Int(maxDepth));
+        data.Set("sceneEntities", CommandData::Int(static_cast<long long>(scene->m_Entities.size())));
+        data.Set("elapsedMs", CommandData::Double(elapsedMs));
+        Debug->Log("[scene.populate] created=" + std::to_string(created.size()) +
+            " failed=" + std::to_string(failed) +
+            " fanout=" + std::to_string(fanout) +
+            " maxDepth=" + std::to_string(maxDepth) +
+            " entities=" + std::to_string(scene->m_Entities.size()) +
+            " elapsedMs=" + std::to_string(elapsedMs));
+        if (failed > 0)
+            return Fail("scene.populate.partial",
+                "일부 엔티티를 만들지 못했다: " + std::to_string(failed) + "건");
+        return Ok({}, std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_scene_hierarchycheck(const ConsoleCommandContext& ctx)
@@ -1350,6 +1461,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "object.rootref" }, &Cmd_object_rootref);
         reg.Result({ "object.duplicate" }, &Cmd_object_duplicate);
         reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
+        reg.Result({ "scene.populate" }, &Cmd_scene_populate);
         reg.Result({ "object.property" }, &Cmd_object_property);
         reg.Result({ "scene.select" }, &Cmd_scene_select);
         reg.Result({ "component.add" }, &Cmd_component_add);
