@@ -2,6 +2,7 @@
 #include "ImGui.h"
 #include "SceneViewportOverlay.h"
 #include "EditorViewportCanvas.h"
+#include "EntityHandle.h"
 #include <mathematics/vector3.hpp>
 #include <memory>
 #include <vector>
@@ -47,5 +48,9 @@ private:
 	GizmoRenderer* m_gizmoRenderer{ nullptr };
 
 	std::vector<RayHitResult> m_hitResults;
+	// 직전 클릭이 맞힌 더미의 신원. 이것이 그대로면 다음 클릭은 뒤에 있는
+	// 것으로 넘어가고(겹침 순환), 달라지면 인덱스를 0으로 되돌린다. 포인터가
+	// 아니라 핸들인 이유는 .cpp 의 채우는 자리 주석 참고.
+	std::vector<EntityHandle> m_hitCycleIdentity;
 	size_t m_currentHitIndex = 0;
 };

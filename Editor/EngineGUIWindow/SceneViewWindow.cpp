@@ -450,6 +450,27 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (!hits.empty())
 			{
+				// 겹친 것들 사이의 순환은 **같은 더미를 다시 찍었을 때만** 다음
+				// 것으로 넘어간다. 리셋 조건이 "아무것도 못 맞혔을 때"뿐이라
+				// 지점을 옮겨 찍어도 인덱스가 계속 올라갔고, 바닥 위의 모델을
+				// 두 번째로 클릭하면 index 1 → 바닥이 잡혔다. 인스펙터는 그
+				// 선택을 그대로 그리므로 사용자는 모델을 편집한다고 믿으면서
+				// 바닥의 Scale 을 고쳤다(2026-09-14 사고).
+				//
+				// 신원은 포인터가 아니라 핸들로 잰다 — 파괴된 슬롯 자리에 새
+				// 엔티티가 같은 주소로 들어오면 포인터 비교는 ABA 로 같다고
+				// 답한다. 세대가 실린 EntityHandle 은 그 자리에서 갈린다.
+				std::vector<EntityHandle> cycleIdentity;
+				cycleIdentity.reserve(hits.size());
+				for (const RayHitResult& hit : hits)
+					cycleIdentity.push_back(scene->HandleOf(hit.object->m_index));
+
+				if (cycleIdentity != m_hitCycleIdentity)
+				{
+					m_hitCycleIdentity = std::move(cycleIdentity);
+					m_currentHitIndex = 0;
+				}
+
 				m_hitResults = hits;
 
 				m_currentHitIndex = m_currentHitIndex % m_hitResults.size();
@@ -471,6 +492,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			else
 			{
 				m_hitResults.clear();
+				m_hitCycleIdentity.clear();
 				m_currentHitIndex = 0;
 			}
 		}
@@ -658,6 +680,13 @@ Entity* SceneViewWindow::PickObjectFromRay(const Ray& ray, const std::vector<std
 
 	for (auto& obj : sceneObjects)
 	{
+		// m_Entities 는 구멍이 있는 슬롯맵이다 — AllocateSlot 이 nullptr 로 늘리고
+		// ReleaseSlot 이 파괴된 슬롯을 비운 채 재사용 전까지 남긴다(Scene.cpp
+		// AllocateSlot/ReleaseSlot). 저장소의 다른 순회 열넷은 전부 이 검사를
+		// 갖고 있었고 피킹 둘만 없었다 — 엔티티를 하나라도 파괴한 뒤 씬뷰를
+		// 한 번 클릭하면 널 역참조로 죽었다(2026-09-14 덤프, 읽기 주소 0x150).
+		if (!obj) continue;
+
 		auto* meshComp = obj->GetComponent<MeshRenderer>();
 		// I5-D5b — "그릴 메시가 있는가"는 창구가 판정한다. legacy m_Mesh를
 		// 직접 가드로 쓰면 D4f의 은퇴가 이 조건을 통째로 거짓으로 만들어
@@ -690,6 +719,9 @@ std::vector<RayHitResult> SceneViewWindow::PickObjectsFromRay(const Ray& ray, co
 
 	for (auto& obj : sceneObjects)
 	{
+		// 빈 슬롯 건너뛰기 — 사유는 위 PickObjectFromRay 주석 참고.
+		if (!obj) continue;
+
 		auto* meshComp = obj->GetComponent<MeshRenderer>();
 		auto* cameraComp = obj->GetComponent<CameraComponent>();
 		auto* lightComp = obj->GetComponent<LightComponent>();
