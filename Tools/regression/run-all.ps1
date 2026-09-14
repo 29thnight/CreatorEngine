@@ -1072,6 +1072,20 @@ if (Test-Path (Join-Path $PSScriptRoot "lifecycle_baseline.tsv")) {
     ""
 }
 
+# 계획 대시보드(docs/RefactoringPlanDashboard.html)가 열리는 상태인지. 슬라이스마다 손으로
+# 고치는 파일이고, note 값 안의 raw 큰따옴표 하나면 TASKS 배열 전체가 파싱에 실패해 페이지가
+# 통째로 빈다 — 2026-09-14 `4cc9b30d`가 실제로 그랬다. 그때까지 검사는 습관뿐이었고 계획서에는
+# "dashboard JavaScript 검사를 통과했다"고 적혀 있었지만 저장소에 그런 자가 없었다.
+# phase-meta 문장이 주장하는 공수 산수도 데이터로 검산한다 — 그쪽은 JS 파서가 못 잡는 축이다.
+#
+# ── 어느 바이너리를 재는가 ──
+#
+# 아무것도 재지 않는다. 문서 파일 하나만 읽으므로 -Exe 를 넘기지 않는다.
+Run-Step "계획 대시보드" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-plan-dashboard.ps1")
+}
+
 # D3-b(SerializationPlan): 저작 텍스트 자산의 개행이 LF로 고정돼 있는지. 결과(자산의 CRLF 0)와 원인(writer가 텍스트 모드를 쓰지 않음, .gitattributes의 eol=lf)을 함께 본다 — 결과만 재면 "지금은 깨끗하지만 다음 저장에서 되돌아오는" 상태를 통과시킨다.
 Run-Step "저작 개행 LF 고정(D3-b)" {
     & pwsh -NoProfile -File `
