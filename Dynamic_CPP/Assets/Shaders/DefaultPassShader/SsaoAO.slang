@@ -1,4 +1,4 @@
-#include "SsaoCommon.hlsli"
+#include "Includes/SsaoCommon.slang"
 
 Texture2D<float>  gDepth  : register(t0);
 Texture2D<float4> gNormal : register(t1);

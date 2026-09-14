@@ -24,7 +24,7 @@ namespace
     constexpr uint32_t kSssStepX = 190;
     constexpr uint32_t kSssHorizontalSlice = 0;
     constexpr uint32_t kSssFinalSlice = 1;
-    constexpr const char* kSssSceneShader = "SelfTest/SssScene.hlsl";
+    constexpr const char* kSssSceneShader = "SelfTest/SssScene.slang";
 
     struct SssSpirvScope
     {

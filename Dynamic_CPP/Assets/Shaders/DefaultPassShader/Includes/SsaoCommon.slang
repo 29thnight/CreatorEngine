@@ -1,3 +1,4 @@
+#pragma once
 cbuffer SSAOParams : register(b0)
 {
     float4x4 gInverseProjection;

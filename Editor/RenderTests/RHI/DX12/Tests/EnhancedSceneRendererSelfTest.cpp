@@ -72,7 +72,7 @@ namespace
 
     // 브링업 셰이더는 파일 의존을 만들지 않으려고 소스에 담는다. 실제 씬 셰이더는
     // PSOManager(3-4)가 ShaderSystem과 함께 관리한다.
-    constexpr const char* kTriangleShaderFile = "SelfTest/Triangle.hlsl";
+    constexpr const char* kTriangleShaderFile = "SelfTest/Triangle.slang";
 
     // 체커보드 텍스처 파라미터. 픽셀 검증이 같은 상수로 기대값을 계산한다.
     constexpr uint32_t kTexSize = 64;      // 64*4 = 256바이트 행 — 업로드 정렬과 정확히 일치
@@ -149,7 +149,7 @@ namespace
         const bool fixtureMatches = ShaderMeta::kSchemaVersion == meta.schemaVersion
             && guid == meta.guid
             && "ShaderMetaFixture" == meta.name
-            && std::filesystem::path("ShaderMetaFixture.hlsl") == meta.source
+            && std::filesystem::path("ShaderMetaFixture.slang") == meta.source
             && 3 == meta.properties.size() && nullptr != tint
             && 1.0f == (*tint)[0] && 0.5f == (*tint)[1]
             && nullptr != roughness && 0.5f == *roughness

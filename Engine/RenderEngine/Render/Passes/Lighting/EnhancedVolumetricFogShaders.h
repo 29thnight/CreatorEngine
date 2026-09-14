@@ -27,7 +27,7 @@
 //
 // 프록셀마다 광원 목록을 돌며 위상 함수를 먹이고, 그림자맵과 구름으로
 // 가려짐을 곱한 뒤 지난 프레임 격자와 섞는다.
-constexpr const char* kFogScatterFile = "FogScatter.hlsl";
+constexpr const char* kFogScatterFile = "FogScatter.slang";
 
 // ── ② 누적 ──
 //
@@ -36,11 +36,11 @@ constexpr const char* kFogScatterFile = "FogScatter.hlsl";
 //
 // ★ 원본 그대로 경계 검사가 없다. 디스패치가 96행이라 y가 90~95인 스레드가
 //   격자 밖에 쓰는데, D3D가 범위 밖 UAV 쓰기를 버려 사고는 나지 않는다.
-constexpr const char* kFogAccumulateFile = "FogAccumulate.hlsl";
+constexpr const char* kFogAccumulateFile = "FogAccumulate.slang";
 
 // ── ③ 합성 ──
 //
 // 화면 픽셀의 월드 좌표로 격자를 샘플해 씬 색에 얹는다.
 // inputColor * 투과율 + 쌓인 산란광이 곧 이 픽셀이 보는 것이다.
-constexpr const char* kFogCompositeFile = "FogComposite.hlsl";
+constexpr const char* kFogCompositeFile = "FogComposite.slang";
 

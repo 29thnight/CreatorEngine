@@ -25,7 +25,7 @@ namespace
     //   depth>=1 분기에 return이 없는 것, reflectFactor·edgeFade를 구해
     //   놓고 안 쓰는 것, screenSize가 (0,0)이라 비트플래그가 텍셀 (0,0)만
     //   보는 것. 고치면 그림이 바뀌고, 기준선은 DX11이다.
-    constexpr const char* kSSRShaderFile = "Ssr.hlsl";
+    constexpr const char* kSSRShaderFile = "Ssr.slang";
 
     struct SSRConstants
     {

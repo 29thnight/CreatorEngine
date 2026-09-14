@@ -1,4 +1,4 @@
-#include "FogCommon.hlsli"
+#include "Includes/FogCommon.slang"
 
 #define PI 3.14159265358
 #define EPSILON 0.000001

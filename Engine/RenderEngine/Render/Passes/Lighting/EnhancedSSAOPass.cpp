@@ -46,7 +46,7 @@ namespace
     // 들어가 AO가 실제보다 어두워지는데, 그 오차는 '좀 어둡다'로만 보여
     // 원인을 특정할 수 없다. 마스크는 이미 세워진 비트를 다시 세우지
     // 않으므로 그 실수가 구조적으로 불가능하다.
-    constexpr const char* kAOShaderFile = "SsaoAO.hlsl";
+    constexpr const char* kAOShaderFile = "SsaoAO.slang";
 
 
 
@@ -57,7 +57,7 @@ namespace
     // 노멀을 안 쓰는 이유: AO는 이미 노멀을 반영한 값이고, 여기서 다시
     // 노멀로 가중치를 주면 같은 정보를 두 번 쓰는 셈이다. 깊이만으로
     // 부족하다는 실측이 나오면 그때 넣는다.
-    constexpr const char* kFilterShaderFile = "SsaoFilter.hlsl";
+    constexpr const char* kFilterShaderFile = "SsaoFilter.slang";
 
     struct SSAOParams
     {

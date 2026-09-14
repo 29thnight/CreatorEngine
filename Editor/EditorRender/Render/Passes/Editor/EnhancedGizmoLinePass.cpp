@@ -12,7 +12,7 @@ namespace
 {
     // DX11 Gizmo_Line.vs/ps의 이식. 정점이 위치·색뿐이라 셰이더도 그만큼이다.
     // 행렬 규약만 GBuffer·Grid와 맞췄다(전치 업로드 + mul(v, M)).
-    constexpr const char* kGizmoLineShaderFile = "GizmoLine.hlsl";
+    constexpr const char* kGizmoLineShaderFile = "GizmoLine.slang";
 
     struct GizmoCameraConstants
     {

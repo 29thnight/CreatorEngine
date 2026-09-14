@@ -27,7 +27,7 @@ namespace
     // 빌보드가 사라진다 — DX11도 같은 동작이라 그대로 둔다.
     //
     // PS의 alpha = min(a, 0.5)도 원본의 의도된 그림이라 유지한다.
-    constexpr const char* kGizmoIconShaderFile = "GizmoIcon.hlsl";
+    constexpr const char* kGizmoIconShaderFile = "GizmoIcon.slang";
 
     struct GizmoIconConstants
     {

@@ -1,4 +1,4 @@
-#include "PostChainCommon.hlsli"
+#include "Includes/PostChainCommon.slang"
 
 Texture2D<float4> gSource : register(t0);
 #ifdef __spirv__

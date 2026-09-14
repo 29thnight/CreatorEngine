@@ -1,3 +1,4 @@
+#pragma once
 cbuffer PostParams : register(b0)
 {
     uint2  gSrcSize;

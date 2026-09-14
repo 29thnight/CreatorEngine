@@ -41,7 +41,7 @@ namespace
     constexpr uint32_t kPostWidth = 256;
     constexpr uint32_t kPostHeight = 256;
 
-    constexpr const char* kPostSceneShaderFile = "SelfTest/PostChainScene.hlsl";
+    constexpr const char* kPostSceneShaderFile = "SelfTest/PostChainScene.slang";
 
     struct PostSceneParams
     {

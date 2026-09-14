@@ -527,27 +527,27 @@ namespace ConsoleCmd
             / "Shaders" / "DefaultPassShader" / "SelfTest" / "RejectProbe.shadermeta";
         static const RejectCase kRejects[] = {
             { "duplicate-property",
-              "schema: 1\nname: RejectDuplicate\nsource: ShaderMetaFixture.hlsl\n"
+              "schema: 1\nname: RejectDuplicate\nsource: ShaderMetaFixture.slang\n"
               "properties:\n  - { name: v, type: float, default: 0.0 }\n"
               "  - { name: v, type: float, default: 1.0 }\n"
               "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
               " queue: opaque }\n",
               "중복" },
             { "unknown-field",
-              "schema: 1\nname: RejectUnknown\nsource: ShaderMetaFixture.hlsl\n"
+              "schema: 1\nname: RejectUnknown\nsource: ShaderMetaFixture.slang\n"
               "passes:\n  - name: Main\n    vs: { entry: VSMain }\n"
               "    ps: { entry: PSMain }\n    state: { depthWriet: false }\n"
               "    queue: opaque\n",
               "알 수 없는 field" },
             { "escaping-source",
-              "schema: 1\nname: RejectPath\nsource: ../ShaderMetaFixture.hlsl\n"
+              "schema: 1\nname: RejectPath\nsource: ../ShaderMetaFixture.slang\n"
               "passes:\n  - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain },"
               " queue: opaque }\n",
               "상위 이동 없는 상대" },
             // ★ YAML 1.1 bool 표. `1`은 bool이 아니다 — 스칼라 파리티(D3-b-2b-0)가
             //   두 backend에서 갈리는 것으로 실측한 부류라 상시로 밟는다.
             { "numeric-bool",
-              "schema: 1\nname: RejectBool\nsource: ShaderMetaFixture.hlsl\n"
+              "schema: 1\nname: RejectBool\nsource: ShaderMetaFixture.slang\n"
               "passes:\n  - name: Main\n    vs: { entry: VSMain }\n"
               "    ps: { entry: PSMain }\n    state: { depthWrite: 1 }\n"
               "    queue: opaque\n",

@@ -1,4 +1,4 @@
-#include "PostChainCommon.hlsli"
+#include "Includes/PostChainCommon.slang"
 
 Texture2D<float4> gColor : register(t0);
 Texture2D<float4> gBloom : register(t1);

@@ -14,20 +14,20 @@ namespace PostChainShaders
     //
     // 임계를 넘는 부분만 남긴다. 딱 잘라내면 경계에서 계단이 보이므로,
     // knee 구간에서 이차식으로 부드럽게 올린다(업계 통용 방식).
-    constexpr const char* kThresholdFile = "PostChainThreshold.hlsl";
+    constexpr const char* kThresholdFile = "PostChainThreshold.slang";
 
     // ── 다운샘플 ──
     //
     // 13탭 가중 평균(Call of Duty 발표에서 널리 퍼진 배치). 단순 2x2로
     // 내려가면 단수를 거듭할수록 격자 무늬가 생긴다 — 표본이 축에만
     // 몰려 있기 때문이다.
-    constexpr const char* kDownsampleFile = "PostChainDownsample.hlsl";
+    constexpr const char* kDownsampleFile = "PostChainDownsample.slang";
 
     // ── 업샘플 + 누적 ──
     //
     // 거친 밉을 텐트 필터로 올려 더한다. 출력에 더하는 것이라 목적지가
     // 이미 담고 있는 값을 읽는다 — UAV 읽기·쓰기가 같은 픽셀이라 안전하다.
-    constexpr const char* kUpsampleFile = "PostChainUpsample.hlsl";
+    constexpr const char* kUpsampleFile = "PostChainUpsample.slang";
 
     // ── Uber: 블룸 합성 + 톤맵 + 비네트 + 그레이딩 ──
     //
@@ -37,14 +37,14 @@ namespace PostChainShaders
     // 순서는 기존 체인과 같게 둔다: 블룸 → 톤맵 → 비네트 → 그레이딩.
     // 순서가 바뀌면 그림이 달라지는데(톤맵 뒤의 비네트와 앞의 비네트는
     // 다른 결과다), 그 차이가 이식 실수인지 의도인지 구분되지 않는다.
-    constexpr const char* kUberFile = "PostChainUber.hlsl";
-    constexpr const char* kUberHDRFile = "PostChainUberHDR.hlsl";
+    constexpr const char* kUberFile = "PostChainUber.slang";
+    constexpr const char* kUberHDRFile = "PostChainUberHDR.slang";
 
     // ── FXAA ──
     //
     // 톤맵 뒤(LDR)에서 돈다. HDR에서 돌리면 밝은 곳의 휘도 대비가 실제
     // 화면보다 훨씬 크게 나와서, 보이지도 않는 경계를 흐리고 정작 보이는
     // 경계는 놓친다 — 기존 체인이 그 순서였다.
-    constexpr const char* kFxaaFile = "PostChainFxaa.hlsl";
+    constexpr const char* kFxaaFile = "PostChainFxaa.slang";
 }
 

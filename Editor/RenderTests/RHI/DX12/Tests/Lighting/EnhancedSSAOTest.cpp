@@ -43,7 +43,7 @@ namespace
 
     // 검사용 깊이·노멀 생성. 왼쪽 절반은 뷰 z = 1.0, 오른쪽 절반은 0.6인
     // 벽 두 장이고 둘 다 카메라를 마주 본다(노멀 (0,0,-1)).
-    constexpr const char* kSceneShaderFile = "SelfTest/SsaoScene.hlsl";
+    constexpr const char* kSceneShaderFile = "SelfTest/SsaoScene.slang";
 
     struct SceneParams
     {

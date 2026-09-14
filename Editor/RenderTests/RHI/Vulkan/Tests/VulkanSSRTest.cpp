@@ -26,7 +26,7 @@ namespace
     constexpr uint32_t kSsrRhiMetalRowY = 64;
     constexpr uint32_t kSsrRhiPlainRowY = 192;
     constexpr uint32_t kSsrRhiVariantCount = 4;
-    constexpr const char* kSsrRhiSceneShader = "SelfTest/SsrScene.hlsl";
+    constexpr const char* kSsrRhiSceneShader = "SelfTest/SsrScene.slang";
 
     enum SsrRhiVariant : uint32_t
     {

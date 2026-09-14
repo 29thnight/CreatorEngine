@@ -22,7 +22,7 @@ namespace SsgiShaders
     // 바닥 평면 하나와 가운데 구 하나. 화면 공간 행진이 실제로 무언가를
     // 맞출 수 있는 최소 구성이다: 구가 바닥에 간접광을 던지고, 바닥이
     // 구의 아래쪽을 비춘다.
-    constexpr const char* kTestDepthFile = "SelfTest/SsgiTestDepth.hlsl";
+    constexpr const char* kTestDepthFile = "SelfTest/SsgiTestDepth.slang";
 
     // ── 리졸브: 시간적 재투영 + 누적 ──
     //
@@ -37,7 +37,7 @@ namespace SsgiShaders
     // 오해하기 쉽다. 지난 깊이와 재투영된 깊이를 비교해 거른다.
     //
     // 거부하면 누적을 처음부터 시작한다.
-    constexpr const char* kResolveFile = "SsgiResolve.hlsl";
+    constexpr const char* kResolveFile = "SsgiResolve.slang";
 
     // ── 필터: bilateral 한 번 ──
     //
@@ -47,7 +47,7 @@ namespace SsgiShaders
     //
     // 깊이와 노멀을 보고 가중한다. 그냥 흐리면 물체 경계에서 배경의 GI가
     // 새어 들어오고, 증상은 '윤곽에 후광이 생긴다'로 나타난다.
-    constexpr const char* kFilterFile = "SsgiFilter.hlsl";
+    constexpr const char* kFilterFile = "SsgiFilter.slang";
 
     // ── 합성: 업샘플 + 더하기 ──
     //
@@ -57,6 +57,6 @@ namespace SsgiShaders
     //
     // 간접광은 알베도를 곱해 더한다. GI가 옮기는 것은 빛이고, 그 빛이 이
     // 표면에서 얼마나 반사되는지는 알베도가 정한다.
-    constexpr const char* kCompositeFile = "SsgiComposite.hlsl";
+    constexpr const char* kCompositeFile = "SsgiComposite.slang";
 }
 

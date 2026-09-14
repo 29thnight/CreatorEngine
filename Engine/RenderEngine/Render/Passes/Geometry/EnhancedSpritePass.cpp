@@ -11,7 +11,7 @@
 
 namespace
 {
-    constexpr const char* kWorldSpriteShaderFile = "WorldSprite.hlsl";
+    constexpr const char* kWorldSpriteShaderFile = "WorldSprite.slang";
 
     bool CompileWorldSpriteShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)

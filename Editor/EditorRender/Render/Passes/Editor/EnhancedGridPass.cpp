@@ -29,7 +29,7 @@ namespace
     // quirk(비정수 위치에서 서브픽셀 이동이 사라진다), 페이드가 fadeStart/
     // fadeEnd와 별개로 (1 - dist/100)을 한 번 더 곱하는 것. 픽셀 대조의
     // 기준선이 그 동작이므로 여기서 고치면 대조가 성립하지 않는다.
-    constexpr const char* kGridShaderFile = "Grid.hlsl";
+    constexpr const char* kGridShaderFile = "Grid.slang";
 
     // HLSL 쪽 cbuffer와 정확히 같은 배치.
     struct GridConstants

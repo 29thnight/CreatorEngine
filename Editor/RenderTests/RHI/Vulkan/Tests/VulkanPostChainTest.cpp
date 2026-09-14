@@ -29,7 +29,7 @@ namespace
     constexpr uint32_t kPostRhiPreAaSlice = 1;
     constexpr uint32_t kPostRhiVariantCount = 3;
     constexpr const char* kPostRhiSceneShader =
-        "SelfTest/PostChainScene.hlsl";
+        "SelfTest/PostChainScene.slang";
 
     enum PostRhiVariant : uint32_t
     {

@@ -1,4 +1,4 @@
-#include "SsaoCommon.hlsli"
+#include "Includes/SsaoCommon.slang"
 
 Texture2D<float2> gInput : register(t0);
 

@@ -125,7 +125,7 @@ namespace RenderTest
             std::string stem{ "probe" };
             std::string metaGuid{ "11111111-1111-4111-8111-111111111111" };
             std::string shaderGuid{ "22222222-2222-4222-8222-222222222222" };
-            std::string sourceRelative{ "probe.hlsl" };
+            std::string sourceRelative{ "probe.slang" };
             std::string documentOverride{};
             std::string extension{ ".shadermeta" };
             bool writeSidecar{ true };

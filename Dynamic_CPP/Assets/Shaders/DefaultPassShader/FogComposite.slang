@@ -1,4 +1,4 @@
-#include "FogCommon.hlsli"
+#include "Includes/FogCommon.slang"
 
 Texture2D<float4> InputScreenColor              : register(t0);
 Texture2D<float>  DepthTexture                  : register(t1);

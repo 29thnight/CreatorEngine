@@ -3951,7 +3951,7 @@ bool RunVulkanDecalTest(std::string& outLog)
 namespace
 {
     constexpr uint32_t kSsaoTestSize = 256;
-    constexpr const char* kSsaoSceneShader = "SelfTest/SsaoScene.hlsl";
+    constexpr const char* kSsaoSceneShader = "SelfTest/SsaoScene.slang";
 
     struct SsaoSceneParams
     {
@@ -4309,7 +4309,7 @@ namespace
 {
     constexpr uint32_t kSsgiTestSize = 64;
     constexpr uint32_t kSsgiTestFrames = 6;
-    constexpr const char* kSsgiSceneShader = "SelfTest/SsgiRhiScene.hlsl";
+    constexpr const char* kSsgiSceneShader = "SelfTest/SsgiRhiScene.slang";
 
     struct SsgiSceneParams
     {

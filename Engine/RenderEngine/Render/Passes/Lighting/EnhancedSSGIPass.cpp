@@ -47,7 +47,7 @@ namespace
     // 홀수 크기에서 한 텍셀이 빠지는 것을 막으려고 오른쪽·아래를 한 번 더
     // 본다. 빠뜨리면 그 줄만 낡은 값이 남고, 증상이 '가끔 광선이 샌다'라서
     // 찾기 어렵다.
-    constexpr const char* kHiZBuildShaderFile = "SsgiHiZBuild.hlsl";
+    constexpr const char* kHiZBuildShaderFile = "SsgiHiZBuild.slang";
 
     // ── 트레이스 ──
     //
@@ -65,7 +65,7 @@ namespace
     // 프레임당 슬라이스는 적게(kSlicesPerFrame) 쓰고 프레임마다 방향을
     // 돌린다. 나머지는 시간축이 맡는다 — 그것이 이 설계의 전제이고,
     // 리졸브(3단계)가 붙기 전까지는 노이즈가 그대로 보인다.
-    constexpr const char* kTraceShaderFile = "SsgiTrace.hlsl";
+    constexpr const char* kTraceShaderFile = "SsgiTrace.slang";
 
     struct ResolveParams
     {

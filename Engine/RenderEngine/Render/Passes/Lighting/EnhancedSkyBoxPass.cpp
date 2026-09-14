@@ -30,7 +30,7 @@ namespace
     //     LESS를 통과하지 못해 하늘이 통째로 사라진다.
     //   · texCoord = 큐브 로컬 정점(스케일·이동 전) — 샘플 방향이 된다.
     //     정규화하지 않는다(큐브맵 샘플은 방향의 크기를 무시한다).
-    constexpr const char* kSkyBoxShaderFile = "SkyBox.hlsl";
+    constexpr const char* kSkyBoxShaderFile = "SkyBox.slang";
 
     struct SkyBoxConstants
     {

@@ -35,7 +35,7 @@ namespace
     //     mul(v, M)(행 벡터, CPU가 전치)다. 수학적으로 같다.
     //   · decalForward를 뺀다. 원본이 계산하지만 그것을 쓰던 discard가 주석
     //     처리돼 있어 결과에 닿지 않는 죽은 값이다.
-    constexpr const char* kDecalShaderFile = "Decal.hlsl";
+    constexpr const char* kDecalShaderFile = "Decal.slang";
 
     struct DecalFrameConstants
     {

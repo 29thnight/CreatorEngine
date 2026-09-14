@@ -19,7 +19,7 @@ namespace
     //
     // 원본과 갈리는 점 하나: 원본은 위치에만 본을 먹인다(법선은 안 쓴다).
     // 여기도 위치만 변형한다 — 와이어프레임은 법선을 보지 않는다.
-    constexpr const char* kWireFrameShaderFile = "WireFrame.hlsl";
+    constexpr const char* kWireFrameShaderFile = "WireFrame.slang";
 
     struct WireFrameConstants
     {

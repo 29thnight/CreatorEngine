@@ -1,3 +1,4 @@
+#pragma once
 float LinearToExponentialDepth(float z, float NearPlaneZ, float FarPlaneZ)
 {
     float z_buffer_params_y = FarPlaneZ / NearPlaneZ;

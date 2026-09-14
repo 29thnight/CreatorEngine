@@ -27,7 +27,7 @@ namespace
     constexpr uint32_t kFogRhiProbeY = kFogRhiVolumeH / 2;
     constexpr uint32_t kFogRhiVariantCount = 4;
     constexpr float kFogRhiSceneGray = 0.5f;
-    constexpr const char* kFogRhiSceneShader = "SelfTest/FogScene.hlsl";
+    constexpr const char* kFogRhiSceneShader = "SelfTest/FogScene.slang";
 
     enum FogRhiVariant : uint32_t
     {

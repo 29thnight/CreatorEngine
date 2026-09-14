@@ -16,7 +16,7 @@ namespace
     //   · 정점을 SV_VertexID 풀스크린 삼각형으로(DX11은 Fullscreen.vs + Draw(4))
     //   · MetalRough(t2) 선언 제거 — 원본이 읽지 않는다
     //   · direction을 상수로 받되 호출부가 축을 고정한다(원본과 같은 동작)
-    constexpr const char* kSSSShaderFile = "Sss.hlsl";
+    constexpr const char* kSSSShaderFile = "Sss.slang";
 
     struct SSSConstants
     {

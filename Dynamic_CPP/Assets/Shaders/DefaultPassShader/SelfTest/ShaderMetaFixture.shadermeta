@@ -1,6 +1,6 @@
 schema: 1
 name: ShaderMetaFixture
-source: ShaderMetaFixture.hlsl
+source: ShaderMetaFixture.slang
 properties:
   - { name: tint, label: Tint, type: float4, default: [1.0, 0.5, 0.25, 1.0] }
   - { name: roughness, label: Roughness, type: float, default: 0.5 }

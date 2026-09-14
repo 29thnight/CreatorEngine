@@ -40,7 +40,7 @@ namespace
     // 버퍼에 담을 것이 '0,0 / 1,0 / 0,1 / 1,1' 네 개뿐이다. 그것을 위해
     // 버퍼를 만들고 바인딩하고 입력 조립을 거치는 비용이, 셰이더에서
     // 비트 두 개로 만드는 것보다 크다.
-    constexpr const char* kUIShaderFile = "UI.hlsl";
+    constexpr const char* kUIShaderFile = "UI.slang";
 
     struct UIParams
     {
