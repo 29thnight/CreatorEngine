@@ -150,6 +150,9 @@
     <ClCompile Include="RHI\Vulkan\Tests\PbrCaptureCompare.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\PbrNormalPair.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>

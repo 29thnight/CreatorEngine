@@ -66,6 +66,9 @@ bool RunPbrSealTest(std::string& outLog);
 bool RunPbrCaptureCompare(const std::string& leftDirectory,
     const std::string& rightDirectory, const std::string& outputPath,
     std::string& outLog);
+/// PBR-W1 — 실장면 캡처에서 normal-map 저작 유무의 정본이 하나인지 본다.
+/// 같은 프레임에 노멀맵 있는 draw 와 없는 draw 가 함께 있어야 성립한다.
+bool RunPbrNormalPairVerification(const std::string& directory, std::string& outLog);
 bool RunVulkanDecalTest(std::string& outLog);
 bool RunVulkanSSAOTest(std::string& outLog);
 bool RunVulkanSSGITest(std::string& outLog);

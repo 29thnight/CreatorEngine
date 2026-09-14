@@ -17,6 +17,9 @@ $settings = Join-Path $root 'Dynamic_CPP\ProjectSetting\EngineSettings.asset'
 $utf8 = [Text.UTF8Encoding]::new($false)
 $original = $null
 $process = $null
+# W1 fixture 가 model.load 로 복사되어 앉는 자리. finally 가 반드시 치운다 —
+# 게이트가 자산 트리에 잔해를 남기면 다음 실행의 전제가 달라진다.
+$importedNormalPair = Join-Path $root 'Dynamic_CPP\Assets\Models\NormalPair'
 
 function Invoke-Editor([string]$Name, [string[]]$Commands, [int]$ExpectedExit = 0) {
     $scenario = Join-Path $run "$Name.txt"
@@ -151,6 +154,13 @@ try {
         [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, "`${1}$api"), $utf8)
         $primitive = Join-Path $run "$api-primitives"
         $gunner = Join-Path $run "$api-gunner"
+        $normalPair = Join-Path $run "$api-normalpair"
+        # W1 fixture 는 자산 트리 밖에 있어 model.load 가 트리 안으로 복사한다.
+        # backend 둘이 같은 조건에서 돌도록 매 회차 앞에서 지운다 — 남겨 두면
+        # 두 번째 회차만 "제자리 열기" 경로를 타서 두 실행이 같은 것을 재지 않는다.
+        if (Test-Path -LiteralPath $importedNormalPair) {
+            Remove-Item -Recurse -Force -LiteralPath $importedNormalPair
+        }
         $commands = @(
             "scene.switch `"$root/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator`"",
             # ★ 첫 대기가 렌더 예열을 겸한다 (2026-09-14). 라이브 렌더러의 첫
@@ -171,16 +181,36 @@ try {
             'object.transform Gunner_F_Mythic 0 0 2 0 180 0 0.025 0.025 0.025',
             'wait 30',
             "render.pbr.capture `"$gunner`" game",
+            # ★ W1 — normal-map 저작 유무의 정본이 하나인지는 **실장면 프레임**에서만
+            #   물을 수 있다. 격리 fixture 에는 스냅샷이 없어 draw.useNormalMap 폴백이
+            #   쓰이기 때문이다(EnhancedGBufferPass.cpp:439). 노멀맵 있는 재질과 없는
+            #   재질을 **한 자산의 두 primitive** 로 두어 같은 노드·같은 프레임 아래
+            #   draw 둘이 뜨게 한다 — 그래야 변인이 재질 하나로 좁혀진다.
+            "model.load `"$root/Tools/regression/fixtures/pbr-normal-pair/NormalPair.gltf`"",
+            'model.place NormalPair',
+            'object.transform NormalPair 0 0 2 0 180 0 1 1 1',
+            'wait 30',
+            "render.pbr.capture `"$normalPair`" game",
+            "render.pbr.normalpair `"$normalPair`"",
             'quit')
         $results = @(Invoke-Editor $api $commands)
         $captures = @($results | Where-Object command -eq 'render.pbr.capture')
-        if ($captures.Count -ne 2 -or @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
-            throw "$api capture did not return two completed frames; artifacts: $run"
+        if ($captures.Count -ne 3 -or @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
+            throw "$api capture did not return three completed frames; artifacts: $run"
         }
         Assert-Capture $primitive $api @('Prim_Cube', 'Prim_Sphere', 'Prim_Cylinder')
         Assert-Capture $gunner $api @('Gunner_F_Mythic')
+        # 이 캡처의 모델 확인은 Models 목록이 아니라 render.pbr.normalpair 가 한다.
+        # Assert-Capture 의 모델 검사는 `<이름>.glb.meta` 를 전제하는데 이 fixture 는
+        # 하위 폴더의 `.gltf` 다. 그리고 여기서 물어야 할 것은 "모델이 떴나" 가
+        # 아니라 "대조쌍이 섰고 두 유도가 같은 답을 내나" 다.
+        Assert-Capture $normalPair $api @()
+        $normalVerdict = Get-SucceededCommand $results 'render.pbr.normalpair'
+        if (-not $normalVerdict.passed) {
+            throw "$api normal-map pair verification failed; artifacts: $run"
+        }
         $captureDirs[$api] = @{ primitives = $primitive; gunner = $gunner }
-        Write-Output "$api product capture PASS: $primitive; $gunner"
+        Write-Output "$api product capture PASS: $primitive; $gunner; $normalPair (normal pair PASS)"
     }
     # W9 — 두 backend 캡처의 float32 readback을 실제로 맞댄다.
     #
@@ -234,9 +264,12 @@ try {
     if ($capture.status -ne 'failed' -or $capture.code -ne 'render.pbr.capture.rejected') {
         throw 'Capture did not reject an existing output directory.'
     }
-    Write-Output "PBR W0/W2/W3/W4/W5/W6/W7-normal/UV/mip baseline PASS (W9 acceptance pending): $run"
+    Write-Output "PBR W0/W1/W2/W3/W4/W5/W6/W7-normal/UV/mip baseline PASS (W9 acceptance pending): $run"
 }
 finally {
     if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
     if ($null -ne $original) { [IO.File]::WriteAllBytes($settings, $original) }
+    if (Test-Path -LiteralPath $importedNormalPair) {
+        Remove-Item -Recurse -Force -LiteralPath $importedNormalPair -ErrorAction SilentlyContinue
+    }
 }

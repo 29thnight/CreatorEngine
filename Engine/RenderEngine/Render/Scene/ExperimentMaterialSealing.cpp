@@ -13,6 +13,31 @@
 
 namespace ExperimentMaterialSealing
 {
+    /// W1 — normal-map 저작 유무의 **단일 유도**.
+    ///
+    /// ★ 예전에는 legacy 경로가 `m_materialInfo.m_useNormalMap` 을, 저작 경로가
+    ///   resolver 가 준 owner 를 각각 읽었다. 주석은 둘이 같은 뜻이라 적어 두었지만
+    ///   강제하는 것은 없었다 — W3 에서 중립 텍셀에 대해 걷어낸 것과 같은 모양이다.
+    ///
+    /// ★ 그리고 이것이 이론적 위험이 아니라는 것을 실장면 변이가 보였다(§17).
+    ///   저작 경로만 반전시켰더니 fixture 의 draw 둘만 뒤집히고 씬의 나머지 여덟은
+    ///   꿈쩍하지 않았다 — **두 경로가 한 프레임 안에서 동시에 돈다**. 값이 두 벌인
+    ///   채로 두면 갈리는 것은 시간 문제다.
+    ///
+    /// 물음을 하나로 둔다: "이 재질의 `normalMap` 슬롯에 owner 가 실제로 있는가".
+    /// 슬롯 자체가 없으면(ShaderMeta 가 선언하지 않은 재질) 0 이다.
+    static std::uint32_t DeriveUseNormalMap(
+        const std::vector<SealTextureOwner>& textures)
+    {
+        for (const SealTextureOwner& texture : textures)
+        {
+            if (texture.propertyName
+                != standard_material::property::NormalMap) continue;
+            return (nullptr != texture.owner) ? 1u : 0u;
+        }
+        return 0u;
+    }
+
     bool BuildSealSourceFromLegacy(const Material& legacy, const ShaderMeta& meta,
         SealSource& outSource, std::string& outError)
     {
@@ -38,8 +63,9 @@ namespace ExperimentMaterialSealing
         source.baseColorFactor = legacy.m_materialInfo.m_baseColor;
         source.metallic = legacy.m_materialInfo.m_metallic;
         source.roughness = legacy.m_materialInfo.m_roughness;
-        source.useNormalMap =
-            (0 != legacy.m_materialInfo.m_useNormalMap) ? 1u : 0u;
+        // 위 순회가 `source.textures` 를 이미 채웠으므로 여기서 legacy 스칼라를
+        // 다시 읽을 이유가 없다 — 같은 사실을 두 곳에서 뽑던 것이 W1 의 대상이다.
+        source.useNormalMap = DeriveUseNormalMap(source.textures);
         source.debugName = legacy.m_name;
 
         outSource = std::move(source);
@@ -166,17 +192,8 @@ namespace ExperimentMaterialSealing
 
         // I5-D5c5 — useNormalMap은 인스턴스 채널에서 **유일하게 살아 있는**
         // 소비다(ForwardShade:441·GBuffer:237이 usePropertyBlock 분기 밖에서
-        // 무조건 읽는다). legacy는 m_materialInfo.m_useNormalMap을 줬는데,
-        // 그 의미는 "노멀맵이 붙어 있는가"다 — 저작 정본에서는 resolver가
-        // normalMap owner를 실제로 준 것으로 같은 뜻을 만든다.
-        source.useNormalMap = 0u;
-        for (const SealTextureOwner& texture : source.textures)
-        {
-            if (texture.propertyName
-                != standard_material::property::NormalMap) continue;
-            source.useNormalMap = (nullptr != texture.owner) ? 1u : 0u;
-            break;
-        }
+        // 무조건 읽는다). W1 이후로 legacy 경로와 같은 함수에서 유도한다.
+        source.useNormalMap = DeriveUseNormalMap(source.textures);
         if (nullptr != outCooked) *outCooked = resolved.notes.cookedTextures;
         if (nullptr != outSourceFallback)
         {

@@ -188,6 +188,7 @@ namespace CommandCore
             { "render.pbr.coverage", CommandCost::Long, "", "PBR coverage verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.emission", CommandCost::Long, "", "PBR emission verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.mip", CommandCost::Long, "", "PBR mip verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "render.pbr.normalpair", CommandCost::Immediate, "<capture-dir>", "캡처의 normal-map 저작 유무 단일 정본 판정", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.occlusion", CommandCost::Long, "", "PBR occlusion verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.parity", CommandCost::Long, "", "PBR parity verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.pbr.seal", CommandCost::Immediate, "", "PBR seal identity/ledger verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

@@ -1,6 +1,6 @@
 # PBR 배선 안정화 계획 (PHASE 4)
 
-**신설 2026-09-03 · 갱신 2026-09-14 · 10슬라이스 18일 · W2/W3/W4/W5/W6 완료(W3는 §16) · W0/W1/W7 진행 · W8/W9 구현 착지·부분 실측(§14·§15)**
+**신설 2026-09-03 · 갱신 2026-09-14 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행 · W8/W9 구현 착지·부분 실측(§14·§15)**
 
 > **W8/W9 현재 상태 한 줄.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
 > 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: 배선 게이트가
@@ -49,7 +49,7 @@ sampler/mip, tangent basis와 non-uniform scale normal transform은 이 페이�
 | P1 | world의 3×3을 normal/tangent에 직접 곱한다 | non-uniform scale에서 normal과 highlight가 틀어짐 | `PBR-W7` |
 | P1 | flat property/고정 texture table과 descriptor batch가 material generation보다 약한 신원으로 재사용될 여지가 있다 | 전체 mesh가 검거나 색이 바뀌는 간헐적 플리커를 fail-closed로 가두지 못함 | `PBR-W8` |
 | P1 | GBuffer의 diffuse/metalRough/normal/emissive가 모두 고정 폭 포맷이고 material texture 입력도 4개로 고정돼 있다 | 대역폭 낭비와 AO/향후 재질 입력 확장 충돌 | `PBR-W5`, `PBR-W8` |
-| 완료 대기 | `useNormalMap`은 저작 material snapshot→scene snapshot→GBuffer/Forward instance까지 전달하도록 수정했고 Debug x64 빌드는 통과했다 | 실제 Gunner/primitive 런타임 장면 판정은 아직 하지 않음 | `PBR-W1`, `PBR-W9` |
+| 완료(§17) | `useNormalMap`은 저작 material snapshot→scene snapshot→GBuffer/Forward instance까지 전달되고, 2026-09-14 유도를 한 함수로 접은 뒤 실장면 캡처로 판정한다 | draw별 픽셀 분리는 여전히 못 잰다(캡처에 draw별 영역이 없다 — W0) | `PBR-W1` 완료 · `PBR-W0`, `PBR-W9` |
 
 이 표는 정적 감사와 이미 수행한 빌드 결과다. 런타임에서 플리커의 단일 원인을 확정했다는 뜻이
 아니며, `PBR-W8`에서 generation/descriptor 일치성 위반을 먼저 검출하고 `PBR-W9`에서 실제 장면으로
@@ -83,7 +83,7 @@ typed Material generation
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
 | `PBR-W0` | 감사 정본·Gunner/primitive capture·strict gate | ◐ | PHASE 3.75 | 2 |
-| `PBR-W1` | normal-map 저작 유무 snapshot 단일화 | ◐ | — | 1 |
+| `PBR-W1` | normal-map 저작 유무 snapshot 단일화 | ✓ | — | 1 |
 | `PBR-W2` | GBuffer/Deferred/Forward native Slang 제품 진입점·공용 현행 평가 | ✓ | W0 | 2.5 |
 | `PBR-W3` | backend neutral resource·binding·종료 코드 동등성 | ✓ | W0 | 1 |
 | `PBR-W4` | OPAQUE/MASK/BLEND·alpha cutoff·double-sided/cull | ✓ | W2 | 2 |
@@ -94,11 +94,11 @@ typed Material generation
 | `PBR-W9` | DX12/Vulkan 실장면·장시간·재임포트 회귀와 cutover | · | W8 | 1.5 |
 | **합계** |  |  |  | **18** |
 
-`PBR-W0`은 정적 감사 절반, `PBR-W1`은 코드·빌드 절반을 기성으로 센다. 둘 다 `PBR-W9`의
-실장면 acceptance 전에는 완료가 아니다. W3는 2026-09-14 중립 상수 단일 출처화와 양 팔
-변이 증명으로 닫았다(§16). W7의 normal/tangent·UV 선택/변환·mip 구현과 검증은 합계
-1.5일 기성이다. W2/W3/W4/W5/W6 완료 9.5일 + 진행 기성 3일이며 잔여는 5.5일이다.
-W7 sampler는 미완료다.
+`PBR-W0`은 정적 감사 절반을 기성으로 센다. W3는 2026-09-14 중립 상수 단일 출처화와
+양 팔 변이 증명으로 닫았고(§16), W1은 같은 날 유도를 한 함수로 접고 저장소 소유
+fixture로 실장면 판정을 세워 닫았다(§17). W7의 normal/tangent·UV 선택/변환·mip
+구현과 검증은 합계 1.5일 기성이다. W1/W2/W3/W4/W5/W6 완료 10.5일 + 진행 기성 2.5일이며
+잔여는 5일이다. W7 sampler는 미완료다.
 
 ---
 
@@ -960,3 +960,132 @@ EXIT=4 · vk.gbuffer -> failed
   재빌드가 일어나지 않아, 소스는 옳은데 게이트가 변이 바이너리를 잰다.
 - 소스 왕복은 **Latin-1 바이트 치환**으로 했다. 이 트리에 CP949 파일이 섞여 있어
   텍스트로 읽고 쓰면 한글 주석이 깨진다.
+
+---
+
+## 17. W1 — normal-map 저작 유무의 실장면 판정, 2026-09-14
+
+### 착수 전 실측이 뒤집은 것
+
+W1 의 배선은 진작 끝나 있었다. §1 의 표가 남겨 둔 것은 한 줄이다 — "실제
+Gunner/primitive 런타임 장면 판정은 아직 하지 않음". 그래서 이 슬라이스의 일은
+코드를 더 잇는 것이 아니라 **재는 것**이었다.
+
+재 보니 정본은 하나가 아니라 **유도가 둘**이었다. `SealSource` 로 가는 길이 둘이고
+각자 다른 곳에서 같은 사실을 뽑는다.
+
+| 경로 | 어디서 뽑나 |
+|---|---|
+| `BuildSealSourceFromLegacy` (`ExperimentMaterialSealing.cpp:41`) | `legacy.m_materialInfo.m_useNormalMap` |
+| `BuildSealSourceFromAuthored` (`:167`) | resolver 가 `normalMap` owner 를 실제로 줬는가 |
+
+주석은 둘이 같은 뜻이라고 적고 있지만, 그것은 **적어 둔 약속이지 강제된 것이 아니다**
+— W3 에서 방금 닫은 것과 같은 모양이다([[§16]]). 라이브 경로는 저작 쪽을 먼저 쓰고
+실패할 때만 legacy 로 내려간다(`EnhancedSceneRenderer.cpp:3061-3080`).
+
+곁가지로 둘을 더 확인했다. `m_useNormalMap` 은 **직렬화되지 않는다**(`reflect()` 에
+없다) — 그래서 디스크에서 어긋난 값이 들어올 길은 없다. writer 는 `UseTextureMap`
+과 `ResetTextureRuntime` 둘뿐이고 둘 다 owner 표와 함께 움직인다.
+
+★ **격리 자가 검사는 이 축을 재울 수 없다.** `EnhancedSceneRendererSelfTest.cpp:3201`
+이 `m_materialInfo.m_useNormalMap` 으로 `EnhancedDrawItem.useNormalMap` 을 채우는데,
+그것은 단정이 아니라 **스냅샷이 없는 경로의 폴백 채널을 채우는 생산자**다
+(`EnhancedGBufferPass.cpp:439` 가 "snapshot 이 없는 격리 fixture 호환 경계" 라고
+적은 그 자리). 즉 격리 fixture 는 스냅샷 경로를 한 번도 타지 않으므로, 제품 정본이
+스냅샷이라는 사실을 격리로는 확인할 수 없다 — W1 의 판정이 실장면이어야 하는 이유가
+이것이다.
+
+### fixture — 저장소가 소유해야 했다
+
+대조쌍을 만들 자산이 **저장소에 없었다**. 추적되는 모델은 `Prim_*` 9 개뿐이고 전수
+확인 결과 `normalTexture` 가 전부 0 건이다. 노멀맵을 가진 것은
+`Gunner_F_Mythic.glb` 인데 `.gitignore` 의 `/Dynamic_CPP/Assets/Models/*` 에 막혀
+**추적 밖**이다.
+
+★ **같은 이유로 이 게이트의 Gunner 캡처 축은 지금 이 기계 전용이다.**
+`verify-pbr-wiring-baseline.ps1` 이 `model.loadcached` 로 그 파일을 여는데, clean
+checkout 에는 파일이 없다. W1 이 만든 결함이 아니라 전부터 있던 것이고, 여기서
+드러났으므로 적어 둔다.
+
+그래서 `Tools/regression/fixtures/pbr-normal-pair/` 를 저장소가 직접 소유하게 했다
+(`imgui-ini`·`gltf-multifile` 과 같은 규약).
+
+- 쿼드 2 개 · 재질 2 개를 **한 mesh 의 두 primitive** 로 둔다. 자산을 둘로 나누면
+  카메라·광원·프레임·씬 epoch 이 달라질 수 있어 차이의 원인을 가릴 수 없다. 한 노드
+  아래 두면 **변인이 재질 하나**로 좁혀진다. `POSITION`/`NORMAL`/`TEXCOORD_0`
+  accessor 까지 공유하고 인덱스만 가른다.
+- 노멀맵을 평평한 `(128,128,255)` 로 두지 않았다. 그 값은 디코드하면 `(0,0,1)` 이라
+  **안 물린 것과 같은 픽셀**이 나와서, "노멀맵이 안 물렸다" 는 회귀가 통과한다.
+  좌우를 +X/−X 로 기울여 두었다.
+
+### 구현
+
+- `render.pbr.normalpair <capture-dir>` (`PbrNormalPair.cpp`). 캡처 manifest 의 draw
+  마다 `useNormalMap` 과 `normalMap` 슬롯의 `authored` 를 맞댄다. 둘은 **다른 곳에서
+  유도된 같은 사실**이라 어긋나면 정본이 둘이라는 뜻이다.
+- 픽셀이 아니라 manifest 를 읽는 이유: 캡처는 attachment 를 통째로 남기지 draw 별
+  영역을 남기지 않아 "노멀맵 있는 draw 의 픽셀" 만 떼어낼 수단이 아직 없다(draw 별
+  영역은 W0 의 남은 항목이다).
+- 게이트(`verify-pbr-wiring-baseline.ps1`)의 backend 별 회차에 세 번째 캡처로 붙였다.
+  fixture 가 `model.load` 로 자산 트리에 복사되므로 회차 앞과 `finally` 에서 지운다 —
+  게이트가 자산 트리에 잔해를 남기면 다음 실행의 전제가 달라진다.
+
+### 빈 집합을 통과시키지 않는다
+
+★ 이 검사의 본문(`useNormalMap == authored`)은 **대조가 없으면 공짜로 참이다**.
+fixture 가 빠지거나 배치가 실패해도 전부 0 이면 불일치가 0 이라 초록이 된다. 그래서
+"노멀맵 있는 draw 와 없는 draw 가 둘 다 있는가" 를 먼저 묻고, 아니면 실패시킨다.
+
+실물로 확인했다 — fixture 없이 `FT_Primitives` 만 찍은 캡처에 물리면
+`draw 8 · useNormalMap 1/0 = 0/8 · 불일치 0` 을 내면서도 **FAIL** 한다
+("대조쌍이 없다"). 불일치가 0 인 채로 붉어지는 것이 이 방어의 요점이다.
+
+### 변이 증명 — 예고와 어긋난 숫자가 새 사실을 줬다
+
+심기 전에 관측값을 적었다: 저작 경로의 유도(`ExperimentMaterialSealing.cpp:177`)를
+반전시키면 `useNormalMap 1/0` 이 `1/9 → 9/1` 로 뒤집히고 **불일치 10** 이 되어야 한다.
+그대로면 결론은 ③(자극 못 함)이고, 그때는 legacy 쪽을 쳐야 한다.
+
+실제로 나온 것:
+
+```
+normal pair — draw 10 · useNormalMap 1/0 = 1/9 · 슬롯 없음 0 · 불일치 2
+  draw 8: useNormalMap=0 인데 normalMap authored=true
+  draw 9: useNormalMap=1 인데 normalMap authored=false
+[CLI] render.pbr.normalpair FAIL
+```
+
+**잡혔고, 붉어진 자리도 맞다** — 대조는 `1/9` 로 그대로 섰으므로 대조 가드가 아니라
+격리하려던 **불일치 단정**이 잡았다. 복원 뒤 같은 시나리오는 `불일치 0 · PASS ·
+exit 0 · stderr 없음` 이고 자산 트리 잔해도 0 이다.
+
+★ **그런데 예고한 10 이 아니라 2 였다.** 저작 경로를 통째로 반전시켰는데 뒤집힌 것은
+**fixture 의 두 draw 뿐**이고 `FT_Primitives` 의 나머지 여덟은 꿈쩍하지 않았다.
+뜻은 하나다 — **그 여덟은 저작 경로를 타지 않는다**(legacy 폴백을 타거나
+`authoredMaterialSource` 자체가 없다). 즉 한 프레임 안에서 두 유도가 **실제로 동시에
+돌고 있다**. W1 이 "단일화" 를 조건으로 적은 근거가 가설이 아니라 관측이 됐다.
+
+예고와 실제의 **차이**가 이것을 드러냈다. 숫자를 적어 두지 않았다면 "붉었으니 됐다"
+로 넘어가 이 비대칭을 못 봤을 것이다([[mutation-passed-because-fixture-cannot-trigger]]).
+
+### 유도를 접었다
+
+변이가 "두 경로가 한 프레임에 공존한다" 를 보인 이상 강제력만 세우고 두는 것은
+반쪽이다. 그래서 물음을 한 함수로 옮겼다 — `DeriveUseNormalMap(source.textures)`
+(`ExperimentMaterialSealing.cpp`). 두 builder 가 그것만 부른다.
+
+접는 비용이 싼 이유는 legacy builder 가 **바로 위에서 `source.textures` 를 이미
+채우기 때문**이다(`meta.properties` 순회 → `legacy.GetTextureMapShared(desc.name)`).
+`m_materialInfo.m_useNormalMap` 을 한 번 더 읽을 이유가 없었다. 두 값은 `UseTextureMap`
+과 `ResetTextureRuntime` 이 함께 움직여 오늘 일치하므로, 접어도 **값이 변하지
+않는다** — 값이 같으면 seal 해시도 같으므로 W8 장부에 파문이 없다. 그 "변하지 않음"
+을 실장면 캡처와 `render.pbr.seal` 로 확인했다.
+
+### 남은 것 (정직하게)
+
+- **draw 별 픽셀 분리는 못 쟀다.** 캡처에 draw 별 영역이 없다(W0 의 남은 항목).
+  지금 판정은 "플래그가 정본 하나에서 왔는가" 이지 "그 플래그가 픽셀을 바꿨는가"
+  가 아니다. fixture 의 노멀맵을 평평하지 않게 만들어 둔 것은 그 판정이 가능해질 때를
+  위한 것이다.
+- **Gunner 축은 여전히 이 기계 전용이다.** 위에 적은 추적 밖 문제는 W1 이 고치지
+  않았다.

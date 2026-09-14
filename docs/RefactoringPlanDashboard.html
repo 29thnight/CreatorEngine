@@ -569,7 +569,7 @@
 <!-- ===== PHASE 4 ===== -->
 <section class="phase" id="phase-4">
   <h2 class="sec"><span class="no">PHASE 4</span>PBR 제품 배선 안정화 <span class="phase-pct" data-phase-pct="4"></span></h2>
-  <div class="phase-meta"><b>정본: <a href="plans/PBRWiringStabilizationPlan.md" style="color:var(--accent)">PBRWiringStabilizationPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 18일 · 완료 9.5일 + 진행 기성 3일 · 잔여 5.5일</b> · 선행 PHASE 3.75.</div>
+  <div class="phase-meta"><b>정본: <a href="plans/PBRWiringStabilizationPlan.md" style="color:var(--accent)">PBRWiringStabilizationPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 18일 · 완료 10.5일 + 진행 기성 2.5일 · 잔여 5일</b> · 선행 PHASE 3.75.</div>
   <div class="phase-goal"><b>목표:</b> 현재 제품의 GBuffer/Deferred/Forward를 native Slang 한 계통과 immutable material generation으로 묶고, alpha/AO/emissive/UV/sampler/normal 의미 손실 및 backend 기본값 차이, 검정·변색 플리커를 먼저 제거한다. Blender Principled와 Material Graph, 그림자·probe·후처리는 이 완료선에 섞지 않는다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
   <div class="verify">
@@ -2768,8 +2768,8 @@ const TASKS = [
     note: "2026-09-06 제품 frame capture·7 attachments·manifest·strict exit 구현. DX12/Vulkan primitive 8/Gunner 10 draw capture, validation 0. sampler/descriptor/PSO 기록과 의미별 fixture·W9 acceptance는 남았다. 2026-09-06 strict GUID 재검사에서 기존 ImmProbe.prefab.meta 추적 정책 위반 1개 확인(자산 GUID invalid/duplicate/missing 0)." },
   { phase: 4, id: "PBR-W1", title: "normal-map 저작 유무 snapshot 단일화",
     detail: "Material의 normal map 유무를 scene snapshot과 GBuffer/Forward instance까지 보존하고 fallback texture 존재와 혼동하지 않는다.",
-    refs: "PBRWiringStabilizationPlan PBR-W1", priority: "P0", days: 1, status: "progress", earnedDays: 0.5,
-    note: "코드 수정과 CreatorEditor Debug x64 빌드는 통과. Gunner/primitive runtime acceptance 전이라 완료가 아니다." },
+    refs: "PBRWiringStabilizationPlan PBR-W1·§17", priority: "P0", days: 1, status: "done", earnedDays: 1,
+    note: "2026-09-14 완료. 착수해 보니 정본이 하나가 아니라 유도가 둘이었다 — BuildSealSourceFromLegacy는 m_materialInfo.m_useNormalMap을, BuildSealSourceFromAuthored는 resolver의 normalMap owner를 각각 읽었고 주석만 '같은 뜻'이라 적고 있었다. DeriveUseNormalMap 한 함수로 접었다(legacy 빌더가 바로 위에서 source.textures를 이미 채우므로 값이 변하지 않고, 값이 같으면 seal 해시도 같아 W8 장부에 파문이 없다). 판정은 새 render.pbr.normalpair가 캡처 manifest의 draw마다 useNormalMap과 normalMap 슬롯 authored를 맞대 한다 — 픽셀이 아닌 이유는 캡처에 draw별 영역이 없어서다(W0 잔여). ★ 대조쌍 자산이 저장소에 없었다: 추적 모델은 Prim_* 9개뿐이고 전부 normalTexture 0건, 노멀맵을 가진 Gunner_F_Mythic.glb는 gitignore로 추적 밖 — 그래서 이 게이트의 Gunner 캡처 축은 지금 이 기계 전용이다(W1이 만든 결함 아님). Tools/regression/fixtures/pbr-normal-pair/를 저장소가 소유하게 했고, 쿼드 2·재질 2를 한 mesh의 두 primitive로 두어 변인을 재질 하나로 좁혔다. 평평한 (128,128,255)를 쓰지 않은 이유는 그것이 '안 물린 것과 같은 픽셀'이라 회귀를 통과시키기 때문이다. 빈 집합 방어를 실물로 확인 — fixture 없는 캡처는 불일치 0인 채로 FAIL('대조쌍이 없다'). ★ 변이가 예고를 빗나가 새 사실을 줬다: 저작 경로만 반전시켰더니 불일치 10이 아니라 2, fixture의 draw 둘만 뒤집히고 씬의 여덟은 그대로였다 — 두 유도가 한 프레임에 동시에 돈다는 관측이고, 그래서 접는 것이 반쪽이 아니게 됐다." },
   { phase: 4, id: "PBR-W2", title: "native Slang 제품 진입점·공용 현행 평가",
     detail: "GBuffer/Deferred/Forward 제품 PBR을 native .slang 한 계통으로 만들고 현행 GGX/IBL/material evaluation 중복을 공용 모듈로 모은다.",
     refs: "PBRWiringStabilizationPlan §7", priority: "P0", days: 2.5, status: "done", note: "2026-09-06 Forward/Water/Wind native Slang 전환·공용 material/GGX/IBL 평가. Forward 보상 누락·null LUT 직접광 과보상 수정. DX12/Vulkan 36-case HDR 경로/백엔드 편차 0, 기존 ShaderMeta·제품 캡처 회귀 통과. W9 golden/장시간 acceptance 별도." },

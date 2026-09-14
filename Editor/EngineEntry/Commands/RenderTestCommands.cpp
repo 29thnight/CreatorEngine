@@ -697,6 +697,24 @@ namespace ConsoleCmd
                 "PBR capture comparison failed", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_render_pbr_normalpair(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2)
+        {
+            return CommandCore::InvalidArguments("render.pbr.normalpair <capture-dir>");
+        }
+        std::string result;
+        const bool passed = RunPbrNormalPairVerification(ctx.parts[1], result);
+        Debug->LogWarning(std::string("[render.pbr.normalpair] ") + result);
+        std::printf("%s[CLI] render.pbr.normalpair %s\n", result.c_str(), passed ? "PASS" : "FAIL");
+        auto data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(result));
+        return passed ? CommandCore::Ok({}, std::move(data))
+            : CommandCore::Fail("render.pbr.normalpair.failed",
+                "PBR normal-map pair verification failed", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_render_pbr_seal(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
@@ -1297,6 +1315,7 @@ namespace ConsoleCmd
         reg.Result({ "render.pbr.parity" }, &Cmd_render_pbr_parity);
         reg.Result({ "render.pbr.seal" }, &Cmd_render_pbr_seal);
         reg.Result({ "render.pbr.compare" }, &Cmd_render_pbr_compare);
+        reg.Result({ "render.pbr.normalpair" }, &Cmd_render_pbr_normalpair);
         reg.Result({ "render.pbr.sealstatus" }, &Cmd_render_pbr_sealstatus);
         reg.Result({ "render.pbr.coverage" }, &Cmd_render_pbr_coverage);
         reg.Result({ "render.pbr.occlusion" }, &Cmd_render_pbr_occlusion);

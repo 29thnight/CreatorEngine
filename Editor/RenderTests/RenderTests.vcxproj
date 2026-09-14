@@ -102,6 +102,7 @@
     <ClCompile Include="RHI\Vulkan\Tests\PbrShaderParityTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\PbrSealLedgerTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\PbrCaptureCompare.cpp" />
+    <ClCompile Include="RHI\Vulkan\Tests\PbrNormalPair.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGridTest.cpp" />
     <ClCompile Include="RHI\Vulkan\Tests\VulkanIBLTest.cpp" />
