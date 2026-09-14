@@ -95,7 +95,10 @@ foreach ($source in $probeSources) {
     }
 }
 
-$engineLibNames = @('RenderEngine', 'SceneRuntime', 'Utility_Framework')
+# ★ `EngineDiagnostics` 가 빠져 있었다. `SceneRuntime` 이 `gCPUProfiler` 를 참조하고
+#   그 정의는 이 라이브러리에 있다 — probe 가 프로파일러를 쓰지 않아도 obj 하나가
+#   끌려오면 심볼은 따라온다. 목록이 SceneRuntime 의 현재 의존과 어긋나 있었다.
+$engineLibNames = @('RenderEngine', 'SceneRuntime', 'EngineDiagnostics', 'Utility_Framework')
 
 # ★ vcpkg 는 몇몇 포트의 Debug 산출물에 `d` 접미사를 붙인다(`fmtd` · `spdlogd` ·
 #   `lz4d`). 붙이지 않는 것도 같이 있어서(`ryml` · `c4core` · `meshoptimizer` ·
@@ -188,9 +191,31 @@ foreach ($current in $configurations) {
         $libArguments += '"' + $lib + '"'
     }
 
+    # ★ nethost 경로를 준다. `SceneRuntime.lib(ClrHost.obj)` 안의
+    #   `#pragma comment(lib, "nethost.lib")`(2026-08-24, 2c3bd764)가 기본 라이브러리
+    #   지시를 심는데, 그 lib 은 SDK 팩이 아니라 **저장소가 고정한 사본**이라
+    #   링커의 기본 탐색 경로에 없다. exe 프로젝트(`CreatorEditor.vcxproj` ·
+    #   `Player.vcxproj`)는 이 경로를 주지만 이 독립 probe 는 주지 않아
+    #   `LNK1104: cannot open file 'nethost.lib'` 로 죽어 있었다 — probe 가
+    #   CLR 호스팅을 쓰지 않아도 obj 하나가 끌려오면 지시는 따라온다.
+    $hostLibDir = Join-Path $repoRoot 'ThirdParty\DotNetHost\lib'
+    if (-not (Test-Path -LiteralPath (Join-Path $hostLibDir 'nethost.lib') -PathType Leaf)) {
+        throw "고정된 nethost.lib 가 없다: $hostLibDir"
+    }
+    # ★ FMOD 도 같은 이유로 필요하다 — `SceneRuntime` 의 `SoundManager` 가 건다.
+    #   구성별 이름이 다르다(Debug 는 로깅판 `fmodL_vc`), exe 프로젝트들이 쓰는
+    #   것과 같은 이름을 그대로 쓴다.
+    $fmodLibDir = Join-Path $repoRoot 'ThirdParty\Fmod\lib\x64'
+    $fmodLibName = if ($current -eq 'Debug') { 'fmodL_vc.lib' } else { 'fmod_vc.lib' }
+    $fmodLib = Join-Path $fmodLibDir $fmodLibName
+    if (-not (Test-Path -LiteralPath $fmodLib -PathType Leaf)) {
+        throw "FMOD 라이브러리가 없다: $fmodLib"
+    }
+    $libArguments += '"' + $fmodLib + '"'
     Write-Host ("[EXPERIMENT CONTRACT] {0} 링크" -f $current)
     $linkCommand = 'call "' + $vcvars + '" >nul && link.exe /nologo /OUT:"' +
-        $executable + '" ' + ($objects -join ' ') + ' ' + ($libArguments -join ' ')
+        $executable + '" /LIBPATH:"' + $hostLibDir + '" ' +
+        ($objects -join ' ') + ' ' + ($libArguments -join ' ')
     & $env:ComSpec /d /s /c $linkCommand
     if ($LASTEXITCODE -ne 0) {
         throw "링크 실패 ($current): exit $LASTEXITCODE"
