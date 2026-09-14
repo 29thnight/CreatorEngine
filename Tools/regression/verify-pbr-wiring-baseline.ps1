@@ -21,6 +21,26 @@ $process = $null
 # 게이트가 자산 트리에 잔해를 남기면 다음 실행의 전제가 달라진다.
 $importedNormalPair = Join-Path $root 'Dynamic_CPP\Assets\Models\NormalPair'
 
+# ── 축 회계 ─────────────────────────────────────────────────────────────
+#
+# ★ 이 게이트의 요구는 "fixture 를 추적한다" 가 아니라 **"fixture 가 없는 축을
+#   절대 PASS 로 보고하지 않는다"** 다. 둘은 다르다 — 추적은 그것을 보장하는 한
+#   방법일 뿐이고, 값이 큰 외부 자산(라이선스 의무가 딸린 것 포함)까지 저장소에
+#   넣는 것은 이 게이트가 CI 에서 돌지도 않는 마당에 나쁜 거래다.
+#
+# ★ 실제로 여기 구멍이 있었다. Gunner 캡처는 `Dynamic_CPP/Assets/Models/
+#   Gunner_F_Mythic.glb` 를 열었는데 그 파일은 `.gitignore` 에 막혀 **추적 밖**이다
+#   — 이 기계 말고 다른 기여자 기계에서는 그 자리에서 죽거나, 더 나쁘게는 무엇도
+#   재지 못한 채 지나간다. 저장소에는 기여자가 다섯이다.
+#
+# 그래서 축마다 "돌았음/건너뜀(이유)" 을 남기고, 마지막 요약이 **돈 축만** 이름을
+# 부른다. 조용히 넘어가는 길을 없애는 것이 목적이지 자산을 늘리는 것이 아니다.
+$axisReport = [ordered]@{}
+function Set-AxisRan([string]$Name) { $script:axisReport[$Name] = 'ran' }
+function Set-AxisSkipped([string]$Name, [string]$Reason) {
+    $script:axisReport[$Name] = "skipped: $Reason"
+}
+
 function Invoke-Editor([string]$Name, [string[]]$Commands, [int]$ExpectedExit = 0) {
     $scenario = Join-Path $run "$Name.txt"
     [IO.File]::WriteAllText($scenario, ($Commands -join "`n") + "`n", $utf8)
@@ -203,6 +223,9 @@ try {
         if (Test-Path -LiteralPath $importedNormalPair) {
             Remove-Item -Recurse -Force -LiteralPath $importedNormalPair
         }
+        # Gunner 는 추적 밖 자산이다. 있으면 재고, 없으면 **건너뛰었다고 적는다**.
+        $gunnerAsset = Join-Path $root 'Dynamic_CPP\Assets\Models\Gunner_F_Mythic.glb'
+        $hasGunner = Test-Path -LiteralPath $gunnerAsset
         $commands = @(
             "scene.switch `"$root/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator`"",
             # ★ 첫 대기가 렌더 예열을 겸한다 (2026-09-14). 라이브 렌더러의 첫
@@ -217,12 +240,16 @@ try {
             #   `game` 캡처가 영원히 완료되지 않는다 — 모드를 먼저 세운다.
             'editor.viewport game',
             'wait 30',
-            "render.pbr.capture `"$primitive`" game",
-            "model.loadcached `"$root/Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb`"",
-            'model.place Gunner_F_Mythic',
-            'object.transform Gunner_F_Mythic 0 0 2 0 180 0 0.025 0.025 0.025',
-            'wait 30',
-            "render.pbr.capture `"$gunner`" game",
+            "render.pbr.capture `"$primitive`" game")
+        if ($hasGunner) {
+            $commands += @(
+                "model.loadcached `"$root/Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb`"",
+                'model.place Gunner_F_Mythic',
+                'object.transform Gunner_F_Mythic 0 0 2 0 180 0 0.025 0.025 0.025',
+                'wait 30',
+                "render.pbr.capture `"$gunner`" game")
+        }
+        $commands += @(
             # ★ W1 — normal-map 저작 유무의 정본이 하나인지는 **실장면 프레임**에서만
             #   물을 수 있다. 격리 fixture 에는 스냅샷이 없어 draw.useNormalMap 폴백이
             #   쓰이기 때문이다(EnhancedGBufferPass.cpp:439). 노멀맵 있는 재질과 없는
@@ -236,12 +263,22 @@ try {
             "render.pbr.normalpair `"$normalPair`"",
             'quit')
         $results = @(Invoke-Editor $api $commands)
+        $expectedCaptures = if ($hasGunner) { 3 } else { 2 }
         $captures = @($results | Where-Object command -eq 'render.pbr.capture')
-        if ($captures.Count -ne 3 -or @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
-            throw "$api capture did not return three completed frames; artifacts: $run"
+        if ($captures.Count -ne $expectedCaptures -or
+            @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
+            throw "$api capture did not return $expectedCaptures completed frames; artifacts: $run"
         }
         Assert-Capture $primitive $api @('Prim_Cube', 'Prim_Sphere', 'Prim_Cylinder')
-        Assert-Capture $gunner $api @('Gunner_F_Mythic')
+        Set-AxisRan "$api/primitives"
+        if ($hasGunner) {
+            Assert-Capture $gunner $api @('Gunner_F_Mythic')
+            Set-AxisRan "$api/gunner"
+        } else {
+            # 조용히 넘어가지 않는다. 이 줄이 없으면 "Gunner 축을 쟀다" 와
+            # "Gunner 축이 없었다" 가 요약에서 구분되지 않는다.
+            Set-AxisSkipped "$api/gunner" 'Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb 없음 (추적 밖 자산)'
+        }
         # 이 캡처의 모델 확인은 Models 목록이 아니라 render.pbr.normalpair 가 한다.
         # Assert-Capture 의 모델 검사는 `<이름>.glb.meta` 를 전제하는데 이 fixture 는
         # 하위 폴더의 `.gltf` 다. 그리고 여기서 물어야 할 것은 "모델이 떴나" 가
@@ -251,8 +288,12 @@ try {
         if (-not $normalVerdict.passed) {
             throw "$api normal-map pair verification failed; artifacts: $run"
         }
-        $captureDirs[$api] = @{ primitives = $primitive; gunner = $gunner }
-        Write-Output "$api product capture PASS: $primitive; $gunner; $normalPair (normal pair PASS)"
+        Set-AxisRan "$api/normal-pair"
+        $captureDirs[$api] = @{ primitives = $primitive }
+        if ($hasGunner) { $captureDirs[$api]['gunner'] = $gunner }
+        $ranHere = @("primitives", $(if ($hasGunner) { 'gunner' }), 'normal-pair') |
+            Where-Object { $_ }
+        Write-Output "$api product capture PASS ($($ranHere -join ', ')): $run"
     }
     # W9 — 두 backend 캡처의 float32 readback을 실제로 맞댄다.
     #
@@ -263,7 +304,10 @@ try {
     if ($captureDirs.Count -eq 2) {
         $left = $captureDirs['dx12']
         $right = $captureDirs['vulkan']
-        foreach ($fixture in @('primitives', 'gunner')) {
+        # 양쪽 backend 가 **둘 다 가진** 축만 맞댄다. 한쪽에만 있는 축을 맞대면
+        # 존재하지 않는 디렉터리를 열게 된다.
+        $comparable = @($left.Keys | Where-Object { $right.ContainsKey($_) } | Sort-Object)
+        foreach ($fixture in $comparable) {
             $outputJson = Join-Path $run "compare-$fixture.json"
             $results = @(Invoke-Editor "compare-$fixture" @(
                 "render.pbr.compare `"$($left[$fixture])`" `"$($right[$fixture])`" `"$outputJson`"",
@@ -273,9 +317,11 @@ try {
             if (-not (Test-Path -LiteralPath $outputJson)) {
                 throw "Comparison result was not written: $outputJson"
             }
+            Set-AxisRan "compare/$fixture"
         }
-        Write-Output "cross-backend capture compare PASS"
+        Write-Output "cross-backend capture compare PASS ($($comparable -join ', '))"
     } else {
+        Set-AxisSkipped 'compare' 'backend 하나만 실행됨'
         Write-Output "cross-backend capture compare SKIPPED (backend 하나만 실행됨)"
     }
 
@@ -306,9 +352,25 @@ try {
     if ($capture.status -ne 'failed' -or $capture.code -ne 'render.pbr.capture.rejected') {
         throw 'Capture did not reject an existing output directory.'
     }
-    Write-Output "PBR W0/W1/W2/W3/W4/W5/W6/W7-normal/UV/mip baseline PASS (W9 acceptance pending): $run"
+    $ranAxes = @($axisReport.Keys | Where-Object { $axisReport[$_] -eq 'ran' })
+    $skipped = @($axisReport.Keys | Where-Object { $axisReport[$_] -ne 'ran' })
+    Write-Output ("PBR W0/W1/W2/W3/W4/W5/W6/W7-normal/UV/mip baseline PASS" +
+        " — 잰 축 $($ranAxes.Count) · 건너뛴 축 $($skipped.Count)" +
+        " (W9 acceptance pending): $run")
+    if ($skipped.Count) {
+        Write-Output "  ※ 위 PASS 는 건너뛴 축에 대해 아무 말도 하지 않는다: $($skipped -join ', ')"
+    }
 }
 finally {
+    # ★ 축 회계는 **실패해도 찍는다**. 처음에는 성공 경로에만 두었는데, 이 게이트는
+    #   지금 뒤쪽(experiment contract)에서 기존 결함으로 멈추기 때문에 회계가 영영
+    #   보이지 않았다. 무엇을 쟀는지는 실패했을 때야말로 알아야 한다.
+    if ($axisReport.Count) {
+        Write-Output '── 축 회계 ──'
+        foreach ($name in $axisReport.Keys) {
+            Write-Output ("  {0,-24} {1}" -f $name, $axisReport[$name])
+        }
+    }
     if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
     if ($null -ne $original) { [IO.File]::WriteAllBytes($settings, $original) }
     if (Test-Path -LiteralPath $importedNormalPair) {
