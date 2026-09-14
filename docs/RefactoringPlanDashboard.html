@@ -569,7 +569,7 @@
 <!-- ===== PHASE 4 ===== -->
 <section class="phase" id="phase-4">
   <h2 class="sec"><span class="no">PHASE 4</span>PBR 제품 배선 안정화 <span class="phase-pct" data-phase-pct="4"></span></h2>
-  <div class="phase-meta"><b>정본: <a href="plans/PBRWiringStabilizationPlan.md" style="color:var(--accent)">PBRWiringStabilizationPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 18일 · 완료 10.5일 + 진행 기성 2.5일 · 잔여 5일</b> · 선행 PHASE 3.75.</div>
+  <div class="phase-meta"><b>정본: <a href="plans/PBRWiringStabilizationPlan.md" style="color:var(--accent)">PBRWiringStabilizationPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 18일 · 완료 10.5일 + 진행 기성 3일 · 잔여 4.5일</b> · 선행 PHASE 3.75.</div>
   <div class="phase-goal"><b>목표:</b> 현재 제품의 GBuffer/Deferred/Forward를 native Slang 한 계통과 immutable material generation으로 묶고, alpha/AO/emissive/UV/sampler/normal 의미 손실 및 backend 기본값 차이, 검정·변색 플리커를 먼저 제거한다. Blender Principled와 Material Graph, 그림자·probe·후처리는 이 완료선에 섞지 않는다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="4"><!-- JS 생성 --></table></div>
   <div class="verify">
@@ -2764,8 +2764,8 @@ const TASKS = [
   // ---------- PHASE 4: 현재 PBR Slang·Material·Renderer 배선 안정화 ----------
   { phase: 4, id: "PBR-W0", title: "PBR 감사 정본·Gunner/primitive capture·strict gate",
     detail: "같은 카메라·광원·HDRI의 Gunner helmet/armor, primitive, alpha/AO/emissive/non-uniform scale fixture와 pre-tone HDR·GBuffer·generation artifact를 고정한다.",
-    refs: "PBRWiringStabilizationPlan §1·§4", priority: "P0", days: 2, status: "progress", earnedDays: 1,
-    note: "2026-09-06 제품 frame capture·7 attachments·manifest·strict exit 구현. DX12/Vulkan primitive 8/Gunner 10 draw capture, validation 0. sampler/descriptor/PSO 기록과 의미별 fixture·W9 acceptance는 남았다. 2026-09-06 strict GUID 재검사에서 기존 ImmProbe.prefab.meta 추적 정책 위반 1개 확인(자산 GUID invalid/duplicate/missing 0)." },
+    refs: "PBRWiringStabilizationPlan §1·§4·§18", priority: "P0", days: 2, status: "progress", earnedDays: 1.5,
+    note: "2026-09-06 제품 frame capture·7 attachments·manifest·strict exit 구현. DX12/Vulkan primitive 8/Gunner 10 draw capture, validation 0. 2026-09-06 strict GUID 재검사에서 기존 ImmProbe.prefab.meta 추적 정책 위반 1개 확인(자산 GUID invalid/duplicate/missing 0). ★ 2026-09-14 manifest 축 착지(§18): 셋 중 둘은 이미 있었다 — sealLedger.bindings 가 sealHash 마다 pipelineId(resolved PSO key)와 samplerIdentity 를 적고 draws[].seal.hash 로 조인된다(실측 10/10). draw 항목에 복사하지 않은 것은 설계다 — '같은 밀봉을 공유하는 draw 는 같은 바인딩을 쓴다'가 W8 불변식이라 복사하면 표에서 사라진다. descriptor generation 만 제품에 없었다: Binding::descriptorVersion 이 writer 0 인 죽은 칸이었고, 값(ToToken)은 중립인데 꺼내는 어휘가 DX12 에만 있었다 — Vulkan recycler 에 GetCurrentVersionToken 을 더하고 IRenderDeviceServices::GetDescriptorVersionToken 으로 중립화한 뒤 두 패스가 적고 캡처가 방출한다. ★ 폭을 uint32→uint64 로 넓힌 것이 결정적: 토큰은 generation<<32|slot 이고 실측 17179869185 는 옛 폭이면 1 로 잘렸다. 게이트는 '조인이 자기 라우트 장부에서 성립' 과 '세 축이 0 이 아님' 만 단정하고 변이 폭(distinct pso 1~2·sampler 1·descriptorVersion 1)은 출력에만 남긴다 — sampler 가 1 인 것은 pass-global 이라 지금 옳고 재질별로 가르는 것은 W7 이다. descriptorVersion 은 operator== 에 넣지 않았다(한 프레임에 기록이 둘이면 거짓 충돌). 변이 증명: DX12 토큰을 0 으로 바꾸니 첫 캡처에서 descriptorVersion=0 으로 붉었다. 남은 것은 fixture 축 — 여덟 중 셋(primitives·Gunner·normal 대조쌍)만 서 있고 alpha mask·AO·emissive-only·비균등 스케일이 없다. AO/emissive 원본은 추적 밖 폴더라 자산 소유 결정이 먼저다. 라우트별 조인은 forward draw 가 있는 fixture 가 없어 자극된 적이 없다." },
   { phase: 4, id: "PBR-W1", title: "normal-map 저작 유무 snapshot 단일화",
     detail: "Material의 normal map 유무를 scene snapshot과 GBuffer/Forward instance까지 보존하고 fallback texture 존재와 혼동하지 않는다.",
     refs: "PBRWiringStabilizationPlan PBR-W1·§17", priority: "P0", days: 1, status: "done", earnedDays: 1,

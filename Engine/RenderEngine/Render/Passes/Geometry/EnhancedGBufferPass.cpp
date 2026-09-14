@@ -419,6 +419,10 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
                     key.snapshot->textureBindings);
                 binding.samplerIdentity = m_samplerIdentity;
                 binding.pipelineId = batch.pipeline.id;
+                // W0 — 이 배치의 descriptor 가 어느 버전에서 잘렸는지. 기록만 하고
+                // 신원(operator==)에는 넣지 않는다(장부 주석 참조).
+                binding.descriptorVersion = nullptr != context.resources
+                    ? context.resources->GetDescriptorVersionToken() : 0ull;
                 if (!m_sealLedger.Observe(key.snapshot->seal.sealHash, binding))
                 {
                     m_rejectedSnapshots.insert(key.snapshot.get());

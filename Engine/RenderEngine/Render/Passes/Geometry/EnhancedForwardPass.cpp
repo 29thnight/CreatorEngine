@@ -1340,6 +1340,9 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
                 key.snapshot->textureBindings);
             binding.samplerIdentity = m_samplerIdentity;
             binding.pipelineId = shadePipeline.id;
+            // W0 — GBuffer 쪽과 같은 값을 같은 규칙으로 적는다.
+            binding.descriptorVersion = nullptr != context.resources
+                ? context.resources->GetDescriptorVersionToken() : 0ull;
             if (!m_sealLedger.Observe(key.snapshot->seal.sealHash, binding))
             {
                 m_rejectedSnapshots.insert(key.snapshot.get());

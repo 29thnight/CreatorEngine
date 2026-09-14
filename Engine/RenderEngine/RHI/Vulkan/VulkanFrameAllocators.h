@@ -183,6 +183,15 @@ public:
     VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout setLayout);
     VulkanDescriptorRecyclerStats GetStats() const;
 
+    /// PBR-W0 — 지금 기록 중인 descriptor 버전의 토큰(generation·slot 인코딩).
+    ///
+    /// ★ DX12 쪽에는 `DX12DescriptorRecycler::GetCurrentVersionToken()` 이 진작
+    ///   있었는데 여기에만 없었다. 값(`m_activeVersion`)은 양쪽 다 같은
+    ///   `RHIDescriptorVersionHandle` 인데 **꺼내는 어휘가 한쪽에만 있어서**
+    ///   중립 계층이 이 축을 물어볼 수 없었다 — 캡처 manifest 의
+    ///   `descriptorVersion` 이 writer 0 인 죽은 칸으로 남아 있던 이유다.
+    uint64_t GetCurrentVersionToken() const { return m_activeVersion.ToToken(); }
+
 private:
     bool EnsurePool(VkDevice device, uint32_t slot, std::string& outError);
     void RecordPeak(uint32_t used);

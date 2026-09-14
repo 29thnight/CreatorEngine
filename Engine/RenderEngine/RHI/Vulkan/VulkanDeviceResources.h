@@ -207,6 +207,11 @@ public:
 
     RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc> descs) override;
     RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) override;
+    /// PBR-W0 — DX12 와 같은 값을 같은 이름으로 내보낸다.
+    uint64_t GetDescriptorVersionToken() const override
+    {
+        return m_descriptorRecycler.GetCurrentVersionToken();
+    }
 
     bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format,
         uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) override;

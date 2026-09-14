@@ -438,6 +438,9 @@ passes:
         RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc>) override { return {}; }
         RHIEncoder& GetImmediateEncoder() override { return encoder; }
         RHIBindingTable CreateBindings(std::span<const RHIBindingDesc>) override { return {}; }
+        // 이 대역에는 descriptor recycler 가 없다. 0 은 "기록 중인 버전이 없다"이고
+        // 인터페이스가 그 뜻을 규정한다 — 판정하는 쪽이 0 을 값으로 읽지 않는다.
+        uint64_t GetDescriptorVersionToken() const override { return 0; }
         RHIRenderTargetBinding CreateRenderTargets(
             std::span<const RHITextureHandle>, const RHIDepthTargetDesc*) override { return {}; }
         RHIRenderTargetBinding CreateRenderTargets(

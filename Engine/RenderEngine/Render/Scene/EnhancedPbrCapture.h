@@ -173,6 +173,12 @@ struct EnhancedPbrCapture
                 entry["pipelineId"] << binding.pipelineId;
                 entry["textureDigest"] << binding.textureDigest;
                 entry["samplerIdentity"] << binding.samplerIdentity;
+                // W0 — 이 셋이 draw 별 신원의 세 축이다. draw 쪽 `seal.hash` 로
+                // 여기 `sealHash` 를 조인하면 draw 마다의 PSO·sampler·descriptor
+                // 버전이 나온다. 값을 여기 두는 이유는 같은 밀봉을 공유하는
+                // draw 들이 **같은 바인딩을 써야 한다**는 것이 W8 의 불변식이라,
+                // draw 마다 복사하면 그 불변식이 표에서 안 보이게 되기 때문이다.
+                entry["descriptorVersion"] << binding.descriptorVersion;
             }
         };
         appendPass("gbuffer", gbuffer, gbufferSampler);

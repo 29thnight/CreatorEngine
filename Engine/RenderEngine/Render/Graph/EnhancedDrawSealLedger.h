@@ -105,7 +105,22 @@ struct EnhancedDrawSealLedger
         std::uint64_t textureDigest{};
         std::uint64_t samplerIdentity{};
         std::uint32_t pipelineId{};
-        std::uint32_t descriptorVersion{};
+
+        /// W0 — 이 바인딩이 어느 transient descriptor 버전에서 잘려 나왔는가.
+        /// `RHIDescriptorVersionHandle::ToToken()` 값이고 0 은 "버전 없음"이다.
+        ///
+        /// ★ 이 칸은 오래 **writer 가 0 이었다** — 선언만 있고 아무도 채우지
+        ///   않았으며 방출되지도 않았다. 값을 꺼낼 어휘가 DX12 에만 있었기
+        ///   때문이다(`IRenderDeviceServices::GetDescriptorVersionToken` 이 그것을
+        ///   중립으로 올렸다). 폭도 uint32 였는데 토큰은 generation<<32|slot 이라
+        ///   윗 32비트가 통째로 잘려 나갔을 자리다.
+        ///
+        /// ★ **아직 신원에 넣지 않는다.** 아래 `operator==` 는 이 값을 보지
+        ///   않는다 — 한 프레임에 기록이 둘 이상이면 같은 밀봉이 서로 다른
+        ///   버전에서 잘릴 수 있고, 그때 신원으로 쓰면 거짓 충돌이 된다.
+        ///   먼저 캡처로 실제 분포를 재고, 프레임당 하나임이 확인되면 그때
+        ///   신원으로 올린다. 재기 전에 판정하지 않는다.
+        std::uint64_t descriptorVersion{};
 
         bool operator==(const Binding& other) const noexcept
         {

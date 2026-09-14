@@ -137,6 +137,17 @@ public:
     /// 흩어져 있었고, 뒤엣것은 대개 빠져 있었다.
     virtual RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) = 0;
 
+    /// PBR-W0 — 지금 기록 중인 transient descriptor 버전의 토큰.
+    ///
+    /// ★ 값 자체는 `RHIDescriptorVersionHandle::ToToken()` 이라 백엔드 중립인데,
+    ///   그것을 **꺼내는 어휘가 DX12 에만 있었다**. 그래서 W8 의 draw 장부가
+    ///   `descriptorVersion` 칸을 들고도 아무도 채우지 못했고, 캡처가 그 축을
+    ///   통째로 잃고 있었다. 어휘 구멍이 백엔드 비대칭을 만든 자리다.
+    ///
+    /// 0 은 "기록 중인 버전이 없다"는 뜻이다(프레임 밖이거나 recycler 가 없는
+    /// 구현). 판정하는 쪽은 0 을 값으로 읽지 말 것.
+    virtual uint64_t GetDescriptorVersionToken() const = 0;
+
     // ★ BindDescriptorHeaps도 R4-1b에서 인코더로 갔다(R2b의 거는 셋과 같은 수).
     //
     //   구현은 DX12DeviceResources에 남는다. 그래프 밖에서 부르는 자리 둘

@@ -94,11 +94,12 @@ typed Material generation
 | `PBR-W9` | DX12/Vulkan 실장면·장시간·재임포트 회귀와 cutover | · | W8 | 1.5 |
 | **합계** |  |  |  | **18** |
 
-`PBR-W0`은 정적 감사 절반을 기성으로 센다. W3는 2026-09-14 중립 상수 단일 출처화와
-양 팔 변이 증명으로 닫았고(§16), W1은 같은 날 유도를 한 함수로 접고 저장소 소유
-fixture로 실장면 판정을 세워 닫았다(§17). W7의 normal/tangent·UV 선택/변환·mip
-구현과 검증은 합계 1.5일 기성이다. W1/W2/W3/W4/W5/W6 완료 10.5일 + 진행 기성 2.5일이며
-잔여는 5일이다. W7 sampler는 미완료다.
+`PBR-W0`은 정적 감사와 2026-09-14 manifest 축(§18)을 기성으로 센다 — fixture 여덟 중
+셋만 서 있어 완료가 아니다. W3는 중립 상수 단일 출처화와 양 팔 변이 증명으로 닫았고
+(§16), W1은 유도를 한 함수로 접고 저장소 소유 fixture로 실장면 판정을 세워 닫았다
+(§17). W7의 normal/tangent·UV 선택/변환·mip 구현과 검증은 합계 1.5일 기성이다.
+W1/W2/W3/W4/W5/W6 완료 10.5일 + 진행 기성 3일이며 잔여는 4.5일이다. W7 sampler는
+미완료다.
 
 ---
 
@@ -1089,3 +1090,95 @@ exit 0 · stderr 없음` 이고 자산 트리 잔해도 0 이다.
   위한 것이다.
 - **Gunner 축은 여전히 이 기계 전용이다.** 위에 적은 추적 밖 문제는 W1 이 고치지
   않았다.
+
+---
+
+## 18. W0 — draw별 신원 세 축을 캡처에 싣는다, 2026-09-14
+
+### 착수 전 실측이 뒤집은 것
+
+W0 의 남은 항목은 "draw-level sampler identity · descriptor generation · resolved PSO
+key 를 capture manifest 에" 였다. 재 보니 **셋 중 둘은 이미 있었다**.
+
+캡처의 `sealLedger.<pass>.bindings` 가 `sealHash` 마다 `pipelineId`(= resolved PSO
+key)와 `samplerIdentity` 를 적고 있고, `draws[].seal.hash` 로 조인하면 draw 별 값이
+나온다. 실제 캡처로 확인했다 — draw 10 · distinct sealHash 10 · 조인 10/10, 누락 0.
+
+값을 draw 항목에 복사하지 않은 것은 설계다. **"같은 밀봉을 공유하는 draw 는 같은
+바인딩을 쓴다"가 W8 의 불변식**이라, draw 마다 복사하면 그 불변식이 표에서 사라진다.
+
+그래서 이 슬라이스가 할 일은 셋을 다 새로 싣는 것이 아니라 (a) 없는 하나를 만들고
+(b) 있는 것이 **실제로 닿는지를 단정**하는 것이었다.
+
+### descriptor generation 은 제품에 없었다
+
+`EnhancedDrawSealLedger::Binding::descriptorVersion` 은 **writer 가 0 인 죽은 칸**이었다
+— 선언만 있고 아무도 채우지 않았으며, `operator==` 에도 없고, 캡처가 방출하지도
+않았다.
+
+값 자체는 있었다. `RHIDescriptorVersionHandle::ToToken()` 은 백엔드 중립이고 양쪽
+recycler 가 `m_activeVersion` 을 들고 있다. 문제는 **꺼내는 어휘가 DX12 에만** 있었다는
+것이다 — `DX12DescriptorRecycler::GetCurrentVersionToken()` 은 진작 있었는데 Vulkan
+쪽에는 없었고, 중립 인터페이스(`IRenderDeviceServices`)에는 이 축의 낱말이 아예 없었다.
+어휘 구멍이 백엔드 비대칭을 만든 자리다.
+
+- `VulkanDescriptorPoolRecycler::GetCurrentVersionToken()` 을 더해 DX12 와 짝을 맞췄다.
+- `IRenderDeviceServices::GetDescriptorVersionToken()` 으로 중립 계층에 올렸다.
+  구현은 셋이다(DX12 · Vulkan · 자가 검사 대역). 대역은 recycler 가 없으므로 0 을
+  돌려주고, **0 의 뜻을 인터페이스가 규정한다** — "기록 중인 버전 없음".
+- 두 패스(`EnhancedGBufferPass` · `EnhancedForwardPass`)의 바인딩 기록이 그것을 적는다.
+- 캡처가 `descriptorVersion` 을 방출한다.
+
+★ **폭을 넓힌 것이 결정적이었다.** 칸은 `uint32` 였는데 토큰은 `generation << 32 | slot`
+이다. 실측값이 `17179869185`(= `0x4_0000_0001`, generation 4 · slot 0)이므로 옛 폭
+그대로였다면 윗 32비트가 잘려 **`1` 로 보였을 것이다** — 죽어 있던 칸이라 아무도
+그것을 몰랐다.
+
+### 단정하는 것과 재기만 하는 것을 갈랐다
+
+게이트(`Assert-Capture`)에 더한 단정은 둘이다.
+
+1. **조인이 성립한다** — 모든 draw 의 `seal.hash` 가 **자기 라우트의** 장부에서
+   바인딩을 찾는다. 조인되지 않는 draw 는 manifest 에 있어도 신원이 없는 draw 다.
+   라우트를 나눠 찾는 이유는, 두 장부를 합쳐 놓고 찾으면 gbuffer draw 가 forward
+   장부의 항목에 붙어도 통과하기 때문이다.
+2. **세 축이 0 이 아니다** — 0 은 "기록되지 않았다"이고 값이 아니다.
+   `descriptorVersion` 이 방금까지 writer 0 이었으므로 그 시절과 반드시 구분되어야 한다.
+
+★ **변이 폭은 재기만 하고 판정하지 않는다.** 실측은 `distinct pso 1~2 · sampler 1 ·
+descriptorVersion 1` 이다. sampler 가 1 인 것은 지금 pass-global 이라 **옳다**(재질별로
+가르는 것은 W7 이다). 여기서 "1 보다 커야 한다" 로 단정하면 W7 착수 전까지 이 게이트가
+도는 세트에 있을 수 없다. 그래서 수는 매 실행 출력에 남기고 판정에서는 뺐다.
+
+`descriptorVersion` 을 `operator==`(= 바인딩 신원)에 넣지 않은 것도 같은 이유다.
+한 프레임에 기록이 둘 이상이면 같은 밀봉이 서로 다른 버전에서 잘릴 수 있고, 그때
+신원으로 쓰면 거짓 충돌이 된다. 실측은 프레임당 하나를 가리키지만(캡처 셋 전부
+distinct 1), **재 놓고 판정은 미룬다**.
+
+### 변이 증명
+
+예고: DX12 의 토큰 접근자가 0 을 돌려주면 **첫 캡처(`dx12-primitives`)에서**
+`descriptorVersion=0` 으로 던지고, 변이 폭을 적는 식별 줄은 **찍히기 전에** 멈춘다.
+
+```
+verify-pbr-wiring-baseline.ps1:164
+  gbuffer binding has descriptorVersion=0 for seal 5568184615101585538:
+  ...\dx12-primitives
+MUT_GATE_EXIT=1
+```
+
+예고한 자리에서 예고한 문장으로 붉었다. 복원 뒤 세 캡처 전부 조인 성립이고
+식별 줄은 `distinct pso 1~2 · sampler 1 · descriptorVersion 1` 이다.
+
+### 남은 것 (정직하게)
+
+- **라우트별 조인은 데이터로 증명되지 않았다.** 이 fixture 들의 draw 는 전부
+  `gbuffer` 라우트라 `forward` 장부가 비어 있다. 라우트를 나눠 찾는 것은 옳은
+  설계지만, "합쳐 찾으면 통과했을 회귀" 를 실제로 자극한 적은 없다 — forward 로
+  가는 draw(= `Transparent` 재질)가 있는 fixture 가 생겨야 선다.
+- **W0 의 fixture 축은 그대로 남았다.** 이 슬라이스는 manifest 축만 닫았다.
+  §4 가 적은 여덟 중 서 있는 것은 여전히 셋이고(primitives · Gunner · normal
+  대조쌍), alpha mask · AO · emissive-only · 비균등 스케일은 없다. 그중 AO 와
+  emissive 의 원본은 추적 밖 폴더에 있어 자산 소유 결정이 먼저다(§17 의 Gunner
+  문제와 같은 뿌리).
+- **descriptorVersion 은 아직 신원이 아니다.** 위에 적은 이유로 재기만 한다.

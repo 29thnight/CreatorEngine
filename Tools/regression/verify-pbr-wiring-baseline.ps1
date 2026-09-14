@@ -132,6 +132,48 @@ function Assert-Capture([string]$Directory, [string]$ExpectedBackend, [string[]]
             throw "Sampler identity was never recorded in $pass : $Directory"
         }
     }
+    # W0 — draw별 신원 세 축이 캡처에서 실제로 닿는가.
+    #
+    # ★ 세 값(resolved PSO key · sampler identity · descriptor version)은 draw 항목이
+    #   아니라 sealLedger의 bindings에 있고, draw의 seal.hash로 조인해야 나온다.
+    #   값을 draw마다 복사하지 않는 이유는 "같은 밀봉을 공유하는 draw는 같은
+    #   바인딩을 쓴다"가 W8의 불변식이라, 복사하면 그 불변식이 표에서 사라지기
+    #   때문이다. 그래서 여기서 **조인이 실제로 성립하는지**를 단정한다 —
+    #   조인되지 않는 draw는 manifest에 있어도 신원이 없는 draw다.
+    #
+    # ★ 조인은 **라우트별로** 한다. 두 장부를 합쳐 놓고 찾으면 gbuffer draw가
+    #   forward 장부의 항목에 붙어도 통과한다.
+    $identityCounts = @{ pipelineId = @{}; samplerIdentity = @{}; descriptorVersion = @{} }
+    foreach ($pass in @('gbuffer', 'forward')) {
+        $bindings = @{}
+        foreach ($binding in @($manifest.sealLedger.$pass.bindings)) {
+            if ($null -ne $binding) { $bindings[[string]$binding.sealHash] = $binding }
+        }
+        foreach ($draw in @($manifest.draws | Where-Object route -EQ $pass)) {
+            $binding = $bindings[[string]$draw.seal.hash]
+            if ($null -eq $binding) {
+                throw "Draw seal $($draw.seal.hash) has no $pass binding (신원 없는 draw): $Directory"
+            }
+            # 0은 "기록되지 않았다"다. 값으로 읽으면 안 된다 — descriptorVersion은
+            # 이 축이 열리기 전까지 writer가 0이었고 그 시절과 구분되어야 한다.
+            foreach ($axis in @('pipelineId', 'samplerIdentity', 'descriptorVersion')) {
+                if (-not $binding.PSObject.Properties[$axis]) {
+                    throw "$pass binding lacks ${axis} (manifest 배선이 끊겼다): $Directory"
+                }
+                if ([uint64]$binding.$axis -eq 0) {
+                    throw "$pass binding has ${axis}=0 for seal $($draw.seal.hash): $Directory"
+                }
+                $identityCounts[$axis][[string]$binding.$axis] = $true
+            }
+        }
+    }
+    # ★ 변이 폭은 **재기만 한다**. 지금 sampler identity는 pass-global이라 distinct가
+    #   1이고 그것이 옳다(재질별로 가르는 것은 W7이다). 여기서 ">1이어야 한다"로
+    #   단정하면 W7 착수 전까지 게이트가 도는 세트에 있을 수 없다.
+    Write-Output ("  draw identity: distinct pso={0} sampler={1} descriptorVersion={2} ({3})" -f
+        $identityCounts.pipelineId.Count, $identityCounts.samplerIdentity.Count,
+        $identityCounts.descriptorVersion.Count, (Split-Path $Directory -Leaf))
+
     if ($manifest.sealLedger.encoderDrops -ne 0) {
         throw "Encoder dropped commands ($($manifest.sealLedger.lastEncoderDrop)): $Directory"
     }

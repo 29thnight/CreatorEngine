@@ -305,6 +305,11 @@ public:
 
     // ── 바인딩(R2) — 구현은 .cpp에 ──
     RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) override;
+    /// PBR-W0 — recycler 가 이미 들고 있던 값을 중립 어휘로 내보낸다.
+    uint64_t GetDescriptorVersionToken() const override
+    {
+        return m_descriptorRecycler.GetCurrentVersionToken();
+    }
     /// 인터페이스에서 빠졌다(R4-1b) — 인코더와, 그래프 밖에서 원시 경로를
     /// 쓰는 두 자리(인코더 벤치·SSGI 자가 검증)만 부른다.
     void BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList,
