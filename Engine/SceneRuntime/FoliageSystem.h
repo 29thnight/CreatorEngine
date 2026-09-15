@@ -18,7 +18,7 @@ class FoliageComponent;
 // 모든 FoliageComponent가 그 결과를 공유한다 — 컴포넌트 수가 늘수록
 // 이관의 실익이 커지는 지점이다.
 //
-// Awake/OnDestroy는 손대지 않는다 — FoliageComponent가 거기서 하는 일
+// OnInitialized/OnUninitializing은 손대지 않는다 — FoliageComponent가 거기서 하는 일
 // (scene->CollectFoliageComponent/UnCollectFoliageComponent,
 // renderScene->RegisterCommand/UnregisterCommand)은 이 트랙의 대상인
 // "Update 오버라이드"와 무관한 별도 축(렌더 등록)이다.

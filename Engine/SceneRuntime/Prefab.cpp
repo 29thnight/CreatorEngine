@@ -486,7 +486,7 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
 
     // 여기에 있던 주석 처리된 블록은 C++ 스크립트가 프리팹 로드 직후 씬 이벤트에
     // 재구독하던 경로였다. 그 계층이 은퇴하면서(9-4) 대응물이 사라졌다 —
-    // C# 스크립트는 ScriptComponent::Awake가 인스턴스를 만들고 ClrHost가 틱당
+    // C# 스크립트는 ScriptComponent::OnInitialized가 인스턴스를 만들고 ClrHost가 틱당
     // 일괄 디스패치하므로, 프리팹 쪽에서 따로 배선할 것이 없다.
 
     // ★ P4-a: 중첩 프리팹 정체성 보존 (SceneGraphRedesignPlan §4 트랙 P, 확정된

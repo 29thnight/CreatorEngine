@@ -42,10 +42,7 @@ public:
 	   }
    }
 
-   void OnBeginSimulation() override
-   {
-	   OnStart();
-   }
+   void OnBeginSimulation() override;
 
    void OnUninitializing() override
    {
@@ -57,7 +54,7 @@ public:
    }
 
    // 트랙 C3: FixedUpdate/LateUpdate 가상 오버라이드를 걷어내고
-   // CharacterControllerSystem(조밀 벡터, 전용 틱)으로 옮겼다. Awake/OnDestroy(위,
+   // CharacterControllerSystem(조밀 벡터, 전용 틱)으로 옮겼다. OnInitialized/OnUninitializing(위,
    // 콜라이더 등록용)는 이 트랙 범위 밖이라 그대로 둔다. 등록/해지는 씬
    // 편입/이탈 훅(OnAddedToScene/OnRemovingFromScene, DDOL 안전 근거는
    // CharacterControllerSystem.h 주석 참고)으로 한다. 아래 OnFixedUpdate/
@@ -74,7 +71,6 @@ public:
 
 	//==========================
 	//�� ���ο��� ����	�Ǵ� �Լ���
-	void OnStart();
 	void OnFixedUpdate(float fixedDeltaTime);
 	void OnLateUpdate(float fixedDeltaTime);
 

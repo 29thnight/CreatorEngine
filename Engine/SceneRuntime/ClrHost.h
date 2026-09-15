@@ -39,7 +39,7 @@ public:
 	/// ⚠ 반드시 scene->EndFramePass() '뒤'에서 부를 것. 순서가 이 함수의 전부다.
 	///
 	/// 파괴 전에 부르면 아직 살아 있는 스크립트를 거두게 되고, 그 직후 컴포넌트의
-	/// OnDestroy가 이미 사라진 인스턴스를 해제하려 든다. sceneUnloadedEvent가 정확히
+	/// OnUninitializing이 이미 사라진 인스턴스를 해제하려 든다. sceneUnloadedEvent가 정확히
 	/// 그 자리(파괴 전)라 그 이벤트에 붙일 수 없다 — 편해 보이지만 틀린 자리다.
 	///
 	/// 관리 측이 '전부 비우기'가 아니라 '소유자가 죽은 것만 거두기'인 것도 순서와
@@ -218,7 +218,7 @@ public:
 	// ⚠ 담는 쪽은 스레드 안전해야 한다.
 	//
 	// AI 갱신은 게임 스레드가 아니라 std::async가 띄운 스레드에서 돈다
-	// (Scene::OnDestroy 말미의 m_AIFuture). 즉 QueueAITick은 그 스레드에서 불린다.
+	// (Scene::EndFramePass 말미의 m_AIFuture). 즉 QueueAITick은 그 스레드에서 불린다.
 	// 반대로 Flush는 게임 스레드 전용이다 — 관리 측 호출은 GC 때문에 그래야 한다.
 	// 애니메이션 키프레임(ScriptMessage)이 같은 상황이고 같은 규약을 쓴다.
 	void QueueAITick(int instanceId, float deltaTime);
@@ -483,7 +483,7 @@ private:
 	using InitializeFn      = int(__stdcall*)(void*);
 	using ShutdownFn        = int(__stdcall*)();
 	using TickFn            = int(__stdcall*)(float);
-	using AwakeFn           = int(__stdcall*)();
+	using NoArgumentFn      = int(__stdcall*)();
 	using CreateFn          = int(__stdcall*)(ScriptObjectHandle, const char*);
 	using DestroyFn         = int(__stdcall*)(int);
 	using LifecycleFn       = int(__stdcall*)(int, int);
@@ -501,10 +501,10 @@ private:
 
 	InitializeFn m_fnInitialize{ nullptr };
 	ShutdownFn   m_fnShutdown{ nullptr };
-	AwakeFn      m_fnFlushRegistrations{ nullptr };
+	NoArgumentFn m_fnFlushRegistrations{ nullptr };
 	TickFn       m_fnPrePhysicsTick{ nullptr };
 	TickFn       m_fnPostPhysicsTick{ nullptr };
-	AwakeFn      m_fnSceneUnload{ nullptr };
+	NoArgumentFn m_fnSceneUnload{ nullptr };
 
 	// 관리 힙 제어·계측(9-6·9-7). 선택 바인딩이라 구 어셈블리에서는 nullptr로 남는다.
 	// 행동 트리(9-8). 선택 바인딩이라 구 어셈블리에서는 nullptr로 남고 BT만 조용히 꺼진다.
@@ -522,14 +522,14 @@ private:
 	HasBTNodeFn   m_fnHasBTNodeType{ nullptr };
 	using BTStatsFn = int(__stdcall*)(ScriptBTStats*);
 	BTStatsFn    m_fnGetBTStats{ nullptr };
-	AwakeFn      m_fnResetBTStats{ nullptr };
+	NoArgumentFn m_fnResetBTStats{ nullptr };
 
 	// 경계 계수는 관리 측이 볼 수 없으므로 여기서만 센다(선언은 공개 절 참고).
 	AICrossingCounters m_aiCrossings{};
 
 	using GcStatsFn   = int(__stdcall*)(ScriptGcStats*);
 	using GcLatencyFn = int(__stdcall*)(int);
-	AwakeFn      m_fnGcCollectNow{ nullptr };
+	NoArgumentFn m_fnGcCollectNow{ nullptr };
 	GcLatencyFn  m_fnGcSetLatencyMode{ nullptr };
 	GcStatsFn    m_fnGcGetStats{ nullptr };
 

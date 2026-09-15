@@ -89,7 +89,7 @@ void Editor::EditorMain::Initialize()
 	BootProgress::Step(L"Initializing RenderEngine...");
 
 	// 옥트리 컬링 초기화가 여기 있었다 — 계통 전체를 걷었다
-	// (RenderSceneViewPlan ③, MeshRenderer::Awake의 주석 참고).
+	// (RenderSceneViewPlan ③, MeshRenderer::OnInitialized의 주석 참고).
 
 	BootProgress::Step(L"Creating Renderers...");
 
@@ -643,7 +643,7 @@ void Editor::EditorMain::Update()
 			SceneManagers->GameLogic(0.0f);
 
 			// 편집 모드에서는 스크립트를 돌리지 않는다(Unity와 같은 규약).
-			// 붙여 둔 스크립트는 보류 큐에 쌓였다가 재생 시작 시 한꺼번에 Awake된다.
+			// 붙여 둔 스크립트는 보류 큐에 쌓였다가 재생 시작 시 한꺼번에 OnInitialized를 받는다.
 			return;
 		}
 

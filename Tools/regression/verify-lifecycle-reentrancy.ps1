@@ -200,7 +200,7 @@ if ($tickFaults -gt 0) {
 
 # ── 판정 M: 하네스가 살아 있다 (한계는 위 머리말 참고) ────────────────────────
 
-$required = @('Awake', 'AddedToScene', 'Enable', 'Start', 'SimulateStart',
+$required = @('Initialized', 'AddedToScene', 'Enable', 'BeginSimulation', 'SimulateStart',
               'Disable', 'EndSimulation', 'RemovingFromScene', 'Uninitializing')
 $missing = @($required | Where-Object { $controlHooks -notcontains $_ })
 

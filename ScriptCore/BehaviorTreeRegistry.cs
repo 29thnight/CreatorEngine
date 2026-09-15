@@ -137,7 +137,7 @@ internal static class BehaviorTreeRegistry
     /// 씬 언로드에서 <see cref="Clear"/>를 부르면 안 되는 이유는 Component 쪽과 같다 —
     /// DontDestroyOnLoad 오브젝트의 트리까지 없어진다. 소유자 생존으로 가른다.
     ///
-    /// 정상 경로는 BehaviorTreeComponent::OnDestroy → DestroyBehaviorTree이고, 그쪽을
+    /// 정상 경로는 BehaviorTreeComponent::OnUninitializing → DestroyBehaviorTree이고, 그쪽을
     /// 탄 트리는 이미 목록에서 빠져 있다. 즉 여기 걸리는 것은 <b>그 경로를 타지 못한
     /// 트리</b>뿐이라, 하나라도 나오면 수명 배선에 구멍이 있다는 신호다.
     /// </summary>

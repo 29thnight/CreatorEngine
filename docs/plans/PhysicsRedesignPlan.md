@@ -89,7 +89,7 @@ else core -= 4;
 | S-7 | **충돌 매트릭스 2중 진실.** `PhysicsManager`는 `vector<vector<uint8_t>>`(32×32), `PhysicX`는 `unsigned int[32]`. setter 시점에만 동기화, 레이어 수 32 하드코딩 | `PhysicsManager.h:145`, `Physx.h:188` |
 | S-8 | **계층 침범.** ScriptBinder 12개 헤더가 `../Physics/Physx.h` / `PhysicsCommon.h`를 직접 include → 유니티 빌드에서 PhysX 헤더가 엔진 전역에 전이 | 12개 파일 |
 | S-9 | **싱글턴 접근자가 헤더의 `static auto`.** `static auto Physics = PhysicX::GetInstance();`(Physx.h 말미), `static auto PhysicsManagers = ...`(PhysicsManager.h 말미) — TU마다 사본 | 헤더 말미 |
-| S-10 | **생성이 3단계 지연.** `Awake` → `Scene::CollectColliderComponent`(정보만 채우고 람다 저장) → 다음 `FixedUpdate`의 `SetInternalPhysicData`가 람다 호출. `PhysicsManager::AddCollider`는 이름과 달리 아무것도 만들지 않고 오프셋만 계산 | `PhysicsManager.cpp:430` |
+| S-10 | **생성이 3단계 지연.** `OnInitialized` → `Scene::CollectColliderComponent`(정보만 채우고 람다 저장) → 다음 `FixedUpdate`의 `SetInternalPhysicData`가 람다 호출. `PhysicsManager::AddCollider`는 이름과 달리 아무것도 만들지 않고 오프셋만 계산 | `PhysicsManager.cpp:430` |
 | S-12 | **되쓰기가 분해→합성→재분해를 돈다.** `GetPhysicData`가 scale·quat·pos로 행렬을 조립(`CreateScale`×`CreateFromQuaternion`×`CreateTranslation`, 곱 2회)한 뒤 `SetAndDecomposeMatrix`에 넘기고, 그 안에서 행렬 비교(16 float) → `XMMatrixDecompose`(축마다 sqrt) → `XMVector4Normalize` → 부모 조회를 한다. **이미 분해된 형태로 들고 있던 데이터를 옮기려고** 동적 바디마다 프레임마다. 물리는 스케일을 바꾸지 않으므로 스케일은 왕복할 이유조차 없다 | `PhysicsManager.cpp:955-962`, `Transform.cpp:364` |
 | S-11 | **주석 소실.** `PhysicsManager.cpp`·`Physx.cpp` 상당 부분이 이중 mojibake(`占쏙옙`)로 **복구 불가**. 기존 의도를 주석에서 읽어낼 수 없다 | — |
 
@@ -296,7 +296,7 @@ CUDA 초기화 실패 시 `eENABLE_GPU_DYNAMICS`·`broadPhaseType`을 CPU로 되
 
 S-2, S-5를 함께 뒤집는다. 한 오브젝트의 콜라이더 N개가 컴파운드 셰이프 하나로 합쳐진다. RigidBodyComponent가 없으면 **정적 바디**를 만든다(에러가 아니라 정상 경로). `Scene`의 7개 병렬 벡터와 `m_ColliderTypeLinkCallback`을 은퇴시키고 `PhysicsScene` 등록표 하나로.
 
-S-10(3단계 지연 생성)도 여기서 접는다 — `Awake`에서 등록, 다음 스텝 직전에 일괄 생성. 두 단계.
+S-10(3단계 지연 생성)도 여기서 접는다 — `OnInitialized`에서 등록, 다음 스텝 직전에 일괄 생성. 두 단계.
 
 #### B2. dirty 기반 차등 동기화 — P0 · 3일
 

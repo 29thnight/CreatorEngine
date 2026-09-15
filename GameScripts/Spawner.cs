@@ -22,7 +22,7 @@ public sealed partial class Spawner : Component
 
     /// <summary>
     /// 이름이 바뀌면 다시 로드한다.
-    /// Start에서 한 번만 하지 않는 이유는, 인스펙터에서 프리팹 이름을 나중에 채우거나
+    /// OnBeginSimulation에서 한 번만 하지 않는 이유는, 인스펙터에서 프리팹 이름을 나중에 채우거나
     /// 실행 중에 바꾸는 일이 흔하기 때문이다.
     /// </summary>
     private void EnsurePrefab()

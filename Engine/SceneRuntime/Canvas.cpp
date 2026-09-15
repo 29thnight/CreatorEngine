@@ -79,7 +79,7 @@ void Canvas::AddUIObject(Entity* obj)
 	const EntityHandle handle = scene ? scene->HandleOf(obj->m_index) : EntityHandle{};
 	if (!handle.IsValid()) return;
 
-	// 레지스트리 등록은 여기서 하지 않는다(6-1). 등록은 각 컴포넌트의 Awake가
+	// 레지스트리 등록은 여기서 하지 않는다(6-1). 등록은 각 컴포넌트의 OnInitialized가
 	// 자기 수명에 맞춰 직접 한다 — 예전에는 캔버스 연결이 곧 등록이라, 연결이
 	// 안 된 UI는 레지스트리에 없고 연결 경로가 실패하면 크래시로 이어졌다.
 	// 여기는 "이 캔버스 소속"이라는 연결만 만든다. 직렬화용 이름 기록도
@@ -120,7 +120,7 @@ void Canvas::RemoveUIObject(Entity* obj)
 void Canvas::TickCanvasOrder(float tick)
 {
 	// 여기 있던 두 폴링은 걷어 냈다(6-4).
-	//  · 파괴된 UI 청소(erase_if) → UI 컴포넌트 OnDestroy가 RemoveUIObject를 부른다.
+	//  · 파괴된 UI 청소(erase_if) → UI 컴포넌트 OnUninitializing이 RemoveUIObject를 부른다.
 	//    원 작성자도 "UI Manager에서 통합으로 처리하자"라고 남겨 뒀던 자리다.
 	//  · 이름 변경 감지 → 연결이 직접 참조가 되면서(6-2) 런타임에 이름을 맞출 필요가
 	//    없어졌다. 직렬화용 이름은 SetCanvas 시점에 한 번 기록된다.
@@ -131,10 +131,10 @@ void Canvas::TickCanvasOrder(float tick)
 	}
 }
 
-// 레인 UI — UITickSystem 등록/해지. Awake/OnDestroy(컴포넌트당 1회 게이트)가
+// 레인 UI — UITickSystem 등록/해지. OnInitialized/OnUninitializing(컴포넌트당 1회 게이트)이
 // 아니라 씬 편입/이탈 훅을 쓰는 이유는 UITickSystem.h 상단 주석 참조 — DDOL
 // 오브젝트가 씬을 건널 때도 매번 다시 불려야 하기 때문이다. 실제 파괴 경로
-// (PrefabUtility::ApplyComponentDiff·Scene::FlushPendingDestroy)도 OnDestroy
+// (PrefabUtility::ApplyComponentDiff·Scene::FlushPendingDestroy)도 OnUninitializing
 // 직전에 OnRemovingFromScene을 먼저 부르므로, 이 시스템에서 빠지는 시점이
 // 항상 실 파괴보다 먼저다.
 void Canvas::OnAddedToScene()

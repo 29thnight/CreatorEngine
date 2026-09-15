@@ -659,7 +659,7 @@ void ConsoleCommandSystem::Pump()
     // 여기에 두는 이유는 이 함수가 이미 "게임 스레드에서 프레임마다 정확히 한 번"이고,
     // 그 성질을 가진 자리를 새로 만들면 엔진 루프에 진단용 호출이 하나 더 늘기 때문이다.
     // 아래 조기 반환들보다 앞이어야 한다 — wait 중이거나 씬 로딩 중인 프레임도
-    // 프레임이고, 그 사이에 일어난 Awake/OnDestroy가 어느 프레임 것인지 알아야 한다.
+    // 프레임이고, 그 사이에 일어난 OnInitialized/OnUninitializing이 어느 프레임 것인지 알아야 한다.
     Lifecycle::Trace::BeginFrame();
 
     // Count every editor frame, including frames waiting for scene activation.

@@ -2203,10 +2203,10 @@ void Scene::RegisterComponent(Component* component)
 
     if (Lifecycle::Bit_None == mask) return;  // 훅이 하나도 없는 타입 — 넣을 곳이 없다
 
-    // 이미 Awake(OnInitialized)를 받은 컴포넌트는 큐에 넣지 않는다.
+    // 이미 OnInitialized를 받은 컴포넌트는 큐에 넣지 않는다.
     //
     // 등록은 한 번이 아니다 — DDOL은 씬을 건널 때마다, 경로 전환은 그 시점에
-    // 다시 등록한다. 상태를 보지 않으면 그때마다 Awake가 또 돈다.
+    // 다시 등록한다. 상태를 보지 않으면 그때마다 OnInitialized가 또 돈다.
     //
     // OnAddedToScene(트랙 L1, 신설 축)은 대응하는 옛 훅이 없어 자기 상태 비트가
     // 없다 — OnInitialized와 같은 자리(DrainPendingPhases의 첫 loop)에서
@@ -2486,7 +2486,7 @@ void Scene::TryFireReentrancyStressMidTraversal(const char* systemName, const ch
 //
 // 트랙 C2-0으로 CameraSystem::Update 한복판에 진짜 발화점이 생긴 지금도 이 폴백은
 // 남긴다 — 이유는 그대로다: 앞선 시험이 카메라를 전부 파괴해 CameraSystem의
-// m_cameras가 비면(또는 아직 Awake 전이라 처음부터 비어 있으면) 그 루프 자체가
+// m_cameras가 비면(또는 아직 OnInitialized 전이라 처음부터 비어 있으면) 그 루프 자체가
 // 안 돌아 순회 중 발화점을 영영 못 만난다. 그 경우에도 무장이 조용히 증발하지
 // 않도록 각 페이즈 진입부에서 한 번 더 확인한다.
 //
@@ -2700,7 +2700,7 @@ void Scene::Update(float deltaSecond)
     // 순회 중 발화가 우선이고, 위 CameraSystem 루프가 이미 소비했다면 여기는
     // no-op이다(g_stressArmed가 발화 즉시 false). 이 폴백이 실제로 뭔가 하는
     // 경우는 CameraSystem::m_cameras가 비어(파괴 스트레스로 카메라가 전부
-    // 사라졌거나 Awake 전) 순회 중 지점 자체가 안 돈 프레임뿐이다.
+    // 사라졌거나 OnInitialized 전) 순회 중 지점 자체가 안 돈 프레임뿐이다.
     PROFILE_CPU_BEGIN("UpdateEvent");
     PumpReentrancyStress("Update");
     PROFILE_CPU_END();

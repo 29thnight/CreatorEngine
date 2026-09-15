@@ -38,7 +38,7 @@ bool RenderScene::BeginProxyFrame(uint64_t sceneEpoch)
 	if (sceneEpoch == m_consumedSceneEpoch) return true;
 
 	// epoch가 바뀌는 프레임 경계에서만 기존 씬 저장소를 한꺼번에 접는다.
-	// producer의 SetScene/OnDestroy는 이 맵들을 직접 만지지 않는다.
+	// producer의 SetScene/OnUninitializing은 이 맵들을 직접 만지지 않는다.
 	{
 		SpinLock lock(m_proxyMapFlag);
 		m_proxyMap.clear();

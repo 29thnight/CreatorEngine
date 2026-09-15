@@ -1,9 +1,9 @@
 # managed lifecycle trace v1
 # hook	object
-Awake	ScriptHostA
+Initialized	ScriptHostA
 AddedToScene	ScriptHostA
 Enable	ScriptHostA
-Start	ScriptHostA
+BeginSimulation	ScriptHostA
 SimulateStart	ScriptHostA
 SimulateResume	ScriptHostA
 Disable	ScriptHostA
@@ -11,10 +11,10 @@ SimulateCancel	ScriptHostA
 EndSimulation	ScriptHostA
 RemovingFromScene	ScriptHostA
 Uninitializing	ScriptHostA
-Awake	ScriptHostB
+Initialized	ScriptHostB
 AddedToScene	ScriptHostB
 Enable	ScriptHostB
-Start	ScriptHostB
+BeginSimulation	ScriptHostB
 SimulateStart	ScriptHostB
 SimulateResume	ScriptHostB
 Disable	ScriptHostB
@@ -22,10 +22,10 @@ SimulateCancel	ScriptHostB
 EndSimulation	ScriptHostB
 RemovingFromScene	ScriptHostB
 Uninitializing	ScriptHostB
-Awake	ScriptHostA
+Initialized	ScriptHostA
 AddedToScene	ScriptHostA
 Enable	ScriptHostA
-Start	ScriptHostA
+BeginSimulation	ScriptHostA
 SimulateStart	ScriptHostA
 SimulateResume	ScriptHostA
 Disable	ScriptHostA

@@ -33,7 +33,7 @@ namespace Runtime
     ///       → pre-physics 관리 틱 → Physics → GameLogic → post-physics 관리 틱
     ///
     /// 관리 틱 둘은 씬 구조 변경이 대기 중이면 건너뛴다. 재생을 누른 프레임은 아직
-    /// 옛 씬이 활성이라, 여기서 돌리면 곧 접힐 스크립트가 Awake를 한 번 실행해
+    /// 옛 씬이 활성이라, 여기서 돌리면 곧 접힐 스크립트가 OnInitialized를 한 번 실행해
     /// 스폰·사운드 같은 부작용이 두 번 일어난다. 앞뒤 짝이 같은 조건이어야 한다.
     void TickSimulationFrame(float deltaSeconds);
 }

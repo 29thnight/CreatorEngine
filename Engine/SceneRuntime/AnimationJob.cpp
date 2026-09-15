@@ -86,7 +86,7 @@ std::vector<Animator*> AnimationJob::SnapshotAnimators()
 	// 안전 근거 — 잡 실행 창과 컴포넌트 소멸 창은 겹치지 않는다:
 	// SceneManager::GameLogic이 InternalAnimationUpdateEvent를 Broadcast하면
 	// AnimationJob::Update가 이 스냅샷으로 스레드 풀에 작업을 흘리고
-	// NotifyAllAndWait로 그 프레임 안에서 완결된다. 실제 소멸(Scene::OnDestroy →
+	// NotifyAllAndWait로 그 프레임 안에서 완결된다. 실제 소멸(Scene::EndFramePass →
 	// FlushPendingDestroy → DestroyComponents의 component.reset())은 같은 게임
 	// 스레드의 그 뒤(EditorMain::Update의 DisableOrEnable)에서만 일어나므로,
 	// 여기서 담아 스레드 풀 람다에 넘기는 raw 포인터는 그 잡이 완료될 때까지

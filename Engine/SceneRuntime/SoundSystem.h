@@ -20,11 +20,11 @@ class SoundComponent;
 //
 // ── 등록/해지 훅 선택 근거 ──
 //
-// Awake/OnDestroy가 아니라 OnAddedToScene/OnRemovingFromScene(6단계 축, 게이트
+// OnInitialized/OnUninitializing이 아니라 OnAddedToScene/OnRemovingFromScene(6단계 축, 게이트
 // 없음)에 건다 — 근거는 AnimatorSystem.h와 동일(DDOL 오브젝트가 씬을 건널 때
-// Awake는 컴포넌트당 1회만 불려 재등록되지 않는다). SoundComponent::OnDestroy는
+// OnInitialized는 컴포넌트당 1회만 불려 재등록되지 않는다). SoundComponent::OnUninitializing은
 // 기존 그대로(Stop() 호출, FMOD 채널 정지) 둔다 — RenderScene 류의 별도 등록부가
-// 없어 Animator처럼 "다른 시스템 등록을 위해 남겨둘 Awake/OnDestroy"가 애초에
+// 없어 Animator처럼 "다른 시스템 등록을 위해 남겨둘 OnInitialized/OnUninitializing"이 애초에
 // 없다.
 //
 // ── 실행 시점(호출 위치)은 이 시스템의 소관 밖 ──

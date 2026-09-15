@@ -22,7 +22,7 @@
 #
 # ── 판정 항목 (verify-ddol-script.ps1) ──
 #
-#   1  생성 시 Awake·AddedToScene 각 1회   — 기준선(관리 드레인이 돌았다)
+#   1  생성 시 Initialized·AddedToScene 각 1회   — 기준선(관리 드레인이 돌았다)
 #   2  이송 시 RemovingFromScene 1회 추가   — ★ detach 통지가 닿았는가
 #   3  이송 시 AddedToScene 1회 추가        — ★ attach 통지가 닿았는가
 #   4  이송 뒤 로그에 오브젝트 이름이 남는다 — ★ 핸들이 이송을 살아 건넜는가

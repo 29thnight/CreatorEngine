@@ -3,22 +3,22 @@ namespace CreatorEngine.Scripts;
 /// <summary>
 /// 라이프사이클 호출 시점을 관측하는 진단용 스크립트.
 ///
-/// 프레임 번호는 엔진에서 직접 받는다. 스크립트가 세는 값을 쓰면 TickAwake가
-/// TickUpdate보다 먼저 도는 탓에 "같은 프레임"으로 잘못 보인다.
+/// 프레임 번호는 엔진에서 직접 받는다. 스크립트가 틱에서 세는 값을 쓰면 생명주기 훅이
+/// 틱보다 먼저 도는 탓에 "같은 프레임"으로 잘못 보인다.
 /// </summary>
 public sealed partial class LifecycleProbe : Component
 {
-    private ulong _awakeFrame;
+    private ulong _initializedFrame;
 
     public override void OnInitialized()
     {
-        _awakeFrame = FrameCount;
-        Log($"[Probe] Awake — {Entity.Name} · 엔진프레임 {_awakeFrame}");
+        _initializedFrame = FrameCount;
+        Log($"[Probe] Initialized — {Entity.Name} · 엔진프레임 {_initializedFrame}");
     }
 
     public override void OnBeginSimulation()
     {
-        Log($"[Probe] Start — {Entity.Name} · 엔진프레임 {FrameCount} (Awake는 {_awakeFrame})");
+        Log($"[Probe] BeginSimulation — {Entity.Name} · 엔진프레임 {FrameCount} (Initialized는 {_initializedFrame})");
     }
 
     // 씬 편입/이탈 — 이 둘은 두 기제에서 온다(설계 문서 §4 트랙 L · L3 잔여).

@@ -2578,10 +2578,10 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	void* fn = nullptr;
 	if (!bind(L"Initialize", &fn))       return false;  m_fnInitialize = reinterpret_cast<InitializeFn>(fn);
 	if (!bind(L"Shutdown", &fn))         return false;  m_fnShutdown = reinterpret_cast<ShutdownFn>(fn);
-	if (!bind(L"FlushRegistrations", &fn)) return false;  m_fnFlushRegistrations = reinterpret_cast<AwakeFn>(fn);
+	if (!bind(L"FlushRegistrations", &fn)) return false;  m_fnFlushRegistrations = reinterpret_cast<NoArgumentFn>(fn);
 	if (!bind(L"PrePhysicsTick", &fn))   return false;  m_fnPrePhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"PostPhysicsTick", &fn))  return false;  m_fnPostPhysicsTick = reinterpret_cast<TickFn>(fn);
-	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<AwakeFn>(fn);
+	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<NoArgumentFn>(fn);
 	if (!bind(L"FlushPhysicsEvents", &fn)) return false;  m_fnFlushPhysicsEvents = reinterpret_cast<FlushPhysicsFn>(fn);
 	if (!bind(L"CreateComponent", &fn))  return false;  m_fnCreateComponent = reinterpret_cast<CreateFn>(fn);
 
@@ -2598,14 +2598,14 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (bind(L"GetBTNodeTypeNames", &fn))  m_fnGetBTNodeTypeNames  = reinterpret_cast<BTTypeNamesFn>(fn);
 	if (bind(L"HasBTNodeType", &fn))       m_fnHasBTNodeType       = reinterpret_cast<HasBTNodeFn>(fn);
 	if (bind(L"GetBTStats", &fn))          m_fnGetBTStats          = reinterpret_cast<BTStatsFn>(fn);
-	if (bind(L"ResetBTStats", &fn))        m_fnResetBTStats        = reinterpret_cast<AwakeFn>(fn);
+	if (bind(L"ResetBTStats", &fn))        m_fnResetBTStats        = reinterpret_cast<NoArgumentFn>(fn);
 
 	// 관리 힙 제어·계측(9-6·9-7). Bootstrap이 아니라 GcControl에 있다 —
 	// 성격이 스크립트 수명이 아니라 런타임 정책이라 진입점 묶음을 나눴다.
 	// 선택 바인딩이라 이것이 없는 어셈블리에서는 GC 연동만 조용히 꺼진다.
 	{
 		const wchar_t* gcType = L"CreatorEngine.GcControl, ScriptCore";
-		if (bindFrom(gcType, L"CollectNow", &fn))     m_fnGcCollectNow     = reinterpret_cast<AwakeFn>(fn);
+		if (bindFrom(gcType, L"CollectNow", &fn))     m_fnGcCollectNow     = reinterpret_cast<NoArgumentFn>(fn);
 		if (bindFrom(gcType, L"SetLatencyMode", &fn)) m_fnGcSetLatencyMode = reinterpret_cast<GcLatencyFn>(fn);
 		if (bindFrom(gcType, L"GetStats", &fn))       m_fnGcGetStats       = reinterpret_cast<GcStatsFn>(fn);
 	}

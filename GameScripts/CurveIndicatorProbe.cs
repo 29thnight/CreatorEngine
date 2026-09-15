@@ -5,7 +5,7 @@ namespace CreatorEngine.Scripts;
 ///
 /// SetIndicator·EnableIndicator는 다른 스크립트가 부르는 API라 CLI로는 건드릴 수 없다.
 /// 그래서 호출부 역할을 대신하는데, 덤으로 스크립트끼리의 GetComponent도 함께 검증된다.
-/// 구동은 Update 첫 프레임에 한다 — Start 순서에 기대지 않기 위해서다.
+/// 구동은 PostPhysics 첫 프레임에 한다 — OnBeginSimulation 순서에 기대지 않기 위해서다.
 /// </summary>
 public sealed partial class CurveIndicatorProbe : Component
 {

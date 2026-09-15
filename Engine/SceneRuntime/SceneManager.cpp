@@ -1522,8 +1522,8 @@ bool SceneManager::RestoreSceneSnapshot()
 
 // ── 시뮬레이션 primitive (E3-1) ──
 //
-// OnBeginSimulation 같은 훅을 여기서 부르지 않는다 — Start()는 이미 매 프레임 드는
-// pendingInitialize/Start 드레인이 State_SimulationBegun 가드로 정확히 한 번만 부르고 있어
+// OnBeginSimulation 같은 훅을 여기서 부르지 않는다 — 그것은 이미 매 프레임 드는
+// PendingInitialize/PendingSimulation 드레인이 State_SimulationBegun 가드로 정확히 한 번만 부르고 있어
 // (에디터 틱도 예외가 아니다), 여기서 다시 부르면 그 가드를 건너뛰고 두 번 불린다.
 // phase 필드는 그 드레인과 무관하게 상태 기계 자체를 정확히 유지하기 위한 부기다.
 void SceneManager::SetSimulationPhase(ScenePhase phase)

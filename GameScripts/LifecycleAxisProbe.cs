@@ -12,7 +12,7 @@ namespace CreatorEngine.Scripts;
 ///   T1 편집 모드에서 6단계가 이미 돈다.
 ///      EditorMain.cpp:510이 "편집 모드에서는 스크립트를 돌리지 않는다(Unity와
 ///      같은 규약). 붙여 둔 스크립트는 보류 큐에 쌓였다가 재생 시작 시 한꺼번에
-///      Awake된다"고 적어 뒀지만, 그 return 앞의 SceneManagers-&gt;Editor()가
+///      OnInitialized를 받는다"고 적어 뒀지만, 그 return 앞의 SceneManagers-&gt;Editor()가
 ///      매 프레임 DrainPendingLifecycle을 돌린다(SceneManager.cpp:382). 재생
 ///      시작에는 State_Initialized·State_SimulationBegun이 이미 서 있어
 ///      <b>훅이 하나도 다시 불리지 않는다.</b>

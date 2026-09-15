@@ -1328,7 +1328,7 @@ E3-5(BT/Animation)는 앞의 사슬과 파일을 공유하지 않아 별도 트�
   "복원"을 원한다면 선택을 instanceID/EntityHandle로 들어야 하고, 그것은 리팩터가
   아니라 기능이라 이 PHASE 밖이다.
   게이트: `verify-play-selection-undo.ps1`.
-- DDOL과 C# Awake/OnEnable/Start/OnDisable/OnDestroy 순서가 유지된다.
+- DDOL과 C# OnInitialized/OnEnable/OnBeginSimulation/OnDisable/OnUninitializing 순서가 유지된다.
 - `SceneManager`가 Undo, PrefabEditor, Editor mode를 include하지 않는다.
   ⚠ 2026-08-23 정정 — Selection을 이 목록에서 뺀다. `SceneManager`의 선택 관여는
   실측 4건인데, 둘은 델리게이트 선언·전역 별칭이고 나머지 둘은 옮길 수 없다:

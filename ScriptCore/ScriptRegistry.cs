@@ -18,7 +18,7 @@ internal static class ScriptRegistry
     ///
     /// 실측에서 GetComponent 계열이 734회로 1위인데, 그 상당수가 스크립트끼리의 참조다.
     /// 이 색인이 있으면 그 호출들이 전부 관리 영역에서 끝난다(설계 문서 03.1 · 11.2).
-    /// 보류 큐를 거치지 않고 즉시 갱신하는 이유는, 스폰 직후 Awake 안에서 바로
+    /// 보류 큐를 거치지 않고 즉시 갱신하는 이유는, 스폰 직후 OnInitialized 안에서 바로
     /// GetComponent를 부르는 패턴이 흔하기 때문이다.
     /// </summary>
     private static readonly Dictionary<ObjectHandle, List<Component>> _byObject = new();
@@ -616,13 +616,13 @@ internal static class ScriptRegistry
     /// 씬 언로드에서 <see cref="Clear"/>를 부르면 <b>DontDestroyOnLoad 오브젝트의
     /// 스크립트까지 죽는다</b>. Scene::AllDestroyMark가 DDOL을 건너뛰므로 그 컴포넌트는
     /// 파괴 표시조차 되지 않고, 따라서 여기 _active에 그대로 남아 있다. Clear는 목록을
-    /// 통째로 도니 그것들에도 OnDisable·OnDestroy를 부르고 목록에서 지운다 —
+    /// 통째로 도니 그것들에도 OnDisable·OnUninitializing을 부르고 목록에서 지운다 —
     /// 오브젝트는 살아서 다음 씬으로 넘어가는데 스크립트만 죽는 셈이다.
     /// 크래시가 아니라 '저 오브젝트만 스크립트가 안 돈다'로 나타나 원인을 짚기 어렵다.
     ///
     /// 그래서 소유자 생존으로 가른다. 세대 핸들 비교라 슬롯 재사용에도 속지 않는다.
     ///
-    /// 이미 파괴 표시된 것은 건드리지 않는다 — 정상 경로(ScriptComponent::OnDestroy →
+    /// 이미 파괴 표시된 것은 건드리지 않는다 — 정상 경로(ScriptComponent::OnUninitializing →
     /// Remove → _pendingRemove)를 탄 것이고, Flush가 TearDown(OnEndSimulation→
     /// OnRemovingFromScene→OnUninitializing)을 부를 예정이라 여기서 또 부르면 두 번 불린다.
     /// </summary>
@@ -639,7 +639,7 @@ internal static class ScriptRegistry
             if (b.IsMarkedDestroyed) continue;   // 정상 경로가 이미 잡았다
             if (b.Entity.IsAlive) continue;  // 살아 있다 — DDOL 포함
 
-            // 정상 경로와 같은 통로로 보낸다. 여기서 직접 OnDestroy를 부르지 않는 이유는
+            // 정상 경로와 같은 통로로 보낸다. 여기서 직접 OnUninitializing을 부르지 않는 이유는
             // 그러면 _active·_byObject 정리가 빠져 목록에만 시체가 남기 때문이다.
             Remove(b);
             ++swept;

@@ -186,7 +186,7 @@ void Entity::AttachComponentLifecycle(Component* component)
     if (nullptr == scene) return;
 
     // 소유자는 아직 안 붙었을 수 있지만(호출부마다 순서가 다르다) 등록은 typeID만
-    // 보므로 무관하다 — 소유자는 Awake를 부를 때 확인한다.
+    // 보므로 무관하다 — 소유자는 OnInitialized를 부를 때 확인한다.
     scene->RegisterComponent(component);
 
 	// X4 projection membership은 계층뿐 아니라 공간 컴포넌트 조합에도 달렸다.

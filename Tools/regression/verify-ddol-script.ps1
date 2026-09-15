@@ -22,7 +22,7 @@
 #
 # ── 판정 항목 ──
 #
-#   1  Awake 1회                      — 관리 드레인이 실제로 돌았다(0이면 재생 안 됨)
+#   1  Initialized 1회                — 관리 드레인이 실제로 돌았다(0이면 재생 안 됨)
 #   2  AddedToScene 2회               — ★ 생성 1 + 이송 재부착 1
 #   3  RemovingFromScene 2회          — ★ 이송 이탈 1 + 종료 TearDown 1
 #   4  이름 없는 훅 로그 0건          — ★ 핸들이 이송을 살아 건넜다
@@ -93,7 +93,7 @@ function Count-Hook([string]$hook) {
     return ([regex]::Matches($logText, "\[Probe\] $hook — $([regex]::Escape($probeName))")).Count
 }
 
-$awake     = Count-Hook "Awake"
+$awake     = Count-Hook "Initialized"
 $added     = Count-Hook "AddedToScene"
 $removing  = Count-Hook "RemovingFromScene"
 
@@ -111,7 +111,7 @@ $sequenceText = ($sequence -join ' > ')
 
 "훅 순서: $sequenceText"
 ""
-"Awake              $awake 회 (기대 1 — 0이면 재생/드레인이 안 돌았다)"
+"Initialized        $awake 회 (기대 1 — 0이면 재생/드레인이 안 돌았다)"
 "AddedToScene       $added 회 (기대 2 — 생성 1 + 이송 재부착 1)"
 "RemovingFromScene  $removing 회 (기대 2 — 이송 이탈 1 + 종료 1)"
 "이름 없는 훅 로그  $nameless 건 (기대 0 — 핸들이 이송을 살아 건넜는가)"
@@ -129,7 +129,7 @@ if (-not $saveOk) {
 }
 
 if ($awake -ne 1) {
-    $failed += "Awake가 $awake 회다 — 0이면 재생이 안 돌아 이 검사가 아무것도 재지 못한 것이다(play 확인)"
+    $failed += "Initialized가 $awake 회다 — 0이면 재생이 안 돌아 이 검사가 아무것도 재지 못한 것이다(play 확인)"
 }
 if ($added -lt 2) {
     $failed += "AddedToScene가 $added 회다 — 이송 재부착 통지가 스크립트에 닿지 않았다(Scene::AttachExistingEntity의 NotifyManagedLifecycle 확인)"
@@ -148,7 +148,7 @@ if ($nameless -gt 0) {
 # 그것이 이 슬라이스의 회귀다(개수는 맞는데 순서만 틀리는 경우를 잡는다).
 # 2026-08-20 실측 기준선. 이 줄이 트랙 L5가 제시한 구조를 그대로 증명한다:
 #
-#   · SimulateStart가 Start(OnBeginSimulation) **직후**    — 본문의 시작 지점
+#   · SimulateStart가 BeginSimulation **직후**    — 본문의 시작 지점
 #   · SimulateResume                                        — Scope.Delay가 엔진 dt로 흘러 재개
 #   · RemovingFromScene > AddedToScene 사이를 건너 살아남음 — 이송에서 취소되지 않는다
 #     (사용자 결정: Remove Entity에서만 취소)
@@ -156,7 +156,7 @@ if ($nameless -gt 0) {
 #
 # 종료 시 Disable이 그 앞에 오는 것은 ScriptRegistry.Clear가 OnDisable을 부른 뒤
 # TearDown을 부르기 때문이다(TearDown이 Scope.Cancel부터 한다).
-$expectedSequence = "Awake > AddedToScene > Enable > Start > SimulateStart > SimulateResume > RemovingFromScene > AddedToScene > Disable > SimulateCancel > EndSimulation > RemovingFromScene > Uninitializing"
+$expectedSequence = "Initialized > AddedToScene > Enable > BeginSimulation > SimulateStart > SimulateResume > RemovingFromScene > AddedToScene > Disable > SimulateCancel > EndSimulation > RemovingFromScene > Uninitializing"
 if ($sequenceText -ne $expectedSequence) {
     $failed += "훅 순서가 다르다`n      기대: $expectedSequence`n      실측: $sequenceText"
 }

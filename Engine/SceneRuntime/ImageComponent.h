@@ -70,7 +70,7 @@ public:
 
 	bool isThisTextureExist(std::string_view path) const;
 
-	// rect의 결과를 렌더 파라미터(pos·scale·origin)로 옮긴다. Awake와 Update가
+	// rect의 결과를 렌더 파라미터(pos·scale·origin)로 옮긴다. 옛 Awake와 Update가
 	// 같은 코드를 복제하고 있어 한쪽만 고쳐지는 일이 실제로 있었다(Update에는
 	// SetSizeDelta 호출이 주석 처리돼 두 경로의 동작이 달랐다).
 	void RefreshTransformFromRect();
@@ -94,7 +94,7 @@ public:
 	float                                   clipPercent{ 1.f };
 	ClipDirection                           clipDirection{ ClipDirection::None };
 
-	// 켜면 Awake에서 한 번 SetNativeSize를 부른다 — 예전의 자동 덮어쓰기 동작이다.
+	// 켜면 OnInitialized에서 한 번 SetNativeSize를 부른다 — 예전의 자동 덮어쓰기 동작이다.
 	//
 	// 기본값이 false인 이유: 현재 에셋 154개의 sizeDelta가 전부 0이 아닌 실제 값이고,
 	// 그 값이 곧 저작 당시의 텍스처 크기다. 즉 끄는 쪽이 기존 결과를 그대로 재현하면서

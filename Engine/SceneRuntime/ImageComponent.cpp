@@ -97,7 +97,7 @@ void ImageComponent::OnInitialized()
 		if (renderScene) renderScene->RegisterCommand(this);
 	}
 
-	// 레지스트리 등록은 수명의 시작(Awake)에서 스스로 한다(6-1).
+	// 레지스트리 등록은 수명의 시작(OnInitialized)에서 스스로 한다(6-1).
 	// 캔버스 연결과 무관하게 등록되므로, 연결이 늦거나 없어도 유령이 되지 않는다.
 	UIManagers->RegisterImageComponent(this);
 
@@ -116,10 +116,10 @@ void ImageComponent::TickLayout(float tick)
 	RefreshTransformFromRect();
 }
 
-// 레인 UI — UITickSystem 등록/해지. Awake/OnDestroy(컴포넌트당 1회 게이트)가
+// 레인 UI — UITickSystem 등록/해지. OnInitialized/OnUninitializing(컴포넌트당 1회 게이트)이
 // 아니라 씬 편입/이탈 훅을 쓰는 이유는 UITickSystem.h 상단 주석 참조 — DDOL
 // 오브젝트가 씬을 건널 때도 매번 다시 불려야 하기 때문이다. 실제 파괴 경로
-// (PrefabUtility::ApplyComponentDiff·Scene::FlushPendingDestroy)도 OnDestroy
+// (PrefabUtility::ApplyComponentDiff·Scene::FlushPendingDestroy)도 OnUninitializing
 // 직전에 OnRemovingFromScene을 먼저 부르므로, 이 시스템에서 빠지는 시점이
 // 항상 실 파괴보다 먼저다.
 void ImageComponent::OnAddedToScene()

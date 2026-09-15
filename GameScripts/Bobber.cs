@@ -20,13 +20,13 @@ public sealed partial class Bobber : Component
 
     public override void OnInitialized()
     {
-        Log($"[Bobber] Awake — {Entity.Name}");
+        Log($"[Bobber] Initialized — {Entity.Name}");
     }
 
     public override void OnBeginSimulation()
     {
         _origin = Transform.LocalPosition;
-        Log($"[Bobber] Start — 기준 위치 {_origin}");
+        Log($"[Bobber] BeginSimulation — 기준 위치 {_origin}");
     }
 
     public override void PostPhysics(float tick)
@@ -42,7 +42,7 @@ public sealed partial class Bobber : Component
 
     public override void OnUninitializing()
     {
-        Log("[Bobber] OnDestroy");
+        Log("[Bobber] Uninitializing");
     }
 }
 

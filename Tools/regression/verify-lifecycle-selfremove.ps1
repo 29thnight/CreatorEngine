@@ -188,7 +188,7 @@ elseif ($yieldFrames.Count -lt 2) {
 
 # ── 판정 T: 이웃이 순회에서 건너뛰어지지 않는다 ───────────────────────────────
 
-$required = @('Awake', 'AddedToScene', 'Enable', 'Start', 'SimulateStart',
+$required = @('Initialized', 'AddedToScene', 'Enable', 'BeginSimulation', 'SimulateStart',
               'Disable', 'EndSimulation', 'RemovingFromScene', 'Uninitializing')
 $missing = @($required | Where-Object { $controlHooks -notcontains $_ })
 

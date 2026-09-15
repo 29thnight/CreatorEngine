@@ -3,8 +3,8 @@ namespace CreatorEngine.Scripts;
 /// <summary>
 /// CharacterControllerComponent 래퍼 검증.
 ///
-/// 이동은 PhysX 틱을 거쳐야 결과가 나오므로 Awake 한 번으로 판정할 수 없다.
-/// 그래서 즉시 판정 가능한 것(속성 왕복·강제 이동 상태·형상 정보)은 Awake에서 보고,
+/// 이동은 PhysX 틱을 거쳐야 결과가 나오므로 OnInitialized 한 번으로 판정할 수 없다.
+/// 그래서 즉시 판정 가능한 것(속성 왕복·강제 이동 상태·형상 정보)은 OnInitialized에서 보고,
 /// 실제 이동은 몇 프레임 뒤 위치 변화를 확인한다.
 /// </summary>
 public sealed partial class CctProbe : Component
@@ -61,7 +61,7 @@ public sealed partial class CctProbe : Component
         Assert("Move 입력이 실제 이동으로 이어짐", moved.Length > 1e-3f, "위치가 그대로입니다");
 
         // 강제 이동은 여기서 본다. PhysX 컨트롤러 생성이 한 틱 뒤로 미뤄져 있어
-        // Awake 시점에는 아직 등록 전이고, 그때 걸면 조용히 무시된다.
+        // OnInitialized 시점에는 아직 등록 전이고, 그때 걸면 조용히 무시된다.
         CheckForcedMove();
 
         if (_failed == 0) Log($"[CctProbe] 전체 통과 ({_passed}건)");

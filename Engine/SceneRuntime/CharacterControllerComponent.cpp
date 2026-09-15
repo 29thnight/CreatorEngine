@@ -1,7 +1,7 @@
 #include "CharacterControllerComponent.h"
 #include "CharacterControllerSystem.h"
 
-void CharacterControllerComponent::OnStart()
+void CharacterControllerComponent::OnBeginSimulation()
 {
 	m_transform = &GetOwner()->Transform_();
 	
@@ -10,11 +10,11 @@ void CharacterControllerComponent::OnStart()
 	m_bMoveRestrict.fill(false);
 }
 
-// 트랙 C3 — CharacterControllerSystem 등록/해지. Awake/OnDestroy(위, 컴포넌트당
+// 트랙 C3 — CharacterControllerSystem 등록/해지. OnInitialized/OnUninitializing(위, 컴포넌트당
 // 1회 게이트)가 아니라 씬 편입/이탈 훅을 쓰는 이유는 CharacterControllerSystem.h
 // 상단 주석 참조 — DDOL 오브젝트가 씬을 건널 때도 매번 다시 불려야 하기 때문이다.
 // 실제 파괴 경로(Scene::FlushPendingDestroy·PrefabUtility::ApplyComponentDiff)도
-// 실 파괴(OnDestroy) 직전에 OnRemovingFromScene을 먼저 부르므로, 이 시스템에서
+// 실 파괴(OnUninitializing) 직전에 OnRemovingFromScene을 먼저 부르므로, 이 시스템에서
 // 빠지는 시점이 항상 실 파괴보다 먼저다.
 void CharacterControllerComponent::OnAddedToScene()
 {

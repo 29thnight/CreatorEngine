@@ -230,7 +230,7 @@ namespace
 		}
 
 		// 제거: 프리팹에서 빠진 타입, 또는 개수가 줄어 남은 초과분만 파괴한다.
-		// Destroy → OnDestroy → UnregisterComponent 순서는 옛 전량 재생성 경로와
+		// Destroy → OnUninitializing → UnregisterComponent 순서는 옛 전량 재생성 경로와
 		// 동일하게 유지한다 — UnregisterComponent를 먼저 하지 않으면 다음 프레임
 		// 디스패치가 죽은 포인터를 순회한다(K2 §6 함정, "제거가 비로소 성립").
 		Scene* scene = obj.GetScene();

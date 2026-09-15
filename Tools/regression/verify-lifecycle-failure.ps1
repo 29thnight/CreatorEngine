@@ -272,7 +272,7 @@ else {
 # 정상 경로의 11훅. 이웃의 예외가 이 인스턴스의 생명주기를 끊지 않아야 한다.
 
 $expectedControl = @(
-    'Awake', 'AddedToScene', 'Enable', 'Start', 'SimulateStart',
+    'Initialized', 'AddedToScene', 'Enable', 'BeginSimulation', 'SimulateStart',
     'Disable', 'SimulateCancel', 'EndSimulation', 'RemovingFromScene', 'Uninitializing'
 )
 $missingControl = @($expectedControl | Where-Object { $controlHooks -notcontains $_ })

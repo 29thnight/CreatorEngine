@@ -142,7 +142,7 @@ if ($playing.Ticks -le $spawned.Ticks) {
 # 4 · 죽은 id로 들어온 틱이 있으면 수명 배선이 어긋난 것이다.
 if ($playing.Skipped -ne 0) { $failed += "건너뛴 틱이 $($playing.Skipped)회다(0이어야 한다)" }
 
-# 5 · 정지는 틱만 멈춘다. 파괴는 OnDestroy에서만 일어난다.
+# 5 · 정지는 틱만 멈춘다. 파괴는 OnUninitializing에서만 일어난다.
 if ($stopped.Trees -ne 3) { $failed += "정지 후 트리가 $($stopped.Trees)개다(3이어야 한다)" }
 
 # 6 · 남으면 Running이 다음 씬으로 새고 어셈블리 언로드도 막힌다.

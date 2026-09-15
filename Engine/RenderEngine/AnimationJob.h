@@ -27,8 +27,8 @@ public:
 		const assets::ModelAssetGeneration& generation, int clipIndex,
 		float time, math::matrix4x4* outPose);
 	// K2: 공유 소유 해체 — Animator는 게임/컴포넌트 측이 소유하고, 여기서는
-	// 프레임 안에서만 유효한 관찰용 raw 포인터로 추적한다(등록/해제는 Awake/
-	// OnDestroy가 this로 직접 호출). 수명 불변식은 AnimationJob.cpp의
+	// 프레임 안에서만 유효한 관찰용 raw 포인터로 추적한다(등록/해제는 OnInitialized/
+	// OnUninitializing이 this로 직접 호출). 수명 불변식은 AnimationJob.cpp의
 	// SnapshotAnimators 주석 참조.
 	void RegisterAnimator(Animator* animator);
 	void UnregisterAnimator(Animator* animator);
@@ -54,7 +54,7 @@ private:
 	mutable std::mutex m_animatorMutex;
 	// K2: weak_ptr<Animator>(공유 소유 관찰) → Animator*(프레임-로컬 관찰).
 	// Animator가 더 이상 enable_shared_from_this를 상속하지 않으므로 lock()할
-	// shared_ptr이 없다 — 등록/해제 시점(Awake/OnDestroy)에 정확히 맞춰
+	// shared_ptr이 없다 — 등록/해제 시점(OnInitialized/OnUninitializing)에 정확히 맞춰
 	// 정본을 유지한다.
 	std::unordered_map<size_t, Animator*> m_animators;
 };

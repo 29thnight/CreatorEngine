@@ -11,7 +11,7 @@
 #
 # 왜 왕복(A→B→A)인가:
 #   편도만 재면 "새 씬에서 안 불렸다"와 "이전 씬이 정리되지 않았다"를 구분할 수 없다.
-#   씬 전환의 OnDestroy 대칭성은 왕복에서만 드러난다.
+#   씬 전환의 OnUninitializing 대칭성은 왕복에서만 드러난다.
 #
 # 씬 경로:
 #   {{SCENE_A}} / {{SCENE_B}}는 verify-lifecycle-baseline.ps1이 실행 직전에
@@ -31,7 +31,7 @@
 #   구조가 다른 둘이어야 한다는 원래 요건(아래)은 그대로다.
 #
 #   ★ 저작은 `lifecycle.trace clear`보다 **앞**이어야 한다. 뒤에 두면 만드는
-#   과정의 Awake가 기록에 섞여, 무엇이 왕복의 결과인지 구분되지 않는다.
+#   과정의 OnInitialized가 기록에 섞여, 무엇이 왕복의 결과인지 구분되지 않는다.
 #
 #   ── 스크립트 호스트 (LC0 · 2026-09-05) ──
 #
@@ -57,8 +57,8 @@
 
 # --- 기록 시작 ---
 #
-# 첫 씬 로드보다 앞이어야 한다. 로드 뒤에 켜면 그 씬의 Awake가 빠진 채 나중에
-# OnDestroy만 잡혀 두 수가 어긋나고, 그 어긋남이 결함인지 계측 구멍인지
+# 첫 씬 로드보다 앞이어야 한다. 로드 뒤에 켜면 그 씬의 OnInitialized가 빠진 채 나중에
+# OnUninitializing만 잡혀 두 수가 어긋나고, 그 어긋남이 결함인지 계측 구멍인지
 # 구분되지 않는다.
 #
 # 예산을 0으로 주는 것은 '수명 단계만'이라는 뜻이다. 틱 단계는 재생이 안정된
@@ -152,7 +152,7 @@ lifecycle.trace on 0
 scene.switch {{SCENE_A}}
 wait 60
 
-# --- 재생 진입: Awake/OnEnable/Start 순서가 여기 담긴다 ---
+# --- 재생 진입: OnInitialized/OnEnable/OnBeginSimulation 순서가 여기 담긴다 ---
 play
 wait 120
 
@@ -166,7 +166,7 @@ lifecycle.trace on 3
 wait 10
 lifecycle.trace status
 
-# --- 파괴 경로: OnDestroy 순서와 파괴 중 순회 안전성 ---
+# --- 파괴 경로: OnUninitializing 순서와 파괴 중 순회 안전성 ---
 lifecycle.stress destroy 8
 wait 60
 lifecycle.stress churn 8

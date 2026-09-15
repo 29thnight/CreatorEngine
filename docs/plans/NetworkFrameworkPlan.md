@@ -297,7 +297,7 @@ meta::field<&Self::m_health>.with(
 
 | 호출 | 실제로 하는 일 | 배치 | 근거 |
 |---|---|---|---|
-| `SceneManagers->Initialization` | **비동기 씬 로딩 완료 폴링 → `ActivateScene`** + `DrainPendingLifecycle`(Awake/Start 드레인) | **밖** | tick 루프 안에서 활성 씬이 바뀌면 같은 프레임의 남은 tick이 다른 씬을 돈다 |
+| `SceneManagers->Initialization` | **비동기 씬 로딩 완료 폴링 → `ActivateScene`** + `DrainPendingLifecycle`(OnInitialized/OnBeginSimulation 드레인) | **밖** | tick 루프 안에서 활성 씬이 바뀌면 같은 프레임의 남은 tick이 다른 씬을 돈다 |
 | `SceneManagers->InputEvents` | 입력 샘플 | **밖** | 프레임 이벤트다. 30fps에서 두 tick이 같은 입력을 소비하는 것은 정상이며 §4.6의 "input은 server tick에 귀속"과 일치 |
 | `IsGamePaused`/`Pausing` | — | **밖** | 일시정지는 누산 자체를 멈춘다 |
 | `SceneManagers->Physics`<br>= `Scene::FixedUpdate` | AI future 회수 · `AllUpdateWorldMatrix(FixedUpdate)` · `SetInternalPhysicData` · `CharacterControllerSystems->FixedUpdate` · `PhysicsManagers->Update`(PhysX simulate) | **안** | 고정 스텝의 본체. CCT가 PhysX **앞**이어야 한다는 기존 순서 규약은 tick 안에서 그대로 성립한다 |

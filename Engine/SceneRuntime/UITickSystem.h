@@ -26,21 +26,21 @@ class ImageComponent;
 //
 // ── 등록/해지 훅 선택 근거 ──
 //
-// Awake/OnDestroy(Component.h 8훅 축, 컴포넌트당 1회 게이트)가 아니라
+// OnInitialized/OnUninitializing(Component.h 8훅 축, 컴포넌트당 1회 게이트)이 아니라
 // OnAddedToScene/OnRemovingFromScene(6단계 축, 게이트 없음)에 건다.
-// SpriteSheetComponent::Awake/OnDestroy, TextComponent::Awake/OnDestroy는
+// SpriteSheetComponent·TextComponent의 OnInitialized/OnUninitializing은
 // RenderScene 커맨드 등록·UIManager 캔버스-연결 등록용으로 그대로 두고(과제
 // 지시대로 손대지 않는다), 이 시스템 등록은 별도 훅 쌍을 쓴다 — 이유는
 // AnimatorSystem.h와 동일: DDOL(DontDestroyOnLoad) 오브젝트가 씬을 건널 때
-// Awake는 Component::State_Initialized 비트로 컴포넌트 평생 1회만 불리므로
+// OnInitialized는 Component::State_Initialized 비트로 컴포넌트 평생 1회만 불리므로
 // (Scene::DrainPendingPhases) 재부착 시 다시 불리지 않는다 — 이 시스템
-// 등록을 Awake에 걸면 최초 생성 씬의 등록부에서만 존재하고 새 씬으로 넘어간 뒤
+// 등록을 OnInitialized에 걸면 최초 생성 씬의 등록부에서만 존재하고 새 씬으로 넘어간 뒤
 // 영원히 틱을 못 받는 결함이 생긴다. OnAddedToScene/OnRemovingFromScene은
 // 게이트가 없어 씬에 들고 날 때마다(최초 생성 때도, DDOL Detach/Attach 때도)
 // 매번 불린다(Scene::DetachEntityHierarchy·AttachExistingEntity·
 // AttachExistingEntityHierarchy가 각각 무조건 호출, Scene.cpp 확인).
 // 실제 파괴 경로 중 프레임 끝 정규 경로(Scene::FlushPendingDestroy)도, 저장소
-// 유일의 즉시 소멸 경로(PrefabUtility::ApplyComponentDiff)도 OnDestroy 직전에
+// 유일의 즉시 소멸 경로(PrefabUtility::ApplyComponentDiff)도 OnUninitializing 직전에
 // OnRemovingFromScene을 먼저 부르므로(PrefabUtility.cpp 확인), 이 시스템에서
 // 빠지는 시점이 항상 실 파괴보다 먼저다 — 죽은 포인터를 틱할 창이 없다.
 //

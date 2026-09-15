@@ -6,7 +6,7 @@ class DecalComponent;
 
 // PHASE(SceneGraphRedesignPlan) 트랙 C3 — DecalComponent 가상 Update 오버라이드의
 // 시스템 이관. 패턴은 AnimatorSystem과 동형이다 — 등록/해지 훅 선택 근거(왜
-// Awake/OnDestroy가 아니라 OnAddedToScene/OnRemovingFromScene인가, DDOL이 왜
+// OnInitialized/OnUninitializing이 아니라 OnAddedToScene/OnRemovingFromScene인가, DDOL이 왜
 // 문제인가)와 파괴 경로 전수 확인(FlushPendingDestroy·DetachEntityHierarchy·
 // PrefabUtility::ApplyComponentDiff가 전부 OnRemovingFromScene을 실 파괴보다
 // 먼저 부른다는 근거)은 AnimatorSystem.h 상단 주석에 이미 있다 — 여기서는
@@ -23,7 +23,7 @@ class DecalComponent;
 // 지우면 오브젝트가 비활성인데도 슬라이스 애니메이션이 계속 도는 동작 변경이
 // 된다.
 //
-// Awake/OnDestroy는 손대지 않는다 — DecalComponent가 거기서 하는 일
+// OnInitialized/OnUninitializing은 손대지 않는다 — DecalComponent가 거기서 하는 일
 // (scene->CollectDecalComponent/UnCollectDecalComponent,
 // renderScene->RegisterCommand/UnregisterCommand)은 이 트랙의 대상인
 // "Update 오버라이드"와 무관한 별도 축(렌더 등록)이다.

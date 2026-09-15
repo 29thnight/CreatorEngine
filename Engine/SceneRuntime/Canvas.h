@@ -33,8 +33,8 @@ public:
 	void OnUninitializing() override;
 
 	// 레인 UI — 가상 Update 오버라이드를 걷어내고 UITickSystem이 부르는 비가상
-	// 진입점으로 옮긴다(UITickSystem.h 상단 주석 참고). 등록/해지는 Awake/OnDestroy가
-	// 아니라 6단계 씬 편입/이탈 훅에 건다 — DDOL 오브젝트가 씬을 건널 때 Awake가
+	// 진입점으로 옮긴다(UITickSystem.h 상단 주석 참고). 등록/해지는 OnInitialized/OnUninitializing이
+	// 아니라 6단계 씬 편입/이탈 훅에 건다 — DDOL 오브젝트가 씬을 건널 때 OnInitialized가
 	// 다시 불리지 않아 등록부에서 영구 이탈하는 결함을 피하기 위해서다(근거 동일).
 	void OnAddedToScene() override;
 	void OnRemovingFromScene() override;

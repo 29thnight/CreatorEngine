@@ -21,13 +21,13 @@ class CharacterControllerComponent;
 //
 // ── 등록/해지 훅 선택 근거 ──
 //
-// Awake/OnDestroy가 아니라 OnAddedToScene/OnRemovingFromScene(6단계 축, 게이트
+// OnInitialized/OnUninitializing이 아니라 OnAddedToScene/OnRemovingFromScene(6단계 축, 게이트
 // 없음)에 건다 — 근거는 AnimatorSystem.h와 동일(DDOL 오브젝트가 씬을 건널 때
-// Awake는 컴포넌트당 1회만 불려 재등록되지 않는다). CharacterControllerComponent::
-// Awake/OnDestroy는 Scene의 콜라이더 등록부(CollectColliderComponent/
+// OnInitialized는 컴포넌트당 1회만 불려 재등록되지 않는다). CharacterControllerComponent::
+// OnInitialized/OnUninitializing은 Scene의 콜라이더 등록부(CollectColliderComponent/
 // UnCollectColliderComponent, ICollider 축)용으로 그대로 남긴다(이 트랙 범위
-// 밖 — 이 시스템의 등록/해지와 혼동 금지). OnStart(구 Start 오버라이드가 위임하던
-// 몸통)도 손대지 않는다 — m_transform 캐시를 채우는 자리라 이 트랙과 무관하다.
+// 밖 — 이 시스템의 등록/해지와 혼동 금지). OnBeginSimulation(m_transform 캐시를 채우는
+// 자리)도 손대지 않는다 — 이 트랙과 무관하다.
 //
 // ── FixedUpdate 호출 횟수에 대한 주의 ──
 //

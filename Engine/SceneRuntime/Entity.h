@@ -317,7 +317,7 @@ public:
 	// 컴포넌트는 애초에 소유자가 Entity 하나뿐이었다 — 다른 시스템(Scene::
 	// RegisterComponent, RenderScene/AnimationJob의 Animator* 등)은 전부 raw
 	// 포인터로만 참조해 왔다(전제는 프레임 순서 불변식: GameLogic이 끝나야
-	// DisableOrEnable→OnDestroy가 돈다 — AnimationJob 재적용 보고 참고). shared_ptr은
+	// DisableOrEnable→OnUninitializing이 돈다 — AnimationJob 재적용 보고 참고). shared_ptr은
 	// 그 사실을 감추고 있었을 뿐 실제로 공유된 적이 없다.
 	//
 	// 컴포넌트 소유·순서의 정본. K2 스테이지 B(SBO)는 폐기했다 — 되돌린 근거:

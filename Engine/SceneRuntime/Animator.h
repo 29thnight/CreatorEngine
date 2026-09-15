@@ -45,7 +45,7 @@ enum class AnimatorDataPath : std::uint8_t
 };
 
 // K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
-// 않고 this를 프레임-로컬 raw 포인터로만 관찰한다(Awake/OnDestroy 참조).
+// 않고 this를 프레임-로컬 raw 포인터로만 관찰한다(OnInitialized/OnUninitializing 참조).
 class Animator : public meta::identity<Animator, Component>
 {
     public:
@@ -80,7 +80,7 @@ public:
 
     // 트랙 C3: 가상 Update 오버라이드를 걷어내고 AnimatorSystem(조밀 벡터,
     // 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,
-    // 근거는 AnimatorSystem.h 주석). Awake/OnDestroy는 RenderScene 등록용으로
+    // 근거는 AnimatorSystem.h 주석). OnInitialized/OnUninitializing은 RenderScene 등록용으로
     // 그대로 둔다(트랙 범위 밖 — AnimationJob 스키닝 등록부와 혼동 금지).
     void OnAddedToScene() override;
     void OnRemovingFromScene() override;

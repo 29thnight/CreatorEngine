@@ -124,7 +124,7 @@ namespace Editor
 		uint32_t m_presentationThreadTestDelayMs{ 0 };
 		double m_frameDeltaTime{ 0.0 };
 
-		// PresentationThread가 UI에서 씬 객체를 읽는 동안 GT의 OnDestroy/씬 교체만 막는다.
+		// PresentationThread가 UI에서 씬 객체를 읽는 동안 GT의 OnUninitializing/씬 교체만 막는다.
 		// 프레임 진행을 맞추는 배리어가 아니라 구조 변경 구간의 좁은 상호 배제다.
 		std::mutex m_sceneStructureMutex;
 

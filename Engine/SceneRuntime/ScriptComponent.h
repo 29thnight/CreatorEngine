@@ -9,11 +9,11 @@
 // 인스펙터 순회, YAML 직렬화, 프리팹 복제가 전부 따라온다.
 // (그전에는 ClrHost가 GameObject→인스턴스 맵을 따로 들고 인스펙터도 별도 섹션을 그렸다)
 //
-// 주의: Update/LateUpdate/FixedUpdate를 override하지 않는다.
-// RegistableEvent는 override한 메서드만 씬 이벤트에 등록하는데, 관리 측 라이프사이클은
-// ClrHost가 틱당 한 번 일괄 디스패치한다(설계 문서 02절). 여기서 컴포넌트마다 등록하면
-// 경계를 스크립트 수만큼 넘게 되어 그 설계가 무너진다.
-// Awake/OnDestroy만 받는 이유는 인스턴스의 생성·파괴 시점을 잡기 위해서다.
+// 주의: 틱(PrePhysics/PostPhysics)은 여기서 받지 않는다.
+// 관리 측 틱은 ClrHost가 틱당 한 번 일괄 디스패치한다(설계 문서 02절). 여기서 컴포넌트마다
+// 경계를 넘으면 스크립트 수만큼 건너게 되어 그 설계가 무너진다.
+// 6단계 훅과 OnEnable/OnDisable은 전부 override해 NotifyManagedLifecycle로 넘긴다
+// (ScriptLifecyclePhase.h) — 관리 측 생명주기의 드라이버를 네이티브 하나로 두기 위해서다.
 class ScriptComponent : public meta::identity<ScriptComponent, Component>
 {
    public:
@@ -87,7 +87,7 @@ public:
 	void NotifyManagedLifecycle(ScriptLifecyclePhase phase);
 
 	// 붙일 C# 타입 이름. 이 값이 직렬화되어 씬·프리팹에 남고,
-	// 로드 시 Awake에서 다시 인스턴스를 만든다.
+	// 로드 시 OnInitialized에서 다시 인스턴스를 만든다.
 	std::string m_scriptType{};
 
 	// 노출 필드 값. 관리 객체 안에 있는 값이라 리플렉션이 직접 볼 수 없으므로,

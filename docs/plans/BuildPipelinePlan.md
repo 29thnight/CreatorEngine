@@ -381,7 +381,7 @@ Stage/Pak/Player 불변을 통과했다.
    frame/bootstrap 경계는 E3·E6이 맡는다). 초안 B0의 이식 목록이 그대로 새 main의 명세다: DX12
    InitializeRuntime + SetRenderScene · 씬 델리게이트 2종(없으면 조용한 빈
    화면) · `ShaderSystem->Initialize()` · ClrHost 기동 + **프레임별
-   TickScripts**(없으면 Awake 영영 없음) · ScreenResizeBus 초기값 ·
+   TickScripts**(없으면 OnInitialized 영영 없음) · ScreenResizeBus 초기값 ·
    WinProcProxy 드레인 · `--smoke N`(명령줄 파싱 신설 + 종료 코드 규약).
    ★ ImGuiRenderer는 얹지 않는 것을 기본으로 한다 — 게임 UI는 엔진 UI
    계통(UIPass)이지 ImGui가 아니다(구 GameMain이 매 프레임 돌리던 것은

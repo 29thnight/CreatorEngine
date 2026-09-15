@@ -121,7 +121,7 @@ namespace Lifecycle
         Register<TerrainComponent>();
         Register<TerrainColliderComponent>();
         Register<TextComponent>();
-        // S1-b: Transform이 Component로 승격되며 신규 등록. Awake/Update 등
+        // S1-b: Transform이 Component로 승격되며 신규 등록. OnInitialized 등
         // 어느 훅도 오버라이드하지 않는다(마스크 0, 위 문단과 같은 사유로
         // 등록 자체는 필요) — Transform 갱신은 Scene::UpdateModelRecursive
         // 순회로 도는 별도 경로이지 Component 생명주기 디스패치가 아니다.

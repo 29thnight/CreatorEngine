@@ -21,7 +21,7 @@ class Component;
 //
 // ── 왜 틱 단계는 프레임 예산을 두는가 ──
 //
-// Awake·Start·OnDestroy는 객체당 한 번이라 전부 적어도 파일이 유한하다.
+// OnInitialized·OnBeginSimulation·OnUninitializing은 객체당 한 번이라 전부 적어도 파일이 유한하다.
 // 반면 Update는 프레임마다 컴포넌트 수만큼 나오므로 그대로 적으면 몇 초 만에
 // 수백만 줄이 되고, 그런 파일은 diff가 불가능하다.
 //
