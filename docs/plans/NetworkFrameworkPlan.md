@@ -399,6 +399,81 @@ Render frame
 - client는 snapshot interpolation buffer를 가지며, prediction은 N8 전에는 선택하지
   않는다.
 
+#### 축 간 계약 — Scope 클럭 · PostPhysics 잔류 규칙 · 프레임 내 읽기/쓰기 방향 (2026-09-15)
+
+위 결정(Pre/Post는 프레임 축, `OnSimulationTick`은 고정 축)만으로는 세 가지가
+비어 있었다. 셋 다 이 절이 **계약 소유자**다 —
+[SimulationEffectContractPlan](SimulationEffectContractPlan.md)(`OnSimulate`·`Scope`)과
+[ScriptLifecycleContractHardeningPlan](archive/ScriptLifecycleContractHardeningPlan.md)
+§1.2 4항("dt 기반 대기를 고정 클럭으로 암묵적으로 바꾸지 않는다")은 이 절을 인용하고,
+어긋나면 이 절이 이긴다. `OnSimulate`는 VerseLike 계약형 스크립트의 **본문**으로
+그대로 두며 이 절은 그 본문이 밟는 **시간축과 축 사이의 경계**만 정한다.
+
+**계약 A — `Scope`의 클럭은 고정 축 하나다.**
+
+- `SimulationScope.Delay(seconds)`는 `fixedDelta`를 누산해 만료한다. 재개는
+  `Scope.Tick(fixedDelta)` 자리, 즉 고정 루프 안 `Physics` **앞**이다(§4.4 루프 그림).
+  같은 입력이면 재개 tick 번호가 FPS와 무관하게 같다 — "결정적 지연"의 뜻이 이것이다.
+- `OnSimulate` 본문은 따라서 **고정 축 위에서 흐르는 코루틴**이다. 시작은
+  `OnBeginSimulation` 직후 1회(프레임 축의 드레인이 부른다), 이후 모든 재개는 tick
+  경계에서만 일어난다. 본문이 프레임 축 정보(`interpolationAlpha`, 렌더 프레임 번호)를
+  읽는 것은 계약 위반이다.
+- 프레임 축 대기는 **만들지 않는다.** UI 연출처럼 벽시계·프레임에 묶인 대기가 실제로
+  필요해지면 그때 `Scope`가 아닌 별도 이름(예: `PresentationScope`)으로 받는다 — 같은
+  `Delay`에 축 인자를 더해 두 클럭을 섞지 않는다.
+- Hardening §1.2 4항의 "암묵적으로 바꾸지 않는다"는 **명시적으로 바꾼다**로 닫는다.
+  이주 시점은 N3-b이며, `verify-lifecycle-delayarg`·`ddolwait`의 프레임 기대치를 tick
+  기대치로 함께 갈아 끼우는 것이 착지 조건이다(같은 수치를 프레임과 tick이 우연히
+  공유하면 게이트가 눈멀므로 `fixedDelta ≠ 1/60`인 변이를 하나 심는다).
+
+**계약 B — `PostPhysics`에 남아도 되는 것의 규칙.**
+
+"결정론이 필요한 것부터 이주"는 판단 기준이 아니다. 기준은 **무엇을 쓰는가**다.
+
+| 쓰는 대상 | 허용 축 | 근거 |
+|---|---|---|
+| `[Replicated]` 필드, `NetworkObjectId`로 식별되는 상태 | `OnSimulationTick`·`OnSimulate`만 | `OnTickCommitted`가 tick 끝에 스냅샷을 뜬다. 프레임 축에서 쓰면 서버·클라이언트가 다른 횟수로 쓴다 |
+| 물리 입력(힘·속도·CCT 이동·Transform 쓰기) | `OnSimulationTick`·`OnSimulate`만 | 물리는 tick당 돈다. 프레임 축의 쓰기는 tick 수에 따라 적용 횟수가 갈린다 |
+| Spawn/Despawn 요청 | `OnSimulationTick`·`OnSimulate`만 | 루프 안 `Commit spawn/despawn`이 tick에 귀속시킨다 |
+| `Scope` 대기 시작·취소 | `OnSimulate`(본문)만 | 계약 A. 틱 훅에서 `Delay`를 시작하는 것은 본문을 우회하는 상태 머신이다 |
+| 카메라·UI·오디오·애니메이션 파라미터·파티클 등 표현 상태 | `PostPhysics`(또는 `PrePhysics`) | 프레임 축이 정답이다. `interpolationAlpha`를 읽을 수 있는 유일한 자리 |
+| 시뮬레이션 상태 **읽기** | 어느 축이든 | 아래 계약 C의 방향 규칙을 따른다 |
+
+- 위 표의 첫 네 행을 `PostPhysics`에서 하는 코드는 **이주 대상**이며, 그 코드가 남아
+  있는 동안 N5(스냅샷) 판정은 통과할 수 없다 — 프레임 축의 쓰기가 스냅샷 사이로
+  새어 서버 골든과 어긋난다. 현재 `PostPhysics` 17건은 이 표로 분류해 N3-b 착수 시
+  이주 목록을 만든다(이주 자체는 N3 완료 조건이 아니다, §5 N3 참고).
+- 강제는 두 겹이다. 착지 시점에는 코드 리뷰 규칙이고, SimulationEffectContractPlan의
+  E7 정적 검사기가 서면 "프레임 축 훅 본문에서 `[Replicated]`·물리·Spawn API 호출"을
+  컴파일 단계 오류로 올린다. 검사기가 서기 전까지는 `verify-lifecycle-axis`에 "프레임
+  축 훅에서 물리 API 호출 시 거부 건수" 판정을 하나 더해 런타임에서 센다.
+- `PrePhysics`는 위 표에서 `PostPhysics`와 같은 열이다. 오버라이드 0건이라 규칙만
+  두고 게이트는 두지 않는다.
+
+**계약 C — 한 프레임 안의 읽기/쓰기 방향은 tick → frame 한 방향이다.**
+
+§4.4 루프 그림의 순서는 프레임마다 `OnSimulationTick`(0~N회) → `Commit` →
+`OnTickCommitted` → `GameLogic` → `PostPhysics`다. 여기서 나오는 규칙:
+
+- `PostPhysics`가 읽는 시뮬레이션 상태는 **이번 프레임의 마지막 커밋된 tick** 상태다.
+  0회 tick인 프레임(누산 부족)에서는 직전 프레임과 같은 상태를 다시 읽는다 — 그것이
+  정상이며, 표현 축은 `interpolationAlpha`로 그 사이를 메운다.
+- `PostPhysics`가 쓴 값을 시뮬레이션이 읽는 경로는 **없다**(계약 B가 쓰기를 막는다).
+  따라서 "PostPhysics에서 바꾼 값이 다음 tick에 프레임 늦게 반영된다"는 상황 자체가
+  성립하지 않는다. 남는 예외는 입력 하나인데, 입력은 `InputEvents`가 프레임 축에서
+  샘플해 `Drain validated commands(tick)`로 **tick 시작에** 들어간다(§4.6 "input은
+  server tick에 귀속") — 즉 프레임 → tick 방향의 유일한 통로는 커맨드 큐다.
+- 한 스크립트가 `OnSimulationTick`과 `PostPhysics`를 둘 다 오버라이드해도 같은 규칙이다.
+  틱에서 쓴 필드를 같은 프레임의 `PostPhysics`가 읽는 것은 허용, 그 반대는 금지.
+  `OnSimulate` 본문과 `OnSimulationTick`은 같은 축이므로 순서는 루프 그림대로
+  `Scope.Tick`(본문 재개) → `Physics` → `OnSimulationTick`이다 — 본문이 tick 안에서
+  먼저 쓰고 틱 훅이 그것을 본다.
+- 게이트: `verify-lifecycle-axis`의 `[Axis]` 로그(kind=hook|tick|mark)에 tick 서수를
+  실어, 한 프레임 안에서 `SimulationTick` 표지가 `PostPhysics` 표지보다 항상 앞이고
+  `PostPhysics`가 읽은 필드 값이 직전 `SimulationTick`이 쓴 값과 같은지 단정한다.
+  변이는 둘 — `PostPhysics`를 루프 안으로 옮긴 판, `OnSimulationTick`을 `GameLogic`
+  뒤로 옮긴 판 — 어느 쪽도 초록이면 게이트가 순서를 재지 않은 것이다.
+
 ### 4.5 스레드와 수명
 
 ```text
