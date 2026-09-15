@@ -37,6 +37,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [BuildPipelinePlan.md](plans/BuildPipelinePlan.md) | PHASE 12.5 · 진행 — 게임 빌드·cook·stage·managed·CI 파이프라인. B/L 잔여 유지. |
 | [EngineLayerSeparationPlan.md](plans/EngineLayerSeparationPlan.md) | E0~E7 · 잔여 있음 — Runtime Core·Editor·Host 경계. E2 writer와 E7 잔여 유지. |
 | [AnimationSchedulerPlan.md](plans/AnimationSchedulerPlan.md) | PHASE 13 — 애니메이션 스케줄러·LOD·CPU 버짓 재설계. |
+| [TaskSchedulerUnificationPlan.md](plans/TaskSchedulerUnificationPlan.md) | PHASE 13 S0.5·S6 부속 — 태스크 스케줄러 enkiTS 이관의 실태 조사·측정. fork-join만 옮기고 장기 블로킹 스레드 18곳은 존치. |
 | [ProfilingCapturePlan.md](plans/ProfilingCapturePlan.md) | PHASE 14 · 진행 — 수집 코어·녹화·구간 분석과 프로파일러 소비 경로. |
 | [RenderFrameDebuggerPlan.md](plans/RenderFrameDebuggerPlan.md) | PHASE 14 확장 — 불변 프레임 캡처·그리기 출처·선택적 픽셀 재현. |
 | [UtilityFrameworkModernizationPlan.md](plans/UtilityFrameworkModernizationPlan.md) | PHASE 15 · 진행 — 유틸리티의 실제 소비·계약을 기준으로 정리. |

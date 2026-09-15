@@ -97,7 +97,8 @@ fork-join은 packet 밀봉 전에 끝난다는 순서만 유지하며 렌더 스
 
 | 자산 | 위치 | 쓰임 |
 |---|---|---|
-| 전역 워커 풀 `WorkerPools` | Utility_Framework\WorkerPool.h:16-68 | 전용 풀 은퇴 후보지 (S6에서 실측 비교) |
+| 전역 워커 풀 `WorkerPools` | Utility_Framework\WorkerPool.h:16-68 | 전용 풀 은퇴 후보지 (S6에서 실측 비교). **S0.5에서 백엔드가 enkiTS로 바뀐다** |
+| enkiTS 태스크 스케줄러 | vcpkg `enkits` (S0.5에서 도입) | `threadnum_`이 0..`GetNumTaskThreads()-1` 보장 — S3.5 워커별 포즈 풀의 키 |
 | CPU 프로파일러 `gCPUProfiler` + `PROFILE_CPU_SCOPE` | ImGuiHelper\Profiler.h | 버짓 실측·HUD의 기반 |
 | `TimeSystem` (QPC) | Utility_Framework\TimeSystem.h | 인스턴스별 비용 측정 |
 | `Camera::CalculateLODDistance` · `GetFrustum` | Camera.cpp:174,121 | Significance 입력 (첫 배선) |
@@ -531,6 +532,7 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 | ID | 슬라이스 | 내용 | 완료 기준 | 공수 |
 |---|---|---|---|---|
 | S0 | 결함 지혈 | R1~R6. `curKey` 죽은 캐시 삭제 · R2 `find`+스킵 · R3 `continue` · R4 클램프 · R5 괄호 · R6 간이 이벤트 큐(수집→join 후 발화). `Bone` 트랜스폼 쓰기는 소비자 grep 후 제거 또는 S3′로 이관 명시(최종 소멸은 S3.6) | 같은 모델 다수 씬에서 공유 애셋 쓰기 grep 0 (curKey·map 삽입) · 이벤트가 메인 스레드에서만 발화 | 1.5일 |
+| S0.5 | **태스크 스케줄러 기반 정비** | `AssetLoadJob` 삭제(인스턴스화 0건) · vcpkg `enkits` 추가 + `WorkerPool` 백엔드 교체(시그니처 유지, 소비자 `DataSystem.cpp:1678`·`:1702` 무수정) · `ThreadPool` 생성자 우선순위 기본값 HIGHEST→NORMAL · `FoliageComponent`·`Scene` AI의 `std::async` 2건 이관 | `DataSystem` 경로 완료 수 == 제출 수(독립 카운터) · `std::async` 잔존 정확히 3건 | 2일 |
 | S1 | 계측 기선 | `PROFILE_CPU_SCOPE("Animation")` 단계 계측 + 인스턴스별 QPC. 캐릭터 N체(10/50/100) 비용 곡선 실측 → 버짓 기본값 근거 확보. 검증 씬 신설 | 비용 곡선 수치가 이 문서 §1에 추가 기록됨 | 1일 |
 | S2′ | 데이터 정지 작업 + **Pose 타입** | **`Pose`(SoA TRS) 신설 + 블렌드 커널 4종(§2.2①)** · 채널 테이블 베이크(E1·E4, 키는 `Skeleton::m_serial`) · **마스크를 `BoneRegion` 7분할 → 이름 기반 dense weight로 교체** · 부모 선행 정렬 + 평탄 순회(E7) · 키 커서: 이진 탐색 + **인스턴스** 캐시(E2) · 매 프레임 할당 제거(E5) · 배속 파라미터 핸들화(E10) | 핫 패스에서 문자열 조회 0 · 프레임당 힙 할당 0 · **행렬 분해 블렌드 0** · S1 대비 비용 곡선 재실측 개선 확인 | 4일 |
 | S3′ | AnimInstance 분리 (**시스템 소유**) | 핫 데이터 이관 · **`AnimationSystem`이 조밀 배열로 소유, `Animator`는 핸들만** · 포즈 prev/curr 실본수 버퍼 · `Bone` 런타임 쓰기 완전 소멸 · 파일 전역 `m_currAnimator` 은퇴 | 공유 애셋 런타임 쓰기 0 · `Animator`·`AnimationController` sizeof에서 64KB 배열 제거 | 3일 |
@@ -538,16 +540,20 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 | **S3.6** | **관측 본 물질화** | 관측 집합 산출(4조건) · 구조 변경 시에만 재계산 · 비관측 본 Transform 갱신 정지 · `GetWorldTransform()` 온디맨드 FK + **자동 승격** · 소켓 경로를 관측 집합으로 통합(현 3중 복제 제거) | 744 뼈 노드 씬에서 프레임당 Transform 기록 수가 관측 본 수와 일치 · 부착물 위치 왕복 검사 통과 | 2일 |
 | S4 | Significance + **강등 사다리** | 거리·프러스텀·화면비 배선(§2.2⑥) · **L0~L7 레시피 변환 구현**(§2.2⑦) · **인러셜라이제이션**(L4 전제·승격 복귀) · 보간 · 재가시 복귀 · 에디터 L0 고정 | 화면 밖 캐릭터의 포즈 계산 비용 ≈ 0 · **등급별 비용이 단조 감소**(계측으로 판정) · 강등/승격 전환 팝 없음 | 4일 |
 | S5 | CPU 버짓 + 스케줄러 | **태스크 종류별 EMA 비용 모델** · 강등 등급 선택 알고리즘(계산형, §2.2⑧) · 이중 히스테리시스 · `EngineSetting` 설정값 | 100체 씬에서 버짓 상한 준수(초과 프레임 1% 미만) · **예측 비용 대 실측 비용 오차 15% 이내** · 버짓 2배 변화에 등급 분포가 단조 반응 | 3일 |
-| S6 | Job 배치 전환 | 청크 분할 · 전용 풀 vs WorkerPools 실측 비교 후 결정 · 이벤트 큐 정식화(락프리) · `AnimationScheduler`로 개명·이주(계층 정위치) | 태스크 수 = O(워커 수) · RenderEngine에 애니메이션 헤더 잔존 0 | 2일 |
+| S6 | Job 배치 전환 | 청크 분할 · **전용 풀 vs `WorkerPools`(S0.5 이후 enkiTS) vs 전용 enkiTS 인스턴스** 3지선다 실측 비교 후 결정 · 이벤트 큐 정식화(락프리) · `AnimationScheduler`로 개명·이주(계층 정위치) | 태스크 수 = O(워커 수) · RenderEngine에 애니메이션 헤더 잔존 0 | 2일 |
 | S7 | HUD + 회귀 | ProfilerWindow 버짓 패널(등록/평가/강등 등급 분포 · 버짓 대비 실측 ms · **태스크 실행 스냅샷**: 도달성·실행 순서·버퍼 소유) · 검증 씬을 회귀 세트에 편입(pwsh) | 패널에서 강등이 실시간 관측됨 · 회귀 세트 통과 | 2일 |
 | **S8** | **바이트코드 VM (선택·후행)** | 상태머신·그래프를 명령 스트림으로 컴파일 · 레지스터 파일(스칼라/포즈-태스크-인덱스) · 버전 스탬프 · 에디터 컴파일러 분리 · 핀↔레지스터 디버그 오버레이 | **Executor·Pose·버퍼 풀·강등 사다리 무변경** · 런타임에서 `imgui_node_editor` 간선 0 · 파라미터 조회에 문자열·뮤텍스 0 | 6~8일 |
 
-합계 ≈ **25.5일** (S8 제외) / **31.5~33.5일** (S8 포함).
-초판 18.5일 대비 +7일 — S2′ +1 · **S3.5 +3** · **S3.6 +2** · S4 +1.
+합계 ≈ **27.5일** (S8 제외) / **33.5~35.5일** (S8 포함).
+초판 18.5일 대비 +9일 — S2′ +1 · **S3.5 +3** · **S3.6 +2** · S4 +1 · **S0.5 +2**(9-15 편입).
 
 **착수 제약:**
 
-- S0·S1은 **즉시 착수 가능**하고 다른 페이즈와 충돌하지 않는다.
+- S0·**S0.5**·S1은 **즉시 착수 가능**하고 다른 페이즈와 충돌하지 않는다.
+- **S0.5는 S6의 선행이다.** 순서를 뒤집어 `AnimationJob`을 먼저 옮기면,
+  S2′~S3.5가 분해를 "애니메이터당 태스크"에서 "워커 수 청크 + 워커별 포즈
+  풀"로 바꾸므로 **곧 버려질 모양을 이식**하게 된다. 근거와 측정은
+  [TaskSchedulerUnificationPlan.md](TaskSchedulerUnificationPlan.md) §3.3.
 - S2′ 이후는 `AnimationJob.cpp`를 크게 다시 쓰므로 **동시 세션 주의 대상**
   (공유 워크트리 — 착수 직전 HEAD 재대조, 한 슬라이스 한 커밋).
 - **S3.5는 S2′(Pose 값 타입)에 의존한다.** 포즈가 값이 아니면 태스크의

@@ -1051,7 +1051,7 @@
 <!-- ===== PHASE 13 ===== -->
 <section class="phase" id="phase-13">
   <h2 class="sec"><span class="no">PHASE 13</span>애니메이션 스케줄러 · LOD · CPU 버짓 <span class="phase-pct" data-phase-pct="13"></span></h2>
-  <div class="phase-meta">예상 공수: 32.5일 (S8 바이트코드 VM 7일 포함 · 제외 시 25.5일) · 선행 조건: 없음(S0·S1 즉시 착수 가능) · 설계 문서: AnimationSchedulerPlan.md (2026-08-19 개정) · 주의: S2′부터 AnimationJob.cpp 대개편 — 동시 세션과 파일 충돌 회피</div>
+  <div class="phase-meta">예상 공수: 34.5일 (S8 바이트코드 VM 7일 포함 · 제외 시 27.5일) · 선행 조건: 없음(S0·S0.5·S1 즉시 착수 가능) · 설계 문서: AnimationSchedulerPlan.md (2026-08-19 개정) · <a href="plans/TaskSchedulerUnificationPlan.md">TaskSchedulerUnificationPlan.md</a> (2026-09-15 · S0.5와 S6의 근거) · 주의: S2′부터 AnimationJob.cpp 대개편 — 동시 세션과 파일 충돌 회피</div>
   <div class="phase-goal"><b>목표:</b> 평가 엔진을 <b>3세대로 올리고</b>(포즈=값 → 태스크 레시피 기록 → 도달성 실행) 그 위에 배분 장치를 얹는다.
   significance(거리·화면·가시성)로 <b>레시피 강등 등급 L0~L7</b>을 정하고, 태스크별 비용 EMA로 프레임당 CPU 버짓에 맞춘다.
   시간·progress·키프레임 이벤트는 강등과 무관하게 항상 전진(게임플레이 무손상).
@@ -2134,6 +2134,10 @@ const TASKS = [
     detail: "curKey 죽은 캐시 삭제(공유 쓰기 레이스) · UpdateBlendBone의 operator[] 애셋 오염+OOB를 find+스킵으로(AnimationJob.cpp:396,651) · CurrentKeyIndex -1 클램프 · CheckTransition 우선순위 버그 괄호(AnimationController.cpp:60) · 간이 이벤트 큐(워커 수집 → join 후 메인 스레드 발화). Bone 트랜스폼 쓰기는 소비자 grep 후 제거 또는 S3′ 이관 명시(최종 소멸은 S3.6).",
     refs: "AnimationSchedulerPlan §1.2·§3 S0", priority: "P0", days: 1.5, status: "todo",
     note: "★ 8-19 재확인: R3만 K2 리팩터로 해소, 나머지 5종은 전부 살아 있다. R2는 워커에서 공유 map 삽입 + 빈 벡터 인덱싱 = 미정의 동작이라 이 페이즈 최우선." },
+  { phase: 13, id: "13-11", title: "S0.5 — 태스크 스케줄러 기반 정비 (enkiTS 도입)",
+    detail: "S6의 선행. 스케줄러를 먼저 갈아 두고 애니메이션 이관은 S6에서 한다. ① <code>AssetLoadJob</code> 삭제 — 16스레드 풀을 선언하는데 <b>인스턴스화 0건</b>인 죽은 코드다. ② vcpkg에 <code>enkits</code> 추가 + <code>WorkerPool</code> 백엔드 교체 — <code>Enqueue</code>/<code>NotifyAllAndWait</code> 시그니처를 유지해 소비자(DataSystem.cpp:1678·1702, 유일)는 수정하지 않는다. ③ <code>ThreadPool</code> 생성자 우선순위 기본값 HIGHEST→NORMAL. ④ <code>FoliageComponent</code>·<code>Scene</code> AI의 <code>std::async</code> 2건을 enkiTS로 (<code>future</code> 소멸, 완료 폴링은 <code>ICompletable::GetIsComplete()</code>). 판정: DataSystem 경로 완료 수 == 제출 수(풀과 무관한 독립 카운터) · <code>std::async</code> 잔존이 정확히 3건(SceneManager 2 + PSOManager 1).",
+    refs: "TaskSchedulerUnificationPlan §3·§4 · AnimationSchedulerPlan §1.4 · §3 S6", priority: "P0", days: 2, status: "todo",
+    note: "★ 측정 근거(2026-09-15, 독립 프로브 6회 · 정방향 3 + 역방향 3): 같은 fork-join 워크로드에서 p50이 enkiTS 229µs · 엔진 풀 NORMAL 336µs · HIGHEST 406µs. <b>enkiTS 32% · NORMAL 17%</b>, 둘 다 6/6 일관이고 순서 역전에도 유지된다. enkiTS는 range 분할·개별 taskset 셋 다 227~229µs라 <b>분해 방식이 아니라 스케줄러 자체가 빠른 것</b>이다. ★ 우선순위 축은 9-6 조사(JobSystemFeasibilityAnalysis §11)가 이미 NORMAL 우위를 냈는데 코드에 반영되지 않았다 — 생성자 기본값이라 소비자 전원이 HIGHEST를 받는다(논리 프로세서 8개에 워커 16개). ★ 반증된 것도 적어 둔다: 자체 풀의 배리어는 정직했다(6만 라운드 거짓말 0건, 커밋 a6da7899가 작동) · 세마포어 토큰 복제·소실·기아 전부 미발현. <b>교체 명분은 정확성이 아니라 처리량뿐이다.</b> 꼬리 지연은 기계 노이즈가 신호보다 커서(max/mean이 같은 구성에서 2.7x~137x) 판정 축에서 뺐다. ★ 옮기지 않는 것: 장기 블로킹 스레드 18곳(소켓·stdin·파일감시·표시·GPU제출 등) · SceneManager::LoadSceneAsync(수백ms~초 + future&lt;Scene*&gt; 값 반환 + 공개 API) · DX12PSOManager의 shared_future. 블로킹을 워커에 올리면 그 워커가 영구 점유되고 work stealing이 구제하지 못한다." },
   { phase: 13, id: "13-1", title: "S1 — 계측 기선",
     detail: "PROFILE_CPU_SCOPE 단계 계측 + 인스턴스별 QPC. 캐릭터 10/50/100체 비용 곡선 실측 → 버짓 기본값 근거. 검증 씬 신설.",
     refs: "AnimationSchedulerPlan §3 S1", priority: "P0", days: 1, status: "todo",
@@ -2162,8 +2166,9 @@ const TASKS = [
     refs: "AnimationSchedulerPlan §2.2⑧ · §3 S5", priority: "P1", days: 3, status: "todo",
     note: "★ 언리얼 ABA와 갈리는 지점 — ABA는 인스턴스 EMA 하나로 '레이트 절반이면 비용도 절반'을 가정한다. 레시피가 costed item 목록이면 그 가정이 필요 없다. 오차 15% 초과 시 해당 태스크 종류만 인스턴스별 EMA로 내린다." },
   { phase: 13, id: "13-8", title: "S6 — Job 배치 전환 + 계층 정위치",
-    detail: "애니메이터 1개=태스크 1개 → 워커 수 청크 분할 · 전용 8스레드 풀 vs 전역 WorkerPools 실측 비교 후 결정 · 이벤트 큐 정식화(락프리) · AnimationScheduler로 개명·이주(RenderEngine 헤더/ScriptBinder 구현 기형 해소 — PHASE 5 래칫 게이트 통과 필수). 판정: 태스크 수 = O(워커 수) · RenderEngine 애니메이션 헤더 잔존 0.",
-    refs: "AnimationSchedulerPlan §2.2⑨⑩·§2.3 · §3 S6", priority: "P1", days: 2, status: "todo", note: "" },
+    detail: "애니메이터 1개=태스크 1개 → 워커 수 청크 분할 · <b>전용 8스레드 풀 vs 전역 WorkerPools(S0.5 이후 enkiTS) vs 전용 enkiTS 인스턴스</b> 3지선다 실측 비교 후 결정 — 프로브는 scratchpad/poolprobe/probe3.cpp 재사용(워밍업 200 + 측정 2000라운드, 순서 역전 대조 필수) · 이벤트 큐 정식화(락프리) · AnimationScheduler로 개명·이주(RenderEngine 헤더/ScriptBinder 구현 기형 해소 — PHASE 5 래칫 게이트 통과 필수). 판정: 태스크 수 = O(워커 수) · RenderEngine 애니메이션 헤더 잔존 0.",
+    refs: "AnimationSchedulerPlan §2.2⑨⑩·§2.3 · §3 S6 · TaskSchedulerUnificationPlan §3.3", priority: "P1", days: 2, status: "todo",
+    note: "★ S0.5가 WorkerPools를 enkiTS로 바꿔 두므로 이 비교는 자동으로 전용 풀 vs enkiTS가 된다. <b>순서를 뒤집지 말 것</b> — S2′~S3.5가 분해를 애니메이터당 태스크에서 워커 수 청크로 바꾸고 워커별 포즈 풀을 도입하므로, 그 전에 현행 분해를 옮기면 곧 버려질 모양을 이식하게 된다. enkiTS의 threadnum_은 0..GetNumTaskThreads()-1이 보장되어 S3.5의 워커별 버퍼 풀 키로 그대로 쓸 수 있다. ★ 스케줄러 교체는 R1·R2(공유 애셋 동시 쓰기·map 오염)를 고치지 않는다 — 그것은 S0과 S3′ 소관이다." },
   { phase: 13, id: "13-9", title: "S7 — 버짓 HUD + 회귀 편입",
     detail: "ProfilerWindow 버짓 패널(등록/평가/강등 등급 분포 · 버짓 대비 실측 ms · 태스크 실행 스냅샷: 도달성·실행 순서·버퍼 소유) · 검증 씬을 pwsh 회귀 세트에 편입(이벤트 발화 순서·개수 고정 + 소켓 부착물 월드 위치 왕복 포함). 판정: 강등이 실시간 관측 · 회귀 통과.",
     refs: "AnimationSchedulerPlan §3 S7 · §4", priority: "P2", days: 2, status: "todo", note: "" },
