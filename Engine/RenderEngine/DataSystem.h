@@ -3,7 +3,6 @@
 #include "Texture.h"
 #include "AuthoringNodeView.h" // D3-a-5b
 #include "AssetMetaRegistry.h"
-#include "AssetJob.h"
 #include "ClassProperty.h"
 #include "AssetBundle.h"
 #include "ShaderMetaHandle.h"

@@ -10,9 +10,6 @@
     <Filter Include="Asset\JobSystem\Animation">
       <UniqueIdentifier>{2f627c45-eb9d-458f-a144-c8f83fb01876}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Asset\JobSystem\Asset">
-      <UniqueIdentifier>{8fd7ed60-c364-4d51-988d-8434ef51db2c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Asset\Loader">
       <UniqueIdentifier>{108407a5-4069-4f4b-a9ec-e212562003f9}</UniqueIdentifier>
     </Filter>
@@ -245,9 +242,6 @@
   <ItemGroup>
     <ClCompile Include="AssetAuthoringPort.cpp">
       <Filter>Asset\ManagerSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="AssetJob.cpp">
-      <Filter>Asset\JobSystem\Asset</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
       <Filter>Objects\Camera</Filter>
@@ -589,9 +583,6 @@
     </ClInclude>
     <ClInclude Include="AssetEntry.h">
       <Filter>Resources\AssetBundle</Filter>
-    </ClInclude>
-    <ClInclude Include="AssetJob.h">
-      <Filter>Asset\JobSystem\Asset</Filter>
     </ClInclude>
     <ClInclude Include="AssetMetaRegistry.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>

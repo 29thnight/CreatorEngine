@@ -156,7 +156,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AssetJob.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
@@ -465,7 +464,6 @@
     <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AssetBundle.h" />
     <ClInclude Include="AssetEntry.h" />
-    <ClInclude Include="AssetJob.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
     <ClInclude Include="BillboardType.h" />
     <ClInclude Include="CanvasRenderMode.h" />
