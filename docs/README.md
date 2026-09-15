@@ -29,7 +29,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.75 · RG — 리소스 의존성 스케줄링과 단계별 제품 전환. |
 | [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.75 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
 | [ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md) | PHASE 4.75 · SRP — Pipeline Asset·Custom Pass·Shader Graph 저작과 제품 배선. |
-| [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의로 종결 조건은 둘(소유 게이트 HEAD 재실행·GUI 수동), MCP 보류. |
+| [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의 뒤 소유 게이트 13칸 HEAD 재실행으로 조건 ① 닫음(초록 11·붉음 2는 게이트 결함). 남은 조건은 GUI 수동 하나, MCP 보류. |
 | [ScriptSurfacePlan.md](plans/ScriptSurfacePlan.md) | PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계. |
 | [EnginePackagingPlan.md](plans/EnginePackagingPlan.md) | PHASE 10·11 등 — EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지. |
 | [ModelGeometryTextureImprovementPlan.md](plans/ModelGeometryTextureImprovementPlan.md) | 비동기 배치 완료 · 나머지 구조 개선은 제안 단계. 기존 PHASE의 완료·공수와 구분 |
@@ -42,7 +42,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [RenderFrameDebuggerPlan.md](plans/RenderFrameDebuggerPlan.md) | PHASE 14 확장 — 불변 프레임 캡처·그리기 출처·선택적 픽셀 재현. |
 | [UtilityFrameworkModernizationPlan.md](plans/UtilityFrameworkModernizationPlan.md) | PHASE 15 · 진행 — 유틸리티의 실제 소비·계약을 기준으로 정리. |
 | [MathematicsMigrationPlan.md](plans/MathematicsMigrationPlan.md) | 구조 완료 · 검증 잔여 — 수학 라이브러리 이주. pixel·Physics runtime gate가 남아 있다. |
-| [UISystemRedesignPlan.md](plans/UISystemRedesignPlan.md) | PHASE 16 · 진행 — Scene 소유 UI Runtime과 값 타입 렌더 제출. |
+| [UISystemRedesignPlan.md](plans/UISystemRedesignPlan.md) | PHASE 16 · 진행 — Scene 소유 UI Runtime과 값 타입 렌더 제출. 9-15 개정에서 텍스트 렌더(트랙 T)가 U1 앞으로 서고, UI 저작의 소유 레이어를 C++로 확정했다(D-5). |
 | [SerializationPlan.md](plans/SerializationPlan.md) | PHASE 17 · 진행 — 저작 텍스트·쿠킹 바이너리 경계와 잔여 성능 판정. |
 | [PhysicsRedesignPlan.md](plans/PhysicsRedesignPlan.md) | PHASE 19 — 물리 컴포넌트·backend·스레딩 전면 재설계. |
 | [NetworkFrameworkPlan.md](plans/NetworkFrameworkPlan.md) | PHASE 20 — 네트워크 신원·fixed tick·replication 기반. |

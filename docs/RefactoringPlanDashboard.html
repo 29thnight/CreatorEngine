@@ -368,7 +368,7 @@
     <div class="doc"><a href="plans/MathematicsMigrationPlan.md">MathematicsMigrationPlan.md</a><span class="tie">구조 완료 · 검증 잔여</span>
       <div class="why">수학 라이브러리 이주. pixel·Physics runtime gate가 남아 있다.</div></div>
     <div class="doc"><a href="plans/UISystemRedesignPlan.md">UISystemRedesignPlan.md</a><span class="tie">PHASE 16 · 진행</span>
-      <div class="why">Scene 소유 UI Runtime과 값 타입 렌더 제출.</div></div>
+      <div class="why">Scene 소유 UI Runtime과 값 타입 렌더 제출. 텍스트 렌더(트랙 T)가 U1 앞에 선다.</div></div>
     <div class="doc"><a href="plans/SerializationPlan.md">SerializationPlan.md</a><span class="tie">PHASE 17 · 완료</span>
       <div class="why">저작 텍스트·쿠킹 바이너리 경계와 잔여 성능 판정.</div></div>
     <div class="doc"><a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a><span class="tie">PHASE 19</span>
@@ -1158,10 +1158,13 @@
 
 <!-- ===== PHASE 16 ===== -->
 <section class="phase" id="phase-16">
-  <h2 class="sec"><span class="no">PHASE 16</span>UI 시스템 재설계 (uGUI 저작 · Slate 런타임) <span class="phase-pct" data-phase-pct="16"></span></h2>
-  <div class="phase-meta">신설: 2026-08-16 · 설계 문서: <a href="plans/UISystemRedesignPlan.md">UISystemRedesignPlan.md</a> · PHASE 7·8을 승계하는 실행 계획 · 공수는 계획 추정치</div>
-  <div class="phase-goal"><b>목표:</b> 저작은 uGUI 형상(<code>[[Property]]</code> 리플렉션), 런타임은 Slate식 단일 draw 생산·dirty 게이팅.
-  별도 위젯 트리는 만들지 않는다(금지 근거 문서화). 실측: 클릭 0-나누기 등 CRITICAL 4종 — U0 지혈이 구조 개편보다 먼저다.</div>
+  <h2 class="sec"><span class="no">PHASE 16</span>UI 시스템 재설계 (Scene 소유 UI Runtime · 값 타입 렌더 제출) <span class="phase-pct" data-phase-pct="16"></span></h2>
+  <div class="phase-meta">신설: 2026-08-16 · 전면 개정: 2026-08-30 · 3차 개정: 2026-09-15 · 설계 문서: <a href="plans/UISystemRedesignPlan.md">UISystemRedesignPlan.md</a> · PHASE 7·8을 승계하는 실행 계획 · 공수는 계획 추정치</div>
+  <div class="phase-goal"><b>목표:</b> UI 오브젝트는 Scene이 소유하고, UI 런타임은 <code>weak_ptr</code>나 장기 raw pointer 없이
+  Scene-qualified generation handle로 참조하며, 렌더러에는 값 타입의 불변 <code>UIDrawSnapshot</code>만 전달한다.
+  별도 위젯 트리는 만들지 않는다(§14 비범위). 저작 데이터의 정본은 네이티브 <code>reflect()</code> consteval 스키마 하나이고
+  C#은 그것을 읽고 쓰는 래퍼다(D-5). 실측: 클릭 경로가 죽어 있고(C1 — viewport 생산자가 저장소 전수 0건)
+  <b>텍스트를 그리는 코드가 엔진에 없다</b> — U0 지혈과 트랙 T가 구조 개편보다 먼저다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="16"><!-- JS 생성 --></table></div>
 </section>
 
@@ -2248,7 +2251,7 @@ const TASKS = [
   { phase: 14.5, id: "LC9", title: "소비자 이관과 최종 계약 검증",
     detail: "사람용 verdict와 소스 기반 명령 존재 판정을 제거하고 JSON 결과와 현재 실행 증거로 판정한다.",
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 2.5, status: "progress",
-    note: "제품 결과 이행·한국어 verdict 13→0·명령 소스 존재 6→0·미보고 어댑터 제거 및 자동 계약 검증 완료. 통합 전 Debug 281/Release 280, HTTP 재질 포함 236단정 통과. master 병합 후보 재검증은 analysis/Phase14_5MergePreparation.md. 지연 100회 p50/p95/p99=3.84/4.74/5.02ms. ★ <b>2026-09-15 종결 조건 재정의</b> — 9-06 판정이 든 보류 사유 둘 중 <b>canonical 성능은 이 페이즈 소유가 아니었다</b>(같은 문서가 &quot;서비스 지연과 도메인 렌더링 성능은 별개&quot;라고 써 놓고 그것으로 종결을 막고 있었다). 게다가 그 축을 재던 <code>verify-model-cutover-budget.ps1</code>과 기준 <code>mbc11_perf_archive.json</code>은 <code>0ec60573</code>(9-12 Commandlet 68개 은퇴)에서 회귀 스크립트 27개·fixture 10개와 함께 삭제됐다 — 조건이 가리키던 대상이 저장소에 없다. 그래서 <b>남는 조건은 둘</b>: ① 14.5 소유 게이트 13칸(LC0~LC9 · Player 둘 포함)의 <b>현재 HEAD 재실행</b> — 기존 증거는 통합 전·병합 준비 트리의 것이다, ② GUI 수동 조작(LC6 Undo 선언 21개). <b>빼되 소유를 옮겼다</b>: canonical 성능 예산 → 3.75(감시 끊김을 MBC11에 기록), 전체 run-all 완주 → 어느 페이즈의 조건도 아님(HEAD부터 초록 기준선 없음), dx12.selftest material authoring round trip → 렌더 도메인·<b>추적자 미정</b>(그 이름 아래 검사가 지금 없다 — 고쳐서 통과한 것이 아니다). 상세 증거와 재정의 근거: docs/analysis/Phase14_5Closure.md." },
+    note: "제품 결과 이행·한국어 verdict 13→0·명령 소스 존재 6→0·미보고 어댑터 제거 및 자동 계약 검증 완료. 통합 전 Debug 281/Release 280, HTTP 재질 포함 236단정 통과. master 병합 후보 재검증은 analysis/Phase14_5MergePreparation.md. 지연 100회 p50/p95/p99=3.84/4.74/5.02ms. ★ <b>2026-09-15 종결 조건 재정의</b> — 9-06 판정이 든 보류 사유 둘 중 <b>canonical 성능은 이 페이즈 소유가 아니었다</b>(같은 문서가 &quot;서비스 지연과 도메인 렌더링 성능은 별개&quot;라고 써 놓고 그것으로 종결을 막고 있었다). 게다가 그 축을 재던 <code>verify-model-cutover-budget.ps1</code>과 기준 <code>mbc11_perf_archive.json</code>은 <code>0ec60573</code>(9-12 Commandlet 68개 은퇴)에서 회귀 스크립트 27개·fixture 10개와 함께 삭제됐다 — 조건이 가리키던 대상이 저장소에 없다. 그래서 <b>남는 조건은 둘</b>: ① 14.5 소유 게이트 13칸(LC0~LC9 · Player 둘 포함)의 <b>현재 HEAD 재실행</b> — 기존 증거는 통합 전·병합 준비 트리의 것이다, ② GUI 수동 조작(LC6 Undo 선언 21개). <b>빼되 소유를 옮겼다</b>: canonical 성능 예산 → 3.75(감시 끊김을 MBC11에 기록), 전체 run-all 완주 → 어느 페이즈의 조건도 아님(HEAD부터 초록 기준선 없음), dx12.selftest material authoring round trip → 렌더 도메인·<b>추적자 미정</b>(그 이름 아래 검사가 지금 없다 — 고쳐서 통과한 것이 아니다). ★ <b>2026-09-15 조건 ① 닫음</b> — HEAD <code>575ab79b</code> 에서 Editor Debug 재빌드 뒤 13칸 재실행: <b>초록 11 · 붉음 2</b>. 붉은 둘은 제품 축이 아니다. ⑥ LC5 drain 은 제품이 <code>status</code>·<code>timing</code> 을 <code>state==Completed</code> 에서만 내는데(설계) 게이트가 그것을 <b>판정문이 아니라 출력문</b>에서 무방비로 읽어 StrictMode 에 죽는다 — 실패가 &quot;state=running&quot; 이 아니라 PowerShell 속성 오류로 위장되고, async 완료를 고정 800ms 만 기다려 부하에 갈린다. ⑬ LC8 Player 서비스는 <code>abbad0f6</code>(9-13 런처 전환)이 <code>Runtime/layout.version</code> 을 요구하게 바꿨는데 게이트가 스테이지 사본에 exe·dll 만 덮어 <b>9-13 부터 조용히 붉었다</b>(게이트는 9-06 이후 무변경, 스테이지는 8-25 것). 두 게이트 다 사유를 모아 마지막에 출력하는데 그 전에 throw 가 나 <b>진짜 사유가 로그에서 사라진다</b>. 그 근거로 제품 표면 초록으로 판정하고 조건 ①을 닫았다(사용자 결정) — 검사를 지우거나 붉음을 통과로 바꾸지 않았고 게이트 수정은 별도 과제다. ⑦ 이 초록인 것도 누락이 아니다: <code>lifecycle.stress</code> 는 seed 의 <code>commandlet=true</code> 라 제품 명령 표에 오르지 않으며, 은퇴 직전 seed·골든과 대조해 <code>584d1ed4</code> 가 원상복구임을 확인했다. <b>남은 조건은 ②(GUI 수동) 하나</b>라 status 는 progress 를 유지한다. 상세 증거와 재정의 근거: docs/analysis/Phase14_5Closure.md." },
 
   // ---------- PHASE 15: 유틸리티 프레임워크 현대화 ----------
   // 신설(2026-08-14). 설계: UtilityFrameworkModernizationPlan.md. 공수는 계획 추정치.
@@ -2270,23 +2273,77 @@ const TASKS = [
     note: "부분 진행 — PHASE 18 CT3가 Core.Minimal의 Reflection.hpp 전파를 절단했다. 남은 우산 헤더와 plf_colony 배치 정정은 별도 include 비용/경계 게이트로 진행한다." },
   // ---------- PHASE 16: UI 시스템 재설계 ----------
   // 신설(2026-08-16). 설계: UISystemRedesignPlan.md. 공수는 계획 추정치.
-  { phase: 16, id: "U0", title: "지혈 — 현 시스템 위 CRITICAL 4종",
-    detail: "클릭 0-나누기 등 즉시 결함을 구조 개편 착수 전에 닫는다.",
-    refs: "UISystemRedesignPlan §1.1·U0", priority: "P0", days: 1, status: "progress", earnedDays: 0.5,
-    note: "부분 진행 — EntityHandle generation, Canvas/UI 주요 참조 handle화, navigation route, RectTransform canonical 계산, button/viewport 방어, C# API와 rect/hitbox golden은 완료했다. viewport 실제 생산자, ui.click handle화, input capability 분리와 남은 dead/editor surface는 미완료다." },
-  { phase: 16, id: "U0.5", title: "WorkerPools 레이스 검증 스파이크",
-    detail: "조사 전용, 최소 투자.", refs: "UISystemRedesignPlan U0.5", priority: "P1", days: 0.5, status: "todo", note: "" },
-  { phase: 16, id: "U1", title: "신규 저작 표면 골격(구 시스템 병행)",
-    detail: "uGUI 형상 저작 계층을 구 시스템과 병행 배치.", refs: "UISystemRedesignPlan §3.1·U1", priority: "P1", days: 2, status: "todo", note: "" },
-  { phase: 16, id: "U2", title: "draw 생산 단일화 + Paint dirty 게이팅",
-    detail: "", refs: "UISystemRedesignPlan §3.4·U2", priority: "P1", days: 2, status: "todo", note: "" },
-  { phase: 16, id: "U3", title: "레이아웃 — dirty-root 순회·LayoutGroup·RectMask (U3a~U3c)",
-    detail: "1-pass 앵커(승계) + 2-pass flow(신규) + 클리핑.", refs: "UISystemRedesignPlan §3.2·U3a~c", priority: "P1", days: 4.5, status: "todo", note: "" },
-  { phase: 16, id: "U4", title: "InputRouter 전면 교체",
-    detail: "CheckInput 전면 교체.", refs: "UISystemRedesignPlan §3.3·U4", priority: "P1", days: 2, status: "todo", note: "" },
-  { phase: 16, id: "U5", title: "렌더 소비 갭 마감", detail: "", refs: "UISystemRedesignPlan U5", priority: "P2", days: 1, status: "todo", note: "" },
-  { phase: 16, id: "U6", title: "에디터 정합(누락 2건 포함)", detail: "", refs: "UISystemRedesignPlan U6", priority: "P2", days: 1.5, status: "todo", note: "" },
-  { phase: 16, id: "U7", title: "구 시스템 은퇴 + 콘텐츠 이식", detail: "", refs: "UISystemRedesignPlan U7", priority: "P1", days: 2, status: "todo", note: "" },
+  // ★ 2026-09-15 재배치 — 계획서의 8-30 전면 개정과 9-15 3차 개정을 반영했다. 그 전까지 이 블록은
+  //   8-16 신설판이라 폐기된 U0.5를 항목으로 들고 있었고, 트랙 T가 0건이었으며, 무엇보다
+  //   같은 ID가 다른 것을 가리켰다 — 구 U3=레이아웃 / 현 U3=InputRouter, 구 U4=InputRouter / 현 U4a·b=레이아웃.
+  //   구 U0의 earnedDays 0.5는 U2로 이관했다: 그 note가 완료로 적은 "참조 handle화·navigation route"가
+  //   현행 계획서 U2의 체크된 세 항목이기 때문이다.
+  //   활성 규모가 16일 → 28일로 늘었다 — 트랙 T(6일)가 신설되고 U0·U4가 세분됐기 때문이다.
+  //   따라서 이 페이즈 진척률이 3% → 2%로 내려간 것은 후퇴가 아니라 분모가 커진 것이다.
+  { phase: 16, id: "U0-a", title: "저작·측정 표면 신설 — 자를 먼저 세운다",
+    detail: "ui.click / ui.pick / ui.drawitems 신설 + 시나리오 ui_input_probe.txt + verify-ui-input.ps1.",
+    refs: "UISystemRedesignPlan U0-a·§1.7", priority: "P0", days: 1.5, status: "todo",
+    note: "다른 모든 단계보다 먼저다 — C1·C3·C5를 고쳐도 증명할 방법이 없다. 클릭을 태울 명령이 저장소에 없어서 지금의 초록 게이트 넷 중 어느 것도 입력 경로를 지나지 않는다(ConsoleCommandSystem에 click 문자열 0건). 완료 조건이 '초록'이 아니라 '결함이 빨갛게 보인다'이다: ui.click이 버튼 위를 찍어도 히트 0을 보고하고(C1), ui.drawitems가 Text 컴포넌트가 있는 씬에서 Text 항목 0을 보고해야 한다(§1.4-①). 초록이 나오면 자가 틀린 것이다." },
+  { phase: 16, id: "U0-b", title: "지혈 — C1·C3·dead path",
+    detail: "GameView viewport 생산자 연결 · UIInputCapabilities로 pointer/navigation 분리 · ICollision2D·MaxOreder·UItype·SpriteFont 잔재 삭제.",
+    refs: "UISystemRedesignPlan U0-b·§1.3·§1.5", priority: "P0", days: 1, status: "todo",
+    note: "C1이 최악 판정이다 — InputManager의 viewport 두 필드에 쓰기가 저장소 전수 0건이고, 읽기는 UIButton.cpp 한 곳뿐이라 0-크기 방어에 걸려 CheckClick이 항상 false다. Player 단독 실행 경로도 함께 고친다(에디터에만 넣으면 빌드된 게임에서 다시 죽는다). C3은 isEnableUINavigation 검사가 마우스 스캔보다 위에 있어 navigation 플래그 하나가 포인터까지 차단하는 것. 판정은 verify-ui-input이 RED→GREEN으로 뒤집히는 것." },
+  { phase: 16, id: "U0-c", title: "게이트 보강 — 눈먼 초록 제거",
+    detail: "DDOL 프로브에 UI 자식을 넣어 UIObjs 멤버십을 본 판정에 · 골든에 pivot 3종과 reparent 후 rect 추가 · 셀프테스트의 UI 건너뜀 수를 로그가 아니라 단정으로.",
+    refs: "UISystemRedesignPlan U0-c·§1.4-④", priority: "P0", days: 1, status: "todo",
+    note: "지금 verify-ddol-canvas의 본 판정 출력이 DdolCanvas(0)이다 — 프로브 캔버스 밑에 UI 컴포넌트가 하나도 없어서 캔버스 재등록만 증명하고 멤버십 재구축은 한 번도 재지 않는다. 초록 넷을 그대로 믿었으면 못 봤다. 신규 단정마다 고침을 한 줄 되돌려 정확히 그 항목만 빨개지는지 확인하는 변이 검사가 완료 조건에 들어 있다." },
+  { phase: 16, id: "U0.5", title: "(폐기) WorkerPools 레이스 검증 스파이크",
+    detail: "판정할 대상이 사라졌다.",
+    refs: "UISystemRedesignPlan §0.5", priority: "P1", days: 0.5, status: "stopped",
+    note: "폐기(계획서 8-30 개정 §0.5) — 워커 UI 푸시 파이프라인 자체가 철거됐다(Scene.cpp:844-855). 항목을 지우지 않고 남기는 것은, 이 ID가 8-16판 대시보드에 살아남아 '없는 단계를 붙들' 뻔한 전례가 있기 때문이다." },
+  { phase: 16, id: "T0", title: "트랙 T — 폰트 자산과 SDF 아틀라스 정본",
+    detail: ".ttf 임포트 → SDF 아틀라스 + 메트릭 · 아틀라스 캐시와 GUID 계약 · D4 은퇴가 남긴 고아 7자리 청산 · 저작 폰트 자산 신설.",
+    refs: "UISystemRedesignPlan 트랙 T0·§1.4-⑦·D-6", priority: "P1", days: 3, status: "todo",
+    note: "신규 vcpkg 포트 0 — stb_truetype v1.26이 이미 설치돼 있고 stbtt_GetCodepointSDF·stbtt_PackBegin·stbtt_GetCodepointKernAdvance가 전부 있다(vcpkg.json의 stb $why만 갱신한다). 폰트 계통은 '미구현'이 아니라 D4 은퇴(8-09)가 끊어 놓은 자리 일곱이다: ManagedAssetType::SpriteFont case 본문 비어 있음 · m_fontMutex가 지킬 대상 없이 남음 · AssetBundleWindow 섹션 제거됨 · ResourceCounterWindow가 하드코딩 0을 그리는 중 · TextComponent::OnDeserialized가 저작 씬마다 LogError · TextData 프록시는 완비인데 소비자 0. Assets/Font/가 빈 디렉터리이고 .ttf/.otf가 저장소 전수 0건이라 저작 자산을 함께 지어야 한다 — 폰트는 바이너리라 D-3(CLI 저작본)의 예외이며 추적되는 자리에 둔다. SDF 생성은 직렬로 먼저 세우고, 병렬화할 때에만 PHASE 13 S0.5가 선행이다." },
+  { phase: 16, id: "T1", title: "트랙 T — 텍스트 draw item",
+    detail: "글리프 배치(커닝·줄바꿈·정렬) → UIDrawItem 다중 사각형 · BuildRectsFromQueue의 TextData 분기 · dx12.text 자가 검증(글리프 수·배치 수·픽셀 표본).",
+    refs: "UISystemRedesignPlan 트랙 T1", priority: "P1", days: 2, status: "todo",
+    note: "U1 앞에 서는 이유는 콘텐츠 가시성이 아니라 U5a 공통 빌더의 모양이다 — UIDrawItem이 사각형 1개짜리 구조체인데 텍스트는 1 컴포넌트 → N 사각형이라, Image만 보고 BuildUIDrawItem을 만들면 §8.2가 여섯 단계로 짠 전환 경로가 두 번 흔들린다. 순서를 바꾸면 사라지는 비용이다. 지금 ++skipped로 버리는 자리에 프록시 경로로 먼저 붙이고 U5a가 공통 builder로 흡수한다. 완료 조건: ui.drawitems가 Text 항목을 보고하고 저작 씬 AsanLifeUI/LifecycleUI의 텍스트 4개가 화면에 나온다." },
+  { phase: 16, id: "T2", title: "트랙 T — 스케일·해상도 대응",
+    detail: "fontSize * layoutScale과 SDF 샘플링의 맞물림을 해상도 스윕으로 · 한글 등 다국어 글리프 범위.",
+    refs: "UISystemRedesignPlan 트랙 T2", priority: "P2", days: 1, status: "todo",
+    note: "T0·T1과 달리 U1 앞이 아니다 — 해상도 스윕이 RHI 0x0000087D swapchain resize 손상으로 2/7에서 끊긴다. 그 결함은 RHI 계층 소유이고 이 계획의 works가 아니다(§14). 비트맵 아틀라스가 아니라 SDF를 고른 이유가 여기 있다: 캔버스 스케일러가 fontSize에 배율을 곱하므로 비트맵은 해상도 스윕에서 즉시 뭉개진다(D-2)." },
+  { phase: 16, id: "U1", title: "UISceneContext와 shadow registry",
+    detail: "Scene이 UI 런타임 컨텍스트를 직접 소유 · UIVisualRef/CanvasBucket 구현 · 기존 registry와 병행하는 shadow registry로 프레임별 mismatch assert.",
+    refs: "UISystemRedesignPlan U1·§3.3·§4.2", priority: "P1", days: 2, status: "todo",
+    note: "hierarchy 훅을 SceneGraph::Reparent 쪽에 신설해야 한다 — C6의 뿌리가 여기다. same-scene reparent는 OnAddedToScene/OnRemovingFromScene이 불리지 않는 경로라 기존 생명주기 이벤트로는 안 잡힌다. SceneGraphRedesignPlan에 거는 선행 의존이다. 완료 조건: 생성/삭제/reparent/DDOL에서 shadow mismatch 0, Scene teardown 후 registry 0." },
+  { phase: 16, id: "U2", title: "등록 통합과 장기 raw pointer 제거",
+    detail: "Canvas::UIObjs 필드 제거 · UIManager의 Images/Texts/SpriteSheets 제거 · UITickSystem 레인을 handle 또는 Scene-owned record로.",
+    refs: "UISystemRedesignPlan U2·§1.4-⑤", priority: "P1", days: 2, status: "progress", earnedDays: 0.5,
+    note: "구 U0(8-16판)의 earnedDays 0.5를 여기로 이관했다 — 그 note가 완료로 적은 'Canvas/UI 주요 참조 handle화·navigation route'가 현행 계획서 U2의 체크된 세 항목(UIObjs를 EntityHandle 목록으로, m_ownerCanvasObject를 EntityHandle로, navigation을 route+handle 캐시로)이다. 남은 것의 순서 제약: UIManager의 포인터 목록은 등록부가 아니라 작업 목록이다 — UIManager::Update가 매 프레임 미연결 UI를 조상 계층에서 캔버스에 잇고 navigation route를 재해석한다(주석이 '캔버스 연결의 단일 지연 지점'이라 적는다). U1의 mount가 그 일을 인수한 뒤에만 지울 수 있고, 어기면 로드 순서 의존이 되살아나 조용한 미연결로 나타난다. 판정은 비정상 순서 로드 게이트(ui_regression.txt)가 그대로 통과하는 것." },
+  { phase: 16, id: "U3", title: "InputRouter 통합",
+    detail: "Scene별 router로 모든 Canvas를 대상으로 · viewport/Canvas projection 단일화 · clip-aware hit-test · 렌더와 공통 sort key(C5) · hover/pressed/focus/capture를 handle로.",
+    refs: "UISystemRedesignPlan U3·§6", priority: "P1", days: 2, status: "todo",
+    note: "현재와의 차이 셋: 모든 Canvas를 본다(지금은 CurCanvas 하나) · topmost를 고른다(지금은 삽입 순서 첫 히트) · 어느 뷰의 좌표인지 안다. ★ PHASE 9.5 W3의 A/B 결정이 선행이다 — UI-facing C# API 46종이 전부 게터/세터이고 이벤트 수단이 폴링 Button_ConsumeClicked 하나인데, 통로인 ScriptMessage는 {int instanceId; char name[64]}뿐이라 어떤 UI가 눌렸는지 실을 자리가 없다. 먼저 정하지 않으면 U3가 폴링 표면을 고착시킨다. 완료 조건: ui.pick의 최상단과 ui.click이 먹은 대상이 일치한다." },
+  { phase: 16, id: "U4a", title: "Layout dirty propagation",
+    detail: "dirty 원인 계측·root 병합 · LayoutUISubtree 기반 부분 갱신 드라이버 · visited 스크래치 버퍼화 · Canvas bucket 기점 진입 · full layout 비교 모드.",
+    refs: "UISystemRedesignPlan U4a·§1.4-②·§7.3", priority: "P1", days: 2, status: "todo",
+    note: "백지가 아니다 — Scene::LayoutUISubtree가 이미 부모 rect를 컴포넌트와 같은 규칙으로 찾아 서브트리만 다시 계산하고 호출자가 9곳이다. 대상 실태: UpdateUILayout이 씬 루트의 모든 자식을 훑고(UI가 아닌 서브트리도 진입), 호출마다 visited 집합을 힙에 새로 만들며, Scene::Update가 그것을 프레임당 3회 부른다. ★ PHASE 14 P1(프레임 단계 마커)이 선행이다 — UI 경로에 PROFILE_CPU 스코프가 0건인데 완료 조건이 그 매크로로 적혀 있었고 ProfilingCapturePlan이 그 계통을 재활용 폐기했다. 재는 자가 없는 채로 고치면 판정 불능이다. UI는 태스크가 아니라 고정 프레임 단계라 계측 자체는 싸다." },
+  { phase: 16, id: "U4b", title: "Layout 컴포넌트 — LayoutGroup·ContentSizeFitter",
+    detail: "Horizontal/Vertical/Grid LayoutGroup · ContentSizeFitter · preferred/min/flexible size 계약 · cycle 검출과 경고.",
+    refs: "UISystemRedesignPlan U4b · PHASE 8-8 승계", priority: "P2", days: 2.5, status: "todo",
+    note: "PHASE 8-8이 중단되며(2026-08-27) 범위를 넘긴 자리다 — 새 UI 소유권/dirty-root 계약 위에서 구현해야 하므로 U4a가 선행이다." },
+  { phase: 16, id: "U5a", title: "값 타입 UIDrawSnapshot",
+    detail: "공통 BuildUIDrawItem으로 create/update 단일화(C8) · shadow snapshot과 proxy 결과 해시 비교 · renderer 소비 전환 · shared_ptr<UIRenderProxy> 제거.",
+    refs: "UISystemRedesignPlan U5a·§8.2", priority: "P1", days: 2, status: "todo",
+    note: "C8의 실체: UIProxyBridge(create)와 ProxyCommand(update)가 필드를 각각 따로 채운다. T1이 앞서므로 공통 빌더는 '1 컴포넌트 → N 사각형'을 아는 채로 설계된다. 완료 조건: render thread가 Scene/Entity/Component에 접근하지 않고, ui.drawitems 출력이 proxy 경로와 snapshot 경로에서 동일하다." },
+  { phase: 16, id: "U5b", title: "렌더 기능 완성",
+    detail: "clip stack / RectMask(clipRect + discard) · CanvasGroup alpha와 raycast · Overlay/Camera/WorldSpace 일관성 · batch key와 resource lifetime 검증.",
+    refs: "UISystemRedesignPlan U5b·§8.4", priority: "P2", days: 2, status: "todo",
+    note: "지금 Overlay만 BuildRectsFromQueue를 지나고 Camera/World Space는 world sprite 경로다 — 두 경로가 같은 draw item에서 갈라지게 한다. 클리핑을 스텐실로 하지 않는 이유는 멀티 백엔드 비용이다: 스텐실 상태는 백엔드마다 비용이 갈리지만 discard는 0이다(RhiBoundaryPlan 제약)." },
+  { phase: 16, id: "U6", title: "에디터·직렬화 정합 + C# UI 표면 재정렬",
+    detail: "anchor/pivot preset · Canvas mode/order/scaler Inspector · navigation route picker와 끊긴 route 표시 · hit rect/clip/sort 디버그 오버레이 · C# API 표 갱신과 reflect 골든.",
+    refs: "UISystemRedesignPlan U6·D-5", priority: "P2", days: 2, status: "todo",
+    note: "'C# UI 표면 재정렬'은 9-15 개정이 works로 배정한 신규 항목이다 — 그 전에는 §1.4-⑥이 위젯 하나의 팬아웃 34파일·등록점 14곳을 세어 놓고 U1의 '함정'에만 적었고, 그것은 계획서가 스스로 지적한 양식(리스크 서술로만 남기고 works에 배정 안 하기)의 재발이었다. ★ 주의: check-api-table은 이름과 순서만 보므로 시그니처를 유지한 채 의미가 바뀐 API를 원리적으로 못 잡는다 — Mesh_SetMaterialFloat의 buffer 인자가 그렇게 조용히 죽은 전례가 있다. 의미를 바꾸면 그것을 재는 음성 단정을 따로 세운다." },
+  { phase: 16, id: "U7", title: "전역 UIManager 퇴역",
+    detail: "모든 호출자를 Scene::GetUIContext()로 · 임시 facade는 active Scene dispatch만 · 전역 선택/Canvas/component 목록 제거 후 facade 삭제.",
+    refs: "UISystemRedesignPlan U7·D-4", priority: "P1", days: 2, status: "todo",
+    note: "UIManagers->를 지나는 호출점 31곳/11파일. 그중 C# 브릿지는 Api_UiNav_GetSelected/SetSelected 2곳뿐이고, UI-facing C# API 46종의 나머지는 컴포넌트를 직접 지나므로 이 단계와 무관하다. 퇴역을 U7까지 미루는 진짜 이유는 UIManager::Update가 지연 캔버스 연결의 단일 지점이라는 것이다(§1.4-⑤). 최종 완료 조건: Scene 종료 후 UI 상태·input state·render state 잔존 0, 런타임 UI lifetime 관리를 위한 weak_ptr 0." },
   // ---------- PHASE 17: 직렬화 이원화 ----------
   // 신설(2026-08-16), 재감사(2026-09-02). D3-b-L 재산정 전이라 공수는 하한.
   { phase: 17, id: "D0", title: "계측 — 기준선 확정",

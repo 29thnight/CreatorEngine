@@ -3,13 +3,17 @@
 > 최초 작성: 2026-08-19
 > 1차 개정: 2026-08-21
 > **전면 개정: 2026-08-30 — 현재 소스 전수 실측 + 인접 계획 경계 재확정**
+> **3차 개정: 2026-09-15 — 레이어 판정(D-5) · 인접 페이즈 접점 · 트랙 T 승격**
 > 연계 문서: `SceneGraphRedesignPlan.md`, `RhiBoundaryPlan.md`, `MathematicsMigrationPlan.md`,
-> `ReflectionRedesignPlan.md`, `EditorAutomationCLIPlan.md`, `MultiCameraRenderPlan.md`
+> `ReflectionRedesignPlan.md`, `EditorAutomationCLIPlan.md`, `MultiCameraRenderPlan.md`,
+> `ScriptSurfacePlan.md`, `ProfilingCapturePlan.md`, `TaskSchedulerUnificationPlan.md`
 > 범위: UI 소유권·생명주기·참조·입력·레이아웃·렌더 제출·텍스트 렌더·에디터·회귀 검증
 
 ---
 
-## 0. 이번 전면 개정의 사유
+## 0. 개정 사유
+
+### 0.0 2026-08-30 전면 개정
 
 1차 개정(08-21) 이후 아홉 날 동안 **이 계획서 밑의 지반이 세 번 바뀌었다.**
 
@@ -54,6 +58,9 @@
 | `EditorAutomationCLIPlan` | `ui.*` 저작·관측 명령의 소유. 이 계획의 U0-a가 그 표면에 명령 3종을 더한다 |
 | `MultiCameraRenderPlan` | Overlay UI는 `EnhancedLiveViewFlags::ScreenSpaceUI`를 가진 뷰에만 간다. Camera/World Space Canvas는 뷰별 평면으로 간다. **뷰별 UI 상태(hover/focus)는 이 계획의 U3가 정한다** |
 | `MaterialPipelinePlan` | **경계 정정**: 폰트/SDF는 이 계획이 조사한 결과 **어느 계획도 소유하지 않았다**. 트랙 T로 이 계획이 받는다(§0.4) |
+| `ScriptSurfacePlan`(PHASE 9.5) | **거는 것**: W3의 `ScriptMessage` 값 통로 결정(A/B)이 U3의 클릭 이벤트를 C#에 전달할 유일한 길이다. **넘기는 것**: UI C# 표면 갱신은 이 계획이 필드를 늘리고 U6가 works로 진다(D-5) |
+| `AnimationSchedulerPlan` S0.5 / `TaskSchedulerUnificationPlan` | **거는 것**: 트랙 T0의 SDF 생성을 **병렬화할 때에만** enkiTS가 선행이다. **넘기는 것**: UI 본선(U0~U7)은 병렬화 대상이 아니다 — 근거 §1.4-⑧ |
+| `ProfilingCapturePlan`(PHASE 14) | **거는 것**: U4a의 완료 판정이 프레임 단계 마커를 요구한다. `PROFILE_CPU` 매크로 계통은 그 계획이 폐기했고 UI 경로 스코프는 **0건**이다 |
 
 ### 0.4 이번 개정에서 **신설**하는 것 — 트랙 T (텍스트 렌더)
 
@@ -78,6 +85,39 @@
 | *"navigations 로드마다 2배"* (구 CRITICAL ②) | 해소. typed 직렬화 이관 때 수동 복원 루프를 의도적으로 미이식했다 — `ComponentFactory.cpp:171`, `ImageComponent.cpp:200`, `TextComponent.cpp:144` |
 | *"UI 프리팹 instanceID 재발급 스킵"* (구 CRITICAL ③) | 해소. `verify-ui-navigation-local`의 **"ID 재발급 PASS"**가 살아 있는 판정이다 |
 | §1.6의 "현재 회귀 기준선" 서술 | 오늘 실측값으로 교체(§1.6) |
+
+### 0.6 2026-09-15 3차 개정 — 레이어 판정 · 인접 페이즈 접점 · 트랙 T 승격
+
+8-30 전면 개정 이후 이 계획서 **밖에서** 셋이 착지했고, 그것이 여기 답이 없던 질문 둘을
+강제했다 — *UI 저작을 어느 레이어가 소유하는가* 와 *enkiTS 도입이 이 페이즈에 무엇을
+더하는가*.
+
+| 착지한 것 | 이 계획서에 미친 영향 |
+|---|---|
+| `ScriptSurfacePlan.md`(PHASE 9.5) W1·W2 | C# 표면이 네이티브와 1:1로 다시 섰다. 레이어 질문이 이제 **실측으로 대답 가능**해졌다 — D-5로 판정한다 |
+| `TaskSchedulerUnificationPlan.md`(9-15) → PHASE 13 S0.5 | `WorkerPool`이 enkiTS로 교체된다. UI 본선은 무관하나 **트랙 T0의 폰트 로딩이 그 경로를 탄다** |
+| `ProfilingCapturePlan.md`(PHASE 14) 재활용 폐기 개정 | `PROFILE_CPU` 매크로 계통이 폐기됐다. **U4a의 완료 조건이 그 매크로로 적혀 있었다** |
+
+이번 개정이 정하는 것 넷:
+
+1. **D-5 — UI 저작의 소유 레이어를 C++로 확정**하고 근거를 실측으로 박는다(§9.0).
+   "C# 스크립트 레이어로 올린다"를 §14 비범위에 명시한다. 근거를 안 적으면 다음 세션이
+   같은 질문을 처음부터 되짚는다.
+2. **트랙 T를 U1 앞으로 승격**한다. "순서 자유도"로 뒀던 것을 순서 제약으로 바꾼다.
+   그 사유는 콘텐츠 가시성이 아니라 **U5a 공통 빌더의 모양**이다(§9 트랙 T).
+3. **인접 페이즈 의존 셋을 명시**한다 — U4a ← PHASE 14 P1 · U3 ← PHASE 9.5 W3 ·
+   T0의 SDF 병렬화 ← PHASE 13 S0.5.
+4. **§4.3 thread 규칙에 태스크 워커 항목**을 더한다. enkiTS 이후 생길 유혹을 미리 막는다.
+
+이번 개정은 §1~§8의 설계를 바꾸지 않는다. 바뀐 것은 **순서·경계·판정**이다.
+
+> ★ **대시보드가 이 계획서보다 두 개정 뒤처져 있다** (9-15 실측). `RefactoringPlanDashboard.html`의
+> PHASE 16 블록은 **8-16 신설판**이라 `U0.5`(§0.5에서 폐기)를 항목으로 들고 있고, 트랙 T가 0건이며,
+> 무엇보다 **같은 ID가 다른 것을 가리킨다** — 대시보드의 `U3`는 레이아웃이고 이 계획서의 `U3`는
+> InputRouter다(`U4`도 서로 반대). 이 저장소는 두 방향의 드리프트를 다 겪었다(BT는 계획서가
+> 뒤처졌고 여기서는 대시보드가 뒤처졌다). **착수 전에 어느 쪽이 정본인지 먼저 확인한다** —
+> 이 페이즈에서는 이 계획서가 정본이다. 대시보드 재배치는 진척(`status`·`earnedDays`) 보존
+> 규칙이 필요하므로 별건으로 둔다.
 
 ---
 
@@ -223,6 +263,45 @@ Create/Update/Destroy 배관은 세 종 모두 완비다(`RenderSceneBridge.cpp:
 `UIComponents.cs` = **14곳**.
 
 이 숫자가 U1~U2의 설계 판단 근거다. 등록부를 하나로 모으는 것의 값이 여기서 나온다.
+
+#### ⑦ 폰트 계통은 "미구현"이 아니라 **은퇴가 남긴 고아**다 (9-15 실측)
+
+§0.4가 "텍스트를 그리는 코드가 없다"까지 적었는데, 그 아래를 더 파니 D4 은퇴(8-09)가
+남긴 자리가 **일곱**이다. 새로 만드는 일이 아니라 **끊어진 자리를 잇는 일**이고, 그래서
+트랙 T의 크기 추정과 착수 순서가 둘 다 달라진다.
+
+| 자리 | 상태 | 위치 |
+|---|---|---|
+| 폰트 자산 | `Assets/Font/`가 **빈 디렉터리**. `.ttf`/`.otf`가 저장소 전수 **0건** | — |
+| 자산 타입 enum | `ManagedAssetType::SpriteFont` **존치**. 번들 로더에 case가 있고 **본문이 비어 있다** | `DataSystem.cpp:1691-1695` |
+| 로더 | `LoadSFont` 삭제됨. `m_fontMutex`는 **지킬 대상 없이 남았다**(`SFonts` 컨테이너는 사라졌고 주석만 그것을 가리킨다) | `DataSystem.h:268,273` |
+| 에디터 자산 창 | `SpriteFonts` 섹션 제거됨 — *"SDF 계통이 서면 다시 붙인다"* | `AssetBundleWindow.cpp:184` |
+| 리소스 카운터 | **죽은 카운터를 그리는 중** — `snapshot.spriteFonts = 0`을 하드코딩해 놓고 행은 표시한다 | `ResourceCounterWindow.cpp:88,204` |
+| 컴포넌트 | `SetFont`이 경로만 저장. `OnDeserialized`가 빈 경로면 `LogError` — **폰트가 0건이라 저작 씬마다 난다** | `TextComponent.cpp:141-165` |
+| 렌더 프록시 | `TextData`는 **완비**다 — `fontPath`·`message`·`color`·`position`·`maxSize`·`fontSize`·`alignment`·`stretchX/Y`. 소비자만 0 | `UIRenderProxy.h:46-60` |
+
+**그리고 래스터라이저는 이미 프로세스 안에 있다.** `stb_truetype.h` **v1.26**이 vcpkg
+`stb` 포트로 설치돼 있고 필요한 API가 전부 있다 — `stbtt_GetCodepointSDF` /
+`stbtt_GetGlyphSDF`(SDF 직접 생성) · `stbtt_PackBegin` 계열(아틀라스 패킹) ·
+`stbtt_GetCodepointKernAdvance`(커닝).
+
+→ **D-6: 트랙 T에 새 vcpkg 포트를 추가하지 않는다.** `vcpkg.json`의 `stb` 항목은
+`$why`가 "이미지 로드/기록 — Terrain"이라 적혀 있으므로 그 줄을 갱신한다. 이 저장소는
+`$why`를 근거 문서로 쓰고 실측으로 포트 12개를 걷어 온 이력이 있다 — 용도가 늘면 적는다.
+
+#### ⑧ UI 런타임에 스레딩 코드가 0이다 — enkiTS 보강 대상이 아니다
+
+UI 런타임 18파일 2,873줄 전수에서 `WorkerPool`·`std::async`·`ThreadPool`·`std::thread`
+히트 **0건**. 워커 UI 푸시 파이프라인은 이미 철거됐고(`Scene.cpp:844-855`), 현재 UI
+규모는 골든 기준 rect 14개다.
+
+**그러므로 PHASE 13(enkiTS)이 이 계획에 더하는 works는 없다.** 접점은 셋이고 전부
+순서 제약이지 병렬화 항목이 아니다 — T0의 자산 로딩 경로 · U4a의 계측 · §4.3의 워커 금지.
+
+> 유일한 실질 병렬 후보는 **T0의 SDF 거리장 생성**(글리프 수백~수천 개의 독립 계산)이고,
+> 그것은 임포트/쿠킹 시점이라 프레임 예산과 무관하다. **직렬로 먼저 세운다.** 체감되면
+> 그때 `ITaskSet` range 분할로 올리고, **그 시점에만** S0.5가 선행이다. 지금 순서를
+> 뒤집어 T 전체를 PHASE 13 뒤로 미룰 근거는 없다.
 
 ### 1.5 제거 후보 dead path (재확인 — 전부 유효)
 
@@ -453,9 +532,13 @@ SceneGraph::Reparent → UISceneContext::OnHierarchyChanged   ★ 현재 없는 
 
 ### 4.3 thread 규칙
 
-- Scene/UISceneContext mutation과 handle resolve: **game thread**
+- Scene/UISceneContext mutation과 handle resolve: **game thread 전용**
 - `UIDrawSnapshot`: commit 이후 immutable
 - render thread: Entity/Component/Canvas/UIManager 접근 금지
+- **태스크 워커도 같은 금지다** (현 `WorkerPools`, PHASE 13 S0.5 이후 enkiTS).
+  워커가 고정 인덱스로 안정되면 "레이아웃을 워커에서" 유혹이 생기는데, `AnimationJob`의
+  R6(워커 스레드에서 C# 이벤트 직발화)이 정확히 그 자리에서 난 결함이다. UI는 mount ·
+  route 재해석 · 입력 dispatch가 전부 게임 스레드 불변식 위에 서 있다(§1.4-⑧)
 - input callback: dispatch 중 파괴 요청은 지연, dispatch 종료 후 flush
 
 ---
@@ -676,6 +759,45 @@ Canvas order → hierarchy sibling order → component/local order → stable ti
 | D-2 | 텍스트 래스터화 방식 | **SDF 아틀라스** | 캔버스 스케일러가 폰트 크기에 배율을 곱한다(`UIProxyBridge.cpp`의 `fontSize * layoutScale`). 비트맵 아틀라스는 해상도 스윕에서 즉시 뭉개진다 |
 | D-3 | 신규 게이트의 자산 원천 | **CLI 저작본만** | 저작 UI 씬 3종이 전부 gitignore(§1.4-③). 저작 자산 게이트는 다른 기계에서 죽는다 |
 | D-4 | `UIManager` 전역 퇴역 시점 | **U7 유지** | 호출점 31곳/11파일인데 C# 바인딩은 2곳뿐이다(`ClrHost.cpp:1895/1904`). 진짜 이유는 `UIManager::Update`가 **지연 캔버스 연결의 단일 지점**이라는 것 — §1.4-⑤ |
+| D-5 | UI 저작의 소유 레이어 — **C++ 정본** / C# 스크립트 레이어 이관 | **C++ 정본 유지** | 이관이 요구하는 전제 넷이 전부 0이다 (아래 근거표) |
+| D-6 | 폰트 래스터라이저 조달 | **`stb_truetype` 재사용** (신규 포트 0) | v1.26이 이미 설치돼 있고 SDF·패킹·커닝 API가 완비다 (§1.4-⑦) |
+
+#### D-5 근거 — "UI 저작을 C# 스크립트 레이어로 올린다"가 지금 성립하지 않는 이유
+
+질문의 형태: *UI 저작을 C#으로 올리고 필요한 API만 C++에 두는 것*(Unity uGUI 구도) 대
+*C++가 저작 API를 소유하고 C#이 그것을 공유하는 것*(현행).
+
+**전제 넷이 필요한데 넷 다 0이다** (2026-09-15 실측):
+
+| # | 전제 | 실측 | 근거 |
+|---|---|---|---|
+| ① | 관리 측이 컴포넌트를 **붙일** 수단 | **없다** — C# 경계에 `Prefab_Instantiate`와 `Entity_Destroy`뿐이고 AddComponent 계열 0. `CreateComponent`는 네이티브→관리 방향(스크립트 인스턴스 생성)이다 | `Native.cs:78-79` |
+| ② | **편집 모드**에서 도는 실행 체계 | **없다** — C# 훅은 `OnBeginSimulation`~`OnEndSimulation`으로 시뮬레이션에 귀속된다(`SimulationScope`가 "컴포넌트 하나의 시뮬레이션 수명"이라 못박는다). 반면 UI 레이아웃은 **일시정지 중에도** 네이티브로 돈다 | `Scene.cpp:5050` `AllUIUpdateWorldMatrix` · `SceneViewWindow.cpp:301` |
+| ③ | 관리 타입이 직렬화·인스펙터의 **정본**이 될 기반 | **없다** — 정본은 네이티브 `reflect()` consteval이고 소비자가 셋(직렬화·인스펙터·`object.property`). C# 쪽 `SerializeField`는 7종이며 **실자산 저작분 0건**이라 왕복이 검증된 적이 없다 | `ScriptSurfacePlan` W6 |
+| ④ | 틱당 크로싱 1회 불변식 | **깨진다** — 레이아웃·히트테스트는 부모→자식 재귀 동기 순회라 배치로 묶이지 않는다 | §6.1 · §7 |
+
+**④에서 BT와 갈린다.** 행동 트리는 "노드 하나만 C#이면 크로싱이 노드 수만큼 생긴다 →
+트리 전체를 관리 측으로"가 옳은 판정이었다. **그 판정이 성립한 이유는 BT의 네이티브
+소비자가 0이었기 때문이다**(`RuntimeFrame.cpp:53`, C# 단독 실행). UI는 네이티브 소비자가
+셋이다 — 렌더 프록시 생성(`UIProxyBridge`) · 에디터 SceneView 조작 · 직렬화. 트리를 통째로
+옮기면 이 셋이 전부 크로싱을 문다. **같은 형태의 논증이 반대 결론을 낸다.**
+
+**Unity도 전부 C#이 아니다.** uGUI가 C# 패키지인 것은 맞지만 그 아래가 갈려 있다 —
+`RectTransform` 계산 · `Canvas` 배칭/정렬 · `CanvasRenderer` · 텍스트 메시 생성은
+네이티브이고, `LayoutGroup`/`Selectable`/`EventSystem`이 C#이다. 즉 **좌표·제출·배칭은
+네이티브, 정책·상호작용만 관리 측**이라는 선이며, 그 C# 계층이 서는 전제가 위 ①~③이다.
+
+**저작분이 규모를 정한다**(PHASE 9.5 §4-1의 원칙). UI C# API를 쓰는 `GameScripts`는
+5개이고 그중 4개가 Probe다 — 실사용은 `TutorialUI.cs` 하나. W2가 같은 근거로 래퍼 11종을
+착수하지 않았다.
+
+**그래서 무엇을 하는가.** 현행 구도를 유지하되 **C# 표면 갱신을 이 계획의 works로
+명시한다**(U6). 지금은 §1.4-⑥이 14 등록점을 세어 놓고 U1의 "함정"에만 적었는데, 그것은
+§0.4가 스스로 지적한 양식 — *"리스크 서술로만 남기고 works에 배정 안 하기"* — 의 재발이다.
+
+**이 판정을 되짚는 조건**: ①②③ 중 **둘 이상**이 서면 다시 잰다. ①은 현재 어느 계획의
+범위에도 없고, ②는 Unity `ExecuteAlways` 상당의 기제를 요구한다. 하나만 서는 것으로는
+부족하다 — 셋이 함께 있어야 저작 데이터의 정본이 한 벌로 유지된다.
 
 ---
 
@@ -721,9 +843,81 @@ Canvas order → hierarchy sibling order → component/local order → stable ti
 - [ ] 골든에 **reparent 후 rect** 항목 추가(same Canvas / cross Canvas)
 - [ ] `EnhancedSceneRendererSelfTest`의 UI `건너뜀` 수를 로그가 아니라 **단정**으로
 - [ ] 변이 검사 — 각 신규 단정마다 고침을 한 줄 되돌려 정확히 그 항목만 빨개지는지 확인
+- [ ] U0-a가 세운 **두 RED의 현재 값을 래칫으로 고정** — 클릭 쪽은 U0-b가 닫았고,
+      텍스트 쪽(`ui.drawitems`의 Text 항목 수)은 다음 단계인 트랙 T가 닫는다
 
 **완료 조건**
 - 신규 단정 각각이 **의도한 변이에서만** 빨개진다(전부 통과하는 첫 실행을 믿지 않는다)
+
+---
+
+### 트랙 T — 텍스트 렌더 *(신설 · §0.4 · **9-15 개정에서 U1 앞으로 승격**)*
+
+**선행**: U0-a(`ui.drawitems`) · U0-c(래칫). **후행**: U1 이후 전부.
+
+**왜 U1 앞으로 올리는가 (9-15)**
+
+8-30판은 T를 "U1~U4와 독립 · 순서 자유"로 뒀다. 그것을 순서 제약으로 바꾼다. 근거 셋,
+그중 첫째가 결정적이다.
+
+1. **U5a의 공통 빌더가 텍스트를 모르면 틀린 모양으로 선다.** `UIDrawItem`은 지금 사각형
+   하나짜리 구조체인데(§8.1), 텍스트는 **1 컴포넌트 → N 사각형**(글리프마다)이다. Image만
+   보고 `BuildUIDrawItem`을 만들면 T1이 그 구조를 다시 연다 — §8.2가 "한 번에 제거하지
+   않는다"며 여섯 단계로 짠 전환 경로가 두 번 흔들린다. **이건 순서를 바꾸면 사라지는
+   비용이다.**
+2. **U0-a가 세우는 두 RED 중 하나를 T만 닫는다.** 클릭 쪽은 U0-b가 닫는데 텍스트 쪽은
+   T까지 열린 채다. `verify-resolution-sweep`의 2/7은 래칫으로 후퇴를 막을 수 있지만,
+   **고정할 값이 0이면 래칫이 막을 것이 없다.**
+3. **콘텐츠가 지금 화면에 없고, 오류가 나는 중이다.** 저작 씬 `AsanLifeUI`·`LifecycleUI`의
+   텍스트 4개가 나오지 않고, 폰트 자산이 0건이라 `TextComponent::OnDeserialized`가 저작
+   씬마다 `LogError`를 낸다(§1.4-⑦). UI 소유권 결함을 다 고쳐도 이 상태는 그대로다.
+
+**다만 U0은 여전히 T보다 앞이다.** `ui.drawitems` 없이는 T의 완료를 판정할 수단이 없고,
+C1(클릭 사망 · 최악 판정)의 지혈은 viewport 생산자 연결 한 자리라 미룰 이유가 없다.
+
+**T0 — 폰트 자산과 아틀라스 정본**
+- [ ] 폰트 자산 타입 정의(`.ttf` 임포트 → 아틀라스 + 메트릭)
+- [ ] SDF 생성 경로(D-2 권고) · 아틀라스 캐시 · GUID 계약(`SerializationPlan` D2 준수).
+      **`stb_truetype`으로 짓는다**(D-6) — `stbtt_GetCodepointSDF` · `stbtt_PackBegin` ·
+      `stbtt_GetCodepointKernAdvance`. **직렬로 먼저 세운다**(§1.4-⑧)
+- [ ] `TextComponent::fontPath`가 이 자산을 가리키게
+- [ ] **고아 일곱 자리 청산**(§1.4-⑦) — `ManagedAssetType::SpriteFont` case 본문 ·
+      `m_fontMutex`의 소유 대상 · `AssetBundleWindow` 섹션 복원 · `ResourceCounterWindow`의
+      하드코딩 `0` · `AssetEntry.h` enum 값 호환(번들 자산에 옛 값이 직렬화돼 있다) ·
+      `OnDeserialized`의 `LogError`가 정상 저작에서 사라지는지
+- [ ] **저작 폰트 자산 신설** — `Assets/Font/`가 빈 디렉터리이고 `.ttf`/`.otf`가 저장소
+      전수 0건이다. **최소 1종(라틴 + 한글 상용)을 넣지 않으면 T1을 붙여도 화면이 그대로다.**
+      D-3이 "신규 게이트는 CLI 저작본"이라 정했는데 **폰트는 바이너리 자산이라 CLI로 지을 수
+      없다** — 게이트가 쓰는 폰트는 `Dynamic_CPP/Assets`(대부분 gitignore)가 아니라
+      **추적되는 자리**(`Tools/regression/fixtures/`)에 두고, 라이선스가 재배포를 허용하는
+      것을 고른다
+- [ ] `vcpkg.json`의 `stb` 항목 `$why`에 폰트 용도 추가 (포트 추가는 **없다**)
+
+**T1 — 텍스트 draw item**
+- [ ] 글리프 배치(커닝·줄바꿈·정렬) → `UIDrawItem` 다중 사각형
+- [ ] `BuildRectsFromQueue`의 `TextData` 분기 — 지금 `++skipped`로 버리는 자리
+- [ ] `dx12.text` 자가 검증: 글리프 수 · 배치 수 · 픽셀 표본
+
+**T2 — 스케일·해상도 대응** *(RHI `0x0000087D` 해소에 걸린다 — T0·T1과 달리 U1 앞이 아니다)*
+- [ ] `fontSize * layoutScale`이 SDF 샘플링과 맞물리는지 해상도 스윕으로
+- [ ] 한글 등 다국어 글리프 범위 (기존 코드 주석이 이미 이 함정을 겪었다:
+      `TextComponent.h`의 *"한글이 안나올시…"*)
+
+**완료 조건**
+- `ui.drawitems`가 Text 항목을 **보고**하고, 저작 씬 `AsanLifeUI`/`LifecycleUI`의
+  텍스트 4개가 화면에 나온다
+- U0-a에서 세운 두 번째 RED가 GREEN으로
+
+**프록시 경로로 붙인다.** T0·T1이 U5a보다 앞이므로, 텍스트 draw item은 현행
+`shared_ptr<UIRenderProxy>` 경로(`TextData` → `BuildRectsFromQueue`의 `++skipped` 자리)에
+먼저 붙는다. U5a가 그것을 공통 builder로 흡수한다 — **그때 빌더는 이미 N 사각형을 아는
+채로 설계된다**는 것이 이 순서의 이득이다.
+
+**PHASE 13(enkiTS)과의 관계**: SDF 생성은 이 페이즈에서 유일한 실질 병렬 후보지만
+임포트/쿠킹 시점이라 프레임 예산과 무관하다. **직렬로 세우고**, 체감되면 그때 `ITaskSet`
+range 분할로 올린다 — **그 시점에만** S0.5가 선행이다. 폰트 로딩이 타는
+`DataSystem::LoadAssetBundle`의 `WorkerPools->Enqueue`는 S0.5가 **시그니처를 유지한 채**
+백엔드만 바꾸므로 이 계획은 소비자로서 영향을 받지 않는다(§1.4-⑧).
 
 ---
 
@@ -742,6 +936,7 @@ Canvas order → hierarchy sibling order → component/local order → stable ti
 
 **함정**: UI 필드를 늘리면 `reflect()` 스키마 · C# `Native.cs`/`UIComponents.cs` ·
 Inspector가 **동시에** 따라와야 한다(§1.4-⑥의 14 등록점). 하나만 고치면 조용히 갈린다.
+**그 C# 쪽 몫은 U6가 works로 진다**(D-5) — 여기서는 함정으로만 적고 배정하지 않는다.
 
 ---
 
@@ -775,7 +970,7 @@ Inspector가 **동시에** 따라와야 한다(§1.4-⑥의 14 등록점). 하�
 
 ### U3 — InputRouter 통합
 
-**선행**: U0-b(C1) · U1(mount 이벤트)
+**선행**: U0-b(C1) · U1(mount 이벤트) · **PHASE 9.5 W3의 A/B 결정**(아래 마지막 항목)
 
 - [ ] Scene별 router 도입, 모든 Canvas를 대상으로
 - [ ] viewport/Canvas projection 단일화
@@ -783,6 +978,13 @@ Inspector가 **동시에** 따라와야 한다(§1.4-⑥의 14 등록점). 하�
 - [ ] **렌더와 공통 sort key** — C5의 해소점
 - [ ] hover/pressed/focus/capture를 handle로 관리
 - [ ] dispatch 중 파괴/disable 테스트
+- [ ] **C#으로 가는 클릭 이벤트 통로 결정** *(9-15 신설)* — 지금 UI-facing C# API 46종은
+      전부 게터/세터이고 이벤트 수단이 폴링 `Button_ConsumeClicked` 하나다(`Native.cs:292`).
+      InputRouter가 서면 콜백이 자연스러운 표면이 되는데, 그 통로인 `ScriptMessage`는
+      `{int instanceId; char name[64]}`뿐이라 **어떤 UI가 눌렸는지 실을 자리가 없다.**
+      `ScriptSurfacePlan` W3이 같은 결정(안 A: 값 필드 추가 / 안 B: 질의 API)에 걸려 있다 —
+      **먼저 정하지 않으면 U3가 폴링 표면을 고착시킨다.** 결정은 그쪽 소유이고, 이 단계는
+      결정 없이 착수하지 않는다
 
 **완료 조건**
 - `ui.pick`의 최상단과 `ui.click`이 먹은 대상이 **일치**
@@ -804,7 +1006,15 @@ Inspector가 **동시에** 따라와야 한다(§1.4-⑥의 14 등록점). 하�
 **완료 조건**
 - 골든 결과 **동일**
 - 변경 없는 프레임의 layout 방문 수 **0 또는 상수**
-- `PROFILE_CPU`로 잰 `UpdateUILayout` 프레임 비용이 착수 전 대비 감소(수치는 착수 시 실측)
+- **프레임 단계 마커로 잰** `UpdateUILayout` 비용이 착수 전 대비 감소(수치는 착수 시 실측)
+
+> ★ **선행 — PHASE 14 P1** *(9-15 신설)*. 지금 UI 경로에 `PROFILE_CPU` 스코프가 **0건**이고
+> (`UI*.cpp` · `Canvas.cpp` · `RectTransformComponent.cpp` 전수), `ProfilingCapturePlan`이
+> 그 매크로 계통을 **재활용 폐기**했다. 죽은 매크로에 스코프를 박으면 P1에서 다시 옮긴다.
+> 다행히 UI는 태스크가 아니라 **고정 프레임 단계**이므로(`SystemSchedule.h:19`가
+> `UITickSystem`을 그 표에 둔다) 그 계획이 말한 "13단계는 한 줄씩 수동 표기" 쪽이라 계측이
+> 싸다. **재는 자가 없는 채로 고치면 이 항목은 판정 불능이다** — 착수 전에 마커 유무를
+> 먼저 확인한다.
 
 ### U4b — Layout 컴포넌트
 
@@ -812,34 +1022,6 @@ Inspector가 **동시에** 따라와야 한다(§1.4-⑥의 14 등록점). 하�
 - [ ] ContentSizeFitter
 - [ ] preferred/min/flexible size 계약
 - [ ] cycle 검출과 경고
-
----
-
-### 트랙 T — 텍스트 렌더 *(신설 · §0.4)*
-
-**T0 — 폰트 자산과 아틀라스 정본**
-- [ ] 폰트 자산 타입 정의(`.ttf` 임포트 → 아틀라스 + 메트릭)
-- [ ] SDF 생성 경로(D-2 권고) · 아틀라스 캐시 · GUID 계약(`SerializationPlan` D2 준수)
-- [ ] `TextComponent::fontPath`가 이 자산을 가리키게
-
-**T1 — 텍스트 draw item**
-- [ ] 글리프 배치(커닝·줄바꿈·정렬) → `UIDrawItem` 다중 사각형
-- [ ] `BuildRectsFromQueue`의 `TextData` 분기 — 지금 `++skipped`로 버리는 자리
-- [ ] `dx12.text` 자가 검증: 글리프 수 · 배치 수 · 픽셀 표본
-
-**T2 — 스케일·해상도 대응**
-- [ ] `fontSize * layoutScale`이 SDF 샘플링과 맞물리는지 해상도 스윕으로
-- [ ] 한글 등 다국어 글리프 범위 (기존 코드 주석이 이미 이 함정을 겪었다:
-      `TextComponent.h`의 *"한글이 안나올시…"*)
-
-**완료 조건**
-- `ui.drawitems`가 Text 항목을 **보고**하고, 저작 씬 `AsanLifeUI`/`LifecycleUI`의
-  텍스트 4개가 화면에 나온다
-- U0-a에서 세운 두 번째 RED가 GREEN으로
-
-**순서 자유도**: T는 U1~U4와 독립이다. 콘텐츠 가시성 회복을 우선하면 U5a 이전에
-프록시 경로로 먼저 붙이고, U5a에서 공통 builder로 흡수한다. 그 경우 T1의 코드가
-한 번 옮겨지는 비용을 **의도적으로 지불하는 것**임을 기록해 둔다.
 
 ---
 
@@ -872,7 +1054,16 @@ Inspector가 **동시에** 따라와야 한다(§1.4-⑥의 14 등록점). 하�
 - [ ] Canvas mode/order/scaler Inspector (C9의 잔여 — 값 경로는 이미 있다)
 - [ ] navigation route picker와 끊긴 route 표시
 - [ ] hit rect / clip / sort / debug overlay
-- [ ] C# API와 reflect 스키마 골든 갱신 — `reflect_golden.yaml`
+- [ ] **C# UI 표면 재정렬** *(9-15 신설 · D-5)* — 지금까지 works에 없던 항목이다
+      - 신설·변경 필드를 `Native.cs` API 표에 반영하고 `kApiVersion`을 올린다
+      - ★ 표 순서 대조 게이트(`check-api-table`)는 **이름과 순서만 본다**. 시그니처를
+        유지한 채 의미가 바뀐 API는 원리적으로 못 잡는다 — `Mesh_SetMaterialFloat`의
+        `buffer` 인자가 그렇게 조용히 죽은 전례가 있다. 의미를 바꾸면 그것을 재는 음성
+        단정을 따로 세운다
+      - D-1이 은퇴로 가면 `SpriteSheet` 계통을 C# 쪽에서도 지운다 (현재 C# 표면에
+        SpriteSheet 타입이 **없으므로** 지울 것이 0일 수 있다 — 확인 후 판정)
+      - `UIButton.ConsumeClicked` 폴링이 U3 이후에도 유효한지 판정 (U3의 W3 결정과 한 쌍)
+- [ ] reflect 스키마 골든 갱신 — `reflect_golden.yaml`
 
 ### U7 — 전역 `UIManager` 퇴역
 
@@ -895,17 +1086,20 @@ Inspector가 **동시에** 따라와야 한다(§1.4-⑥의 14 등록점). 하�
 ## 10. 순서 제약
 
 ```text
-U0-a ─► U0-b ─► U0-c ─┬─► U1 ─► U2 ─┬─► U3 ─────────────┐
- (자 먼저)             │             │                    │
-                       │             ├─► U4a ─► U4b       ├─► U6 ─► U7
-                       │             │                    │
-                       │             └─► U5a ─► U5b ──────┘
-                       │                  ▲
-   트랙 T ─ T0 ─► T1 ─►T2 ─────────────────┘  (U1~U4와 독립)
+U0-a ─► U0-b ─► U0-c ─► T0 ─► T1 ─┬─► U1 ─► U2 ─┬─► U3 ─────────────┐
+ (자 먼저)       (T 승격 · 9-15)   │             │                    │
+                                   │             ├─► U4a ─► U4b       ├─► U6 ─► U7
+                                   │             │                    │
+                                   │             └─► U5a ─► U5b ──────┘
+                                   │                  ▲
+                            T2 ────┴──────────────────┘  (RHI 0x87D 해소 후)
 
 선행 의존(트랙 밖):
-  RHI 0x0000087D swapchain resize  ─► §5.5 해상도 7종 검증
+  RHI 0x0000087D swapchain resize  ─► §5.5 해상도 7종 검증 · T2
   SceneGraph hierarchy 이벤트 훅   ─► U1의 reparent 계측
+  PHASE 14 P1 (프레임 단계 마커)   ─► U4a의 완료 판정                  ★ 9-15 신설
+  PHASE 9.5 W3 (ScriptMessage 값)  ─► U3의 C# 클릭 이벤트 표면         ★ 9-15 신설
+  PHASE 13 S0.5 (enkiTS)           ─► T0의 SDF 생성을 병렬화할 때만    ★ 9-15 신설
 ```
 
 **금지**: `weak_ptr`를 먼저 raw pointer로 바꾸는 중간 단계. 각 단계는 이전 구현과
@@ -950,6 +1144,10 @@ U0-a ─► U0-b ─► U0-c ─┬─► U1 ─► U2 ─┬─► U3 ───
 14. **생산 경로를 만들면 같은 슬라이스에서 소비자를 붙이거나, 붙이지 않는 이유를
     works에 적는다.** — §1.4-①이 이 저장소에서 네 번째 재발이다.
 15. 기존 native game script 호환은 설계 제약이나 완료 조건이 아니다.
+16. **UI 저작 데이터의 정본은 네이티브 `reflect()` 스키마 하나다.** 같은 값을 관리 측
+    타입에 다시 두지 않는다 — C# 표면은 그 정본을 읽고 쓰는 래퍼다 (D-5).
+17. **UI 상태를 만지는 코드는 게임 스레드에서만 돈다** — 렌더 스레드와 태스크 워커를
+    모두 포함한다 (§4.3).
 
 ---
 
@@ -968,6 +1166,10 @@ U0-a ─► U0-b ─► U0-c ─┬─► U1 ─► U2 ─┬─► U3 ───
 | **게이트가 이 기계에서만 돈다** | D-3 — 신규 게이트는 CLI 저작본만 사용 |
 | **신규 단정이 첫 실행부터 전부 초록** | U0-c의 변이 검사를 완료 조건에 넣었다 |
 | 해상도 검증이 RHI 결함에 막힘 | §5.5에 선행 의존으로 명시. 2/7 상태를 **래칫**으로 고정해 후퇴만 막는다 |
+| **폰트 자산이 0건이라 T1을 붙여도 화면이 그대로** | T0에 저작 자산 신설을 works로 배정. 폰트는 CLI로 지을 수 없으므로 D-3의 예외이며, 추적되는 자리에 둔다 |
+| **U4a를 재는 자 없이 고친다** | PHASE 14 P1을 선행으로 명시(§9 U4a). 착수 전 마커 유무를 먼저 확인한다 |
+| **U3가 폴링 표면을 고착** | W3의 A/B 결정을 U3의 선행으로. 결정 소유는 PHASE 9.5 |
+| **레이어 판정이 다음 세션에 되짚힌다** | D-5에 실측 근거표와 **되짚는 조건**(①②③ 중 둘 이상)을 함께 적었다 |
 
 ---
 
@@ -981,3 +1183,8 @@ U0-a ─► U0-b ─► U0-c ─┬─► U1 ─► U2 ─┬─► U3 ───
 - 기존 native game script의 호환, 복원, 빌드 편입
 - **RHI swapchain resize 결함(`0x0000087D`)의 수정** — 선행 의존이지 이 계획의 works가 아니다
 - 리치 텍스트(마크업·인라인 이미지)와 텍스트 입력 위젯 — 트랙 T 완료 이후 별건
+- **UI 위젯 로직을 C# 스크립트 레이어로 이관하는 것** — D-5에서 판정했다. 되짚을 때 필요한
+  실측(전제 넷 · BT와 갈리는 지점 · Unity가 실제로 그은 선)은 §9.0의 D-5 근거표에 있다
+- **UI 본선의 병렬화** — UI 런타임에 스레딩 코드가 0이고 규모가 rect 14개다(§1.4-⑧).
+  PHASE 13(enkiTS)이 이 계획에 더하는 works는 없고, 접점 셋은 전부 순서 제약이다
+- 트랙 T의 SDF 생성 **병렬화** — 직렬 구현이 선 다음, 체감될 때 별건으로 판정한다
