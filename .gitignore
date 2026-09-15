@@ -520,6 +520,7 @@ FodyWeavers.xsd
 !Tools/regression/fixtures/imgui-ini/*.ini
 
 /Build/
+docs/dist/
 GEMINI.md
 gemini_worker/
 /RenderEngine/DataSystem.cpp

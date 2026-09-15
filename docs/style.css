@@ -33,8 +33,9 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 .brand-page{scroll-snap-type:none}
 .hero{position:relative;isolation:isolate;height:100svh;min-height:720px;display:flex;align-items:center;justify-content:center;overflow:hidden;scroll-snap-align:start}
 .hero canvas,.facet-fallback,.hero-vignette{position:absolute;inset:0;width:100%;height:100%;z-index:-3;pointer-events:none}
-.facet-fallback{background:linear-gradient(135deg,#1b354c,transparent 25%),linear-gradient(225deg,#17324d,transparent 30%);clip-path:polygon(0 0,100% 0,100% 100%,78% 78%,90% 35%,73% 10%,34% 0,13% 30%,4% 100%,0 100%)}
-.hero-vignette{z-index:-1;background:linear-gradient(0deg,var(--bg),transparent 25%),radial-gradient(ellipse at 50% 50%,#070b1244,transparent 65%)}
+/* 스크립트가 없을 때의 정지 화면. Loading.bmp처럼 검은 바탕에 위쪽 면만 남긴다. */
+.facet-fallback{background:linear-gradient(153deg,#0e2f4c 0%,#061627 17%,#000 33%),linear-gradient(207deg,#0f3253 0%,#05121f 19%,#000 35%),#000;clip-path:polygon(0 0,100% 0,100% 58%,83% 41%,64% 56%,46% 24%,28% 50%,10% 31%,0 55%)}
+.hero-vignette{z-index:-1;background:linear-gradient(0deg,var(--bg) 4%,transparent 34%),radial-gradient(ellipse 58% 46% at 50% 47%,#000000d9 0%,#00000080 52%,transparent 82%)}
 .hero-copy{padding:115px 24px 120px;max-width:1100px;text-align:center}
 .eyebrow{font:10px var(--mono);letter-spacing:2px;color:var(--blue)}
 .hero-eyebrow{display:flex;justify-content:center;align-items:center;gap:14px;margin-bottom:24px;color:#8faccc;letter-spacing:2.5px}
@@ -81,6 +82,9 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(-
 .architecture{border-top:1px solid #1e2f43;display:flex;flex-direction:column;justify-content:center}
 .architecture-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .feature{padding:30px;border-right:1px solid var(--line);background:linear-gradient(135deg,#13243766,transparent)}
+.spotlight-card{position:relative;isolation:isolate;overflow:hidden;background:radial-gradient(circle at var(--spot-x,50%) var(--spot-y,0%),rgba(104,196,255,.18),transparent 38%),linear-gradient(135deg,#13243766,transparent)}
+.spotlight-card::after{content:"";position:absolute;inset:0;z-index:-1;border:1px solid rgba(137,211,255,.18);border-radius:inherit;opacity:0;transition:opacity .25s}
+.spotlight-card:hover::after{opacity:1}
 .feature:last-child{border:0}
 .feature-number{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--blue)}
 .feature-number span{font-size:9px;letter-spacing:1.5px;color:#9ab0c8}
@@ -121,6 +125,12 @@ dialog img{display:block;max-width:100%;max-height:78svh;margin:auto;object-fit:
 dialog p{text-align:center;font-size:11px}
 .dialog-close{position:absolute;top:10px;right:12px;min-height:32px;padding:4px 12px;font-size:12px}
 .mobile-only{display:none}
+.tilted-card{transform-style:preserve-3d;transition:transform .2s ease,box-shadow .2s ease}
+.tilted-card:hover{box-shadow:0 32px 90px #0008}
+.scroll-float{opacity:0;transform:translateY(28px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
+.scroll-float.is-visible{opacity:1;transform:none}
+.blur-text{opacity:0;filter:blur(10px);transform:translateY(12px);transition:opacity .7s ease,filter .7s ease,transform .7s ease}
+.blur-text.is-visible{opacity:1;filter:none;transform:none}
 .brand-page.scroll-morph-ready main>section{--section-focus:0;--section-shift:0;will-change:transform,opacity,filter;transform:translate3d(0,calc(var(--section-shift) * 1px),0) scale(calc(.94 + var(--section-focus) * .06));opacity:calc(.5 + var(--section-focus) * .5);filter:blur(calc((1 - var(--section-focus)) * 5px));transition:filter .12s linear}
 .brand-page.scroll-morph-ready main>.hero{transform:scale(calc(.97 + var(--section-focus) * .03));filter:blur(calc((1 - var(--section-focus)) * 3px));}
 .brand-page.scroll-morph-ready main>section.is-focused{z-index:2}

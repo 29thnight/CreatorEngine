@@ -5,6 +5,9 @@ on:
     branches: [master]
     paths:
       - 'docs/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.js'
       - '.github/workflows/website.yml'
   workflow_dispatch:
 
@@ -28,10 +31,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload docs artifact
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install website dependencies
+        run: npm ci
+
+      - name: Build website
+        run: npm run build
+
+      - name: Upload website artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: docs/dist
 
       - name: Deploy to GitHub Pages
         id: deployment
