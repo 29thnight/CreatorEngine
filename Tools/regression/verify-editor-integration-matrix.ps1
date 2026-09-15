@@ -45,7 +45,6 @@ param(
 #  · 픽셀. 배치가 서 있어도 그림이 옳은지는 `verify-editor-chrome-golden` 의 몫이다.
 #  · 실제 모니터 DPI. 이 하네스는 모니터 배율을 바꿀 수 없어 user scale 로만 민다
 #    (`verify-editor-theme` 와 같은 자리).
-#  · Vulkan 백엔드의 검증 레이어. 장부에 실는 자리가 DX12 쪽뿐이다.
 #  · 마지막 `dx12.validation` 뒤에 — 즉 해체 중에 — 나는 오류. 장부를 읽는
 #    시각이 종료 앞이라 그 구간은 이 게이트의 밖이다. 종료 코드만 본다.
 #
@@ -54,7 +53,7 @@ param(
 #  ① `DrainDebugMessages` 를 다시 Release 에서 무력화 → **잡았다.**
 #     `surface/boot : 큐를 한 번도 비우지 않았다(drains=0)` — 이 조각이 고친 바로 그 결함이다.
 #  ② `declare_layer` 가 끈 실행도 켜진 것으로 적게 함 → **잡았다.**
-#     `control-off: 레이어를 꺼는데 layerEnabled 가 참이다` — 대조군이 제 일을 한다.
+#     `control-off: 레이어를 껐는데 layerEnabled 가 참이다` — 대조군이 제 일을 한다.
 #  ③ 디바이스 생성 직후 UPLOAD 힙 자원을 `RENDER_TARGET` 상태로 만드는
 #     줄 하나 → **잡았다.** problems 2 건 · retained 에 해당 ERROR 두 줄
 #     (디바이스가 둘이라 두 번 난다). 이것이 판정문의 이빨이다.
@@ -63,7 +62,7 @@ param(
 #     게이트 두 팔을 따로 친 것이 이 둘이다.
 #
 #  ★ ③가 `surface/boot` 에서 잡힐 수 있게 된 것은 변이를 **설계하다가** 게이트의
-#    구멍을 먼저 찾았기 때문이다. 처음엔 축마다 `reset` 으로 시작했는데, 그랬면
+#    구멍을 먼저 찾았기 때문이다. 처음엔 축마다 `reset` 으로 시작했는데, 그러면
 #    부팅 구간의 오류를 첫 reset 이 지워 버렸다 — DX12 오류가 가장 잘 나는 구간이다.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -229,8 +228,8 @@ Write-Host ''
 $surfaceLines = @(
     'window.resize 1600 1000'
     'wait 120'
-    # ★ 첫 독서는 **reset 앞**이다. 디바이스 생성 · 스왈체인 · 파이프라인
-    #   상태 물체 · 셔이더 적재는 전부 부팅 때 도는데, 그것을 읽기 전에
+    # ★ 첫 독서는 **reset 앞**이다. 디바이스 생성 · 스왑체인 · 파이프라인
+    #   상태 물체 · 셰이더 적재는 전부 부팅 때 도는데, 그것을 읽기 전에
     #   비우면 DX12 오류가 가장 잘 나는 구간을 통째로 버리게 된다.
     'dx12.validation'
     'editor.workspace presets'      # ②가 돌 preset 목록을 제품에서 받는다
