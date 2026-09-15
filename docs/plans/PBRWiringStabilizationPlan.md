@@ -1483,9 +1483,39 @@ fail-closed 고 상태만 쐐기로 박힌 것이다. sidecar 보다 큰 고아 
 |---|---|---|
 | RHI 중립 어휘(enum·변환표) | **그대로 양 백엔드** | 어휘에 구멍을 내면 백엔드 비대칭이 생기고 4.9 에서 갚을 빚이 된다 |
 | Vulkan 백엔드 구현 | **그대로 유지·확장** | W7 이 `RHIAddressMode::Mirror` 를 더할 때 DX12·Vulkan 변환표 셋을 모두 채운 것이 기준이다 |
-| Vulkan RHI 자가 검증(`vk.*`) | **계속 돈다** | RHI 계약을 지키는 자다. 이것까지 끄면 계약이 조용히 갈라진다 |
+| `vk.shadow/gbuffer/forward/deferred` | **끈다** | 2026-09-15 추가 결정. 이름과 달리 **DX12/Vulkan 대조** 테스트라 vulkan 만 떼어낼 수 없다 — 아래를 보라 |
 | 제품 프레임 캡처의 vulkan 회차 | **끈다** | `verify-pbr-wiring-baseline.ps1` 기본값이 `-Backend dx12` 다 |
 | 교차 백엔드 픽셀 비교(`render.pbr.compare`) | **끈다** | 시각 고정 수단이 없어 애초에 성립하지 않는 질문이었다(§15) |
+
+### `vk.*` 도 끈다 — 그 이름은 범위를 속인다
+
+처음 이 절은 "Vulkan RHI 자가 검증은 계속 돈다" 로 적었다. **틀렸다.**
+`vk.shadow`·`vk.gbuffer`·`vk.forward`·`vk.deferred` 는 vulkan 단독 검사가 아니라
+**DX12/Vulkan 대조** 검사다. 소스가 그렇게 말한다 — `RunVulkanGBufferTest` 안에
+`dx12Capture` 와 `vkCapture` 가 나란히 있고, 로그 첫 줄이 각각 이렇다.
+
+```
+── Shadow 패스 — DX12/Vulkan depth-array·mesh 대조 ──
+── 제품 GBuffer — DX12/Vulkan Standard Material batch b2·MRT 대조 ──
+── Forward+ 패스 — DX12/Vulkan P2d-e legacy retirement + required assets 대조 ──
+── Deferred 패스 — DX12/Vulkan GBuffer consume·fullscreen 대조 ──
+```
+
+따라서 **끄면 vulkan 팔만이 아니라 DX12 팔도 함께 꺼진다.** 그래도 끈다(사용자 결정) —
+교차 백엔드 대조 자체가 4.9 의 몫이기 때문이다. 다만 **무엇이 어두워지는지**는 적는다.
+
+| 껐을 때 어두워지는 것 | DX12 전용 대체 |
+|---|---|
+| Shadow depth-array·mesh | `dx12.shadowquality` 가 있으나 **축이 다르다**(경사 편향·캐스케이드 블렌딩) |
+| GBuffer MRT5·texture·sampler·mesh | `dx12.gbuffer`(입력조립·MRT5·깊이·배리어) — 이 게이트가 이미 돌린다 |
+| Forward+ legacy retirement·required assets | `dx12.forwardshade` — 이 게이트가 이미 돌린다. `dx12.forward` 는 **아직 안 건다** |
+| Deferred GBuffer consume·fullscreen | **없다** — DX12 전용 대체가 존재하지 않는다 |
+
+★ 마지막 줄이 이 결정의 실제 비용이다. `dx12.deferred` 라는 명령이 없다. 4.9 가
+착수할 때 이 자리를 먼저 갚거나, 그 전에 DX12 전용 deferred 검사를 따로 세워야 한다.
+
+`-IncludeVulkanSelfTest` 로 되돌린다. 축 회계에는 이 손실이 **문장으로** 남는다 —
+"미뤘다" 만 적고 무엇을 잃었는지 안 적으면 뒷사람이 되돌릴 근거를 잃는다.
 
 ### 왜 지금인가
 

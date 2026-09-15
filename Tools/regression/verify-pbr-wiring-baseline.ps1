@@ -21,6 +21,9 @@ param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
     [ValidateSet('dx12', 'vulkan')][string[]]$Backend = @('dx12'),
+    # `vk.shadow/gbuffer/forward/deferred` 는 이름과 달리 **DX12/Vulkan 대조** 테스트다.
+    # 2026-09-15 결정으로 기본은 끔이고, 이 스위치로 되돌린다.
+    [switch]$IncludeVulkanSelfTest,
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [int]$TimeoutSeconds = 240
 )
@@ -68,9 +71,16 @@ function Set-AxisDeferred([string]$Name, [string]$Owner) {
     $script:axisReport[$Name] = "deferred: $Owner"
 }
 
-# 2026-09-15 결정 — 판정은 DX12 로만. vulkan 회차를 끄더라도 그 사실이 회계에 남는다.
+# 2026-09-15 결정 — 판정은 DX12 로만. 끈 축은 회계에 **맨 앞에서** 등록한다.
+# ★ 처음에는 해당 블록에 닿았을 때 등록했는데, 게이트가 그 앞에서 죽으면 미룬 축이
+#   통째로 사라졌다. 미룬 축은 인자만 보면 알 수 있으므로 실행과 무관하게 먼저 적는다.
 if ($Backend -notcontains 'vulkan') {
     Set-AxisDeferred 'vulkan/제품 캡처' 'PHASE 4.9 BackendParityPlan (2026-09-15 결정) · -Backend dx12,vulkan 로 되돌려 잰다'
+}
+if (-not $IncludeVulkanSelfTest) {
+    Set-AxisDeferred 'vk/* 백엔드 대조' ('PHASE 4.9 BackendParityPlan · -IncludeVulkanSelfTest 로 되돌린다 · ' +
+        'DX12 팔도 함께 꺼진다 — gbuffer/forward 는 dx12.gbuffer·dx12.forwardshade 가 덮지만 ' +
+        'deferred(GBuffer consume·fullscreen)는 DX12 전용 대체가 없다')
 }
 
 function Invoke-Editor([string]$Name, [string[]]$Commands, [int]$ExpectedExit = 0) {
@@ -455,7 +465,18 @@ try {
     # The paired harness owns both DX12 and Vulkan test devices; keep its Editor
     # host on DX12 independently of the final product-capture backend above.
     [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, '${1}dx12'), $utf8)
-    $null = Invoke-Editor 'defaults' @('vk.shadow', 'vk.gbuffer', 'vk.forward', 'vk.deferred', 'quit')
+    # ★ `vk.*` 는 이름이 범위를 속인다 — 넷 다 **DX12/Vulkan 대조** 테스트다
+    #   (`RunVulkanGBufferTest` 안에 `dx12Capture` 와 `vkCapture` 가 함께 있다).
+    #   그래서 끄면 vulkan 팔만이 아니라 **DX12 팔도 함께 꺼진다.** 2026-09-15 결정은
+    #   그 사실을 알고 내린 것이고, 잃는 것은 아래에 적어 회계에 남긴다.
+    if ($IncludeVulkanSelfTest) {
+        $null = Invoke-Editor 'defaults' @('vk.shadow', 'vk.gbuffer', 'vk.forward', 'vk.deferred', 'quit')
+        Set-AxisRan 'vk/* 백엔드 대조'
+    }
+    else {
+        # 회계 등록은 맨 앞에서 이미 했다. 여기서는 로그에만 남긴다.
+        Write-Output 'vk.* 백엔드 대조 DEFERRED (PHASE 4.9 — 2026-09-15 결정 · DX12 팔도 함께 꺼진다)'
+    }
     $null = Invoke-Editor 'forward-shade' @('dx12.forwardshade', 'quit')
     # Material codec/seal contracts moved out of the Editor registry in PHASE 14.5.
     $contractLog = Join-Path $run 'experiment-contract.log'
