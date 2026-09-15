@@ -113,6 +113,7 @@ namespace CommandCore
             { "inputmap.corpus.probe", CommandCost::Long, "", "입력 액션맵 코퍼스를 전수로 읽어 계수를 낸다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "lifecycle.dump", CommandCost::Immediate, "[파일]", "기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "path=lifecycle_trace.tsv" },
             { "lifecycle.registry", CommandCost::Frames, "", "생명주기 등록 수와 대기 중인 초기화 수를 조회한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "lifecycle.stress", CommandCost::Frames, "destroy|churn|reentrant [개수]", "수명 경로를 흔든다(reentrant는 순회 한복판)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "lifecycle.trace", CommandCost::Frames, "on [틱프레임]|off|clear|status", "생명주기 호출 순서를 받아 적는다", CommandClass::EngineService, CommandLiveness::Live },
             { "light.proxy", CommandCost::Frames, "", "Read live light proxy values and publication counters", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()", false, false },
             { "log.flush", CommandCost::Immediate, "", "로그를 디스크에 즉시 반영", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },

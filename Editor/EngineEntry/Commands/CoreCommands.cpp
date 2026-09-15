@@ -726,6 +726,82 @@ namespace ConsoleCmd
         return Fail("lifecycle.dump_failed", "Unable to write trace: " + path);
     }
 
+    static CommandCore::CommandResult Cmd_lifecycle_stress(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return InvalidArguments("lifecycle.stress <mode> [count]");
+        const std::vector<std::string>& parts = ctx.parts;
+
+        // 파괴·생성을 몰아쳐 수명 경로를 흔든다(PHASE 9-0의 ASan 재현용).
+        //
+        // ★ 0ec60573(9-12)이 "닫힌 계획 소속" 으로 은퇴시켰지만, 살아 있는 게이트
+        //   둘(verify-lifecycle-baseline · verify-ai-registry)이 시나리오에서 계속
+        //   부르고 있었다. 이름이 표에서 빠지자 commandlet 모드의 미등록 명령이
+        //   EditorCommandlets::Run 으로 흘러 "accepts no arguments" 로 거절됐고,
+        //   기준선 TSV 의 씬 A 파괴 블록(21행)이 거꾸로 나왔다. 그래서 되살린다.
+        //
+        // 지금은 프레임 경계에서 파괴가 일어나는 경로만 흔든다. "순회 도중 파괴"와
+        // "Update 안에서 AddComponent" 같은 재진입 재현은 reentrant 모드가 맡는다.
+        const std::string mode = (parts.size() >= 2) ? parts[1] : "";
+        int count = 8;
+        if (parts.size() == 3 && (!ParseNumber(parts[2], count) || count < 1 || count > 100000)) return InvalidArguments("count must be 1..100000");
+        if (mode != "destroy" && mode != "churn" && mode != "reentrant" && mode != "reentrant-destroy" && mode != "reentrant-add") return InvalidArguments("Unknown lifecycle stress mode");
+        auto data = CommandData::Object(); data.Set("mode", CommandData::String(mode)); data.Set("requested", CommandData::Int(count));
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene) { std::printf("[CLI] 활성 씬 없음\n"); return PreconditionFailed("scene.not_found", "No active scene"); }
+
+        if (mode == "destroy")
+        {
+            int marked = 0;
+            // 루트(0번)는 건드리지 않는다. 씬 구조가 무너지면 이후 명령이 전부 의미를 잃는다.
+            for (size_t i = 1; i < scene->m_Entities.size() && marked < count; ++i)
+            {
+                const auto& owned = scene->m_Entities[i];
+                if (!owned || owned->IsDestroyMark()) continue;
+                scene->DestroyEntity(owned.get());
+                ++marked;
+            }
+            data.Set("marked", CommandData::Int(marked));
+            std::printf("[CLI] lifecycle.stress destroy — %d개 파괴 표시\n", marked);
+        }
+        else if (mode == "churn")
+        {
+            // 파괴와 생성을 같은 프레임에 섞는다. 인덱스 재사용 경로가 여기서 드러난다.
+            int marked = 0;
+            for (size_t i = 1; i < scene->m_Entities.size() && marked < count; ++i)
+            {
+                const auto& owned = scene->m_Entities[i];
+                if (!owned || owned->IsDestroyMark()) continue;
+                scene->DestroyEntity(owned.get());
+                ++marked;
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                scene->CreateEntity("StressChurn_" + std::to_string(i));
+            }
+            data.Set("marked", CommandData::Int(marked)); data.Set("created", CommandData::Int(count));
+            std::printf("[CLI] lifecycle.stress churn — 파괴 %d · 생성 %d\n", marked, count);
+        }
+        else if (mode == "reentrant" || mode == "reentrant-destroy" || mode == "reentrant-add")
+        {
+            // 순회 한복판에서 터뜨린다(PHASE 9-9).
+            //
+            // 위 destroy/churn은 프레임 경계에서 일어나므로 R1·R2를 시험하지 못한다 —
+            // 그 둘은 "순회하는 도중에 대상이 죽으면?"이라는 질문이고, 답하려면
+            // 실제로 순회 중이어야 한다.
+            const auto kind =
+                (mode == "reentrant-destroy") ? Scene::StressKind::Destroy :
+                (mode == "reentrant-add")     ? Scene::StressKind::AddComponent :
+                                                Scene::StressKind::Both;
+            scene->ArmReentrancyStress(kind, count);
+            data.Set("armed", CommandData::Bool(true));
+            std::printf("[CLI] lifecycle.stress %s — 다음 Update 순회 한복판에서 %d건 발화\n",
+                mode.c_str(), count);
+        }
+        return Ok("Lifecycle stress operation applied or armed", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_log_flush(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1630,6 +1706,7 @@ namespace ConsoleCmd
         reg.Result({ "lifecycle.trace" }, &Cmd_lifecycle_trace);
         reg.Result({ "lifecycle.registry" }, &Cmd_lifecycle_registry);
         reg.Result({ "lifecycle.dump" }, &Cmd_lifecycle_dump);
+        reg.Result({ "lifecycle.stress" }, &Cmd_lifecycle_stress);
         reg.Result({ "log.flush" }, &Cmd_log_flush);
         reg.Result({ "editor.menu" }, &Cmd_editor_menu);
         reg.Result({ "editor.window" }, &Cmd_editor_window);

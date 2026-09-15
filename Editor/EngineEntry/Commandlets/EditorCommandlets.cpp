@@ -13,7 +13,6 @@ namespace EditorCommandlets
         using namespace CommandCore;
         if (arguments.empty()) return InvalidArguments("--commandlet requires a name", "commandlet.name_missing");
         const std::string& name = arguments.front();
-        if (arguments.size() != 1) return InvalidArguments("This commandlet accepts no arguments", "commandlet.arguments");
         using Test = bool (*)(std::string&);
         struct Entry { const char* name; Test synthetic; Test real; };
         const Entry entries[] = {
@@ -23,6 +22,7 @@ namespace EditorCommandlets
         };
         if (name == "list")
         {
+            if (arguments.size() != 1) return InvalidArguments("This commandlet accepts no arguments", "commandlet.arguments");
             CommandData data = CommandData::Object();
             CommandData names = CommandData::Array();
             for (const auto& entry : entries) names.Append(CommandData::String(entry.name));
@@ -34,6 +34,10 @@ namespace EditorCommandlets
         for (const auto& entry : entries)
         {
             if (name != entry.name) continue;
+            // ★ 인자 판정은 이름이 맞은 뒤에 한다. 앞에서 크기부터 보면 등록되지
+            //   않은 이름에 인자가 붙었을 때 "accepts no arguments" 가 나와 원인이
+            //   "이름이 없다" 는 사실을 가린다(lifecycle.stress 은퇴가 그렇게 숨었다).
+            if (arguments.size() != 1) return InvalidArguments("This commandlet accepts no arguments", "commandlet.arguments");
             try
             {
                 std::string log;
