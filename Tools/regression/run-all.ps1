@@ -441,6 +441,31 @@ Run-Step "브라우저 파일시스템 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-browser-filesystem-contract.ps1") -Exe $Exe -Work (Join-Path $Work 'browser-fs')
 }
 
+# PHASE 21 W7 — 브라우저 썸네일 계약.
+#
+# 계약은 "썸네일은 **실제 GPU 사용 가능 시점**을 따른다" 고 적어 두고도 그 값을 물을
+# 수단이 없었다. `RegisterTexture` 는 업로드 전에도 0 이 아닌 id 를 돌려준다(DX12 는
+# 프레임이 닫혀 있으면 서술자 칸만 예약하고 널 SRV 를 쓴다). 그 반환값을 "됐다" 로
+# 읽으면 한 프레임이 빈 그림으로 나가고, 그 프레임은 어떤 계수기에도 남지 않는다.
+#
+# ★ 이 게이트의 절반은 **자극**이다. 브라우저 뿌리에는 이미지가 0 이라 기본 배치로는
+#   썸네일이 한 번도 요청되지 않고, 그러면 장부가 전부 0 이며 모든 단정이 통과한다.
+#   추적되는 fixture 셋을 뿌리에 올려 요청·축소·통과·실패 네 경로를 만든다. 바이트는
+#   **등호로** 잰다 — 첫 실패 fixture 는 WIC 가 삼켜 8x8 을 냈고, 부등호였다면 그
+#   유령이 지나갔다(`bytes` 가 산술보다 256 컸다).
+#
+# 무효화·축출은 프로세스를 다시 띄우면 자극할 수 없다(캐시가 프로세스 안에 있다).
+# 그래서 한 회차 안에서 단을 나누고, `scene.save` 표지로 동기를 맞춰 **에디터가 도는
+# 중에** 원본을 다시 쓴다. 축출은 예산을 낮춰야 닿는다 — 목록이 clipper 로 보이는
+# 타일만 요청하므로 파일 수로는 기본 48 MB 에 영원히 못 닿는다.
+#
+# 소스 축이 따로 있는 이유 셋: ① 어느 스레드에서 디코딩하는가(메인에서 풀어도 장부는
+# 같다) ② 예산 창구가 실물인가(비교가 상수를 읽으면 축출 절이 미자극이다) ③ Vulkan
+# 팔이 배선돼 있는가 — 판정은 DX12 지만 **미루는 것은 판정이지 배선이 아니다.**
+Run-Step "브라우저 썸네일 계약" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-browser-thumbnail-contract.ps1") -Exe $Exe -Work (Join-Path $Work 'browser-thumbnail')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로
