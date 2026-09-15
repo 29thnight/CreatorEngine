@@ -24,6 +24,7 @@ namespace
         double frameMs{};
         std::uint64_t frameUnits{};
         std::uint64_t frameScans{};
+        std::uint64_t frameProbes{};
         bool touchedThisFrame{};
 
         // ── 잠금 아래 ──
@@ -34,8 +35,10 @@ namespace
         double maxMs{};
         std::uint64_t lastUnits{};
         std::uint64_t lastScans{};
+        std::uint64_t lastProbes{};
         std::uint64_t totalUnits{};
         std::uint64_t totalScans{};
+        std::uint64_t totalProbes{};
     };
 
     std::mutex& cost_mutex()
@@ -183,6 +186,14 @@ namespace editor::windows
         state.touchedThisFrame = true;
     }
 
+    void add_panel_probes(panel_cost_slot slot, std::uint64_t probes) noexcept
+    {
+        if (!valid(slot)) return;
+        slot_state& state = state_of(slot);
+        state.frameProbes += probes;
+        state.touchedThisFrame = true;
+    }
+
     void publish_panel_costs()
     {
         std::lock_guard lock(cost_mutex());
@@ -201,8 +212,10 @@ namespace editor::windows
             state.maxMs = (std::max)(state.maxMs, state.frameMs);
             state.lastUnits = state.frameUnits;
             state.lastScans = state.frameScans;
+            state.lastProbes = state.frameProbes;
             state.totalUnits += state.frameUnits;
             state.totalScans += state.frameScans;
+            state.totalProbes += state.frameProbes;
             if (state.ring.size() < kRingCapacity)
             {
                 state.ring.push_back(state.frameMs);
@@ -217,6 +230,7 @@ namespace editor::windows
             state.frameMs = 0.0;
             state.frameUnits = 0;
             state.frameScans = 0;
+            state.frameProbes = 0;
             state.touchedThisFrame = false;
         }
 
@@ -262,8 +276,10 @@ namespace editor::windows
             out.maxMs = state.maxMs;
             out.lastUnits = state.lastUnits;
             out.lastScans = state.lastScans;
+            out.lastProbes = state.lastProbes;
             out.totalUnits = state.totalUnits;
             out.totalScans = state.totalScans;
+            out.totalProbes = state.totalProbes;
             out.samples = static_cast<std::uint32_t>(state.ring.size());
             if (!state.ring.empty())
             {
@@ -404,8 +420,10 @@ namespace editor::windows
             state.maxMs = 0.0;
             state.lastUnits = 0;
             state.lastScans = 0;
+            state.lastProbes = 0;
             state.totalUnits = 0;
             state.totalScans = 0;
+            state.totalProbes = 0;
         }
     }
 }

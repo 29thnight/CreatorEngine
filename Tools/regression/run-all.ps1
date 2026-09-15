@@ -422,6 +422,25 @@ Run-Step "에디터 chrome 성능 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-chrome-perf.ps1") -Exe $Exe -Work (Join-Path $Work 'chrome-perf')
 }
 
+# PHASE 21 W7-5 — 브라우저 파일시스템 계약.
+#
+# W7-1 이 매 프레임 디렉터리 스캔을 24 → 0 으로 없앴고 그 게이트는 `scans` 를 보고
+# 초록이었다. 그런데 `browser_tree` 는 그 뒤에도 avg 1.375 ms 였다. **세는 자가 틀린
+# 단위를 세고 있었다** — 계약은 "프레임마다 디스크를 만지지 않는다" 인데 계수기는
+# "디렉터리를 훑은 횟수" 만 셌고, 그 사이로 `std::filesystem::equivalent` 가 트리
+# 노드마다 빠져나갔다(경로를 실제로 열어 비교한다. 노드 24 × 2 = 프레임당 핸들 48).
+#
+# 그래서 `probes`(스캔이 아닌 디스크 접촉) 축을 열고 idle 프레임에서 **둘 다 0** 을
+# 판정으로 둔다.
+#
+# ★ 런타임만으로는 모자라다. 고침의 핵심은 순서이고(비교는 드래그 중에만 뜻이
+#   있는데 `&&` 왼쪽에 있었다) **CLI 에는 드래그를 만들 창구가 없다.** 그래서 소스
+#   축을 함께 세운다 — equivalent 단일 출처 · 계수가 호출 앞 · 드래그 관문이 비교
+#   앞 · 디스크를 묻는 함수의 호출자 수.
+Run-Step "브라우저 파일시스템 계약" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-browser-filesystem-contract.ps1") -Exe $Exe -Work (Join-Path $Work 'browser-fs')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

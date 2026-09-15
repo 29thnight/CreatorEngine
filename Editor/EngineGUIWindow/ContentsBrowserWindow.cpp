@@ -157,10 +157,16 @@ namespace
         draw->PopClipRect();
     }
 
+    // W7-5: 이 함수는 `std::filesystem::equivalent` 였다 — 경로를 **실제로 열어**
+    // 파일 식별자를 비교하므로 트리 노드마다 부르면 프레임당 파일 핸들이 수십 개
+    // 열린다. 그것이 "스캔은 0 인데 비쌌다" 의 정체였다.
+    //
+    // 지금은 디스크를 만지지 않는 어휘 비교다. 이 물음("이 폴더가 프리팹 폴더인가")
+    // 에는 그것으로 충분하다 — 양쪽 다 같은 `PathFinder` 뿌리에서 나오고, 트리는
+    // 심볼릭 링크를 타지 않으므로 `equivalent` 의 링크 의미론이 필요 없다.
     bool browser_same_path(const file::path& a, const file::path& b)
     {
-        std::error_code ec;
-        return !a.empty() && !b.empty() && file::equivalent(a, b, ec) && !ec;
+        return ::editor::browser_same_directory(a, b);
     }
 
     // Draw over the existing item so changing artwork never changes its ID or hit area.
@@ -246,10 +252,18 @@ void ContentsBrowserWindow::DrawFolderMenu(const file::path& directory)
         m_openFolderDialog = true;
         m_error.clear();
     }
-    if (browser_same_path(directory, PathFinder::VolumeProfilePath())
+    // ★ W7-5 가 지나가다 잡았다 — 여기 중괄호가 없어서 `browser_cache_invalidate()`
+    //   가 `if` **밖**에 있었다(W7-1, e790b678). 들여쓰기는 안에 있는 것처럼 보이고
+    //   컴파일러는 /W0 라 아무 말도 하지 않는다. 그래서 이 메뉴가 그려지는 **모든
+    //   프레임**에 캐시가 통째로 버려졌다 — 폴더 우클릭 메뉴를 열어 둔 동안 브라우저가
+    //   매 프레임 전부 다시 훑었다는 뜻이다. 아래 타일 쪽(`:521`)은 같은 일을 중괄호와
+    //   함께 적어 두어 멀쩡했다 — 복제된 코드의 한쪽만 틀린 모양이다.
+    if (browser_same_path(directory, m_volumeProfileDirectory)
         && ImGui::MenuItem("Create Volume Profile..."))
+    {
         EditorAssetDatabase::Get().CreateVolumeProfile(directory);
         editor::browser_cache_invalidate();   // W7-1: 방금 만든 것은 즉시 보여야 한다
+    }
     if (ImGui::MenuItem("Open in File Explorer"))
         EditorPlatform::Get().RevealInFileExplorer(directory);
     if (::editor::popup_host_has_items(::editor::popup_host::content_browser_folder))
@@ -320,9 +334,17 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
         EditorIcon::Folder);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", id.c_str());
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) Navigate(directory);
-    if (browser_same_path(directory, PathFinder::RelativeToPrefab("")) && ImGui::BeginDragDropTarget())
+    // W7-5: 관문을 앞으로 옮긴다. 이 검사는 **드래그 중에만** 뜻이 있는데 `&&`
+    // 왼쪽에 있어 평상시에도 노드마다 돌았다. `BeginDragDropTarget()` 은 드래그가
+    // 없으면 즉시 거짓을 돌려주므로, 순서를 바꾸면 평상시 비용이 0 이 된다.
+    // ★ 순서만 바꿔도 되는 이유: 둘 다 부수 효과가 없고, `BeginDragDropTarget` 이
+    //   참일 때만 `EndDragDropTarget` 을 부르는 짝은 그대로다.
+    if (ImGui::BeginDragDropTarget())
     {
-        if (const auto* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT")) HandleSceneObjectDrop(payload->Data);
+        if (browser_same_path(directory, m_prefabDirectory))
+        {
+            if (const auto* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT")) HandleSceneObjectDrop(payload->Data);
+        }
         ImGui::EndDragDropTarget();
     }
     if (ImGui::BeginPopupContextItem())
@@ -343,6 +365,7 @@ void ContentsBrowserWindow::DrawDirectoryPanel()
     // W7-1: **실제로 디스크를 만진 횟수**만 센다. 이 수가 0 에 수렴하는 것이
     // 캐시가 섰다는 증거이고, 시간은 OS 파일 캐시 온도로 흔들려 증거가 못 된다.
     const std::uint64_t scansBefore = editor::browser_cache_get_stats().scans;
+    const std::uint64_t probesBefore = editor::browser_cache_get_stats().probes;
     ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, editor::ThemePixels(14.f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 0.f, editor::ThemePixels(3.f) });
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { editor::ThemePixels(3.f), editor::ThemePixels(1.f) });
@@ -360,21 +383,28 @@ void ContentsBrowserWindow::DrawDirectoryPanel()
     }
     ImGui::PopStyleVar(3);
     m_revealDirectory = false;
+    const auto treeAfter = editor::browser_cache_get_stats();
     editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_tree,
-        editor::browser_cache_get_stats().scans - scansBefore);
+        treeAfter.scans - scansBefore);
+    editor::windows::add_panel_probes(editor::windows::panel_cost_slot::browser_tree,
+        treeAfter.probes - probesBefore);
 }
 
 void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
 {
     const editor::windows::panel_cost_scope cost{ editor::windows::panel_cost_slot::browser_files };
     const std::uint64_t scansBefore = editor::browser_cache_get_stats().scans;
+    const std::uint64_t probesBefore = editor::browser_cache_get_stats().probes;
     // W7-1: 목록은 스냅샷이 준다. 프레임마다 하던 것 셋이 여기서 사라졌다 —
     // directory_iterator · 항목마다의 is_directory(stat) · 비교마다 stat 하던
     // 정렬. 남은 것은 **정책**뿐이다(지원 확장자·검색·유형 필터·정렬 방향).
     // 그 정책은 W2-B 의 소유라 캐시로 내리지 않는다.
     const editor::browser_directory_listing& listing = editor::browser_cache_listing(m_currentDirectory);
+    const auto filesAfter = editor::browser_cache_get_stats();
     editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_files,
-        editor::browser_cache_get_stats().scans - scansBefore);
+        filesAfter.scans - scansBefore);
+    editor::windows::add_panel_probes(editor::windows::panel_cost_slot::browser_files,
+        filesAfter.probes - probesBefore);
     if (!listing.valid)
     {
         ImGui::TextWrapped("Unable to read folder: %s", listing.error.message().c_str());
@@ -450,9 +480,14 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
     // Submit a real remaining-area item; never grow the window with cursor movement.
     const ImVec2 remaining = ImGui::GetContentRegionAvail();
     ImGui::Dummy({ std::max(1.f, remaining.x), std::max(1.f, remaining.y) });
-    if (browser_same_path(m_currentDirectory, PathFinder::RelativeToPrefab("")) && ImGui::BeginDragDropTarget())
+    // W7-5: 트리와 같은 순서 교정. 여기는 프레임당 1 회뿐이라 이득이 작지만,
+    // 두 자리가 같은 규칙을 따라야 다음 사람이 한쪽만 보고 옛 모양을 베끼지 않는다.
+    if (ImGui::BeginDragDropTarget())
     {
-        if (const auto* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT")) HandleSceneObjectDrop(payload->Data);
+        if (browser_same_path(m_currentDirectory, m_prefabDirectory))
+        {
+            if (const auto* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT")) HandleSceneObjectDrop(payload->Data);
+        }
         ImGui::EndDragDropTarget();
     }
 }
@@ -518,7 +553,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 		{
 			EditorPlatform::Get().RevealInFileExplorer(directory);
 		}
-		if (browser_same_path(m_currentDirectory, PathFinder::VolumeProfilePath()))
+		if (browser_same_path(m_currentDirectory, m_volumeProfileDirectory))
 		{
 			if (ImGui::MenuItem("Create Volume Profile"))
 			{
@@ -793,18 +828,53 @@ void ContentsBrowserWindow::Draw()
     // W7-1: 이 프레임에 다시 훑을 수 있는 폴더 수를 되돌린다. 낡은 것을
     // 한꺼번에 훑지 않게 막는 자리다.
     editor::browser_cache_begin_frame();
-    std::error_code ec;
-    const auto root = file::weakly_canonical(PathFinder::Relative(), ec);
-    if (ec || !file::is_directory(root, ec)) { ImGui::TextDisabled("Assets folder is unavailable."); return; }
-    if (root != m_rootDirectory)
+    // W7-5: 뿌리 해석은 **프로젝트가 바뀔 때만** 한다. `weakly_canonical` 과
+    // `is_directory` 는 둘 다 디스크를 만지므로 매 프레임 부르면 그것이 곧
+    // 프레임당 파일시스템 호출이다 — 이 조각이 없애려는 바로 그 모양이고,
+    // 게다가 여기는 슬롯 계측 **밖**이라 새 계수기에도 안 잡히고 있었다.
+    //
+    // 날것 경로가 그대로면 디스크에 다시 묻지 않는다(문자열 비교다). 그 값이
+    // 바뀌는 것은 프로젝트를 여는 순간뿐이다.
+    // W7-5: 이 블록의 디스크 접촉을 browser_tree 슬롯에 실어 보낸다. 여기는 슬롯
+    // 계측 **밖**이라 그냥 두면 계수기가 이 자리를 못 본다 — 그러면 아래 캐시를
+    // 걷어내는 변이가 게이트를 조용히 지나간다. 정상 상태의 델타는 0 이라
+    // 슬롯 표본을 더럽히지 않는다(0 일 때는 신고조차 하지 않는다).
+    const std::uint64_t rootProbesBefore = editor::browser_cache_get_stats().probes;
+    const auto rootSource = PathFinder::Relative();
+    if (rootSource != m_rootSource)
     {
-        m_rootDirectory = root;
-        m_currentDirectory.clear();
-        m_history.clear();
-        m_historyIndex = 0;
-        Navigate(root);
+        m_rootSource = rootSource;
+        std::error_code rootError;
+        const auto resolved = editor::browser_canonical(rootSource, rootError);
+        m_rootUsable = !rootError && editor::browser_directory_exists(resolved);
+        if (m_rootUsable)
+        {
+            m_rootDirectory = resolved;
+            // 비교 대상도 **같은 정규형**으로 풀어 둔다. 한쪽만 정규형이면 어휘
+            // 비교가 조용히 안 맞는다 — RelativeToPrefab("") 은 끝에 구분자가
+            // 붙은 날것이라 정확히 그 함정이다.
+            std::error_code prefabError;
+            m_prefabDirectory = editor::browser_canonical(PathFinder::PrefabSourcePath(), prefabError);
+            std::error_code volumeError;
+            m_volumeProfileDirectory = editor::browser_canonical(PathFinder::VolumeProfilePath(), volumeError);
+            m_currentDirectory.clear();
+            m_history.clear();
+            m_historyIndex = 0;
+            Navigate(m_rootDirectory);
+        }
     }
-    if (!file::is_directory(m_currentDirectory, ec)) Navigate(root);
+    const std::uint64_t rootProbes = editor::browser_cache_get_stats().probes - rootProbesBefore;
+    if (0 != rootProbes)
+        editor::windows::add_panel_probes(editor::windows::panel_cost_slot::browser_tree, rootProbes);
+    if (!m_rootUsable) { ImGui::TextDisabled("Assets folder is unavailable."); return; }
+    // 현재 폴더가 사라졌는지는 **캐시가 안다** — 목록을 읽지 못했으면 뿌리로
+    // 돌아간다. 여기서 is_directory 를 다시 부르면 프레임당 호출이 되살아난다.
+    //
+    // ★ 맞바꾼 것: 에디터가 떠 있는 동안 Assets 폴더가 밖에서 지워지면 이제
+    //   "unavailable" 문구 대신 빈 트리가 보인다. 그 대가로 idle 프레임의 디스크
+    //   접촉이 0 이 된다. 밖의 변경을 알아채는 일은 감시자(EditorDirectoryWatcher)
+    //   의 몫이고 이 조각의 범위가 아니다.
+    if (!editor::browser_cache_listing(m_currentDirectory).valid) Navigate(m_rootDirectory);
 
     ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), 0.f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { editor::ThemePixels(6.f), editor::ThemePixels(6.f) });

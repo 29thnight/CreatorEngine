@@ -53,6 +53,14 @@ private:
 
 	ImGuiTextFilter m_filter{};
 	file::path m_rootDirectory{};
+	// W7-5: 뿌리를 만든 **날것 경로**. 이것이 그대로면 디스크에 다시 묻지 않는다.
+	file::path m_rootSource{};
+	bool m_rootUsable{};
+	// W7-5: 정규형으로 **미리 풀어 둔** 특수 폴더. 트리 노드마다 equivalent 로
+	// 디스크에 묻던 것을 이 값과의 어휘 비교로 대신한다. 양쪽이 같은 정규형이라야
+	// 비교가 성립하므로 여기 담을 때 browser_canonical 을 거친다.
+	file::path m_prefabDirectory{};
+	file::path m_volumeProfileDirectory{};
 	file::path		m_currentDirectory{};
     std::vector<file::path> m_history;
     size_t m_historyIndex{};

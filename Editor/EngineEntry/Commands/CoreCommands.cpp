@@ -1205,8 +1205,13 @@ namespace ConsoleCmd
             entry.Set("maxMs", CommandData::Double(sample.maxMs));
             entry.Set("lastUnits", CommandData::Int(static_cast<long long>(sample.lastUnits)));
             entry.Set("lastScans", CommandData::Int(static_cast<long long>(sample.lastScans)));
+            // W7-5: `scans` 옆에 나란히 둔다. 둘의 뜻이 달라서다 — scans 는
+            // 디렉터리를 훑은 횟수이고 probes 는 **스캔이 아닌** 디스크 접촉이다.
+            // scans 0 · probes 25 가 W7-5 를 발견하게 한 그림이다.
+            entry.Set("lastProbes", CommandData::Int(static_cast<long long>(sample.lastProbes)));
             entry.Set("totalUnits", CommandData::Int(static_cast<long long>(sample.totalUnits)));
             entry.Set("totalScans", CommandData::Int(static_cast<long long>(sample.totalScans)));
+            entry.Set("totalProbes", CommandData::Int(static_cast<long long>(sample.totalProbes)));
             panels.Append(std::move(entry));
             Debug->Log("[editor.panelcost] " + std::string(::editor::windows::panel_cost_slot_name(slot)) +
                 " frames=" + std::to_string(sample.frames) +
@@ -1214,7 +1219,8 @@ namespace ConsoleCmd
                 " avgMs=" + std::to_string(sample.avgMs) +
                 " p95Ms=" + std::to_string(sample.p95Ms) +
                 " units=" + std::to_string(sample.lastUnits) +
-                " scans=" + std::to_string(sample.lastScans));
+                " scans=" + std::to_string(sample.lastScans) +
+                " probes=" + std::to_string(sample.lastProbes));
         }
         data.Set("panels", std::move(panels));
 

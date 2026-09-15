@@ -51,8 +51,12 @@ namespace editor::windows
         double maxMs{};              ///< 리셋 이후 최댓값
         std::uint64_t lastUnits{};   ///< 이번 프레임에 그린 행/항목 수
         std::uint64_t lastScans{};   ///< 이번 프레임의 디렉터리 스캔 수
+        /// W7-5: 이번 프레임에 **스캔이 아닌** 디스크 접촉 수. `scans` 가 0 인데
+        /// 이 수가 크면 캐시를 경유하지 않는 호출이 남아 있다는 뜻이다.
+        std::uint64_t lastProbes{};
         std::uint64_t totalUnits{};
         std::uint64_t totalScans{};
+        std::uint64_t totalProbes{};
         std::uint32_t samples{};     ///< 링에 담긴 표본 수
     };
 
@@ -67,6 +71,8 @@ namespace editor::windows
     void end_panel_cost(panel_cost_slot slot) noexcept;
     void add_panel_units(panel_cost_slot slot, std::uint64_t units) noexcept;
     void add_panel_scans(panel_cost_slot slot, std::uint64_t scans) noexcept;
+    /// W7-5: 스캔이 아닌 디스크 접촉(`browser_cache_stats::probes` 의 구간 델타).
+    void add_panel_probes(panel_cost_slot slot, std::uint64_t probes) noexcept;
 
     /// 구간 누적 RAII. 같은 슬롯을 한 프레임에 여러 번 열어도 누적된다.
     struct panel_cost_scope

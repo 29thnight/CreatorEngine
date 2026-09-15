@@ -37,6 +37,29 @@ namespace
         return instance;
     }
 
+    /// W7-5: 어휘 비교가 성립하려면 양쪽이 같은 모양이어야 한다. 두 가지를 접는다.
+    ///
+    ///   ① `lexically_normal` — `.`·`..`·중복 구분자.
+    ///   ② **후행 구분자** — `PathFinder::RelativeToPrefab("")` 은 `path / ""` 라
+    ///      끝에 구분자를 남기는데, 표준의 정규화 절차는 마지막 요소가 `..` 일
+    ///      때만 그것을 지운다. 그래서 `".../Prefabs/"` 와 `".../Prefabs"` 가
+    ///      정규화 뒤에도 서로 다르다. `equivalent` 는 이 차이를 덮고 있었으므로
+    ///      접지 않고 바꾸면 **드롭 대상이 조용히 죽는다.**
+    ///
+    /// 대소문자는 접지 않는다 — 비교하는 두 값이 모두 `browser_canonical` 을 거쳐
+    /// 디스크의 철자로 풀린 뒤에 들어오기 때문이다. 한쪽이라도 날것이면 그쪽을
+    /// 고쳐야지 여기서 무마할 일이 아니다.
+    browser_fs::path strip_trailing_separator(const browser_fs::path& path)
+    {
+        browser_fs::path normalized = path.lexically_normal();
+        if (!normalized.empty() && !normalized.has_filename())
+        {
+            browser_fs::path parent = normalized.parent_path();
+            if (!parent.empty()) normalized = parent;
+        }
+        return normalized;
+    }
+
     /// 빈 목록. 경로를 못 읽었을 때 돌려줄 것이 필요하다 — 참조를 주는
     /// 계약이라 매번 새로 만들 수 없다.
     const browser_directory_listing& empty_listing()
@@ -146,5 +169,26 @@ namespace editor
         cache_state& cache = state();
         cache.stats.cached = cache.slots.size();
         return cache.stats;
+    }
+
+    bool browser_same_directory(const browser_fs::path& a, const browser_fs::path& b)
+    {
+        if (a.empty() || b.empty()) return false;
+        return strip_trailing_separator(a) == strip_trailing_separator(b);
+    }
+
+    browser_fs::path browser_canonical(const browser_fs::path& path, std::error_code& ec)
+    {
+        // ★ 계수는 결과가 아니라 **호출**에 건다. 실패해도 디스크는 이미 만졌다 —
+        //   성공한 것만 세면 없는 경로를 묻는 자리가 계수기 밖으로 빠져나간다.
+        ++state().stats.probes;
+        return browser_fs::weakly_canonical(path, ec);
+    }
+
+    bool browser_directory_exists(const browser_fs::path& path)
+    {
+        std::error_code ec;
+        ++state().stats.probes;
+        return browser_fs::is_directory(path, ec) && !ec;
     }
 }

@@ -66,6 +66,8 @@ namespace editor
         std::uint64_t hits{};       ///< 캐시로 답한 횟수(누계)
         std::uint64_t evictions{};  ///< 무효화로 버린 목록 수(누계)
         std::size_t   cached{};     ///< 지금 들고 있는 폴더 수
+        /// W7-5: **목록 스캔 밖에서** 디스크를 만진 횟수(누계). 아래 주석 참조.
+        std::uint64_t probes{};
     };
 
     /// 프레임 머리에서 한 번. 재스캔 예산을 되돌린다.
@@ -79,4 +81,43 @@ namespace editor
     void browser_cache_invalidate();
 
     browser_cache_stats browser_cache_get_stats();
+
+    // ══ PHASE 21 W7-5 — 스캔 밖에서 디스크를 만지는 자리 ═══════════════════
+    //
+    // W7-1 이 스캔을 24 → 0 으로 없앴는데도 `browser_tree` 가 avg 1.375 ms 였다
+    // (실측 2026-09-15). **`scans` 는 0 이었다.** 세는 자가 틀린 단위를 세고
+    // 있었기 때문이다 — 계약은 *"브라우저가 프레임마다 디스크를 만지지 않는다"*
+    // 인데 계수기는 *"디렉터리를 훑은 횟수"* 만 셌다. 그 사이로
+    // `std::filesystem::equivalent` 가 트리 노드마다 빠져나갔다(노드 24 × 경로
+    // 2 = 프레임당 파일 핸들 48 회). Windows 에서 `equivalent` 는 두 경로를
+    // **실제로 열어**(`CreateFile` + `GetFileInformationByHandle`) 파일 식별자를
+    // 비교한다 — 목록 캐시를 경유할 수 없는 종류의 호출이다.
+    //
+    // 그래서 축을 하나 더 연다. `scans` 는 W7-1 의 뜻 그대로 두고(그 게이트가
+    // 그 수에 걸려 있다) **`probes`** 가 "스캔이 아닌 디스크 접촉" 을 센다.
+    // 판정은 idle 프레임에서 둘 다 0 이다.
+    //
+    // ★ 강제 단위를 맞춘 것이 핵심이다. 계약이 말하는 단위(디스크 접촉)로 세지
+    //   않으면, 그 단위의 다른 모양이 계수기 옆으로 지나가도 게이트는 초록이다.
+
+    /// ★ 디스크를 만지는 통로는 아래 둘뿐이다(`browser_canonical` ·
+    ///   `browser_directory_exists`). 둘 다 `probes` 를 올린다. 경로 비교는
+    ///   **어휘로** 하고, 디스크 철자가 필요하면 미리 한 번 풀어서 들고 있어라.
+    ///   `equivalent` 를 다시 들이지 마라 — 게이트가 브라우저 코드에서 그 호출이
+    ///   0 인 것을 단정한다.
+
+    /// 두 경로가 같은 폴더를 가리키는가 — **디스크를 만지지 않는다.**
+    /// 어휘 정규화(`lexically_normal`)로 비교한다. 트리는 심볼릭 링크를 타지
+    /// 않으므로(`browser_directory_entry::isSymlink` 참조) 여기서 필요한 것은
+    /// `equivalent` 의 링크 의미론이 아니라 "이 폴더가 그 폴더인가" 하나다.
+    bool browser_same_directory(const browser_fs::path& a, const browser_fs::path& b);
+
+    /// 경로를 정규형으로 편다. **디스크를 만진다**(`probes` 가 오른다).
+    /// 뿌리처럼 자주 바뀌지 않는 것에만 쓰고 **결과를 들고 있어라** — 매 프레임
+    /// 부르면 그것이 곧 프레임당 파일시스템 호출이고, 이 조각이 없애려는 바로
+    /// 그것이다.
+    browser_fs::path browser_canonical(const browser_fs::path& path, std::error_code& ec);
+
+    /// 폴더가 실재하는가. **디스크를 만진다.** 위와 같은 규약으로 쓴다.
+    bool browser_directory_exists(const browser_fs::path& path);
 }
