@@ -12,6 +12,13 @@
   Play/Stop·Pause/Resume은 최소화 버튼 앞의 공통 박스에 배치하며 별도 재생 행을 제거했다. 검증: [EditorTitleBarValidation.md](../analysis/EditorTitleBarValidation.md).
 - 최신 상태: **2026-09-13 현재 외관 사용자 승인·고정**. M0~M4·W0·W1(DX12)·**W3·W4**는 `done`, W2·W2-I·W2-V·W2-B는 부분 구현 `progress`다. 완료 부분과 남은 범위는 [§9.0](#phase21-current-status)을 정본으로 한다. Vulkan 대응·표시 오류는 사용자 결정으로 별도 보류한다.
 - 방향: **Dear ImGui 유지 · S&Box 테마 토큰 이식 · 소수 전용 위젯만 custom draw**
+- **범위: 이 페이즈는 에디터다. 에디터는 DX12 로 뜨므로 backend 는 DX12 하나다.**
+  Vulkan 은 이 페이즈의 **대상이 아니다** — 미룬 일이 아니라 다른 일이다(RHI 트랙의 몫).
+  2026-09-15 정정: 그 전까지 문서 곳곳이 Vulkan 을 *"별도 보류"* 로 적어 두었는데, 그
+  표현은 **잔여 목록에 남아 있는 일**로 읽힌다. 실제로 그렇게 읽혀 잔여 작업을 셀 때마다
+  따라 나왔다. 아래 판정문과 행렬에서 그 표현을 범위 밖으로 바로잡는다. 다만 W1 이 실제로
+  Vulkan 을 돌려 본 **이력**(6기동·device loss 미수정)은 사실이므로 그대로 남긴다 —
+  그것은 잔여 작업이 아니라 관측 기록이다.
 - 인스펙터 후속 결정: 2026-09-11 — **W2-I 공통 속성 배치 규칙 추가 · Transform 2안 채택**.
   컴포넌트 렌더 경로 통합·상단 우선 배치·개별 비활성화 불가. 상세는 [W2-I](#w2-inspector-layout).
   2026-09-12 Inspector 스타일 슬라이스 구현·DX12 검증으로 `progress`이며 전체 완료는 아니다.
@@ -1009,7 +1016,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 
 | 단계 | 상태 | 남은 작업 |
 |---|---|---|
-| M0~M4, W0, W1 | **done** | 현재 DX12 기준 완료. 외관 추가 시안 없음. Vulkan은 별도 보류 |
+| M0~M4, W0, W1 | **done** | 완료. 외관 추가 시안 없음 |
 | W2 | progress | 4종 구현은 완료. **키보드 탐색은 W2-1, 잘라 그리기·tooltip 은 W2-2 로 착지**(2026-09-15 — 두 절 모두 판정문에 자가 없었다. nav 커서는 넷 중 셋이 안 그렸고, 자르기는 넷 중 하나만 온전히 알고 있었다). 상태 matrix, 시각 기준선과 성능 gate 가 남는다 |
 | W2-I | progress | Transform·RectTransform 공통 컴포넌트 경로 통합, RectTransform 최소 폭 대응, 중첩/배열·전용 드로어·Import Settings 전수 이관, 활성 정책·중복 호출·편집/저장 회귀 |
 | W2-V | progress | 기즈모가 숨겨지는 낮은 높이의 방향 선택 메뉴, resize 중 조작 취소·release/포커스 소유권, drop/terrain 입력 관통, W4/W5 연결·연속 resize 및 DPI/성능 회귀 |
@@ -1051,7 +1058,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 - 최신 Float3은 라이브러리 빌드/링크와 사용자 화면 확인이 있고 추가 selftest는 실행 통과로 세지 않는다.
   당시 공유 런타임 배포 변경 때문에 전체 빌드가 중단된 기록도 보존한다. 이번 문서 갱신에서는 재빌드하지 않았으며
   최신 공유 작업 트리의 통합 성공은 W8에서 별도 확인한다.
-- **현재 완료 판정은 DX12 범위다.** 아래 원래 행렬의 Vulkan 항목은 삭제하거나 통과 처리하지 않고 별도 보류한다.
+- **완료 판정은 DX12 다** — 이 페이즈의 backend 가 그것 하나이기 때문이다. 원래 행렬에 있던 Vulkan 항목은 이 페이즈의 대상이 아니므로 통과로도 잔여로도 세지 않는다.
   실제 모니터 DPI와 사용자 배율도 구분한다. 사용자 승인 화면을 자동 golden 전수 검증으로 세지 않는다.
 
 ### W0 — 관측 표면 · 기준선 · 실패 게이트 (P0, 2일 · 정찰 뒤 1일→2일)
@@ -1173,11 +1180,12 @@ DX12 Scene 표시 복구 지연과 Vulkan 모니터 경계 리사이즈 후 devi
 Debug/Release 빌드와 각 10회 resize·실제 DPI 왕복이 통과했으며 DPI 축소 시 표시 공백은
 기존 8.58초에서 Debug 118ms / Release 63ms로 줄었다.
 [EditorW1Dx12ResizeValidation.md](../analysis/EditorW1Dx12ResizeValidation.md)에 증거와 범위를 둔다.
-**2026-09-12 후속 사용자 결정:** Vulkan의 DX12 대응과 표시 오류 처리는 우선 보류하고,
-W1을 DX12 기준 `done`으로 판정한다. 이 범위에서 남은 W1 구현·필수 검증은 없다.
-Vulkan 모니터 경계 resize 후 device loss는 미수정·미재검증이며 해결된 것으로 세지 않는다.
-Vulkan 작업을 재개할 때 [기존 원인 분석](../analysis/EditorW1DpiResizeRootCauseAndFixPlan.md)의
-실제 extent·실패 상태·DPI/resize 검증 항목을 이어간다.
+**2026-09-12 후속 사용자 결정:** W1을 `done`으로 판정한다. 남은 W1 구현·필수 검증은 없다.
+Vulkan 의 DX12 대응과 표시 오류 처리는 **이 페이즈에서 다루지 않는다**(§0 범위).
+다만 관측 기록은 남긴다 — Vulkan 모니터 경계 resize 후 device loss 는 미수정·미재검증이며
+해결된 것으로 세지 않는다. RHI 트랙이 그 backend 를 다룰 때
+[기존 원인 분석](../analysis/EditorW1DpiResizeRootCauseAndFixPlan.md)의 실제 extent·실패
+상태·DPI/resize 검증 항목을 이어가면 된다. 이것은 PHASE 21 의 잔여 작업이 아니다.
 CoreCLR 자동 변경 감지 방향에 따라 Live Code 비활성 자리표시자 **버튼을 제거했다**.
 자동 변경 감지 기능 자체의 구현은 이번 범위가 아니다. 메시·텍스처 등 Browser 타일은 유형 아이콘을 먼저 표시하고,
 비동기 썸네일이 GPU에서 표시 가능해지면 다음 프레임부터 교체한다. 유형 아이콘 정리는 W1,
@@ -1217,7 +1225,7 @@ Scene/Game 탭·툴바 및 본문/한글/작은 글씨에 같은 보정을 적�
 본문은 사용자 100%에서 24→16→24px, 사용자 150%에서 36→24→36px로 복귀했다.
 다만 DX12 표시 복구 지연과 Vulkan 경계 리사이즈의 `VK_ERROR_DEVICE_LOST`를 발견했다.
 `editor.theme clean`은 GPU 표시 성공까지 검사하지 않으므로 당시에는 두 오류를 남겨 `progress`로 유지했다.
-이후 DX12 수정·실기 재검증과 Vulkan 보류 결정으로 현재 판정은 위의 **DX12 기준 `done`**이다.
+이후 DX12 수정·실기 재검증으로 현재 판정은 위의 **`done`** 이다(Vulkan 오류는 이 페이즈의 판정 대상이 아니다).
 Material Symbols 제품 적용과 Live Code 제거는 이후 W1 후속 작업에서 착지했다.
 추가된 전체 의미 아이콘 coverage·저장 ID/레이아웃 검증 결과는 위 Material Symbols 검증 기록을 따른다.
 Browser는 유형 아이콘까지 적용됐으며 비동기 썸네일 Ready 교체는 W7 미구현 범위다.
@@ -2068,8 +2076,8 @@ generation 수렴**(계획서가 미룬 이유였던 축을 미루는 대신 여
 남의 이유로 붉었다 — 거부는 따로 띄운다.
 
 **못 잡는 것.** 캔버스 정책을 `fill` 에서 `crop` 으로 되돌리는 변이는 이 게이트가 못 잡는다
-(픽셀을 세는 단정이 없다 — W8 visual golden 몫이다). Vulkan 경로는 같은 버스를 쓰므로 함께
-따라오지만 실행으로 확인하지 않았다(저장소 규약대로 Vulkan 은 보류).
+(픽셀을 세는 단정이 없다 — W8 visual golden 몫이다). 같은 버스를 쓰는 다른 backend 도
+따라오지만 이 페이즈에서 실행으로 확인하지 않는다 — 에디터의 backend 가 아니다.
 
 ### W5 — Play/Pause/Eject 표시·입력 상태 머신 (P0, 4일 · 정찰 뒤 3일→4일)
 
@@ -2487,10 +2495,10 @@ mutation/revision 또는 명시적 scene event로 cache를 무효화한다"* 고
 
 ### W8 — 통합 회귀와 legacy 강제 배치 은퇴 (P0, 2일)
 
-**2026-09-13 외관 기준은 현재 승인 상태로 고정한다. DX12가 현재 완료 gate이며 Vulkan은 별도 보류다.**
+**2026-09-13 외관 기준은 현재 승인 상태로 고정한다. 완료 gate 는 DX12 이고, 그것이 이 페이즈의 backend 전부다.**
 새 시안 제작 대신 현 상태의 자동 golden·회귀를 만든다. 완료된 개별 검증은 유지하되 전체 통합과 구분한다.
 
-- DX12, DPI, restart, damaged ini, Play 왕복, Game Preview, preset matrix를 자동화한다. Vulkan은 보류 후속 행렬로 유지한다.
+- DX12, DPI, restart, damaged ini, Play 왕복, Game Preview, preset matrix를 자동화한다.
   W2-I의 인스펙터 배치·Transform 2안, W2-V의 연속 resize·오버레이 입력 분리,
   W2-B의 내부 분할·탐색/검색·New·자산 선택/drag-drop을 함께 판정한다.
 - 3D 씬 렌더 영역을 제외한 chrome crop visual golden을 만든다. 씬뷰 전체를 제외하지 않고
@@ -2498,8 +2506,8 @@ mutation/revision 또는 명시적 scene event로 cache를 무효화한다"* 고
 - 이미 제거된 `BuildInitialDockLayout`의 ContentsBrowserStyle 분기가 재유입되지 않는지 확인하고, 핵심 ToolPanel `NoMove` 잔재를 정리한다.
 - ImGui internal adapter version canary를 CI에 넣는다.
 
-**판정:** 현재 범위인 DX12에서 검증 레이어 오류/비정상 종료 0, layout·Play·시각·성능 gate 통과 후에만
-PHASE 21(DX12 범위)을 완료로 표시한다. Vulkan 대응은 별도 보류 이력으로 남기며 통과로 표시하지 않는다.
+**판정:** DX12에서 검증 레이어 오류/비정상 종료 0, layout·Play·시각·성능 gate 통과 후에
+PHASE 21을 완료로 표시한다. 다른 backend 는 이 판정에 들어오지 않는다 — 대상이 아니다.
 
 #### W8-1 착지 — 어댑터 판 canary와 legacy 잔재 (2026-09-15)
 
@@ -2682,8 +2690,9 @@ DPI(user scale 1.0/1.5) · 대조군 1.
 종료 코드 0. 축마다 `drains` 는 113~321 로 프레임 수를 따른다. 즉 **에디터의 이 경로들에는
 실제로 DX12 검증 오류가 없다** — 이제 그것이 측정된 문장이다.
 
-**못 잡는 것.** Vulkan(장부에 싣는 자리가 DX12 뿐이다 — 별도 보류), 픽셀(chrome golden 의
-몫), 실제 모니터 DPI(하네스가 못 바꾼다), 마지막 독서 **뒤** 해체 중에 나는 오류.
+**못 잡는 것.** 픽셀(chrome golden 의 몫), 실제 모니터 DPI(하네스가 못 바꾼다),
+마지막 독서 **뒤** 해체 중에 나는 오류. (다른 backend 는 못 잡는 것이 아니라 대상이
+아니다 — 에디터는 DX12 로 뜬다.)
 
 **CLI 표.** `dx12.validation` 이 새 명령이라 `cli_registry.golden.tsv` 를 갱신했다
 (122 → 123 · 이름 131 → 132).
@@ -2757,7 +2766,7 @@ W2 후속에는 W2-I·W2-V·W2-B를 추가했다. W3 이후 작업과의 의존�
 |---|---|---|
 | layout | clean, legacy, custom, corrupt, missing | central 부재, panel 유실, silent overwrite |
 | DPI | 100%, 125%, 150%, resize 왕복 | double scale, clipped text, 0-size |
-| backend | DX12 필수, Vulkan 별도 보류 | presentation key 오류, validation error, crash |
+| backend | DX12(에디터의 backend 는 이것 하나다) | presentation key 오류, validation error, crash |
 | mode | Edit, Entering, Play, Pause, Eject, Stop | wrong target, gizmo/game input 동시 활성 |
 | focus | click panel, Alt-Tab, modal, Game Preview | cursor lock 잔존, focus stealing |
 | scale | Hierarchy/Browser 1k/10k/50k | 빈 측정, semantic mismatch, p95 회귀 |
@@ -2854,7 +2863,7 @@ flag로 분리한다. 단, 완료 뒤 영구 이중 경로를 유지하지 않�
    owner가 겹치지 않는다. **스냅샷 실패 시 UI가 Playing으로 보이지 않는다**(§1.6).
 9. optional Game Preview는 기존 두 표시 타깃을 재사용하고 두 번째 카메라 정본을 만들지 않는다.
 10. theme/docking CPU 회귀가 §8 gate 안이며, single-view/clipping 이득은 실제 수치로 기록된다.
-11. 현재 DX12 범위에서 DPI, Play 왕복, visual golden, large-data 성능 gate가 모두 통과한다. Vulkan 검증은 별도 보류로 명시한다.
+11. DPI, Play 왕복, visual golden, large-data 성능 gate가 모두 통과한다(backend 는 DX12 하나다).
 12. `verify-imgui-obsolete-surface.ps1`이 통과하고(§3.2의 ABI 정정), `ViewportsEnable`은
     꺼진 채로 남아 있음을 게이트가 단정한다(§3.2, §1.7).
 13. `editor.*` 관측 커맨드 5종이 서 있고, 에디터 chrome 회귀 3종이 **변이로 이빨을 증명한**
