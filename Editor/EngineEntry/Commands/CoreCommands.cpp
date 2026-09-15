@@ -24,6 +24,7 @@
 #include "EditorWorkspaceStore.h"
 #include "ViewportHostWindow.h"
 #include "EditorPanelCost.h"
+#include "EditorNavContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorPlayModeController.h"
 #include "EditorWindowHost.h"       // PHASE 21 M4: editor.windows 덤프
 #include "EditorWindowAudit.h"
@@ -1137,6 +1138,101 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    // PHASE 21 W2-1 — 키보드 탐색 계약을 밖에서 읽고, 자극한다.
+    //
+    // 계획서 §7.1 은 custom widget 이 "ImGui ID, nav, focus, disabled, clipping,
+    // tooltip, testability 를 보존해야 한다" 고 적는데 그 어느 절도 **밖에서 읽을
+    // 수단이 없었다.** 판정문만 있고 자가 없는 상태다(W8-3 의 검증 레이어와 같은
+    // 모양). 이 명령이 그 자다.
+    //
+    // ★ `keyboardEnabled` 를 함께 낸다. 그것이 거짓이면 아래 수가 전부 0 인 것은
+    //   계약이 지켜졌다는 뜻이 아니라 **축이 없다**는 뜻이다.
+    // ★ `visitedWidgets` 를 함께 낸다. 비어 있으면 nav 가 custom widget 위에
+    //   한 번도 서지 않은 것이고, 그때의 "위반 0" 은 자극하지 못한 것이다.
+    static CommandCore::CommandResult Cmd_editor_nav(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        const char* const usage = "editor.nav [reset | key <tab|up|down|left|right|enter|space|escape>...]";
+
+        if (args.size() >= 2 && "key" == args[1])
+        {
+            if (args.size() < 3) return InvalidArguments(usage);
+            std::vector<std::string> keys(args.begin() + 2, args.end());
+            std::string error;
+            if (!::editor::nav::request_keys(keys, error))
+                return Fail("editor.nav.key", error);
+        }
+        else if (2 == args.size() && "reset" == args[1])
+        {
+            // 수만 비운다. 켜짐 여부는 이 실행의 성질이라 구간마다 달라지지 않는다.
+            ::editor::nav::reset_counts();
+        }
+        else if (args.size() > 1)
+        {
+            return InvalidArguments(usage);
+        }
+
+        const ::editor::nav::contract_view view = ::editor::nav::read();
+        auto data = CommandData::Object();
+        data.Set("keyboardEnabled", CommandData::Bool(view.keyboardEnabled));
+        data.Set("cursorVisible", CommandData::Bool(view.cursorVisible));
+        data.Set("navIdIsAlive", CommandData::Bool(view.navIdIsAlive));
+        data.Set("navId", CommandData::Int(static_cast<long long>(view.navId)));
+        data.Set("activeId", CommandData::Int(static_cast<long long>(view.activeId)));
+        data.Set("navWindow", CommandData::String(view.navWindow));
+        data.Set("navWidget", CommandData::String(view.navWidget));
+        data.Set("frames", CommandData::Int(static_cast<long long>(view.frames)));
+        data.Set("announced", CommandData::Int(static_cast<long long>(view.announced)));
+        data.Set("cursorsDrawn", CommandData::Int(static_cast<long long>(view.cursorsDrawn)));
+        data.Set("silentFrames", CommandData::Int(static_cast<long long>(view.silentFrames)));
+        data.Set("delegatedFrames", CommandData::Int(static_cast<long long>(view.delegatedFrames)));
+        data.Set("disabledFrames", CommandData::Int(static_cast<long long>(view.disabledFrames)));
+        data.Set("navCursorColor", CommandData::Int(static_cast<long long>(view.navCursorColor)));
+        data.Set("keysPending", CommandData::Int(static_cast<long long>(view.keysPending)));
+        data.Set("keysDelivered", CommandData::Int(static_cast<long long>(view.keysDelivered)));
+
+        const auto names = [](const std::vector<std::string>& source)
+        {
+            auto array = CommandData::Array();
+            for (const std::string& name : source) array.Append(CommandData::String(name));
+            return array;
+        };
+        data.Set("visitedWidgets", names(view.visitedWidgets));
+        data.Set("silentWidgets", names(view.silentWidgets));
+        data.Set("disabledWidgets", names(view.disabledWidgets));
+
+        std::printf("[editor.nav] keyboard=%s cursor=%s widget=%s window=%s "
+            "frames=%llu announced=%llu cursors=%llu silent=%llu delegated=%llu disabled=%llu\n",
+            view.keyboardEnabled ? "on" : "off",
+            view.cursorVisible ? "visible" : "hidden",
+            view.navWidget.empty() ? "-" : view.navWidget.c_str(),
+            view.navWindow.empty() ? "-" : view.navWindow.c_str(),
+            static_cast<unsigned long long>(view.frames),
+            static_cast<unsigned long long>(view.announced),
+            static_cast<unsigned long long>(view.cursorsDrawn),
+            static_cast<unsigned long long>(view.silentFrames),
+            static_cast<unsigned long long>(view.delegatedFrames),
+            static_cast<unsigned long long>(view.disabledFrames));
+        std::fflush(stdout);
+
+        if (0 != view.silentFrames)
+        {
+            std::string summary = "키보드 탐색이 선 자리에 커서를 안 그린 프레임 " +
+                std::to_string(view.silentFrames) + " 회";
+            if (!view.silentWidgets.empty()) summary += ": " + view.silentWidgets.front();
+            return Fail("editor.nav.silent_cursor", summary, std::move(data));
+        }
+        if (0 != view.disabledFrames)
+        {
+            std::string summary = "키보드 탐색이 손댈 수 없는 자리에 선 프레임 " +
+                std::to_string(view.disabledFrames) + " 회";
+            if (!view.disabledWidgets.empty()) summary += ": " + view.disabledWidgets.front();
+            return Fail("editor.nav.disabled_stop", summary, std::move(data));
+        }
+        return Ok("키보드 탐색 계약 위반 0", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_editor_renderscale(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1474,6 +1570,7 @@ namespace ConsoleCmd
         reg.Result({ "editor.sceneview" }, &Cmd_editor_sceneview);
         reg.Result({ "editor.viewport" }, &Cmd_editor_viewport);
         reg.Result({ "editor.panelcost" }, &Cmd_editor_panelcost);
+        reg.Result({ "editor.nav" }, &Cmd_editor_nav);
         reg.Result({ "editor.renderscale" }, &Cmd_editor_renderscale);
         reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);
     }

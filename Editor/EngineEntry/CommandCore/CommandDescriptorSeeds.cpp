@@ -89,6 +89,7 @@ namespace CommandCore
             { "editor.dock", CommandCost::Immediate, "", "살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.layout", CommandCost::Immediate, "", "활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.menu", CommandCost::Immediate, "", "선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "editor.nav", CommandCost::Immediate, "[reset|key <키>...]", "키보드 탐색 계약(커서·disabled 위반 수)을 읽고 키를 주입한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.panelcost", CommandCost::Immediate, "[reset]", "패널별 draw 비용과 그 프레임에 한 일의 수(행·디렉터리 스캔)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.renderscale", CommandCost::Immediate, "[auto|off|<0.25-1.0>]", "뷰포트 렌더 배율 — 표시 크기보다 낮게 그린다(기본 auto = 1/DPI)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.sceneview", CommandCost::Immediate, "", "씬 뷰 오버레이 배치와 카메라 상태를 읽는다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },

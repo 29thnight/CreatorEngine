@@ -5,6 +5,7 @@
 #include "EditorWindowRegistry.h"
 #include "EditorLayoutPreset.h"
 #include "EditorChromeProbe.h"
+#include "EditorNavContract.h"
 #include "RHI/IImGuiHost.h"
 #include "EditorFontResources.h"
 #include "EditorTheme.h"
@@ -391,6 +392,14 @@ void EditorRenderer::EndRender()
     // W7-0: 패널 비용도 같은 자리에서 게시한다 — 이번 프레임의 모든 본문이
     // 끝났고, 읽는 쪽(CLI)은 게임 스레드다.
     ::editor::windows::publish_panel_costs();
+
+    // W2-1: 키보드 탐색 계약. 자리가 여기인 이유는 스냅샷과 같다 — 이번
+    // 프레임의 모든 `Begin`/`End` 가 끝나 `NavId` 가 확정됐고 문맥이 아직 살아
+    // 있다. 관측이 먼저다(이번 프레임의 판정), 키 주입은 그 다음이다(다음
+    // 프레임에 반영된다 — `AddKeyEvent` 는 큐에 쌓이고 `NewFrame` 이 푼다).
+    ::editor::nav::observe_frame();
+    ::editor::nav::deliver_pending_key();
+
     m_workspace->EndFrame();
     const bool captured = ::editor::capture_chrome_snapshot();
 

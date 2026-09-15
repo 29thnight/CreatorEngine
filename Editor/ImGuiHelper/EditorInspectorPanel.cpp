@@ -1,4 +1,5 @@
 #include "EditorInspectorPanel.h"
+#include "EditorNavContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -157,6 +158,10 @@ namespace editor::widgets
         ImGui::ItemSize(header_rect);
         if (ImGui::ItemAdd(click_zone, id))
         {
+            ::editor::nav::announce_item("EditorInspectorPanel", id, true);
+            // 이 위젯은 배경을 칠하지 않고 위쪽에 선 두 줄만 긋는다. 그래서
+            // 커서를 어느 자리에 그려도 덮이지 않는다 — 신고 직후에 둔다.
+            ::editor::nav::draw_cursor(click_zone, id, "EditorInspectorPanel");
             if (!overToggle && ImGui::ButtonBehavior(click_zone, id, &hovered, &held,
                     ImGuiButtonFlags_PressedOnClick))
             {

@@ -1,4 +1,5 @@
 #include "EditorSectionHeader.h"
+#include "EditorNavContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -122,6 +123,7 @@ namespace editor::widgets
         ImGui::ItemSize(click_zone);
         if (ImGui::ItemAdd(click_zone, id))
         {
+            ::editor::nav::announce_item("EditorSectionHeader", id, true);
             if (ImGui::ButtonBehavior(click_zone, id, &hovered, &held,
                     ImGuiButtonFlags_PressedOnClick))
             {
@@ -134,7 +136,16 @@ namespace editor::widgets
         ImGui::RenderFrame(header_rect.Min, header_rect.Max,
             background_color(open, hovered, held), true, style.FrameRounding);
 
-        // ③ 왼쪽 체크박스. 원본 둘째 오버로드의 몫이다.
+        // ③ 키보드 탐색 커서. **배경 뒤**다. 표준 위젯(`ButtonEx`)은 배경 앞에
+        //    그리는데, 그쪽은 커서 사각형과 배경이 같은 rect 라 3px 확장분이
+        //    배경 밖에 남는다. 여기는 배경이 머리줄 **전체 폭**이고 커서는 그
+        //    안쪽의 클릭 영역이라, 앞에 그리면 확장분까지 배경에 덮인다.
+        //
+        //    색은 이미 있었다 — 테마가 `ImGuiCol_NavCursor` 를 `Primary` 로
+        //    정해 두었는데 부르는 곳이 없어 한 번도 그려지지 않았다.
+        ::editor::nav::draw_cursor(click_zone, id, "EditorSectionHeader");
+
+        // ④ 왼쪽 체크박스. 원본 둘째 오버로드의 몫이다.
         if (nullptr != request.enabled)
         {
             const bool before = *request.enabled;
@@ -145,7 +156,7 @@ namespace editor::widgets
             result.enabled_changed = (before != *request.enabled);
         }
 
-        // ④ 오른쪽 버튼.
+        // ⑤ 오른쪽 버튼.
         if (nullptr != request.menu_icon)
         {
             ImGui::SetCursorScreenPos(
@@ -154,13 +165,13 @@ namespace editor::widgets
                 ImGui::Button(request.menu_icon, ImVec2(menu_width, 0.f));
         }
 
-        // ⑤ 글자. 클릭 영역 왼쪽 끝에서 프레임 여백만큼 들여 세로 중앙에 놓는다.
+        // ⑥ 글자. 클릭 영역 왼쪽 끝에서 프레임 여백만큼 들여 세로 중앙에 놓는다.
         const ImVec2 label_size = ImGui::CalcTextSize(request.label);
         const ImVec2 text_pos(zone_min.x + style.FramePadding.x,
             origin.y + (full_size.y - label_size.y) * 0.5f);
         ImGui::RenderText(text_pos, request.label);
 
-        // ⑥ 다음 줄. 아래 여백은 원본의 3.0f 자리다.
+        // ⑦ 다음 줄. 아래 여백은 원본의 3.0f 자리다.
         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + full_size.y));
         ImGui::PopID();
         ImGui::Dummy(ImVec2(0.f, EditorThemeTokens::CompactGap));

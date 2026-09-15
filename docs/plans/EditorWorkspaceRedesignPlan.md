@@ -847,6 +847,24 @@ resize·Table·Input·Menu 조합을 우선하고, 내부 API가 필요하면 �
 widget을 그대로 쓴다. custom widget은 ImGui ID, nav, focus, disabled, clipping, tooltip, testability를
 보존해야 하며 별도 input framework를 만들지 않는다.
 
+**2026-09-15 정정 — 목록은 넷인데 아이템을 직접 등록하는 자리는 다섯이다.**
+W2-1 의 소스 대조가 `ItemAdd` 를 부르는 파일을 전수로 뽑자 이렇게 갈렸다.
+
+| 파일 | 위 목록에 | 실제 |
+|---|---|---|
+| `EditorSectionHeader.cpp` | 있다 | `ItemAdd` 를 부른다 |
+| `EditorPropertyRow.cpp` | 있다 | `ItemAdd` 를 부른다 |
+| `EditorModeButton.cpp` | 있다 | `ItemAdd` 를 부른다 |
+| `EditorAxisField3` | 있다 | **부르지 않는다** — `EditorPropertyRow` 와 표준 위젯을 조합한다 |
+| `EditorInspectorPanel.cpp` | **없다** | `ItemAdd` 를 부른다 — 패널 헤더의 접기 띠 |
+| `ProfilerWindow.cpp` | 없다 | 부른다. PHASE 14 타임라인이라 W2 family 가 아니다(면제) |
+
+허용 목록을 family 단위로 적은 탓에 **아이템 등록 단위와 어긋나 있었다.** 계약을 지켜야 하는
+단위는 family 가 아니라 `ItemAdd` 를 부르는 자리다. 게이트는 그 자리를 소스에서 전수로 뽑아
+허용 목록(넷)과 면제(하나)의 합집합과 **집합 그대로** 맞댄다 — 새 자리가 하나라도 생기면
+목록 밖이라는 이유로 붉어진다. `EditorAxisField3` 를 계약 대상으로 요구하지 않는 근거도
+같다: 스스로 아이템을 등록하지 않으므로 nav 커서를 그릴 주체가 아니다.
+
 **정찰 정정 — 넷은 백지 신설이 아니다.** 아래 승계 결정과 이관은 완료됐다.
 근거는 [EditorWidgetInheritanceW2.md](../analysis/EditorWidgetInheritanceW2.md)의 실제 소비자 조사이며,
 현재 외관 적용 완료와 남은 상호작용/성능 검증은 §9.0을 따른다.
@@ -966,7 +984,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | 단계 | 상태 | 남은 작업 |
 |---|---|---|
 | M0~M4, W0, W1 | **done** | 현재 DX12 기준 완료. 외관 추가 시안 없음. Vulkan은 별도 보류 |
-| W2 | progress | 4종 구현은 완료. 최종 상태/키보드 탐색/clipping 회귀, 시각 기준선과 성능 gate |
+| W2 | progress | 4종 구현은 완료. **키보드 탐색은 W2-1 로 착지**(2026-09-15 — 판정문에 자가 없었고, 넷 중 셋이 nav 커서를 안 그리고 있었다). 최종 상태 matrix·clipping 회귀, 시각 기준선과 성능 gate 가 남는다 |
 | W2-I | progress | Transform·RectTransform 공통 컴포넌트 경로 통합, RectTransform 최소 폭 대응, 중첩/배열·전용 드로어·Import Settings 전수 이관, 활성 정책·중복 호출·편집/저장 회귀 |
 | W2-V | progress | 기즈모가 숨겨지는 낮은 높이의 방향 선택 메뉴, resize 중 조작 취소·release/포커스 소유권, drop/terrain 입력 관통, W4/W5 연결·연속 resize 및 DPI/성능 회귀 |
 | W2-B | progress | 최근/전체 검색, 방문별 검색·선택 복원, Volume Profile 생성 대상 경로/취소/실패 정리, W3 저장·W7 목록 연결, 실제 마우스 분할선/동명 자산 drop 회귀 |
@@ -1202,6 +1220,68 @@ XYZ 배지와 숫자 표시, 가벼운 컴포넌트/내부 그룹 헤더를 적�
 - `ImGuiContext.h`의 죽은 `imgui_impl_dx11.h` include를 걷는다.
 
 **판정:** keyboard navigation과 clipping이 유지되고, visual golden 및 §8 성능 gate를 통과한다.
+
+#### W2-1 착지 — keyboard navigation (2026-09-15)
+
+위 판정문의 앞 절반에 **자가 없었다.** nav 상태를 내보내는 표면이 0 이고 키를 주입할 표면도
+0 이라, "키보드 탐색이 유지된다" 는 관찰이 아니라 문장이었다. W8-1(`IMGUI_CHECKVERSION` 이
+Release 에서 힘 0), W8-3(검증 레이어를 켜 놓고 아무도 큐를 읽지 않음)에 이은 같은 결함
+계통의 세 번째다 — **판정문을 만나면 출하 구성에서 그 수를 읽을 수단이 있는지부터 본다.**
+
+**실제로 틀려 있던 것.** `ImGui::RenderNavCursor`(1.91.4 에서 `RenderNavHighlight` 개명)는
+위젯이 **직접** 불러야 한다. `ItemAdd` 는 대신 그려 주지 않고, 표준 `ButtonEx` 도 스스로
+부른다. 아이템을 등록하는 자리 넷 중 `EditorPropertyRow` 하나만 그것을 불렀다. 나머지 셋은
+`ItemAdd` + `ButtonBehavior` 를 하므로 **키보드로 닿고 Enter 로 눌리기까지 하는데 지금 어디에
+서 있는지가 화면에 없었다.** 테마는 `ImGuiCol_NavCursor` 를 `Primary` 로 이미 정해 두었다 —
+색은 있고 그리는 곳이 없었다. 꺼진 `EditorModeButton` 은 `ImGuiItemFlags_Disabled` 없이 등록돼
+Tab 이 그 자리에 **서 버렸다.**
+
+**세운 것.** `editor::nav`(`Editor/ImGuiHelper/EditorNavContract.{h,cpp}`) — `rhi::validation`
+과 같은 꼴의 프로세스 장부다. 위젯이 `announce_item`/`draw_cursor` 로 신고하고, 프레임 끝
+(`EditorRenderer::EndRender`)에서 `observe_frame()` 이 `g.NavId` 를 신고분과 맞대 **커서 없이
+선 프레임**과 **disabled 인데 선 프레임**을 센다. `deliver_pending_key()` 가 `io.AddKeyEvent` 로
+키를 넣되 누름과 뗌을 두 프레임에 나눈다 — 한 프레임에 둘을 넣으면 `IsKeyPressed` 가 보는
+전이가 상쇄돼 아무 일도 안 일어난다. 읽고 자극하는 창구는 `editor.nav [reset|key <키>...]`.
+
+**면제 하나를 남겼다.** Tab 으로 `Inputable` 아이템에 들어가면 ImGui 는 `PreferInput` 으로
+활성화하고, 그때부터 `TempInputScalar`/`InputTextEx` 가 그리기를 **가져간다** — 커서까지
+자기가 그린다. 그래서 `EditorPropertyRow` 의 드래그 자리는 위임(`delegated`)으로 신고하고
+판정에서 뺀다. 다만 **수는 남긴다**: `delegatedFrames` 를 세고 `delegatedFrames < frames` 를
+단정해 면제가 전 프레임을 덮지 못하게 한다(허용치를 늘리는 대신 판정에서 빼되 수는 남긴다).
+이 면제가 하중을 받는 줄이라는 증거는 반대쪽 변이다 — 위임 신고를 일반 신고로 되돌리자
+`silentFrames 132 · EditorPropertyRow.drag` 로 처음 겪은 오탐이 그대로 재현됐다.
+
+**게이트:** `Tools/regression/verify-editor-keyboard-nav.ps1`(단정 28 건, run-all 배선 완료).
+두 축이다.
+
+- **① 런타임.** Inspector 에 포커스를 주고 Tab 40 회를 주입한 뒤 장부를 읽는다. "부르는 줄이
+  있다" 가 아니라 "그 상황에서 실제로 그렸다" 를 재는 유일한 방법이다.
+- **② 소스 대조.** 런타임은 nav 가 닿는 자리만 본다. `ItemAdd` 를 부르는 파일을 전수로 뽑아
+  허용 목록(§7.1)+면제와 집합 그대로 맞대고, 각 파일이 신고·커서를 부르는지, 장부를 우회한
+  `RenderNavCursor` 직접 호출이 0 인지를 본다.
+
+**자극하지 못한 것을 숨기지 않는다.** 이 하네스는 `EditorModeButton`(툴바)과
+`EditorSectionHeader` 에 키보드로 닿지 못한다. 게이트는 방문한 위젯 이름과 함께 **닿지 못한
+대상의 이름을 찍어** 출력한다 — 그 둘의 계약은 ②만이 지킨다는 사실이 초록 안에 묻히지
+않게 한다.
+
+**변이 증명(6종, 양쪽 팔을 따로).** 소스 축 넷은 빌드 없이, 런타임 축 둘은 Release 빌드로.
+
+| 변이 | 축 | 결과 |
+|---|---|---|
+| `EditorModeButton` 이 꺼진 버튼을 `Disabled` 로 신고하지 않는다 | ① | 잡았다 |
+| `EditorSectionHeader` 가 커서를 안 그린다 | ② | 잡았다 |
+| 장부를 우회해 `ImGui::RenderNavCursor` 를 직접 부른다 | ② | 잡았다 |
+| `ItemAdd` 를 부르는 새 파일이 허용 목록 밖에서 생긴다 | ② | 잡았다 |
+| `EditorInspectorPanel` 의 커서 호출을 **죽은 분기로** 만든다(소스엔 남음) | ① | 잡았다 — silent 16 |
+| `EditorPropertyRow` 의 위임 신고를 일반 신고로 되돌린다 | ① | 잡았다 — silent 132 |
+
+다섯째는 소스 축을 일부러 통과시켜 런타임 축만 겨눈 것이고, 여섯째는 면제가 옳다를 증명하는
+반대쪽 팔이다. Release·Debug 양쪽에서 초록(프레임 318/321 · 신고 1055/1057 · 커서 911/913 ·
+위임 144 · 키 40).
+
+**남은 것:** clipping 회귀, visual baseline, §8 성능 게이트, 상태 matrix
+(hover/active/focus/nav/disabled/mixed/error). W2 는 `progress` 로 둔다.
 
 <a id="w2-inspector-layout"></a>
 

@@ -1,4 +1,5 @@
 #include "EditorModeButton.h"
+#include "EditorNavContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -77,10 +78,16 @@ namespace editor::widgets
 
         const ImGuiID id = ImGui::GetID(request.icon);
         ImGui::ItemSize(bounds, style.FramePadding.y);
-        if (!ImGui::ItemAdd(bounds, id))
+        // ★ 꺼진 버튼은 `ImGuiItemFlags_Disabled` 로 **신고한다.** 예전에는
+        //   `ButtonBehavior` 만 건너뛰었는데, 그러면 아이템은 평범하게 등록되어
+        //   키보드 탐색이 죽은 버튼 위에 **멈추고** Enter 를 눌러도 아무 일이
+        //   없다. 마우스만 쓰면 보이지 않는 결함이다.
+        if (!ImGui::ItemAdd(bounds, id, nullptr,
+                request.enabled ? ImGuiItemFlags_None : ImGuiItemFlags_Disabled))
         {
             return false;
         }
+        ::editor::nav::announce_item("EditorModeButton", id, request.enabled);
 
         // 꺼진 버튼은 상호작용을 아예 묻지 않는다. `BeginDisabled` 로 감싸면
         // 전체 알파가 내려가 marker 까지 흐려지는데, 켜져 있는데 손댈 수 없는
@@ -92,6 +99,10 @@ namespace editor::widgets
         {
             pressed = ImGui::ButtonBehavior(bounds, id, &hovered, &held);
         }
+
+        // 커서를 배경 앞에 그린다 — 표준 `ButtonEx` 와 같은 순서다. 여기는
+        // 배경과 커서가 같은 rect 라 3px 확장분이 배경 밖에 남는다.
+        ::editor::nav::draw_cursor(bounds, id, "EditorModeButton");
 
         ImGui::RenderFrame(bounds.Min, bounds.Max,
             ImGui::GetColorU32(ThemeColorValue(mode_surface_token(mode_surface_of(hovered, held)))),

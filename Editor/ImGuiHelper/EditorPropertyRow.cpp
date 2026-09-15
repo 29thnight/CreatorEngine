@@ -16,6 +16,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 #include "EditorPropertyRow.h"
+#include "EditorNavContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -109,6 +110,11 @@ namespace editor::widgets
         {
             const bool clamp = (flags & ImGuiSliderFlags_ClampOnInput) &&
                 (min < max || (min == max && (min != 0.f || (flags & ImGuiSliderFlags_ClampZeroRange))));
+            // W2-1: 이 프레임의 그리기를 표준 위젯에 **넘긴다.** Tab 으로
+            // `Inputable` 아이템에 들어가면 ImGui 가 `PreferInput` 으로 편집
+            // 모드에 넣고, 그때부터 `InputTextEx` 가 이 칸과 nav 커서를 함께
+            // 그린다 — 여기서 또 그리면 두 벌이다. 장부에는 넘겼다고 적는다.
+            ::editor::nav::announce_item("EditorPropertyRow.drag", id, input_allowed, true);
             return TempInputScalar(frame, id, label, ImGuiDataType_Float, value,
                 format, clamp ? &min : nullptr, clamp ? &max : nullptr);
         }
@@ -117,7 +123,14 @@ namespace editor::widgets
         window->DrawList->AddRectFilled(frame.Min, frame.Max, background,
             style.FrameRounding, joined_left ? ImDrawFlags_RoundCornersRight : ImDrawFlags_RoundCornersAll);
         RenderFrameBorder(frame.Min, frame.Max, style.FrameRounding);
-        RenderNavCursor(frame, id);
+        // 여기부터는 이 위젯이 직접 그린다 — 그리기 책임이 확정된 자리에서
+        // 신고한다. `ItemAdd` 직후에 신고하면 위의 위임 경로까지 "내가 그린다"
+        // 로 적히고, 그러면 판정이 옳은 동작을 위반으로 읽는다.
+        ::editor::nav::announce_item("EditorPropertyRow.drag", id, input_allowed);
+        // `RenderNavCursor` 를 직접 부르지 않는다 — 그러면 그린 사실이 장부에
+        // 남지 않아 판정이 "안 그렸다" 로 읽는다. 소스 대조 게이트가 직접
+        // 호출을 막는다(verify-editor-keyboard-nav).
+        ::editor::nav::draw_cursor(frame, id, "EditorPropertyRow.drag");
         const bool changed = DragBehavior(id, ImGuiDataType_Float, value,
             speed, &min, &max, format, flags);
         if (changed) MarkItemEdited(id);

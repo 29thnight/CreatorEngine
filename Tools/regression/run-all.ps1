@@ -304,6 +304,25 @@ Run-Step "에디터 통합 매트릭스" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-integration-matrix.ps1") -Exe $Exe -Work (Join-Path $Work 'integration-matrix')
 }
 
+# PHASE 21 W2-1 — custom widget 의 키보드 탐색 계약.
+#
+# 계획서 §7.1 은 custom widget 이 nav·focus·disabled·testability 를 보존하라고
+# 적어 두었지만, 그 문장을 잴 자가 없었다 — nav 상태를 내보내는 표면 0, 키를
+# 주입할 표면 0. W8-3 의 검증 레이어와 같은 모양이다(켜 놓고 아무도 안 읽었다).
+#
+# 실제로 셋이 틀려 있었다. `ImGui::RenderNavCursor` 는 위젯이 직접 불러야 하는데
+# custom widget 넷 중 하나만 불렀다 — 나머지 셋은 **키보드로 닿고 Enter 로
+# 눌리는데 어디에 서 있는지 보이지 않았다.** 테마에 `ImGuiCol_NavCursor` 는 이미
+# 있었으니 색은 있고 그리는 곳이 없던 셈이다.
+#
+# 두 축이다. ① Tab 을 주입해 장부를 읽는다("부르는 줄이 있다" 가 아니라 "그
+# 상황에서 실제로 그렸다"). ② 런타임이 닿지 못하는 자리(툴바 버튼 등)는 소스에서
+# 양쪽을 뽑아 맞댄다. 게이트는 자극하지 못한 대상의 이름을 출력해 ①의 공백을
+# 숨기지 않는다.
+Run-Step "에디터 키보드 탐색 계약" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-keyboard-nav.ps1") -Exe $Exe -Work (Join-Path $Work 'keyboard-nav')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로
