@@ -1,6 +1,7 @@
 #include "EditorInspectorPanel.h"
 #include "EditorNavContract.h"
 #include "EditorClipContract.h"
+#include "EditorStateContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -180,6 +181,43 @@ namespace editor::widgets
 
         const bool disabled = (nullptr != request.enabled) && !*request.enabled;
         const float opacity = inspector_panel_opacity(open, disabled);
+
+        // W2-3: 상태 행렬.
+        //
+        // `focus` 와 `nav` 를 같은 자리에서 읽되 **다른 것으로** 적는다.
+        // `focus` 는 "이 아이템이 키보드 입력을 받는 자리다"(`NavId` 가 나다)이고,
+        // `nav` 는 거기에 "키보드로 와서 커서가 보인다"(`NavCursorVisible`)가
+        // 더해진 것이다. 둘을 같은 식으로 적으면 이름만 둘이고 뜻은 하나가 된다.
+        //
+        // 패널은 컴포넌트의 꺼짐을 받아 흐리게 그린다.
+        {
+            ImGuiContext& state_ctx = *ImGui::GetCurrentContext();
+            // ★ active 는 **포인터로는 서지 않는다.** 이 머리줄은
+            //   `ImGuiButtonFlags_PressedOnClick` 이라 ImGui 가 눌린 프레임에
+            //   `ClearActiveID` 를 부른다 — 마우스를 누르고 있어도 `held` 가 한
+            //   프레임도 참이 되지 않는다. 그래서 "올 수 없다" 로 적을 뻔했는데,
+            //   게이트가 변이 회차에서 실제 관측을 내밀어 그 판단을 뒤집었다:
+            //   키보드로 활성화하면(`NavActivateId` 가 나면) `ButtonBehavior` 가
+            //   `SetActiveID` 를 불러 `held` 가 선다. 소스만 읽고 "없다" 를 적으면
+            //   행렬에 거짓 빈칸이 남는다 — 자극을 키워서 확인해야 한다.
+            ::editor::state::declare("EditorInspectorPanel",
+                ::editor::state::hover | ::editor::state::active |
+                ::editor::state::focus | ::editor::state::nav | ::editor::state::disabled,
+                ::editor::state::mixed | ::editor::state::error,
+                "active 는 포인터가 아니라 키보드 활성화로만 선다(PressedOnClick 이 ClearActiveID 를 부른다). mixed 는 Inspector 가 m_selectedEntity 하나만 그려 값이 갈리는 상황이 오지 않고(W2-I3 의 몫), error 는 값 검증이라는 원천이 아직 없다");
+            ::editor::state::announce("EditorInspectorPanel",
+                (hovered ? ::editor::state::hover : 0u) |
+                (held ? ::editor::state::active : 0u) |
+                ((state_ctx.NavId == id) ? ::editor::state::focus : 0u) |
+                ((state_ctx.NavId == id && state_ctx.NavCursorVisible) ? ::editor::state::nav : 0u) |
+            // disabled 는 **둘의 합집합**이다. 위젯이 스스로 받는 꺼짐과,
+            // 바깥에서 `ImGui::BeginDisabled` 로 씌운 꺼짐. 앞의 것만 읽으면
+            // 인스펙터가 실제로 쓰는 기제(BeginDisabled)를 통째로 못 본다.
+                ((disabled ||
+                  0 != (state_ctx.CurrentItemFlags & ImGuiItemFlags_Disabled))
+                     ? ::editor::state::disabled : 0u),
+                click_zone);
+        }
 
         // ── hover ────────────────────────────────────────────────────────
         //

@@ -161,6 +161,7 @@
     <ClInclude Include="ImGuiHelper\EditorModeButton.h" />
     <ClInclude Include="ImGuiHelper\EditorClipContract.h" />
     <ClInclude Include="ImGuiHelper\EditorNavContract.h" />
+    <ClInclude Include="ImGuiHelper\EditorStateContract.h" />
     <ClInclude Include="ImGuiHelper\widgets.h" />
   </ItemGroup>
   <ItemGroup>
@@ -325,6 +326,7 @@
     <ClCompile Include="ImGuiHelper\EditorModeButton.cpp" />
     <ClCompile Include="ImGuiHelper\EditorClipContract.cpp" />
     <ClCompile Include="ImGuiHelper\EditorNavContract.cpp" />
+    <ClCompile Include="ImGuiHelper\EditorStateContract.cpp" />
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp" />
     <ClCompile Include="ImGuiHelper\widgets.cpp" />

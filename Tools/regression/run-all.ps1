@@ -385,6 +385,25 @@ Run-Step "에디터 위젯 잘라 그리기 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-widget-clipping.ps1") -Exe $Exe -Work (Join-Path $Work 'widget-clipping')
 }
 
+# PHASE 21 W2-3 — 위젯 상태 행렬.
+#
+# 계획서가 요구한 일곱 상태(hover/active/focus/nav/disabled/mixed/error)를 한자리에서
+# 볼 수단이 0 이었다. 있던 것은 위젯 둘의 색 열거뿐이고 그 둘의 항목마저 서로
+# 달랐다. 그래서 위젯이 "나는 이 상태들을 구분한다" 를 코드로 **선언**하고 매
+# 프레임 지금 상태를 신고하게 한 뒤, 게이트가 선언과 관측을 맞댄다.
+#
+# ★ 자극 표면이 없었다. hover·active 는 포인터가 있어야 서는데 CLI 에 마우스를
+#   넣을 길이 0 이라, W2-1 이 키를 만든 자리와 같은 일이 되풀이됐다. 넣고 보니
+#   이벤트 큐로는 서지 않아(다음 프레임의 백엔드가 덮는다) 고정 상태로 들고
+#   있다가 NewFrame 뒤에 얹는다.
+#
+# ★ 자리를 한 번만 읽으면 모자란다. 자극이 배치를 바꾸기 때문이다 — 첫 회차에
+#   없던 값 줄이 클릭과 Tab 뒤에 드러났다. 그래서 세 회차를 돈다(읽고 · 찌르고
+#   다시 읽고 · 같은 접두사로 재현한 뒤 새 자리까지 찌른다).
+Run-Step "에디터 위젯 상태 행렬" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-state-matrix.ps1") -Exe $Exe -Work (Join-Path $Work 'state-matrix')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

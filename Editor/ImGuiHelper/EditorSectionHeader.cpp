@@ -1,6 +1,7 @@
 #include "EditorSectionHeader.h"
 #include "EditorNavContract.h"
 #include "EditorClipContract.h"
+#include "EditorStateContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -131,6 +132,31 @@ namespace editor::widgets
                 open = !open;
                 ImGui::GetStateStorage()->SetBool(id, open);
             }
+        }
+
+        // W2-3: 상태 행렬.
+        //
+        // `focus` 와 `nav` 를 같은 자리에서 읽되 **다른 것으로** 적는다.
+        // `focus` 는 "이 아이템이 키보드 입력을 받는 자리다"(`NavId` 가 나다)이고,
+        // `nav` 는 거기에 "키보드로 와서 커서가 보인다"(`NavCursorVisible`)가
+        // 더해진 것이다. 둘을 같은 식으로 적으면 이름만 둘이고 뜻은 하나가 된다.
+        //
+        // 이 머리줄은 접힘/펼침까지 색을 가르므로 hover·active 가 실재한다.
+        // 꺼짐은 옆에 선 표준 Checkbox 의 몫이라 머리줄 자체는 disabled 로
+        // 그려지지 않는다.
+        {
+            ImGuiContext& state_ctx = *ImGui::GetCurrentContext();
+            ::editor::state::declare("EditorSectionHeader",
+                ::editor::state::hover | ::editor::state::active |
+                ::editor::state::focus | ::editor::state::nav,
+                ::editor::state::disabled | ::editor::state::mixed | ::editor::state::error,
+                "머리줄은 항상 손댈 수 있다(켜짐은 옆의 표준 Checkbox 가 든다). mixed 는 Inspector 가 m_selectedEntity 하나만 그려 값이 갈리는 상황이 오지 않고(W2-I3 의 몫), error 는 값 검증이라는 원천이 아직 없다");
+            ::editor::state::announce("EditorSectionHeader",
+                (hovered ? ::editor::state::hover : 0u) |
+                (held ? ::editor::state::active : 0u) |
+                ((state_ctx.NavId == id) ? ::editor::state::focus : 0u) |
+                ((state_ctx.NavId == id && state_ctx.NavCursorVisible) ? ::editor::state::nav : 0u),
+                click_zone);
         }
 
         // ② 배경. 위에서 읽은 상태로 고른다.

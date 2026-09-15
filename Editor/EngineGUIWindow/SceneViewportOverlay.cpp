@@ -11,6 +11,7 @@
 #include <mutex>
 #include <string>
 #include "EditorClipContract.h"
+#include "EditorStateContract.h"
 
 namespace editor::scene_overlay_detail
 {
@@ -50,6 +51,25 @@ namespace editor::scene_overlay_detail
         draw->AddRect(p, {p.x + width, p.y + height}, ImGui::GetColorU32(ImGuiCol_Border), height * 0.5f, 1.f, corners);
         if (ImGui::IsItemFocused()) draw->AddRect(p, {p.x + width, p.y + height},
             ImGui::GetColorU32(ImGuiCol_NavCursor), height * 0.5f, 2.f, corners);
+        // W2-3: 상태 행렬. 이 버튼은 `selected` 를 켜짐 표시로 쓰고 포커스 링을
+        // 직접 그린다. 꺼짐은 받지 않는다 — 못 쓰는 도구는 회색으로 두지 않고
+        // 아예 그리지 않는 쪽이다.
+        {
+            ImGuiContext& state_ctx = *ImGui::GetCurrentContext();
+            const ImGuiID state_id = state_ctx.LastItemData.ID;
+            ::editor::state::declare("SceneViewportOverlay.button",
+                ::editor::state::hover | ::editor::state::active |
+                ::editor::state::focus | ::editor::state::nav,
+                ::editor::state::disabled | ::editor::state::mixed | ::editor::state::error,
+                "못 쓰는 도구는 회색으로 두지 않고 아예 그리지 않는다. mixed 는 Inspector 가 m_selectedEntity 하나만 그려 값이 갈리는 상황이 오지 않고(W2-I3 의 몫), error 는 값 검증이라는 원천이 아직 없다");
+            ::editor::state::announce("SceneViewportOverlay.button",
+                (ImGui::IsItemHovered() ? ::editor::state::hover : 0u) |
+                (ImGui::IsItemActive() ? ::editor::state::active : 0u) |
+                ((state_ctx.NavId == state_id) ? ::editor::state::focus : 0u) |
+                ((state_ctx.NavId == state_id && state_ctx.NavCursorVisible) ? ::editor::state::nav : 0u),
+                ImRect(p, ImVec2(p.x + width, p.y + height)));
+        }
+
         const ImVec2 text = ImGui::CalcTextSize(label);
 
         // W2-2: 이 버튼은 §7.1 의 네 family 밖이다. 그런데 `InvisibleButton` 위에

@@ -6,6 +6,7 @@
 
 #include <array>
 #include "EditorClipContract.h"
+#include "EditorStateContract.h"
 
 namespace editor::widgets
 {
@@ -82,6 +83,12 @@ namespace editor::widgets
             // 신고한다 — 이 위젯은 §7.1 의 네 family 중 하나이고, "넘칠 일이
             // 없어서" 계약 밖에 두면 폰트나 배지 폭이 바뀌는 날 아무도 모른다.
             // 가운데 정렬이라 넘치면 **양쪽으로** 샌다.
+            // W2-3: badge 는 칠해진 표지다 — 손대는 물건이 아니라 상태가 하나도
+            // 없다. **없는 것을 없다고 선언해야** 행렬에 빈칸이 남지 않는다.
+            ::editor::state::declare("EditorAxisField3.badge", 0u, ::editor::state::all,
+                "축 색 표지는 아이템이 아니다 — 포인터도 키보드도 닿지 않는다");
+            ::editor::state::announce("EditorAxisField3.badge", 0u, ImRect(origin, corner));
+
             const bool badge_clipped = (text_size.x > width);
             ::editor::clipping::announce_text("EditorAxisField3.badge",
                 text_size.x, width, badge_clipped, false);

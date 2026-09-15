@@ -150,6 +150,32 @@ namespace editor::nav
     /// space · escape. 하나라도 모르면 아무것도 넣지 않고 거짓을 돌려준다.
     bool request_keys(const std::vector<std::string>& keys, std::string& outError);
 
+    // ── 포인터 주입 (PHASE 21 W2-3) ───────────────────────────────────────
+    //
+    // `hover` 와 `active` 는 포인터가 있어야 관측된다. 그 표면이 0 이라 상태
+    // 행렬의 절반을 런타임으로 잴 수 없었다 — 키가 없어 nav 를 못 재던 것과
+    // 같은 모양이다. 키와 같은 자리에 둔다: CLI 가 예약하고 프레임 끝에서
+    // `io.AddMousePosEvent`/`AddMouseButtonEvent` 로 넣는다.
+    //
+    // ★ 키와 달리 **이벤트 큐로는 안 된다.** 큐에 넣으면 다음 프레임의
+    //   `ImGui_ImplWin32_NewFrame` 이 자기 좌표를 뒤에 넣어 덮어쓴다 — 실측으로
+    //   주입이 한 번도 서지 않았다(2026-09-15). 그래서 **고정 상태**로 들고
+    //   있다가 `NewFrame` **뒤**에 매 프레임 얹는다. 그 자리에서 얹으면 이번
+    //   프레임의 모든 위젯이 그 좌표를 본다.
+    //
+    // 누름과 뗌을 나누는 이유는 키와 같다. `ButtonBehavior` 가 보는 것은 전이라,
+    // 같은 프레임에 눌렀다 떼면 눌린 적이 없는 것이 된다.
+    enum class pointer_action : unsigned char { move = 0, press = 1, release = 2 };
+
+    /// 게임 스레드(CLI)에서 부른다. move 는 좌표를, press/release 는 왼쪽
+    /// 버튼을 바꾼다. 좌표는 화면(뷰포트) 기준이다. 한 번 부르면 다시 부를
+    /// 때까지 그 자리에 **머문다** — 자극은 여러 프레임을 살아야 한다.
+    void request_pointer(pointer_action action, float x, float y);
+
+    /// 프레임 머리(`NewFrame` 뒤)에서 부른다. 주입이 활성이면 이번 프레임의
+    /// 마우스 상태를 그것으로 덮는다.
+    void apply_injected_pointer();
+
     contract_view read();
 
     /// 수만 비운다 — 켜짐 여부(`keyboardEnabled`)는 이 실행의 성질이다.

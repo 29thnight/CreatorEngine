@@ -31,6 +31,12 @@ namespace editor::nav
         std::deque<ImGuiKey> g_pendingKeys;
         ImGuiKey g_liveKey = ImGuiKey_None;
 
+        // 주입된 포인터. 큐가 아니라 **고정 상태**다 — 이유는 헤더에 있다.
+        bool g_pointerActive = false;
+        float g_pointerX = 0.f;
+        float g_pointerY = 0.f;
+        bool g_pointerDown = false;
+
         void remember(std::vector<std::string>& names, const char* name)
         {
             if (nullptr == name) return;
@@ -179,6 +185,32 @@ namespace editor::nav
 
         g_published.keysPending = static_cast<std::uint64_t>(g_pendingKeys.size()) +
             ((ImGuiKey_None != g_liveKey) ? 1u : 0u);
+    }
+
+    void request_pointer(pointer_action action, float x, float y)
+    {
+        std::lock_guard lock(g_mutex);
+        g_pointerActive = true;
+        switch (action)
+        {
+        case pointer_action::move:    g_pointerX = x; g_pointerY = y; break;
+        case pointer_action::press:   g_pointerDown = true;  break;
+        case pointer_action::release: g_pointerDown = false; break;
+        }
+    }
+
+    void apply_injected_pointer()
+    {
+        std::lock_guard lock(g_mutex);
+        if (!g_pointerActive) return;
+
+        // `NewFrame` 이 이벤트를 다 푼 **뒤**다. 여기서 덮으면 이번 프레임의
+        // 위젯이 전부 이 좌표를 본다. 누름은 `io.MouseDown` 만 세우면 되는데,
+        // 다음 프레임의 `UpdateMouseInputs` 가 "직전에 안 눌려 있었다" 를 보고
+        // `MouseClicked` 를 스스로 세우기 때문이다 — 전이는 그때 생긴다.
+        ImGuiIO& io = ImGui::GetIO();
+        io.MousePos = ImVec2(g_pointerX, g_pointerY);
+        io.MouseDown[0] = g_pointerDown;
     }
 
     bool request_keys(const std::vector<std::string>& keys, std::string& outError)

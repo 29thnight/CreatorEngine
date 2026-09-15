@@ -7,6 +7,7 @@
 #include "EditorChromeProbe.h"
 #include "EditorNavContract.h"
 #include "EditorClipContract.h"
+#include "EditorStateContract.h"
 #include "RHI/IImGuiHost.h"
 #include "EditorFontResources.h"
 #include "EditorTheme.h"
@@ -267,6 +268,10 @@ void EditorRenderer::BeginRender()
         const ::editor::TabStyleScope tabs;
         m_host->BeginFrame();
     }
+
+    // W2-3: 주입된 포인터를 얹는다. **`BeginFrame`(= NewFrame) 뒤**여야 한다 —
+    // 앞에 두면 `ImGui_ImplWin32_NewFrame` 이 자기 좌표를 뒤에 넣어 덮는다.
+    ::editor::nav::apply_injected_pointer();
     // ── 메인 독스페이스 ──
     // 구 ImGuiRenderer에서는 #ifndef BUILD_FLAG 안이었다. 지금은 이 파일
     // 자체가 에디터 exe에만 링크되므로 조건이 필요 없다 — 매크로가 하던
@@ -404,6 +409,9 @@ void EditorRenderer::EndRender()
     // W2-2: 잘라 그리기 계약. 신고는 위젯이 그 자리에서 판정하므로 여기서는
     // 프레임을 세고, 프레임을 넘기며 닫히지 않은 클립 스택을 잡는다.
     ::editor::clipping::observe_frame();
+
+    // W2-3: 상태 행렬. 선언은 위젯이 한 번, 관측은 매 프레임 신고가 쌓는다.
+    ::editor::state::observe_frame();
 
     m_workspace->EndFrame();
     const bool captured = ::editor::capture_chrome_snapshot();

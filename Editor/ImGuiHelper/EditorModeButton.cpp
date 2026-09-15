@@ -1,6 +1,7 @@
 #include "EditorModeButton.h"
 #include "EditorNavContract.h"
 #include "EditorClipContract.h"
+#include "EditorStateContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -99,6 +100,35 @@ namespace editor::widgets
         if (request.enabled)
         {
             pressed = ImGui::ButtonBehavior(bounds, id, &hovered, &held);
+        }
+
+        // W2-3: 상태 행렬.
+        //
+        // `focus` 와 `nav` 를 같은 자리에서 읽되 **다른 것으로** 적는다.
+        // `focus` 는 "이 아이템이 키보드 입력을 받는 자리다"(`NavId` 가 나다)이고,
+        // `nav` 는 거기에 "키보드로 와서 커서가 보인다"(`NavCursorVisible`)가
+        // 더해진 것이다. 둘을 같은 식으로 적으면 이름만 둘이고 뜻은 하나가 된다.
+        //
+        // 꺼짐을 스스로 받는 유일한 family 다(`request.enabled`).
+        {
+            ImGuiContext& state_ctx = *ImGui::GetCurrentContext();
+            ::editor::state::declare("EditorModeButton",
+                ::editor::state::hover | ::editor::state::active |
+                ::editor::state::focus | ::editor::state::nav | ::editor::state::disabled,
+                ::editor::state::mixed | ::editor::state::error,
+                "mixed 는 Inspector 가 m_selectedEntity 하나만 그려 값이 갈리는 상황이 오지 않고(W2-I3 의 몫), error 는 값 검증이라는 원천이 아직 없다");
+            ::editor::state::announce("EditorModeButton",
+                (hovered ? ::editor::state::hover : 0u) |
+                (held ? ::editor::state::active : 0u) |
+                ((state_ctx.NavId == id) ? ::editor::state::focus : 0u) |
+                ((state_ctx.NavId == id && state_ctx.NavCursorVisible) ? ::editor::state::nav : 0u) |
+            // disabled 는 **둘의 합집합**이다. 위젯이 스스로 받는 꺼짐과,
+            // 바깥에서 `ImGui::BeginDisabled` 로 씌운 꺼짐. 앞의 것만 읽으면
+            // 인스펙터가 실제로 쓰는 기제(BeginDisabled)를 통째로 못 본다.
+                ((request.enabled &&
+                  0 == (state_ctx.CurrentItemFlags & ImGuiItemFlags_Disabled))
+                     ? 0u : ::editor::state::disabled),
+                bounds);
         }
 
         // 커서를 배경 앞에 그린다 — 표준 `ButtonEx` 와 같은 순서다. 여기는

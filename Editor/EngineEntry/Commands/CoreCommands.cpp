@@ -24,7 +24,8 @@
 #include "EditorWorkspaceStore.h"
 #include "ViewportHostWindow.h"
 #include "EditorPanelCost.h"
-#include "EditorClipContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
+#include "EditorClipContract.h"
+#include "EditorStateContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorNavContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorPlayModeController.h"
 #include "EditorWindowHost.h"       // PHASE 21 M4: editor.windows 덤프
@@ -1230,9 +1231,32 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         const auto& args = ctx.parts;
-        const char* const usage = "editor.nav [reset | key <tab|up|down|left|right|enter|space|escape>...]";
+        const char* const usage = "editor.nav [reset | key <tab|up|down|left|right|enter|space|escape>... "
+            "| pointer <x> <y> | press | release]";
 
-        if (args.size() >= 2 && "key" == args[1])
+        // W2-3: 포인터 주입. hover·active 는 이것 없이는 런타임으로 못 잰다.
+        if (args.size() >= 2 && "pointer" == args[1])
+        {
+            if (4 != args.size()) return InvalidArguments(usage);
+            try
+            {
+                ::editor::nav::request_pointer(::editor::nav::pointer_action::move,
+                    std::stof(args[2]), std::stof(args[3]));
+            }
+            catch (const std::exception&)
+            {
+                return InvalidArguments(usage);
+            }
+        }
+        else if (2 == args.size() && "press" == args[1])
+        {
+            ::editor::nav::request_pointer(::editor::nav::pointer_action::press, 0.f, 0.f);
+        }
+        else if (2 == args.size() && "release" == args[1])
+        {
+            ::editor::nav::request_pointer(::editor::nav::pointer_action::release, 0.f, 0.f);
+        }
+        else if (args.size() >= 2 && "key" == args[1])
         {
             if (args.size() < 3) return InvalidArguments(usage);
             std::vector<std::string> keys(args.begin() + 2, args.end());
@@ -1378,6 +1402,84 @@ namespace ConsoleCmd
             return Fail("editor.clipping.unbalanced", summary, std::move(data));
         }
         return Ok("잘라 그리기 계약 위반 0", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_editor_state(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        const char* const usage = "editor.state [reset]";
+
+        if (2 == args.size() && "reset" == args[1])
+        {
+            ::editor::state::reset_counts();
+        }
+        else if (args.size() > 1)
+        {
+            return InvalidArguments(usage);
+        }
+
+        const ::editor::state::contract_view view = ::editor::state::read();
+
+        const auto bits_to_names = [](std::uint32_t mask)
+        {
+            auto array = CommandData::Array();
+            for (std::uint32_t bit = 1u; bit <= ::editor::state::error; bit <<= 1)
+            {
+                if (0 == (mask & bit)) continue;
+                const char* const name = ::editor::state::name_of(bit);
+                if (nullptr != name) array.Append(CommandData::String(name));
+            }
+            return array;
+        };
+
+        auto data = CommandData::Object();
+        data.Set("frames", CommandData::Int(static_cast<long long>(view.frames)));
+        data.Set("announced", CommandData::Int(static_cast<long long>(view.announced)));
+
+        // 선언했는데 한 번도 관측되지 않은 상태. 죽은 분기이거나 자극하지
+        // 못한 것이고, 둘을 가르는 것은 게이트의 몫이라 여기서는 **수와 이름**
+        // 만 낸다.
+        std::uint64_t unobserved = 0;
+        auto widgets = CommandData::Array();
+        for (const ::editor::state::widget_view& widget : view.widgets)
+        {
+            const std::uint32_t missing = widget.declared & ~widget.observed;
+            unobserved += static_cast<std::uint64_t>(__popcnt(missing));
+
+            auto row = CommandData::Object();
+            row.Set("widget", CommandData::String(widget.widget));
+            row.Set("declared", bits_to_names(widget.declared));
+            row.Set("notApplicable", bits_to_names(widget.notApplicable));
+            row.Set("observed", bits_to_names(widget.observed));
+            row.Set("missing", bits_to_names(missing));
+            row.Set("reason", CommandData::String(widget.reason));
+            row.Set("frames", CommandData::Int(static_cast<long long>(widget.frames)));
+            auto rect = CommandData::Array();
+            rect.Append(CommandData::Double(widget.x0));
+            rect.Append(CommandData::Double(widget.y0));
+            rect.Append(CommandData::Double(widget.x1));
+            rect.Append(CommandData::Double(widget.y1));
+            row.Set("rect", std::move(rect));
+            widgets.Append(std::move(row));
+        }
+        data.Set("widgets", std::move(widgets));
+        data.Set("unobserved", CommandData::Int(static_cast<long long>(unobserved)));
+
+        std::printf("[editor.state] frames=%llu announced=%llu widgets=%zu unobserved=%llu\n",
+            static_cast<unsigned long long>(view.frames),
+            static_cast<unsigned long long>(view.announced),
+            view.widgets.size(),
+            static_cast<unsigned long long>(unobserved));
+        std::fflush(stdout);
+
+        if (view.widgets.empty())
+        {
+            return Fail("editor.state.empty",
+                "상태를 신고한 위젯이 하나도 없다 — 빈 표를 위반 0 으로 읽지 않는다",
+                std::move(data));
+        }
+        return Ok("상태 행렬 " + std::to_string(view.widgets.size()) + " 위젯", std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_editor_renderscale(const ConsoleCommandContext& ctx)
@@ -1720,6 +1822,7 @@ namespace ConsoleCmd
         reg.Result({ "editor.panelcost" }, &Cmd_editor_panelcost);
         reg.Result({ "editor.clipping" }, &Cmd_editor_clipping);
         reg.Result({ "editor.nav" }, &Cmd_editor_nav);
+        reg.Result({ "editor.state" }, &Cmd_editor_state);
         reg.Result({ "editor.renderscale" }, &Cmd_editor_renderscale);
         reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);
     }

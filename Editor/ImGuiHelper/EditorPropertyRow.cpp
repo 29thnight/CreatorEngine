@@ -18,6 +18,7 @@
 #include "EditorPropertyRow.h"
 #include "EditorNavContract.h"
 #include "EditorClipContract.h"
+#include "EditorStateContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -107,6 +108,20 @@ namespace editor::widgets
                 g.ActiveIdUsingNavDirMask = (1 << ImGuiDir_Left) | (1 << ImGuiDir_Right);
             }
         }
+        // W2-3: 상태 행렬.
+        //
+        // `focus` 와 `nav` 를 같은 자리에서 읽되 **다른 것으로** 적는다.
+        // `focus` 는 "이 아이템이 키보드 입력을 받는 자리다"(`NavId` 가 나다)이고,
+        // `nav` 는 거기에 "키보드로 와서 커서가 보인다"(`NavCursorVisible`)가
+        // 더해진 것이다. 둘을 같은 식으로 적으면 이름만 둘이고 뜻은 하나가 된다.
+        //
+        // 값 줄은 편집 중(active)과 손댈 수 없음(disabled)을 모두 갖는다.
+        ::editor::state::declare("EditorPropertyRow.drag",
+            ::editor::state::hover | ::editor::state::active |
+            ::editor::state::focus | ::editor::state::nav | ::editor::state::disabled,
+            ::editor::state::mixed | ::editor::state::error,
+            "mixed 는 Inspector 가 m_selectedEntity 하나만 그려 값이 갈리는 상황이 오지 않고(W2-I3 의 몫), error 는 값 검증이라는 원천이 아직 없다");
+
         if (input)
         {
             const bool clamp = (flags & ImGuiSliderFlags_ClampOnInput) &&
@@ -116,6 +131,19 @@ namespace editor::widgets
             // 모드에 넣고, 그때부터 `InputTextEx` 가 이 칸과 nav 커서를 함께
             // 그린다 — 여기서 또 그리면 두 벌이다. 장부에는 넘겼다고 적는다.
             ::editor::nav::announce_item("EditorPropertyRow.drag", id, input_allowed, true);
+            // W2-3: 그리기는 넘겼어도 이 아이템은 그 프레임에 **존재하고
+            // 포커스를 쥐고 있다.** 여기서 신고하지 않으면 Tab 이 닿는 순간
+            // 위젯이 행렬에서 사라져 `focus`·`nav` 가 영영 미관측으로 남는다 —
+            // 자극이 도착하는 바로 그 경로가 장부의 눈을 가리는 셈이다.
+            // `active` 는 여기서 "편집 중" 을 뜻한다.
+            ::editor::state::announce("EditorPropertyRow.drag",
+                (hovered ? ::editor::state::hover : 0u) |
+                ((g.ActiveId == id) ? ::editor::state::active : 0u) |
+                ((g.NavId == id) ? ::editor::state::focus : 0u) |
+                ((g.NavId == id && g.NavCursorVisible) ? ::editor::state::nav : 0u) |
+                ((input_allowed && 0 == (g.CurrentItemFlags & ImGuiItemFlags_Disabled))
+                     ? 0u : ::editor::state::disabled),
+                frame);
             return TempInputScalar(frame, id, label, ImGuiDataType_Float, value,
                 format, clamp ? &min : nullptr, clamp ? &max : nullptr);
         }
@@ -127,6 +155,17 @@ namespace editor::widgets
         // 여기부터는 이 위젯이 직접 그린다 — 그리기 책임이 확정된 자리에서
         // 신고한다. `ItemAdd` 직후에 신고하면 위의 위임 경로까지 "내가 그린다"
         // 로 적히고, 그러면 판정이 옳은 동작을 위반으로 읽는다.
+        ::editor::state::announce("EditorPropertyRow.drag",
+            (hovered ? ::editor::state::hover : 0u) |
+            ((g.ActiveId == id) ? ::editor::state::active : 0u) |
+            ((g.NavId == id) ? ::editor::state::focus : 0u) |
+            ((g.NavId == id && g.NavCursorVisible) ? ::editor::state::nav : 0u) |
+            // disabled 는 둘의 합집합이다 — `NoInput` 플래그와 바깥의
+            // `BeginDisabled`. 앞의 것만 읽으면 인스펙터가 실제로 쓰는
+            // 기제를 통째로 못 본다.
+            ((input_allowed && 0 == (g.CurrentItemFlags & ImGuiItemFlags_Disabled))
+                 ? 0u : ::editor::state::disabled),
+            frame);
         ::editor::nav::announce_item("EditorPropertyRow.drag", id, input_allowed);
         // `RenderNavCursor` 를 직접 부르지 않는다 — 그러면 그린 사실이 장부에
         // 남지 않아 판정이 "안 그렸다" 로 읽는다. 소스 대조 게이트가 직접

@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	125
-# names	134
+# commands	127
+# names	136
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -27,11 +27,12 @@ editor.clipping	-	immediate	editor	engine_service	live	no	yes	[reset]	잘라 그
 editor.dock	-	immediate	editor	engine_service	live	no	yes	-	살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다
 editor.layout	-	immediate	editor	engine_service	live	no	yes	-	활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다
 editor.menu	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다
-editor.nav	-	immediate	editor	engine_service	live	no	yes	[reset|key <키>...]	키보드 탐색 계약(커서·disabled 위반 수)을 읽고 키를 주입한다
+editor.nav	-	immediate	editor	engine_service	live	no	yes	[reset|key <키>...|pointer <x> <y>|press|release]	키보드 탐색 계약(커서·disabled 위반 수)을 읽고 키를 주입한다
 editor.panelcost	-	immediate	editor	engine_service	live	no	yes	[reset]	패널별 draw 비용과 그 프레임에 한 일의 수(행·디렉터리 스캔)
 editor.renderscale	-	immediate	editor	engine_service	live	no	yes	[auto|off|<0.25-1.0>]	뷰포트 렌더 배율 — 표시 크기보다 낮게 그린다(기본 auto = 1/DPI)
 editor.sceneview	-	immediate	editor	engine_service	live	no	yes	-	씬 뷰 오버레이 배치와 카메라 상태를 읽는다
 editor.selftest	-	immediate	editor	engine_service	live	no	yes	-	editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다
+editor.state	-	immediate	editor	engine_service	live	no	yes	[reset]	위젯 상태 행렬(선언 대 관측)을 읽는다
 editor.theme	-	immediate	editor	engine_service	live	no	yes	-	적용된 ImGui 스타일 값을 TSV로 내고 배율 출처를 판정한다
 editor.viewport	-	immediate	editor	engine_service	live	no	yes	[scene|game]	중앙 ViewportHost 의 표시 모드와 뷰 수요
 editor.window	-	immediate	editor	editor_operation	live	no	yes	<안정식별자> <open|close|focus>	창 하나를 열고 닫고 앞으로 세운다(탭으로 겹친 창은 선택돼야 본문이 돈다)
@@ -81,6 +82,7 @@ prefab.objectguid	-	immediate	editor	engine_service	live	no	yes	<오브젝트 �
 prefab.overrides	-	immediate	editor	engine_service	live	no	yes	<오브젝트>	프리팹 인스턴스에 기록된 오버라이드를 나열한다
 prefab.status	-	immediate	editor	engine_service	live	no	yes	-	프리팹 등록·캐시 상태를 낸다
 prefab.update	-	frames	editor	engine_service	live	no	yes	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
+profile.frame	-	immediate	editor	engine_service	live	no	yes	-	보존된 프레임의 CPU 이벤트를 이름·깊이·ms 로 낸다(PHASE 14 임시)
 profile.stats	-	immediate	editor	engine_service	live	no	yes	-	프로파일러 자체 비용과 용량 소진(교란 없음)
 quit	exit	immediate	both	engine_service	terminates_process	no	yes	-	호스트를 종료한다
 render.backend	-	immediate	editor	engine_service	live	no	yes	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)
