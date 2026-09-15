@@ -158,6 +158,11 @@ Commandlet 모드와 일반 `--script`/`--exec`/stdin/HTTP를 혼합하면 실�
 `Commandlet 격리 및 공통 편집 API`·`Player Shipping 격리`·`Player 명령 서비스`)이 **현재 HEAD에서** 초록,
 ② LC6 공통 편집 API의 Undo 선언 21개에 대한 GUI 수동 조작 확인.
 
+**①은 2026-09-15에 닫았다** — HEAD `575ab79b`에서 초록 11 · 붉음 2이고, 붉은 둘(LC5 drain · LC8 Player 서비스)은
+제품 응답이 아니라 게이트 자신의 가정에서 나온 것임을 각각 확정했다. 사유와 실행 표는
+[종결 검토](../analysis/Phase14_5Closure.md)에 있다. 게이트 둘의 수정은 별도 과제이며, 붉음을 통과로 바꾸지 않았다.
+**남은 조건은 ② 하나다.**
+
 전체 `run-all.ps1` 완주와 canonical 성능 예산은 이 페이즈의 종결 조건이 아니다. 전자는 HEAD부터 초록
 기준선이 없어 한 페이즈가 남의 선행 실패를 떠안게 되고, 후자는 게이트와 기준 archive가 PHASE 3.75
 소유였으며 그 계획이 닫히면서 함께 삭제됐다. 근거와 옮긴 자리는 [종결 검토](../analysis/Phase14_5Closure.md)에 있다.
