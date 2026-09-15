@@ -1,7 +1,7 @@
 #pragma once
 #include "ImGui.h"
 #include "Windows/EditorWindowBody.h"
-#include "LogStore.h"
+#include "OutputLogWindow.h"
 
 #include <vector>
 
@@ -20,7 +20,6 @@ public:
 	/// 도는 정리 경로다. 함수 지역 static을 나눠 쓰므로 몸통은 하나로 둔다.
 	void DrawBehaviorTreeWindow();
 	void DrawBlackBoardWindow();
-    void ShowLogWindow();
 	void ShowBehaviorTreeWindow();
 	void ShowBlackBoardWindow();
 	void SHowInputActionMap();
@@ -33,9 +32,8 @@ private:
 	void BlackBoardWindow(bool drawing);
 
     ImFont* m_koreanFont{ nullptr };
-    std::uint64_t m_selectedLogSequence{};
-    LogSnapshot m_logSnapshot;
-    std::vector<std::string> m_logDisplayText;
+    // 로그 창은 자기 파일을 갖는다(3단계). 여기는 수명만 든다.
+    ::editor::OutputLogWindow m_outputLog;
 	bool m_bShowNewScenePopup{ false };
 	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
 

@@ -81,8 +81,15 @@ struct editor_diagnostic_windows
                 .open_by_default(false)
                 .available(&windows::has_frame_profiler),
 
+            // 첫 크기를 싣지 않으면 ImGui 가 **내용에 맞춰** 접는다. 로그 창은
+            // 처음 떴을 때 들고 있는 것이 툴바 한 줄과 로그 몇 줄뿐이라, 그
+            // 자동 크기가 1~2 행짜리 창이 된다 — Auto Scroll 이 켜져 있으면
+            // 마지막 한 줄만 보이고 나머지는 스크롤 밖으로 밀린다.
+            // 폭은 한 줄이 곧바로 말줄임되지 않을 만큼, 높이는 목록과 상세가
+            // 함께 설 만큼 잡는다(상세는 남은 높이의 45% 또는 8행 중 작은 쪽).
             panel<&windows::draw_output_log>(
                 EditorWindowName::kOutputLog, EditorWindowName::kOutputLogLabel)
+                .initial_size(1100.f, 460.f)
                 .open_by_default(false)
                 .available(&windows::has_output_log),
 

@@ -1,4 +1,4 @@
-# Output Log 저장 경계 정리 — 1·2단계
+# Output Log 저장 경계 정리 — 1·2·3단계
 
 ## 1단계: 저장 경계 정리
 
@@ -201,17 +201,183 @@ Editor 트리는 한 줄도 건드리지 않았다 — `verify-editor-widget-cli
   `rejectedEntries`와 `entry.level`·`entry.sequence`만 읽고, `OutputLogText.h`는
   `LogEntry`의 기존 필드만 읽는다. 모두 남아 있다. 게이트가 `MenuBarWindow.h`와
   `LogSystem.h`를 `/W4 /WX`로 컴파일하지만 `MenuBarWindow.cpp` 본문은 아니다.
-- 실제 로그 창의 시각·입력. 화면은 아직 1단계 그대로이며 그룹을 보여주지 않는다.
+- 실제 로그 창의 시각·입력. (3단계에서 화면을 교체하며 해소했다.)
 - 이 게이트는 여전히 `Tools/regression/run-all.ps1`에 **등록돼 있지 않다.**
   손으로 부를 때만 돈다.
 
-## 다음 단계
+## 3단계: 화면 교체
 
-1. Collapse·검색·목록/상세·실측 폭·clipper로 화면을 교체한다. Editor 트리를
-   건드리므로 `verify-editor-widget-clipping`·`verify-editor-keyboard-nav`·
-   `verify-editor-state-matrix`의 닫힌 목록을 함께 고쳐야 한다.
-2. C++/C# 출처 전달과 producer별 수집 경계를 보강한다. 특히 `DebugStreamBuf`의
-   공유 문자열 동기화는 이번 store 잠금으로 해결되지 않는다.
+이 단계가 원래 요청의 첫 문장에 답한다 — *"문자열 자르는 로직이 전혀 근거없는
+눈대중으로 작성한 구 로직"*.
 
-현재 검증은 저장소/연결부 독립 회귀와 정적 확인에 한정한다.
-Editor 전체 빌드, DX12/Vulkan 실행, 실제 로그 창의 시각·입력 검증은 수행하지 않았다.
+### 무엇이 눈대중이었나
+
+옛 화면(`MenuBarWindow::ShowLogWindow()`)은 세 가지를 **폭을 재지 않고** 했다.
+
+| 옛 코드 | 무엇을 가정했나 | 왜 틀렸나 |
+|---|---|---|
+| `WordWrapText(text, 120)` | 한 줄에 120 **바이트** | 한글은 3바이트라 40자에서 접힌다. 글꼴 폭과 무관하다 |
+| `text.substr(0, 100) + "..."` | 100바이트면 한 줄 | UTF-8 중간에서 잘라 깨진 바이트를 낸다 |
+| 창 폭을 안 봄 | 창이 늘 같은 폭 | 도킹·리사이즈에 따라 남거나 모자란다 |
+
+지금은 `EllipsizeToWidth(text, maxWidth, measure)` 하나가 한다. `measure`는
+`ImGui::CalcTextSize`이고, 자를 자리는 **UTF-8 글자 경계 위에서만** 이진 탐색으로
+찾는다. 말줄임표를 포함한 결과가 `maxWidth` 안에 들어온다.
+
+### 적용 범위
+
+| 파일 | 하는 일 |
+|---|---|
+| `Editor/EngineGUIWindow/OutputLogView.h` | 상태와 판정. ImGui를 모른다 |
+| `Editor/EngineGUIWindow/OutputLogWindow.h/.cpp` | 그리기만 한다 |
+| `Editor/EngineGUIWindow/MenuBarWindow.cpp/.h` | 로그 본문 154줄과 `WordWrapText`를 뺐다(−186줄) |
+| `Editor/EditorWindow/Windows/EditorToolboxWindows.h` | 창 첫 크기 선언 |
+
+화면 상태를 `OutputLogView.h`에 따로 두는 이유는 게이트 때문이다. 판정이 ImGui
+호출에 섞여 있으면 창을 띄우지 않고는 잴 수 없고, 창을 띄우는 게이트는 프로젝트에
+하나뿐인 endpoint 파일을 독점해 다른 게이트와 같이 못 돈다. 지금은 말줄임·필터·
+검색·Collapse·선택 수명을 전부 `/W4 /WX` 단독 컴파일 프로브에서 잰다.
+
+### 화면 계약
+
+- **Collapse** — 같은 정체성의 반복을 한 행으로 접고 오른쪽에 누적 수를 적는다.
+  배지는 `totalCount`다. `retainedOccurrences`가 아니다 — 이력 버퍼가 밀려도
+  "몇 번 찍혔는지"는 남아야 한다.
+- **수준 필터** — `group.level < minimumLevel`이면 거른다. 옛 화면은 Trace를 어떤
+  설정에서도 흘렸다. 그 결함을 고쳤다.
+- **검색** — 평탄화 **이전의 원문**을 본다. 화면이 개행을 공백으로 바꿔 보여주는
+  것은 표시 사정이고, 찾는 사람은 자기가 찍은 글자를 찾는다.
+- **clipper** — `ImGuiListClipper`로 보이는 행만 낸다. 행 목록은 평탄하다.
+- **선택 수명** — 고른 그룹이 퇴거되면 선택을 비운다. 그러지 않으면 상세 창이
+  없는 그룹을 가리킨다.
+- **출처** — 없으면 `source: none (the producer did not supply a call site)`라고
+  **적는다.** 지금 이 엔진의 로그는 전부 출처가 없다. 숨기면 4단계가 무엇을
+  고쳐야 하는지 흐려진다.
+- **파일 열기** — 상세 창의 버튼으로만 연다. 옛 화면은 **아무 줄이나 한 번 누르면**
+  본문에서 Windows 경로를 찾아 편집기를 띄웠다. 읽으려고 고른 것만으로 열렸다.
+
+### 그리기 규약
+
+표준 위젯만 쓴다 — `AddText`·`RenderTextClipped`·`ItemAdd`를 직접 부르지 않는다.
+그래야 클리핑과 nav 커서를 ImGui가 맡고, W2의 custom draw 계약
+(`verify-editor-widget-clipping`·`verify-editor-keyboard-nav`)이 요구하는 신고를
+따로 들 필요가 없다. 행은 라벨이 빈 `Selectable("##row", ...)`로 깔고 본문을 그
+위에 낸다 — `Selectable`은 라벨 안의 `##`를 식별자 구분자로 읽는데, 로그 본문에
+`##`가 들어오는 일이 실제로 있다.
+
+### 겹쳐 그리려고 `SetCursorPos`로 돌아가면 안 된다
+
+첫 판은 행 위에 본문을 겹치려고 `SetCursorPos`로 행 머리로 돌아갔다가, 다음 행
+자리를 `SetCursorPos(rowStart.y + rowHeight)`로 직접 놓았다. 컴파일도 되고 그림도
+맞았지만 ImGui가 **매 프레임** 오류를 냈다.
+
+```
+In window ' Log###Editor.OutputLog/OutputLogRows_...':
+Code uses SetCursorPos()/SetCursorScreenPos() to extend window/parent boundaries.
+Please submit an item e.g. Dummy() afterwards in order to grow window/parent boundaries.
+```
+
+`SetCursorPos`는 커서만 옮기고 창의 content 크기를 키우지 않는다. ImGui는 항목
+제출 없이 커서가 경계 밖으로 나간 채 `EndChild`에 닿으면 그것을 오류로 신고한다.
+
+고친 방식은 `Dummy()`를 덧붙이는 쪽이 아니다 — 그러면 그 항목이 다시 보폭을
+바꾼다. 행 머리로 돌아가는 일을 `SameLine(rowStartX)`가 하게 했다. `SameLine`은
+앞 줄의 높이를 그대로 물려받으므로 경계도 보폭도 건드리지 않는다. 그리고 목록
+안에서만 `ItemSpacing.y`를 0으로 눌러, `Selectable`이 차지하는 높이와 다음 행이
+시작하는 자리를 둘 다 `rowHeight`로 맞췄다 — clipper에 알려 준 보폭과 실제
+보폭이 갈리면 **스크롤해야만** 드러난다.
+
+측정: 같은 자극으로 띄운 에디터 stdout의 `[imgui-error]` 줄 수가 **62 → 0**.
+
+이것은 게이트가 못 잡았다. 게이트는 `OutputLogView.h`만 컴파일하고 ImGui를 띄우지
+않으며, 네 에디터 게이트도 이 오류를 세지 않는다. 사람이 창을 열어 본 것이 유일한
+관측 수단이었다.
+
+### 창 첫 크기
+
+`initial_size`를 싣지 않으면 ImGui가 **내용에 맞춰** 접는다. 처음 뜬 로그 창이
+들고 있는 것은 툴바 한 줄과 로그 몇 줄뿐이라, 자동 크기가 1~2행짜리 창이 됐다.
+Auto Scroll이 켜져 있으면 마지막 한 줄만 보이고 나머지는 스크롤 밖으로 밀린다.
+선언에 `1100x460`을 실었다 — 형제 창들이 크기를 선언하는 그 자리다.
+
+### 검증
+
+```powershell
+./Tools/regression/verify-log-storage.ps1 -Configuration Debug
+```
+
+결과: **`LOG_STORAGE_OK`**. `PASS presentation: 글자 폭 말줄임, 행 평탄화, 수준
+필터, 검색, Collapse, 선택 수명`이 늘었다.
+
+말줄임은 **자 둘**로 잰다. 글자 폭 자(글자당 고정 폭)와 바이트 자(바이트당 3px).
+자가 하나뿐이면 글자 경계와 바이트 경계가 같은 자리에서 갈라져, 경계를 무시하는
+구현도 같은 답을 내 통과한다(아래 P1 참조).
+
+에디터 축도 전부 통과했다.
+
+| 무엇 | 결과 |
+|---|---|
+| Editor Release 빌드 | exit 0 |
+| `--exec editor.selftest`(선언 자가 검사) | exit 0 |
+| `verify-editor-declaration-wiring` | exit 0 |
+| `verify-editor-widget-clipping` | exit 0 |
+| `verify-editor-keyboard-nav` | exit 0 |
+| `verify-editor-state-matrix` | exit 0 |
+
+변이 증명(Debug, 여섯 전부 겨냥한 단정이 잡았다):
+
+| 변이 | 잡은 단정 |
+|---|---|
+| P1 UTF-8 경계 대신 바이트 단위로 자른다 | `바이트 자 아래에서도 글자 경계까지만 담는다` |
+| P2 Trace를 언제나 흘린다(옛 결함 복원) | `고른 수준 미만은 전부 걸러진다` |
+| P3 검색이 평탄화한 것을 본다 | `검색이 보는 것은 평탄화 이전의 원문이다` |
+| P4 배지에 `totalCount` 대신 보관 이력을 싣는다 | `배지는 누적 20이다 — 보관 이력 3이 아니다` |
+| P5 퇴거된 그룹의 선택을 안 놓는다 | `퇴거된 그룹의 선택은 비워진다` |
+| P6 변경분이 들어와도 행을 무효화하지 않는다 | `필터가 같아도 변경분이 들어오면 행을 다시 센다` |
+
+**P1과 P4는 처음에 자극조차 되지 않았다.** 고친 것은 구현이 아니라 fixture다.
+
+- P1: 글자 폭 자 하나만 있을 때는 글자 경계와 바이트 경계가 같은 자리를 가리켜
+  바이트 단위 구현도 같은 답을 냈다. 둘이 실제로 갈라지는 바이트 자를 더했다
+  (한글 30바이트, 폭 40 → 옳은 답 9바이트/12, 바이트 단위 10바이트/13).
+- P4: 쓰던 저장소가 넉넉해 `totalCount == retainedOccurrences`였다. 둘이 갈라지는
+  좁은 저장소(이력 3, 20회 반복)를 더해 배지가 20인지 3인지 물었다.
+
+### 실제 화면 확인
+
+게이트는 창을 띄우지 않는다. Release 에디터를 스크립트로 띄워 캡처했다.
+
+```
+window.resize 2560 1440 ×9   (같은 본문·같은 수준의 경고를 아홉 번 만든다)
+editor.window ###Editor.OutputLog open / focus
+editor.nav pointer <x> <y> / press / release   (행 하나를 고른다)
+```
+
+관측된 것: 반복 아홉 개가 한 행으로 접히고 오른쪽 배지가 **9**, 수준별 아이콘과
+색(warn 노랑 · info 기본 · trace 흐림), 오른쪽 끝의 실측 폭 말줄임, 머물면 뜨는
+전문 툴팁, 고른 행의 상세 창(Copy · 수준 · logger · `total`/`retained` ·
+`source: none`).
+
+### 아직 재지 않은 것
+
+- **ImGui 오류를 세는 자가 없다.** 위의 62 → 0은 손으로 stdout을 센 것이다.
+  제품에 `[imgui-error]` 계수기가 없어 게이트로 만들지 못했다. 같은 부류의 결함이
+  다시 들어와도 아무 게이트가 붉어지지 않는다.
+- 픽셀 골든 없음. 위 캡처는 사람이 본 것이지 재는 자가 아니다.
+- 이 게이트는 여전히 `Tools/regression/run-all.ps1`에 **등록돼 있지 않다.**
+- `OutputLogText.h`는 이제 제품 소비자가 0이고 게이트만 부른다. 처분은 4단계로.
+
+## 다음 단계 — 4단계
+
+1. C++/C# 출처 전달. 지금 상세 창이 모든 줄에 `source: none`을 적는 이유는
+   `Debug->Log*`가 spdlog 매크로가 아니라 함수라 호출 위치를 싣지 않기 때문이다.
+   호출처는 528자리다.
+2. producer별 수집 경계. 특히 `DebugStreamBuf`의 공유 문자열 동기화는 1단계의
+   store 잠금으로 해결되지 않는다.
+3. `OutputLogText.h`의 처분. 제품 소비자가 0이고 게이트만 부른다.
+4. `[imgui-error]`를 세는 계수기. 3단계의 매 프레임 오류를 잡은 것은 사람 눈뿐이고,
+   지금 그 자리를 지키는 게이트가 없다.
+
+검증 범위: 저장소·화면 상태의 독립 회귀(`verify-log-storage`), 에디터 선언·클리핑·
+키보드 탐색·상태 행렬 네 게이트, Editor Release 빌드, 그리고 창을 띄운 눈 확인.
+픽셀 골든과 Vulkan 백엔드에서의 확인은 하지 않았다.

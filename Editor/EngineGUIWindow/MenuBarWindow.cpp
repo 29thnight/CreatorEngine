@@ -6,9 +6,7 @@
 #include "EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
 #include "EditorWorkspaceStore.h"
-#include "OutputLogText.h"
 #include "LogSystem.h"
-#include <spdlog/pattern_formatter.h>
 #include "RHI/IRHIDeviceResources.h"
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 m_sceneName을 읽으므로
@@ -72,33 +70,6 @@ void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
     ImGui::Dummy(barSize); // 레이아웃 공간 확보
 }
 
-std::string WordWrapText(const std::string& input, size_t maxLineLength)
-{
-    std::istringstream iss(input);
-    std::ostringstream oss;
-    std::string word;
-    size_t lineLength = 0;
-
-    while (iss >> word)
-    {
-        if (lineLength + word.length() > maxLineLength)
-        {
-            oss << '\n';
-            lineLength = 0;
-        }
-        else if (lineLength > 0)
-        {
-            oss << ' ';
-            ++lineLength;
-        }
-
-        oss << word;
-        lineLength += word.length();
-    }
-
-    return oss.str();
-}
-
 namespace
 {
     // 메뉴바 한글 폰트의 기준 크기. 본문 폰트와 같은 값이어야 같은 줄에서
@@ -117,6 +88,7 @@ MenuBarWindow::MenuBarWindow()
         ::editor::fonts::add_optional_font(
             "korean", ::editor::fonts::korean_candidates(), kMenuBarFontSizePixels);
     m_koreanFont = korean.font;
+    m_outputLog.SetFont(m_koreanFont);
 
     // PHASE 21 M4 2단계: 프레임은 셸이 연다. 처음 닫혀 있다는 사실은
     // 선언이 든다(open_by_default(false)) — 여기서 다시 닫지 않는다.
@@ -129,7 +101,7 @@ MenuBarWindow::MenuBarWindow()
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kFrameProfiler,
         [this]() { ShowProfilerWindow(); }));
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kOutputLog,
-        [this]() { ShowLogWindow(); }));
+        [this]() { m_outputLog.Draw(); }));
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kAbout,
         [this]() { ShowAboutWindow(); }));
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kBehaviorTree,
@@ -832,160 +804,6 @@ void MenuBarWindow::ShowAboutWindow()
 
     ImGui::Separator();
     if (ImGui::Button("Close")) editor::close_window(EditorWindowName::kAbout);
-}
-
-void MenuBarWindow::ShowLogWindow()
-{
-    static int levelFilter = spdlog::level::trace;
-    static bool autoScroll = true;
-
-    // 폰트 밀기는 본문에 남는다. 옛 코드는 `Begin` 앞에서 밀어 제목표시줄까지
-    // 덮었지만 제목이 ASCII 라 보이는 차이가 없다.
-    ImGui::PushFont(m_koreanFont, 0.0f);
-
-    // == 상단 고정 헤더 영역 ==
-    ImGui::BeginChild("LogHeader", ImVec2(0, 0),
-        ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY,
-        ImGuiWindowFlags_NoScrollbar);
-    {
-        if (ImGui::Button("Clear"))
-        {
-            Debug->Clear();
-            m_selectedLogSequence = 0;
-        }
-        ImGui::SameLine();
-        ImGui::Combo("Log Filter", &levelFilter,
-            "Trace\0Debug\0Info\0Warning\0Error\0Critical\0\0");
-        ImGui::SameLine();
-        ImGui::Checkbox("Auto Scroll", &autoScroll);
-    }
-    ImGui::EndChild();
-
-    ImGui::Separator();
-
-    // == 스크롤 가능한 로그 영역 ==
-    ImGui::BeginChild("LogScrollRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
-    {
-        if (auto snapshot = Debug->GetLogSnapshotIfChanged(m_logSnapshot.revision))
-        {
-            // The copy is complete and the store lock is released before any
-            // formatting or ImGui work. Unchanged history is reused next frame.
-            std::vector<std::string> displayText;
-            displayText.reserve(snapshot->entries.size());
-            spdlog::pattern_formatter formatter;
-            bool selectionRetained = false;
-            for (const auto& entry : snapshot->entries)
-            {
-                displayText.push_back(editor::FormatOutputLogEntry(entry, formatter));
-                selectionRetained |= entry.sequence == m_selectedLogSequence;
-            }
-            if (!selectionRetained) m_selectedLogSequence = 0;
-            m_logSnapshot = std::move(*snapshot);
-            m_logDisplayText = std::move(displayText);
-        }
-
-        const auto& entries = m_logSnapshot.entries;
-        float sizeX = ImGui::GetContentRegionAvail().x;
-		static bool isCopyPopupOpen = false;
-		static std::string copiedText;
-        // 현재 스크롤 상태 감지
-        bool shouldScroll = autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 10.0f;
-
-        if (m_logSnapshot.evictedEntries != 0 || m_logSnapshot.rejectedEntries != 0)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(editor::ThemeColor::TextMuted));
-            ImGui::TextWrapped("History limit: %llu expired, %llu oversized. See log file for full history.",
-                static_cast<unsigned long long>(m_logSnapshot.evictedEntries),
-                static_cast<unsigned long long>(m_logSnapshot.rejectedEntries));
-            ImGui::PopStyleColor();
-        }
-
-        for (size_t i = 0; i < entries.size(); ++i)
-        {
-            const auto& entry = entries[i];
-            if (entry.level != spdlog::level::trace && entry.level < levelFilter)
-                continue;
-
-            bool is_selected = (entry.sequence == m_selectedLogSequence);
-
-            ImVec4 color;
-            switch (entry.level)
-            {
-            case spdlog::level::info:       color = editor::ThemeColorValue(editor::ThemeColor::Text); break;
-            case spdlog::level::warn:       color = editor::ThemeColorValue(editor::ThemeColor::Warning); break;
-            case spdlog::level::err:        color = editor::ThemeColorValue(editor::ThemeColor::Error); break;
-            case spdlog::level::critical:   color = editor::ThemeColorValue(editor::ThemeColor::Error); break;
-            default:                        color = editor::ThemeColorValue(editor::ThemeColor::TextMuted); break;
-            }
-
-            if (is_selected)
-                ImGui::PushStyleColor(ImGuiCol_Header, editor::ThemeColorValue(editor::ThemeColor::Selection));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertFloat4ToU32(color));
-
-            std::string wrapped = WordWrapText(m_logDisplayText[i], 120);
-            int stringLine = std::count(wrapped.begin(), wrapped.end(), '\n');
-
-            const auto rowId = std::to_string(entry.sequence);
-            ImGui::PushID(rowId.c_str());
-            if (ImGui::Selectable((EditorIcon::Info + std::string(" ") + wrapped).c_str(),
-                is_selected, ImGuiSelectableFlags_AllowDoubleClick,
-                ImVec2(sizeX, float(35 * stringLine))))
-            {
-                m_selectedLogSequence = entry.sequence;
-
-                std::regex pattern(R"(([A-Za-z]:\\.*))");
-                std::istringstream iss(wrapped);
-                std::string line;
-
-                while (std::getline(iss, line))
-                {
-                    std::smatch match;
-                    if (std::regex_search(line, match, pattern) && entry.level != spdlog::level::debug)
-                    {
-                        std::string fileDirectory = match[1].str();
-			EditorPlatform::Get().OpenFile(fileDirectory);
-                    }
-                }
-            }
-            if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-            {
-                isCopyPopupOpen = true;
-                copiedText = m_logDisplayText[i];
-            }
-            ImGui::PopID();
-            ImGui::PopStyleColor();
-            if (is_selected)
-                ImGui::PopStyleColor();
-        }
-
-        if (shouldScroll)
-            ImGui::SetScrollHereY(1.0f);
-
-        if (isCopyPopupOpen)
-        {
-            ImGui::OpenPopup("CopyLogPopup");
-			isCopyPopupOpen = false;
-        }
-
-        if (ImGui::BeginPopup("CopyLogPopup"))
-        {
-            ImGui::Text("Copy Log Text");
-            ImGui::Separator();
-            if (ImGui::Button("Copy"))
-            {
-                ImGui::SetClipboardText(copiedText.c_str());
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Close"))
-            {
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-		}
-    }
-    ImGui::EndChild();
-    ImGui::PopFont();
 }
 
 ed::EditorContext* s_MenuBarBTEditorContext{ nullptr };

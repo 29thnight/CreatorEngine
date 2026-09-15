@@ -114,6 +114,8 @@
     <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h" />
     <ClInclude Include="EngineGUIWindow\BTEditorBridge.h" />
     <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h" />
+    <ClInclude Include="EngineGUIWindow\OutputLogView.h" />
+    <ClInclude Include="EngineGUIWindow\OutputLogWindow.h" />
     <ClInclude Include="EngineGUIWindow\EditorCameraRig.h" />
     <ClInclude Include="EngineGUIWindow\EditorFontResources.h" />
     <ClInclude Include="ImGuiHelper\EditorIconAlignment.h" />
@@ -290,6 +292,7 @@
     <ClCompile Include="EngineEntry\WinProcProxy.cpp" />
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\OutputLogWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp" />
     <ClCompile Include="EngineGUIWindow\EditorCameraRig.cpp" />
     <ClCompile Include="EngineGUIWindow\EditorFontResources.cpp" />

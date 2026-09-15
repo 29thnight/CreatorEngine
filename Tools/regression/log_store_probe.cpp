@@ -3,6 +3,7 @@
 #include "HtmlFileSink.h"
 #include "OutputLogText.h"
 #include "MenuBarWindow.h"
+#include "OutputLogView.h"
 #include <spdlog/logger.h>
 #include <spdlog/pattern_formatter.h>
 #include <atomic>
@@ -494,6 +495,192 @@ namespace
         }
     }
 
+    // ── 3단계: 화면이 쓰는 상태 ────────────────────────────────────────────
+    //
+    // ImGui 를 켜지 않고 잰다. 여기 있는 것이 옛 화면에서 눈대중이던 자리다 —
+    // 말줄임 · 평탄화 · 필터 · Collapse · 선택.
+
+    // 글자 하나에 7 px 인 가짜 자. **바이트가 아니라 글자**를 세므로, 바이트
+    // 길이로 자르는 구현은 이 자를 통과하지 못한다(옛 `WordWrapText` 가 그랬다).
+    struct GlyphWidth
+    {
+        float operator()(std::string_view text) const
+        {
+            std::size_t glyphs = 0;
+            for (std::size_t index = 0; index < text.size();
+                index = editor::NextUtf8Boundary(text, index))
+                ++glyphs;
+            return static_cast<float>(glyphs) * 7.0f;
+        }
+    };
+
+    // 바이트마다 3 px 인 자. 글자 경계와 바이트 경계가 **갈라지는** 자극을
+    // 만들려면 이런 자가 있어야 한다 — 글자 폭 자로는 두 구현이 같은 답을 내서
+    // "바이트 경계로 자른다" 변이가 통과해 버렸다(2026-09-16 실측).
+    struct ByteWidth
+    {
+        float operator()(std::string_view text) const
+        {
+            return static_cast<float>(text.size()) * 3.0f;
+        }
+    };
+
+    void CheckOutputLogPresentation()
+    {
+        const GlyphWidth measure;
+        // 한글 열 글자 = 30 바이트. 폭으로는 70, 바이트로는 210 이다.
+        const std::string korean = "가나다라마바사아자차";
+        Require(korean.size() == 30 && measure(korean) == 70.0f, "fixture 전제");
+
+        Require(editor::EllipsizeToWidth(korean, 70.0f, measure) == korean,
+            "글자 폭에 들어가면 그대로 둔다 — 바이트로 셌다면 여기서 잘린다");
+
+        const std::string cut = editor::EllipsizeToWidth(korean, 50.0f, measure);
+        Require(cut.size() == 15 && cut.substr(cut.size() - 3) == "...",
+            "말줄임표를 붙인다");
+        Require(cut.substr(0, 12) == korean.substr(0, 12),
+            "글자 경계에서 자른다 — 한글이 반 토막 나지 않는다");
+        Require(measure(cut) <= 50.0f, "말줄임표까지 더한 결과가 한계를 넘지 않는다");
+        Require(editor::EllipsizeToWidth(korean, 10.0f, measure).empty(),
+            "말줄임표조차 못 들어가면 빈 문자열");
+        Require(editor::EllipsizeToWidth("", 100.0f, measure).empty(), "빈 입력");
+
+        // 글자 경계와 바이트 경계가 다른 답을 내는 자리에서 잰다.
+        Require(!editor::IsUtf8ContinuationByte(korean[9]) &&
+            editor::IsUtf8ContinuationByte(korean[10]),
+            "fixture 전제: 9 는 글자 경계이고 10 은 이어지는 바이트다");
+        const ByteWidth byteMeasure;
+        const std::string byteCut = editor::EllipsizeToWidth(korean, 40.0f, byteMeasure);
+        Require(byteCut.size() == 12 && byteCut.substr(byteCut.size() - 3) == "...",
+            "바이트 자 아래에서도 글자 경계까지만 담는다");
+        Require(byteCut.substr(0, 9) == korean.substr(0, 9),
+            "자른 자리가 글자 경계다 — 바이트 경계면 10 바이트에서 끊어 한 글자가 깨진다");
+
+        std::string messy = "  앞뒤\t공백과\r\n개행  그리고";
+        messy.push_back('\0');
+        messy += "NUL";
+        const std::string flat = editor::FlattenForRow(messy);
+        Require(flat == "앞뒤 공백과 개행 그리고 NUL", "행 본문은 한 줄로 접힌다");
+        Require(flat.find('\n') == std::string::npos && flat.find('\t') == std::string::npos &&
+            flat.find('\0') == std::string::npos, "개행·탭·NUL 이 남지 않는다");
+
+        // ── 필터 · Collapse · 검색 · 선택 ──────────────────────────────────
+        LogStore store({ 64, 64, 8192 });
+        auto warn = Keyed("반복되는 경고");
+        store.Append(warn);
+        store.Append(warn);
+        store.Append(warn);
+        auto info = Keyed("한 번만 나온 정보");
+        info.level = spdlog::level::info;
+        store.Append(std::move(info));
+        auto failure = Keyed("치명적인 오류  두 칸");
+        failure.level = spdlog::level::err;
+        store.Append(std::move(failure));
+        auto noise = Keyed("추적용 잡음");
+        noise.level = spdlog::level::trace;
+        store.Append(std::move(noise));
+        auto shader = Keyed("Shader COMPILE failed");
+        store.Append(std::move(shader));
+
+        editor::OutputLogView view;
+        auto delta = store.ReadDeltaSince(view.Cursor());
+        Require(delta.has_value(), "첫 조회는 전체를 준다");
+        view.Apply(*delta);
+
+        editor::OutputLogFilter filter;
+        view.Rebuild(filter);
+        Require(view.Rows().size() == 5, "Collapse 는 정체성마다 한 줄이다");
+        std::uint64_t warnGroupId = 0;
+        for (const auto& row : view.Rows())
+        {
+            const LogGroup* const group = view.FindGroup(row.groupId);
+            Require(group != nullptr, "행은 언제나 자기 그룹을 가리킨다");
+            if (group->message == "반복되는 경고")
+            {
+                warnGroupId = row.groupId;
+                Require(row.repeatCount == 3, "배지는 누적 횟수다");
+            }
+        }
+        Require(warnGroupId != 0, "반복 그룹을 찾았다");
+
+        filter.collapse = false;
+        view.Rebuild(filter);
+        Require(view.Rows().size() == 7, "Collapse 를 끄면 발생마다 한 줄이다");
+
+        filter.collapse = true;
+        filter.minimumLevel = spdlog::level::err;
+        view.Rebuild(filter);
+        Require(view.Rows().size() == 1 && view.Rows().front().level == spdlog::level::err,
+            "고른 수준 미만은 전부 걸러진다 — 옛 화면은 Trace 를 언제나 흘렸다");
+
+        filter.minimumLevel = spdlog::level::trace;
+        filter.search = "오류";
+        view.Rebuild(filter);
+        Require(view.Rows().size() == 1, "검색은 본문을 본다");
+
+        filter.search = "compile";
+        view.Rebuild(filter);
+        Require(view.Rows().size() == 1, "ASCII 는 대소문자를 무시한다");
+
+        // 검색은 **원문**을, 행 본문은 평탄화한 것을 본다. 두 칸이 그 차이다.
+        filter.search = "오류  두";
+        view.Rebuild(filter);
+        Require(view.Rows().size() == 1, "검색이 보는 것은 평탄화 이전의 원문이다");
+        const std::string rowText = view.RowText(view.Rows().front());
+        Require(rowText.find("오류 두") != std::string::npos &&
+            rowText.find("오류  두") == std::string::npos,
+            "행 본문은 접혔는데 검색은 접히기 전을 본다");
+
+        filter.search.clear();
+        view.Rebuild(filter);
+        const std::size_t before = view.Rows().size();
+        store.Append(Keyed("새로 생긴 줄"));
+        view.Apply(*store.ReadDeltaSince(view.Cursor()));
+        view.Rebuild(filter);
+        Require(view.Rows().size() == before + 1,
+            "필터가 같아도 변경분이 들어오면 행을 다시 센다");
+
+        view.Select({ warnGroupId, 0 });
+        Require(view.Selection().groupId == warnGroupId, "선택은 id 로 산다");
+        view.Select({ 999999, 0 });
+        Require(view.Selection().IsEmpty(), "없는 그룹은 선택되지 않는다");
+
+        // 그룹이 퇴거되면 선택도 화면도 그것을 놓아야 한다.
+        LogStore narrow({ 8, 2, 8192 });
+        editor::OutputLogView narrowView;
+        narrow.Append(Keyed("첫째"));
+        narrowView.Apply(*narrow.ReadDeltaSince(narrowView.Cursor()));
+        editor::OutputLogFilter plain;
+        narrowView.Rebuild(plain);
+        const std::uint64_t firstId = narrowView.Rows().front().groupId;
+        narrowView.Select({ firstId, 0 });
+        Require(!narrowView.Selection().IsEmpty(), "퇴거 전에는 선택이 선다");
+        narrow.Append(Keyed("둘째"));
+        narrow.Append(Keyed("셋째"));
+        narrowView.Apply(*narrow.ReadDeltaSince(narrowView.Cursor()));
+        narrowView.Rebuild(plain);
+        Require(narrowView.FindGroup(firstId) == nullptr, "퇴거된 그룹은 화면에서도 사라진다");
+        Require(narrowView.Selection().IsEmpty(), "퇴거된 그룹의 선택은 비워진다");
+        Require(narrowView.Rows().size() == 2, "남은 정체성만 그린다");
+
+        // 배지는 보관 이력이 아니라 **누적 횟수**다. 둘이 같은 값이면 무엇을
+        // 싣든 통과하므로, 갈라지는 자리를 따로 만들어 잰다.
+        LogStore spamStore({ 3, 8, 8192 });
+        editor::OutputLogView spamView;
+        for (int index = 0; index < 20; ++index) spamStore.Append(Keyed("프레임마다 실패"));
+        spamView.Apply(*spamStore.ReadDeltaSince(spamView.Cursor()));
+        spamView.Rebuild(plain);
+        Require(spamView.Rows().size() == 1, "반복은 Collapse 에서 한 줄이다");
+        Require(spamView.Rows().front().repeatCount == 20,
+            "배지는 누적 20 이다 — 보관 이력 3 이 아니다");
+        editor::OutputLogFilter expanded = plain;
+        expanded.collapse = false;
+        spamView.Rebuild(expanded);
+        Require(spamView.Rows().size() == 3, "Collapse 를 끄면 보관된 이력만 보인다");
+
+        std::puts("PASS presentation: 글자 폭 말줄임, 행 평탄화, 수준 필터, 검색, Collapse, 선택 수명");
+    }
+
     void CheckDelta()
     {
         const LogStoreLimits limits{ 6, 3, 4096 };
@@ -563,6 +750,7 @@ int main(int argc, char** argv)
         CheckRetentionAndClear();
         CheckGrouping();
         CheckDelta();
+        CheckOutputLogPresentation();
         CheckConcurrentAccess(false);
         CheckConcurrentAccess(true);
         CheckFileSinkIndependence(argv[1]);

@@ -92,6 +92,13 @@ public:
 	{
 		return m_logStore->ReadSnapshotIfChanged(revision);
 	}
+
+	// 화면이 프레임마다 전체를 받지 않도록 변경분만 준다. 커서는 돌려받은
+	// 것을 그대로 다음 호출에 넘긴다.
+	std::optional<LogDelta> GetLogDeltaSince(LogCursor cursor) const
+	{
+		return m_logStore->ReadDeltaSince(cursor);
+	}
 };
 
 static auto Debug = DebugClass::GetInstance();
