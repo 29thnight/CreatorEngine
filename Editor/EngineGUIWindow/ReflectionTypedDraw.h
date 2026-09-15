@@ -23,8 +23,10 @@
 #include "ReflectionImGuiHelper.h"
 #include "InspectorDrawerList.h" // InspectorDrawer<T> 특수화 모음 — 분기보다 먼저 본다
 #include "EditorPropertyRow.h"   // 공통 배치 계약 (W2-I2)
-#include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf 재사용
+#include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf·EncodeMapKey 재사용
 #include <cstddef>
+#include <algorithm> // iter_swap — 임의 접근이 없는 컨테이너의 재배열
+#include <iterator>  // prev·next·begin
 
 static_assert(std::is_standard_layout_v<math::vector2>);
 static_assert(std::is_standard_layout_v<math::vector3>);
@@ -162,11 +164,15 @@ namespace Meta::TypedDraw
         ImGui::PopID();
     }
 
-    // 스칼라 원소 벡터 편집기 — 레거시 블록(Add/Remove/개별 위젯/^v 재배열)과
-    // 동일한 조작을 원본 벡터에 직접 한다(접힘 조기 검사 포함, CT1 규칙 유지).
-    template<class E, class WidgetFn>
-    inline void DrawVectorEditor(const char* idName, const char* label,
-        std::vector<E>& vec, E defaultValue, WidgetFn&& widget)
+    // 스칼라 원소 시퀀스 편집기 — 레거시 블록(Add/Remove/개별 위젯/^v 재배열)과
+    // 동일한 조작을 원본 컨테이너에 직접 한다(접힘 조기 검사 포함, CT1 규칙 유지).
+    //
+    // 예전에는 서명이 `std::vector<E>&` 였다. 컨테이너 이름을 서명에 박으면
+    // deque·list 는 같은 조작을 할 수 있는데도 못 들어온다 — 직렬화기가 range
+    // 일반화로 걷어 낸 것과 같은 제약이 여기 남아 있었다.
+    template<class Container, class E, class WidgetFn>
+    inline void DrawSequenceEditor(const char* idName, const char* label,
+        Container& vec, E defaultValue, WidgetFn&& widget)
     {
         ImGui::PushID(idName);
         if (ImGui::CollapsingHeader(label))
@@ -185,22 +191,26 @@ namespace Meta::TypedDraw
             }
 
             const int size = static_cast<int>(vec.size());
-            for (int i = 0; i < size; ++i)
+            // 임의 접근이 없는 컨테이너(list)도 같은 조작을 받아야 하므로
+            // 인덱스가 아니라 반복자로 걷는다.
+            auto cursor = std::begin(vec);
+            for (int i = 0; i < size; ++i, ++cursor)
             {
                 ImGui::PushID(i);
-                widget(i, vec[static_cast<size_t>(i)]);
+                widget(i, *cursor);
 
                 if (size > 0)
                 {
+                    auto neighbour = cursor;
                     ImGui::SameLine();
                     if (ImGui::Button("^") && i > 0)
                     {
-                        std::swap(vec[static_cast<size_t>(i)], vec[static_cast<size_t>(i) - 1]);
+                        std::iter_swap(cursor, std::prev(neighbour));
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("v") && i < size - 1)
                     {
-                        std::swap(vec[static_cast<size_t>(i)], vec[static_cast<size_t>(i) + 1]);
+                        std::iter_swap(cursor, std::next(neighbour));
                     }
                 }
                 ImGui::PopID();
@@ -208,6 +218,120 @@ namespace Meta::TypedDraw
         }
         ImGui::PopID();
     }
+
+    // ── 컨테이너 원소 하나의 값 위젯 ──────────────────────────────────────
+    //
+    // 멤버와 **같은 문**으로 들어간다: `InspectorDrawer<E>` 특수화가 먼저고,
+    // 없으면 기본 위젯이다. 원소만 다른 문을 쓰면, 포크가 자기 타입에 붙인
+    // 드로어가 컨테이너 안에서만 조용히 무시된다 — 확장점의 계약이 반쪽이 된다.
+    //
+    // 기존 다섯 갈래(string·int·float·vector2·vector3)의 위젯은 그대로 둔다.
+    // 실측상 등록된 필드가 있는 것은 `vector<float>`(3건)·`vector<std::string>`
+    // (2건) 둘뿐이고 그 둘에는 드로어가 없으므로, 이 문을 앞에 세워도 실제로
+    // 그려지는 화면은 바뀌지 않는다.
+    template<class E>
+    inline bool DrawContainerElement(const char* id, E& value)
+    {
+        if constexpr (editor::inspector::HasInspectorDrawer<E>)
+        {
+            return editor::inspector::InspectorDrawer<E>::Draw(id, value);
+        }
+        else if constexpr (std::is_same_v<E, std::string>)
+        {
+            char buffer[128];
+            strncpy_s(buffer, sizeof(buffer), value.c_str(), _TRUNCATE);
+            buffer[sizeof(buffer) - 1] = '\0';
+            if (ImGui::InputText(id, buffer, sizeof(buffer)))
+            {
+                value = std::string(buffer);
+                return true;
+            }
+            return false;
+        }
+        else if constexpr (std::is_same_v<E, HashingString>)
+        {
+            char buffer[128];
+            strncpy_s(buffer, sizeof(buffer), value.ToString().c_str(), _TRUNCATE);
+            buffer[sizeof(buffer) - 1] = '\0';
+            if (ImGui::InputText(id, buffer, sizeof(buffer)))
+            {
+                value = HashingString(std::string_view{ buffer });
+                return true;
+            }
+            return false;
+        }
+        else if constexpr (std::is_same_v<E, bool>)
+        {
+            return ImGui::Checkbox(id, &value);
+        }
+        else if constexpr (std::is_same_v<E, int>)
+        {
+            return ImGui::InputInt(id, &value);
+        }
+        else if constexpr (std::is_same_v<E, float>)
+        {
+            return ImGui::InputFloat(id, &value);
+        }
+        else if constexpr (std::is_enum_v<E>)
+        {
+            DrawEnumCombo(id, id, value);
+            return false; // enum 콤보는 멤버 쪽과 같게 즉시 대입한다
+        }
+        else if constexpr (std::is_same_v<E, math::vector2>)
+        {
+            return ImGui::InputFloat2(id, &value.x);
+        }
+        else if constexpr (std::is_same_v<E, math::vector3>)
+        {
+            return ImGui::InputFloat3(id, &value.x);
+        }
+        else if constexpr (std::is_same_v<E, math::vector4>
+            || std::is_same_v<E, math::quaternion>)
+        {
+            return ImGui::InputFloat4(id, &value.x);
+        }
+        else if constexpr (std::is_same_v<E, math::color>)
+        {
+            return ImGui::ColorEdit4(id, &value.r);
+        }
+        else if constexpr (std::is_same_v<E, HashedGuid>)
+        {
+            // 손으로 고칠 값이 아니다 — 보여 주기만 한다. `[no widget]` 보다
+            // 낫다: `vector<HashedGuid>`(BTBuildNode::Children)는 그 자리에
+            // 무엇이 걸려 있는지가 읽을 거리의 전부다.
+            ImGui::TextDisabled("%zu", value.m_ID_Data);
+            return false;
+        }
+        else if constexpr (std::is_arithmetic_v<E>)
+        {
+            // uint16_t·uint32_t·size_t 처럼 폭만 다른 정수들. 예전에는 갈래가
+            // 없어 `m_keywordSelections`(vector<uint16_t>) 같은 필드가 인스펙터에
+            // 아예 나타나지 않았다.
+            double scratch = static_cast<double>(value);
+            if (ImGui::InputDouble(id, &scratch))
+            {
+                value = static_cast<E>(scratch);
+                return true;
+            }
+            return false;
+        }
+        else
+        {
+            ImGui::TextDisabled("[no widget]");
+            return false;
+        }
+    }
+
+    /// 원소를 제자리에서 편집할 수 있는 타입인가(그릴 수만 있는 것과 구분한다).
+    template<class E>
+    inline constexpr bool kElementHasWidget =
+        editor::inspector::HasInspectorDrawer<E>
+        || std::is_arithmetic_v<E> || std::is_enum_v<E>
+        || std::is_same_v<E, std::string> || std::is_same_v<E, HashingString>
+        || std::is_same_v<E, HashedGuid>
+        || std::is_same_v<E, math::vector2> || std::is_same_v<E, math::vector3>
+        || std::is_same_v<E, math::vector4> || std::is_same_v<E, math::quaternion>
+        || std::is_same_v<E, math::color>;
 
     template<meta::reflectable T>
     void DrawTypedObject(T& obj);
@@ -579,51 +703,127 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             DrawEnumCombo(kValueId, name, value);
         }
-        else if constexpr (std::is_same_v<MemberT, std::vector<std::string>>)
+        // ── 컨테이너 (range 일반화) ────────────────────────────────────────
+        //
+        // 예전에는 `std::vector<E>` 다섯 벌을 구체 타입 비교로 적어 두었다.
+        // 실측하면 그중 등록된 필드가 있는 것은 float·string 둘뿐이고 나머지
+        // 셋(int·vector2·vector3)은 **죽은 분기**였다. 그리고 목록 밖의
+        // 컨테이너는 마지막 else 로 떨어져 조용히 안 그려졌다 — `vector<uint16_t>`
+        // 도, `vector<AssetEntry>` 처럼 reflect() 원소를 담은 벡터 일곱 종도
+        // 인스펙터에 아예 나타나지 않았다.
+        //
+        // 직렬화기와 같은 판정(meta::container)으로 갈아 끼운다. 이름이 아니라
+        // 능력으로 고르므로 deque·list·array·set 이 같은 길로 들어온다.
+        else if constexpr (meta::container::SequenceRange<MemberT>
+            && !editor::inspector::HasInspectorDrawer<MemberT>)
         {
-            DrawVectorEditor(name, label, value, std::string{},
-                [](int i, std::string& s)
+            using E = meta::container::ValueT<MemberT>;
+
+            if constexpr (std::is_pointer_v<E> || is_shared_ptr_v<E> || is_unique_ptr_v<E>)
+            {
+                // 포인터 원소 목록(Entity::m_components 등)은 여기 몫이 아니다 —
+                // 소유자 인스펙터가 따로 그린다. 종전과 같이 넘어간다.
+            }
+            else if constexpr (meta::container::ConstElementRange<MemberT>)
+            {
+                // std::set 계열은 원소를 const 로만 내준다. 제자리 편집이
+                // 성립하지 않으므로(키를 고치면 정렬이 깨진다) 읽기로만 낸다.
+                ImGui::PushID(name);
+                if (ImGui::CollapsingHeader(label))
                 {
-                    char buf[128];
-                    strncpy_s(buf, sizeof(buf), s.c_str(), _TRUNCATE);
-                    buf[sizeof(buf) - 1] = '\0';
-                    if (ImGui::InputText(("##" + std::to_string(i)).c_str(), buf, sizeof(buf)))
+                    int index = 0;
+                    for (const E& element : value)
                     {
-                        s = std::string(buf);
+                        ImGui::PushID(index++);
+                        E scratch = element;
+                        const DisabledScope readOnly{ true };
+                        DrawContainerElement(kValueId, scratch);
+                        ImGui::PopID();
                     }
-                });
-        }
-        else if constexpr (std::is_same_v<MemberT, std::vector<int>>)
-        {
-            DrawVectorEditor(name, label, value, 0,
-                [](int i, int& v)
+                }
+                ImGui::PopID();
+            }
+            else if constexpr (kElementHasWidget<E>
+                && meta::container::BackInsertable<MemberT>)
+            {
+                DrawSequenceEditor(name, label, value, E{},
+                    [](int, E& element)
+                    {
+                        DrawContainerElement(kValueId, element);
+                    });
+            }
+            else
+            {
+                // 크기가 고정된 배열이거나(Add/Remove 가 성립하지 않는다),
+                // 원소가 reflect() 타입이라 한 줄 위젯으로 안 접히는 경우.
+                ImGui::PushID(name);
+                if (ImGui::CollapsingHeader(label))
                 {
-                    ImGui::InputInt(("##" + std::to_string(i)).c_str(), &v);
-                });
+                    int index = 0;
+                    for (auto& element : value)
+                    {
+                        ImGui::PushID(index);
+                        if constexpr (kElementHasWidget<E>)
+                        {
+                            DrawContainerElement(kValueId, element);
+                        }
+                        else if constexpr (meta::reflectable<E>)
+                        {
+                            if (editor::widgets::property_group_header(
+                                std::to_string(index).c_str()))
+                            {
+                                DrawTypedObject(element);
+                            }
+                        }
+                        else
+                        {
+                            ImGui::TextDisabled("[%d] [no widget]", index);
+                        }
+                        ImGui::PopID();
+                        ++index;
+                    }
+                }
+                ImGui::PopID();
+            }
         }
-        else if constexpr (std::is_same_v<MemberT, std::vector<float>>)
+        else if constexpr (meta::container::KeyedRange<MemberT>
+            && !editor::inspector::HasInspectorDrawer<MemberT>)
         {
-            DrawVectorEditor(name, label, value, 0.0f,
-                [](int i, float& v)
+            using M = meta::container::MappedT<MemberT>;
+
+            // 키는 줄의 이름이 된다. 키 자체를 고치는 길은 두지 않는다 —
+            // 맵에서 키를 바꾸는 것은 항목을 지우고 새로 넣는 일이라, 같은
+            // 프레임에 순회를 무너뜨린다. 항목 추가·삭제도 같은 이유로 없다.
+            ImGui::PushID(name);
+            if (ImGui::CollapsingHeader(label))
+            {
+                int index = 0;
+                for (auto& entry : value)
                 {
-                    ImGui::InputFloat(("##" + std::to_string(i)).c_str(), &v);
-                });
-        }
-        else if constexpr (std::is_same_v<MemberT, std::vector<math::vector2>>)
-        {
-            DrawVectorEditor(name, label, value, math::vector2{ 0.f, 0.f },
-                [](int i, math::vector2& v)
-                {
-                    ImGui::InputFloat2(("##" + std::to_string(i)).c_str(), &v.x);
-                });
-        }
-        else if constexpr (std::is_same_v<MemberT, std::vector<math::vector3>>)
-        {
-            DrawVectorEditor(name, label, value, math::vector3{ 0.f, 0.f, 0.f },
-                [](int i, math::vector3& v)
-                {
-                    ImGui::InputFloat3(("##" + std::to_string(i)).c_str(), &v.x);
-                });
+                    ImGui::PushID(index++);
+                    const std::string keyLabel =
+                        Meta::Typed::EncodeMapKey(entry.first);
+                    if constexpr (kElementHasWidget<M>)
+                    {
+                        ImGui::SetNextItemWidth(
+                            editor::widgets::begin_property_line(keyLabel.c_str(), layout));
+                        DrawContainerElement(kValueId, entry.second);
+                    }
+                    else if constexpr (meta::reflectable<M>)
+                    {
+                        if (editor::widgets::property_group_header(keyLabel.c_str()))
+                        {
+                            DrawTypedObject(entry.second);
+                        }
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("%s: [no widget]", keyLabel.c_str());
+                    }
+                    ImGui::PopID();
+                }
+            }
+            ImGui::PopID();
         }
         else if constexpr (std::is_pointer_v<MemberT> || is_shared_ptr_v<MemberT>)
         {

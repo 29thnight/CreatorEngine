@@ -25,12 +25,39 @@
 // 수정 1건(역직렬화 측만, 골든 무영향): HashedGuid를 as<uint32_t>로 읽던
 // 절단을 as<size_t>로 — typeID가 FNV64(CT4-b)가 된 뒤로 32비트 초과 값을
 // 읽으면 BadConversion이 나는 잠재 로드 버그였다.
+//
+// ── range 일반화 (컨테이너 축) ────────────────────────────────────────────
+//
+// 컨테이너 판정이 `is_vector_v` 에서 형상 판정(ReflectionContainer.h)으로 옮겨
+// 왔다. **레거시 파리티는 그대로다** — std::vector 가 지나던 길을 한 글자도
+// 바꾸지 않고, 그 길을 다른 컨테이너도 지나게 했을 뿐이다:
+//
+//   시퀀스 (vector·deque·list·set·array) → YAML 시퀀스, 빈 것은 `~`
+//   맵     (map·unordered_map)           → YAML 맵,   빈 것은 `~`
+//
+// 빈 표기를 `~` 로 **모든 시퀀스에 같게** 거는 것이 계약이다. 빈 vector 만 `~`
+// 고 빈 set 은 `[]` 가 되면, 같은 자리에서 컨테이너를 바꾸는 것만으로 파일
+// 형상이 갈린다.
+//
+// 이 이행에서 닫힌 구멍 셋(전부 레거시부터 있던 것):
+//   ① 시퀀스 원소 표기가 멤버 표기와 따로 자라 math::rect·math::color 갈래가
+//      없었다 — `std::vector<math::rect>` 는 필드로 실으면 컴파일이 깨졌다.
+//   ② 시퀀스 원소에 enum 갈래가 없었다 — `std::vector<LightType>` 은 저장
+//      시점에 런타임 로그만 남기고 값을 통째로 잃었다.
+//   ③ 원소가 미지원일 때 런타임 로그로 넘어가던 자리를 C1 과 같은 기준으로
+//      static_assert 로 올렸다.
+//
+// 맵의 키는 값보다 좁다(YamlMapKey): 복합 스칼라는 한 문장으로 안 접히고,
+// 부동소수는 표기 왕복이 정밀도에 걸려 키가 조용히 갈린다. 포인터를 값으로 갖는
+// 맵은 거부한다 — 시퀀스의 포인터 원소는 SceneManager 가 복원하지만 맵에는 그
+// 복원자가 없어 "적기만 하고 못 읽는" 한쪽 방향이 된다.
 #include "ReflectionYml.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "AuthoringScalarConvert.h" // D3-b-2b-1a
 #include "AuthoringReadNode.h" // D3-b-2b-1b
 #include <limits>
 #include "ReflectionMeta.h"
+#include "ReflectionContainer.h" // range 일반화 — is_vector_v 를 대신하는 형상 판정
 #include <mathematics/color.hpp>
 #include <mathematics/rect.hpp>
 #include <mathematics/matrix4x4.hpp>
@@ -69,67 +96,84 @@ namespace Meta::Typed
         node.Child("w").SetScalar(w);
     }
 
+    // ── 스칼라는 "어느 노드에 적을 것인가" 하나로 통일한다 ────────────────
+    //
+    // 예전에는 스칼라를 적는 자리가 둘이었다: 멤버용 `EmitScalar(node, name, v)`
+    // 와 벡터 원소용 `EmitVectorElement(arrayNode, v)`. 같은 타입의 표기를 두
+    // 벌 적고 있었고, 실제로 **한쪽만 자라 있었다** — 원소 쪽에는 math::rect 와
+    // math::color 갈래가 없어서 `std::vector<math::rect>` 는 필드로 실으면
+    // ryml save 로 떨어져 컴파일이 깨졌다(레거시부터 그랬다).
+    //
+    // 정본을 "대상 노드에 적는다" 하나로 두면 멤버·시퀀스 원소·맵 값 셋이 같은
+    // 표기를 공유한다. 앞의 구멍은 갈래를 더해서가 아니라 **출처가 하나가 되면서**
+    // 닫힌다.
+    //
     // 기본 산술·문자열 — WriteNode의 canonical scalar writer.
     template<class T>
         requires (std::is_arithmetic_v<T> && !std::is_enum_v<T>)
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const T& v)
+    inline void EmitScalarInto(Authoring::WriteNode target, const T& v)
     {
-        node.Child(name).SetScalar(v);
+        target.SetScalar(v);
     }
 
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const std::string& v) { node.Child(name).SetScalar(v); }
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const HashingString& v) { node.Child(name).SetScalar(v.ToString()); }
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const HashedGuid& v) { node.Child(name).SetScalar(v.m_ID_Data); }
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const file::path& v) { node.Child(name).SetScalar(v.string()); }
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const FileGuid& v) { node.Child(name).SetScalar(v.ToString()); }
+    inline void EmitScalarInto(Authoring::WriteNode target, const std::string& v) { target.SetScalar(v); }
+    inline void EmitScalarInto(Authoring::WriteNode target, const HashingString& v) { target.SetScalar(v.ToString()); }
+    inline void EmitScalarInto(Authoring::WriteNode target, const HashedGuid& v) { target.SetScalar(v.m_ID_Data); }
+    inline void EmitScalarInto(Authoring::WriteNode target, const file::path& v) { target.SetScalar(v.string()); }
+    inline void EmitScalarInto(Authoring::WriteNode target, const FileGuid& v) { target.SetScalar(v.ToString()); }
 
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::vector2& v)
+    inline void EmitScalarInto(Authoring::WriteNode target, const math::vector2& v)
     {
-        EmitFlowMap2(node.Child(name), "x", v.x, "y", v.y);
+        EmitFlowMap2(target, "x", v.x, "y", v.y);
     }
 
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::vector3& v)
+    inline void EmitScalarInto(Authoring::WriteNode target, const math::vector3& v)
     {
-        EmitFlowMap3(node.Child(name), v.x, v.y, v.z);
+        EmitFlowMap3(target, v.x, v.y, v.z);
     }
 
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::color& v)
+    inline void EmitScalarInto(Authoring::WriteNode target, const math::color& v)
     {
-        auto child = node.Child(name);
-        child.SetMap(true);
-        child.Child("r").SetScalar(v.r);
-        child.Child("g").SetScalar(v.g);
-        child.Child("b").SetScalar(v.b);
-        child.Child("a").SetScalar(v.a);
+        target.SetMap(true);
+        target.Child("r").SetScalar(v.r);
+        target.Child("g").SetScalar(v.g);
+        target.Child("b").SetScalar(v.b);
+        target.Child("a").SetScalar(v.a);
     }
 
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::vector4& v)
+    inline void EmitScalarInto(Authoring::WriteNode target, const math::vector4& v)
     {
-        EmitFlowMap4(node.Child(name), v.x, v.y, v.z, v.w);
+        EmitFlowMap4(target, v.x, v.y, v.z, v.w);
     }
 
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::quaternion& v)
+    inline void EmitScalarInto(Authoring::WriteNode target, const math::quaternion& v)
     {
-        EmitFlowMap4(node.Child(name), v.x, v.y, v.z, v.w);
+        EmitFlowMap4(target, v.x, v.y, v.z, v.w);
     }
 
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::rect& v)
+    inline void EmitScalarInto(Authoring::WriteNode target, const math::rect& v)
     {
-        auto child = node.Child(name);
-        child.SetMap(true);
-        child.Child("x").SetScalar(v.x);
-        child.Child("y").SetScalar(v.y);
-        child.Child("width").SetScalar(v.width);
-        child.Child("height").SetScalar(v.height);
+        target.SetMap(true);
+        target.Child("x").SetScalar(v.x);
+        target.Child("y").SetScalar(v.y);
+        target.Child("width").SetScalar(v.width);
+        target.Child("height").SetScalar(v.height);
     }
 
-    inline void EmitScalar(Authoring::WriteNode node, const char* name, const math::matrix4x4& v)
+    inline void EmitScalarInto(Authoring::WriteNode target, const math::matrix4x4& v)
     {
-        auto child = node.Child(name);
-        child.SetSequence(true);
+        target.SetSequence(true);
         for (int row = 0; row < 4; ++row)
             for (int column = 0; column < 4; ++column)
-                child.Append().SetScalar(v.m[row][column]);
+                target.Append().SetScalar(v.m[row][column]);
+    }
+
+    // 멤버 자리 — 키를 열고 그 노드에 정본을 적는다. 예전 오버로드 13벌이 저마다
+    // `node.Child(name)`을 열던 자리가 이 한 줄로 접힌다.
+    template<class T>
+    inline void EmitScalar(Authoring::WriteNode node, const char* name, const T& v)
+    {
+        EmitScalarInto(node.Child(name), v);
     }
 
     // 정확 타입 목록 — 오버로드 가시성(requires{EmitScalar(...)})으로 정의하면
@@ -272,37 +316,162 @@ namespace Meta::Typed
     // 즉시 발화하므로 템플릿 매개변수에 의존시킨다.
     template<class> inline constexpr bool kUnsupportedForYaml = false;
 
-    // 벡터의 스칼라 원소 emitter — VectorElementToYaml 파리티(Flow + 개별 push)
+    // 시퀀스의 스칼라 원소 — VectorElementToYaml 파리티(Flow + 개별 push).
+    //
+    // 표기는 EmitScalarInto 가 소유하고 여기 남은 것은 **Flow 규칙 하나**다:
+    // 스칼라 원소 시퀀스만 flow 로 적는다(객체 원소는 블록). 그 한 줄이 이
+    // 함수의 존재 이유 전부다.
     template<YamlScalar T>
-    inline void EmitVectorElement(Authoring::WriteNode arrayNode, const T& v)
+    inline void EmitSequenceElement(Authoring::WriteNode arrayNode, const T& v)
     {
         arrayNode.SetFlow();
-        if constexpr (std::is_same_v<T, HashingString>) { arrayNode.Append().SetScalar(v.ToString()); }
-        else if constexpr (std::is_same_v<T, HashedGuid>) { arrayNode.Append().SetScalar(v.m_ID_Data); }
-        else if constexpr (std::is_same_v<T, file::path>) { arrayNode.Append().SetScalar(v.string()); }
-        else if constexpr (std::is_same_v<T, FileGuid>) { arrayNode.Append().SetScalar(v.ToString()); }
-        else if constexpr (std::is_same_v<T, math::matrix4x4>)
+        EmitScalarInto(arrayNode.Append(), v);
+    }
+
+    // ── 맵 키 — 값이 아니라 **키 자리**의 계약 ────────────────────────────
+    //
+    // YAML 맵의 키는 문자열 하나로 접혀야 한다. 그래서 값으로는 실을 수 있는
+    // 스칼라라도 키로는 못 쓰는 것이 있다:
+    //
+    //   · 복합 스칼라(vector3·color·rect·matrix)는 애초에 한 문장으로 안 접힌다.
+    //   · 부동소수는 접히긴 하는데 **표기 왕복이 정밀도에 걸린다** — 키가 조용히
+    //     갈리면 맵 하나가 통째로 다른 맵이 되고, 그 사고는 값이 틀리는 것보다
+    //     훨씬 늦게 발견된다. 접을 수 있다는 이유로 허용하지 않는다.
+    //
+    // 허용 밖은 소비 측 static_assert 가 선언 시점에 잡는다.
+    template<class T>
+    concept YamlMapKey =
+        std::is_integral_v<T>
+        || std::is_enum_v<T>
+        || std::is_same_v<std::remove_cv_t<T>, std::string>
+        || std::is_same_v<std::remove_cv_t<T>, HashingString>
+        || std::is_same_v<std::remove_cv_t<T>, HashedGuid>
+        || std::is_same_v<std::remove_cv_t<T>, file::path>
+        || std::is_same_v<std::remove_cv_t<T>, FileGuid>;
+
+    template<YamlMapKey K>
+    inline std::string EncodeMapKey(const K& key)
+    {
+        using U = std::remove_cv_t<K>;
+        if constexpr (std::is_same_v<U, bool>) { return key ? "true" : "false"; }
+        else if constexpr (std::is_enum_v<U>)
         {
-            auto element = arrayNode.Append();
-            element.SetSequence(true);
-            for (int row = 0; row < 4; ++row)
-                for (int column = 0; column < 4; ++column)
-                    element.Append().SetScalar(v.m[row][column]);
+            return std::to_string(
+                static_cast<long long>(static_cast<std::underlying_type_t<U>>(key)));
         }
-        else if constexpr (std::is_same_v<T, math::vector2>)
+        else if constexpr (std::is_integral_v<U>) { return std::to_string(key); }
+        else if constexpr (std::is_same_v<U, std::string>) { return key; }
+        else if constexpr (std::is_same_v<U, HashingString>) { return key.ToString(); }
+        else if constexpr (std::is_same_v<U, HashedGuid>) { return std::to_string(key.m_ID_Data); }
+        else if constexpr (std::is_same_v<U, file::path>) { return key.string(); }
+        else { return key.ToString(); } // FileGuid
+    }
+
+    /// 실패를 예외가 아니라 값으로 돌려준다 — 키 하나가 깨졌다고 씬 로드를
+    /// 통째로 날리지 않기 위해서다. 호출부가 로그를 남기고 그 항목만 건너뛴다.
+    template<YamlMapKey K>
+    inline bool DecodeMapKey(std::string_view raw, K& out)
+    {
+        using U = std::remove_cv_t<K>;
+        if constexpr (std::is_same_v<U, bool>)
         {
-            EmitFlowMap2(arrayNode.Append(), "x", v.x, "y", v.y);
+            out = ("true" == raw || "1" == raw);
+            return true;
         }
-        else if constexpr (std::is_same_v<T, math::vector3>)
+        else if constexpr (std::is_enum_v<U>)
         {
-            EmitFlowMap3(arrayNode.Append(), v.x, v.y, v.z);
+            std::underlying_type_t<U> underlying{};
+            if (!ScalarDetail::TryConvert(raw, underlying)) return false;
+            out = static_cast<U>(underlying);
+            return true;
         }
-        else if constexpr (std::is_same_v<T, math::vector4>
-            || std::is_same_v<T, math::quaternion>)
+        else if constexpr (std::is_integral_v<U>)
         {
-            EmitFlowMap4(arrayNode.Append(), v.x, v.y, v.z, v.w);
+            return ScalarDetail::TryConvert(raw, out);
         }
-        else { arrayNode.Append().SetScalar(v); }
+        else if constexpr (std::is_same_v<U, std::string>)
+        {
+            out.assign(raw);
+            return true;
+        }
+        else if constexpr (std::is_same_v<U, HashingString>)
+        {
+            out = HashingString(std::string(raw));
+            return true;
+        }
+        else if constexpr (std::is_same_v<U, HashedGuid>)
+        {
+            std::size_t value{};
+            if (!ScalarDetail::TryConvert(raw, value)) return false;
+            out = HashedGuid(value);
+            return true;
+        }
+        else if constexpr (std::is_same_v<U, file::path>)
+        {
+            out = file::path(std::string(raw));
+            return true;
+        }
+        else
+        {
+            // FileGuid::FromString 은 Uuid::Parse 로 던진다. 키 하나의 오타가
+            // 로드 전체를 끊지 않도록 여기서 값으로 바꾼다.
+            try { out = FileGuid(std::string(raw)); }
+            catch (const std::exception&) { return false; }
+            return true;
+        }
+    }
+
+    // ── 순서 계약: 스칼라가 range 판정보다 앞선다 ─────────────────────────
+    //
+    // ReflectionContainer.h 가 std::string·path 를 이미 걸러 내지만, 그 한 겹에
+    // 전부를 걸지 않는다. YamlScalar 에 **앞으로 추가될** 어떤 타입이 우연히
+    // range 여도(begin/end 를 가진 고정 크기 수학 타입 같은 것) 스칼라로 남아야
+    // 한다. 아래 두 콘셉트가 그 우선순위를 타입 판정 자체에 박아 둔다 —
+    // if/else 사슬의 줄 순서에 기대면 누군가 분기를 옮기는 순간 무너진다.
+    template<class T>
+    concept SerializedAsKeyedRange = !YamlScalar<T> && meta::container::KeyedRange<T>;
+
+    template<class T>
+    concept SerializedAsSequence = !YamlScalar<T> && meta::container::SequenceRange<T>;
+
+    namespace canary
+    {
+        // 스칼라 13종이 하나도 range 로 새지 않는다는 것을, 판정하는 자리에서
+        // 직접 붙든다. 런타임 게이트는 생성되지 않은 분기를 볼 수 없다.
+        static_assert(!SerializedAsSequence<std::string>);
+        static_assert(!SerializedAsSequence<file::path>);
+        static_assert(!SerializedAsSequence<HashingString>);
+        static_assert(!SerializedAsSequence<HashedGuid>);
+        static_assert(!SerializedAsSequence<FileGuid>);
+        static_assert(!SerializedAsSequence<math::vector2>);
+        static_assert(!SerializedAsSequence<math::vector3>);
+        static_assert(!SerializedAsSequence<math::vector4>);
+        static_assert(!SerializedAsSequence<math::quaternion>);
+        static_assert(!SerializedAsSequence<math::color>);
+        static_assert(!SerializedAsSequence<math::rect>);
+        static_assert(!SerializedAsSequence<math::matrix4x4>);
+        static_assert(!SerializedAsSequence<float> && !SerializedAsSequence<int>);
+
+        // 시퀀스와 맵은 서로 배타다 — 한 타입이 둘 다면 분기 순서가 결과를 정한다.
+        static_assert(!(SerializedAsSequence<std::vector<int>>
+            && SerializedAsKeyedRange<std::vector<int>>));
+        static_assert(SerializedAsSequence<std::vector<int>>);
+
+        // 부동소수 키 금지가 실제로 서 있는가. 값으로는 실리는 타입이라
+        // "스칼라면 키도 된다"로 새기 쉬운 자리다.
+        static_assert(!YamlMapKey<float> && !YamlMapKey<double>);
+        static_assert(!YamlMapKey<math::vector3>);
+        static_assert(YamlMapKey<std::string> && YamlMapKey<int>);
+
+        // TypeTrait 의 value_type 계보(IsCopyableForProperty)와 여기 range 계보가
+        // 같은 답을 내는가. 갈리면 콘솔 세터가 "복사 가능"으로 오판해 any_cast
+        // 인스턴스화에서 깨진다 — K2 스테이지 A 에서 실제로 밟은 함정이다.
+        // 맵·집합·고정 배열까지 포함한 전수 대조는 reflect.container.roundtrip
+        // 프로브가 든다(그쪽 TU 가 <map>/<set>/<array> 를 이미 물고 있다).
+        static_assert(!IsCopyableForProperty<std::vector<std::unique_ptr<int>>>(),
+            "vector<unique_ptr<T>> 가 복사 가능으로 판정됐다");
+        static_assert(IsCopyableForProperty<std::vector<int>>());
+        static_assert(IsCopyableForProperty<std::string>());
     }
 
     // 포인터류의 피지시 타입 — conditional_t는 양팔을 모두 인스턴스화하므로
@@ -426,21 +595,27 @@ namespace Meta::Typed
     {
         using T = std::remove_cv_t<V>;
 
-        if constexpr (is_vector_v<T>)
+        if constexpr (SerializedAsSequence<T>)
         {
-            using E = VectorElementTypeT<T>;
+            using E = meta::container::ValueT<T>;
             const Authoring::WriteNode arrayNode = node.Child(name);
 			// yaml-cpp의 기본 Node에 아무 원소도 push하지 않은 뒤 맵에 넣으면
 			// `~`가 된다. 빈 시퀀스 `[]`로 바꾸면 골든과 구 reader의 널 의미가
 			// 달라지므로 legacy 표기를 명시 보존한다.
-			if (value.empty())
+			//
+			// range 일반화 이후에도 이 규칙은 **모든 시퀀스에 같게** 건다. 빈
+			// vector 만 `~`고 빈 set 은 `[]`가 되면, 같은 자리에서 컨테이너를
+			// 바꾸는 것만으로 파일 형상이 갈린다.
+			if (std::ranges::empty(value))
 			{
 				arrayNode.SetNull();
 				return;
 			}
             arrayNode.SetSequence();
 
-            for (auto& elem : value)
+            // std::vector<bool> 의 원소 참조는 프록시 prvalue 라 `auto&` 로 못
+            // 묶는다. ElementRefT 가 묶을 수 있으면 참조, 아니면 값으로 받는다.
+            for (meta::container::ElementRefT<T> elem : value)
             {
                 // K2 스테이지 A: is_unique_ptr_v 병기 — Entity::m_components가
                 // vector<std::unique_ptr<Component>>가 되며 원소가 이 갈래를
@@ -475,23 +650,89 @@ namespace Meta::Typed
                     }
                     else
                     {
-                        Debug->LogError("Serialize: Unsupported vector element type");
+                        Debug->LogError("Serialize: Unsupported sequence element type");
                     }
                 }
                 else if constexpr (meta::reflectable<E>)
                 {
+                    static_assert(!meta::container::ConstElementRange<T>,
+                        "원소를 const 로만 순회하는 컨테이너(std::set 계열)에는 reflect() "
+                        "타입을 담을 수 없다 — 직렬화가 OnBeforeSerialize 훅 때문에 "
+                        "비-const 참조를 요구한다. vector/deque/list 를 쓰라.");
                     SerializeObjectInto(elem, arrayNode.Append());
                 }
                 else if constexpr (YamlScalar<E>)
                 {
-                    EmitVectorElement(arrayNode, elem);
+                    EmitSequenceElement(arrayNode, elem);
+                }
+                else if constexpr (std::is_enum_v<E>)
+                {
+                    // 멤버 자리는 enum 을 int 로 적는데 원소 자리에는 그 갈래가
+                    // 아예 없었다 — `std::vector<LightType>` 은 저장 시점에
+                    // 런타임 에러 로그만 남기고 값을 통째로 잃었다.
+                    arrayNode.SetFlow();
+                    arrayNode.Append().SetScalar(
+                        static_cast<int>(static_cast<std::underlying_type_t<E>>(elem)));
                 }
                 else
                 {
-                    Debug->LogError("Serialize: Unsupported vector element type");
+                    // C1 과 같은 이유로 선언 시점에 잡는다. 원소 타입은 필드
+                    // 타입에서 정적으로 나오므로 런타임 로그를 기다릴 이유가 없다.
+                    static_assert(kUnsupportedForYaml<E>,
+                        "직렬화할 수 없는 시퀀스 원소 타입이다. "
+                        "YamlScalar에 추가하거나, reflect()를 달거나, 필드 목록에서 빼라.");
                 }
             }
 
+        }
+        else if constexpr (SerializedAsKeyedRange<T>)
+        {
+            using K = meta::container::KeyT<T>;
+            using M = meta::container::MappedT<T>;
+
+            static_assert(YamlMapKey<K>,
+                "맵 키로 쓸 수 없는 타입이다. 키는 문자열 하나로 접혀야 한다 — "
+                "복합 스칼라와 부동소수는 키가 될 수 없다(값으로는 실을 수 있다).");
+            static_assert(!(std::is_pointer_v<M> || is_shared_ptr_v<M> || is_unique_ptr_v<M>),
+                "포인터를 값으로 갖는 맵은 직렬화하지 않는다. 시퀀스의 포인터 원소는 "
+                "SceneManager/ComponentFactory 가 복원하지만 맵에는 그 복원자가 없어 "
+                "적기만 하고 못 읽는 한쪽 방향이 된다.");
+
+            const Authoring::WriteNode mapNode = node.Child(name);
+            if (std::ranges::empty(value))
+            {
+                mapNode.SetNull(); // 빈 시퀀스와 같은 규칙
+                return;
+            }
+            mapNode.SetMap();
+
+            // 비-const 로 순회한다 — 값이 reflect() 타입이면 직렬화 훅이
+            // 비-const 참조를 요구한다(시퀀스 쪽과 같은 이유다).
+            for (auto& entry : value)
+            {
+                const Authoring::WriteNode valueNode =
+                    mapNode.Child(EncodeMapKey(entry.first));
+
+                if constexpr (meta::reflectable<M>)
+                {
+                    SerializeObjectInto(entry.second, valueNode);
+                }
+                else if constexpr (YamlScalar<M>)
+                {
+                    EmitScalarInto(valueNode, entry.second);
+                }
+                else if constexpr (std::is_enum_v<M>)
+                {
+                    valueNode.SetScalar(
+                        static_cast<int>(static_cast<std::underlying_type_t<M>>(entry.second)));
+                }
+                else
+                {
+                    static_assert(kUnsupportedForYaml<M>,
+                        "직렬화할 수 없는 맵 값 타입이다. "
+                        "YamlScalar에 추가하거나, reflect()를 달거나, 필드 목록에서 빼라.");
+                }
+            }
         }
         else if constexpr (std::is_pointer_v<T> || is_shared_ptr_v<T> || is_unique_ptr_v<T>)
         {
@@ -599,6 +840,85 @@ namespace Meta::Typed
     template<meta::reflectable T>
     void DeserializeObjectFrom(T& obj, const Authoring::ReadNode& node);
 
+    /// 노드 하나를 원소 하나로 읽는다 — 시퀀스·맵 값이 공유하는 정본.
+    template<class E>
+    inline void ReadElement(const Authoring::ReadNode& en, E& item)
+    {
+        if constexpr (YamlScalar<E>)
+        {
+            ReadScalar(en, item);
+        }
+        else if constexpr (std::is_enum_v<E>)
+        {
+            // 멤버 자리와 같은 규칙 — `as<int>` 직결은 backend 의미에 묶인다.
+            int raw{};
+            item = ScalarDetail::TryConvert(std::string(en.Scalar()), raw)
+                ? static_cast<E>(raw) : static_cast<E>(en.As<int>());
+        }
+        else
+        {
+            static_assert(meta::reflectable<E> && std::is_default_constructible_v<E>,
+                "역직렬화할 수 없는 원소 타입이다. YamlScalar에 추가하거나, "
+                "기본 생성 가능한 reflect() 타입으로 만들거나, 필드 목록에서 빼라.");
+            DeserializeObjectFrom(item, en);
+        }
+    }
+
+    // 시퀀스 채우기 — 컨테이너가 **가진 수단**에 맞춰 넣는다.
+    //
+    //   · push_back 이 있으면 뒤에 붙인다      (vector·deque·list)
+    //   · 인자 하나짜리 insert 만 있으면 넣는다 (set·unordered_set)
+    //   · 둘 다 없고 자리로 접근되면 덮어쓴다   (std::array)
+    //
+    // ★ std::array 는 비울 수 없다. 노드가 배열보다 짧으면 남은 자리를 **값
+    //   초기화**한다. 앞부분만 갱신하고 뒤를 그대로 두면 같은 파일을 읽은 결과가
+    //   대상 객체의 이전 상태에 따라 달라진다 — 프리팹 오버라이드 적용은 실제로
+    //   기존 객체 위에 읽으므로 가정이 아니라 실경로다.
+    template<class Container, class E>
+    inline void FillSequence(Container& value, const Authoring::ReadNode& sub)
+    {
+        if constexpr (meta::container::Clearable<Container>)
+        {
+            value.clear();
+        }
+        if constexpr (meta::container::Reservable<Container>)
+        {
+            value.reserve(sub.Size());
+        }
+
+        if constexpr (meta::container::FixedSizeRange<Container>)
+        {
+            const std::size_t capacity = std::size(value);
+            std::size_t index = 0;
+            for (const auto& en : sub)
+            {
+                if (index >= capacity) break; // 남는 노드는 버린다(크기가 타입이다)
+                ReadElement(en, value[index]);
+                ++index;
+            }
+            for (; index < capacity; ++index)
+            {
+                value[index] = E{};
+            }
+        }
+        else
+        {
+            for (const auto& en : sub)
+            {
+                E item{};
+                ReadElement(en, item);
+                if constexpr (meta::container::BackInsertable<Container>)
+                {
+                    value.push_back(std::move(item));
+                }
+                else
+                {
+                    value.insert(std::move(item));
+                }
+            }
+        }
+    }
+
     template<class V>
     inline void ReadMember(const Authoring::ReadNode& node, const char* name, V& value)
     {
@@ -647,38 +967,54 @@ namespace Meta::Typed
             }
             }
         }
-        else if constexpr (is_vector_v<T>)
+        else if constexpr (SerializedAsSequence<T>)
         {
-            using E = VectorElementTypeT<T>;
+            using E = meta::container::ValueT<T>;
             if constexpr (std::is_pointer_v<E> || is_shared_ptr_v<E> || is_unique_ptr_v<E>)
             {
                 // 레거시 파리티: 포인터 원소 벡터(컴포넌트 목록)는 리플렉션이
                 // 복원하지 않는다 — SceneManager/ComponentFactory의 몫.
                 return;
             }
-            else if constexpr (YamlScalar<E>)
+            else
             {
+                static_assert(meta::container::FillableSequence<T>,
+                    "채울 수단이 없는 시퀀스다 — push_back·insert·인덱스 대입 중 "
+                    "하나는 있어야 역직렬화 경로를 세울 수 있다.");
+
                 if (!sub.IsSequence()) { return; }
-                value.clear();
-                value.reserve(sub.Size());
-                for (const auto& en : sub)
-                {
-                    E item{};
-                    ReadScalar(en, item);
-                    value.push_back(std::move(item));
-                }
+                FillSequence<T, E>(value, sub);
             }
-            else if constexpr (meta::reflectable<E> && std::is_default_constructible_v<E>)
+        }
+        else if constexpr (SerializedAsKeyedRange<T>)
+        {
+            using K = meta::container::KeyT<T>;
+            using M = meta::container::MappedT<T>;
+
+            static_assert(YamlMapKey<K>,
+                "맵 키로 쓸 수 없는 타입이다(EmitMember 쪽과 같은 계약).");
+            static_assert(meta::container::FillableKeyed<T>,
+                "insert_or_assign 이 없는 맵이다 — 키로 덮어쓸 수단이 없으면 "
+                "역직렬화 경로를 세울 수 없다.");
+
+            if (!sub.IsMap()) { return; }
+            value.clear();
+
+            for (const auto entry : sub.Map())
             {
-                if (!sub.IsSequence()) { return; }
-                value.clear();
-                value.reserve(sub.Size());
-                for (const auto& en : sub)
+                K key{};
+                if (!DecodeMapKey(entry.key.Scalar(), key))
                 {
-                    E item{};
-                    DeserializeObjectFrom(item, en);
-                    value.push_back(std::move(item));
+                    // 키 하나가 깨졌다고 나머지를 버리지 않는다. 다만 조용히
+                    // 넘어가지도 않는다 — 조용한 유실이 이 파일이 없앤 병이다.
+                    Debug->LogError(std::string("Deserialize: 맵 키를 읽지 못했다 - ")
+                        + name + " / " + std::string(entry.key.Scalar()));
+                    continue;
                 }
+
+                M item{};
+                ReadElement(entry.value, item);
+                value.insert_or_assign(std::move(key), std::move(item));
             }
         }
         else if constexpr (YamlScalar<T>)

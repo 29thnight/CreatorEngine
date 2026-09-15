@@ -37,17 +37,6 @@ inline size_t ConvertGUIDToHash(const GUID& guid)
 	return guid.Data1 + guid.Data2 + guid.Data3;
 }
 
-// 기본: 벡터 아님
-template<typename T>
-struct VectorElementType { using Type = void; };
-
-// std::vector<T>
-template<typename T>
-struct VectorElementType<std::vector<T>> { using Type = T; };
-
-template<typename T>
-using VectorElementTypeT = typename VectorElementType<T>::Type;
-
 template<typename T>
 constexpr bool is_shared_ptr_v = false;
 
@@ -64,25 +53,29 @@ constexpr bool is_unique_ptr_v = false;
 template<typename T, typename D>
 constexpr bool is_unique_ptr_v<std::unique_ptr<T, D>> = true;
 
-template<typename T>
-constexpr bool is_vector_v = false;
-
-template<typename T>
-constexpr bool is_vector_v<std::vector<T>> = true;
-
 // 콘솔 세터(MakePropertyImpl)의 std::any_cast<T> 인스턴스화 가드 (K2 스테이지 A
 // 함정, 실측). std::is_copy_constructible_v<std::vector<std::unique_ptr<X>>>는
 // **true**를 돌려준다 — vector의 복사 생성자는 원소 타입과 무관하게 항상
 // 선언돼 있어서, 트레이트가 보는 오버로드 해석 단계에서는 성립하는 것처럼
-// 보인다(실제 본문 인스턴스화는 원소 복사에서 깨진다). is_vector_v면 원소
-// 타입까지 내려가 판정해야 vector<unique_ptr<Component>> 같은 필드를 정확히
-// "복사 불가"로 잡아낸다.
+// 보인다(실제 본문 인스턴스화는 원소 복사에서 깨진다). 그래서 원소 타입까지
+// 내려가 판정해야 vector<unique_ptr<Component>> 같은 필드를 정확히 "복사 불가"로
+// 잡아낸다.
+//
+// ★ 이 판정은 직렬화기의 range 판정(ReflectionContainer.h)과 **일부러 다른
+//   계보다.** 이 헤더는 Core.Minimal 을 타고 수백 TU 로 퍼지므로 <ranges> 를
+//   들이지 않는다. 여기서 필요한 것은 "원소가 복사 가능한가" 하나뿐이고, 그건
+//   컨테이너 공통 표식인 value_type 한 겹으로 충분하다 — 시퀀스인지 맵인지,
+//   문자열인지 아닌지는 이 질문과 무관하다(std::string 은 char 로 내려가고
+//   답은 같다, std::map 은 pair 로 내려가고 답은 같다).
+//
+//   대신 그 "무관함"이 실제로 성립하는지는 대조로 붙든다 — 두 계보가 같은
+//   답을 내는지 ReflectionContainer 소비 측 카나리아가 교차 확인한다.
 template<typename T>
 constexpr bool IsCopyableForProperty()
 {
-	if constexpr (is_vector_v<T>)
+	if constexpr (requires { typename T::value_type; })
 	{
-		return IsCopyableForProperty<VectorElementTypeT<T>>();
+		return IsCopyableForProperty<typename T::value_type>();
 	}
 	else
 	{

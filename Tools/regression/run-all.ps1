@@ -56,6 +56,49 @@ Run-Step "HashingString 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-hashing-string.ps1")
 }
 
+# 리플렉션 컨테이너 계약 두 축(range 일반화). exe가 필요 없어 앞쪽에 둔다.
+#
+# ── 왜 둘로 나뉘는가 ──
+#
+# 직렬화기의 컨테이너 디스패치는 전부 `if constexpr` 다. 고르지 않은 갈래는
+# 코드가 아예 생성되지 않으므로, 판정이 틀려도 **런타임이 볼 것이 없다.**
+# 그래서 형상 판정 자체를 컴파일타임에 단정하는 축이 따로 필요하다.
+#
+#   verify-reflection-container            판정 — 무엇이 시퀀스이고 무엇이 맵이며
+#                                          어떤 수단으로 채우는가. 되돌림 금지
+#                                          정적 래칫 포함. Debug/Release 양쪽.
+#   verify-reflection-container-roundtrip  값과 형상 — 컨테이너 12종을 저장하고
+#                                          다시 읽어 맞대고, 방출 텍스트의 형상을
+#                                          직접 본다(28축). Debug.
+#
+# ── 이빨 확인(2026-09-15) ──
+#
+# 판정 축 변이 여덟이 각각 정확한 자리에서 빨개졌다. ① Range 의 문자열 배제
+# 제거 → `!Range<std::string>` 단정, ② StringLike 의 path 절 제거 → path 단정
+# (path 는 string_view 로 변환되지 않으므로 변환 판정만으로는 못 막는다는 것이
+# 이 단정의 존재 이유다), ③ ElementRefT 의 const 참조 고정 → 프록시·const 단정
+# 넷, ④ 순서 계약의 YamlScalar 선배제 제거 → 정적 래칫, ⑤ is_vector_v 복귀 →
+# 정적 래칫(실행 축은 이걸 못 잡는다 — vector 만 쓰는 한 모든 단정이 그대로
+# 통과한다), ⑥ 맵 갈래의 빈 표기 규칙 변경 → 정적 래칫, ⑦ IsCopyableForProperty
+# 의 원소 하강 제거 → 두 계보 교차 대조, ⑧ SetInsertable 이 위치 인자 insert 를
+# 받게 → vector 오판 단정.
+#
+# 왕복 축은 여섯이 지목한 축에서 빨개졌다: 빈 맵 표기, 고정 배열 자리 대입,
+# 정수 키 표기, 스칼라 시퀀스 flow, 빈 시퀀스 널, 맵을 키 없는 시퀀스로 방출
+# (마지막은 7축 동시). enum 갈래 제거는 값이 아니라 static_assert 로 붉어졌다.
+#
+# ★ 자극하지 못한 변이 1건을 기록해 둔다. `mapNode.SetMap()` 을 `SetSequence()`
+#   로 바꿔도 출력이 한 글자도 안 바뀐다 — `WriteNode::Child()` 가 맵이 아니면
+#   스스로 맵으로 되돌리기 때문이다. 그 줄은 의도를 적은 것이지 형상을 정하는
+#   줄이 아니다. "못 잡음" 과 "자극하지 못함" 은 다르다.
+Run-Step "리플렉션 컨테이너 판정" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-reflection-container.ps1")
+}
+
+Run-Step "리플렉션 컨테이너 왕복" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-reflection-container-roundtrip.ps1")
+}
+
 # 네이티브 ↔ 관리 미러 대조(9-4). exe가 필요 없는 정적 검사라 앞쪽에 둔다.
 #
 # ── 왜 세트 안에 있어야 하는가 ──
