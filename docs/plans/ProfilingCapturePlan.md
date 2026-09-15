@@ -31,6 +31,124 @@ ImGui 타임라인을 먼저 확장하지 않는다. 엔진·렌더러·관리 �
 
 ---
 
+## 0.5 2026-09-15 개정 — 무엇이 바뀌었나
+
+이 개정은 착수 전 실측(9-14·9-15)과 두 가지 결정을 반영한다. **결정은 둘이다 —
+현행 수집 코어를 재활용하지 않는다, 그리고 마커 매크로를 폐기한다.**
+
+### 0.5.1 실측으로 뒤집힌 전제
+
+| 전제(개정 전) | 실측(9-14·9-15) |
+|---|---|
+| "Shipping 구성 자체가 없어 compile-out을 검증할 대상이 없다" | **폐기.** PHASE 14.5 LC8이 이미 세웠다 — `Directory.Build.props`의 `EngineShipping` 스위치, `Directory.Build.targets:72-73`이 전 프로젝트에 `CE_SHIPPING`/`CE_DEVELOPMENT` 정의, 산출물 키 분리, 그리고 격리 게이트가 `run-all:299`에 편입돼 있다 |
+| "profiler 검증 하네스가 산다" | **절반만.** `-Action SelfTest`는 초록이지만 `-Action Stats`는 9-06(521fa21a)부터 exit 1이다. 명령은 성공하고 판정기가 죽었다 — `reg.Legacy`→`reg.Result` 전환으로 사람이 읽는 `[profile.stats]` 블록이 사라졌는데 하네스가 그 리터럴을 `IndexOf`로 찾는다 |
+| "예산 포화·드롭을 게이트 단정으로 쓸 수 있다" | **쓸 수 없다.** 편집 27 / 재생 34 이벤트(상한 1024의 3%), 이름 388B / 525B(상한 16384B). 계측 지점이 전부 시스템 단위 고정 지점이고 per-object 루프 안에 하나도 없어 **씬에 무엇을 얹든 상수**다. 어떤 변이로도 자극되지 않는 빈 단정이다 |
+
+### 0.5.2 ★ 지금은 녹화가 아니다 — 4프레임 실시간이다
+
+`PROFILER_INITIALIZE(5, 1024)`의 5 중 현재 프레임을 뺀 **넷만 읽힌다**(selftest 실측
+`보존 프레임 [65, 69)`). UI의 `Recording / Paused`는 링을 덮어쓰다 멈추는 것이라,
+**스파이크를 발견했을 때 그 프레임은 이미 덮여 있다.** §0의 완료 모습 1~3단계가
+원리적으로 성립하지 않는다는 뜻이고, 그것이 이 계획의 존재 이유다.
+
+### 0.5.3 재활용하지 않는다 — 구조적 근거
+
+결함 8종(§3·P0 기록)은 잡다한 버그가 아니라 **원죄 하나의 파생**이다 — 수집기가
+producer의 TLS를 직접 만진다(`Profiler.cpp:169`의 `pTLS->NumEvents = 0`). 그래서
+스레드 은퇴 시 UAF가 나고, 표 순회에 락이 필요해지고, 락을 넓히면 `RegisterThread`가
+같은 뮤텍스를 다시 잡아 교착이고, 수집 시점에 스팬을 정렬해야 해서 부등호 하나로
+스레드가 통째로 사라졌다.
+
+§6.2의 sealed chunk handoff는 이 다섯을 **고치는 것이 아니라 발생하지 않게** 한다.
+writer가 자기 chunk를 봉인해 넘기면 collector가 남의 메모리를 만질 일이 없다.
+고쳐서 도달할 수 없고 갈아야 도달하는 지점이므로, 현행 `CPUProfiler`는 재활용하지 않는다.
+
+**경계 — 무엇을 버리고 무엇을 남기는가**
+
+| 대상 | 처리 |
+|---|---|
+| `CPUProfiler` 클래스(4프레임 링·TLS 리셋·수집 시점 정렬·`FixedStack` 32·이름 `LinearAllocator`) | **버린다** |
+| `ImGuiHelper/ProfilerWindow.cpp` 557줄 | **버린다** — §6.4가 "UI가 global vector를 직접 읽지 않는다" |
+| `PROFILE_CPU_*` 매크로 정의 | **버린다** — §5.2 참조 |
+| 마커 호출부 39곳 | **남긴다** — 표기 형태만 바뀐다(이름과 자리는 보존) |
+| selftest 픽스처 11종 | **다시 겨눈다** — 검사의 존재 이유가 정확히 이것이다 |
+| 결함 8종 기록 | **설계 입력으로 남긴다** |
+
+selftest의 `cross-frame/preserve`는 지금 KNOWN-DEFECT인데, **새 설계에서는 PASS여야
+한다**(§6.1의 `truncated` flag). 그 한 줄이 PASS로 바뀌는 것이 이 작업의 진척 정의다.
+
+### 0.5.4 자동 계측은 이 계획의 전제가 아니다
+
+"계측 호출부 0"을 목표로 두자는 논의가 있었고, 실측 결과 **지금 구조로는 상속형
+자동 수집이 성립하지 않는다**:
+
+- 시스템 7종은 전부 `Singleton<T>` **CRTP** 상속이라 타입마다 다르게 인스턴스화되어
+  공통 포인터로 담을 수 없다. `CameraSystem`은 `final`에 상속이 없다.
+- `SystemSchedule`은 **컴포넌트 저장소**지 실행표가 아니다. 클래스 주석이 못 박는다 —
+  "무엇을 들고 있는가만 관리하고 언제 도는가는 건드리지 않는다".
+- 계측 지점의 실제 모양은 `PROFILE_CPU_BEGIN("X"); X->Update(dt); PROFILE_CPU_END();`
+  **하드코딩 나열**이다.
+
+실행 표(`{MarkerId, 함수 포인터}` 순회)로 자동화하는 길은 있으나, 그것은 씬 실행
+구조 변경이고 `lifecycle 221사건` 순서 게이트를 지나간다. **이 계획은 그것을 기다리지
+않는다** — 마커 표기를 호출부 형태에 독립으로 설계하면, 나중에 표가 생겨도
+
+```cpp
+for (auto& step : table) { ce::ProfileScope _{ step.marker }; step.fn(*this, dt); }
+```
+
+한 줄로 흡수되고 코어 변경은 0이다. **자동 수집은 프로파일러의 요구가 아니라 씬 구조
+정리의 결과로 둔다.**
+
+> 참고 — 실행 표는 트랙 C3가 버린 델리게이트로의 회귀가 아니다. C3가 없앤 것은
+> **컴포넌트 N개**의 가상 디스패치(암묵 구독, 등록 순서 = 프리팹 파일 순서 의존)이고,
+> `Component`에는 지금 가상 `Update`/`LateUpdate`/`FixedUpdate`가 하나도 없다. 실행 표는
+> **시스템 13개**의 함수 포인터 호출이며 목록도 순서도 소스에 고정된다. 입도와 결정자가
+> 둘 다 다르다.
+
+### 0.5.5 ★ PHASE 13(enkiTS)과의 순서 제약 — 새로 생긴 의존
+
+`TaskSchedulerUnificationPlan.md`(9-15)가 PHASE 13 S0.5로 enkiTS 이관을 편입했다.
+이것이 이 계획에 양방향 의존을 만든다.
+
+**enkiTS가 이 계획에 주는 것**
+
+- `threadnum_`이 `0..GetNumTaskThreads()-1`로 **안정 보장**된다. 현행 코어가 11비트
+  `ThreadIndex` 슬롯을 스스로 관리하고 은퇴·재사용 규칙(히스토리 한 바퀴 뒤 재사용)을
+  발명해야 했던 이유는 "스레드가 임의로 생기고 죽어서"인데, enkiTS 워커는 **고정 개수·
+  고정 인덱스**다. §6.2의 thread stream 설계에서 슬롯 수명 문제의 상당 부분이 사라진다.
+- 태스크 실행 지점이 소수로 모이므로, **자동 계측의 진짜 자리는 프레임 단계 표가 아니라
+  태스크 스케줄러**다. 수가 많고 동적인 쪽이 태스크이고, 프레임 단계 13개는 고정이라
+  한 줄씩 써도 부담이 없다.
+
+**이 계획이 enkiTS에 지우는 조건**
+
+- ★ **지금 애니메이션은 이미 워커 8스레드에서 도는데(`AnimationJob.cpp:39`의
+  `ThreadPool(8)`), 프로파일러는 `[GameThread]` 하나만 본다**(실측: 스레드 슬롯 1개).
+  즉 **PHASE 13이 최적화하려는 바로 그 비용이 현재 캡처에 전혀 잡히지 않는다.**
+- 그런데 현행 코어에 워커 계측을 그냥 붙이면 안 된다. §3.1의 원소 단위 경합이 그대로
+  열려 있고, **지금 안 터지는 유일한 이유가 writer가 `[GameThread]` 하나뿐이기
+  때문**이다. 워커가 마커를 찍는 순간 계약 부재가 현실이 된다.
+- 따라서 **워커 계측은 §6.2 sealed chunk handoff 이후에만 추가한다.** 그 전에는
+  enkiTS 이관(S0.5)을 진행하되 **워커에 마커를 걸지 않는다.**
+
+**PHASE 13이 이 계획의 소비자다.** `AnimationSchedulerPlan.md` §4의 완료 기준 —
+"100체 씬에서 버짓 상한 초과 프레임 1% 미만 · 예측 비용 대 실측 오차 15% 이내 ·
+HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로파일러 없이 판정할 수 없다.
+13-7(버짓 HUD)과 14-3(ProfilerWindow 신설)의 파일 접점 경고가 여기서 실체를 갖는다.
+
+### 0.5.6 개정으로 바뀐 실행 계획
+
+- **P1의 "기존 `PROFILE_CPU_*` 매크로를 adapter로 연결" 항목은 폐기한다.** 옛 코어에
+  adapter를 붙이는 일이 재활용 폐기로 무의미해졌다. P1에 남는 것은 `EngineFrameId`
+  단일 발행 지점 통합과 마커 표기 신설이다.
+- **P1의 "Shipping compile-out"은 만드는 일이 아니라 무는 일이다** — `CE_DEVELOPMENT`가
+  이미 전 프로젝트에 정의돼 있다(§5.2).
+- **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
+  "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
+
+---
+
 ## 1. 범위와 비범위
 
 ### 1.1 이번 계획의 범위
@@ -63,68 +181,98 @@ Deep Profiling은 기본 녹화와 분리한다. 모든 호출을 자동 계측�
 
 ## 2. 현재 소스에서 확인한 기반
 
+> 이 절은 **2026-09-15 실측으로 전면 갱신했다.** 초판(8-11)의 근거 줄은 그 뒤의
+> 이관으로 대부분 무효가 됐다 — 수집 코어는 `ImGuiHelper`에서 `Engine/EngineDiagnostics`
+> 로 옮겼고(P1a), `EnhancedSceneRendererLive.cpp`는 소멸했으며, `EnhancedRenderGraph.cpp`
+> 는 `Render/Graph/`로 이동했다. 낡은 줄 번호를 남기면 다음 사람이 그것을 근거로 읽는다.
+
 ### 2.1 CPU 계측
 
-| 항목 | 현재 근거 | 판정 |
+| 항목 | 현재 근거(9-15 실측) | 판정 |
 |---|---|---|
-| 초기화 | `EngineEntry/EditorMain.cpp:61`의 `PROFILER_INITIALIZE(5, 1024)` | 최근 5프레임·프레임당 최대 1,024 이벤트 |
-| 프레임 경계 | `EditorMain.cpp:173,425`의 `PROFILE_FRAME()` | 초기 프레임 시작과 게임 프레임 말미에 호출 |
-| 이벤트 | `ImGuiHelper/Profiler.cpp:29~70` | QPC 기반 Begin/End와 TLS stack 존재 |
-| 스레드 | `Profiler.cpp:133~172` | Game/CB/CE 스레드를 등록하고 TLS 주소를 보관 |
-| 보관 | `Profiler.h:179~205` | 프레임별 event vector와 string allocator |
-| 일시정지 | `Profiler.h:288~290`, `ProfilerWindow.cpp:487~543` | queued pause 상태 존재 |
+| 초기화 | `Editor/EngineEntry/EditorMain.cpp:80` `PROFILER_INITIALIZE(5, 1024)` | historySize 5 · 프레임당 최대 1,024 이벤트 |
+| **읽히는 과거** | selftest 실측 `보존 프레임 [65, 69)` | ★ **4프레임**. 5 중 현재 프레임을 뺀 넷만 읽힌다 |
+| 프레임 경계 | `EditorMain.cpp:279`(부팅 마감) · `:602`(메인 루프) | 게임 프레임 말미에 `Tick()` |
+| 이벤트 | `Engine/EngineDiagnostics/Profiler.cpp` | QPC 기반 Begin/End와 TLS stack |
+| **등록 스레드** | `EditorMain.cpp:81` `PROFILE_REGISTER_THREAD("[GameThread]")` | ★ **1개뿐.** P0(8-11) 때의 3개(Game·CB·CE)에서 줄었다 |
+| 보관 | `Profiler.h` | 프레임별 event vector와 이름 `LinearAllocator`(16,384B) |
+| 일시정지 | `Profiler.h` · `ImGuiHelper/ProfilerWindow.cpp` | queued pause 상태 존재 |
 
-즉 CPU marker와 기본 타임라인은 스켈레톤이 아니라 실제 동작 가능한 기반이다. 부족한 것은
-장기 보존, 안전한 producer/consumer 경계, 선택 구간 통계와 파일화다.
+**계측 밀도 실측 — 예산은 문제가 아니다.**
+
+| | 이벤트 | 이름 바이트 | 드롭 | 스레드 |
+|---|---|---|---|---|
+| 편집 모드 | **27** / 1024 (2.6%) | 388 / 16384 | 0 | 1 |
+| 재생 모드 | **34** / 1024 (3.3%) | 525 / 16384 | 0 | 1 |
+
+둘 다 `peak == last`로 **모든 프레임에서 동일**했다. 계측 지점은 정적으로 39곳이고
+(`Scene.cpp` 22 · `SceneManager.cpp` 15 · `EditorMain.cpp` 2) **전부 시스템 단위 고정
+지점**이다 — `PROFILE_CPU_SCOPE`의 실사용은 0이고 per-object 루프 안에 박힌 마커도 0이다.
+그래서 씬에 무엇을 얹든 이벤트 수는 상수이고, 재생을 걸어도 27→34(딱 7개, 재생 경로
+계측분)에 그친다.
+
+함의 둘.
+
+1. **예산 포화·드롭은 게이트 단정으로 쓸 수 없다**(§11.4 참조). 1024에 닿으려면 계측
+   지점이 30배 늘어야 한다.
+2. **이벤트 수 자체가 유일하게 자극 가능한 축이다.** 마커 하나가 새 코어로 안 이어지면
+   27이 26이 된다 — 그리고 그것이 마침 P1 완료조건("기존 호출부 대량 수정 없이 새 코어로
+   이벤트가 들어감")을 직접 재는 값이다.
+
+**★ 가장 큰 사각지대 — 워커가 통째로 안 보인다.**
+`AnimationJob.cpp:39`가 `ThreadPool(8)`로 애니메이션 워커 8개를 띄우고 프레임마다
+`Enqueue`→`NotifyAllAndWait`로 돌리는데, 그 워커 중 **어느 것도 프로파일러에 등록되지
+않는다**(등록 스레드 1개). RenderThread·PresentationThread에도 마커가 0이다. 즉
+**오늘의 CPU 캡처는 애니메이션과 렌더 경로를 볼 수 없다** — PHASE 13이 최적화하려는
+비용이 정확히 그 안에 있다(§0.5.5).
 
 ### 2.2 기존 FrameProfiler UI
 
-`ImGuiHelper/ProfilerWindow.cpp`에는 이미 다음 조작이 있다.
+`ImGuiHelper/ProfilerWindow.cpp`(557줄)에는 이미 다음 조작이 있다.
 
-- 스레드별 중첩 bar
-- 검색 필터
-- threshold pause
-- Ctrl+wheel 확대
-- 우클릭 이동
-- double-click 구간 확대
-- drag 구간 시간 측정
-- event tooltip의 frame/file/line 표시
+- 스레드별 중첩 bar · 검색 필터 · threshold pause
+- Ctrl+wheel 확대 · 우클릭 이동 · double-click 구간 확대
+- drag 구간 시간 측정 · event tooltip의 frame/file/line 표시
 
-현재 drag 구간은 화면에 길이만 그린다. 선택 결과를 보존하거나 Hierarchy 계산의 입력으로
-쓰지 않으므로, 분석 모델이 아니라 일회성 자에 가깝다.
+★ **`Recording / Paused` 문구가 있지만 녹화가 아니다.** 4칸 링을 계속 덮어쓰다
+Space로 멈추면 그 순간 링에 남아 있던 4프레임만 보게 된다. 구간을 보존하는 장치가
+없으므로 §0의 완료 모습 1~3단계("Record 후 10초 플레이 → 스파이크 발견 → 그 프레임
+선택")가 **원리적으로 성립하지 않는다** — 발견했을 때 그 프레임은 이미 덮여 있다.
+
+drag 구간도 화면에 길이만 그린다. 선택 결과를 보존하거나 Hierarchy 계산의 입력으로
+쓰지 않으므로 분석 모델이 아니라 일회성 자다.
+
+이 파일은 §0.5.3에 따라 버린다(§6.4의 immutable reader로 대체).
 
 ### 2.3 DX12 GPU 계측
 
-| 항목 | 현재 근거 | 판정 |
+| 항목 | 현재 근거(9-15 실측) | 판정 |
 |---|---|---|
-| timestamp heap/readback | `DX12GpuProfiler.cpp:18~79` | 프레임 링 크기의 query 저장소 존재 |
-| 패스 경계 | `EnhancedRenderGraph.cpp:522~539,686~710` | 그래프가 모든 실행 패스를 자동 감쌈 |
-| 수집 | `DX12GpuProfiler.cpp:151~235` | 패스 이름별 ms 계산 |
-| 라이브 연결 | `EnhancedSceneRendererLive.cpp:1733~1849` | BeginFrame→ResolveFrame→EndFrame |
-| 비동기 완료 | `EnhancedSceneRendererLive.cpp:2235~2311` | fence 완료 후 Collect |
-| 표시 | `EnhancedRenderDebugWindow.cpp:109~186` | 마지막 CPU/GPU 합계와 패스별 표 |
+| timestamp heap/readback | `Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.{h,cpp}` | 프레임 링 크기의 query 저장소 존재 |
+| 패스 경계 | `Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp` | 그래프가 실행 패스를 자동으로 감쌈 |
+| 프레임 진입 | `Render/Scene/EnhancedSceneRenderer.cpp:3588` `dx12.BeginProfilerFrame(frameCounter++)` | ★ **뷰마다 불린다**(§3.3) |
+| 수집 | `DX12GpuProfiler::Collect(std::vector<PassTiming>&, std::string&)` | ★ **프레임 token을 받지 않는다** |
+| 저장소 | `DX12GpuProfiler.h`의 `m_records` · `m_frameIndex` | ★ **한 벌뿐**(링이 아니다) |
+| 표시 | `Editor/EngineGUIWindow/EnhancedRenderDebugWindow.cpp` | 마지막 CPU/GPU 합계와 패스별 표 |
 
-그래프 경계에서 자동으로 감싸는 선택은 유지한다. 패스 작성자가 marker를 빼먹지 않기
-때문이다. 다만 현재 결과는 raw timestamp가 아니라 마지막 완료분의 duration 목록으로
-축약된다.
+그래프 경계에서 자동으로 감싸는 선택은 유지한다 — 패스 작성자가 marker를 빼먹지 않기
+때문이고, 이것이 §0.5.4가 말한 "자동 계측이 성립하는 자리"의 기존 사례다. 다만 현재
+결과는 raw timestamp가 아니라 마지막 완료분의 duration 목록으로 축약되고, 뷰 구분이 없다.
 
 ### 2.4 Counter 기반
 
-`EngineGUIWindow/ResourceCounterWindow`는 다음 값을 이미 읽는다.
+`EditorGUIWindow/ResourceCounterWindow`는 다음 값을 이미 읽는다.
 
 - DataSystem 모델·재질·텍스처·UI 리소스·retained asset
 - RenderScene proxy·UI proxy·animator·palette·render pass data
-- VRAM usage/budget
-- 엔진 리소스 census
+- VRAM usage/budget · 엔진 리소스 census
 - CoreCLR Gen0/1/2 횟수, heap, fragmentation, GC pause percentage
 
-DX12 쪽에도 다음 통계가 있다.
-
-- `DX12UploadRing::Stats`: allocations, bytes, overflows, peak frame bytes
-- `DX12DescriptorRing::Stats`: allocations, descriptors, overflows, peak frame descriptors
+DX12 쪽에도 `DX12UploadRing::Stats`(allocations·bytes·overflows·peak frame bytes)와
+`DX12DescriptorRing::Stats`(allocations·descriptors·overflows·peak frame descriptors)가 있다.
 
 현재 값은 UI가 0.5초마다 직접 polling한다. 캡처용으로는 각 owner가 프레임 경계에 값
-스냅샷을 발행하고 수집 코어가 `FrameId`에 붙여야 한다.
+스냅샷을 발행하고 수집 코어가 `EngineFrameId`에 붙여야 한다.
 
 ---
 
@@ -282,16 +430,19 @@ EngineGUIWindow/
 
 ### 5.2 Marker
 
+> **2026-09-15 개정 — 매크로를 폐기한다.** 현행 `PROFILE_CPU_BEGIN`/`PROFILE_CPU_END`
+> 매크로 쌍을 남기지 않는다. 호출부 39곳의 **이름과 자리는 보존**하되 표기를 바꾼다.
+
 ```cpp
 using MarkerId = uint32_t;
 
 struct MarkerDesc
 {
-    MarkerId id;
-    CategoryId category;
-    StringId name;
-    StringId file;
-    uint32_t line;
+    MarkerId    id;
+    CategoryId  category;
+    StringId    name;
+    StringId    file;
+    uint32_t    line;
     MarkerFlags flags;
 };
 ```
@@ -299,28 +450,67 @@ struct MarkerDesc
 이벤트마다 문자열을 복사하지 않는다. 정적 marker는 최초 등록 뒤 정수 ID만 writer에 쓴다.
 동적 이름이 필요한 경우 별도 dynamic string table과 rate limit을 둔다.
 
-권장 API:
+#### 매크로를 버리는 이유 — 둘 다 구조적 이득이다
+
+**① 짝 불균형이 문법적으로 불가능해진다.** 현행 결함 6은 `EndEvent`가 건너뛰어지면
+(`if (m_Paused) return;`이 Pop 앞에 있다) 깊이가 어긋난 채 **영구 누적**되고, 32를 넘으면
+`FixedStack::Push`가 TLS의 다음 멤버를 덮어쓰는 것이었다. RAII 스코프는 이 결함을
+고치는 것이 아니라 **작성할 수 없게** 만든다. 열고 닫는 두 문장이 하나가 되면 한쪽만
+실행되는 경로가 존재하지 않는다.
+
+**② 이름 예산이라는 개념 자체가 사라진다.** 지금은 수집기가 프레임마다
+`frame.Allocator.String(event.pName)`으로 이름을 복사하고, 그래서 16,384B 예산과
+`DroppedNames` 계수가 필요했다. 이 저장소는 **C++23**이므로 NTTP 문자열 리터럴로
+마커 ID를 컴파일 타임 상수로 확정할 수 있다 — 등록은 정적 초기화에서 한 번,
+hot path에는 정수만 흐른다. 예산도 누락 계수도 필요 없어진다.
+
+#### 표기
 
 ```cpp
-static const ProfileMarker kPhysicsStep{
-    ProfileCategory::Physics, "Physics.Step", __FILE__, __LINE__
-};
+// 정적 마커 — 이름은 컴파일 타임 상수, 등록은 1회
+ce::ProfileScope _{ ce::Marker<"AnimatorSystem">() };
 
-CE_PROFILE_SCOPE(kPhysicsStep);
-CE_PROFILE_COUNTER(kDrawCalls, drawCount);
-CE_PROFILE_INSTANT(kSceneLoaded);
+// 보조 — 이름을 생략하면 std::source_location이 함수·파일·행을 채운다
+ce::ProfileScope _{};
+
+ce::ProfileCounter(ce::Marker<"DrawCalls">(), drawCount);
+ce::ProfileInstant(ce::Marker<"SceneLoaded">());
 ```
 
-Build 정책:
+`source_location` 판은 **보조**다. 지금 `Scene::Update` 한 함수 안에 계측 지점이
+13개 있어 함수 이름만으로는 구분되지 않는다 — 이름을 명시하는 쪽이 기본이다.
 
-- Editor/Development: marker 코드 포함
-- Shipping: `CE_PROFILE_ENABLED=0`이면 compile-out
-- 포함된 빌드에서도 runtime category mask로 비활성화 가능
-- `WITH_PROFILING`의 헤더 내 무조건 기본값 1은 제거하고 빌드 설정이 정한다.
-- ★ **Editor/Development/Shipping 구성 구분은 이 계획 혼자 쓰지 않는다**(2026-09-04 기입).
-  PHASE 14.5(`EditorAutomationCLIPlan.md` §11.1)의 Player 커맨드 서비스가 같은 구분을
-  compile-out 경계로 쓴다. 저장소에는 아직 그런 매크로가 0건이므로 **먼저 도착하는 쪽이
-  만들고 다른 쪽이 소비한다** — 두 벌을 만들면 Shipping 격리 게이트가 둘로 갈린다.
+#### ★ 호출부 형태에 독립이어야 한다
+
+마커 ID가 컴파일 타임 상수이고 스코프가 RAII이면, 호출부가 39곳이든 1곳이든 코어는
+동일하다. 나중에 씬 실행 표가 도입되면
+
+```cpp
+for (auto& step : table) { ce::ProfileScope _{ step.marker }; step.fn(*this, dt); }
+```
+
+한 줄로 흡수되고 코어 변경은 0이다. **이 독립성이 설계 요구사항이다** — 프로파일러가
+씬 실행 구조 리팩터를 인질로 잡지 않게 한다(§0.5.4).
+
+#### Build 정책 — 만들 것이 아니라 물 것이다
+
+> **2026-09-15 갱신.** 초판은 "저장소에 그런 매크로가 0건이므로 먼저 도착하는 쪽이
+> 만든다"고 적었다. **PHASE 14.5 LC8이 먼저 도착했고 이미 서 있다.**
+
+- `Directory.Build.targets:72-73`이 **전 프로젝트에** 정의한다 —
+  `EngineShipping=true`면 `CE_SHIPPING=1;CE_DEVELOPMENT=0`, 아니면 `CE_SHIPPING=0;CE_DEVELOPMENT=1`
+- 스위치는 `Directory.Build.props`의 `EngineShipping`이고 **솔루션 구성을 늘리지 않는다**
+  (`msbuild ... /p:EngineShipping=true`)
+- 산출물 키가 갈린다 — `Bin\x64-Release-Shipping\Player\`
+- 격리 게이트 `verify-player-shipping-isolation.ps1`이 **`run-all:299`에 편입돼 있다**
+- 현재 소비자는 `Player/PlayerCommandService.cpp` 하나뿐이다
+
+따라서 이 계획이 할 일은 **`CE_DEVELOPMENT`를 무는 것**이다. 마커 타입을
+`CE_DEVELOPMENT == 0`에서 빈 타입으로 두고(`if constexpr`로 본문 소거), 격리 게이트에
+"Shipping 바이너리에 프로파일러 심볼 0" 단정을 얹으면 완료조건이 닫힌다.
+**새 매크로를 만들지 않는다** — 두 벌이 되면 격리 게이트가 둘로 갈린다.
+
+포함된 빌드에서도 runtime category mask로 비활성화할 수 있어야 한다.
 
 ### 5.3 Event
 
@@ -731,43 +921,88 @@ P2의 성공 판정은 `cross-frame/preserve`가 `KNOWN-DEFECT`에서 `PASS`로 
   (PROFILE_SELFTEST_OK=true — 이동한 코어의 실행 실증). **P1 완료 조건 중
   "UI를 링크하지 않는 Player에서도 코어가 빌드됨"이 닫혔다.**
 
-남은 P1 본체: ProfilerService·MarkerRegistry·EngineFrameId·shipping
-compile-out — 아래 할 일 그대로.
+> **2026-09-15 개정.** 아래 할 일·완료 조건을 재작성했다. 재활용 폐기(§0.5.3)와
+> 매크로 폐기(§5.2)로 **항목 하나가 무의미해졌고**, Shipping 항목은 **대상이 이미
+> 서 있음이 확인됐다**(§0.5.1).
+
+#### P1b — 새 코어와 공통 frame clock (개정)
 
 할 일:
 
-- `EngineDiagnostics.vcxproj` 추가
-- `ProfilerService`, `MarkerRegistry`, build flag
-- 단일 `EngineFrameId` 발행 지점을 main loop에 배선
-- `ProfileMarker` 정적 ID API와 RAII scope
-- 기존 `PROFILE_CPU_*` 매크로를 새 API adapter로 연결
-- ImGui/D3D12 include 없는지 include boundary 검사 추가
+- `ProfilerService` — 스트림을 서비스가 소유한다. 현행의 함수 지역
+  `static thread_local`(모든 인스턴스가 스레드당 TLS 하나를 공유) 제약이 여기서 풀린다
+- `MarkerRegistry` — 컴파일 타임 마커 ID 등록(§5.2). **매크로를 만들지 않는다**
+- `ce::ProfileScope` RAII — 짝 불균형을 문법적으로 불가능하게
+- **단일 `EngineFrameId` 발행 지점 통합.** 새로 만드는 일이 아니라 지금 서로 모르고
+  도는 세 카운터를 묶는 일이다:
+
+  | 후보 | 성질 | 판정 |
+  |---|---|---|
+  | `TimeSystem::m_frameCount`(atomic uint32) | Editor·Player 공통, 편집·재생 모두 증가, **`FixedTick` 호출부 0**이라 루프당 1회(9-15 재확인) | **정본** |
+  | `Runtime::TickSimulationFrame` | 편집 모드는 앞에서 early return | 부적합 |
+  | `LiveState::publishedFrameId`(atomic uint64) | RT 파이프라인 제출 단위 | `SubmissionId` 축 후보 |
+
+- 호출부 39곳의 표기를 새 RAII로 교체(**이름과 자리는 보존**)
+- `CE_DEVELOPMENT`를 물어 compile-out(§5.2 — 새 매크로 신설 금지)
+- ImGui/D3D12 include 없는지 include boundary 검사 유지
+
+~~기존 `PROFILE_CPU_*` 매크로를 새 API adapter로 연결~~ — **폐기.** 옛 코어에 adapter를
+붙이는 일이 재활용 폐기로 의미를 잃었다. 매크로는 정의째 없어진다.
 
 완료 조건:
 
-- 기존 marker 호출부를 대량 수정하지 않고 새 코어로 이벤트가 들어감
-- Shipping 설정에서 marker 코드 compile-out 검증
+- **이벤트 수가 보존된다 — 편집 27 / 재생 34**(§2.1 실측). 이것이 "기존 호출부 대량
+  수정 없이 새 코어로 이벤트가 들어감"을 재는 값이다. 마커 하나가 안 이어지면 26이 된다
 - 동일 marker가 여러 스레드에서 하나의 안정된 ID 사용
-- UI를 링크하지 않는 `Player` 프로젝트에서도 코어가 빌드됨
+- `CE_SHIPPING=1` 빌드에서 프로파일러 심볼 0 — `verify-player-shipping-isolation.ps1`에
+  단정 추가(그 게이트는 이미 `run-all:299`에 있다)
+- UI를 링크하지 않는 `Player`에서도 코어가 빌드됨 *(P1a에서 이미 닫힘)*
+- ★ **프로파일링 검사가 `run-all`에 편입된다.** 현재 113개 게이트 중 프로파일링은
+  0건이고, 그래서 Stats 축이 9-06부터 8일·115커밋 동안 죽어 있는 것을 아무도 몰랐다
+
+#### P1b 착수 전 선행 — 죽은 게이트 축 복구
+
+P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34였다"를 증명할 자리가 없다.
+
+- `Invoke-ProfilingValidation -Action Stats`가 JSON을 읽게 고친다(텍스트 복구가 아니다 —
+  `reg.Result` 규약이 정본이고 이 저장소에 `ConvertFrom-Json` 게이트 13종의 선례가 있다)
+- 단정은 **이벤트 수 두 개**(편집 27 / 재생 34)로 좁힌다. 씬을 추적되는 fixture로 고정한다
+- 드롭·포화(`totalDroppedEvents`·`peakFrameEvents < eventCapacity`)는 **값만 기록하고
+  이빨 없음을 주석에 남긴다** — §2.1이 보였듯 어떤 변이로도 자극되지 않는다
+- 변이로 증명한다: 마커 하나를 빼서 27→26으로 붉어지는지, 그리고 그 변이가 실제로
+  단정 자리를 지나는지까지
 
 ### P2 — CPU thread stream과 rolling capture
+
+> **2026-09-15 우선순위 승격.** P2는 "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를
+> 막고 있는 일**이다. PHASE 13이 애니메이션 워커 8스레드를 최적화하는데(§0.5.5),
+> 그 워커에 마커를 걸려면 sealed chunk handoff가 먼저 있어야 한다 — 지금 코어에 워커
+> 계측을 붙이면 §3.1의 원소 단위 경합이 그대로 열린다. **지금 안 터지는 유일한 이유가
+> writer가 `[GameThread]` 하나뿐이기 때문**이다.
 
 할 일:
 
 - owner 수명이 명확한 `ThreadStream`
-- sealed chunk handoff
-- cross-frame scope와 mid-capture scope 처리
+- sealed chunk handoff — writer가 자기 chunk를 봉인해 넘기고 collector는 남의 메모리를
+  만지지 않는다. 현행 결함 8종 중 다섯이 **고쳐지는 것이 아니라 발생하지 않게** 된다
+- cross-frame scope와 mid-capture scope 처리 — `truncated` flag(§6.1).
+  **selftest의 `cross-frame/preserve`가 KNOWN-DEFECT에서 PASS로 바뀌는 것이 판정이다**
 - 600프레임/128MiB rolling ring
 - drop/overflow 진단
 - `CaptureSession` freeze
+- ★ **워커 스레드 등록** — 애니메이션 워커 8개, RenderThread, PresentationThread.
+  enkiTS 이관(PHASE 13 S0.5) 이후라면 `threadnum_`(0..`GetNumTaskThreads()-1` 보장)을
+  슬롯 키로 쓴다 — 현행이 발명해야 했던 11비트 슬롯 은퇴·재사용 규칙이 불필요해진다
 
 완료 조건:
 
 - 8개 이상 writer thread stress에서 충돌·손상 없음
-- 프레임 경계를 넘는 scope의 duration이 정확함
+- 프레임 경계를 넘는 scope의 duration이 정확함(`cross-frame/preserve` PASS)
 - thread 생성/종료 후 dangling TLS 접근 없음
 - pool 고갈 시 정지하지 않고 dropped count가 정확히 증가
 - ASan 가능 구성 또는 동등한 메모리 검증에서 오류 없음
+- ★ **애니메이션 워커의 시간이 캡처에 나타난다** — PHASE 13 §4의 완료 기준("예측 비용
+  대 실측 오차 15% 이내")을 판정할 수단이 이것이다
 
 ### P3 — CPU 중심 에디터 녹화 MVP
 
@@ -910,21 +1145,29 @@ compile-out — 아래 할 일 그대로.
 
 다음 네 모드를 같은 장면·해상도·프레임 수로 비교한다.
 
-1. profiler compile-out
+1. profiler compile-out (`CE_SHIPPING=1`)
 2. compiled but stopped
 3. CPU marker recording
 4. CPU+GPU+all counters recording
 
 기록값:
 
-- median/P95/P99 CPU frame
-- GPU frame
+- median/P95/P99 CPU frame · GPU frame
 - profiler service 자체 CPU 시간
 - events/sec와 bytes/sec
-- dropped events
-- peak capture memory
+- dropped events · peak capture memory
 
 허용 예산은 P0 실측 후 확정한다. 숫자를 먼저 정해 통과시키기 위해 데이터를 줄이지 않는다.
+
+> ★ **2026-09-15 경고 — 예산 소진을 게이트 단정으로 쓰지 말 것.** §2.1 실측이
+> 편집 27 / 재생 34 이벤트(상한 1024의 3%), 이름 388B / 525B(상한 16384B)를 보였고
+> 둘 다 `peak == last`였다. 계측 지점이 전부 시스템 단위 고정 지점이라 **씬에 무엇을
+> 얹어도 상수**이고, 1024에 닿으려면 계측 지점이 30배 늘어야 한다. 드롭·포화 단정은
+> 어떤 변이로도 자극되지 않는 **빈 단정**이다 — 달더라도 값만 기록하고 이빨이 없음을
+> 명시한다. 이 절이 재야 할 것은 예산이 아니라 **네 모드의 프레임 시간 차이**다.
+>
+> 그리고 이 절은 **P2 이후에야 의미가 생긴다.** 지금은 워커 8스레드가 계측 밖이라
+> 모드 3·4가 재는 것이 반쪽이다(§2.1).
 
 ---
 
@@ -974,18 +1217,27 @@ compile-out — 아래 할 일 그대로.
 다음 전부가 성립해야 계획 완료다.
 
 - [ ] Editor/Development에서 Record/Pause/Clear 가능
-- [ ] 최소 600프레임 또는 정한 메모리 예산만큼 rolling capture
+- [ ] 최소 600프레임 또는 정한 메모리 예산만큼 rolling capture — **4프레임 링 폐기**(§2.2)
 - [ ] 멀티스레드 CPU Timeline과 선택 구간 Hierarchy
+- [ ] ★ **애니메이션 워커 8스레드·RenderThread·PresentationThread가 캡처에 나타남**
+      (§2.1 — 지금은 `[GameThread]` 하나뿐이라 렌더·애니메이션 경로가 통째로 안 보인다)
 - [ ] 멀티카메라·2-in-flight에서도 정확한 GPU frame/submission 매핑
 - [ ] CPU/GPU/Rendering/Memory/GC counter가 같은 EngineFrameId에 정렬
 - [ ] overflow·누락·malformed scope·profiler overhead 표시
 - [ ] `.ceprof` 저장/불러오기 round-trip 검증
 - [ ] profiler UI가 닫혀도 Development Player capture 가능
-- [ ] Shipping compile-out 검증
+- [ ] `CE_SHIPPING=1`에서 프로파일러 심볼 0 — `verify-player-shipping-isolation.ps1` 단정
 - [ ] CreatorEngine.sln의 Academy_4Q + Player 빌드 통과
 - [ ] CPU/GPU selftest와 장시간 stress 통과
+- [ ] ★ **selftest `cross-frame/preserve`가 KNOWN-DEFECT에서 PASS로** — 이 한 줄이
+      수집 코어 교체의 진척 정의다
+- [ ] ★ **프로파일링 검사가 `run-all`에 편입** — 게이트는 도는 세트에 없으면 없는 것이다
 - [ ] DX12 debug layer/DRED 회귀 없음
 - [ ] 선택 조건에서 지원되는 PIX 다음 프레임 캡처 가능
+
+**매크로 잔존 0**(§5.2) — `PROFILE_CPU_BEGIN`·`PROFILE_CPU_END`·`PROFILER_INITIALIZE`
+등 옛 매크로가 정의·사용 모두에서 사라져야 한다. 소스 전수 검사로 판정하고, 주석·이력은
+제외한다.
 
 이 조건을 닫은 뒤에 Flame Graph, 두 캡처 비교, 원격 플레이어 연결, 자동 성능 회귀 게이트를
 후속 계획으로 분리한다.
@@ -1005,3 +1257,5 @@ compile-out — 아래 할 일 그대로.
   <https://learn.microsoft.com/windows/win32/tracelogging/trace-logging-reference>
 - CreatorEngine 기존 DX12 검증 진입점
   `Tools/dx12-validation/Invoke-DX12Validation.ps1`
+- 스케줄러 이관과 순서 제약: `docs/plans/TaskSchedulerUnificationPlan.md`(PHASE 13 S0.5·S6)
+- 이 계획의 소비자: `docs/plans/AnimationSchedulerPlan.md` §4 완료 기준(버짓·강등 관측)
