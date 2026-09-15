@@ -1,6 +1,6 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
-**신설 2026-09-01 · 재분할 2026-09-03 · PHASE 4.5 분리 2026-09-14 · PHASE 4.3 분리 2026-09-15 · 활성 69행 352.5일 · 완료 12.5일 + 진행 기성 3.5일 · 잔여 336.5일**
+**신설 2026-09-01 · 재분할 2026-09-03 · PHASE 4.5 분리 2026-09-14 · PHASE 4.3 분리 2026-09-15 · PHASE 4.9 신설 2026-09-15(공수 미산정) · 활성 69행 352.5일 · 완료 12.5일 + 진행 기성 3.5일 · 잔여 336.5일**
 
 기존 단일 PHASE 4에는 현재 PBR 배선 수정, Blender형 Material Graph, RenderGraph·라이트맵·
 일반 SRP·후처리·차세대 GPU 기능이 한데 섞여 있었다. 이 문서는 그것을 다섯 완료선으로
@@ -144,6 +144,33 @@ PHASE 4.75의 generic Pass graph는 PHASE 4.25의 graph editor/typed IR 기반�
 Material output/Principled 의미를 소유하지 않는다. 반대로 PHASE 4.25는 Pass topology,
 RenderGraph resource lifetime이나 post stack을 소유하지 않는다.
 
+### 1.6 PHASE 4.9 — 백엔드 패리티 (DX12/Vulkan 교차 판정)
+
+정본은 [`BackendParityPlan.md`](BackendParityPlan.md)다. **2026-09-15 사용자 결정**으로
+PHASE 4의 판정을 DX12 백엔드로만 하기로 하면서, 미룬 것들을 잃지 않으려고 세웠다.
+
+- 교차 백엔드 제품 프레임 캡처 1:1 픽셀 대응과 `render.pbr.compare` 판정 복귀.
+- `verify-pbr-wiring-baseline.ps1`의 vulkan 회차·`vk.*` 4종 복구.
+- **DX12 전용 deferred 검사 신설** — `vk.*`를 끄며 생긴 구멍이다(아래).
+- Vulkan 기동 창 `gCubeMap` 결함(PHASE 4와 무관한 별건).
+
+**★ 미룬 것은 판정이지 배선이 아니다.** RHI 중립 어휘(enum·변환표)와 Vulkan 백엔드
+구현은 PHASE 4에서도 계속 **양쪽을 채운다**. 새 값 축을 더할 때 두 백엔드 변환표를
+모두 채우는 규약은 그대로다 — 어휘에 구멍을 내면 백엔드 비대칭이 생기고 그것이
+4.9에서 갚을 빚이 된다. 다른 세션은 PHASE 4에서 vulkan을 걱정하지 않는다.
+
+**`vk.*`는 이름이 범위를 속인다.** `vk.shadow`/`gbuffer`/`forward`/`deferred` 넷은
+vulkan 단독이 아니라 **DX12/Vulkan 대조** 검사다(`RunVulkanGBufferTest` 안에
+`dx12Capture`와 `vkCapture`가 나란히 있다). 그래서 끄면 **DX12 팔도 함께 꺼진다.**
+gbuffer는 `dx12.gbuffer`, forward는 `dx12.forwardshade`가 덮고 shadow는
+`dx12.shadowquality`가 축이 달라 절반만 덮으며, **deferred는 대체가 아예 없다**
+(`dx12.deferred`라는 명령이 없다). 이 자리가 결정의 실제 비용이고, 교차 백엔드가
+아니라 DX12 단독이라 시각 고정을 기다리지 않고 먼저 갚을 수 있다.
+
+**공수는 미산정이다.** 선행 조건인 시뮬레이션 시각 고정(`time.*` 부재)을 실측하기
+전에는 슬라이스를 끊을 수 없다. **총공수 352.5일은 변동 없다** — 지어낸 공수를
+정본에 넣지 않았고, 대시보드에도 행을 비워 두었다.
+
 **항목 ID 개명 (2026-09-15).** 구 PHASE 4 시절 잔재인 `4-2`/`4-3`/`4-4`/`4-6`을
 `GPU-1`/`GPU-2`/`GPU-3`/`GPU-9`로 바꾼다. 하이픈 ID `4-3`이 새 페이즈 번호 `4.3`과
 읽는 자리에서 충돌하기 때문이며, 내용·공수·선후는 바뀌지 않는다. 완료된 `4-1`은
@@ -183,6 +210,8 @@ PHASE 4.5   PHASE 4.3에서 BASE-0만 입력으로 받는다
               └─ TR1 → TR2 → TR3 → TU0 → TU1 ∥ TU2 → TU3 ∥ TU4 ∥ TU5
                                                           └─ FG0 → FG1 ∥ FG2 → FG3 ∥ FG4
                                                                               → TFG9
+    ↓
+PHASE 4.9   BackendParityPlan — 시각 고정 → 교차 백엔드 판정 복귀 (슬라이스 미확정)
     ↓
 PHASE 4.75  PHASE 4.3에서 BASE-0·RG5·RG6·Q0를 입력으로 받는다
               ├─ L1 ∥ L2 → L3 → Q0 → L4 → L5/L6 → L7

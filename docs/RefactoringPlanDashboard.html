@@ -253,6 +253,12 @@
       <div class="rm-d">모션 벡터 · jitter · 업스케일 · 프레임 생성</div>
     </div>
     <div class="rm-arrow">→</div>
+    <div class="rm-node" style="border-color:var(--accent)">
+      <div class="rm-p" style="color:var(--accent)">PHASE 4.9</div>
+      <div class="rm-t">백엔드 패리티</div>
+      <div class="rm-d">시각 고정 · 교차 백엔드 픽셀 판정 복귀 · vulkan 기동 창</div>
+    </div>
+    <div class="rm-arrow">→</div>
     <div class="rm-node" style="border-color:var(--purple)">
       <div class="rm-p" style="color:var(--purple)">PHASE 4.75</div>
       <div class="rm-t">차세대 렌더 파이프라인</div>
@@ -345,6 +351,8 @@
       <div class="why">모션 벡터·jitter·히스토리와 벤더 중립 Temporal Upscaling·Frame Generation.</div></div>
     <div class="doc"><a href="plans/RenderGraphDependencySchedulingPlan.md">RenderGraphDependencySchedulingPlan.md</a><span class="tie">PHASE 4.3 · RG</span>
       <div class="why">공통 밀봉 하네스와 리소스 의존성 스케줄링, 단계별 제품 전환.</div></div>
+    <div class="doc"><a href="plans/BackendParityPlan.md">BackendParityPlan.md</a><span class="tie">PHASE 4.9 · 미착수</span>
+      <div class="why">PHASE 4가 DX12로 좁히며 미룬 교차 백엔드 판정을 한자리에 모은다.</div></div>
     <div class="doc"><a href="plans/LightmapBakerPlan.md">LightmapBakerPlan.md</a><span class="tie">PHASE 4.75 · L</span>
       <div class="why">라이트맵 베이커 재작성과 비동기 베이킹 계약.</div></div>
     <div class="doc"><a href="plans/ScriptableRenderPipelinePlan.md">ScriptableRenderPipelinePlan.md</a><span class="tie">PHASE 4.75 · SRP</span>
@@ -678,6 +686,28 @@
   <div class="risknote">
     <div class="vt">범위 원칙</div>
     PHASE 4.75는 PHASE 4의 wiring 의미, PHASE 4.25의 Principled/artist 비용 계약, PHASE 4.3의 RenderGraph resource lifetime·queue 계약을 재정의하지 않는다. L 사전 연구는 병렬 가능하지만 제품 cutover는 앞선 완료선을 우회하지 않는다.
+  </div>
+</section>
+
+<!-- ===== PHASE 4.9 ===== -->
+<section class="phase" id="phase-4.9">
+  <h2 class="sec"><span class="no">PHASE 4.9</span>백엔드 패리티 · DX12/Vulkan 교차 판정 <span class="phase-pct" data-phase-pct="4.9"></span></h2>
+  <div class="phase-meta"><b>정본: <a href="plans/BackendParityPlan.md" style="color:var(--accent)">BackendParityPlan.md</a></b> · 2026-09-15 신설 · <b>활성 0행 · 슬라이스·공수 미산정</b> · 선행 PHASE 4. <b>총공수는 변동 없다</b> — 지어낸 공수를 넣지 않으려고 행을 비워 두었다. 착수 시 §1의 선행 조건(시뮬레이션 시각 고정)부터 실측한 뒤 슬라이스를 끊는다.</div>
+  <div class="phase-goal"><b>목표:</b> PHASE 4가 판정을 DX12로 좁히며 미룬 것들을 갚는다. <b>미룬 것은 판정이지 배선이 아니다</b> — RHI 중립 어휘와 Vulkan 백엔드 구현은 PHASE 4에서도 계속 양쪽을 채웠으므로, 여기서 할 일은 구현이 아니라 <b>다시 재는 장치를 세우는 것</b>이다.</div>
+  <div class="task-wrap"><table class="tasks" data-phase="4.9"><!-- JS 생성 --></table></div>
+  <div class="verify">
+    <div class="vt">이 페이즈가 갚을 목록 (BackendParityPlan)</div>
+    <ul>
+      <li><b>선행 P0 — 시뮬레이션 시각 고정.</b> <code>time.*</code> 명령이 없어 교차 백엔드 픽셀 판정은 <b>성립하지 않는 질문</b>이었다. 같은 백엔드끼리도 Δt만 벌어지면 허용치를 넘는다(구름 그림자·포그 직전프레임 혼합·SSGI 누적). 이것 없이는 나머지가 착수되지 않는다</li>
+      <li><b>P1 — DX12 전용 deferred 검사 신설.</b> <code>vk.*</code> 넷을 끄면서 생긴 구멍이다. 그 넷은 이름과 달리 DX12/Vulkan <b>대조</b> 검사라 끄면 DX12 팔도 함께 꺼졌다. gbuffer·forward는 <code>dx12.gbuffer</code>·<code>dx12.forwardshade</code>가 덮지만 <b>deferred는 대체가 아예 없다</b>. 교차 백엔드가 아니라 DX12 단독이라 시각 고정을 기다리지 않는다</li>
+      <li>Vulkan 기동 창 <code>gCubeMap</code> 결함 — 기록되지 않은 셋으로 그려진다. <code>SetBindings</code>가 이미지 뷰 생성 실패 시 pending 없이 돌아가는데 <code>Draw</code>는 진행한다. PHASE 4와 무관한 별건인데 게이트를 끝까지 못 가게 막았다</li>
+      <li><code>verify-pbr-wiring-baseline.ps1</code>의 vulkan 회차 복구(<code>-Backend dx12,vulkan</code>)와 <code>vk.*</code> 복구(<code>-IncludeVulkanSelfTest</code>) — <b>코드는 지우지 않았다</b>, 스위치 하나로 돌아온다</li>
+      <li><code>render.pbr.compare</code>를 <code>gated:false</code> 측정에서 <b>판정</b>으로 되돌린다</li>
+    </ul>
+  </div>
+  <div class="risknote">
+    <div class="vt">미룬다고 "확인한 적 없다"가 아니다</div>
+    2026-09-14 W7 실측에서 <code>vulkan-samplermodes</code>는 <b>draws 18 · bindings 18 · distinct 3 · validation 0</b>이었고 <b>세 신원 값이 dx12와 같았다</b>. 미룬 것은 그 사실을 <b>매 실행 자동으로 다시 확인하는 일</b>이다. 게이트의 축 회계도 <code>skipped</code>(이번 기계에 조건이 없다)와 <code>deferred</code>(다른 계획이 소유한다)를 가르고, 미룬 축에 <b>무엇을 잃었는지까지</b> 문장으로 들고 있다 — "미뤘다"만 적으면 뒷사람이 되돌릴 근거를 잃는다.
   </div>
 </section>
 
@@ -2937,7 +2967,7 @@ const TASKS = [
 // ★ 10·11이 빠져 있었다(2026-08-08). 요약 카드 루프가 이 배열 길이를 도므로
 //   PHASE 10은 섹션만 있고 카드가 안 나오고 있었다.
 // ★ 배열 → 맵(2026-08-11): PHASE 3.5 신설로 정수 인덱스가 페이즈 번호를 못 담는다.
-const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.3: "RenderGraph 리소스 의존성 스케줄링", 4.5: "시간축 재구성 (Temporal Upscaling·Frame Generation)", 4.75: "차세대 렌더 파이프라인·GPU 기능", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 9.5: "스크립트 표면 재설계 (C# 계층 기준 재수립)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "텍스처 파이프라인 (임포트·cook·런타임 소비)", 12.5: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 14.5: "라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어)", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
+const PHASE_NAMES = { 0: "안전망 구축", 1: "크래시 핫픽스", 2: "자원 소유권 재설계", 3: "DX12 렌더러 전환", 3.5: "머테리얼·셰이더 파이프라인 재설계", 3.75: "모델 자산 빅뱅 전환", 4: "PBR 제품 배선 안정화", 4.25: "Blender형 PBR·Material Graph", 4.3: "RenderGraph 리소스 의존성 스케줄링", 4.5: "시간축 재구성 (Temporal Upscaling·Frame Generation)", 4.75: "차세대 렌더 파이프라인·GPU 기능", 4.9: "백엔드 패리티 (DX12/Vulkan 교차 판정)", 5: "구조적 커플링 제거", 6: "코드 정리·상시화", 7: "UI 서브시스템 재설계", 8: "UI 레이아웃 해상도 독립", 8.5: "씬 그래프 재설계 (Entity·계층·컴포넌트·프리팹·생명주기)", 8.75: "Transform 갱신 구조·성능 재설계", 9: "생명주기 재설계 (델리게이트 프레임 루프 은퇴)", 9.5: "스크립트 표면 재설계 (C# 계층 기준 재수립)", 10: "파티클·이펙트 DX12 재설계와 패키지화", 11: "지형 DX12 재설계와 패키지화", 12: "텍스처 파이프라인 (임포트·cook·런타임 소비)", 12.5: "빌드 파이프라인 신설과 계층 전면 개편", 13: "애니메이션 스케줄러 · LOD · CPU 버짓", 14: "프레임 프로파일러 수집·녹화·구간 분석", 14.5: "라이브 커맨드 서비스 (로컬 HTTP·JSON · 실행 중 에디터/플레이어 제어)", 15: "유틸리티 프레임워크 현대화", 16: "UI 시스템 재설계 (uGUI 저작 · Slate 런타임)", 17: "직렬화 이원화 (저작 YAML · 런타임 쿠킹 바이너리)", 18: "컴파일타임 리플렉션 전환", 19: "물리 재설계 (컴포넌트·백엔드·스레딩)", 20: "네트워크 준비형 런타임 · Replication 기반", 21: "에디터 워크스페이스 · 도킹 · ViewportHost 재설계", 22: "오디오 백엔드 현대화 · FMOD Core 은퇴", 23: "엔진 배포 · Launcher · 프로젝트 관리" };
 const ST_LABEL = { todo: "대기", progress: "진행 중", done: "완료", blocked: "차단됨", stopped: "중단됨" };
 const ST_CLASS = { todo: "st-todo", progress: "st-progress", done: "st-done", blocked: "st-blocked", stopped: "st-stopped" };
 const ST_WEIGHT = { todo: 0, progress: 0.5, done: 1, blocked: 0, stopped: 0 };
