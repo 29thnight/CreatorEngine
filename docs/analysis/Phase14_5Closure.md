@@ -91,7 +91,7 @@ MBC0 기준선과 비교했고, Gunner_F_Mythic·SU_Mythic·scene은 그 게이�
 | # | 조건 | 판정 방법 |
 |---|---|---|
 | 1 | 14.5 소유 게이트가 **현재 HEAD에서** 초록 | run-all의 아래 13칸을 그 세트만 묶어 실행 |
-| 2 | GUI 수동 조작 확인 | LC6 공통 편집 API의 Undo 선언 21개를 위젯 조작 → Undo/Redo → 상태 복원으로 확인 |
+| 2 | GUI 수동 조작 확인 | LC6 공통 편집 API의 Undo 선언을 위젯 조작 → Undo/Redo → 상태 복원으로 확인 — [체크리스트](Phase14_5ManualGuiChecklist.md) |
 
 1번의 13칸은 `CLI tokenizer 골든(LC0)`, `CLI exit spine(LC1)`, `CLI invocation(LC2)`, `CLI discovery(LC3)`,
 `CLI command service(LC4)`, `CLI drain·operation·SLO(LC5)`, `CLI 제품 표면 변경 검증`, `Commandlet 격리 및 공통 편집 API`(LC6),
@@ -164,6 +164,9 @@ host runtime DLL 을 로드하는 배치로 전환하면서 런처가 `Runtime/l
 
 이번에 남아 있던 제품 결과 이행, 폐기 하네스·어댑터 제거, 13개 한국어 판정 소비자,
 6개 명령 소스 존재 소비자 및 도표 불일치는 정리했다. 구현 잔량과 검증 잔량을 구분한다.
-2026-09-15 재정의의 조건 ①은 같은 날 HEAD 재실행으로 닫았다(위 절). 남은 미확인은 **GUI 수동 조작** 하나다.
+2026-09-15 재정의의 조건 ①은 같은 날 HEAD 재실행으로 닫았다(위 절). 남은 미확인은 **GUI 수동 조작** 하나이며
+대상과 절차는 [체크리스트](Phase14_5ManualGuiChecklist.md)에 세웠다 — 대상은 **24개**다. 위 표의 21개는
+2026-09-06 당시 옳았고, `4737ec60`(09-13 PHASE 21)이 `object.icon`·`object.lock`·`scene.navigate` 셋을 더했다.
+다른 페이즈가 공통 편집 API 를 쓰면 이 페이즈의 Undo 표면이 함께 늘어난다 — 착수 시 seed 표에서 다시 뽑는다.
 도메인별 코퍼스 누락·기존 렌더 검사 실패를 완료로 바꾸거나 실패 항목을 삭제하지 않는다 — 소유를 옮겼을 뿐이며,
 옮긴 자리에서 감시가 끊겨 있다는 사실도 함께 적었다.

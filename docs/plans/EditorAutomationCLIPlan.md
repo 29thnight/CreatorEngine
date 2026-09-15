@@ -156,7 +156,9 @@ Commandlet 모드와 일반 `--script`/`--exec`/stdin/HTTP를 혼합하면 실�
 
 이 페이즈는 둘을 만족하면 닫는다 — ① 14.5 소유 게이트 13칸(`CLI *(LC0~LC9)`·`CLI 제품 표면 변경 검증`·
 `Commandlet 격리 및 공통 편집 API`·`Player Shipping 격리`·`Player 명령 서비스`)이 **현재 HEAD에서** 초록,
-② LC6 공통 편집 API의 Undo 선언 21개에 대한 GUI 수동 조작 확인.
+② LC6 공통 편집 API의 Undo 선언에 대한 GUI 수동 조작 확인 —
+대상과 절차는 [체크리스트](../analysis/Phase14_5ManualGuiChecklist.md)에 있다(2026-09-15 기준 **24개**,
+경로 확인 18 · 미확인 6). 위 "마무리 반영"의 21개는 09-06 당시 값이며 PHASE 21이 셋을 더했다.
 
 **①은 2026-09-15에 닫았다** — HEAD `575ab79b`에서 초록 11 · 붉음 2이고, 붉은 둘(LC5 drain · LC8 Player 서비스)은
 제품 응답이 아니라 게이트 자신의 가정에서 나온 것임을 각각 확정했다. 사유와 실행 표는
