@@ -33,7 +33,7 @@ TriangleMeshResource::TriangleMeshResource(physx::PxPhysics* PxPhysics, const ma
 	bool res = PxValidateTriangleMesh(params, meshDesc);
 	if (res == false)
 	{
-		Debug->LogError("TriangleMeshResource::TriangleMeshResource() : PxValidateTriangleMesh failed");
+		Debug::PrintLog({}, spdlog::level::err, "TriangleMeshResource::TriangleMeshResource() : PxValidateTriangleMesh failed");
 	}
 #endif
 

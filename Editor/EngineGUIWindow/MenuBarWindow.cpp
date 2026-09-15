@@ -308,7 +308,7 @@ void MenuBarWindow::RenderMenuBar()
                         }
                         else
                         {
-                            Debug->LogError("Failed to save scene.");
+                            Debug::PrintLog({}, spdlog::level::err, "Failed to save scene.");
                         }
                     }
                 }
@@ -326,7 +326,7 @@ void MenuBarWindow::RenderMenuBar()
                     }
                     else
                     {
-                        Debug->LogError("Failed to save scene.");
+                        Debug::PrintLog({}, spdlog::level::err, "Failed to save scene.");
                     }
                 }
                 if (ImGui::MenuItem("Load Scene"))
@@ -343,7 +343,7 @@ void MenuBarWindow::RenderMenuBar()
                     }
                     else
                     {
-                        Debug->LogError("Failed to load scene.");
+                        Debug::PrintLog({}, spdlog::level::err, "Failed to load scene.");
                     }
 
                 }
@@ -579,7 +579,7 @@ void MenuBarWindow::RenderMenuBar()
                 // 여기서 따로 세면 로그 창이 보여 주는 값과 두 벌이 되어
                 // 한쪽만 맞는 일이 생긴다.
                 LogLevelTotals totals;
-                if (Log::IsAlive()) totals = Debug->GetLogLevelTotals();
+                if (Log::IsAlive()) totals = Debug::GetLogLevelTotals();
                 const std::string countText[3] = {
                     std::string(EditorIcon::Info) + " " + std::to_string(totals.messages),
                     std::string(EditorIcon::Warning) + " " + std::to_string(totals.warnings),
@@ -699,7 +699,7 @@ void MenuBarWindow::RenderMenuBar()
         }
         else
         {
-            Debug->LogError("Failed to save scene.");
+            Debug::PrintLog({}, spdlog::level::err, "Failed to save scene.");
         }
     }
     else if (isPressedControl && isDownS)
@@ -726,7 +726,7 @@ void MenuBarWindow::RenderMenuBar()
             }
             else
             {
-                Debug->LogError("Failed to save scene.");
+                Debug::PrintLog({}, spdlog::level::err, "Failed to save scene.");
             }
         }
     }
@@ -916,7 +916,7 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
             }
             else
             {
-				Debug->LogError("Failed to create Behavior Tree.");
+				Debug::PrintLog({}, spdlog::level::err, "Failed to create Behavior Tree.");
             }
         }
 		ImGui::SameLine();
@@ -942,7 +942,7 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
 							fileName.string(), parseError);
 					if (!document)
 					{
-						Debug->LogError("Behavior Tree parse failed: " + parseError);
+						Debug::PrintLog({}, spdlog::level::err, "Behavior Tree parse failed: " + parseError);
 					}
 					else
 					{
@@ -960,12 +960,12 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
                 }
                 else
                 {
-                    Debug->LogError("Behavior Tree file does not exist: " + fileName.string());
+                    Debug::PrintLog({}, spdlog::level::err, "Behavior Tree file does not exist: " + fileName.string());
                 }
             }
             else
             {
-                Debug->LogError("Failed to load Behavior Tree.");
+                Debug::PrintLog({}, spdlog::level::err, "Failed to load Behavior Tree.");
             }
         }
         ImGui::SameLine();
@@ -986,7 +986,7 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
                 }
                 else
                 {
-                    Debug->LogError("Failed to save Behavior Tree.");
+                    Debug::PrintLog({}, spdlog::level::err, "Failed to save Behavior Tree.");
 				}
             }
 
@@ -1750,7 +1750,7 @@ void MenuBarWindow::BlackBoardWindow(bool drawing)
                 editorBlackBoard.m_name = blackBoardName;
                 if (!editorBlackBoard.Serialize(blackBoardName))
                 {
-                    Debug->LogError("Failed to create BlackBoard: " + blackBoardName);
+                    Debug::PrintLog({}, spdlog::level::err, "Failed to create BlackBoard: " + blackBoardName);
                 }
             }
         }
@@ -1774,7 +1774,7 @@ void MenuBarWindow::BlackBoardWindow(bool drawing)
                 }
                 catch (const std::exception& e)
                 {
-                    Debug->LogError("Failed to load BlackBoard: " + std::string(e.what()));
+                    Debug::PrintLog({}, spdlog::level::err, "Failed to load BlackBoard: " + std::string(e.what()));
                 }
             }
         }
@@ -1785,7 +1785,7 @@ void MenuBarWindow::BlackBoardWindow(bool drawing)
             {
                 if (!editorBlackBoard.Serialize(blackBoardName))
                 {
-                    Debug->LogError("Failed to save BlackBoard: " + blackBoardName);
+                    Debug::PrintLog({}, spdlog::level::err, "Failed to save BlackBoard: " + blackBoardName);
                 }
             }
         }
@@ -2094,7 +2094,7 @@ void MenuBarWindow::SHowInputActionMap()
         {
             if (!InputActionManagers->SaveManager())
             {
-                Debug->LogError("Failed to save one or more input action maps");
+                Debug::PrintLog({}, spdlog::level::err, "Failed to save one or more input action maps");
             }
         }
         ImGui::SameLine();

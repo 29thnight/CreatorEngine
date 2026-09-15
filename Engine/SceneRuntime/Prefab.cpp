@@ -95,7 +95,7 @@ namespace
 						const auto targetIt = pathByLegacyId.find(legacyTarget);
 						if (targetIt == pathByLegacyId.end())
 						{
-							Debug->LogWarning("구 Navigation 링크를 프리팹 로컬 경로로 승격하지 못했다: 대상 instanceID "
+							Debug::PrintLog({}, spdlog::level::warn, "구 Navigation 링크를 프리팹 로컬 경로로 승격하지 못했다: 대상 instanceID "
 								+ std::to_string(legacyTarget) + "가 같은 프리팹 트리에 없다");
 							continue;
 						}
@@ -148,7 +148,7 @@ struct Prefab::InstantiateContext
 		const auto [it, inserted] = indexRemap.emplace(sourceIndex, targetIndex);
 		if (!inserted && it->second != targetIndex)
 		{
-			Debug->LogWarning("Prefab 인스턴스화 중 중복 source index를 발견했다: "
+			Debug::PrintLog({}, spdlog::level::warn, "Prefab 인스턴스화 중 중복 source index를 발견했다: "
 				+ std::to_string(sourceIndex) + " (첫 매핑을 유지한다)");
 		}
 	}
@@ -184,7 +184,7 @@ struct Prefab::InstantiateContext
 					// SceneManager의 load-batch remap과 같은 안전 폴백이다. 찾지 못한
 					// source slot을 대상 Scene의 동번호 슬롯로 해석하지 않는다.
 					targetRootIndex = fixup.targetIndex;
-					Debug->LogWarning("Prefab root index를 대상 계층에서 찾지 못했다: source "
+					Debug::PrintLog({}, spdlog::level::warn, "Prefab root index를 대상 계층에서 찾지 못했다: source "
 						+ std::to_string(fixup.sourceRootIndex) + ", self로 정규화한다");
 				}
 			}
@@ -436,7 +436,7 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
         }
         catch (const std::exception& e)
         {
-            Debug->LogError("Prefab instantiation failed: " + std::string(e.what()));
+            Debug::PrintLog({}, spdlog::level::err, "Prefab instantiation failed: " + std::string(e.what()));
             return nullptr;
 		}
     }
@@ -478,7 +478,7 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
             }
             catch (const std::exception& e)
             {
-                Debug->LogError(e.what());
+                Debug::PrintLog({}, spdlog::level::err, e.what());
                 continue;
             }
         }
@@ -542,7 +542,7 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
                     // 조용한 유실 양식이다.
                     const std::string childName = childNode["m_name"]
                         ? childNode["m_name"].AsStringChecked() : std::string("(이름없음)");
-                    Debug->LogError("중첩 프리팹 참조를 풀지 못했다 — 자식 '" + childName
+                    Debug::PrintLog({}, spdlog::level::err, "중첩 프리팹 참조를 풀지 못했다 — 자식 '" + childName
                         + "'이(가) 이 인스턴스에서 누락된다. 참조된 프리팹 자산을 찾을 수 없다");
                 }
                 continue;
@@ -608,7 +608,7 @@ Entity* Prefab::InstantiateNestedReference(const Authoring::ReadNode& node,
     // 않지만, 손으로 편집한 자산이 그런 노드를 담을 수 있다.
     if (refGuid == GetFileGuid())
     {
-        Debug->LogError("중첩 프리팹 참조가 자기 자신을 가리킨다 — 무한 재귀를 막으려 건너뛴다");
+        Debug::PrintLog({}, spdlog::level::err, "중첩 프리팹 참조가 자기 자신을 가리킨다 — 무한 재귀를 막으려 건너뛴다");
         return nullptr;
     }
 
@@ -671,7 +671,7 @@ Entity* Prefab::InstantiateNestedReference(const Authoring::ReadNode& node,
             }
             catch (const std::exception& e)
             {
-                Debug->LogError("중첩 참조의 오버라이드 항목을 읽지 못했다: " + std::string(e.what()));
+                Debug::PrintLog({}, spdlog::level::err, "중첩 참조의 오버라이드 항목을 읽지 못했다: " + std::string(e.what()));
             }
         }
     }

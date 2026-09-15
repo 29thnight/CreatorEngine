@@ -5,8 +5,11 @@
 #include "ClassProperty.h"
 #include <spdlog/spdlog.h>
 #include <atomic>
+#include <format>
+#include <source_location>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 class DebugClass : public Singleton<DebugClass>
 {
@@ -43,34 +46,87 @@ public:
 	bool IsInitialized() const noexcept { return m_initialized.load(std::memory_order_acquire); }
 	const std::string& GetLogFilePath() const noexcept { return m_logFilePath; }
 
-	void LogWarning(std::string_view message)
+	// source는 파일 경로가 아니라 호출부를 구분하는 논리적 태그/모듈명이다
+	// (예: "PhysicsManager"). file/line/function은 항상 실제 호출 지점을 가리키는
+	// where(std::source_location::current())에서 채운다 — 호출부가 __FILE__을
+	// 넘길 필요가 없다. source가 비어있지 않으면 메시지 앞에 "[source] "를 붙여
+	// 어느 태그의 로그인지 구분한다.
+	void PrintLog(std::string_view source, spdlog::level::level_enum level,
+		std::string_view message, std::source_location where = std::source_location::current())
 	{
-		spdlog::warn(message);
+		const spdlog::source_loc location{ where.file_name(), static_cast<int>(where.line()), where.function_name() };
+		if (source.empty())
+			spdlog::log(location, level, "{}", message);
+		else
+			spdlog::log(location, level, "[{}] {}", source, message);
 	}
 
-	void Log(std::string_view message)
+	// fmt 문자열 리터럴과 호출 지점(source_location)을 함께 캡처하는 래퍼.
+	// std::format_string<Args...>와 같은 방식으로 fmt는 컴파일 타임에 자리표시자
+	// 개수/타입이 검증되고, where는 이 값이 넘어오는 실제 호출부에서 기본 인자로
+	// 채워진다 — 포맷 오버로드가 내부적으로 다른 함수를 거쳐도 위치 정보가 유실되지
+	// 않는다.
+	template <typename... Args>
+	struct FormatArgs
 	{
-		spdlog::info(message);
+		std::format_string<Args...> fmt;
+		std::source_location where;
+
+		template <typename T>
+		consteval FormatArgs(const T& f, std::source_location loc = std::source_location::current())
+			: fmt(f), where(loc)
+		{
+		}
+	};
+
+	// std::format 스타일 포맷 오버로드. fmt는 컴파일 타임에 검증되는 리터럴이어야 하고,
+	// args는 런타임 값이면 된다 — 자리표시자 없이 완성 문자열만 넘기던 << 체인을
+	// 대신한다.
+	// FormatArgs<Args...> 자리에 std::type_identity_t를 씌워 비연역 컨텍스트로 만든다
+	// (std::format_string 자신도 이 방식을 쓴다) — 그러지 않으면 컴파일러가 fmt
+	// 리터럴 하나만으로 Args를 추론하려다 실패한다. 실제 Args는 뒤의 args... 팩에서만
+	// 추론된다.
+	template <typename... Args>
+	void PrintLog(std::string_view source, spdlog::level::level_enum level,
+		FormatArgs<std::type_identity_t<Args>...> fmtArgs, Args&&... args)
+	{
+		PrintLog(source, level, std::format(fmtArgs.fmt, std::forward<Args>(args)...), fmtArgs.where);
 	}
 
-	void LogError(std::string_view message)
+	void LogWarning(std::string_view message,
+		std::source_location where = std::source_location::current())
 	{
-		spdlog::error(message);
+		PrintLog({}, spdlog::level::warn, message, where);
 	}
 
-	void LogDebug(std::string_view message)
+	void Log(std::string_view message,
+		std::source_location where = std::source_location::current())
 	{
-		spdlog::debug(message);
+		PrintLog({}, spdlog::level::info, message, where);
 	}
 
-	void LogTrace(std::string_view message)
+	void LogError(std::string_view message,
+		std::source_location where = std::source_location::current())
 	{
-		spdlog::trace(message);
+		PrintLog({}, spdlog::level::err, message, where);
 	}
 
-	void LogCritical(std::string_view message)
+	void LogDebug(std::string_view message,
+		std::source_location where = std::source_location::current())
 	{
-		spdlog::critical(message);
+		PrintLog({}, spdlog::level::debug, message, where);
+	}
+
+	void LogTrace(std::string_view message,
+		std::source_location where = std::source_location::current())
+	{
+		PrintLog({}, spdlog::level::trace, message, where);
+	}
+
+	void LogCritical(std::string_view message,
+		std::source_location where = std::source_location::current())
+	{
+		PrintLog({}, spdlog::level::critical, message, where);
 	}
 
 	void Flush()
@@ -104,7 +160,38 @@ public:
 	}
 };
 
-static auto Debug = DebugClass::GetInstance();
+namespace Debug
+{
+	inline DebugClass& Instance() { return *DebugClass::GetInstance(); }
+
+	// where는 이 오버로드가 직접 호출된 지점(예: PhysicsManager.cpp)에서 기본값으로
+	// 채워지고, Instance().PrintLog로 그 값을 그대로 전달한다 — 여기서 생략하면
+	// LogSystem.h 안에서 재평가돼 실제 호출 지점을 잃어버린다.
+	inline void PrintLog(std::string_view source, spdlog::level::level_enum level,
+		std::string_view message, std::source_location where = std::source_location::current())
+	{
+		Instance().PrintLog(source, level, message, where);
+	}
+
+	template <typename... Args>
+	inline void PrintLog(std::string_view source, spdlog::level::level_enum level,
+		DebugClass::FormatArgs<std::type_identity_t<Args>...> fmtArgs, Args&&... args)
+	{
+		Instance().PrintLog(source, level, std::move(fmtArgs), std::forward<Args>(args)...);
+	}
+
+	inline void Clear() { Instance().Clear(); }
+	inline LogSnapshot GetLogSnapshot() { return Instance().GetLogSnapshot(); }
+	inline std::optional<LogSnapshot> GetLogSnapshotIfChanged(std::uint64_t revision)
+	{
+		return Instance().GetLogSnapshotIfChanged(revision);
+	}
+	inline LogLevelTotals GetLogLevelTotals() { return Instance().GetLogLevelTotals(); }
+	inline std::optional<LogDelta> GetLogDeltaSince(LogCursor cursor)
+	{
+		return Instance().GetLogDeltaSince(cursor);
+	}
+}
 
 namespace Log
 {
@@ -139,26 +226,26 @@ namespace Log
 	inline void Initialize(std::string_view sessionName = "Editor")
     {
 		DebugClass::GetInstance();
-		Debug->Initialize(sessionName);
+		DebugClass::GetInstance()->Initialize(sessionName);
 	}
 
 	inline void Finalize()
 	{
 		if (!IsAlive()) return;   // 중복 호출 및 파괴 후 접근 방지
 
-		Debug->Finalize();
+		DebugClass::GetInstance()->Finalize();
 		DebugClass::Destroy();
 	}
 
 	// 위험 구간 진입 전이나 크래시 핸들러에서 호출한다.
 	inline void FlushNow()
 	{
-		if (IsAlive() && Debug) Debug->FlushNow();
+		if (IsAlive()) DebugClass::GetInstance()->FlushNow();
 	}
 
 	inline void NotifyCrash(std::string_view reason)
 	{
-		if (IsAlive() && Debug) Debug->NotifyCrash(reason);
+		if (IsAlive()) DebugClass::GetInstance()->NotifyCrash(reason);
 	}
 
 	// SEH 예외 정보를 해석해 로그에 남기고 즉시 flush한다.

@@ -55,7 +55,7 @@ namespace
 			startupScene.empty() || file::path(startupScene).filename() != startupScene ||
 			_wcsicmp(file::path(startupScene).extension().c_str(), L".creator") != 0)
 		{
-			Debug->LogError("Build Settings의 시작 씬은 프로젝트에 있는 .creator 파일이어야 합니다.");
+			Debug::PrintLog({}, spdlog::level::err, "Build Settings의 시작 씬은 프로젝트에 있는 .creator 파일이어야 합니다.");
 			return false;
 		}
 		const file::path startupScenePath =
@@ -63,14 +63,14 @@ namespace
 		pathError.clear();
 		if (!file::is_regular_file(startupScenePath, pathError) || pathError)
 		{
-			Debug->LogError("Build Settings 시작 씬 파일을 찾을 수 없습니다.");
+			Debug::PrintLog({}, spdlog::level::err, "Build Settings 시작 씬 파일을 찾을 수 없습니다.");
 			return false;
 		}
 
 		const auto distribution = ResolveEditorEngineDistribution(true);
 		if (distribution.root.empty())
 		{
-			Debug->LogError("선택 가능한 엔진 배포본이 없습니다. CreatorBuildTool publish-engine으로 배포본을 생성하세요.");
+			Debug::PrintLog({}, spdlog::level::err, "선택 가능한 엔진 배포본이 없습니다. CreatorBuildTool publish-engine으로 배포본을 생성하세요.");
 			return false;
 		}
 		const file::path repositoryRoot = distribution.root;
@@ -79,7 +79,7 @@ namespace
 		pathError.clear();
 		if (!file::is_regular_file(buildToolPath, pathError) || pathError)
 		{
-			Debug->LogError("선택한 엔진 배포본에 CreatorBuildTool.exe가 없습니다.");
+			Debug::PrintLog({}, spdlog::level::err, "선택한 엔진 배포본에 CreatorBuildTool.exe가 없습니다.");
 			return false;
 		}
 
@@ -119,7 +119,7 @@ namespace
 			FALSE, CREATE_NO_WINDOW, nullptr, repositoryRoot.c_str(),
 			&startupInfo, &processInfo))
 		{
-			Debug->LogError("게임 패키지 빌드 프로세스 시작 실패 (Win32=" +
+			Debug::PrintLog({}, spdlog::level::err, "게임 패키지 빌드 프로세스 시작 실패 (Win32=" +
 				std::to_string(GetLastError()) + ")");
 			return false;
 		}
@@ -132,7 +132,7 @@ namespace
 		CloseHandle(processInfo.hProcess);
 		if (!exitCodeRead || exitCode != 0)
 		{
-			Debug->LogError("게임 패키지 빌드 실패 (exit=" +
+			Debug::PrintLog({}, spdlog::level::err, "게임 패키지 빌드 실패 (exit=" +
 				std::to_string(exitCodeRead ? exitCode : ERROR_GEN_FAILURE) + ")");
 			return false;
 		}
@@ -169,7 +169,7 @@ bool GameBuilderSystem::BuildGame()
 		return false;
 	}
 
-	Debug->LogDebug("선택한 엔진의 Player 패키지 빌드·검증·게시 완료 (Build/Staging/*.current.json).");
+	Debug::PrintLog({}, spdlog::level::debug, "선택한 엔진의 Player 패키지 빌드·검증·게시 완료 (Build/Staging/*.current.json).");
 	return true;
 }
 

@@ -1213,7 +1213,7 @@ namespace
                 if (gbufferShaderMetaError != error)
                 {
                     ++gbufferShaderMetaFailures;
-                    Debug->LogError("[EnhancedRenderer] GBuffer ShaderMeta 적용 실패: " + error);
+                    Debug::PrintLog({}, spdlog::level::err, "[EnhancedRenderer] GBuffer ShaderMeta 적용 실패: " + error);
                 }
                 gbufferShaderMetaError = error;
             };
@@ -1296,7 +1296,7 @@ namespace
                 if (forwardShaderMetaError != error)
                 {
                     ++forwardShaderMetaFailures;
-                    Debug->LogError("[EnhancedRenderer] Forward ShaderMeta 적용 실패: " + error);
+                    Debug::PrintLog({}, spdlog::level::err, "[EnhancedRenderer] Forward ShaderMeta 적용 실패: " + error);
                 }
                 forwardShaderMetaError = error;
             };
@@ -3068,7 +3068,7 @@ namespace
                                 authoredError, pooled.generationSource.get());
                         if (!sealBuilt)
                         {
-                            Debug->LogWarning("Forward 저작 seal 시공 실패 —"
+                            Debug::PrintLog({}, spdlog::level::warn, "Forward 저작 seal 시공 실패 —"
                                 " legacy 폴백: " + authoredError);
                         }
                     }
@@ -3293,7 +3293,7 @@ namespace
                             pooled.generationSource.get());
                     if (!sealBuilt)
                     {
-                        Debug->LogWarning("GBuffer 저작 seal 시공 실패 —"
+                        Debug::PrintLog({}, spdlog::level::warn, "GBuffer 저작 seal 시공 실패 —"
                             " legacy 폴백: " + authoredError);
                     }
                 }
@@ -4139,14 +4139,14 @@ namespace
                         lastError = std::string("RenderThread frame exception: ") +
                             exception.what();
                         ++frameFailures;
-                        Debug->LogError(lastError);
+                        Debug::PrintLog({}, spdlog::level::err, lastError);
                     }
                     catch (...)
                     {
                         std::lock_guard<std::mutex> stateLock(renderStateMutex);
                         lastError = "RenderThread frame unknown exception";
                         ++frameFailures;
-                        Debug->LogError(lastError);
+                        Debug::PrintLog({}, spdlog::level::err, lastError);
                     }
                     activeDeltaBatch.clear();
 
@@ -4858,7 +4858,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                 state.vulkanFirstFrameReported = true;
                 const VulkanMeshCache::Stats meshStats =
                     state.vulkanPipeline->meshCache.GetStats();
-                Debug->LogWarning("[vulkan.live] editor TickLive 첫 프레임 완성"
+                Debug::PrintLog({}, spdlog::level::warn, "[vulkan.live] editor TickLive 첫 프레임 완성"
                     " · 공통 LivePipelineDesc→live_present"
                     " · draw " + std::to_string(state.lastDrawCount) +
                     " / batch " + std::to_string(state.lastBatchCount) +
@@ -4875,7 +4875,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             if (!validation.empty() && state.reportedValidation.insert(validation).second)
             {
                 std::printf("[vulkan.live 검증] %s\n", validation.c_str());
-                Debug->LogError("[vulkan.live 검증] " + validation);
+                Debug::PrintLog({}, spdlog::level::err, "[vulkan.live 검증] " + validation);
             }
         }
 
@@ -4905,7 +4905,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             {
                 state.lastError = "Vulkan 파이프라인 구축 실패: " + error;
                 state.enabled = false;
-                Debug->LogError("[EnhancedRenderer] " + state.lastError);
+                Debug::PrintLog({}, spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
                 return;
             }
         }
@@ -5015,7 +5015,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                 ++state.frameFailures;
                 ++state.consecutiveFrameFailures;
                 if (state.reportedValidation.insert(state.lastError).second)
-                    Debug->LogError("[EnhancedRenderer] " + state.lastError);
+                    Debug::PrintLog({}, spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
                 if (LiveState::kMaxConsecutiveFrameFailures <= state.consecutiveFrameFailures)
                 {
                     state.TeardownVulkanPipeline();
@@ -5187,7 +5187,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         if (!state.ResizePipeline(rtWidth, rtHeight, resizeError))
         {
             state.lastError = "DX12 resize lifecycle 실패: " + resizeError;
-            Debug->LogError("[EnhancedRenderer] " + state.lastError);
+            Debug::PrintLog({}, spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
             state.TeardownPipeline();
             state.enabled = false;
             return;
@@ -5200,7 +5200,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         if (!state.BuildPipeline(rtWidth, rtHeight, error))
         {
             state.lastError = "파이프라인 구축 실패: " + error;
-            Debug->LogError("[EnhancedRenderer] " + state.lastError);
+            Debug::PrintLog({}, spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
             state.TeardownPipeline();
             state.enabled = false;   // 실패를 조용히 반복하지 않는다
             return;
@@ -5393,12 +5393,12 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             // 정작 첫 원인을 못 본다).
             if (state.reportedValidation.insert(state.lastError).second)
             {
-                Debug->LogError("[EnhancedRenderer] " + state.lastError);
+                Debug::PrintLog({}, spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
             }
 
             if (LiveState::kMaxConsecutiveFrameFailures <= state.consecutiveFrameFailures)
             {
-                Debug->LogError("[EnhancedRenderer] 프레임 실패가 "
+                Debug::PrintLog({}, spdlog::level::err, "[EnhancedRenderer] 프레임 실패가 "
                     + std::to_string(state.consecutiveFrameFailures)
                     + "회 연속이라 파이프라인을 접는다. 마지막 사유: " + error);
                 state.TeardownPipeline();

@@ -85,7 +85,6 @@ void PhysicsManager::Update(float fixedDeltaTime)
 	ApplyPendingChanges();
 	// 물리 엔진 업데이트
 	Physics->Update(fixedDeltaTime);
-	//std::cout << " Physics->Update" << bm.GetElapsedTime() << std::endl;
 	
 	// 1순위: GetPhysicData()
 	// 물리 시뮬레이션의 결과를 모든 게임오브젝트의 Transform에 먼저 동기화합니다.
@@ -129,7 +128,7 @@ void PhysicsManager::OnLoadScene()
 void PhysicsManager::OnUnloadScene()
 {
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
-	for (auto& [id, info] : Container) 
+	for (auto& [id, info] : Container)
 	{
 		info.bIsDestroyed = true;
 	}
@@ -143,8 +142,6 @@ void PhysicsManager::OnUnloadScene()
 void PhysicsManager::ProcessCallback()
 {
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
-	//std::cout << " ProcessCallback size :" << m_callbacks.size() << std::endl;
-	//std::cout << " ColliderContainer size :" << Container.size() << std::endl;
 	for (auto& [data, type] : m_callbacks) {
 
 	
@@ -157,7 +154,7 @@ void PhysicsManager::ProcessCallback()
 		if (isSameID || lhs == iterEnd || rhs == iterEnd)
 		{
 			//자신의 콜라이더와 충돌 이거나 충돌체가 없어 졌을 경우 -> error
-			Debug->LogError("Collision Callback Error lfs :" + std::to_string(data.thisId) + " ,rhs : " + std::to_string(data.otherId));
+			Debug::PrintLog({}, spdlog::level::err, "Collision Callback Error lfs :" + std::to_string(data.thisId) + " ,rhs : " + std::to_string(data.otherId));
 			continue;
 		}
 
@@ -165,8 +162,6 @@ void PhysicsManager::ProcessCallback()
 		auto rhsObj = rhs->second.gameObject;
 
 		Collision collision{ lhsObj,rhsObj,data.contactPoints };
-		
-		//std::cout << " ProcessCallback thisId :" << lhsObj->GetHashedName().ToString() << " , otherId : " << rhsObj->GetHashedName().ToString() << " , type : " << static_cast<int>(type) << std::endl;
 
 		switch (type)
 		{
@@ -461,13 +456,13 @@ void PhysicsManager::AddCollider(BoxColliderComponent* box)
 	auto obj = box->GetOwner();
 	if (obj == nullptr)
 	{
-		Debug->LogError("BoxColliderComponent has no owner Entity.");
+		Debug::PrintLog({}, spdlog::level::err, "BoxColliderComponent has no owner Entity.");
 		return;
 	}
 
 	auto& transform = obj->Transform_();
 	unsigned int gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Box) - Entity InstanceID: " << gameObjectID << std::endl;
+	Debug::PrintLog({}, spdlog::level::info, "PhysicsManager::AddCollider(Box) - Entity InstanceID: {}", gameObjectID);
 	auto boxInfo = box->GetBoxInfo();
 	auto tranformOffset = box->GetPositionOffset();
 	auto rotationOffset = box->GetRotationOffset();
@@ -493,7 +488,7 @@ void PhysicsManager::AddCollider(SphereColliderComponent* sphere)
 	auto rotOffset = sphere->GetRotationOffset();
 
 	unsigned int gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Sphere) - Entity InstanceID: " << gameObjectID << std::endl;
+	Debug::PrintLog({}, spdlog::level::info, "PhysicsManager::AddCollider(Sphere) - Entity InstanceID: {}", gameObjectID);
 	sphereInfo.colliderInfo.id = gameObjectID;
 	sphereInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	auto& collisionTransform = sphereInfo.colliderInfo.collsionTransform;
@@ -513,7 +508,7 @@ void PhysicsManager::AddCollider(CapsuleColliderComponent* capsule)
 	auto posOffset = capsule->GetPositionOffset();
 	auto rotOffset = capsule->GetRotationOffset();
 	unsigned int gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Capsule) - Entity InstanceID: " << gameObjectID << std::endl;
+	Debug::PrintLog({}, spdlog::level::info, "PhysicsManager::AddCollider(Capsule) - Entity InstanceID: {}", gameObjectID);
 	capsuleInfo.colliderInfo.id = gameObjectID;
 	capsuleInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 
@@ -554,7 +549,7 @@ void PhysicsManager::AddCollider(MeshColliderComponent* mesh)
 	auto posOffset = mesh->GetPositionOffset();
 	auto rotOffset = mesh->GetRotationOffset();
 	unsigned int gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Mesh) - Entity InstanceID: " << gameObjectID << std::endl;
+	Debug::PrintLog({}, spdlog::level::info, "PhysicsManager::AddCollider(Mesh) - Entity InstanceID: {}", gameObjectID);
 	convexMeshInfo.colliderInfo.id = gameObjectID;
 	convexMeshInfo.colliderInfo.layerNumber = obj->GetCollisionType();
 	auto& collisionTransform = convexMeshInfo.colliderInfo.collsionTransform;
@@ -578,7 +573,7 @@ void PhysicsManager::AddCollider(CharacterControllerComponent* controller)
 	auto posOffset = controller->GetPositionOffset();
 	auto rotOffset = controller->GetRotationOffset();
 	ColliderID gameObjectID = obj->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(CharacterController) - Entity InstanceID: " << gameObjectID << std::endl;
+	Debug::PrintLog({}, spdlog::level::info, "PhysicsManager::AddCollider(CharacterController) - Entity InstanceID: {}", gameObjectID);
 	controllerInfo.id = gameObjectID;
 	controllerInfo.layerNumber = obj->GetCollisionType();
 	controllerInfo.position =
@@ -601,7 +596,7 @@ void PhysicsManager::AddCollider(TerrainColliderComponent* terrain)
 	HeightFieldColliderInfo heightFieldInfo;
 
 	ColliderID gameObjectID = object->GetInstanceID();
-	std::cout << "PhysicsManager::AddCollider(Terrain) - Entity InstanceID: " << gameObjectID << std::endl;
+	Debug::PrintLog({}, spdlog::level::info, "PhysicsManager::AddCollider(Terrain) - Entity InstanceID: {}", gameObjectID);
 
 	collider->SetColliderID(gameObjectID);
 	heightFieldInfo.colliderInfo.id = gameObjectID;
@@ -690,7 +685,6 @@ void PhysicsManager::RemoveCollider(TerrainColliderComponent* terrain)
 
 void PhysicsManager::CallbackEvent(CollisionData data, ECollisionEventType type)
 {
-	//std::cout << "PhysicsManager::CallbackEvent - ThisID: " << data.thisId << ", OtherID: " << data.otherId << ", EventType: " << static_cast<int>(type) << std::endl;
 	m_callbacks.push_back({ data,type });
 }
 
@@ -698,8 +692,7 @@ void PhysicsManager::SetPhysicData()
 {
 	
 	auto& Container = SceneManagers->GetActiveScene()->m_colliderContainer;
-	//std::cout << "Container size" << Container.size()<<std::endl;
-	for (auto& [id, colliderInfo] : Container) 
+	for (auto& [id, colliderInfo] : Container)
 	{
 		if (colliderInfo.bIsDestroyed)
 		{
@@ -719,7 +712,7 @@ void PhysicsManager::SetPhysicData()
 			static std::unordered_set<unsigned int> reported;
 			if (reported.insert(id).second)
 			{
-				Debug->LogError("[물리] RigidBodyComponent 없이 콜라이더만 붙은 오브젝트를 건너뜁니다: "
+				Debug::PrintLog({}, spdlog::level::err, "[물리] RigidBodyComponent 없이 콜라이더만 붙은 오브젝트를 건너뜁니다: "
 					+ colliderInfo.gameObject->m_name.ToString());
 			}
 			continue;
@@ -753,7 +746,7 @@ void PhysicsManager::SetPhysicData()
 			auto prevlayer = controllerInfo.layerNumber;
 			auto currentLayer = static_cast<unsigned int>(colliderInfo.gameObject->GetCollisionType());
 			
-			if (prevlayer != currentLayer) 
+			if (prevlayer != currentLayer)
 			{
 				data.LayerNumber = currentLayer;
 				controllerInfo.layerNumber = currentLayer;
@@ -772,8 +765,6 @@ void PhysicsManager::SetPhysicData()
 			movementData.restrictDirection = controller->GetMoveRestrict();
 
 			Physics->SetMovementData(id, movementData);
-
-			//std::cout << " PhysicsManager::SetPhysicData CCT : " << bm.GetElapsedTime() << std::endl;
 		}
 		else if (colliderInfo.id == m_heightFieldTypeId)
 		{
@@ -794,7 +785,7 @@ void PhysicsManager::SetPhysicData()
 			math::decompose(transform.GetWorldMatrix_NoScale(), ignoredScale,
 				pureWorldRot, pureWorldPos);
 
-			// 2. 콜라이더의 로컬 오프셋을 가져옵니다.  
+			// 2. 콜라이더의 로컬 오프셋을 가져옵니다.
 			auto offset = colliderInfo.collider->GetPositionOffset();
 			auto rotOffset = colliderInfo.collider->GetRotationOffset();
 
@@ -803,7 +794,7 @@ void PhysicsManager::SetPhysicData()
 			// 3. 오프셋을 적용하여 물리 객체의 '최종 월드 Pose'를 계산합니다
 			data.rotation = rotOffset * pureWorldRot;
 			data.position = pureWorldPos + math::rotate(offset, pureWorldRot);
-			// 4. 월드 스케일 값을 따로 가져옵니다.  
+			// 4. 월드 스케일 값을 따로 가져옵니다.
 			data.scale = transform.GetWorldScale();
 			if(data.scale != rigidbody->GetScale())
 			{
@@ -825,7 +816,7 @@ void PhysicsManager::SetPhysicData()
 			data.maxDepenetrationVelocity = rigidbody->GetMaxDepenetrationVelocity();
 
 			data.forceMode = static_cast<int>(rigidbody->GetForceMode());
-			rigidbody->SetForceMode(EForceMode::NONE); 
+			rigidbody->SetForceMode(EForceMode::NONE);
 			data.velocity = rigidbody->GetLinearVelocity();
 			data.AngularDamping = rigidbody->GetAngularDamping();
 			data.LinearDamping = rigidbody->GetLinearDamping();
@@ -842,13 +833,9 @@ void PhysicsManager::SetPhysicData()
 
 			data.isDirty = rigidbody->IsRigidbodyDirty();
 			rigidbody->DevelopOnlyDirtySet(false);
-			
-
-			//std::cout << " PhysicsManager::SetPhysicData CCT elses RigidBodyGetSetData Set  : " << bm1.GetElapsedTime() << std::endl;
 
 			//Benchmark bm2;
 			Physics->SetRigidBodyData(id, data);
-			//std::cout << " PhysicsManager::SetPhysicData CCT elses SetRigidBodyData : " << bm2.GetElapsedTime() << std::endl;
 		}
 	}
 	
@@ -943,7 +930,6 @@ void PhysicsManager::GetPhysicData()
 	// compiled parent order로 정렬해 parent+child 동시 write도 결정론적으로
 	// local을 역산하고 world cache를 즉시 맞춘다.
 	scene->ApplyWorldWriteBatch(worldWrites, TransformWriteReason::Physics);
-	//std::cout <<" PhysicsManager::GetPhysicData" << bm.GetElapsedTime() << std::endl;
 }
 
 // 펜딩된 CCT 위치 변경 요청을 일괄 처리하는 함수
@@ -1010,7 +996,7 @@ bool PhysicsManager::SaveCollisionMatrix()
 
 	if (!AssetAuthoringPort::WriteCollisionMatrix(request))
 	{
-		Debug->LogError(
+		Debug::PrintLog({}, spdlog::level::err,
 			"CollisionMatrix save requires a complete Editor authoring transaction");
 		return false;
 	}
@@ -1023,7 +1009,7 @@ void PhysicsManager::LoadCollisionMatrix()
 	file::path matrixSettingsPath = PathFinder::ProjectSettingPath("CollisionMatrix.asset");
 	if (!file::exists(matrixSettingsPath))
 	{
-		Debug->LogWarning("No CollisionMatrix.asset file found. Using default collision matrix.");
+		Debug::PrintLog({}, spdlog::level::warn, "No CollisionMatrix.asset file found. Using default collision matrix.");
 		return;
 	}
 	std::string parseError;
@@ -1031,7 +1017,7 @@ void PhysicsManager::LoadCollisionMatrix()
 		Authoring::ParsedDocument::ParseFile(matrixSettingsPath.string(), parseError);
 	if (!document)
 	{
-		Debug->LogError("CollisionMatrix.asset parse failed: " + parseError);
+		Debug::PrintLog({}, spdlog::level::err, "CollisionMatrix.asset parse failed: " + parseError);
 		return;
 	}
 	const Authoring::ReadNode matrixNode = document.Root();
@@ -1075,7 +1061,7 @@ bool PhysicsManager::IsRigidBodyColliderEnabled(unsigned int id) const
 	return Physics->IsColliderEnabled(id);
 }
 
-bool PhysicsManager::IsRigidBodyUseGravity(unsigned int id) const 
+bool PhysicsManager::IsRigidBodyUseGravity(unsigned int id) const
 {
 	return Physics->IsUseGravity(id);
 }

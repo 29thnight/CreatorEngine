@@ -32,11 +32,11 @@ namespace editor::menus
         {
             if (text.empty())
             {
-                Debug->LogWarning(std::string("[메뉴] 복사할 ") + what + " 이 비어 있다");
+                Debug::PrintLog({}, spdlog::level::warn, std::string("[메뉴] 복사할 ") + what + " 이 비어 있다");
                 return;
             }
             ImGui::SetClipboardText(text.c_str());
-            Debug->Log(std::string("[메뉴] 클립보드에 ") + what + ": " + text);
+            Debug::PrintLog({}, spdlog::level::info, std::string("[메뉴] 클립보드에 ") + what + ": " + text);
         }
 
         /// 명령 하나를 게임 스레드로 넘긴다. completion 은 GT 에서 불리므로 짧다.
@@ -51,17 +51,17 @@ namespace editor::menus
                     // GT 에서 불린다 — 값만 찍고 곧 반환한다.
                     if (result.IsSuccess())
                     {
-                        Debug->Log("[메뉴] " + name + " 완료");
+                        Debug::PrintLog({}, spdlog::level::info, "[메뉴] " + name + " 완료");
                     }
                     else
                     {
-                        Debug->LogError("[메뉴] " + name + " 실패: " + result.message);
+                        Debug::PrintLog({}, spdlog::level::err, "[메뉴] " + name + " 실패: " + result.message);
                     }
                 });
 
             if (!accepted)
             {
-                Debug->LogError("[메뉴] " + name + " 적재 거부 — 서비스 큐가 가득하다");
+                Debug::PrintLog({}, spdlog::level::err, "[메뉴] " + name + " 적재 거부 — 서비스 큐가 가득하다");
             }
         }
     }
@@ -117,18 +117,18 @@ namespace editor::menus
         // `confirm`), 복제가 하나로 줄었다는 것이다.
         if (target.path.empty())
         {
-            Debug->LogWarning("[메뉴] 지울 대상이 비어 있다");
+            Debug::PrintLog({}, spdlog::level::warn, "[메뉴] 지울 대상이 비어 있다");
             return;
         }
 
         std::error_code error;
         if (!file::remove(target.path, error) || error)
         {
-            Debug->LogError("[메뉴] 삭제 실패: " + target.path.string() +
+            Debug::PrintLog({}, spdlog::level::err, "[메뉴] 삭제 실패: " + target.path.string() +
                             " (" + error.message() + ")");
             return;
         }
-        Debug->Log("[메뉴] 삭제: " + target.path.string());
+        Debug::PrintLog({}, spdlog::level::info, "[메뉴] 삭제: " + target.path.string());
 
         if (".cpp" != target.path.extension()) return;
 
@@ -138,9 +138,9 @@ namespace editor::menus
 
         if (!file::remove(header, error) || error)
         {
-            Debug->LogError("[메뉴] 짝 헤더 삭제 실패: " + header.string());
+            Debug::PrintLog({}, spdlog::level::err, "[메뉴] 짝 헤더 삭제 실패: " + header.string());
             return;
         }
-        Debug->Log("[메뉴] 삭제: " + header.string());
+        Debug::PrintLog({}, spdlog::level::info, "[메뉴] 삭제: " + header.string());
     }
 }

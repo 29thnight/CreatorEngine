@@ -650,7 +650,7 @@ namespace Meta::Typed
                     }
                     else
                     {
-                        Debug->LogError("Serialize: Unsupported sequence element type");
+                        Debug::PrintLog({}, spdlog::level::err, "Serialize: Unsupported sequence element type");
                     }
                 }
                 else if constexpr (meta::reflectable<E>)
@@ -1007,7 +1007,7 @@ namespace Meta::Typed
                 {
                     // 키 하나가 깨졌다고 나머지를 버리지 않는다. 다만 조용히
                     // 넘어가지도 않는다 — 조용한 유실이 이 파일이 없앤 병이다.
-                    Debug->LogError(std::string("Deserialize: 맵 키를 읽지 못했다 - ")
+                    Debug::PrintLog({}, spdlog::level::err, std::string("Deserialize: 맵 키를 읽지 못했다 - ")
                         + name + " / " + std::string(entry.key.Scalar()));
                     continue;
                 }

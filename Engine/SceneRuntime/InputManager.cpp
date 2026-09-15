@@ -37,7 +37,7 @@ namespace
             char message[128]{};
             std::snprintf(message, sizeof(message), "[GameInput] %s 판독 실패: 0x%08lX",
                 kindName, static_cast<unsigned long>(hr));
-            Debug->LogWarning(message);
+            Debug::PrintLog({}, spdlog::level::warn, message);
         }
         return false;
     }
@@ -52,7 +52,7 @@ bool InputManager::Initialize(HWND _hwnd)
     else
     {
         hwnd = _hwnd;
-        std::cout << "GameInput System NewCreateSceneInitialize succeed" << std::endl;
+        Debug::PrintLog({}, spdlog::level::info, "GameInput System NewCreateSceneInitialize succeed");
         return true;
     }
 
@@ -117,8 +117,6 @@ bool InputManager::IsAnyKeyPressed()
 {
     if (m_GameInputKeyStates.size() != 0)
     {
-
-        // std::cout <<  "키가 눌렸습니다 " << std::endl;
         return true;
     }
     return false;

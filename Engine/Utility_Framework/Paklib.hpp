@@ -1,4 +1,4 @@
-﻿// PakLib.hpp — header-only minimal packer/loader (Unreal Pak 스타일)
+// PakLib.hpp — header-only minimal packer/loader (Unreal Pak 스타일)
 // Feature: chunked container, optional compression (LZ4 hook), AES-256-CTR encryption via Windows CNG (bcrypt.h),
 //          end-of-file index with SHA-256 integrity, UTF-8 paths, streaming I/O.
 // Target: MSVC / C++23 / Windows 10+

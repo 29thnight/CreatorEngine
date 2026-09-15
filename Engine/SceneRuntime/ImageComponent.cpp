@@ -229,7 +229,7 @@ void ImageComponent::OnDeserialized()
 			DataSystem::TextureFileType::UITexture);
 		if (!texture)
 		{
-			Debug->LogError("Failed to load texture for ImageComponent: " + imagePath);
+			Debug::PrintLog({}, spdlog::level::err, "Failed to load texture for ImageComponent: " + imagePath);
 			continue;
 		}
 		DeserializeTexture(texture);

@@ -187,14 +187,14 @@ bool PhysicX::Initialize()
 	if (m_cudaContextManager) {
 		m_cudaContext = m_cudaContextManager->getCudaContext();
 		if (m_cudaContext) {
-			std::cout << "CUDA context created successfully." << std::endl;
+			Debug::PrintLog({}, spdlog::level::info, "CUDA context created successfully.");
 		}
 		else {
-			std::cout << "Failed to create CUDA context." << std::endl;
+			Debug::PrintLog({}, spdlog::level::info, "Failed to create CUDA context.");
 		}
 	}
 	else {
-		std::cout << "CUDA context manager creation failed." << std::endl;
+		Debug::PrintLog({}, spdlog::level::info, "CUDA context manager creation failed.");
 	}*/
 
 
@@ -208,17 +208,17 @@ bool PhysicX::Initialize()
 		m_cudaContextManager = nullptr;
 
 		// 실패해도 그냥 넘어가기 (로그만 찍고)
-		std::cout << "CUDA context manager creation failed, continuing without CUDA." << std::endl;
+		Debug::PrintLog({}, spdlog::level::info, "CUDA context manager creation failed, continuing without CUDA.");
 	}
 
 	// CUDA 컨텍스트가 있으면 사용
 	if (m_cudaContextManager) {
 		m_cudaContext = m_cudaContextManager->getCudaContext();
 		if (m_cudaContext) {
-			std::cout << "CUDA context created successfully." << std::endl;
+			Debug::PrintLog({}, spdlog::level::info, "CUDA context created successfully.");
 		}
 		else {
-			std::cout << "Failed to create CUDA context." << std::endl;
+			Debug::PrintLog({}, spdlog::level::info, "Failed to create CUDA context.");
 			// 실패해도 그냥 넘어가기
 		}
 	}
@@ -440,13 +440,13 @@ void PhysicX::Update(float fixedDeltaTime)
 	//Scene 시뮬레이션
 	if (!m_scene->simulate(fixedDeltaTime))
 	{
-		Debug->LogCritical("physic m_scene simulate failed");
+		Debug::PrintLog({}, spdlog::level::critical, "physic m_scene simulate failed");
 		return;
 	}
 	//시뮬레이션 결과 가져오기
 	if (!m_scene->fetchResults(true))
 	{
-		Debug->LogCritical("physic m_scene fetchResults failed");
+		Debug::PrintLog({}, spdlog::level::critical, "physic m_scene fetchResults failed");
 		return;
 	}
 	//콜백 이벤트 처리
@@ -454,7 +454,7 @@ void PhysicX::Update(float fixedDeltaTime)
 	//오류 처리
 	//if (cudaGetLastError() != cudaError::cudaSuccess)
 	//{
-	//	Debug->LogError("cudaGetLastError : "+ std::string(cudaGetErrorString(cudaGetLastError())));
+	//	Debug::PrintLog({}, spdlog::level::err, "cudaGetLastError : "+ std::string(cudaGetErrorString(cudaGetLastError())));
 	//}
 }
 
@@ -491,7 +491,6 @@ void PhysicX::DestroyActor(unsigned int id)
 	auto iter = m_rigidBodyContainer.find(id);
 	if (iter == m_rigidBodyContainer.end())
 	{
-		//std::cout << "PhysicX::DestroyActor : Actor not found with id" << id << std::endl;
 		return;
 	}
 
@@ -509,7 +508,7 @@ void PhysicX::DestroyActor(unsigned int id)
 	}
 	else
 	{
-		Debug->LogError("PhysicX::DestroyActor : Actor is not a valid RigidBody type");
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::DestroyActor : Actor is not a valid RigidBody type");
 		return;
 	}
 
@@ -657,7 +656,7 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 			}
 			else {
 				out.hasBlock = false;
-				std::cout << "Not physx block userdata" << std::endl;
+				Debug::PrintLog({}, spdlog::level::info, "Not physx block userdata");
 			}
 		}
 	}
@@ -953,7 +952,7 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 		//스테틱 바디 초기화-->rigidbody 생성 및 shape attach , collider 정보 등록, collisionData 등록
 		if (!staticBody->Initialize(colInfo,shape,m_physics,collisionData))
 		{
-			Debug->LogError("PhysicX::SettingStaticBody() : staticBody Initialize failed id :" + std::to_string(colInfo.id));
+			Debug::PrintLog({}, spdlog::level::err, "PhysicX::SettingStaticBody() : staticBody Initialize failed id :" + std::to_string(colInfo.id));
 			delete collisionData; // 실패 시 메모리 해제
 			return nullptr;
 		}
@@ -966,7 +965,7 @@ StaticRigidBody* PhysicX::SettingStaticBody(physx::PxShape* shape, const Collide
 	}
 	else
 	{
-		Debug->LogError("PhysicX::SettingStaticBody() : Failed to allocate CollisionData for id " + std::to_string(colInfo.id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::SettingStaticBody() : Failed to allocate CollisionData for id " + std::to_string(colInfo.id));
 		delete staticBody; // staticBody도 해제
 		return nullptr;
 	}
@@ -991,7 +990,7 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 		//다이나믹 바디 초기화-->rigidbody 생성 및 shape attach , collider 정보 등록, collisionData 등록
 		if (!dynamicBody->Initialize(colInfo, shape, m_physics, collisionData,isKinematic))
 		{
-			Debug->LogError("PhysicX::SettingDynamicBody() : dynamicBody Initialize failed id :" + std::to_string(colInfo.id));
+			Debug::PrintLog({}, spdlog::level::err, "PhysicX::SettingDynamicBody() : dynamicBody Initialize failed id :" + std::to_string(colInfo.id));
 			delete collisionData; // 실패 시 메모리 해제
 			return nullptr;
 		}
@@ -1004,7 +1003,7 @@ DynamicRigidBody* PhysicX::SettingDynamicBody(physx::PxShape* shape, const Colli
 	}
 	else
 	{
-		Debug->LogError("PhysicX::SettingDynamicBody() : Failed to allocate CollisionData for id " + std::to_string(colInfo.id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::SettingDynamicBody() : Failed to allocate CollisionData for id " + std::to_string(colInfo.id));
 		delete dynamicBody; // dynamicBody도 해제
 		return nullptr;
 	}
@@ -1041,7 +1040,7 @@ RigidBodyGetSetData PhysicX::GetRigidBodyData(unsigned int id)
 	auto it = m_rigidBodyContainer.find(id);
 	if (it == m_rigidBodyContainer.end())
 	{
-		//Debug->LogError("PhysicX::GetRigidBodyData: RigidBody with ID " + std::to_string(id) + " not found in container. This might indicate a lifecycle management issue.");
+		//Debug::PrintLog({}, spdlog::level::err, "PhysicX::GetRigidBodyData: RigidBody with ID " + std::to_string(id) + " not found in container. This might indicate a lifecycle management issue.");
 		return rigidBodyData;
 	}
 	auto body = it->second;
@@ -1124,7 +1123,7 @@ RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
 	//등록되어 있는지 검색
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
 	{
-		//Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
+		//Debug::PrintLog({}, spdlog::level::warn, "GetRigidBody id :" + std::to_string(id) + " Get Failed");
 		return nullptr;
 	}
 	RigidBody* body = m_rigidBodyContainer[id];
@@ -1134,7 +1133,7 @@ RigidBody* PhysicX::GetRigidBody(const unsigned int& id)
 	}
 	else
 	{
-		//Debug->LogWarning("GetRigidBody id :" + std::to_string(id) + " Get Failed");
+		//Debug::PrintLog({}, spdlog::level::warn, "GetRigidBody id :" + std::to_string(id) + " Get Failed");
 		return nullptr;
 	}
 }
@@ -1144,7 +1143,7 @@ void PhysicX::SetRigidBodyData(const unsigned int& id, RigidBodyGetSetData& rigi
 	//데이터를 설정할 물리 바디 등록되어 있는지 검색
 	if (m_rigidBodyContainer.find(id) == m_rigidBodyContainer.end())
 	{
-		std::cout << "PhysicX::SetRigidBodyData: RigidBody with ID " << id << " not found in container." << std::endl;
+		Debug::PrintLog({}, spdlog::level::info, "PhysicX::SetRigidBodyData: RigidBody with ID {} not found in container.", id);
 		return;
 	}
 	auto body = m_rigidBodyContainer.find(id)->second;
@@ -1265,7 +1264,7 @@ void PhysicX::RemoveRigidBody(const unsigned int& id, physx::PxScene* scene, std
 	//등록되어 있는지 검색
 	if (m_rigidBodyContainer.find(id)==m_rigidBodyContainer.end())
 	{
-		Debug->LogWarning("RemoveRigidBody id :" + std::to_string(id) + " Remove Failed");
+		Debug::PrintLog({}, spdlog::level::warn, "RemoveRigidBody id :" + std::to_string(id) + " Remove Failed");
 		return;
 	}
 
@@ -1478,14 +1477,14 @@ void PhysicX::SetControllerPosition(UINT id, const math::vector3& pos)
 	auto it = m_characterControllerContainer.find(id);
 	if (it == m_characterControllerContainer.end())
 	{
-		Debug->LogError("PhysicX::SetControllerPosition() : CharacterController wrapper for ID not found: " + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::SetControllerPosition() : CharacterController wrapper for ID not found: " + std::to_string(id));
 		return;
 	}
 
 	CharacterController* controllerWrapper = it->second;
 	if (!controllerWrapper)
 	{
-		Debug->LogError("PhysicX::SetControllerPosition() : CharacterController wrapper is null for ID: " + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::SetControllerPosition() : CharacterController wrapper is null for ID: " + std::to_string(id));
 		return;
 	}
 
@@ -1494,7 +1493,7 @@ void PhysicX::SetControllerPosition(UINT id, const math::vector3& pos)
 	physx::PxController* pxController = controllerWrapper->GetController();
 	if (!pxController)
 	{
-		Debug->LogError("PhysicX::SetControllerPosition() : Raw PxController is null for ID: " + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::SetControllerPosition() : Raw PxController is null for ID: " + std::to_string(id));
 		return;
 	}
 
@@ -1612,7 +1611,7 @@ void PhysicX::CreateCharacterInfo(const ArticulationInfo& info)
 {
 	if (m_ragdollContainer.find(info.id) != m_ragdollContainer.end())
 	{
-		Debug->LogError("PhysicX::CreateCharacterInfo() : id is already exist id :" + std::to_string(info.id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::CreateCharacterInfo() : id is already exist id :" + std::to_string(info.id));
 		return;
 	}
 
@@ -1633,7 +1632,7 @@ void PhysicX::RemoveCharacterInfo(const unsigned int& id)
 {
 	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
 	{
-		Debug->LogWarning("remove ragdoll data fail container have not data id:"+std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::warn, "remove ragdoll data fail container have not data id:"+std::to_string(id));
 		return;
 	}
 
@@ -1666,7 +1665,7 @@ void PhysicX::RemoveAllCharacterInfo()
 				pxArticulation = nullptr;
 			}
 
-			Debug->Log("PhysicX::RemoveAllCharacterInfo() : remove articulation id :" + std::to_string(id));
+			Debug::PrintLog({}, spdlog::level::info, "PhysicX::RemoveAllCharacterInfo() : remove articulation id :" + std::to_string(id));
 		}
 	}
 	m_ragdollContainer.clear();
@@ -1676,7 +1675,7 @@ void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const math::v
 {
 	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
 	{
-		Debug->LogError("PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
 		return;
 	}
 
@@ -1688,7 +1687,7 @@ void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const float& 
 {
 	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
 	{
-		Debug->LogError("PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
 		return;
 	}
 	RagdollPhysics* ragdoll = m_ragdollContainer[id];
@@ -1699,7 +1698,7 @@ void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info, const float& 
 {
 	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
 	{
-		Debug->LogError("PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
 		return;
 	}
 	RagdollPhysics* ragdoll = m_ragdollContainer[id];
@@ -1710,7 +1709,7 @@ void PhysicX::AddArticulationLink(unsigned int id, LinkInfo& info)
 {
 	if (m_ragdollContainer.find(id) == m_ragdollContainer.end())
 	{
-		Debug->LogError("PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::AddArticulationLink() : id is not exist id :" + std::to_string(id));
 		return;
 	}
 	RagdollPhysics* ragdoll = m_ragdollContainer[id];
@@ -1723,7 +1722,7 @@ ArticulationGetData PhysicX::GetArticulationData(const unsigned int& id)
 	auto articulationIter = m_ragdollContainer.find(id);
 	if (articulationIter == m_ragdollContainer.end())
 	{
-		Debug->LogError("PhysicX::GetArticulationData() : id is not exist id :" + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::GetArticulationData() : id is not exist id :" + std::to_string(id));
 		return data;
 	}
 
@@ -1759,7 +1758,7 @@ void PhysicX::SetArticulationData(const unsigned int& id, const ArticulationSetD
 	auto articulationIter = m_ragdollContainer.find(id);
 	if (articulationIter == m_ragdollContainer.end())
 	{
-		Debug->LogError("PhysicX::SetArticulationData() : id is not exist id :" + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::SetArticulationData() : id is not exist id :" + std::to_string(id));
 		return;
 	}
 
@@ -1783,7 +1782,7 @@ void PhysicX::SetArticulationData(const unsigned int& id, const ArticulationSetD
 
 			if (isCheck == false)
 			{
-				Debug->LogError("PhysicX::SetArticulationData() : add articulation failed id :" + std::to_string(id));
+				Debug::PrintLog({}, spdlog::level::err, "PhysicX::SetArticulationData() : add articulation failed id :" + std::to_string(id));
 			}
 		}
 	}
@@ -1805,7 +1804,7 @@ void PhysicX::ConnectPVD()
     PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 10);
     auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::eALL);
 	//auto isconnected = pvd->connect(*transport, PxPvdInstrumentationFlag::ePROFILE);
-    std::cout << "pvd connected : " << isconnected << std::endl;
+    Debug::PrintLog({}, spdlog::level::info, "pvd connected : {}", isconnected);
 }
 
 void PhysicX::CollisionDataUpdate()
@@ -1837,7 +1836,7 @@ CollisionData* PhysicX::FindCollisionData(const unsigned int& id)
 	}
 	else
 	{
-		Debug->LogError("PhysicX::FindCollisionData() : id is not exist id :" + std::to_string(id));
+		Debug::PrintLog({}, spdlog::level::err, "PhysicX::FindCollisionData() : id is not exist id :" + std::to_string(id));
 		return nullptr;
 	}
 }
@@ -1883,20 +1882,20 @@ void PhysicX::DrawPVDLine(math::vector3 ori, math::vector3 end)
 
 void PhysicX::ShowNotRelease()
 {
-    std::cout << "physx count " << std::endl;
-   std::cout << m_physics->getNbBVHs()<< std::endl;
-   std::cout << m_physics->getNbBVHs()<< std::endl;
-   std::cout << m_physics->getNbConvexMeshes()<< std::endl;
-   std::cout << m_physics->getNbDeformableSurfaceMaterials()<< std::endl;
-   std::cout << m_physics->getNbDeformableVolumeMaterials()<< std::endl;
-   std::cout << m_physics->getNbFEMSoftBodyMaterials()<< std::endl;
-   std::cout << m_physics->getNbHeightFields()<< std::endl;
-   std::cout << m_physics->getNbMaterials()<< std::endl; // 1
-   std::cout << m_physics->getNbPBDMaterials()<< std::endl;
-   std::cout << m_physics->getNbScenes()<< std::endl;  // 1
-   std::cout << m_physics->getNbShapes()<< std::endl;  // 3
-   std::cout << m_physics->getNbTetrahedronMeshes()<< std::endl;
-   std::cout << m_physics->getNbTriangleMeshes() << std::endl;
+    Debug::PrintLog({}, spdlog::level::info, "physx count ");
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbBVHs());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbBVHs());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbConvexMeshes());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbDeformableSurfaceMaterials());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbDeformableVolumeMaterials());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbFEMSoftBodyMaterials());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbHeightFields());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbMaterials()); // 1
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbPBDMaterials());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbScenes());  // 1
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbShapes());  // 3
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbTetrahedronMeshes());
+   Debug::PrintLog({}, spdlog::level::info, "{}", m_physics->getNbTriangleMeshes());
 }
 
 bool PhysicX::IsKinematic(unsigned int id) const

@@ -128,7 +128,7 @@ void ComponentFactory::LoadComponent(Entity* obj, const Authoring::NodeView& vie
         // 사라진다 — §1.1의 "리네임 시 컴포넌트 소실"과 같은 증상이다. 로그
         // 없이 return하던 자리라 어떤 오브젝트에서 어떤 노드가 버려졌는지
         // 남긴다.
-        Debug->LogError("ComponentFactory::LoadComponent: 컴포넌트 타입을 확정하지 못해 노드를 버림 - GameObject \""
+        Debug::PrintLog({}, spdlog::level::err, "ComponentFactory::LoadComponent: 컴포넌트 타입을 확정하지 못해 노드를 버림 - GameObject \""
             + obj->GetHashedName().ToString() + "\"");
         return;
     }

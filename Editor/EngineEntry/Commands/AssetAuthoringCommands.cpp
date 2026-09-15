@@ -1,4 +1,4 @@
-﻿#include "../EditorModelPlacement.h"
+#include "../EditorModelPlacement.h"
 #include <DirectXTex.h>
 #include <stb_image.h>
 #include "Texture.h"
@@ -794,7 +794,7 @@ namespace ConsoleCmd
             }
             catch (const std::exception& exception)
             {
-                Debug->LogError("[material.corpus] " + name + ": "
+                Debug::PrintLog({}, spdlog::level::err, "[material.corpus] " + name + ": "
                     + exception.what());
             }
 
@@ -1462,9 +1462,9 @@ namespace ConsoleCmd
             passed = RenderTest::RunSceneModelGenerationSelfTest(log, &report);
         }
         if (passed)
-            Debug->LogWarning(std::string("[assets.scenemodel] 통과\n") + log);
+            Debug::PrintLog({}, spdlog::level::warn, std::string("[assets.scenemodel] 통과\n") + log);
         else
-            Debug->LogError(std::string("[assets.scenemodel] 실패\n") + log);
+            Debug::PrintLog({}, spdlog::level::err, std::string("[assets.scenemodel] 실패\n") + log);
         auto data = CommandData::Object();
         data.Set("renderers", CommandData::Int(report.renderers));
         data.Set("generationBound", CommandData::Int(report.generationBound));
@@ -1510,11 +1510,11 @@ namespace ConsoleCmd
         std::printf("%s", log.c_str());
         if (passed)
         {
-            Debug->LogWarning(std::string("[experiment.cooked] 통과\n") + log);
+            Debug::PrintLog({}, spdlog::level::warn, std::string("[experiment.cooked] 통과\n") + log);
         }
         else
         {
-            Debug->LogError(std::string("[experiment.cooked] 실패\n") + log);
+            Debug::PrintLog({}, spdlog::level::err, std::string("[experiment.cooked] 실패\n") + log);
         }
         std::printf("[CLI] experiment.cooked %s\n", passed ? "통과" : "실패");
         auto data = CommandData::Object();
@@ -1636,7 +1636,7 @@ namespace ConsoleCmd
             static_cast<unsigned long long>(bt.tickCount),
             static_cast<unsigned long long>(bt.skippedCount));
         std::printf("[CLI] %s\n", line);
-        Debug->LogWarning(line);
+        Debug::PrintLog({}, spdlog::level::warn, line);
 
         // 크로싱 비율이 이 재설계의 핵심 주장이다 — 트리가 몇 개든 프레임당 1회.
         // 분모는 FlushAITicks 호출 수(= 흘려보낸 프레임 수)이고, 큐가 빈 프레임도
@@ -1654,7 +1654,7 @@ namespace ConsoleCmd
             static_cast<unsigned long long>(x.ticksDelivered), perCrossing,
             static_cast<unsigned long long>(x.maxBatch));
         std::printf("[CLI] %s\n", cross);
-        Debug->LogWarning(cross);
+        Debug::PrintLog({}, spdlog::level::warn, cross);
         auto data = CommandData::Object();
         data.Set("treeCount", CommandData::Int(bt.treeCount));
         data.Set("nodeTypeCount", CommandData::Int(bt.nodeTypeCount));

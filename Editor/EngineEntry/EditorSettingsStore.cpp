@@ -66,7 +66,7 @@ namespace
     bool ReportSettingsError(const std::string& message) noexcept
     {
         std::fprintf(stderr, "[EditorSettings] %s\n", message.c_str());
-        if (Log::IsAlive()) Debug->LogError(message);
+        if (Log::IsAlive()) Debug::PrintLog({}, spdlog::level::err, message);
         return false;
     }
 }

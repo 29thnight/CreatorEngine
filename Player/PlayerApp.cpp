@@ -76,7 +76,7 @@ namespace
 		{
 			if (Log::IsAlive())
 			{
-				Debug->LogError("Player package preparation threw an unknown exception.");
+				Debug::PrintLog({}, spdlog::level::err, "Player package preparation threw an unknown exception.");
 			}
 			return false;
 		}

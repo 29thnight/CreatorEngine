@@ -52,15 +52,15 @@ namespace
         if (!census.available)
         {
             // 디버그 레이어를 못 쓰는 실행 중에는 엔진이 직접 센 에셋 수로 대신한다.
-            Debug->Log(std::format("[GPU 진단] {} · VRAM {}MB / {}MB · 엔진 에셋 {}",
+            Debug::PrintLog({}, spdlog::level::info, std::format("[GPU 진단] {} · VRAM {}MB / {}MB · 엔진 에셋 {}",
                 label, census.vramUsedMB, census.vramBudgetMB,
                 Diagnostics::FormatSnapshot(Diagnostics::CaptureResourceSnapshot())));
             return;
         }
 
-        Debug->Log(std::format("[GPU 진단] {} · 라이브 객체 {}개 · VRAM {}MB / {}MB",
+        Debug::PrintLog({}, spdlog::level::info, std::format("[GPU 진단] {} · 라이브 객체 {}개 · VRAM {}MB / {}MB",
             label, census.totalObjects, census.vramUsedMB, census.vramBudgetMB));
-        Debug->Log(std::format("[GPU 진단]   타입별: {}", SummarizeByType(census.byType, 12)));
+        Debug::PrintLog({}, spdlog::level::info, std::format("[GPU 진단]   타입별: {}", SummarizeByType(census.byType, 12)));
     }
 
     void WriteDelta(const RHIGpuObjectCensus& current, std::string_view label)
@@ -84,7 +84,7 @@ namespace
         if (!current.available)
         {
             // 실행 중 경로. 씬을 오갔을 때 이 에셋 수가 제자리로 돌아오는지가 핵심 지표다.
-            Debug->Log(std::format("[GPU 진단] {} · VRAM {}MB ({:+}MB) · 엔진 에셋 {}",
+            Debug::PrintLog({}, spdlog::level::info, std::format("[GPU 진단] {} · VRAM {}MB ({:+}MB) · 엔진 에셋 {}",
                 label, current.vramUsedMB, vramDelta,
                 Diagnostics::FormatDelta(resources, g_baselineResources)));
 
@@ -105,18 +105,18 @@ namespace
             }
         }
 
-        Debug->Log(std::format("[GPU 진단] {} · 라이브 객체 {}개 ({:+}) · VRAM {}MB ({:+}MB) · 엔진 에셋 {}",
+        Debug::PrintLog({}, spdlog::level::info, std::format("[GPU 진단] {} · 라이브 객체 {}개 ({:+}) · VRAM {}MB ({:+}MB) · 엔진 에셋 {}",
             label, current.totalObjects, objectDelta, current.vramUsedMB, vramDelta,
             Diagnostics::FormatDelta(resources, g_baselineResources)));
 
         if (increased.empty())
         {
-            Debug->Log("[GPU 진단]   증가한 객체 타입 없음");
+            Debug::PrintLog({}, spdlog::level::info, "[GPU 진단]   증가한 객체 타입 없음");
         }
         else
         {
             // 누수 후보이므로 경고 레벨로 남긴다(경고 이상은 즉시 디스크에 기록된다).
-            Debug->LogWarning(std::format("[GPU 진단]   증가: {}", SummarizeByType(increased, 12)));
+            Debug::PrintLog({}, spdlog::level::warn, std::format("[GPU 진단]   증가: {}", SummarizeByType(increased, 12)));
         }
 
         g_baselineCensus = current;

@@ -39,7 +39,7 @@ Entity* UIManager::MakeCanvas(std::string_view name)
 {
 	if(auto existingCanvas = FindCanvasName(name); existingCanvas )
 	{
-		std::cout << "Canvas with name '" << name << "' already exists." << std::endl;
+		Debug::PrintLog({}, spdlog::level::info, "Canvas with name '{}' already exists.", name);
 		return nullptr;
 	}
 
@@ -79,13 +79,13 @@ void UIManager::AddCanvas(Entity* canvas)
 {
 	if (!canvas)
 	{
-		std::cout << "Canvas is nullptr" << std::endl;
+		Debug::PrintLog({}, spdlog::level::info, "Canvas is nullptr");
 		return;
 	}
 	auto canvasCom = canvas->GetComponent<Canvas>();
 	if (!canvasCom)
 	{
-		std::cout << "This Obj Not Canvas" << std::endl;
+		Debug::PrintLog({}, spdlog::level::info, "This Obj Not Canvas");
 		return;
 	}
 
@@ -100,7 +100,7 @@ void UIManager::AddCanvas(Entity* canvas)
 	{
 		if (curScene->Resolve(it->second))
 		{
-			std::cout << "Canvas with name '" << canvasName << "' already exists." << std::endl;
+			Debug::PrintLog({}, spdlog::level::info, "Canvas with name '{}' already exists.", canvasName);
 			return;
 		}
 
@@ -138,7 +138,7 @@ Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Textur
 	auto canvasRect = canvas->GetComponent<RectTransformComponent>();
 	if(!canvasCom || !canvasRect)
 	{
-		std::cout << "This Obj Not Canvas" << std::endl;
+		Debug::PrintLog({}, spdlog::level::info, "This Obj Not Canvas");
 		return nullptr;
 	}
     auto newImage = SceneManagers->GetActiveScene()->CreateEntity(name, GameObjectType::UI, canvas->m_index);
@@ -178,7 +178,7 @@ Entity* UIManager::MakeImage(std::string_view name, const std::shared_ptr<Textur
     Entity* canvas = FindCanvasName(canvasname);
     if (canvas == nullptr)
     {
-        std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+        Debug::PrintLog({}, spdlog::level::info, "해당 이름의 캔버스가 없습니다.");
         return nullptr;
     }
 
@@ -210,7 +210,7 @@ Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Textu
     auto canvasRect = canvas->GetComponent<RectTransformComponent>();
     if (!canvasCom || !canvasRect)
     {
-        std::cout << "This Obj Not Canvas" << std::endl;
+        Debug::PrintLog({}, spdlog::level::info, "This Obj Not Canvas");
         return nullptr;
     }
 
@@ -256,7 +256,7 @@ Entity* UIManager::MakeButton(std::string_view name, const std::shared_ptr<Textu
     Entity* canvas = FindCanvasName(canvasname);
     if (canvas == nullptr)
     {
-        std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+        Debug::PrintLog({}, spdlog::level::info, "해당 이름의 캔버스가 없습니다.");
         return nullptr;
     }
 
@@ -285,7 +285,7 @@ Entity* UIManager::MakeText(std::string_view name, file::path FontName, Entity* 
 	auto canvasRect = canvas->GetComponent<RectTransformComponent>();
 	if (!canvasCom || !canvasRect)
 	{
-		std::cout << "This Obj Not Canvas" << std::endl;
+		Debug::PrintLog({}, spdlog::level::info, "This Obj Not Canvas");
 		return nullptr;
 	}
 
@@ -316,7 +316,7 @@ Entity* UIManager::MakeText(std::string_view name, file::path FontName, std::str
     Entity* canvas = FindCanvasName(canvasname);
     if (canvas == nullptr)
     {
-        std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+        Debug::PrintLog({}, spdlog::level::info, "해당 이름의 캔버스가 없습니다.");
         return nullptr;
     }
     return MakeText(name, FontName, canvas, Pos);
@@ -342,7 +342,7 @@ Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spri
     auto canvasRect = canvas->GetComponent<RectTransformComponent>();
     if (!canvasCom || !canvasRect)
     {
-        std::cout << "This Obj Not Canvas" << std::endl;
+        Debug::PrintLog({}, spdlog::level::info, "This Obj Not Canvas");
         return nullptr;
     }
 
@@ -372,7 +372,7 @@ Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spri
     Entity* canvas = FindCanvasName(canvasname);
     if (canvas == nullptr)
     {
-        std::cout << "해당 이름의 캔버스가 없습니다." << std::endl;
+        Debug::PrintLog({}, spdlog::level::info, "해당 이름의 캔버스가 없습니다.");
         return nullptr;
     }
     return MakeSpriteSheet(name, spriteSheetPath, canvas, Pos);
@@ -595,7 +595,7 @@ void UIManager::Update()
 				// 경고는 컴포넌트당 한 번만 — 매 프레임 재시도라 그대로 두면 로그가 폭주한다.
 				// 이름조차 없는 미연결 UI는 경고하지 않는다(런타임에 갓 만든 정상 상태).
 				ui->m_canvasLinkLogged = true;
-				Debug->LogWarning("UI '" + owner->m_name.ToString() +
+				Debug::PrintLog({}, spdlog::level::warn, "UI '" + owner->m_name.ToString() +
 					"' 가 캔버스 '" + ui->m_ownerCanvasName + "' 를 찾지 못했습니다.");
 			}
 		};

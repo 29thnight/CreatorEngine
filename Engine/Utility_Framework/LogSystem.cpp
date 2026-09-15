@@ -56,10 +56,10 @@ std::terminate_handler g_previousTerminate{ nullptr };
                 " (EngineBootstrap에서 CoreWindow::SetDumpType이 불렸는지 확인할 것).\n", stdout);
             std::fflush(stdout);
 
-            if (g_logSystemAlive.load(std::memory_order_acquire) && Debug)
+            if (g_logSystemAlive.load(std::memory_order_acquire))
             {
-                Debug->LogError("크래시 덤프 기록자 미등록 - 이번 크래시는 덤프 없이 지나간다.");
-                Debug->FlushNow();
+                Debug::PrintLog({}, spdlog::level::err, "크래시 덤프 기록자 미등록 - 이번 크래시는 덤프 없이 지나간다.");
+                DebugClass::GetInstance()->FlushNow();
             }
             return;
         }
@@ -90,10 +90,7 @@ std::terminate_handler g_previousTerminate{ nullptr };
             return;
         }
 
-        if (Debug)
-        {
-            Debug->NotifyCrash(reason);
-        }
+        DebugClass::GetInstance()->NotifyCrash(reason);
     }
 
     void OnTerminate()
@@ -135,9 +132,9 @@ std::terminate_handler g_previousTerminate{ nullptr };
             return;
         }
 
-        if (Debug && Debug->IsInitialized())
+        if (DebugClass::GetInstance()->IsInitialized())
         {
-            Debug->FlushNow();
+            DebugClass::GetInstance()->FlushNow();
         }
     }
 
@@ -264,15 +261,15 @@ void Log::SetCrashDumpWriter(CrashDumpWriter writer)
     // 예전에는 등록이 빠져도 아무 흔적이 없었고, 크래시가 난 뒤에야 '덤프가
     // 없네'로 알게 됐다. 이제는 세션 로그 첫머리만 봐도 이번 실행이 덤프를
     // 남길 수 있는 상태인지 판단할 수 있다.
-    if (!g_logSystemAlive.load(std::memory_order_acquire) || !Debug) return;
+    if (!g_logSystemAlive.load(std::memory_order_acquire)) return;
 
     if (nullptr != writer)
     {
-        Debug->Log("크래시 덤프 기록자 등록 완료 - 이번 실행의 크래시는 .dmp로 남는다.");
+        Debug::PrintLog({}, spdlog::level::info, "크래시 덤프 기록자 등록 완료 - 이번 실행의 크래시는 .dmp로 남는다.");
     }
     else
     {
-        Debug->LogWarning("크래시 덤프 기록자가 해제됐다 - 이후 크래시는 덤프 없이 지나간다.");
+        Debug::PrintLog({}, spdlog::level::warn, "크래시 덤프 기록자가 해제됐다 - 이후 크래시는 덤프 없이 지나간다.");
     }
 }
 
@@ -447,4 +444,3 @@ void DebugClass::Finalize()
     htmlSink.reset();
     logSink.reset();
 }
-

@@ -186,7 +186,7 @@ namespace ConsoleCmd
         auto object = scene->GetEntity(objectName);
         if (!object)
         {
-            Debug->LogError("[스크립트] 오브젝트를 찾을 수 없음: " + objectName);
+            Debug::PrintLog({}, spdlog::level::err, "[스크립트] 오브젝트를 찾을 수 없음: " + objectName);
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
             return CommandCore::PreconditionFailed(
                 "object.not_found", "오브젝트를 찾을 수 없다: " + objectName);
@@ -363,7 +363,7 @@ namespace ConsoleCmd
 
         script->CaptureFields();
 
-        Debug->LogWarning("[스크립트] 필드 설정 — id=" + parts[1] + " [" + parts[2] + "] = " + parts[3]);
+        Debug::PrintLog({}, spdlog::level::warn, "[스크립트] 필드 설정 — id=" + parts[1] + " [" + parts[2] + "] = " + parts[3]);
         std::printf("[CLI] 필드 설정 완료\n");
         auto data = CommandData::Object();
         data.Set("instanceId", CommandData::Int(id)); data.Set("index", CommandData::Int(index));
@@ -436,7 +436,7 @@ namespace ConsoleCmd
                     " scale(" + std::to_string(rect->GetLayoutScale()).substr(0, 5) + ")";
 
                 std::printf("[CLI] %s\n", line.c_str());
-                Debug->LogWarning("[ui.rect] " + line);
+                Debug::PrintLog({}, spdlog::level::warn, "[ui.rect] " + line);
                 ++reportedRects;
             }
 
@@ -557,7 +557,7 @@ namespace ConsoleCmd
                 std::to_string(static_cast<int>(hitbox.height)) + ")";
 
             std::printf("[CLI] %s\n", line.c_str());
-            Debug->LogWarning("[ui.hitbox] " + line);
+            Debug::PrintLog({}, spdlog::level::warn, "[ui.hitbox] " + line);
             ++reported;
         }
 
@@ -777,7 +777,7 @@ namespace ConsoleCmd
             spriteLinked, UIManagers->SpriteSheets.size(),
             scene->GetCanvases().size(), canvasNames.c_str());
 
-        Debug->LogWarning(line);
+        Debug::PrintLog({}, spdlog::level::warn, line);
         std::printf("%s\n", line);
 
         // ★ 연결되지 않은 UI 가 있어도 **실패로 내지 않는다.** 이 명령은 지연 연결의
@@ -836,7 +836,7 @@ namespace ConsoleCmd
         auto& clr = ClrHost::Get();
         const bool stale = clr.IsPreviousContextAlive();
 
-        Debug->LogWarning(std::string("[스크립트] CLR ") + (clr.IsReady() ? "준비됨" : "비활성") +
+        Debug::PrintLog({}, spdlog::level::warn, std::string("[스크립트] CLR ") + (clr.IsReady() ? "준비됨" : "비활성") +
             " · 활성 스크립트 " + std::to_string(clr.LastActiveCount()) + "개" +
             " · 이전 어셈블리 " + (stale ? "잔존(참조 누수)" : "정리됨"));
         std::printf("[CLI] CLR %s, 활성 스크립트 %d개, 이전 어셈블리 %s\n",

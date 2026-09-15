@@ -125,10 +125,10 @@ namespace
     {
         // The real facade is usable before sink initialization; UI reads do not
         // depend on a live LogSink pointer or its friend-only storage members.
-        const auto initialFacade = Debug->GetLogSnapshot();
-        Debug->Clear();
-        Require(Debug->GetLogSnapshot().clearGeneration == initialFacade.clearGeneration + 1 &&
-            Debug->GetLogSnapshotIfChanged(initialFacade.revision).has_value(),
+        const auto initialFacade = Debug::GetLogSnapshot();
+        Debug::Clear();
+        Require(Debug::GetLogSnapshot().clearGeneration == initialFacade.clearGeneration + 1 &&
+            Debug::GetLogSnapshotIfChanged(initialFacade.revision).has_value(),
             "DebugClass snapshot/Clear before sink initialization");
         LogStore store({ 3, 64, 100 });
         Require(store.ReadSnapshotIfChanged(0).has_value(), "initial empty snapshot published");

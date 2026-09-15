@@ -270,7 +270,7 @@ inline void CrashNotify(const char* message)
     ::OutputDebugStringA(message);
     ::OutputDebugStringA("\n");
 
-    if (Log::IsAlive() && Debug) Debug->LogError(message);
+    if (Log::IsAlive()) Debug::PrintLog({}, spdlog::level::err, message);
 }
 
 /// 미니덤프 파일만 남긴다. 성공하면 그 경로를, 실패하면 빈 경로를 돌려준다.
@@ -385,9 +385,9 @@ inline void WriteCrashReportArtifacts(const file::path& dumpPath, const std::str
     std::fputs(report.c_str(), stdout);
     std::fflush(stdout);
 
-    if (Log::IsAlive() && Debug)
+    if (Log::IsAlive())
     {
-        Debug->LogError(report);
+        Debug::PrintLog({}, spdlog::level::err, report);
     }
 
     // 크래시 중에는 spdlog를 shutdown하지 않는다.

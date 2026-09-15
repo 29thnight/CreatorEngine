@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 #include "Camera.h"
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "DumpHandler.h"
 #include "CoreWindow.h"
 #include "DataSystem.h"
-#include "DebugStreamBuf.h"
 #include "RuntimeSettings.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
@@ -80,9 +79,6 @@ namespace EngineBootstrap
         // 고정한다. PathFinder와 RuntimeSettings는 아래의 명시적 Host config만 쓴다.
         EngineMode::Set(config.compatibilityRunMode);
 
-        static DebugStreamBuf debugBuf(std::cout.rdbuf());
-        std::cout.rdbuf(&debugBuf);
-
         Meta::RegisterClassInitalize();
         if (!PathFinder::Initialize(config.paths))
         {
@@ -97,7 +93,7 @@ namespace EngineBootstrap
 		catch (const std::exception& exception)
 		{
 			std::fprintf(stderr, "[Log] initialization failed: %s\n", exception.what());
-			Debug->AbortInitialization();
+			DebugClass::GetInstance()->AbortInitialization();
 			DebugClass::Destroy();
 			Meta::RegisterClassFinalize();
 			return false;
@@ -105,7 +101,7 @@ namespace EngineBootstrap
 		catch (...)
 		{
 			std::fputs("[Log] initialization failed with an unknown error\n", stderr);
-			Debug->AbortInitialization();
+			DebugClass::GetInstance()->AbortInitialization();
 			DebugClass::Destroy();
 			Meta::RegisterClassFinalize();
 			return false;
@@ -125,7 +121,7 @@ namespace EngineBootstrap
 			!config.prepareRuntimeContent(config.paths))
 		{
 			std::fputs("[EnginePaths] Host runtime content preparation failed\n", stderr);
-			Debug->LogError("Host runtime content preparation failed");
+			Debug::PrintLog({}, spdlog::level::err, "Host runtime content preparation failed");
 			Meta::RegisterClassFinalize();
 			Log::Finalize();
 			return false;
@@ -135,7 +131,7 @@ namespace EngineBootstrap
 		{
 			std::fputs("[RuntimeSettings] EngineSettings 초기화 실패 — 부팅을 중단한다\n",
 				stderr);
-			Debug->LogError("RuntimeSettings 초기화 실패 — 기본값으로 계속하지 않는다");
+			Debug::PrintLog({}, spdlog::level::err, "RuntimeSettings 초기화 실패 — 기본값으로 계속하지 않는다");
 			RuntimeSettings::Shutdown();
 			Meta::RegisterClassFinalize();
 			Log::Finalize();
@@ -147,7 +143,7 @@ namespace EngineBootstrap
 		if (config.initializeHostSettings && !config.initializeHostSettings())
 		{
 			std::fputs("[HostSettings] Host settings initialization failed\n", stderr);
-			Debug->LogError("Host settings initialization failed");
+			Debug::PrintLog({}, spdlog::level::err, "Host settings initialization failed");
 			RuntimeSettings::Shutdown();
 			Meta::RegisterClassFinalize();
 			Log::Finalize();

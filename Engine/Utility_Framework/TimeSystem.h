@@ -106,7 +106,6 @@ namespace Core
 				m_totalTicks += timeDelta;
 				m_leftOverTicks = 0;
 				m_frameCount++;
-				//std::cout << "Tick" << TicksToSeconds(m_elapsedTicks) << std::endl;
 				update();
 			}
 
@@ -166,7 +165,6 @@ namespace Core
 				m_elapsedTicks = m_targetElapsedTicks;
 				m_totalTicks += m_targetElapsedTicks;
 				m_fixedLeftOverTicks -= m_targetElapsedTicks;
-				//std::cout << "FixedTick" << TicksToSeconds(m_elapsedTicks) << std::endl;
 				m_frameCount++;
 
 				fixedUpdate();

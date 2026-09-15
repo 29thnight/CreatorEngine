@@ -8,8 +8,8 @@
 
 namespace
 {
-    // 이름→경로 규약은 한 곳에만 둔다. 저작 쓰기와 런타임 읽기가 각자 경로를
-    // 조립하면 조용히 갈라진다.
+ // 이름→경로 규약은 한 곳에만 둔다. 저작 쓰기와 런타임 읽기가 각자 경로를
+ // 조립하면 조용히 갈라진다.
     file::path ResolveTagManagerPath()
     {
         return PathFinder::ProjectSettingPath("TagManager.asset");
@@ -25,13 +25,13 @@ void TagManager::Initialize()
     m_layerMap.reserve(32);
     m_layeredObjects.reserve(300);
 
-    // 파일이 없으면 기본 태그·레이어를 채우고 저장을 시도한다. 실제 쓰기는
-    // Editor Host가 설치한 handler만 수행하므로 모드 분기가 필요 없다 —
-    // Player는 handler가 없어 메모리 기본값만 갖고 지나간다(pak에 자산이 빠진
-    // 방어 경로이며, 빈 표보다 낫다).
+ // 파일이 없으면 기본 태그·레이어를 채우고 저장을 시도한다. 실제 쓰기는
+ // Editor Host가 설치한 handler만 수행하므로 모드 분기가 필요 없다 —
+ // Player는 handler가 없어 메모리 기본값만 갖고 지나간다(pak에 자산이 빠진
+ // 방어 경로이며, 빈 표보다 낫다).
     if (!file::exists(ResolveTagManagerPath()))
     {
-        // Initialize the tag map with some default tags if needed
+ // Initialize the tag map with some default tags if needed
         m_tagMap["Untagged"] = 0;
         m_tagMap["Respawn"] = 1;
         m_tagMap["Finish"] = 2;
@@ -48,7 +48,7 @@ void TagManager::Initialize()
         m_layerMap["UI"] = 4;
 
         m_layers = { "Default", "TransparentFX", "Ignore RayCast", "Water", "UI" };
-	    
+
         Save();
     }
 
@@ -57,9 +57,9 @@ void TagManager::Initialize()
 
 void TagManager::Finalize()
 {
-    // Player에는 handler가 없어 이 호출이 그대로 실패한다 — 모드 분기가 필요 없다.
-    // Editor는 authoring handler가 살아 있는 구간에서 Finalize를 부른다
-    // (EditorMain이 EditorAssetDatabase::Shutdown 전에 호출한다).
+ // Player에는 handler가 없어 이 호출이 그대로 실패한다 — 모드 분기가 필요 없다.
+ // Editor는 authoring handler가 살아 있는 구간에서 Finalize를 부른다
+ // (EditorMain이 EditorAssetDatabase::Shutdown 전에 호출한다).
     Save();
     m_tags.clear();
     m_tagMap.clear();
@@ -72,23 +72,23 @@ void TagManager::Finalize()
 void TagManager::Load()
 {
     file::path path = ResolveTagManagerPath();
-    // 예전에는 이 존재 검사가 에디터 전용이었다 — 플레이어에서 파일이 없으면
-    // YAML::LoadFile이 예외를 던졌다. 언팩 실패가 크래시로 둔갑하지 않게
-    // 양쪽 모두 검사한다.
+ // 예전에는 이 존재 검사가 에디터 전용이었다 — 플레이어에서 파일이 없으면
+ // YAML::LoadFile이 예외를 던졌다. 언팩 실패가 크래시로 둔갑하지 않게
+ // 양쪽 모두 검사한다.
     if (!file::exists(path))
     {
         return;
     }
 
-    // D3-b-L: ryml로 읽는다(leaf 파서 — 소비자가 backend에 묶여 있지 않다).
-    // ★ 문서가 트리를 소유한다. root 이하 노드는 이 스코프 안에서만 유효하다.
+ // D3-b-L: ryml로 읽는다(leaf 파서 — 소비자가 backend에 묶여 있지 않다).
+ // ★ 문서가 트리를 소유한다. root 이하 노드는 이 스코프 안에서만 유효하다.
     std::string parseError;
     const Authoring::ParsedDocument document =
         Authoring::ParsedDocument::ParseFile(path.string(), parseError);
     if (!document)
     {
-        Debug->LogError("TagManager parse failed: " + path.string() + " (" + parseError + ")");
-        // 플래그를 세우지 않고 나간다 — Save가 빈 상태로 덮어쓰지 못하게 한다.
+        Debug::PrintLog({}, spdlog::level::err, "TagManager parse failed: " + path.string() + " (" + parseError + ")");
+ // 플래그를 세우지 않고 나간다 — Save가 빈 상태로 덮어쓰지 못하게 한다.
         return;
     }
     const Authoring::ReadNode root = document.Root();
@@ -121,17 +121,17 @@ void TagManager::Load()
 
 bool TagManager::Save()
 {
-    // ★ 로드가 실패한 상태로 기존 파일을 덮지 않는다. 빈 상태 저장은
-    //   사용자가 정말 전부 지운 경우에만 정당하고, 로드 실패 뒤에는 손실이다.
+ // ★ 로드가 실패한 상태로 기존 파일을 덮지 않는다. 빈 상태 저장은
+ //   사용자가 정말 전부 지운 경우에만 정당하고, 로드 실패 뒤에는 손실이다.
     if (!m_loadSucceeded && file::exists(ResolveTagManagerPath()))
     {
-        Debug->LogWarning("TagManager::Save 건너뜀 — 로드가 성공한 적이 없어 "
+        Debug::PrintLog({}, spdlog::level::warn, "TagManager::Save 건너뜀 — 로드가 성공한 적이 없어 "
             "기존 자산을 빈 상태로 덮을 수 없다");
         return false;
     }
 
-    // 빈 시퀀스를 명시한다. 손대지 않은 노드를 흘리면 0바이트를 내고,
-    // 그렇게 저장된 자산은 Load가 tags/layers를 하나도 복원하지 못한다.
+ // 빈 시퀀스를 명시한다. 손대지 않은 노드를 흘리면 0바이트를 내고,
+ // 그렇게 저장된 자산은 Load가 tags/layers를 하나도 복원하지 못한다.
 	Authoring::WriteDocument document;
 	const Authoring::WriteNode root = document.Root();
 	const Authoring::WriteNode tagsNode = root.Child("tags");
@@ -147,15 +147,15 @@ bool TagManager::Save()
 		layersNode.Append().SetScalar(layer);
     }
 
-    // 목적 경로는 Load와 같은 규약으로 만든다. 게시는 Editor Host가 소유하며
-    // Player에는 handler가 없어 정상적으로 실패한다.
+ // 목적 경로는 Load와 같은 규약으로 만든다. 게시는 Editor Host가 소유하며
+ // Player에는 handler가 없어 정상적으로 실패한다.
     UncatalogedAuthoringRequest request{};
     request.destinationPath = ResolveTagManagerPath();
 	request.payload = document.Dump();
 
     if (!AssetAuthoringPort::WriteTagManager(request))
     {
-        Debug->LogError(
+        Debug::PrintLog({}, spdlog::level::err,
             "TagManager save requires a complete Editor authoring transaction");
         return false;
     }
@@ -269,7 +269,7 @@ void TagManager::AddTagToObject(std::string_view tag, Entity* object)
 	}
     else
     {
-        // If the tag does not exist, you might want to add it or handle the error
+ // If the tag does not exist, you might want to add it or handle the error
 		// For now, we'll just add the object to the "Untagged" category
 		object->SetTag("Untagged");
 		m_taggedObjects["Untagged"].push_back(object);
@@ -290,8 +290,8 @@ void TagManager::AddObjectToLayer(std::string_view layer, Entity* object)
     }
     else
     {
-        // If the layer does not exist, you might want to add it or handle the error
-        // For now, we'll just add the object to a default layer
+ // If the layer does not exist, you might want to add it or handle the error
+ // For now, we'll just add the object to a default layer
 		object->SetLayer("Default");
 		m_layeredObjects["Default"].push_back(object);
     }

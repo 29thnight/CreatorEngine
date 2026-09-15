@@ -52,7 +52,6 @@
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="WindowDesc.h" />
     <ClInclude Include="CoroutineHelper.h" />
-    <ClInclude Include="DebugStreamBuf.h" />
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DumpHandler.h" />

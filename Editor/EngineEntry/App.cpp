@@ -11,7 +11,6 @@
 #include "CoreWindow.h"
 #include "DataSystem.h"
 #include "Material.h"
-#include "DebugStreamBuf.h"
 #include "EditorSettingsStore.h"
 #include "EditorSessionState.h"
 #include "EditorAssetDatabase.h"
@@ -404,7 +403,7 @@ void Core::App::WarmUpFirstRenderedFrame()
 		std::this_thread::sleep_for(std::chrono::milliseconds(4));
 	}
 
-	Debug->LogWarning("[Boot] 렌더러 예열이 상한을 넘었다 — 예열 없이 창을 띄운다");
+	Debug::PrintLog({}, spdlog::level::warn, "[Boot] 렌더러 예열이 상한을 넘었다 — 예열 없이 창을 띄운다");
 }
 
 void Core::App::Run()
@@ -467,7 +466,7 @@ void Core::App::Run()
 
 		if (cli.IsQuitRequested())
 		{
-			Debug->LogDebug("[SHUTDOWN] CLI quit 요청 — 종료 시작");
+			Debug::PrintLog({}, spdlog::level::debug, "[SHUTDOWN] CLI quit 요청 — 종료 시작");
 			m_windowClosed = true;
 			PostQuitMessage(0);
 		}
@@ -478,7 +477,7 @@ LRESULT Core::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	// 종료의 발원지를 로그에 남긴다. 부팅 리팩토링 검증 중 "누가 종료를
 	// 시작했나"를 몰라 한참 헤맸다 — WM_CLOSE 수신과 CLI quit을 구분한다.
-	Debug->LogDebug("[SHUTDOWN] WM_CLOSE 수신 — 종료 시작");
+	Debug::PrintLog({}, spdlog::level::debug, "[SHUTDOWN] WM_CLOSE 수신 — 종료 시작");
 	m_windowClosed = true;
 	PostQuitMessage(0);
 	return 0;
@@ -614,4 +613,3 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
 	return 0;
 }
-

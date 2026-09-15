@@ -110,13 +110,13 @@ void FoliageComponent::SaveFoliageAsset(const file::path& directory,
 	TextAssetAuthoringResult result{};
 	if (!AssetAuthoringPort::WriteFoliage(request, result))
 	{
-		Debug->LogError(
+		Debug::PrintLog({}, spdlog::level::err,
 			"Foliage save requires a complete Editor authoring transaction");
 		return;
 	}
 
 	m_foliageAssetGuid = result.guid;
-	Debug->LogDebug("Foliage asset saved to: " + result.assetPath.string());
+	Debug::PrintLog({}, spdlog::level::debug, "Foliage asset saved to: " + result.assetPath.string());
 }
 
 void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
@@ -156,15 +156,15 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
         Meta::Deserialize(&instance, instanceNode);
         AddFoliageInstance(instance);
     }
-	std::cout << "Foliage asset loaded successfully: " << assetPath << std::endl;
+	Debug::PrintLog({}, spdlog::level::info, "Foliage asset loaded successfully: {}", assetPath.string());
 }
 
 void FoliageComponent::BindModelGeneration(FoliageType& type)
 {
-    // PHASE 3.75 MBC9 — typed 정본만 있다. Foliage 자산은 모델을 **이름**으로만
-    // 적으므로(m_modelName) 이름 → ModelId → 현재 generation으로 잇는다. 메시는
-    // legacy 규약과 같은 0번(FoliageType이 메시를 고르지 않는다). 재질은 그 메시가
-    // 가리키는 generation 재질에서 시공하고 embedded texture는 같은 closure에서 푼다.
+ // PHASE 3.75 MBC9 — typed 정본만 있다. Foliage 자산은 모델을 **이름**으로만
+ // 적으므로(m_modelName) 이름 → ModelId → 현재 generation으로 잇는다. 메시는
+ // legacy 규약과 같은 0번(FoliageType이 메시를 고르지 않는다). 재질은 그 메시가
+ // 가리키는 generation 재질에서 시공하고 embedded texture는 같은 closure에서 푼다.
     type.m_modelGeneration.reset();
     type.m_modelMeshIndex = 0;
     type.m_material.reset();
@@ -176,7 +176,7 @@ void FoliageComponent::BindModelGeneration(FoliageType& type)
         DataSystems->LoadModelAssetGeneration(modelGuid);
     if (!generation || generation->Meshes().empty())
     {
-        Debug->LogError("FoliageType 모델 generation 해석 실패: " + type.m_modelName);
+        Debug::PrintLog({}, spdlog::level::err, "FoliageType 모델 generation 해석 실패: " + type.m_modelName);
         return;
     }
     const assets::ModelMeshAsset& mesh = generation->Meshes().front();
@@ -203,7 +203,7 @@ void FoliageComponent::BindModelGeneration(FoliageType& type)
         }
         else
         {
-            Debug->LogWarning("FoliageType 재질 변환 실패 — 빈 재질: " + error);
+            Debug::PrintLog({}, spdlog::level::warn, "FoliageType 재질 변환 실패 — 빈 재질: " + error);
         }
         break;
     }
@@ -213,8 +213,8 @@ void FoliageComponent::BindModelGeneration(FoliageType& type)
 void FoliageComponent::AddFoliageType(const FoliageType& type)
 {
     m_foliageTypes.push_back(type);
-    // 저작 경로(에디터 드롭·CLI)든 자산 로드 경로(LoadFoliageAsset)든 이름으로
-    // 같은 typed 바인딩을 한다.
+ // 저작 경로(에디터 드롭·CLI)든 자산 로드 경로(LoadFoliageAsset)든 이름으로
+ // 같은 typed 바인딩을 한다.
     BindModelGeneration(m_foliageTypes.back());
 	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 }
@@ -355,14 +355,14 @@ void FoliageComponent::UpdateFoliageCullingData(
 
             auto& foliage = m_foliageInstances[i];
 
-            // 경계 체크 보정: >=
+ // 경계 체크 보정: >=
             if (static_cast<size_t>(foliage.m_foliageTypeID) >= m_foliageTypes.size())
                 continue;
 
             foliage.RebuildWorldMatrix();
 
             const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
-            // MBC9 — 바운드는 typed generation 메시가 소유한다.
+ // MBC9 — 바운드는 typed generation 메시가 소유한다.
             if (!foliageType.m_modelGeneration
                 || foliageType.m_modelMeshIndex >= foliageType.m_modelGeneration->Meshes().size())
             {
@@ -396,7 +396,7 @@ void FoliageComponent::UpdateFoliageCullingData(
         tasks.emplace_back(std::async(std::launch::async, process_range, begin, end));
     }
 
-    // 완료 대기
+ // 완료 대기
     for (auto& f : tasks)
     {
         if (f.valid()) f.get();
@@ -409,7 +409,7 @@ void FoliageComponent::OnDeserialized()
 	// CT6-d: 구 ComponentFactory 분기 이동 — m_foliageAssetGuid는 반영 멤버.
 	if (m_foliageAssetGuid == nullFileGuid)
 	{
-		Debug->LogError("FoliageComponent is missing m_foliageAssetGuid");
+		Debug::PrintLog({}, spdlog::level::err, "FoliageComponent is missing m_foliageAssetGuid");
 		return;
 	}
 
@@ -421,7 +421,7 @@ void FoliageComponent::OnDeserialized()
 	{
 		if (!type.m_modelName.empty() && !type.m_modelGeneration)
 		{
-			Debug->LogError("Failed to load model for FoliageType: " + type.m_modelName);
+			Debug::PrintLog({}, spdlog::level::err, "Failed to load model for FoliageType: " + type.m_modelName);
 		}
 	}
 

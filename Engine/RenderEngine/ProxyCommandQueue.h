@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Core.Minimal.h"
 #include "ProxyCommand.h"
 #include "concurrent_queue.h"
@@ -168,7 +168,7 @@ private:
 		{
 			m_failed.fetch_add(1, std::memory_order_seq_cst);
 			m_dropped.fetch_add(1, std::memory_order_seq_cst);
-			Debug->LogWarning(e.what());
+			Debug::PrintLog({}, spdlog::level::warn, e.what());
 		}
 	}
 

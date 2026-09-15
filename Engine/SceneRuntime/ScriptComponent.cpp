@@ -118,11 +118,11 @@ void ScriptComponent::OnInitialized()
 		auto& clr = ClrHost::Get();
 		if (!clr.IsReady())
 		{
-			Debug->LogWarning("[스크립트] CLR이 준비되지 않아 " + m_scriptType + " 을 만들지 못했습니다");
+			Debug::PrintLog({}, spdlog::level::warn, "[스크립트] CLR이 준비되지 않아 " + m_scriptType + " 을 만들지 못했습니다");
 		}
 		else
 		{
-			Debug->LogError("[스크립트] 인스턴스 생성 실패 — 등록되지 않은 타입: " + m_scriptType);
+			Debug::PrintLog({}, spdlog::level::err, "[스크립트] 인스턴스 생성 실패 — 등록되지 않은 타입: " + m_scriptType);
 		}
 		return;
 	}

@@ -711,7 +711,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	EnsureAnimationBinding();
 	if (FileGuid{} != m_Motion && nullptr == TypedSkeleton())
 	{
-		Debug->LogError("[Animator] 모델 generation의 스켈레톤을 붙들지 못했다: "
+		Debug::PrintLog({}, spdlog::level::err, "[Animator] 모델 generation의 스켈레톤을 붙들지 못했다: "
 			+ m_Motion.ToString());
 	}
 

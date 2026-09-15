@@ -514,7 +514,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				std::string skyError;
 				if (!EnhancedSceneRenderer::SetSkyBoxPath(filepath.string(), skyError))
 				{
-					Debug->LogError("SkyBox 변경 실패: " + skyError);
+					Debug::PrintLog({}, spdlog::level::err, "SkyBox 변경 실패: " + skyError);
 				}
 			}
 

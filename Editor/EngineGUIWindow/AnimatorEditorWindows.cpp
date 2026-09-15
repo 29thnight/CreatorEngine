@@ -1063,12 +1063,12 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 			file::path scriptFullPath = DataSystems->GetFilePath(fileGuid);
 			if (scriptFullPath.empty())
 			{
-				Debug->LogError("Script not found: " + state->behaviour->m_name);
+				Debug::PrintLog({}, spdlog::level::err, "Script not found: " + state->behaviour->m_name);
 			}
 			else
 			{
 				// C++ 스크립트 솔루션은 은퇴(9-4) — 파일 위치만 알려 준다.
-				Debug->Log("Behaviour script: " + scriptFullPath.string());
+				Debug::PrintLog({}, spdlog::level::info, "Behaviour script: " + scriptFullPath.string());
 			}
 		}
 	}

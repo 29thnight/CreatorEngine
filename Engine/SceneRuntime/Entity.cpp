@@ -207,7 +207,7 @@ Component* Entity::AddComponent(const Meta::Type& type)
 {
     if (auto it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& component) { return component->GetTypeID() == type.typeID; }); it != m_components.end())
     {
-		Debug->LogWarning("Component of type " + type.name + " already exists on Entity " + m_name.ToString() + ". Only one instance allowed.");
+		Debug::PrintLog({}, spdlog::level::warn, "Component of type " + type.name + " already exists on Entity " + m_name.ToString() + ". Only one instance allowed.");
 		return it->get();
     }
 
@@ -319,7 +319,7 @@ Transform& Entity::MissingTransformFallback(const Entity* who)
 	const std::string name = who ? who->m_name.ToString() : std::string("<null>");
 	if (s_reported.insert(name).second)
 	{
-		Debug->LogError("[S3] Transform이 없는 오브젝트에서 Transform_()가 불렸다: '" + name
+		Debug::PrintLog({}, spdlog::level::err, "[S3] Transform이 없는 오브젝트에서 Transform_()가 불렸다: '" + name
 			+ "' — UI는 RectTransformComponent만 갖는다. 이 호출부를 찾아 고쳐야 한다"
 			" (지금은 공유 더미를 돌려주므로 값이 반영되지 않는다).");
 	}
@@ -570,7 +570,7 @@ void Entity::SetCollisionType()
 	size_t index = TagManager::GetInstance()->GetLayerIndex(m_layer.ToString());
 	if (index >= TagManager::GetInstance()->GetLayers().size() || index > 32)
 	{
-		Debug->LogError("Invalid layer index: " + std::to_string(index));
+		Debug::PrintLog({}, spdlog::level::err, "Invalid layer index: " + std::to_string(index));
 		return;
 	}
 

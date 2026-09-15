@@ -172,7 +172,7 @@ void TextComponent::OnDeserialized()
 	}
 	else
 	{
-		Debug->LogError("Text Component is missing font path");
+		Debug::PrintLog({}, spdlog::level::err, "Text Component is missing font path");
 	}
 }
 

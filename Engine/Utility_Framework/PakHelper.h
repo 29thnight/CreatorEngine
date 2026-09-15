@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "EnginePaths.h"
 #include "PathFinder.h"
 #include "LogSystem.h"
@@ -30,7 +30,7 @@ namespace
     {
         if (Log::IsAlive())
         {
-            Debug->LogError(message);
+            Debug::PrintLog({}, spdlog::level::err, message);
             return;
         }
         std::fprintf(stderr, "[PakCleanup] %s\n", message.c_str());
@@ -38,14 +38,14 @@ namespace
 
     void RuntimeCleanupInfo(const std::string& message) noexcept
     {
-        if (Log::IsAlive()) Debug->Log(message);
+        if (Log::IsAlive()) Debug::PrintLog({}, spdlog::level::info, message);
     }
 
     bool EnsureDirectoryExists(const fs::path& directory)
     {
         if (directory.empty())
         {
-            Debug->LogError("Directory path is empty.");
+            Debug::PrintLog({}, spdlog::level::err, "Directory path is empty.");
             return false;
         }
 
@@ -53,14 +53,14 @@ namespace
         const bool exists = fs::exists(directory, ec);
         if (ec)
         {
-            Debug->LogError("Failed to query directory '" + PathToUtf8(directory) + "': " + ec.message());
+            Debug::PrintLog({}, spdlog::level::err, "Failed to query directory '" + PathToUtf8(directory) + "': " + ec.message());
             return false;
         }
         if (exists)
         {
             if (!fs::is_directory(directory, ec) || ec)
             {
-                Debug->LogError("Path exists but is not a directory: " + PathToUtf8(directory));
+                Debug::PrintLog({}, spdlog::level::err, "Path exists but is not a directory: " + PathToUtf8(directory));
                 return false;
             }
 
@@ -71,7 +71,7 @@ namespace
         fs::create_directories(directory, ec);
         if (ec)
         {
-            Debug->LogError("Failed to create directory '" + PathToUtf8(directory) + "': " + ec.message());
+            Debug::PrintLog({}, spdlog::level::err, "Failed to create directory '" + PathToUtf8(directory) + "': " + ec.message());
             return false;
         }
 
@@ -126,14 +126,14 @@ namespace
         const fs::path assetsRoot = PathFinder::Relative();
         if (assetsRoot.empty())
         {
-            Debug->LogWarning("Assets root path is empty. Skipping pak generation.");
+            Debug::PrintLog({}, spdlog::level::warn, "Assets root path is empty. Skipping pak generation.");
             return false;
         }
 
         std::error_code ec{};
         if (!fs::exists(assetsRoot, ec) || ec)
         {
-            Debug->LogError("Assets directory not found: " + PathToUtf8(assetsRoot));
+            Debug::PrintLog({}, spdlog::level::err, "Assets directory not found: " + PathToUtf8(assetsRoot));
             return false;
         }
 
@@ -155,7 +155,7 @@ namespace
 
         if (outputDir.empty())
         {
-            Debug->LogError("Project root path is empty. Cannot resolve pak output directory.");
+            Debug::PrintLog({}, spdlog::level::err, "Project root path is empty. Cannot resolve pak output directory.");
             return false;
         }
 
@@ -164,7 +164,7 @@ namespace
             fs::create_directories(outputDir, ec);
             if (ec)
             {
-                Debug->LogError("Failed to create pak output directory '" + PathToUtf8(outputDir) + "': " + ec.message());
+                Debug::PrintLog({}, spdlog::level::err, "Failed to create pak output directory '" + PathToUtf8(outputDir) + "': " + ec.message());
                 return false;
             }
         }
@@ -175,7 +175,7 @@ namespace
             fs::remove(pakPath, ec);
             if (ec)
             {
-                Debug->LogWarning("Unable to remove existing pak '" + PathToUtf8(pakPath) + "': " + ec.message());
+                Debug::PrintLog({}, spdlog::level::warn, "Unable to remove existing pak '" + PathToUtf8(pakPath) + "': " + ec.message());
                 ec.clear();
             }
         }
@@ -187,7 +187,7 @@ namespace
             fs::recursive_directory_iterator it{ assetsRoot, fs::directory_options::skip_permission_denied, ec };
             if (ec)
             {
-                Debug->LogError("Failed to enumerate assets: " + ec.message());
+                Debug::PrintLog({}, spdlog::level::err, "Failed to enumerate assets: " + ec.message());
                 return false;
             }
 
@@ -220,7 +220,7 @@ namespace
                 {
                     if (!source.mountName.empty())
                     {
-                        Debug->LogWarning("Pak source directory not found for '" + source.mountName + "': " + PathToUtf8(source.root));
+                        Debug::PrintLog({}, spdlog::level::warn, "Pak source directory not found for '" + source.mountName + "': " + PathToUtf8(source.root));
                     }
                     ec.clear();
                     continue;
@@ -229,7 +229,7 @@ namespace
                 fs::recursive_directory_iterator it{ source.root, fs::directory_options::skip_permission_denied, ec };
                 if (ec)
                 {
-                    Debug->LogError("Failed to enumerate pak source '" + source.mountName + "': " + ec.message());
+                    Debug::PrintLog({}, spdlog::level::err, "Failed to enumerate pak source '" + source.mountName + "': " + ec.message());
                     ec.clear();
                     continue;
                 }
@@ -239,7 +239,7 @@ namespace
                 {
                     if (ec)
                     {
-                        Debug->LogWarning("Error while iterating pak source '" + source.mountName + "': " + ec.message());
+                        Debug::PrintLog({}, spdlog::level::warn, "Error while iterating pak source '" + source.mountName + "': " + ec.message());
                         ec.clear();
                         continue;
                     }
@@ -254,7 +254,7 @@ namespace
                     auto relative = fs::relative(entry.path(), source.root, ec);
                     if (ec)
                     {
-                        Debug->LogWarning("Failed to resolve relative path for '" + PathToUtf8(entry.path()) + "' in '" + source.mountName + "': " + ec.message());
+                        Debug::PrintLog({}, spdlog::level::warn, "Failed to resolve relative path for '" + PathToUtf8(entry.path()) + "' in '" + source.mountName + "': " + ec.message());
                         ec.clear();
                         continue;
                     }
@@ -271,26 +271,26 @@ namespace
                 }
 
                 totalFileCount += rootFileCount;
-                Debug->Log("Added " + std::to_string(rootFileCount) + " files from '" + source.mountName + "' to pak queue.");
+                Debug::PrintLog({}, spdlog::level::info, "Added " + std::to_string(rootFileCount) + " files from '" + source.mountName + "' to pak queue.");
             }
 
             if (totalFileCount == 0)
             {
-                Debug->LogWarning("No files found under pak source directories. Skipping pak generation.");
+                Debug::PrintLog({}, spdlog::level::warn, "No files found under pak source directories. Skipping pak generation.");
                 return false;
             }
 
             builder.finish();
-            Debug->Log("Packaged " + std::to_string(totalFileCount) + " files into pak: " + PathToUtf8(pakPath));
+            Debug::PrintLog({}, spdlog::level::info, "Packaged " + std::to_string(totalFileCount) + " files into pak: " + PathToUtf8(pakPath));
             return true;
         }
         catch (const std::exception& e)
         {
-            Debug->LogError(std::string("Failed to build asset pak: ") + e.what());
+            Debug::PrintLog({}, spdlog::level::err, std::string("Failed to build asset pak: ") + e.what());
         }
         catch (...)
         {
-            Debug->LogError("Failed to build asset pak: unknown error.");
+            Debug::PrintLog({}, spdlog::level::err, "Failed to build asset pak: unknown error.");
         }
 
         return false;
@@ -381,7 +381,7 @@ namespace
     {
         if (archivePath.empty() || archivePath.find('\0') != std::string_view::npos)
         {
-            Debug->LogError("Pak entry has an empty or invalid path.");
+            Debug::PrintLog({}, spdlog::level::err, "Pak entry has an empty or invalid path.");
             return false;
         }
 
@@ -390,7 +390,7 @@ namespace
         if (relativePath.empty() || relativePath.is_absolute() || relativePath.has_root_name() ||
             relativePath.has_root_directory())
         {
-            Debug->LogError("Pak entry path is not relative: " + std::string(archivePath));
+            Debug::PrintLog({}, spdlog::level::err, "Pak entry path is not relative: " + std::string(archivePath));
             return false;
         }
 
@@ -402,7 +402,7 @@ namespace
                 value.find_first_of(invalidComponentChars) != std::wstring::npos ||
                 value.back() == L' ' || value.back() == L'.')
             {
-                Debug->LogError("Pak entry contains an unsafe path component: " +
+                Debug::PrintLog({}, spdlog::level::err, "Pak entry contains an unsafe path component: " +
                     std::string(archivePath));
                 return false;
             }
@@ -418,7 +418,7 @@ namespace
         if (outPath == normalizedRoot || outputNative.size() <= rootPrefix.size() ||
             _wcsnicmp(outputNative.c_str(), rootPrefix.c_str(), rootPrefix.size()) != 0)
         {
-            Debug->LogError("Pak entry escapes the extraction root: " + std::string(archivePath));
+            Debug::PrintLog({}, spdlog::level::err, "Pak entry escapes the extraction root: " + std::string(archivePath));
             return false;
         }
 
@@ -499,7 +499,7 @@ namespace
     {
         if (pakPath.empty())
         {
-            Debug->LogError("Pak file path is empty.");
+            Debug::PrintLog({}, spdlog::level::err, "Pak file path is empty.");
             return false;
         }
 
@@ -509,27 +509,27 @@ namespace
         if (ec || absolutePakPath.empty() ||
             !ValidateExistingPathHasNoReparsePoints(absolutePakPath))
         {
-            Debug->LogError("Pak file path is invalid: " + PathToUtf8(pakPath));
+            Debug::PrintLog({}, spdlog::level::err, "Pak file path is invalid: " + PathToUtf8(pakPath));
             return false;
         }
 
         ec.clear();
         if (!fs::is_regular_file(absolutePakPath, ec) || ec)
         {
-            Debug->LogError("Pak file not found or not a regular file: " +
+            Debug::PrintLog({}, spdlog::level::err, "Pak file not found or not a regular file: " +
                 PathToUtf8(absolutePakPath));
             return false;
         }
 
         if (extractRoot.empty())
         {
-            Debug->LogError("Unpacked assets root is empty.");
+            Debug::PrintLog({}, spdlog::level::err, "Unpacked assets root is empty.");
             return false;
         }
         if (!ValidateExistingPathHasNoReparsePoints(extractRoot)) return false;
         if (!EnsureDirectoryExists(extractRoot))
         {
-            Debug->LogError("Unable to prepare extraction root: " + PathToUtf8(extractRoot));
+            Debug::PrintLog({}, spdlog::level::err, "Unable to prepare extraction root: " + PathToUtf8(extractRoot));
             return false;
         }
         if (!ValidateExistingPathHasNoReparsePoints(extractRoot)) return false;
@@ -542,7 +542,7 @@ namespace
             auto entries = archive.list();
             if (entries.empty())
             {
-                Debug->LogWarning("Pak archive contains no entries: " +
+                Debug::PrintLog({}, spdlog::level::warn, "Pak archive contains no entries: " +
                     PathToUtf8(absolutePakPath));
                 return false;
             }
@@ -558,7 +558,7 @@ namespace
                 if (!ResolveSafeExtractPath(extractRoot, entry.path, outPath, outputKey) ||
                     !extractedPaths.insert(outputKey).second)
                 {
-                    Debug->LogError("Pak contains an unsafe or duplicate output path: " + entry.path);
+                    Debug::PrintLog({}, spdlog::level::err, "Pak contains an unsafe or duplicate output path: " + entry.path);
                     return false;
                 }
                 fs::path parent = outPath.parent_path();
@@ -573,13 +573,13 @@ namespace
                 const DWORD existingAttributes = GetFileAttributesW(outPath.c_str());
                 if (existingAttributes != INVALID_FILE_ATTRIBUTES)
                 {
-                    Debug->LogError("Pak extraction destination already exists: " + PathToUtf8(outPath));
+                    Debug::PrintLog({}, spdlog::level::err, "Pak extraction destination already exists: " + PathToUtf8(outPath));
                     return false;
                 }
                 const DWORD destinationError = GetLastError();
                 if (destinationError != ERROR_FILE_NOT_FOUND && destinationError != ERROR_PATH_NOT_FOUND)
                 {
-                    Debug->LogError("Unable to inspect pak extraction destination '" +
+                    Debug::PrintLog({}, spdlog::level::err, "Unable to inspect pak extraction destination '" +
                         PathToUtf8(outPath) + "' (Win32=" +
                         std::to_string(destinationError) + ").");
                     return false;
@@ -592,28 +592,28 @@ namespace
                 }
                 catch (const std::exception& e)
                 {
-                    Debug->LogError("Failed to extract '" + entry.path + "': " + e.what());
+                    Debug::PrintLog({}, spdlog::level::err, "Failed to extract '" + entry.path + "': " + e.what());
                     allSucceeded = false;
                 }
                 catch (...)
                 {
-                    Debug->LogError("Failed to extract '" + entry.path + "': unknown error.");
+                    Debug::PrintLog({}, spdlog::level::err, "Failed to extract '" + entry.path + "': unknown error.");
                     allSucceeded = false;
                 }
             }
 
-            Debug->Log("Unpacked " + std::to_string(extractedCount) +
+            Debug::PrintLog({}, spdlog::level::info, "Unpacked " + std::to_string(extractedCount) +
                 " assets from pak to '" + PathToUtf8(extractRoot) + "'.");
 
             return allSucceeded;
         }
         catch (const std::exception& e)
         {
-            Debug->LogError(std::string("Failed to open pak archive: ") + e.what());
+            Debug::PrintLog({}, spdlog::level::err, std::string("Failed to open pak archive: ") + e.what());
         }
         catch (...)
         {
-            Debug->LogError("Failed to open pak archive: unknown error.");
+            Debug::PrintLog({}, spdlog::level::err, "Failed to open pak archive: unknown error.");
         }
 
         return false;

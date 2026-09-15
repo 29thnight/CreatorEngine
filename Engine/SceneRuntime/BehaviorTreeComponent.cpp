@@ -16,7 +16,7 @@ void BehaviorTreeComponent::Initialize()
 		file::path blackBoardPath = DataSystems->GetFilePath(m_BlackBoardGuid);
 		if (!file::exists(blackBoardPath))
 		{
-			Debug->LogError("Blackboard File not Exists");
+			Debug::PrintLog({}, spdlog::level::err, "Blackboard File not Exists");
 		}
 		else
 		{
@@ -27,7 +27,7 @@ void BehaviorTreeComponent::Initialize()
 	}
 	else
 	{
-		Debug->LogError("Blackboard GUID is invalid.");
+		Debug::PrintLog({}, spdlog::level::err, "Blackboard GUID is invalid.");
 	}
 
 	if (m_BehaviorTreeGuid != nullFileGuid)
@@ -36,7 +36,7 @@ void BehaviorTreeComponent::Initialize()
 	}
 	else
 	{
-		Debug->LogError("Behavior Tree GUID is invalid.");
+		Debug::PrintLog({}, spdlog::level::err, "Behavior Tree GUID is invalid.");
 	}
 }
 
@@ -106,7 +106,7 @@ void BehaviorTreeComponent::SendGraphToManaged(const BTBuildGraph& graph)
 	const std::vector<ClrHost::ScriptBTNodeDesc> nodes = BTFlatten::Flatten(graph);
 	if (nodes.empty())
 	{
-		Debug->LogError("[BT] 그래프가 비어 있어 트리를 만들지 못했다: " + name);
+		Debug::PrintLog({}, spdlog::level::err, "[BT] 그래프가 비어 있어 트리를 만들지 못했다: " + name);
 		return;
 	}
 
@@ -125,7 +125,7 @@ void BehaviorTreeComponent::SendGraphToManaged(const BTBuildGraph& graph)
 		// 조용히 넘기지 않는다 — 트리가 안 서면 그 AI는 아무것도 하지 않는데,
 		// 그 모습이 "가만히 있는 캐릭터"라 원인을 짚기 어렵다.
 		// 관리 측이 실패 사유를 이미 로그로 남겼다(BehaviorTreeRegistry.Create).
-		Debug->LogError("[BT] 트리 생성 실패: " + name);
+		Debug::PrintLog({}, spdlog::level::err, "[BT] 트리 생성 실패: " + name);
 	}
 }
 
@@ -148,7 +148,7 @@ void BehaviorTreeComponent::GraphToBuild()
 				Authoring::ParsedDocument::ParseFile(BTpath.string(), parseError);
 			if (!document)
 			{
-				Debug->LogError("Behavior Tree parse failed: " + parseError);
+				Debug::PrintLog({}, spdlog::level::err, "Behavior Tree parse failed: " + parseError);
 				return;
 			}
 			const Authoring::ReadNode node = document.Root();
@@ -167,10 +167,10 @@ void BehaviorTreeComponent::GraphToBuild()
 		}
 		else
 		{
-			Debug->LogError("Behavior Tree file does not exist: " + BTpath.string());
+			Debug::PrintLog({}, spdlog::level::err, "Behavior Tree file does not exist: " + BTpath.string());
 		}
 	}
-	std::cout << "Behavior Tree Build Time: " << bm.GetElapsedTime() << " ms\n";
+	Debug::PrintLog({}, spdlog::level::info, "Behavior Tree Build Time: {} ms\n", bm.GetElapsedTime());
 }
 
 

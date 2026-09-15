@@ -70,8 +70,8 @@ void InputActionManager::DeleteActionMap(std::string name)
 		auto it = std::find(m_actionMaps.begin(), m_actionMaps.end(), deleteMap);
 		if (it != m_actionMaps.end())
 		{
-			delete* it;                      
-			m_actionMaps.erase(it);          
+			delete* it;
+			m_actionMaps.erase(it);
 		}
 	}
 }
@@ -87,7 +87,7 @@ ActionMap* InputActionManager::FindActionMap(std::string name)
 			return actionMap;
 		}
 	}
-	std::cout << "ActionMap not found: " << name << std::endl;
+	Debug::PrintLog({}, spdlog::level::info, "ActionMap not found: {}", name);
 	return nullptr;
 }
 
@@ -112,7 +112,7 @@ void InputActionManager::LoadManager()
 	const fs::path directory = PathFinder::InputMapPath();
 	if (!fs::exists(directory) || !fs::is_directory(directory))
 	{
-		Debug->LogWarning("Input map directory does not exist: "
+		Debug::PrintLog({}, spdlog::level::warn, "Input map directory does not exist: "
 			+ directory.string());
 		return;
 	}
@@ -136,7 +136,7 @@ void InputActionManager::LoadManager()
 		}
 		else
 		{
-			Debug->LogError("Input map rejected: " + path.string());
+			Debug::PrintLog({}, spdlog::level::err, "Input map rejected: " + path.string());
 		}
 	}
 }
@@ -158,7 +158,7 @@ bool InputActionManager::SaveMap(ActionMap* actionMap)
 		if (nullptr == action || action->actionName.empty()
 			|| action->key.empty() || action->key.size() > 4)
 		{
-			Debug->LogError("Input map contains an invalid action: "
+			Debug::PrintLog({}, spdlog::level::err, "Input map contains an invalid action: "
 				+ actionMap->m_name);
 			return false;
 		}
@@ -186,7 +186,7 @@ bool InputActionManager::SaveMap(ActionMap* actionMap)
 
 	if (!AssetAuthoringPort::WriteInputActionMap(request))
 	{
-		Debug->LogError(
+		Debug::PrintLog({}, spdlog::level::err,
 			"Input action map save requires a complete Editor authoring "
 			"transaction: " + actionMap->m_name);
 		return false;
@@ -201,7 +201,7 @@ ActionMap* InputActionManager::LoadMap(const std::string& filepath)
 		Authoring::ParsedDocument::ParseFile(filepath, parseError);
 	if (!document)
 	{
-		Debug->LogError("Input map parse failed: " + filepath + " / " + parseError);
+		Debug::PrintLog({}, spdlog::level::err, "Input map parse failed: " + filepath + " / " + parseError);
 		return nullptr;
 	}
 
@@ -211,7 +211,7 @@ ActionMap* InputActionManager::LoadMap(const std::string& filepath)
 	if (!root.IsMap() || root["schemaVersion"].As<int>(0) != 1
 		|| !mapNameNode.IsScalar() || !actionsNode.IsSequence())
 	{
-		Debug->LogError("Input map schema is invalid: " + filepath);
+		Debug::PrintLog({}, spdlog::level::err, "Input map schema is invalid: " + filepath);
 		return nullptr;
 	}
 
@@ -236,7 +236,7 @@ ActionMap* InputActionManager::LoadMap(const std::string& filepath)
 			|| !scriptNameNode.IsScalar() || !functionNameNode.IsScalar()
 			|| keysNode.Size() == 0 || keysNode.Size() > 4)
 		{
-			Debug->LogError("Input map action schema is invalid: " + filepath);
+			Debug::PrintLog({}, spdlog::level::err, "Input map action schema is invalid: " + filepath);
 			return nullptr;
 		}
 
@@ -251,7 +251,7 @@ ActionMap* InputActionManager::LoadMap(const std::string& filepath)
 			|| (keyStateName != "Down" && keyStateName != "Pressed"
 				&& keyStateName != "Released"))
 		{
-			Debug->LogError("Input map action value is invalid: " + filepath);
+			Debug::PrintLog({}, spdlog::level::err, "Input map action value is invalid: " + filepath);
 			return nullptr;
 		}
 
@@ -271,7 +271,7 @@ ActionMap* InputActionManager::LoadMap(const std::string& filepath)
 			if (rawKey > static_cast<unsigned long long>(
 					std::numeric_limits<std::size_t>::max()))
 			{
-				Debug->LogError("Input map key is out of range: " + filepath);
+				Debug::PrintLog({}, spdlog::level::err, "Input map key is out of range: " + filepath);
 				return nullptr;
 			}
 			action->key.push_back(static_cast<std::size_t>(rawKey));

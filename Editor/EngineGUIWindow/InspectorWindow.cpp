@@ -811,7 +811,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 			{
 				const auto tagResult = EditorProjectOperations::AddTag(newTagName);
 				if (tagResult.IsSuccess()) assignTag(std::string(newTagName));
-				else Debug->LogError(tagResult.message);
+				else Debug::PrintLog({}, spdlog::level::err, tagResult.message);
 			}
 			ImGui::CloseCurrentPopup();
 		}
@@ -1075,7 +1075,7 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			}
 			else
 			{
-				Debug->LogError("Failed to get file GUID for Behavior Tree: " + filePath.string());
+				Debug::PrintLog({}, spdlog::level::err, "Failed to get file GUID for Behavior Tree: " + filePath.string());
 			}
 		}
 	}
@@ -1099,7 +1099,7 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 			}
 			else
 			{
-				Debug->LogError("Failed to get file GUID for Blackboard: " + filePath.string());
+				Debug::PrintLog({}, spdlog::level::err, "Failed to get file GUID for Blackboard: " + filePath.string());
 			}
 		}
 	}
@@ -1137,14 +1137,14 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 				// 이미 프로파일이 존재하는 경우
 				if (volumeComponent->m_volumeProfileGuid != nullFileGuid)
 				{
-					Debug->LogWarning("Volume profile already exists. Replacing with new profile.");
+					Debug::PrintLog({}, spdlog::level::warn, "Volume profile already exists. Replacing with new profile.");
 				}
 				volumeComponent->m_volumeProfileGuid = guid;
 				volumeComponent->LoadProfile(guid);
 			}
 			else
 			{
-				Debug->LogError("Failed to load volume profile: " + filepath.string());
+				Debug::PrintLog({}, spdlog::level::err, "Failed to load volume profile: " + filepath.string());
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1222,7 +1222,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 					}
 					else
 					{
-						Debug->LogError("Failed to load HDR: " + filepath.string());
+						Debug::PrintLog({}, spdlog::level::err, "Failed to load HDR: " + filepath.string());
 					}
 				}
 				ImGui::EndDragDropTarget();
@@ -1353,7 +1353,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 				decalComponent->SetDecalTexture(filename.string().c_str());
 			}
 			else {
-				Debug->Log("Empty Texture File Name");
+				Debug::PrintLog({}, spdlog::level::info, "Empty Texture File Name");
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1376,7 +1376,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 				decalComponent->SetNormalTexture(filename.string().c_str());
 			}
 			else {
-				Debug->Log("Empty Texture File Name");
+				Debug::PrintLog({}, spdlog::level::info, "Empty Texture File Name");
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1399,7 +1399,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 				decalComponent->SetORMTexture(filename.string().c_str());
 			}
 			else {
-				Debug->Log("Empty Texture File Name");
+				Debug::PrintLog({}, spdlog::level::info, "Empty Texture File Name");
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1461,7 +1461,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 			}
 			else
 			{
-				Debug->LogError("Failed to load UI Texture: " + filepath.string());
+				Debug::PrintLog({}, spdlog::level::err, "Failed to load UI Texture: " + filepath.string());
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -2401,12 +2401,12 @@ void InspectorWindow::Draw()
 					}
 					else
 					{
-						Debug->LogError("Failed to open file for writing: " + selectedMetaFilePath.string());
+						Debug::PrintLog({}, spdlog::level::err, "Failed to open file for writing: " + selectedMetaFilePath.string());
 					}
 				}
 				catch (const std::exception& e)
 				{
-					Debug->LogError("Failed to save YAML: " + std::string(e.what()));
+					Debug::PrintLog({}, spdlog::level::err, "Failed to save YAML: " + std::string(e.what()));
 				}
 			}
 		}

@@ -137,7 +137,7 @@ namespace Lifecycle
         ComponentTypeUUID::RegisterAll();
         if (Count() != ComponentTypeUUID::kTable.size())
         {
-            Debug->LogCritical("LifecycleRegistry/ComponentTypeUUID 등록 수 불일치: Lifecycle="
+            Debug::PrintLog({}, spdlog::level::critical, "LifecycleRegistry/ComponentTypeUUID 등록 수 불일치: Lifecycle="
                 + std::to_string(Count()) + ", UUID=" + std::to_string(ComponentTypeUUID::kTable.size())
                 + " - 두 목록 중 한쪽에 타입을 추가하고 다른 쪽을 빠뜨렸을 가능성");
             Log::FlushNow();

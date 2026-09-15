@@ -1,4 +1,4 @@
-﻿#include "EditorCommandServiceHost.h"
+#include "EditorCommandServiceHost.h"
 
 #include "ConsoleCommandSystem.h"
 #include "CommandCore/CommandRegistry.h"

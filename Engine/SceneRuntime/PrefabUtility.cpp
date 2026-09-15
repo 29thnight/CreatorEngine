@@ -224,7 +224,7 @@ namespace
 				}
 				catch (const std::exception& e)
 				{
-					Debug->LogError(e.what());
+					Debug::PrintLog({}, spdlog::level::err, e.what());
 				}
 			}
 		}
@@ -391,7 +391,7 @@ void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
 			{
                 // 조용히 넘기지 않는다 — 값 하나가 유실되면 그 필드는 이후
                 // 프리팹 갱신을 계속 받아 사용자 수정이 사라진 것처럼 보인다.
-				Debug->LogError("ApplyRecordedOverrides: 값 파싱 실패 "
+				Debug::PrintLog({}, spdlog::level::err, "ApplyRecordedOverrides: 값 파싱 실패 "
 					+ type->name + "." + ov.m_propertyName + " — " + parseError);
 			}
         }
@@ -711,7 +711,7 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
 			path, payload, identity);
 		if (authoredIdentity != identity)
 		{
-			Debug->LogError("Prefab/meta GUID mismatch after authoring: " + path);
+			Debug::PrintLog({}, spdlog::level::err, "Prefab/meta GUID mismatch after authoring: " + path);
 			return false;
 		}
 	}
@@ -774,13 +774,13 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 		readPath = DataSystems->ResolveCatalogAssetPath(sourceIdentity);
 		if (readPath.empty())
 		{
-			Debug->LogError("Prefab cooked runtime artifact 해석 실패: " + path);
+			Debug::PrintLog({}, spdlog::level::err, "Prefab cooked runtime artifact 해석 실패: " + path);
 			return nullptr;
 		}
 	}
 	else if (!PathFinder::IsAssetAuthoringEnabled())
 	{
-		Debug->LogError("Player prefab source identity 해석 실패: " + path);
+		Debug::PrintLog({}, spdlog::level::err, "Player prefab source identity 해석 실패: " + path);
 		return nullptr;
 	}
 
@@ -799,7 +799,7 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 		Authoring::ParsedDocument::ParseFile(readPath.string(), parseError);
 	if (!document)
 	{
-		Debug->LogError("Prefab parse failed: " + readPath.string()
+		Debug::PrintLog({}, spdlog::level::err, "Prefab parse failed: " + readPath.string()
 			+ " — " + parseError);
 		return nullptr;
 	}
@@ -811,7 +811,7 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 	const FileGuid identity = sourceIdentity;
 	if (identity == FileGuid{})
 	{
-		Debug->LogError("Prefab load rejected missing catalog identity: " + path);
+		Debug::PrintLog({}, spdlog::level::err, "Prefab load rejected missing catalog identity: " + path);
 		return nullptr;
 	}
 	prefab->SetFileGuid(identity);

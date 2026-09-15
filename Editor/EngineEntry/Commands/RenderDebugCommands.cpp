@@ -433,7 +433,7 @@ namespace ConsoleCmd
         }
         report += mismatchReport;
 
-        Debug->LogWarning("[렌더 타깃]\n" + report);
+        Debug::PrintLog({}, spdlog::level::warn, "[렌더 타깃]\n" + report);
         std::printf("[CLI] 렌더 타깃\n%s", report.c_str());
             data.Set("width", CommandData::Int(screenWidth)); data.Set("height", CommandData::Int(screenHeight));
         data.Set("textures", std::move(textures)); data.Set("registered", CommandData::Int(entries.size())); data.Set("mismatched", CommandData::Int(mismatched));
@@ -552,7 +552,7 @@ namespace ConsoleCmd
         report += "shadow cascades: EnhancedShadowPass render-owned state\n";
         std::printf("[shadowinfo]\n%s", report.c_str());
         std::fflush(stdout);
-        Debug->LogWarning("[shadowinfo]\n" + report);
+        Debug::PrintLog({}, spdlog::level::warn, "[shadowinfo]\n" + report);
             data.Set("cameras", std::move(cameraData));
         return Ok({}, std::move(data));
     }

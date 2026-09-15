@@ -1,4 +1,4 @@
-﻿#include "Transform.h"
+#include "Transform.h"
 #include "Scene.h"
 #include "Terrain.h"
 #include "DataSystem.h"
@@ -391,7 +391,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	if (m_width <= 0 || m_height <= 0 ||
 		m_layers.size() != m_layerHeightMap.size())
 	{
-		Debug->LogError("Terrain authoring snapshot is inconsistent");
+		Debug::PrintLog({}, spdlog::level::err, "Terrain authoring snapshot is inconsistent");
 		return;
 	}
 
@@ -420,24 +420,24 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	TerrainAuthoringResult result{};
 	if (!AssetAuthoringPort::WriteTerrain(request, result))
 	{
-		Debug->LogError(
+		Debug::PrintLog({}, spdlog::level::err,
 			"Terrain save requires a complete Editor authoring transaction");
 		return;
 	}
 
 	m_terrainTargetPath = result.descriptorPath.wstring();
 	m_trrainAssetGuid = result.guid;
-	Debug->LogDebug("Terrain saved to: " + Utf8Encode(m_terrainTargetPath));
+	Debug::PrintLog({}, spdlog::level::debug, "Terrain saved to: " + Utf8Encode(m_terrainTargetPath));
 }
 bool TerrainComponent::Load(const std::wstring& filePath)
 {
-	Debug->LogDebug("Loading terrain from: " + Utf8Encode(filePath));
+	Debug::PrintLog({}, spdlog::level::debug, "Loading terrain from: " + Utf8Encode(filePath));
 
 	namespace fs = std::filesystem;
 	const fs::path descriptorPath = filePath;
 	if (!fs::is_regular_file(descriptorPath))
 	{
-		Debug->LogError("Terrain descriptor does not exist: "
+		Debug::PrintLog({}, spdlog::level::err, "Terrain descriptor does not exist: "
 			+ Utf8Encode(descriptorPath.wstring()));
 		return false;
 	}
@@ -447,7 +447,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		Authoring::ParsedDocument::ParseFile(descriptorPath.string(), parseError);
 	if (!document)
 	{
-		Debug->LogError("Terrain descriptor parse failed: "
+		Debug::PrintLog({}, spdlog::level::err, "Terrain descriptor parse failed: "
 			+ Utf8Encode(descriptorPath.wstring()) + " / " + parseError);
 		return false;
 	}
@@ -463,7 +463,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		|| !layers.IsSequence() || splatmaps.Size() != layers.Size()
 		|| layers.Size() > 4)
 	{
-		Debug->LogError("Terrain descriptor schema is invalid: "
+		Debug::PrintLog({}, spdlog::level::err, "Terrain descriptor schema is invalid: "
 			+ descriptorPath.string());
 		return false;
 	}
@@ -480,7 +480,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 			> std::numeric_limits<std::size_t>::max()
 				/ static_cast<std::size_t>(tmpWidth))
 	{
-		Debug->LogError("Terrain descriptor dimensions are invalid: "
+		Debug::PrintLog({}, spdlog::level::err, "Terrain descriptor dimensions are invalid: "
 			+ descriptorPath.string());
 		return false;
 	}
@@ -503,7 +503,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	if (!LoadEditorHeightMap(heightMapPath, static_cast<float>(tmpWidth),
 		static_cast<float>(tmpHeight), tmpMinHeight, tmpMaxHeight, tmpHeightMap))
 	{
-		Debug->LogError("Terrain height map load failed: "
+		Debug::PrintLog({}, spdlog::level::err, "Terrain height map load failed: "
 			+ heightMapPath.string());
 		return false;
 	}
@@ -518,7 +518,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		if (!LoadEditorSplatMap(splatPath, tmpWidth, tmpHeight,
 			static_cast<int>(splatIndex), tmpLayerHeightMap))
 		{
-			Debug->LogError("Terrain splat map load failed: "
+			Debug::PrintLog({}, spdlog::level::err, "Terrain splat map load failed: "
 				+ splatPath.string());
 			return false;
 		}
@@ -537,7 +537,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 			|| !layerData["diffuseTexturePath"].IsScalar()
 			|| !layerData["tiling"].IsScalar())
 		{
-			Debug->LogError("Terrain layer schema is invalid: "
+			Debug::PrintLog({}, spdlog::level::err, "Terrain layer schema is invalid: "
 				+ descriptorPath.string());
 			return false;
 		}
@@ -551,14 +551,14 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		if (desc.layerName.empty() || !std::isfinite(desc.tilling)
 			|| !file::is_regular_file(desc.diffuseTexturePath))
 		{
-			Debug->LogError("Terrain layer value is invalid: " + desc.layerName);
+			Debug::PrintLog({}, spdlog::level::err, "Terrain layer value is invalid: " + desc.layerName);
 			return false;
 		}
 		std::unique_ptr<Texture> diffuseTexture{
 			Texture::LoadFormPath(desc.diffuseTexturePath) };
 		if (!diffuseTexture)
 		{
-			Debug->LogError("Failed to load diffuse texture: " + desc.layerName);
+			Debug::PrintLog({}, spdlog::level::err, "Failed to load diffuse texture: " + desc.layerName);
 			return false;
 		}
 		desc.diffuseTexture = diffuseTexture.get();
@@ -610,7 +610,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap); // 레이어 정보 업데이트
 	m_nextLayerID = tmpNextLayerID;
 	m_selectedLayerID = 0xFFFFFFFF; // 선택된 레이어 초기화
-	//LoadLayers();	
+	//LoadLayers();
 
 
 	//로드 완료 후 리소스 해제
@@ -637,7 +637,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 
 		if (!document)
 		{
-			Debug->LogError("Terrain sidecar parse failed: " + parseError);
+			Debug::PrintLog({}, spdlog::level::err, "Terrain sidecar parse failed: " + parseError);
 		}
 		else if (node["guid"] && !node["guid"].IsNull())
 		{
@@ -697,7 +697,7 @@ bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float
 //	auto path = pngPath.string();
 //	unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
 //	if (!data || width != dataWidth || height != dataHeight) {
-//		Debug->LogError("Failed to load splat map from PNG: " + path);
+//		Debug::PrintLog({}, spdlog::level::err, "Failed to load splat map from PNG: " + path);
 //		if (data) {
 //			stbi_image_free(data);
 //		}
@@ -849,7 +849,7 @@ void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& di
 	// MAX_TERRAIN_LAYERS 상수를 사용하도록 수정
 	if (m_layers.size() >= MAX_TERRAIN_LAYERS)
 	{
-		Debug->LogWarning("Cannot add more layers. The current limit is " + std::to_string(MAX_TERRAIN_LAYERS));
+		Debug::PrintLog({}, spdlog::level::warn, "Cannot add more layers. The current limit is " + std::to_string(MAX_TERRAIN_LAYERS));
 		return;
 	}
 
@@ -867,14 +867,14 @@ void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& di
 	}
 	else
 	{
-		Debug->LogError("Failed to load diffuse texture: " + newLayer.layerName);
+		Debug::PrintLog({}, spdlog::level::err, "Failed to load diffuse texture: " + newLayer.layerName);
 		return;
 	}
 
 	// 텍스처 로딩 성공 여부 확인
 	if (!newLayer.diffuseTexture)
 	{
-		Debug->LogError("Texture object is null after loading: " + newLayer.layerName);
+		Debug::PrintLog({}, spdlog::level::err, "Texture object is null after loading: " + newLayer.layerName);
 		return;
 	}
 
@@ -892,7 +892,7 @@ void TerrainComponent::RemoveLayer(uint32_t layerID)
 {
 	if (layerID >= m_layers.size())
 	{
-		Debug->LogError("Invalid layer ID: " + std::to_string(layerID));
+		Debug::PrintLog({}, spdlog::level::err, "Invalid layer ID: " + std::to_string(layerID));
 		return;
 	}
 
@@ -959,19 +959,19 @@ bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, std::vecto
 void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path)
 {
 	if (!brush) {
-		Debug->LogError("Brush is null");
+		Debug::PrintLog({}, spdlog::level::err, "Brush is null");
 		return;
 	}
 
 	if (path.empty()) {
-		Debug->LogError("Brush mask texture path is empty");
+		Debug::PrintLog({}, spdlog::level::err, "Brush mask texture path is empty");
 		return;
 	}
 
 	TerrainBrush::BrushMask mask;
 
 	if (!LoadBrushMaskTexture(path, mask.m_mask, mask.m_maskWidth, mask.m_maskHeight)) {
-		Debug->LogError("Failed to load brush mask texture: " + Utf8Encode(path));
+		Debug::PrintLog({}, spdlog::level::err, "Failed to load brush mask texture: " + Utf8Encode(path));
 		return;
 	}
 
@@ -990,16 +990,16 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 {
 	//debug용
-	Debug->LogDebug("Loading runtime terrain from: " + Utf8Encode(filePath));
+	Debug::PrintLog({}, spdlog::level::debug, "Loading runtime terrain from: " + Utf8Encode(filePath));
 	namespace fs = std::filesystem;
 	fs::path terrainPath = filePath;
 	if (!fs::exists(terrainPath)) {
-		Debug->LogError("Terrain file does not exist: " + Utf8Encode(terrainPath.wstring()));
+		Debug::PrintLog({}, spdlog::level::err, "Terrain file does not exist: " + Utf8Encode(terrainPath.wstring()));
 		return false;
 	}
 	std::ifstream ifs(terrainPath, std::ios::binary);
 	if (!ifs) {
-		Debug->LogError("Failed to open terrain file for reading: " + Utf8Encode(terrainPath.wstring()));
+		Debug::PrintLog({}, spdlog::level::err, "Failed to open terrain file for reading: " + Utf8Encode(terrainPath.wstring()));
 		return false;
 	}
 
@@ -1007,7 +1007,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 	TerrainBinHeader header;
 	ifs.read(reinterpret_cast<char*>(&header), sizeof(header));
 	if (header.magic != 0x5442524E || header.version != 1) {
-		Debug->LogError("Invalid terrain file format: " + Utf8Encode(terrainPath.wstring()));
+		Debug::PrintLog({}, spdlog::level::err, "Invalid terrain file format: " + Utf8Encode(terrainPath.wstring()));
 		return false;
 	}
 	m_terrainID = header.terrainID;
@@ -1031,7 +1031,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 		}
 	}
 
-	//path offset 
+	//path offset
 	std::vector<uint32_t> textureOffsets(header.layers);
 	ifs.read(reinterpret_cast<char*>(textureOffsets.data()), sizeof(uint32_t) * header.layers);
 
@@ -1089,7 +1089,7 @@ void TerrainComponent::OnDeserialized()
 	}
 	else
 	{
-		Debug->LogError("Terrain component is missing m_trrainAssetGuid");
+		Debug::PrintLog({}, spdlog::level::err, "Terrain component is missing m_trrainAssetGuid");
 	}
 }
 

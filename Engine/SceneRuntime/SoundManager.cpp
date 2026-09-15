@@ -47,10 +47,10 @@ void SoundManager::shutdown()
 void SoundManager::Initialize()
 {
     FMOD_RESULT r = FMOD::System_Create(&system);
-    if (r != FMOD_OK) Debug->LogError(std::string("FMOD create failed: ") + FMOD_ErrorString(r));
+    if (r != FMOD_OK) Debug::PrintLog({}, spdlog::level::err, std::string("FMOD create failed: ") + FMOD_ErrorString(r));
 
     r = system->init(_inputMaxChannels, FMOD_INIT_NORMAL, nullptr);
-    if (r != FMOD_OK) Debug->LogError(std::string("FMOD init failed: ") + FMOD_ErrorString(r));
+    if (r != FMOD_OK) Debug::PrintLog({}, spdlog::level::err, std::string("FMOD init failed: ") + FMOD_ErrorString(r));
 
     int avail = 0; system->getSoftwareChannels(&avail);
     _softMaxChannels = std::min(_inputMaxChannels, avail);
@@ -78,7 +78,7 @@ void SoundManager::Initialize()
     for (auto* g : groups) {
         if (g && master) {
             FMOD_RESULT rr = master->addGroup(g);
-            if (rr != FMOD_OK) Debug->LogError(std::string("addGroup failed: ") + FMOD_ErrorString(rr));
+            if (rr != FMOD_OK) Debug::PrintLog({}, spdlog::level::err, std::string("addGroup failed: ") + FMOD_ErrorString(rr));
         }
     }
 
@@ -171,7 +171,7 @@ bool SoundManager::loadSound(const std::string& name, const std::string& filePat
     FMOD::Sound* s = nullptr;
     FMOD_RESULT r = system->createSound(filePath.c_str(), mode, nullptr, &s);
     if (r != FMOD_OK) {
-        Debug->LogError("Failed to load sound: " + filePath + " - " + std::string(FMOD_ErrorString(r)));
+        Debug::PrintLog({}, spdlog::level::err, "Failed to load sound: " + filePath + " - " + std::string(FMOD_ErrorString(r)));
         return false;
     }
     if (isBGM) {
@@ -317,7 +317,7 @@ SoundManager::playFromSourceBlended(const SoundComponent& src, void* ownerTag)
     {
         std::shared_lock rlock(_soundsMutex);
         auto it = sounds.find(src.clipKey);
-        if (it == sounds.end()) { Debug->LogError("Sound not found: " + src.clipKey); return {}; }
+        if (it == sounds.end()) { Debug::PrintLog({}, spdlog::level::err, "Sound not found: " + src.clipKey); return {}; }
         snd = it->second;
     }
 
@@ -359,7 +359,7 @@ SoundManager::playOneShotPooled(const std::string& clipKey, ChannelType bus,
     {
         std::shared_lock rlock(_soundsMutex);
         auto it = sounds.find(clipKey);
-        if (it == sounds.end()) { Debug->LogError("Sound not found: " + clipKey); return {}; }
+        if (it == sounds.end()) { Debug::PrintLog({}, spdlog::level::err, "Sound not found: " + clipKey); return {}; }
         snd = it->second;
     }
 

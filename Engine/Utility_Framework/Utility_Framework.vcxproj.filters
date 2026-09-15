@@ -161,9 +161,6 @@
     <ClInclude Include="CoroutineHelper.h">
       <Filter>Core.Coroutine</Filter>
     </ClInclude>
-    <ClInclude Include="DebugStreamBuf.h">
-      <Filter>Utility</Filter>
-    </ClInclude>
     <ClInclude Include="Delegate.h">
       <Filter>Core.Delegate</Filter>
     </ClInclude>

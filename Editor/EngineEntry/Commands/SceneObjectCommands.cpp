@@ -200,7 +200,7 @@ namespace ConsoleCmd
 
         if (!scene)
         {
-            Debug->LogError("[CLI] 씬 로드 실패: " + parts[1]);
+            Debug::PrintLog({}, spdlog::level::err, "[CLI] 씬 로드 실패: " + parts[1]);
             std::printf("[CLI] 씬 로드 실패: %s\n", parts[1].c_str());
 
             // 선행조건 불충족이지 명령의 결함이 아니다 — 부를 수는 있으나
@@ -309,14 +309,14 @@ namespace ConsoleCmd
         Scene* scene = Scene::CreateNewScene(name);
         if (!scene)
         {
-            Debug->LogError("[CLI] 씬 생성 실패: " + name);
+            Debug::PrintLog({}, spdlog::level::err, "[CLI] 씬 생성 실패: " + name);
             std::printf("[CLI] 씬 생성 실패: %s\n", name.c_str());
             return CommandCore::Fail("scene.create_failed", "씬을 만들지 못했다: " + name);
         }
 
         SceneManagers->ActivateScene(scene, true);
 
-        Debug->LogWarning("[CLI] 새 씬: " + name);
+        Debug::PrintLog({}, spdlog::level::warn, "[CLI] 새 씬: " + name);
         std::printf("[CLI] 새 씬: %s\n", name.c_str());
 
         CommandCore::CommandData data = CommandCore::CommandData::Object();
@@ -354,7 +354,7 @@ namespace ConsoleCmd
         // 실제로 파일이 생겼는지 확인한다 — SaveScene은 실패를 돌려주지 않는다.
         if (!file::exists(path))
         {
-            Debug->LogError("[CLI] 씬 저장 실패: " + path);
+            Debug::PrintLog({}, spdlog::level::err, "[CLI] 씬 저장 실패: " + path);
             std::printf("[CLI] 씬 저장 실패: %s\n", path.c_str());
             // ★ `SaveScene` 은 실패를 돌려주지 않는다. 파일 존재로 확인한 이
             //   판정이 이제 종료 코드에 닿는다 — 예전에는 "저장 실패" 를 찍고도
@@ -363,7 +363,7 @@ namespace ConsoleCmd
         }
 
         const auto bytes = file::file_size(path);
-        Debug->LogWarning("[CLI] 씬 저장: " + path);
+        Debug::PrintLog({}, spdlog::level::warn, "[CLI] 씬 저장: " + path);
         std::printf("[CLI] 씬 저장: %s (%llu 바이트)\n", path.c_str(),
             static_cast<unsigned long long>(bytes));
 
@@ -558,7 +558,7 @@ namespace ConsoleCmd
         data.Set("maxDepth", CommandData::Int(maxDepth));
         data.Set("sceneEntities", CommandData::Int(static_cast<long long>(scene->m_Entities.size())));
         data.Set("elapsedMs", CommandData::Double(elapsedMs));
-        Debug->Log("[scene.populate] created=" + std::to_string(created.size()) +
+        Debug::PrintLog({}, spdlog::level::info, "[scene.populate] created=" + std::to_string(created.size()) +
             " failed=" + std::to_string(failed) +
             " fanout=" + std::to_string(fanout) +
             " maxDepth=" + std::to_string(maxDepth) +
@@ -746,7 +746,7 @@ namespace ConsoleCmd
         auto object = scene->GetEntity(objectName);
         if (!object)
         {
-            Debug->LogError("[CLI] 오브젝트를 찾을 수 없음: " + objectName);
+            Debug::PrintLog({}, spdlog::level::err, "[CLI] 오브젝트를 찾을 수 없음: " + objectName);
             std::printf("[CLI] 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
             return CommandCore::Fail("prefab.overrides.not_found", "오브젝트가 없다");
         }
@@ -817,7 +817,7 @@ namespace ConsoleCmd
         auto source = scene->GetEntity(objectName);
         if (!source)
         {
-            Debug->LogError("[CLI] 소스 오브젝트를 찾을 수 없음: " + objectName);
+            Debug::PrintLog({}, spdlog::level::err, "[CLI] 소스 오브젝트를 찾을 수 없음: " + objectName);
             std::printf("[CLI] 소스 오브젝트를 찾을 수 없음: %s\n", objectName.c_str());
             return CommandCore::Fail("prefab.update.source_not_found", "소스 오브젝트가 없다");
         }
@@ -849,7 +849,7 @@ namespace ConsoleCmd
         // 고쳤다. 이 가드는 세 번째 방어선이다 — 어느 경로로 널이 오든 막는다.
         if (identity == nullFileGuid)
         {
-            Debug->LogError("[CLI] 프리팹 identity를 확인할 수 없어 갱신을 중단한다: " + prefabName);
+            Debug::PrintLog({}, spdlog::level::err, "[CLI] 프리팹 identity를 확인할 수 없어 갱신을 중단한다: " + prefabName);
             std::printf("[CLI] 프리팹 identity 없음(catalog 항목 부재) — 갱신 중단: %s\n",
                 prefabName.c_str());
             return CommandCore::Fail("prefab.update.identity_missing",
@@ -891,7 +891,7 @@ namespace ConsoleCmd
         const size_t registered = PrefabUtilitys->RegisteredInstanceCount();
         const size_t applied = PrefabUtilitys->UpdateInstances(prefab);
 
-        Debug->LogWarning("[CLI] 프리팹 갱신 적용: " + prefabName + " <- " + objectName);
+        Debug::PrintLog({}, spdlog::level::warn, "[CLI] 프리팹 갱신 적용: " + prefabName + " <- " + objectName);
         std::printf("[prefab.update] %s <- %s · 등록 인스턴스 %zu개 중 %zu개에 적용\n",
             prefabName.c_str(), objectName.c_str(), registered, applied);
 
@@ -935,7 +935,7 @@ namespace ConsoleCmd
             PrefabUtilitys->RegisteredInstanceCount(),
             PrefabUtilitys->OwnedPrefabCount());
         std::printf("[CLI] %s\n", line);
-        Debug->LogWarning(line);
+        Debug::PrintLog({}, spdlog::level::warn, line);
 
         CommandCore::CommandData data = CommandCore::CommandData::Object();
         data.Set("owned", CommandCore::CommandData::Int(
@@ -1095,7 +1095,7 @@ namespace ConsoleCmd
         std::sort(names.begin(), names.end());
         auto data = CommandData::Object();
         auto types = CommandData::Array();
-        for (const auto& name : names) { types.Append(CommandData::String(name)); Debug->LogWarning("[CLI] " + name); }
+        for (const auto& name : names) { types.Append(CommandData::String(name)); Debug::PrintLog({}, spdlog::level::warn, "[CLI] " + name); }
         data.Set("types", std::move(types));
         data.Set("count", CommandData::Int(names.size()));
         return Ok({}, std::move(data));
@@ -1146,7 +1146,7 @@ namespace ConsoleCmd
             return CommandCore::Fail("prefab.create.save_failed", "프리팹을 저장하지 못했다");
         }
 
-        Debug->LogWarning("[CLI] 프리팹 생성: " + prefabName + " <- " + objectName);
+        Debug::PrintLog({}, spdlog::level::warn, "[CLI] 프리팹 생성: " + prefabName + " <- " + objectName);
         std::printf("[CLI] 프리팹 생성: %s\n", path.string().c_str());
 
         CommandCore::CommandData data = CommandCore::CommandData::Object();
@@ -1415,7 +1415,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         }
 
         const std::string label = (parts.size() > 1) ? parts[1] : std::string("dump");
-        Debug->LogWarning("[씬 덤프] " + label + " · 오브젝트 " +
+        Debug::PrintLog({}, spdlog::level::warn, "[씬 덤프] " + label + " · 오브젝트 " +
             std::to_string(scene->m_Entities.size()) + "개");
 
         for (const auto& object : scene->m_Entities)
@@ -1425,7 +1425,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
             char position[96]{};
             std::snprintf(position, sizeof(position), "(%.3f, %.3f, %.3f)", p.x, p.y, p.z);
 
-            Debug->LogWarning("[씬 덤프]   " + object->m_name.ToString() +
+            Debug::PrintLog({}, spdlog::level::warn, "[씬 덤프]   " + object->m_name.ToString() +
                 " (index=" + std::to_string(object->m_index) +
                 ", parent=" + std::to_string(object->GetParentIndex()) +
                 ", 컴포넌트 " + std::to_string(object->m_components.size()) + "개"

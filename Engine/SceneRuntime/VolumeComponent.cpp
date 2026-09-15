@@ -22,7 +22,7 @@ void VolumeComponent::OnInitialized()
             const Authoring::ReadNode node = document.Root();
             if (!document)
             {
-                Debug->LogError("Volume profile parse failed: " + parseError);
+                Debug::PrintLog({}, spdlog::level::err, "Volume profile parse failed: " + parseError);
             }
             else if (node["settings"])
             {
@@ -61,7 +61,7 @@ void VolumeComponent::LoadProfile(FileGuid profileGuid)
         const Authoring::ReadNode node = document.Root();
         if (!document)
         {
-            Debug->LogError("Volume profile parse failed: " + parseError);
+            Debug::PrintLog({}, spdlog::level::err, "Volume profile parse failed: " + parseError);
         }
         else if (node["settings"])
         {

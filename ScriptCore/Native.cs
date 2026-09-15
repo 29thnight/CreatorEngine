@@ -19,8 +19,10 @@ internal unsafe struct ScriptApiTable
     public int Version;
     public int StructSize;
 
-    // 로그 — level: 0=Debug 1=Info 2=Warning 3=Error, message: null 종료 UTF-8
+    // 기존 로그 — level: 0=Debug 1=Info 2=Warning 3=Error, message: null 종료 UTF-8
     public delegate* unmanaged<int, byte*, void> Log;
+    // 구조화 로그 — source/message: null 종료 UTF-8, level: spdlog 값
+    public delegate* unmanaged<byte*, int, byte*, void> PrintLog;
 
     // Entity
     //
@@ -305,7 +307,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 24;
+    public const int ExpectedVersion = 25;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -439,6 +441,19 @@ internal static unsafe class Native
                 p[written] = 0;
                 _api.Log(level, p);
             }
+        }
+    }
+
+    public static void PrintLog(string source, int level, string message)
+    {
+        if (!_bound || _api.PrintLog == null) return;
+
+        byte[] sourceBytes = System.Text.Encoding.UTF8.GetBytes(source + "\0");
+        byte[] messageBytes = System.Text.Encoding.UTF8.GetBytes(message + "\0");
+        fixed (byte* sourcePointer = sourceBytes)
+        fixed (byte* messagePointer = messageBytes)
+        {
+            _api.PrintLog(sourcePointer, level, messagePointer);
         }
     }
 
@@ -1523,8 +1538,6 @@ internal static unsafe class Native
     public static Color4 RectGetWorldRect(ObjectHandle h)
         => Entered() && _api.Rect_GetWorldRect != null ? _api.Rect_GetWorldRect(h) : default;
 }
-
-
 
 
 

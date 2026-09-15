@@ -77,6 +77,7 @@ namespace
 		int structSize;
 
 		void (__stdcall* Log)(int level, const char* message);
+		void (__stdcall* PrintLog)(const char* source, int level, const char* message);
 
 		ScriptObjectHandle (__stdcall* Entity_FindByName)(const char* name);
 		int  (__stdcall* Entity_IsAlive)(ScriptObjectHandle handle);
@@ -384,11 +385,33 @@ namespace
 
 		switch (level)
 		{
-		case 0:  Debug->LogDebug(message);   break;
-		case 2:  Debug->LogWarning(message); break;
-		case 3:  Debug->LogError(message);   break;
-		default: Debug->Log(message);        break;
+		case 0:  Debug::PrintLog({}, spdlog::level::debug, message);   break;
+		case 2:  Debug::PrintLog({}, spdlog::level::warn, message); break;
+		case 3:  Debug::PrintLog({}, spdlog::level::err, message);   break;
+		default: Debug::PrintLog({}, spdlog::level::info, message);        break;
 		}
+	}
+
+	void __stdcall Api_PrintLog(const char* source, int level, const char* message)
+	{
+		if (nullptr == message) return;
+
+		const std::string_view sourceView = source != nullptr ? source : "";
+		spdlog::level::level_enum logLevel{};
+		switch (level)
+		{
+		case 0: logLevel = spdlog::level::debug;    break;
+		case 1: logLevel = spdlog::level::info;     break;
+		case 2: logLevel = spdlog::level::warn;     break;
+		case 3: logLevel = spdlog::level::err;      break;
+		case 4: logLevel = spdlog::level::critical; break;
+		default:
+		{
+			Debug::PrintLog({}, spdlog::level::err, "C# PrintLog received an invalid log level.");
+			return;
+		}
+		}
+		Debug::PrintLog(sourceView, logLevel, message);
 	}
 
 	ScriptObjectHandle __stdcall Api_Entity_FindByName(const char* name)
@@ -730,7 +753,7 @@ namespace
 		Prefab* prefab = PrefabUtilitys->LoadPrefab(prefabName);
 		if (nullptr == prefab)
 		{
-			Debug->LogWarning(std::string("[스크립트] 프리팹을 찾을 수 없습니다: ") + prefabName);
+			Debug::PrintLog({}, spdlog::level::warn, std::string("[스크립트] 프리팹을 찾을 수 없습니다: ") + prefabName);
 			return {};
 		}
 
@@ -738,7 +761,7 @@ namespace
 		Entity* instance = PrefabUtilitys->InstantiatePrefab(prefab, name);
 		if (nullptr == instance)
 		{
-			Debug->LogWarning(std::string("[스크립트] 프리팹 인스턴스 생성 실패: ") + prefabName);
+			Debug::PrintLog({}, spdlog::level::warn, std::string("[스크립트] 프리팹 인스턴스 생성 실패: ") + prefabName);
 			return {};
 		}
 
@@ -2275,6 +2298,7 @@ namespace
 		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
 
 		g_apiTable.Log                         = &Api_Log;
+		g_apiTable.PrintLog                    = &Api_PrintLog;
 		g_apiTable.Entity_FindByName       = &Api_Entity_FindByName;
 		g_apiTable.Entity_IsAlive          = &Api_Entity_IsAlive;
 		g_apiTable.Entity_GetName          = &Api_Entity_GetName;
@@ -2527,14 +2551,14 @@ bool ClrHost::LoadHostfxr()
     const bool hasPrivateRuntime = file::is_directory(privateRoot / L"host" / L"fxr");
     if (0 != get_hostfxr_path(path, &size, hasPrivateRuntime ? &parameters : nullptr))
 	{
-		Debug->LogWarning("[CLR] hostfxr를 찾을 수 없습니다. 스크립트 계층이 비활성화됩니다.");
+		Debug::PrintLog({}, spdlog::level::warn, "[CLR] hostfxr를 찾을 수 없습니다. 스크립트 계층이 비활성화됩니다.");
 		return false;
 	}
 
 	HMODULE module = ::LoadLibraryW(path);
 	if (nullptr == module)
 	{
-		Debug->LogWarning("[CLR] hostfxr 로드 실패");
+		Debug::PrintLog({}, spdlog::level::warn, "[CLR] hostfxr 로드 실패");
 		return false;
 	}
 
@@ -2564,7 +2588,7 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 		{
 			char buffer[256]{};
 			std::snprintf(buffer, sizeof(buffer), "[CLR] 진입점 바인딩 실패 (rc=0x%X)", rc);
-			Debug->LogError(buffer);
+			Debug::PrintLog({}, spdlog::level::err, buffer);
 			return false;
 		}
 		return true;
@@ -2665,7 +2689,7 @@ bool ClrHost::Initialize()
 	if (!file::exists(assemblyPath) || !file::exists(configPath))
 	{
 		// 스크립트 없이도 에디터는 떠야 한다. 경고만 남기고 비활성 상태로 둔다.
-		Debug->LogWarning("[CLR] ScriptCore.dll을 찾을 수 없어 스크립트 계층을 건너뜁니다: "
+		Debug::PrintLog({}, spdlog::level::warn, "[CLR] ScriptCore.dll을 찾을 수 없어 스크립트 계층을 건너뜁니다: "
 			+ assemblyPath.string());
 		return false;
 	}
@@ -2679,7 +2703,7 @@ bool ClrHost::Initialize()
 	{
 		char buffer[256]{};
 		std::snprintf(buffer, sizeof(buffer), "[CLR] 런타임 초기화 실패 (rc=0x%X)", rc);
-		Debug->LogError(buffer);
+		Debug::PrintLog({}, spdlog::level::err, buffer);
 		if (nullptr != context) g_hostClose(context);
 		return false;
 	}
@@ -2690,7 +2714,7 @@ bool ClrHost::Initialize()
 
 	if (0 != rc || nullptr == loader)
 	{
-		Debug->LogError("[CLR] 로더 델리게이트 획득 실패");
+		Debug::PrintLog({}, spdlog::level::err, "[CLR] 로더 델리게이트 획득 실패");
 		return false;
 	}
 	g_loadAssembly = reinterpret_cast<load_assembly_and_get_function_pointer_fn>(loader);
@@ -2704,7 +2728,7 @@ bool ClrHost::Initialize()
 		char buffer[256]{};
 		std::snprintf(buffer, sizeof(buffer),
 			"[CLR] 관리 초기화 실패 (result=%d) — API 표 버전이 어긋났을 수 있습니다", initResult);
-		Debug->LogError(buffer);
+		Debug::PrintLog({}, spdlog::level::err, buffer);
 		return false;
 	}
 
@@ -2717,16 +2741,16 @@ bool ClrHost::Initialize()
 		const std::string utf8(pathUtf8.begin(), pathUtf8.end());
 		if (0 != m_fnLoadScripts(utf8.c_str()))
 		{
-			Debug->LogWarning("[CLR] 게임 스크립트 어셈블리 로드 실패");
+			Debug::PrintLog({}, spdlog::level::warn, "[CLR] 게임 스크립트 어셈블리 로드 실패");
 		}
 	}
 	else
 	{
-		Debug->LogWarning("[CLR] GameScripts.dll이 없어 스크립트 없이 시작합니다: " + scriptsPath.string());
+		Debug::PrintLog({}, spdlog::level::warn, "[CLR] GameScripts.dll이 없어 스크립트 없이 시작합니다: " + scriptsPath.string());
 	}
 
 	m_ready = true;
-	Debug->Log("[CLR] CoreCLR 스크립트 계층 준비 완료");
+	Debug::PrintLog({}, spdlog::level::info, "[CLR] CoreCLR 스크립트 계층 준비 완료");
 	return true;
 }
 
@@ -3177,7 +3201,7 @@ void ClrHost::QueueScriptMessage(int instanceId, std::string_view methodName)
 	// 엉뚱한 메서드를 부르거나(접두사 충돌) 조용히 실패한다. 둘 다 추적하기 어렵다.
 	if (methodName.size() >= kScriptMessageNameCapacity)
 	{
-		Debug->LogWarning("[스크립트] 콜백 이름이 너무 깁니다: " + std::string(methodName));
+		Debug::PrintLog({}, spdlog::level::warn, "[스크립트] 콜백 이름이 너무 깁니다: " + std::string(methodName));
 		return;
 	}
 
@@ -3310,9 +3334,6 @@ void ClrHost::SetFieldObject(int instanceId, int index, Entity* object)
 
 	m_fnSetFieldObject(instanceId, index, handle);
 }
-
-
-
 
 
 

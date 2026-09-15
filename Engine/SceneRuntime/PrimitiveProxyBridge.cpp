@@ -85,7 +85,7 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
         {
             // 합성 실패는 legacy 경로로 조용히 내려간다 — 지어낸 재질로
             // 그리는 것보다 전환기 브리지가 낫다(관측은 남긴다).
-            Debug->LogWarning("MeshRenderProxy 저작 재질 합성 실패 — legacy"
+            Debug::PrintLog({}, spdlog::level::warn, "MeshRenderProxy 저작 재질 합성 실패 — legacy"
                 " sealing으로 내려간다: " + error);
         }
     }
