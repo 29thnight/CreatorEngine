@@ -712,6 +712,81 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    // PHASE 14 임시 — 보존된 프레임의 이벤트를 그대로 낸다.
+    //
+    // `profile.stats` 는 프로파일러 **자체** 비용과 용량만 낸다. 어느 마커가 몇 ms
+    // 였는지는 ImGui 창에서만 보였고, 그래서 CLI·자동화·무인 실행이 프레임 드랍의
+    // 원인을 짚을 수단이 전혀 없었다 — 계측을 늘려도 읽을 창구가 없으면 늘린 것이
+    // 보이지 않는다. 데이터는 이미 코어 안에 있고(`GetEventsForThread`) 창구만
+    // 없었으므로 여기서 연다.
+    //
+    // 보존 범위 전부를 낸다(현행 historySize 5 에서 읽히는 과거는 4프레임). 프레임
+    // 하나만 내면 "이 프레임이 느린 프레임인가"를 알 수 없다 — 드랍을 찾는 일은
+    // 프레임 사이의 차이를 보는 일이다.
+    static CommandCore::CommandResult Cmd_profile_frame(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("profile.frame takes no arguments");
+
+        const auto range = gCPUProfiler.GetFrameRange();
+        auto data = CommandData::Object();
+        data.Set("rangeBegin", CommandData::Int(range.Begin));
+        data.Set("rangeEnd", CommandData::Int(range.End));
+        data.Set("paused", CommandData::Bool(gCPUProfiler.IsPaused()));
+
+        const double ticksPerSecond = static_cast<double>(CPUProfiler::GetTicksPerSecond());
+        const double toMs = (ticksPerSecond > 0.0) ? (1000.0 / ticksPerSecond) : 0.0;
+
+        auto frames = CommandData::Array();
+        for (std::uint32_t frame = range.Begin; frame < range.End; ++frame)
+        {
+            auto frameEntry = CommandData::Object();
+            frameEntry.Set("frame", CommandData::Int(frame));
+
+            auto threadList = CommandData::Array();
+            for (const auto& thread : gCPUProfiler.GetThreads())
+            {
+                // 은퇴 슬롯은 건너뛴다 — pTLS 가 null 이면 주인이 이미 죽었다.
+                if (nullptr == thread.pTLS) continue;
+
+                const auto events = gCPUProfiler.GetEventsForThread(thread, frame);
+                if (events.empty()) continue;
+
+                auto eventList = CommandData::Array();
+                double rootMs = 0.0;
+                for (const auto& event : events)
+                {
+                    const double ms = (event.TicksEnd > event.TicksBegin)
+                        ? static_cast<double>(event.TicksEnd - event.TicksBegin) * toMs
+                        : 0.0;
+                    // 깊이 0 만 더한다. 중첩 구간을 전부 더하면 합이 프레임을 넘는다.
+                    if (0 == event.Depth) rootMs += ms;
+
+                    auto eventEntry = CommandData::Object();
+                    eventEntry.Set("name", CommandData::String(
+                        nullptr != event.pName ? event.pName : "(null)"));
+                    eventEntry.Set("depth", CommandData::Int(event.Depth));
+                    eventEntry.Set("ms", CommandData::Double(ms));
+                    eventList.Append(std::move(eventEntry));
+                }
+
+                auto threadEntry = CommandData::Object();
+                threadEntry.Set("index", CommandData::Int(thread.Index));
+                threadEntry.Set("name", CommandData::String(thread.Name));
+                threadEntry.Set("count", CommandData::Int(static_cast<std::int64_t>(events.size())));
+                threadEntry.Set("rootMs", CommandData::Double(rootMs));
+                threadEntry.Set("events", std::move(eventList));
+                threadList.Append(std::move(threadEntry));
+            }
+
+            frameEntry.Set("threads", std::move(threadList));
+            frames.Append(std::move(frameEntry));
+        }
+
+        data.Set("frames", std::move(frames));
+        return Ok({}, std::move(data));
+    }
+
     // ★ `dump.crash` 를 지웠다(2026-09-05). `crash.test` 와 같은 네 분기를 가진
     //   중복이었고, 호출자가 없었으며, **죽지 않았다.**
     //
@@ -1213,6 +1288,7 @@ namespace ConsoleCmd
         reg.Result({ "pix.capture" }, &Cmd_pix_capture);
         reg.Result({ "profile.selftest" }, &Cmd_profile_selftest);
         reg.Result({ "profile.stats" }, &Cmd_profile_stats);
+        reg.Result({ "profile.frame" }, &Cmd_profile_frame);
         // ★ 별칭이 아니라 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).
         //   `dump.list` 는 목록만, `dump.show` 는 가장 최근 요약의 내용까지 찍는다
         //   (`Cmd_dump_list` 안에서 `cmd == "dump.show"` 로 갈린다). 한 descriptor 를

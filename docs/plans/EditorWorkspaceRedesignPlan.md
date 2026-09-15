@@ -1025,7 +1025,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize와 렌더 배율은 **2026-09-14 착지**(§W4 후속) — 미뤄 둔 근거였던 generation/retire 수렴을 게이트 단정으로 옮겼다 |
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
 | W6 | **done** | **preset 5종 + 이름 붙인 배치 착지(2026-09-15)** — 자리의 정본이 선언에서 preset 으로 옮겨 갔고(`EditorLayoutPreset.h`), 기본 preset 은 재정의 0 이라 현재 외관이 값이 아니라 **출처**로 유지된다(픽셀 392,888 중 0 차이). `dock_slot::left` 신설, 안 쓰는 자리는 노드를 만들지 않음, 패널 바닥 보존, 파일 스키마 2(v1 계속 읽음), Reset 은 **지금** preset 으로. 런타임 게이트 197 단정·변이 7 종·run-all 배선. **재지 못한 축 하나** — 최소 중앙 보존은 이 기계의 배율 2.25 에서 하한(1080x675)이 창보다 커서 제품이 늘 탈출 가지로 간다. 게이트가 그 사실을 건너뜀으로 찍는다. **W6-2(2026-09-15)** 로 Save As/Rename/Delete/목록까지 닫았다 — 이름 붙인 배치는 `<이름>.workspace` 이고 **파일 이름이 곧 이름**이다. 덮어쓰기·열기·지우기가 전부 `before-*` 백업을 남기고, 쓸 수 없는 이름은 만들 때 거절한다. 게이트 91 단정·변이 9 종 |
-| W7 | progress | **W7-0~W7-3 착지(2026-09-14·15)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0), Browser 스냅샷(§W7-1)으로 매 프레임 디렉터리 스캔 24 → 0, 그리고 평탄 목록+clipping(§W7-2·W7-3)으로 `hierarchy.units` 50,000 → **14** · p95 30.4 → **0.041 ms**. 실측이 두 번 판을 고쳤다: ① 브라우저가 clipping 보다 먼저였고(엔티티 1,000 에서 Hierarchy 의 5.8 배), ② W7-2 는 홀로는 이득 0 이라 W7-3 과 한 조각으로 묶어야 했다. W7-4 로 그 계약을 게이트에 걸었다(72 단정 · 변이 12 종 · run-all 배선). 남은 것은 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리뿐이다 |
+| W7 | progress | **W7-0~W7-3 착지(2026-09-14·15)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0), Browser 스냅샷(§W7-1)으로 매 프레임 디렉터리 스캔 24 → 0, 그리고 평탄 목록+clipping(§W7-2·W7-3)으로 `hierarchy.units` 50,000 → **14** · p95 30.4 → **0.041 ms**. 실측이 두 번 판을 고쳤다: ① 브라우저가 clipping 보다 먼저였고(엔티티 1,000 에서 Hierarchy 의 5.8 배), ② W7-2 는 홀로는 이득 0 이라 W7-3 과 한 조각으로 묶어야 했다. W7-4 로 그 계약을 게이트에 걸었다(72 단정 · 변이 12 종 · run-all 배선). ★ 그런데 **W7-1 이후에도 `browser_tree` 가 avg 1.375 ms · p95 1.829 ms · max 10.40 ms 다**(2026-09-15, PHASE 14 임시 계측이 잡았다). 스캔은 0인데 비싸다 — `equivalent` 가 캐시를 경유하지 않아 W7-1 이 세운 계수에 안 잡혔다. 게임 스레드는 그 락 대기로 프레임의 **95%** 를 쓴다. §W7-5 참조. 남은 것은 그 W7-5 와, 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리다 |
 | W8 | progress | **W8-1 착지(2026-09-15)** — 어댑터 판 canary와 legacy 잔재 재유입 차단. 계획서가 지목한 legacy 둘(`ContentsBrowserStyle`·ToolPanel `NoMove`)은 **이미 죽어 있었고** 남은 일은 게이트였다. 진짜 구멍은 `IMGUI_CHECKVERSION()` 이 Release 에서 힘이 0 이던 것(`IM_ASSERT`=`assert()`, NDEBUG 로 소멸, 반환값도 버림) — 이 기계엔 imgui 설치본이 둘이라 실재하는 위험이다. 반환값을 받아 던지고 `ImGui::GetVersion()`(도는 코드가 말하는 판)을 `editor.dock` 이 헤더 매크로와 함께 내보낸다. 게이트 `verify-imgui-adapter-canary.ps1` 29 단정·변이 7 종·run-all 배선. **W8-2 착지(2026-09-15)** — 3D 렌더 영역을 제외한 chrome crop visual golden. 마스킹에 필요한 제품 변경은 없었다 — W4 가 이미 `editor.sceneview` 로 image·clip 사각형과 툴바 상자 둘·기즈모 원반을 내보내고 있어, 게이트가 좌표를 한 줄도 적지 않는다. 대신 **스크롤에 닿을 길**이 없어 제품 변경 둘을 넣었다: 선택한 줄을 끌어오기(`IncludeItemByIndex` + 그 줄을 그리는 자리의 커서)와 접힌 조상 펼치기. 게이트 `verify-editor-chrome-golden.ps1` 21 단정·회차 4·변이 6 종·run-all 배선. ★ 캡처 자가 두 번째로 틀려 있었다 — `PrintWindow` 는 창 전체를 DC 원점부터 그리는데 클라이언트 크기 비트맵을 주고 있어 9~10 px 밀렸고, 그 탓에 가리기가 밀린 채 초록이었다. **W8-3 착지(2026-09-15)** — 통합 행렬. ★ 판정문 *"검증 레이어 오류 0"* 이 **출하 구성에서 잴 수 없는 것이었다**: `DrainDebugMessages` 가 통째로 `_DEBUG` 였고 라이브 호출부 둘도 같은 가드라, `CREATOR_DX12_VALIDATION=basic` 으로 레이어를 켜도 아무도 큐를 읽지 않았다(W8-1 의 `IMGUI_CHECKVERSION` 과 같은 모양). `rhi::validation` 장부를 세우고 가드를 걷고 `dx12.validation [reset]` 을 냈다. 게이트 `verify-editor-integration-matrix.ps1` 214 단정·축 12·기동 11 회·대조군 1(`=off` 에서 `layerEnabled` 가 거짓이어야 한다)·변이 4 종 전부 잡음·run-all 배선. Release·Debug 양쪽에서 12 축 모두 problems 0. **W8 네 줄 전부 닫혔다** — 이 칸이 아직 `progress` 인 것은 W8 이 선행으로 잡고 있는 W2 계열(W2·W2-I·W2-V·W2-B)이 남아 그것들이 닫힌 뒤 행렬에 축을 더해 재판정해야 하기 때문이다 |
 
 현재 소스에서 확인한 잔여 경계:
@@ -2492,6 +2492,72 @@ mutation/revision 또는 명시적 scene event로 cache를 무효화한다"* 고
 
 **남는 구멍.** 소스 대조라 화면을 안 본다. 높이 식이 같아도 스타일 스택이 중간에 바뀌면
 못 잡는다 — W8 visual golden 의 몫이고, 거기에는 **스크롤한 상태**가 들어가야 한다.
+
+#### W7-5 미착수 — 트리 노드마다 도는 파일시스템 호출 (2026-09-15 발견)
+
+W7-1이 매 프레임 디렉터리 스캔을 24 → 0으로 없앴는데도 `browser_tree`가 여전히
+비싸다. **PHASE 14 임시 계측이 그것을 잡았다** — 이 발견은 W7 자신의 계측이 아니라
+게임 스레드 쪽에서 왔다.
+
+**실측 (Release, 편집 모드 idle, 에디터에 HTTP 명령 서비스로 질의)**
+
+| | avg | p95 | max | units | unit당 |
+|---|---|---|---|---|---|
+| `hierarchy` | 0.017 ms | 0.022 ms | 1.32 ms | 2 | 0.009 ms |
+| **`browser_tree`** | **1.375 ms** | **1.829 ms** | **10.40 ms** | 24 | **0.057 ms** |
+| `browser_files` | 0.091 ms | 0.130 ms | 3.78 ms | 23 | 0.004 ms |
+
+그리고 게임 스레드에서 본 같은 프레임(4프레임 연속):
+
+```
+CPU Frame              2.914 / 2.990 / 3.305 / 3.345 ms
+  SceneStructureLockWait  2.638 / 2.854 / 3.158 / 3.193 ms   ← 90.5~95.6 %
+  (나머지 전부)            0.276 / 0.136 / 0.147 / 0.152 ms
+```
+
+★ **게임 스레드는 프레임의 95%를 락에서 기다린다.** `PresentFrame()`(=`OnGui()`)이
+`m_sceneStructureMutex`를 쥔 채 도는 구조이므로(`EditorMain.cpp:429`), UI가 쓴 시간이
+게임 스레드의 대기로 그대로 나타난다. 시뮬레이션은 사실상 공짜다 — `Update` 전체가
+0.007 ms이고 그 안의 시스템 12개는 0.000~0.002 ms다.
+
+**원인 후보 — `std::filesystem::equivalent`가 노드마다 돈다.**
+
+```cpp
+// ContentsBrowserWindow.cpp:323 — ShowDirectoryTree, 노드마다
+if (browser_same_path(directory, PathFinder::RelativeToPrefab("")) && ImGui::BeginDragDropTarget())
+```
+
+`browser_same_path`는 `file::equivalent`다 — 경로를 **실제로 열어** 파일 식별자를
+비교한다(Windows에서 `CreateFile` + `GetFileInformationByHandle`). 노드 24개 ×
+두 경로 = 프레임마다 파일 핸들 48회.
+
+정황 넷이 일치한다.
+
+1. `lastScans`가 0인데도 느리다 — `equivalent`는 브라우저 캐시를 경유하지 않아
+   **W7-1이 세운 스캔 계수에 잡히지 않는다.** 스캔을 0으로 만들고도 비용이 남은 이유다
+2. 같은 코드가 `:453`(파일 목록)에서는 프레임당 **1회**뿐이다 — 호출 비 24:1이고
+   실측 unit당 비용 비가 14배다
+3. 노드당 57 µs는 ImGui 위젯 비용(보통 1~2 µs)으로 설명되지 않는다
+4. 파일시스템 접근이라 OS 캐시 온도로 튄다 — `max 10.40 ms` 스파이크와 맞는다
+
+**수정 방향.** 이 검사는 **드래그 중에만 의미가 있는데 `&&` 왼쪽에 있어 평상시에도
+전부 돈다.** `ImGui::BeginDragDropTarget()`은 드래그가 없으면 즉시 false를 돌려주므로,
+조건을 그 블록 안으로 옮기면 평상시 비용이 0이 된다. 경로 비교 자체도 정규화된
+문자열 대조로 충분한지 함께 본다(`equivalent`는 심볼릭 링크·하드 링크를 같게 보는
+의미론이고, 여기서 필요한 것은 "이 폴더가 프리팹 폴더인가" 하나다).
+
+**남은 미계측 — 절반은 아직 안 보인다.** 락 대기 2.6~3.2 ms 중 `browser_tree`는
+1.26~1.83 ms다. 나머지 1.3~1.4 ms는 `editor.panelcost` 슬롯이 셋뿐이라 계측 밖이다.
+`browser_tree`를 고쳐도 절반만 회수되므로, **UI 총계 슬롯을 먼저 세워야** 무엇이
+남았는지 보인다.
+
+**판정.** 고쳐서 A/B로 확정한다 — 지금은 정황이지 인과가 아니다. 판정 값은
+`browser_tree` p95와 게임 스레드 `SceneStructureLockWait`를 **함께** 본다. 전자만
+내려가고 후자가 그대로면 범인이 다른 데 있다는 뜻이다.
+
+> 계측 출처: PHASE 14 임시 계측(`SceneStructureLockWait` 등 12곳)과 신설
+> `profile.frame` 명령. `ProfilingCapturePlan.md` §0.5 참조 — 그 계측은 새 수집
+> 코어로 갈 때 정리된다. W7-5를 그 전에 닫으면 같은 값을 다시 잴 수 없다.
 
 ### W8 — 통합 회귀와 legacy 강제 배치 은퇴 (P0, 2일)
 

@@ -118,7 +118,10 @@ function Invoke-SelfTest {
     $result = Invoke-EngineScript -Label "profile-selftest" -Commands @(
         "# PHASE 14 P0 — CPU 프로파일러 특성화 검사"
         "wait $WarmupFrames"
-        "profile.stats"
+        # profile.stats 를 따로 부르지 않는다 — RunProfilerSelfTest 가 자기 리포트 끝에
+        # GetProfilerStatsReport() 를 붙인다. 제품 명령이 JSON 으로 바뀐 뒤(9-06) 이 줄은
+        # 아무 텍스트도 내지 않으면서 selftest 리포트에 실린 **교란된** 값이 그 자리를
+        # 메워 왔다. 라이브 기준선은 -Action Stats 단독으로만 잰다.
         "profile.selftest"
         "quit"
     )
@@ -158,16 +161,77 @@ function Invoke-Stats {
         "quit"
     )
 
+    # ★ 9-06(521fa21a)에 이 축이 죽었던 이유를 여기 적어 둔다.
+    #
+    #   `profile.stats` 가 reg.Legacy 에서 reg.Result 로 옮겨가며 사람이 읽는
+    #   "[profile.stats]" 텍스트 블록을 잃었는데, 이 함수는 그 리터럴을 IndexOf 로
+    #   찾고 있었다. **명령은 계속 성공하는데 판정기만 붉었다.** 8일·115커밋 동안
+    #   아무도 몰랐던 이유는 이 검사가 run-all 세트 밖에 있었기 때문이다.
+    #
+    #   그래서 텍스트를 되살리지 않는다 — 제품 CLI 의 정본은 JSON(reg.Result)이고
+    #   이 저장소에는 ConvertFrom-Json 으로 판정하는 게이트 선례가 여럿 있다.
     $body = $result.Combined
-    $start = $body.IndexOf("[profile.stats]")
-    if ($start -lt 0) {
-        Write-Host "프로파일러 통계를 출력하지 못했다. 전체 출력: $($result.OutFile)" -ForegroundColor Red
+    $line = $body -split "`n" | Where-Object { $_ -match '"command"\s*:\s*"profile\.stats"' } | Select-Object -First 1
+    if (-not $line) {
+        Write-Host "profile.stats 응답을 찾지 못했다. 전체 출력: $($result.OutFile)" -ForegroundColor Red
         return 1
     }
 
+    try { $json = $line.Trim() | ConvertFrom-Json }
+    catch {
+        Write-Host "profile.stats 응답을 JSON 으로 읽지 못했다: $_" -ForegroundColor Red
+        return 1
+    }
+
+    $d = $json.data
+    $tps = [double]$d.ticksPerSecond
+    $toMs = if ($tps -gt 0) { 1000.0 / $tps } else { 0.0 }
+
     Write-Host ""
-    Write-Host $body.Substring($start)
-    return $(if ($result.ExitCode -eq 0) { 0 } else { 1 })
+    Write-Host "[profile.stats] 라이브 기준선 (교란 없음)"
+    Write-Host ("  상태            {0} / 보존 프레임 [{1}, {2})" -f $(if ($d.paused) { "일시정지" } else { "기록 중" }), $d.frameBegin, $d.frameEnd)
+    Write-Host ("  Tick 비용       평균 {0:N1}us / 최대 {1:N1}us  ({2}회)" -f `
+        $(if ($d.tickCount -gt 0) { $d.totalTickTicks * $toMs * 1000.0 / $d.tickCount } else { 0 }), `
+        ($d.peakTickTicks * $toMs * 1000.0), $d.tickCount)
+    Write-Host ("  이벤트/프레임   마지막 {0} / 최대 {1} / 상한 {2}" -f $d.lastFrameEvents, $d.peakFrameEvents, $d.eventCapacity)
+    Write-Host ("  이름 바이트     마지막 {0} / 최대 {1} / 상한 {2}" -f $d.lastFrameNameBytes, $d.peakFrameNameBytes, $d.nameCapacity)
+    Write-Host ("  누적 누락       이벤트 {0} / 이름 {1}" -f $d.totalDroppedEvents, $d.totalDroppedNames)
+    Write-Host ("  불균형 스코프   {0}" -f $d.malformedScopes)
+    Write-Host ("  스레드 슬롯     {0}개" -f $d.threads.Count)
+    foreach ($t in $d.threads) {
+        Write-Host ("    [{0}] {1,-24} tid={2}{3}" -f $t.index, $t.name, $t.threadId, $(if ($t.retired) { " (은퇴)" } else { "" }))
+    }
+
+    # ── 단정 ────────────────────────────────────────────────────────────────
+    #
+    # ⚠ 드롭·포화를 단정하지 않는다. 실측(9-15)에서 편집 27 / 재생 34 이벤트로
+    #   상한 1024 의 3% 였고 이름도 525B/16384B 였다. 계측 지점 39곳이 전부 시스템
+    #   단위 고정 지점이라 씬에 무엇을 얹어도 상수이므로, 그 단정은 **어떤 변이로도
+    #   자극되지 않는 빈 단정**이다. 값은 위에 찍되 판정에서는 뺀다.
+    #
+    # ⚠ 이벤트 수의 **정확한 값**도 아직 단정하지 않는다. PHASE 14 임시 계측이
+    #   들어가 있는 동안에는 값이 유동적이다. 임시 계측을 정리하고 새 수집 코어로
+    #   넘어갈 때 정확값(편집/재생 두 축)을 여기에 못 박는다 — 계획서 §10 P1b.
+    $failures = New-Object System.Collections.Generic.List[string]
+    if ($json.status -ne 'succeeded') { $failures.Add("status=$($json.status)") }
+    if ($d.frameEnd -le $d.frameBegin) { $failures.Add("보존 프레임이 비었다 [$($d.frameBegin), $($d.frameEnd))") }
+    if ($d.lastFrameEvents -le 0)      { $failures.Add("이벤트가 0이다 — 계측이 통째로 죽었다") }
+    if ($d.malformedScopes -ne 0)      { $failures.Add("불균형 스코프 $($d.malformedScopes) — Begin/End 짝이 깨졌다") }
+    if (-not ($d.threads | Where-Object { $_.name -eq '[GameThread]' -and -not $_.retired })) {
+        $failures.Add("[GameThread] 슬롯이 살아 있지 않다")
+    }
+    if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
+
+    Write-Host ""
+    Write-Host "── 판정 ─────────────────────────────"
+    if ($failures.Count -eq 0) {
+        Write-Host "  결과           통과" -ForegroundColor Green
+        return 0
+    }
+    foreach ($f in $failures) { Write-Host "  실패           $f" -ForegroundColor Red }
+    Write-Host ("  전체 출력      {0}" -f $result.OutFile)
+    Write-Host "  결과           실패" -ForegroundColor Red
+    return 1
 }
 
 switch ($Action) {

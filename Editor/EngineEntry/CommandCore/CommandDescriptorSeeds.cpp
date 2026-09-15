@@ -181,6 +181,7 @@ namespace CommandCore
             { "prefab.overrides", CommandCost::Immediate, "<오브젝트>", "프리팹 인스턴스에 기록된 오버라이드를 나열한다", CommandClass::EngineService, CommandLiveness::Live },
             { "prefab.status", CommandCost::Immediate, "", "프리팹 등록·캐시 상태를 낸다", CommandClass::EngineService, CommandLiveness::Live },
             { "prefab.update", CommandCost::Frames, "<소스 오브젝트> <프리팹 이름>", "기존 프리팹을 소스 오브젝트로 갱신한다", CommandClass::EngineService, CommandLiveness::Live },
+            { "profile.frame", CommandCost::Immediate, "", "보존된 프레임의 CPU 이벤트를 이름·깊이·ms 로 낸다(PHASE 14 임시)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "profile.selftest", CommandCost::Frames, "", "CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "profile.stats", CommandCost::Immediate, "", "프로파일러 자체 비용과 용량 소진(교란 없음)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             // LC8 — 요약을 **호스트 중립으로 고쳤다.** 두 registry 가 같은 seed 를
