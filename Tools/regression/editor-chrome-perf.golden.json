@@ -1,0 +1,17 @@
+{
+  "environment": {
+    "uiScale": 2.25,
+    "rootWidth": 2880.0,
+    "rootHeight": 1575.0
+  },
+  "base": {
+    "vertices": 5626,
+    "indices": 17013,
+    "drawCommands": 126
+  },
+  "selected": {
+    "vertices": 7124,
+    "indices": 21489,
+    "drawCommands": 147
+  }
+}

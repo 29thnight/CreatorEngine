@@ -67,6 +67,10 @@ private:
     std::chrono::steady_clock::time_point m_uiFrameBegan{};
     bool m_firstLoop{ true };
     bool m_selectSceneOnStartup{ true };
+    /// 기본 배치를 새로 세운 실행에서 아래 패널의 앞 탭을 Content Browser 로
+    /// 둘지. 빌더가 세우고 `Render()` 가 소비한다 — 창이 전부 `Begin` 된 뒤라야
+    /// 도크 노드와 탭 바가 서 있기 때문이다.
+    bool m_selectContentBrowserOnBuild{ false };
 
     static std::atomic_bool s_dockLayoutResetRequested;
 };

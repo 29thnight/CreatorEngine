@@ -404,6 +404,24 @@ Run-Step "에디터 위젯 상태 행렬" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-state-matrix.ps1") -Exe $Exe -Work (Join-Path $Work 'state-matrix')
 }
 
+# PHASE 21 W2-4 — chrome 성능 계약.
+#
+# §8.2 는 "chrome p95 CPU 가 기준선 대비 악화되면 **원인을 기록하고** 최적화 또는
+# rollback 한다" 고 적었는데 원인을 기록할 수단이 없었다. 있던 계측은 W7 이 자기
+# 축으로 세운 슬롯 셋뿐이고 그 합이 프레임의 1% 였다 — 나머지 99% 는 이름이 없었다.
+#
+# 창 단위와 셸 구간을 열어 지금은 80% 가 이름으로 설명된다. 그러자 판이 뒤집혔다:
+# 가장 비싼 구간은 `(host.beginframe)` 이고(프레임의 46%, 그 안에 RHI 프레임 자원
+# 획득이 있다) 에디터 창을 다 합쳐도 0.09 ms 다. chrome 이 비싼 것은 위젯 때문이
+# 아니다.
+#
+# ★ 시간은 기계에 묶이므로 절대 ms 를 골든으로 박지 않는다. 판정은 결정적인 축
+#   (정점·인덱스·draw command)과 구조적인 축(계측이 걸린 자리, 제출이 총계 밖에
+#   있다는 것)으로 하고, 절대 ms 와 W0 기준선과의 차이는 **기록**한다.
+Run-Step "에디터 chrome 성능 계약" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-chrome-perf.ps1") -Exe $Exe -Work (Join-Path $Work 'chrome-perf')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

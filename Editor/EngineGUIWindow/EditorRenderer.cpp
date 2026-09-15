@@ -5,6 +5,7 @@
 #include "EditorWindowRegistry.h"
 #include "EditorLayoutPreset.h"
 #include "EditorChromeProbe.h"
+#include "EditorPanelCost.h"
 #include "EditorNavContract.h"
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"
@@ -253,18 +254,34 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     }
 
     ImGui::DockBuilderFinish(id);
+
+    // 아래 패널은 Asset Bundle 과 Content Browser 가 탭으로 겹치고, 기본 배치에서
+    // 앞에 서야 하는 것은 자산 브라우저다. 그런데 **여기서는 정할 수 없다** —
+    // `DockBuilderDockWindow` 는 창의 `DockId` 만 적고, 어느 탭이 선택되는지는
+    // 창이 실제로 `Begin` 되는 순서가 정하기 때문이다(실측: 이 자리에서 도크
+    // 순서를 바꾸고 노드의 `SelectedTabId` 를 직접 적어도 둘 다 서지 않았다).
+    // 그래서 선택은 창들이 다 열린 **뒤**에 한 번 건다 — 아래 `Render()` 끝.
+    m_selectContentBrowserOnBuild = true;
 }
 
 void EditorRenderer::BeginRender()
 {
     m_uiFrameBegan = std::chrono::steady_clock::now();
+    ::editor::windows::begin_shell_cost(
+        ::editor::windows::shell_cost_section::shell_beforeframe);
     const bool workspaceReset = m_workspace->BeforeFrame();
     // NewFrame가 현재 폰트 크기를 계산하므로 글자/geometry 배율을 먼저 적용한다.
     const float targetScale = EditorSettingsStore::Get().Preferences().GetImGuiScale();
     const float dpiScale = m_host->GetWindowDpiScale();
     if (m_lastRequestedScale != targetScale || m_lastDpiScale != dpiScale)
         ApplyEditorScale(targetScale, dpiScale);
+    ::editor::windows::end_shell_cost(
+        ::editor::windows::shell_cost_section::shell_beforeframe);
     {
+        // W2-4: 구간 계측. 창 표와 겹치지 않는 조각들이고, 합에서 빠진 것이
+        // 잔차로 남는다.
+        const ::editor::windows::shell_cost_scope cost{
+            ::editor::windows::shell_cost_section::host_beginframe };
         const ::editor::TabStyleScope tabs;
         m_host->BeginFrame();
     }
@@ -272,6 +289,9 @@ void EditorRenderer::BeginRender()
     // W2-3: 주입된 포인터를 얹는다. **`BeginFrame`(= NewFrame) 뒤**여야 한다 —
     // 앞에 두면 `ImGui_ImplWin32_NewFrame` 이 자기 좌표를 뒤에 넣어 덮는다.
     ::editor::nav::apply_injected_pointer();
+
+    const ::editor::windows::shell_cost_scope dockspaceCost{
+        ::editor::windows::shell_cost_section::shell_dockspace };
     // ── 메인 독스페이스 ──
     // 구 ImGuiRenderer에서는 #ifndef BUILD_FLAG 안이었다. 지금은 이 파일
     // 자체가 에디터 exe에만 링크되므로 조건이 필요 없다 — 매크로가 하던
@@ -349,6 +369,7 @@ void EditorRenderer::RequestDockLayoutReset() noexcept
 
 void EditorRenderer::Render()
 {
+    ::editor::windows::begin_shell_cost(::editor::windows::shell_cost_section::shell_prewindows);
     if (!SceneManagers->IsSceneLoading())
     {
         auto* scene = SceneManagers->GetActiveScene();
@@ -367,8 +388,36 @@ void EditorRenderer::Render()
     //
     // 자리가 BeginRender 뒤인 이유는 그대로다 — 도크스페이스가 이미 서 있어야
     // 창이 자기 도크 노드를 찾는다.
+    // 창 그리기 **앞**까지가 한 조각이다. 창 안은 창 표가 센다 — 여기서 함께
+    // 재면 같은 시간이 두 번 잡혀 잔차가 음수가 된다.
+    ::editor::windows::end_shell_cost(::editor::windows::shell_cost_section::shell_prewindows);
+
     ::editor::draw_windows(*m_windows);
+
+    const ::editor::windows::shell_cost_scope postCost{
+        ::editor::windows::shell_cost_section::shell_postwindows };
     ::editor::draw_workspace_dialog();
+
+    // 기본 배치를 새로 세운 실행에서만, 아래 패널의 앞 탭을 Content Browser 로
+    // 둔다. 자리가 여기인 이유는 바로 아래 주석과 같다 — 창이 전부 `Begin` 된
+    // 뒤라야 도크 노드와 탭 바가 서 있다.
+    //
+    // ★ `workspaceReset` 으로 빌더가 돈 실행에서만 한 번이다. 매 프레임(또는 매
+    //   실행) 강제하면 사용자가 Asset Bundle 을 골라 두고 재시작했을 때 그 선택을
+    //   조용히 되돌리게 된다.
+    if (m_selectContentBrowserOnBuild)
+    {
+        ImGuiWindow* browser = ImGui::FindWindowByName(EditorWindowName::kContentBrowser);
+        if (nullptr != browser && nullptr != browser->DockNode)
+        {
+            browser->DockNode->SelectedTabId = browser->TabId;
+            if (nullptr != browser->DockNode->TabBar)
+            {
+                browser->DockNode->TabBar->NextSelectedTabId = browser->TabId;
+            }
+            m_selectContentBrowserOnBuild = false;
+        }
+    }
 
     // Select after all Begin calls: both restored and newly built dock tabs now
     // exist. Applying this once also avoids Game's first-appearance focus winning.
@@ -384,6 +433,7 @@ void EditorRenderer::Render()
 
 void EditorRenderer::EndRender()
 {
+    ::editor::windows::begin_shell_cost(::editor::windows::shell_cost_section::shell_endrender);
     // PHASE 21 W0 전반(계획서 §1.9): 밖에서 배치를 볼 수단.
     //
     // 자리가 `EndFrame` **앞**인 이유는 둘이다 — 이번 프레임의 모든
@@ -415,19 +465,35 @@ void EditorRenderer::EndRender()
 
     m_workspace->EndFrame();
     const bool captured = ::editor::capture_chrome_snapshot();
+    ::editor::windows::end_shell_cost(::editor::windows::shell_cost_section::shell_endrender);
 
     const std::chrono::steady_clock::time_point uiFrameEnded =
         std::chrono::steady_clock::now();
 
-    m_host->EndFrame();
+    // 프레임 총계는 여기서 닫는다 — `EndFrame` **앞**이고, W0 이 기준선을 뜰 때
+    // 쓴 자(`ui_cpu_ms`)와 같은 구간이다. 정의를 옮기면 그 기준선과의 비교가
+    // 통째로 끊긴다.
+    //
+    // ★ 그래서 `EndFrame` 은 총계 밖이다. 그 안에 `ImGui::Render()` 뿐 아니라
+    //   **`RenderAndPresent`** 가 있어 GPU 제출·Present 가 함께 든다 — 총계에
+    //   넣으면 "UI CPU" 가 제출 비용을 포함하게 된다. 따로 재서 따로 낸다.
+    ::editor::windows::record_ui_frame_ms(
+        std::chrono::duration<double, std::milli>(uiFrameEnded - m_uiFrameBegan).count());
+
+    {
+        const ::editor::windows::shell_cost_scope cost{
+            ::editor::windows::shell_cost_section::present };
+        m_host->EndFrame();
+    }
 
     // draw data 는 `EndFrame` 안의 `ImGui::Render()` 뒤라야 유효하다
     // (`ImDrawData::Valid`). 그래서 배치·스타일과 자리가 다르고, 뜬 프레임에만
     // 얹어 값 넷이 **같은 프레임**의 것이 되게 한다.
+    const double uiCpuMs =
+        std::chrono::duration<double, std::milli>(uiFrameEnded - m_uiFrameBegan).count();
+
     if (captured)
     {
-        const double uiCpuMs =
-            std::chrono::duration<double, std::milli>(uiFrameEnded - m_uiFrameBegan).count();
         ::editor::capture_chrome_draw_totals(uiCpuMs);
     }
 }

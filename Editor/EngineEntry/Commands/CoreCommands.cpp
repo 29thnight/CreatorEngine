@@ -1181,7 +1181,11 @@ namespace ConsoleCmd
         const auto& args = ctx.parts;
         if (args.size() > 2 || (2 == args.size() && "reset" != args[1]))
             return InvalidArguments("editor.panelcost [reset]");
-        if (2 == args.size()) ::editor::windows::reset_panel_costs();
+        if (2 == args.size())
+        {
+            ::editor::windows::reset_panel_costs();
+            ::editor::windows::reset_window_costs();
+        }
 
         const auto snapshot = ::editor::windows::read_panel_costs();
         auto data = CommandData::Object();
@@ -1213,6 +1217,67 @@ namespace ConsoleCmd
                 " scans=" + std::to_string(sample.lastScans));
         }
         data.Set("panels", std::move(panels));
+
+        // ── W2-4: 창 단위 비용과 잔차 ────────────────────────────────────────
+        //
+        // 위의 슬롯 표는 창 **안**의 구간이라 프레임 총계와 더할 수 없다. 창 표는
+        // 층위가 맞으므로 합을 총계에서 빼면 **어느 창에도 속하지 않은 비용**이
+        // 남는다 — ImGui 의 NewFrame·EndFrame·Render, 도킹 갱신, 셸 자신.
+        //
+        // 그 잔차를 내지 않으면 "원인을 기록한다" 가 성립하지 않는다. 설명된
+        // 부분만 보여 주는 표는 설명하지 못한 부분을 0 처럼 보이게 한다.
+        const auto windowCosts = ::editor::windows::read_window_costs();
+        auto windows = CommandData::Array();
+        double explainedAvgMs = 0.0;
+        double presentAvgMs = 0.0;
+        double presentP95Ms = 0.0;
+        for (const auto& sample : windowCosts.windows)
+        {
+            // `(present)` 는 총계 **밖**이다 — 그 안에 GPU 제출과 Present 가 든다.
+            // 잔차에 섞으면 "UI CPU 가 설명됐다" 가 거짓이 된다. 줄은 남기되
+            // 합에서 뺀다.
+            const bool isPresent = (sample.id == ::editor::windows::kPresentRowId);
+            auto entry = CommandData::Object();
+            entry.Set("id", CommandData::String(sample.id));
+            entry.Set("frames", CommandData::Int(static_cast<long long>(sample.frames)));
+            entry.Set("samples", CommandData::Int(static_cast<long long>(sample.samples)));
+            entry.Set("lastMs", CommandData::Double(sample.lastMs));
+            entry.Set("avgMs", CommandData::Double(sample.avgMs));
+            entry.Set("p95Ms", CommandData::Double(sample.p95Ms));
+            entry.Set("maxMs", CommandData::Double(sample.maxMs));
+            entry.Set("outsideFrameTotal", CommandData::Bool(isPresent));
+            windows.Append(std::move(entry));
+            if (isPresent)
+            {
+                presentAvgMs = sample.avgMs;
+                presentP95Ms = sample.p95Ms;
+            }
+            else
+            {
+                explainedAvgMs += sample.avgMs;
+            }
+        }
+        data.Set("windows", std::move(windows));
+
+        auto frame = CommandData::Object();
+        frame.Set("frames", CommandData::Int(static_cast<long long>(windowCosts.frame.frames)));
+        frame.Set("samples", CommandData::Int(static_cast<long long>(windowCosts.frame.samples)));
+        frame.Set("lastMs", CommandData::Double(windowCosts.frame.lastMs));
+        frame.Set("avgMs", CommandData::Double(windowCosts.frame.avgMs));
+        frame.Set("p95Ms", CommandData::Double(windowCosts.frame.p95Ms));
+        frame.Set("maxMs", CommandData::Double(windowCosts.frame.maxMs));
+        data.Set("frame", std::move(frame));
+        data.Set("explainedAvgMs", CommandData::Double(explainedAvgMs));
+        data.Set("unexplainedAvgMs",
+            CommandData::Double(windowCosts.frame.avgMs - explainedAvgMs));
+        data.Set("presentAvgMs", CommandData::Double(presentAvgMs));
+        data.Set("presentP95Ms", CommandData::Double(presentP95Ms));
+
+        std::printf("[editor.panelcost] frame avg=%.3f p95=%.3f · 창 %zu · 설명 %.3f · 미설명 %.3f\n",
+            windowCosts.frame.avgMs, windowCosts.frame.p95Ms, windowCosts.windows.size(),
+            explainedAvgMs, windowCosts.frame.avgMs - explainedAvgMs);
+        std::fflush(stdout);
+
         return Ok({}, std::move(data));
     }
 
