@@ -28,4 +28,28 @@ namespace EditorImGuiTexture
     {
         return From(pointer ? &*pointer : nullptr);
     }
+
+    // ── 비동기 썸네일이 쓰는 둘 (PHASE 21 W7) ──
+    //
+    // ★ From 의 반환값은 "준비됐다" 가 아니다. DX12 는 표시 프레임 밖 호출에서
+    //   슬롯만 예약하고 null SRV 를 써 두므로 업로드 전에도 0 이 아닌 ID 가
+    //   나온다. 그것을 Ready 로 읽으면 한 프레임 빈 그림이 나오고, 그것이
+    //   계약이 금지한 상태다.
+
+    /// 그림을 내지 않은 채 **업로드만 시킨다.** 표시 프레임 안에서 불러야 한다.
+    ///
+    /// 왜 필요한가: 업로드는 RegisterTexture 가 열린 프레임에서 한다. 준비될
+    /// 때까지 유형 아이콘만 그리는 타일은 썸네일 텍스처를 한 번도 등록하지
+    /// 않으므로, 이 창구가 없으면 **영원히 안 올라간다** — 준비를 기다리는
+    /// 쪽이 준비를 막는 교착이다.
+    void Prime(Texture* texture);
+
+    /// 픽셀이 실제로 GPU 에 올라갔는가. 부수 효과가 없다.
+    bool IsReady(Texture* texture);
+
+    template <typename TPtr>
+    bool IsReady(const TPtr& pointer)
+    {
+        return IsReady(pointer ? &*pointer : nullptr);
+    }
 }

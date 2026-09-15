@@ -81,13 +81,13 @@ namespace
             {
                 std::printf("[ImGui] %s 백엔드 초기화 실패 - UI가 표시되지 않는다: %s\n",
                     m_renderer->GetName(), outError.c_str());
-                Debug->LogError(std::string("[ImGui] ") + m_renderer->GetName() +
+                Debug::PrintLog({}, spdlog::level::err, std::string("[ImGui] ") + m_renderer->GetName() +
                     " 백엔드 초기화 실패: " + outError);
                 return false;
             }
 
             std::printf("[ImGui] 렌더러 백엔드: %s\n", m_renderer->GetName());
-            Debug->LogDebug(std::string("[ImGui] 렌더러 백엔드: ") +
+            Debug::PrintLog({}, spdlog::level::debug, std::string("[ImGui] 렌더러 백엔드: ") +
                 m_renderer->GetName());
             return true;
         }
@@ -183,6 +183,11 @@ namespace
         uint64_t RegisterTexture(Texture* texture) override
         {
             return m_renderer ? m_renderer->RegisterTexture(texture) : 0;
+        }
+
+        bool IsTextureReady(Texture* texture) const override
+        {
+            return m_renderer && m_renderer->IsTextureReady(texture);
         }
 
         uint64_t OpenSharedTexture(void* sharedHandle) override

@@ -57,6 +57,13 @@ public:
     /// DX12 descriptor handle 또는 Vulkan descriptor set을 구분하지 않는다.
     /// ID를 영구 캐시하지 말고 실제 표시 프레임마다 호출해 수명 표식을 남긴다.
     virtual uint64_t RegisterTexture(Texture* texture) = 0;
+
+    /// 그 텍스처의 픽셀이 실제로 GPU에 올라가 있는가(PHASE 21 W7 비동기 썸네일).
+    /// RegisterTexture의 반환값은 이것을 말하지 않는다 — 업로드 전에도 0이 아닌
+    /// ID가 나온다. 부수 효과가 없으며, 올리는 일은 표시 프레임의
+    /// RegisterTexture가 한다. 백엔드 세부는 IImGuiRendererBackend 주석 참조.
+    virtual bool IsTextureReady(Texture* texture) const = 0;
+
     virtual uint64_t OpenSharedTexture(void* sharedHandle) = 0;
     virtual void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
         const void* rgba, uint32_t rowPitch) = 0;

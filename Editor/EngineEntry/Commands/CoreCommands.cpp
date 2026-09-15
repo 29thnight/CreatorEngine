@@ -24,6 +24,7 @@
 #include "EditorWorkspaceStore.h"
 #include "ViewportHostWindow.h"
 #include "EditorPanelCost.h"
+#include "BrowserThumbnailCache.h"
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorNavContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
@@ -584,7 +585,7 @@ namespace ConsoleCmd
             : "[CLI] 창 크기 변경(클램프됨): 요청 " + std::to_string(width) + "x" + std::to_string(height) +
               " -> 실제 " + std::to_string(actualWidth) + "x" + std::to_string(actualHeight);
 
-        Debug->LogWarning(message);
+        Debug::PrintLog({}, spdlog::level::warn, message);
         std::printf("%s\n", message.c_str());
         auto data = CommandData::Object();
         data.Set("requestedWidth", CommandData::Int(width));
@@ -605,7 +606,7 @@ namespace ConsoleCmd
         const uint32_t clientW = client.width;
         const uint32_t clientH = client.height;
         std::printf("[CLI] 클라이언트 영역: %ux%u\n", clientW, clientH);
-        Debug->LogWarning("[CLI] 클라이언트 영역: " +
+        Debug::PrintLog({}, spdlog::level::warn, "[CLI] 클라이언트 영역: " +
             std::to_string(clientW) + "x" + std::to_string(clientH));
         auto data = CommandData::Object();
         data.Set("width", CommandData::Int(clientW));
@@ -1213,7 +1214,7 @@ namespace ConsoleCmd
             entry.Set("totalScans", CommandData::Int(static_cast<long long>(sample.totalScans)));
             entry.Set("totalProbes", CommandData::Int(static_cast<long long>(sample.totalProbes)));
             panels.Append(std::move(entry));
-            Debug->Log("[editor.panelcost] " + std::string(::editor::windows::panel_cost_slot_name(slot)) +
+            Debug::PrintLog({}, spdlog::level::info, "[editor.panelcost] " + std::string(::editor::windows::panel_cost_slot_name(slot)) +
                 " frames=" + std::to_string(sample.frames) +
                 " lastMs=" + std::to_string(sample.lastMs) +
                 " avgMs=" + std::to_string(sample.avgMs) +
@@ -1403,6 +1404,64 @@ namespace ConsoleCmd
             return Fail("editor.nav.disabled_stop", summary, std::move(data));
         }
         return Ok("키보드 탐색 계약 위반 0", std::move(data));
+    }
+
+    // PHASE 21 W7 — 비동기 썸네일 장부.
+    //
+    // 계약의 완료 판정 셋(*"동일 자산 요청이 중복되지 않는지, 변경·삭제 뒤 늦은
+    // 완료가 재게시되지 않는지, 느린 로더에서 아이콘 상태로도 UI 입력이
+    // 처리되는지"*)은 전부 **수를 세야** 판정할 수 있다. 화면만 봐서는 중복
+    // 요청도, 폐기된 늦은 완료도 보이지 않는다.
+    static CommandCore::CommandResult Cmd_editor_thumbnail(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        if (args.size() > 2 || (2 == args.size() && "reset" != args[1]))
+            return InvalidArguments("editor.thumbnail [reset]");
+        if (2 == args.size()) ::editor::thumbnail_reset_stats();
+
+        const auto stats = ::editor::thumbnail_read_stats();
+        auto data = CommandData::Object();
+        data.Set("requests", CommandData::Int(static_cast<long long>(stats.requests)));
+        data.Set("deduped", CommandData::Int(static_cast<long long>(stats.deduped)));
+        data.Set("decoded", CommandData::Int(static_cast<long long>(stats.decoded)));
+        data.Set("published", CommandData::Int(static_cast<long long>(stats.published)));
+        data.Set("failed", CommandData::Int(static_cast<long long>(stats.failed)));
+        data.Set("lateDropped", CommandData::Int(static_cast<long long>(stats.lateDropped)));
+        data.Set("invalidated", CommandData::Int(static_cast<long long>(stats.invalidated)));
+        data.Set("evicted", CommandData::Int(static_cast<long long>(stats.evicted)));
+        data.Set("servedThumbnails", CommandData::Int(static_cast<long long>(stats.servedThumbnails)));
+        data.Set("servedIcons", CommandData::Int(static_cast<long long>(stats.servedIcons)));
+        data.Set("entries", CommandData::Int(static_cast<long long>(stats.entries)));
+        data.Set("queued", CommandData::Int(static_cast<long long>(stats.queued)));
+        data.Set("working", CommandData::Int(static_cast<long long>(stats.working)));
+        data.Set("awaitingUpload", CommandData::Int(static_cast<long long>(stats.awaitingUpload)));
+        data.Set("ready", CommandData::Int(static_cast<long long>(stats.ready)));
+        data.Set("bytes", CommandData::Int(static_cast<long long>(stats.bytes)));
+        data.Set("budgetBytes", CommandData::Int(static_cast<long long>(stats.budgetBytes)));
+        data.Set("workerPoolRunning", CommandData::Bool(stats.workerPoolRunning));
+
+        Debug::PrintLog({}, spdlog::level::info, "[editor.thumbnail]"
+            " requests=" + std::to_string(stats.requests) +
+            " deduped=" + std::to_string(stats.deduped) +
+            " decoded=" + std::to_string(stats.decoded) +
+            " published=" + std::to_string(stats.published) +
+            " failed=" + std::to_string(stats.failed) +
+            " lateDropped=" + std::to_string(stats.lateDropped) +
+            " invalidated=" + std::to_string(stats.invalidated) +
+            " evicted=" + std::to_string(stats.evicted));
+        Debug::PrintLog({}, spdlog::level::info, "[editor.thumbnail]"
+            " entries=" + std::to_string(stats.entries) +
+            " queued=" + std::to_string(stats.queued) +
+            " working=" + std::to_string(stats.working) +
+            " awaitingUpload=" + std::to_string(stats.awaitingUpload) +
+            " ready=" + std::to_string(stats.ready) +
+            " bytes=" + std::to_string(stats.bytes) +
+            " servedThumbnails=" + std::to_string(stats.servedThumbnails) +
+            " servedIcons=" + std::to_string(stats.servedIcons) +
+            " workerPool=" + std::string(stats.workerPoolRunning ? "running" : "down"));
+
+        return Ok({}, std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_editor_clipping(const ConsoleCommandContext& ctx)
@@ -1891,6 +1950,7 @@ namespace ConsoleCmd
         reg.Result({ "editor.sceneview" }, &Cmd_editor_sceneview);
         reg.Result({ "editor.viewport" }, &Cmd_editor_viewport);
         reg.Result({ "editor.panelcost" }, &Cmd_editor_panelcost);
+        reg.Result({ "editor.thumbnail" }, &Cmd_editor_thumbnail);
         reg.Result({ "editor.clipping" }, &Cmd_editor_clipping);
         reg.Result({ "editor.nav" }, &Cmd_editor_nav);
         reg.Result({ "editor.state" }, &Cmd_editor_state);

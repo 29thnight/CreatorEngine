@@ -37,6 +37,8 @@
     <ClCompile Include="EngineGUIWindow\EditorPanelCost.cpp" />
     <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h" />
     <ClCompile Include="EngineGUIWindow\BrowserDirectorySnapshot.cpp" />
+    <ClInclude Include="EngineGUIWindow\BrowserThumbnailCache.h" />
+    <ClCompile Include="EngineGUIWindow\BrowserThumbnailCache.cpp" />
     <ClInclude Include="EngineGUIWindow\HierarchyFlatten.h" />
     <ClCompile Include="EngineGUIWindow\HierarchyFlatten.cpp" />
     <ClInclude Include="EngineGUIWindow\EditorWorkspaceStore.h" />
@@ -138,7 +140,6 @@
     <ClInclude Include="EngineGUIWindow\InspectorDrawerMath.h" />
     <ClInclude Include="EngineGUIWindow\InspectorWindow.h" />
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h" />
-    <ClInclude Include="EngineGUIWindow\OutputLogText.h" />
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h" />
     <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h" />
     <ClInclude Include="EngineGUIWindow\ReflectionTypedDraw.h" />

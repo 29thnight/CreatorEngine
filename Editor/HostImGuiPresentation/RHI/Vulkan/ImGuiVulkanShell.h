@@ -26,6 +26,7 @@ public:
     void RebuildFontAtlas() override;
 
     uint64_t RegisterTexture(Texture* texture) override;
+    bool IsTextureReady(Texture* texture) const override;
     uint64_t OpenSharedTexture(void* sharedHandle) override;
     void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
         const void* rgba, uint32_t rowPitch) override;

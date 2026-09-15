@@ -369,6 +369,19 @@ uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
     return slot.textureId;
 }
 
+bool ImGuiDx12Shell::IsTextureReady(Texture* texture) const
+{
+    const Impl& impl = *m_impl;
+    if (!impl.active || nullptr == texture) return false;
+
+    // ★ 슬롯이 있다는 것과 올라갔다는 것은 다르다. RegisterTexture가 프레임
+    //   밖에서 불리면 슬롯을 잡고 null SRV를 써 두므로, 슬롯의 존재만 보면
+    //   빈 그림을 "준비됐다"로 읽는다. uploaded가 그 둘을 가른다.
+    const auto found = impl.textureSlots.find(
+        static_cast<uint64_t>(texture->m_assetId.m_ID_Data));
+    return found != impl.textureSlots.end() && found->second.uploaded;
+}
+
 uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue)
 {
     Impl& impl = *m_impl;

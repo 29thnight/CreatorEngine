@@ -30,6 +30,22 @@ namespace EditorImGuiTexture
         return 0;
     }
 
+    void Prime(Texture* texture)
+    {
+        if (nullptr == texture) return;
+        IImGuiHost& host = GetImGuiHost();
+        // 반환 ID 를 버리는 것이 이 함수의 요점이다 — 그리지 않고 등록만 한다.
+        // 열린 프레임이면 RegisterTexture 가 그 자리에서 업로드한다.
+        if (host.IsActive()) (void)host.RegisterTexture(texture);
+    }
+
+    bool IsReady(Texture* texture)
+    {
+        if (nullptr == texture) return false;
+        IImGuiHost& host = GetImGuiHost();
+        return host.IsActive() && host.IsTextureReady(texture);
+    }
+
     // ★ FromRawDx11Srv를 걷었다 (E, 2026-08-09).
     //
     //   "Texture 객체 없이 원시 DX11 SRV만 든 디버그 뷰 부류"를 위한 변환기로,

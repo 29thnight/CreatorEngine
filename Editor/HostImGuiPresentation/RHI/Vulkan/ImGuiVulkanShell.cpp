@@ -559,6 +559,20 @@ uint64_t ImGuiVulkanShell::RegisterTexture(Texture* texture)
     return ToImTextureId(descriptor);
 }
 
+bool ImGuiVulkanShell::IsTextureReady(Texture* texture) const
+{
+    const Impl& impl = *m_impl;
+    if (!impl.active || nullptr == texture) return false;
+
+    // ★ Vulkan 쪽은 DX12의 uploaded 같은 별도 표식이 없다 — 여기서는
+    //   descriptor set이 있다는 것이 곧 올라갔다는 뜻이다. RegisterTexture가
+    //   GetOrUpload에 성공한 뒤에만 AddTexture를 부르고, 실패하면 폴백 ID를
+    //   돌려주며 표에 아무것도 남기지 않기 때문이다. 두 백엔드의 기제는
+    //   다르지만 이 함수가 답하는 물음은 같다.
+    return impl.textureSets.find(
+        static_cast<uint64_t>(texture->m_assetId.m_ID_Data)) != impl.textureSets.end();
+}
+
 uint64_t ImGuiVulkanShell::OpenSharedTexture(void* /*sharedHandle*/)
 {
     // DXGI shared handle은 Vulkan descriptor가 아니다. Vulkan scene path는 공통

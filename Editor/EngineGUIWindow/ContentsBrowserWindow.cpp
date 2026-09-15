@@ -12,6 +12,7 @@
 #include "Prefab.h"
 #include "PrefabUtility.h"
 #include "EditorImGuiTexture.h"
+#include "BrowserThumbnailCache.h"
 #include "EditorPlatform.h"
 #include "EditorAssetDatabase.h"
 #include "EditorIcons.h"
@@ -169,9 +170,19 @@ namespace
         return ::editor::browser_same_directory(a, b);
     }
 
+    /// W7 썸네일을 만들 해상도(정사각 한 변). 타일 보기와 목록 보기가 **같은
+    /// 값을 쓴다** — 보기마다 다른 해상도를 요청하면 같은 자산에 키가 둘이 생겨
+    /// 같은 그림을 두 번 디코드한다. 그리는 크기는 그릴 때 정한다.
+    constexpr std::uint16_t kThumbnailResolution = 128;
+
     // Draw over the existing item so changing artwork never changes its ID or hit area.
+    //
+    // W7 썸네일: `badgeIcon` 은 그림 오른쪽 아래의 **작은 유형 기호**다. 썸네일이
+    // 붙은 타일에서만 준다 — 계약이 *"실제 에셋 썸네일 + 작은 유형 배지"* 로
+    // 적었고, 그림만 남으면 그 파일이 무엇인지가 사라지기 때문이다.
     void browser_item_artwork(Texture* texture, const char* fallbackIcon,
-        const std::string& name, bool listView, float tileIconSize = 40.f)
+        const std::string& name, bool listView, float tileIconSize = 40.f,
+        const char* badgeIcon = nullptr)
     {
         const auto minimum = ImGui::GetItemRectMin();
         const auto maximum = ImGui::GetItemRectMax();
@@ -192,6 +203,22 @@ namespace
             const auto glyph = font->CalcTextSizeA(iconSize, FLT_MAX, 0.f, fallbackIcon);
             draw->AddText(font, iconSize, {position.x+(iconSize-glyph.x)*.5f, position.y+(iconSize-glyph.y)*.5f},
                 ImGui::GetColorU32(ImGuiCol_Text), fallbackIcon);
+        }
+        if (badgeIcon && image)
+        {
+            // 그림의 오른쪽 아래 모서리. 어두운 판을 깔아 밝은 썸네일 위에서도
+            // 기호가 읽히게 한다.
+            const float badgeSize = iconSize * .38f;
+            const ImVec2 badgeMin{ position.x + iconSize - badgeSize,
+                                   position.y + iconSize - badgeSize };
+            draw->AddRectFilled(badgeMin, { badgeMin.x + badgeSize, badgeMin.y + badgeSize },
+                ImGui::GetColorU32(ImGuiCol_WindowBg, .82f), badgeSize * .25f);
+            auto* badgeFont = ImGui::GetFont();
+            const auto badgeGlyph = badgeFont->CalcTextSizeA(badgeSize, FLT_MAX, 0.f, badgeIcon);
+            draw->AddText(badgeFont, badgeSize,
+                { badgeMin.x + (badgeSize - badgeGlyph.x) * .5f,
+                  badgeMin.y + (badgeSize - badgeGlyph.y) * .5f },
+                ImGui::GetColorU32(ImGuiCol_Text), badgeIcon);
         }
         if (listView)
             draw->AddText({position.x+iconSize+editor::ThemePixels(8.f), minimum.y+(height-ImGui::GetFontSize())*.5f},
@@ -465,7 +492,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
             else
             {
                 auto presentation = EditorAssetPresentation::Get().ResolveFilePresentation(entry->extension);
-                DrawFileTile(presentation, entry->path, name,
+                DrawFileTile(presentation, entry->path, name, entry->revision,
                     { editor::ThemePixels(m_tileSize), editor::ThemePixels(m_tileSize) });
             }
             ImGui::PopID();
@@ -494,9 +521,20 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
 void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePresentation& presentation,
 										 const file::path& directory,
 										 const std::string& fileName,
+										 std::uint64_t revision,
 										 const ImVec2& tileSize)
 {
 	const auto fileType = presentation.type;
+	// W7 썸네일: 준비된 것이 있으면 그것을, 아니면 nullptr 이라 유형 아이콘이
+	// 그대로 간다. 조회는 디스크를 만지지 않는다 — `revision` 은 목록 스캔이
+	// 담아 둔 값이고, 캐시는 표 하나를 볼 뿐이다.
+	Texture* thumbnail = nullptr;
+	if (0 != revision)
+	{
+		thumbnail = editor::thumbnail_acquire(
+			editor::thumbnail_make_key(directory, revision, kThumbnailResolution),
+			directory, true);
+	}
 	ImGui::PushID(fileName.c_str());
 	ImGui::BeginGroup();
     ImU32 color{};
@@ -515,7 +553,9 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
     if (ImGui::IsItemFocused())
         draw->AddRect(minimum, maximum, ImGui::GetColorU32(ImGuiCol_NavCursor),
                       ImGui::GetStyle().FrameRounding);
-    browser_item_artwork(presentation.type_image, presentation.type_icon, fileName, m_listView);
+    browser_item_artwork(thumbnail ? thumbnail : presentation.type_image,
+        presentation.type_icon, fileName, m_listView, 40.f,
+        thumbnail ? presentation.type_icon : nullptr);
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", browser_utf8(directory).c_str());
     if (pressed)
 	{
@@ -529,7 +569,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 			selectedMetaFilePath, &parseError);
 		if (!selectedFileMetaNode)
 		{
-			Debug->LogError(parseError);
+			Debug::PrintLog({}, spdlog::level::err, parseError);
 		}
 	}
 
@@ -828,6 +868,14 @@ void ContentsBrowserWindow::Draw()
     // W7-1: 이 프레임에 다시 훑을 수 있는 폴더 수를 되돌린다. 낡은 것을
     // 한꺼번에 훑지 않게 막는 자리다.
     editor::browser_cache_begin_frame();
+    // W7 썸네일: 완료를 반영하고 올라간 것을 Ready 로 승격한다. 프레임 **머리**
+    // 에서만 바꾼다 — 프레임 안에서 승격하면 같은 프레임의 앞 타일과 뒤 타일이
+    // 서로 다른 그림을 받는다.
+    //
+    // ★ 이 창이 안 그려지면 이 자리도 안 돈다(뒤 탭이면 ImGui 가 본문을 건너뛴다).
+    //   그래도 맞다 — 보이지 않는 타일에는 바꿀 그림이 없다. 진행 중이던 작업은
+    //   완료 큐에서 기다리고, 창이 다시 서면 그때 반영된다.
+    editor::thumbnail_begin_frame();
     // W7-5: 뿌리 해석은 **프로젝트가 바뀔 때만** 한다. `weakly_canonical` 과
     // `is_directory` 는 둘 다 디스크를 만지므로 매 프레임 부르면 그것이 곧
     // 프레임당 파일시스템 호출이다 — 이 조각이 없애려는 바로 그 모양이고,

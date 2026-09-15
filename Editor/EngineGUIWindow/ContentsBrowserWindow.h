@@ -4,6 +4,7 @@
 #include "EditorAssetPresentation.h"
 #include "EditorSettingsStore.h"
 #include "AuthoringWriteNode.h"
+#include <cstdint>
 #include <vector>
 
 // ── 콘텐츠 브라우저 (PHASE 4-3 슬라이스 2) ──
@@ -42,9 +43,12 @@ private:
     void DrawFolderMenu(const file::path& directory);
     void DrawFolderDialog();
     void DrawSearch(float width);
+	/// `revision` 은 목록 스캔이 담아 둔 원본 변경 표식이다(W7 썸네일 키).
+	/// 0 이면 썸네일을 묻지 않고 유형 아이콘에 머문다.
 	void DrawFileTile(const EditorAssetPresentation::FilePresentation& presentation,
 					  const file::path& directory,
 					  const std::string& fileName,
+					  std::uint64_t revision,
 					  const ImVec2& tileSize = ImVec2(160, 160));
 
 	// 씬 오브젝트를 프리팹 폴더에 떨어뜨렸을 때. payload는 ImGui가

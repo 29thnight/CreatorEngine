@@ -390,9 +390,6 @@
     <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
-    <ClInclude Include="EngineGUIWindow\OutputLogText.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
     <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
@@ -421,6 +418,9 @@
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\BrowserThumbnailCache.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
     <ClInclude Include="EngineGUIWindow\HierarchyFlatten.h">
@@ -597,6 +597,9 @@
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\BrowserDirectorySnapshot.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\BrowserThumbnailCache.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\HierarchyFlatten.cpp">

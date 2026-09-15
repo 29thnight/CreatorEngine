@@ -53,6 +53,18 @@ public:
     // 반환 ID는 backend descriptor다. 표시하는 프레임마다 다시 호출해야
     // last-used가 갱신되며, 호출자는 프레임을 넘어 ID를 영구 저장하지 않는다.
     virtual uint64_t RegisterTexture(Texture* texture) = 0;
+
+    // 그 텍스처의 **픽셀이 실제로 GPU에 올라가 있는가**(PHASE 21 W7).
+    //
+    // ★ RegisterTexture의 반환값으로는 이것을 알 수 없다. DX12는 프레임 밖
+    //   호출에서 슬롯만 예약하고 null SRV를 써 두므로 업로드 전에도 0이 아닌
+    //   ID가 나온다. 그 ID를 "준비됐다"로 읽으면 한 프레임 빈 그림이 나온다.
+    //
+    //   비동기 썸네일 계약이 *"CPU 이미지가 생겼다는 이유만으로 Ready로
+    //   게시하지 않고 실제 GPU 사용 가능 시점을 따른다"* 고 적은 그 시점을
+    //   묻는 창구다. 부수 효과가 없다 — 업로드를 **일으키지 않는다**.
+    //   올리려면 표시 프레임 안에서 RegisterTexture를 불러야 한다.
+    virtual bool IsTextureReady(Texture* texture) const = 0;
     virtual uint64_t OpenSharedTexture(void* sharedHandle) = 0;
     virtual void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
         const void* rgba, uint32_t rowPitch) = 0;

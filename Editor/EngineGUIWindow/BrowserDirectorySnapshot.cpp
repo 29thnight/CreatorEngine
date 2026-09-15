@@ -93,6 +93,19 @@ namespace
             entry.isDirectory = it->is_directory(kindError) && !kindError;
             std::error_code linkError;
             entry.isSymlink = it->is_symlink(linkError) && !linkError;
+            // W7 썸네일의 revision. 폴더는 묻지 않는다 — 크기를 물으면 오류다.
+            // 두 값 다 찾기 결과에 담겨 오므로 여기서 새 접촉이 생기지 않는다.
+            if (!entry.isDirectory)
+            {
+                std::error_code timeError;
+                const auto written = it->last_write_time(timeError);
+                std::error_code sizeError;
+                const auto bytes = it->file_size(sizeError);
+                if (!timeError)
+                    entry.revision = std::uint64_t(
+                        written.time_since_epoch().count());
+                if (!sizeError) entry.revision ^= std::uint64_t(bytes);
+            }
             listing.entries.push_back(std::move(entry));
         }
         listing.error = ec;

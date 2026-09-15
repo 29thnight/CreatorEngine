@@ -51,6 +51,14 @@ namespace editor
         std::string extension{};  ///< 소문자 아님 — 원문 그대로(지원 여부 판정은 창이 한다)
         bool isDirectory{};       ///< 여기 담아 두면 정렬 비교마다 stat 하지 않는다
         bool isSymlink{};         ///< 폴더 트리는 심볼릭 링크를 타지 않는다(옛 동작 보존)
+        /// W7 썸네일: 원본 변경 표식 — 마지막 쓰기 시각 ^ 파일 크기.
+        ///
+        /// ★ 여기 담는 이유가 W7-5 와 같다. 썸네일 캐시 키에는 "이 파일이
+        ///   바뀌었는가" 가 있어야 하는데, 그것을 타일마다 물으면 프레임마다
+        ///   디스크를 만지는 그 병이 돌아온다. 이 값은 **스캔이 이미 들고 있는
+        ///   것**이다 — `directory_iterator` 가 찾기 결과에 담아 주므로 새
+        ///   접촉이 0 이다. 폴더는 0 이다(썸네일이 없다).
+        std::uint64_t revision{};
     };
 
     struct browser_directory_listing
