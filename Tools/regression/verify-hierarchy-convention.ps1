@@ -80,11 +80,53 @@ $wideTmp = Join-Path $Work "HierarchyWide.creator"
 foreach ($p in @($deepTmp, $wideTmp)) { if (Test-Path $p) { Remove-Item $p -Force } }
 
 $scenario = Join-Path $Work "hierarchy_convention_resolved.txt"
-((((Get-Content $template -Raw) -replace '\{\{DEEP_AUTHOR\}\}', $deepBlock) `
-    -replace '\{\{WIDE_AUTHOR\}\}', $wideBlock) `
-    -replace '\{\{DEEP_TMP\}\}', ($deepTmp -replace '\\', '/')) `
-    -replace '\{\{WIDE_TMP\}\}', ($wideTmp -replace '\\', '/') |
-    Set-Content $scenario -Encoding UTF8
+
+# ── 여러 줄 블록은 자리표가 **홀로 선 줄**일 때만 채운다 ──
+#
+# 예전에는 -replace 로 통째로 바꿨다. 그런데 템플릿 머리글에 자리표를 **설명하는
+# 주석**이 있다(`# 저작 명령({{DEEP_AUTHOR}}·{{WIDE_AUTHOR}})은 …`). -replace 는
+# 모든 등장을 바꾸므로 그 주석 안에도 블록이 통째로 박혔고, 그러면 블록의 첫 줄만
+# `#` 에 삼켜지고 **나머지는 진짜 명령이 된다.** 실제 결과(2026-09-15): `Deep0` 과
+# `Wide0` 이 안 생긴 채 `object.parent Deep1 Deep0` 이 preconditions_failed 로
+# 죽고, 주석 꼬리가 붙은 두 줄은 invalid_arguments 가 났다 — 종료 코드 3.
+#
+# 계층 불변식 단정은 전부 초록이었다. scene.new 가 그 앞의 쓰레기를 지우기
+# 때문이다. 잡은 것은 종료 코드 단정 하나뿐이었다.
+#
+# 그래서 치환을 줄 전체로 고정한다. 산문에 자리표를 적어도 주석으로 남을 뿐
+# 명령이 되지 않는다 — 템플릿 문구를 고쳐 피하는 것보다 이쪽이 되돌아오지 않는다.
+$blocks = @{ 'DEEP_AUTHOR' = $deepBlock; 'WIDE_AUTHOR' = $wideBlock }
+$resolvedLines = [System.Collections.Generic.List[string]]::new()
+foreach ($line in (Get-Content $template)) {
+    $key = $line.Trim() -replace '^\{\{(.+)\}\}$', '$1'
+    if ($key -ne $line.Trim() -and $blocks.ContainsKey($key)) {
+        foreach ($cmd in ($blocks[$key] -split "`n")) { $resolvedLines.Add($cmd) }
+    }
+    else {
+        # 메서드 호출 괄호 안에서 줄 잇기 백틱과 -replace 를 섞으면 인수 둘로 갈린다.
+        # 먼저 변수로 풀어 둔다.
+        $filled = $line -replace '\{\{DEEP_TMP\}\}', ($deepTmp -replace '\\', '/')
+        $filled = $filled -replace '\{\{WIDE_TMP\}\}', ($wideTmp -replace '\\', '/')
+        $resolvedLines.Add($filled)
+    }
+}
+Set-Content $scenario -Encoding UTF8 -Value $resolvedLines
+
+# 자기 시나리오를 잘못 만들면 여기서 이름을 달고 죽는다. 위 사고는 종료 코드
+# 0x3 으로만 나타났고 그 수는 무엇이 틀렸는지 말해 주지 않았다.
+$createdNames = @($resolvedLines | Where-Object { $_ -match '^object\.create\s+(\S+)' } |
+    ForEach-Object { if ($_ -match '^object\.create\s+(\S+)') { $Matches[1] } })
+$expectedNames = @(
+    (0..($DeepChain - 1) | ForEach-Object { "Deep$_" })
+    (0..($WideSiblings - 1) | ForEach-Object { "Wide$_"; "WideKid$_" })
+)
+$missingNames = @($expectedNames | Where-Object { $createdNames -notcontains $_ })
+if ($missingNames.Count -gt 0 -or $createdNames.Count -ne $expectedNames.Count) {
+    "시나리오 생성이 틀렸다: object.create $($createdNames.Count) 개 (기대 $($expectedNames.Count))"
+    if ($missingNames.Count -gt 0) { "  빠진 이름: " + ($missingNames -join ', ') }
+    "  결과 파일: $scenario"
+    exit 1
+}
 
 $outPath = Join-Path $Work "hierarchy_convention.out"
 $errPath = Join-Path $Work "hierarchy_convention.err"

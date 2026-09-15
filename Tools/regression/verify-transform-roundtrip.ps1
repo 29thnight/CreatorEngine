@@ -100,8 +100,28 @@ $tmpPath  = ($tempScene) -replace '\\', '/'
 if (Test-Path $tempScene) { Remove-Item $tempScene -Force }
 
 $scenario = Join-Path $Work "transform_roundtrip_resolved.txt"
-((Get-Content $template -Raw) -replace '\{\{AUTHOR_BLOCK\}\}', $authorBlock) -replace '\{\{TMP_SCENE\}\}', $tmpPath |
-    Set-Content $scenario -Encoding UTF8
+
+# ── 저작 블록은 자리표가 **홀로 선 줄**일 때만 채운다 ──
+#
+# 이 템플릿 머리글에도 자리표를 설명하는 주석이 있다(`… — {{AUTHOR_BLOCK}}은 검사
+# 스크립트가 …`). -replace 로 통째로 바꾸면 그 주석 안에도 블록이 박히고, 첫 줄만
+# `#` 에 삼켜진 채 나머지가 진짜 명령이 된다. 실측(2026-09-15): 이 게이트는 그
+# 상태로 **초록이었다** — 주입된 사본이 scene.new 앞에서 돌아 명령 8 개가 실패해도
+# 종료 코드를 보는 단정이 없었기 때문이다. 같은 결함이 계층 규약 게이트에서는
+# 종료 코드 3 으로 잡혔다. 잡히는 쪽과 안 잡히는 쪽을 함께 고친다.
+$resolvedLines = [System.Collections.Generic.List[string]]::new()
+foreach ($line in (Get-Content $template)) {
+    if ($line.Trim() -eq '{{AUTHOR_BLOCK}}') {
+        foreach ($cmd in ($authorBlock -split "`n")) { $resolvedLines.Add($cmd) }
+    }
+    else {
+        # .Add($line -replace 'a', 'b') 는 -replace 의 쉼표를 **메서드 인수 구분자**로
+        # 읽어 "인수 개수 2" 로 죽는다. 먼저 변수로 풀어 둔다.
+        $filled = $line -replace '\{\{TMP_SCENE\}\}', $tmpPath
+        $resolvedLines.Add($filled)
+    }
+}
+Set-Content $scenario -Encoding UTF8 -Value $resolvedLines
 
 $outFile = Join-Path $Work "transform_roundtrip.out"
 $errFile = Join-Path $Work "transform_roundtrip.err"
@@ -113,6 +133,15 @@ $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
 if (-not $proc.HasExited) {
     $proc.Kill()
     "실패: 시간 초과 ($TimeoutSeconds 초)"
+    exit 1
+}
+
+# 종료 코드 단정이 없었다. 배치 시나리오는 명령 하나가 실패하면 3 으로 끝나는데,
+# 이 게이트는 다이제스트 두 벌만 보고 통과를 찍었다 — 시나리오가 절반쯤 죽어도
+# 남은 절반의 왕복이 맞으면 초록이다. 값 판정보다 **먼저** 본다.
+if ($proc.ExitCode -ne 0) {
+    "실패: 종료 코드 비정상 0x{0:X8} — 시나리오의 명령 하나 이상이 실패했다" -f $proc.ExitCode
+    "  출력: $outFile"
     exit 1
 }
 
