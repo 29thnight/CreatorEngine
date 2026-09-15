@@ -1,9 +1,26 @@
 # PHASE 4 W0/W2~W8: product-frame capture, shared PBR, backend defaults and seal identity.
 # Captures are observations, not W9 visual acceptance or cross-backend goldens.
+#
+# ── 2026-09-15 판정 범위 결정 (사용자) ──
+#
+#   **PHASE 4 의 판정은 DX12 백엔드로만 한다.** Vulkan 과의 1:1 픽셀 대응은 PHASE 4.9
+#   (BackendParityPlan) 로 넘겼다. 이유는 진도다 — 교차 백엔드 판정은 시각 고정
+#   수단이 없어 성립하지 않는 질문이었고(§15), vulkan 쪽 별건 결함(기동 창의
+#   `gCubeMap`)이 PHASE 4 와 무관하게 게이트를 끝까지 못 가게 막고 있었다.
+#
+#   ★ **구현과 RHI 계약은 그대로 양 백엔드다.** 미룬 것은 *판정*이지 *배선*이 아니다.
+#     새 축을 더할 때는 여전히 중립 어휘(RHI enum)로 더하고 두 백엔드 변환표를
+#     모두 채운다 — 어휘에 구멍을 내면 백엔드 비대칭이 생기고, 그것은 PHASE 4.9 에서
+#     갚을 빚이 된다. Vulkan RHI 자가 검증(`vk.*`)은 계속 돈다. 여기서 끄는 것은
+#     **제품 프레임 캡처의 vulkan 회차**뿐이다.
+#
+#   그래서 기본값을 dx12 하나로 두되, vulkan 은 **조용히 사라지지 않는다** — 축 회계에
+#   `deferred` 로 이름이 남고 요약이 그것을 부른다. `-Backend dx12,vulkan` 으로
+#   언제든 되돌려 잴 수 있다.
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
-    [ValidateSet('dx12', 'vulkan')][string[]]$Backend = @('dx12', 'vulkan'),
+    [ValidateSet('dx12', 'vulkan')][string[]]$Backend = @('dx12'),
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [int]$TimeoutSeconds = 240
 )
@@ -42,6 +59,18 @@ $axisReport = [ordered]@{}
 function Set-AxisRan([string]$Name) { $script:axisReport[$Name] = 'ran' }
 function Set-AxisSkipped([string]$Name, [string]$Reason) {
     $script:axisReport[$Name] = "skipped: $Reason"
+}
+# ★ `skipped` 와 `deferred` 를 가른다. skipped 는 **이번 기계에 조건이 없어서**
+#   못 잰 것이고(예: 추적 밖 Gunner 자산), deferred 는 **계획이 다른 자리로 옮긴 것**
+#   이다. 둘을 한 통에 넣으면 "언젠가 고치면 다시 도는 축" 과 "다른 계획이 소유한 축"
+#   이 구분되지 않아, 뒷사람이 없는 결함을 찾아 헤매게 된다.
+function Set-AxisDeferred([string]$Name, [string]$Owner) {
+    $script:axisReport[$Name] = "deferred: $Owner"
+}
+
+# 2026-09-15 결정 — 판정은 DX12 로만. vulkan 회차를 끄더라도 그 사실이 회계에 남는다.
+if ($Backend -notcontains 'vulkan') {
+    Set-AxisDeferred 'vulkan/제품 캡처' 'PHASE 4.9 BackendParityPlan (2026-09-15 결정) · -Backend dx12,vulkan 로 되돌려 잰다'
 }
 
 function Invoke-Editor([string]$Name, [string[]]$Commands, [int]$ExpectedExit = 0) {
@@ -411,7 +440,14 @@ try {
             Set-AxisRan "compare/$fixture"
         }
         Write-Output "cross-backend capture compare PASS ($($comparable -join ', '))"
-    } else {
+    }
+    elseif ($Backend -notcontains 'vulkan') {
+        # 2026-09-15 결정으로 판정이 DX12 하나다. 이건 '못 쟀다'가 아니라 '다른 계획이
+        # 소유한다' 이므로 skipped 가 아니라 deferred 로 적는다.
+        Set-AxisDeferred 'compare' 'PHASE 4.9 BackendParityPlan — 교차 백엔드 픽셀 판정은 시각 고정이 선행이다(§15)'
+        Write-Output 'cross-backend capture compare DEFERRED (PHASE 4.9 — 2026-09-15 결정)'
+    }
+    else {
         Set-AxisSkipped 'compare' 'backend 하나만 실행됨'
         Write-Output "cross-backend capture compare SKIPPED (backend 하나만 실행됨)"
     }
@@ -444,12 +480,16 @@ try {
         throw 'Capture did not reject an existing output directory.'
     }
     $ranAxes = @($axisReport.Keys | Where-Object { $axisReport[$_] -eq 'ran' })
-    $skipped = @($axisReport.Keys | Where-Object { $axisReport[$_] -ne 'ran' })
-    Write-Output ("PBR W0/W1/W2/W3/W4/W5/W6/W7-normal/UV/mip baseline PASS" +
-        " — 잰 축 $($ranAxes.Count) · 건너뛴 축 $($skipped.Count)" +
+    $deferredAxes = @($axisReport.Keys | Where-Object { $axisReport[$_] -like 'deferred:*' })
+    $skipped = @($axisReport.Keys | Where-Object { $axisReport[$_] -notlike 'deferred:*' -and $axisReport[$_] -ne 'ran' })
+    Write-Output ("PBR W0/W1/W2/W3/W4/W5/W6/W7-normal/UV/mip baseline PASS (dx12 판정)" +
+        " — 잰 축 $($ranAxes.Count) · 건너뛴 축 $($skipped.Count) · 미룬 축 $($deferredAxes.Count)" +
         " (W9 acceptance pending): $run")
     if ($skipped.Count) {
         Write-Output "  ※ 위 PASS 는 건너뛴 축에 대해 아무 말도 하지 않는다: $($skipped -join ', ')"
+    }
+    if ($deferredAxes.Count) {
+        Write-Output "  ※ 미룬 축은 다른 계획이 소유한다(고칠 결함이 아니다): $($deferredAxes -join ', ')"
     }
 }
 finally {
