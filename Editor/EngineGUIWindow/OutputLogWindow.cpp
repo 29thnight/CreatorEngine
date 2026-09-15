@@ -153,7 +153,7 @@ namespace editor
         // 종료 단계에서는 전역 Debug 가 죽은 인스턴스를 가리킬 수 있다.
         if (Log::IsAlive())
         {
-            if (auto delta = Debug->GetLogDeltaSince(m_view.Cursor())) m_view.Apply(*delta);
+            if (auto delta = Debug::GetLogDeltaSince(m_view.Cursor())) m_view.Apply(*delta);
         }
         m_filter.minimumLevel = static_cast<spdlog::level::level_enum>(m_levelChoice);
         m_filter.search = m_search;
@@ -166,7 +166,7 @@ namespace editor
 
         if (ImGui::Button(EditorIcon::Label<EditorIcon::Delete, " Clear">))
         {
-            if (Log::IsAlive()) Debug->Clear();
+            if (Log::IsAlive()) Debug::Clear();
             m_view.Clear();
             m_lastRowCount = 0;
         }
@@ -423,9 +423,10 @@ namespace editor
             static_cast<unsigned long long>(group->totalCount),
             static_cast<unsigned long long>(group->retainedOccurrences));
 
-        // 출처는 **없으면 없다고 적는다.** 지금 이 엔진의 로그는 전부 출처가
-        // 없다(`Debug->Log*` 는 spdlog 매크로가 아니라 함수라 호출 위치를
-        // 싣지 않는다). 그것을 숨기면 4단계가 무엇을 고쳐야 하는지 흐려진다.
+        // 출처는 **없으면 없다고 적는다.** `Debug::PrintLog` 가
+        // `std::source_location` 기본 인자로 호출 위치를 싣게 된 뒤로는 대부분
+        // 채워지지만, 래퍼를 한 겹 거쳐 들어오는 줄은 여전히 비어 있다. 빈 것을
+        // 숨기면 그 래퍼들이 어디인지 알 수단이 사라진다.
         if (group->source.file.empty() && group->source.line == 0)
             ImGui::TextDisabled("source: none (the producer did not supply a call site)");
         else

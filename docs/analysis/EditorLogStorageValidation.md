@@ -467,17 +467,99 @@ T1 은 지금도 오류 버킷 단정이 아니라 메시지 버킷 단정에 �
 두 버킷을 동시에 움직이므로 어느 쪽이 울려도 같은 사실을 가리킨다 — 나누지
 않았다.
 
-## 다음 단계 — 4단계
+## 4단계 보강: 아무도 안 읽던 두 채널
 
-1. C++/C# 출처 전달. 지금 상세 창이 모든 줄에 `source: none`을 적는 이유는
-   `Debug->Log*`가 spdlog 매크로가 아니라 함수라 호출 위치를 싣지 않기 때문이다.
-   호출처는 528자리다.
-2. producer별 수집 경계. 특히 `DebugStreamBuf`의 공유 문자열 동기화는 1단계의
-   store 잠금으로 해결되지 않는다.
-3. `OutputLogText.h`의 처분. 제품 소비자가 0이고 게이트만 부른다.
-4. `[imgui-error]`를 세는 계수기. 3단계의 매 프레임 오류를 잡은 것은 사람 눈뿐이고,
-   지금 그 자리를 지키는 게이트가 없다.
+`Tools/regression/verify-editor-startup-diagnostics.ps1` 를 새로 세웠다.
+`run-all.ps1` 에는 **넣지 않았다**(요청).
+
+### 왜
+
+2026-09-16 에 결함 둘이 같은 날 들어왔고 **둘 다 빌드 exit 0** 이었다.
+
+| | 무엇 | 왜 컴파일러가 못 잡나 |
+|---|---|---|
+| ① | 일괄 치환이 문자열 리터럴 46 자리에 ` << ` 를 박았다. 그중 둘이 `spReflection*_GetTypeLayout` 심볼 이름이라 Slang reflection 적재가 실패했다 | 전부 문자열 |
+| ② | 네이티브가 `CreatorScriptApiVersion` 을 24→25 로 올렸는데 `ScriptCore/Native.cs` 의 `ExpectedVersion` 이 24 로 남아 CLR 초기화가 실패했다 | 런타임 비교 |
+
+두 실패 메시지는 **인메모리·HTML 싱크로만** 가고 stdout 에는 안 나온다. 회귀
+하네스가 읽을 수단이 아예 없었다 — 사람이 로그 창을 열어 보고 찾았다.
+
+거기에 3단계가 낸 `[imgui-error]` 도 같은 처지였다. 그리기가 매 프레임 규약을
+어겼는데 그림은 맞았고 게이트 넷은 전부 초록이었다.
+
+### 재는 것
+
+- HTML 로그의 심각 행 수 → 0
+- stdout 의 `[imgui-error]` 줄 수 → 0
+
+심각도 집합을 손으로 적지 않는다. `HtmlFileSink.h` 안의 뷰어 스크립트가 이미
+정하고 있으므로 거기서 뽑고, 뽑지 못하면 통과시키지 않고 던진다. 값의 일치가
+아니라 **출처의 동일성**이다.
+
+### 빈 집합을 성공으로 읽지 않기
+
+"오류 0" 은 로그를 못 읽어도 0 이다. 그래서 자극이 실제로 일어났음을 따로
+단정한다 — 로그 창이 실제로 열렸고(결과 행의 `data.stableId`·`data.request` 로
+본다. `command` 필드에는 동사만 들어 있다), 표지 씬이 저장됐고, 이 회차가 만든
+HTML 로그가 **새로** 생겼고, 그 안에 이 회차의 `scene.save` 줄이 있고, 세션 종료
+줄까지 있어 로그가 잘리지 않았다.
+
+행 **개수**로는 재지 않는다. 처음에 `$totalRows -ge 20` 으로 적었다가 실측하니
+매 회차 정확히 16 이었다 — 눈대중이었고, 자극이 바뀌면 조용히 낡는다. 내가
+일으킨 사건이 보이는지로 바꿨다.
+
+### 변이
+
+| 변이 | 결과 | 관측 |
+|---|---|---|
+| G0 자식 창을 닫기 직전에 커서를 내용 밖으로 던진다 | 잡힘 | `imgui-error 444 줄` (고유 2 종) |
+| G1 행 끝의 `Dummy` 를 `SetCursorPos` 로 바꾼다 | **못 잡음** | `심각 0 · imgui-error 0` |
+| G2 `Native.cs` 의 `ExpectedVersion` 을 24 로 되돌린다 | 잡힘 | `[CLR] 관리 초기화 실패 (result=-1) — API 표 버전이 어긋났을 수 있습니다` |
+| G3 Slang 심볼 이름을 하나 망가뜨린다 | 잡힘 | `[EnhancedRenderer] 파이프라인 구축 실패: 노드 'Shadow' 초기화 실패: Slang reflection C API 진입점이 없다` |
+| G4 게이트 자신이 로그 창을 안 연다 | 잡힘 | `로그 창을 열지 못했다` |
+| 대조 (변이 없음) | 초록 | `행 16 · 심각 0 · imgui-error 0`, 9 checks |
+
+G2·G3 이 낸 것은 **2026-09-16 에 실제로 났던 그 문장 그대로**다. 이 게이트가
+지키기로 한 두 결함을 각각 제 단정으로 다시 잡았다.
+
+**G4 가 실패한 방식이 요점이다.** 그 회차는 `심각 0 · imgui-error 0` 을 내고도
+붉었다. 0 만 봤다면 초록이었을 회차다.
+
+행 수는 회차마다 16·14·17 로 흔들렸다(G2 는 CLR 이 죽어 뒤가 줄고, G3 은 실패
+보고가 늘어난다). 처음 쓰려던 `$totalRows -ge 20` 이었다면 **G2 를 행 수로 잡고
+심각 행으로는 못 잡은 것**이 되어, 무엇을 재는 게이트인지가 흐려졌을 것이다.
+
+**G1 은 못 잡았고, 왜인지는 안다.** ImGui 1.92.8 의
+`ErrorCheckUsingSetCursorPosToExtendParentBoundaries` 는 `End`·`EndChild`·
+`EndGroup` 에서 `IsSetPos` 가 **선 채로** 닿았고 커서가 `CursorMaxPos` 를 넘었을
+때만 운다. 행 끝의 `SetCursorPos` 는 다음 행이 내는 항목이 지우고, 마지막 행의
+것은 `ImGuiListClipper` 의 마지막 `Seek` 이 `CursorMaxPos` 를 **직접 올려**
+흡수한다. 그래서 이 변이는 위반이 아니다.
+
+그러면 2026-09-16 의 진짜 결함은 왜 울었나. 그때 관측한 프레임 번호가
+71·160·398 로 **띄엄띄엄**이었다. 수동 누산(`rowStart.y + rowHeight` 를 행마다
+더해 간다)과 clipper 의 `start + n*stride` 가 부동소수점으로 갈라져, 누산 쪽이
+한 ULP 위로 올라간 프레임에서만 울었다는 뜻이다. 즉 **이 축은 결정적이지 않다**
+— 한 프레임 단위로는 확률적이고, 회차가 600 프레임쯤 되기 때문에 실무에서
+잡히는 것이다. G0 는 그 확률에 기대지 않는 자리라 매번 운다.
+
+`-AllowedErrorSubstrings` 는 비워 두는 것이 정상이다. 채울 때는 왜 그것이
+기대되는 오류인지 한 줄 적는다.
+
+## 다음 단계
+
+1. `ScriptCore/Debug.cs` 의 처분. 소비자 0, 게이트 0.
+2. `OutputLogText.h` 의 처분. `Editor.vcxproj` 등재가 0 이 됐고 부르는 것은
+   `Tools/regression/log_store_probe.cpp` 하나뿐이다.
+3. 래퍼를 거치는 호출처. `PakHelper.h`·`DumpHandler.h`·`ComponentTypeUUID.h`·
+   `ProxyCommandQueue.h` 의 `Debug::PrintLog({}, …)` 열 자리쯤이 자기 위치를
+   싣는다 — 상세 창에 래퍼가 찍힌다.
+
+앞의 두 항목(출처 전달, producer별 수집 경계)은 닫혔다. `Debug::PrintLog` 가
+`std::source_location` 기본 인자로 호출 위치를 싣게 됐고, `DebugStreamBuf` 는
+소스에서 사라졌다.
 
 검증 범위: 저장소·화면 상태의 독립 회귀(`verify-log-storage`), 에디터 선언·클리핑·
-키보드 탐색·상태 행렬 네 게이트, Editor Release 빌드, 그리고 창을 띄운 눈 확인.
-픽셀 골든과 Vulkan 백엔드에서의 확인은 하지 않았다.
+키보드 탐색·상태 행렬 네 게이트, 기동 진단 게이트(변이 G0~G4), Editor Release
+빌드, 그리고 창을 띄운 눈 확인. 픽셀 골든과 Vulkan 백엔드에서의 확인은 하지
+않았다.
