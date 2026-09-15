@@ -24,6 +24,33 @@ struct LogStoreLimits
     std::size_t maxTextBytes{ 8 * 1024 * 1024 };
 };
 
+// Per-level running totals since the last Clear. These count what was
+// appended, not what is still retained: a message evicted from the occurrence
+// buffer still happened. Readers that want "how many are still in the list"
+// read the groups instead.
+//
+// The buckets are the three a reader acts on, not the six spdlog levels.
+// Trace/debug/info all mean "the program is telling you something"; err and
+// critical both mean "this is broken".
+struct LogLevelTotals
+{
+    std::uint64_t messages{};  // trace, debug, info
+    std::uint64_t warnings{};  // warn
+    std::uint64_t errors{};    // err, critical
+
+    std::uint64_t Total() const { return messages + warnings + errors; }
+    bool operator==(const LogLevelTotals&) const = default;
+};
+
+// Which bucket a level falls in. One definition, so the window, the status bar
+// and the gate cannot disagree about what "errors" counts.
+inline void AddToLevelTotals(LogLevelTotals& totals, spdlog::level::level_enum level)
+{
+    if (level == spdlog::level::warn) ++totals.warnings;
+    else if (level == spdlog::level::err || level == spdlog::level::critical) ++totals.errors;
+    else if (level != spdlog::level::off) ++totals.messages;
+}
+
 struct LogSnapshot
 {
     // Occurrence order, payload restored from the owning group. This is the
@@ -38,6 +65,7 @@ struct LogSnapshot
     std::uint64_t evictedGroups{};
     // Sum over groups, so repeats of one message are counted once.
     std::size_t textBytes{};
+    LogLevelTotals levelTotals;
 };
 
 // What a reader hands back to ask "what changed since I last looked".
@@ -64,6 +92,7 @@ struct LogDelta
     std::uint64_t rejectedEntries{};
     std::uint64_t evictedGroups{};
     std::size_t textBytes{};
+    LogLevelTotals levelTotals;
 };
 
 // The sole mutable owner of console history. No borrowed entries or callbacks
@@ -93,6 +122,7 @@ public:
             // payload. Other spdlog sinks still receive the original message.
             ++m_nextSequence;
             ++m_rejectedEntries;
+            AddToLevelTotals(m_levelTotals, entry.level);
             return false;
         }
 
@@ -113,6 +143,8 @@ public:
             m_groupsByHash[hash].push_back(groupId);
             m_textBytes += entryText;
         }
+
+        AddToLevelTotals(m_levelTotals, entry.level);
 
         LogGroup& group = m_groups.at(groupId);
         const std::uint64_t sequence = m_nextSequence++;
@@ -142,10 +174,17 @@ public:
         m_evictedEntries = 0;
         m_rejectedEntries = 0;
         m_evictedGroups = 0;
+        m_levelTotals = {};
         ++m_clearGeneration;
         ++m_revision;
         // Sequence and group ids stay monotonic across Clear, even when a
         // reader retains an older snapshot. Clear and Append share this lock.
+    }
+
+    LogLevelTotals ReadLevelTotals() const
+    {
+        std::lock_guard lock(m_mutex);
+        return m_levelTotals;
     }
 
     LogSnapshot ReadSnapshot() const
@@ -205,6 +244,7 @@ public:
             m_occurrences.empty() ? cursor.lastSequence : m_occurrences.back().sequence };
         delta.evictedEntries = m_evictedEntries;
         delta.rejectedEntries = m_rejectedEntries;
+        delta.levelTotals = m_levelTotals;
         delta.evictedGroups = m_evictedGroups;
         delta.textBytes = m_textBytes;
         return delta;
@@ -356,6 +396,7 @@ private:
         snapshot.clearGeneration = m_clearGeneration;
         snapshot.evictedEntries = m_evictedEntries;
         snapshot.rejectedEntries = m_rejectedEntries;
+        snapshot.levelTotals = m_levelTotals;
         snapshot.evictedGroups = m_evictedGroups;
         snapshot.textBytes = m_textBytes;
         return snapshot;
@@ -378,6 +419,7 @@ private:
     std::uint64_t m_clearGeneration{};
     std::uint64_t m_evictedEntries{};
     std::uint64_t m_rejectedEntries{};
+    LogLevelTotals m_levelTotals;
     std::uint64_t m_evictedGroups{};
     std::uint64_t m_droppedRemovalRevision{};
 };

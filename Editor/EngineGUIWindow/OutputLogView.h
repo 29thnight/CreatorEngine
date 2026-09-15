@@ -192,6 +192,7 @@ namespace editor
             m_cursor = delta.cursor;
             m_evictedEntries = delta.evictedEntries;
             m_rejectedEntries = delta.rejectedEntries;
+            m_levelTotals = delta.levelTotals;
             m_dirty = true;
         }
 
@@ -204,13 +205,19 @@ namespace editor
             m_cursor = {};
             m_evictedEntries = 0;
             m_rejectedEntries = 0;
+            m_levelTotals = {};
             m_dirty = true;
         }
 
         LogCursor Cursor() const { return m_cursor; }
         std::uint64_t EvictedEntries() const { return m_evictedEntries; }
         std::uint64_t RejectedEntries() const { return m_rejectedEntries; }
+        // 저장소가 센 값을 그대로 물린다. 창이 따로 세면 상태 표시줄과 두 벌이
+        // 되어 한쪽만 맞는 일이 생긴다.
+        const LogLevelTotals& LevelTotals() const { return m_levelTotals; }
         const std::vector<OutputLogRow>& Rows() const { return m_rows; }
+        // 목록이 빈 이유를 가른다 — 아직 아무것도 안 찍혔나, 걸러졌나.
+        bool HasAnyGroup() const { return !m_groups.empty(); }
         const OutputLogSelection& Selection() const { return m_selection; }
 
         const LogGroup* FindGroup(std::uint64_t groupId) const
@@ -300,6 +307,7 @@ namespace editor
         OutputLogFilter m_filter;
         LogCursor m_cursor;
         std::uint64_t m_evictedEntries{};
+        LogLevelTotals m_levelTotals;
         std::uint64_t m_rejectedEntries{};
         bool m_dirty{ true };
     };

@@ -571,11 +571,51 @@ void MenuBarWindow::RenderMenuBar()
                 const ImVec2 textSize = ImGui::CalcTextSize(EditorIcon::Debug);
                 const ImVec2 buttonSize(textSize.x + style.FramePadding.x * 2.0f,
                                         textSize.y + style.FramePadding.y * 2.0f);
+
+                // 수준별 누적을 디버그 버튼 **왼쪽**에 붙인다. 로그 창을 열지
+                // 않아도 무엇이 쌓였는지 보이고, 누르면 그 창이 열린다.
+                //
+                // 숫자는 저장소가 센 것을 그대로 읽는다(`GetLogLevelTotals`).
+                // 여기서 따로 세면 로그 창이 보여 주는 값과 두 벌이 되어
+                // 한쪽만 맞는 일이 생긴다.
+                LogLevelTotals totals;
+                if (Log::IsAlive()) totals = Debug->GetLogLevelTotals();
+                const std::string countText[3] = {
+                    std::string(EditorIcon::Info) + " " + std::to_string(totals.messages),
+                    std::string(EditorIcon::Warning) + " " + std::to_string(totals.warnings),
+                    std::string(EditorIcon::Error) + " " + std::to_string(totals.errors),
+                };
+                const ::editor::ThemeColor countColor[3] = {
+                    ::editor::ThemeColor::TextMuted,
+                    ::editor::ThemeColor::Warning,
+                    ::editor::ThemeColor::Error,
+                };
+                float countsWidth = 0.0f;
+                for (const std::string& text : countText)
+                    countsWidth += ImGui::CalcTextSize(text.c_str()).x +
+                                   style.FramePadding.x * 2.0f + style.ItemSpacing.x;
+
                 const float available = ImGui::GetContentRegionAvail().x;
-                if (available > buttonSize.x)
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + available - buttonSize.x);
+                const float tail = buttonSize.x + countsWidth;
+                if (available > tail)
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + available - tail);
                 else
                     ImGui::SameLine();
+
+                for (int slot = 0; slot < 3; ++slot)
+                {
+                    ImGui::PushID(slot);
+                    ImGui::PushStyleColor(ImGuiCol_Text, ::editor::ThemeColorValue(countColor[slot]));
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+                    if (ImGui::Button(countText[slot].c_str()))
+                        editor::open_window(EditorWindowName::kOutputLog);
+                    ImGui::PopStyleColor(2);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("%s — 눌러서 Output Log 를 연다",
+                            slot == 0 ? "메시지" : (slot == 1 ? "경고" : "오류"));
+                    ImGui::PopID();
+                    ImGui::SameLine();
+                }
 
                 const bool wasDebug = ShouldCollectGizmoColliders();
                 if (wasDebug) {

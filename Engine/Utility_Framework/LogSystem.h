@@ -95,6 +95,9 @@ public:
 
 	// 화면이 프레임마다 전체를 받지 않도록 변경분만 준다. 커서는 돌려받은
 	// 것을 그대로 다음 호출에 넘긴다.
+	/// 목록을 들지 않는 소비자(상태 표시줄)가 수준별 누적만 읽는다.
+	LogLevelTotals GetLogLevelTotals() const { return m_logStore->ReadLevelTotals(); }
+
 	std::optional<LogDelta> GetLogDeltaSince(LogCursor cursor) const
 	{
 		return m_logStore->ReadDeltaSince(cursor);

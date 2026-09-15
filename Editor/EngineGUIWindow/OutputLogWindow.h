@@ -32,6 +32,10 @@ namespace editor
         void Draw();
 
     private:
+        // 수준별 누적을 내보이는 알약. 누르면 그 수준을 최소 수준으로 세운다.
+        static bool CountChip(const char* icon, std::uint64_t count,
+            spdlog::level::level_enum level, bool active, const char* tooltip);
+
         void PumpStore();
         void DrawToolbar();
         void DrawList(float height);

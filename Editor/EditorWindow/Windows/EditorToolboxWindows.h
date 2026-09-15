@@ -86,10 +86,12 @@ struct editor_diagnostic_windows
             // 자동 크기가 1~2 행짜리 창이 된다 — Auto Scroll 이 켜져 있으면
             // 마지막 한 줄만 보이고 나머지는 스크롤 밖으로 밀린다.
             // 폭은 한 줄이 곧바로 말줄임되지 않을 만큼, 높이는 목록과 상세가
-            // 함께 설 만큼 잡는다(상세는 남은 높이의 45% 또는 8행 중 작은 쪽).
+            // 함께 설 만큼 잡는다. 행 하나가 본문·메타 두 줄짜리 카드라 한 줄
+            // 목록이던 때보다 같은 높이에 절반만 들어간다(상세는 남은 높이의
+            // 45% 또는 8행 중 작은 쪽을 가져간다).
             panel<&windows::draw_output_log>(
                 EditorWindowName::kOutputLog, EditorWindowName::kOutputLogLabel)
-                .initial_size(1100.f, 460.f)
+                .initial_size(1180.f, 640.f)
                 .open_by_default(false)
                 .available(&windows::has_output_log),
 

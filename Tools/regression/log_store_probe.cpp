@@ -525,6 +525,77 @@ namespace
         }
     };
 
+    // 수준별 누적. 창 툴바의 알약과 상태 표시줄의 숫자가 이 값 하나를 읽는다.
+    // 여기가 틀리면 두 자리가 **똑같이** 틀려 서로 대조해도 안 드러난다.
+    void CheckLevelTotals()
+    {
+        // 버킷 축은 **넉넉한** 저장소에서 잰다. 좁은 저장소에 섞어 두면 퇴거가
+        // 버킷 단정 앞에서 일어나, 퇴거를 건드리는 변이가 "퇴거는 누적을 줄이지
+        // 않는다" 가 아니라 버킷 단정에 걸린다 — 그 단정은 증명되지 않은 채
+        // 남는다.
+        LogStore store({ 64, 64, 8192 });
+
+        auto at = [](spdlog::level::level_enum level, std::string message) {
+            LogEntry entry;
+            entry.level = level;
+            entry.message = std::move(message);
+            return entry;
+        };
+
+        Require(store.ReadLevelTotals() == LogLevelTotals{}, "빈 저장소의 누적은 0 셋이다");
+
+        // 여섯 수준을 하나씩. 버킷 셋으로 어떻게 접히는지가 판정 대상이다.
+        store.Append(at(spdlog::level::trace, "t"));
+        store.Append(at(spdlog::level::debug, "d"));
+        store.Append(at(spdlog::level::info, "i"));
+        store.Append(at(spdlog::level::warn, "w"));
+        store.Append(at(spdlog::level::err, "e"));
+        store.Append(at(spdlog::level::critical, "c"));
+
+        const LogLevelTotals bucketed = store.ReadLevelTotals();
+        Require(store.ReadSnapshot().evictedEntries == 0,
+            "fixture 전제: 버킷을 재는 동안에는 아무것도 밀려나지 않았다");
+        Require(bucketed.messages == 3, "trace·debug·info 셋이 메시지 하나로 접힌다");
+        Require(bucketed.warnings == 1, "warn 만 경고다");
+        Require(bucketed.errors == 2, "err 와 critical 둘이 오류다");
+        Require(bucketed.Total() == 6, "여섯 개를 하나도 잃지 않았다");
+
+        // off 는 어디에도 안 든다 — 찍지 않기로 한 수준이다.
+        store.Append(at(spdlog::level::off, "o"));
+        Require(store.ReadLevelTotals().Total() == 6, "off 는 세지 않는다");
+
+        // 변경분을 읽는 쪽도 같은 값을 받는다 — 창이 따로 세지 않게 하는 축이다.
+        auto delta = store.ReadDeltaSince(LogCursor{});
+        Require(delta && delta->levelTotals == store.ReadSnapshot().levelTotals,
+            "변경분이 실은 누적이 snapshot 과 같다");
+
+        store.Clear();
+        Require(store.ReadLevelTotals() == LogLevelTotals{}, "Clear 는 누적을 0 으로 되돌린다");
+
+        // 퇴거 축은 따로 선다. 여기 오는 변이는 이 단정 말고 걸릴 자리가 없다.
+        LogStore evicting({ 2, 2, 8192 });
+        for (int index = 0; index < 9; ++index)
+            evicting.Append(at(index % 2 == 0 ? spdlog::level::info : spdlog::level::warn,
+                "e" + std::to_string(index)));
+        const auto evicted = evicting.ReadSnapshot();
+        Require(evicted.evictedEntries > 0 && evicted.evictedGroups > 0,
+            "fixture 전제: 이력과 그룹이 실제로 밀려났다");
+        Require(evicted.entries.size() == 2 && evicted.groups.size() <= 2,
+            "fixture 전제: 남은 것은 한도만큼뿐이다");
+        Require(evicted.levelTotals.messages == 5 && evicted.levelTotals.warnings == 4,
+            "퇴거는 누적을 줄이지 않는다 — 아홉 번 찍힌 것은 둘만 남아도 아홉이다");
+
+        // 거절된 기록도 센다. 찍으려 한 것은 사실이고, 숫자가 그것을 감추면
+        // "왜 안 보이나" 를 묻는 사람이 없는 것을 찾게 된다.
+        LogStore narrow({ 8, 8, 16 });
+        Require(!narrow.Append(at(spdlog::level::err, std::string(64, 'x'))),
+            "fixture 전제: 예산을 넘겨 거절된다");
+        Require(narrow.ReadLevelTotals().errors == 1, "거절된 기록도 수준별로 센다");
+        Require(narrow.ReadSnapshot().groups.empty(), "거절된 기록은 그룹을 만들지 않는다");
+
+        std::puts("PASS level totals: 버킷 분류, 퇴거 뒤 생존, 거절 계상, Clear");
+    }
+
     void CheckOutputLogPresentation()
     {
         const GlyphWidth measure;
@@ -750,6 +821,7 @@ int main(int argc, char** argv)
         CheckRetentionAndClear();
         CheckGrouping();
         CheckDelta();
+        CheckLevelTotals();
         CheckOutputLogPresentation();
         CheckConcurrentAccess(false);
         CheckConcurrentAccess(true);
