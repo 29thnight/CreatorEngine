@@ -98,7 +98,7 @@ Initialization → InputEvents → TickManagedPrePhysics(C#)
 |---|---|---|---|
 | PHASE 13 `AnimationSchedulerPlan` | S3.5 태스크 레시피·워커별 포즈 풀 · **S6 Job 배치 전환**(청크 분할, 전용 풀 vs `WorkerPools` 실측, 락프리 이벤트 큐) | 전부 todo | 워커 index 안정성·parallel_for·GT 드레인 큐 |
 | PHASE 19 `PhysicsRedesignPlan` | T0 스레딩 계약 · **T1 잡 시스템 통합**(Jolt면 `JobSystemWithBarrier` 어댑터를 `WorkerPool` 위에, PhysX면 simulate↔fetch 창에 작업 배치) · T2 쿼리 병렬화 | 전부 todo, 백엔드 미결(X0 스파이크) | 부분 대기·배리어 |
-| PHASE 4.75 `RenderGraphDependencySchedulingPlan` | RG4 dependency wave 병렬 기록 · RG8 multi-queue | 미착수 | 기존 record-cost 휴리스틱 재사용 명시(`:188-189`), "JobSystem" 언급 0건 |
+| PHASE 4.3 `RenderGraphDependencySchedulingPlan` | RG4 dependency wave 병렬 기록 · RG8 multi-queue | 미착수 | 기존 record-cost 휴리스틱 재사용 명시(`:188-189`), "JobSystem" 언급 0건 |
 | PHASE 14 `ProfilingCapturePlan` | P2 thread stream · sealed chunk handoff · `ThreadEnd` | P0·P1a 완료, P2~ todo | 워커 계측이 서려면 선행 |
 | PHASE 15 `UtilityFrameworkModernizationPlan` | S1 `Thread`→`jthread` · S2 `CountingSemaphore`→`std::counting_semaphore` · `ThreadPool`/`WorkerPool` "존치" | todo | 풀 코어를 손대는 슬라이스와 겹침 |
 | PHASE 8.75 `TransformUpdatePlan`(보관) | X9 병렬 range resolve | 선택 중단 | `ParallelFor`·false sharing 방어 |

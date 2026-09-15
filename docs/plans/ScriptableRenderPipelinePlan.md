@@ -4,7 +4,10 @@
 의존성 스케줄링 트랙 RG를 확정. 2026-09-03 PHASE 4.75로 이동하면서 현재 PBR 배선과
 Blender Material Graph를 별도 완료선으로 분리했다.
 
-상태: **SRP 설계 기준선 확정. 트랙 RG와 일반 SRP는 PHASE 4.75 구현 계획 확정·미착수다.**
+상태: **SRP 설계 기준선 확정. 일반 SRP는 PHASE 4.75, 트랙 RG는 PHASE 4.3 구현 계획
+확정·미착수다.** 2026-09-15에 트랙 RG와 `BASE-0`이 PHASE 4.3으로 분리됐다 —
+[`RenderGraphDependencySchedulingPlan.md`](RenderGraphDependencySchedulingPlan.md)가 정본이고
+이 문서의 `SRP-1`은 `RG5`를 하드 선행으로 받는다.
 
 ---
 
@@ -69,7 +72,7 @@ PHASE 4 PBR 제품 배선 안정화
     ↓
 PHASE 4.25 Principled Material Graph·feature route 완료
     ↓
-지원 행렬·BASE-0
+PHASE 4.3 지원 행렬·BASE-0 → 트랙 RG (RG5가 SRP-1의 선행)
     ↓
 Scriptable Pipeline·Custom Pass 계약
     ↓
@@ -757,10 +760,13 @@ Graph 동등성 밖의 renderer task `RND-1~RND-3`으로 남긴다.
 > 이 문서는 PHASE 4.75의 일반 SRP만 소유한다. 현재 PBR 배선은 PHASE 4,
 > Blender Material Graph는 PHASE 4.25로 분리됐다.
 
-4-0~4-6은 설계 게이트다. 다만 현재 `EnhancedRenderGraph`의 선언 순서 계약을
-Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 PHASE 4.75 구현
-트랙으로 확정**했다. 나머지 SRP 번호는 최종 4-6에서 네 GPU 기능의 공통 기반과 함께
-묶거나 분리한다.
+`4-1`과 `GPU-1`~`GPU-9`는 설계 게이트다. 다만 현재 `EnhancedRenderGraph`의 선언 순서 계약을
+Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 구현 트랙으로 확정**했고,
+2026-09-15에 `BASE-0`과 함께 **PHASE 4.3**으로 분리됐다. 나머지 SRP 번호는 최종 `GPU-9`에서
+네 GPU 기능의 공통 기반과 함께 묶거나 분리한다.
+
+> 구 항목 ID `4-2`/`4-3`/`4-4`/`4-6`은 2026-09-15에 `GPU-1`/`GPU-2`/`GPU-3`/`GPU-9`로 개명됐다.
+> 하이픈 `4-3`이 새 페이즈 번호 `4.3`과 충돌했기 때문이며 내용은 바뀌지 않았다.
 
 ### 트랙 RG0~RG9 — 리소스 의존성 RenderGraph
 
@@ -971,7 +977,7 @@ Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 
 
 | 계획 | 관계 |
 |---|---|
-| **`RenderGraphDependencySchedulingPlan.md` (같은 PHASE 4.75 · 트랙 RG)** | **이 계획의 실행 순서 정본** — Pipeline Asset의 `read/write/modify`를 versioned handle로 낮추고 stable DAG를 만든다. RG0~RG6 단일 큐 제품 전환 뒤 RG7 aliasing, RG8 async compute, RG9 subresource/관측 순으로 확장한다 |
+| **`RenderGraphDependencySchedulingPlan.md` (PHASE 4.3 · 트랙 RG)** | **이 계획의 실행 순서 정본** — Pipeline Asset의 `read/write/modify`를 versioned handle로 낮추고 stable DAG를 만든다. RG0~RG6 단일 큐 제품 전환 뒤 RG7 aliasing, RG8 async compute, RG9 subresource/관측 순으로 확장한다 |
 | **`ModelAssetBigBangCutoverPlan.md` (PHASE 3.75)** | **하드 선행.** MBC6가 vertex attribute mask→input layout/PSO/VSIn 계약을 닫고 MBC7·MBC8이 typed material/texture/CLR handle을 게시한다. 이 문서는 그 결과만 소비하며 legacy GUID·Assimp·experiment fallback을 재도입하지 않는다 |
 | **`LightmapBakerPlan.md` (같은 PHASE 4.75 · 트랙 L)** | `Q0` queue/fence RHI 계약의 소비자다. `LightMapPass`를 Pipeline Asset이 선택하는 Pass로 둘지 소스 Native Pass로 둘지 결정한다 |
 | `LivePipelineDescPlan.md` | 현재 C++ 조립 기술을 첫 native compiler target으로 사용. 공개 asset schema로 직접 노출하지 않음 |

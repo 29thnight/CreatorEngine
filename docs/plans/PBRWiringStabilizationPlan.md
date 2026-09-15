@@ -27,7 +27,8 @@
 이 계획은 현재 제품 렌더 경로의 `.slang`·머테리얼·렌더러 배선 결함만 닫는다.
 Blender형 Material Graph와 Principled 확장은
 [`BlenderMaterialGraphPlan.md`](BlenderMaterialGraphPlan.md), **PHASE 4.25**가 소유한다.
-RenderGraph·일반 Custom Pass·그림자·reflection probe·후처리는 **PHASE 4.75**로 보낸다.
+RenderGraph 리소스 의존성 스케줄링은 **PHASE 4.3**, 일반 Custom Pass·그림자·reflection
+probe·후처리는 **PHASE 4.75**로 보낸다.
 
 좌표계 변환 자체는 Blender 시각 동등성의 범위가 아니지만, 현재 제품 결함인 UV set/transform,
 sampler/mip, tangent basis와 non-uniform scale normal transform은 이 페이즈에서 수정한다.
@@ -146,7 +147,8 @@ sampler 분기와 Anisotropic 둘이다(§19).
 
 - Blender Principled/OpenPBR, Material Graph, coat/sheen/transmission/SSS는 PHASE 4.25.
 - local reflection probe, shadow atlas, AgX/auto exposure/bloom은 PHASE 4.75.
-- RenderGraph scheduling, generic Pipeline/Pass Shader Graph, GPU-driven/DXR는 PHASE 4.75.
+- RenderGraph scheduling·versioned resource·aliasing·async compute는 PHASE 4.3.
+- generic Pipeline/Pass Shader Graph, GPU-driven/DXR는 PHASE 4.75.
 - 모션 벡터, Temporal Upscaling, Frame Generation은 PHASE 4.5.
 - 모델 GUID/sidecar/importer identity를 다시 해석하지 않는다. PHASE 3.75의 typed generation만
   입력으로 받는다.

@@ -408,7 +408,7 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 | 계획 | 관계 |
 |---|---|
 | **`ModelAssetBigBangCutoverPlan` (PHASE 3.75)** | **하드 선행.** MBC3 authoring transaction과 MBC6 vertex schema를 소비한다. UV1은 라이트맵 대상 메시에만 붙고 L1이 새 model generation으로 원자 게시한다 |
-| **`RenderGraphDependencySchedulingPlan` (같은 PHASE 4.75 · 트랙 RG)** | `Q0`(queue-neutral 큐·cross-queue 펜스·상태 전이)은 L4-a와 RG8의 공용 기반이다. `L4`는 `RG8`을 기다리지 않는다 |
+| **`RenderGraphDependencySchedulingPlan` (PHASE 4.3 · 트랙 RG)** | `Q0`(queue-neutral 큐·cross-queue 펜스·상태 전이)은 L4-a와 RG8의 공용 기반이다. `L4`는 `RG8`을 기다리지 않는다 |
 | **`ScriptableRenderPipelinePlan` (같은 PHASE 4.75)** | `LightMapPass` 를 Pipeline Asset 이 선택하는 Pass 로 둘지, 소스 Native Pass 로 둘지 결정 필요 |
 | PHASE 4.75 Stochastic Lighting | 정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다 |
 | PHASE 4.75 DXR | BLAS 가 서면 **베이크의 BVH 를 DXR 가속 구조로 대체**할 수 있다. L2 의 자체 BVH 는 그때까지의 다리다 |

@@ -25,8 +25,8 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 |---|---|
 | [PBRWiringStabilizationPlan.md](plans/PBRWiringStabilizationPlan.md) | PHASE 4 · 진행 — 현행 PBR 배선·재질 의미·backend 동등성과 실장면 회귀. |
 | [BlenderMaterialGraphPlan.md](plans/BlenderMaterialGraphPlan.md) | PHASE 4.25 · 미착수 — Principled 기반 Material Graph와 artist workflow. |
-| [Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md) | PHASE 4 계열 · 정본 — PHASE 4·4.25·4.75의 책임·순서·공수 통합 기준. |
-| [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.75 · RG — 리소스 의존성 스케줄링과 단계별 제품 전환. |
+| [Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md) | PHASE 4 계열 · 정본 — PHASE 4·4.25·4.3·4.5·4.75의 책임·순서·공수 통합 기준. |
+| [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.3 · RG — 공통 밀봉 하네스와 리소스 의존성 스케줄링, 단계별 제품 전환. |
 | [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.75 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
 | [ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md) | PHASE 4.75 · SRP — Pipeline Asset·Custom Pass·Shader Graph 저작과 제품 배선. |
 | [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의 뒤 소유 게이트 13칸 HEAD 재실행으로 조건 ① 닫음(초록 11·붉음 2는 게이트 결함). 남은 조건은 GUI 수동 하나, MCP 보류. |
