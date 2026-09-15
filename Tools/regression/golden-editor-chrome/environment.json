@@ -1,0 +1,18 @@
+{
+  "captureWidth": 1400,
+  "captureHeight": 945,
+  "uiScale": 2.25,
+  "rootWidth": 1400.0,
+  "rootHeight": 855.0,
+  "imguiVersion": "1.92.8",
+  "imageMinX": 0.0,
+  "imageMinY": 99.0,
+  "imageMaxX": 764.0,
+  "imageMaxY": 432.0,
+  "imageReady": true,
+  "toolbarHeight": 54.0,
+  "gizmoRadius": 90.0,
+  "objects": 300,
+  "revealAt": 260,
+  "nestDepth": 8
+}

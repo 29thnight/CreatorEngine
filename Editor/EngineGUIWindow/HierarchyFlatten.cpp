@@ -55,6 +55,39 @@ void editor::HierarchyFlatView::Toggle(int index)
 	++m_toggleStamp;
 }
 
+bool editor::HierarchyFlatView::IsSlotExpanded(const Entity* obj, int index) const
+{
+	// 기본값은 씬 루트의 직계만 펼침 — 옛 `ImGuiTreeNodeFlags_DefaultOpen` 조건
+	// 그대로다. `m_toggled` 는 **기본값에서 벗어난 것**만 담는다.
+	const bool byDefault = (nullptr != obj && 0 == obj->GetParentIndex());
+	return (m_toggled.find(index) != m_toggled.end()) ? !byDefault : byDefault;
+}
+
+void editor::HierarchyFlatView::ExpandAncestors(Scene* scene, int index)
+{
+	if (!scene) return;
+
+	const auto& entities = scene->m_Entities;
+	const int count = static_cast<int>(entities.size());
+	if (index <= 0 || index >= count) return;
+
+	Entity* self = entities[static_cast<std::size_t>(index)].get();
+	if (!self) return;
+
+	// 슬롯 0 은 씬 자신이고 그 머리 행은 늘 펼쳐져 있다 — 거기서 멈춘다.
+	// 걸음 수를 슬롯 수로 묶는 것은 부모 고리가 끊겨 순환이 되어도 프레임이
+	// 멈추지 않게 하려는 것이다. 여기는 그리는 도중이다.
+	int at = static_cast<int>(self->GetParentIndex());
+	for (int guard = 0; at > 0 && at < count && guard < count; ++guard)
+	{
+		Entity* ancestor = entities[static_cast<std::size_t>(at)].get();
+		if (!ancestor) break;
+
+		if (!IsSlotExpanded(ancestor, at)) Toggle(at);
+		at = static_cast<int>(ancestor->GetParentIndex());
+	}
+}
+
 void editor::HierarchyFlatView::Rebuild(Scene* scene, const ImGuiTextFilter& filter, bool searching)
 {
 	m_rows.clear();
@@ -193,11 +226,7 @@ void editor::HierarchyFlatView::Rebuild(Scene* scene, const ImGuiTextFilter& fil
 			// 검색 중에는 걸린 것을 전부 펼친다(옛 SetNextItemOpen(true, Always)).
 			// 기본값은 씬 루트의 직계만 펼침 — 옛 DefaultOpen 조건 그대로다.
 			bool expanded = true;
-			if (!searching)
-			{
-				const bool byDefault = (0 == obj->GetParentIndex());
-				expanded = (m_toggled.find(here.index) != m_toggled.end()) ? !byDefault : byDefault;
-			}
+			if (!searching) expanded = IsSlotExpanded(obj, here.index);
 			expanded = expanded && hasChildren;
 
 			m_rows.push_back({ here.index, here.depth, band++,

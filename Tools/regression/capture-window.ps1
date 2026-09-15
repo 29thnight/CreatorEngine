@@ -16,13 +16,34 @@ param(
     [string]$TitleContains = ""
 )
 
+# ── 먼저 이 프로세스를 DPI 인식으로 선언한다 ─────────────────────────────
+#
+# 선언하지 않으면 Windows 가 `GetClientRect` 를 **논리 픽셀로 가상화**한다. 그러면
+# 아래에서 만드는 비트맵이 실제 클라이언트보다 작아지고, `PrintWindow` 는 창을
+# 물리 크기로 그리므로 **좌상단만 남고 잘린다.** 이 저장소는 그 잘림을 두 번
+# 제품 결함으로 오독했다 — 배율 1.5 인 기계에서 1400x945 창이 933x630 으로 잡혀
+# 오른쪽 패널이 통째로 프레임 밖에 있었다.
+#
+# 창을 열기 전에 불러야 한다. 실패해도 캡처 자체는 되므로 막지 않되, 크기가
+# 가상화됐다는 사실은 남긴다.
+Add-Type -Namespace Win32 -Name Dpi -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+'@
+# DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 == -4
+if (-not [Win32.Dpi]::SetProcessDpiAwarenessContext([IntPtr](-4))) {
+    Write-Host "DPI 인식 선언에 실패했다 — 캡처가 논리 픽셀로 잘릴 수 있다"
+}
+
 Add-Type -AssemblyName System.Drawing
 
 Add-Type -Namespace Win32 -Name Capture -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
 [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hwnd, out RECT rect);
+[DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+[DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr hwnd, ref POINT point);
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
 public struct RECT { public int Left, Top, Right, Bottom; }
+public struct POINT { public int X, Y; }
 '@
 
 # 보이는 메인 창이 생길 때까지 기다린다(로딩 창 -> 본 창 전환이 있다).
@@ -52,13 +73,34 @@ while ((Get-Date) -lt $deadline) {
 }
 if ($hwnd -eq [IntPtr]::Zero) { "창을 찾지 못했다: $ProcessName (제목 조건: `"$TitleContains`")"; exit 1 }
 
-$rect = New-Object Win32.Capture+RECT
-[Win32.Capture]::GetClientRect($hwnd, [ref]$rect) | Out-Null
-$w = $rect.Right - $rect.Left
-$h = $rect.Bottom - $rect.Top
+# ── 창을 통째로 찍고 클라이언트만 잘라 낸다 ────────────────
+#
+# `PrintWindow` 는 **창 전체**(비클라이언트 프레임 포함)를 DC 원점부터 그린다.
+# 그런데 여기서 주는 비트맵이 클라이언트 크기면, 왼쪽·위로 프레임 두께만큼 밀린
+# 그림이 담기고 오른쪽·아래가 그만큼 잘린다. 크기 조절이 되는 창은 테두리가
+# 보이지 않아도 두께가 있어서(WS_THICKFRAME, 배율 1.5 에서 9~10 px) 눈으로는
+# 거의 티가 안 난다 — 그러나 화소 좌표를 쓰는 소비자에게는 통째로 어긋난 자다.
+#
+# 실측으로 확정했다(PHASE 21 W8-2): 제품이 게시한 씬 이미지 오른쪽 끝이 764 인데
+# 렌더 배율만 바꿔도 x=773 까지 화소가 변했고, 774 부터는 하나도 변하지 않았다.
+$client = New-Object Win32.Capture+RECT
+[Win32.Capture]::GetClientRect($hwnd, [ref]$client) | Out-Null
+$w = $client.Right - $client.Left
+$h = $client.Bottom - $client.Top
 if ($w -le 0 -or $h -le 0) { "클라이언트 영역이 비어 있다 (${w}x${h})"; exit 1 }
 
-$bmp = New-Object System.Drawing.Bitmap($w, $h)
+$window = New-Object Win32.Capture+RECT
+[Win32.Capture]::GetWindowRect($hwnd, [ref]$window) | Out-Null
+$windowW = $window.Right - $window.Left
+$windowH = $window.Bottom - $window.Top
+if ($windowW -lt $w -or $windowH -lt $h) { "창이 클라이언트보다 작다 (${windowW}x${windowH})"; exit 1 }
+
+$origin = New-Object Win32.Capture+POINT
+[Win32.Capture]::ClientToScreen($hwnd, [ref]$origin) | Out-Null
+$offsetX = $origin.X - $window.Left
+$offsetY = $origin.Y - $window.Top
+
+$bmp = New-Object System.Drawing.Bitmap($windowW, $windowH)
 $gfx = [System.Drawing.Graphics]::FromImage($bmp)
 $hdc = $gfx.GetHdc()
 # 0x2 = PW_RENDERFULLCONTENT — D3D 스왑체인 내용 포함
@@ -68,7 +110,10 @@ $gfx.Dispose()
 
 if (-not $ok) { $bmp.Dispose(); "PrintWindow 실패"; exit 1 }
 
-$bmp.Save($OutFile, [System.Drawing.Imaging.ImageFormat]::Png)
+$crop = New-Object System.Drawing.Rectangle $offsetX, $offsetY, $w, $h
+$clientBmp = $bmp.Clone($crop, $bmp.PixelFormat)
 $bmp.Dispose()
-"캡처 완료: $OutFile (${w}x${h})"
+$clientBmp.Save($OutFile, [System.Drawing.Imaging.ImageFormat]::Png)
+$clientBmp.Dispose()
+"캡처 완료: $OutFile (${w}x${h}, 창 ${windowW}x${windowH} 에서 오프셋 ${offsetX},${offsetY} 로 잘랐다)"
 exit 0

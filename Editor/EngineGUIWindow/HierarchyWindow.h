@@ -14,7 +14,12 @@ public:
 
 	ImGuiTextFilter m_searchFilter{};
 	std::vector<Entity*> m_clipboard{};
+	// W8-2: 선택이 **바뀐** 프레임에만 선다. 매 프레임 끌면 사람이 굴린 스크롤을
+	// 빼앗는다. 끌어온 뒤(또는 끌 자리가 없다고 판정한 뒤) 스스로 내린다.
 	bool m_requestScrollToSelection = false;
+	// 마지막으로 본 선택 슬롯. 선택이 바뀌었는지는 이것과의 차이로만 안다 —
+	// Hierarchy 밖(뷰포트 클릭 · `object.select`)에서 바뀐 것도 같이 잡힌다.
+	int m_lastSelectionIndex = -1;
 	// 한 판에서 **실제로 그린** 엔티티 줄 수. W7-3 의 clipping 이 서면 이 값이
 	// 보이는 행 수로 떨어진다. 홀짝 띠의 번호는 여기가 아니라 목록이 준다 —
 	// 건너뛴 줄이 있어도 띠가 어긋나지 않게 하려는 것이다.

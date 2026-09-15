@@ -275,6 +275,21 @@ Run-Step "ImGui 어댑터 판 canary" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-imgui-adapter-canary.ps1") -Exe $Exe -Work (Join-Path $Work 'imgui-canary')
 }
 
+# PHASE 21 W8-2 — 3D 렌더 영역을 제외한 chrome crop visual golden.
+#
+# 지금까지의 에디터 게이트는 전부 **값**을 본다. 값이 맞아도 그림은 틀릴 수 있고,
+# W4 의 기즈모 누수가 실제로 그러했다(픽셀 단정이 0 이라 게이트 전부 초록이었다).
+# 여기서는 클라이언트를 통째로 찍어 **3D 이미지 사각형만** 가리고 맞댈다 —
+# 계획서가 포함하라고 한 툴바·방향 기즈모는 남긴다. 가릴 자리와 남길 자리를
+# 전부 `editor.sceneview` 가 게시한 값에서 읽으므로 좌표를 베껴 적지 않는다.
+#
+# 회차 넷: 선택 없음 · 목록 아래쪽 선택(끌어오기) · 같은 상태 재촬영(재현성) ·
+# 접힌 조상 밑의 선택(조상 펼치기). 스크롤한 상태가 반드시 들어 있어야 한다 —
+# W7 의 clipper 보폭 불일치는 스크롤해야만 드러난다.
+Run-Step "에디터 chrome 픽셀 골든" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-chrome-golden.ps1") -Exe $Exe
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

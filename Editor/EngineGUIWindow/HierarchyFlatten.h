@@ -57,6 +57,7 @@
 #include <vector>
 
 class Scene;
+class Entity;
 
 namespace editor
 {
@@ -106,6 +107,13 @@ namespace editor
 		/// 사람이 화살표를 눌렀다. 기본값에서 벗어난 집합을 뒤집는다.
 		void Toggle(int index);
 
+		/// 이 슬롯의 **조상**을 전부 펼친다. 자기 자신은 건드리지 않는다 —
+		/// 보이게 하려는 것은 그 줄이지 그 자식이 아니다.
+		///
+		/// 스크롤만으로는 닿을 수 없는 자리가 있다. 조상이 하나라도 접혀 있으면
+		/// 그 줄은 목록에 **아예 만들어지지 않으므로**, 끌어올 인덱스 자체가 없다.
+		void ExpandAncestors(Scene* scene, int index);
+
 		/// 근거를 댈 수 없는 변화를 만났을 때. 다음 호출이 전량 재구축한다.
 		/// (씬 포인터는 건드리지 않는다 — 그것이 바뀌면 접힘까지 버려야 한다.)
 		void Invalidate() noexcept { m_built.revision = 0; }
@@ -114,6 +122,10 @@ namespace editor
 
 	private:
 		void Rebuild(Scene* scene, const ImGuiTextFilter& filter, bool searching);
+
+		/// 접힘의 정본. `Rebuild` 와 `ExpandAncestors` 가 같은 식을 두 벌 갖지
+		/// 않게 한자리에 둔다 — 두 벌이 되면 한쪽만 고쳐져도 조용하다.
+		bool IsSlotExpanded(const Entity* obj, int index) const;
 
 		std::vector<hierarchy_flat_row> m_rows;
 		std::vector<std::uint8_t> m_matched;   ///< 검색: 자신 또는 자손이 걸린다

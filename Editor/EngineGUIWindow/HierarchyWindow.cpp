@@ -324,6 +324,23 @@ void HierarchyWindow::Draw()
 			{
 				selectedSceneObject = scene->m_selectedEntity;
 
+				// W8-2: 선택이 바뀌면 그 줄을 화면 안으로 끌어온다. W7-3 이 목록에
+				// clipping 을 세운 뒤로 화면 밖 줄은 그려지지 않으므로, 선택이 밖에
+				// 있으면 사람은 그것이 어디 있는지 알 길이 없다.
+				const int selectionIndex = (nullptr != selectedSceneObject)
+					? static_cast<int>(selectedSceneObject->m_index) : -1;
+				if (selectionIndex != m_lastSelectionIndex)
+				{
+					m_lastSelectionIndex = selectionIndex;
+					if (selectionIndex >= 0)
+					{
+						// 펼치는 것이 먼저다. 조상이 접혀 있으면 그 줄은 목록에
+						// 없고, 없는 줄로는 스크롤할 수 없다. 목록은 이 뒤에 선다.
+						m_flat.ExpandAncestors(scene, selectionIndex);
+						m_requestScrollToSelection = true;
+					}
+				}
+
 				if (ImGui::IsWindowFocused() && !ImGui::GetIO().WantTextInput)
 				{
 					bool ctrl = InputManagement->IsKeyPressed((int)KeyBoard::LeftControl);
@@ -599,11 +616,50 @@ void HierarchyWindow::Draw()
 					const float rowHeight = ImGui::GetFrameHeight();
 					ImGuiListClipper rowClipper;
 					rowClipper.Begin(static_cast<int>(flatRows.size()), rowHeight);
+
+					// W8-2: clipper 는 화면 밖 줄을 아예 밟지 않는다. 끌어올 줄을
+					// 따로 **청구**하지 않으면 그 줄의 자리를 알 길이 없다 —
+					// `IncludeItemByIndex` 가 그 자리이고 `Begin` 뒤가 그 때다.
+					//
+					// ★ 이 블록은 줄 높이 선언과 `ImGuiListClipper` **사이에 두지
+					//   않는다.** 그 인접성으로 "clipper 에 준 줄 높이" 를 찾는
+					//   소스 대조 게이트가 있다(verify-hierarchy-flatten-contract).
+					int revealRow = -1;
+					if (m_requestScrollToSelection && m_lastSelectionIndex >= 0)
+					{
+						for (std::size_t at = 0; at < flatRows.size(); ++at)
+						{
+							if (editor::hierarchy_row_kind::entity != flatRows[at].kind) continue;
+							if (flatRows[at].index != m_lastSelectionIndex) continue;
+							revealRow = static_cast<int>(at);
+							break;
+						}
+						// 목록에 없다(검색이 걸러냈다). 다음 프레임에도 같은 목록이니
+						// 매달리지 않고 내린다.
+						if (revealRow < 0) m_requestScrollToSelection = false;
+					}
+					if (revealRow >= 0) rowClipper.IncludeItemByIndex(revealRow);
+
 					while (rowClipper.Step())
 					{
 						for (int rowAt = rowClipper.DisplayStart; rowAt < rowClipper.DisplayEnd; ++rowAt)
 						{
 							const auto& flatRow = flatRows[static_cast<std::size_t>(rowAt)];
+
+							// W8-2: 끌어올 줄이면 **지금 커서가 선 자리**가 그 줄의
+							// 자리다. 보폭을 여기서 다시 계산하지 않는다 — 계산하면
+							// clipper 의 보폭과 두 벌이 되고, 어긋나도 조용하다.
+							// 이미 온전히 보이면 흔들지 않는다.
+							if (rowAt == revealRow)
+							{
+								const float rowTop = ImGui::GetCursorPosY();
+								const float viewTop = ImGui::GetScrollY();
+								const float viewHeight = ImGui::GetWindowHeight();
+								if (rowTop < viewTop || rowTop + rowHeight > viewTop + viewHeight)
+									ImGui::SetScrollY(rowTop + (rowHeight - viewHeight) * 0.5f);
+								m_requestScrollToSelection = false;
+							}
+
 							const float indent = indentStep * static_cast<float>(flatRow.depth);
 							if (indent > 0.f) ImGui::Indent(indent);
 
