@@ -1,0 +1,1853 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "coverage": "curated",
+    "repository": "29thnight/CreatorEngine",
+    "revision": "b503b5728ca2f94a139e00fe01cb8c39163d3782",
+    "sourceFiles": {
+      "ScriptCore/Component.cs": "eb1678efc52a5da589a1c2ba68ca8ac28e2c88c8",
+      "ScriptCore/Entity.cs": "444574e00306a4701ad97b4997e68e61b8c28f47",
+      "ScriptCore/Transform.cs": "3842220c6e855e153f8657829b88ee2f6ebd4236",
+      "ScriptCore/Input.cs": "5af018ce584a748e010f2350acea8b592cf6696f",
+      "ScriptCore/SimulationScope.cs": "d76ef7165b87ceaa9a04c956f561c2939d98d86b",
+      "ScriptCore/Camera.cs": "64965943414b5fdcf74c66dc548f4930d812dd51",
+      "ScriptCore/CameraComponent.cs": "830e2ce40522ab3eae174ec5c229a92d6989744c",
+      "ScriptCore/Animator.cs": "af5777a49e97d2fdaed76b4cae83a173b996e45c",
+      "ScriptCore/BlackBoard.cs": "25a209a6f6af4af5f5eac419778369f38c3af948",
+      "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "06bf4f15b42cddae6abf00c7479af829e4073bf9",
+      "Engine/RenderEngine/Interfaces/RenderBackend.h": "6a21f79704b64445a0329447e7c91a929541f64b",
+      "BuildTool/Program.cs": "d26dcad307cdd53794ea04d00b141435843c95d6",
+      "BuildTool/README.md": "a19a35f6ed6d982565ff7404505eb7e9464896d9",
+      "README.md": "77caa2afc8d5ccf3c170e3cbb3d62fd74cbbbf00",
+      "EngineVersion.json": "8bea737bfd59074118db7804325eeeab8eb3dfa2"
+    },
+    "screenshots": [
+      {
+        "path": "docs/resource/CE_260914.png",
+        "blob": "d1f1b2348c036b18cf457b26ff9f44677e53da64"
+      },
+      {
+        "path": "docs/resource/스크린샷 2026-09-14 101942.png",
+        "blob": "beef92932ce656f586cfd8286d3d73bb419a3f57"
+      },
+      {
+        "path": "docs/resource/스크린샷 2026-09-14 131741.png",
+        "blob": "2938995c518976b9bc6fc83b4b61825510b8aedd"
+      }
+    ],
+    "compatibilityCheckedAt": "4d6122e343f8231dc906c3661db97dcd48b4881e",
+    "reviewedDate": "2026-09-16"
+  },
+  "pages": [
+    {
+      "id": "guide/overview",
+      "title": "엔진을 이해하고,\n첫 동작을 만드세요.",
+      "summary": "게임 제작자를 위한 C# API와 엔진 개발자를 위한 네이티브 인터페이스를 구분합니다. 이름뿐 아니라 수명, 부재와 사용 조건을 함께 읽으세요.",
+      "group": "시작하기",
+      "source": "README.md",
+      "sections": [
+        {
+          "id": "start",
+          "title": "어디에서 시작할까요?",
+          "text": "소스 빌드부터 시작하거나, 이미 만들어진 배포본으로 프로젝트를 여세요. 첫 번째 스크립트와 생명주기 안내를 읽은 뒤 필요한 타입을 검색할 수 있습니다."
+        },
+        {
+          "id": "coverage",
+          "title": "문서의 범위",
+          "text": "초판은 검토한 핵심 타입·주요 멤버의 선별 레퍼런스입니다. 전체 공개 API의 자동 생성 목록이나 안정적인 외부 플러그인 SDK가 아닙니다. 상속 멤버, 모든 오버로드와 내부 바인딩의 완전한 열거를 보장하지 않습니다."
+        },
+        {
+          "id": "current",
+          "title": "현재 API에서 시작하기",
+          "text": "Component, Entity, PrePhysics/PostPhysics가 현재의 이름입니다. 과거의 Behaviour, GameObject, Awake/Update를 현행 API로 가정하지 않습니다."
+        },
+        {
+          "id": "sources",
+          "title": "소스와 함께 읽기",
+          "text": "페이지마다 불변 커밋의 소스 링크를 제공합니다. 참조한 파일이 바뀌면 문서 검사가 실패하여 설명을 다시 검토하도록 합니다. 문서 작성이나 시그니처 확인은 네이티브 빌드·실행 검증과 구분합니다."
+        }
+      ],
+      "cards": [
+        [
+          "엔진 빌드하기",
+          "개발 환경과 Editor 실행",
+          "guide/getting-started"
+        ],
+        [
+          "첫 번째 스크립트",
+          "입력으로 엔티티를 움직이기",
+          "guide/first-script"
+        ],
+        [
+          "C# Script API",
+          "생명주기와 컴포넌트 접근",
+          "script/Component"
+        ],
+        [
+          "게임 패키징",
+          "엔진 pin과 검증·게시",
+          "guide/packaging"
+        ]
+      ]
+    },
+    {
+      "id": "guide/getting-started",
+      "title": "소스에서 시작하기",
+      "summary": "엔진 자체를 수정·빌드하는 개발자를 위한 절차입니다. 배포본으로 게임을 제작하는 환경과 구분합니다.",
+      "group": "시작하기",
+      "source": "README.md",
+      "sections": [
+        {
+          "id": "requirements",
+          "title": "개발 환경",
+          "text": "Windows x64, Visual Studio C++ 워크로드와 MSVC v145, Windows SDK, x64 MSBuild가 필요합니다. .NET 10 SDK·x64 Runtime, Git, vcpkg, PowerShell 7을 준비합니다. 문서 검사에는 Python 3를 사용합니다."
+        },
+        {
+          "id": "clone",
+          "title": "저장소 준비",
+          "text": "VCPKG_ROOT를 실제 vcpkg 설치 경로로 설정한 후 실행합니다. 최초 manifest 복원은 네이티브 의존성 빌드로 오래 걸릴 수 있습니다.",
+          "code": "git clone https://github.com/29thnight/CreatorEngine.git\nSet-Location CreatorEngine\n& \"$env:VCPKG_ROOT\\vcpkg.exe\" integrate install",
+          "language": "powershell"
+        },
+        {
+          "id": "fmod",
+          "title": "FMOD 개발 파일",
+          "text": "FMOD Core API 2.02.26 x64 바이너리는 저장소에 없습니다. 아래 위치에 로컬 SDK의 파일을 배치합니다.",
+          "code": "ThirdParty/Fmod/lib/x64/fmod_vc.lib\nThirdParty/Fmod/lib/x64/fmodL_vc.lib\nThirdParty/Fmod/bin/x64/fmod.dll\nThirdParty/Fmod/bin/x64/fmodL.dll",
+          "language": "text"
+        },
+        {
+          "id": "build",
+          "title": "빌드와 실행",
+          "text": "v145 도구가 준비된 x64 Developer PowerShell에서 실행합니다. CreatorEditor 빌드는 ScriptCore와 GameScripts도 함께 준비합니다.",
+          "code": "dotnet build .\\BuildTool\\CreatorBuildTool.csproj -c Debug\nmsbuild .\\CreatorEngine.sln /m /t:CreatorEditor /p:Configuration=Debug /p:Platform=x64 /v:minimal\n.\\Bin\\x64-Debug\\Editor\\CreatorEditor.exe",
+          "language": "powershell"
+        },
+        {
+          "id": "layout",
+          "title": "실행 파일 배치",
+          "text": "소스 checkout의 기본 프로젝트는 Dynamic_CPP/입니다. 작은 EXE가 *.runtime.dll을 로드합니다. EXE 하나만 복사하지 말고 Runtime/, Managed/, Resources/를 포함한 출력 배치를 유지하세요."
+        }
+      ]
+    },
+    {
+      "id": "guide/first-script",
+      "title": "첫 번째 스크립트",
+      "summary": "Transform이 있는 엔티티를 W 입력으로 이동하는 최소 예제입니다. 등록된 스크립트와 실행 가능한 Editor가 준비되어 있다고 가정합니다.",
+      "group": "시작하기",
+      "source": "ScriptCore/Component.cs",
+      "sections": [
+        {
+          "id": "location",
+          "title": "스크립트의 위치",
+          "text": "외부 프로젝트의 C# 입력은 Assets/Script/**/*.cs입니다. 소스 checkout의 GameScripts/와 다릅니다. Mover.cs를 저장하고 스크립트를 빌드한 뒤 대상 엔티티에 연결합니다."
+        },
+        {
+          "id": "example",
+          "title": "입력으로 위치 바꾸기",
+          "text": "Translate는 로컬 위치에 delta를 더합니다. 회전에 따른 시선 방향 이동이나 물리 컨트롤러의 힘 적용 예제가 아닙니다.",
+          "code": "using CreatorEngine;\n\npublic sealed partial class Mover : Component\n{\n    public override void PostPhysics(float tick)\n    {\n        if (!HasTransform) return;\n        if (Input.GetKey(KeyCode.W))\n            Transform.Translate(new Float3(0f, 0f, 2f * tick));\n    }\n}",
+          "language": "csharp"
+        },
+        {
+          "id": "tick",
+          "title": "물리 전후의 틱",
+          "text": "현행 틱은 PrePhysics(float tick)와 PostPhysics(float tick)입니다. 예제는 물리 이후의 단순 위치 변경입니다. 이번 물리 스텝에 반영할 힘·입력 처리는 전자의 역할을 먼저 검토하세요."
+        },
+        {
+          "id": "null",
+          "title": "Transform이 없는 엔티티",
+          "text": "UI/Canvas에는 RectTransformComponent만 있을 수 있습니다. Component.Transform은 부재 시 예외입니다. HasTransform 또는 Entity.GetComponent<Transform>()의 null 결과로 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "guide/lifecycle",
+      "title": "컴포넌트 생명주기",
+      "summary": "초기화·씬 소속·시뮬레이션의 세 쌍과 활성 상태·프레임 갱신을 서로 다른 축으로 다룹니다.",
+      "group": "시작하기",
+      "source": "ScriptCore/Component.cs",
+      "sections": [
+        {
+          "id": "phases",
+          "title": "세 쌍, 여섯 단계",
+          "text": "OnInitialized ↔ OnUninitializing, OnAddedToScene ↔ OnRemovingFromScene, OnBeginSimulation ↔ OnEndSimulation. 시작 단계의 성공 여부와 종료 단계의 호출 조건을 구분하고 훅을 임의로 직접 호출하지 마세요."
+        },
+        {
+          "id": "tick",
+          "title": "활성과 갱신",
+          "text": "OnEnable/OnDisable은 여섯 단계와 별도 축입니다. PrePhysics와 PostPhysics는 물리 스텝 앞뒤의 갱신이며, OnSimulate는 Task를 반환하는 다중 프레임 흐름입니다."
+        },
+        {
+          "id": "scope",
+          "title": "스코프에 속하는 작업",
+          "text": "Scope.Delay는 엔진 프레임 dt로 진행합니다. 스코프가 취소되면 대기도 취소됩니다. 아래 코드에는 System.Threading.Tasks가 필요합니다.",
+          "code": "using System.Threading.Tasks;\nusing CreatorEngine;\n\npublic sealed partial class DelayedMove : Component\n{\n    public override async Task OnSimulate()\n    {\n        await Scope.Delay(1f);\n        if (IsAlive && HasTransform)\n            Transform.Translate(new Float3(0f, 1f, 0f));\n    }\n}",
+          "language": "csharp"
+        },
+        {
+          "id": "thread",
+          "title": "게임 스레드 계약",
+          "text": "ConfigureAwait(false)로 게임 스레드 복귀를 포기한 뒤 엔진 상태를 접근하지 마세요. Enabled 변경도 게임 스레드 밖에서는 적용하지 않고 오류를 남깁니다."
+        }
+      ]
+    },
+    {
+      "id": "guide/packaging",
+      "title": "엔진 배포본으로 게임 만들기",
+      "summary": "정확한 엔진 배포본을 프로젝트에 연결하고, 컴파일·cook·PAK·Player 검증을 거친 결과를 게시합니다.",
+      "group": "시작하기",
+      "source": "BuildTool/README.md",
+      "sections": [
+        {
+          "id": "publish",
+          "title": "엔진 개발자: 배포본 생성",
+          "text": "--build는 네이티브 호스트·도구 빌드까지 명시적으로 요청합니다. 네이티브 개발 환경과 FMOD 개발 파일이 필요합니다.",
+          "code": "dotnet build .\\BuildTool\\CreatorBuildTool.csproj -c Release\n$tool = '.\\Bin\\x64-Release\\Tools\\CreatorBuildTool\\CreatorBuildTool.exe'\n& $tool publish-engine --repository . --config Release --build",
+          "language": "powershell"
+        },
+        {
+          "id": "select",
+          "title": "게임 제작자: 프로젝트 연결",
+          "text": "두 경로를 실제 Release 배포본과 Assets/·ProjectSetting/이 있는 기존 프로젝트의 절대 경로로 바꾸세요. 프로젝트 생성 명령이 아닙니다.",
+          "code": "$engine = 'C:\\Engines\\MyEngineDistribution'\n$project = 'C:\\Projects\\MyGame'\n$tool = Join-Path $engine 'Bin/x64-Release/Tools/CreatorBuildTool/CreatorBuildTool.exe'\n& $tool verify-engine --engine-distribution $engine\n& $tool select-engine --engine-distribution $engine --project $project\n& $tool open-project --engine-distribution $engine --development-project $project",
+          "language": "powershell"
+        },
+        {
+          "id": "package",
+          "title": "검증하고 게시하기",
+          "text": "에디터를 종료한 뒤 같은 배포본과 구성으로 패키징합니다.",
+          "code": "& $tool package-game `\n  --engine-distribution $engine `\n  --project $project `\n  --config Release `\n  --input-mode Project `\n  --stage-root \"$project\\Build\\Staging\" `\n  --render-backend dx12",
+          "language": "powershell"
+        },
+        {
+          "id": "contract",
+          "title": "실패·구성·배포 경계",
+          "text": "성공한 candidate만 불변 Game-<ID> 디렉터리로 옮기고 current 포인터를 바꿉니다. --skip-verify는 미게시 결과만 남깁니다. Debug/Release와 Shipping variant를 배포본과 일치시키세요. 현재는 개발용 프로젝트 adapter이며 정식 .creatorproject parser/Launcher가 아닙니다."
+        },
+        {
+          "id": "runtime",
+          "title": "런타임 포함",
+          "text": "Release 게임은 .NET 10 x64와 필요한 네이티브 런타임을 함께 배치합니다. Debug는 개발 검증용입니다. Workspace/Tracked 입력은 소스 checkout의 Dynamic_CPP 전용입니다."
+        }
+      ]
+    },
+    {
+      "id": "script/Component",
+      "title": "Component",
+      "summary": "게임 스크립트의 기반 클래스. 소유 엔티티·수명주기·물리 전후 갱신·시뮬레이션 스코프를 제공합니다.",
+      "signature": "public abstract class Component",
+      "group": "C# Script API",
+      "source": "ScriptCore/Component.cs",
+      "members": [
+        [
+          "Entity",
+          "public Entity Entity { get; internal set; }",
+          "소유 엔티티. 사용자 코드에서 소유자를 설정하지 않습니다.",
+          "property"
+        ],
+        [
+          "Transform",
+          "public Transform Transform { get; }",
+          "부재 시 InvalidOperationException.",
+          "property"
+        ],
+        [
+          "HasTransform",
+          "public bool HasTransform { get; }",
+          "Transform 존재 여부.",
+          "property"
+        ],
+        [
+          "Enabled",
+          "public bool Enabled { get; set; }",
+          "네이티브에 활성 변경을 요청합니다. 게임 스레드 밖의 변경은 거부합니다.",
+          "property"
+        ],
+        [
+          "IsAlive",
+          "public bool IsAlive { get; }",
+          "파괴 표시 또는 소유 엔티티 소실을 확인합니다.",
+          "property"
+        ],
+        [
+          "Scope",
+          "public SimulationScope Scope { get; }",
+          "시뮬레이션 수명에 연결된 작업과 대기.",
+          "property"
+        ],
+        [
+          "OnInitialized",
+          "public virtual void OnInitialized()",
+          "초기화.",
+          "method"
+        ],
+        [
+          "OnAddedToScene",
+          "public virtual void OnAddedToScene()",
+          "씬 진입.",
+          "method"
+        ],
+        [
+          "OnBeginSimulation",
+          "public virtual void OnBeginSimulation()",
+          "시뮬레이션 시작.",
+          "method"
+        ],
+        [
+          "OnEndSimulation",
+          "public virtual void OnEndSimulation()",
+          "시뮬레이션 종료.",
+          "method"
+        ],
+        [
+          "OnRemovingFromScene",
+          "public virtual void OnRemovingFromScene()",
+          "씬 이탈.",
+          "method"
+        ],
+        [
+          "OnUninitializing",
+          "public virtual void OnUninitializing()",
+          "초기화 정리.",
+          "method"
+        ],
+        [
+          "OnEnable",
+          "public virtual void OnEnable()",
+          "활성화 알림.",
+          "method"
+        ],
+        [
+          "OnDisable",
+          "public virtual void OnDisable()",
+          "비활성화 알림.",
+          "method"
+        ],
+        [
+          "PrePhysics",
+          "public virtual void PrePhysics(float tick)",
+          "물리 전 갱신.",
+          "method"
+        ],
+        [
+          "PostPhysics",
+          "public virtual void PostPhysics(float tick)",
+          "물리 후 갱신.",
+          "method"
+        ],
+        [
+          "OnSimulate",
+          "public virtual Task OnSimulate()",
+          "다중 프레임 시뮬레이션. 기본값은 완료된 Task.",
+          "method"
+        ],
+        [
+          "InvokeMessage",
+          "public virtual bool InvokeMessage(string message)",
+          "메시지 진입점. 호출 분기는 소스 제너레이터가 구현합니다.",
+          "method"
+        ],
+        [
+          "OnTriggerEnter",
+          "public virtual void OnTriggerEnter(in Collision collision)",
+          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
+          "method"
+        ],
+        [
+          "OnTriggerStay",
+          "public virtual void OnTriggerStay(in Collision collision)",
+          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
+          "method"
+        ],
+        [
+          "OnTriggerExit",
+          "public virtual void OnTriggerExit(in Collision collision)",
+          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
+          "method"
+        ],
+        [
+          "OnCollisionEnter",
+          "public virtual void OnCollisionEnter(in Collision collision)",
+          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
+          "method"
+        ],
+        [
+          "OnCollisionStay",
+          "public virtual void OnCollisionStay(in Collision collision)",
+          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
+          "method"
+        ],
+        [
+          "OnCollisionExit",
+          "public virtual void OnCollisionExit(in Collision collision)",
+          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
+          "method"
+        ]
+      ],
+      "note": "과거 Awake/Start/Update 예제를 그대로 사용하지 마세요. 현재의 여섯 단계와 PrePhysics/PostPhysics를 기준으로 읽습니다.",
+      "sections": [],
+      "example": "using CreatorEngine;\n\npublic sealed partial class Mover : Component\n{\n    public override void PostPhysics(float tick)\n    {\n        if (!HasTransform) return;\n        if (Input.GetKey(KeyCode.W))\n            Transform.Translate(new Float3(0f, 0f, 2f * tick));\n    }\n}"
+    },
+    {
+      "id": "script/Entity",
+      "title": "Entity",
+      "summary": "네이티브 엔티티를 가리키는 값 타입입니다. 장기 보관한 핸들을 사용하기 전에 수명을 확인합니다.",
+      "signature": "public readonly struct Entity(ObjectHandle handle) : IEquatable<Entity>",
+      "group": "C# Script API",
+      "source": "ScriptCore/Entity.cs",
+      "members": [
+        [
+          "IsAlive",
+          "public bool IsAlive { get; }",
+          "살아 있는 대상을 가리키는지 확인.",
+          "property"
+        ],
+        [
+          "Name",
+          "public string Name { get; }",
+          "엔티티 이름.",
+          "property"
+        ],
+        [
+          "Transform",
+          "public Transform? Transform { get; }",
+          "없으면 null. Component.Transform과 다릅니다.",
+          "property"
+        ],
+        [
+          "SetEnabled",
+          "public void SetEnabled(bool enabled)",
+          "엔티티 활성 상태 변경 요청.",
+          "method"
+        ],
+        [
+          "GetComponent<T>",
+          "public T? GetComponent<T>() where T : Component",
+          "없거나 지원되는 래퍼가 없으면 null.",
+          "method"
+        ],
+        [
+          "TryGetComponent<T>",
+          "public bool TryGetComponent<T>(out T component) where T : Component",
+          "false이면 out 값을 사용하지 마세요.",
+          "method"
+        ],
+        [
+          "HasComponent<T>",
+          "public bool HasComponent<T>() where T : Component",
+          "조회 가능한 T의 존재 여부.",
+          "method"
+        ],
+        [
+          "GetComponents<T>",
+          "public List<T> GetComponents<T>() where T : Component",
+          "ScriptRegistry의 T 스크립트를 모읍니다. 모든 네이티브 컴포넌트 열거가 아닙니다.",
+          "method"
+        ],
+        [
+          "Parent",
+          "public Entity Parent { get; }",
+          "루트의 부모는 무효 엔티티. IsAlive로 확인.",
+          "property"
+        ],
+        [
+          "ChildCount",
+          "public int ChildCount { get; }",
+          "직계 자식 수.",
+          "property"
+        ],
+        [
+          "GetChild",
+          "public Entity GetChild(int index)",
+          "범위 밖이면 무효 엔티티.",
+          "method"
+        ],
+        [
+          "Children",
+          "public IEnumerable<Entity> Children { get; }",
+          "직계 자식 순회. 순회 중 계층 변경은 피하세요.",
+          "property"
+        ],
+        [
+          "GetComponentInChildren<T>",
+          "public T? GetComponentInChildren<T>(bool includeSelf = true) where T : Component",
+          "자손에서 T 하나를 찾습니다. 없으면 null.",
+          "method"
+        ],
+        [
+          "GetComponentsInChildren<T>",
+          "public List<T> GetComponentsInChildren<T>(bool includeSelf = true) where T : Component",
+          "자신 포함 여부를 지정해 자손의 T를 모읍니다.",
+          "method"
+        ],
+        [
+          "GetComponentInParent<T>",
+          "public T? GetComponentInParent<T>(bool includeSelf = true) where T : Component",
+          "조상 탐색. 구현의 최대 깊이는 64입니다.",
+          "method"
+        ],
+        [
+          "FindByIndex",
+          "public static Entity FindByIndex(int index)",
+          "씬 인덱스로 조회. 인덱스를 장기 신원으로 저장하지 마세요.",
+          "method"
+        ],
+        [
+          "Destroy",
+          "public void Destroy()",
+          "지연 파괴 요청. 즉시 IsAlive=false라고 가정하지 않습니다.",
+          "method"
+        ]
+      ],
+      "note": "Entity 부재는 null이 아닌 무효 핸들로 표현됩니다.",
+      "sections": []
+    },
+    {
+      "id": "script/Transform",
+      "title": "Transform",
+      "summary": "로컬·월드 위치·회전·스케일과 방향축을 제공하는 네이티브 컴포넌트 래퍼입니다.",
+      "signature": "public sealed class Transform : NativeComponent",
+      "group": "C# Script API",
+      "source": "ScriptCore/Transform.cs",
+      "members": [
+        [
+          "LocalPosition",
+          "public Float3 LocalPosition { get; set; }",
+          "로컬 또는 월드 속성. 월드 쓰기는 네이티브의 로컬 환산 경로를 사용합니다.",
+          "property"
+        ],
+        [
+          "LocalRotation",
+          "public Quaternion LocalRotation { get; set; }",
+          "로컬 또는 월드 속성. 월드 쓰기는 네이티브의 로컬 환산 경로를 사용합니다.",
+          "property"
+        ],
+        [
+          "LocalScale",
+          "public Float3 LocalScale { get; set; }",
+          "로컬 또는 월드 속성. 월드 쓰기는 네이티브의 로컬 환산 경로를 사용합니다.",
+          "property"
+        ],
+        [
+          "WorldPosition",
+          "public Float3 WorldPosition { get; set; }",
+          "로컬 또는 월드 속성. 월드 쓰기는 네이티브의 로컬 환산 경로를 사용합니다.",
+          "property"
+        ],
+        [
+          "WorldRotation",
+          "public Quaternion WorldRotation { get; set; }",
+          "로컬 또는 월드 속성. 월드 쓰기는 네이티브의 로컬 환산 경로를 사용합니다.",
+          "property"
+        ],
+        [
+          "WorldScale",
+          "public Float3 WorldScale { get; set; }",
+          "로컬 또는 월드 속성. 월드 쓰기는 네이티브의 로컬 환산 경로를 사용합니다.",
+          "property"
+        ],
+        [
+          "Forward",
+          "public Float3 Forward { get; }",
+          "정규화된 월드 방향축.",
+          "property"
+        ],
+        [
+          "Right",
+          "public Float3 Right { get; }",
+          "정규화된 월드 방향축.",
+          "property"
+        ],
+        [
+          "Up",
+          "public Float3 Up { get; }",
+          "정규화된 월드 방향축.",
+          "property"
+        ],
+        [
+          "Translate",
+          "public void Translate(Float3 delta)",
+          "로컬 위치에 delta를 더합니다.",
+          "method"
+        ],
+        [
+          "Rotate",
+          "public void Rotate(Quaternion delta)",
+          "네이티브 AddLocalRotation 순서로 이어 붙입니다.",
+          "method"
+        ],
+        [
+          "SetLocalPosition",
+          "public void SetLocalPosition(Float3 p)",
+          "해당 로컬·월드 속성 설정의 메서드 형태.",
+          "method"
+        ],
+        [
+          "SetLocalRotation",
+          "public void SetLocalRotation(Quaternion q)",
+          "해당 로컬·월드 속성 설정의 메서드 형태.",
+          "method"
+        ],
+        [
+          "SetLocalScale",
+          "public void SetLocalScale(Float3 s)",
+          "해당 로컬·월드 속성 설정의 메서드 형태.",
+          "method"
+        ],
+        [
+          "SetWorldPosition",
+          "public void SetWorldPosition(Float3 p)",
+          "해당 로컬·월드 속성 설정의 메서드 형태.",
+          "method"
+        ],
+        [
+          "SetWorldRotation",
+          "public void SetWorldRotation(Quaternion q)",
+          "해당 로컬·월드 속성 설정의 메서드 형태.",
+          "method"
+        ],
+        [
+          "SetWorldScale",
+          "public void SetWorldScale(Float3 s)",
+          "해당 로컬·월드 속성 설정의 메서드 형태.",
+          "method"
+        ],
+        [
+          "LookAt",
+          "public void LookAt(Float3 target)",
+          "월드 지점을 바라봅니다. 위쪽은 +Y. 방향 길이 제곱이 1e-12f 미만이면 변경하지 않습니다.",
+          "method"
+        ]
+      ],
+      "note": "현재 Transform은 struct가 아닌 sealed class입니다. Entity.Transform은 null일 수 있습니다.",
+      "sections": [],
+      "example": "if (Entity.Transform is { } transform)\n    transform.LocalPosition = new Float3(0f, 1f, 0f);"
+    },
+    {
+      "id": "script/Input",
+      "title": "Input",
+      "summary": "키보드·마우스·게임패드의 프레임 상태를 조회합니다. Down, 유지 상태, Up을 구분합니다.",
+      "signature": "public static class Input",
+      "group": "C# Script API",
+      "source": "ScriptCore/Input.cs",
+      "members": [
+        [
+          "GetKeyDown",
+          "public static bool GetKeyDown(KeyCode key)",
+          "첫 누름 프레임만 true.",
+          "method"
+        ],
+        [
+          "GetKey",
+          "public static bool GetKey(KeyCode key)",
+          "첫 프레임을 포함한 누름 상태.",
+          "method"
+        ],
+        [
+          "GetKeyUp",
+          "public static bool GetKeyUp(KeyCode key)",
+          "해제 프레임만 true.",
+          "method"
+        ],
+        [
+          "AnyKey",
+          "public static bool AnyKey { get; }",
+          "아무 키 누름 여부.",
+          "property"
+        ],
+        [
+          "GetMouseButtonDown",
+          "public static bool GetMouseButtonDown(MouseButton button)",
+          "첫 누름.",
+          "method"
+        ],
+        [
+          "GetMouseButton",
+          "public static bool GetMouseButton(MouseButton button)",
+          "첫 프레임과 유지.",
+          "method"
+        ],
+        [
+          "GetMouseButtonUp",
+          "public static bool GetMouseButtonUp(MouseButton button)",
+          "해제 프레임.",
+          "method"
+        ],
+        [
+          "MousePosition",
+          "public static Float2 MousePosition { get; }",
+          "좌상단 원점의 화면 픽셀 좌표.",
+          "property"
+        ],
+        [
+          "MouseDelta",
+          "public static Float2 MouseDelta { get; }",
+          "이번 프레임의 이동량.",
+          "property"
+        ],
+        [
+          "WheelDelta",
+          "public static int WheelDelta { get; }",
+          "휠 회전량. 위쪽 양수.",
+          "property"
+        ],
+        [
+          "SetCursorVisible",
+          "public static void SetCursorVisible(bool visible)",
+          "커서 표시 요청.",
+          "method"
+        ],
+        [
+          "IsGamepadConnected",
+          "public static bool IsGamepadConnected(int index)",
+          "0부터 시작하는 패드 번호의 연결 상태.",
+          "method"
+        ],
+        [
+          "GetButtonDown",
+          "public static bool GetButtonDown(int index, GamepadButton button)",
+          "패드 첫 누름.",
+          "method"
+        ],
+        [
+          "GetButton",
+          "public static bool GetButton(int index, GamepadButton button)",
+          "패드 첫 프레임과 유지.",
+          "method"
+        ],
+        [
+          "GetButtonUp",
+          "public static bool GetButtonUp(int index, GamepadButton button)",
+          "패드 해제.",
+          "method"
+        ],
+        [
+          "GetTriggerLeft",
+          "public static bool GetTriggerLeft(int index)",
+          "왼쪽 트리거 임계 판정. float 값이 아닙니다.",
+          "method"
+        ],
+        [
+          "GetTriggerRight",
+          "public static bool GetTriggerRight(int index)",
+          "오른쪽 트리거 임계 판정.",
+          "method"
+        ],
+        [
+          "GetThumbLeft",
+          "public static Float2 GetThumbLeft(int index)",
+          "데드존 적용 후 왼쪽 스틱.",
+          "method"
+        ],
+        [
+          "GetThumbRight",
+          "public static Float2 GetThumbRight(int index)",
+          "데드존 적용 후 오른쪽 스틱.",
+          "method"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/SimulationScope",
+      "title": "SimulationScope",
+      "summary": "컴포넌트의 시뮬레이션 수명에 귀속되는 대기와 정리 작업입니다. 엔진 시간·게임 스레드 계약을 따릅니다.",
+      "signature": "public sealed class SimulationScope",
+      "group": "C# Script API",
+      "source": "ScriptCore/SimulationScope.cs",
+      "members": [
+        [
+          "Token",
+          "public CancellationToken Token { get; }",
+          "협조적 취소 토큰.",
+          "property"
+        ],
+        [
+          "Delay",
+          "public Task Delay(float seconds)",
+          "프레임 dt 기반 대기. 취소 시 Task도 취소됩니다.",
+          "method"
+        ],
+        [
+          "Subscribe",
+          "public void Subscribe(Action<Action> add, Action<Action> remove, Action handler)",
+          "이벤트 구독과 스코프 종료의 해지를 함께 등록.",
+          "method"
+        ],
+        [
+          "Subscribe<T>",
+          "public void Subscribe<T>(Action<Action<T>> add, Action<Action<T>> remove, Action<T> handler)",
+          "인자 하나의 이벤트 구독.",
+          "method"
+        ],
+        [
+          "RegisterCleanup",
+          "public void RegisterCleanup(Action cleanup)",
+          "스코프 종료에 정리 작업 등록.",
+          "method"
+        ]
+      ],
+      "note": "Delay: 0 이하는 다음 프레임, 양의 무한대는 취소까지 대기, NaN은 ArgumentException. 등록 프레임에는 만기 판정하지 않습니다.",
+      "sections": []
+    },
+    {
+      "id": "script/Camera",
+      "title": "Camera",
+      "summary": "현재 카메라를 질의하는 정적 접근점입니다. 카메라 컴포넌트 자체와 구분합니다.",
+      "signature": "public static class Camera",
+      "group": "C# Script API",
+      "source": "ScriptCore/Camera.cs",
+      "members": [
+        [
+          "Exists",
+          "public static bool Exists { get; }",
+          "사용 가능한 카메라 여부.",
+          "property"
+        ],
+        [
+          "ScreenSize",
+          "public static Float2 ScreenSize { get; }",
+          "픽셀 화면 크기.",
+          "property"
+        ],
+        [
+          "Main",
+          "public static CameraComponent? Main { get; }",
+          "실제 선택된 주 카메라. 부재 시 null. 매번 조회.",
+          "property"
+        ],
+        [
+          "WorldToScreenPoint",
+          "public static Float3 WorldToScreenPoint(Float3 world)",
+          "X/Y는 좌상단 원점 픽셀, Z는 앞쪽 거리. Z<=0인 대상의 X/Y를 표시 좌표로 사용하지 마세요.",
+          "method"
+        ]
+      ],
+      "note": "GetComponent<Camera>() 대상이 아닙니다. 컴포넌트 조회에는 CameraComponent를 사용하세요.",
+      "sections": []
+    },
+    {
+      "id": "script/CameraComponent",
+      "title": "CameraComponent",
+      "summary": "카메라의 시야각·클리핑 평면과 주 카메라 후보 여부를 제어합니다. 위치와 방향은 엔티티 Transform에서 유도됩니다.",
+      "signature": "public sealed class CameraComponent : NativeComponent",
+      "group": "C# Script API",
+      "source": "ScriptCore/CameraComponent.cs",
+      "members": [
+        [
+          "FieldOfView",
+          "public float FieldOfView { get; set; }",
+          "도 단위 수직 시야각.",
+          "property"
+        ],
+        [
+          "NearPlane",
+          "public float NearPlane { get; set; }",
+          "근평면.",
+          "property"
+        ],
+        [
+          "FarPlane",
+          "public float FarPlane { get; set; }",
+          "원평면.",
+          "property"
+        ],
+        [
+          "IsPrimary",
+          "public bool IsPrimary { get; set; }",
+          "주 카메라 후보 표시. 즉시 선택을 강제하지 않습니다.",
+          "property"
+        ]
+      ],
+      "note": "실제 주 카메라는 Camera.Main으로 확인합니다. primary 후보의 활성 상태와 인스턴스 ID가 선택에 영향을 줍니다.",
+      "sections": []
+    },
+    {
+      "id": "script/Animator",
+      "title": "Animator",
+      "summary": "Animator의 파라미터·레이어·재생을 제어하는 래퍼입니다.",
+      "signature": "public sealed class Animator : NativeComponent",
+      "group": "C# Script API",
+      "source": "ScriptCore/Animator.cs",
+      "members": [
+        [
+          "SetBool",
+          "public void SetBool(string name, bool value)",
+          "이름으로 파라미터 설정.",
+          "method"
+        ],
+        [
+          "SetFloat",
+          "public void SetFloat(string name, float value)",
+          "이름으로 파라미터 설정.",
+          "method"
+        ],
+        [
+          "SetInt",
+          "public void SetInt(string name, int value)",
+          "이름으로 파라미터 설정.",
+          "method"
+        ],
+        [
+          "SetTrigger",
+          "public void SetTrigger(string name)",
+          "트리거 설정. 전이 후 엔진이 되돌립니다.",
+          "method"
+        ],
+        [
+          "ResetTrigger",
+          "public void ResetTrigger(string name)",
+          "트리거 해제.",
+          "method"
+        ],
+        [
+          "GetBool",
+          "public bool GetBool(string name)",
+          "없는 이름이면 false/0. HasParameter로 부재를 구분.",
+          "method"
+        ],
+        [
+          "GetFloat",
+          "public float GetFloat(string name)",
+          "없는 이름이면 false/0. HasParameter로 부재를 구분.",
+          "method"
+        ],
+        [
+          "GetInt",
+          "public int GetInt(string name)",
+          "없는 이름이면 false/0. HasParameter로 부재를 구분.",
+          "method"
+        ],
+        [
+          "HasParameter",
+          "public bool HasParameter(string name)",
+          "파라미터 존재 여부.",
+          "method"
+        ],
+        [
+          "SetUseLayer",
+          "public void SetUseLayer(int layerIndex, bool useLayer)",
+          "레이어 사용 여부.",
+          "method"
+        ],
+        [
+          "StopAnimation",
+          "public void StopAnimation(float duration)",
+          "지정 시간 동안 재생 정지.",
+          "method"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/BlackBoard",
+      "title": "BlackBoard",
+      "summary": "행동 트리가 관리 영역에서 공유하는 값 저장소입니다. 키의 존재와 현재 타입을 확인합니다.",
+      "signature": "public sealed class BlackBoard",
+      "group": "C# Script API",
+      "source": "ScriptCore/BlackBoard.cs",
+      "members": [
+        [
+          "Name",
+          "public string Name { get; internal set; }",
+          "블랙보드 이름.",
+          "property"
+        ],
+        [
+          "Keys",
+          "public IReadOnlyCollection<string> Keys { get; }",
+          "키 집합.",
+          "property"
+        ],
+        [
+          "HasKey",
+          "public bool HasKey(string key)",
+          "존재 여부.",
+          "method"
+        ],
+        [
+          "GetType",
+          "public BlackBoardType GetType(string key)",
+          "없으면 None.",
+          "method"
+        ],
+        [
+          "RemoveKey",
+          "public void RemoveKey(string key)",
+          "키 제거.",
+          "method"
+        ],
+        [
+          "Clear",
+          "public void Clear()",
+          "전체 제거.",
+          "method"
+        ],
+        [
+          "SetBool",
+          "public void SetBool(string key, bool value)",
+          "타입과 값을 저장하거나 현재 항목을 교체합니다.",
+          "method"
+        ],
+        [
+          "SetInt",
+          "public void SetInt(string key, int value)",
+          "타입과 값을 저장하거나 현재 항목을 교체합니다.",
+          "method"
+        ],
+        [
+          "SetFloat",
+          "public void SetFloat(string key, float value)",
+          "타입과 값을 저장하거나 현재 항목을 교체합니다.",
+          "method"
+        ],
+        [
+          "SetString",
+          "public void SetString(string key, string value)",
+          "타입과 값을 저장하거나 현재 항목을 교체합니다.",
+          "method"
+        ],
+        [
+          "SetVector2",
+          "public void SetVector2(string key, Float2 value)",
+          "타입과 값을 저장하거나 현재 항목을 교체합니다.",
+          "method"
+        ],
+        [
+          "SetVector3",
+          "public void SetVector3(string key, Float3 value)",
+          "타입과 값을 저장하거나 현재 항목을 교체합니다.",
+          "method"
+        ],
+        [
+          "SetEntity",
+          "public void SetEntity(string key, Entity value)",
+          "타입과 값을 저장하거나 현재 항목을 교체합니다.",
+          "method"
+        ],
+        [
+          "GetBool",
+          "public bool GetBool(string key)",
+          "없거나 타입이 다르면 경고 후 기본값을 반환합니다.",
+          "method"
+        ],
+        [
+          "GetInt",
+          "public int GetInt(string key)",
+          "없거나 타입이 다르면 경고 후 기본값을 반환합니다.",
+          "method"
+        ],
+        [
+          "GetFloat",
+          "public float GetFloat(string key)",
+          "없거나 타입이 다르면 경고 후 기본값을 반환합니다.",
+          "method"
+        ],
+        [
+          "GetString",
+          "public string GetString(string key)",
+          "없거나 타입이 다르면 경고 후 기본값을 반환합니다.",
+          "method"
+        ],
+        [
+          "GetVector2",
+          "public Float2 GetVector2(string key)",
+          "없거나 타입이 다르면 경고 후 기본값을 반환합니다.",
+          "method"
+        ],
+        [
+          "GetVector3",
+          "public Float3 GetVector3(string key)",
+          "없거나 타입이 다르면 경고 후 기본값을 반환합니다.",
+          "method"
+        ],
+        [
+          "GetEntity",
+          "public Entity GetEntity(string key)",
+          "없거나 타입이 다르면 경고 후 기본값을 반환합니다.",
+          "method"
+        ]
+      ],
+      "note": "현행 Set*는 항목을 덮어씁니다. 과거 주석의 영구 타입 고정을 가정하지 마세요. GetEntity의 부재는 null이 아닌 기본 Entity입니다.",
+      "sections": []
+    },
+    {
+      "id": "script/BlackBoardType",
+      "title": "BlackBoardType",
+      "summary": "블랙보드 값의 종류입니다. 네이티브 계약과 값이 대응합니다.",
+      "signature": "public enum BlackBoardType",
+      "group": "C# Script API",
+      "source": "ScriptCore/BlackBoard.cs",
+      "members": [
+        [
+          "None",
+          "None = 0",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "Bool",
+          "Bool = 1",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "Int",
+          "Int = 2",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "Float",
+          "Float = 3",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "String",
+          "String = 4",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "Vector2",
+          "Vector2 = 5",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "Vector3",
+          "Vector3 = 6",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "Vector4",
+          "Vector4 = 7",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "Entity",
+          "Entity = 8",
+          "값의 종류 표시.",
+          "enum"
+        ],
+        [
+          "Transform",
+          "Transform = 9",
+          "값의 종류 표시.",
+          "enum"
+        ]
+      ],
+      "note": "열거값의 존재가 모든 Set/Get 접근자 제공을 뜻하지 않습니다.",
+      "sections": []
+    },
+    {
+      "id": "native/EnhancedRenderGraph",
+      "title": "EnhancedRenderGraph",
+      "summary": "DX12/Vulkan 공용 렌더 그래프. 패스 검증·컬링·배리어·자원 수명을 관리하며 현재 선언 순서로 실행합니다.",
+      "signature": "class EnhancedRenderGraph",
+      "group": "Native Engine API",
+      "source": "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h",
+      "members": [
+        [
+          "EnhancedRenderGraph",
+          "explicit EnhancedRenderGraph(IRenderDeviceServices& services);",
+          "필수 백엔드 중립 디바이스 서비스.",
+          "method"
+        ],
+        [
+          "Reset",
+          "void Reset();",
+          "그래프 재설정.",
+          "method"
+        ],
+        [
+          "CreateTexture",
+          "RGHandle CreateTexture(const RGTextureDesc& desc);",
+          "transient 텍스처 선언. Compile에서 생성.",
+          "method"
+        ],
+        [
+          "ImportTexture",
+          "RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState,\n    const std::string& name, RHIResourceState* stateWriteback = nullptr);",
+          "외부 텍스처 상태 추적. Compile이 최종 상태를 writeback에 기록.",
+          "method"
+        ],
+        [
+          "ImportBuffer",
+          "RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState,\n    const std::string& name, RHIResourceState* stateWriteback = nullptr);",
+          "외부 버퍼 상태 추적.",
+          "method"
+        ],
+        [
+          "AddPass",
+          "RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,\n    ExecuteCallback execute, bool hasSideEffect = false);",
+          "상태 사용과 기록 콜백 선언. side effect는 컬링 루트에 영향.",
+          "method"
+        ],
+        [
+          "AddSplitPass",
+          "RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages,\n    SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,\n    uint32_t recordCost = 0);",
+          "각 기록 조각이 상태를 직접 바인딩합니다. recordCost 단위는 배치 수.",
+          "method"
+        ],
+        [
+          "Compile",
+          "bool Compile(std::string& outError);",
+          "검증·컬링·배리어 계획. 실패 이유를 문자열로 반환.",
+          "method"
+        ],
+        [
+          "Execute",
+          "bool Execute(std::string& outError);",
+          "Compile 결과의 배리어와 패스 기록.",
+          "method"
+        ],
+        [
+          "SetTransientPool",
+          "void SetTransientPool(RGTransientPool* pool);",
+          "재사용 풀 연결. 반납·소멸 전에 호출자가 GPU 완료를 보장.",
+          "method"
+        ],
+        [
+          "GetExecuteOrder",
+          "const std::vector<uint16_t>& GetExecuteOrder() const;",
+          "Compile 뒤 진단용 실행 순서.",
+          "method"
+        ]
+      ],
+      "note": "엔진 내부용입니다. 안정적인 외부 플러그인 ABI, 자동 위상 정렬·aliasing·async compute 완료를 뜻하지 않습니다.",
+      "sections": []
+    },
+    {
+      "id": "native/RGHandle",
+      "title": "RGHandle",
+      "summary": "그래프 리소스 표의 인덱스 핸들입니다. GPU 리소스 핸들과 구분합니다.",
+      "signature": "struct RGHandle",
+      "group": "Native Engine API",
+      "source": "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h",
+      "members": [
+        [
+          "index",
+          "uint16_t index{ 0xFFFF };",
+          "그래프 리소스 인덱스.",
+          "field"
+        ],
+        [
+          "kInvalid",
+          "static constexpr uint16_t kInvalid = 0xFFFF;",
+          "무효 표식.",
+          "field"
+        ],
+        [
+          "IsValid",
+          "bool IsValid() const;",
+          "무효 인덱스 여부. GPU 완료·실제 자원 생존 검사가 아닙니다.",
+          "method"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "native/RGTextureDesc",
+      "title": "RGTextureDesc",
+      "summary": "그래프 소유 transient 텍스처의 생성 설명입니다.",
+      "signature": "struct RGTextureDesc",
+      "group": "Native Engine API",
+      "source": "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h",
+      "members": [
+        [
+          "width",
+          "uint32_t width{ 0 };",
+          "폭.",
+          "field"
+        ],
+        [
+          "height",
+          "uint32_t height{ 0 };",
+          "높이.",
+          "field"
+        ],
+        [
+          "arraySize",
+          "uint32_t arraySize{ 1 };",
+          "배열 슬라이스 수.",
+          "field"
+        ],
+        [
+          "format",
+          "RHIFormat format{ RHIFormat::RGBA8Unorm };",
+          "형식.",
+          "field"
+        ],
+        [
+          "allowRenderTarget",
+          "bool allowRenderTarget{ false };",
+          "렌더 타깃 허용.",
+          "field"
+        ],
+        [
+          "allowDepthStencil",
+          "bool allowDepthStencil{ false };",
+          "깊이·스텐실 허용.",
+          "field"
+        ],
+        [
+          "allowUnorderedAccess",
+          "bool allowUnorderedAccess{ false };",
+          "UAV 허용.",
+          "field"
+        ],
+        [
+          "clearColor",
+          "float clearColor[4]{ 0.f, 0.f, 0.f, 0.f };",
+          "최적 클리어 힌트.",
+          "field"
+        ],
+        [
+          "name",
+          "std::string name;",
+          "자원 이름.",
+          "field"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "native/RenderBackend",
+      "title": "RenderBackend",
+      "summary": "렌더 백엔드 선택과 문자열 변환의 열거형·자유 함수입니다.",
+      "signature": "enum class RenderBackend : std::uint8_t { DX12, Vulkan };",
+      "group": "Native Engine API",
+      "source": "Engine/RenderEngine/Interfaces/RenderBackend.h",
+      "members": [
+        [
+          "RenderBackendName",
+          "inline const char* RenderBackendName(RenderBackend backend) noexcept;",
+          "Vulkan에는 vulkan, 나머지는 dx12 문자열.",
+          "method"
+        ],
+        [
+          "TryParseRenderBackend",
+          "inline bool TryParseRenderBackend(std::string_view value,\n    RenderBackend& outBackend) noexcept;",
+          "ASCII 대소문자 무시. 실패 시 false이며 outBackend 변경 없음.",
+          "method"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "tools/CreatorBuildTool",
+      "title": "CreatorBuildTool",
+      "summary": "Editor와 CLI가 공유하는 독립 C# 빌드 도구입니다. 배포·컴파일·패키징과 진단 계약을 제공합니다.",
+      "group": "도구",
+      "source": "BuildTool/Program.cs",
+      "sections": [
+        {
+          "id": "commands",
+          "title": "명령",
+          "text": "publish-engine: 배포본 생성. verify-engine: 검증. select-engine: 프로젝트 pin. open-project: 검증·컴파일 후 Editor. compile-game: C# 컴파일. package-game: cook·PAK·Player 검증 후 게시."
+        },
+        {
+          "id": "help",
+          "title": "도움말과 컴파일",
+          "text": "$tool, $engine, $project는 패키징 가이드의 실제 경로입니다.",
+          "code": "& $tool help\n& $tool verify-engine --engine-distribution $engine\n& $tool compile-game --engine-distribution $engine --project $project --config Release --output \"$project\\Intermediate\\Managed\\Release\"",
+          "language": "powershell"
+        },
+        {
+          "id": "exit",
+          "title": "종료 코드와 진단",
+          "text": "성공 0, 실패 1, 취소 130. --json은 JSON Lines, --log-path FILE은 파일 로그입니다. --skip-verify는 게시 포인터를 변경하지 않습니다."
+        },
+        {
+          "id": "config",
+          "title": "구성 명시",
+          "text": "package-game 기본은 Debug, publish-engine·compile-game 기본은 Release입니다. --config와 Shipping variant를 엔진 배포본에 맞춰 명시하세요."
+        }
+      ]
+    },
+    {
+      "id": "script/MeshRenderer",
+      "title": "MeshRenderer",
+      "summary": "렌더링 오브젝트의 재질과 셰이더 값을 조정하는 컴포넌트입니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/MeshRenderer.cs",
+      "signature": "public sealed class MeshRenderer : NativeComponent",
+      "members": [
+        [
+          "MaterialName",
+          "public string MaterialName { get; }",
+          "현재 재질의 이름.",
+          "property"
+        ],
+        [
+          "InstantiateMaterial",
+          "public void InstantiateMaterial(string newName)",
+          "재질 사본을 만들어 이 오브젝트에만 연결합니다. 공유 재질을 개별적으로 바꾸기 전에 호출합니다.",
+          "method"
+        ],
+        [
+          "SetMaterialFloat",
+          "public bool SetMaterialFloat(string valueName, float value)",
+          "재질의 float 값을 갱신합니다. 이름이 없으면 false를 반환합니다.",
+          "method"
+        ],
+        [
+          "SetMaterialInt",
+          "public bool SetMaterialInt(string valueName, int value)",
+          "재질의 int 값을 갱신합니다.",
+          "method"
+        ],
+        [
+          "BaseColor",
+          "public Color4 BaseColor { get; set; }",
+          "재질의 베이스 색입니다. 사본을 만들지 않으면 공유 재질을 사용하는 오브젝트에도 영향을 줍니다.",
+          "property"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/LightComponent",
+      "title": "LightComponent",
+      "summary": "색·세기·범위와 광원 종류를 스크립트에서 조정하는 조명 컴포넌트입니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/LightComponent.cs",
+      "signature": "public sealed class LightComponent : NativeComponent",
+      "members": [
+        [
+          "Color",
+          "public Color4 Color { get; set; }",
+          "광원의 색입니다.",
+          "property"
+        ],
+        [
+          "Intensity",
+          "public float Intensity { get; set; }",
+          "광원의 세기입니다.",
+          "property"
+        ],
+        [
+          "Range",
+          "public float Range { get; set; }",
+          "점광원·스포트라이트의 사거리입니다. 방향광에는 의미가 없습니다.",
+          "property"
+        ],
+        [
+          "SpotAngle",
+          "public float SpotAngle { get; set; }",
+          "스포트라이트 원뿔 각도(도)입니다.",
+          "property"
+        ],
+        [
+          "Type",
+          "public LightType Type { get; set; }",
+          "Directional, Point, Spot 중 광원 종류입니다.",
+          "property"
+        ],
+        [
+          "Status",
+          "public LightStatus Status { get; set; }",
+          "렌더 쪽 활성·정적 그림자 상태입니다.",
+          "property"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/LightType",
+      "title": "LightType",
+      "summary": "광원의 종류를 나타내는 열거형입니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/LightComponent.cs",
+      "signature": "public enum LightType",
+      "members": [
+        [
+          "Directional",
+          "Directional = 0",
+          "방향광입니다.",
+          "enum"
+        ],
+        [
+          "Point",
+          "Point = 1",
+          "점광원입니다.",
+          "enum"
+        ],
+        [
+          "Spot",
+          "Spot = 2",
+          "스포트라이트입니다.",
+          "enum"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/LightStatus",
+      "title": "LightStatus",
+      "summary": "광원의 렌더 상태를 나타내는 열거형입니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/LightComponent.cs",
+      "signature": "public enum LightStatus",
+      "members": [
+        [
+          "Disabled",
+          "Disabled = 0",
+          "광원을 비활성화합니다.",
+          "enum"
+        ],
+        [
+          "Enabled",
+          "Enabled = 1",
+          "광원을 활성화합니다.",
+          "enum"
+        ],
+        [
+          "StaticShadows",
+          "StaticShadows = 2",
+          "정적 그림자 상태를 사용합니다.",
+          "enum"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/SoundComponent",
+      "title": "SoundComponent",
+      "summary": "FMOD 기반 사운드 클립의 재생과 기본 재생 속성을 제어합니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/SoundComponent.cs",
+      "signature": "public sealed class SoundComponent : NativeComponent",
+      "members": [
+        [
+          "Play",
+          "public void Play()",
+          "현재 클립을 재생합니다.",
+          "method"
+        ],
+        [
+          "Stop",
+          "public void Stop()",
+          "재생을 중지합니다.",
+          "method"
+        ],
+        [
+          "Pause",
+          "public void Pause(bool pause)",
+          "재생을 일시정지하거나 재개합니다.",
+          "method"
+        ],
+        [
+          "IsPlaying",
+          "public bool IsPlaying()",
+          "현재 재생 중인지 반환합니다.",
+          "method"
+        ],
+        [
+          "PlayOneShot",
+          "public void PlayOneShot()",
+          "현재 클립을 겹쳐 재생합니다. 짧은 효과음에 사용합니다.",
+          "method"
+        ],
+        [
+          "ClipKey",
+          "public string ClipKey { get; set; }",
+          "SoundManager에 등록된 클립 키입니다.",
+          "property"
+        ],
+        [
+          "Volume",
+          "public float Volume { get; set; }",
+          "다음 재생에 적용할 음량입니다.",
+          "property"
+        ],
+        [
+          "Pitch",
+          "public float Pitch { get; set; }",
+          "다음 재생에 적용할 피치입니다.",
+          "property"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/Prefab",
+      "title": "Prefab",
+      "summary": "프리팹 에셋을 이름으로 참조하고 씬에 인스턴스화합니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/Prefab.cs",
+      "signature": "public readonly struct Prefab",
+      "members": [
+        [
+          "IsValid",
+          "public bool IsValid { get; }",
+          "유효한 프리팹을 가리키는지 반환합니다.",
+          "property"
+        ],
+        [
+          "Name",
+          "public string Name { get; }",
+          "프리팹 이름입니다.",
+          "property"
+        ],
+        [
+          "Load",
+          "public static Prefab Load(string name)",
+          "이름으로 프리팹을 찾습니다. 없으면 유효하지 않은 값을 반환합니다.",
+          "method"
+        ],
+        [
+          "Instantiate",
+          "public Entity Instantiate(string? instanceName = null)",
+          "활성 씬에 프리팹 인스턴스를 만듭니다.",
+          "method"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/ObjectHandle",
+      "title": "ObjectHandle",
+      "summary": "네이티브 객체의 인덱스와 세대를 나타내는 안전한 핸들입니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/ObjectHandle.cs",
+      "signature": "public readonly struct ObjectHandle : IEquatable<ObjectHandle>",
+      "members": [
+        [
+          "Index",
+          "public readonly uint Index",
+          "객체 슬롯 인덱스입니다.",
+          "field"
+        ],
+        [
+          "Generation",
+          "public readonly uint Generation",
+          "슬롯 재사용을 구분하는 세대입니다.",
+          "field"
+        ],
+        [
+          "Invalid",
+          "public static ObjectHandle Invalid { get; }",
+          "비어 있는 핸들입니다.",
+          "property"
+        ],
+        [
+          "IsValid",
+          "public bool IsValid { get; }",
+          "세대가 유효한지 반환합니다.",
+          "property"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/Quaternion",
+      "title": "Quaternion",
+      "summary": "회전과 회전 보간에 사용하는 쿼터니언 값 타입입니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/Quaternion.cs",
+      "signature": "public struct Quaternion",
+      "members": [
+        [
+          "Identity",
+          "public static Quaternion Identity { get; }",
+          "단위 회전입니다.",
+          "property"
+        ],
+        [
+          "CreateFromAxisAngle",
+          "public static Quaternion CreateFromAxisAngle(Float3 axis, float angle)",
+          "축과 라디안 각도로 회전을 만듭니다.",
+          "method"
+        ],
+        [
+          "CreateFromYawPitchRoll",
+          "public static Quaternion CreateFromYawPitchRoll(float yaw, float pitch, float roll)",
+          "요·피치·롤로 회전을 만듭니다.",
+          "method"
+        ],
+        [
+          "LookRotation",
+          "public static Quaternion LookRotation(Float3 forward, Float3 up)",
+          "주어진 방향을 바라보는 회전을 만듭니다.",
+          "method"
+        ],
+        [
+          "Slerp",
+          "public static Quaternion Slerp(Quaternion a, Quaternion b, float t)",
+          "두 회전을 구면 선형 보간합니다.",
+          "method"
+        ],
+        [
+          "Normalized",
+          "public Quaternion Normalized { get; }",
+          "정규화된 회전입니다.",
+          "property"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/Physics",
+      "title": "Physics",
+      "summary": "할당 없이 광선과 구 범위의 물리 질의를 수행합니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/Physics.cs",
+      "signature": "public static class Physics",
+      "members": [
+        [
+          "AllLayers",
+          "public const uint AllLayers = ~0u",
+          "모든 레이어를 대상으로 하는 기본 마스크입니다.",
+          "field"
+        ],
+        [
+          "Raycast",
+          "public static bool Raycast(Float3 origin, Float3 direction, float maxDistance, out RaycastHit hit, uint layerMask = AllLayers)",
+          "가장 가까운 충돌 하나를 찾습니다.",
+          "method"
+        ],
+        [
+          "RaycastAll",
+          "public static int RaycastAll(Float3 origin, Float3 direction, float maxDistance, Span<RaycastHit> results, uint layerMask = AllLayers)",
+          "광선에 걸리는 충돌을 결과 버퍼에 채웁니다. 반환값은 실제 충돌 수입니다.",
+          "method"
+        ],
+        [
+          "OverlapSphere",
+          "public static int OverlapSphere(Float3 position, float radius, Span<RaycastHit> results, uint layerMask = AllLayers)",
+          "구 범위 안에 겹치는 충돌을 결과 버퍼에 채웁니다.",
+          "method"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/RaycastHit",
+      "title": "RaycastHit",
+      "summary": "물리 질의에서 반환되는 충돌 결과입니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/Physics.cs",
+      "signature": "public struct RaycastHit",
+      "members": [
+        [
+          "Layer",
+          "public uint Layer",
+          "충돌 대상의 레이어 비트입니다.",
+          "field"
+        ],
+        [
+          "Point",
+          "public Float3 Point",
+          "접촉 지점입니다.",
+          "field"
+        ],
+        [
+          "Normal",
+          "public Float3 Normal",
+          "접촉면 법선입니다.",
+          "field"
+        ],
+        [
+          "Distance",
+          "public float Distance",
+          "질의 시작점에서의 거리입니다.",
+          "field"
+        ],
+        [
+          "Entity",
+          "public Entity Entity { get; }",
+          "충돌 대상 엔티티입니다.",
+          "property"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    },
+    {
+      "id": "script/Float3",
+      "title": "Float3",
+      "summary": "위치·방향·크기에 사용하는 3성분 벡터 값 타입입니다.",
+      "group": "C# Script API",
+      "source": "ScriptCore/ObjectHandle.cs",
+      "signature": "public struct Float3",
+      "members": [
+        [
+          "Zero",
+          "public static Float3 Zero { get; }",
+          "모든 성분이 0인 벡터입니다.",
+          "property"
+        ],
+        [
+          "One",
+          "public static Float3 One { get; }",
+          "모든 성분이 1인 벡터입니다.",
+          "property"
+        ],
+        [
+          "Up",
+          "public static Float3 Up { get; }",
+          "+Y 방향입니다.",
+          "property"
+        ],
+        [
+          "Forward",
+          "public static Float3 Forward { get; }",
+          "+Z 방향입니다.",
+          "property"
+        ],
+        [
+          "Length",
+          "public float Length { get; }",
+          "벡터의 길이입니다.",
+          "property"
+        ],
+        [
+          "Normalized",
+          "public Float3 Normalized { get; }",
+          "정규화된 벡터입니다.",
+          "property"
+        ],
+        [
+          "Dot",
+          "public static float Dot(Float3 a, Float3 b)",
+          "내적을 계산합니다.",
+          "method"
+        ],
+        [
+          "Cross",
+          "public static Float3 Cross(Float3 a, Float3 b)",
+          "외적을 계산합니다.",
+          "method"
+        ],
+        [
+          "Lerp",
+          "public static Float3 Lerp(Float3 a, Float3 b, float t)",
+          "두 벡터를 선형 보간합니다.",
+          "method"
+        ]
+      ],
+      "note": "",
+      "sections": []
+    }
+  ]
+}

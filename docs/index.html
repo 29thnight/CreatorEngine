@@ -1,22 +1,39 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CreatorEngine – Intro</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <main class="wrap">
-    <h1>CreatorEngine – Intro</h1>
-    <div class="responsive-embed">
-      <iframe
-        title="CreatorEngine Intro"
-        src="https://www.youtube-nocookie.com/embed/W75M6eNZhf0"
-        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
-        allowfullscreen>
-      </iframe>
-    </div>
-  </main>
-</body>
-</html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070b12"><meta name="description" content="Creator Engine — C++ 런타임, C# 스크립팅, 에디터와 독립 Player를 연결하는 Windows 게임 제작 환경."><title>Creator Engine — Build your world.</title><link rel="icon" type="image/svg+xml" href="site-assets/mark.svg"><link rel="stylesheet" href="style.css"><script type="module" src="site.js"></script><script type="module" src="facets.js"></script></head>
+<body class="brand-page"><a class="skip" href="#main">본문으로 이동</a>
+<header class="topbar"><a class="wordmark" href="./" aria-label="Creator Engine 홈"><img src="site-assets/mark.svg" width="32" height="32" alt=""><span>Creator Engine</span></a>
+<nav class="desktop-nav" aria-label="주 메뉴"><a href="./" aria-current="page">엔진</a><a href="api/" >문서 · API</a><a href="https://github.com/29thnight/CreatorEngine" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></nav>
+<div class="nav-end"><span class="preview-badge"><i></i> Preview</span><button class="menu-toggle icon-button" aria-label="메뉴 열기" aria-controls="mobile-menu" aria-expanded="false">☰</button></div>
+<nav id="mobile-menu" class="mobile-menu" aria-label="모바일 메뉴" hidden><a href="./">엔진</a><a href="api/">문서 · API</a><a href="https://github.com/29thnight/CreatorEngine" target="_blank" rel="noopener noreferrer">GitHub ↗</a></nav></header>
+<main id="main">
+<section class="hero" aria-labelledby="hero-title"><div class="facet-fallback" aria-hidden="true"></div><canvas id="facets" aria-hidden="true"></canvas><div class="hero-vignette" aria-hidden="true"></div>
+<div class="hero-copy"><div class="eyebrow hero-eyebrow"><span class="tiny-rule"></span> A GAME CREATION ENGINE <span class="tiny-rule"></span></div><h1 id="hero-title">Creator <span>Engine</span></h1><p class="hero-lead">상상한 세계를, 직접 만드는 도구.</p><p class="hero-description">C++ 런타임과 C# 스크립팅.<br class="mobile-only"> 에디터에서 플레이어까지 이어지는<br>Windows 게임 제작 환경을 만들고 있습니다.</p>
+<div class="hero-actions"><a class="button primary" href="api/#guide/getting-started">시작하기 <span aria-hidden="true">↗</span></a><a class="button secondary" href="api/#guide/overview">API 살펴보기 <span aria-hidden="true">→</span></a></div>
+<div class="tech-line"><span>Windows x64</span><b>·</b><span>C++23</span><b>·</b><span>DirectX 12 / Vulkan</span><b>·</b><span>.NET 10</span></div></div>
+<div class="hero-bottom"><a class="scroll-cue" href="#editor">INSIDE THE EDITOR <span aria-hidden="true">↓</span></a><button id="motion-toggle" class="motion-toggle" aria-pressed="false">조명 애니메이션 일시정지 <span aria-hidden="true">Ⅱ</span></button></div></section>
+<section id="editor" class="section showcase" aria-labelledby="editor-title"><div class="section-heading"><div><span class="eyebrow">01 / WORKSPACE</span><h2 id="editor-title">만드는 순간과<br>플레이하는 순간을 가까이.</h2></div><p>씬을 구성하고, 속성을 조정하고, 실행합니다.<br>하나의 워크스페이스에서 이어지는 작업 흐름.</p></div>
+<div class="editor-frame"><div class="frame-top"><div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span>Creator Engine <span class="muted">/ Editor</span></span><span class="capture-date">CAPTURED 2026.09.14</span></div>
+<a id="capture-link" class="capture-link" href="resource/CE_260914.png" target="_blank" rel="noopener" aria-label="에디터 스크린샷 1 원본 확대"><img id="capture" src="resource/CE_260914.png" alt="Creator Engine 에디터의 2026년 9월 14일 캡처 1" loading="lazy" decoding="async"><span class="expand-label">원본 확대 ↗</span></a>
+<div class="gallery-bar"><div class="gallery-tabs" role="group" aria-label="에디터 스크린샷 선택"><button class="selected" data-capture="0" aria-pressed="true">01 <span>에디터 화면</span></button><button data-capture="1" aria-pressed="false">02 <span>에디터 화면</span></button><button data-capture="2" aria-pressed="false">03 <span>에디터 화면</span></button></div><span class="gallery-count" aria-live="polite">01 / 03</span></div></div>
+<p class="caption">실제 에디터 캡처 · 이미지 원본은 저장소의 <code>docs/resource</code>에 보존됩니다.</p></section>
+<section id="architecture" class="section architecture" aria-labelledby="architecture-title"><div class="section-heading"><div><span class="eyebrow">02 / ENGINE ARCHITECTURE</span><h2 id="architecture-title">작업은 나누고,<br>실행 기반은 공유합니다.</h2></div><p>화면을 만드는 렌더러, 세계를 갱신하는 런타임,<br>게임을 완성하는 도구의 경계를 분명하게.</p></div>
+<div class="architecture-grid"><article class="feature"><div class="feature-number">01 <span>RENDERING</span></div><h3>하나의 렌더 경계.</h3><p>DX12와 Vulkan을 RHI로 분리하고, RenderGraph가 패스 검증·배리어·컬링·자원 수명을 관리합니다.</p><a href="api/#native/EnhancedRenderGraph">RenderGraph 구조 <span>↗</span></a></article><article class="feature"><div class="feature-number">02 <span>SCRIPTING</span></div><h3>게임 로직은 C#으로.</h3><p>Component의 생명주기와 물리 전후 틱, SimulationScope를 이용해 게임의 동작을 구성합니다.</p><a href="api/#script/Component">Script API <span>↗</span></a></article><article class="feature"><div class="feature-number">03 <span>BUILD PIPELINE</span></div><h3>프로젝트에서 플레이어로.</h3><p>CreatorBuildTool이 엔진 배포, 스크립트 컴파일, 콘텐츠 cook·PAK와 Player 검증을 연결합니다.</p><a href="api/#tools/CreatorBuildTool">빌드 도구 <span>↗</span></a></article></div>
+<div class="architecture-note"><span class="status-dot"></span><p><strong>개발 중인 엔진입니다.</strong> 현재 RenderGraph는 선언 순서로 실행합니다. 자동 의존성 정렬과 Launcher 등 후속 계획은 구현된 기능과 구분합니다. 에디터 워크스페이스의 현행 검증 대상은 DX12입니다.</p><a href="https://github.com/29thnight/CreatorEngine/blob/master/README.md">개발 상태 ↗</a></div></section>
+<section class="section scripting" aria-labelledby="script-title"><div class="scripting-copy"><span class="eyebrow">03 / START CREATING</span><h2 id="script-title">작은 동작에서<br>게임이 시작됩니다.</h2><p>엔진이 제공하는 생명주기와 API를 따라 게임의 동작을 구성합니다.<br>물리 스텝 전후처럼 각 단계의 역할에 맞는 지점에서<br>필요한 로직을 작성할 수 있습니다.</p><a class="text-link" href="api/#guide/first-script">첫 번째 스크립트 작성하기 <span>→</span></a><p class="small muted">예제는 Transform이 있는 엔티티에서 W 입력으로<br>로컬 위치를 이동합니다.</p></div><div class="code-panel"><div class="code-top"><span><i class="file-dot"></i> Mover.cs</span><span>C# / ScriptCore</span></div><pre><code><span class="syntax-key">using</span> CreatorEngine;
+
+<span class="syntax-key">public sealed partial class</span> <span class="syntax-type">Mover</span> : <span class="syntax-type">Component</span>
+{
+    <span class="syntax-key">public override void</span> <span class="syntax-fn">PostPhysics</span>(<span class="syntax-key">float</span> tick)
+    {
+        <span class="syntax-key">if</span> (!HasTransform) <span class="syntax-key">return</span>;
+        <span class="syntax-key">if</span> (Input.GetKey(KeyCode.W))
+        {
+            Transform.Translate(
+                <span class="syntax-key">new</span> <span class="syntax-type">Float3</span>(<span class="syntax-num">0f</span>, <span class="syntax-num">0f</span>, <span class="syntax-num">2f</span> * tick));
+        }
+    }
+}</code></pre><div class="code-bottom"><span>현재 소스에 맞춘 입문 예제</span><a href="api/#script/Transform">Transform 레퍼런스 ↗</a></div></div></section>
+<section class="section final-cta"><span class="eyebrow">A PERSONAL PROJECT. STILL IN PROGRESS.</span><h2>엔진 안으로 들어가 보세요.</h2><p>시작 가이드, API의 사용 조건, 소스 코드까지.</p><div class="hero-actions"><a class="button primary" href="api/">문서 · API <span>→</span></a><a class="button secondary" href="https://github.com/29thnight/CreatorEngine">GitHub 저장소 <span>↗</span></a></div></section>
+</main><footer class="site-footer"><a class="wordmark" href="./"><img src="site-assets/mark.svg" width="25" height="25" alt=""><span>Creator Engine</span></a><p>개인 개발 프로젝트 · Preview</p><a href="https://github.com/29thnight/CreatorEngine/blob/master/README.md#의존성과-라이선스">의존성 · 라이선스 ↗</a></footer>
+<dialog id="image-dialog" aria-label="에디터 스크린샷 확대"><button class="dialog-close button secondary" aria-label="확대 보기 닫기">닫기 ×</button><img alt="" id="dialog-image"><p>2026.09.14 · Creator Engine Editor</p></dialog>
+</body></html>
