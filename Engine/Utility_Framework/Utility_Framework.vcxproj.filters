@@ -200,6 +200,9 @@
     <ClInclude Include="LogEntry.h">
       <Filter>Core.Logger</Filter>
     </ClInclude>
+    <ClInclude Include="LogGroup.h">
+      <Filter>Core.Logger</Filter>
+    </ClInclude>
     <ClInclude Include="LogSink.h">
       <Filter>Core.Logger</Filter>
     </ClInclude>

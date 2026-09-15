@@ -18,6 +18,9 @@ struct LogEntry
 {
     // Assigned by LogStore. Zero is reserved for an empty UI selection.
     std::uint64_t sequence{};
+    // Assigned by LogStore too: which identity this occurrence belongs to.
+    // Producers leave it zero; the store fills it in when it hands a record back.
+    std::uint64_t groupId{};
     spdlog::level::level_enum level{};
     spdlog::log_clock::time_point timestamp{};
     std::size_t threadId{};

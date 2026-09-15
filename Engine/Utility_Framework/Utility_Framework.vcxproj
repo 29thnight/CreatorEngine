@@ -62,6 +62,7 @@
     <ClInclude Include="TypeIO.h" />
     <ClInclude Include="LinkedListLib.hpp" />
     <ClInclude Include="LogEntry.h" />
+    <ClInclude Include="LogGroup.h" />
     <ClInclude Include="HtmlFileSink.h" />
     <ClInclude Include="LogSink.h" />
     <ClInclude Include="LogStore.h" />
