@@ -6,6 +6,7 @@
 #include "EditorLayoutPreset.h"
 #include "EditorChromeProbe.h"
 #include "EditorNavContract.h"
+#include "EditorClipContract.h"
 #include "RHI/IImGuiHost.h"
 #include "EditorFontResources.h"
 #include "EditorTheme.h"
@@ -399,6 +400,10 @@ void EditorRenderer::EndRender()
     // 프레임에 반영된다 — `AddKeyEvent` 는 큐에 쌓이고 `NewFrame` 이 푼다).
     ::editor::nav::observe_frame();
     ::editor::nav::deliver_pending_key();
+
+    // W2-2: 잘라 그리기 계약. 신고는 위젯이 그 자리에서 판정하므로 여기서는
+    // 프레임을 세고, 프레임을 넘기며 닫히지 않은 클립 스택을 잡는다.
+    ::editor::clipping::observe_frame();
 
     m_workspace->EndFrame();
     const bool captured = ::editor::capture_chrome_snapshot();

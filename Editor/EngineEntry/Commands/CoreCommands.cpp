@@ -24,6 +24,7 @@
 #include "EditorWorkspaceStore.h"
 #include "ViewportHostWindow.h"
 #include "EditorPanelCost.h"
+#include "EditorClipContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorNavContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorPlayModeController.h"
 #include "EditorWindowHost.h"       // PHASE 21 M4: editor.windows 덤프
@@ -1233,6 +1234,76 @@ namespace ConsoleCmd
         return Ok("키보드 탐색 계약 위반 0", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_editor_clipping(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        const char* const usage = "editor.clipping [reset]";
+
+        if (2 == args.size() && "reset" == args[1])
+        {
+            ::editor::clipping::reset_counts();
+        }
+        else if (args.size() > 1)
+        {
+            return InvalidArguments(usage);
+        }
+
+        const ::editor::clipping::contract_view view = ::editor::clipping::read();
+        auto data = CommandData::Object();
+        data.Set("frames", CommandData::Int(static_cast<long long>(view.frames)));
+        data.Set("announced", CommandData::Int(static_cast<long long>(view.announced)));
+        data.Set("overflowFrames", CommandData::Int(static_cast<long long>(view.overflowFrames)));
+        data.Set("silentFrames", CommandData::Int(static_cast<long long>(view.silentFrames)));
+        data.Set("truncated", CommandData::Int(static_cast<long long>(view.truncated)));
+        data.Set("unbalanced", CommandData::Int(static_cast<long long>(view.unbalanced)));
+
+        const auto names = [](const std::vector<std::string>& source)
+        {
+            auto array = CommandData::Array();
+            for (const std::string& name : source) array.Append(CommandData::String(name));
+            return array;
+        };
+        data.Set("measuredWidgets", names(view.measuredWidgets));
+        data.Set("overflowWidgets", names(view.overflowWidgets));
+        data.Set("silentWidgets", names(view.silentWidgets));
+        data.Set("truncatedWidgets", names(view.truncatedWidgets));
+        data.Set("unbalancedWidgets", names(view.unbalancedWidgets));
+
+        std::printf("[editor.clipping] frames=%llu announced=%llu overflow=%llu "
+            "silent=%llu truncated=%llu unbalanced=%llu\n",
+            static_cast<unsigned long long>(view.frames),
+            static_cast<unsigned long long>(view.announced),
+            static_cast<unsigned long long>(view.overflowFrames),
+            static_cast<unsigned long long>(view.silentFrames),
+            static_cast<unsigned long long>(view.truncated),
+            static_cast<unsigned long long>(view.unbalanced));
+        std::fflush(stdout);
+
+        if (0 != view.overflowFrames)
+        {
+            std::string summary = "칸보다 넓은 글자를 자르지 않은 신고 " +
+                std::to_string(view.overflowFrames) + " 건";
+            if (!view.overflowWidgets.empty()) summary += ": " + view.overflowWidgets.front();
+            return Fail("editor.clipping.overflow", summary, std::move(data));
+        }
+        if (0 != view.silentFrames)
+        {
+            std::string summary = "잘라 놓고 전체를 돌려주지 않은 신고 " +
+                std::to_string(view.silentFrames) + " 건";
+            if (!view.silentWidgets.empty()) summary += ": " + view.silentWidgets.front();
+            return Fail("editor.clipping.silent_truncation", summary, std::move(data));
+        }
+        if (0 != view.unbalanced)
+        {
+            std::string summary = "클립 스택이 균형을 잃은 횟수 " +
+                std::to_string(view.unbalanced) + " 회";
+            if (!view.unbalancedWidgets.empty()) summary += ": " + view.unbalancedWidgets.front();
+            return Fail("editor.clipping.unbalanced", summary, std::move(data));
+        }
+        return Ok("잘라 그리기 계약 위반 0", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_editor_renderscale(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1570,6 +1641,7 @@ namespace ConsoleCmd
         reg.Result({ "editor.sceneview" }, &Cmd_editor_sceneview);
         reg.Result({ "editor.viewport" }, &Cmd_editor_viewport);
         reg.Result({ "editor.panelcost" }, &Cmd_editor_panelcost);
+        reg.Result({ "editor.clipping" }, &Cmd_editor_clipping);
         reg.Result({ "editor.nav" }, &Cmd_editor_nav);
         reg.Result({ "editor.renderscale" }, &Cmd_editor_renderscale);
         reg.Result({ "editor.selftest" }, &Cmd_editor_selftest);

@@ -159,6 +159,7 @@
     <ClInclude Include="ImGuiHelper\EditorPropertyRow.h" />
     <ClInclude Include="ImGuiHelper\EditorAxisField3.h" />
     <ClInclude Include="ImGuiHelper\EditorModeButton.h" />
+    <ClInclude Include="ImGuiHelper\EditorClipContract.h" />
     <ClInclude Include="ImGuiHelper\EditorNavContract.h" />
     <ClInclude Include="ImGuiHelper\widgets.h" />
   </ItemGroup>
@@ -322,6 +323,7 @@
     <ClCompile Include="ImGuiHelper\EditorPropertyRow.cpp" />
     <ClCompile Include="ImGuiHelper\EditorAxisField3.cpp" />
     <ClCompile Include="ImGuiHelper\EditorModeButton.cpp" />
+    <ClCompile Include="ImGuiHelper\EditorClipContract.cpp" />
     <ClCompile Include="ImGuiHelper\EditorNavContract.cpp" />
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp" />

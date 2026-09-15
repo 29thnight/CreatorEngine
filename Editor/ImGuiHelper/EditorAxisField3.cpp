@@ -5,6 +5,7 @@
 #include "EditorPropertyRow.h"
 
 #include <array>
+#include "EditorClipContract.h"
 
 namespace editor::widgets
 {
@@ -76,7 +77,17 @@ namespace editor::widgets
             const ImVec2 text_size = ImGui::CalcTextSize(text);
             const ImVec2 text_pos(origin.x + (width - text_size.x) * 0.5f,
                 origin.y + (height - text_size.y) * 0.5f);
+
+            // W2-2: badge 는 글자 한 자라 실제로 넘칠 일이 거의 없다. 그래도
+            // 신고한다 — 이 위젯은 §7.1 의 네 family 중 하나이고, "넘칠 일이
+            // 없어서" 계약 밖에 두면 폰트나 배지 폭이 바뀌는 날 아무도 모른다.
+            // 가운데 정렬이라 넘치면 **양쪽으로** 샌다.
+            const bool badge_clipped = (text_size.x > width);
+            ::editor::clipping::announce_text("EditorAxisField3.badge",
+                text_size.x, width, badge_clipped, false);
+            if (badge_clipped) ImGui::PushClipRect(origin, corner, true);
             list->AddText(text_pos, packed(axis_badge_hex(which)), text);
+            if (badge_clipped) ImGui::PopClipRect();
         }
     }
 

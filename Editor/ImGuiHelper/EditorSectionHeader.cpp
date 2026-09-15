@@ -1,5 +1,6 @@
 #include "EditorSectionHeader.h"
 #include "EditorNavContract.h"
+#include "EditorClipContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -166,10 +167,32 @@ namespace editor::widgets
         }
 
         // ⑥ 글자. 클릭 영역 왼쪽 끝에서 프레임 여백만큼 들여 세로 중앙에 놓는다.
+        //
+        // W2-2: 여기는 자르지 않고 있었다. 컴포넌트 이름이 길면 ⑤의 더보기 버튼
+        // **위로** 그려진다 — 글자가 버튼보다 나중이라 덮는 쪽이다. 규칙은 이미
+        // `EditorPropertyRow` 에 서 있었다(잘라 그리고, 잘린 줄은 tooltip 으로
+        // 전체를 돌려준다). 그 규칙을 여기로 옮긴다.
         const ImVec2 label_size = ImGui::CalcTextSize(request.label);
         const ImVec2 text_pos(zone_min.x + style.FramePadding.x,
             origin.y + (full_size.y - label_size.y) * 0.5f);
-        ImGui::RenderText(text_pos, request.label);
+        const float label_room = zone_max.x - style.FramePadding.x - text_pos.x;
+        const bool label_clipped = (label_size.x > label_room);
+        ::editor::clipping::announce_text("EditorSectionHeader",
+            label_size.x, label_room, label_clipped, true);
+        if (label_clipped)
+        {
+            ImGui::PushClipRect(text_pos,
+                ImVec2(text_pos.x + label_room, origin.y + full_size.y), true);
+            ImGui::RenderText(text_pos, request.label);
+            ImGui::PopClipRect();
+            // 잘린 이름을 돌려준다. 클릭 영역 위에 있을 때만 — 양옆 컨트롤을
+            // 비켜서 잡은 사각형이라 버튼 hover 를 빼앗지 않는다.
+            if (hovered) ImGui::SetTooltip("%s", request.label);
+        }
+        else
+        {
+            ImGui::RenderText(text_pos, request.label);
+        }
 
         // ⑦ 다음 줄. 아래 여백은 원본의 3.0f 자리다.
         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + full_size.y));

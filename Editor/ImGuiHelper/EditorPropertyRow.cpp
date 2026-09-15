@@ -17,6 +17,7 @@
 // THE SOFTWARE.
 #include "EditorPropertyRow.h"
 #include "EditorNavContract.h"
+#include "EditorClipContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -615,6 +616,11 @@ namespace editor::widgets
         const char* const end = ImGui::FindRenderedTextEnd(label);
         const float text_width = ImGui::CalcTextSize(label, end).x;
         const bool clipped = text_width > metrics.label_col;
+
+        // W2-2: 이 위젯이 규칙의 정본이다 — 재고, 넘치면 자르고, 자른 줄은
+        // tooltip 으로 전체를 준다. 형제 셋이 여기를 베꼈다. 신고만 붙인다.
+        ::editor::clipping::announce_text("EditorPropertyRow.label",
+            text_width, metrics.label_col, clipped, true);
 
         ImGui::AlignTextToFramePadding();
         if (InspectorStyleActive())

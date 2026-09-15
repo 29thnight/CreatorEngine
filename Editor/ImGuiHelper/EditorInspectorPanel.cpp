@@ -1,5 +1,6 @@
 #include "EditorInspectorPanel.h"
 #include "EditorNavContract.h"
+#include "EditorClipContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -250,11 +251,23 @@ namespace editor::widgets
 
             // 이름이 칸보다 길면 잘라 그린다. 오른쪽 버튼 위로 넘어가면 글자와
             // 아이콘이 겹쳐 둘 다 안 읽힌다.
+            //
+            // W2-2: 자르기만 하고 **돌려주지 않고 있었다.** 옆 칸은 지켜지는데
+            // 잘린 이름을 읽을 길이 없다 — 눈에 띄는 고장이 아니라 조용히
+            // 사라지는 정보라 더 오래 남는다.
+            const bool name_clipped = (size.x > metrics.title_w);
+            ::editor::clipping::announce_text("EditorInspectorPanel",
+                size.x, metrics.title_w, true, true);
             ImGui::PushClipRect(text_pos,
                 ImVec2(text_pos.x + metrics.title_w, origin.y + metrics.height), true);
             ImGui::GetWindowDrawList()->AddText(text_pos,
                 token_color(ThemeColor::Text, opacity), request.label, end);
             ImGui::PopClipRect();
+            if (name_clipped && hovered)
+            {
+                ImGui::SetTooltip("%.*s", static_cast<int>(end - request.label),
+                    request.label);
+            }
         }
 
         // ── 오른쪽 더보기 버튼 ───────────────────────────────────────────

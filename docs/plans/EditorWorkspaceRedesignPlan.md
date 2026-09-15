@@ -865,6 +865,32 @@ W2-1 의 소스 대조가 `ItemAdd` 를 부르는 파일을 전수로 뽑자 이
 목록 밖이라는 이유로 붉어진다. `EditorAxisField3` 를 계약 대상으로 요구하지 않는 근거도
 같다: 스스로 아이템을 등록하지 않으므로 nav 커서를 그릴 주체가 아니다.
 
+**2026-09-15 두 번째 정정 — 절마다 단위가 다르다.** W2-2 가 `clipping`/`tooltip` 절의
+대상을 같은 방식으로 뽑자 **또 다른 집합**이 나왔다. 글자를 직접 그리는 자리(`RenderText`·
+`AddText`)가 그 절의 강제 단위다.
+
+| 파일 | §7.1 목록 | `ItemAdd`(nav 절) | 글자 직접 그리기(clipping 절) |
+|---|---|---|---|
+| `EditorSectionHeader` | 있다 | ○ | ○ |
+| `EditorPropertyRow` | 있다 | ○ | ○ |
+| `EditorModeButton` | 있다 | ○ | ○ |
+| `EditorAxisField3` | 있다 | **×** | **○** |
+| `EditorInspectorPanel` | 없다 | ○ | ○ |
+| `SceneViewportOverlay` | 없다 | **×**(`InvisibleButton`) | **○** |
+
+`SceneViewportOverlay` 는 `InvisibleButton` 위에 프레임·글자·포커스 링·tooltip 을 직접
+그린다 — 실질은 custom draw 인데 `ItemAdd` 를 부르지 않아 W2-1 의 소스 축이 통째로
+놓쳤다. **같은 어긋남이 기제만 바꿔 되풀이된 것이다.** 그래서 절마다 그 절의 강제 단위로
+집합을 유도한다. family 하나를 여러 절이 공유해도 지켜야 할 자리는 절마다 다르다.
+
+**`EditorModeButton` 은 소비자가 0 이다(2026-09-15 실측).** 위 표에서 이 family 는 nav·
+clipping 두 절 모두의 대상인데, 저장소 어디에서도 `draw_mode_button` 을 부르지 않는다.
+§7.1 은 이것을 *"viewport toolbar와 Play/Pause/Eject의 flat icon/active marker"* 로 적었지만
+툴바는 위의 `SceneViewportOverlay::Button` 을 자기 안에 따로 갖고 있다. 즉 **이 family 는
+제자리를 다른 구현에 내주고 죽어 있다.** 지금 지우거나 툴바를 이쪽으로 옮기는 것은
+현재 외관 고정(2026-09-13 사용자 승인)과 맞물리므로 결정을 미루고, 두 게이트가 그 사실을
+들고 있다 — 누가 소비자를 이으면 게이트가 붉어져 판단을 다시 요구한다.
+
 **정찰 정정 — 넷은 백지 신설이 아니다.** 아래 승계 결정과 이관은 완료됐다.
 근거는 [EditorWidgetInheritanceW2.md](../analysis/EditorWidgetInheritanceW2.md)의 실제 소비자 조사이며,
 현재 외관 적용 완료와 남은 상호작용/성능 검증은 §9.0을 따른다.
@@ -984,7 +1010,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | 단계 | 상태 | 남은 작업 |
 |---|---|---|
 | M0~M4, W0, W1 | **done** | 현재 DX12 기준 완료. 외관 추가 시안 없음. Vulkan은 별도 보류 |
-| W2 | progress | 4종 구현은 완료. **키보드 탐색은 W2-1 로 착지**(2026-09-15 — 판정문에 자가 없었고, 넷 중 셋이 nav 커서를 안 그리고 있었다). 최종 상태 matrix·clipping 회귀, 시각 기준선과 성능 gate 가 남는다 |
+| W2 | progress | 4종 구현은 완료. **키보드 탐색은 W2-1, 잘라 그리기·tooltip 은 W2-2 로 착지**(2026-09-15 — 두 절 모두 판정문에 자가 없었다. nav 커서는 넷 중 셋이 안 그렸고, 자르기는 넷 중 하나만 온전히 알고 있었다). 상태 matrix, 시각 기준선과 성능 gate 가 남는다 |
 | W2-I | progress | Transform·RectTransform 공통 컴포넌트 경로 통합, RectTransform 최소 폭 대응, 중첩/배열·전용 드로어·Import Settings 전수 이관, 활성 정책·중복 호출·편집/저장 회귀 |
 | W2-V | progress | 기즈모가 숨겨지는 낮은 높이의 방향 선택 메뉴, resize 중 조작 취소·release/포커스 소유권, drop/terrain 입력 관통, W4/W5 연결·연속 resize 및 DPI/성능 회귀 |
 | W2-B | progress | 최근/전체 검색, 방문별 검색·선택 복원, Volume Profile 생성 대상 경로/취소/실패 정리, W3 저장·W7 목록 연결, 실제 마우스 분할선/동명 자산 drop 회귀 |
@@ -1282,6 +1308,84 @@ Tab 이 그 자리에 **서 버렸다.**
 
 **남은 것:** clipping 회귀, visual baseline, §8 성능 게이트, 상태 matrix
 (hover/active/focus/nav/disabled/mixed/error). W2 는 `progress` 로 둔다.
+
+#### W2-2 착지 — clipping · tooltip (2026-09-15)
+
+같은 문장의 다음 두 절이다. 그리고 **둘은 한 규칙의 양쪽**이다 — 자기 칸보다 넓은 글자를
+안 자르면 옆 칸의 버튼·아이콘 위로 그려지고(글자가 대개 나중이라 덮는 쪽이다), 잘랐는데
+전체를 tooltip 으로 돌려주지 않으면 이름을 영영 못 읽는다. 앞쪽은 눈에 띄는 고장이고
+뒤쪽은 **조용히 사라지는 정보**라 더 오래 남는다.
+
+**규칙은 이미 서 있었고, 한 위젯만 알고 있었다.** `EditorPropertyRow` 가 정본이다 —
+`CalcTextSize` 로 재고, 넘치면 `PushClipRect` 로 자르고, 잘린 줄에 `SetTooltip` 으로 전체
+이름을 준다. 형제들은 일부만 알았다.
+
+| 위젯 | 자르는가 | 잘린 것을 돌려주는가 | W2-2 가 한 일 |
+|---|---|---|---|
+| `EditorPropertyRow` | ○ | ○ | 신고만 붙였다 |
+| `EditorInspectorPanel` | ○ | **×** | tooltip 을 더했다 |
+| `EditorSectionHeader` | **×** | **×** | 자르기와 tooltip 을 더했다 |
+| `EditorModeButton` | **×** | (용도 tooltip) | 자르기를 더했다 |
+| `EditorAxisField3` | **×** | (한 글자) | 자르기와 신고를 더했다 |
+| `SceneViewportOverlay.button` | ○ | ○ | 신고만 붙였다 |
+
+`EditorInspectorPanel` 은 주석에 *"오른쪽 버튼 위로 넘어가면 글자와 아이콘이 겹쳐 둘 다
+안 읽힌다"* 고 적어 두고도 잘라 낸 이름을 돌려줄 길은 만들지 않았다.
+
+**세운 것.** `editor::clipping`(`Editor/ImGuiHelper/EditorClipContract.{h,cpp}`) —
+`editor::nav`·`rhi::validation` 과 같은 꼴의 장부다. 위젯이 글자를 그리기 직전에
+`announce_text(위젯, 글자폭, 칸폭, 잘랐는가, 돌려줄수있는가)` 로 신고하면 장부가 그 자리에서
+가른다: 넓은데 안 잘랐다 → `overflow`, 잘랐는데 tooltip 이 없다 → `silent`, 둘 다 했다 →
+`truncated`(정상이지만 **수를 남긴다**). 클립 스택 깊이도 함께 신고해 `PushClipRect` 뒤
+조기 반환으로 그 뒤 전부가 좁은 사각형에 갇히는 사고를 그 자리에서 잡는다. 창구는
+`editor.clipping [reset]`.
+
+**자극이 이 축의 진짜 문제였다.** `EditorPropertyRow` 의 라벨 열은 **라벨에 맞춰 커지므로**
+평상시 잘릴 일이 없고, Inspector 도크는 창을 좁혀도 폭이 그대로다 — 실측으로 창을
+2200 → 900 으로 줄여도 Inspector 는 둘 다 **634 px** 였다(도크 노드가 절대 폭을 지키고
+중앙이 차이를 흡수한다). 그 상태로 재면 위반 0 인데, 그것은 계약을 지켰다는 뜻이 아니라
+**한 번도 자극하지 않았다**는 뜻이다. 그래서 게이트가 저장된 배치의 도킹 `SizeRef` 를
+고쳐 좁힌 판과 넓힌 판을 **한 저장본에서** 유도한다.
+
+**대조군을 한 번 틀렸다.** 처음엔 "손대지 않은 기본 배치" 를 대조군으로 뒀는데, 기본
+배치도 이미 좁아(1600x1000 에서 오른쪽 열 352 px) 182 건이 잘렸다 — 대조가 대조가
+아니었다. 같은 출처에서 **방향만 반대로** 유도해야 대조다(좁힘 150 px / 넓힘 900 px).
+
+**게이트:** `Tools/regression/verify-editor-widget-clipping.ps1`(단정 46 건, run-all 배선).
+① 런타임은 좁힌 판에서 `truncated > 0`(자극 확인)과 `overflow == 0 · silent == 0 ·
+unbalanced == 0`을, 넓힌 판에서 `truncated == 0`을 본다. ② 소스 대조는 글자를 직접 그리는
+파일을 전수로 뽑아 계약 6 · 면제 8 과 집합 그대로 맞대고, 계약 대상이 전부 신고하는지와
+창과 교차하지 않는 `PushClipRect(..., false)` 가 0 인지를 본다(ImGuizmo 가 정확히 그래서
+패널 위로 샜다 — W4, 2026-09-14).
+
+**자극하지 못한 것을 숨기지 않는다.** `EditorModeButton` 은 소비자가 0 이라 **영영** 닿지
+못한다. 게이트가 회차마다 그 이름을 찍는다.
+
+**변이 증명(9 종, 세 축).**
+
+| 변이 | 축 | 결과 |
+|---|---|---|
+| `EditorSectionHeader` 가 신고하지 않는다 | 소스 | 잡았다 |
+| `SceneViewportOverlay` 가 신고하지 않는다 | 소스 | 잡았다 |
+| 창과 교차하지 않는 클립을 민다 | 소스 | 잡았다 |
+| `EditorModeButton` 에 소비자가 생긴다 | 소스 | 잡았다 |
+| 글자를 직접 그리는 새 파일이 목록 밖에서 생긴다 | 소스 | 잡았다 |
+| `EditorInspectorPanel` 이 잘린 이름을 안 돌려준다 | 런타임 | 잡았다 — silent 91 |
+| `EditorPropertyRow` 가 넘쳐도 안 자른다 | 런타임 | 잡았다 — overflow 344 |
+| `EditorSectionHeader` 가 안 자른다(신고는 남는다) | 런타임 | **자극하지 못했다**(선언대로) |
+| 좁히기를 넓히기로 바꾼다 | 게이트 | 잡았다 — A/B 가 서지 않는다 |
+
+여덟째는 **미리 선언한 대로** 안 잡혔다. `EditorSectionHeader` 의 유일한 소비자가
+RectTransform 컴포넌트 하나뿐이라 이 하네스의 씬(빈 엔티티)에는 그려지지 않는다. 그 계약은
+소스 대조만이 지킨다 — `EditorModeButton` 과 함께 두 번째 미자극 대상이다.
+
+아홉째를 짜면서 게이트 자신의 결함도 하나 나왔다: 좁힌 폭을 출력에 **리터럴로** 찍고
+있어서, 폭을 바꾸는 변이 아래서 게이트가 한 일이 아니라 **적어 둔 의도**를 말했다. 쓴
+값을 기록해 찍도록 고쳤다.
+
+Release·Debug 양쪽 초록(좁힘 프레임 91/92 · 신고 2730/2760 · 자름 455/460, 넓힘 자름 0).
+
+**남은 것:** visual baseline, §8 성능 게이트, 상태 matrix. W2 는 `progress` 로 둔다.
 
 <a id="w2-inspector-layout"></a>
 

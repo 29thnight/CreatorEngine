@@ -323,6 +323,25 @@ Run-Step "에디터 키보드 탐색 계약" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-keyboard-nav.ps1") -Exe $Exe -Work (Join-Path $Work 'keyboard-nav')
 }
 
+# PHASE 21 W2-2 — custom widget 의 잘라 그리기 계약.
+#
+# §7.1 의 같은 문장에서 `clipping` 과 `tooltip` 은 한 규칙의 양쪽이다. 자기 칸보다
+# 넓은 글자를 안 자르면 옆 칸의 버튼 위로 그려지고(글자가 나중이라 덮는 쪽이다),
+# 잘랐는데 전체를 tooltip 으로 돌려주지 않으면 이름을 영영 못 읽는다. 뒤쪽은
+# 눈에 띄는 고장이 아니라 **조용히 사라지는 정보**라 더 오래 남는다.
+#
+# 규칙은 이미 `EditorPropertyRow` 에 완성돼 있었고 형제들이 일부만 알고 있었다 —
+# `EditorInspectorPanel` 은 자르기만 하고 돌려주지 않았고 `EditorSectionHeader` 는
+# 둘 다 없었다.
+#
+# ★ 이 축은 자극이 어렵다. 라벨 열은 라벨에 맞춰 커지고, Inspector 도크는 창을
+#   좁혀도 폭이 그대로다(실측: 창 2200 → 900 인데 둘 다 634 px). 그래서 게이트가
+#   저장된 배치의 `SizeRef` 를 고쳐 좁힌 판과 넓힌 판을 한 출처에서 유도하고,
+#   넓힌 쪽이 0 인 것으로 좁힌 쪽의 수가 폭 때문임을 세운다.
+Run-Step "에디터 위젯 잘라 그리기 계약" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-widget-clipping.ps1") -Exe $Exe -Work (Join-Path $Work 'widget-clipping')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

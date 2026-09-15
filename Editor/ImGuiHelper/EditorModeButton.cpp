@@ -1,5 +1,6 @@
 #include "EditorModeButton.h"
 #include "EditorNavContract.h"
+#include "EditorClipContract.h"
 
 #include "ImGui.h"
 #include "EditorTheme.h"
@@ -117,8 +118,16 @@ namespace editor::widgets
         const ImVec2 text_size = ImGui::CalcTextSize(request.icon, text_end);
         const ImVec2 text_pos(origin.x + (size.x - text_size.x) * 0.5f,
             origin.y + (size.y - text_size.y) * 0.5f);
+
+        // W2-2: 가운데 정렬이라 넘치면 **양쪽으로** 샌다 — 툴바에서는 옆 버튼
+        // 위다. tooltip 은 이 위젯이 이미 갖고 있다(아래 ⑦).
+        const bool icon_clipped = (text_size.x > size.x);
+        ::editor::clipping::announce_text("EditorModeButton",
+            text_size.x, size.x, icon_clipped, nullptr != request.tooltip);
+        if (icon_clipped) ImGui::PushClipRect(bounds.Min, bounds.Max, true);
         window->DrawList->AddText(text_pos,
             packed(mode_button_text_hex(request.enabled)), request.icon, text_end);
+        if (icon_clipped) ImGui::PopClipRect();
 
         // 켜짐은 아래 marker 가 든다. 두께는 활성 탭의 것과 같은 토큰을 쓴다 —
         // 같은 뜻("이것이 지금 켜진 것")을 에디터 안에서 두 가지 두께로 그리면

@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	124
-# names	133
+# commands	125
+# names	134
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -23,6 +23,7 @@ dump.list	-	immediate	editor	engine_service	live	no	yes	[limit]	크래시 덤프
 dump.show	-	immediate	editor	engine_service	live	no	yes	[limit]	덤프 목록과 최신 덤프 요약을 조회한다
 dx12.live	-	immediate	editor	engine_service	live	no	yes	on|status	EnhancedRenderer 메인 런타임 상태
 dx12.validation	-	immediate	editor	engine_service	live	no	yes	[reset]	검증 레이어 장부(레이어 상태·드레인 수·문제 건수·문구)
+editor.clipping	-	immediate	editor	engine_service	live	no	yes	[reset]	잘라 그리기 계약(넘침·조용한 잘림·클립 스택) 위반 수를 읽는다
 editor.dock	-	immediate	editor	engine_service	live	no	yes	-	살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다
 editor.layout	-	immediate	editor	engine_service	live	no	yes	-	활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다
 editor.menu	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다

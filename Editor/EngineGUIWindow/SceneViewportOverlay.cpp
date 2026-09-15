@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <mutex>
 #include <string>
+#include "EditorClipContract.h"
 
 namespace editor::scene_overlay_detail
 {
@@ -50,6 +51,16 @@ namespace editor::scene_overlay_detail
         if (ImGui::IsItemFocused()) draw->AddRect(p, {p.x + width, p.y + height},
             ImGui::GetColorU32(ImGuiCol_NavCursor), height * 0.5f, 2.f, corners);
         const ImVec2 text = ImGui::CalcTextSize(label);
+
+        // W2-2: 이 버튼은 §7.1 의 네 family 밖이다. 그런데 `InvisibleButton` 위에
+        // 프레임·글자·포커스 링·tooltip 을 **직접** 그리므로 실질은 다섯째 custom
+        // draw 자리다. 계약(자르고, 잘리면 전체를 돌려준다)은 이미 손으로 옳게
+        // 구현돼 있다 — 아래 클립과 `SetTooltip` 이 그것이다. 고칠 것은 없고,
+        // 장부에 들어와 있지 않았던 것만 고친다. 신고하지 않으면 판정이 이 자리를
+        // 영영 못 본다(W2-1 의 소스 축도 `ItemAdd` 를 안 불러 놓쳤다).
+        ::editor::clipping::announce_text("SceneViewportOverlay.button",
+            text.x, width, true, nullptr != tip);
+
         draw->PushClipRect(p, {p.x + width, p.y + height}, true);
         draw->AddText({p.x + (width - text.x) * 0.5f, p.y + (height - text.y) * 0.5f},
             ImGui::GetColorU32(ImGuiCol_Text), label);
