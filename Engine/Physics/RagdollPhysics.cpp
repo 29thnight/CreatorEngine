@@ -67,7 +67,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	physx::PxShape* shape = link->CreateShape(m_material, extend, m_collisionData);
 	if (shape == nullptr)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "ragdoll link error [ nema :" + linkInfo.boneName + "] create Shape fail");
+		Debug::PrintLog(spdlog::level::err, "ragdoll link error [ nema :" + linkInfo.boneName + "] create Shape fail");
 		return false;
 	}
 
@@ -103,7 +103,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	physx::PxShape* shape = link->CreateShape(m_material, radius, m_collisionData);
 	if (shape == nullptr)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "ragdoll link error [ nema :" + linkInfo.boneName + "] create Shape fail");
+		Debug::PrintLog(spdlog::level::err, "ragdoll link error [ nema :" + linkInfo.boneName + "] create Shape fail");
 		return false;
 	}
 	physx::PxFilterData filterData;
@@ -137,7 +137,7 @@ bool RagdollPhysics::AddArticulationLink(const LinkInfo& linkInfo, unsigned int*
 	physx::PxShape* shape = link->CreateShape(m_material, radius, halfHeight, m_collisionData);
 	if (shape == nullptr)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "ragdoll link error [ nema :" + linkInfo.boneName + "] create Shape fail");
+		Debug::PrintLog(spdlog::level::err, "ragdoll link error [ nema :" + linkInfo.boneName + "] create Shape fail");
 		return false;
 	}
 	physx::PxFilterData filterData;

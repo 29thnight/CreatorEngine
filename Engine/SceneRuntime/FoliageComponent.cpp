@@ -110,13 +110,13 @@ void FoliageComponent::SaveFoliageAsset(const file::path& directory,
 	TextAssetAuthoringResult result{};
 	if (!AssetAuthoringPort::WriteFoliage(request, result))
 	{
-		Debug::PrintLog({}, spdlog::level::err,
+		Debug::PrintLog(spdlog::level::err,
 			"Foliage save requires a complete Editor authoring transaction");
 		return;
 	}
 
 	m_foliageAssetGuid = result.guid;
-	Debug::PrintLog({}, spdlog::level::debug, "Foliage asset saved to: " + result.assetPath.string());
+	Debug::PrintLog(spdlog::level::debug, "Foliage asset saved to: " + result.assetPath.string());
 }
 
 void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
@@ -156,7 +156,7 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
         Meta::Deserialize(&instance, instanceNode);
         AddFoliageInstance(instance);
     }
-	Debug::PrintLog({}, spdlog::level::info, "Foliage asset loaded successfully: {}", assetPath.string());
+	Debug::PrintLog(spdlog::level::info, "Foliage asset loaded successfully: {}", assetPath.string());
 }
 
 void FoliageComponent::BindModelGeneration(FoliageType& type)
@@ -176,7 +176,7 @@ void FoliageComponent::BindModelGeneration(FoliageType& type)
         DataSystems->LoadModelAssetGeneration(modelGuid);
     if (!generation || generation->Meshes().empty())
     {
-        Debug::PrintLog({}, spdlog::level::err, "FoliageType 모델 generation 해석 실패: " + type.m_modelName);
+        Debug::PrintLog(spdlog::level::err, "FoliageType 모델 generation 해석 실패: " + type.m_modelName);
         return;
     }
     const assets::ModelMeshAsset& mesh = generation->Meshes().front();
@@ -203,7 +203,7 @@ void FoliageComponent::BindModelGeneration(FoliageType& type)
         }
         else
         {
-            Debug::PrintLog({}, spdlog::level::warn, "FoliageType 재질 변환 실패 — 빈 재질: " + error);
+            Debug::PrintLog(spdlog::level::warn, "FoliageType 재질 변환 실패 — 빈 재질: " + error);
         }
         break;
     }
@@ -409,7 +409,7 @@ void FoliageComponent::OnDeserialized()
 	// CT6-d: 구 ComponentFactory 분기 이동 — m_foliageAssetGuid는 반영 멤버.
 	if (m_foliageAssetGuid == nullFileGuid)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "FoliageComponent is missing m_foliageAssetGuid");
+		Debug::PrintLog(spdlog::level::err, "FoliageComponent is missing m_foliageAssetGuid");
 		return;
 	}
 
@@ -421,7 +421,7 @@ void FoliageComponent::OnDeserialized()
 	{
 		if (!type.m_modelName.empty() && !type.m_modelGeneration)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Failed to load model for FoliageType: " + type.m_modelName);
+			Debug::PrintLog(spdlog::level::err, "Failed to load model for FoliageType: " + type.m_modelName);
 		}
 	}
 

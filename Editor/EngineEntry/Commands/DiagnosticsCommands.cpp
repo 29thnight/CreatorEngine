@@ -662,13 +662,13 @@ namespace ConsoleCmd
         std::printf("%s", log.c_str());
         if (passed)
         {
-            Debug::PrintLog({}, spdlog::level::warn, std::string("[profile.selftest] 통과\n") + log);
+            Debug::PrintLog(spdlog::level::warn, std::string("[profile.selftest] 통과\n") + log);
         }
         else
         {
             // 실패는 반드시 로그 파일에도 남긴다 — 회귀 스크립트가 stdout
             // 리다이렉트를 놓쳐도 판정 근거가 남아야 한다.
-            Debug::PrintLog({}, spdlog::level::err, std::string("[profile.selftest] 실패\n") + log);
+            Debug::PrintLog(spdlog::level::err, std::string("[profile.selftest] 실패\n") + log);
         }
         std::printf("[CLI] profile.selftest %s\n", passed ? "통과" : "실패");
         auto data = CommandData::Object();
@@ -1210,7 +1210,7 @@ namespace ConsoleCmd
             std::printf("[CLI]   CRT churn 미집계 — mem.hook on 을 먼저 부를 것\n");
         }
 #endif
-        Debug::PrintLog({}, spdlog::level::warn, line);
+        Debug::PrintLog(spdlog::level::warn, line);
         return Ok({}, std::move(data));
     }
 
@@ -1249,7 +1249,7 @@ namespace ConsoleCmd
             return CommandCore::InvalidArguments("crash.test [av|abort|terminate|throw]");
 
         std::printf("[CLI] crash.test %s - 의도적으로 프로세스를 죽인다\n", kind.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[crash.test] 의도적 크래시: " + kind);
+        Debug::PrintLog(spdlog::level::warn, "[crash.test] 의도적 크래시: " + kind);
         Log::FlushNow();
 
         if (kind == "av")

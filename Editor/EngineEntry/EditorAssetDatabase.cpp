@@ -44,13 +44,13 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset meta creation failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset meta creation failed: " +
 				std::string(exception.what()));
 			return {};
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset meta creation failed with an unknown error");
+			Debug::PrintLog(spdlog::level::err, "Editor asset meta creation failed with an unknown error");
 			return {};
 		}
 	}
@@ -65,13 +65,13 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor text asset publication failed: "
+			Debug::PrintLog(spdlog::level::err, "Editor text asset publication failed: "
 				+ std::string(exception.what()));
 			return {};
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err,
+			Debug::PrintLog(spdlog::level::err,
 				"Editor text asset publication failed with an unknown error");
 			return {};
 		}
@@ -86,12 +86,12 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor model-cache write failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor model-cache write failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor model-cache write failed with an unknown error");
+			Debug::PrintLog(spdlog::level::err, "Editor model-cache write failed with an unknown error");
 		}
 		return false;
 	}
@@ -106,12 +106,12 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor embedded-texture write failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor embedded-texture write failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err,
+			Debug::PrintLog(spdlog::level::err,
 				"Editor embedded-texture write failed with an unknown error");
 		}
 		return false;
@@ -126,12 +126,12 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor terrain authoring transaction failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor terrain authoring transaction failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err,
+			Debug::PrintLog(spdlog::level::err,
 				"Editor terrain authoring transaction failed with an unknown error");
 		}
 		return false;
@@ -146,12 +146,12 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor foliage authoring transaction failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor foliage authoring transaction failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err,
+			Debug::PrintLog(spdlog::level::err,
 				"Editor foliage authoring transaction failed with an unknown error");
 		}
 		return false;
@@ -166,12 +166,12 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor collision-matrix authoring failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor collision-matrix authoring failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor collision-matrix authoring failed with an "
+			Debug::PrintLog(spdlog::level::err, "Editor collision-matrix authoring failed with an "
 				"unknown error");
 		}
 		return false;
@@ -186,12 +186,12 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor input-action-map authoring failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor input-action-map authoring failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor input-action-map authoring failed with an "
+			Debug::PrintLog(spdlog::level::err, "Editor input-action-map authoring failed with an "
 				"unknown error");
 		}
 		return false;
@@ -206,12 +206,12 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor tag-manager authoring failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor tag-manager authoring failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor tag-manager authoring failed with an "
+			Debug::PrintLog(spdlog::level::err, "Editor tag-manager authoring failed with an "
 				"unknown error");
 		}
 		return false;
@@ -226,12 +226,12 @@ namespace
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor blackboard authoring transaction failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor blackboard authoring transaction failed: " +
 				std::string(exception.what()));
 		}
 		catch (...)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor blackboard authoring transaction failed with "
+			Debug::PrintLog(spdlog::level::err, "Editor blackboard authoring transaction failed with "
 				"an unknown error");
 		}
 		return false;
@@ -383,7 +383,7 @@ namespace
 			experiment::importer::ScanGltfSourceDependencies(source);
 		if (!dependencies.Succeeded())
 		{
-			Debug::PrintLog({}, spdlog::level::err, std::string("Editor asset import rejected a glTF reference (")
+			Debug::PrintLog(spdlog::level::err, std::string("Editor asset import rejected a glTF reference (")
 				+ experiment::importer::ToString(dependencies.rejection) + "): "
 				+ source.string() + " — " + dependencies.rejectionDetail);
 			return false;
@@ -400,7 +400,7 @@ namespace
 			const std::wstring bundleName = source.stem().wstring();
 			if (!IsSafeAssetName(bundleName))
 			{
-				Debug::PrintLog({}, spdlog::level::err, "Editor asset import bundle name is unsafe: "
+				Debug::PrintLog(spdlog::level::err, "Editor asset import bundle name is unsafe: "
 					+ source.string());
 				return false;
 			}
@@ -409,7 +409,7 @@ namespace
 			{
 				if (!IsSafeRelativeAssetPath(relative))
 				{
-					Debug::PrintLog({}, spdlog::level::err, "Editor asset import rejected an unsafe sidecar path: "
+					Debug::PrintLog(spdlog::level::err, "Editor asset import rejected an unsafe sidecar path: "
 						+ source.string() + " — " + relative.generic_string());
 					return false;
 				}
@@ -442,7 +442,7 @@ namespace
 		file::create_directories(destination.parent_path(), error);
 		if (error)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset import directory creation failed: "
+			Debug::PrintLog(spdlog::level::err, "Editor asset import directory creation failed: "
 				+ destination.parent_path().string() + " (" + error.message() + ")");
 			return false;
 		}
@@ -452,7 +452,7 @@ namespace
 			file::copy_options::overwrite_existing, error);
 		if (error)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset import copy failed: " + source.string()
+			Debug::PrintLog(spdlog::level::err, "Editor asset import copy failed: " + source.string()
 				+ " -> " + destination.string() + " (" + error.message() + ")");
 			return false;
 		}
@@ -526,7 +526,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 	{
 		if (!file::exists(m_root) || !file::is_directory(m_root))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset root is missing: " + m_root.string());
+			Debug::PrintLog(spdlog::level::err, "Editor asset root is missing: " + m_root.string());
 			return false;
 		}
 
@@ -540,7 +540,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			m_watcher->addWatch(watcherRoot, this, true);
 		if (watchId < 0)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset watcher registration failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset watcher registration failed: " +
 				watcherRoot);
 			m_watcher.reset();
 			return false;
@@ -582,7 +582,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			|| !IsPathInside(destination, root) || !IsTargetFile(destination)
 			|| !IsSafeAssetName(destination.filename().wstring()))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor cataloged text publication rejected: "
+			Debug::PrintLog(spdlog::level::err, "Editor cataloged text publication rejected: "
 				+ requestedDestination.string());
 			return {};
 		}
@@ -617,7 +617,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 				!= ToLower(destinationPath.extension().string())
 			|| !file::is_directory(destinationPath.parent_path()))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset rename rejected: " + source.string()
+			Debug::PrintLog(spdlog::level::err, "Editor asset rename rejected: " + source.string()
 				+ " -> " + destination.string());
 			return {};
 		}
@@ -627,7 +627,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		if (!file::is_regular_file(sourceMeta, error) || error
 			|| file::exists(destinationMeta))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset rename requires exactly one source sidecar: "
+			Debug::PrintLog(spdlog::level::err, "Editor asset rename requires exactly one source sidecar: "
 				+ sourceMeta.string());
 			return {};
 		}
@@ -635,7 +635,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		const FileGuid guid = LoadGuidFromMeta(sourceMeta);
 		if (guid == FileGuid{})
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset rename rejected invalid source sidecar: "
+			Debug::PrintLog(spdlog::level::err, "Editor asset rename rejected invalid source sidecar: "
 				+ sourceMeta.string());
 			return {};
 		}
@@ -646,7 +646,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		file::rename(sourceMeta, destinationMeta, error);
 		if (error)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset sidecar rename failed: " + error.message());
+			Debug::PrintLog(spdlog::level::err, "Editor asset sidecar rename failed: " + error.message());
 			return {};
 		}
 
@@ -657,7 +657,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			const std::string moveError = error.message();
 			std::error_code rollbackError;
 			file::rename(destinationMeta, sourceMeta, rollbackError);
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset rename failed: " + moveError
+			Debug::PrintLog(spdlog::level::err, "Editor asset rename failed: " + moveError
 				+ (rollbackError ? " (sidecar rollback failed: "
 					+ rollbackError.message() + ")" : ""));
 			return {};
@@ -685,7 +685,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		file::create_directories(destination.parent_path(), error);
 		if (error)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor embedded-texture directory creation failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor embedded-texture directory creation failed: " +
 				destination.parent_path().string() + " (" + error.message() + ")");
 			return false;
 		}
@@ -702,7 +702,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			if (width == 0 || height > std::numeric_limits<size_t>::max() / rowBytes ||
 				bytes.size() != rowBytes * static_cast<size_t>(height))
 			{
-				Debug::PrintLog({}, spdlog::level::err, "Editor embedded-texture payload is invalid: " +
+				Debug::PrintLog(spdlog::level::err, "Editor embedded-texture payload is invalid: " +
 					destination.string());
 				return false;
 			}
@@ -751,7 +751,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			request.height > static_cast<uint32>(std::numeric_limits<int>::max()) ||
 			request.layers.size() > 4)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor Terrain request header is invalid");
+			Debug::PrintLog(spdlog::level::err, "Editor Terrain request header is invalid");
 			return false;
 		}
 
@@ -763,7 +763,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		if (pixelCount > std::numeric_limits<size_t>::max() / 4 ||
 			request.heightMap.size() != pixelCount)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor Terrain height payload is invalid");
+			Debug::PrintLog(spdlog::level::err, "Editor Terrain height payload is invalid");
 			return false;
 		}
 		for (const float value : request.heightMap)
@@ -778,7 +778,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 				!file::is_regular_file(layer.diffuseTextureSource, sourceError) ||
 				sourceError)
 			{
-				Debug::PrintLog({}, spdlog::level::err, "Editor Terrain layer payload is invalid: " +
+				Debug::PrintLog(spdlog::level::err, "Editor Terrain layer payload is invalid: " +
 					layer.diffuseTextureSource.string());
 				return false;
 			}
@@ -797,7 +797,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			file::absolute(request.destinationDirectory, error).lexically_normal();
 		if (error || !IsPathInside(destinationDirectory, terrainRoot))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor Terrain destination escaped the Terrain root: " +
+			Debug::PrintLog(spdlog::level::err, "Editor Terrain destination escaped the Terrain root: " +
 				request.destinationDirectory.string());
 			return false;
 		}
@@ -1071,13 +1071,13 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		std::error_code error;
 		if (source.empty() || !file::is_regular_file(source, error) || error)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset import source is missing: " + source.string());
+			Debug::PrintLog(spdlog::level::err, "Editor asset import source is missing: " + source.string());
 			return {};
 		}
 
 		if (!IsAllowedImportExtension(kind, source.extension().string()))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset import extension does not match its kind: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset import extension does not match its kind: " +
 				source.string());
 			return {};
 		}
@@ -1092,7 +1092,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		file::create_directories(plan.destinationDirectory, error);
 		if (error)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset import directory creation failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset import directory creation failed: " +
 				plan.destinationDirectory.string() + " (" + error.message() + ")");
 			return {};
 		}
@@ -1126,7 +1126,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			if (!hadMeta) created.push_back(sidecarMeta);
 			if (sidecarGuid == FileGuid{})
 			{
-				Debug::PrintLog({}, spdlog::level::err, "Editor asset import sidecar meta creation failed: "
+				Debug::PrintLog(spdlog::level::err, "Editor asset import sidecar meta creation failed: "
 					+ sidecar.string());
 				return RollbackImport(created, plan);
 			}
@@ -1138,7 +1138,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		const FileGuid guid = CreateMetaLocked(plan.destination);
 		if (guid == FileGuid{})
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset import meta creation failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset import meta creation failed: " +
 				plan.destination.string());
 			if (!hadDestinationMeta) created.push_back(destinationMeta);
 			return RollbackImport(created, plan);
@@ -1178,7 +1178,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		}
 		catch (const std::exception& exception)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset watcher callback failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset watcher callback failed: " +
 				std::string(exception.what()));
 		}
 	}
@@ -1196,7 +1196,7 @@ private:
 
 		if (!IsSafeAssetName(request.name) || request.payload.empty())
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor " + std::string(label) +
+			Debug::PrintLog(spdlog::level::err, "Editor " + std::string(label) +
 				" request is invalid");
 			return false;
 		}
@@ -1210,7 +1210,7 @@ private:
 			file::absolute(request.destinationDirectory, error).lexically_normal();
 		if (error || !IsPathInside(destinationDirectory, authoringRoot))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor " + std::string(label) +
+			Debug::PrintLog(spdlog::level::err, "Editor " + std::string(label) +
 				" destination escaped its authoring root: " +
 				request.destinationDirectory.string());
 			return false;
@@ -1242,7 +1242,7 @@ private:
 	{
 		if (request.payload.empty())
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor " + std::string(label) + " payload is empty");
+			Debug::PrintLog(spdlog::level::err, "Editor " + std::string(label) + " payload is empty");
 			return false;
 		}
 
@@ -1261,7 +1261,7 @@ private:
 		if (error || destination.parent_path() != root ||
 			!IsSafeAssetName(destination.filename().wstring()))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor " + std::string(label) +
+			Debug::PrintLog(spdlog::level::err, "Editor " + std::string(label) +
 				" destination is not directly under its authoring root: " +
 				request.destinationPath.string());
 			return false;
@@ -1292,7 +1292,7 @@ private:
 		file::create_directories(destination.parent_path(), error);
 		if (error)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset directory creation failed: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset directory creation failed: " +
 				destination.parent_path().string() + " (" + error.message() + ")");
 			return false;
 		}
@@ -1308,7 +1308,7 @@ private:
 		std::ofstream output(temporary, mode);
 		if (!output.is_open())
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset staging file could not be opened: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset staging file could not be opened: " +
 				temporary.string());
 			return false;
 		}
@@ -1319,7 +1319,7 @@ private:
 		output.close();
 		if (!complete)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset staging write was incomplete: " +
+			Debug::PrintLog(spdlog::level::err, "Editor asset staging write was incomplete: " +
 				temporary.string());
 			file::remove(temporary, error);
 			return false;
@@ -1330,7 +1330,7 @@ private:
 		{
 			// 잠금·권한·경로 길이가 여기서 갈린다. 실패 이유를 여기서 남기지 않으면
 			// 호출부는 자산 이름밖에 모른 채 실패한다.
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset publish failed: " + destination.string() +
+			Debug::PrintLog(spdlog::level::err, "Editor asset publish failed: " + destination.string() +
 				" (GetLastError=" + std::to_string(::GetLastError()) + ")");
 			file::remove(temporary, error);
 			return false;
@@ -1411,7 +1411,7 @@ private:
 				std::error_code error;
 				file::remove(metaPath, error);
 				if (error)
-					Debug::PrintLog({}, spdlog::level::warn, "Failed to remove invalid meta: " +
+					Debug::PrintLog(spdlog::level::warn, "Failed to remove invalid meta: " +
 						metaPath.string() + " (" + error.message() + ")");
 			}
 		}
@@ -1498,7 +1498,7 @@ private:
 		{
 			if (preferredGuid != FileGuid{})
 			{
-				Debug::PrintLog({}, spdlog::level::err, "Model authoring rejects caller-supplied legacy identity: "
+				Debug::PrintLog(spdlog::level::err, "Model authoring rejects caller-supplied legacy identity: "
 					+ targetFile.string());
 				return {};
 			}
@@ -1514,7 +1514,7 @@ private:
 			if (!result.Succeeded())
 			{
 				for (const assets::ModelAssetAuthoringIssue& issue : result.issues)
-					Debug::PrintLog({}, spdlog::level::err, "Model authoring failed [" + issue.stage + "]: "
+					Debug::PrintLog(spdlog::level::err, "Model authoring failed [" + issue.stage + "]: "
 						+ issue.message + " (" + targetFile.string() + ")");
 				return {};
 			}
@@ -1533,7 +1533,7 @@ private:
 				Authoring::WriteDocument::ParseFile(metaPath, &parseError);
 			if (!parsed || !parsed->Root().Read().IsMap())
 			{
-				Debug::PrintLog({}, spdlog::level::err, "Editor meta parse failed: " + metaPath.string()
+				Debug::PrintLog(spdlog::level::err, "Editor meta parse failed: " + metaPath.string()
 					+ " — " + parseError);
 				return {};
 			}
@@ -1546,7 +1546,7 @@ private:
 		if (guid == FileGuid{}) return {};
 		if (preferredGuid != FileGuid{} && guid != preferredGuid)
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Editor asset identity disagrees with canonical sidecar: "
+			Debug::PrintLog(spdlog::level::err, "Editor asset identity disagrees with canonical sidecar: "
 				+ targetFile.string() + " requested=" + preferredGuid.ToString()
 				+ " canonical=" + guid.ToString());
 			return guid;
@@ -1627,7 +1627,7 @@ private:
 			std::error_code error;
 			file::rename(oldMeta, newMeta, error);
 			if (error)
-				Debug::PrintLog({}, spdlog::level::warn, "Failed to move asset meta: " + error.message());
+				Debug::PrintLog(spdlog::level::warn, "Failed to move asset meta: " + error.message());
 		}
 
 		if (assets::IsModelAuthoringSource(newPath)) CreateMeta(newPath);
@@ -1682,7 +1682,7 @@ private:
 		std::error_code error;
 		file::remove(metaPath, error);
 		if (error)
-			Debug::PrintLog({}, spdlog::level::warn, "Failed to remove deleted asset meta: " +
+			Debug::PrintLog(spdlog::level::warn, "Failed to remove deleted asset meta: " +
 				error.message());
 	}
 
@@ -1873,12 +1873,12 @@ file::path EditorAssetDatabase::ImportSourceAsset(
 	}
 	catch (const std::exception& exception)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Editor asset import failed: " + source.string() +
+		Debug::PrintLog(spdlog::level::err, "Editor asset import failed: " + source.string() +
 			" (" + exception.what() + ")");
 	}
 	catch (...)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Editor asset import failed with an unknown error: " +
+		Debug::PrintLog(spdlog::level::err, "Editor asset import failed with an unknown error: " +
 			source.string());
 	}
 	return {};
@@ -1971,7 +1971,7 @@ bool EditorAssetDatabase::SaveExistingVolumeProfile(
 	const file::path savePath = DataSystems->GetFilePath(guid);
 	if (savePath.empty())
 	{
-		Debug::PrintLog({}, spdlog::level::err,
+		Debug::PrintLog(spdlog::level::err,
 			"EditorAssetDatabase::SaveExistingVolumeProfile: path is empty");
 		return false;
 	}

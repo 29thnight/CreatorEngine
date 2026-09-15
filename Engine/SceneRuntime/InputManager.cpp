@@ -37,7 +37,7 @@ namespace
             char message[128]{};
             std::snprintf(message, sizeof(message), "[GameInput] %s 판독 실패: 0x%08lX",
                 kindName, static_cast<unsigned long>(hr));
-            Debug::PrintLog({}, spdlog::level::warn, message);
+            Debug::PrintLog(spdlog::level::warn, message);
         }
         return false;
     }
@@ -52,7 +52,7 @@ bool InputManager::Initialize(HWND _hwnd)
     else
     {
         hwnd = _hwnd;
-        Debug::PrintLog({}, spdlog::level::info, "GameInput System NewCreateSceneInitialize succeed");
+        Debug::PrintLog(spdlog::level::info, "GameInput System NewCreateSceneInitialize succeed");
         return true;
     }
 

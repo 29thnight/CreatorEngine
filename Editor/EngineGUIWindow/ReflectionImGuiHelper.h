@@ -86,7 +86,7 @@ namespace Meta
                     }
                     catch (const std::exception& e)
                     {
-                        Debug::PrintLog({}, spdlog::level::err, e.what());
+                        Debug::PrintLog(spdlog::level::err, e.what());
                     }
                 }
             }
@@ -173,7 +173,7 @@ namespace Meta
                         }
                         catch (const std::exception& e)
                         {
-                            Debug::PrintLog({}, spdlog::level::err, e.what());
+                            Debug::PrintLog(spdlog::level::err, e.what());
                         }
                     }
                     ImGui::TreePop();

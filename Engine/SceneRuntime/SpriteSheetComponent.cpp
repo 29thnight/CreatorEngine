@@ -123,7 +123,7 @@ void SpriteSheetComponent::OnDeserialized()
 	}
 	else
 	{
-		Debug::PrintLog({}, spdlog::level::err, "SpriteSheetComponent is missing m_spriteSheetPath");
+		Debug::PrintLog(spdlog::level::err, "SpriteSheetComponent is missing m_spriteSheetPath");
 	}
 }
 

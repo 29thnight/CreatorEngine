@@ -569,7 +569,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 			selectedMetaFilePath, &parseError);
 		if (!selectedFileMetaNode)
 		{
-			Debug::PrintLog({}, spdlog::level::err, parseError);
+			Debug::PrintLog(spdlog::level::err, parseError);
 		}
 	}
 

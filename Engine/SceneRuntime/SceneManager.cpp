@@ -122,7 +122,7 @@ namespace
         if (!prefab)
         {
             // 프리팹 파일이 삭제됐거나 GUID가 끊겼다 — 연결 없이 오브젝트는 그대로 살려 둔다.
-            Debug::PrintLog({}, spdlog::level::warn, "프리팹 재연결 실패(파일을 찾을 수 없음): " + obj->GetHashedName().ToString());
+            Debug::PrintLog(spdlog::level::warn, "프리팹 재연결 실패(파일을 찾을 수 없음): " + obj->GetHashedName().ToString());
             return;
         }
 
@@ -418,7 +418,7 @@ void SceneManager::Initialization()
         }
         catch (const std::exception& e)
         {
-            Debug::PrintLog({}, spdlog::level::err, "Failed to activate loaded scene.");
+            Debug::PrintLog(spdlog::level::err, "Failed to activate loaded scene.");
             // Handle loading failure
         }
         // The future is now invalid after .get(), so this block won't run again until a new scene is loaded.
@@ -639,7 +639,7 @@ Scene* SceneManager::SaveScene(std::string_view name)
     }
 	catch (const std::exception& e)
 	{
-		Debug::PrintLog({}, spdlog::level::err, e.what());
+		Debug::PrintLog(spdlog::level::err, e.what());
 		return nullptr;
 	}
 
@@ -732,7 +732,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             {
                 if (assetsBundleNode.IsNull())
                 {
-                    Debug::PrintLog({}, spdlog::level::err, "AssetsBundle node is null.");
+                    Debug::PrintLog(spdlog::level::err, "AssetsBundle node is null.");
                 }
                 else
                 {
@@ -781,7 +781,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type)
                 {
-                    Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                    Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                     continue;
                 }
 
@@ -789,7 +789,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             }
             catch (const std::exception& e)
             {
-                Debug::PrintLog({}, spdlog::level::err, std::string("Failed to deserialize Entity: ") + e.what());
+                Debug::PrintLog(spdlog::level::err, std::string("Failed to deserialize Entity: ") + e.what());
                 continue;
 			}
         }
@@ -802,14 +802,14 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type)
                 {
-                    Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                    Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                     continue;
                 }
                 DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
             }
             catch (const std::exception& e)
             {
-                Debug::PrintLog({}, spdlog::level::err, std::string("Failed to deserialize DontDestroyOnLoadObject: ") + e.what());
+                Debug::PrintLog(spdlog::level::err, std::string("Failed to deserialize DontDestroyOnLoadObject: ") + e.what());
                 continue;
 			}
 		}
@@ -839,7 +839,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 	}
 	catch (const std::exception& e)
 	{
-		Debug::PrintLog({}, spdlog::level::err, e.what());
+		Debug::PrintLog(spdlog::level::err, e.what());
 		return nullptr;
 	}
 	return m_activeScene;
@@ -866,7 +866,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
         {
             if (assetsBundleNode.IsNull())
             {
-                Debug::PrintLog({}, spdlog::level::err, "AssetsBundle node is null.");
+                Debug::PrintLog(spdlog::level::err, "AssetsBundle node is null.");
             }
             else
             {
@@ -891,7 +891,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
             {
-                Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                 continue;
             }
 
@@ -904,7 +904,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
             {
-                Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                 continue;
             }
             DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, Authoring::NodeViewAccess::Make(objNode), &ddolBatch);
@@ -934,7 +934,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
     }
     catch (const std::exception& e)
     {
-        Debug::PrintLog({}, spdlog::level::err, e.what());
+        Debug::PrintLog(spdlog::level::err, e.what());
         return nullptr;
     }
 
@@ -999,7 +999,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                     const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                     if (!type)
                     {
-                        Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                        Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                         continue;
                     }
 
@@ -1007,7 +1007,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                 }
                 catch (const std::exception& e)
                 {
-                    Debug::PrintLog({}, spdlog::level::err, std::string("Failed to deserialize Entity: ") + e.what());
+                    Debug::PrintLog(spdlog::level::err, std::string("Failed to deserialize Entity: ") + e.what());
                     continue;
                 }
             }
@@ -1020,14 +1020,14 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
                     const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                     if (!type)
                     {
-                        Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                        Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                         continue;
                     }
                     DesirealizeDontDestroyOnLoadObjects(newScene, type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
                 }
                 catch (const std::exception& e)
                 {
-                    Debug::PrintLog({}, spdlog::level::err, std::string("Failed to deserialize DontDestroyOnLoadObject: ") + e.what());
+                    Debug::PrintLog(spdlog::level::err, std::string("Failed to deserialize DontDestroyOnLoadObject: ") + e.what());
                     continue;
                 }
             }
@@ -1047,7 +1047,7 @@ std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
         }
         catch (const std::exception& e)
         {
-            Debug::PrintLog({}, spdlog::level::err, e.what());
+            Debug::PrintLog(spdlog::level::err, e.what());
             // Returning nullptr indicates failure. The exception is also stored in the future.
             return nullptr;
         }
@@ -1105,7 +1105,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
             {
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type) {
-                    Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                    Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                     continue;
                 }
                 DesirealizeGameObject(newScene, type, Authoring::NodeViewAccess::Make(objNode), &sceneBatch);
@@ -1117,7 +1117,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
                 const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type)
                 {
-                    Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                    Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                     continue;
                 }
                 DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, Authoring::NodeViewAccess::Make(objNode), &ddolBatch);
@@ -1146,7 +1146,7 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
         }
         catch (const std::exception& e)
         {
-            Debug::PrintLog({}, spdlog::level::err, e.what());
+            Debug::PrintLog(spdlog::level::err, e.what());
             // Returning nullptr indicates failure. The exception is also stored in the future.
             return nullptr;
         }
@@ -1226,7 +1226,7 @@ void SceneManager::BeforeAwakeSceneLoad()
                 std::distance(m_scenes.begin(), found));
         }
         // Debug log the time taken to activate the scene
-        Debug::PrintLog({}, spdlog::level::info, std::string("Scene activation took ") + std::to_string(debugTimer.GetElapsedTime()) + " ms.");
+        Debug::PrintLog(spdlog::level::info, std::string("Scene activation took ") + std::to_string(debugTimer.GetElapsedTime()) + " ms.");
 
         Benchmark debugTimer1;
 
@@ -1246,7 +1246,7 @@ void SceneManager::BeforeAwakeSceneLoad()
             delete oldScene;
         }
         m_sceneToActivate = nullptr;
-        Debug::PrintLog({}, spdlog::level::info, std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
+        Debug::PrintLog(spdlog::level::info, std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
 
         // 새 씬의 보존 목록(RetainAssets)이 갱신된 뒤이므로 이 시점에 캐시를 정리한다.
         //
@@ -1401,7 +1401,7 @@ bool SceneManager::CaptureSceneSnapshot()
         // 검증용 주입(선언부 주석 참고). 실제 실패와 같은 자리에서 같은 모양으로
         // 빠진다 — 백업을 비우고 거부를 로그에 남긴다.
         --m_injectedSnapshotFailures;
-        Debug::PrintLog({}, spdlog::level::err, "[PIE] 주입된 스냅샷 실패 — 재생에 들어가지 않는다");
+        Debug::PrintLog(spdlog::level::err, "[PIE] 주입된 스냅샷 실패 — 재생에 들어가지 않는다");
         DiscardSceneSnapshot();
         return false;
     }
@@ -1429,7 +1429,7 @@ bool SceneManager::CaptureSceneSnapshot()
         // → 씬을 다시 열고 재생하면 이 catch에 닿는다.
         //
         // 스냅샷을 비우는 편이 옳다. 다만 이 거부는 조용하면 안 되므로 로그가 남는다.
-        Debug::PrintLog({}, spdlog::level::err, e.what());
+        Debug::PrintLog(spdlog::level::err, e.what());
         DiscardSceneSnapshot();
         return false;
     }
@@ -1440,7 +1440,7 @@ bool SceneManager::CaptureSceneSnapshot()
         // 재생에 들어갔고, 정지할 때 비로소 "백업이 없어 복원하지 못했다"가 떠서
         // 편집 내용을 잃었다. 지금은 들어가지 않는다 — 다만 그 거부가 조용하면
         // "재생 버튼이 안 먹는다"로만 보이므로 반드시 남긴다.
-        Debug::PrintLog({}, spdlog::level::err, "[PIE] 씬 스냅샷이 비어 있어 재생에 들어가지 않는다");
+        Debug::PrintLog(spdlog::level::err, "[PIE] 씬 스냅샷이 비어 있어 재생에 들어가지 않는다");
         DiscardSceneSnapshot();
         return false;
     }
@@ -1479,7 +1479,7 @@ bool SceneManager::RestoreSceneSnapshot()
             const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
             {
-                Debug::PrintLog({}, spdlog::level::err, "Failed to extract type from YAML node.");
+                Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
                 continue;
             }
 
@@ -1513,7 +1513,7 @@ bool SceneManager::RestoreSceneSnapshot()
     }
     catch (const std::exception& e)
     {
-        Debug::PrintLog({}, spdlog::level::err, e.what());
+        Debug::PrintLog(spdlog::level::err, e.what());
         return false;
     }
 
@@ -1571,7 +1571,7 @@ bool SceneManager::BeginPlayTransaction()
     }
     catch (const std::exception& e)
     {
-        Debug::PrintLog({}, spdlog::level::err, e.what());
+        Debug::PrintLog(spdlog::level::err, e.what());
         NotePlayFailure(e.what());
         return false;
     }
@@ -1614,7 +1614,7 @@ void SceneManager::EndPlayTransaction()
     {
         // 백업이 없으면 되돌릴 기준이 없다. 씬을 비우면 복구 불가능한 손실이
         // 되므로 그대로 둔다 — 재생 중 상태가 남는 편이 빈 씬보다 낫다.
-        Debug::PrintLog({}, spdlog::level::err, "[PIE] 에디터 씬 백업이 없어 복원하지 못했다");
+        Debug::PrintLog(spdlog::level::err, "[PIE] 에디터 씬 백업이 없어 복원하지 못했다");
         m_isEditorSceneLoaded = false;
         return;
     }
@@ -1722,7 +1722,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring
                 }
                 catch (const std::exception& e)
                 {
-                    Debug::PrintLog({}, spdlog::level::err, e.what());
+                    Debug::PrintLog(spdlog::level::err, e.what());
                     continue;
                 }
             }
@@ -1799,7 +1799,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
                 }
                 catch (const std::exception& e)
                 {
-                    Debug::PrintLog({}, spdlog::level::err, e.what());
+                    Debug::PrintLog(spdlog::level::err, e.what());
                     continue;
                 }
             }
@@ -1816,7 +1816,7 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
 			[&](const auto& obj) { return obj->GetInstanceID() == itNode["m_instanceID"].As<size_t>(); });
         if(it != m_dontDestroyOnLoadObjects.end())
         {
-            Debug::PrintLog({}, spdlog::level::warn, "Object with instance ID " + std::to_string(itNode["m_instanceID"].As<size_t>()) + " already exists in DontDestroyOnLoad.");
+            Debug::PrintLog(spdlog::level::warn, "Object with instance ID " + std::to_string(itNode["m_instanceID"].As<size_t>()) + " already exists in DontDestroyOnLoad.");
             return; // Object already exists, skip deserialization
 		}
 
@@ -1878,7 +1878,7 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
                 }
                 catch (const std::exception& e)
                 {
-                    Debug::PrintLog({}, spdlog::level::err, e.what());
+                    Debug::PrintLog(spdlog::level::err, e.what());
                     continue;
                 }
             }
@@ -1924,7 +1924,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
     // 오브젝트별 스팸 대신 배치당 한 줄 요약만 남긴다.
     if (mismatchCount > 0)
     {
-        Debug::PrintLog({}, spdlog::level::warn, "[Scene] '" + targetScene->GetSceneName().ToString() + "' 로드: m_index 불일치 "
+        Debug::PrintLog(spdlog::level::warn, "[Scene] '" + targetScene->GetSceneName().ToString() + "' 로드: m_index 불일치 "
             + std::to_string(mismatchCount) + "/" + std::to_string(batch.size())
             + "건을 슬롯 위치로 정정하고, 배치 내 계층 참조(m_parentIndex/m_childrenIndices/m_rootIndex)를 "
             + "슬롯 인덱스로 리매핑합니다.");
@@ -1939,7 +1939,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
             return foundIt->second;
         }
 
-        Debug::PrintLog({}, spdlog::level::err, "[Scene] '" + targetScene->GetSceneName().ToString() + "' Entity '"
+        Debug::PrintLog(spdlog::level::err, "[Scene] '" + targetScene->GetSceneName().ToString() + "' Entity '"
             + (owner ? owner->m_name.ToString() : std::string("?")) + "'의 " + label
             + " 참조(파일 인덱스 " + std::to_string(fileIdx) + ")가 이 배치 안에 없습니다 — 데이터 오염 가능성.");
         return Entity::INVALID_INDEX;

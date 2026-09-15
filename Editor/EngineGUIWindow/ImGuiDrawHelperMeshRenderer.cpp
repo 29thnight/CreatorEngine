@@ -423,14 +423,14 @@ namespace
 					PathFinder::Relative("Textures\\") / filename.filename();
 				if (filename.filename().empty())
 				{
-					Debug::PrintLog({}, spdlog::level::info, "Empty Texture File Name");
+					Debug::PrintLog(spdlog::level::info, "Empty Texture File Name");
 				}
 				else if (const FileGuid guid = DataSystems->GetFileGuid(filepath);
 					FileGuid{} == guid)
 				{
 					// GUID 없는 드롭을 받으면 화면에는 보여도 저장이 안 된다 —
 					// 조용한 소실보다 거부가 낫다.
-					Debug::PrintLog({}, spdlog::level::warn, "드롭한 텍스처에 .meta GUID가 없다 — "
+					Debug::PrintLog(spdlog::level::warn, "드롭한 텍스처에 .meta GUID가 없다 — "
 						"저작을 거부한다: " + filepath.string());
 				}
 				else

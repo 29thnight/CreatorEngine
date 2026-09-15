@@ -64,7 +64,7 @@ bool DynamicRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* sha
 	}
 
 	if (!m_rigidDynamic->attachShape(*shape)) {
-		Debug::PrintLog({}, spdlog::level::err, "DynamicRigidBody::Initialize() : attachShape failed id :" + std::to_string(m_id));
+		Debug::PrintLog(spdlog::level::err, "DynamicRigidBody::Initialize() : attachShape failed id :" + std::to_string(m_id));
 		return false;
 	}
 
@@ -119,7 +119,7 @@ void DynamicRigidBody::SetConvertScale(const math::vector3& scale, physx::PxPhys
 	//바꾸려는 스케일이 음수인지 체크--> - 크기는 존재할 수 없음
 	if (scale.x < 0 || scale.y < 0 || scale.z < 0)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "DynamicRigidBody::SetConvertScale() : scale is less than 0.001 id :" + std::to_string(m_id));
+		Debug::PrintLog(spdlog::level::err, "DynamicRigidBody::SetConvertScale() : scale is less than 0.001 id :" + std::to_string(m_id));
 		return;
 	}
 
@@ -186,7 +186,7 @@ void DynamicRigidBody::SetConvertScale(const math::vector3& scale, physx::PxPhys
 	}
 	else
 	{
-		Debug::PrintLog({}, spdlog::level::err, "DynamicRigidBody::SetConvertScale() : Unknown geometry type id :" + std::to_string(m_id));
+		Debug::PrintLog(spdlog::level::err, "DynamicRigidBody::SetConvertScale() : Unknown geometry type id :" + std::to_string(m_id));
 	}
 	
 }

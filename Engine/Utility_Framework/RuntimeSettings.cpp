@@ -54,11 +54,11 @@ bool RuntimeSettings::Load() noexcept
         {
             if (!PathFinder::IsAssetAuthoringEnabled())
             {
-                Debug::PrintLog({}, spdlog::level::err, "Packaged EngineSettings.asset is missing.");
+                Debug::PrintLog(spdlog::level::err, "Packaged EngineSettings.asset is missing.");
                 return false;
             }
 
-            Debug::PrintLog({}, spdlog::level::warn, "EngineSettings.asset is missing; using runtime defaults until the Editor saves it.");
+            Debug::PrintLog(spdlog::level::warn, "EngineSettings.asset is missing; using runtime defaults until the Editor saves it.");
             return true;
         }
 
@@ -67,7 +67,7 @@ bool RuntimeSettings::Load() noexcept
             Authoring::ParsedDocument::ParseFile(settingsPath.string(), parseError);
         if (!document)
         {
-            Debug::PrintLog({}, spdlog::level::err, "Unable to load EngineSettings.asset: " + parseError);
+            Debug::PrintLog(spdlog::level::err, "Unable to load EngineSettings.asset: " + parseError);
             return false;
         }
         const Authoring::ReadNode root = document.Root();
@@ -85,7 +85,7 @@ bool RuntimeSettings::Load() noexcept
         {
             if (!renderNode.IsMap())
             {
-                Debug::PrintLog({}, spdlog::level::err, "EngineSettings render must be a map.");
+                Debug::PrintLog(spdlog::level::err, "EngineSettings render must be a map.");
                 return false;
             }
 
@@ -94,7 +94,7 @@ bool RuntimeSettings::Load() noexcept
             {
                 if (!backendNode.IsScalar())
                 {
-                    Debug::PrintLog({}, spdlog::level::err, "EngineSettings render.backend must be dx12 or vulkan.");
+                    Debug::PrintLog(spdlog::level::err, "EngineSettings render.backend must be dx12 or vulkan.");
                     return false;
                 }
 
@@ -104,7 +104,7 @@ bool RuntimeSettings::Load() noexcept
                     const std::string message = "Unsupported EngineSettings render.backend '" +
                         backendName + "' (expected dx12 or vulkan).";
                     std::fprintf(stderr, "[RenderBackend] %s\n", message.c_str());
-                    Debug::PrintLog({}, spdlog::level::err, message);
+                    Debug::PrintLog(spdlog::level::err, message);
                     return false;
                 }
                 hasCanonicalBackend = true;
@@ -128,7 +128,7 @@ bool RuntimeSettings::Load() noexcept
         m_renderBackend = renderBackend;
         m_startupSceneName = startupScene.wstring();
 
-        Debug::PrintLog({}, spdlog::level::debug, std::string("[RenderBackend] runtime=") +
+        Debug::PrintLog(spdlog::level::debug, std::string("[RenderBackend] runtime=") +
             RenderBackendName(m_renderBackend));
         return true;
     }
@@ -137,13 +137,13 @@ bool RuntimeSettings::Load() noexcept
         const std::string message = "Runtime settings initialization failed: " +
             std::string(exception.what());
         std::fprintf(stderr, "[RuntimeSettings] %s\n", message.c_str());
-        Debug::PrintLog({}, spdlog::level::err, message);
+        Debug::PrintLog(spdlog::level::err, message);
         return false;
     }
     catch (...)
     {
         std::fputs("[RuntimeSettings] unknown initialization failure\n", stderr);
-        Debug::PrintLog({}, spdlog::level::err, "Runtime settings initialization failed with an unknown error.");
+        Debug::PrintLog(spdlog::level::err, "Runtime settings initialization failed with an unknown error.");
         return false;
     }
 }

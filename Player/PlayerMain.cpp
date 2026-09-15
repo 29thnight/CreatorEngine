@@ -249,7 +249,7 @@ void Player::PlayerMain::Initialize()
 			// LoadSceneImmediate는 실패를 삼키고 nullptr를 돌려준다 —
 			// 여기서 종료 코드로 승격하지 않으면 스모크가 빈 화면을
 			// 성공으로 오판한다(§2.4의 1호 발견이 정확히 이 모양이었다).
-			Debug::PrintLog({}, spdlog::level::err, "[SMOKE] startup scene load FAILED: " + scenePath.string());
+			Debug::PrintLog(spdlog::level::err, "[SMOKE] startup scene load FAILED: " + scenePath.string());
 			if (g_smoke.IsActive())
 			{
 				// §5.4 의 3 = precondition 불충족. LC8 이 표를 이관하며 다시 봤고
@@ -266,7 +266,7 @@ void Player::PlayerMain::Initialize()
 			// 'Scene loaded:[^\r\n]*<시작 씬>'으로 찾는다. 문구와 인자를 바꾸면
 			// 게임 빌드 검증이 조용히 깨진다. 옛 코드가 찍던 것과 같은 문자열이다
 			// (Core는 이 함수에 넘어온 경로 문자열을 그대로 찍었다).
-			Debug::PrintLog({}, spdlog::level::info, "Scene loaded: {}", scenePath.string());
+			Debug::PrintLog(spdlog::level::info, "Scene loaded: {}", scenePath.string());
 		}
 	}
 
@@ -534,7 +534,7 @@ void Player::PlayerMain::Update()
 			// 파이프라인이 영구 비활성화됐으면 promotion은 절대 오지 않는다.
 			// 기다리기만 하면 CI가 timeout으로만 실패해 최초 원인을 잃으므로,
 			// renderer가 공개한 정본 오류와 전용 종료 코드를 함께 남긴다.
-			Debug::PrintLog({}, spdlog::level::err, "[SMOKE] render pipeline FAILED: " +
+			Debug::PrintLog(spdlog::level::err, "[SMOKE] render pipeline FAILED: " +
 				renderState.lastError);
 			std::printf("[SMOKE] render pipeline FAILED: %s\n",
 				renderState.lastError.c_str());
@@ -573,15 +573,15 @@ void Player::PlayerMain::Update()
             for (const auto& node : pipelineState.pipelineNodes)
             {
                 const std::string state = !node.conditional ? "always" : node.active ? "active" : "inactive";
-                Debug::PrintLog({}, spdlog::level::debug, "[SMOKE] pipeline.node " + node.name + "|" + state);
+                Debug::PrintLog(spdlog::level::debug, "[SMOKE] pipeline.node " + node.name + "|" + state);
             }
-            Debug::PrintLog({}, spdlog::level::debug, "[SMOKE] pipeline.nodes 합계 " + std::to_string(pipelineState.pipelineNodes.size()));
+            Debug::PrintLog(spdlog::level::debug, "[SMOKE] pipeline.nodes 합계 " + std::to_string(pipelineState.pipelineNodes.size()));
 		}
 
 		// 성공 마커 — Verify는 이 줄과 "Scene loaded"(SceneManager), 종료
 		// 코드 0을 함께 본다. 락스텝 제거 뒤 GT frame 수만으로 끝내면 실제 GPU
 		// 완료가 0이어도 통과하므로 display 슬롯 회전도 함께 요구한다.
-		Debug::PrintLog({}, spdlog::level::debug, "[SMOKE] frame limit reached — clean exit ("
+		Debug::PrintLog(spdlog::level::debug, "[SMOKE] frame limit reached — clean exit ("
 			+ std::to_string(Time->GetFrameCount()) + " GT frames, display frame "
 			+ std::to_string(gameDisplay.completedFrameId) + ", promotions "
 			+ std::to_string(gameDisplay.promotionCount) + ")");

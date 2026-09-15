@@ -186,4 +186,15 @@ namespace editor
     // ── 게임 스레드(CLI) ────────────────────────────────────────────────────
     thumbnail_stats thumbnail_read_stats();
     void thumbnail_reset_stats();
+
+    /// 기본 CPU 픽셀 예산.
+    std::uint64_t thumbnail_default_budget_bytes();
+
+    /// 예산을 바꾼다. 0 을 주면 기본값으로 돌아간다.
+    ///
+    /// ★ 이것이 없으면 계약의 "예산을 넘으면 오래 안 쓴 것부터 버린다" 를
+    ///   **자극할 수 없다.** 목록은 clipper 로 보이는 타일만 요청하므로 파일을
+    ///   수백 개 뿌려도 기본 예산에 닿지 않는다. 자극할 수 없는 절은 게이트가
+    ///   초록으로 지나가고, 그 초록은 "지킨다" 가 아니라 "묻지 않았다" 다.
+    void thumbnail_set_budget_bytes(std::uint64_t bytes);
 }

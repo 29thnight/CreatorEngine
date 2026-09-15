@@ -87,7 +87,7 @@ void TagManager::Load()
         Authoring::ParsedDocument::ParseFile(path.string(), parseError);
     if (!document)
     {
-        Debug::PrintLog({}, spdlog::level::err, "TagManager parse failed: " + path.string() + " (" + parseError + ")");
+        Debug::PrintLog(spdlog::level::err, "TagManager parse failed: " + path.string() + " (" + parseError + ")");
  // 플래그를 세우지 않고 나간다 — Save가 빈 상태로 덮어쓰지 못하게 한다.
         return;
     }
@@ -125,7 +125,7 @@ bool TagManager::Save()
  //   사용자가 정말 전부 지운 경우에만 정당하고, 로드 실패 뒤에는 손실이다.
     if (!m_loadSucceeded && file::exists(ResolveTagManagerPath()))
     {
-        Debug::PrintLog({}, spdlog::level::warn, "TagManager::Save 건너뜀 — 로드가 성공한 적이 없어 "
+        Debug::PrintLog(spdlog::level::warn, "TagManager::Save 건너뜀 — 로드가 성공한 적이 없어 "
             "기존 자산을 빈 상태로 덮을 수 없다");
         return false;
     }
@@ -155,7 +155,7 @@ bool TagManager::Save()
 
     if (!AssetAuthoringPort::WriteTagManager(request))
     {
-        Debug::PrintLog({}, spdlog::level::err,
+        Debug::PrintLog(spdlog::level::err,
             "TagManager save requires a complete Editor authoring transaction");
         return false;
     }

@@ -548,7 +548,7 @@ void ConsoleCommandSystem::LoadScriptFile(const std::string& path)
         // 그냥 계속 돈다 — 하네스가 타임아웃으로 죽을 때까지. 실제로 겪었다.
         std::fprintf(stderr, "[CLI] 스크립트를 열 수 없습니다: %s\n", path.c_str());
         std::fflush(stderr);
-        Debug::PrintLog({}, spdlog::level::err, "[CLI] 스크립트를 열 수 없습니다: " + path);
+        Debug::PrintLog(spdlog::level::err, "[CLI] 스크립트를 열 수 없습니다: " + path);
 
         m_scriptLoadFailed = true;
         return;
@@ -1024,7 +1024,7 @@ namespace
             "[tfdigest:%s] 합계 오브젝트 %zu · 해시 %016llx",
             label.c_str(), emitted, static_cast<unsigned long long>(hash));
         std::printf("%s\n", summary);
-        Debug::PrintLog({}, spdlog::level::warn, summary);
+        Debug::PrintLog(spdlog::level::warn, summary);
 
         // ★ 해시를 **문자열로** 낸다. `%016llx` 로 찍는 값과 같은 표기여야 소비자가
         //   stdout 과 JSON 을 같은 값으로 읽는다. Int 로 내면 64비트 부호 없는 값이
@@ -1176,7 +1176,7 @@ namespace
         found->set(enable);
         const std::string msg = std::string("[scene.flag] ") + found->name + " = "
             + (enable ? found->onText : found->offText);
-        Debug::PrintLog({}, spdlog::level::warn, msg);
+        Debug::PrintLog(spdlog::level::warn, msg);
         std::printf("[CLI] %s\n", msg.c_str());
 
         CommandCore::CommandData data = CommandCore::CommandData::Object();

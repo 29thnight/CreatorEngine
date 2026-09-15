@@ -18,7 +18,7 @@ namespace Core
 		{
 			try
 			{
-				Debug::PrintLog({}, spdlog::level::err, "[Delegate] {} 중 예외: {}", phase, what);
+				Debug::PrintLog(spdlog::level::err, "[Delegate] {} 중 예외: {}", phase, what);
 			}
 			catch (...)
 			{

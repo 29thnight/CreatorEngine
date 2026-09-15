@@ -21,8 +21,9 @@ internal unsafe struct ScriptApiTable
 
     // 기존 로그 — level: 0=Debug 1=Info 2=Warning 3=Error, message: null 종료 UTF-8
     public delegate* unmanaged<int, byte*, void> Log;
-    // 구조화 로그 — source/message: null 종료 UTF-8, level: spdlog 값
-    public delegate* unmanaged<byte*, int, byte*, void> PrintLog;
+    // 구조화 로그 — message/file/member: null 종료 UTF-8, level: spdlog 값.
+    // file/line/member 는 호출부의 [CallerFilePath] 계열이 채운 값이 그대로 온다.
+    public delegate* unmanaged<int, byte*, byte*, int, byte*, void> PrintLog;
 
     // Entity
     //
@@ -307,7 +308,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 25;
+    public const int ExpectedVersion = 26;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -444,16 +445,20 @@ internal static unsafe class Native
         }
     }
 
-    public static void PrintLog(string source, int level, string message)
+    public static void PrintLog(int level, string message, string file, int line, string member)
     {
         if (!_bound || _api.PrintLog == null) return;
 
-        byte[] sourceBytes = System.Text.Encoding.UTF8.GetBytes(source + "\0");
         byte[] messageBytes = System.Text.Encoding.UTF8.GetBytes(message + "\0");
-        fixed (byte* sourcePointer = sourceBytes)
+        byte[] fileBytes = System.Text.Encoding.UTF8.GetBytes(file + "\0");
+        byte[] memberBytes = System.Text.Encoding.UTF8.GetBytes(member + "\0");
         fixed (byte* messagePointer = messageBytes)
+        fixed (byte* filePointer = fileBytes)
+        fixed (byte* memberPointer = memberBytes)
         {
-            _api.PrintLog(sourcePointer, level, messagePointer);
+            // 핀은 이 블록 동안만 유효하다. 네이티브가 동기로 포매팅을 끝내므로
+            // 호출이 돌아온 뒤에 포인터가 쓰이는 일은 없다.
+            _api.PrintLog(level, messagePointer, filePointer, line, memberPointer);
         }
     }
 

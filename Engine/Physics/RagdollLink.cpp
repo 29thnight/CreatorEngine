@@ -54,7 +54,7 @@ physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const math
 
 	if (shape == nullptr)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "ragdoll link error [ nema :" + m_name + "] create Shape fail");
+		Debug::PrintLog(spdlog::level::err, "ragdoll link error [ nema :" + m_name + "] create Shape fail");
 		return nullptr;
 	}
 
@@ -70,7 +70,7 @@ physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const floa
 	physx::PxRigidBodyExt::updateMassAndInertia(*m_pxLink, m_density);
 	if (shape == nullptr)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "ragdoll link error [ nema :" + m_name + "] create Shape fail");
+		Debug::PrintLog(spdlog::level::err, "ragdoll link error [ nema :" + m_name + "] create Shape fail");
 		return nullptr;
 	}
 
@@ -87,7 +87,7 @@ physx::PxShape* RagdollLink::CreateShape(physx::PxMaterial* material, const floa
 	physx::PxRigidBodyExt::updateMassAndInertia(*m_pxLink, m_density);
 	if (shape == nullptr)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "ragdoll link error [ nema :" + m_name + "] create Shape fail");
+		Debug::PrintLog(spdlog::level::err, "ragdoll link error [ nema :" + m_name + "] create Shape fail");
 		return nullptr;
 	}
 

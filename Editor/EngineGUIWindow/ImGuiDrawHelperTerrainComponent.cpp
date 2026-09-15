@@ -23,7 +23,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 
 	if (!g_CurrentBrush && !sessionBrush)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "TerrainComponent::GetCurrentBrush() returned nullptr.");
+		Debug::PrintLog(spdlog::level::err, "TerrainComponent::GetCurrentBrush() returned nullptr.");
 		sessionBrush = &EditorSessionState::Get().GetOrCreateTerrainBrush();
 		terrainComponent->SetTerrainBrush(sessionBrush);
 		return;

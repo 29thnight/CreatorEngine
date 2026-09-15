@@ -166,7 +166,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 				for (const auto& componentNode : sourceNode["m_components"])
 				{
 					try { ComponentFactorys->LoadComponent(clone, Authoring::NodeViewAccess::Make(componentNode), true); }
-					catch (const std::exception& e) { Debug::PrintLog({}, spdlog::level::err, e.what()); }
+					catch (const std::exception& e) { Debug::PrintLog(spdlog::level::err, e.what()); }
 				}
 			}
 

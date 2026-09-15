@@ -23,7 +23,7 @@ math::quaternion BoxColliderComponent::GetRotationOffset()
 
 void BoxColliderComponent::OnTriggerEnter(ICollider* other)
 {
-	Debug::PrintLog({}, spdlog::level::info, "OnTriggerEnter");
+	Debug::PrintLog(spdlog::level::info, "OnTriggerEnter");
 	++m_collsionCount;
 }
 
@@ -34,14 +34,14 @@ void BoxColliderComponent::OnTriggerStay(ICollider* other)
 void BoxColliderComponent::OnTriggerExit(ICollider* other)
 {
 	if (m_collsionCount != 0) {
-		Debug::PrintLog({}, spdlog::level::info, "OnTriggerExit");
+		Debug::PrintLog(spdlog::level::info, "OnTriggerExit");
 		--m_collsionCount;
 	}
 }
 
 void BoxColliderComponent::OnCollisionEnter(ICollider* other)
 {
-	Debug::PrintLog({}, spdlog::level::info, "OnCollisionEnter");
+	Debug::PrintLog(spdlog::level::info, "OnCollisionEnter");
 	++m_collsionCount;
 }
 
@@ -52,7 +52,7 @@ void BoxColliderComponent::OnCollisionStay(ICollider* other)
 void BoxColliderComponent::OnCollisionExit(ICollider* other)
 {
 	if (m_collsionCount != 0) {
-		Debug::PrintLog({}, spdlog::level::info, "OnCollisionExit");
+		Debug::PrintLog(spdlog::level::info, "OnCollisionExit");
 		--m_collsionCount;
 	}
 }

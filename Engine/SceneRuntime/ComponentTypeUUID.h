@@ -78,7 +78,7 @@ namespace ComponentTypeUUID
         {
             if (TypeTrait::ComponentUUIDRegistry::FindByName(entry.typeName) != nullptr)
             {
-                Debug::PrintLog({}, spdlog::level::critical, "ComponentTypeUUID: 이름 중복 등록 - " + std::string(entry.typeName));
+                Debug::PrintLog(spdlog::level::critical, "ComponentTypeUUID: 이름 중복 등록 - " + std::string(entry.typeName));
                 Log::FlushNow();
                 std::abort();
             }
@@ -87,7 +87,7 @@ namespace ComponentTypeUUID
 
             if (const std::string* dupName = TypeTrait::ComponentUUIDRegistry::FindNameByUUID(uuid))
             {
-                Debug::PrintLog({}, spdlog::level::critical, "ComponentTypeUUID: UUID 중복 - " + *dupName
+                Debug::PrintLog(spdlog::level::critical, "ComponentTypeUUID: UUID 중복 - " + *dupName
                     + " / " + std::string(entry.typeName));
                 Log::FlushNow();
                 std::abort();

@@ -123,7 +123,7 @@ namespace Meta
 			return true;
 		}
 
-		Debug::PrintLog({}, spdlog::level::err, std::string("SerializeInto: typed ops 미등록 타입 - ") + type.name
+		Debug::PrintLog(spdlog::level::err, std::string("SerializeInto: typed ops 미등록 타입 - ") + type.name
 			+ " (RegisterReflectManual.h 목록을 확인하라)");
 		return false;
 	}
@@ -254,7 +254,7 @@ namespace Meta
 			// 오브젝트마다 한 줄씩 나와 진짜 불일치가 묻힌다.
 			if (type->typeID != typeID && !renamed)
 			{
-				Debug::PrintLog({}, spdlog::level::warn, std::string("ExtractTypeFromYAML: typeID 불일치 — 이름으로 수용(구 파일, 재저장 시 치유): ")
+				Debug::PrintLog(spdlog::level::warn, std::string("ExtractTypeFromYAML: typeID 불일치 — 이름으로 수용(구 파일, 재저장 시 치유): ")
 					+ typeName);
 			}
 			return type;
@@ -293,7 +293,7 @@ namespace Meta
 			return;
 		}
 
-		Debug::PrintLog({}, spdlog::level::err, std::string("Deserialize: typed ops 미등록 타입 - ") + type.name
+		Debug::PrintLog(spdlog::level::err, std::string("Deserialize: typed ops 미등록 타입 - ") + type.name
 			+ " (RegisterReflectManual.h 목록을 확인하라)");
 	}
 

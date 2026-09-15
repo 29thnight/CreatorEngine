@@ -29,13 +29,13 @@ const BlackBoardValue& BlackBoard::GetChecked(const std::string& key, BlackBoard
 	if (it == m_values.end())
 	{
 		// If the key does not exist, throw an error
-		Debug::PrintLog({}, spdlog::level::err, "BlackBoard key not found: " + key);
+		Debug::PrintLog(spdlog::level::err, "BlackBoard key not found: " + key);
 		throw std::runtime_error("BlackBoard key not found: " + key);
 	}
 
 	if (it->second.Type != expected)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "BlackBoard type mismatch for key: " + key +
+		Debug::PrintLog(spdlog::level::err, "BlackBoard type mismatch for key: " + key +
 			". Expected: " + BlackBoardTypeToString(expected) +
 			", Actual: " + BlackBoardTypeToString(it->second.Type));
 
@@ -162,7 +162,7 @@ Entity* BlackBoard::GetValueAsGameObject(const std::string& key) const
 	auto gameObject = Entity::Find(entry.StringValue);
 	if (!gameObject)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Entity not found: " + entry.StringValue);
+		Debug::PrintLog(spdlog::level::err, "Entity not found: " + entry.StringValue);
 
 		throw std::runtime_error("Entity not found: " + entry.StringValue);
 	}
@@ -176,7 +176,7 @@ const Transform& BlackBoard::GetValueAsTransform(const std::string& key) const
 	auto gameObject = Entity::Find(entry.StringValue);
 	if (!gameObject)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Entity not found: " + entry.StringValue);
+		Debug::PrintLog(spdlog::level::err, "Entity not found: " + entry.StringValue);
 
 		throw std::runtime_error("Entity not found: " + entry.StringValue);
 	}
@@ -228,7 +228,7 @@ bool BlackBoard::Serialize(std::string_view name)
 	// 그러면 저장 경로와 Deserialize의 읽기 경로가 조용히 갈라진다.
 	if (name.empty())
 	{
-		Debug::PrintLog({}, spdlog::level::err, "BlackBoard save requires a non-empty name");
+		Debug::PrintLog(spdlog::level::err, "BlackBoard save requires a non-empty name");
 		return false;
 	}
 
@@ -262,7 +262,7 @@ bool BlackBoard::Serialize(std::string_view name)
 	TextAssetAuthoringResult result{};
 	if (!AssetAuthoringPort::WriteBlackBoard(request, result))
 	{
-		Debug::PrintLog({}, spdlog::level::err,
+		Debug::PrintLog(spdlog::level::err,
 			"BlackBoard save requires a complete Editor authoring transaction: " +
 			std::string(name));
 		return false;
@@ -281,7 +281,7 @@ void BlackBoard::Deserialize(std::string_view name)
 	file::path filePath = ResolveBlackBoardPath(name);
 	if (!file::exists(filePath))
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Blackboard file not found: " + filePath.string());
+		Debug::PrintLog(spdlog::level::err, "Blackboard file not found: " + filePath.string());
 
 		throw std::runtime_error("Blackboard file not found: " + filePath.string());
 	}
@@ -295,7 +295,7 @@ void BlackBoard::Deserialize(std::string_view name)
 		Authoring::ParsedDocument::ParseFile(filePath.string(), parseError);
 	if (!document)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Blackboard parse failed: " + filePath.string() + " (" + parseError + ")");
+		Debug::PrintLog(spdlog::level::err, "Blackboard parse failed: " + filePath.string() + " (" + parseError + ")");
 		throw std::runtime_error("Blackboard parse failed: " + filePath.string());
 	}
 	const Authoring::ReadNode entries = document.Root()[m_name.c_str()];

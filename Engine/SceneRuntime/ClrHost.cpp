@@ -77,7 +77,8 @@ namespace
 		int structSize;
 
 		void (__stdcall* Log)(int level, const char* message);
-		void (__stdcall* PrintLog)(const char* source, int level, const char* message);
+		void (__stdcall* PrintLog)(int level, const char* message,
+			const char* file, int line, const char* member);
 
 		ScriptObjectHandle (__stdcall* Entity_FindByName)(const char* name);
 		int  (__stdcall* Entity_IsAlive)(ScriptObjectHandle handle);
@@ -385,18 +386,28 @@ namespace
 
 		switch (level)
 		{
-		case 0:  Debug::PrintLog({}, spdlog::level::debug, message);   break;
-		case 2:  Debug::PrintLog({}, spdlog::level::warn, message); break;
-		case 3:  Debug::PrintLog({}, spdlog::level::err, message);   break;
-		default: Debug::PrintLog({}, spdlog::level::info, message);        break;
+		case 0:  Debug::PrintLog(spdlog::level::debug, message);   break;
+		case 2:  Debug::PrintLog(spdlog::level::warn, message); break;
+		case 3:  Debug::PrintLog(spdlog::level::err, message);   break;
+		default: Debug::PrintLog(spdlog::level::info, message);        break;
 		}
 	}
 
-	void __stdcall Api_PrintLog(const char* source, int level, const char* message)
+	// 관리 코드가 자기 호출 지점을 직접 싣는다. C# 의 [CallerFilePath]·
+	// [CallerLineNumber]·[CallerMemberName] 은 컴파일러가 채우므로
+	// std::source_location 과 같은 성격이다. 그 값을 그대로 흘리면 spdlog 가
+	// 받는 source_loc 이 된다 — 예전처럼 논리 태그를 받아 메시지 앞에 붙일
+	// 필요가 없다.
+	//
+	// 문자열 수명: 관리 측이 핀한 버퍼가 이 호출 동안 살아 있고, 로거가
+	// 동기라 포매팅이 여기서 끝난다.
+	void __stdcall Api_PrintLog(int level, const char* message,
+		const char* file, int line, const char* member)
 	{
 		if (nullptr == message) return;
 
-		const std::string_view sourceView = source != nullptr ? source : "";
+		const spdlog::source_loc where{ file != nullptr ? file : "",
+			line, member != nullptr ? member : "" };
 		spdlog::level::level_enum logLevel{};
 		switch (level)
 		{
@@ -407,11 +418,11 @@ namespace
 		case 4: logLevel = spdlog::level::critical; break;
 		default:
 		{
-			Debug::PrintLog({}, spdlog::level::err, "C# PrintLog received an invalid log level.");
+			Debug::PrintLog(spdlog::level::err, "C# PrintLog received an invalid log level.");
 			return;
 		}
 		}
-		Debug::PrintLog(sourceView, logLevel, message);
+		Debug::PrintLog(logLevel, message, where);
 	}
 
 	ScriptObjectHandle __stdcall Api_Entity_FindByName(const char* name)
@@ -753,7 +764,7 @@ namespace
 		Prefab* prefab = PrefabUtilitys->LoadPrefab(prefabName);
 		if (nullptr == prefab)
 		{
-			Debug::PrintLog({}, spdlog::level::warn, std::string("[스크립트] 프리팹을 찾을 수 없습니다: ") + prefabName);
+			Debug::PrintLog(spdlog::level::warn, std::string("[스크립트] 프리팹을 찾을 수 없습니다: ") + prefabName);
 			return {};
 		}
 
@@ -761,7 +772,7 @@ namespace
 		Entity* instance = PrefabUtilitys->InstantiatePrefab(prefab, name);
 		if (nullptr == instance)
 		{
-			Debug::PrintLog({}, spdlog::level::warn, std::string("[스크립트] 프리팹 인스턴스 생성 실패: ") + prefabName);
+			Debug::PrintLog(spdlog::level::warn, std::string("[스크립트] 프리팹 인스턴스 생성 실패: ") + prefabName);
 			return {};
 		}
 
@@ -2551,14 +2562,14 @@ bool ClrHost::LoadHostfxr()
     const bool hasPrivateRuntime = file::is_directory(privateRoot / L"host" / L"fxr");
     if (0 != get_hostfxr_path(path, &size, hasPrivateRuntime ? &parameters : nullptr))
 	{
-		Debug::PrintLog({}, spdlog::level::warn, "[CLR] hostfxr를 찾을 수 없습니다. 스크립트 계층이 비활성화됩니다.");
+		Debug::PrintLog(spdlog::level::warn, "[CLR] hostfxr를 찾을 수 없습니다. 스크립트 계층이 비활성화됩니다.");
 		return false;
 	}
 
 	HMODULE module = ::LoadLibraryW(path);
 	if (nullptr == module)
 	{
-		Debug::PrintLog({}, spdlog::level::warn, "[CLR] hostfxr 로드 실패");
+		Debug::PrintLog(spdlog::level::warn, "[CLR] hostfxr 로드 실패");
 		return false;
 	}
 
@@ -2588,7 +2599,7 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 		{
 			char buffer[256]{};
 			std::snprintf(buffer, sizeof(buffer), "[CLR] 진입점 바인딩 실패 (rc=0x%X)", rc);
-			Debug::PrintLog({}, spdlog::level::err, buffer);
+			Debug::PrintLog(spdlog::level::err, buffer);
 			return false;
 		}
 		return true;
@@ -2689,7 +2700,7 @@ bool ClrHost::Initialize()
 	if (!file::exists(assemblyPath) || !file::exists(configPath))
 	{
 		// 스크립트 없이도 에디터는 떠야 한다. 경고만 남기고 비활성 상태로 둔다.
-		Debug::PrintLog({}, spdlog::level::warn, "[CLR] ScriptCore.dll을 찾을 수 없어 스크립트 계층을 건너뜁니다: "
+		Debug::PrintLog(spdlog::level::warn, "[CLR] ScriptCore.dll을 찾을 수 없어 스크립트 계층을 건너뜁니다: "
 			+ assemblyPath.string());
 		return false;
 	}
@@ -2703,7 +2714,7 @@ bool ClrHost::Initialize()
 	{
 		char buffer[256]{};
 		std::snprintf(buffer, sizeof(buffer), "[CLR] 런타임 초기화 실패 (rc=0x%X)", rc);
-		Debug::PrintLog({}, spdlog::level::err, buffer);
+		Debug::PrintLog(spdlog::level::err, buffer);
 		if (nullptr != context) g_hostClose(context);
 		return false;
 	}
@@ -2714,7 +2725,7 @@ bool ClrHost::Initialize()
 
 	if (0 != rc || nullptr == loader)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "[CLR] 로더 델리게이트 획득 실패");
+		Debug::PrintLog(spdlog::level::err, "[CLR] 로더 델리게이트 획득 실패");
 		return false;
 	}
 	g_loadAssembly = reinterpret_cast<load_assembly_and_get_function_pointer_fn>(loader);
@@ -2728,7 +2739,7 @@ bool ClrHost::Initialize()
 		char buffer[256]{};
 		std::snprintf(buffer, sizeof(buffer),
 			"[CLR] 관리 초기화 실패 (result=%d) — API 표 버전이 어긋났을 수 있습니다", initResult);
-		Debug::PrintLog({}, spdlog::level::err, buffer);
+		Debug::PrintLog(spdlog::level::err, buffer);
 		return false;
 	}
 
@@ -2741,16 +2752,16 @@ bool ClrHost::Initialize()
 		const std::string utf8(pathUtf8.begin(), pathUtf8.end());
 		if (0 != m_fnLoadScripts(utf8.c_str()))
 		{
-			Debug::PrintLog({}, spdlog::level::warn, "[CLR] 게임 스크립트 어셈블리 로드 실패");
+			Debug::PrintLog(spdlog::level::warn, "[CLR] 게임 스크립트 어셈블리 로드 실패");
 		}
 	}
 	else
 	{
-		Debug::PrintLog({}, spdlog::level::warn, "[CLR] GameScripts.dll이 없어 스크립트 없이 시작합니다: " + scriptsPath.string());
+		Debug::PrintLog(spdlog::level::warn, "[CLR] GameScripts.dll이 없어 스크립트 없이 시작합니다: " + scriptsPath.string());
 	}
 
 	m_ready = true;
-	Debug::PrintLog({}, spdlog::level::info, "[CLR] CoreCLR 스크립트 계층 준비 완료");
+	Debug::PrintLog(spdlog::level::info, "[CLR] CoreCLR 스크립트 계층 준비 완료");
 	return true;
 }
 
@@ -3201,7 +3212,7 @@ void ClrHost::QueueScriptMessage(int instanceId, std::string_view methodName)
 	// 엉뚱한 메서드를 부르거나(접두사 충돌) 조용히 실패한다. 둘 다 추적하기 어렵다.
 	if (methodName.size() >= kScriptMessageNameCapacity)
 	{
-		Debug::PrintLog({}, spdlog::level::warn, "[스크립트] 콜백 이름이 너무 깁니다: " + std::string(methodName));
+		Debug::PrintLog(spdlog::level::warn, "[스크립트] 콜백 이름이 너무 깁니다: " + std::string(methodName));
 		return;
 	}
 

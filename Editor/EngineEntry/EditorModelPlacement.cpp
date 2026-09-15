@@ -230,7 +230,7 @@ namespace Editor
             }
             if (!request->prepared)
             {
-                Debug::PrintLog({}, spdlog::level::err, request->error);
+                Debug::PrintLog(spdlog::level::err, request->error);
                 ++state.failed;
                 request->finished.store(true, std::memory_order_release);
                 continue;
@@ -248,7 +248,7 @@ namespace Editor
             }
             catch (const std::exception& error)
             {
-                Debug::PrintLog({}, spdlog::level::err, error.what());
+                Debug::PrintLog(spdlog::level::err, error.what());
                 request->prepared->Cancel(*active);
                 result = ModelSceneInstantiation::PendingInstance::Status::Failed;
             }

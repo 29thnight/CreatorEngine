@@ -187,7 +187,7 @@ namespace Meta
                 }
                 else
                 {
-                    Debug::PrintLog({}, spdlog::level::warn, std::string("MakePropertyImpl: 콘솔 세터가 지원하지 않는 타입(복사 불가) - ") + name);
+                    Debug::PrintLog(spdlog::level::warn, std::string("MakePropertyImpl: 콘솔 세터가 지원하지 않는 타입(복사 불가) - ") + name);
                 }
             },
             typeID,

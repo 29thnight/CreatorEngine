@@ -46,19 +46,34 @@ public:
 	bool IsInitialized() const noexcept { return m_initialized.load(std::memory_order_acquire); }
 	const std::string& GetLogFilePath() const noexcept { return m_logFilePath; }
 
-	// source는 파일 경로가 아니라 호출부를 구분하는 논리적 태그/모듈명이다
-	// (예: "PhysicsManager"). file/line/function은 항상 실제 호출 지점을 가리키는
-	// where(std::source_location::current())에서 채운다 — 호출부가 __FILE__을
-	// 넘길 필요가 없다. source가 비어있지 않으면 메시지 앞에 "[source] "를 붙여
-	// 어느 태그의 로그인지 구분한다.
-	void PrintLog(std::string_view source, spdlog::level::level_enum level,
-		std::string_view message, std::source_location where = std::source_location::current())
+	// 호출 지점(file/line/function)은 where가 기본 인자로 채운다 — 호출부가
+	// __FILE__을 넘길 필요가 없다.
+	//
+	// 예전에는 앞에 논리 태그 source를 하나 더 받아 메시지 앞에 "[source] "로
+	// 붙였다. 걷어냈다 — 호출처 596 중 592가 빈 {}를 넘기고 있었고, 태그를
+	// 채우는 유일한 생산자는 C# 경계였는데 그쪽은 이제 자기 호출 지점을
+	// [CallerFilePath] 계열로 직접 싣는다. 태그는 문자열 연결이라 구조 필드도
+	// 아니었다 — 로그 창이 따로 낼 수도 걸러낼 수도 없었다.
+	void PrintLog(spdlog::level::level_enum level, std::string_view message,
+		std::source_location where = std::source_location::current())
 	{
-		const spdlog::source_loc location{ where.file_name(), static_cast<int>(where.line()), where.function_name() };
-		if (source.empty())
-			spdlog::log(location, level, "{}", message);
-		else
-			spdlog::log(location, level, "[{}] {}", source, message);
+		PrintLog(level, message, spdlog::source_loc{ where.file_name(),
+			static_cast<int>(where.line()), where.function_name() });
+	}
+
+	// 경계 밖에서 온 호출 지점을 그대로 싣는 저수준 진입점.
+	//
+	// std::source_location은 값으로 만들 수 없다(표준이 current()만 준다). 그래서
+	// CLR 브리지처럼 file/line/function을 문자열로 건네받는 쪽은 이 오버로드로
+	// 들어온다 — 위 오버로드를 거치면 기본 인자가 재평가돼 브리지 자신의 위치를
+	// 싣게 된다.
+	//
+	// where가 든 포인터는 이 호출 동안만 살아 있으면 된다. 로거가 동기라
+	// (async_logger가 아니다) 포매팅이 여기서 끝난다.
+	void PrintLog(spdlog::level::level_enum level, std::string_view message,
+		spdlog::source_loc where)
+	{
+		spdlog::log(where, level, "{}", message);
 	}
 
 	// fmt 문자열 리터럴과 호출 지점(source_location)을 함께 캡처하는 래퍼.
@@ -87,46 +102,46 @@ public:
 	// 리터럴 하나만으로 Args를 추론하려다 실패한다. 실제 Args는 뒤의 args... 팩에서만
 	// 추론된다.
 	template <typename... Args>
-	void PrintLog(std::string_view source, spdlog::level::level_enum level,
+	void PrintLog(spdlog::level::level_enum level,
 		FormatArgs<std::type_identity_t<Args>...> fmtArgs, Args&&... args)
 	{
-		PrintLog(source, level, std::format(fmtArgs.fmt, std::forward<Args>(args)...), fmtArgs.where);
+		PrintLog(level, std::format(fmtArgs.fmt, std::forward<Args>(args)...), fmtArgs.where);
 	}
 
 	void LogWarning(std::string_view message,
 		std::source_location where = std::source_location::current())
 	{
-		PrintLog({}, spdlog::level::warn, message, where);
+		PrintLog(spdlog::level::warn, message, where);
 	}
 
 	void Log(std::string_view message,
 		std::source_location where = std::source_location::current())
 	{
-		PrintLog({}, spdlog::level::info, message, where);
+		PrintLog(spdlog::level::info, message, where);
 	}
 
 	void LogError(std::string_view message,
 		std::source_location where = std::source_location::current())
 	{
-		PrintLog({}, spdlog::level::err, message, where);
+		PrintLog(spdlog::level::err, message, where);
 	}
 
 	void LogDebug(std::string_view message,
 		std::source_location where = std::source_location::current())
 	{
-		PrintLog({}, spdlog::level::debug, message, where);
+		PrintLog(spdlog::level::debug, message, where);
 	}
 
 	void LogTrace(std::string_view message,
 		std::source_location where = std::source_location::current())
 	{
-		PrintLog({}, spdlog::level::trace, message, where);
+		PrintLog(spdlog::level::trace, message, where);
 	}
 
 	void LogCritical(std::string_view message,
 		std::source_location where = std::source_location::current())
 	{
-		PrintLog({}, spdlog::level::critical, message, where);
+		PrintLog(spdlog::level::critical, message, where);
 	}
 
 	void Flush()
@@ -167,17 +182,24 @@ namespace Debug
 	// where는 이 오버로드가 직접 호출된 지점(예: PhysicsManager.cpp)에서 기본값으로
 	// 채워지고, Instance().PrintLog로 그 값을 그대로 전달한다 — 여기서 생략하면
 	// LogSystem.h 안에서 재평가돼 실제 호출 지점을 잃어버린다.
-	inline void PrintLog(std::string_view source, spdlog::level::level_enum level,
-		std::string_view message, std::source_location where = std::source_location::current())
+	inline void PrintLog(spdlog::level::level_enum level, std::string_view message,
+		std::source_location where = std::source_location::current())
 	{
-		Instance().PrintLog(source, level, message, where);
+		Instance().PrintLog(level, message, where);
+	}
+
+	// 경계 밖에서 온 호출 지점을 그대로 넘기는 진입점. CLR 브리지가 쓴다.
+	inline void PrintLog(spdlog::level::level_enum level, std::string_view message,
+		spdlog::source_loc where)
+	{
+		Instance().PrintLog(level, message, where);
 	}
 
 	template <typename... Args>
-	inline void PrintLog(std::string_view source, spdlog::level::level_enum level,
+	inline void PrintLog(spdlog::level::level_enum level,
 		DebugClass::FormatArgs<std::type_identity_t<Args>...> fmtArgs, Args&&... args)
 	{
-		Instance().PrintLog(source, level, std::move(fmtArgs), std::forward<Args>(args)...);
+		Instance().PrintLog(level, std::move(fmtArgs), std::forward<Args>(args)...);
 	}
 
 	inline void Clear() { Instance().Clear(); }

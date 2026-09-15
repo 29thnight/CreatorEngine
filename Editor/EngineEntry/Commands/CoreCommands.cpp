@@ -585,7 +585,7 @@ namespace ConsoleCmd
             : "[CLI] 창 크기 변경(클램프됨): 요청 " + std::to_string(width) + "x" + std::to_string(height) +
               " -> 실제 " + std::to_string(actualWidth) + "x" + std::to_string(actualHeight);
 
-        Debug::PrintLog({}, spdlog::level::warn, message);
+        Debug::PrintLog(spdlog::level::warn, message);
         std::printf("%s\n", message.c_str());
         auto data = CommandData::Object();
         data.Set("requestedWidth", CommandData::Int(width));
@@ -606,7 +606,7 @@ namespace ConsoleCmd
         const uint32_t clientW = client.width;
         const uint32_t clientH = client.height;
         std::printf("[CLI] 클라이언트 영역: %ux%u\n", clientW, clientH);
-        Debug::PrintLog({}, spdlog::level::warn, "[CLI] 클라이언트 영역: " +
+        Debug::PrintLog(spdlog::level::warn, "[CLI] 클라이언트 영역: " +
             std::to_string(clientW) + "x" + std::to_string(clientH));
         auto data = CommandData::Object();
         data.Set("width", CommandData::Int(clientW));
@@ -1214,7 +1214,7 @@ namespace ConsoleCmd
             entry.Set("totalScans", CommandData::Int(static_cast<long long>(sample.totalScans)));
             entry.Set("totalProbes", CommandData::Int(static_cast<long long>(sample.totalProbes)));
             panels.Append(std::move(entry));
-            Debug::PrintLog({}, spdlog::level::info, "[editor.panelcost] " + std::string(::editor::windows::panel_cost_slot_name(slot)) +
+            Debug::PrintLog(spdlog::level::info, "[editor.panelcost] " + std::string(::editor::windows::panel_cost_slot_name(slot)) +
                 " frames=" + std::to_string(sample.frames) +
                 " lastMs=" + std::to_string(sample.lastMs) +
                 " avgMs=" + std::to_string(sample.avgMs) +
@@ -1416,9 +1416,23 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         const auto& args = ctx.parts;
-        if (args.size() > 2 || (2 == args.size() && "reset" != args[1]))
-            return InvalidArguments("editor.thumbnail [reset]");
-        if (2 == args.size()) ::editor::thumbnail_reset_stats();
+        const char* const usage = "editor.thumbnail [reset | budget <bytes|default>]";
+
+        if (2 == args.size() && "reset" == args[1]) ::editor::thumbnail_reset_stats();
+        else if (3 == args.size() && "budget" == args[1])
+        {
+            // 예산을 낮춰 축출을 자극하는 창구. 목록이 clipper 로 보이는 타일만
+            // 요청하므로 파일 수로는 기본 예산에 닿을 수 없다.
+            if ("default" == args[2]) ::editor::thumbnail_set_budget_bytes(0);
+            else
+            {
+                unsigned long long bytes = 0;
+                try { bytes = std::stoull(args[2]); }
+                catch (const std::exception&) { return InvalidArguments(usage); }
+                ::editor::thumbnail_set_budget_bytes(bytes);
+            }
+        }
+        else if (args.size() > 1) return InvalidArguments(usage);
 
         const auto stats = ::editor::thumbnail_read_stats();
         auto data = CommandData::Object();
@@ -1441,7 +1455,7 @@ namespace ConsoleCmd
         data.Set("budgetBytes", CommandData::Int(static_cast<long long>(stats.budgetBytes)));
         data.Set("workerPoolRunning", CommandData::Bool(stats.workerPoolRunning));
 
-        Debug::PrintLog({}, spdlog::level::info, "[editor.thumbnail]"
+        Debug::PrintLog(spdlog::level::info, "[editor.thumbnail]"
             " requests=" + std::to_string(stats.requests) +
             " deduped=" + std::to_string(stats.deduped) +
             " decoded=" + std::to_string(stats.decoded) +
@@ -1450,7 +1464,7 @@ namespace ConsoleCmd
             " lateDropped=" + std::to_string(stats.lateDropped) +
             " invalidated=" + std::to_string(stats.invalidated) +
             " evicted=" + std::to_string(stats.evicted));
-        Debug::PrintLog({}, spdlog::level::info, "[editor.thumbnail]"
+        Debug::PrintLog(spdlog::level::info, "[editor.thumbnail]"
             " entries=" + std::to_string(stats.entries) +
             " queued=" + std::to_string(stats.queued) +
             " working=" + std::to_string(stats.working) +

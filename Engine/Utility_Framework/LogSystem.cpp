@@ -58,7 +58,7 @@ std::terminate_handler g_previousTerminate{ nullptr };
 
             if (g_logSystemAlive.load(std::memory_order_acquire))
             {
-                Debug::PrintLog({}, spdlog::level::err, "크래시 덤프 기록자 미등록 - 이번 크래시는 덤프 없이 지나간다.");
+                Debug::PrintLog(spdlog::level::err, "크래시 덤프 기록자 미등록 - 이번 크래시는 덤프 없이 지나간다.");
                 DebugClass::GetInstance()->FlushNow();
             }
             return;
@@ -265,11 +265,11 @@ void Log::SetCrashDumpWriter(CrashDumpWriter writer)
 
     if (nullptr != writer)
     {
-        Debug::PrintLog({}, spdlog::level::info, "크래시 덤프 기록자 등록 완료 - 이번 실행의 크래시는 .dmp로 남는다.");
+        Debug::PrintLog(spdlog::level::info, "크래시 덤프 기록자 등록 완료 - 이번 실행의 크래시는 .dmp로 남는다.");
     }
     else
     {
-        Debug::PrintLog({}, spdlog::level::warn, "크래시 덤프 기록자가 해제됐다 - 이후 크래시는 덤프 없이 지나간다.");
+        Debug::PrintLog(spdlog::level::warn, "크래시 덤프 기록자가 해제됐다 - 이후 크래시는 덤프 없이 지나간다.");
     }
 }
 

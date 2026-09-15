@@ -182,7 +182,7 @@ namespace ConsoleCmd
         {
             std::printf("%s", line.c_str());
         }
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[dx12.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, std::string("[dx12.selftest] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.selftest %s → %s\n", passed ? "통과" : "실패", outputPath.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -207,7 +207,7 @@ namespace ConsoleCmd
         const bool passed = RunVulkanGridTest(log);
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[vk.grid] ") + (passed ? "통과" : "실패") + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, std::string("[vk.grid] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.grid %s\n", passed ? "통과" : "실패");
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -229,7 +229,7 @@ namespace ConsoleCmd
         const bool passed = RunVulkanTextureCodecTest(log);
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[vk.texturecodec] ") +
+        Debug::PrintLog(spdlog::level::warn, std::string("[vk.texturecodec] ") +
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.texturecodec %s\n", passed ? "통과" : "실패");
 
@@ -252,7 +252,7 @@ namespace ConsoleCmd
         const bool passed = RunVulkanShadowTest(log);
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[vk.shadow] ") +
+        Debug::PrintLog(spdlog::level::warn, std::string("[vk.shadow] ") +
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.shadow %s\n", passed ? "통과" : "실패");
 
@@ -275,7 +275,7 @@ namespace ConsoleCmd
         const bool passed = RunVulkanGBufferTest(log);
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[vk.gbuffer] ") +
+        Debug::PrintLog(spdlog::level::warn, std::string("[vk.gbuffer] ") +
             (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] vk.gbuffer %s\n", passed ? "통과" : "실패");
 
@@ -297,7 +297,7 @@ namespace ConsoleCmd
         std::string result;
         const bool passed = RunVulkanForwardTest(result);
         std::printf("%s", result.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[vk.forward] ") +
+        Debug::PrintLog(spdlog::level::warn, std::string("[vk.forward] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.forward %s\n", passed ? "통과" : "실패");
 
@@ -318,7 +318,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanDeferredTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[vk.deferred] ") +
+        Debug::PrintLog(spdlog::level::warn, std::string("[vk.deferred] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.deferred %s\n", passed ? "통과" : "실패");
 
@@ -339,7 +339,7 @@ namespace ConsoleCmd
     {
         std::string result;
         const bool passed = RunVulkanDecalTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[vk.decal] ") +
+        Debug::PrintLog(spdlog::level::warn, std::string("[vk.decal] ") +
             (passed ? "통과\n" : "실패\n") + result);
         std::printf("[CLI] vk.decal %s\n", passed ? "통과" : "실패");
 
@@ -363,7 +363,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.forward] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.forward] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.forward %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -386,7 +386,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.forwardshade] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.forwardshade] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.forwardshade %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -413,7 +413,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.post] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.post] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.post %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -438,7 +438,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.ui] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.ui] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ui %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -462,7 +462,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.gizmoscene] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.gizmoscene] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gizmoscene %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -486,7 +486,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.shadowquality] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.shadowquality] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.shadowquality %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -510,7 +510,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.skinning] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.skinning] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.skinning %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -557,7 +557,7 @@ namespace ConsoleCmd
             GetImGuiHost().GetBackendName(), backendMatch ? "일치" : "불일치");
         std::printf("%s", log.c_str());
         std::printf("[CLI] render.livecheck %s\n", passed ? "통과" : "실패");
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.livecheck] ") +
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.livecheck] ") +
             (passed ? "통과\n" : "실패\n") + log);
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -586,7 +586,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.scene] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.scene] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.scene %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -619,7 +619,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.gbuffer] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.gbuffer] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gbuffer %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -640,7 +640,7 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
         std::string result;
         const bool passed = RunPbrShaderParityTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.parity] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.parity] ") + result);
         std::printf("%s[CLI] render.pbr.parity %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -687,7 +687,7 @@ namespace ConsoleCmd
         const std::string output = ctx.parts.size() == 4 ? ctx.parts[3] : std::string{};
         std::string result;
         const bool passed = RunPbrCaptureCompare(ctx.parts[1], ctx.parts[2], output, result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.compare] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.compare] ") + result);
         std::printf("%s[CLI] render.pbr.compare %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -705,7 +705,7 @@ namespace ConsoleCmd
         }
         std::string result;
         const bool passed = RunPbrNormalPairVerification(ctx.parts[1], result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.normalpair] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.normalpair] ") + result);
         std::printf("%s[CLI] render.pbr.normalpair %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -720,7 +720,7 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
         std::string result;
         const bool passed = RunPbrSealTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.seal] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.seal] ") + result);
         std::printf("%s[CLI] render.pbr.seal %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -734,7 +734,7 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
         std::string result;
         const bool passed = RunPbrCoverageTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.coverage] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.coverage] ") + result);
         std::printf("%s[CLI] render.pbr.coverage %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -748,7 +748,7 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
         std::string result;
         const bool passed = RunPbrOcclusionTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.occlusion] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.occlusion] ") + result);
         std::printf("%s[CLI] render.pbr.occlusion %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -762,7 +762,7 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
         std::string result;
         const bool passed = RunPbrEmissionTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.emission] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.emission] ") + result);
         std::printf("%s[CLI] render.pbr.emission %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -776,7 +776,7 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
         std::string result;
         const bool passed = RunPbrTransformTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.transform] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.transform] ") + result);
         std::printf("%s[CLI] render.pbr.transform %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -790,7 +790,7 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
         std::string result;
         const bool passed = RunPbrUvTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.uv] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.uv] ") + result);
         std::printf("%s[CLI] render.pbr.uv %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -804,7 +804,7 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("This PBR verification accepts no arguments");
         std::string result;
         const bool passed = RunPbrMipTest(result);
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[render.pbr.mip] ") + result);
+        Debug::PrintLog(spdlog::level::warn, std::string("[render.pbr.mip] ") + result);
         std::printf("%s[CLI] render.pbr.mip %s\n", result.c_str(), passed ? "PASS" : "FAIL");
         auto data = CommandCore::CommandData::Object();
         data.Set("passed", CommandCore::CommandData::Bool(passed));
@@ -877,7 +877,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.ssao] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.ssao] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssao %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -900,7 +900,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.ssgi] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.ssgi] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssgi %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -924,7 +924,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.ssr] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.ssr] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ssr %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -948,7 +948,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.sss] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.sss] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.sss %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -972,7 +972,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.fog] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.fog] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.fog %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -996,7 +996,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.skybox] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.skybox] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.skybox %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1020,7 +1020,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.grid] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.grid] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.grid %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1044,7 +1044,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.wireframe] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.wireframe] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.wireframe %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1068,7 +1068,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.gizmoicon] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.gizmoicon] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gizmoicon %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1092,7 +1092,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.gizmoline] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.gizmoline] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.gizmoline %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1116,7 +1116,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.decal] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.decal] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.decal %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1140,7 +1140,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.ibl] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.ibl] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.ibl %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1164,7 +1164,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.iblshade] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.iblshade] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.iblshade %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1187,7 +1187,7 @@ namespace ConsoleCmd
         const bool passed = DX12Test::RunRenderGraphTest(log);
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.rendergraph %s\n", passed ? "통과" : "실패");
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1211,7 +1211,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.parallel] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.parallel] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.parallel %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1234,7 +1234,7 @@ namespace ConsoleCmd
         const bool passed = DX12Test::RunDescriptorHeapTest(log);
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[dx12.descriptorheap] ") + (passed ? "통과" : "실패") + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, std::string("[dx12.descriptorheap] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.descriptorheap %s\n", passed ? "통과" : "실패");
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1258,7 +1258,7 @@ namespace ConsoleCmd
         const std::string verdict = passed ? "통과" : "실패";
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, "[dx12.resize] " + verdict + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, "[dx12.resize] " + verdict + "\n" + log);
         std::printf("[CLI] dx12.resize %s\n", verdict.c_str());
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —
@@ -1287,7 +1287,7 @@ namespace ConsoleCmd
         const bool passed = DX12Test::RunPsoCacheTest(cachePath, log);
 
         std::printf("%s", log.c_str());
-        Debug::PrintLog({}, spdlog::level::warn, std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
+        Debug::PrintLog(spdlog::level::warn, std::string("[dx12.psocache] ") + (passed ? "통과" : "실패") + "\n" + log);
         std::printf("[CLI] dx12.psocache %s\n", passed ? "통과" : "실패");
 
         // LC6: 판정을 값으로 돌려준다. 위의 printf 는 그대로 둔다 —

@@ -89,6 +89,16 @@ namespace
         std::uint64_t frame{ 0 };
         std::uint64_t nextGeneration{ 1 };
         std::uint64_t bytes{ 0 };
+
+        /// CPU 픽셀 예산. 기본값은 위의 상수고, 게이트가 낮춰 부를 수 있다.
+        ///
+        /// ★ 조종 창구가 없으면 **축출 축을 자극할 수 없다.** 목록은 clipper 로
+        ///   보이는 타일만 요청하므로 파일을 수백 개 뿌려도 48 MB 에 닿지 않는다.
+        ///   "예산을 넘으면 버린다" 는 판정문을 적어 두고 그 수를 만들 방법이
+        ///   없으면 그 절은 영원히 미자극이다.
+        ///
+        /// 쓰는 쪽은 게임 스레드(CLI)고 읽는 쪽은 Presentation 스레드다.
+        std::atomic<std::uint64_t> budgetBytes{ kThumbnailBudgetBytes };
     };
 
     thumbnail_cache_state& thumbnail_cache()
@@ -364,7 +374,8 @@ namespace
         }
 
         // ── ④ 예산을 넘으면 오래 안 쓴 것부터 버린다 ────────────────────
-        if (self.bytes > kThumbnailBudgetBytes)
+        const std::uint64_t budget = self.budgetBytes.load();
+        if (self.bytes > budget)
         {
             // ★ 나이를 키와 **함께** 담는다. 비교자 안에서 표를 다시 찾으면
             //   (`entries[key]`) 정렬 도중에 표를 건드리는 꼴이 되고, 그것은
@@ -382,7 +393,7 @@ namespace
                 [](const auto& a, const auto& b) { return a.first < b.first; });
             for (const auto& [age, key] : order)
             {
-                if (self.bytes <= kThumbnailBudgetBytes) break;
+                if (self.bytes <= budget) break;
                 const auto found = self.entries.find(key);
                 if (found == self.entries.end()) continue;
                 self.bytes -= found->second.bytes;
@@ -395,7 +406,7 @@ namespace
         thumbnail_stats snapshot = self.live;
         snapshot.entries = self.entries.size();
         snapshot.bytes = self.bytes;
-        snapshot.budgetBytes = kThumbnailBudgetBytes;
+        snapshot.budgetBytes = budget;
         snapshot.workerPoolRunning = WorkerPools->IsRunning();
         for (const auto& [key, item] : self.entries)
         {
@@ -513,5 +524,18 @@ namespace
         self.resetRequested.store(true);
         std::lock_guard<std::mutex> guard(self.statsMutex);
         self.published = thumbnail_stats{};
+    }
+
+    std::uint64_t thumbnail_default_budget_bytes()
+    {
+        return kThumbnailBudgetBytes;
+    }
+
+    void thumbnail_set_budget_bytes(std::uint64_t bytes)
+    {
+        // 0 은 "기본값으로 되돌려라" 다. 예산 0 은 뜻이 없다 — 만드는 즉시 버리므로
+        // 타일이 영원히 아이콘에 머물고, 그것은 판정이 아니라 고장이다.
+        thumbnail_cache_state& self = thumbnail_cache();
+        self.budgetBytes.store(0 == bytes ? kThumbnailBudgetBytes : bytes);
     }
 }

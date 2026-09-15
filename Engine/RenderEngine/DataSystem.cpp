@@ -180,7 +180,7 @@ namespace
 			break;
 		}
 
-		Debug::PrintLog({}, spdlog::level::err, "Asset catalog rejected meta registration: guid="
+		Debug::PrintLog(spdlog::level::err, "Asset catalog rejected meta registration: guid="
 			+ guid.ToString() + " path=" + path.string() + " reason=" + reason);
 		return false;
 	}
@@ -214,7 +214,7 @@ void DataSystem::Initialize()
 		if (!authoring)
 			throw std::runtime_error("Packaged cooked catalog mount failed: "
 				+ cookedCatalogError);
-		Debug::PrintLog({}, spdlog::level::warn, "[cooked.catalog] 마운트 실패: " + cookedCatalogError);
+		Debug::PrintLog(spdlog::level::warn, "[cooked.catalog] 마운트 실패: " + cookedCatalogError);
 	}
 	if (!authoring)
 	{
@@ -306,7 +306,7 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 						entry.path().string(), parseError);
 				if (!document)
 				{
-					Debug::PrintLog({}, spdlog::level::warn, "Asset catalog ignored invalid meta: " +
+					Debug::PrintLog(spdlog::level::warn, "Asset catalog ignored invalid meta: " +
 						entry.path().string() + " (" + parseError + ")");
 				}
 				else
@@ -387,7 +387,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(
 			? "알 수 없는 generation load 실패"
 			: loaded.issues.front().context + ": "
 				+ loaded.issues.front().message;
-		Debug::PrintLog({}, spdlog::level::err, std::string("[model.generation] 게시 전 검증 실패(")
+		Debug::PrintLog(spdlog::level::err, std::string("[model.generation] 게시 전 검증 실패(")
 			+ (fromCatalog ? "catalog" : "library") + "): " + sourceLabel
 			+ " (" + detail + ")");
 		return {};
@@ -400,7 +400,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(
 		m_modelAssetGenerations.Publish(std::move(loaded.generation));
 	if (!published.Succeeded())
 	{
-		Debug::PrintLog({}, spdlog::level::err, "[model.generation] cache publish 거부: "
+		Debug::PrintLog(spdlog::level::err, "[model.generation] cache publish 거부: "
 			+ sourcePathString + " (outcome "
 			+ std::to_string(static_cast<unsigned>(published.outcome)) + ")");
 		return {};
@@ -506,7 +506,7 @@ std::shared_ptr<Texture> DataSystem::ResolveModelGenerationTexture(
 	{
 		std::lock_guard lock(m_modelGenerationTextureMutex);
 		++m_modelGenerationTextureStats.rejected;
-		Debug::PrintLog({}, spdlog::level::err, "[model.generation] embedded texture owner 생성 실패: "
+		Debug::PrintLog(spdlog::level::err, "[model.generation] embedded texture owner 생성 실패: "
 			+ texture->name + " (" + error + ")");
 		return nullptr;
 	}
@@ -765,7 +765,7 @@ bool DataSystem::SerializeMaterialPayload(Material& material,
 				return true;
 			}
 		}
-		Debug::PrintLog({}, spdlog::level::warn, "Material 새 정본 writer 실패 — legacy 표기로 폴백"
+		Debug::PrintLog(spdlog::level::warn, "Material 새 정본 writer 실패 — legacy 표기로 폴백"
 			" (" + material.m_name + "): " + error);
 	}
 
@@ -824,7 +824,7 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 		std::string error;
 		if (!experiment::DeserializeMaterialAuthoring(readNode, authored, error))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Material 새 정본 decode 실패: " + error);
+			Debug::PrintLog(spdlog::level::err, "Material 새 정본 decode 실패: " + error);
 			return false;
 		}
 		const ShaderMeta* metaForKeywords = nullptr;
@@ -838,7 +838,7 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 			metaOwner = ResolveShaderMeta(handle);
 			if (!metaOwner)
 			{
-				Debug::PrintLog({}, spdlog::level::err, "Material 새 정본 keywords 정규화용 ShaderMeta"
+				Debug::PrintLog(spdlog::level::err, "Material 새 정본 keywords 정규화용 ShaderMeta"
 					" 로드 실패: " + error);
 				return false;
 			}
@@ -847,7 +847,7 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 		if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(authored,
 			metaForKeywords, material, error))
 		{
-			Debug::PrintLog({}, spdlog::level::err, "Material 새 정본 변환 실패: " + error);
+			Debug::PrintLog(spdlog::level::err, "Material 새 정본 변환 실패: " + error);
 			return false;
 		}
 		FinalizeMaterialRuntime(material);
@@ -881,7 +881,7 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 	}
 	catch (const std::exception& exception)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Material payload deserialize failed: "
+		Debug::PrintLog(spdlog::level::err, "Material payload deserialize failed: "
 			+ std::string(exception.what()));
 		return false;
 	}
@@ -913,7 +913,7 @@ bool DataSystem::SerializeMaterialBinaryPayload(Material& material,
 	std::string encodeError;
 	if (!Authoring::EncodeCookedDocument(document.Root().Read(), payload, encodeError))
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Material binary payload encode failed: " + encodeError);
+		Debug::PrintLog(spdlog::level::err, "Material binary payload encode failed: " + encodeError);
 		return false;
 	}
 	if (payload.size() > kMaxMaterialPayloadBytes
@@ -963,7 +963,7 @@ bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 		Authoring::ParsedDocument::ParseCooked(payload, parseError);
 	if (!document)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "Material binary payload decode failed: " + parseError);
+		Debug::PrintLog(spdlog::level::err, "Material binary payload decode failed: " + parseError);
 		return false;
 	}
 	const Authoring::ReadNode payloadNode = document.Root();
@@ -1059,7 +1059,7 @@ Material* DataSystem::LoadMaterial(std::string_view name)
         std::lock_guard<std::mutex> guard(m_materialMutex);
         if (Materials.find(materialName) != Materials.end())
         {
-            Debug::PrintLog({}, spdlog::level::info, "MaterialLoader::LoadMaterial : Material already loaded");
+            Debug::PrintLog(spdlog::level::info, "MaterialLoader::LoadMaterial : Material already loaded");
             return Materials[materialName].get();
         }
     }
@@ -1224,7 +1224,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 		std::lock_guard<std::mutex> guard(m_textureMutex);
 		if (Textures.find(name) != Textures.end())
 		{
-			Debug::PrintLog({}, spdlog::level::info, "TextureLoader::LoadTexture : Texture already loaded");
+			Debug::PrintLog(spdlog::level::info, "TextureLoader::LoadTexture : Texture already loaded");
 			return Textures[name];
 		}
 	}
@@ -1256,7 +1256,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 	}
 	else
 	{
-		Debug::PrintLog({}, spdlog::level::err, "ModelLoader::LoadModel : Model file not found");
+		Debug::PrintLog(spdlog::level::err, "ModelLoader::LoadModel : Model file not found");
 	}
 
 	return nullptr;
@@ -1271,7 +1271,7 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
 		std::unique_lock lock(m_textureMutex);
 		if (Textures.find(name) != Textures.end())
 		{
-			Debug::PrintLog({}, spdlog::level::info, "TextureLoader::LoadTexture : Texture already loaded");
+			Debug::PrintLog(spdlog::level::info, "TextureLoader::LoadTexture : Texture already loaded");
 			return Textures[name].get();
 		}
 	}
@@ -1287,7 +1287,7 @@ Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompr
     }
     else
     {
-        Debug::PrintLog({}, spdlog::level::err, "ModelLoader::LoadModel : Model file not found");
+        Debug::PrintLog(spdlog::level::err, "ModelLoader::LoadModel : Model file not found");
     }
 
     return nullptr;
@@ -1334,13 +1334,13 @@ std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view 
         loaded = Texture::WithMipChain(loaded, mipFailure);
         if (!loaded)
         {
-            Debug::PrintLog({}, spdlog::level::err, "Material texture mip preparation failed: " + destination.string() + ": " + mipFailure);
+            Debug::PrintLog(spdlog::level::err, "Material texture mip preparation failed: " + destination.string() + ": " + mipFailure);
             return nullptr;
         }
     }
 	if (!loaded)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "TextureLoader::LoadTexture : file not found");
+		Debug::PrintLog(spdlog::level::err, "TextureLoader::LoadTexture : file not found");
 		return nullptr;
 	}
 
@@ -1439,13 +1439,13 @@ ShaderMetaHandle DataSystem::LoadShaderMetaHandle(FileGuid guid,
 	ShaderMetaPermutationStats stats;
 	if (!ShaderPermutationDomain::Measure(loaded, stats, outError)) return {};
 
-	Debug::PrintLog({}, spdlog::level::info, "ShaderMeta loaded: " + loaded.name + " [" + guid.ToString()
+	Debug::PrintLog(spdlog::level::info, "ShaderMeta loaded: " + loaded.name + " [" + guid.ToString()
 		+ "] variants/pass=" + std::to_string(stats.variantsPerPass)
 		+ ", compile requests=" + std::to_string(stats.compileRequests));
 	if (stats.compileRequests
 		> ShaderPermutationDomain::kDefaultBuildCompileLimit)
 	{
-		Debug::PrintLog({}, spdlog::level::warn, "ShaderMeta Build permutation 상한 초과: "
+		Debug::PrintLog(spdlog::level::warn, "ShaderMeta Build permutation 상한 초과: "
 			+ loaded.name + " requests=" + std::to_string(stats.compileRequests)
 			+ ", limit=" + std::to_string(
 				ShaderPermutationDomain::kDefaultBuildCompileLimit));
@@ -1976,7 +1976,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGenerationByPath(
 	if (FileGuid{} == guid) guid = GetFilenameToGuid(path.filename().string());
 	if (FileGuid{} == guid)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "[model.generation] registry에 없는 모델 경로: " + path.string());
+		Debug::PrintLog(spdlog::level::err, "[model.generation] registry에 없는 모델 경로: " + path.string());
 		return {};
 	}
 	return LoadModelAssetGeneration(guid);

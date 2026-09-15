@@ -2196,7 +2196,7 @@ void Scene::RegisterComponent(Component* component)
         // '훅이 하나도 없는 타입'과 구분되지 않아 아무 일도 안 일어난 채 지나갔다.
         // 컴포넌트를 새로 만들고 LifecycleRegistry.cpp의 목록에 넣는 것을 잊으면
         // 여기서 이름과 함께 드러난다.
-        Debug::PrintLog({}, spdlog::level::err, "[Lifecycle] 등록되지 않은 컴포넌트 타입: "
+        Debug::PrintLog(spdlog::level::err, "[Lifecycle] 등록되지 않은 컴포넌트 타입: "
             + component->ToString() + " — LifecycleRegistry.cpp의 목록에 추가할 것");
         return;
     }
@@ -2439,7 +2439,7 @@ void Scene::FireReentrancyStress(bool midTraversal, const std::string& origin)
         + " · 생성+컴포넌트 " + std::to_string(added)
         + " (pendingInitialize " + std::to_string(m_schedule.PendingInitializeList().size()) + ")";
 
-    Debug::PrintLog({}, spdlog::level::warn, fireLine);
+    Debug::PrintLog(spdlog::level::warn, fireLine);
 
     // ★ stdout에도 같은 줄을 낸다 — 이게 없으면 회귀가 발화를 못 본다.
     //
@@ -3559,7 +3559,7 @@ bool Scene::TryEnterTraversal(std::unordered_set<Key>& visited, const Key& key,
         static std::atomic<bool> reported{ false };
         if (!reported.exchange(true, std::memory_order_relaxed))
         {
-            Debug::PrintLog({}, spdlog::level::err, std::string(traversalLabel)
+            Debug::PrintLog(spdlog::level::err, std::string(traversalLabel)
                 + "가 최대 깊이를 넘었다 — 계층이 지나치게 깊거나 순환한다: "
                 + std::string(nodeName));
         }

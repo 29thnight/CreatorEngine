@@ -398,7 +398,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 		}
 		else
 		{
-			Debug::PrintLog({}, spdlog::level::err, "MeshRenderer m_Material base 참조 해석 실패 — "
+			Debug::PrintLog(spdlog::level::err, "MeshRenderer m_Material base 참조 해석 실패 — "
 				"재질을 비운다: " + error);
 			m_Material.reset();
 			SetExperimentMaterialBase(nullptr); // 부분 상태를 남기지 않는다
@@ -421,7 +421,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 		}
 		else
 		{
-			Debug::PrintLog({}, spdlog::level::err, "MeshRenderer m_Material 새 정본 해석 실패 — "
+			Debug::PrintLog(spdlog::level::err, "MeshRenderer m_Material 새 정본 해석 실패 — "
 				"typed 기본값 상태를 유지한다");
 		}
 	}
@@ -474,7 +474,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 			}
 			if (assets::kInvalidModelAssetIndex == meshIndex)
 			{
-				Debug::PrintLog({}, spdlog::level::warn, "MeshRenderer m_meshAssetId가 모델 generation에 없다 — "
+				Debug::PrintLog(spdlog::level::warn, "MeshRenderer m_meshAssetId가 모델 generation에 없다 — "
 					"이름으로 다시 찾는다: " + m_meshAssetId.ToString());
 			}
 		}
@@ -492,7 +492,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 				meshIndex = assets::kInvalidModelAssetIndex;
 				if (matches > 1u)
 				{
-					Debug::PrintLog({}, spdlog::level::warn, "MeshRenderer 메시 이름이 generation 안에서 유일하지 "
+					Debug::PrintLog(spdlog::level::warn, "MeshRenderer 메시 이름이 generation 안에서 유일하지 "
 						"않다 — MeshId가 필요하다: " + meshName);
 				}
 			}
@@ -508,7 +508,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	else if (FileGuid{} != m_modelGuid)
 	{
 		ModelConsumptionDiagnostics::NoteMeshResolveFailed();
-		Debug::PrintLog({}, spdlog::level::err, "MeshRenderer 모델 generation 해석 실패 — 그리지 않는다: model="
+		Debug::PrintLog(spdlog::level::err, "MeshRenderer 모델 generation 해석 실패 — 그리지 않는다: model="
 			+ m_modelGuid.ToString() + " mesh=" + (meshName.empty()
 				? m_meshAssetId.ToString() : meshName));
 	}
@@ -536,13 +536,13 @@ void MeshRenderer::OnAfterSerialize(const Authoring::MutableNodeView& view)
 		{
 			return;
 		}
-		Debug::PrintLog({}, spdlog::level::warn, "m_Material base 참조 저장 실패 — 인라인 폴백: "
+		Debug::PrintLog(spdlog::level::warn, "m_Material base 참조 저장 실패 — 인라인 폴백: "
 			+ error);
 	}
 	if (!DataSystems->SerializeMaterialPayload(
 		*m_Material, node.Child("m_Material")))
 	{
-		Debug::PrintLog({}, spdlog::level::warn, "m_Material writer ryml 전환 실패");
+		Debug::PrintLog(spdlog::level::warn, "m_Material writer ryml 전환 실패");
 	}
 }
 

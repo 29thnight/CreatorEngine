@@ -58,12 +58,12 @@ bool StaticRigidBody::Initialize(ColliderInfo colliderInfo, physx::PxShape* shap
 	m_rigidStatic->userData = data;
 
 	if (m_rigidStatic == nullptr) {
-		Debug::PrintLog({}, spdlog::level::err, "StaticRigidBody::Initialize() : m_rigidStatic is nullptr id :" + std::to_string(m_id));
+		Debug::PrintLog(spdlog::level::err, "StaticRigidBody::Initialize() : m_rigidStatic is nullptr id :" + std::to_string(m_id));
 		return false;
 	}
 	if (!m_rigidStatic->attachShape(*shape))
 	{
-		Debug::PrintLog({}, spdlog::level::err, "StaticRigidBody::Initialize() : attachShape failed id :" + std::to_string(m_id));
+		Debug::PrintLog(spdlog::level::err, "StaticRigidBody::Initialize() : attachShape failed id :" + std::to_string(m_id));
 		return false;
 	}
 	data->thisId = m_id;
@@ -163,10 +163,10 @@ void StaticRigidBody::SetConvertScale(const math::vector3& scale, physx::PxPhysi
 	}
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eTRIANGLEMESH)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "StaticRigidBody::SetConvertScale() : TriangleMesh is not supported id :" + std::to_string(m_id));
+		Debug::PrintLog(spdlog::level::err, "StaticRigidBody::SetConvertScale() : TriangleMesh is not supported id :" + std::to_string(m_id));
 	}
 	else if (shape->getGeometry().getType() == physx::PxGeometryType::eHEIGHTFIELD)
 	{
-		Debug::PrintLog({}, spdlog::level::err, "StaticRigidBody::SetConvertScale() : HeightField is not supported id :" + std::to_string(m_id));
+		Debug::PrintLog(spdlog::level::err, "StaticRigidBody::SetConvertScale() : HeightField is not supported id :" + std::to_string(m_id));
 	}
 }

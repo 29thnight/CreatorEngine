@@ -121,7 +121,7 @@ namespace EngineBootstrap
 			!config.prepareRuntimeContent(config.paths))
 		{
 			std::fputs("[EnginePaths] Host runtime content preparation failed\n", stderr);
-			Debug::PrintLog({}, spdlog::level::err, "Host runtime content preparation failed");
+			Debug::PrintLog(spdlog::level::err, "Host runtime content preparation failed");
 			Meta::RegisterClassFinalize();
 			Log::Finalize();
 			return false;
@@ -131,7 +131,7 @@ namespace EngineBootstrap
 		{
 			std::fputs("[RuntimeSettings] EngineSettings 초기화 실패 — 부팅을 중단한다\n",
 				stderr);
-			Debug::PrintLog({}, spdlog::level::err, "RuntimeSettings 초기화 실패 — 기본값으로 계속하지 않는다");
+			Debug::PrintLog(spdlog::level::err, "RuntimeSettings 초기화 실패 — 기본값으로 계속하지 않는다");
 			RuntimeSettings::Shutdown();
 			Meta::RegisterClassFinalize();
 			Log::Finalize();
@@ -143,7 +143,7 @@ namespace EngineBootstrap
 		if (config.initializeHostSettings && !config.initializeHostSettings())
 		{
 			std::fputs("[HostSettings] Host settings initialization failed\n", stderr);
-			Debug::PrintLog({}, spdlog::level::err, "Host settings initialization failed");
+			Debug::PrintLog(spdlog::level::err, "Host settings initialization failed");
 			RuntimeSettings::Shutdown();
 			Meta::RegisterClassFinalize();
 			Log::Finalize();

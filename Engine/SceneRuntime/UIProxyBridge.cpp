@@ -109,7 +109,7 @@ UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
         }
         catch (const std::exception& e)
         {
-            Debug::PrintLog({}, spdlog::level::info, "Failed to load sprite sheet from path: {}\nError: {}", data.spriteSheetPath, e.what());
+            Debug::PrintLog(spdlog::level::info, "Failed to load sprite sheet from path: {}\nError: {}", data.spriteSheetPath, e.what());
 		}
     }
 
