@@ -151,3 +151,13 @@ Commandlet 모드와 일반 `--script`/`--exec`/stdin/HTTP를 혼합하면 실�
 실제 상태 복원을 검사한다. `run-all.ps1`에 연결한다. 이름 변경 한 건이나 빌드
 성공을 전체 GUI 기능의 수동 검증으로 확대하지 않는다. Debug/Release 실행 결과,
 회귀 범위와 미실행 항목은 구현 기록에 명시한다.
+
+### 종결 조건 (2026-09-15 재정의)
+
+이 페이즈는 둘을 만족하면 닫는다 — ① 14.5 소유 게이트 13칸(`CLI *(LC0~LC9)`·`CLI 제품 표면 변경 검증`·
+`Commandlet 격리 및 공통 편집 API`·`Player Shipping 격리`·`Player 명령 서비스`)이 **현재 HEAD에서** 초록,
+② LC6 공통 편집 API의 Undo 선언 21개에 대한 GUI 수동 조작 확인.
+
+전체 `run-all.ps1` 완주와 canonical 성능 예산은 이 페이즈의 종결 조건이 아니다. 전자는 HEAD부터 초록
+기준선이 없어 한 페이즈가 남의 선행 실패를 떠안게 되고, 후자는 게이트와 기준 archive가 PHASE 3.75
+소유였으며 그 계획이 닫히면서 함께 삭제됐다. 근거와 옮긴 자리는 [종결 검토](../analysis/Phase14_5Closure.md)에 있다.

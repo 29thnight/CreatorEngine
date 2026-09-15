@@ -29,7 +29,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.75 · RG — 리소스 의존성 스케줄링과 단계별 제품 전환. |
 | [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.75 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
 | [ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md) | PHASE 4.75 · SRP — Pipeline Asset·Custom Pass·Shader Graph 저작과 제품 배선. |
-| [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 종결 검증 잔여, MCP 보류. |
+| [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의로 종결 조건은 둘(소유 게이트 HEAD 재실행·GUI 수동), MCP 보류. |
 | [ScriptSurfacePlan.md](plans/ScriptSurfacePlan.md) | PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계. |
 | [EnginePackagingPlan.md](plans/EnginePackagingPlan.md) | PHASE 10·11 등 — EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지. |
 | [ModelGeometryTextureImprovementPlan.md](plans/ModelGeometryTextureImprovementPlan.md) | 비동기 배치 완료 · 나머지 구조 개선은 제안 단계. 기존 PHASE의 완료·공수와 구분 |
