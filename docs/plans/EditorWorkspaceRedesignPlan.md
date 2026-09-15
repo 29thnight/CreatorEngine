@@ -975,7 +975,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
 | W6 | **done** | **preset 5종 + 이름 붙인 배치 착지(2026-09-15)** — 자리의 정본이 선언에서 preset 으로 옮겨 갔고(`EditorLayoutPreset.h`), 기본 preset 은 재정의 0 이라 현재 외관이 값이 아니라 **출처**로 유지된다(픽셀 392,888 중 0 차이). `dock_slot::left` 신설, 안 쓰는 자리는 노드를 만들지 않음, 패널 바닥 보존, 파일 스키마 2(v1 계속 읽음), Reset 은 **지금** preset 으로. 런타임 게이트 197 단정·변이 7 종·run-all 배선. **재지 못한 축 하나** — 최소 중앙 보존은 이 기계의 배율 2.25 에서 하한(1080x675)이 창보다 커서 제품이 늘 탈출 가지로 간다. 게이트가 그 사실을 건너뜀으로 찍는다. **W6-2(2026-09-15)** 로 Save As/Rename/Delete/목록까지 닫았다 — 이름 붙인 배치는 `<이름>.workspace` 이고 **파일 이름이 곧 이름**이다. 덮어쓰기·열기·지우기가 전부 `before-*` 백업을 남기고, 쓸 수 없는 이름은 만들 때 거절한다. 게이트 91 단정·변이 9 종 |
 | W7 | progress | **W7-0~W7-3 착지(2026-09-14·15)** — 관측(`editor.panelcost`)·fixture(`scene.populate`)·측정 도구와 1k/10k/50k Release 기준선(§W7-0), Browser 스냅샷(§W7-1)으로 매 프레임 디렉터리 스캔 24 → 0, 그리고 평탄 목록+clipping(§W7-2·W7-3)으로 `hierarchy.units` 50,000 → **14** · p95 30.4 → **0.041 ms**. 실측이 두 번 판을 고쳤다: ① 브라우저가 clipping 보다 먼저였고(엔티티 1,000 에서 Hierarchy 의 5.8 배), ② W7-2 는 홀로는 이득 0 이라 W7-3 과 한 조각으로 묶어야 했다. W7-4 로 그 계약을 게이트에 걸었다(72 단정 · 변이 12 종 · run-all 배선). 남은 것은 별도 산정인 **아이콘→비동기 썸네일 교체**·무효화/예산/퇴출/늦은 완료 처리뿐이다 |
-| W8 | progress | **W8-1 착지(2026-09-15)** — 어댑터 판 canary와 legacy 잔재 재유입 차단. 계획서가 지목한 legacy 둘(`ContentsBrowserStyle`·ToolPanel `NoMove`)은 **이미 죽어 있었고** 남은 일은 게이트였다. 진짜 구멍은 `IMGUI_CHECKVERSION()` 이 Release 에서 힘이 0 이던 것(`IM_ASSERT`=`assert()`, NDEBUG 로 소멸, 반환값도 버림) — 이 기계엔 imgui 설치본이 둘이라 실재하는 위험이다. 반환값을 받아 던지고 `ImGui::GetVersion()`(도는 코드가 말하는 판)을 `editor.dock` 이 헤더 매크로와 함께 내보낸다. 게이트 `verify-imgui-adapter-canary.ps1` 29 단정·변이 7 종·run-all 배선. **W8-2 착지(2026-09-15)** — 3D 렌더 영역을 제외한 chrome crop visual golden. 마스킹에 필요한 제품 변경은 없었다 — W4 가 이미 `editor.sceneview` 로 image·clip 사각형과 툴바 상자 둘·기즈모 원반을 내보내고 있어, 게이트가 좌표를 한 줄도 적지 않는다. 대신 **스크롤에 닿을 길**이 없어 제품 변경 둘을 넣었다: 선택한 줄을 끌어오기(`IncludeItemByIndex` + 그 줄을 그리는 자리의 커서)와 접힌 조상 펼치기. 게이트 `verify-editor-chrome-golden.ps1` 21 단정·회차 4·변이 6 종·run-all 배선. ★ 캐처 자가 두 번째로 틀려 있었다 — `PrintWindow` 는 창 전체를 DC 원점부터 그리는데 클라이언트 크기 비트맵을 주고 있어 9~10 px 밀렸고, 그 탓에 가리기가 밀린 채 초록이었다. 남은 것은 **통합 행렬** 하나다 |
+| W8 | progress | **W8-1 착지(2026-09-15)** — 어댑터 판 canary와 legacy 잔재 재유입 차단. 계획서가 지목한 legacy 둘(`ContentsBrowserStyle`·ToolPanel `NoMove`)은 **이미 죽어 있었고** 남은 일은 게이트였다. 진짜 구멍은 `IMGUI_CHECKVERSION()` 이 Release 에서 힘이 0 이던 것(`IM_ASSERT`=`assert()`, NDEBUG 로 소멸, 반환값도 버림) — 이 기계엔 imgui 설치본이 둘이라 실재하는 위험이다. 반환값을 받아 던지고 `ImGui::GetVersion()`(도는 코드가 말하는 판)을 `editor.dock` 이 헤더 매크로와 함께 내보낸다. 게이트 `verify-imgui-adapter-canary.ps1` 29 단정·변이 7 종·run-all 배선. **W8-2 착지(2026-09-15)** — 3D 렌더 영역을 제외한 chrome crop visual golden. 마스킹에 필요한 제품 변경은 없었다 — W4 가 이미 `editor.sceneview` 로 image·clip 사각형과 툴바 상자 둘·기즈모 원반을 내보내고 있어, 게이트가 좌표를 한 줄도 적지 않는다. 대신 **스크롤에 닿을 길**이 없어 제품 변경 둘을 넣었다: 선택한 줄을 끌어오기(`IncludeItemByIndex` + 그 줄을 그리는 자리의 커서)와 접힌 조상 펼치기. 게이트 `verify-editor-chrome-golden.ps1` 21 단정·회차 4·변이 6 종·run-all 배선. ★ 캐처 자가 두 번째로 틀려 있었다 — `PrintWindow` 는 창 전체를 DC 원점부터 그리는데 클라이언트 크기 비트맵을 주고 있어 9~10 px 밀렸고, 그 탓에 가리기가 밀린 채 초록이었다. **W8-3 착지(2026-09-15)** — 통합 행렬. ★ 판정문 *"검증 레이어 오류 0"* 이 **출하 구성에서 잴 수 없는 것이었다**: `DrainDebugMessages` 가 통째로 `_DEBUG` 였고 라이브 호출부 둘도 같은 가드라, `CREATOR_DX12_VALIDATION=basic` 으로 레이어를 켜도 아무도 큐를 읽지 않았다(W8-1 의 `IMGUI_CHECKVERSION` 과 같은 모양). `rhi::validation` 장부를 세우고 가드를 걷고 `dx12.validation [reset]` 을 냈다. 게이트 `verify-editor-integration-matrix.ps1` 214 단정·축 12·기동 11 회·대조군 1(`=off` 에서 `layerEnabled` 가 거짓이어야 한다)·변이 4 종 전부 잡음·run-all 배선. Release·Debug 양쪽에서 12 축 모두 problems 0. **W8 네 줄 전부 닫혔다** — 이 칸이 아직 `progress` 인 것은 W8 이 선행으로 잡고 있는 W2 계열(W2·W2-I·W2-V·W2-B)이 남아 그것들이 닫힌 뒤 행렬에 축을 더해 재판정해야 하기 때문이다 |
 
 현재 소스에서 확인한 잔여 경계:
 
@@ -2423,8 +2423,86 @@ W8 의 셋째 줄을 닫는다. 남는 것은 통합 행렬 하나다.
 - **자극 불가 하나:** 매 프레임 끌어오게 만드는 변이(과잉)는 초록이다. 하네스가
   스크롤을 굴리지 않아 과잉 끌어오기가 그림에 나타날 자리가 없다.
 
-**남은 W8.** DX12·DPI·재시작·손상 ini·Play 왕복·Game Preview·preset 행렬의 통합
-자동화 하나다.
+**남은 W8.** 없다 — W8-3 이 통합 행렬을 닫았다.
+
+---
+
+#### W8-3 착지 — 통합 행렬, 그리고 판정이 잴 수 없는 것이었다 (2026-09-15)
+
+W8 의 마지막 줄을 닫는다.
+
+**축마다 게이트는 이미 있었다.** resize 는 `verify-editor-viewport-extent`, preset 은
+`verify-editor-layout-preset`, 재시작·손상 ini 는 `verify-editor-workspace`, DPI 는
+`verify-editor-theme`, Play 왕복은 `verify-play-roundtrip`. 그래서 착수 전에 이 조각을
+"이미 있는 것들을 한 번 더 도는 일" 로 적어 두었는데, 그것이 아니었다.
+
+**★ 판정문이 출하 구성에서 잴 수 없는 것이었다.** W8 의 판정은 *"현재 범위인 DX12 에서
+검증 레이어 오류/비정상 종료 0"* 이다. `CREATOR_DX12_VALIDATION=basic` 은 Release 에서도
+디버그 레이어를 켠다 — 실측으로 `[DX12 검증] DebugLayer=on` 이 두 줄 찍힌다(셸과 라이브
+렌더러가 각각 디바이스를 만든다). 그런데 `DX12DeviceResources::DrainDebugMessages` 가
+**통째로 `#if defined(_DEBUG)`** 였고, 라이브 경로의 호출부 둘(`ImGuiDx12Shell` 의 프레임
+끝, `EnhancedSceneRenderer` 의 슬롯 은퇴)도 같은 가드 안이었다. **레이어를 켜 놓고 아무도
+큐를 읽지 않았다.** 디버그 레이어의 비용만 내고 판정은 못 하는 상태였고, 그 위에서 "오류
+0" 을 말하면 빈 집합을 성공으로 읽는 것이다 — W8-1 의 `IMGUI_CHECKVERSION()` 과 **같은
+모양의 결함**이다(출하 구성에서 힘이 0 인 검사).
+
+**제품 변경.**
+
+- `Engine/RenderEngine/RHI/RHIValidationLedger.{h,cpp}` — 프로세스 범위 장부.
+  `layerEnabled · mode · devices · drains · messages · problems · retained[] ·
+  droppedMessages`. **세는 자리를 `DrainDebugMessages` 안 한 곳으로 모은다** — 큐를 비우는
+  길이 그 함수뿐이므로 여기로 들어오지 않는 메시지는 애초에 없다. 호출부마다 세면 어느
+  자리가 안 세는지 알 수 없다(셸과 라이브 렌더러는 **서로 다른 InfoQueue** 를 갖는다).
+- `DX12DeviceResources` — `ID3D12InfoQueue` 를 **들고 있는다**(매 프레임 QueryInterface 를
+  없애고, "큐가 있는가" 를 밖에서 물을 자리를 만든다). `DrainDebugMessages` 의 `_DEBUG`
+  가드를 걷었다 — 꺼진 실행의 비용은 **포인터 하나 검사**다. 초기화 끝에서
+  `declare_layer` 로 **실물**(큐를 얻었는가)을 선언한다. 환경 변수가 basic 이라고 적혀
+  있어도 큐를 못 얻었으면 그 실행의 "오류 0" 은 아무것도 뜻하지 않는다.
+- 라이브 드레인 호출부 둘의 `_DEBUG` 가드 제거.
+- `dx12.validation [reset]` — 장부를 읽는다. `problems != 0` 이면 명령 자체가 실패한다.
+  수만 내면 "몇 건" 만 알고 **무엇인지** 모르므로 문구를 최대 16 줄 함께 싣는다.
+  `reset` 은 **수만** 비운다 — 레이어 선언은 그 실행의 성질이라 구간마다 달라지지 않는다.
+
+**게이트.** `verify-editor-integration-matrix.ps1` — 214 단정, 축 12, 에디터 기동 11 회,
+run-all 배선. 세션은 표면 왕복(한 세션 안에서 resize 3 회 → Game Preview 왕복 → Play
+왕복) · preset 5 종 순회 · 재시작 2 회차(폴더를 일부러 공유한다) · 손상 ini 2 벌 ·
+DPI(user scale 1.0/1.5) · 대조군 1.
+
+**눈먼 초록을 막는 장치 셋.**
+
+1. **판정은 넷이 함께 서야 성립한다** — `layerEnabled == true` · `mode == basic` ·
+   `drains > 0` · `problems == 0`. `problems == 0` 하나만 보면 레이어가 꺼진 실행도 통과한다.
+2. **대조군 세션.** 같은 이진·같은 스크립트, 환경 변수만 `CREATOR_DX12_VALIDATION=off`.
+   여기서 `layerEnabled` 가 거짓이고 `drains` 가 0 이어야 한다. 이것이 없으면
+   `layerEnabled` 가 늘 참인 상수여도 게이트는 초록이다.
+3. **축마다 `reset`** — 문제가 났을 때 "어딘가에서 났다" 가 아니라 **어느 축**인지 말한다.
+
+**★ 변이를 설계하다 게이트의 구멍을 먼저 찾았다.** 처음엔 축마다 `reset` 으로 시작했는데,
+그러면 **부팅 구간**(디바이스 생성 · 스왑체인 · 파이프라인 상태 물체 · 셰이더 적재)의
+오류를 첫 `reset` 이 지워 버린다 — DX12 오류가 가장 잘 나는 구간이다. `reset` **앞의**
+독서(`surface/boot` · `preset/부팅`)를 축으로 세웠고, 실제로 변이 ③이 거기서 잡혔다.
+
+**변이 4 종, 넷 다 잡았다.**
+
+| 변이 | 자리 | 결과 |
+| --- | --- | --- |
+| ① `DrainDebugMessages` 를 다시 Release 에서 무력화 | `DX12DeviceResources.cpp` | `surface/boot : 큐를 한 번도 비우지 않았다(drains=0)` |
+| ② `declare_layer` 가 끈 실행도 켠 것으로 적음 | `RHIValidationLedger.cpp` | `control-off: 레이어를 껐는데 layerEnabled 가 참이다` |
+| ③ 디바이스 생성 직후 UPLOAD 힙 자원을 `RENDER_TARGET` 상태로 | `DX12DeviceResources.cpp` | `surface/boot` — problems **2** 건, retained 에 해당 ERROR 두 줄(디바이스가 둘이라 두 번) |
+| ④ ③ 위에 `Cmd_dx12_validation` 의 `Fail` 길을 닫음 | `RenderDebugCommands.cpp` | 게이트 자신의 `problems == 0` 이 따로 붉었다 |
+
+③과 ④는 **양 팔을 따로 친 것**이다 — 제품이 실패로 보고하는 길과 게이트가 수를 읽는
+길이 각각 서 있는지 본다. 한쪽만 치면 다른 쪽이 죽어도 초록이다.
+
+**실측(둘 다 문제 0).** Release·Debug 양쪽에서 12 축 전부 `problems=0 · messages=0`,
+종료 코드 0. 축마다 `drains` 는 113~321 로 프레임 수를 따른다. 즉 **에디터의 이 경로들에는
+실제로 DX12 검증 오류가 없다** — 이제 그것이 측정된 문장이다.
+
+**못 잡는 것.** Vulkan(장부에 싣는 자리가 DX12 뿐이다 — 별도 보류), 픽셀(chrome golden 의
+몫), 실제 모니터 DPI(하네스가 못 바꾼다), 마지막 독서 **뒤** 해체 중에 나는 오류.
+
+**CLI 표.** `dx12.validation` 이 새 명령이라 `cli_registry.golden.tsv` 를 갱신했다
+(122 → 123 · 이름 131 → 132).
 
 ---
 

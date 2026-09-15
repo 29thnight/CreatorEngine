@@ -290,6 +290,20 @@ Run-Step "에디터 chrome 픽셀 골든" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-chrome-golden.ps1") -Exe $Exe
 }
 
+# PHASE 21 W8-3 — 통합 매트릭스. 축을 가로지르고 그 위에 W8 의 판정을 얇는다.
+#
+# 축마다 게이트는 이미 있다(resize · preset · 재시작 · 손상 ini · DPI · Play).
+# 이 단계가 새로 재는 것은 그 축들이 아니라 **판정**이다 — 계획서 W8 의
+# *"검증 레이어 오류/비정상 종료 0"* 은 출하 구성에서 읽을 수단이 없었다.
+# `DrainDebugMessages` 가 통째로 `_DEBUG` 였고 라이브 호출부 둘도 같은 가드 안이라,
+# `CREATOR_DX12_VALIDATION=basic` 으로 레이어를 켜도 아무도 큐를 읽지 않았다.
+#
+# 대조군 세션(`CREATOR_DX12_VALIDATION=off`)을 함께 돌아 `layerEnabled` 가 실물을
+# 따르는지까지 본다. 그것이 없으면 "오류 0" 은 빈 집합을 성공으로 읽는 것이다.
+Run-Step "에디터 통합 매트릭스" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-integration-matrix.ps1") -Exe $Exe -Work (Join-Path $Work 'integration-matrix')
+}
+
 # PHASE 21 W4 후속 — 뷰포트 extent 기반 resize · 렌더 배율.
 #
 # 라이브 뷰의 렌더 해상도가 창 클라이언트 크기였다. 캔버스는 창보다 늘 작으므로

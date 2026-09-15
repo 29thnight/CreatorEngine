@@ -5125,10 +5125,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                 view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
                 view.slots[slotIndex].key = {};
 
-#if defined(_DEBUG)
-                // ★ 검증 레이어를 읽는다. Debug 빌드에서 배선 오류(포맷·상태·
-                //   디스크립터)는 여기에만 남는데 아무도 안 읽으면 증상만 보고
-                //   추측하게 된다 — 실제로 그 상태로 며칠을 쫓았다.
+                // ★ 검증 레이어를 읽는다. 배선 오류(포맷·상태·디스크립터)는 여기에만
+                //   남는데 아무도 안 읽으면 증상만 보고 추측하게 된다 — 실제로 그
+                //   상태로 며칠을 쫓았다.
+                //
+                //   W8-3: 그 가드가 `_DEBUG` 였다. 그래서 출하 구성에서는 레이어를
+                //   켜도 이 자리가 닫혀 있었고, 계획서 W8 이 판정하라는 "검증 오류 0"
+                //   을 잴 수단이 없었다. 꺼진 실행의 비용은 포인터 하나 검사다.
                 {
                     std::string validation;
                     if (0 != state.dx12.DrainDebugMessages(validation) &&
@@ -5140,7 +5143,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
                         }
                     }
                 }
-#endif
 
                 std::vector<EnhancedLivePassTiming> timings;
                 std::string collectError;

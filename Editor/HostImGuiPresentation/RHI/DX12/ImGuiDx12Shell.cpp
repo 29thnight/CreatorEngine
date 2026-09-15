@@ -671,7 +671,9 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
     impl.frameOpen = false;
     ++impl.frameIndex;
 
-#if defined(_DEBUG)
+    // W8-3: 가드를 걷었다. 셸의 디바이스는 라이브 렌더러와 **다른 InfoQueue** 를
+    // 갖고, 출하 구성에서 이 자리가 닫혀 있으면 그 큐는 영영 읽히지 않는다.
+    // 레이어가 꺼져 있으면 드레인이 큐 포인터 하나를 보고 즉시 돌아온다.
     {
         std::string validation;
         if (0 != impl.resources.DrainDebugMessages(validation) && !validation.empty())
@@ -682,7 +684,6 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
             }
         }
     }
-#endif
 
     return impl.resources.Present(outError);
 }

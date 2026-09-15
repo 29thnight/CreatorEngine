@@ -84,6 +84,7 @@ namespace CommandCore
             { "dx12.ssr", CommandCost::Frames, "", "SSR 패스 검증(반사 발생·금속 마스크·두께 게이트·비트플래그)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "dx12.sss", CommandCost::Frames, "", "SSS 패스 검증(번짐·축 분리·표면 추종·에너지)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "dx12.ui", CommandCost::Frames, "", "DX12 UI 패스를 리드백으로 판정한다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "dx12.validation", CommandCost::Immediate, "[reset]", "검증 레이어 장부(레이어 상태·드레인 수·문제 건수·문구)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
             { "dx12.wireframe", CommandCost::Frames, "", "와이어프레임 패스 검증(변·내부 비채움·인스턴싱·메시 캐시)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "editor.dock", CommandCost::Immediate, "", "살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.layout", CommandCost::Immediate, "", "활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },

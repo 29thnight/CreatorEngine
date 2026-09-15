@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <sstream>
 #include <dxgidebug.h>   // IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
+#include "../RHIValidationLedger.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -275,22 +276,30 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 심각도를 통째로 낮추는 대신 이 ID 하나만 막는다 — 억제 목록이 길어지는 것은
     // 그 자체로 신호이므로, 새 항목을 넣을 때는 왜 정상인지를 여기 적을 것.
     {
-        Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
-        if (SUCCEEDED(m_device.As(&infoQueue)))
+        // W8-3: 큐를 **들고 있는다.** 매 프레임 QueryInterface 를 다시 하면
+        // 레이어가 꺼진 실행에서도 프레임마다 실패하는 호출이 하나 늘고,
+        // 무엇보다 "큐가 있는가" 를 밖에서 물을 자리가 없다.
+        if (SUCCEEDED(m_device.As(&m_infoQueue)))
         {
             if (breakOnError)
             {
-                infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-                infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+                m_infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+                m_infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
             }
 
             D3D12_MESSAGE_ID denied[] = { D3D12_MESSAGE_ID_LOADPIPELINE_NAMENOTFOUND };
             D3D12_INFO_QUEUE_FILTER filter{};
             filter.DenyList.NumIDs = _countof(denied);
             filter.DenyList.pIDList = denied;
-            infoQueue->AddStorageFilterEntries(&filter);
+            m_infoQueue->AddStorageFilterEntries(&filter);
         }
     }
+
+    // 장부는 **실물**을 받아 적는다. 환경 변수가 basic 이라고 적혀 있어도 큐를
+    // 얻지 못했으면 읽을 것이 없고, 그 실행의 "오류 0" 은 아무것도 뜻하지 않는다.
+    ::rhi::validation::declare_layer(nullptr != m_infoQueue,
+        ValidationMode::Gpu == validationMode ? "gpu" :
+        ValidationMode::Basic == validationMode ? "basic" : "off");
 
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -903,13 +912,19 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
     return m_lastLifecycleResult.IsClean();
 }
 
+// ★ 이 함수는 예전에 통째로 `#if defined(_DEBUG)` 였다. 그래서 출하 구성에서는
+//   `CREATOR_DX12_VALIDATION=basic` 으로 레이어를 켜도 **아무도 큐를 읽지 않았다** —
+//   성능만 내고 판정은 못 하는 상태였고, 그 위에서 "검증 오류 0" 을 말하면 빈 집합을
+//   성공으로 읽는 것이다(계획서 W8 의 판정이 바로 그 수다).
+//
+//   가드를 걷어도 꺼진 실행의 비용은 **포인터 하나 검사**다. 큐는 레이어를 켠
+//   디바이스에서만 만들어지므로 그렇지 않으면 즉시 돌아온다.
 uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
 {
     outMessages.clear();
-#if defined(_DEBUG)
-    Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
-    if (FAILED(m_device.As(&infoQueue))) return 0;
+    if (nullptr == m_infoQueue) return 0;
 
+    ID3D12InfoQueue* infoQueue = m_infoQueue.Get();
     const uint64_t count = infoQueue->GetNumStoredMessages();
     uint32_t problems = 0;
 
@@ -942,10 +957,11 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
     }
 
     infoQueue->ClearStoredMessages();
+
+    // 세는 자리는 여기 하나다. 큐를 비우는 길이 이 함수뿐이므로 여기로 들어오지
+    // 않는 메시지는 없다 — 호출부마다 세면 어느 자리가 안 세는지 알 수 없다.
+    ::rhi::validation::record_drain(problems, static_cast<uint32_t>(count), outMessages);
     return problems;
-#else
-    return 0;
-#endif
 }
 
 // ── GPU 진단 (DX11 DeviceResources에서 이관, 2026-08-10) ──

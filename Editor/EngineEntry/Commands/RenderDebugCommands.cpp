@@ -47,6 +47,7 @@
 //   할 일이 아니다. 없는 기능을 있는 것처럼 적어 두지 않는 것이 지금 할 일이다.
 
 #include "CommandRegistrar.h"
+#include "RHI/RHIValidationLedger.h"
 #include "CommandSupport.h"
 #include "EditorObjectOperations.h"
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
@@ -556,12 +557,70 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    // PHASE 21 W8-3 — 검증 레이어가 말한 것을 밖에서 읽는다.
+    //
+    // 계획서 W8 의 판정이 *"검증 레이어 오류/비정상 종료 0"* 인데, 그 수를 출하
+    // 구성에서 읽을 수단이 없었다. `DrainDebugMessages` 가 통째로 `_DEBUG` 였고
+    // 라이브 경로의 호출부들도 같은 가드 안이라, `CREATOR_DX12_VALIDATION=basic`
+    // 으로 레이어를 켜도 아무도 큐를 읽지 않았다 — 성능만 내고 판정은 못 했다.
+    //
+    // ★ `layerEnabled` 를 함께 낸다. 그것이 거짓이면 `problems == 0` 은 아무것도
+    //   증명하지 않는다(빈 집합을 성공으로 읽는 자리다). 판정하는 쪽이 이 값을
+    //   먼저 보게 하려고 같은 결과에 싣는다.
+    //
+    // ★ 문구를 함께 낸다. 수만 내면 "몇 건" 만 알고 **무엇인지** 모른다.
+    static CommandCore::CommandResult Cmd_dx12_validation(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        if (args.size() > 2) return InvalidArguments("dx12.validation [reset]");
+        if (2 == args.size())
+        {
+            if ("reset" != args[1]) return InvalidArguments("dx12.validation [reset]");
+            // 수만 비운다. 레이어 선언은 이 실행의 성질이라 구간마다 달라지지 않는다.
+            ::rhi::validation::reset_counts();
+        }
+
+        const ::rhi::validation::ledger_view ledger = ::rhi::validation::read();
+        auto data = CommandData::Object();
+        data.Set("layerEnabled", CommandData::Bool(ledger.layerEnabled));
+        data.Set("mode", CommandData::String(ledger.mode));
+        data.Set("devices", CommandData::Int(static_cast<int64_t>(ledger.devices)));
+        data.Set("drains", CommandData::Int(static_cast<int64_t>(ledger.drains)));
+        data.Set("messages", CommandData::Int(static_cast<int64_t>(ledger.messages)));
+        data.Set("problems", CommandData::Int(static_cast<int64_t>(ledger.problems)));
+        data.Set("droppedMessages", CommandData::Int(static_cast<int64_t>(ledger.droppedMessages)));
+        auto retained = CommandData::Array();
+        for (const std::string& line : ledger.retained) retained.Append(CommandData::String(line));
+        data.Set("retained", std::move(retained));
+
+        std::printf("[dx12.validation] layer=%s mode=%s devices=%llu drains=%llu "
+            "messages=%llu problems=%llu\n",
+            ledger.layerEnabled ? "on" : "off", ledger.mode.c_str(),
+            static_cast<unsigned long long>(ledger.devices),
+            static_cast<unsigned long long>(ledger.drains),
+            static_cast<unsigned long long>(ledger.messages),
+            static_cast<unsigned long long>(ledger.problems));
+        for (const std::string& line : ledger.retained)
+            std::printf("  %s\n", line.c_str());
+        std::fflush(stdout);
+
+        if (0 != ledger.problems)
+        {
+            std::string summary = "검증 레이어가 문제 " + std::to_string(ledger.problems) + " 건을 말했다";
+            if (!ledger.retained.empty()) summary += ": " + ledger.retained.front();
+            return Fail("dx12.validation.problems", summary, std::move(data));
+        }
+        return Ok("검증 레이어 문제 0", std::move(data));
+    }
+
     void RegisterRenderDebugCommands(Registrar& reg)
     {
         reg.Result({ "light.proxy" }, &Cmd_light_proxy);
         reg.Result({ "render.matmode" }, &Cmd_render_matmode);
         reg.Result({ "render.backend" }, &Cmd_render_backend);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
+        reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
         reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
         reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
         reg.Result({ "render.shadowinfo" }, &Cmd_render_shadowinfo);

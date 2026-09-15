@@ -170,6 +170,7 @@
     <ClCompile Include="RHI\RHIAssetEvictionPolicy.cpp" />
     <ClCompile Include="RHI\RHIDeviceMemoryBudgetCoordinator.cpp" />
     <ClCompile Include="RHI\RHIPersistentHeapPolicy.cpp" />
+    <ClCompile Include="RHI\RHIValidationLedger.cpp" />
     <ClCompile Include="RHI\DX12\DX12PersistentHeap.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanLoader.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanDeviceResources.cpp" />
@@ -525,6 +526,7 @@
     <ClInclude Include="RHI\RHIAssetEvictionPolicy.h" />
     <ClInclude Include="RHI\RHIDeviceMemoryBudgetCoordinator.h" />
     <ClInclude Include="RHI\RHIPersistentHeapPolicy.h" />
+    <ClInclude Include="RHI\RHIValidationLedger.h" />
     <ClInclude Include="GpuDiagnostics.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="ShaderMetaHandle.h" />

@@ -170,6 +170,10 @@ public:
     // 대신 outMessages에는 등급을 붙여 전부 담는다 — 세지 않는 것과 감추는 것은 다르다.
     uint32_t DrainDebugMessages(std::string& outMessages) override;
 
+    /// 검증 레이어가 실제로 붙었는가. `Initialize` 가 InfoQueue 를 얻어 낸
+    /// 경우에만 참이다 — 환경 변수를 다시 읽지 않는다(선언과 실물이 갈릴 수 있다).
+    bool HasDebugMessageQueue() const noexcept { return nullptr != m_infoQueue; }
+
     // ── GPU 진단 (DX11 DeviceResources에서 이관, 2026-08-10) ──
     //
     // VRAM은 어댑터(DXGI) 질의라 원래도 백엔드와 무관했다 — DX11 쪽 구현을
@@ -472,6 +476,10 @@ private:
     ComPtr<IDXGIFactory6>              m_factory;
     ComPtr<IDXGIAdapter1>              m_adapter;
     ComPtr<ID3D12Device>               m_device;
+    // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
+    // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이
+    // 포인터 하나 검사로 끝난다.
+    ComPtr<ID3D12InfoQueue>            m_infoQueue;
     ComPtr<ID3D12CommandQueue>         m_queue;
     std::array<ComPtr<ID3D12CommandAllocator>, kFrameCount> m_allocators;
     std::array<uint64_t, kFrameCount>  m_frameFenceValues{};
