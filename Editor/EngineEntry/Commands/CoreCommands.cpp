@@ -25,6 +25,7 @@
 #include "ViewportHostWindow.h"
 #include "EditorPanelCost.h"
 #include "BrowserThumbnailCache.h"
+#include "ContentBrowserControl.h"
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorNavContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
@@ -1406,6 +1407,118 @@ namespace ConsoleCmd
         return Ok("키보드 탐색 계약 위반 0", std::move(data));
     }
 
+    // PHASE 21 W2-B — Content Browser 의 탐색 상태를 읽고 모는 창구.
+    //
+    // 착수 시점에 이 창의 위치·이력·검색·선택을 밖으로 내는 명령이 0 개였고,
+    // 이동을 일으킬 수단도 사람의 클릭뿐이었다. 계획서의 판정 행렬
+    // (*"A→B→뒤로→C 뒤 앞으로 이력 제거 · 검색 중 뒤로 복원 · 전체/최근 결과의
+    // 원래 위치 열기"*)은 그 둘이 없으면 기본 위치를 두 번 읽고 끝난다.
+    //
+    // 인자를 준 호출은 **요청만 넣는다.** 창이 다음 프레임 머리에서 비우므로 같은
+    // 호출이 돌려주는 게시본은 아직 옛 상태다 — 검사는 `wait` 를 끼운다.
+    static CommandCore::CommandResult Cmd_editor_browser(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        using Kind = ::editor::windows::content_browser_request_kind;
+        const auto& args = ctx.parts;
+        const char* const usage = "editor.browser [go <assets-relative path>|@recent|@everything"
+            " | back | forward | up | search [text] | select <assets-relative path> | scroll <px>"
+            " | create folder <name> | create volume <name>]";
+
+        // 공백이 든 이름을 받는다 — 파서가 자른 조각을 도로 붙인다(W6-2 와 같은 이유).
+        const auto joined = [&](size_t from)
+        {
+            std::string text;
+            for (size_t i = from; i < args.size(); ++i)
+            {
+                if (i > from) text += ' ';
+                text += args[i];
+            }
+            return text;
+        };
+
+        if (args.size() > 1)
+        {
+            ::editor::windows::content_browser_request request;
+            const std::string& verb = args[1];
+            if ("go" == verb && args.size() >= 3)
+            {
+                const std::string target = joined(2);
+                // 가상 위치는 `@` 로 가른다 — `recent` 라는 이름의 폴더와 섞이지 않게.
+                if ("@recent" == target) request.kind = Kind::go_recent;
+                else if ("@everything" == target) request.kind = Kind::go_everything;
+                else { request.kind = Kind::go_folder; request.text = target; }
+            }
+            else if ("back" == verb && 2 == args.size()) request.kind = Kind::back;
+            else if ("forward" == verb && 2 == args.size()) request.kind = Kind::forward;
+            else if ("up" == verb && 2 == args.size()) request.kind = Kind::up;
+            else if ("search" == verb) { request.kind = Kind::search; request.text = joined(2); }
+            else if ("select" == verb && args.size() >= 3) { request.kind = Kind::select; request.text = joined(2); }
+            else if ("create" == verb && args.size() >= 4 && ("folder" == args[2] || "volume" == args[2]))
+            {
+                request.kind = "folder" == args[2] ? Kind::create_folder : Kind::create_volume_profile;
+                request.text = joined(3);
+            }
+            else if ("scroll" == verb && 3 == args.size())
+            {
+                request.kind = Kind::scroll;
+                try { request.value = std::stof(args[2]); }
+                catch (const std::exception&) { return InvalidArguments(usage); }
+            }
+            else return InvalidArguments(usage);
+            if (!::editor::windows::request_content_browser(std::move(request)))
+                return Fail("editor.browser.queue_full", "요청함이 가득 찼다(창이 그려지고 있는가)");
+        }
+
+        const auto snapshot = ::editor::windows::read_content_browser();
+        auto data = CommandData::Object();
+        data.Set("frames", CommandData::Int(static_cast<int64_t>(snapshot.frames)));
+        data.Set("requestsApplied", CommandData::Int(static_cast<int64_t>(snapshot.requestsApplied)));
+        data.Set("requestsRejected", CommandData::Int(static_cast<int64_t>(snapshot.requestsRejected)));
+        data.Set("lastRejection", CommandData::String(snapshot.lastRejection));
+        data.Set("scope", CommandData::String(::editor::windows::content_browser_scope_name(snapshot.scope)));
+        data.Set("directory", CommandData::String(snapshot.directory));
+        data.Set("search", CommandData::String(snapshot.search));
+        data.Set("selected", CommandData::String(snapshot.selected));
+        data.Set("error", CommandData::String(snapshot.error));
+        data.Set("historyIndex", CommandData::Int(static_cast<int64_t>(snapshot.historyIndex)));
+        data.Set("historySize", CommandData::Int(static_cast<int64_t>(snapshot.historySize)));
+        auto history = CommandData::Array();
+        for (const auto& visit : snapshot.history) history.Append(CommandData::String(visit));
+        data.Set("history", std::move(history));
+        data.Set("canBack", CommandData::Bool(snapshot.canBack));
+        data.Set("canForward", CommandData::Bool(snapshot.canForward));
+        data.Set("canUp", CommandData::Bool(snapshot.canUp));
+        data.Set("canCreate", CommandData::Bool(snapshot.canCreate));
+        data.Set("canCreateVolumeProfile", CommandData::Bool(snapshot.canCreateVolumeProfile));
+        data.Set("resultCount", CommandData::Int(static_cast<int64_t>(snapshot.resultCount)));
+        auto results = CommandData::Array();
+        for (const auto& result : snapshot.results) results.Append(CommandData::String(result));
+        data.Set("results", std::move(results));
+        data.Set("scrollY", CommandData::Double(snapshot.scrollY));
+        data.Set("scrollMaxY", CommandData::Double(snapshot.scrollMaxY));
+        data.Set("everythingFolders", CommandData::Int(static_cast<int64_t>(snapshot.everythingFolders)));
+        data.Set("everythingPending", CommandData::Int(static_cast<int64_t>(snapshot.everythingPending)));
+        data.Set("everythingComplete", CommandData::Bool(snapshot.everythingComplete));
+        data.Set("recentCount", CommandData::Int(static_cast<int64_t>(snapshot.recentCount)));
+
+        Debug::PrintLog(spdlog::level::info, "[editor.browser]"
+            " frames=" + std::to_string(snapshot.frames) +
+            " scope=" + ::editor::windows::content_browser_scope_name(snapshot.scope) +
+            " directory=" + snapshot.directory +
+            " search=" + snapshot.search +
+            " selected=" + snapshot.selected +
+            " history=" + std::to_string(snapshot.historyIndex) + "/" + std::to_string(snapshot.historySize) +
+            " results=" + std::to_string(snapshot.resultCount) +
+            " recent=" + std::to_string(snapshot.recentCount) +
+            " applied=" + std::to_string(snapshot.requestsApplied) +
+            " rejected=" + std::to_string(snapshot.requestsRejected));
+
+        if (0 == snapshot.frames)
+            return Fail("editor.browser.not_drawn", "Content Browser 본문이 아직 한 프레임도 돌지 않았다", std::move(data));
+        return Ok("Content Browser", std::move(data));
+    }
+
     // PHASE 21 W7 — 비동기 썸네일 장부.
     //
     // 계약의 완료 판정 셋(*"동일 자산 요청이 중복되지 않는지, 변경·삭제 뒤 늦은
@@ -1965,6 +2078,7 @@ namespace ConsoleCmd
         reg.Result({ "editor.viewport" }, &Cmd_editor_viewport);
         reg.Result({ "editor.panelcost" }, &Cmd_editor_panelcost);
         reg.Result({ "editor.thumbnail" }, &Cmd_editor_thumbnail);
+        reg.Result({ "editor.browser" }, &Cmd_editor_browser);
         reg.Result({ "editor.clipping" }, &Cmd_editor_clipping);
         reg.Result({ "editor.nav" }, &Cmd_editor_nav);
         reg.Result({ "editor.state" }, &Cmd_editor_state);

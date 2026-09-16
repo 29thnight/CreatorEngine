@@ -1,5 +1,6 @@
 #include "MeshRenderer.h"
 #include "EditorTheme.h"
+#include "EditorAssetDragPayload.h"
 // MeshRenderer.h는 Material을 전방 선언만 한다. 이 파일은 m_ORM_TexName 같은
 // 멤버를 직접 읽으므로 완전한 형이 필요하다. 그동안은 같은 유니티 블롭의
 // 앞선 파일이 대신 공급했고, 폴더에 파일 하나가 늘어 블롭 구성이 바뀌자
@@ -417,11 +418,8 @@ namespace
 			if (const ImGuiPayload* payload =
 				ImGui::AcceptDragDropPayload("Texture"))
 			{
-				const char* droppedFilePath = (const char*)payload->Data;
-				file::path filename = droppedFilePath;
-				file::path filepath =
-					PathFinder::Relative("Textures\\") / filename.filename();
-				if (filename.filename().empty())
+				const file::path filepath = editor::asset_drag::path_of(*payload);
+				if (filepath.filename().empty())
 				{
 					Debug::PrintLog(spdlog::level::info, "Empty Texture File Name");
 				}

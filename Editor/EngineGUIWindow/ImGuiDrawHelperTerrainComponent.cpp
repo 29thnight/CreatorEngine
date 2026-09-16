@@ -1,6 +1,7 @@
 #include "ExternUI.h"
 #include "EditorSessionState.h"
 #include "DataSystem.h"
+#include "EditorAssetDragPayload.h"
 #include "Assets/ModelAssetGeneration.h" // MBC9
 #include "EditorImGuiTexture.h"
 #include "Terrain.h"
@@ -281,10 +282,18 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 				{
 					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
 					{
-						const char* droppedFilePath = static_cast<const char*>(payload->Data);
-						file::path filename = file::path(droppedFilePath).filename();
-						file::path filepath = PathFinder::Relative("Models\\") / filename;
-						if (auto generation = DataSystems->LoadModelAssetGenerationByPath(filepath.string()))
+						const file::path filepath = editor::asset_drag::path_of(*payload);
+						// 폴리지는 모델을 stem 으로 저장하고 GetStemToGuid 로 다시 찾는다.
+						// 그 stem 이 끌어 온 파일로 돌아오지 않으면(같은 이름이 다른 폴더에
+						// 있으면) 다른 모델이 묶이므로 받지 않는다.
+						const FileGuid droppedGuid = DataSystems->GetFileGuid(filepath);
+						if (droppedGuid == nullFileGuid
+							|| DataSystems->GetStemToGuid(filepath.stem().string()) != droppedGuid)
+						{
+							Debug::PrintLog(spdlog::level::err, "Foliage model drop: '" + filepath.string()
+								+ "' is not the model its name resolves to — rename it or remove the duplicate");
+						}
+						else if (auto generation = DataSystems->LoadModelAssetGenerationByPath(filepath.string()))
 						{
 							// MBC9 — Foliage 자산은 모델을 이름(stem)으로 적고, 런타임 바인딩은
 							// AddFoliageType(BindModelGeneration)이 잇는다.

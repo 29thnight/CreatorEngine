@@ -420,6 +420,12 @@
     <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ContentBrowserControl.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorAssetDragPayload.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\BrowserThumbnailCache.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
@@ -594,6 +600,9 @@
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\EditorPanelCost.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorAssetDragPayload.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\BrowserDirectorySnapshot.cpp">

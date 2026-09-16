@@ -5,13 +5,13 @@
     "rootHeight": 1575.0
   },
   "base": {
-    "vertices": 5626,
-    "indices": 17013,
-    "drawCommands": 126
+    "vertices": 5602,
+    "indices": 16977,
+    "drawCommands": 116
   },
   "selected": {
-    "vertices": 7124,
-    "indices": 21489,
-    "drawCommands": 147
+    "vertices": 7100,
+    "indices": 21453,
+    "drawCommands": 137
   }
 }

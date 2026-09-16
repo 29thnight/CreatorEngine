@@ -168,6 +168,14 @@ namespace editor
         return found->second.listing;
     }
 
+    const browser_directory_listing* browser_cache_peek(const browser_fs::path& directory)
+    {
+        if (directory.empty()) return nullptr;
+        cache_state& cache = state();
+        const auto found = cache.slots.find(to_utf8(directory));
+        return found == cache.slots.end() ? nullptr : &found->second.listing;
+    }
+
     void browser_cache_invalidate()
     {
         cache_state& cache = state();

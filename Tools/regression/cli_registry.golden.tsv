@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	127
-# names	136
+# commands	130
+# names	139
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -23,6 +23,7 @@ dump.list	-	immediate	editor	engine_service	live	no	yes	[limit]	크래시 덤프
 dump.show	-	immediate	editor	engine_service	live	no	yes	[limit]	덤프 목록과 최신 덤프 요약을 조회한다
 dx12.live	-	immediate	editor	engine_service	live	no	yes	on|status	EnhancedRenderer 메인 런타임 상태
 dx12.validation	-	immediate	editor	engine_service	live	no	yes	[reset]	검증 레이어 장부(레이어 상태·드레인 수·문제 건수·문구)
+editor.browser	-	immediate	editor	editor_operation	live	no	yes	[go <경로>|@recent|@everything | back | forward | up | search [텍스트] | select <경로> | scroll <px> | create folder|volume <이름>]	Content Browser 의 위치·이력·검색·선택을 읽고 탐색·생성을 요청한다
 editor.clipping	-	immediate	editor	engine_service	live	no	yes	[reset]	잘라 그리기 계약(넘침·조용한 잘림·클립 스택) 위반 수를 읽는다
 editor.dock	-	immediate	editor	engine_service	live	no	yes	-	살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다
 editor.layout	-	immediate	editor	engine_service	live	no	yes	-	활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다
@@ -34,6 +35,7 @@ editor.sceneview	-	immediate	editor	engine_service	live	no	yes	-	씬 뷰 오버�
 editor.selftest	-	immediate	editor	engine_service	live	no	yes	-	editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다
 editor.state	-	immediate	editor	engine_service	live	no	yes	[reset]	위젯 상태 행렬(선언 대 관측)을 읽는다
 editor.theme	-	immediate	editor	engine_service	live	no	yes	-	적용된 ImGui 스타일 값을 TSV로 내고 배율 출처를 판정한다
+editor.thumbnail	-	immediate	editor	engine_service	live	no	yes	[reset | budget <bytes|default>]	비동기 썸네일 장부(요청·디코딩·게시·실패·축출)를 읽고 예산을 조종한다
 editor.viewport	-	immediate	editor	engine_service	live	no	yes	[scene|game]	중앙 ViewportHost 의 표시 모드와 뷰 수요
 editor.window	-	immediate	editor	editor_operation	live	no	yes	<안정식별자> <open|close|focus>	창 하나를 열고 닫고 앞으로 세운다(탭으로 겹친 창은 선택돼야 본문이 돈다)
 editor.windows	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 창 표를 TSV로 내고 배선 고아를 판정한다
@@ -49,6 +51,7 @@ lifecycle.registry	-	frames	editor	engine_service	live	no	yes	-	생명주기 등
 lifecycle.trace	-	frames	editor	engine_service	live	no	yes	on [틱프레임]|off|clear|status	생명주기 호출 순서를 받아 적는다
 light.proxy	-	frames	editor	engine_service	live	no	yes	-	Read live light proxy values and publication counters
 log.flush	-	immediate	editor	engine_service	live	no	yes	-	로그를 디스크에 즉시 반영
+material.override	-	frames	editor	editor_operation	live	no	yes	<오브젝트> <렌더러색인> <속성> <값|r g b a>	렌더러별 MaterialInstance override 를 얹는다(공유 재질을 값으로 가른다)
 mem.delta	-	immediate	editor	engine_service	live	no	yes	[라벨]	기준선 대비 CRT 블록·바이트 증감(기준선이 없으면 지금을 기준선으로 삼는다)
 mem.hook	-	immediate	editor	engine_service	live	no	yes	on|stack|off|top|status	CRT 할당 훅 — 호출 계수, stack 은 귀속까지(디버그 CRT 전용)
 mem.reset	-	immediate	editor	engine_service	live	no	yes	-	churn 누계와 기준선을 0으로 — 구간 측정용

@@ -36,6 +36,9 @@
     <ClInclude Include="EngineGUIWindow\EditorPanelCost.h" />
     <ClCompile Include="EngineGUIWindow\EditorPanelCost.cpp" />
     <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h" />
+    <ClInclude Include="EngineGUIWindow\ContentBrowserControl.h" />
+    <ClInclude Include="EngineGUIWindow\EditorAssetDragPayload.h" />
+    <ClCompile Include="EngineGUIWindow\EditorAssetDragPayload.cpp" />
     <ClCompile Include="EngineGUIWindow\BrowserDirectorySnapshot.cpp" />
     <ClInclude Include="EngineGUIWindow\BrowserThumbnailCache.h" />
     <ClCompile Include="EngineGUIWindow\BrowserThumbnailCache.cpp" />

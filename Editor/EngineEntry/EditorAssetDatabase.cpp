@@ -1905,30 +1905,48 @@ bool EditorAssetDatabase::SaveMaterial(Material* material)
 		== material->m_fileGuid;
 }
 
+namespace
+{
+    /// 새 자산 이름 하나를 검사한다. 폴더와 Volume Profile 이 같은 규칙을 쓴다.
+    bool asset_database_valid_new_name(std::string_view name)
+    {
+        return !name.empty() && name != "." && name != ".."
+            && name.find_first_of("<>:\"/\\|?*") == std::string_view::npos
+            && name.back() != '.' && name.back() != ' '
+            && std::none_of(name.begin(), name.end(), [](unsigned char c) { return c < 32; });
+    }
+
+    /// `parent` 를 정규형으로 풀고 프로젝트 Assets 안인지 본다.
+    bool asset_database_target_inside_assets(const file::path& parent, file::path& target, std::string& error)
+    {
+        std::error_code ec;
+        const auto root = file::weakly_canonical(PathFinder::Relative(), ec);
+        if (ec) { error = ec.message(); return false; }
+        target = file::canonical(parent, ec);
+        if (ec) { error = ec.message(); return false; }
+        const auto relative = target.lexically_relative(root);
+        if (relative.empty() || *relative.begin() == "..")
+        {
+            error = "Choose a folder inside the project Assets directory.";
+            return false;
+        }
+        return true;
+    }
+}
+
 bool EditorAssetDatabase::CreateFolder(const file::path& parent, std::string_view name,
     file::path& createdPath, std::string& error)
 {
     createdPath.clear();
     error.clear();
-    if (!m_impl || name.empty() || name == "." || name == ".."
-        || name.find_first_of("<>:\"/\\|?*") != std::string_view::npos
-        || name.back() == '.' || name.back() == ' '
-        || std::any_of(name.begin(), name.end(), [](unsigned char c) { return c < 32; }))
+    if (!m_impl || !asset_database_valid_new_name(name))
     {
         error = "Enter a valid folder name.";
         return false;
     }
     std::error_code ec;
-    const auto root = file::weakly_canonical(PathFinder::Relative(), ec);
-    if (ec) { error = ec.message(); return false; }
-    const auto target = file::canonical(parent, ec);
-    if (ec) { error = ec.message(); return false; }
-    const auto relative = target.lexically_relative(root);
-    if (relative.empty() || *relative.begin() == "..")
-    {
-        error = "Choose a folder inside the project Assets directory.";
-        return false;
-    }
+    file::path target;
+    if (!asset_database_target_inside_assets(parent, target, error)) return false;
     const auto candidate = target / file::u8path(name.begin(), name.end());
     if (!file::create_directory(candidate, ec))
     {
@@ -1939,29 +1957,64 @@ bool EditorAssetDatabase::CreateFolder(const file::path& parent, std::string_vie
     return true;
 }
 
-bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory)
+// PHASE 21 W2-B — 예전에는 OS 저장 대화상자를 `VolumeProfilePath()` 에 열어 두고
+// 거기서 고른 **이름만** 가져와 `directory` 에 썼다(다른 폴더를 골라도 무시). 같은
+// 이름이 있으면 말없이 숫자를 붙였고, 취소·쓰기 실패·메타 실패가 전부 같은 `false`
+// 였는데 호출자 둘 다 반환값을 버렸다. 이제 대상 폴더는 호출자가 정하고, 이름은
+// 폴더 만들기와 같은 규칙으로 검사하며, 실패마다 이유를 돌려준다.
+bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory, std::string_view name,
+	file::path& createdPath, std::string& error)
 {
-	if (!m_impl || directory.empty()) return false;
-	const file::path selectedPath = ShowSaveFileDialog(
-		L"", L"Save File", PathFinder::VolumeProfilePath());
-	if (selectedPath.empty()) return false;
+	createdPath.clear();
+	error.clear();
+	if (!m_impl || !asset_database_valid_new_name(name))
+	{
+		error = "Enter a valid volume profile name.";
+		return false;
+	}
+	file::path target;
+	if (!asset_database_target_inside_assets(directory, target, error)) return false;
+	std::string fileName(name);
+	fileName += ".volume";
+	const file::path candidate = target / file::u8path(fileName);
+	file::path metaPath = candidate;
+	metaPath += ".meta";
+	std::error_code ec;
+	if (file::exists(candidate, ec) || file::exists(metaPath, ec))
+	{
+		error = "A file with that name already exists.";
+		return false;
+	}
 
 	VolumeProfile profile;
 	profile.settings = RuntimeSettings::Get().GetRenderPassSettings();
-	const std::string baseName = selectedPath.stem().string();
-	file::path fullPath = directory / (baseName + ".volume");
-	int suffix = 1;
-	while (file::exists(fullPath))
-		fullPath = directory / (baseName + std::to_string(suffix++) + ".volume");
-
-	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
-	std::ofstream output(fullPath, std::ios::binary | std::ios::trunc);
-	if (!output.is_open()) return false;
-	output << Meta::SerializeDocument(&profile).Dump();
-	output.flush();
-	if (!output.good()) return false;
-	output.close();
-	return CreateMeta(fullPath) != FileGuid{};
+	bool written = false;
+	{
+		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+		std::ofstream output(candidate, std::ios::binary | std::ios::trunc);
+		if (output.is_open())
+		{
+			output << Meta::SerializeDocument(&profile).Dump();
+			output.flush();
+			written = output.good();
+		}
+	}
+	if (!written)
+	{
+		file::remove(candidate, ec);
+		error = "Could not write the volume profile file.";
+		return false;
+	}
+	if (CreateMeta(candidate) == FileGuid{})
+	{
+		// 반쯤 만든 자산을 남기지 않는다 — 메타 없는 .volume 은 참조할 수 없다.
+		file::remove(candidate, ec);
+		file::remove(metaPath, ec);
+		error = "Could not create the .meta file for the volume profile.";
+		return false;
+	}
+	createdPath = candidate;
+	return true;
 }
 
 bool EditorAssetDatabase::SaveExistingVolumeProfile(

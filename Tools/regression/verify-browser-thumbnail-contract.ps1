@@ -103,6 +103,10 @@ $fixtures = Join-Path $PSScriptRoot 'fixtures/browser-thumbnails'
 $names    = @('Checker256.png', 'Tiny4.png', 'Undecodable.png')
 $stimulus = 'Checker256.png'   # 무효화 단에서 다시 쓸 원본
 $placed   = @()
+# ★ W2-B 가 목록을 잘라 그리게 되자 뿌리에 올린 fixture 가 폴더 스무 개 뒤로 밀려
+#   **화면 밖**이 됐고 요청이 0 이 됐다. 전용 폴더에 두고 `editor.browser go` 로 연다.
+$fixtureFolderName = 'ThumbnailContractCheck'
+$fixtureFolder = Join-Path $assets $fixtureFolderName
 
 Assert (Test-Path -LiteralPath $assets) "브라우저 뿌리가 없다: $assets"
 foreach ($n in $names) {
@@ -110,8 +114,12 @@ foreach ($n in $names) {
 }
 
 try {
+    if (Test-Path -LiteralPath $fixtureFolder) {
+        throw "뿌리에 이미 $fixtureFolderName 이 있다 — 지난 회차가 안 지워졌다."
+    }
+    New-Item -ItemType Directory -Force -Path $fixtureFolder | Out-Null
     foreach ($n in $names) {
-        $destination = Join-Path $assets $n
+        $destination = Join-Path $fixtureFolder $n
         if (Test-Path -LiteralPath $destination) {
             throw "뿌리에 이미 $n 이 있다 — 지난 회차가 안 지워졌거나 실제 자산과 이름이 겹친다."
         }
@@ -120,7 +128,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $fixtures $n) -Destination $destination
         $placed += $destination
     }
-    Write-Host ('  fixture {0} 개를 뿌리에 올렸다: {1}' -f $names.Count, ($names -join ' / '))
+    Write-Host ('  fixture {0} 개를 {1} 에 올렸다: {2}' -f $names.Count, $fixtureFolderName, ($names -join ' / '))
 
     # ══ 회차 ═══════════════════════════════════════════════════════════════
 
@@ -135,6 +143,7 @@ try {
     #   부팅 구간에서 일어나 버려지고 requests 가 0 으로 보인다. 구간을 가르는
     #   장치는 가르는 순간 앞쪽을 버린다.
     $lines.Add('editor.thumbnail reset')            # 행 #0
+    $lines.Add('editor.browser go ' + $fixtureFolderName)   # 첫 그리기 머리에서 적용된다
     $lines.Add('wait 240')                          # 워밍업 — 도크 구축·최초 스캔
     $lines.Add('editor.panelcost reset')            # 비용 축만 부팅 구간을 뺀다
     foreach ($i in 1..20) { $lines.Add('editor.dock'); $lines.Add('wait 20') }
@@ -158,7 +167,7 @@ try {
     $env:CREATOR_EDITOR_WORKSPACE_DIR = $ws
     $env:CREATOR_EDITOR_LEGACY_INI = Join-Path $ws 'none.ini'
 
-    $stimulusPath = Join-Path $assets $stimulus
+    $stimulusPath = Join-Path $fixtureFolder $stimulus
     $revisionBefore = (Get-Item -LiteralPath $stimulusPath).LastWriteTimeUtc
     $stimulated = $false
 
@@ -409,8 +418,10 @@ finally {
     foreach ($path in $placed) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
     # .meta 사이드카가 생겼을 수 있다 — 감시자가 자산을 등록하면서 만든다.
     foreach ($n in $names) {
-        Remove-Item -LiteralPath (Join-Path $assets ($n + '.meta')) -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $fixtureFolder ($n + '.meta')) -Force -ErrorAction SilentlyContinue
     }
+    Remove-Item -LiteralPath $fixtureFolder -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath ($fixtureFolder + '.meta') -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host ''

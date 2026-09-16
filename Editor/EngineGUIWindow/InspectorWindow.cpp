@@ -1,6 +1,7 @@
 #include "../EngineEntry/EditorProjectOperations.h"
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
+#include "EditorAssetDragPayload.h"
 
 #include "EditorInspectorPanel.h"
 #include "InspectorIconList.h"
@@ -1128,9 +1129,7 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VolumeProfile"))
 		{
-			const char* droppedFilePath = static_cast<const char*>(payload->Data);
-			file::path filename = file::path(droppedFilePath).filename();
-			file::path filepath = PathFinder::Relative("VolumeProfile\\") / filename;
+			const file::path filepath = editor::asset_drag::path_of(*payload);
 			FileGuid guid = DataSystems->GetFileGuid(filepath);
 			if (guid != nullFileGuid)
 			{
@@ -1212,9 +1211,8 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HDR"))
 				{
-					const char* droppedFilePath = static_cast<const char*>(payload->Data);
-					file::path filename = file::path(droppedFilePath).filename();
-					file::path filepath = PathFinder::Relative("HDR\\") / filename;
+					const file::path filepath = editor::asset_drag::path_of(*payload);
+					const file::path filename = filepath.filename();
 					FileGuid guid = DataSystems->GetFileGuid(filepath);
 					if (guid != nullFileGuid)
 					{
@@ -1345,15 +1343,10 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 		{
-			const char* droppedFilePath = (const char*)payload->Data;
-			file::path filename = droppedFilePath;
-			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-			HashingString path = filepath.string();
-			if (!filename.filename().empty()) {
-				decalComponent->SetDecalTexture(filename.string().c_str());
-			}
-			else {
-				Debug::PrintLog(spdlog::level::info, "Empty Texture File Name");
+			// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
+			const file::path filepath = editor::asset_drag::path_of(*payload);
+			if (editor::asset_drag::lives_in(filepath, "Textures", "Decal Decal texture drop")) {
+				decalComponent->SetDecalTexture(filepath.filename().string().c_str());
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1368,15 +1361,10 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 		{
-			const char* droppedFilePath = (const char*)payload->Data;
-			file::path filename = droppedFilePath;
-			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-			HashingString path = filepath.string();
-			if (!filename.filename().empty()) {
-				decalComponent->SetNormalTexture(filename.string().c_str());
-			}
-			else {
-				Debug::PrintLog(spdlog::level::info, "Empty Texture File Name");
+			// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
+			const file::path filepath = editor::asset_drag::path_of(*payload);
+			if (editor::asset_drag::lives_in(filepath, "Textures", "Decal Normal texture drop")) {
+				decalComponent->SetNormalTexture(filepath.filename().string().c_str());
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1391,15 +1379,10 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 		{
-			const char* droppedFilePath = (const char*)payload->Data;
-			file::path filename = droppedFilePath;
-			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
-			HashingString path = filepath.string();
-			if (!filename.filename().empty()) {
-				decalComponent->SetORMTexture(filename.string().c_str());
-			}
-			else {
-				Debug::PrintLog(spdlog::level::info, "Empty Texture File Name");
+			// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
+			const file::path filepath = editor::asset_drag::path_of(*payload);
+			if (editor::asset_drag::lives_in(filepath, "Textures", "Decal ORM texture drop")) {
+				decalComponent->SetORMTexture(filepath.filename().string().c_str());
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1448,9 +1431,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
 		{
-			const char* droppedFilePath = static_cast<const char*>(payload->Data);
-			file::path filename = file::path(droppedFilePath).filename();
-			file::path filepath = PathFinder::Relative("UI\\") / filename;
+			const file::path filepath = editor::asset_drag::path_of(*payload);
 			auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(),
 				DataSystem::TextureFileType::UITexture);
 			if (texture)
@@ -1571,9 +1552,7 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 		{
-			const char* droppedFilePath = (const char*)payload->Data;
-			file::path filename = droppedFilePath;
-			file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+			const file::path filepath = editor::asset_drag::path_of(*payload);
 			auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::Texture);
 			spriteRenderer->SetSprite(texture);
 		}

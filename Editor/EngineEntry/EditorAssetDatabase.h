@@ -62,7 +62,8 @@ public:
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);
-	bool CreateVolumeProfile(const file::path& directory);
+	bool CreateVolumeProfile(const file::path& directory, std::string_view name,
+		file::path& createdPath, std::string& error);
     bool CreateFolder(const file::path& parent, std::string_view name,
         file::path& createdPath, std::string& error);
 	bool SaveExistingVolumeProfile(FileGuid guid, VolumeProfile* volume);

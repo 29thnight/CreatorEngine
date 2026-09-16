@@ -84,6 +84,16 @@ namespace editor
     /// 폴더 하나의 목록. 캐시에 있고 낡지 않았으면 **디스크를 만지지 않는다.**
     const browser_directory_listing& browser_cache_listing(const browser_fs::path& directory);
 
+    /// PHASE 21 W2-B — 캐시에 **이미 있으면** 목록을, 없으면 nullptr.
+    /// **어떤 경우에도 디스크를 만지지 않는다**(낡았어도 다시 훑지 않는다).
+    ///
+    /// ★ 왜 따로 있는가. 위의 `browser_cache_listing` 은 처음 보는 폴더를 **예산과
+    ///   무관하게** 훑는다(줄 것이 없으니까). 한 폴더만 여는 트리에서는 옳지만,
+    ///   전체 자산 순회가 그것으로 폴더 서른 개를 물으면 한 프레임에 스캔 서른
+    ///   번이 몰린다 — W7-1 이 없앤 바로 그 스파이크다. 순회는 이것으로 먼저 묻고,
+    ///   없는 폴더는 **자기 예산 안에서만** `browser_cache_listing` 으로 데운다.
+    const browser_directory_listing* browser_cache_peek(const browser_fs::path& directory);
+
     /// 이 창이 만든 변경 뒤에 부른다(새 폴더·삭제·이름 변경·자산 생성).
     /// 다음 프레임은 예산을 무시하고 필요한 만큼 다시 훑는다.
     void browser_cache_invalidate();

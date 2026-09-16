@@ -10,6 +10,9 @@
   §1.3의 표시 상태 저장소 수를 정정했다.
 - 셸 크롬 후속: 2026-09-12 — 제목 행을 20 logical px / 글꼴 12px로 줄이고 File 왼쪽에 실행 파일의 엔진 아이콘을 표시한다.
   Play/Stop·Pause/Resume은 최소화 버튼 앞의 공통 박스에 배치하며 별도 재생 행을 제거했다. 검증: [EditorTitleBarValidation.md](../analysis/EditorTitleBarValidation.md).
+- 검사 호출 규약: **2026-09-16 `run-all.ps1` 폐지.** 아래 기록의 "run-all 배선/연결" 은 폐지 전의
+  역사다. 검사는 이 문서에 적힌 **이름**으로 찾고, 변경마다 닿는 것을 모아 묶어 돌린 뒤 무엇을
+  돌렸는지 적는다.
 - 최신 상태: **2026-09-13 현재 외관 사용자 승인·고정**. M0~M4·W0·W1(DX12)·**W3·W4**는 `done`, W2·W2-I·W2-V·W2-B는 부분 구현 `progress`다. 완료 부분과 남은 범위는 [§9.0](#phase21-current-status)을 정본으로 한다. Vulkan 대응·표시 오류는 사용자 결정으로 별도 보류한다.
 - 방향: **Dear ImGui 유지 · S&Box 테마 토큰 이식 · 소수 전용 위젯만 custom draw**
 - **범위: 이 페이즈는 에디터다. 에디터는 DX12 로 뜨므로 backend 는 DX12 하나다.**
@@ -1030,7 +1033,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 | W2 | done | 4종 구현 완료. **W2-1 키보드 탐색 · W2-2 잘라 그리기/tooltip · W2-3 상태 행렬 · W2-4 시각 기준선과 §8 성능 계약**으로 전부 착지(2026-09-15 — 네 절 모두 판정문에 자가 없었다. nav 커서는 넷 중 셋이 안 그렸고, 자르기는 넷 중 하나만 온전히 알고 있었고, 일곱 상태를 한자리에서 볼 수단은 0 이었고, §8.2 의 "원인을 기록하고" 는 프레임 1.1 ms 중 0.015 ms 만 이름이 있었다). W2-4 는 하나를 **세우지 않고 닫았다** — 시각 기준선은 W8-2 의 chrome 골든이 이미 덮고 있음을 변이로 증명했다(위젯의 테두리 한 줄을 걷자 단정 3 건으로 붉었다). 성능 쪽은 창·셸 두 층을 새로 열어 설명력 1.4% → 95.6/96.5% (게이트 `verify-editor-chrome-perf.ps1` 단정 59 · run-all 배선). ★ 그 자가 곧바로 값을 냈다 — 사용자 요청으로 Content Browser 를 기본 앞 탭으로 세우자 그 창 혼자 프레임의 82.6%(2.446 ms) 다. 원인은 §W7-5 이고 **2026-09-16 에 닫혔다**(2.446 → 0.250 ms) |
 | W2-I | progress | RectTransform 최소 폭 대응, 중첩/배열 이관, **전용 드로어 15 중 12**, Import Settings(대상은 `DrawYamlNodeEditor.cpp`), 활성 정책·중복 호출·편집/저장 회귀. ★ **2026-09-16 재기준선** — 잔여를 문장에서 **이름 열둘**로 바꿨다. 그 과정에서 자를 한 번 고쳤다: `EditorPropertyRow` 는 파일 이름이고 코드가 부르는 어휘는 `editor::widgets::` 이며, 전용 드로어 열은 별도 파일이 아니라 `InspectorWindow.cpp` 안의 멤버라 **파일 단위 세기가 12 를 0 으로 읽었다.** 일반 리플렉션·C# 노출 필드 경로는 이미 정본을 지난다 |
 | W2-V | progress | ★ **2026-09-16 재기준선 — 다섯 줄 중 넷이 줄었다.** 남은 넷: V2 **방향 선택 창구**(높이 축과 Stats 대체 접근은 이미 섰다 — `showGizmo`·`RenderStatistics` 팝업), V3 **resize 중 조작 취소**(기제 0 건), V0·V4 는 **구현이 아니라 판정** — V0 은 `좌표식 부재`의 소스 축, V4 는 오버레이 위치/ID/입력 변이 검출. `W4 Host canvas 통합`·`drop/terrain 관통`·`W5 소유권`·`연속 resize`·`DPI` 는 W4 후속·W5·W8-3 이 닫았다 |
-| W2-B | progress | 최근/전체 **가상 탐색 위치**, 방문별 검색·선택 복원, Volume Profile 생성 대상 경로/취소/실패 정리, 실제 마우스 분할선/동명 자산 drop 회귀. ★ **2026-09-16 재기준선 — `W3 저장·W7 목록 연결` 은 닫혔다**(폭은 W3 autosave 소유, 창은 `browser_cache_listing` 소비, 타일은 `thumbnail_acquire` 소비). `전체` 의 원천은 **W7 목록 캐시 순회**다 — `AssetIdentityRegistry` 는 경로도 타입도 없어 브라우징 원천이 못 되고, 계획서가 별도 자산 DB를 금지한다 |
+| W2-B | progress | **2026-09-17 착지** — 방문 이력(검색·선택·스크롤 복원·사라진 폴더 복구)·최근/전체 가상 위치(W7 캐시 순회, 잘라 그리기로 Release 4k p95 15.9→3.25ms)·끌기 payload 전체 경로(받는 자리 17)·Volume Profile 이름 대화상자와 실패 이유. 검사 `verify-content-browser-navigation.ps1` 114 단정·변이 14 종. 남은 것: 실제 마우스·DPI 행렬, 프로젝트 전환 실행 검증, 모으기 비용, 끌기 실물 자극 |
 | W3 | **done** | ID·legacy 이주, 자유 dock/close/reopen, versioned save/load/reset/backup·손상 복구가 게이트 둘(169+212 checks)로 선다. Scene `no_move` 해제는 W4 단일 Host, `dock_slot` 선언화는 W6 preset 소속 |
 | W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize와 렌더 배율은 **2026-09-14 착지**(§W4 후속) — 미뤄 둔 근거였던 generation/retire 수렴을 게이트 단정으로 옮겼다 |
 | W5 | **done** | 요청/진행/확정 신호 셋과 Snapshot → phase → 통지 순서, 실패 시 요청 되돌림, `Stopped/Entering/PlayingPossessed/PlayingEjected/Exiting` 컨트롤러, 게임 입력 소유 관문(포커스·글자 입력·pause·eject)과 커서 의사/적용 분리, Stop 의 문서·포커스·선택 복원이 `verify-play-roundtrip.ps1`(2 launches)·`verify-play-selection-undo.ps1` 로 선다. 기즈모 잔류는 CLI 로 못 몬다 |
@@ -1956,6 +1959,73 @@ W7의 목록/썸네일 최적화와 담당 범위를 구분한다. 아래 여섯
   `browser_files` 의 `probes` 가 0 을 유지해야 한다(§W7-5 계약).
   실행 검증 결과는 [Content Browser 검증](../analysis/EditorContentBrowserLayoutValidation.md)에 기록한다.
 
+#### 2026-09-17 방문 이력·가상 위치·끌어다 놓기 신원·Volume Profile 생성 착지
+
+- **밖에서 읽고 모는 창구가 0 이었다.** `editor.browser` 를 세웠다 — 요청함에 넣고 창이 프레임
+  머리에서 적용하며 프레임 끝에 사본을 게시한다(`editor.viewport` 와 같은 모양,
+  `ContentBrowserControl.h`). 위치·범위·검색어·선택·이력·버튼 상태·결과(앞 256)·스크롤·전체 순회
+  진행·최근 수를 낸다. 요청은 `go <경로>|@recent|@everything`·`back`·`forward`·`up`·`search`·
+  `select`(지난 프레임에 보인 결과 안만)·`scroll`·`create folder|volume <이름>`.
+- **이력의 칸은 경로가 아니라 방문이다**(범위·폴더·검색어·선택·스크롤). 떠날 때 적고 돌아올 때
+  되살린다(계약 4). 선택은 부모 폴더의 캐시 목록에 지금도 있을 때만 되살린다(계약 6). 지워진 폴더는
+  Assets 안의 가장 가까운 조상으로 가고 이유를 적는다.
+- **최근 항목·전체 자산은 가상 위치다**(계약 5). 트리 위 두 줄로 들어간다. 전체는 W7 목록 캐시를
+  걷고 캐시에 없는 폴더는 프레임당 2 개만 훑어 차오른다. 이름 다음 경로 순으로 정렬해 동명 파일이
+  둘 다 안정적으로 나온다. 최근은 메타를 읽어 인스펙터에 올리는 데 성공한 선택과 열기에 성공한
+  파일만 적고, 프로젝트별 `Library/EditorState/ContentBrowserRecents.txt`(루트 상대 32 줄)에 둔다.
+  파일이 사라지면 목록과 저장 파일에서 빠진다. 가상 위치에서는 New·빈 곳 메뉴·Up 을 닫는다.
+- **잘라 그리기 — 수치가 먼저였다.** Release 실측으로 전체 자산 274 개 p95 2.75ms, 4,274 개
+  15.9ms 였고 units 가 결과 수와 같았다(안 보이는 타일까지 썸네일 조회째 그렸다). 줄 단위 clipper
+  를 넣어 1.18ms · 3.25ms(그린 타일 5). ★ 파일 타일은 폴더 타일보다 선 하나와 3px 만큼 높아
+  clipper 가 첫 줄(폴더)로 줄 높이를 재면 파일 줄마다 어긋난다 — 그린 칸의 최대 높이를 모든 줄의
+  최소 높이로 준다(폴더만 있는 줄이 파일 줄 높이로 맞춰진다). ★ 남은 3.25ms 는 매 프레임 모으고
+  정렬하는 비용이고 결과 수에 선형이다 — 수만 남기고 판정하지 않는다.
+- **끌어다 놓기 신원.** payload 가 파일 이름이었고 받는 자리 17 곳이 `<유형 폴더>\이름` 으로
+  경로를 다시 지었다 — 전체 자산에서 `Animation/Cha_Mon_5.fbx` 를 끌면 `Models/` 쪽이 열렸다.
+  이제 UTF-8 전체 경로 하나다(`EditorAssetDragPayload.h` 의 `set_payload`·`path_of`). 이름만 저장하는
+  소비자 가운데 데칼 셋·스프라이트 시트는 그 폴더 바로 아래 파일만 받고(`lives_in`), 폴리지는
+  stem→GUID 가 끌어 온 파일로 돌아오는지 본다. ★ 남는 것: `DataSystem::LoadSharedTexture` 의
+  캐시 키가 stem 이다 — 엔진 캐시의 신원 문제라 이 조각 밖이다.
+- **Volume Profile 생성.** OS 저장 대화상자에서 이름만 가져와 넘겨받은 폴더에 썼고, 같은 이름엔
+  말없이 숫자를 붙였으며, 취소·쓰기 실패·메타 실패가 반환값을 버린 호출자 앞에서 같은 침묵이었다.
+  이제 새 폴더와 같은 이름 대화상자를 쓰고 `CreateVolumeProfile(directory, name, created, error)` 가
+  같은 이름·잘못된 이름·쓰기 실패·메타 실패마다 이유를 돌려주며 반쯤 만든 파일을 지운다. 만든 것을
+  고른다. 두 메뉴가 같은 술어(`CanCreateVolumeProfileIn`)와 같은 생성 경로(`CreateNamedAsset`)를
+  쓴다. 생성이 동기라 늦은 완료는 없다.
+- **검사 `Tools/regression/verify-content-browser-navigation.ps1`** — 실행 축(에디터 1 회·창 숨김·
+  표본 22)과 소스 축, 단정 114. Debug·Release 통과. 변이 14 종 전부 잡음 — 소스 8(경로 다시
+  짓기·이름 싣기·받는 자리 이동·데칼 가드 제거·폴리지 검사 제거·숫자 붙이기·메뉴 술어 분기·
+  Show in Folder 선택 누락), 실행 6(앞으로 이력 유지·검색어 복원 누락·조상 복구 누락·같은 이름
+  덮어쓰기·전체 자산 예산 제거·잘라 그리기 제거). ★ 받는 자리는 수가 아니라 (파일, 유형) 목록으로
+  맞댄다 — 한 자리가 빠지고 다른 자리가 늘어도 수는 17 그대로였다.
+  ★ 에디터가 도는 중에 폴더를 지워야 하는데 결과 파일은 에디터가 공유 없이 열어 읽히지 않는다 —
+  에디터가 만드는 폴더(`create folder Signal`)를 표지로 쓴다. ★ 최근 항목 정리는 목록 캐시 나이
+  (1 초)에 걸려 Release 에서만 붉었다(프레임이 빨라 1 초 안에 도착) — 같은 이름 폴더 만들기가
+  실패하면서 캐시를 버리는 것으로 자극한다.
+- **함께 고친 것.** 잘라 그리기 뒤 `verify-browser-thumbnail-contract.ps1` 의 요청이 0 이 됐다 —
+  뿌리에 올린 검사용 PNG 가 폴더 스무 개 뒤 화면 밖이었다. 전용 폴더에 두고 `editor.browser go`
+  로 연다(56 단정 통과). `verify-browser-filesystem-contract.ps1` 가 `lives_in` 의 `equivalent` 를
+  잡아 `browser_canonical` + 어휘 비교로 바꿨다. W7 의 `editor.thumbnail` 이 명령 씨앗에 빠져
+  있었고, `5eebcc23` 이 골든 갱신 없이 `material.override` 를 넣었다 — 둘 다
+  `cli_registry.golden.tsv` 에 함께 적었다.
+- **이번에 돌린 검사.** Debug: 탐색·`verify-cli-registry-golden`·`verify-cli-discovery`·
+  `verify-editor-command-surface`·`verify-model-authoring-transaction`·`verify-model-multifile-import`.
+  Release: 탐색·`verify-browser-filesystem-contract`·`verify-browser-thumbnail-contract`·
+  `verify-editor-widget-clipping`·`verify-editor-chrome-perf`. 소스만: `verify-asset-guid-contract`·
+  `verify-asset-runtime-change-boundary`·`verify-authoring-line-endings`·`verify-hierarchy-flatten-contract`·
+  `verify-nlohmann-retirement`·`verify-scene-gizmo-input-boundary`.
+  ★ `verify-editor-chrome-perf` 골든을 갱신했다 — 기본·선택 두 회차 모두 정점 −24·인덱스 −36·draw
+  command −10 이다. 이미지 여섯 장 분량으로, 잘라 그리기가 화면 밖 타일의 아트워크를 더 내지 않은
+  것이다. 픽셀 골든의 브라우저 영역은 그대로다.
+  ★ 이 변경 전부터 붉은 셋 — `verify-asset-presentation-boundary`(`d2b70402` M4 2단계가
+  `ContextRegister(kMaterialPicker` 를 창 선언으로 옮긴 뒤 안 따라옴), `verify-editor-chrome-golden`
+  (9-16 로그 작업이 아래 상태 막대에 넣은 개수가 회차마다 달라 "같은 상태 두 번" 재현 축부터 붉다 ·
+  브라우저 영역 차이 0), `verify-asset-authoring-ownership`(`efsw.dll` 을 exe 옆에서 찾는데 지금은
+  `Bin/x64-*/Runtime/Editor/` 에 있다).
+- **남은 것.** 실제 마우스 분할선·DPI 행렬(B1), Volume Profile 취소(사람 손으로만 일어난다),
+  프로젝트 전환 때 이력·최근 재사용 금지의 실행 검증, 전체 자산 모으기 비용(4k 3.25ms)과
+  1k/10k/50k 공동 측정, 끌기의 실물 자극(지금은 소스 축뿐이다), 텍스처 캐시의 stem 신원.
+
 #### 스크린샷과 착수 전 코드 대조
 
 기준 소스는 `Editor/EngineGUIWindow/ContentsBrowserWindow.{cpp,h}`다. S&Box 기능의 세부 동작이나
@@ -2040,12 +2110,12 @@ W7의 목록/썸네일 최적화와 담당 범위를 구분한다. 아래 여섯
 
 | 단계 | 작업 | 초기 추정 | 완료 기준 | 2026-09-13 상태 |
 |---|---|---:|---|---|
-| W2-B0 | 화면/상태 계약·생성/drag 소비자 계수 | 0.5일 | 기존 기능·신규 범위·W3/W7 경계와 지원 생성 종류 확정 | progress — 화면 계약 적용, 생성/drag 소비자 전수 확인 남음 |
+| W2-B0 | 화면/상태 계약·생성/drag 소비자 계수 | 0.5일 | 기존 기능·신규 범위·W3/W7 경계와 지원 생성 종류 확정 | progress — 화면 계약 적용. **생성/끌기 소비자 전수는 2026-09-17 닫힘**(받는 자리 17 · 생성 경로 2) |
 | W2-B1 | 내부 분할선·긴 이름·좁은 창 대응 | 1일 | 폭 조절/복원·접기·tooltip 도달 가능, DPI/resize에서 본문 최소 폭 유지 | progress — 분할/저장/접기 적용. **폭 저장의 W3 이관은 2026-09-16 닫힘.** 실제 마우스·전체 DPI 회귀만 남는다 |
-| W2-B2 | 경로 바·루트/Up·뒤로/앞으로·이력 | 1.5일 | 모든 폴더 진입점 통합, 삭제/실패 복구·프로젝트 경계·선택 복원 일치 | progress — 경로/뒤·앞/상위 적용, 방문별 상태 복원 남음 |
-| W2-B3 | 폴더+자산 목록·검색 범위·최근/전체·표시 옵션 | 1.5일 | 유형/정렬/목록·타일이 같은 결과/ID를 소비하고 W7 스냅샷과 연결 | progress — 현재 폴더 검색/유형/정렬/보기 적용. **W7 스냅샷 연결은 2026-09-16 닫힘**(§W7-1·§W7-5). 최근/전체 가상 위치만 남는다 |
-| W2-B4 | New·폴더 우클릭 공통 생성 및 결과 반영 | 1.5일 | 새 폴더·Volume Profile 생성/취소/실패, 경로·GUID·선택 일치와 늦은 완료 처리 | progress — 새 폴더 적용, Volume Profile 경로/실패/완료 처리 남음 |
-| W2-B5 | 배치·탐색·생성·검색·기존 자산 동작 회귀 | 1일 | 아래 행렬·관측·W8 연결 완료, 새 목록의 동명 자산 drag 소비자까지 검증 | progress — 대표 UI/fixture 검증, 전체 행렬·drop 소비자 남음 |
+| W2-B2 | 경로 바·루트/Up·뒤로/앞으로·이력 | 1.5일 | 모든 폴더 진입점 통합, 삭제/실패 복구·프로젝트 경계·선택 복원 일치 | progress — 경로/뒤·앞/상위 적용. **방문별 검색·선택·스크롤 복원과 사라진 폴더 복구는 2026-09-17 닫힘.** 프로젝트 전환 실행 검증 남음 |
+| W2-B3 | 폴더+자산 목록·검색 범위·최근/전체·표시 옵션 | 1.5일 | 유형/정렬/목록·타일이 같은 결과/ID를 소비하고 W7 스냅샷과 연결 | progress — 현재 폴더 검색/유형/정렬/보기 적용. **W7 스냅샷 연결은 2026-09-16 닫힘**(§W7-1·§W7-5). **최근/전체 가상 위치와 잘라 그리기는 2026-09-17 닫힘.** 모으기 비용(4k 3.25ms)·1k/10k/50k 공동 측정 남음 |
+| W2-B4 | New·폴더 우클릭 공통 생성 및 결과 반영 | 1.5일 | 새 폴더·Volume Profile 생성/취소/실패, 경로·GUID·선택 일치와 늦은 완료 처리 | progress — 새 폴더 적용. **Volume Profile 이름 대화상자·충돌/실패 이유·선택은 2026-09-17 닫힘**(생성이 동기라 늦은 완료 없음). 취소는 사람 손 확인만 남음 |
+| W2-B5 | 배치·탐색·생성·검색·기존 자산 동작 회귀 | 1일 | 아래 행렬·관측·W8 연결 완료, 새 목록의 동명 자산 drag 소비자까지 검증 | progress — 대표 UI/fixture 검증. **`verify-content-browser-navigation.ps1` 114 단정·변이 14 종(2026-09-17), 끌기 신원은 소스 축.** 실제 마우스·DPI 행렬·끌기 실물 자극 남음 |
 
 W1/W2와 이미 착지한 M1 메뉴 배선을 선행으로 한다. W2-I·W2-V 완료와 순차 의존은 없다.
 W7의 폴더/자산 스냅샷 계약을 먼저 공유해 B3가 같은 정본을 소비하게 하고, 검색을 위해 매 프레임

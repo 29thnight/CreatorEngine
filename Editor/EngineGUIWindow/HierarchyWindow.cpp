@@ -1,6 +1,7 @@
 #include "EditorModelPlacement.h"
 #include "EditorTheme.h"
 #include "EditorObjectOperations.h"
+#include "EditorAssetDragPayload.h"
 #include "EditorAssetPresentation.h"
 #include "EditorImGuiTexture.h"
 #include "HierarchyWindow.h"
@@ -433,9 +434,7 @@ void HierarchyWindow::Draw()
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
 				{
-					const char* droppedFilePath = (const char*)payload->Data;
-					file::path filename = droppedFilePath;
-					file::path filepath = PathFinder::Relative("Models\\") / filename.filename();
+					const file::path filepath = editor::asset_drag::path_of(*payload);
 
 					if (scene)
 					{
@@ -445,9 +444,8 @@ void HierarchyWindow::Draw()
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
 				{
 					//TODO : 불필요 로직 제거 -> DataSystem에서 LoadUITexture로 변경
-					const char* droppedFilePath = (const char*)payload->Data;
-					file::path filename = droppedFilePath;
-					file::path filepath = PathFinder::Relative("UI\\") / filename.filename();
+					const file::path filepath = editor::asset_drag::path_of(*payload);
+					const file::path filename = filepath.filename();
 					auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::UITexture);
 					ImageComponent* sprite = nullptr;
 					if (selectedSceneObject)
@@ -474,9 +472,8 @@ void HierarchyWindow::Draw()
 				}
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
 				{
-					const char* droppedFilePath = (const char*)payload->Data;
-					file::path filename = droppedFilePath;
-					file::path filepath = PathFinder::Relative("Textures\\") / filename.filename();
+					const file::path filepath = editor::asset_drag::path_of(*payload);
+					const file::path filename = filepath.filename();
 					auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::Texture);
 
 					if (scene)
@@ -507,9 +504,8 @@ void HierarchyWindow::Draw()
 				//}
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Font"))
 				{
-					const char* droppedFilePath = (const char*)payload->Data;
-					file::path filename = droppedFilePath;
-					file::path filepath = PathFinder::Relative("Font\\") / filename.filename();
+					const file::path filepath = editor::asset_drag::path_of(*payload);
+					const file::path filename = filepath.filename();
 					if (selectedSceneObject)
 					{
 						TextComponent* text = nullptr;
@@ -535,10 +531,13 @@ void HierarchyWindow::Draw()
 				}
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SPRITESHEET"))
 				{
-					const char* droppedFilePath = (const char*)payload->Data;
-					file::path filename = droppedFilePath;
-					file::path filepath = PathFinder::Relative("SpriteSheets\\") / filename.filename();
-					if (selectedSceneObject)
+					const file::path filepath = editor::asset_drag::path_of(*payload);
+					const file::path filename = filepath.filename();
+					if (!editor::asset_drag::lives_in(filepath, "SpriteSheets", "Hierarchy sprite sheet drop"))
+					{
+						// 거부 사유는 lives_in 이 로그에 남겼다 — 스프라이트 시트는 이름만 저장한다.
+					}
+					else if (selectedSceneObject)
 					{
 						SpriteSheetComponent* spriteSheet = nullptr;
 						if (SpriteSheetComponent* hasSpriteSheet = selectedSceneObject->GetComponent<SpriteSheetComponent>())

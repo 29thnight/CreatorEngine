@@ -2,6 +2,7 @@
 #include "EditorTheme.h"
 #include "EditorObjectOperations.h"
 #include "SceneViewWindow.h"
+#include "EditorAssetDragPayload.h"
 #include "ReflectionUndo.h"
 #include "EditorCameraRig.h"
 #include "RHI/ScreenSizedResource.h"
@@ -495,8 +496,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
                     position = ray.origin + ray.direction * distance;
                 if (payload->IsDelivery() && scene)
                 {
-                    const file::path filename = static_cast<const char*>(payload->Data);
-                    const file::path path = PathFinder::Relative("Models\\") / filename.filename();
+                    const file::path path = editor::asset_drag::path_of(*payload);
                     Editor::ModelPlacement::Get().Execute(scene->GetSceneId(), path.string(), position);
                 }
                 else
@@ -507,9 +507,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
             }
 			if (const ImGuiPayload* HDRPayload = ImGui::AcceptDragDropPayload("HDR"))
 			{
-				const char* droppedFilePath = (const char*)HDRPayload->Data;
-				file::path filename = droppedFilePath;
-				file::path filepath = PathFinder::Relative("HDR\\") / filename.filename();
+				const file::path filepath = editor::asset_drag::path_of(*HDRPayload);
 				RuntimeSettings::Get().SetSkyboxTextureName(filepath.string());
 				std::string skyError;
 				if (!EnhancedSceneRenderer::SetSkyBoxPath(filepath.string(), skyError))
@@ -520,13 +518,11 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 			if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))
 			{
-				const char* droppedFilePath = (const char*)prefabPayload->Data;
-				file::path filename = droppedFilePath;
-				file::path filepath = PathFinder::Relative("Prefabs\\") / filename.filename();
+				const file::path filepath = editor::asset_drag::path_of(*prefabPayload);
 				auto prefab = PrefabUtilitys->LoadPrefabFullPath(filepath.string().c_str());
 				if (prefab)
 				{
-					EditorObjectOperations::InstantiatePrefab(prefab, filename.stem().string());
+					EditorObjectOperations::InstantiatePrefab(prefab, filepath.stem().string());
 				}
 			}
 
