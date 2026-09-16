@@ -1,6 +1,7 @@
 #include "EditorSettingsStore.h"
 
 #include "LogSystem.h"
+#include <source_location>
 #include "PathFinder.h"
 #include "ReflectionTypedYml.h"
 #include "RuntimeSettings.h"
@@ -63,10 +64,13 @@ namespace
         return SanitizeProjectName(projectRoot.filename().string());
     }
 
-    bool ReportSettingsError(const std::string& message) noexcept
+    // where 는 호출자에서 채워져 여기까지 온다. 생략하면 아래 PrintLog 의 기본
+    // 인자가 이 줄에서 채워져 호출자 열여덟이 모두 이 한 줄을 가리킨다.
+    bool ReportSettingsError(const std::string& message,
+        std::source_location where = std::source_location::current()) noexcept
     {
         std::fprintf(stderr, "[EditorSettings] %s\n", message.c_str());
-        if (Log::IsAlive()) Debug::PrintLog(spdlog::level::err, message);
+        if (Log::IsAlive()) Debug::PrintLog(spdlog::level::err, message, where);
         return false;
     }
 }

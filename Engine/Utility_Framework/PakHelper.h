@@ -2,6 +2,7 @@
 #include "EnginePaths.h"
 #include "PathFinder.h"
 #include "LogSystem.h"
+#include <source_location>
 #include "Paklib.hpp"
 
 #include <cwctype>
@@ -26,19 +27,21 @@ namespace
 #endif
     }
 
-    void RuntimeCleanupError(const std::string& message) noexcept
+    void RuntimeCleanupError(const std::string& message,
+        std::source_location where = std::source_location::current()) noexcept
     {
         if (Log::IsAlive())
         {
-            Debug::PrintLog(spdlog::level::err, message);
+            Debug::PrintLog(spdlog::level::err, message, where);
             return;
         }
         std::fprintf(stderr, "[PakCleanup] %s\n", message.c_str());
     }
 
-    void RuntimeCleanupInfo(const std::string& message) noexcept
+    void RuntimeCleanupInfo(const std::string& message,
+        std::source_location where = std::source_location::current()) noexcept
     {
-        if (Log::IsAlive()) Debug::PrintLog(spdlog::level::info, message);
+        if (Log::IsAlive()) Debug::PrintLog(spdlog::level::info, message, where);
     }
 
     bool EnsureDirectoryExists(const fs::path& directory)

@@ -77,6 +77,43 @@ Write-Host ("  심각도 집합(HtmlFileSink.h 에서 유도): " + ($severe -joi
 Assert ($severe -contains 'error' -and $severe -contains 'critical') `
     ("심각도 집합에 error·critical 이 없다: " + ($severe -join ', '))
 
+# ── C++ 로그 래퍼가 호출자의 자리를 넘기는가 (소스 축) ─────────────────────
+#
+# `Debug::PrintLog` 의 `where` 는 기본 인자라, 메시지를 받아 넘기는 래퍼가 그것을
+# 생략하면 기본값이 **래퍼 자리**에서 채워진다. 호출자 서른둘이 세 줄로 몰린다 —
+# C# 쪽 `Component.Log` 와 같은 함정이다.
+#
+# 이 축은 런타임으로 못 잡는다. 셋 다 오류 경로거나(설정 파싱 실패·pak 정리 실패)
+# pak 런타임 정리 경로라 기동 한 바퀴에서 한 번도 안 돈다. 자극할 수 없는 것을
+# 런타임 단정으로 적으면 미자극이 초록으로 읽힌다 — 그래서 소스에서 본다.
+$wrappers = @(
+    @{ File = 'Engine\Utility_Framework\PakHelper.h';          Name = 'RuntimeCleanupError' }
+    @{ File = 'Engine\Utility_Framework\PakHelper.h';          Name = 'RuntimeCleanupInfo' }
+    @{ File = 'Editor\EngineEntry\EditorSettingsStore.cpp';    Name = 'ReportSettingsError' }
+)
+foreach ($wrapper in $wrappers) {
+    $wrapperPath = Join-Path $repo $wrapper.File
+    if (-not (Test-Path -LiteralPath $wrapperPath)) { throw ("래퍼 파일이 없다: " + $wrapper.File) }
+    $wrapperText = Get-Content -LiteralPath $wrapperPath -Raw
+    # ★ 정의만 잡아야 한다. 이름 뒤의 괄호를 그냥 찾으면 **호출 자리**가 먼저
+    # 걸린다(`return ReportSettingsError("...")`). 실제로 그렇게 적었다가 W2
+    # 변이에서 드러났다 — 이름을 바꿨는데 "정의를 못 찾았다" 가 아니라 호출의
+    # 인수를 매개변수로 읽고 엉뚱한 단정이 울렸다. 지금까지 초록이던 것은 두 파일
+    # 모두 정의가 호출보다 앞에 있었던 우연이다.
+    #
+    # 가르는 기준: 매개변수에 **타입 선언**이 있는가. 호출은 값이나 식을 넘긴다.
+    $definitions = @([regex]::Matches($wrapperText,
+        ('(?s)\b' + [regex]::Escape($wrapper.Name) + '\s*\((?<params>[^)]*)\)')) |
+        Where-Object { $_.Groups['params'].Value -match 'const\s+std::string\s*&' })
+    Assert ($definitions.Count -eq 1) `
+        ("래퍼 정의를 " + $definitions.Count + " 건 찾았다 (기대 1): " + $wrapper.Name +
+         " (" + $wrapper.File + ") — 이름이 바뀌었거나 오버로드가 생겼으면 이 표를 함께 고쳐라")
+    if ($definitions.Count -ne 1) { continue }
+    Assert ($definitions[0].Groups['params'].Value -match 'source_location') `
+        ($wrapper.Name + " 가 std::source_location 을 받지 않는다 (" + $wrapper.File +
+         ") — 호출자의 자리가 아니라 이 래퍼 자신이 출처로 찍힌다")
+}
+
 $work = Join-Path ([IO.Path]::GetTempPath()) ("editor-startup-diagnostics-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 
