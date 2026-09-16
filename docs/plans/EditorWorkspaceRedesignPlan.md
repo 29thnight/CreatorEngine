@@ -2956,8 +2956,22 @@ sharing violation 으로 한 번 죽었다.
 ##### 남은 것
 
 - **모델 렌더 썸네일**(`.fbx`·`.gltf`·프리팹의 오프스크린 렌더). 지금 생성기는 이미지
-  디코딩 하나뿐이고, 모델은 유형 아이콘에 머문다. 렌더 타깃·카메라 배치·결정성이
-  걸려 별도 조각이다.
+  디코딩 하나뿐이고, 모델은 유형 아이콘에 머문다.
+
+  **정찰 완료(2026-09-16) — 산정 4~5일.** 코드는 쓰지 않았고 전문은
+  `docs/analysis/EditorIconSelectionStudy.md` §모델 렌더 썸네일 정찰에 있다. 요지:
+  draw 밀봉도 재질 변환도 **씬을 요구하지 않는다**(`BuildRHIModelMeshView` 는 inline
+  자유 함수고, 재질은 `ModelSceneInstantiation.cpp:160-167` 의 네 줄이 이미 한다).
+  ★ 썸네일 패스는 **라이브 프레임 그래프 안**에 들어가야 한다 — 재질 밀봉이
+  `EnhancedFrameContext`·`EnsureShaderMetaVariant`·`sceneEpoch` 에 밀착돼 있다.
+  그 덕에 "프레임 밖 패스의 펜싱" 이라는 유일한 큰 위험이 사라졌다.
+  ★ 결과는 **구워서 `Library/Thumbnails/` 에 둔다**(`.meta` 는 추적 대상이라 안 된다).
+  구운 뒤에는 그냥 PNG 라 지금 도는 `generator::texture` 가 그대로 판다 — 런타임
+  경로 추가분이 0 이고, **게이트가 결정적이 되어 아래의 픽셀 골든 제약이 사라진다.**
+  ★ GPU 잔류(공유 핸들)는 가능하지만 하지 않는다 — Vulkan 은 라이브 뷰조차
+  리드백이고, 굽기로 가면 CPU 픽셀이 필요해 잔류의 이점이 사라진다(대체재다).
+  남은 미지수 하나: 썸네일 재질의 셰이더가 그 프레임의
+  `EnhancedShaderMetaFrameSnapshot` 에 없다 — 착수 첫날에 판가름 난다.
 - 서브에셋 축(`subasset`)은 키에 자리만 있고 항상 0 이다. 텍스처 아틀라스·머티리얼
   슬롯이 생길 때 채운다.
 

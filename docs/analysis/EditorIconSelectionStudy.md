@@ -228,6 +228,148 @@ DX12/Vulkan에서 캐시 퇴출·창 닫기·종료 중 자원 수명도 확인�
 - Vulkan 은 이 페이즈의 대상이 아니다. 런타임 회차는 DX12 뿐이고, Vulkan 팔은 **배선이
   있는가**만 소스로 지킨다.
 
+### 모델 렌더 썸네일 정찰 (2026-09-16)
+
+W7-6 이 남긴 하나뿐인 항목이다. 착수 전에 정찰만 했다 — **코드는 쓰지 않았다.**
+아래는 전부 실물을 읽어 확인한 것이고, 확인하지 못한 것은 그렇게 적었다.
+
+#### 결론부터
+
+착수 가능하다. **4~5일.** 착수 전에 알아야 할 것은 셋이다.
+
+1. draw 밀봉도 재질 변환도 **씬을 요구하지 않는다** — 둘 다 이미 있는 함수다.
+2. 썸네일 패스는 **라이브 프레임 그래프 안**에 들어가야 한다(프레임 밖이 아니다).
+3. 결과는 **구워서 `Library/` 에 둔다.** 그래야 평상시 비용이 0 이고 게이트가 결정적이다.
+
+#### ① 씬 없이 그릴 수 있는가 — 된다
+
+`BuildRHIModelMeshView(generation, meshIndex, view)` 는 `RHI/IRenderDeviceServices.h`
+의 **inline 자유 함수**다. 생성물과 메시 인덱스만 받는다.
+
+제품이 밀봉하는 자리(`EnhancedSceneRenderer.cpp` 의 `poolMesh`)가 프록시에서 읽는
+것은 **`m_worldMatrix` · `m_modelGeneration` · `m_modelMeshIndex` 셋뿐**이다. 앞의
+둘은 썸네일이 만들고 뒤는 루프 변수다. `EnhancedDrawItem` 자체가 *"프레임을 밀봉할
+때 필요한 것만 복사해 온"* POD 라 씬 자료구조를 안 들고 있다.
+
+#### ② 재질 텍스처는 얼마나 드는가 — 네 줄이다
+
+처음에는 무광(베이스컬러 팩터 + 방향광 하나)으로 시작하고 재질은 나중에 올리자고
+적었다. **그 판단이 틀렸다.** `baseColorFactor` 는 대부분의 자산에서 `1,1,1,1` 이고
+신원은 전부 `baseColor` **텍스처**에 있다. 무광으로 가면 "덜 예쁜" 것이 아니라
+**모델 50 개가 거의 같은 회색 덩어리로 보인다** — 썸네일의 일이 식별인데 그것을
+못 한다.
+
+그리고 비용도 과대 계상이었다. `ModelSceneInstantiation.cpp:160-167` 이 모델
+생성물에서 렌더 가능한 재질을 만드는 전 과정을 이미 하고 있다.
+
+```cpp
+ExperimentMaterialMigration::ConvertModelMaterialAsset(materials[index], *generation, *converted);
+ExperimentMaterialMigration::ConvertToLegacyMaterial(*converted, nullptr, *material, error);
+DataSystems->FinalizeMaterialRuntime(*material);
+DataSystems->BindModelGenerationTextures(*material, *generation);
+```
+
+넷 다 공개 창구고 씬을 요구하지 않는다. 나오는 `shared_ptr<Material>` 이 제품
+밀봉이 먹는 `pooled.materialSource` 이고, 남는 `converted` 가
+`pooled.authoredMaterialSource` 다. 내장 텍스처는
+`DataSystem::ResolveModelGenerationTexture` 가 자기 캐시를 갖고 푼다.
+
+즉 재질은 **새로 짓는 것이 아니라 부르는 것**이다.
+
+#### ③ 언리얼은 어떻게 하는가, 그리고 왜 그대로 베끼면 안 되는가
+
+| 층 | 언리얼 |
+|---|---|
+| 렌더러 선택 | `UThumbnailManager` 가 자산 클래스 → `UThumbnailRenderer` 표를 든다 |
+| 그리는 법 | `FThumbnailPreviewScene` 파생이 **진짜 `FPreviewScene`(최소 `UWorld`)** 을 세우고 제품 씬 렌더러를 돌린다. 카메라는 바운드에서 유도하되 `USceneThumbnailInfo`(orbit pitch/yaw/zoom)가 **자산에 저장**되어 사용자가 돌려 놓은 각도가 유지된다 |
+| 표시 | `FAssetThumbnailPool` 이 렌더 타깃을 재활용하고 Slate 가 그 RT 를 **직접 샘플링**한다. 프레임당 **시간 예산**으로 몇 장을 그릴지 정한다 |
+| 저장 | `.uasset` 패키지의 thumbnail table(`FObjectThumbnail`, `ThumbnailTools::CacheThumbnail`). 그래서 **평상시 브라우징은 아무것도 렌더하지 않는다** |
+
+★ **미니 월드는 우리 구조에서 더 비싸다.** 언리얼 렌더러는 `UWorld` +
+`FSceneViewFamily` 를 먹으므로 월드를 세우는 것이 가장 싼 길이다. 우리는 게임
+스레드가 프레임을 **한 번** 밀봉하고 모든 뷰가 그 draw 목록을 공유한다
+(`EnhancedLiveViewPacket` 에는 draw 목록이 없다 — key·camera·gizmos·target·flags
+뿐이다). "미니 월드" 는 곧 두 번째 Scene 을 만들고 두 번째 프레임을 밀봉하는
+것인데 그런 장치가 없다. 반대로 ①②가 보인 대로 **합성이 언리얼보다 싸다.**
+
+☞ 가져올 것: 시간 예산(개수 예산이 아니다), 자산별 프레이밍 저장(나중), 구워 두기.
+☞ 안 가져올 것: 미니 월드, GPU 잔류(아래).
+
+※ 위 표의 구조는 확실하나 **상수(풀 크기·프레임 허용치 밀리초)는 기억에서 꺼낸
+것이고 버전을 탄다.** 설계 근거로 쓸 값이면 소스를 열어 확인할 것.
+
+#### ④ GPU 잔류 — 가능하지만 하면 안 된다
+
+기계장치는 있다. `CreateDisplayTexture(w, h, rhiTexture, interopToken)` 가 공유
+텍스처를 만들고, 펜스 완료로 슬롯을 표시로 승격하며(`DisplaySlot.fenceValue`),
+셸이 `OpenSharedTexture(HANDLE)` 로 받아 `ImTextureID` 를 낸다. 라이브 씬 뷰가 매
+프레임 그 길로 온다.
+
+그런데 넷이 동시에 걸린다.
+
+- `ImGuiDx12Shell::RegisterTexture` 는 `textureCache.GetOrUpload(texture)` 로
+  **CPU 픽셀을 셸 디바이스에 올린다.** `Texture*` 로는 잔류가 불가능하고, 잔류하려면
+  `ImTextureID` + 공유 핸들이라는 **둘째 썸네일 형태**를 캐시에 들여야 한다.
+- **Vulkan 에서는 아예 안 된다.** 셸 주석이 명시한다 — *"Vulkan 같은 비-DX12 RHI의
+  최종 화면은 CPU 리드백 뒤 이 표를 거쳐 셸 디바이스의 RGBA8 텍스처가 된다."*
+  라이브 뷰조차 거기서는 리드백이다. 팔이 둘로 갈린다.
+- 썸네일마다 공유 핸들 + 디스크립터. 언리얼이 풀을 묶어 두는 이유가 이것이다.
+- 매 실행 다시 그린다.
+
+★ **그리고 굽기가 잔류를 지운다.** 구우려면 CPU 픽셀이 필요하고, 그 순간 잔류의
+유일한 이점(왕복 한 번 절약)이 사라진다. 둘은 보완재가 아니라 **대체재**다.
+
+#### ⑤ 구워서 둔다
+
+| 확인한 것 | 값 |
+|---|---|
+| 파생물 자리 | `Dynamic_CPP/Library/` — `.gitignore` 557행. 이미 `ModelAssetGenerations/<GUID>` 가 산다 |
+| `.meta` | **추적 대상**이다(`.gitignore` 140·464행 + 예외 목록). 여기 바이너리를 박으면 git 이 요동친다 — 언리얼이 `.uasset` 에 넣는 것은 그쪽 자산이 원래 바이너리라서다 |
+| PNG 쓰기 | `stbi_write_png` 가 이미 에디터에 링크돼 있다(`EditorAssetDatabase.cpp:841`) |
+
+그래서 `Library/Thumbnails/<경로해시>-<revision>.png`. 이름에 `revision` 을 넣으면
+**무효화가 공짜**고(바뀐 파일은 다른 이름이 된다) GUID 를 읽지 않아 W7-5 계약을 안
+건드린다. 대가는 고아 파일이 쌓이는 것 — 주기적 청소 한 번.
+
+굽고 나면 **런타임 경로 추가분이 0 이다.** 구운 산출물은 그냥 PNG 라 지금 도는
+`generator::texture` 가 그대로 판다. 그리고 게이트가 **결정적**이 되어, W7-6 이
+적어 둔 *"픽셀 골든을 세우지 마라"* 제약이 통째로 사라진다.
+
+#### ⑥ 패스는 프레임 안에 — 그래서 가장 큰 위험이 사라졌다
+
+재질 밀봉 블록이 `EnsureShaderMetaVariant(context, …)` · `sceneEpoch` · `frameId` ·
+`CommitShaderMetaFrame` 에 밀착돼 있다. 프레임 문맥 없이는 못 돈다. 그래서 썸네일
+패스는 **라이브 프레임 그래프 안**에 들어간다 — 일이 있을 때만 작은 타깃 하나를 더
+그리고 리드백으로 내린다.
+
+이것이 오히려 낫다. 정찰 내내 유일한 큰 위험이 *"프레임 밖 패스를 라이브 펜싱을 안
+건드리고 돌릴 수 있는가"* 였는데, 안으로 들어가면 **그 물음 자체가 없어진다.**
+라이브 프레임의 펜스·승격 기계를 그대로 탄다. 덤으로 프레임당 예산에 자연히 묶이는데
+그것이 언리얼 `FAssetThumbnailPool` 의 시간 허용치와 같은 자리다.
+
+★ 참고로 `Editor/RenderTests` 의 테스트 스물몇 개가 오프스크린+리드백으로 돌지만
+**자기 `DX12DeviceResources` 를 새로 만든다.** 에디터 런타임에는 못 쓰고 패스의
+모양을 베끼는 용도로만 쓴다.
+
+#### 산정과 남은 미지수
+
+| 조각 | 일 |
+|---|---|
+| 생성물 로드 + 재질 네 줄 + AABB 프레이밍 + draw 밀봉 | 1 |
+| 라이브 그래프 안 썸네일 패스 + 리드백 | 1.5~2 |
+| 굽기·조회 계층 | 0.5~1 |
+| 캐시 배선(`generator::model`, 구운 뒤 기존 경로 합류) | 0.25 |
+| 게이트 | 1 |
+
+★ **남은 미지수 하나.** 프레임의 `EnhancedShaderMetaFrameSnapshot` 은 **그 프레임의
+씬이 쓰는 셰이더**로 게임 스레드가 밀봉한다. 썸네일 재질의 셰이더가 그 집합에 없으면
+밀봉이 실패하는데, 씬에 없는 모델을 그리는 일이므로 실제로 자주 없을 것이다. 그
+셰이더를 프레임 스냅샷에 끼워 넣는 일의 크기가 1.5 일과 2 일을 가른다. 구체적이고
+찾을 수 있는 문제라 착수 첫날에 판가름 난다.
+
+부차적으로, `subasset` 축은 여전히 0 이다. 모델 하나가 메시 여럿을 갖지만 썸네일은
+모델 전체를 한 장으로 잡으므로 서브에셋이 생기지 않는다.
+
 ## 적용 순서와 단계 경계
 
 1. **W1:** Material Symbols의 버전·라이선스·codepoint·기준 크기를 고정하고 역할 매핑을 만든다.
