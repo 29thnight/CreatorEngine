@@ -503,6 +503,16 @@ FodyWeavers.xsd
 # 나머지 FT 씬(Shadow·Material·Lights)은 계속 로컬 생성물이다.
 /Dynamic_CPP/Assets/Scenes/*
 !/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator
+# 음원은 저장소에 두지 않는다 — 예외 없음. `.meta` 사이드카도 함께 막는다.
+# 짝이 되는 음원이 추적 밖인데 사이드카만 실리면 GUID 만 있고 실물이 없는
+# 참조가 되어, clean checkout 에서 ImportFailed 와 구분되지 않는다.
+#
+# 두 철자를 모두 막는다. 저작 폴더는 `Sound/` 인데 런타임 로더가 도는 경로는
+# `Sounds/` 라(SoundManager::SoundLoaderThread) 앞으로 어느 쪽에도 파일이
+# 생길 수 있다. 오디오 게이트의 fixture 는 Build/ 아래에 생성되므로 여기
+# 예외가 필요 없다(verify-audio-voice-contract.ps1).
+/Dynamic_CPP/Assets/Sound/
+/Dynamic_CPP/Assets/Sounds/
 /Dynamic_CPP/Assets/Terrain/
 /Dynamic_CPP/Assets/Textures/
 /Dynamic_CPP/Assets/UI/
