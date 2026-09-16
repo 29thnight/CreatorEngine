@@ -1822,5 +1822,56 @@ generation 인스턴스가 남은 채 새 generation 인스턴스가 같은 프�
 
 - **preToneHdr·display 판정** — 시뮬레이션 시각 고정(`time.*` 부재)이 선행이다(§15).
 - **cutover** — 위가 서야 판단한다.
-- **Animator 경로의 세대 혼합** — soak 의 probe 는 뼈가 없다. `Animator::BindModelGeneration`
-  의 reset-before-validate(§22.6)는 여전히 자극되지 않았다.
+- ~~**Animator 경로의 세대 혼합** — soak 의 probe 는 뼈가 없다. `Animator::BindModelGeneration`
+  의 reset-before-validate(§22.6)는 여전히 자극되지 않았다.~~ → §24: 이미 generation 을 쥔
+  Animator 에 닿는 호출 경로가 없다.
+
+---
+
+## 24. Animator 의 "검증 전 초기화" — 코드는 있고 도달 경로는 없다, 2026-09-16
+
+§22.6 은 `Animator::BindModelGeneration` 이 검증보다 먼저 `m_modelGeneration.reset()` 을 해서
+실패한 reload 뒤 직전 정상 generation 을 버린다고 적었다. 뼈 있는 fixture 를 만들기 전에
+**그 초기화가 이미 generation 을 쥔 Animator 에 닿는지**부터 쟀다. 닿지 않으면 fixture 는
+자극할 수 없는 것을 자극하려는 일이 된다.
+
+### 24.1 호출자는 둘이고 둘 다 새 Animator 다
+
+| 호출 | 대상 |
+|---|---|
+| `ModelSceneInstantiation.cpp` — 모델 배치 | 바로 앞 줄에서 `AddComponent<Animator>()` 로 만든 것 |
+| `Animator::OnDeserialized` → `EnsureAnimationBinding` | `ComponentFactory::LoadComponent` 가 붙인 것 |
+
+런타임 재임포트는 배치된 컴포넌트를 재바인딩하지 않는다(§22.1 · §23.3). 둘째 경로가 기존
+Animator 에 닿을 수 있는 틈은 하나였다 — `Entity::AddComponent(const Meta::Type&)` 는 같은 타입이
+있으면 **파괴 표시 여부를 보지 않고** 기존 것을 돌려주고, `RemoveComponent` 는 표시만 하고 실제
+제거는 프레임 끝으로 미룬다. 그러면 "제거 → 같은 프레임에 되살리기" 가 표시된 옛 Animator 를
+다시 역직렬화할 수 있다.
+
+### 24.2 실측 — 그 틈은 CLI 와 에디터 조작으로 열리지 않는다
+
+Debug 에디터(창 숨김), `FT_Primitives` 에 `Gunner_F_Mythic` 배치 후:
+
+| 단계 | `animator.status` |
+|---|---|
+| 배치 뒤 | 1 개 · path `generation` |
+| `component.remove Gunner_F_Mythic Animator` 직후 | 0 개 |
+| 5 프레임 뒤 | 0 개 |
+| `undo` 직후 | 1 개 · path `generation` |
+| 5 프레임 뒤 | 1 개 · path `generation` |
+
+제거와 되살리기는 서로 다른 프레임에 돌고 그 사이에 실제 제거가 끝난다. 되살린 것은 새
+Animator 이고 정상으로 묶였다.
+
+### 24.3 판정
+
+- `BindModelGeneration` 의 초기화 순서는 **계약 위반의 모양**이지만 **지금 도달 경로가 없다**.
+  새 Animator 는 버릴 직전 generation 이 없다. 그래서 뼈 있는 fixture 로 자극할 수 있는 것이
+  없고, W8 을 막는 사유에서 뺀다.
+- 순서를 "검증 뒤 교체" 로 바꾸는 것은 싸지만, `m_Motion` 이 다른 모델로 바뀐 경우에는 옛
+  generation 을 **버리는 것이 옳다**(modelId 가 다르다). 고친다면 "같은 modelId 일 때만 유지" 여야
+  하고, 도달 경로가 생기는 변경(예: 재임포트 시 배치된 컴포넌트 재바인딩)과 **함께** 넣어야
+  시험할 수 있다. 지금 넣으면 자극할 수 없는 코드가 된다.
+- 되살아날 조건 둘을 적어 둔다. ① 재임포트가 배치된 컴포넌트를 재바인딩하게 바뀔 때,
+  ② 같은 프레임 안에서 컴포넌트를 제거하고 다시 붙이는 경로가 생길 때(`AddComponent` 가 파괴
+  표시를 보지 않으므로).
