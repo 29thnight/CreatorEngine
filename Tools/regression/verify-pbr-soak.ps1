@@ -93,6 +93,8 @@ try {
     $start.WorkingDirectory = $root
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
+    # 에디터는 GUI 앱이라 CreateNoWindow 만으로는 창이 뜬다. baseline 게이트와 맞춘다.
+    $start.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
     $start.StandardOutputEncoding = $utf8
