@@ -28,7 +28,9 @@
 #   7  최근 항목 정리 — 파일이 사라진 최근 항목은 목록에서 빠지고 저장 파일에서도 빠진다
 #   8  ★ 전체 자산 — 한 프레임에 다 훑지 않고 차오른다(첫 표본 pending > 0) · 끝나면
 #      pending 0 · 만들기/위로 불가 · 동명 두 파일이 경로로 구별되어 둘 다 나온다 ·
-#      보이는 줄만 그린다(그린 타일 < 결과 수). Release 실측 4,274 개 p95 15.9ms 가 이유다
+#      보이는 줄만 그린다(그린 타일 < 결과 수). Release 실측 4,274 개 p95 15.9ms 가 이유다 ·
+#      목록·범위·검색이 그대로인 프레임에는 결과를 다시 모으지 않는다(`resultRebuilds`) ·
+#      그러나 목록 **내용**이 바뀌면(폴더에 선 채 밖에서 파일이 생기면) 다시 모은다
 #   9  가상 위치 이력 — 최근→뒤로가 전체 자산과 그 검색어로 돌아온다
 #  10  폴더 만들기 — 같은 길로 만들고 들어간다 · 같은 이름 거부
 #  11  엔진이 정상 종료했다
@@ -245,8 +247,14 @@ if (-not $SkipRuntime) {
         "$B go $tag/Gamma", 'wait 5',
         # 표지: 에디터가 디스크에 폴더를 만든다 → 검사가 그것을 보고 지운다. 결과 파일은
         # 에디터가 공유 없이 열어 실행 중에는 읽히지 않으므로 표지로 쓸 수 없다.
-        "$B create folder Signal", 'wait 400',
-        $B,                                                          # 12 표지 폴더 안
+        # ★ 표지 폴더에 검사가 넣은 파일은 목록 재검증(나이 1 초) 뒤에야 보인다. 프레임
+        #   수 하나로 기다리면 Release 에서 1 초에 못 미친다(900 프레임으로 붉었다).
+        #   400 프레임씩 여섯 번 표집하고 그 가운데 하나라도 보이면 된다. 표집 줄은 끝에
+        #   공백을 붙여 번호 붙은 표본과 가른다(명령 해석은 같다).
+        "$B create folder Signal",
+        'wait 400', "$B ", 'wait 400', "$B ", 'wait 400', "$B ",
+        'wait 400', "$B ", 'wait 400', "$B ", 'wait 400',
+        $B,                                                          # 12 표지 폴더 안 — 늦게 생긴 파일
         "$B back", 'wait 10',
         "$B back", 'wait 30',
         $B,                                                          # 13 사라진 폴더
@@ -261,19 +269,21 @@ if (-not $SkipRuntime) {
         'wait 400',
         $B,                                                          # 16 다 찼다
         'editor.panelcost',
+        'wait 200',
+        $B,                                                          # 17 대기 — 다시 모으지 않는다
         "$B search Twin", 'wait 5',
-        $B,                                                          # 17 동명 둘
+        $B,                                                          # 18 동명 둘
         "$B create folder Nope", 'wait 5',
-        $B,                                                          # 18 가상 위치 거부
+        $B,                                                          # 19 가상 위치 거부
         "$B go @recent", 'wait 5',
         "$B back", 'wait 5',
-        $B,                                                          # 19 가상 위치 이력
+        $B,                                                          # 20 가상 위치 이력
         "$B go $tag/Gamma", 'wait 5',
         "$B create folder Sub", 'wait 5',
-        $B,                                                          # 20 폴더 만들기
+        $B,                                                          # 21 폴더 만들기
         "$B up", 'wait 5',
         "$B create folder Sub", 'wait 5',
-        $B,                                                          # 21 같은 이름 폴더
+        $B,                                                          # 22 같은 이름 폴더
         'quit'
     )
     $signalDir = Join-Path $fixture 'Gamma\Signal'
@@ -299,6 +309,9 @@ if (-not $SkipRuntime) {
                 Remove-Item -LiteralPath (Join-Path $fixture 'Doomed') -Recurse -Force
                 Remove-Item -LiteralPath $profilePath -Force -ErrorAction SilentlyContinue
                 Remove-Item -LiteralPath "$profilePath.meta" -Force -ErrorAction SilentlyContinue
+                # 결과 기억이 **내용이 바뀐 목록**을 알아채는지 — 에디터는 지금 이 폴더에
+                # 서 있고, 목록·범위·검색은 그대로다. 바뀌는 것은 디스크의 내용뿐이다.
+                Copy-Item -LiteralPath $seedVolume.FullName -Destination (Join-Path $signalDir 'Late.volume')
                 $deletedAtMarker = $true
             }
             if ([DateTime]::UtcNow -gt $deadline) { $proc.Kill(); throw "editor did not exit in time" }
@@ -332,8 +345,8 @@ if (-not $SkipRuntime) {
     for ($k = 0; $k -lt [Math]::Min($rows.Count, $lines.Count); $k++) {
         if ($lines[$k] -eq $B) { $snaps += $rows[$k] }
     }
-    Assert ($snaps.Count -eq 22) "스냅샷 표본이 22 개가 아니다($($snaps.Count)) — 판정할 수 없다"
-    if ($snaps.Count -eq 22) {
+    Assert ($snaps.Count -eq 23) "스냅샷 표본이 23 개가 아니다($($snaps.Count)) — 판정할 수 없다"
+    if ($snaps.Count -eq 23) {
         $s = @($snaps | ForEach-Object { $_.data })
         $vp = "VolumeProfile/$profileName.volume"
 
@@ -352,7 +365,7 @@ if (-not $SkipRuntime) {
             "2 잘못된 이름이 거부되지 않았다(last='$($s[3].lastRejection)')"
         Assert (-not $s[5].canCreateVolumeProfile) "2 다른 폴더에서 생성 술어가 참이다"
         Assert ($s[6].lastRejection -match 'VolumeProfile folder') "2 다른 폴더의 생성이 거부되지 않았다(last='$($s[6].lastRejection)')"
-        Assert ($s[18].lastRejection -match 'open a folder') "2 가상 위치의 생성이 거부되지 않았다(last='$($s[18].lastRejection)')"
+        Assert ($s[19].lastRejection -match 'open a folder') "2 가상 위치의 생성이 거부되지 않았다(last='$($s[19].lastRejection)')"
 
         # 3
         Assert ($s[4].search -eq $tag -and $s[4].selected -eq $vp) "3 검색·선택이 서지 않았다('$($s[4].search)' '$($s[4].selected)')"
@@ -378,6 +391,17 @@ if (-not $SkipRuntime) {
 
         # 6
         Assert ($s[12].directory -eq "$tag/Gamma/Signal") "6 표지 폴더로 들어가지 않았다(dir='$($s[12].directory)')"
+        # 8 — 결과 기억은 목록 **내용**이 바뀌면 버려진다(캐시 세대).
+        $latePolls = @()
+        for ($k = 0; $k -lt [Math]::Min($rows.Count, $lines.Count); $k++) {
+            if ($lines[$k] -eq "$B ") { $latePolls += $rows[$k].data }
+        }
+        $lateSeen = @($latePolls + @($s[12]) | Where-Object {
+            $_.directory -eq "$tag/Gamma/Signal" -and (@($_.results) -contains "$tag/Gamma/Signal/Late.volume") })
+        Write-Host ("  늦게 생긴 파일: 표집 {0} 가운데 {1} 에서 보였다" -f ($latePolls.Count + 1), $lateSeen.Count)
+        Assert ($latePolls.Count -eq 5) "8 늦은 파일 표집이 5 개가 아니다($($latePolls.Count))"
+        Assert ([int]$s[12].resultCount -eq 1 -and (@($s[12].results) -contains "$tag/Gamma/Signal/Late.volume")) `
+            "8 표지 폴더에 늦게 생긴 파일이 마지막 표집에 없다([$(@($s[12].results) -join ' | ')]) — 결과 기억이 바뀐 목록을 못 알아챘다"
         Assert ($s[13].directory -eq $tag) "6 사라진 폴더에서 가장 가까운 조상으로 가지 않았다(dir='$($s[13].directory)')"
         Assert ($s[13].error -match 'no longer exists') "6 사라진 폴더의 이유가 없다(error='$($s[13].error)')"
 
@@ -391,7 +415,7 @@ if (-not $SkipRuntime) {
         # 8
         Assert ($s[15].scope -eq 'everything' -and -not $s[15].canCreate -and -not $s[15].canUp) "8 전체 자산에서 만들기/위로가 열려 있다"
         Assert ([int]$s[15].everythingPending -gt 0) "8 전체 자산이 첫 프레임에 다 찼다(pending=$($s[15].everythingPending)) — 예산 없이 훑는다"
-        Assert ($s[17].everythingComplete -and [int]$s[17].everythingPending -eq 0) "8 전체 자산이 끝나지 않았다(pending=$($s[17].everythingPending))"
+        Assert ($s[18].everythingComplete -and [int]$s[18].everythingPending -eq 0) "8 전체 자산이 끝나지 않았다(pending=$($s[18].everythingPending))"
         # ★ 잘라 그리기 — 결과가 한 화면을 넘으면 그린 타일이 결과보다 적다.
         $cost = @($rows | Where-Object { $_.command -eq 'editor.panelcost' }) | Select-Object -First 1
         $filesCost = if ($null -ne $cost) { @($cost.data.panels | Where-Object { $_.slot -eq 'browser_files' }) | Select-Object -First 1 } else { $null }
@@ -401,16 +425,28 @@ if (-not $SkipRuntime) {
             Assert ([int]$filesCost.lastUnits -lt [int]$s[16].resultCount) `
                 "8 결과 $($s[16].resultCount) 개를 전부 그렸다(units=$($filesCost.lastUnits)) — 잘라 그리지 않는다"
         }
-        $twins = @($s[17].results)
+        # ★ 결과 기억 — 목록·범위·검색이 그대로인 200 프레임 동안 다시 모으지 않는다.
+        #   Release 실측으로 전체 자산 4,274 개에서 매 프레임 모으고 정렬하던 비용이
+        #   p95 3.25ms 였다. 감시자가 검사용 자산의 .meta 를 만들며 목록이 바뀌면
+        #   정당하게 몇 번 오를 수 있어 0 이 아니라 **프레임 수의 10 분의 1** 로 막는다.
+        $idleRebuilds = [int64]$s[17].resultRebuilds - [int64]$s[16].resultRebuilds
+        $idleFrames = [int64]$s[17].frames - [int64]$s[16].frames
+        Write-Host ("  결과 기억: 대기 {0} 프레임 · 다시 모음 {1} 회 · 결과 {2}" -f $idleFrames, $idleRebuilds, $s[17].resultCount)
+        Assert ($idleFrames -ge 100) "8 대기 구간의 창 프레임이 $idleFrames 이다 — 판정할 수 없다"
+        Assert ($idleRebuilds -le [Math]::Max(2, [int]($idleFrames / 10))) `
+            "8 대기 $idleFrames 프레임 동안 결과를 $idleRebuilds 번 다시 모았다 — 결과 기억이 죽었다"
+        Assert ([int]$s[17].resultCount -eq [int]$s[16].resultCount -and $s[17].everythingComplete) `
+            "8 대기 뒤 결과 수가 바뀌었다($($s[16].resultCount) → $($s[17].resultCount))"
+        $twins = @($s[18].results)
         Assert ($twins.Count -eq 2 -and $twins[0] -eq "$tag/Alpha/Twin.volume" -and $twins[1] -eq "$tag/Beta/Twin.volume") `
             "8 동명 두 파일이 경로 순서로 둘 다 나오지 않았다([$($twins -join ' | ')])"
 
         # 9
-        Assert ($s[19].scope -eq 'everything' -and $s[19].search -eq 'Twin') "9 최근→뒤로가 전체 자산·검색어로 돌아오지 않았다($($s[19].scope) '$($s[19].search)')"
+        Assert ($s[20].scope -eq 'everything' -and $s[20].search -eq 'Twin') "9 최근→뒤로가 전체 자산·검색어로 돌아오지 않았다($($s[20].scope) '$($s[20].search)')"
 
         # 10
-        Assert ($s[20].directory -eq "$tag/Gamma/Sub") "10 만든 폴더로 들어가지 않았다(dir='$($s[20].directory)')"
-        Assert ($s[21].lastRejection -match 'already exists') "10 같은 이름 폴더가 거부되지 않았다(last='$($s[21].lastRejection)')"
+        Assert ($s[21].directory -eq "$tag/Gamma/Sub") "10 만든 폴더로 들어가지 않았다(dir='$($s[21].directory)')"
+        Assert ($s[22].lastRejection -match 'already exists') "10 같은 이름 폴더가 거부되지 않았다(last='$($s[22].lastRejection)')"
     }
 
     # 2 — 거부가 디스크에 흔적을 남기지 않았다(표지에서 지운 하나를 빼면 원래 수)

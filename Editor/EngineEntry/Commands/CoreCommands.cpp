@@ -1508,6 +1508,7 @@ namespace ConsoleCmd
         data.Set("everythingPending", CommandData::Int(static_cast<int64_t>(snapshot.everythingPending)));
         data.Set("everythingComplete", CommandData::Bool(snapshot.everythingComplete));
         data.Set("recentCount", CommandData::Int(static_cast<int64_t>(snapshot.recentCount)));
+        data.Set("resultRebuilds", CommandData::Int(static_cast<int64_t>(snapshot.resultRebuilds)));
 
         Debug::PrintLog(spdlog::level::info, "[editor.browser]"
             " frames=" + std::to_string(snapshot.frames) +

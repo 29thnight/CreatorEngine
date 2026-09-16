@@ -698,6 +698,7 @@ void ContentsBrowserWindow::PublishSnapshot()
     snapshot.everythingPending = m_everythingPending;
     snapshot.everythingComplete = m_scope == Scope::everything && 0 == m_everythingPending;
     snapshot.recentCount = m_recents.size();
+    snapshot.resultRebuilds = m_resultRebuilds;
     std::lock_guard lock(g_browserMailboxMutex);
     g_browserSnapshot = std::move(snapshot);
 }
@@ -915,21 +916,54 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
         ImGui::SetScrollY(m_pendingScrollY);
         m_pendingScrollY = -1.f;
     }
-    std::vector<const editor::browser_directory_entry*> entries;
-    size_t supported = 0;
+    // folder 범위의 목록 요청이 **먼저** 와야 한다 — 낡은 목록을 다시 훑어 세대가
+    // 오르면 아래 열쇠 비교가 그것을 본다.
     const bool folderUnreadable = m_scope == Scope::folder
         && !editor::browser_cache_listing(m_currentDirectory).valid;
-    if (!folderUnreadable) CollectResults(entries, supported);
+    // W2-B: 모으기는 목록·범위·검색·유형·정렬이 바뀔 때만 한다. Release 실측으로 전체
+    // 자산 4,274 개에서 **아무것도 안 바뀐 프레임**마다 순회·지원 판정·검색·정렬·게시
+    // 문자열 256 개를 새로 만드느라 p95 3.25ms 였다.
+    //
+    // 매번 모으는 두 경우 — 전체 자산이 **아직 차오르는 중**(데우기는 모으는 순회가
+    // 한다)이고, 최근 항목(최대 32 개이고, 모으면서 사라진 것을 정리한다).
+    ResultKey key;
+    key.generation = editor::browser_cache_generation();
+    key.scope = m_scope;
+    key.directory = m_scope == Scope::folder ? m_currentDirectory : file::path{};
+    key.filter = m_filter.InputBuf;
+    key.typeFilter = m_typeFilter;
+    key.descending = m_sortDescending;
+    const bool rebuild = !m_resultsValid || !(key == m_resultKey) || m_scope == Scope::recent
+        || (m_scope == Scope::everything && 0 != m_everythingPending);
+    if (folderUnreadable)
+    {
+        m_results.clear();
+        m_resultSupported = 0;
+        m_resultsValid = false;
+        m_publishedResultCount = 0;
+        m_publishedResults.clear();
+    }
+    else if (rebuild)
+    {
+        CollectResults(m_results, m_resultSupported);
+        ++m_resultRebuilds;
+        // 모으는 동안 데우기가 폴더를 넣어 세대가 올랐을 수 있다 — 결과는 그 뒤의
+        // 상태를 담았으므로 **모은 뒤의** 세대로 적는다.
+        key.generation = editor::browser_cache_generation();
+        m_resultKey = std::move(key);
+        m_resultsValid = true;
+        m_publishedResultCount = m_results.size();
+        m_publishedResults.clear();
+        for (size_t i = 0; i < m_results.size() && i < kPublishedResultCapacity; ++i)
+            m_publishedResults.push_back(RelativeUtf8(m_results[i]->path));
+    }
+    const std::vector<const editor::browser_directory_entry*>& entries = m_results;
+    const size_t supported = m_resultSupported;
     const auto filesAfter = editor::browser_cache_get_stats();
     editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_files,
         filesAfter.scans - scansBefore);
     editor::windows::add_panel_probes(editor::windows::panel_cost_slot::browser_files,
         filesAfter.probes - probesBefore);
-
-    m_publishedResultCount = entries.size();
-    m_publishedResults.clear();
-    for (size_t i = 0; i < entries.size() && i < kPublishedResultCapacity; ++i)
-        m_publishedResults.push_back(RelativeUtf8(entries[i]->path));
 
     if (folderUnreadable)
     {

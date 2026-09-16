@@ -28,6 +28,7 @@ namespace
         std::unordered_map<std::string, cache_slot> slots;
         browser_cache_stats stats{};
         int frameBudget{ kRescanBudget };
+        std::uint64_t generation{ 1 };
         bool forceThisFrame{};
     };
 
@@ -74,7 +75,20 @@ namespace
         return { reinterpret_cast<const char*>(utf8.data()), utf8.size() };
     }
 
-    void scan_into(const browser_fs::path& directory, cache_slot& slot)
+    bool same_listing(const browser_directory_listing& a, const browser_directory_listing& b)
+    {
+        if (a.valid != b.valid || a.error != b.error || a.entries.size() != b.entries.size()) return false;
+        for (size_t i = 0; i < a.entries.size(); ++i)
+        {
+            const auto& left = a.entries[i];
+            const auto& right = b.entries[i];
+            if (left.revision != right.revision || left.isDirectory != right.isDirectory
+                || left.isSymlink != right.isSymlink || left.pathUtf8 != right.pathUtf8) return false;
+        }
+        return true;
+    }
+
+    void scan_into(const browser_fs::path& directory, cache_slot& slot, bool fresh)
     {
         browser_directory_listing listing;
         std::error_code ec;
@@ -119,7 +133,12 @@ namespace
                 if (a.isDirectory != b.isDirectory) return a.isDirectory;
                 return a.path.filename() < b.path.filename();
             });
-        slot.listing = std::move(listing);
+        // W2-B: 내용이 같으면 목록 객체를 그대로 둔다 — 창이 기억한 항목 주소가 산다.
+        if (fresh || !same_listing(slot.listing, listing))
+        {
+            slot.listing = std::move(listing);
+            ++state().generation;
+        }
         slot.scannedAt = clock_type::now();
         ++state().stats.scans;
     }
@@ -150,7 +169,7 @@ namespace editor
         {
             // 처음 보는 폴더는 예산과 무관하게 훑는다 — 줄 것이 없다.
             cache_slot slot;
-            scan_into(directory, slot);
+            scan_into(directory, slot, true);
             found = cache.slots.emplace(key, std::move(slot)).first;
             cache.stats.cached = cache.slots.size();
             return found->second.listing;
@@ -161,7 +180,7 @@ namespace editor
         if (age >= kRevalidateMs && cache.frameBudget > 0)
         {
             --cache.frameBudget;
-            scan_into(directory, found->second);
+            scan_into(directory, found->second, false);
             return found->second.listing;
         }
         ++cache.stats.hits;
@@ -182,7 +201,13 @@ namespace editor
         cache.stats.evictions += cache.slots.size();
         cache.slots.clear();
         cache.stats.cached = 0;
+        ++cache.generation;
         cache.forceThisFrame = true;
+    }
+
+    std::uint64_t browser_cache_generation()
+    {
+        return state().generation;
     }
 
     browser_cache_stats browser_cache_get_stats()

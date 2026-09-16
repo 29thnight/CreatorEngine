@@ -139,6 +139,24 @@ private:
     size_t m_everythingFolderCount{};
     size_t m_everythingPending{};
 
+    /// W2-B — 결과 기억. 이 열쇠가 그대로면 모으기·정렬·게시 문자열을 다시 만들지
+    /// 않는다. 포인터는 캐시 세대가 같은 동안만 유효하다(`browser_cache_generation`).
+    struct ResultKey
+    {
+        std::uint64_t generation{};
+        Scope scope{ Scope::folder };
+        file::path directory{};
+        std::string filter{};
+        int typeFilter{ -1 };
+        bool descending{};
+        bool operator==(const ResultKey&) const = default;
+    };
+    bool m_resultsValid{};
+    ResultKey m_resultKey{};
+    std::vector<const editor::browser_directory_entry*> m_results;
+    size_t m_resultSupported{};
+    std::uint64_t m_resultRebuilds{};
+
     // 게시용 — 이번 프레임에 그린 결과.
     std::vector<std::string> m_publishedResults;
     size_t m_publishedResultCount{};

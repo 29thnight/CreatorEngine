@@ -85,6 +85,9 @@ namespace editor::windows
         std::size_t everythingPending{};   ///< 아직 확보하지 못한 폴더 수
         bool everythingComplete{};
         std::size_t recentCount{};
+        /// 결과를 **다시 모은** 횟수(누계). 목록·검색·범위가 그대로인 프레임에는 오르지
+        /// 않아야 한다 — 전체 자산 4,274 개에서 매 프레임 모으고 정렬하던 비용이 3.25ms 였다.
+        std::uint64_t resultRebuilds{};
     };
 
     /// 요청을 넣는다. 함이 가득 차면(32) 거짓.
