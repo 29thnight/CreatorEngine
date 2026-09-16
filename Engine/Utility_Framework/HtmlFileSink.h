@@ -103,6 +103,16 @@ public:
     uint64_t GetWarnCount() const noexcept { return m_warnCount.load(std::memory_order_relaxed); }
 
 protected:
+    // 경로에서 파일 이름만. `__FILE__`/`std::source_location` 둘 다 절대 경로를
+    // 주고, C# 쪽 `[CallerFilePath]` 도 컴파일 기계의 절대 경로다.
+    static std::string_view BaseName(const char* path) noexcept
+    {
+        if (nullptr == path) return {};
+        std::string_view view{ path };
+        const std::size_t cut = view.find_last_of("/\\");
+        return std::string_view::npos == cut ? view : view.substr(cut + 1);
+    }
+
     void sink_it_(const spdlog::details::log_msg& msg) override
     {
         if (!m_file)
@@ -119,6 +129,17 @@ protected:
         row += levelName;
         row += "\" class=\"lv-";
         row += levelName;
+        // 호출 지점. 경로 전체는 빌드 기계마다 달라 잡음이 되므로 파일 이름만
+        // 싣는다 — 사람이 추적할 때도 기계가 대조할 때도 그것으로 충분하다.
+        const std::string_view sourceFile = BaseName(msg.source.filename);
+        const bool hasSource = !sourceFile.empty() && msg.source.line > 0;
+        if (hasSource)
+        {
+            row += "\" data-src=\"";
+            AppendEscaped(row, sourceFile);
+            row += ':';
+            row += std::to_string(msg.source.line);
+        }
         row += "\"><td class=\"c-time\">";
         AppendTimestamp(row, msg.time);
         row += "</td><td class=\"c-lv\">";
@@ -127,6 +148,14 @@ protected:
         row += std::to_string(msg.thread_id);
         row += "</td><td class=\"c-msg\">";
         AppendEscaped(row, payload);
+        if (hasSource)
+        {
+            row += "<span class=\"c-src\">";
+            AppendEscaped(row, sourceFile);
+            row += ':';
+            row += std::to_string(msg.source.line);
+            row += "</span>";
+        }
         row += "</td></tr>\n";
 
         ::fwrite(row.data(), 1, row.size(), m_file);
@@ -275,6 +304,7 @@ td{padding:4px 10px;vertical-align:top}
 .c-time{color:var(--dim);white-space:nowrap;width:96px}
 .c-lv{white-space:nowrap;width:74px;font-weight:700}
 .c-tid{color:var(--dim);white-space:nowrap;width:64px;text-align:right}
+.c-src{color:var(--dim);font-size:11px;margin-left:10px;opacity:.65}
 .c-msg{word-break:break-word;white-space:pre-wrap;font-family:"Segoe UI","Malgun Gothic",sans-serif;font-size:13px}
 .lv-trace .c-lv{color:#6b7688}.lv-trace .c-msg{color:var(--dim)}
 .lv-debug .c-lv{color:var(--purple)}

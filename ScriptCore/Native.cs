@@ -20,7 +20,6 @@ internal unsafe struct ScriptApiTable
     public int StructSize;
 
     // 기존 로그 — level: 0=Debug 1=Info 2=Warning 3=Error, message: null 종료 UTF-8
-    public delegate* unmanaged<int, byte*, void> Log;
     // 구조화 로그 — message/file/member: null 종료 UTF-8, level: spdlog 값.
     // file/line/member 는 호출부의 [CallerFilePath] 계열이 채운 값이 그대로 온다.
     public delegate* unmanaged<int, byte*, byte*, int, byte*, void> PrintLog;
@@ -308,7 +307,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 26;
+    public const int ExpectedVersion = 27;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -419,31 +418,18 @@ internal static unsafe class Native
 
     // ── 로그 ──
     // 문자열은 호출 시점에만 필요하므로 스택 버퍼로 UTF-8 변환한다(할당 없음).
-    public static void Log(int level, string message)
-    {
-        if (!_bound || _api.Log == null) return;
-
-        const int stackLimit = 512;
-        int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(message.Length) + 1;
-
-        if (maxBytes <= stackLimit)
-        {
-            byte* buffer = stackalloc byte[stackLimit];
-            int written = System.Text.Encoding.UTF8.GetBytes(message, new Span<byte>(buffer, stackLimit - 1));
-            buffer[written] = 0;
-            _api.Log(level, buffer);
-        }
-        else
-        {
-            byte[] heap = new byte[maxBytes];
-            fixed (byte* p = heap)
-            {
-                int written = System.Text.Encoding.UTF8.GetBytes(message, new Span<byte>(p, maxBytes - 1));
-                p[written] = 0;
-                _api.Log(level, p);
-            }
-        }
-    }
+    /// <summary>
+    /// 관리 측 로그. 호출 지점은 [Caller*]가 컴파일 시점에 채운다.
+    ///
+    /// 래퍼를 한 겹 거쳐 부르는 쪽(Component.Log 등)은 반드시 자기 [Caller*] 값을
+    /// 넘겨야 한다 — 생략하면 기본값이 그 래퍼의 자리에서 채워져 모든 로그가
+    /// 래퍼 한 줄을 가리킨다.
+    /// </summary>
+    public static void Log(int level, string message,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "")
+        => PrintLog(level, message, file, line, member);
 
     public static void PrintLog(int level, string message, string file, int line, string member)
     {

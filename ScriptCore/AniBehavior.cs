@@ -1,5 +1,7 @@
 namespace CreatorEngine;
 
+using System.Runtime.CompilerServices;
+
 /// <summary>
 /// 네이티브 <c>AniBehavior</c>에 대응하는 애니메이션 상태 스크립트.
 ///
@@ -47,9 +49,20 @@ public abstract class AniBehavior
     /// <summary>엔진 프레임 번호. 콜백이 어느 프레임에 왔는지 볼 때 쓴다.</summary>
     public static ulong FrameCount => Native.FrameCount;
 
-    protected static void Log(string message) => Native.Log(1, message);
-    protected static void LogWarning(string message) => Native.Log(2, message);
-    protected static void LogError(string message) => Native.Log(3, message);
+    protected static void Log(string message,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "") => Native.Log(1, message, file, line, member);
+
+    protected static void LogWarning(string message,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "") => Native.Log(2, message, file, line, member);
+
+    protected static void LogError(string message,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "") => Native.Log(3, message, file, line, member);
 }
 
 /// <summary>전달할 콜백 종류. 네이티브 <c>ScriptAniEventKind</c>와 값이 같아야 한다.</summary>

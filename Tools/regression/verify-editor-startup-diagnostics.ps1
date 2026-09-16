@@ -108,6 +108,11 @@ $lines = @(
     # 자리가 는다.
     'editor.window ###Editor.FrameProfiler open'
     'wait 120'
+    # 관리 로그를 **래퍼를 통해** 낸다. 기동 로그(`Bootstrap.cs`)는 `Native.Log` 를
+    # 직접 부르므로 `Component.Log` 계열의 [Caller*] 전달을 한 번도 안 지난다 —
+    # 그 축을 자극하지 않고 아래 단정을 걸면 미자극을 초록으로 읽는다.
+    'script.invoke ManagedLogProbe EmitLogLines'
+    'wait 30'
     ('scene.save ' + $mark)
     'wait 60'
     'quit'
@@ -164,9 +169,21 @@ $severeRows = @()
 $totalRows = 0
 $sawStimulus = $false
 $sawSessionEnd = $false
+$managedSources = @()
 foreach ($file in $fresh) {
     $html = Get-Content -LiteralPath $file -Raw
     $totalRows += ([regex]::Matches($html, '<tr\s+data-lv="')).Count
+    # 관리 로그가 **자기** 호출 지점을 싣는가.
+    #
+    # `Native.Log` 는 예전에 표의 `Log` 슬롯으로 가서 위치를 안 실었고, 모든 C#
+    # 로그가 `ClrHost.cpp` 한 줄을 자기 출처로 보고했다. 래퍼(`Component.Log`
+    # 등)가 자기 `[Caller*]` 를 전달하지 않아도 같은 증상이 나는데, 그때는
+    # `Component.cs` 한 줄로 몰린다. 둘 다 "출처가 있다" 로는 안 걸린다 —
+    # `.cs` 파일이 **여럿** 나오는지를 봐야 한다.
+    foreach ($match in [regex]::Matches($html, '<tr\s+data-lv="[^"]*"[^>]*?\sdata-src="(?<src>[^"]+)"')) {
+        $value = $match.Groups['src'].Value
+        if ($value -like '*.cs:*') { $managedSources += $value }
+    }
     # 이 회차의 `scene.save` 가 남긴 줄. 로그 통로가 살아 있다는 증거를 개수가
     # 아니라 **내가 일으킨 사건**에서 얻는다 — 개수는 눈대중이 된다.
     if ($html.Contains('[CLI] 씬 저장')) { $sawStimulus = $true }
@@ -188,6 +205,37 @@ Assert $sawStimulus `
     'scene.save 가 남긴 줄이 HTML 로그에 없다 — 로그 통로가 끊겼다면 심각 행 0 은 눈먼 초록이다'
 Assert $sawSessionEnd `
     "HTML 로그에 세션 종료 줄이 없다 — 로그가 잘렸고, 잘린 로그의 심각 0 은 앞부분만 본 것이다"
+
+# ── ③ 관리 로그가 자기 호출 지점을 싣는가 ──────────────────────────────────
+$distinctManaged = @($managedSources | Sort-Object -Unique)
+Write-Host ("  관리 로그 출처 " + $managedSources.Count + " 줄 · 고유 " + $distinctManaged.Count + " 자리")
+foreach ($src in ($distinctManaged | Select-Object -First 5)) { Write-Host ("    " + $src) }
+Assert ($managedSources.Count -ge 1) `
+    "C# 이 낸 로그가 한 줄도 없다 — CLR 이 기동했는데 관리 로그가 안 보이면 경로가 끊긴 것이고, 아래 '고유 자리' 단정은 빈 집합을 통과한다"
+# 자리가 **하나뿐**이면 통과시키지 않는다. 브리지나 래퍼가 자기 위치를 싣는
+# 고장이 정확히 그 모양이다 — 출처는 있는데 전부 같은 한 줄이다.
+Assert ($distinctManaged.Count -ge 2) `
+    ("관리 로그 출처가 " + $distinctManaged.Count + " 자리뿐이다 (" + ($distinctManaged -join ', ') +
+     ") — 래퍼나 브리지가 호출자 대신 자기 위치를 싣고 있다. [Caller*] 를 전달하는지 봐라")
+
+# 자극이 실제로 래퍼를 지났는가. 이 줄이 없으면 아래 '래퍼 파일이 없다' 단정이
+# 빈 집합을 통과한다 — 래퍼를 안 지났으니 당연히 래퍼 이름도 안 나온다.
+Assert (@($managedSources | Where-Object { $_ -like 'ManagedLogProbe.cs:*' }).Count -ge 1) `
+    ("ManagedLogProbe 가 낸 줄이 로그에 없다 — script.invoke 가 돌지 않았거나 래퍼 경로가 끊겼다. 관측: " +
+     ($distinctManaged -join ', '))
+
+# 래퍼 자신이 출처로 찍히면 안 된다.
+#
+# `Component.Log` 계열이 자기 [Caller*] 를 전달하지 않으면 호출자 전부가 래퍼 한
+# 줄로 몰린다. 그때도 출처는 **있고** 자리 수도 2 이상일 수 있어서(기동 로그가
+# 따로 있다) 위 단정들로는 안 걸린다. 래퍼 파일 이름을 직접 금지한다.
+$wrapperFiles = @('Component.cs', 'BehaviorTree.cs', 'AniBehavior.cs', 'Native.cs', 'Debug.cs')
+$wrapperHits = @($distinctManaged | Where-Object {
+    $name = ($_ -split ':')[0]
+    $wrapperFiles -contains $name })
+Assert ($wrapperHits.Count -eq 0) `
+    ("관리 로그가 래퍼 자신을 출처로 싣는다: " + ($wrapperHits -join ', ') +
+     " — 그 래퍼가 [Caller*] 를 받아 넘기지 않는다. 호출자의 자리가 아니면 출처는 없는 것만 못하다")
 
 foreach ($row in $severeRows) { Write-Host ("    " + $row.Substring(0, [Math]::Min(220, $row.Length))) }
 Assert ($severeRows.Count -eq 0) `

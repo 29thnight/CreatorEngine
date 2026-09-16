@@ -76,7 +76,6 @@ namespace
 		int version;
 		int structSize;
 
-		void (__stdcall* Log)(int level, const char* message);
 		void (__stdcall* PrintLog)(int level, const char* message,
 			const char* file, int line, const char* member);
 
@@ -379,19 +378,6 @@ namespace
 
 	// ── API 구현 ──
 	// 전부 게임 스레드에서만 불린다(관리 코드 호출을 게임 스레드로 한정했으므로).
-
-	void __stdcall Api_Log(int level, const char* message)
-	{
-		if (nullptr == message) return;
-
-		switch (level)
-		{
-		case 0:  Debug::PrintLog(spdlog::level::debug, message);   break;
-		case 2:  Debug::PrintLog(spdlog::level::warn, message); break;
-		case 3:  Debug::PrintLog(spdlog::level::err, message);   break;
-		default: Debug::PrintLog(spdlog::level::info, message);        break;
-		}
-	}
 
 	// 관리 코드가 자기 호출 지점을 직접 싣는다. C# 의 [CallerFilePath]·
 	// [CallerLineNumber]·[CallerMemberName] 은 컴파일러가 채우므로
@@ -2308,7 +2294,6 @@ namespace
 		g_apiTable.version    = kApiVersion;
 		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
 
-		g_apiTable.Log                         = &Api_Log;
 		g_apiTable.PrintLog                    = &Api_PrintLog;
 		g_apiTable.Entity_FindByName       = &Api_Entity_FindByName;
 		g_apiTable.Entity_IsAlive          = &Api_Entity_IsAlive;

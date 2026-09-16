@@ -546,20 +546,120 @@ G2·G3 이 낸 것은 **2026-09-16 에 실제로 났던 그 문장 그대로**�
 `-AllowedErrorSubstrings` 는 비워 두는 것이 정상이다. 채울 때는 왜 그것이
 기대되는 오류인지 한 줄 적는다.
 
+## 출처 축: 태그를 걷고, 두 경로를 합치고, 읽을 채널을 냈다
+
+### 논리 태그는 살아 있지도 않았다
+
+`Debug::PrintLog` 는 첫 인자로 논리 태그 `source` 를 받아 메시지 앞에 `[태그] ` 로
+붙였다. 호출처 **596 중 592 가 빈 `{}`** 를 넘기고 있었고, 나머지 넷은 전부 중계지
+생산자가 아니다(셋은 `LogSystem.h` 안의 전달, 하나는 CLR 브리지). 태그를 채우는
+유일한 생산자는 C# 경계인데 그쪽 호출자가 0 이라 `[{}] {}` 분기는 **런타임에 죽어
+있었다.** 살아 있지도 않은 축을 위해 592 자리가 `{}` 를 적고 있었다.
+
+태그는 구조 필드도 아니었다 — 문자열 연결이라 로그 창이 따로 열에 낼 수도 걸러낼
+수도 없고, 바이트 단위 묶음 키에 메시지로 섞여 들어갔다. `LogStore` 의
+`entry.source` 는 `file`/`line`/`function` 이라 **이름만 같고 다른 것**이다.
+
+걷어냈다. 592 자리는 바이트 단위로 고쳤다 — 패턴이 순수 ASCII 라 파일을 디코딩하지
+않았다(같은 날 일괄 치환이 CP949 파일 7 개의 한국어 주석 112 줄을 U+FFFD 로 지운
+일이 있었고, 그것은 읽기에서 인코딩을 가정했기 때문이다. 읽지 않으면 그 축이 생기지
+않는다). 그리고 **옛 오버로드를 지웠다** — 놓친 자리가 조용히 남는 대신 컴파일
+오류가 된다. 빌드 exit 0 이 곧 592 자리가 전부 맞다는 뜻이다.
+
+### `std::source_location` 은 CLR 경계를 못 넘는다
+
+C# 에는 대응 장치가 있다. `[CallerFilePath]`·`[CallerLineNumber]`·
+`[CallerMemberName]` 은 컴파일러가 호출 지점에서 채운다 —
+`std::source_location::current()` 기본 인자와 같은 성격이고 호출자는 아무것도
+적지 않는다.
+
+다만 `std::source_location` 은 **값으로 만들 수 없다**(표준이 `current()` 만 준다).
+경계 밖에서 온 file/line/function 을 담을 수 없으므로 `spdlog::source_loc` 을 직접
+받는 저수준 오버로드를 하나 뒀고 CLR 브리지가 그리로 들어간다. 그 오버로드가
+없으면 기본 인자가 재평가돼 모든 관리 로그가 `ClrHost.cpp` 를 자기 출처로 보고한다.
+포인터는 호출 동안만 살면 된다 — 로거가 동기라(`async_logger` 가 아니다) 포매팅이
+거기서 끝나고, 관리 측 `fixed` 핀이 그 구간을 덮는다.
+
+### ★ 관리 로깅 경로가 둘이었고, 고친 쪽은 안 쓰는 쪽이었다
+
+| 슬롯 | 관리 측 호출 | 출처 |
+|---|---|---|
+| `Native.Log` → `Api_Log` | **44 자리** (`Component.Log`·`BehaviorTree`·`AniBehavior`·`Bootstrap`·`BlackBoard`…) | `ClrHost.cpp` 한 줄 — 전부 |
+| `Native.PrintLog` → `Api_PrintLog` | **0** | `[Caller*]` 를 얹은 쪽 |
+
+즉 `[Caller*]` 작업이 **트래픽이 흐르지 않는 경로**에 들어가 있었고, 실제 관리
+로그는 여전히 브리지 자신을 가리키고 있었다. 게이트를 세우려다 알았다 — 자극할
+대상이 무엇인지 확인하지 않았으면 안 쓰는 경로에 게이트를 걸 뻔했다.
+
+`Native.Log` 자체가 `[Caller*]` 기본 인자를 받아 `PrintLog` 슬롯으로 가게 합쳤다.
+**호출 44 자리의 텍스트는 한 글자도 안 바뀌고** 출처만 붙는다. 표에서 `Log` 슬롯과
+`Api_Log` 가 사라져 `CreatorScriptApiVersion` 이 26→27 이고 `ExpectedVersion` 을
+같은 커밋에서 올렸다.
+
+래퍼 아홉(`Component`·`BehaviorTree`·`AniBehavior` × `Log`/`LogWarning`/`LogError`)은
+자기 `[Caller*]` 를 **전달**하게 했다. 안 그러면 44 자리가 전부 `Component.cs` 한
+줄을 가리킨다 — 출처는 **있으므로** "출처가 있는가" 로는 안 걸리는 고장이다.
+
+### 출처를 읽을 채널이 없었다
+
+`HtmlFileSink` 는 시각·수준·tid·메시지만 적고, `set_pattern` 은 어디에도 없고
+(spdlog 기본 패턴은 출처를 안 찍는다), CLI 는 `log.flush` 뿐이었다. 출처는
+`LogStore` 에 들어가 **로그 창 상세 패널에서 눈으로만** 보였다. 파일로도 안 나가고
+게이트가 읽을 길도 없었다.
+
+`<tr>` 에 `data-src="파일:줄"` 을 달았다 — 표 배치를 안 건드려 기계가 읽는다.
+사람 쪽으로는 메시지 칸 끝에 흐린 글씨를 붙인다. 경로 전체가 아니라 파일 이름만
+싣는다(절대 경로는 빌드 기계마다 달라 잡음이다).
+
+### 변이
+
+기동 진단 게이트에 단정 넷을 더했다(9 → 13 checks).
+
+| 변이 | 결과 | 관측 |
+|---|---|---|
+| H1 래퍼가 `[Caller*]` 를 전달 안 함 | 잡힘 | `관리 로그가 래퍼 자신을 출처로 싣는다: Component.cs:341` |
+| H2 마샬러가 호출 지점을 버림 | 잡힘 | `관리 로그 출처 0 줄 · 고유 0 자리` |
+| H3 싱크가 출처를 안 적음 | 잡힘 | 〃 |
+| 대조 | 초록 | `Bootstrap.cs:31 · 356 · ManagedLogProbe.cs:26 · 27`, 13 checks |
+
+**H1 이 세 번 만에 잡혔고, 그 과정이 결과보다 값지다.**
+
+1. 첫 회차는 **빌드가 실패**했다. 다른 세션이 `EditorObjectOperations.cpp` 에 쓰는
+   자리를 먼저 넣고 `#include` 를 뒤에 넣는 사이 컴파일이 파일을 읽어 `C2653` 이
+   났다. 빌드 실패를 "게이트가 못 잡았다" 로 적으면 없는 구멍을 만든다 — 러너가
+   '재지 못함' 을 따로 적게 해 뒀다.
+2. 둘째 회차는 임시 명령의 따옴표 중첩이 깨져 **빌드가 안 돌았고**, 앞 변이가 구워진
+   낡은 바이너리를 쟀다. 산출물 시각 가드를 우회한 것이 원인이다.
+3. 셋째 회차에서 제대로 쟀더니 **자극 자체가 그 코드를 안 지났다.** 이 게이트의
+   관리 로그는 `Bootstrap.cs` 둘뿐인데 그것은 `Native.Log` 를 **직접** 부른다 —
+   `Component.Log` 래퍼를 한 번도 안 지난다.
+
+그래서 `GameScripts/ManagedLogProbe.cs` 를 세웠다. `Component.Log`/`LogWarning` 을
+서로 다른 줄에서 부르고, 게이트가 `script.invoke` 로 돌린다. `LogError` 는 쓰지
+않는다 — 오류 수준은 같은 게이트의 '심각 행 0' 에 걸려 자기 fixture 가 게이트를
+붉게 만든다.
+
+**그리고 단정을 자리 수로 걸면 H1 이 안 걸린다.** H1 회차의 고유 자리는 **여전히
+4** 였다(`Bootstrap.cs` 둘 + `Component.cs:341` + `ManagedLogProbe.cs:27`). 래퍼
+파일 이름이 출처로 나오는 것 자체를 금지해야 걸린다. 그 앞에는 "`ManagedLogProbe.cs`
+가 로그에 있는가" 를 둬서, 래퍼를 안 지난 회차가 빈 집합으로 통과하는 것을 막는다.
+
 ## 다음 단계
 
-1. `ScriptCore/Debug.cs` 의 처분. 소비자 0, 게이트 0.
-2. `OutputLogText.h` 의 처분. `Editor.vcxproj` 등재가 0 이 됐고 부르는 것은
-   `Tools/regression/log_store_probe.cpp` 하나뿐이다.
-3. 래퍼를 거치는 호출처. `PakHelper.h`·`DumpHandler.h`·`ComponentTypeUUID.h`·
-   `ProxyCommandQueue.h` 의 `Debug::PrintLog({}, …)` 열 자리쯤이 자기 위치를
-   싣는다 — 상세 창에 래퍼가 찍힌다.
+1. C++ 래퍼 호출처. `PakHelper.h`(39 자리)·`DumpHandler.h`·`ComponentTypeUUID.h`·
+   `ProxyCommandQueue.h` 가 래퍼를 한 겹 거쳐 자기 위치를 싣는다. C# 절반은 위에서
+   닫혔고 기법도 같다 — 래퍼가 `std::source_location` 기본 인자를 받아 넘기면 된다.
+   게이트에 걸린 래퍼 파일 금지 목록에 그 넷을 더하면 회귀도 막힌다.
+2. `OutputLogText.h` 의 처분. 정의는 `FormatOutputLogEntry` 하나, 호출자는
+   `log_store_probe.cpp` 의 `"legacy display parity"` 단정 하나, `Editor.vcxproj`
+   등재 0. 그 단정이 재는 '옛 화면과 같은 문자열인가' 는 3단계에서 화면을 카드로
+   바꾸며 **비교 대상이 사라졌다.**
 
-앞의 두 항목(출처 전달, producer별 수집 경계)은 닫혔다. `Debug::PrintLog` 가
-`std::source_location` 기본 인자로 호출 위치를 싣게 됐고, `DebugStreamBuf` 는
-소스에서 사라졌다.
+`ScriptCore/Debug.cs` 는 **처분 대상이 아니다.** 한때 "소비자 0" 으로 적었는데
+틀렸다 — 저장소 안에서 호출자를 센 것이고, 게임 스크립트에 공개된 API 에 그 수는
+죽었다는 증거가 아니다. 경로도 끝까지 살아 있다.
 
 검증 범위: 저장소·화면 상태의 독립 회귀(`verify-log-storage`), 에디터 선언·클리핑·
-키보드 탐색·상태 행렬 네 게이트, 기동 진단 게이트(변이 G0~G4), Editor Release
-빌드, 그리고 창을 띄운 눈 확인. 픽셀 골든과 Vulkan 백엔드에서의 확인은 하지
-않았다.
+키보드 탐색·상태 행렬 네 게이트, 기동 진단 게이트(변이 G0~G4·H1~H3), Editor
+Release 빌드, 그리고 창을 띄운 눈 확인. 픽셀 골든과 Vulkan 백엔드에서의 확인은
+하지 않았다.
