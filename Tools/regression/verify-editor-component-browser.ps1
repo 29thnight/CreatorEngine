@@ -61,7 +61,10 @@ function WaitCreation([bool]$success) {
     $timer = [Diagnostics.Stopwatch]::StartNew()
     do { Start-Sleep -Milliseconds 300; $state = Call 'script.creation' } while ($state.busy -and $timer.Elapsed.TotalSeconds -lt 150)
     Check (-not $state.busy) 'Script compilation timed out'
-    Check ($state.succeeded -eq $success) "Script creation success expected $success; inspect the compilation log"
+    if ($state.succeeded -ne $success) {
+        $log = if ($state.log -and (Test-Path -LiteralPath $state.log)) { (Get-Content -LiteralPath $state.log -Tail 20) -join "`n" } else { '(no compilation log)' }
+        Check $false "Script creation success expected $success; compilation log $($state.log):`n$log"
+    }
     return $state
 }
 function Scripts([string]$owner) {

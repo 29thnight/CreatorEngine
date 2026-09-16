@@ -14,6 +14,7 @@
 #include <fstream>
 #include <mutex>
 #include <utility>
+#include <vector>
 
 namespace EditorScriptAuthoring
 {
@@ -85,18 +86,33 @@ namespace EditorScriptAuthoring
         CommandCore::CommandResult StartBuild(Work& work)
         {
             const auto projectRoot = PathFinder::BaseProjectPath();
-            const auto distribution = ResolveEditorEngineDistribution();
-            if (distribution.root.empty()) return FailWork(work, "Publish/select an engine distribution before compiling scripts.");
-            const auto repository = distribution.root;
-            const auto buildTool = repository / L"Bin" / (L"x64-" + distribution.configuration) /
-                L"Tools/CreatorBuildTool/CreatorBuildTool.exe";
-            if (!std::filesystem::is_regular_file(buildTool))
-                return FailWork(work, "The selected engine compiler is incomplete.");
+            std::filesystem::path program, workingDirectory;
+            std::vector<std::wstring> arguments;
             std::filesystem::create_directories(work.log.parent_path());
-            const std::array arguments{buildTool.wstring(), std::wstring(L"compile-game"),
-                std::wstring(L"-EngineDistribution"), repository.wstring(), std::wstring(L"-Project"), projectRoot.wstring(),
-                std::wstring(L"-Config"), distribution.configuration, std::wstring(L"-Output"),
-                PathFinder::ManagedPath("Scripts").parent_path().wstring(), std::wstring(L"-LogPath"), work.log.wstring()};
+            if (const auto checkout = ResolveEditorSourceCheckout(); !checkout.repository.empty())
+            {
+                std::array<wchar_t, MAX_PATH> dotnet{};
+                if (!SearchPathW(nullptr, L"dotnet.exe", nullptr, static_cast<DWORD>(dotnet.size()), dotnet.data(), nullptr))
+                    return FailWork(work, "Compiling scripts in a source checkout requires the .NET SDK (dotnet.exe on PATH).");
+                program = dotnet.data();
+                workingDirectory = checkout.repository;
+                arguments = {L"build", (checkout.repository / L"GameScripts/GameScripts.csproj").wstring(), L"-c", checkout.configuration,
+                    L"--nologo", L"-v", L"quiet", L"-p:CreatorScriptSourceRoot=" + (projectRoot / L"Assets/Script").wstring(),
+                    L"-flp:logfile=" + work.log.wstring() + L";verbosity=minimal"};
+            }
+            else
+            {
+                const auto distribution = ResolveEditorEngineDistribution();
+                if (distribution.root.empty()) return FailWork(work, "Publish/select an engine distribution before compiling scripts.");
+                program = distribution.root / L"Bin" / (L"x64-" + distribution.configuration) / L"Tools/CreatorBuildTool/CreatorBuildTool.exe";
+                if (!std::filesystem::is_regular_file(program))
+                    return FailWork(work, "The selected engine compiler is incomplete.");
+                workingDirectory = distribution.root;
+                arguments = {L"compile-game", L"-EngineDistribution", distribution.root.wstring(), L"-Project", projectRoot.wstring(),
+                    L"-Config", distribution.configuration, L"-Output", PathFinder::ManagedPath("Scripts").parent_path().wstring(),
+                    L"-LogPath", work.log.wstring()};
+            }
+            arguments.insert(arguments.begin(), program.wstring());
             std::wstring command;
             for (const auto& argument : arguments) { if (!command.empty()) command += L' '; command += Quote(argument); }
             work.job = CreateJobObjectW(nullptr, nullptr);
@@ -109,8 +125,8 @@ namespace EditorScriptAuthoring
             startup.dwFlags = STARTF_USESHOWWINDOW;
             startup.wShowWindow = SW_HIDE;
             PROCESS_INFORMATION process{};
-            if (!CreateProcessW(buildTool.c_str(), command.data(), nullptr, nullptr, FALSE,
-                CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, repository.c_str(), &startup, &process))
+            if (!CreateProcessW(program.c_str(), command.data(), nullptr, nullptr, FALSE,
+                CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, workingDirectory.c_str(), &startup, &process))
                 return FailWork(work, "Cannot start the script compiler (Windows error " + std::to_string(GetLastError()) + ").");
             work.process = process.hProcess;
             if (!AssignProcessToJobObject(work.job, work.process))
