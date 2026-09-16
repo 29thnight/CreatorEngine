@@ -25,10 +25,22 @@ foreach ($runtimeFile in @("Engine\RenderEngine\DataSystem.h", "Engine\RenderEng
 }
 
 $presentation = "Editor\EngineEntry\EditorAssetPresentation.cpp"
-Assert-Matches $presentation 'ContextRegister\(kMaterialPicker'
-Assert-Matches $presentation 'ContextRegister\(kTextureImportSelector'
+# PHASE 21 M4 2단계(d2b70402)부터 프레임은 창 선언이 열고, 이 파일은 본문만
+# 묶는다. 경로는 세 고리다: 본문 묶기 → 선언의 panel → 선언이 부르는 진입점.
+# 한 고리라도 빠지면 창은 목록에 없거나 빈 틀만 뜬다.
+Assert-Matches $presentation 'bind_window_body\(\s*kMaterialPicker,\s*\[this\]\(\)\s*\{\s*RenderMaterialPicker\(\);'
+Assert-Matches $presentation 'bind_window_body\(\s*kTextureImportSelector,\s*\[this\]\(\)\s*\{\s*RenderTextureImportSelector\(\);'
+$windowDeclarations = "Editor\EditorWindow\Windows\EditorStandardWindows.h"
+Assert-Matches $windowDeclarations 'panel<&windows::draw_material_picker>\(\s*EditorWindowName::kMaterialPicker,'
+Assert-Matches $windowDeclarations 'panel<&windows::draw_texture_import_selector>\(\s*EditorWindowName::kTextureImportSelector,'
+$windowEntries = "Editor\EditorWindow\Windows\EditorStandardWindows.cpp"
+Assert-Matches $windowEntries 'EDITOR_DEFINE_WINDOW_ENTRY\(material_picker,\s*EditorWindowName::kMaterialPicker\)'
+Assert-Matches $windowEntries 'EDITOR_DEFINE_WINDOW_ENTRY\(texture_import_selector,\s*EditorWindowName::kTextureImportSelector\)'
 Assert-Matches $presentation 'ResolveFilePresentation'
-Assert-Matches $presentation 'AddFontFromFileTTF'
+# 폰트 파일 적재는 W1(afe52737)에서 EditorFontResources 한 자리로 모였다.
+# 표시 계층은 그 창구로 small/extra_small 을 받는다.
+Assert-Matches $presentation 'm_smallFont\s*=\s*::editor::fonts::add_optional_font\('
+Assert-Matches $presentation 'm_extraSmallFont\s*=\s*::editor::fonts::add_optional_font\('
 Assert-Matches $presentation 'CameraGizmo\.png'
 Assert-Matches $presentation 'SetGizmoIconTextures\(m_gizmoIconTextures\)'
 
