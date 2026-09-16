@@ -2022,6 +2022,34 @@ W7의 목록/썸네일 최적화와 담당 범위를 구분한다. 아래 여섯
   (9-16 로그 작업이 아래 상태 막대에 넣은 개수가 회차마다 달라 "같은 상태 두 번" 재현 축부터 붉다 ·
   브라우저 영역 차이 0), `verify-asset-authoring-ownership`(`efsw.dll` 을 exe 옆에서 찾는데 지금은
   `Bin/x64-*/Runtime/Editor/` 에 있다).
+  **셋을 닫았다(2026-09-17).** 모두 Release 에디터에 `-Exe`·`-EditorExe` 를 명시해 돌렸다.
+  · `verify-asset-presentation-boundary` — 통과. 머티리얼 선택기의 실제 경로 세 고리를 단정한다:
+  `EditorAssetPresentation.cpp` 의 `bind_window_body(kMaterialPicker, … RenderMaterialPicker)`,
+  `EditorStandardWindows.h` 의 `panel<&windows::draw_material_picker>`, `.cpp` 의
+  `EDITOR_DEFINE_WINDOW_ENTRY(material_picker, …)`(텍스처 가져오기 선택기도 같은 셋). 고쳐 보니
+  한 줄 뒤 `AddFontFromFileTTF` 단정도 W1(`afe52737`)이 폰트 적재를 `EditorFontResources` 로 모은 뒤
+  낡아 있어 `add_optional_font` 로 바꿨다. 변이 4 종(본문 비움·선언 진입점 바꿈·정의 끊음·폰트 창구
+  끊음) 전부 붉음.
+  · `verify-editor-chrome-golden` — 25 단정 통과. **계수를 고정하지 않고 가렸다.** 계수는 명령마다
+  늘고(`scene.save` 표지 자체가 로그를 남긴다) 자릿수가 바뀌면 오른쪽 정렬이 움직이므로, 캡처 직전에
+  비워도 대기 12 초 사이 비동기 로그를 막을 수 없다. 가릴 칸은 제품이 낸다 — `editor.dock` 의
+  `statusCountsSlot`(ProfileFrame 버튼 오른쪽 끝 ~ 디버그 버튼 왼쪽 끝, 자릿수와 무관한 두 끝).
+  칸을 못 받으면 단정이 붉고, `-Update` 는 가리기가 서지 않으면 골든을 뜨지 않는다. 가린 뒤 재현 축
+  0 을 먼저 확인하고 골든을 다시 떴다. 골든이 움직인 것은 ① 가린 칸 36,315 화소와 ② 칸 바깥 380
+  화소다 — ②는 씬 툴바 이동·회전 버튼 경계와 Content Browser·Inspector 탭 제목·Hierarchy 한 글자의
+  명암 차(1~17 단계)이고, 두 번 따로 실행해 화소 하나까지 같았으니 흔들림이 아니라 골든(`ff679836`)
+  이후의 결정적 변화다. 어느 커밋인지는 가르지 않았다. 변이(가리는 칸을 왼쪽 절반으로)가 원래 증상
+  그대로 붉었다 — 4 건, 재현 축 x 1023..1193 · y 910..933.
+  · `verify-asset-authoring-ownership` — 통과(11 축). 감시자 런타임을 `RuntimeLauncher.cpp` 와 같은
+  규칙으로 찾는다 — exe 폴더에서 두 단계 위까지 `Runtime/layout.version`(판 1), 그 아래
+  `Runtime/Editor/efsw.dll`, 그리고 `Runtime/Manifests/CreatorEditor.json` 이 그 파일을 싣는지.
+  가짜 배치 변이 5 종(파일 없음·옛 자리·목록에서 뺌·판 2·layout 없음) 전부 붉고 대조군은 통과.
+  ★ 그 전제를 넘자 **뒤에 가려 있던 둘**이 드러났다. `foliage-ads` 는 거부 모드가 없는 탐침이라
+  거부가 곧 `Failed`(exit 4)인데 검사가 0 만 받아 출력도 안 보고 던졌다 — 기대 종료 코드를 받게
+  했다(거부가 풀려 커밋되면 0 이 되어 붉다). `blackboard-empty` 는 **탐침 명령의 판정이 틀려**
+  있었다 — `committed keys=0` 을 찍고도 반환식이 `!empty && …` 라 빈 판의 성공을 언제나 Failed 로
+  냈다. LC1(`987a552e`)이 실패를 종료 코드에 이은 뒤로 계속 붉었을 자리다. 반환식을 고쳤다(제품
+  빌드가 필요한 변이는 걸지 않았다).
 - **남은 것.** 실제 마우스 분할선·DPI 행렬(B1), Volume Profile 취소(사람 손으로만 일어난다),
   프로젝트 전환 때 이력·최근 재사용 금지의 실행 검증, 전체 자산 모으기 비용(4k 3.25ms)과
   1k/10k/50k 공동 측정, 끌기의 실물 자극(지금은 소스 축뿐이다), 텍스처 캐시의 stem 신원.
