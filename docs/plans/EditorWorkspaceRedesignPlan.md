@@ -1028,8 +1028,8 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 |---|---|---|
 | M0~M4, W0, W1 | **done** | 완료. 외관 추가 시안 없음 |
 | W2 | done | 4종 구현 완료. **W2-1 키보드 탐색 · W2-2 잘라 그리기/tooltip · W2-3 상태 행렬 · W2-4 시각 기준선과 §8 성능 계약**으로 전부 착지(2026-09-15 — 네 절 모두 판정문에 자가 없었다. nav 커서는 넷 중 셋이 안 그렸고, 자르기는 넷 중 하나만 온전히 알고 있었고, 일곱 상태를 한자리에서 볼 수단은 0 이었고, §8.2 의 "원인을 기록하고" 는 프레임 1.1 ms 중 0.015 ms 만 이름이 있었다). W2-4 는 하나를 **세우지 않고 닫았다** — 시각 기준선은 W8-2 의 chrome 골든이 이미 덮고 있음을 변이로 증명했다(위젯의 테두리 한 줄을 걷자 단정 3 건으로 붉었다). 성능 쪽은 창·셸 두 층을 새로 열어 설명력 1.4% → 95.6/96.5% (게이트 `verify-editor-chrome-perf.ps1` 단정 59 · run-all 배선). ★ 그 자가 곧바로 값을 냈다 — 사용자 요청으로 Content Browser 를 기본 앞 탭으로 세우자 그 창 혼자 프레임의 82.6%(2.446 ms) 다. 원인은 §W7-5 이고 **2026-09-16 에 닫혔다**(2.446 → 0.250 ms) |
-| W2-I | progress | Transform·RectTransform 공통 컴포넌트 경로 통합, RectTransform 최소 폭 대응, 중첩/배열·전용 드로어·Import Settings 전수 이관, 활성 정책·중복 호출·편집/저장 회귀 |
-| W2-V | progress | 기즈모가 숨겨지는 낮은 높이의 방향 선택 메뉴, resize 중 조작 취소·release/포커스 소유권, drop/terrain 입력 관통, W4/W5 연결·연속 resize 및 DPI/성능 회귀 |
+| W2-I | progress | RectTransform 최소 폭 대응, 중첩/배열 이관, **전용 드로어 15 중 12**, Import Settings(대상은 `DrawYamlNodeEditor.cpp`), 활성 정책·중복 호출·편집/저장 회귀. ★ **2026-09-16 재기준선** — 잔여를 문장에서 **이름 열둘**로 바꿨다. 그 과정에서 자를 한 번 고쳤다: `EditorPropertyRow` 는 파일 이름이고 코드가 부르는 어휘는 `editor::widgets::` 이며, 전용 드로어 열은 별도 파일이 아니라 `InspectorWindow.cpp` 안의 멤버라 **파일 단위 세기가 12 를 0 으로 읽었다.** 일반 리플렉션·C# 노출 필드 경로는 이미 정본을 지난다 |
+| W2-V | progress | ★ **2026-09-16 재기준선 — 다섯 줄 중 넷이 줄었다.** 남은 넷: V2 **방향 선택 창구**(높이 축과 Stats 대체 접근은 이미 섰다 — `showGizmo`·`RenderStatistics` 팝업), V3 **resize 중 조작 취소**(기제 0 건), V0·V4 는 **구현이 아니라 판정** — V0 은 `좌표식 부재`의 소스 축, V4 는 오버레이 위치/ID/입력 변이 검출. `W4 Host canvas 통합`·`drop/terrain 관통`·`W5 소유권`·`연속 resize`·`DPI` 는 W4 후속·W5·W8-3 이 닫았다 |
 | W2-B | progress | 최근/전체 **가상 탐색 위치**, 방문별 검색·선택 복원, Volume Profile 생성 대상 경로/취소/실패 정리, 실제 마우스 분할선/동명 자산 drop 회귀. ★ **2026-09-16 재기준선 — `W3 저장·W7 목록 연결` 은 닫혔다**(폭은 W3 autosave 소유, 창은 `browser_cache_listing` 소비, 타일은 `thumbnail_acquire` 소비). `전체` 의 원천은 **W7 목록 캐시 순회**다 — `AssetIdentityRegistry` 는 경로도 타입도 없어 브라우징 원천이 못 되고, 계획서가 별도 자산 DB를 금지한다 |
 | W3 | **done** | ID·legacy 이주, 자유 dock/close/reopen, versioned save/load/reset/backup·손상 복구가 게이트 둘(169+212 checks)로 선다. Scene `no_move` 해제는 W4 단일 Host, `dock_slot` 선언화는 W6 preset 소속 |
 | W4 | **done** | 닫을 수 없는 중앙 단일 ViewportHost와 모드(Scene/Game), canvas 규약 하나(crop/letterbox), 선택적 Game Preview, 가시성별 view demand가 게이트 W4-①②③으로 선다. 결함 넷(central 미표시·dock 감사 패널 면제·Game 종횡비 출처·모드 스레드 경계)을 함께 고쳤다. extent 기반 resize와 렌더 배율은 **2026-09-14 착지**(§W4 후속) — 미뤄 둔 근거였던 generation/retire 수렴을 게이트 단정으로 옮겼다 |
@@ -1591,6 +1591,7 @@ Browser 가 원래 비쌌고 앞에 서지 않아 안 보였을 뿐**이다. 원
 ### W2-I — 인스펙터 공통 속성 배치 규칙 · Transform 컴포넌트 렌더 통합 (P1, 6일 · 초기 추정)
 
 **2026-09-13 현재 외관 승인·고정. W2-I0 `done`(0.5일), I1~I5 잔여로 전체는 `progress`다.**
+**잔여의 실제 크기는 2026-09-16 재기준선(아래 표 다음 문단)을 정본으로 한다.**
 W2의 공통 위젯을 모든 인스펙터 경로가 같은 배치 규칙으로 소비하도록 확장한다.
 W2 기존 3일에 흡수하지 않으며, 아래 여섯 단계의 초기 추정 합계가 6일이다.
 초기 설계 근거와 이번 구현/검증을 구분한다. 기존 배치 기반 위에 적용한 스타일,
@@ -1659,17 +1660,67 @@ Transform Undo 수정, 대표 폭 DX12 실행 기록은
 
 #### 이관 순서와 초기 공수
 
-| 단계 | 작업 | 초기 추정 | 완료 기준 | 2026-09-13 상태 |
+| 단계 | 작업 | 초기 추정 | 완료 기준 | 상태(2026-09-16 재기준선) |
 |---|---|---:|---|---|
 | W2-I0 | content 폭·공통 열·줄 전환과 표시 정책 정의 | 0.5일 | 폭 계산·정책이 한 정본을 소비하고 전환 조건이 고정됨 | done — 공통 계약·측정 함수 및 소비 경로 확인 |
 | W2-I1 | Transform 2안·공통 헤더/전용 본문 분리 | 1일 | 일반 엔티티·UI·Canvas에서 중복 0, 개별 조작 제한과 엔티티 활성 전이 보존 | progress — 중복 제외·상단 표시 적용, 공통 순회 통합/정책 회귀 남음 |
 | W2-I2 | 기본 정보·Transform·RectTransform 반응형 배치 | 1일 | 공백 정렬·고정 숫자 열 폭 제거, 축별 최소 가독성·기존 편집 의미 보존 | progress — 기본/XYZ 적용·사용자 확인, RectTransform 최소 폭 남음 |
-| W2-I3 | 일반 리플렉션·중첩 필드·공유 드로어 이관 | 1일 | 수치·문자열·bool·enum·벡터가 같은 규칙을 사용하고 Inspector 밖 소비자도 회귀 없음 | progress — 일반 필드·SerializeField 적용, 중첩/배열·공유 소비자 전수 남음 |
-| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — 일부 전용 드로어 적용, Sound·Import Settings 등 전수 남음 |
+| W2-I3 | 일반 리플렉션·중첩 필드·공유 드로어 이관 | 1일 | 수치·문자열·bool·enum·벡터가 같은 규칙을 사용하고 Inspector 밖 소비자도 회귀 없음 | progress — **일반 경로와 C# 노출 필드는 정본을 쓴다**(`ReflectionTypedDraw.h`·`EditorAxisField3`·`DrawManagedScripts` 5 건). 중첩/배열 전수는 남음 |
+| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — **잔여가 셈이 된다: 전용 드로어 15 중 12.** 아래 재기준선의 표가 이름을 전부 적는다. Import Settings 의 대상 파일은 인스펙터가 아니라 `DrawYamlNodeEditor.cpp` 다 |
 | W2-I5 | 폭·배율·편집·중복 렌더 회귀와 잔재 점검 | 1일 | 아래 검증 행렬 및 §8 성능 gate 충족, 미이관 표면 0 | progress — 대표 UI/편집 검증, 전체 행렬·호출 수/성능 남음 |
 
 전용 드로어 전수 이관량과 개별 활성 변경 진입점의 실제 범위는 I0에서 재계수한다.
 초기 추정이 달라지면 본문과 대시보드의 공수를 함께 갱신하며, 추가 범위를 완료 실적으로 계산하지 않는다.
+
+##### 2026-09-16 재기준선 — 잔여를 문장에서 셈으로 바꾼다
+
+착수 전에 상태를 읽었더니 2026-09-13 기준이었고, 잔여가 *"전용 드로어 전수 이관"*
+처럼 크기를 알 수 없는 문장으로 적혀 있었다. 낡은 상태로 산정하면 이미 한 일을
+다시 잡는다(같은 이유로 §W2-B 를 같은 날 재기준선했다). 실물을 세어 아래로 바꾼다.
+
+★ **먼저 자를 고쳐야 했다.** 처음에 `EditorPropertyRow` 로 세어 "전용 드로어 다섯 중
+넷이 미이관" 이라는 수를 얻었는데 **그 자가 틀렸다.** `EditorPropertyRow` 는 파일
+이름이고 코드가 부르는 어휘는 `editor::widgets::` 다 — 그래서 include 와 주석만
+잡히고 실제 소비는 한 건도 안 잡혔다. 게다가 전용 드로어의 **열이 별도 파일이 아니라
+`InspectorWindow.cpp` 안의 멤버 함수**여서 파일 단위 세기가 통째로 놓쳤다. 어휘 아홉
+(`begin_property_line`·`draw_property_row`·`measure_property_layout`·
+`begin_inspector_panel`·`drag_property_float(s)`·`property_group_header`·
+`draw_axis_field3`·`property_layout_inputs_now`)으로 함수 범위마다 다시 셌다.
+
+**전용 드로어는 열다섯이고 정본을 쓰는 것은 셋이다.**
+
+| 드로어 | 자리 | 어휘 |
+|---|---|---:|
+| `ImGuiDrawHelperTransformComponent` | `InspectorWindow.cpp:872` | 6 |
+| `ImGuiDrawHelperGameObjectBaseInfo` | `InspectorWindow.cpp:667` | 4 |
+| `ImGuiDrawHelperRectTransformComponent` | 별도 파일 | 3 |
+| `ImGuiDrawHelperFSM` | `InspectorWindow.cpp:1034` | 0 |
+| `ImGuiDrawHelperBT` | `InspectorWindow.cpp:1056` | 0 |
+| `ImGuiDrawHelperVolume` | `InspectorWindow.cpp:1121` | 0 |
+| `ImGuiDrawHelperDecal` | `InspectorWindow.cpp:1322` | 0 |
+| `ImGuiDrawHelperImageComponent` | `InspectorWindow.cpp:1409` | 0 |
+| `ImGuiDrawHelperSpriteRenderer` | `InspectorWindow.cpp:1561` | 0 |
+| `ImGuiDrawHelperCanvas` | `InspectorWindow.cpp:1589` | 0 |
+| `ImGuiDrawHelperSoundComponent` | `InspectorWindow.cpp:1602` | 0 |
+| `ImGuiDrawHelperAnimator` | 별도 파일 | 0 |
+| `ImGuiDrawHelperMeshRenderer` | 별도 파일 | 0 |
+| `ImGuiDrawHelperPlayerInput` | 별도 파일 | 0 |
+| `ImGuiDrawHelperTerrainComponent` | 별도 파일 | 0 |
+
+즉 착지한 셋은 전부 **W2-I1·W2-I2 가 다룬 공간/기본 정보**이고, W2-I4 의 1.5 일이
+상대하는 것은 **미이관 열둘 + Import Settings** 다. 이전 문장의 *"Sound 등"* 은
+맞았다 — `SoundComponent` 가 그 열둘 중 하나다.
+
+· **일반 경로는 이미 정본을 지난다** — `ReflectionTypedDraw.h` · `EditorAxisField3` ·
+  그리고 C# 노출 필드를 그리는 `DrawManagedScripts`(5 건). W2-I3 의 남은 몫은
+  *경로 이관* 이 아니라 중첩/배열이라는 **모양** 하나다.
+· ★ **Import Settings 는 인스펙터에 없다.** `InspectorWindow.cpp:2385` 가 머리줄만
+  붙이고 본문은 `DrawYamlNodeEditor(selectedNode->Root())` 로 넘긴다
+  (`DrawYamlNodeEditor.cpp` 143 줄, 어휘 0 건). 인스펙터 파일을 훑어 이관을 끝냈다고
+  읽으면 이 표면이 그대로 남는다 — 대상 파일이 다른 트리에 있다.
+
+잔여 산정은 바꾸지 않는다. 바뀐 것은 **무엇을 열어야 하는지가 이름으로 정해졌다**는
+것과, 착수하면 셈으로 진척을 잴 수 있다는 것이다 — 이관이 끝나면 위 표의 0 이 0 개다.
 
 #### 검증과 완료 판정
 
@@ -1696,6 +1747,8 @@ W3 docking 완료를 구현 착수의 조건으로 삼지 않는다. W3와 공�
 ### W2-V — 씬뷰 툴바·오버레이 반응형 배치 규칙 (P1, 4일 · 초기 추정)
 
 **2026-09-13 현재 외관 승인·고정. W2-V1 `done`(1일), V0/V2~V4 잔여로 전체는 `progress`다.**
+**잔여의 실제 크기는 2026-09-16 재기준선(아래 표 다음 문단)을 정본으로 한다 — 넷 중
+둘은 구현이고 둘은 판정이다.**
 언리얼 참조 툴바 묶음과 폭에 따른 전체/축약/도구/메뉴 전환, 같은 프레임의 이미지 영역 기반 배치,
 Mathematics를 사용하는 ImViewGuizmo 및 Blender 참조 표시를 적용했다.
 FPS 상시 박스를 제거하고 Render Statistics에 Render Pass 창과 같은 Runtime 표시 함수 및 실제 GPU 패스 시간을 연결했다.
@@ -1766,11 +1819,34 @@ W4의 중앙 Host/렌더 타깃 크기 소유권 및 W5의 전체 입력 상태 
 
 | 단계 | 작업 | 초기 추정 | 완료 기준 | 2026-09-13 상태 |
 |---|---|---:|---|---|
-| W2-V0 | canvas 소비 계약·묶음 측정·표시 모드 계산 | 0.5일 | 같은 크기에서 창 원점이 달라도 상대 배치 동일, W4 정본 외 좌표식 없음 | progress — Scene 좌표·측정 적용, W4 Host canvas 통합 남음 |
+| W2-V0 | canvas 소비 계약·묶음 측정·표시 모드 계산 | 0.5일 | 같은 크기에서 창 원점이 달라도 상대 배치 동일, W4 정본 외 좌표식 없음 | **구현 닫힘 · 판정 미비**(2026-09-16 재기준선) — `W4 Host canvas 통합 남음` 은 닫혔다. `SceneViewWindow.h:4·74` 가 `EditorViewportCanvas.h` 의 `editor::ViewportCanvas m_canvas` 를 들고 오버레이도 그 헤더를 소비한다. 남은 것은 *"정본 외 좌표식 없음"* 을 읽을 **자**다(소스 축 0 건) |
 | W2-V1 | 좌우 툴바 공통 정렬·아이콘/더보기 전환 | 1일 | 최소 크기부터 넓은 창까지 도구·설정 도달 가능, 명령 ID·상태 유지 | done — 4개 폭 모드·도구/상태 조작 검증 |
-| W2-V2 | 방향 기즈모·HUD의 공간 예약과 작은 높이 대응 | 0.5일 | 툴바/기즈모/HUD 겹침·잘림 0, 방향 선택·Stats 대체 접근 가능 | progress — 기즈모/통계 적용, 낮은 높이의 방향 메뉴 남음 |
-| W2-V3 | 씬 입력의 오버레이 제외·조작 취소/소유권 연결 | 1일 | 클릭·카메라·drop·terrain 입력 관통 0, W5와 소유권 연결 지점 확정 | progress — **그 "포인터 차단 구현"이 기즈모를 지우고 있었다**(2026-09-14 `eb602724`). 오버레이 제외가 `ImGuizmo::Manipulate` 호출 조건에 들어가 있었는데 그 호출은 그림과 입력을 함께 하므로, 툴바에 마우스를 올리는 것만으로 기즈모가 사라졌다. 제외를 `ImGuizmo::Enable` 로 옮기고 소스 대조 게이트로 못 박았다(§W2-V3 후속). drop/terrain 관통·조작 취소/소유권 전수는 남음 |
-| W2-V4 | 연속 리사이즈·DPI·입력 회귀 및 관측 확장 | 1일 | 아래 행렬·성능 gate 충족, 위치/ID/입력 변이를 실패로 검출 | progress — 관측·대표 폭 검사, 연속 resize/DPI/성능 남음 |
+| W2-V2 | 방향 기즈모·HUD의 공간 예약과 작은 높이 대응 | 0.5일 | 툴바/기즈모/HUD 겹침·잘림 0, 방향 선택·Stats 대체 접근 가능 | progress — **잔여가 절반으로 좁혀졌다**(2026-09-16 재기준선). 높이 축은 **실재한다**: `SceneViewportOverlay.h:42` 의 `showGizmo` 가 낮은 높이에서 거짓이 되고 `.cpp:256` 의 `drawViewGizmo` 가 그리기를 끈다. Stats 대체 접근도 이미 있다(`RenderStatistics` 팝업, `.cpp:253`). 없는 것은 **기즈모가 숨은 뒤의 방향 선택 창구 하나** — 오버레이 팝업 일곱 중 방향을 고르는 것이 0 이다 |
+| W2-V3 | 씬 입력의 오버레이 제외·조작 취소/소유권 연결 | 1일 | 클릭·카메라·drop·terrain 입력 관통 0, W5와 소유권 연결 지점 확정 | progress — **그 "포인터 차단 구현"이 기즈모를 지우고 있었다**(2026-09-14 `eb602724`). 오버레이 제외가 `ImGuizmo::Manipulate` 호출 조건에 들어가 있었는데 그 호출은 그림과 입력을 함께 하므로, 툴바에 마우스를 올리는 것만으로 기즈모가 사라졌다. 제외를 `ImGuizmo::Enable` 로 옮기고 소스 대조 게이트로 못 박았다(§W2-V3 후속). ★ **2026-09-16 재기준선 — `drop/terrain 입력 관통` 은 닫혔다**: `SceneViewWindow.cpp:222` 의 `canvasInput = pointerInCanvas && !m_overlay.blocksPointer` 하나가 우클릭 카메라(:380)·terrain(:441)·drag-drop(:486)·선택(:553)을 함께 관문한다. W5 소유권 연결도 §W5 가 모드 하나로 닫았다. 남은 것은 **`resize 중 조작 취소` 하나**이고 그 기제는 아직 0 건이다(`SceneViewWindow.cpp` 에 취소·resize 문자열 0) |
+| W2-V4 | 연속 리사이즈·DPI·입력 회귀 및 관측 확장 | 1일 | 아래 행렬·성능 gate 충족, 위치/ID/입력 변이를 실패로 검출 | progress — **이 줄은 구현이 아니라 회귀다**(2026-09-16 재기준선). `연속 resize` 의 제품 몫은 2026-09-14 W4 후속(extent 기반 resize·렌더 배율)이 가져갔고 `verify-editor-viewport-extent.ps1` 이 캔버스·렌더 해상도를 단정한다. DPI 축은 W8-3 통합 행렬이 user scale 1.0/1.5 로 돈다. 남은 것은 **씬뷰 오버레이 자신의 위치/ID/입력 변이 검출** 하나다 |
+
+##### 2026-09-16 재기준선 — 다섯 줄 중 넷이 줄어들었다
+
+W2-I 와 같은 날 같은 이유로 다시 읽었다. 위 표의 상태가 2026-09-13 기준이었고 그
+뒤로 W4 후속(extent resize·렌더 배율, 2026-09-14) · W5 · W8-3 이 착지했다. 결과:
+
+| 줄 | 2026-09-13 잔여 | 2026-09-16 |
+|---|---|---|
+| V0 | W4 Host canvas 통합 | **구현 닫힘** — 남은 것은 좌표식 단정의 자 |
+| V2 | 낮은 높이의 방향 메뉴 · Stats 대체 접근 | **방향 창구 하나** — 높이 축과 Stats 는 이미 섰다 |
+| V3 | drop/terrain 관통 · 조작 취소 · 소유권 | **조작 취소 하나** — 관문과 W5 연결은 닫혔다 |
+| V4 | 연속 resize · DPI · 성능 | **오버레이 변이 검출 하나** — 앞의 셋은 W4·W8 이 가져갔다 |
+
+★ **남은 넷은 서로 성질이 다르다.** V2 는 없는 UI 를 만드는 일(제품), V3 는 없는
+기제를 만드는 일(제품), V0 와 V4 는 **이미 도는 것을 읽을 자를 만드는 일**(판정)이다.
+이 저장소에서 반복된 실패 양식이 그 둘을 섞어 *"남았다"* 로 적는 것이었다 — 판정이
+없으면 착지해도 초록이 무엇을 뜻하는지 말할 수 없고, 그 상태의 잔여는 구현 잔여보다
+싸다고 오해된다(§W8-1·§W8-3·§W2-1~4 가 전부 같은 계통이었다).
+
+★ V0 의 자를 세울 때 주의할 것 하나 — 캔버스 **런타임** 축은 이미 있다
+(`verify-editor-viewport-extent.ps1` 이 `canvasWidth/Height` 와 렌더 해상도를 단정).
+없는 것은 *"정본 외 좌표식이 없다"* 는 **부재 단정**이고 그것은 소스 축이다. 두 벌을
+세우지 말고 없는 쪽만 더한다(§W2-4 가 시각 기준선에서 같은 판단을 했다).
 
 ##### W2-V3 후속 — 오버레이 제외는 그림이 아니라 입력에 건다 (2026-09-14)
 
