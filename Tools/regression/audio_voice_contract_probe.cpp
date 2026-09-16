@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "Audio/AudioRuntime.h"
+#include "Audio/ClipDirectory.h"
 #include "Audio/MiniaudioBackend.h"
 #include "Audio/NullAudioBackend.h"
 #include "Audio/VoiceTable.h"
@@ -155,6 +156,22 @@ namespace
         if (!WriteSineWav(out.assets / "Sounds" / "probe_tone.wav", 0.60f, 440.0f)) return false;
         if (!WriteSineWav(out.assets / "Sounds" / "probe_blip.wav", 0.12f, 880.0f)) return false;
 
+        // ★ 미지원 확장자. `.ogg` 는 목록 밖이라 **적재를 시도조차 하지 않는다** —
+        //   옛 배선은 목록에 넣어 두고 실패 로그만 남겨, 저작자가 원인을 알 수 없었다.
+        {
+            std::ofstream unsupported(out.assets / "Sounds" / "probe_ignored.ogg",
+                std::ios::binary | std::ios::trunc);
+            if (!unsupported.is_open()) return false;
+            unsupported << "ogg placeholder";
+            if (!unsupported.good()) return false;
+        }
+
+        // ★ 동명 충돌. 키가 파일명 stem 이라 폴더가 다르면 하나가 진다(AU2 까지).
+        //   이기는 쪽을 따지기 전에 **졌다는 사실이 세어지는지**를 먼저 재야 한다.
+        file::create_directories(out.assets / "Sounds" / "BGM", error);
+        if (error) return false;
+        if (!WriteSineWav(out.assets / "Sounds" / "BGM" / "probe_tone.wav", 0.20f, 220.0f)) return false;
+
         // ★ 손상 파일. "적재 성공, 재생 실패" 로 뒤늦게 드러나는 것을 막는 canary 다.
         //   확장자만 .wav 이고 내용은 RIFF 가 아니다.
         {
@@ -192,6 +209,12 @@ namespace
     bool HasClip(const std::vector<std::string>& keys, const char* wanted)
     {
         return std::find(keys.begin(), keys.end(), std::string(wanted)) != keys.end();
+    }
+
+    bool HasClipKey(const std::vector<wave::ClipKey>& keys, const char* wanted)
+    {
+        const wave::ClipKey target{ std::string(wanted) };
+        return std::find(keys.begin(), keys.end(), target) != keys.end();
     }
 
     bool ChannelPairIsPlaying(const ChannelPair& pair)
@@ -464,6 +487,103 @@ namespace
         runtime.Shutdown();
         Report(!backend.IsRunning(), "종료가 장치를 닫는다");
     }
+
+    // ── 검사 9: 클립 폴더 훑기(wave) ─────────────────────────────────────
+    //
+    // 옛 배선의 [1] 과 **같은 물음**이다 — 폴더에 넣은 것이 클립 표에 오르는가.
+    // 다른 것은 답이 오는 방식이다. 옛 배선은 1초 주기 폴링이라 6초를 기다리며
+    // 물어봐야 했고, 여기서는 호출 하나가 결과를 들고 돌아온다.
+    //
+    // ★ 훑기의 판정은 "몇 개 실렸나" 하나가 아니다. 무엇이 왜 빠졌는지가 같이
+    //   나와야 한다 — 옛 배선은 넷을 전부 같은 침묵으로 떨궜다(폴더 부재 · 권한
+    //   오류 · 미지원 확장자 · 적재 실패).
+    void RunWaveClipDirectory(const Fixture& fixture)
+    {
+        std::printf("[9] 클립 폴더 훑기(wave)\n");
+
+        wave::MiniaudioBackend backend;
+        wave::AudioRuntime runtime(backend, 8);
+        if (!runtime.Start(wave::DeviceSettings{}))
+        {
+            std::printf("  (장치를 열지 못했다: %s — 이 검사만 건너뛴다)\n",
+                backend.LastError().c_str());
+            return;
+        }
+
+        const wave::ClipScanReport report =
+            wave::LoadClipsFromDirectory(runtime, fixture.assets / "Sounds");
+
+        const std::vector<wave::ClipKey> keys = runtime.ListClipKeys();
+        Report(HasClipKey(keys, "probe_tone"), "probe_tone 이 클립 표에 있다");
+        Report(HasClipKey(keys, "probe_blip"), "probe_blip 이 클립 표에 있다");
+
+        Report(2u == report.accepted, "성한 클립 둘만 실린다");
+        Report(1u == report.rejected, "손상 파일은 실리지 않는다");
+        Report(1u == report.unsupported, "미지원 확장자는 적재를 시도하지 않는다");
+        Report(1u == report.collided, "동명 충돌이 세어진다");
+        Report(!report.rejectedFiles.empty() && !report.collidedKeys.empty(),
+            "빠진 것이 이름으로 남는다");
+        Report(!HasClipKey(keys, "probe_broken"), "손상 파일은 표에 오르지 않는다");
+        Report(!HasClipKey(keys, "probe_ignored"), "미지원 확장자는 표에 오르지 않는다");
+
+        // ★ 두 번 훑어도 같은 결과여야 한다. 옛 폴링 배선은 파일 수가 바뀔
+        //   때마다 전체를 다시 훑으면서 이미 있는 것을 조용히 건너뛰었다 —
+        //   건너뛴 것과 새로 실은 것이 구분되지 않았다.
+        const wave::ClipScanReport again =
+            wave::LoadClipsFromDirectory(runtime, fixture.assets / "Sounds");
+        Report(0u == again.accepted, "두 번째 훑기는 아무것도 새로 싣지 않는다");
+        Report(3u == again.collided, "이미 있는 것은 충돌로 세어진다");
+        Report(keys.size() == runtime.ListClipKeys().size(), "두 번 훑어도 표 크기가 같다");
+
+        // ★ 없는 폴더는 오류가 아니라 빈 결과다.
+        const wave::ClipScanReport absent =
+            wave::LoadClipsFromDirectory(runtime, fixture.assets / "NoSuchFolder");
+        Report(0u == absent.Examined(), "없는 폴더는 빈 결과를 준다");
+
+        runtime.Shutdown();
+    }
+
+    // ── 검사 10: wave 종료가 끝난다 ──────────────────────────────────────
+    //
+    // [5] 와 **같은 물음**이고, 옛 배선에서 붉은 그 자리다. 클립이 하나도 없을 때
+    // 종료가 끝나는가.
+    //
+    // ★ 이 실행은 `SoundManager` 를 **한 번도 만들지 않는다.** 만들면 FMOD 싱글톤의
+    //   적재 스레드가 서서, 여기서 재려는 것과 다른 이유로 프로세스가 멈출 수 있다.
+    //   그러면 초록도 붉음도 믿을 수 없다.
+    int RunWaveShutdown(const Fixture& fixture, bool withClips)
+    {
+        std::printf("[10] 종료 — wave::AudioRuntime::Shutdown() (클립 %s)\n",
+            withClips ? "있음" : "없음");
+        std::fflush(stdout);
+
+        wave::MiniaudioBackend backend;
+        wave::AudioRuntime runtime(backend, 8);
+        if (!runtime.Start(wave::DeviceSettings{}))
+        {
+            std::printf("오디오 장치를 열지 못했다 — 검사 불가: %s\n",
+                backend.LastError().c_str());
+            return kExitNoDevice;
+        }
+
+        const wave::ClipScanReport report =
+            wave::LoadClipsFromDirectory(runtime, fixture.assets / "Sounds");
+        std::printf("  적재 %zu · 거부 %zu · 미지원 %zu · 충돌 %zu\n",
+            report.accepted, report.rejected, report.unsupported, report.collided);
+
+        // ★ 울리는 채로 끝낸다. "정지한 뒤에만 끝난다" 는 종료가 아니다.
+        if (report.accepted > 0u)
+        {
+            wave::PlayRequest request{};
+            request.clip = wave::ClipKey("probe_tone");
+            request.ownerId = 1u;
+            (void)runtime.Play(request);
+        }
+
+        runtime.Shutdown();
+        std::printf("  [ ok ] Shutdown() 이 끝났다\n");
+        return kExitPass;
+    }
 }
 
 int main(int argc, char** argv)
@@ -474,7 +594,7 @@ int main(int argc, char** argv)
         : file::current_path();
 
     // 종료 canary 는 클립 없는 자산 루트로 돈다 — 제품의 실제 상태다.
-    const bool withClips = (mode != "shutdown-empty");
+    const bool withClips = (mode != "shutdown-empty") && (mode != "wave-shutdown-empty");
 
     Fixture fixture{};
     if (!PrepareFixture(repositoryRoot, withClips, fixture))
@@ -486,6 +606,14 @@ int main(int argc, char** argv)
     {
         std::printf("PathFinder 초기화 실패\n");
         return kExitFail;
+    }
+
+    // ★★ wave 모드는 여기서 갈라진다 — `SoundManager` 를 **만들기 전에** 끝낸다.
+    //   싱글톤을 한 번이라도 건드리면 FMOD 적재 스레드가 서고, 그러면 이 실행이
+    //   멈췄을 때 원인이 wave 종료인지 옛 스레드인지 가릴 수 없다.
+    if (mode == "wave-shutdown" || mode == "wave-shutdown-empty")
+    {
+        return RunWaveShutdown(fixture, withClips);
     }
 
     Sound->initialize(kMaxChannels);
@@ -533,6 +661,7 @@ int main(int argc, char** argv)
     RunVoiceTable();
     RunWaveNullBackend();
     RunWaveMiniaudio(fixture);
+    RunWaveClipDirectory(fixture);
 
     std::printf("실패 %d건\n", g_failures);
     // ★ 여기서 정상 반환한다. 싱글톤은 누수되므로 소멸자가 돌지 않는다 —

@@ -81,6 +81,7 @@ $waveSources = @(
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\NullAudioBackend.cpp')
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\AudioRuntime.cpp')
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\MiniaudioBackend.cpp')
+    (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\ClipDirectory.cpp')
 )
 foreach ($source in $waveSources) {
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "원본이 없다: $source" }
@@ -210,30 +211,54 @@ try {
 
     # ── 종료 canary ────────────────────────────────────────────────────────
     #
-    # `SoundManager::Destroy()` 가 제한 시간 안에 끝나는지 본다. 지금은 끝나지
-    # 않는다(정찰 §2.2) — 이 절이 붉은 것이 현재의 정직한 상태다. 배선을 다시
-    # 그으면 초록이 되어야 한다.
-    # ★ 두 상태를 모두 잰다. 클립이 있으면 `LoadSounds()` 가 한 번 돌아 플래그가
-    #   내려가므로 종료가 끝난다 — **fixture 를 넣는 순간 결함 조건이 지워진다.**
-    #   제품의 실제 상태는 `Sounds` 디렉터리가 없는 쪽이고, 그때 종료가 멈춘다.
+    # 같은 물음을 두 배선에 던진다: **클립이 하나도 없을 때 종료가 끝나는가.**
+    #
+    # ★ 옛 배선은 끝나지 않는다(정찰 §2.2). 그것을 단순히 '실패' 로 두면 게이트가
+    #   영원히 붉어 아무도 판정에 쓰지 못한다. 그래서 **기대 모양**을 적는다 —
+    #   옛 배선의 빈 상태는 멈추는 것이 맞고, 멈추지 않으면 그것도 알아야 한다
+    #   (누가 고쳤거나, 이 canary 가 결함 조건을 잃었거나 둘 중 하나다).
+    # ★★ 클립이 있으면 `LoadSounds()` 가 한 번 돌아 플래그가 내려가므로 옛 배선도
+    #   끝난다 — **fixture 를 넣는 순간 결함 조건이 지워진다.** 두 상태를 다 잰다.
     $shutdownExit = 0
+    $noDevice = $false
     foreach ($canary in @(
-        @{ Mode = 'shutdown';       Label = '클립 있음' },
-        @{ Mode = 'shutdown-empty'; Label = '클립 없음 — 제품의 실제 상태' })) {
-        Write-Host ("[AUDIO VOICE] 종료 canary ({0}, 제한 {1}초)" -f $canary.Label, $ShutdownTimeoutSeconds)
+        @{ Mode = 'shutdown';            Label = 'FMOD · 클립 있음';                   Expect = $true  },
+        @{ Mode = 'shutdown-empty';      Label = 'FMOD · 클립 없음 — 제품의 실제 상태'; Expect = $false },
+        @{ Mode = 'wave-shutdown';       Label = 'wave · 클립 있음';                   Expect = $true  },
+        @{ Mode = 'wave-shutdown-empty'; Label = 'wave · 클립 없음 — 같은 조건';        Expect = $true  })) {
+        $expectText = if ($canary.Expect) { '끝난다' } else { '멈춘다(기대)' }
+        Write-Host ("[AUDIO VOICE] 종료 canary ({0}, 기대: {1}, 제한 {2}초)" -f `
+            $canary.Label, $expectText, $ShutdownTimeoutSeconds)
         $process = Start-Process -FilePath $executable -ArgumentList @($canary.Mode, $repoRoot) `
             -PassThru -NoNewWindow
         $finished = $process.WaitForExit($ShutdownTimeoutSeconds * 1000)
-        if (-not $finished) {
-            try { $process.Kill($true) } catch { }
-            Write-Host ("  [FAIL] Destroy() 가 {0}초 안에 끝나지 않았다 — 강제 종료" -f $ShutdownTimeoutSeconds)
+        if (-not $finished) { try { $process.Kill($true) } catch { } }
+
+        # 장치가 없으면 판정이 아니라 '검사 불가' 다.
+        if ($finished -and $process.ExitCode -eq 3) {
+            Write-Host '  오디오 장치가 없다 — 검사 불가'
+            $noDevice = $true
+            continue
+        }
+
+        $ended = $finished -and ($process.ExitCode -eq 0)
+        if ($ended -eq $canary.Expect) {
+            if ($ended) { Write-Host '  [ ok ] 제한 시간 안에 끝났다' }
+            else { Write-Host ('  [ ok ] 끝나지 않았다 — 기대한 붉음이다(제한 {0}초)' -f $ShutdownTimeoutSeconds) }
+        }
+        elseif ($canary.Expect) {
+            Write-Host ('  [FAIL] {0}초 안에 끝나지 않았다 (exit {1})' -f `
+                $ShutdownTimeoutSeconds, $(if ($finished) { $process.ExitCode } else { '시간 초과' }))
             $shutdownExit = 1
         }
-        elseif ($process.ExitCode -ne 0) {
-            Write-Host ("  [FAIL] 종료 canary exit {0}" -f $process.ExitCode)
+        else {
+            Write-Host '  [FAIL] 멈출 줄 알았는데 끝났다 — 결함이 고쳐졌거나 canary 가 조건을 잃었다'
             $shutdownExit = 1
         }
-        else { Write-Host '  [ ok ] Destroy() 가 제한 시간 안에 끝났다' }
+    }
+    if ($noDevice) {
+        Write-Host '[AUDIO VOICE] 오디오 장치가 없다 — 검사 불가(통과 아님)'
+        exit 3
     }
 }
 finally { $env:PATH = $previousPath }
