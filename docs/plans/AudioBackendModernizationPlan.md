@@ -2,6 +2,12 @@
 
 - 수립일: 2026-08-24
 - 재검토일: 2026-08-27 — efsw 유지 결정과 소스 재감사 반영
+- 재검토일: 2026-09-16 — **사전 정찰로 §1 기준선 14건 정정**. 정정 목록과 근거는
+  [Phase22AudioPreflight.md](../analysis/Phase22AudioPreflight.md) §7. 이 문서의 §1·AU0·AU8 을 읽을 때는
+  정찰 결과를 함께 본다. 특히 ① 현재 FMOD 경로는 `Sounds\` 디렉터리 부재로 클립을 적재하지 못해
+  AU0 의 "유효 FMOD 항목 A/B" 가 성립하지 않고, ② AU8 이 지목한 `Tools/build.ps1` stage 는
+  `Tools/runtime/deploy-runtime.ps1` 의 PE import 폐포로 이사했으며, ③ 배포본이 FMOD 로깅 빌드를
+  라이선스 등재 없이 싣고 있다.
 - 상태: **계획 수립 · 구현 미착수**
 - 배치: PHASE 17 직렬화·Asset/Cook 경계와 PHASE 12.5 package gate 뒤, PHASE 23 MSI·Launcher 제품화 앞
 - 초기 추정: **45 인일**. AU0 기준선과 device/backend 스파이크 뒤 갱신
@@ -11,6 +17,7 @@
 관련 정본:
 
 - [RefactoringPlanDashboard.html](../RefactoringPlanDashboard.html) — PHASE 22 진행 상태
+- [Phase22AudioPreflight.md](../analysis/Phase22AudioPreflight.md) — 2026-09-16 사전 정찰(기준선 재측정·정정 목록·착수 판정)
 - [SerializationPlan.md](SerializationPlan.md) — `.meta`, `AssetId`, authoring/cooked 경계
 - [BuildPipelinePlan.md](BuildPipelinePlan.md) — clean-checkout·CI·Game package gate
 - [EngineLayerSeparationPlan.md](EngineLayerSeparationPlan.md) — Runtime / Editor / Host 의존 방향

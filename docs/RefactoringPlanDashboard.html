@@ -1284,6 +1284,7 @@
 <section class="phase" id="phase-22">
   <h2 class="sec"><span class="no">PHASE 22</span>오디오 백엔드 현대화 · FMOD Core 은퇴 <span class="phase-pct" data-phase-pct="22"></span></h2>
   <div class="phase-meta">신설: 2026-08-24 · 재검토: 2026-08-27 · 설계 문서: <a href="plans/AudioBackendModernizationPlan.md">AudioBackendModernizationPlan.md</a> · WAV/MP3/FLAC only · efsw 유지 · 초기 추정 45 인일 · 구현 미착수</div>
+  <div class="phase-meta">2026-09-16 <a href="analysis/Phase22AudioPreflight.md">사전 정찰</a>: 현재 FMOD 경로는 <b>소리를 한 번도 적재하지 못한다</b>(<code>Sounds\</code> 부재 → <code>LoadSounds()</code> 영구 미실행) — AU0 의 "유효 FMOD A/B" 축이 무너져 합성 골든 중심으로 재작성이 필요하다. AU8 대상은 <code>Tools/build.ps1</code> 에서 <code>deploy-runtime.ps1</code> PE 폐포·<code>Runtime/Manifests</code> 로 이사했고, 오디오 회귀 게이트는 0개다. 신규: 배포본이 <code>fmodL.dll</code> 을 라이선스 등재 없이 싣는다. AU0·AU1·AU3 착수 가능, 결정 2건 선행. 재추정 ≈ 50~54 인일</div>
   <div class="phase-goal"><b>목표:</b> FMOD SDK 타입과 바이너리 의존을 <b>AssetId 기반 AudioClip + generation handle + engine-owned voice/bus policy + source-integrated miniaudio backend</b>로 바꾼다.
   detached 오디오 폴링 loader와 filename key를 제거하고, Editor Asset DB의 efsw 감시는 유지한다. listener·2D/3D·stream·voice virtualization·reverb·device/성능 회귀를 닫은 뒤 source/project/stage/PE import의 FMOD를 0으로 만든다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="22"><!-- JS 생성 --></table></div>
