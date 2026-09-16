@@ -624,15 +624,20 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 | `Engine/SceneRuntime/Audio/NullAudioBackend.h/.cpp` | 장치 없이 도는 결정적 구현. degrade 경로 겸 판정 경로 |
 | `Engine/SceneRuntime/Audio/MiniaudioBackend.h/.cpp` | miniaudio 를 무는 유일한 TU. pimpl |
 | `Engine/SceneRuntime/Audio/AudioRuntime.h/.cpp` | `AudioService` 구현. 백엔드를 참조로만 받는다 |
+| `Engine/SceneRuntime/Audio/ClipDirectory.h/.cpp` | 폴더 훑기 **동기 호출 한 번**. 빠진 것을 세어 돌려준다 |
 | `ThirdParty/miniaudio/` | 0.11.25 · MIT-0 · PROVENANCE.md |
 | `Tools/regression/verify-audio-voice-contract.ps1` | 로컬 게이트. **run-all 미배선** |
 | `Tools/regression/audio_voice_contract_probe.cpp` | probe. fixture 를 스스로 생성한다 |
 
-게이트 현황: FMOD 기능 8 + 보이스 표 15 + wave·Null 20 + wave·miniaudio 13 = **56 단정 초록**,
-종료 canary(클립 없음) **RED**. 변이는 두 벌로 확인했다 — 보이스 표·fixture 6종과 런타임·백엔드
-5종(가드 제거 · 감쇠 미적용 · 일시정지 회수 · 종료 미회수 · 손상 파일 수용)이 전부 잡힌다.
+게이트 현황(2026-09-16 실측): FMOD 기능 8 + 보이스 표 17 + wave·Null 20 + wave·miniaudio 13 +
+클립 훑기 13 = **71 단정 초록**. 변이는 세 벌로 확인했다 — 보이스 표·fixture 6종, 런타임·백엔드
+5종(가드 제거 · 감쇠 미적용 · 일시정지 회수 · 종료 미회수 · 손상 파일 수용), 훑기·종료 4종
+(ogg 수용 · 충돌 미검사 · 적재 실패 무시 · **옛 결함 모양 재현**)이 전부 잡힌다.
 `wave` 는 아직 `SceneRuntime.vcxproj` 에 넣지 않았다 — 제품 소비자가 생기는 다음 슬라이스에서
 함께 넣는다.
+
+> 앞서 이 자리에 적었던 **56** 은 항목을 더한 값이고 실제로 센 값이 아니었다. 실측은 보이스 표가
+> 17(15 가 아니라)이라 58 이었다. 위 숫자는 게이트 출력을 구획별로 센 것이다.
 
 ★ 변이 한 종이 처음에 빠져나갔다. 런타임의 `HasClip` 가드를 걷어도 `NullAudioBackend` 가 자기
 가드로 대신 막아 결과가 같았다 — 단정이 *런타임이 막는다* 가 아니라 *둘 중 하나가 막는다* 를 재고
@@ -667,9 +672,32 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 ★ 계획서 §제약 10("FMOD와 miniaudio를 동시에 shipping하지 않는다")은 그대로 산다. miniaudio 가
 들어왔지만 제품 배선은 아직 FMOD 하나다 — 동시 shipping 이 아니라 **미배선 공존**이다.
 
-### 11.7 다음
+### 11.7 종료 canary 가 초록으로 바뀌었다 (2026-09-16)
 
-probe 의 FMOD 기능 단정을 `wave` 호출로 갈아끼운다. 같은 자리에서 **종료 canary 가 초록으로
-바뀌어야 한다** — 그것이 옛 표면을 걷어도 되는 근거다. 그 뒤 접점 12곳과 Inspector 채널 직결
-5블록을 옮기고 `SoundManager`/`SoundSystem` 을 걷는다. `wave` 의 `SceneRuntime.vcxproj` 등록은
-그 슬라이스에서 함께 한다.
+옛 표면을 걷어도 되는 근거가 이것이다. **같은 물음을 두 배선에 던져 답이 갈린다.**
+
+| 배선 | 클립 있음 | 클립 없음(제품의 실제 상태) |
+|---|---|---|
+| `SoundManager::Destroy()` | 끝난다 | **끝나지 않는다** |
+| `wave::AudioRuntime::Shutdown()` | 끝난다 | **끝난다** |
+
+옛 배선이 클립 있을 때만 끝나는 이유는 §11.1 에 적었다 — 종료가 적재 스레드의 플래그를 기다리는데,
+그 플래그를 내리는 유일한 경로가 `LoadSounds()` 의 끝이다. `wave` 에는 기다릴 스레드가 없다.
+폴더를 훑는 일이 **동기 호출 한 번**(`LoadClipsFromDirectory`)이 되면서 원인이 사라졌다.
+
+★ 게이트는 이 붉음을 **기대 모양으로 적는다.** 단순 실패로 두면 게이트가 영원히 붉어 아무도
+판정에 못 쓴다. 옛 배선의 빈 상태는 멈추는 것이 맞고, *멈추지 않으면 그것도 알아야 한다* —
+누가 고쳤거나 canary 가 결함 조건을 잃었거나 둘 중 하나이기 때문이다. 옛 표면을 걷을 때 이
+canary 도 함께 걷는다.
+
+★★ 이 canary 는 `SoundManager` 를 **한 번도 만들지 않는 프로세스**에서 돈다. 싱글톤을 건드리면
+FMOD 적재 스레드가 서서, 멈췄을 때 원인이 wave 종료인지 옛 스레드인지 가릴 수 없다.
+
+변이로 이빨을 확인했다. `Shutdown()` 에 **옛 결함과 같은 모양**(클립이 비면 돌지 않는 루프)을
+심자 canary 가 붉어진다 — 회귀가 오면 잡힌다는 뜻이다.
+
+### 11.8 다음
+
+접점 12곳과 Inspector 채널 직결 5블록을 `wave` 로 옮기고 `SoundManager`/`SoundSystem` 을 걷는다.
+`wave` 의 `SceneRuntime.vcxproj` 등록과 FMOD canary 철거는 그 슬라이스에서 함께 한다.
+폴더 훑기를 **누가 언제 부르는가**(Host 소유 수명)가 그 슬라이스의 첫 물음이다.
