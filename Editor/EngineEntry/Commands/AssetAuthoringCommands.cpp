@@ -1491,6 +1491,43 @@ namespace ConsoleCmd
         return passed ? Ok({}, std::move(data)) : Fail("scenemodel.failed", "Scene model generation verification failed", std::move(data));
     }
 
+    // PBR-W8 — `RunModelAssetGenerationSelfTest` 를 **되살린다.**
+    //
+    // ★ 이 검사는 저장소 안에서 호출자가 **0** 이었다(형제 셋도 같다). 컴파일되고
+    //   링크까지 되는데 아무도 부르지 않아, `verifyTamperDoesNotPublish` 가 재는
+    //   W8 계약(§1 "재임포트 실패 시 마지막 정상 generation 유지")이 사실상
+    //   측정되지 않고 있었다.
+    //
+    // ★ 죽어 있던 이유는 fixture 다. 이 검사는 **ModelId 디렉터리가 정확히 1 개**인
+    //   프로젝트 트리를 요구하는데 살아 있는 `Dynamic_CPP/Library` 에는 103 개가
+    //   있고 그 경로는 gitignore 다. 그래서 projectRoot 를 인자로 받는다 —
+    //   게이트가 추적되는 fixture 트리를 가리킨다.
+    static CommandCore::CommandResult Cmd_assets_generation(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 3)
+            return InvalidArguments("assets.generation <project-root> <model-id>");
+        RenderTest::ModelGenerationReport report;
+        std::string log;
+        const bool passed = RenderTest::RunModelAssetGenerationSelfTest(
+            ctx.parts[1], ctx.parts[2], log, &report);
+        if (passed)
+            Debug::PrintLog(spdlog::level::warn, std::string("[assets.generation] 통과\n") + log);
+        else
+            Debug::PrintLog(spdlog::level::err, std::string("[assets.generation] 실패\n") + log);
+        auto data = CommandData::Object();
+        data.Set("passed", CommandData::Int(report.passed));
+        data.Set("failed", CommandData::Int(report.failed));
+        data.Set("tamperCases", CommandData::Int(report.tamperCases));
+        data.Set("tamperRejected", CommandData::Int(report.tamperRejected));
+        data.Set("tamperCurrentHeld", CommandData::Int(report.tamperCurrentHeld));
+        data.Set("fixtureResolved", CommandData::Bool(report.fixtureResolved));
+        data.Set("log", CommandData::String(std::move(log)));
+        return passed ? Ok({}, std::move(data))
+            : Fail("generation.failed", "Model generation atomicity verification failed",
+                std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_experiment_cooked(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1691,6 +1728,7 @@ namespace ConsoleCmd
         reg.Result({ "model.place" }, &Cmd_model_place);
         reg.Result({ "model.async" }, &Cmd_model_async);
         reg.Result({ "assets.scenemodel" }, &Cmd_assets_scenemodel);
+        reg.Result({ "assets.generation" }, &Cmd_assets_generation);
         reg.Result({ "assets.modeldiag" }, &Cmd_assets_modeldiag);
         reg.Result({ "animator.status" }, &Cmd_animator_status);
         reg.Result({ "experiment.cooked" }, &Cmd_experiment_cooked);

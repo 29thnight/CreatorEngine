@@ -1071,6 +1071,16 @@ Run-Step "MBC cutover 변경 동결" {
 # ModelAssetGeneration closure/cache(변조 4종 게시 전 거부·generation 1→2 교체).
 # 이 넷은 2026-09-02 구현 뒤 세트에 배선되지 않은 채였다 — 도는 세트에 없으면
 # 없는 것과 같다.
+# PBR-W8 — generation 캐시의 원자성과 **재임포트 실패 뒤 current 불변**.
+#
+# ★ 이 계약을 재는 검사는 저장소에 있었지만 **호출자가 0** 이었다. 컴파일되고
+#   링크까지 되는데 아무도 부르지 않아 12 일 넘게 측정되지 않았다. 되살려서
+#   도는 세트에 건다 — 존재와 배선은 따로 점검해야 한다.
+Run-Step "model generation 원자성·실패 뒤 current 유지(W8)" {
+    & pwsh -NoProfile -File `
+        (Join-Path $PSScriptRoot "verify-model-generation-atomicity.ps1") `
+        -Editor $Exe -Work $Work
+}
 Run-Step "model authoring transaction(MBC3)" {
     & pwsh -NoProfile -File `
         (Join-Path $PSScriptRoot "verify-model-authoring-transaction.ps1") -Work $Work

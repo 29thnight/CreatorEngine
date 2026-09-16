@@ -36,6 +36,9 @@ namespace CommandCore
             { "animator.status", CommandCost::Frames, "", "Read live Animator palettes and product publication metrics", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "assets.decodeab", CommandCost::Long, "[root] [limit]", "Compare PNG decoder bytes", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "assets.decodeabhdr", CommandCost::Long, "[root]", "Compare HDR decoder values", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            // PBR-W8 — 호출자 0 이던 `RunModelAssetGenerationSelfTest` 의 창구.
+            // fixture 는 살아 있는 프로젝트가 아니라 추적되는 트리라 인자로 받는다.
+            { "assets.generation", CommandCost::Long, "<프로젝트 루트>", "generation 1→2 원자 교체와 tamper 거부 뒤 current 불변을 잰다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "root", false, true },
             { "assets.modeldiag", CommandCost::Immediate, "", "모델 소비 계수를 읽는다(상태를 바꾸지 않는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "assets.scenemodel", CommandCost::Frames, "[reload <모델 이름>]", "활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "assets.texturebench", CommandCost::Long, "[limit]", "Measure texture decode mip and compression stages", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

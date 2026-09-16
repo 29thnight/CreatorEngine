@@ -107,37 +107,111 @@ namespace RenderTest
     }
 
     bool RunModelAssetGenerationSelfTest(const std::string& projectRoot,
-        std::string& outLog)
+        const std::string& modelIdText, std::string& outLog,
+        ModelGenerationReport* report)
     {
         GenerationChecker check{ outLog };
         outLog += "[assets.generation] MBC5 immutable aggregate·atomic cache 검사\n";
+
+        // PBR-W8 — 게이트가 읽는 수. 세 return 지점이 모두 채운다(이른 반환에서
+        // 비워 두면 fixture 가 안 선 회차가 "0 건 실패" 로 읽혀 초록이 된다).
+        std::uint64_t tamperCases = 0, tamperRejected = 0, tamperCurrentHeld = 0;
+        bool fixtureResolved = false;
+        const auto publishReport = [&]
+        {
+            if (!report) return;
+            report->passed = check.passed;
+            report->failed = check.failed;
+            report->tamperCases = tamperCases;
+            report->tamperRejected = tamperRejected;
+            report->tamperCurrentHeld = tamperCurrentHeld;
+            report->fixtureResolved = fixtureResolved;
+        };
 
         const std::filesystem::path project(projectRoot);
         const std::filesystem::path header =
             project / "ProjectSetting" / "AssetIdentity.asset";
         const std::filesystem::path generationRoot =
             project / "Library" / "ModelAssetGenerations";
-        const std::filesystem::path source =
-            project / "Assets" / "Models" / "Prim_Cube.glb";
-        std::filesystem::path canonical = source;
-        canonical += ".meta";
+
+        // ★ 예전에는 `Prim_Cube.glb` 를 박아 두고 ModelId 디렉터리가 **정확히 1 개**
+        //   이기를 요구했다. 살아 있는 프로젝트에는 103 개가 있어 그 전제가 설 수
+        //   없었고, 그래서 이 검사는 호출자 0 으로 죽어 있었다. 재는 것은 번호가
+        //   아니라 원자성이므로 대상 모델을 인자로 받는다.
+        Uuid::Uuid16 modelId{};
+        check.Check(assets::TryParseCanonicalUuidV8(modelIdText, modelId),
+            "인자 modelId 가 canonical UUIDv8");
+        const std::filesystem::path modelDirectory = generationRoot / modelIdText;
+        check.Check(std::filesystem::is_directory(modelDirectory),
+            "대상 ModelId generation 디렉터리 존재");
         check.Check(std::filesystem::is_regular_file(header), "fixture epoch header 존재");
-        check.Check(std::filesystem::is_regular_file(canonical), "fixture canonical sidecar 존재");
         check.Check(std::filesystem::is_directory(generationRoot), "fixture generation root 존재");
 
-        std::vector<std::filesystem::path> modelDirectories;
+        // canonical sidecar — 원본 자산 옆의 `.meta`. 이름은 모르므로 자산 트리에서
+        // 이 ModelId 를 지목하는 것을 찾는다.
         std::error_code error;
-        if (std::filesystem::is_directory(generationRoot, error) && !error)
+        std::filesystem::path canonical;
+        std::uint64_t canonicalGeneration = 0;
         {
-            for (const std::filesystem::directory_entry& entry
-                : std::filesystem::directory_iterator(generationRoot, error))
+            const std::filesystem::path models = project / "Assets" / "Models";
+            if (std::filesystem::is_directory(models, error) && !error)
             {
-                if (!error && entry.is_directory()) modelDirectories.push_back(entry.path());
+                for (const std::filesystem::directory_entry& entry
+                    : std::filesystem::recursive_directory_iterator(models, error))
+                {
+                    if (error) break;
+                    if (!entry.is_regular_file() || entry.path().extension() != ".meta") continue;
+                    std::ifstream probe(entry.path());
+                    std::string line;
+                    bool matched = false;
+                    std::uint64_t generation = 0;
+                    while (std::getline(probe, line))
+                    {
+                        if (line.rfind("assetId: ", 0) == 0
+                            && line.substr(9, modelIdText.size()) == modelIdText)
+                        {
+                            matched = true;
+                        }
+                        else if (line.rfind("generation: ", 0) == 0)
+                        {
+                            generation = std::strtoull(line.c_str() + 12, nullptr, 10);
+                        }
+                    }
+                    if (matched && 0 != generation)
+                    {
+                        canonical = entry.path();
+                        canonicalGeneration = generation;
+                        break;
+                    }
+                }
             }
         }
-        check.Check(modelDirectories.size() == 1u, "fixture ModelId directory 정확히 1개");
-        if (modelDirectories.size() != 1u)
+        check.Check(!canonical.empty() && std::filesystem::is_regular_file(canonical),
+            "대상 ModelId 의 canonical sidecar 존재");
+
+        // ★ 번호는 **실재하는 것에서 고른다.** 뒤엣것은 canonical sidecar 가 지목하는
+        //   generation 이어야 "canonical sidecar load" 단정이 자기 트리와 맞다.
+        std::uint64_t generationTwo = canonicalGeneration;
+        std::uint64_t generationOne = 0;
+        if (std::filesystem::is_directory(modelDirectory, error) && !error)
         {
+            for (const std::filesystem::directory_entry& entry
+                : std::filesystem::directory_iterator(modelDirectory, error))
+            {
+                if (error || !entry.is_directory()) continue;
+                const std::uint64_t value =
+                    std::strtoull(entry.path().filename().string().c_str(), nullptr, 10);
+                if (0 != value && value < generationTwo && value > generationOne)
+                    generationOne = value;
+            }
+        }
+        check.Check(0 != generationOne && generationOne < generationTwo,
+            "generation 두 벌(이전·current)이 디스크에 있다");
+        if (canonical.empty() || 0 == generationOne || generationOne >= generationTwo)
+        {
+            outLog += "  fixture 해석 실패 model=" + modelIdText
+                + " gen=" + std::to_string(generationOne) + "->"
+                + std::to_string(generationTwo) + "\n";
             outLog += "  단정 " + std::to_string(check.passed + check.failed)
                 + "건 중 통과 " + std::to_string(check.passed) + " · 실패 "
                 + std::to_string(check.failed) + "\n";
@@ -145,24 +219,23 @@ namespace RenderTest
                 + std::to_string(check.passed + check.failed)
                 + " passed=" + std::to_string(check.passed)
                 + " failed=" + std::to_string(check.failed) + "\n";
+            publishReport();
             return false;
         }
 
-        Uuid::Uuid16 modelId{};
-        check.Check(assets::TryParseCanonicalUuidV8(
-            modelDirectories.front().filename().string(), modelId),
-            "generation directory가 canonical UUIDv8 ModelId");
-        const std::filesystem::path onePath = modelDirectories.front() / "1";
-        const std::filesystem::path twoPath = modelDirectories.front() / "2";
-        check.Check(std::filesystem::is_directory(onePath), "generation 1 존재");
-        check.Check(std::filesystem::is_directory(twoPath), "generation 2 존재");
+        const std::filesystem::path onePath =
+            modelDirectory / std::to_string(generationOne);
+        const std::filesystem::path twoPath =
+            modelDirectory / std::to_string(generationTwo);
+        check.Check(std::filesystem::is_directory(onePath), "이전 generation 디렉터리 존재");
+        check.Check(std::filesystem::is_directory(twoPath), "current generation 디렉터리 존재");
 
         const assets::ModelAssetGenerationLoadResult one =
-            Load(header, onePath, modelId, 1u);
+            Load(header, onePath, modelId, generationOne);
         const assets::ModelAssetGenerationLoadResult two =
-            Load(header, twoPath, modelId, 2u, canonical);
-        check.Check(one.Succeeded(), "generation 1 전체 closure load");
-        check.Check(two.Succeeded(), "generation 2 + canonical sidecar load");
+            Load(header, twoPath, modelId, generationTwo, canonical);
+        check.Check(one.Succeeded(), "이전 generation 전체 closure load");
+        check.Check(two.Succeeded(), "current generation + canonical sidecar load");
         if (!one.Succeeded() || !two.Succeeded())
         {
             for (const auto& issue : one.issues)
@@ -176,14 +249,24 @@ namespace RenderTest
                 + std::to_string(check.passed + check.failed)
                 + " passed=" + std::to_string(check.passed)
                 + " failed=" + std::to_string(check.failed) + "\n";
+            publishReport();
             return false;
         }
+        // 여기까지 왔으면 fixture 전제(ModelId 1개 · generation 1·2 적재)가 섰다.
+        fixtureResolved = true;
 
         const auto first = one.generation;
         const auto second = two.generation;
+        // ★ 해석한 번호와 적재된 신원을 **둘 다** 찍는다. 둘이 어긋나면 단정만
+        //   붉어지고 이유는 안 보인다 — 그 자리를 로그가 메운다.
+        outLog += "  resolved gen=" + std::to_string(generationOne) + "->"
+            + std::to_string(generationTwo)
+            + " identity=" + std::to_string(first->Identity().generation) + "->"
+            + std::to_string(second->Identity().generation) + "\n";
         check.Check(first->Identity().modelId == second->Identity().modelId
-            && first->Identity().generation == 1u
-            && second->Identity().generation == 2u,
+            && first->Identity().generation == generationOne
+            && second->Identity().generation == generationTwo
+            && generationOne < generationTwo,
             "동일 ModelId·단조 generation identity");
         check.Check(first->Identity().sourceFingerprint
             == second->Identity().sourceFingerprint,
@@ -194,7 +277,7 @@ namespace RenderTest
             == second->Meshes().size() * 2u + second->Textures().size(),
             "mesh vertex/index + texture upload descriptor 폐포");
         check.Check(!second->Textures().empty(),
-            "Prim_Cube embedded texture가 generation closure에 포함됨");
+            "embedded texture가 generation closure에 포함됨");
         for (const assets::ModelMeshAsset& mesh : second->Meshes())
         {
             check.Check(assets::IsUuidV8(mesh.meshId) && !mesh.vertexBytes.empty()
@@ -247,7 +330,7 @@ namespace RenderTest
             && publishOne.current == first, "generation 1 최초 원자 게시");
         check.Check(cache.ResolveCurrent(modelId) == first, "current generation 1 resolve");
         const assets::ModelMeshHandle oldMeshHandle{ modelId,
-            first->Meshes().front().meshId, 1u };
+            first->Meshes().front().meshId, generationOne };
         assets::ModelAssetGeneration::Shared oldMeshOwner;
         check.Check(cache.ResolveMesh(oldMeshHandle, oldMeshOwner) != nullptr
             && oldMeshOwner == first, "{ModelId,MeshId,generation} mesh binding");
@@ -260,7 +343,8 @@ namespace RenderTest
             "교체 뒤 current generation 2 resolve");
         check.Check(!cache.Resolve(first->Handle()),
             "교체 뒤 이전 generation handle은 cache에서 해석되지 않음");
-        check.Check(first->Identity().generation == 1u && !first->Meshes().empty(),
+        check.Check(first->Identity().generation == generationOne
+            && !first->Meshes().empty(),
             "외부 owner가 잡은 retired generation은 수명 안전");
         check.Check(cache.Publish(first).outcome
             == assets::ModelAssetPublishOutcome::RejectedStale,
@@ -285,13 +369,19 @@ namespace RenderTest
                 std::filesystem::copy_options::recursive, error);
             const bool mutated = !error && mutate(bad);
             const auto rejected = mutated
-                ? Load(header, bad, modelId, 2u)
+                ? Load(header, bad, modelId, generationTwo)
                 : assets::ModelAssetGenerationLoadResult{};
-            check.Check(mutated && !rejected.Succeeded()
-                && HasIssue(rejected, expected),
-                std::string(name) + " 게시 전 거부");
-            check.Check(cache.ResolveCurrent(modelId) == second,
-                std::string(name) + " 실패 뒤 current generation 불변");
+            ++tamperCases;
+            const bool wasRejected = mutated && !rejected.Succeeded()
+                && HasIssue(rejected, expected);
+            check.Check(wasRejected, std::string(name) + " 게시 전 거부");
+            if (wasRejected) ++tamperRejected;
+            // ★ W8 계약이 걸린 자리는 여기다. "거부됐다" 와 "거부된 뒤에도 current 가
+            //   그대로다" 는 다른 단정이다 — 합쳐 세면 거부는 되는데 current 가
+            //   날아가는 회귀를 못 본다.
+            const bool currentHeld = cache.ResolveCurrent(modelId) == second;
+            check.Check(currentHeld, std::string(name) + " 실패 뒤 current generation 불변");
+            if (currentHeld) ++tamperCurrentHeld;
         };
 
         verifyTamperDoesNotPublish("bad-model",
@@ -329,7 +419,7 @@ namespace RenderTest
         const assets::ModelAssetGeneration::Shared retired = cache.Retire(modelId);
         check.Check(retired == second && !cache.ResolveCurrent(modelId),
             "retire가 model/subasset/descriptor generation 전체를 cache에서 분리");
-        check.Check(second->Identity().generation == 2u
+        check.Check(second->Identity().generation == generationTwo
             && !second->GpuDescriptors().empty(),
             "retire 뒤 외부 snapshot 수명 안전");
         const assets::ModelAssetGenerationCacheSnapshot snapshot = cache.Snapshot();
@@ -345,7 +435,12 @@ namespace RenderTest
             + " materials=" + std::to_string(second->Materials().size())
             + " textures=" + std::to_string(second->Textures().size())
             + " descriptors=" + std::to_string(second->GpuDescriptors().size())
-            + " tamper=4"
+            // ★ 리터럴 `tamper=4` 였다. 게이트의 출력은 **변수**에서 나와야 한다 —
+            //   주입 하나를 지우는 변이 아래서도 4 라고 말하면, 진단이 한 일이
+            //   아니라 적어 둔 의도를 말하는 것이다.
+            + " tamper=" + std::to_string(tamperCases)
+            + " tamperRejected=" + std::to_string(tamperRejected)
+            + " tamperCurrentHeld=" + std::to_string(tamperCurrentHeld)
             + " replacements=" + std::to_string(snapshot.replacements)
             + " retires=" + std::to_string(snapshot.retires) + "\n";
         outLog += "  단정 " + std::to_string(check.passed + check.failed)
@@ -355,6 +450,7 @@ namespace RenderTest
             + std::to_string(check.passed + check.failed)
             + " passed=" + std::to_string(check.passed)
             + " failed=" + std::to_string(check.failed) + "\n";
+        publishReport();
         return check.failed == 0u;
     }
 
