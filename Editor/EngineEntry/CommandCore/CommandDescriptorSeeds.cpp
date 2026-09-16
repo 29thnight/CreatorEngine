@@ -119,6 +119,10 @@ namespace CommandCore
             { "light.proxy", CommandCost::Frames, "", "Read live light proxy values and publication counters", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()", false, false },
             { "log.flush", CommandCost::Immediate, "", "로그를 디스크에 즉시 반영", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "material.corpus.probe", CommandCost::Long, "<이름> ...", "standalone material identity/reference 왕복", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            // PBR-W8 — named input 은 스칼라 형태만 선언한다. CLI 는 4 성분
+            // baseColor 도 받지만 위치 바인딩으로는 1 개와 4 개를 한 줄에 못 적고,
+            // 억지로 적으면 HTTP 가 조용히 어긋난 인자를 만든다.
+            { "material.override", CommandCost::Frames, "<오브젝트> <렌더러색인> <속성> <값|r g b a>", "렌더러별 MaterialInstance override 를 얹는다(공유 재질을 값으로 가른다)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,renderer:integer,property,value:number" },
             { "mem.delta", CommandCost::Immediate, "[라벨]", "기준선 대비 CRT 블록·바이트 증감(기준선이 없으면 지금을 기준선으로 삼는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "label=" },
             { "mem.hook", CommandCost::Immediate, "on|stack|off|top|status", "CRT 할당 훅 — 호출 계수, stack 은 귀속까지(디버그 CRT 전용)", CommandClass::EngineService, CommandLiveness::Live },
             { "mem.reset", CommandCost::Immediate, "", "churn 누계와 기준선을 0으로 — 구간 측정용", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },

@@ -57,6 +57,25 @@ namespace EditorObjectOperations
     CommandCore::CommandResult InstantiatePrefab(Prefab* prefab, const std::string& name);
     CommandCore::CommandResult MaterialMode(const std::vector<std::shared_ptr<Material>>& materials, MaterialRenderingMode mode);
     CommandCore::CommandResult MaterialMode(EntityHandle target, MaterialRenderingMode mode);
+
+    // PBR-W8 — 렌더러별 MaterialInstance override 를 헤드리스로 얹는다.
+    //
+    // ★ 그 전에는 `SetPropertyOverride` 에 닿는 표면이 GUI 인스펙터와 C# 스크립트
+    //   뿐이었다. 게이트는 `--commandlet-script` 로만 움직이므로, "같은 `Material*`
+    //   을 공유하는 렌더러 둘이 서로 다른 override 를 갖는" 상태를 **만들 수가
+    //   없었다** — W8 이 밀봉 키를 주소에서 값으로 바꾼 그 결함을 자극할 fixture 가
+    //   저장소에 없던 진짜 이유가 이것이다.
+    //
+    // `rendererIndex` 는 target 서브트리의 MeshRenderer 를 깊이 우선으로 센 색인이다
+    // (MaterialMode(EntityHandle) 의 순회와 같은 규약). 오브젝트 id 로 주소를
+    // 지정하려면 호출자가 먼저 트리를 걸어야 하는데, 모델 배치가 만드는 자식 이름은
+    // 자산이 정하므로 색인이 게이트에 안정적이다.
+    //
+    // 값이 하나면 스칼라, 넷이면 baseColor 다. 둘 다 ShaderMeta 선언으로 검증되며
+    // (MaterialScriptBinding), 이름·타입이 안 맞으면 조용히 삼키지 않고 실패한다.
+    CommandCore::CommandResult MaterialOverride(EntityHandle target,
+        int rendererIndex, const std::string& property,
+        const std::vector<float>& values);
     CommandCore::CommandResult AnimatorParameter(EntityHandle target, const std::string& name, ValueType type);
     CommandCore::CommandResult AnimatorDefaultParameter(Animator& animator, ValueType type);
     CommandCore::CommandResult UndoRedo(bool redo);

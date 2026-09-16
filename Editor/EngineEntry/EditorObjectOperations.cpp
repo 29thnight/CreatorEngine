@@ -10,6 +10,11 @@
 #include "Material.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
+// PBR-W8 — MeshRenderer.h 는 MaterialInstance·ModelMeshHandle 을 전방선언만 한다.
+#include "MaterialScriptBinding.h"
+#include "Experiment/MaterialInstance.h"
+#include "Assets/ModelAssetGeneration.h"
+#include "StandardMaterialProperty.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
 #include <unordered_set>
@@ -720,6 +725,105 @@ namespace EditorObjectOperations
         auto result = MaterialMode(materials, mode);
         result.data.Set("id", CommandCore::CommandData::String(ObjectId(target)));
         return result;
+    }
+
+    // PBR-W8 — 렌더러별 MaterialInstance override 를 헤드리스로 얹는다.
+    //
+    // ★ 이 명령이 없던 동안 `SetPropertyOverride` 에 닿는 표면은 GUI 인스펙터와 C#
+    //   스크립트뿐이었다. 게이트는 `--commandlet-script` 로만 움직이므로 "같은
+    //   `Material*` 을 공유하는 렌더러 둘이 서로 다른 override 를 갖는" 상태를 만들
+    //   수 없었고, 그래서 W8 의 핵심 수정(밀봉 키를 주소에서 값으로)을 자극하는
+    //   fixture 가 저장소에 없었다. 그 구멍을 메우는 자리다.
+    CommandCore::CommandResult MaterialOverride(EntityHandle target,
+        int rendererIndex, const std::string& property,
+        const std::vector<float>& values)
+    {
+        using namespace CommandCore;
+        auto* object = Resolve(target);
+        if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity hierarchy before editing");
+        if (rendererIndex < 0) return InvalidArguments("Renderer index must be >= 0");
+        if (property.empty()) return InvalidArguments("Property name is required");
+        if (values.size() != 1 && values.size() != 4)
+            return InvalidArguments("Value must be one scalar or four baseColor components");
+
+        // MaterialMode(EntityHandle) 와 **같은** 깊이 우선 순회다. 색인 규약이 두
+        // 곳에서 따로 정해지면 같은 인자가 다른 렌더러를 가리키게 된다.
+        std::vector<MeshRenderer*> renderers;
+        std::function<void(Entity*)> collect = [&](Entity* node) {
+            if (!node || node->IsDestroyMark()) return;
+            for (const auto& component : node->m_components)
+                if (auto* renderer = dynamic_cast<MeshRenderer*>(component.get());
+                    renderer && !renderer->IsDestroyMark())
+                    renderers.push_back(renderer);
+            for (auto index : node->GetChildrenIndices()) collect(node->OwnerSceneFindIndex(index));
+        };
+        collect(object);
+        if (static_cast<std::size_t>(rendererIndex) >= renderers.size())
+            return InvalidArguments("Renderer index " + std::to_string(rendererIndex)
+                + " is out of range (" + std::to_string(renderers.size()) + " mesh renderers)");
+
+        MeshRenderer* renderer = renderers[static_cast<std::size_t>(rendererIndex)];
+        if (!renderer->m_Material)
+            return PreconditionFailed("material.missing", "Mesh renderer has no material");
+        experiment::MaterialInstance* instance = renderer->GetMaterialInstance();
+        if (nullptr == instance)
+            return PreconditionFailed("material.instance.missing",
+                "Mesh renderer has no authored base — override는 저작 정본이 있어야 얹힌다");
+
+        if (1 == values.size())
+        {
+            if (!MaterialScriptBinding::SetFloat(*renderer->m_Material, property,
+                values[0], instance))
+            {
+                return InvalidArguments("ShaderMeta에 없는 property이거나 스칼라가 아니다: "
+                    + property);
+            }
+        }
+        else if (property != std::string(standard_material::property::BaseColor))
+        {
+            return InvalidArguments("Four components are only accepted for "
+                + std::string(standard_material::property::BaseColor));
+        }
+        else
+        {
+            MaterialScriptBinding::SetBaseColor(*renderer->m_Material,
+                math::color{ values[0], values[1], values[2], values[3] }, instance);
+        }
+        renderer->PublishRenderProxyDirty(ProxyDirty::Material);
+
+        using D = CommandCore::CommandData;
+        D data = D::Object();
+        data.Set("object", D::String(ObjectId(target)));
+        data.Set("renderer", D::Int(rendererIndex));
+        data.Set("renderers", D::Int(static_cast<int>(renderers.size())));
+        data.Set("property", D::String(property));
+        D applied = D::Array();
+        for (float value : values) applied.Append(D::Double(value));
+        data.Set("values", std::move(applied));
+        data.Set("revision", D::Int(static_cast<std::int64_t>(instance->Revision())));
+
+        // ★ 캡처 manifest 의 draw 와 **같은 출처**로 적는다. 캡처는
+        //   `draw.modelMeshView.handle` 을 쓰고 그 핸들은 BuildRHIModelMeshView 가
+        //   `{generation.Identity().modelId, mesh.meshId, ...}` 로 짓는다 —
+        //   GetModelMeshHandle() 이 같은 세 값을 같은 순서로 낸다. 재질 이름 같은
+        //   사람 눈의 표지를 쓰면 게이트의 조인이 조용히 어긋난다.
+        const assets::ModelMeshHandle meshHandle = renderer->GetModelMeshHandle();
+        if (meshHandle.IsValid())
+        {
+            data.Set("modelId", D::String(FileGuid(meshHandle.modelId).ToString()));
+            data.Set("meshId", D::String(FileGuid(meshHandle.meshId).ToString()));
+        }
+
+        // ★ fixture 의 전제("주소가 실제로 공유됐다")를 값으로 돌려준다. 모델
+        //   인스턴스화가 언젠가 사본을 주도록 바뀌면 이 수가 1 이 되고, 게이트는
+        //   조용히 아무것도 재지 않는 대신 그 자리에서 붉어진다.
+        int sharedWith = 0;
+        for (const MeshRenderer* other : renderers)
+            if (other->m_Material.get() == renderer->m_Material.get()) ++sharedWith;
+        data.Set("sharedMaterialRenderers", D::Int(sharedWith));
+        data.Set("changed", D::Bool(true));
+        return Ok("material override applied", std::move(data));
     }
 
     CommandCore::CommandResult AnimatorParameter(EntityHandle target, const std::string& name, ValueType type)

@@ -1,12 +1,14 @@
 # PBR 배선 안정화 계획 (PHASE 4)
 
-**신설 2026-09-03 · 갱신 2026-09-15 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행(W7 sampler는 §19) · W8/W9 구현 착지·부분 실측(§14·§15) · 판정 범위는 DX12(§20 — vulkan 1:1 은 PHASE 4.9)**
+**신설 2026-09-03 · 갱신 2026-09-16 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행(W7 sampler는 §19) · W8 핵심 수정 증명(§21 — 공유 `Material` fixture) · W9 구현 착지·부분 실측(§15) · 판정 범위는 DX12(§20 — vulkan 1:1 은 PHASE 4.9)**
 
 > **W8/W9 현재 상태 한 줄.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
 > 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: 배선 게이트가
 > 끝까지 간 적이 없고(§15 — `verify-experiment-contract.ps1` 링크 부패, W9 이전부터),
 > 교차 백엔드 픽셀 판정은 GBuffer 다섯 장으로 좁혔으며(시각 고정 불가),
-> **W8 핵심 수정을 자극하는 fixture가 없어 그 수정은 아직 증명되지 않았다.**
+> ~~**W8 핵심 수정을 자극하는 fixture가 없어 그 수정은 아직 증명되지 않았다.**~~
+> **2026-09-16 — 닫혔다. §21 을 보라.** 공유 `Material` fixture 와 `material.override`
+> 저작 표면을 세우고 같은 변이 ① 을 다시 물려 `distinct sealHash` 2 → 1 을 잡았다.
 
 > 2026-09-06 원격 CLI 통합: `render.pbr.*` 검사는 `--commandlet` 또는
 > `--commandlet-script`로 실행하고 JSONL terminal 결과로 판정한다. capture 결과는 실제
@@ -1551,3 +1553,107 @@ fail-closed 고 상태만 쐐기로 박힌 것이다. sidecar 보다 큰 고아 
 distinct 3 · validation 0` 이었고 **세 신원 값이 dx12 와 같았다**. 즉 지금 시점의
 sampler 축에 대해 두 백엔드는 실제로 같은 답을 냈다. 미루는 것은 그 사실을 **매 실행
 자동으로 다시 확인하는 일**이지, 확인한 적 없다는 뜻이 아니다.
+
+---
+
+## 21. W8 핵심 수정을 증명한다 — 공유 `Material` fixture, 2026-09-16
+
+§14 는 W8 을 "구현 착지·미증명" 으로 닫았다. 변이 ①(밀봉 키를 주소로 복원)이 게이트를
+통과했는데, 그 이유가 "게이트가 눈멀어서" 가 아니라 **fixture 가 그 상태를 못 만들어서**
+였기 때문이다. 이 절이 그 fixture 를 만들고 같은 변이를 다시 물린다.
+
+### 21.1 왜 씬 저작으로는 못 만드는가
+
+`MeshRenderer` 역직렬화의 표기 **셋이 모두** 렌더러마다 자기 `Material` 사본을 만든다.
+
+| 표기 | `m_Material` |
+|---|---|
+| ref (base+diff) | `make_shared<Material>(*base)` — 사본 |
+| 인라인 새 정본 | `make_shared<Material>()` — 사본 |
+| legacy | typed 역직렬화의 자기 객체 |
+
+§14 가 기댄 전제("`DataSystem::Materials` 가 같은 객체를 여러 렌더러에 준다")는
+**절반이 죽어 있었다.** `LoadMaterialShared` 는 base 를 얻어 **복사하는 데만** 쓰인다.
+살아 있는 공유 경로는 **모델 인스턴스화 하나**다(`ModelSceneInstantiation.cpp:227`):
+
+```cpp
+renderer->SetMaterial(state.materials[materialIndex]);              // 주소 공유
+renderer->SetExperimentMaterialBase(state.authored[materialIndex]); // base 공유
+```
+
+### 21.2 그래서 fixture 는 자산이고, 저작 표면을 하나 세워야 했다
+
+`Tools/regression/fixtures/pbr-shared-material/` — 노드 1 · 메시 1 ·
+**primitive 2 가 모두 `material 0`**. 임포터가 primitive 마다 IR mesh 를 갈라
+`persistentId` 에 `/primitive/N` 을 붙이므로 **`meshId` 는 갈리고 `modelId` 는 같다.**
+
+여기에 렌더러마다 **다른** override 를 얹어야 하는데, `MaterialInstance::SetPropertyOverride`
+에 닿는 표면이 GUI 인스펙터와 C# 스크립트뿐이었다. 게이트는 `--commandlet-script` 로만
+움직인다 — **저장소에 fixture 가 없던 진짜 이유가 명령의 부재였다.**
+`material.override <오브젝트> <렌더러색인> <속성> <값>` 을 세웠다(구현·등록·descriptor 셋).
+
+★ 이 명령은 `modelId`/`meshId` 를 `MeshRenderer::GetModelMeshHandle()` 로 돌려준다.
+캡처가 쓰는 `draw.modelMeshView.handle` 을 `BuildRHIModelMeshView` 가 같은 세 값으로
+짓기 때문이다. 두 자리를 따로 조립하면 게이트의 조인이 나중에 **조용히** 어긋난다.
+
+### 21.3 단정을 어디에 걸 것인가 — W7 과 정확히 반대다
+
+변이 전에 관측값을 먼저 정했다.
+
+| | distinct sealHash | distinct authoredDigest | bindingConflict |
+|---|---:|---:|---:|
+| 기준 | **2** | 2 | 0 |
+| 변이(주소 키 복원) | **1** | **1** | **0 — 안 운다** |
+
+★ 키가 주소로 접히면 둘째 draw 가 첫째의 스냅샷을 **그대로** 받는다. 바인딩이 일치하므로
+장부는 침묵한다. PBR-W7 때는 conflict 가 울고 distinct 가 침묵했다 — **반대 모양**이다.
+미리 정하지 않았으면 "게이트가 눈멀었다" 로 오진했을 자리다. 그래서 단정은
+**conflict 가 아니라 distinct 수**에 건다.
+
+### 21.4 실측 (2026-09-16 · Debug · dx12)
+
+기준 회차 — `dx12/shared-material-seal ran`, 캡처 6/6 PASS.
+
+| | meshId | sealHash | authoredDigest |
+|---|---|---:|---:|
+| 렌더러 0 (roughness 0.10) | `0b67047e…` | 4540832424283382145 | 14302327363989219122 |
+| 렌더러 1 (roughness 0.90) | `29792225…` | 16793130829285904082 | 78459466700331823 |
+
+`bindingConflict 0 · skipped 0 · stamped 19/0`.
+
+**전제가 값으로 확인됐다** — `material.override` 가 돌려준 `sharedMaterialRenderers: 2` 는
+두 렌더러가 정말 같은 `Material*` 을 들고 있다는 실측이다. 모델 인스턴스화가 언젠가
+사본을 주도록 바뀌면 이 수가 1 이 되어 게이트가 그 자리에서 붉어진다 — 조용히 아무것도
+재지 않는 대신.
+
+**변이 ① — 잡았다.**
+
+```
+Shared-material draws share authoredDigest (9616496091697257145)
+ — 렌더러별 MaterialInstance override 가 밀봉까지 오지 않았다
+```
+
+두 draw 가 **같은 sealHash `4540832424283382145`** 를 받았고, 그 값은 기준 회차의
+**렌더러 0** 것과 같다 — 둘째가 첫째의 스냅샷을 그대로 받았다는 직접 증거다.
+장부는 예고대로 완전히 침묵했다(`bindingConflict 0 · skipped 0 · valueMismatch 0 ·
+violations 0 · lastReason ''`).
+
+**즉 §14 가 남긴 "W8 의 핵심 수정은 아직 증명되지 않았다" 는 이제 닫힌다.**
+
+### 21.5 이 회차가 드러낸 것
+
+- **캡처의 draw 20 개 중 `draws == 2` 인 modelId 가 셋이었다.** 전체 distinct 를 셌으면
+  아무 의미 없는 수가 나왔고, 재질 이름 같은 사람 눈의 표지로 조인했으면 조용히
+  어긋났을 자리다. **게이트는 `material.override` 가 돌려준 `modelId` 로 draw 를 못 박는다**
+  — 게이트가 지어낸 값이 아니다.
+- **`sealHash` 는 실행마다 달라지지만 그 안의 상대 관계는 안정적이다.** roughness 0.10 의
+  sealHash 는 기준·변이 두 회차에서 같은 값이었다. 실행 간 golden 으로는 여전히 쓰면
+  안 되고(§14), **한 회차 안의 distinct 수**로만 물어야 한다.
+- **게이트 끝의 붉음은 W8 과 무관하다.** `verify-experiment-contract.ps1` 의 기존 링크
+  파손(`PhysicX::*` · `GameInputInitialize` 등 unresolved 49)이며 §15 가 이미 별건으로
+  남긴 것이다. shared-material 단정은 그보다 앞에서 판정된다.
+
+### 21.6 남은 것
+
+- W8 의 **재임포트 실패 주입**(§15 가 남긴 축)은 아직이다.
+- W9 의 10 분 acceptance · Release · cutover 는 §15 의 목록 그대로 남는다.

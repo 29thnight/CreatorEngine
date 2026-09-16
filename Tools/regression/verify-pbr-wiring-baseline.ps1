@@ -11,8 +11,13 @@
 #   ★ **구현과 RHI 계약은 그대로 양 백엔드다.** 미룬 것은 *판정*이지 *배선*이 아니다.
 #     새 축을 더할 때는 여전히 중립 어휘(RHI enum)로 더하고 두 백엔드 변환표를
 #     모두 채운다 — 어휘에 구멍을 내면 백엔드 비대칭이 생기고, 그것은 PHASE 4.9 에서
-#     갚을 빚이 된다. Vulkan RHI 자가 검증(`vk.*`)은 계속 돈다. 여기서 끄는 것은
-#     **제품 프레임 캡처의 vulkan 회차**뿐이다.
+#     갚을 빚이 된다.
+#
+#   ★★ `vk.*` 도 끈다. 그 이름이 범위를 속인다 — `vk.shadow/gbuffer/forward/deferred`
+#     는 Vulkan 자가 검증이 아니라 **DX12/Vulkan 대조**라, 끄면 DX12 팔도 함께 꺼진다.
+#     gbuffer·forward 는 `dx12.gbuffer`·`dx12.forwardshade` 가 덮지만
+#     `deferred`(GBuffer consume·fullscreen)는 **DX12 전용 대체가 없다** — 그 구멍은
+#     BackendParityPlan §2.5 에 P1 빚으로 적혀 있다.
 #
 #   그래서 기본값을 dx12 하나로 두되, vulkan 은 **조용히 사라지지 않는다** — 축 회계에
 #   `deferred` 로 이름이 남고 요약이 그것을 부른다. `-Backend dx12,vulkan` 으로
@@ -42,7 +47,8 @@ $process = $null
 $importedFixtures = @(
     (Join-Path $root 'Dynamic_CPP\Assets\Models\NormalPair'),
     (Join-Path $root 'Dynamic_CPP\Assets\Models\AlphaModes'),
-    (Join-Path $root 'Dynamic_CPP\Assets\Models\SamplerModes'))
+    (Join-Path $root 'Dynamic_CPP\Assets\Models\SamplerModes'),
+    (Join-Path $root 'Dynamic_CPP\Assets\Models\SharedMaterial'))
 
 # ── 축 회계 ─────────────────────────────────────────────────────────────
 #
@@ -191,6 +197,63 @@ function Assert-SamplerModes([string]$Directory) {
     }
 }
 
+# ★ 같은 이름의 결과가 둘이라 Get-CommandResult 를 못 쓴다(그쪽은 1건을 요구한다).
+function Get-AllSucceeded($Results, [string]$Command) {
+    $rows = @($Results | Where-Object command -eq $Command)
+    if (0 -eq $rows.Count) { throw "No $Command result" }
+    foreach ($row in $rows) {
+        if ($row.status -ne 'succeeded') {
+            throw "$Command status=$($row.status) code=$($row.code): $($row.message)"
+        }
+    }
+    return @($rows | ForEach-Object { $_.data })
+}
+
+function Assert-SharedMaterial([string]$Directory, [string]$ModelId) {
+    $manifest = Get-Content -LiteralPath (Join-Path $Directory 'manifest.json') -Raw | ConvertFrom-Json
+    # 이 fixture 의 draw 만 골라낸다. 캡처는 누적이라(앞 축들이 같은 씬에 남아
+    # 있다) 전체 distinct 를 세면 아무 의미가 없다 — modelId 로 못 박는다.
+    # 그 값은 material.override 가 돌려준 것이고 게이트가 지어내지 않는다.
+    $mine = @($manifest.draws | Where-Object { $_.modelId -eq $ModelId })
+    if ($mine.Count -ne 2) {
+        throw ("Shared-material fixture produced $($mine.Count) draws (expected 2)" +
+            " for modelId=$ModelId : $Directory")
+    }
+    # ★ 여기서 묻는 것은 "주소가 같은 재질 둘이 값으로 갈리는가" 다.
+    #   두 렌더러는 모델 인스턴스화가 붙인 같은 `Material*` 을 갖는다. 밀봉 중복
+    #   제거 키가 주소였던 시절이라면 뒤 draw 가 앞 draw 의 스냅샷을 그대로 받아
+    #   override 가 통째로 사라진다.
+    #
+    # ★ 단정을 **bindingConflict 가 아니라 distinct 수**에 건다. 키가 주소로
+    #   돌아가면 둘째 draw 는 첫째의 스냅샷을 **그대로 받으므로** 바인딩이 일치해
+    #   장부는 침묵한다. PBR-W7 과 정확히 반대 모양이다(그때는 conflict 가 울고
+    #   distinct 가 침묵했다) — 미리 정하지 않으면 "게이트가 눈멀었다"로 오진한다.
+    $digests = @($mine | ForEach-Object { $_.seal.authoredDigest } | Sort-Object -Unique)
+    if ($digests.Count -ne 2) {
+        throw ("Shared-material draws share authoredDigest ($($digests -join ',')) —" +
+            " 렌더러별 MaterialInstance override 가 밀봉까지 오지 않았다: $Directory")
+    }
+    $hashes = @($mine | ForEach-Object { $_.seal.hash } | Sort-Object -Unique)
+    if ($hashes.Count -ne 2) {
+        throw ("Shared-material draws share sealHash ($($hashes -join ',')) —" +
+            " 밀봉 중복 제거 키가 값이 아니라 주소로 접혔다: $Directory")
+    }
+    # 도장이 없으면 위의 두 단정이 '우연히 다른 쓰레기'를 비교한 것일 수 있다.
+    if (@($mine | Where-Object { -not $_.seal.stamped }).Count) {
+        throw "Shared-material draws are unstamped: $Directory"
+    }
+    # 값이 갈렸는데 장부가 버렸다면 그것대로 결함이다 — 둘 다 물어야 한다.
+    foreach ($route in @('gbuffer', 'forward')) {
+        $node = $manifest.sealLedger.$route
+        if ($null -eq $node) { continue }
+        if ($node.bindingConflict -ne 0 -or $node.skipped -ne 0) {
+            throw ("Shared-material fixture dropped draws (route=$route" +
+                " bindingConflict=$($node.bindingConflict) skipped=$($node.skipped)" +
+                " reason='$($node.lastReason)'): $Directory")
+        }
+    }
+}
+
 function Assert-Capture([string]$Directory, [string]$ExpectedBackend, [string[]]$Models) {
     $manifest = Get-Content -LiteralPath (Join-Path $Directory 'manifest.json') -Raw | ConvertFrom-Json
     if ($manifest.source -ne 'product-live' -or $manifest.backend -ne $ExpectedBackend -or
@@ -323,6 +386,7 @@ try {
         $normalPair = Join-Path $run "$api-normalpair"
         $alphaModes = Join-Path $run "$api-alphamodes"
         $samplerModes = Join-Path $run "$api-samplermodes"
+        $sharedMaterial = Join-Path $run "$api-sharedmaterial"
         # W1 fixture 는 자산 트리 밖에 있어 model.load 가 트리 안으로 복사한다.
         # backend 둘이 같은 조건에서 돌도록 매 회차 앞에서 지운다 — 남겨 두면
         # 두 번째 회차만 "제자리 열기" 경로를 타서 두 실행이 같은 것을 재지 않는다.
@@ -385,9 +449,22 @@ try {
             'object.transform SamplerModes 0 0 2 0 180 0 1 1 1',
             'wait 30',
             "render.pbr.capture `"$samplerModes`" game",
+            # ★ W8 — primitive 둘이 재질 하나를 공유하는 자산. 모델 인스턴스화가
+            #   두 MeshRenderer 에 **같은 `Material*`** 과 같은 authored base 를
+            #   붙이고, 각자 자기 MaterialInstance 를 갖는다. 거기에 서로 다른
+            #   override 를 얹으면 "주소는 같은데 값이 다른" 상태가 된다 — W8 이
+            #   밀봉 키를 주소에서 값으로 바꾼 바로 그 이유다.
+            #   ★ 씬 저작으로는 이 상태를 못 만든다(표기 셋이 모두 사본을 준다).
+            "model.load `"$root/Tools/regression/fixtures/pbr-shared-material/SharedMaterial.gltf`"",
+            'model.place SharedMaterial',
+            'object.transform SharedMaterial 0 0 2 0 180 0 1 1 1',
+            'material.override SharedMaterial 0 roughness 0.10',
+            'material.override SharedMaterial 1 roughness 0.90',
+            'wait 30',
+            "render.pbr.capture `"$sharedMaterial`" game",
             'quit')
         $results = @(Invoke-Editor $api $commands)
-        $expectedCaptures = if ($hasGunner) { 5 } else { 4 }
+        $expectedCaptures = if ($hasGunner) { 6 } else { 5 }
         $captures = @($results | Where-Object command -eq 'render.pbr.capture')
         if ($captures.Count -ne $expectedCaptures -or
             @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
@@ -419,10 +496,25 @@ try {
         Assert-Capture $samplerModes $api @()
         Assert-SamplerModes $samplerModes
         Set-AxisRan "$api/sampler"
+        Assert-Capture $sharedMaterial $api @()
+        # modelId 는 material.override 가 돌려준 값이다 — 게이트가 지어내지 않는다.
+        $overrides = Get-AllSucceeded $results 'material.override'
+        if ($overrides.Count -ne 2) {
+            throw "$api expected two material.override results, found $($overrides.Count)"
+        }
+        if ($overrides[0].modelId -ne $overrides[1].modelId) {
+            throw "$api shared-material overrides landed on different models"
+        }
+        if ($overrides[0].meshId -eq $overrides[1].meshId) {
+            throw "$api shared-material overrides landed on the same renderer"
+        }
+        Assert-SharedMaterial $sharedMaterial $overrides[0].modelId
+        Set-AxisRan "$api/shared-material-seal"
         $captureDirs[$api] = @{ primitives = $primitive }
         if ($hasGunner) { $captureDirs[$api]['gunner'] = $gunner }
         $ranHere = @("primitives", $(if ($hasGunner) { 'gunner' }), 'normal-pair',
-            'alpha-modes+nonuniform-scale', 'sampler') | Where-Object { $_ }
+            'alpha-modes+nonuniform-scale', 'sampler',
+            'shared-material-seal') | Where-Object { $_ }
         Write-Output "$api product capture PASS ($($ranHere -join ', ')): $run"
     }
     # W9 — 두 backend 캡처의 float32 readback을 실제로 맞댄다.

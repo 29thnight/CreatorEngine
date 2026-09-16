@@ -676,6 +676,53 @@ namespace ConsoleCmd
             {values[6],values[7],values[8]});
     }
 
+    // PBR-W8 — `MaterialInstance::SetPropertyOverride` 에 닿는 유일한 헤드리스 표면.
+    // 그 전에는 GUI 인스펙터와 C# 스크립트뿐이라, 게이트(`--commandlet-script`)가
+    // "같은 `Material*` 을 공유하는 렌더러 둘이 서로 다른 override 를 갖는" 상태를
+    // 만들 수 없었다 — 밀봉 키를 주소에서 값으로 바꾼 W8 의 결함을 자극할 fixture 가
+    // 없던 진짜 이유다.
+    static CommandCore::CommandResult Cmd_material_override(const ConsoleCommandContext& ctx)
+    {
+        // <target> <rendererIndex> <property> <v> | <r g b a>
+        if (ctx.parts.size() != 5 && ctx.parts.size() != 8)
+            return CommandCore::InvalidArguments(
+                "material.override <target> <rendererIndex> <property> <value|r g b a>");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+
+        const auto& indexRaw = ctx.parts[2];
+        int rendererIndex = 0;
+        auto parsedIndex = std::from_chars(indexRaw.data(),
+            indexRaw.data() + indexRaw.size(), rendererIndex);
+        if (parsedIndex.ec != std::errc{}
+            || parsedIndex.ptr != indexRaw.data() + indexRaw.size())
+        {
+            return CommandCore::InvalidArguments(
+                "Renderer index must be an integer", "material.index_invalid");
+        }
+
+        std::vector<float> values;
+        values.reserve(ctx.parts.size() - 4);
+        for (size_t i = 4; i < ctx.parts.size(); ++i)
+        {
+            const auto& raw = ctx.parts[i];
+            float value = 0.f;
+            auto parsed = std::from_chars(raw.data(), raw.data() + raw.size(), value);
+            // ★ 조용히 0 으로 읽으면 "override 가 걸렸는데 값이 같다" 가 되어
+            //   게이트가 제품 결함으로 오진한다. 파싱 실패는 실패로 낸다.
+            if (parsed.ec != std::errc{} || parsed.ptr != raw.data() + raw.size()
+                || !std::isfinite(value))
+            {
+                return CommandCore::InvalidArguments(
+                    "Material override requires finite numbers", "material.number_invalid");
+            }
+            values.push_back(value);
+        }
+        return EditorObjectOperations::MaterialOverride(target, rendererIndex,
+            ctx.parts[3], values);
+    }
+
     static CommandCore::CommandResult Cmd_object_property(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() < 5) return CommandCore::InvalidArguments("object.property <target> <component> <field> <value>");
@@ -1463,6 +1510,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
         reg.Result({ "scene.populate" }, &Cmd_scene_populate);
         reg.Result({ "object.property" }, &Cmd_object_property);
+        reg.Result({ "material.override" }, &Cmd_material_override);
         reg.Result({ "scene.select" }, &Cmd_scene_select);
         reg.Result({ "component.add" }, &Cmd_component_add);
         reg.Result({ "prefab.instantiate" }, &Cmd_prefab_instantiate);
