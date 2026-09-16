@@ -18,6 +18,12 @@ param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     # 기본값은 게이트용으로 짧다. W9 acceptance 는 -Minutes 10 으로 돌린다.
     [double]$Minutes = 1.0,
+    # 표본 하나에 드는 벽시계 초. 표본 수 = Minutes*60 / 이 값. 구성·기계마다 다르므로
+    # 실제 시간을 요구하는 회차는 짧은 회차로 재서 넘긴다.
+    [double]$SecondsPerSample = 0.6,
+    # 0 이 아니면 에디터 실행의 실제 경과가 이 초 이상이어야 통과다. W9 acceptance 는
+    # "10 분" 이 벽시계라는 뜻이므로 -MinimumWallSeconds 600 을 함께 준다.
+    [double]$MinimumWallSeconds = 0,
     [int]$TimeoutSeconds = 1800
 )
 
@@ -33,7 +39,6 @@ $original = $null
 # 한 표본이 도는 데 드는 프레임 수. Debug 라이브 렌더러의 실측 프레임 시간에
 # 맞춰 잡았고, 정확한 벽시계가 아니라 "충분히 많은 표본"이 목적이다.
 $framesPerSample = 30
-$secondsPerSample = 0.6
 
 function New-SoakCommands([int]$Samples) {
     $commands = [Collections.Generic.List[string]]::new()
@@ -167,6 +172,14 @@ try {
     $measured = $status.Count - $warmupSamples
     if ($movedFrames -lt [int]($measured * 0.9)) {
         throw "Soak samples did not advance frames ($movedFrames/$measured); artifacts: $run"
+    }
+
+    $wallSeconds = $clock.Elapsed.TotalSeconds
+    if ($MinimumWallSeconds -gt 0 -and $wallSeconds -lt $MinimumWallSeconds) {
+        $measuredPerSample = $wallSeconds / [math]::Max(1, $status.Count)
+        throw ("Soak ran {0:0} s of wall time, required {1:0} s — 표본 수가 모자라다. " +
+               "-SecondsPerSample {2:0.###} 로 다시 돌려라; artifacts: $run") -f `
+            $wallSeconds, $MinimumWallSeconds, $measuredPerSample
     }
 
     Write-Output ("PBR soak PASS: {0} samples ({1} warmup excluded), {2} advancing frames, backend {3}, requested {4} min, wall {5:0} s" -f `
