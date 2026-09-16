@@ -345,6 +345,11 @@ counter를 남긴다. package smoke에는 최소 한 개의 MP3 stream과 FLAC l
 
 ### AU0 — 기준선 유효성 분류·합성 fixture·실패 canary (P0, 3일)
 
+> **2026-09-16 부분 착지 — §11.** fixture 생성기·실패 canary·게이트가 섰다
+> (`Tools/regression/verify-audio-voice-contract.ps1`). **이 슬라이스의 판정문에서
+> "유효 FMOD 항목 A/B" 를 참고로 강등한다** — 비교 대상이 없다(§11.1). 남은 것은
+> 절대 성능 예산(callback/CPU/memory/startup)과 MP3/FLAC fixture 다.
+
 - sine, impulse, silence, short loop를 WAV/MP3/FLAC으로 생성하는 재현 가능한 test fixture를 둔다.
 - 기존 동작을 `유효(play/stop/loop/stream/bus)`, `고장(shutdown/lifetime)`, `미검증(listener/spatial/reverb)`으로
   분류하고 FMOD A/B는 유효 항목에만 사용한다.
@@ -359,6 +364,11 @@ counter를 남긴다. package smoke에는 최소 한 개의 MP3 stream과 FLAC l
 근거로 사용하지 않는다.
 
 ### AU1 — backend-neutral 계약·모듈·listener·Host 수명 (P0, 5일)
+
+> **2026-09-16 부분 착지 — §11.** `wave` 네임스페이스로 값 타입·계약·보이스 표가
+> 섰다(`Engine/SceneRuntime/Audio/`). 표면은 백엔드 API 이식이 아니라 **소비자 요구
+> 역산**으로 만들었다(§11.2). 남은 것은 Null backend, Host 소유 initialize/update/
+> shutdown, Scene-owned source/listener 등록부, 그리고 옛 표면을 걷는 이행이다.
 
 - `AudioClipId`, `AudioVoiceHandle`, `AudioBusId`, listener/play/state command를 정의한다.
 - generation stale-handle rejection과 logical voice table을 구현한다.
@@ -542,3 +552,89 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 - 실제 프로젝트 audio asset이 생기면 AU0 합성 fixture와 별도로 대표 content corpus를 고정하고 hash를 남긴다.
 - miniaudio tag를 올릴 때 release note, source hash, license, offline/device/soak gate를 다시 실행한다.
 - PHASE 23 MSI·Launcher는 AU8/AU9를 구현으로 추정하지 않고 package manifest와 PE import 결과를 직접 검증한다.
+
+---
+
+## 11. 착수 기록 (2026-09-16)
+
+사전 정찰([Phase22AudioPreflight.md](../analysis/Phase22AudioPreflight.md)) 뒤 AU0·AU1 을 착수했다.
+정찰이 정정한 전제는 §7 에 있고, 여기에는 **정찰 이후에 정한 것과 실제로 착지한 것**만 적는다.
+
+### 11.1 AU0 의 판정문을 바꾼 이유
+
+계획서는 AU0·AU4·AU9 세 곳에서 "유효 FMOD 항목과의 A/B" 를 판정 근거로 썼다. 실행으로 확인한
+현재 상태는 이렇다.
+
+- 로더가 스캔하는 `Sounds` 디렉터리가 저장소에 없어 `LoadSounds()` 가 한 번도 실행되지 않는다.
+  그래서 클립 표가 영구 공집합이고 모든 재생이 첫 줄에서 끊긴다 — **비교 대상이 없다.**
+- 반대로 **폴더와 파일만 있으면 경로 자체는 동작한다.** 게이트가 fixture 를 넣자 적재·재생·정지·
+  리스너 왕복이 전부 통과했다. 정찰의 "소리를 못 낸다" 는 코드 결함이 아니라 자산 부재였다.
+- 종료는 클립이 하나라도 적재됐을 때만 끝난다. 클립이 없으면 `_isSoundLoaderThreadRunning` 이
+  내려갈 경로가 없어 소멸자가 영원히 돈다.
+
+따라서 A/B 는 **참고 수치**로 강등하고, 판정은 합성 fixture 의 golden 기대값·실패 canary·절대 예산으로
+만 세운다. 한 가지를 기록해 둔다 — **fixture 를 넣으면 종료 결함의 조건이 지워진다.** canary 를 처음
+짤 때 실제로 밟았고(거짓 초록), 빈 자산 루트로 도는 회차를 따로 두어 잡았다.
+
+### 11.2 배선을 파사드가 아니라 신규 작성으로 간다
+
+`SoundManager`·`SoundSystem` 을 감싸지 않고 새로 쓴다. 근거 셋.
+
+1. 결함이 표면이 아니라 내부에 있다 — 보이스 표가 없고, 상태를 백엔드에 물어보고, steal 이
+   `getPosition` 으로 나이를 재고, 풀에 소유자가 없다. 감싸면 전부 남고 타입만 가려진다.
+2. 파사드는 `playFromSourceBlended(const SoundComponent&)` 를 계속 불러야 해서 **끊으려던 역방향
+   간선조차 안 끊긴다**(하위 계층이 상위 타입의 열 필드를 직접 읽는다).
+3. 갈아끼울 접점이 작다 — `Sound->` 외부 호출은 7종 12곳이고, 오디오 소스 총량은 1,160줄이다.
+   그중 실제 FMOD 호출 순서 지식은 50줄 남짓이라 그것만 backend 구현으로 옮긴다.
+
+부수로 확인된 것 하나. probe 가 `SoundManager` 하나를 쓰려고 `SceneRuntime.lib` 를 링크하자
+**유니티 blob 이 Physics·PhysX·GameInput 까지 끌고 왔다.** 오디오만 떼어 검증할 수 없다는 뜻이고,
+새 계층을 자기 단위로 두어야 할 이유가 하나 더 늘었다.
+
+### 11.3 확정한 이름과 경계
+
+- 네임스페이스는 **`wave`**. `VoiceHandle` · `PlayRequest` · `BusId` 는 §3.1 이 세운 이름을 그대로 쓰되,
+  네임스페이스와 겹쳐 더듬지 않게 접두사 `Audio` 는 뗐다. 약칭은 쓰지 않는다.
+- **클립 참조는 AU2 소관으로 남긴다.** 지금은 `wave::ClipKey` 가 파일명 문자열을 한 겹 안에 가둔다.
+  `AssetId` 로 가려면 importer·`RuntimeAssetType`·`CookedAssetKind`·`.meta` 오디오 필드·pak 범위
+  read·C# identity 여섯 축이 함께 와야 하고(정찰 §3.2), 그것이 AU2 다. 저작 참조가 0건이라 미루는
+  비용도 0이다. 래퍼가 이음매라 전환 시 바꿀 곳은 서비스 경계 한 곳과 컴포넌트 필드 하나다.
+- **등록부 소유권 이전은 별도 축.** 이번에는 배선만 긋고 전역 `SoundSystem` 은 그대로 둔다. 다만
+  §3.2 의 조건은 지킨다 — 전역을 새 오디오 정본으로 **승격하지 않는다**.
+- **보이스 풀을 폐기한다.** `playOneShotPooled`·`configureVoicePool`·`clearVoicePool`·`poolKey` 는
+  엔진이 표를 안 들어서 필요했던 우회다. 표와 cap 정책이 있으면 one-shot 은 손잡이를 보관하지 않는
+  재생일 뿐이다.
+- **클립 적재는 명시 호출**(`LoadClip`). 폴링 스레드·공회전 예외·종료 정지가 원인째 사라진다.
+
+### 11.4 착지한 것
+
+| 산출물 | 내용 |
+|---|---|
+| `Engine/SceneRuntime/Audio/AudioValues.h` | `VoiceHandle`(index+generation) · `BusId` · `ClipKey` · `RolloffKind` · `VoiceState` · `BackendVoiceId` |
+| `Engine/SceneRuntime/Audio/PlayRequest.h` | 재생 입력 한 덩어리(리버브·소유자 포함) |
+| `Engine/SceneRuntime/Audio/ListenerState.h` | 듣는 자 자세 |
+| `Engine/SceneRuntime/Audio/AudioService.h` | 계약 12 메서드. vendor 토큰 0 |
+| `Engine/SceneRuntime/Audio/VoiceTable.h/.cpp` | 고정 용량 슬롯 표, 세대 발급·낡은 핸들 거부 |
+| `Tools/regression/verify-audio-voice-contract.ps1` | 로컬 게이트. **run-all 미배선** |
+| `Tools/regression/audio_voice_contract_probe.cpp` | probe. fixture 를 스스로 생성한다 |
+
+게이트 현황: 기능 8 + 보이스 표 15 = **23 단정 초록**, 종료 canary(클립 없음) **RED**. 변이 6종
+(fixture 0프레임 · 정지 호출 제거 · 리스너 설정 제거 · 세대 미증가 · 반납 상태 무시 · 세대 미대조)이
+전부 잡혔다. `wave` 는 아직 `SceneRuntime.vcxproj` 에 넣지 않았다 — 제품 소비자가 생기는 다음
+슬라이스에서 함께 넣는다.
+
+### 11.5 운영 제약
+
+- **오디오 게이트를 `run-all.ps1` 에 배선하지 않는다.** 실제 출력 장치를 요구하므로 무인 회귀 세트의
+  전제와 맞지 않는다. 로컬에서 손으로 돌린다.
+- **음원을 저장소에 커밋하지 않는다.** 예외 없다. `Dynamic_CPP/Assets/Sound/` 와 `Sounds/` 를 `.meta`
+  까지 무시로 막았다(두 철자를 다 막은 이유는 저작 폴더가 `Sound/` 인데 로더가 도는 경로가 `Sounds/`
+  라서다). 게이트 fixture 는 probe 가 `Build/` 아래에 무음 PCM 으로 생성한다.
+- AU2 가 착지해 `.meta` 가 오디오 identity 의 정본이 되면 이 무시 규칙을 다시 판단해야 한다 —
+  "음원은 빼고 identity 만 추적" 이 필요해질 수 있다.
+
+### 11.6 다음
+
+`FmodBackend`(`fmod.hpp` 를 무는 유일한 TU)와 `AudioService` 구현을 세우고, probe 의 기능 단정을
+`wave` 호출로 갈아끼운다. 그 시점에 같은 23 단정이 새 배선 위에서 초록이어야 하고, **종료 canary 가
+초록으로 바뀌어야 한다.** 그 뒤 접점 12곳과 Inspector 채널 직결 5블록을 옮기고 옛 표면을 걷는다.
