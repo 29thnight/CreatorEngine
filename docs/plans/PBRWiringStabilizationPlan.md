@@ -1,10 +1,11 @@
 # PBR 배선 안정화 계획 (PHASE 4)
 
-**신설 2026-09-03 · 갱신 2026-09-16 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행(W7 sampler는 §19) · W8 핵심 수정 증명(§21 — 공유 `Material` fixture) · 재임포트 실패 뒤 current 불변(§22 — 죽은 검사 부활, Animator 위반 미자극) · W9 구현 착지·부분 실측(§15) · 판정 범위는 DX12(§20 — vulkan 1:1 은 PHASE 4.9)**
+**신설 2026-09-03 · 갱신 2026-09-16 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행(W7 sampler는 §19) · W8 핵심 수정 증명(§21 — 공유 `Material` fixture) · 재임포트 실패 뒤 current 불변(§22 — 죽은 검사 부활, Animator 위반 미자극) · W9 구현 착지·부분 실측(§15) · 배선 게이트 첫 완주와 10 분 Release soak(§23 — 재임포트 실자극) · 판정 범위는 DX12(§20 — vulkan 1:1 은 PHASE 4.9)**
 
 > **W8/W9 현재 상태 한 줄.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
-> 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: 배선 게이트가
-> 끝까지 간 적이 없고(§15 — `verify-experiment-contract.ps1` 링크 부패, W9 이전부터),
+> 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: ~~배선 게이트가
+> 끝까지 간 적이 없고(§15 — `verify-experiment-contract.ps1` 링크 부패, W9 이전부터),~~
+> (§23 — 링크를 고쳐 처음 완주했고 10 분 Release soak 이 재임포트를 실제로 자극하며 통과했다)
 > 교차 백엔드 픽셀 판정은 GBuffer 다섯 장으로 좁혔으며(시각 고정 불가),
 > ~~**W8 핵심 수정을 자극하는 fixture가 없어 그 수정은 아직 증명되지 않았다.**~~
 > **2026-09-16 — 닫혔다. §21 을 보라.** 공유 `Material` fixture 와 `material.override`
@@ -1744,3 +1745,82 @@ generation 두 벌을 `Tools/regression/fixtures/` 에 스냅샷하려 했다(ig
   못했다. 그래서 W8 을 완료로 올리지 않는다.
 - 은퇴가 먼저 도는 런타임 캐시 공백(retire → 적재 실패)은 별도 축이다.
 - 호출자 0 인 형제 검사 셋은 아직 죽어 있다.
+
+---
+
+## 23. W9 — 배선 게이트 첫 완주와 10 분 Release soak, 2026-09-16
+
+§15 의 "아직 하지 않은 것" 넷 중 셋을 닫는다(vulkan soak 은 §20 결정으로 PHASE 4.9 소유).
+그 과정에서 soak 게이트 자신의 결함 셋이 나왔고, 셋째는 **초록인데 재임포트를 한 번도 안
+한** 것이었다.
+
+### 23.1 배선 게이트가 처음 끝까지 갔다
+
+`verify-experiment-contract.ps1` 의 링크 파손은 두 겹이었고 둘째는 첫째가 가리고 있었다.
+
+| 층 | 증상 | 원인 | 처방 |
+|---|---|---|---|
+| 링크 | unresolved 49(`PhysicX::*` 48 · `GameInputInitialize` 1) | 엔진 lib 목록에 `Physics` 부재. GameInput 은 pragma 만 두면 Windows SDK 의 옛 `gameinput.lib` 을 집는다 — LNK1104 가 아니라 unresolved 로 위장 | `Physics` + PhysX vcpkg lib · `gameinput` 명시 |
+| 실행 | 0xC0000135 | PATH 에 넣던 `Bin\x64-<구성>\Editor` 에 PhysX·meshoptimizer DLL 이 없다 — 지금은 `Runtime\Common` | DLL 경로 교체 |
+
+Debug·Release 12/12. 이어 `verify-pbr-wiring-baseline.ps1`(Debug) 이 exit 0 으로 완주했다 —
+잰 축 6(dx12 primitives·gunner·normal-pair·alpha-modes·sampler·shared-material-seal) ·
+건너뛴 축 0 · 미룬 축 3(vulkan 캡처·vk.* 대조·교차 비교, 모두 PHASE 4.9).
+
+### 23.2 soak 게이트의 결함 셋
+
+| # | 결함 | 드러난 방식 | 처방 |
+|---|---|---|---|
+| ① | 예열 표본을 검은 화면으로 읽었다 | 10 분 Debug 회차가 붉음 — 1099 중 **첫 표본 하나**가 `framesRendered 0 · drawCount 0`, 나머지 1098 은 전부 10. 기본 1 분 회차에도 같은 표본이 있어 run-all 의 이 게이트는 늘 붉었을 것이다 | `framesRendered` 로 예열을 가르고, 예열 뒤 draw 0 과 예열 10 표본 초과는 실패 |
+| ② | `-Minutes` 는 표본 수일 뿐 벽시계가 아니다 | Debug `-Minutes 10` → 200 s, Release 0.1 s/표본 → 250 s. PASS 줄은 "10 min" 이라고 적었다 | `-SecondsPerSample` · `-MinimumWallSeconds`, PASS 줄에 실제 초 |
+| ③ | **재임포트를 한 번도 안 했다** | Release 740 s 초록 회차의 `model.loadcached` 1886 회가 전부 executedMs ~0.5 의 캐시 적중 | 아래 23.3 |
+
+③ 을 조사하며 틀린 근거 하나를 먼저 적었다: "`object.transform` 이 보고한 generation 이
+18858 회 모두 1" — 그 필드는 **엔티티 핸들** generation 이지 모델 generation 이 아니다.
+캐시 적중이라는 결론은 executedMs 로 선다.
+
+### 23.3 재임포트를 자극하는 모양 — 재임포트만으로는 화면이 안 바뀐다
+
+배치된 인스턴스는 자기 generation 을 붙들고 재바인딩되지 않는다(§22.1). 그래서 재임포트가
+진짜로 돌아도 그려지는 generation 은 그대로다. 세대 혼합이 실제로 일어나는 모양은 **옛
+generation 인스턴스가 남은 채 새 generation 인스턴스가 같은 프레임에 그려지는 것**이다.
+
+- **렌더러가 센다.** GBuffer 밀봉이 본 (modelId, generation) 을 프레임마다 모아
+  `modelGenerationPairs` · `mixedGenerationModels` · `mixedNewestGeneration` 을
+  `render.pbr.sealstatus` 로 낸다. 전체 최댓값이 아니라 **mixed 모델의 최신 번호**를 쓴다 —
+  다른 모델의 큰 번호가 전진을 가리기 때문이다.
+- **게이트가 만든다.** `Prim_Cube` 를 `SoakReimportProbe` 로 복사해 `model.load` 로 진짜
+  재임포트하고, Anchor(첫 generation)를 남긴 채 `-ReimportEvery` 표본마다 Fresh 를 지우고 새
+  generation 으로 다시 배치한다. 모든 명령 succeeded · 재임포트가 예정 횟수만큼
+  `cache=reloaded` · mixed 표본 > 0 · 그려진 새 번호 종류 ≥ 재임포트 횟수를 단정한다.
+- **`object.rename` 을 쓰지 않는다.** rename 은 옛 이름을 이름 집합에서 놓지 않아(실측) 같은
+  모델을 다시 배치하면 원래 이름이 돌아오지 않는다. delete 는 놓으므로 Fresh 는 늘 `(1)` 이다.
+  결함 자체는 별도 작업으로 넘겼다.
+
+| 회차(Debug · 1 분) | 결과 |
+|---|---|
+| 기준 | 103 표본 · reloaded 4 · mixed 표본 83 · 새 번호 4 종 · exit 0 |
+| 변이 A — 재임포트를 `loadcached` 로 | "재임포트 0/4" 로 붉음 |
+| 변이 B — 재임포트는 하되 Fresh 배치 제거 | "두 generation 이 그려진 표본 0" 으로 붉음 |
+
+변이 B 는 "재임포트만으로는 그려지는 generation 이 안 바뀐다" 를 수로도 확인했다.
+
+### 23.4 W9 acceptance — Release · dx12 · 벽시계 10 분
+
+`-Minutes 11 -SecondsPerSample 0.035 -MinimumWallSeconds 600 -ReimportEvery 100`
+
+| 항목 | 값 |
+|---|---|
+| 벽시계 | **856 s** |
+| 표본 | 19,045 (예열 1 제외) · 전진 19,045 |
+| 봉인 위반·unstamped·encoder drop·업로드 실패 | 전 표본 0 |
+| 진짜 재임포트 | 188 / 188 `reloaded` |
+| 같은 모델 두 generation 을 한 프레임에 그린 표본 | 18,945 |
+| 그려진 새 generation | 188 종(마지막 190) |
+
+### 23.5 W9 에 남은 것
+
+- **preToneHdr·display 판정** — 시뮬레이션 시각 고정(`time.*` 부재)이 선행이다(§15).
+- **cutover** — 위가 서야 판단한다.
+- **Animator 경로의 세대 혼합** — soak 의 probe 는 뼈가 없다. `Animator::BindModelGeneration`
+  의 reset-before-validate(§22.6)는 여전히 자극되지 않았다.
