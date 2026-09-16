@@ -19,7 +19,7 @@ param(
 #   링크한다.
 #
 #   그러므로 이 게이트는 **엔진이 먼저 지어져 있어야 한다**(`Build/Lib/x64-<구성>`
-#   과 `Bin/x64-<구성>/Editor` 의 DLL). 링크할 .cpp 를 하나씩 찾아 끌어오는 대안도
+#   과 `Bin/x64-<구성>/Runtime/Common` 의 DLL). 링크할 .cpp 를 하나씩 찾아 끌어오는 대안도
 #   있었지만 폐포가 계속 자랐다 — 실측으로 `texcook` 하나가 rapidyaml 전체를 끌고
 #   왔다. 라이브러리를 링크하는 편이 정직하고 작다.
 #
@@ -98,15 +98,27 @@ foreach ($source in $probeSources) {
 # ★ `EngineDiagnostics` 가 빠져 있었다. `SceneRuntime` 이 `gCPUProfiler` 를 참조하고
 #   그 정의는 이 라이브러리에 있다 — probe 가 프로파일러를 쓰지 않아도 obj 하나가
 #   끌려오면 심볼은 따라온다. 목록이 SceneRuntime 의 현재 의존과 어긋나 있었다.
-$engineLibNames = @('RenderEngine', 'SceneRuntime', 'EngineDiagnostics', 'Utility_Framework')
+#
+# ★ 2026-09-16 `Physics` 가 빠져 링크가 unresolved 49 로 죽어 있었다(`PhysicX::*` 48 ·
+#   `GameInputInitialize` 1). `SceneRuntime` 의 `PhysicsManager` · `Scene` · 콜라이더
+#   컴포넌트가 `PhysicX` 를 부르고, 그 정의는 `Physics.lib` 에 있다. PhysX SDK 자체와
+#   GameInput v3 는 vcpkg 사본이다 — 아래 vendor 목록에 같이 넣는다.
+$engineLibNames = @('RenderEngine', 'SceneRuntime', 'Physics', 'EngineDiagnostics', 'Utility_Framework')
 
 # ★ vcpkg 는 몇몇 포트의 Debug 산출물에 `d` 접미사를 붙인다(`fmtd` · `spdlogd` ·
 #   `lz4d`). 붙이지 않는 것도 같이 있어서(`ryml` · `c4core` · `meshoptimizer` ·
 #   `DirectXTex`) 구성별로 이름을 따로 적는다. 한쪽 이름만 쓰면 다른 구성에서
 #   "라이브러리가 없다" 로 죽는다.
+# ★ `gameinput` 를 명시한다. `InputManager.cpp` 의 `#pragma comment(lib, "GameInput.lib")`
+#   만 두면 링커가 Windows SDK 의 옛 GameInput.lib 을 먼저 집어 v3 의
+#   `GameInputInitialize` 가 없다고 난다 — LNK1104 가 아니라 unresolved 로 위장한다.
+$physicsVendorLibNames = @(
+    'PhysX_64', 'PhysXCommon_64', 'PhysXFoundation_64', 'PhysXCooking_64',
+    'PhysXExtensions_static_64', 'PhysXCharacterKinematic_static_64', 'PhysXPvdSDK_static_64',
+    'gameinput')
 $vendorLibNamesByConfig = @{
-    Debug   = @('meshoptimizer', 'ryml', 'c4core', 'DirectXTex', 'lz4d', 'fmtd', 'spdlogd')
-    Release = @('meshoptimizer', 'ryml', 'c4core', 'DirectXTex', 'lz4',  'fmt',  'spdlog')
+    Debug   = @('meshoptimizer', 'ryml', 'c4core', 'DirectXTex', 'lz4d', 'fmtd', 'spdlogd') + $physicsVendorLibNames
+    Release = @('meshoptimizer', 'ryml', 'c4core', 'DirectXTex', 'lz4',  'fmt',  'spdlog') + $physicsVendorLibNames
 }
 
 $externalFlags = '/external:W0 ' +
@@ -118,7 +130,10 @@ $configurations = if ($Configuration -eq 'All') { @('Debug', 'Release') }
 
 foreach ($current in $configurations) {
     $libDir = Join-Path $repoRoot ("Build\Lib\x64-{0}" -f $current)
-    $dllDir = Join-Path $repoRoot ("Bin\x64-{0}\Editor" -f $current)
+    # ★ 2026-09-16 `Bin\x64-<구성>\Editor` 를 가리키고 있었는데 서드파티 DLL(PhysX ·
+    #   meshoptimizer)은 이제 `Runtime\Common` 에 놓인다. 링크가 살아나자 실행이
+    #   0xC0000135 로 죽어 드러났다 — 링크가 먼저 죽어 있어 이 경로는 아무도 안 밟았다.
+    $dllDir = Join-Path $repoRoot ("Bin\x64-{0}\Runtime\Common" -f $current)
     # vcpkg 는 Debug 산출물을 debug\lib 아래 둔다.
     $vendorLibDir = if ($current -eq 'Debug') { Join-Path $vcpkgRoot 'debug\lib' }
                     else { Join-Path $vcpkgRoot 'lib' }
