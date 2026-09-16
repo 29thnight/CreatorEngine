@@ -638,6 +638,10 @@ namespace EnhancedSceneRenderer
         uint32_t forwardUnstamped{ 0 };
         uint32_t forwardViolations{ 0 };
         uint32_t textureUploadFailures{ 0 };
+        // W9 — 직전 GBuffer 밀봉이 본 모델 generation(재임포트 자극 여부).
+        uint32_t modelGenerationPairs{ 0 };
+        uint32_t mixedGenerationModels{ 0 };
+        uint64_t mixedNewestGeneration{ 0 };
         bool     enabled{ false };
     };
     LiveSealDiagnostics GetLiveSealDiagnostics();

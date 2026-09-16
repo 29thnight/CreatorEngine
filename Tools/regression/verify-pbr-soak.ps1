@@ -11,6 +11,18 @@
 #
 # ★ drawCount 도 함께 본다. 위 셋이 0이어도 그릴 것이 0이면 화면은 검다 —
 #   "위반 없음"과 "그렸음"은 다른 질문이다.
+#
+# ★★ 재임포트 축 (2026-09-16 정정). 처음 판은 `model.loadcached` 로 "같은 모델을 다시
+#   열면 generation 이 갈린다" 고 적었지만 Release 740 s 회차의 1886 회가 모두 캐시
+#   적중(executedMs ~0.5)이었다 — 재임포트는 한 번도 일어나지 않았다. 게다가 배치된
+#   인스턴스는 자기 generation 을 붙들고 재바인딩되지 않으므로, 재임포트만으로는 그려지는
+#   generation 이 바뀌지 않는다.
+#
+#   그래서 세대 혼합이 **실제로 일어나는 모양**을 만든다: 작은 probe 모델을 복사해
+#   `model.load` 로 진짜 재임포트하고, 옛 generation 인스턴스(Anchor)를 남긴 채 새
+#   generation 인스턴스(Fresh)를 배치해 **한 프레임에 같은 modelId 의 두 generation** 을
+#   그린다. 자극했는지는 렌더러가 센다(`mixedGenerationModels` · `mixedNewestGeneration`).
+#   그 수가 전진하지 않으면 재임포트 축은 자극되지 않은 것이고 게이트는 붉다.
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
@@ -24,6 +36,8 @@ param(
     # 0 이 아니면 에디터 실행의 실제 경과가 이 초 이상이어야 통과다. W9 acceptance 는
     # "10 분" 이 벽시계라는 뜻이므로 -MinimumWallSeconds 600 을 함께 준다.
     [double]$MinimumWallSeconds = 0,
+    # 몇 표본마다 probe 를 재임포트하나. 재임포트 하나가 generation 디렉터리 하나다.
+    [int]$ReimportEvery = 20,
     [int]$TimeoutSeconds = 1800
 )
 
@@ -40,6 +54,31 @@ $original = $null
 # 맞춰 잡았고, 정확한 벽시계가 아니라 "충분히 많은 표본"이 목적이다.
 $framesPerSample = 30
 
+# 재임포트 probe — 저장소 corpus 의 작은 모델을 **다른 이름**으로 복사한다. modelId 가
+# 갈리므로 원본의 추적 사이드카를 건드리지 않고, 끝나면 앞뒤로 치운다.
+$project = Join-Path $root 'Dynamic_CPP'
+$probeSource = Join-Path $project 'Assets\Models\Prim_Cube.glb'
+$probeName = 'SoakReimportProbe'
+$probeAsset = Join-Path $project "Assets\Models\$probeName.glb"
+$probeMeta = "$probeAsset.meta"
+
+function Remove-Probe {
+    $id = $null
+    if (Test-Path -LiteralPath $probeMeta -PathType Leaf) {
+        $line = Get-Content -LiteralPath $probeMeta | Where-Object { $_ -like 'assetId: *' } | Select-Object -First 1
+        if ($line) { $id = ($line -split ' ', 2)[1].Trim() }
+    }
+    foreach ($path in @($probeAsset, $probeMeta)) {
+        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
+    }
+    if ($id) {
+        $generationDir = Join-Path $project "Library\ModelAssetGenerations\$id"
+        if (Test-Path -LiteralPath $generationDir) {
+            Remove-Item -LiteralPath $generationDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function New-SoakCommands([int]$Samples) {
     $commands = [Collections.Generic.List[string]]::new()
     $commands.Add("scene.switch `"$root/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator`"")
@@ -48,7 +87,17 @@ function New-SoakCommands([int]$Samples) {
     $commands.Add('editor.viewport game')
     $commands.Add("model.loadcached `"$root/Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb`"")
     $commands.Add('model.place Gunner_F_Mythic')
+    # probe 의 첫 generation 인스턴스(Anchor). 끝까지 지우지 않는다 — 옛 generation 을 그리는 쪽이다.
+    #
+    # ★ 이름을 바꾸지 않는다. `object.rename` 은 옛 이름을 이름 집합에서 놓지 않아(2026-09-16
+    #   실측: rename 뒤 같은 모델을 배치하면 원래 이름이 아니라 `(1)` 이 붙고, 그 뒤로도 원래
+    #   이름은 돌아오지 않는다) 스크립트가 이름을 예측할 수 없게 된다. 대신 Anchor 가 원래
+    #   이름을, Fresh 가 `(1)` 을 갖는다 — `object.delete` 는 이름을 놓으므로 매 회차 `(1)` 이다.
+    $commands.Add("model.load `"$probeAsset`"")
+    $commands.Add("model.place $probeName")
+    $commands.Add("object.transform $probeName -2 0 2 0 0 0 0.5 0.5 0.5")
     $commands.Add('wait 30')
+    $freshPlaced = $false
 
     for ($i = 0; $i -lt $Samples; $i++) {
         # 회전과 이동을 함께 준다 — 회전만 주면 배치 키가 거의 그대로라
@@ -60,11 +109,14 @@ function New-SoakCommands([int]$Samples) {
         $commands.Add("wait $framesPerSample")
         $commands.Add('render.pbr.sealstatus')
 
-        # 재임포트를 주기적으로 섞는다. 같은 모델을 다시 열면 generation 이
-        # 갈리고, 그 순간이 세대 혼합이 일어날 수 있는 자리다 — 계획이 이
-        # 검사에 재임포트를 함께 요구한 이유다.
-        if (0 -eq ($i % 10) -and $i -gt 0) {
-            $commands.Add("model.loadcached `"$root/Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb`"")
+        # 재임포트: probe 를 진짜로 다시 임포트하고(새 generation), 직전 Fresh 를 지운 뒤
+        # 새 generation 으로 다시 배치한다. Anchor 는 옛 generation 을 계속 그린다.
+        if (0 -eq ($i % $ReimportEvery) -and $i -gt 0) {
+            $commands.Add("model.load `"$probeAsset`"")
+            if ($freshPlaced) { $commands.Add("object.delete `"$probeName (1)`"") }
+            $commands.Add("model.place $probeName")
+            $commands.Add(("object.transform `"$probeName (1)`" 2 0 2 0 {0} 0 0.5 0.5 0.5" -f $angle))
+            $freshPlaced = $true
             $commands.Add('wait 10')
             $commands.Add('render.pbr.sealstatus')
         }
@@ -78,6 +130,9 @@ try {
         throw 'Close the running Editor before this test; it temporarily selects the startup backend.'
     }
     New-Item -ItemType Directory -Path $run | Out-Null
+    if (-not (Test-Path -LiteralPath $probeSource -PathType Leaf)) { throw "probe 원본이 없다: $probeSource" }
+    Remove-Probe
+    Copy-Item -LiteralPath $probeSource -Destination $probeAsset -Force
     $original = [IO.File]::ReadAllBytes($settings)
     $text = $utf8.GetString($original)
     $backendPattern = '(?m)(^render:\r?\n\s{2}backend: )\w+'
@@ -121,6 +176,12 @@ try {
     }
 
     $results = @(Read-CommandResults $resultPath)
+    # 자극 명령이 하나라도 실패했으면 아래 수는 그 자극을 재지 않은 것이다.
+    $failedRows = @($results | Where-Object status -ne 'succeeded')
+    if ($failedRows.Count -gt 0) {
+        $first = $failedRows[0]
+        throw "soak 명령 $($failedRows.Count) 건 실패 (첫째: $($first.command) $($first.code) $($first.message)); artifacts: $run"
+    }
     $status = @($results | Where-Object command -eq 'render.pbr.sealstatus')
     if ($status.Count -lt $samples) {
         throw "Soak collected $($status.Count) samples, expected at least $samples; artifacts: $run"
@@ -170,6 +231,33 @@ try {
         $previousFrame = $data.frameId
     }
     $measured = $status.Count - $warmupSamples
+
+    # ── 재임포트 축: 자극했음을 수로 단정한다 ──
+    $placedNames = @($results | Where-Object command -eq 'model.place' | ForEach-Object { $_.data.name })
+    $unexpectedNames = @($placedNames | Where-Object { $_ -notin @('Gunner_F_Mythic', $probeName, "$probeName (1)") })
+    if ($unexpectedNames.Count -gt 0) {
+        throw "배치 이름이 예측과 다르다($($unexpectedNames[0])) — Fresh 를 지우지 못해 쌓이고 있다; artifacts: $run"
+    }
+    $reimports = @($results | Where-Object command -eq 'model.load' | Select-Object -Skip 1)
+    $expectedReimports = [int][math]::Floor(($samples - 1) / $ReimportEvery)
+    $reloaded = @($reimports | Where-Object { $_.data.cache -eq 'reloaded' }).Count
+    if ($expectedReimports -lt 1) {
+        throw "표본 $samples 개로는 재임포트가 0 회다 — -ReimportEvery 를 줄여라; artifacts: $run"
+    }
+    if ($reloaded -ne $expectedReimports) {
+        throw "재임포트 $reloaded/$expectedReimports 회만 새 generation 을 냈다(cache=reloaded); artifacts: $run"
+    }
+    $mixedSamples = @($status | Where-Object { $_.data.mixedGenerationModels -ge 1 }).Count
+    $newest = @($status | ForEach-Object { [uint64]$_.data.mixedNewestGeneration } |
+        Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+    if ($mixedSamples -eq 0) {
+        throw "한 프레임에 같은 모델의 두 generation 이 그려진 표본이 0 이다 — 세대 혼합을 자극하지 못했다; artifacts: $run"
+    }
+    # 재임포트마다 새 번호가 그려져야 한다. watcher 가 한 번 더 임포트하면 번호는 더 뛸
+    # 수 있지만(그래서 '이상'), 모자라면 새 generation 이 화면에 닿지 않은 것이다.
+    if ($newest.Count -lt $expectedReimports) {
+        throw "그려진 새 generation 이 $($newest.Count) 종뿐이다(재임포트 $expectedReimports 회); artifacts: $run"
+    }
     if ($movedFrames -lt [int]($measured * 0.9)) {
         throw "Soak samples did not advance frames ($movedFrames/$measured); artifacts: $run"
     }
@@ -184,6 +272,8 @@ try {
 
     Write-Output ("PBR soak PASS: {0} samples ({1} warmup excluded), {2} advancing frames, backend {3}, requested {4} min, wall {5:0} s" -f `
         $measured, $warmupSamples, $movedFrames, $Backend, $Minutes, $clock.Elapsed.TotalSeconds)
+    Write-Output ("  reimport: {0} reloaded, {1} mixed-generation samples, {2} distinct newest generations (last {3})" -f `
+        $reloaded, $mixedSamples, $newest.Count, $newest[-1])
     exit 0
 }
 catch {
@@ -192,4 +282,5 @@ catch {
 }
 finally {
     if ($null -ne $original) { [IO.File]::WriteAllBytes($settings, $original) }
+    Remove-Probe
 }

@@ -1148,6 +1148,14 @@ namespace
         uint32_t lastSpriteBatchCount{ 0 };
         uint32_t lastUIRectCount{ 0 };
         uint32_t lastUIBatchCount{ 0 };
+        // W9 soak — 직전 GBuffer 밀봉이 본 모델 generation. 재임포트 뒤 옛 인스턴스와
+        // 새 인스턴스가 한 프레임에 함께 그려질 때만 mixed 가 1 이상이 된다. 이 수가
+        // 0 인 채로 soak 이 통과하면 재임포트 축은 자극되지 않은 것이다.
+        uint32_t lastModelGenerationPairs{ 0 };   // 서로 다른 (modelId, generation)
+        uint32_t lastMixedGenerationModels{ 0 };  // generation 이 둘 이상인 modelId
+        // mixed 모델 중 가장 새 generation. 모든 모델의 최댓값을 쓰면 다른 모델의
+        // 큰 번호가 재임포트의 전진을 가린다.
+        uint64_t lastMixedNewestGeneration{ 0 };
         std::array<uint32_t, kEnhancedLiveDisplayTargetCount> viewSpriteCounts{};
         std::array<uint32_t, kEnhancedLiveDisplayTargetCount> viewUICounts{};
         double   lastGpuMs{ 0.0 };
@@ -3220,6 +3228,8 @@ namespace
                 std::shared_ptr<const EnhancedMaterialDrawSnapshot>> sealed;
             sealed.reserve(drawPool.size());
             RHIShaderCompiler::ScopedOutput outputScope(output);
+            std::vector<std::pair<Uuid::Uuid16, std::uint64_t>> drawnGenerations;
+            drawnGenerations.reserve(drawPool.size());
 
             for (PooledDraw& pooled : drawPool)
             {
@@ -3263,6 +3273,9 @@ namespace
                         *pooled.authoredMaterialSource) : 0ull;
                 const std::uint64_t modelGeneration = pooled.generationSource
                     ? pooled.generationSource->Identity().generation : 0ull;
+                if (pooled.generationSource)
+                    drawnGenerations.emplace_back(
+                        pooled.generationSource->Identity().modelId, modelGeneration);
                 EnhancedSealDigest keyDigest;
                 keyDigest.U64(reinterpret_cast<std::uintptr_t>(source));
                 keyDigest.U64(authoredDigest);
@@ -3364,6 +3377,24 @@ namespace
                 pooled.item.materialSnapshot = std::move(immutable);
                 pooled.materialSource.reset();
             }
+
+            std::sort(drawnGenerations.begin(), drawnGenerations.end());
+            drawnGenerations.erase(
+                std::unique(drawnGenerations.begin(), drawnGenerations.end()),
+                drawnGenerations.end());
+            uint32_t mixedModels = 0;
+            uint64_t mixedNewest = 0;
+            for (std::size_t i = 1; i < drawnGenerations.size(); ++i)
+            {
+                if (drawnGenerations[i].first != drawnGenerations[i - 1].first) continue;
+                // 정렬돼 있으므로 같은 modelId 의 둘째 원소에서만 모델 하나를 센다.
+                if (i < 2 || drawnGenerations[i - 2].first != drawnGenerations[i].first)
+                    ++mixedModels;
+                mixedNewest = (std::max)(mixedNewest, drawnGenerations[i].second);
+            }
+            lastModelGenerationPairs = static_cast<uint32_t>(drawnGenerations.size());
+            lastMixedGenerationModels = mixedModels;
+            lastMixedNewestGeneration = mixedNewest;
 
             pass.CommitShaderMetaFrame(context, activeHandles, retireAfter);
             return true;
@@ -5680,6 +5711,9 @@ EnhancedSceneRenderer::GetLiveSealDiagnostics()
     out.encoderDrops = state.encoderDrops;
     out.lastDrawCount = state.lastDrawCount;
     out.lastBatchCount = state.lastBatchCount;
+    out.modelGenerationPairs = state.lastModelGenerationPairs;
+    out.mixedGenerationModels = state.lastMixedGenerationModels;
+    out.mixedNewestGeneration = state.lastMixedNewestGeneration;
 
     const auto read = [&out](const EnhancedGBufferPass& gbuffer,
         const EnhancedForwardPass& forward, uint32_t textureFailures)

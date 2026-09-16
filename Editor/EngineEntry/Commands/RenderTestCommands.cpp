@@ -671,6 +671,9 @@ namespace ConsoleCmd
         data.Set("forwardUnstamped", count(seal.forwardUnstamped));
         data.Set("forwardViolations", count(seal.forwardViolations));
         data.Set("textureUploadFailures", count(seal.textureUploadFailures));
+        data.Set("modelGenerationPairs", count(seal.modelGenerationPairs));
+        data.Set("mixedGenerationModels", count(seal.mixedGenerationModels));
+        data.Set("mixedNewestGeneration", count(seal.mixedNewestGeneration));
         // ★ 여기서 판정하지 않는다. 이 명령은 재는 자이고, 판정은 장시간
         //   검사가 표본 전체를 보고 한다 — 한 표본만 보고 실패로 끝내면
         //   나머지 표본을 못 모은다.
