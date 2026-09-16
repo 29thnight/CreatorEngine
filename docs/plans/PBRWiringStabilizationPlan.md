@@ -1,6 +1,6 @@
 # PBR 배선 안정화 계획 (PHASE 4)
 
-**신설 2026-09-03 · 갱신 2026-09-16 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행(W7 sampler는 §19) · W8 핵심 수정 증명(§21 — 공유 `Material` fixture) · W9 구현 착지·부분 실측(§15) · 판정 범위는 DX12(§20 — vulkan 1:1 은 PHASE 4.9)**
+**신설 2026-09-03 · 갱신 2026-09-16 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행(W7 sampler는 §19) · W8 핵심 수정 증명(§21 — 공유 `Material` fixture) · 재임포트 실패 뒤 current 불변(§22 — 죽은 검사 부활, Animator 위반 미자극) · W9 구현 착지·부분 실측(§15) · 판정 범위는 DX12(§20 — vulkan 1:1 은 PHASE 4.9)**
 
 > **W8/W9 현재 상태 한 줄.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
 > 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: 배선 게이트가
@@ -1657,3 +1657,90 @@ violations 0 · lastReason ''`).
 
 - W8 의 **재임포트 실패 주입**(§15 가 남긴 축)은 아직이다.
 - W9 의 10 분 acceptance · Release · cutover 는 §15 의 목록 그대로 남는다.
+
+---
+
+## 22. W8 마지막 축 — 재임포트 실패 뒤 current 불변, 2026-09-16
+
+§1 의 계약 한 줄: **"reload/재임포트 실패 시 마지막 정상 generation을 유지하고 부분
+게시하지 않는다."** 커밋 `b04103df`.
+
+### 22.1 CLI 는 제대로 실패한다 — 그런데 `model.load` 로는 계약이 자극되지 않는다
+
+| 입력(같은 자산 이름) | status / code | exit |
+|---|---|---:|
+| 없는 경로 | `failed` / `model.import_failed` | 4 |
+| 깨진 JSON | `failed` / `model.import_failed` | 4 |
+| `.bin` 없음 | `failed` / `model.import_failed` | 4 |
+| **잘린 `.bin`** | `failed` / **`model.load_failed`** | 4 |
+| `assets.scenemodel reload` (깨진 자산) | `failed` / `scenemodel.failed` | 4 |
+
+거짓 초록은 없다. 그러나 깨진 입력 셋 모두 뒤의 `assets.scenemodel` 이 **완전히 같았다**
+(`renderers=2 generationBound=2 rhiView=2`). 렌더러가 자기 `shared_ptr` 을 붙들고 아무도
+재바인딩하지 않으니, 실패해도 **아무 일이 일어나지 않는다** — 계약이 참인 것이 아니라
+건드려지지 않은 것이다(③ 자극하지 못함). 은퇴를 먼저 시키는 `reload` 경로에서는 캡처
+앞뒤로 같은 modelId 의 draw 2 개 · `stamped 2 · violations 0` 이 유지됐다.
+
+### 22.2 계약을 재는 검사는 이미 있었다 — 호출자가 0 이었다
+
+`RunModelAssetGenerationSelfTest` 의 `verifyTamperDoesNotPublish` 가 tamper 4 종으로
+"게시 전 거부 → current 불변" 을 정확히 잰다. 저장소 전체에서 **호출자 0**. 형제 셋
+(`RunAssetIdentitySelfTest` · `RunAssetSidecarSchemaSelfTest` ·
+`RunModelAssetGenerationCorpusSelfTest`)도 같다. 컴파일되고 링크까지 되는데 아무도
+부르지 않았다.
+
+죽어 있던 이유는 **fixture 전제 둘**이었고, 둘 다 재는 것과 무관했다.
+
+| 전제 | 실측 | 처방 |
+|---|---|---|
+| ModelId 디렉터리가 정확히 1 개 | 살아 있는 프로젝트에 103 개 | 대상 modelId 를 인자로 받는다 |
+| generation 이 `1`·`2` | `model.load` 한 번에 watcher 가 한 번 더 임포트해 번호 제어 불가 | 실재하는 두 벌을 고른다(뒤엣것은 canonical sidecar 가 지목) |
+
+`Prim_Cube` 하드코딩과 리터럴 generation 번호 다섯 자리도 걷었다.
+
+### 22.3 fixture 를 커밋하지 않는 이유 — cooked 산출물은 썩는다
+
+generation 두 벌을 `Tools/regression/fixtures/` 에 스냅샷하려 했다(ignore 규칙
+`/Dynamic_CPP/Library/` 는 앵커돼 있어 가능하다). 실측이 막았다 — 9-02·9-03 산출물은
+**포맷 4·5** 인데 리더는 **9** 를 요구한다. `Prim_Cube` 의 직전 generation 도 포맷 8 이었다.
+**갓 재임포트한 모델만 두 벌이 모두 현재 포맷**이다. 그래서
+`verify-model-generation-atomicity.ps1` 은 저장소 모델을 다른 이름으로 복사해 두 번
+임포트하고, 끝나면 앞뒤로 치운다.
+
+### 22.4 축을 셋으로 나눠 센다 — 변이가 그 이유를 보였다
+
+`tamperCases`(주입을 실제로 했나) · `tamperRejected`(게시 전 거부) ·
+`tamperCurrentHeld`(거부 뒤에도 current 가 그대로).
+
+| 회차 | assertions | cases | rejected | currentHeld | exit |
+|---|---|---:|---:|---:|---:|
+| 기준 | 44/0 | 4 | 4 | 4 | 0 |
+| 변이 ② current 유지 파괴 | 39/5 | 4 | **4** | **0** | 1 |
+| 변이 ③ 주입 하나 제거 | 44/0 | **3** | 3 | 3 | 1 |
+| 복구 | 44/0 | 4 | 4 | 4 | 0 |
+
+- ② 에서 `rejected` 는 4 에 머물렀다 — 합쳐 셌다면 "4/4 거부됨" 으로 **통과**했을 변이다.
+- ③ 의 `failed` 는 **0** 이다 — `failed == 0` 만 봤다면 게이트가 초록이면서 검사 하나를 덜
+  돌았다. 진단의 리터럴 `tamper=4` 를 변수로 바꾼 것이 여기서 값을 했다.
+- ② 는 예고한 4 건 외에 1 건("retire 가 분리")이 더 붉었다 — 변이가 모델을 미리 은퇴시킨
+  부작용이다. 예고와 실측의 차이를 그대로 적는다.
+
+변이가 **게이트 자신의 결함 둘**도 드러냈다. 종료 코드에서 먼저 죽어 원인을 담은 report 를
+못 읽었고, 에러 문구가 안내하는 artifacts 를 `finally` 가 지웠다. 판정은 수로 하고 종료
+코드는 그 수와 어긋나는지만 본다. 붉은 회차의 산출물은 남긴다.
+
+### 22.5 하마터면 제품 결함으로 보고할 뻔했다 — 증분 링크가 낡은 오브젝트를 실었다
+
+리터럴을 고친 뒤에도 단정 4 건이 붉었다. 진단 줄을 넣어도 로그에 안 나왔다.
+`RenderTests.lib` 에는 새 문자열이 **있었고** DLL 에는 **없었다**. 소스·lib 시각은 둘 다
+최신이라 **시각으로는 못 잡는다**. DLL 을 지우고 재링크하자 크기가 48,924,672 → 49,059,840
+으로 바뀌며 4 건이 사라졌다. 이후 변이 회차는 전부 DLL 을 지우고 빌드했다.
+
+### 22.6 자극하지 못한 것 — 게이트 출력에 매 회차 적는다
+
+- **`Animator::BindModelGeneration` 은 검증보다 먼저 `m_modelGeneration.reset()` 을 한다**
+  (`Engine/SceneRuntime/Animator.cpp`). 실패한 reload 뒤 null 이 오면 직전 정상 generation 을
+  스스로 버린다 — **계약 위반이 실코드로 있는 자리**다. 뼈 있는 fixture 가 없어 자극하지
+  못했다. 그래서 W8 을 완료로 올리지 않는다.
+- 은퇴가 먼저 도는 런타임 캐시 공백(retire → 적재 실패)은 별도 축이다.
+- 호출자 0 인 형제 검사 셋은 아직 죽어 있다.
