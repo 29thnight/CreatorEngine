@@ -1,11 +1,9 @@
 #include "LogSink.h"
 #include "LogSystem.h"
 #include "HtmlFileSink.h"
-#include "OutputLogText.h"
 #include "MenuBarWindow.h"
 #include "OutputLogView.h"
 #include <spdlog/logger.h>
-#include <spdlog/pattern_formatter.h>
 #include <atomic>
 #include <barrier>
 #include <chrono>
@@ -80,10 +78,6 @@ namespace
             { logger.data(), logger.size() }, spdlog::level::warn, { payload.data(), payload.size() });
         message.thread_id = 12345;
 
-        spdlog::pattern_formatter oldFormatter;
-        spdlog::memory_buf_t oldText;
-        oldFormatter.format(message, oldText);
-        const std::string expectedText(oldText.data(), oldText.size());
         sink.set_pattern("this pattern must not become the stored payload");
         sink.log(message);
         payload.assign(200, 'x');
@@ -99,8 +93,6 @@ namespace
             entry.level == spdlog::level::warn, "captured occurrence metadata");
         Require(entry.source.file == originalFile && entry.source.function == "Producer" &&
             entry.source.line == 42, "owned source metadata");
-        spdlog::pattern_formatter newFormatter;
-        Require(editor::FormatOutputLogEntry(entry, newFormatter) == expectedText, "legacy display parity");
         Require(!store->ReadSnapshotIfChanged(snapshot.revision), "unchanged snapshot is not copied");
         snapshot.entries.front().message = "reader mutation";
         Require(store->ReadSnapshot().entries.front().message == original, "reader cannot mutate history");
@@ -118,7 +110,7 @@ namespace
         store.reset();
         Require(!weak.expired(), "sink retains store lifetime");
         Require(snapshot.entries.front().source.file == originalFile, "snapshot owns its fields");
-        std::puts("PASS ownership, metadata, original bytes, formatter parity, snapshot isolation");
+        std::puts("PASS ownership, metadata, original bytes, snapshot isolation");
     }
 
     void CheckRetentionAndClear()

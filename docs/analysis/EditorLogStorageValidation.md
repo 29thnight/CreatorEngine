@@ -644,22 +644,99 @@ C# 에는 대응 장치가 있다. `[CallerFilePath]`·`[CallerLineNumber]`·
 파일 이름이 출처로 나오는 것 자체를 금지해야 걸린다. 그 앞에는 "`ManagedLogProbe.cs`
 가 로그에 있는가" 를 둬서, 래퍼를 안 지난 회차가 빈 집합으로 통과하는 것을 막는다.
 
+## 출처 축 닫기: C++ 래퍼 셋과 `OutputLogText.h`
+
+### 후보는 열여섯이었고 진짜는 셋이었다
+
+앞 절에서 "`PakHelper.h`(39 자리)" 라고 적은 것은 **틀린 셈**이다. 그 파일의 로그
+호출 서른아홉 중 대부분은 결함이 아니다. 직접 부르는 줄은 그 줄이 곧 진짜 호출
+지점이고, `WriteCensus`·`ApplyGBufferShaderMeta`·`WriteCrashReportArtifacts` 처럼
+메시지를 자기가 만드는 함수도 사건이 거기서 일어나므로 그 줄이 찍히는 것이 맞다.
+
+결함은 **매개변수로 받은 메시지를 그대로 넘기면서 `where` 를 생략하는** 함수뿐이다.
+그때만 기본 인자가 래퍼 자리에서 채워져 호출자 전부가 한 줄로 몰린다. 저장소를
+그 기준으로 훑으니 후보 열여섯 중 셋이었다.
+
+| 래퍼 | 호출자 | 몰리던 자리 |
+| --- | --- | --- |
+| `ReportSettingsError` | 18 | `EditorSettingsStore.cpp:69` |
+| `RuntimeCleanupError` | 13 | `PakHelper.h:33` |
+| `RuntimeCleanupInfo` | 1 | `PakHelper.h:41` |
+
+셋 다 `std::source_location where = std::source_location::current()` 를 받아 그대로
+넘기게 고쳤다. `DumpHandler.h`·`ComponentTypeUUID.h`·`ProxyCommandQueue.h` 는 목록에
+적혀 있었으나 이 기준으로는 래퍼가 아니었다.
+
+### 이 축은 런타임으로 못 잡는다
+
+셋 다 오류 경로거나 pak 런타임 정리 경로라 기동 한 바퀴에서 한 번도 안 돈다.
+자극할 수 없는 것을 런타임 단정으로 적으면 **미자극이 초록으로 읽힌다.** 그래서
+기동 진단 게이트에 소스 축 단정을 넣었다(13 → 19 checks). 게이트는 이미
+`HtmlFileSink.h` 에서 심각도 집합을 뽑고 있어 같은 자리다.
+
+| 변이 | 무엇을 한다 | 결과 |
+| --- | --- | --- |
+| W1 | 래퍼에서 `source_location` 매개변수를 뗀다 | 잡힘 — `ReportSettingsError 가 … 받지 않는다` |
+| W2 | 래퍼 이름을 바꾼다 | 잡힘 — `래퍼 정의를 0 건 찾았다 (기대 1)` |
+
+**W2 가 이 게이트 자신의 결함을 드러냈다.** 처음 쓴 정규식은 이름 뒤의 괄호를 그냥
+찾아서 정의가 아니라 **호출 자리**를 잡고 있었다(`return ReportSettingsError("...")`).
+그때까지 초록이던 것은 두 파일 모두 정의가 호출보다 앞에 있었던 우연이다. 매개변수에
+**타입 선언**이 있는 것만 정의로 인정하게 고쳤다 — 호출은 값이나 식을 넘긴다. 그리고
+정의를 찾았는지를 먼저 단정한다. 표가 낡아 0 건이 되면 "`source_location` 이 없다" 가
+아니라 아무 일도 안 일어난 채 통과하기 때문이다. W2 회차에서 총 checks 가 19 → 18 로
+줄어 단정 하나가 통째로 사라진 것까지 드러난다.
+
+### `OutputLogText.h` 를 걷었다
+
+`FormatOutputLogEntry` 는 저장한 `LogEntry` 를 `spdlog::details::log_msg` 로 되돌려
+옛 창이 내던 문자열을 다시 만드는 함수였다. 3단계에서 화면을 카드 목록으로 바꾸며
+**비교 대상인 옛 화면이 없어졌고**, 그 뒤로 제품 소비자가 0이다. 카드 UI 의 Copy 는
+`group->message` 원문을 쓴다 — `OutputLogView.h` 가 "검색·복사·상세는 언제나 원문을
+본다" 고 못 박아 둔 대로다.
+
+`ScriptCore/Debug.cs` 에서 "소비자 0" 을 틀리게 세었던 일이 있어 이번엔 축을 나눠
+다시 셌다: 제품 호출 0, `Editor.vcxproj`·`.filters`·`.sln` 등재 0(`ClInclude` 124 건이
+전부 손표이고 와일드카드가 없다), 패키징 내보내기 0, 게이트 단정 1. `Debug.cs` 와
+결정적으로 다른 점은 이것이 **밖에 내준 표면이 아니라 에디터 내부 헤더**라는 것이다.
+
+남아 있던 단정 하나는 바로 위 필드 단정들에 **통째로 포함된다.** 기본 패턴 `%+` 가
+읽는 것과 위 단정이 재는 것을 맞대면 이렇다.
+
+| `%+` 가 읽는 것 | 바로 위 필드 단정 |
+| --- | --- |
+| time (밀리초 절삭) | `entry.timestamp == timestamp` — 절삭 없음 |
+| logger_name | `entry.loggerName == "producer"` |
+| level | `entry.level == warn` |
+| source.filename (**basename 만**) | `entry.source.file == originalFile` — 전체 경로 |
+| source.line | `entry.source.line == 42` |
+| payload | `entry.message == original` |
+
+`%+` 는 `thread_id` 와 `funcname` 을 아예 안 읽는데 그 둘도 위에서 재고 있다. 즉 이
+단정은 덮는 범위가 더 좁고 정밀도도 더 낮았다. 헤더와 단정을 같이 걷고, 쓰임이 사라진
+`#include <spdlog/pattern_formatter.h>` 까지 뺐다. `sink.set_pattern("this pattern must
+not become the stored payload")` 는 남겼다 — 싱크의 패턴이 저장 payload 로 새지 않는지는
+`entry.message == original` 이 계속 지킨다.
+
 ## 다음 단계
 
-1. C++ 래퍼 호출처. `PakHelper.h`(39 자리)·`DumpHandler.h`·`ComponentTypeUUID.h`·
-   `ProxyCommandQueue.h` 가 래퍼를 한 겹 거쳐 자기 위치를 싣는다. C# 절반은 위에서
-   닫혔고 기법도 같다 — 래퍼가 `std::source_location` 기본 인자를 받아 넘기면 된다.
-   게이트에 걸린 래퍼 파일 금지 목록에 그 넷을 더하면 회귀도 막힌다.
-2. `OutputLogText.h` 의 처분. 정의는 `FormatOutputLogEntry` 하나, 호출자는
-   `log_store_probe.cpp` 의 `"legacy display parity"` 단정 하나, `Editor.vcxproj`
-   등재 0. 그 단정이 재는 '옛 화면과 같은 문자열인가' 는 3단계에서 화면을 카드로
-   바꾸며 **비교 대상이 사라졌다.**
+목록이 비었다. 네 항목의 행선지는 이렇다.
+
+| 항목 | 결과 |
+| --- | --- |
+| 1·3 관리 로그 두 경로 합치기·읽을 채널 | `e350cabe` |
+| 2 C++ 래퍼 호출처 | `2240a73e` |
+| 4 `OutputLogText.h` 처분 | 이 커밋 |
+
+열려 있는 것은 판단 하나다. 기동 진단 게이트의 단정 열아홉은 지금 **어느 세트에도
+없다.** `Tools/regression/run-all.ps1` 은 손으로 적은 목록이라 파일을 놓아둔다고
+잡히지 않는다. 등재는 사용자 판단을 기다린다.
 
 `ScriptCore/Debug.cs` 는 **처분 대상이 아니다.** 한때 "소비자 0" 으로 적었는데
 틀렸다 — 저장소 안에서 호출자를 센 것이고, 게임 스크립트에 공개된 API 에 그 수는
 죽었다는 증거가 아니다. 경로도 끝까지 살아 있다.
 
-검증 범위: 저장소·화면 상태의 독립 회귀(`verify-log-storage`), 에디터 선언·클리핑·
-키보드 탐색·상태 행렬 네 게이트, 기동 진단 게이트(변이 G0~G4·H1~H3), Editor
-Release 빌드, 그리고 창을 띄운 눈 확인. 픽셀 골든과 Vulkan 백엔드에서의 확인은
-하지 않았다.
+검증 범위: 저장소·화면 상태의 독립 회귀(`verify-log-storage`, Debug·Release 양쪽),
+에디터 선언·클리핑·키보드 탐색·상태 행렬 네 게이트, 기동 진단 게이트 19 checks(변이
+G0~G4·H1~H3·W1~W2), Editor Release 빌드, 그리고 창을 띄운 눈 확인. 픽셀 골든과
+Vulkan 백엔드에서의 확인은 하지 않았다.
