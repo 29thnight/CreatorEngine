@@ -563,6 +563,22 @@ digest로 복원된다.
 버전/license가 SBOM과 일치한다. Player/Launcher의 efsw, 전체 제품의 FMOD dependency와
 `miniaudio.dll`은 0이다.
 
+### DL11 — 게임 스크립트 디버깅 계약 (P1, 2일)
+
+- 게임 스크립트 컴파일의 **최적화 축과 심볼 축을 분리**한다. 지금 `GameCompiler`는 `Config{Debug,Release}`
+  하나로 둘을 묶어 Release에 `/debug:portable`이 없다(pdb 0) — "릴리스 최적화 + 예외 위치" 조합을
+  표현할 수단이 없다. PHASE 12.5 B1의 결정(구성을 늘리지 않는다)을 지켜 vcxproj 구성이 아니라
+  `compile-game` 플래그로 연다.
+- **관리 디버거 대기** 옵션을 Host에 넣는다. `Bootstrap.Initialize`가 `Debugger.IsAttached`를 기다릴 수
+  있어야 초기화와 `OnEnable` 경로를 디버깅할 수 있다 — 지금은 그 구간에 붙을 방법이 없다.
+- **attach 경로를 제품 문서로 고정한다.** CoreCLR managed-only attach가 정본이다. 네이티브 mixed-mode는
+  배포본에 vcxproj가 없어 엔진 사용자에게 도달하지 않으며, 엔진 개발자 로컬 편의로만 남는다.
+- **예외 로그에 인스턴스 식별자**를 싣는다. `ScriptRegistry.Invoke`가 타입 이름만 실어, 같은 스크립트가
+  여러 오브젝트에 붙으면 어느 것이 터졌는지 좁힐 수 없다.
+
+**판정:** 저장소 밖 project를 설치된 엔진으로 열어 ① 릴리스 최적화 구성에서 스크립트 예외의 파일·줄이
+로그에 남고 ② 그 예외가 어느 오브젝트의 것인지 식별되며 ③ 디버거 대기 옵션으로 `OnEnable` 중단점이 선다.
+
 ---
 
 ## 10. 의존 관계와 배정
@@ -587,6 +603,8 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 - **DL8/DL9 release gate**는 PHASE 12.5 B5 game CI, PHASE 17 D5 cooked manifest, PHASE 21 W8 Editor,
   PHASE 22 AU9 audio device/performance/soak 회귀가 닫힌 뒤 판정한다.
 - PHASE 21의 UI shell을 Launcher에 복제하지 않는다. Launcher는 별도 작고 안정적인 제품 UI다.
+- **DL11**은 DL1 descriptor와 PHASE 12.5 B4 managed 배치 위에 선다. DL4 Launcher보다 앞설 수 있고
+  릴리스 게이트가 아니다 — 다만 이것 없이는 배포받은 사람이 릴리스 구성에서 예외 위치를 볼 수 없다.
 - EnginePackagingPlan P1~P5는 내부 링크/프로젝트 경계이고, 이 문서의 MSI/distribution ownership을
   대체하지 않는다.
 
@@ -612,6 +630,7 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 | 빌드 | Launcher와 CLI package manifest/content digest 동일 |
 | 신뢰 | MSI/PE/channel metadata 서명 검증, 변조 fixture 전부 거부 |
 | 운영 | SBOM, third-party notices, crash/log bundle, rollback runbook 재현 |
+| 디버깅 | 릴리스 구성 스크립트 예외에 파일·줄과 대상 오브젝트가 남고, managed attach로 `OnEnable` 중단점이 선다 |
 
 ---
 
@@ -635,7 +654,7 @@ DL0 -> DL1 -> DL3 -> DL4 -> DL5 -> DL6 -> DL7
 
 ## 13. 갱신 규칙
 
-- 대시보드의 DL0~DL10과 이 문서의 상태를 함께 바꾼다.
+- 대시보드의 DL0~DL11과 이 문서의 상태를 함께 바꾼다.
 - “코드 작성”, “MSI 생성”, “Launcher 화면 표시”를 단독 완료로 세지 않는다. 각 slice의 **판정**을 통과해야 한다.
 - 설치/업데이트 실패 판단은 project source digest와 Windows Installer 결과/로그를 함께 남긴다.
 - watcher 판단은 callback 개수만 보지 않고 최종 Asset DB scan diff와 handle/thread 수명까지 본다.
