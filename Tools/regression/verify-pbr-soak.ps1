@@ -99,6 +99,9 @@ try {
     $start.RedirectStandardError = $true
     $start.StandardOutputEncoding = $utf8
     $start.StandardErrorEncoding = $utf8
+    # ★ -Minutes 는 표본 수를 정할 뿐 벽시계가 아니다. 2026-09-16 Debug dx12 에서
+    #   -Minutes 10 이 200~259 s 에 끝났다. PASS 줄에 실제 경과를 같이 낸다.
+    $clock = [Diagnostics.Stopwatch]::StartNew()
     $process = [Diagnostics.Process]::Start($start)
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
@@ -120,9 +123,26 @@ try {
 
     $previousFrame = -1
     $movedFrames = 0
+    # ★ 첫 표본은 라이브 렌더러가 첫 프레임을 내기 **전**일 수 있다(2026-09-16 10분 회차:
+    #   표본 0 이 framesRendered 0 · drawCount 0, 나머지 1098 은 전부 10). 그것은 soak 중
+    #   검어진 것이 아니라 아직 시작하지 않은 것이다. framesRendered 로 가르고, 예열이
+    #   끝난 뒤의 drawCount 0 은 그대로 실패다. 예열이 끝나지 않으면 그것도 실패다.
+    $warmupSamples = 0
+    $maxWarmupSamples = 10
+    $rendering = $false
     foreach ($sample in $status) {
         $data = $sample.data
         if ($sample.status -ne 'succeeded') { throw "sealstatus sample failed; artifacts: $run" }
+        if (-not $rendering) {
+            if ($data.framesRendered -le 0) {
+                $warmupSamples++
+                if ($warmupSamples -gt $maxWarmupSamples) {
+                    throw "Live renderer never produced a frame ($warmupSamples samples); artifacts: $run"
+                }
+                continue
+            }
+            $rendering = $true
+        }
         if (-not $data.enabled) { throw "Live renderer went dark during the soak; artifacts: $run" }
         if ($data.gbufferViolations -ne 0 -or $data.forwardViolations -ne 0) {
             throw "Seal violations during soak (gbuffer $($data.gbufferViolations), forward $($data.forwardViolations)); artifacts: $run"
@@ -144,12 +164,13 @@ try {
         if ($data.frameId -gt $previousFrame) { $movedFrames++ }
         $previousFrame = $data.frameId
     }
-    if ($movedFrames -lt [int]($status.Count * 0.9)) {
-        throw "Soak samples did not advance frames ($movedFrames/$($status.Count)); artifacts: $run"
+    $measured = $status.Count - $warmupSamples
+    if ($movedFrames -lt [int]($measured * 0.9)) {
+        throw "Soak samples did not advance frames ($movedFrames/$measured); artifacts: $run"
     }
 
-    Write-Output ("PBR soak PASS: {0} samples, {1} advancing frames, backend {2}, {3} min" -f `
-        $status.Count, $movedFrames, $Backend, $Minutes)
+    Write-Output ("PBR soak PASS: {0} samples ({1} warmup excluded), {2} advancing frames, backend {3}, requested {4} min, wall {5:0} s" -f `
+        $measured, $warmupSamples, $movedFrames, $Backend, $Minutes, $clock.Elapsed.TotalSeconds)
     exit 0
 }
 catch {
