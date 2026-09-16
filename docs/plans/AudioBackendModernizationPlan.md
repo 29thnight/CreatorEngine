@@ -393,6 +393,11 @@ missing/failed reference package fail-closed가 통과한다. Editor 미기동 c
 
 ### AU3 — `MiniaudioBackend` 미배선 구현 (P0, 4일)
 
+> **2026-09-16 부분 착지 — §11.6.** 벤더링(0.11.25 · MIT-0 · PROVENANCE)과 단일 구현 TU 규약,
+> 실 device open/close, error translation, 적재 시 디코드 검증이 섰고 게이트 13 단정이 초록이다.
+> **남은 것:** MP3/FLAC 축(지금 fixture 는 WAV 뿐), stream/resident 정책, pak/VFS byte source 와
+> job-thread 수명. 제품 배선은 여전히 없다. `FmodBackend` 는 출하 뒤로 미뤘다(§11.6).
+
 - exact pinned `miniaudio.c/.h`와 LICENSE/provenance를 벤더링한다.
 - 한 implementation TU만 컴파일하고 public/header 전이를 막는다.
 - `ma_engine`, resource manager, Null/실 device, error translation과 shutdown skeleton을 구현한다.
@@ -615,13 +620,23 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 | `Engine/SceneRuntime/Audio/ListenerState.h` | 듣는 자 자세 |
 | `Engine/SceneRuntime/Audio/AudioService.h` | 계약 12 메서드. vendor 토큰 0 |
 | `Engine/SceneRuntime/Audio/VoiceTable.h/.cpp` | 고정 용량 슬롯 표, 세대 발급·낡은 핸들 거부 |
+| `Engine/SceneRuntime/Audio/AudioBackend.h` | 장치·클립·보이스·버스·리스너만 아는 계약. 정책 없음 |
+| `Engine/SceneRuntime/Audio/NullAudioBackend.h/.cpp` | 장치 없이 도는 결정적 구현. degrade 경로 겸 판정 경로 |
+| `Engine/SceneRuntime/Audio/MiniaudioBackend.h/.cpp` | miniaudio 를 무는 유일한 TU. pimpl |
+| `Engine/SceneRuntime/Audio/AudioRuntime.h/.cpp` | `AudioService` 구현. 백엔드를 참조로만 받는다 |
+| `ThirdParty/miniaudio/` | 0.11.25 · MIT-0 · PROVENANCE.md |
 | `Tools/regression/verify-audio-voice-contract.ps1` | 로컬 게이트. **run-all 미배선** |
 | `Tools/regression/audio_voice_contract_probe.cpp` | probe. fixture 를 스스로 생성한다 |
 
-게이트 현황: 기능 8 + 보이스 표 15 = **23 단정 초록**, 종료 canary(클립 없음) **RED**. 변이 6종
-(fixture 0프레임 · 정지 호출 제거 · 리스너 설정 제거 · 세대 미증가 · 반납 상태 무시 · 세대 미대조)이
-전부 잡혔다. `wave` 는 아직 `SceneRuntime.vcxproj` 에 넣지 않았다 — 제품 소비자가 생기는 다음
-슬라이스에서 함께 넣는다.
+게이트 현황: FMOD 기능 8 + 보이스 표 15 + wave·Null 20 + wave·miniaudio 13 = **56 단정 초록**,
+종료 canary(클립 없음) **RED**. 변이는 두 벌로 확인했다 — 보이스 표·fixture 6종과 런타임·백엔드
+5종(가드 제거 · 감쇠 미적용 · 일시정지 회수 · 종료 미회수 · 손상 파일 수용)이 전부 잡힌다.
+`wave` 는 아직 `SceneRuntime.vcxproj` 에 넣지 않았다 — 제품 소비자가 생기는 다음 슬라이스에서
+함께 넣는다.
+
+★ 변이 한 종이 처음에 빠져나갔다. 런타임의 `HasClip` 가드를 걷어도 `NullAudioBackend` 가 자기
+가드로 대신 막아 결과가 같았다 — 단정이 *런타임이 막는다* 가 아니라 *둘 중 하나가 막는다* 를 재고
+있었다. `StartVoiceAttempts()` 로 **요청이 백엔드에 닿았는지**를 세는 관측점을 더해 자리를 못 박았다.
 
 ### 11.5 운영 제약
 
@@ -633,8 +648,28 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 - AU2 가 착지해 `.meta` 가 오디오 identity 의 정본이 되면 이 무시 규칙을 다시 판단해야 한다 —
   "음원은 빼고 identity 만 추적" 이 필요해질 수 있다.
 
-### 11.6 다음
+### 11.6 `FmodBackend` 는 출하 뒤로 미룬다 (2026-09-16 결정)
 
-`FmodBackend`(`fmod.hpp` 를 무는 유일한 TU)와 `AudioService` 구현을 세우고, probe 의 기능 단정을
-`wave` 호출로 갈아끼운다. 그 시점에 같은 23 단정이 새 배선 위에서 초록이어야 하고, **종료 canary 가
-초록으로 바뀌어야 한다.** 그 뒤 접점 12곳과 Inspector 채널 직결 5블록을 옮기고 옛 표면을 걷는다.
+당초 11.6 은 `FmodBackend` 를 먼저 세워 옛 동작과 A/B 하는 것이었다. 사용자 결정으로 **구현을
+출하 뒤 엔진 개발자 몫으로 남기고, 이번에는 인터페이스화와 miniaudio 도입만 간다.**
+
+근거는 §11.1 과 같은 줄기다 — A/B 의 기준이 될 *유효한 FMOD 항목* 이 없다. 비교 대상이 없는데
+비교용 백엔드를 먼저 짓는 것은 공수를 판정 없는 곳에 넣는 일이다. 대신 같은 인터페이스 뒤에
+자리만 비워 둔다.
+
+| 구멍 | 누가 |
+|---|---|
+| `FmodBackend` (`fmod.hpp` 를 무는 유일한 TU) | 출하 뒤 엔진 개발자. 계약은 `AudioBackend.h` 가 고정 |
+| `spatialBlend` 중간값 (0<b<1) | AU5. 지금은 0/1 만 |
+| 보이스 상한·도둑질 | 런타임 정책. AU4 |
+| 리버브 센드 | AU6 |
+
+★ 계획서 §제약 10("FMOD와 miniaudio를 동시에 shipping하지 않는다")은 그대로 산다. miniaudio 가
+들어왔지만 제품 배선은 아직 FMOD 하나다 — 동시 shipping 이 아니라 **미배선 공존**이다.
+
+### 11.7 다음
+
+probe 의 FMOD 기능 단정을 `wave` 호출로 갈아끼운다. 같은 자리에서 **종료 canary 가 초록으로
+바뀌어야 한다** — 그것이 옛 표면을 걷어도 되는 근거다. 그 뒤 접점 12곳과 Inspector 채널 직결
+5블록을 옮기고 `SoundManager`/`SoundSystem` 을 걷는다. `wave` 의 `SceneRuntime.vcxproj` 등록은
+그 슬라이스에서 함께 한다.
