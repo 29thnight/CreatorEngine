@@ -113,6 +113,29 @@ namespace editor
         stored.ui_cpu_ms           = ui_cpu_ms;
     }
 
+    namespace
+    {
+        std::mutex&         status_slot_mutex()   { static std::mutex m; return m; }
+        status_counts_slot& status_slot_storage() { static status_counts_slot s; return s; }
+    }
+
+    void publish_status_counts_slot(float min_x, float min_y, float max_x, float max_y) noexcept
+    {
+        std::lock_guard<std::mutex> guard(status_slot_mutex());
+        status_counts_slot& stored = status_slot_storage();
+        stored.valid   = true;
+        stored.rect[0] = min_x;
+        stored.rect[1] = min_y;
+        stored.rect[2] = max_x;
+        stored.rect[3] = max_y;
+    }
+
+    status_counts_slot read_status_counts_slot() noexcept
+    {
+        std::lock_guard<std::mutex> guard(status_slot_mutex());
+        return status_slot_storage();
+    }
+
     chrome_snapshot read_chrome_snapshot()
     {
         std::lock_guard<std::mutex> guard(snapshot_mutex());

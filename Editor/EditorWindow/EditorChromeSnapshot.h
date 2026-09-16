@@ -217,6 +217,24 @@ namespace editor
     /// 다음 프레임이 게시해도 안전해야 한다.
     chrome_snapshot read_chrome_snapshot();
 
+    /// 상태 표시줄에서 로그 수준별 누적이 놓이는 칸(min x, min y, max x, max y).
+    ///
+    /// 칸의 두 끝은 계수 자릿수와 상관없이 고정이다 — 왼쪽은 ProfileFrame 버튼의
+    /// 오른쪽 끝, 오른쪽은 오른쪽에 붙은 디버그 버튼의 왼쪽 끝이다. 계수 글자는
+    /// 명령 하나마다 늘어나므로 같은 상태를 두 번 찍어도 같지 않다. chrome
+    /// golden 이 이 칸을 가리되 좌표를 제 파일에 적지 않도록 제품이 낸다.
+    ///
+    /// 스냅샷과 달리 매 프레임 싼 값 넷을 적는다. 스냅샷에 넣지 않은 것은
+    /// 스냅샷을 뜨는 자리(도크 확정 뒤)와 상태 표시줄을 그리는 자리가 다르고,
+    /// 스냅샷 구조체의 배치를 바꾸지 않기 위해서다.
+    struct status_counts_slot
+    {
+        bool  valid{ false };
+        float rect[4]{};
+    };
+    void publish_status_counts_slot(float min_x, float min_y, float max_x, float max_y) noexcept;
+    status_counts_slot read_status_counts_slot() noexcept;
+
     // ── 언제 뜨는가 ───────────────────────────────────────────────────────
     //
     // 매 프레임 뜨지 않는다. Debug 실측으로 한 번에 0.47 ms 였다 — 스타일 색

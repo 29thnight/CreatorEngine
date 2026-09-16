@@ -6,6 +6,7 @@
 #include "EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
 #include "EditorWorkspaceStore.h"
+#include "EditorChromeSnapshot.h"
 #include "LogSystem.h"
 #include "RHI/IRHIDeviceResources.h"
 #include "SceneManager.h"
@@ -564,6 +565,7 @@ void MenuBarWindow::RenderMenuBar()
                 else
                     editor::open_window(EditorWindowName::kFrameProfiler);
             }
+            const float countsSlotMinX = ImGui::GetItemRectMax().x;
 
             {
                 // The retired manual Live Code placeholder is removed; automatic detection belongs to CoreCLR.
@@ -625,6 +627,11 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 if (ImGui::Button(EditorIcon::Debug, buttonSize))
                     SetCollectGizmoColliders(!wasDebug);
+                {
+                    const ImVec2 barPos = ImGui::GetWindowPos();
+                    ::editor::publish_status_counts_slot(countsSlotMinX, barPos.y,
+                        ImGui::GetItemRectMin().x, barPos.y + ImGui::GetWindowSize().y);
+                }
                 if (wasDebug) ImGui::PopStyleColor(3);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("Collider debug gizmos");
             }

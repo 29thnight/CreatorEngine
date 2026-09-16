@@ -19,6 +19,7 @@
 #
 #   가린다 : image 사각형 (3D 가 놓일 수 있는 자리 전부. clip ⊆ image 이므로
 #            image 를 가리면 그림이 어떻게 맞춰지든 덮인다)
+#            상태 표시줄의 로그 누적 칸 (`editor.dock` 의 statusCountsSlot)
 #   남긴다 : 툴바 왼쪽 상자 · 툴바 오른쪽 상자 · 방향 기즈모 원반
 #
 # ── 스크롤한 상태를 반드시 담는다 ───────────────────────────────────────────
@@ -32,6 +33,17 @@
 # 픽셀 골든은 기계의 배율·폰트·창 크기에 묶인다. 골든과 환경이 다르면 **틀렸다고
 # 말하지 않고 건너뛴다.** 다만 건너뛴 수를 세어 찍는다 — 조용한 건너뜀은 눈먼
 # 초록과 구별되지 않는다.
+#
+# ── 로그 누적 칸을 가리는 이유 (2026-09-17) ────────────────────────────────
+#
+# 9-16 로그 작업(19826bd6)이 상태 표시줄 오른쪽에 info/warning/error 누적을
+# 냈다. 누적은 명령 하나마다 늘어난다 — `scene.save` 표지 자체가 로그를 남긴다.
+# 그래서 같은 상태를 두 번 찍은 회차가 그 칸에서 갈렸다(x 1023..1193 · y 910..933).
+# 수를 고정하려면 캡처 직전에 저장소를 비워야 하는데, 비운 뒤에도 표지와 대기
+# 12 초 사이에 비동기 로그가 들어오고 자릿수가 바뀌면 오른쪽 정렬이 칸 안에서
+# 움직인다. 그래서 가린다. 칸의 두 끝(ProfileFrame 버튼 오른쪽 끝, 디버그 버튼
+# 왼쪽 끝)은 자릿수와 무관해 회차마다 같은 사각형이 가려진다. 대가로 계수 글자의
+# 모양은 이 골든이 보지 않는다 — 그 칸의 값은 로그 게이트의 몫이다.
 #
 # 3D 그림이 실제로 떠 있으면(`imageReady`) 그 회차도 건너뛴다. 툴바 상자가
 # 반투명(알파 0.94)이라 뒤의 그림을 6% 섞어 들이고, 그러면 남긴 자리가 3D 를
@@ -382,7 +394,7 @@ $environment = [ordered]@{
     nestDepth      = $NestDepth
 }
 
-function Get-MaskedShot($roundName, $view) {
+function Get-MaskedShot($roundName, $view, $dock) {
     $shot = Read-Shot (Join-Path $work ($roundName + '.png'))
     $outer = @(
         [int][Math]::Floor($view.imageMin[0]), [int][Math]::Floor($view.imageMin[1]),
@@ -402,7 +414,16 @@ function Get-MaskedShot($roundName, $view) {
                   [int][Math]::Ceiling($view.gizmoRadius))
     }
     $masked = [ChromePixels]::MaskExcept($shot.bytes, $shot.width, $shot.height, $outer, $keep, $disc)
-    return @{ shot = $shot; masked = $masked }
+    $countsMasked = 0
+    if ($dock.PSObject.Properties.Name -contains 'statusCountsSlot') {
+        $slot = $dock.statusCountsSlot
+        $countsOuter = @(
+            [int][Math]::Floor($slot[0]), [int][Math]::Floor($slot[1]),
+            [int][Math]::Ceiling($slot[2]), [int][Math]::Ceiling($slot[3]))
+        $countsMasked = [ChromePixels]::MaskExcept($shot.bytes, $shot.width, $shot.height,
+            $countsOuter, $null, $null)
+    }
+    return @{ shot = $shot; masked = $masked; countsMasked = $countsMasked }
 }
 
 # ── 회차마다 가린 그림을 만든다 ─────────────────────────────────────────────
@@ -411,14 +432,21 @@ $prepared = @()
 for ($at = 0; $at -lt $rounds.Count; ++$at) {
     $name = $rounds[$at].name
     $view = $views[$at].data
-    $made = Get-MaskedShot $name $view
+    $made = Get-MaskedShot $name $view $docks[$at].data
     Assert ($made.masked -gt 0) "${name}: 가린 화소가 0 이다 — image 사각형이 화면 밖이거나 비었다"
+    # 칸을 못 받으면 조용히 안 가리고 넘어가지 않는다. 가리지 못한 채 떠진 골든은
+    # 다음 실행의 재현 축을 다시 붉힌다.
+    Assert ($made.countsMasked -gt 0) "${name}: 로그 누적 칸을 가리지 못했다 — editor.dock 에 statusCountsSlot 이 없거나 비었다"
     $prepared += @{ name = $name; shot = $made.shot; masked = $made.masked; view = $view;
                     compareWith = $rounds[$at].compareWith }
-    Write-Host ("  가림: " + $name + " — " + $made.masked + " 화소")
+    Write-Host ("  가림: " + $name + " — " + $made.masked + " 화소 · 로그 누적 칸 " + $made.countsMasked + " 화소")
 }
 
 if ($Update) {
+    if ($script:failures.Count -gt 0) {
+        Write-Host ("FAIL verify-editor-chrome-golden — 가리기가 서지 않아 골든을 뜨지 않는다: " + $script:failures.Count + " 건")
+        exit 1
+    }
     foreach ($item in $prepared) {
         if ($null -ne $item.compareWith) { continue }   # 같은 상태를 두 번 찍은 회차
         Write-Shot $item.shot (Join-Path $GoldenDir ($item.name + '.png'))

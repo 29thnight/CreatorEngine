@@ -1044,6 +1044,13 @@ namespace ConsoleCmd
         data.Set("uiScale", CommandData::Double(snapshot.ui_scale));
         data.Set("minCentralWidth", CommandData::Double(snapshot.min_central_width));
         data.Set("minCentralHeight", CommandData::Double(snapshot.min_central_height));
+        // 상태 표시줄의 로그 누적 칸. chrome golden 이 가린다(명령마다 바뀐다).
+        if (const auto slot = ::editor::read_status_counts_slot(); slot.valid)
+        {
+            auto rect = CommandData::Array();
+            for (float value : slot.rect) rect.Append(CommandData::Double(value));
+            data.Set("statusCountsSlot", std::move(rect));
+        }
 
         // W0 후반 성능 기준선. 타깃별 GPU ms 는 잴 수단이 없어 빠졌다 —
         // 이유는 덤프의 [NOTE] 에 적혀 있다.
