@@ -45,8 +45,9 @@ namespace EditorObjectOperations
         public:
             RenameCommand(EntityHandle target, std::string before, std::string after)
                 : m_target(Resolve(target)), m_before(std::move(before)), m_after(std::move(after)) {}
-            void Undo() override { if (auto* object = m_target.Resolve()) object->m_name.SetString(m_before); }
-            void Redo() override { if (auto* object = m_target.Resolve()) object->m_name.SetString(m_after); }
+            // 이름 등록부를 같이 옮겨야 옛 이름이 반환되고 새 이름이 예약된다 — Scene::RenameEntity.
+            void Undo() override { if (auto* object = m_target.Resolve()) object->GetScene()->RenameEntity(*object, m_before); }
+            void Redo() override { if (auto* object = m_target.Resolve()) object->GetScene()->RenameEntity(*object, m_after); }
         private:
             Meta::EntityReference m_target;
             std::string m_before, m_after;

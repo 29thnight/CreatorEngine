@@ -771,6 +771,10 @@ public:
 	std::unordered_map<std::string, EntityHandle>& GetCanvasMap() { return CanvasMap; }
 	// 해석까지 끝난 값을 준다(fail-closed — 이 씬에 없으면 nullptr).
 	Entity* FindCanvasName(std::string_view name);
+	// 이름 등록부(m_entityNameSet)를 함께 옮기는 유일한 이름 변경 창구. m_name 을
+	// 직접 쓰면 옛 이름이 반환되지 않고 새 이름이 예약되지 않는다 — 새 엔티티가
+	// 빈 이름 대신 " (N)" 을 받거나 중복 이름을 받는다.
+	void RenameEntity(Entity& entity, std::string_view name);
 
 private:
     void DestroyEntities();

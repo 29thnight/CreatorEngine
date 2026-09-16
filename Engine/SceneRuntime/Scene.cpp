@@ -3526,6 +3526,13 @@ void Scene::RemoveEntityName(const std::string_view& name)
     m_entityNameSet.erase(name.data());
 }
 
+void Scene::RenameEntity(Entity& entity, std::string_view name)
+{
+    RemoveEntityName(entity.GetHashedName().ToString());
+    m_entityNameSet.emplace(name);
+    entity.SetName(name);
+}
+
 // 순회 진입 가드 단일화 구현(선언은 Scene.h — 이유·수렴 안 시킨 두 곳의 근거도
 // 거기 있다). Debug 전역이 필요해 Scene.h가 아니라 여기서 정의하고, 실제로
 // 쓰이는 두 키 타입(Entity::Index·GameObject*)만 명시 인스턴스화한다 —

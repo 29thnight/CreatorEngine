@@ -245,6 +245,12 @@ Run-Step "Commandlet 격리 및 공통 편집 API" {
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-editor-command-surface.ps1") -Exe $Exe -Work (Join-Path $Work 'command-surface')
 }
 
+# object.rename 과 그 Undo/Redo 가 Scene 이름 등록부를 옮기는가(2026-09-16).
+# 옛 RenameCommand 는 m_name 만 바꿔 옛 이름이 영영 반환되지 않았다.
+Run-Step "엔티티 rename 이름 등록부" {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot "verify-entity-rename-name-registry.ps1") -Editor $Exe -Work $Work
+}
+
 # PHASE 21 M4 — editor:: 선언 배선.
 #
 # 두 자가 검사(창 표·메뉴 표)와 창 배선 감사를 한 번에 태운다. 둘 다 오래
