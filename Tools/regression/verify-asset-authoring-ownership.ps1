@@ -204,9 +204,41 @@ if (-not (Test-Path -LiteralPath $EditorExe)) {
     throw "Editor executable is missing: $EditorExe"
 }
 $editorRuntimeDirectory = Split-Path $EditorExe -Parent
-$editorWatcherRuntime = Join-Path $editorRuntimeDirectory "efsw.dll"
-if (-not (Test-Path -LiteralPath $editorWatcherRuntime)) {
+# 감시자 런타임(efsw)은 실행 파일 옆이 아니라 공유 배치의 `Runtime\Editor` 에
+# 있다(abbad0f6 엔진 배포·런처). 찾는 규칙은 `Tools\runtime\RuntimeLauncher.cpp`
+# 를 따른다 — 실행 파일 폴더에서 두 단계 위까지 `Runtime\layout.version` 을
+# 찾고, 에디터일 때만 `Runtime\Editor` 를 DLL 경로에 올린다. 규칙을 따로 세우면
+# 런처가 못 찾는 자리를 이 검사는 찾았다고 말할 수 있다.
+$layoutRoot = $editorRuntimeDirectory
+$layoutFound = $false
+for ($depth = 0; $depth -le 2 -and $layoutRoot; ++$depth) {
+    if (Test-Path -LiteralPath (Join-Path $layoutRoot "Runtime\layout.version") -PathType Leaf) {
+        $layoutFound = $true
+        break
+    }
+    $layoutRoot = Split-Path $layoutRoot -Parent
+}
+if (-not $layoutFound) {
+    throw "Editor runtime layout is missing: no Runtime\layout.version within two parents of $editorRuntimeDirectory"
+}
+$layoutVersion = (Get-Content -LiteralPath (Join-Path $layoutRoot "Runtime\layout.version") -TotalCount 1).Trim()
+if ($layoutVersion -ne "1") {
+    throw "Editor runtime layout version is unsupported: $layoutVersion"
+}
+$editorWatcherRuntime = Join-Path $layoutRoot "Runtime\Editor\efsw.dll"
+if (-not (Test-Path -LiteralPath $editorWatcherRuntime -PathType Leaf)) {
     throw "Editor asset database runtime is missing: $editorWatcherRuntime"
+}
+# 파일이 우연히 남아 있는 것과 배포가 싣는 것은 다르다. 배포 목록에 없으면
+# 다음 배치 정리에서 사라진다.
+$editorHostName = [IO.Path]::GetFileNameWithoutExtension($EditorExe)
+$editorManifestPath = Join-Path $layoutRoot ("Runtime\Manifests\" + $editorHostName + ".json")
+if (-not (Test-Path -LiteralPath $editorManifestPath -PathType Leaf)) {
+    throw "Editor runtime manifest is missing: $editorManifestPath"
+}
+$editorManifest = Get-Content -LiteralPath $editorManifestPath -Raw | ConvertFrom-Json
+if (-not (@($editorManifest.entries) | Where-Object { $_.path -ieq "Runtime/Editor/efsw.dll" })) {
+    throw "Editor runtime manifest does not ship the asset database runtime: $editorManifestPath"
 }
 
 $probeName = "CE_AssetWriterProbe_" + [guid]::NewGuid().ToString("N")
@@ -291,7 +323,11 @@ function Test-ByteSequence([byte[]]$bytes, [byte[]]$needle) {
     return $false
 }
 
-function Invoke-Import([string]$suffix) {
+# 기대 종료 코드를 받는다. 탐침 대부분은 거부도 "기대한 거부" 로 성공(0)을
+# 돌려주지만, 거부 모드를 따로 두지 않은 탐침은 거부를 `Failed`(4)로 낸다
+# (LC1 987a552e 이 실패를 종료 코드에 이은 뒤부터). 0 만 받으면 그 거부의
+# 출력을 보기도 전에 던진다.
+function Invoke-Import([string]$suffix, [int]$ExpectedExitCode = 0) {
     $stdout = Join-Path $tempRoot ("stdout-" + $suffix + ".txt")
     $stderr = Join-Path $tempRoot ("stderr-" + $suffix + ".txt")
     $process = Start-Process -FilePath $EditorExe `
@@ -303,11 +339,11 @@ function Invoke-Import([string]$suffix) {
         throw "asset-authoring probe timed out ($suffix)"
     }
     $process.WaitForExit()
-    if ($process.ExitCode -ne 0) {
+    if ($process.ExitCode -ne $ExpectedExitCode) {
         $errorText = if (Test-Path -LiteralPath $stderr) {
             Get-Content -LiteralPath $stderr -Raw
         } else { "" }
-        throw "asset-authoring probe failed ($suffix): exit=$($process.ExitCode) $errorText"
+        throw "asset-authoring probe failed ($suffix): exit=$($process.ExitCode) expected=$ExpectedExitCode $errorText"
     }
     return Get-Content -LiteralPath $stdout -Raw
 }
@@ -495,7 +531,9 @@ try {
         "foliage.authoring.probe ${foliageName}:ads"
         "quit"
     ))
-    $foliageAdsOutput = Invoke-Import "foliage-ads"
+    # 이 탐침에는 거부 모드가 없어(`escape` 만 있다) 거부가 곧 `Failed` 다.
+    # 이름 검사가 풀려 커밋되면 종료 코드가 0 이 되어 여기서 붉어진다.
+    $foliageAdsOutput = Invoke-Import "foliage-ads" 4
     if ($foliageAdsOutput -notmatch '\[foliage\.authoring\.probe\] rejected') {
         throw "Foliage alternate-data-stream name was not rejected"
     }

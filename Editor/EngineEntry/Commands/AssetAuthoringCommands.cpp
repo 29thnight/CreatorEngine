@@ -690,7 +690,14 @@ namespace ConsoleCmd
         auto data = CommandData::Object();
         data.Set("keys", CommandData::Int(reloaded.GetValues().size()));
         data.Set("roundTrip", CommandData::Int(roundTrip));
-        return !empty && !noName && roundTrip == 4177 ? Ok({}, std::move(data)) : Fail("blackboard.authoring.failed", "Commandlet verification failed", std::move(data));
+        // 빈 판은 "값 0 개로 저장되고 다시 열린다" 가 성공이다. 예전 식은
+        // `!empty` 를 조건에 넣어 그 성공을 언제나 Failed 로 냈다 — LC1 이 실패를
+        // 종료 코드에 이은 뒤로 게이트가 커밋을 확인하기도 전에 죽었다.
+        // 이름 없는 판이 여기까지 왔다면 거부가 풀린 것이므로 실패다.
+        const bool verified = empty
+            ? reloaded.GetValues().empty() && 0 == roundTrip
+            : !noName && 4177 == roundTrip;
+        return verified ? Ok({}, std::move(data)) : Fail("blackboard.authoring.failed", "Commandlet verification failed", std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_material_corpus_probe(const ConsoleCommandContext& ctx)
