@@ -30,6 +30,9 @@
 #include <thread>
 #include <vector>
 
+#include "Audio/AudioRuntime.h"
+#include "Audio/MiniaudioBackend.h"
+#include "Audio/NullAudioBackend.h"
 #include "Audio/VoiceTable.h"
 #include "PathFinder.h"
 #include "SoundManager.h"
@@ -150,7 +153,17 @@ namespace
 
         // `SoundManager::LoadSounds` 는 파일명 stem 을 클립 키로 쓴다.
         if (!WriteSineWav(out.assets / "Sounds" / "probe_tone.wav", 0.60f, 440.0f)) return false;
-        if (!WriteSineWav(out.assets / "Sounds" / "probe_blip.wav", 0.20f, 880.0f)) return false;
+        if (!WriteSineWav(out.assets / "Sounds" / "probe_blip.wav", 0.12f, 880.0f)) return false;
+
+        // ★ 손상 파일. "적재 성공, 재생 실패" 로 뒤늦게 드러나는 것을 막는 canary 다.
+        //   확장자만 .wav 이고 내용은 RIFF 가 아니다.
+        {
+            std::ofstream broken(out.assets / "Sounds" / "probe_broken.wav",
+                std::ios::binary | std::ios::trunc);
+            if (!broken.is_open()) return false;
+            broken << "이것은 WAV 가 아니다. not a riff header at all.";
+            if (!broken.good()) return false;
+        }
         return true;
     }
 
@@ -318,6 +331,139 @@ namespace
         (void)slotB;
         (void)slotC;
     }
+
+    [[nodiscard]] bool NearlyEqual(float left, float right) noexcept
+    {
+        return std::abs(left - right) < 1e-4f;
+    }
+
+    // ── 검사 7: wave + Null 백엔드 ────────────────────────────────────────
+    //
+    // 장치 없이 도는 결정적 경로다. 여기서 재는 것은 소리가 아니라 **계약**이다 —
+    // 시작 전/적재 전 재생 거부, 손잡이 수명, 값 전달, 용량, 소유자별 정지, 종료.
+    void RunWaveNullBackend()
+    {
+        std::printf("[7] wave + Null 백엔드\n");
+
+        wave::NullAudioBackend backend;
+        wave::AudioRuntime runtime(backend, 2);
+
+        wave::PlayRequest request{};
+        request.clip = wave::ClipKey("probe_tone");
+        request.bus = wave::BusId{ 1u };
+        request.ownerId = 42u;
+
+        Report(!runtime.Play(request).IsValid(), "시작 전 재생은 무효 핸들이다");
+        Report(runtime.Start(wave::DeviceSettings{}), "Null 백엔드가 시작한다");
+        const std::size_t attemptsBefore = backend.StartVoiceAttempts();
+        Report(!runtime.Play(request).IsValid(), "적재되지 않은 클립은 무효 핸들이다");
+        // ★ 위 단정만으로는 런타임이 막았는지 백엔드가 막았는지 알 수 없다 — 실제로
+        //   런타임 가드를 변이로 걷었을 때 Null 이 대신 막아 통과했다. 요청이 백엔드에
+        //   닿지 않았음을 함께 재야 그 자리가 못 박힌다.
+        Report(attemptsBefore == backend.StartVoiceAttempts(),
+            "없는 클립은 백엔드에 요청조차 가지 않는다");
+
+        Report(runtime.LoadClip(request.clip, "probe_tone.wav"), "클립이 적재된다");
+        Report(1u == runtime.ListClipKeys().size(), "적재된 클립이 목록에 오른다");
+
+        const wave::VoiceHandle voice = runtime.Play(request);
+        Report(voice.IsValid(), "적재 뒤 재생이 손잡이를 준다");
+        Report(runtime.IsAlive(voice), "손잡이가 살아 있다");
+        Report(1u == backend.PlayingCount(), "백엔드가 실제로 하나를 울린다");
+
+        // 값 전달과 이득 합성. 기본 이득 × 감쇠가 백엔드에 닿아야 한다.
+        const wave::BackendVoiceId firstBackendVoice{ 1u };
+        runtime.SetVoiceParameters(voice, 0.5f, 1.5f, 10);
+        Report(NearlyEqual(backend.VoiceVolume(firstBackendVoice), 0.5f),
+            "값 변경이 백엔드까지 간다");
+        Report(NearlyEqual(backend.VoicePitch(firstBackendVoice), 1.5f),
+            "피치가 백엔드까지 간다");
+        runtime.SetVoiceGain(voice, 0.5f);
+        Report(NearlyEqual(backend.VoiceVolume(firstBackendVoice), 0.25f),
+            "감쇠가 기본 이득과 곱해진다");
+
+        const wave::VoiceHandle second = runtime.Play(request);
+        const wave::VoiceHandle third = runtime.Play(request);
+        Report(second.IsValid(), "용량 안에서는 더 잡힌다");
+        Report(!third.IsValid(), "용량을 넘으면 무효 핸들이다");
+
+        runtime.SetPaused(voice, true);
+        Report(runtime.IsAlive(voice), "일시정지해도 손잡이는 살아 있다");
+        runtime.Update(0.016f);
+        Report(runtime.IsAlive(voice), "틱이 일시정지한 보이스를 회수하지 않는다");
+        runtime.SetPaused(voice, false);
+
+        runtime.StopByOwner(42u);
+        Report(!runtime.IsAlive(voice) && !runtime.IsAlive(second),
+            "소유자별 정지가 그 소유자의 것을 전부 끈다");
+        Report(0u == backend.PlayingCount(), "백엔드에도 남지 않는다");
+
+        wave::ListenerState listener{};
+        listener.position = math::vector3{ 1.0f, 2.0f, 3.0f };
+        runtime.SetListener(listener);
+        Report(NearlyEqual(backend.Listener().position.x, 1.0f) &&
+            NearlyEqual(backend.Listener().position.z, 3.0f), "리스너가 백엔드로 간다");
+
+        runtime.Shutdown();
+        Report(!backend.IsRunning(), "종료가 백엔드를 멈춘다");
+    }
+
+    // ── 검사 8: wave + miniaudio ──────────────────────────────────────────
+    //
+    // 실제 장치로 도는 경로다. 장치가 없으면 이 검사만 건너뛴다(그 자체가 degrade
+    // 계약이다 — Null 로 내려가면 상위는 분기하지 않는다).
+    void RunWaveMiniaudio(const Fixture& fixture)
+    {
+        std::printf("[8] wave + miniaudio\n");
+
+        wave::MiniaudioBackend backend;
+        wave::AudioRuntime runtime(backend, 8);
+
+        if (!runtime.Start(wave::DeviceSettings{}))
+        {
+            std::printf("  (장치를 열지 못했다: %s — 이 검사만 건너뛴다)\n",
+                backend.LastError().c_str());
+            return;
+        }
+        Report(backend.IsRunning(), "miniaudio 장치가 열린다");
+        Report(backend.ActualSettings().sampleRate > 0u, "열린 장치의 sampleRate 가 보고된다");
+
+        const file::path sounds = fixture.assets / "Sounds";
+        const wave::ClipKey tone("probe_tone");
+        const wave::ClipKey blip("probe_blip");
+
+        Report(runtime.LoadClip(tone, sounds / "probe_tone.wav"), "생성한 WAV 가 적재된다");
+        Report(!runtime.LoadClip(wave::ClipKey("probe_broken"), sounds / "probe_broken.wav"),
+            "손상 파일은 적재가 거부된다");
+        Report(!backend.LastError().empty(), "거부 사유가 문장으로 남는다");
+
+        wave::PlayRequest request{};
+        request.clip = tone;
+        request.bus = wave::BusId{ 1u };
+        request.ownerId = 7u;
+
+        const wave::VoiceHandle voice = runtime.Play(request);
+        Report(voice.IsValid(), "재생이 손잡이를 준다");
+        runtime.Update(0.016f);
+        Report(runtime.IsAlive(voice), "틱 뒤에도 살아 있다");
+        runtime.Stop(voice);
+        Report(!runtime.IsAlive(voice), "정지 뒤 손잡이가 죽는다");
+
+        // ★ 자연 종료 회수. 옛 배선에는 이 경로가 아예 없어 끝난 소리의 자리가
+        //   백엔드 열거로만 드러났다. 짧은 클립을 끝까지 두고 틱이 슬롯을 돌려주는지 본다.
+        wave::PlayRequest shortRequest = request;
+        shortRequest.clip = blip;
+        Report(runtime.LoadClip(blip, sounds / "probe_blip.wav"), "짧은 클립이 적재된다");
+        const wave::VoiceHandle shortVoice = runtime.Play(shortRequest);
+        Report(shortVoice.IsValid(), "짧은 클립이 재생된다");
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        runtime.Update(0.016f);
+        Report(!runtime.IsAlive(shortVoice), "끝난 보이스를 틱이 회수한다");
+        Report(0u == runtime.AliveVoiceCount(), "회수 뒤 생존 보이스가 0이다");
+
+        runtime.Shutdown();
+        Report(!backend.IsRunning(), "종료가 장치를 닫는다");
+    }
 }
 
 int main(int argc, char** argv)
@@ -385,6 +531,8 @@ int main(int argc, char** argv)
     }
     RunListenerRoundTrip();
     RunVoiceTable();
+    RunWaveNullBackend();
+    RunWaveMiniaudio(fixture);
 
     std::printf("실패 %d건\n", g_failures);
     // ★ 여기서 정상 반환한다. 싱글톤은 누수되므로 소멸자가 돌지 않는다 —

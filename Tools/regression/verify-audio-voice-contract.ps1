@@ -78,6 +78,9 @@ $engineSources = @(
 # 경고 수준(/W4 /WX)으로 짓는다.
 $waveSources = @(
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\VoiceTable.cpp')
+    (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\NullAudioBackend.cpp')
+    (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\AudioRuntime.cpp')
+    (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\MiniaudioBackend.cpp')
 )
 foreach ($source in $waveSources) {
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "원본이 없다: $source" }
@@ -179,6 +182,9 @@ if (-not (Test-Path -LiteralPath $fmodLib -PathType Leaf)) {
     throw "FMOD 라이브러리가 없다: $fmodLib"
 }
 $libArguments += '"' + $fmodLib + '"'
+# miniaudio 의 Windows 백엔드가 쓰는 시스템 라이브러리. 벤더 소스는
+# `#pragma comment(lib, ...)` 를 심지 않으므로 여기서 준다.
+$libArguments += @('ole32.lib', 'user32.lib', 'advapi32.lib')
 
 Write-Host ("[AUDIO VOICE] {0} 링크" -f $Configuration)
 $linkCommand = 'call "' + $vcvars + '" >nul && link.exe /nologo /OUT:"' + $executable +
