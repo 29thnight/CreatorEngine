@@ -46,16 +46,30 @@
 #      같은 술어(`CanCreateVolumeProfileIn`)와 같은 생성 경로(`CreateNamedAsset`)를 쓴다
 #  16  "Show in Folder" 는 원래 폴더로 가서 그 자산을 고른다
 #
+# 프로젝트 전환 축 (임시 프로젝트 둘 · 같은 작업 공간 · 에디터 3 회)
+#  17  ★ 이전 프로젝트의 이력·선택·최근 항목이 새지 않는다. 계약 6 의 *"프로젝트 변경 때
+#      이전 프로젝트의 이력/선택을 재사용하지 않는다"* 다. 이 제품에는 세션 안에서 프로젝트를
+#      바꾸는 길이 없다 — 뿌리는 기동 때 `--development-project` 로 한 번 정해진다(App.cpp).
+#      그래서 전환은 **다른 프로젝트로 다시 띄우는 것**이고, 새어 나갈 수 있는 통로는 둘이다:
+#      같은 작업 공간(`CREATOR_EDITOR_WORKSPACE_DIR`)과 최근 항목 저장 파일.
+#      A 에서 Volume Profile 을 만들어 최근에 올리고 하위 폴더로 이동한다 → B 를 같은 작업
+#      공간으로 띄운다 → B 는 뿌리·이력 0/1·선택 없음·최근 0 이어야 하고, 결과는 B 의 폴더다.
+#      B 에도 **같은 상대 경로** `VolumeProfile/Keep.volume` 을 둔다 — 최근 항목이 프로젝트가
+#      아니라 상대 경로로만 묶이면 B 에서 그것이 살아난다. 다시 A 를 띄우면 A 의 최근 1 이
+#      그대로다(B 가 덮지 않았다). A 의 저장 파일 바이트는 B 회차 앞뒤로 같아야 한다.
+#
 # 사용
 #   pwsh -File Tools/regression/verify-content-browser-navigation.ps1 -Exe <CreatorEditor.exe>
 #   -SkipRuntime            소스 축만(변이 확인용)
+#   -SkipProjectSwitch      프로젝트 전환 축을 건너뛴다
 #   -SourceRoot <dir>       소스 축이 읽을 저장소 뿌리(변이 사본)
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$ProjectRoot = (Join-Path $PSScriptRoot "..\..\Dynamic_CPP"),
     [string]$SourceRoot = (Join-Path $PSScriptRoot "..\.."),
     [string]$Work = "",
-    [switch]$SkipRuntime
+    [switch]$SkipRuntime,
+    [switch]$SkipProjectSwitch
 )
 
 $ErrorActionPreference = "Stop"
@@ -409,7 +423,110 @@ if (-not $SkipRuntime) {
     $runtimeSummary = "실행 표본 $($snaps.Count)"
 }
 
-"Content Browser 탐색 검사: 단정 $checks · $runtimeSummary · 받는 자리 $($sites.Count)"
+# ═══════════════════════════════════════════════════════════════════════════
+# 프로젝트 전환 축
+# ═══════════════════════════════════════════════════════════════════════════
+$switchSummary = "전환 축 건너뜀"
+if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
+    $switchRoot = Join-Path ([IO.Path]::GetTempPath()) ("CE_BrowserProjectSwitch_" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+    $projectA = Join-Path $switchRoot 'ProjA'
+    $projectB = Join-Path $switchRoot 'ProjB'
+    $switchWorkspace = Join-Path $switchRoot 'workspace'
+    foreach ($dir in @("$projectA\Assets\VolumeProfile", "$projectA\Assets\OnlyA", "$projectB\Assets\VolumeProfile", "$projectB\Assets\OnlyB", $switchWorkspace)) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    }
+    $recentsA = Join-Path $projectA 'Library\EditorState\ContentBrowserRecents.txt'
+    $recentsB = Join-Path $projectB 'Library\EditorState\ContentBrowserRecents.txt'
+
+    function Invoke-ProjectRun([string]$project, [string]$name, [string[]]$commands) {
+        $scriptFile = Join-Path $switchRoot "$name.txt"
+        $resultFile = Join-Path $switchRoot "$name.jsonl"
+        $all = @('wait 240') + $commands + @('quit')
+        Set-Content -LiteralPath $scriptFile -Encoding UTF8 -Value $all
+        $priorWorkspace = $env:CREATOR_EDITOR_WORKSPACE_DIR
+        $priorLegacy = $env:CREATOR_EDITOR_LEGACY_INI
+        # ★ 세 회차가 **같은** 작업 공간을 쓴다 — 그것이 새는 통로 하나다.
+        $env:CREATOR_EDITOR_WORKSPACE_DIR = $switchWorkspace
+        $env:CREATOR_EDITOR_LEGACY_INI = Join-Path $switchWorkspace 'legacy.ini'
+        try {
+            $proc = Start-Process -FilePath $Exe -WorkingDirectory (Split-Path $Exe) -PassThru -WindowStyle Hidden `
+                -ArgumentList @('--development-project', ('"' + $project + '"'), '--script', ('"' + $scriptFile + '"'),
+                                '--result-format', 'jsonl', '--result-file', ('"' + $resultFile + '"')) `
+                -RedirectStandardOutput (Join-Path $switchRoot "$name.out") -RedirectStandardError (Join-Path $switchRoot "$name.err")
+            if (-not $proc.WaitForExit(600000)) { $proc.Kill(); throw "project run $name did not exit" }
+        }
+        finally {
+            if ($null -ne $priorWorkspace) { $env:CREATOR_EDITOR_WORKSPACE_DIR = $priorWorkspace }
+            else { Remove-Item Env:CREATOR_EDITOR_WORKSPACE_DIR -ErrorAction SilentlyContinue }
+            if ($null -ne $priorLegacy) { $env:CREATOR_EDITOR_LEGACY_INI = $priorLegacy }
+            else { Remove-Item Env:CREATOR_EDITOR_LEGACY_INI -ErrorAction SilentlyContinue }
+        }
+        Assert ($proc.ExitCode -eq 0) "17 $name 에디터 종료 코드가 $($proc.ExitCode) 다"
+        if (-not (Test-Path -LiteralPath $resultFile)) { throw "project run $name wrote no result file" }
+        $rows = @(Get-Content -LiteralPath $resultFile | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
+        Assert ($rows.Count -eq $all.Count) "17 $name 결과 줄 수 $($rows.Count) 가 스크립트 줄 수 $($all.Count) 와 다르다"
+        $snapshots = @()
+        for ($k = 0; $k -lt [Math]::Min($rows.Count, $all.Count); $k++) {
+            if ($all[$k] -eq 'editor.browser') { $snapshots += $rows[$k].data }
+        }
+        return ,$snapshots
+    }
+
+    try {
+        # A — 최근 항목을 만들고, 이력을 늘리고, 선택한 채 끝낸다.
+        $a1 = Invoke-ProjectRun $projectA 'a1' @(
+            'editor.browser go VolumeProfile', 'wait 5',
+            'editor.browser create volume Keep', 'wait 5',
+            'editor.browser go OnlyA', 'wait 5',
+            'editor.browser')
+        Assert ($a1.Count -eq 1) "17 a1 표본이 1 개가 아니다($($a1.Count))"
+        if ($a1.Count -eq 1) {
+            Assert ([int]$a1[0].recentCount -eq 1 -and [int]$a1[0].historySize -eq 3 -and $a1[0].directory -eq 'OnlyA') `
+                "17 a1 이 자극을 만들지 못했다(recent=$($a1[0].recentCount) hist=$($a1[0].historySize) dir='$($a1[0].directory)')"
+        }
+        Assert (Test-Path -LiteralPath $recentsA) "17 A 의 최근 항목 파일이 생기지 않았다 — 비교할 것이 없다"
+        $recentsABytes = if (Test-Path -LiteralPath $recentsA) { [Convert]::ToBase64String([IO.File]::ReadAllBytes($recentsA)) } else { '' }
+
+        # B 에 같은 상대 경로의 파일을 둔다(메타는 없다 — B 에서 고른 적이 없는 파일이다).
+        Copy-Item -LiteralPath (Join-Path $projectA 'Assets\VolumeProfile\Keep.volume') -Destination (Join-Path $projectB 'Assets\VolumeProfile\Keep.volume')
+
+        $b1 = Invoke-ProjectRun $projectB 'b1' @(
+            'editor.browser',
+            'editor.browser go @recent', 'wait 10',
+            'editor.browser')
+        Assert ($b1.Count -eq 2) "17 b1 표본이 2 개가 아니다($($b1.Count))"
+        if ($b1.Count -eq 2) {
+            $first = $b1[0]
+            Assert ($first.scope -eq 'folder' -and $first.directory -eq '.') "17 B 가 뿌리에서 시작하지 않았다($($first.scope) '$($first.directory)')"
+            Assert ([int]$first.historySize -eq 1 -and [int]$first.historyIndex -eq 0) "17 B 에 A 의 이력이 남았다($($first.historyIndex)/$($first.historySize) [$(@($first.history) -join ', ')])"
+            Assert ($first.selected -eq '') "17 B 에 A 의 선택이 남았다('$($first.selected)')"
+            Assert ([int]$first.recentCount -eq 0) "17 B 에 A 의 최근 항목이 보인다(recent=$($first.recentCount))"
+            $firstResults = @($first.results)
+            Assert (($firstResults -contains 'OnlyB') -and -not ($firstResults -contains 'OnlyA')) `
+                "17 B 의 결과가 B 의 폴더가 아니다([$($firstResults -join ' | ')])"
+            Assert ($b1[1].scope -eq 'recent' -and [int]$b1[1].resultCount -eq 0) `
+                "17 B 의 최근 항목에 결과가 있다($($b1[1].resultCount) [$(@($b1[1].results) -join ' | ')])"
+        }
+        $recentsAAfterB = if (Test-Path -LiteralPath $recentsA) { [Convert]::ToBase64String([IO.File]::ReadAllBytes($recentsA)) } else { '' }
+        Assert ($recentsABytes -eq $recentsAAfterB) "17 B 회차가 A 의 최근 항목 파일을 바꿨다"
+        $bText = if (Test-Path -LiteralPath $recentsB) { [IO.File]::ReadAllText($recentsB) } else { '' }
+        Assert ($bText.Trim() -eq '') "17 B 의 최근 항목 파일에 내용이 생겼다('$($bText.Trim())')"
+
+        $a2 = Invoke-ProjectRun $projectA 'a2' @('editor.browser')
+        Assert ($a2.Count -eq 1) "17 a2 표본이 1 개가 아니다($($a2.Count))"
+        if ($a2.Count -eq 1) {
+            Assert ([int]$a2[0].recentCount -eq 1) "17 A 로 돌아왔는데 최근 항목이 $($a2[0].recentCount) 개다 — 1 이어야 한다"
+            Assert ($a2[0].directory -eq '.' -and [int]$a2[0].historySize -eq 1 -and $a2[0].selected -eq '') `
+                "17 A 의 다음 세션이 뿌리·빈 이력·빈 선택으로 시작하지 않았다('$($a2[0].directory)' $($a2[0].historySize) '$($a2[0].selected)')"
+        }
+        $switchSummary = "전환 회차 3"
+    }
+    finally {
+        Remove-Item -LiteralPath $switchRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+"Content Browser 탐색 검사: 단정 $checks · $runtimeSummary · $switchSummary · 받는 자리 $($sites.Count)"
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { "  FAIL $_" }
     throw "Content Browser 탐색 검사 실패 $($failures.Count) 건"
