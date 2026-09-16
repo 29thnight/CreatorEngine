@@ -7,6 +7,7 @@
 
 | 폴더 | 무엇 | 왜 vcpkg가 아닌가 |
 |---|---|---|
+| `miniaudio/` | 오디오 device·decoder·믹싱 백엔드(단일 헤더) | **DLL 로 배포하지 않기로 했다** — 공식 ABI 안정성 보장이 없고 MSI 런타임 의존을 늘리지 않는다. 구현 TU 하나만 직접 컴파일하면 그 결정이 빌드 구조로 강제된다. device·decoder·resampler 가 얽혀 있어 판본이 조용히 바뀌면 재현이 깨지므로 tag/hash 를 이 저장소가 쥔다. 판본·라이선스 선택·통합 규약은 [miniaudio/PROVENANCE.md](miniaudio/PROVENANCE.md) |
 | `Fmod/` | FMOD Studio API 헤더·라이브러리 | 독점 SDK다. 재배포 조건이 있어 공개 레지스트리에 없다. `lib/x64/`는 `.gitignore`의 `x64/` 규칙에 걸려 추적되지 않는다 — 헤더만 저장소에 있고 라이브러리는 각자 받아 넣는다 |
 | `Vulkan-Headers/` | Vulkan C API 헤더 | 아래 ★ |
 | `Slang/` | Slang 셰이더 컴파일러 API 헤더·런타임 | PHASE 3.5 M1B의 DXIL/SPIR-V 단일 컴파일 경계다. 개발자 Vulkan SDK가 산출물을 바꾸지 못하도록 공식 릴리스의 최소 런타임을 저장소에 고정한다 |
