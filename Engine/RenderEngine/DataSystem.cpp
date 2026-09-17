@@ -1305,7 +1305,22 @@ std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view 
 	}
 
 	// 로드 (락 없이 I/O)
-	auto loaded = Texture::LoadSharedFromPath(destination.string(), isCompress);
+	// ★ 디코더는 HRESULT 실패를 예외로 던진다(Win32::ThrowIfFailed). 이 함수의 계약은
+	//   "못 읽으면 nullptr + 로그" 인데, 파일이 **있지만 그림이 아닐** 때만 예외가
+	//   새어 FinalizeMaterialRuntime → DeserializeMaterialPayload 를 뚫었다 — 텍스처
+	//   GUID 하나가 엉뚱한 자산(.shadermeta)을 가리키면 재질 복원 전체가 예외로
+	//   끊겼다. 없는 파일과 같은 자리에서 거절한다.
+	std::shared_ptr<Texture> loaded;
+	try
+	{
+		loaded = Texture::LoadSharedFromPath(destination.string(), isCompress);
+	}
+	catch (const std::exception& exception)
+	{
+		Debug::PrintLog(spdlog::level::err, "Material texture decode failed: "
+			+ destination.string() + ": " + exception.what());
+		return nullptr;
+	}
     if (loaded && srgb.has_value())
     {
         loaded = Texture::WithColorSpace(loaded, *srgb);

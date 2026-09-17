@@ -171,17 +171,44 @@ namespace
             return false;
         }
 
+        // 거부 사례는 저마다 **자기 규칙**으로 거부돼야 한다. 로더는 source 존재를
+        // property·pass 해석보다 먼저 보므로, source 가 없으면 아래 사례들은 전부
+        // "source 파일이 없다" 로 거부되고 겨냥한 규칙은 한 번도 실행되지 않는다.
+        // 9-14 Slang 이관이 Triangle.hlsl 을 .slang 으로 옮기며 실제로 그렇게 됐다
+        // (9-17 까지 중복·unknown-field 두 절이 무판정). 그래서 결함만 뺀 같은
+        // 문서가 먼저 **받아들여져야** 한다 — 이 대조군이 붉으면 거부 판정은 무효다.
+        constexpr std::string_view validControl = R"yaml(
+schema: 1
+name: ValidControl
+source: Triangle.slang
+properties:
+  - { name: value, type: float, default: 0.0 }
+passes:
+  - name: Main
+    vs: { entry: VSMain }
+    ps: { entry: PSMain }
+    state: { depthWrite: false }
+    queue: opaque
+)yaml";
+        ShaderMeta invalid;
+        std::string controlError;
+        if (!ShaderMetaLoader::Parse(validControl, metaPath, guid, invalid, controlError))
+        {
+            outLog += "[shadermeta] 거부 사례의 정상 대조군이 거부됐다(fixture 전제 붕괴): "
+                + controlError + "\n";
+            return false;
+        }
+
         constexpr std::string_view duplicateProperty = R"yaml(
 schema: 1
 name: InvalidDuplicate
-source: Triangle.hlsl
+source: Triangle.slang
 properties:
   - { name: value, type: float, default: 0.0 }
   - { name: value, type: float, default: 1.0 }
 passes:
   - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain }, queue: opaque }
 )yaml";
-        ShaderMeta invalid;
         std::string duplicateError;
         const bool duplicateRejected = !ShaderMetaLoader::Parse(
             duplicateProperty, metaPath, guid, invalid, duplicateError)
@@ -190,7 +217,7 @@ passes:
         constexpr std::string_view unknownState = R"yaml(
 schema: 1
 name: InvalidState
-source: Triangle.hlsl
+source: Triangle.slang
 passes:
   - name: Main
     vs: { entry: VSMain }
@@ -206,7 +233,7 @@ passes:
         constexpr std::string_view escapingSource = R"yaml(
 schema: 1
 name: InvalidPath
-source: ../Triangle.hlsl
+source: ../Triangle.slang
 passes:
   - { name: Main, vs: { entry: VSMain }, ps: { entry: PSMain }, queue: opaque }
 )yaml";
@@ -217,6 +244,13 @@ passes:
         if (!duplicateRejected || !unknownRejected || !pathRejected)
         {
             outLog += "[shadermeta] 중복/unknown-field/source 경계 거부 계약 불일치\n";
+            // 어느 사례가 무슨 문장으로 거부됐는지 남긴다. 합친 한 줄만으로는
+            // "규칙이 사라졌다" 와 "다른 규칙이 먼저 거부했다" 가 구분되지 않는다.
+            outLog += "  duplicate " + std::string(duplicateRejected ? "ok" : "FAIL")
+                + ": " + duplicateError + "\n  unknown-field "
+                + (unknownRejected ? "ok" : "FAIL") + ": " + unknownError
+                + "\n  source-path " + (pathRejected ? "ok" : "FAIL") + ": "
+                + pathError + "\n";
             return false;
         }
 

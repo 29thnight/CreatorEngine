@@ -346,6 +346,36 @@ postscale·ssaoscale·uploadring·live 가 스위트에서 빠진 뒤의 목록)
 - **재지 않은 것.** 실제 에디터 씬 뷰에서의 눈 확인은 하지 않았다(검사 렌더만). Vulkan `RunVulkanGizmoIconTest`
   (`VulkanSkyBoxTest.cpp`)도 같은 128 계약을 적었지만 호출자가 0 이라 돌릴 수 없다. `dx12.selftest` 는 여전히 붉다.
 
+**2026-09-17 — `dx12.selftest` 복구: 붉은 이유가 두 겹이었고 둘 다 9-14 Slang 이관 뒤 fixture 전제였다.**
+(셰이더·재질 계획서 `MaterialPipelinePlan` 은 archive 라 여기 적는다.)
+
+- **① `[shadermeta]` — 거부는 살아 있었고 문장도 그대로였다. 세 사례 중 둘이 엉뚱한 규칙으로 거부됐다.**
+  사례별 문장을 찍어 보니 중복 property·unknown field 둘은 `source 파일이 없다: …SelfTest\Triangle.hlsl` 이었고, 경로 사례만
+  제 문장이었다. abb9ff9e(9-14)가 `Triangle.hlsl`→`.slang` 으로 옮기며 이 테스트는 네 줄만 고쳐 잘못된 YAML 셋의
+  `source:` 리터럴이 남았다. 로더는 source 존재를 property·pass 해석보다 먼저 보므로, 두 규칙은 9-14 이후 **한 번도 실행되지
+  않았다**. 로더 문장(`ShaderMeta.cpp`)은 9-02 이후 그대로다.
+  - 처방: 리터럴을 `Triangle.slang` 으로. 그리고 **결함만 뺀 같은 문서(정상 대조군)가 먼저 받아들여져야** 거부 판정을 믿는다 —
+    source 가 다시 썩으면 "거부 통과" 가 아니라 대조군 실패로 붉다. 실패 시 사례마다 ok/FAIL 과 문장을 남긴다.
+  - 오류 코드: `ShaderMetaLoader` 는 문자열만 낸다(코드 없음). 그래서 부분 문자열 단정을 두고 대조군으로 원인 혼동을 막았다.
+- **② 그 뒤에 9-14 의 `[shader reflection] exception at material authoring round trip: Unknown exception` 이 그대로 있었다.**
+  cdb 첫 기회 예외 스택: `Win32::ThrowIfFailed ← Texture::LoadSharedFromPath ← DataSystem::LoadSharedMaterialTexture ←
+  FinalizeMaterialRuntime ← DeserializeMaterialPayload ← RunShaderReflectionSelfTestImpl`. 결함 셋:
+  1. **테스트 전제** — `albedoMap` 텍스처 GUID 로 `meta.guid`(= `.shadermeta`)를 썼다. 복원이 GUID 로 텍스처를 실제로 읽으면서
+     셰이더 메타를 WIC 로 디코드하러 갔다. 왕복은 진짜 그림(`texturePath` 의 GUID)으로 바꿨다.
+  2. **제품 결함** — `LoadSharedMaterialTexture` 의 계약은 "못 읽으면 nullptr + 로그" 인데 **파일은 있고 그림이 아니면** 디코더
+     예외가 새어 재질 복원 전체를 뚫었다(텍스처 참조 하나가 씬 로드를 예외로 끊을 수 있다). 디코드를 감싸 로그 + nullptr 로
+     거절한다. 새 단계 `material texture decode fail-closed` 가 그림이 아닌 GUID 를 가진 재질이 예외 없이 복원되고 나머지 값
+     (roughness 0.75)이 사는지 단정한다.
+  3. **진단 결함** — `ComException::CreateException` 이 `std::exception` 을 **값으로** 돌려줘 던지는 순간 잘렸다(what() 이
+     MSVC 기본 "Unknown exception", HRESULT 소실). 파생 타입 그대로 던지고 문장을 객체가 든다(`DirectXHelper.h`).
+- **변이.** ② 의 catch 를 `throw;` 로 되살리자 `[shader reflection] exception at material texture decode fail-closed: Failure with
+  HRESULT of 88982F50` 으로 붉었다(`WINCODEC_ERR_COMPONENTNOTFOUND` — 잘림 수정으로 HRESULT 가 처음 보였다). 되돌리자 초록.
+- **검증(Release, 창 숨김).** `Invoke-Dx12Suite -Only dx12.selftest` 두 회차 통과(`Artifacts/dx12-selftest-fix-1`, `-fix-2`),
+  변이 회차 `Artifacts/dx12-selftest-mutation`. 수정 전 진단 회차 `Artifacts/dx12-selftest-diag`.
+- **재지 않은 것.** ① 의 대조군 자체를 변이로 붉히지는 않았다(수정 전 진단 회차가 stale source 의 붉음을 보였다).
+  `ThrowIfFailed` 를 쓰는 다른 경로(텍스처 압축 등)의 예외 전파는 이번에 바꾸지 않았다 — 잘림만 고쳐 문장이 살아난다.
+  스위트 전체(28종)는 다시 돌리지 않았다.
+
 ### G3. 불변 CPU 이미지 저장소와 요청 중복 제어 — P1
 
 **문제:** 임베디드 텍스처가 generation 픽셀과 Texture 이미지로 중복 저장된다.

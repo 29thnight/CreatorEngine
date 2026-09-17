@@ -198,7 +198,16 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         && 0.5f == defaultRoughness;
 
     const math::vector4 changedTint{ 0.125f, 0.25f, 0.5f, 1.0f };
-    const FileGuid textureGuid = meta.guid;
+    // ★ 예전에는 meta.guid(= .shadermeta)를 텍스처 GUID 로 썼다. GUID 왕복만 보던
+    //   때는 무해했지만 복원 경로가 GUID 로 텍스처를 실제로 읽게 되자 셰이더 메타를
+    //   WIC 로 디코드하다 예외가 났다. 왕복은 진짜 그림으로 재고, 그림이 아닌 자산을
+    //   가리키는 경우는 아래 fail-closed 단정이 따로 본다.
+    const FileGuid textureGuid = DataSystems->GetFileGuid(file::path(texturePath));
+    if (FileGuid{} == textureGuid)
+    {
+        outLog += "[material schema] 텍스처 fixture GUID 가 catalog 에 없다: " + texturePath + "\n";
+        return false;
+    }
     Material invalidHandleMaterial;
     std::string invalidHandleError;
     const bool invalidHandleRejected = !invalidHandleMaterial.ConfigureShaderProperties(
@@ -271,6 +280,30 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         && restored.TryGetFloat(
             "MaterialProperties", "roughness", originalAfterCopyWrite)
         && 0.75f == originalAfterCopyWrite;
+
+    stage = "material texture decode fail-closed";
+    // 파일은 있지만 그림이 아닌 자산을 텍스처 GUID 가 가리켜도 재질 복원은 예외 없이
+    // 끝나야 한다 — 그 텍스처만 비고 나머지 값은 산다. 붉으면 한 참조가 씬 로드 전체를
+    // 예외로 끊는다.
+    Material wrongTexture(restored);
+    Authoring::WriteDocument wrongTextureDocument;
+    Material wrongTextureRestored;
+    float wrongTextureRoughness{};
+    const bool wrongTextureSerializedOk = wrongTexture.TrySetTextureGuid("albedoMap", meta.guid)
+        && DataSystems->SerializeMaterialPayload(wrongTexture, wrongTextureDocument.Root());
+    const Authoring::ReadNode wrongTextureSerialized = wrongTextureDocument.Root().Read();
+    const bool nonImageTextureFailClosed = wrongTextureSerializedOk
+        && wrongTextureRestored.ConfigureShaderProperties(meta, layout, error, metaHandle)
+        && DataSystems->DeserializeMaterialPayload(wrongTextureRestored,
+            Authoring::NodeViewAccess::Make(wrongTextureSerialized))
+        && wrongTextureRestored.ConfigureShaderProperties(meta, layout, error, metaHandle)
+        && wrongTextureRestored.TryGetFloat("MaterialProperties", "roughness", wrongTextureRoughness)
+        && 0.75f == wrongTextureRoughness;
+    if (!nonImageTextureFailClosed)
+    {
+        outLog += "[material schema] 그림이 아닌 텍스처 참조의 복원 fail-closed 계약 불일치\n";
+        return false;
+    }
 
     stage = "material binary round trip";
 	std::ostringstream binaryOutput(std::ios::out | std::ios::binary);

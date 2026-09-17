@@ -27,34 +27,33 @@
 // "DX11을 지우려면 이것도 지워야 한다"는 잘못된 신호를 계속 낸다.
 namespace Win32
 {
+    // ★ 예전에는 `static std::exception CreateException(HRESULT)` 가 이 타입을
+    //   **값으로** std::exception 에 담아 돌려줬고 ThrowIfFailed 가 그것을 던졌다.
+    //   던지는 순간 잘려(slicing) what() 이 MSVC 기본값 "Unknown exception" 이 됐고
+    //   HRESULT 는 사라졌다. dx12.selftest 가 9-14 부터 그 한 줄만 남기고 붉었다 —
+    //   원인(WIC 가 .shadermeta 를 그림으로 못 읽음)은 cdb 스택으로만 보였다.
+    //   파생 타입 그대로 던진다. 문장은 객체가 들고 있다(정적 버퍼는 스레드끼리 덮는다).
     class ComException : public std::exception
     {
     public:
-        ComException() = default;
-        const char* what() const override
+        explicit ComException(HRESULT hr) : m_result(hr)
         {
-            static char s_str[64] = {};
-            sprintf_s(s_str, "Failure with HRESULT of %08X", result);
-            return s_str;
+            sprintf_s(m_message, "Failure with HRESULT of %08X", static_cast<unsigned long>(hr));
         }
 
-        static std::exception CreateException(HRESULT hr)
-        {
-            return ComException(hr);
-        }
+        const char* what() const override { return m_message; }
+        HRESULT Result() const noexcept { return m_result; }
 
     private:
-        ComException(HRESULT hr) : result(hr) {}
-
-    private:
-        HRESULT result;
+        HRESULT m_result{};
+        char m_message[48]{};
     };
 
     inline void ThrowIfFailed(HRESULT hr)
     {
         if (FAILED(hr))
         {
-            throw Win32::ComException::CreateException(hr);
+            throw ComException(hr);
         }
     }
 }
