@@ -1078,6 +1078,10 @@ texture/buffer transition과 UAV 순서를 `RHIBarrierBatch`로 묶어 backend e
   `dx12.scene`(씬에 메시 0 — 리소스 부재)과 `dx12.bench11`(Debug 설계
   거부). 워밍업 0 으로 재면 27 이 나오는데 회귀가 아니라 **다른 자**다
   (`dx12.gizmoscene` 이 에디터 씬의 살아 있는 카메라를 쓴다).
+- **2026-09-17 갱신**: 예열은 프레임 수가 아니라 `render.live.wait`(렌더 스레드가 새 프레임을 끝낼
+  때까지)다 — Release 에선 `wait 2000` 이 첫 프레임(~17~24초)을 못 덮어 dx12.scene 이 drain
+  시간 초과로 넘어졌다. 검사 목록은 9-06 뒤 28종. Release 결과와 새로 붉은 gizmoicon·selftest 는
+  ModelGeometryTextureImprovementPlan G2 의 09-17 후속 기록을 본다.
 - **성능을 고치는 커밋일수록 전수를 돌린다.** 픽셀도 속도도 안 바뀌는
   부류(검증 레이어 경고)가 있고, 그것이 한 번에 28종을 깬 실적이 있다.
   (A-4 `GetGPUVirtualAddress`)

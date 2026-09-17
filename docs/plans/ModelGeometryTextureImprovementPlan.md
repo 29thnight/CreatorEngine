@@ -298,8 +298,33 @@ commandlet 과 서비스 혼용이 설계상 금지라(CommandSurfaceImplementat
 
 **재지 않은 것.** Debug 구성에서 이 게이트를 다시 돌리지 않았다. `render.live.wait` 가 이르게 풀리는 변이는 따로 돌리지
 않았다 — 근거는 변경 전 `wait 2000` 4회 붉음과 대기 시간 실측(22~23 s)이다. 첫 프레임 22~24초 자체(slang reflect
-비용)는 줄이지 않았다. `Tools/dx12-validation/Invoke-Dx12Suite.ps1` 은 여전히 `wait $WarmupFrames`(2000) 로 예열하므로
-Release 스위트의 `dx12.scene` 은 같은 이유로 붉을 수 있다 — 스위트 기준선(§7.4 28 통과)이 걸린 별도 자라 이번에 바꾸지 않았다.
+비용)는 줄이지 않았다.
+
+**2026-09-17 후속 — DX12 스위트 예열도 `render.live.wait` 로.** `Invoke-Dx12Suite.ps1` 이 검사 앞에
+`wait 2000` 대신 `render.live.wait <RenderWaitTimeoutSec=180>` 을 둔다(`-WarmupFrames` 는 그 뒤 추가 프레임, 기본 0 ·
+`-NoRenderWait` 로 끈다). 예열이 서지 않은 검사는 `예열 실패` 로 적고 CSV 에 `WarmupMs` 를 남긴다. 검사 프로세스를
+숨긴 창으로 띄운다(예전 `-NoNewWindow`).
+
+같은 Release 바이너리(e3010dc7)·숨긴 창으로 두 회차를 맞댔다(28종, 9-06 에 bench11·encoderbench·forwardscale·
+postscale·ssaoscale·uploadring·live 가 스위트에서 빠진 뒤의 목록):
+
+| 회차 | 통과 | 실패 | 시간 | 산출물 |
+|---|---|---|---|---|
+| `wait 2000` | 25 | gizmoicon · scene · selftest | 674 s | `Artifacts/dx12-suite-release-wait2000` |
+| `render.live.wait` | 25 | gizmoicon · scene · selftest | 629 s | `Artifacts/dx12-suite-release-livewait` (`-Baseline` 판정 줄 차이 0) |
+
+- 예열 실측 17.2~21.7초(중앙 17.5초) — 28 프로세스 모두 섰다.
+- **`dx12.scene` 은 판정은 같고 사유가 바뀌었다.** 변경 전 `[1/4] RenderThread drain 시간 초과 — pending 2 · active 1`,
+  변경 후 끝까지 돌고 `[4/4] 실패 — 드로우가 0건이다`. 스위트는 부팅 씬(메시 0)에서 돌므로 이것이 RhiBoundaryPlan
+  §4.3 기준선이 적은 설계 실패("씬에 메시 0")다. Code 가 둘 다 `rendertest.failed` 라 `-Baseline` 대조는 이 차이를 못 본다.
+- 8-29 Debug 기준선(`Artifacts/m6-p2a-dx12-suite`, 옛 `Line` 형식)과 같은 28종을 대면 그때는 scene 만 실패였다.
+  **새로 붉은 둘은 예열과 무관하고 두 회차에서 똑같다:**
+  - `dx12.gizmoicon` — `[1/4] CameraGizmo.png가 기대한 128x128 RGBA 자산이 아니다`. 9-16 커밋 c2739278(로그 리팩터)에
+    `Resources/Editor/Icons/*Gizmo.png` 다섯 장 교체가 섞여 1254×1254 가 됐다.
+  - `dx12.selftest` — `[shadermeta] 중복/unknown-field/source 경계 거부 계약 불일치`. 거부 문구를 부분 문자열
+    (`중복`·`알 수 없는 field`·`상위 이동 없는 상대`)로 대조한다. 9-14 `Artifacts/shader-slang-baseline` 에서는 다른 사유
+    (`[shader reflection] exception at material authoring round trip`)로 실패했다.
+  둘 다 이번에 고치지 않았다(후속 작업으로 넘김). Debug 스위트는 이번에 다시 재지 않았다.
 
 ### G3. 불변 CPU 이미지 저장소와 요청 중복 제어 — P1
 

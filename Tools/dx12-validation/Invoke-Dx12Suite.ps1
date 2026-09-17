@@ -29,16 +29,37 @@
         이제 엔진이 `--result-format jsonl` 로 terminal 결과를 내고, 그 봉투는
         HTTP 응답과 같은 함수가 만든다(§18 의 schema v1 공유). text fallback 은
         두지 않는다 — 이중 parser 는 새 drift 를 만든다.
-      · 워밍업 프레임을 기본으로 준다.
+      · 검사 앞에서 **라이브 렌더러가 준비될 때까지** 기다린다(`render.live.wait`).
 
     검사당 프로세스를 하나씩 쓴다. 한 프로세스에 몰면 어서션 모달 하나가
     뒤의 검사를 통째로 막고, 그때 로그에는 아무것도 안 남는다(R2b 에서 25분을
     먹은 함정).
 
+.PARAMETER RenderWaitTimeoutSec
+    예열 상한(초). 검사 앞에 `render.live.wait <초>` 를 둔다 — 명령 시점 뒤에
+    발행된 프레임을 렌더 스레드가 **끝낼** 때까지 게임 스레드를 세우지 않고 다음
+    명령을 미룬다(EnhancedRenderThreadStats::completedFrameId). 상한을 넘기면 그
+    검사는 `예열 실패` 로 적히고 검사 자신의 결과로 세지 않는다.
+    ★ 2026-09-17 — 프레임 수 예열(`wait 2000`)을 이것으로 바꿨다. 라이브 렌더러의
+      첫 프레임은 GBuffer ShaderMeta 반영(slang reflect)에 **Release 에서도 약
+      22~24초**를 쓴다. Release 의 2000 프레임은 몇 초 만에 지나가, 같은 결함이
+      verify-model-scene-consumption 의 dx12.scene 을 `pending 2 · active 1` 로
+      넘어뜨렸다. 아래 WarmupFrames 의 이력이 그 앞 단계다.
+    ★ 실측(Release, 28종): 예열 17.2~21.7초(중앙 17.5초). 판정은 `wait 2000` 회차와
+      줄 차이 0 이었지만 dx12.scene 의 **사유**가 'RenderThread drain 시간 초과' 에서
+      '드로우가 0건이다'(부팅 씬에 메시 없음 — 계획서 기준선의 설계 실패)로 바뀌었다.
+      Code 가 둘 다 rendertest.failed 라 -Baseline 대조는 이 차이를 못 본다 —
+      사유는 <검사>.out.txt 에서 읽어라.
+
+.PARAMETER NoRenderWait
+    준비 대기를 끈다. 워밍업이 없는 자(아래 ③)를 일부러 재고 싶을 때만 쓴다.
+
 .PARAMETER WarmupFrames
-    검사 앞에 돌릴 프레임 수. 0 이면 워밍업 없음.
+    준비 대기 **뒤에** 더 돌릴 프레임 수. 기본 0.
     ★ 기준선(§7.4 의 28 통과)은 워밍업을 갖춘 값이다. 0 으로 재면 27 이 나오고
       그것은 회귀가 아니라 다른 자다.
+    ★ 2000 → 0 (2026-09-17). 준비를 프레임 수로 재지 않게 되었으므로 기본을
+      내렸다. 준비 뒤에도 프레임이 더 필요한 검사가 드러나면 그때 올린다.
     ★ 240 → 2000 (2026-09-14). 이 수가 재야 하는 것은 프레임 수가 아니라
       **렌더러가 준비되기까지의 시간**이다. 라이브 렌더러의 첫 프레임은
       파이프라인 구축과 ShaderMeta 적용 때문에 Debug 에서 13~28초가 걸린다.
@@ -67,7 +88,9 @@ param(
 
     [string]$Exe = "",
     [string]$TexturePath = (Join-Path $PSScriptRoot "../../Dynamic_CPP/Assets/Materials/Cube_Mat_BaseColor.png"),
-    [int]$WarmupFrames = 2000,
+    [int]$RenderWaitTimeoutSec = 180,
+    [switch]$NoRenderWait,
+    [int]$WarmupFrames = 0,
     [int]$TimeoutSec = 300,
     [string[]]$Only = @(),
     [string]$Baseline = ""
@@ -117,7 +140,8 @@ if ($Only.Count -gt 0) {
     $tests = @($tests | Where-Object { $Only -contains $_ })
 }
 if ($tests.Count -eq 0) { throw "검사를 하나도 못 찾았다" }
-Write-Host "검사 $($tests.Count)종 · 워밍업 $WarmupFrames 프레임 · 출력 $OutDir"
+$warmupLabel = if ($NoRenderWait) { '준비 대기 없음' } else { "render.live.wait(상한 $RenderWaitTimeoutSec 초)" }
+Write-Host "검사 $($tests.Count)종 · 예열 $warmupLabel · 추가 $WarmupFrames 프레임 · 출력 $OutDir"
 
 $rows = @()
 foreach ($name in $tests) {
@@ -129,6 +153,7 @@ foreach ($name in $tests) {
     if (Test-Path -LiteralPath $resultFile) { Remove-Item -LiteralPath $resultFile -Force }
 
     $commands = @()
+    if (-not $NoRenderWait) { $commands += "render.live.wait $RenderWaitTimeoutSec" }
     if ($WarmupFrames -gt 0) { $commands += "wait $WarmupFrames" }
     $invocation = if ($name -eq "dx12.selftest") { "$name `"$([IO.Path]::GetFullPath($TexturePath))`"" } else { $name }
     $commands += @($invocation, "wait 10", "quit")
@@ -153,7 +178,8 @@ foreach ($name in $tests) {
     #   만든다." 결과 줄이 없으면 그것은 **무판정**이고, 무판정은 통과가 아니다.
     $process = Start-Process -FilePath $Exe `
         -ArgumentList "--commandlet-script", "`"$cmdFile`"", "--result-format", "jsonl", "--result-file", "`"$resultFile`"" `
-        -PassThru -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        -WindowStyle Hidden `
+        -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
 
     if (-not $process.WaitForExit($TimeoutSec * 1000)) {
         try { $process.Kill($true) } catch {}
@@ -168,12 +194,22 @@ foreach ($name in $tests) {
 
     # 이 검사의 줄만 고른다. 시나리오에는 `wait`·`quit` 도 함께 들어 있다.
     $record = $null
+    $warmup = $null
     if (Test-Path -LiteralPath $resultFile) {
         foreach ($line in [IO.File]::ReadAllLines($resultFile)) {
             if ([string]::IsNullOrWhiteSpace($line)) { continue }
             try { $parsed = $line | ConvertFrom-Json } catch { continue }
             if ($parsed.command -eq $name) { $record = $parsed }
+            if ($parsed.command -eq 'render.live.wait') { $warmup = $parsed }
         }
+    }
+    # 예열이 서지 않은 검사는 준비되지 않은 렌더러를 잰 것이다 — 그 판정을 검사의
+    # 결과로 세지 않는다. 대기 시간은 첫 프레임 비용의 실측이라 CSV 에 남긴다.
+    $warmupMs = ''
+    $warmupFailed = $false
+    if (-not $NoRenderWait) {
+        if ($null -eq $warmup -or $warmup.status -ne 'succeeded') { $warmupFailed = $true }
+        elseif ($null -ne $warmup.data.PSObject.Properties['waitedMs']) { $warmupMs = [int]$warmup.data.waitedMs }
     }
 
     if ($null -ne $record) {
@@ -197,18 +233,24 @@ foreach ($name in $tests) {
         $verdict = if ($errBytes -gt 0) { "어서션" } else { "무판정" }
     }
 
+    if ($warmupFailed) {
+        $warmupStatus = if ($null -eq $warmup) { '결과 없음' } else { "$($warmup.status)/$($warmup.code)" }
+        $verdict = "예열 실패($warmupStatus)"
+        $status = 'warmup_failed'
+    }
+
     $rows += [pscustomobject]@{
         Test = $name; Verdict = $verdict; Exit = $process.ExitCode
-        ErrBytes = $errBytes; Status = $status; Code = $code
+        ErrBytes = $errBytes; Status = $status; Code = $code; WarmupMs = $warmupMs
     }
-    Write-Host ("  {0,-22} {1}" -f $name, $verdict)
+    Write-Host ("  {0,-22} {1}  (예열 {2} ms)" -f $name, $verdict, $warmupMs)
 }
 
 $verdictPath = Join-Path $OutDir "verdicts.csv"
 $rows | Export-Csv -LiteralPath $verdictPath -NoTypeInformation -Encoding UTF8
 
 Write-Host ""
-$rows | Format-Table Test, Verdict, Status, Code, ErrBytes -AutoSize | Out-String -Width 200 | Write-Host
+$rows | Format-Table Test, Verdict, Status, Code, ErrBytes, WarmupMs -AutoSize | Out-String -Width 200 | Write-Host
 $summary = $rows | Group-Object Verdict | Sort-Object Name |
     ForEach-Object { "$($_.Name)=$($_.Count)" }
 Write-Host ("집계: " + ($summary -join " · ") + "  → $verdictPath")
