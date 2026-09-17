@@ -19,6 +19,11 @@ param(
 # 자 자신도 단정한다: 요청 폭 × 배율 = 받은 폭, 폭을 줄이면 넘침이 실제로 생기는
 # 드로어가 있다(없으면 자극이 안 된 것), 상단 공간 드로어는 줄 > 0.
 #
+# 소스 축: 이관한 드로어 함수 본문에 **배율을 받지 않는 고정 폭**이 남으면 실패다 —
+# `SetNextItemWidth(150)`, `ImVec2(150, 20)` 같은 숫자 리터럴. 런타임 축은 배율 2.25 인
+# 기계에서 "넘치지 않았다" 만 보므로 배율 1 에서 넘칠 고정 폭을 못 잡는다(착수 때
+# SpriteRenderer 가 줄 5 · 넘침 0 이면서 `ImVec2(150, 20)` 을 들고 있었다).
+#
 # 사용법:
 #   pwsh Tools/regression/verify-inspector-drawer-layout.ps1 -Exe Bin/x64-Release/Editor/CreatorEditor.exe
 Set-StrictMode -Version Latest
@@ -33,7 +38,25 @@ Remove-Item -LiteralPath $Work -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 
 # 이관을 끝낸 드로어. 옮길 때마다 여기에 더한다.
-$Migrated = @('GameObjectBaseInfo', 'Transform')
+$Migrated = @('GameObjectBaseInfo', 'Transform',
+    'SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'VolumeComponent',
+    'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent')
+# 이관한 드로어의 그리는 함수 — 소스 축이 본문을 잘라 읽는다. 첫 칸이 파일(저장소 기준), 나머지가
+# 함수 이름이다. 드로어가 부르는 같은 파일의 조각 함수도 적는다(고정 폭이 그리로 숨을 수 있다).
+$DrawerSources = @{
+    SoundComponent        = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperSoundComponent', 'DrawNamedPicker')
+    DecalComponent        = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperDecal', 'DrawAssetSlot')
+    ImageComponent        = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperImageComponent', 'NameButton')
+    SpriteRenderer        = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperSpriteRenderer')
+    Animator              = @('Editor/EngineGUIWindow/ImGuiDrawHelperAnimator.cpp', 'ImGuiDrawHelperAnimator')
+    MeshRenderer          = @('Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp', 'ImGuiDrawHelperMeshRenderer', 'DrawMaterialTextureSlot', 'ReadOnlyLine')
+    PlayerInputComponent  = @('Editor/EngineGUIWindow/ImGuiDrawHelperPlayerInput.cpp', 'ImGuiDrawHelperPlayerInput')
+    TerrainComponent      = @('Editor/EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp', 'ImGuiDrawHelperTerrainComponent', 'DrawBrushMasks', 'ButtonRow')
+    Canvas                = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperCanvas')
+    VolumeComponent       = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperVolume')
+    BehaviorTreeComponent = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperBT')
+    StateMachineComponent = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperFSM')
+}
 # 전용 드로어를 가진 컴포넌트 열둘 — 계획서 §W2-I 재기준선 표.
 $Drawers = @('SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'VolumeComponent',
     'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent')
@@ -44,6 +67,35 @@ $failures = [Collections.Generic.List[string]]::new()
 function Assert([bool]$Condition, [string]$Message) {
     $script:checks++
     if (-not $Condition) { $failures.Add($Message); Write-Host "  FAIL $Message" -ForegroundColor Red }
+}
+
+# ── 소스 축: 이관한 드로어 본문의 고정 폭 ─────────────────────────────────────
+# 함수 머리부터 중괄호 짝이 닫힐 때까지를 본문으로 읽는다. 주석은 지우고 센다.
+$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+function Get-FunctionBody([string]$File, [string]$Name) {
+    $text = [IO.File]::ReadAllText((Join-Path $repoRoot $File))
+    $head = [regex]::Match($text, '(?m)^[ \t]*\w[\w:<>\*& ]*[ *&]' + [regex]::Escape($Name) + '\s*\(')
+    if (-not $head.Success) { return $null }
+    $open = $text.IndexOf('{', $head.Index)
+    $depth = 0
+    for ($i = $open; $i -lt $text.Length; $i++) {
+        if ($text[$i] -eq '{') { $depth++ }
+        elseif ($text[$i] -eq '}') { $depth--; if ($depth -eq 0) { return $text.Substring($open, $i - $open + 1) } }
+    }
+    return $null
+}
+$fixedWidth = '(SetNextItemWidth|PushItemWidth)\(\s*\d[\d.]*f?\s*\)|ImVec2\(\s*[1-9][\d.]*f?\s*,|ImVec2\([^()]*,\s*[1-9][\d.]*f?\s*\)'
+foreach ($name in $Migrated) {
+    if (-not $DrawerSources.ContainsKey($name)) { continue }
+    $file = $DrawerSources[$name][0]
+    foreach ($function in @($DrawerSources[$name] | Select-Object -Skip 1)) {
+        $body = Get-FunctionBody $file $function
+        Assert ($null -ne $body) "${name}: 그리는 함수 '$function' 를 '$file' 에서 못 찾았다"
+        if ($null -eq $body) { continue }
+        $code = [regex]::Replace($body, '//[^\r\n]*', '')
+        $hits = @([regex]::Matches($code, $fixedWidth) | ForEach-Object { $_.Value })
+        Assert ($hits.Count -eq 0) "${name}: '$function' 에 배율을 받지 않는 고정 폭이 남았다 — $($hits -join ' · ')"
+    }
 }
 
 $lines = @('window.resize 2400 1600', 'wait 60', 'scene.new InspectorDrawerLayout', 'wait 30',

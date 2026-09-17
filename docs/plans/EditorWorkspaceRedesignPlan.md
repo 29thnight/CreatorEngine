@@ -1669,7 +1669,7 @@ Transform Undo 수정, 대표 폭 DX12 실행 기록은
 | W2-I1 | Transform 2안·공통 헤더/전용 본문 분리 | 1일 | 일반 엔티티·UI·Canvas에서 중복 0, 개별 조작 제한과 엔티티 활성 전이 보존 | progress — 중복 제외·상단 표시 적용, 공통 순회 통합/정책 회귀 남음 |
 | W2-I2 | 기본 정보·Transform·RectTransform 반응형 배치 | 1일 | 공백 정렬·고정 숫자 열 폭 제거, 축별 최소 가독성·기존 편집 의미 보존 | progress — 기본/XYZ 적용·사용자 확인, RectTransform 최소 폭 남음 |
 | W2-I3 | 일반 리플렉션·중첩 필드·공유 드로어 이관 | 1일 | 수치·문자열·bool·enum·벡터가 같은 규칙을 사용하고 Inspector 밖 소비자도 회귀 없음 | progress — **일반 경로와 C# 노출 필드는 정본을 쓴다**(`ReflectionTypedDraw.h`·`EditorAxisField3`·`DrawManagedScripts` 5 건). 중첩/배열 전수는 남음 |
-| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — **잔여가 셈이 된다: 전용 드로어 15 중 12.** 아래 재기준선의 표가 이름을 전부 적는다. Import Settings 의 대상 파일은 인스펙터가 아니라 `DrawYamlNodeEditor.cpp` 다. **2026-09-17 자를 열었다** — `editor.inspector width` 와 `verify-inspector-drawer-layout.ps1`(이관 목록에만 단정, 착수 기준선은 아래) |
+| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — **잔여가 셈이 된다: 전용 드로어 15 중 12.** 아래 재기준선의 표가 이름을 전부 적는다. Import Settings 의 대상 파일은 인스펙터가 아니라 `DrawYamlNodeEditor.cpp` 다. **2026-09-17 자를 열었다** — `editor.inspector width` 와 `verify-inspector-drawer-layout.ps1`(이관 목록에만 단정, 착수 기준선은 아래). **같은 날 전용 드로어 열둘 이관 — 14/14, 네 폭 넘침 0, 소스 축 고정 폭 0.** 남은 것은 Import Settings 하나 |
 | W2-I5 | 폭·배율·편집·중복 렌더 회귀와 잔재 점검 | 1일 | 아래 검증 행렬 및 §8 성능 gate 충족, 미이관 표면 0 | progress — 대표 UI/편집 검증, 전체 행렬·호출 수/성능 남음 |
 
 전용 드로어 전수 이관량과 개별 활성 변경 진입점의 실제 범위는 I0에서 재계수한다.
@@ -1762,6 +1762,58 @@ Transform Undo 수정, 대표 폭 DX12 실행 기록은
 ★ 자를 여는 중에 **DecalComponent 를 붙이는 순간 에디터가 죽었다.** 빈 텍스처 이름이
 `Assets/Textures/` **폴더**가 되고, `Texture::LoadSharedFromPath` 계열 셋이 `exists` 만
 보아 폴더를 통과시켜 WIC 가 폴더를 열다 예외를 던졌다. 셋을 `is_regular_file` 로 고쳤다.
+
+##### 2026-09-17 전용 드로어 열둘 이관 — 14/14
+
+`editor::widgets::property_sheet` 를 더했다. 구간이 그릴 **고정 라벨 목록**으로 라벨 열을
+한 번 재고(`label_hint`), 줄마다 `line(label)` 이 라벨을 놓고 값 칸 폭을 돌려준다.
+배치 판정은 공통 계층의 것 그대로이고 새 규칙은 없다. 값 칸 뒤에 정사각 버튼을 붙이는
+줄은 `line_before_buttons` 가 버튼과 간격을 뺀 폭을 준다. 열두 드로어의 라벨 붙은 위젯을
+전부 `"##"` 위젯 + 공통 줄로 바꾸고, 고정 폭(`SetNextItemWidth(150)` · `ImVec2(150, 20)` ·
+`ImVec2(0, 200)` 등)을 줄이 준 폭 또는 `ThemePixels` 로 바꿨다.
+
+| 드로어 | 공통 배치 줄 | 240 | 320 | 480·720 |
+|---|---:|---:|---:|---:|
+| 기본 정보 · Transform | 1 · 3 | 0 | 0 | 0 |
+| ImageComponent | 13 | 0 (착수 260) | 0 (80) | 0 |
+| SoundComponent | 12 | 0 (23.8) | 0 | 0 |
+| MeshRenderer | 10 | 0 (15) | 0 | 0 |
+| DecalComponent | 7 | 0 (54.3) | 0 | 0 |
+| SpriteRenderer | 6 | 0 | 0 | 0 |
+| TerrainComponent | 5 | 0 (15.8) | 0 | 0 |
+| Animator | 3 | 0 | 0 | 0 |
+| Canvas · BT · PlayerInput | 2 · 2 · 2 | 0 (61.8 · 46.5 · 47.3) | 0 | 0 |
+| Volume · StateMachine | 1 · 1 | 0 | 0 | 0 |
+
+검사 `verify-inspector-drawer-layout.ps1` 은 이제 열넷 전부에 단정을 건다(단정 213). 런타임
+축(네 폭 모두 줄 > 0 · 넘침 0)에 **소스 축**을 더했다 — 드로어 함수와 그 조각 함수
+(`DrawAssetSlot` · `DrawNamedPicker` · `NameButton` · `DrawMaterialTextureSlot` ·
+`ReadOnlyLine` · `DrawBrushMasks` · `ButtonRow`) 본문에 숫자 리터럴 폭이 남으면 실패다.
+런타임 축은 배율 2.25 기계에서 "넘치지 않았다" 만 보므로 배율 1 에서 넘칠 고정 폭을 못
+잡는다. 240 폭 화면을 열둘 모두 찍어 눈으로 확인했다(라벨 아래로 값이 내려가고 잘림·겹침 없음).
+
+변이 넷이 모두 붉다 —
+이름 버튼 폭을 `ThemePixels(400)` 으로(런타임 축 — Decal·Image·Sprite·Volume 넘침 558 px),
+Canvas 에 `SetNextItemWidth(150.0f)`(소스 축만 — 배율 2.25 에서는 안 넘친다),
+StateMachine 이 공통 줄을 건너뜀(줄 0), MeshRenderer 텍스처 칸 미리보기 `ImVec2(30, 30)`
+(소스 축 — 텍스처가 없으면 그리지 않는 조각이라 런타임은 자극을 못 한다).
+같이 돈 검사: 잘라 그리기 계약 · 테마(121) · 키보드 탐색 · 상태 행렬 · 엔티티 저작(163) 모두 통과.
+
+★ 목록이 다 차면 착수 때의 자극 단정(*240 에서 넘치는 본문이 하나는 있다*)은 설 자리가
+없다 — 넘치는 드로어가 남지 않았다. 넘침을 재는 자가 살아 있다는 증거는 이제 첫 변이
+(이름 버튼 폭을 `ThemePixels(400)` 으로 — 리터럴이 아니라 소스 축은 통과한다)가 진다.
+
+같이 고친 결함:
+- ImageComponent 방향 이동 칸 넷이 `BeginDragDropTarget` 을 열고 **닫지 않았다**.
+- ImageComponent 의 텍스처 인덱스가 **창의 정적 변수**라 이미지 컴포넌트 둘이 한 값을 나눠 썼다 — 컴포넌트의 `curindex` 를 쓴다.
+- Decal·SpriteRenderer·MeshRenderer 텍스처 칸이 모두 같은 ID `"MyDropTarget"` 으로 끌어 놓기 대상을 열었다 — 버튼 자신을 대상으로 한다.
+- SoundComponent 의 잔향 적용이 **마지막 위젯(Reverb Index)의 편집만** 보았다 — 수준 편집도 적용한다.
+- `Meta::DrawEnumProperty` 에 콤보 라벨 인자를 더했다(기본값은 예전과 같다).
+
+바뀐 모양: Terrain 의 페인트·폴리지 두 모드가 따로 그리던 마스크 목록을 한 조각으로
+합쳤다(선택 표시도 하나). 긴 안내 문장은 `TextWrapped` 로 바꿨다.
+
+남은 것: **Import Settings**(`DrawYamlNodeEditor.cpp`) 는 이번에 손대지 않았다.
 
 #### 검증과 완료 판정
 

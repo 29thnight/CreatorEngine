@@ -31,6 +31,7 @@
 // `BeginDisabled` 로 감싸는 한 겹이고, 그때 이 규약 안으로 들인다.
 
 #include <cstdint>
+#include <initializer_list>
 
 namespace editor::widgets
 {
@@ -292,4 +293,37 @@ namespace editor::widgets
     /// `begin_property_line` 을 부른 누계 (PHASE 21 W2-I4). 인스펙터 본문이 공통 배치를
     /// 지났는지를 소스 셈이 아니라 **돈 줄 수**로 읽으려고 둔다. 그리는 스레드만 쓴다.
     std::uint64_t property_line_count() noexcept;
+
+    /// 전용 드로어 한 구간의 배치 (PHASE 21 W2-I4).
+    ///
+    /// 전용 드로어는 리플렉션 경로를 지나지 않아 `SetNextItemWidth(150)` 같은
+    /// 고정 폭을 제각기 적어 왔다 — 배율을 받지 않고, 좁은 폭에서 넘친다. 이 묶음은
+    /// 구간이 그릴 **고정 라벨 목록**으로 라벨 열을 한 번 재고(`label_hint`),
+    /// 줄마다 `line` 이 라벨을 놓고 값 칸 폭을 돌려준다. 배치 판정은 공통 계층의
+    /// 것 그대로다 — 새 규칙을 만들지 않는다.
+    ///
+    /// 상태는 호출자(창)가 소유한다. 한 프레임 안에서 구간마다 새로 세운다.
+    class property_sheet
+    {
+    public:
+        property_sheet(property_layout_state& state,
+            std::initializer_list<const char*> labels)
+            : m_metrics(measure_property_layout(property_layout_inputs_now(0,
+                property_layout_label_hint(labels.begin(), static_cast<int>(labels.size()))),
+                state))
+        {
+        }
+
+        /// 라벨을 놓고 값 칸 폭을 돌려준다.
+        float line(const char* label) const { return begin_property_line(label, m_metrics); }
+
+        /// 값 칸 뒤에 정사각 버튼 `buttons` 개를 붙이는 줄. 돌려주는 폭은 버튼과
+        /// 그 사이 간격(`ItemInnerSpacing`)을 뺀 값 칸 폭이다.
+        float line_before_buttons(const char* label, int buttons = 1) const;
+
+        const property_layout_metrics& metrics() const noexcept { return m_metrics; }
+
+    private:
+        property_layout_metrics m_metrics{};
+    };
 }

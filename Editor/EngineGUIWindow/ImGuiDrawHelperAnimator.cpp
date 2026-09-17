@@ -18,6 +18,8 @@
 #include "AnimatorEditorWindows.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
+#include "EditorPropertyRow.h"
+#include "imgui_stdlib.h"
 
 namespace
 {
@@ -27,62 +29,58 @@ namespace
         if (::editor::is_window_open(window)) ::editor::close_window(window);
         else                                  ::editor::open_window(window);
     }
+
+    // 전용 드로어의 줄 배치 상태 (PHASE 21 W2-I4). 인스펙터는 한 스레드에서 그린다.
+    editor::widgets::property_layout_state g_animatorLayout{};
 }
 
 void ImGuiDrawHelperAnimator(Animator* animator)
 {
-	if (animator)
+	if (!animator) return;
+
+	const auto& aniType = Meta::Find(animator->GetTypeID());
+	Meta::TypedDraw::DrawOwnMembers(*animator);
+	Meta::DrawMethods(animator, *aniType);
+
+	const editor::widgets::property_sheet sheet(g_animatorLayout, { "Clip", "Loop", "Key Frame Event", "Controllers" });
+	if (ImGui::CollapsingHeader("animations"))
 	{
-		const auto& aniType = Meta::Find(animator->GetTypeID());
-		Meta::TypedDraw::DrawOwnMembers(*animator);
-		Meta::DrawMethods(animator, *aniType);
-		if (ImGui::CollapsingHeader("animations"))
+		// I5-D5b — 열거·이름도 창구를 지난다. D4e-2가 편집을 Animator
+		// 소유로 옮겼으나 목록은 공유 자산을 직접 훑고 있었다 — 인덱스
+		// 축이 두 출처로 갈리면 편집 정본과 표시 대상이 어긋난다.
+		const int clipCount = static_cast<int>(animator->GetClipCount());
+		for (int i = 0; i < clipCount; ++i)
 		{
-			// I5-D5b — 열거·이름도 창구를 지난다. D4e-2가 편집을 Animator
-			// 소유로 옮겼으나 목록은 공유 자산을 직접 훑고 있었다 — 인덱스
-			// 축이 두 출처로 갈리면 편집 정본과 표시 대상이 어긋난다.
-			const int clipCount = static_cast<int>(animator->GetClipCount());
-			for (int i = 0; i < clipCount; ++i)
+			std::string clipName = animator->GetClipName(i);
+			// 이름이 같은 클립이 둘일 수 있다 — ID 는 인덱스로 묶는다.
+			ImGui::PushID(i);
+			ImGui::SetNextItemWidth(sheet.line("Clip"));
+			ImGui::InputText("##ClipName", &clipName, ImGuiInputTextFlags_ReadOnly);
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", clipName.c_str());
+
+			// I5-D4e-2 — 루프·이벤트 편집의 정본은 Animator 클립
+			// 오버라이드다. 구 코드는 공유 자산(m_Skeleton->m_animations)을
+			// 직접 편집해 같은 스켈레톤을 공유하는 다른 Animator까지
+			// 바뀌었다 — 발화·저장 정본과 편집 표면을 함께 옮긴다.
+			bool looping = animator->IsClipLooping(i);
+			sheet.line("Loop");
+			if (ImGui::Checkbox("##Loop", &looping))
 			{
-				const std::string clipName = animator->GetClipName(i);
-				ImGui::PushID(clipName.c_str());
-				ImGui::Text("%s", clipName.c_str());
-				ImGui::Text("Loop");
-				ImGui::SameLine();
-				// I5-D4e-2 — 루프·이벤트 편집의 정본은 Animator 클립
-				// 오버라이드다. 구 코드는 공유 자산(m_Skeleton->m_animations)을
-				// 직접 편집해 같은 스켈레톤을 공유하는 다른 Animator까지
-				// 바뀌었다 — 발화·저장 정본과 편집 표면을 함께 옮긴다.
-				bool looping = animator->IsClipLooping(i);
-				if (ImGui::Checkbox("", &looping))
-				{
-					animator->SetClipLooping(i, looping);
-				}
-				ImGui::Text("KeyFrameEvent");
-				ImGui::SameLine();
-				if (ImGui::Button(EditorIcon::AssetPicker))
-				{
-					ImGui::PopID();
-					::editor::animator_editing::select_clip(i);
-					ToggleAnimatorWindow(EditorWindowName::kAnimatorEvent);
-				}
-				else
-				{
-					ImGui::PopID();
-				}
-				ImGui::Separator();
+				animator->SetClipLooping(i, looping);
+			}
+			const bool openEvents = ImGui::Button("Edit###KeyFrameEvent", ImVec2(sheet.line("Key Frame Event"), 0.f));
+			ImGui::PopID();
+			if (openEvents)
+			{
+				::editor::animator_editing::select_clip(i);
+				ToggleAnimatorWindow(EditorWindowName::kAnimatorEvent);
 			}
 			ImGui::Separator();
 		}
+	}
 
-		//if (!animator->m_animationControllers.empty())
-		{
-			ImGui::Text("Controllers ");
-			ImGui::SameLine();
-			if (ImGui::Button(EditorIcon::AssetPicker))
-			{
-				ToggleAnimatorWindow(EditorWindowName::kAnimationControllers);
-			}
-		}
+	if (ImGui::Button("Edit###AnimationControllers", ImVec2(sheet.line("Controllers"), 0.f)))
+	{
+		ToggleAnimatorWindow(EditorWindowName::kAnimationControllers);
 	}
 }

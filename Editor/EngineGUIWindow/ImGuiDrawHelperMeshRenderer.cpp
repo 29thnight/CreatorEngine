@@ -20,6 +20,9 @@
 #include "EditorAssetPresentation.h"
 #include "EditorIcons.h"
 #include "ExternUI.h"
+#include "EditorPropertyRow.h"
+#include "imgui_stdlib.h"
+#include <cstdio>
 #include <d3d11shader.h>
 #include <algorithm>
 #include <cstring>
@@ -29,8 +32,35 @@
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */
 
+namespace
+{
+	// 전용 드로어의 줄 배치 상태 (PHASE 21 W2-I4). 인스펙터는 한 스레드에서 그린다.
+	editor::widgets::property_layout_state g_meshRendererLayout{};
+
+	// Material 구간과 텍스처 칸(`TextureDropTarget`)이 **같은 열**에 서도록 한 목록에서 잰다.
+	editor::widgets::property_sheet MaterialSheet()
+	{
+		return editor::widgets::property_sheet(g_meshRendererLayout, { "Element", "Bitflag",
+			"Base Map", "Normal Map", "ORM Map", "Base Color", "Metallic", "Roughness", "Rendering Mode",
+			"Enable LODGroup", "Receive Shadow", "Cast Shadow",
+			"Model", "Mesh", "Generation", "Name", "Vertices" });
+	}
+
+	// 읽기 전용 값 한 줄. 값이 칸보다 길면 입력칸이 잘라 보이고 tooltip 이 전체를 준다.
+	void ReadOnlyLine(const editor::widgets::property_sheet& sheet, const char* label, std::string value)
+	{
+		ImGui::PushID(label);
+		ImGui::SetNextItemWidth(sheet.line(label));
+		ImGui::InputText("##Value", &value, ImGuiInputTextFlags_ReadOnly);
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", value.c_str());
+		ImGui::PopID();
+	}
+}
+
 void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 {
+	const editor::widgets::property_sheet sheet = MaterialSheet();
+
 	// PHASE 3.75 MBC8 — typed 정본의 read-only snapshot. 인스펙터는 generation을
 	// 읽기만 하고, 변경은 authoring transaction(재임포트)이 새 generation으로
 	// 게시한다. legacy Mesh 필드는 여기서 보이지 않는다(MBC9 은퇴).
@@ -39,78 +69,75 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		if (const auto& generation = meshRenderer->m_modelGeneration)
 		{
 			const assets::ModelAssetGenerationIdentity& identity = generation->Identity();
-			ImGui::Text("Model    %s", Uuid::ToString(identity.modelId).c_str());
-			ImGui::Text("Mesh     %s", meshRenderer->m_meshAssetId.ToString().c_str());
-			ImGui::Text("Generation %llu · epoch %s",
-				static_cast<unsigned long long>(identity.generation),
-				identity.identityEpoch.c_str());
+			ReadOnlyLine(sheet, "Model", Uuid::ToString(identity.modelId));
+			ReadOnlyLine(sheet, "Mesh", meshRenderer->m_meshAssetId.ToString());
+			ReadOnlyLine(sheet, "Generation", std::to_string(identity.generation) + " · epoch " + identity.identityEpoch);
 			if (meshRenderer->m_modelMeshIndex < generation->Meshes().size())
 			{
 				const assets::ModelMeshAsset& mesh =
 					generation->Meshes()[meshRenderer->m_modelMeshIndex];
-				ImGui::Text("Name     %s", mesh.name.c_str());
-				ImGui::Text("Vertices %zu · Indices %zu · mask 0x%X",
+				ReadOnlyLine(sheet, "Name", mesh.name);
+				char counts[128]{};
+				std::snprintf(counts, sizeof(counts), "%zu · Indices %zu · mask 0x%X",
 					static_cast<std::size_t>(mesh.vertexStride ? mesh.vertexBytes.size() / mesh.vertexStride : 0u),
 					mesh.indices.size(), mesh.vertexAttributeMask);
+				ReadOnlyLine(sheet, "Vertices", counts);
 			}
 		}
 		else
 		{
-			ImGui::TextDisabled("typed generation 없음 (legacy/experiment 경로)");
+			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+			ImGui::TextWrapped("typed generation 없음 (legacy/experiment 경로)");
+			ImGui::PopStyleColor();
 		}
 	}
 
 	if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::Text("Element ");
-		ImGui::SameLine();
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(editor::ThemePixels(editor::EditorThemeTokens::PropertyGapX), editor::ThemePixels(editor::EditorThemeTokens::ItemGapY)));
 		// 자산 이름은 왼쪽 정렬한다. 정렬 비율은 pixel 배율 대상이 아니다.
 		ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 
-		if (meshRenderer->m_Material && !meshRenderer->m_Material->m_name.empty())
+		const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+		const float button = ImGui::GetFrameHeight();
+		const std::string materialName = meshRenderer->m_Material && !meshRenderer->m_Material->m_name.empty()
+			? meshRenderer->m_Material->m_name : std::string("No Material");
+		ImGui::Button((materialName + "###MaterialElement").c_str(), ImVec2(sheet.line_before_buttons("Element", 2), 0.f));
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materialName.c_str());
+		ImGui::PopStyleVar();
+		ImGui::SameLine(0.f, gap);
+		if (ImGui::Button(EditorIcon::Label<EditorIcon::AssetPicker, "##PickMaterial">, ImVec2(button, button)))
 		{
-			ImGui::Button(meshRenderer->m_Material->m_name.c_str(), ImVec2(250, 0));
+			EditorAssetPresentation::Get().OpenMaterialPicker();
 		}
-		else
+		ImGui::SameLine(0.f, gap);
+		if (ImGui::Button(EditorIcon::Label<EditorIcon::More, "##MaterialMenu">, ImVec2(button, button)))
 		{
-			ImGui::Button("No Material", ImVec2(250, 0));
+			ImGui::OpenPopup("MaterialMenu");
 		}
-		ImGui::SameLine();
-        if (ImGui::Button(EditorIcon::AssetPicker))
-        {
-            EditorAssetPresentation::Get().OpenMaterialPicker();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button(EditorIcon::More))
-        {
-                ImGui::OpenPopup("MaterialMenu");
-        }
-        if (ImGui::BeginPopup("MaterialMenu"))
-        {
-            if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
-            {
-                // I5-M5 S4 — runtime 인스턴스는 비영속이다. asset cache에
-                // 등록하지 않고 독립 .asset으로 저장하지 않는다(InstantiateShared
-                // 계약 비승계). 새 저작 자산이 필요하면 그것은 자산 복제
-                // (DuplicateMaterialAsset)의 몫이다.
-                meshRenderer->SetMaterial(MaterialScriptBinding::InstantiateOwned(
-                    *meshRenderer->m_Material, {}));
-                // S2c-2a — 인스턴스화는 base 링크 해제다(Unity 의미론): 이후
-                // 편집은 자산 diff가 아니라 인라인 소유 저작이다.
-                meshRenderer->m_materialBaseGuid = FileGuid{};
-            }
-            ImGui::EndPopup();
-        }
-		ImGui::DragScalar("Bitflag", ImGuiDataType_U32, &meshRenderer->m_bitflag);
-        ImGui::PopStyleVar(2);
+		if (ImGui::BeginPopup("MaterialMenu"))
+		{
+			if (ImGui::MenuItem("Instantiate") && meshRenderer->m_Material)
+			{
+				// I5-M5 S4 — runtime 인스턴스는 비영속이다. asset cache에
+				// 등록하지 않고 독립 .asset으로 저장하지 않는다(InstantiateShared
+				// 계약 비승계). 새 저작 자산이 필요하면 그것은 자산 복제
+				// (DuplicateMaterialAsset)의 몫이다.
+				meshRenderer->SetMaterial(MaterialScriptBinding::InstantiateOwned(
+					*meshRenderer->m_Material, {}));
+				// S2c-2a — 인스턴스화는 base 링크 해제다(Unity 의미론): 이후
+				// 편집은 자산 diff가 아니라 인라인 소유 저작이다.
+				meshRenderer->m_materialBaseGuid = FileGuid{};
+			}
+			ImGui::EndPopup();
+		}
+		ImGui::SetNextItemWidth(sheet.line("Bitflag"));
+		ImGui::DragScalar("##Bitflag", ImGuiDataType_U32, &meshRenderer->m_bitflag);
 	}
 
-    if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        const auto& mat_type = Meta::Find(type_guid(Material)); // CT1: 문자열 → typeID 조회
-        const auto& mat_info_type = Meta::Find(type_guid(MaterialInfomation));
-        if (nullptr != meshRenderer->m_Material)
+	if (ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		const auto& mat_type = Meta::Find(type_guid(Material)); // CT1: 문자열 → typeID 조회
+		if (nullptr != meshRenderer->m_Material)
 		{
 			auto& mat_info = meshRenderer->m_Material->m_materialInfo;
 			auto mat = meshRenderer->m_Material.get();
@@ -120,7 +147,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			// legacy 스칼라 소비자용 사본이라 binding이 함께 동기화한다.
 			// meta가 없어 논리 경로가 거부되는 legacy 재질만 사본에 직접 쓴다.
 			math::color baseColor = MaterialScriptBinding::GetBaseColor(*mat);
-			if (ImGui::ColorEdit4("base color", &baseColor.r))
+			ImGui::SetNextItemWidth(sheet.line("Base Color"));
+			if (ImGui::ColorEdit4("##BaseColor", &baseColor.r))
 			{
 				MaterialScriptBinding::SetBaseColor(*mat, baseColor,
 					meshRenderer->GetMaterialInstance());
@@ -128,7 +156,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 			float metallic = MaterialScriptBinding::GetFloat(*mat,
 				standard_material::property::Metallic, mat_info.m_metallic);
-			if (ImGui::SliderFloat("metalic", &metallic, 0.f, 1.f)
+			ImGui::SetNextItemWidth(sheet.line("Metallic"));
+			if (ImGui::SliderFloat("##Metallic", &metallic, 0.f, 1.f)
 				&& !MaterialScriptBinding::SetFloat(*mat,
 					standard_material::property::Metallic, metallic,
 					meshRenderer->GetMaterialInstance()))
@@ -138,7 +167,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 			float roughness = MaterialScriptBinding::GetFloat(*mat,
 				standard_material::property::Roughness, mat_info.m_roughness);
-			if (ImGui::SliderFloat("roughness", &roughness, 0.f, 1.f)
+			ImGui::SetNextItemWidth(sheet.line("Roughness"));
+			if (ImGui::SliderFloat("##Roughness", &roughness, 0.f, 1.f)
 				&& !MaterialScriptBinding::SetFloat(*mat,
 					standard_material::property::Roughness, roughness,
 					meshRenderer->GetMaterialInstance()))
@@ -149,28 +179,23 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			// IOR 슬라이더는 은퇴 — 유일 소비자였던 TrySetMaterialInfo가 호출자
 			// 0인 죽은 함수였고 PBRMaterial CB는 어떤 셰이더에도 없다. 소비 0인
 			// 저작 표면은 데이터만 쌓는다. m_IOR 필드 자체는 S2c/I6에서 제거한다.
+
+			for (auto& enumProp : mat_type->properties)
+			{
+				if (enumProp.typeID == TypeTrait::GUIDCreator::GetTypeID<MaterialRenderingMode>())
+				{
+					auto mode = meshRenderer->m_Material->m_renderingMode;
+					ImGui::SetNextItemWidth(sheet.line("Rendering Mode"));
+					Meta::DrawEnumProperty((int*)&mode, enumProp, "##RenderingMode");
+					if (mode != meshRenderer->m_Material->m_renderingMode)
+						EditorObjectOperations::MaterialMode({meshRenderer->m_Material}, mode);
+					break;
+				}
+			}
 		}
 		else
 		{
-			ImGui::Text("No Material assigned.");
-		}
-		for (auto& enumProp : mat_type->properties)
-		{
-			if (enumProp.typeID == TypeTrait::GUIDCreator::GetTypeID<MaterialRenderingMode>())
-			{
-				if (nullptr != meshRenderer->m_Material)
-				{
-					auto mode = meshRenderer->m_Material->m_renderingMode;
-                    Meta::DrawEnumProperty((int*)&mode, enumProp);
-                    if (mode != meshRenderer->m_Material->m_renderingMode)
-                        EditorObjectOperations::MaterialMode({meshRenderer->m_Material}, mode);
-				}
-				else
-				{
-					ImGui::Text("No Material assigned.");
-				}
-				break;
-			}
+			ImGui::TextUnformatted("No Material assigned.");
 		}
 	}
 
@@ -182,11 +207,11 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 		Material* mat = meshRenderer->m_Material.get();
 		if (nullptr == mat)
 		{
-			ImGui::Text("No Material assigned.");
+			ImGui::TextUnformatted("No Material assigned.");
 		}
 		else if (FileGuid{} == mat->m_shaderMetaGuid)
 		{
-			ImGui::TextUnformatted("ShaderMeta가 없어 논리 property를 편집할 수 없다");
+			ImGui::TextWrapped("ShaderMeta가 없어 논리 property를 편집할 수 없다");
 		}
 		else
 		{
@@ -196,7 +221,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 			const auto meta = DataSystems->ResolveShaderMeta(metaHandle);
 			if (!meta)
 			{
-				ImGui::Text("ShaderMeta 로드 실패: %s", metaError.c_str());
+				ImGui::TextWrapped("ShaderMeta 로드 실패: %s", metaError.c_str());
 			}
 			else
 			{
@@ -232,6 +257,9 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 						}
 					}
 
+					// 이름은 셰이더가 정한다 — 컴파일 시 목록에 없으므로 최소 열에서 잘린다.
+					ImGui::PushID(desc.name.c_str());
+					const float width = sheet.line(desc.name.c_str());
 					switch (desc.type)
 					{
 					case ShaderPropertyType::Float:
@@ -247,7 +275,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 						{
 							values[i] = current.m_numericValue[i];
 						}
-						if (ImGui::DragScalarN(desc.name.c_str(),
+						ImGui::SetNextItemWidth(width);
+						if (ImGui::DragScalarN("##Value",
 							ImGuiDataType_Float, values, count, 0.01f))
 						{
 							(void)MaterialScriptBinding::SetFloatVector(*mat,
@@ -260,7 +289,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 					case ShaderPropertyType::Int:
 					{
 						int value = current.m_integerValue;
-						if (ImGui::DragInt(desc.name.c_str(), &value))
+						ImGui::SetNextItemWidth(width);
+						if (ImGui::DragInt("##Value", &value))
 						{
 							(void)MaterialScriptBinding::SetInt(*mat, *meta,
 								desc.name, value,
@@ -271,7 +301,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 					case ShaderPropertyType::Bool:
 					{
 						bool value = current.m_boolValue;
-						if (ImGui::Checkbox(desc.name.c_str(), &value))
+						if (ImGui::Checkbox("##Value", &value))
 						{
 							(void)MaterialScriptBinding::SetInt(*mat, *meta,
 								desc.name, value ? 1 : 0,
@@ -281,17 +311,17 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 					}
 					case ShaderPropertyType::Texture2D:
 					{
-						ImGui::Text("%s: %s", desc.name.c_str(),
-							FileGuid{} == current.m_textureGuid
-							? "(none)"
-							: current.m_textureGuid.ToString().c_str());
+						std::string guid = FileGuid{} == current.m_textureGuid
+							? std::string("(none)") : current.m_textureGuid.ToString();
+						ImGui::SetNextItemWidth(width);
+						ImGui::InputText("##Value", &guid, ImGuiInputTextFlags_ReadOnly);
 						break;
 					}
 					default:
-						ImGui::Text("%s: (Inspector 미지원 타입)",
-							desc.name.c_str());
+						ImGui::TextDisabled("(Inspector 미지원 타입)");
 						break;
 					}
+					ImGui::PopID();
 				}
 			}
 		}
@@ -299,7 +329,6 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 
 	if (ImGui::CollapsingHeader("LightMapping", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		const auto& lightmap_type = Meta::Find(type_guid(LightMapping));
 		Meta::TypedDraw::DrawOwnMembers(meshRenderer->m_LightMapping);
 	}
 
@@ -315,13 +344,16 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
 	// 흐르는 저작 값이고, 미래 LOD는 렌더 파생 몫이라는 것이 D0b 판정이다.
 	if (ImGui::CollapsingHeader("LODGroupShared", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::Checkbox("Enable LODGroup", &meshRenderer->m_isEnableLOD);
+		sheet.line("Enable LODGroup");
+		ImGui::Checkbox("##EnableLODGroup", &meshRenderer->m_isEnableLOD);
 	}
 
 	if (ImGui::CollapsingHeader("ShadowSetting", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::Checkbox("Enable Shadow Receive", &meshRenderer->m_shadowRecive);
-		ImGui::Checkbox("Enable Shadow Cast", &meshRenderer->m_shadowCast);
+		sheet.line("Receive Shadow");
+		ImGui::Checkbox("##EnableShadowReceive", &meshRenderer->m_shadowRecive);
+		sheet.line("Cast Shadow");
+		ImGui::Checkbox("##EnableShadowCast", &meshRenderer->m_shadowCast);
 	}
 
 	if (auto selectedMaterial =
@@ -378,8 +410,10 @@ namespace
 	// SynchronizeLegacyMaterialProperties가 GUID에서 이름을 되채운다). delete는
 	// GUID와 이름을 함께 비운다 — 이름만 남으면 Finalize의 이름 폴백이
 	// 텍스처를 되살린다.
-	void DrawMaterialTextureSlot(Material& mat, const char* emptyLabel,
-		std::string_view propertyName, std::string& legacyNameField,
+	//
+	// 한 줄이다: 라벨, 미리보기(있을 때), 이름 버튼(끌어 놓기 대상), 지우기 버튼.
+	void DrawMaterialTextureSlot(const editor::widgets::property_sheet& sheet, Material& mat,
+		const char* label, std::string_view propertyName, std::string& legacyNameField,
 		const std::shared_ptr<Texture>& current, bool compress,
 		const std::function<void(std::shared_ptr<Texture>)>& apply,
 		experiment::MaterialInstance* instance) // I5-D5c3
@@ -387,33 +421,23 @@ namespace
 		ImGui::PushID(propertyName.data(),
 			propertyName.data() + propertyName.size());
 
-		ImVec2 minRect;
-		ImVec2 maxRect;
+		const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+		const float square = ImGui::GetFrameHeight();
+		float width = current ? sheet.line_before_buttons(label, 2) : sheet.line(label);
 		if (current)
 		{
 			ImGui::Image((ImTextureID)EditorImGuiTexture::From(current.get()),
-				ImVec2(30, 30));
-			minRect = ImGui::GetItemRectMin();
-			maxRect = ImGui::GetItemRectMax();
-
-			ImGui::SameLine();
-			if (ImGui::Button("delete"))
-			{
-				legacyNameField.clear();
-				MaterialScriptBinding::SetTexture(mat, propertyName, {},
-					instance);
-				apply({});
-			}
-		}
-		else
-		{
-			ImGui::Button(emptyLabel);
-			minRect = ImGui::GetItemRectMin();
-			maxRect = ImGui::GetItemRectMax();
+				ImVec2(square, square));
+			ImGui::SameLine(0.f, gap);
 		}
 
-		ImRect bb(minRect, maxRect);
-		if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget")))
+		const std::string name = current ? current->m_name + current->m_extension : std::string("None");
+		ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+		ImGui::Button((name + "###Slot").c_str(), ImVec2(width, 0.f));
+		ImGui::PopStyleVar();
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", name.c_str());
+
+		if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 		{
 			if (const ImGuiPayload* payload =
 				ImGui::AcceptDragDropPayload("Texture"))
@@ -442,6 +466,19 @@ namespace
 			ImGui::EndDragDropTarget();
 		}
 
+		if (current)
+		{
+			ImGui::SameLine(0.f, gap);
+			if (ImGui::Button(EditorIcon::Label<EditorIcon::Close, "##ClearTexture">, ImVec2(square, square)))
+			{
+				legacyNameField.clear();
+				MaterialScriptBinding::SetTexture(mat, propertyName, {},
+					instance);
+				apply({});
+			}
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Clear texture");
+		}
+
 		ImGui::PopID();
 	}
 }
@@ -449,22 +486,23 @@ namespace
 void TextureDropTarget(Material* mat,
 	experiment::MaterialInstance* instance)
 {
+	const editor::widgets::property_sheet sheet = MaterialSheet();
 	ImGui::PushID(mat);
-	DrawMaterialTextureSlot(*mat, "No basemap texture",
+	DrawMaterialTextureSlot(sheet, *mat, "Base Map",
 		standard_material::property::BaseColorMap, mat->m_baseColorTexName,
 		mat->GetBaseColorMapShared(), true,
 		[mat](std::shared_ptr<Texture> texture)
 		{
 			mat->UseBaseColorMap(std::move(texture));
 		}, instance);
-	DrawMaterialTextureSlot(*mat, "No Normalmap texture",
+	DrawMaterialTextureSlot(sheet, *mat, "Normal Map",
 		standard_material::property::NormalMap, mat->m_normalTexName,
 		mat->GetNormalMapShared(), false,
 		[mat](std::shared_ptr<Texture> texture)
 		{
 			mat->UseNormalMap(std::move(texture));
 		}, instance);
-	DrawMaterialTextureSlot(*mat, "No ORMmap texture",
+	DrawMaterialTextureSlot(sheet, *mat, "ORM Map",
 		standard_material::property::OrmMap, mat->m_ORM_TexName,
 		mat->GetOccRoughMetalMapShared(), false,
 		[mat](std::shared_ptr<Texture> texture)

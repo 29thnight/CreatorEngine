@@ -1128,25 +1128,89 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 	}
 }
 
+// ── 전용 드로어의 공통 조각 (PHASE 21 W2-I4) ───────────────────────────────
+//
+// 아래 드로어들은 `editor::widgets::property_sheet` 로 라벨 열을 한 번 재고, 값 칸은
+// 그 줄이 돌려준 폭을 쓴다. 고정 픽셀 폭은 두지 않는다 — 배율을 받지 않고 좁은
+// 폭에서 넘친다(착수 기준선: ImageComponent 240 에서 260 px).
+
+static bool DropTargetEnabled()
+{
+	return !(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled);
+}
+
+// 자산·대상 이름을 보여 주는 버튼. 이름은 왼쪽 정렬한다(MeshRenderer 의 Element 와 같다).
+static bool NameButton(const std::string& name, const char* id, float width)
+{
+	ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+	const bool pressed = ImGui::Button((name + id).c_str(), ImVec2(width, 0.f));
+	ImGui::PopStyleVar();
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", name.c_str());
+	return pressed;
+}
+
+// 자산 칸: 이름을 보여 주는 버튼 하나. 버튼이 끌어 놓기 대상이다. 텍스처가 있으면
+// 앞에 줄 높이의 미리보기를 붙인다. 놓인 자산 경로를 돌려준다(없으면 빈 경로).
+static file::path DrawAssetSlot(const char* id, Texture* texture, const char* emptyText,
+	const char* payloadType, float width)
+{
+	ImGui::PushID(id);
+	float buttonWidth = width;
+	if (texture)
+	{
+		const float preview = ImGui::GetFrameHeight();
+		const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+		ImGui::Image((ImTextureID)EditorImGuiTexture::From(texture), ImVec2(preview, preview));
+		ImGui::SameLine(0.f, gap);
+		buttonWidth = ImMax(1.f, width - preview - gap);
+	}
+	const std::string name = texture ? texture->m_name + texture->m_extension : std::string(emptyText);
+	NameButton(name, "###Slot", buttonWidth);
+
+	file::path dropped;
+	if (DropTargetEnabled() && ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(payloadType))
+			dropped = editor::asset_drag::path_of(*payload);
+		ImGui::EndDragDropTarget();
+	}
+	ImGui::PopID();
+	return dropped;
+}
+
+// 읽기 전용 이름 칸과 그 뒤의 고르기 버튼. 버튼을 눌렀으면 참.
+static bool DrawNamedPicker(const editor::widgets::property_sheet& sheet, const char* label,
+	const std::string& name, const char* emptyText, const char* buttonLabel)
+{
+	ImGui::PushID(label);
+	ImGui::SetNextItemWidth(sheet.line_before_buttons(label));
+	std::string shown = name.empty() ? std::string(emptyText) : name;
+	ImGui::InputText("##Name", &shown, ImGuiInputTextFlags_ReadOnly);
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", shown.c_str());
+	ImGui::SameLine(0.f, ImGui::GetStyle().ItemInnerSpacing.x);
+	const float button = ImGui::GetFrameHeight();
+	const bool pressed = ImGui::Button(buttonLabel, ImVec2(button, button));
+	ImGui::PopID();
+	return pressed;
+}
+
 void InspectorWindow::ImGuiDrawHelperFSM(StateMachineComponent* FSMComponent)
 {
-	if (FSMComponent)
+	if (!FSMComponent) return;
+
+	const editor::widgets::property_sheet sheet(m_layout, { "State Machine" });
+	if (ImGui::Button("Edit###EditStateMachine", ImVec2(sheet.line("State Machine"), 0.f)))
 	{
-		ImGui::Text("State Machine Editor");
-		ImGui::Separator();
-		if (ImGui::Button("Edit State Machine"))
+		m_openFSMPopup = true;
+		ImGui::OpenPopup("FSMEditorPopup");
+	}
+	if (ImGui::BeginPopupModal("FSMEditorPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		if (ImGui::Button("Add State"))
 		{
-			m_openFSMPopup = true;
-			ImGui::OpenPopup("FSMEditorPopup");
+			// Add state logic here
 		}
-		if (ImGui::BeginPopupModal("FSMEditorPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-		{
-			if (ImGui::Button("Add State"))
-			{
-				// Add state logic here
-			}
-			ImGui::EndPopup();
-		}
+		ImGui::EndPopup();
 	}
 }
 
@@ -1154,505 +1218,331 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 {
 	if (!BTComponent) return;
 
-	if (ImGui::Button("Set Behavior Tree")) 
+	const editor::widgets::property_sheet sheet(m_layout, { "Behavior Tree", "BlackBoard" });
+	const auto pick = [](const wchar_t* filter, const wchar_t* title, std::string& name,
+		FileGuid& guid, const char* kind)
 	{
-		file::path filePath = ShowOpenFileDialog(
-			L"Behavior Tree Files (*.bt)\0*.bt\0",
-			L"Load Behavior Tree",
-			PathFinder::Relative("BehaviorTree").wstring()
-		);
+		file::path filePath = ShowOpenFileDialog(filter, title,
+			PathFinder::Relative("BehaviorTree").wstring());
+		if (filePath.empty()) return;
 
-		if (!filePath.empty())
-		{
-			BTComponent->name = filePath.stem().string();
-			FileGuid guid = DataSystems->GetFileGuid(filePath);
-			if (guid != nullFileGuid)
-			{
-				BTComponent->m_BehaviorTreeGuid = guid;
-			}
-			else
-			{
-				Debug::PrintLog(spdlog::level::err, "Failed to get file GUID for Behavior Tree: " + filePath.string());
-			}
-		}
-	}
-	ImGui::SameLine();
+		name = filePath.stem().string();
+		const FileGuid found = DataSystems->GetFileGuid(filePath);
+		if (found != nullFileGuid)
+			guid = found;
+		else
+			Debug::PrintLog(spdlog::level::err, std::string("Failed to get file GUID for ") + kind + ": " + filePath.string());
+	};
 
-	if (ImGui::Button("Set BlackBoard"))
+	if (DrawNamedPicker(sheet, "Behavior Tree", BTComponent->name, "None",
+		EditorIcon::Label<EditorIcon::AssetPicker, "##PickBehaviorTree">))
 	{
-		file::path filePath = ShowOpenFileDialog(
-			L"BlackBoard Files (*.blackboard)\0*.blackboard\0",
-			L"Load BlackBoard",
-			PathFinder::Relative("BehaviorTree").wstring()
-		);
-
-		if (!filePath.empty())
-		{
-			BTComponent->blackBoardName = filePath.stem().string();
-			FileGuid guid = DataSystems->GetFileGuid(filePath);
-			if (guid != nullFileGuid)
-			{
-				BTComponent->m_BlackBoardGuid = guid;
-			}
-			else
-			{
-				Debug::PrintLog(spdlog::level::err, "Failed to get file GUID for Blackboard: " + filePath.string());
-			}
-		}
+		pick(L"Behavior Tree Files (*.bt)\0*.bt\0", L"Load Behavior Tree",
+			BTComponent->name, BTComponent->m_BehaviorTreeGuid, "Behavior Tree");
 	}
-
-	// Behavior Tree 이름 표시
-	if (!BTComponent->name.empty())
+	if (DrawNamedPicker(sheet, "BlackBoard", BTComponent->blackBoardName, "None",
+		EditorIcon::Label<EditorIcon::AssetPicker, "##PickBlackBoard">))
 	{
-		ImGui::Text("Behavior Tree: %s", BTComponent->name.c_str());
+		pick(L"BlackBoard Files (*.blackboard)\0*.blackboard\0", L"Load BlackBoard",
+			BTComponent->blackBoardName, BTComponent->m_BlackBoardGuid, "Blackboard");
 	}
-
-	//BlackBoard 이름 표시
-	if (!BTComponent->blackBoardName.empty())
-	{
-		ImGui::Text("BlackBoard: %s", BTComponent->blackBoardName.c_str());
-	}
-
 }
 
 void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 {
 	if (!volumeComponent) return;
 
-	ImGui::SeparatorText("VolumeProfile");
-	ImGui::Text("Drag VolumeProfile Here");
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VolumeProfile"))
+		const editor::widgets::property_sheet sheet(m_layout, { "Profile" });
+		const float width = sheet.line("Profile");
+		const std::string name = volumeComponent->m_volumeProfileName.empty()
+			? std::string("None (drag VolumeProfile)") : volumeComponent->m_volumeProfileName;
+		NameButton(name, "###VolumeProfileSlot", width);
+		if (DropTargetEnabled() && ImGui::BeginDragDropTarget())
 		{
-			const file::path filepath = editor::asset_drag::path_of(*payload);
-			FileGuid guid = DataSystems->GetFileGuid(filepath);
-			if (guid != nullFileGuid)
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VolumeProfile"))
 			{
-				// 이미 프로파일이 존재하는 경우
-				if (volumeComponent->m_volumeProfileGuid != nullFileGuid)
+				const file::path filepath = editor::asset_drag::path_of(*payload);
+				FileGuid guid = DataSystems->GetFileGuid(filepath);
+				if (guid != nullFileGuid)
 				{
-					Debug::PrintLog(spdlog::level::warn, "Volume profile already exists. Replacing with new profile.");
+					// 이미 프로파일이 존재하는 경우
+					if (volumeComponent->m_volumeProfileGuid != nullFileGuid)
+					{
+						Debug::PrintLog(spdlog::level::warn, "Volume profile already exists. Replacing with new profile.");
+					}
+					volumeComponent->m_volumeProfileGuid = guid;
+					volumeComponent->LoadProfile(guid);
 				}
-				volumeComponent->m_volumeProfileGuid = guid;
-				volumeComponent->LoadProfile(guid);
+				else
+				{
+					Debug::PrintLog(spdlog::level::err, "Failed to load volume profile: " + filepath.string());
+				}
 			}
-			else
-			{
-				Debug::PrintLog(spdlog::level::err, "Failed to load volume profile: " + filepath.string());
-			}
+			ImGui::EndDragDropTarget();
 		}
-		ImGui::EndDragDropTarget();
 	}
 
-	if(volumeComponent->IsProfileLoaded())
+	if (!volumeComponent->IsProfileLoaded()) return;
+
+	VolumeProfile& profile = volumeComponent->GetVolumeProfile();
+	const auto drawMembers = [](const char* header, auto& setting)
 	{
-		VolumeProfile& profile = volumeComponent->GetVolumeProfile();
+		if (!ImGui::CollapsingHeader(header)) return;
+		ImGui::PushID(header);
+		Meta::TypedDraw::DrawOwnMembers(setting);
+		ImGui::PopID();
+	};
 
-		if (ImGui::CollapsingHeader("ShadowPass"))
+	drawMembers("ShadowPass", profile.settings.shadow);
+	drawMembers("SSAOPass", profile.settings.ssao);
+	drawMembers("DeferredPass", profile.settings.deferred);
+	drawMembers("SSGIPass", profile.settings.ssgi);
+
+	if (ImGui::CollapsingHeader("SkyBoxPass"))
+	{
+		const editor::widgets::property_sheet sheet(m_layout, { "Use SkyBox", "HDR" });
+		sheet.line("Use SkyBox");
+		ImGui::Checkbox("##UseSkyBox", &profile.settings.m_isSkyboxEnabled);
+
+		std::string_view profileTextureName = profile.settings.skyboxTextureName;
+		const RenderPassSettings runtimeRenderSettings =
+			RuntimeSettings::Get().GetRenderPassSettings();
+		std::string_view settingsTextureName = runtimeRenderSettings.skyboxTextureName;
+		if (!settingsTextureName.empty() && settingsTextureName != profileTextureName)
 		{
-			ImGui::PushID("ShadowPass");
-			auto type = Meta::Find(type_guid(ShadowMapPassSetting)) /* CT1: typeID */;
-			Meta::TypedDraw::DrawOwnMembers(profile.settings.shadow);
-			ImGui::PopID();
+			profile.settings.skyboxTextureName = settingsTextureName;
 		}
 
-		if (ImGui::CollapsingHeader("SSAOPass"))
+		const float width = sheet.line("HDR");
+		const std::string hdrName = profile.settings.skyboxTextureName.empty()
+			? std::string("None (drag HDR texture)") : profile.settings.skyboxTextureName;
+		NameButton(hdrName, "###HdrSlot", width);
+		if (DropTargetEnabled() && ImGui::BeginDragDropTarget())
 		{
-			ImGui::PushID("SSAOPass");
-			auto type = Meta::Find(type_guid(SSAOPassSetting));
-			Meta::TypedDraw::DrawOwnMembers(profile.settings.ssao);
-			ImGui::PopID();
-		}
-
-		if (ImGui::CollapsingHeader("DeferredPass"))
-		{
-			ImGui::PushID("DeferredPass");
-			auto type = Meta::Find(type_guid(DeferredPassSetting));
-			Meta::TypedDraw::DrawOwnMembers(profile.settings.deferred);
-			ImGui::PopID();
-		}
-
-		if (ImGui::CollapsingHeader("SSGIPass"))
-		{
-			ImGui::PushID("SSGIPass");
-			auto type = Meta::Find(type_guid(SSGIPassSetting));
-			Meta::TypedDraw::DrawOwnMembers(profile.settings.ssgi);
-			ImGui::PopID();
-		}
-
-		if (ImGui::CollapsingHeader("SkyBoxPass"))
-		{
-			ImGui::Checkbox("Use SkyBox", &profile.settings.m_isSkyboxEnabled);
-
-			file::path HDRPath = PathFinder::Relative("HDR\\");
-			std::string_view profileTextureName = profile.settings.skyboxTextureName;
-			const RenderPassSettings runtimeRenderSettings =
-				RuntimeSettings::Get().GetRenderPassSettings();
-			std::string_view settingsTextureName = runtimeRenderSettings.skyboxTextureName;
-			if (!settingsTextureName.empty() && settingsTextureName != profileTextureName)
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HDR"))
 			{
-				profile.settings.skyboxTextureName = settingsTextureName;
-			}
-			
-			if (profile.settings.skyboxTextureName.empty())
-			{
-				ImGui::Text("Drag HDR Texture Here");
-			}
-			else
-			{
-				ImGui::Text("Loaded HDR: %s", profile.settings.skyboxTextureName.c_str());
-			}
-			if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
-			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HDR"))
+				const file::path filepath = editor::asset_drag::path_of(*payload);
+				FileGuid guid = DataSystems->GetFileGuid(filepath);
+				if (guid != nullFileGuid)
 				{
-					const file::path filepath = editor::asset_drag::path_of(*payload);
-					const file::path filename = filepath.filename();
-					FileGuid guid = DataSystems->GetFileGuid(filepath);
-					if (guid != nullFileGuid)
-					{
-						profile.settings.skyboxTextureName = filename.string();
-					}
-					else
-					{
-						Debug::PrintLog(spdlog::level::err, "Failed to load HDR: " + filepath.string());
-					}
+					profile.settings.skyboxTextureName = filepath.filename().string();
 				}
-				ImGui::EndDragDropTarget();
+				else
+				{
+					Debug::PrintLog(spdlog::level::err, "Failed to load HDR: " + filepath.string());
+				}
 			}
+			ImGui::EndDragDropTarget();
 		}
-		ImGui::Separator();
-		if (ImGui::CollapsingHeader("PostProcessPass"))
+	}
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("PostProcessPass"))
+	{
+		drawMembers("AAPass", profile.settings.aa);
+		drawMembers("BloomPass", profile.settings.bloom);
+		drawMembers("VignettePass", profile.settings.vignette);
+
+		if (ImGui::CollapsingHeader("ToneMapPass"))
 		{
-			if (ImGui::CollapsingHeader("AAPass"))
-			{
-				ImGui::PushID("AAPass");
-				auto type = Meta::Find(type_guid(AAPassSetting));
-				Meta::TypedDraw::DrawOwnMembers(profile.settings.aa);
-				ImGui::PopID();
-			}
+			auto& setting = profile.settings.toneMap;
+			ImGui::PushID("ToneMapPass");
 
-			if (ImGui::CollapsingHeader("BloomPass"))
-			{
-				ImGui::PushID("BloomPass");
-				auto type = Meta::Find(type_guid(BloomPassSetting));
-				Meta::TypedDraw::DrawOwnMembers(profile.settings.bloom);
-				ImGui::PopID();
-			}
+			const editor::widgets::property_sheet sheet(m_layout, { "Use ToneMap", "ToneMap Type",
+				"Use Auto Exposure", "Exposure", "fNumber", "Shutter Time", "ISO",
+				"Exposure Compensation", "Speed Brightness", "Speed Darkness" });
+			sheet.line("Use ToneMap");
+			ImGui::Checkbox("##UseToneMap", &setting.isAbleToneMap);
+			ImGui::SetNextItemWidth(sheet.line("ToneMap Type"));
+			ImGui::Combo("##ToneMapType", &setting.toneMapType, "Reinhard\0ACES\0Uncharted2\0HDR10\0ACESFlim");
 
-			//if (ImGui::CollapsingHeader("ScreenSpaceReflectionPass"))
-			//{
-			//	m_sceneRenderer->m_pScreenSpaceReflectionPass->ControlPanel();
-			//}
+			ImGui::SeparatorText("Auto Exposure");
+			sheet.line("Use Auto Exposure");
+			ImGui::Checkbox("##UseAutoExposure", &setting.isAbleAutoExposure);
+			ImGuiSliderFlags exposureFlags = setting.isAbleAutoExposure ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None;
+			ImGui::SetNextItemWidth(sheet.line("Exposure"));
+			ImGui::DragFloat("##ToneMapExposure", &setting.toneMapExposure, 0.01f, 0.0f, 5.0f, "%.3f", exposureFlags);
 
-			//if (ImGui::CollapsingHeader("SubsurfaceScatteringPass"))
-			//{
-			//	m_sceneRenderer->m_pSubsurfaceScatteringPass->ControlPanel();
-			//}
+			ImGui::SeparatorText("Manual Camera");
+			ImGui::SetNextItemWidth(sheet.line("fNumber"));
+			ImGui::DragFloat("##fNumber", &setting.fNumber, 0.01f, 1.0f, 32.0f);
+			ImGui::SetNextItemWidth(sheet.line("Shutter Time"));
+			ImGui::DragFloat("##ShutterTime", &setting.shutterTime, 0.001f, 0.000125f, 30.0f);
+			ImGui::SetNextItemWidth(sheet.line("ISO"));
+			ImGui::DragFloat("##ISO", &setting.ISO, 50.0f, 50.0f, 6400.0f);
+			ImGui::SetNextItemWidth(sheet.line("Exposure Compensation"));
+			ImGui::DragFloat("##ExposureCompensation", &setting.exposureCompensation, 0.01f, -5.0f, 5.0f);
+			ImGui::SetNextItemWidth(sheet.line("Speed Brightness"));
+			ImGui::DragFloat("##SpeedBrightness", &setting.speedBrightness, 0.01f, 0.1f, 10.0f);
+			ImGui::SetNextItemWidth(sheet.line("Speed Darkness"));
+			ImGui::DragFloat("##SpeedDarkness", &setting.speedDarkness, 0.01f, 0.1f, 10.0f);
 
-			if (ImGui::CollapsingHeader("VignettePass"))
-			{
-				ImGui::PushID("VignettePass");
-				auto type = Meta::Find(type_guid(VignettePassSetting));
-				Meta::TypedDraw::DrawOwnMembers(profile.settings.vignette);
-				ImGui::PopID();
-			}
-
-			if (ImGui::CollapsingHeader("ToneMapPass"))
-			{
-				auto& setting = profile.settings.toneMap;
-
-				ImGui::PushID("ToneMapPass");
-
-				ImGui::Checkbox("Use ToneMap", &setting.isAbleToneMap);
-				ImGui::Combo("ToneMap Type", &setting.toneMapType, "Reinhard\0ACES\0Uncharted2\0HDR10\0ACESFlim");
-
-				ImGui::Separator();
-				ImGui::Text("Auto Exposure Settings");
-				ImGui::Checkbox("Use Auto Exposure", &setting.isAbleAutoExposure);
-
-				ImGuiSliderFlags exposureFlags = setting.isAbleAutoExposure ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None;
-				ImGui::DragFloat("ToneMap Exposure", &setting.toneMapExposure, 0.01f, 0.0f, 5.0f, "%.3f", exposureFlags);
-
-				ImGui::Separator();
-				ImGui::Text("Manual Camera Settings");
-
-				ImGui::DragFloat("fNumber", &setting.fNumber, 0.01f, 1.0f, 32.0f);
-				ImGui::DragFloat("Shutter Time", &setting.shutterTime, 0.001f, 0.000125f, 30.0f);
-				ImGui::DragFloat("ISO", &setting.ISO, 50.0f, 50.0f, 6400.0f);
-				ImGui::DragFloat("Exposure Compensation", &setting.exposureCompensation, 0.01f, -5.0f, 5.0f);
-				ImGui::DragFloat("Speed Brightness", &setting.speedBrightness, 0.01f, 0.1f, 10.0f);
-				ImGui::DragFloat("Speed Darkness", &setting.speedDarkness, 0.01f, 0.1f, 10.0f);
-
-				ImGui::PopID();
-			}
-
-			if (ImGui::CollapsingHeader("ColorGradingPass"))
-			{
-				ImGui::PushID("ColorGradingPass");
-				auto type = Meta::Find(type_guid(ColorGradingPassSetting));
-				Meta::TypedDraw::DrawOwnMembers(profile.settings.colorGrading);
-				ImGui::PopID();
-			}
-
-			//if (ImGui::CollapsingHeader("VolumetricFogPass"))
-			//{
-			//	m_sceneRenderer->m_pVolumetricFogPass->ControlPanel();
-			//}
+			ImGui::PopID();
 		}
 
-		volumeComponent->UpdateProfileEditMode();
+		drawMembers("ColorGradingPass", profile.settings.colorGrading);
+	}
 
-		ImGui::Separator();
-		if (ImGui::Button("Save VolumeProfile Asset"))
-		{
-			EditorAssetDatabase::Get().SaveExistingVolumeProfile(
-				volumeComponent->m_volumeProfileGuid, &profile);
-		}
+	volumeComponent->UpdateProfileEditMode();
+
+	ImGui::Separator();
+	if (ImGui::Button("Save VolumeProfile Asset", ImVec2(ImGui::GetContentRegionAvail().x, 0.f)))
+	{
+		EditorAssetDatabase::Get().SaveExistingVolumeProfile(
+			volumeComponent->m_volumeProfileGuid, &profile);
 	}
 }
 
 void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 {
+	const editor::widgets::property_sheet sheet(m_layout, { "Slice X", "Slice Y", "Slice Number",
+		"Use Animation", "Slices Per Second", "Loop", "Diffuse", "Normal", "ORM" });
+
 	int sliceX = decalComponent->sliceX;
 	int sliceY = decalComponent->sliceY;
-	ImGui::SliderInt("SliceX", &sliceX, 1, 20);
-	ImGui::SliderInt("SliceY", &sliceY, 1, 20);
-	ImGui::InputInt("SliceNumber", &decalComponent->sliceNumber);
+	ImGui::SetNextItemWidth(sheet.line("Slice X"));
+	ImGui::SliderInt("##SliceX", &sliceX, 1, 20);
+	ImGui::SetNextItemWidth(sheet.line("Slice Y"));
+	ImGui::SliderInt("##SliceY", &sliceY, 1, 20);
+	ImGui::SetNextItemWidth(sheet.line("Slice Number"));
+	ImGui::InputInt("##SliceNumber", &decalComponent->sliceNumber);
 	decalComponent->sliceX = sliceX;
 	decalComponent->sliceY = sliceY;
 
-	ImGui::Checkbox("Use Animation", &decalComponent->useAnimation);
-	if (decalComponent->useAnimation) {
-		ImGui::SliderFloat("SlicePerSeconds", &decalComponent->slicePerSeconds, 0.f, 10.f, "%.5f");
-		ImGui::Checkbox("isLoop", &decalComponent->isLoop);
+	sheet.line("Use Animation");
+	ImGui::Checkbox("##UseAnimation", &decalComponent->useAnimation);
+	if (decalComponent->useAnimation)
+	{
+		ImGui::SetNextItemWidth(sheet.line("Slices Per Second"));
+		ImGui::SliderFloat("##SlicePerSeconds", &decalComponent->slicePerSeconds, 0.f, 10.f, "%.5f");
+		sheet.line("Loop");
+		ImGui::Checkbox("##Loop", &decalComponent->isLoop);
 	}
 
-	if (decalComponent->GetDecalTexture() == nullptr)
-		ImGui::Button("None Diffuse Texture", ImVec2(150, 20));
-	else
-		ImGui::Image((ImTextureID)EditorImGuiTexture::From(decalComponent->GetDecalTexture()), ImVec2(30, 30));
-	ImVec2 minRect = ImGui::GetItemRectMin();
-	ImVec2 maxRect = ImGui::GetItemRectMax();
-	ImRect bb(minRect, maxRect);
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
-		{
-			// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
-			const file::path filepath = editor::asset_drag::path_of(*payload);
-			if (editor::asset_drag::lives_in(filepath, "Textures", "Decal Decal texture drop")) {
-				decalComponent->SetDecalTexture(filepath.filename().string().c_str());
-			}
-		}
-		ImGui::EndDragDropTarget();
-	}
-	if (decalComponent->GetNormalTexture() == nullptr)
-		ImGui::Button("None Normal Texture", ImVec2(150, 20));
-	else
-		ImGui::Image((ImTextureID)EditorImGuiTexture::From(decalComponent->GetNormalTexture()), ImVec2(30, 30));
-	minRect = ImGui::GetItemRectMin();
-	maxRect = ImGui::GetItemRectMax();
-	bb = { minRect, maxRect };
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
-		{
-			// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
-			const file::path filepath = editor::asset_drag::path_of(*payload);
-			if (editor::asset_drag::lives_in(filepath, "Textures", "Decal Normal texture drop")) {
-				decalComponent->SetNormalTexture(filepath.filename().string().c_str());
-			}
-		}
-		ImGui::EndDragDropTarget();
-	}
-	if (decalComponent->GetORMTexture() == nullptr)
-		ImGui::Button("None OccluRoughMetal Texture", ImVec2(150, 20));
-	else
-		ImGui::Image((ImTextureID)EditorImGuiTexture::From(decalComponent->GetORMTexture()), ImVec2(30, 30));
-	minRect = ImGui::GetItemRectMin();
-	maxRect = ImGui::GetItemRectMax();
-	bb = { minRect, maxRect };
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget"))) {
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
-		{
-			// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
-			const file::path filepath = editor::asset_drag::path_of(*payload);
-			if (editor::asset_drag::lives_in(filepath, "Textures", "Decal ORM texture drop")) {
-				decalComponent->SetORMTexture(filepath.filename().string().c_str());
-			}
-		}
-		ImGui::EndDragDropTarget();
-	}
+	// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
+	const auto slot = [&](const char* label, Texture* texture, const char* context)
+	{
+		const file::path dropped = DrawAssetSlot(label, texture, "None", "Texture", sheet.line(label));
+		return !dropped.empty() && editor::asset_drag::lives_in(dropped, "Textures", context)
+			? dropped.filename().string() : std::string();
+	};
+	if (auto name = slot("Diffuse", decalComponent->GetDecalTexture(), "Decal Decal texture drop"); !name.empty())
+		decalComponent->SetDecalTexture(name.c_str());
+	if (auto name = slot("Normal", decalComponent->GetNormalTexture(), "Decal Normal texture drop"); !name.empty())
+		decalComponent->SetNormalTexture(name.c_str());
+	if (auto name = slot("ORM", decalComponent->GetORMTexture(), "Decal ORM texture drop"); !name.empty())
+		decalComponent->SetORMTexture(name.c_str());
 }
 
 void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageComponent)
 {
-	auto textures = imageComponent->GetTextures();
-	int count = static_cast<int>(textures.size());
-	static int currentTextureIndex = imageComponent->curindex;
+	const editor::widgets::property_sheet sheet(m_layout, { "Image", "Add Texture", "Color Tint",
+		"Rotation", "Origin", "Union Scale", "Layer", "Size", "Clip Direction", "Clip Percent",
+		"Left", "Right", "Up", "Down" });
 
+	const auto& textures = imageComponent->GetTextures();
+	const int count = static_cast<int>(textures.size());
 	if (count > 0)
 	{
-		const char* items[64]{};
-		for (int i = 0; i < count; ++i)
-		{
-			items[i] = textures[i]->m_name.c_str();
-		}
-		ImGui::Text("Image");
-		ImGui::SameLine();
-		ImGui::SetNextItemWidth(150.0f); // 픽셀 단위로 너비 설정
-		if (ImGui::BeginCombo("##TextureCombo", items[currentTextureIndex]))
+		// 컴포넌트가 자기 인덱스를 들고 있다. 창에 정적 인덱스를 두면 이미지
+		// 컴포넌트 둘이 한 값을 나눠 쓴다.
+		const int current = ImClamp(imageComponent->curindex, 0, count - 1);
+		ImGui::SetNextItemWidth(sheet.line("Image"));
+		if (ImGui::BeginCombo("##TextureCombo", textures[current]->m_name.c_str()))
 		{
 			for (int i = 0; i < count; ++i)
 			{
-				bool isSelected = (currentTextureIndex == i);
-				if (ImGui::Selectable(items[i], isSelected))
-				{
-					currentTextureIndex = i;
+				ImGui::PushID(i);
+				const bool isSelected = (current == i);
+				if (ImGui::Selectable(textures[i]->m_name.c_str(), isSelected))
 					imageComponent->SetTexture(i);
-				}
 				if (isSelected)
 					ImGui::SetItemDefaultFocus();
+				ImGui::PopID();
 			}
 			ImGui::EndCombo();
 		}
 	}
-	else
-	{
-		ImGui::Text("No textures available. Please drag and drop a texture.");
-	}
 
-	ImGui::Text("Drag Texture Here");
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
+	const file::path dropped = DrawAssetSlot("AddTexture", nullptr,
+		count > 0 ? "Drag UI texture to add" : "No textures - drag UI texture", "UI_TEXTURE",
+		sheet.line("Add Texture"));
+	if (!dropped.empty())
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UI_TEXTURE"))
+		auto texture = DataSystems->LoadSharedTexture(dropped.string().c_str(),
+			DataSystem::TextureFileType::UITexture);
+		if (texture)
 		{
-			const file::path filepath = editor::asset_drag::path_of(*payload);
-			auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(),
-				DataSystem::TextureFileType::UITexture);
-			if (texture)
-			{
-				imageComponent->Load(texture);
-				imageComponent->SetTexture(static_cast<int>(imageComponent->GetTextures().size() - 1));
-				currentTextureIndex = static_cast<int>(imageComponent->GetTextures().size() - 1);
-			}
-			else
-			{
-				Debug::PrintLog(spdlog::level::err, "Failed to load UI Texture: " + filepath.string());
-			}
+			imageComponent->Load(texture);
+			imageComponent->SetTexture(static_cast<int>(imageComponent->GetTextures().size() - 1));
 		}
-		ImGui::EndDragDropTarget();
+		else
+		{
+			Debug::PrintLog(spdlog::level::err, "Failed to load UI Texture: " + dropped.string());
+		}
 	}
 
 	ImGui::SeparatorText("BaseInfo");
-	ImGui::ColorEdit4("color tint", &imageComponent->color.r);
-	ImGui::DragFloat("rotation", &imageComponent->rotate, 0.1f, -360.0f, 360.0f);
-	ImGui::DragFloat2("origin", &imageComponent->origin.x, 0.01f, 0.0f, 1.0f);
-	ImGui::DragFloat("union scale", &imageComponent->unionScale, 0.01f, 1.f, 10.f);
-	ImGui::InputInt("layer", &imageComponent->_layerorder);
-	if(ImGui::Button("Reset Size", ImVec2(100, 20)))
+	ImGui::SetNextItemWidth(sheet.line("Color Tint"));
+	ImGui::ColorEdit4("##ColorTint", &imageComponent->color.r);
+	ImGui::SetNextItemWidth(sheet.line("Rotation"));
+	ImGui::DragFloat("##Rotation", &imageComponent->rotate, 0.1f, -360.0f, 360.0f);
+	ImGui::SetNextItemWidth(sheet.line("Origin"));
+	ImGui::DragFloat2("##Origin", &imageComponent->origin.x, 0.01f, 0.0f, 1.0f);
+	ImGui::SetNextItemWidth(sheet.line("Union Scale"));
+	ImGui::DragFloat("##UnionScale", &imageComponent->unionScale, 0.01f, 1.f, 10.f);
+	ImGui::SetNextItemWidth(sheet.line("Layer"));
+	ImGui::InputInt("##Layer", &imageComponent->_layerorder);
+	if (ImGui::Button("Reset###ResetSize", ImVec2(sheet.line("Size"), 0.f)))
 	{
 		imageComponent->ResetSize();
 	}
+
 	static const char* clipDirections[] = { "None", "LeftToRight", "RightToLeft", "UpToBottom", "BottomToTop" };
-
 	int currentClipDir = static_cast<int>(imageComponent->clipDirection);
-	ImGui::Combo("Clip Direction", &currentClipDir, clipDirections, IM_ARRAYSIZE(clipDirections));
+	ImGui::SetNextItemWidth(sheet.line("Clip Direction"));
+	ImGui::Combo("##ClipDirection", &currentClipDir, clipDirections, IM_ARRAYSIZE(clipDirections));
 	imageComponent->clipDirection = static_cast<ClipDirection>(currentClipDir);
+	ImGui::SetNextItemWidth(sheet.line("Clip Percent"));
+	ImGui::DragFloat("##ClipPercent", &imageComponent->clipPercent, 0.01f, 0.0f, 1.0f);
 
-	ImGui::DragFloat("Clip Percent", &imageComponent->clipPercent, 0.01f, 0.0f, 1.0f);
-
-	ImGui::Text("Navigation");
-	auto drawNavigationTarget = [imageComponent](Direction direction)
+	ImGui::SeparatorText("Navigation");
+	const auto navigationTarget = [&](const char* label, Direction direction)
 	{
-		if (Entity* target = imageComponent->GetNextNavi(direction))
-			ImGui::Text(("-> " + target->m_name.ToString()).c_str());
-		else
-			ImGui::Text("-> None");
+		ImGui::PushID(label);
+		Entity* target = imageComponent->GetNextNavi(direction);
+		const std::string name = target ? target->m_name.ToString() : std::string("None (drag object)");
+		NameButton(name, "###Target", sheet.line(label));
+		if (DropTargetEnabled() && ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+			{
+				Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
+				if (draggedIndex != imageComponent->GetOwner()->m_index)
+					imageComponent->SetNavi(direction, Entity::FindIndex(draggedIndex));
+			}
+			// 예전 판은 네 방향 모두 여기서 닫지 않았다.
+			ImGui::EndDragDropTarget();
+		}
+		ImGui::PopID();
 	};
-
-	ImGui::Button(EditorIcon::Label<EditorIcon::Back, "##Left">, ImVec2(30, 20));
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
-	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-		{
-			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
-			if (draggedIndex != imageComponent->GetOwner()->m_index)
-			{
-				Entity* draggedObject = Entity::FindIndex(draggedIndex);
-				imageComponent->SetNavi(Direction::Left, draggedObject);
-			}
-		}
-	}
-	ImGui::SameLine();
-	drawNavigationTarget(Direction::Left);
-
-	ImGui::Button(EditorIcon::Label<EditorIcon::Forward, "##Right">, ImVec2(30, 20));
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
-	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-		{
-			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
-			if (draggedIndex != imageComponent->GetOwner()->m_index)
-			{
-				Entity* draggedObject = Entity::FindIndex(draggedIndex);
-				imageComponent->SetNavi(Direction::Right, draggedObject);
-			}
-		}
-	}
-	ImGui::SameLine();
-	drawNavigationTarget(Direction::Right);
-
-	ImGui::Button(EditorIcon::Label<EditorIcon::Up, "##Up">, ImVec2(30, 20));
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
-	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-		{
-			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
-			if (draggedIndex != imageComponent->GetOwner()->m_index)
-			{
-				Entity* draggedObject = Entity::FindIndex(draggedIndex);
-				imageComponent->SetNavi(Direction::Up, draggedObject);
-			}
-		}
-	}
-	ImGui::SameLine();
-	drawNavigationTarget(Direction::Up);
-	ImGui::Button(EditorIcon::Label<EditorIcon::Down, "##Down">, ImVec2(30, 20));
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTarget())
-	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
-		{
-			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
-			if (draggedIndex != imageComponent->GetOwner()->m_index)
-			{
-				Entity* draggedObject = Entity::FindIndex(draggedIndex);
-				imageComponent->SetNavi(Direction::Down, draggedObject);
-			}
-		}
-	}
-	ImGui::SameLine();
-	drawNavigationTarget(Direction::Down);
+	navigationTarget("Left", Direction::Left);
+	navigationTarget("Right", Direction::Right);
+	navigationTarget("Up", Direction::Up);
+	navigationTarget("Down", Direction::Down);
 }
 
 void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRenderer)
 {
-	if (spriteRenderer->GetSprite() == nullptr)
-		ImGui::Button("None Sprite", ImVec2(150, 20));
-	else
-		ImGui::Image((ImTextureID)EditorImGuiTexture::From(spriteRenderer->GetSprite()), ImVec2(30, 30));
-	ImVec2 minRect = ImGui::GetItemRectMin();
-	ImVec2 maxRect = ImGui::GetItemRectMax();
-	ImRect bb(minRect, maxRect);
-	if (!(ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) && ImGui::BeginDragDropTargetCustom(bb, ImGui::GetID("MyDropTarget")))
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Texture"))
+		const editor::widgets::property_sheet sheet(m_layout, { "Sprite" });
+		const file::path dropped = DrawAssetSlot("Sprite", spriteRenderer->GetSprite().get(), "None (drag texture)",
+			"Texture", sheet.line("Sprite"));
+		if (!dropped.empty())
 		{
-			const file::path filepath = editor::asset_drag::path_of(*payload);
-			auto texture = DataSystems->LoadSharedTexture(filepath.string().c_str(), DataSystem::TextureFileType::Texture);
+			auto texture = DataSystems->LoadSharedTexture(dropped.string().c_str(), DataSystem::TextureFileType::Texture);
 			spriteRenderer->SetSprite(texture);
 		}
-		ImGui::EndDragDropTarget();
 	}
 
 	if (const auto* type = Meta::Find(type_guid(SpriteRenderer)))
@@ -1663,30 +1553,31 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 
 void InspectorWindow::ImGuiDrawHelperCanvas(Canvas* canvas)
 {
-	ImGui::InputText("CanvasName", &canvas->CanvasName);
-	static int order{};
+	const editor::widgets::property_sheet sheet(m_layout, { "Canvas Name", "Canvas Order" });
+	ImGui::SetNextItemWidth(sheet.line("Canvas Name"));
+	ImGui::InputText("##CanvasName", &canvas->CanvasName);
 
-	order = canvas->CanvasOrder;
-	if (ImGui::DragInt("CanvasOrder", &order))
+	int order = canvas->CanvasOrder;
+	ImGui::SetNextItemWidth(sheet.line("Canvas Order"));
+	if (ImGui::DragInt("##CanvasOrder", &order))
 	{
 		canvas->SetCanvasOrder(order);
 	}
-
 }
 
 void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 {
 	using namespace ImGui;
 
+	const editor::widgets::property_sheet sheet(m_layout, { "Clip", "Bus", "Volume", "Pitch", "Priority",
+		"Loop", "Play On Start", "Spatial", "Spatial Blend", "Min Distance", "Max Distance", "Rolloff",
+		"Reverb Send", "Reverb Level (dB)", "Reverb Index", "Preview" });
+
 	// ─────────────────────────────────────────────────────────────
 	//  Clip / Picker
 	// ─────────────────────────────────────────────────────────────
-	TextUnformatted("Clip");
-	ImGui::SameLine();
-	SetNextItemWidth(240);
-	InputText("##ClipKeyRO", &sc->clipKey, ImGuiInputTextFlags_ReadOnly);
-	ImGui::SameLine();
-	if (Button(EditorIcon::Audio))
+	if (DrawNamedPicker(sheet, "Clip", sc->clipKey, "None",
+		EditorIcon::Label<EditorIcon::Audio, "##PickClip">))
 	{
 		m_clipKeyCache = Sound->getAllClipKeys();
 		m_clipSearch.clear();
@@ -1701,21 +1592,23 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 
 	const char* busNames[] = { "BGM","SFX","PLAYER","MONSTER","UI" };
 	int busIdx = (int)sc->bus;
-	SetNextItemWidth(150);
-	if (Combo("Bus", &busIdx, busNames, IM_ARRAYSIZE(busNames))) {
+	SetNextItemWidth(sheet.line("Bus"));
+	if (Combo("##Bus", &busIdx, busNames, IM_ARRAYSIZE(busNames))) {
 		sc->bus = (ChannelType)busIdx;
 	}
 
-	SetNextItemWidth(200);
-	DragFloat("Volume", &sc->volume, 0.01f, 0.0f, 1.0f, "%.3f");
-	SetNextItemWidth(200);
-	DragFloat("Pitch", &sc->pitch, 0.01f, 0.25f, 4.0f, "%.2f");
-	SetNextItemWidth(200);
-	DragInt("Priority", &sc->priority, 1, 0, 256);
+	SetNextItemWidth(sheet.line("Volume"));
+	DragFloat("##Volume", &sc->volume, 0.01f, 0.0f, 1.0f, "%.3f");
+	SetNextItemWidth(sheet.line("Pitch"));
+	DragFloat("##Pitch", &sc->pitch, 0.01f, 0.25f, 4.0f, "%.2f");
+	SetNextItemWidth(sheet.line("Priority"));
+	DragInt("##Priority", &sc->priority, 1, 0, 256);
 
 	bool loopBefore = sc->loop;
-	Checkbox("Loop", &sc->loop); ImGui::SameLine();
-	Checkbox("Play On Start", &sc->playOnStart);
+	sheet.line("Loop");
+	Checkbox("##Loop", &sc->loop);
+	sheet.line("Play On Start");
+	Checkbox("##PlayOnStart", &sc->playOnStart);
 
 	// 루프 상태 변경 즉시 채널에 반영
 	if (loopBefore != sc->loop) {
@@ -1735,30 +1628,33 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 	//  Spatial
 	// ─────────────────────────────────────────────────────────────
 	SeparatorText("Spatial");
-	Checkbox("Spatial (Blend 2D+3D)", &sc->spatial);
+	sheet.line("Spatial");
+	Checkbox("##Spatial", &sc->spatial);
+	if (IsItemHovered()) SetTooltip("Blend 2D + 3D");
 
-	if (sc->spatial) 
+	if (sc->spatial)
 	{
-		ImGui::SetNextItemWidth(220);
-		ImGui::DragFloat("Spatial Blend", &sc->spatialBlend, 0.01f, 0.0f, 1.0f, "%.2f");
+		SetNextItemWidth(sheet.line("Spatial Blend"));
+		DragFloat("##SpatialBlend", &sc->spatialBlend, 0.01f, 0.0f, 1.0f, "%.2f");
 
 		float minBefore = sc->minDistance, maxBefore = sc->maxDistance;
-		ImGui::SetNextItemWidth(220);
-		ImGui::DragFloat("Min Distance", &sc->minDistance, 0.01f, 0.01f, 200.0f, "%.2f");
-		ImGui::SetNextItemWidth(220);
-		ImGui::DragFloat("Max Distance", &sc->maxDistance, 0.10f, 0.10f, 500.0f, "%.2f");
+		SetNextItemWidth(sheet.line("Min Distance"));
+		DragFloat("##MinDistance", &sc->minDistance, 0.01f, 0.01f, 200.0f, "%.2f");
+		SetNextItemWidth(sheet.line("Max Distance"));
+		DragFloat("##MaxDistance", &sc->maxDistance, 0.10f, 0.10f, 500.0f, "%.2f");
 		if (sc->minDistance > sc->maxDistance) sc->maxDistance = sc->minDistance + 0.01f;
 
 		const char* rolloffNames[] = { "Linear", "Inverse", "Custom" };
 		int roll = (int)sc->rolloff;
-		ImGui::SetNextItemWidth(180);
-		bool rollChanged = ImGui::Combo("Rolloff", &roll, rolloffNames, IM_ARRAYSIZE(rolloffNames));
+		SetNextItemWidth(sheet.line("Rolloff"));
+		bool rollChanged = Combo("##Rolloff", &roll, rolloffNames, IM_ARRAYSIZE(rolloffNames));
 		sc->rolloff = (Rolloff)roll;
 
 		// 그래프: spatial이면 항상 표시
-		ImGui::SeparatorText("Distance Rolloff Curve");
+		SeparatorText("Distance Rolloff Curve");
 
 		const bool isCustom = (sc->rolloff == Rolloff::Custom);
+		const ImVec2 curveSize(0.f, editor::ThemePixels(200.f));
 
 		// Linear /Inverse 선택 시: 자동 곡선으로 동기화(읽기전용)
 		if (!isCustom) {
@@ -1766,8 +1662,10 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 				if (sc->rolloff == Rolloff::Linear)  BuildLinearCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
 				if (sc->rolloff == Rolloff::Inverse) BuildInverseCurve(sc->localRolloffCurve, sc->minDistance, sc->maxDistance);
 			}
-			DrawRolloffCurveEditor(sc->localRolloffCurve, std::max(0.1f, sc->maxDistance), ImVec2(0, 200), nullptr, /*readOnly=*/true);
-			ImGui::TextDisabled("Rolloff is %s - curve preview (read-only).", sc->rolloff == Rolloff::Linear ? "Linear" : "Inverse");
+			DrawRolloffCurveEditor(sc->localRolloffCurve, std::max(0.1f, sc->maxDistance), curveSize, nullptr, /*readOnly=*/true);
+			PushStyleColor(ImGuiCol_Text, GetStyleColorVec4(ImGuiCol_TextDisabled));
+			TextWrapped("Rolloff is %s - curve preview (read-only).", sc->rolloff == Rolloff::Linear ? "Linear" : "Inverse");
+			PopStyleColor();
 		}
 		else {
 			// Custom: 에디트 가능
@@ -1777,11 +1675,13 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 			// maxDistance 변경 시 마지막 점 X를 범위 내로 보정(편집 내용은 유지)
 			sc->localRolloffCurve.back().distance = std::clamp(sc->localRolloffCurve.back().distance, 0.1f, std::max(0.1f, sc->maxDistance));
 
-			if (ImGui::SmallButton("Reset to Default")) {
+			if (SmallButton("Reset to Default")) {
 				sc->localRolloffCurve = { {0.f,1.f}, { std::max(0.1f, sc->maxDistance), 0.f } };
 			}
-			DrawRolloffCurveEditor(sc->localRolloffCurve, std::max(0.1f, sc->maxDistance), ImVec2(0, 200), nullptr, /*readOnly=*/false);
-			ImGui::TextDisabled("Custom mode - drag points, double-click to add, right-click/Delete to remove.");
+			DrawRolloffCurveEditor(sc->localRolloffCurve, std::max(0.1f, sc->maxDistance), curveSize, nullptr, /*readOnly=*/false);
+			PushStyleColor(ImGuiCol_Text, GetStyleColorVec4(ImGuiCol_TextDisabled));
+			TextWrapped("Custom mode - drag points, double-click to add, right-click/Delete to remove.");
+			PopStyleColor();
 		}
 
 		// 실시간 3D 채널 반영(위치/거리/롤오프 모드 등)
@@ -1812,13 +1712,8 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 	// ─────────────────────────────────────────────────────────────
 	SeparatorText("Reverb Send");
 	bool useRevBefore = sc->useReverbSend;
-	Checkbox("Enable Reverb Send", &sc->useReverbSend);
-
-	// dB 슬라이더(-80~+10), 내부는 선형(0~1)로 변환해서 FMOD에 적용
-	SetNextItemWidth(260);
-	DragFloat("Reverb Level (dB)", &sc->reverbLevel, 0.1f, -80.0f, 10.0f, "%.1f dB");
-	SetNextItemWidth(200);
-	DragInt("Reverb Index", &sc->reverbIndex, 1, 0, 3);
+	sheet.line("Reverb Send");
+	Checkbox("##EnableReverbSend", &sc->useReverbSend);
 
 	auto applyReverb = [&](FMOD::Channel* ch) {
 		if (!ch) return;
@@ -1830,12 +1725,16 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 		ch->setReverbProperties(sc->reverbIndex, wet);
 		};
 
-	if (useRevBefore != sc->useReverbSend) {
-		applyReverb(sc->Get2DChannel());
-		applyReverb(sc->Get3DChannel());
-	}
-	// 값이 바뀌면 항상 적용
-	if (IsItemEdited() || IsItemDeactivatedAfterEdit()) {
+	// dB 슬라이더(-80~+10), 내부는 선형(0~1)로 변환해서 FMOD에 적용
+	SetNextItemWidth(sheet.line("Reverb Level (dB)"));
+	DragFloat("##ReverbLevel", &sc->reverbLevel, 0.1f, -80.0f, 10.0f, "%.1f dB");
+	bool reverbEdited = IsItemEdited() || IsItemDeactivatedAfterEdit();
+	SetNextItemWidth(sheet.line("Reverb Index"));
+	DragInt("##ReverbIndex", &sc->reverbIndex, 1, 0, 3);
+	reverbEdited |= IsItemEdited() || IsItemDeactivatedAfterEdit();
+
+	// 값이 바뀌면 적용한다. 예전 판은 마지막 항목(Reverb Index)의 편집만 보았다.
+	if (useRevBefore != sc->useReverbSend || reverbEdited) {
 		applyReverb(sc->Get2DChannel());
 		applyReverb(sc->Get3DChannel());
 	}
@@ -1844,9 +1743,15 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
 	//  Preview Controls
 	// ─────────────────────────────────────────────────────────────
 	Separator();
-	if (Button("Play")) { sc->Play(); } ImGui::SameLine();
-	if (Button("Stop")) { sc->Stop(); } ImGui::SameLine();
-	if (Button("OneShot")) { sc->PlayOneShot(); }
+	{
+		const float gap = GetStyle().ItemInnerSpacing.x;
+		const float button = ImMax(1.f, (sheet.line("Preview") - gap * 2.f) / 3.f);
+		if (Button("Play", ImVec2(button, 0.f))) { sc->Play(); }
+		SameLine(0.f, gap);
+		if (Button("Stop", ImVec2(button, 0.f))) { sc->Stop(); }
+		SameLine(0.f, gap);
+		if (Button("OneShot", ImVec2(button, 0.f))) { sc->PlayOneShot(); }
+	}
 
 	// 볼륨/피치/프라이어리티 변경 실시간 반영(채널 살아있을 때)
 	auto applyBasic = [&](FMOD::Channel* ch) {

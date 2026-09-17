@@ -185,7 +185,8 @@ namespace Meta
     // 열거형 점검(8-17): 이름 키 재조회(EnumRegistry->Find — 같은 것을 두 번
     // 찾는 이중 조회였다)를 Property::enumType 직접 참조로 대체. 파라미터로
     // 받던 EnumType*도 prop이 이미 들고 있으므로 시그니처에서 내렸다.
-    inline void DrawEnumProperty(int* instance, const Property& prop)
+    // `comboLabel` 을 주면 그 라벨로 그린다 — 공통 배치 줄이 라벨을 이미 놓았을 때 "##" 로 넘긴다.
+    inline void DrawEnumProperty(int* instance, const Property& prop, const char* comboLabel = nullptr)
     {
         if (const EnumType* enumType = prop.enumType)
         {
@@ -200,7 +201,7 @@ namespace Meta
             }
 
             ImGui::PushID(prop.name);
-            if (ImGui::Combo(prop.name, &current_index, items.data(), static_cast<int>(items.size())))
+            if (ImGui::Combo(comboLabel ? comboLabel : prop.name, &current_index, items.data(), static_cast<int>(items.size())))
             {
                 Meta::MakeCustomChangeCommand(
                     [=]

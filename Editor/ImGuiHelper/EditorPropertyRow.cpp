@@ -715,4 +715,12 @@ namespace editor::widgets
         }
         return metrics.value_col;
     }
+
+    float property_sheet::line_before_buttons(const char* label, int buttons) const
+    {
+        const float value = line(label);
+        const float button = ImGui::GetFrameHeight();
+        const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+        return ImMax(1.f, value - static_cast<float>(buttons) * (button + gap));
+    }
 }
