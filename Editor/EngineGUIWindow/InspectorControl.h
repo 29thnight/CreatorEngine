@@ -36,6 +36,7 @@ namespace editor::windows
         std::string type{};           ///< 컴포넌트 타입 이름(상단 셋은 드로어 이름)
         std::uint32_t instance{};     ///< 컴포넌트 인스턴스 ID. 상단 셋은 0
         bool open{};                  ///< 본문이 그려졌는가(접힌 패널은 거짓)
+        bool enabledToggle{};         ///< 머리줄이 개별 활성 체크박스를 냈는가(W2-I1 정책)
         std::uint64_t propertyLines{};///< 이 본문이 지난 `begin_property_line` 수
         float minX{}, maxX{};         ///< 본문 항목이 차지한 가로 범위
         float height{};

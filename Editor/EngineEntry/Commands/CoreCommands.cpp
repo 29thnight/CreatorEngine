@@ -1489,6 +1489,7 @@ namespace ConsoleCmd
             item.Set("type", CommandData::String(body.type));
             item.Set("instance", CommandData::Int(static_cast<int64_t>(body.instance)));
             item.Set("open", CommandData::Bool(body.open));
+            item.Set("enabledToggle", CommandData::Bool(body.enabledToggle));
             item.Set("propertyLines", CommandData::Int(static_cast<int64_t>(body.propertyLines)));
             item.Set("minX", CommandData::Double(body.minX));
             item.Set("maxX", CommandData::Double(body.maxX));

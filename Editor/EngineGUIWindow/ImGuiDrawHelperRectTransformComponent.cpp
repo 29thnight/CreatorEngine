@@ -1,8 +1,6 @@
 #include "ExternUI.h"
 #include "RectTransformComponent.h"
 #include "EditorPropertyRow.h"
-#include "EditorSectionHeader.h"
-#include "EditorIcons.h"
 
 #include <cmath>
 #include <cstdio>
@@ -197,13 +195,9 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 {
 	if (!rectTransformComponent) return;
 
-	// 메뉴 버튼은 그대로 그린다 — 모습을 바꾸지 않기 위해서다. 누른 결과를
-	// 받는 쪽은 이 함수 끝의 주석 처리된 TransformMenu 블록이라, 이 변경
-	// 전에도 소비자가 없었다.
-	editor::widgets::section_header_request header{};
-	header.label = "RectTransform";
-	header.menu_icon = EditorIcon::More;
-	if (editor::widgets::draw_section_header(header).open)
+	// 본문만 그린다(W2-I1 · 2안). 머리줄은 인스펙터의 공통 순회가 소유한다 — 예전에는 여기서
+	// `EditorSectionHeader` 를 따로 열어 다른 컴포넌트와 머리줄 모양·체크박스 칸이 달랐고, 메뉴
+	// 버튼은 누른 결과를 받는 쪽이 없었다.
 	{
 		auto anchorMin = rectTransformComponent->GetAnchorMin();
 		auto anchorMax = rectTransformComponent->GetAnchorMax();
@@ -315,23 +309,4 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 		ImGui::InputText("##WorldRect", worldRect, sizeof(worldRect), ImGuiInputTextFlags_ReadOnly);
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("x y w h: %s", worldRect);
 	}
-	//if (menuClicked) {
-	//	ImGui::OpenPopup("TransformMenu");
-	//	menuClicked = false;
-	//}
-
-	//if (ImGui::BeginPopup("TransformMenu"))
-	//{
-	//	if (ImGui::MenuItem("Reset Transform"))
-	//	{
-	//		gameObject->Transform_().position = { 0, 0, 0, 1 };
-	//		gameObject->Transform_().scale = { 1, 1, 1, 1 };
-	//		gameObject->Transform_().SetDirty();
-	//		gameObject->Transform_().UpdateLocalMatrix();
-	//		ImGui::CloseCurrentPopup();
-	//	}
-	//	ImGui::EndPopup();
-	//}
-	//ImGui::PopStyleVar();
-	//ImGui::PopStyleColor(2);
 }

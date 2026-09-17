@@ -142,6 +142,7 @@ namespace CommandCore
             { "object.delete", CommandCost::Frames, "<target>", "Delete an object subtree with Undo", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target", true },
             { "object.describe", CommandCost::Immediate, "<name-or-id>", "Read object identity and name", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "target", false },
             { "object.duplicate", CommandCost::Frames, "<오브젝트> [새 이름]", "오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,name=", true },
+            { "object.enable", CommandCost::Immediate, "<target> on|off", "엔티티 전체를 켜고 끈다(컴포넌트·자식으로 전파, Undo)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,state", true },
             { "object.icon", CommandCost::Immediate, "<target> <preset|default>", "Set entity image preset with Undo", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,preset", true },
             { "object.lock", CommandCost::Immediate, "<target> <true|false>", "Lock or unlock entity authoring with Undo", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,locked", true },
             { "object.parent", CommandCost::Frames, "<자식> <부모 | ->", "오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,parent", true },

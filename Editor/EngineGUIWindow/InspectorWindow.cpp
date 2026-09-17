@@ -176,7 +176,7 @@ namespace
 			m_window->DC.CursorMaxPos = m_start;
 		}
 
-		void finish(std::string type, std::uint32_t instance, bool open)
+		void finish(std::string type, std::uint32_t instance, bool open, bool enabledToggle = false)
 		{
 			const ImVec2 extent = m_window->DC.CursorMaxPos;
 			m_window->DC.CursorMaxPos = ImMax(m_savedMax, extent);
@@ -184,6 +184,7 @@ namespace
 			body.type = std::move(type);
 			body.instance = instance;
 			body.open = open;
+			body.enabledToggle = enabledToggle;
 			body.propertyLines = editor::widgets::property_line_count() - m_lines;
 			body.minX = m_start.x;
 			body.maxX = extent.x;
@@ -793,7 +794,8 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	bool isEnabled = gameObject->IsEnabled();
 	ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.65f, 0.78f, 0.47f, 1.f));
 	ImGui::PushStyleColor(ImGuiCol_CheckboxSelectedBg, ImVec4(0.23f, 0.29f, 0.16f, 1.f));
-	if (ImGui::Checkbox("##Enabled", &isEnabled)) gameObject->SetEnabled(isEnabled);
+	if (ImGui::Checkbox("##Enabled", &isEnabled))
+		EditorObjectOperations::SetEntityEnabled(gameObject->GetScene()->HandleOf(gameObject->m_index), isEnabled);
 	ImGui::PopStyleColor(2);
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Object enabled");
 	ImGui::SameLine();
@@ -1006,17 +1008,8 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		i *= math::rad_to_deg;
 	}
 
-	// Transform 은 끌 수 없는 컴포넌트라 체크박스를 넘기지 않는다. 그래도
-	// 패널이 체크박스 칸을 비워 두므로 이름은 다른 컴포넌트와 같은 x 에 선다.
-	editor::widgets::inspector_panel_request transformPanel{};
-	transformPanel.label = "Transform";
-	transformPanel.icon = editor::inspector::inspector_icon(
-		type_guid(Transform).m_ID_Data);
-	transformPanel.menu_icon = EditorIcon::More;
-	const editor::widgets::inspector_panel_result transformHeaderState =
-		editor::widgets::begin_inspector_panel(transformPanel);
-	bool menuClicked = transformHeaderState.menu_clicked;
-	if (transformHeaderState.open)
+	// 본문만 그린다(W2-I1 · 2안). 머리줄·체크박스·메뉴는 인스펙터의 공통 순회가 소유한다 —
+	// 예전에는 이 함수가 자기 패널을 열어, 공통 순회 밖에서 한 번 더 도는 두 번째 길이었다.
 	{
 		// 이 컴포넌트의 세 줄이 같은 배치를 쓴다. 줄마다 다시 재면 라벨 길이가
 		// 다른 줄끼리 값 열이 어긋난다.
@@ -1124,28 +1117,18 @@ void InspectorWindow::ImGuiDrawHelperTransformComponent(Entity* gameObject)
 		}
 	}
 
-	editor::widgets::end_inspector_panel();
+}
 
-	if (menuClicked) {
-		ImGui::OpenPopup("TransformMenu");
-		menuClicked = false;
-	}
-
-	if (ImGui::BeginPopup("TransformMenu")) 
-	{
-		if (ImGui::MenuItem("Reset Transform"))
-		{
-			gameObject->Transform_().SetPositionValue(
-				{ 0.f, 0.f, 0.f, 1.f }, TransformWriteReason::Inspector);
-			gameObject->Transform_().SetRotationValue(
-				{ 0.f, 0.f, 0.f, 1.f }, TransformWriteReason::Inspector);
-			gameObject->Transform_().SetScaleValue(
-				{ 1.f, 1.f, 1.f, 1.f }, TransformWriteReason::Inspector);
-			gameObject->Transform_().UpdateLocalMatrix();
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
-	}
+// 컴포넌트 메뉴의 "Reset Transform". 예전에는 Transform 드로어가 자기 팝업으로 들고 있었다.
+static void ResetTransform(Entity* gameObject)
+{
+	gameObject->Transform_().SetPositionValue(
+		{ 0.f, 0.f, 0.f, 1.f }, TransformWriteReason::Inspector);
+	gameObject->Transform_().SetRotationValue(
+		{ 0.f, 0.f, 0.f, 1.f }, TransformWriteReason::Inspector);
+	gameObject->Transform_().SetScaleValue(
+		{ 1.f, 1.f, 1.f, 1.f }, TransformWriteReason::Inspector);
+	gameObject->Transform_().UpdateLocalMatrix();
 }
 
 // ── 전용 드로어의 공통 조각 (PHASE 21 W2-I4) ───────────────────────────────
@@ -2095,33 +2078,6 @@ void InspectorWindow::Draw()
 			probe.finish("GameObjectBaseInfo", 0, true);
 		}
 
-		// ★ 공간 컴포넌트는 여기서만 그린다 (W2-I1)
-		//
-		// 예전에는 이 블록이 배타 분기(if/else)였고, 아래 일반 순회는
-		// RectTransformComponent 만 건너뛰었다. 그래서 RectTransform 이 없는
-		// 보통 오브젝트는 Transform 이 **두 번** 나왔다 — 위에는 전용 드로어가
-		// 그린 오일러 각·색 축 필드가, 아래에는 리플렉션이 그린 쿼터니언 네 칸과
-		// 내부 필드가. 화면에서 확인한 증상이고, 아래 건너뛰기 목록에 Transform 이
-		// 빠져 있던 것이 원인이다.
-		//
-		// 배타 분기를 푼 이유는 캔버스다. 캔버스는 둘을 함께 갖는다
-		// (Entity::AttachSpatialComponent — rect 는 자식 레이아웃 기준,
-		// Transform 은 월드 배치). 예전 else 는 캔버스의 Transform 을 건너뛰었고,
-		// 그 결과 캔버스만 Transform 이 일반 순회에서 리플렉션으로 그려졌다.
-		// 각각 묻도록 바꿔 셋(보통·UI·캔버스)이 모두 전용 드로어를 쓴다.
-		if (RectTransformComponent* rectTransform = selectedSceneObject->GetComponent<RectTransformComponent>())
-		{
-			inspector_body_probe probe;
-			ImGuiDrawHelperRectTransformComponent(rectTransform);
-			probe.finish("RectTransformComponent", 0, true);
-		}
-		if (selectedSceneObject->GetComponent<Transform>())
-		{
-			inspector_body_probe probe;
-			ImGuiDrawHelperTransformComponent(selectedSceneObject);
-			probe.finish("Transform", 0, true);
-		}
-
 		static bool isOpen = false;
 		static Component* selectedComponent = nullptr;
         if (changedTarget || editLocked) { isOpen = false; selectedComponent = nullptr; }
@@ -2150,14 +2106,23 @@ void InspectorWindow::Draw()
 		//
 		// 부착을 커맨드 버퍼로 미루는 쪽은 택하지 않았다: 드로어가 반환값을 바로 다음
 		// 줄에서 역참조한다(foliage->GetFoliageTypes()). 지연시키면 그 참조가 깨진다.
+		//
+		// ★ 모든 컴포넌트가 이 순회 하나를 지난다 (W2-I1 · Transform 2안)
+		//
+		// 예전에는 공간 컴포넌트 둘을 순회 **앞에서** 전용 드로어로 따로 부르고 순회에서는
+		// 건너뛰었다(1안). 머리줄·체크박스·메뉴를 드로어가 제각각 소유해, 건너뛰기 목록 한 줄이
+		// 빠지면 Transform 이 두 번 나왔고(실제로 그랬다) 캔버스는 한쪽이 리플렉션으로 떨어졌다.
+		// 이제 머리줄과 정책은 여기 한 자리가 소유하고 전용 드로어는 본문만 그린다. 표시 순서는
+		// 정책의 `order` 로 정해 공간 컴포넌트가 위에 서고, 같은 순서 안에서는 붙은 순서를 지킨다.
+		// 순서마다 한 번씩 훑는 것은 프레임마다 정렬 사본을 만들지 않기 위해서다.
+		for (int orderPass = 0; orderPass < EditorObjectOperations::kComponentOrderCount; ++orderPass)
 		for (size_t componentIndex = 0; componentIndex < selectedSceneObject->m_components.size(); ++componentIndex)
 		{
 			auto& component = selectedSceneObject->m_components[componentIndex];
-			// 공간 컴포넌트 둘은 위에서 전용 드로어가 이미 그렸다. 한쪽만
-			// 건너뛰면 다른 쪽이 두 번 나온다 — 그것이 W2-I1 이 고친 결함이다.
-			if (nullptr == component || component->IsDestroyMark()
-				|| component->GetTypeID() == type_guid(RectTransformComponent)
-				|| component->GetTypeID() == type_guid(Transform))
+			if (nullptr == component || component->IsDestroyMark())
+				continue;
+			const EditorObjectOperations::ComponentEditPolicy policy = EditorObjectOperations::PolicyOf(*component);
+			if (policy.order != orderPass)
 				continue;
 
 			// CT1: 종전 Meta::Find(component->ToString())는 매 프레임 컴포넌트마다
@@ -2183,7 +2148,10 @@ void InspectorWindow::Draw()
 			componentPanel.icon = editor::inspector::inspector_icon(
 				component->GetTypeID().m_ID_Data);
 			componentPanel.menu_icon = EditorIcon::More;
-			componentPanel.enabled = &isEnabled;
+			// 개별로 켜고 끌 수 없는 컴포넌트는 체크박스를 넘기지 않는다. 패널이 그 칸을 비워 두므로
+			// 이름은 다른 컴포넌트와 같은 x 에 선다. 체크박스를 숨기는 것만으로 정책이 서지는 않는다 —
+			// `object.property` 쪽도 같은 표로 거부한다.
+			componentPanel.enabled = policy.individuallyToggleable ? &isEnabled : nullptr;
 			const editor::widgets::inspector_panel_result componentHeaderState =
 				editor::widgets::begin_inspector_panel(componentPanel);
 			// isOpen은 프레임을 건너 사는 정적 변수라, 아래에서 ComponentMenu를
@@ -2209,7 +2177,16 @@ void InspectorWindow::Draw()
 					selectedComponent = component.get();
 				}
 				auto componentTypeID = component->GetTypeID();
-				if(componentTypeID == type_guid(MeshRenderer))
+				if (componentTypeID == type_guid(Transform))
+				{
+					ImGuiDrawHelperTransformComponent(selectedSceneObject);
+				}
+				else if (componentTypeID == type_guid(RectTransformComponent))
+				{
+					if (auto* rectTransform = dynamic_cast<RectTransformComponent*>(component.get()))
+						ImGuiDrawHelperRectTransformComponent(rectTransform);
+				}
+				else if(componentTypeID == type_guid(MeshRenderer))
 				{
 					MeshRenderer* meshRenderer = dynamic_cast<MeshRenderer*>(component.get());
 					if (nullptr != meshRenderer)
@@ -2329,7 +2306,8 @@ void InspectorWindow::Draw()
 			}
 
 			bodyProbe.finish(component->ToString(),
-				static_cast<std::uint32_t>(component->GetInstanceID()), isHeaderOpen);
+				static_cast<std::uint32_t>(component->GetInstanceID()), isHeaderOpen,
+				nullptr != componentPanel.enabled);
 
 			// 접혀 있어도 부른다. 여는 쪽이 ID 와 들여쓰기를 밀어 두기 때문에
 			// 건너뛰면 그 뒤의 모든 줄이 한 칸씩 밀린 채 프레임이 끝난다.
@@ -2373,11 +2351,19 @@ void InspectorWindow::Draw()
 
 		if (ImGui::BeginPopup("ComponentMenu"))
 		{
-			if (ImGui::MenuItem("		Remove Component"))
+			// 제거할 수 없는 컴포넌트에는 항목을 내지 않는다. 눌러도 작업이 거부하지만, 거부될 항목을
+			// 보여 주는 것은 정책을 화면에서 숨기는 일이다.
+			if (selectedComponent && EditorObjectOperations::PolicyOf(*selectedComponent).removable &&
+				ImGui::MenuItem("		Remove Component"))
 			{
-				if (selectedComponent) {
-					EditorObjectOperations::RemoveComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), "#" + std::to_string(selectedComponent->GetInstanceID()));
-				}
+				EditorObjectOperations::RemoveComponent(selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index), "#" + std::to_string(selectedComponent->GetInstanceID()));
+				ImGui::CloseCurrentPopup();
+				selectedComponent = nullptr;
+			}
+			if (selectedComponent && selectedComponent->GetTypeID() == type_guid(Transform) &&
+				ImGui::MenuItem("Reset Transform"))
+			{
+				ResetTransform(selectedSceneObject);
 				ImGui::CloseCurrentPopup();
 				selectedComponent = nullptr;
 			}

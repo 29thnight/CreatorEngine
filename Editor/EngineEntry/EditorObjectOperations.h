@@ -30,6 +30,24 @@ namespace EditorObjectOperations
     // Ancestor locks protect descendants; subtree checks also protect locked
     // children from indirect edits such as moving/deleting their parent.
     bool IsEditLocked(const Entity* target, bool includeDescendants = false);
+
+    // 컴포넌트 편집 정책 (PHASE 21 W2-I1 · Transform 2안).
+    //
+    // 표시 순서 · 개별 활성 변경 · 개별 제거를 **따로** 둔다. 인스펙터 순회와 CLI 진입점이 같은
+    // 표를 읽는다 — 한쪽만 막으면 다른 쪽이 구멍이 된다(착수 때 `object.property <대상> Transform
+    // m_isEnabled false` 가 성공해 공간 컴포넌트를 개별로 껐다. 인스펙터에는 체크박스가 없었다).
+    // 엔티티 전체의 활성 전이(`SetEntityEnabled`)는 이 정책의 대상이 아니다.
+    inline constexpr int kComponentOrderCount = 3;
+    struct ComponentEditPolicy
+    {
+        int order{ kComponentOrderCount - 1 }; ///< 인스펙터 표시 순서. 작을수록 위
+        bool individuallyToggleable{ true };   ///< 컴포넌트 하나만 켜고 끌 수 있는가
+        bool removable{ true };                ///< 컴포넌트 하나만 제거할 수 있는가
+    };
+    ComponentEditPolicy PolicyOf(const Component& component);
+
+    /// 엔티티 전체를 켜고 끈다(컴포넌트·자식으로 전파, Undo). 개별 활성 정책과 무관하다.
+    CommandCore::CommandResult SetEntityEnabled(EntityHandle target, bool enabled);
     CommandCore::CommandResult Create(Scene* scene, const std::string& name, GameObjectType type, uint32_t parent = 0);
     CommandCore::CommandResult Delete(EntityHandle target);
     CommandCore::CommandResult Duplicate(EntityHandle target, const std::string& name = {});

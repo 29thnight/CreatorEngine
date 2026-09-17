@@ -132,6 +132,7 @@ namespace EditorObjectOperations
             data.Set("name", D::String(object.m_name.ToString()));
             data.Set("editorIcon", D::String(object.m_editorIcon));
             data.Set("editorLocked", D::Bool(object.m_editorLocked));
+            data.Set("enabled", D::Bool(object.IsEnabled()));
             data.Set("editBlocked", D::Bool(IsEditLocked(&object, true)));
             data.Set("sceneId", D::Int(handle.sceneId));
             data.Set("index", D::Int(handle.index));
@@ -157,6 +158,7 @@ namespace EditorObjectOperations
                     entry.Set("id", D::String("#" + std::to_string(component->GetInstanceID())));
                     const auto* type = Meta::Find(component->GetTypeID().m_ID_Data);
                     entry.Set("type", D::String(type ? type->name : component->ToString()));
+                    entry.Set("enabled", D::Bool(component->IsEnabled()));
                     components.Append(std::move(entry));
                 }
             data.Set("components", std::move(components));
@@ -178,6 +180,34 @@ namespace EditorObjectOperations
             for (auto child : target->GetChildrenIndices())
                 if (IsEditLocked(scene->TryGetEntity(child), true)) return true;
         return false;
+    }
+
+    ComponentEditPolicy PolicyOf(const Component& component)
+    {
+        // 공간 컴포넌트는 엔티티 유형이 붙인다(`Entity::AttachSpatialComponent`). 캔버스는 둘을 다
+        // 가지며 각각 다른 정보라 둘 다 위에 선다 — rect 가 먼저(자식 레이아웃 기준), 월드 배치가 다음.
+        if (dynamic_cast<const RectTransformComponent*>(&component)) return { 0, false, false };
+        if (dynamic_cast<const ::Transform*>(&component)) return { 1, false, false };
+        return {};
+    }
+
+    CommandCore::CommandResult SetEntityEnabled(EntityHandle target, bool enabled)
+    {
+        using namespace CommandCore;
+        auto* object = Resolve(target);
+        if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
+        const bool before = object->IsEnabled();
+        if (before != enabled)
+        {
+            // `Entity::SetEnabled` 가 컴포넌트와 자식에게 전한다. 공간 컴포넌트도 여기서는 따라간다 —
+            // 개별 활성 금지는 컴포넌트 단독 조작의 규칙이지 엔티티 전이의 규칙이 아니다.
+            const Meta::EntityReference reference(object);
+            Meta::MakeCustomChangeCommand(
+                [reference, before] { if (auto* entity = reference.Resolve()) entity->SetEnabled(before); },
+                [reference, enabled] { if (auto* entity = reference.Resolve()) entity->SetEnabled(enabled); });
+        }
+        return Describe(target);
     }
 
     CommandCore::CommandResult SetEditLocked(EntityHandle target, bool locked)
@@ -495,6 +525,8 @@ namespace EditorObjectOperations
         if (!property || !property->setter) return InvalidArguments("Field is not editable", "property.not_found");
         // Engine identity and ownership fields are not authoring properties.
         if (field == "m_instanceID" || field == "m_index" || field == "m_typeID") return InvalidArguments("Identity fields are read-only");
+        if (field == "m_isEnabled" && !PolicyOf(*component).individuallyToggleable)
+            return PreconditionFailed("component.toggle_locked", "This component cannot be enabled or disabled on its own; toggle the entity with object.enable");
         std::any value;
         if (!ParsePropertyValue(*property, raw, value)) return InvalidArguments("Value does not match property type", "property.value_invalid");
         auto before = Meta::SerializeDocument(component, *type);
@@ -649,7 +681,7 @@ namespace EditorObjectOperations
         if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         auto* component = FindComponent(object, name);
         if (!component) return InvalidArguments("Missing or ambiguous component");
-        if (dynamic_cast<::Transform*>(component) || dynamic_cast<RectTransformComponent*>(component)) return InvalidArguments("Spatial component is required by the object type");
+        if (!PolicyOf(*component).removable) return InvalidArguments("Spatial component is required by the object type");
         auto* type = Meta::Find(component->GetTypeID().m_ID_Data);
         auto snapshot = std::make_shared<Authoring::WriteDocument>(Meta::SerializeDocument(component, *type));
         const std::string id = "#" + std::to_string(component->GetInstanceID());

@@ -390,6 +390,16 @@ namespace ConsoleCmd
         return EditorObjectOperations::Delete(target);
     }
 
+    static CommandCore::CommandResult Cmd_object_enable(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3 || (ctx.parts[2] != "on" && ctx.parts[2] != "off"))
+            return CommandCore::InvalidArguments("object.enable <target> on|off");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        return EditorObjectOperations::SetEntityEnabled(target, ctx.parts[2] == "on");
+    }
+
     static CommandCore::CommandResult Cmd_component_remove(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("component.remove <target> <component>");
@@ -1502,6 +1512,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "object.rename" }, &Cmd_object_rename);
         reg.Result({ "object.icon" }, &Cmd_object_icon);
         reg.Result({ "object.lock" }, &Cmd_object_lock);
+        reg.Result({ "object.enable" }, &Cmd_object_enable);
         reg.Result({ "scene.navigate" }, &Cmd_scene_navigate);
         reg.Result({ "object.transform" }, &Cmd_object_transform);
         reg.Result({ "object.parent" }, &Cmd_object_parent);
