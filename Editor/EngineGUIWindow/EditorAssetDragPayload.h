@@ -17,9 +17,8 @@ struct ImGuiPayload;
 // — 다른 파일로 조용히 바꿔 치우지 않는다. 폴리지는 stem 으로 GUID 를 찾으므로 그
 // stem 이 끌어 온 파일로 돌아오는지를 따로 본다(ImGuiDrawHelperTerrainComponent.cpp).
 //
-// ★ 남는 것: `DataSystem::LoadSharedTexture` 의 캐시 키가 stem 이다. 전체 경로를 넘겨도
-//   같은 stem 의 텍스처가 이미 올라와 있으면 그것을 돌려준다 — 엔진 캐시의 신원 문제라
-//   이 조각 밖이다.
+// `DataSystem::LoadSharedTexture` 의 캐시 키도 stem 이었다가 경로로 바뀌었다(G2 —
+// verify-texture-cache-identity.ps1). 전체 경로를 넘기면 그 파일이 돌아온다.
 namespace editor::asset_drag
 {
     /// 브라우저 타일이 부르는 유일한 입구.

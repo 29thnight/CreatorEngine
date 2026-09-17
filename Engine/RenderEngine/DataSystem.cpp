@@ -150,7 +150,48 @@ namespace
 		const file::path requested(requestedPath);
 		std::error_code error;
 		if (file::is_regular_file(requested, error) && !error) return requested;
+		// G2 — 폴더를 가진 상대 경로는 Assets 기준 신원이다(TextureCacheKey 가 만든다).
+		// 이름만 온 요청만 유형 폴더에서 다시 찾는다.
+		if (requested.is_relative() && requested.has_parent_path())
+		{
+			const file::path underAssets = PathFinder::Relative() / requested;
+			error.clear();
+			if (file::is_regular_file(underAssets, error) && !error) return underAssets;
+		}
 		return PathFinder::Relative(std::string(fallbackDirectory)) / requested.filename();
+	}
+
+	// G2 — 텍스처 캐시의 신원. stem 은 신원이 아니다: 다른 폴더의 같은 이름,
+	// 같은 이름의 다른 확장자가 한 칸을 나눠 먼저 온 쪽이 이겼다.
+	// Assets 안이면 그 기준 상대 경로(저장해도 기계를 옮겨도 같은 파일로 돌아온다),
+	// 밖이면 절대 경로. 적재·은퇴·번들 보존이 모두 이 함수 하나로 키를 만든다.
+	std::string TextureCacheKey(const file::path& path)
+	{
+		const file::path absolute = file::absolute(path).lexically_normal();
+		const file::path assets = file::absolute(PathFinder::Relative()).lexically_normal();
+		const file::path relative = absolute.lexically_relative(assets);
+		if (!relative.empty() && *relative.begin() != "..")
+			return relative.generic_string();
+		return absolute.generic_string();
+	}
+
+	std::string MaterialTextureKeyPrefix(const file::path& path)
+	{
+		return "material:" + file::absolute(path).lexically_normal().generic_string() + ":";
+	}
+
+	std::string_view TextureFallbackDirectory(DataSystem::TextureFileType type)
+	{
+		switch (type)
+		{
+		case DataSystem::TextureFileType::Texture:         return "Textures\\";
+		case DataSystem::TextureFileType::MaterialTexture: return "Materials\\";
+		case DataSystem::TextureFileType::TerrainTexture:  return "Terrain\\Texture\\";
+		case DataSystem::TextureFileType::HDR:             return "HDR\\";
+		case DataSystem::TextureFileType::UITexture:       return "UI\\";
+		case DataSystem::TextureFileType::SpriteSheet:     return "SpriteSheets\\";
+		}
+		return {};
 	}
 
 	bool RegisterAssetMeta(AssetMetaRegistry& registry, const FileGuid& guid,
@@ -1184,113 +1225,51 @@ Texture* DataSystem::LoadTexture(std::string_view filePath, TextureFileType type
 	return LoadSharedTexture(filePath, type).get();
 }
 
-std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath, TextureFileType type)
+DataContainer<Texture>& DataSystem::TextureCacheFor(TextureFileType type)
 {
-	std::string_view fallbackDirectory;
-	
+	// 조회와 넣기가 **같은** 맵을 본다. 예전에는 조회는 늘 Textures, 넣기는 용도별이라
+	// UI·SpriteSheet 는 한 번도 맞지 않았고 같은 stem 의 일반 텍스처가 대신 나왔다.
+	// 재질·지형·HDR 용도는 같은 적재 정책이라 Textures 를 나눠 쓴다 — 키가 경로라
+	// 다른 파일이 섞이지 않는다.
 	switch (type)
 	{
-	case DataSystem::TextureFileType::Texture:
-		fallbackDirectory = "Textures\\";
-		break;
-	case DataSystem::TextureFileType::MaterialTexture:
-		fallbackDirectory = "Materials\\";
-		break;
-	case DataSystem::TextureFileType::TerrainTexture:
-		fallbackDirectory = "Terrain\\Texture\\";
-		break;
-	case DataSystem::TextureFileType::HDR:
-		fallbackDirectory = "HDR\\";
-		break;
-	case DataSystem::TextureFileType::UITexture:
-		fallbackDirectory = "UI\\";
-		break;
-	case DataSystem::TextureFileType::SpriteSheet:
-		fallbackDirectory = "SpriteSheets\\";
-		break;
-	default:
-		break;
+	case TextureFileType::UITexture:   return UITextures;
+	case TextureFileType::SpriteSheet: return SpriteSheets;
+	default:                           return Textures;
 	}
+}
 
-	const file::path assetPath = ResolveRuntimeAssetPath(filePath, fallbackDirectory);
-	std::string name = assetPath.stem().string();
+std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath, TextureFileType type)
+{
+	const file::path assetPath = ResolveRuntimeAssetPath(filePath, TextureFallbackDirectory(type));
+	const std::string key = TextureCacheKey(assetPath);
+	DataContainer<Texture>& cache = TextureCacheFor(type);
 
 	// 캐시 조회와 삽입만 락으로 감싼다.
 	// 이 함수는 LoadAssetBundle이 스레드풀로 병렬 호출하는데 예전에는 무잠금이라
 	// 동시 삽입 시 unordered_map 리해시와 겹쳐 힙이 손상될 수 있었다.
 	// 디스크 로딩은 오래 걸리므로 락 밖에서 수행한다(같은 파일을 두 번 읽는
-	// 낭비는 있을 수 있으나 삽입 시 정리되며, 정확성에는 문제가 없다).
+	// 낭비는 있을 수 있으나 삽입 시 먼저 들어온 것을 쓰므로 정확성에는 문제가 없다).
 	{
 		std::lock_guard<std::mutex> guard(m_textureMutex);
-		if (Textures.find(name) != Textures.end())
-		{
-			Debug::PrintLog(spdlog::level::info, "TextureLoader::LoadTexture : Texture already loaded");
-			return Textures[name];
-		}
+		if (const auto found = cache.find(key); found != cache.end())
+			return found->second;
 	}
 
 	std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(assetPath.string());
-	if (texture)
+	if (!texture)
 	{
-		{
-			std::lock_guard<std::mutex> guard(m_textureMutex);
-			switch (type)
-			{
-			case DataSystem::TextureFileType::Texture:
-				Textures[name] = texture;
-				break;
-			case DataSystem::TextureFileType::UITexture:
-				UITextures[name] = texture;
-				break;
-			case DataSystem::TextureFileType::SpriteSheet:
-				SpriteSheets[name] = texture;
-				break;
-			default:
-				break;
-			}
-		}
-		texture->m_name = name;
-		texture->m_extension = assetPath.extension().string();
-
-		return texture;
+		Debug::PrintLog(spdlog::level::err, "DataSystem::LoadSharedTexture : texture file not found: " + assetPath.string());
+		return nullptr;
 	}
-	else
-	{
-		Debug::PrintLog(spdlog::level::err, "ModelLoader::LoadModel : Model file not found");
-	}
+	texture->m_name = assetPath.stem().string();
+	texture->m_extension = assetPath.extension().string();
+	texture->m_assetPath = key;
 
-	return nullptr;
-}
-
-Texture* DataSystem::LoadMaterialTexture(std::string_view filePath, bool isCompress)
-{
-    const file::path destination = ResolveRuntimeAssetPath(filePath, "Materials\\");
-
-    std::string name = file::path(filePath).stem().string();
-	{
-		std::unique_lock lock(m_textureMutex);
-		if (Textures.find(name) != Textures.end())
-		{
-			Debug::PrintLog(spdlog::level::info, "TextureLoader::LoadTexture : Texture already loaded");
-			return Textures[name].get();
-		}
-	}
-
-    auto texture = Texture::LoadSharedFromPath(destination.string(), isCompress);
-    if (texture)
-    {
-		{
-			std::unique_lock lock(m_textureMutex);
-			Textures[name] = texture;
-		}
-        return texture.get();
-    }
-    else
-    {
-        Debug::PrintLog(spdlog::level::err, "ModelLoader::LoadModel : Model file not found");
-    }
-
-    return nullptr;
+	std::lock_guard<std::mutex> guard(m_textureMutex);
+	// 다른 스레드가 먼저 넣었으면 그것을 돌려준다 — 같은 키에 인스턴스가 둘이면
+	// 먼저 받은 쪽과 나중에 받은 쪽이 서로 다른 GPU 이미지를 붙든다.
+	return cache.emplace(key, std::move(texture)).first->second;
 }
 
 std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view filePath, bool isCompress,
@@ -1311,12 +1290,12 @@ std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view 
 		destination = PathFinder::Relative("Materials\\")
 			/ destination.filename();
 	}
-	// Authored textures distinguish path, compression and sampling color space.
-    // Legacy name lookups keep their existing keys.
-    std::string key = srgb.has_value()
-        ? "material:" + file::absolute(destination).lexically_normal().generic_string()
-            + (isCompress ? ":bc:" : ":raw:") + (*srgb ? "srgb" : "linear")
-        : file::path(destination).stem().string();
+	// G2 — 경로·압축·색공간이 모두 결과를 바꾼다. 색공간을 안 준 호출은 원본 그대로를
+	// 받으므로 "source" 로 가른다. 예전 이 자리의 stem 키는 일반 텍스처 캐시와 같은
+	// 맵에서 같은 stem 을 나눠 다른 파일·다른 압축 결과를 돌려줄 수 있었다.
+	std::string key = MaterialTextureKeyPrefix(destination)
+		+ (isCompress ? "bc:" : "raw:")
+		+ (srgb.has_value() ? (*srgb ? "srgb" : "linear") : "source");
 
 	// 1차 조회 (락 짧게)
 	{
@@ -1580,7 +1559,10 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 		return;
 	}
 
-	const std::string key = path.stem().string();
+	// G2 — 텍스처 캐시는 적재와 같은 신원으로 뗀다. stem 으로 떼면 다른 폴더의 같은
+	// 이름 항목이 대신 떨어졌다. 재질 캐시는 이름 키 그대로다.
+	const std::string key = RuntimeAssetType::Material == assetType
+		? path.stem().string() : TextureCacheKey(path);
 	auto detach = [&key](auto& cache, std::mutex& cacheMutex)
 	{
 		typename std::decay_t<decltype(cache)>::mapped_type generation;
@@ -1622,6 +1604,23 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 		break;
 	case RuntimeAssetType::Texture:
 		detachForType(assetType, Textures, m_textureMutex);
+		{
+			// 같은 파일의 재질 변형(압축·색공간)도 함께 뗀다.
+			const std::string prefix = MaterialTextureKeyPrefix(path);
+			std::vector<std::shared_ptr<Texture>> variants;
+			{
+				std::lock_guard lock(m_textureMutex);
+				for (auto iterator = Textures.begin(); iterator != Textures.end();)
+				{
+					if (!iterator->first.starts_with(prefix)) { ++iterator; continue; }
+					variants.push_back(std::move(iterator->second));
+					iterator = Textures.erase(iterator);
+				}
+			}
+			std::lock_guard retiredLock(m_retiredTextureMutex);
+			for (auto& variant : variants)
+				m_retiredTextureGenerations.emplace_back(std::move(variant));
+		}
 		break;
 	case RuntimeAssetType::UITexture:
 		detachForType(assetType, UITextures, m_textureMutex);
@@ -1707,7 +1706,25 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 	for (const auto& entry : bundle.assets)
 	{
 		file::path name = entry.assetName;
-		m_retainedAssets[entry.assetTypeID].insert(name.stem().string());
+		// G2 — 텍스처 캐시는 경로 키다. 적재와 같은 해석으로 키를 만들지 않으면
+		// UnloadUnusedAssets 가 번들이 붙든 텍스처를 전부 "안 쓰는 것" 으로 지운다.
+		std::string key;
+		switch (static_cast<ManagedAssetType>(entry.assetTypeID))
+		{
+		case ManagedAssetType::Texture:
+			key = TextureCacheKey(ResolveRuntimeAssetPath(entry.assetName, TextureFallbackDirectory(TextureFileType::Texture)));
+			break;
+		case ManagedAssetType::UITexture:
+			key = TextureCacheKey(ResolveRuntimeAssetPath(entry.assetName, TextureFallbackDirectory(TextureFileType::UITexture)));
+			break;
+		case ManagedAssetType::SpriteSheet:
+			key = TextureCacheKey(ResolveRuntimeAssetPath(entry.assetName, TextureFallbackDirectory(TextureFileType::SpriteSheet)));
+			break;
+		default:
+			key = name.stem().string();
+			break;
+		}
+		m_retainedAssets[entry.assetTypeID].insert(std::move(key));
 	}
 }
 

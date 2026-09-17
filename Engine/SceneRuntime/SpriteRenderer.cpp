@@ -54,7 +54,10 @@ void SpriteRenderer::SetSprite(const std::shared_ptr<Texture>& ptr)
 	m_Sprite = ptr;
 	if (m_Sprite)
 	{
-		m_SpritePath = m_Sprite->m_name + m_Sprite->m_extension;
+		// G2 — 이름이 아니라 캐시 신원을 적는다. 이름을 적으면 다시 열 때 Textures 폴더의
+		// 같은 이름(없으면 아무것도)이 붙었다.
+		m_SpritePath = !m_Sprite->m_assetPath.empty()
+			? m_Sprite->m_assetPath : m_Sprite->m_name + m_Sprite->m_extension;
 	}
 	else
 	{

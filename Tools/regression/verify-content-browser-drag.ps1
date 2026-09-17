@@ -214,7 +214,8 @@ try {
     Assert ($properties.status -eq 'succeeded') "놓아 만든 엔티티 $stem 의 SpriteRenderer 를 못 읽었다: $($properties.message)"
     $spritePath = if ($properties.status -eq 'succeeded') { [string]$properties.data.values.m_SpritePath } else { '' }
     # 텍스처가 올라왔을 때만 채워지는 값이다(SetSprite). 예전 소비자는 Textures\ 에서 이름으로 찾아 비었다.
-    Assert ($spritePath -eq "$stem.png") "SpriteRenderer 가 끌어 온 텍스처를 올리지 못했다(m_SpritePath='$spritePath') — 받는 자리가 경로를 다시 지었다"
+    # 적히는 값은 캐시 신원(Assets 기준 상대 경로)이다 — verify-texture-cache-identity.ps1.
+    Assert ($spritePath -eq $relative) "SpriteRenderer 가 끌어 온 텍스처를 올리지 못했다(m_SpritePath='$spritePath', $relative 여야 한다) — 받는 자리가 경로를 다시 지었다"
     Assert ($missed -eq $dropped) "받지 않는 자리(브라우저 본문)에 놓았는데 엔티티가 $dropped → $missed 로 바뀌었다"
 
     $summary = "놓기: payload Texture·$relative → 엔티티 $before→$dropped · 스프라이트 '$spritePath' | 빗나간 놓기: 엔티티 $missed"

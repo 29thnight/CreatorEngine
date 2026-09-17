@@ -1632,6 +1632,65 @@ namespace ConsoleCmd
     //   ② 게이트가 임시 Derived 트리를 명시적으로 마운트할 창구가 된다.
     // 저작 트리에는 Derived가 없으므로 인자 없는 실행은 미게시(skip)가 정상이다.
 
+    // G2 — 텍스처 캐시의 신원을 밖에서 자극하고 읽는 창구. 같은 stem 의 다른 파일,
+    // 용도별 재요청, 파일 변경 은퇴가 **어느 키에 무엇이 앉았는지**로만 드러난다.
+    static CommandCore::CommandResult Cmd_assets_texture(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto describe = [](const std::shared_ptr<Texture>& texture)
+        {
+            auto item = CommandData::Object();
+            char instance[32]{};
+            std::snprintf(instance, sizeof(instance), "%p", static_cast<void*>(texture.get()));
+            item.Set("instance", CommandData::String(instance));
+            item.Set("name", CommandData::String(texture->m_name));
+            item.Set("extension", CommandData::String(texture->m_extension));
+            const math::vector2 size = texture->GetImageSize();
+            item.Set("width", CommandData::Int(static_cast<int>(size.x)));
+            item.Set("height", CommandData::Int(static_cast<int>(size.y)));
+            return item;
+        };
+
+        auto data = CommandData::Object();
+        if (ctx.parts.size() == 4 && ctx.parts[1] == "load")
+        {
+            using Type = DataSystem::TextureFileType;
+            const std::string& kind = ctx.parts[2];
+            Type type{};
+            if (kind == "texture") type = Type::Texture;
+            else if (kind == "ui") type = Type::UITexture;
+            else if (kind == "spritesheet") type = Type::SpriteSheet;
+            else return InvalidArguments("assets.texture load <texture|ui|spritesheet> <경로>");
+            const std::shared_ptr<Texture> loaded = DataSystems->LoadSharedTexture(ctx.parts[3], type);
+            if (!loaded) return Fail("texture.load_failed", "Texture load failed: " + ctx.parts[3]);
+            data.Set("loaded", describe(loaded));
+        }
+        else if (ctx.parts.size() != 1)
+        {
+            return InvalidArguments("assets.texture [load <texture|ui|spritesheet> <경로>]");
+        }
+
+        const auto list = [&describe](DataContainer<Texture>& cache)
+        {
+            auto entries = CommandData::Array();
+            for (const auto& [key, texture] : cache)
+            {
+                if (!texture) continue;
+                auto item = describe(texture);
+                item.Set("key", CommandData::String(key));
+                entries.Append(std::move(item));
+            }
+            return entries;
+        };
+        {
+            std::lock_guard<std::mutex> guard(DataSystems->m_textureMutex);
+            data.Set("textures", list(DataSystems->Textures));
+            data.Set("uiTextures", list(DataSystems->UITextures));
+            data.Set("spriteSheets", list(DataSystems->SpriteSheets));
+        }
+        return Ok({}, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_assets_unload(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1740,6 +1799,7 @@ namespace ConsoleCmd
         reg.Result({ "animator.status" }, &Cmd_animator_status);
         reg.Result({ "experiment.cooked" }, &Cmd_experiment_cooked);
         reg.Result({ "assets.unload" }, &Cmd_assets_unload);
+        reg.Result({ "assets.texture" }, &Cmd_assets_texture);
         reg.Result({ "bt.status", "bt.reset" }, &Cmd_bt_status);
     }
 }

@@ -1,12 +1,13 @@
 # lc3-commands v1
-# commands	130
-# names	139
+# commands	131
+# names	140
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
 animator.param	-	frames	editor	editor_operation	live	no	yes	<오브젝트> <파라미터> <bool|float|int|trigger>	Animator 파라미터를 저작한다
 animator.status	-	frames	editor	engine_service	live	no	yes	-	Read live Animator palettes and product publication metrics
 assets.modeldiag	-	immediate	editor	engine_service	live	no	yes	-	모델 소비 계수를 읽는다(상태를 바꾸지 않는다)
+assets.texture	-	immediate	editor	engine_service	live	no	yes	[load <texture|ui|spritesheet> <경로>]	텍스처 캐시 키와 앉은 이미지를 읽고 경로 하나를 적재한다
 assets.unload	-	frames	editor	engine_service	live	no	yes	-	사용하지 않는 에셋 캐시 정리
 bt.status	bt.reset	immediate	editor	engine_service	live	no	yes	-	행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)
 camera.editor	-	frames	editor	engine_service	live	no	yes	match | follow [on|off] | status	에디터 카메라를 게임 카메라와 같은 시점으로

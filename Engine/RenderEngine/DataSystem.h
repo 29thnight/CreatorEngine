@@ -194,6 +194,9 @@ public:
 	//Resource Texture
 	Texture* LoadTextureGUID(FileGuid guid);
 	Texture* LoadTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
+	// 캐시 키는 확장자까지 포함한 Assets 기준 상대 경로다(밖이면 절대 경로). 폴더를 가진
+	// 상대 경로는 Assets 기준으로, 이름만 온 요청은 용도 폴더에서 찾는다. 돌려준
+	// Texture 의 m_assetPath 가 그 키이고, 저장하면 같은 파일로 돌아온다.
 	std::shared_ptr<Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
 	std::vector<std::pair<std::string, std::shared_ptr<Texture>>> SnapshotTextures();
 	//Resource Material
@@ -228,7 +231,6 @@ public:
 	// 소유권을 공유하는 조회. 컴포넌트처럼 참조를 보관하는 쪽은 이것을 써야
 	// 캐시에서 제거되어도 사용 중인 머티리얼이 파괴되지 않는다.
 	std::shared_ptr<Material> LoadMaterialShared(std::string_view name);
-    Texture* LoadMaterialTexture(std::string_view filePath, bool isCompress = false);
 	std::shared_ptr<Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress,
         std::optional<bool> srgb = std::nullopt);
 	Material* CreateMaterial();
@@ -303,6 +305,7 @@ public:
 
 private:
 	void LoadAssetCatalog(const file::path& root);
+	DataContainer<Texture>& TextureCacheFor(TextureFileType type);
 	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path,
 		FileGuid guid, bool remove);
 	// MBC7 — 한 generation의 embedded texture owner를 전부 캐시에서 떼어 낸다.

@@ -41,6 +41,7 @@ namespace CommandCore
             { "assets.generation", CommandCost::Long, "<프로젝트 루트>", "generation 1→2 원자 교체와 tamper 거부 뒤 current 불변을 잰다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "root", false, true },
             { "assets.modeldiag", CommandCost::Immediate, "", "모델 소비 계수를 읽는다(상태를 바꾸지 않는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "assets.scenemodel", CommandCost::Frames, "[reload <모델 이름>]", "활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "assets.texture", CommandCost::Immediate, "[load <texture|ui|spritesheet> <경로>]", "텍스처 캐시 키와 앉은 이미지를 읽고 경로 하나를 적재한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "assets.texturebench", CommandCost::Long, "[limit]", "Measure texture decode mip and compression stages", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "assets.unload", CommandCost::Frames, "", "사용하지 않는 에셋 캐시 정리", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "blackboard.authoring.probe", CommandCost::Frames, "<이름> [empty|noname]", "Blackboard 저장·재로드 왕복으로 키 값이 살아 돌아오는지 본다", CommandClass::RawFixture, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

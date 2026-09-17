@@ -337,6 +337,7 @@ std::shared_ptr<Texture> Texture::WithColorSpace(
     texture->m_textureType = source->m_textureType;
     texture->m_name = source->m_name;
     texture->m_extension = source->m_extension;
+    texture->m_assetPath = source->m_assetPath;
     texture->m_size = source->m_size;
     texture->m_isTextureAlpha = source->m_isTextureAlpha;
     return texture;
@@ -426,6 +427,7 @@ std::shared_ptr<Texture> Texture::WithMipChain(
     texture->m_codecImage = std::move(codec);
     texture->m_textureType = source->m_textureType;
     texture->m_name = source->m_name; texture->m_extension = source->m_extension;
+    texture->m_assetPath = source->m_assetPath;
     texture->m_size = source->m_size; texture->m_isTextureAlpha = source->m_isTextureAlpha;
     return texture;
 }

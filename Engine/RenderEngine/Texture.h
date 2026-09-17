@@ -179,6 +179,10 @@ public:
 
 	std::string m_name;
 	std::string m_extension;
+	// G2 — DataSystem 텍스처 캐시의 신원(Assets 기준 상대 경로, 밖이면 절대 경로).
+	// 경로에서 올린 적 없는 텍스처(모델 임베디드·렌더 타깃)는 비어 있다.
+	// 저장하는 컴포넌트는 이름이 아니라 이것을 적는다 — 이름은 다른 폴더의 같은 파일을 부른다.
+	std::string m_assetPath;
 
 	math::vector2 GetImageSize() const;
 	math::vector2 GetSize() const { return m_size; }

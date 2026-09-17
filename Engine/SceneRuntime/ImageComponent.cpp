@@ -67,8 +67,8 @@ void ImageComponent::Load(const std::shared_ptr<Texture>& ptr)
 		return;
 
 	textures.push_back(ptr);
-	std::string filename = ptr->m_name + ptr->m_extension;
-	texturePaths.push_back(filename);
+	// G2 — 이름이 아니라 캐시 신원을 적는다(SpriteRenderer::SetSprite 와 같은 규약).
+	texturePaths.push_back(!ptr->m_assetPath.empty() ? ptr->m_assetPath : ptr->m_name + ptr->m_extension);
 	if (1 == textures.size())
 	{
 		SetTexture(0);

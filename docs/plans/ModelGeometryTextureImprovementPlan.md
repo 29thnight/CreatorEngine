@@ -2,7 +2,7 @@
 
 작성일: 2026-09-06
 
-상태: **모델 드롭 비동기화 구현·검증 완료 / 나머지 구조 개선은 제안 단계**
+상태: **모델 드롭 비동기화 구현·검증 완료 / G2 캐시 신원(경로 키) 구현·검증 완료(2026-09-17) / 나머지 구조 개선은 제안 단계**
 
 기준: HEAD `6b9c2b792860b5f8bb408956990789f3a2d2b1d2` + 현재 작업 트리의 비동기 배치 변경.
 
@@ -252,6 +252,36 @@ LOD 유지 여부에 따른 실제 소비·검증 또는 API 제거, 모델과 �
 UI·SpriteSheet 재요청, 동시 중복 요청에서 잘못된 캐시 재사용이 없고 색상 회귀를 통과한다.
 정책 어휘는 TexturePipelinePlan의 T0와 공유한다.
 
+**2026-09-17 착지 — 경로 키.** 콘텐츠 브라우저 끌기가 전체 경로를 싣게 된 뒤(EditorWorkspace W2-B)
+남은 엔진 쪽 신원이다. 착수 전 실물로 네 결함을 재현했다(창구 `assets.texture`):
+① 다른 폴더의 같은 이름 — `B/Probe.png`(4×4)를 요청하면 `A/Probe.png`(256×256) 인스턴스가 나왔다
+② UI 재요청 — 조회는 `Textures`, 넣기는 `UITextures` 라 같은 파일을 두 번 요청하면 인스턴스가 둘
+③ SpriteRenderer·ImageComponent 가 `m_name + m_extension` 을 저장 — 씬을 열면 `Textures\<이름>` 을 찾아
+유형 폴더 밖 텍스처가 다음 기동에서 사라졌다 ④ 삭제 은퇴가 stem 으로 떼어 다른 폴더의 같은 이름
+파일을 지우면 살아 있는 항목이 떨어졌다.
+
+| 바뀐 것 | 내용 |
+|---|---|
+| 신원 | `TextureCacheKey` — 확장자까지 포함한 Assets 기준 상대 경로, 밖이면 절대 경로. `LoadSharedTexture`·`RetireCachedAsset`·`RetainAssets` 가 모두 이 함수로 키를 만든다 |
+| 해석 | `ResolveRuntimeAssetPath` 가 폴더를 가진 상대 경로를 Assets 기준으로 먼저 찾는다. 이름만 온 요청만 용도 폴더로 간다 |
+| 용도별 맵 | `TextureCacheFor` — 조회와 넣기가 같은 맵. 재질·지형·HDR 용도는 적재 정책이 같아 `Textures` 를 나눠 쓴다(키가 경로라 섞이지 않는다). 넣기는 `emplace` 라 동시 중복 요청이 같은 인스턴스를 받는다 |
+| 영속 | `Texture::m_assetPath` 에 키를 두고 SpriteRenderer·ImageComponent 가 그것을 저장한다(색공간·밉 사본에도 복사) |
+| 재질 텍스처 | `LoadSharedMaterialTexture` 의 색공간 없는 호출도 stem 대신 `material:<절대 경로>:<bc\|raw>:source` 키. 텍스처 삭제 은퇴가 같은 파일의 재질 변형 키도 함께 뗀다. 호출자 0 인 `LoadMaterialTexture` 삭제 |
+
+검사 `Tools/regression/verify-texture-cache-identity.ps1`(Release, 단정 18): ①②③④ 를 실물로 자극하고
+③ 은 새 기동에서 저장된 신원으로 256×256 이 다시 올라오는지까지 본다. 변이 여섯(stem 키 · 조회를
+늘 `Textures` 에서 · 스프라이트가 이름 저장 · 은퇴가 stem · Assets 기준 해석 제거 · 번들 보존이 stem)이
+모두 붉다. 함께 돌린 검사: 끌기(`verify-content-browser-drag.ps1`, 적히는 경로를 신원으로 고침)·
+`verify-asset-runtime-change-boundary`·명령 등록부 골든(`assets.texture` 추가로 갱신)·`verify-cli-discovery`·
+`verify-editor-command-surface`(292, `experiment.matresolve` 포함) 통과.
+
+**재지 않은 것.** 번들 보존 → `UnloadUnusedAssets` 는 CLI 로 번들을 세울 수 없어 소스 대조뿐이다.
+같은 이름의 다른 확장자, sRGB/linear 색상 회귀(`render.pbr.*` 는 에디터 명령표에 없다), 동시 중복
+요청의 실물 경합은 자극하지 않았다. 옛 씬이 저장한 이름만의 경로는 용도 폴더로 그대로 찾는다.
+**`verify-model-scene-consumption.ps1` 은 붉다** — `dx12.scene` 이 "RenderThread drain 시간 초과"로
+실패한다. 텍스처 파일 여섯을 HEAD 판으로 되돌린 기준선 빌드에서도 두 번 모두 같아서 이 변경과
+무관한 기존 결함이다(같은 실행의 텍스처 단정 `textures=6 missing=0` 은 통과).
+
 ### G3. 불변 CPU 이미지 저장소와 요청 중복 제어 — P1
 
 **문제:** 임베디드 텍스처가 generation 픽셀과 Texture 이미지로 중복 저장된다.
@@ -370,7 +400,7 @@ worker·GPU 준비 시간의 p95/p99와 peak memory를 별도로 보고한다.
 | 단계 | 범위 | 상태 | 통과 조건 |
 |---|---|---|---|
 | A0 | SceneView·Hierarchy 비동기 배치 | 구현·검증 완료 | §3의 빌드·실행 결과 |
-| A1 | G1 잔여 정리, G2 캐시 정확성, G4 입력 검증 | 제안 | 참조 0, 이름/정책 충돌 검사, 잘못된 입력 거부, 기존 기능 유지 |
+| A1 | G1 잔여 정리, G2 캐시 정확성, G4 입력 검증 | G2 경로 키 완료(2026-09-17) · 나머지 제안 | 참조 0, 이름/정책 충돌 검사, 잘못된 입력 거부, 기존 기능 유지 |
 | A2 | G3 이미지 저장소·중복 요청 | 제안 | owner 수명, 세대 교체, 동시 요청, 재업로드, 메모리 측정 |
 | A3 | G4 RHI 접합부 분리, G5 전체 geometry key | 제안 | header 경계, 강제 충돌, 양 backend 모델·절차 메시 렌더 |
 | A4 | G6 상태 구분, G7 공통 자원 준비, G8 GPU 준비 예산 | 제안 | 실제 렌더 프레임 예산과 준비/실패/재시도 관측 |
