@@ -105,6 +105,12 @@ public:
         RHIPersistentHeapStats persistentHeap;
     };
 
+    /// ★ 명시 Shutdown 을 건너뛴 채 사라져도 업로드 리스너 표에 죽은 포인터를 남기지 않는다.
+    ///   dx12.scene 이 도중 단계에서 `return false` 로 빠지면 이 캐시가 `resources` 보다
+    ///   먼저 소멸하고, 뒤이은 `~DX12DeviceResources` → DrainForLifecycle 이 죽은 리스너의
+    ///   OnUploadCompleted 를 불러 ACCESS_VIOLATION 이 났다 — 실패 사유 로그까지 삼켰다
+    ///   (2026-09-14·09-17). 소유처는 전부 `resources` 를 먼저 선언하므로 여기서는 살아 있다.
+    ~DX12TextureCache() override;
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
     void Shutdown();
 

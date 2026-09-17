@@ -278,9 +278,28 @@ UI·SpriteSheet 재요청, 동시 중복 요청에서 잘못된 캐시 재사용
 **재지 않은 것.** 번들 보존 → `UnloadUnusedAssets` 는 CLI 로 번들을 세울 수 없어 소스 대조뿐이다.
 같은 이름의 다른 확장자, sRGB/linear 색상 회귀(`render.pbr.*` 는 에디터 명령표에 없다), 동시 중복
 요청의 실물 경합은 자극하지 않았다. 옛 씬이 저장한 이름만의 경로는 용도 폴더로 그대로 찾는다.
-**`verify-model-scene-consumption.ps1` 은 붉다** — `dx12.scene` 이 "RenderThread drain 시간 초과"로
-실패한다. 텍스처 파일 여섯을 HEAD 판으로 되돌린 기준선 빌드에서도 두 번 모두 같아서 이 변경과
-무관한 기존 결함이다(같은 실행의 텍스처 단정 `textures=6 missing=0` 은 통과).
+**`verify-model-scene-consumption.ps1` 은 붉었다** — `dx12.scene` 이 "RenderThread drain 시간 초과"로
+실패했다. 텍스처 파일 여섯을 HEAD 판으로 되돌린 기준선 빌드에서도 두 번 모두 같아서 이 변경과
+무관한 기존 결함이었다(같은 실행의 텍스처 단정 `textures=6 missing=0` 은 통과). 같은 날 닫았다(아래).
+
+**2026-09-17 — 모델 씬 소비 게이트 복구. 결함 셋이 겹쳐 있었다.** 앞의 것이 뒤의 것을 가렸다.
+
+| # | 증상 | 원인(실측) | 처방 |
+|---|---|---|---|
+| 1 | `[1/4] RenderThread drain 시간 초과 — pending 2 · active 1` | 숨긴 Release 에디터에 cdb 를 붙이자 렌더 스레드가 `TickLive → ApplyGBufferShaderMeta → EnhancedGBufferPass::BuildVariantCandidate → MaterialTextureTable::Reflect → slang` 안에 있었다. 멈춤이 아니라 **첫 프레임이 약 22~24초**다. 스크립트의 `wait 2000` 은 게임 스레드 프레임 수라 Release 에서는 몇 초 만에 지나가고, `dx12.scene` 의 10초 drain 이 첫 프레임 도중에 걸렸다. 에디터 수명 내내 게임 스레드 발행 2018 · 렌더 스레드 소비 4. Debug 는 프레임이 느려 2000 프레임이 우연히 그 시간을 덮었다. `view_inactive` 는 원인이 아니다 | commandlet 전용 `render.live.wait [초]` 신설 — 명령 시점의 발행 frame id 보다 큰 프레임을 렌더 스레드가 **끝낼** 때까지 `WaitForResult` 로 다음 명령을 미룬다(게임 스레드는 계속 돈다). `EnhancedRenderThreadStats` 에 `publishedFrameId`·`completedFrameId`(TickLive 종료 시 기록)를 더했다. 디버그 스냅샷의 `consumedFrameId` 는 TickLive **시작**에 적혀 판정에 못 쓴다. 게이트 A·B 의 `wait 2000` 과 reimport 뒤 `wait 10` 을 이것으로 바꾸고, 대기 결과가 전부 succeeded 인지 단정한다 |
+| 2 | drain 을 넘기자 `ACCESS_VIOLATION` — `DX12MeshCache::OnUploadCompleted` ← `~DX12DeviceResources` (09-14 Debug 실행과 같은 스택) | `DX12MeshCache`·`DX12TextureCache` 에 소멸자가 없었다. 검사가 도중에 `return false` 로 빠지면 캐시가 `resources` 보다 먼저 사라지고, `resources` 소멸자의 lifecycle drain 이 죽은 리스너를 불렀다. 크래시가 실패 사유 로그까지 삼켰다 | 두 캐시에 등록 해제만 하는 소멸자(자원 해제는 명시 Shutdown 몫). Vulkan 캐시는 이미 소멸자가 있었다 |
+| 3 | `[4/4] 재질 키잉 렌더 실패: CPU 픽셀이 없어 DX12로 올릴 수 없다` | `dx12.scene` 의 재질 키잉·규모 측정 fixture 가 T6(08-08) 이래 빈 `Texture` 를 썼다. 709eafe5(09-06)부터 `MaterialTextureTable::Upload` 가 업로드 오류를 프레임 실패로 올렸고, 1·2 에 가려 아무도 이 줄에 닿지 못했다 | fixture 를 `Texture::CreateFromPixels` 1×1 로 교체(신원은 그대로 인스턴스마다 다르다) |
+
+검증(Release): `verify-model-scene-consumption.ps1` **연속 두 번 통과**(66 s · 69 s). 첫 `render.live.wait` 는
+22.2 s · 23.2 s(첫 프레임 비용 그대로), reimport 뒤 대기는 45~49 ms. 함께 돌린 검사:
+`verify-cli-registry-golden`(132, commandlet 이라 골든 불변)·`verify-editor-command-surface`(292, HTTP·일반 배치에
+검증 명령 부재 포함) 통과. HTTP 서비스로 모는 안도 시도했으나 `dx12.scene`·`assets.scenemodel` 이 commandlet 전용이고
+commandlet 과 서비스 혼용이 설계상 금지라(CommandSurfaceImplementation.md) 접었다.
+
+**재지 않은 것.** Debug 구성에서 이 게이트를 다시 돌리지 않았다. `render.live.wait` 가 이르게 풀리는 변이는 따로 돌리지
+않았다 — 근거는 변경 전 `wait 2000` 4회 붉음과 대기 시간 실측(22~23 s)이다. 첫 프레임 22~24초 자체(slang reflect
+비용)는 줄이지 않았다. `Tools/dx12-validation/Invoke-Dx12Suite.ps1` 은 여전히 `wait $WarmupFrames`(2000) 로 예열하므로
+Release 스위트의 `dx12.scene` 은 같은 이유로 붉을 수 있다 — 스위트 기준선(§7.4 28 통과)이 걸린 별도 자라 이번에 바꾸지 않았다.
 
 ### G3. 불변 CPU 이미지 저장소와 요청 중복 제어 — P1
 

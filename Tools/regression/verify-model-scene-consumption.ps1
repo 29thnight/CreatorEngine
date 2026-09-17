@@ -94,6 +94,14 @@ function Assert-SceneModelClosure([string]$Label, $Results) {
     }
 }
 
+function Assert-RenderWaits([string]$Label, $Results, [int]$Expected) {
+    # 예열 대기가 실제로 서지 않았으면 뒤의 판정은 준비되지 않은 렌더러를 잰 것이다.
+    $waits = @($Results | Where-Object command -eq 'render.live.wait')
+    if ($waits.Count -ne $Expected -or @($waits | Where-Object status -ne 'succeeded').Count -ne 0) {
+        Add-Failure "$Label render.live.wait $($waits.Count)/$Expected 성공하지 않았다: $($waits | ConvertTo-Json -Compress -Depth 4)"
+    }
+}
+
 try {
     if (-not (Test-Path -LiteralPath $Editor -PathType Leaf)) {
         throw "CreatorEditor 실행 파일이 없다: $Editor"
@@ -109,8 +117,10 @@ try {
     # ── A: 저작 프로세스 — 배치·폐포·저장 ──
     $author = Invoke-Editor 'author' @(
         "scene.switch $($baseScene.Replace('\', '/'))",
-        # 첫 대기가 렌더 예열을 겸한다 — 아래 주석 참고.
-        'wait 2000',
+        # 렌더 예열은 프레임 수가 아니라 렌더 스레드의 완료 프레임으로 기다린다.
+        # `wait 2000` 은 Release 에서 첫 프레임(ShaderMeta 반영 ~24초)을 덮지 못했다 —
+        # B 의 주석과 render.live.wait 핸들러 주석 참고.
+        'render.live.wait',
         "model.loadcached $($gunner.Replace('\', '/'))",
         'wait 60',
         'model.place Gunner_F_Mythic',
@@ -129,6 +139,7 @@ try {
         'wait 30',
         'quit')
     if ($author.ExitCode -ne 0) { Add-Failure "A 종료 코드 $($author.ExitCode)" }
+    Assert-RenderWaits 'A' $author.Results 1
     if (-not [string]::IsNullOrWhiteSpace($author.Stderr)) { Add-Failure 'A stderr가 비어 있지 않다.' }
     # MBC10 — 배치 관측은 읽기 전용 스냅샷이다(제품 stdout 토큰 없음).
     $authorDiag = Get-SucceededCommand $author.Results 'assets.modeldiag'
@@ -151,14 +162,22 @@ try {
     $cold = Invoke-Editor 'cold' @(
         "scene.switch $savedScene",
         # B 도 별도 프로세스라 렌더 예열을 처음부터 다시 치른다.
-        'wait 2000',
+        # ★ 예전 `wait 2000` 은 프레임 수로 시간을 대신했다. 라이브 렌더러의 첫 프레임은
+        #   GBuffer ShaderMeta 반영(slang reflect)에 Release 에서 약 24초를 쓰는데,
+        #   Release 의 2000 프레임은 몇 초 만에 지나가 dx12.scene 의 10초 RenderThread
+        #   drain 이 첫 프레임 도중에 걸렸다(`pending 2 · active 1`, 2026-09-17 cdb 스택).
+        #   render.live.wait 는 이 명령 뒤 발행된 프레임을 렌더 스레드가 끝낼 때까지
+        #   게임 스레드를 세우지 않고 다음 명령을 미룬다.
+        'render.live.wait',
         'assets.modeldiag',
         'assets.scenemodel',
         'assets.scenemodel reload Gunner_F_Mythic',
-        'wait 10',
+        # reimport 가 발행한 교체를 렌더 스레드가 소화한 뒤 그린다.
+        'render.live.wait',
         'dx12.scene',
         'quit')
     if ($cold.ExitCode -ne 0) { Add-Failure "B 종료 코드 $($cold.ExitCode)" }
+    Assert-RenderWaits 'B' $cold.Results 2
     if (-not [string]::IsNullOrWhiteSpace($cold.Stderr)) { Add-Failure 'B stderr가 비어 있지 않다.' }
     # FT 프리미티브 8 + Gunner 2 — UUIDv8 corpus라 전량 typed여야 한다(해석 실패 0).
     $coldDiag = Get-SucceededCommand $cold.Results 'assets.modeldiag'

@@ -3073,13 +3073,15 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
     // producer-consumer 진행도 차이이므로, 호출 시점까지 발행된 packet만 drain한다.
     // 일반 프레임 경로에는 동기 대기를 넣지 않는다.
     // 상한은 10초 그대로다. 이 대기는 '이미 발행된 것을 RT가 소화했는가'만
-    // 재고, RT의 첫 프레임(파이프라인 구축·ShaderMeta 적용)은 여기서 기다려도
-    // 끝나지 않는다 — 게임 스레드가 이 함수에 묶여 새 프레임을 발행하지
-    // 못하는 동안에는 RT도 진행하지 못하기 때문이다(2026-09-14 실측: 상한을
-    // 60초로 올려도 pending 2 · active 1 그대로였고, 앞의 wait 를 2000 프레임
-    // 으로 늘리자 즉시 통과했다). 그러므로 예열은 **이 대기가 아니라 앞선
-    // wait 프레임 수**가 책임진다 — 하네스의 워밍업 값이 첫 프레임 시간을
-    // 덮어야 한다(Invoke-Dx12Suite 의 WarmupFrames 주석 참고).
+    // 재고, RT의 첫 프레임(ShaderMeta 반영 — slang reflect)을 덮으라고 둔 것이
+    // 아니다. 그 첫 프레임은 Release 에서도 약 24초다.
+    // ★ 2026-09-17 정정: 09-14 에는 '게임 스레드가 여기 묶이면 RT 도 진행 못 한다'
+    //   고 적었지만, cdb 스택으로는 RT 가 게임 스레드와 무관하게
+    //   ApplyGBufferShaderMeta → MaterialTextureTable::Reflect 안에서 돌고 있었다.
+    //   09-14 의 '60초로 올려도 그대로' 는 다시 재현하지 않았다 — 근거로 쓰지 마라.
+    //   예열은 **프레임 수(wait N)가 아니라 `render.live.wait`** 가 책임진다 —
+    //   Release 의 wait 2000 은 몇 초 만에 지나가 여기서 pending 2 · active 1 로
+    //   넘어졌다(verify-model-scene-consumption).
     constexpr uint32_t kRenderThreadDrainTimeoutMs = 10000;
     if (!EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(
             kRenderThreadDrainTimeoutMs))
@@ -4163,10 +4165,18 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
     uint32_t keyedBatchCount = 0;
     if (!draws.empty())
     {
-        // ★ 빈 Texture 객체로 만든다 (T6). 재질 키는 포인터라 신원만 갈리면
-        //   되고, 예전에 만들던 4x4 DX11 리소스는 한 번도 읽히지 않았다.
-        auto* keyTextureA = new Texture();
-        auto* keyTextureB = new Texture();
+        // ★ 신원(m_assetId)만 갈리면 되지만 **CPU 픽셀은 있어야 한다.**
+        //   T6(2026-08-08)은 빈 Texture 로 충분했다 — 그때 캐시는 픽셀 없는 텍스처에
+        //   흰색을 주고 넘어갔다. 709eafe5(09-06)부터 MaterialTextureTable::Upload 가
+        //   업로드 오류를 프레임 실패로 올려, 이 단계가 'CPU 픽셀이 없어 DX12로 올릴 수
+        //   없다' 로 넘어졌다. 앞선 RenderThread drain 시간 초과와 캐시 리스너 크래시에
+        //   가려 09-17 까지 아무도 이 줄에 닿지 못했다.
+        const uint8_t keyPixelA[4] = { 255, 0, 0, 255 };
+        const uint8_t keyPixelB[4] = { 0, 0, 255, 255 };
+        auto* keyTextureA = Texture::CreateFromPixels(1, 1, "sceneKeyA",
+            RHIFormat::RGBA8Unorm, keyPixelA);
+        auto* keyTextureB = Texture::CreateFromPixels(1, 1, "sceneKeyB",
+            RHIFormat::RGBA8Unorm, keyPixelB);
 
         if (nullptr != keyTextureA && nullptr != keyTextureB)
         {
@@ -4383,8 +4393,11 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         variantTextures.reserve(kMaterialVariants);
         for (uint32_t index = 0; index < kMaterialVariants; ++index)
         {
-            auto* texture = new Texture();   // 신원만 필요하다(위 T6 주석 참조)
-            variantTextures.push_back(texture);
+            // 신원만 필요하지만 CPU 픽셀은 있어야 한다(위 재질 키잉 주석 참조).
+            const uint8_t pixel[4] = { static_cast<uint8_t>(index * 4u), 128, 128, 255 };
+            auto* texture = Texture::CreateFromPixels(1, 1,
+                "sceneVariant" + std::to_string(index), RHIFormat::RGBA8Unorm, pixel);
+            if (nullptr != texture) variantTextures.push_back(texture);
         }
 
         // 재질을 가르지 않은 경우와 가른 경우를 나란히 잰다. 하나만 재면

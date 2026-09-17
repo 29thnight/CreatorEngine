@@ -4,6 +4,12 @@
 
 #include <array>
 
+DX12MeshCache::~DX12MeshCache()
+{
+    // 자원 해제는 명시 Shutdown 의 몫이다. 여기서는 리스너 등록만 걷는다(헤더 주석).
+    if (nullptr != m_resources) m_resources->UnregisterUploadTransactionListener(this);
+}
+
 bool DX12MeshCache::Initialize(DX12DeviceResources* resources, std::string& outError)
 {
     if (nullptr == resources || !resources->IsInitialized())

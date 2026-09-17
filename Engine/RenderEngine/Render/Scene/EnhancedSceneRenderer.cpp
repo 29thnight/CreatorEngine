@@ -857,6 +857,7 @@ namespace
         uint32_t renderInProgress{ 0 };
         uint64_t renderPublished{ 0 };
         uint64_t renderConsumed{ 0 };
+        uint64_t renderCompletedFrameId{ 0 };
         uint64_t renderOverflowEvents{ 0 };
         uint64_t renderCoalescedFrames{ 0 };
         uint64_t renderCoalescedDeltas{ 0 };
@@ -4185,6 +4186,7 @@ namespace
                         std::lock_guard<std::mutex> queueLock(renderQueueMutex);
                         renderInProgress = 0;
                         ++renderConsumed;
+                        renderCompletedFrameId = submission.frame.frameId;
                     }
                     renderQueueWake.notify_all();
                 }
@@ -4351,6 +4353,8 @@ namespace
         stats.inProgress = renderInProgress;
         stats.highWatermark = renderQueueHighWatermark;
         stats.capacity = kRenderQueueCapacity;
+        stats.publishedFrameId = publishedFrameId.load();
+        stats.completedFrameId = renderCompletedFrameId;
         stats.running = renderThreadRunning;
         stats.accepting = renderThreadAccepting;
         stats.producerConsumerSeparated =

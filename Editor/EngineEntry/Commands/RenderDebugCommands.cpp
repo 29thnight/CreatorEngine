@@ -352,6 +352,71 @@ namespace ConsoleCmd
         return Ok(mode == "on" ? "Renderer enable requested" : "", std::move(data));
     }
 
+    // 라이브 렌더러가 **이 명령 이후에 발행된 프레임**을 끝낼 때까지 다음 명령을 미룬다.
+    //
+    // ★ `wait N` 을 예열로 쓰면 안 되는 이유(2026-09-17 실측).
+    //
+    //   `wait` 는 게임 스레드 프레임 수라, 렌더 스레드가 한 프레임에 얼마를 쓰는지와
+    //   무관하게 지나간다. 라이브 렌더러의 첫 프레임은 GBuffer ShaderMeta 반영
+    //   (slang reflect)에 Release 에서 약 24초를 쓰는데, Release 의 `wait 2000` 은
+    //   몇 초 만에 끝나 `dx12.scene` 의 10초 RenderThread drain 이 첫 프레임 도중에
+    //   걸렸다(`pending 2 · active 1`). Debug 는 프레임이 느려 2000 프레임이 우연히
+    //   그 시간을 덮고 있었다 — 같은 스크립트가 구성마다 다른 것을 쟀다.
+    //
+    // ★ 게임 스레드를 세우지 않는다. `WaitForLiveRenderThreadIdle` 처럼 막고 기다리면
+    //   새 프레임이 발행되지 않는다. `WaitForResult` 로 판정만 미루고 프레임은 계속 돈다.
+    //
+    // ★ 판정 값은 `completedFrameId`(TickLive 를 끝낸 id)다. 디버그 스냅샷의
+    //   `consumedFrameId` 는 TickLive 시작에 적혀, 긴 첫 프레임 도중에도 이미 넘어간다.
+    static CommandCore::CommandResult Cmd_render_live_wait(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        constexpr int kDefaultTimeoutSeconds = 120;
+        constexpr int kMaxTimeoutSeconds = 600;
+        int timeoutSeconds = kDefaultTimeoutSeconds;
+        if (ctx.parts.size() > 2)
+            return InvalidArguments("render.live.wait [timeout-seconds]");
+        if (ctx.parts.size() == 2 &&
+            (!ParseNumber(ctx.parts[1], timeoutSeconds) || timeoutSeconds <= 0 ||
+             timeoutSeconds > kMaxTimeoutSeconds))
+        {
+            return InvalidArguments("render.live.wait timeout must be 1..600 seconds",
+                "render.live.wait.timeout_invalid");
+        }
+
+        const EnhancedRenderThreadStats start = EnhancedSceneRenderer::GetLiveRenderThreadStats();
+        if (!start.running)
+            return PreconditionFailed("render.live.not_running", "Live RenderThread is not running");
+
+        const uint64_t afterFrame = start.publishedFrameId;
+        const auto began = std::chrono::steady_clock::now();
+        const auto deadline = began + std::chrono::seconds(timeoutSeconds);
+        ctx.system.WaitForResult([afterFrame, began, deadline]() -> std::optional<CommandResult>
+        {
+            const EnhancedRenderThreadStats stats = EnhancedSceneRenderer::GetLiveRenderThreadStats();
+            const double waitedMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - began).count();
+            auto data = CommandData::Object();
+            data.Set("afterFrame", CommandData::Int(static_cast<int64_t>(afterFrame)));
+            data.Set("completedFrame", CommandData::Int(static_cast<int64_t>(stats.completedFrameId)));
+            data.Set("publishedFrame", CommandData::Int(static_cast<int64_t>(stats.publishedFrameId)));
+            data.Set("waitedMs", CommandData::Double(waitedMs));
+            if (stats.completedFrameId > afterFrame)
+            {
+                std::printf("[CLI] render.live.wait 완료 — frame %llu > %llu · %.0f ms\n",
+                    static_cast<unsigned long long>(stats.completedFrameId),
+                    static_cast<unsigned long long>(afterFrame), waitedMs);
+                return Ok("Live RenderThread completed a frame published after the wait began", std::move(data));
+            }
+            if (!stats.running)
+                return Fail("render.live.not_running", "Live RenderThread stopped while waiting", std::move(data));
+            if (std::chrono::steady_clock::now() < deadline) return std::nullopt;
+            return CommandResult{ CommandStatus::TimedOut, "render.live.wait.timeout",
+                "Live RenderThread did not complete a newer frame", std::move(data) };
+        });
+        return Ok(); // The command system publishes only the eventual result.
+    }
+
     static CommandCore::CommandResult Cmd_render_rtinfo(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -620,6 +685,7 @@ namespace ConsoleCmd
         reg.Result({ "render.matmode" }, &Cmd_render_matmode);
         reg.Result({ "render.backend" }, &Cmd_render_backend);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
+        reg.Result({ "render.live.wait" }, &Cmd_render_live_wait);
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
         reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
         reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);

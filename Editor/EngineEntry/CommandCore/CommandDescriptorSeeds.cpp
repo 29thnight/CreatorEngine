@@ -200,6 +200,7 @@ namespace CommandCore
             // 나눠 쓰므로 "에디터 종료" 는 Player 의 help 에서 거짓이 된다.
             { "quit", CommandCost::Immediate, "", "호스트를 종료한다", CommandClass::EngineService, CommandLiveness::TerminatesProcess, false, CommandRoles::Both },
             { "render.backend", CommandCost::Immediate, "status", "부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
+            { "render.live.wait", CommandCost::Long, "[timeout-seconds]", "라이브 렌더러가 이 명령 뒤 발행된 프레임을 끝낼 때까지 다음 명령을 미룬다(프레임 수 대기 대신 예열 판정)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.livecheck", CommandCost::Immediate, "[너비 높이]", "resize·다중 뷰·표시 슬롯 회전 회귀 판정", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.matmode", CommandCost::Immediate, "<오브젝트> <opaque|transparent>", "오브젝트 재질의 렌더링 모드를 바꾼다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,mode", true },
             { "render.pbr.capture", CommandCost::Long, "<new-absolute-directory> [game|editor]", "PBR capture verification", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

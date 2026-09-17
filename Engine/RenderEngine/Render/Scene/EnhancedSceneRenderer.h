@@ -244,6 +244,13 @@ struct EnhancedRenderThreadStats
     uint32_t inProgress{ 0 };
     uint32_t highWatermark{ 0 };
     uint32_t capacity{ 0 };
+    /// 게임 스레드가 마지막으로 발행한 frame id. 읽는 순간의 값이다.
+    uint64_t publishedFrameId{ 0 };
+    /// RenderThread 가 TickLive 를 **끝낸** 마지막 frame id.
+    /// ★ EnhancedLiveDebugSnapshot::consumedFrameId 는 TickLive **시작**에 적힌다 —
+    ///   첫 프레임의 ShaderMeta 반영처럼 긴 프레임 도중에도 이미 그 id 를 가리킨다.
+    ///   "이 시점 이후 발행된 프레임이 그려졌다"는 이 값으로만 판정한다.
+    uint64_t completedFrameId{ 0 };
     bool running{ false };
     bool accepting{ false };
     bool producerConsumerSeparated{ false };
