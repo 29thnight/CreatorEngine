@@ -30,6 +30,8 @@
 // 돈 적 없는 경로를 "된다" 고 적을 수는 없다. 필요해지면 호출자가
 // `BeginDisabled` 로 감싸는 한 겹이고, 그때 이 규약 안으로 들인다.
 
+#include <cstdint>
+
 namespace editor::widgets
 {
     // Display-only normalization. Units, exponents and non-numbers stay intact.
@@ -286,4 +288,8 @@ namespace editor::widgets
     /// 라벨이 열보다 길면 잘라 그리고 그 자리에 tooltip 으로 전체 이름을 준다.
     /// 공백 문자열로 자리를 맞추지 않는다 — 그 방식은 폰트가 바뀌면 어긋난다.
     float begin_property_line(const char* label, const property_layout_metrics& metrics);
+
+    /// `begin_property_line` 을 부른 누계 (PHASE 21 W2-I4). 인스펙터 본문이 공통 배치를
+    /// 지났는지를 소스 셈이 아니라 **돈 줄 수**로 읽으려고 둔다. 그리는 스레드만 쓴다.
+    std::uint64_t property_line_count() noexcept;
 }

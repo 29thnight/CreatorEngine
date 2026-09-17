@@ -639,8 +639,19 @@ namespace editor::widgets
         return previous;
     }
 
+    namespace
+    {
+        std::uint64_t g_propertyLineCount = 0;
+    }
+
+    std::uint64_t property_line_count() noexcept
+    {
+        return g_propertyLineCount;
+    }
+
     float begin_property_line(const char* label, const property_layout_metrics& metrics)
     {
+        ++g_propertyLineCount;
         IM_ASSERT(nullptr != label && "속성 줄은 이름이 있어야 한다");
         if (nullptr == label)
         {

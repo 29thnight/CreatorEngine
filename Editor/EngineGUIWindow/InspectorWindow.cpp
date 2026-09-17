@@ -1,6 +1,9 @@
 #include "../EngineEntry/EditorProjectOperations.h"
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
+#include "InspectorControl.h"
+#include <atomic>
+#include <mutex>
 #include "EditorAssetDragPayload.h"
 
 #include "EditorInspectorPanel.h"
@@ -143,11 +146,104 @@ namespace
 		static InspectorWindow value;
 		return value;
 	}
+
+	// ── W2-I 창구(InspectorControl.h) ───────────────────────────────────────
+	std::atomic<float> g_inspectorWidth{ 0.f };
+	std::mutex g_inspectorMailboxMutex;
+	editor::windows::inspector_snapshot g_inspectorSnapshot{};
+	// 그리는 스레드만 만진다. 프레임 끝에 사본으로 게시한다.
+	std::vector<editor::windows::inspector_body> g_inspectorBodies;
+	std::string g_inspectorEntity;
+
+	// 본문 하나가 차지한 가로 범위를 잰다.
+	//
+	// `CursorMaxPos` 는 창이 그린 항목 오른쪽 끝의 누적 최대값이다. 본문에 들어갈 때
+	// 지금 커서로 내려 두고 나올 때 읽은 뒤 원래 값과 합친다 — 앞 본문의 끝이 이
+	// 본문의 끝으로 읽히지 않게 하되, 창의 내용 크기 계산은 그대로 둔다.
+	// 고정 폭 입력칸이 좁은 폭에서 작업 영역 밖으로 나가면 여기서 넘침이 된다.
+	class inspector_body_probe
+	{
+	public:
+		inspector_body_probe()
+			: m_window(ImGui::GetCurrentWindow())
+			, m_savedMax(m_window->DC.CursorMaxPos)
+			, m_start(m_window->DC.CursorPos)
+			, m_lines(editor::widgets::property_line_count())
+		{
+			m_window->DC.CursorMaxPos = m_start;
+		}
+
+		void finish(std::string type, std::uint32_t instance, bool open)
+		{
+			const ImVec2 extent = m_window->DC.CursorMaxPos;
+			m_window->DC.CursorMaxPos = ImMax(m_savedMax, extent);
+			editor::windows::inspector_body body;
+			body.type = std::move(type);
+			body.instance = instance;
+			body.open = open;
+			body.propertyLines = editor::widgets::property_line_count() - m_lines;
+			body.minX = m_start.x;
+			body.maxX = extent.x;
+			body.height = m_window->DC.CursorPos.y - m_start.y;
+			body.overflow = ImMax(0.f, extent.x - m_window->WorkRect.Max.x);
+			g_inspectorBodies.push_back(std::move(body));
+		}
+
+	private:
+		ImGuiWindow* m_window;
+		ImVec2 m_savedMax;
+		ImVec2 m_start;
+		std::uint64_t m_lines;
+	};
+}
+
+void editor::windows::set_inspector_width(float logicalWidth) noexcept
+{
+	g_inspectorWidth.store(logicalWidth > 0.f ? logicalWidth : 0.f, std::memory_order_relaxed);
+}
+
+editor::windows::inspector_snapshot editor::windows::read_inspector()
+{
+	std::lock_guard lock(g_inspectorMailboxMutex);
+	return g_inspectorSnapshot;
 }
 
 void editor::windows::draw_inspector()
 {
-	inspector_state().Draw();
+	g_inspectorBodies.clear();
+	g_inspectorEntity.clear();
+
+	// 요청한 논리 폭의 영역 안에서 그린다. 세로 막대를 늘 세워 두어 내용 길이에 따라
+	// 작업 폭이 흔들리지 않게 하고, 막대 폭만큼 더 잡아 작업 영역이 요청 폭이 되게 한다.
+	const float requested = g_inspectorWidth.load(std::memory_order_relaxed);
+	const bool probed = requested > 0.f;
+	bool visible = true;
+	if (probed)
+	{
+		visible = ImGui::BeginChild("##InspectorWidthProbe",
+			ImVec2(editor::ThemePixels(requested) + ImGui::GetStyle().ScrollbarSize, 0.f),
+			ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+	}
+	if (visible)
+	{
+		inspector_state().Draw();
+	}
+	const ImGuiWindow* const window = ImGui::GetCurrentWindow();
+	const float contentWidth = window->WorkRect.GetWidth();
+	const float contentMaxX = window->WorkRect.Max.x;
+	if (probed)
+	{
+		ImGui::EndChild();
+	}
+
+	std::lock_guard lock(g_inspectorMailboxMutex);
+	++g_inspectorSnapshot.frames;
+	g_inspectorSnapshot.entity = g_inspectorEntity;
+	g_inspectorSnapshot.uiScale = editor::ThemePixels(1.f);
+	g_inspectorSnapshot.requestedWidth = requested;
+	g_inspectorSnapshot.contentWidth = contentWidth;
+	g_inspectorSnapshot.contentMaxX = contentMaxX;
+	g_inspectorSnapshot.bodies = g_inspectorBodies;
 }
 
 // typed Draw 등록은 창의 일이 아니라 부팅의 일이다(PHASE 21 W3).
@@ -2067,7 +2163,12 @@ void InspectorWindow::Draw()
     ImGui::BeginDisabled(editLocked);
 	if (scene && selectedSceneObject)
 	{
-		ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
+		g_inspectorEntity = selectedSceneObject->m_name.ToString();
+		{
+			inspector_body_probe probe;
+			ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
+			probe.finish("GameObjectBaseInfo", 0, true);
+		}
 
 		// ★ 공간 컴포넌트는 여기서만 그린다 (W2-I1)
 		//
@@ -2085,11 +2186,15 @@ void InspectorWindow::Draw()
 		// 각각 묻도록 바꿔 셋(보통·UI·캔버스)이 모두 전용 드로어를 쓴다.
 		if (RectTransformComponent* rectTransform = selectedSceneObject->GetComponent<RectTransformComponent>())
 		{
+			inspector_body_probe probe;
 			ImGuiDrawHelperRectTransformComponent(rectTransform);
+			probe.finish("RectTransformComponent", 0, true);
 		}
 		if (selectedSceneObject->GetComponent<Transform>())
 		{
+			inspector_body_probe probe;
 			ImGuiDrawHelperTransformComponent(selectedSceneObject);
+			probe.finish("Transform", 0, true);
 		}
 
 		static bool isOpen = false;
@@ -2166,6 +2271,7 @@ void InspectorWindow::Draw()
 				selectedComponent = component.get();
 			}
 			const bool isHeaderOpen = componentHeaderState.open;
+			inspector_body_probe bodyProbe;
 			if (componentHeaderState.enabled_changed)
 			{
 				component->SetEnabled(isEnabled);
@@ -2296,6 +2402,9 @@ void InspectorWindow::Draw()
 					}
 				}
 			}
+
+			bodyProbe.finish(component->ToString(),
+				static_cast<std::uint32_t>(component->GetInstanceID()), isHeaderOpen);
 
 			// 접혀 있어도 부른다. 여는 쪽이 ID 와 들여쓰기를 밀어 두기 때문에
 			// 건너뛰면 그 뒤의 모든 줄이 한 칸씩 밀린 채 프레임이 끝난다.

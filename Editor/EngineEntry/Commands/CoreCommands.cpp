@@ -26,6 +26,7 @@
 #include "EditorPanelCost.h"
 #include "BrowserThumbnailCache.h"
 #include "ContentBrowserControl.h"
+#include "InspectorControl.h"
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorNavContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
@@ -1438,6 +1439,57 @@ namespace ConsoleCmd
     //
     // 인자를 준 호출은 **요청만 넣는다.** 창이 다음 프레임 머리에서 비우므로 같은
     // 호출이 돌려주는 게시본은 아직 옛 상태다 — 검사는 `wait` 를 끼운다.
+    // PHASE 21 W2-I — 인스펙터 본문 폭을 정하고 본문마다 공통 배치 줄·넘침을 읽는다.
+    static CommandCore::CommandResult Cmd_editor_inspector(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        if (args.size() == 3 && "width" == args[1])
+        {
+            if ("off" == args[2])
+            {
+                ::editor::windows::set_inspector_width(0.f);
+            }
+            else
+            {
+                char* end = nullptr;
+                const float width = std::strtof(args[2].c_str(), &end);
+                if (end == args[2].c_str() || *end != '\0' || !(width > 0.f))
+                    return InvalidArguments("editor.inspector width <logical px>|off");
+                ::editor::windows::set_inspector_width(width);
+            }
+        }
+        else if (args.size() != 1)
+        {
+            return InvalidArguments("editor.inspector [width <logical px>|off]");
+        }
+
+        const auto snapshot = ::editor::windows::read_inspector();
+        auto data = CommandData::Object();
+        data.Set("frames", CommandData::Int(static_cast<int64_t>(snapshot.frames)));
+        data.Set("entity", CommandData::String(snapshot.entity));
+        data.Set("uiScale", CommandData::Double(snapshot.uiScale));
+        data.Set("requestedWidth", CommandData::Double(snapshot.requestedWidth));
+        data.Set("contentWidth", CommandData::Double(snapshot.contentWidth));
+        data.Set("contentMaxX", CommandData::Double(snapshot.contentMaxX));
+        auto bodies = CommandData::Array();
+        for (const auto& body : snapshot.bodies)
+        {
+            auto item = CommandData::Object();
+            item.Set("type", CommandData::String(body.type));
+            item.Set("instance", CommandData::Int(static_cast<int64_t>(body.instance)));
+            item.Set("open", CommandData::Bool(body.open));
+            item.Set("propertyLines", CommandData::Int(static_cast<int64_t>(body.propertyLines)));
+            item.Set("minX", CommandData::Double(body.minX));
+            item.Set("maxX", CommandData::Double(body.maxX));
+            item.Set("height", CommandData::Double(body.height));
+            item.Set("overflow", CommandData::Double(body.overflow));
+            bodies.Append(std::move(item));
+        }
+        data.Set("bodies", std::move(bodies));
+        return Ok({}, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_editor_browser(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -2145,6 +2197,7 @@ namespace ConsoleCmd
         reg.Result({ "editor.panelcost" }, &Cmd_editor_panelcost);
         reg.Result({ "editor.thumbnail" }, &Cmd_editor_thumbnail);
         reg.Result({ "editor.browser" }, &Cmd_editor_browser);
+        reg.Result({ "editor.inspector" }, &Cmd_editor_inspector);
         reg.Result({ "editor.clipping" }, &Cmd_editor_clipping);
         reg.Result({ "editor.nav" }, &Cmd_editor_nav);
         reg.Result({ "editor.state" }, &Cmd_editor_state);

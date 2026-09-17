@@ -1,0 +1,57 @@
+#pragma once
+
+// PHASE 21 W2-I — Inspector 를 밖에서 읽고 폭을 정하는 창구.
+//
+// 왜 있는가. 계획서 §W2-I 의 완료 판정은 *"가용 content 폭 240/320/480/720 logical px
+// 에서 가로 잘림·겹침·0-size 입력칸은 실패"* 와 *"미이관 표면 0"* 이다. 착수 시점에
+// 인스펙터 폭을 정할 수단이 없었다 — 도크는 창을 좁혀도 절대 폭을 지키고, 도킹
+// 저장본의 `SizeRef` 를 고치는 길은 값을 정확히 맞추지 못한다. 그리고 전용 드로어가
+// 공통 배치를 지나는지는 소스 셈으로만 읽혔다(파일 단위 셈이 12 를 0 으로 읽은 적이
+// 있다). 그래서 둘을 연다.
+//
+//   ① 폭: 요청한 논리 폭의 영역 안에서 본문을 그린다(끄면 창 그대로).
+//   ② 본문마다: 공통 배치 줄(`begin_property_line`) 수와 오른쪽 끝, 넘침 px.
+//
+// ── 스레드 ─────────────────────────────────────────────────────────────────
+//
+// 창은 PresentationThread 에서 그려지고 CLI 는 게임 스레드에서 돈다. 브라우저
+// 창구(`ContentBrowserControl.h`)와 같은 모양 — 폭은 원자 값, 사본은 프레임 끝에
+// 게시한다. 요청 직후의 읽기는 아직 옛 상태다(게이트는 `wait` 를 끼운다).
+//
+// 이 헤더는 ImGui 를 모른다. 명령 쪽이 이것만 include 한다.
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace editor::windows
+{
+    /// 이번 프레임에 그린 본문 하나. 좌표는 ImGui 화면 좌표(px).
+    struct inspector_body
+    {
+        std::string type{};           ///< 컴포넌트 타입 이름(상단 셋은 드로어 이름)
+        std::uint32_t instance{};     ///< 컴포넌트 인스턴스 ID. 상단 셋은 0
+        bool open{};                  ///< 본문이 그려졌는가(접힌 패널은 거짓)
+        std::uint64_t propertyLines{};///< 이 본문이 지난 `begin_property_line` 수
+        float minX{}, maxX{};         ///< 본문 항목이 차지한 가로 범위
+        float height{};
+        float overflow{};             ///< 오른쪽 끝이 작업 영역을 넘은 px(0 이면 안 넘침)
+    };
+
+    struct inspector_snapshot
+    {
+        std::uint64_t frames{};       ///< 창 본문이 돈 프레임 수
+        std::string entity{};         ///< 선택된 엔티티 이름, 없으면 빈 문자열
+        float uiScale{};              ///< `ThemePixels(1)`
+        float requestedWidth{};       ///< 요청한 논리 폭, 0 이면 창 그대로
+        float contentWidth{};         ///< 본문이 실제로 받은 작업 영역 폭(px)
+        float contentMaxX{};          ///< 작업 영역 오른쪽 끝(px)
+        std::vector<inspector_body> bodies{};
+    };
+
+    /// 본문 폭을 논리 px 로 정한다. 0 이하면 끈다.
+    void set_inspector_width(float logicalWidth) noexcept;
+
+    /// 마지막으로 게시된 사본. 창이 한 번도 안 그려졌으면 `frames == 0`.
+    inspector_snapshot read_inspector();
+}

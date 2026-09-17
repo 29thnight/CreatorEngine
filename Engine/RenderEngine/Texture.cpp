@@ -510,13 +510,15 @@ std::shared_ptr<Texture> Texture::CreateSharedFromImage(
 Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
-	if (!file::exists(path) && !file::exists(matPath))
+	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
+	// 폴더를 열다 예외로 에디터를 죽였다(DecalComponent 를 붙이는 순간).
+	if (!file::is_regular_file(path) && !file::is_regular_file(matPath))
 	{
 		return nullptr;
 	}
 
 	file::path preparePath{};
-	if (file::exists(matPath))
+	if (file::is_regular_file(matPath))
 	{
 		preparePath = matPath;
 	}
@@ -630,12 +632,14 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
-	if (!file::exists(path) && !file::exists(matPath))
+	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
+	// 폴더를 열다 예외로 에디터를 죽였다(DecalComponent 를 붙이는 순간).
+	if (!file::is_regular_file(path) && !file::is_regular_file(matPath))
 	{
 		return nullptr;
 	}
 
-	const file::path preparePath = file::exists(path) ? path : matPath;
+	const file::path preparePath = file::is_regular_file(path) ? path : matPath;
 
 	ScratchImage image{};
 	TexMetadata metadata{};
@@ -787,13 +791,15 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
-	if (!file::exists(path) && !file::exists(matPath))
+	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
+	// 폴더를 열다 예외로 에디터를 죽였다(DecalComponent 를 붙이는 순간).
+	if (!file::is_regular_file(path) && !file::is_regular_file(matPath))
 	{
 		return nullptr;
 	}
 
 	file::path preparePath{};
-	if (file::exists(matPath))
+	if (file::is_regular_file(matPath))
 	{
 		preparePath = matPath;
 	}

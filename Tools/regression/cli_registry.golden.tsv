@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	131
-# names	140
+# commands	132
+# names	141
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -27,6 +27,7 @@ dx12.validation	-	immediate	editor	engine_service	live	no	yes	[reset]	검증 레
 editor.browser	-	immediate	editor	editor_operation	live	no	yes	[go <경로>|@recent|@everything | back | forward | up | search [텍스트] | select <경로> | scroll <px> | create folder|volume <이름>]	Content Browser 의 위치·이력·검색·선택을 읽고 탐색·생성을 요청한다
 editor.clipping	-	immediate	editor	engine_service	live	no	yes	[reset]	잘라 그리기 계약(넘침·조용한 잘림·클립 스택) 위반 수를 읽는다
 editor.dock	-	immediate	editor	engine_service	live	no	yes	-	살아 있는 도크 노드 트리를 TSV로 내고 배치 고아를 판정한다
+editor.inspector	-	immediate	editor	editor_operation	live	no	yes	[width <논리 px>|off]	인스펙터 본문 폭을 정하고 본문마다 공통 배치 줄 수와 가로 넘침을 읽는다
 editor.layout	-	immediate	editor	engine_service	live	no	yes	-	활성 레이아웃과 imgui.ini 항목을 선언 표와 맞대 본다
 editor.menu	-	immediate	editor	engine_service	live	no	yes	-	선언된 에디터 메뉴 표를 TSV로 내고 배선 충돌을 판정한다
 editor.nav	-	immediate	editor	engine_service	live	no	yes	[reset|key <키>...|pointer <x> <y>|press|release]	키보드 탐색 계약(커서·disabled 위반 수)을 읽고 키를 주입한다

@@ -423,6 +423,9 @@
     <ClInclude Include="EngineGUIWindow\ContentBrowserControl.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorControl.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\EditorAssetDragPayload.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>

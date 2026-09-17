@@ -1669,7 +1669,7 @@ Transform Undo 수정, 대표 폭 DX12 실행 기록은
 | W2-I1 | Transform 2안·공통 헤더/전용 본문 분리 | 1일 | 일반 엔티티·UI·Canvas에서 중복 0, 개별 조작 제한과 엔티티 활성 전이 보존 | progress — 중복 제외·상단 표시 적용, 공통 순회 통합/정책 회귀 남음 |
 | W2-I2 | 기본 정보·Transform·RectTransform 반응형 배치 | 1일 | 공백 정렬·고정 숫자 열 폭 제거, 축별 최소 가독성·기존 편집 의미 보존 | progress — 기본/XYZ 적용·사용자 확인, RectTransform 최소 폭 남음 |
 | W2-I3 | 일반 리플렉션·중첩 필드·공유 드로어 이관 | 1일 | 수치·문자열·bool·enum·벡터가 같은 규칙을 사용하고 Inspector 밖 소비자도 회귀 없음 | progress — **일반 경로와 C# 노출 필드는 정본을 쓴다**(`ReflectionTypedDraw.h`·`EditorAxisField3`·`DrawManagedScripts` 5 건). 중첩/배열 전수는 남음 |
-| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — **잔여가 셈이 된다: 전용 드로어 15 중 12.** 아래 재기준선의 표가 이름을 전부 적는다. Import Settings 의 대상 파일은 인스펙터가 아니라 `DrawYamlNodeEditor.cpp` 다 |
+| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — **잔여가 셈이 된다: 전용 드로어 15 중 12.** 아래 재기준선의 표가 이름을 전부 적는다. Import Settings 의 대상 파일은 인스펙터가 아니라 `DrawYamlNodeEditor.cpp` 다. **2026-09-17 자를 열었다** — `editor.inspector width` 와 `verify-inspector-drawer-layout.ps1`(이관 목록에만 단정, 착수 기준선은 아래) |
 | W2-I5 | 폭·배율·편집·중복 렌더 회귀와 잔재 점검 | 1일 | 아래 검증 행렬 및 §8 성능 gate 충족, 미이관 표면 0 | progress — 대표 UI/편집 검증, 전체 행렬·호출 수/성능 남음 |
 
 전용 드로어 전수 이관량과 개별 활성 변경 진입점의 실제 범위는 I0에서 재계수한다.
@@ -1724,6 +1724,44 @@ Transform Undo 수정, 대표 폭 DX12 실행 기록은
 
 잔여 산정은 바꾸지 않는다. 바뀐 것은 **무엇을 열어야 하는지가 이름으로 정해졌다**는
 것과, 착수하면 셈으로 진척을 잴 수 있다는 것이다 — 이관이 끝나면 위 표의 0 이 0 개다.
+
+##### 2026-09-17 착수 — 자를 먼저 연다
+
+같은 날 어휘 셈을 다시 했고 표와 같았다(열둘이 0). 그런데 소스 셈으로는 판정문의
+절반인 *"가로 잘림·겹침"* 을 읽을 수 없고, 인스펙터 폭을 240/320/480/720 으로 정할
+수단도 없었다(도크는 절대 폭을 지키고 `SizeRef` 고치기는 값을 못 맞춘다). 그래서
+`editor.inspector [width <논리 px>|off]` 를 열었다. 폭을 주면 본문을 그 폭의 영역
+안에서 그리고, 본문마다 **지난 공통 배치 줄 수**(`begin_property_line` 누계의 차)와
+**오른쪽 넘침 px**(`CursorMaxPos` 를 본문 머리에서 내렸다가 읽는다)를 낸다.
+검사 `verify-inspector-drawer-layout.ps1` 은 이관을 끝낸 드로어 목록에만 단정을 건다
+(네 폭 모두 줄 > 0 · 넘침 0). 목록 밖은 판정하지 않고 수만 낸다. 자 자신도 단정한다 —
+받은 폭 = 요청 × 배율, 240 에서 넘치는 본문이 실제로 있다(없으면 자극이 안 된 것).
+변이 셋(폭 무시 · 줄 계수 제거 · 아래 텍스처 폴더 판정 복원)이 모두 붉다.
+
+착수 기준선(Release, 실제 배율 2.25 — 사용자 1.5 × 모니터 150%, 넘침은 px):
+
+| 드로어 | 공통 배치 줄 | 240 | 320 | 480·720 |
+|---|---:|---:|---:|---:|
+| 기본 정보 · Transform (이관) | 1 · 3 | 0 | 0 | 0 |
+| ImageComponent | 0 | 260 | 80 | 0 |
+| Canvas | 0 | 61.8 | 0 | 0 |
+| DecalComponent | 0 | 54.3 | 0 | 0 |
+| PlayerInputComponent | 0 | 47.3 | 0 | 0 |
+| BehaviorTreeComponent | 0 | 46.5 | 0 | 0 |
+| SoundComponent | 0 | 23.8 | 0 | 0 |
+| TerrainComponent | 0 | 15.8 | 0 | 0 |
+| MeshRenderer | 5 | 15 | 0 | 0 |
+| SpriteRenderer · Animator | 5 · 2 | 0 | 0 | 0 |
+| VolumeComponent · StateMachineComponent | 0 | 0 | 0 | 0 |
+
+★ 줄 > 0 · 넘침 0 이 곧 이관 완료는 아니다. SpriteRenderer·Animator 는 리플렉션
+경로(`DrawOwnMembers`)로 일부 줄이 공통 배치를 지나지만 `ImVec2(150, 20)` 같은
+**배율을 받지 않는 고정 크기**가 남아 있다 — 배율 2.25 에서는 넘치지 않을 뿐이다.
+옮길 때 소스 축(고정 크기 리터럴 0)을 같이 건다.
+
+★ 자를 여는 중에 **DecalComponent 를 붙이는 순간 에디터가 죽었다.** 빈 텍스처 이름이
+`Assets/Textures/` **폴더**가 되고, `Texture::LoadSharedFromPath` 계열 셋이 `exists` 만
+보아 폴더를 통과시켜 WIC 가 폴더를 열다 예외를 던졌다. 셋을 `is_regular_file` 로 고쳤다.
 
 #### 검증과 완료 판정
 
