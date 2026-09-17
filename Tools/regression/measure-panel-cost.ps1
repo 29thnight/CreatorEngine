@@ -13,7 +13,10 @@ param(
     # 1600 창에서는 아래 도크가 그 밑으로 떨어져 browser_tree 가 0 으로 나왔다.
     [int]$WindowWidth = 2400,
     [int]$WindowHeight = 1400,
-    [string]$Label = ''
+    [string]$Label = '',
+    # W2-B·W7 공동 fixture — 엔티티 N 개와 **같은 회차에** 자산 파일 N 개를 한 폴더에
+    # 올리고 브라우저 비용·잘라 그리기·가시 썸네일 요청을 함께 잰다.
+    [switch]$WithAssets
 )
 # PHASE 21 W7-0 — Hierarchy/Browser draw 비용 **기준선 측정 도구**.
 #
@@ -34,9 +37,23 @@ param(
 # 로 만들고, 만든 직후 `scene.hierarchycheck` 로 고아·쌍불일치·순회미도달 0 을
 # 확인한다. 그 줄이 붉으면 측정값은 읽지 않는다 — 무엇을 그렸는지 모르는 수치다.
 #
+# `-WithAssets` 는 W2-B 의 "1k/10k/50k 목록의 비용·clipping·가시 썸네일 요청" 을 같은
+# 회차에 잰다. 추적되는 `fixtures/browser-thumbnails/Tiny4.png` 를 N 개 복사해
+# `Dynamic_CPP/Assets/W7ScaleAssets_<난수>` 에 올리고(감시자가 `.meta` 를 N 개 만든다),
+# 끝나면 폴더째 지운다. 구간은 넷이다:
+#   ① 대기 — 그 폴더에 선 채 표집. 결과 기억이 있어 다시 모으지 않는다.
+#   ② 끝까지 스크롤 — 잘라 그리기가 마지막 줄에서도 보이는 줄만 그리는지, 썸네일
+#      요청이 새로 보인 타일만큼만 느는지.
+#   ③ 검색 되풀이 — 검색어를 넣고 빼기를 되풀이해 **다시 모으는 프레임**의 비용을
+#      max 로 드러낸다(대기의 p95 는 결과 기억 덕이라 이 비용을 가린다).
+#   ④ 전체 자산 — `@everything` 이 다 찬 뒤 대기 표집.
+# 게이트가 아니므로 붉게 끝내지 않는다. 다만 units 가 N 에 따라 늘거나 요청이 보이는
+# 타일 수를 넘으면 ★ 로 적는다.
+#
 # 사용법:
 #   pwsh Tools/regression/measure-panel-cost.ps1
 #   pwsh Tools/regression/measure-panel-cost.ps1 -Counts 1000,10000 -Fanout 4
+#   pwsh Tools/regression/measure-panel-cost.ps1 -WithAssets
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Exe = [IO.Path]::GetFullPath($Exe)
@@ -46,6 +63,17 @@ if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) {
     throw '이미 떠 있는 에디터를 닫아라 — endpoint 파일은 프로젝트에 하나다.'
 }
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
+$script:assetsRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../Dynamic_CPP/Assets'))
+$script:tinyPng = $null
+$script:recentsPath = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../Dynamic_CPP/Library/EditorState/ContentBrowserRecents.txt'))
+$script:recentsBackup = ''
+if ($WithAssets) {
+    $script:tinyPng = [IO.File]::ReadAllBytes((Join-Path $PSScriptRoot 'fixtures/browser-thumbnails/Tiny4.png'))
+    # 방문 폴더가 최근 항목에 남는다 — 개발자의 목록을 되돌려 놓는다.
+    if (Test-Path -LiteralPath $script:recentsPath) {
+        $script:recentsBackup = [Convert]::ToBase64String([IO.File]::ReadAllBytes($script:recentsPath))
+    }
+}
 
 # 표본이 이만큼 쌓일 때까지 표집한다. 링 용량(512)보다 작아야 평균·p95 가
 # 이 측정만의 것이 된다.
@@ -62,7 +90,26 @@ function Invoke-Measurement([int]$count) {
         if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file }
     }
 
-    $lines = @(
+    $assetFolder = $null
+    $assetName = $null
+    if ($WithAssets) {
+        $assetName = 'W7ScaleAssets_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+        $assetFolder = Join-Path $script:assetsRoot $assetName
+        New-Item -ItemType Directory -Force -Path $assetFolder | Out-Null
+        for ($n = 0; $n -lt $count; $n++) {
+            [IO.File]::WriteAllBytes((Join-Path $assetFolder ('T{0:D5}.png' -f $n)), $script:tinyPng)
+        }
+    }
+
+    $lines = [Collections.Generic.List[string]]::new()
+    # 줄 번호 → 구간 이름. 결과 파일은 줄마다 한 행이라 번호로 짝을 짓는다.
+    $marks = @{}
+    function Mark([string]$name) { $marks[$lines.Count - 1] = $name }
+    if ($WithAssets) {
+        # ★ 썸네일 장부는 부팅 앞에서 비운다 — 뒤에 두면 첫 요청이 버려진다.
+        $lines.Add('editor.thumbnail reset')
+    }
+    $lines.AddRange([string[]]@(
         # 창 크기를 고정한다 — 보이는 행 수가 기계마다 다르면 units 를 비교할 수 없다.
         "window.resize $WindowWidth $WindowHeight",
         'wait 120',
@@ -74,12 +121,44 @@ function Invoke-Measurement([int]$count) {
         # 이라 **탭으로 겹친다**. 열려 있어도 선택되지 않으면 본문이 돌지 않아
         # 처음 재었을 때 181 프레임 중 1 프레임만 잡혔다. 앞으로 세운다.
         'editor.window ###Editor.ContentBrowser focus',
-        'wait 120',
-        'editor.panelcost reset'
-    )
-    for ($p = 0; $p -lt $kMaxPolls; $p++) { $lines += 'wait 60'; $lines += 'editor.panelcost' }
-    $lines += 'quit'
-    Set-Content -LiteralPath $scriptPath -Encoding UTF8 -Value $lines
+        'wait 120'
+    ))
+    # ★ 이동은 브라우저가 한 번 그려진 뒤에 건다. 첫 줄에 두면 `not_drawn` 으로
+    #   거절 응답이 나와 종료 코드가 4 가 된다(요청 자체는 적용된다).
+    if ($WithAssets) { $lines.Add("editor.browser go $assetName"); $lines.Add('wait 120') }
+    $lines.Add('editor.panelcost reset')
+    for ($p = 0; $p -lt $kMaxPolls; $p++) { $lines.Add('wait 60'); $lines.Add('editor.panelcost'); Mark 'idle-cost' }
+    if ($WithAssets) {
+        $lines.Add('editor.thumbnail'); Mark 'idle-thumb'
+        $lines.Add('editor.browser'); Mark 'idle-browser'
+
+        $lines.Add('editor.panelcost reset')
+        $lines.Add('editor.browser scroll 100000000')
+        for ($p = 0; $p -lt 4; $p++) { $lines.Add('wait 60') }
+        $lines.Add('editor.panelcost'); Mark 'end-cost'
+        $lines.Add('editor.thumbnail'); Mark 'end-thumb'
+        $lines.Add('editor.browser'); Mark 'end-browser'
+
+        $lines.Add('editor.browser scroll 0')
+        $lines.Add('wait 60')
+        $lines.Add('editor.panelcost reset')
+        $lines.Add('editor.browser'); Mark 'search-before'
+        for ($p = 0; $p -lt 40; $p++) {
+            $lines.Add('editor.browser search T0'); $lines.Add('wait 3')
+            $lines.Add('editor.browser search'); $lines.Add('wait 3')
+        }
+        $lines.Add('editor.panelcost'); Mark 'search-cost'
+        $lines.Add('editor.browser'); Mark 'search-after'
+
+        $lines.Add('editor.browser go @everything')
+        for ($p = 0; $p -lt 20; $p++) { $lines.Add('wait 60'); $lines.Add('editor.browser'); Mark 'everything-fill' }
+        $lines.Add('editor.panelcost reset')
+        for ($p = 0; $p -lt 6; $p++) { $lines.Add('wait 60') }
+        $lines.Add('editor.panelcost'); Mark 'everything-cost'
+        $lines.Add('editor.browser'); Mark 'everything-browser'
+    }
+    $lines.Add('quit')
+    Set-Content -LiteralPath $scriptPath -Encoding UTF8 -Value $lines.ToArray()
 
     # 워크스페이스를 격리한다 — 개발자의 배치를 건드리지 않고, 기본 배치라야
     # Hierarchy·Content Browser 가 둘 다 열려 있다.
@@ -91,7 +170,7 @@ function Invoke-Measurement([int]$count) {
     $env:CREATOR_EDITOR_WORKSPACE_DIR = $workspaceDir
     $env:CREATOR_EDITOR_LEGACY_INI = Join-Path $workspaceDir 'none.ini'
     try {
-        $proc = Start-Process -FilePath $Exe -WorkingDirectory (Split-Path $Exe) -PassThru `
+        $proc = Start-Process -FilePath $Exe -WorkingDirectory (Split-Path $Exe) -WindowStyle Hidden -PassThru `
             -ArgumentList @('--script', ('"' + $scriptPath + '"'), '--result-format', 'jsonl',
                             '--result-file', ('"' + $resultPath + '"')) `
             -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
@@ -103,6 +182,10 @@ function Invoke-Measurement([int]$count) {
         else { Remove-Item Env:CREATOR_EDITOR_WORKSPACE_DIR -ErrorAction SilentlyContinue }
         if ($null -ne $savedLegacyIni) { $env:CREATOR_EDITOR_LEGACY_INI = $savedLegacyIni }
         else { Remove-Item Env:CREATOR_EDITOR_LEGACY_INI -ErrorAction SilentlyContinue }
+        if ($null -ne $assetFolder) {
+            Remove-Item -LiteralPath $assetFolder -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath "$assetFolder.meta" -Force -ErrorAction SilentlyContinue
+        }
     }
 
     if (-not (Test-Path -LiteralPath $resultPath)) { throw "result file missing: $resultPath ($tag)" }
@@ -122,7 +205,9 @@ function Invoke-Measurement([int]$count) {
 
     # 표본이 목표만큼 쌓인 마지막 표집을 쓴다. 없으면 가장 많이 쌓인 것을 쓰고
     # 그 사실을 함께 낸다 — 조용히 적은 표본으로 p95 를 말하지 않는다.
+    # 대기 구간의 표집만 본다 — 뒤 구간은 링을 다시 비운다.
     $best = $null
+    $costs = @(for ($k = 0; $k -lt $rows.Count; $k++) { if ($marks[$k] -eq 'idle-cost') { $rows[$k] } })
     foreach ($row in $costs) {
         if ($row.status -ne 'succeeded') { continue }
         $hierarchy = @($row.data.panels | Where-Object { $_.slot -eq 'hierarchy' }) | Select-Object -First 1
@@ -143,6 +228,41 @@ function Invoke-Measurement([int]$count) {
         Panels      = $best.data.panels
         ExitCode    = $exitCode
         ResultPath  = $resultPath
+        Assets      = if ($WithAssets) { Read-AssetArms $rows $marks $count } else { $null }
+    }
+}
+
+function Read-AssetArms($rows, $marks, [int]$count) {
+    $at = @{}
+    $fill = @()
+    for ($k = 0; $k -lt $rows.Count; $k++) {
+        if (-not $marks.ContainsKey($k)) { continue }
+        if ($marks[$k] -eq 'everything-fill') { $fill += $rows[$k]; continue }
+        $at[$marks[$k]] = $rows[$k]
+    }
+    foreach ($need in @('idle-thumb', 'idle-browser', 'end-cost', 'end-thumb', 'end-browser',
+                        'search-before', 'search-cost', 'search-after', 'everything-cost', 'everything-browser')) {
+        if (-not $at.ContainsKey($need) -or $at[$need].status -ne 'succeeded') {
+            throw "자산 구간 행 '$need' 가 없거나 실패했다 (n=$count)"
+        }
+    }
+    function Files($row) { @($row.data.panels | Where-Object { $_.slot -eq 'browser_files' }) | Select-Object -First 1 }
+    $idleCosts = @(for ($k = 0; $k -lt $rows.Count; $k++) { if ($marks[$k] -eq 'idle-cost' -and $rows[$k].status -eq 'succeeded') { $rows[$k] } })
+    $idleFiles = Files ($idleCosts | Sort-Object { (Files $_).samples } | Select-Object -Last 1)
+    $completeAt = @($fill | Where-Object { $_.data.everythingComplete }).Count
+    [pscustomobject]@{
+        IdleResults     = $at['idle-browser'].data.resultCount
+        IdleFiles       = $idleFiles
+        IdleRequests    = $at['idle-thumb'].data.requests
+        EndFiles        = Files $at['end-cost']
+        EndRequests     = $at['end-thumb'].data.requests
+        EndEntries      = $at['end-thumb'].data.entries
+        SearchFiles     = Files $at['search-cost']
+        SearchRebuilds  = [long]$at['search-after'].data.resultRebuilds - [long]$at['search-before'].data.resultRebuilds
+        EverythingFiles = Files $at['everything-cost']
+        EverythingResults  = $at['everything-browser'].data.resultCount
+        EverythingComplete = [bool]$at['everything-browser'].data.everythingComplete
+        EverythingFillPolls = $fill.Count - $completeAt
     }
 }
 
@@ -158,7 +278,17 @@ $countList = @($Counts -split '[,;\s]+' | Where-Object { $_ } | ForEach-Object {
 if ($countList.Count -eq 0) { throw "-Counts 가 비었다: '$Counts'" }
 
 $results = @()
-foreach ($count in $countList) { $results += Invoke-Measurement $count }
+try {
+    foreach ($count in $countList) { $results += Invoke-Measurement $count }
+}
+finally {
+    if ($WithAssets) {
+        if ($script:recentsBackup) {
+            [IO.File]::WriteAllBytes($script:recentsPath, [Convert]::FromBase64String($script:recentsBackup))
+        }
+        elseif (Test-Path -LiteralPath $script:recentsPath) { Remove-Item -LiteralPath $script:recentsPath }
+    }
+}
 
 Write-Host ''
 Write-Host ('{0,-8} {1,-14} {2,8} {3,8} {4,8} {5,9} {6,8} {7,7}' -f `
@@ -179,3 +309,38 @@ foreach ($result in $results) {
     }
 }
 Write-Host ''
+
+if ($WithAssets) {
+    Write-Host '자산 공동 fixture — browser_files (한 폴더에 PNG N 개)'
+    Write-Host ('{0,-8} {1,-12} {2,8} {3,8} {4,9} {5,6} {6,9} {7,9}' -f `
+        'files', 'arm', 'results', 'p95Ms', 'maxMs', 'units', 'requests', 'etc')
+    Write-Host ('-' * 78)
+    $firstUnits = $null
+    foreach ($result in $results) {
+        $a = $result.Assets
+        $rowsOut = @(
+            @('대기', $a.IdleResults, $a.IdleFiles, $a.IdleRequests, "samples=$($a.IdleFiles.samples)"),
+            @('끝 스크롤', $a.IdleResults, $a.EndFiles, $a.EndRequests, "entries=$($a.EndEntries)"),
+            @('검색 되풀이', '', $a.SearchFiles, '', "rebuilds=$($a.SearchRebuilds)"),
+            @('전체 자산', $a.EverythingResults, $a.EverythingFiles, '', "fillPolls=$($a.EverythingFillPolls)")
+        )
+        foreach ($r in $rowsOut) {
+            Write-Host ('{0,-8} {1,-12} {2,8} {3,8:N3} {4,9:N3} {5,6} {6,9} {7}' -f `
+                $result.Count, $r[0], $r[1], [double]$r[2].p95Ms, [double]$r[2].maxMs, $r[2].lastUnits, $r[3], $r[4])
+        }
+        if ($a.IdleResults -ne $result.Count) {
+            Write-Host "         ★ 결과 $($a.IdleResults) 이 파일 수 $($result.Count) 와 다르다 — 무엇을 잰 것인지 모른다" -ForegroundColor Yellow
+        }
+        if (-not $a.EverythingComplete) {
+            Write-Host '         ★ 전체 자산이 다 차지 않은 채 쟀다' -ForegroundColor Yellow
+        }
+        if ($null -eq $firstUnits) { $firstUnits = [int]$a.IdleFiles.lastUnits }
+        elseif ([int]$a.IdleFiles.lastUnits -gt $firstUnits) {
+            Write-Host "         ★ 그린 줄이 $firstUnits → $($a.IdleFiles.lastUnits) 로 늘었다 — 잘라 그리기가 N 을 따른다" -ForegroundColor Yellow
+        }
+        if ([int]$a.EndRequests -gt 4 * [int]$a.IdleRequests) {
+            Write-Host "         ★ 끝까지 스크롤한 뒤 요청 $($a.EndRequests) — 보이는 타일보다 훨씬 많다" -ForegroundColor Yellow
+        }
+    }
+    Write-Host ''
+}

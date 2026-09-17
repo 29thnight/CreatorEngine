@@ -807,11 +807,13 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
     // 주고, 정렬도 스캔할 때 한 번 해 둔 것이다.
     const editor::browser_directory_listing& listing = editor::browser_cache_listing(directory);
     std::vector<file::path> children;
-    children.reserve(listing.entries.size());
     for (const auto& entry : listing.entries)
     {
+        // ★ 목록은 폴더가 먼저다(스캔이 그렇게 세운다). 첫 파일에서 멈춘다 — 파일
+        //   5 만 개 폴더의 노드가 프레임마다 5 만 번 돌고 그만큼 `reserve` 했다.
+        if (!entry.isDirectory) break;
         // 심볼릭 링크를 타지 않는 것은 옛 동작 그대로다 — 순환을 막는다.
-        if (entry.isDirectory && !entry.isSymlink) children.push_back(entry.path);
+        if (!entry.isSymlink) children.push_back(entry.path);
     }
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth
         | ImGuiTreeNodeFlags_FramePadding;

@@ -13,6 +13,11 @@ namespace
     /// 경로가 알 방법이 지금은 없어서 나이로 대신한다.
     constexpr int kRevalidateMs = 1000;
 
+    /// 다시 훑는 데 걸린 시간의 이만큼 배를 다음 확인까지 쉰다(최소 `kRevalidateMs`).
+    /// 폴더 하나에 파일 5 만 개면 훑기만 40ms 라, 1 초마다 훑으면 그 폴더에 선
+    /// 것만으로 초마다 멈칫한다. 확인에 쓰는 시간을 1% 아래로 묶는다.
+    constexpr int kRevalidateCostFactor = 100;
+
     /// 프레임당 다시 훑을 폴더 수. 낡은 것을 한꺼번에 훑으면 초당 몇 번씩
     /// 24 회 스캔이 몰려 p95 가 오히려 나빠진다.
     constexpr int kRescanBudget = 1;
@@ -21,6 +26,10 @@ namespace
     {
         browser_directory_listing listing{};
         clock_type::time_point scannedAt{};
+        /// 다음 확인까지 쉴 시간. 훑는 비용에 따라 늘어난다.
+        std::chrono::milliseconds revalidateAfter{ kRevalidateMs };
+        /// 목록을 만든 순회의 지문. 같으면 항목을 새로 만들지 않는다.
+        std::uint64_t fingerprint{};
     };
 
     struct cache_state
@@ -75,6 +84,53 @@ namespace
         return { reinterpret_cast<const char*>(utf8.data()), utf8.size() };
     }
 
+    /// 항목 하나가 목록에 남기는 것(경로·종류·revision)을 지문에 접는다. 목록을
+    /// 만드는 순회와 확인만 하는 순회가 **같은 함수**를 타야 둘이 어긋나지 않는다.
+    std::uint64_t fold_entry(std::uint64_t hash, const browser_fs::directory_entry& it,
+        bool& isDirectory, bool& isSymlink, std::uint64_t& revision)
+    {
+        std::error_code kindError;
+        isDirectory = it.is_directory(kindError) && !kindError;
+        std::error_code linkError;
+        isSymlink = it.is_symlink(linkError) && !linkError;
+        revision = 0;
+        // W7 썸네일의 revision. 폴더는 묻지 않는다 — 크기를 물으면 오류다.
+        // 두 값 다 찾기 결과에 담겨 오므로 여기서 새 접촉이 생기지 않는다.
+        if (!isDirectory)
+        {
+            std::error_code timeError;
+            const auto written = it.last_write_time(timeError);
+            std::error_code sizeError;
+            const auto bytes = it.file_size(sizeError);
+            if (!timeError) revision = std::uint64_t(written.time_since_epoch().count());
+            if (!sizeError) revision ^= std::uint64_t(bytes);
+        }
+        constexpr std::uint64_t prime = 1099511628211ull;
+        for (const auto unit : it.path().native()) { hash ^= std::uint64_t(unit); hash *= prime; }
+        hash ^= revision; hash *= prime;
+        hash ^= (isDirectory ? 2u : 0u) | (isSymlink ? 1u : 0u); hash *= prime;
+        return hash;
+    }
+
+    constexpr std::uint64_t kFingerprintSeed = 1469598103934665603ull;
+
+    /// 항목을 만들지 않고 지문만 낸다. 문자열 할당이 없어 목록 만들기의 절반 아래다.
+    std::uint64_t fingerprint_directory(const browser_fs::path& directory, size_t& count, std::error_code& ec)
+    {
+        std::uint64_t hash = kFingerprintSeed;
+        count = 0;
+        bool isDirectory{}, isSymlink{};
+        std::uint64_t revision{};
+        for (browser_fs::directory_iterator it(directory,
+                 browser_fs::directory_options::skip_permission_denied, ec), end;
+             !ec && it != end; it.increment(ec))
+        {
+            hash = fold_entry(hash, *it, isDirectory, isSymlink, revision);
+            ++count;
+        }
+        return hash;
+    }
+
     bool same_listing(const browser_directory_listing& a, const browser_directory_listing& b)
     {
         if (a.valid != b.valid || a.error != b.error || a.entries.size() != b.entries.size()) return false;
@@ -88,38 +144,47 @@ namespace
         return true;
     }
 
+    void finish_scan(cache_slot& slot, clock_type::time_point startedAt)
+    {
+        const auto now = clock_type::now();
+        const auto spent = std::chrono::duration_cast<std::chrono::milliseconds>(now - startedAt);
+        slot.revalidateAfter = std::max(std::chrono::milliseconds(kRevalidateMs), spent * kRevalidateCostFactor);
+        slot.scannedAt = now;
+        ++state().stats.scans;
+    }
+
     void scan_into(const browser_fs::path& directory, cache_slot& slot, bool fresh)
     {
+        const auto startedAt = clock_type::now();
+        // W2-B: 다시 훑을 때는 지문부터 본다. 같으면 목록을 만들지 않는다 —
+        // 파일 5 만 개 폴더에서 목록 만들기·정렬·버리기가 초마다 0.5 초를 멈췄다.
+        if (!fresh && slot.listing.valid)
+        {
+            size_t count = 0;
+            std::error_code probeError;
+            const std::uint64_t fingerprint = fingerprint_directory(directory, count, probeError);
+            if (!probeError && count == slot.listing.entries.size() && fingerprint == slot.fingerprint)
+            {
+                finish_scan(slot, startedAt);
+                return;
+            }
+        }
+
         browser_directory_listing listing;
+        std::uint64_t fingerprint = kFingerprintSeed;
         std::error_code ec;
         for (browser_fs::directory_iterator it(directory,
                  browser_fs::directory_options::skip_permission_denied, ec), end;
              !ec && it != end; it.increment(ec))
         {
             browser_directory_entry entry;
+            // ★ 종류·revision 은 여기서 한 번만 묻는다. 예전에는 정렬 비교자가
+            //   비교마다 `is_directory(ec)` 를 불렀다 — 비교 횟수만큼 stat 이다.
+            fingerprint = fold_entry(fingerprint, *it, entry.isDirectory, entry.isSymlink, entry.revision);
             entry.path = it->path();
             entry.nameUtf8 = to_utf8(it->path().filename());
             entry.pathUtf8 = to_utf8(it->path());
             entry.extension = it->path().extension().string();
-            // ★ 여기서 한 번만 묻는다. 예전에는 정렬 비교자가 비교마다
-            //   `is_directory(ec)` 를 불렀다 — 비교 횟수만큼 stat 이다.
-            std::error_code kindError;
-            entry.isDirectory = it->is_directory(kindError) && !kindError;
-            std::error_code linkError;
-            entry.isSymlink = it->is_symlink(linkError) && !linkError;
-            // W7 썸네일의 revision. 폴더는 묻지 않는다 — 크기를 물으면 오류다.
-            // 두 값 다 찾기 결과에 담겨 오므로 여기서 새 접촉이 생기지 않는다.
-            if (!entry.isDirectory)
-            {
-                std::error_code timeError;
-                const auto written = it->last_write_time(timeError);
-                std::error_code sizeError;
-                const auto bytes = it->file_size(sizeError);
-                if (!timeError)
-                    entry.revision = std::uint64_t(
-                        written.time_since_epoch().count());
-                if (!sizeError) entry.revision ^= std::uint64_t(bytes);
-            }
             listing.entries.push_back(std::move(entry));
         }
         listing.error = ec;
@@ -127,11 +192,14 @@ namespace
         // 정렬은 여기서 한 번 해 둔다 — 폴더 먼저, 그 다음 이름 오름차순.
         // 창이 내림차순을 원하면 뒤집기만 하면 되고, 그것은 비교가 아니라
         // 순회 방향이라 stat 을 다시 부르지 않는다.
+        // ★ 이미 담아 둔 UTF-8 이름으로 비교한다. `path.filename()` 은 비교마다 경로
+        //   둘을 새로 만들어 5 만 개에서 정렬만 150ms 였다(이름 비교 8ms). 전체
+        //   자산 범위가 같은 키로 다시 세우므로 두 범위의 순서도 같아진다.
         std::sort(listing.entries.begin(), listing.entries.end(),
             [](const browser_directory_entry& a, const browser_directory_entry& b)
             {
                 if (a.isDirectory != b.isDirectory) return a.isDirectory;
-                return a.path.filename() < b.path.filename();
+                return a.nameUtf8 < b.nameUtf8;
             });
         // W2-B: 내용이 같으면 목록 객체를 그대로 둔다 — 창이 기억한 항목 주소가 산다.
         if (fresh || !same_listing(slot.listing, listing))
@@ -139,8 +207,8 @@ namespace
             slot.listing = std::move(listing);
             ++state().generation;
         }
-        slot.scannedAt = clock_type::now();
-        ++state().stats.scans;
+        slot.fingerprint = fingerprint;
+        finish_scan(slot, startedAt);
     }
 }
 
@@ -176,8 +244,8 @@ namespace editor
         }
 
         const auto age = std::chrono::duration_cast<std::chrono::milliseconds>(
-            clock_type::now() - found->second.scannedAt).count();
-        if (age >= kRevalidateMs && cache.frameBudget > 0)
+            clock_type::now() - found->second.scannedAt);
+        if (age >= found->second.revalidateAfter && cache.frameBudget > 0)
         {
             --cache.frameBudget;
             scan_into(directory, found->second, false);
