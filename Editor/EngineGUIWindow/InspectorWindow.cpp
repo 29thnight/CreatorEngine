@@ -149,6 +149,7 @@ namespace
 
 	// ── W2-I 창구(InspectorControl.h) ───────────────────────────────────────
 	std::atomic<float> g_inspectorWidth{ 0.f };
+	std::atomic<bool> g_inspectorExpandAll{ false };
 	std::mutex g_inspectorMailboxMutex;
 	editor::windows::inspector_snapshot g_inspectorSnapshot{};
 	// 그리는 스레드만 만진다. 프레임 끝에 사본으로 게시한다.
@@ -202,6 +203,16 @@ void editor::windows::set_inspector_width(float logicalWidth) noexcept
 	g_inspectorWidth.store(logicalWidth > 0.f ? logicalWidth : 0.f, std::memory_order_relaxed);
 }
 
+void editor::windows::set_inspector_expand_all(bool expand) noexcept
+{
+	g_inspectorExpandAll.store(expand, std::memory_order_relaxed);
+}
+
+bool editor::windows::inspector_expand_all() noexcept
+{
+	return g_inspectorExpandAll.load(std::memory_order_relaxed);
+}
+
 editor::windows::inspector_snapshot editor::windows::read_inspector()
 {
 	std::lock_guard lock(g_inspectorMailboxMutex);
@@ -241,6 +252,7 @@ void editor::windows::draw_inspector()
 	g_inspectorSnapshot.entity = g_inspectorEntity;
 	g_inspectorSnapshot.uiScale = editor::ThemePixels(1.f);
 	g_inspectorSnapshot.requestedWidth = requested;
+	g_inspectorSnapshot.expandAll = editor::windows::inspector_expand_all();
 	g_inspectorSnapshot.contentWidth = contentWidth;
 	g_inspectorSnapshot.contentMaxX = contentMaxX;
 	g_inspectorSnapshot.bodies = g_inspectorBodies;
@@ -2377,9 +2389,14 @@ void InspectorWindow::Draw()
 
 		stem += " Import Settings";
 
-		if (ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+		const bool importOpen = ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 		{
-			DrawYamlNodeEditor(selectedNode->Root());
+			inspector_body_probe probe;
+			if (importOpen) DrawYamlNodeEditor(selectedNode->Root());
+			probe.finish("ImportSettings", 0, importOpen);
+		}
+		if (importOpen)
+		{
 
 			ImGui::Spacing();
 			if (ImGui::Button("Save"))

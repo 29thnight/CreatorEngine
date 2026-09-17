@@ -19,6 +19,11 @@ param(
 # 자 자신도 단정한다: 요청 폭 × 배율 = 받은 폭, 폭을 줄이면 넘침이 실제로 생기는
 # 드로어가 있다(없으면 자극이 안 된 것), 상단 공간 드로어는 줄 > 0.
 #
+# Import Settings: 자산을 고르면 인스펙터가 `.meta` 를 `DrawYamlNodeEditor` 로 그린다. 추적되는
+# 모델 메타 하나(긴 해시 문자열 · 맵 · 맵을 담은 배열)를 `editor.browser select` 로 고르고,
+# 접힌 채 한 번, `editor.inspector expand on` 으로 펼친 채 네 폭을 잰다. 펼친 줄 수가 접힌 줄
+# 수보다 커야 안쪽이 자극된 것이다.
+#
 # 소스 축: 이관한 드로어 함수 본문에 **배율을 받지 않는 고정 폭**이 남으면 실패다 —
 # `SetNextItemWidth(150)`, `ImVec2(150, 20)` 같은 숫자 리터럴. 런타임 축은 배율 2.25 인
 # 기계에서 "넘치지 않았다" 만 보므로 배율 1 에서 넘칠 고정 폭을 못 잡는다(착수 때
@@ -52,6 +57,7 @@ $DrawerSources = @{
     MeshRenderer          = @('Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp', 'ImGuiDrawHelperMeshRenderer', 'DrawMaterialTextureSlot', 'ReadOnlyLine')
     PlayerInputComponent  = @('Editor/EngineGUIWindow/ImGuiDrawHelperPlayerInput.cpp', 'ImGuiDrawHelperPlayerInput')
     TerrainComponent      = @('Editor/EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp', 'ImGuiDrawHelperTerrainComponent', 'DrawBrushMasks', 'ButtonRow')
+    ImportSettings        = @('Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp', 'DrawYamlNodeEditor', 'DrawEntry', 'DrawScalar', 'BeginContainer')
     Canvas                = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperCanvas')
     VolumeComponent       = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperVolume')
     BehaviorTreeComponent = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperBT')
@@ -85,7 +91,8 @@ function Get-FunctionBody([string]$File, [string]$Name) {
     return $null
 }
 $fixedWidth = '(SetNextItemWidth|PushItemWidth)\(\s*\d[\d.]*f?\s*\)|ImVec2\(\s*[1-9][\d.]*f?\s*,|ImVec2\([^()]*,\s*[1-9][\d.]*f?\s*\)'
-foreach ($name in $Migrated) {
+$ImportAsset = 'Animation/Cha_Mon_5.fbx'
+foreach ($name in @($Migrated) + 'ImportSettings') {
     if (-not $DrawerSources.ContainsKey($name)) { continue }
     $file = $DrawerSources[$name][0]
     foreach ($function in @($DrawerSources[$name] | Select-Object -Skip 1)) {
@@ -100,11 +107,27 @@ foreach ($name in $Migrated) {
 
 $lines = @('window.resize 2400 1600', 'wait 60', 'scene.new InspectorDrawerLayout', 'wait 30',
     'editor.window ###Editor.Inspector focus', 'wait 10')
+# Import Settings 는 엔티티를 고르기 전에 잰다 — 엔티티 선택이 자산 선택보다 먼저 그려진다.
+$lines += "editor.browser go $(Split-Path $ImportAsset -Parent)"; $lines += 'wait 120'
+$lines += "editor.browser select $ImportAsset"; $lines += 'wait 120'
+# 폭마다 여러 번 읽는다. `wait` 는 게임 스레드 프레임이고 인스펙터는 표시 스레드에서 그려져,
+# 같은 기다림이 어떤 때는 인스펙터 한 프레임도 못 채운다(기동 직후·컴포넌트 적재 중). 판정은
+# 요청이 반영된 마지막 읽기로 한다 — 끝까지 반영되지 않으면 그 사실이 실패로 남는다.
+$Reads = 3
+function Add-WidthReads([int]$Width) {
+    $script:lines += "editor.inspector width $Width"
+    for ($r = 0; $r -lt $Reads; $r++) { $script:lines += 'wait 12'; $script:lines += 'editor.inspector' }
+}
+Add-WidthReads 720
+$lines += 'editor.inspector expand on'
+foreach ($width in $Widths) { Add-WidthReads $width }
+$lines += 'editor.inspector expand off'
+$importEnd = $lines.Count
 foreach ($type in $Drawers) { $lines += "object.create Drawer_$type"; $lines += "component.add Drawer_$type $type" }
 $lines += 'wait 30'
 foreach ($type in $Drawers) {
     $lines += "scene.select Drawer_$type"
-    foreach ($width in $Widths) { $lines += "editor.inspector width $width"; $lines += 'wait 6'; $lines += 'editor.inspector' }
+    foreach ($width in $Widths) { Add-WidthReads $width }
 }
 $lines += 'editor.inspector width off'; $lines += 'wait 6'; $lines += 'editor.inspector'; $lines += 'quit'
 
@@ -132,15 +155,52 @@ for ($i = 0; $i -lt $rows.Count; $i++) {
     if ($rows[$i].status -ne 'succeeded') { throw "'$($lines[$i])' 가 $($rows[$i].status): $($rows[$i].message)" }
 }
 
-$samples = [Collections.Generic.List[object]]::new()
-$selected = ''
-for ($i = 0; $i -lt $rows.Count; $i++) {
-    if ($lines[$i] -like 'scene.select *') { $selected = $lines[$i].Substring('scene.select Drawer_'.Length) }
-    if ($lines[$i] -ne 'editor.inspector' -or -not $selected) { continue }
-    $width = [int]($lines[$i - 2] -replace 'editor.inspector width ', '' -replace 'off', '0')
-    if ($width -eq 0) { continue }
-    $samples.Add([pscustomobject]@{ Drawer = $selected; Width = $width; Data = $rows[$i].data })
+# 읽기를 (구간 · 대상 · 폭 · 펼침) 으로 묶고, 요청이 반영된 마지막 읽기를 표본으로 고른다.
+function Select-Samples([int]$From, [int]$To, [scriptblock]$Settled) {
+    $groups = [ordered]@{}
+    $target = ''; $width = 0; $expand = $false
+    for ($i = $From; $i -lt $To; $i++) {
+        $line = $lines[$i]
+        if ($line -like 'scene.select *') { $target = $line.Substring('scene.select Drawer_'.Length) }
+        elseif ($line -like 'editor.inspector width *') { $width = [int]($line.Substring('editor.inspector width '.Length) -replace 'off', '0') }
+        elseif ($line -eq 'editor.inspector expand on') { $expand = $true }
+        elseif ($line -eq 'editor.inspector expand off') { $expand = $false }
+        elseif ($line -eq 'editor.inspector' -and $width -gt 0) {
+            $key = "$target|$width|$expand"
+            if (-not $groups.Contains($key)) { $groups[$key] = [Collections.Generic.List[object]]::new() }
+            $groups[$key].Add([pscustomobject]@{ Drawer = $target; Width = $width; Expanded = $expand; Data = $rows[$i].data })
+        }
+    }
+    foreach ($group in $groups.Values) {
+        $ready = @($group | Where-Object { $_.Data.requestedWidth -eq $_.Width -and (& $Settled $_) })
+        if ($ready.Count -gt 0) { $ready[-1] } else { $group[$group.Count - 1] }
+    }
 }
+
+# ── Import Settings ─────────────────────────────────────────────────────────
+$importReads = @(Select-Samples -From 0 -To $importEnd -Settled { param($s) @($s.Data.bodies | Where-Object { $_.type -eq 'ImportSettings' -and $_.open }).Count -eq 1 })
+$importSamples = @(foreach ($read in $importReads) {
+    $d = $read.Data
+    $body = @($d.bodies | Where-Object { $_.type -eq 'ImportSettings' })
+    [pscustomobject]@{ Width = $read.Width; Expanded = $read.Expanded
+        Found = $body.Count; Open = ($body.Count -eq 1 -and $body[0].open); Lines = $(if ($body.Count) { [int]$body[0].propertyLines } else { 0 })
+        Overflow = $(if ($body.Count) { [double]$body[0].overflow } else { 0 }); Content = $d.contentWidth; Scale = $d.uiScale }
+})
+Assert ($importSamples.Count -eq $Widths.Count + 1) "Import Settings 표본 $($importSamples.Count) 이 $($Widths.Count + 1) 이 아니다"
+$collapsed = $importSamples | Where-Object { -not $_.Expanded } | Select-Object -First 1
+foreach ($sample in $importSamples) {
+    $tag = "ImportSettings@$($sample.Width)$(if ($sample.Expanded) { ' 펼침' } else { ' 접힘' })"
+    Assert ($sample.Open) "${tag}: '$ImportAsset' 의 Import Settings 본문이 열린 채 한 번 그려지지 않았다(찾은 본문 $($sample.Found)) — 자산 선택이 닿지 않았다"
+    Assert ([Math]::Abs($sample.Content - $sample.Width * $sample.Scale) -le 1) "${tag}: 받은 폭 $($sample.Content) 이 요청 × 배율과 다르다"
+    Assert ($sample.Lines -gt 0) "${tag}: 공통 배치 줄이 0 이다"
+    Assert ($sample.Overflow -le 0.5) "${tag}: 넘침 $($sample.Overflow) px"
+    if ($sample.Expanded -and $collapsed) {
+        Assert ($sample.Lines -gt $collapsed.Lines) "${tag}: 펼친 줄 $($sample.Lines) 이 접힌 줄 $($collapsed.Lines) 보다 크지 않다 — 안쪽 맵·배열이 자극되지 않았다"
+    }
+}
+
+$samples = @(Select-Samples -From $importEnd -To ($rows.Count) -Settled { param($s)
+    $s.Data.entity -eq "Drawer_$($s.Drawer)" -and @($s.Data.bodies | Where-Object { $_.type -eq $s.Drawer -and $_.open }).Count -eq 1 })
 Assert ($samples.Count -eq $Drawers.Count * $Widths.Count) "표본 $($samples.Count) 이 $($Drawers.Count)×$($Widths.Count) 가 아니다"
 
 # ── 자 ──────────────────────────────────────────────────────────────────────
@@ -163,7 +223,8 @@ foreach ($name in @('GameObjectBaseInfo', 'Transform') + $Drawers) {
     if ($bodies.Count -eq 0) { Assert $false "$name 본문을 한 번도 못 봤다"; continue }
     $worst = ($bodies | Measure-Object Overflow -Maximum).Maximum
     $fewest = ($bodies | Measure-Object Lines -Minimum).Minimum
-    $byWidth = ($Widths | ForEach-Object { $w = $_; $o = ($bodies | Where-Object Width -eq $w | Measure-Object Overflow -Maximum).Maximum; "{0}:{1:0.#}" -f $w, $o }) -join ' '
+    $byWidth = ($Widths | ForEach-Object { $w = $_; $at = @($bodies | Where-Object Width -eq $w)
+        $o = if ($at.Count) { ($at | Measure-Object Overflow -Maximum).Maximum } else { '-' }; "{0}:{1:0.#}" -f $w, $o }) -join ' '
     $state = if ($name -in $Migrated) { '이관' } else { '미이관' }
     $table.Add(("  {0,-24} {1,-4} 줄 {2,-3} 넘침 {3}" -f $name, $state, $fewest, $byWidth))
     if ($name -in $Migrated) {
@@ -175,8 +236,11 @@ foreach ($name in @('GameObjectBaseInfo', 'Transform') + $Drawers) {
     }
 }
 
+$importByWidth = ($importSamples | Where-Object Expanded | ForEach-Object { "{0}:{1:0.#}" -f $_.Width, $_.Overflow }) -join ' '
+$table.Add(("  {0,-24} {1,-4} 줄 {2,-3} 넘침 {3} (접힌 줄 {4})" -f 'ImportSettings', '이관',
+    (($importSamples | Where-Object Expanded | Measure-Object Lines -Minimum).Minimum), $importByWidth, $collapsed.Lines))
 Write-Host ''
 $table | ForEach-Object { Write-Host $_ }
 Write-Host ''
 if ($failures.Count -gt 0) { throw "인스펙터 드로어 배치 검사 실패 $($failures.Count) 건" }
-Write-Host "인스펙터 드로어 배치 검사: 단정 $script:checks · 이관 $($Migrated.Count)/$($Drawers.Count + 2) · PASS"
+Write-Host "인스펙터 드로어 배치 검사: 단정 $script:checks · 이관 $($Migrated.Count + 1)/$($Drawers.Count + 3) · PASS"

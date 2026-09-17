@@ -1669,7 +1669,7 @@ Transform Undo 수정, 대표 폭 DX12 실행 기록은
 | W2-I1 | Transform 2안·공통 헤더/전용 본문 분리 | 1일 | 일반 엔티티·UI·Canvas에서 중복 0, 개별 조작 제한과 엔티티 활성 전이 보존 | progress — 중복 제외·상단 표시 적용, 공통 순회 통합/정책 회귀 남음 |
 | W2-I2 | 기본 정보·Transform·RectTransform 반응형 배치 | 1일 | 공백 정렬·고정 숫자 열 폭 제거, 축별 최소 가독성·기존 편집 의미 보존 | progress — 기본/XYZ 적용·사용자 확인, RectTransform 최소 폭 남음 |
 | W2-I3 | 일반 리플렉션·중첩 필드·공유 드로어 이관 | 1일 | 수치·문자열·bool·enum·벡터가 같은 규칙을 사용하고 Inspector 밖 소비자도 회귀 없음 | progress — **일반 경로와 C# 노출 필드는 정본을 쓴다**(`ReflectionTypedDraw.h`·`EditorAxisField3`·`DrawManagedScripts` 5 건). 중첩/배열 전수는 남음 |
-| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — **잔여가 셈이 된다: 전용 드로어 15 중 12.** 아래 재기준선의 표가 이름을 전부 적는다. Import Settings 의 대상 파일은 인스펙터가 아니라 `DrawYamlNodeEditor.cpp` 다. **2026-09-17 자를 열었다** — `editor.inspector width` 와 `verify-inspector-drawer-layout.ps1`(이관 목록에만 단정, 착수 기준선은 아래). **같은 날 전용 드로어 열둘 이관 — 14/14, 네 폭 넘침 0, 소스 축 고정 폭 0.** 남은 것은 Import Settings 하나 |
+| W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — **잔여가 셈이 된다: 전용 드로어 15 중 12.** 아래 재기준선의 표가 이름을 전부 적는다. Import Settings 의 대상 파일은 인스펙터가 아니라 `DrawYamlNodeEditor.cpp` 다. **2026-09-17 자를 열었다** — `editor.inspector width` 와 `verify-inspector-drawer-layout.ps1`(이관 목록에만 단정, 착수 기준선은 아래). **같은 날 전용 드로어 열둘 이관 — 14/14, 네 폭 넘침 0, 소스 축 고정 폭 0.** 이어서 Import Settings(`DrawYamlNodeEditor.cpp`)도 옮겼다 — 15/15, 펼친 채 네 폭 넘침 0(`editor.inspector expand on`). **W2-I4 의 대상 표면 0** |
 | W2-I5 | 폭·배율·편집·중복 렌더 회귀와 잔재 점검 | 1일 | 아래 검증 행렬 및 §8 성능 gate 충족, 미이관 표면 0 | progress — 대표 UI/편집 검증, 전체 행렬·호출 수/성능 남음 |
 
 전용 드로어 전수 이관량과 개별 활성 변경 진입점의 실제 범위는 I0에서 재계수한다.
@@ -1814,6 +1814,45 @@ StateMachine 이 공통 줄을 건너뜀(줄 0), MeshRenderer 텍스처 칸 미�
 합쳤다(선택 표시도 하나). 긴 안내 문장은 `TextWrapped` 로 바꿨다.
 
 남은 것: **Import Settings**(`DrawYamlNodeEditor.cpp`) 는 이번에 손대지 않았다.
+
+##### 2026-09-17 Import Settings 이관 — 15/15
+
+자산을 고르면 인스펙터가 `.meta` YAML 을 `DrawYamlNodeEditor` 로 그린다. 예전 판은 키를 위젯
+라벨에 붙여(`key##label`) 값 칸 **오른쪽**에 그렸고 폭은 ImGui 기본(창의 2/3)이었으며, 문자열은
+256 바이트 버퍼에 `strcpy_s` 로 복사해 그보다 긴 값이면 런타임 검사로 죽었다. 64 비트 정수
+(`timestamp` 같은 값)는 정수 판독에 실패해 `float` 로 떨어져 편집하면 값이 깎였다.
+
+- 키는 공통 줄의 라벨이다. 파일이 키를 정하므로 고정 라벨 목록은 없고(라벨 열은 최소 폭), 긴 키는 공통 줄이 잘라 그리고 tooltip 으로 준다.
+- 값: bool → 체크, 64 비트 정수 → `InputScalar(S64)`, 실수 → `InputFloat`, 나머지 → `std::string` 입력칸. 들여쓰기가 깊이마다 폭을 줄이므로 배치는 줄마다 그 자리에서 잰다.
+- 맵·배열은 접힘 머리(`SpanAvailWidth`), ID 는 키·순번으로 묶는다.
+
+자극: 명령은 클릭을 못 하므로 접힌 트리 안쪽이 그려지지 않는다. `editor.inspector expand on|off`
+를 더해 접힘 머리를 모두 펼친다. `verify-inspector-drawer-layout.ps1` 은 추적되는 모델 메타
+`Animation/Cha_Mon_5.fbx.meta`(긴 해시 · 맵 · 맵을 담은 배열)를 `editor.browser go`/`select` 로
+고르고(보이는 결과 안에서만 고를 수 있다), 접힌 채 720 에서 한 번, 펼친 채 네 폭을 잰다.
+접힌 줄 7 → 펼친 줄 27, 네 폭 넘침 0. 펼친 줄이 접힌 줄보다 커야 안쪽이 자극된 것이다.
+240 폭 화면을 찍어 눈으로 확인했다(중첩 배열 안쪽은 값이 라벨 아래로 내려간다).
+
+★ 검사의 읽기를 고쳤다. `wait` 는 게임 스레드 프레임이고 인스펙터는 표시 스레드에서 그려져,
+같은 `wait 6` 이 기동 직후에는 인스펙터 3 프레임, 컴포넌트 적재 중에는 한 프레임도 못 채웠다
+(ImageComponent 480 · PlayerInput 240 표본이 이전 상태를 읽고 붉었다). 폭마다 세 번 읽고
+요청이 반영된(요청 폭 · 선택 엔티티 · 본문 열림) 마지막 읽기를 표본으로 삼는다. 끝까지
+반영되지 않으면 그대로 실패로 남는다. 단정 246 · 이관 15/15, 연속 두 회차 통과.
+
+★ 앞 커밋의 누락: 드로어 이관이 Decal·Sprite·Image 텍스처 칸의 받는 자리 다섯을 조각
+`DrawAssetSlot` 하나(`AcceptDragDropPayload(payloadType)`)로 모았는데, 그 모양을 소스로 대조하는
+`verify-content-browser-navigation.ps1` 을 그때 돌리지 않아 13·14 번이 붉은 채 올라갔다. 검사를
+새 모양으로 고쳤다 — 유형이 변수인 받는 자리도 세어 `path_of` 를 단정하고, 조각을 부르는 자리의
+유형 집합(데칼 Texture · 스프라이트 Texture · 이미지 UI_TEXTURE)을 기록과 대조하고, 데칼 세 칸이
+Textures 폴더 검사를 통과한 이름만 자기 `Set*Texture` 로 넘기는지 본다. 이미지 칸 유형을
+`Texture` 로 바꾼 변이가 붉다.
+
+변이 —
+옛 `DrawYamlNodeEditor.cpp` 를 그대로 되돌리면 공통 줄 0 · 240 펼침 넘침 78.75 px(착수 기준선)에 소스 축의 조각 함수 부재까지 붉다.
+펼침 스위치를 무시하게 하면 펼친 줄이 접힌 줄 7 과 같아 네 폭 모두 붉다(자극 단정).
+스칼라 값 칸에 `SetNextItemWidth(300.0f)` 를 넣으면 소스 축과 런타임 축(240 넘침 93 · 320 넘침 3 px)이 함께 붉다.
+이미지 칸 유형을 `Texture` 로 바꾸면 탐색 검사 13 이 붉다.
+같이 돈 검사: 명령 등록 골든(132) · CLI 발견 · 잘라 그리기 계약 · Content Browser 탐색(130) 통과.
 
 #### 검증과 완료 판정
 

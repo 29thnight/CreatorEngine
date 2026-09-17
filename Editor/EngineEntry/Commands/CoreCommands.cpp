@@ -1459,9 +1459,13 @@ namespace ConsoleCmd
                 ::editor::windows::set_inspector_width(width);
             }
         }
+        else if (args.size() == 3 && "expand" == args[1] && ("on" == args[2] || "off" == args[2]))
+        {
+            ::editor::windows::set_inspector_expand_all("on" == args[2]);
+        }
         else if (args.size() != 1)
         {
-            return InvalidArguments("editor.inspector [width <logical px>|off]");
+            return InvalidArguments("editor.inspector [width <logical px>|off|expand on|off]");
         }
 
         const auto snapshot = ::editor::windows::read_inspector();
@@ -1470,6 +1474,7 @@ namespace ConsoleCmd
         data.Set("entity", CommandData::String(snapshot.entity));
         data.Set("uiScale", CommandData::Double(snapshot.uiScale));
         data.Set("requestedWidth", CommandData::Double(snapshot.requestedWidth));
+        data.Set("expandAll", CommandData::Bool(snapshot.expandAll));
         data.Set("contentWidth", CommandData::Double(snapshot.contentWidth));
         data.Set("contentMaxX", CommandData::Double(snapshot.contentMaxX));
         auto bodies = CommandData::Array();

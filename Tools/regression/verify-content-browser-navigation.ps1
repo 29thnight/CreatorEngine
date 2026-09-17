@@ -107,9 +107,7 @@ $expectedSites = @(
     'HierarchyWindow.cpp:Font', 'HierarchyWindow.cpp:Model', 'HierarchyWindow.cpp:SPRITESHEET',
     'HierarchyWindow.cpp:Texture', 'HierarchyWindow.cpp:UI_TEXTURE',
     'ImGuiDrawHelperMeshRenderer.cpp:Texture', 'ImGuiDrawHelperTerrainComponent.cpp:Model',
-    'InspectorWindow.cpp:HDR', 'InspectorWindow.cpp:Texture', 'InspectorWindow.cpp:Texture',
-    'InspectorWindow.cpp:Texture', 'InspectorWindow.cpp:Texture', 'InspectorWindow.cpp:UI_TEXTURE',
-    'InspectorWindow.cpp:VolumeProfile',
+    'InspectorWindow.cpp:HDR', 'InspectorWindow.cpp:(payloadType)', 'InspectorWindow.cpp:VolumeProfile',
     'SceneViewWindow.cpp:HDR', 'SceneViewWindow.cpp:Model', 'SceneViewWindow.cpp:Prefab'
 ) | Sort-Object
 
@@ -121,8 +119,11 @@ foreach ($file in $editorSources) {
     for ($i = 0; $i -lt $lines.Count; $i++) {
         # 여러 줄로 나뉜 호출(`payload =\n AcceptDragDropPayload(`)도 한 줄 뒤에서 잡힌다.
         $m = [regex]::Match($lines[$i], $typePattern)
+        # W2-I4: 전용 드로어의 자산 칸은 유형을 인자로 받는 조각 하나(`DrawAssetSlot`)로 모였다.
+        # 유형이 변수인 받는 자리도 같은 계약(path_of)을 지켜야 하므로 `(변수)` 로 센다.
+        if (-not $m.Success) { $m = [regex]::Match($lines[$i], '^(?!\s*//).*AcceptDragDropPayload\s*\(\s*(\w+)\s*\)') }
         if (-not $m.Success) { continue }
-        $key = "$($file.Name):$($m.Groups[1].Value)"
+        $key = if ($lines[$i] -match 'AcceptDragDropPayload\s*\(\s*"') { "$($file.Name):$($m.Groups[1].Value)" } else { "$($file.Name):($($m.Groups[1].Value))" }
         $sites.Add($key)
         $end = [Math]::Min($lines.Count - 1, $i + 40)
         $body = New-Object System.Text.StringBuilder
@@ -142,11 +143,18 @@ $actualSites = @($sites | Sort-Object)
 $diff = Compare-Object -ReferenceObject $expectedSites -DifferenceObject $actualSites
 Assert ($null -eq $diff) ("13 받는 자리 집합이 기록과 다르다: " + (($diff | ForEach-Object { "$($_.SideIndicator)$($_.InputObject)" }) -join ', '))
 
-# 14 — 이름만 저장하는 소비자
+# 13 이어서 — 유형을 인자로 받는 조각을 부르는 자리의 유형 집합. 조각이 받는 유형이 조용히
+# 바뀌거나(예: UI_TEXTURE → Texture) 부르는 자리가 늘면 여기서 드러난다.
 $inspectorText = [IO.File]::ReadAllText((Join-Path $SourceRoot "Editor\EngineGUIWindow\InspectorWindow.cpp"))
-foreach ($slot in @('Decal', 'Normal', 'ORM')) {
-    $pattern = 'lives_in\(\s*filepath\s*,\s*"Textures"\s*,\s*"Decal ' + $slot + ' texture drop"\s*\)\s*\)\s*\{\s*decalComponent->Set' + $slot + 'Texture\('
-    Assert ($inspectorText -match $pattern) "14 데칼 $slot 이 Textures 폴더 검사 뒤에만 이름을 넘기지 않는다"
+$slotTypes = @([regex]::Matches($inspectorText, 'DrawAssetSlot\((?:[^;"]|"[^"]*")*?"(\w+)"\s*,\s*sheet\.line\(') | ForEach-Object { $_.Groups[1].Value } | Sort-Object)
+Assert (($slotTypes -join ',') -eq 'Texture,Texture,UI_TEXTURE') "13 DrawAssetSlot 을 부르는 자리의 유형이 기록(데칼 Texture · 스프라이트 Texture · 이미지 UI_TEXTURE)과 다르다: $($slotTypes -join ',')"
+
+# 14 — 이름만 저장하는 소비자. 데칼 세 칸은 한 람다(`slot`)를 지나고, 람다는 Textures 폴더 검사를
+# 통과한 경우에만 이름을 돌려준다. 칸마다 그 이름이 자기 Set*Texture 로 간다.
+Assert ($inspectorText -match '!dropped\.empty\(\)\s*&&\s*editor::asset_drag::lives_in\(\s*dropped\s*,\s*"Textures"\s*,\s*context\s*\)\s*\?\s*dropped\.filename\(\)\.string\(\)\s*:\s*std::string\(\)') "14 데칼 칸 람다가 Textures 폴더 검사를 통과할 때만 이름을 돌려주지 않는다"
+foreach ($pair in @(@('Diffuse', 'Decal', 'GetDecalTexture'), @('Normal', 'Normal', 'GetNormalTexture'), @('ORM', 'ORM', 'GetORMTexture'))) {
+    $pattern = 'slot\(\s*"' + $pair[0] + '"\s*,\s*decalComponent->' + $pair[2] + '\(\)\s*,\s*"Decal ' + $pair[1] + ' texture drop"\s*\)\s*;\s*!name\.empty\(\)\s*\)\s*decalComponent->Set' + $pair[1] + 'Texture\(\s*name\.c_str\(\)\s*\)'
+    Assert ($inspectorText -match $pattern) "14 데칼 $($pair[1]) 이 Textures 폴더 검사 뒤에만 이름을 넘기지 않는다"
 }
 $hierarchyText = [IO.File]::ReadAllText((Join-Path $SourceRoot "Editor\EngineGUIWindow\HierarchyWindow.cpp"))
 Assert ($hierarchyText -match '!editor::asset_drag::lives_in\(\s*filepath\s*,\s*"SpriteSheets"[^)]*\)\s*\)\s*\{[^}]*\}\s*else if \(selectedSceneObject\)') `
