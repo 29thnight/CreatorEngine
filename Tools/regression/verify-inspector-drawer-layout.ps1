@@ -24,6 +24,9 @@ param(
 # 접힌 채 한 번, `editor.inspector expand on` 으로 펼친 채 네 폭을 잰다. 펼친 줄 수가 접힌 줄
 # 수보다 커야 안쪽이 자극된 것이다.
 #
+# RectTransform(W2-I2): 컴포넌트를 붙여서는 생기지 않는다 — 엔티티 유형이 정한다(UI 는
+# RectTransform 만, 캔버스는 둘 다). `object.create <이름> UI` 로 만든 엔티티를 같은 네 폭에서 잰다.
+#
 # 소스 축: 이관한 드로어 함수 본문에 **배율을 받지 않는 고정 폭**이 남으면 실패다 —
 # `SetNextItemWidth(150)`, `ImVec2(150, 20)` 같은 숫자 리터럴. 런타임 축은 배율 2.25 인
 # 기계에서 "넘치지 않았다" 만 보므로 배율 1 에서 넘칠 고정 폭을 못 잡는다(착수 때
@@ -45,7 +48,8 @@ New-Item -ItemType Directory -Force -Path $Work | Out-Null
 # 이관을 끝낸 드로어. 옮길 때마다 여기에 더한다.
 $Migrated = @('GameObjectBaseInfo', 'Transform',
     'SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'VolumeComponent',
-    'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent')
+    'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent',
+    'RectTransformComponent')
 # 이관한 드로어의 그리는 함수 — 소스 축이 본문을 잘라 읽는다. 첫 칸이 파일(저장소 기준), 나머지가
 # 함수 이름이다. 드로어가 부르는 같은 파일의 조각 함수도 적는다(고정 폭이 그리로 숨을 수 있다).
 $DrawerSources = @{
@@ -59,6 +63,7 @@ $DrawerSources = @{
     TerrainComponent      = @('Editor/EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp', 'ImGuiDrawHelperTerrainComponent', 'DrawBrushMasks', 'ButtonRow')
     ImportSettings        = @('Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp', 'DrawYamlNodeEditor', 'DrawEntry', 'DrawScalar', 'BeginContainer')
     Canvas                = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperCanvas')
+    RectTransformComponent = @('Editor/EngineGUIWindow/ImGuiDrawHelperRectTransformComponent.cpp', 'ImGuiDrawHelperRectTransformComponent', 'DrawVec2Row', 'DrawAnchorPresetPopup', 'DrawAnchorIconButton')
     VolumeComponent       = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperVolume')
     BehaviorTreeComponent = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperBT')
     StateMachineComponent = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperFSM')
@@ -66,6 +71,9 @@ $DrawerSources = @{
 # 전용 드로어를 가진 컴포넌트 열둘 — 계획서 §W2-I 재기준선 표.
 $Drawers = @('SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'VolumeComponent',
     'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent')
+# 유형이 붙이는 공간 컴포넌트. 값은 `object.create` 의 유형이다.
+$SpatialDrawers = [ordered]@{ RectTransformComponent = 'UI' }
+$Targets = @($Drawers) + @($SpatialDrawers.Keys)
 $Widths = @(240, 320, 480, 720)
 
 $script:checks = 0
@@ -124,8 +132,9 @@ foreach ($width in $Widths) { Add-WidthReads $width }
 $lines += 'editor.inspector expand off'
 $importEnd = $lines.Count
 foreach ($type in $Drawers) { $lines += "object.create Drawer_$type"; $lines += "component.add Drawer_$type $type" }
+foreach ($type in $SpatialDrawers.Keys) { $lines += "object.create Drawer_$type $($SpatialDrawers[$type])" }
 $lines += 'wait 30'
-foreach ($type in $Drawers) {
+foreach ($type in $Targets) {
     $lines += "scene.select Drawer_$type"
     foreach ($width in $Widths) { Add-WidthReads $width }
 }
@@ -201,7 +210,7 @@ foreach ($sample in $importSamples) {
 
 $samples = @(Select-Samples -From $importEnd -To ($rows.Count) -Settled { param($s)
     $s.Data.entity -eq "Drawer_$($s.Drawer)" -and @($s.Data.bodies | Where-Object { $_.type -eq $s.Drawer -and $_.open }).Count -eq 1 })
-Assert ($samples.Count -eq $Drawers.Count * $Widths.Count) "표본 $($samples.Count) 이 $($Drawers.Count)×$($Widths.Count) 가 아니다"
+Assert ($samples.Count -eq $Targets.Count * $Widths.Count) "표본 $($samples.Count) 이 $($Targets.Count)×$($Widths.Count) 가 아니다"
 
 # ── 자 ──────────────────────────────────────────────────────────────────────
 foreach ($sample in $samples) {
@@ -217,7 +226,7 @@ Assert ($narrowOverflow.Count -gt 0 -or $Migrated.Count -ge $Drawers.Count + 2) 
 
 # ── 이관 끝난 드로어 ────────────────────────────────────────────────────────
 $table = [Collections.Generic.List[string]]::new()
-foreach ($name in @('GameObjectBaseInfo', 'Transform') + $Drawers) {
+foreach ($name in @('GameObjectBaseInfo', 'Transform') + $Targets) {
     $bodies = @($samples | ForEach-Object { $s = $_; $s.Data.bodies | Where-Object { $_.type -eq $name -and $_.open } |
         ForEach-Object { [pscustomobject]@{ Width = $s.Width; Lines = [int]$_.propertyLines; Overflow = [double]$_.overflow } } })
     if ($bodies.Count -eq 0) { Assert $false "$name 본문을 한 번도 못 봤다"; continue }
@@ -243,4 +252,4 @@ Write-Host ''
 $table | ForEach-Object { Write-Host $_ }
 Write-Host ''
 if ($failures.Count -gt 0) { throw "인스펙터 드로어 배치 검사 실패 $($failures.Count) 건" }
-Write-Host "인스펙터 드로어 배치 검사: 단정 $script:checks · 이관 $($Migrated.Count + 1)/$($Drawers.Count + 3) · PASS"
+Write-Host "인스펙터 드로어 배치 검사: 단정 $script:checks · 이관 $($Migrated.Count + 1)/$($Targets.Count + 3) · PASS"

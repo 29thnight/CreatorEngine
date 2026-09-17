@@ -1045,7 +1045,7 @@ M3은 W3보다 앞서 섰다. 순서를 바꾼 이유는 §10에 적었다 — �
 
 - `InspectorWindow::Render`는 공간 컴포넌트를 앞에서 그린 뒤 일반 순회에서 제외한다. 중복 표시는 막았지만
   W2-I1이 요구한 **공통 순회/헤더 + 전용 본문** 통합과 인스턴스별 호출 수 검증은 아직 별개다.
-- `RectTransformTable`은 고정 90px를 없앴지만 좁은 폭에도 앵커 옆 3열 표를 유지한다.
+- ~~`RectTransformTable`은 고정 90px를 없앴지만 좁은 폭에도 앵커 옆 3열 표를 유지한다.~~ 2026-09-17 표를 걷고 공통 줄로 옮겼다(§W2-I 의 "RectTransform 최소 폭" 절).
   일반 필드의 공통 열 적용만으로 RectTransform·중첩 배열·Import Settings 완료를 판정하지 않는다.
 - `SceneViewportOverlay`는 공간이 부족하면 `showGizmo=false`로 숨긴다. 여섯 축 클릭은 검증됐지만
   그 상황의 방향 선택 대체 메뉴는 없다. Scene crop은 W4 기여로 기록하고 V0에서 중복 실적을 세지 않는다.
@@ -1667,7 +1667,7 @@ Transform Undo 수정, 대표 폭 DX12 실행 기록은
 |---|---|---:|---|---|
 | W2-I0 | content 폭·공통 열·줄 전환과 표시 정책 정의 | 0.5일 | 폭 계산·정책이 한 정본을 소비하고 전환 조건이 고정됨 | done — 공통 계약·측정 함수 및 소비 경로 확인 |
 | W2-I1 | Transform 2안·공통 헤더/전용 본문 분리 | 1일 | 일반 엔티티·UI·Canvas에서 중복 0, 개별 조작 제한과 엔티티 활성 전이 보존 | progress — 중복 제외·상단 표시 적용, 공통 순회 통합/정책 회귀 남음 |
-| W2-I2 | 기본 정보·Transform·RectTransform 반응형 배치 | 1일 | 공백 정렬·고정 숫자 열 폭 제거, 축별 최소 가독성·기존 편집 의미 보존 | progress — 기본/XYZ 적용·사용자 확인, RectTransform 최소 폭 남음 |
+| W2-I2 | 기본 정보·Transform·RectTransform 반응형 배치 | 1일 | 공백 정렬·고정 숫자 열 폭 제거, 축별 최소 가독성·기존 편집 의미 보존 | done — 기본/XYZ 적용·사용자 확인. **2026-09-17 RectTransform 도 공통 줄로 옮겼다** — 240 넘침 122 → 0 px, 공통 줄 0 → 7(아래 절) |
 | W2-I3 | 일반 리플렉션·중첩 필드·공유 드로어 이관 | 1일 | 수치·문자열·bool·enum·벡터가 같은 규칙을 사용하고 Inspector 밖 소비자도 회귀 없음 | progress — **일반 경로와 C# 노출 필드는 정본을 쓴다**(`ReflectionTypedDraw.h`·`EditorAxisField3`·`DrawManagedScripts` 5 건). 중첩/배열 전수는 남음 |
 | W2-I4 | 전용 컴포넌트·자산 Import Settings 이관 | 1.5일 | Sound 등 고정 폭 제거, 긴 참조·보조 버튼·허용된 두 열 묶음·저장 동작 확인 | progress — **잔여가 셈이 된다: 전용 드로어 15 중 12.** 아래 재기준선의 표가 이름을 전부 적는다. Import Settings 의 대상 파일은 인스펙터가 아니라 `DrawYamlNodeEditor.cpp` 다. **2026-09-17 자를 열었다** — `editor.inspector width` 와 `verify-inspector-drawer-layout.ps1`(이관 목록에만 단정, 착수 기준선은 아래). **같은 날 전용 드로어 열둘 이관 — 14/14, 네 폭 넘침 0, 소스 축 고정 폭 0.** 이어서 Import Settings(`DrawYamlNodeEditor.cpp`)도 옮겼다 — 15/15, 펼친 채 네 폭 넘침 0(`editor.inspector expand on`). **W2-I4 의 대상 표면 0** |
 | W2-I5 | 폭·배율·편집·중복 렌더 회귀와 잔재 점검 | 1일 | 아래 검증 행렬 및 §8 성능 gate 충족, 미이관 표면 0 | progress — 대표 UI/편집 검증, 전체 행렬·호출 수/성능 남음 |
@@ -1853,6 +1853,35 @@ Textures 폴더 검사를 통과한 이름만 자기 `Set*Texture` 로 넘기는
 스칼라 값 칸에 `SetNextItemWidth(300.0f)` 를 넣으면 소스 축과 런타임 축(240 넘침 93 · 320 넘침 3 px)이 함께 붉다.
 이미지 칸 유형을 `Texture` 로 바꾸면 탐색 검사 13 이 붉다.
 같이 돈 검사: 명령 등록 골든(132) · CLI 발견 · 잘라 그리기 계약 · Content Browser 탐색(130) 통과.
+
+##### 2026-09-17 W2-I2 RectTransform 최소 폭 — 16/16
+
+착수 때 이 드로어는 **한 번도 재지 않았다.** `verify-inspector-drawer-layout.ps1` 은 컴포넌트를
+`component.add` 로 붙여 자극하는데 RectTransform 은 붙일 수 없고 엔티티 유형이 정한다(UI 는
+RectTransform 만, 캔버스는 둘 다 — `Entity::AttachSpatialComponent`). `object.create <이름> UI` 는
+이미 있었으므로 검사가 UI 엔티티를 만들어 같은 네 폭에서 읽게 했다. 기준선: **240 넘침 122 px ·
+공통 줄 0**(배율 2.25), 320 이상은 넘침 0.
+
+원인은 배치였다. 왼쪽에 앵커 버튼 무리(`ImVec2(36, 36)`), 세로 구분선, 오른쪽에 3 열 표를 나란히
+두어 표가 버튼 폭만큼 밀린 채 줄지 못했고, 끝의 `Text("World Rect …")` 는 자르지 않았다.
+
+- 모든 줄이 `property_sheet` 한 벌을 쓴다(Anchors · Anchor Min/Max · Pos · Width/Height · Pivot · World Rect). 라벨 열이 다른 컴포넌트와 같은 x 에 서고, 좁으면 값이 라벨 아래로 내려간다.
+- 앵커 버튼은 `Anchors` 줄의 값이다. 크기는 프레임 높이 × 1.6(값 폭을 넘지 않음), 팝업 칸은 × 1.4 — 논리 28·36 px 리터럴을 걷었다.
+- vec2 줄은 값 열을 두 칸이 나눠 갖는다. 한 칸이 공통 배치의 축 최소치(`axis_need`)를 못 담으면 축마다 한 줄을 쓴다. 공통 배치의 `axis_stacked` 는 **축 셋** 기준이라 그대로 쓰면 320 에서도 두 칸이 세로로 내려갔다(화면으로 확인하고 고쳤다). ID 는 표 시절과 같은 라벨 아래 `##f0`·`##f1`.
+- World Rect 는 읽기 전용 입력칸으로 틀이 잘라 그리고 tooltip 으로 전체를 준다.
+- 같은 팝업을 ID 안과 밖에서 두 번 열던 중복을 걷었다. 편집 의미(앵커·피벗은 `SetAnchorsPivotKeepWorld`, 위치·크기는 직접 설정)는 그대로다.
+
+결과: 네 폭 넘침 0 · 공통 줄 7 · 단정 268 · 이관 16/16. 240(두 칸 세로)·320(두 칸 가로) 화면을
+찍어 눈으로 확인했다. 소스 축 목록에 `ImGuiDrawHelperRectTransformComponent`·`DrawVec2Row`·
+`DrawAnchorPresetPopup`·`DrawAnchorIconButton` 을 더했다.
+
+변이 —
+옛 드로어를 그대로 되돌리면 공통 줄 0 · 240 넘침 122 px(착수 기준선)에 소스 축(`ImVec2(4, …)`·`ImVec2(1, 6)`)까지 붉다.
+두 칸 줄에 `SetNextItemWidth(120.0f)` 를 넣으면 소스 축이 붉다(배율 2.25 에서는 120 이 칸보다 작아 런타임 축은 초록이다 — 소스 축이 필요한 이유).
+World Rect 를 옛 `Text` 한 줄로 되돌리면 240 넘침 455 · 320 넘침 275 px 로 붉다.
+못 잡는 변이: 두 칸을 늘 가로로 두어도(세로 전환 제거) 칸 폭이 1 px 까지 줄 뿐 넘치지 않아 초록이다 —
+가독성 최소치는 넘침 자가 아니라 화면 확인으로만 보았다.
+같이 돈 검사: 잘라 그리기 계약(46) · 상태 행렬(54) · 키보드 탐색(28) 통과, 드로어 배치 검사 연속 두 회차 통과.
 
 #### 검증과 완료 판정
 

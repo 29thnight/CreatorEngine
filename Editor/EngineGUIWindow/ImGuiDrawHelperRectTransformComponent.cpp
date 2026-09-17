@@ -5,6 +5,7 @@
 #include "EditorIcons.h"
 
 #include <cmath>
+#include <cstdio>
 
 // 프리셋 표는 RectTransformComponent가 소유한다. 여기에 사본을 두었더니 값이
 // 갈라졌고, 양쪽 모두 스트레치 6종이 3종으로 뭉개져 있었다(분석 문서 F-6).
@@ -76,7 +77,7 @@ namespace
 
 	// 작은 아이콘 한 칸을 누를 수 있게 그린다 (프리셋 시각화).
 	bool DrawAnchorIconButton(const char* id, const math::vector2& aMin, const math::vector2& aMax,
-		bool selected, ImVec2 size = ImVec2(28, 28))
+		bool selected, ImVec2 size)
 	{
 		ImGui::PushID(id);
 		const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -94,18 +95,32 @@ namespace
 		return NearEq(a.x, b.x) && NearEq(a.y, b.y);
 	}
 
-	// vec2 한 줄. 라벨 열 + X·Y 두 열은 `EditorPropertyRow` 의 규약이다.
-	bool DrawVec2Row(const char* label, math::vector2& v,
-		float speed, float min, float max)
+	// vec2 한 줄 (W2-I2). 라벨과 값 열은 공통 줄이 놓고, 두 칸이 값 열을 나눠 갖는다.
+	// 예전에는 앵커 버튼 오른쪽의 3 열 표 한 행이었다 — 표 전체가 버튼 폭만큼 밀려
+	// 좁은 폭에서 넘쳤다. 값 열이 축 둘을 담지 못하면
+	// 축마다 한 줄을 쓴다. ID 는 표 시절 그대로 라벨 아래 `##f0`·`##f1` 이다.
+	bool DrawVec2Row(const editor::widgets::property_sheet& sheet, const char* label,
+		math::vector2& v, float speed, float min, float max)
 	{
-		editor::widgets::property_row_request row{};
-		row.label = label;
-		row.values = &v.x;
-		row.count = 2;
-		row.speed = speed;
-		row.min = min;
-		row.max = max;
-		return editor::widgets::draw_property_row(row);
+		const float width = sheet.line(label);
+		// 공통 배치의 `axis_stacked` 는 축 셋을 기준으로 판정해 두 칸에는 너무 이르다. 같은 최소치(`axis_need`)를
+		// 두 칸에 대어 본다 — 폭에서만 유도하므로 값이 바뀌어도 흔들리지 않는다.
+		const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
+		const bool stacked = (width - gap) * 0.5f < sheet.metrics().axis_need;
+		const float field = stacked ? width : ImMax((width - gap) * 0.5f, 1.f);
+		bool changed = false;
+		ImGui::PushID(label);
+		ImGui::BeginGroup();
+		for (int index = 0; index < 2; ++index)
+		{
+			if (index > 0 && !stacked) ImGui::SameLine(0.f, gap);
+			ImGui::SetNextItemWidth(field);
+			changed |= editor::widgets::drag_property_float(
+				editor::widgets::property_row_field_id(index), &v.x + index, speed, min, max);
+		}
+		ImGui::EndGroup();
+		ImGui::PopID();
+		return changed;
 	}
 }
 
@@ -125,8 +140,11 @@ static int FindCurrentPresetIndex(RectTransformComponent* rt) {
 // 3x3 포인트 프리셋 + 가로스트레치 3 + 세로스트레치 3 + 전체스트레치 1
 static void DrawAnchorPresetPopup(RectTransformComponent* rt)
 {
-	const float pad = 4.f;
-	const ImVec2 cell(28, 28);
+	// 칸 크기는 프레임 높이를 따른다 — 논리 28 px 을 그대로 두면 배율 2 에서 아이콘만 작아진다.
+	const float pad = ImGui::GetStyle().ItemInnerSpacing.x;
+	const float side = ImGui::GetFrameHeight() * 1.4f;
+	const ImVec2 cell(side, side);
+	const ImVec2 gapBelow(0.f, ImGui::GetStyle().ItemSpacing.y);
 
 	int cur = FindCurrentPresetIndex(rt);
 
@@ -155,9 +173,9 @@ static void DrawAnchorPresetPopup(RectTransformComponent* rt)
 		drawBtn(AnchorPreset::BottomRight);
 	}
 
-	ImGui::Dummy(ImVec2(1, 6));
+	ImGui::Dummy(gapBelow);
 	ImGui::Separator();
-	ImGui::Dummy(ImVec2(1, 6));
+	ImGui::Dummy(gapBelow);
 
 	// 세로 스트레치 3종 — 가로 위치(좌/중앙/우)만 다르다
 	drawBtn(AnchorPreset::StretchLeft);   ImGui::SameLine(0, pad);
@@ -165,13 +183,13 @@ static void DrawAnchorPresetPopup(RectTransformComponent* rt)
 	drawBtn(AnchorPreset::StretchRight);
 
 	// 가로 스트레치 3종 — 세로 위치(상/중/하)만 다르다
-	ImGui::Dummy(ImVec2(1, 6));
+	ImGui::Dummy(gapBelow);
 	drawBtn(AnchorPreset::StretchTop);     ImGui::SameLine(0, pad);
 	drawBtn(AnchorPreset::StretchMiddle);  ImGui::SameLine(0, pad);
 	drawBtn(AnchorPreset::StretchBottom);
 
 	// 양축 전체 스트레치
-	ImGui::Dummy(ImVec2(1, 6));
+	ImGui::Dummy(gapBelow);
 	drawBtn(AnchorPreset::StretchAll);
 }
 
@@ -193,21 +211,27 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 		auto sizeDelta = rectTransformComponent->GetSizeDelta();
 		auto pivot = rectTransformComponent->GetPivot();
 
-		// 좌: 프리셋 팝업 버튼 (Unity처럼)
-		ImGui::BeginGroup();
-		ImGui::TextUnformatted("Anchors");
+		// W2-I2: 모든 줄이 공통 배치를 쓴다. 예전에는 왼쪽에 앵커 버튼 무리(36 px 고정),
+		// 세로 구분선, 오른쪽에 3 열 표를 나란히 두어, 표가 버튼 폭만큼 밀린 채
+		// 줄어들지 못하고 240 폭에서 122 px 넘쳤다(배율 2.25). 버튼도 한 줄의 값으로
+		// 세우면 라벨 열이 다른 컴포넌트와 같은 x 에 서고, 좁으면 공통 배치가 값을
+		// 라벨 아래로 내린다.
+		//
+		// 상태가 함수 지역 정적인 이유: 이 드로어는 자유 함수라 창 객체가 없다.
+		// 인스펙터가 하나뿐이라 성립하고, 둘이 되면 호출자가 소유해야 한다
+		// (`EditorPropertyRow.h` 의 `property_layout_state` 주석).
+		static editor::widgets::property_layout_state rectLayoutState{};
+		const editor::widgets::property_sheet sheet(rectLayoutState,
+			{ "Anchors", "Anchor Min", "Anchor Max", "Pos", "Width/Height", "Pivot", "World Rect" });
+
 		{
-			int curIndex = FindCurrentPresetIndex(rectTransformComponent);
-			ImVec2 btnSize(36, 36);
+			const float valueWidth = sheet.line("Anchors");
+			const float side = ImMin(ImGui::GetFrameHeight() * 1.6f, valueWidth);
+			const int curIndex = FindCurrentPresetIndex(rectTransformComponent);
 
 			ImGui::PushID("CurrentPresetButton");
-			bool pressed = ImGui::InvisibleButton("##currentPreset", btnSize);
-
-			// 버튼의 실제 사각형
-			ImRect r(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-
-			// 위에 그리기: 겹침 문제가 있으면 ForegroundDrawList 사용
-			// ImDrawList* dl = ImGui::GetForegroundDrawList(); // 항상 최상위
+			const bool pressed = ImGui::InvisibleButton("##currentPreset", ImVec2(side, side));
+			const ImRect r(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 			ImDrawList* dl = ImGui::GetWindowDrawList();
 
 			// 배경(호버/액티브 반응)
@@ -219,115 +243,77 @@ void ImGuiDrawHelperRectTransformComponent(RectTransformComponent* rectTransform
 			// curIndex는 프리셋과 일치하지 않으면 -1이다. 이전 코드는 이 검사 전에
 			// presets[curIndex]를 읽어, 앵커를 손으로 조절해 둔 상태에서 인스펙터를
 			// 열면 배열 밖을 읽었다.
+			const ImVec2 inset(side * 0.11f, side * 0.11f);
 			if (curIndex >= 0) {
 				const auto& pr = Presets()[curIndex];
-				DrawAnchorIcon(dl, ImRect(r.Min + ImVec2(4, 4), r.Max - ImVec2(4, 4)),
+				DrawAnchorIcon(dl, ImRect(r.Min + inset, r.Max - inset),
 					pr.anchorMin, pr.anchorMax, /*selected=*/false);
 			}
 			else {
 				// Custom 상태: 간단한 십자
-				dl->AddLine(ImVec2((r.Min.x + r.Max.x) * 0.5f, r.Min.y + 4), ImVec2((r.Min.x + r.Max.x) * 0.5f, r.Max.y - 4), IM_COL32(200, 200, 200, 255), 1.f);
-				dl->AddLine(ImVec2(r.Min.x + 4, (r.Min.y + r.Max.y) * 0.5f), ImVec2(r.Max.x - 4, (r.Min.y + r.Max.y) * 0.5f), IM_COL32(200, 200, 200, 255), 1.f);
+				const ImVec2 c = r.GetCenter();
+				dl->AddLine(ImVec2(c.x, r.Min.y + inset.y), ImVec2(c.x, r.Max.y - inset.y), IM_COL32(200, 200, 200, 255), 1.f);
+				dl->AddLine(ImVec2(r.Min.x + inset.x, c.y), ImVec2(r.Max.x - inset.x, c.y), IM_COL32(200, 200, 200, 255), 1.f);
 			}
 
 			if (pressed)
 				ImGui::OpenPopup("AnchorPresetPopup");
 
+			// 예전에는 같은 팝업을 ID 안과 밖에서 두 번 열었다. 여는 자리와 같은 ID 에서 한 번만 연다.
 			if (ImGui::BeginPopup("AnchorPresetPopup"))
 			{
-				DrawAnchorPresetPopup(rectTransformComponent); // 기존 프리셋 목록
+				DrawAnchorPresetPopup(rectTransformComponent);
 				ImGui::EndPopup();
 			}
 			ImGui::PopID();
 		}
 
-		if (ImGui::BeginPopup("AnchorPresetPopup"))
+		bool anchorsChanged = false;
+		bool pivotChanged = false;
+
+		if (DrawVec2Row(sheet, "Anchor Min", anchorMin, 0.01f, 0.f, 1.f))
+			anchorsChanged = true;
+		if (DrawVec2Row(sheet, "Anchor Max", anchorMax, 0.01f, 0.f, 1.f))
+			anchorsChanged = true;
+
+		// 제한 없는 줄은 min/max 를 같은 값으로 둔다 — 원본
+		// `DrawVec2RowAbs` 가 `0,0` 을 넘겨 끄던 것과 같은 규약이다.
+		if (DrawVec2Row(sheet, "Pos", anchoredPos, 1.f, 0.f, 0.f))
+			rectTransformComponent->SetAnchoredPosition(anchoredPos);
+
+		if (DrawVec2Row(sheet, "Width/Height", sizeDelta, 1.f, 0.f, 0.f))
+			rectTransformComponent->SetSizeDelta(sizeDelta);
+
+		if (DrawVec2Row(sheet, "Pivot", pivot, 0.01f, 0.f, 1.f))
+			pivotChanged = true;
+
+		if (anchorsChanged || pivotChanged)
 		{
-			DrawAnchorPresetPopup(rectTransformComponent);
-			ImGui::EndPopup();
-		}
-		ImGui::EndGroup();
-
-		ImGui::SameLine();
-		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-		ImGui::SameLine();
-
-		// 우: 값 편집 테이블 (라벨 | X | Y)
-		//
-		// 예전에는 X·Y 가 각각 90px 고정이고 라벨이 stretch 였다(W2-I2 가 고친
-		// 자리). 좁아지면 값 칸 180px 가 그대로 버텨 라벨이 먼저 죽고, 넓어지면
-		// 남는 폭이 전부 라벨 열로 갔다. 반대로 둔다 — 라벨에 상한을 주고 X·Y 가
-		// 남는 폭을 나눠 갖는다.
-		//
-		// 상태가 함수 지역 정적인 이유: 이 드로어는 자유 함수라 창 객체가 없다.
-		// 인스펙터가 하나뿐이라 성립하고, 둘이 되면 호출자가 소유해야 한다
-		// (`EditorPropertyRow.h` 의 `property_layout_state` 주석).
-		// 이 표의 라벨은 다섯으로 고정이다. 그 폭을 넘겨 라벨 열이 필요 이상
-		// 넓어지지 않게 한다. 이 표는 앵커 아이콘 오른쪽의 좁은 영역에 서므로
-		// 상단 구간과 같은 열을 쓸 수 없다 — 가용 폭 자체가 다르다.
-		static const char* const rectLabels[]{
-			"Anchor Min", "Anchor Max", "Pos", "Width/Height", "Pivot" };
-
-		static editor::widgets::property_layout_state rectLayoutState{};
-		const editor::widgets::property_layout_metrics rectLayout =
-			editor::widgets::measure_property_layout(
-				editor::widgets::property_layout_inputs_now(0,
-					editor::widgets::property_layout_label_hint(
-						rectLabels, IM_ARRAYSIZE(rectLabels))),
-				rectLayoutState);
-
-		if (ImGui::BeginTable("RectTransformTable", 3,
-			ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchSame, ImVec2(-1, 0)))
-		{
-			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, rectLayout.label_col);
-			ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("Y", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableHeadersRow();
-
-			bool anchorsChanged = false;
-			bool pivotChanged = false;
-
-			if (DrawVec2Row("Anchor Min", anchorMin, 0.01f, 0.f, 1.f))
-				anchorsChanged = true;
-			if (DrawVec2Row("Anchor Max", anchorMax, 0.01f, 0.f, 1.f))
-				anchorsChanged = true;
-
-			// 제한 없는 줄은 min/max 를 같은 값으로 둔다 — 원본
-			// `DrawVec2RowAbs` 가 `0,0` 을 넘겨 끄던 것과 같은 규약이다.
-			if (DrawVec2Row("Pos", anchoredPos, 1.f, 0.f, 0.f))
-				rectTransformComponent->SetAnchoredPosition(anchoredPos);
-
-			if (DrawVec2Row("Width/Height", sizeDelta, 1.f, 0.f, 0.f))
-				rectTransformComponent->SetSizeDelta(sizeDelta);
-
-			if (DrawVec2Row("Pivot", pivot, 0.01f, 0.f, 1.f))
-				pivotChanged = true;
-
-			if (anchorsChanged || pivotChanged)
+			// 폴백 rect는 컴포넌트가 정한다 — 여기에 (0,0,W,H)를 따로 적어 두었더니
+			// 캔버스 규약과 (W/2,H/2)만큼 어긋났다(PHASE 7-2).
+			math::rect parentRect = RectTransformComponent::GetScreenRootRect();
+			if (auto* owner = rectTransformComponent->GetOwner(); owner)
 			{
-				// 폴백 rect는 컴포넌트가 정한다 — 여기에 (0,0,W,H)를 따로 적어 두었더니
-				// 캔버스 규약과 (W/2,H/2)만큼 어긋났다(PHASE 7-2).
-				math::rect parentRect = RectTransformComponent::GetScreenRootRect();
-				if (auto* owner = rectTransformComponent->GetOwner(); owner)
+				if (Entity::IsValidIndex(owner->GetParentIndex()))
 				{
-	if (Entity::IsValidIndex(owner->GetParentIndex()))
-	{
-		if (auto* parentObj = owner->OwnerSceneFindIndex(owner->GetParentIndex()))
-						{
-							if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
-								parentRect = parentRT->GetWorldRect();
-						}
+					if (auto* parentObj = owner->OwnerSceneFindIndex(owner->GetParentIndex()))
+					{
+						if (auto* parentRT = parentObj->GetComponent<RectTransformComponent>())
+							parentRect = parentRT->GetWorldRect();
 					}
 				}
-				rectTransformComponent->SetAnchorsPivotKeepWorld(anchorMin, anchorMax, pivot, parentRect);
 			}
-
-			ImGui::EndTable();
+			rectTransformComponent->SetAnchorsPivotKeepWorld(anchorMin, anchorMax, pivot, parentRect);
 		}
 
+		// 읽기 전용 값. 예전 `Text` 한 줄은 자르지 않아 좁은 폭에서 그대로 넘쳤다 — 입력칸
+		// 틀이 잘라 그리고, 전체는 tooltip 으로 준다.
 		const auto& wr = rectTransformComponent->GetWorldRect();
-		ImGui::Spacing();
-		ImGui::Text("World Rect (x y w h): %.1f  %.1f  %.1f  %.1f", wr.x, wr.y, wr.width, wr.height);
+		char worldRect[96];
+		snprintf(worldRect, sizeof(worldRect), "%.1f  %.1f  %.1f  %.1f", wr.x, wr.y, wr.width, wr.height);
+		ImGui::SetNextItemWidth(sheet.line("World Rect"));
+		ImGui::InputText("##WorldRect", worldRect, sizeof(worldRect), ImGuiInputTextFlags_ReadOnly);
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("x y w h: %s", worldRect);
 	}
 	//if (menuClicked) {
 	//	ImGui::OpenPopup("TransformMenu");
