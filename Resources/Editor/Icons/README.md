@@ -18,3 +18,6 @@ File-type artwork is a placeholder; asynchronous asset thumbnail generation rema
 the separate PHASE 21 W7 work item.
 
 Engine.png and the scene light/camera gizmo textures are independent editor artwork.
+The five `*Gizmo.png` files must stay 128x128 RGBA: the live gizmo icon pass samples
+them without mipmaps, so larger masters alias when shrunk on screen and cost 6 MB+ each.
+Downscale new artwork before committing; `verify-editor-icon-resources.ps1` enforces it.

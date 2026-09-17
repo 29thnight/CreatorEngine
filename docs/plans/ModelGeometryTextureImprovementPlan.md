@@ -326,6 +326,26 @@ postscale·ssaoscale·uploadring·live 가 스위트에서 빠진 뒤의 목록)
     (`[shader reflection] exception at material authoring round trip`)로 실패했다.
   둘 다 이번에 고치지 않았다(후속 작업으로 넘김). Debug 스위트는 이번에 다시 재지 않았다.
 
+**2026-09-17 — `dx12.gizmoicon` 복구: 새 그림은 살리고 128 px 로 줄였다.**
+
+- **교체는 의도였다.** 다섯 장이 9-16 06:42~06:47 에 1~3분 간격으로 한 장씩 저장됐고(로그 일괄 치환 03:53 과 무관),
+  옛 128 px 그림(채운 실루엣)과 달리 둥근 선·균일한 굵기의 한 양식으로 새로 그린 그림이다(카메라 캠코더형 · 방향광 해 ·
+  주광 테두리 해 · 점광 전구 · 스포트). 세션 전사에는 흔적이 없어 사람이 도구로 넣은 것으로 본다. c2739278 은 주인 없는
+  워킹트리 묶음을 통째로 닫으며 이것을 함께 실었고 메시지에는 적지 않았다.
+- **크기는 계약이다.** `EditorAssetPresentation` 이 `Texture::LoadSharedFromPath` 로 WIC 적재 → **밉 없이** 한 벌 업로드하고,
+  `EnhancedGizmoIconPass` 는 월드 1 단위 빌보드에 선형 샘플러로 찍는다. 1254 px 를 화면 수십 px 로 밉 없이 줄이면 가는 선이
+  깨지고, 메모리는 장당 RGBA 6.3 MB 가 CPU 사본·GPU 에 한 벌씩(다섯 장 합 약 31 MB × 2). 128 px 는 다섯 장 합 0.33 MB 다.
+  같은 폴더의 다른 에디터 아이콘 24장은 256 px(ImGui 가 그린다)라 기즈모 다섯 장만 튀었다.
+- **처방.** 다섯 장을 premultiplied(Pillow `RGBa`) Lanczos 로 1254→128 축소(파일 합 1.9 MB → 28 KB). 1254 px 원본은
+  c2739278 의 blob 으로 남는다. 검사의 128 계약은 바꾸지 않았다. `Resources/Editor/Icons/README.md` 에 규칙을 적었다.
+- **재발 방지.** `dx12.gizmoicon` 은 카메라 한 장만 크기를 본다. `verify-editor-icon-resources.ps1` ⑧ 이 제품 소비자
+  (`gizmoIcons->x = loadIcon(L"...")`)에서 이름 다섯을 뽑아 PNG 헤더로 128×128 RGBA 를 단정한다. 변이(SpotLight 만 1254 판
+  복원 — `dx12.gizmoicon` 이 못 보는 자리)가 붉었고 되돌리자 28 단정 초록.
+- **검증(Release, 창 숨김).** `Invoke-Dx12Suite -Only dx12.gizmoicon,dx12.gizmoscene,dx12.gizmoline` 3/3 통과
+  (`Artifacts/dx12-gizmoicon-128`). gizmoicon 픽셀: 중심 R 0.499 · 투명 R 0.000 · 측면 0.499 · 등진 점등 0 · 배칭 1/4.
+- **재지 않은 것.** 실제 에디터 씬 뷰에서의 눈 확인은 하지 않았다(검사 렌더만). Vulkan `RunVulkanGizmoIconTest`
+  (`VulkanSkyBoxTest.cpp`)도 같은 128 계약을 적었지만 호출자가 0 이라 돌릴 수 없다. `dx12.selftest` 는 여전히 붉다.
+
 ### G3. 불변 CPU 이미지 저장소와 요청 중복 제어 — P1
 
 **문제:** 임베디드 텍스처가 generation 픽셀과 Texture 이미지로 중복 저장된다.

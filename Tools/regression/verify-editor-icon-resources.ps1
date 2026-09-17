@@ -136,6 +136,31 @@ Assert ($missing.Count -eq 0) `
 # 붉어진다.
 $unused = @($diskFiles | Where-Object { -not $referenced.Contains($_) })
 
+# ⑧ 씬 기즈모 아이콘은 128x128 이다. 크기가 계약인 이유는 소비 경로다 —
+#    `Texture::LoadSharedFromPath` 가 WIC 로 **밉 없이** 한 벌만 올리고, 기즈모
+#    아이콘 패스는 월드 1 단위 빌보드에 선형 샘플러로 찍는다. 원본이 크면 화면
+#    수십 px 로 밉 없이 줄어 가는 선이 깨지고, 메모리는 장당 RGBA 로 CPU 사본과
+#    GPU 에 한 벌씩 든다(1254 px 면 장당 6.3 MB, 128 px 는 65 KB).
+#    2026-09-16 에 다섯 장이 새 그림으로 바뀌면서 1254x1254 원본이 그대로 실렸고
+#    dx12.gizmoicon 이 카메라 한 장만 크기를 보고 있어 나머지 넷은 아무도 못 봤다.
+#    이름은 제품 소비자(`gizmoIcons->x = loadIcon(L"...")`)에서 뽑는다.
+$presentation = Get-Content -LiteralPath (Join-Path $Root 'Editor/EngineEntry/EditorAssetPresentation.cpp') -Raw
+$gizmoIcons = @([regex]::Matches($presentation, 'gizmoIcons->\w+\s*=\s*loadIcon\(L"([^"]+)"\)') |
+    ForEach-Object { $_.Groups[1].Value })
+Assert ($gizmoIcons.Count -ge 5) `
+    "gizmo icon consumers were not found ($($gizmoIcons.Count)); the extraction pattern went stale"
+$kGizmoIconPixels = 128
+foreach ($name in $gizmoIcons) {
+    $bytes = [IO.File]::ReadAllBytes((Join-Path $iconRoot $name))
+    $isPng = $bytes.Length -ge 26 -and $bytes[1] -eq 0x50 -and $bytes[2] -eq 0x4E -and $bytes[3] -eq 0x47
+    Assert $isPng "gizmo icon is not a PNG: $name"
+    $width = ([int]$bytes[16] -shl 24) -bor ([int]$bytes[17] -shl 16) -bor ([int]$bytes[18] -shl 8) -bor [int]$bytes[19]
+    $height = ([int]$bytes[20] -shl 24) -bor ([int]$bytes[21] -shl 16) -bor ([int]$bytes[22] -shl 8) -bor [int]$bytes[23]
+    # 색 형식 6 = RGBA. 알파가 없으면 빌보드가 사각형으로 찍힌다.
+    Assert ($width -eq $kGizmoIconPixels -and $height -eq $kGizmoIconPixels -and $bytes[25] -eq 6) `
+        "gizmo icon must be ${kGizmoIconPixels}x${kGizmoIconPixels} RGBA (no mips on the live path): $name is ${width}x${height} colorType $($bytes[25])"
+}
+
 Write-Host ("icon source root   : " + $iconRoot)
 Write-Host ("tracked icon files : " + $diskFiles.Count)
 Write-Host ("referenced by code : " + $referenced.Count)
