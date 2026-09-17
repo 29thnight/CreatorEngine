@@ -169,6 +169,7 @@ private:
     bool m_listView{};
     float m_tileSize{ 88.f };
     float m_treeDragStart{ 220.f };
+    editor::windows::content_browser_layout m_layout{};
     int m_typeFilter{ -1 };
     bool m_sortDescending{};
     std::string m_error;

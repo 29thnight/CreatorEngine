@@ -699,6 +699,7 @@ void ContentsBrowserWindow::PublishSnapshot()
     snapshot.everythingComplete = m_scope == Scope::everything && 0 == m_everythingPending;
     snapshot.recentCount = m_recents.size();
     snapshot.resultRebuilds = m_resultRebuilds;
+    snapshot.layout = m_layout;
     std::lock_guard lock(g_browserMailboxMutex);
     g_browserSnapshot = std::move(snapshot);
 }
@@ -1505,6 +1506,16 @@ void ContentsBrowserWindow::Draw()
     const float split = editor::ThemePixels(8.f);
     const float contentGap = editor::ThemePixels(10.f);
     const bool treeVisible = m_showTree && size.x >= editor::ThemePixels(560.f);
+    m_layout = {};
+    m_layout.treeVisible = treeVisible;
+    m_layout.uiScale = scale;
+    m_layout.availableWidth = size.x;
+    m_layout.preferredTreeWidth = preferences.GetContentTreeWidth();
+    m_layout.viewportX = ImGui::GetMainViewport()->Pos.x;
+    m_layout.viewportY = ImGui::GetMainViewport()->Pos.y;
+    m_layout.mouseX = ImGui::GetIO().MousePos.x;
+    m_layout.mouseY = ImGui::GetIO().MousePos.y;
+    m_layout.mouseDown = ImGui::GetIO().MouseDown[0];
     if (treeVisible)
     {
         const float treeWidth = std::clamp(editor::ThemePixels(preferences.GetContentTreeWidth()),
@@ -1515,6 +1526,9 @@ void ContentsBrowserWindow::Draw()
             ImGuiChildFlags_AlwaysUseWindowPadding);
         DrawDirectoryPanel();
         ImGui::EndChild();
+        m_layout.appliedTreeWidth = treeWidth;
+        m_layout.treeMinX = ImGui::GetItemRectMin().x;
+        m_layout.treeMaxX = ImGui::GetItemRectMax().x;
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
         ImGui::SameLine(0.f, 0.f);
@@ -1525,6 +1539,12 @@ void ContentsBrowserWindow::Draw()
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_NoNavOverride)
             || (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left)))
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        m_layout.splitterMinX = ImGui::GetItemRectMin().x;
+        m_layout.splitterMaxX = ImGui::GetItemRectMax().x;
+        m_layout.splitterMinY = ImGui::GetItemRectMin().y;
+        m_layout.splitterMaxY = ImGui::GetItemRectMax().y;
+        m_layout.splitterHovered = ImGui::IsItemHovered();
+        m_layout.splitterActive = ImGui::IsItemActive();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Drag to resize. Double-click to reset. Arrow keys adjust width.");
         float preferred = preferences.GetContentTreeWidth();
         if (ImGui::IsItemActivated()) m_treeDragStart = treeWidth / scale;
@@ -1544,6 +1564,7 @@ void ContentsBrowserWindow::Draw()
         preferred = std::clamp(preferred, 140.f, 600.f);
         const bool changed = preferred != preferences.GetContentTreeWidth();
         if (changed) preferences.SetContentTreeWidth(preferred);
+        m_layout.preferredTreeWidth = preferred;
         // W3 workspace autosave owns this personal width. Do not write project settings.
         // Keep the 8px grab target, but paint only a 1px line at its center.
         const ImVec2 splitMin = ImGui::GetItemRectMin();
@@ -1556,6 +1577,8 @@ void ContentsBrowserWindow::Draw()
         ImGui::SameLine(0.f, contentGap);
     }
     ImGui::BeginChild("ContentBody", { 0.f, std::max(1.f, size.y) });
+    m_layout.bodyMinX = ImGui::GetWindowPos().x;
+    m_layout.bodyMaxX = ImGui::GetWindowPos().x + ImGui::GetWindowSize().x;
     DrawToolbar(!treeVisible);
     if (!m_error.empty()) ImGui::TextWrapped("%s", m_error.c_str());
     if (m_typeFilter >= 0) ImGui::TextDisabled("Type: %s", FileTypeToString(static_cast<FileType>(m_typeFilter)));

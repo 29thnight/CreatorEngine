@@ -1509,6 +1509,31 @@ namespace ConsoleCmd
         data.Set("everythingComplete", CommandData::Bool(snapshot.everythingComplete));
         data.Set("recentCount", CommandData::Int(static_cast<int64_t>(snapshot.recentCount)));
         data.Set("resultRebuilds", CommandData::Int(static_cast<int64_t>(snapshot.resultRebuilds)));
+        {
+            const auto& l = snapshot.layout;
+            auto layout = CommandData::Object();
+            layout.Set("treeVisible", CommandData::Bool(l.treeVisible));
+            layout.Set("uiScale", CommandData::Double(l.uiScale));
+            layout.Set("availableWidth", CommandData::Double(l.availableWidth));
+            layout.Set("preferredTreeWidth", CommandData::Double(l.preferredTreeWidth));
+            layout.Set("appliedTreeWidth", CommandData::Double(l.appliedTreeWidth));
+            layout.Set("treeMinX", CommandData::Double(l.treeMinX));
+            layout.Set("treeMaxX", CommandData::Double(l.treeMaxX));
+            layout.Set("splitterMinX", CommandData::Double(l.splitterMinX));
+            layout.Set("splitterMaxX", CommandData::Double(l.splitterMaxX));
+            layout.Set("splitterMinY", CommandData::Double(l.splitterMinY));
+            layout.Set("splitterMaxY", CommandData::Double(l.splitterMaxY));
+            layout.Set("bodyMinX", CommandData::Double(l.bodyMinX));
+            layout.Set("bodyMaxX", CommandData::Double(l.bodyMaxX));
+            layout.Set("splitterHovered", CommandData::Bool(l.splitterHovered));
+            layout.Set("splitterActive", CommandData::Bool(l.splitterActive));
+            layout.Set("viewportX", CommandData::Double(l.viewportX));
+            layout.Set("viewportY", CommandData::Double(l.viewportY));
+            layout.Set("mouseX", CommandData::Double(l.mouseX));
+            layout.Set("mouseY", CommandData::Double(l.mouseY));
+            layout.Set("mouseDown", CommandData::Bool(l.mouseDown));
+            data.Set("layout", std::move(layout));
+        }
 
         Debug::PrintLog(spdlog::level::info, "[editor.browser]"
             " frames=" + std::to_string(snapshot.frames) +

@@ -54,6 +54,26 @@ namespace editor::windows
         float value{};
     };
 
+    /// W2-B1 — 트리·분할선·본문의 **같은 프레임** 배치. 좌표는 ImGui 화면 좌표(px),
+    /// 선호 폭만 논리 px 이다. 분할선 끌기·배율 행렬·좁은 창 판정이 이 값을 본다.
+    struct content_browser_layout
+    {
+        bool treeVisible{};
+        float uiScale{};                   ///< `ThemePixels(1)` — 사용자 배율 × DPI
+        float availableWidth{};            ///< 트리+분할선+본문이 나눠 쓰는 폭
+        float preferredTreeWidth{};        ///< 저장되는 선호 폭(논리 px, 140~600)
+        float appliedTreeWidth{};          ///< 이번 프레임에 준 폭 — 좁으면 본문 최소 폭에 잘린다
+        float treeMinX{}, treeMaxX{};
+        float splitterMinX{}, splitterMaxX{}, splitterMinY{}, splitterMaxY{};
+        float bodyMinX{}, bodyMaxX{};
+        bool splitterHovered{}, splitterActive{};
+        float viewportX{}, viewportY{};    ///< 주 뷰포트 원점 — 창 클라이언트 (0,0) 의 화면 좌표
+        /// 이 프레임에 ImGui 가 본 포인터. 운영체제 메시지가 백엔드를 지나 여기까지
+        /// 닿았는지를 결과(폭)가 아니라 **경계 통과**로 판정하려고 낸다.
+        float mouseX{}, mouseY{};
+        bool mouseDown{};
+    };
+
     struct content_browser_snapshot
     {
         std::uint64_t frames{};            ///< 창 본문이 돈 프레임 수(게시가 살아 있는가)
@@ -88,6 +108,7 @@ namespace editor::windows
         /// 결과를 **다시 모은** 횟수(누계). 목록·검색·범위가 그대로인 프레임에는 오르지
         /// 않아야 한다 — 전체 자산 4,274 개에서 매 프레임 모으고 정렬하던 비용이 3.25ms 였다.
         std::uint64_t resultRebuilds{};
+        content_browser_layout layout{};
     };
 
     /// 요청을 넣는다. 함이 가득 차면(32) 거짓.
