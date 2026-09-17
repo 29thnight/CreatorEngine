@@ -680,9 +680,22 @@ namespace editor::widgets
             // 자른다. 잘린 줄은 그 자리에 tooltip 으로 전체 이름을 준다.
             // `IsItemHovered` 를 쓰지 않는 이유는 항목 사각형이 잘리기 전의
             // 글자 폭이라 열 밖까지 hover 로 잡히기 때문이다.
-            ImGui::PushClipRect(screen, ImVec2(screen.x + metrics.label_col, screen.y + height), true);
-            ImGui::TextUnformatted(label, end);
-            ImGui::PopClipRect();
+            //
+            // 항목 크기도 라벨 열로 잡는다(W2-I3). 예전에는 자른 채 `TextUnformatted` 로 그려
+            // 그림은 열 안에 있는데 **항목은 잘리기 전 글자 폭**이었다 — 창의 내용 폭이 그만큼
+            // 밀려, 긴 맵 키 하나가 240 폭 인스펙터를 323 px 넘치게 했다(화면에는 안 보인다).
+            // `TextEx` 와 같은 순서(`ItemSize` → `ItemAdd` → 그리기)로 폭만 바꾼다.
+            ImGuiWindow* const window = ImGui::GetCurrentWindow();
+            const ImVec2 text_pos(window->DC.CursorPos.x,
+                window->DC.CursorPos.y + window->DC.CurrLineTextBaseOffset);
+            const ImVec2 item_size(metrics.label_col, ImGui::GetTextLineHeight());
+            ImGui::ItemSize(item_size, 0.f);
+            if (ImGui::ItemAdd(ImRect(text_pos, text_pos + item_size), 0))
+            {
+                ImGui::PushClipRect(screen, ImVec2(screen.x + metrics.label_col, screen.y + height), true);
+                ImGui::RenderText(text_pos, label, end, false);
+                ImGui::PopClipRect();
+            }
         }
         else
         {

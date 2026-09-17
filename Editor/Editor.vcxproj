@@ -38,6 +38,7 @@
     <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h" />
     <ClInclude Include="EngineGUIWindow\ContentBrowserControl.h" />
     <ClInclude Include="EngineGUIWindow\InspectorControl.h" />
+    <ClInclude Include="EngineGUIWindow\InspectorLayoutFixture.h" />
     <ClInclude Include="EngineGUIWindow\EditorAssetDragPayload.h" />
     <ClCompile Include="EngineGUIWindow\EditorAssetDragPayload.cpp" />
     <ClCompile Include="EngineGUIWindow\BrowserDirectorySnapshot.cpp" />

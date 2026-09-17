@@ -2,6 +2,7 @@
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
 #include "InspectorControl.h"
+#include "InspectorLayoutFixture.h"
 #include <atomic>
 #include <mutex>
 #include "EditorAssetDragPayload.h"
@@ -150,6 +151,7 @@ namespace
 	// ── W2-I 창구(InspectorControl.h) ───────────────────────────────────────
 	std::atomic<float> g_inspectorWidth{ 0.f };
 	std::atomic<bool> g_inspectorExpandAll{ false };
+	std::atomic<bool> g_inspectorFixture{ false };
 	std::mutex g_inspectorMailboxMutex;
 	editor::windows::inspector_snapshot g_inspectorSnapshot{};
 	// 그리는 스레드만 만진다. 프레임 끝에 사본으로 게시한다.
@@ -213,6 +215,11 @@ bool editor::windows::inspector_expand_all() noexcept
 	return g_inspectorExpandAll.load(std::memory_order_relaxed);
 }
 
+void editor::windows::set_inspector_fixture(bool enabled) noexcept
+{
+	g_inspectorFixture.store(enabled, std::memory_order_relaxed);
+}
+
 editor::windows::inspector_snapshot editor::windows::read_inspector()
 {
 	std::lock_guard lock(g_inspectorMailboxMutex);
@@ -253,6 +260,7 @@ void editor::windows::draw_inspector()
 	g_inspectorSnapshot.uiScale = editor::ThemePixels(1.f);
 	g_inspectorSnapshot.requestedWidth = requested;
 	g_inspectorSnapshot.expandAll = editor::windows::inspector_expand_all();
+	g_inspectorSnapshot.fixture = g_inspectorFixture.load(std::memory_order_relaxed);
 	g_inspectorSnapshot.contentWidth = contentWidth;
 	g_inspectorSnapshot.contentMaxX = contentMaxX;
 	g_inspectorSnapshot.bodies = g_inspectorBodies;
@@ -2326,6 +2334,18 @@ void InspectorWindow::Draw()
 			// 접혀 있어도 부른다. 여는 쪽이 ID 와 들여쓰기를 밀어 두기 때문에
 			// 건너뛰면 그 뒤의 모든 줄이 한 칸씩 밀린 채 프레임이 끝난다.
 			editor::widgets::end_inspector_panel();
+			ImGui::PopID();
+		}
+
+		// W2-I3 자극물. 컴포넌트와 같은 순회·같은 측정을 지나야 판정이 같은 자로 읽힌다.
+		if (g_inspectorFixture.load(std::memory_order_relaxed))
+		{
+			static editor::inspector::InspectorLayoutFixture fixture{};
+			ImGui::PushID("ReflectionFixture");
+			const bool fixtureOpen = editor::widgets::property_group_header("Reflection Fixture");
+			inspector_body_probe probe;
+			if (fixtureOpen) Meta::TypedDraw::DrawTypedObject(fixture);
+			probe.finish("ReflectionFixture", 0, fixtureOpen);
 			ImGui::PopID();
 		}
 

@@ -27,6 +27,12 @@ param(
 # RectTransform(W2-I2): 컴포넌트를 붙여서는 생기지 않는다 — 엔티티 유형이 정한다(UI 는
 # RectTransform 만, 캔버스는 둘 다). `object.create <이름> UI` 로 만든 엔티티를 같은 네 폭에서 잰다.
 #
+# 리플렉션 모양(W2-I3): 일반 경로로 그려지는 컴포넌트 중 중첩 구조체·배열·맵을 가진 것이 사실상
+# 없어(컨테이너 필드를 가진 셋은 전용 드로어이거나 숨긴 필드) 실제 데이터로는 분기 대부분이
+# 자극되지 않는다. `editor.inspector fixture on` 이 합성 값(`InspectorLayoutFixture.h`)을
+# `ReflectionFixture` 본문으로 그린다. 줄 수를 **타입 정의에서 센 값과 같게** 단정한다 — 원소
+# 하나라도 공통 줄을 지나지 않으면 수가 모자란다. 접힌 채 13, 펼친 채 55.
+#
 # 소스 축: 이관한 드로어 함수 본문에 **배율을 받지 않는 고정 폭**이 남으면 실패다 —
 # `SetNextItemWidth(150)`, `ImVec2(150, 20)` 같은 숫자 리터럴. 런타임 축은 배율 2.25 인
 # 기계에서 "넘치지 않았다" 만 보므로 배율 1 에서 넘칠 고정 폭을 못 잡는다(착수 때
@@ -138,6 +144,19 @@ foreach ($type in $Targets) {
     $lines += "scene.select Drawer_$type"
     foreach ($width in $Widths) { Add-WidthReads $width }
 }
+# 리플렉션 자극물. 줄 수의 기대값은 `InspectorLayoutFixture.h` 에서 센다:
+#   접힘 — 윗단 스칼라·벡터 8 + branch(depth·title·leaf 셋) 5 = 13 (컨테이너 머리는 닫힘)
+#   펼침 — 8 + branch 8(samples 원소 셋) + weights 3 · names 2 · points 2 · smallIds 2 · fixed 3 ·
+#          tags 3 · scores 2 · leaves 2×3 · branches 2×8 = 55
+$FixtureCollapsedLines = 13
+$FixtureExpandedLines = 55
+$fixtureStart = $lines.Count
+$lines += 'object.create Drawer_Fixture'; $lines += 'wait 30'; $lines += 'scene.select Drawer_Fixture'
+$lines += 'editor.inspector fixture on'
+Add-WidthReads 720
+$lines += 'editor.inspector expand on'
+foreach ($width in $Widths) { Add-WidthReads $width }
+$lines += 'editor.inspector expand off'; $lines += 'editor.inspector fixture off'
 $lines += 'editor.inspector width off'; $lines += 'wait 6'; $lines += 'editor.inspector'; $lines += 'quit'
 
 $scriptPath = Join-Path $Work 'run.txt'; $resultPath = Join-Path $Work 'run.jsonl'
@@ -208,7 +227,25 @@ foreach ($sample in $importSamples) {
     }
 }
 
-$samples = @(Select-Samples -From $importEnd -To ($rows.Count) -Settled { param($s)
+# ── 리플렉션 자극물 ─────────────────────────────────────────────────────────
+$fixtureReads = @(Select-Samples -From $fixtureStart -To ($rows.Count) -Settled { param($s)
+    $s.Data.entity -eq 'Drawer_Fixture' -and @($s.Data.bodies | Where-Object { $_.type -eq 'ReflectionFixture' -and $_.open }).Count -eq 1 })
+Assert ($fixtureReads.Count -eq $Widths.Count + 1) "리플렉션 자극물 표본 $($fixtureReads.Count) 이 $($Widths.Count + 1) 이 아니다"
+$fixtureSamples = @(foreach ($read in $fixtureReads) {
+    $body = @($read.Data.bodies | Where-Object { $_.type -eq 'ReflectionFixture' })
+    [pscustomobject]@{ Width = $read.Width; Expanded = $read.Expanded; Found = $body.Count
+        Open = ($body.Count -eq 1 -and $body[0].open); Lines = $(if ($body.Count) { [int]$body[0].propertyLines } else { 0 })
+        Overflow = $(if ($body.Count) { [double]$body[0].overflow } else { 0 }) }
+})
+foreach ($sample in $fixtureSamples) {
+    $tag = "ReflectionFixture@$($sample.Width)$(if ($sample.Expanded) { ' 펼침' } else { ' 접힘' })"
+    Assert ($sample.Open) "${tag}: 자극물 본문이 열린 채 한 번 그려지지 않았다(찾은 본문 $($sample.Found))"
+    $expected = if ($sample.Expanded) { $FixtureExpandedLines } else { $FixtureCollapsedLines }
+    Assert ($sample.Lines -eq $expected) "${tag}: 공통 배치 줄 $($sample.Lines) 이 타입 정의에서 센 $expected 와 다르다 — 공통 줄을 지나지 않는 필드·원소가 있다"
+    Assert ($sample.Overflow -le 0.5) "${tag}: 넘침 $($sample.Overflow) px"
+}
+
+$samples = @(Select-Samples -From $importEnd -To $fixtureStart -Settled { param($s)
     $s.Data.entity -eq "Drawer_$($s.Drawer)" -and @($s.Data.bodies | Where-Object { $_.type -eq $s.Drawer -and $_.open }).Count -eq 1 })
 Assert ($samples.Count -eq $Targets.Count * $Widths.Count) "표본 $($samples.Count) 이 $($Targets.Count)×$($Widths.Count) 가 아니다"
 
@@ -245,6 +282,10 @@ foreach ($name in @('GameObjectBaseInfo', 'Transform') + $Targets) {
     }
 }
 
+$fixtureByWidth = ($fixtureSamples | Where-Object Expanded | ForEach-Object { "{0}:{1:0.#}" -f $_.Width, $_.Overflow }) -join ' '
+$fixtureCollapsed = $fixtureSamples | Where-Object { -not $_.Expanded } | Select-Object -First 1
+$table.Add(("  {0,-24} {1,-4} 줄 {2,-3} 넘침 {3} (접힌 줄 {4})" -f 'ReflectionFixture', '자극',
+    (($fixtureSamples | Where-Object Expanded | Measure-Object Lines -Minimum).Minimum), $fixtureByWidth, $fixtureCollapsed.Lines))
 $importByWidth = ($importSamples | Where-Object Expanded | ForEach-Object { "{0}:{1:0.#}" -f $_.Width, $_.Overflow }) -join ' '
 $table.Add(("  {0,-24} {1,-4} 줄 {2,-3} 넘침 {3} (접힌 줄 {4})" -f 'ImportSettings', '이관',
     (($importSamples | Where-Object Expanded | Measure-Object Lines -Minimum).Minimum), $importByWidth, $collapsed.Lines))

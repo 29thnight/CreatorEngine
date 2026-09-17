@@ -24,6 +24,7 @@
 #include "InspectorDrawerList.h" // InspectorDrawer<T> 특수화 모음 — 분기보다 먼저 본다
 #include "EditorPropertyRow.h"   // 공통 배치 계약 (W2-I2)
 #include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf·EncodeMapKey 재사용
+#include "InspectorControl.h"    // 접힘 머리 펼침(W2-I3 자극)
 #include <cstddef>
 #include <algorithm> // iter_swap — 임의 접근이 없는 컨테이너의 재배열
 #include <iterator>  // prev·next·begin
@@ -137,6 +138,34 @@ namespace Meta::TypedDraw
             [obj, newValue]() { obj->*MP = newValue; });
     }
 
+    // 컨테이너의 접힘 머리. 명령은 클릭할 수 없으므로 `editor.inspector expand on` 이
+    // 켜져 있으면 연다 — 켜지 않으면 안쪽 줄은 어떤 검사에도 자극되지 않는다.
+    inline bool ContainerHeader(const char* label)
+    {
+        if (editor::windows::inspector_expand_all())
+        {
+            ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+        }
+        return ImGui::CollapsingHeader(label);
+    }
+
+    // 컨테이너 원소 한 줄 (W2-I3). 이름은 순번(`[0]`)이고 라벨·값 열은 공통 배치가 놓는다.
+    //
+    // 예전에는 원소 위젯이 라벨 없이 ImGui 기본 폭(창의 2/3)으로 서고, 가변 배열은 그
+    // 오른쪽에 `^`·`v` 버튼을 더 붙였다. 좁은 인스펙터에서 합성 자극물이 240 폭 323 px ·
+    // 320 폭 143 px 넘쳤고, 원소 24 개가 공통 줄을 지나지 않았다. 뒤에 붙는 정사각 버튼
+    // 몫은 값 폭에서 뺀다(`property_sheet::line_before_buttons` 와 같은 셈).
+    inline float BeginElementLine(int index, int trailingButtons = 0)
+    {
+        char label[16];
+        snprintf(label, sizeof(label), "[%d]", index);
+        const float value = editor::widgets::begin_property_line(
+            label, editor::widgets::current_property_layout());
+        const float reserve = static_cast<float>(trailingButtons) *
+            (ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x);
+        return ImMax(value - reserve, 1.f);
+    }
+
     template<class E>
     inline void DrawEnumCombo(const char* label, const char* idName, E& value)
     {
@@ -175,7 +204,7 @@ namespace Meta::TypedDraw
         Container& vec, E defaultValue, WidgetFn&& widget)
     {
         ImGui::PushID(idName);
-        if (ImGui::CollapsingHeader(label))
+        if (ContainerHeader(label))
         {
             if (ImGui::Button("Add"))
             {
@@ -191,27 +220,27 @@ namespace Meta::TypedDraw
             }
 
             const int size = static_cast<int>(vec.size());
+            const float button = ImGui::GetFrameHeight();
+            const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
             // 임의 접근이 없는 컨테이너(list)도 같은 조작을 받아야 하므로
             // 인덱스가 아니라 반복자로 걷는다.
             auto cursor = std::begin(vec);
             for (int i = 0; i < size; ++i, ++cursor)
             {
                 ImGui::PushID(i);
+                ImGui::SetNextItemWidth(BeginElementLine(i, 2));
                 widget(i, *cursor);
 
-                if (size > 0)
+                auto neighbour = cursor;
+                ImGui::SameLine(0.f, gap);
+                if (ImGui::Button("^", ImVec2(button, button)) && i > 0)
                 {
-                    auto neighbour = cursor;
-                    ImGui::SameLine();
-                    if (ImGui::Button("^") && i > 0)
-                    {
-                        std::iter_swap(cursor, std::prev(neighbour));
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("v") && i < size - 1)
-                    {
-                        std::iter_swap(cursor, std::next(neighbour));
-                    }
+                    std::iter_swap(cursor, std::prev(neighbour));
+                }
+                ImGui::SameLine(0.f, gap);
+                if (ImGui::Button("v", ImVec2(button, button)) && i < size - 1)
+                {
+                    std::iter_swap(cursor, std::next(neighbour));
                 }
                 ImGui::PopID();
             }
@@ -729,16 +758,18 @@ namespace Meta::TypedDraw
                 // std::set 계열은 원소를 const 로만 내준다. 제자리 편집이
                 // 성립하지 않으므로(키를 고치면 정렬이 깨진다) 읽기로만 낸다.
                 ImGui::PushID(name);
-                if (ImGui::CollapsingHeader(label))
+                if (ContainerHeader(label))
                 {
                     int index = 0;
                     for (const E& element : value)
                     {
-                        ImGui::PushID(index++);
+                        ImGui::PushID(index);
                         E scratch = element;
                         const DisabledScope readOnly{ true };
+                        ImGui::SetNextItemWidth(BeginElementLine(index));
                         DrawContainerElement(kValueId, scratch);
                         ImGui::PopID();
+                        ++index;
                     }
                 }
                 ImGui::PopID();
@@ -757,7 +788,7 @@ namespace Meta::TypedDraw
                 // 크기가 고정된 배열이거나(Add/Remove 가 성립하지 않는다),
                 // 원소가 reflect() 타입이라 한 줄 위젯으로 안 접히는 경우.
                 ImGui::PushID(name);
-                if (ImGui::CollapsingHeader(label))
+                if (ContainerHeader(label))
                 {
                     int index = 0;
                     for (auto& element : value)
@@ -765,6 +796,7 @@ namespace Meta::TypedDraw
                         ImGui::PushID(index);
                         if constexpr (kElementHasWidget<E>)
                         {
+                            ImGui::SetNextItemWidth(BeginElementLine(index));
                             DrawContainerElement(kValueId, element);
                         }
                         else if constexpr (meta::reflectable<E>)
@@ -795,7 +827,7 @@ namespace Meta::TypedDraw
             // 맵에서 키를 바꾸는 것은 항목을 지우고 새로 넣는 일이라, 같은
             // 프레임에 순회를 무너뜨린다. 항목 추가·삭제도 같은 이유로 없다.
             ImGui::PushID(name);
-            if (ImGui::CollapsingHeader(label))
+            if (ContainerHeader(label))
             {
                 int index = 0;
                 for (auto& entry : value)

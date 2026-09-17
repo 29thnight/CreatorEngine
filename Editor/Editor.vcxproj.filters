@@ -426,6 +426,9 @@
     <ClInclude Include="EngineGUIWindow\InspectorControl.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorLayoutFixture.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\EditorAssetDragPayload.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>

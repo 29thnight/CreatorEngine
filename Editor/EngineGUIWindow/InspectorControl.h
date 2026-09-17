@@ -13,6 +13,8 @@
 //   ② 본문마다: 공통 배치 줄(`begin_property_line`) 수와 오른쪽 끝, 넘침 px.
 //   ③ 펼침: 접힘 머리로 시작하는 본문(Import Settings 의 맵·배열)을 모두 펼친다.
 //      명령은 클릭할 수 없으므로, 켜지 않으면 안쪽 줄은 자극되지 않는다.
+//   ④ 자극물(W2-I3): 리플렉션 경로의 모든 모양(중첩 구조체·배열·맵)을 담은 합성 값을
+//      엔티티 본문 끝에 `ReflectionFixture` 로 그린다(`InspectorLayoutFixture.h`).
 //
 // ── 스레드 ─────────────────────────────────────────────────────────────────
 //
@@ -47,6 +49,7 @@ namespace editor::windows
         float uiScale{};              ///< `ThemePixels(1)`
         float requestedWidth{};       ///< 요청한 논리 폭, 0 이면 창 그대로
         bool expandAll{};             ///< 접힘 머리를 모두 펼치고 있는가
+        bool fixture{};               ///< 리플렉션 자극물을 그리고 있는가
         float contentWidth{};         ///< 본문이 실제로 받은 작업 영역 폭(px)
         float contentMaxX{};          ///< 작업 영역 오른쪽 끝(px)
         std::vector<inspector_body> bodies{};
@@ -58,6 +61,9 @@ namespace editor::windows
     /// 접힘 머리를 모두 펼친다. 그리는 쪽은 `inspector_expand_all` 로 읽는다.
     void set_inspector_expand_all(bool expand) noexcept;
     bool inspector_expand_all() noexcept;
+
+    /// 리플렉션 모양 자극물을 엔티티 본문 끝에 그린다.
+    void set_inspector_fixture(bool enabled) noexcept;
 
     /// 마지막으로 게시된 사본. 창이 한 번도 안 그려졌으면 `frames == 0`.
     inspector_snapshot read_inspector();
