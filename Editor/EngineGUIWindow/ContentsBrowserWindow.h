@@ -170,6 +170,7 @@ private:
     float m_tileSize{ 88.f };
     float m_treeDragStart{ 220.f };
     editor::windows::content_browser_layout m_layout{};
+    std::vector<editor::windows::content_browser_tile> m_visibleTiles;
     int m_typeFilter{ -1 };
     bool m_sortDescending{};
     std::string m_error;

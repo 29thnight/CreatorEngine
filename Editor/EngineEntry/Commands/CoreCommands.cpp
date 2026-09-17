@@ -1058,6 +1058,21 @@ namespace ConsoleCmd
         data.Set("imguiVertices", CommandData::Int(snapshot.imgui_vertices));
         data.Set("imguiIndices", CommandData::Int(snapshot.imgui_indices));
         data.Set("imguiDrawCommands", CommandData::Int(snapshot.imgui_draw_commands));
+        // W2-B — 창마다의 사각형. 끌어 놓기 자극이 놓을 자리를 여기서 얻는다.
+        {
+            auto placements = CommandData::Array();
+            for (const ::editor::window_placement_view& placement : snapshot.placements)
+            {
+                auto row = CommandData::Object();
+                row.Set("id", CommandData::String(placement.stable_id));
+                row.Set("dockNode", CommandData::Int(static_cast<long long>(placement.dock_node)));
+                auto rect = CommandData::Array();
+                for (float value : placement.rect) rect.Append(CommandData::Double(value));
+                row.Set("rect", std::move(rect));
+                placements.Append(std::move(row));
+            }
+            data.Set("placements", std::move(placements));
+        }
 
         if (!audit.clean())
         {
@@ -1534,6 +1549,24 @@ namespace ConsoleCmd
             layout.Set("mouseDown", CommandData::Bool(l.mouseDown));
             data.Set("layout", std::move(layout));
         }
+        {
+            auto tiles = CommandData::Array();
+            for (const auto& tile : snapshot.tiles)
+            {
+                auto row = CommandData::Object();
+                row.Set("path", CommandData::String(tile.path));
+                auto rect = CommandData::Array();
+                rect.Append(CommandData::Double(tile.minX));
+                rect.Append(CommandData::Double(tile.minY));
+                rect.Append(CommandData::Double(tile.maxX));
+                rect.Append(CommandData::Double(tile.maxY));
+                row.Set("rect", std::move(rect));
+                tiles.Append(std::move(row));
+            }
+            data.Set("tiles", std::move(tiles));
+        }
+        data.Set("dragPayloadType", CommandData::String(snapshot.dragPayloadType));
+        data.Set("dragPayloadPath", CommandData::String(snapshot.dragPayloadPath));
 
         Debug::PrintLog(spdlog::level::info, "[editor.browser]"
             " frames=" + std::to_string(snapshot.frames) +

@@ -74,6 +74,13 @@ namespace editor::windows
         bool mouseDown{};
     };
 
+    /// W2-B — 이번 프레임에 그린 타일 하나. 끌기 자극이 누를 자리를 여기서 얻는다.
+    struct content_browser_tile
+    {
+        std::string path{};                ///< Assets 기준 상대 경로
+        float minX{}, minY{}, maxX{}, maxY{};
+    };
+
     struct content_browser_snapshot
     {
         std::uint64_t frames{};            ///< 창 본문이 돈 프레임 수(게시가 살아 있는가)
@@ -109,6 +116,11 @@ namespace editor::windows
         /// 않아야 한다 — 전체 자산 4,274 개에서 매 프레임 모으고 정렬하던 비용이 3.25ms 였다.
         std::uint64_t resultRebuilds{};
         content_browser_layout layout{};
+        std::vector<content_browser_tile> tiles{}; ///< 그린 타일(앞에서 최대 64)
+        /// 지금 들린 끌기 payload. 끌기 자극의 경계 통과 — 놓는 자리까지 갔는지와 별개로
+        /// 브라우저가 무엇을 들어 올렸는지를 본다. 없으면 빈 문자열.
+        std::string dragPayloadType{};
+        std::string dragPayloadPath{};     ///< Assets 기준 상대 경로
     };
 
     /// 요청을 넣는다. 함이 가득 차면(32) 거짓.

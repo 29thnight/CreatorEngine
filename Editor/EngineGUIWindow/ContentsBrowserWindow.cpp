@@ -700,6 +700,15 @@ void ContentsBrowserWindow::PublishSnapshot()
     snapshot.recentCount = m_recents.size();
     snapshot.resultRebuilds = m_resultRebuilds;
     snapshot.layout = m_layout;
+    snapshot.tiles = m_visibleTiles;
+    // 들린 자산 payload — 끌기 자극의 경계 통과. 씬 오브젝트 payload 는 경로가 아니라 건너뛴다.
+    if (const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+        payload && '\0' != payload->DataType[0] && !payload->IsDataType("SCENE_OBJECT"))
+    {
+        snapshot.dragPayloadType = payload->DataType;
+        const file::path dragged = editor::asset_drag::path_of(*payload);
+        snapshot.dragPayloadPath = dragged.empty() ? std::string{} : RelativeUtf8(dragged);
+    }
     std::lock_guard lock(g_browserMailboxMutex);
     g_browserSnapshot = std::move(snapshot);
 }
@@ -906,6 +915,7 @@ void ContentsBrowserWindow::DrawDirectoryPanel()
 void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
 {
     const editor::windows::panel_cost_scope cost{ editor::windows::panel_cost_slot::browser_files };
+    m_visibleTiles.clear();
     const std::uint64_t scansBefore = editor::browser_cache_get_stats().scans;
     const std::uint64_t probesBefore = editor::browser_cache_get_stats().probes;
     // W7-1: 목록은 스냅샷이 준다. 프레임마다 하던 것 셋이 여기서 사라졌다 —
@@ -1210,6 +1220,10 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
     }
 
 	ImGui::EndGroup();
+	// W2-B: 끌기 자극이 누를 자리. clipper 가 그린 타일만 들어간다.
+	if (m_visibleTiles.size() < 64)
+		m_visibleTiles.push_back({ RelativeUtf8(directory), ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y,
+			ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y });
 
 	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 	{
