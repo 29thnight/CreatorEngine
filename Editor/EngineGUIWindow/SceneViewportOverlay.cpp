@@ -97,10 +97,14 @@ editor::SceneOverlaySnapshot editor::ReadSceneOverlaySnapshot()
     return scene_overlay_detail::snapshot;
 }
 
-void editor::SceneViewportOverlay::Draw(ImVec2 imageMin, ImVec2 imageMax,
+void editor::SceneViewportOverlay::Draw(
     EditorCameraRig& rig, GizmoRenderer* gizmos, const ViewportCanvas& canvas)
 {
     using namespace scene_overlay_detail;
+    // 오버레이가 놓이는 자리는 **content** 다. image 가 아니다 — crop 에서
+    // image 는 content 를 넘으므로 그 사각형에 툴바를 놓으면 화면 밖으로 나간다.
+    const ImVec2 imageMin = canvas.contentMin;
+    const ImVec2 imageMax = canvas.contentMax;
     Camera& cam = rig.GetCamera();
     const float scale = ThemePixels(1.f), h = ThemePixels(24.f), gap = ThemePixels(6.f);
     const ImVec2 savedCursor = ImGui::GetCursorScreenPos();

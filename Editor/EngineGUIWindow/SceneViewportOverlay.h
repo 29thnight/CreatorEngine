@@ -54,7 +54,12 @@ namespace editor
         bool blocksPointer{}, blocksShortcuts{};
         math::vector3 orbitPivot{};
 
-        void Draw(ImVec2 imageMin, ImVec2 imageMax, EditorCameraRig& camera, GizmoRenderer* gizmos,
+        // 사각형을 따로 받지 않는다 — 자리는 캔버스가 정본이다(§1.5).
+        // 예전에는 `imageMin`/`imageMax` 를 인자로 받으면서 캔버스도 함께 받아
+        // 출처가 둘이었고, 배치는 인자 쪽으로 했다. 값이 같아 보이는 동안에는
+        // 드러나지 않지만 정책이 갈리는 순간(crop 은 image 가 content 를 넘는다)
+        // 툴바가 화면 밖으로 나간다.
+        void Draw(EditorCameraRig& camera, GizmoRenderer* gizmos,
             const ViewportCanvas& canvas);
         float* ActiveSnap() { return operation > 0 && snapEnabled[operation - 1] ? &snapValues[operation - 1] : nullptr; }
     };

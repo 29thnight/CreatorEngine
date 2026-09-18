@@ -80,12 +80,27 @@ namespace editor
         ViewportCanvas canvas{};
         canvas.fit = fit;
         const auto positive = [](float value) { return std::isfinite(value) && value > 0.f; };
+
+        // ★ content 는 `valid` 와 **무관하게** 채운다.
+        //
+        //   content 는 모드가 받은 자리라 소스가 아직 없어도 알 수 있는 값이다.
+        //   예전에는 여기서 통째로 조기 반환해 content 까지 0 으로 돌려줬고, 그
+        //   탓에 소비자가 제 좌표를 따로 만들어 들고 다녔다 — 씬뷰가 `imageMin`
+        //   이라는 이름의 지역 content 사각형을 만들어 오버레이에 넘기던 것이
+        //   그것이다. 정본이 답할 수 있는 것을 답하지 않으면 정본이 둘이 된다.
+        //
+        //   `valid` 의 뜻은 바뀌지 않는다 — "그릴 소스가 있고 image/clip/uv 가
+        //   섰는가" 이고, 그 셋은 아래에서만 채워진다.
+        if (positive(contentSize.x) && positive(contentSize.y))
+        {
+            canvas.contentMin = contentMin;
+            canvas.contentMax = { contentMin.x + contentSize.x, contentMin.y + contentSize.y };
+        }
+
         if (!positive(contentSize.x) || !positive(contentSize.y) ||
             !positive(sourcePixels.x) || !positive(sourcePixels.y) ||
             !positive(framebufferScale.x) || !positive(framebufferScale.y)) return canvas;
 
-        canvas.contentMin = contentMin;
-        canvas.contentMax = { contentMin.x + contentSize.x, contentMin.y + contentSize.y };
         canvas.sourceAspect = sourcePixels.x / sourcePixels.y;
 
         ImVec2 imageSize{};

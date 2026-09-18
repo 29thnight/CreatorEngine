@@ -143,25 +143,27 @@ static math::matrix4x4 ResolveParentWorldMatrix(const Entity* obj)
 
 void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, Entity* obj, Camera* cam)
 {
-    const ImVec2 imageMin = ImGui::GetCursorScreenPos();
-    const ImVec2 imageSize = ImGui::GetContentRegionAvail();
-    if (imageSize.x <= 0.f || imageSize.y <= 0.f) return;
-    const ImVec2 imageMax{imageMin.x + imageSize.x, imageMin.y + imageSize.y};
+    // 캔버스 규약의 **입력**을 만드는 자리는 여기 하나다(§1.5 ①). 원점은 창
+    // 프레임이 아니라 content 이고, 제목표시줄 보정은 없다. 이 아래로는 좌표를
+    // 다시 만들지 않는다 — 전부 `m_canvas` 를 읽는다.
+    const ImVec2 contentOrigin = ImGui::GetCursorScreenPos();
+    const ImVec2 contentSize = ImGui::GetContentRegionAvail();
+    if (contentSize.x <= 0.f || contentSize.y <= 0.f) return;
     const auto displayed = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Editor);
     // 예열 장부: 표시 텍스처가 처음 유효해진 때. 캔버스는 이 크기를 입력으로
     // 받으므로, 이것이 0 이면 아래 `LayoutViewportCanvas` 는 무효를 돌려준다 —
     // 두 단계를 따로 찍어야 "그림이 없다" 와 "자리가 없다" 를 가를 수 있다.
     if (displayed.width > 0 && displayed.height > 0)
         engine::warmup::mark(engine::warmup::stage::display_texture);
-    m_canvas = editor::LayoutViewportCanvas(editor::viewport_fit::fill, imageMin, imageSize,
+    m_canvas = editor::LayoutViewportCanvas(editor::viewport_fit::fill, contentOrigin, contentSize,
         {static_cast<float>(displayed.width), static_cast<float>(displayed.height)}, ImGui::GetIO().DisplayFramebufferScale);
     if (m_canvas.valid)
         engine::warmup::mark(engine::warmup::stage::scene_canvas);
     // Reserve the canvas without taking ImGui's active/hovered item: transform
     // gizmos must be able to acquire the mouse over the rendered image.
-    ImGui::Dummy(imageSize);
+    ImGui::Dummy(m_canvas.ContentExtent());
     auto* draw = ImGui::GetWindowDrawList();
-    draw->AddRectFilled(imageMin, imageMax, IM_COL32(20, 20, 23, 255));
+    draw->AddRectFilled(m_canvas.contentMin, m_canvas.contentMax, IM_COL32(20, 20, 23, 255));
     // W4: 표시 신호를 Game 쪽과 같은 2단으로 읽는다. `active` 는 "그릴 카메라가
     // 있는가", 텍스처 ID 는 "그림이 준비됐는가" 이고 둘은 다른 프레임에 참이 된다.
     // 예전에는 씬 쪽이 둘째만 보아서, 카메라가 없는 것과 첫 프레임을 기다리는 것이
@@ -174,8 +176,9 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     {
         const char* noCamera = "No editor camera";
         const ImVec2 textSize = ImGui::CalcTextSize(noCamera);
-        draw->AddText({ imageMin.x + (imageSize.x - textSize.x) * .5f,
-                        imageMin.y + (imageSize.y - textSize.y) * .5f },
+        const ImVec2 content = m_canvas.ContentExtent();
+        draw->AddText({ m_canvas.contentMin.x + (content.x - textSize.x) * .5f,
+                        m_canvas.contentMin.y + (content.y - textSize.y) * .5f },
             ImGui::GetColorU32(ImVec4(1.f, 0.f, 0.f, 1.f)), noCamera);
     }
     else if (displayed.textureId && m_canvas.valid)
@@ -185,7 +188,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     }
     ImGuizmo::BeginFrame();
     ImGuizmo::SetDrawlist();
-    m_overlay.Draw(imageMin, imageMax, *m_editorCameraRig, m_gizmoRenderer, m_canvas);
+    m_overlay.Draw(*m_editorCameraRig, m_gizmoRenderer, m_canvas);
     if (!m_canvas.valid) return;
     // 기즈모는 image 사각형을 받는다 — 잘린 부분까지 포함한 소스 전체의 자리라야
     // 화면 밖으로 밀려난 조작점의 투영이 맞는다. 제목표시줄 보정은 없다(원점이 content).
@@ -491,7 +494,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			}
 		}
 
-		ImRect dropRect = ImRect(imageMin, imageMax);
+		ImRect dropRect = ImRect(m_canvas.contentMin, m_canvas.contentMax);
         if (canvasInput && ImGui::BeginDragDropTargetCustom(dropRect, ImGui::GetID("MyDropTarget")))
         {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model", ImGuiDragDropFlags_AcceptBeforeDelivery))
