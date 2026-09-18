@@ -7,6 +7,7 @@
 #include "../../Engine/CommandService/CommandGateway.h"
 #include "../../Engine/CommandService/CommandService.h"
 #include "../../Engine/CommandService/JsonValue.h"
+#include "../../Engine/Utility_Framework/WarmupLedger.h"
 
 #include "CommandResultJson.h"   // LC9: 변환·봉투의 단일 정본
 
@@ -394,6 +395,30 @@ namespace EditorCommandService
                                          + std::to_string(status.waitFramesRemaining);
                 }
                 return health;
+            }
+
+            /// 예열 장부를 그대로 옮긴다. 이 함수는 **아무것도 기다리지 않는다** —
+            /// 장부가 원자 배열이라 렌더 스레드가 락을 쥐고 있어도 읽힌다.
+            WarmupSnapshot Warmup() override
+            {
+                const engine::warmup::ledger_view ledger = engine::warmup::read();
+
+                WarmupSnapshot snapshot;
+                snapshot.stages.reserve(engine::warmup::kStageCount);
+                for (std::size_t i = 0; i < engine::warmup::kStageCount; ++i)
+                {
+                    WarmupStage stage;
+                    stage.name    = ledger.stages[i].name;
+                    stage.reached = ledger.stages[i].reached;
+                    stage.atMs    = ledger.stages[i].atMs;
+                    snapshot.stages.push_back(std::move(stage));
+                }
+                snapshot.reached     = ledger.reachedCount;
+                snapshot.elapsedMs   = ledger.elapsedMs;
+                snapshot.last        = engine::warmup::stage_name(ledger.last);
+                snapshot.sinceLastMs = ledger.sinceLastMs;
+                snapshot.complete    = ledger.complete;
+                return snapshot;
             }
 
         private:

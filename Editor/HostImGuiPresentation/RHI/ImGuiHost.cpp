@@ -6,6 +6,7 @@
 #include "LogSystem.h"
 #include "RuntimeSettings.h"
 #include "../../../Engine/Utility_Framework/PathFinder.h"
+#include "../../../Engine/Utility_Framework/WarmupLedger.h"
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -158,6 +159,9 @@ namespace
         {
             if (!m_renderer) return;
             ImGui::Render();
+            // 예열 장부: UI 가 한 프레임을 온전히 끝낸 때. 창이 보이는 것과 다른
+            // 사건이다 — 그 사이에 첫 프레임의 셰이더·파이프라인 비용이 있다.
+            engine::warmup::mark(engine::warmup::stage::first_ui_frame);
             ImGuiWin32Cursor::PublishFrameCursor(static_cast<HWND>(m_windowHandle));
 
             std::string presentError;

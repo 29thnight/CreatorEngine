@@ -33,6 +33,7 @@
 #include "EngineBootstrap.h"
 #include "EngineLaunchConfig.h"
 #include "BootProgress.h"
+#include "../../Engine/Utility_Framework/WarmupLedger.h"
 #include "WinProcProxy.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
@@ -437,6 +438,9 @@ void Core::App::Run()
 		// 일어나며 동기 SendMessage 교착이 비결정적으로 발생했다.
 		g_progressWindow->Close();
 		CoreWindow::GetForCurrentInstance()->Show();
+		// 예열 장부: 여기까지가 "창이 뜬다" 이고, 계획서가 재 온 긴 구간은
+		// 이 **뒤**에 있다(2026-09-14 실측: 창 1.7s, 씬뷰 첫 그림 18.5s).
+		engine::warmup::mark(engine::warmup::stage::window_shown);
 
 		// 초기화가 끝난 뒤 CLI를 연다. 그래야 명령이 완성된 엔진 위에서 실행된다.
 		ConsoleCommandSystem::Get().InitializeFromCommandLine();

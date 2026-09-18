@@ -89,6 +89,7 @@
     <ClInclude Include="TypeTrait.h" />
     <ClInclude Include="Sha256.h" />
       <ClInclude Include="EngineResourceCensus.h" />
+    <ClInclude Include="WarmupLedger.h" />
 </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AuthoringRymlErrorPolicy.cpp" />
@@ -106,6 +107,7 @@
     <ClCompile Include="ProgressSink.cpp" />
     <ClCompile Include="ReflectionYml.cpp" />
     <ClCompile Include="TypeTrait.cpp" />
+    <ClCompile Include="WarmupLedger.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Delegate.inl" />

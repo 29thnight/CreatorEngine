@@ -1,6 +1,7 @@
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
 #include "EnhancedPbrCapture.h"
+#include "../../../Utility_Framework/WarmupLedger.h"
 
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../Graph/EnhancedRenderPass.h"
@@ -1590,6 +1591,11 @@ namespace
             // 프레임 시작에 큐브맵·조도·프리필터를 만들어 소비 패스에 건넨다.
             // 노드가 될 것이 아니므로 여기 남는다.
             if (!p.ibl.Initialize(p.frameContext, outError)) return false;
+
+            // 예열 장부: 파이프라인 구축이 끝난 때. 2026-09-14 실측으로 이
+            // 구간이 6.84s 였고 그 내내 표시 락을 쥐어 게임 스레드까지 멈췄다 —
+            // 예열을 밖에서 볼 수 있어야 하는 이유가 바로 이 구간이다.
+            engine::warmup::mark(engine::warmup::stage::render_pipeline);
 
             // 기본은 둘 다 꺼짐(EnhancedLiveTuning의 Sss·Ssr 주석 참조).
             //
@@ -4187,6 +4193,15 @@ namespace
                         renderInProgress = 0;
                         ++renderConsumed;
                         renderCompletedFrameId = submission.frame.frameId;
+                        // 예열 장부: 라이브 프레임 하나가 **끝난** 때.
+                        //
+                        // ★ 이 자리라야 한다. 처음에는 CPU 톤맵 경로의
+                        //   `view.completedFrameId` 옆에 찍었는데 DX12 는 그 길을
+                        //   지나지 않아(텍스처를 직접 공유한다) 190 초를 돌려도
+                        //   끝내 미도달이었다. `render.live.wait` 의 판정이 읽는
+                        //   값이 여기서 서므로, 예열의 "한 프레임 끝" 도 같은
+                        //   자리를 써야 둘이 같은 사건을 말한다.
+                        engine::warmup::mark(engine::warmup::stage::first_live_frame);
                     }
                     renderQueueWake.notify_all();
                 }
@@ -5261,6 +5276,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
             state.enabled = false;
             return;
         }
+        // 예열 장부: 셰이더 반영·재질 밀봉이 끝난 때(실측 9.36s 구간의 끝).
+        engine::warmup::mark(engine::warmup::stage::shader_meta);
         if (!state.ApplyForwardShaderMeta(frame.forwardShaderMetas, p.forward,
                 p.frameContext,
                 RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },

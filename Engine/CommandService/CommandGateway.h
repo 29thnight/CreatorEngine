@@ -128,5 +128,32 @@ namespace CommandService
             std::string currentCommand;
         };
         virtual HealthSnapshot Health() = 0;
+
+        /// `GET /warmup` 이 낼 예열 진행. **수신 스레드에서 부른다.**
+        ///
+        /// ★ Health 와 같은 이유로 원자 읽기만 해야 한다. 오히려 더 엄격하다 —
+        ///   예열 구간은 게임 스레드가 실제로 멈춰 있는 시간이고(2026-09-14 실측:
+        ///   렌더 스레드의 파이프라인 구축이 표시 락을 쥐어 씬뷰 본문을 통해
+        ///   게임 스레드까지 멈춘다), 그 구간을 보라고 있는 창구가 그 구간에
+        ///   막히면 아무것도 답하지 못한다.
+        ///
+        ///   단계 목록은 **아직 도달하지 않은 것까지** 실어야 한다. 도달한 것만
+        ///   내면 "무엇이 남았는가" 에 답할 수 없다.
+        struct WarmupStage
+        {
+            std::string name;
+            bool        reached{ false };
+            double      atMs{ 0.0 };
+        };
+        struct WarmupSnapshot
+        {
+            std::vector<WarmupStage> stages;
+            std::size_t reached{ 0 };
+            double      elapsedMs{ 0.0 };
+            std::string last;          ///< 마지막으로 도달한 단계의 이름
+            double      sinceLastMs{ 0.0 };
+            bool        complete{ false };
+        };
+        virtual WarmupSnapshot Warmup() = 0;
     };
 }

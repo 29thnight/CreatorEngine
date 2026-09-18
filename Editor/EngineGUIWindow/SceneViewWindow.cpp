@@ -11,6 +11,7 @@
 // 딸려 들어왔는데, 옥트리 계통을 걷으면서 그 경로가 끊겼다.
 #include "RenderScene.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "../../Engine/Utility_Framework/WarmupLedger.h"
 #include "GizmoRenderer.h"
 #include "ImGuizmo.h"
 #include "EditorIcons.h"
@@ -147,8 +148,15 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     if (imageSize.x <= 0.f || imageSize.y <= 0.f) return;
     const ImVec2 imageMax{imageMin.x + imageSize.x, imageMin.y + imageSize.y};
     const auto displayed = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Editor);
+    // 예열 장부: 표시 텍스처가 처음 유효해진 때. 캔버스는 이 크기를 입력으로
+    // 받으므로, 이것이 0 이면 아래 `LayoutViewportCanvas` 는 무효를 돌려준다 —
+    // 두 단계를 따로 찍어야 "그림이 없다" 와 "자리가 없다" 를 가를 수 있다.
+    if (displayed.width > 0 && displayed.height > 0)
+        engine::warmup::mark(engine::warmup::stage::display_texture);
     m_canvas = editor::LayoutViewportCanvas(editor::viewport_fit::fill, imageMin, imageSize,
         {static_cast<float>(displayed.width), static_cast<float>(displayed.height)}, ImGui::GetIO().DisplayFramebufferScale);
+    if (m_canvas.valid)
+        engine::warmup::mark(engine::warmup::stage::scene_canvas);
     // Reserve the canvas without taking ImGui's active/hovered item: transform
     // gizmos must be able to acquire the mouse over the rendered image.
     ImGui::Dummy(imageSize);

@@ -433,6 +433,36 @@ namespace CommandService
             return finish(200, root.Serialize(), "");
         }
 
+        // ── GET /warmup ─────────────────────────────────────────────────
+        //
+        // 예열이 어디까지 갔는지. `/health` 와 같은 자리에 두는 이유는 같다 —
+        // 이 값이 필요한 구간이 바로 게임 스레드가 멈춰 있는 구간이라, 큐를 타는
+        // 창구로는 끝난 뒤에야 답을 받는다.
+        if ("GET" == request.method && "/warmup" == request.path)
+        {
+            const ICommandGateway::WarmupSnapshot warmup = m_gateway->Warmup();
+
+            JsonValue root = JsonValue::Object();
+            root.Set("schemaVersion", JsonValue::Int(1));
+            root.Set("elapsedMs",     JsonValue::Double(warmup.elapsedMs));
+            root.Set("reached",       JsonValue::Int(static_cast<int64_t>(warmup.reached)));
+            root.Set("total",         JsonValue::Int(static_cast<int64_t>(warmup.stages.size())));
+            root.Set("last",          JsonValue::String(warmup.last));
+            root.Set("sinceLastMs",   JsonValue::Double(warmup.sinceLastMs));
+            root.Set("complete",      JsonValue::Bool(warmup.complete));
+            JsonValue stages = JsonValue::Array();
+            for (const ICommandGateway::WarmupStage& stage : warmup.stages)
+            {
+                JsonValue entry = JsonValue::Object();
+                entry.Set("name",    JsonValue::String(stage.name));
+                entry.Set("reached", JsonValue::Bool(stage.reached));
+                entry.Set("atMs",    JsonValue::Double(stage.atMs));
+                stages.Append(std::move(entry));
+            }
+            root.Set("stages", std::move(stages));
+            return finish(200, root.Serialize(), "");
+        }
+
         // ── GET /commands, GET /commands/{id} ───────────────────────────
         if ("GET" == request.method && 0 == request.path.rfind("/commands", 0))
         {
