@@ -701,9 +701,13 @@ void ContentsBrowserWindow::PublishSnapshot()
     snapshot.resultRebuilds = m_resultRebuilds;
     snapshot.layout = m_layout;
     snapshot.tiles = m_visibleTiles;
-    // 들린 자산 payload — 끌기 자극의 경계 통과. 씬 오브젝트 payload 는 경로가 아니라 건너뛴다.
+    // 들린 자산 payload — 끌기 자극의 경계 통과. **경로를 나르는 payload 만** 본다.
+    // 예전에는 "SCENE_OBJECT 만 아니면 경로" 였다. 배제 목록은 모르는 것을 통과시키고,
+    // 실제로 통과한 것은 도킹 창 드래그의 `_IMWINDOW`(ImGuiWindow* 8바이트)였다 —
+    // 창 탭을 끄는 동안 브라우저가 그려지면 그 프레임에 죽었다(9-18 덤프). 구조체를
+    // 싣는 `ASSET_ENTRY` 도 같은 문으로 들어왔다. 이제 허용 목록이 정본이다.
     if (const ImGuiPayload* payload = ImGui::GetDragDropPayload();
-        payload && '\0' != payload->DataType[0] && !payload->IsDataType("SCENE_OBJECT"))
+        payload && editor::asset_drag::carries_path(*payload))
     {
         snapshot.dragPayloadType = payload->DataType;
         const file::path dragged = editor::asset_drag::path_of(*payload);

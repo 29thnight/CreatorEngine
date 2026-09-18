@@ -112,7 +112,7 @@ void AssetBundleWindow::Draw()
 	        ImGui::Selectable(label.c_str());
 	        if (ImGui::BeginDragDropSource())
 	        {
-	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
+	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(entry));
 	            ImGui::TextUnformatted(label.c_str());
 	            ImGui::EndDragDropSource();
 	        }
@@ -143,7 +143,7 @@ void AssetBundleWindow::Draw()
 	        ImGui::Selectable(label.c_str());
 	        if (ImGui::BeginDragDropSource())
 	        {
-	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
+	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(entry));
 	            ImGui::TextUnformatted(label.c_str());
 	            ImGui::EndDragDropSource();
 	        }
@@ -174,7 +174,7 @@ void AssetBundleWindow::Draw()
 	        ImGui::Selectable(label.c_str());
 	        if (ImGui::BeginDragDropSource())
 	        {
-	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(AssetEntry));
+	            ImGui::SetDragDropPayload("ASSET_ENTRY", &entry, sizeof(entry));
 	            ImGui::TextUnformatted(label.c_str());
 	            ImGui::EndDragDropSource();
 	        }
