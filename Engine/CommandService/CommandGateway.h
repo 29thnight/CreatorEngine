@@ -154,6 +154,17 @@ namespace CommandService
             double      sinceLastMs{ 0.0 };
             bool        complete{ false };
         };
-        virtual WarmupSnapshot Warmup() = 0;
+        /// 기본은 **빈 목록**이다 — 그 자체가 "이 역할은 예열을 보고하지 않는다" 는
+        /// 답이다. 순수 가상이 아닌 이유는 단계 집합이 역할마다 다르기 때문이다:
+        /// 지금의 여덟 단계는 씬뷰 캔버스·표시 텍스처처럼 **에디터에만 있는** 사건이라
+        /// Player 가 그대로 흉내 내면 "전부 미도달" 이라는 거짓을 답하게 된다(Player 는
+        /// 장부에 아무것도 적지 않는다). 나중에 Player 가 자기 단계를 갖게 되면 그때
+        /// 이것을 override 하는 것이 그 결정의 표식이 된다.
+        ///
+        /// ★ 이 함수가 순수 가상이던 동안 Player 빌드가 C2259 로 깨져 있었다
+        ///   (2026-09-18, `PlayerGateway` 가 추상이 됨). 게이트웨이 구현이 둘인데
+        ///   한쪽만 고친 것이다 — 인터페이스에 순수 가상을 더할 때는 Player 도 같이
+        ///   빌드해 보아야 한다.
+        virtual WarmupSnapshot Warmup() { return {}; }
     };
 }
