@@ -29,6 +29,61 @@ namespace editor
         name_dialog nameDialog{ name_dialog::none };
         char nameBuffer[128]{};
         std::string deleteTarget;
+        /// 지금 화면 구성의 지문. 뷰포트 좌표를 믿어도 되는지를 이것 하나로 가른다.
+        ///
+        /// 모니터의 **가상 데스크톱 사각형**만 쓴다 — 장치 이름이나 핸들은 케이블을
+        /// 다시 꽂거나 드라이버가 갱신되기만 해도 바뀌어서, 실제로는 같은 자리인데
+        /// 배치를 버리게 된다. 정렬해서 잇는 이유는 열거 **순서**가 보장되지 않기
+        /// 때문이다(같은 구성인데 순서가 달라 지문이 갈리면 아무 때나 버린다).
+        /// 배율은 넣지 않는다: 가상 좌표는 물리 픽셀이라 배율을 바꿔도 뜻이 같고,
+        /// 창 크기 쪽은 이미 `geometry` 의 dpi 가 보정한다.
+        std::string current_monitor_fingerprint()
+        {
+            // ★ 게이트가 **화면 구성을 모르는 환경**을 자극하는 창구다. 열거가 실패한
+            //   상태는 실제 기계에서 만들 수 없고(모니터는 늘 하나는 잡힌다), 만들 수
+            //   없는 절은 변이를 그냥 통과한다 — 이 창구를 내기 전에 "빈 지문을 같다고
+            //   읽는" 변이가 게이트 넷을 **모두 지나갔다**. `none` 은 열거 실패와 같은
+            //   뜻이다(빈 문자열은 환경변수로 전할 수 없다 — Windows 는 그것을 삭제로
+            //   읽는다). 오버라이드는 `CREATOR_EDITOR_WORKSPACE_DIR` 과 같은 계열이다.
+            wchar_t forced[1024]{};
+            if(const auto length=::GetEnvironmentVariableW(L"CREATOR_EDITOR_MONITOR_FINGERPRINT",forced,1024);
+               length>0 && length<1024)
+            {
+                const std::wstring_view value{forced,length};
+                if(value==L"none") return {};
+                return std::string(value.begin(),value.end());  // 지문은 ASCII 다
+            }
+
+            std::vector<std::string> rectangles;
+            ::EnumDisplayMonitors(nullptr, nullptr,
+                [](HMONITOR monitor, HDC, LPRECT, LPARAM param) -> BOOL
+                {
+                    MONITORINFO info{ sizeof(MONITORINFO) };
+                    if (::GetMonitorInfoW(monitor, &info))
+                    {
+                        char buffer[64]{};
+                        std::snprintf(buffer, sizeof(buffer), "%ldx%ld+%ld+%ld",
+                            info.rcMonitor.right - info.rcMonitor.left,
+                            info.rcMonitor.bottom - info.rcMonitor.top,
+                            info.rcMonitor.left, info.rcMonitor.top);
+                        reinterpret_cast<std::vector<std::string>*>(param)->emplace_back(buffer);
+                    }
+                    return TRUE;
+                },
+                reinterpret_cast<LPARAM>(&rectangles));
+            std::sort(rectangles.begin(), rectangles.end());
+            std::string out;
+            for (const auto& rectangle : rectangles)
+            {
+                if (!out.empty()) out += ';';
+                out += rectangle;
+            }
+            // 열거가 실패하면 빈 문자열이다. 그것은 "모니터가 없다" 가 아니라 **모른다**
+            // 이므로, 아래 비교에서 어떤 저장본과도 같지 않게 되어 좌표를 버리는 쪽으로
+            // 간다 — 모르면 안전한 쪽으로 기운다.
+            return out;
+        }
+
         std::filesystem::path override_path(const wchar_t* name, std::filesystem::path fallback)
         {
             wchar_t value[32768]{};
@@ -189,8 +244,15 @@ namespace editor
         if(document.imgui_version!=IMGUI_VERSION_NUM || document.theme_version!=1)
             throw std::runtime_error("Workspace version requires migration");
         ImGui::ClearIniSettings();
-        ImGui::LoadIniSettingsFromMemory(document.ini.data(),document.ini.size());
-        m_document=document;
+        // 뷰포트 좌표는 **적힌 화면 구성에서만** 뜻이 있다. 구성이 다르면(또는 이 파일이
+        // 구성을 안 적은 v1·v2 면) 좌표만 걷어 낸다 — 창은 메인 뷰포트로 돌아오고 도크
+        // 배치는 그대로다. 버리지 않으면 없는 화면에 패널이 떠서, 보이지 않는 것을 닫을
+        // 창구가 없는 상태가 된다.
+        auto restored=document;
+        if(restored.monitors.empty() || restored.monitors!=current_monitor_fingerprint())
+            restored.ini=workspace::strip_viewport_positions(restored.ini);
+        ImGui::LoadIniSettingsFromMemory(restored.ini.data(),restored.ini.size());
+        m_document=std::move(restored);
         // 파일이 든 preset 이 없는 이름이면(손으로 고쳤거나 옛 판) 기본으로 돌린다.
         // 배치 자체는 ini 가 들고 있으므로 이름 하나 때문에 배치를 버리지 않는다.
         if(const layout_preset* named=find_layout_preset(document.preset)) m_preset=named;
@@ -464,6 +526,9 @@ namespace editor
             auto dump=m_path; dump+=".invalid"; try{ workspace::atomic_write(dump,value.ini); }catch(...){}
             throw std::runtime_error(error); }
         for(const auto& entry:m_windows.entries) if(entry.persist_open) value.panels[std::string(entry.stable_id)]=entry.open;
+        // 지금 화면 구성을 같이 적는다. ini 에 뷰포트 좌표가 하나도 없더라도 적는다 —
+        // 다음에 누가 창을 꺼내면 그 좌표가 **이 구성에서** 적힌 것이 되기 때문이다.
+        value.monitors=current_monitor_fingerprint();
         value.dpi=ImGui::GetStyle().FontScaleDpi;
         value.width=ImGui::GetIO().DisplaySize.x; value.height=ImGui::GetIO().DisplaySize.y;
         if(value.width<=0.f || value.height<=0.f) return; // minimized windows never replace valid geometry

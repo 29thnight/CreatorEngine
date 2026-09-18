@@ -116,6 +116,7 @@ namespace editor::workspace
             bool docking = false, known = false; int roots = 0, dockSpaces = 0;
             const std::regex id(R"(\bID=0x([0-9A-Fa-f]+))"), parent(R"(\bParent=0x([0-9A-Fa-f]+))");
             const std::regex dock(R"(^DockId=0x([0-9A-Fa-f]+))"), size(R"(^Size=(-?[0-9]+),(-?[0-9]+)$)");
+            const std::regex viewport(R"(^ViewportPos=(-?[0-9]+),(-?[0-9]+)$)");
             std::smatch m;
             while (std::getline(input,line))
             {
@@ -132,6 +133,15 @@ namespace editor::workspace
                     require(std::regex_match(line,m,size), "Invalid window size");
                     const auto x=std::stoll(m[1]), y=std::stoll(m[2]);
                     require(x>0 && y>0 && x<=65536 && y<=65536, "Window size out of range");
+                }
+                // 멀티뷰포트를 켜면서 생긴 키다. 검증이 모르는 키는 무엇이 적혀 있어도
+                // 통과하므로, 값의 모양과 범위를 여기서 못 박는다 — 가상 데스크톱 좌표는
+                // 주 모니터 왼쪽/위가 **음수**라 부호를 허용한다.
+                if (known && line.starts_with("ViewportPos="))
+                {
+                    require(std::regex_match(line,m,viewport), "Invalid viewport position");
+                    const auto x=std::stoll(m[1]), y=std::stoll(m[2]);
+                    require(x>=-65536 && x<=65536 && y>=-65536 && y<=65536, "Viewport position out of range");
                 }
                 if (known && std::regex_search(line,m,dock)) docks.push_back(std::stoul(m[1],nullptr,16));
                 if (docking && (line.find("DockNode")!=std::string::npos || line.find("DockSpace")!=std::string::npos))
@@ -167,13 +177,34 @@ namespace editor::workspace
         catch(const std::exception& ex) { error=ex.what(); return false; }
     }
 
+    std::string strip_viewport_positions(std::string_view ini)
+    {
+        std::string out;
+        out.reserve(ini.size());
+        std::istringstream input{std::string(ini)};
+        std::string line;
+        while (std::getline(input, line))
+        {
+            std::string_view view{line};
+            if (!view.empty() && view.back() == '\r') view.remove_suffix(1);
+            // 줄 단위로만 본다 — 섹션을 따질 필요가 없다. 이 두 키는 `[Window]` 절에서만
+            // 나오고(imgui.cpp `WindowSettingsHandler_WriteAll`), 다른 절에 같은 이름의
+            // 키가 없다. 남기는 줄은 원본 그대로 옮겨 줄 끝(CRLF)을 건드리지 않는다.
+            if (view.starts_with("ViewportPos=") || view.starts_with("ViewportId=")) continue;
+            out += line;
+            out += '\n';
+        }
+        return out;
+    }
+
     std::string encode(const document& d)
     {
         std::ostringstream out;
         out << "CreatorWorkspace " << schema_version << '\n' << "name " << std::quoted(d.name)
             << "\npreset " << std::quoted(d.preset)
             << "\nviewport " << std::quoted(d.viewport) << "\nversions " << d.theme_version << ' ' << d.imgui_version
-            << "\ngeometry " << d.dpi << ' ' << d.width << ' ' << d.height << ' ' << d.tree_width << '\n';
+            << "\ngeometry " << d.dpi << ' ' << d.width << ' ' << d.height << ' ' << d.tree_width
+            << "\nmonitors " << std::quoted(d.monitors) << '\n';
         for(const auto& [id,open]:d.panels) out << "panel " << std::quoted(id) << ' ' << (open?1:0) << '\n';
         out << "--ini--\n" << d.ini; return out.str();
     }
@@ -194,6 +225,7 @@ namespace editor::workspace
             else if(keyName=="viewport") in >> std::quoted(d.viewport);
             else if(keyName=="versions") in >> d.theme_version >> d.imgui_version;
             else if(keyName=="geometry") in >> d.dpi >> d.width >> d.height >> d.tree_width;
+            else if(keyName=="monitors") in >> std::quoted(d.monitors);
             else if(keyName=="panel")
             {
                 std::string id; int open{}; in >> std::quoted(id) >> open;
@@ -204,9 +236,12 @@ namespace editor::workspace
         }
         // v1 에는 `preset` 이 없다. 그 하나만큼 적게 요구하고 기본값을 남긴다 — 버전을
         // 하나 올렸다고 쓰던 배치를 "복구했습니다" 한 줄과 함께 버리지 않는다.
-        require(fields.size()==static_cast<std::size_t>(version>=2?5:4) &&
+        require(fields.size()==static_cast<std::size_t>(version>=3?6:version>=2?5:4) &&
             !d.name.empty() && d.name.size()<=128 &&
-            !d.preset.empty() && d.preset.size()<=64, "Missing workspace metadata");
+            !d.preset.empty() && d.preset.size()<=64 &&
+            // 지문은 **비어 있어도 된다** — 열거에 실패한 환경이 그렇게 적는다. 그때는
+            // "모르는 환경" 이라 뷰포트 좌표를 못 믿는 쪽으로 가므로 거절할 이유가 없다.
+            d.monitors.size()<=512, "Missing workspace metadata");
         require(std::isfinite(d.dpi) && d.dpi>=0.5f && d.dpi<=8.f && std::isfinite(d.width) && d.width>0.f && d.width<=65536.f &&
             std::isfinite(d.height) && d.height>0.f && d.height<=65536.f && std::isfinite(d.tree_width) && d.tree_width>=140.f && d.tree_width<=600.f,
             "Invalid workspace geometry");
