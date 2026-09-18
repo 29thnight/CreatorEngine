@@ -310,6 +310,12 @@ namespace editor
         float window_dpi_scale{ 0.f };
         float viewport_dpi_scale{ 0.f };
         bool dpi_matches{ false };
+        /// 운영체제 뷰포트(멀티뷰포트)가 켜져 있는가. **판정이 아니라 사실**이다 —
+        /// `dpi_matches` 는 메인 뷰포트 기준의 등식만 말하므로, 보조 창이 다른 DPI 의
+        /// 모니터에 있을 수 있다는 것을 읽는 쪽이 알아야 한다. 예전에는 이 값이
+        /// `dpi_matches` 를 **뒤집는 조건**이었는데, 그것은 멀티뷰포트가 꺼져 있던
+        /// 시절(9-11 W1)을 기술한 것이라 켜는 순간 등식과 무관하게 거짓이 됐다.
+        bool os_viewports_enabled{ false };
         bool theme_mapping_matches{ false };
         bool geometry_matches{ false };
 

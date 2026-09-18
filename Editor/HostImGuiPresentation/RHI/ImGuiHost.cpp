@@ -52,6 +52,21 @@ namespace
             // 커서 모양은 ImGui가 결정하지만 SetCursor는 HWND 소유 스레드에서
             // 적용한다. Win32 backend의 PresentationThread 직접 호출을 막는다.
             io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
+            // ★ 이 셋은 **백엔드 Init 보다 먼저** 서야 한다. 예전에는 `NewFrame` 에서
+            //   매 프레임 세웠는데, 그 자리는 이미 늦다 — DX12 백엔드는 `Init` 안에서
+            //   `ViewportsEnable` 을 보고 그때만 멀티뷰포트 인터페이스를 등록한다
+            //   (imgui_impl_dx12.cpp:826). 늦게 켜면 `RendererHasViewports` 만 서고
+            //   보조 창을 그릴 자가 없어, 패널을 창 밖으로 끌어낸 순간 빈 창이 뜨거나
+            //   `RenderPlatformWindowsDefault` 가 없는 핸들러를 부른다. Win32 쪽은
+            //   `Init` 이 조건 없이 등록하므로(imgui_impl_win32.cpp:200) 플랫폼 절반만
+            //   살아 있는 모양이 된다 — 반쯤 켜진 상태가 가장 나쁘다.
+            //
+            //   `ViewportsEnable` 은 팝업·패널을 메인 창 **밖으로** 꺼내기 위한 것이다.
+            //   ImGui 에서 창 경계를 넘는 그림은 운영체제 창을 따로 여는 길밖에 없다.
+            io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+            io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+            io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
             io.ConfigDpiScaleFonts = true;
             static const std::string kIniPath =
                 PathFinder::ConfigPath("imgui.ini").string();
@@ -148,10 +163,12 @@ namespace
             // (mouse=false · keyboard=true(NavActive) · text=false). 계획서 §1.8 은
             // 이 줄이 입력 소유 신호를 지운다고 봤는데, 지운 것이 아니라 아무
             // 일도 하지 않고 있었다. 신호를 읽는 자리는 ViewportHost 의 게시본이다.
-            io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-            io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-            io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports |
-                ImGuiBackendFlags_HasMouseCursors;
+            // ConfigFlags 와 `PlatformHasViewports` 를 매 프레임 세우던 줄을 걷었다.
+            // 설정 플래그는 백엔드 Init 앞으로 옮겼고(Initialize 의 주석), 백엔드
+            // 능력 플래그는 **백엔드가 스스로 세운다** — Win32 는 `Init` 에서
+            // `PlatformHasViewports` 를, DX12 는 `RendererHasViewports` 를 세운다.
+            // 소비자가 대신 세우면 백엔드가 실제로 등록했는지와 무관하게 참이 되어,
+            // "능력 있음" 이 거짓말이 될 수 있는 자리가 생긴다.
             ImGui::NewFrame();
         }
 

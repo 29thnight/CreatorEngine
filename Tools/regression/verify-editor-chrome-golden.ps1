@@ -1,4 +1,4 @@
-# PHASE 21 W8-2 — 3D 렌더 영역을 제외한 chrome crop visual golden.
+﻿# PHASE 21 W8-2 — 3D 렌더 영역을 제외한 chrome crop visual golden.
 #
 # 계획서 W8: *"3D 씬 렌더 영역을 제외한 chrome crop visual golden을 만든다. 씬뷰
 # 전체를 제외하지 않고 W2-V의 툴바·방향 기즈모·HUD를 포함한다."*
@@ -94,6 +94,26 @@ Add-Type -Namespace ChromeGolden -Name Win -MemberDefinition @'
 public struct RECT { public int Left, Top, Right, Bottom; }
 public struct POINT { public int X, Y; }
 '@
+
+# ── 제품 좌표 → 비트맵 좌표 ────────────────────────────────────────────────
+#
+# 제품이 내는 화면 좌표의 **원점이 어디인가**는 멀티뷰포트 설정이 정한다.
+#
+#   꺼짐 — ImGui 의 메인 뷰포트가 (0,0) 이라 좌표가 곧 클라이언트 좌표다.
+#   켜짐 — 메인 뷰포트가 창의 화면 위치를 들고 있어 좌표가 그만큼 밀려 있다.
+#          `PrintWindow` 가 만드는 비트맵의 원점은 여전히 클라이언트이므로,
+#          빼 주지 않으면 가릴 사각형이 통째로 비트맵 밖으로 나간다.
+#
+# 2026-09-18 에 그 전환이 일어났고, 이 파일은 좌표를 그대로 썼다. 가림이
+# 0 화소가 되어 로그 누적 칸이 회차마다 갈렸고 재현 축이 붉었다 — 골든 대조는
+# 환경이 달라 이미 건너뛰던 참이라, 붉은 이유가 픽셀이 아니라 **좌표계**였다.
+$script:frameOffset = @(0, 0)
+function Set-FrameOffset([bool]$osViewports, $origin) {
+    if ($osViewports -and $null -ne $origin) { $script:frameOffset = @([int]$origin[0], [int]$origin[1]) }
+    else { $script:frameOffset = @(0, 0) }
+}
+function ToShotX([double]$v) { return $v - $script:frameOffset[0] }
+function ToShotY([double]$v) { return $v - $script:frameOffset[1] }
 
 # 화소를 PowerShell 루프로 훑으면 한 판에 백만 번이 넘는다. 가리기와 대조는
 # 컴파일된 쪽에 둔다. 다만 **이미지 형식은 모른다** — 바이트 배열만 받는다.
@@ -244,6 +264,9 @@ foreach ($round in $rounds) {
     if ($null -ne $round.select) { $lines += ("scene.select " + $round.select); $lines += 'wait 900' }
     $lines += 'editor.sceneview'
     $lines += 'editor.dock'
+    # 좌표계가 무엇인지 묻는다. 멀티뷰포트가 켜지면 위 두 명령이 내는 화면 좌표가
+    # 클라이언트 기준이 아니라 **가상 데스크톱 기준**이 된다(아래 Get-MaskedShot).
+    $lines += 'editor.theme'
     # 회차마다 **같은 파일 이름**을 서로 다른 폴더에 쓴다. `scene.save` 는 씬 이름을
     # 파일 이름으로 바꾸고 그 이름은 Hierarchy 머리 행에 그려진다 — 회차마다 이름이
     # 다르면 그 행 하나 때문에 회차 대조가 저절로 달라져, 스크롤 축을 재려던 단정이
@@ -320,6 +343,7 @@ $env:CREATOR_EDITOR_LEGACY_INI = Join-Path $work 'no-legacy.ini'
 New-Item -ItemType Directory -Force -Path $env:CREATOR_EDITOR_WORKSPACE_DIR | Out-Null
 
 $exitCode = -1
+$captureOrigins = @{}
 try {
     $proc = Start-Process -FilePath $Exe -WorkingDirectory (Split-Path $Exe) -PassThru `
         -ArgumentList @('--script', ('"' + $scriptPath + '"'), '--result-format', 'jsonl',
@@ -337,6 +361,13 @@ try {
         if (-not (Test-Path -LiteralPath $mark)) { throw ("표지를 못 봤다: " + $round.name) }
         $handle = Resolve-EditorWindow $proc.Id
         Save-ClientCapture $handle (Join-Path $work ($round.name + '.png'))
+        # ★ 비트맵의 (0,0) 이 화면 어디인가. 멀티뷰포트가 켜지면 제품이 내는 좌표가
+        #   이 원점만큼 밀려 있으므로, 빼 주지 않으면 가릴 사각형이 통째로 비트맵
+        #   밖으로 나간다(2026-09-18: 그래서 "로그 누적 칸 0 화소" 가 났다).
+        #   이 프로세스는 위에서 DPI 인식을 선언했으므로 여기 값은 물리 픽셀이다.
+        $clientOrigin = New-Object ChromeGolden.Win+POINT
+        [void][ChromeGolden.Win]::ClientToScreen($handle, [ref]$clientOrigin)
+        $captureOrigins[$round.name] = @($clientOrigin.X, $clientOrigin.Y)
         Write-Host ("  캡처: " + $round.name)
     }
 
@@ -361,6 +392,7 @@ Assert (0 -eq $failedRows.Count) ("실패한 명령: " + (($failedRows | ForEach
 
 $views = @($rows | Where-Object { $_.command -eq 'editor.sceneview' })
 $docks = @($rows | Where-Object { $_.command -eq 'editor.dock' })
+$themes = @($rows | Where-Object { $_.command -eq 'editor.theme' })
 Assert ($views.Count -eq $rounds.Count) ("editor.sceneview 결과 수가 회차 수와 다르다: " + $views.Count)
 Assert ($docks.Count -eq $rounds.Count) ("editor.dock 결과 수가 회차 수와 다르다: " + $docks.Count)
 if ($script:failures.Count -gt 0) {
@@ -374,6 +406,11 @@ $envPath = Join-Path $GoldenDir 'environment.json'
 # ── 환경 기록. 골든이 어떤 자 아래에서 떴는지 함께 적는다 ──────────────────
 $firstDock = $docks[0].data
 $firstView = $views[0].data
+$firstOsViewports = $(if ($themes.Count -gt 0 -and $null -ne $themes[0].data) { [bool]$themes[0].data.osViewportsEnabled } else { $false })
+# ★ 환경에 적는 사각형도 **비트맵 좌표**여야 한다. 보정 전 좌표를 적으면 좌표계가
+#   바뀐 것만으로 "골든이 뜬 환경과 다르다" 가 되어 픽셀 판정이 통째로 건너뛰어진다
+#   (2026-09-18: imageMinX 골든 0 / 지금 480 — 480 은 창의 화면 위치였다).
+Set-FrameOffset $firstOsViewports $captureOrigins[$rounds[0].name]
 $shot0 = Read-Shot (Join-Path $work ($rounds[0].name + '.png'))
 $environment = [ordered]@{
     captureWidth   = $shot0.width
@@ -382,35 +419,39 @@ $environment = [ordered]@{
     rootWidth      = [double]$firstDock.rootWidth
     rootHeight     = [double]$firstDock.rootHeight
     imguiVersion   = [string]$firstDock.imguiHeaderVersion
-    imageMinX      = [double]$firstView.imageMin[0]
-    imageMinY      = [double]$firstView.imageMin[1]
-    imageMaxX      = [double]$firstView.imageMax[0]
-    imageMaxY      = [double]$firstView.imageMax[1]
+    imageMinX      = [double](ToShotX $firstView.imageMin[0])
+    imageMinY      = [double](ToShotY $firstView.imageMin[1])
+    imageMaxX      = [double](ToShotX $firstView.imageMax[0])
+    imageMaxY      = [double](ToShotY $firstView.imageMax[1])
     imageReady     = [bool]$firstView.imageReady
     toolbarHeight  = [double]$firstView.toolbarHeight
     gizmoRadius    = [double]$firstView.gizmoRadius
     objects        = $Objects
     revealAt       = $RevealAt
     nestDepth      = $NestDepth
+    # 좌표계가 바뀌면 같은 환경이라도 골든이 다른 그림이 된다 — 건너뜀 판정이
+    # 이것을 보고 결정할 수 있도록 남긴다.
+    osViewports    = $(if ($themes.Count -gt 0 -and $null -ne $themes[0].data) { [bool]$themes[0].data.osViewportsEnabled } else { $false })
 }
+
 
 function Get-MaskedShot($roundName, $view, $dock) {
     $shot = Read-Shot (Join-Path $work ($roundName + '.png'))
     $outer = @(
-        [int][Math]::Floor($view.imageMin[0]), [int][Math]::Floor($view.imageMin[1]),
-        [int][Math]::Ceiling($view.imageMax[0]), [int][Math]::Ceiling($view.imageMax[1]))
+        [int][Math]::Floor((ToShotX $view.imageMin[0])), [int][Math]::Floor((ToShotY $view.imageMin[1])),
+        [int][Math]::Ceiling((ToShotX $view.imageMax[0])), [int][Math]::Ceiling((ToShotY $view.imageMax[1])))
     $keep = New-Object 'int[][]' 2
     $keep[0] = @(
-        [int][Math]::Floor($view.left[0]), [int][Math]::Floor($view.left[1]),
-        [int][Math]::Ceiling($view.left[0] + $view.leftWidth),
-        [int][Math]::Ceiling($view.left[1] + $view.toolbarHeight))
+        [int][Math]::Floor((ToShotX $view.left[0])), [int][Math]::Floor((ToShotY $view.left[1])),
+        [int][Math]::Ceiling((ToShotX ($view.left[0] + $view.leftWidth))),
+        [int][Math]::Ceiling((ToShotY ($view.left[1] + $view.toolbarHeight))))
     $keep[1] = @(
-        [int][Math]::Floor($view.right[0]), [int][Math]::Floor($view.right[1]),
-        [int][Math]::Ceiling($view.right[0] + $view.rightWidth),
-        [int][Math]::Ceiling($view.right[1] + $view.toolbarHeight))
+        [int][Math]::Floor((ToShotX $view.right[0])), [int][Math]::Floor((ToShotY $view.right[1])),
+        [int][Math]::Ceiling((ToShotX ($view.right[0] + $view.rightWidth))),
+        [int][Math]::Ceiling((ToShotY ($view.right[1] + $view.toolbarHeight))))
     $disc = $null
     if ($view.gizmoVisible) {
-        $disc = @([int][Math]::Round($view.gizmoCenter[0]), [int][Math]::Round($view.gizmoCenter[1]),
+        $disc = @([int][Math]::Round((ToShotX $view.gizmoCenter[0])), [int][Math]::Round((ToShotY $view.gizmoCenter[1])),
                   [int][Math]::Ceiling($view.gizmoRadius))
     }
     $masked = [ChromePixels]::MaskExcept($shot.bytes, $shot.width, $shot.height, $outer, $keep, $disc)
@@ -418,8 +459,8 @@ function Get-MaskedShot($roundName, $view, $dock) {
     if ($dock.PSObject.Properties.Name -contains 'statusCountsSlot') {
         $slot = $dock.statusCountsSlot
         $countsOuter = @(
-            [int][Math]::Floor($slot[0]), [int][Math]::Floor($slot[1]),
-            [int][Math]::Ceiling($slot[2]), [int][Math]::Ceiling($slot[3]))
+            [int][Math]::Floor((ToShotX $slot[0])), [int][Math]::Floor((ToShotY $slot[1])),
+            [int][Math]::Ceiling((ToShotX $slot[2])), [int][Math]::Ceiling((ToShotY $slot[3])))
         $countsMasked = [ChromePixels]::MaskExcept($shot.bytes, $shot.width, $shot.height,
             $countsOuter, $null, $null)
     }
@@ -432,14 +473,21 @@ $prepared = @()
 for ($at = 0; $at -lt $rounds.Count; ++$at) {
     $name = $rounds[$at].name
     $view = $views[$at].data
+    $osViewports = $false
+    if ($at -lt $themes.Count -and $null -ne $themes[$at].data) {
+        $osViewports = [bool]$themes[$at].data.osViewportsEnabled
+    }
+    Set-FrameOffset $osViewports $captureOrigins[$name]
     $made = Get-MaskedShot $name $view $docks[$at].data
     Assert ($made.masked -gt 0) "${name}: 가린 화소가 0 이다 — image 사각형이 화면 밖이거나 비었다"
     # 칸을 못 받으면 조용히 안 가리고 넘어가지 않는다. 가리지 못한 채 떠진 골든은
     # 다음 실행의 재현 축을 다시 붉힌다.
     Assert ($made.countsMasked -gt 0) "${name}: 로그 누적 칸을 가리지 못했다 — editor.dock 에 statusCountsSlot 이 없거나 비었다"
     $prepared += @{ name = $name; shot = $made.shot; masked = $made.masked; view = $view;
-                    compareWith = $rounds[$at].compareWith }
-    Write-Host ("  가림: " + $name + " — " + $made.masked + " 화소 · 로그 누적 칸 " + $made.countsMasked + " 화소")
+                    osViewports = $osViewports; compareWith = $rounds[$at].compareWith }
+    Write-Host ("  가림: " + $name + " — " + $made.masked + " 화소 · 로그 누적 칸 " +
+        $made.countsMasked + " 화소 · 좌표계 " +
+        $(if ($osViewports) { "가상 데스크톱(원점 " + ($script:frameOffset -join ',') + " 을 뺐다)" } else { "클라이언트" }))
 }
 
 if ($Update) {
@@ -542,7 +590,9 @@ foreach ($pair in $stimulus) {
     if ($crossDiff[0] -le 0) { continue }
     # 차이는 씬 이미지 **바깥**에만 있어야 한다. 안쪽은 가려 놓았으므로 안쪽에서
     # 차이가 나면 가리기가 샌 것이다.
-    $imageRight = [int][Math]::Ceiling($a.view.imageMax[0])
+    # 비트맵 좌표로 옮겨 잰다 — `$crossDiff` 는 비트맵 열 번호를 돌려준다.
+    Set-FrameOffset $a.osViewports $captureOrigins[$a.name]
+    $imageRight = [int][Math]::Ceiling((ToShotX $a.view.imageMax[0]))
     Assert ($crossDiff[1] -ge $imageRight) ($pair.left + ' ↔ ' + $pair.right +
         ' 의 차이가 씬 이미지 열 안쪽에서 시작한다: x ' + $crossDiff[1] + ' < ' + $imageRight + ' — 가리기가 샜다')
     Write-Host ("  자극 확인: " + $pair.left + " ↔ " + $pair.right + " 다른 화소 " + $crossDiff[0] +

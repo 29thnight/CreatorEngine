@@ -1962,6 +1962,9 @@ namespace ConsoleCmd
         data.Set("viewportDpiScale", CommandData::Double(audit.viewport_dpi_scale));
         data.Set("renderedFontSize", CommandData::Double(snapshot.rendered_font_size));
         data.Set("dpiMatches", CommandData::Bool(audit.dpi_matches));
+        // 멀티뷰포트 상태. `dpiMatches` 는 **메인 뷰포트 기준**의 등식이므로,
+        // 이것이 참이면 보조 창이 다른 DPI 에 있을 수 있다는 뜻이다(판정이 아니라 사실).
+        data.Set("osViewportsEnabled", CommandData::Bool(audit.os_viewports_enabled));
         data.Set("perMonitorDpiAware", CommandData::Bool(snapshot.per_monitor_dpi_aware));
         data.Set("themeMappingMatches", CommandData::Bool(audit.theme_mapping_matches));
         data.Set("geometryMatches", CommandData::Bool(audit.geometry_matches));

@@ -234,8 +234,13 @@ namespace editor
         audit.window_dpi_scale = snapshot.window_dpi_scale;
         audit.viewport_dpi_scale = snapshot.viewport_dpi_scale;
         const auto near = [](float a, float b) { return std::abs(a - b) < 0.0001f; };
+        // ★ `!os_viewports_enabled` 를 조건에서 걷었다. 그 줄은 멀티뷰포트가 꺼져
+        //   있던 시절을 기술한 것이라, 켜는 순간 세 값이 전부 같아도(실측 window
+        //   1.500 · viewport 1.500 · font 1.500) 판정만 거짓이 됐다. 등식은 메인
+        //   뷰포트 기준으로 그대로 성립한다 — 멀티뷰포트가 켜졌다는 사실은 판정을
+        //   뒤집는 대신 `audit.os_viewports_enabled` 로 **실어 보낸다**.
+        audit.os_viewports_enabled = snapshot.os_viewports_enabled;
         audit.dpi_matches = snapshot.dpi_scaling_enabled && snapshot.per_monitor_dpi_aware &&
-            !snapshot.os_viewports_enabled &&
             snapshot.window_dpi_scale > 0.f &&
             near(snapshot.font_scale_dpi, snapshot.window_dpi_scale) &&
             near(snapshot.viewport_dpi_scale, snapshot.window_dpi_scale);
@@ -550,10 +555,10 @@ namespace editor
         // 같은 줄에 적는다 — 어느 API 가 정식인지가 판에 달린 판단이라 근거를 떼어 두지 않는다.
         char scaleBuffer[256]{};
         std::snprintf(scaleBuffer, sizeof(scaleBuffer),
-            "[AUDIT] dpi window=%.3f viewport=%.3f font=%.3f matched=%d geometry=%d tokens=%d\n",
+            "[AUDIT] dpi window=%.3f viewport=%.3f font=%.3f matched=%d geometry=%d tokens=%d osViewports=%d\n",
             audit.window_dpi_scale, audit.viewport_dpi_scale, audit.font_scale_dpi,
             audit.dpi_matches ? 1 : 0, audit.geometry_matches ? 1 : 0,
-            audit.theme_mapping_matches ? 1 : 0);
+            audit.theme_mapping_matches ? 1 : 0, audit.os_viewports_enabled ? 1 : 0);
         out += scaleBuffer;
         out += "[NOTE] imgui " + snapshot.imgui_version +
                " · FontScaleMain(user) × FontScaleDpi(monitor), geometry는 같은 곱을 한 번 적용\n";
