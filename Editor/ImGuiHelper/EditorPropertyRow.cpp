@@ -28,6 +28,12 @@
 
 namespace editor::widgets
 {
+    namespace
+    {
+        // 값 칸 장부는 파일 아래에 있다(W2-I5). 신고하는 자리가 위라 이름만 먼저 세운다.
+        void announce_property_field(std::uint32_t id, float width) noexcept;
+    }
+
     void compact_property_number(char* text) noexcept
     {
         if (!text || !*text) return;
@@ -54,6 +60,11 @@ namespace editor::widgets
     bool drag_property_float(const char* label, float* value, float speed,
         float min, float max, const char* format, int flags, bool joined_left)
     {
+        if (!ImGui::GetCurrentWindow()->SkipItems)
+        {
+            announce_property_field(ImGui::GetCurrentWindow()->GetID(label),
+                ImGui::CalcItemWidth());
+        }
         if (!InspectorStyleActive())
             return ImGui::DragFloat(label, value, speed, min, max, format, flags);
 
@@ -193,23 +204,40 @@ namespace editor::widgets
         float speed, float min, float max, const char* format, int flags)
     {
         if (ImGui::GetCurrentWindow()->SkipItems) return false;
+        // ── 전환 (W2-I5) ─────────────────────────────────────────────────
+        //
+        // 칸 여럿이 한 줄을 나누면 줄이 좁아질수록 칸은 그 수만큼 빨리 좁아진다.
+        // 이 위젯은 그것을 모른 채 언제나 가로로 나눴고, 240 폭에서 `vector3` 의
+        // 칸이 **24 px** 이었다 — 오른쪽 끝은 작업 영역 안이라 넘침은 0 이고,
+        // 화면에는 숫자를 읽을 수 없는 칸 셋만 남는다. 축 위젯
+        // (`EditorAxisField3`)은 같은 상황에서 이미 세로로 내려간다. 같은 하한을
+        // 쓴다 — 하한도 그쪽처럼 폰트에서 나오므로 배율을 저절로 따라간다.
+        const float total = ImGui::CalcItemWidth();
+        const float inner = ImGui::GetStyle().ItemInnerSpacing.x;
+        const float slot = (total - inner * static_cast<float>(count - 1)) /
+            static_cast<float>(count);
+        const bool stacked = slot < property_axis_value_min_width();
+
         bool changed = false;
+        begin_axis_fields();
         ImGui::BeginGroup();
         ImGui::PushID(label);
-        ImGui::PushMultiItemsWidths(count, ImGui::CalcItemWidth());
+        if (!stacked) ImGui::PushMultiItemsWidths(count, total);
         for (int i = 0; i < count; ++i)
         {
             ImGui::PushID(i);
-            if (i) ImGui::SameLine(0.f, ImGui::GetStyle().ItemInnerSpacing.x);
+            if (i && !stacked) ImGui::SameLine(0.f, inner);
+            if (stacked) ImGui::SetNextItemWidth(total);
             changed |= drag_property_float("", values + i, speed, min, max, format, flags);
             ImGui::PopID();
-            ImGui::PopItemWidth();
+            if (!stacked) ImGui::PopItemWidth();
         }
         ImGui::PopID();
+        end_axis_fields();
         const char* end = ImGui::FindRenderedTextEnd(label);
-        if (label != end)
+        if (label != end && !stacked)
         {
-            ImGui::SameLine(0.f, ImGui::GetStyle().ItemInnerSpacing.x);
+            ImGui::SameLine(0.f, inner);
             ImGui::TextEx(label, end);
         }
         ImGui::EndGroup();
@@ -474,8 +502,12 @@ namespace editor::widgets
 
         inputs.gap = ThemePixels(EditorThemeTokens::ItemGapX);
         inputs.axis_gap = style.ItemInnerSpacing.x;
+        // 버튼 하나는 정사각이고 **앞에 간격이 하나 붙는다**(`SameLine(0, inner)`).
+        // 간격을 빼먹으면 예약이 버튼 수만큼 모자라, 값 칸이 그만큼 오른쪽으로
+        // 밀린다 — 배열 원소 줄에서 정확히 `버튼 수 × inner` 만큼 넘쳤다(W2-I5).
         inputs.aux_reserve = aux_button_count > 0
-            ? ImGui::GetFrameHeight() * static_cast<float>(aux_button_count)
+            ? (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x) *
+                static_cast<float>(aux_button_count)
             : 0.f;
         inputs.hysteresis = inputs.gap;
         inputs.editing = ImGui::IsAnyItemActive();
@@ -642,6 +674,73 @@ namespace editor::widgets
     namespace
     {
         std::uint64_t g_propertyLineCount = 0;
+        property_field_tally g_fieldTally{};
+
+        // 지금 그리는 줄의 이름. 값 위젯은 자기 라벨이 빈 문자열인 경우가 많아
+        // (`drag_property_floats` 의 축) 줄 쪽 이름을 들고 있어야 한다.
+        char g_currentLineLabel[48]{};
+
+        // 축 칸 구간의 깊이. `drag_property_floats` 안에서 `draw_axis_field3` 가
+        // 다시 열릴 수 있으므로 켜짐/꺼짐이 아니라 수다.
+        int g_axisFieldDepth = 0;
+
+        void copy_label(char* target, const char* label) noexcept
+        {
+            if (nullptr == label) { target[0] = '\0'; return; }
+            std::size_t index = 0;
+            for (; index + 1 < 48 && label[index] != '\0'; ++index)
+            {
+                target[index] = label[index];
+            }
+            target[index] = '\0';
+        }
+
+        float smaller_nonzero(float a, float b) noexcept
+        {
+            if (a <= 0.f) return b;
+            if (b <= 0.f) return a;
+            return ImMin(a, b);
+        }
+
+        // 순서를 담는다. 같은 ID 집합이라도 그린 차례가 바뀌면 다른 값이다 —
+        // 칸이 서로 자리를 바꾸는 것도 신원이 바뀐 것이기 때문이다.
+        std::uint32_t mix_field_id(std::uint32_t digest, std::uint32_t id) noexcept
+        {
+            return (digest * 1000003u) ^ id;
+        }
+
+        void announce_property_field(std::uint32_t id, float width) noexcept
+        {
+            if (0 == g_fieldTally.fields + g_fieldTally.axis_fields)
+            {
+                const ImVec2 origin = ImGui::GetCurrentWindow()->DC.CursorPos;
+                g_fieldTally.first_field_x = origin.x;
+                g_fieldTally.first_field_y = origin.y;
+                g_fieldTally.first_field_w = width;
+                g_fieldTally.first_field_h = ImGui::GetFrameHeight();
+            }
+            if (g_axisFieldDepth > 0)
+            {
+                ++g_fieldTally.axis_fields;
+                if (g_fieldTally.min_axis_width <= 0.f || width < g_fieldTally.min_axis_width)
+                {
+                    copy_label(g_fieldTally.min_axis_label, g_currentLineLabel);
+                }
+                g_fieldTally.min_axis_width =
+                    smaller_nonzero(g_fieldTally.min_axis_width, width);
+            }
+            else
+            {
+                ++g_fieldTally.fields;
+                if (g_fieldTally.min_field_width <= 0.f || width < g_fieldTally.min_field_width)
+                {
+                    copy_label(g_fieldTally.min_field_label, g_currentLineLabel);
+                }
+                g_fieldTally.min_field_width =
+                    smaller_nonzero(g_fieldTally.min_field_width, width);
+            }
+            g_fieldTally.digest = mix_field_id(g_fieldTally.digest, id);
+        }
     }
 
     std::uint64_t property_line_count() noexcept
@@ -649,9 +748,73 @@ namespace editor::widgets
         return g_propertyLineCount;
     }
 
+    property_field_tally take_property_field_tally() noexcept
+    {
+        const property_field_tally taken = g_fieldTally;
+        g_fieldTally = property_field_tally{};
+        return taken;
+    }
+
+    void merge_property_field_tally(const property_field_tally& tally) noexcept
+    {
+        g_fieldTally.lines += tally.lines;
+        g_fieldTally.fields += tally.fields;
+        g_fieldTally.min_line_value =
+            smaller_nonzero(g_fieldTally.min_line_value, tally.min_line_value);
+        if (0 == g_fieldTally.fields + g_fieldTally.axis_fields && tally.first_field_w > 0.f)
+        {
+            g_fieldTally.first_field_x = tally.first_field_x;
+            g_fieldTally.first_field_y = tally.first_field_y;
+            g_fieldTally.first_field_w = tally.first_field_w;
+            g_fieldTally.first_field_h = tally.first_field_h;
+        }
+        g_fieldTally.axis_fields += tally.axis_fields;
+        if (tally.min_field_width > 0.f &&
+            (g_fieldTally.min_field_width <= 0.f ||
+             tally.min_field_width < g_fieldTally.min_field_width))
+        {
+            copy_label(g_fieldTally.min_field_label, tally.min_field_label);
+        }
+        if (tally.min_axis_width > 0.f &&
+            (g_fieldTally.min_axis_width <= 0.f ||
+             tally.min_axis_width < g_fieldTally.min_axis_width))
+        {
+            copy_label(g_fieldTally.min_axis_label, tally.min_axis_label);
+        }
+        g_fieldTally.min_field_width =
+            smaller_nonzero(g_fieldTally.min_field_width, tally.min_field_width);
+        g_fieldTally.min_axis_width =
+            smaller_nonzero(g_fieldTally.min_axis_width, tally.min_axis_width);
+        g_fieldTally.digest = mix_field_id(g_fieldTally.digest, tally.digest);
+    }
+
+    void begin_axis_fields() noexcept
+    {
+        ++g_axisFieldDepth;
+    }
+
+    void end_axis_fields() noexcept
+    {
+        if (g_axisFieldDepth > 0) --g_axisFieldDepth;
+    }
+
+    float property_value_min_width()
+    {
+        return ImGui::CalcTextSize(kValueSample).x + ImGui::GetStyle().FramePadding.x * 2.f;
+    }
+
+    float property_axis_value_min_width()
+    {
+        return ImGui::CalcTextSize(kAxisSample).x + ImGui::GetStyle().FramePadding.x * 2.f;
+    }
+
     float begin_property_line(const char* label, const property_layout_metrics& metrics)
     {
         ++g_propertyLineCount;
+        ++g_fieldTally.lines;
+        g_fieldTally.min_line_value =
+            smaller_nonzero(g_fieldTally.min_line_value, metrics.value_col);
+        copy_label(g_currentLineLabel, label);
         IM_ASSERT(nullptr != label && "속성 줄은 이름이 있어야 한다");
         if (nullptr == label)
         {

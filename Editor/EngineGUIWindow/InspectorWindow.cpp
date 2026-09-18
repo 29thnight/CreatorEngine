@@ -172,6 +172,7 @@ namespace
 			, m_savedMax(m_window->DC.CursorMaxPos)
 			, m_start(m_window->DC.CursorPos)
 			, m_lines(editor::widgets::property_line_count())
+			, m_tally(editor::widgets::take_property_field_tally())
 		{
 			m_window->DC.CursorMaxPos = m_start;
 		}
@@ -186,6 +187,22 @@ namespace
 			body.open = open;
 			body.enabledToggle = enabledToggle;
 			body.propertyLines = editor::widgets::property_line_count() - m_lines;
+			// 이 본문 몫만 떠내고, 바깥 본문이 이어 세도록 둘을 되돌린다.
+			const auto mine = editor::widgets::take_property_field_tally();
+			body.fields = mine.fields;
+			body.minLineValue = mine.min_line_value;
+			body.minFieldWidth = mine.min_field_width;
+			body.narrowestField = mine.min_field_label;
+			body.axisFields = mine.axis_fields;
+			body.minAxisWidth = mine.min_axis_width;
+			body.narrowestAxis = mine.min_axis_label;
+			body.firstFieldX = mine.first_field_x;
+			body.firstFieldY = mine.first_field_y;
+			body.firstFieldW = mine.first_field_w;
+			body.firstFieldH = mine.first_field_h;
+			body.fieldDigest = mine.digest;
+			editor::widgets::merge_property_field_tally(m_tally);
+			editor::widgets::merge_property_field_tally(mine);
 			body.minX = m_start.x;
 			body.maxX = extent.x;
 			body.height = m_window->DC.CursorPos.y - m_start.y;
@@ -198,6 +215,7 @@ namespace
 		ImVec2 m_savedMax;
 		ImVec2 m_start;
 		std::uint64_t m_lines;
+		editor::widgets::property_field_tally m_tally;
 	};
 }
 
@@ -239,6 +257,14 @@ void editor::windows::draw_inspector()
 	bool visible = true;
 	if (probed)
 	{
+		// ★ 이 자식 창은 **탐색 범위를 가른다**(W2-I5 에서 실측). 폭을 정한 채로는
+		//   Tab 이 본문 안으로 들어가지 못한다 — 넣은 키 10 회에 `navId` 가 한 번도
+		//   움직이지 않았다. `ImGuiChildFlags_NavFlattened` 는 스크롤하는 자식에는
+		//   쓸 수 없어(ImGui 의 제약) 여기서는 길이 아니다.
+		//   그래서 폭을 정한 채의 편집 자극은 키가 아니라 포인터로 한다
+		//   (`editor.nav pointer`·`press` — 값 칸의 사각형을 장부가 낸다).
+		//   키보드 탐색 계약 자체는 폭 창구 없이 도는 `verify-editor-keyboard-nav`
+		//   가 지킨다.
 		visible = ImGui::BeginChild("##InspectorWidthProbe",
 			ImVec2(editor::ThemePixels(requested) + ImGui::GetStyle().ScrollbarSize, 0.f),
 			ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -250,6 +276,9 @@ void editor::windows::draw_inspector()
 	const ImGuiWindow* const window = ImGui::GetCurrentWindow();
 	const float contentWidth = window->WorkRect.GetWidth();
 	const float contentMaxX = window->WorkRect.Max.x;
+	// 잘린 뒤 남는 폭. 자식 창이 부모 도크보다 넓으면 그 차이는 화면에 없다.
+	const float visibleWidth = ImMax(0.f,
+		ImMin(window->ClipRect.Max.x, contentMaxX) - window->WorkRect.Min.x);
 	if (probed)
 	{
 		ImGui::EndChild();
@@ -264,6 +293,10 @@ void editor::windows::draw_inspector()
 	g_inspectorSnapshot.fixture = g_inspectorFixture.load(std::memory_order_relaxed);
 	g_inspectorSnapshot.contentWidth = contentWidth;
 	g_inspectorSnapshot.contentMaxX = contentMaxX;
+	g_inspectorSnapshot.visibleWidth = visibleWidth;
+	g_inspectorSnapshot.valueMin = editor::widgets::property_value_min_width();
+	g_inspectorSnapshot.axisValueMin = editor::widgets::property_axis_value_min_width();
+	g_inspectorSnapshot.activeId = static_cast<std::uint32_t>(ImGui::GetActiveID());
 	g_inspectorSnapshot.bodies = g_inspectorBodies;
 }
 

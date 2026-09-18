@@ -38,6 +38,16 @@ namespace editor::windows
         bool open{};                  ///< 본문이 그려졌는가(접힌 패널은 거짓)
         bool enabledToggle{};         ///< 머리줄이 개별 활성 체크박스를 냈는가(W2-I1 정책)
         std::uint64_t propertyLines{};///< 이 본문이 지난 `begin_property_line` 수
+        std::uint64_t fields{};       ///< 이 본문이 그린 값 위젯 수(W2-I5)
+        float minLineValue{};         ///< 줄이 값에 준 폭의 최소(px)
+        float minFieldWidth{};        ///< 값 위젯이 받은 폭의 최소(px)
+        std::uint32_t fieldDigest{};  ///< 값 위젯 ID 를 그린 차례대로 섞은 값
+        std::string narrowestField{}; ///< 가장 좁은 칸이 있던 줄 이름
+        std::uint64_t axisFields{};   ///< 줄을 여럿이 나눠 쓰는 칸의 수
+        float minAxisWidth{};         ///< 그 칸이 받은 폭의 최소(px)
+        std::string narrowestAxis{};  ///< 그 칸이 있던 줄 이름
+        /// 이 본문이 처음 그린 값 칸의 화면 사각형(px). 밖에서 그 칸을 끌 수 있다.
+        float firstFieldX{}, firstFieldY{}, firstFieldW{}, firstFieldH{};
         float minX{}, maxX{};         ///< 본문 항목이 차지한 가로 범위
         float height{};
         float overflow{};             ///< 오른쪽 끝이 작업 영역을 넘은 px(0 이면 안 넘침)
@@ -53,6 +63,22 @@ namespace editor::windows
         bool fixture{};               ///< 리플렉션 자극물을 그리고 있는가
         float contentWidth{};         ///< 본문이 실제로 받은 작업 영역 폭(px)
         float contentMaxX{};          ///< 작업 영역 오른쪽 끝(px)
+
+        /// ★ 실제로 **보이는** 폭. 요청한 폭이 도크 패널보다 넓으면 본문은 그
+        /// 폭으로 배치되지만 패널 밖은 잘려 화면에 없다 — 작업 영역만 읽으면
+        /// 자가 "보이지 않는 배치" 를 재고도 초록이다(W2-I5 에서 실측: 요청
+        /// 1080 px 중 505 px 만 보였다). 이 값이 `contentWidth` 보다 작으면
+        /// 그만큼은 화면 밖이다.
+        float visibleWidth{};
+
+        // 최소 가독 폭(W2-I5). 값 칸이 이보다 좁으면 숫자를 읽을 수 없다.
+        // 폰트와 배율에서 나오므로 검사가 리터럴 대신 이 값과 견준다.
+        float valueMin{};             ///< 일반 값 칸의 하한
+        float axisValueMin{};         ///< 축 값 칸의 하한(badge 제외)
+
+        /// 지금 편집 중인 ImGui 아이템. 폭을 바꾸는 동안 이 값이 살아 있어야
+        /// *"편집 중 ID/Undo 손실"* 이 없다고 말할 수 있다.
+        std::uint32_t activeId{};
         std::vector<inspector_body> bodies{};
     };
 

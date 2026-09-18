@@ -153,17 +153,28 @@ namespace Meta::TypedDraw
     //
     // 예전에는 원소 위젯이 라벨 없이 ImGui 기본 폭(창의 2/3)으로 서고, 가변 배열은 그
     // 오른쪽에 `^`·`v` 버튼을 더 붙였다. 좁은 인스펙터에서 합성 자극물이 240 폭 323 px ·
-    // 320 폭 143 px 넘쳤고, 원소 24 개가 공통 줄을 지나지 않았다. 뒤에 붙는 정사각 버튼
-    // 몫은 값 폭에서 뺀다(`property_sheet::line_before_buttons` 와 같은 셈).
+    // 320 폭 143 px 넘쳤고, 원소 24 개가 공통 줄을 지나지 않았다.
+    //
+    // ★ W2-I5 — 배치를 **이 줄에서 다시 잰다.** 두 가지가 틀려 있었다.
+    //   ① 버튼 몫을 판정 **뒤에** 뺐다. 그래서 값 칸이 최소 가독 폭 아래로 눌려도
+    //      줄이 내려가지 않았다 — 240 폭에서 원소 칸이 **1 px** 이었다. 오른쪽 끝은
+    //      작업 영역 안이라 넘침은 0 이고, 화면에는 눌린 칸만 남는다.
+    //   ② 바깥 본문에서 잰 배치를 그대로 썼다. 원소는 접힘 머리 안이라 들여쓰기만큼
+    //      좁은데, 라벨 열은 바깥 폭 기준이라 값이 그 차이만큼 더 줄었다.
+    // 버튼 수를 `aux_button_count` 로 넘기면 전환 판정이 그 몫을 알고 내려간다.
     inline float BeginElementLine(int index, int trailingButtons = 0)
     {
         char label[16];
         snprintf(label, sizeof(label), "[%d]", index);
-        const float value = editor::widgets::begin_property_line(
-            label, editor::widgets::current_property_layout());
-        const float reserve = static_cast<float>(trailingButtons) *
-            (ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x);
-        return ImMax(value - reserve, 1.f);
+
+        // 원소 줄끼리 한 판정을 쓴다 — 같은 배열의 원소가 서로 다른 모드로 서면
+        // 줄마다 값 칸의 자리가 달라진다(`LayoutScope` 와 같은 이유).
+        static editor::widgets::property_layout_state state{};
+        const editor::widgets::property_layout_metrics metrics =
+            editor::widgets::measure_property_layout(
+                editor::widgets::property_layout_inputs_now(trailingButtons,
+                    ImGui::CalcTextSize(label).x), state);
+        return ImMax(editor::widgets::begin_property_line(label, metrics), 1.f);
     }
 
     template<class E>

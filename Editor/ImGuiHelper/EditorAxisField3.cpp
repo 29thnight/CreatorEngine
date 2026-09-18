@@ -128,15 +128,26 @@ namespace editor::widgets
         const float total = ImGui::CalcItemWidth();
         const float gap = style.ItemInnerSpacing.x;
 
-        // 세로로 놓으면 축마다 한 줄을 다 쓴다. 가로일 때만 셋으로 나눈다.
-        const float slot = request.stacked
-            ? total
-            : (total - gap * static_cast<float>(kAxisCount - 1)) /
+        // ★ W2-I5 — 호출자가 안 내렸어도 **칸이 하한 아래면 내린다.**
+        //   `stacked` 는 배치 계약이 내려 주는 값인데, 그것을 묻지 않는 소비자가
+        //   있었다(`InspectorDrawer<math::vector3>`). 그 자리에서는 240 폭의
+        //   `vector3` 칸이 24 px 이었고 — 오른쪽 끝은 작업 영역 안이라 넘침 0 —
+        //   숫자를 읽을 수 없었다. 판정을 위젯 안에 바닥으로 둔다: 계약이 쓰는
+        //   식과 같으므로 계약을 지킨 호출자에게는 아무 변화가 없다.
+        const float horizontal_slot =
+            (total - gap * static_cast<float>(kAxisCount - 1)) /
                 static_cast<float>(kAxisCount);
+        const bool stacked = request.stacked ||
+            horizontal_slot < badge_width + ::editor::widgets::property_axis_value_min_width();
+
+        // 세로로 놓으면 축마다 한 줄을 다 쓴다. 가로일 때만 셋으로 나눈다.
+        const float slot = stacked ? total : horizontal_slot;
         const float field_width = ImMax(slot - badge_width, 1.f);
 
         bool changed = false;
 
+        // 셋이 한 줄을 나눈다 — 값 칸 장부가 일반 칸과 다른 하한으로 센다(W2-I5).
+        ::editor::widgets::begin_axis_fields();
         ImGui::PushID(request.label);
         ImGui::BeginGroup();
 
@@ -147,7 +158,7 @@ namespace editor::widgets
         for (std::size_t index = 0; index < kAxisCount; ++index)
         {
             // 가로일 때만 옆으로 붙인다. 세로면 그냥 다음 줄로 떨어진다.
-            if (index > 0 && !request.stacked)
+            if (index > 0 && !stacked)
             {
                 ImGui::SameLine(0.f, gap);
             }
@@ -168,7 +179,7 @@ namespace editor::widgets
         // 세로 배치에서는 라벨을 옆에 붙이지 않는다 — 마지막 축 줄 오른쪽에만
         // 붙어 셋 전체의 이름으로 읽히지 않는다.
         const char* const visible = request.label;
-        if (!request.stacked && ('#' != visible[0] || '#' != visible[1]))
+        if (!stacked && ('#' != visible[0] || '#' != visible[1]))
         {
             ImGui::SameLine(0.f, style.ItemInnerSpacing.x);
             ImGui::AlignTextToFramePadding();
@@ -177,6 +188,7 @@ namespace editor::widgets
 
         ImGui::EndGroup();
         ImGui::PopID();
+        ::editor::widgets::end_axis_fields();
 
         return changed;
     }

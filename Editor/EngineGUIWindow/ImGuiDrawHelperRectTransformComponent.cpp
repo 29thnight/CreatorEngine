@@ -107,6 +107,9 @@ namespace
 		const bool stacked = (width - gap) * 0.5f < sheet.metrics().axis_need;
 		const float field = stacked ? width : ImMax((width - gap) * 0.5f, 1.f);
 		bool changed = false;
+		// 두 칸이 한 줄을 나눈다 — 값 칸 장부가 축 칸과 같은 하한(`axisValueMin`)으로
+		// 센다(W2-I5). 한 줄을 혼자 쓰는 칸의 하한을 대면 두 칸 줄은 늘 그 아래다.
+		editor::widgets::begin_axis_fields();
 		ImGui::PushID(label);
 		ImGui::BeginGroup();
 		for (int index = 0; index < 2; ++index)
@@ -118,6 +121,7 @@ namespace
 		}
 		ImGui::EndGroup();
 		ImGui::PopID();
+		editor::widgets::end_axis_fields();
 		return changed;
 	}
 }

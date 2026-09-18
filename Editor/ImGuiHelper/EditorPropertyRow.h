@@ -294,6 +294,53 @@ namespace editor::widgets
     /// 지났는지를 소스 셈이 아니라 **돈 줄 수**로 읽으려고 둔다. 그리는 스레드만 쓴다.
     std::uint64_t property_line_count() noexcept;
 
+    /// 값 칸 장부 (W2-I5). 넘침만 재면 **칸이 1 px 로 눌린 것**을 못 본다 —
+    /// 오른쪽 끝이 작업 영역 안에 있으면 넘침은 0 이다. 계획서 §W2-I 의
+    /// *"0-size 입력칸은 실패"* 와 *"편집 중 ID 손실"* 은 이 둘을 요구한다:
+    /// 줄이 값에 준 폭과, 값 위젯이 실제로 받은 폭·신원.
+    struct property_field_tally
+    {
+        std::uint64_t lines{};       ///< 값 폭을 받은 공통 줄 수
+        std::uint64_t fields{};      ///< 그린 값 위젯 수(`drag_property_float`)
+        float min_line_value{};      ///< 줄이 값에 준 폭의 최소(px). 줄이 없으면 0
+        float min_field_width{};     ///< 값 위젯이 받은 폭의 최소(px). 없으면 0
+        /// 값 위젯 ImGui ID 를 **그린 순서대로** 섞은 값. 폭·배율이 바뀌어도
+        /// 같아야 한다 — 달라졌다면 편집 중이던 칸의 신원이 사라진 것이다.
+        std::uint32_t digest{};
+
+        /// 가장 좁은 칸이 있던 줄의 이름. 수만 있으면 "어딘가 1 px 이다" 에서
+        /// 멈춘다 — 실패가 자리를 말해야 고칠 수 있다.
+        char min_field_label[48]{};
+
+        /// 축 칸(`EditorAxisField3` · `drag_property_floats`)은 하나의 줄을 셋·넷이
+        /// 나눠 쓰므로 하한이 다르다. 같은 칸으로 세면 일반 칸의 하한이 축의
+        /// 하한까지 내려간다 — 그러면 눌린 텍스트 칸을 못 잡는다.
+        std::uint64_t axis_fields{};
+        float min_axis_width{};
+        char min_axis_label[48]{};
+
+        /// 이 구간에서 **처음** 그린 값 칸의 화면 사각형. 밖에서 그 칸을 실제로
+        /// 끌어 보려면 좌표가 있어야 한다 — 폭 창구를 켜면 자식 창이 탐색 범위를
+        /// 갈라 키로는 칸에 들어갈 수 없다(W2-I5 실측).
+        float first_field_x{}, first_field_y{}, first_field_w{}, first_field_h{};
+    };
+
+    /// 지금까지 걷은 것을 돌려주고 장부를 비운다(본문 탐침이 부른다).
+    property_field_tally take_property_field_tally() noexcept;
+
+    /// 걷은 것을 장부에 되돌린다. 안쪽 본문을 떠낸 뒤 바깥 본문의 수가
+    /// 사라지지 않게 한다.
+    void merge_property_field_tally(const property_field_tally& tally) noexcept;
+
+    /// 이번 프레임의 최소 가독 폭. 검사가 논리 픽셀 리터럴 대신 이것과 견준다 —
+    /// 하한이 폰트·배율에서 나오므로 기계마다 값이 다르다.
+    float property_value_min_width();
+    float property_axis_value_min_width();
+
+    /// 이 구간의 값 위젯은 축 칸이다(줄 하나를 여럿이 나눈다). 겹쳐 열 수 있다.
+    void begin_axis_fields() noexcept;
+    void end_axis_fields() noexcept;
+
     /// 전용 드로어 한 구간의 배치 (PHASE 21 W2-I4).
     ///
     /// 전용 드로어는 리플렉션 경로를 지나지 않아 `SetNextItemWidth(150)` 같은

@@ -1482,6 +1482,10 @@ namespace ConsoleCmd
         data.Set("fixture", CommandData::Bool(snapshot.fixture));
         data.Set("contentWidth", CommandData::Double(snapshot.contentWidth));
         data.Set("contentMaxX", CommandData::Double(snapshot.contentMaxX));
+        data.Set("visibleWidth", CommandData::Double(snapshot.visibleWidth));
+        data.Set("valueMin", CommandData::Double(snapshot.valueMin));
+        data.Set("axisValueMin", CommandData::Double(snapshot.axisValueMin));
+        data.Set("activeId", CommandData::Int(static_cast<int64_t>(snapshot.activeId)));
         auto bodies = CommandData::Array();
         for (const auto& body : snapshot.bodies)
         {
@@ -1491,6 +1495,18 @@ namespace ConsoleCmd
             item.Set("open", CommandData::Bool(body.open));
             item.Set("enabledToggle", CommandData::Bool(body.enabledToggle));
             item.Set("propertyLines", CommandData::Int(static_cast<int64_t>(body.propertyLines)));
+            item.Set("fields", CommandData::Int(static_cast<int64_t>(body.fields)));
+            item.Set("minLineValue", CommandData::Double(body.minLineValue));
+            item.Set("minFieldWidth", CommandData::Double(body.minFieldWidth));
+            item.Set("narrowestField", CommandData::String(body.narrowestField));
+            item.Set("axisFields", CommandData::Int(static_cast<int64_t>(body.axisFields)));
+            item.Set("minAxisWidth", CommandData::Double(body.minAxisWidth));
+            item.Set("narrowestAxis", CommandData::String(body.narrowestAxis));
+            item.Set("firstFieldX", CommandData::Double(body.firstFieldX));
+            item.Set("firstFieldY", CommandData::Double(body.firstFieldY));
+            item.Set("firstFieldW", CommandData::Double(body.firstFieldW));
+            item.Set("firstFieldH", CommandData::Double(body.firstFieldH));
+            item.Set("fieldDigest", CommandData::Int(static_cast<int64_t>(body.fieldDigest)));
             item.Set("minX", CommandData::Double(body.minX));
             item.Set("maxX", CommandData::Double(body.maxX));
             item.Set("height", CommandData::Double(body.height));

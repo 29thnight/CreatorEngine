@@ -36,6 +36,10 @@ namespace editor::nav
         float g_pointerX = 0.f;
         float g_pointerY = 0.f;
         bool g_pointerDown = false;
+        // 직전 프레임에 우리가 얹은 좌표. 이동량을 여기서 만든다(W2-I5).
+        float g_pointerPrevX = 0.f;
+        float g_pointerPrevY = 0.f;
+        bool g_pointerMoved = false;
 
         void remember(std::vector<std::string>& names, const char* name)
         {
@@ -211,6 +215,21 @@ namespace editor::nav
         ImGuiIO& io = ImGui::GetIO();
         io.MousePos = ImVec2(g_pointerX, g_pointerY);
         io.MouseDown[0] = g_pointerDown;
+
+        // ★ **이동량도 우리 것이어야 한다** (W2-I5). `io.MouseDelta` 는
+        //   `NewFrame` 이 **실제** 마우스 좌표로 이미 계산해 둔 값이라, 좌표만
+        //   덮으면 델타는 0 으로 남는다. hover 와 클릭은 좌표만 보므로 멀쩡해
+        //   보이고 — 실제로 `activeId` 는 섰다 — **끄는 것만 조용히 죽는다.**
+        //   `DragBehavior` 가 보는 것이 델타이기 때문이다(주입으로 40 px 를
+        //   옮겨도 값이 한 번도 안 움직였다).
+        io.MousePosPrev = g_pointerMoved
+            ? ImVec2(g_pointerPrevX, g_pointerPrevY)
+            : io.MousePos;
+        io.MouseDelta = ImVec2(io.MousePos.x - io.MousePosPrev.x,
+            io.MousePos.y - io.MousePosPrev.y);
+        g_pointerPrevX = g_pointerX;
+        g_pointerPrevY = g_pointerY;
+        g_pointerMoved = true;
     }
 
     bool request_keys(const std::vector<std::string>& keys, std::string& outError)
