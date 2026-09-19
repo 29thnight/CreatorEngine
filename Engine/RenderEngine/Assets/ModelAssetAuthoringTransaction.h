@@ -34,6 +34,10 @@ namespace assets
         std::filesystem::path identityHeaderPath{};
         std::filesystem::path generationRoot{};
 
+        // Automatic recovery may rebuild derived files, never replace identity.
+        // Nil leaves normal first-import behavior unchanged.
+        Uuid::Uuid16 expectedModelId{};
+
         // 회귀 검사의 단계별 원자성 검증에만 사용한다. 제품 호출은 None이다.
         ModelAuthoringFailurePoint failurePoint{ ModelAuthoringFailurePoint::None };
     };

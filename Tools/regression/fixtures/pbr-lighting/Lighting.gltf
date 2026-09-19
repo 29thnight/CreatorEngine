@@ -1,0 +1,351 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "CreatorEngine PBR lighting regression"
+  },
+  "extensionsUsed": [
+    "KHR_materials_emissive_strength"
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "Lighting"
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Lighting",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8
+          },
+          "indices": 0,
+          "material": 0
+        },
+        {
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8
+          },
+          "indices": 1,
+          "material": 1
+        },
+        {
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8
+          },
+          "indices": 2,
+          "material": 2
+        },
+        {
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8
+          },
+          "indices": 3,
+          "material": 3
+        },
+        {
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8
+          },
+          "indices": 4,
+          "material": 4
+        },
+        {
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8
+          },
+          "indices": 5,
+          "material": 5
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "AOQuarter",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.6,
+          0.6,
+          0.6,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      },
+      "occlusionTexture": {
+        "index": 0,
+        "strength": 1
+      }
+    },
+    {
+      "name": "AOZeroStrength",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.6,
+          0.6,
+          0.6,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      },
+      "occlusionTexture": {
+        "index": 0,
+        "strength": 0
+      }
+    },
+    {
+      "name": "AONeutral",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.6,
+          0.6,
+          0.6,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      }
+    },
+    {
+      "name": "EmissionConstant",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      },
+      "emissiveFactor": [
+        0.25,
+        0.5,
+        1
+      ],
+      "extensions": {
+        "KHR_materials_emissive_strength": {
+          "emissiveStrength": 2
+        }
+      }
+    },
+    {
+      "name": "EmissionTexture",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      },
+      "emissiveFactor": [
+        0.25,
+        0.5,
+        1
+      ],
+      "extensions": {
+        "KHR_materials_emissive_strength": {
+          "emissiveStrength": 2
+        }
+      },
+      "emissiveTexture": {
+        "index": 1
+      }
+    },
+    {
+      "name": "EmissionOff",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      }
+    }
+  ],
+  "textures": [
+    {
+      "source": 0
+    },
+    {
+      "source": 1
+    }
+  ],
+  "images": [
+    {
+      "uri": "Occlusion.png"
+    },
+    {
+      "uri": "Emission.png"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "byteOffset": 0,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        3
+      ]
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 12,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        4
+      ],
+      "max": [
+        7
+      ]
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 24,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        8
+      ],
+      "max": [
+        11
+      ]
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 36,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        12
+      ],
+      "max": [
+        15
+      ]
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 48,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        16
+      ],
+      "max": [
+        19
+      ]
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 60,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        20
+      ],
+      "max": [
+        23
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC3",
+      "min": [
+        -1.65,
+        -1.05,
+        0
+      ],
+      "max": [
+        1.65,
+        1.05,
+        0
+      ]
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC2"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 72,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 72,
+      "byteLength": 288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 360,
+      "byteLength": 288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 648,
+      "byteLength": 192,
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "Lighting.bin",
+      "byteLength": 840
+    }
+  ]
+}

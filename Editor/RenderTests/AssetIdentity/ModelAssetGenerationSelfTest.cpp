@@ -2,6 +2,8 @@
 
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelSidecarV2.h"
+#include "DataSystem.h"
+#include "MeshRenderer.h"
 #include "RHI/IRenderDeviceServices.h"
 
 #include <algorithm>
@@ -104,12 +106,177 @@ namespace RenderTest
             output.flush();
             return output.good();
         }
+
+        // Exercise the production change boundary without changing the source fixture.
+        // Only this unloaded probe's catalog path points at a temporary sidecar;
+        // its immutable generation files stay in the project's normal Library.
+        void VerifyRuntimeReload(GenerationChecker& check,
+            const std::filesystem::path& onePath,
+            const std::filesystem::path& twoPath, const Uuid::Uuid16& modelId,
+            ModelGenerationReport& report)
+        {
+            const auto currents = DataSystems->SnapshotCurrentModelAssetGenerations();
+            const bool unused = std::ranges::none_of(currents, [&](const auto& generation)
+                { return generation->Identity().modelId == modelId; });
+            check.Check(unused, "runtime fixture is not already used by the active scene");
+            if (!unused) return;
+
+            TemporaryTree sandbox;
+            sandbox.path = std::filesystem::temp_directory_path()
+                / ("creator-runtime-reload-" + std::to_string(
+                    std::chrono::steady_clock::now().time_since_epoch().count()));
+            std::filesystem::create_directory(sandbox.path);
+            const FileGuid guid(modelId);
+            const auto originalPath = DataSystems->GetFilePath(guid);
+            const auto source = sandbox.path / "RuntimeReloadProbe.glb";
+            const auto meta = std::filesystem::path(source.string() + ".meta");
+            std::ofstream(source, std::ios::binary).put('\0');
+            struct CatalogGuard
+            {
+                FileGuid guid;
+                std::filesystem::path source, original;
+                ~CatalogGuard()
+                {
+                    DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+                        RuntimeAssetType::Model, guid, source });
+                    if (!original.empty())
+                        DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+                            RuntimeAssetType::Model, guid, original });
+                }
+            } catalogGuard{ guid, source, originalPath };
+            // Registration rejects one ID at two paths. Detach only the unloaded
+            // probe's catalog entry; the guard restores it even on failure.
+            if (!originalPath.empty())
+                DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+                    RuntimeAssetType::Model, guid, originalPath });
+            const auto select = [&](const std::filesystem::path& generation)
+            {
+                std::filesystem::copy_file(generation / "sidecar.meta", meta,
+                    std::filesystem::copy_options::overwrite_existing);
+            };
+            const auto reload = [&]
+            {
+                DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+                    RuntimeAssetType::Model, guid, source });
+                DataSystems->DrainQueuedAssetChanges();
+            };
+            select(onePath);
+            DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+                RuntimeAssetType::Model, guid, source });
+            const auto initial = DataSystems->LoadModelAssetGeneration(guid);
+            const bool coldReady = initial && !initial->Textures().empty()
+                && std::to_string(initial->Handle().generation) == onePath.filename().string();
+            check.Check(coldReady, "runtime probe cold loads the selected older generation with textures");
+            if (!coldReady) return;
+
+            MeshRenderer instance;
+            const auto verifyFailure = [&](const char* name, auto tamper)
+            {
+                const auto before = DataSystems->LoadModelAssetGeneration(guid);
+                if (!before) { check.Check(false, "runtime failure probe lost setup generation"); return; }
+                check.Check(instance.BindModelGeneration(before, 0), "existing instance bound");
+                const auto instanceHandle = instance.GetModelMeshHandle();
+                std::vector<std::shared_ptr<Texture>> owners;
+                for (const auto& texture : before->Textures())
+                    owners.push_back(DataSystems->ResolveModelGenerationTexture(*before, texture.textureId));
+                check.Check(std::ranges::all_of(owners, [](const auto& owner) { return !!owner; }),
+                    "runtime probe texture owners exist");
+                const auto cacheBefore = DataSystems->SnapshotModelAssetGenerations();
+                const auto texturesBefore = DataSystems->SnapshotModelGenerationTextures();
+                const auto sourcesBefore = DataSystems->SnapshotModelGenerationSources();
+                tamper();
+                ++report.runtimeCases;
+                check.Check(!DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+                    RuntimeAssetType::Model, guid, source }), std::string(name) + " reports reload rejection to caller");
+                reload();
+                const auto after = DataSystems->LoadModelAssetGeneration(guid);
+                const auto cacheAfter = DataSystems->SnapshotModelAssetGenerations();
+                const bool rejected = DataSystems->SnapshotModelGenerationSources().failed > sourcesBefore.failed;
+                const bool held = after == before
+                    && DataSystems->ResolveModelAssetGeneration(before->Handle()) == before
+                    && cacheAfter.retires == cacheBefore.retires
+                    && cacheAfter.replacements == cacheBefore.replacements;
+                bool texturesHeld = DataSystems->SnapshotModelGenerationTextures().retired == texturesBefore.retired;
+                for (std::size_t i = 0; i < owners.size(); ++i)
+                    texturesHeld &= owners[i] == DataSystems->ResolveModelGenerationTexture(
+                        *before, before->Textures()[i].textureId);
+                RHIModelMeshView view;
+                const bool instanceHeld = instance.m_modelGeneration == before
+                    && instance.GetModelMeshHandle() == instanceHandle
+                    && BuildRHIModelMeshView(*instance.m_modelGeneration, 0, view) && view.IsComplete();
+                check.Check(rejected, std::string(name) + " reload failure observed");
+                check.Check(held, std::string(name) + " current lookup and handle preserved");
+                check.Check(texturesHeld, std::string(name) + " texture owners preserved");
+                check.Check(instanceHeld, std::string(name) + " existing instance remains renderable");
+                report.runtimeRejected += rejected;
+                report.runtimeCurrentHeld += held;
+                report.runtimeTexturesHeld += texturesHeld;
+                report.runtimeInstanceHeld += instanceHeld;
+            };
+
+            verifyFailure("missing-sidecar", [&] { std::filesystem::remove(meta); });
+            select(onePath); reload();
+            verifyFailure("malformed-sidecar", [&]
+                { std::ofstream(meta, std::ios::trunc) << "schemaVersion: invalid\n"; });
+            select(onePath); reload();
+            verifyFailure("candidate-mismatch", [&]
+                { select(twoPath); std::ofstream(meta, std::ios::app) << "\n# different canonical bytes\n"; });
+            select(onePath); reload();
+
+            const auto before = DataSystems->LoadModelAssetGeneration(guid);
+            if (!before) { check.Check(false, "runtime recovery setup"); return; }
+            instance.BindModelGeneration(before, 0);
+            std::vector<std::shared_ptr<Texture>> oldOwners;
+            for (const auto& texture : before->Textures())
+                oldOwners.push_back(DataSystems->ResolveModelGenerationTexture(*before, texture.textureId));
+            const auto cacheBefore = DataSystems->SnapshotModelAssetGenerations();
+            const auto texturesBefore = DataSystems->SnapshotModelGenerationTextures();
+            select(twoPath); reload();
+            const auto after = DataSystems->LoadModelAssetGeneration(guid);
+            const auto cacheAfter = DataSystems->SnapshotModelAssetGenerations();
+            bool newOwners = !!after;
+            if (after)
+                for (std::size_t i = 0; i < after->Textures().size(); ++i)
+                {
+                    const auto owner = DataSystems->ResolveModelGenerationTexture(*after, after->Textures()[i].textureId);
+                    newOwners &= owner && std::ranges::find(oldOwners, owner) == oldOwners.end();
+                }
+            MeshRenderer fresh;
+            RHIModelMeshView oldView;
+            report.runtimeRecovered = after && after->Handle().generation > before->Handle().generation
+                && cacheAfter.replacements == cacheBefore.replacements + 1
+                && !DataSystems->ResolveModelAssetGeneration(before->Handle()) && newOwners
+                && DataSystems->SnapshotModelGenerationTextures().retired == texturesBefore.retired + oldOwners.size()
+                && instance.m_modelGeneration == before
+                && BuildRHIModelMeshView(*before, 0, oldView) && oldView.IsComplete()
+                && fresh.BindModelGeneration(after, 0) && fresh.GetModelMeshHandle().generation == after->Handle().generation;
+            check.Check(report.runtimeRecovered, "valid candidate atomically replaces current; old instance lives, fresh uses new");
+            if (!after) return;
+
+            // A valid but older candidate must not roll current back either.
+            verifyFailure("stale-generation", [&] { select(onePath); });
+            select(twoPath); reload();
+            const auto stable = DataSystems->LoadModelAssetGeneration(guid);
+            const auto duplicateCache = DataSystems->SnapshotModelAssetGenerations();
+            const auto duplicateTextures = DataSystems->SnapshotModelGenerationTextures();
+            reload();
+            report.runtimeDuplicateStable = stable && DataSystems->LoadModelAssetGeneration(guid) == stable
+                && DataSystems->SnapshotModelAssetGenerations().retires == duplicateCache.retires
+                && DataSystems->SnapshotModelGenerationTextures().retired == duplicateTextures.retired;
+            check.Check(report.runtimeDuplicateStable, "duplicate current notification does not recreate aggregate or textures");
+            DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+                RuntimeAssetType::Model, guid, source });
+            report.runtimeRemoved = stable && !DataSystems->ResolveModelAssetGeneration(stable->Handle())
+                && !DataSystems->LoadModelAssetGeneration(guid) && !stable->Meshes().empty();
+            check.Check(report.runtimeRemoved, "explicit removal clears lookup while held snapshot lives");
+        }
     }
 
     bool RunModelAssetGenerationSelfTest(const std::string& projectRoot,
         const std::string& modelIdText, std::string& outLog,
         ModelGenerationReport* report)
     {
+        if (report) *report = {};
         GenerationChecker check{ outLog };
         outLog += "[assets.generation] MBC5 immutable aggregate·atomic cache 검사\n";
 
@@ -254,6 +421,20 @@ namespace RenderTest
         }
         // 여기까지 왔으면 fixture 전제(ModelId 1개 · generation 1·2 적재)가 섰다.
         fixtureResolved = true;
+
+        ModelGenerationReport runtime;
+        VerifyRuntimeReload(check, onePath, twoPath, modelId, runtime);
+        if (report)
+        {
+            report->runtimeCases = runtime.runtimeCases;
+            report->runtimeRejected = runtime.runtimeRejected;
+            report->runtimeCurrentHeld = runtime.runtimeCurrentHeld;
+            report->runtimeTexturesHeld = runtime.runtimeTexturesHeld;
+            report->runtimeInstanceHeld = runtime.runtimeInstanceHeld;
+            report->runtimeRecovered = runtime.runtimeRecovered;
+            report->runtimeDuplicateStable = runtime.runtimeDuplicateStable;
+            report->runtimeRemoved = runtime.runtimeRemoved;
+        }
 
         const auto first = one.generation;
         const auto second = two.generation;

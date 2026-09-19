@@ -7,7 +7,7 @@
 |---|---|
 | `SamplerModes.gltf` | 쿼드 3개 · 재질 3개 · texture 3개가 **이미지 하나**를 sampler 3종으로 참조. |
 | `SamplerModes.bin` | 인덱스 18 + 위치·법선·UV 각 12정점(420바이트). |
-| `Quadrants.png` | 4×4 RGB. 사분면마다 다른 색(88바이트). |
+| `Quadrants.png` | 16×16 RGB. BC1 블록 경계에 맞춘 8×8 단색 사분면. |
 | `make_sampler.py` | `.bin` 과 `.png` 생성기. |
 
 | sampler | wrapS | wrapT | magFilter | minFilter |
@@ -39,6 +39,11 @@ MIRROR 는 뒤집힌다.
 그것이었다(DX12 는 WRAP, Vulkan 은 CLAMP_TO_EDGE 로 서로 다르게 접혔다).
 사분면마다 색을 달리해 뒤집힘이 보이게 한다.
 
+2026-09-19 제품 픽셀 판정에서 기존 4×4 이미지의 네 색이 하나의 BC1 블록에
+압축되어 원색과 크게 달라지는 것을 확인했다. 색을 0/255 끝점으로 정하고 영역을
+블록에 맞춰 확대했다. 따라서 압축 오차를 허용치로 덮지 않고 Repeat/Clamp/Mirror의
+예상 색을 직접 판정한다. sRGB 전달 함수는 별도 lighting fixture가 검증한다.
+
 ## 이 fixture 가 자극하는 축과 자극하지 못하는 축
 
 자극한다:
@@ -66,7 +71,7 @@ MIRROR 는 뒤집힌다.
 
 ```
 python3 Tools/regression/fixtures/pbr-sampler/make_sampler.py Tools/regression/fixtures/pbr-sampler
-# bin=420B offsets=0/36/180/324 png=88B
+# bin=420B offsets=0/36/180/324 (PNG size is printed by the generator)
 ```
 
 출력의 수가 위와 다르면 `.gltf` 의 `bufferViews`·`byteLength`·`accessors` 도 함께

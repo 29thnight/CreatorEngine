@@ -1,6 +1,7 @@
 #include "DataSystem.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h" // I7-C1 (MBC9: ExperimentModelMigration.cpp에서 이주)
 #include "Assets/ModelAssetGeneration.h"
+#include "Interfaces/AssetAuthoringPort.h"
 #include "Material.h" // MBC9: Model.h 전이 include가 사라져 직접 든다
 #include "Mesh.h"
 #include "Texture.h"
@@ -390,6 +391,12 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(
 	if (FileGuid{} == guid || !assets::IsUuidV8(guid.m_guid)) return {};
 	if (auto current = m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
 		return current;
+	return LoadAndPublishModelAssetGeneration(guid, true);
+}
+
+assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGeneration(
+	FileGuid guid, bool allowEditorRecovery)
+{
 
 	// MBC11 — cooked catalog가 마운트돼 있고 이 모델의 generation 레코드가 신선하면
 	// 그 레코드(Derived/Models/xx/<id>/<gen>/generation.asset)를 읽는다. Player는 이
@@ -424,6 +431,12 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(
 	if (!loaded.Succeeded())
 	{
 		m_generationLoadFailed.fetch_add(1, std::memory_order_relaxed);
+		// Uncooked loads/reloads may ask the Editor to repair derived data, then
+		// retry this strict reader exactly once. Callers release authoring locks
+		// before applying a reload; the repair itself never calls this loader.
+		if (allowEditorRecovery && !fromCatalog && PathFinder::IsAssetAuthoringEnabled()
+			&& AssetAuthoringPort::RecoverModel(GetFilePath(guid), guid))
+			return LoadAndPublishModelAssetGeneration(guid, false);
 		const std::string detail = loaded.issues.empty()
 			? "알 수 없는 generation load 실패"
 			: loaded.issues.front().context + ": "
@@ -441,6 +454,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(
 		m_modelAssetGenerations.Publish(std::move(loaded.generation));
 	if (!published.Succeeded())
 	{
+		m_generationLoadFailed.fetch_add(1, std::memory_order_relaxed);
 		Debug::PrintLog(spdlog::level::err, "[model.generation] cache publish 거부: "
 			+ sourcePathString + " (outcome "
 			+ std::to_string(static_cast<unsigned>(published.outcome)) + ")");
@@ -1532,9 +1546,9 @@ std::size_t DataSystem::DrainQueuedAssetChanges()
 	return pending.size();
 }
 
-void DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
+bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 {
-	if (!m_assetMetaRegistry || change.path.empty()) return;
+	if (!m_assetMetaRegistry || change.path.empty()) return false;
 
 	RuntimeAssetType assetType = change.assetType;
 	if (RuntimeAssetType::Auto == assetType)
@@ -1543,21 +1557,33 @@ void DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 	switch (change.kind)
 	{
 	case RuntimeAssetChangeKind::CatalogUpsert:
-		if (change.guid != FileGuid{})
-			RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
-		break;
+		return RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
 	case RuntimeAssetChangeKind::ContentReload:
+		if (assetType == RuntimeAssetType::Model)
+		{
+			const FileGuid guid = change.guid != FileGuid{} ? change.guid
+				: m_assetMetaRegistry->GetGuid(change.path);
+			if (!assets::IsUuidV8(guid.m_guid)
+				|| !RegisterAssetMeta(*m_assetMetaRegistry, guid, change.path)) return false;
+			// Keep unused assets lazy. For a resident model, validate a candidate
+			// before Publish atomically replaces current. Only successful replacement
+			// retires embedded textures; failed and duplicate reloads keep their owners.
+			if (m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
+				return !!LoadAndPublishModelAssetGeneration(guid, true);
+			return true;
+		}
 		// 파일 게시는 이미 끝났다. 먼저 이전 generation을 cache lookup에서
 		// 분리한 뒤 catalog를 갱신해, 이 호출 이후의 load가 새 파일을 읽게 한다.
 		RetireCachedAsset(assetType, change.path, change.guid, false);
 		if (change.guid != FileGuid{})
-			RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
-		break;
+			return RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
+		return true;
 	case RuntimeAssetChangeKind::Removed:
 		RetireCachedAsset(assetType, change.path, change.guid, true);
 		m_assetMetaRegistry->Unregister(change.path);
-		break;
+		return true;
 	}
+	return false;
 }
 
 void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,

@@ -204,6 +204,7 @@ void CSMain(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : 
         float4 result = float4(lighting * Strength * Density, visibility * Density);
 
         // 지난 프레임과 섞는다 — 지터로 흔들리는 표본을 시간축에서 재운다.
+        if (CameraNearFar_FrameIndex_PreviousFrameBlend.w > 0.0f)
         {
             float3 prevUV = GetUVFromVolumetricFogVoxelWorldPos(voxelWorldPosNoJitter,
                 CameraNearFar_FrameIndex_PreviousFrameBlend.x,

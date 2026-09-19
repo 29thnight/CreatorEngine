@@ -5,6 +5,8 @@ Texture2D<float>  gDepth    : register(t3);
 Texture2D<float4> gDiffuse  : register(t4);
 Texture2D<float2> gAO       : register(t5);   // x = AO · y = 뷰 깊이
 
+Texture2D<float4> gMetalRough : register(t6);
+
 #ifdef __spirv__
 [[vk::image_format("rgba16f")]]
 #endif
@@ -17,6 +19,8 @@ cbuffer CompositeParams : register(b0)
     float  gIntensity;
     float  gDepthSigma;
     uint2  gAOSize;      // 0이면 AO가 없다는 뜻
+    uint   gHasMaterial;
+    uint3  gPadding;
 };
 
 [numthreads(8, 8, 1)]
@@ -85,5 +89,14 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         ao = gAO.Load(int3(aoCoord, 0)).x;
     }
 
-    gOutput[id.xy] = float4(direct.rgb + gi * albedo * gIntensity * ao, direct.a);
+    // This pass estimates diffuse irradiance. Metals have no diffuse lobe.
+    // ORM is optional for standalone fixtures; an absent input is a dielectric.
+    float metallic = 0.0f;
+    if (gHasMaterial != 0u)
+    {
+        const float3 orm = gMetalRough.Load(int3(id.xy, 0)).rgb;
+        metallic = saturate(orm.b);
+        ao *= saturate(orm.r);
+    }
+    gOutput[id.xy] = float4(direct.rgb + gi * albedo * (1.0f - metallic) * gIntensity * ao, direct.a);
 }

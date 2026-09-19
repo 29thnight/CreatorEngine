@@ -288,7 +288,10 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
 
         // 이번 프레임이 쓸 '지난 프레임' 값을 밀봉하고, 다음 프레임을 위해
         // 이번 값을 저장한다.
-        m_previousViewProjectionSealed = m_previousViewProjection;
+        m_useHistoryThisFrame = m_historyValid;
+        m_previousViewProjectionSealed = m_historyValid
+            ? m_previousViewProjection : m_viewProjection;
+        m_historyValid = true;
         m_previousViewProjection = m_viewProjection;
     }
 
@@ -406,7 +409,8 @@ void EnhancedVolumetricFogPass::Declare(EnhancedRenderGraph& graph,
         constants.cameraPosition = m_cameraPosition;
         constants.nearFarFrameBlend = {
             m_tuning.customNearPlane, m_tuning.customFarPlane,
-            static_cast<float>(m_frameIndex), m_tuning.previousFrameBlendFactor };
+            static_cast<float>(m_frameIndex),
+            m_useHistoryThisFrame ? m_tuning.previousFrameBlendFactor : 0.f };
         constants.volumeSize = { static_cast<float>(kVolumeWidth),
             static_cast<float>(kVolumeHeight), static_cast<float>(kVolumeDepth), 0.f };
         constants.anisotropy = m_tuning.anisotropy;

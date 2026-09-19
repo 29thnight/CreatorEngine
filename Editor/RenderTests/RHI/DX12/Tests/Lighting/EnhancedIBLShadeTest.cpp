@@ -288,6 +288,10 @@ bool DX12Test::RunIBLShadeTest(std::string& outLog)
     draws[1].metallic = 0.f;
     draws[1].roughness = 1.f;
 
+    std::vector<EnhancedLight> directLights(1);
+    directLights[0].position = { 0.f, 0.f, 0.f, 0.f };
+    directLights[0].direction = { 0.f, -1.f, 0.f, 0.f };
+    directLights[0].color = { 1.f, 1.f, 1.f, 1.f };
     const std::vector<EnhancedLight> noLights;   // 광원 0개 — 출력 = 앰비언트뿐
 
     FrameCameraSnapshot camera{};
@@ -322,11 +326,11 @@ bool DX12Test::RunIBLShadeTest(std::string& outLog)
     bool passed = true;
 
     const auto renderOnce = [&](const std::vector<EnhancedDrawItem>& frameDraws,
-        bool useIbl, IblShadeCapture& outCapture) -> bool
+        bool useIbl, IblShadeCapture& outCapture, float ao = -1.f, bool lightEnabled = false) -> bool
     {
         frameContext.camera = &camera;
         frameContext.draws = &frameDraws;
-        frameContext.lights = &noLights;
+        frameContext.lights = lightEnabled ? &directLights : &noLights;
 
         if (!resources.BeginFrame(error))
         {
@@ -348,8 +352,32 @@ bool DX12Test::RunIBLShadeTest(std::string& outLog)
         shadow.Declare(graph, frameContext);
         gbuffer.Declare(graph, frameContext);
 
+        RGHandle aoInput;
+        if (ao >= 0.f)
+        {
+            RGTextureDesc aoDesc{};
+            aoDesc.width = kIblShadeWidth / 2;
+            aoDesc.height = kIblShadeHeight / 2;
+            aoDesc.format = RHIFormat::RG16Float;
+            aoDesc.allowRenderTarget = true;
+            aoDesc.name = "IBLShade.AO";
+            aoDesc.clearColor[0] = ao;
+            aoDesc.clearColor[1] = 1.f;
+            aoInput = graph.CreateTexture(aoDesc);
+            graph.AddPass("IBLShade.FillAO", { { aoInput, RHIResourceState::RenderTarget } },
+                [&, aoInput, ao](const EnhancedRenderGraph::ExecuteContext& execution)
+                {
+                    const RHITextureHandle colors[] = { execution.ResolveHandle(aoInput) };
+                    const auto targets = resources.CreateRenderTargets(colors);
+                    const float value[] = { ao, 1.f, 0.f, 0.f };
+                    execution.encoder->ClearRenderTargets(targets, value);
+                });
+        }
+        deferred.SetAmbientOcclusion(aoInput);
         deferred.SetInputs(gbuffer.GetOutputs());
-        deferred.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
+        // The direct-light AO control must be lit; the ceiling otherwise shadows the floor.
+        if (lightEnabled) deferred.SetShadow({}, {});
+        else deferred.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
         if (useIbl)
         {
             deferred.SetIBL(generator.GetIrradianceMap(), generator.GetPrefilteredMap(),
@@ -492,6 +520,28 @@ bool DX12Test::RunIBLShadeTest(std::string& outLog)
                 outLog += "금속 반사가 빨강 우세가 아니다 — 반사 방향이 틀렸다\n";
                 passed = false;
             }
+        }
+    }
+
+    if (passed)
+    {
+        IblShadeCapture neutral, occluded, direct, directOccluded, disabled;
+        if (!renderOnce(draws, true, neutral, 1.f) ||
+            !renderOnce(draws, true, occluded, 0.25f) ||
+            !renderOnce(draws, false, direct, 1.f, true) ||
+            !renderOnce(draws, false, directOccluded, 0.f, true) ||
+            !renderOnce(draws, true, disabled)) passed = false;
+        else
+        {
+            const float ratio = occluded.At(floorX,floorY,0) / neutral.At(floorX,floorY,0);
+            const float directDelta = std::abs(direct.At(floorX,floorY,0) - directOccluded.At(floorX,floorY,0));
+            const float resetDelta = std::abs(neutral.At(floorX,floorY,0) - disabled.At(floorX,floorY,0));
+            passed &= std::abs(ratio - 0.25f) < 0.02f && directDelta < 0.001f
+                && direct.At(floorX,floorY,0) > 0.05f && resetDelta < 0.001f;
+            char line[192]{};
+            std::snprintf(line, sizeof(line), "SSAO consume: ambient ratio %.4f, direct %.4f, direct delta %.6f, disabled delta %.6f\n",
+                ratio, direct.At(floorX,floorY,0), directDelta, resetDelta);
+            outLog += line;
         }
     }
 

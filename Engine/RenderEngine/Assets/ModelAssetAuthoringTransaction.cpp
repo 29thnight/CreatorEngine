@@ -895,6 +895,14 @@ namespace assets
             }
         }
 
+        if (!request.expectedModelId.IsNil()
+            && (!hasPriorV2 || prior.assetId != request.expectedModelId))
+        {
+            Mbc3AddIssue(result, "sidecar.prior",
+                "자동 복구 대상의 canonical model identity가 바뀌었다.");
+            return result;
+        }
+
         markPhase("lock+header+sidecar");
         std::vector<std::byte> sourceBytes;
         if (!Mbc3ReadBytes(source, sourceBytes) || sourceBytes.empty())

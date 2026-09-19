@@ -12,9 +12,8 @@
 //   ③ 프리필터 스페큘러  GGX 중요도 샘플링, 밉마다 거칠기 0~1 (정반사 앰비언트)
 //   ④ BRDF LUT          split-sum의 (scale, bias) 사전 적분
 //
-// ①의 밉 체인은 ②③이 쓴다. 표본이 성길수록 흐린 밉을 읽어 잡음을 사전
-// 필터가 맡게 하는 것이 Karis 2013의 방식이고, 그래야 적분이 에너지를
-// 잃지 않는다 — 자세한 사연은 Includes/Ibl.slang의 SelectEnvironmentMip에.
+// 환경 밝기와 cosine/GGX 분포를 함께 표집한다(MIS). 중요도 격자의
+// radiance와 PDF는 동일한 셀을 사용하며, 거칠기 0은 원본 밉 0을 보존한다.
 //
 // 프레임 패스가 아니다 — 씬 로드 때 한 번 도는 생성 작업이라
 // EnhancedRenderPass/그래프를 태우지 않고, 열린 프레임의 중립 즉시 인코더에
@@ -39,19 +38,12 @@ public:
     /// 프리필터 밉 수. DX11은 거칠기 i/5로 여섯 단계를 만든다.
     static constexpr uint32_t kPrefilterMips = 6;
 
-    /// 환경 큐브의 최대 밉 수.
-    ///
-    /// 1024 표본·512 큐브에서 SelectEnvironmentMip이 고르는 밉은 6을 넘지
-    /// 않는다(가장 성긴 조도 표본이 ~6.0). 체인을 거기서 끊는 이유는 값이
-    /// 아니라 비용이다 — 밉 m은 소스에서 2^m x 2^m을 표집하므로 밉 7이면
-    /// 텍셀 하나에 16384 표본이 되고, 그 위는 TDR 사정권이다.
+    // 소스에서 직접 다운샘플하므로 큰 밉의 단일 드로우 비용을 제한한다.
     static constexpr uint32_t kMaxEnvironmentMips = 7;
+    static constexpr uint32_t kImportanceMaxSize = 128;
+    static constexpr uint32_t kImportanceSampleCount = 1024;
+    static constexpr RHIFormat kImportanceFormat = RHIFormat::RGBA32Float;
 
-    /// 환경 큐브의 밉 수를 큐브 한 변에서 구한다.
-    ///
-    /// 조도·프리필터가 표본의 입체각에 맞는 밉을 골라 읽으려면(Karis 2013)
-    /// 큐브에 밉 체인이 있어야 한다. 없으면 잡음을 누적값 억제로 눌러야 하고,
-    /// 그 억제는 대비가 있는 환경에서 에너지를 깎는다.
     static constexpr uint32_t CubeMipCount(uint32_t cubeSize)
     {
         uint32_t mips = 1;
@@ -84,14 +76,18 @@ public:
     RHITextureHandle GetBrdfLut() const { return m_brdfLutHandle; }
 
     uint32_t GetCubeSize() const { return m_cubeSize; }
+    uint32_t GetIrradianceSize() const { return (m_cubeSize < 64u) ? m_cubeSize : 64u; }
 
 private:
+    void ReleaseTargets();
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     bool CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
         std::string& outError);
 
     uint32_t m_cubeSize{ 0 };
     uint32_t m_brdfSize{ 0 };
+    uint32_t m_importanceSize{ 0 };
+    uint32_t m_importanceMip{ 0 };
 
     // CreateTexture가 실물 소유권까지 백엔드 표에 둔다. 생성기는 핸들만 들고,
     // 재생성·Shutdown에서 GPU 완료가 보장된 시점에 ReleaseTexture한다.
@@ -105,11 +101,17 @@ private:
     RHITextureHandle m_irradianceHandle;
     RHITextureHandle m_prefilteredHandle;
     RHITextureHandle m_brdfLutHandle;
+    RHITextureHandle m_importanceRows;
+    RHITextureHandle m_importanceMarginal;
+    RHITextureHandle m_importanceSamples;
 
     RHIPipelineHandle m_rectToCubePso;
     RHIPipelineHandle m_cubeDownsamplePso;
     RHIPipelineHandle m_irradiancePso;
     RHIPipelineHandle m_prefilterPso;
     RHIPipelineHandle m_brdfPso;
+    RHIPipelineHandle m_importanceRowsPso;
+    RHIPipelineHandle m_importanceMarginalPso;
+    RHIPipelineHandle m_importanceSamplesPso;
 };
 

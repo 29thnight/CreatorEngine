@@ -59,6 +59,8 @@ public:
         m_iblBrdfLut = brdfLut;
     }
 
+    void SetAmbientOcclusion(RGHandle input) { m_ambientOcclusion = input; }
+
     RGHandle GetOutput() const { return m_output; }
 
     static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
@@ -80,9 +82,11 @@ private:
         float          cascadeBlendBand{ 0.f };
         uint32_t       hasIbl{ 0 };
         EnhancedLight  lights[kMaxLights]{};
+        uint32_t       hasAmbientOcclusion{ 0 };
+        uint32_t       padding[3]{};
     };
 
-    static_assert(sizeof(LightingConstants) == 4432u);
+    static_assert(sizeof(LightingConstants) == 4448u);
     static_assert(offsetof(LightingConstants, inverseViewProjection) == 0u);
     static_assert(offsetof(LightingConstants, lightViewProjection) == 64u);
     static_assert(offsetof(LightingConstants, eyePosition) == 256u);
@@ -92,6 +96,7 @@ private:
 
     EnhancedGBufferPass::Outputs m_inputs;
     RGHandle m_output;
+    RGHandle m_ambientOcclusion;
 
     std::vector<EnhancedLight> m_frameLights;
     math::matrix4x4 m_inverseViewProjection{};

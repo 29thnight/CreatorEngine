@@ -273,7 +273,7 @@ namespace RenderTest
         change.assetType = RuntimeAssetType::Model;
         change.guid = guid;
         change.path = DataSystems->GetFilePath(guid);
-        DataSystems->ApplyAssetChange(change);
+        const bool accepted = DataSystems->ApplyAssetChange(change);
 
         const std::shared_ptr<const assets::ModelAssetGeneration> after =
             DataSystems->LoadModelAssetGeneration(guid);
@@ -297,10 +297,12 @@ namespace RenderTest
             DataSystems->SnapshotModelGenerationTextures();
         const std::uint64_t retired = statsAfter.retired - statsBefore.retired;
 
-        const bool passed = static_cast<bool>(after) && after != before
-            && 0 == reused && 0 == missingAfter
-            && created == before->Textures().size()
-            && retired == before->Textures().size();
+        const bool duplicate = after && after->Handle() == before->Handle();
+        const bool passed = accepted && after && 0 == missingAfter
+            && (duplicate
+                ? after == before && reused == before->Textures().size() && created == 0 && retired == 0
+                : after->Handle().generation > before->Handle().generation && reused == 0
+                    && created == after->Textures().size() && retired == before->Textures().size());
         char line[384]{};
         std::snprintf(line, sizeof(line),
             "[CLI] assets.scenemodel reload %s model=%s textures=%zu reused=%zu created=%zu"

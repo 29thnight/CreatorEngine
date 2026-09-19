@@ -547,6 +547,38 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
             outLog += "혼합 계수가 0인데 씬 색이 바뀌었다 — 계수가 안 먹는다\n";
             passed = false;
         }
+
+        // A diagnostic restart must ignore bright history even with blend=1.
+        // Then a fresh lit frame must reproduce the independent blend=0 control.
+        fog.ResetHistory();
+        RHIReadbackImage resetDarkVoxel{}, resetDarkScreen{};
+        if (!renderFrame(historyOnly, 0, resetDarkVoxel, resetDarkScreen))
+        {
+            outLog += "Fog history reset dark frame failed: " + error + "\n";
+            resources.Shutdown();
+            return false;
+        }
+        fog.ResetHistory();
+        RHIReadbackImage resetLitVoxel{}, resetLitScreen{};
+        if (!renderFrame(historyOnly, 1, resetLitVoxel, resetLitScreen))
+        {
+            outLog += "Fog history reset lit frame failed: " + error + "\n";
+            resources.Shutdown();
+            return false;
+        }
+        float resetMaxDelta = 0.f;
+        for (uint32_t y = 0; y < kFogScreen; ++y)
+            for (uint32_t x = 0; x < kFogScreen; ++x)
+                for (uint32_t c = 0; c < 3; ++c)
+                {
+                    const float delta = std::fabs(resetLitScreen.At(x, y, c) - litScreen.At(x, y, c));
+                    if (!std::isfinite(delta)) passed = false;
+                    resetMaxDelta = (std::max)(resetMaxDelta, delta);
+                }
+        const float resetDark = resetDarkVoxel.At(kProbeX, kProbeY, 1, kFogVolumeD - 1);
+        if (!std::isfinite(resetDark) || resetDark > 0.0005f || resetMaxDelta > 0.002f) passed = false;
+        outLog += "Fog restart: dark=" + std::to_string(resetDark)
+            + " fresh-screen maxDelta=" + std::to_string(resetMaxDelta) + "\n";
     }
 
     std::string validation;

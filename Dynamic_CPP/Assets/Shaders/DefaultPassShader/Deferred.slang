@@ -2,9 +2,7 @@
 
 // Deferred 조명. GBuffer 를 읽어 직접광 + IBL 앰비언트를 적분한다.
 //
-// ★ Deferred.hlsl 의 이식본이다. 바인딩(b0, t0..t8, s0..s2)과 상수 레이아웃은
-//   한 바이트도 바뀌지 않았다 ─ C++ 쪽 업로더가 그대로 쓴다. 바뀐 것은 BRDF
-//   본체이고, 그 정본은 Includes/Brdf.slang 과 Includes/PbrSurface.slang 이다.
+// t9 receives screen-space AO; the appended constant keeps light offsets stable.
 //
 // ── HLSL 판과 달라진 것 ─────────────────────────────────────────────
 //
@@ -44,6 +42,8 @@ cbuffer LightingConstants : register(b0)
     float         gCascadeBlendBand; // 경계 블렌딩 폭 · 0이면 하드 스위치
     uint          gHasIbl;
     DeferredLight gLights[MAX_DEFERRED_LIGHTS];
+    uint          gHasAmbientOcclusion;
+    uint3         gPadding;
 };
 
 Texture2D      gDiffuse    : register(t0);
@@ -56,6 +56,7 @@ Texture2DArray gShadowMap  : register(t5);
 TextureCube    gIrradiance  : register(t6);
 TextureCube    gPrefiltered : register(t7);
 Texture2D      gBrdfLut     : register(t8);
+Texture2D<float2> gAmbientOcclusion : register(t9);
 
 SamplerState gSampler    : register(s0);
 
@@ -159,7 +160,9 @@ float4 PSMain(VSOut input) : SV_TARGET
     //   이제 GBuffer.slang 이 그 자리에 중립 1 을 써 넣는다(aoMap 슬롯이
     //   생기기 전까지). 그래서 여기 R 은 "AO 아니면 1" 이 보장되고, 슬롯이
     //   생기는 날 이 소비 코드는 손댈 곳이 없다.
-    const float occlusion = saturate(orm.r);
+    float occlusion = saturate(orm.r);
+    if (gHasAmbientOcclusion != 0u)
+        occlusion *= saturate(gAmbientOcclusion.SampleLevel(gIblSampler, input.uv, 0.0).r);
 
     // 깊이에서 월드 위치를 복원한다. GBuffer 에 위치를 따로 저장하면 타깃이
     // 하나 늘고 대역폭이 그만큼 든다 — 깊이가 이미 있으니 역행렬로 푼다.

@@ -103,6 +103,8 @@ namespace
         // '결과가 조용히 이상해진다'라서 잡기 어렵다.
         uint32_t aoWidth{ 0 };
         uint32_t aoHeight{ 0 };
+        uint32_t hasMaterial{ 0 };
+        uint32_t padding[3]{};
     };
 
     struct HiZParams
@@ -804,6 +806,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         params.giHeight = m_giHeight;
         params.intensity = m_tuning.intensity;
         params.depthSigma = m_tuning.compositeDepthSigma;
+        params.hasMaterial = m_inputs.metalRough.IsValid() ? 1u : 0u;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         usages.push_back({ m_filtered, RHIResourceState::ShaderResource });
@@ -821,9 +824,11 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         {
             usages.push_back({ m_inputs.ambientOcclusion, RHIResourceState::ShaderResource });
         }
+        if (m_inputs.metalRough.IsValid())
+            usages.push_back({ m_inputs.metalRough, RHIResourceState::ShaderResource });
         usages.push_back({ m_output, RHIResourceState::UnorderedAccess });
 
-        // t0 GI · t1 GI깊이 · t2 라이팅 · t3 깊이 · t4 디퓨즈 · t5 AO
+        // t0 GI · t1 GI깊이 · t2 라이팅 · t3 깊이 · t4 디퓨즈 · t5 AO · t6 ORM
         // 자리를 고정한다(리졸브와 같은 이유).
         std::vector<RGHandle> srvHandles{ m_filtered, m_hiZMips[0] };
         srvHandles.push_back(m_inputs.lighting.IsValid() ? m_inputs.lighting : m_hiZMips[0]);
@@ -831,6 +836,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         srvHandles.push_back(m_inputs.diffuse.IsValid() ? m_inputs.diffuse : m_hiZMips[0]);
         srvHandles.push_back(m_inputs.ambientOcclusion.IsValid()
             ? m_inputs.ambientOcclusion : m_hiZMips[0]);
+        srvHandles.push_back(m_inputs.metalRough.IsValid() ? m_inputs.metalRough : m_hiZMips[0]);
 
         if (m_inputs.ambientOcclusion.IsValid())
         {

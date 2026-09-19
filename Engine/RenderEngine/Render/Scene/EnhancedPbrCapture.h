@@ -22,6 +22,7 @@ struct EnhancedPbrCapture
     EnhancedLivePbrCaptureStatus result;
     EnhancedLiveDisplayTarget target{ EnhancedLiveDisplayTarget::Game };
     uint64_t afterFrameId{};
+    bool controlled{ false }; // Static scene repeatability; not a simulation clock.
     ryml::Tree manifest;
     std::array<RHIReadback, 7> readbacks{};
 
@@ -47,6 +48,12 @@ struct EnhancedPbrCapture
         root["height"] << frame.height;
         root["totalSeconds"] << frame.totalSeconds;
         root["deltaSeconds"] << frame.deltaSeconds;
+        root["captureMode"] << (controlled ? "static-repeatability-v1" : "observation");
+        if (controlled)
+        {
+            root["sampleIndex"] << 0;
+            root["historyPolicy"] << "restart-ssgi-fog";
+        }
         const auto matrix = [](ryml::NodeRef node, const math::matrix4x4& value)
         {
             std::array<float, 16> values;

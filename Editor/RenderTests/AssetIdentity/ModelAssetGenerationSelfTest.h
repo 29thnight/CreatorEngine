@@ -20,6 +20,12 @@ namespace RenderTest
         std::uint64_t tamperRejected{};     ///< 게시 전 거부된 수
         std::uint64_t tamperCurrentHeld{};  ///< 거부 뒤 current generation 이 불변인 수
         bool fixtureResolved{};             ///< fixture 전제(대상 ModelId · generation 두 벌)가 섰나
+        std::uint64_t runtimeCases{};
+        std::uint64_t runtimeRejected{};
+        std::uint64_t runtimeCurrentHeld{};
+        std::uint64_t runtimeTexturesHeld{};
+        std::uint64_t runtimeInstanceHeld{};
+        bool runtimeRecovered{}, runtimeDuplicateStable{}, runtimeRemoved{};
     };
 
     // MBC5 — fixture project의 generation 1→2를 읽어 closure, immutable

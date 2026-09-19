@@ -14,8 +14,8 @@
 #     cache 로드(model.loadcached — import를 타지 않아 tracked sidecar를 건드리지
 #     않는다) → 배치(model.place) → 카메라를 삼키지 않게 이동 → assets.scenemodel
 #     → 저장. dx12.scene은 활성 카메라를 요구하므로 빈 씬으로는 7을 잴 수 없다.
-#   B(콜드 프로세스) 저장 씬 로드 → assets.scenemodel → reimport(assets.scenemodel
-#     reload) → dx12.scene 렌더.
+#   B(콜드 프로세스) 저장 씬 로드 → assets.scenemodel → 같은 세대 ContentReload
+#     중복 알림(assets.scenemodel reload) → dx12.scene 렌더.
 #
 # ── 판정 항목 ──
 #
@@ -27,7 +27,8 @@
 #      experiment 0 (FT 프리미티브 8 + Gunner 2, 전부 UUIDv8이라 전량 typed여야 한다)
 #   5  콜드 로드 폐포(B) — 2와 같은 조건    ★ 같은 프로세스의 이전 로드·등록부 없이
 #      6/6이 closure에서 온다(순서 해킹 없이 성립하는 것을 증명하는 축)
-#   6  reimport 뒤 이전 texture generation 재사용 0 — reload pass reused=0 retired=6
+#   6  같은 세대의 중복 알림은 owner 보존 — reused=6 retired=0 sameAggregate=true.
+#      실제 신세대 교체·실패 보존은 verify-model-generation-atomicity.ps1이 별도로 잰다.
 #   7  실GPU 렌더가 typed 업로드다          — dx12.scene 통과, 메시 업로드 N == generation N ≥ 1,
 #      handle(experiment 핸들 진입점) 0, 커버리지 > 0. `experiment` 계수는 packed 정점
 #      전체(attributeMask != 0 — generation 포함)라 판정 축이 아니다.
@@ -39,7 +40,8 @@
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
-    [int]$TimeoutSeconds = 300
+    [int]$TimeoutSeconds = 300,
+    [switch]$PreserveArtifacts
 )
 
 Set-StrictMode -Version Latest
@@ -63,6 +65,7 @@ function Invoke-Editor([string]$Label, [string[]]$Commands) {
     $start.WorkingDirectory = $root
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
+    $start.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
     $process = [Diagnostics.Process]::new()
@@ -158,7 +161,7 @@ try {
         Add-Failure '3 nil m_meshAssetId가 저장됐다(해석 실패 renderer).'
     }
 
-    # ── B: 콜드 프로세스 — 로드·폐포·reimport·렌더 ──
+    # ── B: 콜드 프로세스 — 로드·폐포·중복 reload 알림·렌더 ──
     $cold = Invoke-Editor 'cold' @(
         "scene.switch $savedScene",
         # B 도 별도 프로세스라 렌더 예열을 처음부터 다시 치른다.
@@ -172,7 +175,7 @@ try {
         'assets.modeldiag',
         'assets.scenemodel',
         'assets.scenemodel reload Gunner_F_Mythic',
-        # reimport 가 발행한 교체를 렌더 스레드가 소화한 뒤 그린다.
+        # 중복 알림 뒤에도 실제 scene 렌더가 이어져야 한다.
         'render.live.wait',
         'dx12.scene',
         'quit')
@@ -184,7 +187,8 @@ try {
     if ($coldDiag.meshResolveGeneration -lt 10 -or $coldDiag.meshResolveFailed -ne 0) { Add-Failure 'Cold typed model resolution coverage failed' }
     Assert-SceneModelClosure '5(B)' $cold.Results
     $reload = Get-SucceededCommand @($cold.Results | Where-Object { $_.command -eq 'assets.scenemodel' -and $_.data.reload }) 'assets.scenemodel'
-    if ($reload.textures -ne 6 -or $reload.reused -ne 0 -or $reload.retired -ne 6 -or $reload.sameAggregate) { Add-Failure 'Reload generation retirement failed' }
+    if ($reload.textures -ne 6 -or $reload.reused -ne 6 -or $reload.created -ne 0 -or
+        $reload.retired -ne 0 -or -not $reload.sameAggregate) { Add-Failure 'Duplicate reload failed to preserve generation and texture owners' }
     $sceneData = Get-SucceededCommand $cold.Results 'dx12.scene'
     if ($sceneData.meshUploads -lt 1 -or $sceneData.generationUploads -ne $sceneData.meshUploads -or $sceneData.coverage -le 0) { Add-Failure 'Typed GPU upload and coverage failed' }
 
@@ -222,6 +226,11 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 $summary
-'통과 — Scene/MeshRenderer가 typed generation을 붙들고 Gunner 콜드 로드가 등록부·순서 없이 closure 6/6, reimport 뒤 이전 texture generation 재사용 0, 실GPU 업로드 전량 typed'
-Remove-Item -LiteralPath $run -Recurse -Force -ErrorAction SilentlyContinue
+'통과 — Scene/MeshRenderer typed generation·Gunner cold closure 6/6, 중복 reload의 model/texture owner 보존, 실GPU 업로드 전량 typed'
+if (-not $PreserveArtifacts) {
+    $workRoot = [IO.Path]::GetFullPath($Work).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+    $runPath = [IO.Path]::GetFullPath($run)
+    if (-not $runPath.StartsWith($workRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Run directory escaped work root' }
+    Remove-Item -LiteralPath $runPath -Recurse -Force -ErrorAction SilentlyContinue
+}
 exit 0

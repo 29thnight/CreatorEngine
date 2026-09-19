@@ -36,9 +36,8 @@ namespace RenderTest
     [[nodiscard]] bool RunSceneModelGenerationSelfTest(std::string& outLog, SceneModelReport* report = nullptr);
     [[nodiscard]] bool RunIncrementalModelCancellationSelfTest(const std::string& guardPath);
 
-    // MBC7 — 모델 reimport(ContentReload) 뒤 이전 texture generation owner가
-    // 재사용되지 않는가(§6.2 마지막 조건). 같은 프로세스에서 generation을 은퇴시키고
-    // 다시 게시해 texture owner의 포인터 신원을 전후 대조한다.
+    // A newer ContentReload replaces texture owners; a duplicate notification for
+    // the same immutable generation preserves aggregate and texture identities.
     [[nodiscard]] bool RunSceneModelGenerationReloadSelfTest(
         const std::string& modelName, std::string& outLog, SceneModelReport* report = nullptr);
 }

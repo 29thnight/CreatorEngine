@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 cbuffer SSAOParams : register(b0)
 {
     float4x4 gInverseProjection;
@@ -11,6 +11,7 @@ cbuffer SSAOParams : register(b0)
     float    gDepthSigma;
     uint     gFrameIndex;
     uint3    gPad;
+    float4x4 gView;          // GBuffer world normal -> view-space AO
 };
 
 static const float kPi = 3.14159265f;
@@ -24,9 +25,7 @@ float3 ViewFromDepth(float2 uv, float depth)
     return view.xyz / view.w;
 }
 
-// 픽셀·프레임마다 도는 해시. 이웃끼리 다른 각을 보게 해서 잡음을 만들고,
-// 그 잡음을 디노이즈가 걷어낸다 — 잡음을 안 만들려고 표본을 늘리는 것보다
-// 이쪽이 싸다. 프레임 번호를 빼면 잡음이 화면에 박혀 지워지지 않는다.
+// Pixel/frame sample rotation. This pass currently uses spatial filtering only.
 float Hash21(uint2 pixel, uint frame)
 {
     const float2 p = float2(pixel) + float2(frame * 0.7548f, frame * 0.5698f);

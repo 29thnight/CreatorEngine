@@ -14,10 +14,10 @@
 | | 소유 | 근거 |
 |---|---|---|
 | DX12/Vulkan 제품 프레임 캡처 1:1 픽셀 대응 | **이 계획** | 시각 고정이 선행이라 PHASE 4 에서 성립하지 않았다 |
-| `render.pbr.compare` 를 판정으로 되돌리기 | **이 계획** | 지금은 `gated:false` 로 수만 남긴다 |
+| `render.pbr.compare`의 교차 HDR/display 판정 복구 | **이 계획** | 교차 비교에서는 해당 두 출력만 측정. PHASE 4의 DX12 반복 판정은 별도 소비자 |
 | PBR 게이트의 vulkan 회차 복구 | **이 계획** | `-Backend dx12,vulkan` 기본값 복귀 |
 | `vk.*` 4종(DX12/Vulkan 대조) 복구 | **이 계획** | `-IncludeVulkanSelfTest` 기본값 복귀 · §2.5 |
-| **DX12 전용 deferred 검사 신설** | **이 계획** | 위를 끄면서 생긴 구멍이다 · §2.5 |
+| **DX12 전용 Deferred 소비 검사** | **PHASE 4** | `dx12.iblshade`와 제품 AO/emissive 판정. PBR 정본 §26 |
 | Vulkan 기동 창 `gCubeMap` 결함 | **이 계획** | PHASE 4 와 무관한 별건인데 게이트를 끝까지 못 가게 막았다 |
 | RHI 중립 어휘(enum·변환표) | PHASE 4 (와 이후 모든 페이즈) | 어휘 구멍은 그 자리에서 막는다. 여기로 미루면 빚이 된다 |
 | 셰이더 언어·재질 의미 | PHASE 4 | 이미 닫혔다 |
@@ -28,6 +28,11 @@
 ---
 
 ## 1. 선행 조건 — 시각 고정이 먼저다
+
+**2026-09-19 소유권 정정:** PHASE 4가 정적 제품 장면의 고정 렌더 시간·샘플·새
+히스토리 캡처와 DX12 HDR/display 재현성을 먼저 구현·검증한다. 아래는 그 이전 진단
+기록이다. 이 계획은 해당 계약을 재사용해 Vulkan 적용과 교차 차이를 판정하며,
+게임 시뮬레이션/애니메이션 전체 시각 고정은 별도 선행으로 확인한다.
 
 교차 백엔드 픽셀 판정은 **지금 하네스로는 성립하지 않는 질문**이다. PHASE 4 §15 의 실측:
 
@@ -87,11 +92,11 @@ vulkan 단독 검사가 아니라 **DX12/Vulkan 대조** 검사다 — `RunVulka
 | GBuffer MRT5·texture·sampler·mesh | `dx12.gbuffer` | PBR 게이트가 이미 돌린다 |
 | Forward+ legacy retirement·required assets | `dx12.forwardshade` | PBR 게이트가 이미 돌린다 |
 | | `dx12.forward` | 존재하나 **PBR 게이트가 안 건다** — 값싼 보강 후보 |
-| **Deferred GBuffer consume·fullscreen** | **없다** | `dx12.deferred` 라는 명령이 존재하지 않는다 |
+| **Deferred GBuffer consume·fullscreen** | `dx12.iblshade` + 제품 AO/emission | PHASE 4 기본 게이트에 연결(2026-09-19). `dx12.deferred`라는 이름은 만들 필요 없음 |
 
-> **P1. DX12 전용 deferred 검사를 세운다.** 마지막 줄이 이 결정의 실제 비용이다.
-> 이 계획이 착수하면 여기부터 갚거나, 그 전에라도 따로 세울 수 있다 — 교차 백엔드가
-> 아니라 DX12 단독 검사라서 §1 의 시각 고정을 기다릴 필요가 없다.
+> **P1 소유권 정정(2026-09-19).** DX12 생산 Deferred를 사용하는 `dx12.iblshade`와
+> 제품 AO/emissive fixture 검사를 PHASE 4 기본 게이트에 연결한다. 이 계획은
+> `vk.deferred` 교차 축 복구를 소유한다. DX12 전용 검증을 4.9 착수까지 미루지 않는다.
 
 ★ 미룬 축을 적을 때는 **무엇을 잃었는지까지** 적는다. "미뤘다" 만 적으면 뒷사람이
 되돌릴 근거를 잃는다. 게이트의 축 회계도 이 손실을 문장으로 들고 있다.

@@ -1,8 +1,13 @@
 # PBR 배선 안정화 계획 (PHASE 4)
 
-**신설 2026-09-03 · 갱신 2026-09-16 · 10슬라이스 18일 · W1~W6 완료(W3는 §16 · W1은 §17) · W0/W7 진행(W7 sampler는 §19) · W8 핵심 수정 증명(§21 — 공유 `Material` fixture) · 재임포트 실패 뒤 current 불변(§22 — 죽은 검사 부활, Animator 위반 미자극) · W9 구현 착지·부분 실측(§15) · 배선 게이트 첫 완주와 10 분 Release soak(§23 — 재임포트 실자극) · 판정 범위는 DX12(§20 — vulkan 1:1 은 PHASE 4.9)**
+> **2026-09-20 완료. 조건은 §26, 최종 검증과 종료 판정은 §28을 따른다.** 아래 절들은 실행 당시의 기록이다.
+> 공수 진행률은 렌더 품질이나 검증 통과율이 아니다. W8 런타임 모델 실패 교체 수정과
+> 최신 Debug/Release 회귀·Release 장시간 검증을 마쳐 W0~W9를 완료했다.
+> 후속 요청인 Editor 모델 생성 데이터 자동 복구의 구현·검증 범위는 §29에 기록한다.
 
-> **W8/W9 현재 상태 한 줄.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
+**신설 2026-09-03 · 완료 2026-09-20 · 10슬라이스 18일 모두 완료 · 잔여 0일 · 판정 범위 DX12(Vulkan 교차 판정은 PHASE 4.9)**
+
+> **2026-09-16 당시 W8/W9 상태 기록.** 빌드 exit 0 · `render.pbr.seal` 42/42 · 제품 캡처 W8 단정
 > 양쪽 backend PASS · soak 109/109(dx12 1분). 그러나 **cutover 아님**: ~~배선 게이트가
 > 끝까지 간 적이 없고(§15 — `verify-experiment-contract.ps1` 링크 부패, W9 이전부터),~~
 > (§23 — 링크를 고쳐 처음 완주했고 10 분 Release soak 이 재임포트를 실제로 자극하며 통과했다)
@@ -86,25 +91,24 @@ typed Material generation
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `PBR-W0` | 감사 정본·Gunner/primitive capture·strict gate | ◐ | PHASE 3.75 | 2 |
+| `PBR-W0` | 감사 정본·Gunner/primitive capture·strict gate | ✓ | PHASE 3.75 | 2 |
 | `PBR-W1` | normal-map 저작 유무 snapshot 단일화 | ✓ | — | 1 |
 | `PBR-W2` | GBuffer/Deferred/Forward native Slang 제품 진입점·공용 현행 평가 | ✓ | W0 | 2.5 |
 | `PBR-W3` | backend neutral resource·binding·종료 코드 동등성 | ✓ | W0 | 1 |
 | `PBR-W4` | OPAQUE/MASK/BLEND·alpha cutoff·double-sided/cull | ✓ | W2 | 2 |
 | `PBR-W5` | AO 소비·고정 4 texture slot 제거·GBuffer packing 검토 | ✓ | W2, W3 | 2.5 |
 | `PBR-W6` | emissive factor/strength·constant-only emission·색공간 | ✓ | W2 | 1.5 |
-| `PBR-W7` | UV set/transform/sampler/mip·normal/tangent 변환 | ◐ | W2 | 2 |
-| `PBR-W8` | material/descriptor/PSO generation 원자 밀봉·플리커 fail-closed | · | W3~W7 | 2 |
-| `PBR-W9` | DX12/Vulkan 실장면·장시간·재임포트 회귀와 cutover | · | W8 | 1.5 |
+| `PBR-W7` | UV set/transform/sampler/mip·normal/tangent 변환 | ✓ | W2 | 2 |
+| `PBR-W8` | material/descriptor/PSO generation 원자 밀봉·실패 교체 | ✓ | W3~W7 | 2 |
+| `PBR-W9` | DX12 제품 픽셀·장시간·재임포트 회귀와 cutover | ✓ | W8 | 1.5 |
 | **합계** |  |  |  | **18** |
 
-`PBR-W0`은 정적 감사와 2026-09-14 manifest 축(§18)을 기성으로 센다 — fixture 여덟 중
-셋만 서 있어 완료가 아니다. W3는 중립 상수 단일 출처화와 양 팔 변이 증명으로 닫았고
-(§16), W1은 유도를 한 함수로 접고 저장소 소유 fixture로 실장면 판정을 세워 닫았다
-(§17). W7의 normal/tangent·UV 선택/변환·mip 구현과 검증은 합계 1.5일 기성이었고,
-sampler 단위가 §19로 착지해 2일 기성이 됐다. W1/W2/W3/W4/W5/W6 완료 10.5일 +
-진행 기성 3.75일이며 잔여는 3.75일이다. W7에서 **주장하지 않는 축**은 재질 안 슬롯별
-sampler 분기와 Anisotropic 둘이다(§19).
+W0은 §27의 AO/emissive fixture와 제품 픽셀·HDR/display 반복 판정으로 닫는다.
+W7은 기존 normal/UV/mip 수치 검사와 실제 Repeat/Clamp/Mirror 픽셀 판정을 합쳐 닫는다.
+지원 계약은 재질당 sampler 하나이며, 슬롯별 서로 다른 sampler·독립 min/mag·anisotropic을
+지원한다고 주장하지 않는다(§19·§27). W8은 §28의 실제 런타임 실패 교체 검사로,
+W9는 최신 통합·제품 픽셀·600초 이상 실제 표본 검증으로 닫았다. 완료 10행 18일,
+잔여 0일이다. 대시보드 완료율은 이 범위의 작업 회계이며 모든 렌더 품질의 보증이 아니다.
 
 ---
 
@@ -141,7 +145,9 @@ sampler 분기와 Anisotropic 둘이다(§19).
 - frame 안에서 material/texture/sampler/descriptor/PSO generation이 섞이지 않는다.
 - reload/재임포트 실패 시 마지막 정상 generation을 유지하고 부분 게시하지 않는다.
 - 10분 회전·카메라 이동·재임포트 중 검정/변색 frame 0, validation error 0.
-- DX12/Vulkan 모두 Gunner/primitive golden 허용 오차를 통과한다.
+- DX12 Gunner/primitive의 고정 입력 HDR/display 반복 허용 오차를 통과한다. 이는 정답
+  이미지와의 비교가 아니며, 재질 정확성은 독립 수치·fixture 기대값으로 따로 판정한다.
+  Vulkan 제품 및 교차 backend 판정은 §20의 결정에 따라 PHASE 4.9가 소유한다.
 - 제품 PBR HLSL fallback, silent neutral substitution, 실패를 성공으로 반환하는 gate 0건.
 
 ---
@@ -1875,3 +1881,294 @@ Animator 이고 정상으로 묶였다.
 - 되살아날 조건 둘을 적어 둔다. ① 재임포트가 배치된 컴포넌트를 재바인딩하게 바뀔 때,
   ② 같은 프레임 안에서 컴포넌트를 제거하고 다시 붙이는 경로가 생길 때(`AddComponent` 가 파괴
   표시를 보지 않으므로).
+
+
+---
+
+## 25. RenderDoc 표면 무늬 후속 수정 — 2026-09-19
+
+`issue-Renderer-260919-frame7976/8876/9271/9984.rdc`를 재생해 조사했다.
+네 캡처의 IBL 85개 서브리소스는 동일했고, 원본 glTF 텍스처 6장의 mip0과 GPU 입력도
+일치했다. Deferred를 직접광/IBL로 분리했을 때 무늬는 IBL에 남았다. 캡처의 첫 Deferred
+이벤트는 각각 361/365/365/392다. 원인은 환경 큐브에 있는 작은 고휘도 태양을 고정
+1024개 cosine/GGX 방향으로 적분하며 발생한 오차였다.
+
+### 25.1 변경
+
+| 문제 | 수정 |
+|---|---|
+| 확산·거친 반사의 반복적인 적분 무늬 | 환경 휘도 CDF와 cosine/GGX를 각 1024개 표집하는 MIS. PDF와 라디언스는 같은 셀을 사용한다. |
+| roughness=0 프리필터도 환경의 흐린 밉을 읽음 | 원본 큐브 mip0을 직접 보존한다. |
+| GGX 분모 `max(...,1e-6)`가 매끄러운 반사의 피크를 잘라냄 | 상쇄를 줄인 분모식과 수치 보호용 작은 하한을 사용한다. |
+| SSAO가 SSGI에만 반영되고 Deferred IBL에 연결되지 않음 | 그래프 의존성과 t9를 추가하고 재질 AO와 함께 IBL에만 적용한다. 입력이 없으면 AO=1이다. |
+| 금속에도 SSGI 확산광이 더해짐 | 합성 t6에 ORM을 연결해 `(1-metallic)`와 재질 AO를 적용한다. 입력이 없으면 비금속/AO=1이다. |
+
+중요도 격자는 환경 밉에서 최대 128²×6으로 만들고, CDF와 환경 표본은 굽기마다 한 번
+계산한다. 확산 조도는 최대 64²×6, 반사 mip0은 기존 환경 해상도를 유지한다. 기존의
+선택적 표본 mip 계산은 제거했다. 생성·전이·바인딩은 중립 RHI API를 사용한다.
+
+### 25.2 검증
+
+VS18/v145 Debug Editor 빌드. 실제 DX12 GPU readback을 쓰는 기존 검증을 확장했다.
+
+| 검증 | 결과 |
+|---|---|
+| `dx12.ibl` — GGX 피크/피크 밖의 해석적 참값 | 최대 상대 오차 0.000002 |
+| 작은 60000 대 배경 0.125 광원, 독립 입체각 구적법 — 확산 | 상대 RMS 0.000920, 최대 오차/참조 피크 0.001531 |
+| 같은 광원 — 반사 roughness 0.2 / 0.6 / 1.0 | 상대 RMS 0.001649 / 0.003465 / 0.007080 |
+| 거울 반사와 원본 cube mip0, 6면 전체 | 상대 최대 오차 0 |
+| 검은 환경으로 재생성 | 조도 및 반사 mip0/3/5의 6면 모두 유한한 0 |
+| `dx12.iblshade` | AO=0.25의 IBL 응답, 직접광 보존, 입력 해제 복귀 검증 |
+| `dx12.ssao` | 기존 AO 생성·필터 검증 통과 |
+| `dx12.ssgi` — 평균 추가 광량 | 비금속 0.225337, metallic=0.5에서 0.112538, 금속 0, ORM 없음 0.225337, 재질 AO=0.25에서 0.056139 |
+| `dx12.forwardshade` | 기존 Forward 소비 검증 통과 |
+| Gunner 제품 프레임 전신/근접 | `render.pbr.capture` 성공, 7개 출력의 비유한 값 0, validation 0, seal 위반·encoder drop·texture upload 실패 0 |
+
+HDR 구적 검증은 GPU 표집 패턴을 복제하지 않고 환경 셀의 입체각을 독립적으로 적분한다.
+거울은 방향 몇 개의 색이 아니라 6면 모든 텍셀을 비교한다. SSAO 직접광 대조는 천장의
+그림자를 제외한 실제로 밝은 바닥에서 측정한다. SSGI는 생산 패스 전체를 거쳐 ORM의
+0/0.5/1·입력 없음·재질 AO를 비교한다.
+
+이번 검증은 **Debug/DX12**다. Release/Vulkan 런타임 판정, 모든 HDRI와 기기에서의 성능,
+원래 네 캡처와 새 제품 프레임의 동일 카메라·동일 시각 픽셀 판정은 포함하지 않는다.
+제품 캡처는 같은 Gunner와 같은 HDRI를 새 시점에서 관찰한 것이다. W9의 시각 고정·cutover
+판정을 완료로 바꾸지 않는다. 두 번의 렌더 체인이 들어 있던 원본 캡처도 원인 확정 없이
+중복 렌더 버그로 단정하지 않는다.
+
+상세 원본 분석·빌드 로그·명령 결과·제품 프레임은 로컬
+`C:/Users/lance/Documents/Codex/artifacts/render-audit-20260919`에 보관했다.
+
+## 26. 현재 완료 조건과 검증 소유권 (2026-09-19)
+
+PHASE 4는 **현재 DX12 제품 렌더 경로의 PBR 정확성·배선·세대 안정성**을 판정한다.
+PHASE 4.9는 Vulkan 제품 판정과 DX12/Vulkan 교차 비교를 소유한다. DX12 HDR/display
+검증을 4.9로 미루면서 4.9가 PHASE 4 완료를 기다리게 하는 순환 의존은 두지 않는다.
+
+| 축 | PHASE 4의 완료 증거 | 현재 처리 |
+|---|---|---|
+| W0 제품 입력 | 추적 가능한 normal/alpha/sampler/shared-material/AO/emissive fixture, 실제 draw와 픽셀 검증 | AO/emissive 제품 fixture 보강 |
+| W5/W6 라이팅 | 생산 Deferred/Forward의 AO·emission 소비, IBL 독립 구적 참값, SSAO 좌표계·반구·회전·경사면 대조, SSGI 금속/AO 응답 | 최신 GPU 검사를 기본 배선 게이트에 연결 |
+| W7 재질 계약 | UV/transform/mip/normal 수치 검사와 제품 sampler 확인 | 재질당 sampler 계약. 텍스처별 서로 다른 sampler와 anisotropic 지원은 미지원으로 명시하며 완료 주장에 포함하지 않음 |
+| W8 세대 원자성 | 공유 Material의 서로 다른 override, seal ledger, 실패한 재임포트 뒤 current 유지, 변이 검사의 실패 | §21/§22 및 §28 통과. 실제 런타임 모델 실패 4종 보존, 정상 복구·중복 알림·삭제 검증 완료 |
+| W9 제품 출력 | 정적 장면의 고정 렌더 시간·샘플·새 히스토리로 HDR/display 재현성, 알려진 재질 입력의 독립 픽셀 기대값 | 같은 backend 반복은 재현성 검사이며 물리적 참값 검사를 대체하지 않음 |
+| W9 통합 | 최신 Debug/Release 빌드·전체 DX12 배선 게이트·Release 실제 600초 이상 회전/이동/진짜 재임포트 soak | §27·§28 통과. 최종 Release 실제 표본 구간 676.895초·재임포트 188회 |
+
+SSAO 수정의 선행 증거: Debug에서 카메라 90도 회전 차이 0, 경사면 최솟값
+0.999512, 한쪽 벽 0.5, 양쪽 벽 평균 0.221680, intensity=0/sky=1,
+DX12 validation 0. 상세는 로컬 `artifacts/ssao-fix-20260919/SSAO-Fix-Validation.md`.
+
+Animator reset-before-validate는 §24에서 현재 도달 가능한 동일 인스턴스 재바인딩 경로가
+없음을 확인했다. W8의 차단 사유로 다시 세지 않는다. 2026-09-19에는 ContentReload가
+검증 전에 current를 은퇴시키는 실제 경로 때문에 W8/W9를 진행으로 남겼다. 게시 전 손상
+거부 4종은 이 경로를 검사하지 않았다. §28에서 그 경로의 실패를 재현하고 후보 검증 후
+원자 교체로 수정했으며 기존 인스턴스·신규 lookup·texture owner 보존을 검증했다.
+sibling orphan은 별도 수명주기 후속 축이며 이번에 검증하지 않았다.
+
+고정 캡처는 정적 제품 장면의 렌더 입력 재현성을 다룬다. 게임 시뮬레이션 전체 고정,
+애니메이션 golden, 장기 temporal 수렴, Vulkan 패리티, path tracing은 이 완료선이 아니다.
+SSAO는 현재 bitmask 각도 가시성 근사이며 GTAO의 코사인 가중 적분으로 바꾸지 않는다.
+
+## 27. 제품 픽셀 판정과 최신 통합 검증 (2026-09-19)
+
+### 구현한 검증 경로
+
+- `render.pbr.capture <새 절대 경로> game controlled`: DX12 정적 장면의 렌더 시간과
+  delta를 0으로, SSAO/포그 표본 번호를 0으로 고정한다. SSGI와 포그는 캡처 전후에
+  히스토리를 초기화한다. frame ID·자원 회수·펜스 번호는 되돌리지 않으며, 다른 카메라는
+  진단용 시각을 히스토리에 섞지 않는다. 기존 관찰 캡처는 선택 인자 없이 사용할 수 있다.
+- `PbrProductPixels.ps1`: 같은 입력의 서로 다른 제품 frame을 요구하고, 7개 attachment
+  전체에 기존 허용식 `abs 0.002 + rel 0.5%`를 적용한다. HDR/display도 실패를 전파한다.
+  이 두 readback에 각각 오류를 주입해 비교 술어가 거부하는지 확인한다. 이것은 반복
+  재현성 판정이며 물리적 참값 판정은 아래 대조 fixture와 GPU 수치 검사에서 별도로 한다.
+- `pbr-lighting/Lighting.gltf`: AO 64/255·strength=0·맵 없음, 상수 발광·sRGB 텍스처
+  발광·발광 없음의 여섯 쿼드다. 카메라/모델 행렬로 지정한 내부 영역을 투영하고 실제
+  depth hit와 GBuffer 값을 검증하며, AO 감쇠와 발광이 HDR/최종 화면에 도달하는지 본다.
+- NormalPair와 SamplerModes는 다른 물체가 가리지 않는 제품 장면에서 별도 캡처한다.
+  노멀맵 유무는 법선 픽셀로, Repeat/Clamp/Mirror는 UV 범위 밖의 9개 색 표본으로 판정한다.
+  이전의 sampler 신원 장부와 정상적인 draw 기록만으로는 이 픽셀 판정을 대신할 수 없다.
+- 기존 4×4 sampler 이미지의 네 색이 한 BC1 블록에서 크게 손실되는 것을 발견했다.
+  16×16 이미지의 블록에 정렬한 단색 영역과 0/255 끝점으로 바꿨다. 이미지 압축 오차를
+  픽셀 허용치를 늘려 숨기지 않았으며 제품 텍스처 압축 정책을 변경한 것도 아니다.
+- 기본 배선 게이트에 `dx12.ibl/iblshade/ssao/ssgi/fog`와 generation 원자성 검사를 연결했다.
+  `-Configuration Release`는 별도 Editor 인자가 없을 때 Release 실행 파일을 선택한다.
+  `-ProductOnly` 실행은 제한된 제품 검사라고 명시하며 전체 게이트 통과로 보고하지 않는다.
+- soak 시간은 프로세스가 종료될 때 멈춘다. 후속 JSON 분석 시간을 렌더 실행 시간으로
+  세지 않는다. 모든 명령의 terminal 결과 수를 확인하고 마지막 실제 제품 frame도 저장한다.
+
+### 판정의 범위
+
+정적 primitive·Gunner·lighting 장면의 반복 가능성, 알려진 재질 의미와 독립 IBL 적분,
+SSAO 공간/반구/경사면, SSGI 재질 응답, 지원하는 sampler 계약과 세대 원자성을 검사한다.
+재질당 하나의 sampler라는 현행 한계, 텍스처별 서로 다른 sampler, min/mag의 독립 표현,
+anisotropic, 게임 시뮬레이션 전체 고정 및 모든 애니메이션/시간축 장면은 별도 범위다.
+이 지원 한계를 모든 glTF 재질 지원이나 모든 렌더 상황의 무결함으로 확대 해석하지 않는다.
+
+soak의 연속 표본은 draw/seal/encoder/upload 수치다. 마지막 frame은 픽셀까지 확인하지만,
+전체 실행의 모든 화면을 읽어 검정/변색 픽셀이 0임을 직접 증명한 것은 아니다.
+제품 validation 메시지 수집은 Debug 빌드에서 활성화된다. Release의 0 표기를 동일한
+debug-layer 검증으로 계산하지 않는다.
+
+최종 빌드·검사·캡처 원본은 로컬
+`C:/Users/lance/Documents/Codex/artifacts/phase4-acceptance-20260919`에 보존한다.
+
+### 최신 실행 결과
+
+| 검사 | 실제 결과 |
+|---|---|
+| Editor 빌드 | 최신 Debug/Release 모두 exit 0 |
+| Debug 배선 | 전체 회귀 통과 후, 최종 캡처/포그 변경에 대해 제품 12캡처·포그·generation 집중 재실행 통과. 최종 변경 뒤 전체 세트를 다시 돌렸다는 뜻은 아님 |
+| Release 배선 | 최종 코드 전체 게이트 exit 0. 31축 실행, skipped 0, PHASE 4.9 소유 3축 deferred |
+| 실제 제품 픽셀 | Debug/Release AO/emissive 6쿼드, normal 대조쌍, sampler 9표본 통과 |
+| 정적 반복 | 구성별 primitive/Gunner/lighting 3쌍, 각각 7 attachment의 max delta와 RMSE 모두 0. HDR/display 오류 주입 거부 |
+| 포그 히스토리 초기화 | 이전 밝은 히스토리 뒤 reset+무광원 출력 0. reset+유광원과 독립 fresh 화면의 전체 픽셀 최대 차이 0 |
+| 세대 게시 원자성 | Debug/Release 각각 44단정, 손상 입력 4종 거부, current 유지 4/4 |
+| Release 장시간 | 프로세스 746.595초, **예열 후 실제 표본 구간 724.098초**. 19,045표본/19,045프레임 전진, 예열 1표본 제외 |
+| 재임포트 자극 | 188/188 실제 reloaded, 같은 모델의 구/신 generation 동시 렌더 18,945표본, 새 generation 188종 |
+| 장시간 상태/마지막 frame | 검사 표본의 seal 위반·unstamped·encoder drop·upload 실패 0. 마지막 frame 627361의 7 attachment 유효·finite·비어 있지 않음 |
+
+Release의 validationCount=0은 Debug validation 수집과 동등한 증거가 아니다.
+Debug 제품 캡처에서는 validation 0을 확인했다. 실행 후 테스트 모델과 임시 설정을 복구했다.
+
+핵심 산출물(위 로컬 루트 기준):
+
+- 최종 Debug 제품: `creator-pbr-95471cd1bf514eb6aebf7f669f3ba939`.
+- 최종 Release 전체: `creator-pbr-4f5aad45cacc497a8dadd431b1f0a1e0`.
+- Release 장시간: `creator-pbr-soak-72d5afe9f9a54b2d907f0ddf19cfb0fc/summary.json`.
+- 최종 빌드: `build-debug-final.log`, `build-release-final.log`.
+- 검토 보고서: `Phase4-Acceptance.md`, 제품 readback 보기: `product-overview.png`.
+
+### 종료 판정
+
+**2026-09-19 당시 판정: W0/W7 완료, W8/W9 진행 유지.** 이번 순서의 제품 fixture 보강, 고정 입력 캡처,
+최신 통합·장시간 검증은 통과했다. 그러나 W8의 runtime ContentReload는 게시 원자성
+테스트와 다른 경로다. 은퇴 후 재적재 실패 시 기존 인스턴스와 새 lookup이 어떻게 되는지
+실패를 주입해 검증하고 필요한 수정을 마친 뒤 W8을 닫아야 한다. W9의 최종 cutover는
+이에 의존한다. 현재 상태 표본과 마지막 픽셀만으로 모든 frame의 화면 무결함도 주장하지 않는다.
+
+미완료 행의 원래 공수는 3.5일(전체 18일 중 완료 14.5일, 약 81%)이다. 이번에 통과한
+검사를 미실행으로 되돌린다는 뜻도, 렌더 품질이 81%라는 뜻도 아니다.
+
+## 28. W8 런타임 모델 reload 실패 교체와 W9 종료 (2026-09-20)
+
+### 실제로 깨진 계약
+
+`DataSystem::ApplyAssetChange(ContentReload, Model)`은 current와 embedded texture owner를
+먼저 은퇴시켰다. 이후 적재가 실패하면 기존 current 조회가 비었고, 이전 generation의
+texture 조회도 다른 owner를 만들었다. 유효한 과거 generation을 읽으면 이미 current를
+제거했으므로 `Publish`의 stale 거부도 우회했다. 같은 generation의 중복 알림도 aggregate와
+texture owner를 다시 만들었다.
+
+**수정 전 실제 실패:** 새 런타임 검사 73단정 중 11개 실패. 실패 입력 4종에서 current 및
+texture owner 유지 각각 0/4, 기존 MeshRenderer의 보유 snapshot 수명은 4/4 유지였다.
+그러므로 이 결과는 기존 인스턴스가 즉시 검게 변했다는 증거가 아니라, 후속 조회·교체
+계약이 깨졌다는 증거다. 게시 전 독립 캐시 검사는 기존대로 4/4 통과해 이 차이를 못 잡았다.
+
+### 수정과 회귀
+
+- `LoadAndPublishModelAssetGeneration`으로 적재·검증·게시 경로를 공유한다. resident 모델은
+  검증한 후보를 기존 `Publish`에 넘겨 원자 교체하며, 성공한 교체만 이전 texture owner를
+  은퇴시킨다. 사용하지 않는 모델은 기존의 지연 적재를 유지한다.
+- 실패와 stale 후보는 current를 유지하고 오류 로그·계수를 남긴다. `ApplyAssetChange`는
+  resident reload 거부를 false로 반환하며, `EditorAssetDatabase::ImportSourceAsset`도 이를
+  성공으로 반환하지 않는다. 디스크에 이미 게시한 파일까지 되돌리는 변경은 아니다.
+  명시적인 Removed는 이전처럼 캐시 조회를 제거한다.
+- 기본 `assets.generation`에 실제 DataSystem 경계를 추가한다. 별도 임시 sidecar와
+  사용 중이지 않은 probe의 catalog 매핑을 사용하며 원본 generation 파일은 바꾸지 않는다.
+  누락·문법 오류·canonical 불일치·stale 후보를 직접 호출과 queue/drain 양쪽으로 보낸다.
+- 실패 뒤 current/handle·embedded texture 포인터·기존 MeshRenderer와 RHI view를 확인한다.
+  정상 신세대에서만 교체·texture 은퇴가 생기는지, 새 MeshRenderer는 새 세대를 사용하는지,
+  중복 알림은 불변인지, 명시적 제거 뒤 외부 snapshot은 살아 있는지도 확인한다.
+- 기존 `assets.scenemodel reload`는 같은 디스크 세대를 알렸을 뿐 실제 재임포트가 아니었다.
+  같은 세대에서는 aggregate/texture 신원을 보존하도록 판정을 정정했다. 신세대 교체는
+  두 개의 실제 generation을 쓰는 검사와 reimport soak에서 별도로 자극한다.
+
+수정 후 Debug/Release 각각 **77단정 통과**, 런타임 실패 4종의 current/texture/instance 유지
+각각 4/4, 정상 복구·중복 알림·명시적 제거 통과. 이전 게시 전 손상 검사 4종도 계속 통과했다.
+
+### 최종 변경의 실행 증거 (2026-09-20)
+
+| 실행 | 결과 | 원본 위치(아래 artifact root 기준) |
+|---|---|---|
+| Debug/Release Editor 빌드 | 성공. 기존 경고는 남음 | `build-debug-final.log`, `build-release.log` |
+| 런타임 실패 교체 | Debug/Release 각각 77단정, 실패 0 | `generation-debug.log`, Release baseline의 `generation-atomicity.log` |
+| 실제 저장 씬 콜드 로드 | 두 구성 모두 Gunner texture closure 6/6·typed GPU 렌더 통과. 중복 알림은 동일 aggregate, texture 재사용 6·생성/은퇴 0 | `scene-debug.log`, `scene-release.log` |
+| Debug 비동기 배치 | cold prepare·실패·취소·undo/redo·씬/재생 전환 통과 | `async-debug.log` |
+| Debug 제품 집중 검사 | 실제 캡처 12개, AO/emission/normal/sampler 픽셀 통과. 정적 3쌍 × 7 attachment 최대 차이 0, HDR/display 변이 거부 | `product-debug.log` |
+| Release 전체 배선 회귀 | 31축 실행, 생략 0, PHASE 4.9 소유 제품/교차 판정 3축 유예. IBL/SSAO/SSGI/fog 수치·재질 계약·제품 픽셀·strict 실패 검사를 포함해 통과 | `baseline-release.log` |
+
+Release 배포 ID는 `504d044c50b3d2ebc608e290ba4657593cdce321825271decc33747f0ec76cbb`다.
+Debug 전체 게이트는 §27에서 통과했으며, 이번 변경 뒤에는 위 집중 회귀를 다시 실행했다.
+Release 전체 게이트에는 독립 수치 검사의 Vulkan 실행도 포함되지만 제품 완료 범위는 DX12다.
+Release 장시간 실행도 통과했다. 프로세스 실행 **698.805초**, 예열과 마지막 캡처를 제외한
+실제 표본 구간 **676.895초**다. 19,045개 유효 표본이 모두 다른 프레임으로 전진했고,
+실제 재임포트 188회·그려진 새 generation 188종·두 정상 세대가 함께 그려진 표본 18,945개를
+확인했다. seal 위반·미밀봉 draw·encoder 누락·texture upload 실패는 모두 0이다.
+마지막 제품 frame `627361`은 draw 12개·attachment 7개, finite이며 depth/HDR이 비어 있지 않다.
+Release의 validationCount=0을 Debug validation layer 활성 검증으로 해석하지 않는다.
+
+원본 요약은 `creator-pbr-soak-84350c7b1bce4a8eb18563c857410498/summary.json`이다.
+연속 표본은 상태 수치이며 **픽셀 검사는 마지막 frame에 한정**된다.
+
+### 종료 판정
+
+**W8/W9 완료. PHASE 4의 W0~W9 10행·18일을 완료 처리한다.** 실제 실패를 재현한 검사와
+수정 후 Debug/Release 결과, 최신 제품 픽셀·Release 전체 회귀·장시간 검사에 근거한다.
+PHASE 4 계열 총 352.5일 중 완료는 22일, 잔여는 330.5일이다. 하위 페이즈의 하이브리드
+기능·시간축·RenderGraph·새 재질 모델을 완료했다는 뜻은 아니다.
+
+독립 texture/material 자산의 일반 hot reload 정책은 이 모델 aggregate 수정의 대상이 아니다.
+게임 시뮬레이션/애니메이션 전체와 모든 frame의 화면 무결함을 검증했다고 주장하지 않는다.
+원본 로그: `C:/Users/lance/Documents/Codex/artifacts/phase4-runtime-reload-20260919`.
+
+## 29. Editor 모델 생성 데이터 자동 복구 (2026-09-20)
+
+§28은 실패한 교체에서 기존 세대를 보존했지만, 읽지 못한 생성 데이터를 자동으로 다시
+만들지는 않았다. 사용자 요청으로 일반 모델 로드와 resident 모델의 reload 실패에
+Editor 소유 복구 경로를 연결한다.
+
+- `AssetAuthoringPort`의 선택적 model recovery handler를 Editor 시작/종료에 설치/해제한다.
+  해제는 진행 중인 복구 호출이 끝나기를 기다린다. Player에는 handler를 설치하지 않고,
+  cooked catalog 적재는 이 경로를 호출하지 않는다.
+- 원본이 프로젝트 Assets 안에 있고 canonical sidecar의 UUIDv8·epoch·closure가 기대 ID와
+  일치할 때만 기존 authoring transaction으로 제자리 재생성한다. transaction 자체도
+  expectedModelId를 확인한다. source/meta/header 신원이 손상되면 새 ID를 만들지 않는다.
+- 캐시 누락·구버전 CEMC·생성 기록/sidecar/해시 불일치 등은 생성 데이터를 다시 만들고
+  기존 strict loader로 한 번 재시도한다. 후보가 검증돼야 runtime current가 교체된다.
+  정상적인 구세대 snapshot 공존이나 stale 후보의 rollback 거부는 재임포트 사유가 아니다.
+- 동일 source/meta/header의 크기·수정 시각으로 실패 재시도를 억제한다. 입력 변경 또는
+  명시적 임포트로 다시 진행할 수 있다. 복구/명시적 임포트/파일 감시의 저작은 같은 mutex로
+  직렬화하고, 먼저 복구된 결과는 재생성 없이 사용한다.
+- source의 Modified/Add/Moved 이벤트는 중복 입력을 합친 뒤 재임포트하고 ContentReload를
+  프레임 경계에 전달한다. 일반 덮어쓰기와 임시 파일의 원자적 교체를 모두 포함한다.
+  실제 삭제 시 중복 기록도 지워, 크기·수정 시각을 유지한 복원 파일이 무시되지 않게 한다.
+  명시적 임포트는 저작 mutex를 해제한 뒤 runtime reload를 적용해 복구 재진입을 허용한다.
+- 일반 `model.loadcached` 결과에 generation·modelId와 복구/억제/거부/감시 교체 계수를 싣는다.
+  새 `verify-model-auto-recovery.ps1`을 기본 배선 게이트에 연결했다. 단순히 명령 성공을
+  세지 않고 자동 복구 횟수·ID 보존·새 generation·실패 억제·비동기 배치를 검사한다.
+
+삭제 처리 보강 전 Release에서 같은 크기·수정 시각의 source 복원이 중복 이벤트로
+무시되어 `model.loadcached`가 실패하는 것을 새 검사로 재현했다
+(`Restored source was suppressed as a duplicate`). 실제 삭제 시 중복/실패 기록을
+지우도록 수정한 최종 Debug에서는 **47단정 전부 통과**했다.
+
+| 검증 | 결과 |
+|---|---|
+| 최종 Debug/Release Editor 빌드 | 성공. 기존 경고는 남음 |
+| Debug 자동 복구 | 47단정: 생성 파일 누락·구버전 CEMC·generation 기록 불일치·sidecar 누락, ID 보존·반복 복구 방지·실패 억제·감시 수정/원자 교체/삭제 복원·신원 손상 거부·비동기 배치 |
+| Debug 기존 회귀 | generation 원자 교체 77단정, 실제 저장 씬 Gunner closure 6/6·typed GPU draw 10, 비동기 배치/undo/redo/실패/씬·재생 취소 통과 |
+| 최종 Release 전체 회귀 | 32축 실행·생략 0·PHASE 4.9 소유 3축 유예로 통과. 자동 복구 47단정, generation 보존 77단정, 제품 캡처 12개와 픽셀·반복성, IBL/SSAO/SSGI/fog 수치, 재질 계약, 실패 종료/캡처 거부 검사 포함 |
+
+Debug 배포 ID는 `1510a13c5dc6f37a18ae7071250e78da908371d816facc1e937519ef8fe7b114`,
+Release 배포 ID는 `340ca630bec93ce36634a0e8352aa8a42d2455bbf33c4c7daaae0c79347d595c`다.
+최종 Debug 복구 요약은 `creator-model-recovery-4a3d6c3e9d6646d6b31057370a9328eb/summary.json`,
+최종 Release 전체 실행은 `creator-pbr-89347ef4fc1d476b8ba023dfff330966`이다.
+수정 전 실패 실행 `creator-pbr-387caec458c34944821c4a5c4077a5eb`는 통과 근거에 포함하지 않는다.
+
+프로젝트 전체를 미리 재임포트하지 않고, 요청된 로드와 원본 변경을 처리한다.
+현재 씬 인스턴스를 강제로 새 snapshot으로 바꾸지 않는다. 교체 이후의 새 조회/배치는
+새 세대를 사용하며, 기존 인스턴스 수명은 유지한다. canonical 신원이나 원본 자체가
+손상되면 새 ID를 만들어 우회하지 않는다. Player/cooked catalog 재생성도 대상이 아니다.
+§28의 장시간 검사는 이번 복구 변경 후 다시 실행한 결과로 세지 않는다.
+PHASE 4 공수/완료율 및 후속 페이즈 소유권은 바꾸지 않는다.
+
+원본 로그: `C:/Users/lance/Documents/Codex/artifacts/model-auto-recovery-20260920`.

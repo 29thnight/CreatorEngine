@@ -25,7 +25,8 @@
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
-    [int]$TimeoutSeconds = 240
+    [int]$TimeoutSeconds = 240,
+    [switch]$PreserveArtifacts
 )
 
 Set-StrictMode -Version Latest
@@ -37,7 +38,7 @@ $project = Join-Path $root 'Dynamic_CPP'
 $run = Join-Path ([IO.Path]::GetFullPath($Work)) ('creator-generation-' + [guid]::NewGuid().ToString('N'))
 $utf8 = [Text.UTF8Encoding]::new($false)
 $process = $null
-$keepArtifacts = $false
+$keepArtifacts = [bool]$PreserveArtifacts
 $lastExit = 0
 
 # 원본은 저장소의 corpus 자산이다. 복사본을 **다른 이름**으로 임포트하므로
@@ -63,6 +64,11 @@ function Remove-Probe {
     }
     if ($id) {
         $generationDir = Join-Path $project "Library\ModelAssetGenerations\$id"
+        $generationRoot = [IO.Path]::GetFullPath((Join-Path $project 'Library/ModelAssetGenerations')) + [IO.Path]::DirectorySeparatorChar
+        $generationDir = [IO.Path]::GetFullPath($generationDir)
+        if ($id -notmatch '^[0-9a-fA-F-]{36}$' -or -not $generationDir.StartsWith($generationRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Unsafe generated probe directory'
+        }
         if (Test-Path -LiteralPath $generationDir) {
             Remove-Item -LiteralPath $generationDir -Recurse -Force -ErrorAction SilentlyContinue
         }
@@ -155,6 +161,8 @@ try {
     #   "무엇이 깨졌나" 를 말하지 못하고 사람이 로그를 뒤져야 했다.
     $verify = Invoke-Editor 'generation' @(
         "assets.generation `"$project`" $modelId",
+        "model.loadcached `"$probeAsset`"",
+        "assets.scenemodel reload $probeName",
         'quit') -ExpectedExit -1
     $data = (Get-CommandResult $verify 'assets.generation').data
 
@@ -181,6 +189,18 @@ try {
         throw ("재임포트 실패 뒤 current generation 이 $($data.tamperCurrentHeld)/$($data.tamperCases) 만 유지됐다" +
             " — §1 '마지막 정상 generation 유지' 위반")
     }
+    if ($data.runtimeCases -ne 4 -or $data.runtimeRejected -ne 4 -or
+        $data.runtimeCurrentHeld -ne 4 -or $data.runtimeTexturesHeld -ne 4 -or
+        $data.runtimeInstanceHeld -ne 4 -or -not $data.runtimeRecovered -or
+        -not $data.runtimeDuplicateStable -or -not $data.runtimeRemoved) {
+        throw "Runtime reload contract failed: $($data | ConvertTo-Json -Compress)"
+    }
+    $duplicate = Get-CommandResult $verify 'assets.scenemodel'
+    if ($duplicate.status -ne 'succeeded' -or -not $duplicate.data.sameAggregate -or
+        $duplicate.data.textures -lt 1 -or $duplicate.data.reused -ne $duplicate.data.textures -or
+        $duplicate.data.created -ne 0 -or $duplicate.data.retired -ne 0) {
+        throw 'Duplicate ContentReload churned the model or its embedded textures'
+    }
 
     if ($lastExit -ne 0) {
         throw "단정 실패 0 인데 exit=$lastExit — 결과 계약 불일치: $($data.log)"
@@ -194,9 +214,9 @@ try {
     "  tamper 게시 전 거부        ran ($($data.tamperCases) 종)"
     "  실패 뒤 current 유지       ran ($($data.tamperCurrentHeld)/$($data.tamperCases))"
     # ★ 자극하지 못한 것을 **평상시 출력에도** 적는다. 잊힌 사각지대는 초록으로 읽힌다.
-    "  Animator 의 last-good 유지 미자극 — Animator::BindModelGeneration 은 검증보다 먼저"
-    "                             m_modelGeneration.reset() 을 한다(뼈 있는 fixture 필요)"
-    "  런타임 캐시 공백(retire→적재 실패) 미자극 — 은퇴가 먼저 도는 경로는 별도 축"
+    "  Animator 동일 인스턴스 재바인딩 미자극 — 현재 제품 호출 경로 없음(정본 §24), W8 blocker 아님"
+    "  런타임 reload 실패        ran ($($data.runtimeCases) 종, current/texture/instance 모두 유지)"
+    "  정상 복구·중복 알림·제거    ran"
     exit 0
 }
 catch {
@@ -210,6 +230,10 @@ finally {
     if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
     Remove-Probe
     if (-not $keepArtifacts -and (Test-Path -LiteralPath $run)) {
+        $workRoot = [IO.Path]::GetFullPath($Work).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+        if (-not [IO.Path]::GetFullPath($run).StartsWith($workRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Generated run directory escaped work root'
+        }
         Remove-Item -LiteralPath $run -Recurse -Force -ErrorAction SilentlyContinue
     }
     elseif ($keepArtifacts) { Write-Host "artifacts: $run" }

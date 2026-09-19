@@ -1,81 +1,13 @@
-#pragma once
+﻿#pragma once
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
 
-// SSAO 패스 (PHASE 3-6, 신규 작성).
-//
-// ── 기존 DX11 SSAO가 하는 일과 그 값 ──
-//
-// 반구 커널 64개를 뽑아 픽셀마다 이렇게 돈다:
-//
-//   for (i = 0; i < 64; ++i)
-//       samplePosW = posW + mul(TBN, kernel[i]) * radius
-//       sampleClip = mul(viewProjection, samplePosW)        ← 행렬곱 1
-//       depth      = gDepthTex.Sample(sampleUV)             ← 텍스처 페치
-//       scenePosW  = mul(inverseViewProjection, ...)        ← 행렬곱 2
-//       occlusion += step(...) * rangeCheck
-//
-// 전 해상도에서 픽셀마다 페치 64회 + 4x4 행렬곱 128회다. 그리고 결과를
-// 흐리지 않는다 — 픽셀마다 커널을 무작위로 회전시켜 놓고 디노이즈가 없으니
-// 그 잡음이 그대로 화면에 남는다.
-//
-// ── 다시 쓰면서 바꾸는 것 ──
-//
-//   1. 월드 왕복을 없앤다. 전부 뷰 공간에서 하고, 표본은 화면 공간에서
-//      행진해 얻는다 — 표본 UV가 2D 덧셈 하나로 나오므로 표본당 행렬곱이
-//      0이 된다. 깊이에서 뷰 위치를 되돌리는 것만 남는다.
-//
-//   2. 반해상도(1/2)에서 계산한다. AO는 저주파라 반해상도로 잃는 것이
-//      거의 없고, 픽셀 수가 1/4이 된다.
-//
-//   3. 가시성 비트마스크로 센다. 방향마다 32비트 마스크를 두고 표본이
-//      가리는 각도 구간의 비트를 세운 뒤 countbits로 한 번에 센다.
-//      가중치를 누적하는 방식과 달리 같은 각도를 두 번 세지 않는다 —
-//      겹쳐 있는 가림막이 AO를 과대평가하는 것이 이 방식으로 사라진다.
-//
-//   4. 디노이즈를 넣는다. 방향을 픽셀·프레임마다 돌려 잡음을 만들고
-//      교차 양방향 필터로 걷어낸다. 잡음을 만들고 걷어내는 쪽이, 잡음을
-//      안 만들려고 표본을 늘리는 쪽보다 싸다.
-//
-// 표본 수 비교(전 해상도 픽셀 하나 기준):
-//   기존  페치 64 · 행렬곱 128
-//   신규  페치 (2방향 x 8스텝 x 양쪽 2) / 4 = 8 · 행렬곱 0
-//
-// ★ 처음에는 '페치 4'라고 적었다. 양쪽을 다 본다는 것(x2)을 계산에서
-//   빼먹은 탓이다. 계산을 근거로 삼지 말자고 적어 두고도 그 계산이
-//   틀렸으니, 실측이 아니면 적지 않는 편이 낫다는 쪽에 무게가 더 실린다.
-//
-// ── 단계 ──
-//
-//   1. 반해상도 AO 컴퓨트 + 자가 검증(알려진 배치로 단정)
-//   2. 디노이즈·업샘플
-//   3. 실제 씬 연결 + 기존 SSAO와 시간 비교
-//
-// 종료된 알고리즘 비교 벤치와 참조 경로는 제거했다. 측정 이력은 Git에 남는다.
-//
-// ── 1·2단계 실측 (dx12.ssao, 256x256 → 반해상도 128x128) ──
-//
-//   평평한 곳 AO 0.969 · 계단 안쪽 0.373 · 필터가 이웃 차이를 51.7% 줄임
-//
-// ★ 첫 실행은 평평한 곳이 0.590으로 나왔다. 비트마스크를 법선 기준 0~pi에
-//   걸어 둔 탓이다 — 같은 평면 위의 이웃 표본은 법선과 정확히 pi/2를
-//   이루므로 그 위쪽 절반(16비트)이 통째로 켜져 가림 0.5가 된다.
-//   실측 1-0.590 = 0.41이 그 계산과 맞아떨어져 원인이 한 번에 잡혔다.
-//
-//   반구는 접평면 기준 0~pi/2다. 고도(asin)로 재면 같은 평면 위의 표본은
-//   고도 0, 뒷면은 음수라 구간이 [0,0]으로 접혀 비트가 0이 된다 —
-//   '평면은 자기 자신을 가리지 않는다'가 식에서 저절로 나온다.
-//
-//   이 배치를 고른 이유가 여기서 값을 했다. 평평한 곳을 단정하지 않았으면
-//   계단이 어두워진 것만 보고 통과시켰을 것이고, 화면 전체가 반쯤 탁한 채로
-//   씬에 붙었을 것이다.
-//
-// SSGI·Forward+에서 배운 규율을 그대로 쓴다: 셰이더는 부르는 자리가 생겨야
-// 오류가 드러나므로 자가 검증을 먼저, 리드백 없이는 '도는 것처럼 보이는'
-// 상태를 구분할 수 없으므로 진단을 처음부터, 상수는 실측으로.
+// Half-resolution screen-space AO using signed visibility sectors.
+// The angular average is an approximation, not cosine-weighted GTAO.
+// RG16F output stores visibility and view-space depth for the spatial filter.
 class EnhancedSSAOPass : public EnhancedRenderPass
 {
 public:
@@ -116,8 +48,7 @@ public:
         /// 배경이 통째로 가려진다. 그 깊이를 이 값으로 자른다.
         float thickness{ 0.25f };
 
-        /// 결과에 거는 세기. 1이 물리적으로 맞는 값이고, 그림이 약하다고
-        /// 느껴 올리는 것은 화가의 선택이라 기본값은 1로 둔다.
+        /// Visibility reduction multiplier; zero disables occlusion.
         float intensity{ 1.f };
 
         /// 디노이즈의 깊이 민감도. 작을수록 경계를 잘 지키고 잡음이 남는다.
@@ -137,7 +68,7 @@ public:
     struct Inputs
     {
         RGHandle depth;    // GBuffer 깊이
-        RGHandle normal;   // GBuffer 노멀 — 반구의 축
+        RGHandle normal;   // Encoded world-space GBuffer normal (normal * 0.5 + 0.5)
     };
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
@@ -154,8 +85,7 @@ public:
     /// 알 수 없다(SSGI 필터 스윕에서 전 구간 0.0%가 나왔던 일이 그 예다).
     RGHandle GetRawOutput() const { return m_rawOutput; }
 
-    /// 프레임 번호. 방향 회전에 쓴다 — 고정하면 잡음이 화면에 박혀서
-    /// 디노이즈가 지우지 못한다.
+    /// Sample rotation seed. The current filter is spatial; it has no history.
     void SetFrameIndex(uint32_t index) { m_frameIndex = index; }
 
 

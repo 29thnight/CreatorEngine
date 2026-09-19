@@ -846,6 +846,14 @@ namespace ConsoleCmd
             generation ? "ok" : "fail", parts[1].c_str());
         auto data = CommandData::Object();
         data.Set("path", CommandData::String(parts[1]));
+        data.Set("generation", CommandData::Int(generation ? generation->Handle().generation : 0));
+        data.Set("modelId", CommandData::String(generation ? Uuid::ToString(generation->Identity().modelId) : ""));
+        const auto recovery = EditorAssetDatabase::Get().GetModelRecoveryStats();
+        data.Set("recoveryAttempts", CommandData::Int(recovery.attempts));
+        data.Set("recoverySucceeded", CommandData::Int(recovery.succeeded));
+        data.Set("recoverySuppressed", CommandData::Int(recovery.suppressed));
+        data.Set("recoveryDeclined", CommandData::Int(recovery.declined));
+        data.Set("sourceReloads", CommandData::Int(recovery.sourceReloads));
         return generation ? Ok({}, std::move(data)) : Fail("model.load_failed", "Model generation load failed", std::move(data));
     }
 
@@ -1528,6 +1536,14 @@ namespace ConsoleCmd
         data.Set("tamperCases", CommandData::Int(report.tamperCases));
         data.Set("tamperRejected", CommandData::Int(report.tamperRejected));
         data.Set("tamperCurrentHeld", CommandData::Int(report.tamperCurrentHeld));
+        data.Set("runtimeCases", CommandData::Int(report.runtimeCases));
+        data.Set("runtimeRejected", CommandData::Int(report.runtimeRejected));
+        data.Set("runtimeCurrentHeld", CommandData::Int(report.runtimeCurrentHeld));
+        data.Set("runtimeTexturesHeld", CommandData::Int(report.runtimeTexturesHeld));
+        data.Set("runtimeInstanceHeld", CommandData::Int(report.runtimeInstanceHeld));
+        data.Set("runtimeRecovered", CommandData::Bool(report.runtimeRecovered));
+        data.Set("runtimeDuplicateStable", CommandData::Bool(report.runtimeDuplicateStable));
+        data.Set("runtimeRemoved", CommandData::Bool(report.runtimeRemoved));
         data.Set("fixtureResolved", CommandData::Bool(report.fixtureResolved));
         data.Set("log", CommandData::String(std::move(log)));
         return passed ? Ok({}, std::move(data))

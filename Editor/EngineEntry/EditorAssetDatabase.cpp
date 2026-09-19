@@ -2,6 +2,7 @@
 
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Assets/ModelAssetAuthoringTransaction.h"
+#include "Assets/ModelSidecarV2.h"
 #include "Experiment/Import/GltfSourceDependencies.h"
 #include "DataSystem.h"
 #include "FileDialog.h"
@@ -19,15 +20,48 @@
 #include <stb_image_write.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <limits>
 #include <mutex>
+#include <map>
 #include <regex>
 #include <unordered_set>
 
 namespace
 {
+	bool RecoverModelThroughEditor(const file::path& source, FileGuid expectedId)
+	{
+		return EditorAssetDatabase::Get().RecoverModel(source, expectedId);
+	}
+
+	struct ModelSourceStamp
+	{
+		file::file_time_type modified{};
+		std::uintmax_t size{};
+		bool present{};
+		bool operator==(const ModelSourceStamp&) const = default;
+	};
+
+	ModelSourceStamp ReadModelSourceStamp(const file::path& path)
+	{
+		std::error_code error;
+		ModelSourceStamp stamp;
+		if (!file::is_regular_file(path, error) || error) return stamp;
+		stamp.size = file::file_size(path, error);
+		if (error) return {};
+		stamp.modified = file::last_write_time(path, error);
+		stamp.present = !error;
+		return stamp;
+	}
+
+	std::string ReadModelRecoveryText(const file::path& path)
+	{
+		std::ifstream input(path, std::ios::binary);
+		return { std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>() };
+	}
+
 	file::path RemoveMetaExtension(const file::path& metaPath)
 	{
 		file::path target = metaPath;
@@ -568,6 +602,75 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		return CreateMetaLocked(targetFile, preferredGuid);
 	}
 
+	bool RecoverModel(const file::path& requestedSource, FileGuid expectedId)
+	{
+		// This mutex also serializes explicit imports and watcher authoring. A
+		// concurrent failing load rechecks the winner's result before rebuilding.
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const file::path source = file::weakly_canonical(requestedSource, error);
+		if (error || !IsPathInside(source, file::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source) || !ReadModelSourceStamp(source).present
+			|| !assets::IsUuidV8(expectedId.m_guid))
+		{
+			++m_modelRecoveryStats.declined;
+			return false;
+		}
+		const file::path meta = source.string() + ".meta";
+		const file::path headerPath = m_root.parent_path() / "ProjectSetting/AssetIdentity.asset";
+		assets::IdentityEpochHeader header;
+		assets::ModelSidecarV2 sidecar;
+		std::vector<assets::EpochHeaderIssue> headerIssues;
+		std::vector<assets::SidecarIssue> sidecarIssues;
+		if (!assets::ReadIdentityEpochHeader(ReadModelRecoveryText(headerPath), header, headerIssues)
+			|| !assets::ReadModelSidecarV2(ReadModelRecoveryText(meta), sidecar, sidecarIssues)
+			|| sidecar.assetId != expectedId.m_guid
+			|| !assets::ValidateModelSidecarV2Closure(sidecar, header, sidecarIssues))
+		{
+			// Missing/corrupt identity is not a license to allocate a different ID.
+			++m_modelRecoveryStats.declined;
+			return false;
+		}
+		assets::ModelAssetGenerationLoadRequest load;
+		load.identityHeaderPath = headerPath;
+		load.generationRoot = m_root.parent_path() / "Library/ModelAssetGenerations";
+		load.canonicalSidecarPath = meta;
+		load.expectedModelId = expectedId.m_guid;
+		if (assets::LoadModelAssetGeneration(load).Succeeded()) return true;
+
+		const auto inputs = std::array{ ReadModelSourceStamp(source),
+			ReadModelSourceStamp(meta), ReadModelSourceStamp(headerPath) };
+		if (const auto failed = m_failedModelRecovery.find(source);
+			failed != m_failedModelRecovery.end() && failed->second == inputs)
+		{
+			++m_modelRecoveryStats.suppressed;
+			return false;
+		}
+		m_failedModelRecovery[source] = inputs;
+		++m_modelRecoveryStats.attempts;
+		Debug::PrintLog(spdlog::level::info, "[model.recovery] rebuilding derived data: " + source.string());
+		// Rebuild in place; ImportSourceAsset may copy external sources to a new
+		// destination and must not be used to repair an existing model identity.
+		const FileGuid rebuilt = CreateMetaLocked(source, {}, expectedId);
+		if (rebuilt != expectedId || !assets::LoadModelAssetGeneration(load).Succeeded())
+		{
+			m_failedModelRecovery[source] = { ReadModelSourceStamp(source),
+				ReadModelSourceStamp(meta), ReadModelSourceStamp(headerPath) };
+			Debug::PrintLog(spdlog::level::err, "[model.recovery] failed; automatic retry waits for input change: " + source.string());
+			return false;
+		}
+		m_failedModelRecovery.erase(source);
+		++m_modelRecoveryStats.succeeded;
+		Debug::PrintLog(spdlog::level::info, "[model.recovery] repaired: " + source.string());
+		return true;
+	}
+
+	ModelRecoveryStats GetModelRecoveryStats()
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return m_modelRecoveryStats;
+	}
+
 	FileGuid WriteTextAssetWithMeta(const file::path& requestedDestination,
 		std::string_view payload, const FileGuid& preferredGuid)
 	{
@@ -1066,7 +1169,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 	file::path ImportSourceAsset(const file::path& source,
 		EditorAssetDatabase::ImportKind kind)
 	{
-		std::lock_guard lock(m_authoringMutex);
+		std::unique_lock lock(m_authoringMutex);
 
 		std::error_code error;
 		if (source.empty() || !file::is_regular_file(source, error) || error)
@@ -1143,8 +1246,17 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			if (!hadDestinationMeta) created.push_back(destinationMeta);
 			return RollbackImport(created, plan);
 		}
-		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
-			ToRuntimeAssetType(kind), guid, plan.destination });
+		// Runtime validation can request Editor recovery. Do not re-enter our
+		// authoring mutex while applying the published generation.
+		lock.unlock();
+		if (!DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			ToRuntimeAssetType(kind), guid, plan.destination }))
+		{
+			Debug::PrintLog(spdlog::level::err,
+				"Runtime rejected the published asset reload: "
+				+ plan.destination.string());
+			return {};
+		}
 		return plan.destination;
 	}
 
@@ -1491,7 +1603,7 @@ private:
 	}
 
 	FileGuid CreateMetaLocked(const file::path& targetFile,
-		const FileGuid& preferredGuid = {})
+		const FileGuid& preferredGuid = {}, const FileGuid& expectedModelId = {})
 	{
 		if (targetFile.empty() || !file::exists(targetFile)) return {};
 		if (assets::IsModelAuthoringSource(targetFile))
@@ -1509,6 +1621,7 @@ private:
 				/ "ProjectSetting" / "AssetIdentity.asset";
 			request.generationRoot = m_root.parent_path()
 				/ "Library" / "ModelAssetGenerations";
+			request.expectedModelId = expectedModelId.m_guid;
 			const assets::ModelAssetAuthoringResult result =
 				assets::AuthorModelAsset(request);
 			if (!result.Succeeded())
@@ -1519,6 +1632,7 @@ private:
 				return {};
 			}
 			const FileGuid guid(result.modelAssetId);
+			m_modelSourceImports[targetFile.lexically_normal()] = ReadModelSourceStamp(targetFile);
 			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
 				RuntimeAssetType::Model, guid, targetFile });
 			return guid;
@@ -1600,7 +1714,8 @@ private:
 			RegisterMetaFile(filepath);
 			return;
 		}
-		if (IsTargetFile(filepath)) CreateMeta(filepath);
+		if (assets::IsModelAuthoringSource(filepath)) ReloadChangedModel(filepath);
+		else if (IsTargetFile(filepath)) CreateMeta(filepath);
 	}
 
 	void HandleMoved(const file::path& directory, const std::string& oldName,
@@ -1630,7 +1745,7 @@ private:
 				Debug::PrintLog(spdlog::level::warn, "Failed to move asset meta: " + error.message());
 		}
 
-		if (assets::IsModelAuthoringSource(newPath)) CreateMeta(newPath);
+		if (assets::IsModelAuthoringSource(newPath)) ReloadChangedModel(newPath);
 		else if (file::exists(newMeta)) RegisterMetaFile(newMeta);
 		else CreateMeta(newPath);
 	}
@@ -1671,6 +1786,16 @@ private:
 		}
 
 		if (TargetStillExists(deletedPath)) return;
+		if (assets::IsModelAuthoringSource(deletedPath))
+		{
+			// A restored file may retain the deleted file's size and timestamp.
+			// Its Add event must not be mistaken for a duplicate modification.
+			std::lock_guard lock(m_authoringMutex);
+			m_modelSourceImports.erase(deletedPath.lexically_normal());
+			std::error_code pathError;
+			const auto canonical = file::weakly_canonical(deletedPath, pathError);
+			if (!pathError) m_failedModelRecovery.erase(canonical);
+		}
 
 		// ★ ApplyAssetChange가 아니라 QueueAssetChange다. 이 함수는 efsw I/O
 		// 스레드에서 돈다 — DataSystem.h의 계약("Watcher I/O thread는 cache/catalog를
@@ -1686,11 +1811,28 @@ private:
 				error.message());
 	}
 
+	void ReloadChangedModel(const file::path& filepath)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		const auto key = filepath.lexically_normal();
+		const auto stamp = ReadModelSourceStamp(filepath);
+		if (const auto previous = m_modelSourceImports.find(key);
+			previous != m_modelSourceImports.end() && previous->second == stamp) return;
+		m_modelSourceImports[key] = stamp;
+		const FileGuid guid = CreateMetaLocked(filepath);
+		if (guid != FileGuid{})
+		{
+			++m_modelRecoveryStats.sourceReloads;
+			DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+				RuntimeAssetType::Model, guid, filepath });
+		}
+	}
+
 	void HandleModified(const file::path& filepath)
 	{
 		if (assets::IsModelAuthoringSource(filepath))
 		{
-			CreateMeta(filepath);
+			ReloadChangedModel(filepath);
 			return;
 		}
 		// M5-C3a는 generation 계약이 이미 있는 ShaderMeta만 연다. HLSL include
@@ -1712,6 +1854,9 @@ private:
 
 	file::path m_root;
 	std::mutex m_authoringMutex;
+	std::map<file::path, std::array<ModelSourceStamp, 3>> m_failedModelRecovery;
+	std::map<file::path, ModelSourceStamp> m_modelSourceImports;
+	ModelRecoveryStats m_modelRecoveryStats;
 	std::unique_ptr<efsw::FileWatcher> m_watcher;
 	const std::unordered_set<std::string> m_registeredFiles{
 		".fbx", ".gltf", ".obj", ".glb",
@@ -1752,6 +1897,7 @@ bool EditorAssetDatabase::Initialize()
 	auto implementation = std::make_unique<Impl>(PathFinder::Relative());
 	if (!implementation->Start()) return false;
 	m_impl = std::move(implementation);
+	AssetAuthoringPort::InstallModelRecovery(&RecoverModelThroughEditor);
 	AssetAuthoringPort::Install(&CreateMetaThroughEditor);
 	AssetAuthoringPort::InstallTextAssetWriter(
 		&WriteTextAssetWithMetaThroughEditor);
@@ -1771,6 +1917,7 @@ bool EditorAssetDatabase::Initialize()
 
 void EditorAssetDatabase::Shutdown() noexcept
 {
+	AssetAuthoringPort::UninstallModelRecovery(&RecoverModelThroughEditor);
 	AssetAuthoringPort::UninstallInputActionMapWriter(
 		&WriteInputActionMapThroughEditor);
 	AssetAuthoringPort::UninstallTagManagerWriter(&WriteTagManagerThroughEditor);
@@ -1792,6 +1939,16 @@ void EditorAssetDatabase::Shutdown() noexcept
 bool EditorAssetDatabase::IsInitialized() const noexcept
 {
 	return nullptr != m_impl;
+}
+
+bool EditorAssetDatabase::RecoverModel(const file::path& source, FileGuid expectedId)
+{
+	return m_impl && m_impl->RecoverModel(source, expectedId);
+}
+
+EditorAssetDatabase::ModelRecoveryStats EditorAssetDatabase::GetModelRecoveryStats() const
+{
+	return m_impl ? m_impl->GetModelRecoveryStats() : ModelRecoveryStats{};
 }
 
 FileGuid EditorAssetDatabase::CreateMeta(const file::path& filepath,

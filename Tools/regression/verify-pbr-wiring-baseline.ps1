@@ -1,5 +1,5 @@
 # PHASE 4 W0/W2~W8: product-frame capture, shared PBR, backend defaults and seal identity.
-# Captures are observations, not W9 visual acceptance or cross-backend goldens.
+# Controlled DX12 captures gate repeatability; analytic fixtures gate material correctness.
 #
 # ── 2026-09-15 판정 범위 결정 (사용자) ──
 #
@@ -15,9 +15,8 @@
 #
 #   ★★ `vk.*` 도 끈다. 그 이름이 범위를 속인다 — `vk.shadow/gbuffer/forward/deferred`
 #     는 Vulkan 자가 검증이 아니라 **DX12/Vulkan 대조**라, 끄면 DX12 팔도 함께 꺼진다.
-#     gbuffer·forward 는 `dx12.gbuffer`·`dx12.forwardshade` 가 덮지만
-#     `deferred`(GBuffer consume·fullscreen)는 **DX12 전용 대체가 없다** — 그 구멍은
-#     BackendParityPlan §2.5 에 P1 빚으로 적혀 있다.
+#     DX12는 `dx12.gbuffer`·`dx12.forwardshade`·`dx12.iblshade` 및 실제 제품
+#     AO/emission 픽셀로 판정한다. Vulkan 교차 축의 소유권은 BackendParityPlan이다.
 #
 #   그래서 기본값을 dx12 하나로 두되, vulkan 은 **조용히 사라지지 않는다** — 축 회계에
 #   `deferred` 로 이름이 남고 요약이 그것을 부른다. `-Backend dx12,vulkan` 으로
@@ -29,6 +28,8 @@ param(
     # `vk.shadow/gbuffer/forward/deferred` 는 이름과 달리 **DX12/Vulkan 대조** 테스트다.
     # 2026-09-15 결정으로 기본은 끔이고, 이 스위치로 되돌린다.
     [switch]$IncludeVulkanSelfTest,
+    # Focused revalidation after a capture/fixture change; never reported as the full gate.
+    [switch]$ProductOnly,
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [int]$TimeoutSeconds = 240
 )
@@ -36,7 +37,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
+. (Join-Path $PSScriptRoot 'PbrProductPixels.ps1')
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+if (-not $PSBoundParameters.ContainsKey('Editor')) {
+    $Editor = Join-Path $root "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
+}
 $run = Join-Path ([IO.Path]::GetFullPath($Work)) ('creator-pbr-' + [guid]::NewGuid().ToString('N'))
 $settings = Join-Path $root 'Dynamic_CPP\ProjectSetting\EngineSettings.asset'
 $utf8 = [Text.UTF8Encoding]::new($false)
@@ -48,7 +53,15 @@ $importedFixtures = @(
     (Join-Path $root 'Dynamic_CPP\Assets\Models\NormalPair'),
     (Join-Path $root 'Dynamic_CPP\Assets\Models\AlphaModes'),
     (Join-Path $root 'Dynamic_CPP\Assets\Models\SamplerModes'),
-    (Join-Path $root 'Dynamic_CPP\Assets\Models\SharedMaterial'))
+    (Join-Path $root 'Dynamic_CPP\Assets\Models\SharedMaterial'),
+    (Join-Path $root 'Dynamic_CPP\Assets\Models\Lighting'))
+# Only these exact generated import directories may be removed. Never consume user assets.
+foreach ($imported in $importedFixtures) {
+    $absolute = [IO.Path]::GetFullPath($imported)
+    $modelRoot = [IO.Path]::GetFullPath((Join-Path $root 'Dynamic_CPP/Assets/Models')) + [IO.Path]::DirectorySeparatorChar
+    if (-not $absolute.StartsWith($modelRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture path escaped project models' }
+    if (Test-Path -LiteralPath $absolute) { throw "Fixture target already exists; preserve it: $absolute" }
+}
 
 # ── 축 회계 ─────────────────────────────────────────────────────────────
 #
@@ -85,8 +98,7 @@ if ($Backend -notcontains 'vulkan') {
 }
 if (-not $IncludeVulkanSelfTest) {
     Set-AxisDeferred 'vk/* 백엔드 대조' ('PHASE 4.9 BackendParityPlan · -IncludeVulkanSelfTest 로 되돌린다 · ' +
-        'DX12 팔도 함께 꺼진다 — gbuffer/forward 는 dx12.gbuffer·dx12.forwardshade 가 덮지만 ' +
-        'deferred(GBuffer consume·fullscreen)는 DX12 전용 대체가 없다')
+        'DX12는 dx12.gbuffer·dx12.forwardshade·dx12.iblshade 및 제품 AO/emission 픽셀로 별도 판정')
 }
 
 function Invoke-Editor([string]$Name, [string[]]$Commands, [int]$ExpectedExit = 0) {
@@ -382,11 +394,18 @@ try {
     foreach ($api in $Backend) {
         [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, "`${1}$api"), $utf8)
         $primitive = Join-Path $run "$api-primitives"
+        $primitiveRepeat = Join-Path $run "$api-primitives-repeat"
         $gunner = Join-Path $run "$api-gunner"
+        $gunnerRepeat = Join-Path $run "$api-gunner-repeat"
+        $captureMode = if ($api -eq 'dx12') { ' controlled' } else { '' }
         $normalPair = Join-Path $run "$api-normalpair"
         $alphaModes = Join-Path $run "$api-alphamodes"
         $samplerModes = Join-Path $run "$api-samplermodes"
         $sharedMaterial = Join-Path $run "$api-sharedmaterial"
+        $lighting = Join-Path $run "$api-lighting"
+        $lightingRepeat = Join-Path $run "$api-lighting-repeat"
+        $normalPixels = Join-Path $run "$api-normal-pixels"
+        $samplerPixels = Join-Path $run "$api-sampler-pixels"
         # W1 fixture 는 자산 트리 밖에 있어 model.load 가 트리 안으로 복사한다.
         # backend 둘이 같은 조건에서 돌도록 매 회차 앞에서 지운다 — 남겨 두면
         # 두 번째 회차만 "제자리 열기" 경로를 타서 두 실행이 같은 것을 재지 않는다.
@@ -412,14 +431,20 @@ try {
             #   `game` 캡처가 영원히 완료되지 않는다 — 모드를 먼저 세운다.
             'editor.viewport game',
             'wait 30',
-            "render.pbr.capture `"$primitive`" game")
+            "render.pbr.capture `"$primitive`" game$captureMode")
+        if ($api -eq 'dx12') {
+            $commands += @('wait 90', "render.pbr.capture `"$primitiveRepeat`" game controlled")
+        }
         if ($hasGunner) {
             $commands += @(
                 "model.loadcached `"$root/Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb`"",
                 'model.place Gunner_F_Mythic',
                 'object.transform Gunner_F_Mythic 0 0 2 0 180 0 0.025 0.025 0.025',
                 'wait 30',
-                "render.pbr.capture `"$gunner`" game")
+                "render.pbr.capture `"$gunner`" game$captureMode")
+            if ($api -eq 'dx12') {
+                $commands += @('wait 90', "render.pbr.capture `"$gunnerRepeat`" game controlled")
+            }
         }
         $commands += @(
             # ★ W1 — normal-map 저작 유무의 정본이 하나인지는 **실장면 프레임**에서만
@@ -462,9 +487,33 @@ try {
             'material.override SharedMaterial 1 roughness 0.90',
             'wait 30',
             "render.pbr.capture `"$sharedMaterial`" game",
-            'quit')
+            # Isolate known geometry while retaining the actual product lighting/post chain.
+            "scene.switch `"$root/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator`"",
+            'wait 30',
+            'object.transform MainCamera 0 0 -6 0 0 0 1 1 1')
+        foreach ($name in @('Ground','P_Cube','P_Sphere','P_IcoSphere','P_Cylinder','P_Cone','P_Torus','P_Suzanne')) {
+            $commands += "object.delete $name"
+        }
+        $commands += @(
+            "model.load `"$root/Tools/regression/fixtures/pbr-lighting/Lighting.gltf`"",
+            'model.place Lighting',
+            'object.transform Lighting 0 0 0 0 0 0 1 1 1',
+            'wait 30')
+        if ($api -eq 'dx12') {
+            $commands += @("render.pbr.capture `"$lighting`" game controlled", 'wait 90',
+                "render.pbr.capture `"$lightingRepeat`" game controlled")
+        } else {
+            $commands += "render.pbr.capture `"$lighting`" game"
+        }
+        $commands += @('object.delete Lighting', 'model.place NormalPair',
+            'object.transform NormalPair 0 0 0 0 0 0 1 1 1', 'wait 30',
+            "render.pbr.capture `"$normalPixels`" game", 'object.delete NormalPair',
+            'model.place SamplerModes', 'object.transform SamplerModes 0 0 0 0 0 0 1 1 1',
+            'wait 30', "render.pbr.capture `"$samplerPixels`" game", 'quit')
         $results = @(Invoke-Editor $api $commands)
         $expectedCaptures = if ($hasGunner) { 6 } else { 5 }
+        $expectedCaptures += $(if ($api -eq 'dx12') { 4 } else { 3 })
+        if ($api -eq 'dx12') { $expectedCaptures += $(if ($hasGunner) {2} else {1}) }
         $captures = @($results | Where-Object command -eq 'render.pbr.capture')
         if ($captures.Count -ne $expectedCaptures -or
             @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
@@ -472,9 +521,19 @@ try {
         }
         Assert-Capture $primitive $api @('Prim_Cube', 'Prim_Sphere', 'Prim_Cylinder')
         Set-AxisRan "$api/primitives"
+        if ($api -eq 'dx12') {
+            Assert-Capture $primitiveRepeat $api @('Prim_Cube','Prim_Sphere','Prim_Cylinder')
+            Assert-PbrRepeatability $primitive $primitiveRepeat (Join-Path $run 'dx12-primitives-repeatability.json')
+            Set-AxisRan 'dx12/primitives-hdr+display-repeatability'
+        }
         if ($hasGunner) {
             Assert-Capture $gunner $api @('Gunner_F_Mythic')
             Set-AxisRan "$api/gunner"
+            if ($api -eq 'dx12') {
+                Assert-Capture $gunnerRepeat $api @('Gunner_F_Mythic')
+                Assert-PbrRepeatability $gunner $gunnerRepeat (Join-Path $run 'dx12-gunner-repeatability.json')
+                Set-AxisRan 'dx12/gunner-hdr+display-repeatability'
+            }
         } else {
             # 조용히 넘어가지 않는다. 이 줄이 없으면 "Gunner 축을 쟀다" 와
             # "Gunner 축이 없었다" 가 요약에서 구분되지 않는다.
@@ -510,11 +569,29 @@ try {
         }
         Assert-SharedMaterial $sharedMaterial $overrides[0].modelId
         Set-AxisRan "$api/shared-material-seal"
+        Assert-Capture $lighting $api @()
+        $lightingMeta = Join-Path $root 'Dynamic_CPP/Assets/Models/Lighting/Lighting.gltf.meta'
+        $lightingId = (Get-Content -LiteralPath $lightingMeta | Where-Object { $_ -match '^assetId:' } | Select-Object -First 1) -replace '^assetId:\s*',''
+        if (-not $lightingId) { throw 'Imported lighting model identity is missing' }
+        Assert-PbrLightingPixels $lighting $lightingId (Join-Path $run "$api-lighting-pixels.json")
+        Set-AxisRan "$api/ao+emission-product-pixels"
+        if ($api -eq 'dx12') {
+            Assert-Capture $lightingRepeat $api @()
+            Assert-PbrRepeatability $lighting $lightingRepeat (Join-Path $run 'dx12-repeatability.json')
+            Set-AxisRan 'dx12/hdr+display-repeatability'
+        }
+        foreach ($case in @(@('NormalPair',$normalPixels),@('SamplerModes',$samplerPixels))) {
+            Assert-Capture $case[1] $api @()
+            $meta = Join-Path $root "Dynamic_CPP/Assets/Models/$($case[0])/$($case[0]).gltf.meta"
+            $id = (Get-Content -LiteralPath $meta | Where-Object { $_ -match '^assetId:' } | Select-Object -First 1) -replace '^assetId:\s*',''
+            Assert-PbrMaterialPixels $case[1] $id $case[0] (Join-Path $run "$api-$($case[0])-pixels.json")
+            Set-AxisRan "$api/$($case[0])-product-pixels"
+        }
         $captureDirs[$api] = @{ primitives = $primitive }
         if ($hasGunner) { $captureDirs[$api]['gunner'] = $gunner }
         $ranHere = @("primitives", $(if ($hasGunner) { 'gunner' }), 'normal-pair',
             'alpha-modes+nonuniform-scale', 'sampler',
-            'shared-material-seal') | Where-Object { $_ }
+            'shared-material-seal', 'ao+emission-pixels', 'normal-pixels', 'sampler-pixels') | Where-Object { $_ }
         Write-Output "$api product capture PASS ($($ranHere -join ', ')): $run"
     }
     # W9 — 두 backend 캡처의 float32 readback을 실제로 맞댄다.
@@ -554,6 +631,11 @@ try {
         Write-Output "cross-backend capture compare SKIPPED (backend 하나만 실행됨)"
     }
 
+    if ($ProductOnly) {
+        Set-AxisSkipped 'isolated GPU/material/generation regressions' '-ProductOnly: this run validates product captures only'
+        Write-Output "PBR PRODUCT-ONLY PASS (not full baseline or cutover): $run"
+        return
+    }
     # The paired harness owns both DX12 and Vulkan test devices; keep its Editor
     # host on DX12 independently of the final product-capture backend above.
     [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, '${1}dx12'), $utf8)
@@ -570,17 +652,36 @@ try {
         Write-Output 'vk.* 백엔드 대조 DEFERRED (PHASE 4.9 — 2026-09-15 결정 · DX12 팔도 함께 꺼진다)'
     }
     $null = Invoke-Editor 'forward-shade' @('dx12.forwardshade', 'quit')
+    Set-AxisRan 'dx12.forwardshade'
+    foreach ($command in @('dx12.ibl','dx12.iblshade','dx12.ssao','dx12.ssgi','dx12.fog')) {
+        $results = @(Invoke-Editor ($command -replace '\.','-') @($command,'quit'))
+        $null = Get-SucceededCommand $results $command
+        Set-AxisRan $command
+    }
     # Material codec/seal contracts moved out of the Editor registry in PHASE 14.5.
     $contractLog = Join-Path $run 'experiment-contract.log'
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'verify-experiment-contract.ps1') -Configuration $Configuration *> $contractLog
     if ($LASTEXITCODE -ne 0) { throw "Standalone material contracts failed; log: $contractLog" }
+    Set-AxisRan 'standalone/material-contracts'
     $contractCommands = @('experiment.matresolve', 'experiment.matmigrate', 'experiment.cooked')
     $null = Invoke-Editor 'material-contracts' ($contractCommands + 'quit')
+    foreach ($command in $contractCommands) { Set-AxisRan $command }
     foreach ($name in @('seal', 'parity', 'coverage', 'emission', 'transform', 'uv', 'mip', 'occlusion')) {
         $results = @(Invoke-Editor $name @("render.pbr.$name", 'quit'))
         $data = Get-SucceededCommand $results "render.pbr.$name"
         if (-not $data.passed) { throw "PBR $name did not execute its verification" }
+        Set-AxisRan "render.pbr.$name"
     }
+    $generationLog = Join-Path $run 'generation-atomicity.log'
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'verify-model-generation-atomicity.ps1') `
+        -Editor $Editor -Work $run -PreserveArtifacts *> $generationLog
+    if ($LASTEXITCODE -ne 0) { throw "Model generation atomicity failed: $generationLog" }
+    Set-AxisRan 'model/generation-atomicity'
+    $recoveryLog = Join-Path $run 'model-auto-recovery.log'
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'verify-model-auto-recovery.ps1') `
+        -Editor $Editor -Work $run *> $recoveryLog
+    if ($LASTEXITCODE -ne 0) { throw "Model automatic recovery failed: $recoveryLog" }
+    Set-AxisRan 'model/auto-recovery'
     # A later successful test must not erase an earlier failure exit code.
     $results = @(Invoke-Editor 'negative-exit' @('render.livecheck 1 1', 'dx12.gbuffer', 'quit') 4)
     if ((Get-CommandResult $results 'render.livecheck').status -ne 'failed') {
@@ -597,7 +698,7 @@ try {
     $skipped = @($axisReport.Keys | Where-Object { $axisReport[$_] -notlike 'deferred:*' -and $axisReport[$_] -ne 'ran' })
     Write-Output ("PBR W0/W1/W2/W3/W4/W5/W6/W7-normal/UV/mip baseline PASS (dx12 판정)" +
         " — 잰 축 $($ranAxes.Count) · 건너뛴 축 $($skipped.Count) · 미룬 축 $($deferredAxes.Count)" +
-        " (W9 acceptance pending): $run")
+        " (장시간 검증·W9 cutover는 별도 판정): $run")
     if ($skipped.Count) {
         Write-Output "  ※ 위 PASS 는 건너뛴 축에 대해 아무 말도 하지 않는다: $($skipped -join ', ')"
     }
@@ -621,6 +722,9 @@ finally {
         }
     }
     if ($process -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
+    if (Test-Path -LiteralPath $run) {
+        $axisReport | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $run 'axes.json') -Encoding utf8
+    }
     if ($null -ne $original) { [IO.File]::WriteAllBytes($settings, $original) }
     foreach ($imported in $importedFixtures) {
         if (Test-Path -LiteralPath $imported) {

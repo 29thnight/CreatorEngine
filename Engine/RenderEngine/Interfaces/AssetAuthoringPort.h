@@ -77,6 +77,7 @@ public:
 		const FileGuid& preferredGuid);
 	using WriteModelCacheHandler = bool (*)(const file::path& destination,
 		std::span<const std::byte> bytes);
+	using RecoverModelHandler = bool (*)(const file::path& source, FileGuid expectedId);
 	using WriteEmbeddedTextureHandler = bool (*)(const file::path& destination,
 		std::span<const std::byte> bytes, uint32 width, uint32 height);
 	using WriteTerrainHandler = bool (*)(const TerrainAuthoringRequest& request,
@@ -110,6 +111,11 @@ public:
 	static void UninstallModelCacheWriter(WriteModelCacheHandler handler) noexcept;
 	static bool WriteModelCache(const file::path& destination,
 		std::span<const std::byte> bytes) noexcept;
+	// Editor-only repair of derived model data. The caller retries its strict
+	// reader once; the host must preserve the canonical identity. Player has no handler.
+	static void InstallModelRecovery(RecoverModelHandler handler) noexcept;
+	static void UninstallModelRecovery(RecoverModelHandler handler) noexcept;
+	static bool RecoverModel(const file::path& source, FileGuid expectedId) noexcept;
 
 	static void InstallEmbeddedTextureWriter(
 		WriteEmbeddedTextureHandler handler) noexcept;

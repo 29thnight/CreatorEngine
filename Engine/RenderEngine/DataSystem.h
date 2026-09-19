@@ -246,7 +246,9 @@ public:
 
 	// Authoring Host가 파일/meta 게시를 끝낸 뒤 전달하는 유일한 변경 경계다.
 	// Player는 생산자를 설치하지 않고 startup catalog만 읽는다.
-	void ApplyAssetChange(const RuntimeAssetChange& change);
+	// A rejected resident-model reload returns false and keeps its last valid
+	// generation. Callers must not report that reload as successfully applied.
+	bool ApplyAssetChange(const RuntimeAssetChange& change);
 	// Watcher I/O thread는 cache/catalog를 직접 바꾸지 않고 이 큐에 게시한다.
 	// Editor game thread가 프레임 경계에서 DrainQueuedAssetChanges를 호출해
 	// generation 변경과 이후 load의 관측 순서를 직렬화한다.
@@ -305,6 +307,8 @@ public:
 
 private:
 	void LoadAssetCatalog(const file::path& root);
+	[[nodiscard]] assets::ModelAssetGeneration::Shared LoadAndPublishModelAssetGeneration(
+		FileGuid guid, bool allowEditorRecovery = false);
 	DataContainer<Texture>& TextureCacheFor(TextureFileType type);
 	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path,
 		FileGuid guid, bool remove);

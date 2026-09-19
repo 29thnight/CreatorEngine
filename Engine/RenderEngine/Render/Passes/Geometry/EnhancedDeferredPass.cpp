@@ -41,7 +41,7 @@ bool EnhancedDeferredPass::Initialize(const EnhancedFrameContext& context, std::
     const RHIPipelineLayoutParam params[] = {
         // diffuse · metalRough · normal · emissive · depth · shadow
         // + IBL 셋(조도 · 프리필터 · LUT)
-        RHILayout::SrvTable(9, 0, RHIShaderVisibility::Pixel),
+        RHILayout::SrvTable(10, 0, RHIShaderVisibility::Pixel),
         RHILayout::SamplerTable(3, 0, RHIShaderVisibility::Pixel),   // 일반 · 비교(그림자) · IBL 선형
         RHILayout::Cbv(0, RHIShaderVisibility::Pixel),
     };
@@ -159,6 +159,9 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
     if (hasShadowMap)
         usages.push_back({ m_shadowMap, RHIResourceState::ShaderResource });
 
+    if (m_ambientOcclusion.IsValid())
+        usages.push_back({ m_ambientOcclusion, RHIResourceState::ShaderResource });
+
     graph.AddPass(GetName(), usages,
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
@@ -176,7 +179,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
 
             constexpr RHIFormat kIblFormat = RHIFormat::RGBA16Float;
 
-            // t0~t8을 테이블 하나로 잘라 받는다(R2).
+            // t0~t9를 테이블 하나로 잘라 받는다(R2).
             const RHIBindingDesc srvs[] = {
                 RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.diffuse)),
                 RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.metalRough)),
@@ -194,6 +197,9 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
                     kIblFormat, hasIbl ? m_iblPrefilterMips : 1).OrNull(),
                 RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : RHITextureHandle{},
                     kIblFormat).OrNull(),
+                RHIBindingDesc::Srv2D(m_ambientOcclusion.IsValid()
+                    ? executeContext.ResolveHandle(m_ambientOcclusion) : RHITextureHandle{},
+                    RHIFormat::RG16Float).OrNull(),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             if (!srvTable.IsValid()) return;
@@ -214,6 +220,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
             constants.hasShadow = hasShadow ? 1u : 0u;
             constants.cascadeBlendBand = m_shadowData.cascadeBlendBand;
             constants.hasIbl = hasIbl ? 1u : 0u;
+            constants.hasAmbientOcclusion = m_ambientOcclusion.IsValid() ? 1u : 0u;
             for (size_t i = 0; i < m_frameLights.size(); ++i)
             {
                 constants.lights[i] = m_frameLights[i];
@@ -240,6 +247,7 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
 
 void EnhancedDeferredPass::Shutdown()
 {
+    m_ambientOcclusion = {};
     m_pso = {};
     m_iblIrradiance = {};
     m_iblPrefiltered = {};

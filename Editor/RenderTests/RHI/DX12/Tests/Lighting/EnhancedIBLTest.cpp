@@ -1,4 +1,5 @@
 #include "RHI/DX12/EnhancedIBLGenerator.h"
+#include "RHI/RHIShaderCompiler.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -53,6 +54,273 @@ namespace
     constexpr uint32_t kIblRegionCount = 10;
 }
 
+namespace
+{
+    bool RunIblGgxRegression(DX12DeviceResources& resources,
+        const EnhancedFrameContext& context, std::string& outLog)
+    {
+        std::string error;
+        RHIShaderBlob shader;
+        if (!RHIShaderCompiler::CompileFile("Tests/IblGgxProbe.slang", "CSMain", "cs_5_0", shader, error))
+        { outLog += error; return false; }
+        const RHIPipelineLayoutParam params[] = { RHILayout::UavTable(1, 0) };
+        RHIPipelineLayoutDesc layoutDesc{}; layoutDesc.params = params;
+        const auto layout = context.rootSignatures->GetOrCreate(layoutDesc, error);
+        RHIComputePipelineDesc pipelineDesc{};
+        pipelineDesc.csBytecode = shader.Data(); pipelineDesc.csSize = shader.Size();
+        pipelineDesc.layout = layout;
+        const auto pipeline = context.psoManager->GetOrCreateCompute(pipelineDesc, error);
+        RHITextureDesc desc{};
+        desc.width = 4; desc.height = 1; desc.format = RHIFormat::RGBA32Float;
+        desc.allowUnorderedAccess = true; desc.initialState = RHIResourceState::UnorderedAccess;
+        RHITextureHandle output;
+        RHIReadback readback;
+        if (!layout.IsValid() || !pipeline.IsValid() || !resources.CreateTexture(desc, output, error) ||
+            !resources.CreateReadback(4, 1, desc.format, 1, readback, error) ||
+            !resources.BeginFrame(error)) { outLog += error; return false; }
+        const RHIBindingDesc view[] = { RHIBindingDesc::Uav2D(output, desc.format) };
+        const auto bindings = resources.CreateBindings(view);
+        auto& encoder = resources.GetImmediateEncoder();
+        encoder.SetPipeline(RHIBindPoint::Compute, pipeline);
+        encoder.SetBindings(RHIBindPoint::Compute, 0, bindings);
+        encoder.Dispatch(1,1,1);
+        const RHITransition transition[] = {
+            { output, RHIResourceState::UnorderedAccess, RHIResourceState::CopySource } };
+        resources.TransitionResources(transition);
+        encoder.CopyToReadback(readback, output);
+        if (!resources.EndFrame(error)) { outLog += error; return false; }
+        resources.WaitForGpu();
+        RHIReadbackImage image;
+        if (!resources.MapReadback(readback, image, error)) { outLog += error; return false; }
+        const double roughness[] = { .032, .05, .1, .2 };
+        double maxError = 0.0;
+        for (uint32_t x = 0; x < 4; ++x)
+            for (uint32_t c = 0; c < 2; ++c)
+            {
+                const double a2 = std::pow(roughness[x],4.0);
+                const double nh = c == 0 ? 1.0 : .99;
+                const double d = 1.0 - nh*nh + nh*nh*a2;
+                const double expected = a2 / (3.141592653589793 * d*d);
+                const double actual = image.At(x,0,c);
+                if (!std::isfinite(actual)) { resources.ReleaseTexture(output); return false; }
+                maxError = (std::max)(maxError,std::abs(actual-expected)/expected);
+            }
+        resources.ReleaseTexture(output);
+        outLog += "GGX peak/off-peak relative error: " + std::to_string(maxError) + "\n";
+        return maxError < 0.0001;
+    }
+
+    // Independent solid-angle quadrature, not the shader's Hammersley sequence.
+    // A small 60000:0.125 emitter exposes coherent sampling error and mip0 blur.
+    bool RunIblHdrRegression(DX12DeviceResources& resources,
+        const EnhancedFrameContext& context, EnhancedIBLGenerator& generator,
+        std::string& outLog)
+    {
+        constexpr uint32_t cubeSize = 256, grid = 128, width = 1024, height = 512;
+        constexpr uint32_t cubeMips = EnhancedIBLGenerator::CubeMipCount(cubeSize);
+        constexpr uint32_t prefilterMips = EnhancedIBLGenerator::kPrefilterMips;
+        std::string error;
+        RHITextureHandle source;
+        RHITextureDesc desc{};
+        desc.width = width; desc.height = height;
+        desc.format = RHIFormat::RGBA16Float;
+        desc.initialState = RHIResourceState::CopyDest;
+        desc.debugName = L"IBL.HdrRegression";
+        if (!resources.CreateTexture(desc, source, error)) { outLog += error; return false; }
+        const auto fail = [&]() { outLog += "HDR regression failed: " + error + "\n";
+            resources.WaitForGpu(); resources.ReleaseTexture(source); return false; };
+        if (!resources.BeginFrame(error)) return fail();
+        const auto upload = resources.AllocateUpload(
+            RHIUploadRequest{ width * height * 8, RHIUploadUsage::TextureCopy, 1 });
+        if (!upload.IsValid()) { error = "HDR upload allocation"; return fail(); }
+        auto* texels = static_cast<uint16_t*>(upload.cpuAddress);
+        for (uint32_t y = 0; y < height; ++y)
+            for (uint32_t x = 0; x < width; ++x)
+            {
+                const bool sun = x >= 620 && x < 626 && y >= 200 && y < 206;
+                const uint16_t value = sun ? 0x7b53 : 0x3000; // 60000, 0.125
+                const size_t offset = (static_cast<size_t>(y) * width + x) * 4;
+                texels[offset] = texels[offset + 1] = texels[offset + 2] = value;
+                texels[offset + 3] = 0x3c00;
+            }
+        D3D12_TEXTURE_COPY_LOCATION from{};
+        from.pResource = resources.Resolve(upload.buffer);
+        from.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        from.PlacedFootprint.Offset = upload.offset;
+        from.PlacedFootprint.Footprint = { DXGI_FORMAT_R16G16B16A16_FLOAT, width, height, 1, width * 8 };
+        D3D12_TEXTURE_COPY_LOCATION to{};
+        to.pResource = resources.Resolve(source);
+        to.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        resources.GetCommandList()->CopyTextureRegion(&to, 0, 0, 0, &from, nullptr);
+        const RHITransition inputReady[] = { { source, RHIResourceState::CopyDest,
+            RHIResourceState::PixelShaderResource } };
+        resources.TransitionResources(inputReady);
+        if (!generator.Generate(context, source, RHIFormat::RGBA16Float, cubeSize, 32, error) ||
+            !resources.EndFrame(error)) return fail();
+        resources.WaitForGpu();
+
+        RHIReadback maps{}, mirrors{};
+        if (!resources.CreateReadback(grid, grid, RHIFormat::RGBA16Float, 30, maps, error) ||
+            !resources.CreateReadback(cubeSize, cubeSize, RHIFormat::RGBA16Float, 12, mirrors, error) ||
+            !resources.BeginFrame(error)) return fail();
+        const RHITransition copyReady[] = {
+            { generator.GetCubeMap(), RHIResourceState::PixelShaderResource, RHIResourceState::CopySource },
+            { generator.GetIrradianceMap(), RHIResourceState::PixelShaderResource, RHIResourceState::CopySource },
+            { generator.GetPrefilteredMap(), RHIResourceState::PixelShaderResource, RHIResourceState::CopySource },
+        };
+        resources.TransitionResources(copyReady);
+        auto& encoder = resources.GetImmediateEncoder();
+        const uint32_t roughMips[] = { 1, 3, 5 };
+        for (uint32_t face = 0; face < 6; ++face)
+        {
+            encoder.CopyToReadback(maps, generator.GetCubeMap(), face, face * cubeMips + 1);
+            encoder.CopyToReadback(maps, generator.GetIrradianceMap(), 6 + face, face);
+            encoder.CopyToReadback(mirrors, generator.GetCubeMap(), face, face * cubeMips);
+            encoder.CopyToReadback(mirrors, generator.GetPrefilteredMap(), 6 + face, face * prefilterMips);
+            for (uint32_t r = 0; r < 3; ++r)
+                encoder.CopyToReadback(maps, generator.GetPrefilteredMap(), 12 + r * 6 + face,
+                    face * prefilterMips + roughMips[r]);
+        }
+        if (!resources.EndFrame(error)) return fail();
+        resources.WaitForGpu();
+        RHIReadbackImage image{}, mirror{};
+        if (!resources.MapReadback(maps, image, error) ||
+            !resources.MapReadback(mirrors, mirror, error)) return fail();
+        double mirrorError = 0.0, peak = 0.0;
+        for (uint32_t f = 0; f < 6; ++f)
+            for (uint32_t y = 0; y < cubeSize; ++y)
+                for (uint32_t x = 0; x < cubeSize; ++x)
+                {
+                    const double value = mirror.At(x, y, 0, f);
+                    const double reflected = mirror.At(x, y, 0, f + 6);
+                    if (!std::isfinite(value) || !std::isfinite(reflected))
+                    { error = "non-finite mirror"; return fail(); }
+                    peak = (std::max)(peak, value);
+                    mirrorError = (std::max)(mirrorError, std::abs(value - reflected) / (1.0 + value));
+                }
+        if (peak < 10000.0 || mirrorError > 0.01)
+        { error = "HDR mirror lost source detail"; return fail(); }
+
+        struct Direction { double x, y, z; };
+        const auto direction = [](uint32_t face, double u, double v)
+        {
+            Direction d;
+            switch (face)
+            {
+            case 0: d = { 1, -v, -u }; break;
+            case 1: d = { -1, -v, u }; break;
+            case 2: d = { u, 1, v }; break;
+            case 3: d = { u, -1, -v }; break;
+            case 4: d = { u, -v, 1 }; break;
+            default: d = { -u, -v, -1 }; break;
+            }
+            const double length = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+            return Direction{ d.x / length, d.y / length, d.z / length };
+        };
+        const auto area = [](double u, double v)
+        { return std::atan2(u * v, std::sqrt(u * u + v * v + 1.0)); };
+        struct Cell { Direction d; double radiance, solidAngle; };
+        std::vector<Cell> cells;
+        for (uint32_t face = 0; face < 6; ++face)
+            for (uint32_t y = 0; y < grid; ++y)
+                for (uint32_t x = 0; x < grid; ++x)
+                {
+                    const double u = (x + 0.5) * 2.0 / grid - 1.0;
+                    const double v = (y + 0.5) * 2.0 / grid - 1.0;
+                    const double h = 1.0 / grid;
+                    const double omega = area(u+h,v+h)-area(u-h,v+h)-area(u+h,v-h)+area(u-h,v-h);
+                    cells.push_back({ direction(face,u,v), image.At(x,y,0,face), omega });
+                }
+        bool passed = true;
+        for (uint32_t test = 0; test < 4; ++test)
+        {
+            const uint32_t size = test == 0 ? generator.GetIrradianceSize() : cubeSize >> roughMips[test-1];
+            const double roughness = test == 0 ? 1.0 : roughMips[test-1] / 5.0;
+            const double a2 = std::pow(roughness, 4.0);
+            double error2 = 0.0, reference2 = 0.0, maxError = 0.0, maxReference = 0.0;
+            for (uint32_t face = 0; face < 6; ++face)
+                for (uint32_t iy = 0; iy < 4; ++iy)
+                    for (uint32_t ix = 0; ix < 4; ++ix)
+                    {
+                        const uint32_t x = (2 * ix + 1) * size / 8;
+                        const uint32_t y = (2 * iy + 1) * size / 8;
+                        const Direction n = direction(face,(x+0.5)*2.0/size-1.0,(y+0.5)*2.0/size-1.0);
+                        double sum = 0.0, weight = 0.0;
+                        for (const Cell& cell : cells)
+                        {
+                            const double nl = n.x * cell.d.x + n.y * cell.d.y + n.z * cell.d.z;
+                            if (nl <= 0.0) continue;
+                            double w = nl * cell.solidAngle / 3.141592653589793;
+                            if (test != 0)
+                            {
+                                const double h2 = 0.5 * (1.0 + nl);
+                                const double denominator = 1.0 - h2 + h2 * a2;
+                                w *= a2 / (4.0 * denominator * denominator);
+                            }
+                            sum += cell.radiance * w;
+                            weight += w;
+                        }
+                        const double expected = test == 0 ? sum : sum / weight;
+                        const double actual = image.At(x,y,0,6 + test*6 + face);
+                        if (!std::isfinite(actual)) { error = "non-finite convolution"; return fail(); }
+                        const double delta = std::abs(actual - expected);
+                        error2 += delta * delta; reference2 += expected * expected;
+                        maxError = (std::max)(maxError, delta);
+                        maxReference = (std::max)(maxReference, expected);
+                    }
+            const double relativeRms = std::sqrt(error2 / reference2);
+            const double relativeMax = maxError / maxReference;
+            char line[192]{};
+            std::snprintf(line, sizeof(line), "HDR quadrature %u rough=%.1f: relative RMS %.6f, max/peak %.6f\n",
+                test, roughness, relativeRms, relativeMax);
+            outLog += line;
+            passed &= relativeRms < 0.03 && relativeMax < 0.05;
+        }
+        outLog += "HDR mirror relative maximum error: " + std::to_string(mirrorError) + "\n";
+        RHITextureHandle black;
+        RHITextureDesc blackDesc{};
+        blackDesc.width = blackDesc.height = 1;
+        blackDesc.format = RHIFormat::RGBA16Float;
+        blackDesc.allowRenderTarget = true;
+        blackDesc.initialState = RHIResourceState::RenderTarget;
+        if (!resources.CreateTexture(blackDesc, black, error) || !resources.BeginFrame(error)) return fail();
+        const RHITextureHandle colors[] = { black };
+        const auto target = resources.CreateRenderTargets(colors);
+        const float zero[] = {0.f,0.f,0.f,0.f};
+        resources.GetImmediateEncoder().ClearRenderTargets(target, zero);
+        const RHITransition blackReady[] = { { black, RHIResourceState::RenderTarget,
+            RHIResourceState::PixelShaderResource } };
+        resources.TransitionResources(blackReady);
+        if (!generator.Generate(context, black, blackDesc.format, 64, 32, error)) return fail();
+        const RHITransition blackCopy[] = {
+            { generator.GetIrradianceMap(), RHIResourceState::PixelShaderResource, RHIResourceState::CopySource },
+            { generator.GetPrefilteredMap(), RHIResourceState::PixelShaderResource, RHIResourceState::CopySource } };
+        resources.TransitionResources(blackCopy);
+        for (uint32_t f=0; f<6; ++f)
+        {
+            resources.GetImmediateEncoder().CopyToReadback(maps, generator.GetIrradianceMap(), f, f);
+            resources.GetImmediateEncoder().CopyToReadback(maps, generator.GetPrefilteredMap(), f+6, f*prefilterMips);
+            resources.GetImmediateEncoder().CopyToReadback(maps, generator.GetPrefilteredMap(), f+12, f*prefilterMips+3);
+            resources.GetImmediateEncoder().CopyToReadback(maps, generator.GetPrefilteredMap(), f+18, f*prefilterMips+5);
+        }
+        if (!resources.EndFrame(error)) return fail();
+        resources.WaitForGpu();
+        if (!resources.MapReadback(maps, image, error)) return fail();
+        for (uint32_t slice=0; slice<24; ++slice)
+        {
+            const uint32_t size = slice < 12 ? 64 : slice < 18 ? 8 : 2;
+            for (uint32_t y=0; y<size; ++y)
+                for (uint32_t x=0; x<size; ++x)
+                    for (uint32_t c=0; c<3; ++c)
+                        passed &= image.At(x,y,c,slice) == 0.f; // NaN also fails.
+        }
+        resources.ReleaseTexture(black);
+        outLog += "Black environment finite zero: " + std::string(passed ? "PASS\n" : "FAIL\n");
+        resources.ReleaseTexture(source);
+        return passed;
+    }
+}
+
 bool DX12Test::RunIBLTest(std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
@@ -92,7 +360,7 @@ bool DX12Test::RunIBLTest(std::string& outLog)
         resources.Shutdown();
         return false;
     }
-    outLog += "[1/5] 셰이더 4종 컴파일·PSO 생성 통과\n";
+    outLog += "[1/5] IBL 셰이더 컴파일·PSO 생성 통과\n";
 
     // ── [2/5] 합성 equirect — 위 반구 빨강 · 아래 반구 초록 ──
     //
@@ -439,6 +707,9 @@ bool DX12Test::RunIBLTest(std::string& outLog)
             passed = false;
         }
     }
+
+    if (passed) passed = RunIblGgxRegression(resources, frameContext, outLog);
+    if (passed) passed = RunIblHdrRegression(resources, frameContext, generator, outLog);
 
     std::string validation;
     const uint32_t problems = resources.DrainDebugMessages(validation);

@@ -1112,6 +1112,7 @@ namespace
         EnhancedGizmoSceneData        gizmoData;   // 아이콘 벡터를 프레임 동안 소유
 
         uint32_t ssaoFrameIndex{ 0 };
+        bool controlledCaptureFrame{ false };
         uint32_t frameCounter{ 0 };
         // 러너를 켠 뒤의 누적 초. SSR의 광선 잡음 씨앗이다 — DX11은
         // TimeSystem의 총 경과 초를 넘기는데, 여기서는 TickLive가 받는
@@ -2066,7 +2067,7 @@ namespace
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
                     inputs.normal = bb.Get(LiveSlots::kGBufferNormal);
                     p.ssao.SetInputs(inputs);
-                    p.ssao.SetFrameIndex(ssaoFrameIndex++);
+                    p.ssao.SetFrameIndex(controlledCaptureFrame ? 0 : ssaoFrameIndex++);
                     p.ssao.Declare(graph, ctx);
                     bb.Set(LiveSlots::kAmbientOcclusion, p.ssao.GetOutput());
                 };
@@ -2086,12 +2087,14 @@ namespace
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
                     LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
                     LiveSlots::kGBufferDepth,   LiveSlots::kShadowMap,
+                    LiveSlots::kAmbientOcclusion,
                 };
                 node.writes = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
                     p.deferred.SetInputs(GatherGBufferOutputs(bb));
+                    p.deferred.SetAmbientOcclusion(bb.Get(LiveSlots::kAmbientOcclusion));
                     p.deferred.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
                     p.forward.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
                     p.deferred.Declare(graph, ctx);
@@ -2372,7 +2375,7 @@ namespace
                     // 캐스케이드 행렬을 넘기는 것과 짝이다.
                     view.fog.SetShadowMatrix(p.shadow.GetShadowData()
                         .lightViewProjection[EnhancedShadowPass::kCascadeCount - 1]);
-                    view.fog.SetFrameIndex(frameCounter);
+                    view.fog.SetFrameIndex(controlledCaptureFrame ? 0 : frameCounter);
                     view.fog.Declare(graph, ctx);
 
                     if (view.fog.GetOutput().IsValid())
@@ -3715,6 +3718,16 @@ namespace
 
             dx12.BeginProfilerFrame(frameCounter++);
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
+            // Restart only the captured view. Also discard this diagnostic history
+            // afterward, so the next interactive frame cannot blend with time zero.
+            struct CaptureHistoryGuard
+            {
+                LivePipeline::CameraView& view;
+                bool active;
+                void Reset() { view.ssgi.ResetHistory(); view.fog.ResetHistory(); }
+                ~CaptureHistoryGuard() { if (active) Reset(); }
+            } historyGuard{ view, capture && capture->controlled };
+            if (historyGuard.active) historyGuard.Reset();
             if (!PreparePipelineFrame(p, viewIndex, outError)) return false;
 
             lastDrawCount = p.gbuffer.GetLastDrawCount();
@@ -4774,12 +4787,14 @@ EnhancedRenderThreadStats EnhancedSceneRenderer::GetLiveRenderThreadStats()
 }
 
 bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
-    EnhancedLiveDisplayTarget target, std::string& outError)
+    EnhancedLiveDisplayTarget target, std::string& outError, bool controlled)
 {
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> lock(state.renderStateMutex);
     if (target >= EnhancedLiveDisplayTarget::Count || !state.enabled)
     { outError = "capture requires an enabled live renderer and valid display target"; return false; }
+    if (controlled && state.backend != EnhancedLiveBackend::DX12)
+    { outError = "controlled capture currently supports DX12 only (PHASE 4)"; return false; }
     if (state.pbrCapture && (state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
         || state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording))
     { outError = "a PBR capture is already pending"; return false; }
@@ -4789,6 +4804,7 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     { outError = "capture requires a new absolute directory: " + directory; return false; }
     state.pbrCapture = std::make_unique<EnhancedPbrCapture>();
     state.pbrCapture->target = target;
+    state.pbrCapture->controlled = controlled;
     state.pbrCapture->afterFrameId = state.publishedFrameId.load();
     state.pbrCapture->result.directory = directory;
     state.pbrCapture->result.state = EnhancedPbrCaptureState::Pending;
@@ -4816,10 +4832,23 @@ bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMillisec
     return GetLiveState().WaitForRenderThreadIdle(timeoutMilliseconds);
 }
 
-void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
+void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 {
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
+    state.controlledCaptureFrame = state.pbrCapture && state.pbrCapture->controlled
+        && state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
+        && inputFrame.frameId > state.pbrCapture->afterFrameId;
+    // Copy only for diagnostic captures. Publication IDs, resource retirement and
+    // simulation state remain monotonic; only render clock consumers see zero.
+    std::optional<EnhancedLiveFramePacket> controlledFrame;
+    if (state.controlledCaptureFrame)
+    {
+        controlledFrame = inputFrame;
+        controlledFrame->totalSeconds = 0.f;
+        controlledFrame->deltaSeconds = 0.f;
+    }
+    const EnhancedLiveFramePacket& frame = controlledFrame ? *controlledFrame : inputFrame;
     const std::thread::id currentThread = std::this_thread::get_id();
     if (state.frameConsumerThread == std::thread::id{})
         state.frameConsumerThread = currentThread;
@@ -5334,6 +5363,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& frame)
         const uint32_t packetViewIndex = (startIndex + step) % cameraCount;
         const EnhancedLiveViewPacket& viewPacket = frame.views[packetViewIndex];
         if (!viewPacket.key.IsValid()) continue;
+        // The diagnostic clock must not enter another camera's temporal history.
+        if (state.controlledCaptureFrame && viewPacket.displayTarget != state.pbrCapture->target)
+            continue;
 
         if (totalPending >= 2)
         {

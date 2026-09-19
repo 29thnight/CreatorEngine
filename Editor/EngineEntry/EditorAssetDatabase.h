@@ -4,6 +4,7 @@
 #include "TypeTrait.h"
 
 #include <memory>
+#include <cstdint>
 #include <span>
 #include <string_view>
 
@@ -60,6 +61,12 @@ public:
 	bool WriteTagManager(const UncatalogedAuthoringRequest& request);
 	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
+	bool RecoverModel(const file::path& source, FileGuid expectedId);
+	struct ModelRecoveryStats
+	{
+		std::uint64_t attempts{}, succeeded{}, suppressed{}, declined{}, sourceReloads{};
+	};
+	ModelRecoveryStats GetModelRecoveryStats() const;
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);
 	bool CreateVolumeProfile(const file::path& directory, std::string_view name,

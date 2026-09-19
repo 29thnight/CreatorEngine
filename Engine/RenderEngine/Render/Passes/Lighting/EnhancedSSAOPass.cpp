@@ -1,4 +1,4 @@
-#include "EnhancedSSAOPass.h"
+﻿#include "EnhancedSSAOPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
@@ -6,20 +6,11 @@
 #include "../../../RHI/RHIEncoder.h"
 
 #include <sstream>
+#include <cstddef>
 #include "../../../RHI/RHIShaderCompiler.h"
 
-// 단계(순서대로 채운다):
-//   [v] 1. 반해상도 AO 컴퓨트 + 자가 검증
-//   [v] 2. 디노이즈·업샘플
-//   [v] 3. 실제 씬 연결 + 기존 SSAO와 시간 비교
-//
-// 자가 검증(dx12.ssao):
-//   평평한 곳 0.969 · 계단 안쪽 0.373 · 필터 이웃 차이 51.7% 감소
-// 실제 씬(dx12.scene, 256x256):
-//   SSAO.Compute 0.0133 ms · SSAO.Filter 0.0020 ms
-//
-// AO는 SSGI 합성이 간접광에 곱해 쓴다. 직접광에 곱하면 광원이 실제로
-// 보이는 곳까지 어두워져 그림자가 두 번 진 것처럼 보인다.
+// Half-resolution visibility bitmask AO followed by a depth-aware spatial filter.
+// Inputs: device depth and encoded world normals. Output: (visibility, view Z).
 
 namespace
 {
@@ -31,32 +22,7 @@ namespace
         return oss.str();
     }
 
-    // ── 공통 조각 ──
-    //
-    // 두 셰이더가 같은 깊이 → 뷰 위치 변환을 쓴다. 한 곳에 두는 이유는
-    // 이 변환이 어긋나면 AO와 필터가 서로 다른 공간을 보게 되는데, 그 증상이
-    // '그림이 조금 이상하다'로만 나타나기 때문이다.
-
-    // ── AO 컴퓨트 ──
-    //
-    // 방향마다 화면 공간으로 걸으며 32비트 가시성 마스크를 세운다.
-    //
-    // 왜 비트마스크인가: 가중치를 누적하는 방식은 같은 각도를 두 번 세기
-    // 쉽다. 앞뒤로 겹친 가림막 둘이 같은 방향을 막고 있으면 기여가 두 번
-    // 들어가 AO가 실제보다 어두워지는데, 그 오차는 '좀 어둡다'로만 보여
-    // 원인을 특정할 수 없다. 마스크는 이미 세워진 비트를 다시 세우지
-    // 않으므로 그 실수가 구조적으로 불가능하다.
     constexpr const char* kAOShaderFile = "SsaoAO.slang";
-
-
-
-    // ── 디노이즈 ──
-    //
-    // 교차 양방향 필터. 깊이가 비슷한 이웃만 섞어 경계를 지킨다.
-    //
-    // 노멀을 안 쓰는 이유: AO는 이미 노멀을 반영한 값이고, 여기서 다시
-    // 노멀로 가중치를 주면 같은 정보를 두 번 쓰는 셈이다. 깊이만으로
-    // 부족하다는 실측이 나오면 그때 넣는다.
     constexpr const char* kFilterShaderFile = "SsaoFilter.slang";
 
     struct SSAOParams
@@ -73,13 +39,16 @@ namespace
         float         depthSigma{ 0.f };
         uint32_t      frameIndex{ 0 };
         uint32_t      pad[3]{};
+        math::matrix4x4 view{ math::matrix4x4::identity() };
     };
+    static_assert(offsetof(SSAOParams, view) == 176);
+    static_assert(sizeof(SSAOParams) == 240);
 
     bool CompileSsaoShader(const char* file,
         const RHIShaderPermutation& permutation,
         RHIShaderBlob& outBlob, std::string& outError)
     {
-        // 공통 조각은 셰이더가 #include "SsaoCommon.hlsli" 로 직접 당긴다.
+        // Shared constants and reconstruction live in Includes/SsaoCommon.slang.
         // 예전에는 문자열을 앞에 이어 붙였는데, 소스가 파일이 되면서
         // 인클루드 핸들러가 소스 파일 위치를 기준으로 풀어 준다.
         return RHIShaderCompiler::CompileFile(file, "CSMain", "cs_5_0", permutation,
@@ -201,6 +170,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             params.inverseProjection =
                 math::transpose(context.camera->inverseProjection);
             params.projection = math::transpose(context.camera->projection);
+            params.view = math::transpose(context.camera->view);
         }
         params.sizeX = m_width;
         params.sizeY = m_height;
@@ -295,4 +265,3 @@ void EnhancedSSAOPass::Shutdown()
     m_aoPSO = {};
     m_filterPSO = {};
 }
-

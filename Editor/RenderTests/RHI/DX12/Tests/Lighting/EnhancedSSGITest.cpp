@@ -698,6 +698,82 @@ bool DX12Test::RunSSGITest(std::string& outLog)
             }
         }
 
+        // Exercise the production pass's fixed ORM slot, including its absent-input branch.
+        RHIReadback compositeReadback{};
+        if (!resources.CreateReadback(kWidth, kHeight, EnhancedSSGIPass::kGIFormat,
+            1, compositeReadback, error)) passed = false;
+        std::vector<double> gains;
+        const float metallicCases[] = { 0.f, 0.5f, 1.f, -1.f, 0.f };
+        for (uint32_t test = 0; test < 5 && passed; ++test)
+        {
+            ssgi.ResetHistory();
+            if (!resources.BeginFrame(error) || !ssgi.PrepareFrame(frameContext, error))
+            { passed = false; break; }
+            EnhancedRenderGraph graph(resources);
+            const auto constantInput = [&](const char* name, float r, float g, float b)
+            {
+                RGTextureDesc desc{};
+                desc.width = kWidth; desc.height = kHeight;
+                desc.format = RHIFormat::RGBA16Float;
+                desc.allowRenderTarget = true; desc.name = name;
+                desc.clearColor[0] = r; desc.clearColor[1] = g;
+                desc.clearColor[2] = b; desc.clearColor[3] = 1.f;
+                const auto handle = graph.CreateTexture(desc);
+                graph.AddPass(name, { { handle, RHIResourceState::RenderTarget } },
+                    [&, handle, r, g, b](const EnhancedRenderGraph::ExecuteContext& execution)
+                    {
+                        const RHITextureHandle colors[] = { execution.ResolveHandle(handle) };
+                        const auto targets = resources.CreateRenderTargets(colors);
+                        const float value[] = { r, g, b, 1.f };
+                        execution.encoder->ClearRenderTargets(targets, value);
+                    });
+                return handle;
+            };
+            EnhancedSSGIPass::Inputs input{};
+            input.depth = graph.ImportTexture(depthRegistration.Handle(),
+                RHIResourceState::ShaderResource, "SSGI.MaterialDepth");
+            input.normal = graph.ImportTexture(normalRegistration.Handle(),
+                RHIResourceState::ShaderResource, "SSGI.MaterialNormal");
+            input.lighting = constantInput("SSGI.MaterialLighting", 1.f, 1.f, 1.f);
+            input.diffuse = constantInput("SSGI.MaterialDiffuse", 1.f, 1.f, 1.f);
+            if (metallicCases[test] >= 0.f)
+                input.metalRough = constantInput("SSGI.MaterialORM", test == 4 ? 0.25f : 1.f,
+                    0.5f, metallicCases[test]);
+            ssgi.SetInputs(input);
+            ssgi.Declare(graph, frameContext);
+            const auto output = ssgi.GetOutput();
+            graph.AddPass("SSGI.MaterialReadback", { { output, RHIResourceState::CopySource } },
+                [&](const EnhancedRenderGraph::ExecuteContext& execution)
+                { execution.encoder->CopyToReadback(compositeReadback, execution.ResolveHandle(output)); }, true);
+            if (!graph.Compile(error) || !graph.Execute(error) || !resources.EndFrame(error))
+            { passed = false; break; }
+            resources.WaitForGpu();
+            RHIReadbackImage image;
+            if (!resources.MapReadback(compositeReadback, image, error)) { passed = false; break; }
+            double gain = 0.0;
+            for (uint32_t y = 0; y < kHeight; ++y)
+                for (uint32_t x = 0; x < kWidth; ++x)
+                {
+                    const float value = image.At(x,y,0);
+                    if (!std::isfinite(value) || value < 0.999f) passed = false;
+                    gain += value - 1.0;
+                }
+            gains.push_back(gain / (kWidth * kHeight));
+        }
+        if (gains.size() == 5)
+        {
+            char line[240]{};
+            std::snprintf(line, sizeof(line),
+                "SSGI material gain: dielectric %.6f, half metal %.6f, metal %.6f, absent %.6f, AO .25 %.6f\n",
+                gains[0],gains[1],gains[2],gains[3],gains[4]);
+            outLog += line;
+            passed &= gains[0] > 0.001 && std::abs(gains[1]/gains[0] - 0.5) < 0.02
+                && std::abs(gains[2]) < 0.0001 && std::abs(gains[3] - gains[0]) < 0.001
+                && std::abs(gains[4]/gains[0] - 0.25) < 0.02;
+        }
+        else passed = false;
+        if (!passed && !error.empty()) outLog += error + "\n";
+
         // Hi-Z 밉마다 하나 + 트레이스 + 리졸브 + 필터 + 합성
         // + 히스토리 저장 + 리드백.
         const uint32_t expectedPasses = expectedMips + 6;

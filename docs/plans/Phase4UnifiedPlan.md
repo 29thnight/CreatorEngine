@@ -1,6 +1,6 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
-**신설 2026-09-01 · 재분할 2026-09-03 · PHASE 4.5 분리 2026-09-14 · PHASE 4.3 분리 2026-09-15 · PHASE 4.9 신설 2026-09-15(공수 미산정) · 활성 69행 352.5일 · 완료 12.5일 + 진행 기성 3.5일 · 잔여 336.5일**
+**신설 2026-09-01 · 재분할 2026-09-03 · PHASE 4.5 분리 2026-09-14 · PHASE 4.3 분리 2026-09-15 · PHASE 4.9 신설 2026-09-15(공수 미산정) · 갱신 2026-09-20 · 활성 69행 352.5일 · 완료 22일 · 잔여 330.5일**
 
 기존 단일 PHASE 4에는 현재 PBR 배선 수정, Blender형 Material Graph, RenderGraph·라이트맵·
 일반 SRP·후처리·차세대 GPU 기능이 한데 섞여 있었다. 이 문서는 그것을 다섯 완료선으로
@@ -16,12 +16,12 @@ PHASE 4.5가 소유하던 `BASE-0` 6일이 새 페이즈로 옮겨갔을 뿐이�
 
 | 페이즈 | 단일 책임 | 활성 행 | 일 | 상태 |
 |---|---|---:|---:|---|
-| **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | W2/W4/W5/W6 8.5일 완료 + 진행 기성 3.5일 |
+| **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | W0~W9 완료(현재 DX12 제품 계약) |
 | **4.25** | Blender 5.1.1 Principled 기반 Material Graph와 artist workflow | 10 | 34 | 미착수 |
 | **4.3** | 공통 밀봉 하네스와 RenderGraph 리소스 의존성·queue/fence RHI 계약 | 11 | 119 | 미착수 |
 | **4.5** | 모션 벡터·jitter·히스토리와 Temporal Upscaling·Frame Generation | 16 | 86 | 미착수 |
 | **4.75** | 라이트맵·일반 SRP·shadow/probe/post·GPU 기능 | 22 | 95.5 | 4일 완료 |
-| **합계** |  | **69** | **352.5** | **잔여 336.5** |
+| **합계** |  | **69** | **352.5** | **잔여 330.5** |
 
 `Q0`(queue/fence RHI 계약)은 미산정이며 위 119일에 포함되지 않는다.
 
@@ -58,16 +58,30 @@ PHASE 4.5가 소유하던 `BASE-0` 6일이 새 페이즈로 옮겨갔을 뿐이�
 
 ### 1.1 PHASE 4 — 현재 제품 배선을 먼저 정상화
 
+**2026-09-19 완료선 정정:** 판정 backend는 DX12다. 현재 완료 조건은
+[`PBRWiringStabilizationPlan.md` §26](PBRWiringStabilizationPlan.md#26-현재-완료-조건과-검증-소유권-2026-09-19)을 따른다.
+DX12 수치 정확성·정적 제품 HDR/display 재현성과 최신 Debug/Release 통합은 PHASE 4,
+Vulkan과의 교차 판정은 PHASE 4.9다. 과거 공수 기성 비율을 품질 통과율로 해석하지 않는다.
+**2026-09-20 W0~W9 완료:** W0/W7 제품 픽셀 검증에 이어 W8 런타임 모델 실패 교체를
+수정·검증했다. Debug/Release 77단정, 최신 제품·Release 전체 회귀, 실제 표본 구간
+676.895초·재임포트 188회의 장시간 검증으로 W9 cutover까지 완료했다(정본 §28).
+현재 DX12 제품 계약의 완료이며 모든 frame의 픽셀이나 후속 렌더 기능을 보증하지 않는다.
+잔여 공수는 다른 미완료 행의 원래 산정값이다.
+
+후속 요청인 Editor 모델 생성 데이터 자동 복구는 정본 §29에 기록한다.
+기존 canonical ID를 보존한 재생성·파일 감시 후 runtime 교체가 대상이며,
+기존 씬 인스턴스의 강제 재바인딩이나 Player에서의 재임포트는 포함하지 않는다.
+
 현재 자산을 정확히 읽고 같은 frame에서 흔들리지 않게 그리는 책임만 갖는다.
 
 - GBuffer/Deferred/Forward native Slang 제품 진입점과 공용 현행 평가.
 - backend neutral 기본 texture/binding과 실패 종료 코드.
 - alpha mode/cutoff/double-sided, AO, emissive, UV/sampler/mip, normal/tangent transform.
 - material/texture/sampler/descriptor/PSO generation 원자 밀봉과 플리커 차단.
-- Gunner/primitive DX12/Vulkan 실장면 회귀.
+- Gunner/primitive와 추적 fixture의 DX12 실장면 회귀(Vulkan 판정은 PHASE 4.9).
 
 Blender Principled lobe나 Material Graph를 결함 수정에 섞지 않는다. `PBR-W1` normal-map
-snapshot 배선은 코드와 Debug x64 빌드까지 진행됐으나 런타임 acceptance 전이라 완료가 아니다.
+snapshot 배선의 런타임 증거는 PBR 정본 §17에 있으며, 최신 통합 검증은 §26으로 추적한다.
 
 ### 1.2 PHASE 4.25 — Blender형 재질 저작과 결과 계약
 
@@ -242,18 +256,21 @@ PHASE 4.75가 PHASE 4.3에서 받는 것은 `BASE-0`(전 트랙의 판정 하네
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `PBR-W0` | 감사 정본·Gunner/primitive capture·strict gate | ◐ | PHASE 3.75 | 2 |
-| `PBR-W1` | normal-map 저작 유무 snapshot 단일화 | ◐ | — | 1 |
+| `PBR-W0` | 감사 정본·Gunner/primitive capture·strict gate | ✓ | PHASE 3.75 | 2 |
+| `PBR-W1` | normal-map 저작 유무 snapshot 단일화 | ✓ | — | 1 |
 | `PBR-W2` | native Slang 제품 진입점·공용 현행 평가 | ✓ | W0 | 2.5 |
-| `PBR-W3` | backend neutral resource/binding/exit code | ◐ | W0 | 1 |
+| `PBR-W3` | backend neutral resource/binding/exit code | ✓ | W0 | 1 |
 | `PBR-W4` | alpha mode/cutoff·double-sided/cull | ✓ | W2 | 2 |
 | `PBR-W5` | AO·texture table·GBuffer packing | ✓ | W2, W3 | 2.5 |
 | `PBR-W6` | emissive factor/strength·constant·색공간 | ✓ | W2 | 1.5 |
-| `PBR-W7` | UV/sampler/mip·normal/tangent transform | ◐ | W2 | 2 |
-| `PBR-W8` | generation 원자 밀봉·플리커 fail-closed | ◐ | W3~W7 | 2 |
-| `PBR-W9` | DX12/Vulkan 실장면·장시간·재임포트 cutover | ◐ | W8 | 1.5 |
+| `PBR-W7` | UV/sampler/mip·normal/tangent transform | ✓ | W2 | 2 |
+| `PBR-W8` | generation 원자 밀봉·플리커 fail-closed | ✓ | W3~W7 | 2 |
+| `PBR-W9` | DX12 제품 픽셀·장시간·재임포트 cutover | ✓ | W8 | 1.5 |
 
-완료선은 [`PBRWiringStabilizationPlan.md`](PBRWiringStabilizationPlan.md) §4를 따른다.
+현재 완료선은 [`PBRWiringStabilizationPlan.md`](PBRWiringStabilizationPlan.md) §26~§27을 따른다.
+W0~W9는 완료다. 최종 실패 교체·제품 회귀·장시간 증거는 정본 §28에 기록했다.
+아래 2026-09-06~14 기록의 당시 상태·미실행 문구는 최신 판정이 아니다.
+
 2026-09-06 W0/W3 첫 구현과 실장면 캡처 근거는 같은 문서 §6에 기록했다.
 W3 기성 0.5일을 추가했으며, W0/W1/W3 모두 최종 acceptance 전이라 진행 상태다.
 W2 native Slang 공용 평가는 같은 문서 §7의 양 backend 36-case HDR 비교와 기존 회귀를
@@ -452,7 +469,7 @@ renderer golden과 성능 gate를 사용한다.
 
 | 묶음 | 활성 행 | 총일 | 완료 | 진행 기성 | 잔여 |
 |---|---:|---:|---:|---:|---:|
-| PHASE 4 PBR 배선 | 10 | 18 | 8.5 | 3.5 | 6 |
+| PHASE 4 PBR 배선 | 10 | 18 | 18 | 0 | 0 |
 | PHASE 4.25 Material Graph | 10 | 34 | 0 | 0 | 34 |
 | PHASE 4.3 공통 기준선 | 1 | 6 | 0 | 0 | 6 |
 | PHASE 4.3 트랙 RG/Q0 | 10 | 113 | 0 | 0 | 113 |
@@ -464,7 +481,7 @@ renderer golden과 성능 gate를 사용한다.
 | PHASE 4.75 라이트맵 | 8 | 35 | 2 | 0 | 33 |
 | PHASE 4.75 일반 SRP | 6 | 33 | 0 | 0 | 33 |
 | PHASE 4.75 renderer/post | 3 | 20 | 0 | 0 | 20 |
-| **합계** | **69** | **352.5** | **12.5** | **3.5** | **336.5** |
+| **합계** | **69** | **352.5** | **22** | **0** | **330.5** |
 
 페이즈 소계는 PHASE 4 18일 · 4.25 34일 · **4.3 119일** · **4.5 86일** · **4.75 95.5일**이다.
 
@@ -478,7 +495,7 @@ renderer golden과 성능 gate를 사용한다.
 
 2026-09-15 PHASE 4.3 분리는 **총공수를 바꾸지 않았다.** 이동한 것은 두 묶음뿐이다 —
 `BASE-0` 1행 6일이 PHASE 4.5에서, 트랙 `RG`·`Q0` 10행 113일이 PHASE 4.75에서 왔다. 어느
-행의 공수·상태·선행도 이 이동으로 재산정하지 않았고, 완료 12.5일과 진행 기성 3.5일도 그대로다.
+행의 공수·상태·선행도 이 이동으로 재산정하지 않았고, 당시 완료 12.5일과 진행 기성 3.5일도 그대로였다.
 공수를 재산정한 이동이 아니므로 **이 재배치를 진척으로 읽지 않는다.**
 
 ---
@@ -488,9 +505,11 @@ renderer golden과 성능 gate를 사용한다.
 ### PHASE 4
 
 - 제품 PBR GBuffer/Deferred/Forward가 native Slang 공용 평가를 사용한다.
-- alpha/AO/emissive/UV/sampler/normal 의미가 material generation에서 draw까지 손실 없다.
+- 지원하는 alpha/AO/emissive/UV/sampler/normal 의미가 material generation에서 제품 픽셀까지 도달한다.
 - backend neutral 기본값과 gate 종료 코드가 일치한다.
-- generation 혼합과 부분 게시를 fail-closed하고 검정/변색 플리커 실장면 0.
+- generation 혼합과 부분 게시를 fail-closed하며, reload 실패 시 정상 세대 보존은 별도 실패 자극으로 판정한다.
+- DX12 고정 입력 HDR/display 반복 및 독립 재질 기대값과 600초 이상 장시간 상태 표본을 검사한다.
+  마지막 제품 frame 픽셀 검사를 모든 frame의 검정/변색 부재 증명으로 확대하지 않는다.
 
 ### PHASE 4.25
 
@@ -550,6 +569,9 @@ renderer golden과 성능 gate를 사용한다.
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-09-20 | 사용자 후속 요청: Editor 모델 생성 데이터 자동 복구, 동일 ID 보존, 실패 재시도 억제, 원본 감시 후 runtime 교체를 연결했다(정본 §29). 삭제·동일 시각 복원 실패를 재현·수정하고 Debug/Release 복구 각 47단정·generation 보존 각 77단정, 최종 Release 전체 32축 통과(생략 0·PHASE 4.9 소유 3축 유예). 기존 씬 강제 재바인딩·Player 재임포트는 제외하며 공수/완료율은 변경하지 않는다. |
+| 2026-09-20 | W8 런타임 모델 reload의 선행 은퇴 결함을 실패 주입으로 재현·수정. Debug/Release 77단정, 실제 씬·비동기 배치·제품 픽셀·Release 전체 회귀와 실제 표본 구간 676.895초·재임포트 188회 통과로 W8/W9 완료. PHASE 4 18일 완료, 계열 완료 22일·잔여 330.5일. 일반 texture/material hot reload와 Vulkan 제품 교차 판정은 이 완료 범위가 아니다. |
+| 2026-09-19 | DX12 제품 AO/emissive/normal/sampler 픽셀과 고정 입력 HDR/display 반복 검사로 W0/W7 완료. W1/W3의 이전 완료 기록도 소계에 동기화했다. W8 런타임 실패 교체와 W9 cutover는 진행으로 남긴다. 완료 18.5일, 진행 기성 0일, 잔여 334일. 공수 비율은 품질 통과율이 아니다. |
 | 2026-09-15 | **PHASE 4.3 분리.** 트랙 `RG`·`Q0` 10행 113일을 PHASE 4.75에서, `BASE-0` 1행 6일을 PHASE 4.5에서 옮겨 11행 119일의 새 페이즈로 세웠다. PHASE 4.5 92 → 86일(16행), PHASE 4.75 208.5 → 95.5일(22행). **총공수 352.5일·완료 12.5일·진행 기성 3.5일·잔여 336.5일은 변동 없다 — 순수 재배치다.** 4.5는 `BASE-0`만 받고 `RG` 본체와 병렬이라 번호가 완료 선후를 뜻하지 않는 유일한 칸이 됐다. 항목 ID `4-2`/`4-3`/`4-4`/`4-6`을 `GPU-1`/`GPU-2`/`GPU-3`/`GPU-9`로 개명(하이픈 `4-3` ↔ 페이즈 `4.3` 충돌). §6~§12 절 번호가 한 칸씩 밀렸다 |
 | 2026-09-14 | PHASE 4.5 시간축 재구성 계층 신설. 구 `4-5 DLSS 구상` 1일을 TR/TU/FG 17행 92일로 재산정하고 `BASE-0` 6일을 PHASE 4.75 공통·GPU 설계 게이트에서 이관. PHASE 4.75가 §6에서 §7로 이동, 215.5일 → 208.5일. 총공수 267.5일 → 352.5일, 잔여 336.5일 |
 | 2026-09-06 | W7 mip 생성/보존·10개 포맷·양 backend 30-case, 축소 MASK를 포함한 coverage 48-case 통과. CEMC8 유지. W7 기성 1.5일, sampler 미완료. 기존 strict GUID 추적 정책 위반 1개 별도 기록. 완료 12.5일 + 진행 기성 3.5일, 잔여 251.5일 |

@@ -42,10 +42,12 @@ assert off_pos % 4 == 0 and off_nrm % 4 == 0 and off_uv % 4 == 0
 blob = idx + pos + nrm + uv
 (out / "SamplerModes.bin").write_bytes(blob)
 
-# 4x4 RGB. 사분면마다 다른 색 — 좌우/상하 어느 쪽으로도 대칭이 아니다.
-W = H = 4
-QUAD_COLOR = [[(230, 60, 40), (250, 210, 40)],    # 위: 빨강 | 노랑
-              [(40, 90, 220), (30, 170, 90)]]     # 아래: 파랑 | 초록
+# Solid 8x8 quadrants align with BC1 blocks. A 4x4 four-color image forced
+# unrelated colors into one BC1 endpoint line, obscuring sampler correctness.
+# Endpoints use 0/255 so RGB565 quantization cannot change the expected colors.
+W = H = 16
+QUAD_COLOR = [[(255, 0, 0), (255, 255, 0)],
+              [(0, 0, 255), (0, 255, 0)]]
 raw = bytearray()
 for y in range(H):
     raw.append(0)

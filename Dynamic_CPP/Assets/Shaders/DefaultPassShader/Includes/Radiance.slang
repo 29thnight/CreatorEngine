@@ -14,9 +14,8 @@
 //   태양이 있는 HDRI 로 재니 조도가 참값의 0.53 배까지 떨어졌다. 누적값에
 //   손대는 억제는 형태를 바꿔도 에너지를 깎는다.
 //
-//   지금은 잡음을 환경 큐브의 **밉**이 맡는다(Includes/Ibl.slang 의
-//   SelectEnvironmentMip). 적분기는 라디언스를 그대로 평균낸다. 여기 남은
-//   것은 Inf/NaN 을 걷어내는 정제뿐이다 ─ 그건 가역이 아니어도 된다.
+//   환경 적분은 IblImportance.slang의 MIS로 밝은 영역을 직접 표집한다.
+//   이 파일은 저장 가능한 라디언스 범위와 비유한 값의 처리만 정의한다.
 
 static const float PI     = 3.14159265359;
 static const float INV_PI = 0.31830988618;

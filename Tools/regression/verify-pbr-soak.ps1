@@ -1,13 +1,11 @@
 # PHASE 4 W9 — 장시간 회전·이동·재임포트 중 세대 밀봉이 깨지지 않는지.
 #
-# ★ 이 검사가 재는 것은 "10분 동안 검은 프레임이 없었다"가 아니라 **검은
-#   프레임을 만드는 기계장치가 한 번도 돌지 않았다**이다. 픽셀을 매 프레임
-#   읽는 것은 감당할 수 없고(1920x1080x4 float 7장), 눈으로 보는 것은 게이트가
-#   아니다. W8이 세운 수 셋이 그 자리를 대신한다.
+# 연속 표본에서는 W8의 상태 수치를, 마지막 제품 frame에서는 픽셀을 검사한다.
+# 모든 frame의 검정/변색 부재를 증명하지 않으며, 수치가 다루지 않는 원인은 남는다.
 #     · seal 위반(세대 혼합·지난 프레임 밀봉·기록 단계 누락)
 #     · 인코더가 조용히 버린 명령(놓인 PSO 핸들·만료 descriptor)
 #     · 업로드 실패를 흰색으로 덮은 횟수
-#   이 셋이 0이 아닌 채로 그려진 프레임이 곧 검정/변색 프레임의 원인이다.
+#   이 셋 중 하나라도 0이 아니면 해당 회차를 실패시킨다.
 #
 # ★ drawCount 도 함께 본다. 위 셋이 0이어도 그릴 것이 0이면 화면은 검다 —
 #   "위반 없음"과 "그렸음"은 다른 질문이다.
@@ -33,8 +31,8 @@ param(
     # 표본 하나에 드는 벽시계 초. 표본 수 = Minutes*60 / 이 값. 구성·기계마다 다르므로
     # 실제 시간을 요구하는 회차는 짧은 회차로 재서 넘긴다.
     [double]$SecondsPerSample = 0.6,
-    # 0 이 아니면 에디터 실행의 실제 경과가 이 초 이상이어야 통과다. W9 acceptance 는
-    # "10 분" 이 벽시계라는 뜻이므로 -MinimumWallSeconds 600 을 함께 준다.
+    # 0 이 아니면 프로세스 실행과 예열 후 첫/마지막 표본 간격이 모두 이 초 이상이어야 한다.
+    # W9 acceptance 는 -MinimumWallSeconds 600 을 함께 준다.
     [double]$MinimumWallSeconds = 0,
     # 몇 표본마다 probe 를 재임포트하나. 재임포트 하나가 generation 디렉터리 하나다.
     [int]$ReimportEvery = 20,
@@ -45,6 +43,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+if (-not $PSBoundParameters.ContainsKey('Editor')) {
+    $Editor = Join-Path $root "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
+}
 $run = Join-Path ([IO.Path]::GetFullPath($Work)) ('creator-pbr-soak-' + [guid]::NewGuid().ToString('N'))
 $settings = Join-Path $root 'Dynamic_CPP\ProjectSetting\EngineSettings.asset'
 $utf8 = [Text.UTF8Encoding]::new($false)
@@ -73,6 +74,11 @@ function Remove-Probe {
     }
     if ($id) {
         $generationDir = Join-Path $project "Library\ModelAssetGenerations\$id"
+        $generationRoot = [IO.Path]::GetFullPath((Join-Path $project 'Library/ModelAssetGenerations')) + [IO.Path]::DirectorySeparatorChar
+        $generationDir = [IO.Path]::GetFullPath($generationDir)
+        if ($id -notmatch '^[0-9a-fA-F-]{36}$' -or -not $generationDir.StartsWith($generationRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Unsafe generated probe directory'
+        }
         if (Test-Path -LiteralPath $generationDir) {
             Remove-Item -LiteralPath $generationDir -Recurse -Force -ErrorAction SilentlyContinue
         }
@@ -121,6 +127,7 @@ function New-SoakCommands([int]$Samples) {
             $commands.Add('render.pbr.sealstatus')
         }
     }
+    $commands.Add("render.pbr.capture `"$run/final-frame`" game")
     $commands.Add('quit')
     return $commands
 }
@@ -141,7 +148,8 @@ try {
 
     $samples = [int][math]::Max(10, [math]::Ceiling($Minutes * 60 / $secondsPerSample))
     $scenario = Join-Path $run 'soak.txt'
-    [IO.File]::WriteAllText($scenario, ((New-SoakCommands $samples) -join "`n") + "`n", $utf8)
+    $commands = @(New-SoakCommands $samples)
+    [IO.File]::WriteAllText($scenario, ($commands -join "`n") + "`n", $utf8)
     $resultPath = Join-Path $run 'soak.results.jsonl'
 
     $start = [Diagnostics.ProcessStartInfo]::new()
@@ -167,8 +175,11 @@ try {
     $stderrTask = $process.StandardError.ReadToEndAsync()
     if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
         $process.Kill($true)
+        $process.WaitForExit()
         throw "Soak timed out after $TimeoutSeconds s; artifacts: $run"
     }
+    # Parsing thousands of JSON rows is host analysis, not additional renderer soak time.
+    $clock.Stop()
     [IO.File]::WriteAllText((Join-Path $run 'soak.out'), $stdoutTask.Result, $utf8)
     [IO.File]::WriteAllText((Join-Path $run 'soak.err'), $stderrTask.Result, $utf8)
     if ($process.ExitCode -ne 0) {
@@ -176,6 +187,7 @@ try {
     }
 
     $results = @(Read-CommandResults $resultPath)
+    if ($results.Count -ne $commands.Count) { throw 'Soak terminal command count mismatch' }
     # 자극 명령이 하나라도 실패했으면 아래 수는 그 자극을 재지 않은 것이다.
     $failedRows = @($results | Where-Object status -ne 'succeeded')
     if ($failedRows.Count -gt 0) {
@@ -231,6 +243,14 @@ try {
         $previousFrame = $data.frameId
     }
     $measured = $status.Count - $warmupSamples
+    $final = Get-Content -LiteralPath (Join-Path $run 'final-frame/manifest.json') -Raw | ConvertFrom-Json
+    if (-not $final.finite -or $final.draws.Count -eq 0 -or $final.attachments.Count -ne 7 -or
+        $final.validationCount -ne 0 -or $final.frameId -le $previousFrame) {
+        throw 'Soak final product capture is invalid'
+    }
+    $finalDepth = $final.attachments | Where-Object name -eq depth
+    $finalHdr = $final.attachments | Where-Object name -eq preToneHdr
+    if ($finalDepth.min -eq $finalDepth.max -or $finalHdr.rgbMax -le 0) { throw 'Soak final frame is empty' }
 
     # ── 재임포트 축: 자극했음을 수로 단정한다 ──
     $placedNames = @($results | Where-Object command -eq 'model.place' | ForEach-Object { $_.data.name })
@@ -263,13 +283,27 @@ try {
     }
 
     $wallSeconds = $clock.Elapsed.TotalSeconds
+    $activeSampleSeconds = ([double]$status[-1].timing.queuedMs -
+        [double]$status[$warmupSamples].timing.queuedMs) / 1000.0
     if ($MinimumWallSeconds -gt 0 -and $wallSeconds -lt $MinimumWallSeconds) {
         $measuredPerSample = $wallSeconds / [math]::Max(1, $status.Count)
         throw ("Soak ran {0:0} s of wall time, required {1:0} s — 표본 수가 모자라다. " +
                "-SecondsPerSample {2:0.###} 로 다시 돌려라; artifacts: $run") -f `
             $wallSeconds, $MinimumWallSeconds, $measuredPerSample
     }
+    if ($MinimumWallSeconds -gt 0 -and $activeSampleSeconds -lt $MinimumWallSeconds) {
+        throw "Active sample interval was $activeSampleSeconds s, required $MinimumWallSeconds s (startup/final capture excluded)"
+    }
 
+    [ordered]@{ passed=$true; backend=$Backend; configuration=$Configuration;
+        processWallSeconds=$wallSeconds; activeSampleSeconds=$activeSampleSeconds;
+        measuredSamples=$measured; warmupSamples=$warmupSamples;
+        advancingFrames=$movedFrames; reimports=$reloaded; mixedGenerationSamples=$mixedSamples;
+        distinctNewestGenerations=$newest.Count; lastGeneration=$newest[-1];
+        sealViolations=0; unstamped=0; encoderDrops=0; textureUploadFailures=0;
+        finalFrameId=$final.frameId; finalFinite=$final.finite; finalValidationCount=$final.validationCount;
+        pixelCoverage='final frame only; continuous samples use seal and draw counters' } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'summary.json') -Encoding utf8
     Write-Output ("PBR soak PASS: {0} samples ({1} warmup excluded), {2} advancing frames, backend {3}, requested {4} min, wall {5:0} s" -f `
         $measured, $warmupSamples, $movedFrames, $Backend, $Minutes, $clock.Elapsed.TotalSeconds)
     Write-Output ("  reimport: {0} reloaded, {1} mixed-generation samples, {2} distinct newest generations (last {3})" -f `

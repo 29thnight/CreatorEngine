@@ -11,8 +11,10 @@
 float DistributionGGX(float ndoth, float alpha)
 {
     const float a2 = alpha * alpha;
-    const float d  = ndoth * ndoth * (a2 - 1.0) + 1.0;
-    return a2 / max(PI * d * d, 1e-6);
+    // Preserve the narrow GGX peak: a fixed 1e-6 denominator flattens smooth
+    // materials. This form also avoids subtracting nearly equal values at NoH=1.
+    const float d = (1.0 - ndoth) * (1.0 + ndoth) + ndoth * ndoth * a2;
+    return a2 / max(PI * d * d, 1e-20);
 }
 
 // 높이 상관(height-correlated) Smith 가시성. 분모의 4*NdotV*NdotL 까지

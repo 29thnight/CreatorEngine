@@ -508,7 +508,7 @@ namespace EnhancedSceneRenderer
     // Diagnostic only: capture one subsequent product frame on the render thread.
     // The output directory must not exist; incomplete data is never overwritten.
     bool RequestLivePbrCapture(const std::string& directory,
-        EnhancedLiveDisplayTarget target, std::string& outError);
+        EnhancedLiveDisplayTarget target, std::string& outError, bool controlled = false);
     EnhancedLivePbrCaptureStatus GetLivePbrCaptureStatus();
     void CancelLivePbrCapture();
 

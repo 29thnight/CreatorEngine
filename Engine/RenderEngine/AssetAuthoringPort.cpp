@@ -1,6 +1,8 @@
 #include "Interfaces/AssetAuthoringPort.h"
 
 #include <atomic>
+#include <mutex>
+#include <shared_mutex>
 
 namespace
 {
@@ -8,6 +10,8 @@ namespace
 	std::atomic<AssetAuthoringPort::WriteTextAssetWithMetaHandler>
 		g_writeTextAssetWithMetaHandler{};
 	std::atomic<AssetAuthoringPort::WriteModelCacheHandler> g_writeModelCacheHandler{};
+	std::shared_mutex g_modelRecoveryMutex;
+	AssetAuthoringPort::RecoverModelHandler g_modelRecoveryHandler{};
 	std::atomic<AssetAuthoringPort::WriteEmbeddedTextureHandler>
 		g_writeEmbeddedTextureHandler{};
 	std::atomic<AssetAuthoringPort::WriteTerrainHandler> g_writeTerrainHandler{};
@@ -69,6 +73,27 @@ FileGuid AssetAuthoringPort::WriteTextAssetWithMeta(
 	{
 		return {};
 	}
+}
+
+void AssetAuthoringPort::InstallModelRecovery(RecoverModelHandler handler) noexcept
+{
+	std::unique_lock lock(g_modelRecoveryMutex);
+	g_modelRecoveryHandler = handler;
+}
+
+void AssetAuthoringPort::UninstallModelRecovery(RecoverModelHandler handler) noexcept
+{
+	// Wait for in-flight worker loads before the Editor-owned database is destroyed.
+	std::unique_lock lock(g_modelRecoveryMutex);
+	if (g_modelRecoveryHandler == handler) g_modelRecoveryHandler = nullptr;
+}
+
+bool AssetAuthoringPort::RecoverModel(const file::path& source, FileGuid expectedId) noexcept
+{
+	std::shared_lock lock(g_modelRecoveryMutex);
+	if (!g_modelRecoveryHandler) return false;
+	try { return g_modelRecoveryHandler(source, expectedId); }
+	catch (...) { return false; }
 }
 
 void AssetAuthoringPort::InstallModelCacheWriter(

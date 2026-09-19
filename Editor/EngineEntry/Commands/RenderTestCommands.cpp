@@ -819,13 +819,15 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_render_pbr_capture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() < 2 || ctx.parts.size() > 3
-            || (ctx.parts.size() == 3 && ctx.parts[2] != "game" && ctx.parts[2] != "editor"))
-            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor]");
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 4
+            || (ctx.parts.size() >= 3 && ctx.parts[2] != "game" && ctx.parts[2] != "editor")
+            || (ctx.parts.size() == 4 && ctx.parts[3] != "controlled"))
+            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor] [controlled]");
         std::string error;
-        const auto target = ctx.parts.size() == 3 && ctx.parts[2] == "editor"
+        const auto target = ctx.parts.size() >= 3 && ctx.parts[2] == "editor"
             ? EnhancedLiveDisplayTarget::Editor : EnhancedLiveDisplayTarget::Game;
-        if (!EnhancedSceneRenderer::RequestLivePbrCapture(ctx.parts[1], target, error))
+        if (!EnhancedSceneRenderer::RequestLivePbrCapture(ctx.parts[1], target, error,
+                ctx.parts.size() == 4))
             return Fail("render.pbr.capture.rejected", error);
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
         ctx.system.WaitForResult([deadline]() -> std::optional<CommandResult>
