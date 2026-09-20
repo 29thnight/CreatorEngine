@@ -1,0 +1,53 @@
+# CreatorEngine 포매팅 규약 — docs/design/CodingConventions.md §7.1
+#
+# 기준 도구: VS 2022 동봉 clang-format 19.1.5
+#   VC/Tools/Llvm/bin/clang-format.exe
+# 스타일 기본값은 버전마다 바뀐다. 도구 버전을 올리면 --dump-config 로 아래
+# 덮어쓰기가 여전히 필요한지 다시 확인할 것.
+#
+# 값은 취향이 아니라 실측으로 골랐다 — 무작위 48개 파일에 후보 설정을 돌려
+# "공백 외 변경 줄" 이 가장 적은 조합을 취했다(3,262 → 2,943).
+#
+# Microsoft 를 출발점으로 삼은 것은 넷이 이미 실태와 맞기 때문이다
+# (Engine+Editor 실측, 서드파티 제외):
+#   UseTab: Never                           들여쓴 줄 20.2만 중 스페이스 15.6만 (77%)
+#   IndentWidth: 4                          선행 공백의 98.9% 가 4의 배수
+#   ColumnLimit: 120                        120열 초과 1,049줄 / 26.4만 (0.4%)
+#   BreakBeforeBraces: Custom (Allman 계열)  새 줄 여는 중괄호 23,220 대 442 (98%)
+---
+Language: Cpp
+BasedOnStyle: Microsoft
+
+# ★ Microsoft 기본은 Right(`Entity *entity`)다. 이 저장소는 정반대로
+#   `Entity* entity` 가 포인터 4,361 대 77(98%), 참조 8,269 대 26(99.7%).
+#   명시하지 않으면 재포맷이 12,700여 곳의 선언을 뒤집는다.
+PointerAlignment: Left
+
+# ★ Microsoft 기본은 true 다. 이 저장소의 주석은 한글이고 줄바꿈이 뜻의
+#   단위로 손수 맞춰져 있는데, clang-format 은 한글의 2열 폭을 세지 못해
+#   재배치를 허용하면 주석이 제자리에서 어긋난 채 전부 다시 접힌다.
+#   되돌릴 수 없는 손실이라 끈다.
+ReflowComments: false
+
+# ★★ 기본값 CaseSensitive 는 include 를 알파벳 순으로 재정렬한다.
+#    이 저장소에는 선행 include 에 의존하는 헤더가 있고(전방 선언·Windows
+#    헤더·유니티 빌드), 재정렬은 포매팅이 아니라 **빌드를 깨뜨릴 수 있는
+#    코드 변경**이다. 순서는 사람이 정한다.
+SortIncludes: Never
+
+# 한 줄짜리 클래스 내 인라인 함수 1,849곳을 그대로 둔다.
+# 기본값 None 은 `{ return m_name; }` 을 세 줄로 펼친다.
+# All 도 재 봤지만 Inline 쪽이 실측에서 더 적게 바꿨다.
+AllowShortFunctionsOnASingleLine: Inline
+
+# template 선언 뒤에서 항상 줄을 바꾼다 — 실태 416 대 104 (80%).
+# 기본값 MultiLine 은 짧은 선언을 `template <class T> void f();` 로 합친다.
+BreakTemplateDeclarations: Yes
+
+# `template<typename T>` 372 대 `template <typename T>` 148 (72%).
+SpaceAfterTemplateKeyword: false
+
+# BinPackArguments/BinPackParameters 는 끄지 않는다 — 실측에서 오히려
+# 변경이 늘었다(2,943 → 3,153). 인자를 한 줄에 하나씩 세워 둔 자리
+# (예: meta::schema 의 필드 나열)는 그 블록만 `// clang-format off` /
+# `// clang-format on` 으로 감싸 보호한다.
