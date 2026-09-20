@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -19,10 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ProfileEvent.h" />
+    <ClInclude Include="ProfileMarker.h" />
+    <ClInclude Include="ProfileThreadStream.h" />
     <ClInclude Include="Profiler.h" />
     <ClInclude Include="ProfilerSelfTest.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ProfileMarker.cpp" />
+    <ClCompile Include="ProfileThreadStream.cpp" />
     <ClCompile Include="Profiler.cpp" />
     <ClCompile Include="ProfilerSelfTest.cpp" />
   </ItemGroup>

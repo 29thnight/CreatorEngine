@@ -17,7 +17,7 @@
 ## 0. 한 줄 결론
 
 ImGui 타임라인을 먼저 확장하지 않는다. 엔진·렌더러·관리 런타임의 계측 결과를
-`CaptureSession` 하나에 `EngineFrameId`와 `SubmissionId`로 묶어 보존하는 **수집 코어**를
+`capture_session` 하나에 `engine_frame_id`와 `submission_id`로 묶어 보존하는 **수집 코어**를
 먼저 만든다. 에디터는 이 불변 캡처를 읽기만 한다.
 
 완료 모습은 다음과 같다.
@@ -89,12 +89,12 @@ selftest의 `cross-frame/preserve`는 지금 KNOWN-DEFECT인데, **새 설계에
 - 계측 지점의 실제 모양은 `PROFILE_CPU_BEGIN("X"); X->Update(dt); PROFILE_CPU_END();`
   **하드코딩 나열**이다.
 
-실행 표(`{MarkerId, 함수 포인터}` 순회)로 자동화하는 길은 있으나, 그것은 씬 실행
+실행 표(`{marker_id, 함수 포인터}` 순회)로 자동화하는 길은 있으나, 그것은 씬 실행
 구조 변경이고 `lifecycle 221사건` 순서 게이트를 지나간다. **이 계획은 그것을 기다리지
 않는다** — 마커 표기를 호출부 형태에 독립으로 설계하면, 나중에 표가 생겨도
 
 ```cpp
-for (auto& step : table) { ce::ProfileScope _{ step.marker }; step.fn(*this, dt); }
+for (auto& step : table) { ce::profile_scope _{ step.marker }; step.fn(*this, dt); }
 ```
 
 한 줄로 흡수되고 코어 변경은 0이다. **자동 수집은 프로파일러의 요구가 아니라 씬 구조
@@ -140,7 +140,7 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 ### 0.5.6 개정으로 바뀐 실행 계획
 
 - **P1의 "기존 `PROFILE_CPU_*` 매크로를 adapter로 연결" 항목은 폐기한다.** 옛 코어에
-  adapter를 붙이는 일이 재활용 폐기로 무의미해졌다. P1에 남는 것은 `EngineFrameId`
+  adapter를 붙이는 일이 재활용 폐기로 무의미해졌다. P1에 남는 것은 `engine_frame_id`
   단일 발행 지점 통합과 마커 표기 신설이다.
 - **P1의 "Shipping compile-out"은 만드는 일이 아니라 무는 일이다** — `CE_DEVELOPMENT`가
   이미 전 프로젝트에 정의돼 있다(§5.2).
@@ -217,7 +217,7 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 → **회귀는 없다.** 그리고 12곳을 넣었는데 38−27=11 만 늘었다 — 안 도는 한 곳은 `profile.frame` 으로
 지목했다: **`TickSimulationFrame`**(`EditorMain.cpp:665`)이다. 그 계측은 `IsPlayCommitted()` 가 거짓일 때의
 `return` **뒤**에 있어 편집 모드에서는 람다가 먼저 빠져나간다. 보존 프레임 [59,63) 네 개가 전부 이벤트 38 ·
-빠진 것 그 하나였다(§2.1 의 EngineFrameId 후보 표가 "편집 모드는 early return 이라 안 돈다" 고 적은 것이
+빠진 것 그 하나였다(§2.1 의 engine_frame_id 후보 표가 "편집 모드는 early return 이라 안 돈다" 고 적은 것이
 계측 축에서 그대로 재현됐다). 이 왕복이 없었으면 25 를 보고 "계측 2곳이 사라졌다" 는 유령을 쫓았을 것이다
 ([[gate-measures-stale-binary]]: 걷은 뒤에는 반드시 재빌드하고, 되돌린 뒤에도 재빌드한다).
 
@@ -359,7 +359,7 @@ DX12 쪽에도 `DX12UploadRing::Stats`(allocations·bytes·overflows·peak frame
 `DX12DescriptorRing::Stats`(allocations·descriptors·overflows·peak frame descriptors)가 있다.
 
 현재 값은 UI가 0.5초마다 직접 polling한다. 캡처용으로는 각 owner가 프레임 경계에 값
-스냅샷을 발행하고 수집 코어가 `EngineFrameId`에 붙여야 한다.
+스냅샷을 발행하고 수집 코어가 `engine_frame_id`에 붙여야 한다.
 
 ---
 
@@ -387,7 +387,7 @@ DX12 쪽에도 `DX12UploadRing::Stats`(allocations·bytes·overflows·peak frame
 
 필요한 변경:
 
-- `ThreadStream` 소유권을 profiler service가 가진다.
+- `thread_stream` 소유권을 profiler service가 가진다.
 - TLS는 소유 객체의 handle만 보관한다.
 - 스레드 종료를 `ThreadEnd` 이벤트로 남기고, 미소비 chunk 회수 후 stream을 은퇴한다.
 
@@ -420,11 +420,11 @@ struct GpuFrameToken
 
 ### 3.4 엔진 프레임과 렌더 제출은 1:1이 아니다
 
-씬뷰와 게임뷰가 함께 있으면 한 `EngineFrameId`에 여러 GPU 제출이 생긴다. 따라서 다음 두
+씬뷰와 게임뷰가 함께 있으면 한 `engine_frame_id`에 여러 GPU 제출이 생긴다. 따라서 다음 두
 식별자를 구분한다.
 
-- `EngineFrameId`: 게임 업데이트 경계. 프레임 그래프와 CPU Hierarchy의 기준.
-- `SubmissionId`: GPU queue에 실제 제출한 단위. 카메라·뷰·queue를 식별.
+- `engine_frame_id`: 게임 업데이트 경계. 프레임 그래프와 CPU Hierarchy의 기준.
+- `submission_id`: GPU queue에 실제 제출한 단위. 카메라·뷰·queue를 식별.
 
 GPU 합계는 모든 패스 duration의 단순 합만으로 정의하지 않는다.
 
@@ -456,8 +456,8 @@ EngineGUIWindow/ProfilerWindow
         ▼
 [Core diagnostics]
 EngineDiagnostics
-  MarkerRegistry · ThreadStream · FrameAssembler
-  CaptureSession · CounterRegistry · CaptureFile
+  marker_registry · thread_stream · FrameAssembler
+  capture_session · CounterRegistry · CaptureFile
         ▲                    ▲
         │                    │
 RenderEngine DX12       ScriptBinder/CoreCLR
@@ -477,11 +477,11 @@ GPU timestamp provider  managed marker/counters
 ```text
 EngineDiagnostics/
   ProfilerTypes.h
-  ProfilerService.h/.cpp
-  MarkerRegistry.h/.cpp
+  profiler_service.h/.cpp
+  marker_registry.h/.cpp
   ThreadEventStream.h/.cpp
   FrameAssembler.h/.cpp
-  CaptureSession.h/.cpp
+  capture_session.h/.cpp
   CaptureFile.h/.cpp
   CounterRegistry.h/.cpp
 
@@ -521,16 +521,16 @@ EngineGUIWindow/
 > 매크로 쌍을 남기지 않는다. 호출부 39곳의 **이름과 자리는 보존**하되 표기를 바꾼다.
 
 ```cpp
-using MarkerId = uint32_t;
+using marker_id = uint32_t;
 
-struct MarkerDesc
+struct marker_desc
 {
-    MarkerId    id;
-    CategoryId  category;
-    StringId    name;
-    StringId    file;
+    marker_id    id;
+    category_id  category;
+    string_id    name;
+    string_id    file;
     uint32_t    line;
-    MarkerFlags flags;
+    marker_flags flags;
 };
 ```
 
@@ -555,14 +555,28 @@ hot path에는 정수만 흐른다. 예산도 누락 계수도 필요 없어진�
 
 ```cpp
 // 정적 마커 — 이름은 컴파일 타임 상수, 등록은 1회
-ce::ProfileScope _{ ce::Marker<"AnimatorSystem">() };
+ce::profile_scope _{ ce::marker<"AnimatorSystem">() };
 
 // 보조 — 이름을 생략하면 std::source_location이 함수·파일·행을 채운다
-ce::ProfileScope _{};
+ce::profile_scope _{};
 
-ce::ProfileCounter(ce::Marker<"DrawCalls">(), drawCount);
-ce::ProfileInstant(ce::Marker<"SceneLoaded">());
+ce::profile_counter(ce::marker<"DrawCalls">(), drawCount);
+ce::profile_instant(ce::marker<"SceneLoaded">());
 ```
+
+> **2026-09-20 표기 확정 — 층 B(snake_case).** 초판은 `ce::ProfileScope`·`ce::Marker<>` 로
+> 적었으나, 9-20 에 확정된 `CodingConventions.md` 가 층 B 를 snake_case 로 못 박았고
+> `thread_pool`·`job_scheduler` 가 "엔진 공용 실행 유틸리티" 로 층 B 확정된 선례가 있다.
+> 프로파일러도 같은 성격의 공용 인프라이고 계측 API 는 코드 전역에 박히므로, 선례와
+> 어긋나면 눈에 띈다. `ce::` 안에 타입이 들어가는 것은 컨벤션 §5.4 에 예외로 적었다 —
+> `profile_scope` 는 컨테이너가 아니라 **자유 함수를 쓸 수 없는 자리의 자유 함수**이고
+> (여는 일과 닫는 일이 한 문장이어야 한다) 그것을 표현하는 수단이 소멸자뿐이기 때문이다.
+
+> **NTTP 실증(2026-09-20).** MSVC v145 `/std:c++23preview` 에서 `fixed_string` NTTP 가
+> W4 경고 0 으로 서고, 이름마다 `marker_slot<Name>` 정적 슬롯이 갈리며 같은 이름은 같은
+> 슬롯을 얻는 것을 확인했다. 등록은 `static inline const marker_id id = intern(...)` 의
+> 동적 초기화 1회이고, registry 는 함수 지역 static 으로 들고 있어 TU 간 초기화 순서에
+> 의존하지 않는다.
 
 `source_location` 판은 **보조**다. 지금 `Scene::Update` 한 함수 안에 계측 지점이
 13개 있어 함수 이름만으로는 구분되지 않는다 — 이름을 명시하는 쪽이 기본이다.
@@ -573,7 +587,7 @@ ce::ProfileInstant(ce::Marker<"SceneLoaded">());
 동일하다. 나중에 씬 실행 표가 도입되면
 
 ```cpp
-for (auto& step : table) { ce::ProfileScope _{ step.marker }; step.fn(*this, dt); }
+for (auto& step : table) { ce::profile_scope _{ step.marker }; step.fn(*this, dt); }
 ```
 
 한 줄로 흡수되고 코어 변경은 0이다. **이 독립성이 설계 요구사항이다** — 프로파일러가
@@ -619,7 +633,7 @@ struct ProfileEvent
 {
     uint64_t timestampNs;
     uint64_t sequence;
-    MarkerId marker;
+    marker_id marker;
     ThreadId thread;
     ProfileEventType type;
     uint64_t payload;
@@ -720,8 +734,8 @@ Pause는 다음 engine frame 경계에서 확정한다. 중간 scope는 `truncat
 
 현재처럼 UI가 global profiler vector를 직접 읽지 않는다.
 
-- recording 중에는 경량 `LiveSummary`만 double-buffer로 공개
-- pause 시 `shared_ptr<const CaptureSession>`을 원자적으로 교체
+- recording 중에는 경량 `live_summary`만 double-buffer로 공개
+- pause 시 `shared_ptr<const capture_session>`을 원자적으로 교체
 - UI selection과 정렬은 reader 쪽 별도 상태
 - 저장 작업도 immutable capture를 읽으므로 recorder를 오래 잠그지 않음
 
@@ -768,7 +782,7 @@ Space 전역 단축키는 제거하거나 Profiler 창 focus일 때만 받는다
 6. GPU Compute/Copy queue가 생기면 별도 트랙
 
 기존 확대·이동·검색·tooltip 코드는 재사용하되 data source를 `CaptureReader`로 교체한다.
-GPU bar는 `SubmissionId`, view/camera, fence, pass name을 tooltip에 표시한다.
+GPU bar는 `submission_id`, view/camera, fence, pass name을 tooltip에 표시한다.
 
 ### 7.4 Hierarchy
 
@@ -944,7 +958,7 @@ WinPixEventRuntime 경로로만 넣고 raw Begin/End 주입은 하지 않는다.
 - `CPUProfiler::GetTLSUnsafe()`가 함수 지역 `static thread_local`이라 **모든 CPUProfiler
   인스턴스가 스레드당 TLS 하나를 공유한다.** 검사 전용 인스턴스를 세울 수 없어, selftest는
   전역 `gCPUProfiler`의 프레임 경계를 직접 넘긴다 — 그래서 **라이브 캡처를 교란한다.**
-  §3.2의 "`ThreadStream` 소유권을 profiler service가 가진다"가 이것을 푼다.
+  §3.2의 "`thread_stream` 소유권을 profiler service가 가진다"가 이것을 푼다.
 - **프레임을 넘는 스코프는 게임 스레드에서 재현하면 안 된다.** `Tick()`은 스택 맨 위를
   무조건 닫으므로, 열린 스코프가 있으면 `"CPU Frame"` 대신 그것을 닫는다. 게임 스레드의
   스택이 프레임마다 한 칸씩 깊어져 `kMaxStackDepth`(32)에서 죽는다. 워커에서만 관측할 것.
@@ -954,7 +968,7 @@ WinPixEventRuntime 경로로만 넣고 raw Begin/End 주입은 하지 않는다.
 | P0이 닫은 것(최소 지혈) | P2가 받는 것(정식 구조) |
 |---|---|
 | 드롭 계수화(`DroppedEvents`·`DroppedNames`) | 캡처 diagnostics로 승격, UI 노출 |
-| 널 슬롯 스킵 + `UnregisterThread` | `ThreadStream` 소유권 역전(서비스가 소유) |
+| 널 슬롯 스킵 + `UnregisterThread` | `thread_stream` 소유권 역전(서비스가 소유) |
 | 수집 구간 `m_ThreadDataLock`(**표만**) | writer 전용 chunk의 sealed handoff |
 | 스팬 그룹핑 부등호 정정 | (해당 없음 — 닫힘) |
 | `EventStack` 은퇴·재등록 시 복구 + 불균형 계수 | `truncated` 플래그로 승격(§6.1) |
@@ -1016,18 +1030,18 @@ P2의 성공 판정은 `cross-frame/preserve`가 `KNOWN-DEFECT`에서 `PASS`로 
 
 할 일:
 
-- `ProfilerService` — 스트림을 서비스가 소유한다. 현행의 함수 지역
+- `profiler_service` — 스트림을 서비스가 소유한다. 현행의 함수 지역
   `static thread_local`(모든 인스턴스가 스레드당 TLS 하나를 공유) 제약이 여기서 풀린다
-- `MarkerRegistry` — 컴파일 타임 마커 ID 등록(§5.2). **매크로를 만들지 않는다**
-- `ce::ProfileScope` RAII — 짝 불균형을 문법적으로 불가능하게
-- **단일 `EngineFrameId` 발행 지점 통합.** 새로 만드는 일이 아니라 지금 서로 모르고
+- `marker_registry` — 컴파일 타임 마커 ID 등록(§5.2). **매크로를 만들지 않는다**
+- `ce::profile_scope` RAII — 짝 불균형을 문법적으로 불가능하게
+- **단일 `engine_frame_id` 발행 지점 통합.** 새로 만드는 일이 아니라 지금 서로 모르고
   도는 세 카운터를 묶는 일이다:
 
   | 후보 | 성질 | 판정 |
   |---|---|---|
   | `TimeSystem::m_frameCount`(atomic uint32) | Editor·Player 공통, 편집·재생 모두 증가, **`FixedTick` 호출부 0**이라 루프당 1회(9-15 재확인) | **정본** |
   | `Runtime::TickSimulationFrame` | 편집 모드는 앞에서 early return | 부적합 |
-  | `LiveState::publishedFrameId`(atomic uint64) | RT 파이프라인 제출 단위 | `SubmissionId` 축 후보 |
+  | `LiveState::publishedFrameId`(atomic uint64) | RT 파이프라인 제출 단위 | `submission_id` 축 후보 |
 
 - 호출부 39곳의 표기를 새 RAII로 교체(**이름과 자리는 보존**)
 - `CE_DEVELOPMENT`를 물어 compile-out(§5.2 — 새 매크로 신설 금지)
@@ -1079,14 +1093,14 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 할 일:
 
-- owner 수명이 명확한 `ThreadStream`
+- owner 수명이 명확한 `thread_stream`
 - sealed chunk handoff — writer가 자기 chunk를 봉인해 넘기고 collector는 남의 메모리를
   만지지 않는다. 현행 결함 8종 중 다섯이 **고쳐지는 것이 아니라 발생하지 않게** 된다
 - cross-frame scope와 mid-capture scope 처리 — `truncated` flag(§6.1).
   **selftest의 `cross-frame/preserve`가 KNOWN-DEFECT에서 PASS로 바뀌는 것이 판정이다**
 - 600프레임/128MiB rolling ring
 - drop/overflow 진단
-- `CaptureSession` freeze
+- `capture_session` freeze
 - ★ **워커 스레드 등록** — 애니메이션 워커 8개, RenderThread, PresentationThread.
   enkiTS 이관(PHASE 13 S0.5) 이후라면 `threadnum_`(0..`GetNumTaskThreads()-1` 보장)을
   슬롯 키로 쓴다 — 현행이 발명해야 했던 11비트 슬롯 은퇴·재사용 규칙이 불필요해진다
@@ -1130,7 +1144,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - DisplaySlot/pendingQueue에 token 연결
 - `Collect(token)`으로 API 교체
 - raw pass interval과 queue span 보존
-- clock calibration과 `SubmissionId`, view 정보 기록
+- clock calibration과 `submission_id`, view 정보 기록
 - GPU Timeline 추가
 
 검증 장면:
@@ -1142,7 +1156,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 완료 조건:
 
-- heavy/light 패턴이 올바른 `EngineFrameId`와 `SubmissionId`에 교대로 매핑
+- heavy/light 패턴이 올바른 `engine_frame_id`와 `submission_id`에 교대로 매핑
 - 2-in-flight와 멀티카메라에서 이전/최신 query record 혼동 없음
 - fence 미완료 slot을 읽지 않음
 - GPU query overflow와 collect 실패가 캡처 diagnostics에 남음
@@ -1223,7 +1237,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 |---|---|
 | 1 submission | pass raw interval과 queue span 일치 |
 | 2 in-flight | token별 query record 분리 |
-| 두 카메라 | 같은 EngineFrameId, 서로 다른 SubmissionId/view |
+| 두 카메라 | 같은 engine_frame_id, 서로 다른 submission_id/view |
 | pass slice | raw slice 보존, UI aggregate 가능 |
 | resize/rebuild | 이전 pipeline token 완료 후 안전 폐기 |
 | query overflow | 일부 누락을 숨기지 않고 diagnostics 표시 |
@@ -1319,7 +1333,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - [ ] ★ **애니메이션 워커 8스레드·RenderThread·PresentationThread가 캡처에 나타남**
       (§2.1 — 지금은 `[GameThread]` 하나뿐이라 렌더·애니메이션 경로가 통째로 안 보인다)
 - [ ] 멀티카메라·2-in-flight에서도 정확한 GPU frame/submission 매핑
-- [ ] CPU/GPU/Rendering/Memory/GC counter가 같은 EngineFrameId에 정렬
+- [ ] CPU/GPU/Rendering/Memory/GC counter가 같은 engine_frame_id에 정렬
 - [ ] overflow·누락·malformed scope·profiler overhead 표시
 - [ ] `.ceprof` 저장/불러오기 round-trip 검증
 - [ ] profiler UI가 닫혀도 Development Player capture 가능

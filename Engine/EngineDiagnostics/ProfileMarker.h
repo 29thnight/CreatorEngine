@@ -1,0 +1,89 @@
+#pragma once
+// PHASE 14 P1 — 컴파일 타임 마커.
+//
+// 이벤트마다 문자열을 복사하지 않는다. 마커 이름은 NTTP(비타입 템플릿 인자)로
+// 받아 이름마다 정적 슬롯 하나가 생기고, hot path 에는 그 슬롯이 들고 있는
+// 정수 id 만 흐른다. 옛 코어가 필요로 했던 프레임당 이름 예산(16,384B)과
+// 누락 계수(DroppedNames)는 이 설계에서 **개념 자체가 없다**.
+//
+// 층 B(STL 표기, snake_case) — CodingConventions §4·§5.4.
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+
+namespace ce
+{
+	using marker_id = std::uint32_t;
+
+	// 등록되지 않은 마커. 0 을 유효 id 로 쓰지 않으므로 "빈 마커" 를 따로
+	// 표현할 수 있고, 계측이 꺼진 구성에서 스코프가 이 값을 들고 다녀도
+	// 수집기가 곧바로 걸러낸다.
+	inline constexpr marker_id invalid_marker = 0;
+
+	// 마커가 속한 갈래. 지금은 CPU 하나뿐이지만 P4(GPU)·P5(counter)가
+	// 같은 표를 쓰므로 자리를 먼저 둔다 — 나중에 값이 늘어도 id 는 안 바뀐다.
+	enum class marker_kind : std::uint8_t
+	{
+		cpu_scope = 0,
+		counter   = 1,
+		instant   = 2,
+	};
+
+	struct marker_desc
+	{
+		const char*  name = "";
+		const char*  file = nullptr;
+		std::uint32_t line = 0;
+		marker_kind  kind = marker_kind::cpu_scope;
+	};
+
+	namespace detail
+	{
+		// NTTP 로 받을 수 있는 문자열. 배열을 값으로 들고 다녀야 구조적
+		// 타입(structural type) 요건을 만족한다 — 포인터로는 NTTP 가 안 된다.
+		template <std::size_t N>
+		struct fixed_string
+		{
+			char value[N]{};
+
+			consteval fixed_string(const char (&literal)[N])
+			{
+				std::copy_n(literal, N, value);
+			}
+
+			constexpr const char* c_str() const { return value; }
+		};
+
+		// 등록은 여기 한 곳에서만 일어난다. registry 를 함수 지역 static 으로
+		// 들고 있으므로(ProfileMarker.cpp) **TU 간 정적 초기화 순서에
+		// 의존하지 않는다** — 어느 TU 의 슬롯이 먼저 깨어나든 그때 표가 선다.
+		marker_id intern_marker(const marker_desc& desc);
+
+		// 이름마다 하나씩 생기는 슬롯. inline 변수라 TU 가 몇 개든, 유니티
+		// 빌드가 청크를 어떻게 묶든 링커가 한 벌로 합친다. 그래서 같은 이름은
+		// 언제나 같은 id 이고, 이것이 §5.2 의 "동일 marker 가 여러 스레드에서
+		// 하나의 안정된 ID" 완료조건을 **자료구조로** 만족시킨다.
+		template <fixed_string Name, marker_kind Kind>
+		struct marker_slot
+		{
+			static inline const marker_id id =
+				intern_marker(marker_desc{ Name.c_str(), nullptr, 0, Kind });
+		};
+	}
+
+	// 정적 마커. 같은 이름은 어디서 불러도 같은 id 다.
+	//
+	//     ce::profile_scope _{ ce::marker<"AnimatorSystem">() };
+	template <detail::fixed_string Name, marker_kind Kind = marker_kind::cpu_scope>
+	inline marker_id marker()
+	{
+		return detail::marker_slot<Name, Kind>::id;
+	}
+
+	// 등록된 마커를 되읽는다. reader(UI·CLI·저장)만 쓴다 — hot path 에는
+	// 이 경로가 없다.
+	const marker_desc& marker_info(marker_id id);
+	std::span<const marker_desc> registered_markers();
+	std::uint32_t registered_marker_count();
+}
