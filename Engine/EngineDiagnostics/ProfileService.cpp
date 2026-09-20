@@ -223,6 +223,12 @@ namespace ce
 		return static_cast<std::uint32_t>(m_threadInfo.size());
 	}
 
+	std::vector<thread_info> profiler_service::threads() const
+	{
+		std::lock_guard<std::mutex> guard(m_streamLock);
+		return m_threadInfo;
+	}
+
 	thread_stream* profiler_service::current_stream()
 	{
 		thread_stream* stream = t_streams[m_serviceSlot];

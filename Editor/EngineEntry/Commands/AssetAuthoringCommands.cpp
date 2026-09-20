@@ -113,7 +113,6 @@
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
-#include "ProfilerSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
 #include "AssetIdentity/ModelAssetGenerationSelfTest.h"

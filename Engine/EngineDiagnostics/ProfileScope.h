@@ -20,7 +20,13 @@ namespace ce
 	// 엔진이 쓰는 라이브 서비스. 검사용 서비스는 자기 인스턴스를 따로 세운다.
 	profiler_service& profiler();
 
-#if defined(CE_SHIPPING)
+// ★ `defined(CE_SHIPPING)` 이 아니라 **값**을 본다. Directory.Build.targets 는
+//   두 구성 모두에서 이 매크로를 정의하고 값으로만 가른다
+//   (`CE_SHIPPING=1;CE_DEVELOPMENT=0` 또는 `CE_SHIPPING=0;CE_DEVELOPMENT=1`).
+//   그래서 defined() 로 물으면 Development 에서도 참이 되어 계측이 통째로
+//   빈 껍데기가 된다 — 실제로 그렇게 썼다가 에디터의 이벤트가 0 이 됐고,
+//   "수집은 도는데 이벤트만 0" 이라는 모양으로 게이트가 잡았다.
+#if CE_SHIPPING
 
 	class profile_scope
 	{

@@ -113,8 +113,7 @@
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
-#include "ProfilerSelfTest.h"
-#include "Profiler.h"
+#include "ProfileScope.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
@@ -649,141 +648,180 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
-    static CommandCore::CommandResult Cmd_profile_selftest(const ConsoleCommandContext& ctx)
-    {
-        using namespace CommandCore;
-        if (ctx.parts.size() != 1) return InvalidArguments("profile.selftest");
-        // 현행 CPU 프로파일러의 계약을 못박는 특성화 검사(PHASE 14 P0).
-        // 프레임 경계를 스스로 넘으므로 라이브 캡처를 교란한다 — 성능을 재는
-        // 도중에 부르지 말 것. 게임 스레드에서 도는 것은 Pump()가 보장한다.
-        std::string log;
-        const bool passed = RunProfilerSelfTest(log);
-
-        std::printf("%s", log.c_str());
-        if (passed)
-        {
-            Debug::PrintLog(spdlog::level::warn, std::string("[profile.selftest] 통과\n") + log);
-        }
-        else
-        {
-            // 실패는 반드시 로그 파일에도 남긴다 — 회귀 스크립트가 stdout
-            // 리다이렉트를 놓쳐도 판정 근거가 남아야 한다.
-            Debug::PrintLog(spdlog::level::err, std::string("[profile.selftest] 실패\n") + log);
-        }
-        std::printf("[CLI] profile.selftest %s\n", passed ? "통과" : "실패");
-        auto data = CommandData::Object();
-        data.Set("log", CommandData::String(std::move(log)));
-        return passed ? Ok({}, std::move(data)) : Fail("profile.selftest.failed", "Commandlet verification failed", std::move(data));
-    }
+    // profile.selftest 는 은퇴했다(PHASE 14 P1+P2). 옛 코어의 특성화 검사였고,
+    // 전역 싱글톤 하나를 공유하는 구조 때문에 라이브 캡처의 프레임 경계를 직접
+    // 넘겨야 했다 — 그 교란 때문에 이 명령 직후의 profile.stats 는 포화로 보였다.
+    // 새 코어는 서비스를 인스턴스로 세울 수 있어 엔진을 띄우지 않고 검사할 수
+    // 있다: Tools/regression/verify-profile-core.ps1 이 그 자리를 대신한다.
 
     static CommandCore::CommandResult Cmd_profile_stats(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
         if (ctx.parts.size() != 1) return InvalidArguments("profile.stats takes no arguments");
-        const auto stats = gCPUProfiler.GetStats();
-        const auto range = gCPUProfiler.GetFrameRange();
+
+        const ce::live_summary summary = ce::profiler().summary();
         auto data = CommandData::Object();
-        data.Set("paused", CommandData::Bool(gCPUProfiler.IsPaused()));
-        data.Set("frameBegin", CommandData::Int(range.Begin)); data.Set("frameEnd", CommandData::Int(range.End));
-        data.Set("ticksPerSecond", CommandData::Int(CPUProfiler::GetTicksPerSecond()));
-        data.Set("lastTickTicks", CommandData::Int(stats.LastTickTicks));
-        data.Set("peakTickTicks", CommandData::Int(stats.PeakTickTicks));
-        data.Set("totalTickTicks", CommandData::Int(stats.TotalTickTicks));
-        data.Set("tickCount", CommandData::Int(stats.TickCount));
-        data.Set("lastFrameEvents", CommandData::Int(stats.LastFrameEvents));
-        data.Set("peakFrameEvents", CommandData::Int(stats.PeakFrameEvents));
-        data.Set("eventCapacity", CommandData::Int(stats.EventCapacity));
-        data.Set("lastFrameNameBytes", CommandData::Int(stats.LastFrameNameBytes));
-        data.Set("peakFrameNameBytes", CommandData::Int(stats.PeakFrameNameBytes));
-        data.Set("nameCapacity", CommandData::Int(stats.NameCapacity));
-        data.Set("totalDroppedEvents", CommandData::Int(stats.TotalDroppedEvents));
-        data.Set("totalDroppedNames", CommandData::Int(stats.TotalDroppedNames));
-        data.Set("retiredThreads", CommandData::Int(stats.RetiredThreads));
-        data.Set("malformedScopes", CommandData::Int(stats.MalformedScopes));
+
+        // ★ 이름 예산 키(lastFrameNameBytes·peakFrameNameBytes·nameCapacity·
+        //   totalDroppedNames)는 **뺐다**. 새 코어는 마커 id 만 흘리므로 프레임마다
+        //   도는 이름 복사가 없고, 그래서 예산도 누락도 개념 자체가 없다. 0 을
+        //   내면 "예산이 있는데 안 쓴다" 로 읽히므로 거짓말이 된다.
+        data.Set("state", CommandData::String(
+            summary.state == ce::recorder_state::recording ? "recording" :
+            summary.state == ce::recorder_state::frozen ? "frozen" : "stopped"));
+        data.Set("paused", CommandData::Bool(summary.state != ce::recorder_state::recording));
+        data.Set("engineFrame", CommandData::Int(summary.engine_frame));
+
+        // 보존 구간. 옛 키 이름을 지킨다 — 하네스가 frameEnd > frameBegin 으로
+        // "프레임이 돌고 있다" 를 판정한다.
+        const std::uint32_t begin = (summary.engine_frame >= summary.retained_frames)
+            ? (summary.engine_frame - summary.retained_frames) : 0u;
+        data.Set("frameBegin", CommandData::Int(begin));
+        data.Set("frameEnd", CommandData::Int(summary.engine_frame));
+        data.Set("retainedFrames", CommandData::Int(summary.retained_frames));
+
+        data.Set("ticksPerSecond", CommandData::Int(ce::profiler_service::ticks_per_second()));
+        data.Set("lastFrameEvents", CommandData::Int(summary.last_frame_events));
+        data.Set("peakFrameEvents", CommandData::Int(summary.peak_frame_events));
+        data.Set("totalDroppedEvents", CommandData::Int(summary.dropped_events));
+        data.Set("malformedScopes", CommandData::Int(summary.unbalanced_scopes));
+        data.Set("registeredMarkers", CommandData::Int(summary.registered_markers));
+
+        // 용량은 이제 이름 예산이 아니라 청크 풀이다.
+        data.Set("chunkCount", CommandData::Int(summary.chunk_count));
+        data.Set("freeChunks", CommandData::Int(summary.free_chunks));
+        data.Set("memoryBytes", CommandData::Int(static_cast<std::int64_t>(summary.memory_bytes)));
+        data.Set("memoryBudget", CommandData::Int(static_cast<std::int64_t>(summary.memory_budget)));
+
+        // ★ 얼린 캡처가 아니라 **지금 등록된** 스레드를 낸다. 캡처는 pause()
+        //   뒤에만 있으므로, 녹화 중 기준선을 재는 이 명령이 캡처를 보면
+        //   스레드가 언제나 빈 배열이 된다(게이트가 그렇게 잡았다).
         auto threads = CommandData::Array();
-        for (const auto& thread : gCPUProfiler.GetThreads())
         {
-            auto entry = CommandData::Object();
-            entry.Set("index", CommandData::Int(thread.Index)); entry.Set("name", CommandData::String(thread.Name));
-            entry.Set("threadId", CommandData::Int(thread.ThreadID)); entry.Set("retired", CommandData::Bool(thread.pTLS == nullptr));
-            threads.Append(std::move(entry));
+            for (const ce::thread_info& thread : ce::profiler().threads())
+            {
+                auto entry = CommandData::Object();
+                entry.Set("index", CommandData::Int(thread.slot));
+                entry.Set("name", CommandData::String(thread.name));
+                entry.Set("threadId", CommandData::Int(thread.os_thread_id));
+                threads.Append(std::move(entry));
+            }
         }
+        data.Set("threadCount", CommandData::Int(summary.thread_count));
         data.Set("threads", std::move(threads));
         return Ok({}, std::move(data));
     }
 
-    // PHASE 14 임시 — 보존된 프레임의 이벤트를 그대로 낸다.
+    // 보존된 프레임의 이벤트를 그대로 낸다.
     //
     // `profile.stats` 는 프로파일러 **자체** 비용과 용량만 낸다. 어느 마커가 몇 ms
-    // 였는지는 ImGui 창에서만 보였고, 그래서 CLI·자동화·무인 실행이 프레임 드랍의
-    // 원인을 짚을 수단이 전혀 없었다 — 계측을 늘려도 읽을 창구가 없으면 늘린 것이
-    // 보이지 않는다. 데이터는 이미 코어 안에 있고(`GetEventsForThread`) 창구만
-    // 없었으므로 여기서 연다.
+    // 였는지는 창에서만 보였고, 그래서 CLI·자동화·무인 실행이 프레임 드랍의 원인을
+    // 짚을 수단이 전혀 없었다 — 계측을 늘려도 읽을 창구가 없으면 늘린 것이 보이지
+    // 않는다.
     //
-    // 보존 범위 전부를 낸다(현행 historySize 5 에서 읽히는 과거는 4프레임). 프레임
-    // 하나만 내면 "이 프레임이 느린 프레임인가"를 알 수 없다 — 드랍을 찾는 일은
-    // 프레임 사이의 차이를 보는 일이다.
+    // ★ 새 코어에서는 **얼린 캡처**를 읽는다. 녹화 중에는 링이 계속 자라므로
+    //   읽는 동안 자료가 변하는데, pause() 가 shared_ptr<const capture_session>
+    //   하나를 공개하면 그 뒤로는 엔진이 계속 돌아도 손에 든 것이 변하지 않는다.
     static CommandCore::CommandResult Cmd_profile_frame(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
         if (ctx.parts.size() != 1) return InvalidArguments("profile.frame takes no arguments");
 
-        const auto range = gCPUProfiler.GetFrameRange();
-        auto data = CommandData::Object();
-        data.Set("rangeBegin", CommandData::Int(range.Begin));
-        data.Set("rangeEnd", CommandData::Int(range.End));
-        data.Set("paused", CommandData::Bool(gCPUProfiler.IsPaused()));
+        // 읽으려면 얼려야 한다. 이미 얼어 있으면 그대로 쓴다.
+        const bool wasRecording = (ce::profiler().state() == ce::recorder_state::recording);
+        if (wasRecording)
+        {
+            ce::profiler().pause();
+        }
 
-        const double ticksPerSecond = static_cast<double>(CPUProfiler::GetTicksPerSecond());
+        ce::capture_session_ptr capture = ce::profiler().capture();
+        auto data = CommandData::Object();
+
+        const double ticksPerSecond = static_cast<double>(ce::profiler_service::ticks_per_second());
         const double toMs = (ticksPerSecond > 0.0) ? (1000.0 / ticksPerSecond) : 0.0;
 
         auto frames = CommandData::Array();
-        for (std::uint32_t frame = range.Begin; frame < range.End; ++frame)
+        std::uint32_t rangeBegin = 0;
+        std::uint32_t rangeEnd = 0;
+
+        if (capture && capture->frame_count() > 0)
         {
-            auto frameEntry = CommandData::Object();
-            frameEntry.Set("frame", CommandData::Int(frame));
+            rangeBegin = capture->frames().front().engine_frame;
+            rangeEnd = capture->frames().back().engine_frame + 1;
 
-            auto threadList = CommandData::Array();
-            for (const auto& thread : gCPUProfiler.GetThreads())
+            // 프레임이 많을 수 있으므로 최근 것만 낸다 — 드랍을 찾는 일은
+            // 프레임 사이의 차이를 보는 일이라 여러 개가 필요하지만,
+            // 600 프레임을 전부 JSON 으로 내면 읽는 쪽이 못 쓴다.
+            constexpr std::size_t kMaxReportedFrames = 8;
+            const std::span<const ce::frame_record> all = capture->frames();
+            const std::size_t first = (all.size() > kMaxReportedFrames)
+                ? (all.size() - kMaxReportedFrames) : 0;
+
+            for (std::size_t i = first; i < all.size(); ++i)
             {
-                // 은퇴 슬롯은 건너뛴다 — pTLS 가 null 이면 주인이 이미 죽었다.
-                if (nullptr == thread.pTLS) continue;
+                const ce::frame_record& record = all[i];
+                auto frameEntry = CommandData::Object();
+                frameEntry.Set("frame", CommandData::Int(record.engine_frame));
+                frameEntry.Set("droppedEvents", CommandData::Int(record.dropped_events));
 
-                const auto events = gCPUProfiler.GetEventsForThread(thread, frame);
-                if (events.empty()) continue;
-
-                auto eventList = CommandData::Array();
-                double rootMs = 0.0;
-                for (const auto& event : events)
+                // 스레드별로 나눈다. 이벤트에 thread_slot 이 박혀 있으므로
+                // 수집 시점에 정렬하지 않고 여기서 가른다.
+                auto threadList = CommandData::Array();
+                for (const ce::thread_info& thread : capture->threads())
                 {
-                    const double ms = (event.TicksEnd > event.TicksBegin)
-                        ? static_cast<double>(event.TicksEnd - event.TicksBegin) * toMs
-                        : 0.0;
-                    // 깊이 0 만 더한다. 중첩 구간을 전부 더하면 합이 프레임을 넘는다.
-                    if (0 == event.Depth) rootMs += ms;
+                    auto eventList = CommandData::Array();
+                    double rootMs = 0.0;
+                    std::size_t count = 0;
 
-                    auto eventEntry = CommandData::Object();
-                    eventEntry.Set("name", CommandData::String(
-                        nullptr != event.pName ? event.pName : "(null)"));
-                    eventEntry.Set("depth", CommandData::Int(event.Depth));
-                    eventEntry.Set("ms", CommandData::Double(ms));
-                    eventList.Append(std::move(eventEntry));
+                    for (const ce::profile_event& event : record.events)
+                    {
+                        if (event.thread_slot != thread.slot) continue;
+
+                        const double ms = (event.tick_end > event.tick_begin)
+                            ? static_cast<double>(event.tick_end - event.tick_begin) * toMs
+                            : 0.0;
+                        // 깊이 0 만 더한다. 중첩 구간을 전부 더하면 합이 프레임을 넘는다.
+                        if (0 == event.depth) rootMs += ms;
+
+                        auto eventEntry = CommandData::Object();
+                        eventEntry.Set("name", CommandData::String(ce::marker_info(event.marker).name));
+                        eventEntry.Set("depth", CommandData::Int(event.depth));
+                        eventEntry.Set("ms", CommandData::Double(ms));
+                        eventEntry.Set("startFrame", CommandData::Int(event.frame));
+                        if (ce::has_flag(event.flags, ce::event_flags::truncated_end))
+                        {
+                            eventEntry.Set("truncatedEnd", CommandData::Bool(true));
+                        }
+                        eventList.Append(std::move(eventEntry));
+                        ++count;
+                    }
+
+                    if (0 == count) continue;
+
+                    auto threadEntry = CommandData::Object();
+                    threadEntry.Set("index", CommandData::Int(thread.slot));
+                    threadEntry.Set("name", CommandData::String(thread.name));
+                    threadEntry.Set("count", CommandData::Int(static_cast<std::int64_t>(count)));
+                    threadEntry.Set("rootMs", CommandData::Double(rootMs));
+                    threadEntry.Set("events", std::move(eventList));
+                    threadList.Append(std::move(threadEntry));
                 }
 
-                auto threadEntry = CommandData::Object();
-                threadEntry.Set("index", CommandData::Int(thread.Index));
-                threadEntry.Set("name", CommandData::String(thread.Name));
-                threadEntry.Set("count", CommandData::Int(static_cast<std::int64_t>(events.size())));
-                threadEntry.Set("rootMs", CommandData::Double(rootMs));
-                threadEntry.Set("events", std::move(eventList));
-                threadList.Append(std::move(threadEntry));
+                frameEntry.Set("threads", std::move(threadList));
+                frames.Append(std::move(frameEntry));
             }
-
-            frameEntry.Set("threads", std::move(threadList));
-            frames.Append(std::move(frameEntry));
         }
 
+        data.Set("rangeBegin", CommandData::Int(rangeBegin));
+        data.Set("rangeEnd", CommandData::Int(rangeEnd));
+        data.Set("paused", CommandData::Bool(true));
         data.Set("frames", std::move(frames));
+
+        // 읽기 위해 멈췄다면 다시 연다 — 관측이 관측 대상을 멈춰 두면 안 된다.
+        if (wasRecording)
+        {
+            ce::profiler().record(ce::profiler().summary().engine_frame);
+        }
         return Ok({}, std::move(data));
     }
 
@@ -1286,7 +1324,6 @@ namespace ConsoleCmd
     {
         reg.Result({ "shadermeta.probe" }, &Cmd_shadermeta_probe);
         reg.Result({ "pix.capture" }, &Cmd_pix_capture);
-        reg.Result({ "profile.selftest" }, &Cmd_profile_selftest);
         reg.Result({ "profile.stats" }, &Cmd_profile_stats);
         reg.Result({ "profile.frame" }, &Cmd_profile_frame);
         // ★ 별칭이 아니라 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).

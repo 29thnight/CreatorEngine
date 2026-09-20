@@ -21,7 +21,7 @@
 #include "AuthoringParsedDocument.h"
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
 #include "RegisterReflectManual.h" // CT4: 명시 메타 이전 타입의 등록 (def 스캔 밖)
-#include "Profiler.h"
+#include "ProfileScope.h"
 #include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
 #include "InputActionManager.h"
 #include "TagManager.h"
@@ -351,9 +351,14 @@ void SceneManager::ApplyPendingSceneStructureChange()
     {
         auto activeScenePtr = m_activeScene.load();
         if (!activeScenePtr) return;
-        PROFILE_CPU_BEGIN("BeginPlayTransaction");
-        const bool committed = BeginPlayTransaction();
-        PROFILE_CPU_END();
+        // 선언이 스코프 밖에서 쓰이므로 블록으로 감싸지 않는다. RAII 라
+        // 어차피 문장 끝이 아니라 **스코프 끝**에서 닫히므로, 여기서는
+        // 호출 자체를 감싼 즉시 실행 람다가 가장 정직하다.
+        const bool committed = [this]
+        {
+            ce::profile_scope _profile{ ce::marker<"BeginPlayTransaction">() };
+            return BeginPlayTransaction();
+        }();
         if (!committed)
         {
             // 요청을 되돌린다(W5 선행 1). 예전에는 스냅샷이 실패해도 여기까지
@@ -363,9 +368,10 @@ void SceneManager::ApplyPendingSceneStructureChange()
             SetGameStart(false);
             return;
         }
-        PROFILE_CPU_BEGIN("Reset");
-        activeScenePtr->Reset();
-        PROFILE_CPU_END();
+        {
+            ce::profile_scope _profile{ ce::marker<"Reset">() };
+            activeScenePtr->Reset();
+        }
 		m_isEditorSceneLoaded = true;
         // 확정은 맨 끝이다. 이 줄이 참이면 위의 전부가 끝났다는 뜻이라야
         // 읽는 쪽이 하나만 보고 판단할 수 있다.
@@ -373,30 +379,32 @@ void SceneManager::ApplyPendingSceneStructureChange()
     }
     else if (!m_isGameStart && m_isEditorSceneLoaded)
     {
-        PROFILE_CPU_BEGIN("EndPlayTransaction");
-        EndPlayTransaction();
-        PROFILE_CPU_END();
+        {
+            ce::profile_scope _profile{ ce::marker<"EndPlayTransaction">() };
+            EndPlayTransaction();
+        }
     }
 }
 
 void SceneManager::Editor()
 {
-    PROFILE_CPU_BEGIN("Editor");
-
-    // 재생/정지 전환은 여기서 하지 않는다. 렌더 스레드가 도는 중이기 때문이다.
-    // Dx11Main이 렌더 배리어 사이에서 ApplyPendingSceneStructureChange를 부른다.
-
-    if (!m_isGameStart)
     {
-        auto activeScenePtr = m_activeScene.load();
-        if (!activeScenePtr) return;
-        // Sweep DDOL bucket for destroyed objects
-		std::erase_if(m_dontDestroyOnLoadObjects, [](Object* o){ return !o || o->IsDestroyMark(); });
-		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
-        m_isInitialized = false; // Reset initialization state for editor scene
-        activeScenePtr->DrainPendingLifecycle();
-	}
-    PROFILE_CPU_END();
+        ce::profile_scope _profile{ ce::marker<"Editor">() };
+
+        // 재생/정지 전환은 여기서 하지 않는다. 렌더 스레드가 도는 중이기 때문이다.
+        // Dx11Main이 렌더 배리어 사이에서 ApplyPendingSceneStructureChange를 부른다.
+
+        if (!m_isGameStart)
+        {
+            auto activeScenePtr = m_activeScene.load();
+            if (!activeScenePtr) return;
+            // Sweep DDOL bucket for destroyed objects
+    		std::erase_if(m_dontDestroyOnLoadObjects, [](Object* o){ return !o || o->IsDestroyMark(); });
+    		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
+            m_isInitialized = false; // Reset initialization state for editor scene
+            activeScenePtr->DrainPendingLifecycle();
+    	}
+    }
 }
 
 void SceneManager::Initialization()
@@ -414,45 +422,52 @@ void SceneManager::Initialization()
     // 옛 Awake→OnEnable→Start 3단은 뒤의 둘이 빈 함수라 사실상 드레인 하나였다
     // (트랙 C · C4). 활성 전이는 Component::SetEnabled가 그 자리에서 처리하고,
     // OnBeginSimulation은 이 드레인이 PendingSimulation까지 소진한다.
-    PROFILE_CPU_BEGIN("DrainPendingLifecycle");
-	m_activeScene.load()->DrainPendingLifecycle();
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"DrainPendingLifecycle">() };
+    	m_activeScene.load()->DrainPendingLifecycle();
+    }
 }
 
 void SceneManager::Physics(float deltaSecond)
 {
     if (!m_activeScene) return;
-    PROFILE_CPU_BEGIN("FixedUpdate");
-    m_activeScene.load()->FixedUpdate(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"FixedUpdate">() };
+        m_activeScene.load()->FixedUpdate(deltaSecond);
+    }
 }
 
 void SceneManager::InputEvents(float deltaSecond)
 {
-    PROFILE_CPU_BEGIN("InputEvents");
-    InputEvent.Broadcast(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"InputEvents">() };
+        InputEvent.Broadcast(deltaSecond);
+    }
 }
 
 void SceneManager::GameLogic(float deltaSecond)
 {
     if (!m_activeScene) return;
 
-    PROFILE_CPU_BEGIN("Update");
-    m_activeScene.load()->Update(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"Update">() };
+        m_activeScene.load()->Update(deltaSecond);
+    }
 
-    PROFILE_CPU_BEGIN("YieldNull");
-    m_activeScene.load()->YieldNull();
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"YieldNull">() };
+        m_activeScene.load()->YieldNull();
+    }
 
-    PROFILE_CPU_BEGIN("InternalAnimationUpdateEvent");
-    InternalAnimationUpdateEvent.Broadcast(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"InternalAnimationUpdateEvent">() };
+        InternalAnimationUpdateEvent.Broadcast(deltaSecond);
+    }
 
-    PROFILE_CPU_BEGIN("LateUpdate");
-    m_activeScene.load()->LateUpdate(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"LateUpdate">() };
+        m_activeScene.load()->LateUpdate(deltaSecond);
+    }
 }
 
 void SceneManager::SceneRendering(float deltaSecond)
@@ -472,10 +487,11 @@ void SceneManager::GUIRendering()
 
 void SceneManager::EndOfFrame()
 {
-    PROFILE_CPU_BEGIN("EndOfFrame");
-	CoroutineManagers->yield_WaitForEndOfFrame();
-    endOfFrameEvent.Broadcast();
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };
+    	CoroutineManagers->yield_WaitForEndOfFrame();
+        endOfFrameEvent.Broadcast();
+    }
 
     // Sweep DDOL bucket for destroyed objects
 	std::erase_if(m_dontDestroyOnLoadObjects, [](Object* o){ return !o || o->IsDestroyMark(); });
@@ -1401,13 +1417,14 @@ bool SceneManager::CaptureSceneSnapshot()
 
     try
     {
-        PROFILE_CPU_BEGIN("Serialize");
-        // 편집 중이던 최신 값이 담기도록 직렬화한다. 스크립트를 재우지 않는
-        // 이유는 사본이 없어 두 벌이 생기지 않기 때문이다 — 지금 씬의 인스턴스가
-        // 그대로 플레이 인스턴스가 된다.
-		m_editorSceneBackup = Authoring::DocumentAccess::Adopt(
-			Meta::SerializeDocument(scene));
-        PROFILE_CPU_END();
+        {
+            ce::profile_scope _profile{ ce::marker<"Serialize">() };
+            // 편집 중이던 최신 값이 담기도록 직렬화한다. 스크립트를 재우지 않는
+            // 이유는 사본이 없어 두 벌이 생기지 않기 때문이다 — 지금 씬의 인스턴스가
+            // 그대로 플레이 인스턴스가 된다.
+    		m_editorSceneBackup = Authoring::DocumentAccess::Adopt(
+    			Meta::SerializeDocument(scene));
+        }
     }
     catch (const std::exception& e)
     {
@@ -1462,40 +1479,41 @@ bool SceneManager::RestoreSceneSnapshot()
 
     try
     {
-		PROFILE_CPU_BEGIN("RestoreEditorScene");
-		LoadIndexBatch loadBatch;
-		[[maybe_unused]] auto hierarchyTransaction =
-			scene->BeginHierarchyBulkBuild();
-        for (const Authoring::ReadNode objNode : SerializedEntities(
-            Authoring::DocumentAccess::Read(m_editorSceneBackup)))
-        {
-            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-            if (!type)
-            {
-                Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
-                continue;
-            }
-
-            if (objNode["m_instanceID"] &&
-                survivingIds.contains(objNode["m_instanceID"].As<size_t>()))
-            {
-                continue;
-            }
-
-            DesirealizeGameObject(type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
-        }
-        RemapLoadBatchIndices(scene, loadBatch);
-
-        // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — DDOL로 살아남아
-        // 되먹인 오브젝트(survivingIds로 걸러짐)는 이미 등록돼 있으니 중복 등록은
-        // RegisterInstance의 existing-check가 걸러준다.
-		for (const auto& entry : loadBatch)
 		{
-			ReconnectPrefabInstance(scene, entry.object);
-		}
-		hierarchyTransaction.Complete();
+			ce::profile_scope _profile{ ce::marker<"RestoreEditorScene">() };
+			LoadIndexBatch loadBatch;
+			[[maybe_unused]] auto hierarchyTransaction =
+				scene->BeginHierarchyBulkBuild();
+	        for (const Authoring::ReadNode objNode : SerializedEntities(
+	            Authoring::DocumentAccess::Read(m_editorSceneBackup)))
+	        {
+	            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+	            if (!type)
+	            {
+	                Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
+	                continue;
+	            }
 
-		PROFILE_CPU_END();
+	            if (objNode["m_instanceID"] &&
+	                survivingIds.contains(objNode["m_instanceID"].As<size_t>()))
+	            {
+	                continue;
+	            }
+
+	            DesirealizeGameObject(type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
+	        }
+	        RemapLoadBatchIndices(scene, loadBatch);
+
+	        // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — DDOL로 살아남아
+	        // 되먹인 오브젝트(survivingIds로 걸러짐)는 이미 등록돼 있으니 중복 등록은
+	        // RegisterInstance의 existing-check가 걸러준다.
+			for (const auto& entry : loadBatch)
+			{
+				ReconnectPrefabInstance(scene, entry.object);
+			}
+			hierarchyTransaction.Complete();
+
+		}
 
         // InScene으로 되돌린다(트랙 L1) — 방금 복원한 오브젝트는 GameObject
         // 생성자의 기본값이 이미 InScene이지만, DDOL이라 파괴 없이 살아남은
@@ -1577,9 +1595,10 @@ bool SceneManager::BeginPlayTransaction()
     // 함수는 Player도 타므로(Player의 유일한 재생 진입 경로다) 출하 게임이
     // 매번 Undo를 비우고 있었다. 지금은 통지만 하고, EditorPlayModeController가
     // 구독해 그 일을 한다. Player는 구독자가 없어 아무 일도 일어나지 않는다.
-    PROFILE_CPU_BEGIN("PlayModeEvent(enter)");
-    PlayModeEvent.Broadcast(true);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"PlayModeEvent(enter)">() };
+        PlayModeEvent.Broadcast(true);
+    }
     return true;
 }
 

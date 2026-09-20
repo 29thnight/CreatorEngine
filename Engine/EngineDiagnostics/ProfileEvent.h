@@ -54,6 +54,12 @@ namespace ce
 		profile_tick  tick_end = 0;
 		marker_id     marker = invalid_marker;
 		std::uint32_t frame = 0;      // 이 구간이 **시작한** 엔진 프레임
+
+		// ★ 귀속은 이벤트가 들고 다닌다. 청크에만 두면 수집기가 이벤트를
+		//   프레임 벡터로 옮기는 순간 어느 스레드의 것인지 잃는다 —
+		//   그것이 옛 코어가 수집 시점에 스팬을 정렬해야 했던 이유이고,
+		//   그 정렬의 부등호 하나가 스레드를 통째로 사라지게 했다.
+		std::uint16_t thread_slot = 0;
 		std::uint16_t depth = 0;
 		event_flags   flags = event_flags::none;
 		std::uint8_t  reserved = 0;

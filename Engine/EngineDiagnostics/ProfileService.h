@@ -79,6 +79,10 @@ namespace ce
 		void unregister_thread();
 		std::uint32_t thread_count() const;
 
+		// 지금 등록되어 있는 스레드. 얼린 캡처가 없어도 읽힌다 — 녹화 중에
+		// 스레드가 잡히고 있는지 보는 것이 라이브 기준선의 축 하나다.
+		std::vector<thread_info> threads() const;
+
 		// --- 기록 --------------------------------------------------------
 		// hot path. 상태가 recording 이 아니면 곧바로 돌아온다.
 		void begin_scope(marker_id id);

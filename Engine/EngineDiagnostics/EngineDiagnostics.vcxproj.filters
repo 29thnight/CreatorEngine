@@ -11,19 +11,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Profiler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ProfilerSelfTest.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Profiler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ProfilerSelfTest.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

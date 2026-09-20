@@ -15,8 +15,8 @@
     5.1은 이를 시스템 코드페이지로 읽어 한글이 깨진 채 정규식 판정이 어긋난다.
 
 .PARAMETER Action
-    SelfTest  프로파일러 특성화 검사(기본)
-    Stats     프로파일러 자체 비용만 출력(교란 없음)
+    Stats     라이브 기준선(기본, 교란 없음)
+              코어 계약 검사는 Tools/regression/verify-profile-core.ps1 이 맡는다
     Build     Debug|x64 빌드만 수행
 
 .EXAMPLE
@@ -25,8 +25,8 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("SelfTest", "Stats", "Build")]
-    [string]$Action = "SelfTest",
+    [ValidateSet("Stats", "Build")]
+    [string]$Action = "Stats",
 
     [string]$Exe,
 
@@ -114,45 +114,15 @@ function Invoke-EngineScript {
     }
 }
 
-function Invoke-SelfTest {
-    $result = Invoke-EngineScript -Label "profile-selftest" -Commands @(
-        "# PHASE 14 P0 — CPU 프로파일러 특성화 검사"
-        "wait $WarmupFrames"
-        # profile.stats 를 따로 부르지 않는다 — RunProfilerSelfTest 가 자기 리포트 끝에
-        # GetProfilerStatsReport() 를 붙인다. 제품 명령이 JSON 으로 바뀐 뒤(9-06) 이 줄은
-        # 아무 텍스트도 내지 않으면서 selftest 리포트에 실린 **교란된** 값이 그 자리를
-        # 메워 왔다. 라이브 기준선은 -Action Stats 단독으로만 잰다.
-        "profile.selftest"
-        "quit"
-    )
-
-    # 검사 본문을 그대로 보여준다. 통과/실패보다 항목별 실측값이 쓸모 있다.
-    $body = $result.Combined
-    $start = $body.IndexOf("[profile.selftest]")
-    if ($start -ge 0) {
-        Write-Host ""
-        Write-Host $body.Substring($start)
-    }
-
-    $ok = $body -match "PROFILE_SELFTEST_OK=true"
-    $crashed = $body -match "미처리 예외"
-    $exitOk = ($result.ExitCode -eq 0)
-
-    Write-Host ""
-    Write-Host "── 판정 ─────────────────────────────"
-    Write-Host ("  종료 코드      {0}" -f $(if ($exitOk) { "0 (정상)" } else { "$($result.ExitCode) (비정상)" }))
-    Write-Host ("  성공 마커      {0}" -f $(if ($ok) { "PROFILE_SELFTEST_OK=true" } else { "없음" }))
-    Write-Host ("  크래시         {0}" -f $(if ($crashed) { "미처리 예외 발견" } else { "없음" }))
-    Write-Host ("  전체 출력      {0}" -f $result.OutFile)
-
-    if ($ok -and $exitOk -and -not $crashed) {
-        Write-Host "  결과           통과" -ForegroundColor Green
-        return 0
-    }
-
-    Write-Host "  결과           실패" -ForegroundColor Red
-    return 1
-}
+# Invoke-SelfTest 는 은퇴했다(PHASE 14 P1+P2). 그것은 `profile.selftest` 명령을
+# 불렀고, 그 명령은 옛 코어의 특성화 검사였다 — 전역 싱글톤 하나를 공유하는
+# 구조라 검사 전용 인스턴스를 세울 수 없어 **라이브 캡처의 프레임 경계를 직접
+# 넘겨야** 했고, 그래서 이 검사 직후에 stats 를 재면 예산 100% 포화로 보였다.
+#
+# 새 코어는 서비스를 인스턴스로 세울 수 있어 엔진을 띄우지 않고 검사한다:
+#   pwsh Tools/regression/verify-profile-core.ps1
+# 코어만 cl 로 링크해 Debug·Release 각각 초 단위로 돌고, 변이 셋으로 이빨까지
+# 증명한다. 이 파일에 남은 축은 **라이브 기준선**(-Action Stats) 하나다.
 
 function Invoke-Stats {
     $result = Invoke-EngineScript -Label "profile-stats" -Commands @(
@@ -184,41 +154,43 @@ function Invoke-Stats {
     }
 
     $d = $json.data
-    $tps = [double]$d.ticksPerSecond
-    $toMs = if ($tps -gt 0) { 1000.0 / $tps } else { 0.0 }
 
     Write-Host ""
     Write-Host "[profile.stats] 라이브 기준선 (교란 없음)"
-    Write-Host ("  상태            {0} / 보존 프레임 [{1}, {2})" -f $(if ($d.paused) { "일시정지" } else { "기록 중" }), $d.frameBegin, $d.frameEnd)
-    Write-Host ("  Tick 비용       평균 {0:N1}us / 최대 {1:N1}us  ({2}회)" -f `
-        $(if ($d.tickCount -gt 0) { $d.totalTickTicks * $toMs * 1000.0 / $d.tickCount } else { 0 }), `
-        ($d.peakTickTicks * $toMs * 1000.0), $d.tickCount)
-    Write-Host ("  이벤트/프레임   마지막 {0} / 최대 {1} / 상한 {2}" -f $d.lastFrameEvents, $d.peakFrameEvents, $d.eventCapacity)
-    Write-Host ("  이름 바이트     마지막 {0} / 최대 {1} / 상한 {2}" -f $d.lastFrameNameBytes, $d.peakFrameNameBytes, $d.nameCapacity)
-    Write-Host ("  누적 누락       이벤트 {0} / 이름 {1}" -f $d.totalDroppedEvents, $d.totalDroppedNames)
+    Write-Host ("  상태            {0} / 보존 프레임 {1}개 (최신 {2})" -f $d.state, $d.retainedFrames, $d.frameEnd)
+    Write-Host ("  이벤트/프레임   마지막 {0} / 최대 {1}" -f $d.lastFrameEvents, $d.peakFrameEvents)
+    Write-Host ("  등록 마커       {0}" -f $d.registeredMarkers)
+    Write-Host ("  청크 풀         여유 {0} / {1}" -f $d.freeChunks, $d.chunkCount)
+    Write-Host ("  캡처 메모리     {0:N2} MiB / {1:N0} MiB" -f ($d.memoryBytes / 1MB), ($d.memoryBudget / 1MB))
+    Write-Host ("  누적 누락       이벤트 {0}" -f $d.totalDroppedEvents)
     Write-Host ("  불균형 스코프   {0}" -f $d.malformedScopes)
-    Write-Host ("  스레드 슬롯     {0}개" -f $d.threads.Count)
+    Write-Host ("  스레드          {0}개" -f $d.threadCount)
     foreach ($t in $d.threads) {
-        Write-Host ("    [{0}] {1,-24} tid={2}{3}" -f $t.index, $t.name, $t.threadId, $(if ($t.retired) { " (은퇴)" } else { "" }))
+        Write-Host ("    [{0}] {1,-24} tid={2}" -f $t.index, $t.name, $t.threadId)
     }
 
     # ── 단정 ────────────────────────────────────────────────────────────────
     #
-    # ⚠ 드롭·포화를 단정하지 않는다. 실측(9-15)에서 편집 27 / 재생 34 이벤트로
-    #   상한 1024 의 3% 였고 이름도 525B/16384B 였다. 계측 지점 39곳이 전부 시스템
-    #   단위 고정 지점이라 씬에 무엇을 얹어도 상수이므로, 그 단정은 **어떤 변이로도
+    # ⚠ 드롭·포화를 단정하지 않는다. 계측 지점이 전부 시스템 단위 고정 지점이라
+    #   씬에 무엇을 얹어도 이벤트 수가 상수이므로, 그 단정은 **어떤 변이로도
     #   자극되지 않는 빈 단정**이다. 값은 위에 찍되 판정에서는 뺀다.
     #
-    # ⚠ 이벤트 수의 **정확한 값**도 아직 단정하지 않는다. PHASE 14 임시 계측이
-    #   들어가 있는 동안에는 값이 유동적이다. 임시 계측을 정리하고 새 수집 코어로
-    #   넘어갈 때 정확값(편집/재생 두 축)을 여기에 못 박는다 — 계획서 §10 P1b.
+    # ⚠ 이벤트 수의 **절대값**은 단정하지 않는다(2026-09-20 실측). 이 축은 남의
+    #   임시 계측이 드나들 때마다 움직인다 — 9-15 의 27 이 임시 계측 12곳 때문에
+    #   38 이 됐고, 걷으니 다시 27 로 돌아왔다. 절대 숫자를 박으면 멀쩡한 변경이
+    #   붉어지고, 우연히 수가 맞으면 마커가 끊긴 변경이 통과한다.
+    #
+    # ★ 이름 예산 단정은 **대상이 사라져서** 뺐다. 새 코어는 마커 id 만 흘리므로
+    #   프레임마다 도는 이름 복사가 없고, 예산도 누락 계수도 개념 자체가 없다.
     $failures = New-Object System.Collections.Generic.List[string]
     if ($json.status -ne 'succeeded') { $failures.Add("status=$($json.status)") }
-    if ($d.frameEnd -le $d.frameBegin) { $failures.Add("보존 프레임이 비었다 [$($d.frameBegin), $($d.frameEnd))") }
-    if ($d.lastFrameEvents -le 0)      { $failures.Add("이벤트가 0이다 — 계측이 통째로 죽었다") }
-    if ($d.malformedScopes -ne 0)      { $failures.Add("불균형 스코프 $($d.malformedScopes) — Begin/End 짝이 깨졌다") }
-    if (-not ($d.threads | Where-Object { $_.name -eq '[GameThread]' -and -not $_.retired })) {
-        $failures.Add("[GameThread] 슬롯이 살아 있지 않다")
+    if ($d.retainedFrames -le 0)      { $failures.Add("보존 프레임이 0이다 - 수집이 돌지 않았다") }
+    if ($d.lastFrameEvents -le 0)     { $failures.Add("이벤트가 0이다 - 계측이 통째로 죽었다") }
+    if ($d.registeredMarkers -le 0)   { $failures.Add("등록된 마커가 0이다 - 마커 등록이 끊겼다") }
+    if ($d.malformedScopes -ne 0)     { $failures.Add("불균형 스코프 $($d.malformedScopes) - 스코프 짝이 깨졌다") }
+    if ($d.freeChunks -le 0)          { $failures.Add("청크 풀이 고갈됐다 - 수집이 막히고 있다") }
+    if (-not ($d.threads | Where-Object { $_.name -eq '[GameThread]' })) {
+        $failures.Add("[GameThread] 가 캡처에 없다")
     }
     if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
 
@@ -237,5 +209,4 @@ function Invoke-Stats {
 switch ($Action) {
     "Build" { Invoke-Build; exit 0 }
     "Stats" { exit (Invoke-Stats) }
-    "SelfTest" { exit (Invoke-SelfTest) }
 }

@@ -169,6 +169,8 @@ namespace ce
 		}
 
 		m_writer->events[m_writer->count] = value;
+		m_writer->events[m_writer->count].thread_slot =
+			static_cast<std::uint16_t>(m_info.slot);
 		++m_writer->count;
 		++m_sequence;
 	}

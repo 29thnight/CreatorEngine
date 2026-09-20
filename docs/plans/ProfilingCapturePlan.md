@@ -147,6 +147,63 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 - **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
   "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
 
+### 0.5.8 2026-09-20 P1+P2 착지 — 옛 코어를 걷었다
+
+P1 과 P2 를 한 덩어리로 지었다. 재활용하지 않기로 한 이상(§0.5.3) 옛 소유권
+모델로 먼저 짓고 나중에 갈아끼우는 것은 두 번 짓는 일이기 때문이다.
+
+**걷은 것.** `Profiler.{h,cpp}`(781줄) · `ProfilerSelfTest.{h,cpp}`(660줄) ·
+`ProfilerWindow.cpp`(557줄) · `profile.selftest` 명령 · `PROFILE_CPU_*` 매크로
+일습. 저장소에 옛 심볼은 **0건**이다.
+
+**선 것.** `ProfileMarker`(NTTP 정적 슬롯) · `ProfileEvent`/`ProfileThreadStream`
+(sealed chunk handoff) · `ProfileCapture`(rolling ring · immutable reader) ·
+`ProfileService`(스트림 소유 · recorder 상태머신 · 프레임 시계) ·
+`ProfileScope`(RAII 표기).
+
+**완료조건 — 마커 집합이 보존됐다.** 교체 직전 값을 그 자리에서 떠서 직후와
+맞댔다(§10 P1b 가 요구한 동수 단정). 옛 코어 27 · 새 코어 26 인데, 차이는
+**`CPU Frame` 하나뿐**이고 집합 대조에서 그 외에는 양쪽 모두 0 이다.
+`CPU Frame` 은 옛 `Tick()` 이 프레임마다 자동으로 끼워 넣던 루트 이벤트이고,
+새 코어는 프레임 시간을 `frame_record::tick_begin/tick_end` 가 직접 들고 있어
+그 이벤트가 필요 없다. 즉 **호출부 39곳이 전부 이어졌다**.
+
+**engine_frame_id 가 통합됐다.** `publish_frame(Time->GetFrameCount())` —
+프로파일러가 자기 카운터를 따로 세지 않는다. §2.1 표의 정본 판정을 그대로 썼다.
+
+**착지하며 잡은 결함 넷.** 전부 게이트가 먼저 잡았다.
+
+1. `profile_scope` 가 전역 서비스에만 찍어, 인스턴스로 세운 서비스에는 아무것도
+   들어가지 않았다 — 격리 설계가 반쪽이었다(코어 프로브가 잡았다).
+2. `record()` 가 시작 프레임을 받지 않아 첫 스코프들이 "아직 모르는" 프레임에
+   기록되고 닫을 때 붙는 라벨과 어긋났다(코어 프로브).
+3. ★ **`#if defined(CE_SHIPPING)` 이 Development 에서도 참이었다.**
+   `Directory.Build.targets` 는 두 구성 **모두**에서 이 매크로를 정의하고 값으로만
+   가른다(`CE_SHIPPING=0;CE_DEVELOPMENT=1`). 그래서 Debug 에디터의 계측이 통째로
+   빈 껍데기였고, "수집은 도는데 이벤트만 0" 이라는 모양으로 라이브 기준선이
+   잡았다. `#if CE_SHIPPING` 으로 고쳤다.
+4. `profile_event` 가 `thread_slot` 을 들고 있지 않아, 이벤트가 청크를 떠나
+   프레임 벡터로 옮겨지는 순간 스레드 귀속을 잃었다. 귀속을 이벤트에 실었다 —
+   옛 코어가 수집 시점에 스팬을 정렬해야 했던 이유가 이것이고, 그 정렬의 부등호
+   하나가 스레드를 통째로 사라지게 했다.
+
+**검사 표면이 바뀌었다.** `profile.selftest` 와 `Invoke-ProfilingValidation
+-Action SelfTest` 는 은퇴했다. 옛 selftest 는 전역 싱글톤을 공유하는 구조 때문에
+라이브 캡처의 프레임 경계를 직접 넘겨야 했고, 그 교란이 stats 를 못 믿게 만들었다.
+새 코어는 서비스를 인스턴스로 세울 수 있어 **엔진을 띄우지 않고** 검사한다 —
+`Tools/regression/verify-profile-core.ps1` 이 Debug·Release 각각 36 검사를 초
+단위로 돌리고 변이 셋으로 이빨을 증명한다. `-Action Stats` 는 라이브 기준선
+하나로 남았고, 이름 예산 단정은 **대상이 사라져서** 뺐다.
+
+**P3 로 넘긴 것.** `ProfilerWindow` 는 지금 요약과 녹화 제어만 낸다(빈 창을 두면
+계측이 살아 있는지 에디터에서 볼 수단이 P3 까지 사라진다). 타임라인·Hierarchy·
+프레임 선택이 P3 의 몫이다.
+
+**아직 하지 않은 것.** 워커 스레드 등록(P2 완료조건의 마지막 항목). sealed chunk
+handoff 가 섰으므로 이제 **안전하게** 붙일 수 있다 — enkiTS `threadnum_` 을 슬롯
+키로 쓴다. 애니메이션 워커의 시간이 캡처에 나타나는 것이 PHASE 13 §4 의 판정
+수단이다.
+
 ### 0.5.7 2026-09-20 정찰 최신화 — 전제 다섯이 또 바뀌었다
 
 닷새 만에 다시 쟀다. 착수 전 정찰은 한 번 적고 끝나는 것이 아니다.

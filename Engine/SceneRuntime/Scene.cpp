@@ -190,7 +190,7 @@ struct TransformExecutionGraphState
 
 using namespace std::literals;
 
-#include "Profiler.h"
+#include "ProfileScope.h"
 
 // ===== 유틸: 중복 없이 push_back =====
 template<class R, class T>
@@ -2072,9 +2072,10 @@ void Scene::UpdateRenderData()
     // 스레드풀에 넣지 않는다. ProxyCommand 생성자들이 RenderScene의 프록시·
     // 애니메이터 맵을 만지는데 그 락 규약은 아직 전수 검증되지 않았다(구조
     // 분석의 CRITICAL ①). 병렬화는 프로파일이 요구할 때 별도로 다룬다.
-    PROFILE_CPU_BEGIN("CommitRenderProxies");
-    CommitRenderProxies();
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"CommitRenderProxies">() };
+        CommitRenderProxies();
+    }
 
     // ── 워커 UI 푸시 파이프라인을 걷었다 (2026-08-20 전수 추적) ──
     //
@@ -2560,13 +2561,15 @@ void Scene::FixedUpdate(float deltaSecond)
     {
         DrainAIUpdate();
     }
-    PROFILE_CPU_BEGIN("AllUpdateWorldMatrix");
-	AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"AllUpdateWorldMatrix">() };
+    	AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
+    }
 
-    PROFILE_CPU_BEGIN("SetInternalPhysicData");
-    SetInternalPhysicData();
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"SetInternalPhysicData">() };
+        SetInternalPhysicData();
+    }
 
     // 트랙 C2-0 — 여기 있던 PumpReentrancyStress("FixedUpdate") 폴백 호출을 뺐다.
     //
@@ -2580,22 +2583,25 @@ void Scene::FixedUpdate(float deltaSecond)
     // 순회 중 지점이 우선이고, 그것이 못 잡으면 Update 안의 폴백이 같은 프레임
     // 안에서 바로 뒤이어 잡는다) — FixedUpdate 자체엔 순회 중 발화점이 없으므로
     // 여기서 더 할 일이 없다.
-    PROFILE_CPU_BEGIN("internalfixedBroadcast");
-    // 트랙 C3 잔여 — CharacterControllerComponent::FixedUpdate 이관분.
-    // ★ 자리가 PhysicsManagers->Update **이전**이어야 한다. 옛 구현은
-    // FixedUpdateList 안에서 Physics->AddInputMove 등으로 그 프레임의 이동 입력을
-    // 큐에 실었고 바로 다음 물리 스텝이 그것을 같은 프레임에 소비했다 —
-    // 순서가 뒤집히면 캐릭터 이동이 한 프레임 밀린다.
-    CharacterControllerSystems->FixedUpdate(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"internalfixedBroadcast">() };
+        // 트랙 C3 잔여 — CharacterControllerComponent::FixedUpdate 이관분.
+        // ★ 자리가 PhysicsManagers->Update **이전**이어야 한다. 옛 구현은
+        // FixedUpdateList 안에서 Physics->AddInputMove 등으로 그 프레임의 이동 입력을
+        // 큐에 실었고 바로 다음 물리 스텝이 그것을 같은 프레임에 소비했다 —
+        // 순서가 뒤집히면 캐릭터 이동이 한 프레임 밀린다.
+        CharacterControllerSystems->FixedUpdate(deltaSecond);
+    }
     // Internal Physics Update 작성
-    PROFILE_CPU_BEGIN("physxUpdate");
-    PhysicsManagers->Update(deltaSecond);
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("yield_WaitForFixedUpdate");
-    // OnTriggerEvent.Broadcast(); 작성
-    CoroutineManagers->yield_WaitForFixedUpdate();
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"physxUpdate">() };
+        PhysicsManagers->Update(deltaSecond);
+    }
+    {
+        ce::profile_scope _profile{ ce::marker<"yield_WaitForFixedUpdate">() };
+        // OnTriggerEvent.Broadcast(); 작성
+        CoroutineManagers->yield_WaitForFixedUpdate();
+    }
 }
 
 namespace
@@ -2652,9 +2658,10 @@ void Scene::OnCollisionExit(const Collision& collider)
 
 void Scene::Update(float deltaSecond)
 {
-    PROFILE_CPU_BEGIN("PreAllUpdateWorldMatrix");
-	AllUpdateWorldMatrix(TransformSyncPoint::PreUpdate);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"PreAllUpdateWorldMatrix">() };
+    	AllUpdateWorldMatrix(TransformSyncPoint::PreUpdate);
+    }
 
     // 트랙 C3 — Animator는 가상 Update 오버라이드(암묵 구독)를 버리고 전용
     // 시스템의 조밀 배열로 옮겼다. 자리가 RegistryTick 직후인 근거는 실측이다:
@@ -2663,66 +2670,77 @@ void Scene::Update(float deltaSecond)
     // "자기 컴포넌트 먼저 → 자식 재귀" 순으로 등록하므로 옛 update 리스트에서도
     // 스크립트가 먼저였다. 그 상대 순서를 그대로 보존한다 — 다만 이제는 프리팹
     // 구조와 무관하게 "전 스크립트 → 전 Animator"가 결정론적으로 보장된다.
-    PROFILE_CPU_BEGIN("AnimatorSystem");
-    AnimatorSystems->Update(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"AnimatorSystem">() };
+        AnimatorSystems->Update(deltaSecond);
+    }
 
     // 트랙 C3 잔여 — 가상 Update 오버라이드(암묵 구독)를 버리고 전용 시스템의
     // 조밀 배열로 옮긴 컴포넌트들. 이 자리인 근거는 옛 위치의 보존이다:
     // 전부 RegistryTick(UpdateList) 안에서 돌아 **두 번째 AllUpdateWorldMatrix
     // (= UpdateUILayout 재실행)보다 항상 먼저**였다. 특히 SpriteSheet·Text는
     // RectTransform의 월드 rect를 읽으므로 그 창을 벗어나면 한 프레임 낡은 값을 본다.
-    PROFILE_CPU_BEGIN("DecalSystem");
-    DecalSystems->Update(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"DecalSystem">() };
+        DecalSystems->Update(deltaSecond);
+    }
 
-    PROFILE_CPU_BEGIN("FoliageSystem");
-    FoliageSystems->Update(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"FoliageSystem">() };
+        FoliageSystems->Update(deltaSecond);
+    }
 
-    PROFILE_CPU_BEGIN("UITickSystem");
-    UITickSystems->Update(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"UITickSystem">() };
+        UITickSystems->Update(deltaSecond);
+    }
 
-    PROFILE_CPU_BEGIN("SoundSystem");
-    SoundSystems->Update(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"SoundSystem">() };
+        SoundSystems->Update(deltaSecond);
+    }
 
     // 트랙 C2-0 — 재진입 시험의 순회 중 발화점(Scene.h의 TryFireReentrancyStressMidTraversal
     // 상단 주석 참고). Scene 소유 CameraSystem에 콜백을 주입한다. 이 함수 자체는
     // 무장돼 있지 않으면 bool 하나
     // 읽고 끝나므로 카메라가 없거나 시험이 비무장인 평소 프레임엔 비용이
     // 사실상 0이다.
-    PROFILE_CPU_BEGIN("CameraSystem");
-    m_cameraSystem.Update(deltaSecond, [this]() { TryFireReentrancyStressMidTraversal("CameraSystem", "Update"); });
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"CameraSystem">() };
+        m_cameraSystem.Update(deltaSecond, [this]() { TryFireReentrancyStressMidTraversal("CameraSystem", "Update"); });
+    }
 
     // 순회 중 발화가 우선이고, 위 CameraSystem 루프가 이미 소비했다면 여기는
     // no-op이다(g_stressArmed가 발화 즉시 false). 이 폴백이 실제로 뭔가 하는
     // 경우는 CameraSystem::m_cameras가 비어(파괴 스트레스로 카메라가 전부
     // 사라졌거나 OnInitialized 전) 순회 중 지점 자체가 안 돈 프레임뿐이다.
-    PROFILE_CPU_BEGIN("UpdateEvent");
-    PumpReentrancyStress("Update");
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"UpdateEvent">() };
+        PumpReentrancyStress("Update");
+    }
 
-    PROFILE_CPU_BEGIN("LightSystem");
-    LightSystems->Update(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"LightSystem">() };
+        LightSystems->Update(deltaSecond);
+    }
 
-    PROFILE_CPU_BEGIN("PlayerInputSystem");
-    PlayerInputSystems->Update(deltaSecond);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"PlayerInputSystem">() };
+        PlayerInputSystems->Update(deltaSecond);
+    }
 
     // Tween apply는 stable EntityHandle을 binding 함수가 그 자리에서 resolve한다.
     // 이 위치는 로직 시스템 뒤·두 번째 world-matrix 갱신 앞이라 Transform/UI 값을
     // 바꾸는 binding도 같은 프레임의 파생 행렬에 반영된다.
-    PROFILE_CPU_BEGIN("TweenManager");
-    m_tweenManager->Update(deltaSecond, *this);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"TweenManager">() };
+        m_tweenManager->Update(deltaSecond, *this);
+    }
 
-    PROFILE_CPU_BEGIN("LateAllUpdateWorldMatrix");
-	AllUpdateWorldMatrix(TransformSyncPoint::LateUpdate);
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"LateAllUpdateWorldMatrix">() };
+    	AllUpdateWorldMatrix(TransformSyncPoint::LateUpdate);
+    }
 }
 
 void Scene::YieldNull()
@@ -2755,25 +2773,29 @@ void Scene::EndFramePass()
 	// 비소유 AI snapshot이 Entity/Component 주소를 읽는 동안 파괴가 겹치지 않게
 	// 실제 구조 변경 전에 AI 작업을 회수한다.
 	DrainAIUpdate();
-    PROFILE_CPU_BEGIN("FlushPendingDestroy");
-    // 이 자리가 프레임 끝의 파괴 지점이다 — 바로 아래에서 DestroyComponents와
-    // DestroyEntities가 실제 해제를 하므로, 그 직전이 축소 3단계를 부를 마지막
-    // 기회다.
-    //
-    // 레지스트리 경로는 여기서만 파괴가 일어난다는 것을 불변식으로 쓴다: 순회하는
-    // 동안에는 리스트에서 아무것도 빠지지 않으므로 '순회 중인 것이 죽는' 상황이
-    // 표현 불가능해진다(R1·R2가 여기서 닫힌다).
-    FlushPendingDestroy();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("DestroyLight");
-    DestroyLight();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("DestroyComponents");
-    DestroyComponents();
-    PROFILE_CPU_END();
-    PROFILE_CPU_BEGIN("DestroyEntities");
-    DestroyEntities();
-    PROFILE_CPU_END();
+    {
+        ce::profile_scope _profile{ ce::marker<"FlushPendingDestroy">() };
+        // 이 자리가 프레임 끝의 파괴 지점이다 — 바로 아래에서 DestroyComponents와
+        // DestroyEntities가 실제 해제를 하므로, 그 직전이 축소 3단계를 부를 마지막
+        // 기회다.
+        //
+        // 레지스트리 경로는 여기서만 파괴가 일어난다는 것을 불변식으로 쓴다: 순회하는
+        // 동안에는 리스트에서 아무것도 빠지지 않으므로 '순회 중인 것이 죽는' 상황이
+        // 표현 불가능해진다(R1·R2가 여기서 닫힌다).
+        FlushPendingDestroy();
+    }
+    {
+        ce::profile_scope _profile{ ce::marker<"DestroyLight">() };
+        DestroyLight();
+    }
+    {
+        ce::profile_scope _profile{ ce::marker<"DestroyComponents">() };
+        DestroyComponents();
+    }
+    {
+        ce::profile_scope _profile{ ce::marker<"DestroyEntities">() };
+        DestroyEntities();
+    }
     //여기서 병렬처리
     if (!m_AIJob.valid() && !SceneManagers->IsDecommissioning())
     {

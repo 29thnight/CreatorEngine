@@ -31,7 +31,7 @@
 #include "EditorSceneOverlayContributor.h"
 #include "EditorWindowChrome.h"
 #include "UIManager.h"
-#include "Profiler.h"
+#include "ProfileScope.h"
 #include "WinProcProxy.h"
 #include "TagManager.h"
 #include "Entity.h"
@@ -78,8 +78,13 @@ Editor::EditorMain::~EditorMain()
 
 void Editor::EditorMain::Initialize()
 {
-	PROFILER_INITIALIZE(5, 1024);
-	PROFILE_REGISTER_THREAD("[GameThread]");
+	// PHASE 14 — 새 코어. 5프레임 링이 아니라 rolling capture 다.
+	ce::profiler().initialize();
+	ce::profiler().register_thread("[GameThread]");
+	// 지금은 부팅과 함께 기록을 연다. 녹화 제어(Record/Pause)는 P3 의
+	// ProfilerWindow 가 가져간다 — 그때까지는 옛 코어와 같은 "항상 기록"
+	// 동작을 유지해야 기준선을 맞대 볼 수 있다.
+	ce::profiler().record(Time->GetFrameCount());
 
 	// Undo 수명은 에디터가 소유한다(E1-6 완결). 공통 bootstrap과 Player는
 	// 이 싱글턴을 링크하지 않는다 — 옛 inline 전역이 정적 초기화 때 Player
@@ -299,7 +304,7 @@ void Editor::EditorMain::Initialize()
 	ClrHost::Get().Initialize();
 	Editor::ModelPlacement::Get().Initialize();
 
-	PROFILE_FRAME();
+	ce::profiler().publish_frame(Time->GetFrameCount());
 	StartPresentationThread();
 }
 
@@ -527,7 +532,7 @@ void Editor::EditorMain::Finalize()
 	// 먼저 비운다 — 명령이 리플렉션 Property를 참조하므로 옛 순서(등록
 	// 정리 뒤 파괴)보다 이쪽이 안전하다.
 	Meta::UndoSystemFinalize();
-	PROFILER_SHUTDOWN();
+	ce::profiler().shutdown();
 }
 
 void Editor::EditorMain::HandleWindowResize()
@@ -616,62 +621,63 @@ void Editor::EditorMain::ApplyViewportRenderExtent()
 
 void Editor::EditorMain::Update()
 {
-	PROFILE_CPU_BEGIN("GameLogic");
-	Time->Tick([this]
 	{
-		m_frameDeltaTime = Runtime::ResolveFrameDelta();
-
-		UpdateTitleBar();
-		InputManagement->Update(m_frameDeltaTime);
-
-		// W5: 입력 갱신 뒤, 씬 틱 앞. 상태를 유도하고 이번 프레임의 입력
-		// 소유자를 정한다 — 그래야 아래 스크립트가 같은 프레임의 소유권을 본다.
-		m_playModeController.Tick();
-
-		// ★ 요청(IsGameStart)이 아니라 **확정**(IsPlayCommitted)으로 가른다(W5).
-		//   요청으로 가르면 Play 를 누른 프레임에 스냅샷이 뜨기 **전**에 Physics 와
-		//   GameLogic 이 한 틱 돌고, 그 결과가 백업에 섞여 정지 뒤 편집 씬이
-		//   한 프레임 어긋난 채 돌아온다. 확정은 ApplyPendingSceneStructureChange
-		//   가 스냅샷을 뜬 뒤에만 참이다.
-		if (!SceneManagers->IsPlayCommitted())
+		ce::profile_scope _profile{ ce::marker<"GameLogic">() };
+		Time->Tick([this]
 		{
-			// 편집 모드 — 런타임에는 없는 상태라 Runtime primitive에도 없다.
+			m_frameDeltaTime = Runtime::ResolveFrameDelta();
+
+			UpdateTitleBar();
+			InputManagement->Update(m_frameDeltaTime);
+
+			// W5: 입력 갱신 뒤, 씬 틱 앞. 상태를 유도하고 이번 프레임의 입력
+			// 소유자를 정한다 — 그래야 아래 스크립트가 같은 프레임의 소유권을 본다.
+			m_playModeController.Tick();
+
+			// ★ 요청(IsGameStart)이 아니라 **확정**(IsPlayCommitted)으로 가른다(W5).
+			//   요청으로 가르면 Play 를 누른 프레임에 스냅샷이 뜨기 **전**에 Physics 와
+			//   GameLogic 이 한 틱 돌고, 그 결과가 백업에 섞여 정지 뒤 편집 씬이
+			//   한 프레임 어긋난 채 돌아온다. 확정은 ApplyPendingSceneStructureChange
+			//   가 스냅샷을 뜬 뒤에만 참이다.
+			if (!SceneManagers->IsPlayCommitted())
+			{
+				// 편집 모드 — 런타임에는 없는 상태라 Runtime primitive에도 없다.
+				SceneManagers->Editor();
+				SceneManagers->InputEvents(m_frameDeltaTime);
+
+				// delta 0을 **명시적으로** 넘긴다. 편집 모드는 일시정지가 아니지만
+				// 시간도 진행하지 않는 제3의 상태다. 예전에는 GameLogic()의 기본
+				// 인자로 0이 조용히 들어갔는데, 그러면 "delta 0은 일시정지에서만"이라는
+				// 규약이 깨지고 있는지 호출부만 봐서는 알 수 없다.
+				SceneManagers->GameLogic(0.0f);
+
+				// 편집 모드에서는 스크립트를 돌리지 않는다(Unity와 같은 규약).
+				// 붙여 둔 스크립트는 보류 큐에 쌓였다가 재생 시작 시 한꺼번에 OnInitialized를 받는다.
+				return;
+			}
+
+			// 에디터 씬 상태 머신(선택·프리뷰). 시뮬레이션이 아니라 여기 남는다.
 			SceneManagers->Editor();
-			SceneManagers->InputEvents(m_frameDeltaTime);
 
-			// delta 0을 **명시적으로** 넘긴다. 편집 모드는 일시정지가 아니지만
-			// 시간도 진행하지 않는 제3의 상태다. 예전에는 GameLogic()의 기본
-			// 인자로 0이 조용히 들어갔는데, 그러면 "delta 0은 일시정지에서만"이라는
-			// 규약이 깨지고 있는지 호출부만 봐서는 알 수 없다.
-			SceneManagers->GameLogic(0.0f);
+			// 재생 중 순서는 Runtime이 소유한다(E3-7). Player가 타는 것과 같은 코드다.
+			Runtime::TickSimulationFrame(m_frameDeltaTime);
+		});
 
-			// 편집 모드에서는 스크립트를 돌리지 않는다(Unity와 같은 규약).
-			// 붙여 둔 스크립트는 보류 큐에 쌓였다가 재생 시작 시 한꺼번에 OnInitialized를 받는다.
-			return;
+		if (InputManagement->IsKeyReleased(VK_F5))
+		{
+			EditorSessionState::Get().ToggleGameViewHidden();
 		}
 
-		// 에디터 씬 상태 머신(선택·프리뷰). 시뮬레이션이 아니라 여기 남는다.
-		SceneManagers->Editor();
+		if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_W))
+		{
+			m_gizmoRenderer->SetWireFrame();
+		}
 
-		// 재생 중 순서는 Runtime이 소유한다(E3-7). Player가 타는 것과 같은 코드다.
-		Runtime::TickSimulationFrame(m_frameDeltaTime);
-	});
-
-	if (InputManagement->IsKeyReleased(VK_F5))
-	{
-		EditorSessionState::Get().ToggleGameViewHidden();
+		if (InputManagement->IsKeyReleased(VK_F9))
+		{
+			Physics->ConnectPVD();
+		}
 	}
-
-	if (ImGui::IsKeyPressed(ImGuiKey_LeftCtrl) && ImGui::IsKeyPressed(ImGuiKey_W))
-	{
-		m_gizmoRenderer->SetWireFrame();
-	}
-
-	if (InputManagement->IsKeyReleased(VK_F9))
-	{
-		Physics->ConnectPVD();
-	}
-	PROFILE_CPU_END();
 
 	// 전용 RenderThread는 이전에 밀봉된 packet/delta만 소비하므로 여기서 세울
 	// 필요가 없다. PresentationThread의 UI가 살아 있는 씬 객체를 읽는 구간과만
@@ -686,13 +692,14 @@ void Editor::EditorMain::Update()
 		// 동시에 만지지 않도록 GT에서 실행하고, 결과를 이번 packet에 포함한다.
 		CoroutineManagers->yield_OnRender();
 
-		PROFILE_CPU_BEGIN("EndOfFrame");
-		SceneManagers->DisableOrEnable();
-		SceneManagers->EndOfFrame();
-		PROFILE_CPU_END();
+		{
+			ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };
+			SceneManagers->DisableOrEnable();
+			SceneManagers->EndOfFrame();
+		}
 	}
 
-	PROFILE_FRAME();
+	ce::profiler().publish_frame(Time->GetFrameCount());
 
 	if (SceneManagers->IsDecommissioning())
 	{
