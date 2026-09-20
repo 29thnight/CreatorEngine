@@ -226,8 +226,24 @@ function Invoke-Stats {
     # 얼린 캡처가 있어야 profile.stats 가 스레드마다 몇 건을 찍었는지 셀 수 있고,
     # 그 계수라야 "등록만 되고 아무것도 안 찍는 스레드" 를 잡는다. 재는 값 자체는
     # 이미 다 쌓인 뒤라 달라지지 않는다.
+    #
+    # ★ `render.live.wait` 가 앞뒤로 있는 이유 — **예열은 프레임 수가 아니다.**
+    #
+    #   `wait N` 은 게임 스레드 프레임 수라 렌더 스레드가 한 프레임에 얼마를
+    #   쓰는지와 무관하게 지나간다. 라이브 첫 프레임은 GBuffer ShaderMeta 반영
+    #   (slang reflect)에 **22.8 초**를 쓰는데(2026-09-21 Debug 실측), 그동안
+    #   게임 프레임은 61 → 3418 로 가고 발행된 것은 전부 latest-wins 로 접힌다.
+    #   그래서 `wait 240` 만 쓰던 시절 이 게이트가 본 렌더 소비는 246 중 **4 회**
+    #   였고 캡처에 남은 것은 1 건이었다 — 워밍업을 늘려도 나아지지 않는다.
+    #   예열이 끝나면 소비는 15 ms 마다 일어난다.
+    #
+    #   앞의 하나는 그 예열을 통과시키고, 뒤의 하나는 **측정 구간 안에서** 라이브
+    #   프레임이 최소 한 번 끝나는 것을 보장한다. 게임 스레드를 세우지 않으므로
+    #   (`WaitForResult` 로 판정만 미룬다) 다른 축의 값이 왜곡되지 않는다.
     $result = Invoke-EngineScript -Label "profile-stats" -Commands @(
+        "render.live.wait 300"
         "wait $WarmupFrames"
+        "render.live.wait 120"
         "profile.frame"
         "profile.stats"
         "quit"
@@ -307,17 +323,14 @@ function Invoke-Stats {
     #   - 워커: 애니메이션 잡을 자극하려면 애니메이터가 있는 씬이 필요한데
     #     Dynamic_CPP/Assets/Scenes 는 통째로 .gitignore 라 게이트가 쓸 fixture 가
     #     없다. 씬을 전환해 재면 워커마다 20~40 건이 잡힌다(9-20 실측).
-    #   - RenderThread: Debug 는 라이브 발행 246 중 **4 개만 소비한다**(나머지는
-    #     latest-wins 로 접힌다). 245 프레임을 돌려도 캡처에 남는 것은 1 건이고
-    #     64 프레임 워밍업에서는 0 이다 — 여기서 건수를 단정하면 계측이 멀쩡해도
-    #     붉어진다. 등록 여부까지만 본다.
-    #
-    #   즉 **이 게이트는 워커·RenderThread 의 구간 계측에 눈멀어 있다.**
-    #   계획서 §0.5.8 에 그렇게 적어 두었다.
+    #   RenderThread 는 위의 `render.live.wait` 가 예열을 통과시키고 측정 구간
+    #   안의 소비를 보장하므로 **건수를 단정한다.** 그 대기가 없던 시절에는
+    #   246 중 4 회만 소비되어 캡처에 1 건이 남았고, 64 프레임 워밍업에서는 0 이라
+    #   계측이 멀쩡해도 붉어졌다.
     if (-not $d.captureFrozen) {
         $failures.Add("얼린 캡처가 없다 - profile.frame 이 캡처를 공개하지 못했다")
     }
-    foreach ($name in @('[GameThread]', '[PresentationThread]')) {
+    foreach ($name in @('[GameThread]', '[PresentationThread]', '[RenderThread]')) {
         $thread = $d.threads | Where-Object { $_.name -eq $name }
         if (-not $thread) {
             $failures.Add("$name 가 스레드 목록에 없다")
@@ -325,10 +338,8 @@ function Invoke-Stats {
             $failures.Add("$name 가 등록만 되고 이벤트를 하나도 안 찍었다")
         }
     }
-    foreach ($name in @('[RenderThread]', '[Worker 1]')) {
-        if (-not ($d.threads | Where-Object { $_.name -eq $name })) {
-            $failures.Add("$name 가 스레드 목록에 없다 - 수명 훅이 끊겼다")
-        }
+    if (-not ($d.threads | Where-Object { $_.name -eq '[Worker 1]' })) {
+        $failures.Add("[Worker 1] 이 스레드 목록에 없다 - 수명 훅이 끊겼다")
     }
     if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
 

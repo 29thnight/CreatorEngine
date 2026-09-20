@@ -270,16 +270,18 @@ RAII 로 감싸 `TickLive` 가 예외로 빠져나가도 닫히게 했다.
 
 **게이트가 이빨을 얻었다.** 축이 둘이다 — 자극이 다르기 때문에 나눴다.
 
-- `-Action Stats` — 기본 씬의 교란 없는 기준선. `[GameThread]` 와
-  `[PresentationThread]` 의 **건수**를 단정한다.
+- `-Action Stats` — 기본 씬의 기준선. `[GameThread]` · `[PresentationThread]` ·
+  `[RenderThread]` 의 **건수**를 단정한다.
 - `-Action Workers` — fixture 씬으로 애니메이션 잡을 돌려 워커를 잰다. 이벤트를
   찍은 워커가 넷 이상인지, 워커 스레드에 `AnimationJob` 이라는 **이름**이
   나타나는지를 단정한다(건수만 보면 "무언가 찍었다" 까지다).
 
-변이 셋으로 증명했다. 렌더 스레드 훅을 끊으면 "`[RenderThread]` 가 스레드
-목록에 없다", `PresentFrame` 스코프를 걷으면 "등록만 되고 이벤트를 하나도 안
-찍었다", `AnimationJob` 스코프를 걷으면 "이벤트를 찍은 워커가 0 개뿐이다" 와
-"워커 스레드에 `AnimationJob` 이 하나도 없다" 가 **둘 다** 붉는다.
+변이 넷으로 증명했다. 렌더 스레드 훅을 통째로 끊으면 "`[RenderThread]` 가 스레드
+목록에 없다", **등록은 두고 프레임 훅만** 끊으면 "`[RenderThread]` 가 등록만 되고
+이벤트를 하나도 안 찍었다"(수명 훅과 구간 훅이 따로 잡힌다), `PresentFrame`
+스코프를 걷으면 같은 문장이 `[PresentationThread]` 로, `AnimationJob` 스코프를
+걷으면 "이벤트를 찍은 워커가 0 개뿐이다" 와 "워커 스레드에 `AnimationJob` 이
+하나도 없다" 가 **둘 다** 붉는다.
 
 **워커 fixture 를 저장소가 소유하게 됐다.**
 `Tools/regression/fixtures/profiling-workers/ProfilingWorkerFixture.creator`.
@@ -297,9 +299,20 @@ RAII 로 감싸 `TickLive` 가 예외로 빠져나가도 닫히게 했다.
 ⚠ 이 fixture 로는 애니메이션 **결과**(포즈·블렌드·스키닝)를 검증할 수 없다.
 그것은 `verify-animation-*.ps1` 의 몫이고, 여기서 재는 것은 계측의 생사뿐이다.
 
-⚠ 건수를 단정하지 **못하는** 축이 하나 남았다. **RenderThread** — 위의
-`consume 4` 때문에 64 프레임 워밍업에서는 0 이다. 건수를 단정하면 계측이
-멀쩡해도 붉어지므로 등록 여부까지만 본다.
+**★ `consume 4` 는 Debug 가 느려서가 아니었다 — 예열을 안 기다린 것이다.**
+`render.live.wait` 를 앞에 두고 재니 그 한 줄이 **22.8 초**를 쓴다. 라이브 첫
+프레임의 GBuffer ShaderMeta 반영(slang reflect)이고, 그동안 게임 프레임은 61 →
+3418 로 가며 발행된 것이 전부 `latest-wins` 로 접힌다. **예열이 끝나면 소비는
+15 ms 마다 일어난다.** 워밍업 프레임 수를 늘리는 것으로는 영영 나아지지 않는
+축이었다 — `wait N` 은 게임 스레드 프레임 수라 렌더가 한 프레임에 얼마를 쓰는지와
+무관하게 지나간다(PHASE 4 가 `render.live.wait` 를 만든 이유가 바로 이것이고,
+그 주석이 같은 말을 적어 두고 있었다).
+
+그래서 Stats 축은 `render.live.wait` 를 **앞뒤로** 둔다. 앞의 하나가 예열을
+통과시키고, 뒤의 하나가 측정 구간 안에서 라이브 프레임이 최소 한 번 끝나는 것을
+보장한다. 게임 스레드를 세우지 않으므로(`WaitForResult` 로 판정만 미룬다) 다른
+축의 값이 왜곡되지 않는다. 그렇게 재면 `[RenderThread]` 가 50 건이고, 게이트
+전체가 28 초다.
 
 **아직 하지 않은 것.** `AnimationJob` 외의 잡 구간에는 마커가 없다. 어디를 잴지는
 타임라인을 보고 정하는 P3 의 몫이다.
