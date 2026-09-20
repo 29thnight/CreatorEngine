@@ -168,3 +168,13 @@ if ($unused.Count -gt 0) {
     Write-Host ("unreferenced       : " + ($unused -join ', '))
 }
 Write-Host ("[OK] editor icon resources: $($script:checks) checks passed")
+
+# ★ 종료 코드를 명시한다(2026-09-20). 이 스크립트의 마지막 네이티브 명령은 ⑥의
+#   `git grep` 인데, **매치가 없으면 git grep 은 1을 낸다** — 즉 "되살아난 참조가
+#   하나도 없다"는 성공 조건이 그대로 $LASTEXITCODE 1 로 남는다. exit 를 적지 않으면
+#   pwsh -File 이 그 값을 프로세스 종료 코드로 쓰므로, 모든 단정을 통과한 실행이
+#   "[OK] ... checks passed" 를 찍으면서 붉게 보인다. 판정이 종료 코드뿐인
+#   집중 검사 방식에서는 통과와 실패가 **둘 다 1** 이라 게이트가 판정 능력을 잃는다.
+#   실패는 Assert 의 throw 가 $ErrorActionPreference='Stop' 아래서 비0 으로 끝내므로,
+#   여기서는 성공만 못 박으면 된다.
+exit 0
