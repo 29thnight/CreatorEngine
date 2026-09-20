@@ -32,6 +32,8 @@
 #include "EditorWindowChrome.h"
 #include "UIManager.h"
 #include "ProfileScope.h"
+#include "ThreadPool.h"
+#include <cstdio>
 #include "WinProcProxy.h"
 #include "TagManager.h"
 #include "Entity.h"
@@ -78,13 +80,16 @@ Editor::EditorMain::~EditorMain()
 
 void Editor::EditorMain::Initialize()
 {
-	// PHASE 14 — 새 코어. 5프레임 링이 아니라 rolling capture 다.
-	ce::profiler().initialize();
+	// 초기화는 부트스트랩이 이미 했다(워커보다 먼저 서야 한다).
 	ce::profiler().register_thread("[GameThread]");
 	// 지금은 부팅과 함께 기록을 연다. 녹화 제어(Record/Pause)는 P3 의
 	// ProfilerWindow 가 가져간다 — 그때까지는 옛 코어와 같은 "항상 기록"
 	// 동작을 유지해야 기준선을 맞대 볼 수 있다.
 	ce::profiler().record(Time->GetFrameCount());
+
+	// 워커 계측 훅과 프로파일러 초기화는 EngineBootstrap::InitializeRuntime 이
+	// 가져갔다 — enkiTS 워커는 거기서 만들어지고 threadStart 는 그때 한 번만
+	// 오므로, 여기서 걸면 이미 태어난 워커를 영영 못 잡는다.
 
 	// Undo 수명은 에디터가 소유한다(E1-6 완결). 공통 bootstrap과 Player는
 	// 이 싱글턴을 링크하지 않는다 — 옛 inline 전역이 정적 초기화 때 Player
@@ -388,6 +393,10 @@ void Editor::EditorMain::PresentationThreadMain()
 	if (FAILED(comResult)) return;
 
 	SetThreadDescription(GetCurrentThread(), L"PresentationThread");
+	// PHASE 14 P2 — 이 스레드가 ImGui 전체를 그린다. 옛 코어에서는 계측을
+	// 걷어야 했다(3-2G: producer TLS 수집이 멀티 writer 안전하지 않았다).
+	// sealed chunk handoff 가 선 지금은 안전하다.
+	ce::profiler().register_thread("[PresentationThread]");
 	for (;;)
 	{
 		bool hasFrameRequest = false;
@@ -442,6 +451,10 @@ void Editor::EditorMain::PresentationThreadMain()
 		}
 	}
 
+	// 스레드가 죽기 전에 스트림을 끊는다. 서비스가 나중에 정리하기도 하지만,
+	// 끊는 자리를 명시해 두면 종료 순서가 바뀌어도 수집기가 죽은 저장소를
+	// 가리키는 구간이 생기지 않는다.
+	ce::profiler().unregister_thread();
 	CoUninitialize();
 }
 

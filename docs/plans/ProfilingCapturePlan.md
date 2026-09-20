@@ -199,10 +199,46 @@ P1 과 P2 를 한 덩어리로 지었다. 재활용하지 않기로 한 이상(�
 계측이 살아 있는지 에디터에서 볼 수단이 P3 까지 사라진다). 타임라인·Hierarchy·
 프레임 선택이 P3 의 몫이다.
 
-**아직 하지 않은 것.** 워커 스레드 등록(P2 완료조건의 마지막 항목). sealed chunk
-handoff 가 섰으므로 이제 **안전하게** 붙일 수 있다 — enkiTS `threadnum_` 을 슬롯
-키로 쓴다. 애니메이션 워커의 시간이 캡처에 나타나는 것이 PHASE 13 §4 의 판정
-수단이다.
+**워커 등록이 섰다 — P2 완료조건의 마지막 항목.** enkiTS 의
+`TaskSchedulerConfig::profilerCallbacks.threadStart/threadStop` 을 물어 워커가
+태어나는 자리에서 등록한다. 이 콜백은 `userData` 없는 함수 포인터라 정적
+트램펄린이 필요했고, `thread_pool::worker_hooks` 로 받아 둔다 — 유틸리티 층은
+관측 도구를 모르고 받아 둔 함수를 부르기만 한다. 배선은 `EngineBootstrap` 이
+한다.
+
+**순서가 전부였다.** 훅 등록과 `profiler().initialize()` 가
+`get_job_scheduler().start()` **보다 먼저**여야 한다. 처음에는 늦게 걸었고 결과는
+**워커 0 개**였다 — 훅은 워커가 태어날 때 한 번만 불리므로, 이미 태어난 뒤에
+거는 것은 아무 일도 하지 않는다. 그래서 `InitializeRuntime` 의 맨 앞으로 옮겼다.
+등록만으로는 아무것도 안 보인다는 것도 같이 겪었다: 워커 10 개가 표에 뜨는데
+이벤트는 26 그대로였다.
+
+**애니메이션 워커의 시간이 캡처에 나타난다.** `AnimationJob::Update` 의 잡 람다
+첫 줄에 스코프를 걸었다. `Test1.creator`(애니메이터 있는 씬)로 전환해 재니
+`[Worker 8]` 에 `AnimationJob` 이 귀속되고 프레임 이벤트가 26 → 27(최대 30)로
+늘었다. PHASE 13 §4 의 "예측 비용 대 실측 오차 15% 이내"를 판정할 수단이 이것이다.
+
+**★ 자극이 없으면 워커 칸은 빈 채로 초록이다.** 기본 씬에는 애니메이터가 없어
+잡이 0 개이고, 그때 캡처의 스레드는 `[GameThread]` 하나뿐이다 — 등록된 워커는
+이벤트가 없으면 프레임에 나오지 않는다. `-Action Stats` 의 라이브 기준선이 바로
+그 상태라, **이 게이트는 워커 계측이 죽어도 초록이다.** 워커 축을 재려면 씬 전환이
+앞에 있어야 한다([[green-soak-never-stimulated]] 와 같은 결).
+
+**훅이 주는 것은 이름뿐이다.** 등록되지 않은 스레드가 마커를 찍으면
+`current_stream()` 이 그 자리에서 `Thread N` 이라는 이름으로 등록한다. 그래서
+훅을 끊는 변이는 "워커가 사라진다" 가 아니라 "이름이 `[Worker 3]` 에서
+`Thread 5` 로 바뀐다" 로 나타난다. 훅의 값은 **귀속이 아니라 라벨과 등록 시점**
+이다 — 이것을 "워커가 안 잡힌다" 의 증거로 쓰면 안 된다.
+
+**아직 하지 않은 것 — RenderThread.** 전용 렌더 스레드는
+`EnhancedSceneRenderer.cpp:4143` 의 `std::thread` 이고, 거기에 등록을 넣으려면
+**RenderEngine → EngineDiagnostics 간선을 새로 만들어야 한다**(RenderEngine 은
+지금 `Utility_Framework` 하나만 참조한다). PHASE 4 가 간선을 154 → 101 로 줄인
+방향과 반대이므로 include 경로부터 얹지 않았다. 붙인다면 `thread_pool` 에서 쓴
+것과 같은 역전이 맞다 — 렌더러가 수명 훅을 내놓고 `EngineBootstrap` 이
+프로파일러를 꽂는다. 구간 마커까지 원하면 훅이 begin/end 두 쌍이 되므로, 어디를
+잴지 타임라인을 보고 정하는 P3 의 몫으로 남긴다. `AnimationJob` 외의 잡 구간에
+마커가 없는 것도 같은 이유다.
 
 ### 0.5.7 2026-09-20 정찰 최신화 — 전제 다섯이 또 바뀌었다
 
@@ -1388,7 +1424,8 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - [ ] 최소 600프레임 또는 정한 메모리 예산만큼 rolling capture — **4프레임 링 폐기**(§2.2)
 - [ ] 멀티스레드 CPU Timeline과 선택 구간 Hierarchy
 - [ ] ★ **애니메이션 워커 8스레드·RenderThread·PresentationThread가 캡처에 나타남**
-      (§2.1 — 지금은 `[GameThread]` 하나뿐이라 렌더·애니메이션 경로가 통째로 안 보인다)
+      (§0.5.8 — 워커 8 과 PresentationThread 는 섰고 애니메이션 워커 시간이 실제로
+      잡힌다. **RenderThread 만 남았다**: 계층 간선을 새로 내야 해서 P3 로 미뤘다)
 - [ ] 멀티카메라·2-in-flight에서도 정확한 GPU frame/submission 매핑
 - [ ] CPU/GPU/Rendering/Memory/GC counter가 같은 engine_frame_id에 정렬
 - [ ] overflow·누락·malformed scope·profiler overhead 표시

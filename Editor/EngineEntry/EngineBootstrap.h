@@ -1,5 +1,7 @@
 #pragma once
 #include "Camera.h"
+#include "ProfileScope.h"
+#include "ThreadPool.h"
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "DumpHandler.h"
@@ -68,6 +70,33 @@ namespace EngineBootstrap
 
     inline bool InitializeRuntime(const EngineLaunchConfig& config)
     {
+        // ★ 프로파일러가 가장 먼저 선다(PHASE 14 P2). 두 가지 때문이다:
+        //
+        //   ① 아래의 job_scheduler().start() 가 enkiTS 워커를 만들고, 워커의
+        //      threadStart 콜백은 **그때 한 번** 온다. 훅이 그보다 늦게 걸리면
+        //      이미 태어난 워커는 영영 등록되지 않는다 — 실제로 EditorMain
+        //      Initialize 에 걸었다가 워커가 0개로 잡혔다.
+        //   ② 서비스가 initialize 되기 전의 register_thread 는 무시되므로,
+        //      훅만 먼저 걸어도 소용이 없다. 둘 다 여기여야 한다.
+        //
+        // Player 도 이 경로를 탄다. 녹화를 켜지 않으면 recorder 가 stopped 라
+        // 마커는 즉시 return 하므로 비용은 사실상 0 이다.
+        ce::profiler().initialize();
+        thread_pool::set_worker_hooks({
+            [](unsigned int index)
+            {
+                // enkiTS threadnum_ 은 0..GetNumTaskThreads()-1 로 안정 보장된다.
+                char name[32];
+                std::snprintf(name, sizeof(name), "[Worker %u]", index);
+                ce::profiler().register_thread(name);
+            },
+            [](unsigned int)
+            {
+                // 스레드가 죽기 전에 스트림을 끊는다. 이것이 없으면 수집기가
+                // 죽은 저장소를 가리킨 채 남는다(옛 코어의 UAF 자리).
+                ce::profiler().unregister_thread();
+            } });
+
 		if ((config.prepareRuntimeContent ||
 			config.paths.HasRuntimeOwnershipCapability()) &&
 			!config.paths.HasValidRuntimeOwnership())

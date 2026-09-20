@@ -1,4 +1,5 @@
 #include "AnimationJob.h"
+#include "ProfileScope.h"
 #include "AnimationDiagnostics.h"
 #include "JobScheduler.h"
 #include "RenderScene.h"
@@ -132,6 +133,15 @@ void AnimationJob::Update(float deltaTime)
         AnimationWorkerTiming* timing = sample ? &timings[jobs.size()] : nullptr;
         jobs.add([this, animator, controllers, delta = deltaTime, timing] ()
         {
+            // PHASE 14 P2 — 워커 계측. sealed chunk handoff 가 서기 전에는
+            // 이 자리에 마커를 걸 수 없었다: 수집기가 producer TLS 를 직접
+            // 만져서, writer 가 [GameThread] 하나뿐인 것이 안 터지는 유일한
+            // 근거였다. 이제 writer 가 자기 청크를 봉인해 넘기므로 안전하다.
+            //
+            // ★ 이 구간의 시간을 프레임 시간에 **더하지 말 것**. 워커 구간은
+            //   서로 겹치고 소유자의 대기와도 겹친다(AnimationDiagnostics 가
+            //   같은 것을 주석으로 못 박았다).
+            ce::profile_scope _profile{ ce::marker<"AnimationJob">() };
             if (timing) timing->m_begin = Clock::now();
             // I6-B4b — 재생 경로가 하나다. legacy 재귀 폴백(UsesMultipleControllers
             // 분기 · UpdateBone/UpdateBlendBone/UpdateBoneLayer ~200줄)을 걷었다.

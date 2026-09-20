@@ -11,6 +11,22 @@
 namespace
 {
 thread_local bool executing_pool_work = false;
+
+// 워커 수명 훅 저장소. 이 층은 관측 도구를 모른다 — 받아 둔 함수를 부르기만
+// 한다. 정적인 이유는 enkiTS 콜백이 userData 없는 함수 포인터이기 때문이고,
+// 엔진 소유 영속 풀이 하나뿐이라 그것으로 충분하다.
+thread_pool::worker_hooks g_thread_pool_worker_hooks{};
+
+void thread_pool_worker_thread_start(uint32_t threadnum)
+{
+    if (g_thread_pool_worker_hooks.on_start)
+        g_thread_pool_worker_hooks.on_start(threadnum);
+}
+void thread_pool_worker_thread_stop(uint32_t threadnum)
+{
+    if (g_thread_pool_worker_hooks.on_stop)
+        g_thread_pool_worker_hooks.on_stop(threadnum);
+}
 }
 
 struct thread_pool::state
@@ -113,6 +129,10 @@ struct thread_pool::state
         workers_ = workers ? static_cast<uint32_t>(workers) : (std::max)(1u, enki::GetNumHardwareThreads());
         enki::TaskSchedulerConfig config;
         config.numTaskThreadsToCreate = workers_;
+        // 워커 수명을 밖으로 알린다. enkiTS 콜백은 함수 포인터라 userData 가
+        // 없으므로 트램펄린이 정적 훅을 읽는다.
+        config.profilerCallbacks.threadStart = &thread_pool_worker_thread_start;
+        config.profilerCallbacks.threadStop  = &thread_pool_worker_thread_stop;
         scheduler_.Initialize(config);
     }
     void dispatch(std::size_t count, std::function<void(std::size_t)> execute,
@@ -158,6 +178,10 @@ thread_pool::thread_pool() = default;
 thread_pool::~thread_pool()
 {
     shutdown();
+}
+void thread_pool::set_worker_hooks(const worker_hooks& hooks)
+{
+    g_thread_pool_worker_hooks = hooks;
 }
 void thread_pool::start(std::size_t worker_count)
 {
