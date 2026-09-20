@@ -32,6 +32,7 @@ namespace CommandCore
         // 정렬된 표. 이름으로 이진 탐색한다.
         constexpr DescriptorSeed kSeeds[] = {
             { "ai.status", CommandCost::Immediate, "[오브젝트]", "AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)", CommandClass::EngineService, CommandLiveness::Live },
+            { "animation.baseline.probe", CommandCost::Long, "<model-path> <10|50|100>", "Measure product animation CPU stages with QPC", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "animation.playback.probe", CommandCost::Long, "<model-path>", "Validate parallel animation, managed events, layers and sockets", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "animation.visual.probe", CommandCost::Long, "<setup model-path|pose>", "Stage deterministic product animation frames for pixel regression", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "animator.param", CommandCost::Frames, "<오브젝트> <파라미터> <bool|float|int|trigger>", "Animator 파라미터를 저작한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,name,type", true },

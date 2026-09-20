@@ -458,7 +458,9 @@ Entity* Animator::FindBoneRecursive(Entity* parent, const std::string& boneName)
 		Entity* child = parent->OwnerSceneFindIndex(childIndex);
 		if (!child) continue;
 
-		if (child->m_name == boneName)
+        // Match the same instance suffix normalization as Scene pose bindings.
+        // Imported actors may have suffixes beyond (10), even after prior actors die.
+		if (child->m_name == boneName || child->RemoveSuffixNumberTag() == boneName)
 			return child;
 
 		// 자식의 자식들도 탐색
@@ -474,30 +476,14 @@ Socket* Animator::MakeSocket(std::string_view socketName, std::string_view boneN
 	if (Socket* socket = FindSocket(socketName); socket)
 		return socket;
 
-	// 먼저 자식 구조 전체에서 boneName을 찾는다 (재귀적 탐색)
-	std::string realBoneName = boneName.data();
-	Entity* socketBone = FindBoneRecursive(object, realBoneName);
-
-	// 없으면 (1)~(100)까지 이름 붙여서 찾는다
-	int index = 1;
-	while (!socketBone && index <= 10)
-	{
-		std::string indexedName = realBoneName + " (" + std::to_string(index) + ")";
-		socketBone = FindBoneRecursive(object, indexedName);
-		if (socketBone)
-		{
-			realBoneName = indexedName;  // 실제 본 이름 업데이트
-			break;
-		}
-		++index;
-	}
+	Entity* socketBone = FindBoneRecursive(object, std::string(boneName));
 
 	// 찾았으면 소켓 생성 후 반환
 	if (socketBone)
 	{
 		Socket* newSocket = new Socket();
 		newSocket->m_name = socketName;
-		newSocket->GameObjectIndex = 9999 + index; // 임의의 인덱스
+		newSocket->GameObjectIndex = 10000; // 기존 기본 인덱스
 		newSocket->m_ObjectName = boneName;
 		socketvec.push_back(newSocket);
 		return newSocket;

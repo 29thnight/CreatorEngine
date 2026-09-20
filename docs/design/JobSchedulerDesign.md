@@ -153,3 +153,16 @@ Player Debug/Release에서도 공용 Job을 통한 비동기 씬 준비 → 소�
 새 화면 표시 → 정상 종료를 확인했다. 관리 스크립트는 씬마다 다시 시작했고,
 SceneManager 해체 뒤 공용 scheduler 종료가 완료됐다. 범위와 재현은
 [부속 계획 §13](../plans/TaskSchedulerUnificationPlan.md#13-player-실제-실행씬-전환종료-2026-09-20)에 기록한다.
+
+
+## 애니메이션 S1 진단 경계
+
+`AnimationMeasurementScope`는 opt-in 소유 스레드 표본이다. 작업별 timing slot을
+그룹 제출 전에 확보하고 worker가 자기 슬롯만 기록한다. owner가 `wait()` 반환 뒤
+집계하며 기존 Profiler의 가변 TLS EventBuffer에 worker marker를 붙이지 않는다.
+worker 합산/실행 구간은 owner 제출·대기와 겹친다. 전체 경로에 중복 합산하지 않으며
+ProxyCommand의 팔레트 할당·복사 시간도 render commit의 부분집합으로 기록한다.
+
+실제 10/50/100체 기선과 표본 조건은 [AnimationSchedulerPlan §10](../plans/AnimationSchedulerPlan.md#10-s1-제품-경로-비용-기선-2026-09-20)을 따른다.
+측정은 공용 풀의 워커 수나 스케줄링 정책을 변경하지 않는다. 지속적인 worker 이벤트
+수집은 여전히 PHASE 14 P1b/P2의 안전한 전달 경계 이후에 진행한다.

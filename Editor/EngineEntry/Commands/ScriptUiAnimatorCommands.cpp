@@ -42,6 +42,7 @@
 #include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "Animation/AnimationPlaybackSelfTest.h"
+#include "Animation/AnimationBaselineProbe.h"
 #include "Animation/AnimationVisualProbe.h"
 #include "Socket.h" // X7 transform bulk probe
 #include "BoneRegion.h" // kMaxBones
@@ -966,6 +967,51 @@ namespace ConsoleCmd
         return CommandCore::InternalError("script.invoke_internal", invoked.reason);
     }
 
+    static CommandCore::CommandResult Cmd_animation_baseline_probe(const ConsoleCommandContext& ctx)
+    {
+        using CommandCore::CommandData;
+        if (ctx.parts.size() != 3 || (ctx.parts[2] != "10" && ctx.parts[2] != "50" && ctx.parts[2] != "100"))
+            return CommandCore::InvalidArguments("animation.baseline.probe <model-path> <10|50|100>");
+        RenderTest::AnimationBaselineReport report;
+        std::string error;
+        const bool passed = RenderTest::RunAnimationBaselineProbe(ctx.parts[1], std::stoul(ctx.parts[2]), report, error);
+        auto data = CommandData::Object();
+        data.Set("passed", CommandData::Bool(passed));
+        data.Set("actors", CommandData::Int(report.m_actors));
+        data.Set("bones", CommandData::Int(report.m_bones));
+        data.Set("sceneBones", CommandData::Int(report.m_sceneBones));
+        data.Set("skinnedMeshes", CommandData::Int(report.m_skinnedMeshes));
+        data.Set("workers", CommandData::Int(report.m_workers));
+        data.Set("warmupFrames", CommandData::Int(30));
+        data.Set("clip", CommandData::String("Walk"));
+        auto frames = CommandData::Array();
+        for (const auto& sample : report.m_frames)
+        {
+            auto frame = CommandData::Object();
+            frame.Set("prepareUs", CommandData::Double(sample.m_prepareUs));
+            frame.Set("submitUs", CommandData::Double(sample.m_submitUs));
+            frame.Set("waitUs", CommandData::Double(sample.m_waitUs));
+            frame.Set("workerSumUs", CommandData::Double(sample.m_workerSumUs));
+            frame.Set("workerSpanUs", CommandData::Double(sample.m_workerSpanUs));
+            frame.Set("publishUs", CommandData::Double(sample.m_publishUs));
+            frame.Set("socketUs", CommandData::Double(sample.m_socketUs));
+            frame.Set("updateUs", CommandData::Double(sample.m_updateUs));
+            frame.Set("syncUs", CommandData::Double(sample.m_syncUs));
+            frame.Set("renderCommitUs", CommandData::Double(sample.m_renderCommitUs));
+            frame.Set("paletteUs", CommandData::Double(sample.m_paletteUs));
+            frame.Set("jobs", CommandData::Int(sample.m_jobs));
+            frame.Set("evaluatedAnimators", CommandData::Int(sample.m_evaluatedAnimators));
+            frame.Set("validBones", CommandData::Int(sample.m_validBones));
+            frame.Set("localWrites", CommandData::Int(sample.m_localWrites));
+            frame.Set("paletteCopies", CommandData::Int(sample.m_paletteCopies));
+            frame.Set("paletteBytes", CommandData::Int(sample.m_paletteBytes));
+            frames.Append(std::move(frame));
+        }
+        data.Set("frames", std::move(frames));
+        return passed ? CommandCore::Ok("ANIMATION_BASELINE_OK", std::move(data))
+            : CommandCore::Fail("animation.baseline.failed", error, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_animation_playback_probe(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("animation.playback.probe <model-path>");
@@ -1014,6 +1060,7 @@ namespace ConsoleCmd
         reg.Result({ "ui.hitbox" }, &Cmd_ui_hitbox);
         reg.Result({ "ui.navprobe" }, &Cmd_ui_navprobe);
         reg.Result({ "ui.status" }, &Cmd_ui_status);
+        reg.Result({ "animation.baseline.probe" }, &Cmd_animation_baseline_probe);
         reg.Result({ "animation.playback.probe" }, &Cmd_animation_playback_probe);
         reg.Result({ "animation.visual.probe" }, &Cmd_animation_visual_probe);
         reg.Result({ "animator.param" }, &Cmd_animator_param);

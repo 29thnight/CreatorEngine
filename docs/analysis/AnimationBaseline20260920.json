@@ -1,0 +1,250 @@
+{
+  "date": "2026-09-20",
+  "cpu": "Intel(R) Xeon(R) W-2223 CPU @ 3.60GHz",
+  "configuration": "Release",
+  "workers": 8,
+  "modelSha256": "58D779AFDE1A7FBD13332999C8B11890FB7E10FF2036CA6AE3645D14BEDBA402",
+  "model": "CreatorRobot.glb",
+  "clip": "Walk",
+  "dt": 0.016666666666666666,
+  "warmupPerRun": 30,
+  "samplesPerRun": 120,
+  "runs": 3,
+  "scope": "CPU pose update + Scene sync + proxy commit; palette allocation/copy is a subset of commit; worker time overlaps wait; excludes GPU and presentation",
+  "rows": [
+    {
+      "actors": 10,
+      "samples": 360,
+      "paletteBytes": 1310720,
+      "validSceneBones": 530,
+      "metricsMs": {
+        "prepare": {
+          "mean": 0.007678333333333333,
+          "p50": 0.006900000000000001,
+          "p95": 0.0112
+        },
+        "submit": {
+          "mean": 0.02031888888888889,
+          "p50": 0.0192,
+          "p95": 0.0249
+        },
+        "wait": {
+          "mean": 0.8609661111111111,
+          "p50": 0.04995,
+          "p95": 3.4355
+        },
+        "workerSum": {
+          "mean": 0.10567361111111111,
+          "p50": 0.1004,
+          "p95": 0.1412
+        },
+        "workerSpan": {
+          "mean": 0.02705,
+          "p50": 0.0233,
+          "p95": 0.038700000000000005
+        },
+        "publish": {
+          "mean": 0.04031972222222222,
+          "p50": 0.0342,
+          "p95": 0.0688
+        },
+        "socket": {
+          "mean": 0.008309444444444444,
+          "p50": 0.0070999999999999995,
+          "p95": 0.0154
+        },
+        "update": {
+          "mean": 0.9392708333333333,
+          "p50": 0.12165000000000001,
+          "p95": 3.5096999999999996
+        },
+        "sync": {
+          "mean": 0.06349027777777778,
+          "p50": 0.05025,
+          "p95": 0.108
+        },
+        "renderCommit": {
+          "mean": 0.1647713888888889,
+          "p50": 0.15,
+          "p95": 0.2359
+        },
+        "palette": {
+          "mean": 0.10759083333333333,
+          "p50": 0.1008,
+          "p95": 0.1464
+        },
+        "cpuFrame": {
+          "mean": 1.1675325,
+          "p50": 0.3241,
+          "p95": 3.7613
+        }
+      }
+    },
+    {
+      "actors": 50,
+      "samples": 360,
+      "paletteBytes": 6553600,
+      "validSceneBones": 2650,
+      "metricsMs": {
+        "prepare": {
+          "mean": 0.03618194444444445,
+          "p50": 0.0332,
+          "p95": 0.0514
+        },
+        "submit": {
+          "mean": 0.04770555555555556,
+          "p50": 0.0222,
+          "p95": 0.0335
+        },
+        "wait": {
+          "mean": 0.9985527777777777,
+          "p50": 0.1163,
+          "p95": 5.7915
+        },
+        "workerSum": {
+          "mean": 0.465645,
+          "p50": 0.4531,
+          "p95": 0.5552
+        },
+        "workerSpan": {
+          "mean": 0.08418972222222222,
+          "p50": 0.07695,
+          "p95": 0.126
+        },
+        "publish": {
+          "mean": 0.21093444444444445,
+          "p50": 0.1822,
+          "p95": 0.3462
+        },
+        "socket": {
+          "mean": 0.04295,
+          "p50": 0.0384,
+          "p95": 0.06670000000000001
+        },
+        "update": {
+          "mean": 1.345388888888889,
+          "p50": 0.41045,
+          "p95": 6.2946
+        },
+        "sync": {
+          "mean": 0.3915688888888889,
+          "p50": 0.34885,
+          "p95": 0.6902999999999999
+        },
+        "renderCommit": {
+          "mean": 1.164845,
+          "p50": 1.12385,
+          "p95": 1.4429
+        },
+        "palette": {
+          "mean": 0.7821836111111111,
+          "p50": 0.7684,
+          "p95": 0.9176
+        },
+        "cpuFrame": {
+          "mean": 2.9018027777777777,
+          "p50": 1.92985,
+          "p95": 8.0474
+        }
+      }
+    },
+    {
+      "actors": 100,
+      "samples": 360,
+      "paletteBytes": 13107200,
+      "validSceneBones": 5300,
+      "metricsMs": {
+        "prepare": {
+          "mean": 0.09270527777777778,
+          "p50": 0.0881,
+          "p95": 0.1226
+        },
+        "submit": {
+          "mean": 0.35560194444444443,
+          "p50": 0.024550000000000002,
+          "p95": 0.1995
+        },
+        "wait": {
+          "mean": 0.8420822222222222,
+          "p50": 0.19790000000000002,
+          "p95": 2.2134
+        },
+        "workerSum": {
+          "mean": 0.9712283333333334,
+          "p50": 0.9456,
+          "p95": 1.1545999999999998
+        },
+        "workerSpan": {
+          "mean": 0.15924055555555555,
+          "p50": 0.1484,
+          "p95": 0.2321
+        },
+        "publish": {
+          "mean": 0.5479630555555556,
+          "p50": 0.50715,
+          "p95": 0.7776000000000001
+        },
+        "socket": {
+          "mean": 0.10611166666666667,
+          "p50": 0.1017,
+          "p95": 0.132
+        },
+        "update": {
+          "mean": 1.9716908333333334,
+          "p50": 0.96305,
+          "p95": 4.9106000000000005
+        },
+        "sync": {
+          "mean": 0.9629775,
+          "p50": 0.8588,
+          "p95": 1.5735999999999999
+        },
+        "renderCommit": {
+          "mean": 6.456891944444444,
+          "p50": 6.742649999999999,
+          "p95": 8.023399999999999
+        },
+        "palette": {
+          "mean": 5.4501025,
+          "p50": 5.7294,
+          "p95": 6.8297
+        },
+        "cpuFrame": {
+          "mean": 9.391560277777778,
+          "p50": 8.74095,
+          "p95": 12.6938
+        }
+      }
+    }
+  ],
+  "sourceInputs": [
+    {
+      "path": "Editor/EngineEntry/Commands/ScriptUiAnimatorCommands.cpp",
+      "sha256": "C172DD30790F147BAD03763A2A4798A0F1003032C5754A57679C0273EE743649"
+    },
+    {
+      "path": "Editor/RenderTests/Animation/AnimationBaselineProbe.cpp",
+      "sha256": "1B8138C76D2ACCE19620BA08D62AC5D365B0BA84F967E77DC75404C2E80ECD9C"
+    },
+    {
+      "path": "Editor/RenderTests/Animation/AnimationBaselineProbe.h",
+      "sha256": "5F14C61BB043C2016F9565CDAAC1204179F4F3BDBBDC5A3C74176AF9984A85DE"
+    },
+    {
+      "path": "Engine/SceneRuntime/AnimationDiagnostics.h",
+      "sha256": "3F4E68E50DD6DF43CD0F1267D1DA3A3AFB245747DC344A83F51FE33F7E164E55"
+    },
+    {
+      "path": "Engine/SceneRuntime/AnimationJob.cpp",
+      "sha256": "85E74A17340BA4B0A99245E5162EF0B9A9AAEB1AE39CD0CA423D53D09D86F1FE"
+    },
+    {
+      "path": "Engine/SceneRuntime/Animator.cpp",
+      "sha256": "AB44A58861C6E9B4407607577710B7D953A0ED3DB711DD572DC568A664BE9570"
+    },
+    {
+      "path": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "sha256": "5A7419398608B1AF43327BD2FFFAA26BFDC3AE0527F0AC33C38FA73F09277EB6"
+    }
+  ]
+}

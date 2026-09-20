@@ -655,6 +655,7 @@
     <ClInclude Include="RuntimeFrame.h">
       <Filter>Managers\SceneManager</Filter>
     </ClInclude>
+    <ClInclude Include="AnimationDiagnostics.h" />
     <ClInclude Include="Scene.h">
       <Filter>Scene</Filter>
     </ClInclude>

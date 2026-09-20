@@ -327,6 +327,7 @@
     <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="RigidBodyComponent.h" />
+    <ClInclude Include="AnimationDiagnostics.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="ClrHost.h" />

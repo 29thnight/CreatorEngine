@@ -1,4 +1,5 @@
 #include "ProxyCommand.h"
+#include "AnimationDiagnostics.h"
 #include "Animator.h"
 #include "MeshRenderer.h"
 #include "../RenderEngine/Experiment/MaterialInstance.h" // I5-D5c3
@@ -90,9 +91,18 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 		{
 			update.hasAnimator = true;
 			update.animatorGuid = animator->GetInstanceID();
+            auto* sample = AnimationMeasurementScope::Current();
+            const auto begin = sample ? AnimationMeasurementScope::Clock::now()
+                : AnimationMeasurementScope::Clock::time_point{};
 			update.bonePalette = std::make_shared<math::matrix4x4[]>(kMaxBones);
 			std::copy_n(animator->m_FinalTransforms, kMaxBones,
 				update.bonePalette.get());
+            if (sample)
+            {
+                sample->m_paletteUs += AnimationMeasurementScope::Microseconds(begin, AnimationMeasurementScope::Clock::now());
+                ++sample->m_paletteCopies;
+                sample->m_paletteBytes += sizeof(math::matrix4x4) * kMaxBones;
+            }
 		}
 	}
 

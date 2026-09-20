@@ -512,7 +512,7 @@ S0의 구간·순서 계약은 §1.2를 따른다. S6의 큐 구조 변경은 �
 |---|---|---|---|---|
 | S0 | 결함 지혈 · 완료 | §1.2의 R5·S0-L·S0-E 구현, 기존 불변 자산·게임 스레드 이벤트 전달 유지. 블렌딩 소켓·비활성 메시 그리기 수정 | Debug/Release 격리·100체/CLR/소켓·DX12 화면 회귀, 전체 Editor 빌드 통과 (§7) | 완료 |
 | S0.5 | 공용 실행 기반 통일 | thread_pool·job_scheduler·job_handle·job_group, 엔진 수명 소유, DataSystem·썸네일·Animation·Foliage·AI 이관 | 그룹 독립 대기·의존·종료 drain·제품 회귀(§9). 성능 비교 제외 | 기존 2일·재산정 필요 |
-| S1 | 계측 기선 | Release 10/50/100체 계산·대기·투영·팔레트 비용 QPC 측정. 워커 수집은 PHASE 14 안전 경계 이후 | 비용 곡선·측정 조건·버짓 기본값 근거 기록 | 1일 |
+| S1 | 계측 기선 · 완료 | Release 10/50/100체 제품 경로 QPC, 3회×120표본 (§10). 워커 Profiler 마커는 PHASE 14 이후 | 비용 곡선·측정 조건·예산 후보/적용 한계 기록 | 완료 |
 | S2′ | 데이터 정지 작업 + Pose 타입 | SoA TRS·블렌드 커널·generation/clip 채널 캐시·dense mask·키 커서·할당 제거·배속 핸들. 부모 선행 평탄 순회는 완료 | 문자열 조회·프레임 할당·행렬 분해 블렌드 0, S1 대비 재측정 | 기존 4일·재산정 필요 |
 | S3′ | AnimInstance 시스템 소유 | 가변 재생 데이터를 조밀 배열로 이관, Animator는 핸들. 실본수 prev/curr 버퍼. legacy Bone 쓰기·전역 m_currAnimator 제거는 이미 완료 | Animator 64KiB·Controller 32KiB 고정 포즈 배열 제거 | 기존 3일·재산정 필요 |
 | **S3.5** | **태스크 레시피 + Executor** | `AnimTaskList`(POD 플랫, 앞선 인덱스 의존) · Update/Execute 2패스 분리 · **도달성 실행** · 워커별 포즈 풀 + steal-in-place · **팔레트 프레임 아레나**(§2.2⑤) · `ProxyCommand`를 {offset,count}로 | 비활성 상태머신 가지의 포즈 계산 0회(스냅샷으로 판정) · 인스턴스당 살아 있는 포즈 버퍼 ≤ 4 · 팔레트 힙 할당 0 | 3일 |
@@ -732,3 +732,81 @@ S0의 구간·순서 계약은 §1.2를 따른다. S6의 큐 구조 변경은 �
 - PSO 비동기 컴파일은 공용 스케줄러로 후속 이관했다(부속 계획 §10).
   씬 로드 2곳도 공용 스케줄러로 후속 이관했다(부속 계획 §11). DX12/Vulkan 명령 기록도 공용 Job 그룹으로 이관했다(부속 계획 §12).
   S1 이후 평가 비용 최적화·LOD·버짓·AnimationScheduler 도메인 소유 이주는 남아 있다.
+
+## 10. S1 제품 경로 비용 기선 (2026-09-20)
+
+테스트 모델은 CreatorRobot을 유지했다. 모델 해시는 §8과 같다. Release x64, VS18/v145,
+Intel Xeon W-2223 3.60GHz, 엔진 공용 워커 8개. 실행 중 빌드·다른 Player는 없었다.
+독립 프로세스 3회, 인원별 30회 준비 뒤 120표본씩, 합계 1,080표본이다.
+
+### 계측 경계
+
+- 엔진 공용 enkiTS 워커 8개, Animator당 job 하나인 현재 실행기를 그대로 측정한다.
+- AnimationMeasurementScope는 호출 스레드에서만 sample을 등록한다. worker는 job별로
+  분리된 슬롯에 기록하고 그룹 wait 완료 뒤 소유 스레드가 합산한다. 기존 Profiler의
+  TLS EventBuffer에 worker가 쓰지 않는다. 측정 비활성 때 QPC 호출과 timing 배열 할당은 없다.
+- prepareUs: animator snapshot과 job/capture 구성. submitUs: 공용 scheduler 제출.
+  waitUs: 제출 반환부터 이 그룹 회수까지 호출자 경과 시간.
+- workerSumUs: 각 worker 콜백 경과 시간의 합계(운영체제 CPU 사용 시간이 아님).
+  workerSpanUs: 첫 콜백 시작부터 마지막 콜백 종료까지다. 둘 다 wait/submit과 겹친다.
+- publishUs: 실제 Scene::PublishAnimatorPose 호출, socketUs: join 뒤 소켓/부착물 반영.
+  updateUs: 이 단계들과 계측 집계를 포함하는 AnimationJob::Update 전체 경과 시간.
+- syncUs: Scene::SyncDerivedState. renderCommitUs: Scene::UpdateRenderData.
+  paletteUs는 실제 ProxyCommand 생성자의 512행렬 버퍼 할당·초기화·복사만 재며
+  renderCommitUs의 부분집합이다. GPU 업로드 시간이 아니다.
+- cpuFrameUs = updateUs + syncUs + renderCommitUs. 병렬 콜백 합계나 paletteUs를
+  여기에 다시 더하지 않는다. 시뮬레이션 전체 프레임 시간이나 GPU 시간으로 해석하지 않는다.
+- 명령은 paused Play에서 제품 모델 인스턴스·컨트롤러·본·메시·소켓을 생성한다.
+  Walk, dt=1/60, 30회 준비 후 120회 측정. 인스턴스 초기 위상은 분산한다.
+  씬 생성/에셋 로딩/cleanup/원자료 직렬화는 시간 구간에서 제외한다.
+- 실제 dirty commit으로 만든 palette batch를 매회 계측 뒤 캡처·폐기하고 superseded로
+  계수한다. 동기 명령 실행 중 메모리가 누적되지 않는다. GPU 소비·렌더 경합은 이 기선에 없다.
+- 모델 본 54개 중 암묵적인 루트를 제외한 씬 본 53개, 메시 4개, 소켓 1개/인스턴스.
+  모든 표본에서 평가 인원·씬 본 바인딩 수·palette copy 수/bytes와 non-finite 포즈를 검사한다.
+- 100체 실측 준비 중 MakeSocket의 복제 이름 (10) 제한을 발견했다. Scene pose binding과
+  같은 RemoveSuffixNumberTag를 써서 actor subtree 안에서 찾고, string_view 길이도 보존한다.
+- 단일 모델/한 컨트롤러/한 소켓의 warm CPU 기선이다. 다중 레이어·콜드 로딩·GPU 경합·
+  다른 CPU·LOD 강등 품질은 포함하지 않는다. 기존 100체 제품 정확성 회귀를 따로 실행한다.
+
+### Release 결과
+
+단위 ms. 각 인원별 360표본을 합친 중앙값(p50)과 p95다.
+
+| 인원 | 전체 경로 p50 / p95 | worker 합산 p50 | owner 대기 p50 / p95 | 본 반영 p50 | 팔레트 할당·복사 p50 | 전송 바이트/표본 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 10 | 0.324 / 3.761 | 0.100 | 0.050 / 3.436 | 0.034 | 0.101 | 1,310,720 |
+| 50 | 1.930 / 8.047 | 0.453 | 0.116 / 5.792 | 0.182 | 0.768 | 6,553,600 |
+| 100 | 8.741 / 12.694 | 0.946 | 0.198 / 2.213 | 0.507 | 5.729 | 13,107,200 |
+
+세 실행의 전체 경로 p50 범위는 10체 0.307–0.335, 50체 1.844–2.001,
+100체 8.526–9.027ms다. 상세 단계별 평균/p50/p95와 소스 해시는
+[측정 요약 JSON](../analysis/AnimationBaseline20260920.json)에 보존했다.
+
+- 100체의 worker 합산 중앙값은 0.946ms, 첫 시작~마지막 완료 구간은 0.148ms다.
+  전체 경로 8.741ms 중 팔레트 할당·복사 중앙값이 5.729ms다. 스레드 수를 더 늘리는
+  선택의 근거는 없으며 S3.5의 실제 본 수/인스턴스별 공유 팔레트 저장소가 주요 개선 대상이다.
+- 100체는 매 표본 400개 × 512행렬 = 12.5MiB를 복제한다. 이 값은 CPU snapshot
+  payload 크기이며 GPU 전송량을 계측한 값이 아니다. 실제 본은 54개다.
+- 작은 부하에서도 대기 p95가 크다. wait에는 큐 대기·wake·완료 통지 및 호출자 재스케줄링이
+  함께 들어가므로 원인을 특정하지 않는다. 평균/중앙값만 보고 안정적인 프레임이라고
+  판정하지 않는다. PHASE 14의 안전한 worker 수집 경계가 다음 선행 과제다.
+- **S5 초기 예산 후보는 평가 작업 합산 QPC 2.0ms**로 잡는다. 100체 단일 레이어의
+  합산 p95 1.155ms에 약 73% 여유가 있는 출발값이다. 이는 운영체제 CPU 사용 시간이나
+  전체 애니메이션 프레임 2ms 보장이 아니다. 본/팔레트 게시 비용과 대기 꼬리는 별도다.
+  다중 레이어·태스크 레시피별 비용을 PHASE 14 이후 재측정해 S5에서 설정·강등에 배선한다.
+  이번에는 EngineSetting이나 런타임 강등 기본값을 변경하지 않았다.
+
+### 검증과 재현
+
+- Editor/Player Debug·Release 빌드 exit 0. 기존 LNK4229/LNK4020와 관리 코드 분석 경고는
+  남아 있으며 경고 없는 빌드로 선언하지 않는다.
+- Release 3회·Debug 1회 모두 10/50/100체 × 120표본에서 평가 수·본 53개/체·팔레트
+  4개/체 경로 단정을 통과했다. Debug 시간은 성능 기선에 섞지 않는다.
+- 기존 애니메이션 제품 회귀도 Debug/Release 각각 `actors=100 rounds=12 checks=69514
+  managedThreadErrors=0 model=CreatorRobot`으로 통과했다. 신규 대규모 인스턴스 검사는
+  MakeSocket의 (10) 제한을 실제로 검출한 뒤 수정본에서 통과했다.
+- 재현: `Tools/regression/measure-animation-baseline.ps1 -Configuration Release -Repeats 3`.
+  원자료는 `Build/Obj/Phase13S1/Release-final/run-*/results.jsonl`, 구성별 검증은
+  같은 Phase13S1의 `Debug-final`, `Product-Debug`, `Product-Release`에 있다.
+- **S1 기선 확보 완료. 다음 순서는 PHASE 14 P1b/P2 → PHASE 13 S2′~S3.5**다.
+  현재 비용을 줄이는 코드는 넣지 않았고 백엔드별 성능 비교도 수행하지 않았다.

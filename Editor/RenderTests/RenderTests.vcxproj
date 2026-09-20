@@ -30,6 +30,7 @@
     <ClInclude Include="Tasks\WorkerPoolSelfTest.h" />
     <ClInclude Include="Tasks\SceneLoadJobsSelfTest.h" />
     <ClInclude Include="RHI\ParallelRecordingJobsSelfTest.h" />
+    <ClInclude Include="Animation\AnimationBaselineProbe.h" />
     <ClInclude Include="Animation\AnimationPlaybackSelfTest.h" />
     <ClInclude Include="Animation\AnimationVisualProbe.h" />
     <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h" />
@@ -69,6 +70,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Animation\AnimationVisualProbe.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Animation\AnimationBaselineProbe.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Animation\AnimationPlaybackSelfTest.cpp">

@@ -1,4 +1,5 @@
 #include "AnimationJob.h"
+#include "AnimationDiagnostics.h"
 #include "JobScheduler.h"
 #include "RenderScene.h"
 #include "BoneRegion.h"
@@ -16,6 +17,26 @@
 #include <atomic> // D34b: 루트 본 부재 1회 경고
 #include "ModelConsumptionDiagnostics.h" // MBC10: 틱 경로 관측(읽기 전용 계수)
 #include <mathematics/transform.hpp>
+
+namespace
+{
+    thread_local AnimationFrameMetrics* g_animationSample = nullptr;
+    // A job owns one slot. The owner reads only after its group's wait completes.
+    struct alignas(64) AnimationWorkerTiming
+    {
+        AnimationMeasurementScope::Clock::time_point m_begin{}, m_end{};
+        bool m_evaluated = false;
+    };
+}
+
+AnimationMeasurementScope::AnimationMeasurementScope(AnimationFrameMetrics& sample)
+    : m_previous(g_animationSample)
+{
+    sample = {};
+    g_animationSample = &sample;
+}
+AnimationMeasurementScope::~AnimationMeasurementScope() { g_animationSample = m_previous; }
+AnimationFrameMetrics* AnimationMeasurementScope::Current() { return g_animationSample; }
 
 AnimationJob::AnimationJob()
 {
@@ -84,8 +105,12 @@ std::vector<Animator*> AnimationJob::SnapshotAnimators()
 
 void AnimationJob::Update(float deltaTime)
 {
-	const auto currentAnimators = SnapshotAnimators();
-	job_group jobs;
+    using Clock = AnimationMeasurementScope::Clock;
+    auto* sample = AnimationMeasurementScope::Current();
+    const auto begin = sample ? Clock::now() : Clock::time_point{};
+    const auto currentAnimators = SnapshotAnimators();
+    std::vector<AnimationWorkerTiming> timings(sample ? currentAnimators.size() : 0);
+    job_group jobs;
 
     for(const auto& animator : currentAnimators)
     {
@@ -104,8 +129,10 @@ void AnimationJob::Update(float deltaTime)
             [](const std::weak_ptr<AnimationController>& controller) { return controller.lock() == nullptr; });
         if (hasExpiredController)
             continue;
-        jobs.add([this, animator, controllers, delta = deltaTime] ()
+        AnimationWorkerTiming* timing = sample ? &timings[jobs.size()] : nullptr;
+        jobs.add([this, animator, controllers, delta = deltaTime, timing] ()
         {
+            if (timing) timing->m_begin = Clock::now();
             // I6-B4b — 재생 경로가 하나다. legacy 재귀 폴백(UsesMultipleControllers
             // 분기 · UpdateBone/UpdateBlendBone/UpdateBoneLayer ~200줄)을 걷었다.
             // 그 폴백이 살아 있으면 Animator가 legacy Skeleton을 들고 있어야 하고,
@@ -127,7 +154,11 @@ void AnimationJob::Update(float deltaTime)
                 animator->m_tickPathLogged = true;
                 ModelConsumptionDiagnostics::NoteTickPath(nullptr != typedSkeleton);
             }
-            if (nullptr == typedSkeleton) return;
+            if (nullptr == typedSkeleton)
+            {
+                if (timing) timing->m_end = Clock::now();
+                return;
+            }
 
             float deltaT = delta;
             if (animator->m_stopTimer > 0.f) {
@@ -141,10 +172,36 @@ void AnimationJob::Update(float deltaTime)
             }
 
             TickGeneration(*animator, *generation, deltaT);
+            if (timing)
+            {
+                timing->m_end = Clock::now();
+                timing->m_evaluated = true;
+            }
         });
     }
 
-    ce::get_job_scheduler().submit(std::move(jobs)).wait();
+    const auto prepared = sample ? Clock::now() : Clock::time_point{};
+    const auto jobCount = jobs.size();
+    auto completion = ce::get_job_scheduler().submit(std::move(jobs));
+    const auto submitted = sample ? Clock::now() : Clock::time_point{};
+    completion.wait();
+    const auto joined = sample ? Clock::now() : Clock::time_point{};
+    if (sample)
+    {
+        sample->m_jobs = jobCount;
+        sample->m_prepareUs = AnimationMeasurementScope::Microseconds(begin, prepared);
+        sample->m_submitUs = AnimationMeasurementScope::Microseconds(prepared, submitted);
+        sample->m_waitUs = AnimationMeasurementScope::Microseconds(submitted, joined);
+        auto first = joined, last = begin;
+        for (std::size_t i = 0; i < jobCount; ++i)
+        {
+            sample->m_workerSumUs += AnimationMeasurementScope::Microseconds(timings[i].m_begin, timings[i].m_end);
+            sample->m_evaluatedAnimators += timings[i].m_evaluated ? 1 : 0;
+            first = std::min(first, timings[i].m_begin);
+            last = std::max(last, timings[i].m_end);
+        }
+        if (jobCount) sample->m_workerSpanUs = AnimationMeasurementScope::Microseconds(first, last);
+    }
 
 	// X7 — worker는 Animator 소유 pose/socket staging만 쓴다. Scene packed
 	// storage와 부착 오브젝트 Transform은 모든 job이 끝난 이 barrier 뒤에서
@@ -157,10 +214,18 @@ void AnimationJob::Update(float deltaTime)
 		if (!owner || owner->IsDestroyMark()) continue;
 		if (Scene* scene = owner->GetScene())
 		{
-			scene->PublishAnimatorPose(*animator);
+            const auto publishBegin = sample ? Clock::now() : Clock::time_point{};
+            const auto metrics = scene->PublishAnimatorPose(*animator);
+            if (sample)
+            {
+                sample->m_publishUs += AnimationMeasurementScope::Microseconds(publishBegin, Clock::now());
+                sample->m_validBones += metrics.validBones;
+                sample->m_localWrites += metrics.localWrites;
+            }
 		}
 
 		if (!animator->HasSocket() || !SceneManagers->m_isGameStart) continue;
+        const auto socketBegin = sample ? Clock::now() : Clock::time_point{};
 		for (Socket* socket : animator->socketvec)
 		{
 			if (!socket) continue;
@@ -168,7 +233,9 @@ void AnimationJob::Update(float deltaTime)
 				socket->m_boneMatrix, TransformWriteReason::Animator);
 			socket->Update();
 		}
+        if (sample) sample->m_socketUs += AnimationMeasurementScope::Microseconds(socketBegin, Clock::now());
 	}
+    if (sample) sample->m_updateUs = AnimationMeasurementScope::Microseconds(begin, Clock::now());
 }
 
 void AnimationJob::PrepareAnimation()

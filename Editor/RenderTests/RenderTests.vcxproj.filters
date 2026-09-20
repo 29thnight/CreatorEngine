@@ -6,9 +6,11 @@
     <ClInclude Include="RHI\ParallelRecordingJobsSelfTest.h" />
     <ClCompile Include="Tasks\WorkerPoolSelfTest.cpp" />
     <ClCompile Include="Tasks\SceneLoadJobsSelfTest.cpp" />
+    <ClInclude Include="Animation\AnimationBaselineProbe.h" />
     <ClInclude Include="Animation\AnimationPlaybackSelfTest.h" />
     <ClInclude Include="Animation\AnimationVisualProbe.h" />
     <ClCompile Include="Animation\AnimationVisualProbe.cpp" />
+    <ClCompile Include="Animation\AnimationBaselineProbe.cpp" />
     <ClCompile Include="Animation\AnimationPlaybackSelfTest.cpp" />
   </ItemGroup>
   <ItemGroup>
