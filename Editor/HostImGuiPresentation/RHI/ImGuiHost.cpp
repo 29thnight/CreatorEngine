@@ -66,7 +66,14 @@ namespace
             //   ImGui 에서 창 경계를 넘는 그림은 운영체제 창을 따로 여는 길밖에 없다.
             io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-            io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+            // 창 분리(멀티뷰포트)는 보류한다 — 2026-09-19.
+            //
+            // 이 프로세스는 ImGui 를 PresentationThread 에서 돌리는데 창 메시지
+            // 펌프는 메인 스레드에만 있다. 보조 창을 만드는 스레드가 펌프를
+            // 가지지 않으면 그 창은 메시지를 못 받는다. 창 생성·파괴를 메인으로
+            // 마샬링하는 작업을 했고 게이트까지 세웠지만, 남은 문제가 있어
+            // 되돌린다(보류한 변경은 git stash 에 있다).
+            // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
             io.ConfigDpiScaleFonts = true;
             static const std::string kIniPath =
                 PathFinder::ConfigPath("imgui.ini").string();
