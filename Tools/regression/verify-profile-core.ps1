@@ -54,6 +54,39 @@ $mutations = @(
         New    = "`t`t`tconst marker_id id = 1;"
         Expect = 'marker/'
         Why    = '모든 이름이 한 id 로 뭉치면 어느 구간이 무엇인지 알 수 없다'
+    },
+
+    # ── PHASE 14 P3 집계 ────────────────────────────────────────────────────
+    @{
+        # 부모를 찾지 않고 전부 루트로 접는다. 트리가 사라지면 자식의 시간이
+        # 루트 합에 두 번 들어가 프레임 예산이 통째로 거짓이 된다.
+        Name   = 'aggregate-flatten'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`tconst node_key key{ stack.empty() ? 0u : stack.back(),"
+        New    = "`t`t`tconst node_key key{ 0u,"
+        Expect = 'aggregate/'
+        Why    = '깊이를 무시하고 접으면 자식이 루트로 올라와 트리가 사라진다'
+    },
+    @{
+        # self 를 total 그대로 둔다. 표의 모든 줄이 자기 자식의 시간을 제 것으로
+        # 주장하게 되고, self 로 병목을 찾는 일이 전부 틀어진다.
+        Name   = 'aggregate-self-as-total'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`tnode.self_ticks = (node.total_ticks > childTicks[i])"
+        New    = "`t`t`tnode.self_ticks = node.total_ticks; if (false) node.self_ticks = (node.total_ticks > childTicks[i])"
+        Expect = 'aggregate/'
+        Why    = 'self 에서 자식을 빼지 않으면 병목을 self 로 찾는 일이 전부 틀어진다'
+    },
+    @{
+        # 정렬을 걷는다. 이벤트는 **끝난 순서**로 기록되므로 정렬하지 않으면
+        # 자식이 부모보다 먼저 나와 트리가 뒤집힌다 — 이 코어에서 가장 틀리기
+        # 쉬운 가정이 그것이라 변이로 못 박는다.
+        Name   = 'aggregate-unsorted'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`tstd::sort(events.begin(), events.end(), precedes);"
+        New    = "`t`tif (events.size() > 1000000) std::sort(events.begin(), events.end(), precedes);"
+        Expect = 'aggregate/'
+        Why    = '이벤트는 끝난 순서로 들어오므로 정렬 없이는 자식이 부모보다 먼저 나온다'
     }
 )
 
@@ -61,6 +94,7 @@ $sources = @(
     (Join-Path $core 'ProfileMarker.cpp'),
     (Join-Path $core 'ProfileThreadStream.cpp'),
     (Join-Path $core 'ProfileCapture.cpp'),
+    (Join-Path $core 'ProfileAggregate.cpp'),
     (Join-Path $core 'ProfileService.cpp'),
     (Join-Path $PSScriptRoot 'profile_core_probe.cpp')
 )
@@ -171,7 +205,7 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host '-- 판정 -----------------------------'
-Write-Host '프로파일러 코어 통과 — 계약이 서고, 변이 셋이 각각 제 검사에서 붉어진다'
+Write-Host ("프로파일러 코어 통과 — 계약이 서고, 변이 {0} 이 각각 제 검사에서 붉어진다" -f $mutations.Count)
 
 # 종료 코드를 명시한다. 판정이 종료 코드뿐인 집중 검사 방식에서는 성공
 # 경로가 남의 $LASTEXITCODE 를 흘리면 게이트가 판정 능력을 잃는다

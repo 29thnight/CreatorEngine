@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ProfileAggregate.h" />
     <ClInclude Include="ProfileCapture.h" />
     <ClInclude Include="ProfileEvent.h" />
     <ClInclude Include="ProfileMarker.h" />
@@ -27,6 +28,7 @@
     <ClInclude Include="ProfileThreadStream.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ProfileAggregate.cpp" />
     <ClCompile Include="ProfileCapture.cpp" />
     <ClCompile Include="ProfileMarker.cpp" />
     <ClCompile Include="ProfileService.cpp" />

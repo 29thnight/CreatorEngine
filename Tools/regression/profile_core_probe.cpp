@@ -14,6 +14,7 @@
 #include <thread>
 #include <vector>
 
+#include "ProfileAggregate.h"
 #include "ProfileScope.h"
 #include "ProfileService.h"
 
@@ -409,6 +410,377 @@ namespace
 		check(capture->find_frame(1) == nullptr, "rolling/evicted — 오래된 프레임은 버려진다");
 		check(capture->find_frame(32) != nullptr, "rolling/newest — 최신 프레임은 남는다");
 	}
+	//-------------------------------------------------------------------------
+	// ⑨ PHASE 14 P3 — 집계. 얼린 캡처를 Hierarchy/Flat 으로 접는다.
+	//
+	//    ★ 이 검사들이 코어에 있는 이유: 완료조건("Timeline 합계와 Hierarchy
+	//      inclusive time 이 일치한다")은 순수 계산이라 화면이 필요 없다.
+	//      그리는 층에 집계를 두면 그 조건을 잴 수단이 눈뿐이 된다.
+	//-------------------------------------------------------------------------
+	const ce::aggregate_row* find_row(const ce::frame_aggregate& aggregate,
+	                                  ce::marker_id marker, std::uint16_t depth)
+	{
+		for (const ce::aggregate_row& row : aggregate.hierarchy())
+		{
+			if (row.marker == marker && row.depth == depth)
+			{
+				return &row;
+			}
+		}
+		return nullptr;
+	}
+
+	const ce::aggregate_row* find_flat(const ce::frame_aggregate& aggregate,
+	                                   ce::marker_id marker)
+	{
+		for (const ce::aggregate_row& row : aggregate.flat())
+		{
+			if (row.marker == marker)
+			{
+				return &row;
+			}
+		}
+		return nullptr;
+	}
+
+	void busy_ticks(int rounds)
+	{
+		// 구간에 잴 만한 길이를 준다. sleep 을 쓰면 검사가 느려지고, 빈
+		// 스코프는 tick 해상도 아래로 내려가 0 이 될 수 있다.
+		volatile std::uint64_t sink = 0;
+		for (int i = 0; i < rounds * 1000; ++i)
+		{
+			sink += static_cast<std::uint64_t>(i);
+		}
+		(void)sink;
+	}
+
+	void test_aggregate_tree()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		// Outer > (Inner, Inner, Leaf) — 같은 marker 를 두 번 부른다.
+		{
+			ce::profile_scope outer{ service, ce::marker<"AggOuter">() };
+			busy_ticks(4);
+			{
+				ce::profile_scope inner{ service, ce::marker<"AggInner">() };
+				busy_ticks(2);
+			}
+			{
+				ce::profile_scope inner{ service, ce::marker<"AggInner">() };
+				busy_ticks(8);
+			}
+			{
+				ce::profile_scope leaf{ service, ce::marker<"AggLeaf">() };
+				busy_ticks(1);
+			}
+		}
+
+		service.publish_frame(1);
+		service.pause();
+
+		ce::capture_session_ptr capture = service.capture();
+		check(capture != nullptr, "aggregate/capture — 얼린 캡처가 있다");
+		if (!capture)
+		{
+			return;
+		}
+
+		const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 1);
+
+		check_eq(aggregate.event_count(), std::uint64_t{ 4 }, "aggregate/events — 이벤트 넷");
+		check_eq(aggregate.hierarchy().size(), std::size_t{ 3 },
+		         "aggregate/rows — 같은 부모의 같은 marker 는 한 줄로 접힌다");
+
+		const ce::aggregate_row* outer = find_row(aggregate, ce::marker<"AggOuter">(), 0);
+		const ce::aggregate_row* inner = find_row(aggregate, ce::marker<"AggInner">(), 1);
+		const ce::aggregate_row* leaf = find_row(aggregate, ce::marker<"AggLeaf">(), 1);
+
+		check(outer != nullptr, "aggregate/root — 루트 행이 있다");
+		check(inner != nullptr, "aggregate/child — 자식 행이 있다");
+		check(leaf != nullptr, "aggregate/leaf — 잎 행이 있다");
+		if (!outer || !inner || !leaf)
+		{
+			return;
+		}
+
+		check_eq(outer->call_count, std::uint64_t{ 1 }, "aggregate/calls-root — 루트는 한 번");
+		check_eq(inner->call_count, std::uint64_t{ 2 }, "aggregate/calls-child — 자식은 두 번");
+
+		// ★ 트리가 서지 않으면 여기가 무너진다. depth 를 무시하고 접으면
+		//   자식이 루트로 올라와 루트 행이 셋이 된다.
+		std::size_t roots = 0;
+		for (const ce::aggregate_row& row : aggregate.hierarchy())
+		{
+			if (row.depth == 0) ++roots;
+		}
+		check_eq(roots, std::size_t{ 1 }, "aggregate/single-root — 루트는 하나다");
+
+		// self = total - 직속 자식 합.
+		const ce::profile_tick childSum = inner->total_ticks + leaf->total_ticks;
+		check(outer->total_ticks >= childSum,
+		      "aggregate/containment — 부모 total 이 자식 합보다 크거나 같다");
+		check_eq(outer->self_ticks, outer->total_ticks - childSum,
+		         "aggregate/self — self 는 total 에서 직속 자식을 뺀 것");
+		check_eq(inner->self_ticks, inner->total_ticks,
+		         "aggregate/self-leaf — 자식이 없으면 self 는 total");
+
+		// max 는 한 호출의 최대다. 두 번 부른 자식은 total 보다 작아야 한다.
+		check(inner->max_ticks < inner->total_ticks,
+		      "aggregate/max — 여러 번 부른 행의 max 는 total 보다 작다");
+		check(inner->max_ticks > 0, "aggregate/max-positive — max 가 0 이 아니다");
+
+		// ★ 완료조건. 같은 것을 두 길로 더하므로 정확히 같아야 한다.
+		check_eq(aggregate.timeline_total_ticks(), aggregate.hierarchy_total_ticks(),
+		         "aggregate/totals — Timeline 합계와 Hierarchy inclusive 합이 같다");
+		check(aggregate.timeline_total_ticks() > 0,
+		      "aggregate/totals-positive — 합계가 0 이 아니다");
+
+		// 서브트리는 전위 순서에서 연속이다.
+		check(outer->child_begin < outer->child_end,
+		      "aggregate/child-range — 루트에 자식 범위가 있다");
+		check_eq(static_cast<std::size_t>(outer->child_end - outer->child_begin),
+		         std::size_t{ 2 }, "aggregate/child-count — 직속 자식 둘");
+
+		const ce::thread_summary* thread = aggregate.threads().empty()
+			? nullptr : &aggregate.threads()[0];
+		check(thread != nullptr, "aggregate/thread — 스레드 요약이 있다");
+		if (thread)
+		{
+			check_eq(thread->max_depth, std::uint16_t{ 1 }, "aggregate/depth — 최대 깊이 1");
+			check_eq(thread->event_count, std::uint32_t{ 4 }, "aggregate/thread-events — 넷");
+		}
+	}
+
+	//-------------------------------------------------------------------------
+	// ⑩ 여러 프레임을 한 범위로 접는다. "다중 frame selection" 이 이것이다.
+	//-------------------------------------------------------------------------
+	void test_aggregate_range()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		for (std::uint32_t frame = 1; frame <= 4; ++frame)
+		{
+			{
+				ce::profile_scope outer{ service, ce::marker<"RangeOuter">() };
+				busy_ticks(2);
+				{
+					ce::profile_scope inner{ service, ce::marker<"RangeInner">() };
+					busy_ticks(1);
+				}
+			}
+			service.publish_frame(frame);
+		}
+		service.pause();
+
+		ce::capture_session_ptr capture = service.capture();
+		if (!capture)
+		{
+			check(false, "aggregate-range/capture — 얼린 캡처가 있다");
+			return;
+		}
+
+		const ce::frame_aggregate one = ce::aggregate_frames(*capture, 2, 2);
+		const ce::frame_aggregate four = ce::aggregate_frames(*capture, 1, 4);
+
+		check_eq(one.frame_count(), std::uint32_t{ 1 }, "aggregate-range/one — 한 프레임");
+		check_eq(four.frame_count(), std::uint32_t{ 4 }, "aggregate-range/four — 네 프레임");
+
+		const ce::aggregate_row* single = find_row(one, ce::marker<"RangeOuter">(), 0);
+		const ce::aggregate_row* merged = find_row(four, ce::marker<"RangeOuter">(), 0);
+		check(single != nullptr && merged != nullptr, "aggregate-range/rows — 두 범위 모두 행이 있다");
+		if (!single || !merged)
+		{
+			return;
+		}
+
+		check_eq(single->call_count, std::uint64_t{ 1 }, "aggregate-range/calls-one — 한 번");
+		check_eq(merged->call_count, std::uint64_t{ 4 }, "aggregate-range/calls-four — 네 번");
+		check(merged->total_ticks > single->total_ticks,
+		      "aggregate-range/total — 범위를 넓히면 total 이 커진다");
+		check(merged->max_ticks >= single->max_ticks,
+		      "aggregate-range/max — max 는 범위를 넓혀도 줄지 않는다");
+
+		check_eq(four.timeline_total_ticks(), four.hierarchy_total_ticks(),
+		         "aggregate-range/totals — 범위가 넓어도 두 합이 같다");
+
+		// 캡처에 없는 범위는 빈 집계다. 던지지 않는다.
+		const ce::frame_aggregate none = ce::aggregate_frames(*capture, 900, 901);
+		check_eq(none.event_count(), std::uint64_t{ 0 }, "aggregate-range/empty — 없는 범위는 비어 있다");
+		check(none.hierarchy().empty(), "aggregate-range/empty-rows — 빈 범위에 행이 없다");
+	}
+
+	//-------------------------------------------------------------------------
+	// ⑪ 스레드가 섞여도 트리가 갈린다. 같은 marker 라도 스레드가 다르면
+	//    다른 줄이어야 한다 — 그러지 않으면 워커의 시간이 게임 스레드에
+	//    더해져 프레임 예산이 통째로 거짓이 된다.
+	//-------------------------------------------------------------------------
+	void test_aggregate_threads()
+	{
+		ce::profiler_service service;
+		ce::profiler_config config;
+		config.chunk_count = 256;
+		service.initialize(config);
+		service.register_thread("Main");
+		service.record(1);
+
+		std::thread worker([&service]()
+		{
+			service.register_thread("Worker");
+			{
+				ce::profile_scope scope{ service, ce::marker<"Shared">() };
+				busy_ticks(4);
+			}
+			service.unregister_thread();
+		});
+
+		{
+			ce::profile_scope scope{ service, ce::marker<"Shared">() };
+			busy_ticks(4);
+		}
+		worker.join();
+
+		service.publish_frame(1);
+		service.pause();
+
+		ce::capture_session_ptr capture = service.capture();
+		if (!capture)
+		{
+			check(false, "aggregate-thread/capture — 얼린 캡처가 있다");
+			return;
+		}
+
+		const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 1);
+		check_eq(aggregate.threads().size(), std::size_t{ 2 },
+		         "aggregate-thread/lanes — 스레드 둘이 레인 둘");
+		check_eq(aggregate.hierarchy().size(), std::size_t{ 2 },
+		         "aggregate-thread/rows — 같은 marker 라도 스레드가 다르면 다른 줄");
+
+		// 두 줄의 thread_slot 이 실제로 다르다.
+		if (aggregate.hierarchy().size() == 2)
+		{
+			check(aggregate.hierarchy()[0].thread_slot != aggregate.hierarchy()[1].thread_slot,
+			      "aggregate-thread/slots — 두 줄의 스레드가 다르다");
+		}
+
+		// Flat 도 스레드를 섞지 않는다.
+		std::size_t sharedRows = 0;
+		for (const ce::aggregate_row& row : aggregate.flat())
+		{
+			if (row.marker == ce::marker<"Shared">()) ++sharedRows;
+		}
+		check_eq(sharedRows, std::size_t{ 2 }, "aggregate-thread/flat — Flat 도 스레드를 섞지 않는다");
+
+		check_eq(aggregate.timeline_total_ticks(), aggregate.hierarchy_total_ticks(),
+		         "aggregate-thread/totals — 스레드가 여럿이어도 두 합이 같다");
+	}
+
+	//-------------------------------------------------------------------------
+	// ⑫ Flat 은 부모를 무시하고 접는다. 같은 marker 가 서로 다른 부모 아래
+	//    있을 때 Hierarchy 는 두 줄, Flat 은 한 줄이어야 한다.
+	//-------------------------------------------------------------------------
+	void test_aggregate_flat()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		{
+			ce::profile_scope a{ service, ce::marker<"ParentA">() };
+			ce::profile_scope shared{ service, ce::marker<"SharedLeaf">() };
+			busy_ticks(2);
+		}
+		{
+			ce::profile_scope b{ service, ce::marker<"ParentB">() };
+			ce::profile_scope shared{ service, ce::marker<"SharedLeaf">() };
+			busy_ticks(3);
+		}
+
+		service.publish_frame(1);
+		service.pause();
+
+		ce::capture_session_ptr capture = service.capture();
+		if (!capture)
+		{
+			check(false, "aggregate-flat/capture — 얼린 캡처가 있다");
+			return;
+		}
+
+		const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 1);
+
+		std::size_t hierarchyRows = 0;
+		for (const ce::aggregate_row& row : aggregate.hierarchy())
+		{
+			if (row.marker == ce::marker<"SharedLeaf">()) ++hierarchyRows;
+		}
+		check_eq(hierarchyRows, std::size_t{ 2 },
+		         "aggregate-flat/hierarchy — 부모가 다르면 Hierarchy 에서 두 줄");
+
+		const ce::aggregate_row* flat = find_flat(aggregate, ce::marker<"SharedLeaf">());
+		check(flat != nullptr, "aggregate-flat/row — Flat 에 줄이 있다");
+		if (!flat)
+		{
+			return;
+		}
+		check_eq(flat->call_count, std::uint64_t{ 2 },
+		         "aggregate-flat/calls — Flat 은 부모를 무시하고 합친다");
+
+		// Flat 은 total 내림차순이다.
+		for (std::size_t i = 1; i < aggregate.flat().size(); ++i)
+		{
+			check(aggregate.flat()[i - 1].total_ticks >= aggregate.flat()[i].total_ticks,
+			      "aggregate-flat/order — Flat 은 total 내림차순");
+		}
+
+		check_eq(aggregate.timeline_total_ticks(), aggregate.hierarchy_total_ticks(),
+		         "aggregate-flat/totals — 두 합이 같다");
+	}
+
+	//-------------------------------------------------------------------------
+	// ⑬ 잘린 구간이 행에 전파된다. 표시하는 쪽은 이 줄의 합계를 다른 줄과
+	//    나란히 두면 안 되므로, 집계가 그 사실을 잃으면 안 된다.
+	//-------------------------------------------------------------------------
+	void test_aggregate_truncated()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		// 프레임을 넘는 구간을 만든다 — 1 프레임에서 열고 2 에서 닫는다.
+		{
+			ce::profile_scope spanning{ service, ce::marker<"Spanning">() };
+			busy_ticks(2);
+			service.publish_frame(1);
+			busy_ticks(2);
+		}
+		service.publish_frame(2);
+		service.pause();
+
+		ce::capture_session_ptr capture = service.capture();
+		if (!capture)
+		{
+			check(false, "aggregate-truncated/capture — 얼린 캡처가 있다");
+			return;
+		}
+
+		const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 2);
+		const ce::aggregate_row* row = find_row(aggregate, ce::marker<"Spanning">(), 0);
+		check(row != nullptr, "aggregate-truncated/row — 프레임을 넘는 구간이 집계에 있다");
+		if (!row)
+		{
+			return;
+		}
+		check(row->total_ticks > 0, "aggregate-truncated/length — 길이가 0 이 아니다");
+	}
 }
 
 int main()
@@ -421,6 +793,11 @@ int main()
 	test_service_isolation();
 	test_recorder_states();
 	test_rolling_retention();
+	test_aggregate_tree();
+	test_aggregate_range();
+	test_aggregate_threads();
+	test_aggregate_flat();
+	test_aggregate_truncated();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

@@ -1,0 +1,112 @@
+#pragma once
+// PHASE 14 P3 — 얼린 캡처를 읽는 집계.
+//
+// ★ 이 파일이 코어에 있는 이유.
+//
+//   P3 가 만드는 것(Frame Overview · Timeline · Hierarchy/Flat)은 전부 "얼린
+//   캡처를 어떻게 접는가" 이고, 접는 일 자체에는 ImGui 가 한 줄도 필요 없다.
+//   그리는 층에 두면 완료조건("Timeline 합계와 Hierarchy inclusive time 이
+//   일치한다")을 잴 수단이 화면뿐이 된다 — P1·P2 에서 두 번 겪었듯 그리는
+//   것만으로는 살았는지 알 수 없다.
+//
+//   그래서 접는 일은 여기 두고 검사는 코어 프로브가 한다. 코어가 표시를 모른다는
+//   규약은 지켜진다 — 이 파일은 자료를 자료로 바꿀 뿐이다.
+//
+// ★ 트리를 어떻게 되살리는가.
+//
+//   이벤트는 **끝난 순서**로 기록된다(`end_scope` 에서 쓰므로 자식이 부모보다
+//   먼저 들어간다). 그래서 목록을 그대로 읽으면 안쪽부터 나온다. 같은 스레드
+//   안에서 (시작 tick 오름차순, depth 오름차순)으로 세우면 전위 순회가 되고,
+//   그 뒤에는 depth 만으로 부모를 찾을 수 있다.
+#include <cstdint>
+#include <span>
+#include <vector>
+
+#include "ProfileCapture.h"
+
+namespace ce
+{
+	// 집계 한 줄. Hierarchy 는 전위 순서로, Flat 은 total 내림차순으로 담긴다.
+	struct aggregate_row
+	{
+		marker_id     marker = invalid_marker;
+		std::uint16_t thread_slot = 0;
+		std::uint16_t depth = 0;
+
+		std::uint64_t call_count = 0;
+		profile_tick  total_ticks = 0;   // inclusive — 자식을 포함한다
+		profile_tick  self_ticks = 0;    // exclusive — 직속 자식의 total 을 뺀 것
+		profile_tick  max_ticks = 0;     // 한 호출의 최대 inclusive
+
+		// 이 행에 **잘린 구간이 섞였다.** 녹화 시작을 못 본 채 끝났거나(begin)
+		// 끝을 못 본 채 프레임이 넘어간(end) 구간이다. 표시하는 쪽은 이 줄의
+		// 합계를 다른 줄과 나란히 두면 안 된다 — 길이가 실제보다 짧다.
+		bool truncated = false;
+
+		// 자식 행의 범위 [child_begin, child_end). Hierarchy 에서만 뜻이 있다.
+		std::uint32_t child_begin = 0;
+		std::uint32_t child_end = 0;
+	};
+
+	// 스레드 하나의 요약. Timeline 이 레인을 세우는 근거이고, 완료조건이
+	// 말하는 "Timeline 합계" 가 여기의 root_ticks 다.
+	struct thread_summary
+	{
+		std::uint16_t thread_slot = 0;
+		std::uint32_t event_count = 0;
+		std::uint16_t max_depth = 0;
+
+		// depth 0 구간의 길이 합. 겹치지 않으므로 그냥 더한다.
+		profile_tick  root_ticks = 0;
+	};
+
+	// 프레임 범위 하나를 접은 결과. 만든 뒤에는 바뀌지 않는다.
+	class frame_aggregate
+	{
+	public:
+		std::span<const aggregate_row>  hierarchy() const { return m_hierarchy; }
+		std::span<const aggregate_row>  flat() const { return m_flat; }
+		std::span<const thread_summary> threads() const { return m_threads; }
+
+		std::uint32_t frame_begin() const { return m_frameBegin; }
+		std::uint32_t frame_end() const { return m_frameEnd; }   // [begin, end)
+		std::uint32_t frame_count() const { return m_frameEnd - m_frameBegin; }
+		std::uint64_t event_count() const { return m_eventCount; }
+		std::uint64_t dropped_events() const { return m_droppedEvents; }
+		std::uint64_t truncated_events() const { return m_truncatedEvents; }
+
+		// 벽시계 구간 — 선택한 프레임들의 tick_begin 최소와 tick_end 최대.
+		profile_tick  tick_begin() const { return m_tickBegin; }
+		profile_tick  tick_end() const { return m_tickEnd; }
+
+		// ★ 완료조건이 재는 값이다. 모든 스레드의 root_ticks 합과, Hierarchy
+		//   루트 행들의 total_ticks 합. 같은 것을 두 길로 더하므로 **정확히**
+		//   같아야 한다 — 부동소수로 바꾼 뒤 비교하면 어긋나도 오차로 읽힌다.
+		profile_tick  timeline_total_ticks() const { return m_timelineTotal; }
+		profile_tick  hierarchy_total_ticks() const { return m_hierarchyTotal; }
+
+		friend frame_aggregate aggregate_frames(const capture_session&,
+		                                        std::uint32_t, std::uint32_t);
+
+	private:
+		std::vector<aggregate_row>  m_hierarchy;
+		std::vector<aggregate_row>  m_flat;
+		std::vector<thread_summary> m_threads;
+
+		std::uint32_t m_frameBegin = 0;
+		std::uint32_t m_frameEnd = 0;
+		std::uint64_t m_eventCount = 0;
+		std::uint64_t m_droppedEvents = 0;
+		std::uint64_t m_truncatedEvents = 0;
+		profile_tick  m_tickBegin = 0;
+		profile_tick  m_tickEnd = 0;
+		profile_tick  m_timelineTotal = 0;
+		profile_tick  m_hierarchyTotal = 0;
+	};
+
+	// 엔진 프레임 [first, last] 를 접는다(양끝 포함). 범위가 비었거나 캡처에
+	// 없으면 빈 집계를 낸다 — 부르는 쪽이 판정할 수 있도록 던지지 않는다.
+	frame_aggregate aggregate_frames(const capture_session& capture,
+	                                 std::uint32_t first_frame,
+	                                 std::uint32_t last_frame);
+}
