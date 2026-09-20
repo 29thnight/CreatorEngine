@@ -621,20 +621,12 @@ void Editor::EditorMain::Update()
 	{
 		m_frameDeltaTime = Runtime::ResolveFrameDelta();
 
-		// PHASE 14 임시 계측 — 프레임 드랍 원인 추적용.
-		PROFILE_CPU_BEGIN("TitleBar");
 		UpdateTitleBar();
-		PROFILE_CPU_END();
-
-		PROFILE_CPU_BEGIN("InputUpdate");
 		InputManagement->Update(m_frameDeltaTime);
-		PROFILE_CPU_END();
 
 		// W5: 입력 갱신 뒤, 씬 틱 앞. 상태를 유도하고 이번 프레임의 입력
 		// 소유자를 정한다 — 그래야 아래 스크립트가 같은 프레임의 소유권을 본다.
-		PROFILE_CPU_BEGIN("PlayModeTick");
 		m_playModeController.Tick();
-		PROFILE_CPU_END();
 
 		// ★ 요청(IsGameStart)이 아니라 **확정**(IsPlayCommitted)으로 가른다(W5).
 		//   요청으로 가르면 Play 를 누른 프레임에 스냅샷이 뜨기 **전**에 Physics 와
@@ -662,9 +654,7 @@ void Editor::EditorMain::Update()
 		SceneManagers->Editor();
 
 		// 재생 중 순서는 Runtime이 소유한다(E3-7). Player가 타는 것과 같은 코드다.
-		PROFILE_CPU_BEGIN("TickSimulationFrame");
 		Runtime::TickSimulationFrame(m_frameDeltaTime);
-		PROFILE_CPU_END();
 	});
 
 	if (InputManagement->IsKeyReleased(VK_F5))
@@ -687,34 +677,14 @@ void Editor::EditorMain::Update()
 	// 필요가 없다. PresentationThread의 UI가 살아 있는 씬 객체를 읽는 구간과만
 	// 좁게 직렬화하고, 씬 전환과 파괴를 끝낸 뒤 호출자가 새 packet을 발행한다.
 	{
-		// ★ PHASE 14 임시 계측 — 이 락은 PresentationThread 가 ImGui 전체를
-		//   그리는 동안 쥐고 있다(PresentationThreadMain → PresentFrame → OnGui).
-		//   즉 여기서 기다린 시간이 곧 UI 쪽 비용의 그림자다. PresentationThread 에는
-		//   마커를 걸 수 없으므로(수집기가 producer TLS 를 직접 만진다 — 계획서 §3.1)
-		//   게임 스레드에서 이 대기를 재는 것이 현재 유일하게 안전한 관측이다.
-		//   lock_guard 를 unique_lock 으로 바꾼 것은 획득 대기만 따로 재기 위해서이고
-		//   해제 시점은 블록 끝으로 동일하다.
-		PROFILE_CPU_BEGIN("SceneStructureLockWait");
-		std::unique_lock<std::mutex> sceneLock(m_sceneStructureMutex);
-		PROFILE_CPU_END();
-
-		PROFILE_CPU_BEGIN("ModelPlacement");
+		std::lock_guard<std::mutex> sceneLock(m_sceneStructureMutex);
 		Editor::ModelPlacement::Get().Tick();
-		PROFILE_CPU_END();
-
-		PROFILE_CPU_BEGIN("ScriptAuthoring");
 		EditorScriptAuthoring::Tick();
-		PROFILE_CPU_END();
-
-		PROFILE_CPU_BEGIN("ApplyPendingSceneStructureChange");
 		SceneManagers->ApplyPendingSceneStructureChange();
-		PROFILE_CPU_END();
 
 		// OnRender도 게임 상태를 진행시키는 코루틴 단계다. 다른 coroutine queue와
 		// 동시에 만지지 않도록 GT에서 실행하고, 결과를 이번 packet에 포함한다.
-		PROFILE_CPU_BEGIN("Coroutine_OnRender");
 		CoroutineManagers->yield_OnRender();
-		PROFILE_CPU_END();
 
 		PROFILE_CPU_BEGIN("EndOfFrame");
 		SceneManagers->DisableOrEnable();

@@ -17,8 +17,6 @@
 #include "EditorAssetPresentation.h"
 #include "EditorPlatform.h"
 #include "EditorWindowChrome.h"
-// PHASE 14 임시 계측 — 프레임 드랍 원인 추적용. 새 수집 코어(§0.5)로 갈 때 함께 정리한다.
-#include "Profiler.h"
 #include "ViewportHostWindow.h"
 #include "RHI/ImGuiWin32Cursor.h"
 #include "PrefabUtility.h"
@@ -449,24 +447,16 @@ void Core::App::Run()
 	{
 		// Watcher I/O thread가 게시한 asset 변경은 GT 프레임 경계에서만 적용한다.
 		// 이 뒤 Update와 frame packet 밀봉은 같은 ShaderMeta generation을 본다.
-		PROFILE_CPU_BEGIN("DrainAssetChanges");
 		DataSystems->DrainQueuedAssetChanges();
-		PROFILE_CPU_END();
 
 		// 메인 루프
 		m_main->Update();
 
 		// 콘솔/스크립트 명령은 프레임 경계에서만 실행한다(게임 스레드 규약).
-		PROFILE_CPU_BEGIN("CLIPump");
 		auto& cli = ConsoleCommandSystem::Get();
 		cli.Pump();
-		PROFILE_CPU_END();
 
-		// 씬을 순회해 이번 프레임의 packet 을 밀봉·발행한다. 여기가 비면
-		// 프레임 시간의 상당 부분이 관측 밖에 있었다(PHASE 14 임시 계측).
-		PROFILE_CPU_BEGIN("PublishRenderFrame");
 		PublishRenderFrame();
-		PROFILE_CPU_END();
 
 		if (cli.IsQuitRequested())
 		{
